@@ -1,0 +1,1143 @@
+'use strict';
+// Procedural level generation, collision, raycasting and path flow-fields.
+// The map is a tile grid (TS metres per tile, after refinement: see TS/CTS/K below). 0 = floor, 1 = wall, 2 = furniture you can take cover behind,
+// 3 = door, 4 = other furniture (garden fences are furniture too). map.out marks tiles open to the sky. Furniture collision boxes live in map.props (see js/furniture.js).
+G.Level = {
+  // The grid: levels are laid out on 2 m cells (CTS), then refined 3x (K) to 0.67 m cells (TS) so walls between
+  // spaces are a single 0.67 m cell thick instead of a whole 2 m tile. Everything that plays on the map
+  // (collision, rays, paths, AI, rendering) works on the fine grid.
+  TS: 2 / 3,
+  CTS: 2,
+  K: 3,
+  CASE_CHANCE: 1, // share of levels with a weapon case (every one)
+  CAB_CHANCE: 0.35, // share of levels with a first aid cabinet on a wall (and of those, CAB_TWO with a second)
+  CAB_TWO: 0.2,
+  WALL_H: 4,
+  CRATE_H: 1.1,
+  CRATE_HX: 0.8,
+  DOOR_H: 2.3,
+
+  // th: the environment (index into G.THEMES) picked on the route map; by default they come round in turn
+  generate(seed, level, th) {
+    const U = G.U, r = U.rng(seed);
+    const theme = G.THEMES[th != null && G.THEMES[th] ? th : (level - 1) % G.THEMES.length];
+    // the layout: an apartment block, a warehouse, two houses back to back with their gardens between, or a
+    // building of rooms and corridors. Every one starts outside it (or, for the apartments, on the stairs).
+    const lay = theme.layout === 'apartments' ? this.layApartments(r, level) : theme.layout === 'warehouse' ? this.layWarehouse(r, level)
+      : theme.layout === 'houses' ? this.layHouses(r, level) : this.approach(this.layRooms(r, level), r, theme);
+    const { W, H, t, rooms } = lay;
+
+    // Doors (tile value 3). `axis` is the direction you walk through the door. The rooms layout puts single and
+    // double doors on the ring just outside each room where a corridor arrives; the others say where theirs go.
+    const doors = [], doorAt = new Map();
+    const isWall = (x, z) => x < 0 || z < 0 || x >= W || z >= H || t[z * W + x] === 1;
+    const addDoor = (x, z, axis, open, mirror, kind) => {
+      const i = z * W + x;
+      t[i] = 3;
+      const d = { id: doors.length, i, tx: x, tz: z, x: (x + 0.5) * this.CTS, z: (z + 0.5) * this.CTS, axis, open: !!open, mirror: !!mirror, kind: kind || null };
+      doors.push(d); doorAt.set(i, d);
+    };
+    if (lay.ringDoors) rooms.forEach((rm) => {
+      const ring = [];
+      for (let x = rm.x; x < rm.x + rm.w; x++) { ring.push([x, rm.z - 1, 'z']); ring.push([x, rm.z + rm.h, 'z']); }
+      for (let z = rm.z; z < rm.z + rm.h; z++) { ring.push([rm.x - 1, z, 'x']); ring.push([rm.x + rm.w, z, 'x']); }
+      for (const [x, z, axis] of ring) {
+        if (x <= 0 || z <= 0 || x >= W - 1 || z >= H - 1 || t[z * W + x] !== 0) continue;
+        const near = axis === 'z' ? [t[(z - 1) * W + x], t[(z + 1) * W + x]] : [t[z * W + x - 1], t[z * W + x + 1]];
+        if (near.includes(3)) continue; // no doors back to back
+        // (ax, az) steps along the room edge, across the opening
+        const ax = axis === 'z' ? 1 : 0, az = axis === 'z' ? 0 : 1;
+        const single = isWall(x - ax, z - az) && isWall(x + ax, z + az);
+        const double = !single && isWall(x - ax, z - az) && t[(z + az) * W + x + ax] === 0 && isWall(x + 2 * ax, z + 2 * az);
+        if (!(single || double) || r() > 0.8) continue;
+        const open = r() < 0.2;
+        addDoor(x, z, axis, open, false);
+        if (double) addDoor(x + ax, z + az, axis, open, true); // second leaf of a double door, hinged on the far side
+      }
+    });
+    for (const [x, z, axis, open, mirror, kind] of lay.doors || []) if (t[z * W + x] !== 3) addDoor(x, z, axis, open, mirror, kind);
+    // The coarse plan. out: tiles open to the sky (gardens); fences: garden fence tiles [x, z, axis].
+    const c = { W, H, t, rooms, seed, level, doors, doorAt, out: lay.out || new Uint8Array(W * H), fences: lay.fences || [], TS: this.CTS, theme };
+    const spawnRoom = lay.spawn || rooms[0];
+    const distFromSpawn = this.flow(c, [[spawnRoom.cx, spawnRoom.cz]]);
+    let exitRoom = rooms[1] || rooms[0], far = -1;
+    rooms.forEach((rm) => { const d = distFromSpawn[rm.cz * W + rm.cx]; if (rm !== spawnRoom && d > far) { far = d; exitRoom = rm; } });
+
+    // Furniture, planned on the coarse grid, only where it keeps the map fully connected
+    const countReach = () => {
+      const f = this.flow(c, [[spawnRoom.cx, spawnRoom.cz]]);
+      let n = 0; for (let i = 0; i < f.length; i++) if (f[i] >= 0) n++;
+      return n;
+    };
+    let reach = countReach();
+    const tryBlock = (x, z, v) => {
+      const i = z * W + x;
+      if (t[i] !== 0) return false;
+      t[i] = v;
+      const nr = countReach();
+      if (nr !== reach - 1) { t[i] = 0; return false; }
+      reach = nr; return true;
+    };
+    G.Furniture.plan(c, r, spawnRoom, exitRoom, tryBlock);
+
+    // then the fine grid, and everything that's placed on it
+    const map = this.refine(c);
+    map.units = lay.units || 0; // apartments: how many (rooms carry .unit)
+    // roller doors (rolled up): [x from, x to, z of the wall] in metres
+    map.rollers = (lay.rollers || []).map(([x0, z, w]) => [x0 * this.CTS, (x0 + w) * this.CTS, (z + 0.5) * this.CTS]);
+    map.spawnRoom = map.rooms[rooms.indexOf(spawnRoom)];
+    map.exitRoom = map.rooms[rooms.indexOf(exitRoom)];
+    return this.finish(map, r);
+  },
+
+  // Coarse plan -> fine grid (K x K cells per tile).
+  //  - A wall tile between two open spaces thins to its middle line of cells; the cells either side become
+  //    part of the spaces. Walls with solid mass behind them (the outside of the building) keep their bulk.
+  //  - A door becomes a 2-cell (1.33 m) opening in the middle line, the third cell wall; the two leaves of a
+  //    double door sit side by side (2.67 m).
+  //  - A garden fence becomes a line of 1-cell fence panels down the middle of its tile.
+  //  - Rooms grow into the cells their thinned walls gave up. Furniture against a wall slides out to the
+  //    wall's new face, and each piece blocks the fine cells it covers.
+  refine(c) {
+    const K = this.K, cs = this.TS, W = c.W * K, H = c.H * K;
+    const t = new Uint8Array(W * H).fill(1), out = new Uint8Array(W * H);
+    const cv = (x, z) => (x < 0 || z < 0 || x >= c.W || z >= c.H ? 1 : c.t[z * c.W + x]);
+    const cout = (x, z) => x >= 0 && z >= 0 && x < c.W && z < c.H && !!c.out[z * c.W + x];
+    const solid = (x, z) => { const v = cv(x, z); return v === 1 || v === 3; };
+    const fenceC = new Map(c.fences.map(([x, z, axis]) => [z * c.W + x, axis])), fenceAx = new Map();
+    // A thin wall separates two spaces (open on both sides along one axis). A wall where thin walls meet (a T or
+    // a corner) is thinned with them. Thinning keeps the wall's centre line and its arms toward the walls it
+    // joins; the rest of the tile opens up to the spaces around it. Walls with solid mass behind them (the
+    // outside of the building, the rock around a corridor) keep their bulk.
+    const open = (x, z) => !solid(x, z);
+    const thinWall = (x, z) => cv(x, z) === 1 && ((open(x - 1, z) && open(x + 1, z)) || (open(x, z - 1) && open(x, z + 1)));
+    for (let z = 0; z < c.H; z++) for (let x = 0; x < c.W; x++) {
+      const v = cv(x, z), ci = z * c.W + x;
+      const thinned = v === 1 && (thinWall(x, z) || [thinWall(x - 1, z), thinWall(x + 1, z), thinWall(x, z - 1), thinWall(x, z + 1)].filter(Boolean).length >= 2);
+      for (let j = 0; j < K; j++) for (let i = 0; i < K; i++) {
+        const fi = (z * K + j) * W + x * K + i;
+        // the coarse neighbour a side cell faces (a thinned cell takes its garden-ness)
+        const face = i === 0 ? [x - 1, z] : i === K - 1 ? [x + 1, z] : j === 0 ? [x, z - 1] : j === K - 1 ? [x, z + 1] : [x, z];
+        if (fenceC.has(ci)) { const ax = fenceC.get(ci), line = ax === 'x' ? j === 1 : i === 1; t[fi] = line ? 4 : 0; out[fi] = 1; if (line) fenceAx.set(fi, ax); continue; }
+        if (v === 1) {
+          if (!thinned || (i === 1 && j === 1)) continue;
+          // an arm toward a neighbouring wall stays; any other cell opens if it faces open space
+          const di = i - 1, dj = j - 1;
+          if ((dj === 0 && solid(x + di, z)) || (di === 0 && solid(x, z + dj))) continue;
+          const faces = [[x + di, z], [x, z + dj], [x + di, z + dj]].filter(([a, b]) => (a !== x || b !== z) && open(a, b));
+          if (!faces.length) continue;
+          t[fi] = 0; out[fi] = faces.some(([a, b]) => cout(a, b)) ? 1 : 0;
+          continue;
+        }
+        if (v === 3) {
+          const d = c.doorAt.get(ci), along = d.axis === 'z' ? i : j, across = d.axis === 'z' ? j : i;
+          if (across !== 1) { t[fi] = 0; out[fi] = cout(...(d.axis === 'z' ? [x, z + (j ? 1 : -1)] : [x + (i ? 1 : -1), z])) ? 1 : 0; continue; }
+          t[fi] = (d.mirror ? along <= 1 : along >= 1) ? 3 : 1;
+          continue;
+        }
+        t[fi] = 0; out[fi] = c.out[ci] ? 1 : 0; // floor (furniture is laid on it below)
+      }
+    }
+    // fence lines run through to the fence tiles beside them (no gap where a side fence meets the middle one)
+    for (const [ci] of fenceC) {
+      const x = ci % c.W, z = (ci / c.W) | 0;
+      for (const [dx, dz] of [[1, 0], [0, 1]]) {
+        if (x + dx >= c.W || z + dz >= c.H || !fenceC.has((z + dz) * c.W + x + dx)) continue;
+        for (let s = 1; s < K; s++) { const fi = (z * K + 1 + dz * s) * W + x * K + 1 + dx * s; t[fi] = 4; out[fi] = 1; if (!fenceAx.has(fi)) fenceAx.set(fi, dx ? 'x' : 'z'); }
+      }
+    }
+    // doors: one record for both cells of each opening
+    const doors = [], doorAt = new Map();
+    for (const d0 of c.doors) {
+      const ax = d0.tx * K, az = d0.tz * K, cells = (d0.mirror ? [0, 1] : [1, 2]).map((a) => (d0.axis === 'z' ? [ax + a, az + 1] : [ax + 1, az + a]));
+      const ids = cells.map(([x, z]) => z * W + x);
+      const d = { id: doors.length, i: ids[0], cells: ids, tx: cells[0][0], tz: cells[0][1], axis: d0.axis, open: d0.open, mirror: d0.mirror, kind: d0.kind, w: 2 * cs,
+        x: ((cells[0][0] + cells[1][0] + 1) / 2) * cs, z: ((cells[0][1] + cells[1][1] + 1) / 2) * cs };
+      doors.push(d); ids.forEach((i) => doorAt.set(i, d));
+    }
+    // rooms: the coarse rectangle, grown into any side the thinned walls opened up
+    const rooms = c.rooms.map((rm) => {
+      const x0 = rm.x * K, z0 = rm.z * K, x1 = (rm.x + rm.w) * K - 1, z1 = (rm.z + rm.h) * K - 1;
+      const col = (x) => { for (let z = z0; z <= z1; z++) if (t[z * W + x] !== 0) return false; return true; };
+      const row = (z) => { for (let x = x0; x <= x1; x++) if (t[z * W + x] !== 0) return false; return true; };
+      const nx0 = col(x0 - 1) ? x0 - 1 : x0, nx1 = col(x1 + 1) ? x1 + 1 : x1, nz0 = row(z0 - 1) ? z0 - 1 : z0, nz1 = row(z1 + 1) ? z1 + 1 : z1;
+      return Object.assign({}, rm, { x: nx0, z: nz0, w: nx1 - nx0 + 1, h: nz1 - nz0 + 1, cx: (nx0 + nx1) >> 1, cz: (nz0 + nz1) >> 1 });
+    });
+    // furniture: slid out to its wall's new face, then laid on the cells it covers
+    const R = G.Furniture.R, wb = G.Furniture.worldBoxes, props = new Map(), propList = [];
+    const hang = (i, p) => { const q = props.get(i); props.set(i, q ? { name: q.name, boxes: q.boxes.concat(p.boxes).sort((a, b) => b.h - a.h) } : p); };
+    for (const [ci, p0] of c.props) {
+      if (fenceC.has(ci)) continue;
+      const cx = ci % c.W, cz = (ci / c.W) | 0;
+      let x = p0.x, z = p0.z;
+      for (const [dx, dz] of p0.wd || []) {
+        const fx = dx > 0 ? cx * K + K : dx < 0 ? cx * K - 1 : cx * K + 1, fz = dz > 0 ? cz * K + K : dz < 0 ? cz * K - 1 : cz * K + 1;
+        if (t[fz * W + fx] === 0) { x += dx * cs; z += dz * cs; }
+      }
+      const p = Object.assign({}, p0, { x, z, boxes: wb(R[p0.name], x, z, p0.q, p0.v) });
+      propList.push(p);
+      const blocks = c.t[ci] === 2 || c.t[ci] === 4;
+      let any = false;
+      for (const b of p.boxes) {
+        for (let fz = Math.floor((b.cz - b.hz) / cs); fz <= Math.floor((b.cz + b.hz) / cs); fz++) for (let fx = Math.floor((b.cx - b.hx) / cs); fx <= Math.floor((b.cx + b.hx) / cs); fx++) {
+          if (fx < 0 || fz < 0 || fx >= W || fz >= H) continue;
+          const i = fz * W + fx;
+          if (t[i] !== 0 && !(blocks && (t[i] === 2 || t[i] === 4))) continue;
+          hang(i, p); any = true;
+          // a cell whose middle it covers is blocked (a small thing in a corner leaves the floor walkable)
+          if (blocks && Math.abs((fx + 0.5) * cs - b.cx) <= b.hx + 0.05 && Math.abs((fz + 0.5) * cs - b.cz) <= b.hz + 0.05) t[i] = c.t[ci];
+        }
+      }
+      if (!any) hang(Math.floor(z / cs) * W + Math.floor(x / cs), p);
+    }
+    // garden fence panels
+    for (let i = 0; i < W * H; i++) {
+      if (t[i] !== 4 || props.has(i)) continue;
+      const x = i % W, z = (i / W) | 0;
+      const p = { name: 'fence', q: fenceAx.get(i) === 'z' ? 1 : 0, x: (x + 0.5) * cs, z: (z + 0.5) * cs, v: ((x * 7 + z * 13) % 17) / 17 };
+      p.boxes = wb(R.fence, p.x, p.z, p.q, p.v);
+      props.set(i, p); propList.push(p);
+    }
+    return { W, H, t, out, rooms, seed: c.seed, level: c.level, doors, doorAt, props, propList, theme: c.theme };
+  },
+
+  // Everything placed on the fine grid: cover spots, hiding spots, where suspects start, the weapon case, the
+  // lights, spawn and extraction.
+  finish(map, r) {
+    const U = G.U, { W, H, t, rooms, spawnRoom, exitRoom } = map, TS = this.TS, K = this.K;
+    // Cover spots: floor cells beside furniture you can hide behind, tight against its side
+    map.cover = [];
+    for (let z = 1; z < H - 1; z++) for (let x = 1; x < W - 1; x++) {
+      if (t[z * W + x] !== 0) continue;
+      const tcx = (x + 0.5) * TS, tcz = (z + 0.5) * TS;
+      for (const [ox, oz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        if (t[(z + oz) * W + x + ox] !== 2) continue;
+        const b = this.boxesAt(map, x + ox, z + oz)[0];
+        if (!b || b.h < 0.85) continue;
+        // stand half a metre off the face nearest this cell, level with its centre
+        const sx = ox ? b.cx - ox * (b.hx + 0.5) : tcx, sz = oz ? b.cz - oz * (b.hz + 0.5) : tcz;
+        if (ox ? Math.abs(tcz - b.cz) > b.hz + 0.1 : Math.abs(tcx - b.cx) > b.hx + 0.1) continue;
+        if (Math.abs(sx - tcx) > 0.8 || Math.abs(sz - tcz) > 0.8) continue;
+        if (map.cover.some((q) => Math.abs(q.x - sx) < 0.5 && Math.abs(q.z - sz) < 0.5)) continue;
+        map.cover.push({ x: sx, z: sz, cx: b.cx, cz: b.cz });
+      }
+    }
+    // spots by a wall edge to lean out from (every third cell is plenty)
+    map.wallSpots = [];
+    for (let z = 1; z < H - 1; z++) for (let x = 1; x < W - 1; x++) {
+      if (t[z * W + x] !== 0 || (x + z) % 2) continue;
+      if (t[z * W + x - 1] === 1 || t[z * W + x + 1] === 1 || t[(z - 1) * W + x] === 1 || t[(z + 1) * W + x] === 1) map.wallSpots.push({ x: (x + 0.5) * TS, z: (z + 0.5) * TS });
+    }
+    // Enemy candidate spots: floor cells in rooms away from the spawn
+    const dist2 = this.flow(map, [[spawnRoom.cx, spawnRoom.cz]]);
+    map.enemySpots = [];
+    rooms.forEach((rm) => {
+      if (rm === spawnRoom) return;
+      for (let z = rm.z; z < rm.z + rm.h; z++) for (let x = rm.x; x < rm.x + rm.w; x++) {
+        const i = z * W + x;
+        if (t[i] === 0 && !map.props.has(i) && dist2[i] > 5 * K) map.enemySpots.push([x, z]);
+      }
+    });
+    // The weapon case: only some levels have one (CASE_CHANCE, from the level seed so everyone agrees), on the
+    // floor along a wall in a room away from the spawn: two clear cells side by side against the wall
+    map.case = null;
+    const hasCase = r() < this.CASE_CHANCE;
+    const clear = (x, z) => t[z * W + x] === 0 && !map.props.has(z * W + x);
+    if (hasCase) for (const rm of U.shuffle(r, rooms.filter((q) => q !== spawnRoom))) {
+      const spots = [];
+      for (let z = rm.z; z < rm.z + rm.h; z++) for (let x = rm.x; x < rm.x + rm.w; x++) {
+        let nearDoor = false;
+        for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) if (t[(z + dz) * W + x + dx] === 3) nearDoor = true;
+        if (nearDoor) continue;
+        for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const ax = dz ? 1 : 0, az = dx ? 1 : 0; // along the wall
+          if (clear(x, z) && clear(x + ax, z + az) && t[(z + dz) * W + x + dx] === 1 && t[(z + az + dz) * W + x + ax + dx] === 1) spots.push([x, z, dx, dz, ax, az]);
+        }
+      }
+      if (!spots.length) continue;
+      const [x, z, dx, dz, ax, az] = U.pick(r, spots);
+      // long side along the wall, latches and handle facing the room, hinge at the back
+      map.case = { x: (x + 0.5 + ax * 0.5) * TS + dx * (TS / 2 - 0.22), z: (z + 0.5 + az * 0.5) * TS + dz * (TS / 2 - 0.22), yaw: Math.atan2(-dx, -dz) };
+      break;
+    }
+    // First aid cabinets: rare, screwed to a wall at chest height in a room (not right by a door, not over
+    // furniture). Their own random stream from the seed, so the rest of the level doesn't change with them.
+    map.cabinets = [];
+    {
+      const rc = U.rng((map.seed ^ 0x5eed0cab) >>> 0);
+      const want = rc() < this.CAB_CHANCE ? (rc() < this.CAB_TWO ? 2 : 1) : 0;
+      const used = new Set();
+      for (const rm of U.shuffle(rc, rooms.slice())) {
+        if (map.cabinets.length >= want) break;
+        if (used.has(rm)) continue;
+        const spots = [];
+        for (let z = rm.z; z < rm.z + rm.h; z++) for (let x = rm.x; x < rm.x + rm.w; x++) {
+          if (!clear(x, z) || (map.out && map.out[z * W + x])) continue; // indoors only
+          let nearDoor = false;
+          for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) if (t[(z + dz) * W + x + dx] === 3) nearDoor = true;
+          if (nearDoor) continue;
+          for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (t[(z + dz) * W + x + dx] === 1) spots.push([x, z, dx, dz]);
+        }
+        if (!spots.length) continue;
+        const [x, z, dx, dz] = U.pick(rc, spots);
+        used.add(rm);
+        // the back against the wall's face, the door facing the room
+        map.cabinets.push({ x: (x + 0.5) * TS + dx * (TS / 2 - 0.075), z: (z + 0.5) * TS + dz * (TS / 2 - 0.075), yaw: Math.atan2(-dx, -dz) });
+      }
+    }
+    // Ceiling lamps: one per room, a grid of them over a warehouse floor, none in the open; porch lanterns over
+    // doors that open onto a garden
+    map.lights = [];
+    for (const rm of rooms) {
+      if (rm.out) continue;
+      if (rm.type === 'corridor') { for (let x = rm.x + 2; x < rm.x + rm.w; x += 7) map.lights.push({ x: (x + 0.5) * TS, z: (rm.cz + 0.5) * TS }); continue; } // down a hallway
+      if (rm.type === 'hall' || rm.type === 'dock') {
+        for (let z = rm.z + 3; z < rm.z + rm.h; z += 9) for (let x = rm.x + 6; x < rm.x + rm.w - 2; x += 18) map.lights.push({ x: (x + 0.5) * TS, z: (z + 0.5) * TS });
+      } else map.lights.push({ x: (rm.cx + 0.5) * TS, z: (rm.cz + 0.5) * TS });
+    }
+    for (const d of map.doors) {
+      if (d.axis !== 'z' || (d.mirror && map.doors.some((o) => o !== d && !o.mirror && Math.abs(o.x - d.x) < 1.5 && Math.abs(o.z - d.z) < 0.1))) continue;
+      const below = map.out[(d.tz + 1) * W + d.tx], above = map.out[(d.tz - 1) * W + d.tx];
+      if (below === above) continue;
+      const dir = below ? 1 : -1, pair = map.doors.find((o) => o !== d && o.mirror && Math.abs(o.x - d.x) < 1.5 && Math.abs(o.z - d.z) < 0.1);
+      map.lights.push({ x: pair ? (d.x + pair.x) / 2 : d.x, z: d.z + dir * (TS / 2 + 0.06), y: 2.55, porch: dir });
+    }
+    // the lamps nearest where you come in first (only the first dozen are real lights)
+    { const sx = (spawnRoom.cx + 0.5) * TS, sz = (spawnRoom.cz + 0.5) * TS; map.lights.sort((a, b) => Math.hypot(a.x - sx, a.z - sz) - Math.hypot(b.x - sx, b.z - sz)); }
+    // An open door's leaf stands out into the room beside its hinge; it hides whoever's behind it and stops
+    // rounds (like the closed door), though you can walk past it. Which cells it stands in, per door.
+    map.leafAt = new Map();
+    for (const d of map.doors) {
+      d.leaf = this.leafBox(d);
+      const b = d.leaf;
+      for (let z = Math.floor((b.cz - b.hz) / TS); z <= Math.floor((b.cz + b.hz) / TS); z++) for (let x = Math.floor((b.cx - b.hx) / TS); x <= Math.floor((b.cx + b.hx) / TS); x++) {
+        const i = z * W + x;
+        if (!map.leafAt.has(i)) map.leafAt.set(i, []);
+        map.leafAt.get(i).push(d);
+      }
+    }
+    map.unitAt = null;
+    if (map.units) {
+      map.unitAt = new Int8Array(W * H).fill(-1);
+      for (const rm of rooms) if (rm.unit != null) for (let z = rm.z; z < rm.z + rm.h; z++) for (let x = rm.x; x < rm.x + rm.w; x++) map.unitAt[z * W + x] = rm.unit;
+      // the doorways and thinned walls between an apartment's rooms are the apartment's too (not the hallway's)
+      for (const rm of rooms) if (rm.unit == null) for (let z = rm.z; z < rm.z + rm.h; z++) for (let x = rm.x; x < rm.x + rm.w; x++) map.unitAt[z * W + x] = -2;
+      for (let pass = 0; pass < 2; pass++) for (let i = W; i < W * (H - 1); i++) {
+        if (map.unitAt[i] !== -1 || t[i] === 1) continue;
+        for (const j of [i - 1, i + 1, i - W, i + W]) if (map.unitAt[j] >= 0) { map.unitAt[i] = map.unitAt[j]; break; }
+      }
+      for (let i = 0; i < W * H; i++) if (map.unitAt[i] === -2) map.unitAt[i] = -1;
+    }
+    this.placeWindows(map);
+    map.spawn = { x: (spawnRoom.cx + 0.5) * TS, z: (spawnRoom.cz + 0.5) * TS };
+    map.extract = { x: (exitRoom.cx + 0.5) * TS, z: (exitRoom.cz + 0.5) * TS, r: 3 };
+    return map;
+  },
+  // the real lights go to the lamps nearest p (a few times a second; now if `now`)
+  LIGHTS: 12,
+  updateLights(map, p, now) {
+    if (!map || !map.lightPool || !map.lightPool.length || !p) return;
+    if (!now && (map.lightT = (map.lightT || 0) - 1) > 0) return;
+    map.lightT = 12; // frames
+    const near = map.lamps.map((l) => [l, (l.x - p.x) * (l.x - p.x) + (l.z - p.z) * (l.z - p.z)]).sort((a, b) => a[1] - b[1]);
+    map.lightPool.forEach((pl, k) => {
+      const e = near[k];
+      if (!e) { pl.intensity = 0; return; }
+      const l = e[0];
+      pl.position.set(l.x, l.y, l.z); pl.color.setHex(l.color); pl.intensity = l.i; pl.distance = l.d;
+    });
+  },
+  // ---------------------------------------------------------------- windows
+  // Real windows: a wall opening two cells wide with a sill (to 0.95 m), a lintel (from 2.25 m) and a pane of
+  // glass between. You can't climb through (to movement and paths it's still wall), but you can see through,
+  // shoot through (the glass breaks), and suspects can see you through it, less well until it's broken.
+  //   thru: in a wall between indoors and outdoors (a house onto its garden or the street, a warehouse onto its
+  //     dock, a building onto its lot): there's real ground on the far side.
+  //   ext: in the outer wall of the building, looking out at the city (the view in the glass, js/furniture.js
+  //     outsideMaterial; high up in an apartment block). Rounds through it stop in the wall behind.
+  // From the level's own random stream, so every peer has the same windows. map.windows[id], map.winAt: cell -> ray boxes.
+  SILL: 0.95, TOP: 2.25,
+  placeWindows(map) {
+    const { W, H, t, out, rooms } = map, TS = this.TS, K = this.K, U = G.U, rw = U.rng((map.seed ^ 0x51d0b0) >>> 0);
+    map.windows = []; map.winAt = new Map();
+    if (map.theme.entry === 'vault') return; // a bunker has none
+    const used = new Set(), floor = (i) => t[i] === 0 || t[i] === 2 || t[i] === 4;
+    const nearDoor = (x, z) => { for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) if (t[(z + dz) * W + x + dx] === 3) return true; return false; };
+    const tall = (i) => { const p = map.props && map.props.get(i); return !!(p && p.boxes[0] && p.boxes[0].h > 1.0); };
+    const inside = (x, z) => x > 0 && z > 0 && x < W - 1 && z < H - 1;
+    const add = (cells, nx, nz, ext) => {
+      const [a, b] = cells.map((i) => [i % W, (i / W) | 0]);
+      const mx = ((a[0] + b[0]) / 2 + 0.5) * TS, mz = ((a[1] + b[1]) / 2 + 0.5) * TS, near = (o) => o && Math.hypot(o.x - mx, o.z - mz) < 1.6;
+      if (near(map.case) || (map.cabinets || []).some(near)) return; // (not through the wall a cabinet or the weapon case is against)
+      const id = map.windows.length;
+      // the opening's middle, on the wall's centre line (thru) or the room-side cell's middle (ext)
+      const w = { id, cells, nx, nz, ext, broken: false, x: ((a[0] + b[0]) / 2 + 0.5) * TS, z: ((a[1] + b[1]) / 2 + 0.5) * TS, len: 2 * TS };
+      map.windows.push(w);
+      for (const i of cells) {
+        used.add(i);
+        const cx = ((i % W) + 0.5) * TS, cz = (((i / W) | 0) + 0.5) * TS, h = TS / 2, along = nx ? { hx: 0.02, hz: h } : { hx: h, hz: 0.02 };
+        const full = { cx, cz, hx: h, hz: h };
+        const boxes = [Object.assign({ y0: 0, h: this.SILL }, full), Object.assign({ y0: this.TOP, h: this.WALL_H }, full)];
+        const glass = Object.assign({ cx, cz, y0: this.SILL, h: this.TOP, glass: id }, along);
+        // an outside window: what's past the glass is the view (the wall behind): rounds stop there, unseen
+        const back = ext ? Object.assign({ cx: cx + nx * (h - 0.01), cz: cz + nz * (h - 0.01), y0: this.SILL, h: this.TOP, view: true }, nx ? { hx: 0.01, hz: h } : { hx: h, hz: 0.01 }) : null;
+        map.winAt.set(i, { win: w, open: back ? boxes.concat([back]) : boxes, shut: (back ? boxes.concat([back]) : boxes).concat([glass]) });
+      }
+    };
+    // a wall cell with floor either side along one axis (a thin wall), indoors on one side and outdoors on the other
+    const thruAt = (x, z) => {
+      const i = z * W + x;
+      if (t[i] !== 1 || used.has(i) || !inside(x, z)) return null;
+      for (const [nx, nz] of [[1, 0], [0, 1]]) {
+        const a = i - nx - nz * W, b = i + nx + nz * W;
+        if (!floor(a) || !floor(b) || !!out[a] === !!out[b]) continue;
+        const s = out[b] ? 1 : -1; // pointing outdoors
+        return [nx * s, nz * s, out[b] ? a : b];
+      }
+      return null;
+    };
+    for (let z = 2; z < H - 2; z++) for (let x = 2; x < W - 2; x++) {
+      const c = thruAt(x, z);
+      if (!c) continue;
+      const [nx, nz, roomSide] = c, ax = nz ? 1 : 0, az = nx ? 1 : 0, c2 = thruAt(x + ax, z + az);
+      if (!c2 || c2[0] !== nx || c2[1] !== nz || nearDoor(x, z) || nearDoor(x + ax, z + az)) continue;
+      if (tall(roomSide) || tall(c2[2]) || used.has((z - az) * W + x - ax) || used.has((z - 2 * az) * W + x - 2 * ax)) continue;
+      if (rw() < 0.45) add([z * W + x, (z + az) * W + x + ax], nx, nz, false);
+    }
+    // the building's outer walls: a wall face of a room, with solid wall from there to the edge of the map (and
+    // not too thick); a couple to a room
+    const solidOut = (x, z, dx, dz) => { let n = 0; for (let cx = x, cz = z; cx >= 0 && cz >= 0 && cx < W && cz < H; cx += dx, cz += dz) { if (t[cz * W + cx] !== 1 || ++n > 4 * K) return false; } return true; };
+    for (const rm of rooms) {
+      if (rm.out) continue;
+      let n = 0;
+      for (let z = rm.z; z < rm.z + rm.h && n < 2; z++) for (let x = rm.x; x < rm.x + rm.w && n < 2; x++) {
+        if (!floor(z * W + x) || out[z * W + x]) continue;
+        for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const wx = x + dx, wz = z + dz, ax = dz ? 1 : 0, az = dx ? 1 : 0, w2 = (wz + az) * W + wx + ax;
+          if (!solidOut(wx, wz, dx, dz) || !solidOut(wx + ax, wz + az, dx, dz) || used.has(wz * W + wx) || used.has(w2) || !floor((z + az) * W + x + ax) || out[(z + az) * W + x + ax]) continue;
+          if (nearDoor(wx, wz) || nearDoor(wx + ax, wz + az) || tall(z * W + x) || tall((z + az) * W + x + ax) || used.has((wz - az) * W + wx - ax) || used.has((wz + 2 * az) * W + wx + 2 * ax)) continue;
+          if (rw() > 0.12) continue;
+          add([wz * W + wx, w2], dx, dz, true); n++;
+          break;
+        }
+      }
+    }
+  },
+  // the box an open door's leaf fills (it swings from its hinge jamb: +x for doors you walk through along x,
+  // -z for the others; see the door meshes in buildMesh)
+  leafBox(d) {
+    const half = (d.w || this.TS) / 2, len = (d.w || this.TS) - 0.05, m = d.mirror ? -1 : 1;
+    return d.axis === 'x'
+      ? { cx: d.x + 0.02 + len / 2, cz: d.z - half * m, hx: len / 2, hz: 0.035, y0: 0, h: this.DOOR_H }
+      : { cx: d.x - half * m, cz: d.z - 0.02 - len / 2, hx: 0.035, hz: len / 2, y0: 0, h: this.DOOR_H };
+  },
+  // what a ray meets in a tile: its solid boxes, and any open door leaf standing in it
+  // (shelving gives its posts, shelves and loads instead of its footprint: you see and shoot through the gaps)
+  rayBoxesAt(map, tx, tz) {
+    const wa = map.winAt && map.winAt.get(tz * map.W + tx);
+    if (wa) return wa.win.broken ? wa.open : wa.shut;
+    let bs = this.boxesAt(map, tx, tz);
+    if (bs._ray || bs.some((b) => b.ray)) bs =bs._ray || (bs._ray = bs.flatMap((b) => b.ray || [b]));
+    const ds = map.leafAt && map.leafAt.get(tz * map.W + tx);
+    if (!ds) return bs;
+    let out = bs;
+    for (const d of ds) if (d.open) out = (out === bs ? bs.slice() : out).concat([d.leaf]);
+    return out;
+  },
+
+  // ----------------------------------------------------------------- layouts
+  // Each returns { W, H, t, rooms, doors?, ringDoors?, out?, fences?, spawn? } on the coarse grid. t starts as all wall
+  // (1); rooms are carved to floor (0).
+  _room(x, z, w, h, o) { return Object.assign({ x, z, w, h, cx: x + (w >> 1), cz: z + (h >> 1) }, o || {}); },
+
+  // Rooms joined by corridors (apartments, bunkers, labs...).
+  layRooms(r, level) {
+    const U = G.U;
+    // compact: ~38 m across on level 1, never more than 60 m
+    const W = Math.min(18 + level, 30), H = W;
+    const t = new Uint8Array(W * H).fill(1);
+    const rooms = [];
+    const want = 5 + Math.min(level, 6);
+    for (let a = 0; a < 600 && rooms.length < want; a++) {
+      const w = U.ri(r, 3, 6), h = U.ri(r, 3, 6); // 6-12 m rooms
+      const x = U.ri(r, 1, W - w - 2), z = U.ri(r, 1, H - h - 2);
+      // rooms may share a single wall, so neighbours connect straight through a doorway
+      if (rooms.some((o) => x < o.x + o.w + 1 && x + w + 1 > o.x && z < o.z + o.h + 1 && z + h + 1 > o.z)) continue;
+      rooms.push(this._room(x, z, w, h));
+    }
+    const set = (x, z, v) => { if (x > 0 && z > 0 && x < W - 1 && z < H - 1) t[z * W + x] = v; };
+    rooms.forEach((rm) => { for (let z = rm.z; z < rm.z + rm.h; z++) for (let x = rm.x; x < rm.x + rm.w; x++) set(x, z, 0); });
+    const corridor = (a, b) => {
+      const wide = r() < 0.2 ? 2 : 1;
+      const horizFirst = r() < 0.5;
+      const carveH = (x0, x1, z) => { for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) for (let k = 0; k < wide; k++) set(x, z + k, 0); };
+      const carveV = (z0, z1, x) => { for (let z = Math.min(z0, z1); z <= Math.max(z0, z1); z++) for (let k = 0; k < wide; k++) set(x + k, z, 0); };
+      if (horizFirst) { carveH(a.cx, b.cx, a.cz); carveV(a.cz, b.cz, b.cx); }
+      else { carveV(a.cz, b.cz, a.cx); carveH(a.cx, b.cx, b.cz); }
+    };
+    for (let i = 1; i < rooms.length; i++) {
+      let best = 0, bd = 1e9;
+      for (let j = 0; j < i; j++) {
+        const d = Math.abs(rooms[i].cx - rooms[j].cx) + Math.abs(rooms[i].cz - rooms[j].cz);
+        if (d < bd) { bd = d; best = j; }
+      }
+      corridor(rooms[i], rooms[best]);
+    }
+    // extra loops give flanking routes
+    const extra = Math.max(1, Math.floor(rooms.length / 3));
+    for (let k = 0; k < extra; k++) corridor(U.pick(r, rooms), U.pick(r, rooms));
+    return { W, H, t, rooms, ringDoors: true };
+  },
+
+  // Outside the building: a lot along its front (open to the sky, fenced), and the way in, a corridor from the
+  // nearest room out to a double door in the front wall (a vault door into a bunker).
+  approach(lay, r, theme) {
+    const D = 4, { W, H } = lay, H2 = H + D, t = new Uint8Array(W * H2).fill(1), out = new Uint8Array(W * H2), fences = [], doors = lay.doors ? lay.doors.slice() : [];
+    t.set(lay.t);
+    for (let z = H; z < H2; z++) for (let x = 0; x < W; x++) out[z * W + x] = 1;
+    for (let z = H; z < H2 - 1; z++) for (let x = 1; x < W - 1; x++) t[z * W + x] = 0;
+    for (let x = 0; x < W; x++) { t[(H2 - 1) * W + x] = 4; fences.push([x, H2 - 1, 'x']); }
+    for (let z = H; z < H2 - 1; z++) for (const x of [0, W - 1]) { t[z * W + x] = 4; fences.push([x, z, 'z']); }
+    const lot = this._room(1, H, W - 2, D - 1, { type: 'lot', out: true });
+    // the room nearest the front, and a two-wide corridor from it to the front wall
+    const rm = lay.rooms.reduce((a, b) => (b.z + b.h > a.z + a.h ? b : a));
+    const x0 = G.U.clamp(rm.cx, 2, W - 4);
+    for (let z = rm.z + rm.h; z < H - 1; z++) for (const x of [x0, x0 + 1]) t[z * W + x] = 0;
+    doors.push([x0, H - 1, 'z', false, false, theme.entry || null], [x0 + 1, H - 1, 'z', false, true, theme.entry || null]);
+    return Object.assign({}, lay, { H: H2, t, out, fences, doors, rooms: lay.rooms.concat([lot]), spawn: lot });
+  },
+
+  // A home split into rooms (the houses' splitter): a door between every room and the next until they're all
+  // reached, now and then another. c: { r, t, W, ids, rooms, doors }. Returns its rooms.
+  _house(c, x0, z0, w, h) {
+    const U = G.U, { r, t, W, ids, rooms, doors } = c;
+    const fill = (x1, z1, w1, h1) => { for (let z = z1; z < z1 + h1; z++) for (let x = x1; x < x1 + w1; x++) t[z * W + x] = 0; };
+    const leaves = [], lo = c.lo || 3; // the smallest room, in tiles
+    const split = (x, z, w, h, depth) => {
+      const canV = w >= 2 * lo + 1, canH = h >= 2 * lo + 1;
+      if ((!canV && !canH) || depth > 3 || (depth >= 2 && r() < 0.3)) { leaves.push([x, z, w, h]); return; }
+      const vert = canV && (!canH || (w >= h ? r() < 0.8 : r() < 0.2));
+      if (vert) { const s = U.ri(r, lo, w - lo - 1); split(x, z, s, h, depth + 1); split(x + s + 1, z, w - s - 1, h, depth + 1); }
+      else { const s = U.ri(r, lo, h - lo - 1); split(x, z, w, s, depth + 1); split(x, z + s + 1, w, h - s - 1, depth + 1); }
+    };
+    split(x0, z0, w, h, 0);
+    const base = rooms.length;
+    leaves.forEach(([x, z, w, h], i) => {
+      fill(x, z, w, h);
+      for (let zz = z; zz < z + h; zz++) for (let xx = x; xx < x + w; xx++) ids[zz * W + xx] = base + i;
+      rooms.push(this._room(x, z, w, h));
+    });
+    // a door through the wall between rooms until every room is reached, then a couple more for loops
+    const cands = [];
+    for (let z = z0; z < z0 + h; z++) for (let x = x0; x < x0 + w; x++) {
+      if (t[z * W + x] !== 1) continue;
+      const a = ids[z * W + x - 1], b = ids[z * W + x + 1], c = ids[(z - 1) * W + x], d = ids[(z + 1) * W + x];
+      if (a >= 0 && b >= 0 && a !== b && t[(z - 1) * W + x] === 1 && t[(z + 1) * W + x] === 1) cands.push([x, z, 'x', a, b]);
+      if (c >= 0 && d >= 0 && c !== d && t[z * W + x - 1] === 1 && t[z * W + x + 1] === 1) cands.push([x, z, 'z', c, d]);
+    }
+    U.shuffle(r, cands);
+    const parent = new Map(), find = (i) => { while (parent.has(i) && parent.get(i) !== i) i = parent.get(i); return i; };
+    const near = (c) => doors.some((d) => Math.abs(d[0] - c[0]) + Math.abs(d[1] - c[1]) < 3);
+    for (const c of cands) { const a = find(c[3]), b = find(c[4]); if (a === b || near(c)) continue; parent.set(a, b); doors.push([c[0], c[1], c[2], r() < 0.3]); }
+    for (const c of cands) if (r() < 0.05 && !near(c)) doors.push([c[0], c[1], c[2], r() < 0.3]);
+    return rooms.slice(base);
+  },
+
+  // An apartment block: a hallway with apartments either side, each its own home (a few rooms, one front door
+  // onto the hallway). You come up the stairs onto a landing at one end. Each apartment has to be cleared.
+  layApartments(r, level) {
+    const U = G.U, per = 2 + Math.min(level >> 1, 2); // apartments each side of the hallway
+    const ud = U.ri(r, 5, 6), ud2 = U.ri(r, 5, 6), uw = () => U.ri(r, 5, 7);
+    const W = 5 + per * 8, hz = ud + 2, H = hz + 2 + ud2 + 1;
+    const t = new Uint8Array(W * H).fill(1), rooms = [], doors = [], ids = new Int16Array(W * H).fill(-1);
+    const fill = (x0, z0, w, h) => { for (let z = z0; z < z0 + h; z++) for (let x = x0; x < x0 + w; x++) t[z * W + x] = 0; };
+    // the landing (stairs up from the street), a door through to the hallway
+    fill(1, hz - 1, 2, 3);
+    const landing = this._room(1, hz - 1, 2, 3, { type: 'landing' });
+    fill(4, hz, W - 5, 1);
+    const hall = this._room(4, hz, W - 5, 1, { type: 'corridor' });
+    doors.push([3, hz, 'x', false, false]);
+    // the apartments: side by side along each side, a wall between each
+    let unit = 0;
+    for (const [z0, h, wallZ] of [[1, ud, hz - 1], [hz + 2, ud2, hz + 1]]) {
+      for (let x = 4; x < W - 2;) {
+        let w = uw();
+        if (W - 1 - (x + w + 1) < 5) w = W - 1 - x;
+        const before = rooms.length;
+        const mine = this._house({ r, t, W, ids, rooms, doors, lo: 2 }, x, z0, w, h);
+        mine.forEach((q) => { q.unit = unit; });
+        // the front door, from the hallway into a room along it
+        const front = mine.filter((q) => (wallZ < z0 ? q.z === z0 : q.z + q.h === wallZ) && q.w >= 2);
+        const f = front.length ? U.pick(r, front) : mine[0];
+        doors.push([U.ri(r, f.x, f.x + f.w - 1), wallZ, 'z', false, false]);
+        unit++;
+        x += w + 1;
+        if (rooms.length === before) break;
+      }
+    }
+    rooms.push(hall, landing);
+    return { W, H, t, rooms, doors, spawn: landing, units: unit };
+  },
+
+  // A warehouse: a row of offices along the back wall, then the warehouse floor (rows of pallet racks with
+  // aisles between and cross-aisles through them), open at the front onto the loading dock where you come in.
+  layWarehouse(r, level) {
+    const U = G.U, W = 26 + Math.min(level, 4), H = 22 + Math.min(level, 3);
+    const t = new Uint8Array(W * H).fill(1), rooms = [], doors = [];
+    const fill = (x0, z0, w, h) => { for (let z = z0; z < z0 + h; z++) for (let x = x0; x < x0 + w; x++) t[z * W + x] = 0; };
+    // offices, 4 tiles deep, side by side with a wall between each
+    const od = 4, offices = [];
+    for (let x = 1; x < W - 2;) {
+      let w = U.ri(r, 4, 6);
+      if (W - 1 - (x + w + 1) < 4) w = W - 1 - x;
+      fill(x, 1, w, od);
+      offices.push(this._room(x, 1, w, od, { type: x === 1 ? 'breakroom' : U.pick(r, ['office', 'office', 'storage']) }));
+      doors.push([x + U.ri(r, 1, w - 2), od + 1, 'z', r() < 0.3]); // into the warehouse
+      if (x > 1 && r() < 0.5) doors.push([x - 1, U.ri(r, 2, od - 1), 'x', r() < 0.3]); // through to the next office
+      x += w + 1;
+    }
+    // the floor inside, then the front wall, then the loading dock outside (where you come in): two roller doors
+    // (rolled up: wide openings) and a door between them
+    const hz = od + 2, dockH = 4, hallH = H - 2 - hz - dockH, fz = hz + hallH, out = new Uint8Array(W * H), fences = [];
+    fill(1, hz, W - 2, hallH);
+    fill(1, fz + 1, W - 2, dockH);
+    for (let z = fz + 1; z < H; z++) for (let x = 0; x < W; x++) out[z * W + x] = 1;
+    const rollers = [U.ri(r, 3, (W >> 1) - 4), U.ri(r, (W >> 1) + 2, W - 6)];
+    for (const x0 of rollers) for (let x = x0; x < x0 + 3; x++) t[fz * W + x] = 0;
+    doors.push([(rollers[0] + rollers[1] + 3) >> 1, fz, 'z', false, false]);
+    for (let x = 0; x < W; x++) { t[(H - 1) * W + x] = 4; fences.push([x, H - 1, 'x']); }
+    for (let z = fz + 1; z < H - 1; z++) for (const x of [0, W - 1]) { t[z * W + x] = 4; fences.push([x, z, 'z']); }
+    const dock = this._room(1, fz + 1, W - 2, dockH, { type: 'dock', out: true });
+    const hall = this._room(1, hz, W - 2, hallH, { type: 'hall' });
+    rooms.push(dock, hall, ...offices);
+    return { W, H, t, rooms, doors, out, fences, spawn: dock, rollers: rollers.map((x0) => [x0, fz, 3]) };
+  },
+
+  // Two detached houses side by side on a street. You start on the street and pick which front door to take.
+  // Each house is split into rooms (a door between every room and the next, and a few more); behind each is its
+  // garden, the two joined by a gap in the fence between them, and a narrow alley runs between the houses from
+  // the street to the gardens. Gardens, alley and street are open to the sky, fenced at the edges.
+  layHouses(r, level) {
+    const U = G.U, S = 3; // the street, S tiles deep
+    const grow = Math.min(level >> 1, 2), hwA = U.ri(r, 7, 9) + grow, hwB = U.ri(r, 7, 9) + grow, hh = U.ri(r, 7, 9) + (grow >> 1), yd = U.ri(r, 4, 5);
+    const zF = S + 1, z0 = S + 2, zb = z0 + hh, H = zb + yd + 2;
+    const xl = hwA + 2, W = hwA + hwB + 5; // the alley between the houses
+    const t = new Uint8Array(W * H).fill(1), out = new Uint8Array(W * H), rooms = [], doors = [], fences = [], ids = new Int16Array(W * H).fill(-1);
+    const fill = (x0, zz, w, h) => { for (let z = zz; z < zz + h; z++) for (let x = x0; x < x0 + w; x++) t[z * W + x] = 0; };
+    const sky = (x0, zz, w, h) => { for (let z = zz; z < zz + h; z++) for (let x = x0; x < x0 + w; x++) out[z * W + x] = 1; };
+    const fence = (x, z, axis) => { t[z * W + x] = 4; out[z * W + x] = 1; fences.push([x, z, axis]); };
+    // the houses
+    const A = this._house({ r, t, W, ids, rooms, doors }, 1, z0, hwA, hh);
+    const B = this._house({ r, t, W, ids, rooms, doors }, hwA + 4, z0, hwB, hh);
+    // the street along the front, the alley, the gardens behind
+    fill(1, 1, W - 2, S); sky(0, 0, W, S + 1);
+    fill(xl, zF, 1, zb - zF + 1); sky(xl, zF, 1, zb - zF + 1);
+    fill(1, zb + 1, W - 2, yd); sky(0, zb + 1, W, yd + 1);
+    for (let x = 0; x < W; x++) { fence(x, 0, 'x'); fence(x, H - 1, 'x'); }
+    for (let z = 1; z <= S; z++) { fence(0, z, 'z'); fence(W - 1, z, 'z'); }
+    for (let z = zb + 1; z < H - 1; z++) { fence(0, z, 'z'); fence(W - 1, z, 'z'); }
+    // between the gardens: a fence down from the alley's mouth (which stays open to both), with now and then a
+    // second gap further back
+    const gap2 = r() < 0.5 ? U.ri(r, zb + 3, zb + yd) : -1;
+    for (let z = zb + 2; z <= zb + yd; z++) if (z !== gap2) fence(xl, z, 'z');
+    // front doors onto the street, back doors (sometimes French doors) into the garden
+    const outer = (list, front) => {
+      const cand = list.filter((rm) => (front ? rm.z === z0 : rm.z + rm.h === zb) && rm.w >= 3);
+      const rm = cand.length ? U.pick(r, cand) : list[0], x = rm.x + U.ri(r, 1, rm.w - 2), french = !front && rm.w >= 4 && x + 1 <= rm.x + rm.w - 2 && r() < 0.5;
+      doors.push([x, front ? zF : zb, 'z', false, false]);
+      if (french) doors.push([x + 1, zb, 'z', false, true]);
+    };
+    for (const list of [A, B]) { outer(list, true); outer(list, false); }
+    const street = this._room(1, 1, W - 2, S, { type: 'street', out: true });
+    const alley = this._room(xl, zF, 1, zb - zF + 1, { type: 'alley', out: true });
+    const yardA = this._room(1, zb + 1, xl - 1, yd, { type: 'yard', out: true }), yardB = this._room(xl + 1, zb + 1, W - 2 - xl, yd, { type: 'yard', out: true });
+    rooms.push(yardA, yardB, alley, street);
+    return { W, H, t, rooms, doors, out, fences, spawn: street };
+  },
+
+  tile(map, tx, tz) {
+    if (tx < 0 || tz < 0 || tx >= map.W || tz >= map.H) return 1;
+    return map.t[tz * map.W + tx];
+  },
+  // Axis-aligned box for a solid tile (null for floor)
+  boxAt(map, tx, tz) {
+    const v = this.tile(map, tx, tz);
+    if (v === 0) return null;
+    const cx = (tx + 0.5) * this.TS, cz = (tz + 0.5) * this.TS;
+    if (v === 2 || v === 4) {
+      const p = map.props && map.props.get(tz * map.W + tx);
+      if (p) return p.boxes[0];
+      return v === 2 ? { cx, cz, hx: this.CRATE_HX, hz: this.CRATE_HX, y0: 0, h: this.CRATE_H } : { cx, cz, hx: this.TS / 2, hz: this.TS / 2, y0: 0, h: this.WALL_H };
+    }
+    if (v === 3) {
+      const d = map.doorAt.get(tz * map.W + tx);
+      if (d && d.open) return { cx, cz, hx: this.TS / 2, hz: this.TS / 2, y0: this.DOOR_H, h: this.WALL_H };
+      const thin = d && d.axis === 'x';
+      return { cx, cz, hx: thin ? 0.07 : this.TS / 2, hz: thin ? this.TS / 2 : 0.07, y0: 0, h: this.WALL_H, door: d };
+    }
+    return { cx, cz, hx: this.TS / 2, hz: this.TS / 2, y0: 0, h: this.WALL_H };
+  },
+
+  // Every solid box in a tile: walls and doors are one box, furniture can be several (a desk and its chair),
+  // and small things in corners (plants, lamps) sit on floor tiles.
+  boxesAt(map, tx, tz) {
+    if (tx >= 0 && tz >= 0 && tx < map.W && tz < map.H && map.props) {
+      const p = map.props.get(tz * map.W + tx);
+      if (p) return p.boxes;
+    }
+    const b = this.boxAt(map, tx, tz);
+    return b ? [b] : this.NONE;
+  },
+  NONE: [],
+  // Returns {t, n:[nx,ny,nz]} — distance along the (unit) direction to the first solid surface
+  // opts.glass: go through glass (listing the panes crossed, nearest first, in .glass) instead of stopping at it.
+  // A hit on the view behind an outside window comes back with .view (no mark to leave there).
+  raycast(map, ox, oy, oz, dx, dy, dz, maxD, opts) {
+    const pass = !!(opts && opts.glass), crossed = pass ? [] : null;
+    const TS = this.TS;
+    let limit = maxD, ln = null;
+    if (dy < -1e-6) { const tf = -oy / dy; if (tf < limit) { limit = tf; ln = [0, 1, 0]; } }
+    else if (dy > 1e-6) {
+      const tc = (this.WALL_H - oy) / dy;
+      if (tc < limit) {
+        // a garden has no ceiling
+        const cx = Math.floor((ox + dx * tc) / TS), cz = Math.floor((oz + dz * tc) / TS);
+        const open = map.out && cx >= 0 && cz >= 0 && cx < map.W && cz < map.H && map.out[cz * map.W + cx];
+        if (!open) { limit = tc; ln = [0, -1, 0]; }
+      }
+    }
+    let tx = Math.floor(ox / TS), tz = Math.floor(oz / TS);
+    const sx = dx > 0 ? 1 : -1, sz = dz > 0 ? 1 : -1;
+    const tdx = Math.abs(dx) > 1e-9 ? Math.abs(TS / dx) : Infinity;
+    const tdz = Math.abs(dz) > 1e-9 ? Math.abs(TS / dz) : Infinity;
+    let tmx = Math.abs(dx) > 1e-9 ? (dx > 0 ? (tx + 1) * TS - ox : ox - tx * TS) / Math.abs(dx) : Infinity;
+    let tmz = Math.abs(dz) > 1e-9 ? (dz > 0 ? (tz + 1) * TS - oz : oz - tz * TS) / Math.abs(dz) : Infinity;
+    let t = 0;
+    for (let guard = 0; guard < 400 && t <= limit; guard++) {
+      const bs = this.rayBoxesAt(map, tx, tz);
+      if (bs.length) {
+        let best = null; // boxes never leave their tile, so the nearest hit in this tile is the nearest overall
+        for (const b of bs) {
+          const hit = this._slab(ox, oy, oz, dx, dy, dz, b);
+          if (!hit || hit.t > limit) continue;
+          if (b.glass != null && pass) { if (!crossed.some((c) => c[0] === b.glass)) crossed.push([b.glass, hit.t]); continue; }
+          if (!best || hit.t < best.t) { best = hit; best.view = !!b.view; best.pane = b.glass != null ? b.glass : undefined; }
+        }
+        if (best) { if (pass) best.glass = crossed.filter((c) => c[1] < best.t).sort((a, c) => a[1] - c[1]); return best; }
+      }
+      if (tmx < tmz) { t = tmx; tmx += tdx; tx += sx; } else { t = tmz; tmz += tdz; tz += sz; }
+    }
+    return { t: limit, n: ln, glass: pass ? crossed.sort((a, c) => a[1] - c[1]) : undefined };
+  },
+  // how well a sees b: 0 (blocked), 1 (clear), or seen through glass that's still whole (GLASS_SEE)
+  GLASS_SEE: 0.4,
+  see(map, ax, ay, az, bx, by, bz) {
+    const dx = bx - ax, dy = by - ay, dz = bz - az, d = Math.hypot(dx, dy, dz);
+    if (d < 0.01) return 1;
+    const h = this.raycast(map, ax, ay, az, dx / d, dy / d, dz / d, d, { glass: true });
+    if (h.t < d - 0.05) return 0;
+    return h.glass && h.glass.length ? this.GLASS_SEE : 1;
+  },
+  _slab(ox, oy, oz, dx, dy, dz, b) {
+    let tmin = -Infinity, tmax = Infinity, n = null;
+    const axes = [[ox, dx, b.cx - b.hx, b.cx + b.hx, 0], [oy, dy, b.y0, b.h, 1], [oz, dz, b.cz - b.hz, b.cz + b.hz, 2]];
+    for (const [o, d, lo, hi, ax] of axes) {
+      if (Math.abs(d) < 1e-9) { if (o < lo || o > hi) return null; continue; }
+      let t1 = (lo - o) / d, t2 = (hi - o) / d, s = -1;
+      if (t1 > t2) { const tmp = t1; t1 = t2; t2 = tmp; s = 1; }
+      if (t1 > tmin) { tmin = t1; n = [0, 0, 0]; n[ax] = s; }
+      if (t2 < tmax) tmax = t2;
+      if (tmin > tmax) return null;
+    }
+    if (tmax < 0) return null;
+    return { t: Math.max(0, tmin), n: n || [0, 1, 0] };
+  },
+  los(map, ax, ay, az, bx, by, bz) {
+    const dx = bx - ax, dy = by - ay, dz = bz - az;
+    const d = Math.hypot(dx, dy, dz);
+    if (d < 0.01) return true;
+    return this.raycast(map, ax, ay, az, dx / d, dy / d, dz / d, d).t >= d - 0.05;
+  },
+
+  // Circle-vs-tile collision. Boxes the entity is standing on top of (y >= box height) are ignored.
+  resolve(map, p, r, y = 0) {
+    const TS = this.TS;
+    for (let iter = 0; iter < 2; iter++) {
+      const x0 = Math.floor((p.x - r) / TS), x1 = Math.floor((p.x + r) / TS);
+      const z0 = Math.floor((p.z - r) / TS), z1 = Math.floor((p.z + r) / TS);
+      for (let tz = z0; tz <= z1; tz++) for (let tx = x0; tx <= x1; tx++) {
+        for (const b of this.boxesAt(map, tx, tz)) {
+        if (y >= b.h - 0.02 || b.y0 > 1.9) continue; // stood on top of it, or walking under a door lintel
+        const qx = G.U.clamp(p.x, b.cx - b.hx, b.cx + b.hx), qz = G.U.clamp(p.z, b.cz - b.hz, b.cz + b.hz);
+        let ddx = p.x - qx, ddz = p.z - qz;
+        const d = Math.hypot(ddx, ddz);
+        if (d >= r) continue;
+        if (d > 1e-5) { p.x += (ddx / d) * (r - d); p.z += (ddz / d) * (r - d); }
+        else {
+          // centre inside the box: push out along the shallowest axis
+          const px = b.hx - Math.abs(p.x - b.cx), pz = b.hz - Math.abs(p.z - b.cz);
+          if (px < pz) p.x += Math.sign(p.x - b.cx || 1) * (px + r); else p.z += Math.sign(p.z - b.cz || 1) * (pz + r);
+        }
+        }
+      }
+    }
+  },
+  groundAt(map, x, z, r, y) {
+    const TS = this.TS;
+    let g = 0;
+    const x0 = Math.floor((x - r) / TS), x1 = Math.floor((x + r) / TS);
+    const z0 = Math.floor((z - r) / TS), z1 = Math.floor((z + r) / TS);
+    for (let tz = z0; tz <= z1; tz++) for (let tx = x0; tx <= x1; tx++) {
+      for (const b of this.boxesAt(map, tx, tz)) {
+        if (b.h >= this.WALL_H) continue;
+        if (Math.abs(x - b.cx) < b.hx + r * 0.6 && Math.abs(z - b.cz) < b.hz + r * 0.6 && y >= b.h - 0.05) g = Math.max(g, b.h);
+      }
+    }
+    return g;
+  },
+
+  // BFS distance field (in tiles) from source tiles over walkable floor; -1 = unreachable
+  flow(map, sources) {
+    const { W, H, t } = map;
+    const dist = new Int16Array(W * H).fill(-1);
+    const q = new Int32Array(W * H);
+    let qh = 0, qt = 0;
+    for (const [x, z] of sources) {
+      if (x < 0 || z < 0 || x >= W || z >= H) continue;
+      const i = z * W + x;
+      if (!(t[i] === 0 || t[i] === 3) || dist[i] >= 0) continue;
+      dist[i] = 0; q[qt++] = i;
+    }
+    const ok = (j) => (t[j] === 0 || t[j] === 3) && dist[j] < 0;
+    while (qh < qt) {
+      const i = q[qh++], x = i % W, z = (i / W) | 0, d = dist[i] + 1;
+      if (x > 0 && ok(i - 1)) { dist[i - 1] = d; q[qt++] = i - 1; }
+      if (x < W - 1 && ok(i + 1)) { dist[i + 1] = d; q[qt++] = i + 1; }
+      if (z > 0 && ok(i - W)) { dist[i - W] = d; q[qt++] = i - W; }
+      if (z < H - 1 && ok(i + W)) { dist[i + W] = d; q[qt++] = i + W; }
+    }
+    return dist;
+  },
+  // Next waypoint (world coords) that walks downhill on the flow field from (x, z)
+  flowStep(map, dist, x, z) {
+    const TS = this.TS, W = map.W;
+    const tx = Math.floor(x / TS), tz = Math.floor(z / TS);
+    const here = dist[tz * W + tx];
+    if (here < 0) return null;
+    let best = null, bd = here;
+    for (let oz = -1; oz <= 1; oz++) for (let ox = -1; ox <= 1; ox++) {
+      if (!ox && !oz) continue;
+      const nx = tx + ox, nz = tz + oz;
+      if (nx < 0 || nz < 0 || nx >= W || nz >= map.H) continue;
+      const nd = dist[nz * W + nx];
+      if (nd < 0) continue;
+      if (ox && oz && (map.t[tz * W + nx] !== 0 || map.t[nz * W + tx] !== 0)) continue; // no diagonal corner-cutting (or through door frames)
+      const score = nd + (ox && oz ? 0.4 : 0);
+      if (score < bd) { bd = score; best = [nx, nz]; }
+    }
+    if (!best) return null;
+    return { x: (best[0] + 0.5) * TS, z: (best[1] + 0.5) * TS };
+  },
+
+  flowAway(map, dist, x, z) {
+    const TS = this.TS, W = map.W;
+    const tx = Math.floor(x / TS), tz = Math.floor(z / TS);
+    const here = dist[tz * W + tx];
+    if (here < 0) return null;
+    let best = null, bd = here;
+    for (const [ox, oz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = tx + ox, nz = tz + oz;
+      if (nx < 0 || nz < 0 || nx >= W || nz >= map.H) continue;
+      const nd = dist[nz * W + nx];
+      if (nd > bd) { bd = nd; best = [nx, nz]; }
+    }
+    return best ? { x: (best[0] + 0.5) * TS, z: (best[1] + 0.5) * TS } : null;
+  },
+  doorNear(map, x, z, r = 1.8) {
+    let best = null, bd = r;
+    for (const d of map.doors) { const dd = Math.hypot(d.x - x, d.z - z); if (dd < bd) { bd = dd; best = d; } }
+    return best;
+  },
+
+  // ----------------------------------------------------------------- meshes
+  _tex(kind, base) {
+    const c = document.createElement('canvas');
+    c.width = c.height = 128;
+    const g = c.getContext('2d');
+    g.fillStyle = base; g.fillRect(0, 0, 128, 128);
+    for (let i = 0; i < 900; i++) {
+      const v = Math.random() * 40 - 20;
+      g.fillStyle = `rgba(${v > 0 ? 255 : 0},${v > 0 ? 255 : 0},${v > 0 ? 255 : 0},${Math.abs(v) / 400})`;
+      g.fillRect(Math.random() * 128, Math.random() * 128, 2 + Math.random() * 4, 2 + Math.random() * 4);
+    }
+    g.strokeStyle = 'rgba(0,0,0,0.35)';
+    if (kind === 'floor') {
+      g.lineWidth = 2; g.strokeRect(1, 1, 126, 126);
+      g.beginPath(); g.moveTo(64, 0); g.lineTo(64, 128); g.moveTo(0, 64); g.lineTo(128, 64); g.lineWidth = 1; g.stroke();
+    } else if (kind === 'wall') {
+      g.lineWidth = 2;
+      g.strokeRect(1, 1, 126, 126);
+      g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(0, 100, 128, 6);
+      g.fillStyle = 'rgba(255,255,255,0.06)'; g.fillRect(0, 20, 128, 3);
+    } else if (kind === 'plaster') {
+      g.fillStyle = 'rgba(255,255,255,0.05)'; g.fillRect(0, 0, 128, 128);
+    } else if (kind === 'crate') {
+      g.lineWidth = 6; g.strokeStyle = 'rgba(0,0,0,0.45)'; g.strokeRect(4, 4, 120, 120);
+      g.lineWidth = 2; for (let y = 24; y < 128; y += 24) { g.beginPath(); g.moveTo(6, y); g.lineTo(122, y); g.stroke(); }
+      g.lineWidth = 6; g.beginPath(); g.moveTo(6, 6); g.lineTo(122, 122); g.stroke();
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.anisotropy = 4;
+    return tex;
+  },
+
+  // each window: the wall below and above the opening, a frame, the pane (map.winMeshes[id], hidden when it
+  // breaks), and for an outside window the view behind the glass
+  buildWindows(map, root, wallMat) {
+    const TS = this.TS, h = TS / 2;
+    map.winMeshes = [];
+    // roller doors, rolled up: the wall over the opening, the shutter's drum under it and a guide down each side
+    const steel = new THREE.MeshStandardMaterial({ color: 0x5d6368, roughness: 0.5, metalness: 0.6 });
+    for (const [x0, x1, z] of map.rollers || []) {
+      const w = x1 - x0, cx = (x0 + x1) / 2, top = 3.0;
+      const lin = new THREE.Mesh(new THREE.BoxGeometry(w, this.WALL_H - top, TS), wallMat); lin.position.set(cx, (top + this.WALL_H) / 2, z); lin.layers.enable(1); root.add(lin);
+      const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, w, 16), steel); drum.rotation.z = Math.PI / 2; drum.position.set(cx, top - 0.2, z); root.add(drum);
+      const lip = new THREE.Mesh(new THREE.BoxGeometry(w, 0.08, 0.1), steel); lip.position.set(cx, top - 0.44, z); root.add(lip); // the shutter's bottom bar
+      for (const x of [x0 + 0.05, x1 - 0.05]) { const g = new THREE.Mesh(new THREE.BoxGeometry(0.1, top, 0.16), steel); g.position.set(x, top / 2, z); root.add(g); }
+    }
+    if (!map.windows || !map.windows.length) return;
+    const frameMat = new THREE.MeshStandardMaterial({ color: map.theme.home >= 1 ? 0xe8e4da : 0x3a3e42, roughness: 0.6 });
+    // tinted, a little reflective, seen from both sides: it has to read as glass, not a hole
+    const glassMat = new THREE.MeshStandardMaterial({ color: 0x7e98a8, transparent: true, opacity: 0.38, roughness: 0.08, metalness: 0.55, depthWrite: false, side: THREE.DoubleSide, envMapIntensity: 1.2 });
+    const view = map.windows.some((w) => w.ext) ? G.Furniture.outsideMaterial(G.U.rng((map.seed ^ 0x77) >>> 0), map.theme.layout === 'apartments' ? 18 : 0) : null;
+    const opening = this.TOP - this.SILL;
+    for (const w of map.windows) {
+      const along = w.nx ? 'z' : 'x', ry = Math.atan2(-w.nx, -w.nz);
+      const g = new THREE.Group(); g.position.set(w.x, 0, w.z); g.rotation.y = ry; // local: x along the wall, z out of it (toward -n... see below)
+      // wall below and above (the full depth of the cell)
+      const below = new THREE.Mesh(new THREE.BoxGeometry(w.len, this.SILL, TS), wallMat); below.position.y = this.SILL / 2; g.add(below);
+      const above = new THREE.Mesh(new THREE.BoxGeometry(w.len, this.WALL_H - this.TOP, TS), wallMat); above.position.y = (this.TOP + this.WALL_H) / 2; g.add(above);
+      for (const m of [below, above]) m.layers.enable(1);
+      // the frame: sill, head, jambs and a mullion
+      const fr = (bw, bh, bd, x, y) => { const m = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd), frameMat); m.position.set(x, y, 0); g.add(m); };
+      fr(w.len, 0.05, 0.1, 0, this.SILL + 0.025); fr(w.len, 0.05, 0.08, 0, this.TOP - 0.025);
+      for (const x of [-1, 1]) fr(0.05, opening, 0.08, x * (w.len / 2 - 0.025), (this.SILL + this.TOP) / 2);
+      fr(0.04, opening, 0.05, 0, (this.SILL + this.TOP) / 2);
+      // the pane
+      const pane = new THREE.Mesh(new THREE.PlaneGeometry(w.len - 0.08, opening - 0.08), glassMat); pane.position.y = (this.SILL + this.TOP) / 2; g.add(pane);
+      pane.material.side = THREE.DoubleSide; pane.renderOrder = 2;
+      map.winMeshes[w.id] = pane;
+      // outside: the view, at the back of the opening (n points out of the building: the group's -z)
+      if (w.ext && view) {
+        const v = new THREE.Mesh(new THREE.PlaneGeometry(w.len, opening), view); v.position.set(0, (this.SILL + this.TOP) / 2, -(h - 0.01)); g.add(v);
+      }
+      if (w.broken) pane.visible = false;
+      root.add(g);
+    }
+  },
+  buildMesh(map) {
+    const TS = this.TS, th = map.theme, root = new THREE.Group();
+    const { W, H, t } = map;
+    // floor + ceiling
+    const ftex = this._tex('floor', th.floor); ftex.repeat.set(W / this.K, H / this.K);
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(W * TS, H * TS), new THREE.MeshStandardMaterial({ map: ftex, roughness: 0.92 }));
+    floor.rotation.x = -Math.PI / 2; floor.position.set((W * TS) / 2, 0, (H * TS) / 2);
+    floor.layers.enable(1); // layer 1: what hides the evidence glow (walls, floors, doors)
+    root.add(floor);
+    // ceiling over everything indoors (gardens are open to the night sky)
+    const ctex = this._tex('floor', th.ceil); ctex.repeat.set(0.5, 0.5);
+    const roofed = [];
+    for (let i = 0; i < W * H; i++) if (!map.out[i]) roofed.push(i);
+    const ceilGeo = new THREE.PlaneGeometry(TS, TS); ceilGeo.rotateX(Math.PI / 2);
+    const ceil = new THREE.InstancedMesh(ceilGeo, new THREE.MeshStandardMaterial({ map: ctex, roughness: 1 }), roofed.length);
+    const cm = new THREE.Matrix4();
+    roofed.forEach((i, n) => { cm.makeTranslation(((i % W) + 0.5) * TS, this.WALL_H, (Math.floor(i / W) + 0.5) * TS); ceil.setMatrixAt(n, cm); });
+    ceil.layers.enable(1);
+    root.add(ceil);
+
+    // walls: only tiles that border floor are visible
+    const walls = [];
+    for (let z = 0; z < H; z++) for (let x = 0; x < W; x++) {
+      const v = t[z * W + x];
+      if (v === 1 && map.winAt && map.winAt.has(z * W + x)) continue; // a window: built below
+      if (v === 1) {
+        let vis = false;
+        for (let oz = -1; oz <= 1 && !vis; oz++) for (let ox = -1; ox <= 1; ox++) {
+          const nx = x + ox, nz = z + oz;
+          if (nx >= 0 && nz >= 0 && nx < W && nz < H && t[nz * W + nx] !== 1) { vis = true; break; }
+        }
+        if (vis) walls.push([x, z]);
+      }
+    }
+    const wtex = this._tex(th.home >= 1 ? 'plaster' : 'wall', th.wall); wtex.repeat.set(1, 2);
+    const wm = new THREE.InstancedMesh(new THREE.BoxGeometry(TS, this.WALL_H, TS), new THREE.MeshStandardMaterial({ map: wtex, roughness: 0.85 }), walls.length);
+    const m4 = new THREE.Matrix4(), col = new THREE.Color();
+    walls.forEach(([x, z], i) => {
+      m4.makeTranslation((x + 0.5) * TS, this.WALL_H / 2, (z + 0.5) * TS);
+      wm.setMatrixAt(i, m4);
+      const s = 0.85 + Math.random() * 0.2; col.setRGB(s, s, s); wm.setColorAt(i, col);
+    });
+    wm.layers.enable(1);
+    root.add(wm);
+
+    // Houses seen from the garden: a pitched roof with eaves along every wall that faces it, and lit windows
+    // behind drawn curtains (just the look: the wall is still solid).
+    if (map.out.some((v) => v)) {
+      const roofMat = new THREE.MeshStandardMaterial({ color: 0x3a2f2c, roughness: 0.9 }), fascia = new THREE.MeshStandardMaterial({ color: 0xe8e4da, roughness: 0.7 });
+      const frameMat = new THREE.MeshStandardMaterial({ color: 0xece8de, roughness: 0.6 });
+      const lit = [0xffcf8a, 0xffe2b0, 0xf2c070, 0x9ab8d8].map((c) => new THREE.MeshBasicMaterial({ color: c }));
+      const dark = new THREE.MeshStandardMaterial({ color: 0x15181c, roughness: 0.2, metalness: 0.3 });
+      const rnd = G.U.rng((map.seed ^ 0x700f) >>> 0);
+      const seg = new THREE.Group();
+      for (let z = 1; z < H - 1; z++) for (let x = 1; x < W - 1; x++) {
+        if (t[z * W + x] !== 1 && t[z * W + x] !== 3) continue;
+        for (const [dx, dz] of [[0, 1], [0, -1]]) {
+          const ni = (z + dz) * W + x;
+          if (!map.out[ni] || t[ni] === 4 || map.out[z * W + x]) continue;
+          // the wall's garden face, and the roof climbing back over the house from it
+          const fz = (z + 0.5) * TS + dz * TS / 2, cx = (x + 0.5) * TS;
+          if (th.home >= 1) { // a home: a pitched roof climbing back from the eaves
+            const roof = new THREE.Mesh(new THREE.BoxGeometry(TS + 0.02, 0.1, 3.6), roofMat);
+            roof.position.set(cx, this.WALL_H + 0.95, fz - dz * 1.35); roof.rotation.x = dz * 0.55;
+            seg.add(roof);
+            const f = new THREE.Mesh(new THREE.BoxGeometry(TS + 0.02, 0.22, 0.06), fascia);
+            f.position.set(cx, this.WALL_H - 0.02, fz + dz * 0.4); seg.add(f);
+          }
+          if (false && t[z * W + x] === 1 && x % this.K === 1 && t[z * W + x - 1] === 1 && t[z * W + x + 1] === 1 && rnd() < 0.5) { // a window
+            const fr = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.3, 0.06), frameMat); fr.position.set(cx, 1.75, fz + dz * 0.03); seg.add(fr);
+            const gl = new THREE.Mesh(new THREE.PlaneGeometry(1.06, 1.16), rnd() < 0.6 ? lit[Math.floor(rnd() * lit.length)] : dark);
+            gl.position.set(cx, 1.75, fz + dz * 0.065); gl.rotation.y = dz > 0 ? 0 : Math.PI; seg.add(gl);
+            const bar = new THREE.Mesh(new THREE.BoxGeometry(0.05, 1.16, 0.02), frameMat); bar.position.set(cx, 1.75, fz + dz * 0.075); seg.add(bar);
+            const sill = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.05, 0.14), frameMat); sill.position.set(cx, 1.08, fz + dz * 0.07); seg.add(sill);
+          }
+        }
+      }
+      root.add(seg);
+    }
+    G.Furniture.build(map, root, this._tex('crate', th.crate));
+    this.buildWindows(map, root, wm.material);
+
+    // ceiling lamps (emissive panels) + a limited number of real point lights
+    const lampGeo = new THREE.SphereGeometry(0.32, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2);
+    lampGeo.scale(1, 0.45, 1); lampGeo.rotateX(Math.PI);
+    const lampMat = new THREE.MeshBasicMaterial({ color: th.light });
+    const porchMat = new THREE.MeshBasicMaterial({ color: 0xffe2a8 }), porchBox = new THREE.MeshStandardMaterial({ color: 0x1c1c1e, roughness: 0.6 });
+    // every lamp's fitting (and where its light would go), then a pool of real lights that follows you: the
+    // LIGHTS lamps nearest you get them (G.Level.updateLights), so whatever room you're in is lit. (Moving a
+    // light costs nothing; adding or removing one recompiles every shader.)
+    map.lamps = [];
+    map.lights.forEach((l) => {
+      if (l.porch) { // a lantern on the wall over a back door
+        const box = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.26, 0.14), porchBox); box.position.set(l.x, l.y, l.z + l.porch * 0.07); root.add(box);
+        const glow = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.18, 0.1), porchMat); glow.position.set(l.x, l.y, l.z + l.porch * 0.1); root.add(glow);
+        map.lamps.push({ x: l.x, y: l.y - 0.1, z: l.z + l.porch * 0.5, color: 0xffd59a, i: 0.9, d: 11 });
+        return;
+      }
+      const lamp = new THREE.Mesh(lampGeo, lampMat);
+      lamp.position.set(l.x, this.WALL_H, l.z);
+      root.add(lamp);
+      map.lamps.push({ x: l.x, y: this.WALL_H - 0.4, z: l.z, color: th.light, i: 0.85, d: 14 });
+    });
+    map.lightPool = [];
+    for (let k = 0; k < Math.min(this.LIGHTS, map.lamps.length); k++) { const pl = new THREE.PointLight(th.light, 0, 14, 1.6); root.add(pl); map.lightPool.push(pl); }
+    map.lightT = 0;
+    this.updateLights(map, map.spawn ? new THREE.Vector3(map.spawn.x, 1.6, map.spawn.z) : null, true);
+
+    // doors: a lintel over the frame and a leaf on a hinge (rotation animated by G.Game.updateDoors)
+    const metal = th.name === 'Bunker' || th.name === 'Research Lab' || th.name === 'Cold Storage';
+    const leafMat = new THREE.MeshStandardMaterial({ color: metal ? 0x5d666e : 0x6e4a2c, roughness: metal ? 0.5 : 0.75, metalness: metal ? 0.5 : 0 });
+    const lintelMat = new THREE.MeshStandardMaterial({ map: wtex, roughness: 0.85 });
+    const knobMat = new THREE.MeshStandardMaterial({ color: 0xb8a060, roughness: 0.3, metalness: 0.9 });
+    const vaultMat = new THREE.MeshStandardMaterial({ color: 0x7a8288, roughness: 0.35, metalness: 0.85 });
+    map.doorMeshes = map.doors.map((d) => {
+      const dw = d.w || TS, half = dw / 2, leafL = dw - 0.05;
+      const lintel = new THREE.Mesh(d.axis === 'x' ? new THREE.BoxGeometry(TS, this.WALL_H - this.DOOR_H, dw) : new THREE.BoxGeometry(dw, this.WALL_H - this.DOOR_H, TS), lintelMat);
+      lintel.position.set(d.x, (this.WALL_H + this.DOOR_H) / 2, d.z);
+      lintel.layers.enable(1);
+      root.add(lintel);
+      const pivot = new THREE.Group();
+      const vault = d.kind === 'vault';
+      const leaf = new THREE.Mesh(new THREE.BoxGeometry(leafL, this.DOOR_H - 0.04, vault ? 0.2 : 0.05), vault ? vaultMat : leafMat);
+      if (vault) { // the locking wheel and bolts on the outside face, rivets round the edge
+        const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.03, 8, 20), knobMat);
+        wheel.position.set(leafL * (d.mirror ? 0.3 : 0.7), 1.2, 0.13); pivot.add(wheel);
+        for (let k = 0; k < 3; k++) { const sp = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.03, 0.03), knobMat); sp.position.copy(wheel.position); sp.rotation.z = k * Math.PI / 3; pivot.add(sp); }
+        for (const y of [0.3, 1.2, 2.0]) { const bolt = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.08, 0.06), knobMat); bolt.position.set(d.mirror ? 0.06 : leafL - 0.06, y, 0.12); pivot.add(bolt); }
+      }
+      leaf.position.set(leafL / 2 + 0.02, (this.DOOR_H - 0.04) / 2, 0);
+      leaf.layers.enable(1);
+      pivot.add(leaf);
+      for (const side of [-1, 1]) { const k = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 6), knobMat); k.position.set(leafL - 0.08, 1.0, side * 0.045); pivot.add(k); }
+      // hinge on one jamb; the second leaf of a double door hinges on the opposite jamb and swings the other way
+      const m = d.mirror ? -1 : 1;
+      if (d.axis === 'x') { pivot.position.set(d.x, 0, d.z - half * m); pivot.rotation.y = -Math.PI / 2 * m; }
+      else { pivot.position.set(d.x - half * m, 0, d.z); if (d.mirror) pivot.rotation.y = Math.PI; }
+      pivot.userData = { base: pivot.rotation.y, ang: d.open ? 1 : 0, sign: m };
+      pivot.rotation.y = pivot.userData.base + (d.open ? Math.PI / 2 * 0.95 * m : 0);
+      root.add(pivot);
+      return pivot;
+    });
+
+    // (no extraction zone: the squad votes to leave once order's restored)
+
+    // the weapon case: a hard-shell long-gun case lying along the wall. The lid is hinged at the back (on the
+    // wall side); the weapon lies in the foam. What's in it and whether it's open: G.Views.syncCase.
+    if (map.case) {
+      const M = (color, roughness, metalness = 0) => new THREE.MeshStandardMaterial({ color, roughness, metalness });
+      const shell = M(0x2b3026, 0.65), steel = M(0x9aa0a6, 0.3, 0.8), foam = M(0x1c1d20, 1), box = (w, h, d, m, x, y, z, parent) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); parent.add(b); return b; };
+      const g = new THREE.Group(), Lc = 1.35, D = 0.4, H0 = 0.075, H1 = 0.055;
+      // bottom half: floor, walls, foam
+      box(Lc, 0.012, D, shell, 0, 0.006, 0, g);
+      for (const s of [-1, 1]) { box(Lc, H0, 0.014, shell, 0, H0 / 2, s * (D / 2 - 0.007), g); box(0.014, H0, D, shell, s * (Lc / 2 - 0.007), H0 / 2, 0, g); }
+      box(Lc - 0.028, 0.02, D - 0.028, foam, 0, 0.022, 0, g);
+      for (let i = 0; i < 6; i++) for (const s of [-1, 1]) box(0.03, H0 + 0.002, 0.01, shell, -0.55 + i * 0.22, H0 / 2, s * (D / 2 + 0.004), g);
+      for (const x of [-0.42, 0.42]) box(0.06, 0.04, 0.012, steel, x, H0 - 0.006, D / 2 + 0.008, g);
+      const handle = new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.01, 6, 12, Math.PI), M(0x111111, 0.8));
+      handle.rotation.set(Math.PI / 2, 0, Math.PI); handle.position.set(0, 0.045, D / 2 + 0.012); g.add(handle);
+      // the lid, built closed around its hinge line
+      const lid = new THREE.Group();
+      lid.position.set(0, H0, -D / 2);
+      g.add(lid);
+      box(Lc, 0.012, D, shell, 0, H1 - 0.006, D / 2, lid);
+      for (const s of [-1, 1]) { box(Lc, H1, 0.014, shell, 0, H1 / 2, D / 2 + s * (D / 2 - 0.007), lid); box(0.014, H1, D, shell, s * (Lc / 2 - 0.007), H1 / 2, D / 2, lid); }
+      box(Lc - 0.028, 0.018, D - 0.028, foam, 0, H1 - 0.021, D / 2, lid);
+      for (let i = 0; i < 6; i++) box(0.03, 0.006, D + 0.004, shell, -0.55 + i * 0.22, H1 + 0.002, D / 2, lid);
+      for (const x of [-0.5, 0.5]) box(0.05, 0.012, 0.016, steel, x, 0.004, -0.004, lid); // hinges
+      box(0.18, 0.002, 0.08, new THREE.MeshBasicMaterial({ color: 0xffb02e }), -0.3, H1 + 0.006, D / 2, lid);
+      const holder = new THREE.Group();
+      holder.position.y = 0.032;
+      g.add(holder);
+      g.position.set(map.case.x, 0, map.case.z); g.rotation.y = map.case.yaw;
+      root.add(g);
+      map.caseView = { g, lid, holder, open: 0, code: null, synced: false };
+    }
+    // first aid cabinets: a white steel box on the wall with a red cross on its door (hinged on the left),
+    // two shelves inside with whatever's left in it. Contents and door: G.Views.syncCabs.
+    map.cabViews = (map.cabinets || []).map((c) => {
+      const M = (color, roughness, metalness = 0) => new THREE.MeshStandardMaterial({ color, roughness, metalness });
+      const white = M(0xe9e7e2, 0.45, 0.3), inner = M(0xd6d3cc, 0.8), red = new THREE.MeshBasicMaterial({ color: 0xc0201a });
+      const box = (w, h, d, m, x, y, z, parent) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); parent.add(b); return b; };
+      const g = new THREE.Group(), Wd = 0.44, Hh = 0.52, D = 0.15, Y = 1.32;
+      box(Wd, Hh, 0.012, inner, 0, Y, -D / 2 + 0.006, g); // back
+      for (const s of [-1, 1]) { box(0.014, Hh, D, white, s * (Wd / 2 - 0.007), Y, 0, g); box(Wd, 0.014, D, white, 0, Y + s * (Hh / 2 - 0.007), 0, g); }
+      box(Wd - 0.03, 0.01, D - 0.02, inner, 0, Y, 0, g); // the shelf
+      const door = new THREE.Group();
+      door.position.set(-Wd / 2, Y, D / 2);
+      g.add(door);
+      box(Wd, Hh, 0.016, white, Wd / 2, 0, 0.008, door);
+      box(0.2, 0.06, 0.004, red, Wd / 2, 0.02, 0.018, door); box(0.06, 0.2, 0.004, red, Wd / 2, 0.02, 0.018, door);
+      box(0.012, 0.08, 0.02, M(0x8a8f94, 0.3, 0.8), Wd - 0.04, -0.05, 0.026, door); // the handle
+      // up to six things on the two shelves
+      const slots = [];
+      for (let i = 0; i < 6; i++) {
+        const m = box(0.09, 0.1, 0.08, M(0xffffff, 0.8), -0.14 + (i % 3) * 0.14, Y + (i < 3 ? -0.2 : 0.06), -0.01, g);
+        m.visible = false; slots.push(m);
+      }
+      g.position.set(c.x, 0, c.z); g.rotation.y = c.yaw;
+      root.add(g);
+      return { g, door, slots, open: 0, key: null };
+    });
+    return root;
+  },
+};
