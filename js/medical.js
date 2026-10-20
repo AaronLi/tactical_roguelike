@@ -12,7 +12,7 @@
 // A punctured lung and blood loss work through painkillers; leg fractures slow you whatever you've taken.
 //
 // Field treatment, each for one injury on one part (and it takes time, see js/invui.js):
-//   bandage (light bleed, anywhere), tourniquet (heavy bleed, arm or leg), hemostatic gauze (heavy bleed,
+//   bandage (light bleed, anywhere), tourniquet (heavy bleed, arm or leg), hemostatic gauze (heavy or light bleed,
 //   anywhere), chest seal (punctured lung), splint (fracture, arm or leg), painkillers (pain, two minutes),
 //   blood bag (40% blood back: on yourself before you black out, or on a downed teammate so they can be revived).
 // Bandages and painkiller doses stack 4 to a slot, tourniquets and gauze 3; the rest are one each.
@@ -29,7 +29,7 @@ G.Med = (() => {
   const ITEMS = {
     bandage: { name: 'Bandage', fixes: 'light', where: 'any', time: 3, size: [1, 1], price: 40, stack: 4, desc: 'Stops light bleeding, anywhere.' },
     tourniquet: { name: 'Tourniquet', fixes: 'heavy', where: 'limb', time: 3, size: [1, 1], price: 80, stack: 3, desc: 'Stops heavy bleeding from an arm or a leg.' },
-    gauze: { name: 'Hemostatic gauze', fixes: 'heavy', where: 'any', time: 5, size: [1, 1], price: 120, stack: 3, desc: 'Packed into the wound: stops heavy bleeding anywhere, the torso too.' },
+    gauze: { name: 'Hemostatic gauze', fixes: 'heavy', light: true, where: 'any', time: 5, size: [1, 1], price: 120, stack: 3, desc: 'Packed into the wound: stops heavy bleeding anywhere, the torso too. Works as a bandage on lighter bleeding too.' },
     seal: { name: 'Chest seal', fixes: 'lung', where: ['thorax'], time: 4, size: [1, 1], price: 150, desc: 'Seals a punctured lung: you can breathe again.' },
     splint: { name: 'Splint', fixes: 'frac', where: 'limb', time: 6, size: [1, 2], price: 100, desc: 'Holds a broken arm or leg: no more limp or shaking aim from it.' },
     bloodbag: { name: 'Blood bag', fixes: 'blood', where: 'any', time: 8, size: [1, 2], price: 220, desc: 'A transfusion: 40% of your blood back. Keeps you from blacking out, and brings a downed teammate\'s blood up far enough to revive them.' },
@@ -125,7 +125,7 @@ G.Med = (() => {
     if (I.fixes === 'pain') return null;
     if (I.fixes === 'blood') return b.blood >= 90 ? 'Plenty of blood: a transfusion isn\'t needed' : null;
     if (I.fixes === 'light' && !p.light) return p.heavy ? 'A bandage won\'t stop that: it needs a tourniquet or gauze' : `No light bleeding on the ${NAME[part].toLowerCase()}`;
-    if (I.fixes === 'heavy' && !p.heavy) return `No heavy bleeding on the ${NAME[part].toLowerCase()}`;
+    if (I.fixes === 'heavy' && !p.heavy && !(I.light && p.light)) return `No ${I.light ? '' : 'heavy '}bleeding on the ${NAME[part].toLowerCase()}`; // (gauze: a bandage too)
     if (I.fixes === 'frac' && !p.frac) return `The ${NAME[part].toLowerCase()} isn't broken`;
     if (I.fixes === 'lung' && !p.lung) return 'No punctured lung';
     return null;
@@ -136,7 +136,7 @@ G.Med = (() => {
     if (I.fixes === 'pain') b.pk = PK;
     else if (I.fixes === 'blood') b.blood = Math.min(100, b.blood + BAG);
     else if (I.fixes === 'light') p.light = false;
-    else if (I.fixes === 'heavy') { p.heavy = false; if (mt === 'tourniquet') p.tq = true; }
+    else if (I.fixes === 'heavy') { if (p.heavy) { p.heavy = false; if (mt === 'tourniquet') p.tq = true; } else p.light = false; } // (gauze on a light bleed: as a bandage)
     else if (I.fixes === 'frac') p.frac = false;
     else if (I.fixes === 'lung') p.lung = false;
     return true;

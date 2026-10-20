@@ -76,9 +76,15 @@ G.Gunsmith = (() => {
     barrel: 'Barrel', muzzle: 'Muzzle', handguard: 'Handguard', stock: 'Stock', grip: 'Pistol grip', mag: 'Magazine',
     optic: 'Sight', magnifier: 'Magnifier', fg: 'Foregrip', tac: 'Tactical', charging: 'Charging handle', slide: 'Slide', motor: 'Drive motor',
     pump: 'Forend', tube: 'Magazine tube', loader: 'Loading', cap: 'Capacitor', limbs: 'Limbs', receiver: 'Receiver group',
+    buttstock: 'Stock (on the adapter)', riserdot: 'Sight (on the riser)',
   };
+  // Adapters: a part in a slot that gives another slot of the same kind on top of it (a buffer tube adapter in
+  // the stock slot takes any AR stock; a riser on the rail takes a pistol red dot). slot -> the kind it takes.
+  const ALIAS = { buttstock: 'stock', riserdot: 'optic' };
+  // whether part p goes in slot s (its interface, and its kind or the kind the slot takes)
+  const fitsSlot = (s, p) => !!(s && p) && (s.mount === p.mount || (p.alsoMounts || []).includes(s.mount)) && (s.slot === p.slot || ALIAS[s.slot] === p.slot);
   // display order
-  const ORDER = ['receiver', 'slide', 'barrel', 'limbs', 'muzzle', 'handguard', 'pump', 'fg', 'tac', 'optic', 'magnifier', 'charging', 'grip', 'stock', 'mag', 'tube', 'loader', 'cap', 'motor'];
+  const ORDER = ['receiver', 'slide', 'barrel', 'limbs', 'muzzle', 'handguard', 'pump', 'fg', 'tac', 'optic', 'riserdot', 'magnifier', 'charging', 'grip', 'stock', 'buttstock', 'mag', 'tube', 'loader', 'cap', 'motor'];
 
   // ------------------------------------------------------------------ brands (all fictional)
   const BR = {
@@ -182,6 +188,12 @@ G.Gunsmith = (() => {
     add({ id: `stk.${fam}.${i}`, slot: 'stock', mount: 'stk:' + fam, brand: BR[b], name: n, price: type === 'folded' ? 60 : 200 + Math.round((STK_ST[type].weight || 0) * 150), tier: tier || 1,
       stype: type, st: STK_ST[type], desc: type === 'folded' ? 'No stock at all: very handy, hard to control.' : '', model: { stock: type, sm: sm || null } });
   });
+  // Buffer tube adapters: on an AK, an SMG or a machine gun, a bare AR-15 buffer tube to take any AR stock
+  const tubeAdapter = (p, name, brand) => Object.assign(p, { name, brand: BR[brand], price: 140, tier: 1, stype: 'tubeonly', st: { weight: 0.12, ergo: 1 }, model: { stock: 'tubeonly', sm: null },
+    provides: { buttstock: 'stk:tube' }, desc: 'A bare AR-15 buffer tube: takes any AR stock. On its own it is as good as no stock.' });
+  tubeAdapter(PARTS['stk.ak.3'], 'Kestrel AK buffer tube adapter', 'kestrel');
+  tubeAdapter(PARTS['stk.heavy.3'], 'Vantage MG buffer tube adapter', 'vantage');
+
 
   // Pistol grips
   const GRIP = {
@@ -233,6 +245,11 @@ G.Gunsmith = (() => {
     ['kodiak', 'Kodiak Keep enclosed pistol dot', { optic: 'minidot', closed: true }, 0.76, 560, { acc: -12, ergo: -4, weight: 0.03 }, 2],
     ['vantage', 'Vantage Halo circle-dot pistol sight', { optic: 'minidot', ret: 'cdot' }, 0.77, 480, { acc: -11, hip: -4, ergo: -2 }, 2]]
     .forEach(([b, n, model, zoom, price, st, tier], i) => add({ id: `op.pso.${i}`, slot: 'optic', mount: 'op:pso', brand: BR[b], name: n, price, tier, st, set: { zoom, scoped: false }, desc: '', model }));
+  // A pistol optic riser: on a rifle's rail, lifting a pistol red dot (an RMR footprint) to the height of a
+  // rifle's sight line. (In place of the old reflex-on-a-riser: same id.) Every pistol dot fits it.
+  Object.assign(PARTS['op.pic.12'], { name: 'Halcyon pistol optic riser', price: 120, tier: 1, st: { weight: 0.05 }, set: {}, model: { optic: 'riser', riser: 0.022 }, provides: { riserdot: 'op:rmr' },
+    desc: 'Lifts a pistol red dot to rifle height on a rail. Mount one on it.' });
+  for (const p of BY_MOUNT.get('op:pso')) if (p.model.optic === 'minidot') { p.alsoMounts = ['op:rmr']; if (!BY_MOUNT.has('op:rmr')) BY_MOUNT.set('op:rmr', []); BY_MOUNT.get('op:rmr').push(p); }
   // Magnifiers: behind a red dot or holographic sight, flipped in or out of the way (scroll while aiming)
   [['bright', 'Brightline 2× micro magnifier', 2, 0.07, 300, { ergo: -2, weight: 0.2 }, 1], ['strix', 'Strix FTS 3× flip magnifier', 3, 0.085, 420, { ergo: -4, weight: 0.3 }, 2],
     ['meridian', 'Meridian 5× flip magnifier', 5, 0.1, 640, { ergo: -6, weight: 0.38 }, 3]]
@@ -285,7 +302,7 @@ G.Gunsmith = (() => {
   // A slot accepts any part made for its interface. Some interfaces are shared by many weapons (rails,
   // buffer tubes, threads); barrels, magazines and slides are made for one platform.
   const IFACE = {
-    'op:pic': 'Picatinny top rail', 'op:pso': 'Pistol optic cut', magn: 'Rail behind a red dot', fg: 'Underside rail (M-LOK / Picatinny)', tac: 'Side rail', ptac: 'Pistol accessory rail',
+    'op:pic': 'Picatinny top rail', 'op:pso': 'Pistol optic cut', 'op:rmr': 'Pistol optic riser', magn: 'Rail behind a red dot', fg: 'Underside rail (M-LOK / Picatinny)', tac: 'Side rail', ptac: 'Pistol accessory rail',
     'stk:tube': 'AR-15 buffer tube', 'stk:ak': 'AK stock trunnion', 'stk:classic': 'Rifle stock inletting', 'stk:precision': 'Precision stock mount', 'stk:smg': 'SMG stock mount', 'stk:heavy': 'Machine-gun buttstock mount',
     'gr:ar': 'AR-15 grip mount', 'gr:ak': 'AK grip mount', 'gr:smg': 'SMG grip frame', 'gr:pistol': 'Pistol grip frame', 'gr:rev': 'Revolver grip frame',
     'hg:ar': 'AR-15 barrel nut', 'hg:ak': 'AK handguard retainer', 'hg:box': 'Rifle forend mount', 'hg:smg': 'SMG forend mount', 'hg:classic': 'Rifle fore-end inletting', 'hg:shroud': 'Barrel jacket mount',
@@ -303,7 +320,7 @@ G.Gunsmith = (() => {
   // canonical model key, for spotting identical parts
   const canon = (m) => JSON.stringify(m || {}, (k, v) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.keys(v).sort().reduce((o, kk) => { if (v[kk] != null) o[kk] = v[kk]; return o; }, {}) : v));
   // Parts missing from a slot cost something (a rifle with no stock is hard to control).
-  const EMPTY = { stock: { recoil: 25, ergo: 8 } };
+  const EMPTY = { stock: { recoil: 25, ergo: 8 }, buttstock: { recoil: 25, ergo: 8 } }; // (an adapter with nothing on it: no stock)
   const GRIP_NAME = { ar: 'A2 pistol grip', wood: 'wooden grip', vertical: 'grip sleeve' };
 
   // ------------------------------------------------------------------ platforms
@@ -624,7 +641,7 @@ G.Gunsmith = (() => {
       const avail = slotsOf(id, build);
       for (const [sl, pid] of Object.entries(build)) {
         const s = avail.find((a) => a.slot === sl);
-        if (!s || !PARTS[pid] || (PARTS[pid].mount !== s.mount && !s.req)) { removed.push(pid); delete build[sl]; changed = true; }
+        if (!s || !PARTS[pid] || (!fitsSlot(s, PARTS[pid]) && !s.req)) { removed.push(pid); delete build[sl]; changed = true; }
       }
     }
     return removed;
@@ -637,7 +654,13 @@ G.Gunsmith = (() => {
     const [id, rest] = String(code).split('/');
     if (rest === undefined) return { id, build: defaultBuild(id) };
     const build = {};
-    for (const s of rest.split('.')) { const p = LIST[parseInt(s, 36)]; if (p) build[p.slot] = p.id; }
+    for (const s of rest.split('.')) {
+      const p = LIST[parseInt(s, 36)];
+      if (!p) continue;
+      const alt = Object.keys(ALIAS).find((a) => ALIAS[a] === p.slot);
+      build[build[p.slot] && alt ? alt : p.slot] = p.id; // (two of a kind: one's on the other's adapter)
+    }
+    for (const [alt, sl] of Object.entries(ALIAS)) if (build[alt] && build[sl] && !(PARTS[build[sl]].provides || {})[alt]) [build[sl], build[alt]] = [build[alt], build[sl]];
     prune(id, build);
     return { id, build };
   }
@@ -754,8 +777,9 @@ G.Gunsmith = (() => {
   function modelSpec(def) {
     const plat = PLATFORMS[def.id];
     const spec = JSON.parse(JSON.stringify(plat.spec));
-    const parts = Object.values(def.build || defaultBuild(def.id)).map((p) => PARTS[p]).filter(Boolean)
-      .sort((a, b) => ORDER.indexOf(a.slot) - ORDER.indexOf(b.slot));
+    // (in slot order, by the slot each is in: what's on an adapter goes over the adapter)
+    const parts = Object.entries(def.build || defaultBuild(def.id)).filter(([, p]) => PARTS[p])
+      .sort((a, b) => ORDER.indexOf(a[0]) - ORDER.indexOf(b[0])).map(([, p]) => PARTS[p]);
     for (const p of parts) for (const [k, v] of Object.entries(p.model || {})) {
       if (k === 'pumpPatch') { spec.pump = Object.assign({}, spec.pump || {}, v); continue; }
       if (v && typeof v === 'object' && !Array.isArray(v) && spec[k] && typeof spec[k] === 'object') spec[k] = Object.assign({}, spec[k], v);
@@ -765,6 +789,8 @@ G.Gunsmith = (() => {
     return spec;
   }
 
+  // (parts added later go on the end of the list: a part's id in a weapon's code is its place in it)
+  tubeAdapter(add({ id: 'stk.smg.6', slot: 'stock', mount: 'stk:smg' }), 'Lynx SMG buffer tube adapter', 'lynx');
   const compatible = (mount) => BY_MOUNT.get(mount) || [];
   const FITS = new Map(); // interface -> weapon ids that have (or can get) a slot for it
   for (const plat of Object.values(PLATFORMS)) {
@@ -779,7 +805,8 @@ G.Gunsmith = (() => {
   // better parts appear deeper in the run.
   function rollStock(level, seed, n = 3) {
     const r = G.U.rng((seed ^ 0x6a5d) >>> 0), maxTier = Math.min(3, 1 + Math.floor(level / 2)), out = new Set();
-    const pool = LIST.filter((p) => !p.factory && !p.variant && p.tier <= maxTier).map((p) => ({ p, w: Math.pow(fits(p.mount).length, 0.8) }));
+    // (lights and lasers are few among hundreds of muzzles, stocks and grips: they're weighted up to turn up most visits)
+    const pool = LIST.filter((p) => !p.factory && !p.variant && p.tier <= maxTier).map((p) => ({ p, w: Math.pow(fits(p.mount).length, 0.8) * (p.slot === 'tac' ? 9 : 1) }));
     while (out.size < n && pool.length) {
       let roll = r() * pool.reduce((a, x) => a + x.w, 0), i = 0;
       while (roll > pool[i].w && i < pool.length - 1) { roll -= pool[i].w; i++; }
@@ -793,7 +820,7 @@ G.Gunsmith = (() => {
   }
 
   return {
-    PARTS, LIST, PLATFORMS, SLOT_LABEL, BRANDS: BR, ifaceName, fits,
+    PARTS, LIST, PLATFORMS, SLOT_LABEL, BRANDS: BR, ifaceName, fits, fitsSlot, ALIAS,
     defaultBuild, slotsOf, visibleSlots, magCap, prune, encode, decode, compile, fromCode, soundSpec, modelSpec, rollStock, compatible, strip, convert, kitsFor, convParts, buyPrice, RCV,
     defaultCode: (id) => encode(id, defaultBuild(id)),
   };

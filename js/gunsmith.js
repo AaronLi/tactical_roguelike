@@ -52,7 +52,59 @@ G.GunsmithUI = (() => {
     const box = new T.Box3().setFromObject(model), size = box.getSize(new T.Vector3());
     box.getCenter(view.center);
     if (!view.fitted || view.fitted !== def.id) { view.dist = Math.max(0.3, Math.max(size.x, size.y, size.z) * 1.45); view.fitted = def.id; }
+    anchors = anchorsOf(def, box);
     paint();
+  }
+  // Where each editable slot is on the model (a dot goes there): the middle of that slot's part, or, for an
+  // empty optional slot, where its part would go (the muzzle at the front of the barrel, a sight on top, a
+  // foregrip under the front of the handguard...). The gun's bore runs along -Z, up is +Y, right is +X.
+  let anchors = {};
+  function anchorsOf(def, box) {
+    const by = {};
+    model.traverse((o) => { if (o.isMesh && o.userData.slot) (by[o.userData.slot] || (by[o.userData.slot] = new T.Box3())).expandByObject(o); });
+    const c = box.getCenter(new T.Vector3()), sz = box.getSize(new T.Vector3()), mid = (s) => by[s] && !by[s].isEmpty() ? by[s].getCenter(new T.Vector3()) : null;
+    const bore = mid('barrel') || c, hg = by.handguard && !by.handguard.isEmpty() ? by.handguard : null, front = (k) => box.min.z + sz.z * k;
+    const out = {};
+    for (const s of GS.visibleSlots(def.id, def.build)) {
+      let p = mid(s.slot);
+      // a barrel inside a handguard: its dot on the stretch that shows, in front of the handguard
+      if (s.slot === 'barrel' && p && hg && by.barrel.min.z < hg.min.z - 0.02) p.z = (by.barrel.min.z + hg.min.z) / 2;
+      if (!p) switch (s.slot) {
+        case 'muzzle': p = new T.Vector3(c.x, bore.y, by.barrel ? by.barrel.min.z : box.min.z); break;
+        case 'optic': p = new T.Vector3(c.x, box.max.y, c.z); break;
+        case 'magnifier': { const o = mid('optic') || new T.Vector3(c.x, box.max.y, c.z); p = new T.Vector3(o.x, o.y, o.z + 0.08); break; }
+        case 'fg': p = hg ? new T.Vector3(c.x, hg.min.y, hg.min.z + (hg.max.z - hg.min.z) * 0.4) : new T.Vector3(c.x, box.min.y + sz.y * 0.3, front(0.3)); break;
+        case 'tac': p = hg ? new T.Vector3(hg.max.x, (hg.min.y + hg.max.y) / 2, hg.min.z + (hg.max.z - hg.min.z) * 0.25) : new T.Vector3(box.max.x, c.y, front(0.35)); break;
+        case 'stock': p = new T.Vector3(c.x, c.y, box.max.z); break;
+        case 'loader': p = new T.Vector3(box.min.x, c.y, c.z); break;
+        case 'receiver': p = mid('base') || c; break;
+        default: p = c.clone();
+      }
+      out[s.slot] = p;
+    }
+    return out;
+  }
+  // the dots: placed over the model every frame (they follow it as it turns)
+  const _dp = new T.Vector3();
+  function placeDots() {
+    const host = document.getElementById('gsDots');
+    if (!host || !model) return;
+    const w = weapon(), slots = w ? GS.visibleSlots(w.def.id, w.def.build) : [];
+    if (host.dataset.key !== modelKey + '|' + slots.map((s) => s.slot).join(',')) {
+      host.dataset.key = modelKey + '|' + slots.map((s) => s.slot).join(',');
+      host.innerHTML = slots.filter((s) => anchors[s.slot]).map((s) => `<button class="gs-dot${w.def.build[s.slot] ? '' : ' empty'}" data-gdot="${s.slot}" title="${GS.SLOT_LABEL[s.slot]}"></button>`).join('');
+    }
+    const r = host.getBoundingClientRect();
+    model.updateMatrixWorld(true);
+    for (const el of host.children) {
+      const a = anchors[el.dataset.gdot];
+      if (!a) { el.style.display = 'none'; continue; }
+      _dp.copy(a).applyMatrix4(model.matrixWorld).project(camera);
+      el.style.display = _dp.z > 1 ? 'none' : '';
+      el.style.left = ((_dp.x + 1) / 2 * r.width) + 'px'; el.style.top = ((1 - _dp.y) / 2 * r.height) + 'px';
+      el.classList.toggle('on', el.dataset.gdot === st.slot);
+      el.classList.toggle('hov', el.dataset.gdot === st.hoverSlot);
+    }
   }
   function paint() {
     if (!model) return;
@@ -93,6 +145,7 @@ G.GunsmithUI = (() => {
     camera.position.set(c.x + Math.sin(view.yaw) * Math.cos(view.pitch) * d, c.y + Math.sin(view.pitch) * d, c.z + Math.cos(view.yaw) * Math.cos(view.pitch) * d);
     camera.lookAt(c);
     renderer.render(scene, camera);
+    placeDots();
   }
 
   // ------------------------------------------------------------------ stats
@@ -236,7 +289,7 @@ G.GunsmithUI = (() => {
     return `<div class="gs-wrap">
       <div class="gs-tabs">${tabs}</div>
       <div class="gs-main">
-        <div class="gs-left"><div class="gs-view"><div id="gsHover" class="gs-hover"></div><div class="gs-hint">Drag to turn · scroll to zoom · click a part</div></div>
+        <div class="gs-left"><div class="gs-view"><div id="gsHover" class="gs-hover"></div><div id="gsDots" class="gs-dots"></div><div class="gs-hint">Drag to turn · scroll to zoom · click a part or a dot</div></div>
         <div class="gs-list"><div class="gs-sub">${cur ? GS.SLOT_LABEL[cur.slot] + (cur.req ? '' : ' (optional)') : ''}</div>${list}</div></div>
         <div class="gs-side"><div class="gs-title">${def.name}${def.modified ? ' <small>CUSTOM</small>' : ''}${def.missing.length ? ' <small class="broken">WON\'T FIRE</small>' : ''}</div>
           <div class="gs-slots">${slotRows}</div>
@@ -269,6 +322,7 @@ G.GunsmithUI = (() => {
     const t = e.target;
     const gw = t.closest('[data-gw]'); if (gw && !gw.disabled) { st.wslot = gw.dataset.gw; st.slot = null; st.hoverPart = null; st.hoverSlot = null; view.auto = true; G.Audio.click(); return refresh(); }
     const gs = t.closest('[data-gslot]'); if (gs) { st.slot = gs.dataset.gslot; st.hoverPart = null; G.Audio.click(); return refresh(); }
+    const gd = t.closest('[data-gdot]'); if (gd) { st.slot = gd.dataset.gdot; st.hoverPart = null; G.Audio.click(); return refresh(); }
     const gi = t.closest('[data-ginstall]'); if (gi && !gi.disabled) return install(st.slot, gi.dataset.ginstall);
     const gr = t.closest('[data-gremove]'); if (gr) return remove(gr.dataset.gremove);
     const gl = t.closest('[data-gsell]'); if (gl) return sell(gl.dataset.gsell);
@@ -277,6 +331,8 @@ G.GunsmithUI = (() => {
   function onHover(e) {
     const w = weapon();
     if (!w) return;
+    const dot = e.target.closest('[data-gdot]');
+    if (dot || st.dotHover) { const s = dot ? dot.dataset.gdot : null; if (s !== st.hoverSlot) { st.hoverSlot = s; paint(); label(s); } st.dotHover = !!dot; if (dot) return; }
     const row = e.target.closest('[data-gpart]');
     let pid = row ? row.dataset.gpart : null;
     if (pid === w.def.build[st.slot]) pid = null; // that's what's fitted already

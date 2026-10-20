@@ -7,6 +7,10 @@
 // Guns are the weapon's own 3D model (as built, parts and all), rendered side-on once and kept.
 G.Icons = (() => {
   const CELL = 64, cache = new Map();
+  // What a round looks like, everywhere it's drawn (these icons, and the rounds in the viewmodel: js/vmanim.js, the
+  // spent hulls: js/casings.js): a shotgun shell's hull is colour-coded by its load; a bullet's tip shows its type.
+  const shellCol = (am) => ({ slug: '#d8c040', flechette: '#3a6ab0', birdshot: '#3a8a3a', he: '#e07a1a' })[am] || '#b02a22'; // (buckshot red)
+  const tipCol = (am) => ({ ap: '#2a2a2a', tracer: '#c03020', hp: '#d8b070', subsonic: '#5a6a3a' })[am] || '#b87333'; // (ball: copper)
   const TYPE_COL = { ball: '#c9a14a', hp: '#e0604a', ap: '#4a90e0', tracer: '#ff6a2a', subsonic: '#9aa4ac', buck: '#c03a2a', slug: '#e8c050', birdshot: '#8ab040', flechette: '#4a90e0', he: '#c8b040', broadhead: '#8a6a40', railslug: '#40c8e0' };
 
   function rr(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
@@ -30,8 +34,13 @@ G.Icons = (() => {
     if (cal === '7.62/39' || cal === '5.6/39' || cal === '7.62/54') return 'banana';
     return def.mag > 20 ? 'curved' : 'straight';
   }
+  // How full a container is (0..1), and how many of k slots that fills (at least one if there's any in it)
+  const fillOf = (it) => (it.cap ? G.U.clamp(it.n / it.cap, 0, 1) : it.n > 0 ? 1 : 0);
+  const slotsOf = (it, k) => (it.n > 0 ? Math.max(1, Math.round(fillOf(it) * k)) : 0);
+  // Every container is drawn as full as it is: a box magazine's rounds from the feed lips down, then the
+  // follower and the spring; a drum's round its ring; a belt box's belt; a speedloader's or clip's rounds.
   function drawMag(g, W, H, it) {
-    const def = G.WEAPONS[it.wid] || {}, full = it.n > 0, am = TYPE_COL[it.am] || TYPE_COL.ball;
+    const def = G.WEAPONS[it.wid] || {}, full = it.n > 0, am = TYPE_COL[it.am] || TYPE_COL.ball, frac = fillOf(it);
     // the variant's own shape: a drum for a drum, a box for a stick magazine on a drum gun
     const vp = it.vid && G.Gunsmith.PARTS[it.vid], vt = vp && vp.model && vp.model.mag && vp.model.mag.t;
     let st = magStyle(def);
@@ -41,22 +50,27 @@ G.Icons = (() => {
     if (st === 'box') { // an ammo can with a belt hanging out
       rr(g, W * 0.12, H * 0.25, W * 0.76, H * 0.6, 6); g.fillStyle = '#4d5639'; g.fill(); shade(g, W * 0.12, H * 0.25, W * 0.76, H * 0.6); g.stroke();
       g.fillStyle = '#3a4229'; g.fillRect(W * 0.3, H * 0.15, W * 0.4, H * 0.12);
-      if (full) for (let i = 0; i < 6; i++) round(g, W * 0.18 + i * W * 0.11, H * 0.06, W * 0.07, H * 0.22, '#b87333', am);
+      for (let i = 0, k = slotsOf(it, 6); i < k; i++) round(g, W * 0.18 + i * W * 0.11, H * 0.06, W * 0.07, H * 0.22, '#b87333', am);
+      g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(W * 0.16, H * 0.29, W * 0.68 * (1 - frac), H * 0.05); // (the can's level: what's gone)
       return;
     }
     if (st === 'loader') { // six rounds in a ring
       g.fillStyle = '#1c1c1e'; g.beginPath(); g.arc(W / 2, H / 2, W * 0.36, 0, 7); g.fill();
-      for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; g.fillStyle = full ? am : '#555'; g.beginPath(); g.arc(W / 2 + Math.cos(a) * W * 0.2, H / 2 + Math.sin(a) * W * 0.2, W * 0.08, 0, 7); g.fill(); g.fillStyle = 'rgba(0,0,0,0.4)'; g.beginPath(); g.arc(W / 2 + Math.cos(a) * W * 0.2, H / 2 + Math.sin(a) * W * 0.2, W * 0.03, 0, 7); g.fill(); }
+      for (let i = 0, k = slotsOf(it, 6); i < 6; i++) { const a = i / 6 * Math.PI * 2 - Math.PI / 2; g.fillStyle = i < k ? am : '#555'; g.beginPath(); g.arc(W / 2 + Math.cos(a) * W * 0.2, H / 2 + Math.sin(a) * W * 0.2, W * 0.08, 0, 7); g.fill(); g.fillStyle = 'rgba(0,0,0,0.4)'; g.beginPath(); g.arc(W / 2 + Math.cos(a) * W * 0.2, H / 2 + Math.sin(a) * W * 0.2, W * 0.03, 0, 7); g.fill(); }
       g.fillStyle = '#8a8f94'; g.beginPath(); g.arc(W / 2, H / 2, W * 0.07, 0, 7); g.fill();
       return;
     }
     if (st === 'clip') { // an en-bloc clip of rounds
-      for (let i = 0; i < 4; i++) round(g, W * 0.2 + i * W * 0.15, H * 0.12, W * 0.12, H * 0.62, full ? '#b87333' : '#555', full ? am : '#555');
+      for (let i = 0, k = slotsOf(it, 4); i < 4; i++) round(g, W * 0.2 + i * W * 0.15, H * 0.12, W * 0.12, H * 0.62, i < k ? '#b87333' : '#555', i < k ? am : '#555');
       g.fillStyle = '#5a5f62'; g.fillRect(W * 0.16, H * 0.68, W * 0.68, H * 0.14);
       return;
     }
     if (st === 'drum') {
       g.fillStyle = '#25282c'; g.beginPath(); g.arc(W / 2, H * 0.55, W * 0.38, 0, 7); g.fill(); g.stroke();
+      if (frac > 0) { // the rounds round the ring, from the feed tower
+        g.strokeStyle = am; g.globalAlpha = 0.8; g.lineWidth = W * 0.13; g.beginPath(); g.arc(W / 2, H * 0.55, W * 0.25, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2); g.stroke(); g.globalAlpha = 1;
+        g.strokeStyle = 'rgba(0,0,0,0.6)'; g.lineWidth = 2;
+      }
       g.fillStyle = '#3a3e44'; g.beginPath(); g.arc(W / 2, H * 0.55, W * 0.14, 0, 7); g.fill();
       g.fillStyle = '#25282c'; g.fillRect(W * 0.4, H * 0.08, W * 0.2, H * 0.2);
       if (full) round(g, W * 0.43, H * 0.02, W * 0.14, H * 0.12, '#b87333', am);
@@ -64,7 +78,7 @@ G.Icons = (() => {
     }
     if (st === 'p90') {
       rr(g, W * 0.1, H * 0.3, W * 0.8, H * 0.4, 5); g.fillStyle = 'rgba(160,175,170,0.7)'; g.fill(); g.stroke();
-      if (full) for (let i = 0; i < 9; i++) { g.fillStyle = am; g.fillRect(W * 0.14 + i * W * 0.08, H * 0.38, W * 0.05, H * 0.24); }
+      for (let i = 0, k = slotsOf(it, 9); i < k; i++) { g.fillStyle = am; g.fillRect(W * 0.14 + i * W * 0.08, H * 0.38, W * 0.05, H * 0.24); }
       return;
     }
     // box magazines: curved (STANAG), banana (AK), straight, slim pistol
@@ -75,17 +89,67 @@ G.Icons = (() => {
     g.quadraticCurveTo(x0 + mw + curve * 0.4, (top + bot) / 2, x0 + mw + curve, bot);
     g.lineTo(x0 + curve, bot);
     g.quadraticCurveTo(x0 + curve * 0.4, (top + bot) / 2, x0, top);
-    g.closePath(); g.fillStyle = body; g.fill(); shade(g, x0, top, mw + curve, bot - top); g.stroke();
+    g.closePath(); g.fillStyle = body; g.fill();
+    { // inside: the rounds stacked from the feed lips down, then the follower, then the spring
+      const span = bot - top - H * 0.06, yf = top + 2 + span * frac, step = Math.max(3, Math.min(H * 0.045, span / Math.max(4, it.cap || 10) * 1.6));
+      g.save(); g.clip();
+      g.fillStyle = 'rgba(0,0,0,0.45)'; g.fillRect(0, yf, W, bot - yf); // (empty: dark)
+      g.fillStyle = am; g.globalAlpha = 0.72;
+      for (let y = top + 2; y < yf - 1; y += step) g.fillRect(0, y, W, Math.max(1.5, step * 0.62));
+      g.globalAlpha = 1;
+      if (frac < 1) {
+        g.fillStyle = '#9aa0a6'; g.fillRect(0, yf, W, 2.5); // the follower
+        g.strokeStyle = 'rgba(160,165,170,0.5)'; g.lineWidth = 1.5; g.beginPath();
+        for (let y = yf + 4, s = 0; y < bot - H * 0.06; y += 4, s++) { const xx = s % 2 ? x0 + curve * ((y - top) / (bot - top)) + mw * 0.8 : x0 + curve * ((y - top) / (bot - top)) + mw * 0.2; if (s) g.lineTo(xx, y); else g.moveTo(xx, y); }
+        g.stroke();
+      }
+      g.restore();
+      g.lineWidth = 2; g.strokeStyle = 'rgba(0,0,0,0.6)';
+    }
+    shade(g, x0, top, mw + curve, bot - top); g.stroke();
     g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(x0 + curve - 2, bot - H * 0.05, mw + 4, H * 0.06); // baseplate
     if (st !== 'pistol') for (let i = 1; i < 4; i++) { g.fillStyle = 'rgba(255,255,255,0.07)'; g.fillRect(x0 + curve * (i / 4) * 0.6 + 3, top + (bot - top) * i / 4, mw - 6, 2); }
     if (full) round(g, W / 2 - mw * 0.25, top - H * 0.09, mw * 0.5, H * 0.12, '#b87333', am);
   }
 
+  // A gun loaded a round at a time (a shotgun's tube, a lever or bolt action's magazine, a break action's
+  // barrels, a crossbow, a launcher's cylinder): a row of what it holds, the empty places dim.
+  function drawTube(g, W, H, it) {
+    const C = G.CALIBERS[it.key] || { group: 'rifle' }, col = TYPE_COL[it.am] || TYPE_COL.ball, n = Math.max(1, it.cap || 1), k = Math.min(n, it.n);
+    const rows = n > 8 ? 2 : 1, per = Math.ceil(n / rows), cw = W * 0.9 / per, ch = H * 0.86 / rows;
+    for (let i = 0; i < n; i++) {
+      const x = W * 0.05 + (i % per) * cw, y = H * 0.07 + Math.floor(i / per) * ch, on = i < k;
+      g.globalAlpha = on ? 1 : 0.22;
+      oneRound(g, x + cw * 0.12, y, cw * 0.76, ch * 0.92, C.group, on ? it.am : 'ball', on ? col : '#888');
+    }
+    g.globalAlpha = 1;
+  }
+  // one round, standing up: a shotgun shell, a 40 mm grenade, a bolt, a rail slug, or a cartridge
+  function oneRound(g, x, y, w, h, group, am, col) {
+    if (group === 'shotgun') { g.fillStyle = shellCol(am); rr(g, x, y, w, h * 0.78, Math.min(3, w / 3)); g.fill(); g.fillStyle = '#c9a14a'; g.fillRect(x, y + h * 0.7, w, h * 0.3); return; }
+    if (group === 'grenade') { g.fillStyle = '#c8b040'; rr(g, x, y, w, h * 0.6, w / 2.5); g.fill(); g.fillStyle = '#b0b4b8'; g.fillRect(x, y + h * 0.55, w, h * 0.45); return; }
+    if (group === 'bolt') { g.fillStyle = '#6a4a2a'; g.fillRect(x + w * 0.4, y + h * 0.1, w * 0.2, h * 0.85); g.fillStyle = '#c0c4c8'; g.beginPath(); g.moveTo(x + w * 0.2, y + h * 0.16); g.lineTo(x + w / 2, y); g.lineTo(x + w * 0.8, y + h * 0.16); g.fill(); return; }
+    if (group === 'cell') { g.fillStyle = '#40c8e0'; rr(g, x + w * 0.2, y, w * 0.6, h, 3); g.fill(); return; }
+    round(g, x + w * 0.15, y, w * 0.7, h, tipCol(am), col);
+  }
+  // the round in a gun's chamber, as a little picture (cached)
+  function chamberPic(cal, am) {
+    const key = 'chamber|' + cal + '|' + am;
+    let url = cache.get(key);
+    if (url) return url;
+    const c = document.createElement('canvas'); c.width = 24; c.height = 64; const g = c.getContext('2d');
+    oneRound(g, 2, 4, 20, 56, (G.CALIBERS[cal] || { group: 'rifle' }).group, am, TYPE_COL[am] || TYPE_COL.ball);
+    url = c.toDataURL(); cache.set(key, url);
+    return url;
+  }
+
   // ---------------------------------------------------------------- ammo boxes
   function drawAmmo(g, W, H, it) {
-    const C = G.CALIBERS[it.key] || { name: '?', group: 'rifle' }, col = TYPE_COL[it.am] || '#c9a14a';
+    // (no count: how full it is shows in how many stand on top of it)
+    const C = G.CALIBERS[it.key] || { name: '?', group: 'rifle' }, col = TYPE_COL[it.am] || '#c9a14a', frac = fillOf(it);
     if (C.group === 'shotgun') { // shells
-      for (let i = 0; i < 3; i++) { const x = W * 0.16 + i * W * 0.24; g.fillStyle = it.am === 'slug' ? '#d8c040' : it.am === 'flechette' ? '#3a6ab0' : '#b02a22'; rr(g, x, H * 0.18, W * 0.18, H * 0.52, 3); g.fill(); g.fillStyle = '#c9a14a'; g.fillRect(x, H * 0.62, W * 0.18, H * 0.16); }
+      const k = Math.ceil(frac * 4);
+      for (let i = 0; i < k; i++) { const x = W * 0.08 + i * W * 0.22; g.fillStyle = shellCol(it.am); rr(g, x, H * 0.18, W * 0.18, H * 0.52, 3); g.fill(); g.fillStyle = '#c9a14a'; g.fillRect(x, H * 0.62, W * 0.18, H * 0.16); }
     } else if (C.group === 'grenade') {
       for (let i = 0; i < 2; i++) { const y = H * 0.1 + i * H * 0.45; g.fillStyle = '#c8b040'; rr(g, W * 0.25, y, W * 0.5, H * 0.28, 8); g.fill(); g.fillStyle = '#b0b4b8'; g.fillRect(W * 0.25, y + H * 0.22, W * 0.5, H * 0.1); }
     } else if (C.group === 'bolt') {
@@ -93,7 +157,8 @@ G.Icons = (() => {
     } else { // a cardboard box, a stripe in the type's colour, two rounds on top
       rr(g, W * 0.12, H * 0.32, W * 0.76, H * 0.56, 4); g.fillStyle = '#b0915e'; g.fill(); shade(g, W * 0.12, H * 0.32, W * 0.76, H * 0.56);
       g.fillStyle = col; g.fillRect(W * 0.12, H * 0.62, W * 0.76, H * 0.12);
-      for (let i = 0; i < 3; i++) round(g, W * 0.3 + i * W * 0.14, H * 0.08, W * 0.1, H * 0.28, it.am === 'ap' ? '#2a2a2a' : it.am === 'tracer' ? '#c03020' : it.am === 'hp' ? '#d8b070' : '#b87333');
+      const k = Math.ceil(frac * 5);
+      for (let i = 0; i < k; i++) round(g, W * 0.17 + i * W * 0.14, H * 0.08, W * 0.1, H * 0.28, tipCol(it.am));
     }
     g.fillStyle = '#fff'; g.font = `bold ${Math.round(Math.min(W, H) * 0.17)}px Consolas, monospace`; g.textAlign = 'center';
     g.shadowColor = '#000'; g.shadowBlur = 3;
@@ -314,6 +379,7 @@ G.Icons = (() => {
     const g = c.getContext('2d');
     const d = it.gid ? G.Gear.DEFS[it.gid] : null;
     if (it.k === 'mag') drawMag(g, W, H, it);
+    else if (it.k === 'tube') drawTube(g, W, H, it);
     else if (it.k === 'ammo') drawAmmo(g, W, H, it);
     else if (it.k === 'med') drawMedItem(g, W, H, it.mt);
     else if (it.k === 'frag') drawFrag(g, W, H);
@@ -335,7 +401,9 @@ G.Icons = (() => {
   }
   // an item drawn in its natural orientation (w x h cells), turned if it's shown turned
   function of(it, w, h, rot) {
-    const key = [it.k, it.k === 'gun' ? it.w.def.code : it.wid || it.key || it.gid || it.pid || it.mt || '', it.vid || '', it.am || '', it.n > 0 ? 1 : 0, w, h, rot ? 1 : 0, it.face ? it.face.gid : ''].join('|');
+    // (a magazine or tube is drawn as full as it is: that's part of the key, to a round on small ones)
+    const fill = it.k === 'mag' || it.k === 'tube' ? (it.cap ? Math.round(G.U.clamp(it.n / it.cap, 0, 1) * Math.min(it.cap, 40)) : it.n > 0 ? 1 : 0) + '/' + (it.cap || 0) : it.k === 'ammo' ? Math.ceil(fillOf(it) * 20) : it.n > 0 ? 1 : 0;
+    const key = [it.k, it.k === 'gun' ? it.w.def.code : it.wid || it.key || it.gid || it.pid || it.mt || '', it.vid || '', it.am || '', fill, w, h, rot ? 1 : 0, it.face ? it.face.gid : ''].join('|');
     let url = cache.get(key);
     if (url) return url;
     const nw = rot ? h : w, nh = rot ? w : h, src = draw(it, nw * CELL, nh * CELL);
@@ -345,5 +413,75 @@ G.Icons = (() => {
     cache.set(key, url);
     return url;
   }
-  return { of };
+  // ---------------------------------------------------------------- the HUD's ammo gauges
+  // Plain white symbols, like a phone's battery: the outline of what the gun feeds from, filled as far as it's
+  // loaded (a box magazine from the bottom up, a drum round its ring, a tube or a cylinder slot by slot), and the
+  // round in the chamber, solid when there's one in it. kind: styleFor(def); n of cap; W x H in CSS pixels.
+  function styleFor(def, vid) {
+    const af = G.Gear.ammoFor(def);
+    if (af.kind !== 'mag') return 'tube';
+    const vp = vid && G.Gunsmith.PARTS[vid], vt = vp && vp.model && vp.model.mag && vp.model.mag.t;
+    let st = magStyle(def);
+    if (vt === 'drum' && st !== 'box') st = 'drum'; else if (st === 'drum' && vt && vt !== 'drum') st = 'straight';
+    return st;
+  }
+  const GW = 'rgba(255,255,255,0.95)', GD = 'rgba(255,255,255,0.14)';
+  function gauge(kind, n, cap, W, H) {
+    const frac = cap ? G.U.clamp(n / cap, 0, 1) : n > 0 ? 1 : 0, q = kind === 'tube' || kind === 'loader' || kind === 'clip' ? n : Math.round(frac * 40);
+    const key = ['gauge', kind, q, cap, W, H].join('|');
+    let url = cache.get(key);
+    if (url) return url;
+    const S = 2, c = document.createElement('canvas'); c.width = W * S; c.height = H * S;
+    const g = c.getContext('2d'); g.scale(S, S);
+    const lw = 2.5; g.lineWidth = lw; g.strokeStyle = GW; g.lineJoin = 'round';
+    const fillBelow = (y) => { g.save(); g.clip(); g.fillStyle = GD; g.fillRect(0, 0, W, H); g.fillStyle = GW; g.fillRect(0, y, W, H - y); g.restore(); g.stroke(); };
+    if (kind === 'drum') { // a ring, filled round from the feed tower
+      const cx = W / 2, cy = H * 0.56, R = Math.min(W, H) * 0.4;
+      g.beginPath(); g.rect(cx - R * 0.3, H * 0.04, R * 0.6, cy - R - H * 0.04 + 3); g.stroke();
+      g.beginPath(); g.arc(cx, cy, R, 0, 7); g.stroke();
+      g.beginPath(); g.arc(cx, cy, R * 0.35, 0, 7); g.stroke();
+      g.strokeStyle = GD; g.lineWidth = R * 0.5; g.beginPath(); g.arc(cx, cy, R * 0.68, 0, 7); g.stroke();
+      if (frac > 0) { g.strokeStyle = GW; g.beginPath(); g.arc(cx, cy, R * 0.68, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2); g.stroke(); }
+    } else if (kind === 'tube') { // a row of slots (two rows for a long tube), filled one by one
+      const N = Math.max(1, cap), rows = N > 8 ? 2 : 1, per = Math.ceil(N / rows), cw = (W - 4) / per, ch = (H - 4) / rows;
+      for (let i = 0; i < N; i++) {
+        const x = 2 + (i % per) * cw + cw * 0.14, y = 2 + Math.floor(i / per) * ch + ch * 0.06;
+        rr(g, x, y, cw * 0.72, ch * 0.88, Math.min(4, cw * 0.2));
+        if (i < n) { g.fillStyle = GW; g.fill(); } else { g.fillStyle = GD; g.fill(); g.stroke(); }
+      }
+    } else if (kind === 'loader') { // a cylinder: six chambers, the loaded ones solid
+      const cx = W / 2, cy = H / 2, R = Math.min(W, H) * 0.44;
+      g.beginPath(); g.arc(cx, cy, R, 0, 7); g.stroke();
+      for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 - Math.PI / 2; g.beginPath(); g.arc(cx + Math.cos(a) * R * 0.55, cy + Math.sin(a) * R * 0.55, R * 0.22, 0, 7); g.fillStyle = i < Math.round(frac * 6) ? GW : GD; g.fill(); if (!(i < Math.round(frac * 6))) g.stroke(); }
+    } else if (kind === 'box' || kind === 'p90') { // a can (or the P90's top magazine), filled from the bottom
+      rr(g, lw, H * 0.12, W - lw * 2, H * 0.84, 5); fillBelow(H * 0.12 + 2 + (H * 0.84 - 4) * (1 - frac));
+      g.fillStyle = GW; g.fillRect(W * 0.3, 1, W * 0.4, H * 0.08);
+    } else { // a box magazine (straight, curved, banana, pistol, clip): its outline, a battery's fill from the bottom
+      const top = H * 0.04 + lw, bot = H - lw, mw = (kind === 'pistol' ? 0.62 : 0.66) * W, curve = kind === 'banana' ? W * 0.32 : kind === 'curved' ? W * 0.16 : 0, x0 = (W - mw - curve) / 2;
+      g.beginPath(); g.moveTo(x0, top); g.lineTo(x0 + mw, top);
+      g.quadraticCurveTo(x0 + mw + curve * 0.4, (top + bot) / 2, x0 + mw + curve, bot); g.lineTo(x0 + curve, bot);
+      g.quadraticCurveTo(x0 + curve * 0.4, (top + bot) / 2, x0, top); g.closePath();
+      fillBelow(top + 2 + (bot - top - 4) * (1 - frac));
+    }
+    url = c.toDataURL(); cache.set(key, url);
+    return url;
+  }
+  // the chamber: a cartridge (or a shell), solid with a round in it, an outline without
+  function chamberGauge(group, full, W, H) {
+    const key = ['chg', group, full ? 1 : 0, W, H].join('|');
+    let url = cache.get(key);
+    if (url) return url;
+    const S = 2, c = document.createElement('canvas'); c.width = W * S; c.height = H * S;
+    const g = c.getContext('2d'); g.scale(S, S); g.lineWidth = 2.5; g.strokeStyle = GW; g.lineJoin = 'round';
+    const x = 2, w = W - 4, y = 2, h = H - 4;
+    g.beginPath();
+    if (group === 'shotgun') rr(g, x, y, w, h, 3);
+    else { g.moveTo(x, y + h); g.lineTo(x, y + h * 0.36); g.quadraticCurveTo(x + w / 2, y - h * 0.08, x + w, y + h * 0.36); g.lineTo(x + w, y + h); g.closePath(); }
+    if (full) { g.fillStyle = GW; g.fill(); } else { g.fillStyle = GD; g.fill(); }
+    g.stroke();
+    if (group === 'shotgun' || !full) { g.beginPath(); g.moveTo(x, y + h * 0.78); g.lineTo(x + w, y + h * 0.78); g.stroke(); } // (the shell's brass, the case mouth)
+    url = c.toDataURL(); cache.set(key, url);
+    return url;
+  }
+  return { of, chamberPic, styleFor, gauge, chamberGauge, TYPE_COL, shellCol, tipCol };
 })();

@@ -14,6 +14,7 @@ G.Game = {
   init() {
     this.settings = { sens: G.U.store.get('sens', 1), fov: G.U.store.get('fov', 80), vol: G.U.store.get('vol', 0.6) };
     this.myName = G.U.store.get('name', 'Operator' + Math.floor(Math.random() * 90 + 10));
+    G.U.store.set('name', this.myName); // (kept: the same name after a refresh, so the squad knows who's back)
     this.myColor = G.U.store.get('color', G.PLAYER_COLORS[Math.floor(Math.random() * 4)]);
     this.myLook = G.Rig.cleanLook(G.U.store.get('look', null)); // top, pants, eyewear, gloves (the menu)
     G.R.init();
@@ -26,7 +27,9 @@ G.Game = {
     G.Net.onServer = (m, from) => G.Server.handle(m, from);
     G.Net.onClient = (m) => this.onMsg(m);
     G.Net.onPeerLeave = (id) => G.Server.onLeave(id);
-    G.Net.onHostLost = () => this.toMenu('Lost connection to the host.');
+    // lost the host (they refreshed, or dropped): back to the menu, trying the same code again for a minute, so
+    // as soon as they're hosting again you're back in
+    G.Net.onHostLost = () => { const code = G.Net.code; this.toMenu('Lost connection to the host. Reconnecting...'); this.rejoin(code, Date.now() + 60000); };
     this.menuBackdrop();
     this.last = performance.now();
     this.serverLast = performance.now();
@@ -135,8 +138,17 @@ G.Game = {
     this.$('btnSolo').onclick = () => this.solo();
     this.$('btnJoin').onclick = () => this.join();
     this.$('joinCode').addEventListener('keydown', (e) => { if (e.key === 'Enter') this.join(); });
+    this.$('joinCode').value = G.U.store.get('lastCode', ''); // (the last game you joined)
+    this.$('btnLan').onclick = () => this.lanScan();
+    // your own relay server, if you have one (used for every connection from now on: js/net.js opts)
+    { const t = G.U.store.get('turn', {}) || {}, save = () => G.U.store.set('turn', { url: this.$('turnUrl').value.trim(), user: this.$('turnUser').value.trim(), pass: this.$('turnPass').value });
+      this.$('turnUrl').value = t.url || ''; this.$('turnUser').value = t.user || ''; this.$('turnPass').value = t.pass || '';
+      for (const id of ['turnUrl', 'turnUser', 'turnPass']) this.$(id).addEventListener('change', save); }
+    // what a host's LAN beacon tells whoever's looking
+    G.Net.lanInfo = () => ({ name: this.myName, players: G.Server.players.size, phase: this.phase });
     this.$('btnStart').onclick = () => { if (G.Net.isHost) G.Server.startRun(); };
     this.$('btnLeave').onclick = () => this.toMenu();
+    this.$('btnNewCode').onclick = () => this.newCode();
     this.$('btnCopy').onclick = () => { navigator.clipboard && navigator.clipboard.writeText(G.Net.code || ''); this.$('btnCopy').textContent = 'Copied'; setTimeout(() => (this.$('btnCopy').textContent = 'Copy'), 1200); };
     this.$('btnResume').onclick = () => this.lock();
     this.$('btnQuit').onclick = () => this.toMenu();
@@ -238,6 +250,7 @@ G.Game = {
   },
   join() {
     const code = this.$('joinCode').value.trim().toUpperCase();
+    G.U.store.set('lastCode', code);
     if (code.length < 4) { this.msg('menuMsg', 'Enter the room code from your host.', true); return; }
     G.Audio.init();
     this.msg('menuMsg', 'Connecting to ' + code + '...');
@@ -248,10 +261,45 @@ G.Game = {
       this.afterConnect();
     });
   },
+  // the host, in the lobby: start over under a fresh room code (the kept one's dropped; anyone already in the lobby
+  // is dropped too and needs the new code)
+  newCode() {
+    if (!G.Net.isHost || G.Net.solo || this.phase !== 'lobby') return;
+    try { sessionStorage.removeItem('bp_hostCode'); } catch (e) { /* storage unavailable */ }
+    G.Net.leave();
+    this.$('lobbyCode').textContent = '-----';
+    G.Net.host((err) => {
+      if (err) { this.toMenu(err); return; }
+      this.afterConnect();
+    });
+  },
+  // Look for games hosted on this network (js/net.js lanScan) and list them: click one to join it
+  lanScan() {
+    const list = this.$('lanList'), btn = this.$('btnLan');
+    btn.disabled = true; btn.textContent = 'Looking...'; list.innerHTML = '';
+    G.Net.lanScan().then((games) => {
+      btn.disabled = false; btn.textContent = 'Find LAN games';
+      if (games == null) { list.innerHTML = '<small class="dim">Could not tell which network you are on (offline, or WebRTC blocked).</small>'; return; }
+      if (!games.length) { list.innerHTML = '<small class="dim">No games hosted on your network.</small>'; return; }
+      const PH = { lobby: 'in the lobby', route: 'picking a route', level: 'mid-level', shop: 'in the shop' };
+      list.innerHTML = games.map((g) => `<button class="btn small lan-game" data-code="${G.U.esc(g.code)}"><b>${G.U.esc(g.name)}</b> · ${g.players} in squad${PH[g.phase] ? ' · ' + PH[g.phase] : ''} <span class="dim">${G.U.esc(g.code)}</span></button>`).join('');
+      list.querySelectorAll('[data-code]').forEach((b) => (b.onclick = () => { this.$('joinCode').value = b.dataset.code; this.join(); }));
+    });
+  },
+  rejoin(code, until) {
+    if (!code || this.phase !== 'menu' || G.Net.peer || Date.now() > until) { if (this.phase === 'menu' && !G.Net.peer && code) this.msg('menuMsg', 'Lost connection to the host.', true); return; }
+    this.$('joinCode').value = code;
+    G.Net.join(code, (err) => {
+      if (!err) { this.afterConnect(); return; }
+      G.Net.leave();
+      if (this.phase === 'menu') { this.msg('menuMsg', 'Lost connection to the host. Reconnecting...'); setTimeout(() => this.rejoin(code, until), 3000); }
+    });
+  },
   setBusy(b) { ['btnHost', 'btnSolo', 'btnJoin'].forEach((id) => (this.$(id).disabled = b)); },
   afterConnect() {
     this.msg('menuMsg', '');
     if (G.Net.isHost) G.Server.reset();
+    if (G.Net.isHost && !G.Net.solo) G.Net.startBeacon(); // (findable from the same network)
     G.Me.newRun();
     this.runStarted = false;
     G.Net.toHost({ t: 'hello', name: this.myName, color: this.myColor, look: this.myLook });
@@ -296,13 +344,17 @@ G.Game = {
         } else if (m.phase === 'shop') this.enterShop(m.level, m.shopSeed);
         else this.enterLobby();
         break;
-      case 'roster':
+      case 'roster': {
+        // someone else just readied up: a chime and a line saying so
+        const prev = this.roster || {};
         this.roster = m.roster;
+        for (const [id, r] of Object.entries(this.roster)) if (id !== G.Net.myId && r.ready && prev[id] && !prev[id].ready) this.readyNote(r);
         G.Views.syncRoster(this.roster);
         if (this.phase === 'lobby') this.renderLobby();
         if (this.phase === 'shop') G.Shop.render();
         if (this.phase === 'route') this.renderRoute();
         break;
+      }
       case 'rvotes': if (this.routeSt) { this.routeSt.votes = m.v || {}; if (this.phase === 'route') this.renderRoute(); } break;
       case 'newrun':
         G.Me.newRun();
@@ -360,6 +412,13 @@ G.Game = {
         if (r) G.HUD.chat(r.name, r.color, m.m); else G.HUD.chat(null, 0, m.m);
         if (this.phase === 'shop' || this.phase === 'lobby') this.lobbyChat(r ? r.name + ': ' + m.m : m.m);
         G.Audio.chat();
+        break;
+      }
+      case 'ping': if (this.phase === 'level') G.Views.addPing(m.id, m.p); break;
+      case 'ffhit': { // a teammate's rounds in you (or, seen from outside, in someone else)
+        if (this.phase !== 'level') break;
+        const def = G.Gunsmith.fromCode(m.w), f = new THREE.Vector3(m.f[0], m.f[1], m.f[2]);
+        if (m.tg === G.Net.myId && def) { G.Me.takeHits(m.hz, def, f, this.nameOf(m.by)); G.HUD.toast('', `Friendly fire from ${G.U.esc(this.nameOf(m.by))}`, 1.6); }
         break;
       }
       case 'left': G.Views.removePlayer(m.id); break;
@@ -436,6 +495,11 @@ G.Game = {
     return pv ? pv.pos.clone().setY(1.6) : null;
   },
   nameOf(id) { return id === G.Net.myId ? this.myName : this.roster[id] ? this.roster[id].name : '???'; },
+  readyNote(r) {
+    G.Audio.tone(660, 0.08, 'sine', 0.09); G.Audio.tone(990, 0.12, 'sine', 0.09, undefined, 0.09); // (a rising two-note chime)
+    G.HUD.chat(null, 0, `${r.name} is ready`);
+    this.lobbyChat(`${r.name} is ready`);
+  },
   lobbyChat(text) {
     const el = this.phase === 'lobby' ? this.$('lobbyMsg') : this.$('vendorQuip');
     if (this.phase === 'lobby') el.textContent = text;
@@ -498,6 +562,7 @@ G.Game = {
     }
     this.$('lobbyPlayers').innerHTML = html;
     this.$('btnStart').classList.toggle('hidden', !G.Net.isHost);
+    this.$('btnNewCode').classList.toggle('hidden', !G.Net.isHost || G.Net.solo); // (the host's: a fresh code)
     if (!G.Net.isHost) this.$('lobbyMsg').textContent = 'Waiting for the host to deploy...';
     else if (G.Net.solo) this.$('lobbyMsg').textContent = 'Solo run. Enemy count and health scale with squad size.';
     else this.$('lobbyMsg').textContent = 'Share the code. Friends can also join between levels.';

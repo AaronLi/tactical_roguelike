@@ -12,6 +12,7 @@ G.Views = {
   removeRig(rig) { G.R.dynRoot.remove(rig.root); rig.dispose(); },
   clearLevel() {
     G.Casings.clear();
+    if (this.pings2) { for (const q of this.pings2.values()) { G.R.dynRoot.remove(q.s); q.s.material.map.dispose(); q.s.material.dispose(); } this.pings2.clear(); }
     for (const ev of this.enemies.values()) this.removeRig(ev.rig);
     this.enemies.clear();
     for (const n of this.nades) G.R.dynRoot.remove(n.mesh);
@@ -34,9 +35,7 @@ G.Views = {
       if (pv && pv.color !== info.color) { this.removeRig(pv.rig); this.players.delete(id); pv = null; }
       if (!pv) {
         const rig = G.Rig.create({ style: 'tactical', color: info.color, seed: id.length * 977, bare: true, look: info.look }); // dressed as they picked, kit from st.kt
-        const tag = G.R.nameTag(info.name, info.color);
-        tag.position.y = 2.15;
-        rig.root.add(tag);
+        const tag = null; // (no nameplates over teammates' heads: you know them by their kit and colour)
         rig.root.visible = false;
         G.R.dynRoot.add(rig.root);
         pv = { id, name: info.name, color: info.color, rig, tag, st: null, pos: new THREE.Vector3(), yaw: 0, pitch: 0, first: true };
@@ -384,9 +383,20 @@ G.Views = {
     if (m.d > 0) {
       if (m.tg === G.Net.myId) G.Me.takeHits(m.hz, wdef, f);
       else G.R.impact(to, null, 'blood');
-    } else G.R.impact(to, null, 'wall');
+    } else this.wallHit(f, to);
     const ev = this.enemies.get(m.e);
     if (ev) ev.rig.recoil(G.Server.kickOf({ str: ev.str }, wdef)); // (the same kick the host gave it)
+  },
+  // a round that missed: where its line meets a wall (or a door, or furniture), with the surface's normal so it
+  // leaves a hole there; sparks only if it ends in the air
+  wallHit(f, to) {
+    const map = G.Game.map, d = to.clone().sub(f), len = d.length();
+    if (map && len > 0.01) {
+      d.divideScalar(len);
+      const h = G.Level.raycast(map, f.x, f.y, f.z, d.x, d.y, d.z, len + 0.5);
+      if (h.n && h.t <= len + 0.45 && !h.view) { G.R.impact(f.clone().addScaledVector(d, h.t), h.n, 'wall'); return; }
+    }
+    G.R.impact(to, null, 'wall');
   },
   enemyThrow(id) { const ev = this.enemies.get(id); if (ev && ev.alive) ev.rig.throwNade(); },
   remoteShot(m) {
@@ -399,10 +409,10 @@ G.Views = {
     if (def.cls === 'BOW') G.R.tracer(f, to, def.tracer, 0.03, 0.25);
     else if (!def.explosive) {
       G.R.tracer(f, to, def.tracer || 0xffd080, def.cls === 'RAIL' ? 0.06 : 0.018);
-      G.R.impact(to, null, 'wall');
+      this.wallHit(f, to);
     } else G.R.tracer(f, to, 0xbbbbbb, 0.05);
     if (!m.sil) G.R.muzzleFlashAt(f, def.tracer || 0xffb060);
-    G.Casings.fired(def, false, f, to);
+    G.Casings.fired(def, false, f, to, m.am);
     const d = G.R.camera.position.distanceTo(f);
     if (def.cls === 'RAIL') G.Audio.rail(d);
     else if (def.cls === 'BOW') G.Audio.bow(d);
@@ -428,9 +438,55 @@ G.Views = {
       G.R.particles(new THREE.Vector3(pos.x + (Math.random() - 0.5) * 0.35, 0.9, pos.z + (Math.random() - 0.5) * 0.35), 1, 0x7a0808, 0.2, 0.8, 9, 0.1, null, true);
     }
   },
+  // ---------------------------------------------------------------- pings
+  // A teammate's ping (or yours): a marker in their colour with their name at the spot (nothing about what's
+  // there), seen through walls,
+  // the same size on screen however far off, gone after a few seconds. One per player: a new one replaces it.
+  PING_T: 6,
+  addPing(id, p) {
+    const me = id === G.Net.myId, r = G.Game.roster && G.Game.roster[id], name = me ? G.Game.myName : r ? r.name : '?', color = me ? G.Game.myColor : r ? r.color : 0xffffff;
+    this.pings2 = this.pings2 || new Map();
+    const old = this.pings2.get(id);
+    if (old) { G.R.dynRoot.remove(old.s); old.s.material.map.dispose(); old.s.material.dispose(); }
+    const c = document.createElement('canvas'); c.width = 400; c.height = 160;
+    const g = c.getContext('2d'), col = G.U.hex(color);
+    g.font = 'bold 30px Consolas, monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.lineWidth = 6; g.strokeStyle = 'rgba(0,0,0,0.85)';
+    const label = name;
+    while (g.measureText(label).width > 380 && parseInt(g.font, 10) > 16) g.font = `bold ${parseInt(g.font.split(' ')[1], 10) - 2}px Consolas, monospace`; // (a long name: smaller)
+    g.strokeText(label, 200, 30); g.fillStyle = col; g.fillText(label, 200, 30);
+    // the marker: a diamond pointing down at the spot
+    g.beginPath(); g.moveTo(200, 150); g.lineTo(176, 100); g.lineTo(200, 62); g.lineTo(224, 100); g.closePath();
+    g.lineWidth = 5; g.strokeStyle = 'rgba(0,0,0,0.85)'; g.stroke(); g.fillStyle = col; g.fill();
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false, transparent: true }));
+    s.center.set(0.5, 0.06); s.renderOrder = 20;
+    s.position.set(p[0], p[1], p[2]);
+    G.R.dynRoot.add(s);
+    this.pings2.set(id, { s, t: this.PING_T });
+    G.Audio.tone && G.Audio.tone(880, 0.08, 'sine', 0.08); // (a soft blip)
+  },
+  updatePings(dt) {
+    if (!this.pings2) return;
+    const cam = G.R.camera.position;
+    for (const [id, q] of this.pings2) {
+      q.t -= dt;
+      if (q.t <= 0) { G.R.dynRoot.remove(q.s); q.s.material.map.dispose(); q.s.material.dispose(); this.pings2.delete(id); continue; }
+      const d = q.s.position.distanceTo(cam), sc = Math.max(0.9, d * 0.085); // (about the same size on screen at any range)
+      q.s.scale.set(sc * 1.56, sc * 0.625, 1);
+      q.s.material.opacity = Math.min(1, q.t / 1.2);
+    }
+  },
   update(dt) {
     G.Casings.update(dt);
-    if (G.Game.map && G.R.camera) G.Level.updateLights(G.Game.map, G.R.camera.position); // the lights follow you
+    this.updatePings(dt);
+    if (G.Game.map && G.R.camera) { // the lights follow you (and, aiming, what you're aiming at)
+      let focus = null;
+      if (G.Me.adsT > 0.5 && G.Game.map.theme.layout === 'festival') {
+        const c = G.R.camera, f = new THREE.Vector3(0, 0, -1).applyQuaternion(c.quaternion), h = G.Level.raycast(G.Game.map, c.position.x, c.position.y, c.position.z, f.x, f.y, f.z, 120);
+        focus = c.position.clone().addScaledVector(f, h.t);
+      }
+      G.Level.updateLights(G.Game.map, G.R.camera.position, false, focus);
+    }
     // officers bleeding: you, and your teammates from what their bodies report
     if (G.Game.phase === 'level' && G.Me.body && G.Me.pos) {
       const parts = Object.values(G.Me.body.parts), bl = parts.some((q) => q.heavy) ? 2 : parts.some((q) => q.light) ? 1 : 0;
@@ -474,6 +530,10 @@ G.Views = {
       // wall closer than that, it's drawn slid back from it (as far as the room behind allows) instead of
       // lying through it.
       let at = ev.pos;
+      // Leaning out round a corner, the body really is out at the lean point (where the host shoots from: 0.55 m
+      // to the side), not tilting from behind the edge (eased in and out with the lean itself)
+      ev.leanS = (ev.leanS || 0) + ((ev.alive ? ev.lean : 0) - (ev.leanS || 0)) * Math.min(1, dt * 7);
+      if (Math.abs(ev.leanS) > 0.01) at = ev.pos.clone().add(new THREE.Vector3(Math.cos(ev.yaw), 0, -Math.sin(ev.yaw)).multiplyScalar(ev.leanS * 0.45 * (ev.def.scale || 1)));
       if (ev.alive && (pose === 'cuffed' || pose === 'takedown')) {
         const key = `${ev.pos.x.toFixed(2)},${ev.pos.z.toFixed(2)},${ev.yaw.toFixed(2)}`;
         if (ev.proneKey !== key) {
@@ -515,7 +575,7 @@ G.Views = {
       pv.lastAct = st.act; pv.lastAp = act ? act.t : 0;
       const kneel = (st.act === 'z' && (st.ap || 0) > 0.3) || st.act === 'b';
       pv.rig.update(dt, { pos: pv.pos, yaw: pv.yaw, pitch: pv.pitch, crouch: (!!st.cr || kneel) && !st.dn, alert: !st.lr && !st.sw, lean: st.ln || 0, state: st.dn ? 'down' : 'alive', act });
-      pv.tag.position.y = st.dn ? 0.8 : st.cr ? 1.7 : 2.15;
+      if (pv.tag) pv.tag.position.y = st.dn ? 0.8 : st.cr ? 1.7 : 2.15;
     }
 
     // marksman lasers

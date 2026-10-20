@@ -123,6 +123,29 @@ G.AUTO_ONLY = ['mac10', 'uzi', 'aa12', 'm249', 'pkm', 'm60', 'shredder'];
 G.FIRE_MODES = { br3: ['semi', 'burst'], an94: ['semi', 'hyper'], auto9: ['semi', 'burst'] };
 G.WEAPON_LIST.forEach((w) => { w.modes = G.FIRE_MODES[w.id] || (w.mode === 'semi' ? ['semi'] : G.AUTO_ONLY.includes(w.id) ? [w.mode] : ['semi', w.mode]); });
 G.MODE_NAME = { semi: 'SEMI', auto: 'AUTO', burst: 'BURST', hyper: 'HYPER' };
+// Chambers. A closed-bolt gun (most of them) holds a round in its chamber as well as the ones in its magazine or
+// tube (w.chamber: its type, or null): it fires that one, and the action feeds the next from the magazine. A
+// reload with one chambered keeps it (30+1); run dry, the chamber's empty too and the reload ends by working the
+// action; a magazine put in by hand leaves it empty, and the first pull of the trigger (or R) racks a round in.
+// Open-bolt guns fire as the bolt closes on a round from the magazine (nothing waits in the chamber), and some
+// guns' chambers are their magazine: revolvers, break actions, the Garand's clip, launchers, the crossbow and the
+// railgun (and the akimbo pair, counted as one).
+G.OPEN_BOLT = ['uzi', 'mac10', 'ppsh', 'thompson', 'aa12', 'm249', 'pkm', 'm60', 'shredder'];
+G.chambered = (def) => {
+  if (!def || G.OPEN_BOLT.includes(def.id) || def.enbloc || def.akimbo || ['GL', 'BOW', 'RAIL'].includes(def.cls)) return false;
+  const P = G.Gunsmith && G.Gunsmith.PLATFORMS[def.id];
+  return !(P && (P.arch === 'revolver' || P.arch === 'derringer' || (P.spec && P.spec.rcv === 'break')));
+};
+// Bolt hold-open: the action locks back on the last round, so a reload from empty is a magazine change and a
+// thumb on the bolt catch (or the slide stop), not a full rack. Every pistol with a slide, the AR-15 family and the
+// rifles and SMGs built the same way; not the AK family, the MP5's roller bolt, the open-bolt guns or a bolt-action.
+G.BOLT_HOLD = new Set(['scar', 'scarl', 'g36', 'aug', 'aug9', 'tavor', 'fal', 'm14', 'mk14', 'sr25', 'barrett', 'mpx', 'mp7', 'vector', 'skorp', 'svd', 'ar9', 'm27', 'hk416', 'br3']);
+G.boltHold = (def) => {
+  const P = def && G.Gunsmith && G.Gunsmith.PLATFORMS[def.id];
+  return !!P && (P.arch === 'pistol' || G.BOLT_HOLD.has(def.id) || (P.arch === 'rifle' && (P.spec.rcv || 'ar') === 'ar')); // (the AR-15 pattern: a bolt catch over the well)
+};
+// what's in the gun, all told: the magazine (or tube) and the chamber
+G.loaded = (w) => (w ? w.mag + (w.chamber ? 1 : 0) : 0);
 // Magazine families: guns that take the same magazines (one set of magazine parts, js/parts.js MAG_FAMS).
 //   stanag: NATO 5.56 (AR-15 pattern): the M4, HK416, F2000, Tavor, SCAR-L and M27
 //   mp5: the MP5 and the MP5SD
@@ -270,14 +293,17 @@ G.ENEMIES = {
 
 // home: share of rooms furnished as a home (the rest are storage, offices and break rooms)
 // layout: 'rooms' (rooms and corridors, the default), 'warehouse' or 'houses' (js/level.js)
+// noFog: a clear view to the far end (the fog colour is still the backdrop)
 G.THEMES = [
   { name: 'Apartment', layout: 'apartments', home: 1, reflect: 0.3, floor: '#4a443d', wall: '#b8ab95', crate: '#8a6a3a', fog: 0x0e0c0a, light: 0xffd8a8, ceil: '#cfc8ba' },
-  { name: 'Warehouse', layout: 'warehouse', home: 0, reflect: 0.3, floor: '#57504a', wall: '#7c6e5b', crate: '#8a6a3a', fog: 0x16130f, light: 0xffd49a, ceil: '#2a2622' },
+  { name: 'Warehouse', layout: 'warehouse', noFog: true, home: 0, reflect: 0.3, floor: '#57504a', wall: '#7c6e5b', crate: '#8a6a3a', fog: 0x16130f, light: 0xffd49a, ceil: '#2a2622' },
   { name: 'Bunker', entry: 'vault', home: 0.45, reflect: 0.4, floor: '#3a4042', wall: '#5a6160', crate: '#4d5a3c', fog: 0x0b0f11, light: 0xa8c8ff, ceil: '#1d2224' },
   { name: 'Suburbs', layout: 'houses', home: 1, reflect: 0.28, floor: '#5a4a3a', wall: '#9fae98', crate: '#8a6a3a', fog: 0x111723, light: 0xffe0b0, ceil: '#d6d2c4' },
   { name: 'Research Lab', home: 0.4, reflect: 0.36, floor: '#8d9399', wall: '#b9bec4', crate: '#5d6b7a', fog: 0x12161a, light: 0xe6f2ff, ceil: '#3a3f44' },
   { name: 'Foundry', home: 0.3, reflect: 0.3, floor: '#3a2a22', wall: '#5e3d2b', crate: '#6a5a4a', fog: 0x1a0c06, light: 0xff9a5a, ceil: '#24160f' },
   { name: 'Cold Storage', home: 0.35, reflect: 0.4, floor: '#4f5d68', wall: '#7f97a8', crate: '#5f6f7a', fog: 0x0a1218, light: 0x9fe0ff, ceil: '#26323a' },
+  // a music festival at night, outdoors: big open spaces, the fog pushed far back, moonlight, more people about
+  { name: 'Festival', layout: 'festival', fence: 'hoarding', home: 0, reflect: 0.2, floor: '#26331f', wall: '#5b7480', crate: '#8a6a3a', fog: 0x060912, light: 0xffe2c0, ceil: '#d8dcde', fogNear: 30, fogFar: 150, hemi: 0x5a6a96, hemiI: 0.55, crowd: 2, foes: 1.5, night: 35 },
 ];
 
 G.PLAYER_COLORS = [0x3fa9f5, 0x7bd34a, 0xf5a623, 0xd94fd9, 0x2fd6c4, 0xf2e94e, 0xff6b6b, 0xffffff];

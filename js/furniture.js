@@ -416,6 +416,182 @@ G.Furniture = (() => {
     for (let i = 0; i < 4; i++) k.ico(k.leaf(), 0.1, (k.rnd() - 0.5) * 0.35, 0.45, (k.rnd() - 0.5) * 0.35);
   } };
 
+  // ---------------------------------------------------------------- festival
+  // A stall: a booth open at the back, its counter across the front (cover to crouch behind), side panels, a
+  // striped awning and a lit sign. Inside, behind the counter, there's room for someone to hide.
+  const STALL = [[0xc0392b, 0xf2efe6], [0x2e86c1, 0xf2efe6], [0x27ae60, 0xf7dc6f], [0x8e44ad, 0xf2efe6], [0xd35400, 0xf9e79f], [0x16a085, 0xf2efe6], [0xe84393, 0xfdf2e9], [0xf1c40f, 0x2c3e50]];
+  // hw: half its width (a 2 m stall, or a 4 m one across two tiles)
+  function stallShell(k, v, hw) {
+    const [c1, c2] = STALL[Math.floor(v * STALL.length) % STALL.length], W2 = hw * 2;
+    const frame = k.mat(0x2a2a2c, 0.6, 0.4), A = k.mat(c1, 0.8), B = k.mat(c2, 0.8), top = k.mat(k.pick([0xd8d4cc, 0x8a5a34, 0x3a3d40]), 0.45);
+    for (const x of [-hw, hw]) for (const z of [-0.85, 0.85]) k.box(frame, 0.05, 2.45, 0.05, x, 1.225, z);
+    k.box(k.mat(k.pick(WOOD), 0.7), W2, 0.98, 0.32, 0, 0.49, 0.72); // the counter
+    k.box(A, W2 + 0.04, 0.72, 0.02, 0, 0.47, 0.89);
+    for (let i = 0; i < 4; i++) k.box(B, W2 + 0.04, 0.05, 0.022, 0, 0.18 + i * 0.17, 0.892); // stripes down its front
+    k.box(top, W2 + 0.06, 0.05, 0.4, 0, 1.03, 0.72);
+    for (const x of [-hw, hw]) k.box(B, 0.03, 2.2, 1.0, x, 1.1, 0.4); // side panels, the front half
+    k.box(A, W2 + 0.16, 0.06, 1.9, 0, 2.46, 0); // the roof
+    const n = Math.round((W2 + 0.04) / 0.25), sw = (W2 + 0.04) / n;
+    for (let i = 0; i < n; i++) k.box(i % 2 ? A : B, sw, 0.025, 0.6, -hw - 0.02 + sw * (i + 0.5), 2.32, 1.1, 0, 0.45); // the awning
+    for (let i = 0; i < n; i++) k.box(i % 2 ? A : B, sw, 0.14, 0.02, -hw - 0.02 + sw * (i + 0.5), 2.12, 1.36); // its edge
+    // the sign over the front, lit
+    k.box(k.mat(0x111111, 0.5), Math.min(W2 - 0.2, 3.0), 0.4, 0.04, 0, 2.72, 0.9);
+    k.box(k.mat(c2, 0.5, 0, { emissive: c2, emissiveIntensity: 0.7 }), Math.min(W2 - 0.3, 2.9), 0.3, 0.01, 0, 2.72, 0.925);
+    k.box(k.mat(c1, 0.5, 0, { emissive: c1, emissiveIntensity: 0.9 }), Math.min(W2 - 0.8, 2.0), 0.08, 0.012, 0, 2.72, 0.93);
+    // a string of little bulbs under the awning
+    const glow = k.mat(0xfff0c8, 0.5, 0, { emissive: 0xffd890, emissiveIntensity: 1.6 }), nb = Math.round(W2 / 0.22);
+    for (let i = 0; i <= nb; i++) k.sph(glow, 0.03, -hw + 0.04 + i * (W2 - 0.08) / nb, 2.0 + Math.sin(i * 0.7) * 0.02, 1.32);
+    return { A, B, c1, c2 };
+  }
+  // left as they ran: a stool on its side, cups and a bag on the ground out front
+  function abandoned(k, hw) {
+    if (k.rnd() < 0.55) k.box(k.mat(k.pick([0xc0392b, 0x2a2a2a, 0xe8e4da]), 0.6), 0.34, 0.04, 0.34, (k.rnd() - 0.5) * hw * 1.3, 0.17, 1.25, k.rnd() * 3, Math.PI / 2);
+    for (let i = 0; i < 2 + hw * 1.5; i++) if (k.rnd() < 0.6) k.cyl(k.mat(k.pick([0xf2efe6, 0xc0392b, 0x2e86c1]), 0.6), 0.04, 0.035, 0.12, (k.rnd() - 0.5) * hw * 1.7, 0.04, 1.1 + k.rnd() * 0.5, 8, Math.PI / 2);
+    if (k.rnd() < 0.35) k.box(k.mat(k.pick([0x6b4428, 0x2a2a2a, 0x8e44ad]), 0.8), 0.32, 0.22, 0.12, (k.rnd() - 0.5) * hw * 1.5, 0.11, 1.5, k.rnd() * 3);
+  }
+  // A food stall: the grill (or fryer) at the back, a cooler, food on the counter, the menu board. Open at the back.
+  const stallFood = (hw) => ({ w: hw * 2 + 0.14, d: 1.8, cover: 1, boxes: [[0, 0.72, hw * 2 + 0.06, 0.36, 1.06], [-hw, 0.4, 0.06, 1.0, 2.3], [hw, 0.4, 0.06, 1.0, 2.3], [-hw + 0.37, -0.6, 0.7, 0.45, 0.92]], build(k, v) {
+    const { c2 } = stallShell(k, v, hw), steel = k.mat(0x9a9ea2, 0.35, 0.7), black = k.mat(0x1c1c1e, 0.5, 0.4), gx = -hw + 0.37;
+    k.box(steel, 0.7, 0.88, 0.45, gx, 0.44, -0.6);
+    k.box(black, 0.66, 0.03, 0.41, gx, 0.9, -0.6);
+    for (let i = 0; i < 4; i++) k.cyl(k.mat(0x4a2a18, 0.8), 0.06, 0.06, 0.02, gx - 0.17 + (i % 2) * 0.3, 0.92, -0.68 + (i >> 1) * 0.18);
+    if (k.rnd() < 0.6) k.box(k.mat(0x2e86c1, 0.4), 0.5, 0.45, 0.35, hw - 0.37, 0.225, -0.55);
+    const items = [0xc0392b, 0xf1c40f, 0xf2efe6, 0x8a5a34, 0x27ae60];
+    for (let i = 0; i < 6 * hw; i++) {
+      const x = -hw + 0.12 + k.rnd() * (hw * 2 - 0.24);
+      if (k.rnd() < 0.5) k.cyl(k.mat(k.pick(items), 0.5), 0.035, 0.03, 0.16, x, 1.14, 0.68); // cups, sauce bottles
+      else k.box(k.mat(k.pick([0xf2efe6, 0xd35400, 0xe8c040]), 0.7), 0.14, 0.06, 0.12, x, 1.09, 0.7, k.rnd()); // boxes of food
+    }
+    k.box(k.mat(0x1c1c1e, 0.6), 0.5, 0.36, 0.02, hw - 0.42, 1.6, -0.84); // a menu board on the back
+    for (const [w, y] of [[0.44, 1.7], [0.36, 1.6], [0.4, 1.52]]) k.box(k.mat(c2, 0.8), w, 0.025, 0.005, hw - 0.42, y, -0.828);
+    abandoned(k, hw);
+  } });
+  // A merchandise stall: folded shirts and caps on the counter, a rail of shirts at the back, posters on the panels.
+  const stallMerch = (hw) => ({ w: hw * 2 + 0.14, d: 1.8, cover: 1, boxes: [[0, 0.72, hw * 2 + 0.06, 0.36, 1.06], [-hw, 0.4, 0.06, 1.0, 2.3], [hw, 0.4, 0.06, 1.0, 2.3], [hw - 0.37, -0.62, 0.7, 0.4, 1.75]], build(k, v) {
+    stallShell(k, v, hw);
+    const shirts = [0x1c1c1e, 0xf2efe6, 0xc0392b, 0x2e86c1, 0x8e44ad, 0x27ae60, 0xf1c40f], piles = Math.round(hw * 5.4);
+    for (let i = 0; i < piles; i++) for (let j = 0; j < 1 + Math.floor(k.rnd() * 3); j++) k.box(k.mat(k.pick(shirts), 0.95), 0.26, 0.03, 0.22, -hw + 0.2 + i * (hw * 2 - 0.4) / Math.max(1, piles - 1), 1.07 + j * 0.032, 0.7);
+    for (let i = 0; i < 3 * hw; i++) if (k.rnd() < 0.7) k.sph(k.mat(k.pick(shirts), 0.8), 0.07, -hw + 0.3 + k.rnd() * (hw * 2 - 0.6), 1.08, 0.82);
+    const rail = k.mat(0x9a9ea2, 0.35, 0.7), rx = hw - 0.37;
+    for (const x of [rx - 0.3, rx + 0.3]) k.box(rail, 0.03, 1.7, 0.03, x, 0.85, -0.62);
+    k.box(rail, 0.66, 0.03, 0.03, rx, 1.68, -0.62);
+    for (let i = 0; i < 6; i++) k.box(k.mat(k.pick(shirts), 0.95), 0.05, 0.6, 0.44, rx - 0.25 + i * 0.1, 1.33, -0.62);
+    for (const s of [-1, 1]) for (let i = 0; i < 2; i++) k.box(k.mat(k.pick(shirts), 0.7), 0.01, 0.5, 0.36, s * (hw - 0.02), 1.55, 0.2 + i * 0.4);
+    abandoned(k, hw);
+  } });
+  R.stallfood = stallFood(0.92); R.stallmerch = stallMerch(0.92);
+  R.bigfood = stallFood(1.92); R.bigmerch = stallMerch(1.92); // (across two tiles)
+  // A row of folding chairs facing the stage (their fronts, +z, toward it).
+  R.seats = { w: 1.98, d: 0.7, cover: 1, boxes: [[0, 0, 1.98, 0.6, 0.9]], build(k, v) {
+    const p = k.mat([0x2e4a7d, 0x7d2e2e, 0x2a2a2a, 0x2e6b3f, 0x5a5f6a][Math.floor(v * 5)], 0.6), leg = k.mat(0x6a6e72, 0.4, 0.7);
+    for (const x of [-0.66, 0, 0.66]) {
+      k.box(p, 0.46, 0.04, 0.42, x, 0.46, 0.04);
+      k.box(p, 0.46, 0.4, 0.03, x, 0.72, -0.19, 0, -0.08);
+      for (const a of [-0.2, 0.2]) { k.box(leg, 0.025, 0.47, 0.025, x + a, 0.235, 0.22, 0, 0.2); k.box(leg, 0.025, 0.9, 0.025, x + a, 0.45, -0.2, 0, -0.1); }
+    }
+    k.box(leg, 1.9, 0.02, 0.02, 0, 0.12, 0.0); // the rail that ties the row together
+  } };
+  // The stage: decking 1.2 m up, black skirt to the ground.
+  R.stagedeck = { w: 2, d: 2, cover: 1, boxes: [[0, 0, 2, 2, 1.2]], build(k) {
+    k.box(k.mat(0x0c0c0e, 0.95), 2.0, 1.14, 2.0, 0, 0.57, 0);
+    k.box(k.mat(0x1c1a18, 0.7), 2.0, 0.06, 2.0, 0, 1.17, 0);
+    if (k.rnd() < 0.3) k.box(k.mat(0xf2efe6, 0.6), 0.6, 0.004, 0.05, (k.rnd() - 0.5) * 1.2, 1.202, (k.rnd() - 0.5) * 1.2, k.rnd() * 3); // tape marks
+    if (k.rnd() < 0.25) k.box(k.mat(0x1c1c1e, 0.5), 0.5, 0.4, 0.4, k.rnd() - 0.5, 1.4, k.rnd() - 0.5, k.rnd()); // a wedge monitor
+  } };
+  R.speaker = { w: 1.3, d: 1.2, boxes: [[0, 0, 1.3, 1.1, 3.3]], build(k) {
+    const box = k.mat(0x151517, 0.8), grille = k.mat(0x2a2a2c, 0.95), cone = k.mat(0x0a0a0b, 0.6);
+    for (let i = 0; i < 3; i++) {
+      k.box(box, 1.26, 1.04, 1.06, 0, 0.53 + i * 1.08, 0);
+      k.box(grille, 1.14, 0.92, 0.02, 0, 0.53 + i * 1.08, 0.535);
+      for (const x of [-0.28, 0.28]) k.cyl(cone, 0.22, 0.22, 0.03, x, 0.53 + i * 1.08, 0.55, 18, Math.PI / 2);
+    }
+  } };
+  // Front of house: the sound desk under a little canopy, out among the seats.
+  R.foh = { w: 1.9, d: 1.5, cover: 1, boxes: [[0, 0, 1.8, 1.0, 1.1]], build(k) {
+    const black = k.mat(0x18191b, 0.6), pole = k.mat(0x9a9ea2, 0.4, 0.6);
+    k.box(black, 1.8, 0.95, 1.0, 0, 0.475, 0);
+    k.box(k.mat(0x2a2a2c, 0.5), 1.4, 0.1, 0.7, 0, 1.0, 0.0, 0, -0.15); // the console
+    for (let i = 0; i < 24; i++) k.box(k.mat(k.pick([0x40ff60, 0xffb040, 0xff4040, 0x40a0ff]), 0.5, 0, { emissive: 0x404040 }), 0.02, 0.01, 0.06, -0.6 + (i % 12) * 0.11, 1.07, -0.1 + (i >> 4) * 0.25);
+    k.box(k.screen(), 0.5, 0.32, 0.02, -0.4, 1.3, -0.35);
+    for (const x of [-0.9, 0.9]) for (const z of [-0.7, 0.7]) k.box(pole, 0.04, 2.4, 0.04, x, 1.2, z);
+    k.box(k.mat(0xf2efe6, 0.9), 2.0, 0.04, 1.6, 0, 2.42, 0);
+  } };
+  R.picnic = { w: 1.9, d: 1.6, boxes: [[0, 0, 1.8, 0.8, 0.76], [0, -0.62, 1.8, 0.28, 0.45], [0, 0.62, 1.8, 0.28, 0.45]], build(k) {
+    const w = k.mat(k.pick(WOOD), 0.85);
+    k.box(w, 1.8, 0.05, 0.8, 0, 0.74, 0);
+    for (const s of [-1, 1]) { k.box(w, 1.8, 0.04, 0.28, 0, 0.44, s * 0.62); for (const x of [-0.75, 0.75]) k.box(w, 0.06, 0.74, 0.06, x, 0.37, s * 0.3, 0, s * 0.35); }
+    if (k.rnd() < 0.6) for (let i = 0; i < 3; i++) k.cyl(k.mat(k.pick([0xf2efe6, 0xc0392b, 0x2e86c1]), 0.6), 0.04, 0.035, 0.12, (k.rnd() - 0.5) * 1.4, 0.82, (k.rnd() - 0.5) * 0.5);
+  } };
+  // A ticket booth by the gate: a little hut with a window and a lit sign.
+  R.booth = { w: 1.7, d: 1.6, boxes: [[0, 0, 1.6, 1.5, 2.5]], build(k) {
+    const wall = k.mat(k.pick([0xc0392b, 0x2e86c1, 0x16a085]), 0.7), trim = k.mat(0xf2efe6, 0.6);
+    k.box(wall, 1.6, 2.4, 1.5, 0, 1.2, 0);
+    k.box(trim, 1.7, 0.1, 1.6, 0, 2.45, 0);
+    k.box(k.mat(0x0e1418, 0.15, 0.3), 1.1, 0.7, 0.02, 0, 1.45, 0.755);
+    k.box(trim, 1.2, 0.06, 0.2, 0, 1.08, 0.8);
+    k.box(k.mat(0xf1c40f, 0.5, 0, { emissive: 0xf1c40f, emissiveIntensity: 0.8 }), 1.2, 0.3, 0.03, 0, 2.15, 0.77);
+  } };
+  R.sinks = { w: 1.98, d: 0.6, cover: 1, boxes: [[0, 0, 1.98, 0.56, 0.9]], build(k) {
+    const white = k.mat(0xeceae4, 0.35), steel = k.mat(0xc4c8cc, 0.25, 0.8);
+    k.box(k.mat(0xb9bdc2, 0.5), 1.96, 0.86, 0.5, 0, 0.43, -0.03);
+    k.box(white, 1.98, 0.05, 0.56, 0, 0.88, 0);
+    for (const x of [-0.5, 0.5]) { k.box(k.mat(0xd8d6d0, 0.3), 0.44, 0.012, 0.32, x, 0.9, 0.04); k.cyl(steel, 0.015, 0.015, 0.2, x, 1.0, -0.2); k.box(steel, 0.02, 0.02, 0.12, x, 1.09, -0.15); }
+    k.box(k.mat(0x8e9ea8, 0.12, 0.6), 1.8, 0.8, 0.01, 0, 1.6, -0.27); // the mirror
+    k.box(k.mat(0xeceae4, 0.4), 0.28, 0.38, 0.12, 0.92, 1.3, -0.22); // a hand dryer
+  } };
+  R.toilet = { small: 1, w: 0.5, d: 0.75, boxes: [[0, -0.05, 0.42, 0.7, 0.8]], build(k) {
+    const white = k.mat(0xf2f0ea, 0.3);
+    k.cyl(white, 0.17, 0.12, 0.4, 0, 0.2, 0.08);
+    k.cyl(k.mat(0x1c1c1e, 0.5), 0.19, 0.19, 0.03, 0, 0.42, 0.1);
+    k.box(white, 0.4, 0.4, 0.18, 0, 0.6, -0.27);
+    k.box(k.mat(0xc4c8cc, 0.25, 0.8), 0.06, 0.02, 0.04, 0.12, 0.81, -0.27);
+  } };
+  // Event fencing round the site: steel mesh panels on block feet, dark scrim, now and then a sponsor's banner.
+  R.hoarding = { w: 0.68, d: 0.14, boxes: [[0, 0, 0.68, 0.14, 2.3]], build(k, v) {
+    const tube = k.mat(0x8a8f94, 0.4, 0.6), banner = v < 0.12;
+    k.box(tube, 0.68, 0.04, 0.04, 0, 2.28, 0); k.box(tube, 0.68, 0.04, 0.04, 0, 0.12, 0);
+    if (v < 0.5) k.box(tube, 0.04, 2.3, 0.04, -0.32, 1.15, 0);
+    k.box(k.mat(banner ? [0xc0392b, 0x2e86c1, 0xf1c40f, 0x8e44ad][Math.floor(v * 33) % 4] : 0x14261c, 0.95), 0.68, 2.1, 0.012, 0, 1.17, 0.015);
+    if (banner) for (let i = 0; i < 3; i++) k.box(k.mat(0xf2efe6, 0.9), 0.5, 0.06, 0.004, 0, 0.9 + i * 0.35, 0.023);
+    if (v < 0.5) k.box(k.mat(0x6a6e72, 0.9), 0.2, 0.12, 0.6, -0.32, 0.06, 0);
+  } };
+
+  // ---------------------------------------------------------------- the town square and the car park
+  // A parked car, nose to +z: body, cabin and glass, wheels, lights. Solid cover across two tiles.
+  const CAR = [0x8a1c1c, 0x1c3a6a, 0xd8d8d4, 0x2a2a2c, 0x6a6e72, 0x2e5a3a, 0xc8a040, 0x5a2a5a, 0xe8e4da, 0x3a4a5a];
+  R.car = { w: 1.9, d: 4.3, cover: 1, boxes: [[0, 0, 1.82, 4.25, 1.45]], build(k, v) {
+    const paint = k.mat(CAR[Math.floor(v * CAR.length) % CAR.length], 0.35, 0.5), glass = k.mat(0x0c1218, 0.1, 0.6), tyre = k.mat(0x111112, 0.9), trim = k.mat(0x1c1c1e, 0.6);
+    k.box(paint, 1.8, 0.62, 4.2, 0, 0.62, 0);
+    k.box(paint, 1.62, 0.5, 2.1, 0, 1.18, -0.2);
+    k.box(glass, 1.64, 0.36, 1.6, 0, 1.18, -0.2); // the side windows
+    k.box(glass, 1.5, 0.42, 0.04, 0, 1.17, 0.86, 0, -0.55); k.box(glass, 1.5, 0.38, 0.04, 0, 1.17, -1.27, 0, 0.5); // windscreen, rear window
+    for (const x of [-0.8, 0.8]) for (const z of [-1.35, 1.35]) { k.box(tyre, 0.24, 0.64, 0.64, x, 0.32, z); k.box(k.mat(0x9a9ea2, 0.3, 0.8), 0.25, 0.34, 0.34, x, 0.32, z); }
+    k.box(trim, 1.84, 0.16, 0.12, 0, 0.42, 2.1); k.box(trim, 1.84, 0.16, 0.12, 0, 0.42, -2.1); // bumpers
+    for (const x of [-0.66, 0.66]) { k.box(k.mat(0xf2efe6, 0.3, 0, { emissive: 0x303030 }), 0.3, 0.1, 0.02, x, 0.74, 2.105); k.box(k.mat(0x8a1010, 0.4, 0, { emissive: 0x200404 }), 0.32, 0.1, 0.02, x, 0.74, -2.105); }
+  } };
+  R.bench = { w: 1.8, d: 0.6, boxes: [[0, 0, 1.8, 0.55, 0.85]], build(k) {
+    const w = k.mat(k.pick(WOOD), 0.85), iron = k.mat(0x1c1c1e, 0.5, 0.5);
+    for (let i = 0; i < 3; i++) k.box(w, 1.8, 0.04, 0.12, 0, 0.45, 0.16 - i * 0.14);
+    for (let i = 0; i < 2; i++) k.box(w, 1.8, 0.1, 0.03, 0, 0.62 + i * 0.14, -0.24, 0, -0.15);
+    for (const x of [-0.8, 0.8]) { k.box(iron, 0.05, 0.45, 0.5, x, 0.225, 0); k.box(iron, 0.05, 0.4, 0.05, x, 0.65, -0.24); }
+  } };
+  // A plane tree: a trunk you can stand behind and a canopy overhead (only the trunk stops you).
+  R.tree = { small: 1, w: 0.6, d: 0.6, boxes: [[0, 0, 0.45, 0.45, 3.2]], build(k) {
+    k.cyl(k.mat(0x4a3a2a, 0.95), 0.18, 0.24, 3.2, 0, 1.6, 0, 8);
+    const leaf = k.mat(k.pick([0x22401c, 0x2a4a22, 0x1e3a1a]), 0.95, 0, { flatShading: true });
+    for (let i = 0; i < 9; i++) k.ico(leaf, 0.9 + k.rnd() * 0.6, (k.rnd() - 0.5) * 2.2, 3.4 + k.rnd() * 1.4, (k.rnd() - 0.5) * 2.2);
+    k.box(k.mat(0x2a2622, 0.9), 1.0, 0.04, 1.0, 0, 0.02, 0); // its grate
+  } };
+  // The fountain in the middle of the square: a round stone basin and a column in the middle.
+  R.fountain = { w: 3.9, d: 3.9, boxes: [[0, 0, 3.7, 3.7, 0.6], [0, 0, 0.8, 0.8, 1.9]], build(k) {
+    const stone = k.mat(0x8a8478, 0.85), water = k.mat(0x2a5a7a, 0.1, 0.3, { emissive: 0x0a1a28 });
+    k.cyl(stone, 1.85, 1.9, 0.6, 0, 0.3, 0, 28);
+    k.cyl(water, 1.65, 1.65, 0.02, 0, 0.52, 0, 28);
+    k.cyl(stone, 0.35, 0.45, 1.4, 0, 1.2, 0, 14);
+    k.cyl(stone, 0.75, 0.55, 0.15, 0, 1.6, 0, 18);
+    k.cyl(water, 0.62, 0.62, 0.02, 0, 1.66, 0, 18);
+    k.cyl(stone, 0.12, 0.16, 0.5, 0, 1.9, 0, 10);
+  } };
   // What goes in each kind of room. `must` is placed first, against a wall.
   const ROOMS = {
     living: { must: 'tv', wall: ['sofa', 'bookshelf', 'dresser', 'bookshelf', 'sofa'], center: ['sofa', 'armchairs'], small: ['plant', 'lamp', 'sidetable', 'plant'], floor: 'wood', rug: 1 },
@@ -435,6 +611,14 @@ G.Furniture = (() => {
     // an apartment block's hallway and the landing at the top of the stairs: bare
     corridor: { floor: 'carpet', bare: 1 }, landing: { floor: 'tile', bare: 1 },
     alley: { floor: 'pave', bare: 1, out: 1 }, // the passage between two houses
+    // a festival (laid out on its own: plan()); the field's lawn is laid in G.Level.buildFestival
+    stage: { floor: null, out: 1 }, seating: { floor: null, out: 1 }, court: { floor: null, out: 1 }, picnic: { floor: null, out: 1 }, gate: { floor: null, out: 1 },
+    washroom: { must: 'sinks', wall: ['sinks'], center: [], small: ['bin'], floor: 'tile' }, cubicle: { floor: 'tile', bare: 1 },
+    plaza: { floor: null, out: 1 }, parking: { floor: null, out: 1 }, aisle: { floor: null, bare: 1, out: 1 },
+    // the shops round the town square
+    cafe: { must: 'counter', wall: ['counter', 'fridge', 'bookshelf'], center: ['dining', 'dining'], small: ['plant', 'bin'], floor: 'tile' },
+    store: { must: 'counter', wall: ['rack', 'rack', 'files'], center: ['rack'], small: ['cardboard', 'plant'], floor: 'tile', dense: 1 },
+    bar: { must: 'counter', wall: ['counter', 'fridge', 'sofa', 'tv'], center: ['dining', 'armchairs'], small: ['plant', 'lamp'], floor: 'wood' },
   };
   // small pieces give only their boxes; they need a footprint too when they're set against a wall
   for (const rec of Object.values(R)) if (rec.w == null || rec.d == null) {
@@ -470,8 +654,128 @@ G.Furniture = (() => {
       const rec = R[name], i = tz * W + tx;
       map.props.set(i, { name, q, x, z, v, wd, boxes: worldBoxes(rec, x, z, q, v) });
     };
+    // A festival is laid out on its own: the stage, rows of seats in front of it, stalls facing each other across
+    // lanes, picnic tables, ticket booths at the gate, a toilet in each cubicle. Where civilians hide (behind a
+    // stall's counter: map.civSpots) and the strings of lights over it all (map.fest.strings: ends in metres,
+    // with a pole under each end that has one) go with it.
+    function festival() {
+      const F = map.fest = { strings: [], stage: null, gate: null, lamps: [], bays: [], plaza: null, lot: null }, C = (v) => (v + 0.5) * TS;
+      map.civSpots = [];
+      const str = (a, b, kind, pa, pb) => F.strings.push({ a, b, kind, pa, pb });
+      return {
+        stage(rm) {
+          F.stage = { x0: rm.x * TS, x1: (rm.x + rm.w) * TS, z0: rm.z * TS, z1: (rm.z + rm.h) * TS };
+          for (let z = rm.z; z < rm.z + rm.h; z++) for (let x = rm.x; x < rm.x + rm.w; x++) {
+            const wing = (x === rm.x || x === rm.x + rm.w - 1) && z === rm.z + rm.h - 1; // the PA stacks, at the front corners
+            if (!tryBlock(x, z, wing ? 4 : 2)) continue;
+            put(wing ? 'speaker' : 'stagedeck', x, z, C(x), C(z), wing ? facing(0, -1) : 0, r());
+          }
+        },
+        seating(rm) {
+          const cx = rm.cx, half = Math.min(11, (rm.w >> 1) - 2);
+          for (const dz of [2, 4, 6, 8]) {
+            const z = rm.z + dz, v = r();
+            if (z >= rm.z + rm.h - 1) continue;
+            for (let x = cx - half; x <= cx + half; x++) { // a centre aisle and one down each side
+              if (x === cx || Math.abs(x - cx) === 6 || x <= rm.x || x >= rm.x + rm.w - 1) continue;
+              if (tryBlock(x, z, 2)) put('seats', x, z, C(x), C(z), facing(0, 1), v);
+            }
+          }
+          const fz = rm.z + rm.h - 1;
+          if (tryBlock(cx, fz, 2)) put('foh', cx, fz, C(cx), C(fz), facing(0, 1), r());
+          // strings fanning out from the top of the stage's truss over the seats to poles at the back
+          const s = F.stage;
+          if (s) for (let i = 0; i < 7; i++) str([s.x0 + 0.4 + (i / 6) * (s.x1 - s.x0 - 0.8), 7.0, s.z1 - 0.3], [C(cx) + (i - 3) * 7.5 + (i === 3 ? 2.4 : 0), 5.2, (rm.z + rm.h) * TS - 0.6], 'bulb', false, true);
+        },
+        court(rm) {
+          // rows of stalls, two facing each other across each lane with their backs to a service alley. Most are
+          // 4 m wide across two tiles (room behind the counter for two); a way through every few.
+          const rows = [[1, 1], [5, -1], [8, 1], [12, -1], [15, 1], [19, -1]].map(([o, f]) => [rm.z + o, f]).filter(([z]) => z < rm.z + rm.h - 1);
+          const gap = (x) => (x - rm.x - 1) % 5 === 4;
+          for (const [z, f] of rows) {
+            const q = facing(0, -f), yaw = Math.atan2(0, -f), free = (x) => t[z * W + x] === 0;
+            for (let x = rm.x + 1; x <= rm.x + rm.w - 2;) {
+              const k = (x - rm.x - 1) % 5, food = r() < 0.55;
+              if (k === 4) { x++; continue; }
+              if ((k === 0 || k === 2) && x + 1 <= rm.x + rm.w - 2 && free(x) && free(x + 1) && tryBlock(x, z, 2)) {
+                if (tryBlock(x + 1, z, 2)) {
+                  put(food ? 'bigfood' : 'bigmerch', x, z, (x + 1) * TS, C(z), q, r());
+                  for (const o of [-0.95, 0.95]) map.civSpots.push({ x: (x + 1) * TS + o, z: C(z), yaw }); // behind the counter
+                  x += 2; continue;
+                }
+                put(food ? 'stallfood' : 'stallmerch', x, z, C(x), C(z), q, r()); map.civSpots.push({ x: C(x), z: C(z), yaw }); x++; continue;
+              }
+              if (tryBlock(x, z, 2)) { put(food ? 'stallfood' : 'stallmerch', x, z, C(x), C(z), q, r()); map.civSpots.push({ x: C(x), z: C(z), yaw }); }
+              x++;
+            }
+          }
+          // lights strung back and forth across each lane, from poles in the gaps
+          const xs = [rm.x]; for (let x = rm.x + 1; x <= rm.x + rm.w - 2; x++) if (gap(x)) xs.push(x);
+          xs.push(rm.x + rm.w - 1);
+          for (let p = 0; p + 1 < rows.length; p += 2) {
+            const zA = C(rows[p][0]), zB = C(rows[p + 1][0]), kind = p % 4 ? 'bulb' : 'lantern';
+            for (let i = 0; i < xs.length; i++) {
+              str([C(xs[i]), 4.6, zA], [C(xs[i]), 4.6, zB], kind, true, true);
+              if (i + 1 < xs.length) str([C(xs[i]), 4.6, zB], [C(xs[i + 1]), 4.6, zA], kind, true, true);
+            }
+          }
+        },
+        picnic(rm) {
+          for (let z = rm.z + 1; z < rm.z + rm.h - 1; z += 3) for (let x = rm.x + 1; x < rm.x + rm.w - 1; x += 2) if (tryBlock(x, z, 4)) put('picnic', x, z, C(x), C(z), r() < 0.5 ? 0 : 2, r());
+          put('bin', rm.x, rm.z + rm.h - 1, C(rm.x), C(rm.z + rm.h - 1) + 0.5, 0, r());
+        },
+        gate(rm) { // inside the festival's gate: the ticket booths either side of it, lights over
+          F.gate = { x0: rm.x * TS, x1: (rm.x + rm.w) * TS, z0: rm.z * TS, z1: (rm.z + rm.h) * TS };
+          const bz = rm.z + rm.h - 1;
+          for (const x of [rm.cx - 4, rm.cx + 3]) if (tryBlock(x, bz, 4)) put('booth', x, bz, C(x), C(bz), facing(0, 1), r());
+          const xs = []; for (let x = rm.x; x < rm.x + rm.w; x += 5) if (Math.abs(x - rm.cx) > 1) xs.push(x); // (no pole right where you come in)
+          for (let i = 0; i + 1 < xs.length; i++) str([C(xs[i]), 4.4, rm.z * TS + 0.4], [C(xs[i + 1]), 4.4, rm.z * TS + 0.4], 'bulb', true, true);
+        },
+        // the town square: a fountain in the middle with benches round it, cafe tables out in front of the shops,
+        // plane trees down the far side, street lamps, lanterns strung across
+        plaza(rm) {
+          F.plaza = { x0: rm.x * TS, x1: (rm.x + rm.w) * TS, z0: rm.z * TS, z1: (rm.z + rm.h) * TS };
+          const cx = rm.cx, cz = rm.cz;
+          if ([[0, 0], [1, 0], [0, 1], [1, 1]].every(([a, b]) => t[(cz + b) * W + cx + a] === 0) && tryBlock(cx, cz, 4)) {
+            tryBlock(cx + 1, cz, 4); tryBlock(cx, cz + 1, 4); tryBlock(cx + 1, cz + 1, 4);
+            put('fountain', cx, cz, (cx + 1) * TS, (cz + 1) * TS, 0, r());
+          }
+          for (const [x, z, dx, dz] of [[cx - 2, cz, -1, 0], [cx - 2, cz + 1, -1, 0], [cx + 3, cz, 1, 0], [cx + 3, cz + 1, 1, 0], [cx, cz - 2, 0, -1], [cx + 1, cz + 3, 0, 1]])
+            if (tryBlock(x, z, 4)) put('bench', x, z, C(x), C(z), facing(dx, dz), r());
+          for (let z = rm.z + 2; z < rm.z + rm.h - 1; z += 4) if (t[z * W + rm.x + rm.w - 1] === 0) put('tree', rm.x + rm.w - 1, z, C(rm.x + rm.w - 1), C(z), 0, r());
+          for (let z = rm.z + 3; z < rm.z + rm.h - 2; z += 6) if (Math.abs(z - cz) > 3 && tryBlock(rm.x + 1, z, 4)) put('patio', rm.x + 1, z, C(rm.x + 1), C(z), 0, r());
+          for (let z = rm.z + 1; z < rm.z + rm.h; z += 8) F.lamps.push([C(rm.x + rm.w - 2), C(z)]);
+          for (const [a, b] of [[-3, -3], [4, -3], [-3, 4], [4, 4]]) F.lamps.push([C(cx + a), C(cz + b)]);
+          const zs = []; for (let z = rm.z + 1; z < rm.z + rm.h; z += 5) zs.push(z);
+          for (let i = 0; i + 1 < zs.length; i++) { const [xa, xb] = i % 2 ? [rm.x + rm.w - 2, rm.x] : [rm.x, rm.x + rm.w - 2]; str([C(xa), 4.6, C(zs[i])], [C(xb), 4.6, C(zs[i + 1])], 'lantern', true, true); }
+        },
+        // the car park: two rows of bays (two tiles deep, a car in most), aisles between, tall lamps down the middle
+        parking(rm) {
+          F.lot = { x0: rm.x * TS, x1: (rm.x + rm.w) * TS, z0: rm.z * TS, z1: (rm.z + rm.h) * TS };
+          for (const za of [rm.z + 1, rm.z + 5]) {
+            if (za + 1 >= rm.z + rm.h) continue;
+            F.bays.push([rm.x * TS, (rm.x + rm.w) * TS, za * TS, (za + 2) * TS]);
+            for (let x = rm.x + 1; x <= rm.x + rm.w - 2; x++) {
+              if (r() < 0.3 || t[za * W + x] !== 0 || t[(za + 1) * W + x] !== 0 || !tryBlock(x, za, 2)) continue; // (an empty bay)
+              if (!tryBlock(x, za + 1, 2)) continue;
+              put('car', x, za, C(x), (za + 1) * TS, r() < 0.5 ? 0 : 2, r());
+            }
+          }
+          for (let x = rm.x + 2; x < rm.x + rm.w; x += 8) F.lamps.push([C(x), (rm.z + 4) * TS]);
+        },
+        cubicle(rm) { // the toilet against the wall facing the door
+          let dir = null;
+          for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (t[(rm.z + dz) * W + rm.x + dx] === 3) dir = [-dx, -dz];
+          if (!dir) return;
+          const off = 1 - 0.02 - R.toilet.d / 2;
+          put('toilet', rm.x, rm.z, C(rm.x) + dir[0] * off, C(rm.z) + dir[1] * off, facing(dir[0], dir[1]), r(), [dir]);
+        },
+      };
+    }
+    const fest = map.theme.layout === 'festival' ? festival() : null;
     for (const rm of rooms) {
       rm.type = rm.type || (r() < home ? homes[hi++ % homes.length] : WORK[wi++ % WORK.length]);
+      if (fest && fest[rm.type]) { fest[rm.type](rm); continue; }
       const spec = ROOMS[rm.type];
       if (spec.bare) continue;
       // the warehouse floor: rows of racking with two-tile aisles between, cut by cross-aisles
@@ -868,7 +1172,7 @@ G.Furniture = (() => {
             const open = rnd() < 0.3 ? 0 : 0.15 + rnd() * 0.5; // blinds up, or part-way down
             for (let s = 0; s < 14 * open; s++) place(new T.BoxGeometry(1.1, 0.012, 0.05), blind, cx - dx * 0.06, 2.15 - s * 0.042, cz - dz * 0.06, ry, 0.35);
             place(new T.BoxGeometry(1.3, 0.04, 0.12), sill, cx - dx * 0.05, 0.98, cz - dz * 0.05, ry);
-          } else if (pics < 3 && v < 0.5) {
+          } else if (pics < 3 && v < 0.5 && rm.type !== 'washroom' && rm.type !== 'cubicle') { // (no art in a toilet block)
             pics++;
             const fw = 0.5 + rnd() * 0.5, fh = fw * 0.75, y = p ? 1.7 : 1.55;
             place(new T.BoxGeometry(fw + 0.06, fh + 0.06, 0.03), pick(frameMats), cx - dx * 0.015, y, cz - dz * 0.015, ry);
@@ -903,5 +1207,5 @@ G.Furniture = (() => {
     }
   }
 
-  return { plan, build, R, ROOMS, worldBoxes, outsideMaterial };
+  return { plan, build, R, ROOMS, worldBoxes, outsideMaterial, textures };
 })();

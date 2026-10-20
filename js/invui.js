@@ -28,6 +28,7 @@ G.InvUI = (() => {
   const GG = () => G.Gear;
   let root = null, drag = null, editMolle = false, menu = null, field = false;
   let patient = null; // a teammate you're treating (their player id), or null: yourself
+  let ptPart = null, lastDropAt = 0; // the part of a body you've picked to treat (highlighted); when something was last dropped on one
   let cab = null; // the first aid cabinet you're looking in (its index), or null
   const locked = () => !field && G.Shop.ready;
   // ---------------------------------------------------------------- field jobs (timed ammo handling)
@@ -51,11 +52,16 @@ G.InvUI = (() => {
     const nb = GG().boxItem(cal, am, 0);
     return GG().stow(me, nb) ? nb : null;
   }
+  // Counts: in the stash and the shop, between levels, you can count your rounds; in the field you can't (a
+  // magazine's fill shows in its picture; check it with R held).
+  const counted = () => G.Game.phase !== 'level';
+  // how far a job's got (no counts: a bar)
+  const bar = (f) => `<i class="jobbar"><b style="width:${Math.round(G.U.clamp(f || 0, 0, 1) * 100)}%"></b></i>`;
   const magPer = (mag) => { const def = G.WEAPONS[mag.wid]; return G.beltFed(def) ? PER.belt : def.cls === 'PST' || def.cls === 'MP' ? PER.pistol : PER.round; };
   // rounds into a magazine, one at a time: from `box`, or from any box of its caliber (same type first)
   function loadJob(mag, box, w) {
     const name = GG().magName(mag);
-    return { label: `Loading the ${name}`, per: magPer(mag), prog: () => `${mag.n}/${mag.cap}`,
+    return { label: `Loading the ${name}`, per: magPer(mag), prog: () => bar(mag.n / mag.cap),
       step(me) {
         if (mag.n >= mag.cap || !where(me, mag) && !w) return 'done';
         const cal = G.calOf(G.WEAPONS[mag.wid]);
@@ -71,7 +77,8 @@ G.InvUI = (() => {
   // rounds out of a magazine (or a loose-fed gun) into a box
   function unloadJob(name, cal, get, take, w) {
     let box = null;
-    return { label: `Unloading the ${name}`, per: PER.out, prog: () => `${get()} left`,
+    let n0 = 0;
+    return { label: `Unloading the ${name}`, per: PER.out, prog: () => bar((n0 = Math.max(n0, get())) ? get() / n0 : 0),
       step(me) {
         if (get() <= 0) return 'done';
         const am = take(true);
@@ -85,7 +92,7 @@ G.InvUI = (() => {
   }
   // shells into a tube (or a break-action), one at a time
   function gunLoadJob(w, box) {
-    return { label: `Loading the ${w.def.name}`, per: PER.shell, prog: () => `${w.mag}/${G.Me.magSize(w.def)}`,
+    return { label: `Loading the ${w.def.name}`, per: PER.shell, prog: () => bar(w.mag / G.Me.magSize(w.def)),
       step(me) {
         const cap = me.magSize(w.def);
         if (w.mag >= cap) return 'done';
@@ -162,6 +169,18 @@ G.InvUI = (() => {
   function paintJob() { const el = root && document.getElementById('invJob'); if (el) el.innerHTML = jobHTML(); }
   // advance the job at the front (called every frame while the field screen is open)
   function update(dt) {
+    // the teammate you're treating has moved out of reach (or died, or gone): what you were doing for them stops
+    // and their panel closes
+    if (field && patient != null) {
+      const pv = patientView(), me = G.Me;
+      if (!pv || !pv.st || pv.st.dd || Math.hypot(pv.pos.x - me.pos.x, pv.pos.z - me.pos.z) > 2.6) {
+        const name = pv ? pv.name : 'They';
+        cancelJobs(); closeMenu(); patient = null; ptPart = null;
+        G.Game.toggleInv(false);
+        G.HUD.toast('', `${G.U.esc(name)} ${pv && pv.st && pv.st.dd ? 'is gone' : 'moved out of reach'}`, 1.4);
+        return;
+      }
+    }
     // walked away from the cabinet: it closes
     if (field && cab != null) {
       const c = G.Game.map && G.Game.map.cabinets && G.Game.map.cabinets[cab];
@@ -290,11 +309,16 @@ G.InvUI = (() => {
   // ---------------------------------------------------------------- drawing
   // rot: the item is shown turned (its icon is turned with it)
   function itemHTML(it, w, h, extra = '', rot = false) {
-    const Gr = GG(), d = Gr.defOf(it);
+    const Gr = GG(), d = Gr.defOf(it), n = (a, b) => (counted() ? ` <b>${a}</b>/${b}` : ''); // (counts: only out of the field)
     let sub = '';
-    if (it.k === 'mag' || it.k === 'ammo') sub = `${it.am && it.n && G.AMMO[it.am] ? `<i class="am am-${it.am}">${G.AMMO[it.am].tag}</i>${Gr.mixed(it) ? '<i class="am mix">+MIX</i>' : ''} ` : ''}<b>${it.n}</b>/${it.cap}`;
+    if (it.k === 'mag') sub = it.am && it.n && G.AMMO[it.am] ? `<i class="am am-${it.am}">${G.AMMO[it.am].tag}</i>${Gr.mixed(it) ? '<i class="am mix">+MIX</i>' : ''}${n(it.n, it.cap)}` : it.n ? '' : `<i class="am">EMPTY</i>${n(0, it.cap)}`; // (how full it is: the picture shows; in the stash, the count too)
+    else if (it.k === 'ammo') sub = it.am && it.n && G.AMMO[it.am] ? `<i class="am am-${it.am}">${G.AMMO[it.am].tag}</i>${Gr.mixed(it) ? '<i class="am mix">+MIX</i>' : ''}${n(it.n, it.cap)}` : it.n ? '' : '<i class="am">EMPTY</i>'; // (how full: the rounds on top; in the stash, the count too)
     else if (it.k === 'med' && GG().medStack(it) > 1) sub = `<b>${it.n || 1}</b>/${GG().medStack(it)}`; // a stack: how many of how many fit
-    else if (it.k === 'gun') sub = it.w.def.missing && it.w.def.missing.length ? '<i class="broken">won\'t fire</i>' : `${it.w.noMag && isMagGun(it.w) ? 'no mag' : `<b>${it.w.mag}</b>/${G.Me.magSize(it.w.def)}`}`;
+    else if (it.k === 'gun') { // (in the field no counts: check the magazine, or the chamber)
+      const nxt = it.w.chamber || (it.w.mag > 0 ? (it.w.tube && it.w.tube.length ? it.w.tube[it.w.tube.length - 1] : it.w.ammo) : null);
+      sub = it.w.def.missing && it.w.def.missing.length ? '<i class="broken">won\'t fire</i>' : it.w.noMag && isMagGun(it.w) ? 'no mag' : nxt && G.AMMO[nxt] ? `<i class="am am-${nxt}">${G.AMMO[nxt].tag}</i>` : '<i class="am">EMPTY</i>';
+      if (!(it.w.def.missing && it.w.def.missing.length) && !(it.w.noMag && isMagGun(it.w))) sub += n(`${it.w.mag}${it.w.chamber ? '+1' : ''}`, G.Me.magSize(it.w.def));
+    }
     else if (d && d.dur) sub = `${Math.round(Gr.cond(it) * 100)}%`;
     else if (it.k === 'part') { const p = GS().PARTS[it.pid]; sub = p && p.factory ? 'factory' : ''; }
     const P = it.k === 'part' ? GS().PARTS[it.pid] : null;
@@ -342,7 +366,8 @@ G.InvUI = (() => {
     const mi = magItem(w), a = mi ? (([w0, h0]) => ({ w: w0, h: h0 }))(Gr.size(mi)) : null;
     rows += isMagGun(w)
       ? `<div class="gun-slot mag" data-wmag="${gunIt.uid}"><small>Magazine in it</small>${mi ? itemHTML(mi, a.w, a.h, 'position:relative') : '<em>none: drop one here</em>'}</div>`
-      : `<div class="gun-slot mag" data-wmag="${gunIt.uid}"><small>Loaded</small><em>${w.mag} / ${me.magSize(def)} rounds${w.mag ? '' : ': drop a box here'}</em></div>`;
+      : `<div class="gun-slot mag" data-wmag="${gunIt.uid}"><small>Loaded</small>${(() => { const cap = me.magSize(def), pw = Math.max(1, Math.min(4, Math.ceil(cap / 3))); return `<img class="tubepic" src="${G.Icons.of({ k: 'tube', key: G.calOf(def), n: w.mag, cap, am: w.ammo }, pw, 1, false)}" style="width:${pw * 30}px;height:30px">`; })()}<em>${w.mag ? (counted() ? `${w.mag} / ${me.magSize(def)} rounds` : '') : 'empty: drop a box here'}</em></div>`;
+    if (G.chambered(def)) rows += `<div class="gun-slot mag"><small>Chamber</small><em>${w.chamber ? `<i class="am am-${w.chamber}">${G.AMMO[w.chamber] ? G.AMMO[w.chamber].tag : ''}</i> a round in it` : 'empty: racks on the next pull of the trigger, or R'}</em></div>`;
     const [gw, gh] = Gr.gunSize(def);
     return `<div class="inv-open gun"><div class="inv-sec"><h4>${G.U.esc(def.name)}${def.modified ? ' <small>CUSTOM</small>' : ''}${def.missing && def.missing.length ? ' <small class="broken">WON\'T FIRE</small>' : ''}${closeBtn(gunIt)}</h4>
       <div class="gun-pic" style="background-image:url(${G.Icons.of(gunIt, gw, gh, false)})"></div><div class="gun-slots">${rows}</div></div></div>`;
@@ -382,7 +407,7 @@ G.InvUI = (() => {
       const p = b.parts[k], f = Math.max(0, p.hp / p.max), col = p.hp <= 0 ? '#5a2020' : f > 0.6 ? '#4f7a44' : f > 0.3 ? '#8a7030' : '#8a3a30';
       const chips = [p.heavy ? '<i class="c heavy">BLEED++</i>' : '', p.light ? '<i class="c light">BLEED</i>' : '', p.frac ? '<i class="c frac">FRACTURE</i>' : '',
         p.lung ? '<i class="c organ">LUNG</i>' : '', p.gut ? '<i class="c organ">GUT</i>' : '', p.tq ? '<i class="c tq">TQ</i>' : ''].join('');
-      return `<div class="bp bp-${k}${p.heavy || p.light ? ' bleeding' : ''}" data-body="${k}" title="${G.U.esc(G.Med.NAME[k])}: ${Math.ceil(Math.max(0, p.hp))}/${p.max}${G.Med.describe(p).length ? ' · ' + G.Med.describe(p).join(', ') : ''}">
+      return `<div class="bp bp-${k}${p.heavy || p.light ? ' bleeding' : ''}${ptPart === k ? ' sel' : ''}" data-body="${k}" title="${G.U.esc(G.Med.NAME[k])}: ${Math.ceil(Math.max(0, p.hp))}/${p.max}${G.Med.describe(p).length ? ' · ' + G.Med.describe(p).join(', ') : ''}">
         <b>${G.Med.NAME[k]}</b><div class="bp-bar"><i style="width:${Math.round(f * 100)}%;background:${col}"></i></div><small>${Math.ceil(Math.max(0, p.hp))}/${p.max}</small><div class="bp-chips">${chips}</div></div>`;
     };
     const bl = Math.round(b.blood), bcol = bl > 70 ? '#7fc06a' : bl > 40 ? '#e0b040' : '#e06060';
@@ -390,6 +415,36 @@ G.InvUI = (() => {
     return `<div class="body-wrap">${G.Med.figure(b, { cls: 'big' })}<div class="body-list">${['head', 'thorax', 'stomach', 'armL', 'armR', 'legL', 'legR'].map(part).join('')}</div></div>
       <div class="hl-hp"><span class="hl-k">BLOOD</span><div class="hl-bar"><i style="width:${bl}%;background:${bcol}"></i></div><b>${bl}%</b></div>
       ${b.pk > 0 ? `<div class="hl-status pk">Painkillers: ${patient == null ? Math.ceil(b.pk) + ' s left' : 'on'}</div>` : ''}`;
+  }
+  // Click a part of a body (yours, or a teammate's you're checking): a dropdown of the medical items you carry
+  // that would treat what's wrong with it, one entry per kind; pick one and it's used (one off your stack).
+  function medMenu(part, x, y) {
+    const me = G.Me, b = bodyOf(me);
+    if (!b || !b.parts[part]) return;
+    closeMenu();
+    const seen = new Set(), opts = [];
+    for (const g of GG().body(me)) for (const p of g.items) {
+      const mt = p.it.k === 'med' && p.it.mt;
+      if (!mt || seen.has(mt)) continue;
+      seen.add(mt);
+      if (!G.Med.cantTreat(b, part, mt)) opts.push(mt);
+    }
+    const wrong = G.Med.describe(b.parts[part]);
+    menu = document.createElement('div');
+    menu.className = 'inv-menu med-menu';
+    menu.innerHTML = `<b>${G.Med.NAME[part]}${wrong.length ? ` <small>${wrong.join(', ')}</small>` : ''}</b>`
+      + (opts.length ? opts.map((mt) => `<button data-mt="${mt}">${G.U.esc(G.Med.ITEMS[mt].name)}</button>`).join('') : `<i class="none">${wrong.length ? 'Nothing you carry treats this' : 'Nothing wrong with it'}</i>`);
+    Object.assign(menu.style, { left: Math.min(x, innerWidth - 200) + 'px', top: Math.min(y, innerHeight - 40 - opts.length * 26) + 'px' });
+    menu.addEventListener('click', (ev) => {
+      const bt = ev.target.closest('[data-mt]');
+      if (!bt) return;
+      closeMenu();
+      const it = GG().body(me).flatMap((g) => g.items).map((p) => p.it).find((q) => q.k === 'med' && q.mt === bt.dataset.mt), src = it && where(me, it);
+      if (src) treatOn(me, src, part); else G.Audio.deny();
+      rerender();
+    });
+    document.body.appendChild(menu);
+    setTimeout(() => window.addEventListener('pointerdown', outside, true));
   }
   function healthHTML(me) {
     const Gr = GG();
@@ -399,12 +454,12 @@ G.InvUI = (() => {
       const far = Math.hypot(pv.pos.x - me.pos.x, pv.pos.z - me.pos.z) > 2.6;
       return `<div class="pt-head"><b>${G.U.esc(pv.name)}</b>${pv.st.dn ? ` <i class="c heavy">DOWN · ${pv.st.bl}s</i>` : ''}${far ? ' <i class="c">too far</i>' : ''}
         ${pv.st.dn ? `<button class="btn tiny" data-revive ${far ? 'disabled' : ''}>Revive (4 s)</button>` : ''}<button class="btn tiny" data-self>Back to me</button></div>
-        ${bodyHTML(b)}<p class="inv-hint">Drag your medical items onto ${G.U.esc(pv.name)}'s body.</p>`;
+        ${bodyHTML(b)}<p class="inv-hint">Click a part of ${G.U.esc(pv.name)}'s body to treat it with what you carry.</p>`;
     }
     const piece = (name, it) => { const d = Gr.defOf(it); if (!d) return ''; const c = d.dur ? Math.round(Gr.cond(it) * 100) : null; return `<div class="hl-row"><span>${name}</span><b>${G.U.esc(d.name)}</b><i>${c == null ? '' : c + '%'}</i></div>`; };
     const status = me.dead ? `Dead: ${G.U.esc(me.deathCause || 'killed')}` : me.down ? `Down: ${Math.ceil(me.bleed)} s for someone to reach you` : G.Med.bleeding(me.body) ? 'Bleeding' : me.hp < 50 ? 'Badly hurt' : me.hp < 90 ? 'Hurt' : 'OK';
     return `<div class="hl-status ${G.Med.bleeding(me.body) ? 'bad' : ''}">${status}</div>${bodyHTML(me.body)}
-      <p class="inv-hint">Drag a medical item onto the part to treat it (it takes a few seconds).</p>
+      <p class="inv-hint">Click a part to treat it with what you carry, or drag a medical item onto it (it takes a few seconds).</p>
       ${piece('Helmet', me.kit.helmet)}${me.kit.helmet && me.kit.helmet.face ? piece('Face', me.kit.helmet.face) : ''}${piece('Armour', me.kit.carrier)}${me.kit.carrier ? piece('Plate', me.kit.carrier.plate) : ''}`;
   }
   function stats(me) {
@@ -437,6 +492,13 @@ G.InvUI = (() => {
     if (k.belt && k.belt.molle) body += molleHTML(k.belt);
     if (k.ifak) body += `<div class="inv-sec"><h4>IFAK <small>medical gear only</small></h4><div class="inv-row">${k.ifak.grids.map((g) => gridHTML(g)).join('')}</div></div>`;
     if (k.pack) body += `<div class="inv-sec"><h4>${G.U.esc(GG().defOf(k.pack).name)}</h4><div class="inv-row">${k.pack.grids.map((g) => gridHTML(g, `${g.w}×${g.h} <i>anything, guns too</i>`)).join('')}</div></div>`;
+    // checking on a teammate: their health and nothing else (no inventory, theirs or yours). Treat a part by
+    // clicking it and picking from what you carry that would help (healthHTML).
+    if (field && patient != null && patientView()) {
+      root.innerHTML = `<div class="inv field patient">
+        <div class="inv-col"><div id="invJob" class="inv-job">${jobHTML()}</div><h4 class="hd">Checking</h4><div id="invHealth">${healthHTML(me)}</div></div></div>`;
+      return;
+    }
     if (field) {
       root.innerHTML = `<div class="inv field">
         <div class="inv-col eq"><h4>Equipment</h4>${SLOTS.map(([s, n]) => slotHTML(me, s, n)).join('')}${stats(me)}<div class="inv-sell inv-drop" data-drop>Drop here to put it on the ground</div></div>
@@ -499,7 +561,7 @@ G.InvUI = (() => {
       return rerender();
     }
     const bodyEl = t.closest('[data-body]');
-    if (bodyEl) { if (field && d.it.k === 'med') treatOn(me, src, bodyEl.dataset.body); else G.Audio.deny(); return rerender(); }
+    if (bodyEl) { lastDropAt = performance.now(); if (field && d.it.k === 'med') treatOn(me, src, bodyEl.dataset.body); else G.Audio.deny(); return rerender(); }
     const wsEl = t.closest('[data-wslot]'), wmEl = t.closest('[data-wmag]');
     if (wsEl && field) { G.HUD.toast('', 'Parts are changed at the quartermaster\'s', 1.5); G.Audio.deny(); return rerender(); }
     if (wsEl && !(onItem && +onItem.dataset.uid === d.it.uid)) { fitPart(me, src, wsEl.dataset.wslot); return rerender(); }
@@ -512,12 +574,12 @@ G.InvUI = (() => {
     if (target && target.it !== d.it && d.it.k === 'ammo' && target.it.k === 'gun' && !isMagGun(target.it.w)) { intoGun(me, src, target.it); return rerender(); }
     if (target && d.it.k === 'part' && target.it.k === 'gun' && field) { G.HUD.toast('', 'Parts are changed at the quartermaster\'s', 1.5); G.Audio.deny(); return rerender(); }
     if (target && d.it.k === 'part' && target.it.k === 'gun' && !src.gunPart) {
-      const w = target.it.w, p = GS().PARTS[d.it.pid], sl = p && GS().slotsOf(w.def.id, w.def.build).find((s) => s.mount === p.mount && s.slot === p.slot);
+      const w = target.it.w, p = GS().PARTS[d.it.pid], sl = p && GS().slotsOf(w.def.id, w.def.build).find((s) => GS().fitsSlot(s, p));
       if (sl) fitPart(me, src, `${target.it.uid}|${sl.slot}`); else { G.HUD.toast('', `It doesn't fit the ${w.def.name}`, 1.5); G.Audio.deny(); }
       return rerender();
     }
     if (target && d.it.k === 'mag' && target.it.k === 'gun') {
-      if (isMagGun(target.it.w) && target.it.w.def.id === d.it.wid) intoGun(me, src, target.it);
+      if (isMagGun(target.it.w) && G.magFits(d.it.wid, target.it.w.def.id)) intoGun(me, src, target.it); // (any magazine of its pattern)
       else { G.HUD.toast('', `That magazine doesn't fit the ${target.it.w.def.name}`, 1.5); G.Audio.deny(); }
       return rerender();
     }
@@ -669,7 +731,12 @@ G.InvUI = (() => {
   }
 
   // ---------------------------------------------------------------- right-click menu
-  function closeMenu() { if (menu) { menu.remove(); menu = null; window.removeEventListener('pointerdown', outside, true); } }
+  function closeMenu() {
+    if (!menu) return;
+    const med = menu.classList.contains('med-menu');
+    menu.remove(); menu = null; window.removeEventListener('pointerdown', outside, true);
+    if (med) { ptPart = null; const el = root && document.getElementById('invHealth'); if (el) el.innerHTML = healthHTML(G.Me); } // (the part's no longer picked)
+  }
   function outside(e) { if (menu && !menu.contains(e.target)) closeMenu(); }
   // what you can do with this item, as [action, label, arg]
   function itemActs(me, src) {
@@ -678,16 +745,16 @@ G.InvUI = (() => {
       const w = it.w, cal = G.calOf(w.def);
       if (isMagGun(w)) {
         if (!w.noMag) out.push(['magout', 'Remove magazine']);
-        else { const m = bestMag(me, w); if (m) out.push(['magin', `Load a magazine (${m.n}/${m.cap})`]); }
+        else { const m = bestMag(me, w); if (m) out.push(['magin', `Load a magazine${counted() ? ` (${m.n}/${m.cap})` : ''}`]); }
       } else {
-        if (w.mag) out.push(['unloadgun', `Unload (${w.mag} rounds)`]);
+        if (G.loaded(w)) out.push(['unloadgun', `Unload${w.chamber ? ' (the chambered one last)' : ''}`]);
         if (w.mag < me.magSize(w.def) && boxes(cal)) out.push(['loadgun', 'Load from your boxes']);
       }
     }
     if (it.k === 'mag') {
-      if (it.n) out.push(['unloadmag', `Unload (${it.n} rounds)`]);
+      if (it.n) out.push(['unloadmag', 'Unload']);
       if (it.n < it.cap && boxes(G.calOf(G.WEAPONS[it.wid]))) out.push(['loadmag', 'Load from your boxes']);
-      if (!src.gunMag) Gr.guns(me).forEach((w, i) => { if (w.def.id === it.wid && w !== (src.gunMag || null)) out.push(['magto', `Put in your ${w.def.name}${w.noMag ? '' : ' (swap)'}`, i]); });
+      if (!src.gunMag) Gr.guns(me).forEach((w, i) => { if (isMagGun(w) && G.magFits(it.wid, w.def.id) && w !== (src.gunMag || null)) out.push(['magto', `Put in your ${w.def.name}${w.noMag ? '' : ' (swap)'}`, i]); });
     }
     if (it.k === 'ammo') {
       let others = 0; Gr.each(grids(me), (b) => { if (b !== it && b.k === 'ammo' && b.key === it.key && b.am === it.am) others++; });
@@ -704,7 +771,7 @@ G.InvUI = (() => {
     }
     if (it.k === 'part' && !src.gunPart && !field) {
       const p = GS().PARTS[it.pid];
-      Gr.guns(me).forEach((w, i) => { const sl = GS().slotsOf(w.def.id, w.def.build).find((s) => s.mount === p.mount && s.slot === p.slot); if (sl && w.def.build[sl.slot] !== it.pid) out.push(['fit', `Fit to your ${w.def.name}${w.def.build[sl.slot] ? ' (swap)' : ''}`, i]); });
+      Gr.guns(me).forEach((w, i) => { const sl = GS().slotsOf(w.def.id, w.def.build).find((s) => GS().fitsSlot(s, p)); if (sl && w.def.build[sl.slot] !== it.pid) out.push(['fit', `Fit to your ${w.def.name}${w.def.build[sl.slot] ? ' (swap)' : ''}`, i]); });
     }
     return out;
   }
@@ -725,7 +792,9 @@ G.InvUI = (() => {
     magout: (me, src) => queue(magOutJob(src.it.w)),
     magin: (me, src) => { const m = bestMag(me, src.it.w); if (m) queue(magInJob(m, src.it)); },
     magto: (me, src, i) => { const w = GG().guns(me)[+i]; if (w) queue(magInJob(src.it, GG().gunItem(w))); },
-    unloadgun: (me, src) => { const w = src.it.w; queue(unloadJob(w.def.name, G.calOf(w.def), () => w.mag, (peek) => { const t = w.tube && w.tube.length ? w.tube[w.tube.length - 1] : w.ammo; if (!peek) { w.mag--; if (w.tube) w.tube.pop(); } return t; })); },
+    unloadgun: (me, src) => { const w = src.it.w; queue(unloadJob(w.def.name, G.calOf(w.def), () => G.loaded(w), (peek) => {
+      if (!w.mag && w.chamber) { const t = w.chamber; if (!peek) w.chamber = null; return t; } // (the magazine's empty: clear the chamber)
+      const t = w.tube && w.tube.length ? w.tube[w.tube.length - 1] : w.ammo; if (!peek) { w.mag--; if (w.tube) w.tube.pop(); } return t; })); },
     loadgun: (me, src) => queue(gunLoadJob(src.it.w, null)),
     unloadmag: (me, src) => { const m = src.it, w = src.gunMag; queue(unloadJob(GG().magName(m), G.calOf(G.WEAPONS[m.wid]), () => m.n, (peek) => { const t = m.am; if (!peek) { m.r.pop(); if (w) w.mag = m.n; } return t; })); },
     loadmag: (me, src) => queue(loadJob(src.it, null, src.gunMag)),
@@ -743,7 +812,7 @@ G.InvUI = (() => {
     fillfrom: (me, src) => { const n = GG().fillFrom(me, src.it); if (src.it.n <= 0 && src.g) GG().removeFrom(src.g, src.it); toast(n, 'Loaded'); G.Audio.click(); },
     fit: (me, src, i) => {
       const w = GG().guns(me)[+i], p = GS().PARTS[src.it.pid];
-      const sl = w && GS().slotsOf(w.def.id, w.def.build).find((s) => s.mount === p.mount && s.slot === p.slot);
+      const sl = w && GS().slotsOf(w.def.id, w.def.build).find((s) => GS().fitsSlot(s, p));
       if (sl) fitPart(me, src, `${GG().gunItem(w).uid}|${sl.slot}`);
     },
   };
@@ -786,13 +855,20 @@ G.InvUI = (() => {
   }
 
   return {
-    show(el, opts) { field = !!(opts && opts.field); patient = opts && opts.patient != null ? opts.patient : null; cab = opts && opts.cab != null ? opts.cab : null; root = el; el.classList.add('inv-host'); if (!el.dataset.invBound) { el.dataset.invBound = 1; el.addEventListener('pointerdown', (e) => root && onDown(e)); el.addEventListener('dblclick', (e) => root && onDbl(e)); el.addEventListener('contextmenu', (e) => root && onMenu(e));
+    show(el, opts) { field = !!(opts && opts.field); patient = opts && opts.patient != null ? opts.patient : null; ptPart = null; cab = opts && opts.cab != null ? opts.cab : null; root = el; el.classList.add('inv-host'); if (!el.dataset.invBound) { el.dataset.invBound = 1; el.addEventListener('pointerdown', (e) => root && onDown(e)); el.addEventListener('dblclick', (e) => root && onDbl(e)); el.addEventListener('contextmenu', (e) => root && onMenu(e));
         el.addEventListener('click', (e) => {
           if (!root) return;
           if (e.target.closest('[data-molle]')) { editMolle = !editMolle; G.Audio.click(); render(); }
           if (e.target.closest('[data-jobcancel]')) { cancelJobs(); G.Audio.click(); return; }
           if (e.target.closest('[data-revive]')) { reviveJob(); return; }
-          if (e.target.closest('[data-self]')) { patient = null; G.Audio.click(); render(); return; }
+          if (e.target.closest('[data-self]')) { patient = null; ptPart = null; G.Audio.click(); render(); return; }
+          const bp = e.target.closest('[data-body]');
+          if (bp && field && performance.now() - lastDropAt > 250) { // (not the click that ends a drag onto it)
+            ptPart = bp.dataset.body; G.Audio.click();
+            const el = document.getElementById('invHealth'); if (el) el.innerHTML = healthHTML(G.Me);
+            medMenu(ptPart, e.clientX, e.clientY);
+            return;
+          }
           const x = e.target.closest('[data-close]');
           if (x) { opened = opened.filter((u) => u !== +x.dataset.close); G.Audio.click(); render(); }
         }); } render(); },

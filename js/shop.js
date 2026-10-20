@@ -183,7 +183,7 @@ G.Shop = {
     // load every magazine (and the guns) from the loose rounds you own: free, it's just your time
     let empty = 0, loose = 0;
     Gr.each(Gr.all(Me), (it) => { if (it.k === 'mag') empty += it.cap - it.n; if (it.k === 'ammo') loose += it.n; });
-    for (const w of Object.values(Me.weapons)) empty += Me.magSize(w.def) - w.mag;
+    for (const w of Object.values(Me.weapons)) empty += Me.magSize(w.def) - w.mag + (G.chambered(w.def) && !w.chamber ? 1 : 0);
     out.push({ id: 'load', name: 'Load Magazines', desc: `Top up every magazine you own (and your guns) from your loose rounds, same type first. ${loose} loose rounds, ${empty} empty places.`, price: 0, disabled: !empty || !loose,
       apply: () => Gr.loadAll(Me) });
     // ball for every caliber you own a gun in
@@ -365,7 +365,7 @@ G.Shop = {
     items.classList.toggle('locked', this.ready);
 
     const kitName = (it) => (it ? G.U.esc(G.Gear.defOf(it).name) : '—');
-    const wline = (w) => `<div class="lo"><span style="color:${G.TIER_COLORS[w.def.tier]}">${w.def.name}${w.def.modified ? ' <small>CUSTOM</small>' : ''}${w.sup ? ' <small>SUPP</small>' : ''}</span><small>${w.mag}/${w.reserve}</small></div>`;
+    const wline = (w) => `<div class="lo"><span style="color:${G.TIER_COLORS[w.def.tier]}">${w.def.name}${w.def.modified ? ' <small>CUSTOM</small>' : ''}${w.sup ? ' <small>SUPP</small>' : ''}</span><small>${w.mag}${w.chamber ? '+1' : ''}/${Me.magSize(w.def)}</small></div>`; // (between levels: the count)
     document.getElementById('shopLoadout').innerHTML =
       (Me.weapons.p ? wline(Me.weapons.p) : '<div class="lo"><span>No primary</span></div>') + (Me.weapons.s ? wline(Me.weapons.s) : '<div class="lo"><span>No sidearm</span></div>') +
       G.Gear.packGuns(Me).map(([it]) => wline(it.w).replace('<div class="lo">', '<div class="lo"><small>PACK</small> ')).join('') +

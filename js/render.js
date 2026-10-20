@@ -11,7 +11,7 @@ G.R = {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x0b0d10);
     this.scene.fog = new THREE.Fog(0x0b0d10, 8, 60);
-    this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.03, 200);
+    this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.03, 280);
     this.camera.rotation.order = 'YXZ';
     this.scene.add(this.camera);
 
@@ -79,10 +79,13 @@ G.R = {
     this.levelRoot.add(G.Level.buildMesh(map));
     const th = map.theme;
     this.scene.fog.color.setHex(th.fog);
+    this.scene.fog.near = th.noFog ? 1e4 : th.fogNear || 8; this.scene.fog.far = th.noFog ? 2e4 : th.fogFar || 60; // (no fog: pushed out of reach, so the shaders stay the same)
     this.scene.background.setHex(th.fog);
-    this.hemi.color.setHex(th.light);
+    this.hemi.color.setHex(th.hemi || th.light); this.hemi.intensity = th.hemiI || 0.26; // (outdoors at night: moonlight)
   },
   clearLevel() {
+    // marks on doors back into the scene first (they're pooled: they mustn't go with the doors)
+    for (const m of [...(this.decals || []), ...(this.bloodMarks || [])]) if (m.parent && m.parent !== this.scene) this.scene.add(m);
     const dispose = (o) => {
       o.traverse((c) => {
         if (c.geometry) c.geometry.dispose();
@@ -99,6 +102,7 @@ G.R = {
   // a drop (or a smear, if it came in fast) lying where it landed
   bloodDrop(x, y, z, size = 0.06, kind = 'drop') {
     const m = this.bloodMarks[this.bloodIdx]; this.bloodIdx = (this.bloodIdx + 1) % this.bloodMarks.length;
+    if (m.parent !== this.scene) this.scene.add(m); // (it may last have been on a door)
     m.material = this.bloodMats[kind] || this.bloodMats.drop;
     m.position.set(x, y + 0.004, z); m.rotation.set(-Math.PI / 2, 0, Math.random() * 6.28);
     m.scale.set(size * (0.8 + Math.random() * 0.5), size * (0.8 + Math.random() * 0.5), 1);
@@ -107,11 +111,13 @@ G.R = {
   // spatter on a wall: p the point on it, n its normal
   bloodWall(p, n, size = 0.35) {
     const m = this.bloodMarks[this.bloodIdx]; this.bloodIdx = (this.bloodIdx + 1) % this.bloodMarks.length;
+    if (m.parent !== this.scene) this.scene.add(m);
     m.material = this.bloodMats.spatter;
     m.position.set(p.x + n[0] * 0.012, p.y + n[1] * 0.012, p.z + n[2] * 0.012);
     m.lookAt(p.x + n[0], p.y + n[1], p.z + n[2]); m.rotation.z = Math.random() * 6.28;
     m.scale.set(size, size, 1);
     m.visible = true;
+    this.onDoor(m);
   },
   // A pool spreading out under someone (owner: anything, so it's started once and can keep growing as they
   // keep bleeding). max: how wide it gets (m), over grow seconds.
@@ -123,21 +129,6 @@ G.R = {
       m.position.set(x, this.bloodFloor(x, z, 0.3) + 0.003, z); m.scale.set(0.05, 0.05, 1); m.visible = true;
     } else { m.userData.max = Math.max(m.userData.max, max); m.userData.grow = grow; }
     return m;
-  },
-
-  // ------------------------------------------------------------ characters (see js/rig.js)
-  nameTag(text, color) {
-    const c = document.createElement('canvas');
-    c.width = 256; c.height = 64;
-    const g = c.getContext('2d');
-    g.font = 'bold 30px Consolas, monospace';
-    g.textAlign = 'center';
-    g.lineWidth = 6; g.strokeStyle = 'rgba(0,0,0,0.8)'; g.strokeText(text, 128, 42);
-    g.fillStyle = G.U.hex(color); g.fillText(text, 128, 42);
-    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false, transparent: true }));
-    s.scale.set(1.6, 0.4, 1);
-    s.renderOrder = 10;
-    return s;
   },
 
   // ------------------------------------------------------------ viewmodels
@@ -324,10 +315,27 @@ G.R = {
     this.particles(p, 4, 0x777066, 1.2, 0.6, 1, 0.6, n);
     if (n) {
       const d = this.decals[this.decalIdx]; this.decalIdx = (this.decalIdx + 1) % this.decals.length;
+      if (d.parent !== this.scene) this.scene.add(d); // (a reused hole: off the door it was on)
       d.position.set(p.x + n[0] * 0.01, p.y + n[1] * 0.01, p.z + n[2] * 0.01);
       d.lookAt(p.x + n[0], p.y + n[1], p.z + n[2]);
       d.rotation.z = Math.random() * 6;
       d.visible = true;
+      this.onDoor(d);
+    }
+  },
+  // A mark that landed on a door's leaf becomes part of the leaf, so it swings with the door. (Marks are pooled:
+  // each is put back in the scene before it's used again, and before a level's meshes are thrown away.)
+  onDoor(m) {
+    const map = G.Game && G.Game.map, doors = map && map.doorMeshes;
+    if (!doors) return;
+    m.updateMatrixWorld(true);
+    const p = m.getWorldPosition(new THREE.Vector3());
+    for (const pivot of doors) {
+      const leaf = pivot.userData && pivot.userData.leaf;
+      if (!leaf || pivot.position.distanceTo(p) > 2.6) continue;
+      leaf.updateMatrixWorld(true);
+      const l = leaf.worldToLocal(p.clone()), g = leaf.geometry.parameters;
+      if (Math.abs(l.x) <= g.width / 2 + 0.03 && Math.abs(l.y) <= g.height / 2 + 0.03 && Math.abs(l.z) <= g.depth / 2 + 0.04) { leaf.attach(m); return; }
     }
   },
   explosion(p, radius) {

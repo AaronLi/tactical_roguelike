@@ -439,3 +439,44 @@ i.c.heavy { background: #a02828; } i.c.light { background: #7a3a30; } i.c.frac {
 .card .ch:has(img.ci) { align-items: center; } .card .ch img.ci + .cn { flex: 1; }
 #objective .bad { color: var(--bad); font-weight: 700; }
 .molle-flow .inv-grid.pocket + .inv-grid.pocket { margin-left: calc(-2px * var(--ik, 1)); } /* the pockets of one pouch sit closer than separate pouches */
+
+/* the field HUD's ammo: the container's picture, as full as it is, and the chambered round beside it */
+#ammoMag > span { display: inline-flex; align-items: flex-end; gap: 6px; }
+#ammoMag .ammopic { image-rendering: auto; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.7)); }
+#ammoMag .chamberpic { width: 26px; height: 70px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.8)); }
+#ammoMag > span { gap: 10px; }
+#ammoMag .nomag { font-size: 14px; color: var(--bad); letter-spacing: 1px; }
+#ammoRes .spare { font-size: 18px; color: var(--text); display: inline-flex; align-items: flex-end; gap: 3px; vertical-align: bottom; }
+#ammoRes .spare img { filter: drop-shadow(0 1px 1px rgba(0,0,0,0.8)); }
+#ammoRes .spare .none { font-size: 11px; color: var(--bad, #e06060); font-style: normal; letter-spacing: 1px; }
+
+/* the gunsmith's dots over each editable part (an outline for an empty slot) */
+.gs-dots { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.gs-dot { position: absolute; width: calc(14px * var(--ik, 1)); height: calc(14px * var(--ik, 1)); margin: calc(-7px * var(--ik, 1)) 0 0 calc(-7px * var(--ik, 1)); padding: 0; border-radius: 50%;
+  background: rgba(255,176,46,0.85); border: 2px solid rgba(20,22,25,0.9); box-shadow: 0 0 0 1px rgba(255,176,46,0.5), 0 1px 4px rgba(0,0,0,0.6); cursor: pointer; pointer-events: auto; transition: transform .1s; }
+.gs-dot.empty { background: rgba(20,22,25,0.55); border-color: rgba(255,176,46,0.85); }
+.gs-dot:hover, .gs-dot.hov { transform: scale(1.35); }
+.gs-dot.on { background: #fff; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(255,176,46,0.9), 0 1px 6px rgba(0,0,0,0.7); }
+
+/* a job's progress (loading, unloading): a bar, no counts */
+.jobbar { display: inline-block; width: 80px; height: 6px; background: rgba(255,255,255,0.15); border-radius: 3px; vertical-align: middle; overflow: hidden; }
+.jobbar b { display: block; height: 100%; background: var(--accent, #f5a623); }
+.gun-slot .tubepic { display: block; image-rendering: auto; }
+
+/* checking a teammate: the part you've picked, and what you can use on it */
+.inv.field .bp { cursor: pointer; }
+.inv.field .bp.sel { outline: 2px solid var(--accent, #f5a623); outline-offset: -2px; }
+.pt-acts { margin-top: calc(8px * var(--ik, 1)); display: flex; flex-wrap: wrap; align-items: center; gap: calc(6px * var(--ik, 1)); }
+.pt-acts i { opacity: 0.7; }
+
+.med-menu b small { display: block; font-weight: 400; opacity: 0.75; text-transform: none; }
+.med-menu .none { display: block; padding: 4px 8px; opacity: 0.7; font-size: 12px; }
+
+/* LAN discovery on the main menu */
+.lan-row { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
+.lan-list { display: flex; flex-direction: column; gap: 4px; }
+.lan-game { text-align: left; }
+.lan-game .dim, .lan-list .dim { opacity: 0.6; }
+
+.turn-row { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 4px; grid-column: 1 / -1; }
+.turn-row input { min-width: 0; }

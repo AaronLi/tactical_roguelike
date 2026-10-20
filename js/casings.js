@@ -25,9 +25,9 @@ G.Casings = (() => {
     if (metal) return;
     const geo = new T.CylinderGeometry(1, 1, 1, 8);
     metal = new T.InstancedMesh(geo, new T.MeshStandardMaterial({ roughness: 0.35, metalness: 0.35, emissive: 0x2a1e08 }), MAX); // not too mirror-like: rooms have no reflections to show
-    hull = new T.InstancedMesh(geo, new T.MeshStandardMaterial({ color: COLORS.plastic, roughness: 0.6 }), MAX);
+    hull = new T.InstancedMesh(geo, new T.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6 }), MAX); // (each hull coloured for its load: setColorAt)
     for (const m of [metal, hull]) { m.frustumCulled = false; m.instanceMatrix.setUsage(T.DynamicDrawUsage); for (let i = 0; i < MAX; i++) m.setMatrixAt(i, hide); }
-    for (let i = 0; i < MAX; i++) metal.setColorAt(i, col.set(COLORS.brass));
+    for (let i = 0; i < MAX; i++) { metal.setColorAt(i, col.set(COLORS.brass)); hull.setColorAt(i, col.set(COLORS.plastic)); }
     free = [...Array(MAX).keys()];
   }
   function attach() { meshes(); if (metal.parent !== G.R.dynRoot) { G.R.dynRoot.add(metal); G.R.dynRoot.add(hull); } }
@@ -49,13 +49,13 @@ G.Casings = (() => {
 
   // A case leaving the gun at pos, thrown along `right` and `up` (world vectors), plus the shooter's velocity.
   // drop: tipped out of a revolver or a break-action instead of flung.
-  function spawn(def, pos, right, up, fwd, vel, drop) {
+  function spawn(def, pos, right, up, fwd, vel, drop, am) {
     if (!G.R || !G.R.camera || pos.distanceTo(G.R.camera.position) > 32) return;
     attach();
     const k = kind(def);
     if (!free.length) recycle();
     const c = { k, p: pos.clone(), v: new T.Vector3(), q: new T.Quaternion().setFromEuler(new T.Euler(Math.random() * 6, Math.random() * 6, Math.random() * 6)),
-      w: new T.Vector3((Math.random() - 0.5) * 50, (Math.random() - 0.5) * 30, (Math.random() - 0.5) * 50), rest: false, age: 0, slots: [free.pop()] };
+      w: new T.Vector3((Math.random() - 0.5) * 50, (Math.random() - 0.5) * 30, (Math.random() - 0.5) * 50), rest: false, age: 0, slots: [free.pop()], am };
     if (k.mat === 'plastic' && free.length) c.slots.push(free.pop()); // a hull: red body and a brass head
     const big = k.len > 60 ? 0.7 : 1;
     if (drop) c.v.copy(up).multiplyScalar(-0.4 - Math.random() * 0.4).addScaledVector(fwd, -0.6 - Math.random() * 0.5).addScaledVector(right, (Math.random() - 0.5) * 0.6);
@@ -73,7 +73,7 @@ G.Casings = (() => {
   // ---------------------------------------------------------------- where cases come from
   const V = () => new T.Vector3();
   // your own gun: the ejection port of the first-person model, at the moment it ejects
-  function fromView(def, drop, n = 1) {
+  function fromView(def, drop, n = 1, am) {
     const vm = G.R.vm, h = vm && vm.userData.holders && vm.userData.holders[0];
     if (!h) return;
     const info = vm.userData.info, port = info.port || (info.pistol ? [0.075, 0.022, 0] : [0.12, 0.02, 0]);
@@ -81,22 +81,23 @@ G.Casings = (() => {
     const m = h.holder.matrixWorld;
     const right = V().setFromMatrixColumn(m, 0).normalize(), up = V().setFromMatrixColumn(m, 1).normalize(), fwd = V().setFromMatrixColumn(m, 2).normalize().negate();
     const vel = G.Me.vel ? V().set(G.Me.vel.x, 0, G.Me.vel.z) : null;
-    for (let i = 0; i < n; i++) spawn(def, h.holder.localToWorld(V().set(drop ? 0 : 0.022, port[1] + 0.006, -port[0])), right, up, fwd, vel, drop);
+    for (let i = 0; i < n; i++) spawn(def, h.holder.localToWorld(V().set(drop ? 0 : 0.022, port[1] + 0.006, -port[0])), right, up, fwd, vel, drop, Array.isArray(am) ? am[i] : am);
   }
   // someone else's gun, from where its round left and where it went
-  function fromShot(def, from, to) {
+  function fromShot(def, from, to, am) {
     const fwd = V().subVectors(to, from).normalize(), right = V().crossVectors(fwd, V().set(0, 1, 0)).normalize(), up = V().crossVectors(right, fwd);
     const back = def.slot === 's' ? 0.16 : 0.42;
-    spawn(def, V().copy(from).addScaledVector(fwd, -back).addScaledVector(right, 0.04).addScaledVector(up, 0.02), right, up, fwd, null, false);
+    spawn(def, V().copy(from).addScaledVector(fwd, -back).addScaledVector(right, 0.04).addScaledVector(up, 0.02), right, up, fwd, null, false, am);
   }
   // when the gun's action throws the case: now, after it's worked, or not at all
-  function fired(def, local, from, to) {
+  // am: the round's type (a spent shotgun hull keeps its load's colour)
+  function fired(def, local, from, to, am) {
     const md = mode(def);
-    if (md === 'shot' || md === 'cycle') queue.push({ t: md === 'cycle' ? Math.min(0.55, (60 / def.rpm) * 0.45) : 0.015, def, local, from: from && from.clone(), to: to && to.clone() });
+    if (md === 'shot' || md === 'cycle') queue.push({ t: md === 'cycle' ? Math.min(0.55, (60 / def.rpm) * 0.45) : 0.015, def, local, from: from && from.clone(), to: to && to.clone(), am });
   }
   // a revolver or break-action opened to reload: the empties come out
-  function emptied(def, n) {
-    if (mode(def) === 'reload' && n > 0) queue.push({ t: 0.25, def, local: true, drop: true, n: Math.min(n, 8) });
+  function emptied(def, n, am) {
+    if (mode(def) === 'reload' && n > 0) queue.push({ t: 0.25, def, local: true, drop: true, n: Math.min(n, 8), am });
   }
 
   // ---------------------------------------------------------------- dropped magazines
@@ -105,6 +106,14 @@ G.Casings = (() => {
   let boxMat = null;
   function magMesh(def, item) {
     const am = G.Gear.ammoFor(def), pistol = def.cls === 'PST' || def.cls === 'MP';
+    // a drum is a drum: a disc that lies on one face (the variant in the item, or the gun's own when it's in it)
+    const vid = item ? item.vid : def.build && def.build.mag, mp = vid && G.Gunsmith.PARTS[vid];
+    if (mp && mp.model && mp.model.mag && mp.model.mag.t === 'drum' && !(item && item.k === 'ammo')) {
+      if (!magMat) magMat = new T.MeshStandardMaterial({ color: 0x232527, roughness: 0.55, metalness: 0.3 });
+      const r = mp.model.mag.r || 0.07, w = mp.model.mag.dw || 0.05, geo = new T.CylinderGeometry(r, r, w, 20);
+      geo.rotateZ(Math.PI / 2); // (its axis across, as it sits in the gun: it falls and lands on a face)
+      return { mesh: new T.Mesh(geo, magMat), r: w / 2 };
+    }
     // thickness (it lies on this), height, depth; a box of rounds is a cardboard box
     const [x, y, z] = item && item.k === 'ammo' ? [0.05, 0.09, 0.12] : G.beltFed(def) ? [0.09, 0.1, 0.13] : am.label === 'LOADER' ? [0.04, 0.03, 0.04] : pistol ? [0.022, 0.11, 0.032] : am.h === 1 ? [0.026, 0.11, 0.06] : [0.026, 0.18, 0.065];
     if (!magMat) magMat = new T.MeshStandardMaterial({ color: 0x232527, roughness: 0.55, metalness: 0.3 });
@@ -227,7 +236,7 @@ G.Casings = (() => {
     const k = c.k;
     if (k.mat === 'plastic') {
       // hull body, and the brass head at one end
-      tmpS.set(k.r, k.h * 0.78, k.r); tmpM.compose(c.p, c.q, tmpS); hull.setMatrixAt(c.slots[0], tmpM);
+      tmpS.set(k.r, k.h * 0.78, k.r); tmpM.compose(c.p, c.q, tmpS); hull.setMatrixAt(c.slots[0], tmpM); hull.setColorAt(c.slots[0], col.set(G.Icons.shellCol(c.am)));
       if (c.slots[1] != null) {
         const off = V().set(0, -k.h * 0.39 - k.h * 0.11, 0).applyQuaternion(c.q).add(c.p);
         tmpS.set(k.r * 1.04, k.h * 0.22, k.r * 1.04); tmpM.compose(off, c.q, tmpS); metal.setMatrixAt(c.slots[1], tmpM); metal.setColorAt(c.slots[1], col.set(COLORS.brass));
@@ -261,7 +270,7 @@ G.Casings = (() => {
         e.t -= dt;
         if (e.t > 0) continue;
         queue.splice(queue.indexOf(e), 1);
-        if (e.local) fromView(e.def, e.drop, e.n || 1); else if (e.from) fromShot(e.def, e.from, e.to);
+        if (e.local) fromView(e.def, e.drop, e.n || 1, e.am); else if (e.from) fromShot(e.def, e.from, e.to, e.am);
       }
       if (!metal) return;
       const h = Math.min(dt, 0.05);
@@ -274,7 +283,7 @@ G.Casings = (() => {
         if (c.age > 6 && !c.rest) settle(c, G.Level.groundAt(map, c.p.x, c.p.z, 0.01, c.p.y + 0.03));
         draw(c); moved = true;
       }
-      if (moved || queue.length === 0) { metal.instanceMatrix.needsUpdate = true; hull.instanceMatrix.needsUpdate = true; if (metal.instanceColor) metal.instanceColor.needsUpdate = true; }
+      if (moved || queue.length === 0) { metal.instanceMatrix.needsUpdate = true; hull.instanceMatrix.needsUpdate = true; if (metal.instanceColor) metal.instanceColor.needsUpdate = true; if (hull.instanceColor) hull.instanceColor.needsUpdate = true; }
     },
     clear() {
       for (const o of mags) { o.mesh.parent && o.mesh.parent.remove(o.mesh); o.mesh.geometry.dispose(); }

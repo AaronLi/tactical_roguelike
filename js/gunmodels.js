@@ -352,6 +352,10 @@ G.GunModels = (() => {
     if (buildingVM && !wrist) return; // (wrist: the stock is what the hand holds, on guns with no pistol grip)
     const pad = (f, y, h) => k.box(0.044, h, 0.012, M.rubber(), f - 0.012, y);
     switch (type) {
+      case 'tubeonly': // a buffer tube adapter with nothing on it
+        k.cyl(0.0155, 0.2, M.black(), -0.2, -0.002);
+        k.cyl(0.02, 0.012, M.black(), -0.02, -0.002);
+        break;
       case 'm4':
         k.cyl(0.0155, 0.2, M.black(), -0.2, -0.002);
         k.prof([[-0.1, 0.018], [-0.235, 0.022], [-0.255, -0.085], [-0.215, -0.096], [-0.13, -0.042], [-0.1, -0.022]], 0.044, m);
@@ -411,6 +415,22 @@ G.GunModels = (() => {
         break;
     }
   }
+  // What you see checking a magazine: the round on top, and down the back a column of witness holes showing brass
+  // as far as it's loaded (in a clear magazine, the rounds themselves). rear(t): the back edge's f at depth t (0 at
+  // the top, 1 at the floorplate); top: its top y; len, w, d: its size. js/vmanim.js shows them for the real count.
+  function magCheck(k, rear, top, len, w, d, clear) {
+    const chk = { holes: [], rounds: [], w }, r = Math.min(0.0045, w * 0.2), yAt = (t) => top - 0.012 - t * (len - 0.026), cl = d * 0.5;
+    // the feed lips, and the top round sitting down between them (its crown just under their edges)
+    for (const s of [-1, 1]) k.box(w * 0.16, 0.003, d * 0.6, M.black(), rear(0) + 0.004, top + 0.0015, s * w * 0.42);
+    const ty = top - r + 0.0024;
+    chk.top = [k.cyl(r, cl, M.brass(), rear(0) + 0.006, ty), k.cyl(r, d * 0.2, M.brass(), rear(0) + 0.006 + cl, ty, 0, 0.0015, 10)];
+    if (clear) for (let j = 1; j <= 9; j++) { // each with its own tip (or, a shotgun's, its hull coloured): js/vmanim.js magFill
+      const t = j / 10, x = (j % 2 ? 1 : -1) * w * 0.12;
+      chk.rounds.push({ t, mesh: k.cyl(r * 0.92, d * 0.46, M.brass(), rear(t) + 0.009, yAt(t), x, r * 0.92, 8), tip: k.cyl(r * 0.88, d * 0.16, M.brass(), rear(t) + 0.009 + d * 0.46, yAt(t), x, 0.0012, 8) });
+    }
+    else for (let i = 1; i <= 5; i++) { const t = (i / 6) * 0.94; chk.holes.push({ t, mesh: k.box(w * 0.22, 0.0055, 0.0025, M.brass(), rear(t) - 0.0035, yAt(t), -w * 0.27) }); }
+    return chk;
+  }
   // Magazines hang from y (the receiver's underside) at forward position f.
   function mag(k, o) {
     const m = o.m || M.black(), y = o.y, len = o.len || 0.18, d = o.d || 0.06, w = o.w || 0.024;
@@ -424,26 +444,28 @@ G.GunModels = (() => {
         }
         k.prof(front.concat(rear.reverse()), w, m);
         k.box(w + 0.004, 0.008, d + 0.006, m, o.f - d / 2 + c - 0.003, y - len - 0.002);
-        break;
+        return magCheck(k, (t) => o.f - d / 2 + c * t * t * 0.85, y, len, w, d, m.transparent);
       }
       case 'straight': {
         const rk = o.rake || 0.012;
         k.prof([[o.f - d / 2, y], [o.f + d / 2, y], [o.f + d / 2 + rk, y - len], [o.f - d / 2 + rk, y - len]], w, m);
         k.box(w + 0.004, 0.008, d + 0.004, m, o.f - d / 2 + rk - 0.002, y - len - 0.002);
-        break;
+        return magCheck(k, (t) => o.f - d / 2 + rk * t, y, len, w, d, m.transparent);
       }
       case 'pistol': { // a pistol magazine in a carbine's well adapter (the Glock-mag conversions)
         const pd = 0.032, pw = 0.022, pl = len * 0.85;
         k.box(pw + 0.012, 0.03, pd + 0.014, M.black(), o.f - pd / 2 - 0.007, y - 0.01);
         k.prof([[o.f - pd / 2, y], [o.f + pd / 2, y], [o.f + pd / 2 + 0.006, y - pl], [o.f - pd / 2 + 0.006, y - pl]], pw, m);
         k.box(pw + 0.004, 0.01, pd + 0.006, m, o.f - pd / 2 + 0.004, y - pl - 0.003);
+        return magCheck(k, (t) => o.f - pd / 2 + 0.006 * t, y, pl, pw, pd, m.transparent);
+      }
+      case 'drum': { // the round face toward the shooter, its axis along the bore
+        const R = o.r || 0.075, dw = o.dw || 0.05;
+        k.box(w, 0.03, d * 0.7, m, o.f - d * 0.35, y - 0.012);
+        k.cyl(R, dw, m, o.f - dw / 2, y - R * 0.95, 0, R, 24);
+        k.cyl(R * 0.35, dw + 0.006, M.steel(), o.f - dw / 2 - 0.003, y - R * 0.95);
         break;
       }
-      case 'drum':
-        k.box(w, 0.03, d * 0.7, m, o.f - d * 0.35, y - 0.012);
-        k.cylX(o.r || 0.075, o.dw || 0.05, m, o.f, y - (o.r || 0.075) * 0.95);
-        k.cylX((o.r || 0.075) * 0.35, (o.dw || 0.05) + 0.006, M.steel(), o.f, y - (o.r || 0.075) * 0.95);
-        break;
       case 'ammobox': {
         const sc = o.scale || 1;
         k.box(0.07 * sc, 0.11 * sc, 0.1 * sc, m, o.f - 0.05 * sc, y - 0.05 * sc, -0.02);
@@ -560,6 +582,7 @@ G.GunModels = (() => {
   // Sights by type. top = height of the rail / mounting surface.
   function sightOf(k, o, top, L, bl, br, front, ofs) {
     const frontF = L + Math.min(bl * 0.82, bl - 0.03);
+    if (o.optic === 'riser') k.box(0.024, o.riser || 0.022, 0.034, M.black(), ofs - 0.017, top + (o.riser || 0.022) / 2); // a pistol optic riser with nothing on it (the irons still work)
     switch (o.optic || 'irons') {
       case 'reddot': return S.reddot(k, ofs, top, o);
       case 'minidot': return S.minidot(k, ofs, top, o);
@@ -681,7 +704,8 @@ G.GunModels = (() => {
       const mo = Object.assign({ f: bull ? L * 0.22 : gf + 0.078, y: rcv === 'ak' ? -0.046 : rcv === 'box' ? -(o.H || 0.085) * 0.55 : -0.042 }, o.mag);
       const p = k.part(mo.f, mo.y);
       k.into(p, mo.f, mo.y);
-      mag(k, mo);
+      const chk = mag(k, mo);
+      if (chk) p.userData.chk = chk;
       k.into(null);
       anim.mag = p; magAt = [mo.f, mo.y];
     }
@@ -740,17 +764,27 @@ G.GunModels = (() => {
     // sights
     k.tag('optic');
     const ofs = o.optF != null ? o.optF : bull ? L * 0.65 : L * 0.5;
+    // (a break-action's bead and rib are on its barrels, so they tip open with them)
+    const onBarrels = brk && (o.optic || 'irons') === 'bead';
+    if (onBarrels) k.into(brk, L, -0.035);
     let sight = sightOf(k, o, top, L, o.integral ? o.integral.len : bl, br, front, ofs);
+    if (onBarrels) k.into(null);
     if (o.magnifier && k.reflex) { k.tag('magnifier'); sight = S.magnifier(k, sight, top, o.magnifier, anim); }
     k.tag('base');
     const support = o.support != null ? o.support : o.pump ? L + o.pump.f + o.pump.len * 0.5 : fgF != null && o.fg !== 'bipod' ? fgF : o.vfg != null ? L + o.vfg : bull ? L + 0.07 : L + (hgLen ? Math.min(hgLen * 0.55, 0.16) : 0.1);
     // where the hands go for reloads and racking (gun space: [forward, up, right])
     const port = o.bolt ? [o.bolt - 0.02, top - 0.004, 0] : o.lever ? [L * 0.55, 0.0, 0.02] : o.pump || o.tube ? [L * 0.62, -0.042, 0] : rcv === 'break' ? [L, 0.0, 0] : [L * 0.5, top, 0];
+    // where a chamber check shows the round: through the ejection port on the right (js/vmanim.js), or for a
+    // break-action, the shell heads in the breech
+    const hw = { ar: 0.0178, ak: 0.022, box: (o.W || 0.045) / 2, round: 0.018, bullpup: 0.023 }[rcv] || 0.018;
+    const chamberAt = rcv === 'break' ? { side: 'breech', heads: (o.barrels || [0]).map((x) => [x, by + 0.035]), z: -0.0005, r: br } // (in the barrels' hinge frame)
+      : o.bolt ? { side: 'top', f: o.bolt - 0.05, y: rcv === 'round' ? top - 0.0015 : top, x: rcv === 'round' ? 0.006 : 0.011, w: 0.024 } // (a bolt gun's port is its open top, to the right of a scope's line, above the stock)
+      : { side: 'right', f: o.lever ? L * 0.55 : magAt ? magAt[0] + 0.005 : !o.pump && handle && handle.x > 0 ? handle.f + 0.026 : o.pump || o.tube ? L * 0.55 : L * 0.5, y: by, x: hw };
     return {
       sy: sight.sy, fSight: sight.fSight, relief: sight.relief,
       muzzles: [[front, by, 0]],
       grip: [gf + 0.005, -0.075, 0], support: [support, o.pump ? -0.03 : -0.028, 0],
-      anim, magAt, handle, port, ch: rcv === 'ar' || o.ch ? [-0.006, 0.026, 0] : null, bolt: o.bolt ? [o.bolt, 0.01, 0.068] : null,
+      anim, magAt, handle, port, chamberAt, ch: rcv === 'ar' || o.ch ? [-0.006, 0.026, 0] : null, bolt: o.bolt ? [o.bolt, 0.01, 0.068] : null,
     };
   }
 
@@ -760,9 +794,16 @@ G.GunModels = (() => {
     k.tag('slide');
     const slide = k.part();
     k.into(slide);
-    k.prof([[0, 0.002], [0, 0.026], [len - 0.012, 0.026], [len, 0.02], [len, 0.002]], w, sm);
+    // the slide, with its ejection port: a cut out of the right half of its top, over the chamber (forward of where
+    // a pistol dot sits), so a press-check shows the round in the barrel
+    const pc = len * 0.44, p0 = pc - 0.016, p1 = pc + 0.016, sy = 0.016;
+    k.prof([[0, 0.002], [0, sy], [len, sy], [len, 0.002]], w, sm, 0, null, 0.001);
+    k.prof([[0, sy], [0, 0.026], [len - 0.012, 0.026], [len, 0.02], [len, sy]], w / 2, sm, -w / 4, null, 0.001);
+    k.prof([[0, sy], [0, 0.026], [p0, 0.026], [p0, sy]], w / 2, sm, w / 4, null, 0.001);
+    k.prof([[p1, sy], [p1, 0.026], [len - 0.012, 0.026], [len, 0.02], [len, sy]], w / 2, sm, w / 4, null, 0.001);
+    k.box(w / 2 - 0.002, 0.0015, p1 - p0, M.rubber(), p0, sy + 0.0008, w / 4); // (the barrel hood under it)
     for (let i = 0; i < 5; i++) k.box(w + 0.001, 0.016, 0.0025, M.rubber(), 0.01 + i * 0.006, 0.014);
-    if (sl.vent) for (let i = 0; i < 4; i++) k.box(w + 0.002, 0.006, 0.012, M.rubber(), len * 0.45 + i * 0.022, 0.024);
+    if (sl.vent) for (let i = 0; i < 4; i++) { const vf = len * 0.45 + i * 0.022; if (vf + 0.012 > p0 - 0.002 && vf < p1 + 0.002) continue; k.box(w + 0.002, 0.006, 0.012, M.rubber(), vf, 0.024); } // (none over the port)
     k.into(null);
     anim.slide = slide;
     let front = len;
@@ -788,8 +829,9 @@ G.GunModels = (() => {
     k.prof([[0.0, -0.006], [0.03, -0.006], [0.02, -0.108], [-0.012, -0.102]], 0.02, M.black());
     const ext = mg.t === 'drum' ? 2 : (mg.len || 0.15) > 0.16 ? 1 : (mg.len || 0.15) < 0.12 ? -1 : o.ext ? 1 : 0;
     if (ext === 1) k.box(0.022, 0.05, 0.03, M.black(), 0.0, -0.12);
-    else if (ext === 2) { k.box(0.022, 0.03, 0.03, M.black(), 0.0, -0.118); k.cylX(0.045, 0.034, M.black(), 0.015, -0.16); }
+    else if (ext === 2) { k.box(0.022, 0.03, 0.03, M.black(), 0.0, -0.118); k.cyl(0.045, 0.034, M.black(), -0.002, -0.16, 0, 0.045, 20); } // (a drum, face toward the shooter)
     else if (ext === 0) k.box(0.026, 0.008, 0.032, M.black(), -0.006, -0.112);
+    magP.userData.chk = magCheck(k, (t) => -0.012 * t, -0.006, 0.096, 0.02, 0.03, false);
     k.into(null);
     anim.mag = magP;
     k.tag('barrel');
@@ -807,7 +849,7 @@ G.GunModels = (() => {
     return {
       sy: sight.sy, fSight: sight.fSight, relief: o.optic === 'minidot' ? 0.3 : 0.36,
       muzzles: [[front, 0.009, 0]], grip: [0.012, -0.06, 0], support: [0.03, -0.065, -0.022], anim, pistol: true,
-      magAt: [0.012, -0.004], slide: [len * 0.2, 0.02, 0],
+      magAt: [0.012, -0.004], slide: [len * 0.2, 0.02, 0], chamberAt: { side: 'port', f: len * 0.44, y: 0.0205, x: w / 4 }, // (the round's crown, set down in the port)
     };
   }
 
@@ -837,7 +879,7 @@ G.GunModels = (() => {
     const sight = o.optic === 'minidot' ? S.minidot(k, 0.02 + cl * 0.5, 0.024) : S.revSights(k, 0.006, front - 0.006, 0.0295, 0.022, fm);
     if (o.optic === 'night') { k.cyl(0.0011, 0.0006, M.tritium(), front - 0.0122, 0.0275); for (const x of [-1, 1]) k.cyl(0.001, 0.0006, M.tritium(), -0.0003, 0.0272, x * 0.0045); }
     k.tag('base');
-    return { sy: sight.sy, fSight: sight.fSight, relief: o.optic === 'minidot' ? 0.3 : 0.36, muzzles: [[front, 0.009, 0]], grip: [0.0, -0.06, 0], support: [0.02, -0.065, -0.022], anim, pistol: true, cylAt: [0.03 + cl / 2, -0.004, 0] };
+    return { sy: sight.sy, fSight: sight.fSight, relief: o.optic === 'minidot' ? 0.3 : 0.36, muzzles: [[front, 0.009, 0]], grip: [0.0, -0.06, 0], support: [0.02, -0.065, -0.022], anim, pistol: true, cylAt: [0.03 + cl / 2, -0.004, 0], chamberAt: { side: 'cyl', z: cl / 2, R: cr * 0.6, r: cr * 0.28 } }; // (the case heads on the cylinder's back face)
   }
 
   function derringer(k, o) {
@@ -855,7 +897,7 @@ G.GunModels = (() => {
     k.tag('grip');
     k.prof([[-0.004, -0.004], [0.025, -0.01], [0.012, -0.075], [-0.022, -0.07]], 0.026, o.gm || M.woodDark());
     k.tag('base');
-    return { sy: 0.034, fSight: 0.0, relief: 0.36, muzzles: [[bl, 0.017, 0]], grip: [0.0, -0.045, 0], support: [0.015, -0.05, -0.02], anim, pistol: true, port: [0.0, 0.0, 0] };
+    return { sy: 0.034, fSight: 0.0, relief: 0.36, muzzles: [[bl, 0.017, 0]], grip: [0.0, -0.045, 0], support: [0.015, -0.05, -0.02], anim, pistol: true, port: [0.0, 0.0, 0], chamberAt: { side: 'breech', heads: [[0, -0.013], [0, -0.036]], z: bl + 0.0026, r: 0.006 } }; // (just proud of the barrel block's bevelled back)
   }
 
   function minigun(k, o) {
@@ -1002,7 +1044,7 @@ G.GunModels = (() => {
     k.tag('optic');
     const sight = sightOf(k, o, top, 0.35, bl, 0.008, front, 0.2);
     k.tag('base');
-    return { sy: sight.sy, fSight: sight.fSight, relief: sight.relief, muzzles: [[front, 0, 0]], grip: [0.2, -0.07, 0], support: [0.3, -0.06, 0], anim: { mag: magP }, magAt: [0.16, 0.042], magTop: true };
+    return { sy: sight.sy, fSight: sight.fSight, relief: sight.relief, muzzles: [[front, 0, 0]], grip: [0.2, -0.07, 0], support: [0.3, -0.06, 0], anim: { mag: magP }, magAt: [0.16, 0.042], magTop: true, chamberAt: { side: 'right', f: 0.06, y: 0, x: 0.025 } };
   }
 
   const ARCH = { rifle, pistol, revolver, derringer, minigun, launcher, railgun, crossbow, p90 };

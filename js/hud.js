@@ -100,12 +100,18 @@ G.HUD = {
     // ammo
     const modes = def.modes || [def.mode], fm = Me.fireMode ? Me.fireMode(w) : modes[0];
     this.set('weapName', `<span style="color:${G.TIER_COLORS[def.tier]}">${def.name}</span> <small${modes.length > 1 ? ' title="X switches"' : ''}>${G.MODE_NAME[fm] || ''}</small>${w.sup ? ' <small>SUPP</small>' : ''}${def.missing && def.missing.length ? ' <em class="broken">WON\'T FIRE</em>' : ''}${Me.reloading ? ` <em>${{ pouch: 'dump reload (pouch)', floor: 'dump reload' }[Me.reloadMode] || 'reloading'}</em>` : ''}`);
-    this.set('ammoMag', `<span class="${w.mag === 0 ? 'empty' : w.mag <= Me.magSize(def) * 0.25 ? 'lowammo' : ''}">${w.mag}</span>`);
-    const am = G.AMMO[w.tube && w.tube.length ? w.tube[w.tube.length - 1] : w.ammo];
-    this.set('ammoRes', ' / ' + w.reserve + (am ? ` <small class="amtag">${am.tag}</small>` : ''));
+    // No counts, no gauges: check the magazine (hold R) or the chamber (hold I) to know what's in it
+    const hasCh = G.chambered(def), Gr = G.Gear, af = Gr.ammoFor(def), top = w.tube && w.tube.length ? w.tube[w.tube.length - 1] : w.ammo;
+    this.set('ammoMag', af.kind === 'mag' && w.noMag ? '<span class="nomag">NO MAG</span>' : '');
+    const am = G.AMMO[hasCh && w.chamber ? w.chamber : top]; // (the next round to fire)
+    // the magazines (or boxes of rounds) you carry for it with something in them: one small white icon each, no count
+    const spare = Gr.feeds(Me, def).length, isMag = af.kind === 'mag';
+    const sk = isMag ? G.Icons.styleFor(def, def.build && def.build.mag) : 'box', [iw, ih] = !isMag || sk === 'box' ? [16, 13] : sk === 'drum' ? [16, 16] : sk === 'p90' ? [22, 9] : [9, sk === 'pistol' ? 16 : 20];
+    const icon = G.Icons.gauge(sk === 'tube' || sk === 'loader' ? 'box' : sk, 1, 1, iw, ih), shown = Math.min(spare, 12);
+    this.set('ammoRes', ` <span class="spare" title="${isMag ? 'Loaded magazines' : 'Boxes of rounds'} on you">${Array.from({ length: shown }, () => `<img src="${icon}" style="width:${iw}px;height:${ih}px">`).join('')}${spare > shown ? '<i>+</i>' : ''}${spare ? '' : '<i class="none">none</i>'}</span>` + (am ? ` <small class="amtag">${am.tag}</small>` : ''));
     const other = Me.weapons[Me.slot === 'p' ? 's' : 'p'];
     const packed = G.Gear.packGuns(Me).map(([it]) => it.w.def.name);
-    this.set('weapAlt', (other ? `${Me.slot === 'p' ? '2' : '1'} · ${other.def.name} ${other.mag}/${other.reserve}` : '') + (packed.length ? `${other ? ' &nbsp; ' : ''}B · ${packed.join(', ')}` : ''));
+    this.set('weapAlt', (other ? `${Me.slot === 'p' ? '2' : '1'} · ${other.def.name}` : '') + (packed.length ? `${other ? ' &nbsp; ' : ''}B · ${packed.join(', ')}` : ''));
     this.set('credits', '¢ ' + G.U.fmt(Me.credits));
     this.set('levelInfo', `LEVEL ${Gm.level} <span>· ${Gm.map.theme.name}</span>`);
 
@@ -122,7 +128,12 @@ G.HUD = {
     const nu = Gm.map.units;
     if (nu) obj += `<br>${(Gm.unitsCleared || 0) >= nu ? '<b class="go">✔ Clear every apartment</b>' : 'Clear every apartment'}`; // (no count: how many there are is for you to find)
     obj += `<br>${o2}`;
-    obj += '<br><span style="opacity:0.65">Also pays: securing bodies and bagging dropped weapons</span>';
+    // (green only once every other objective's done, order restored, apartments cleared, civilians rescued, and
+    // nothing's left lying about: every body secured, every dropped weapon bagged)
+    const V = G.Views, bodies = [...V.enemies.values()].filter((ev) => !ev.alive), drops = [...V.evidence.values()];
+    const pending = bodies.some((ev) => !ev.bodySecured) || drops.some((v) => !v.secured);
+    const othersDone = X.active && (!nu || (Gm.unitsCleared || 0) >= nu) && !X.civDead && !(Gm.civsLeft > 0);
+    obj += othersDone && !pending ? '<br><b class="go">✔ Also pays: securing bodies and bagging dropped weapons</b>' : '<br><span style="opacity:0.65">Also pays: securing bodies and bagging dropped weapons</span>';
     if (X.active) obj += `<br><b class="go">Press Y to vote to leave</b> — ${X.votes}/${X.need}${X.voted ? ' <span style="opacity:0.7">(you voted)</span>' : ''}`;
     this.set('objective', obj);
 

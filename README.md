@@ -38,6 +38,21 @@ The PeerJS public broker (0.peerjs.com) is only used to introduce peers. Game tr
 directly between browsers, and PeerJS's TURN relay is the fallback for strict NATs.
 The host runs the authoritative simulation (enemy AI, damage, objectives), so the host should
 keep their tab open. It keeps ticking in the background, but slower.
+**LAN games.** **Find LAN games** on the main menu lists the games hosted behind the same router as you (name,
+squad size, what they're doing, code): click one to join. No server of our own: everyone on a network shares
+a public address, which WebRTC's public STUN server reports; a host takes one of a few beacon ids on the PeerJS
+broker derived from it, and the search knocks on each. It still goes through the PeerJS broker like every
+connection (so it needs the internet), and it finds games behind the same router, which is what a LAN party
+is. The game itself is a static page: `serve.js` is only a convenience, and any static host will do (not
+`file://`, where the browser blocks the sound files).
+**Reconnecting.** A host keeps its room code through a refresh (in that tab), so the squad can get back in:
+anyone who loses the host keeps trying that code for a minute and rejoins as soon as it's hosting again. The
+join box remembers the last code you joined. In the lobby the host can take a **New code** (anyone already
+there is dropped and needs the new one). Your name stays the same through a refresh too.
+When a teammate readies up (in the lobby or the shop), everyone else hears a two-note chime and sees
+"<name> is ready" in the chat.
+**Friendly fire is on.** Your rounds hit teammates in the way as they would anyone (armour and all; a
+shotgun's pellets each count). The one hit is told who it was, and a death from it says so.
 
 ## How a run works
 
@@ -141,7 +156,7 @@ keep their tab open. It keeps ticking in the background, but slower.
 - **Dark.** There's no weapon light. Rooms are lit by their ceiling lamps, and corridors are dim. Every lamp
   gets its glow, and the twelve real lights move with you to the lamps nearest you, so whatever room you're in
   is lit (moving a light is free; adding one would recompile every shader).
-- Themes: Apartment, Warehouse, Bunker, Suburbs, Research Lab, Foundry, Cold Storage (the route map picks
+- Themes: Apartment, Warehouse, Bunker, Suburbs, Research Lab, Foundry, Cold Storage, Festival (the route map picks
   which). **Every level starts outside the target** (`js/level.js`), and you breach in:
   - **Rooms and corridors** (Bunker, Research Lab, Foundry, Cold Storage). You start on a fenced, paved lot
     in front of the building, among bins, pallets and crates. A double door under a lamp leads in. The
@@ -171,6 +186,35 @@ keep their tab open. It keeps ticking in the background, but slower.
     - Street, alley and gardens are open to the night sky: no ceiling, and rounds fired upward keep going. The
       houses show eaves and lit, curtained windows from outside.
     - The fences are too tall to see over and stop movement.
+  - **Festival.** A music festival at night on the edge of a town, about 125 × 108 m, all of it open to the sky
+    and fenced with event fencing (steel mesh panels, dark scrim, the odd sponsor's banner). The fog's pushed far
+    back and the moon's up: a lot of open ground and long sight lines. More suspects (×1.5) and civilians (×2)
+    than elsewhere.
+    - **The car park** along the south, where you come in: two rows of parked cars (cover) in painted bays,
+      aisles between, tall street lamps. The festival's gate (under the WELCOME arch, ticket booths either side
+      inside) and the street into the town square open off it.
+    - **The town square** to the west, behind the festival fence with a side gate through. Shops down the west
+      side and along the north (cafes, stores, bars: counters, shelves, tables), each with a lit sign over its
+      door onto the square and windows onto it. In the middle a fountain with benches round it, cafe tables out
+      front, plane trees down the fence side, street lamps, lanterns strung across.
+    - **The food court:** rows of food and merchandise stalls facing each other across lanes, a way through every
+      few stalls, service alleys behind. Most are 4 m wide (room behind the counter for two). Each stall has a counter across the front (cover), side panels, a
+      striped awning and a lit sign; it's open at the back. Some civilians are hiding behind the counters,
+      crouched and peeking. The other stalls were left as people ran: a stool on its side, dropped cups, a bag.
+    - **The stage** at the far end: decking at cover height, PA stacks at the front corners, a lighting truss
+      with coloured lamps throwing beams, and a backdrop lit up. In front of it are rows of folding chairs
+      (low cover, aisles down the middle and sides) and the sound desk under its canopy. You can see
+      clear across them.
+    - **The toilet block** on one side: a washroom each side of a dividing wall, each with sinks and two
+      cubicles behind their own doors, and picnic tables behind it.
+    - **Lights:** lights are strung everywhere on poles. There are bulbs over the seats and the gate, and paper
+      lanterns over the first lane, each with a glow. The real lights follow you along the strings and over
+      the stage. There are more civilians about than elsewhere.
+    - **Night:** outdoors in the dark, suspects can't pick you out past 35 m (the lights, the stalls, the size of it) unless your light or laser is on,
+      while a scope still finds them across the field. When you aim, a third of the real lights go to the lamps
+      nearest what you're aiming at, so it's lit.
+    - Built in `js/level.js` (`layFestival`, `buildFestival`) and `js/furniture.js` (the pieces and `plan`'s
+      `festival()`).
 - **Clear the level** by arresting (zip-tying) or killing every suspect.
   - **Arresting:** get behind them first. A
     surrendered suspect watches you approach but holds still once you're close, so walk round, or from the front
@@ -196,7 +240,10 @@ keep their tab open. It keeps ticking in the background, but slower.
   level ends when every officer still alive has voted, downed ones included; solo, that's you. The HUD
   shows the objectives (✔ done, ✘ failed) and the vote count, but never how many suspects, civilians,
   bodies, weapons or apartments there are: that's for you to find out. The civilians objective is only
-  ticked once order's restored, so it can't tell you there's nobody left to find.
+  ticked once order's restored, so it can't tell you there's nobody left to find. The "Also pays" line
+  (securing bodies, bagging dropped weapons) turns green with a tick only once every other objective is
+  complete (order restored, every apartment cleared, all the civilians rescued) and nothing's left lying about:
+  every body secured and every dropped weapon bagged. With a civilian lost it stays grey.
 - **Windows are real** (`js/level.js` `placeWindows`):
   - **The opening:** a gap two cells wide in a wall, with a sill to 0.95 m, a pane of glass up to 2.25 m and a
     frame. You can't climb through: to movement and pathing it's still wall.
@@ -356,8 +403,8 @@ keep their tab open. It keeps ticking in the background, but slower.
   (a 5.56 suppressor on a 9mm barrel), to your locker, with the old barrel and the old receiver group, so you
   can convert back. If the new gun takes different rounds or magazines, the magazine comes out with its rounds.
   The converted guns are guns in their own right: they're sold, carried by suspects, and found in weapon
-  cases. A weapon case with a convertible gun in it has a 35% chance of a conversion packed in: the receiver
-  group with the barrel (and slide, handguard...) it needs. The gunsmith stocks receiver groups now and then.
+  cases. A convertible gun rolled for a weapon case comes built on one of its alternate receiver
+  groups 35% of the time (an M4 as an AR-9, an AK as an RPK), fitted and working. The gunsmith stocks receiver groups now and then.
 - **Shotgun loaders.** The tube shotguns (870, KSG, Slug Gun, Benelli M4) take a side saddle (each shell a
   little faster), a twin-shell carrier, or a quad speed loader (four shells a push). A full tube on the Benelli
   takes 3.6 s bare, 2.9 s with the saddle, 2.6 s with the carrier and 1.9 s with the quad loader.
@@ -398,7 +445,7 @@ keep their tab open. It keeps ticking in the background, but slower.
     | --- | --- | --- | --- |
     | Bandage | light bleeding | anywhere | 3 s |
     | Tourniquet | heavy bleeding | arm or leg | 3 s |
-    | Hemostatic gauze | heavy bleeding | anywhere, the torso too | 5 s |
+    | Hemostatic gauze | heavy bleeding (or light, as a bandage) | anywhere, the torso too | 5 s |
     | Chest seal | punctured lung | thorax | 4 s |
     | Splint (1×2) | fracture | arm or leg | 6 s |
     | Painkillers | pain's effect on aim, for 2 minutes | — | 2 s |
@@ -406,11 +453,13 @@ keep their tab open. It keeps ticking in the background, but slower.
 
     A gut wound can't be fixed in the field, and nothing restores a part's health there: you go into the
     next fight as hurt as you are.
-  - **Treating yourself:** open Tab. Your body is on the right; drag the item onto the part, or right-click
+  - **Treating yourself:** open Tab. Your body is on the right; click a part for a dropdown of the medical items
+    you carry that would treat what's wrong with it (it says so when nothing would), or drag the item onto the part, or right-click
     the item to see what it can treat. The wrong item for a wound (a bandage on heavy bleeding) is refused
     and says what's needed.
-  - **Treating a teammate:** face them and hold **F** (a downed one just needs to be near). Your Tab screen
-    opens with their body. Treat them with your own items the same way (you need to stay within 2.6 m), and
+  - **Treating a teammate:** put your crosshair on them (within 2 m, 2.4 m for a downed one) and hold **F**.
+    The screen shows their health and nothing else: no inventory, theirs or yours. Click a part of their body
+    and pick from the medical items you carry that would help it (one comes off your stack). Stay within 2.6 m: if they move out of reach, whatever you were doing for them stops (nothing's used) and their panel closes. You can
     revive a downed one there (4 s). A revive brings the thorax back to 20, but it can't make blood: someone
     downed with under 25% blood needs a blood bag first. Their wounds still need treating. A blood bag on
     yourself while your blood runs low keeps you from blacking out (at 15% you go down).
@@ -498,7 +547,7 @@ keep their tab open. It keeps ticking in the background, but slower.
     - eyewear: none, glasses, shooting glasses or goggles
     - gloves: tactical, leather, fingerless or none
 
-    Teammates see it. Your squad colour is the armband on your left arm and your name tag. Your own arms in
+    Teammates see it. Your squad colour is the armband on your left arm (there are no nameplates over anyone's head). Your own arms in
     first person match your sleeves and gloves. Suspects and civilians are dressed for who they are: hoodies,
     balaclavas and the odd cap; T-shirts, jeans and glasses.
   - **You look like what you wear.** Teammates see each officer's actual kit (`js/rig.js` `setKit`), and it
@@ -872,14 +921,18 @@ keep their tab open. It keeps ticking in the background, but slower.
     sights show a grainy 68 MOA ring and dot; the circle-dot sights a clean 65 MOA ring round a dot. They sit
     about 10 cm from the eye when aiming.
   - **Reflex sights:** tube dots in three sizes (micro, 30 mm, 34 mm), a green dot, a circle-dot, two
-    holographic sights, and an open reflex on a riser. Pistols take an open dot, a green dot, a circle-dot or an
-    enclosed dot (glass at both ends) in their optic cut.
+    and two holographic sights. Pistols take an open dot, a green dot, a circle-dot or an enclosed dot (glass at
+    both ends) in their optic cut.
+  - **Adapters** take a slot and give you one of their own: the pistol optic riser goes on a rifle's rail and
+    lifts any pistol red dot to rifle height ("Sight (on the riser)"); a buffer tube adapter (AK, SMG or
+    machine gun) is a bare AR-15 buffer tube that takes any AR stock ("Stock (on the adapter)"). On its own an
+    adapter is as good as nothing in that slot.
   - **Magnified optics are picture-in-picture.** Prisms, combat scopes, LPVOs and rifle scopes show the world
     on their ocular lens, rendered from the lens along the scope's axis. The field of view is the lens's
     apparent size divided by the magnification. Prisms come in 1×, 1.5×, 2× and 3×; the combat scope is 4×.
   - **Variable power:** scroll while aiming to step the power: the LPVO 1/2/4/6×, the hunting scope 3/4/6/9×,
     the long-range scope 5/8/12/18/25×. Aiming sensitivity follows the power.
-  - **Magnifiers** (2×, 3×, 5×) go on the rail behind a red dot, holographic or riser-mounted reflex sight.
+  - **Magnifiers** (2×, 3×, 5×) go on the rail behind a red dot or holographic sight.
     Scroll up while aiming and it flips in on its hinge (you see the dot, magnified); scroll down and it swings
     out and down beside the receiver, back to 1×.
   - **The rest of the view** only tightens slightly, so the gun and the room stay visible around the scope.
@@ -891,7 +944,7 @@ keep their tab open. It keeps ticking in the background, but slower.
   too, and shone into a suspect's face from up to 15 m (22 m for the high-output one) it ruins their aim: they
   hit about half as often while it's in their eyes. A laser puts a red or green dot where the bore points (on a
   wall or on someone), and only tightens your hip fire while it's on. The PQ-15 module and the pistol combo
-  unit have both.
+  unit have both. The gunsmith has one in stock most visits.
 - **Default sights.** Every weapon leaves the factory with iron sights (folding sights on a rail, or its own fixed
   sights). Sniper rifles and the railgun are the exception: they come scoped. Optics come from the gunsmith.
 - **Proportions are checked against the real weapons.** Each default build's overall length, measured from the
@@ -925,6 +978,34 @@ keep their tab open. It keeps ticking in the background, but slower.
 
 ## Weapon handling
 
+- **No round counts in the field, and no ammo gauge.** To know what's in the gun you check it: hold R for the
+  magazine, hold I for the chamber. The HUD keeps only a small white icon for each magazine you carry for it
+  with something in it (a box for each box of rounds, for a loose-fed gun), no number, the type of the next round,
+  and a "NO MAG" warning. In the field the inventory doesn't count either.
+  Between levels, in the stash and the shop, it does: every magazine, box and gun shows its count (a gun's
+  as 30+1/30), and so does your loadout.
+  Magazines in the inventory are drawn in colour, as full as they are (rounds from the feed lips down to the
+  follower and spring), with their ammo type and no count; "EMPTY" when there's nothing in one.
+- **Chambers** (`G.chambered`, `js/data.js`). A closed-bolt gun holds a round in its chamber as well as its
+  magazine or tube; a chamber check shows it (brass in the open port, or nothing). It fires the chambered
+  round and the action feeds the next, so a full M4 fires 31. A reload with a round chambered keeps it (30+1);
+  run dry, the reload ends by sending a round home (29+1).
+- **Reloads are put together from what the gun needs** (`Me.reloadTimes`, `js/vmanim.js magClip`): the magazine
+  change, then from empty the action.
+  - **Bolt hold-open** (`G.boltHold`): every pistol with a slide, the AR-15 family, the SCARs, G36, AUG,
+    Tavor, FAL, M14/Mk14, SR-25, Barrett, MPX, MP7, Vector, Skorpion and SVD lock open on their last round. From
+    empty it's the magazine change and a thumb on the bolt catch (or the slide stop), +0.3 s, and the slide
+    (or bolt) slams forward.
+  - **Without one** (the AK family, MP5, open-bolt SMGs, bolt-actions): from empty, the magazine change and then
+    the action racked by hand, +0.6 s.
+  - **Not empty:** just the magazine change. Pull a magazine and the chambered round is still
+  there for one more shot; put one in by hand and the chamber's empty: the first pull of the trigger, or R,
+  racks a round in. A pump's tube holds 6 with one more chambered. The round in the chamber keeps its own
+  type, so after loading AP the old round fires first. Unloading takes the chambered round out last.
+  Open-bolt guns (Uzi, MAC-10, PPSh, Thompson, AA-12, the belt-fed guns, the minigun) have nothing waiting in
+  the chamber, and neither do guns whose chambers are their magazine (revolvers, break actions, the Garand's
+  clip, launchers, the crossbow, the railgun).
+
 `js/vmanim.js` animates the first-person weapon.
 
 - **Arms:** both run from fixed shoulders to wherever the hands need to be, so a hand can leave the gun,
@@ -945,7 +1026,31 @@ keep their tab open. It keeps ticking in the background, but slower.
     at once.
 - **Between shots:** your right hand works the bolt on bolt-actions, and your left rides the pump.
 - **Inspect (I):** show the left side, then the top and right, then a chamber check (charging handle or
-  bolt handle eased back, a press-check on pistols, or a glance at the magazine). Any action cancels it.
+  bolt handle eased back, a press-check on pistols, the pump or lever cracked, the cylinder swung, the
+  barrels broken, or a glance at the magazine). Any action cancels it.
+  - **Hold I** and it stops at the chamber check and stays there, turned so you can see into the action:
+    - a rifle canted with its port toward you: the bolt locked back (your hand goes back to the handguard) and
+      the round, if there is one, in a dark open port on the right. A bolt gun's bolt stays open on top while
+      your hand goes back to the grip.
+    - a pistol side-on with the slide eased back: its slide has a real ejection port, with the round under it.
+    - a break-action low, barrels dropped, the shell heads in the breech; a revolver's cylinder swung out, a
+      brass case head on its back for each round in it.
+    - whatever's chambered is what you see.
+- **Every round shows its load**, the same everywhere (`js/icons.js` `shellCol` / `tipCol`): a shotgun shell's
+  hull is colour-coded (buckshot red, slug yellow, birdshot green, flechette blue) and a bullet's tip shows its
+  type (ball copper, hollow point lead, AP black, tracer red, subsonic olive). That's each round as it really is
+  in the gun: the chambered one, the top of the magazine, each round down a clear magazine and behind each
+  witness hole (a shotgun magazine's holes show the hulls), each shell head in a break-action's breech or a
+  revolver's cylinder (ringed in its hull's colour), the shell in your hand as you load, and the spent hulls on
+  the floor.
+    While it's held the mouse turns the gun (not your view): side to side rolls it, up and down tips the muzzle. Let go
+    and it closes up.
+- **Magazine check (hold R):** a tap still reloads (on release). Held, the magazine comes out into your left
+  hand and up in front of you, top round first (its tip coloured for the load). The mouse then turns it in
+  your hand, as far as a wrist goes: roll it about its length, tip it toward or away from you. Opaque
+  magazines have a column of witness holes down the back, each stamped with the count it stands for
+  (5 / 10 / 15 / 20 / 25 on a 30-rounder); brass in a hole means at least that many. Clear magazines
+  (G36, AUG) show the rounds themselves. Let go of R, or fire, aim or move off, and it goes back in.
 - **Handling:**
   - The gun lags behind fast mouse movement and leans into strafes, much less while aiming.
   - Swapping weapons draws in an arc from low right.
@@ -1025,15 +1130,17 @@ On top of the baked room reverb, echoes are **ray-traced through the level** for
 | C | Toggle crouch (more accurate, and you hide behind furniture) |
 | LMB / RMB | Fire / aim down sights |
 | R | Reload (retention: the old magazine goes back in its pouch) |
+| R (hold) | Magazine check: out into your hand; the mouse turns it to read the witness holes or see the rounds |
 | R R (double tap) | Dump reload: the old magazine goes into your dump pouch, or onto the floor without one |
 | 1, 2, mouse wheel | Switch weapon (the wheel while aiming steps a variable scope or flips a magnifier) |
-| Mouse back / forward | Weapon light / laser on or off (each gun remembers its own). In a level they don't navigate the browser: the page keeps a back and a forward history entry of its own and turns a side-button navigation into the button press. Outside a level, back works as usual (twice to leave). |
-| I | Inspect your weapon |
+| Middle click | Ping: a marker on the spot you're looking at, in your colour with your name, that the whole squad sees through walls for 6 s (it says nothing about what's there) |
+| Mouse back / forward | Weapon light / laser: a tap switches it on or off (each gun remembers its own); held, it's on only while you hold it. In a level they don't navigate the browser: the page keeps a back and a forward history entry of its own and turns a side-button navigation into the button press. Outside a level, back works as usual (twice to leave). |
+| I (hold) | Inspect your weapon; held, the chamber check stays open; mouse side to side rolls the gun, up and down pitches it |
 | G / H | Frag grenade / open your body and kit (as Tab) |
 | B (hold) | Swap the gun in your hands with the next one in your backpack |
 | V | Shout compliance ("Police! Show me your hands!") |
 | X | Fire selector: semi / auto (or burst), on guns that have one |
-| F (hold) | Doors (aim at the door above 1.3 m, a little over its middle, to open it, lower to kick it; face an open door to close it; reach 1.9 m), bag evidence (aim at the weapon), swap with the weapon case, arrest, zip-tie or report (aim at the person or body; whichever of a body and its dropped weapon is nearer the centre of your view), check or treat a teammate. Every interaction is a hold: let go and it's abandoned. Any of these puts your weapon away; drawing it again takes about 1 s (0.65 s for a sidearm). |
+| F (hold) | Doors (aim at the door above 1.3 m, a little over its middle, to open it, lower to kick it; face an open door to close it; reach 1.9 m), bag evidence (aim at the weapon), swap with the weapon case, arrest, zip-tie or report (aim at the person or body; whichever of a body and its dropped weapon is nearer the centre of your view), check or treat a teammate (put the crosshair on them). Every interaction is a hold: let go and it's abandoned. Any of these puts your weapon away; drawing it again takes about 1 s (0.65 s for a sidearm). |
 | M | Mute / unmute (also `?mute` in the URL) |
 | F8 | Show / hide gunshot echo paths |
 | F9 | Show / hide hitboxes |

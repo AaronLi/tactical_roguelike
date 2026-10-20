@@ -15,7 +15,7 @@
 G.Gear = (() => {
   const B = { north: 'Northmark Defense', kest: 'Kestrel Tactical', iron: 'Ironvale Arms', mer: 'Meridian Armor', sable: 'Sable Ridge', para: 'Paragon Systems', halc: 'Halcyon Labs', gray: 'Graywater Supply', vant: 'Vantage Industries' };
   // pouch grids: [w, h, accepts] (accepts: null = anything small, or a list of item kinds)
-  const MAG = ['mag', 'ammo'], NADE = ['frag'], MED = ['med'];
+  const MAG = ['mag', 'ammo'], MED = ['med'];
   const LIST = [
     // ---------------------------------------------------------------- carriers and vests: soft armour + plate slot + pouches
     { id: 'c.ghost', kind: 'carrier', brand: B.north, name: 'Ghost concealable vest', tier: 1, price: 450, speed: 1, dur: 6, plate: false,
@@ -28,8 +28,8 @@ G.Gear = (() => {
     { id: 'c.recon', kind: 'carrier', brand: B.vant, name: 'Recon chest rig', tier: 2, price: 650, speed: 1, dur: 0, plate: false,
       stop: {}, molle: [7, 2], pouches: [['q.rifle', 0, 0], ['q.rifle', 1, 0]], desc: 'No armour at all: wide MOLLE, two magazine pouches as issued. Fast.' },
     { id: 'c.assault', kind: 'carrier', brand: B.para, name: 'Assaulter carrier', tier: 3, price: 1500, speed: 0.98, dur: 7, plate: true,
-      stop: { chest: [0.88, 0.1], abdomen: [0.88, 0.1] }, molle: [8, 2], pouches: [['q.rifle2', 0, 0], ['q.nade', 2, 0]],
-      desc: 'The most MOLLE: issued with a double magazine pouch and a grenade pouch, the rest to fill.' },
+      stop: { chest: [0.88, 0.1], abdomen: [0.88, 0.1] }, molle: [8, 2], pouches: [['q.rifle2', 0, 0], ['q.rifle', 2, 0]],
+      desc: 'The most MOLLE: issued with a double and a single magazine pouch, the rest to fill.' },
     { id: 'c.heavy', kind: 'carrier', brand: B.sable, name: 'Heavy assault armour', tier: 4, price: 2600, speed: 0.9, dur: 9, plate: true,
       stop: { chest: [0.9, 0.12], abdomen: [0.95, 0.65], uarm: [0.8, 0.1], thigh: [0.6, 0.05] }, molle: [6, 2], pouches: [['q.rifle', 0, 0], ['q.rifle', 1, 0], ['q.med', 2, 0]],
       desc: "Side and groin plates, shoulder and thigh protection. Slow, and less MOLLE than you'd like." },
@@ -71,7 +71,6 @@ G.Gear = (() => {
     'q.rifle2': { name: 'Double rifle mag pouch', brand: B.iron, w: 2, h: 2, acc: MAG, price: 85, desc: 'Two rifle magazines side by side (or four pistol ones).' },
     'q.rifle3': { name: 'Triple mag shingle', brand: B.para, w: 3, h: 2, acc: MAG, price: 120, desc: 'Three rifle magazines in one wide pouch, or an LMG box.' },
     'q.dump': { name: 'Dump pouch', brand: B.vant, w: 2, h: 2, mw: 2, mh: 1, acc: null, dump: true, price: 60, desc: 'Takes anything. A dump reload (double-tap R) drops the old magazine in here instead of on the floor.' },
-    'q.nade': { name: 'Grenade pouch', brand: B.north, w: 1, h: 1, acc: NADE, price: 30, desc: 'One frag grenade.' },
     'q.med': { name: 'Med pouch', brand: B.halc, w: 2, h: 2, mw: 1, mh: 1, acc: MED, price: 60, desc: 'A 2×2 roll-out medical pouch on a single MOLLE slot: a splint and a few more.' },
   };
   // how gear sits in the locker
@@ -122,7 +121,7 @@ G.Gear = (() => {
     for (const k of Object.keys(it)) {
       if (k === 'uid' || (it.r && (k === 'n' || k === 'am'))) continue;
       const v = it[k];
-      if (k === 'w') o.w = { id: v.def.id, build: Object.assign({}, v.def.build), mag: v.mag, ammo: v.ammo, tube: (v.tube || []).slice(), noMag: !!v.noMag, fm: v.fm };
+      if (k === 'w') o.w = { id: v.def.id, build: Object.assign({}, v.def.build), mag: v.mag, ammo: v.ammo, tube: (v.tube || []).slice(), noMag: !!v.noMag, fm: v.fm, chamber: v.chamber || null };
       else if (k === 'grids') o.grids = v.map(packGrid);
       else if (k === 'molle') o.molle = packGrid(v);
       else if (k === 'plate' || k === 'face') o[k] = v ? pack(v) : null;
@@ -141,6 +140,7 @@ G.Gear = (() => {
     if (o.k === 'gun' && o.w) {
       const w = G.Me.makeWeapon(o.w.id, o.w.build);
       w.mag = o.w.mag; w.ammo = o.w.ammo; w.tube = (o.w.tube || []).slice(); if (o.w.noMag) w.noMag = true; if (o.w.fm) w.fm = o.w.fm;
+      if ('chamber' in o.w) w.chamber = o.w.chamber;
       return gunItem(w);
     }
     const rest = {};
@@ -432,6 +432,7 @@ G.Gear = (() => {
     for (const w of guns(me)) {
       if (w.noMag) continue; // no magazine in it to load
       const cap = me.magSize(w.def), cal = G.calOf(w.def);
+      if (G.chambered(w.def) && !w.chamber) { const b = boxes().find((q) => q.key === cal); if (b) { w.chamber = b.am; b.n--; n++; if (b.n <= 0) each(all(me), (it, g) => { if (it === b) removeFrom(g, it); }); } }
       for (const b of boxes().filter((q) => q.key === cal).sort((a, c) => (c.am === w.ammo) - (a.am === w.ammo))) {
         if (w.mag >= cap) break;
         const t = Math.min(cap - w.mag, b.n);
@@ -467,10 +468,11 @@ G.Gear = (() => {
   }
   // a gun's loaded rounds out (a tube keeps its order of types)
   function unloadGun(me, w) {
-    const n = w.mag;
+    const n = w.mag + (w.chamber ? 1 : 0);
     if (!n) return 0;
     const counts = new Map();
-    if (w.tube && w.tube.length) for (const t of w.tube) counts.set(t, (counts.get(t) || 0) + 1); else counts.set(w.ammo, n);
+    if (w.tube && w.tube.length) for (const t of w.tube) counts.set(t, (counts.get(t) || 0) + 1); else if (w.mag) counts.set(w.ammo, w.mag);
+    if (w.chamber) { counts.set(w.chamber, (counts.get(w.chamber) || 0) + 1); w.chamber = null; }
     toBoxes(me, G.calOf(w.def), [...counts]);
     w.mag = 0; if (w.tube) w.tube.length = 0;
     return n;
@@ -523,7 +525,9 @@ G.Gear = (() => {
   // a gun leaving you (into the weapon case): its magazines go with it; returns the rounds handed over
   function handOver(me, def) {
     let n = 0;
-    each(body(me), (it, g) => { if (it.k === 'mag' && it.wid === def.id) { n += it.n; removeFrom(g, it); } });
+    // (its magazines: any of its pattern, unless another gun of yours takes them too, in which case they stay)
+    const others = guns(me).filter((w) => w.def.id !== def.id);
+    each(body(me), (it, g) => { if (it.k === 'mag' && G.magFits(it.wid, def.id) && !others.some((w) => G.magFits(it.wid, w.def.id))) { n += it.n; removeFrom(g, it); } });
     return n;
   }
   // a gun arriving: the rounds that came with it, as full magazines (or boxes) where they fit on you

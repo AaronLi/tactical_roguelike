@@ -28,6 +28,7 @@
       <input id="joinCode" maxlength="5" placeholder="ROOM CODE">
       <button id="btnJoin" class="btn">Join</button>
     </div>
+    <div class="lan-row"><button id="btnLan" class="btn small">Find LAN games</button><div id="lanList" class="lan-list"></div></div>
     <div id="menuMsg" class="msg"></div>
 
     <details class="settings">
@@ -37,10 +38,12 @@
         <label>Field of view <span id="fovVal"></span></label><input id="fov" type="range" min="60" max="110" step="1">
         <label>Volume <span id="volVal"></span></label><input id="vol" type="range" min="0" max="1" step="0.05">
         <label class="check"><input type="checkbox" id="mute"> Mute all sound <span class="dim">(M in game)</span></label>
+        <label>Relay (TURN) server <span class="dim">optional: if friends can't connect to you</span></label>
+        <div class="turn-row"><input id="turnUrl" placeholder="turn:host:3478"><input id="turnUser" placeholder="username"><input id="turnPass" type="password" placeholder="password"></div>
       </div>
       <div class="controls">
         <b>WASD</b> move &middot; <b>Space</b> toggle lowered weapon &middot; <b>Shift</b> slow &amp; steady &middot; <b>C</b> crouch &middot; <b>Q / E</b> lean<br>
-        <b>LMB</b> fire &middot; <b>RMB</b> aim &middot; <b>R</b> reload (<b>R R</b> dump reload) &middot; <b>I</b> inspect &middot; <b>1 / 2 / wheel</b> swap (<b>wheel</b> while aiming: magnification)<br>
+        <b>LMB</b> fire &middot; <b>RMB</b> aim &middot; <b>MMB</b> ping &middot; <b>R</b> reload (<b>R R</b> dump reload, <b>hold R</b> check the magazine) &middot; <b>I</b> inspect (<b>hold I</b> hold the chamber check open; the mouse turns what you hold) &middot; <b>1 / 2 / wheel</b> swap (<b>wheel</b> while aiming: magnification)<br>
         <b>Mouse back</b> weapon light &middot; <b>Mouse forward</b> laser<br>
         <b>G</b> grenade &middot; <b>H</b> body &amp; kit (as Tab) &middot; hold <b>B</b> swap with the gun in your backpack &middot; <b>V</b> shout compliance &middot; <b>X</b> fire selector<br>
         hold <b>F</b> doors (aim high: open, low: kick), bag evidence, arrest, restrain or revive<br>
@@ -56,7 +59,7 @@
     <h2>Squad Lobby</h2>
     <div id="codeBlock" class="code-block">
       <div>Room code &mdash; give this to your friends</div>
-      <div class="code-line"><span id="lobbyCode">-----</span><button id="btnCopy" class="btn small">Copy</button></div>
+      <div class="code-line"><span id="lobbyCode">-----</span><button id="btnCopy" class="btn small">Copy</button><button id="btnNewCode" class="btn small" title="Host under a fresh code (anyone in the lobby will need the new one)">New code</button></div>
     </div>
     <div id="lobbyPlayers" class="lobby-players"></div>
     <div id="lobbyMsg" class="msg"></div>

@@ -89,6 +89,9 @@ G.Server = {
         }
         break;
       case 'chat': if (p) G.Net.broadcast({ t: 'chat', id: from, m: String(m.m).slice(0, 120) }); break;
+      // friendly fire: one officer's rounds in another (the shooter traced them; the one hit takes the wounds)
+      case 'ff': if (p && this.phase === 'level' && this.players.has(m.tg) && Array.isArray(m.hz)) G.Net.broadcast({ t: 'ffhit', by: from, tg: m.tg, hz: m.hz.slice(0, 12), w: m.w, f: m.f }); break;
+      case 'ping': if (p && Array.isArray(m.p) && m.p.length === 3) G.Net.broadcast({ t: 'ping', id: from, p: m.p.map(Number) }); break;
       // something put down (dropped from an inventory), or picked up: the first to ask gets it
       case 'drop': {
         // (never refused once it's off them: an item can't be lost. Their position, when we have it, keeps it
@@ -263,11 +266,12 @@ G.Server = {
     for (const [cand, wt] of odds) { x -= wt; if (x <= 0) { w = cand; break; } }
     // loaded, with two full spare magazines (or that many rounds), all of one type: mostly ball, now and then
     // something better
-    // now and then a conversion kit for it is packed in too (the receiver group that makes it another gun)
-    // (the receiver group, and the barrel and such the other gun needs: a receiver alone won't fire)
-    const kits = G.Gunsmith.kitsFor(w.id), rk = kits.length && Math.random() < 0.35 ? kits[Math.floor(Math.random() * kits.length)] : null;
-    const kit = rk ? [rk, ...G.Gunsmith.convParts(w.id, G.Gunsmith.PARTS[rk].becomes)] : null;
-    return { code: G.Gunsmith.defaultCode(w.id), mag: w.mag, reserve: w.mag * 2, am: G.rollAmmo(G.calOf(w)), kit };
+    // A gun that takes other receiver groups (js/parts.js RCV) now and then turns up built on one of them: an M4
+    // lower with the AR-9 kit in it, an AK with the RPK's, fitted and working (its barrel and all), magazines and
+    // rounds to match.
+    const kits = G.Gunsmith.kitsFor(w.id);
+    if (kits.length && Math.random() < 0.35) w = G.WEAPONS[G.Gunsmith.PARTS[kits[Math.floor(Math.random() * kits.length)]].becomes] || w;
+    return { code: G.Gunsmith.defaultCode(w.id), mag: w.mag, reserve: w.mag * 2, am: G.rollAmmo(G.calOf(w)), kit: null };
   },
   // A first aid cabinet's contents: one to three things, mostly bandages and painkillers, now and then a
   // tourniquet, gauze, a chest seal or a splint. [[mt, n], ...], like kinds stacked together.
@@ -368,7 +372,7 @@ G.Server = {
   // --------------------------------------------------------------- enemies
   spawnEnemies() {
     const L = this.level, np = Math.max(1, this.players.size), U = G.U;
-    const count = Math.min(4 + Math.floor(L * 1.5) + (np - 1) * 2, 24);
+    const count = Math.min(Math.round((4 + Math.floor(L * 1.5) + (np - 1) * 2) * (this.map.theme.foes || 1)), 32); // (a bigger map: more of them)
     const hpMult = 1 + 0.04 * (L - 1) + 0.1 * (np - 1);
     this.accMult = Math.min(1 + 0.03 * (L - 1), 1.5);
     this.dmgMult = 1 + 0.07 * (L - 1);
@@ -391,9 +395,19 @@ G.Server = {
       for (const [ty, w] of weights) { if (roll < w) { type = ty; break; } roll -= w; }
       this.addEnemy(type, (tx + 0.5) * G.Level.TS, (tz + 0.5) * G.Level.TS, hpMult);
     }
-    // civilians caught up in it
-    const civs = Math.min(2 + Math.floor(L / 2), 5);
+    // civilians caught up in it (more at a festival: some of them hiding behind the stalls' counters; the other
+    // stalls were left as they ran)
+    const crowd = this.map.theme.crowd || 1, civs = Math.min(Math.round((2 + Math.floor(L / 2)) * crowd), 8), TS = G.Level.TS;
     let placed = 0;
+    for (const s of U.shuffle(Math.random, (this.map.civSpots || []).slice())) {
+      if (placed >= Math.ceil(civs * 0.6)) break;
+      const tx = Math.floor(s.x / TS), tz = Math.floor(s.z / TS);
+      if (this.map.t[tz * this.map.W + tx] !== 0 || used.some(([ux, uz]) => Math.abs(ux - tx) + Math.abs(uz - tz) < 2 * G.Level.K)) continue;
+      used.push([tx, tz]);
+      const c = this.addEnemy('civ', s.x, s.z, 1);
+      c.state = 'hide'; c.hide = { x: s.x, z: s.z, lean: 0 }; c.crouch = true; c.yaw = s.yaw; c.peekT = 1 + Math.random() * 3;
+      placed++;
+    }
     for (const [tx, tz] of spots) {
       if (placed >= civs) break;
       if (used.some(([ux, uz]) => Math.abs(ux - tx) + Math.abs(uz - tz) < 2 * G.Level.K)) continue;
@@ -604,7 +618,7 @@ G.Server = {
       const nx = -(from.z - w.z) / fd, nz = (from.x - w.x) / fd;
       for (const side of [1, -1]) {
         const px = w.x + nx * side * 0.55, pz = w.z + nz * side * 0.55;
-        if (L.tile(map, Math.floor(px / TS), Math.floor(pz / TS)) !== 0 || !L.los(map, px, 1.5, pz, from.x, 1.4, from.z)) continue;
+        if (L.tile(map, Math.floor(px / TS), Math.floor(pz / TS)) !== 0 || !this.leanClear(w.x, w.z, px, pz, 1.5) || !L.los(map, px, 1.5, pz, from.x, 1.4, from.z)) continue;
         best = { x: w.x, z: w.z, lean: side }; bs = score;
         break;
       }
@@ -1061,7 +1075,8 @@ G.Server = {
       for (const p of alive) {
         const [px, py, pz] = p.st.p;
         const d = Math.hypot(px - e.x, pz - e.z);
-        if (d > 75) continue;
+        // (outdoors at night they can't pick you out past `night` metres, unless your light or laser gives you away)
+        if (d > (map.theme.night && !(p.st.tl & 3) ? map.theme.night : 75)) continue;
         const lx = e.cover && e.cover.lean ? e.cover.px : e.x, lz = e.cover && e.cover.lean ? e.cover.pz : e.z;
         const [hx, hz] = this.headXZ(p.st);
         const k = L.see(map, lx, ey, lz, hx, py + (p.st.cr ? 0.95 : 1.5), hz), vis = k > 0; // (through a window: k < 1)
@@ -1419,6 +1434,7 @@ G.Server = {
       for (const side of [1, -1]) {
         const px = w.x + nx * side * 0.55, pz = w.z + nz * side * 0.55;
         if (L.tile(map, Math.floor(px / L.TS), Math.floor(pz / L.TS)) !== 0) continue;
+        if (!this.leanClear(w.x, w.z, px, pz, ey)) continue; // (round the edge, not through a door jamb or a thin wall)
         if (!L.los(map, px, ey, pz, st.p[0], ty, st.p[2])) continue;
         best = { x: w.x, z: w.z, lean: side, px, pz }; bs = score;
         break;
@@ -1429,7 +1445,14 @@ G.Server = {
   coverValid(c, st, def) {
     if (!c.lean) return this.coverProtects(c, st);
     const L = G.Level, map = this.map, ey = 1.6 * def.scale, ty = st.p[1] + 1.4;
-    return !L.los(map, c.x, ey, c.z, st.p[0], ty, st.p[2]) && L.los(map, c.px, ey, c.pz, st.p[0], ty, st.p[2]);
+    return !L.los(map, c.x, ey, c.z, st.p[0], ty, st.p[2]) && this.leanClear(c.x, c.z, c.px, c.pz, ey) && L.los(map, c.px, ey, c.pz, st.p[0], ty, st.p[2]);
+  },
+  // Can someone standing at (x, z) actually lean out to (px, pz)? Nothing solid between: a corner's edge, not a
+  // door jamb, a door leaf or a thin wall to the next room (at chest and at eye height; and the way the head
+  // goes, a little further out still)
+  leanClear(x, z, px, pz, ey) {
+    const L = G.Level, map = this.map, ox = px + (px - x) * 0.3, oz = pz + (pz - z) * 0.3;
+    return L.los(map, x, 1.1, z, px, 1.1, pz) && L.los(map, x, ey, z, px, ey, pz) && L.los(map, x, ey, z, ox, ey, oz);
   },
 
   tryNade(e, tx, tz) {

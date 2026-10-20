@@ -24,7 +24,7 @@ G.Level = {
     // the layout: an apartment block, a warehouse, two houses back to back with their gardens between, or a
     // building of rooms and corridors. Every one starts outside it (or, for the apartments, on the stairs).
     const lay = theme.layout === 'apartments' ? this.layApartments(r, level) : theme.layout === 'warehouse' ? this.layWarehouse(r, level)
-      : theme.layout === 'houses' ? this.layHouses(r, level) : this.approach(this.layRooms(r, level), r, theme);
+      : theme.layout === 'houses' ? this.layHouses(r, level) : theme.layout === 'festival' ? this.layFestival(r, level) : this.approach(this.layRooms(r, level), r, theme);
     const { W, H, t, rooms } = lay;
 
     // Doors (tile value 3). `axis` is the direction you walk through the door. The rooms layout puts single and
@@ -85,6 +85,7 @@ G.Level = {
     map.units = lay.units || 0; // apartments: how many (rooms carry .unit)
     // roller doors (rolled up): [x from, x to, z of the wall] in metres
     map.rollers = (lay.rollers || []).map(([x0, z, w]) => [x0 * this.CTS, (x0 + w) * this.CTS, (z + 0.5) * this.CTS]);
+    map.fest = c.fest || null; map.civSpots = c.civSpots || null; // (a festival: its light strings, where civilians hide)
     map.spawnRoom = map.rooms[rooms.indexOf(spawnRoom)];
     map.exitRoom = map.rooms[rooms.indexOf(exitRoom)];
     return this.finish(map, r);
@@ -194,8 +195,9 @@ G.Level = {
     for (let i = 0; i < W * H; i++) {
       if (t[i] !== 4 || props.has(i)) continue;
       const x = i % W, z = (i / W) | 0;
-      const p = { name: 'fence', q: fenceAx.get(i) === 'z' ? 1 : 0, x: (x + 0.5) * cs, z: (z + 0.5) * cs, v: ((x * 7 + z * 13) % 17) / 17 };
-      p.boxes = wb(R.fence, p.x, p.z, p.q, p.v);
+      const name = c.theme.fence || 'fence'; // (a festival's site fencing)
+      const p = { name, q: fenceAx.get(i) === 'z' ? 1 : 0, x: (x + 0.5) * cs, z: (z + 0.5) * cs, v: ((x * 7 + z * 13) % 17) / 17 };
+      p.boxes = wb(R[name], p.x, p.z, p.q, p.v);
       props.set(i, p); propList.push(p);
     }
     return { W, H, t, out, rooms, seed: c.seed, level: c.level, doors, doorAt, props, propList, theme: c.theme };
@@ -302,6 +304,19 @@ G.Level = {
       const dir = below ? 1 : -1, pair = map.doors.find((o) => o !== d && o.mirror && Math.abs(o.x - d.x) < 1.5 && Math.abs(o.z - d.z) < 0.1);
       map.lights.push({ x: pair ? (d.x + pair.x) / 2 : d.x, z: d.z + dir * (TS / 2 + 0.06), y: 2.55, porch: dir });
     }
+    // a festival: real lights along the strings (a warm pool every few metres) and coloured ones over the stage
+    if (map.fest) {
+      for (const s of map.fest.strings) {
+        const len = Math.hypot(s.b[0] - s.a[0], s.b[2] - s.a[2]), n = Math.max(1, Math.round(len / 9));
+        for (let i = 0; i < n; i++) {
+          const u = (i + 0.5) / n;
+          map.lights.push({ kind: 'string', x: s.a[0] + (s.b[0] - s.a[0]) * u, z: s.a[2] + (s.b[2] - s.a[2]) * u, y: s.a[1] + (s.b[1] - s.a[1]) * u - 0.6, color: s.kind === 'lantern' ? 0xffa868 : 0xffd29a, i: 1.25, d: 16 });
+        }
+      }
+      for (const [x, z] of map.fest.lamps) map.lights.push({ kind: 'string', x, z, y: 5.6, color: 0xffcf98, i: 1.7, d: 24 }); // street lamps
+      const st = map.fest.stage;
+      if (st) [0xff3fa0, 0x40c0ff, 0xffb040].forEach((color, i) => map.lights.push({ kind: 'string', x: st.x0 + (st.x1 - st.x0) * (0.2 + i * 0.3), z: st.z1 - 0.6, y: 5.5, color, i: 2.2, d: 22 }));
+    }
     // the lamps nearest where you come in first (only the first dozen are real lights)
     { const sx = (spawnRoom.cx + 0.5) * TS, sz = (spawnRoom.cz + 0.5) * TS; map.lights.sort((a, b) => Math.hypot(a.x - sx, a.z - sz) - Math.hypot(b.x - sx, b.z - sz)); }
     // An open door's leaf stands out into the room beside its hinge; it hides whoever's behind it and stops
@@ -335,11 +350,18 @@ G.Level = {
   },
   // the real lights go to the lamps nearest p (a few times a second; now if `now`)
   LIGHTS: 12,
-  updateLights(map, p, now) {
+  // focus: where you're aiming, when you are (outdoors at night a third of the lights go to the lamps nearest it,
+  // so what you look at down a scope at the far end of the field is lit)
+  updateLights(map, p, now, focus) {
     if (!map || !map.lightPool || !map.lightPool.length || !p) return;
     if (!now && (map.lightT = (map.lightT || 0) - 1) > 0) return;
     map.lightT = 12; // frames
-    const near = map.lamps.map((l) => [l, (l.x - p.x) * (l.x - p.x) + (l.z - p.z) * (l.z - p.z)]).sort((a, b) => a[1] - b[1]);
+    const by = (q) => map.lamps.map((l) => [l, (l.x - q.x) * (l.x - q.x) + (l.z - q.z) * (l.z - q.z)]).sort((a, b) => a[1] - b[1]);
+    let near = by(p);
+    if (focus && map.theme.layout === 'festival' && Math.hypot(focus.x - p.x, focus.z - p.z) > 20) {
+      const n = map.lightPool.length, mine = near.slice(0, n - Math.floor(n / 3)), set = new Set(mine.map((e) => e[0]));
+      near = mine.concat(by(focus).filter((e) => !set.has(e[0])).slice(0, Math.floor(n / 3)));
+    }
     map.lightPool.forEach((pl, k) => {
       const e = near[k];
       if (!e) { pl.intensity = 0; return; }
@@ -446,6 +468,57 @@ G.Level = {
   },
 
   // ----------------------------------------------------------------- layouts
+  // A music festival at night, on the edge of a town, about 120 x 108 m, all of it open to the sky.
+  //  - The festival (the east): the stage at the far end with rows of seats in front of it (long sight lines over
+  //    them), then the food court (rows of food and merchandise stalls facing each other across lanes), lights
+  //    strung over everything, a toilet block on one side (two washrooms, cubicles behind their own doors), picnic
+  //    tables behind it, and its gate, ticket booths either side.
+  //  - The town square (the west), behind the festival's fence with a side gate through: shops down the west side
+  //    and along the north (cafes, stores, bars, each with a door onto the square), a fountain in the middle.
+  //  - The car park along the south, where you come in: rows of parked cars, the festival's gate under its arch
+  //    and the street into the square opening off it.
+  // (What goes where: G.Furniture.plan's festival(); the lights, sky and stage rig: buildFestival.)
+  layFestival(r, level) {
+    const U = G.U, W = 58 + Math.min(level, 4) * 2, H = 54, TX = 17, PZ = H - 12; // the town west of TX; the car park south of PZ
+    const t = new Uint8Array(W * H).fill(1), out = new Uint8Array(W * H).fill(1), rooms = [], doors = [], fences = [];
+    const fill = (x0, z0, w, h) => { for (let z = z0; z < z0 + h; z++) for (let x = x0; x < x0 + w; x++) t[z * W + x] = 0; };
+    const solid = (x0, z0, x1, z1) => { for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) { t[z * W + x] = 1; out[z * W + x] = 0; } }; // a building's footprint
+    const fence = (x, z, axis) => { t[z * W + x] = 4; fences.push([x, z, axis]); };
+    fill(1, 1, W - 2, H - 2);
+    // the town's buildings: a row of shops down the west edge and along the north of the square
+    solid(0, 0, 5, PZ - 1); solid(6, 0, TX - 1, 5);
+    const shop = (x, z, door) => { fill(x, z, 4, 4); rooms.push(this._room(x, z, 4, 4, { type: U.pick(r, ['cafe', 'store', 'store', 'bar']) })); doors.push(door); };
+    for (let z = 6; z + 3 <= PZ - 3; z += 5) shop(1, z, [5, z + 1 + (r() < 0.5 ? 0 : 1), 'x', false, false]); // (below the north row: the corner's solid)
+    for (let x = 7; x + 3 <= TX - 2; x += 5) shop(x, 1, [x + 1 + (r() < 0.5 ? 0 : 1), 5, 'z', false, false]);
+    // fencing round the site (not where a building is the edge), between the festival and the square (a side gate
+    // half way down), and along the car park (the festival's gate, and the street into the square)
+    for (let x = 0; x < W; x++) for (const z of [0, H - 1]) if (out[z * W + x]) fence(x, z, 'x');
+    for (let z = 1; z < H - 1; z++) for (const x of [0, W - 1]) if (out[z * W + x]) fence(x, z, 'z');
+    const gz = PZ >> 1;
+    for (let z = 1; z < PZ; z++) if (Math.abs(z - gz) > 1) fence(TX, z, 'z');
+    const fx = (TX + 1 + W - 2) >> 1;
+    for (let x = 1; x < W - 1; x++) if (!(x >= fx - 2 && x <= fx + 1) && !(x >= 8 && x <= 10)) fence(x, PZ, 'x');
+    // the toilet block, against the festival's east fence: a washroom each side of a dividing wall, two cubicles off each
+    const x0 = TX + 1, x1 = W - 2, fw = x1 - x0 + 1, bx0 = x1 - 6, bx1 = x1, bz0 = 16, bz1 = 26;
+    for (let z = bz0; z <= bz1; z++) for (let x = bx0; x <= bx1; x++) { t[z * W + x] = 1; out[z * W + x] = 0; }
+    fill(bx0 + 1, bz0 + 1, 3, 4); fill(bx0 + 1, bz0 + 6, 3, 4);
+    const cubX = bx1 - 1;
+    for (const z of [bz0 + 1, bz0 + 3, bz0 + 6, bz0 + 8]) { t[z * W + cubX] = 0; doors.push([cubX - 1, z, 'x', false, false]); rooms.push(this._room(cubX, z, 1, 1, { type: 'cubicle' })); }
+    doors.push([bx0, bz0 + 2, 'x', false, false], [bx0, bz0 + 7, 'x', false, false]);
+    rooms.push(this._room(bx0 + 1, bz0 + 1, 3, 4, { type: 'washroom' }), this._room(bx0 + 1, bz0 + 6, 3, 4, { type: 'washroom' }));
+    // the open ground (the stage first: the seats string their lights from it)
+    const cxF = (x0 + x1) >> 1;
+    const stage = this._room(cxF - 7, 1, 14, 4, { type: 'stage', out: true });
+    const seating = this._room(x0, 5, fw, 10, { type: 'seating', out: true });
+    const court = this._room(x0, 16, bx0 - x0, PZ - 21, { type: 'court', out: true });
+    const picnic = this._room(bx0, bz1 + 1, x1 - bx0 + 1, PZ - 6 - bz1, { type: 'picnic', out: true });
+    const gate = this._room(x0, PZ - 5, fw, 5, { type: 'gate', out: true });
+    const plaza = this._room(6, 6, TX - 6, PZ - 6, { type: 'plaza', out: true });
+    const lot = this._room(1, PZ + 1, W - 2, H - PZ - 2, { type: 'parking', out: true });
+    const aisle = this._room(1, PZ + 4, W - 2, 2, { type: 'aisle', out: true }); // (the lane between the rows of cars: where you come in)
+    rooms.unshift(stage, seating, court, picnic, gate, plaza, lot, aisle);
+    return { W, H, t, rooms, doors, out, fences, spawn: aisle };
+  },
   // Each returns { W, H, t, rooms, doors?, ringDoors?, out?, fences?, spawn? } on the coarse grid. t starts as all wall
   // (1); rooms are carved to floor (0).
   _room(x, z, w, h, o) { return Object.assign({ x, z, w, h, cx: x + (w >> 1), cz: z + (h >> 1) }, o || {}); },
@@ -936,6 +1009,183 @@ G.Level = {
       root.add(g);
     }
   },
+  // ---------------------------------------------------------------- a festival's dressing
+  // The lawn, the night sky (stars and a moon), the strings of lights on their poles (bulbs, or paper lanterns
+  // over the food court, each with a soft glow; the real lights along them are in map.lights), the stage's
+  // truss with coloured lamps throwing beams, its backdrop, and the arch over the gate.
+  buildFestival(map, root) {
+    const T = THREE, f = map.fest, TS = this.TS, rnd = G.U.rng((map.seed ^ 0xfe57) >>> 0), Wm = map.W * TS, Hm = map.H * TS;
+    const tx = G.Furniture.textures(rnd);
+    // the lawn (worn in the lanes), paving at the gate
+    const grass = tx.grass(); grass.repeat.set(map.W / 3, map.H / 3);
+    const lawn = new T.Mesh(new T.PlaneGeometry(Wm, Hm), new T.MeshStandardMaterial({ map: grass, roughness: 1 }));
+    lawn.rotation.x = -Math.PI / 2; lawn.position.set(Wm / 2, 0.003, Hm / 2); lawn.layers.enable(1); root.add(lawn);
+    // the toilet block's floor, wall to wall (over the lawn, under each room's own tiles: the doorways too)
+    const inside = map.rooms.filter((rm) => rm.type === 'washroom' || rm.type === 'cubicle');
+    if (inside.length) {
+      const x0 = Math.min(...inside.map((rm) => rm.x)) - 1, x1 = Math.max(...inside.map((rm) => rm.x + rm.w)) + 1, z0 = Math.min(...inside.map((rm) => rm.z)) - 1, z1 = Math.max(...inside.map((rm) => rm.z + rm.h)) + 1;
+      const ft = tx.tile('#c8ccc8', '#7a7e7a'); ft.repeat.set(x1 - x0, z1 - z0);
+      const fl = new T.Mesh(new T.PlaneGeometry((x1 - x0) * TS, (z1 - z0) * TS), new T.MeshStandardMaterial({ map: ft, roughness: 0.5 }));
+      fl.rotation.x = -Math.PI / 2; fl.position.set((x0 + x1) / 2 * TS, 0.0035, (z0 + z1) / 2 * TS); fl.layers.enable(1); root.add(fl);
+    }
+    if (f.gate) {
+      const g = f.gate, pave = tx.tile('#4e4b46', '#34322e'); pave.repeat.set((g.x1 - g.x0) / 1.5, (g.z1 - g.z0) / 1.5);
+      const p = new T.Mesh(new T.PlaneGeometry(g.x1 - g.x0, g.z1 - g.z0), new T.MeshStandardMaterial({ map: pave, roughness: 0.9 }));
+      p.rotation.x = -Math.PI / 2; p.position.set((g.x0 + g.x1) / 2, 0.005, (g.z0 + g.z1) / 2); p.layers.enable(1); root.add(p);
+    }
+    // the town square's paving, the car park's asphalt with its bays painted on
+    const slab = (r, tex, rep, y) => { tex.repeat.set((r.x1 - r.x0) / rep, (r.z1 - r.z0) / rep); const m = new T.Mesh(new T.PlaneGeometry(r.x1 - r.x0, r.z1 - r.z0), new T.MeshStandardMaterial({ map: tex, roughness: 0.9 })); m.rotation.x = -Math.PI / 2; m.position.set((r.x0 + r.x1) / 2, y, (r.z0 + r.z1) / 2); m.layers.enable(1); root.add(m); };
+    if (f.plaza) slab({ x0: f.plaza.x0 - TS, x1: f.plaza.x1, z0: f.plaza.z0 - TS, z1: f.plaza.z1 + TS * 2 }, tx.tile('#6a645a', '#4a463e'), 1.2, 0.005);
+    if (f.lot) {
+      slab({ x0: f.lot.x0 - TS, x1: f.lot.x1 + TS, z0: f.lot.z0 - TS / 2, z1: f.lot.z1 + TS }, tx.carpet('#26282a'), 2, 0.005);
+      const paint = new T.MeshBasicMaterial({ color: 0xb8b4a8 }), geos = [];
+      for (const [bx0, bx1, bz0, bz1] of f.bays) {
+        for (let x = bx0; x <= bx1 + 0.01; x += TS * this.K) { const g = new T.PlaneGeometry(0.1, bz1 - bz0 - 0.4); g.rotateX(-Math.PI / 2); g.translate(x, 0.008, (bz0 + bz1) / 2); geos.push(g); }
+      }
+      for (const g of geos) root.add(new T.Mesh(g, paint));
+    }
+    // street lamps: a tall post and a lantern head (their light is in map.lights)
+    const postMat = new T.MeshStandardMaterial({ color: 0x1c1e20, roughness: 0.5, metalness: 0.5 }), headMat = new T.MeshBasicMaterial({ color: 0xffe2b8 });
+    const postGeo = new T.CylinderGeometry(0.07, 0.1, 6, 8), headGeo = new T.BoxGeometry(0.34, 0.42, 0.34), globeGeo = new T.SphereGeometry(0.15, 10, 8);
+    for (const [x, z] of f.lamps) {
+      const p = new T.Mesh(postGeo, postMat); p.position.set(x, 3, z); root.add(p);
+      const hd = new T.Mesh(headGeo, postMat); hd.position.set(x, 6.15, z); root.add(hd);
+      const gl = new T.Mesh(globeGeo, headMat); gl.position.set(x, 5.92, z); root.add(gl);
+    }
+    // a lit sign over each shop's door onto the square
+    {
+      const SIGN = { cafe: ['CAFE', '#ffd890'], store: ['STORE', '#a8e0ff'], bar: ['BAR', '#ff8ad0'] };
+      const roomAt = (fx, fz) => map.rooms.find((rm) => fx >= rm.x && fx < rm.x + rm.w && fz >= rm.z && fz < rm.z + rm.h && SIGN[rm.type]);
+      for (const d of map.doors) {
+        const ax = d.axis === 'x' ? 1 : 0, az = 1 - ax, cx = Math.floor(d.x / TS), cz = Math.floor(d.z / TS);
+        let rm = null, s = 0;
+        for (const k of [-2, 2]) { const q = roomAt(cx + ax * k, cz + az * k); if (q) { rm = q; s = -Math.sign(k); } }
+        if (!rm) continue;
+        const [txt, col] = SIGN[rm.type], c = document.createElement('canvas'); c.width = 256; c.height = 64;
+        const g = c.getContext('2d'); g.fillStyle = '#16141a'; g.fillRect(0, 0, 256, 64); g.font = 'bold 44px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.shadowColor = col; g.shadowBlur = 16; g.fillStyle = col; g.fillText(txt, 128, 34);
+        const sign = new T.Mesh(new T.PlaneGeometry(1.6, 0.4), new T.MeshBasicMaterial({ map: new T.CanvasTexture(c) }));
+        sign.position.set(d.x + ax * s * (TS / 2 + 0.03), this.DOOR_H + 0.45, d.z + az * s * (TS / 2 + 0.03)); sign.rotation.y = Math.atan2(ax * s, az * s); root.add(sign);
+      }
+    }
+    // the sky: stars on a dome far off (no fog on them), a moon
+    {
+      const n = 1600, pos = new Float32Array(n * 3), col = new Float32Array(n * 3);
+      for (let i = 0; i < n; i++) {
+        const a = rnd() * Math.PI * 2, e = Math.asin(0.08 + rnd() * 0.92), R = 145; // (inside the camera's far plane from anywhere on the field)
+        pos.set([Wm / 2 + Math.cos(a) * Math.cos(e) * R, Math.sin(e) * R, Hm / 2 + Math.sin(a) * Math.cos(e) * R], i * 3);
+        const b = 0.35 + rnd() * 0.65, warm = rnd();
+        col.set([b * (warm < 0.2 ? 1 : 0.85), b * 0.9, b * (warm > 0.8 ? 1 : 0.85)], i * 3);
+      }
+      const g = new T.BufferGeometry(); g.setAttribute('position', new T.BufferAttribute(pos, 3)); g.setAttribute('color', new T.BufferAttribute(col, 3));
+      root.add(new T.Points(g, new T.PointsMaterial({ size: 1.6, sizeAttenuation: false, vertexColors: true, fog: false, depthWrite: false })));
+      const moon = new T.Mesh(new T.CircleGeometry(9, 32), new T.MeshBasicMaterial({ color: 0xe8ecf4, fog: false }));
+      moon.position.set(Wm / 2 - 70, 120, -90); moon.lookAt(Wm / 2, 0, Hm / 2); moon.scale.setScalar(0.5); root.add(moon);
+    }
+    // a soft round glow for every bulb and lantern
+    const glowTex = (() => {
+      const c = document.createElement('canvas'); c.width = c.height = 64;
+      const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+      gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.25, 'rgba(255,255,255,0.45)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+      return new T.CanvasTexture(c);
+    })();
+    // the strings: a pole under each end that has one, the wire sagging between, bulbs (or lanterns) along it
+    const BULB = [0xfff0c8, 0xfff0c8, 0xfff0c8, 0xffb347, 0xff5a4a, 0x6aff7a, 0x5ab0ff, 0xff7ad8], LANTERN = [0xff4030, 0xff9a30, 0xffd84a, 0xff6ab0, 0x4ae0d0, 0xff4030];
+    const poles = new Map(), wirePts = [], bulbs = [], lanterns = [];
+    const poleMat = new T.MeshStandardMaterial({ color: 0x2a2c2e, roughness: 0.6, metalness: 0.4 });
+    for (const s of f.strings) {
+      for (const [p, has] of [[s.a, s.pa], [s.b, s.pb]]) if (has) poles.set(p[0].toFixed(1) + ',' + p[2].toFixed(1), p);
+      const len = Math.hypot(s.b[0] - s.a[0], s.b[1] - s.a[1], s.b[2] - s.a[2]), sag = G.U.clamp(len * 0.07, 0.25, 1.3);
+      const at = (u) => new T.Vector3(s.a[0] + (s.b[0] - s.a[0]) * u, s.a[1] + (s.b[1] - s.a[1]) * u - sag * 4 * u * (1 - u), s.a[2] + (s.b[2] - s.a[2]) * u);
+      for (let i = 0; i < 16; i++) { wirePts.push(at(i / 16), at((i + 1) / 16)); }
+      const lan = s.kind === 'lantern', step = lan ? 1.3 : 0.55, n = Math.max(2, Math.floor(len / step));
+      for (let i = 1; i < n; i++) {
+        const p = at(i / n);
+        if (lan) { p.y -= 0.22; lanterns.push([p, LANTERN[Math.floor(rnd() * LANTERN.length)]]); }
+        else bulbs.push([p.add(new T.Vector3(0, -0.05, 0)), BULB[Math.floor(rnd() * BULB.length)]]);
+      }
+    }
+    const poleGeo = new T.CylinderGeometry(0.06, 0.08, 1, 8);
+    for (const p of poles.values()) {
+      const m = new T.Mesh(poleGeo, poleMat); m.scale.y = p[1] + 0.3; m.position.set(p[0], (p[1] + 0.3) / 2, p[2]); root.add(m);
+      const foot = new T.Mesh(new T.CylinderGeometry(0.25, 0.3, 0.12, 10), poleMat); foot.position.set(p[0], 0.06, p[2]); root.add(foot);
+    }
+    if (wirePts.length) root.add(new T.LineSegments(new T.BufferGeometry().setFromPoints(wirePts), new T.LineBasicMaterial({ color: 0x0a0a0a })));
+    const lights = (list, geo, size) => {
+      if (!list.length) return;
+      const im = new T.InstancedMesh(geo, new T.MeshBasicMaterial({ color: 0xffffff }), list.length), m4 = new T.Matrix4(), c = new T.Color();
+      const pos = new Float32Array(list.length * 3), col = new Float32Array(list.length * 3);
+      list.forEach(([p, hex], i) => { m4.makeTranslation(p.x, p.y, p.z); im.setMatrixAt(i, m4); im.setColorAt(i, c.setHex(hex)); pos.set([p.x, p.y, p.z], i * 3); col.set([c.r * 0.9, c.g * 0.9, c.b * 0.9], i * 3); });
+      root.add(im);
+      const g = new T.BufferGeometry(); g.setAttribute('position', new T.BufferAttribute(pos, 3)); g.setAttribute('color', new T.BufferAttribute(col, 3));
+      root.add(new T.Points(g, new T.PointsMaterial({ size, map: glowTex, vertexColors: true, transparent: true, depthWrite: false, blending: T.AdditiveBlending })));
+    };
+    lights(bulbs, new T.SphereGeometry(0.06, 8, 6), 0.75);
+    const lg = new T.SphereGeometry(0.19, 12, 8); lg.scale(1, 1.25, 1);
+    lights(lanterns, lg, 1.9);
+    // the stage: a truss over it on four towers, coloured lamps on the front beam throwing beams down over the
+    // stage and the front rows, a backdrop with the festival's name lit up
+    const st = f.stage;
+    if (st) {
+      const geos = [], add = (geo, x, y, z, rx = 0, ry = 0, rz = 0) => { geo.applyMatrix4(new T.Matrix4().makeRotationFromEuler(new T.Euler(rx, ry, rz))); geo.translate(x, y, z); geos.push(geo.index ? geo.toNonIndexed() : geo); };
+      const H = 7.2, x0 = st.x0 + 0.4, x1 = st.x1 - 0.4, zF = st.z1 - 0.5, zB = st.z0 + 0.5;
+      const chord = (ax, ay, az, bx, by, bz) => { const d = new T.Vector3(bx - ax, by - ay, bz - az), l = d.length(), g = new T.CylinderGeometry(0.025, 0.025, l, 6); g.applyMatrix4(new T.Matrix4().makeRotationFromQuaternion(new T.Quaternion().setFromUnitVectors(new T.Vector3(0, 1, 0), d.normalize()))); g.translate((ax + bx) / 2, (ay + by) / 2, (az + bz) / 2); geos.push(g.toNonIndexed()); };
+      const truss = (a, b) => { // a box truss 0.3 m square from a to b, with zig-zag bracing
+        const d = new T.Vector3(b[0] - a[0], b[1] - a[1], b[2] - a[2]), l = d.length(); d.normalize();
+        const u = Math.abs(d.y) > 0.9 ? new T.Vector3(1, 0, 0) : new T.Vector3(0, 1, 0), s1 = new T.Vector3().crossVectors(d, u).normalize().multiplyScalar(0.15), s2 = new T.Vector3().crossVectors(d, s1).normalize().multiplyScalar(0.15);
+        const corners = [s1.clone().add(s2), s1.clone().sub(s2), s1.clone().negate().sub(s2), s1.clone().negate().add(s2)];
+        for (const c of corners) chord(a[0] + c.x, a[1] + c.y, a[2] + c.z, b[0] + c.x, b[1] + c.y, b[2] + c.z);
+        const n = Math.max(2, Math.round(l / 0.45));
+        for (let i = 0; i < n; i++) for (let k = 0; k < 4; k += 2) {
+          const c1 = corners[k], c2 = corners[(k + 1) % 4], p = (i / n) * l, q = ((i + 1) / n) * l;
+          chord(a[0] + d.x * p + c1.x, a[1] + d.y * p + c1.y, a[2] + d.z * p + c1.z, a[0] + d.x * q + c2.x, a[1] + d.y * q + c2.y, a[2] + d.z * q + c2.z);
+        }
+      };
+      for (const x of [x0, x1]) for (const z of [zF, zB]) truss([x, 0, z], [x, H, z]);
+      truss([x0, H, zF], [x1, H, zF]); truss([x0, H, zB], [x1, H, zB]);
+      for (const x of [x0, x1]) truss([x, H, zB], [x, H, zF]);
+      let n = 0; for (const g of geos) n += g.attributes.position.count;
+      const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3); let o = 0;
+      for (const g of geos) { pos.set(g.attributes.position.array, o * 3); nor.set(g.attributes.normal.array, o * 3); o += g.attributes.position.count; g.dispose(); }
+      const bg = new T.BufferGeometry(); bg.setAttribute('position', new T.BufferAttribute(pos, 3)); bg.setAttribute('normal', new T.BufferAttribute(nor, 3));
+      root.add(new T.Mesh(bg, new T.MeshStandardMaterial({ color: 0xb0b4b8, roughness: 0.4, metalness: 0.8 })));
+      // the lamps and their beams
+      const COLS = [0xff3fa0, 0x40c0ff, 0xffb040, 0x8a50ff, 0x40ff90, 0xff5040];
+      const can = new T.CylinderGeometry(0.13, 0.11, 0.3, 10);
+      for (let i = 0; i < 8; i++) {
+        const x = x0 + 0.6 + (i / 7) * (x1 - x0 - 1.2), color = COLS[i % COLS.length];
+        const target = new T.Vector3(x + (rnd() - 0.5) * 6, 0, st.z1 + 1 + rnd() * 8), from = new T.Vector3(x, H - 0.35, zF), d = target.clone().sub(from), l = d.length();
+        const q = new T.Quaternion().setFromUnitVectors(new T.Vector3(0, -1, 0), d.clone().normalize());
+        const lamp = new T.Mesh(can, new T.MeshBasicMaterial({ color })); lamp.position.copy(from); lamp.quaternion.copy(q); root.add(lamp);
+        const beam = new T.Mesh(new T.ConeGeometry(1.4, l, 16, 1, true), new T.MeshBasicMaterial({ color, transparent: true, opacity: 0.07, depthWrite: false, blending: T.AdditiveBlending, side: T.DoubleSide }));
+        beam.geometry.translate(0, -l / 2, 0); beam.position.copy(from); beam.quaternion.copy(q); root.add(beam);
+      }
+      // the backdrop
+      const c = document.createElement('canvas'); c.width = 1024; c.height = 384;
+      const g = c.getContext('2d'), gr = g.createLinearGradient(0, 0, 0, 384);
+      gr.addColorStop(0, '#120a2a'); gr.addColorStop(1, '#3a0f3a'); g.fillStyle = gr; g.fillRect(0, 0, 1024, 384);
+      for (let i = 0; i < 40; i++) { g.fillStyle = `rgba(255,${120 + rnd() * 120},${150 + rnd() * 100},${0.15 + rnd() * 0.3})`; g.beginPath(); g.arc(rnd() * 1024, rnd() * 384, 4 + rnd() * 30, 0, 7); g.fill(); }
+      g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = 'bold 110px sans-serif';
+      g.shadowColor = '#ff4fd0'; g.shadowBlur = 30; g.fillStyle = '#ffe6fa'; g.fillText('SUMMER LIGHTS', 512, 160);
+      g.font = 'bold 54px sans-serif'; g.shadowColor = '#40d0ff'; g.fillStyle = '#d8f6ff'; g.fillText('MUSIC  •  FOOD  •  ART', 512, 280);
+      const bt = new T.CanvasTexture(c);
+      const back = new T.Mesh(new T.PlaneGeometry(x1 - x0 - 0.6, 5.2), new T.MeshBasicMaterial({ map: bt, color: 0xcccccc }));
+      back.position.set((x0 + x1) / 2, 1.2 + 2.7, zB - 0.05); root.add(back);
+      // an LED strip along the stage's front edge
+      const lip = new T.Mesh(new T.BoxGeometry(st.x1 - st.x0 - 2.8, 0.04, 0.04), new T.MeshBasicMaterial({ color: 0x40c0ff }));
+      lip.position.set((st.x0 + st.x1) / 2, 1.18, st.z1 + 0.01); root.add(lip);
+    }
+    // the arch over the gate (you came in under it), on the fence behind the spawn
+    if (f.gate) {
+      const g = f.gate, cx = (g.x0 + g.x1) / 2, z = g.z1 + TS / 2, pm = new T.MeshStandardMaterial({ color: 0x3a2a4a, roughness: 0.6 });
+      for (const s of [-1, 1]) { const p = new T.Mesh(new T.BoxGeometry(0.7, 5.2, 0.7), pm); p.position.set(cx + s * 3.4, 2.6, z); root.add(p); }
+      const c = document.createElement('canvas'); c.width = 1024; c.height = 160;
+      const g2 = c.getContext('2d'); g2.fillStyle = '#2a1238'; g2.fillRect(0, 0, 1024, 160);
+      g2.textAlign = 'center'; g2.textBaseline = 'middle'; g2.font = 'bold 96px sans-serif'; g2.shadowColor = '#ffb040'; g2.shadowBlur = 24; g2.fillStyle = '#fff2d8'; g2.fillText('WELCOME', 512, 84);
+      const sign = new T.Mesh(new T.BoxGeometry(7.5, 1.2, 0.2), [pm, pm, pm, pm, new T.MeshBasicMaterial({ map: new T.CanvasTexture(c) }), new T.MeshBasicMaterial({ map: new T.CanvasTexture(c) })]);
+      sign.position.set(cx, 4.7, z); sign.rotation.y = Math.PI; root.add(sign);
+    }
+  },
   buildMesh(map) {
     const TS = this.TS, th = map.theme, root = new THREE.Group();
     const { W, H, t } = map;
@@ -1028,6 +1278,7 @@ G.Level = {
     // light costs nothing; adding or removing one recompiles every shader.)
     map.lamps = [];
     map.lights.forEach((l) => {
+      if (l.kind === 'string') { map.lamps.push({ x: l.x, y: l.y, z: l.z, color: l.color, i: l.i, d: l.d }); return; } // (its bulbs: buildFestival)
       if (l.porch) { // a lantern on the wall over a back door
         const box = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.26, 0.14), porchBox); box.position.set(l.x, l.y, l.z + l.porch * 0.07); root.add(box);
         const glow = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.18, 0.1), porchMat); glow.position.set(l.x, l.y, l.z + l.porch * 0.1); root.add(glow);
@@ -1068,17 +1319,19 @@ G.Level = {
       leaf.position.set(leafL / 2 + 0.02, (this.DOOR_H - 0.04) / 2, 0);
       leaf.layers.enable(1);
       pivot.add(leaf);
+      pivot.userData.leaf = leaf; // (bullet holes and blood on it go with it: G.R.onDoor)
       for (const side of [-1, 1]) { const k = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 6), knobMat); k.position.set(leafL - 0.08, 1.0, side * 0.045); pivot.add(k); }
       // hinge on one jamb; the second leaf of a double door hinges on the opposite jamb and swings the other way
       const m = d.mirror ? -1 : 1;
       if (d.axis === 'x') { pivot.position.set(d.x, 0, d.z - half * m); pivot.rotation.y = -Math.PI / 2 * m; }
       else { pivot.position.set(d.x - half * m, 0, d.z); if (d.mirror) pivot.rotation.y = Math.PI; }
-      pivot.userData = { base: pivot.rotation.y, ang: d.open ? 1 : 0, sign: m };
+      pivot.userData = { base: pivot.rotation.y, ang: d.open ? 1 : 0, sign: m, leaf };
       pivot.rotation.y = pivot.userData.base + (d.open ? Math.PI / 2 * 0.95 * m : 0);
       root.add(pivot);
       return pivot;
     });
 
+    if (map.fest) this.buildFestival(map, root);
     // (no extraction zone: the squad votes to leave once order's restored)
 
     // the weapon case: a hard-shell long-gun case lying along the wall. The lid is hinged at the back (on the
