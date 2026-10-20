@@ -15,7 +15,10 @@ G.Game = {
     this.settings = { sens: G.U.store.get('sens', 1), fov: G.U.store.get('fov', 80), vol: G.U.store.get('vol', 0.6) };
     this.myName = G.U.store.get('name', 'Operator' + Math.floor(Math.random() * 90 + 10));
     G.U.store.set('name', this.myName); // (kept: the same name after a refresh, so the squad knows who's back)
-    this.myColor = G.U.store.get('color', G.PLAYER_COLORS[Math.floor(Math.random() * 4)]);
+    // your callsign: an animal (its emblem and colour mark you out to the squad; js/callsigns.js)
+    this.myAnimal = G.U.store.get('animal', null);
+    if (!G.Callsigns.valid(this.myAnimal)) this.myAnimal = G.Callsigns.LIST[Math.floor(Math.random() * G.Callsigns.LIST.length)].id;
+    this.myColor = G.Callsigns.of(this.myAnimal).color;
     this.myLook = G.Rig.cleanLook(G.U.store.get('look', null)); // top, pants, eyewear, gloves (the menu)
     G.R.init();
     G.HUD.init();
@@ -78,8 +81,8 @@ G.Game = {
         if (!this._lp) return;
         const lp = this._lp;
         if (lp.rig && !document.getElementById('menu').classList.contains('hidden')) {
-          lp.yaw += 0.012;
-          lp.rig.update(1 / 60, { pos: new THREE.Vector3(0, 0, 0), yaw: Math.PI + Math.sin(lp.yaw) * 0.8, pitch: 0, crouch: false, alert: false });
+          lp.yaw += 0.008; // (turning all the way round: the name patch on the back too)
+          lp.rig.update(1 / 60, { pos: new THREE.Vector3(0, 0, 0), yaw: Math.PI + lp.yaw, pitch: 0, crouch: false, alert: false });
           lp.r.render(lp.sc, lp.cam);
         }
         requestAnimationFrame(spin);
@@ -88,9 +91,16 @@ G.Game = {
     }
     const lp = this._lp;
     if (lp.rig) lp.sc.remove(lp.rig.root);
-    lp.rig = G.Rig.create({ style: 'tactical', color: this.myColor, bare: true, seed: 977, look: this.myLook });
+    lp.rig = G.Rig.create({ style: 'tactical', color: this.myColor, animal: this.myAnimal, callName: this.myName, bare: true, seed: 977, look: this.myLook });
     lp.rig.setKit({ helmet: 0, carrier: 'c.patrol', plate: 1, cp: 3, belt: 'b.battle', bp: 2, ifak: 1 });
     lp.sc.add(lp.rig.root);
+  },
+  // your callsign (picked in the menu, or the host's pick for you when yours was taken)
+  setAnimal(id, keep) {
+    if (!G.Callsigns.valid(id) || id === this.myAnimal) return;
+    this.myAnimal = id; this.myColor = G.Callsigns.of(id).color;
+    if (keep) G.U.store.set('animal', id);
+    if (this._lp && this._lp.rig) this.lookPreview(); // (the officer in the menu, in the new patches)
   },
   // your own arms in first person: sleeves in your top's colour (bare forearms in a T-shirt), your gloves
   applyLook() {
@@ -105,12 +115,12 @@ G.Game = {
     this.$('routeMap').addEventListener('click', (e) => { const g = e.target.closest('[data-node]'); if (g) this.pickRoute(+g.dataset.node); });
     const name = this.$('nameInput');
     name.value = this.myName;
-    name.addEventListener('input', () => { this.myName = name.value.trim().slice(0, 16) || 'Operator'; G.U.store.set('name', this.myName); });
+    name.addEventListener('input', () => { this.myName = name.value.trim().slice(0, 16) || 'Operator'; G.U.store.set('name', this.myName); if (this._lp && this._lp.rig) this._lp.rig.setCallsign(this.myAnimal, this.myName); });
     const row = this.$('colorRow');
-    row.innerHTML = G.PLAYER_COLORS.map((c) => `<button class="sw${c === this.myColor ? ' on' : ''}" data-c="${c}" style="background:${G.U.hex(c)}"></button>`).join('');
+    row.innerHTML = G.Callsigns.LIST.map((a) => `<button class="sw animal${a.id === this.myAnimal ? ' on' : ''}" data-a="${a.id}" title="${a.name}">${G.Callsigns.html(a.id)}<span style="color:${G.U.hex(a.color)}">${a.name}</span></button>`).join('');
     row.addEventListener('click', (e) => {
       const b = e.target.closest('.sw'); if (!b) return;
-      this.myColor = +b.dataset.c; G.U.store.set('color', this.myColor);
+      this.setAnimal(b.dataset.a, true);
       row.querySelectorAll('.sw').forEach((x) => x.classList.toggle('on', x === b));
     });
 
@@ -302,7 +312,7 @@ G.Game = {
     if (G.Net.isHost && !G.Net.solo) G.Net.startBeacon(); // (findable from the same network)
     G.Me.newRun();
     this.runStarted = false;
-    G.Net.toHost({ t: 'hello', name: this.myName, color: this.myColor, look: this.myLook });
+    G.Net.toHost({ t: 'hello', name: this.myName, animal: this.myAnimal, look: this.myLook });
   },
   toMenu(reason) {
     G.Net.leave();
@@ -329,6 +339,7 @@ G.Game = {
     switch (m.t) {
       case 'welcome':
         this.roster = m.roster;
+        if (this.roster[G.Net.myId]) this.setAnimal(this.roster[G.Net.myId].animal);
         G.Views.syncRoster(this.roster);
         if (m.route) this.setRoute(m.route);
         if (m.phase === 'route') this.enterRoute(m.level, m.route);
@@ -348,6 +359,7 @@ G.Game = {
         // someone else just readied up: a chime and a line saying so
         const prev = this.roster || {};
         this.roster = m.roster;
+        if (this.roster[G.Net.myId]) this.setAnimal(this.roster[G.Net.myId].animal); // (yours was taken: the host's pick)
         for (const [id, r] of Object.entries(this.roster)) if (id !== G.Net.myId && r.ready && prev[id] && !prev[id].ready) this.readyNote(r);
         G.Views.syncRoster(this.roster);
         if (this.phase === 'lobby') this.renderLobby();
@@ -357,6 +369,7 @@ G.Game = {
       }
       case 'rvotes': if (this.routeSt) { this.routeSt.votes = m.v || {}; if (this.phase === 'route') this.renderRoute(); } break;
       case 'newrun':
+        this.tGrid = null;
         G.Me.newRun();
             break;
       case 'phase':
@@ -374,6 +387,7 @@ G.Game = {
       case 'lootRm': G.Loot.remove(m.id); break;
       case 'glass': if (this.phase === 'level') for (const id of m.ids || []) G.Views.breakGlass(id); break;
       case 'lootGot': G.Me.lootGot(m.item, m.x, m.z); break;
+      case 'team': this.teamSet(m); break;
       case 'cab': {
         if (this.phase !== 'level' || !this.cabs) break;
         this.cabs[m.i] = m.c;
@@ -558,7 +572,7 @@ G.Game = {
     this.$('lobbyCode').textContent = G.Net.code || '';
     let html = '';
     for (const [id, p] of Object.entries(this.roster)) {
-      html += `<div class="lp"><i style="background:${G.U.hex(p.color)}"></i>${G.U.esc(p.name)}${p.host ? ' <small>HOST</small>' : ''}${id === G.Net.myId ? ' <small>YOU</small>' : ''}</div>`;
+      html += `<div class="lp">${G.Callsigns.html(p.animal)}<span style="color:${G.U.hex(p.color)}">${G.U.esc(p.name)}</span>${p.host ? ' <small>HOST</small>' : ''}${id === G.Net.myId ? ' <small>YOU</small>' : ''}</div>`;
     }
     this.$('lobbyPlayers').innerHTML = html;
     this.$('btnStart').classList.toggle('hidden', !G.Net.isHost);
@@ -597,6 +611,53 @@ G.Game = {
     g.items = c[1].map(([mt, n, x, y, r]) => ({ it: G.Gear.medItem(mt, n), x, y, r }));
     g.lay = lay;
     g.counts = G.Server.cabCounts ? G.Server.cabCounts(c[1]) : null;
+  },
+  // ------------------------------------------------------------- the team locker
+  // the squad's shared locker at the quartermaster's (G.Server.teamEdit), kept as the host has it. Its items
+  // carry a tid (the host's name for them); you move things in and out in the stash, and teamSync tells the
+  // host what changed. base: the tids the host has; gone: those you've taken out (and not had back yet);
+  // sent: what you've put in that the host hasn't answered yet.
+  teamGrid() {
+    if (!this.tGrid) Object.assign((this.tGrid = G.Gear.grid(G.Server.TEAM_W, G.Server.TEAM_H, null, 'Team locker')), { locker: true, team: true, ver: 0, lay: '', base: new Set(), gone: new Set(), sent: new Set() });
+    return this.tGrid;
+  },
+  teamLay(items) { return items.map((e) => e.slice(0, 4).join(':')).sort().join('|'); },
+  teamSet(m) {
+    const g = this.teamGrid(), me = G.Me;
+    if (!this.teamBusy) this.teamSync(); // (anything you've moved that the host hasn't heard about yet goes first)
+    g.ver = m.ver;
+    g.base = new Set(m.items.map((e) => e[0]));
+    for (const tid of g.gone) if (!g.base.has(tid)) g.gone.delete(tid);
+    for (const tid of g.sent) if (g.base.has(tid)) g.sent.delete(tid);
+    const lay = this.teamLay(m.items);
+    if (lay !== g.lay) { g.items = m.items.map(([tid, x, y, r, pk]) => ({ it: Object.assign(G.Gear.unpack(pk), { tid }), x, y, r })); g.lay = lay; }
+    if (m.by === G.Net.myId) {
+      // taken by someone else first: it was never yours; and what didn't fit comes back to your locker
+      for (const tid of m.deny || []) G.InvUI.lose(tid);
+      for (const pk of m.ret || []) G.Gear.place([me.locker, ...G.Gear.body(me)], G.Gear.unpack(pk));
+      if ((m.deny || []).length) G.HUD.toast('', 'Someone took that from the team locker first', 1.8);
+      if ((m.ret || []).length) G.HUD.toast('', 'The team locker filled up: it went back to your locker', 1.8);
+    }
+    if (this.phase === 'shop') G.InvUI.refresh();
+  },
+  // after a change in the stash: how you left the team locker, to the host
+  teamSync() {
+    const g = this.tGrid;
+    if (!g || this.phase !== 'shop') return;
+    const keep = [], put = [], here = new Set();
+    for (const p of g.items) {
+      const r = p.r ? 1 : 0;
+      const tid = p.it.tid;
+      if (tid && (g.base.has(tid) || g.sent.has(tid)) && !g.gone.has(tid) && !here.has(tid)) { keep.push([tid, p.x, p.y, r]); here.add(tid); }
+      else { p.it.tid = `${G.Net.myId}.${(this.tidN = (this.tidN || 0) + 1)}`; g.sent.add(p.it.tid); here.add(p.it.tid); put.push([p.it.tid, p.x, p.y, r, G.Gear.pack(p.it)]); }
+    }
+    const lay = this.teamLay([...keep, ...put]);
+    if (lay === g.lay) return;
+    const take = [...g.base].filter((tid) => !here.has(tid) && !g.gone.has(tid));
+    for (const tid of take) g.gone.add(tid);
+    g.lay = lay; // (before sending: the host's own answer comes straight back)
+    this.teamBusy = true;
+    try { G.Net.toHost({ t: 'teamEdit', ver: g.ver, take, keep: keep.filter((e) => g.base.has(e[0])), put }); } finally { this.teamBusy = false; }
   },
   // ------------------------------------------------------------- the route map
   // the host's route: { seed, act, path, votes }, with the act's map rebuilt from its seed
@@ -697,7 +758,7 @@ G.Game = {
     let html = '<table><tr><th>Operator</th><th>Kills</th><th>Headshots</th><th>Damage</th><th>Downs</th><th>Revives</th></tr>';
     for (const [, s] of Object.entries(m.stats || {})) {
       const sx = s.sx || [0, 0, 0, 0, 0];
-      html += `<tr><td style="color:${G.U.hex(s.color)}">${G.U.esc(s.name)}</td><td>${sx[0]}</td><td>${sx[2]}</td><td>${G.U.fmt(sx[1])}</td><td>${sx[3]}</td><td>${sx[4]}</td></tr>`;
+      html += `<tr><td style="color:${G.U.hex(s.color)}">${G.Callsigns.html(s.animal)}${G.U.esc(s.name)}</td><td>${sx[0]}</td><td>${sx[2]}</td><td>${G.U.fmt(sx[1])}</td><td>${sx[3]}</td><td>${sx[4]}</td></tr>`;
     }
     this.$('goStats').innerHTML = html + '</table>';
     this.$('btnNewRun').classList.toggle('hidden', !G.Net.isHost);

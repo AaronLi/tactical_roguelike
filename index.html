@@ -16,7 +16,7 @@
 
     <label>Callsign</label>
     <input id="nameInput" maxlength="16" placeholder="Operator">
-    <label>Squad colour <small>(your armband and name)</small></label>
+    <label>Squad animal <small>(on your shoulder, your back patch and your pings)</small></label>
     <div id="colorRow" class="color-row"></div>
     <details class="look-details"><summary>Appearance</summary><div id="lookBox"></div></details>
 
@@ -107,7 +107,7 @@
   <div id="downed" class="hidden">
     <div class="big">YOU ARE DOWN</div>
     <div id="bleed"></div>
-    <div class="small">Your sidearm still works. A teammate can revive you.</div>
+    <div class="small">Your sidearm still works. You're bleeding out slowly: a teammate has to stop the bleeding (that only stabilises you) and give you blood before they can get you up.</div>
   </div>
   <div id="deadMsg" class="hidden">
     <div class="big">KIA</div>
@@ -191,6 +191,7 @@
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script src="js/util.js"></script>
 <script src="js/data.js"></script>
+<script src="js/callsigns.js"></script>
 <script src="js/parts.js"></script>
   <script src="js/gear.js"></script>
 <script src="js/medical.js"></script>

@@ -11,6 +11,7 @@ G.Views = {
 
   removeRig(rig) { G.R.dynRoot.remove(rig.root); rig.dispose(); },
   clearLevel() {
+    this.vRounds = [];
     G.Casings.clear();
     if (this.pings2) { for (const q of this.pings2.values()) { G.R.dynRoot.remove(q.s); q.s.material.map.dispose(); q.s.material.dispose(); } this.pings2.clear(); }
     for (const ev of this.enemies.values()) this.removeRig(ev.rig);
@@ -32,15 +33,16 @@ G.Views = {
     for (const [id, info] of Object.entries(roster)) {
       if (id === G.Net.myId) continue;
       let pv = this.players.get(id);
-      if (pv && pv.color !== info.color) { this.removeRig(pv.rig); this.players.delete(id); pv = null; }
+      if (pv && (pv.color !== info.color || pv.animal !== info.animal)) { this.removeRig(pv.rig); this.players.delete(id); pv = null; }
       if (!pv) {
-        const rig = G.Rig.create({ style: 'tactical', color: info.color, seed: id.length * 977, bare: true, look: info.look }); // dressed as they picked, kit from st.kt
-        const tag = null; // (no nameplates over teammates' heads: you know them by their kit and colour)
+        const rig = G.Rig.create({ style: 'tactical', color: info.color, animal: info.animal, callName: info.name, seed: id.length * 977, bare: true, look: info.look }); // dressed as they picked, kit from st.kt
+        const tag = null; // (no nameplates over teammates' heads: you know them by their patches and kit)
         rig.root.visible = false;
         G.R.dynRoot.add(rig.root);
-        pv = { id, name: info.name, color: info.color, rig, tag, st: null, pos: new THREE.Vector3(), yaw: 0, pitch: 0, first: true };
+        pv = { id, name: info.name, color: info.color, animal: info.animal, rig, tag, st: null, pos: new THREE.Vector3(), yaw: 0, pitch: 0, first: true };
         this.players.set(id, pv);
       }
+      if (pv.name !== info.name) pv.rig.setCallsign(info.animal, info.name);
       pv.name = info.name;
     }
     for (const id of [...this.players.keys()]) if (!roster[id]) this.removePlayer(id);
@@ -372,18 +374,21 @@ G.Views = {
       const bore = new THREE.Vector3(0, 0, -1).transformDirection(sh.rig.gun.matrixWorld), line = to.clone().sub(f).normalize();
       if (!(m.d > 0) && bore.dot(line) < Math.cos(10 * Math.PI / 180) && G.Game.map) to = f.clone().addScaledVector(bore, G.Level.raycast(G.Game.map, f.x, f.y, f.z, bore.x, bore.y, bore.z, 60).t);
     }
-    G.R.tracer(f, to, m.ty === 'marksman' ? 0xff6050 : 0xffa060, m.ty === 'marksman' ? 0.03 : 0.018);
     G.R.muzzleFlashAt(f);
     const me = G.R.camera.position;
     const wdef = G.WEAPONS[m.w] || G.WEAPONS[G.ENEMIES[m.ty].wpn];
+    // their round flies there (a machine gunner's belt has a tracer every fourth), and does what the host
+    // decided when it arrives: hits you, or someone else, or the wall
+    const ev0 = this.enemies.get(m.e), tr = wdef.cls === 'LMG' && ev0 && ((ev0.shots = (ev0.shots || 0) + 1) % 4 === 1);
+    const hitMe = m.d > 0 && m.tg === G.Net.myId, hz = m.hz, fromP = f.clone(), toP = to.clone();
+    this.visRound(f, to, wdef, tr ? 'tracer' : G.ballFor(G.calOf(wdef)), () => {
+      if (m.d > 0) { if (hitMe) { if (G.Game.phase === 'level') G.Me.takeHits(hz, wdef, fromP); } else G.R.impact(toP, null, 'blood'); }
+      else this.wallHit(fromP, toP);
+    });
     G.Casings.fired(wdef, false, f, to);
     if (!G.GunAudio.play(wdef.id, f)) G.Audio.shot(G.CLASS_SND[wdef.cls] || G.CLASS_SND.AR, me.distanceTo(f));
     if (m.tg !== G.Net.myId || !(m.d > 0)) G.Audio.flyby(f, to, wdef, G.ballFor(G.calOf(wdef))); // past you (a hit on you is felt, not heard going by)
     this.pings.push({ x: m.f[0], z: m.f[2], t: 2.5 });
-    if (m.d > 0) {
-      if (m.tg === G.Net.myId) G.Me.takeHits(m.hz, wdef, f);
-      else G.R.impact(to, null, 'blood');
-    } else this.wallHit(f, to);
     const ev = this.enemies.get(m.e);
     if (ev) ev.rig.recoil(G.Server.kickOf({ str: ev.str }, wdef)); // (the same kick the host gave it)
   },
@@ -406,11 +411,12 @@ G.Views = {
     const pv = this.players.get(m.id);
     if (pv) pv.rig.recoil();
     G.Audio.flyby(f, to, def, m.am || G.ballFor(G.calOf(def))); // a teammate's round going past you
-    if (def.cls === 'BOW') G.R.tracer(f, to, def.tracer, 0.03, 0.25);
-    else if (!def.explosive) {
-      G.R.tracer(f, to, def.tracer || 0xffd080, def.cls === 'RAIL' ? 0.06 : 0.018);
-      this.wallHit(f, to);
-    } else G.R.tracer(f, to, 0xbbbbbb, 0.05);
+    // their round flies to where it was headed (the walls it'll meet, as the shooter worked it out)
+    const am = m.am || G.ballFor(G.calOf(def)), fromP = f.clone(), toP = to.clone();
+    this.visRound(f, to, def, am, () => {
+      if (def.cls === 'RAIL') G.R.tracer(fromP, toP, def.tracer || 0x55ddff, 0.06);
+      if (!def.explosive) this.wallHit(fromP, toP);
+    });
     if (!m.sil) G.R.muzzleFlashAt(f, def.tracer || 0xffb060);
     G.Casings.fired(def, false, f, to, m.am);
     const d = G.R.camera.position.distanceTo(f);
@@ -419,6 +425,28 @@ G.Views = {
     else if (!G.GunAudio.play(def.soundKey, f)) G.Audio.shot(m.sil ? G.SUPPRESSOR.snd : def.snd, d);
   },
 
+  // ---------------------------------------------------------------- other people's rounds
+  // A round someone else fired, as you see it: from f straight to `to` at its speed (G.roundSpeed, slowing with
+  // drag), drawn like your own (G.R.bullet); arrive: what happens when it gets there.
+  visRound(f, to, def, am, arrive) {
+    const len = f.distanceTo(to);
+    if (len < 0.05) { arrive(); return; }
+    const rail = def.cls === 'RAIL';
+    (this.vRounds = this.vRounds || []).push({ f: f.clone(), dir: to.clone().sub(f).divideScalar(len), len, d: 0, def, arrive,
+      v: rail ? 3000 : Math.max(40, G.roundSpeed(def, am) || 400), drag: rail ? 1e9 : G.dragOf(def, am), tracer: !!(G.AMMO[am] && G.AMMO[am].tracer) });
+  },
+  stepRounds(dt) {
+    const rs = this.vRounds;
+    if (!rs || !rs.length) return;
+    dt = Math.min(dt, 0.05);
+    for (let i = rs.length - 1; i >= 0; i--) {
+      const b = rs[i], step = b.v * dt;
+      b.d = Math.min(b.len, b.d + step);
+      b.v *= Math.exp(-step / b.drag);
+      G.R.bullet(b.f.clone().addScaledVector(b.dir, b.d), b.dir, b.d, b.def, b.tracer, b.v);
+      if (b.d >= b.len || b.v < 30) { rs.splice(i, 1); b.arrive(); }
+    }
+  },
   addNade(p, v, fuse, own, enemy) {
     const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 6), new THREE.MeshLambertMaterial({ color: 0x3a4a2a, emissive: 0x220000 }));
     mesh.position.copy(p);
@@ -444,7 +472,7 @@ G.Views = {
   // the same size on screen however far off, gone after a few seconds. One per player: a new one replaces it.
   PING_T: 6,
   addPing(id, p) {
-    const me = id === G.Net.myId, r = G.Game.roster && G.Game.roster[id], name = me ? G.Game.myName : r ? r.name : '?', color = me ? G.Game.myColor : r ? r.color : 0xffffff;
+    const me = id === G.Net.myId, r = G.Game.roster && G.Game.roster[id], name = me ? G.Game.myName : r ? r.name : '?', color = me ? G.Game.myColor : r ? r.color : 0xffffff, animal = me ? G.Game.myAnimal : r ? r.animal : null;
     this.pings2 = this.pings2 || new Map();
     const old = this.pings2.get(id);
     if (old) { G.R.dynRoot.remove(old.s); old.s.material.map.dispose(); old.s.material.dispose(); }
@@ -454,7 +482,9 @@ G.Views = {
     g.lineWidth = 6; g.strokeStyle = 'rgba(0,0,0,0.85)';
     const label = name;
     while (g.measureText(label).width > 380 && parseInt(g.font, 10) > 16) g.font = `bold ${parseInt(g.font.split(' ')[1], 10) - 2}px Consolas, monospace`; // (a long name: smaller)
-    g.strokeText(label, 200, 30); g.fillStyle = col; g.fillText(label, 200, 30);
+    const tw = g.measureText(label).width, ax = animal ? 22 : 0; // (their animal before their name)
+    g.strokeText(label, 200 + ax, 30); g.fillStyle = col; g.fillText(label, 200 + ax, 30);
+    if (animal) { g.save(); g.translate(200 + ax - tw / 2 - 48, 8); g.beginPath(); g.arc(22, 22, 23, 0, Math.PI * 2); g.fillStyle = 'rgba(0,0,0,0.6)'; g.fill(); G.Callsigns.draw(g, animal, 44, color); g.restore(); }
     // the marker: a diamond pointing down at the spot
     g.beginPath(); g.moveTo(200, 150); g.lineTo(176, 100); g.lineTo(200, 62); g.lineTo(224, 100); g.closePath();
     g.lineWidth = 5; g.strokeStyle = 'rgba(0,0,0,0.85)'; g.stroke(); g.fillStyle = col; g.fill();
@@ -479,6 +509,7 @@ G.Views = {
   update(dt) {
     G.Casings.update(dt);
     this.updatePings(dt);
+    this.stepRounds(dt);
     if (G.Game.map && G.R.camera) { // the lights follow you (and, aiming, what you're aiming at)
       let focus = null;
       if (G.Me.adsT > 0.5 && G.Game.map.theme.layout === 'festival') {

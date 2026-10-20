@@ -4,8 +4,11 @@
 // The body is seven parts, each with its own health: head 35, thorax 85, stomach 70, arms 60, legs 65. A hit
 // takes health from the part it lands on, and can leave an injury there:
 //   bleeding (light or heavy), a fracture (arms and legs), a punctured lung (thorax), a gut wound (stomach).
-// An unarmoured head is still a kill. The head at zero is death; the thorax at zero puts you down (a teammate
-// can revive you). A destroyed arm, leg or stomach passes further damage on to the thorax.
+// An unarmoured head is still a kill. The head at zero is death; the thorax at zero puts you down, and so does
+// blood running low. A destroyed arm, leg or stomach passes further damage on to the thorax.
+// Down, you bleed out slowly (a sixteenth of the rate standing, but nothing clots any more), until the blood's gone.
+// A teammate stopping every bleed only stabilises you; to get you up they also need your blood back over half
+// (blood bags), then a revive.
 // Light bleeding clots by itself in 30-60 s (a bandage stops it at once; a fresh wound there starts it over); heavy
 // bleeding never stops without a tourniquet or gauze. Bleeding drains blood (100 to start): low blood hurts your aim and pace, very low puts you down, none is
 // death. Pain (fractures, wrecked parts, bleeding) throws your aim; painkillers hold it off for two minutes.
@@ -38,7 +41,8 @@ G.Med = (() => {
   const DRAIN = { light: 0.35, heavy: 2.2, gut: 0.08 }; // blood per second
   const PK = 120; // painkillers, seconds
   const BAG = 40; // a blood bag, % blood
-  const REVIVE_BLOOD = 25; // too little blood below this to be brought round (a blood bag first)
+  const REVIVE_BLOOD = 50; // too little blood below this to stand (blood bags first)
+  const DOWN_K = 0.06; // down: bleeding this much slower (you're still, your pressure's low)
 
   function newBody() {
     const parts = {};
@@ -79,16 +83,19 @@ G.Med = (() => {
   }
   // a light bleed starting (or a fresh one on top): it clots by itself in 30-60 s
   function bleed(p) { p.light = true; p.clot = 30 + Math.random() * 30; }
-  // bleeding, light bleeds clotting, painkillers wearing off. Returns 'down' / 'dead' when the blood runs low / out.
-  function tick(b, dt) {
-    let drain = 0;
-    for (const p of Object.values(b.parts)) {
-      if (p.light && (p.clot = (p.clot == null ? 45 : p.clot) - dt) <= 0) { p.light = false; p.clot = null; }
-      if (p.light) drain += DRAIN.light;
-      if (p.heavy) drain += DRAIN.heavy;
-      if (p.gut) drain += DRAIN.gut;
-    }
-    b.blood = Math.max(0, b.blood - drain * dt);
+  // blood lost per second (down: slower, see DOWN_K)
+  function drainOf(b, down) {
+    let d = 0;
+    for (const p of Object.values(b.parts)) d += (p.light ? DRAIN.light : 0) + (p.heavy ? DRAIN.heavy : 0) + (p.gut ? DRAIN.gut : 0);
+    return down ? d * DOWN_K : d;
+  }
+  // down: seconds until you've bled out, or null when nothing's bleeding (stable)
+  function bleedOut(b) { const d = drainOf(b, true); return d > 0 ? b.blood / d : null; }
+  // bleeding, light bleeds clotting (not once you're down), painkillers wearing off. Returns 'down' / 'dead'
+  // when the blood runs low / out.
+  function tick(b, dt, down) {
+    if (!down) for (const p of Object.values(b.parts)) if (p.light && (p.clot = (p.clot == null ? 45 : p.clot) - dt) <= 0) { p.light = false; p.clot = null; }
+    b.blood = Math.max(0, b.blood - drainOf(b, down) * dt);
     b.pk = Math.max(0, b.pk - dt);
     if (b.blood <= 0) return 'dead';
     if (b.blood <= 15) return 'down';
@@ -141,10 +148,14 @@ G.Med = (() => {
     else if (I.fixes === 'lung') p.lung = false;
     return true;
   }
-  // brought round by a teammate: the thorax holding again, enough blood to stand
-  // brought round by a teammate: the thorax holding again (the blood has to be there already: cantRevive)
+  // brought round by a teammate: the thorax holding again (the bleeding stopped and the blood back already: cantRevive)
   function revive(b) { b.parts.thorax.hp = Math.max(b.parts.thorax.hp, 20); }
-  const cantRevive = (b) => (b && b.blood < REVIVE_BLOOD ? 'Too little blood to bring them round: a blood bag first' : null);
+  function cantRevive(b) {
+    if (!b) return null;
+    if (bleeding(b)) return 'Still bleeding: stop every bleed first';
+    if (b.blood < REVIVE_BLOOD) return `Stable, but too little blood to stand (${Math.round(b.blood)}%): blood bags until it's over ${REVIVE_BLOOD}%`;
+    return null;
+  }
   // overall, for the team display (0..100)
   const overall = (b) => Math.max(0, Math.min(b.blood, b.parts.thorax.hp / b.parts.thorax.max * 100, b.parts.head.hp / b.parts.head.max * 100));
 
@@ -204,5 +215,5 @@ G.Med = (() => {
     const kit = '<g class="fkit"><path d="M38 23 Q50 26 62 23"/><path d="M36 40 L37 66 M64 40 L63 66"/><path d="M32 89 Q50 93 68 89"/></g>';
     return `<svg class="figure ${opts.cls || ''}" viewBox="0 0 100 190" ${opts.w ? `width="${opts.w}"` : ''} xmlns="http://www.w3.org/2000/svg">${order.map(part).join('')}${kit}</svg>`;
   }
-  return { PARTS, NAME, ITEMS, LIMBS, figure, isLimb, newBody, partOf, hit, tick, bleeding, aimPenalty, speedMult, cantTreat, treat, revive, cantRevive, REVIVE_BLOOD, overall, encode, decode, describe };
+  return { PARTS, NAME, ITEMS, LIMBS, figure, isLimb, newBody, partOf, hit, tick, bleedOut, bleeding, aimPenalty, speedMult, cantTreat, treat, revive, cantRevive, REVIVE_BLOOD, overall, encode, decode, describe };
 })();

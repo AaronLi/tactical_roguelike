@@ -28,7 +28,7 @@ G.Server = {
   },
   roster() {
     const r = {};
-    for (const [id, p] of this.players) r[id] = { name: p.name, color: p.color, look: p.look, ready: p.ready, host: id === G.Net.myId };
+    for (const [id, p] of this.players) r[id] = { name: p.name, color: p.color, animal: p.animal, look: p.look, ready: p.ready, host: id === G.Net.myId };
     return r;
   },
   sendRoster() { G.Net.broadcast({ t: 'roster', roster: this.roster() }); },
@@ -38,8 +38,12 @@ G.Server = {
     switch (m.t) {
       case 'hello': {
         const name = String(m.name || 'Operator').slice(0, 16);
-        const color = typeof m.color === 'number' ? m.color : 0x3fa9f5;
-        this.players.set(from, { id: from, name, color, look: G.Rig.cleanLook(m.look), ready: false, st: null });
+        // their animal (one of each to a squad: if theirs is taken, the first one free)
+        const CS = G.Callsigns, taken = new Set([...this.players.values()].filter((q) => q.id !== from).map((q) => q.animal));
+        let animal = CS.valid(m.animal) ? m.animal : null;
+        if (!animal || taken.has(animal)) animal = (CS.LIST.find((a) => !taken.has(a.id)) || CS.of(animal)).id;
+        const color = CS.of(animal).color;
+        this.players.set(from, { id: from, name, color, animal, look: G.Rig.cleanLook(m.look), ready: false, st: null });
         G.Net.sendTo(from, {
           t: 'welcome', id: from, roster: this.roster(), phase: this.phase, level: this.level,
           seed: this.seed, shopSeed: this.shopSeed, th: this.theme, route: this.routeMsg(),
@@ -50,6 +54,7 @@ G.Server = {
           loot: this.phase === 'level' && this.loot ? [...this.loot.values()].map((l) => [l.id, l.x, l.y, l.z, l.item, l.yaw]) : null,
           glass: this.phase === 'level' && this.glassBroken ? [...this.glassBroken] : null,
         });
+        if (this.phase === 'shop') G.Net.sendTo(from, this.teamMsg());
         this.sendRoster();
         if (from !== G.Net.myId) G.Net.broadcast({ t: 'chat', id: null, m: name + ' joined the squad.' });
         break;
@@ -142,6 +147,12 @@ G.Server = {
         break;
       }
       // first aid cabinets: opened (once, for everyone), and officers' edits (what they took and put in)
+      case 'teamEdit': {
+        if (this.phase !== 'shop' || !p) break;
+        const r = this.teamEdit(m);
+        G.Net.broadcast(Object.assign(this.teamMsg(), { by: from, deny: r.deny, ret: r.ret }));
+        break;
+      }
       case 'openCab': case 'cabEdit': {
         const c = this.map && this.map.cabinets && this.map.cabinets[m.i], cab = this.cabs && this.cabs[m.i];
         if (this.phase !== 'level' || !c || !cab || !p || !p.st || Math.hypot(c.x - p.st.p[0], c.z - p.st.p[2]) > 2.6) break;
@@ -196,6 +207,7 @@ G.Server = {
   // --------------------------------------------------------------- phases
   startRun() {
     this.level = 1;
+    this.team = { ver: 0, items: [] };
     G.Net.broadcast({ t: 'newrun' });
     this.toRoute();
   },
@@ -339,6 +351,42 @@ G.Server = {
     return { took, deny, ret };
   },
   cabMsg() { return (this.cabs || []).map((c) => [c.open ? 1 : 0, c.items, c.ver]); },
+  // The team locker: a TEAM_W x TEAM_H grid at the quartermaster's that the whole squad shares for the run.
+  // items: [[tid, x, y, rot, packed item], ...]; ver counts changes. An officer sends how they left it: take
+  // (the tids they took out), keep (where the rest now sit), put (what they put in, and where). Made against
+  // the state as it is, it's taken as it is; against an older one, their takes and puts are merged into
+  // what's there now (taking something already gone is denied, a put with no room left comes back).
+  TEAM_W: 7, TEAM_H: 5,
+  team: null,
+  teamMsg() { const t = this.team || { ver: 0, items: [] }; return { t: 'team', ver: t.ver, items: t.items }; },
+  teamGrid() { const g = G.Gear.grid(this.TEAM_W, this.TEAM_H, null, 'Team locker'); g.locker = true; return g; },
+  teamEdit(m) {
+    const Gr = G.Gear, t = this.team || (this.team = { ver: 0, items: [] }), have = new Map(t.items.map((e) => [e[0], e]));
+    const arr = (a) => (Array.isArray(a) ? a.slice(0, this.TEAM_W * this.TEAM_H) : []);
+    const take = arr(m.take).map(String), keep = arr(m.keep).filter(Array.isArray), put = [];
+    for (const e of arr(m.put)) { if (!Array.isArray(e)) continue; try { const it = Gr.unpack(e[4]); put.push([String(e[0]), e[1] | 0, e[2] | 0, e[3] ? 1 : 0, Gr.pack(it), it]); } catch (err) { /* not an item */ } }
+    const deny = take.filter((tid) => !have.has(tid)), unpack = (e) => Gr.unpack(e[4]);
+    let items = null;
+    const ret = [];
+    if (m.ver === t.ver && !deny.length && keep.length + take.length === have.size && keep.every((e) => have.has(String(e[0])))) {
+      const g = this.teamGrid(), out = [];
+      let ok = true;
+      for (const [tid, x, y, r] of keep) { const e = have.get(String(tid)), it = unpack(e); if (!Gr.fits(g, it, x | 0, y | 0, r ? 1 : 0)) { ok = false; break; } Gr.put(g, it, x | 0, y | 0, r); out.push([e[0], x | 0, y | 0, r ? 1 : 0, e[4]]); }
+      for (const [tid, x, y, r, pk, it] of ok ? put : []) { if (have.has(tid) || !Gr.fits(g, it, x, y, r)) { ok = false; break; } Gr.put(g, it, x, y, r); out.push([tid, x, y, r, pk]); }
+      if (ok) items = out;
+    }
+    if (!items) { // merged into what's there now
+      const g = this.teamGrid(), gone = new Set(take);
+      items = t.items.filter((e) => !gone.has(e[0]));
+      for (const e of items) Gr.put(g, unpack(e), e[1], e[2], e[3]);
+      for (const [tid0, , , , pk, it] of put) {
+        const s = Gr.findSpot(g, it), tid = have.has(tid0) ? tid0 + '+' : tid0;
+        if (s) { Gr.put(g, it, s.x, s.y, s.rot); items.push([tid, s.x, s.y, s.rot ? 1 : 0, pk]); } else ret.push(pk);
+      }
+    }
+    t.items = items; t.ver++;
+    return { deny, ret };
+  },
   // [code (null when empty), mag, reserve, open, ammo type] or null when the level has no case
   caseMsg() { return this.map && this.map.case ? [this.wcase ? this.wcase.code : null, this.wcase ? this.wcase.mag : 0, this.wcase ? this.wcase.reserve : 0, this.caseOpen ? 1 : 0, this.wcase ? this.wcase.am : null, this.wcase ? this.wcase.kit || null : null] : null; },
   toShop() {
@@ -346,6 +394,7 @@ G.Server = {
     this.shopSeed = (Math.random() * 2 ** 31) | 0;
     for (const p of this.players.values()) p.ready = false;
     G.Net.broadcast({ t: 'phase', phase: 'shop', level: this.level, shopSeed: this.shopSeed, report: this.report });
+    G.Net.broadcast(this.teamMsg());
     this.sendRoster();
   },
   checkReady() {
@@ -357,7 +406,7 @@ G.Server = {
   gameOver() {
     this.phase = 'gameover';
     const stats = {};
-    for (const [id, p] of this.players) stats[id] = { name: p.name, color: p.color, sx: p.st ? p.st.sx : null };
+    for (const [id, p] of this.players) stats[id] = { name: p.name, color: p.color, animal: p.animal, sx: p.st ? p.st.sx : null };
     G.Net.broadcast({ t: 'phase', phase: 'gameover', level: this.level, stats });
   },
   toLobby() {

@@ -410,12 +410,14 @@ G.AMMO_TYPES = { rifle: ['ball', 'hp', 'ap', 'tracer', 'subsonic'], pistol: ['ba
 // 343 m/s). Reference velocities by caliber at a reference barrel length (inches), scaled gently by the
 // build's barrel; how far it carries before drag takes 63% of its speed (m: pellets slow fast).
 G.MUZZLE_V = {
-  '5.56/45': [940, 20, 900], '7.62/39': [715, 16.3, 800], '7/43': [920, 16, 950], '7.62/51': [840, 22, 1000],
-  '9/19': [370, 4.5, 450], '5.7/29': [715, 10.4, 700], '11.43/23': [260, 5, 450], '18.5/70': [400, 18, 70],
-  '7.62/54': [830, 28, 1000], '12.7/99': [880, 29, 1600], '40/46': [76, 12, 400], '7.65/17': [300, 4, 400],
-  '12.7/33': [450, 6, 500], '9.07/33': [440, 4, 450], '12.7/41': [550, 8, 500], '4.6/30': [720, 7, 650],
-  '5.6/39': [880, 16, 850], '7.62/63': [820, 24, 950], '9/39': [295, 7.9, 600], '11.6/53': [600, 22, 600],
-  '8.6/69': [915, 27, 1500], '7.62/25': [450, 4.6, 450], '10.4/63': [330, 3, 60], '11.43/33': [290, 5, 450],
+  // (the drag lengths from real retained velocities: 5.56 keeps about 73% of its speed at 300 m, 7.62×51 76%,
+  // .338 86%, .50 BMG 91%; 9 mm about 87% at 100 m, .45 ACP 94%; heavy subsonic 9×39 barely slows)
+  '5.56/45': [940, 20, 950], '7.62/39': [715, 16.3, 1000], '7/43': [920, 16, 1050], '7.62/51': [840, 22, 1100],
+  '9/19': [370, 4.5, 700], '5.7/29': [715, 10.4, 550], '11.43/23': [260, 5, 1600], '18.5/70': [400, 18, 70],
+  '7.62/54': [830, 28, 1100], '12.7/99': [880, 29, 3000], '40/46': [76, 12, 2000], '7.65/17': [300, 4, 500],
+  '12.7/33': [450, 6, 850], '9.07/33': [440, 4, 500], '12.7/41': [550, 8, 600], '4.6/30': [720, 7, 550],
+  '5.6/39': [880, 16, 900], '7.62/63': [820, 24, 1100], '9/39': [295, 7.9, 2000], '11.6/53': [600, 22, 700],
+  '8.6/69': [915, 27, 2000], '7.62/25': [450, 4.6, 600], '10.4/63': [330, 3, 60], '11.43/33': [290, 5, 900],
   bolt: [120, 20, 300], cell: [2000, 20, 3000],
 };
 G.SOUND_SPEED = 343;
@@ -430,6 +432,16 @@ G.roundSpeed = (def, am, d = 0) => {
   if (am === 'subsonic' || def.integral) v = Math.min(v, 310);
   return v * Math.exp(-d / (am === 'slug' ? 350 : ref[2])); // (a slug carries its speed; pellets shed it)
 };
+// Rounds are projectiles (js/player.js fly): they slow with drag over dragOf metres (to 37% of their speed) and
+// fall with gravity, so every gun's sights are zeroed: the round leaves a hair above the line of sight, crosses
+// it at zeroOf metres and drops below it past that. Handguns, SMGs and shotguns at 25 m, carbines and machine
+// guns at 50, marksman and sniper rifles at 100, a launcher's leaf sight at 40. The sights sit sightH metres
+// above the bore, so the round starts that far under your eye and climbs to the line: that's what gives a
+// carbine zeroed at 50 m its second zero out near 200 (and puts a round low on something very close).
+G.GRAVITY = 9.81;
+G.zeroOf = (def) => ({ PST: 25, MP: 25, SMG: 25, SG: 25, BOW: 20, GL: 40, DMR: 100, SNP: 100, RAIL: 0 })[def.cls] ?? 50;
+G.sightH = (def) => ({ PST: 0.02, MP: 0.025, SMG: 0.05, SG: 0.035, BOW: 0.05, GL: 0.06, RAIL: 0 })[def.cls] ?? 0.065;
+G.dragOf = (def, am) => { const ref = G.MUZZLE_V[G.calOf(def)]; return am === 'slug' ? 350 : ref ? ref[2] : 600; };
 G.ballFor = (cal) => G.AMMO_TYPES[(G.CALIBERS[cal] || { group: 'cell' }).group][0];
 // how often each type turns up loaded in a found gun (relative): ball and buckshot mostly, AP and flechette rarely
 G.AMMO_RARITY = { ball: 10, hp: 3, tracer: 3, subsonic: 2, ap: 1, buck: 10, slug: 4, birdshot: 3, flechette: 1, he: 1, broadhead: 1, railslug: 1 };

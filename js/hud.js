@@ -172,7 +172,7 @@ G.HUD = {
 
     // downed / dead overlays
     this.el.downed.classList.toggle('hidden', !Me.down);
-    if (Me.down) this.set('bleed', `Bleeding out: ${Math.ceil(Me.bleed)}s`);
+    if (Me.down) this.set('bleed', Me.bleed == null ? (G.Med.cantRevive(Me.body) ? `Stable: you need blood (${Math.round(Me.body.blood)}%) to get up` : 'Stable: a teammate can get you up') : `Bleeding out: ${Math.ceil(Me.bleed)}s`);
     this.el.deadMsg.classList.toggle('hidden', !Me.dead);
 
     // boss bar
@@ -193,9 +193,9 @@ G.HUD = {
       if (st) {
         hpPct = (st.hp / st.mhp) * 100; arPct = st.amx ? (st.ar / st.amx) * 100 : 0;
         if (st.dd) status = '<span class="kia">KIA</span>';
-        else if (st.dn) status = `<span class="dn">DOWN ${st.bl}s</span>`;
+        else if (st.dn) status = `<span class="dn">DOWN ${st.bl < 0 ? 'stable' : st.bl + 's'}</span>`;
       } else status = '<span class="dim">…</span>';
-      html += `<div class="tm"><div class="tn" style="color:${G.U.hex(pv.color)}">${G.U.esc(pv.name)} ${status}</div>
+      html += `<div class="tm"><div class="tn" style="color:${G.U.hex(pv.color)}">${G.Callsigns.html(pv.animal)}${G.U.esc(pv.name)} ${status}</div>
         <div class="tb"><div class="ta" style="width:${arPct}%"></div></div><div class="tb"><div class="th" style="width:${hpPct}%"></div></div></div>`;
     }
     this.set('team', html);
@@ -267,12 +267,12 @@ G.HUD = {
   scoreboardHTML() {
     const rows = [];
     const me = G.Me.state();
-    rows.push({ name: G.Game.myName, color: G.Game.myColor, st: me });
-    for (const pv of G.Views.players.values()) rows.push({ name: pv.name, color: pv.color, st: pv.st });
+    rows.push({ name: G.Game.myName, color: G.Game.myColor, animal: G.Game.myAnimal, st: me });
+    for (const pv of G.Views.players.values()) rows.push({ name: pv.name, color: pv.color, animal: pv.animal, st: pv.st });
     let html = '<table><tr><th>Operator</th><th>Kills</th><th>HS</th><th>Damage</th><th>Downs</th><th>Revives</th><th>Credits</th></tr>';
     for (const r of rows) {
       const sx = (r.st && r.st.sx) || [0, 0, 0, 0, 0];
-      html += `<tr><td style="color:${G.U.hex(r.color)}">${G.U.esc(r.name)}</td><td>${sx[0]}</td><td>${sx[2]}</td><td>${G.U.fmt(sx[1])}</td><td>${sx[3]}</td><td>${sx[4]}</td><td>${r.st ? G.U.fmt(r.st.cred) : '—'}</td></tr>`;
+      html += `<tr><td style="color:${G.U.hex(r.color)}">${G.Callsigns.html(r.animal)}${G.U.esc(r.name)}</td><td>${sx[0]}</td><td>${sx[2]}</td><td>${G.U.fmt(sx[1])}</td><td>${sx[3]}</td><td>${sx[4]}</td><td>${r.st ? G.U.fmt(r.st.cred) : '—'}</td></tr>`;
     }
     html += '</table>';
     if (G.Net.code) html += `<div class="sb-perks">Room code: <b>${G.Net.code}</b></div>`;

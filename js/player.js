@@ -19,6 +19,7 @@ G.Me = {
     this.credits = 500;
     G.Gear.starter(this); // kit, pockets and locker (js/gear.js)
     this.weapons = { s: this.makeWeapon('p9') }; // just a sidearm: the first primary comes from the shop
+    const w = this.weapons.s; w.ammo = 'tracer'; w.tube = w.tube.map(() => 'tracer'); if (w.chamber) w.chamber = 'tracer'; // (loaded with tracers, like its spares)
     this.stash = G.Gear.stashProxy(this); // weapon parts owned but not fitted: items, read as { partId: count }
     this.slot = 's';
     this.stats = { kills: 0, dmg: 0, hs: 0, downs: 0, revives: 0 };
@@ -57,6 +58,7 @@ G.Me = {
     } else if (Gr.isGear(it) && it.k !== 'plate' && it.k !== 'face' && !this.kit[it.k]) { this.kit[it.k] = it; ok = true; } // worn, if that's free
     else if (it.k === 'plate' && this.kit.carrier && Gr.defOf(this.kit.carrier).plate && !this.kit.carrier.plate) { this.kit.carrier.plate = it; ok = true; }
     else if (it.k === 'face') { if (this.kit.helmet && Gr.defOf(this.kit.helmet).face && !this.kit.helmet.face) { this.kit.helmet.face = it; ok = true; } else ok = Gr.stow(this, it); }
+    else if (it.k === 'pouch') ok = !!Gr.place(Gr.molles(this), it) || Gr.stow(this, it); // a pouch: straight onto your MOLLE if there's room
     else ok = Gr.stow(this, it);
     if (ok) { G.HUD.toast('', `Picked up: ${name}`, 1.4); G.Audio.pickup(); if (G.InvUI.field) G.InvUI.render(); }
     else { G.HUD.toast('', `No room on you for the ${name}`, 1.6); G.Net.toHost({ t: 'drop', item: packed, x, z }); }
@@ -332,7 +334,7 @@ G.Me = {
       const s = 0.0022 * G.Game.settings.sens * z;
       // a magazine in your hand, or the gun held open for a chamber check: the mouse turns that, not your view
       const mc = this.magChk;
-      if (mc && !mc.rel && mc.k > 0.6) { mc.yaw = G.U.clamp(mc.yaw + e.movementX * s * 1.6, -1.4, 1.4); mc.pitch = G.U.clamp(mc.pitch + e.movementY * s * 1.6, -1.0, 0.6); return; }
+      if (mc && !mc.rel && mc.k > 0.6) { mc.yaw = G.U.clamp(mc.yaw + e.movementX * s * 1.6, -1.4, 1.4); mc.pitch = G.U.clamp(mc.pitch + e.movementY * s * 1.6, -0.8, 1.4); return; }
       if (this.inspHold) { this.inspYaw = G.U.clamp((this.inspYaw || 0) + e.movementX * s * 1.4, -1.5, 1.5); this.inspPitch = G.U.clamp((this.inspPitch || 0) + e.movementY * s, -0.6, 0.6); return; } // (inspYaw: the roll)
       this.yaw -= e.movementX * s;
       this.pitch = G.U.clamp(this.pitch - e.movementY * s, -1.5, 1.5);
@@ -347,6 +349,7 @@ G.Me = {
     this.body = G.Med.newBody(); // injuries part by part (js/medical.js); hp is the overall, for the team display
     this.hp = this.maxHp();
     this.down = false; this.dead = false;
+    this.rounds = [];
     this.crouch = false; this.onGround = true;
     this.eyeH = 1.62;
     this.fireCd = 0; this.swapT = 0; this.reloading = false; this.reloadT = 0; this.burstQ = 0;
@@ -379,21 +382,19 @@ G.Me = {
   update(dt) {
     const map = G.Game.map;
     if (!map || !this.pos) return;
+    this.stepRounds(dt);
     if (this.dead) { this.spectate(); this.sendState(dt); return; }
 
     this.sinceHurt += dt; this.sinceFire += dt;
     this.pressBuf = Math.max(0, this.pressBuf - dt);
     const maxHp = this.maxHp();
 
-    // bleeding; down, the clock runs too
-    const fate = G.Med.tick(this.body, dt);
+    // bleeding (down: slowly, and nothing clots: you're dead when it's all gone, unless someone stops it)
+    const fate = G.Med.tick(this.body, dt, this.down);
     this.hp = G.Med.overall(this.body);
-    if (fate === 'dead') return this.die('Bled out');
-    if (!this.down) { if (fate === 'down') this.goDown(); }
-    else {
-      this.bleed -= dt;
-      if (this.bleed <= 0) this.die(this.downCause());
-    }
+    if (fate === 'dead') return this.die(this.down ? this.downCause() : 'Bled out');
+    if (!this.down && fate === 'down') this.goDown();
+    this.bleed = this.down ? G.Med.bleedOut(this.body) : null; // (seconds left, or null: stable)
 
     this.move(dt, map);
     this.weaponUpdate(dt);
@@ -794,21 +795,18 @@ G.Me = {
     const a0 = Math.random() * Math.PI * 2, r0 = Math.sqrt(Math.random()) * Math.tan(sr);
     const aim = fwd.clone().addScaledVector(right, Math.cos(a0) * r0).addScaledVector(up, Math.sin(a0) * r0).normalize();
     const pr = Math.tan(((def.choke || 0) * Math.PI) / 180);
-    let firstEnd = null;
+    // each round (or pellet) leaves as a projectile (fly); the squad is told where it's headed, as far as the
+    // walls go (to draw it and hear it go by)
+    const shot = { ff: new Map(), w: w.def.code, f: [origin.x, origin.y, origin.z].map((v) => Math.round(v * 100) / 100) };
     for (let i = 0; i < def.pellets; i++) {
       let dir = aim;
       if (def.pellets > 1 && pr > 0) {
         const a = Math.random() * Math.PI * 2, rr = pr * Math.min(1.6, Math.sqrt(-2 * Math.log(1 - Math.random())) * 0.6);
         dir = aim.clone().addScaledVector(right, Math.cos(a) * rr).addScaledVector(up, Math.sin(a) * rr).normalize();
       }
-      const end = this.trace(origin, dir, muzzle, def, i === 0 || def.pellets <= 10);
-      if (!firstEnd) firstEnd = end;
+      this.fly(origin, dir, muzzle, def, round, i === 0 || def.pellets <= 10, shot, w.sup);
     }
-    // friendly fire: the wounds you put in teammates this shot, sent on (a shotgun's pellets together)
-    if (this.ffQ && this.ffQ.size) {
-      for (const [tg, hz] of this.ffQ) G.Net.toHost({ t: 'ff', tg, hz, w: w.def.code, f: [origin.x, origin.y, origin.z].map((v) => Math.round(v * 100) / 100) });
-      this.ffQ.clear();
-    }
+    const firstEnd = shot.to;
 
     if (def.cls === 'RAIL') G.Audio.rail();
     else if (def.cls === 'BOW') G.Audio.bow();
@@ -828,81 +826,168 @@ G.Me = {
     G.Net.toHost({ t: 'shot', f: [r2(muzzle.x), r2(muzzle.y), r2(muzzle.z)], to: [r2(firstEnd.x), r2(firstEnd.y), r2(firstEnd.z)], w: def.code, am: round, sil: def.cls === 'BOW' ? 2 : w.sup ? (def.quiet ? 2 : 1) : 0 });
   },
 
-  // Raycast one bullet: world geometry + enemy hitboxes, with penetration.
-  trace(origin, dir, muzzle, def, drawTracer) {
-    const map = G.Game.map, L = G.Level;
-    const wall = L.raycast(map, origin.x, origin.y, origin.z, dir.x, dir.y, dir.z, 250, { glass: true }); // (through windows)
+  // ---------------------------------------------------------------- rounds in flight
+  // Every round is a projectile. It leaves at its muzzle velocity (G.roundSpeed: the caliber, the barrel, the
+  // load), slows with drag and falls with gravity, and is stepped a frame at a time: each step is a short straight
+  // segment, checked against the world and against everyone's hitboxes as they stand that frame (so someone can
+  // step out of its way, or into it). The sights are zeroed (G.zeroOf): it leaves a hair above the line of sight,
+  // crosses it at the zero and drops below it further out. What you see is a streak from the muzzle that closes
+  // onto the round's true path (from your eye) over its first few metres: a faint one for ordinary rounds, a long
+  // bright one for tracers.
+  // shot: what the shot's rounds share (the friendly-fire hits to send, together); sup: through a suppressor
+  fly(origin, dir, muzzle, def, am, show, shot, sup) {
+    const rail = def.cls === 'RAIL', v0 = rail ? 3000 : Math.max(40, G.roundSpeed(def, am) || 400), zero = G.zeroOf(def);
+    const d = dir.clone(), start = origin.clone(), drag = rail ? 1e9 : G.dragOf(def, am);
+    const upP = new THREE.Vector3(0, 1, 0).addScaledVector(d, -d.y);
+    if (zero > 0 && upP.lengthSq() > 1e-6) {
+      // it starts the sight height under your eye, tipped up to meet the line at the zero: by then it's had
+      // t seconds to fall (slowing with drag all the way)
+      upP.normalize();
+      const sh = G.sightH(def), t = (drag / v0) * (Math.exp(zero / drag) - 1);
+      start.addScaledVector(upP, -sh);
+      d.addScaledVector(upP, (sh + 0.5 * G.GRAVITY * t * t) / zero).normalize();
+    }
+    const tracer = !!(G.AMMO[am] && G.AMMO[am].tracer);
+    this.rounds = this.rounds || [];
+    if (!shot.to) shot.to = this.predictEnd(start, d.clone().multiplyScalar(v0), drag, rail ? 0 : G.GRAVITY);
+    this.rounds.push({ p: start, v: d.multiplyScalar(v0), def, am, drag, grav: rail ? 0 : G.GRAVITY,
+      n: 0, dist: 0, t: 0, off: muzzle.clone().sub(start), muzzle: muzzle.clone(), show, tracer, shot, sup: sup ? G.SUPPRESSOR.dmg : 1, hit: new Set() });
+  },
+  // where a round would end up if nobody's in the way: its arc, stepped against the walls only (what the squad
+  // is told, to draw it going there)
+  predictEnd(p0, v0, drag, grav) {
+    const map = G.Game.map, p = p0.clone(), v = v0.clone(), dt = 1 / 60;
+    for (let i = 0, dist = 0; i < 180 && dist < 400; i++) {
+      const p1 = p.clone().addScaledVector(v, dt); p1.y -= 0.5 * grav * dt * dt;
+      const seg = p1.clone().sub(p), len = seg.length();
+      if (len < 1e-4) break;
+      seg.divideScalar(len);
+      const h = G.Level.raycast(map, p.x, p.y, p.z, seg.x, seg.y, seg.z, len);
+      if (h.t < len) return p.addScaledVector(seg, h.t);
+      v.multiplyScalar(Math.exp(-len / drag)); v.y -= grav * dt;
+      p.copy(p1); dist += len;
+    }
+    return p;
+  },
+  // every round in flight, one frame on (and the friendly fire they did, sent)
+  stepRounds(dt) {
+    const rs = this.rounds;
+    if (!rs || !rs.length) return;
+    dt = Math.min(dt, 0.05);
+    const shots = new Set();
+    for (let i = rs.length - 1; i >= 0; i--) {
+      const b = rs[i];
+      shots.add(b.shot);
+      if (!G.Game.map || this.stepRound(b, dt)) rs.splice(i, 1);
+    }
+    for (const sh of shots) if (sh.ff.size) {
+      for (const [tg, hz] of sh.ff) G.Net.toHost({ t: 'ff', tg, hz, w: sh.w, f: sh.f });
+      sh.ff.clear();
+    }
+  },
+  // one round, one frame: true when it's done (stopped in something, spent, out of range)
+  stepRound(b, dt) {
+    const sp = b.v.length();
+    // where it gets to this frame: drag takes speed by the metre (G.dragOf), gravity pulls it down
+    const p1 = b.p.clone().addScaledVector(b.v, dt); p1.y -= 0.5 * b.grav * dt * dt;
+    const seg = p1.clone().sub(b.p), len = seg.length();
+    if (len < 1e-4) return true;
+    const dir = seg.divideScalar(len);
+    const end = this.roundSegment(b, b.p, dir, len);
+    const k = Math.exp(-len / b.drag);
+    b.v.multiplyScalar(k); b.v.y -= b.grav * dt;
+    b.t += dt;
+    const head = end ? end.p : p1;
+    // the streak you see: from the muzzle side, closing onto the true path over the first 12 m
+    if (b.show || b.tracer) {
+      const came = b.dist + (end ? end.t : len), near = Math.max(0, 1 - came / 12);
+      G.R.bullet(head.clone().addScaledVector(b.off, near), dir, came, b.def, b.tracer, sp);
+    }
+    if (end) { if (b.def.cls === 'RAIL') G.R.tracer(b.muzzle, end.p, b.def.tracer || 0x55ddff, 0.06); return true; } // (a railgun leaves its line hanging)
+    b.dist += len; b.p.copy(p1);
+    return b.t > 3 || b.dist > 400 || b.v.length() < 30 || b.p.y < -2;
+  },
+  // A round's step from a along dir for len metres: the world (through windows, breaking them) and the
+  // hitboxes of everyone in its way, with penetration through bodies. Returns where it stopped ({ p, t }),
+  // or null if it flies on.
+  roundSegment(b, a, dir, len) {
+    const map = G.Game.map, L = G.Level, def = b.def;
+    const wall = L.raycast(map, a.x, a.y, a.z, dir.x, dir.y, dir.z, len, { glass: true });
+    const wallT = Math.min(wall.t, len), hitWall = wall.t < len - 1e-4;
     const hits = [];
     for (const ev of G.Views.enemies.values()) {
-      if (!ev.alive) continue;
+      if (!ev.alive || b.hit.has(ev)) continue;
       const sc = ev.def.scale;
-      // cheap reject: the ray must pass within ~1.4 m of the body before testing bone capsules
-      const cx = ev.pos.x - origin.x, cy = ev.pos.y + sc - origin.y, cz = ev.pos.z - origin.z;
+      // cheap reject: the segment must pass within ~1.4 m of the body before testing bone capsules
+      const cx = ev.pos.x - a.x, cy = ev.pos.y + sc - a.y, cz = ev.pos.z - a.z;
       const along = cx * dir.x + cy * dir.y + cz * dir.z;
-      if (along < -1.5 || along > wall.t + 1.5) continue;
+      if (along < -1.5 || along > wallT + 1.5) continue;
       const px = cx - dir.x * along, py = cy - dir.y * along, pz = cz - dir.z * along;
       if (px * px + py * py + pz * pz > 1.96 * sc * sc) continue;
-      const h = G.Rig.raycast(ev.rig, origin, dir, wall.t);
+      const h = G.Rig.raycast(ev.rig, a, dir, wallT);
       if (h) hits.push({ t: h.t, zone: h.zone, c: h.c, up: h.up, side: h.side, head: h.zone === 'head', ev, behind: h.behind });
     }
     // friendly fire is on: your teammates are in the way too
     for (const pv of G.Views.players.values()) {
-      if (!pv.st || pv.st.dd || !pv.rig || !pv.rig.root.visible) continue;
-      const cx = pv.pos.x - origin.x, cy = pv.pos.y + 1 - origin.y, cz = pv.pos.z - origin.z, along = cx * dir.x + cy * dir.y + cz * dir.z;
-      if (along < -1.5 || along > wall.t + 1.5) continue;
-      const h = G.Rig.raycast(pv.rig, origin, dir, wall.t);
+      if (!pv.st || pv.st.dd || !pv.rig || !pv.rig.root.visible || b.hit.has(pv)) continue;
+      const cx = pv.pos.x - a.x, cy = pv.pos.y + 1 - a.y, cz = pv.pos.z - a.z, along = cx * dir.x + cy * dir.y + cz * dir.z;
+      if (along < -1.5 || along > wallT + 1.5) continue;
+      const h = G.Rig.raycast(pv.rig, a, dir, wallT);
       if (h) hits.push({ t: h.t, zone: h.zone, c: h.c, side: h.side, mate: pv, behind: h.behind });
     }
-    hits.sort((a, b) => a.t - b.t);
-    let endT = wall.t, hitWall = true;
+    hits.sort((x, y) => x.t - y.t);
+    let endT = hitWall ? wallT : null;
 
     if (def.explosive) {
-      if (hits.length) { endT = hits[0].t; hitWall = false; }
-      const p = origin.clone().addScaledVector(dir, Math.max(0, endT - 0.15));
-      G.R.tracer(muzzle, p, 0xbbbbbb, 0.05);
+      const t = hits.length ? hits[0].t : endT;
+      if (t == null) { this.roundGlass(b, a, dir, wall, len); return null; }
+      const p = a.clone().addScaledVector(dir, Math.max(0, t - 0.15));
       this.explode(p, def.explosive.r, def.explosive.dmg, false);
-      return p;
+      return { p, t };
     }
 
-    const pen = def.pen;
-    let n = 0;
-    const sup = this.cur().sup ? G.SUPPRESSOR.dmg : 1;
     for (const h of hits) {
-      const d = h.t;
+      const d = b.dist + h.t;
       const fall = d <= def.range ? 1 : Math.max(def.falloff, 1 - ((d - def.range) / (def.range * 1.5)) * (1 - def.falloff));
       // how hard this round still hits (range, a suppressor, anything it already went through), then the wound
-      const k = G.woundPower(def.dmg) * fall * sup * Math.pow(0.75, n);
+      const k = G.woundPower(def.dmg) * fall * b.sup * Math.pow(0.75, b.n);
+      const hp = a.clone().addScaledVector(dir, h.t);
       if (h.mate) { // a teammate: the wound's theirs to take (js/player.js takeHits, on their machine)
-        const q = (this.ffQ = this.ffQ || new Map()), list = q.get(h.mate.id) || [];
+        b.hit.add(h.mate);
+        const list = b.shot.ff.get(h.mate.id) || [];
         list.push([h.zone, h.c < 0.5 ? 1 : 0, h.side || 'R']); if (h.behind) list.push([h.behind.zone, h.behind.c < 0.5 ? 1 : 0, h.behind.side || 'R']); // (central: through the middle of the part)
-        q.set(h.mate.id, list);
+        b.shot.ff.set(h.mate.id, list);
         h.mate.rig.hit(dir);
-        G.R.impact(origin.clone().addScaledVector(dir, d), null, 'blood');
-        n++;
-        if (n > pen) { endT = d; hitWall = false; break; }
-        continue;
+        G.R.impact(hp, null, 'blood');
+      } else {
+        b.hit.add(h.ev);
+        this.wound(h, k, def);
+        // through the arm and on into the body behind it, a little slower
+        if (h.behind) this.wound(Object.assign({ ev: h.ev, head: h.behind.zone === 'head' }, h.behind), k * 0.85, def);
+        h.ev.rig.hit(dir);
+        h.ev.selfHit = true;
+        h.ev.lastHitDir = dir.clone().setY(0).normalize();
+        G.R.impact(hp, null, 'blood');
+        // out the far side onto a wall close behind them
+        const back = L.raycast(map, hp.x, hp.y, hp.z, dir.x, dir.y, dir.z, 1.6);
+        if (back.n && back.t < 1.6) G.R.bloodWall(hp.clone().addScaledVector(dir, back.t), back.n, 0.25 + 0.25 * (1 - back.t / 1.6));
       }
-      this.wound(h, k, def);
-      // through the arm and on into the body behind it, a little slower
-      if (h.behind) this.wound(Object.assign({ ev: h.ev, head: h.behind.zone === 'head' }, h.behind), k * 0.85, def);
-      h.ev.rig.hit(dir);
-      h.ev.selfHit = true;
-      h.ev.lastHitDir = dir.clone().setY(0).normalize();
-      const hp = origin.clone().addScaledVector(dir, d);
-      G.R.impact(hp, null, 'blood');
-      // out the far side onto a wall close behind them
-      if (wall.n && wall.t - d < 1.6 && wall.t - d > 0) G.R.bloodWall(origin.clone().addScaledVector(dir, wall.t), wall.n, 0.25 + 0.25 * (1 - (wall.t - d) / 1.6));
-      n++;
-      if (n > pen) { endT = d; hitWall = false; break; }
+      b.n++;
+      if (b.n > def.pen) { endT = h.t; break; }
     }
-    const end = origin.clone().addScaledVector(dir, endT);
-    // the windows it went through on the way break (here at once, and for everyone through the host)
-    const panes = (wall.glass || []).filter(([id, gt]) => gt < endT && map.windows[id] && !map.windows[id].broken).map(([id]) => id);
-    if (panes.length) { for (const id of panes) G.Views.breakGlass(id, origin.clone().addScaledVector(dir, (wall.glass.find((g) => g[0] === id) || [0, endT])[1]), dir); G.Net.toHost({ t: 'glass', ids: panes }); }
-    if (hitWall && !wall.view) G.R.impact(end, wall.n, 'wall'); // (not on the view behind an outside window)
-    if (def.cls === 'BOW') G.R.tracer(muzzle, end, def.tracer, 0.03, 0.25);
-    else if (drawTracer) G.R.tracer(muzzle, end, def.tracer || 0xffd080, def.cls === 'RAIL' ? 0.06 : 0.018);
-    return end;
+    this.roundGlass(b, a, dir, wall, endT == null ? len : endT);
+    if (endT == null) return null;
+    const p = a.clone().addScaledVector(dir, endT);
+    if (hitWall && endT === wallT && !wall.view) G.R.impact(p, wall.n, 'wall'); // (not on the view behind an outside window)
+    return { p, t: endT };
+  },
+  // the windows a round went through on the way break (here at once, and for everyone through the host)
+  roundGlass(b, a, dir, wall, upTo) {
+    const map = G.Game.map;
+    const panes = (wall.glass || []).filter(([id, gt]) => gt < upTo && map.windows[id] && !map.windows[id].broken);
+    if (!panes.length) return;
+    for (const [id, gt] of panes) G.Views.breakGlass(id, a.clone().addScaledVector(dir, gt), dir);
+    G.Net.toHost({ t: 'glass', ids: panes.map(([id]) => id) });
   },
   // One round's wound on one body part (k: how hard it still hits). An unarmoured head is a kill; a helmet covers
   // the top of the head, not the face below its brim. Elsewhere the wound depends on the part and how centrally
@@ -1336,7 +1421,7 @@ G.Me = {
     this.hp = 0;
     this.down = true;
     this.crouch = false;
-    this.bleed = 30;
+    this.bleed = G.Med.bleedOut(this.body);
     this.stats.downs++;
     this.reloading = false;
     if (this.slot !== 's' && this.weapons.s) { this.slot = 's'; G.R.setViewmodel(this.cur().def); }
@@ -1345,21 +1430,19 @@ G.Me = {
     if (G.Game.invOpen) G.Game.toggleInv(false);
   },
   revived(hp) {
-    if (!this.down || G.Med.cantRevive(this.body)) return; // (not enough blood: still out)
+    if (!this.down || G.Med.cantRevive(this.body)) return; // (still bleeding, or not enough blood: still out)
     this.down = false;
     G.Med.revive(this.body);
     this.hp = G.Med.overall(this.body);
     this.sinceHurt = 0;
     G.Audio.revive();
-    if (G.Med.bleeding(this.body)) G.HUD.toast('', 'Still bleeding: treat it (Tab)', 2.5);
   },
   // why you died when nobody reached you in time: what put you down
   downCause() {
     const b = this.body;
     if (!b) return 'Nobody reached you in time';
-    if (b.parts.thorax.hp <= 0) return `Died of your chest wound${b.parts.thorax.lung ? ' (a punctured lung)' : ''}`;
-    if (b.blood <= 15) return 'Bled out';
-    return 'Nobody reached you in time';
+    if (b.parts.thorax.hp <= 0) return `Bled out from your chest wound${b.parts.thorax.lung ? ' (a punctured lung)' : ''}`;
+    return 'Bled out: nobody stopped it in time';
   },
   die(how) {
     this.down = false;
@@ -1660,7 +1743,7 @@ G.Me = {
     return {
       p: [r2(this.pos.x), r2(this.pos.y), r2(this.pos.z)], yw: r2(this.yaw), pt: r2(this.pitch),
       hp: Math.ceil(this.hp), mhp: this.maxHp(), ar: Math.round(this.vestCond() * 100), amx: G.Gear.piece(this, 'chest') ? 100 : 0,
-      dn: this.down ? 1 : 0, dd: this.dead ? 1 : 0, bl: this.down ? Math.ceil(this.bleed) : 0, bd: this.body ? G.Med.encode(this.body) : null,
+      dn: this.down ? 1 : 0, dd: this.dead ? 1 : 0, bl: this.down ? (this.bleed == null ? -1 : Math.ceil(this.bleed)) : 0, bd: this.body ? G.Med.encode(this.body) : null,
       w: this.cur().def.code, tl: this.tacFlags(this.cur()), cr: this.crouch || this.down ? 1 : 0, ln: r2(this.lean || 0), lr: this.lowReady ? 1 : 0, sd: this.steadying ? 1 : 0, sw: this.stowed ? 1 : 0,
       act: this.action && this.action.kind ? this.action.kind[0] : 0, ap: this.action ? r2(Math.min(1, this.action.t / this.action.dur)) : 0, zt: this.action && this.action.kind === 'zip' ? this.action.target : -1, bt: this.action && this.action.kind === 'bag' ? this.action.target : -1, pl: this.action && this.action.pull ? 1 : 0, mv: r2(this.hspeed || 0),
       cred: Math.round(this.credits), sx: [this.stats.kills, Math.round(this.stats.dmg), this.stats.hs, this.stats.downs, this.stats.revives],

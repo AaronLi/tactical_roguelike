@@ -324,7 +324,8 @@ G.VMAnim = (() => {
     }
     return pose;
   }
-  // Hold R: the magazine out into the left hand and up in front of you, top round toward you; then the mouse turns
+  // Hold R: the magazine out into the left hand and up in front of you, held upright (as it sits in the gun, its back
+  // and witness holes toward you); then the mouse turns
   // it in your hand as far as a wrist goes (mc.yaw: rolled about its length, mc.pitch: tipped toward or away) to
   // see the witness holes down its back or the rounds through a clear one. mc.k: out 0..1, mc.back: going back 0..1.
   function magCheckClip(mc, h, Qh) {
@@ -334,8 +335,8 @@ G.VMAnim = (() => {
     pose.gun[0] += 0.07 * g; pose.gun[1] -= 0.06 * g; pose.gun[5] -= 0.45 * g; pose.gun[3] -= 0.08 * g; pose.gun[4] -= 0.15 * g; // the gun down and away to the right
     pose.L = path(p, [[0, A.S], [0.22, WB], [0.4, below], [1, A.F]]);
     if (p < 0.22) { pose.mag = { mode: 'in' }; return pose; }
-    // its turn in camera space: tipped top-toward-you, then rolled; back into the gun's frame (Qh: the gun's turn)
-    const tip = 0.8 + mc.pitch, k = S(0.4, 1, p);
+    // its turn in camera space: upright, tipped as the mouse tips it, then rolled; back into the gun's frame (Qh: the gun's turn)
+    const tip = mc.pitch, k = S(0.4, 1, p);
     const qc = new T.Quaternion().setFromEuler(new T.Euler(tip * k, mc.yaw * k, 0, 'XYZ')).multiply(A.magQ);
     pose.mag = { mode: 'chk', q: Qh.clone().invert().multiply(qc).slerp(A.magQ, 1 - S(0.22, 0.5, p)) };
     return pose;

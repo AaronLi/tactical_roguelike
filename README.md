@@ -410,9 +410,12 @@ shotgun's pellets each count). The one hit is told who it was, and a death from 
   takes 3.6 s bare, 2.9 s with the saddle, 2.6 s with the carrier and 1.9 s with the quad loader.
 - **Pistol stocks.** The P9, G18, G19 and Auto-9 have a stock lug: a folding stock, a brace or a carbine stock
   kit cuts recoil by 14–30% at some cost to handling.
-- If you go down you can still shoot your sidearm. A teammate has 30 s to reach you: they hold **F** to check
-  you, treat you and revive you from their Tab screen. If they don't, you're KIA until the next level. If the
-  whole squad is down, the run ends.
+- If you go down you can still shoot your sidearm. Down, you keep bleeding, a sixteenth as fast as standing
+  but nothing clots any more: a heavy bleed at 15% blood gives about two minutes, a light one several, and when
+  the blood's gone you're KIA until the next level. A teammate holds **F** to check you and treats you from their
+  Tab screen. Stopping every bleed only **stabilises** you (the clock stops: the HUD says Stable); to get you up
+  they also have to get your blood over 50% (blood bags), then revive you. If the whole squad is down, the run
+  ends.
 - **Injuries** (`js/medical.js`). There's no health bar and no medkit; your body is seven parts with their
   own health: head 35, thorax 85, stomach 70, each arm 60, each leg 65.
   - **Hits:** a hit takes health from the part it lands on, and can leave an injury there:
@@ -460,8 +463,8 @@ shotgun's pellets each count). The one hit is told who it was, and a death from 
   - **Treating a teammate:** put your crosshair on them (within 2 m, 2.4 m for a downed one) and hold **F**.
     The screen shows their health and nothing else: no inventory, theirs or yours. Click a part of their body
     and pick from the medical items you carry that would help it (one comes off your stack). Stay within 2.6 m: if they move out of reach, whatever you were doing for them stops (nothing's used) and their panel closes. You can
-    revive a downed one there (4 s). A revive brings the thorax back to 20, but it can't make blood: someone
-    downed with under 25% blood needs a blood bag first. Their wounds still need treating. A blood bag on
+    revive a downed one there (4 s), once they're stable (no bleeding anywhere) and their blood is over 50%:
+    a revive brings the thorax back to 20, but it can't stop bleeding or make blood. A blood bag on
     yourself while your blood runs low keeps you from blacking out (at 15% you go down).
   - **The HUD** shows your blood and a small body figure: each part shaded by its health, glowing red
     while it bleeds, outlined if it's broken. Everything heals at the quartermaster's between levels.
@@ -547,7 +550,11 @@ shotgun's pellets each count). The one hit is told who it was, and a death from 
     - eyewear: none, glasses, shooting glasses or goggles
     - gloves: tactical, leather, fingerless or none
 
-    Teammates see it. Your squad colour is the armband on your left arm (there are no nameplates over anyone's head). Your own arms in
+    Teammates see it. **Your squad animal** (snake, seal, frog, cat, raccoon or hyrax, picked in the main menu) is
+    your callsign: its emblem is a patch on your left shoulder, and a name patch high on your back (on your
+    backpack if you wear one) has the emblem and your name. There are no nameplates over anyone's head. One of each
+    animal to a squad: if yours is taken when you join, the host gives you the first one free. Each animal has its
+    colour, which marks your name in the team list, the scoreboard, chat and pings. Your own arms in
     first person match your sleeves and gloves. Suspects and civilians are dressed for who they are: hoodies,
     balaclavas and the odd cap; T-shirts, jeans and glasses.
   - **You look like what you wear.** Teammates see each officer's actual kit (`js/rig.js` `setKit`), and it
@@ -672,7 +679,8 @@ shotgun's pellets each count). The one hit is told who it was, and a death from 
       - **Exceptions:** parts on a gun come off only at the quartermaster's, and your last gun stays in hand.
       - **On the floor:** a gun lies on its side; anything else is a small box with its icon on top. Hold
         **F** near it to pick it up. Gear you're not wearing goes back on, a gun goes into its hand slot if
-        that's free, and everything else into your pockets, pouches or pack.
+        that's free, a pouch straight onto your MOLLE if there's room on it, and everything else into your
+        pockets, pouches or pack.
       - **No room:** the item stays on the floor.
       - **Co-op:** the host keeps track of what's lying about, so teammates see it and can take it, and the
         first to reach it gets it. Items last until the end of the level (up to 80, the oldest go first).
@@ -713,7 +721,7 @@ shotgun's pellets each count). The one hit is told who it was, and a death from 
     | FMJ ball | The standard round |
     | Hollow point | Wounds ×1.3 and stops in the first body; armour stops it more |
     | Armour-piercing | Gets through armour and through bodies; wounds ×0.9 |
-    | Tracer | Burns red all the way out |
+    | Tracer | Burns red all the way out: a bright core with a glow, from a couple of metres past the muzzle to where it lands. Your starting P9 and its two spare magazines are loaded with them |
     | Subsonic | Wounds ×0.85, shorter range; through a suppressor it's heard no further than a crossbow |
     | Buckshot | The standard shotgun load |
     | Slug | One heavy slug: accurate, hits like a rifle round, goes through |
@@ -734,8 +742,12 @@ shotgun's pellets each count). The one hit is told who it was, and a death from 
       empty magazines. Each visit he also has one random special load, a handful of rounds.
   - **Grenades and medical items** are items too: G throws your first grenade, and medical items are used
     on the body in the Tab screen (H opens it).
-  - **Locker:** everything else waits in your locker, a 10×8 grid that stays at the quartermaster's between
+  - **Locker:** everything else waits in your locker, a 9×7 grid that stays at the quartermaster's between
     levels.
+  - **Team locker:** under your locker, a 7×5 grid the whole squad shares for the run. Put things in for each
+    other and take what you need; everyone sees changes at once. The host keeps the real one: if two of you grab
+    the same thing at once, whoever the host hears first gets it (the other gets a message, and it's gone from
+    their side), and anything put in after it filled up comes back to your locker.
   - **Controls:** drag items between grids, press R to turn the one you're holding, and drop gear on an
     equipment slot to wear it (a plate goes in the carrier's plate slot). Double-click moves an item between
     you and the locker. Drop anything on the sell box for half its price.
@@ -751,7 +763,6 @@ shotgun's pellets each count). The one hit is told who it was, and a death from 
   - **Ammo resupply** refills your guns and every magazine and box you own. There are no ammo caches in
     levels, so this is how you restock.
   - **Spare magazines or boxes** for each of your guns.
-  - **Armour repair** restores every plate, vest and helmet you own.
   - **Medical items** (all six, see Injuries) **and frag grenades.**
 
   Anything you buy needs room: it goes into a pouch or pocket that takes it, otherwise into your locker. Suppressors are muzzle parts from the gunsmith:
@@ -781,7 +792,7 @@ shotgun's pellets each count). The one hit is told who it was, and a death from 
     | Interface | Takes | Fits |
     | --- | --- | --- |
     | Picatinny top rail | red dots, holos, prisms, scopes | 46 weapons |
-    | Underside rail (M-LOK / Picatinny) | foregrips and bipods | 26 weapons (only with a railed handguard) |
+    | Underside rail (M-LOK / Picatinny) | foregrips | 26 weapons (only with a railed handguard) |
     | Side rail | lasers and weapon lights | 26 weapons (only with a railed handguard) |
     | AR-15 grip mount | pistol grips | 20 weapons |
     | Other stock mounts | stocks | AR-15 buffer tube, AK trunnion, rifle stock, SMG, precision and machine-gun mounts |
@@ -978,6 +989,35 @@ shotgun's pellets each count). The one hit is told who it was, and a death from 
 
 ## Weapon handling
 
+- **Rounds are projectiles** (`js/player.js` `fly`). Every round and pellet leaves at its caliber's muzzle
+  velocity (`G.MUZZLE_V`, adjusted for barrel length and load: subsonic rounds stay under 310 m/s), slows with
+  drag and falls with gravity. It's stepped a frame at a time against the walls, windows and everyone's
+  hitboxes as they stand that frame, so a running target can step out of a slow pistol round's way at range.
+  Penetration through bodies, damage falloff past a gun's range and suppressors work as before.
+  - **Zeroing:** sights are zeroed (`G.zeroOf`): handguns, SMGs and shotguns at 25 m, carbines and machine
+    guns at 50, marksman and sniper rifles at 100, the grenade launchers at 40. The sights sit above the bore
+    (`G.sightH`: 2 cm on a pistol, 6.5 on a rifle), so a round starts that far under your eye and climbs to
+    meet it: a carbine zeroed at 50 m is back on at about 200, and a round hits low on something very close
+    (or clips the top of cover your eye line just clears). Drag lengths come from real retained velocities.
+    Checked against real drop tables:
+
+    | Weapon (zero) | 100 m | 200 m | 300 m | 400 m |
+    | --- | --- | --- | --- | --- |
+    | M4, 5.56 (50 m) | +3 cm | −3 cm | −28 cm | −78 cm |
+    | AK, 7.62×39 (50 m) | +1 cm | −14 cm | −59 cm | −138 cm |
+    | R700, 7.62×51 (100 m) | 0 | −9 cm | −38 cm | −90 cm |
+    | AWM, .338 (100 m) | 0 | −6 cm | −27 cm | −63 cm |
+    | P9, 9 mm (25 m) | −24 cm | −142 cm | | |
+    | Pump, slug (25 m) | −11 cm | −99 cm | | |
+    | VSS, subsonic 9×39 (100 m) | +1 cm (+12 at 50) | −116 cm | | |
+
+    A 40 mm grenade (76 m/s) arcs visibly, and a crossbow bolt is half a metre low at 50 m.
+  - **What you see:** an ordinary round is a faint short streak; a tracer is a white-hot core with a red
+    glow (a cheap stand-in for bloom: a soft ribbon always turned to face you, and a glowing point at its
+    head). Your own rounds start from your gun and close onto your line of sight over the first 12 m.
+    Teammates' and enemies' rounds fly too: an enemy hit lands on you when the round arrives, not when it's
+    fired. A machine gunner's belt has a tracer every fourth round.
+
 - **No round counts in the field, and no ammo gauge.** To know what's in the gun you check it: hold R for the
   magazine, hold I for the chamber. The HUD keeps only a small white icon for each magazine you carry for it
   with something in it (a box for each box of rounds, for a loose-fed gun), no number, the type of the next round,
@@ -1046,8 +1086,9 @@ shotgun's pellets each count). The one hit is told who it was, and a death from 
     While it's held the mouse turns the gun (not your view): side to side rolls it, up and down tips the muzzle. Let go
     and it closes up.
 - **Magazine check (hold R):** a tap still reloads (on release). Held, the magazine comes out into your left
-  hand and up in front of you, top round first (its tip coloured for the load). The mouse then turns it in
-  your hand, as far as a wrist goes: roll it about its length, tip it toward or away from you. Opaque
+  hand and up in front of you, held upright as it sits in the gun, its back and witness holes toward you. The
+  mouse then turns it in your hand, as far as a wrist goes: roll it about its length, tip it toward you to
+  look down on the top round (its tip coloured for the load) or away. Opaque
   magazines have a column of witness holes down the back, each stamped with the count it stands for
   (5 / 10 / 15 / 20 / 25 on a 30-rounder); brass in a hole means at least that many. Clear magazines
   (G36, AUG) show the rounds themselves. Let go of R, or fire, aim or move off, and it goes back in.
@@ -1133,7 +1174,7 @@ On top of the baked room reverb, echoes are **ray-traced through the level** for
 | R (hold) | Magazine check: out into your hand; the mouse turns it to read the witness holes or see the rounds |
 | R R (double tap) | Dump reload: the old magazine goes into your dump pouch, or onto the floor without one |
 | 1, 2, mouse wheel | Switch weapon (the wheel while aiming steps a variable scope or flips a magnifier) |
-| Middle click | Ping: a marker on the spot you're looking at, in your colour with your name, that the whole squad sees through walls for 6 s (it says nothing about what's there) |
+| Middle click | Ping: a marker on the spot you're looking at, with your animal and your name in its colour, that the whole squad sees through walls for 6 s (it says nothing about what's there) |
 | Mouse back / forward | Weapon light / laser: a tap switches it on or off (each gun remembers its own); held, it's on only while you hold it. In a level they don't navigate the browser: the page keeps a back and a forward history entry of its own and turns a side-button navigation into the button press. Outside a level, back works as usual (twice to leave). |
 | I (hold) | Inspect your weapon; held, the chamber check stays open; mouse side to side rolls the gun, up and down pitches it |
 | G / H | Frag grenade / open your body and kit (as Tab) |
@@ -1175,6 +1216,7 @@ Two checklists cover what a new piece of content touches and how to check it:
 | File | Purpose |
 | --- | --- |
 | `js/data.js` | All weapons, armour, enemies and their kit, wounds and themes. Tune the game here. |
+| `js/callsigns.js` | Squad animals: the emblems, and the shoulder and back name patches |
 | `js/level.js` | Level generator, collision, raycasting, BFS flow fields |
 | `js/furniture.js` | Room types, furniture layout and collision boxes, furniture/decor meshes |
 | `js/server.js` | Host-only authority: phases, enemy AI, damage, objectives and the vote to leave |

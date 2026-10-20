@@ -244,6 +244,7 @@ G.InvUI = (() => {
   function grids(me) {
     const out = GG().all(me), seen = new Set();
     if (field && cab != null) out.push(G.Game.cabGrid(cab));
+    if (!field && G.Game.phase === 'shop') out.push(G.Game.teamGrid());
     for (let more = true; more;) {
       more = false;
       for (const uid of opened) {
@@ -452,12 +453,12 @@ G.InvUI = (() => {
       const pv = patientView(), b = bodyOf(me);
       if (!pv || !b || pv.st.dd) { patient = null; return healthHTML(me); }
       const far = Math.hypot(pv.pos.x - me.pos.x, pv.pos.z - me.pos.z) > 2.6;
-      return `<div class="pt-head"><b>${G.U.esc(pv.name)}</b>${pv.st.dn ? ` <i class="c heavy">DOWN · ${pv.st.bl}s</i>` : ''}${far ? ' <i class="c">too far</i>' : ''}
+      return `<div class="pt-head"><b>${G.U.esc(pv.name)}</b>${pv.st.dn ? ` <i class="c heavy">DOWN · ${pv.st.bl < 0 ? 'stable' : pv.st.bl + ' s to bleed out'}</i>` : ''}${far ? ' <i class="c">too far</i>' : ''}
         ${pv.st.dn ? `<button class="btn tiny" data-revive ${far ? 'disabled' : ''}>Revive (4 s)</button>` : ''}<button class="btn tiny" data-self>Back to me</button></div>
         ${bodyHTML(b)}<p class="inv-hint">Click a part of ${G.U.esc(pv.name)}'s body to treat it with what you carry.</p>`;
     }
     const piece = (name, it) => { const d = Gr.defOf(it); if (!d) return ''; const c = d.dur ? Math.round(Gr.cond(it) * 100) : null; return `<div class="hl-row"><span>${name}</span><b>${G.U.esc(d.name)}</b><i>${c == null ? '' : c + '%'}</i></div>`; };
-    const status = me.dead ? `Dead: ${G.U.esc(me.deathCause || 'killed')}` : me.down ? `Down: ${Math.ceil(me.bleed)} s for someone to reach you` : G.Med.bleeding(me.body) ? 'Bleeding' : me.hp < 50 ? 'Badly hurt' : me.hp < 90 ? 'Hurt' : 'OK';
+    const status = me.dead ? `Dead: ${G.U.esc(me.deathCause || 'killed')}` : me.down ? (me.bleed == null ? 'Down, stable: needs blood to get up' : `Down: ${Math.ceil(me.bleed)} s until you bleed out`) : G.Med.bleeding(me.body) ? 'Bleeding' : me.hp < 50 ? 'Badly hurt' : me.hp < 90 ? 'Hurt' : 'OK';
     return `<div class="hl-status ${G.Med.bleeding(me.body) ? 'bad' : ''}">${status}</div>${bodyHTML(me.body)}
       <p class="inv-hint">Click a part to treat it with what you carry, or drag a medical item onto it (it takes a few seconds).</p>
       ${piece('Helmet', me.kit.helmet)}${me.kit.helmet && me.kit.helmet.face ? piece('Face', me.kit.helmet.face) : ''}${piece('Armour', me.kit.carrier)}${me.kit.carrier ? piece('Plate', me.kit.carrier.plate) : ''}`;
@@ -484,6 +485,7 @@ G.InvUI = (() => {
     scaleUI();
     const me = G.Me, k = me.kit;
     cabSync();
+    if (!field) G.Game.teamSync();
     closeMenu();
     // gone, sold, or now worn (on you, or a pouch mounted on what you wear): closed
     opened = opened.filter((uid) => { const s = locate(me, uid); return s && (s.it.k === 'gun' || (!s.slot && !GG().molles(me).includes(s.g))); });
@@ -510,7 +512,8 @@ G.InvUI = (() => {
       <div class="inv-col eq"><h4>Equipment</h4>${SLOTS.map(([s, n]) => slotHTML(me, s, n)).join('')}${stats(me)}
         <div class="inv-sell" data-sell>Drop here to sell for half</div></div>
       <div class="inv-col"><h4 class="hd">On you</h4>${body}<p class="inv-hint">Drag to move · R turns what you're holding · double-click opens a pouch, pack or rig (anything else goes to or from the locker) · right-click for more · drop a box of rounds on a magazine to load it · Edit pouches to move, add or take off MOLLE pouches · stow a gun in a big enough backpack and swap to it in the field with B</p></div>
-      <div class="inv-col"><h4 class="hd">Locker <small>(stays here between levels)</small></h4>${gridHTML(me.locker)}${openedHTML(me)}</div></div>`;
+      <div class="inv-col"><h4 class="hd">Locker <small>(stays here between levels)</small></h4>${gridHTML(me.locker)}
+        <h4 class="hd">Team locker <small>(the whole squad shares it)</small></h4>${gridHTML(G.Game.teamGrid())}${openedHTML(me)}</div></div>`;
   }
 
   // ---------------------------------------------------------------- moving things
@@ -701,7 +704,7 @@ G.InvUI = (() => {
   }
   // what the quick move would do, for the menu
   function quickLabel(me, src) {
-    if (src.g !== me.locker) return lastGun(me, src) ? null : 'Send to locker';
+    if (src.g !== me.locker && !(src.g && src.g.team)) return lastGun(me, src) ? null : 'Send to locker';
     const it = src.it;
     if (GG().isGear(it)) return it.k === 'plate' ? 'Fit in carrier' : it.k === 'face' ? 'Fit to helmet' : 'Wear';
     if (it.k === 'gun') return me.weapons[it.w.def.slot] ? null : 'Carry';
@@ -709,7 +712,7 @@ G.InvUI = (() => {
     return 'Take with you';
   }
   function quickMove(me, src) {
-    const inLocker = src.g === me.locker;
+    const inLocker = src.g === me.locker || !!(src.g && src.g.team);
     let ok = false;
     if (src.gunPart || src.gunMag) {
       if (cantDetach(src)) G.HUD.toast('', cantDetach(src), 2);
@@ -872,6 +875,17 @@ G.InvUI = (() => {
           const x = e.target.closest('[data-close]');
           if (x) { opened = opened.filter((u) => u !== +x.dataset.close); G.Audio.click(); render(); }
         }); } render(); },
+    // the stash redrawn (the team locker changed under you), unless you're mid-drag
+    refresh() { if (root && !field && !drag) rerender(); },
+    // something you took from the team locker that someone else had taken first: gone from wherever you put it
+    lose(tid) {
+      const me = G.Me, seen = [];
+      const walk = (gs) => { for (const g of gs) for (const p of g.items) { if (p.it.tid === tid) seen.push({ it: p.it, g }); walk(innerGrids(p.it)); } };
+      walk([...GG().all(me), me.locker]);
+      for (const s of [...GEAR_SLOTS, 'wp', 'ws']) { const it = slotItem(me, s); if (it && it.tid === tid) seen.push({ it, slot: s }); }
+      const f = seen[0];
+      if (f) { if (f.slot && WSLOT[f.slot] && Object.keys(me.weapons).length <= 1) return; detach(me, f); }
+    },
     hide() { cancelJobs(); if (root) cabSync(); cab = null; patient = null; closeMenu(); if (drag) { drag.ghost.remove(); drag = null; } if (root) root.classList.remove('inv-host'); root = null; field = false; },
     // the health panel only (kept fresh while the field screen is open, without disturbing a drag)
     update,

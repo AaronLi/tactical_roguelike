@@ -153,13 +153,51 @@ G.R = {
 
     // tracers: stretched boxes
     this.tracers = [];
-    const tg = new THREE.BoxGeometry(1, 1, 1); tg.translate(0, 0, -0.5);
+    const tg = new THREE.BoxGeometry(1, 1, 1); tg.translate(0, 0, 0.5); // (0..1 along +z: lookAt points +z at the far end)
     for (let i = 0; i < 60; i++) {
       const m = new THREE.Mesh(tg, new THREE.MeshBasicMaterial({ color: 0xffd080, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }));
       m.visible = false; m.userData.life = 0;
       this.scene.add(m); this.tracers.push(m);
     }
     this.tracerIdx = 0;
+    // rounds in flight: a streak each, drawn afresh every frame they fly (streak), gone the frame they don't
+    this.streaks = [];
+    for (let i = 0; i < 160; i++) {
+      const m = new THREE.Mesh(tg, new THREE.MeshBasicMaterial({ color: 0xffd080, transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false }));
+      m.visible = false; m.frustumCulled = false; m.userData.f = -1;
+      this.scene.add(m); this.streaks.push(m);
+    }
+    this.streakN = 0; this.frameNo = 0;
+    // and their glow: a soft ribbon along the streak, always turned to face you (a bloom, without a bloom pass),
+    // brightest at the head and fading out towards the tail
+    const gc = document.createElement('canvas'); gc.width = 32; gc.height = 64;
+    const gx = gc.getContext('2d'), img = gx.createImageData(32, 64);
+    for (let y = 0; y < 64; y++) for (let x = 0; x < 32; x++) {
+      const u = (x + 0.5) / 32 * 2 - 1, v = 1 - (y + 0.5) / 64; // u across (-1..1), v along (0 tail .. 1 head: the canvas's top row)
+      const a = Math.exp(-u * u * 4) * Math.pow(v, 1.2) * Math.min(1, (1 - v) * 12 + 0.25);
+      const i = (y * 32 + x) * 4; img.data[i] = img.data[i + 1] = img.data[i + 2] = 255; img.data[i + 3] = Math.round(a * 255);
+    }
+    gx.putImageData(img, 0, 0);
+    const gt = new THREE.CanvasTexture(gc), gq = new THREE.PlaneGeometry(1, 1); gq.translate(0, 0.5, 0);
+    this.glows = [];
+    for (let i = 0; i < 64; i++) {
+      const m = new THREE.Mesh(gq, new THREE.MeshBasicMaterial({ map: gt, color: 0xff4a2a, transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+      m.visible = false; m.frustumCulled = false; m.matrixAutoUpdate = false; m.userData.f = -1;
+      this.scene.add(m); this.glows.push(m);
+    }
+    this.glowN = 0;
+    // and a glowing point at a tracer's head (what you see of one going straight away from you)
+    const fc = document.createElement('canvas'); fc.width = fc.height = 32;
+    const fx = fc.getContext('2d'), fg = fx.createRadialGradient(16, 16, 0, 16, 16, 16);
+    fg.addColorStop(0, 'rgba(255,255,255,1)'); fg.addColorStop(0.25, 'rgba(255,255,255,0.55)'); fg.addColorStop(1, 'rgba(255,255,255,0)');
+    fx.fillStyle = fg; fx.fillRect(0, 0, 32, 32);
+    const ft = new THREE.CanvasTexture(fc);
+    this.flares = [];
+    for (let i = 0; i < 48; i++) {
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: ft, color: 0xff4a2a, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+      sp.visible = false; sp.userData.f = -1; this.scene.add(sp); this.flares.push(sp);
+    }
+    this.flareN = 0;
 
     // particles
     this.PN = 600;
@@ -290,6 +328,66 @@ G.R = {
     m.material.opacity = 0.9;
     m.userData.life = m.userData.max = life || (width > 0.03 ? 0.35 : 0.07);
     m.visible = true;
+  },
+  // one frame of a round in flight, tail to head. solid: drawn as it is (a bolt, a grenade) instead of glowing.
+  // minPx: never thinner than that on screen, so a tracer still shows far off.
+  streak(from, to, color, width, op = 1, solid = false, minPx = 0) {
+    const dx = to.x - from.x, dy = to.y - from.y, dz = to.z - from.z, len = Math.hypot(dx, dy, dz);
+    if (len < 0.02) return;
+    const m = this.streaks[this.streakN % this.streaks.length]; this.streakN++;
+    const cp = this.camera.position, near = Math.min(cp.distanceTo(from), cp.distanceTo(to)); // (by its nearest end)
+    const pxRad = this.renderer.domElement.height / (this.camera.fov * Math.PI / 180), wd = Math.max(width, near * minPx / pxRad);
+    m.position.copy(from); m.lookAt(to.x, to.y, to.z);
+    m.scale.set(wd, wd, len);
+    m.material.color.setHex(color); m.material.opacity = op;
+    const bl = solid ? THREE.NormalBlending : THREE.AdditiveBlending;
+    if (m.material.blending !== bl) { m.material.blending = bl; m.material.needsUpdate = true; }
+    m.userData.f = this.frameNo; m.visible = true;
+  },
+  // A round in flight, this frame (js/player.js fly, js/views.js visRound): head, the way it's going, how far
+  // it's come, the gun, a tracer or not, its speed. Ordinary rounds a faint short streak; a tracer long and
+  // burning (a core and a glow); a bolt or a grenade drawn solid; a rail slug a long bright line.
+  bullet(head, dir, came, def, tracer, sp) {
+    const rail = def.cls === 'RAIL', bolt = def.cls === 'BOW', gren = !!def.explosive;
+    const L = rail ? 60 : bolt ? 0.7 : gren ? 0.25 : tracer ? G.U.clamp(sp * 0.03, 3, 24) : G.U.clamp(sp * 0.008, 0.6, 5);
+    const lead = bolt || gren ? 0.3 : 2; // (nothing shows in the first couple of metres: it's still in the muzzle's flash)
+    if (came <= lead) return;
+    const tail = head.clone().addScaledVector(dir, -Math.min(L, came - lead)), col = (tracer && G.AMMO.tracer.tracer) || def.tracer || 0xffd080;
+    if (tracer) { // a normal-sized, white-hot core and its bloom
+      const hot = new THREE.Color(col).lerp(new THREE.Color(0xffffff), 0.35).getHex();
+      this.streak(tail, head, hot, 0.008, 1, false, 1.5);
+      if (came > 4) { this.glow(tail, head, col, 0.18, 1, 24); this.flare(head, col, 0.2, 1, 18); }
+    } else if (rail) { this.streak(tail, head, col, 0.02, 1, false, 2); this.glow(tail, head, col, 0.25, 0.7, 20); }
+    else if (bolt) this.streak(tail, head, 0x6b4a2a, 0.012, 1, true, 1.5);
+    else if (gren) this.streak(tail, head, 0x3a4a2a, 0.045, 1, true, 2);
+    else this.streak(tail, head, col, 0.01, 0.4, false, 1);
+  },
+  // a glowing point at p: size in metres, or minPx on screen if that's bigger
+  flare(p, color, size, op, minPx) {
+    const sp = this.flares[this.flareN % this.flares.length]; this.flareN++;
+    const d = this.camera.position.distanceTo(p), pxRad = this.renderer.domElement.height / (this.camera.fov * Math.PI / 180);
+    const sz = Math.max(size, d * minPx / pxRad);
+    sp.position.copy(p); sp.scale.set(sz, sz, 1);
+    sp.material.color.setHex(color); sp.material.opacity = op;
+    sp.userData.f = this.frameNo; sp.visible = true;
+  },
+  // the glow round a streak, tail to head: width in metres, or minPx on screen if that's wider
+  glow(from, to, color, width, op, minPx) {
+    const axis = to.clone().sub(from), len = axis.length();
+    if (len < 0.05) return;
+    axis.divideScalar(len);
+    const m = this.glows[this.glowN % this.glows.length]; this.glowN++;
+    const cp = this.camera.position, near = Math.min(cp.distanceTo(from), cp.distanceTo(to));
+    const pxRad = this.renderer.domElement.height / (this.camera.fov * Math.PI / 180), wd = Math.max(width, near * minPx / pxRad);
+    const mid = from.clone().lerp(to, 0.5), view = cp.clone().sub(mid).normalize();
+    const side = new THREE.Vector3().crossVectors(axis, view);
+    if (side.lengthSq() < 1e-8) return; // (end on: it's the core you see)
+    side.normalize();
+    const nrm = new THREE.Vector3().crossVectors(side, axis);
+    m.matrix.makeBasis(side.multiplyScalar(wd), axis.clone().multiplyScalar(len), nrm).setPosition(from);
+    m.matrixWorldNeedsUpdate = true;
+    m.material.color.setHex(color); m.material.opacity = op;
+    m.userData.f = this.frameNo; m.visible = true;
   },
   particles(p, n, color, speed, life, grav = 9, spread = 1, dir, blood) {
     const col = new THREE.Color(color);
@@ -452,6 +550,10 @@ G.R = {
   },
   render() {
     const r = this.renderer;
+    for (const m of this.streaks) if (m.visible && m.userData.f !== this.frameNo) m.visible = false; // (rounds that stopped)
+    for (const m of this.glows) if (m.visible && m.userData.f !== this.frameNo) m.visible = false;
+    for (const m of this.flares) if (m.visible && m.userData.f !== this.frameNo) m.visible = false;
+    this.frameNo++;
     this.camera.updateMatrixWorld();
     this.vmHolder.matrix.copy(this.camera.matrixWorld);
     this.vmHolder.matrixWorldNeedsUpdate = true;

@@ -261,6 +261,9 @@ G.Gunsmith = (() => {
     ['lynx', 'Lynx Stub stubby grip', 'stubby', { recoil: -4, ergo: 1, weight: 0.07 }, 110], ['bastion', 'Bastion hand stop', 'stop', { recoil: -2, ergo: 4, weight: 0.03 }, 70],
     ['kodiak', 'Kodiak Ridge bipod', 'bipod', { recoil: -9, ergo: -6, weight: 0.42 }, 260]]
     .forEach(([b, n, t, st, price], i) => add({ id: `fg.${i}`, slot: 'fg', mount: 'fg', brand: BR[b], name: n, price, st, desc: '', model: { fg: t } }));
+  // (the bipod's gone: it stays in the list, so the weapon codes don't shift, but nothing fits, sells or drops it)
+  PARTS['fg.4'].retired = true;
+  BY_MOUNT.set('fg', BY_MOUNT.get('fg').filter((p) => !p.retired));
   // Lasers and weapon lights. set.laser: its colour (r / g); set.light: how bright. Both are switched on and off
   // with the mouse's side buttons (back: light, forward: laser); a laser only steadies hip fire while it's on.
   const tacDesc = (s) => (s.laser && s.light ? 'Laser and light: forward side button for the laser (steadier hip fire), back for the light.' : s.laser ? 'Laser: steadier hip fire while it\'s on (forward side mouse button).' : 'Weapon light: lights the way, and dazzles anyone you shine it at (back side mouse button).');
@@ -542,7 +545,7 @@ G.Gunsmith = (() => {
   P('galil', 'rifle', { rcv: 'ak', L: 0.27, rm: 'black', fm: 'polymer', optF: 0.2 }, { barrel: { len: 0.31 }, thread: 'rak', muzzle: 'brake', handguard: ['ak', { t: 'rail', len: 0.2 }], stock: ['ak', 'skeleton'], grip: ['ak', 'wood'], mag: { t: 'curved', len: 0.24, d: 0.072, c: 0.08, w: 0.028 }, optic: ['pic', { optic: 'reddot' }] });
   P('an94', 'rifle', { rcv: 'ak', L: 0.28, rm: 'black', fm: 'polymer' }, { barrel: { len: 0.32 }, thread: 'rak', muzzle: 'brake', handguard: ['ak', { t: 'wood', len: 0.22, m: 'polymer' }], stock: ['ak', 'skeleton'], grip: ['ak', 'wood'], mag: { t: 'curved', len: 0.21, d: 0.068, c: 0.06, w: 0.026, m: 'polymer' }, optic: ['pic', { optic: 'notch' }] });
   P('fal', 'rifle', { rcv: 'box', L: 0.3, H: 0.07, W: 0.04, rm: 'park', fm: 'polymer', optF: 0.24, carry: 0.15, carrySide: true }, { barrel: { len: 0.44 }, thread: 'r762', muzzle: 'flash', handguard: ['box', { t: 'wood', len: 0.22, m: 'polymer' }], stock: ['heavy', 'fixed'], grip: ['ar', 'ar'], mag: { t: 'straight', len: 0.19, d: 0.07, w: 0.026 }, optic: ['pic', { optic: 'irons' }] });
-  P('mk14', 'rifle', { L: 0.25, optF: 0.16 }, { barrel: { len: 0.35 }, thread: 'r762', muzzle: 'flash', handguard: ['ar', { t: 'rail', len: 0.3 }], fg: 'bipod', stock: ['tube', 'crane'], grip: ['ar', 'ar'], mag: { t: 'straight', len: 0.15, d: 0.07, w: 0.026 }, optic: ['pic', { optic: 'scope', scopeLen: 0.3 }], charging: 'ar' });
+  P('mk14', 'rifle', { L: 0.25, optF: 0.16 }, { barrel: { len: 0.35 }, thread: 'r762', muzzle: 'flash', handguard: ['ar', { t: 'rail', len: 0.3 }], fg: 'vertical', stock: ['tube', 'crane'], grip: ['ar', 'ar'], mag: { t: 'straight', len: 0.15, d: 0.07, w: 0.026 }, optic: ['pic', { optic: 'scope', scopeLen: 0.3 }], charging: 'ar' });
   P('garand', 'rifle', { rcv: 'round', L: 0.23, rm: 'park', fm: 'wood', gripT: 'none', optF: 0.12 }, { barrel: { len: 0.56, m: 'park' }, thread: 'r762', muzzle: 'crown', handguard: ['classic', { t: 'stockfore', len: 0.48 }], stock: ['classic', 'wood'], optic: ['pic', { optic: 'irons' }] });
   P('svd', 'rifle', { rcv: 'ak', L: 0.3, rm: 'blued', fm: 'woodRed', gripT: 'none', optF: 0.18 }, { barrel: { len: 0.55 }, thread: 'r762', muzzle: 'flash', handguard: ['ak', { t: 'wood', len: 0.25 }], stock: ['precision', 'thumbhole'], mag: { t: 'straight', len: 0.12, d: 0.07, w: 0.026, rake: 0.02 }, noDrum: true, optic: ['pic', { optic: 'scope', scopeLen: 0.28 }] });
   P('vss', 'rifle', { rcv: 'ak', L: 0.28, rm: 'blued', fm: 'woodRed', gripT: 'none', optF: 0.17 }, { barrel: { len: 0.2 }, integral: { len: 0.32, r: 0.022 }, thread: 'rak', muzzle: 'crown', stock: ['precision', 'thumbhole'], mag: { t: 'straight', len: 0.1, d: 0.07, w: 0.026 }, optic: ['pic', { optic: 'scope', scopeLen: 0.25 }] });
@@ -563,7 +566,7 @@ G.Gunsmith = (() => {
   P('aa12', 'rifle', { rcv: 'box', L: 0.33, H: 0.08, W: 0.05 }, { barrel: { len: 0.28, r: 0.012 }, thread: 'sg', muzzle: 'flash', handguard: ['box', { t: 'box', len: 0.15 }], stock: ['heavy', 'fixed'], grip: ['ar', 'ar'], mag: { t: 'drum', f: 0.16, r: 0.085, dw: 0.07 }, optic: ['pic', { optic: 'reddot' }] });
   P('ksg', 'rifle', { rcv: 'bullpup', L: 0.4, fm: 'polymer', extra: 'ksgTubes', pump: { f: 0.0, len: 0.14 }, vfg: 0.07 }, { barrel: { len: 0.26, r: 0.0105 }, thread: 'sg', muzzle: 'crown', pump: true, grip: ['ar', 'ar'], optic: ['pic', { optic: 'reddot' }] });
   P('slug', 'rifle', { rcv: 'round', L: 0.25, rm: 'black', fm: 'polymer', optF: 0.14 }, { barrel: { len: 0.47, r: 0.0105 }, thread: 'sg', muzzle: 'crown', tube: 0.38, handguard: ['classic', { t: 'wood', len: 0.24, m: 'polymer' }], stock: ['tube', 'm4'], grip: ['ar', 'ar'], optic: ['pic', { optic: 'irons' }] });
-  P('m249', 'rifle', { rcv: 'box', L: 0.32, H: 0.08, W: 0.05, feed: true, optF: 0.2, carry: 0.46 }, { barrel: { len: 0.38 }, thread: 'r556', muzzle: 'flash', handguard: ['box', { t: 'rail', len: 0.18 }], fg: 'bipod', stock: ['heavy', 'fixed'], grip: ['ar', 'ar'], mag: { t: 'ammobox', f: 0.12, m: 'od' }, optic: ['pic', { optic: 'irons' }] });
+  P('m249', 'rifle', { rcv: 'box', L: 0.32, H: 0.08, W: 0.05, feed: true, optF: 0.2, carry: 0.46 }, { barrel: { len: 0.38 }, thread: 'r556', muzzle: 'flash', handguard: ['box', { t: 'rail', len: 0.18 }], fg: 'vertical', stock: ['heavy', 'fixed'], grip: ['ar', 'ar'], mag: { t: 'ammobox', f: 0.12, m: 'od' }, optic: ['pic', { optic: 'irons' }] });
   P('pkm', 'rifle', { rcv: 'box', L: 0.33, H: 0.075, W: 0.045, rm: 'blued', fm: 'woodRed', feed: true, bipod: 0.56 }, { barrel: { len: 0.52, taper: 0.9 }, thread: 'r762', muzzle: 'flash', stock: ['heavy', 'thumbhole'], grip: ['ak', 'wood'], mag: { t: 'ammobox', f: 0.13, m: 'park' }, optic: ['pic', { optic: 'notch' }] });
   P('m60', 'rifle', { rcv: 'box', L: 0.33, H: 0.08, W: 0.05, rm: 'park', fm: 'polymer', feed: true, optF: 0.25, bipod: 0.52, carry: 0.52 }, { barrel: { len: 0.45 }, thread: 'r762', muzzle: 'flash', handguard: ['box', { t: 'box', len: 0.2 }], stock: ['heavy', 'fixed'], grip: ['ar', 'ar'], mag: { t: 'ammobox', f: 0.15, m: 'od' }, optic: ['pic', { optic: 'irons' }] });
   P('skorp', 'rifle', { rcv: 'box', L: 0.16, H: 0.05, W: 0.032, rm: 'blued', grip: 0.01, support: 0.14 }, { barrel: { len: 0.08, r: 0.007 }, thread: 'r9', muzzle: 'crown', stock: ['smg', 'folded'], grip: ['ak', 'wood', 'woodDark'], mag: { t: 'curved', f: 0.1, len: 0.1, d: 0.026, c: 0.03, w: 0.016 }, optic: ['pic', { optic: 'notch' }] });
@@ -574,7 +577,7 @@ G.Gunsmith = (() => {
   P('aks74u', 'rifle', { rcv: 'ak', L: 0.26, rm: 'black', fm: 'woodRed', optF: 0.2 }, { barrel: { len: 0.15 }, thread: 'rak', muzzle: 'cutts', handguard: ['ak', { t: 'wood', len: 0.12, m: 'woodRed' }], stock: ['ak', 'skeleton'], grip: ['ak', 'wood'], mag: { t: 'curved', len: 0.21, d: 0.068, c: 0.06, w: 0.026 }, optic: ['pic', { optic: 'notch' }] });
   P('rpk', 'rifle', { rcv: 'ak', L: 0.3, rm: 'blued', fm: 'wood', bipod: 0.46 }, { barrel: { len: 0.5, taper: 0.9 }, thread: 'rak', muzzle: 'crown', handguard: ['ak', { t: 'wood', len: 0.2 }], stock: ['ak', 'akwood'], grip: ['ak', 'wood'], mag: { t: 'curved', len: 0.23, d: 0.072, c: 0.08, w: 0.028 }, optic: ['pic', { optic: 'notch' }] });
   P('scarl', 'rifle', { L: 0.27, rm: 'tan', fm: 'tan' }, { barrel: { len: 0.3 }, thread: 'r556', muzzle: 'flash', handguard: ['ar', { t: 'rail', len: 0.22, m: 'tan' }], stock: ['heavy', 'fixed'], grip: ['ar', 'ar'], mag: { t: 'curved', len: 0.19, d: 0.064, c: 0.03 }, optic: ['pic', { optic: 'irons' }] });
-  P('m27', 'rifle', { L: 0.22 }, { barrel: { len: 0.4 }, thread: 'r556', muzzle: 'flash', handguard: ['ar', { t: 'rail', len: 0.34 }], fg: 'bipod', stock: ['tube', 'crane'], grip: ['ar', 'ar'], mag: { t: 'curved', len: 0.19, d: 0.064, c: 0.03 }, optic: ['pic', { optic: 'irons' }], charging: 'ar' });
+  P('m27', 'rifle', { L: 0.22 }, { barrel: { len: 0.4 }, thread: 'r556', muzzle: 'flash', handguard: ['ar', { t: 'rail', len: 0.34 }], fg: 'vertical', stock: ['tube', 'crane'], grip: ['ar', 'ar'], mag: { t: 'curved', len: 0.19, d: 0.064, c: 0.03 }, optic: ['pic', { optic: 'irons' }], charging: 'ar' });
   P('m14', 'rifle', { rcv: 'round', L: 0.25, rm: 'park', fm: 'wood', gripT: 'none', optF: 0.14 }, { barrel: { len: 0.45 }, thread: 'r762', muzzle: 'flash', handguard: ['classic', { t: 'stockfore', len: 0.4 }], stock: ['classic', 'wood'], mag: { t: 'straight', len: 0.15, d: 0.07, w: 0.026 }, optic: ['pic', { optic: 'irons' }] });
   P('sr25', 'rifle', { L: 0.25, optF: 0.15 }, { barrel: { len: 0.45 }, thread: 'r762', muzzle: 'flash', handguard: ['ar', { t: 'mlok', len: 0.34 }], stock: ['tube', 'crane'], grip: ['ar', 'ar'], mag: { t: 'straight', len: 0.15, d: 0.07, w: 0.026 }, optic: ['pic', { optic: 'scope', scopeLen: 0.3 }], charging: 'ar' });
   P('mpx', 'rifle', { L: 0.2, optF: 0.1 }, { barrel: { len: 0.16 }, thread: 'r9', muzzle: 'flash', handguard: ['ar', { t: 'mlok', len: 0.17 }], stock: ['tube', 'pdw'], grip: ['ar', 'ar'], mag: { t: 'straight', len: 0.15, d: 0.034, w: 0.022, rake: 0.008 }, optic: ['pic', { optic: 'irons' }], charging: 'ar' });
@@ -656,7 +659,7 @@ G.Gunsmith = (() => {
     const build = {};
     for (const s of rest.split('.')) {
       const p = LIST[parseInt(s, 36)];
-      if (!p) continue;
+      if (!p || p.retired) continue;
       const alt = Object.keys(ALIAS).find((a) => ALIAS[a] === p.slot);
       build[build[p.slot] && alt ? alt : p.slot] = p.id; // (two of a kind: one's on the other's adapter)
     }
@@ -806,7 +809,7 @@ G.Gunsmith = (() => {
   function rollStock(level, seed, n = 3) {
     const r = G.U.rng((seed ^ 0x6a5d) >>> 0), maxTier = Math.min(3, 1 + Math.floor(level / 2)), out = new Set();
     // (lights and lasers are few among hundreds of muzzles, stocks and grips: they're weighted up to turn up most visits)
-    const pool = LIST.filter((p) => !p.factory && !p.variant && p.tier <= maxTier).map((p) => ({ p, w: Math.pow(fits(p.mount).length, 0.8) * (p.slot === 'tac' ? 9 : 1) }));
+    const pool = LIST.filter((p) => !p.factory && !p.variant && !p.retired && p.tier <= maxTier).map((p) => ({ p, w: Math.pow(fits(p.mount).length, 0.8) * (p.slot === 'tac' ? 9 : 1) }));
     while (out.size < n && pool.length) {
       let roll = r() * pool.reduce((a, x) => a + x.w, 0), i = 0;
       while (roll > pool[i].w && i < pool.length - 1) { roll -= pool[i].w; i++; }

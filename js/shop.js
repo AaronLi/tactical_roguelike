@@ -192,15 +192,7 @@ G.Shop = {
       const C = G.CALIBERS[cal], am = G.ballFor(cal), it = Gr.boxItem(cal, am, C.box);
       out.push({ id: 'ball.' + cal, name: `${C.name} ${G.AMMO[am].name} ×${C.box}`, desc: `A box of ${C.box} (${Gr.size(it).join('×')}). ${G.AMMO[am].desc}`, price: Gr.price(it), disabled: !this.room(it), apply: () => this.stow(Gr.boxItem(cal, am, C.box)) });
     }
-    // worn plates, soft armour and helmets made good
-    let wear = 0;
-    Gr.each([Me.locker], (it) => { const d = Gr.defOf(it); if (d && d.dur) wear += (d.dur - it.dur) / d.dur * d.price; });
-    for (const it of [Me.kit.helmet, Me.kit.carrier, Me.kit.carrier && Me.kit.carrier.plate]) { const d = Gr.defOf(it); if (d && d.dur) wear += (d.dur - it.dur) / d.dur * d.price; }
-    out.push({ id: 'repair', name: 'Armour Repair', desc: 'Every plate, vest and helmet you own made good as new.', price: Math.ceil(wear * 0.5), disabled: wear <= 0,
-      apply: () => {
-        const fix = (it) => { const d = Gr.defOf(it); if (d && d.dur) it.dur = d.dur; };
-        Gr.each([Me.locker], fix); [Me.kit.helmet, Me.kit.carrier, Me.kit.carrier && Me.kit.carrier.plate].forEach((it) => it && fix(it));
-      } });
+    // (no armour repair: worn armour stays worn, replace it)
     // field medical gear (js/medical.js): each treats one injury on one part
     for (const [mt, I] of Object.entries(G.Med.ITEMS)) {
       let have = 0; Gr.each(Gr.all(Me), (it) => { if (it.k === 'med' && it.mt === mt) have += it.n || 1; });
@@ -374,7 +366,7 @@ G.Shop = {
       `<div class="lo"><span>Frags ${Me.nades} · Medical items ${Me.meds}</span></div>`;
     let roster = '';
     for (const [id, p] of Object.entries(G.Game.roster)) {
-      roster += `<div class="lo"><span style="color:${G.U.hex(p.color)}">${G.U.esc(p.name)}${id === G.Net.myId ? ' (you)' : ''}</span><small class="${p.ready ? 'rdy' : ''}">${p.ready ? 'READY' : 'shopping'}</small></div>`;
+      roster += `<div class="lo"><span style="color:${G.U.hex(p.color)}">${G.Callsigns.html(p.animal)}${G.U.esc(p.name)}${id === G.Net.myId ? ' (you)' : ''}</span><small class="${p.ready ? 'rdy' : ''}">${p.ready ? 'READY' : 'shopping'}</small></div>`;
     }
     document.getElementById('shopRoster').innerHTML = roster;
     const rb = document.getElementById('btnReady');

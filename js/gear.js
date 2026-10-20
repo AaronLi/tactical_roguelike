@@ -301,7 +301,7 @@ G.Gear = (() => {
   function newKit(me) {
     me.kit = { helmet: null, carrier: null, belt: null, pack: null, ifak: null };
     me.pockets = [[1, 2], [1, 2], [1, 1], [1, 1]].map(([w, h]) => grid(w, h, null, 'Pocket'));
-    me.locker = grid(10, 8, null, 'Locker');
+    me.locker = grid(9, 7, null, 'Locker');
     me.locker.locker = true;
   }
   // every grid you carry, pockets first
@@ -571,7 +571,8 @@ G.Gear = (() => {
   function starter(me) {
     newKit(me);
     const p9 = G.WEAPONS.p9;
-    put(me.pockets[2], ammoItem(p9), 0, 0, 0); put(me.pockets[3], ammoItem(p9), 0, 0, 0); // the tall pockets left for rifle magazines
+    // two spare magazines of tracers (you see every round go), in the small pockets: the tall ones are left for rifle magazines
+    put(me.pockets[2], ammoItem(p9, null, 'tracer'), 0, 0, 0); put(me.pockets[3], ammoItem(p9, null, 'tracer'), 0, 0, 0);
     // second-hand protection: a bump helmet and a concealable vest, both already half worn out
     me.kit.helmet = gearItem('h.bump'); me.kit.helmet.dur = DEFS['h.bump'].dur * 0.5;
     me.kit.carrier = gearItem('c.ghost'); me.kit.carrier.dur = DEFS['c.ghost'].dur * 0.5;

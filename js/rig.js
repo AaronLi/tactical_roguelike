@@ -85,12 +85,28 @@ G.Rig = (() => {
   const KIT_COL = (d) => (!d ? 0x2e3236 : /Sable|Paragon/.test(d.brand || '') ? 0x5a5240 : /Kestrel|Vantage/.test(d.brand || '') ? 0x4d5639 : 0x2e3236);
   const kitMat = new Map();
   const KM = (c, o) => { const key = c + JSON.stringify(o || {}); if (!kitMat.has(key)) kitMat.set(key, new T.MeshLambertMaterial(Object.assign({ color: c }, o || {}))); return kitMat.get(key); };
+  const PACK = { 'k.sling': [0.22, 0.26, 0.09, 0.12], 'k.assault': [0.3, 0.36, 0.13, 0.14], 'k.ruck': [0.34, 0.5, 0.2, 0.2] };
+  // the name patch, high on the back (rig.callsign: { id: their animal, name }): on the backpack if they wear
+  // one, else on the carrier, else on the shirt
+  function backPatch(rig, k) {
+    const cs = rig.callsign;
+    if (!cs || !G.Callsigns) return;
+    const D = (id) => (id && G.Gear && G.Gear.DEFS[id]) || null, cd = D(k && k.carrier), pd = D(k && k.pack);
+    let y = 0.22, z = 0.128;
+    if (pd) { const [, h, d, py] = PACK[pd.id] || PACK['k.assault']; z = (cd && cd.id !== 'c.recon' ? 0.15 : 0.12) + d + 0.003; y = py + h / 2 - 0.05; }
+    else if (cd && cd.id === 'c.ghost') z = 0.126;
+    else if (cd && cd.id !== 'c.recon') { y = 0.2; z = ((cd.id === 'c.heavy' ? 0.3 : 0.27) + (k.plate ? 0.03 : 0)) / 2 + 0.003; }
+    const m = new T.Mesh(new T.PlaneGeometry(0.2, 0.05), new T.MeshLambertMaterial({ map: G.Callsigns.backTex(cs.id, cs.name) }));
+    m.position.set(0, y, z);
+    rig.chest.add(m); rig.kitParts.push(m);
+  }
   function setKit(rig, k) {
-    const key = JSON.stringify(k || {});
+    const key = JSON.stringify(k || {}) + (rig.callsign ? '|' + rig.callsign.id + '|' + rig.callsign.name : '');
     if (rig.kitKey === key) return;
-    rig.kitKey = key;
+    rig.kitKey = key; rig.kit = k;
     for (const m of rig.kitParts) { if (m.parent) m.parent.remove(m); if (m.geometry) m.geometry.dispose(); }
     rig.kitParts = [];
+    backPatch(rig, k);
     if (!k) return;
     const D = (id) => (id && G.Gear && G.Gear.DEFS[id]) || null;
     const box = (parent, w, h, d, c, x, y, z, o) => { const m = new T.Mesh(new T.BoxGeometry(w, h, d), KM(c, o)); m.position.set(x, y, z); parent.add(m); rig.kitParts.push(m); return m; };
@@ -154,7 +170,7 @@ G.Rig = (() => {
     // the backpack, by size
     const pd = D(k.pack);
     if (pd) {
-      const [w, h, d, y] = { 'k.sling': [0.22, 0.26, 0.09, 0.12], 'k.assault': [0.3, 0.36, 0.13, 0.14], 'k.ruck': [0.34, 0.5, 0.2, 0.2] }[pd.id] || [0.3, 0.36, 0.13, 0.14];
+      const [w, h, d, y] = PACK[pd.id] || PACK['k.assault'];
       const back = (cd && cd.id !== 'c.recon' ? 0.15 : 0.12) + d / 2;
       box(C, w, h, d, KIT_COL(pd), 0, y, back);
       box(C, w * 0.8, h * 0.3, 0.04, 0x23251f, 0, y - h * 0.2, back + d / 2 + 0.02); // a pocket
@@ -274,7 +290,10 @@ G.Rig = (() => {
       const up = joint(sh, 0, 0, 0);
       if (longSleeves) M_(cyl(0.056, 0.047, UARM, 10), top, 0, -UARM / 2, 0, up);
       else { M_(cyl(0.06, 0.056, UARM * 0.45, 10), top, 0, -UARM * 0.22, 0, up); M_(cyl(0.05, 0.045, UARM * 0.7, 10), skin, 0, -UARM * 0.62, 0, up); }
-      if (style === 'tactical' && side < 0 && o.color != null) M_(cyl(0.059, 0.059, 0.03, 12), L(o.color), 0, -0.08, 0, up); // the squad armband
+      if (style === 'tactical' && side < 0 && o.animal && G.Callsigns) { // their animal's patch on the shoulder
+        const p = new T.Mesh(new T.PlaneGeometry(0.058, 0.058), new T.MeshLambertMaterial({ map: G.Callsigns.armTex(o.animal) }));
+        p.position.set(side * 0.06, -0.085, 0); p.rotation.y = side * Math.PI / 2; up.add(p);
+      } else if (style === 'tactical' && side < 0 && o.color != null) M_(cyl(0.059, 0.059, 0.03, 12), L(o.color), 0, -0.08, 0, up); // the squad armband
       const lo = joint(up, 0, -UARM, 0);
       M_(new T.SphereGeometry(0.047, 10, 8), longSleeves ? top : skin, 0, 0, 0, lo); // elbow
       M_(cyl(0.046, 0.036, FARM, 10), longSleeves ? top : skin, 0, -FARM / 2, 0, lo);
@@ -308,7 +327,7 @@ G.Rig = (() => {
     const hipMount = joint(hips, 0.2, 0.02, -0.02); hipMount.rotation.set(-Math.PI / 2, 0, 0);
 
     const rig = {
-      hairMesh, look, kitParts: [], kitKey: null,
+      hairMesh, look, kitParts: [], kitKey: null, kit: null, callsign: o.animal ? { id: o.animal, name: o.callName || '' } : null,
       root, body, hips, spine, chest, neck, head, armL, armR, legL, legR, gunMount, slingMount, hipMount, slung: false, mats, scale: s, style,
       gun: null, gunInfo: null, gunKey: null,
       phase: rnd() * 10, vel: new T.Vector3(), lastPos: null,
@@ -364,6 +383,8 @@ G.Rig = (() => {
     };
     rig.throwNade = () => { rig.throwT = 0; };
     rig.setKit = (k) => setKit(rig, k);
+    rig.setCallsign = (id, name) => { rig.callsign = id ? { id, name: name || '' } : null; setKit(rig, rig.kit); };
+    setKit(rig, null); // (the back patch, before any kit)
     // put the weapon away (true) or bring it to the hands (false)
     rig.holster = (on) => {
       if (!rig.gun || rig.slung === on) return;
