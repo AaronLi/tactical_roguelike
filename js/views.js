@@ -347,7 +347,7 @@ G.Views = {
     G.World.windowSolids(map.world, map, w);
     const pane = map.winMeshes && map.winMeshes[id];
     if (pane) pane.visible = false;
-    const Y = w.fy || 0, lo = w.door ? 0.25 : G.Level.SILL, hi = w.door ? G.Level.DOOR_H - 0.1 : G.Level.TOP; // (a glass door: its pane, nearly floor to top rail)
+    const Y = w.fy || 0, lo = w.door ? 0.25 : w.rail ? 0.1 : G.Level.SILL, hi = w.door ? G.Level.DOOR_H - 0.1 : w.rail ? G.Level.RAIL_H - 0.05 : G.Level.TOP; // (a glass door: its pane, nearly floor to top rail; a railing's: under its handrail)
     const ax = w.door ? (w.door.axis === 'x' ? 0 : 1) : (w.nz ? 1 : 0), az = w.door ? (w.door.axis === 'x' ? 1 : 0) : (w.nx ? 1 : 0); // (along the glass)
     for (let k = 0; k < 4; k++) {
       const q = new THREE.Vector3(w.x + ax * (Math.random() - 0.5) * w.len, Y + lo + Math.random() * (hi - lo), w.z + az * (Math.random() - 0.5) * w.len);
@@ -432,7 +432,7 @@ G.Views = {
     if (map && len > 0.01) {
       d.divideScalar(len);
       const h = G.Level.raycast(map, f.x, f.y, f.z, d.x, d.y, d.z, len + 0.5);
-      if (h.n && h.t <= len + 0.45 && !h.view) { G.R.impact(f.clone().addScaledVector(d, h.t), h.n, 'wall'); return; }
+      if (h.n && h.t <= len + 0.45 && !h.view) { G.R.impactOn(f.clone().addScaledVector(d, h.t), h.n, h.solid); return; }
     }
     G.R.impact(to, null, 'wall');
   },
@@ -455,7 +455,7 @@ G.Views = {
     const d = G.R.camera.position.distanceTo(f);
     if (def.cls === 'RAIL') G.Audio.rail(d);
     else if (def.cls === 'BOW') G.Audio.bow(d);
-    else if (!G.GunAudio.play(def.soundKey, f)) G.Audio.shot(m.sil ? G.SUPPRESSOR.snd : def.snd, d);
+    else if (!G.GunAudio.play(G.Gunsmith.roundSoundKey(def, am), f)) G.Audio.shot(m.sil ? G.SUPPRESSOR.snd : def.snd, d);
   },
 
   // ---------------------------------------------------------------- other people's rounds
@@ -689,7 +689,7 @@ G.Views = {
       pv.lastAct = st.act; pv.lastAp = act ? act.t : 0;
       const kneel = (st.act === 'z' && (st.ap || 0) > 0.3) || st.act === 'b';
       const hold = st.hk ? { kind: st.hk === 2 ? 'flash' : 'frag', cock: !!st.hc, str: st.hs == null ? 2 : st.hs } : null; // (a grenade in their hand)
-      pv.rig.update(dt, { pos: pv.pos, yaw: pv.yaw, pitch: pv.pitch, crouch: (!!st.cr || kneel) && !st.dn, alert: !st.lr && !st.sw, lean: st.ln || 0, state: st.dn ? 'down' : 'alive', act,
+      pv.rig.update(dt, { pos: pv.pos, yaw: pv.yaw, pitch: pv.pitch, crouch: (!!st.cr || kneel) && !st.dn, prone: !!st.pr, alert: !st.lr && !st.sw, lean: st.ln || 0, state: st.dn ? 'down' : 'alive', act,
         hold, reload: st.rl == null ? -1 : st.rl, inspect: st.in == null ? -1 : st.in, magChk: st.mc == null ? -1 : st.mc });
       if (pv.tag) pv.tag.position.y = st.dn ? 0.8 : st.cr ? 1.7 : 2.15;
     }
@@ -715,16 +715,25 @@ G.Views = {
     G.R.tacBegin();
     const me = G.Me, mw = G.Game.phase === 'level' && me.cur ? me.cur() : null, mf = mw && !me.dead ? me.tacFlags(mw) : 0;
     if (mf) {
-      // aimed from the eye along the bore (where the rounds go); drawn from the gun in your hands
-      const dir = me.boreDir(), vm = G.R.vm, fl = vm && vm.userData.flash;
-      let gun = null;
-      if (fl) { vm.updateMatrixWorld(true); gun = fl.getWorldPosition(new THREE.Vector3()); }
-      this.tacBeam(G.R.camera.position.clone(), dir, mf, null, gun);
+      // aimed from the eye along the bore (where the rounds go); drawn from the gun in your hands. With the gun off
+      // the line (lowered, coming up, mid-reload) it's the gun itself that points them: from its muzzle along its barrel.
+      let dir = me.boreDir(), from = G.R.camera.position.clone(), gun = null;
+      const vm = G.R.vm, fl = vm && vm.userData.flash;
+      if (fl) {
+        G.R.vmHolder.updateMatrixWorld(true);
+        gun = fl.getWorldPosition(new THREE.Vector3());
+        const axis = new THREE.Vector3(0, 0, -1).transformDirection(fl.parent.matrixWorld); // (the barrel: -z in its holder)
+        const off = THREE.MathUtils.smoothstep(Math.acos(G.U.clamp(axis.dot(dir), -1, 1)), 0.03, 0.12); // (~2° to 7° off)
+        if (off > 0) { dir = dir.lerp(axis, off).normalize(); from.lerp(gun, off); }
+      }
+      this.tacBeam(from, dir, mf, null, gun);
     }
     for (const [id, pv] of this.players) {
       const st = pv.st;
       if (!st || !st.tl || st.dd || st.sw || !pv.rig.root.visible) continue;
-      const cp = Math.cos(pv.pitch), dir = new THREE.Vector3(-Math.sin(pv.yaw) * cp, Math.sin(pv.pitch), -Math.cos(pv.yaw) * cp);
+      const cp = Math.cos(pv.pitch);
+      let dir = new THREE.Vector3(-Math.sin(pv.yaw) * cp, Math.sin(pv.pitch), -Math.cos(pv.yaw) * cp);
+      if (st.lr && pv.rig.gun) { pv.rig.gun.updateMatrixWorld(true); dir = new THREE.Vector3(0, 0, -1).transformDirection(pv.rig.gun.matrixWorld); } // (lowered: where the gun points)
       const gi = pv.rig.gunInfo, from = pv.rig.gun && gi ? pv.rig.gun.localToWorld(new THREE.Vector3(gi.muzzles[0][2], gi.muzzles[0][1], -gi.muzzles[0][0])) : pv.pos.clone().add(new THREE.Vector3(0, 1.4, 0)).addScaledVector(dir, 0.5);
       this.tacBeam(from, dir, st.tl, id);
     }

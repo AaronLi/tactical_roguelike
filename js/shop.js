@@ -13,7 +13,7 @@ G.Shop = {
     this.ammoSold = new Set(); // the special loads bought (by caliber): a handful of each
     this.gearSold = new Set(); // he has one of each piece of kit he lists
     this.genOffers(level, seed);
-    this.partStock = G.Gunsmith.rollStock(level, seed, 4); // the gunsmith's parts this visit (same for the whole squad)
+    this.partStock = G.Gunsmith.rollStock(level, seed, 6); // the gunsmith's parts this visit (same for the whole squad)
     document.getElementById('vendorArt').innerHTML = this.portrait();
     this.quip('hello');
     this.render();
@@ -32,7 +32,7 @@ G.Shop = {
       }
       return out.sort((a, b) => a.price - b.price);
     };
-    const weapons = G.WEAPON_LIST;
+    const weapons = G.WEAPON_LIST.filter(G.obtainable);
     this.offers = {
       p: pickW(weapons.filter((w) => w.slot === 'p'), 3).map((w) => w.id),
       s: pickW(weapons.filter((w) => w.slot === 's'), 2).map((w) => w.id),
@@ -43,13 +43,12 @@ G.Shop = {
         for (let i = 0; i < 3; i++) { const d = pickW(all.filter((x) => !out.some((o) => o.kind === x.kind)), 1)[0]; if (d) out.push(d); }
         return out.sort((x, y) => x.price - y.price).map((d) => d.id);
       })(),
-      // a handful of something other than ball, for two random calibers
+      // three standard magazines' worth of something other than ball, for two random calibers
       ammo: (() => {
         const cals = Object.keys(G.CALIBERS).filter((c) => ['rifle', 'pistol', 'shotgun'].includes(G.CALIBERS[c].group)), out = [];
         while (out.length < 2 && cals.length) {
           const cal = cals.splice(Math.floor(r() * cals.length), 1)[0], types = G.AMMO_TYPES[G.CALIBERS[cal].group].slice(1);
-          const box = G.CALIBERS[cal].box;
-          out.push({ cal, am: types[Math.floor(r() * types.length)], n: Math.max(4, Math.round(box * (0.3 + r() * 0.3))) });
+          out.push({ cal, am: types[Math.floor(r() * types.length)], n: 3 * G.stdMag(cal) });
         }
         return out;
       })(),
@@ -191,7 +190,7 @@ G.Shop = {
     for (const w of Object.values(Me.weapons)) empty += Me.magSize(w.def) - w.mag + (G.chambered(w.def) && !w.chamber ? 1 : 0);
     out.push({ id: 'load', name: 'Load Magazines', desc: `Top up every magazine you own (and your guns) from your loose rounds, same type first. ${loose} loose rounds, ${empty} empty places.`, price: 0, disabled: !empty || !loose,
       apply: () => Gr.loadAll(Me) });
-    // ball for every caliber you own a gun in
+    // ball for every caliber you own a gun in, by the box
     const cals = [...new Set(Gr.guns(Me).map((w) => G.calOf(w.def)))];
     for (const cal of cals) {
       const C = G.CALIBERS[cal], am = G.ballFor(cal), it = Gr.boxItem(cal, am, C.box);
@@ -229,7 +228,7 @@ G.Shop = {
       <div class="cd">${def.desc}</div>
       ${this.bar('DMG', (def.explosive ? def.explosive.dmg : def.dmg * def.pellets) / 300, dmgTxt)}
       ${this.bar('RATE', def.rpm / 1200, def.rpm + ' ' + (def.modes || [def.mode]).map((m) => m === 'hyper' ? 'hyper' : m).join('/'))}
-      ${this.bar('ACC', 1 - def.ads / 3, def.ads <= 0.3 ? 'pinpoint' : def.ads <= 1 ? 'tight' : 'loose')}
+      ${this.bar('ACC', 1 - def.ads * 120 / 20, `${+(def.ads * 120).toFixed(1)} MOA`)}
       ${this.bar('RANGE', def.range / 100, def.range + 'm')}
       ${this.bar('MOBIL', (def.speed - 0.65) / 0.45, Math.round(def.speed * 100) + '%')}
       <div class="cfoot"><span>Mag ${Me.magSize(def)} · DPS ${Math.round(dps)}${def.pen ? ' · Pierce ' + (def.pen > 10 ? '∞' : def.pen) : ''}</span>
@@ -347,7 +346,7 @@ G.Shop = {
       (rp.civKilled ? ` · <b class="red">${rp.civKilled} civilian casualties</b>` : '') + (rp.unauth ? ` · <b class="red">${rp.unauth} unauthorised kills</b>` : '') +
       (!rp.civKilled && !rp.unauth ? ' · <b class="go">clean op +¢200</b>' : '') + (rp.allRescued ? ` · <b class="go">every civilian rescued +¢${150 + 50 * this.level}</b>` : '') + '</div>' : '';
     document.getElementById('shopTitle').innerHTML = `Level ${this.level} cleared <span>— next up: level ${this.level + 1}${G.Route.isBoss(this.level + 1) ? ' <b class="red">(BOSS)</b>' : ''}</span>${rep}`;
-    const tabs = [['stock', 'Stock'], ['kit', 'Kit'], ['gunsmith', 'Gunsmith'], ['svc', 'Supplies']];
+    const tabs = [['stock', 'Stock'], ['kit', 'Kit'], ['gunsmith', 'Gunsmith'], ['zero', 'Zeroing'], ['svc', 'Supplies']];
     document.getElementById('shopTabs').innerHTML = tabs.map(([k, n]) => `<button class="tab${this.tab === k ? ' on' : ''}" data-tab="${k}">${n}</button>`).join('');
     let html = '';
     const O = this.offers;
@@ -360,6 +359,7 @@ G.Shop = {
     const items = document.getElementById('shopItems');
     if (this.tab === 'gunsmith') { G.InvUI.hide(); G.GunsmithUI.show(items); }
     else if (this.tab === 'kit') { G.GunsmithUI.hide(); G.InvUI.show(items); }
+    else if (this.tab === 'zero') { G.GunsmithUI.hide(); G.InvUI.hide(); G.ZeroUI.show(items); }
     else { G.GunsmithUI.hide(); G.InvUI.hide(); items.innerHTML = html; }
     items.classList.toggle('locked', this.ready);
 
@@ -390,6 +390,7 @@ G.Shop = {
     const items = document.getElementById('shopItems');
     items.addEventListener('click', (e) => {
       if (this.tab === 'gunsmith') return G.GunsmithUI.onClick(e);
+      if (this.tab === 'zero') return G.ZeroUI.onClick(e);
       const b = e.target.closest('.buy');
       if (b && !b.disabled) this.buy(b.dataset.k, b.dataset.id);
     });

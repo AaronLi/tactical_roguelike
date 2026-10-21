@@ -26,11 +26,19 @@ G.InvUI = (() => {
     document.documentElement.style.setProperty('--ik', (C / 34).toFixed(3));
   }
   const GG = () => G.Gear;
-  let root = null, drag = null, editMolle = false, menu = null, field = false;
+  let root = null, drag = null, editMolle = false, menu = null, field = false, pressed = false; // (pressed: a pointer's held down)
   let patient = null; // a teammate you're treating (their player id), or null: yourself
   let ptPart = null, lastDropAt = 0; // the part of a body you've picked to treat (highlighted); when something was last dropped on one
   let cab = null; // the first aid cabinet you're looking in (its index), or null
-  const locked = () => !field && G.Shop.ready;
+  // In the range your kit is frozen: everything in it is put back as it was when you leave (js/range.js), so an
+  // item moved (to the stash, the floor, a teammate) while in there would come back as well as being where it went.
+  let frozenAt = 0;
+  const inRange = () => {
+    if (!(G.Range && G.Range.on())) return false;
+    if (performance.now() - frozenAt > 1500) { frozenAt = performance.now(); G.HUD.toast('THE RANGE', 'Your kit stays as it is in here: sort it out once you\'re back in the hangar', 2); }
+    return true;
+  };
+  const locked = () => (!field && G.Shop.ready) || inRange();
   // ---------------------------------------------------------------- field jobs (timed ammo handling)
   // a job: { label, per (s per step), t, step(me) -> 'more' | 'done', prog() -> text, end(me) }
   let jobs = [];
@@ -147,8 +155,9 @@ G.InvUI = (() => {
   function reviveJob() {
     const who = patient, pv = patientView();
     if (!pv || !pv.st.dn) return;
-    const why = G.Med.cantRevive(bodyOf(G.Me));
+    const why = G.Med.cantRevive(bodyOf(G.Me)), warn = G.Med.reviveWarn(bodyOf(G.Me));
     if (why) { G.HUD.toast('', why, 2); return G.Audio.deny(); }
+    if (warn) G.HUD.toast('', warn, 2);
     queue({ label: `Reviving ${pv.name}`, per: 4, prog: () => '',
       step(me) {
         const p = G.Views.players.get(who);
@@ -174,6 +183,16 @@ G.InvUI = (() => {
     return `<div class="job-row"><b>${G.U.esc(j.label)}</b> <span>${j.prog()}</span>${jobs.length > 1 ? ` <i>+${jobs.length - 1} queued</i>` : ''}<button class="btn tiny" data-jobcancel>Cancel</button></div>
       <div class="job-bar"><i style="width:${Math.round(k * 100)}%"></i></div>`;
   }
+  // the health panel redrawn, only when it's changed (now: whatever), and never while a pointer's held: swapping the
+  // part under it between the press and the release would lose the click (the next tick catches up)
+  function paintHealth(now) {
+    if (pressed) return;
+    const el = root && document.getElementById('invHealth'), h = el && healthHTML(G.Me);
+    if (el && (now || h !== el._h)) { el.innerHTML = h; el._h = h; }
+  }
+  // (first in line, before a menu's click-outside check)
+  window.addEventListener('pointerdown', () => { pressed = true; }, true);
+  for (const ev of ['pointerup', 'pointercancel']) window.addEventListener(ev, () => { pressed = false; }, true);
   function paintJob() { const el = root && document.getElementById('invJob'); if (el) el.innerHTML = jobHTML(); }
   // advance the job at the front (called every frame while the field screen is open)
   function update(dt) {
@@ -210,7 +229,7 @@ G.InvUI = (() => {
     if (!field) return G.Shop.render();
     render();
     const w = G.Me.cur();
-    if (w && G.R.vm && G.R.vm.userData.code !== w.def.code) { G.R.setViewmodel(w.def); G.R.vm && (G.R.vm.userData.code = w.def.code); }
+    if (w && G.R.vm && G.R.vm.userData.code !== w.def.code) G.R.setViewmodel(w.def);
   }
   let opened = []; // uids of the open containers, newest first
   const COLORS = { mag: '#3d4a33', ammo: '#4a4130', med: '#5a2a2a', frag: '#3a4237', flash: '#3d4247', carrier: '#2f3a44', plate: '#3c3f46', helmet: '#33393f', face: '#30363c', belt: '#3b3528', pack: '#3a3a2c', gun: '#262b30', pouch: '#353a2e', part: '#2c3136' };
@@ -379,7 +398,7 @@ G.InvUI = (() => {
     let rows = slots.map((s) => {
       const pid = def.build[s.slot], it = pid ? fittedItem(w, s.slot, pid) : null, [iw, ih] = it ? Gr.partSize(pid) : [1, 1];
       const bad = it && GS().PARTS[pid].mount !== s.mount;
-      return `<div class="gun-slot${(!it || bad) && s.req ? ' missing' : ''}" data-wslot="${gunIt.uid}|${s.slot}"><small>${GS().SLOT_LABEL[s.slot]}${s.req ? '' : ' <i>optional</i>'}${bad ? ' <i class="broken">doesn\'t fit: it won\'t fire</i>' : ''}</small>${it ? itemHTML(it, iw, ih, 'position:relative') : s.req ? '<em>missing: it won\'t fire</em>' : '<em>empty</em>'}</div>`;
+      return `<div class="gun-slot${(!it || bad) && s.req ? ' missing' : ''}" data-wslot="${gunIt.uid}|${s.slot}"><small>${GS().slotLabel(s)}${s.req ? '' : ' <i>optional</i>'}${bad ? ' <i class="broken">doesn\'t fit: it won\'t fire</i>' : ''}</small>${it ? itemHTML(it, iw, ih, 'position:relative') : s.req ? '<em>missing: it won\'t fire</em>' : '<em>empty</em>'}</div>`;
     }).join('');
     const mi = magItem(w), a = mi ? (([w0, h0]) => ({ w: w0, h: h0 }))(Gr.size(mi)) : null;
     rows += isMagGun(w)
@@ -414,6 +433,31 @@ G.InvUI = (() => {
   // your health and the condition of what protects you
   // The body you're treating: yours, or the teammate's you're checking (from what they last sent)
   function patientView() { return patient != null ? G.Views.players.get(patient) : null; }
+  const REACH = 2.6; // (how close you have to be to treat someone)
+  const mateFar = (pv, me) => Math.hypot(pv.pos.x - me.pos.x, pv.pos.z - me.pos.z) > REACH;
+  // The squad, under your own body: each teammate's blood (or the head, if that's worse) as a bar. Click one within
+  // reach to treat them (their body takes the place of yours here, as when you hold F on them).
+  function squadHTML(me) {
+    if (!field || !G.Views.players.size) return '';
+    const rows = [...G.Views.players.entries()].map(([id, pv]) => {
+      const st = pv.st, b = st && st.bd ? G.Med.decode(st.bd) : null;
+      if (!b) return '';
+      const hp = Math.round(G.Med.overall(b)), far = mateFar(pv, me), col = hp > 70 ? '#7fc06a' : hp > G.Med.DOWNABLE ? '#e0b040' : '#e06060';
+      const tag = st.dd ? 'KIA' : st.uc ? 'UNCONSCIOUS' : st.dn ? 'DOWN' : G.Med.bleeding(b) ? 'BLEEDING' : '';
+      return `<div class="sq-row${far || st.dd ? ' far' : ''}" data-mate="${id}" title="${st.dd ? '' : far ? 'Too far to treat: get within reach' : 'Click to treat ' + G.U.esc(pv.name)}">
+        <span class="sq-n" style="color:${G.U.hex(pv.color)}">${G.Callsigns.html(pv.animal)}${G.U.esc(pv.name)}</span>${tag ? `<i class="c heavy">${tag}</i>` : ''}
+        <div class="hl-bar"><i style="width:${hp}%;background:${col}"></i></div><b>${hp}%</b></div>`;
+    }).join('');
+    return rows ? `<h4 class="hd">Squad <small>click to treat</small></h4><div class="sq-list">${rows}</div>` : '';
+  }
+  // pick a teammate to treat from the squad list
+  function checkMate(id) {
+    const pv = G.Views.players.get(id), me = G.Me;
+    if (!pv || !pv.st || pv.st.dd) return G.Audio.deny();
+    if (mateFar(pv, me)) { G.HUD.toast('', `${G.U.esc(pv.name)} is too far away to treat`, 1.4); return G.Audio.deny(); }
+    if (inRange()) return G.Audio.deny();
+    patient = id; ptPart = null; G.Audio.click(); render();
+  }
   function bodyOf(me) {
     if (patient == null) return me.body;
     const pv = patientView();
@@ -428,15 +472,15 @@ G.InvUI = (() => {
       return `<div class="bp bp-${k}${p.heavy || p.light ? ' bleeding' : ''}${ptPart === k ? ' sel' : ''}" data-body="${k}" title="${G.U.esc(G.Med.NAME[k])}: ${Math.ceil(Math.max(0, p.hp))}/${p.max}${G.Med.describe(p).length ? ' · ' + G.Med.describe(p).join(', ') : ''}">
         <b>${G.Med.NAME[k]}</b><div class="bp-bar"><i style="width:${Math.round(f * 100)}%;background:${col}"></i></div><small>${Math.ceil(Math.max(0, p.hp))}/${p.max}</small><div class="bp-chips">${chips}</div></div>`;
     };
-    const bl = Math.round(b.blood), bcol = bl > 70 ? '#7fc06a' : bl > 40 ? '#e0b040' : '#e06060';
+    const bl = Math.round(b.blood), bcol = bl > 70 ? '#7fc06a' : bl > G.Med.DOWNABLE ? '#e0b040' : '#e06060';
     // the figure (drop on the part itself), and beside it each part's numbers and what's wrong (drop there too)
     return `<div class="body-wrap">${G.Med.figure(b, { cls: 'big', glow: patient == null ? G.Me.treatingParts() : null })}<div class="body-list">${['head', 'thorax', 'stomach', 'armL', 'armR', 'legL', 'legR'].map(part).join('')}</div></div>
-      <div class="hl-hp"><span class="hl-k">BLOOD</span><div class="hl-bar"><i style="width:${bl}%;background:${bcol}"></i></div><b>${bl}%</b></div>
+      <div class="hl-hp click" data-blood title="Click for a blood bag · ${G.Med.DOWNABLE}% or less: the next hit puts you down · ${G.Med.UNCON}% or less: unconscious"><span class="hl-k">BLOOD</span><div class="hl-bar"><i style="width:${bl}%;background:${bcol}"></i><u style="left:${G.Med.DOWNABLE}%"></u><u style="left:${G.Med.UNCON}%"></u></div><b>${bl}%</b></div>
       ${b.pk > 0 ? `<div class="hl-status pk">Painkillers: ${patient == null ? Math.ceil(b.pk) + ' s left' : 'on'}</div>` : ''}`;
   }
   // Click a part of a body (yours, or a teammate's you're checking): a dropdown of the medical items you carry
   // that would treat what's wrong with it, one entry per kind; pick one and it's used (one off your stack).
-  function medMenu(part, x, y) {
+  function medMenu(part, x, y, only) { // only: just the items for that (e.g. 'blood': transfusions)
     const me = G.Me, b = bodyOf(me);
     if (!b || !b.parts[part]) return;
     closeMenu();
@@ -446,21 +490,21 @@ G.InvUI = (() => {
       const mt = p.it.k === 'med' && p.it.mt;
       if (!mt || seen.has(mt)) continue;
       seen.add(mt);
-      if (!G.Med.cantTreat(b, part, mt)) opts.push({ mt, theirs: false, n: mine[mt] });
+      if (!G.Med.cantTreat(b, part, mt) && (!only || G.Med.ITEMS[mt].fixes === only)) opts.push({ mt, theirs: false, n: mine[mt] });
     }
     // on a teammate: their own medical gear is yours to use on them too (it's taken off them when it goes on)
     const pt = patientView(), md = patient != null && pt && pt.st && pt.st.md;
-    if (md) Object.keys(G.Med.ITEMS).forEach((mt, i) => { if (md[i] > 0 && !G.Med.cantTreat(b, part, mt)) opts.push({ mt, theirs: true, n: md[i] }); });
-    const wrong = G.Med.describe(b.parts[part]), several = opts.some((o) => o.theirs) && opts.some((o) => !o.theirs);
+    if (md) Object.keys(G.Med.ITEMS).forEach((mt, i) => { if (md[i] > 0 && !G.Med.cantTreat(b, part, mt) && (!only || G.Med.ITEMS[mt].fixes === only)) opts.push({ mt, theirs: true, n: md[i] }); });
+    const wrong = only === 'blood' ? (b.blood < 90 ? [`${Math.round(b.blood)}%`] : []) : G.Med.describe(b.parts[part]), several = opts.some((o) => o.theirs) && opts.some((o) => !o.theirs);
     menu = document.createElement('div');
     menu.className = 'inv-menu med-menu';
-    menu.innerHTML = `<b>${G.Med.NAME[part]}${wrong.length ? ` <small>${wrong.join(', ')}</small>` : ''}</b>`
+    menu.innerHTML = `<b>${only === 'blood' ? 'Blood' : G.Med.NAME[part]}${wrong.length ? ` <small>${wrong.join(', ')}</small>` : ''}</b>`
       + (opts.length ? opts.map((o) => {
         // with more than one owner's gear on offer, each says whose it is: their emblem and name
         const who = o.theirs ? pt : { name: G.Game.myName, animal: G.Game.roster && G.Game.roster[G.Net.myId] && G.Game.roster[G.Net.myId].animal, color: G.Game.myColor };
         const owner = several && who ? `<span class="mo" style="color:${G.U.hex(who.color)}">${G.Callsigns.html(who.animal)}${G.U.esc(who.name || '')}${o.theirs ? '' : ' <small>(you)</small>'}</span>` : '';
         return `<button data-mt="${o.mt}" data-th="${o.theirs ? 1 : 0}"><img class="mi" src="${G.Icons.of(GG().medItem(o.mt), 1, 1, false)}" alt=""><span>${G.U.esc(G.Med.ITEMS[o.mt].name)} <small>×${o.n}</small></span>${owner}</button>`;
-      }).join('') : `<i class="none">${wrong.length ? (patient != null ? 'Nothing you or they carry treats this' : 'Nothing you carry treats this') : 'Nothing wrong with it'}</i>`);
+      }).join('') : `<i class="none">${wrong.length ? (only === 'blood' ? (patient != null ? 'No blood bags on you or them' : 'No blood bags on you') : patient != null ? 'Nothing you or they carry treats this' : 'Nothing you carry treats this') : only === 'blood' ? 'Plenty of blood: no transfusion needed' : 'Nothing wrong with it'}</i>`);
     Object.assign(menu.style, { left: Math.min(x, innerWidth - 200) + 'px', top: Math.min(y, innerHeight - 40 - opts.length * 26) + 'px' });
     menu.addEventListener('click', (ev) => {
       const bt = ev.target.closest('[data-mt]');
@@ -480,14 +524,16 @@ G.InvUI = (() => {
       const pv = patientView(), b = bodyOf(me);
       if (!pv || !b || pv.st.dd) { patient = null; return healthHTML(me); }
       const far = Math.hypot(pv.pos.x - me.pos.x, pv.pos.z - me.pos.z) > 2.6;
-      return `<div class="pt-head"><b>${G.U.esc(pv.name)}</b>${pv.st.dn ? ` <i class="c heavy">DOWN · ${pv.st.bl < 0 ? 'stable' : pv.st.bl + ' s to bleed out'}</i>` : ''}${far ? ' <i class="c">too far</i>' : ''}
-        ${pv.st.dn ? `<button class="btn tiny" data-revive ${far ? 'disabled' : ''}>Revive (4 s)</button>` : ''}<button class="btn tiny" data-self>Back to me</button></div>
-        ${bodyHTML(b)}<p class="inv-hint">Click a part of ${G.U.esc(pv.name)}'s body to treat it with what you carry.</p>`;
+      const out = G.Med.unconscious(b), warn = pv.st.dn && G.Med.reviveWarn(b);
+      return `<div class="pt-head"><b>${G.U.esc(pv.name)}</b>${pv.st.dn ? ` <i class="c heavy">${out ? 'UNCONSCIOUS' : 'DOWN'} · ${pv.st.bl < 0 ? 'stable' : pv.st.bl + ' s to bleed out'}</i>` : ''}${far ? ' <i class="c">too far</i>' : ''}
+        ${pv.st.dn ? `<button class="btn tiny" data-revive ${far || out ? 'disabled' : ''} title="${out ? 'Blood bags first: they come round over ' + G.Med.UNCON + '%' : ''}">Revive (4 s)</button>` : ''}<button class="btn tiny" data-self>Back to me</button></div>
+        ${warn && !out ? `<div class="hl-status bad">${warn}</div>` : ''}${bodyHTML(b)}<p class="inv-hint">Click a part of ${G.U.esc(pv.name)}'s body to treat it with what you carry, or their blood bar for a blood bag.</p>`;
     }
     const piece = (name, it) => { const d = Gr.defOf(it); if (!d) return ''; const c = d.dur ? Math.round(Gr.cond(it) * 100) : null; return `<div class="hl-row"><span>${name}</span><b>${G.U.esc(d.name)}</b><i>${c == null ? '' : c + '%'}</i></div>`; };
-    const status = me.dead ? `Dead: ${G.U.esc(me.deathCause || 'killed')}` : me.down ? (me.bleed == null ? 'Down, stable: needs blood to get up' : `Down: ${Math.ceil(me.bleed)} s until you bleed out`) : G.Med.bleeding(me.body) ? 'Bleeding' : me.hp < 50 ? 'Badly hurt' : me.hp < 90 ? 'Hurt' : 'OK';
+    const status = me.dead ? `Dead: ${G.U.esc(me.deathCause || 'killed')}` : me.down ? (me.bleed == null ? 'Down, stable: a teammate can get you up' : `Down: ${Math.ceil(me.bleed)} s until you bleed out`) : G.Med.bleeding(me.body) ? 'Bleeding' : G.Med.downable(me.body) ? 'Low on blood: one more hit puts you down' : me.hp < 50 ? 'Badly hurt' : me.hp < 90 ? 'Hurt' : 'OK';
     return `<div class="hl-status ${G.Med.bleeding(me.body) ? 'bad' : ''}">${status}</div>${bodyHTML(me.body)}
-      <p class="inv-hint">Click a part to treat it with what you carry, or drag a medical item onto it (it takes a few seconds).</p>
+      <p class="inv-hint">Click a part to treat it with what you carry, or drag a medical item onto it (it takes a few seconds). Click the blood bar for a blood bag.</p>
+      ${squadHTML(me)}
       ${piece('Helmet', me.kit.helmet)}${me.kit.helmet && me.kit.helmet.face ? piece('Face', me.kit.helmet.face) : ''}${piece('Armour', me.kit.carrier)}${me.kit.carrier ? piece('Plate', me.kit.carrier.plate) : ''}`;
   }
   function stats(me) {
@@ -611,7 +657,7 @@ G.InvUI = (() => {
     if (target && target.it !== d.it && d.it.k === 'ammo' && target.it.k === 'gun' && !isMagGun(target.it.w)) { intoGun(me, src, target.it); return rerender(); }
     if (target && d.it.k === 'part' && target.it.k === 'gun' && field) { G.HUD.toast('', 'Parts are changed at the quartermaster\'s', 1.5); G.Audio.deny(); return rerender(); }
     if (target && d.it.k === 'part' && target.it.k === 'gun' && !src.gunPart) {
-      const w = target.it.w, p = GS().PARTS[d.it.pid], sl = p && GS().slotsOf(w.def.id, w.def.build).find((s) => GS().fitsSlot(s, p));
+      const w = target.it.w, p = GS().PARTS[d.it.pid], sl = p && GS().slotFor(w.def.id, w.def.build, p);
       if (sl) fitPart(me, src, `${target.it.uid}|${sl.slot}`); else { G.HUD.toast('', `It doesn't fit the ${w.def.name}`, 1.5); G.Audio.deny(); }
       return rerender();
     }
@@ -772,7 +818,7 @@ G.InvUI = (() => {
     if (!menu) return;
     const med = menu.classList.contains('med-menu');
     menu.remove(); menu = null; window.removeEventListener('pointerdown', outside, true);
-    if (med) { ptPart = null; const el = root && document.getElementById('invHealth'); if (el) el.innerHTML = healthHTML(G.Me); } // (the part's no longer picked)
+    if (med) { ptPart = null; paintHealth(true); } // (the part's no longer picked)
   }
   function outside(e) { if (menu && !menu.contains(e.target)) closeMenu(); }
   // what you can do with this item, as [action, label, arg]
@@ -808,7 +854,7 @@ G.InvUI = (() => {
     }
     if (it.k === 'part' && !src.gunPart && !field) {
       const p = GS().PARTS[it.pid];
-      Gr.guns(me).forEach((w, i) => { const sl = GS().slotsOf(w.def.id, w.def.build).find((s) => GS().fitsSlot(s, p)); if (sl && w.def.build[sl.slot] !== it.pid) out.push(['fit', `Fit to your ${w.def.name}${w.def.build[sl.slot] ? ' (swap)' : ''}`, i]); });
+      Gr.guns(me).forEach((w, i) => { const sl = GS().slotFor(w.def.id, w.def.build, p); if (sl && w.def.build[sl.slot] !== it.pid) out.push(['fit', `Fit to your ${w.def.name}${w.def.build[sl.slot] ? ' (swap)' : ''}`, i]); });
     }
     return out;
   }
@@ -849,7 +895,7 @@ G.InvUI = (() => {
     fillfrom: (me, src) => { const n = GG().fillFrom(me, src.it); if (src.it.n <= 0 && src.g) GG().removeFrom(src.g, src.it); toast(n, 'Loaded'); G.Audio.click(); },
     fit: (me, src, i) => {
       const w = GG().guns(me)[+i], p = GS().PARTS[src.it.pid];
-      const sl = w && GS().slotsOf(w.def.id, w.def.build).find((s) => GS().fitsSlot(s, p));
+      const sl = w && GS().slotFor(w.def.id, w.def.build, p);
       if (sl) fitPart(me, src, `${GG().gunItem(w).uid}|${sl.slot}`);
     },
   };
@@ -901,10 +947,14 @@ G.InvUI = (() => {
           if (e.target.closest('[data-jobcancel]')) { cancelJobs(); G.Audio.click(); return; }
           if (e.target.closest('[data-revive]')) { reviveJob(); return; }
           if (e.target.closest('[data-self]')) { patient = null; ptPart = null; G.Audio.click(); render(); return; }
+          const bb = e.target.closest('[data-blood]');
+          if (bb && field && !inRange()) { G.Audio.click(); medMenu('thorax', e.clientX, e.clientY, 'blood'); return; } // (blood: a transfusion goes in anywhere)
+          const sq = e.target.closest('[data-mate]');
+          if (sq && field) { checkMate(sq.dataset.mate); return; } // (player ids are strings)
           const bp = e.target.closest('[data-body]');
-          if (bp && field && performance.now() - lastDropAt > 250) { // (not the click that ends a drag onto it)
+          if (bp && field && performance.now() - lastDropAt > 250 && !inRange()) { // (not the click that ends a drag onto it)
             ptPart = bp.dataset.body; G.Audio.click();
-            const el = document.getElementById('invHealth'); if (el) el.innerHTML = healthHTML(G.Me);
+            paintHealth(true);
             medMenu(ptPart, e.clientX, e.clientY);
             return;
           }
@@ -926,7 +976,7 @@ G.InvUI = (() => {
     // the health panel only (kept fresh while the field screen is open, without disturbing a drag)
     update,
     get busy() { return jobs.length > 0; },
-    tick() { const el = field && root && document.getElementById('invHealth'); if (el) el.innerHTML = healthHTML(G.Me); },
+    tick() { if (field) paintHealth(); },
     get field() { return field; },
     get cab() { return cab; },
     scaleUI,

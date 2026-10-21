@@ -179,8 +179,9 @@ G.HUD = {
 
     // timers
     this.vigT = Math.max(0, this.vigT - dt * 0.8);
-    const lowHp = !Me.dead && (Me.hp < maxHp * 0.3 || (Me.body && Me.body.parts.thorax.hp < Me.body.parts.thorax.max * 0.3)) ? 0.35 : 0;
+    const lowHp = !Me.dead && (Me.hp < maxHp * 0.3 || (Me.body && G.Med.downable(Me.body))) ? 0.35 : 0; // (low on blood: one more hit and you're down)
     this.el.vignette.style.opacity = Math.max(this.vigT, lowHp, Me.down ? 0.6 : 0);
+    this.el.vignette.classList.toggle('out', !!Me.out);
     if (this.toastT > 0) { this.toastT -= dt; if (this.toastT <= 0) this.el.toast.style.opacity = 0; }
 
     // damage direction arcs
@@ -203,7 +204,14 @@ G.HUD = {
     }
     // downed / dead overlays
     this.el.downed.classList.toggle('hidden', !Me.down);
-    if (Me.down) this.set('bleed', Me.bleed == null ? (G.Med.cantRevive(Me.body) ? `Stable: you need blood (${Math.round(Me.body.blood)}%) to get up` : 'Stable: a teammate can get you up') : `Bleeding out: ${Math.ceil(Me.bleed)}s`);
+    this.el.downed.classList.toggle('out', !!Me.out); // (unconscious: the screen all but black)
+    if (Me.down) {
+      const bl = Math.round(Me.body.blood);
+      this.set('downTitle', Me.out ? 'UNCONSCIOUS' : 'YOU ARE DOWN');
+      this.set('bleed', `${Me.bleed == null ? 'Stable' : `Bleeding out: ${Math.ceil(Me.bleed)}s`} · blood ${bl}%`);
+      this.set('downHint', Me.out ? `Out cold. A teammate's blood bags bring you round (over ${G.Med.UNCON}% blood); stop the bleeding first, or it carries on.`
+        : `Your sidearm still works. A teammate can get you up with a revive${bl <= G.Med.DOWNABLE ? `, but under ${G.Med.DOWNABLE + 1}% blood the next hit puts you down again: blood bags help` : ''}.`);
+    }
     this.el.deadMsg.classList.toggle('hidden', !Me.dead);
 
     // boss bar
@@ -224,7 +232,7 @@ G.HUD = {
       if (st) {
         hpPct = (st.hp / st.mhp) * 100; arPct = st.amx ? (st.ar / st.amx) * 100 : 0;
         if (st.dd) status = '<span class="kia">KIA</span>';
-        else if (st.dn) status = `<span class="dn">DOWN ${st.bl < 0 ? 'stable' : st.bl + 's'}</span>`;
+        else if (st.dn) status = `<span class="dn">${st.uc ? 'OUT' : 'DOWN'} ${st.bl < 0 ? 'stable' : st.bl + 's'}</span>`;
       } else status = '<span class="dim">…</span>';
       html += `<div class="tm"><div class="tn" style="color:${G.U.hex(pv.color)}">${G.Callsigns.html(pv.animal)}${G.U.esc(pv.name)} ${status}</div>
         <div class="tb"><div class="ta" style="width:${arPct}%"></div></div><div class="tb"><div class="th" style="width:${hpPct}%"></div></div></div>`;

@@ -103,6 +103,7 @@ G.Level = {
     const map = this.refine(c);
     map.entries = (lay.entries || []).map(([x, z]) => [x * this.K + 1, z * this.K + 1]); // (upstairs: where a loft's own stair comes up, on the fine grid: spawn spots count from there too)
     map.units = lay.units || 0; // apartments: how many (rooms carry .unit)
+    map.underground = !!lay.underground; // (a basement: no windows)
     // roller doors (rolled up): [x from, x to, z of the wall] in metres
     map.rollers = (lay.rollers || []).map(([x0, z, w]) => [x0 * this.CTS, (x0 + w) * this.CTS, (z + 0.5) * this.CTS]);
     map.fest = c.fest || null; map.civSpots = c.civSpots || null; // (a festival: its light strings, where civilians hide)
@@ -147,7 +148,8 @@ G.Level = {
           if ((dj === 0 && solid(x + di, z)) || (di === 0 && solid(x, z + dj))) continue;
           const faces = [[x + di, z], [x, z + dj], [x + di, z + dj]].filter(([a, b]) => (a !== x || b !== z) && open(a, b));
           if (!faces.length) continue;
-          t[fi] = 0; out[fi] = faces.some(([a, b]) => cout(a, b)) ? 1 : 0;
+          // (facing nothing but open air, upstairs outside a house: open air too, not a ledge to stand on)
+          t[fi] = faces.every(([a, b]) => cv(a, b) === 5) ? 5 : 0; out[fi] = faces.some(([a, b]) => cout(a, b)) ? 1 : 0;
           continue;
         }
         if (v === 3) {
@@ -156,7 +158,7 @@ G.Level = {
           t[fi] = (d.mirror ? along <= 1 : along >= 1) ? 3 : 1;
           continue;
         }
-        if (v === 5) { t[fi] = 5; continue; } // a drop: no floor (the floor below shows through)
+        if (v === 5) { t[fi] = 5; out[fi] = c.out[ci] ? 1 : 0; continue; } // a drop: no floor (the floor below shows through), or upstairs, the open air outside
         if (v === 6) { t[fi] = 7; continue; } // a flight of stairs (its steps are solids: G.Level.stack)
         t[fi] = 0; out[fi] = c.out[ci] ? 1 : 0; // floor (furniture is laid on it below)
       }
@@ -263,7 +265,7 @@ G.Level = {
     const dist2 = this.flow(map, [[spawnRoom.cx, spawnRoom.cz]].concat(map.entries || [])); // (a loft's upper floor is reached by its own stair: from its head too)
     map.enemySpots = [];
     rooms.forEach((rm) => {
-      if (rm === spawnRoom) return;
+      if (rm === spawnRoom || rm.type === 'road' || rm.type === 'lawn') return; // (not out on the street among the patrol cars)
       for (let z = rm.z; z < rm.z + rm.h; z++) for (let x = rm.x; x < rm.x + rm.w; x++) {
         const i = z * W + x;
         if (t[i] === 0 && !map.props.has(i) && dist2[i] > 5 * K) map.enemySpots.push([x, z]);
@@ -417,8 +419,8 @@ G.Level = {
   placeWindows(map) {
     const { W, H, t, out, rooms } = map, TS = this.TS, K = this.K, U = G.U, rw = U.rng((map.seed ^ 0x51d0b0) >>> 0);
     map.windows = []; map.winAt = new Map();
-    if (map.theme.entry === 'vault' || map.theme.hub) return; // a bunker has none, nor does the hangar
-    const used = new Set(), floor = (i) => t[i] === 0 || t[i] === 2 || t[i] === 4;
+    if (map.theme.entry === 'vault' || map.theme.hub || map.underground) return; // a bunker has none, nor does the hangar, nor a basement
+    const used = new Set(), floor = (i) => t[i] === 0 || t[i] === 2 || t[i] === 4 || (t[i] === 5 && out[i]); // (upstairs, the open air outside a house counts)
     const nearDoor = (x, z) => { for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) if (t[(z + dz) * W + x + dx] === 3) return true; return false; };
     const tall = (i) => { const p = map.props && map.props.get(i); return !!(p && p.boxes[0] && p.boxes[0].h > 1.0); };
     const inside = (x, z) => x > 0 && z > 0 && x < W - 1 && z < H - 1;
@@ -751,15 +753,16 @@ G.Level = {
   // world, the stairs' steps between them, railings round every drop. The level is floor 0's map, with
   // everything that's counted across floors (doors, windows, rooms, spots) gathered from all of them (and ids
   // numbered through); map.floors holds each floor's own.
+  // lay.base: which floor is at ground level (0 unless there's a basement under it: floors below it are below ground).
   stack(fms, lay) {
-    const FH = this.FLOOR_H, TS = this.TS, CTS = this.CTS;
-    fms.forEach((m, f) => { m.fl = f; m.fy = f * FH; m.skirt = f ? FH - this.WALL_H : 0; });
-    fms.forEach((m, f) => { const up = fms[f + 1]; m.voidAbove = up ? up.t.map((v) => (v === 5 ? 1 : 0)) : null; });
-    const map = Object.assign({}, fms[0]);
-    map.floors = fms; map.NF = fms.length;
+    const FH = this.FLOOR_H, TS = this.TS, CTS = this.CTS, base = lay.base || 0;
+    fms.forEach((m, f) => { m.fl = f; m.fy = (f - base) * FH; m.skirt = f ? FH - this.WALL_H : 0; });
+    fms.forEach((m, f) => { const up = fms[f + 1]; m.voidAbove = up ? up.t.map((v) => (v === 5 ? 1 : 0)) : null; m.above = up || null; });
+    const map = Object.assign({}, fms[base]); // (the level's own map is the ground floor's: the spawn, the outdoors)
+    map.floors = fms; map.NF = fms.length; map.base = base;
     map.doors = []; map.windows = []; map.rooms = []; map.cover = []; map.wallSpots = []; map.enemySpots = [];
     fms.forEach((m, f) => {
-      if (f) { m.case = null; m.cabinets = []; } // (the weapon case and first aid cabinets: downstairs)
+      if (f !== base) { m.case = null; m.cabinets = []; } // (the weapon case and first aid cabinets: on the ground floor)
       for (const d of m.doors) { d.id = map.doors.length; d.fl = f; d.fy = m.fy; map.doors.push(d); }
       for (const w of m.windows) { w.id = map.windows.length; w.fl = f; w.fy = m.fy; map.windows.push(w); }
       for (const rm of m.rooms) { rm.fl = f; map.rooms.push(rm); }
@@ -792,11 +795,23 @@ G.Level = {
         }
       }
     });
+    // each railing's glass is a pane like a window's (shot through and shot out, for everyone: map.windows)
+    for (const r of map.rails) {
+      const alongX = r.x1 - r.x0 > r.z1 - r.z0;
+      r.pane = { id: map.windows.length, rail: r, x: (r.x0 + r.x1) / 2, z: (r.z0 + r.z1) / 2, fy: r.y, fl: r.f, broken: false, cells: [], len: alongX ? r.x1 - r.x0 : r.z1 - r.z0, nz: alongX ? 1 : 0, nx: alongX ? 0 : 1 };
+      map.windows.push(r.pane);
+    }
     // one world for all of it
     const w = G.World.create();
-    fms.forEach((m, f) => G.World.fromTileMap(m, { world: w, y: m.fy, skirt: m.skirt, voidAbove: m.voidAbove, ground: f === 0 }));
+    fms.forEach((m, f) => G.World.fromTileMap(m, { world: w, y: m.fy, skirt: m.skirt, voidAbove: m.voidAbove, ground: f === 0 && base === 0 })); // (over a basement, the ground floor has its stair holes)
     for (const st of map.stairs) G.World.stairs(w, st);
-    for (const rl of map.rails) G.World.add(w, G.World.box(rl.x0, rl.y, rl.z0, rl.x1, rl.y + this.RAIL_H, rl.z1, { kind: 'rail' }));
+    // a railing stops you walking off the drop (glass or not); only its steel handrail stops a round: under it, the
+    // glass is a pane (its solids: G.World.windowSolids), shot through and out
+    for (const rl of map.rails) {
+      G.World.add(w, G.World.box(rl.x0, rl.y, rl.z0, rl.x1, rl.y + this.RAIL_H, rl.z1, { kind: 'rail', ray: false }));
+      G.World.add(w, G.World.box(rl.x0, rl.y + this.RAIL_H - 0.05, rl.z0, rl.x1, rl.y + this.RAIL_H, rl.z1, { kind: 'rail', move: false }));
+      rl.pane.solids = []; G.World.windowSolids(w, map, rl.pane);
+    }
     map.world = w; fms.forEach((m) => { m.world = w; });
     return map;
   },
@@ -806,7 +821,7 @@ G.Level = {
   floorAt(map, x, y, z) {
     if (!map.floors) return 0;
     for (const st of map.stairs) if (x > st.x0 && x < st.x1 && z > st.z0 && z < st.z1 && y < st.y0 + st.rise + 0.3 && y > st.y0 - 0.5) return st.f; // (on its top tread too: the floor above has a drop there)
-    return G.U.clamp(Math.floor((y + 0.6) / this.FLOOR_H), 0, map.NF - 1);
+    return G.U.clamp(Math.floor((y + 0.6) / this.FLOOR_H) + (map.base || 0), 0, map.NF - 1);
   },
   floorMap(map, f) { return map.floors ? map.floors[f] : map; },
   // a flow source for something at (x, y, z): its cell, and (in a building of several floors) its floor
@@ -849,7 +864,7 @@ G.Level = {
   // The hangar: one big hall (the workshop, the store and the warehouse side by side in it), a wide opening in its
   // front wall, and the helipad out in front of that, open to the sky and fenced. 52 x 42 m.
   // Behind its north wall (a garage door in it) is the shooting range, in the first G.HANGAR_ROWS rows: a yard to stand in
-  // at the firing line, a pistol range to the west (16 m) and a rifle range to the east (100 m), walled between and open
+  // at the firing line, an IPSC course on the left, a pistol range (16 m) and a rifle range (300 m), walled between and open
   // to the sky, a backstop at the far end of each.
   layHangar() {
     const R = G.HANGAR_ROWS, W = 26, H = 21 + R, hallH = 12, hz = R + 1, fz = hz + hallH, padH = 6, ox = 9, ow = 8;
@@ -861,57 +876,110 @@ G.Level = {
     for (let z = fz + 1; z < H; z++) for (let x = 0; x < W; x++) out[z * W + x] = 1;
     for (let x = 0; x < W; x++) { t[(H - 1) * W + x] = 4; fences.push([x, H - 1, 'x']); }
     for (let z = fz + 1; z < H - 1; z++) for (const x of [0, W - 1]) { t[z * W + x] = 4; fences.push([x, z, 'z']); }
-    // the range: the yard (3 rows, x 1..11), the pistol lanes (x 1..5, 8 rows up), the rifle lanes (x 7..11, to the top)
-    const yz = R - 3, laneZ = 1, rifH = yz - laneZ, pisH = 8;
-    fill(1, yz, 11, 3); fill(1, yz - pisH, 5, pisH); fill(7, laneZ, 5, rifH);
-    for (let z = yz - pisH; z < R; z++) for (let x = 1; x < 12; x++) out[z * W + x] = 1;
-    for (let z = laneZ; z < yz; z++) for (let x = 7; x < 12; x++) out[z * W + x] = 1;
+    // the range: the yard (3 rows, x 1..17), the IPSC course on the left (x 1..5, 14 rows up: js/course.js), the pistol
+    // lanes (x 7..11, 8 rows up), the rifle lanes (x 13..17, to the top)
+    const yz = R - 3, laneZ = 1, rifH = yz - laneZ, pisH = 8, crsH = 14;
+    fill(1, yz, 17, 3); fill(1, yz - crsH, 5, crsH); fill(7, yz - pisH, 5, pisH); fill(13, laneZ, 5, rifH);
+    for (let z = yz - crsH; z < R; z++) for (let x = 1; x < 12; x++) out[z * W + x] = 1;
+    for (let z = yz; z < R; z++) for (let x = 12; x < 18; x++) out[z * W + x] = 1;
+    for (let z = laneZ; z < yz; z++) for (let x = 13; x < 18; x++) out[z * W + x] = 1;
     for (let x = 2; x < 5; x++) t[R * W + x] = 0; // (the garage door: a wide opening in the hall's north wall, the shutter rolled up)
     const pad = this._room(1, fz + 1, W - 2, padH, { type: 'pad', out: true }), hall = this._room(1, hz, W - 2, hallH, { type: 'hangar' });
-    const yard = this._room(1, yz, 11, 3, { type: 'range', out: true }), pis = this._room(1, yz - pisH, 5, pisH, { type: 'range', out: true }), rif = this._room(7, laneZ, 5, rifH, { type: 'range', out: true });
-    return { W, H, t, rooms: [pad, hall, yard, pis, rif], doors: [], out, fences, spawn: pad, rollers: [[ox, fz, ow], [2, R, 3]] };
+    const yard = this._room(1, yz, 17, 3, { type: 'range', out: true }), crs = this._room(1, yz - crsH, 5, crsH, { type: 'range', out: true }), pis = this._room(7, yz - pisH, 5, pisH, { type: 'range', out: true }), rif = this._room(13, laneZ, 5, rifH, { type: 'range', out: true });
+    return { W, H, t, rooms: [pad, hall, yard, crs, pis, rif], doors: [], out, fences, spawn: pad, rollers: [[ox, fz, ow], [2, R, 3]] };
   },
 
-  // Two detached houses side by side on a street. You start on the street and pick which front door to take.
-  // Each house is split into rooms (a door between every room and the next, and a few more); behind each is its
-  // garden, the two joined by a gap in the fence between them, and a narrow alley runs between the houses from
-  // the street to the gardens. Gardens, alley and street are open to the sky, fenced at the edges.
+  // The suburbs: two detached family homes side by side on a street, the houses of interest, each with a basement, a
+  // ground floor and an upstairs. Coarse tiles (2 m), north (low z) to south:
+  //   the street, four tiles wide (a road with its pavements), running the whole width. You start at its west end,
+  //     behind the roadblock: two patrol cars staggered across the road (a gap to walk through), with the neighbour's
+  //     house on the corner between you and the houses' windows. More patrol cars at the kerb in front of the houses
+  //     and across the far end.
+  //   front lawns, then the houses (18-22 m across, 12-14 m deep), a narrow alley between them and a path down the
+  //     east side, and the back gardens behind, joined by a gap in the fence between them.
+  // Inside each house a stair hall runs front to back down its west side (two tiles wide): the front door opens into
+  // it, the flight down to the basement goes down one lane of it and the flight up the other, and a door from the hall
+  // into the rooms on every floor. The rooms beside it are split up for each floor on its own (living rooms, kitchen
+  // and dining room on the ground floor, bedrooms and a study upstairs, storage and a den in the basement).
+  // Floors: 0 the basement, 1 the ground floor (base), 2 upstairs. Upstairs, everything outside the houses is open
+  // air (tile 5, open to the sky): nothing to stand on, no ceiling, and a roof over the top.
   layHouses(r, level) {
-    const U = G.U, S = 3; // the street, S tiles deep
-    const grow = Math.min(level >> 1, 2), hwA = U.ri(r, 7, 9) + grow, hwB = U.ri(r, 7, 9) + grow, hh = U.ri(r, 7, 9) + (grow >> 1), yd = U.ri(r, 4, 5);
-    const zF = S + 1, z0 = S + 2, zb = z0 + hh, H = zb + yd + 2;
-    const xl = hwA + 2, W = hwA + hwB + 5; // the alley between the houses
-    const t = new Uint8Array(W * H).fill(1), out = new Uint8Array(W * H), rooms = [], doors = [], fences = [], ids = new Int16Array(W * H).fill(-1);
-    const fill = (x0, zz, w, h) => { for (let z = zz; z < zz + h; z++) for (let x = x0; x < x0 + w; x++) t[z * W + x] = 0; };
-    const sky = (x0, zz, w, h) => { for (let z = zz; z < zz + h; z++) for (let x = x0; x < x0 + w; x++) out[z * W + x] = 1; };
-    const fence = (x, z, axis) => { t[z * W + x] = 4; out[z * W + x] = 1; fences.push([x, z, axis]); };
-    // the houses
-    const A = this._house({ r, t, W, ids, rooms, doors }, 1, z0, hwA, hh);
-    const B = this._house({ r, t, W, ids, rooms, doors }, hwA + 4, z0, hwB, hh);
-    // the street along the front, the alley, the gardens behind
-    fill(1, 1, W - 2, S); sky(0, 0, W, S + 1);
-    fill(xl, zF, 1, zb - zF + 1); sky(xl, zF, 1, zb - zF + 1);
-    fill(1, zb + 1, W - 2, yd); sky(0, zb + 1, W, yd + 1);
+    const U = G.U, S = 4, SP = 12; // the street, S tiles deep; its west end, SP tiles, before the houses
+    const grow = Math.min(level >> 1, 2);
+    const hwA = U.ri(r, 9, 10) + (grow >> 1), hwB = U.ri(r, 9, 10) + (grow >> 1), hh = U.ri(r, 6, 7), yd = U.ri(r, 5, 6);
+    const zF = S + 3, z0 = zF + 1, zb = z0 + hh, H = zb + yd + 2; // the front wall row, the first row inside, the back wall row
+    const xA = SP + 2, xl = xA + hwA + 1, xB = xl + 2, xE = xB + hwB + 1, W = xE + 2; // house A's first column, the alley, house B's, the east path
+    const houses = [{ x: xA, w: hwA }, { x: xB, w: hwB }];
+    const mk = (v) => ({ t: new Uint8Array(W * H).fill(v), out: new Uint8Array(W * H), rooms: [], doors: [], fences: [], ids: new Int16Array(W * H).fill(-1) });
+    const B = mk(1), Gf = mk(1), Up = mk(5);
+    Up.out.fill(1);
+    const fill = (F, x0, zz, w, h, v = 0) => { for (let z = zz; z < zz + h; z++) for (let x = x0; x < x0 + w; x++) F.t[z * W + x] = v; };
+    const setOut = (F, x0, zz, w, h, v) => { for (let z = zz; z < zz + h; z++) for (let x = x0; x < x0 + w; x++) F.out[z * W + x] = v; };
+    const fence = (x, z, axis) => { Gf.t[z * W + x] = 4; Gf.out[z * W + x] = 1; Gf.fences.push([x, z, axis]); };
+    // ---- the ground floor's outdoors
+    fill(Gf, 1, 1, W - 2, S); setOut(Gf, 0, 0, W, S + 1, 1); // the street
+    fill(Gf, SP + 1, S + 1, W - SP - 2, zF - S - 1); setOut(Gf, SP, S + 1, W - SP, zF - S - 1, 1); // front lawns
+    fill(Gf, xl, zF, 1, zb - zF + 1); setOut(Gf, xl, zF, 1, zb - zF + 1, 1); // the alley
+    fill(Gf, xE, zF, 1, zb - zF + 1); setOut(Gf, xE, zF, 1, zb - zF + 1, 1); // the east path
+    fill(Gf, SP + 1, zb + 1, W - SP - 2, yd); setOut(Gf, SP, zb + 1, W - SP, yd + 1, 1); // the back gardens
+    // the neighbour on the corner: a front garden behind a fence, their house (not to be entered) behind it
+    fill(Gf, 1, S + 1, SP - 1, 2); setOut(Gf, 0, S + 1, SP, 2, 1);
+    for (let x = 1; x < SP; x++) fence(x, S + 1, 'x');
     for (let x = 0; x < W; x++) { fence(x, 0, 'x'); fence(x, H - 1, 'x'); }
     for (let z = 1; z <= S; z++) { fence(0, z, 'z'); fence(W - 1, z, 'z'); }
-    for (let z = zb + 1; z < H - 1; z++) { fence(0, z, 'z'); fence(W - 1, z, 'z'); }
-    // between the gardens: a fence down from the alley's mouth (which stays open to both), with now and then a
-    // second gap further back
-    const gap2 = r() < 0.5 ? U.ri(r, zb + 3, zb + yd) : -1;
-    for (let z = zb + 2; z <= zb + yd; z++) if (z !== gap2) fence(xl, z, 'z');
-    // front doors onto the street, back doors (sometimes French doors) into the garden
-    const outer = (list, front) => {
-      const cand = list.filter((rm) => (front ? rm.z === z0 : rm.z + rm.h === zb) && rm.w >= 3);
-      const rm = cand.length ? U.pick(r, cand) : list[0], x = rm.x + U.ri(r, 1, rm.w - 2), french = !front && rm.w >= 4 && x + 1 <= rm.x + rm.w - 2 && r() < 0.5;
-      doors.push([x, front ? zF : zb, 'z', false, false]);
-      if (french) doors.push([x + 1, zb, 'z', false, true]);
-    };
-    for (const list of [A, B]) { outer(list, true); outer(list, false); }
-    const street = this._room(1, 1, W - 2, S, { type: 'street', out: true });
-    const alley = this._room(xl, zF, 1, zb - zF + 1, { type: 'alley', out: true });
-    const yardA = this._room(1, zb + 1, xl - 1, yd, { type: 'yard', out: true }), yardB = this._room(xl + 1, zb + 1, W - 2 - xl, yd, { type: 'yard', out: true });
-    rooms.push(yardA, yardB, alley, street);
-    return { W, H, t, rooms, doors, out, fences, spawn: street };
+    for (let z = S + 1; z < H - 1; z++) { fence(SP, z, 'z'); fence(W - 1, z, 'z'); } // (the neighbour's side, and the east edge)
+    for (let z = zb + 2; z <= zb + yd; z++) if (z !== zb + 3) fence(xl, z, 'z'); // between the gardens, a gap near the house
+    // ---- the houses, floor by floor
+    const stairs = [], entries = { 0: [], 2: [] }, HOME = { 0: ['storage', 'living', 'storage', 'office'], 1: null, 2: ['bedroom', 'bedroom', 'office', 'bedroom', 'bedroom'] };
+    for (const hs of houses) {
+      const a = hs.x, bL = hs.x + 1, wc = hs.x + 2, rx = hs.x + 3, rw = hs.w - 3, sz = z0 + 2; // the hall's two lanes, its wall, the rooms beside it; the stairs' first row
+      for (const [f, F] of [[0, B], [1, Gf], [2, Up]]) {
+        fill(F, hs.x - 1, zF, hs.w + 2, hh + 2, 1); setOut(F, hs.x - 1, zF, hs.w + 2, hh + 2, 0); // the shell
+        fill(F, a, z0, 2, hh); // the stair hall
+        const hall = this._room(a, z0, 2, hh, { type: 'landing', stairs: true });
+        F.rooms.push(hall);
+        // the stairs: up from the basement (lane a, climbing north into the hall), up from the ground floor (lane b,
+        // climbing south to the landing upstairs); a drop over each flight on the floor above
+        if (f === 0) { fill(F, a, sz, 1, 3, 6); stairs.push({ f: 0, x0: a, z0: sz, x1: a, z1: sz + 2, axis: 'z', up: -1 }); }
+        if (f === 1) { fill(F, a, sz, 1, 3, 5); fill(F, bL, sz, 1, 3, 6); stairs.push({ f: 1, x0: bL, z0: sz, x1: bL, z1: sz + 2, axis: 'z', up: 1 }); }
+        if (f === 2) { fill(F, bL, sz, 1, 3, 5); entries[2].push([bL, sz + 3]); }
+        if (f === 0) entries[0].push([a, sz + 3]);
+        // the rooms beside the hall, this floor's own split
+        const mine = this._house({ r, t: F.t, W, ids: F.ids, rooms: F.rooms, doors: F.doors }, rx, z0, rw, hh);
+        mine.forEach((q, i) => { if (HOME[f]) q.type = HOME[f][i % HOME[f].length]; q.house = houses.indexOf(hs); });
+        // a door from the hall into each room along its wall (not opposite a flight or the drop beside it)
+        let n = 0;
+        for (const q of mine) {
+          if (q.x !== rx) continue;
+          const rows = []; for (let z = q.z; z < q.z + q.h; z++) if (f === 0 || z < sz || z > sz + 2) rows.push(z);
+          if (!rows.length || (n && r() < 0.35)) continue;
+          F.doors.push([wc, U.pick(r, rows), 'x', r() < 0.3]); n++;
+        }
+        if (!n) F.doors.push([wc, f === 0 ? sz + 3 : z0, 'x', false]); // (always one)
+        if (f === 1) {
+          F.doors.push([U.ri(r, a, bL), zF, 'z', false, false]); // the front door, into the hall
+          const back = mine.filter((q) => q.z + q.h === zb && q.w >= 2), bq = back.length ? U.pick(r, back) : null; // the back door, from a room into the garden
+          if (bq) { const x = bq.x + U.ri(r, 0, bq.w - 1); F.doors.push([x, zb, 'z', false, false]); if (x + 1 < bq.x + bq.w && bq.w >= 3 && r() < 0.5) F.doors.push([x + 1, zb, 'z', false, true]); }
+          else F.doors.push([bL, zb, 'z', false, false]);
+          F.doors.push([hs.x + hs.w, z0 + hh - 1, 'x', false]); // a side door, out of its east wall onto the alley (A) or the path (B)
+        }
+      }
+    }
+    // ---- the outdoor rooms; the street, its patrol cars
+    const curb = S; // (the row along the lawns)
+    const spawn = this._room(1, 1, SP - 3, S, { type: 'road', out: true });
+    const road = this._room(SP - 2, 1, W - SP + 1, S, { type: 'road', out: true, cars: [
+      [SP - 1, 1, false], [SP + 1, 3, false], // the roadblock: staggered across the road
+      [xA + 1, curb, true], [xB + hwB - 4, curb, true], // at the kerb in front of the houses
+      [W - 3, 1, false], [W - 3, 3, false], // across the far end
+    ] });
+    const lawnA = this._room(SP + 1, S + 1, xl - SP - 1, zF - S - 1, { type: 'lawn', out: true }), lawnB = this._room(xl, S + 1, W - xl - 1, zF - S - 1, { type: 'lawn', out: true });
+    const alley = this._room(xl, zF, 1, zb - zF + 1, { type: 'alley', out: true }), path = this._room(xE, zF, 1, zb - zF + 1, { type: 'alley', out: true });
+    const yardA = this._room(SP + 1, zb + 1, xl - SP - 1, yd, { type: 'yard', out: true }), yardB = this._room(xl + 1, zb + 1, W - xl - 2, yd, { type: 'yard', out: true });
+    const nbr = this._room(1, S + 2, SP - 1, 1, { type: 'lawn', out: true });
+    Gf.rooms.push(yardA, yardB, alley, path, lawnA, lawnB, nbr, road, spawn);
+    const floor = (F, f) => ({ W, H, t: F.t, out: F.out, rooms: F.rooms, doors: F.doors, fences: F.fences, spawn: f === 1 ? spawn : F.rooms[0], entries: f === 1 ? null : entries[f], underground: f === 0 });
+    return { floors: [floor(B, 0), floor(Gf, 1), floor(Up, 2)], stairs, base: 1 };
   },
 
   tile(map, tx, tz) {
@@ -1480,7 +1548,7 @@ G.Level = {
       (m.winMeshes || []).forEach((p, i) => { if (p) map.winMeshes[i] = p; });
       for (const l of m.lamps) map.lamps.push(Object.assign({}, l, { y: l.y + m.fy, fl: m.fl }));
     }
-    map.caseView = map.floors[0].caseView; map.cabViews = map.floors[0].cabViews;
+    map.caseView = map.floors[map.base || 0].caseView; map.cabViews = map.floors[map.base || 0].cabViews;
     for (const d of map.doors) if (d.pane) map.winMeshes[d.pane.id] = map.doorMeshes[d.id].userData.leaf; // (a glass door's pane: its leaf)
     // the stairs: each step a block (stone treads, painted risers), and a stringer down the open side
     const tread = new THREE.MeshStandardMaterial({ color: 0x8a847a, roughness: 0.8 }), riser = new THREE.MeshStandardMaterial({ color: 0xcfc8bb, roughness: 0.9 });
@@ -1499,11 +1567,10 @@ G.Level = {
       const top = new THREE.Mesh(new THREE.BoxGeometry(w + 0.02, 0.05, d + 0.02), steel); top.position.set(cx, r.y + H - 0.025, cz); root.add(top);
       const post = new THREE.Mesh(new THREE.BoxGeometry(0.04, H, 0.04), steel); post.position.set(r.x0 + (w > d ? 0.02 : w / 2), r.y + H / 2, r.z0 + (w > d ? d / 2 : 0.02)); root.add(post);
       const pane = new THREE.Mesh(new THREE.BoxGeometry(Math.max(w - 0.04, 0.01), H - 0.12, Math.max(d - 0.04, 0.01)), glass); pane.position.set(cx, r.y + H / 2 + 0.02, cz); pane.renderOrder = 2; root.add(pane);
+      if (r.pane) map.winMeshes[r.pane.id] = pane; // (hidden when it's shot out: js/views.js breakGlass)
     }
     map.lightPool = [];
-    for (let k = 0; k < Math.min(this.LIGHTS, map.lamps.length); k++) { const pl = new THREE.PointLight(th.light, 0, 14, 1.6); root.add(pl); map.lightPool.push(pl); }
-    map.lightT = 0;
-    this.updateLights(map, map.spawn ? new THREE.Vector3(map.spawn.x, 1.6, map.spawn.z) : null, true);
+    G.LightGrid.build(map); // every lamp, on every floor: js/lightgrid.js
     return root;
   },
   buildMesh(map, opts) {
@@ -1583,26 +1650,41 @@ G.Level = {
       const dark = new THREE.MeshStandardMaterial({ color: 0x15181c, roughness: 0.2, metalness: 0.3 });
       const rnd = G.U.rng((map.seed ^ 0x700f) >>> 0);
       const seg = new THREE.Group();
-      for (let z = 1; z < H - 1; z++) for (let x = 1; x < W - 1; x++) {
-        if (t[z * W + x] !== 1 && t[z * W + x] !== 3) continue;
-        for (const [dx, dz] of [[0, 1], [0, -1]]) {
-          const ni = (z + dz) * W + x;
-          if (!map.out[ni] || t[ni] === 4 || map.out[z * W + x]) continue;
-          // the wall's garden face, and the roof climbing back over the house from it
-          const fz = (z + 0.5) * TS + dz * TS / 2, cx = (x + 0.5) * TS;
-          if (th.home >= 1) { // a home: a pitched roof climbing back from the eaves
-            const roof = new THREE.Mesh(new THREE.BoxGeometry(TS + 0.02, 0.1, 3.6), roofMat);
-            roof.position.set(cx, this.WALL_H + 0.95, fz - dz * 1.35); roof.rotation.x = dz * 0.55;
-            seg.add(roof);
-            const f = new THREE.Mesh(new THREE.BoxGeometry(TS + 0.02, 0.22, 0.06), fascia);
-            f.position.set(cx, this.WALL_H - 0.02, fz + dz * 0.4); seg.add(f);
+      // A home's roof: over each part of the house with the sky above it on this floor (the whole top storey, or
+      // a lower part nothing's built on), a gable roof: its ridge along the long side, the two slopes down to
+      // eaves past the walls, a gable at each end, fascia boards along the eaves.
+      if (th.home >= 1) {
+        const up = map.above, sky = new Uint8Array(W * H), seen = new Uint8Array(W * H);
+        for (let i = 0; i < W * H; i++) sky[i] = !map.out[i] && t[i] !== 5 && (!up || up.out[i] || up.t[i] === 5) ? 1 : 0;
+        const gableMat = new THREE.MeshStandardMaterial({ color: 0xd8d2c4, roughness: 0.8 }), O = 0.35, PITCH = 0.55;
+        for (let i0 = 0; i0 < W * H; i0++) {
+          if (!sky[i0] || seen[i0]) continue;
+          let x0 = W, z0 = H, x1 = 0, z1 = 0, n = 0;
+          const stack = [i0]; seen[i0] = 1;
+          while (stack.length) {
+            const i = stack.pop(), x = i % W, z = (i / W) | 0; n++;
+            if (x < x0) x0 = x; if (x > x1) x1 = x; if (z < z0) z0 = z; if (z > z1) z1 = z;
+            for (const j of [i - 1, i + 1, i - W, i + W]) if (j >= 0 && j < W * H && Math.abs((j % W) - x) <= 1 && sky[j] && !seen[j]) { seen[j] = 1; stack.push(j); }
           }
-          if (false && t[z * W + x] === 1 && x % this.K === 1 && t[z * W + x - 1] === 1 && t[z * W + x + 1] === 1 && rnd() < 0.5) { // a window
-            const fr = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.3, 0.06), frameMat); fr.position.set(cx, 1.75, fz + dz * 0.03); seg.add(fr);
-            const gl = new THREE.Mesh(new THREE.PlaneGeometry(1.06, 1.16), rnd() < 0.6 ? lit[Math.floor(rnd() * lit.length)] : dark);
-            gl.position.set(cx, 1.75, fz + dz * 0.065); gl.rotation.y = dz > 0 ? 0 : Math.PI; seg.add(gl);
-            const bar = new THREE.Mesh(new THREE.BoxGeometry(0.05, 1.16, 0.02), frameMat); bar.position.set(cx, 1.75, fz + dz * 0.075); seg.add(bar);
-            const sill = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.05, 0.14), frameMat); sill.position.set(cx, 1.08, fz + dz * 0.07); seg.add(sill);
+          if (n < 12) continue; // (a stray cell: a porch post, a chimney stub)
+          const X0 = x0 * TS - O, X1 = (x1 + 1) * TS + O, Z0 = z0 * TS - O, Z1 = (z1 + 1) * TS + O, Y = this.WALL_H;
+          const alongX = X1 - X0 >= Z1 - Z0, len = alongX ? X1 - X0 : Z1 - Z0, span = alongX ? Z1 - Z0 : X1 - X0, half = span / 2;
+          const rise = Math.min(2.4, half * Math.tan(PITCH)), slope = Math.hypot(half, rise), ang = Math.atan2(rise, half);
+          const cx = (X0 + X1) / 2, cz = (Z0 + Z1) / 2;
+          for (const s of [-1, 1]) { // the two slopes
+            const r = new THREE.Mesh(new THREE.BoxGeometry(alongX ? len : 0.12, alongX ? 0.12 : slope + 0.08, alongX ? slope + 0.08 : len), roofMat);
+            const off = half / 2;
+            r.position.set(alongX ? cx : cx + s * off, Y + rise / 2 + 0.06, alongX ? cz + s * off : cz);
+            if (alongX) { r.rotation.x = s * ang; r.geometry = new THREE.BoxGeometry(len, 0.12, slope + 0.08); } else { r.rotation.z = -s * ang; r.geometry = new THREE.BoxGeometry(slope + 0.08, 0.12, len); }
+            seg.add(r);
+            const f = new THREE.Mesh(new THREE.BoxGeometry(alongX ? len : 0.06, 0.22, alongX ? 0.06 : len), fascia); // (the fascia along the eaves)
+            f.position.set(alongX ? cx : cx + s * (half - 0.02), Y - 0.04, alongX ? cz + s * (half - 0.02) : cz); seg.add(f);
+          }
+          for (const e of [-1, 1]) { // the gables, flush with the end walls
+            const sh = new THREE.Shape(); sh.moveTo(-half + O, 0); sh.lineTo(half - O, 0); sh.lineTo(0, rise * (half - O) / half); sh.closePath();
+            const g = new THREE.Mesh(new THREE.ShapeGeometry(sh), gableMat); g.material.side = THREE.DoubleSide;
+            const ex = alongX ? cx + e * (len / 2 - O) : cx, ez = alongX ? cz : cz + e * (len / 2 - O);
+            g.position.set(ex, Y, ez); g.rotation.y = alongX ? Math.PI / 2 : 0; seg.add(g);
           }
         }
       }
@@ -1616,9 +1698,8 @@ G.Level = {
     lampGeo.scale(1, 0.45, 1); lampGeo.rotateX(Math.PI);
     const lampMat = new THREE.MeshBasicMaterial({ color: th.light });
     const porchMat = new THREE.MeshBasicMaterial({ color: 0xffe2a8 }), porchBox = new THREE.MeshStandardMaterial({ color: 0x1c1c1e, roughness: 0.6 });
-    // every lamp's fitting (and where its light would go), then a pool of real lights that follows you: the
-    // LIGHTS lamps nearest you get them (G.Level.updateLights), so whatever room you're in is lit. (Moving a
-    // light costs nothing; adding or removing one recompiles every shader.)
+    // every lamp's fitting, and where its light comes from: the light grid lights the level from them all
+    // (js/lightgrid.js; a building of several floors builds it once, from every floor's lamps: buildStack)
     map.lamps = [];
     map.lights.forEach((l) => {
       if (l.kind === 'string') { map.lamps.push({ x: l.x, y: l.y, z: l.z, color: l.color, i: l.i, d: l.d }); return; } // (its bulbs: buildFestival)
@@ -1634,11 +1715,7 @@ G.Level = {
       map.lamps.push({ x: l.x, y: this.WALL_H - 0.4, z: l.z, color: th.light, i: 0.85, d: 14 });
     });
     map.lightPool = [];
-    if (pool) {
-      for (let k = 0; k < Math.min(this.LIGHTS, map.lamps.length); k++) { const pl = new THREE.PointLight(th.light, 0, 14, 1.6); root.add(pl); map.lightPool.push(pl); }
-      map.lightT = 0;
-      this.updateLights(map, map.spawn ? new THREE.Vector3(map.spawn.x, 1.6, map.spawn.z) : null, true);
-    }
+    if (pool) G.LightGrid.build(map);
 
     // doors: a lintel over the frame and a leaf on a hinge (rotation animated by G.Game.updateDoors)
     const metal = th.name === 'Bunker' || th.name === 'Research Lab' || th.name === 'Cold Storage';

@@ -23,7 +23,8 @@ G.Hangar = (() => {
   const COUNTER = { x0: 22, x1: 28, z0: 4, z1: 5, h: 1.05 }, VEX = { x: 25, z: 2.9 };
   const STAND = { z: 12.5, xs: [22, 25, 28], top: 0.95 };
   const POUCH = { x0: 17.2, x1: 18.0, z0: 8.7, step: 1.12, n: 5 };
-  const PARTS = { x0: 12.6, z: 2.0, step: 1.0, n: 8 }; // (slid east, toward Vex, to make way for the range's garage door)
+  const ZERO = { x0: 6.3, x1: 8.1, z0: 13.1, z1: 14.9, h: 0.9 }; // the zeroing table, in the middle of the workshop floor
+  const PARTS = { x0: 12.9, z: 3.5, step: 1.3, n: 6, top: 0.9 }; // the gunsmith's parts, on pedestals along the north wall (east of the range's garage door)
   const VEND = [{ id: 'ammo', title: 'AMMUNITION', x: 35.0, z: 10.0, cols: 2, rows: 3, tab: 'svc' }, { id: 'supply', title: 'FIELD SUPPLIES', x: 35.0, z: 12.2, cols: 3, rows: 3, tab: 'svc' }];
   const CONSOLE = { x0: 38.2, x1: 39.1, z0: 12.6, z1: 15.4 };
   const STACK = { x: 44.5, z: 14 };
@@ -35,7 +36,8 @@ G.Hangar = (() => {
   function decorate(map) {
     const w = map.world, add = (x0, y0, z0, x1, y1, z1, o) => G.World.add(w, G.World.box(x0, y0, z0 + RZ, x1, y1, z1 + RZ, Object.assign({ kind: 'prop' }, o || {})));
     for (let i = 0; i < 6; i++) { const b = BENCH(i); add(b.x, 0, b.z - 1.1, b.x1, 0.9, b.z + 1.1); }
-    add(PARTS.x0 - 0.3, 0, PARTS.z, PARTS.x0 + PARTS.n * PARTS.step - 0.6, 0.95, PARTS.z + 0.5); // (a low unit under the parts rack)
+    for (let i = 0; i < PARTS.n; i++) { const x = PARTS.x0 + i * PARTS.step; add(x - 0.36, 0, PARTS.z - 0.34, x + 0.36, 1.5, PARTS.z + 0.34); } // (a parts pedestal, and the air its part turns in)
+    add(ZERO.x0, 0, ZERO.z0, ZERO.x1, ZERO.h + 0.05, ZERO.z1); // (the zeroing table)
     add(COUNTER.x0, 0, COUNTER.z0, COUNTER.x1, COUNTER.h, COUNTER.z1);
     add(COUNTER.x0 - 0.1, 0, 2, COUNTER.x0 + 0.1, 2.2, COUNTER.z1); add(COUNTER.x1 - 0.1, 0, 2, COUNTER.x1 + 0.1, 2.2, COUNTER.z1);
     add(COUNTER.x0, 0, 2, COUNTER.x1, 2.2, 2.45);
@@ -163,6 +165,35 @@ G.Hangar = (() => {
     root.add(pivot);
     return { root, spin: pivot };
   }
+  // A gunsmith's part on show, on its own: built on a gun it fits (in a slot it takes there), all but the part left
+  // out. If it can't be (a receiver kit, a dot that sits on a riser), its card instead.
+  function partPiece(id) {
+    const GS = G.Gunsmith, p = GS.PARTS[id], root = new T.Group();
+    let g = null;
+    for (const gid of GS.fits(p.mount)) {
+      const b = GS.defaultBuild(gid), sl = GS.slotFor(gid, b, p);
+      if (!sl) continue;
+      b[sl.slot] = id; GS.prune(gid, b);
+      if (b[sl.slot] !== id) continue;
+      const { group } = G.GunModels.display(GS.compile(gid, b)), keep = [];
+      group.updateMatrixWorld(true);
+      group.traverse((o) => { if (o.isMesh && o.userData.slot === sl.slot) keep.push(o); });
+      if (keep.length) {
+        g = new T.Group();
+        for (const m of keep) { const c = new T.Mesh(m.geometry, m.material); m.matrixWorld.decompose(c.position, c.quaternion, c.scale); m.material.userData.keep = true; g.add(c); } // (the guns' own materials: shared, kept)
+      }
+      group.traverse((o) => { if (o.isMesh && !keep.includes(o)) o.geometry.dispose(); });
+      if (g) break;
+    }
+    if (!g) { product(root, G.Gear.partItem(id), 0, PARTS.top + 0.24, 0, 0, null, 0.1); return { root, spin: null }; }
+    const bb = new T.Box3().setFromObject(g), ctr = bb.getCenter(new T.Vector3()), sz = bb.getSize(new T.Vector3());
+    g.position.copy(ctr).negate();
+    const k = Math.min(4.5, 0.5 / Math.max(sz.x, sz.y, sz.z, 0.02)), pivot = new T.Group();
+    pivot.add(g); pivot.scale.setScalar(k); pivot.position.y = PARTS.top + 0.08 + Math.max(sz.y, sz.x, sz.z) * k / 2;
+    pivot.rotation.x = 0; pivot.rotation.y = Math.PI / 2; // (side on to the aisle to start)
+    root.add(pivot);
+    return { root, spin: pivot };
+  }
   // what's on the sign: the name, the price, and everything that comes with it (or doesn't)
   function signFor(id, sold) {
     const d = gearOf(id), Sh = G.Shop, O = Sh.offers, L = [d.name, sold ? 'SOLD' : money(Sh.gearPrice(id))];
@@ -244,18 +275,41 @@ G.Hangar = (() => {
       for (let k = 0; k < 6; k++) box(r, 2.1, 1.7 + (k % 3) * 0.25, b.z - 0.8 + k * 0.3, 2.14, 1.9 + (k % 3) * 0.25, b.z - 0.76 + k * 0.3, M(k % 2 ? 0x9aa0a6 : 0xb04a2a));
       addTarget({ id: 'bench' + i, kind: 'pos', box: [b.x, 0.9, b.z - 0.55, b.x1, 1.5, b.z + 0.55], label: owner ? (mine ? 'your bench' : owner.name + "'s bench") : 'a free bench', who: ids[i], tab: 'gunsmith', title: 'the gunsmith', mine });
     }
-    // the parts wall: a pegboard with a slot for each of the gunsmith's parts this visit
-    box(r, PARTS.x0 - 0.5, 1.0, 2.0, PARTS.x0 + PARTS.n * PARTS.step - 0.3, 2.55, 2.06, M(0x5a4a38));
-    box(r, PARTS.x0 - 0.5, 0.95, 2.0, PARTS.x0 + PARTS.n * PARTS.step - 0.3, 1.0, 2.5, M(0x3b3f44));
+    // the zeroing table: a shooting bench with a rest on it and a screen drawing a round's path against the line of sight
+    {
+      const Z = ZERO, cx = (Z.x0 + Z.x1) / 2, cz = (Z.z0 + Z.z1) / 2;
+      box(r, Z.x0, Z.h - 0.06, Z.z0, Z.x1, Z.h, Z.z1, M(0x6a5a44, { roughness: 0.6 }));
+      for (const [x, z] of [[Z.x0 + 0.08, Z.z0 + 0.08], [Z.x1 - 0.08, Z.z0 + 0.08], [Z.x0 + 0.08, Z.z1 - 0.08], [Z.x1 - 0.08, Z.z1 - 0.08]]) box(r, x - 0.04, 0, z - 0.04, x + 0.04, Z.h - 0.06, z + 0.04, M(0x3b3f44));
+      box(r, cx - 0.12, Z.h, Z.z1 - 0.55, cx + 0.12, Z.h + 0.12, Z.z1 - 0.25, M(0x6b6a4a, { roughness: 1 })); // (a sandbag rest)
+      box(r, cx - 0.1, Z.h, Z.z0 + 0.25, cx + 0.1, Z.h + 0.1, Z.z0 + 0.5, M(0x6b6a4a, { roughness: 1 }));
+      box(r, Z.x0 + 0.15, Z.h, cz - 0.05, Z.x0 + 0.3, Z.h + 0.35, cz + 0.05, M(0x25282c)); // (the screen's stand)
+      const scr = new T.Mesh(new T.PlaneGeometry(0.9, 0.5), new T.MeshBasicMaterial({ map: canvasTex(360, 200, (g) => {
+        g.fillStyle = '#05121a'; g.fillRect(0, 0, 360, 200);
+        g.fillStyle = '#ffb43a'; g.font = 'bold 22px monospace'; g.textAlign = 'center'; g.fillText('ZEROING', 180, 28);
+        g.strokeStyle = '#3a5060'; g.setLineDash([6, 4]); g.beginPath(); g.moveTo(20, 110); g.lineTo(340, 110); g.stroke(); g.setLineDash([]);
+        g.strokeStyle = '#ffb43a'; g.lineWidth = 3; g.beginPath();
+        for (let x = 0; x <= 320; x += 4) { const d = x / 320, y = 128 - 70 * d * 1.9 + 120 * d * d * 1.9; x ? g.lineTo(20 + x, y) : g.moveTo(20, y); }
+        g.stroke(); g.fillStyle = '#a8e8ff'; g.font = '15px monospace'; g.fillText('F: zero your sights', 180, 182);
+      }) }));
+      scr.position.set(Z.x0 + 0.24, Z.h + 0.55, cz); scr.rotation.y = Math.PI / 2; r.add(scr);
+      const back = new T.Mesh(new T.BoxGeometry(0.03, 0.54, 0.94), M(0x16181a)); back.position.set(Z.x0 + 0.22, Z.h + 0.55, cz); r.add(back);
+      addTarget({ id: 'zero', kind: 'pos', box: [Z.x0, Z.h, Z.z0, Z.x1, Z.h + 0.9, Z.z1], label: 'the zeroing table', tab: 'zero', title: 'the zeroing table' });
+    }
+    // the gunsmith's parts this visit: a pedestal for each, the part turning on top, its sign on the front (the name
+    // over them on the wall behind)
     const ps = new T.Mesh(new T.PlaneGeometry(2.6, 0.5), signMat(['GUNSMITH PARTS', 'bought into your stash'], 512, 100, '#101418', '#ffb43a', '#cfd6dc'));
-    ps.position.set(PARTS.x0 + 3.6, 2.8, 2.08); r.add(ps);
-    S.partSlots = [];
+    ps.position.set(PARTS.x0 + (PARTS.n - 1) * PARTS.step / 2, 2.6, 2.02); r.add(ps);
+    S.partStands = [];
     for (let i = 0; i < PARTS.n; i++) {
-      const x = PARTS.x0 + i * PARTS.step;
-      const slot = new T.Group(); slot.position.set(x, 0, 0); r.add(slot);
-      S.partSlots.push(slot);
-      const tg = addTarget({ id: 'part' + i, kind: 'buy', box: [x - 0.5, 1.1, 2.0, x + 0.5, 2.0, 2.8], slot, what: 'part', key: null });
-      S.items.push(tg);
+      const x = PARTS.x0 + i * PARTS.step, z = PARTS.z, top = PARTS.top;
+      box(r, x - 0.48, 0, z - 0.46, x + 0.48, 0.08, z + 0.46, M(0x30353b));
+      box(r, x - 0.46, 0.08, z - 0.44, x + 0.46, 0.092, z + 0.44, M(0xe8c030, { emissive: 0x302400 }));
+      box(r, x - 0.32, 0.08, z - 0.3, x + 0.32, top - 0.03, z + 0.3, M(0x3a3f45, { roughness: 0.5 }));
+      box(r, x - 0.35, top - 0.03, z - 0.33, x + 0.35, top, z + 0.33, M(0xe8c030, { emissive: 0x302400 }));
+      const sign = new T.Mesh(new T.PlaneGeometry(0.6, 0.4), new T.MeshBasicMaterial({ color: 0x000000 })); sign.position.set(x, 0.5, z + 0.302); r.add(sign);
+      const disp = new T.Group(); disp.position.set(x, 0, z); r.add(disp);
+      const tg = addTarget({ id: 'part' + i, kind: 'buy', box: [x - 0.4, 0.1, z - 0.36, x + 0.4, 1.6, z + 0.36], what: 'part', key: null, sign, disp, spin: null });
+      S.partStands.push(tg); S.items.push(tg);
     }
   }
 
@@ -436,15 +490,19 @@ G.Hangar = (() => {
       tg.sign.scale.set(1, SH / 0.5, 1);
       tg.sign.position.y = 0.1 + (STAND.top - 0.14) / 2;
     });
-    // the parts wall
-    const parts = parts0;
-    if (S.partSlots) S.partSlots.forEach((slot, i) => {
-      clear(slot);
-      const tg = S.items.find((q) => q.id === 'part' + i), id = parts[i], p = id && G.Gunsmith.PARTS[id];
+    // the parts pedestals
+    (S.partStands || []).forEach((tg, i) => {
+      const id = parts0[i], p = id && G.Gunsmith.PARTS[id];
       tg.key = id || null; tg.sold = !p;
-      if (!p) return;
-      const it = G.Gear.partItem(id);
-      product(slot, it, 0, 1.55, 2.12, 0, signMat([p.name, money(p.price)], 400, 100, '#101418', '#ffd24a', '#ffffff'), 0.11);
+      clear(tg.disp); tg.spin = null;
+      if (p) { const sh = partPiece(id); tg.disp.add(sh.root); tg.spin = sh.spin; }
+      const n = p ? G.Gunsmith.fitsPart(p).length : 0;
+      const lines = p ? [p.name, money(p.price), `${G.Gunsmith.SLOT_LABEL[p.slot]}${n ? ' · fits ' + n + (n > 1 ? ' weapons' : ' weapon') : ''}`] : ['—'];
+      const SH = Math.min(0.62, 0.22 + 0.12 * lines.length);
+      if (tg.sign.material.map) tg.sign.material.map.dispose(); tg.sign.material.dispose();
+      tg.sign.material = signMat(lines, 384, Math.round(384 * SH / 0.6), '#101418', '#ffd24a', '#ffffff');
+      tg.sign.scale.set(1, SH / 0.4, 1);
+      tg.sign.position.y = 0.08 + (PARTS.top - 0.11) / 2;
     });
     // the pouch shelf
     S.pouchSlots.forEach((slot, i) => {
@@ -506,6 +564,7 @@ G.Hangar = (() => {
     const me = G.Me;
     // the kit on show, turning
     for (const tg of S.stands) if (tg.spin) tg.spin.rotation.y += dt * 0.5;
+    for (const tg of S.partStands || []) if (tg.spin) tg.spin.rotation.y += dt * 0.6;
     // Vex, standing about
     for (const o of S.rigs) {
       const idle = o.vex ? { yaw: o.yaw + Math.sin(S.t * 0.35) * 0.18 } : { yaw: o.yaw };

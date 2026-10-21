@@ -507,6 +507,7 @@ G.GunModels = (() => {
         const geo = new T.CylinderGeometry(0.024, 0.024, len, 8); geo.rotateY(Math.PI / 8); geo.rotateX(Math.PI / 2);
         const mesh = new T.Mesh(geo, o.m || rm); mesh.position.set(0, 0, -(f0 + len / 2)); k.add(mesh);
         S.rail(k, f0, len, 0.022, o.m || rm);
+        for (const x of [-0.026, 0.026]) sideRail(k, f0 + 0.01, len - 0.02, 0, x, o.m || rm); // (and one each side)
         return;
       }
       case 'mlok': {
@@ -557,21 +558,27 @@ G.GunModels = (() => {
         break;
     }
   }
-  // Laser / aiming modules on the right side rail at forward position f.
-  function tactical(k, t, f, y, x) {
+  // Laser / aiming modules on a side rail at forward position f: the right (side 1), or the left (-1), mirrored.
+  function tactical(k, t, f, y, x, side = 1) {
     if (!t) return;
     if (t === 'light' || t === 'lightX' || t === 'plight' || t === 'pcombo') { // a weapon light: a tube with a lens on the front
-      const r = t === 'lightX' ? 0.016 : t === 'light' ? 0.013 : 0.011, len = t === 'lightX' ? 0.12 : t === 'light' ? 0.095 : 0.055, cx = x + r * 0.9;
-      k.box(0.01, 0.012, len * 0.5, M.black(), f - len * 0.75, y, x + 0.002);
+      const r = t === 'lightX' ? 0.016 : t === 'light' ? 0.013 : 0.011, len = t === 'lightX' ? 0.12 : t === 'light' ? 0.095 : 0.055, cx = x + side * r * 0.9;
+      k.box(0.01, 0.012, len * 0.5, M.black(), f - len * 0.75, y, x + side * 0.002);
       k.cyl(r, len, M.black(), f - len, y, cx, r * 1.15, 16);
       k.cyl(r * 1.08, 0.003, M.reflexLens(), f, y, cx);
       if (t === 'pcombo') k.cyl(0.0035, 0.004, M.dot(), f, y - r - 0.004, cx);
       return;
     }
     const peq = t === 'peq', big = peq ? 1.4 : 1;
-    k.box(0.02 * big, 0.022 * big, 0.05 * big, peq ? M.tan() : M.black(), f - 0.05 * big, y, x + 0.01 * big);
-    k.cyl(0.0045, 0.004, t === 'laserG' || t === 'plaserG' ? M.glow() : M.dot(), f, y + 0.004, x + 0.01 * big);
-    if (peq) k.cyl(0.006, 0.004, M.lens(), f, y - 0.008, x + 0.01 * big);
+    k.box(0.02 * big, 0.022 * big, 0.05 * big, peq ? M.tan() : M.black(), f - 0.05 * big, y, x + side * 0.01 * big);
+    k.cyl(0.0045, 0.004, t === 'laserG' || t === 'plaserG' ? M.glow() : M.dot(), f, y + 0.004, x + side * 0.01 * big);
+    if (peq) k.cyl(0.006, 0.004, M.lens(), f, y - 0.008, x + side * 0.01 * big);
+  }
+  // A short rail on the side (standing on edge, its teeth outward) from f0, len long, centred at y, its face at x.
+  function sideRail(k, f0, len, y, x, m = M.black()) {
+    const s = Math.sign(x) || 1;
+    k.box(0.007, 0.019, len, m, f0, y, x - s * 0.0035);
+    for (let i = 0; i < Math.floor(len / 0.0105); i++) k.box(0.004, 0.021, 0.0052, m, f0 + 0.003 + i * 0.0105, y, x + s * 0.002);
   }
   // Charging handle at the back of an AR upper.
   function charging(k, t, rm) {
@@ -656,6 +663,7 @@ G.GunModels = (() => {
     } else if (rcv === 'bullpup') {
       k.prof([[-0.01, 0.03], [L, 0.03], [L, -0.045], [L * 0.32, -0.045], [0.06, -0.06], [0.04, -0.135], [-0.01, -0.135]], 0.046, fm);
       k.box(0.05, 0.17, 0.014, M.rubber(), -0.024, -0.052);
+      if (o.siderails) for (const x of [-0.028, 0.028]) sideRail(k, L - 0.14, 0.12, -0.006, x); // (on the front of the shell, each side)
       top = o.railTop === false && ['irons', 'notch', 'bead'].includes(o.optic) ? 0.03 : S.rail(k, L * 0.35, L * 0.6, 0.03, rm);
     } else if (rcv === 'break') {
       // the action: the barrels hinge at its front (L), so it's as long as the receiver
@@ -772,6 +780,7 @@ G.GunModels = (() => {
       for (let i = 0; i < 6; i++) k.ringZ(0.021, 0.0016, M.rubber(), L + o.pump.f + 0.02 + i * (o.pump.len - 0.04) / 5, -0.025);
       if (o.pump.rail) S.rail(k, L + o.pump.f + 0.02, o.pump.len - 0.04, -0.012, M.black());
       if (o.tac) { k.tag('tac'); tactical(k, o.tac, L + o.pump.f + o.pump.len - 0.01, -0.025, 0.022); }
+      if (o.tacL) { k.tag('tacL'); tactical(k, o.tacL, L + o.pump.f + o.pump.len - 0.01, -0.025, -0.022, -1); }
       k.into(null);
       anim.pump = p;
     }
@@ -779,8 +788,21 @@ G.GunModels = (() => {
     if (o.bipod) for (const x of [-0.012, 0.012]) { k.cyl(0.004, 0.2, M.black(), L + o.bipod - 0.2, -0.032, x); k.box(0.012, 0.008, 0.01, M.rubber(), L + o.bipod - 0.21, -0.032, x); }
     if (o.vfg != null) k.prof([[L + o.vfg - 0.012, -0.022], [L + o.vfg + 0.016, -0.022], [L + o.vfg + 0.014, -0.11], [L + o.vfg - 0.01, -0.11]], 0.026, o.vfgM || fm);
     let fgF = null;
-    if (o.fg && hgLen) { k.tag('fg'); fgF = L + Math.min(hgLen * 0.55, hgLen - 0.04); foregrip(k, o.fg, fgF, fm); }
-    if (o.tac && hgLen && !o.pump) { k.tag('tac'); tactical(k, o.tac, L + hgLen - 0.01, 0.0, 0.024); }
+    if (o.fg && hgLen) { k.tag('fg'); fgF = L + Math.min(hgLen * 0.35, 0.09, hgLen - 0.04); foregrip(k, o.fg, fgF, fm); } // (near the rail's back: the support arm bent, the gun out in front)
+    // a clamp-on rail mount: a collar round the barrel (or the can), in front of any jacket, a short rail on one side or both
+    let tacAt = hgLen && !o.pump ? { f: L + hgLen - 0.01, y: 0, x: 0.024 } : o.siderails ? { f: L - 0.02, y: -0.006, x: 0.029 } : null;
+    if (o.railmount) {
+      k.tag('railmount');
+      const run = o.integral ? o.integral.len : bl, R = (o.integral ? o.integral.r : br * (b.taper || 1)) + 0.002;
+      const f0 = L + Math.max(0.005, Math.min(hgLen ? hgLen + 0.012 : 0.03, run - 0.05));
+      k.cyl(R + 0.004, 0.032, M.black(), f0, by, 0, R + 0.004, 16);
+      for (const sd of o.railmount === 'twin' ? [1, -1] : [1]) { k.box(0.006, 0.012, 0.03, M.black(), f0 + 0.001, by, sd * (R + 0.006)); sideRail(k, f0 - 0.004, 0.04, by, sd * (R + 0.011)); }
+      tacAt = { f: f0 + 0.045, y: by, x: R + 0.012 };
+    }
+    if (tacAt) {
+      if (o.tac) { k.tag('tac'); tactical(k, o.tac, tacAt.f, tacAt.y, tacAt.x); }
+      if (o.tacL) { k.tag('tacL'); tactical(k, o.tacL, tacAt.f, tacAt.y, -tacAt.x, -1); }
+    }
 
     // sights
     k.tag('optic');
@@ -792,7 +814,7 @@ G.GunModels = (() => {
     if (onBarrels) k.into(null);
     if (o.magnifier && k.reflex) { k.tag('magnifier'); sight = S.magnifier(k, sight, top, o.magnifier, anim); }
     k.tag('base');
-    const support = o.support != null ? o.support : o.pump ? L + o.pump.f + o.pump.len * 0.5 : fgF != null && o.fg !== 'bipod' ? fgF : o.vfg != null ? L + o.vfg : bull ? L + 0.07 : L + (hgLen ? Math.min(hgLen * 0.55, 0.16) : 0.1);
+    const support = o.support != null ? o.support : o.pump ? L + o.pump.f + o.pump.len * 0.5 : fgF != null && o.fg !== 'bipod' ? fgF : o.vfg != null ? L + o.vfg : bull ? L + 0.07 : L + (hgLen ? Math.min(hgLen * 0.15, 0.04) : 0.03); // (a plain handguard: held near its back, the arm bent, not out at full stretch)
     // where the hands go for reloads and racking (gun space: [forward, up, right])
     const port = o.bolt ? [o.bolt - 0.02, top - 0.004, 0] : o.lever ? [L * 0.55, 0.0, 0.02] : o.pump || o.tube ? [L * 0.62, -0.042, 0] : rcv === 'break' ? [L, 0.0, 0] : [L * 0.5, top, 0];
     // where a chamber check shows the round: through the ejection port on the right (js/vmanim.js), or for a
@@ -819,10 +841,13 @@ G.GunModels = (() => {
     // a pistol dot sits), so a press-check shows the round in the barrel
     const pc = len * 0.44, p0 = pc - 0.016, p1 = pc + 0.016, sy = 0.016;
     k.prof([[0, 0.002], [0, sy], [len, sy], [len, 0.002]], w, sm, 0, null, 0.001);
-    k.prof([[0, sy], [0, 0.026], [len - 0.012, 0.026], [len, 0.02], [len, sy]], w / 2, sm, -w / 4, null, 0.001);
+    // (the TX22, o.tx: a steep bevel down the front of the slide, deep slanted serrations at both ends)
+    const nose = o.tx ? 0.022 : 0.012, noseY = o.tx ? 0.017 : 0.02;
+    k.prof([[0, sy], [0, 0.026], [len - nose, 0.026], [len, noseY], [len, sy]], w / 2, sm, -w / 4, null, 0.001);
     k.prof([[0, sy], [0, 0.026], [p0, 0.026], [p0, sy]], w / 2, sm, w / 4, null, 0.001);
-    k.prof([[p1, sy], [p1, 0.026], [len - 0.012, 0.026], [len, 0.02], [len, sy]], w / 2, sm, w / 4, null, 0.001);
-    for (let i = 0; i < 5; i++) k.box(w + 0.001, 0.016, 0.0025, M.rubber(), 0.01 + i * 0.006, 0.014);
+    k.prof([[p1, sy], [p1, 0.026], [len - nose, 0.026], [len, noseY], [len, sy]], w / 2, sm, w / 4, null, 0.001);
+    if (o.tx) for (const [f0, n] of [[0.006, 7], [len * 0.72, 5]]) for (let i = 0; i < n; i++) k.box(w + 0.0012, 0.019, 0.0022, M.gunmetal(), f0 + i * 0.0058, 0.0155).rotation.x = -0.42; // (raked forward at the top)
+    else for (let i = 0; i < 5; i++) k.box(w + 0.001, 0.016, 0.0025, M.rubber(), 0.01 + i * 0.006, 0.014);
     if (sl.vent) for (let i = 0; i < 4; i++) { const vf = len * 0.45 + i * 0.022; if (vf + 0.012 > p0 - 0.002 && vf < p1 + 0.002) continue; k.box(w + 0.002, 0.006, 0.012, M.rubber(), vf, 0.024); } // (none over the port)
     k.into(null);
     anim.slide = slide;
@@ -830,12 +855,22 @@ G.GunModels = (() => {
     let front = len;
     if (sl.comp) { k.box(w, 0.026, 0.03, sm, len, 0.014); front += 0.03; }
     k.tag('base');
-    k.prof([[0.004, 0.002], [len * 0.92, 0.002], [len * 0.92, -0.014], [0.07, -0.016], [0.05, -0.012], [0.004, -0.012]], w - 0.002, fm);
-    k.ringX(0.016, 0.0025, fm, 0.055, -0.016, 0, Math.PI, Math.PI);
+    if (o.tx) { // the TX22's frame: its dust cover runs right out under the muzzle, railed underneath; a squared-off trigger guard
+      k.prof([[0.004, 0.002], [len * 0.99, 0.002], [len * 0.99, -0.015], [0.085, -0.015], [0.07, -0.013], [0.004, -0.012]], w - 0.002, fm);
+      for (let i = 0; i < 3; i++) k.box(w - 0.006, 0.003, 0.006, M.rubber(), len * 0.62 + i * 0.012, -0.0155);
+      k.prof([[0.03, -0.012], [0.088, -0.012], [0.09, -0.017], [0.083, -0.037], [0.038, -0.037], [0.03, -0.03]], 0.011, fm, 0, [[[0.037, -0.016], [0.081, -0.016], [0.078, -0.032], [0.042, -0.032], [0.037, -0.027]]]);
+      k.box(0.006, 0.008, 0.012, fm, 0.006, 0.0, 0); // (the takedown ledge over the grip)
+    } else {
+      k.prof([[0.004, 0.002], [len * 0.92, 0.002], [len * 0.92, -0.014], [0.07, -0.016], [0.05, -0.012], [0.004, -0.012]], w - 0.002, fm);
+      k.ringX(0.016, 0.0025, fm, 0.055, -0.016, 0, Math.PI, Math.PI);
+    }
     k.box(0.004, 0.016, 0.005, M.black(), 0.05, -0.016);
     if (o.hammer) k.box(0.008, 0.014, 0.008, M.blued(), -0.008, 0.022);
     k.tag('grip');
-    k.prof([[-0.004, -0.004], [0.04, -0.004], [0.028, -0.115], [-0.018, -0.108]], 0.03, gm);
+    if (o.tx) { // raked hard back, a flared base round the magazine well, stippled panels each side
+      k.prof([[-0.006, -0.004], [0.04, -0.004], [0.021, -0.108], [0.025, -0.119], [-0.038, -0.119], [-0.031, -0.104]], 0.03, gm);
+      for (const x of [-0.0152, 0.0152]) k.prof([[0.0, -0.022], [0.03, -0.022], [0.016, -0.094], [-0.024, -0.092]], 0.0016, M.rubber(), x, null, 0.0003);
+    } else k.prof([[-0.004, -0.004], [0.04, -0.004], [0.028, -0.115], [-0.018, -0.108]], 0.03, gm);
     if (o.stock) { // a shoulder stock clipped to the back of the frame
       k.tag('stock');
       const sp = k.part(-0.006, -0.03);
@@ -849,7 +884,11 @@ G.GunModels = (() => {
     k.into(magP, 0.012, -0.004);
     k.prof([[0.0, -0.006], [0.03, -0.006], [0.02, -0.108], [-0.012, -0.102]], 0.02, M.black());
     const ext = mg.t === 'drum' ? 2 : (mg.len || 0.15) > 0.16 ? 1 : (mg.len || 0.15) < 0.12 ? -1 : o.ext ? 1 : 0;
-    if (ext === 1) k.box(0.022, 0.05, 0.03, M.black(), 0.0, -0.12);
+    if (ext === 1) { // a long magazine: the part out of the grip as long as it really is (a 33-rounder ~11 cm), its floorplate on the end
+      const out = G.U.clamp((mg.len || 0.15) - 0.13, 0.03, 0.14) || 0.05, rake = 0.107; // (raked back with the grip)
+      k.box(0.021, out + 0.01, 0.028, M.black(), -rake * out / 2, -0.096 - out / 2).rotation.x = -rake; // (f runs along -z: tilting the bottom back is a negative turn)
+      k.box(0.024, 0.008, 0.033, M.black(), -0.002 - rake * out, -0.1 - out).rotation.x = -rake;
+    }
     else if (ext === 2) { k.box(0.022, 0.03, 0.03, M.black(), 0.0, -0.118); k.cyl(0.045, 0.034, M.black(), -0.002, -0.16, 0, 0.045, 20); } // (a drum, face toward the shooter)
     else if (ext === 0) k.box(0.026, 0.008, 0.032, M.black(), -0.006, -0.112);
     magP.userData.chk = magCheck(k, (t) => -0.012 * t, -0.006, 0.096, 0.02, 0.03, false);
@@ -1042,31 +1081,56 @@ G.GunModels = (() => {
     k.tag('optic');
     const sight = sightOf(k, o, top, 0.3, 0.3, 0.004, 0.62, 0.14);
     k.tag('base');
-    return { sy: sight.sy, fSight: sight.fSight, relief: sight.relief, muzzles: [[0.62, 0.016, 0]], grip: [0.035, -0.075, 0], support: [0.4, -0.03, 0], anim: {}, port: [0.2, 0.02, 0] };
+    return { sy: sight.sy, fSight: sight.fSight, relief: sight.relief, muzzles: [[0.62, 0.016, 0]], grip: [0.035, -0.075, 0], support: [0.3, -0.03, 0], anim: {}, port: [0.2, 0.02, 0] };
   }
 
+  // The P90, traced from FN's side view (500 mm overall): a thumbhole stock and a finger hole through one moulded
+  // frame; the magazine lying along the top behind a sight housing (a post in front, a leg slanting back over it,
+  // a beam between carrying the optic rail, a short side rail each side); the cocking handles low at the front.
+  // (Points are the photo's pixels, butt at x 1110 and bore at y 287, 0.485 mm each.)
   function p90(k, o) {
-    const bl = o.blen || 0.04;
+    const bl = o.blen || 0.04, PX = 0.5 / 1032, F = (x) => -0.03 + (1110 - x) * PX, Y = (y) => (287 - y) * PX;
+    const pts = (a) => a.map(([x, y]) => [F(x), Y(y)]);
+    const oval = (cx, cy, rx, ry, n = 14) => Array.from({ length: n }, (_, i) => [F(cx + Math.cos((i / n) * Math.PI * 2) * rx), Y(cy + Math.sin((i / n) * Math.PI * 2) * ry)]);
+    const P0 = M.polymer(), B = M.black();
     k.tag('base');
-    k.prof([[-0.02, 0.03], [0.32, 0.03], [0.35, 0.0], [0.33, -0.05], [0.25, -0.05], [0.24, -0.1], [0.14, -0.1], [0.1, -0.06], [0.0, -0.08], [-0.03, -0.06], [-0.03, 0.0]], 0.05, M.polymer(), 0,
-      [[[0.17, -0.055], [0.23, -0.055], [0.22, -0.09], [0.16, -0.09]]]);
-    const top = S.rail(k, 0.14, 0.14, 0.053, M.black());
+    // the frame: the stock; underneath, the grip lobe round the thumbhole, a notch, the front lobe round the finger hole
+    // (the trigger at its back), the hand stop's narrow hook at the front with a notch behind it
+    k.prof(pts([[1110, 212], [1110, 450], [840, 452], [700, 480], [560, 495], [470, 490], [444, 452], [430, 420], [416, 452], [398, 490], [320, 497], [285, 485], [268, 450],
+      [264, 372], [202, 372], [200, 415], [168, 415], [167, 315], [460, 315], [460, 258], [790, 258], [790, 212]]), 0.055, P0, 0, [oval(600, 378, 80, 41), oval(358, 373, 33, 42)]);
+    k.box(0.057, 0.115, 0.008, M.rubber(), F(1110), Y(331)); // the butt pad
+    k.box(0.012, 0.005, 0.016, B, F(420), Y(398), 0); // the trigger, at the back of the finger hole
+    // the upper receiver over the frame's front, the barrel in it, the cocking handles' slots along its sides
+    k.prof(pts([[167, 315], [167, 262], [460, 257], [460, 315]]), 0.05, B);
+    for (const x of [-0.0255, 0.0255]) k.box(0.002, 0.012, F(285) - F(460), M.steel(), F(460), Y(300), x);
+    // the sight housing: a post in front of the magazine, a beam (a window through it) to a leg slanting down over the
+    // magazine, a short side rail each side of the beam, the optic rail on top
+    k.prof(pts([[170, 262], [170, 136], [186, 122], [470, 118], [496, 136], [530, 212], [530, 290], [462, 290], [456, 214], [430, 190], [252, 190], [250, 262]]), 0.044, B, 0,
+      [pts([[420, 150], [482, 148], [486, 168], [422, 170]])]);
+    for (const x of [-0.0232, 0.0232]) sideRail(k, F(410), F(250) - F(410), Y(161), x);
+    const top = S.rail(k, F(445), F(200) - F(445), Y(119), B);
+    k.tag('tac'); tactical(k, o.tac, F(232), Y(161), 0.0245);
+    k.tag('tacL'); tactical(k, o.tacL, F(232), Y(161), -0.0245, -1);
+    // the magazine: clear, lying along the top from the housing's front post to the stock, the rounds across it
     k.tag('mag');
-    const mk = ((o.mag && o.mag.len) || 0.15) / 0.15;
-    const magP = k.part(0.16, 0.042);
-    k.into(magP, 0.16, 0.042);
-    k.box(0.042, 0.022, 0.24 * Math.min(1.3, mk), M.clear(), 0.04, 0.042);
-    k.box(0.03, 0.012, 0.22 * Math.min(1.3, mk), M.brass(), 0.05, 0.04);
+    const mk = ((o.mag && o.mag.len) || 0.15) / 0.15, m0 = F(790), m1 = F(250), mlen = (m1 - m0) * Math.min(1.15, mk), my = Y(232);
+    const magP = k.part(m0, my);
+    k.into(magP, m0, my);
+    k.box(0.042, 0.024, mlen, M.clear(), m0, my);
+    k.box(0.03, 0.012, mlen - 0.014, M.brass(), m0 + 0.007, my - 0.002);
+    k.box(0.044, 0.026, 0.007, M.steel(), m0 + mlen - 0.007, my); // (its front cap)
     k.into(null);
-    const handle = { f: 0.3, y: -0.032, x: 0.026, travel: 0.06, style: 'pair', sz: 0.8 }, hp = cockHandle(k, handle);
+    const handle = { f: F(262), y: Y(300), x: 0.027, travel: F(262) - F(440), style: 'pair', sz: 0.8 }, hp = cockHandle(k, handle);
     k.tag('barrel');
-    k.cyl(0.008, bl, M.blued(), 0.35, 0);
-    let front = 0.35 + bl;
-    if (o.muzzle) { k.tag('muzzle'); front += muzzle(k, o.muzzle, front, 0.008, 0); }
+    k.cyl(0.0085, bl, M.blued(), F(167) - 0.045, 0); // (most of it in the receiver: a stub and the flash hider stand out of it)
+    let front = F(167) - 0.045 + bl;
+    if (o.muzzle) { k.tag('muzzle'); front += muzzle(k, o.muzzle, front, 0.0085, 0); }
     k.tag('optic');
-    const sight = sightOf(k, o, top, 0.35, bl, 0.008, front, 0.2);
+    // (irons at the two ends of the housing's rail; anything else in the middle of it)
+    const sight = ['irons', 'notch', undefined].includes(o.optic) ? S.irons(k, F(440), F(210), top + 0.034, top, top, o.irons || 'ar') : sightOf(k, o, top, F(167), bl, 0.0085, front, F(325));
     k.tag('base');
-    return { sy: sight.sy, fSight: sight.fSight, relief: sight.relief, muzzles: [[front, 0, 0]], grip: [0.2, -0.07, 0], support: [0.3, -0.06, 0], anim: { mag: magP, handle: hp }, handle, magAt: [0.16, 0.042], magTop: true, chamberAt: { side: 'right', f: 0.06, y: 0, x: 0.025 } };
+    return { sy: sight.sy, fSight: sight.fSight, relief: sight.relief, muzzles: [[front, 0, 0]], grip: [F(468), Y(425), 0], support: [F(300), Y(445), 0], anim: { mag: magP, handle: hp }, handle,
+      magAt: [m0 + 0.08, my], magTop: true, chamberAt: { side: 'right', f: F(780), y: Y(275), x: 0.028 } };
   }
 
   const ARCH = { rifle, pistol, revolver, derringer, minigun, launcher, railgun, crossbow, p90 };

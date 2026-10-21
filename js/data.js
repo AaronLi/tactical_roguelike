@@ -24,103 +24,115 @@ G.CLASS_SND = {
   BOW: { f: 900, len: 0.12, boom: 0, vol: 0.2 },
 };
 
+// spread / ads: the cone (degrees, its half-angle) a round leaves in around where the gun points, from the hip and
+// aimed. ads is the gun's own mechanical accuracy: a cone ads degrees round makes a group 120 x ads MOA across, set
+// from what the real gun groups with service ammunition (an M4 3 MOA, an AKM 5, an SR-25 1, an AWM 0.5, a service
+// pistol 8-10). What the shooter adds (breathing, moving, recoil, a flinch) is on top of it: js/player.js aimOffset.
+// recoil (degrees a shot climbs) is worked out from the round and the gun's weight (G.physRecoil, below); only guns
+// without a cartridge (the railgun, the crossbow) set their own.
 const W = (o) => Object.assign({ pellets: 1, mode: 'auto', pen: 0, zoom: 0.8, speed: 1, falloff: 0.6, shell: false, burst: 0 }, o);
 
 G.WEAPON_LIST = [
   // ----- PRIMARY: assault / battle rifles -----
-  W({ id: 'm4', slot: 'p', cls: 'AR', tier: 1, price: 900, name: 'M4 Carbine', dmg: 28, rpm: 780, mag: 30, reserve: 180, reload: 2.2, spread: 2.8, ads: 0.6, recoil: 1.1, range: 35, speed: 0.95, desc: 'Reliable all-rounder. Never lets you down.' }),
-  W({ id: 'ak', slot: 'p', cls: 'AR', tier: 1, price: 1000, name: 'KV-47', dmg: 36, rpm: 600, mag: 30, reserve: 180, reload: 2.5, spread: 3.2, ads: 0.8, recoil: 1.8, range: 35, speed: 0.94, pen: 1, desc: 'Hits like a truck, kicks like a mule. Punches through one target.' }),
-  W({ id: 'f2', slot: 'p', cls: 'AR', tier: 2, price: 1500, name: 'F2 Bullpup', dmg: 27, rpm: 950, mag: 30, reserve: 210, reload: 2.4, spread: 2.6, ads: 0.6, recoil: 1.0, range: 32, speed: 0.97, desc: 'Compact bullpup with a blistering cyclic rate.' }),
-  W({ id: 'g36', slot: 'p', cls: 'AR', tier: 2, price: 1600, name: 'G36 Ranger', dmg: 31, rpm: 720, mag: 30, reserve: 210, reload: 2.3, spread: 2.2, ads: 0.35, recoil: 0.7, range: 45, zoom: 0.62, speed: 0.95, desc: 'Laser-flat recoil. Rail on top for whatever optic you like.' }),
-  W({ id: 'br3', slot: 'p', cls: 'AR', tier: 2, price: 1700, name: 'Hellfire BR-3', dmg: 40, rpm: 1000, mode: 'burst', burst: 3, burstRpm: 1600, mag: 30, reserve: 210, reload: 2.3, spread: 2.4, ads: 0.4, recoil: 1.2, range: 40, zoom: 0.7, speed: 0.95, desc: 'Semi, or a three-round burst at 1600 rpm: all three are out before the recoil lands. Pull, pull, everyone falls.' }),
-  W({ id: 'scar', slot: 'p', cls: 'BR', tier: 3, price: 2400, name: 'SCAR-H', dmg: 47, rpm: 580, mag: 20, reserve: 160, reload: 2.4, spread: 2.6, ads: 0.4, recoil: 1.9, range: 50, zoom: 0.62, speed: 0.93, pen: 1, desc: '7.62 battle rifle. Armour is a suggestion.' }),
-  W({ id: 'tavor', slot: 'p', cls: 'AR', tier: 3, price: 2600, name: 'TX-9 Tavor', dmg: 34, rpm: 900, mag: 40, reserve: 240, reload: 2.1, spread: 2.2, ads: 0.4, recoil: 0.8, range: 42, zoom: 0.7, speed: 0.98, desc: 'Top-shelf rifle with a big mag and no weaknesses.' }),
+  W({ id: 'm4', slot: 'p', cls: 'AR', tier: 1, price: 900, name: 'M4 Carbine', dmg: 28, rpm: 780, mag: 30, reserve: 180, reload: 2.2, spread: 2.8, ads: 0.025, range: 35, speed: 0.95, desc: 'Reliable all-rounder. Never lets you down.' }),
+  W({ id: 'ak', slot: 'p', cls: 'AR', tier: 1, price: 1000, name: 'KV-47', dmg: 36, rpm: 600, mag: 30, reserve: 180, reload: 2.5, spread: 3.2, ads: 0.04167, range: 35, speed: 0.94, pen: 1, desc: 'Hits like a truck, kicks like a mule. Punches through one target.' }),
+  W({ id: 'f2', slot: 'p', cls: 'AR', tier: 2, price: 1500, name: 'F2 Bullpup', dmg: 27, rpm: 950, mag: 30, reserve: 210, reload: 2.4, spread: 2.6, ads: 0.02917, range: 32, speed: 0.97, desc: 'Compact bullpup with a blistering cyclic rate.' }),
+  W({ id: 'g36', slot: 'p', cls: 'AR', tier: 2, price: 1600, name: 'G36 Ranger', dmg: 31, rpm: 720, mag: 30, reserve: 210, reload: 2.3, spread: 2.2, ads: 0.02083, range: 45, zoom: 0.62, speed: 0.95, desc: 'Laser-flat recoil. Rail on top for whatever optic you like.' }),
+  W({ id: 'br3', slot: 'p', cls: 'AR', tier: 2, price: 1700, name: 'Hellfire BR-3', dmg: 40, rpm: 1000, mode: 'burst', burst: 3, burstRpm: 1600, mag: 30, reserve: 210, reload: 2.3, spread: 2.4, ads: 0.01667, range: 40, zoom: 0.7, speed: 0.95, desc: 'Semi, or a three-round burst at 1600 rpm: all three are out before the recoil lands. Pull, pull, everyone falls.' }),
+  W({ id: 'scar', slot: 'p', cls: 'BR', tier: 3, price: 2400, name: 'SCAR-H', dmg: 47, rpm: 580, mag: 20, reserve: 160, reload: 2.4, spread: 2.6, ads: 0.01458, range: 50, zoom: 0.62, speed: 0.93, pen: 1, desc: '7.62 battle rifle. Armour is a suggestion.' }),
+  W({ id: 'tavor', slot: 'p', cls: 'AR', tier: 3, price: 2600, name: 'TX-9 Tavor', dmg: 34, rpm: 900, mag: 40, reserve: 240, reload: 2.1, spread: 2.2, ads: 0.02917, range: 42, zoom: 0.7, speed: 0.98, desc: 'Top-shelf rifle with a big mag and no weaknesses.' }),
   // ----- PRIMARY: SMGs -----
-  W({ id: 'uzi', slot: 'p', cls: 'SMG', tier: 1, price: 600, name: 'Micro Uzi', dmg: 18, rpm: 1000, mag: 32, reserve: 224, reload: 1.8, spread: 3.6, ads: 1.8, recoil: 0.8, range: 14, falloff: 0.5, speed: 1.06, desc: 'Spray and pray. Mostly spray.' }),
-  W({ id: 'mp5', slot: 'p', cls: 'SMG', tier: 1, price: 800, name: 'MP5', dmg: 22, rpm: 800, mag: 30, reserve: 210, reload: 2.0, spread: 2.6, ads: 0.9, recoil: 0.6, range: 20, falloff: 0.5, speed: 1.05, desc: 'The classic room-clearer.' }),
-  W({ id: 'p90', slot: 'p', cls: 'SMG', tier: 2, price: 1400, name: 'P90', dmg: 21, rpm: 900, mag: 50, reserve: 250, reload: 2.6, spread: 2.8, ads: 1.0, recoil: 0.6, range: 22, falloff: 0.5, speed: 1.04, pen: 1, desc: '50 rounds of armour-piercing 5.7mm.' }),
-  W({ id: 'vector', slot: 'p', cls: 'SMG', tier: 3, price: 2200, name: 'Vector .45', dmg: 26, rpm: 1200, mag: 25, reserve: 200, reload: 1.9, spread: 2.4, ads: 0.9, recoil: 0.7, range: 18, falloff: 0.5, speed: 1.07, desc: 'Absurd fire rate, tamed recoil. Melts at close range.' }),
+  W({ id: 'uzi', slot: 'p', cls: 'SMG', tier: 1, price: 600, name: 'Micro Uzi', dmg: 18, rpm: 1000, mag: 32, reserve: 224, reload: 1.8, spread: 3.6, ads: 0.075, range: 14, falloff: 0.5, speed: 1.06, desc: 'Spray and pray. Mostly spray.' }),
+  W({ id: 'mp5', slot: 'p', cls: 'SMG', tier: 1, price: 800, name: 'MP5', dmg: 22, rpm: 800, mag: 30, reserve: 210, reload: 2.0, spread: 2.6, ads: 0.025, range: 20, falloff: 0.5, speed: 1.05, desc: 'The classic room-clearer.' }),
+  W({ id: 'p90', slot: 'p', cls: 'SMG', tier: 2, price: 1400, name: 'P90', dmg: 21, rpm: 900, mag: 50, reserve: 250, reload: 2.6, spread: 2.8, ads: 0.03333, range: 22, falloff: 0.5, speed: 1.04, pen: 1, desc: '50 rounds of armour-piercing 5.7mm.' }),
+  W({ id: 'vector', slot: 'p', cls: 'SMG', tier: 3, price: 2200, name: 'Vector .45', dmg: 26, rpm: 1200, mag: 25, reserve: 200, reload: 1.9, spread: 2.4, ads: 0.03333, range: 18, falloff: 0.5, speed: 1.07, desc: 'Absurd fire rate, tamed recoil. Melts at close range.' }),
   // ----- PRIMARY: shotguns -----
-  W({ id: 'pump', slot: 'p', cls: 'SG', tier: 1, price: 800, name: '870 Pump', dmg: 15, pellets: 8, rpm: 70, mode: 'semi', mag: 6, reserve: 36, reload: 0.55, shell: true, choke: 0.75, spread: 4.5, ads: 0.7, recoil: 4, range: 16, falloff: 0.25, speed: 1.0, desc: 'Load one, rack it, clear the room.' }),
-  W({ id: 'dbl', slot: 'p', cls: 'SG', tier: 1, price: 700, name: 'Double Barrel', dmg: 19, pellets: 9, rpm: 400, mode: 'semi', mag: 2, reserve: 30, reload: 2.0, choke: 0.6, spread: 5, ads: 0.8, recoil: 5, range: 18, falloff: 0.25, speed: 1.0, desc: 'Two shells. Make them count.' }),
-  W({ id: 'saiga', slot: 'p', cls: 'SG', tier: 2, price: 1600, name: 'Saiga-12', dmg: 13, pellets: 8, rpm: 260, mode: 'semi', mag: 8, reserve: 48, reload: 2.6, choke: 0.8, spread: 4.5, ads: 0.75, recoil: 3.2, range: 16, falloff: 0.25, speed: 0.98, desc: 'Semi-auto, box-fed, deeply rude.' }),
-  W({ id: 'aa12', slot: 'p', cls: 'SG', tier: 3, price: 2800, name: 'AA-12', dmg: 12, pellets: 8, rpm: 300, mode: 'auto', mag: 20, reserve: 60, reload: 3.0, choke: 0.9, spread: 5, ads: 0.9, recoil: 2.5, range: 15, falloff: 0.25, speed: 0.96, desc: 'Fully automatic shotgun with a drum. Yes, really.' }),
+  W({ id: 'pump', slot: 'p', cls: 'SG', tier: 1, price: 800, name: '870 Pump', dmg: 15, pellets: 8, rpm: 70, mode: 'semi', mag: 6, reserve: 36, reload: 0.55, shell: true, choke: 0.75, spread: 4.5, ads: 0.04167, range: 16, falloff: 0.25, speed: 1.0, desc: 'Load one, rack it, clear the room.' }),
+  W({ id: 'dbl', slot: 'p', cls: 'SG', tier: 1, price: 700, name: 'Double Barrel', dmg: 19, pellets: 9, rpm: 400, mode: 'semi', mag: 2, reserve: 30, reload: 2.0, choke: 0.6, spread: 5, ads: 0.05, range: 18, falloff: 0.25, speed: 1.0, desc: 'Two shells. Make them count.' }),
+  W({ id: 'saiga', slot: 'p', cls: 'SG', tier: 2, price: 1600, name: 'Saiga-12', dmg: 13, pellets: 8, rpm: 260, mode: 'semi', mag: 8, reserve: 48, reload: 2.6, choke: 0.8, spread: 4.5, ads: 0.05, range: 16, falloff: 0.25, speed: 0.98, desc: 'Semi-auto, box-fed, deeply rude.' }),
+  W({ id: 'aa12', slot: 'p', cls: 'SG', tier: 3, price: 2800, name: 'AA-12', dmg: 12, pellets: 8, rpm: 300, mode: 'auto', mag: 20, reserve: 60, reload: 3.0, choke: 0.9, spread: 5, ads: 0.05833, range: 15, falloff: 0.25, speed: 0.96, desc: 'Fully automatic shotgun with a drum. Yes, really.' }),
   // ----- PRIMARY: LMGs -----
-  W({ id: 'm249', slot: 'p', cls: 'LMG', tier: 2, price: 2000, name: 'M249 SAW', dmg: 27, rpm: 800, mag: 100, reserve: 300, reload: 5.0, spread: 3.6, ads: 1.0, recoil: 0.9, range: 35, speed: 0.86, pen: 1, desc: 'Suppressive fire, belt-fed.' }),
-  W({ id: 'pkm', slot: 'p', cls: 'LMG', tier: 3, price: 3000, name: 'PKM', dmg: 38, rpm: 650, mag: 100, reserve: 300, reload: 5.5, spread: 3.6, ads: 1.0, recoil: 1.4, range: 40, speed: 0.83, pen: 2, desc: 'Full-power rounds, a hundred at a time.' }),
-  W({ id: 'shredder', slot: 'p', cls: 'LMG', tier: 4, price: 4400, name: 'Shredder Minigun', dmg: 22, rpm: 1900, mag: 200, reserve: 600, reload: 6.0, spread: 4.2, ads: 2.8, recoil: 0.32, range: 25, speed: 0.72, spinUp: 0.55, desc: 'Has to spin up before it fires. Then it turns rooms into confetti.' }),
+  W({ id: 'm249', slot: 'p', cls: 'LMG', tier: 2, price: 2000, name: 'M249 SAW', dmg: 27, rpm: 800, mag: 100, reserve: 300, reload: 5.0, spread: 3.6, ads: 0.04167, range: 35, speed: 0.86, pen: 1, desc: 'Suppressive fire, belt-fed.' }),
+  W({ id: 'pkm', slot: 'p', cls: 'LMG', tier: 3, price: 3000, name: 'PKM', dmg: 38, rpm: 650, mag: 100, reserve: 300, reload: 5.5, spread: 3.6, ads: 0.03333, range: 40, speed: 0.83, pen: 2, desc: 'Full-power rounds, a hundred at a time.' }),
+  W({ id: 'shredder', slot: 'p', cls: 'LMG', tier: 4, price: 4400, name: 'Shredder Minigun', dmg: 22, rpm: 1900, mag: 200, reserve: 600, reload: 6.0, spread: 4.2, ads: 0.06667, range: 25, speed: 0.72, spinUp: 0.55, desc: 'Has to spin up before it fires. Then it turns rooms into confetti.' }),
   // ----- PRIMARY: marksman / sniper -----
-  W({ id: 'mk14', slot: 'p', cls: 'DMR', tier: 2, price: 1800, name: 'Mk14 EBR', dmg: 60, rpm: 330, mode: 'semi', mag: 20, reserve: 120, reload: 2.6, spread: 2.5, ads: 0.12, recoil: 2.4, range: 60, zoom: 0.45, speed: 0.93, pen: 1, desc: 'Semi-auto marksman rifle. Put a magnified optic on it.' }),
-  W({ id: 'r700', slot: 'p', cls: 'SNP', tier: 2, price: 1700, name: 'R700 Bolt', dmg: 125, rpm: 48, mode: 'semi', mag: 5, reserve: 40, reload: 3.0, spread: 6, ads: 0.02, recoil: 6, range: 100, zoom: 0.3, speed: 0.9, pen: 2, desc: 'One shot, one problem solved. Bolt-action.' }),
-  W({ id: 'barrett', slot: 'p', cls: 'SNP', tier: 4, price: 4200, name: 'M82 Anti-Materiel', dmg: 220, rpm: 90, mode: 'semi', mag: 10, reserve: 40, reload: 3.8, spread: 7, ads: 0.03, recoil: 7, range: 120, zoom: 0.28, speed: 0.85, pen: 5, desc: '.50 BMG. Goes through walls of people.' }),
+  W({ id: 'mk14', slot: 'p', cls: 'DMR', tier: 2, price: 1800, name: 'Mk14 EBR', dmg: 60, rpm: 330, mode: 'semi', mag: 20, reserve: 120, reload: 2.6, spread: 2.5, ads: 0.01458, range: 60, zoom: 0.45, speed: 0.93, pen: 1, desc: 'Semi-auto marksman rifle. Put a magnified optic on it.' }),
+  W({ id: 'r700', slot: 'p', cls: 'SNP', tier: 2, price: 1700, name: 'R700 Bolt', dmg: 125, rpm: 48, mode: 'semi', mag: 5, reserve: 40, reload: 3.0, spread: 6, ads: 0.00625, range: 100, zoom: 0.3, speed: 0.9, pen: 2, desc: 'One shot, one problem solved. Bolt-action.' }),
+  W({ id: 'barrett', slot: 'p', cls: 'SNP', tier: 4, price: 4200, name: 'M82 Anti-Materiel', dmg: 220, rpm: 90, mode: 'semi', mag: 10, reserve: 40, reload: 3.8, spread: 7, ads: 0.01667, range: 120, zoom: 0.28, speed: 0.85, pen: 5, desc: '.50 BMG. Goes through walls of people.' }),
   // ----- PRIMARY: specials -----
-  W({ id: 'm32', slot: 'p', cls: 'GL', tier: 3, price: 3200, name: 'M32 Launcher', dmg: 0, explosive: { r: 4.5, dmg: 170 }, rpm: 110, mode: 'semi', mag: 6, reserve: 18, reload: 0.7, shell: true, spread: 1, ads: 0.5, recoil: 4, range: 100, zoom: 0.75, speed: 0.9, desc: 'Six-shot revolving grenade launcher. Mind the blast.' }),
+  W({ id: 'm32', slot: 'p', cls: 'GL', tier: 3, price: 3200, name: 'M32 Launcher', dmg: 0, explosive: { r: 4.5, dmg: 170 }, rpm: 110, mode: 'semi', mag: 6, reserve: 18, reload: 0.7, shell: true, spread: 1, ads: 0.5, range: 100, zoom: 0.75, speed: 0.9, desc: 'Six-shot revolving grenade launcher. Mind the blast.' }),
   W({ id: 'rail', slot: 'p', cls: 'RAIL', tier: 4, price: 4800, name: 'Arc Railgun', dmg: 290, rpm: 50, mode: 'semi', mag: 4, reserve: 24, reload: 3.2, spread: 0.6, ads: 0, recoil: 5, range: 200, zoom: 0.5, speed: 0.9, pen: 99, tracer: 0x55ddff, desc: 'Magnetically accelerated slug. Penetrates everything alive.' }),
 
   // ----- PRIMARY: more rifles
-  W({ id: 'hk416', slot: 'p', cls: 'AR', tier: 2, price: 1700, name: 'HK416', dmg: 30, rpm: 820, mag: 30, reserve: 210, reload: 2.2, spread: 2.4, ads: 0.45, recoil: 0.8, range: 40, zoom: 0.7, speed: 0.95, desc: 'Piston-driven carbine. Clean, flat, dependable.' }),
-  W({ id: 'aug', slot: 'p', cls: 'AR', tier: 2, price: 1800, name: 'Steyr AUG', dmg: 31, rpm: 700, mag: 30, reserve: 210, reload: 2.4, spread: 2.4, ads: 0.3, recoil: 0.8, range: 45, zoom: 0.62, speed: 0.97, desc: 'Bullpup. Long barrel, short gun.' }),
-  W({ id: 'galil', slot: 'p', cls: 'AR', tier: 2, price: 1500, name: 'Galil ACE', dmg: 37, rpm: 650, mag: 35, reserve: 210, reload: 2.5, spread: 3.0, ads: 0.6, recoil: 1.5, range: 36, zoom: 0.75, speed: 0.94, pen: 1, desc: 'Kalashnikov guts, better manners. 35-round mags.' }),
-  W({ id: 'an94', slot: 'p', cls: 'AR', tier: 3, price: 2700, name: 'AN-94', dmg: 33, rpm: 600, mode: 'hyper', hyper: 2, hyperRpm: 1800, mag: 30, reserve: 210, reload: 2.4, spread: 2.4, ads: 0.35, recoil: 1.3, range: 45, zoom: 0.75, speed: 0.95, desc: 'Hyper-burst: the first two rounds of every pull leave at 1800 rpm, before the recoil lands.' }),
-  W({ id: 'fal', slot: 'p', cls: 'BR', tier: 3, price: 2500, name: 'FN FAL', dmg: 52, rpm: 650, mag: 20, reserve: 140, reload: 2.6, spread: 3.0, ads: 0.45, recoil: 2.4, range: 55, zoom: 0.8, speed: 0.92, pen: 1, desc: 'The right arm of the free world. Full-power 7.62, full-auto, full send.' }),
-  W({ id: 'garand', slot: 'p', cls: 'DMR', tier: 2, price: 1600, name: 'M1 Garand', dmg: 78, rpm: 300, mode: 'semi', mag: 8, reserve: 64, reload: 2.2, enbloc: true, spread: 2.2, ads: 0.1, recoil: 3.0, range: 70, zoom: 0.8, speed: 0.93, pen: 1, desc: 'En-bloc clip: can only be reloaded when empty, and it pings when it is.' }),
-  W({ id: 'svd', slot: 'p', cls: 'DMR', tier: 3, price: 2600, name: 'SVD Dragunov', dmg: 85, rpm: 260, mode: 'semi', mag: 10, reserve: 60, reload: 2.8, spread: 2.8, ads: 0.08, recoil: 3.2, range: 80, zoom: 0.4, speed: 0.92, pen: 1, desc: 'Semi-auto marksman rifle. Wants a scope on that rail.' }),
-  W({ id: 'vss', slot: 'p', cls: 'DMR', tier: 3, price: 2900, name: 'VSS Vintorez', dmg: 42, rpm: 750, mag: 20, reserve: 140, reload: 2.4, spread: 2.6, ads: 0.3, recoil: 1.0, range: 35, zoom: 0.45, speed: 0.97, pen: 1, integral: true, desc: 'Integrally suppressed, subsonic 9x39, full-auto. Whisper-quiet.' }),
-  W({ id: 'lever', slot: 'p', cls: 'DMR', tier: 2, price: 1300, name: 'Marlin .45-70', dmg: 95, rpm: 75, mode: 'semi', mag: 6, reserve: 42, reload: 0.55, shell: true, spread: 2.6, ads: 0.2, recoil: 4.5, range: 50, zoom: 0.8, speed: 0.96, pen: 1, desc: 'Lever-action brush gun. Loads round by round, hits like a bear.' }),
-  W({ id: 'mosin', slot: 'p', cls: 'SNP', tier: 1, price: 1000, name: 'Mosin-Nagant', dmg: 105, rpm: 40, mode: 'semi', mag: 5, reserve: 40, reload: 0.5, shell: true, spread: 6, ads: 0.04, recoil: 5.5, range: 90, zoom: 0.32, speed: 0.92, pen: 1, desc: 'Cheap, ancient, scoped. Bolt-action, loaded one round at a time.' }),
-  W({ id: 'awm', slot: 'p', cls: 'SNP', tier: 3, price: 3200, name: 'AWM .338', dmg: 175, rpm: 45, mode: 'semi', mag: 5, reserve: 35, reload: 3.4, spread: 6.5, ads: 0.02, recoil: 6, range: 120, zoom: 0.26, speed: 0.88, pen: 3, desc: '.338 Lapua Magnum. Through cover, through them, through the next one.' }),
+  W({ id: 'hk416', slot: 'p', cls: 'AR', tier: 2, price: 1700, name: 'HK416', dmg: 30, rpm: 820, mag: 30, reserve: 210, reload: 2.2, spread: 2.4, ads: 0.01667, range: 40, zoom: 0.7, speed: 0.95, desc: 'Piston-driven carbine. Clean, flat, dependable.' }),
+  W({ id: 'aug', slot: 'p', cls: 'AR', tier: 2, price: 1800, name: 'Steyr AUG', dmg: 31, rpm: 700, mag: 30, reserve: 210, reload: 2.4, spread: 2.4, ads: 0.02083, range: 45, zoom: 0.62, speed: 0.97, desc: 'Bullpup. Long barrel, short gun.' }),
+  W({ id: 'galil', slot: 'p', cls: 'AR', tier: 2, price: 1500, name: 'Galil ACE', dmg: 37, rpm: 650, mag: 35, reserve: 210, reload: 2.5, spread: 3.0, ads: 0.025, range: 36, zoom: 0.75, speed: 0.94, pen: 1, desc: 'Kalashnikov guts, better manners. 35-round mags.' }),
+  W({ id: 'an94', slot: 'p', cls: 'AR', tier: 3, price: 2700, name: 'AN-94', dmg: 33, rpm: 600, mode: 'hyper', hyper: 2, hyperRpm: 1800, mag: 30, reserve: 210, reload: 2.4, spread: 2.4, ads: 0.02083, range: 45, zoom: 0.75, speed: 0.95, desc: 'Hyper-burst: the first two rounds of every pull leave at 1800 rpm, before the recoil lands.' }),
+  W({ id: 'fal', slot: 'p', cls: 'BR', tier: 3, price: 2500, name: 'FN FAL', dmg: 52, rpm: 650, mag: 20, reserve: 140, reload: 2.6, spread: 3.0, ads: 0.025, range: 55, zoom: 0.8, speed: 0.92, pen: 1, desc: 'The right arm of the free world. Full-power 7.62, full-auto, full send.' }),
+  W({ id: 'garand', slot: 'p', cls: 'DMR', tier: 2, price: 1600, name: 'M1 Garand', dmg: 78, rpm: 300, mode: 'semi', mag: 8, reserve: 64, reload: 2.2, enbloc: true, spread: 2.2, ads: 0.02083, range: 70, zoom: 0.8, speed: 0.93, pen: 1, desc: 'En-bloc clip: can only be reloaded when empty, and it pings when it is.' }),
+  W({ id: 'svd', slot: 'p', cls: 'DMR', tier: 3, price: 2600, name: 'SVD Dragunov', dmg: 85, rpm: 260, mode: 'semi', mag: 10, reserve: 60, reload: 2.8, spread: 2.8, ads: 0.0125, range: 80, zoom: 0.4, speed: 0.92, pen: 1, desc: 'Semi-auto marksman rifle. Wants a scope on that rail.' }),
+  W({ id: 'vss', slot: 'p', cls: 'DMR', tier: 3, price: 2900, name: 'VSS Vintorez', dmg: 42, rpm: 750, mag: 20, reserve: 140, reload: 2.4, spread: 2.6, ads: 0.025, range: 35, zoom: 0.45, speed: 0.97, pen: 1, integral: true, desc: 'Integrally suppressed, subsonic 9x39, full-auto. Whisper-quiet.' }),
+  W({ id: 'lever', slot: 'p', cls: 'DMR', tier: 2, price: 1300, name: 'Marlin .45-70', dmg: 95, rpm: 75, mode: 'semi', mag: 6, reserve: 42, reload: 0.55, shell: true, spread: 2.6, ads: 0.02083, range: 50, zoom: 0.8, speed: 0.96, pen: 1, desc: 'Lever-action brush gun. Loads round by round, hits like a bear.' }),
+  W({ id: 'mosin', slot: 'p', cls: 'SNP', tier: 1, price: 1000, name: 'Mosin-Nagant', dmg: 105, rpm: 40, mode: 'semi', mag: 5, reserve: 40, reload: 0.5, shell: true, spread: 6, ads: 0.02083, range: 90, zoom: 0.32, speed: 0.92, pen: 1, desc: 'Cheap, ancient, scoped. Bolt-action, loaded one round at a time.' }),
+  W({ id: 'awm', slot: 'p', cls: 'SNP', tier: 3, price: 3200, name: 'AWM .338', dmg: 175, rpm: 45, mode: 'semi', mag: 5, reserve: 35, reload: 3.4, spread: 6.5, ads: 0.00417, range: 120, zoom: 0.26, speed: 0.88, pen: 3, desc: '.338 Lapua Magnum. Through cover, through them, through the next one.' }),
   // ----- PRIMARY: more SMGs
-  W({ id: 'thompson', slot: 'p', cls: 'SMG', tier: 2, price: 1600, name: 'Thompson M1928', dmg: 27, rpm: 700, mag: 50, reserve: 200, reload: 3.0, spread: 3.0, ads: 1.0, recoil: 0.9, range: 18, falloff: 0.5, speed: 1.0, desc: 'Drum-fed .45. Chicago typewriter.' }),
-  W({ id: 'ppsh', slot: 'p', cls: 'SMG', tier: 2, price: 1500, name: 'PPSh-41', dmg: 21, rpm: 1000, mag: 71, reserve: 213, reload: 3.2, spread: 3.4, ads: 1.3, recoil: 0.7, range: 18, falloff: 0.5, speed: 1.0, desc: '71-round drum. Quantity has a quality all its own.' }),
-  W({ id: 'mp5sd', slot: 'p', cls: 'SMG', tier: 2, price: 1700, name: 'MP5SD', dmg: 21, rpm: 750, mag: 30, reserve: 210, reload: 2.0, spread: 2.4, ads: 0.8, recoil: 0.45, range: 18, falloff: 0.5, speed: 1.05, integral: true, desc: 'Integrally suppressed 9mm. Enemies barely hear it.' }),
+  W({ id: 'thompson', slot: 'p', cls: 'SMG', tier: 2, price: 1600, name: 'Thompson M1928', dmg: 27, rpm: 700, mag: 50, reserve: 200, reload: 3.0, spread: 3.0, ads: 0.05, range: 18, falloff: 0.5, speed: 1.0, desc: 'Drum-fed .45. Chicago typewriter.' }),
+  W({ id: 'ppsh', slot: 'p', cls: 'SMG', tier: 2, price: 1500, name: 'PPSh-41', dmg: 21, rpm: 1000, mag: 71, reserve: 213, reload: 3.2, spread: 3.4, ads: 0.06667, range: 18, falloff: 0.5, speed: 1.0, desc: '71-round drum. Quantity has a quality all its own.' }),
+  W({ id: 'mp5sd', slot: 'p', cls: 'SMG', tier: 2, price: 1700, name: 'MP5SD', dmg: 21, rpm: 750, mag: 30, reserve: 210, reload: 2.0, spread: 2.4, ads: 0.02917, range: 18, falloff: 0.5, speed: 1.05, integral: true, desc: 'Integrally suppressed 9mm. Enemies barely hear it.' }),
   // ----- PRIMARY: more shotguns
-  W({ id: 'ksg', slot: 'p', cls: 'SG', tier: 2, price: 1900, name: 'KSG', dmg: 15, pellets: 8, rpm: 75, mode: 'semi', mag: 14, reserve: 42, reload: 0.45, shell: true, choke: 0.75, spread: 4.5, ads: 0.7, recoil: 3.6, range: 16, falloff: 0.25, speed: 0.98, desc: 'Bullpup pump with twin tubes. Fourteen shells before you reload.' }),
-  W({ id: 'slug', slot: 'p', cls: 'SG', tier: 2, price: 1500, name: 'Slug Gun', dmg: 120, pellets: 1, rpm: 220, mode: 'semi', mag: 7, reserve: 42, reload: 0.5, shell: true, spread: 2.2, ads: 0.5, recoil: 4.5, range: 30, falloff: 0.45, speed: 0.98, pen: 1, desc: 'Semi-auto 12-gauge loaded with solid slugs. A shotgun that reaches.' }),
+  W({ id: 'ksg', slot: 'p', cls: 'SG', tier: 2, price: 1900, name: 'KSG', dmg: 15, pellets: 8, rpm: 75, mode: 'semi', mag: 14, reserve: 42, reload: 0.45, shell: true, choke: 0.75, spread: 4.5, ads: 0.04167, range: 16, falloff: 0.25, speed: 0.98, desc: 'Bullpup pump with twin tubes. Fourteen shells before you reload.' }),
+  W({ id: 'slug', slot: 'p', cls: 'SG', tier: 2, price: 1500, name: 'Slug Gun', dmg: 120, pellets: 1, rpm: 220, mode: 'semi', mag: 7, reserve: 42, reload: 0.5, shell: true, spread: 2.2, ads: 0.02083, range: 30, falloff: 0.45, speed: 0.98, pen: 1, desc: 'Semi-auto 12-gauge loaded with solid slugs. A shotgun that reaches.' }),
   // ----- PRIMARY: LMG / special
-  W({ id: 'm60', slot: 'p', cls: 'LMG', tier: 3, price: 3100, name: 'M60', dmg: 42, rpm: 550, mag: 100, reserve: 300, reload: 6.0, spread: 3.8, ads: 1.1, recoil: 1.5, range: 45, speed: 0.82, pen: 2, desc: 'The Pig. Heavy, slow-firing, devastating.' }),
+  W({ id: 'm60', slot: 'p', cls: 'LMG', tier: 3, price: 3100, name: 'M60', dmg: 42, rpm: 550, mag: 100, reserve: 300, reload: 6.0, spread: 3.8, ads: 0.04167, range: 45, speed: 0.82, pen: 2, desc: 'The Pig. Heavy, slow-firing, devastating.' }),
   // ----- PRIMARY: the 2nd round (and the conversions: guns that are another gun's receiver with a different
   // kit in it, see js/parts.js RCV)
-  W({ id: 'ak74', slot: 'p', cls: 'AR', tier: 2, price: 1400, name: 'AK-74M', dmg: 30, rpm: 650, mag: 30, reserve: 210, reload: 2.4, spread: 2.8, ads: 0.55, recoil: 1.05, range: 38, zoom: 0.75, speed: 0.95, desc: 'The 5.45 Kalashnikov: AK furniture, a flatter, lighter round. Takes AN-94 magazines.' }),
-  W({ id: 'aks74u', slot: 'p', cls: 'AR', tier: 1, price: 1100, name: 'AKS-74U', dmg: 26, rpm: 700, mag: 30, reserve: 210, reload: 2.2, spread: 3.2, ads: 1.0, recoil: 1.2, range: 22, falloff: 0.5, speed: 1.02, desc: 'A rifle cut down to SMG size. Loud, short, takes 5.45 AK-74 magazines.' }),
-  W({ id: 'rpk', slot: 'p', cls: 'LMG', tier: 2, price: 1900, name: 'RPK', dmg: 36, rpm: 600, mag: 40, reserve: 200, reload: 3.0, spread: 3.2, ads: 0.7, recoil: 1.35, range: 42, speed: 0.88, pen: 1, desc: 'An AK with a long heavy barrel and a bipod. Magazine-fed: any 7.62×39 AK magazine, and the 75-round drum was made for it.' }),
-  W({ id: 'scarl', slot: 'p', cls: 'AR', tier: 2, price: 1900, name: 'SCAR-L', dmg: 29, rpm: 625, mag: 30, reserve: 210, reload: 2.3, spread: 2.4, ads: 0.45, recoil: 0.85, range: 40, zoom: 0.7, speed: 0.95, desc: 'The SCAR in 5.56: soft-shooting, takes STANAG magazines.' }),
-  W({ id: 'm27', slot: 'p', cls: 'AR', tier: 3, price: 2400, name: 'M27 IAR', dmg: 30, rpm: 750, mag: 30, reserve: 270, reload: 2.4, spread: 2.6, ads: 0.35, recoil: 0.75, range: 45, zoom: 0.7, speed: 0.92, desc: 'An automatic rifle built to keep firing: heavy barrel, bipod, STANAG magazines.' }),
-  W({ id: 'm14', slot: 'p', cls: 'BR', tier: 2, price: 1900, name: 'M14', dmg: 52, rpm: 700, mag: 20, reserve: 140, reload: 2.6, spread: 2.8, ads: 0.3, recoil: 2.5, range: 55, zoom: 0.8, speed: 0.92, pen: 1, desc: 'Walnut and 7.62 NATO. Fit the EBR chassis kit and it becomes a Mk14.' }),
-  W({ id: 'sr25', slot: 'p', cls: 'DMR', tier: 3, price: 2600, name: 'SR-25', dmg: 58, rpm: 360, mode: 'semi', mag: 20, reserve: 120, reload: 2.5, spread: 2.4, ads: 0.1, recoil: 2.0, range: 65, zoom: 0.45, speed: 0.93, pen: 1, desc: 'An AR-10 marksman rifle: AR controls, AR parts, 7.62 NATO.' }),
-  W({ id: 'mpx', slot: 'p', cls: 'SMG', tier: 2, price: 1500, name: 'MPX', dmg: 22, rpm: 850, mag: 30, reserve: 210, reload: 2.0, spread: 2.4, ads: 0.7, recoil: 0.5, range: 22, falloff: 0.5, speed: 1.04, desc: 'A 9mm SMG that handles like an AR: buffer tube, AR grip, AR rail.' }),
-  W({ id: 'benelli', slot: 'p', cls: 'SG', tier: 2, price: 1800, name: 'Benelli M4', dmg: 14, pellets: 8, rpm: 240, mode: 'semi', mag: 7, reserve: 42, reload: 0.5, shell: true, choke: 0.8, spread: 4.5, ads: 0.7, recoil: 3.0, range: 16, falloff: 0.25, speed: 0.98, desc: 'Semi-auto, tube-fed, AR stock and grip. Fast follow-ups, slow to top up (fit a speed loader).' }),
-  W({ id: 'vepr', slot: 'p', cls: 'SG', tier: 2, price: 1700, name: 'Vepr-12', dmg: 13, pellets: 8, rpm: 280, mode: 'semi', mag: 8, reserve: 48, reload: 2.5, choke: 0.8, spread: 4.5, ads: 0.7, recoil: 2.9, range: 16, falloff: 0.25, speed: 0.98, desc: 'The better-mannered Saiga: same magazines, softer recoil.' }),
-  W({ id: 'ar9', slot: 'p', cls: 'SMG', tier: 1, price: 900, name: 'AR-9', dmg: 22, rpm: 900, mag: 33, reserve: 198, reload: 2.1, spread: 2.6, ads: 0.8, recoil: 0.55, range: 20, falloff: 0.5, speed: 1.03, desc: 'An M4 lower with a 9mm blowback kit in it: Glock magazines, every AR part. Fit an M4 upper and it\'s a rifle again.' }),
-  W({ id: 'aug9', slot: 'p', cls: 'SMG', tier: 2, price: 1500, name: 'AUG 9mm', dmg: 22, rpm: 750, mag: 33, reserve: 198, reload: 2.2, spread: 2.2, ads: 0.5, recoil: 0.45, range: 24, zoom: 0.62, falloff: 0.5, speed: 1.03, desc: 'The AUG with its 9mm conversion: a long, quiet-handling bullpup SMG on Glock magazines.' }),
-  W({ id: 'crossbow', slot: 'p', cls: 'BOW', tier: 2, price: 1400, name: 'Crossbow', dmg: 210, rpm: 40, mode: 'semi', mag: 1, reserve: 20, reload: 1.7, spread: 0.8, ads: 0.05, recoil: 1.0, range: 60, falloff: 0.7, zoom: 0.6, speed: 1.0, pen: 1, tracer: 0x8b5a2b, desc: 'Silent. Enemies two steps away won\'t hear it. One bolt per reload.' }),
+  W({ id: 'ak74', slot: 'p', cls: 'AR', tier: 2, price: 1400, name: 'AK-74M', dmg: 30, rpm: 650, mag: 30, reserve: 210, reload: 2.4, spread: 2.8, ads: 0.02917, range: 38, zoom: 0.75, speed: 0.95, desc: 'The 5.45 Kalashnikov: AK furniture, a flatter, lighter round. Takes AN-94 magazines.' }),
+  W({ id: 'aks74u', slot: 'p', cls: 'AR', tier: 1, price: 1100, name: 'AKS-74U', dmg: 26, rpm: 700, mag: 30, reserve: 210, reload: 2.2, spread: 3.2, ads: 0.05, range: 22, falloff: 0.5, speed: 1.02, desc: 'A rifle cut down to SMG size. Loud, short, takes 5.45 AK-74 magazines.' }),
+  W({ id: 'rpk', slot: 'p', cls: 'LMG', tier: 2, price: 1900, name: 'RPK', dmg: 36, rpm: 600, mag: 40, reserve: 200, reload: 3.0, spread: 3.2, ads: 0.03333, range: 42, speed: 0.88, pen: 1, desc: 'An AK with a long heavy barrel and a bipod. Magazine-fed: any 7.62×39 AK magazine, and the 75-round drum was made for it.' }),
+  W({ id: 'scarl', slot: 'p', cls: 'AR', tier: 2, price: 1900, name: 'SCAR-L', dmg: 29, rpm: 625, mag: 30, reserve: 210, reload: 2.3, spread: 2.4, ads: 0.01667, range: 40, zoom: 0.7, speed: 0.95, desc: 'The SCAR in 5.56: soft-shooting, takes STANAG magazines.' }),
+  W({ id: 'm27', slot: 'p', cls: 'AR', tier: 3, price: 2400, name: 'M27 IAR', dmg: 30, rpm: 750, mag: 30, reserve: 270, reload: 2.4, spread: 2.6, ads: 0.01667, range: 45, zoom: 0.7, speed: 0.92, desc: 'An automatic rifle built to keep firing: heavy barrel, bipod, STANAG magazines.' }),
+  W({ id: 'm14', slot: 'p', cls: 'BR', tier: 2, price: 1900, name: 'M14', dmg: 52, rpm: 700, mag: 20, reserve: 140, reload: 2.6, spread: 2.8, ads: 0.02083, range: 55, zoom: 0.8, speed: 0.92, pen: 1, desc: 'Walnut and 7.62 NATO. Fit the EBR chassis kit and it becomes a Mk14.' }),
+  W({ id: 'sr25', slot: 'p', cls: 'DMR', tier: 3, price: 2600, name: 'SR-25', dmg: 58, rpm: 360, mode: 'semi', mag: 20, reserve: 120, reload: 2.5, spread: 2.4, ads: 0.00833, range: 65, zoom: 0.45, speed: 0.93, pen: 1, desc: 'An AR-10 marksman rifle: AR controls, AR parts, 7.62 NATO.' }),
+  W({ id: 'mpx', slot: 'p', cls: 'SMG', tier: 2, price: 1500, name: 'MPX', dmg: 22, rpm: 850, mag: 30, reserve: 210, reload: 2.0, spread: 2.4, ads: 0.025, range: 22, falloff: 0.5, speed: 1.04, desc: 'A 9mm SMG that handles like an AR: buffer tube, AR grip, AR rail.' }),
+  W({ id: 'benelli', slot: 'p', cls: 'SG', tier: 2, price: 1800, name: 'Benelli M4', dmg: 14, pellets: 8, rpm: 240, mode: 'semi', mag: 7, reserve: 42, reload: 0.5, shell: true, choke: 0.8, spread: 4.5, ads: 0.04167, range: 16, falloff: 0.25, speed: 0.98, desc: 'Semi-auto, tube-fed, AR stock and grip. Fast follow-ups, slow to top up (fit a speed loader).' }),
+  W({ id: 'vepr', slot: 'p', cls: 'SG', tier: 2, price: 1700, name: 'Vepr-12', dmg: 13, pellets: 8, rpm: 280, mode: 'semi', mag: 8, reserve: 48, reload: 2.5, choke: 0.8, spread: 4.5, ads: 0.05, range: 16, falloff: 0.25, speed: 0.98, desc: 'The better-mannered Saiga: same magazines, softer recoil.' }),
+  W({ id: 'ar9', slot: 'p', cls: 'SMG', tier: 1, price: 900, name: 'AR-9', dmg: 22, rpm: 900, mag: 33, reserve: 198, reload: 2.1, spread: 2.6, ads: 0.03333, range: 20, falloff: 0.5, speed: 1.03, desc: 'An M4 lower with a 9mm blowback kit in it: Glock magazines, every AR part. Fit an M4 upper and it\'s a rifle again.' }),
+  W({ id: 'aug9', slot: 'p', cls: 'SMG', tier: 2, price: 1500, name: 'AUG 9mm', dmg: 22, rpm: 750, mag: 33, reserve: 198, reload: 2.2, spread: 2.2, ads: 0.03333, range: 24, zoom: 0.62, falloff: 0.5, speed: 1.03, desc: 'The AUG with its 9mm conversion: a long, quiet-handling bullpup SMG on Glock magazines.' }),
+  W({ id: 'crossbow', slot: 'p', cls: 'BOW', tier: 2, price: 1400, name: 'Crossbow', dmg: 210, rpm: 40, mode: 'semi', mag: 1, reserve: 20, reload: 1.7, spread: 0.8, ads: 0.01667, recoil: 1.0, range: 60, falloff: 0.7, zoom: 0.6, speed: 1.0, pen: 1, tracer: 0x8b5a2b, desc: 'Silent. Enemies two steps away won\'t hear it. One bolt per reload.' }),
 
   // ----- SECONDARY -----
-  W({ id: 'p9', slot: 's', cls: 'PST', tier: 0, price: 150, name: 'P9 Pistol', dmg: 24, rpm: 450, mode: 'semi', mag: 15, reserve: 90, reload: 1.5, spread: 2.2, ads: 0.8, recoil: 1.5, range: 18, speed: 1.0, desc: 'Standard issue. Better than throwing it.' }),
-  W({ id: 'm1911', slot: 's', cls: 'PST', tier: 1, price: 300, name: 'M1911', dmg: 36, rpm: 380, mode: 'semi', mag: 8, reserve: 64, reload: 1.6, spread: 2, ads: 0.6, recoil: 2, range: 20, desc: 'A century of .45 ACP.' }),
-  W({ id: 'g18', slot: 's', cls: 'MP', tier: 1, price: 500, name: 'G18 Auto', dmg: 20, rpm: 1100, mag: 33, reserve: 132, reload: 1.6, spread: 3.2, ads: 1.6, recoil: 0.9, range: 14, falloff: 0.5, desc: 'Full-auto pistol. Empty in a blink.' }),
-  W({ id: 'skorp', slot: 's', cls: 'MP', tier: 1, price: 450, name: 'Skorpion', dmg: 19, rpm: 950, mag: 20, reserve: 140, reload: 1.8, spread: 3, ads: 1.5, recoil: 0.6, range: 14, falloff: 0.5, desc: 'Tiny machine pistol, controllable bite.' }),
-  W({ id: 'auto9', slot: 's', cls: 'PST', tier: 2, price: 750, name: 'Auto-9', dmg: 28, rpm: 1100, mode: 'burst', burst: 3, mag: 18, reserve: 108, reload: 1.7, spread: 2.2, ads: 0.7, recoil: 1.2, range: 20, desc: 'Burst-fire sidearm for decisive people.' }),
-  W({ id: 'deagle', slot: 's', cls: 'PST', tier: 2, price: 900, name: 'Desert Eagle', dmg: 72, rpm: 220, mode: 'semi', mag: 7, reserve: 42, reload: 1.9, spread: 2.5, ads: 0.4, recoil: 4, range: 30, pen: 1, desc: '.50 AE hand-howitzer.' }),
-  W({ id: 'rev', slot: 's', cls: 'PST', tier: 2, price: 800, name: '.357 Revolver', dmg: 85, rpm: 160, mode: 'semi', mag: 6, reserve: 42, reload: 2.8, spread: 1.8, ads: 0.3, recoil: 4.5, range: 30, pen: 1, desc: 'Six for sure.' }),
-  W({ id: 'sawn', slot: 's', cls: 'SG', tier: 2, price: 650, name: 'Sawed-Off', dmg: 16, pellets: 8, rpm: 400, mode: 'semi', mag: 2, reserve: 24, reload: 1.8, choke: 1.8, spread: 6, ads: 2.0, recoil: 5, range: 9, falloff: 0.25, desc: 'Pocket shotgun for close friends.' }),
-  W({ id: 'hc500', slot: 's', cls: 'PST', tier: 3, price: 1400, name: '.500 Hand Cannon', dmg: 135, rpm: 110, mode: 'semi', mag: 5, reserve: 30, reload: 2.6, spread: 2, ads: 0.25, recoil: 6, range: 40, pen: 2, desc: 'Sidearm with sniper-rifle opinions.' }),
-  W({ id: 'pocketgl', slot: 's', cls: 'GL', tier: 3, price: 1500, name: 'Pocket Launcher', dmg: 0, explosive: { r: 3.6, dmg: 130 }, rpm: 60, mode: 'semi', mag: 1, reserve: 8, reload: 1.6, spread: 1, ads: 0.5, recoil: 5, range: 80, desc: 'Single-shot 40mm. Emergency room-clearer.' }),
-  W({ id: 'mp7', slot: 's', cls: 'MP', tier: 3, price: 1300, name: 'MP7 Compact', dmg: 24, rpm: 950, mag: 30, reserve: 180, reload: 1.9, spread: 2.2, ads: 0.8, recoil: 0.55, range: 20, pen: 1, desc: 'A full SMG that fits in a holster.' }),
-  W({ id: 'usp', slot: 's', cls: 'PST', tier: 1, price: 500, name: 'USP .45', dmg: 38, rpm: 380, mode: 'semi', mag: 12, reserve: 72, reload: 1.6, spread: 1.8, ads: 0.4, recoil: 2, range: 22, desc: 'Match-grade .45. Takes a suppressor beautifully.' }),
-  W({ id: 'mac10', slot: 's', cls: 'MP', tier: 1, price: 450, name: 'MAC-10', dmg: 22, rpm: 1100, mag: 30, reserve: 150, reload: 1.8, spread: 3.8, ads: 2, recoil: 0.9, range: 12, falloff: 0.5, desc: 'A brick that sprays .45 ACP.' }),
-  W({ id: 'akimbo', slot: 's', cls: 'PST', tier: 2, price: 900, name: 'Akimbo Berettas', dmg: 24, rpm: 700, mode: 'semi', mag: 30, reserve: 150, reload: 2.6, spread: 2.8, ads: 2.8, recoil: 1.2, range: 18, akimbo: true, desc: 'One in each hand, alternating. No aiming down sights, no regrets.' }),
-  W({ id: 'judge', slot: 's', cls: 'SG', tier: 2, price: 700, name: 'The Judge', dmg: 16, pellets: 5, rpm: 200, mode: 'semi', mag: 5, reserve: 35, reload: 2.6, choke: 2.2, spread: 4.5, ads: 1.8, recoil: 4, range: 8, falloff: 0.25, desc: 'A revolver that fires .410 buckshot.' }),
-  W({ id: 'g19', slot: 's', cls: 'PST', tier: 1, price: 350, name: 'G19 Compact', dmg: 24, rpm: 450, mode: 'semi', mag: 15, reserve: 90, reload: 1.4, spread: 2.2, ads: 0.75, recoil: 1.5, range: 18, speed: 1.0, desc: 'Compact 9mm. Takes every Glock magazine, and a stock if you want one.' }),
-  W({ id: 'derringer', slot: 's', cls: 'PST', tier: 1, price: 250, name: 'Derringer', dmg: 70, rpm: 300, mode: 'semi', mag: 2, reserve: 30, reload: 1.6, spread: 2.5, ads: 0.8, recoil: 4, range: 12, desc: 'Two shots of .45 Colt in your palm.' }),
+  W({ id: 'p9', slot: 's', cls: 'PST', tier: 0, price: 150, name: 'P9 Pistol', dmg: 24, rpm: 450, mode: 'semi', mag: 15, reserve: 90, reload: 1.5, spread: 2.2, ads: 0.08333, range: 18, speed: 1.0, desc: 'Standard issue. Better than throwing it.' }),
+  W({ id: 'm1911', slot: 's', cls: 'PST', tier: 1, price: 300, name: 'M1911', dmg: 36, rpm: 380, mode: 'semi', mag: 8, reserve: 64, reload: 1.6, spread: 2, ads: 0.06667, range: 20, desc: 'A century of .45 ACP.' }),
+  W({ id: 'g18', slot: 's', cls: 'MP', tier: 1, price: 500, name: 'G18 Auto', dmg: 20, rpm: 1100, mag: 33, reserve: 132, reload: 1.6, spread: 3.2, ads: 0.1, range: 14, falloff: 0.5, desc: 'Full-auto pistol. Empty in a blink.' }),
+  W({ id: 'skorp', slot: 's', cls: 'MP', tier: 1, price: 450, name: 'Skorpion', dmg: 19, rpm: 950, mag: 20, reserve: 140, reload: 1.8, spread: 3, ads: 0.1, range: 14, falloff: 0.5, desc: 'Tiny machine pistol, controllable bite.' }),
+  W({ id: 'auto9', slot: 's', cls: 'PST', tier: 2, price: 750, name: 'Auto-9', dmg: 28, rpm: 1100, mode: 'burst', burst: 3, mag: 18, reserve: 108, reload: 1.7, spread: 2.2, ads: 0.06667, range: 20, desc: 'Burst-fire sidearm for decisive people.' }),
+  W({ id: 'deagle', slot: 's', cls: 'PST', tier: 2, price: 900, name: 'Desert Eagle', dmg: 72, rpm: 220, mode: 'semi', mag: 7, reserve: 42, reload: 1.9, spread: 2.5, ads: 0.06667, range: 30, pen: 1, desc: '.50 AE hand-howitzer.' }),
+  W({ id: 'rev', slot: 's', cls: 'PST', tier: 2, price: 800, name: '.357 Revolver', dmg: 85, rpm: 160, mode: 'semi', mag: 6, reserve: 42, reload: 2.8, spread: 1.8, ads: 0.05, range: 30, pen: 1, desc: 'Six for sure.' }),
+  W({ id: 'sawn', slot: 's', cls: 'SG', tier: 2, price: 650, name: 'Sawed-Off', dmg: 16, pellets: 8, rpm: 400, mode: 'semi', mag: 2, reserve: 24, reload: 1.8, choke: 1.8, spread: 6, ads: 0.08333, range: 9, falloff: 0.25, desc: 'Pocket shotgun for close friends.' }),
+  W({ id: 'hc500', slot: 's', cls: 'PST', tier: 3, price: 1400, name: '.500 Hand Cannon', dmg: 135, rpm: 110, mode: 'semi', mag: 5, reserve: 30, reload: 2.6, spread: 2, ads: 0.05, range: 40, pen: 2, desc: 'Sidearm with sniper-rifle opinions.' }),
+  W({ id: 'pocketgl', slot: 's', cls: 'GL', tier: 3, price: 1500, name: 'Pocket Launcher', dmg: 0, explosive: { r: 3.6, dmg: 130 }, rpm: 60, mode: 'semi', mag: 1, reserve: 8, reload: 1.6, spread: 1, ads: 0.5, range: 80, desc: 'Single-shot 40mm. Emergency room-clearer.' }),
+  W({ id: 'mp7', slot: 's', cls: 'MP', tier: 3, price: 1300, name: 'MP7 Compact', dmg: 24, rpm: 950, mag: 30, reserve: 180, reload: 1.9, spread: 2.2, ads: 0.02917, range: 20, pen: 1, desc: 'A full SMG that fits in a holster.' }),
+  W({ id: 'usp', slot: 's', cls: 'PST', tier: 1, price: 500, name: 'USP .45', dmg: 38, rpm: 380, mode: 'semi', mag: 12, reserve: 72, reload: 1.6, spread: 1.8, ads: 0.06667, range: 22, desc: 'Match-grade .45. Takes a suppressor beautifully.' }),
+  W({ id: 'mac10', slot: 's', cls: 'MP', tier: 1, price: 450, name: 'MAC-10', dmg: 22, rpm: 1100, mag: 30, reserve: 150, reload: 1.8, spread: 3.8, ads: 0.11667, range: 12, falloff: 0.5, desc: 'A brick that sprays .45 ACP.' }),
+  W({ id: 'akimbo', slot: 's', cls: 'PST', tier: 2, price: 900, name: 'Akimbo Berettas', dmg: 24, rpm: 700, mode: 'semi', mag: 30, reserve: 150, reload: 2.6, spread: 2.8, ads: 2.8, range: 18, akimbo: true, desc: 'One in each hand, alternating. No aiming down sights, no regrets.' }),
+  W({ id: 'judge', slot: 's', cls: 'SG', tier: 2, price: 700, name: 'The Judge', dmg: 16, pellets: 5, rpm: 200, mode: 'semi', mag: 5, reserve: 35, reload: 2.6, choke: 2.2, spread: 4.5, ads: 0.1, range: 8, falloff: 0.25, desc: 'A revolver that fires .410 buckshot.' }),
+  W({ id: 'g19', slot: 's', cls: 'PST', tier: 1, price: 350, name: 'G19 Compact', dmg: 24, rpm: 450, mode: 'semi', mag: 15, reserve: 90, reload: 1.4, spread: 2.2, ads: 0.08333, range: 18, speed: 1.0, desc: 'Compact 9mm. Takes every Glock magazine, and a stock if you want one.' }),
+  W({ id: 'tx22', slot: 's', cls: 'MP', tier: 0, price: 200, name: 'Taurus TX22', dmg: 13, rpm: 1050, mag: 16, reserve: 160, reload: 1.4, spread: 2.4, ads: 0.0833, range: 14, falloff: 0.55, speed: 1.02, desc: 'A rimfire plinker someone made fully automatic: .22 LR, 16 rounds, threaded from the factory, hardly kicks. Lots of small holes.' }),
+  W({ id: 'derringer', slot: 's', cls: 'PST', tier: 1, price: 250, name: 'Derringer', dmg: 70, rpm: 300, mode: 'semi', mag: 2, reserve: 30, reload: 1.6, spread: 2.5, ads: 0.16667, range: 12, desc: 'Two shots of .45 Colt in your palm.' }),
 ];
 G.WEAPONS = {};
+// the sidearms a run can start with (picked before the first level: js/game.js pickSidearm)
+G.STARTERS = ['tx22', 'p9', 'derringer'];
 G.WEAPON_LIST.forEach((w) => { w.snd = G.CLASS_SND[w.cls]; G.WEAPONS[w.id] = w; });
+// Explosive weapons (the grenade launchers) are switched off for now: no case, shop or kit turns one up.
+G.EXPLOSIVES_OFF = true;
+G.obtainable = (w) => !!w && !(G.EXPLOSIVES_OFF && w.explosive);
 // Fire selectors (X): the positions a gun has, the first its default. Most select-fire guns come set to semi
 // with full auto a click away. Cheap open-bolt guns and belt-fed machine guns have no semi: full auto only.
 // The burst guns have semi and their burst (burstRpm: a burst faster than the gun's cyclic rate); the AN-94
 // semi and its two-round hyper burst.
 G.AUTO_ONLY = ['mac10', 'uzi', 'aa12', 'm249', 'pkm', 'm60', 'shredder'];
-G.FIRE_MODES = { br3: ['semi', 'burst'], an94: ['semi', 'hyper'], auto9: ['semi', 'burst'] };
+G.FIRE_MODES = { br3: ['semi', 'burst'], an94: ['semi', 'hyper'], auto9: ['semi', 'burst'], tx22: ['auto', 'semi'] }; // (the TX22: made full auto, it comes set to it)
 G.WEAPON_LIST.forEach((w) => { w.modes = G.FIRE_MODES[w.id] || (w.mode === 'semi' ? ['semi'] : G.AUTO_ONLY.includes(w.id) ? [w.mode] : ['semi', w.mode]); });
 G.MODE_NAME = { semi: 'SEMI', auto: 'AUTO', burst: 'BURST', hyper: 'HYPER' };
 // Chambers. A closed-bolt gun (most of them) holds a round in its chamber as well as the ones in its magazine or
@@ -226,6 +238,7 @@ G.GUN_SPECS = {
   akimbo:   GS(4.9, 9.00, 'none', 35000, 0.35, 124, 0.45, 0.60, 'recoil', 'brass', 19),
   judge:    GS(3.0, 10.4, 'none', 13500, 0.50, 350, 0.05, 0.05, 'recoil', 'plastic', 63, 5),
   derringer:GS(3.0, 11.43, 'none', 14000, 0.50, 250, 0.05, 0.05, 'recoil', 'brass', 33),
+  tx22:     GS(4.1, 5.60, 'none', 24000, 0.10, 40, 0.15, 0.40, 'blowback', 'brass', 15),
   ak74:     GS(16.3, 5.60, 'brake', 50000, 0.70, 53, 0.55, 0.60, 'longstroke', 'steel', 39),
   aks74u:   GS(8.1, 5.60, 'comp', 50000, 0.70, 53, 0.50, 0.65, 'longstroke', 'steel', 39),
   rpk:      GS(23.2, 7.62, 'none', 45000, 1.00, 123, 0.72, 0.70, 'longstroke', 'steel', 39),
@@ -298,7 +311,7 @@ G.THEMES = [
   { name: 'Apartment', layout: 'apartments', foes: 2, crowd: 2, big: 2, home: 1, reflect: 0.3, floor: '#4a443d', wall: '#b8ab95', crate: '#8a6a3a', fog: 0x0e0c0a, light: 0xffd8a8, ceil: '#cfc8ba' },
   { name: 'Warehouse', layout: 'warehouse', noFog: true, home: 0, reflect: 0.3, floor: '#57504a', wall: '#7c6e5b', crate: '#8a6a3a', fog: 0x16130f, light: 0xffd49a, ceil: '#2a2622' },
   { name: 'Bunker', entry: 'vault', home: 0.45, reflect: 0.4, floor: '#3a4042', wall: '#5a6160', crate: '#4d5a3c', fog: 0x0b0f11, light: 0xa8c8ff, ceil: '#1d2224' },
-  { name: 'Suburbs', layout: 'houses', home: 1, reflect: 0.28, floor: '#5a4a3a', wall: '#9fae98', crate: '#8a6a3a', fog: 0x111723, light: 0xffe0b0, ceil: '#d6d2c4' },
+  { name: 'Suburbs', layout: 'houses', foes: 1.8, crowd: 1.6, big: 2, home: 1, reflect: 0.28, floor: '#5a4a3a', wall: '#9fae98', crate: '#8a6a3a', fog: 0x111723, light: 0xffe0b0, ceil: '#d6d2c4' },
   { name: 'Research Lab', home: 0.4, reflect: 0.36, floor: '#8d9399', wall: '#b9bec4', crate: '#5d6b7a', fog: 0x12161a, light: 0xe6f2ff, ceil: '#3a3f44' },
   { name: 'Foundry', home: 0.3, reflect: 0.3, floor: '#3a2a22', wall: '#5e3d2b', crate: '#6a5a4a', fog: 0x1a0c06, light: 0xff9a5a, ceil: '#24160f' },
   { name: 'Cold Storage', home: 0.35, reflect: 0.4, floor: '#4f5d68', wall: '#7f97a8', crate: '#5f6f7a', fog: 0x0a1218, light: 0x9fe0ff, ceil: '#26323a' },
@@ -307,7 +320,7 @@ G.THEMES = [
 ];
 
 // the hangar between levels (js/hangar.js): a daylit hall with a helipad outside it
-G.HANGAR_ROWS = 55; // the shooting range north of the hangar: tile rows (js/level.js layHangar; js/hangar.js shifts the hall by two metres a row)
+G.HANGAR_ROWS = 156; // the shooting range (300 m of rifle lanes) north of the hangar: tile rows (js/level.js layHangar; js/hangar.js shifts the hall by two metres a row)
 G.HANGAR_THEME = { name: 'Hangar', layout: 'hangar', hub: true, noFog: true, home: 0, reflect: 0.35, floor: '#6c7075', wall: '#98a0a8', crate: '#8a6a3a', fog: 0x86a6c8, light: 0xfff2dc, ceil: '#c9cdd0', hemi: 0xe4ecf6, hemiI: 0.85 };
 
 G.PLAYER_COLORS = [0x3fa9f5, 0x7bd34a, 0xf5a623, 0xd94fd9, 0x2fd6c4, 0xf2e94e, 0xff6b6b, 0xffffff];
@@ -354,15 +367,15 @@ G.WOUND_REF = 28;
 G.woundPower = (dmg) => Math.pow(Math.max(1, dmg) / G.WOUND_REF, 0.7);
 // a wound before armour: the part, whether the round went through its middle, how hard it hits
 G.woundOf = (zone, central, k) => (G.WOUNDS[zone] || G.WOUNDS.thigh)[central ? 0 : 1] * k;
-// what kind of round it is, as far as armour cares
-G.threat = (def) => (def.pen >= 2 ? 'ap' : def.cls === 'PST' || def.cls === 'MP' || def.cls === 'SMG' || (def.cls === 'SG' && def.pellets > 1) ? 'handgun' : 'rifle');
+// what kind of round it is, as far as armour cares (a rimfire round: a .22, light and slow, less than any pistol round)
+G.threat = (def) => (def.pen >= 2 ? 'ap' : (G.CALIBERS[G.calOf(def)] || {}).rimfire ? 'rimfire' : def.cls === 'PST' || def.cls === 'MP' || def.cls === 'SMG' || (def.cls === 'SG' && def.pellets > 1) ? 'handgun' : 'rifle');
 // the share of a wound this armour stops on that zone, at its condition (0 used up .. 1 new). The round
 // matters too: armour-piercing ammo gets through more, hollow points flatten on armour.
 G.armorStop = (a, zone, def, cond = 1) => {
   const s = a && a.stop[zone];
   if (!s) return 0;
   const t = G.threat(def);
-  let v = t === 'handgun' ? s[0] : s[1] * (t === 'ap' ? 0.5 : 1);
+  let v = t === 'handgun' ? s[0] : t === 'rimfire' ? s[0] + (1 - s[0]) * 0.7 : s[1] * (t === 'ap' ? 0.5 : 1); // (rimfire: most of what a pistol round would get through, stopped too)
   if (def.apRound && t !== 'ap') v *= 0.6; // (a round that's already armour-piercing doesn't get it twice)
   if (def.armorK) v = Math.min(0.99, v * def.armorK);
   return v * (0.35 + 0.65 * G.U.clamp(cond, 0, 1));
@@ -384,6 +397,7 @@ G.CALIBERS = {
   '9/39': { name: '9×39', group: 'rifle', box: 20, per: 2.2 }, '11.6/53': { name: '.45-70', group: 'rifle', box: 20, per: 2.5 },
   '8.6/69': { name: '.338 Lapua', group: 'rifle', box: 10, per: 6 }, '7.62/25': { name: '7.62×25', group: 'pistol', box: 50, per: 0.7 },
   '10.4/63': { name: '.410 bore', group: 'shotgun', box: 15, per: 1.5 }, '11.43/33': { name: '.45 Colt', group: 'pistol', box: 30, per: 1.2 },
+  '5.6/15': { name: '.22 LR', group: 'pistol', box: 100, per: 0.15, rimfire: true },
   bolt: { name: 'crossbow bolts', group: 'bolt', box: 6, per: 12 }, cell: { name: 'rail slugs', group: 'cell', box: 8, per: 15 },
 };
 G.calOf = (def) => {
@@ -392,13 +406,20 @@ G.calOf = (def) => {
   const g = G.GUN_SPECS[def.id];
   return g ? g.caliber + '/' + g.caseLength : 'cell';
 };
+// a caliber's standard magazine (rounds): the middle one of the guns that take it, belts aside (a shotgun's tube)
+G.stdMag = (cal) => {
+  const n = [];
+  for (const id in G.WEAPONS) { const d = G.WEAPONS[id]; if (G.calOf(d) === cal && d.mag > 2 && !(d.cls === 'LMG' && d.mag >= 100)) n.push(d.mag); }
+  n.sort((a, b) => a - b);
+  return n.length ? n[(n.length - 1) >> 1] : (G.CALIBERS[cal] || {}).box || 10;
+};
 // Ammo types. Their effect on the round: dmgK (wound), armorK (how much more armour stops it), apRound (gets
 // through armour), penD (bodies it carries on through), rangeK, spreadK, pelletsK, slug, tracer (colour),
 // quiet (with a suppressor, heard no further than a crossbow). k: price per round relative to ball.
 G.AMMO = {
   ball: { name: 'FMJ ball', tag: 'FMJ', k: 1, desc: 'Full metal jacket. The standard round.' },
-  hp: { name: 'Hollow point', tag: 'HP', k: 1.8, dmgK: 1.3, armorK: 1.35, penD: -1, desc: 'Opens up in flesh: bigger wounds, stops in the first body. Flattens on armour.' },
-  ap: { name: 'Armour-piercing', tag: 'AP', k: 2.4, dmgK: 0.9, apRound: true, penD: 1, desc: 'Hardened core: punches through armour and through bodies, smaller wounds.' },
+  hp: { name: 'Hollow point', tag: 'HP', k: 1.8, dmgK: 1.3, armorK: 1.35, penD: -1, dragK: 0.8, desc: 'Opens up in flesh: bigger wounds, stops in the first body. Flattens on armour. Its open nose drags more: it slows and drops sooner than ball.' },
+  ap: { name: 'Armour-piercing', tag: 'AP', k: 2.4, dmgK: 0.9, apRound: true, penD: 1, velK: 1.08, massK: 0.85, desc: 'Hardened core, lighter and faster (8% more speed): punches through armour and through bodies, flatter, smaller wounds.' },
   tracer: { name: 'Tracer', tag: 'TR', k: 1.3, tracer: 0xff4a2a, desc: 'Burns red all the way out: you see exactly where it goes (so do they).' },
   subsonic: { name: 'Subsonic', tag: 'SUB', k: 1.6, dmgK: 0.85, rangeK: 0.7, quiet: true, desc: 'No supersonic crack: through a suppressor it is barely heard. Weaker, and drops off sooner.' },
   buck: { name: '00 buckshot', tag: 'BUCK', k: 1, desc: 'Nine pellets. The standard shotgun load.' },
@@ -422,9 +443,13 @@ G.MUZZLE_V = {
   '12.7/33': [450, 6, 850], '9.07/33': [440, 4, 500], '12.7/41': [550, 8, 600], '4.6/30': [720, 7, 550],
   '5.6/39': [880, 16, 900], '7.62/63': [820, 24, 1100], '9/39': [295, 7.9, 2000], '11.6/53': [600, 22, 700],
   '8.6/69': [915, 27, 2000], '7.62/25': [450, 4.6, 600], '10.4/63': [330, 3, 60], '11.43/33': [290, 5, 900],
+  '5.6/15': [370, 4.1, 560], // (.22 LR: a 40-grain round from a pistol, about 85% of its speed left at 100 m)
   bolt: [120, 20, 300], cell: [2000, 20, 3000],
 };
 G.SOUND_SPEED = 343;
+// how far a round goes before drag takes 63% of its speed (m), from this build, with this load
+// (a load's dragK: a hollow point's open, blunt nose sheds speed sooner than ball's)
+G.dragOf = (def, am) => { const ref = G.MUZZLE_V[G.calOf(def)]; return am === 'slug' ? 350 : (ref ? ref[2] : 600) * ((G.AMMO[am] || {}).dragK || 1); };
 // a round's speed (m/s) d metres from the muzzle, from this build, with this load
 G.roundSpeed = (def, am, d = 0) => {
   const cal = G.calOf(def), ref = G.MUZZLE_V[cal];
@@ -432,10 +457,61 @@ G.roundSpeed = (def, am, d = 0) => {
   const barrel = def.barrelIn || (G.GUN_SPECS[def.id] || {}).barrel || ref[1];
   let v = ref[0] * Math.pow(Math.max(1, barrel) / ref[1], 0.2);
   if (am === 'slug') v = Math.max(v, 470);
+  if (G.AMMO[am] && G.AMMO[am].velK) v *= G.AMMO[am].velK; // (AP: a lighter, hard-cored bullet leaves faster)
   // subsonic loads, and guns built to be (the integrally suppressed MP5SD and VSS), stay under Mach 1
   if (am === 'subsonic' || def.integral) v = Math.min(v, 310);
-  return v * Math.exp(-d / (am === 'slug' ? 350 : ref[2])); // (a slug carries its speed; pellets shed it)
+  return v * Math.exp(-d / G.dragOf(def, am)); // (a slug carries its speed; pellets shed it)
 };
+// Recoil comes from the round and the gun. The round pushes back with its momentum: the bullet's, plus the powder
+// gas leaving behind it (about 1.75 times the bullet's speed). The gun's mass soaks that up: the same push moves a
+// heavy gun less. A shot climbs K * impulse^B / mass^A degrees (B > 1: big rounds hurt more than in proportion, and
+// A < 1: your shoulder takes some of it whatever the gun weighs), times HAND for a handgun (it pivots on your wrist).
+// RECOIL_K is what the design adds: a stock that drops below the bore lets it climb more; a manual action (bolt,
+// pump, lever, break, revolver) has nothing to soften it, so the whole kick lands at once; and a few guns built
+// against recoil. The muzzle device and the rest of the build are parts (js/parts.js compile, which also uses the
+// build's own weight and barrel). K puts an M4 at 1.1 degrees.
+G.CHARGE_GR = { // powder charge (grains)
+  '5.56/45': 25, '7.62/39': 25, '7/43': 30, '7.62/51': 46, '9/19': 6, '5.7/29': 6.5, '11.43/23': 5.5, '18.5/70': 27,
+  '7.62/54': 50, '12.7/99': 235, '40/46': 5, '7.65/17': 2.5, '12.7/33': 25, '9.07/33': 14, '12.7/41': 40, '4.6/30': 6,
+  '5.6/39': 23, '7.62/63': 50, '9/39': 15, '11.6/53': 55, '8.6/69': 90, '7.62/25': 8, '10.4/63': 14, '11.43/33': 9, '5.6/15': 2,
+};
+G.GUN_KG = { // each gun as it comes (kg)
+  m4: 2.9, ak: 3.5, f2: 3.6, g36: 3.6, br3: 3.4, scar: 3.6, tavor: 3.3, hk416: 3.5, aug: 3.6, galil: 3.4, an94: 3.85,
+  ak74: 3.4, aks74u: 2.7, scarl: 3.3, m27: 3.6, fal: 4.3, m14: 4.5, mk14: 5.1, garand: 4.3, svd: 4.3, vss: 2.6, lever: 3.3,
+  sr25: 4.9, uzi: 1.5, mp5: 2.5, p90: 2.6, vector: 2.7, thompson: 4.9, ppsh: 3.6, mp5sd: 2.9, mpx: 2.7, ar9: 2.9, aug9: 3.3,
+  pump: 3.6, dbl: 3.2, saiga: 3.6, aa12: 4.8, ksg: 3.6, slug: 3.6, benelli: 3.8, vepr: 4.0, m249: 7.5, pkm: 7.5, m60: 10.5,
+  rpk: 4.8, shredder: 16, r700: 4.1, barrett: 14, mosin: 4.0, awm: 6.5, m32: 5.3, rail: 7.5, crossbow: 3.5,
+  p9: 0.75, g19: 0.7, m1911: 1.1, usp: 0.75, auto9: 1.1, deagle: 2.0, rev: 1.1, hc500: 2.0, akimbo: 0.95, derringer: 0.4,
+  g18: 0.9, skorp: 1.3, mp7: 1.9, mac10: 2.8, tx22: 0.6, sawn: 2.0, judge: 0.85, pocketgl: 1.8,
+};
+G.RECOIL_K = (() => {
+  const k = {}, set = (ids, f) => ids.split(' ').forEach((id) => { k[id] = (k[id] || 1) * f; });
+  set('ak ak74 aks74u an94 galil rpk svd saiga vepr garand thompson ppsh mosin pump dbl', 1.25); // (the stock drops below the bore)
+  set('m14', 1.15);
+  set('r700 mosin awm pump ksg dbl lever rev derringer', 1.4); // (manual actions)
+  set('vector', 0.75); // (the KRISS action throws its bolt down, not back)
+  set('g36', 0.75);
+  set('shredder', 0.4); // (braced on its harness)
+  set('barrett', 0.65); // (its barrel recoils inside the receiver, and the brake takes much of the rest)
+  return k;
+})();
+G.RECOIL = { K: 0.2045, B: 1.35, A: 0.7, HAND: 1.3, GAS: 1.75 };
+// the push back of one shot (N·s) from this build with this load, or 0 (a bolt, a rail slug)
+G.recoilImpulse = (def, am) => {
+  const g = G.GUN_SPECS[def.id], cal = G.calOf(def), ch = G.CHARGE_GR[cal];
+  if (!g || !ch) return 0;
+  const v = G.roundSpeed(def, am), v0 = am === 'subsonic' ? G.roundSpeed(def) : v;
+  // a subsonic load: a heavier bullet on a smaller charge (the energy it's loaded to)
+  const A = G.AMMO[am] || {}, bw = g.bulletWeight * (am === 'subsonic' ? 1.4 : A.massK || 1), cw = ch * (am === 'subsonic' ? 1.4 * (v / v0) * (v / v0) : 1);
+  return (bw * v + cw * G.RECOIL.GAS * v) * 6.479891e-5;
+};
+// a shot's climb (degrees) from this build weighing kg, with this load; null when it isn't a gun with a round
+G.physRecoil = (def, kg = G.GUN_KG[def.id], am) => {
+  const I = G.recoilImpulse(def, am), R = G.RECOIL;
+  if (!I || !kg) return null;
+  return R.K * Math.pow(I, R.B) / Math.pow(kg, R.A) * (def.cls === 'PST' || def.cls === 'MP' ? R.HAND : 1) * (G.RECOIL_K[def.id] || 1);
+};
+for (const id in G.WEAPONS) { const r = G.physRecoil(G.WEAPONS[id]); if (r) G.WEAPONS[id].recoil = Math.round(r * 100) / 100; }
 // Rounds are projectiles (js/player.js fly): they slow with drag over dragOf metres (to 37% of their speed) and
 // fall with gravity, so every gun's sights are zeroed: the round leaves a hair above the line of sight, crosses
 // it at zeroOf metres and drops below it past that. Handguns, SMGs and shotguns at 25 m, carbines and machine
@@ -445,7 +521,41 @@ G.roundSpeed = (def, am, d = 0) => {
 G.GRAVITY = 9.81;
 G.zeroOf = (def) => ({ PST: 25, MP: 25, SMG: 25, SG: 25, BOW: 20, GL: 40, DMR: 100, SNP: 100, RAIL: 0 })[def.cls] ?? 50;
 G.sightH = (def) => ({ PST: 0.02, MP: 0.025, SMG: 0.05, SG: 0.035, BOW: 0.05, GL: 0.06, RAIL: 0 })[def.cls] ?? 0.065;
-G.dragOf = (def, am) => { const ref = G.MUZZLE_V[G.calOf(def)]; return am === 'slug' ? 350 : ref ? ref[2] : 600; };
+// What a round does once it leaves (js/player.js fly, stepRound: the same sums): from sightH under the line of sight,
+// the bore tipped up `slope` (rise over run), out to maxD metres. Samples a metre apart: h (metres above the line of
+// sight; level ground, the line of sight level), v (m/s), t (s). Stops where a round's spent (ROUND_LIFE).
+G.ROUND_LIFE = { t: 4, dist: 550, v: 30 }; // (in the air past any of these, it's gone)
+G.ballistics = (def, am) => { const rail = def.cls === 'RAIL'; return { v0: rail ? 3000 : Math.max(40, G.roundSpeed(def, am) || 400), drag: rail ? 1e9 : G.dragOf(def, am), g: rail ? 0 : G.GRAVITY, sh: G.sightH(def) }; };
+G.flight = (def, am, slope, maxD = 500) => {
+  const { v0, drag, g, sh } = G.ballistics(def, am), L = G.ROUND_LIFE, dt = 1 / 120, n = Math.hypot(1, slope);
+  let x = 0, y = -sh, vx = v0 / n, vy = v0 * slope / n, t = 0, dist = 0;
+  const out = [{ d: 0, h: y, v: v0, t: 0 }];
+  while (x < maxD && t < L.t && dist < L.dist && Math.hypot(vx, vy) >= L.v) {
+    const x1 = x + vx * dt, y1 = y + vy * dt - 0.5 * g * dt * dt, len = Math.hypot(x1 - x, y1 - y), k = Math.exp(-len / drag);
+    for (let d = out.length; d <= x1 && d <= maxD; d++) { const u = (d - x) / (x1 - x); out.push({ d, h: y + (y1 - y) * u, v: Math.hypot(vx, vy) * k, t: t + dt * u }); }
+    vx *= k; vy = vy * k - g * dt; x = x1; y = y1; t += dt; dist += len;
+  }
+  return out;
+};
+// The tip of the bore that puts the round back on the line of sight at `zero` metres (found by halving: higher
+// is always higher there). null if it can't get there (spent first). Kept, by gun, load and zero.
+const _zeroK = new Map();
+G.zeroSlope = (def, am, zero) => {
+  const key = `${def.code || def.id}|${am}|${zero}`;
+  if (_zeroK.has(key)) return _zeroK.get(key);
+  let lo = -0.02, hi = 0.25, k = null;
+  if (zero > 0 && (G.flight(def, am, hi, zero)[zero] || {}).h > 0) {
+    for (let i = 0; i < 28; i++) { const mid = (lo + hi) / 2, p = G.flight(def, am, mid, zero)[zero]; if (p && p.h > 0) hi = mid; else lo = mid; }
+    k = (lo + hi) / 2;
+  }
+  _zeroK.set(key, k);
+  return k;
+};
+// A gun's sights: zeroed for its class's distance with ball (G.zeroOf), then turned at the zeroing table a click at
+// a time (w.clicks: 0.1 mil each, a centimetre at 100 m; up is +, the round strikes higher). The bore's tip over the
+// line of sight, rise over run: every load fires from it (a slower one drops more, so it hits lower).
+G.CLICK = 0.0001;
+G.boreTip = (w) => { const d = w.def; if (d.cls === 'RAIL') return 0; const k = G.zeroSlope(d, G.ballFor(G.calOf(d)), G.zeroOf(d)); return (k == null ? 0 : k) + (w.clicks || 0) * G.CLICK; };
 G.ballFor = (cal) => G.AMMO_TYPES[(G.CALIBERS[cal] || { group: 'cell' }).group][0];
 // how often each type turns up loaded in a found gun (relative): ball and buckshot mostly, AP and flechette rarely
 G.AMMO_RARITY = { ball: 10, hp: 3, tracer: 3, subsonic: 2, ap: 1, buck: 10, slug: 4, birdshot: 3, flechette: 1, he: 1, broadhead: 1, railslug: 1 };
@@ -472,10 +582,11 @@ G.roundDef = (def, am) => {
   if (A.slug) { d.dmg = def.dmg * def.pellets * 0.55; d.pellets = 1; d.choke = 0; d.range = def.range * 2; d.pen = (def.pen || 0) + 1; }
   if (A.tracer) d.tracer = A.tracer;
   if (A.quiet) d.quiet = true;
+  if (A.slug || A.velK || am === 'subsonic') { const I0 = G.recoilImpulse(def), I = G.recoilImpulse(def, am); if (I0 && I) d.recoil = def.recoil * Math.pow(I / I0, G.RECOIL.B); } // (a load that pushes harder or softer)
   return d;
 };
 // durability a round costs the armour it hits
-G.armorWear = (def) => (def.pellets > 1 ? 0.2 : G.threat(def) === 'handgun' ? 0.5 : 1);
+G.armorWear = (def) => (def.pellets > 1 ? 0.2 : G.threat(def) === 'rimfire' ? 0.25 : G.threat(def) === 'handgun' ? 0.5 : 1);
 
 // ---------------------------------------------------------------- enemy kit
 // What suspects carry moves up through gear tiers at its own pace with the level, the way the squad's own
@@ -485,7 +596,7 @@ G.gearTier = (level) => (level <= 2 ? 1 : level <= 4 ? 2 : level <= 7 ? 3 : 4);
 G.ENEMY_GEAR = {
   // weapon pools by type, tiers 1-4
   weapons: {
-    suspect: [['p9', 'rev', 'derringer'], ['p9', 'm1911', 'usp', 'rev', 'g19'], ['usp', 'm1911', 'g18', 'deagle', 'g19'], ['g18', 'deagle', 'usp']],
+    suspect: [['p9', 'rev', 'derringer', 'tx22'], ['p9', 'm1911', 'usp', 'rev', 'g19'], ['usp', 'm1911', 'g18', 'deagle', 'g19'], ['g18', 'deagle', 'usp']],
     grunt: [['mac10', 'uzi', 'skorp', 'aks74u', 'ar9'], ['ak', 'mp5', 'uzi', 'thompson', 'aks74u', 'ak74', 'mpx'], ['ak', 'm4', 'galil', 'mp5', 'vector', 'ak74', 'scarl', 'aug9'], ['hk416', 'scar', 'an94', 'tavor', 'aug', 'scarl', 'm27']],
     rusher: [['sawn', 'dbl'], ['pump', 'dbl', 'sawn'], ['pump', 'saiga', 'ksg', 'vepr', 'benelli'], ['saiga', 'aa12', 'ksg', 'benelli', 'vepr']],
     marksman: [['lever', 'mosin'], ['mosin', 'r700', 'm14'], ['r700', 'svd', 'mk14', 'm14', 'sr25'], ['svd', 'awm', 'mk14', 'sr25']],

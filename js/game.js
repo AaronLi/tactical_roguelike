@@ -181,7 +181,7 @@ G.Game = {
         if (e.code === 'Escape' && this.shopOpen) { this.closeShop(); return; }
         if (e.code === 'Tab') { e.preventDefault(); if (!this.chatOpen && !e.repeat) { if (this.shopOpen) this.closeShop(); else if (G.Me.seat == null) this.openShop('kit', 'your stash and loadout'); } return; }
       }
-      if (e.code === 'Tab') { e.preventDefault(); if (!this.chatOpen && !e.repeat) this.toggleInv(!this.invOpen); return; }
+      if (e.code === 'Tab') { e.preventDefault(); if (!this.chatOpen && !e.repeat && !(G.Me.out && !this.invOpen)) this.toggleInv(!this.invOpen); return; } // (out cold: nothing to do but wait)
       if (e.code === 'Escape' && this.invOpen) { this.toggleInv(false); return; }
       if (e.code === 'KeyY' && !this.chatOpen && !e.repeat && !this.hub) this.vote();
       if (e.code === 'Enter') {
@@ -396,9 +396,10 @@ G.Game = {
         if (this.phase === 'route') this.renderRoute();
         break;
       }
+      case 'arms': this.arms = m.a || {}; if (this.phase === 'route') { this.sidearmPick(); this.renderRoute(); } break;
       case 'rvotes': if (this.routeSt) { this.routeSt.votes = m.v || {}; if (this.phase === 'route') this.renderRoute(); } break;
       case 'newrun':
-        this.tGrid = null;
+        this.tGrid = null; this.arms = {}; this.armSel = null;
         G.Me.newRun();
             break;
       case 'phase':
@@ -437,6 +438,8 @@ G.Game = {
       case 'shot': if (this.phase === 'level' && m.id !== G.Net.myId) G.Views.remoteShot(m); break;
       case 'nade': if (this.phase === 'level' && m.id !== G.Net.myId) { G.Views.addNade(new THREE.Vector3(...m.p), new THREE.Vector3(...m.v), m.fuse, false, !!m.en, m.k || 'frag'); const tp = !m.en && G.Views.players.get(m.id); if (tp) tp.rig.throwNade(m.s == null ? 2 : m.s); /* (their arm throws it) */ if (m.en) G.Views.enemyThrow(m.e); } break;
       case 'boom': this.onBoom(m); break;
+      case 'course': if (G.Course) G.Course.setCourse(m.seed); break;
+      case 'crun': if (G.Course && m.s) G.Course.remoteRun(Object.assign({}, m.s, { who: m.by || m.s.who })); break;
       case 'flash': this.onFlash(m); break;
       case 'kill': this.onKill(m); break;
       case 'ereload': if (this.phase === 'level') G.Views.enemyReload(m); break;
@@ -727,6 +730,41 @@ G.Game = {
     if (!this.map) this.menuBackdrop();
     this.screen('route');
     this.renderRoute();
+    this.sidearmPick();
+  },
+  // Before the first level of a run: which sidearm you start with (G.STARTERS). Your own choice (the squad's aren't
+  // waited on); the route's yours to vote on once you've made it.
+  sidearmPick() {
+    const el = this.$('sidearmPick'), arms = this.arms || {}, roster = this.roster || {};
+    if (G.Me.sidearmChosen) { el.classList.add('hidden'); return; }
+    // who's taken it (the squad's own picks: told by the host)
+    const takers = (id) => Object.entries(arms).filter(([pid, a]) => a === id && roster[pid]).map(([pid]) => `<i style="color:${G.U.hex(roster[pid].color)}">${G.Callsigns.html(roster[pid].animal)}${G.U.esc(roster[pid].name)}</i>`);
+    const others = Object.keys(roster).filter((pid) => pid !== G.Net.myId), waiting = others.filter((pid) => !arms[pid]).length;
+    const card = (id) => {
+      const d = G.WEAPONS[id], w = G.Me.makeWeapon(id), it = G.Gear.gunItem(w), [cw, ch] = G.Gear.size(it), cal = G.CALIBERS[G.calOf(d)];
+      const modes = (d.modes || [d.mode]).map((m) => G.MODE_NAME[m]).join(' / ');
+      return `<button class="arm${this.armSel === id ? ' sel' : ''}" data-arm="${id}"><img src="${G.Icons.of(it, cw, ch, false)}" alt=""><b>${G.U.esc(d.name)}</b>
+        <span class="arm-stats"><span>${cal ? cal.name : ''}</span><span>${d.mag} rounds</span><span>${modes}</span><span>${d.dmg} dmg · ${d.rpm} rpm</span></span>
+        <em>${G.U.esc(d.desc)}</em>${others.length ? `<span class="arm-who">${takers(id).join('') || '<small>no one yet</small>'}</span>` : ''}</button>`;
+    };
+    el.innerHTML = `<div class="arm-box"><h2>Pick your own sidearm</h2><p>This is <b>your</b> equipment, not a squad vote: each of you picks your own, and any number of you can take the same one. A primary comes later, from what you find and what the quartermaster has. It starts loaded with tracers, two spare loads in your pockets.</p>
+      <div class="arms">${G.STARTERS.map(card).join('')}</div>
+      <button class="btn primary arm-ok" data-armok ${this.armSel ? '' : 'disabled'}>${this.armSel ? `Confirm: ${G.U.esc(G.WEAPONS[this.armSel].name)}` : 'Choose one, then confirm'}</button>${others.length ? `<p class="arm-note">Under each: who in the squad took it${waiting ? ` (${waiting} still choosing)` : ''}.</p>` : ''}</div>`;
+    el.classList.remove('hidden');
+    if (!el.dataset.bound) {
+      el.dataset.bound = 1;
+      el.addEventListener('click', (e) => {
+        if (G.Me.sidearmChosen) return;
+        const b = e.target.closest('[data-arm]'), ok = e.target.closest('[data-armok]');
+        if (b) { this.armSel = b.dataset.arm; G.Audio.click(); return this.sidearmPick(); } // (chosen, not yet taken)
+        if (!ok || ok.disabled || !this.armSel) return;
+        const id = this.armSel;
+        G.Me.setSidearm(id); G.Audio.click();
+        G.Net.toHost({ t: 'arm', id }); // (so the squad sees it)
+        G.HUD.toast('', `Sidearm: ${G.WEAPONS[id].name}`, 1.4);
+        this.armSel = null; this.sidearmPick(); this.renderRoute();
+      });
+    }
   },
   renderRoute() {
     const rm = this.routeMap, st = this.routeSt;
@@ -749,8 +787,11 @@ G.Game = {
     const ids = Object.keys(this.roster || {}), voted = ids.filter((id) => st.votes[id] != null).length;
     this.$('routeMsg').innerHTML = mine == null ? (boss ? 'The Kingpin is waiting. Click the node to go in.' : !st.path.length ? `The way in: ${G.U.esc(G.THEMES[rm.nodes.get(opts[0]).th].name)}. Click it to deploy; the routes split after it.` : 'Pick where to deploy next: click one of the lit nodes. Each path decides the environments ahead.')
       : ids.length > 1 ? `Voted. Waiting for the squad (${voted}/${ids.length}); most votes wins, ties are a coin toss.` : 'Deploying...';
+    const arms = this.arms || {}, roster = this.roster || {};
+    if (this.level === 1 && ids.length > 1 && G.Me.sidearmChosen) this.$('routeMsg').innerHTML += `<div class="arm-squad">Sidearms (each your own): ${ids.map((id) => `<i style="color:${G.U.hex(roster[id].color)}">${G.U.esc(roster[id].name)}</i> ${arms[id] ? G.U.esc(G.WEAPONS[arms[id]].name) : '<small>choosing…</small>'}`).join(' · ')}</div>`;
   },
   pickRoute(n) {
+    if (!G.Me.sidearmChosen) return; // (pick your sidearm first)
     if (this.phase !== 'route' || !this.routeMap || !G.Route.options(this.routeMap, this.routeSt.path[this.routeSt.path.length - 1]).includes(n)) return;
     G.Audio.click();
     G.Net.toHost({ t: 'pick', n });
@@ -770,7 +811,7 @@ G.Game = {
     G.Views.clearLevel();
     G.HUD.buildMinimap(this.map);
     const team = [...G.Views.players.values()].map((p) => p.st && p.st.w && G.Gunsmith.fromCode(p.st.w)).filter(Boolean).map((d) => d.soundKey);
-    G.GunAudio.prewarm([...Object.values(G.Me.weapons).map((w) => w.def.soundKey), ...this.enemyGuns(level), ...team], this.map);
+    G.GunAudio.prewarm([...Object.values(G.Me.weapons).flatMap((w) => [w.def.soundKey, G.Gunsmith.roundSoundKey(w.def, w.chamber || w.ammo)]), ...this.enemyGuns(level), ...team], this.map);
     // spread the squad out in the spawn room
     const ids = Object.keys(this.roster).sort();
     const i = Math.max(0, ids.indexOf(G.Net.myId));
@@ -870,6 +911,7 @@ G.Game = {
       G.GunAudio.updateListener(G.R.camera);
       if (this.hub) { G.Hangar.update(dt); G.Hangar.mark(); }
       G.Views.update(dt);
+      if (G.Me.dead) G.Me.spectate(dt); // (after the rigs are posed: the helmet camera's on a head as it is this frame)
       G.Me.flushHits();
       this.updateZone();
       this.updateDoors(dt);
@@ -893,7 +935,10 @@ G.Game = {
       const piv = m.doorMeshes[i], u = piv.userData;
       u.ang += ((d.open ? 1 : 0) - u.ang) * Math.min(1, dt * (u.rate || 7));
       piv.rotation.y = u.base + u.ang * Math.PI / 2 * 0.95 * (u.sign || 1);
+      const k = Math.min(1, u.ang * 2.5); // (the lamps' light past it: all in by the time it's well ajar)
+      G.LightGrid.setDoor(i, k < 0.01 ? 0 : k > 0.99 ? 1 : k);
     });
+    G.LightGrid.flush();
   },
   updateZone() { /* no exit zone: the squad votes to leave (Y) once order's restored */ },
 };

@@ -118,33 +118,12 @@ G.Rig = (() => {
     const hd = D(k.helmet);
     part = 'helmet';
     if (rig.hairMesh) rig.hairMesh.visible = !hd;
-    if (hd) {
-      const cut = { 'h.bump': [0.146, 0.48], 'h.fast': [0.148, 0.5], 'h.ach': [0.15, 0.58], 'h.rifle': [0.153, 0.58], 'h.visor': [0.153, 0.6] }[hd.id] || [0.15, 0.55];
-      const col = { 'h.bump': 0x3a3d40, 'h.fast': 0x5a5240, 'h.ach': 0x3d4232, 'h.rifle': 0x2e3236, 'h.visor': 0x2a2d30 }[hd.id] || 0x2a2d30;
-      add(Hd, new T.Mesh(new T.SphereGeometry(cut[0], 14, 8, 0, Math.PI * 2, 0, Math.PI * cut[1]), KM(col)), 0, 0.14, 0);
-      if (hd.id !== 'h.bump') {
-        for (const x of [-1, 1]) box(Hd, 0.012, 0.035, 0.1, 0x1c1e20, x * 0.148, 0.15, 0.0); // side rails
-        box(Hd, 0.05, 0.035, 0.035, 0x1c1e20, 0, 0.22, -0.125); // the NV mount
-      }
-      if (hd.id === 'h.visor') box(Hd, 0.21, 0.13, 0.012, 0x5a7a8a, 0, 0.1, -0.135, { transparent: true, opacity: 0.55 });
-    }
+    const putHd = (m) => add(Hd, m, m.position.x, m.position.y, m.position.z);
+    if (hd) G.Headgear.helmet(hd.id, KM, putHd); // (its cut, rails, shroud and visor: js/headgear.js)
     // on the helmet's mount: a mandible round the jaw, or a shield over the face
     const fd = D(k.face);
     part = 'face';
-    if (fd && hd) {
-      if (fd.cover < 0.9) {
-        // a mandible: an arm down from each side of the helmet, into a guard that curves round the front over
-        // the mouth, the chin and the top of the neck
-        for (const x of [-1, 1]) { const arm = box(Hd, 0.02, 0.1, 0.045, 0x4a5056, x * 0.132, 0.1, -0.03); arm.rotation.z = x * 0.12; }
-        const guard = new T.Mesh(new T.CylinderGeometry(0.118, 0.1, 0.12, 20, 1, true, Math.PI - 1.75, 3.5), KM(0x5a6168, { side: T.DoubleSide }));
-        add(Hd, guard, 0, 0.03, -0.01);
-        for (let i = 0; i < 4; i++) box(Hd, 0.012, 0.03, 0.004, 0x2a2d30, -0.027 + i * 0.018, 0.035, -0.116); // vents over the mouth
-      } else {
-        const rifle = fd.id === 'f.rifle';
-        box(Hd, 0.22, 0.2, rifle ? 0.02 : 0.012, rifle ? 0x3e4e56 : 0x7a9aaa, 0, 0.1, -0.14, { transparent: true, opacity: rifle ? 0.75 : 0.45 });
-        for (const x of [-1, 1]) box(Hd, 0.015, 0.03, 0.06, 0x1c1e20, x * 0.115, 0.18, -0.11); // the arms
-      }
-    }
+    if (fd && hd) G.Headgear.face(fd.id, hd.id, KM, putHd);
     // the carrier: a soft vest, a slick plate carrier, a chest rig, or a full carrier with its pouches
     const cd = D(k.carrier), cc = KIT_COL(cd);
     part = 'carrier';
@@ -283,10 +262,7 @@ G.Rig = (() => {
       M_(new T.BoxGeometry(0.12, 0.036, 0.006), lens, 0, 0.137, -0.115, head);
       const strap = M_(new T.TorusGeometry(0.1, 0.007, 4, 28), dark, 0, 0.14, 0.004, head); strap.rotation.x = Math.PI / 2; strap.scale.set(0.95, 1.04, 1);
     }
-    if (helmetM) {
-      M_(new T.SphereGeometry(0.148, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), helmetM, 0, 0.14, 0, head);
-      if (style === 'tactical') M_(new T.BoxGeometry(0.06, 0.04, 0.05), gear, 0, 0.2, -0.13, head);
-    }
+    if (helmetM) G.Headgear.helmet(style === 'tactical' ? 'h.fast' : 'generic', (c, op) => (op ? new T.MeshLambertMaterial(Object.assign({ color: c }, op)) : L(c)), (m) => head.add(m), helmetM.color.getHex()); // (js/headgear.js)
     if (o.vex) { // Vex, as his portrait has him: a dark hood, a black visor with two orange eyes, a grey respirator, a gold strap
       const hoodM = new T.MeshLambertMaterial({ color: 0x1d1c18, side: T.DoubleSide });
       const hood = M_(new T.SphereGeometry(0.128, 18, 12, 5.58, 4.54, 0, Math.PI * 0.66), hoodM, 0, 0.125, 0.012, head); hood.scale.set(0.98, 1.04, 1.06); // (open at the front)
@@ -301,7 +277,7 @@ G.Rig = (() => {
       for (const x of [-0.03, 0, 0.03]) { const v = M_(new T.CylinderGeometry(0.0075, 0.0075, 0.006, 8), L(0x1b1b19), x, 0.05, -0.1105, head); v.rotation.x = Math.PI / 2; }
       const strap = M_(new T.BoxGeometry(0.045, 0.34, 0.012), L(0xc9a227), -0.1, 0.12, -0.151, chest); strap.rotation.z = -0.5; // gold, across the chest
     }
-    if (style === 'suspect' && !headCover && rnd() < 0.5) { const capM = L(pick(PAL.hoodie)); M_(new T.BoxGeometry(0.2, 0.05, 0.23), capM, 0, 0.245, 0, head); M_(new T.BoxGeometry(0.18, 0.015, 0.1), capM, 0, 0.225, -0.15, head); }
+    if (style === 'suspect' && !headCover && rnd() < 0.5) { if (hairMesh) hairMesh.scale.y *= 0.9; G.Headgear.cap((c, op) => (op ? new T.MeshLambertMaterial(Object.assign({ color: c }, op)) : L(c)), (m) => head.add(m), pick(PAL.hoodie)); } // a baseball cap
 
     // ---- arms: tapered, with elbows; sleeves (short for a T-shirt), and hands with fingers and a thumb
     const longSleeves = look.top !== 'tshirt';
@@ -463,6 +439,12 @@ G.Rig = (() => {
     rig.gunMount.add(rig.gun);
   }
 
+  // Prone (an officer lying down to shoot), as the rig draws it: how far the chest is propped up on the elbows (rad),
+  // the head lifted, turned and rolled down onto the stock; the gun drawn in toward the middle (chest frame: x across,
+  // up off the ground, forward); the feet (body frame: across, along the body, off the ground: the right one drawn up
+  // and out, the left straight back), and where the elbows bend toward (rig frame: across, height, ahead: -z)
+  const PRONE = { prop: 0.2, neck: 1.05, turn: 0, roll: 0, gunX: 0.07, gunUp: 0.09, gunFwd: 0.22,
+    footR: [0.42, 0.42, 0.08], footL: [-0.26, 0.04, 0.04], elbowX: 0.32, elbowY: -0.4, elbowZ: -2.05 };
   // p: { pos (Vector3 ground position), yaw, pitch, crouch, alert, lean, state: 'alive'|'down', moving override }
   function update(rig, dt, p) {
     const U = G.U, s = rig.scale;
@@ -492,7 +474,12 @@ G.Rig = (() => {
     const tk = p.pose === 'takedown' ? p.tk || 0 : 0;
     const proneT = p.pose === 'cuffed' ? 1 : p.pose === 'takedown' ? U.smooth(0.05, 0.42, tk) : 0;
     rig.proneW = (rig.proneW || 0) + (proneT - (rig.proneW || 0)) * Math.min(1, dt * (p.pose === 'takedown' ? 14 : 5));
-    rig.crouchW += ((p.crouch || posed ? 1 - rig.proneW : 0) - rig.crouchW) * Math.min(1, dt * 9);
+    // prone, to shoot (an officer, p.prone): on their front, propped on the elbows, head up, the gun level in front;
+    // the body lies out ahead of the feet, so it's slid back to keep the head over where they're looking from
+    rig.proneS = (rig.proneS || 0) + ((p.prone && !posed && p.state !== 'down' ? 1 : 0) - (rig.proneS || 0)) * Math.min(1, dt * 4);
+    const lie = Math.max(rig.proneW, rig.proneS);
+    if (rig.proneS > 0.001) { root.position.x += Math.sin(p.yaw) * 1.45 * s * rig.proneS; root.position.z += Math.cos(p.yaw) * 1.45 * s * rig.proneS; }
+    rig.crouchW += ((p.crouch || posed ? 1 - lie : 0) - rig.crouchW) * Math.min(1, dt * 9);
     rig.downW += ((p.state === 'down' ? 1 : 0) - rig.downW) * Math.min(1, dt * 5);
     rig.aimW += ((p.alert && !posed && !rig.slung ? 1 : 0) - rig.aimW) * Math.min(1, dt * 6);
     rig.lean += ((p.lean || 0) - rig.lean) * Math.min(1, dt * 8);
@@ -507,15 +494,15 @@ G.Rig = (() => {
 
     // body: hips height, lean, downed pose
     const hipH = U.lerp(HIP_H, CROUCH_H, rig.crouchW) - bob + 0.02 * moving;
-    rig.body.rotation.set(-Math.PI / 2 * 0.96 * rig.proneW, 0, 0); // tips forward about the feet
-    rig.body.position.y = 0.12 * rig.proneW;
+    rig.body.rotation.set(-Math.PI / 2 * 0.96 * lie, 0, 0); // tips forward about the feet
+    rig.body.position.y = 0.12 * lie;
     rig.hips.position.set(rig.lean * 0.14, U.lerp(hipH, 0.17, rig.downW), U.lerp(0, 0.06, rig.crouchW));
     rig.hips.rotation.set(0, Math.sin(rig.phase) * 0.12 * moving, 0);
     const fl = rig.flinch.z;
     rig.spine.rotation.set(-localFwd * 0.025 - rig.crouchW * 0.4 + rig.downW * 0.35 + fl * rig.flinch.x * 0.6, -rig.hips.rotation.y, -rig.lean * 0.28 + fl * rig.flinch.y * -0.6);
     const pitch = U.clamp(p.pitch || 0, -1.2, 1.2) * rig.aimW;
-    rig.chest.rotation.set(pitch * 0.75 + rig.crouchW * 0.32 - rig.downW * 0.25 + rig.kick * 0.08, 0, -rig.lean * 0.25);
-    rig.neck.rotation.set(pitch * 0.25 - fl * rig.flinch.x * 0.3 - rig.proneW * 0.5, rig.proneW * 0.9, rig.lean * 0.3); // cheek to the floor
+    rig.chest.rotation.set(pitch * 0.75 + rig.crouchW * 0.32 - rig.downW * 0.25 + rig.kick * 0.08 + rig.proneS * PRONE.prop, 0, -rig.lean * 0.25); // (prone: up on the elbows, a little)
+    rig.neck.rotation.set(pitch * 0.25 - fl * rig.flinch.x * 0.3 - rig.proneW * 0.5 + rig.proneS * PRONE.neck, rig.proneW * 0.9 + rig.proneS * PRONE.turn, rig.lean * 0.3 + rig.proneS * PRONE.roll); // cheek to the floor (cuffed); head up, cheek down on the stock (prone)
     rig.head.rotation.set(0, 0, 0);
 
     // gun: shouldered when alert, low-ready otherwise; pistols held out in front
@@ -523,8 +510,12 @@ G.Rig = (() => {
     const pistol = gi && gi.pistol;
     const mount = rig.gunMount;
     if (pistol) mount.position.set(0.02, U.lerp(0.18, 0.27, rig.aimW), U.lerp(-0.32, -0.46, rig.aimW));
-    else mount.position.set(0.12, U.lerp(0.2, 0.28, rig.aimW) - (gi ? gi.sy * 0.6 : 0), -0.15 + rig.kick * 0.04);
-    mount.rotation.set(U.lerp(-0.75, 0, rig.aimW) + rig.kick * 0.12, U.lerp(-0.35, 0, rig.aimW), 0);
+    else mount.position.set(0.12, U.lerp(0.2, 0.28, rig.aimW) - (gi ? gi.sy * 0.6 : 0), -0.21 + rig.kick * 0.04); // (well out in front, the support arm bent)
+    mount.rotation.set(U.lerp(-0.75, 0, rig.aimW) + rig.kick * 0.12 + rig.proneS * (Math.PI / 2 * 0.96 - PRONE.prop), U.lerp(-0.35, 0, rig.aimW), 0); // (prone: back up level, off the chest lying flat)
+    // a bullpup's grip (and so its butt) is well forward of a rifle's: back with it, so the butt's in the shoulder
+    const pup = gi && !pistol ? Math.max(0, gi.grip[0] - 0.05) : 0;
+    if (pup) { mount.position.z += pup * (1 - rig.proneS); mount.position.y -= pup * rig.proneS; }
+    if (rig.proneS > 0.001) { mount.position.x += (PRONE.gunX - mount.position.x) * rig.proneS; mount.position.z += PRONE.gunUp * rig.proneS; mount.position.y += PRONE.gunFwd * rig.proneS; } // (in under the cheek, up off the ground)
     if (rig.throwT >= 0 && !rig.throwHand) mount.rotation.x -= 0.6 * Math.sin(Math.PI * Math.min(1, rig.throwT / 0.9));
     // a reload: the gun canted toward the support hand; inspecting it: rolled over and turned to look along it
     const rl = p.reload != null && p.reload >= 0 ? p.reload : -1, ins = p.inspect != null && p.inspect >= 0 ? p.inspect : -1;
@@ -543,13 +534,21 @@ G.Rig = (() => {
       let fz = dZ * swing * stepLen + rig.crouchW * (side > 0 ? 0.42 : -0.32);
       if (rig.downW > 0.5) { fz = -0.75; fx = side * 0.16; }
       let fy = 0.06 + lift;
+      let legPole = null;
+      if (rig.proneS > 0.01) { // prone: legs spread, toes down; the right knee drawn up and out to the side
+        const k = rig.proneS, [px, py, pz] = side > 0 ? PRONE.footR : PRONE.footL;
+        fx = U.lerp(fx, px, k); fy = U.lerp(fy, py, k); fz = U.lerp(fz, pz, k);
+        legPole = rig.body.localToWorld(_d.set(side * 1.2, side > 0 ? 0.9 : 0.6, 0.12)).clone();
+      }
       if (p.act && p.act.kind === 'kick' && side > 0) { const k = G.U.kickFoot(p.act.t); fx = 0.1; fy = k.y; fz = k.z; } // right leg kicks
       const target = rig.body.localToWorld(_c.set(fx, fy, fz)).clone();
-      const pole = rig.body.localToWorld(_d.set(fx, 0.6, -1.2)).clone();
+      const pole = legPole || rig.body.localToWorld(_d.set(fx, 0.6, -1.2)).clone();
       ik(leg.th, leg.sh, THIGH * s, SHIN * s, target, pole);
     }
 
     // arms: hands on the gun's grip and support points; right arm can override to throw
+    const shL = rig.armL.up, shHome = shL.userData.home || (shL.userData.home = shL.position.clone());
+    shL.position.copy(shHome); // (the left shoulder, unless it's reaching: below)
     if (posed) {
       // hands up / hands behind the back / hands over the head
       for (const [arm, side] of [[rig.armL, -1], [rig.armR, 1]]) {
@@ -567,7 +566,25 @@ G.Rig = (() => {
         ik(arm.up, arm.lo, UARM * s, FARM * s, tgt, pole);
       }
     } else if (rig.gun && gi && !rig.slung) {
-      rig.gun.updateMatrixWorld(true);
+      // held out in front: a long gun's forend can be past where the left arm reaches; it comes back along itself
+      // till the support hand's on it
+      if (!gi.pistol) {
+        rig.chest.updateMatrixWorld(true);
+        const S = rig.gun.localToWorld(_a.set(gi.support[2] - 0.01, gi.support[1], -gi.support[0])), P = rig.armL.up.getWorldPosition(_b);
+        const f = _c.set(0, 0, -1).transformDirection(rig.gun.matrixWorld), D = _d.subVectors(S, P), R = (UARM + FARM) * s * 0.98;
+        // first the shoulder rolls forward toward it (as reaching does), up to 7 cm; then the gun comes back
+        const far = D.length() - R;
+        if (far > 0) {
+          P.addScaledVector(D, Math.min(0.07 * s, far) / D.length()); shL.position.copy(shL.parent.worldToLocal(_e.copy(P)));
+          D.subVectors(S, P);
+        }
+        const df = D.dot(f), over = D.lengthSq() - R * R;
+        if (over > 0) {
+          const back = df - Math.sqrt(Math.max(0, df * df - over));
+          if (back > 0) rig.gunMount.position.addScaledVector(_e.set(0, 0, 1).applyQuaternion(rig.gunMount.quaternion), back / s);
+        }
+      }
+      rig.gunMount.updateMatrixWorld(true);
       const grip = rig.gun.localToWorld(new T.Vector3(gi.grip[2], gi.grip[1], -gi.grip[0]));
       const supp = rig.gun.localToWorld(new T.Vector3(gi.support[2] - 0.01, gi.support[1], -gi.support[0]));
       let rTarget = grip;
@@ -584,8 +601,10 @@ G.Rig = (() => {
         const pouch = rig.hips.localToWorld(new T.Vector3(-0.2, 0.06, -0.12)), L2 = (a, b, u) => a.clone().lerp(b, U.smooth(0, 1, u));
         sp = rl < 0.15 ? L2(supp, well, rl / 0.15) : rl < 0.35 ? L2(well, pouch, (rl - 0.15) / 0.2) : rl < 0.6 ? L2(pouch, well, (rl - 0.35) / 0.25) : rl < 0.82 ? well : L2(well, supp, (rl - 0.82) / 0.18);
       } else if (p.magChk != null && p.magChk >= 0) sp = well.clone().lerp(rig.chest.localToWorld(new T.Vector3(-0.04, 0.32, -0.4)), U.smooth(0.25, 1, p.magChk));
-      ik(rig.armR.up, rig.armR.lo, UARM * s, FARM * s, rTarget, rig.chest.localToWorld(new T.Vector3(0.6, -0.2, 0.4)));
-      ik(rig.armL.up, rig.armL.lo, UARM * s, FARM * s, sp, rig.chest.localToWorld(new T.Vector3(-0.6, -0.3, 0.2)));
+      // the elbows: out and down beside you standing; prone, planted on the ground ahead of the shoulders
+      const elbow = (side, stand) => { const q = rig.chest.localToWorld(stand); if (rig.proneS > 0.01) q.lerp(rig.root.localToWorld(new T.Vector3(side * PRONE.elbowX, PRONE.elbowY, PRONE.elbowZ)), rig.proneS); return q; };
+      ik(rig.armR.up, rig.armR.lo, UARM * s, FARM * s, rTarget, elbow(1, new T.Vector3(0.6, -0.2, 0.4)));
+      ik(rig.armL.up, rig.armL.lo, UARM * s, FARM * s, sp, elbow(-1, new T.Vector3(-0.6, -0.3, 0.2)));
       // the magazine: in the support hand from when it comes out to when the new one's seated (or while it's
       // checked), otherwise on the gun
       const mg = rig.gun.userData.mag;

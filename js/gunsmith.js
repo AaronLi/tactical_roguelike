@@ -74,7 +74,13 @@ G.GunsmithUI = (() => {
         case 'optic': p = new T.Vector3(c.x, box.max.y, c.z); break;
         case 'magnifier': { const o = mid('optic') || new T.Vector3(c.x, box.max.y, c.z); p = new T.Vector3(o.x, o.y, o.z + 0.08); break; }
         case 'fg': p = hg ? new T.Vector3(c.x, hg.min.y, hg.min.z + (hg.max.z - hg.min.z) * 0.4) : new T.Vector3(c.x, box.min.y + sz.y * 0.3, front(0.3)); break;
-        case 'tac': p = hg ? new T.Vector3(hg.max.x, (hg.min.y + hg.max.y) / 2, hg.min.z + (hg.max.z - hg.min.z) * 0.25) : new T.Vector3(box.max.x, c.y, front(0.35)); break;
+        case 'tac': case 'tacL': { // (beside a clamp-on rail mount, or the handguard's side rail)
+          const rm = by.railmount && !by.railmount.isEmpty() ? by.railmount : null, R = s.slot === 'tac';
+          p = rm ? new T.Vector3(R ? rm.max.x + 0.012 : rm.min.x - 0.012, (rm.min.y + rm.max.y) / 2, (rm.min.z + rm.max.z) / 2)
+            : hg ? new T.Vector3(R ? hg.max.x : hg.min.x, (hg.min.y + hg.max.y) / 2, hg.min.z + (hg.max.z - hg.min.z) * 0.25) : new T.Vector3(R ? box.max.x : box.min.x, c.y, front(0.35));
+          break;
+        }
+        case 'railmount': p = new T.Vector3(c.x, bore.y, hg ? hg.min.z - 0.03 : by.barrel ? by.barrel.max.z - 0.05 : front(0.3)); break;
         case 'stock': p = new T.Vector3(c.x, c.y, box.max.z); break;
         case 'loader': p = new T.Vector3(box.min.x, c.y, c.z); break;
         case 'receiver': p = mid('base') || c; break;
@@ -90,9 +96,10 @@ G.GunsmithUI = (() => {
     const host = document.getElementById('gsDots');
     if (!host || !model) return;
     const w = weapon(), slots = w ? GS.visibleSlots(w.def.id, w.def.build) : [];
-    if (host.dataset.key !== modelKey + '|' + slots.map((s) => s.slot).join(',')) {
-      host.dataset.key = modelKey + '|' + slots.map((s) => s.slot).join(',');
-      host.innerHTML = slots.filter((s) => anchors[s.slot]).map((s) => `<button class="gs-dot${w.def.build[s.slot] ? '' : ' empty'}" data-gdot="${s.slot}" title="${GS.SLOT_LABEL[s.slot]}"></button>`).join('');
+    const shop = slots.map((s) => (buyable(s.slot) ? 1 : 0)).join(''), key = modelKey + '|' + slots.map((s) => s.slot).join(',') + '|' + shop;
+    if (host.dataset.key !== key) {
+      host.dataset.key = key;
+      host.innerHTML = slots.filter((s) => anchors[s.slot]).map((s) => { const b = buyable(s.slot); return `<button class="gs-dot${w.def.build[s.slot] ? '' : ' empty'}${b ? ' shop' : ''}" data-gdot="${s.slot}" title="${GS.slotLabel(s)}${b ? ' · parts for it in the store' : ''}">${b ? '<i>!</i>' : ''}</button>`; }).join('');
     }
     const r = host.getBoundingClientRect();
     model.updateMatrixWorld(true);
@@ -131,7 +138,8 @@ G.GunsmithUI = (() => {
     const el = document.getElementById('gsHover');
     if (!el) return;
     const w = weapon(), pid = s && w.def.build[s], p = pid && GS.PARTS[pid];
-    el.innerHTML = s ? `<b>${GS.SLOT_LABEL[s]}</b> ${p ? G.U.esc(p.name) : 'empty'}` : '';
+    const sl = s && GS.visibleSlots(w.def.id, w.def.build).find((q) => q.slot === s);
+    el.innerHTML = s ? `<b>${sl ? GS.slotLabel(sl) : GS.SLOT_LABEL[s]}</b> ${p ? G.U.esc(p.name) : 'empty'}` : '';
   }
   function loop() {
     if (!active) return;
@@ -154,7 +162,7 @@ G.GunsmithUI = (() => {
   const ROWS = [
     ['Ergonomics', (d) => d.ergo, 1, (v) => Math.round(v), [0, 100]],
     ['Recoil', (d) => d.recoil, -1, (v) => v.toFixed(2) + '°', [0, 6]],
-    ['Aimed spread', (d) => d.ads, -1, (v) => v.toFixed(2) + '°', [0, 5]],
+    ['Accuracy', (d) => d.ads * 120, -1, (v) => (v < 10 ? v.toFixed(1) : Math.round(v)) + ' MOA', [0, 20]], // (aimed: the group the gun itself makes)
     ['Hip spread', (d) => d.spread, -1, (v) => v.toFixed(1) + '°', [0, 8]],
     ['Damage', (d) => (d.explosive ? d.explosive.dmg : d.dmg * d.pellets), 1, (v) => Math.round(v), [0, 300]],
     ['Range', (d) => d.range, 1, (v) => Math.round(v) + ' m', [0, 150]],
@@ -205,7 +213,7 @@ G.GunsmithUI = (() => {
 
   // what a part fits: its interface, how many weapons take it, and which of yours
   function fitsLine(p, exceptId) {
-    const ids = GS.fits(p.mount), mine = Object.values(G.Me.weapons).filter((w) => w && w.def.id !== exceptId && ids.includes(w.def.id));
+    const ids = GS.fitsPart(p), mine = Object.values(G.Me.weapons).filter((w) => w && w.def.id !== exceptId && ids.includes(w.def.id));
     return `<em class="gs-fit">${G.U.esc(GS.ifaceName(p.mount))}${ids.length > 1 ? ` · fits ${ids.length} weapons` : ''}${mine.length ? ` · also your ${mine.map((w) => w.def.name).join(', ')}` : ''}</em>`;
   }
 
@@ -217,6 +225,12 @@ G.GunsmithUI = (() => {
   // that doesn't fit (its own barrel, after a receiver swap)
   const forSale = (p) => (!p.factory && G.Shop.partStock && G.Shop.partStock.has(p.id)) || needed(p);
   const needed = (p) => { const w = weapon(), d = w && w.def; return !!d && GS.PLATFORMS[d.id].defaults[p.slot] === p.id && d.missing.includes(p.slot); };
+  // does the store have a part for this slot of the gun you're working on (one that fits it, and isn't the one on it)?
+  // Its dot on the model and its row in the list get a "!".
+  function buyable(slot) {
+    const w = weapon(), s = w && GS.visibleSlots(w.def.id, w.def.build).find((q) => q.slot === slot);
+    return !!s && GS.compatible(s.mount).some((p) => p.id !== w.def.build[slot] && forSale(p));
+  }
   function apply(w, build) {
     G.Me.refit(w, build);
     if (G.GunAudio.available()) G.GunAudio.buildDry(w.def.soundKey);
@@ -264,7 +278,7 @@ G.GunsmithUI = (() => {
     for (const s of slots) {
       const p = build[s.slot] && GS.PARTS[build[s.slot]];
       const bad = p && p.mount !== s.mount;
-      slotRows += `<div class="gs-slot${s.slot === st.slot ? ' on' : ''}${s.parent ? ' sub' : ''}${bad || (!p && s.req) ? ' misfit' : ''}" data-gslot="${s.slot}"><span>${GS.SLOT_LABEL[s.slot]}${s.req ? '' : ' <small>opt.</small>'}</span><b>${p ? G.U.esc(p.name) : '<em>empty</em>'}<i>${bad ? `doesn't fit the ${G.U.esc(GS.ifaceName(s.mount))}: it won't fire` : G.U.esc(GS.ifaceName(s.mount))}</i></b></div>`;
+      slotRows += `<div class="gs-slot${s.slot === st.slot ? ' on' : ''}${s.parent ? ' sub' : ''}${bad || (!p && s.req) ? ' misfit' : ''}" data-gslot="${s.slot}"><span>${GS.slotLabel(s)}${s.req ? '' : ' <small>opt.</small>'}${buyable(s.slot) ? ' <i class="gs-bang" title="Parts for it in the store">!</i>' : ''}</span><b>${p ? G.U.esc(p.name) : '<em>empty</em>'}<i>${bad ? `doesn't fit the ${G.U.esc(GS.ifaceName(s.mount))}: it won't fire` : G.U.esc(GS.ifaceName(s.mount))}</i></b></div>`;
     }
     // parts that fit the picked slot: fitted, in your stash, for sale, then the rest (out of stock / later)
     const cur = slots.find((s) => s.slot === st.slot);
@@ -290,7 +304,7 @@ G.GunsmithUI = (() => {
       <div class="gs-tabs">${tabs}</div>
       <div class="gs-main">
         <div class="gs-left"><div class="gs-view"><div id="gsHover" class="gs-hover"></div><div id="gsDots" class="gs-dots"></div><div class="gs-hint">Drag to turn · scroll to zoom · click a part or a dot</div></div>
-        <div class="gs-list"><div class="gs-sub">${cur ? GS.SLOT_LABEL[cur.slot] + (cur.req ? '' : ' (optional)') : ''}</div>${list}</div></div>
+        <div class="gs-list"><div class="gs-sub">${cur ? GS.slotLabel(cur) + (cur.req ? '' : ' (optional)') : ''}</div>${list}</div></div>
         <div class="gs-side"><div class="gs-title">${def.name}${def.modified ? ' <small>CUSTOM</small>' : ''}${def.missing.length ? ' <small class="broken">WON\'T FIRE</small>' : ''}</div>
           <div class="gs-slots">${slotRows}</div>
           <div class="gs-stats">${statsHtml(def, preview)}</div></div>

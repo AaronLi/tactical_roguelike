@@ -4,20 +4,28 @@
 // The body is seven parts, each with its own health: head 35, thorax 85, stomach 70, arms 60, legs 65. A hit
 // takes health from the part it lands on, and can leave an injury there:
 //   bleeding (light or heavy), a fracture (arms and legs), a punctured lung (thorax), a gut wound (stomach).
-// An unarmoured head is still a kill. The head at zero is death; the thorax at zero puts you down, and so does
-// blood running low. A destroyed arm, leg or stomach passes further damage on to the thorax.
-// Down, you bleed out slowly (a sixteenth of the rate standing, but nothing clots any more), until the blood's gone.
-// A teammate stopping every bleed only stabilises you; to get you up they also need your blood back over half
-// (blood bags), then a revive.
+// What a hit mostly does, though, is cost blood (100 to start): at once, as the wound opens, and then for as long as
+// it bleeds. Blood is what decides whether you're up:
+//   over 40%: up, however hurt;
+//   40% or less: one more hit, anywhere, puts you down;
+//   15% or less: unconscious;
+//   none: dead.
+// A part at zero only stops working (an arm that won't hold the gun steady, a leg that won't carry you, a chest that
+// can't get a breath in); it doesn't put you down by itself. The head is the exception: an unarmoured head is still
+// a kill, and so is the head at zero.
+// Down, you bleed slowly (a sixteenth of the rate standing, but nothing clots any more), until the blood's gone. A
+// teammate gets a downed (conscious) officer up with a revive; an unconscious one needs blood bags first, to come
+// round. Stop the bleeding before that, or it carries on where it left off: and with low blood, the next hit puts you
+// straight back down.
 // Light bleeding clots by itself in 30-60 s (a bandage stops it at once; a fresh wound there starts it over); heavy
-// bleeding never stops without a tourniquet or gauze. Bleeding drains blood (100 to start): low blood hurts your aim and pace, very low puts you down, none is
-// death. Pain (fractures, wrecked parts, bleeding) throws your aim; painkillers hold it off for two minutes.
+// bleeding never stops without a tourniquet or gauze. Low blood hurts your aim and pace.
+// Pain (fractures, wrecked parts, bleeding) throws your aim; painkillers hold it off for two minutes.
 // A punctured lung and blood loss work through painkillers; leg fractures slow you whatever you've taken.
 //
 // Field treatment, each for one injury on one part (and it takes time, see js/invui.js):
 //   bandage (light bleed, anywhere), tourniquet (heavy bleed, arm or leg), hemostatic gauze (heavy or light bleed,
 //   anywhere), chest seal (punctured lung), splint (fracture, arm or leg), painkillers (pain, two minutes),
-//   blood bag (40% blood back: on yourself before you black out, or on a downed teammate so they can be revived).
+//   blood bag (40% blood back: on yourself, or on a teammate; an unconscious one comes round with it).
 // Bandages and painkiller doses stack 4 to a slot, tourniquets and gauze 3; the rest are one each.
 // A gut wound can't be fixed in the field. Everything heals at the quartermaster's.
 G.Med = (() => {
@@ -35,14 +43,17 @@ G.Med = (() => {
     gauze: { name: 'Hemostatic gauze', fixes: 'heavy', light: true, where: 'any', time: 5, size: [1, 1], price: 120, stack: 3, desc: 'Packed into the wound: stops heavy bleeding anywhere, the torso too. Works as a bandage on lighter bleeding too.' },
     seal: { name: 'Chest seal', fixes: 'lung', where: ['thorax'], time: 4, size: [1, 1], price: 150, desc: 'Seals a punctured lung: you can breathe again.' },
     splint: { name: 'Splint', fixes: 'frac', where: 'limb', time: 6, size: [1, 2], price: 100, desc: 'Holds a broken arm or leg: no more limp or shaking aim from it.' },
-    bloodbag: { name: 'Blood bag', fixes: 'blood', where: 'any', time: 8, size: [1, 2], price: 220, desc: 'A transfusion: 40% of your blood back. Keeps you from blacking out, and brings a downed teammate\'s blood up far enough to revive them.' },
+    bloodbag: { name: 'Blood bag', fixes: 'blood', where: 'any', time: 8, size: [1, 2], price: 220, desc: 'A transfusion: 40% of your blood back. Keeps you out of the range where one more hit puts you down, and brings an unconscious teammate round.' },
     pills: { name: 'Painkillers', fixes: 'pain', where: 'any', time: 2, size: [1, 1], price: 90, stack: 4, desc: 'A dose: two minutes without pain throwing your aim. Doesn\'t fix anything.' },
   };
   const DRAIN = { light: 0.35, heavy: 2.2, gut: 0.08 }; // blood per second
   const PK = 120; // painkillers, seconds
   const BAG = 40; // a blood bag, % blood
-  const REVIVE_BLOOD = 50; // too little blood below this to stand (blood bags first)
+  const DOWNABLE = 40; // this much blood or less: the next hit puts you down
+  const UNCON = 15; // this much or less: unconscious (blood bags bring you round)
   const DOWN_K = 0.06; // down: bleeding this much slower (you're still, your pressure's low)
+  // blood lost at once to a wound, per point of damage (the torso bleeds most; the head's a different matter)
+  const HIT_BLOOD = { head: 0, thorax: 0.55, stomach: 0.55, limb: 0.35, frag: 0.3 };
 
   function newBody() {
     const parts = {};
@@ -58,15 +69,14 @@ G.Med = (() => {
     if (zone === 'uarm' || zone === 'farm') return 'arm' + s;
     return 'leg' + s;
   }
-  // Damage to a part (points of a 100-point person, as js/data.js wounds), with the chance of injuries.
-  // through: how much of the round got through armour (0..1); central: through the middle of the part.
-  // Returns what happened to you: null, 'down' or 'dead'.
+  // Damage to a part (points of a 100-point person, as js/data.js wounds), with the chance of injuries, and the
+  // blood it costs. through: how much of the round got through armour (0..1); central: through the middle of the part.
+  // Returns what happened to you: null, 'down', 'out' (unconscious) or 'dead'.
   function hit(b, part, dmg, central, through = 1, bullet = true) {
-    const p = b.parts[part];
-    let left = dmg;
-    if (p.hp > 0) { const t = Math.min(p.hp, left); p.hp -= t; left -= t; }
-    // a wrecked limb or stomach: the rest goes to the thorax
-    if (left > 0 && part !== 'head' && part !== 'thorax') b.parts.thorax.hp = Math.max(0, b.parts.thorax.hp - left * 0.7);
+    const p = b.parts[part], downable = b.blood <= DOWNABLE; // (low already: this is the hit that puts you down)
+    p.hp = Math.max(0, p.hp - dmg); // (a part at zero only stops working: js/medical.js aimPenalty, speedMult)
+    // (a wound alone never empties you: at worst it knocks you out, and the bleeding finishes it unless someone stops it)
+    b.blood = Math.max(Math.min(b.blood, 1), b.blood - dmg * (bullet ? HIT_BLOOD[isLimb(part) ? 'limb' : part] : HIT_BLOOD.frag));
     if (bullet && through > 0.2) {
       const r = Math.random() / through;
       if (r < (central ? 0.45 : 0.15)) p.heavy = true;
@@ -77,9 +87,13 @@ G.Med = (() => {
     } else if (!bullet && Math.random() < 0.5) bleed(p); // fragments
     else if (p.light) p.clot = Math.max(p.clot || 0, 15); // knocked open again
     if (p.heavy && isLimb(part)) p.tq = false; // a new wound past the tourniquet
-    if (b.parts.head.hp <= 0) return 'dead';
-    if (b.parts.thorax.hp <= 0) return 'down';
-    return null;
+    return fateOf(b, downable && dmg > 0);
+  }
+  // where your blood (and your head) leave you: dead, unconscious, down (hit: you were just hit), or up (null)
+  function fateOf(b, hit) {
+    if (b.parts.head.hp <= 0 || b.blood <= 0) return 'dead';
+    if (b.blood <= UNCON) return 'out';
+    return hit ? 'down' : null;
   }
   // a light bleed starting (or a fresh one on top): it clots by itself in 30-60 s
   function bleed(p) { p.light = true; p.clot = 30 + Math.random() * 30; }
@@ -91,16 +105,16 @@ G.Med = (() => {
   }
   // down: seconds until you've bled out, or null when nothing's bleeding (stable)
   function bleedOut(b) { const d = drainOf(b, true); return d > 0 ? b.blood / d : null; }
-  // bleeding, light bleeds clotting (not once you're down), painkillers wearing off. Returns 'down' / 'dead'
-  // when the blood runs low / out.
+  // bleeding, light bleeds clotting (not once you're down), painkillers wearing off. Returns 'out' / 'dead' when the
+  // blood runs very low / out (low blood alone doesn't put you down: the next hit does).
   function tick(b, dt, down) {
     if (!down) for (const p of Object.values(b.parts)) if (p.light && (p.clot = (p.clot == null ? 45 : p.clot) - dt) <= 0) { p.light = false; p.clot = null; }
     b.blood = Math.max(0, b.blood - drainOf(b, down) * dt);
     b.pk = Math.max(0, b.pk - dt);
-    if (b.blood <= 0) return 'dead';
-    if (b.blood <= 15) return 'down';
-    return null;
+    return fateOf(b, false);
   }
+  const downable = (b) => b.blood <= DOWNABLE;
+  const unconscious = (b) => b.blood <= UNCON;
   const bleeding = (b) => Object.values(b.parts).some((p) => p.light || p.heavy);
   // how badly your aim is thrown (0..1): pain (unless painkillers), a punctured lung, blood loss
   function aimPenalty(b) {
@@ -112,14 +126,15 @@ G.Med = (() => {
       if (p.heavy) pain += 0.12;
     }
     if (b.pk > 0) pain *= 0.1;
-    const lung = b.parts.thorax.lung ? 0.3 : 0, blood = b.blood < 70 ? (70 - b.blood) / 70 * 0.6 : 0;
+    const lung = b.parts.thorax.lung || b.parts.thorax.hp <= 0 ? 0.3 : 0, blood = b.blood < 70 ? (70 - b.blood) / 70 * 0.6 : 0;
     return G.U.clamp(pain + lung + blood, 0, 1);
   }
   // how fast you can move (x walk speed)
   function speedMult(b) {
     let k = 1;
     for (const s of ['legL', 'legR']) { const p = b.parts[s]; if (p.hp <= 0) k *= 0.6; else if (p.frac) k *= 0.72; }
-    if (b.parts.thorax.lung) k *= 0.88;
+    if (b.parts.thorax.lung || b.parts.thorax.hp <= 0) k *= 0.88; // (a wrecked chest: short of breath)
+    if (b.parts.stomach.hp <= 0) k *= 0.9;
     if (b.blood < 50) k *= 0.75 + b.blood / 200;
     return k;
   }
@@ -148,16 +163,21 @@ G.Med = (() => {
     else if (I.fixes === 'lung') p.lung = false;
     return true;
   }
-  // brought round by a teammate: the thorax holding again (the bleeding stopped and the blood back already: cantRevive)
-  function revive(b) { b.parts.thorax.hp = Math.max(b.parts.thorax.hp, 20); }
+  // A downed officer gets up with a teammate's help; an unconscious one has to come round first (blood bags)
   function cantRevive(b) {
     if (!b) return null;
-    if (bleeding(b)) return 'Still bleeding: stop every bleed first';
-    if (b.blood < REVIVE_BLOOD) return `Stable, but too little blood to stand (${Math.round(b.blood)}%): blood bags until it's over ${REVIVE_BLOOD}%`;
+    if (unconscious(b)) return `Unconscious: blood bags first (${Math.round(b.blood)}% blood, they come round over ${UNCON}%)`;
     return null;
   }
-  // overall, for the team display (0..100)
-  const overall = (b) => Math.max(0, Math.min(b.blood, b.parts.thorax.hp / b.parts.thorax.max * 100, b.parts.head.hp / b.parts.head.max * 100));
+  // what's worth saying before a revive: what'll put them straight back down
+  function reviveWarn(b) {
+    if (!b) return null;
+    if (bleeding(b)) return 'Still bleeding: they\'ll keep losing blood once up';
+    if (downable(b)) return `Low blood (${Math.round(b.blood)}%): the next hit puts them down again`;
+    return null;
+  }
+  // overall, for the team display (0..100): blood, unless the head's worse
+  const overall = (b) => Math.max(0, Math.min(b.blood, b.parts.head.hp / b.parts.head.max * 100));
 
   // over the network: [hp %, flags] per part, blood, painkillers on
   const FLAGS = ['light', 'heavy', 'frac', 'tq', 'lung', 'gut'];
@@ -215,5 +235,5 @@ G.Med = (() => {
     const kit = '<g class="fkit"><path d="M38 23 Q50 26 62 23"/><path d="M36 40 L37 66 M64 40 L63 66"/><path d="M32 89 Q50 93 68 89"/></g>';
     return `<svg class="figure ${opts.cls || ''}" viewBox="0 0 100 190" ${opts.w ? `width="${opts.w}"` : ''} xmlns="http://www.w3.org/2000/svg">${order.map(part).join('')}${kit}</svg>`;
   }
-  return { PARTS, NAME, ITEMS, LIMBS, figure, isLimb, newBody, partOf, hit, tick, bleedOut, bleeding, aimPenalty, speedMult, cantTreat, treat, revive, cantRevive, REVIVE_BLOOD, overall, encode, decode, describe };
+  return { PARTS, NAME, ITEMS, LIMBS, figure, isLimb, newBody, partOf, hit, tick, bleedOut, bleeding, aimPenalty, speedMult, cantTreat, treat, cantRevive, reviveWarn, downable, unconscious, DOWNABLE, UNCON, overall, encode, decode, describe };
 })();

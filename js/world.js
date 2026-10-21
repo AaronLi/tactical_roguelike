@@ -319,6 +319,12 @@ G.World = (() => {
   // a window's solids: its wall cells' sill and head (and an outside window's view), and the pane while it's whole
   function windowSolids(w, map, win) {
     if (win.door) return door(w, map, win.door); // (a glass door's pane: its door's solids)
+    if (win.rail) { // a railing's glass: under its handrail, while it's whole (it never stopped anyone walking: the drop's edge does)
+      for (const s of win.solids || []) remove(w, s);
+      const r = win.rail, Y = r.y, H = G.Level.RAIL_H;
+      win.solids = win.broken ? [] : [add(w, box(r.x0, Y + 0.08, r.z0, r.x1, Y + H - 0.04, r.z1, { kind: 'glass', glass: win.id, move: false, win }))];
+      return;
+    }
     for (const s of win.solids || []) remove(w, s);
     win.solids = [];
     const Y = win.fy || 0, fm = G.Level.floorMap(map, win.fl || 0);

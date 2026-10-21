@@ -77,6 +77,9 @@ G.Server = {
         G.Net.broadcast({ t: 'boom', id: from, p: m.p, r: m.r, d: m.d });
         break;
       case 'revive': G.Net.broadcast({ t: 'revive', tg: m.tg, by: from, hp: m.hp }); break;
+      // the range's IPSC course: a new stage laid (its seed), and a run as it happens (passed on to the others)
+      case 'course': if (+m.seed > 0) G.Net.broadcast({ t: 'course', seed: Math.floor(+m.seed) }, from); break;
+      case 'crun': if (m.s && typeof m.s === 'object') G.Net.broadcast({ t: 'crun', s: m.s, by: from }, from); break;
       // one officer's medical item on another: passed on to them (they apply it)
       case 'treat': if (G.Med.ITEMS[m.mt] && G.Med.NAME[m.part]) G.Net.broadcast({ t: 'treat', tg: m.tg, by: from, part: m.part, mt: m.mt, th: m.th ? 1 : 0 }); break;
       // an officer has started (or stopped) putting a medical item on another: only the one it's going on hears of it
@@ -89,6 +92,9 @@ G.Server = {
         if (p) { p.ready = !!m.r; this.sendRoster(); this.checkReady(); }
         break;
       // a vote on the route map for where to go next
+      case 'arm': // a player's own sidearm for the run (not a vote: everyone's told who took what)
+        if (p && G.STARTERS.includes(m.id)) { this.arms = this.arms || {}; this.arms[from] = m.id; G.Net.broadcast({ t: 'arms', a: this.arms }); }
+        break;
       case 'pick':
         if (p && this.phase === 'route' && G.Route.options(this.routeMap, this.route.path[this.route.path.length - 1]).includes(m.n)) {
           this.route.votes[from] = m.n;
@@ -211,6 +217,7 @@ G.Server = {
   startRun() {
     this.level = 1;
     this.team = { ver: 0, items: [] };
+    this.arms = {}; // (the sidearms picked: each player's own)
     G.Net.broadcast({ t: 'newrun' });
     this.toRoute();
   },
@@ -263,11 +270,11 @@ G.Server = {
   // The level's weapon case: a weapon in its standard build, fully loaded, picked by rarity. Each tier has a
   // share (CASE_RARITY), split evenly between that tier's weapons so a tier with many weapons isn't more
   // likely; deeper levels shift the odds toward rarer tiers, and legendaries only turn up from level 3.
-  // Three in four are long guns.
-  CASE_RARITY: { 1: 60, 2: 28, 3: 10, 4: 2 },
+  // Three in four are long guns. (Tier 0, the starter pistol, turns up too: less often the deeper you go.)
+  CASE_RARITY: { 0: 15, 1: 60, 2: 28, 3: 10, 4: 2 },
   caseOdds(level, slot) {
     const byTier = {};
-    for (const w of G.WEAPON_LIST) if (w.slot === slot && this.CASE_RARITY[w.tier] && !(w.tier === 4 && level < 3)) (byTier[w.tier] = byTier[w.tier] || []).push(w);
+    for (const w of G.WEAPON_LIST) if (w.slot === slot && G.obtainable(w) && this.CASE_RARITY[w.tier] && !(w.tier === 4 && level < 3)) (byTier[w.tier] = byTier[w.tier] || []).push(w);
     const out = [];
     for (const [tier, list] of Object.entries(byTier)) {
       const share = this.CASE_RARITY[tier] * Math.pow(1 + 0.25 * (level - 1), tier - 1);
@@ -284,7 +291,7 @@ G.Server = {
     // A gun that takes other receiver groups (js/parts.js RCV) now and then turns up built on one of them: an M4
     // lower with the AR-9 kit in it, an AK with the RPK's, fitted and working (its barrel and all), magazines and
     // rounds to match.
-    const kits = G.Gunsmith.kitsFor(w.id);
+    const kits = G.Gunsmith.kitsFor(w.id).filter((k) => G.obtainable(G.WEAPONS[G.Gunsmith.PARTS[k].becomes]));
     if (kits.length && Math.random() < 0.35) w = G.WEAPONS[G.Gunsmith.PARTS[kits[Math.floor(Math.random() * kits.length)]].becomes] || w;
     return { code: G.Gunsmith.defaultCode(w.id), mag: w.mag, reserve: w.mag * 2, am: G.rollAmmo(G.calOf(w)), kit: null };
   },
@@ -439,6 +446,12 @@ G.Server = {
     if (this.map.unitAt) { // apartments: a spot in each one goes to the front of the list
       const first = [], seen = new Set();
       for (const sp of spots) { const u = unitOf(sp); if (u >= 0 && !seen.has(u)) { seen.add(u); first.push(sp); } }
+      spots = first.concat(spots.filter((sp) => !first.includes(sp)));
+    } else if (this.map.NF > 1) { // houses: a spot in every room indoors, on every floor (the basements and upstairs too), first
+      const OUT = new Set(['yard', 'alley', 'lawn', 'road']), rooms = this.map.rooms;
+      const roomOf = (sp) => rooms.findIndex((r) => (r.fl || 0) === (sp[2] || 0) && sp[0] >= r.x && sp[0] < r.x + r.w && sp[1] >= r.z && sp[1] < r.z + r.h);
+      const first = [], seen = new Set();
+      for (const sp of spots) { const ri = roomOf(sp); if (ri >= 0 && !OUT.has(rooms[ri].type) && !seen.has(ri)) { seen.add(ri); first.push(sp); } }
       spots = first.concat(spots.filter((sp) => !first.includes(sp)));
     }
     this.unitsSeen = new Set(); // apartments an officer has been inside
@@ -773,7 +786,7 @@ G.Server = {
 
   // "POLICE! SHOW ME YOUR HANDS!" Everyone in earshot and sight rolls to comply.
   shout(p, from) {
-    const [px, py, pz] = p.st.p, ey = py + (p.st.cr ? 1.0 : 1.6), map = this.map, L = G.Level;
+    const [px, py, pz] = p.st.p, ey = py + (p.st.pr ? 0.36 : p.st.cr ? 1.0 : 1.6), map = this.map, L = G.Level;
     const officers = [...this.players.values()].filter((q) => q.st && !q.st.dn && !q.st.dd);
     let complied = 0;
     for (const e of this.enemies.values()) {
@@ -943,7 +956,7 @@ G.Server = {
   // (js/rig.js powerStep), so where that gun's bore actually points has to agree too. Kept waiting too long,
   // they snap a shot off anyway.
   onTarget(e, st, dt) {
-    const tx = st.p[0], ty = st.p[1] + (st.cr ? 0.75 : 1.2), tz = st.p[2], s = e.str == null ? 1 : e.str;
+    const tx = st.p[0], ty = st.p[1] + (st.pr ? 0.25 : st.cr ? 0.75 : 1.2), tz = st.p[2], s = e.str == null ? 1 : e.str;
     const sag = (1 - G.U.clamp(s / 0.6, 0, 1)) * 45;
     let on = Math.abs(G.U.angDiff(e.yaw, Math.atan2(-(tx - e.x), -(tz - e.z)))) < 0.16 && (e.kick || 0) < 2.5;
     const ev = on && G.Views && G.Views.enemies && G.Views.enemies.get(e.id), rig = ev && ev.rig, gi = rig && rig.gunInfo;
@@ -1166,7 +1179,7 @@ G.Server = {
         if (d > (map.theme.night && !(p.st.tl & 3) ? map.theme.night : 75)) continue;
         const lx = e.cover && e.cover.lean ? e.cover.px : e.x, lz = e.cover && e.cover.lean ? e.cover.pz : e.z;
         const [hx, hz] = this.headXZ(p.st);
-        const k = L.see(map, lx, ey, lz, hx, py + (p.st.cr ? 0.95 : 1.5), hz), vis = k > 0; // (through a window: k < 1)
+        const k = L.see(map, lx, ey, lz, hx, py + (p.st.pr ? 0.35 : p.st.cr ? 0.95 : 1.5), hz), vis = k > 0; // (through a window: k < 1)
         const score = d + (vis ? 0 : 40) + (k < 1 && vis ? 8 : 0);
         if (score < bs) { bs = score; best = p; bvis = vis; bd = d; e.seeK = k; }
       }
@@ -1184,7 +1197,7 @@ G.Server = {
         const toYaw = Math.atan2(-(st.p[0] - e.x), -(st.p[2] - e.z));
         const inFov = Math.abs(U.angDiff(e.yaw, toYaw)) < 1.2 || e.tgtD < 5;
         if (inFov && e.tgtD < def.range * 1.4) {
-          const rate = (1.7 - e.tgtD / (def.range * 1.4)) * (st.cr ? 0.7 : 1) * 1.3 * (e.suspicious ? 1.8 : 1) * (e.seeK == null ? 1 : e.seeK); // slower through glass
+          const rate = (1.7 - e.tgtD / (def.range * 1.4)) * (st.pr ? 0.5 : st.cr ? 0.7 : 1) * 1.3 * (e.suspicious ? 1.8 : 1) * (e.seeK == null ? 1 : e.seeK); // slower through glass
           e.spot += dt * rate;
           if (e.spot >= 1) {
             // caught off guard: police appear close by while they weren't expecting anyone
@@ -1612,14 +1625,14 @@ G.Server = {
     if (!L.los(map, bx, from[1], bz, from[0], from[1], from[2])) from = [bx, from[1], bz];
     // aim at the exposed part: a leaning player shows head and shoulder, not centre mass
     const [hx, hz] = this.headXZ(st), leaning = Math.abs(st.ln || 0) > 0.3;
-    let tx = hx, ty = st.p[1] + (st.cr ? 0.75 : 1.2) + (leaning ? 0.3 : 0) + (leaning ? 0 : up * (st.cr ? 0.25 : 0.38)), tz = hz;
+    let tx = hx, ty = st.p[1] + (st.pr ? 0.25 : st.cr ? 0.75 : 1.2) + (leaning ? 0.3 : 0) + (leaning ? 0 : up * (st.pr ? 0.08 : st.cr ? 0.25 : 0.38)), tz = hz; // (prone: low, a small target)
     const realY = ty;
     if (blind) { tx = e.lastSeen.x + (Math.random() - 0.5) * 1.4; tz = e.lastSeen.z + (Math.random() - 0.5) * 1.4; ty = (e.lastSeen.y || 0) + 0.8 + Math.random() * 0.9; }
     const dx = tx - from[0], dy = ty - from[1], dz = tz - from[2], d = Math.hypot(dx, dy, dz);
     // a bit worse up close, much worse at range: at their weapon's range they hit about a sixth as often
     const distF = 0.9 * G.U.clamp(0.95 - 0.8 * Math.pow(d / def.range, 1.2), 0.12, 0.95);
     const moveF = st.mv > 3 ? 0.72 : st.mv > 0.5 ? 0.88 : 1;
-    const chance = (blind ? 0.15 : 1) * (1 - 0.2 * up) * this.injAim(e) * def.acc * distF * moveF * (st.cr ? 0.8 : 1) * this.accMult * (1 - 0.6 * (e.sup || 0)) * (1 - 0.5 * Math.min(1, e.shock || 0)) * (e.collapsed ? 0.4 : 1) * (e.str != null && e.str < this.TWO_HAND ? 0.7 : 1) * (1 - Math.min(0.5, kickNow / 16)) * (e.broken ? (e.fleeT > 0 ? 0.4 : 0.8) : 1) * this.dazzle(e, st);
+    const chance = (blind ? 0.15 : 1) * (1 - 0.2 * up) * this.injAim(e) * def.acc * distF * moveF * (st.pr ? 0.6 : st.cr ? 0.8 : 1) * this.accMult * (1 - 0.6 * (e.sup || 0)) * (1 - 0.5 * Math.min(1, e.shock || 0)) * (e.collapsed ? 0.4 : 1) * (e.str != null && e.str < this.TWO_HAND ? 0.7 : 1) * (1 - Math.min(0.5, kickNow / 16)) * (e.broken ? (e.fleeT > 0 ? 0.4 : 0.8) : 1) * this.dazzle(e, st);
     // anything solid between muzzle and target stops the round: a closed door right in front of the player included
     // a blind round can only find someone still standing where they were, with nothing in the way
     const thru = (ax, ay, az, bx, by, bz) => { const ddx = bx - ax, ddy = by - ay, ddz = bz - az, dd = Math.hypot(ddx, ddy, ddz) || 1; const h = L.raycast(map, ax, ay, az, ddx / dd, ddy / dd, ddz / dd, dd, { glass: true }); return { clear: h.t >= dd - 0.05, glass: h.glass || [] }; };

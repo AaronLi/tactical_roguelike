@@ -107,9 +107,9 @@
   <div id="credits"></div>
 
   <div id="downed" class="hidden">
-    <div class="big">YOU ARE DOWN</div>
+    <div class="big" id="downTitle">YOU ARE DOWN</div>
     <div id="bleed"></div>
-    <div class="small">Your sidearm still works. You're bleeding out slowly: a teammate has to stop the bleeding (that only stabilises you) and give you blood before they can get you up.</div>
+    <div class="small" id="downHint"></div>
   </div>
   <div id="deadMsg" class="hidden">
     <div class="big">KIA</div>
@@ -147,6 +147,7 @@
     <div id="routeTitle" class="route-title">Act 1</div>
     <div id="routeMap"></div>
     <div id="routeMsg" class="msg"></div>
+    <div id="sidearmPick" class="sidearm-pick hidden"></div>
   </div>
 </div>
 
@@ -203,9 +204,11 @@
 <script src="js/furniture.js"></script>
 <script src="js/gunshot-synth.js"></script>
 <script src="js/gunaudio.js"></script>
+<script src="js/lightgrid.js"></script>
 <script src="js/render.js"></script>
 <script src="js/gunmodels.js"></script>
 <script src="js/vmanim.js"></script>
+<script src="js/headgear.js"></script>
 <script src="js/rig.js"></script>
 <script src="js/net.js"></script>
 <script src="js/server.js"></script>
@@ -217,8 +220,10 @@
 <script src="js/shop.js"></script>
   <script src="js/invui.js"></script>
 <script src="js/gunsmith.js"></script>
+<script src="js/zeroing.js"></script>
 <script src="js/route.js"></script>
 <script src="js/loot.js"></script>
+<script src="js/course.js"></script>
 <script src="js/range.js"></script>
 <script src="js/hangar.js"></script>
 <script src="js/game.js"></script>

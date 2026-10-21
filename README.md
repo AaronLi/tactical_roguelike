@@ -69,7 +69,7 @@ says the same), but not whose: the shooter's name isn't shown.
 - Close-quarters scale: levels are compact buildings (about 38 m across at level 1, never more than 60 m) of
   small 6-12 m rooms that often share a wall and connect straight through a doorway. Movement is deliberate:
   walk 1.9 m/s, 3 m/s with the weapon lowered (Space toggles it; firing or aiming raises it), 1.4 m/s steadied
-  (Shift), crouch-walk 1.3 m/s,
+  (Shift), crouch-walk 1.3 m/s, a crawl prone (Z) 0.55 m/s,
   slower again while aiming, and your kit has weight. There's no jumping, and every level is walkable without it.
   Lean around corners with Q/E; enemies see and shoot at your leaned head.
 - Each level is procedurally generated from a seed: rooms, corridors, doors (single and double), windows and
@@ -163,9 +163,26 @@ says the same), but not whose: the shooter's name isn't shown.
   carpet floors, rugs, framed pictures, clocks, night windows with blinds and baseboards. Furniture blocks movement and bullets, piece by
   piece (a desk and its chair are separate). Waist-high solid pieces (sofas, counters, dressers, crates) are cover
   that suspects use. Doorways are always left clear and every room stays reachable.
-- **Dark.** There's no weapon light. Rooms are lit by their ceiling lamps, and corridors are dim. Every lamp
-  gets its glow, and the twelve real lights move with you to the lamps nearest you, so whatever room you're in
-  is lit (moving a light is free; adding one would recompile every shader).
+- **Dark.** Rooms are lit by their ceiling lamps, and corridors are dim. **Every lamp lights its
+  surroundings** (`js/lightgrid.js`): when a level is built, each lamp's light is worked out over the floor plan
+  tile by tile, stopped by walls, falling off as a point light's does, with where it comes from, into a texture
+  (a layer per floor) that every lit material reads. One texture lookup a pixel, however many lamps: the
+  festival's 115 lamps all light, nothing switches on and off as you move, and the far end of a corridor is as
+  lit as the near. (Real three.js point lights cost every lit pixel a pass each and recompile every shader when
+  their number changes: measured on the festival, 12 put 40% on a frame, 48 160%, 96 320%. The old pool of 12
+  that followed you is gone; the grid draws a frame 20-27% faster than it did.) Muzzle flashes, weapon lights
+  and blasts are still real lights.
+  - **Doors shut the light in.** The grid is worked out with every opaque door shut (a glass stairwell door lets it
+    through), and each door keeps a layer of its own: the light that gets past it once it's open, and its doorway
+    lit. As a door swings its layer blends in by how far open it is (all of it by the time it's well ajar) and
+    back out as it shuts: only the tiles it reaches change, so the shader's still the one lookup. A room's light
+    spills into the hall when you open its door, and a dark room stays dark until someone does. (Light through
+    two shut doors in a row doesn't count: each door's layer is what that door alone lets by.)
+  - **Light bounces.** Lamps light what they can see; the light that comes back off the floor, walls and ceiling
+    is worked out too: each layer's light (the base's and every door's) spread over the open floor round it,
+    stopped by walls and shut doors as the light was, and 45% of it added back, coming mostly up off the floor.
+    Corners a lamp can't see aren't black, and ceilings (which no lamp hanging from them lights) show. A room
+    measured 15-25% brighter for it. The whole grid, layers and bounce, takes about 150 ms when a level's built.
 - Themes: Apartment, Warehouse, Bunker, Suburbs, Research Lab, Foundry, Cold Storage, Festival (the route map picks
   which). **Every level starts outside the target** (`js/level.js`), and you breach in:
   - **Rooms and corridors** (Bunker, Research Lab, Foundry, Cold Storage). You start on a fenced, paved lot
@@ -201,16 +218,32 @@ says the same), but not whose: the shooter's name isn't shown.
     of pallet racking taller than you (cartons, drums, shrink-wrapped stacks), with aisles between the rows
     and cross-aisles through them. Along the back wall is a row of offices and a break room, with doors onto
     the floor and sometimes between them.
-  - **Suburbs.** Two detached houses side by side on a street.
-    - You start on the street (pavement, bins, a fence across the road). Each house has its own front door
-      under a lamp: pick which one to hit first.
-    - Each house is split into rooms with doors between them, and windows onto the street.
-    - A narrow alley runs between the houses from the street to the back gardens: a third way round.
+  - **Suburbs.** Two detached family homes side by side on a street, the houses of interest, each with a
+    basement, a ground floor and an upstairs (18-22 m across, 12-14 m deep).
+    - **The street** runs the whole width of the map, a road with its pavements. You start at its west end,
+      behind a police roadblock: two patrol cars staggered across the road with a gap between them. The
+      neighbour's house on the corner stands between the spawn and the houses, so no window in either house
+      can see where you start. More patrol cars are parked at the kerb in front of the houses (cover for the
+      approach) and across the far end. Patrol cars are black and white with their light bars lit.
+    - **The houses** sit behind front lawns. A stair hall runs front to back down each house's west side: the
+      front door opens into it, the flight down to the basement goes down one lane of it and the flight up the
+      other, railed where the floor is open over them, and a door leads from the hall into the rooms on every
+      floor. The rooms beside it are laid out for each floor on its own: living room, kitchen and dining room on
+      the ground floor, bedrooms and a study upstairs, storage and a den in the basement. Suspects are spread
+      over every floor: a room indoors on each floor, basements and upstairs included, gets one before any
+      room gets a second (the yards and alleys after). It's a big level, and it's held by more of them: 1.8
+      times the usual suspects (9 at level 1 alone, 3 to a floor), 1.6 times the civilians.
+    - A narrow alley runs between the houses, and a path down the east side, from the lawns to the back
+      gardens: other ways round. Each house has a side door onto one of them.
     - Behind each house is its garden (a lawn with hedges, a shed, a barbecue and a patio set). Back doors,
-      or French doors under a porch lantern, lead out into it. A 1.9 m close-boarded fence divides the two
-      gardens. It's open where the alley comes out, and sometimes has a second gap.
-    - Street, alley and gardens are open to the night sky: no ceiling, and rounds fired upward keep going. The
-      houses show eaves and lit, curtained windows from outside.
+      or French doors, lead out into it. A 1.9 m close-boarded fence divides the two gardens, with a gap near
+      the houses.
+    - Street, lawns, alley and gardens are open to the night sky. Upstairs, everything outside the houses is
+      open air: windows on both storeys look out over it, and the roof is over the top storey only. The
+      basement has none.
+    - **The roofs:** each house wears a whole gable roof (tiled slopes from a ridge along its length down to
+      eaves past the walls, a gable at each end, fascia boards), over every part of it with the sky above
+      (the top storey, and any lower part nothing's built on).
     - The fences are too tall to see over and stop movement.
   - **Festival.** A music festival at night on the edge of a town, about 125 × 108 m, all of it open to the sky
     and fenced with event fencing (steel mesh panels, dark scrim, the odd sponsor's banner). The fog's pushed far
@@ -234,11 +267,10 @@ says the same), but not whose: the shooter's name isn't shown.
     - **The toilet block** on one side: a washroom each side of a dividing wall, each with sinks and two
       cubicles behind their own doors, and picnic tables behind it.
     - **Lights:** lights are strung everywhere on poles. There are bulbs over the seats and the gate, and paper
-      lanterns over the first lane, each with a glow. The real lights follow you along the strings and over
-      the stage. There are more civilians about than elsewhere.
+      lanterns over the first lane, each with a glow, and every one of them lights the ground and the stalls
+      round it. There are more civilians about than elsewhere.
     - **Night:** outdoors in the dark, suspects can't pick you out past 35 m (the lights, the stalls, the size of it) unless your light or laser is on,
-      while a scope still finds them across the field. When you aim, a third of the real lights go to the lamps
-      nearest what you're aiming at, so it's lit.
+      while a scope still finds them across the field.
     - Built in `js/level.js` (`layFestival`, `buildFestival`) and `js/furniture.js` (the pieces and `plan`'s
       `festival()`).
 - **Clear the level** by arresting (zip-tying) or killing every suspect.
@@ -368,12 +400,24 @@ says the same), but not whose: the shooter's name isn't shown.
   - **Co-op:** the squad shares it. The host keeps the real contents. If two of you grab the same thing at
     once, the second gets "someone got there first" and it comes off them again; anything put in that no longer
     fits comes back.
-- **Weapons come from the field.** You start with a P9 pistol, two spare magazines, an IFAK, and second-hand
+- **Weapons come from the field.** You start with a sidearm of your choosing, two spare loads for it, an IFAK, and second-hand
   protection: a bump helmet and a Ghost concealable vest, both at half condition. Every level has a weapon case,
   a hard case lying against a wall somewhere away from the spawn.
+  - **Your sidearm:** after Deploy, before the first level's picked on the route map, each of you picks the pistol
+    you go in with (click one to choose it, then Confirm): your own equipment, not a squad vote (any number of you can take the same one; the menu says so,
+    and shows under each gun who in the squad took it and how many are still choosing; the route map lists everyone's
+    once you've picked, and the route's yours to vote on then): the **Taurus TX22** (.22 LR,
+    16 rounds, made fully automatic: 1,050 rounds a minute, hardly any kick, small holes, threaded from the
+    factory; it looks like one: a steep bevel down the front of the slide and deep slanted serrations at both
+    ends, a dust cover out to the muzzle with rail slots under it, a squared trigger guard, a hard-raked grip
+    with stippled panels and a flared base), the **P9** (9 mm, 15 rounds, semi) or the **derringer** (two shots of .45 Colt). It comes loaded with
+    tracers, with two spare loads in your small pockets (two magazines, or for the derringer two boxes of 12).
   - **What's inside:** a weapon in its standard build, fully loaded. It's a long gun three times in four,
     picked by rarity. Each tier has a share of the odds, split evenly between its weapons, and deeper
-    levels shift the odds toward rarer tiers. Legendaries only appear from level 3.
+    levels shift the odds toward rarer tiers. Legendaries only appear from level 3. Every weapon can turn up,
+    the starter P9 too (tier 0, a sidearm now and then, rarer the deeper you go), except the grenade
+    launchers, which are switched off for now (`G.EXPLOSIVES_OFF` in `js/data.js`: no case, shop or kit
+    hands one out). The table is for long guns:
 
     | Level | Common | Uncommon | Rare | Legendary |
     | --- | --- | --- | --- | --- |
@@ -393,10 +437,10 @@ says the same), but not whose: the shooter's name isn't shown.
   inserts and steel common, multi-hit ceramic rare) and included in its price. Stock is randomised (the whole squad
   sees the same) with better gear deeper in the run. He has one of each piece of kit he lists: once you
   buy it, it's sold out until the next visit. He also has five random pouch types and empty magazines for
-  five random guns (up to the level's tier, not just yours), 1–3 of each, and a handful of special ammunition in
-  two different calibers. About half the magazines are the gun's standard
+  five random guns (up to the level's tier, not just yours), 1–3 of each, and three standard magazines' worth of a special
+  load in two different calibers. About half the magazines are the gun's standard
   magazine and the rest a variant (compact, extended, drum, belt box). Supplies no longer sells
-  magazines; ball ammo for your calibers is always there.
+  magazines; ball ammo for your calibers is always there, by the box.
 - **The hangar** (`js/hangar.js`) is where the squad spends the time between levels: a real place you walk
   about, on the same map machinery as a level (`G.Level.generateHub`: walls, lights, collision, rays, sound).
   The squad is there together; the host sends no enemies, and you can't fire or throw in it. It's a 48 × 25 m
@@ -407,7 +451,10 @@ says the same), but not whose: the shooter's name isn't shown.
     and loadout) or a vending machine's screen (supplies). Esc or "Back to the hangar" puts a panel away. Tab opens your stash and loadout from
     anywhere in the hangar.
   - **The workshop** (west): a bench for each officer (their name on the front; the computer on your own opens
-    the gunsmith), and a pegboard with the gunsmith's parts for sale, bought into your stash.
+    the gunsmith), the zeroing table in the middle of the floor (a shooting bench with sandbag rests and a
+    screen: F to zero your sights), and six pedestals along the north wall with the gunsmith's parts for sale (bought into your
+    stash): each part shown on its own and turning slowly, its sign on the front (name, price, the slot it goes in
+    and how many weapons it fits).
   - **The store** (middle): Vex behind his counter (his till is the full stock; he looks like his portrait: dark hood, a black visor with two orange eyes, a grey respirator, a gold strap across the chest), three pedestals with the
     gear for sale, each piece shown on its own and turning slowly (a helmet with its face guard on it, a
     carrier with the plate that comes with it standing beside it and turning with it, a plate or a face guard by itself). The sign
@@ -423,14 +470,33 @@ says the same), but not whose: the shooter's name isn't shown.
     and take your readiness back. When everyone's in it the rotor spins up and, after three seconds, it takes
     off for the route map; anyone getting out stops it.
   - **The shooting range** (`js/range.js`) is through the garage door in the hall's north wall (where the
-    gunsmith's parts wall used to be; that wall slid east, toward Vex). Past the yard, a pistol range to the west
-    (three lanes, paper at 5, 7 and 10 m and steel at 12 and 15 m) and a rifle range to the east (four lanes, steel
-    at 25, 50, 75 and 100 m), each lane marked in metres on the floor. Guns work here and nowhere else in the hangar:
-    every round, magazine and box you use is put back as it was when you walk out (`snapshot`/`restore`). Rounds
+    gunsmith's parts wall used to be; that wall slid east, toward Vex). Off the yard, from the left: the IPSC course,
+    a pistol range (three lanes, paper at 5, 7 and 10 m and steel at 12 and 15 m) and a rifle range to the east (four lanes, 300 m
+    deep, steel at 25, 50, 75 and 100 m off to either side), each lane marked in metres on the floor. Every rifle
+    lane has an **IPSC target** on a carrier down its middle: six buttons on the lane's console (aim, F) send it to
+    10, 25, 50, 100, 200 or 300 m, a fresh target each time. Hits score by zone (A, B on the head, C, D; a round
+    past its edge is a miss), and the console's screen, and a spotting view on your screen while you stand at that
+    lane's line, show the target with every hit on it, the last one ringed. Guns work here and nowhere else in the hangar:
+    every round, magazine and box you use is put back as it was when you walk out (`snapshot`/`restore`). So the
+    rest of your kit is **frozen** in there: nothing can be moved, dropped, sold or used from the Tab screen until
+    you're back in the hall (otherwise the restore would hand back what you'd moved out).
+    - **The IPSC course** (`js/course.js`), on the left: a random stage in a 10 x 28 m strip. Three shooting boxes
+      one behind the other, barriers beside them and knee-high walls between with a gap to go through, and eight
+      to twelve targets downrange: IPSC cardboard (two hits each, the best two count), up to two white no-shoots
+      beside them, and steel poppers that fall when hit. **NEW** (a button in the yard by the entrance) lays a new
+      stage, only while nobody is in the course; the stage comes from a seed the whole squad shares. **START** (a
+      button in the first box): standby, a random pause, the beep, and the clock runs. Every shot you fire is a split
+      and every hit is scored where it lands; the run ends when every target's done, or when you walk out. A shot
+      before the beep stops the run. The **board** on the hall's wall over the yard shows the run as it happens:
+      each target's hits, every shot's time and split, then the time, the points (A 5, C 3, D 1, steel 5; each miss
+      and each no-shoot hit -10) and the hit factor (points / seconds). Whoever is shooting sends it to the others.
+      Either side of it, two **spectator screens** switch on while anyone's in the course: one behind the shooter,
+      one from the far end looking back at them.
+    Rounds
     hit targets (`G.Range.hit` from `roundSegment`): paper takes holes, steel swings and rings (a beat later, for
     the distance), and each lane's console counts its hits (F resets its targets). There is no friendly fire in
-    the hangar, and your shots are heard by the others. The map has the range's 55 rows first (`G.HANGAR_ROWS`), so the
-    hall sits 110 m along: `js/hangar.js` keeps to the hall's own coordinates and adds `RZ` where it meets the world.
+    the hangar, and your shots are heard by the others. The map has the range's 156 rows first (`G.HANGAR_ROWS`), so the
+    hall sits 312 m along (the camera sees 420 m in the hangar, 280 elsewhere): `js/hangar.js` keeps to the hall's own coordinates and adds `RZ` where it meets the world.
   - **Under it** it's an ordinary level with a flag (`G.Game.hub`; the phase is still `'level'`, which is why
     movement, other players, collision and sound all work). The host's phase stays `'shop'` and only carries
     the squad about (`G.Server.updateHub`) and times the helicopter. What's on the shelves is the same
@@ -477,11 +543,12 @@ says the same), but not whose: the shooter's name isn't shown.
 - **Shotgun loaders.** The tube shotguns (870, KSG, Slug Gun, Benelli M4) take a side saddle (each shell a
   little faster), a twin-shell carrier, or a quad speed loader (four shells a push). A full tube on the Benelli
   takes 3.6 s bare, 2.9 s with the saddle, 2.6 s with the carrier and 1.9 s with the quad loader.
-- **Pistol stocks.** The P9, G18, G19 and Auto-9 have a stock lug: a folding stock, a brace or a carbine stock
+- **Pistol stocks.** The P9, G18, G19, Auto-9 and TX22 have a stock lug: a folding stock, a brace or a carbine stock
   kit cuts recoil by 14–30% at some cost to handling. The stock is drawn in first person too (its tube and rails
   along the bottom of the view; not its pad, which would fill the screen aiming), as well as on the gun in the
   gunsmith and in other players' hands.
-- If you go down you can still shoot your sidearm. Down, you keep bleeding, a sixteenth as fast as standing
+- If you go down you can still shoot your sidearm; unconscious (15% blood or less) you can do nothing, and the
+  screen's all but black. Down, you keep bleeding, a sixteenth as fast as standing
   but nothing clots any more: a heavy bleed at 15% blood gives about two minutes, a light one several, and when
   the blood's gone you're KIA until the next level, watching through a camera on the right side of a teammate's helmet, up
   by the crown, tilted a little in and down so you see their arms, hands and weapon. It's a wide, fisheye-ish
@@ -489,16 +556,19 @@ says the same), but not whose: the shooter's name isn't shown.
   render-to-texture pass in `js/render.js`, only while spectating). It follows where they look;
   click to switch to another; your own gun isn't drawn in it. **Your body stays where you fell**, a ragdoll
   with its kit on, for everyone to see, you included (you have no body in first person, so one is made when you
-  die, dressed as you are, `G.Views.spawnSelfBody`); you're a whole officer again next level. A teammate holds **F** to check you and treats you from their
-  Tab screen, with their own medical gear or with yours: click a part and the menu lists what they carry
+  die, dressed as you are, `G.Views.spawnSelfBody`); you're a whole officer again next level. A teammate holds **F** to check you, or clicks your health bar in the squad list under their own
+  body in the Tab screen (within reach), and treats you from there, with their own medical gear or with yours: click a part and the menu lists what they carry
   and what you carry (everyone's counts are in their state), and your item comes off you when it lands. When
   more than one person's gear is on offer, each entry shows its item's icon, its owner's emblem and name
   ("Seal", or "you") and how many they have. If you used it first, or it's no longer needed, it isn't used. **While they work on you, your screen says so:** a green panel under the crosshair
   for each teammate treating you ("Seal is applying chest seal to your thorax") with a bar for how far along
   they are, and that part lit on your body figure (the HUD's, and the one in your Tab screen). It's there from
-  the moment they start until they finish or stop (the host only tells the one it's being done to). Stopping every bleed only **stabilises** you (the clock stops: the HUD says Stable); to get you up
-  they also have to get your blood over 50% (blood bags), then revive you. If the whole squad is down, the run
-  ends.
+  the moment they start until they finish or stop (the host only tells the one it's being done to). Clicking
+  the blood bar (yours or theirs) offers blood bags. Stopping every bleed **stabilises** you (the clock stops:
+  the HUD says Stable). Down but conscious, a revive gets you up; unconscious, they need to get your blood back
+  over 15% with blood bags first, and you come round (still down). Get the bleeding stopped before that, or it
+  carries on, and with your blood still at 40% or less the next hit puts you straight back down. If the whole
+  squad is down, the run ends.
 - **Injuries** (`js/medical.js`). There's no health bar and no medkit; your body is seven parts with their
   own health: head 35, thorax 85, stomach 70, each arm 60, each leg 65.
   - **Hits:** a hit takes health from the part it lands on, and can leave an injury there:
@@ -509,16 +579,22 @@ says the same), but not whose: the shooter's name isn't shown.
 
     A round through the middle of a part is likelier to do damage than a graze, and armour that stops part
     of a round also cuts the odds. Grenade fragments spread over the legs and lower body.
-  - **What kills you:**
-    - an unarmoured head is a kill, and the head at zero is death
-    - the thorax at zero puts you down
-    - a destroyed arm, leg or stomach passes further damage on to the thorax
+  - **Blood is what puts you down.** Every hit costs blood at once (about half a point per point of damage
+    to the torso, a third to a limb; none to the head), and then for as long as it bleeds:
+    - over 40%: you're up, however hurt
+    - 40% or less: the next hit, anywhere, puts you down
+    - 15% or less: unconscious
+    - none: dead (a single wound never empties you by itself: at worst it knocks you out at 1%, and the
+      bleeding finishes it unless someone stops it)
+  - **A part at zero only stops working:** a wrecked arm throws your aim, a wrecked leg slows you, a wrecked
+    chest leaves you short of breath (aim and pace, like a punctured lung), a wrecked stomach slows you. The
+    head is the exception: an unarmoured head is a kill, and the head at zero is death.
 
     Whatever kills you shows on the body (an unprotected head shot leaves the head destroyed and
     bleeding), and the KIA message says what it was: shot in the head or face, killed by the blast,
     died of your chest wound, or bled out.
-  - **Blood:** bleeding drains it (light 0.35%/s, heavy 2.2%/s per wound, a gut wound slowly). Below 70%
-    your aim suffers; at 15% you go down; at 0 you die.
+  - **Bleeding** drains blood (light 0.35%/s, heavy 2.2%/s per wound, a gut wound slowly). Below 70%
+    your aim suffers, below 50% your pace.
   - **Clotting:** a light bleed stops on its own after 30–60 s, costing about 10–20% blood, and a fresh wound
     on that part starts it over. A bandage stops it at once. Heavy bleeds never stop without a tourniquet or
     gauze.
@@ -573,12 +649,13 @@ says the same), but not whose: the shooter's name isn't shown.
 ## Content
 
 - **53 primaries**: assault and battle rifles, SMGs, shotguns, LMGs, DMRs, bolt-action and anti-materiel snipers,
-  a grenade launcher, a railgun and a crossbow
-- **17 sidearms**: pistols, machine pistols, revolvers (including a .410 shotgun revolver), a derringer,
-  a sawed-off, a pocket grenade launcher and akimbo Berettas
+  a grenade launcher (switched off for now), a railgun and a crossbow
+- **18 sidearms**: pistols, machine pistols (a full-auto Taurus TX22 in .22 LR among them), revolvers (including a .410 shotgun revolver), a derringer,
+  a sawed-off, a pocket grenade launcher (switched off for now) and akimbo Berettas
 - Weapons differ in how they work, not just in stats:
   - **AN-94 hyper-burst**: the first two rounds of each trigger pull fire at 1800 rpm.
-  - **M1 Garand**: en-bloc clip that only reloads when empty, and pings when it ejects.
+  - **M1 Garand**: en-bloc clip that only reloads when empty, and pings when it ejects: the empty clip goes back
+    in your kit (on the floor if there's no room), the gun stands open, and the next reload pushes a full one in.
   - **Minigun**: has to spin up before it fires.
   - **Shell by shell**: lever-action, Mosin, pump shotguns, the KSG and the Benelli load one round at a time
     (a speed loader pushes in two or four).
@@ -592,10 +669,33 @@ says the same), but not whose: the shooter's name isn't shown.
     Most of the kick shows as your view punching up and to the side (80% of the climb, 70% of the side
     kick, with a touch of roll); the gun itself turns only a little on screen. Rounds go where the bore
     points. There's **no crosshair**: you aim with the sights, or by where the gun's pointing at the hip.
+  - **Where the kick comes from:** the round and the gun's weight, not a number per gun. A shot pushes back
+    with the bullet's momentum plus the powder gas behind it (about 1.75× the bullet's speed); a heavier gun
+    moves less for the same push. The climb goes as push^1.35 / weight^0.7, ×1.3 for a handgun (it pivots on
+    your wrist), scaled so a 2.9 kg M4 kicks 1.1° a shot. On top of that, design: a stock that drops below the
+    bore (AKs, old wooden stocks) climbs 25% more, a manual action (bolt, pump, lever, break-open, revolver)
+    40% more (nothing in it softens the kick), and a few guns are built against it (the Vector's bolt goes
+    down, the G36, the M82's recoiling barrel, the harness-braced minigun). Every gun has its real weight now
+    (an M249 7.5 kg, a PKM 7.5, an M60 10.5, an RPK 4.8, a P9 0.75, a TX22 0.6). So an M249 kicks 0.62° to
+    the M4's 1.1, a PKM 1.5 to a SCAR-H's 2.3 and an AK's 1.7 on the same class of round. Your build counts:
+    its own weight (a 0.5 kg suppressor takes about 8% off before its own effect), its barrel (a longer one
+    pushes the round faster, so it kicks a little more), and the load (subsonic is a fraction of ball's kick
+    from a rifle; a slug pushes harder than buckshot). The gunsmith's Weight and Recoil show the result.
+  - **The shove back:** each shot also drives the gun back toward you, and you push it forward again, harder
+    and harder as it nears the room there is (aiming, the sight's eye relief short of your eye: 2 cm behind a
+    4× combat scope; from the hip, 12 cm). It never comes near in ordinary fire (a 30-round AK burst through a
+    4× scope uses a fifth of it), but if it ever does, the kick that can't go back goes into the climb and
+    out to the side instead: a long burst can't put your eye in the scope's tube.
   - **Shotgun beads:** the bead guns (the 870, the double barrel, the sawed-off) have a rib from the
     receiver to the muzzle, level with the top of the receiver, with a brass bead on its end. Aiming, you
     look along the receiver and rib with the bead on the target. A side-by-side's forend sits under the
     barrels.
+  - **Accuracy:** aimed, a gun puts its rounds in a cone as wide as the real gun groups, in MOA, with service
+    ammunition: an AWM 0.5, an R700 0.75, an SR-25 1, an HK416 or SCAR-L 2, an M4 3, an AK-74 3.5, an AKM 5, an
+    M249 5, an MP5 3, a Micro Uzi 9, a Glock 10, a 1911 or USP 8, a .357 6, a smoothbore slug 5. The gunsmith shows
+    each build's figure (barrels and the like move it). That's the gun alone, as if clamped in a vise: on top of it
+    comes what you add holding it (breathing sway, moving, recoil, a flinch when hit), and from the hip a wider
+    cone of its own.
   - **Shotgun patterns:** a shot has one aim error, the same as any gun (wide from the hip, tight aimed
     down the bead), and the pellets spread around that point in the gun's own pattern, denser in the
     middle. With buckshot, 90% of pellets land within about 25 cm at 10 m from the double barrel, 32 cm from
@@ -802,8 +902,8 @@ says the same), but not whose: the shooter's name isn't shown.
     | Type | What it does |
     | --- | --- |
     | FMJ ball | The standard round |
-    | Hollow point | Wounds ×1.3 and stops in the first body; armour stops it more |
-    | Armour-piercing | Gets through armour and through bodies; wounds ×0.9 |
+    | Hollow point | Wounds ×1.3 and stops in the first body; armour stops it more. Its open nose drags more (20% shorter drag length): an M4's keeps 594 m/s at 300 m to ball's 642, and drops 33 cm to 29 |
+    | Armour-piercing | Gets through armour and through bodies; wounds ×0.9. A lighter, hard-cored bullet: leaves 8% faster (an M4: 952 m/s to ball's 881), so it drops less (19 cm at 300 m to ball's 29) and kicks a touch less |
     | Tracer | Burns red all the way out: a bright core with a glow, from a couple of metres past the muzzle to where it lands. Your starting P9 and its two spare magazines are loaded with them |
     | Subsonic | Wounds ×0.85, shorter range; through a suppressor it's heard no further than a crossbow |
     | Buckshot | The standard shotgun load |
@@ -821,8 +921,9 @@ says the same), but not whose: the shooter's name isn't shown.
       - rounds you buy, unload or are handed top up the boxes you already have before a new box is made
     - **Tube-fed guns** keep the order you loaded them in: the last shell in is the next one fired, so you can
       put two slugs on top of the buckshot.
-    - **Buying:** the quartermaster always sells ball (or buckshot) for every caliber you own a gun in, and
-      empty magazines. Each visit he also has one random special load, a handful of rounds.
+    - **Buying:** the quartermaster always sells ball (or buckshot) for every caliber you own a gun in, by the
+      box, and empty magazines. Each visit he also has special loads, three
+      standard magazines' worth each (the middle magazine size of the guns that take it).
   - **Flashbangs** (¢150): a 1.5 s fuse, and they hurt nobody. Anyone with an eye on one when it goes off
     (in sight of it, within about 14 m) is blinded: suspects for 1.5 to 6 s, more the closer and the more
     squarely they were facing it. Blinded, a suspect can't see you, stands frozen and loses nerve, and is far
@@ -880,7 +981,8 @@ says the same), but not whose: the shooter's name isn't shown.
     gun's modes.
 - **Gunsmith** (a shop tab, Tarkov-style). Every weapon is a platform, its receiver and trigger group, with
   slots for parts. Depending on the gun these are:
-  - barrel, muzzle device, handguard, foregrip, tactical (laser), sight, charging handle, pistol grip, stock,
+  - barrel, muzzle device, handguard, rail mount, foregrip, tactical (a light or laser on the right side rail, and
+    another on the left), sight, charging handle, pistol grip, stock,
     magazine, magazine tube or forend;
   - on pistols, a slide and a threaded or match barrel;
   - for the specials, a minigun drive motor, railgun capacitor bank or crossbow limbs.
@@ -894,10 +996,12 @@ says the same), but not whose: the shooter's name isn't shown.
     | --- | --- | --- |
     | Picatinny top rail | red dots, holos, prisms, scopes | 46 weapons |
     | Underside rail (M-LOK / Picatinny) | foregrips | 26 weapons (only with a railed handguard) |
-    | Side rail | lasers and weapon lights | 26 weapons (only with a railed handguard) |
+    | Side rail (right and left) | lasers and weapon lights, one each side | 53 weapons (built into the F2000, Tavor, AUGs and P90; otherwise a railed handguard or pump forend, or a clamp-on rail mount) |
+    | Clamp-on rail mount | barrel clamps with a side rail on the right, or both sides | 9 weapons: the long guns with no railed part to fit (integrally suppressed and jacketed guns, the PKM, the machine pistols) |
     | AR-15 grip mount | pistol grips | 20 weapons |
     | Other stock mounts | stocks | AR-15 buffer tube, AK trunnion, rifle stock, SMG, precision and machine-gun mounts |
-    | Muzzle threads | flash hiders, brakes, compensators, suppressors | 5.56, 7.62, AK, 9mm, .45, PDW, .50, pistol, 12ga chokes |
+    | Muzzle threads | flash hiders, brakes, compensators, suppressors | 5.56, 7.62, AK, 9mm, .45, PDW, .50, pistol, .22, 12ga chokes |
+    | .22 ½-28 (the TX22, threaded from the factory) | its own rimfire devices (a thread protector, a flash hider, a compensator, a compact and a long rimfire can), and every 9 mm and 5.56 ½-28 device (the same thread, built for far more pressure) | the TX22; its rimfire devices fit nothing else (a rimfire can isn't rated for a centrefire round) |
 
     A thread only exists on a threaded barrel. Barrels, magazines, slides and magazine tubes are made for
     one weapon.
@@ -918,7 +1022,9 @@ says the same), but not whose: the shooter's name isn't shown.
   - **Sound:** barrel length and the muzzle device feed the gunshot synth, so a short barrel or a brake
     sounds different.
   - **Using it:** the 3D view orbits and zooms. Hover a piece to see what it is, or click it to pick its
-    slot. Hover a part in the list to preview it on the gun with its stat changes, and click to fit it.
+    slot. Hover a part in the list to preview it on the gun with its stat changes, and click to fit it. A slot
+    the gunsmith has a part for in stock (one that fits it, not the one on it) shows a red "!", on its dot on the
+    model and on its row in the list.
   - **Stash:** fitting buys the part if it isn't in your stash. Parts you take off go to your stash, and
     stash parts sell back for half. Swapping a weapon at a case strips its aftermarket parts into your stash.
   - **Stock:** the gunsmith has three random parts for sale each visit, the same for the whole squad. They
@@ -992,7 +1098,9 @@ says the same), but not whose: the shooter's name isn't shown.
     your head and shoulder, crouching hides your legs, an aimed marksman goes for the head). A round to your
     unarmoured head or face kills you outright: no bleeding out, no revive. Everywhere else, see Injuries.
   - **Body armour and helmets:** they stop handgun rounds better than rifle rounds, and they wear (see the
-    kit table above).
+    kit table above). A rimfire round (the TX22's .22 LR) does worst of all: armour stops most of what a pistol
+    round would get through too (96–99% of a hit on a vest's chest, against 85–95% for 9 mm), and it wears
+    armour half as fast as a pistol round.
   - **Toughness:** wounds don't scale with enemy health, so a person is as easy to kill on level 10 as on
     level 1. Only the tougher types (the Enforcer, about 1.5×, and the Kingpin, about 6×) take more.
   - **Explosions:** they still do plain damage.
@@ -1053,12 +1161,14 @@ says the same), but not whose: the shooter's name isn't shown.
   - **Scope reticles and eyebox:** each scope draws its own reticle (duplex crosshair, illuminated chevron or
     circle-dot). A dark crescent creeps in when your eye isn't on the scope's axis, such as while you're
     still bringing it up.
-- **Weapon lights and lasers** (side rail, or a pistol's frame rail). The back side button on your mouse
+- **Weapon lights and lasers** (a side rail, either side, or a pistol's frame rail). A light on one side and a
+  laser on the other gives you both; a second laser doesn't steady your hip fire any further. The back side button on your mouse
   switches the light, the forward one the laser. A light is a real spotlight from the gun that your squad sees
   too, and shone into a suspect's face from up to 15 m (22 m for the high-output one) it ruins their aim: they
   hit about half as often while it's in their eyes. A laser puts a red or green dot where the bore points (on a
   wall or on someone), and only tightens your hip fire while it's on. The PQ-15 module and the pistol combo
-  unit have both. The gunsmith has one in stock most visits.
+  unit have both. Both go where the gun goes: lowered (Space), coming up, mid-reload, the beam and the dot follow
+  its barrel down, not your view. The gunsmith has one in stock most visits.
 - **Default sights.** Every weapon leaves the factory with iron sights (folding sights on a rail, or its own fixed
   sights). Sniper rifles and the railgun are the exception: they come scoped. Optics come from the gunsmith.
 - **Proportions are checked against the real weapons.** Each default build's overall length, measured from the
@@ -1106,15 +1216,26 @@ says the same), but not whose: the shooter's name isn't shown.
 
     | Weapon (zero) | 100 m | 200 m | 300 m | 400 m |
     | --- | --- | --- | --- | --- |
-    | M4, 5.56 (50 m) | +3 cm | −3 cm | −28 cm | −78 cm |
-    | AK, 7.62×39 (50 m) | +1 cm | −14 cm | −59 cm | −138 cm |
-    | R700, 7.62×51 (100 m) | 0 | −9 cm | −38 cm | −90 cm |
-    | AWM, .338 (100 m) | 0 | −6 cm | −27 cm | −63 cm |
-    | P9, 9 mm (25 m) | −24 cm | −142 cm | | |
-    | Pump, slug (25 m) | −11 cm | −99 cm | | |
-    | VSS, subsonic 9×39 (100 m) | +1 cm (+12 at 50) | −116 cm | | |
+    | M4, 5.56 (50 m) | +3 cm | −3 cm | −29 cm | −78 cm |
+    | AK, 7.62×39 (50 m) | +1 cm | −15 cm | −59 cm | −139 cm |
+    | R700, 7.62×51 (100 m) | 0 | −10 cm | −39 cm | −91 cm |
+    | AWM, .338 (100 m) | 0 | −6 cm | −27 cm | −64 cm |
+    | P9, 9 mm (25 m) | −24 cm | −143 cm | | |
+    | Pump, slug (zeroed with buckshot at 25 m) | −7 cm | −91 cm | | |
+    | VSS, subsonic 9×39 (100 m) | 0 (+12 at 50) | −118 cm | | |
 
-    A 40 mm grenade (76 m/s) arcs visibly, and a crossbow bolt is half a metre low at 50 m.
+    A 40 mm grenade (76 m/s) arcs visibly, and a crossbow bolt is half a metre low at 50 m. A round's spent
+    after 4 s in the air, 550 m, or below 30 m/s.
+  - **The zeroing table** (in the workshop, or the shop's Zeroing tab; `js/zeroing.js`): turn a gun's
+    elevation a click at a time. A click is 0.1 mil (a centimetre at 100 m, 5 at 500), up to 15 mil either
+    way, from the standard zero above (`w.clicks`, `G.boreTip`): up raises where it strikes. A graph draws the
+    round's path against the line of sight out to 500 m (the standard zero's path faintly behind it), marks
+    where it crosses the line (the near and far zeros) and where it's spent, and a table gives the path, the
+    hold (mil and MOA), the speed and the time of flight at 25 to 500 m. Pick a load to see where it goes:
+    every load fires from the same bore angle, so a slower one drops more (subsonic in an M4 zeroed with
+    ball is 48 cm low at 100 m). The bore angle for the standard zero is solved from the same drag and
+    gravity the rounds fly with (`G.zeroSlope`, `G.flight`), so the graph is where they go: it matches the
+    game's own frame-by-frame flight to a fraction of a millimetre.
   - **What you see:** an ordinary round is a faint short streak; a tracer is a white-hot core with a red
     glow (a cheap stand-in for bloom: a soft ribbon always turned to face you, and a glowing point at its
     head). Your own rounds start from your gun and close onto your line of sight over the first 12 m.
@@ -1308,6 +1429,7 @@ On top of the baked room reverb, echoes are **ray-traced through the level** for
 | Shift (hold) | Walk slowly with the weapon steadied (tighter spread, less recoil) |
 | Q / E (hold) | Lean left / right |
 | C | Toggle crouch (more accurate, and you hide behind furniture) |
+| Z | Go prone, or get up (to a crouch). It takes 0.8 s either way, no shooting meanwhile. Lying down you crawl, can't lean, and hold the gun steadiest of all: a quarter of the standing sway, 60% of the recoil, half the spread. Suspects see less of you and hit you less often |
 | LMB / RMB | Fire / aim down sights |
 | R | Reload (retention: the old magazine goes back in its pouch) |
 | R (hold) | Magazine check: out into your hand; the mouse turns it to read the witness holes or see the rounds |
@@ -1369,7 +1491,9 @@ solids at any height. Doors and windows are dynamic: their solids change as they
   you and the suspects take a flight as a smooth slope through its steps (`G.World.rampAt`), so you rise and
   fall steadily instead of juddering from tread to tread; its side still stops you (you can't step onto it
   half way up), as does its high end from underneath. A drop is a hole in the floor above a flight or a
-  double-height room, with railings round it. You and the suspects step up anything 32 cm high or less
+  double-height room, with railings round it: a steel handrail over glass. The railing stops you walking off
+  the drop; its glass is a pane like a window's, seen and shot through and shot out (shards and the sound
+  of it, for everyone), the handrail left standing. You and the suspects step up anything 32 cm high or less
   (`G.World.STEP`), and are stopped by the ceiling over you wherever you are. Grenades bounce off floors, steps and ceilings at any height; bodies, dropped weapons,
   blood and evidence land on the floor they fall on.
 - **Navigation across floors:** the AI's flow fields span every floor. A flight's cells connect only along
@@ -1383,8 +1507,9 @@ solids at any height. Doors and windows are dynamic: their solids change as they
 - **Lights:** the 12 real lights go to the lamps on your own floor first; they cast no shadows, so a lamp
   downstairs would otherwise light the floor above through its slab.
 - **Still on grids:** the generators plan each floor on a grid.
-- **Next:** meshes built from the solids, and more buildings that go up (houses with an upstairs, a warehouse
-  mezzanine, balconies).
+- **Next:** meshes built from the solids, and more buildings that go up (a warehouse mezzanine, balconies).
+- **Below ground:** a level's floors can start under ground level (`lay.base`: the ground floor's index); the
+  suburbs' basements are floor 0, at -4.3 m.
 
 ## Code layout
 

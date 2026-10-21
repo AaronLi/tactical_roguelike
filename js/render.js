@@ -81,6 +81,7 @@ G.R = {
     this.scene.fog.color.setHex(th.fog);
     this.scene.fog.near = th.noFog ? 1e4 : th.fogNear || 8; this.scene.fog.far = th.noFog ? 2e4 : th.fogFar || 60; // (no fog: pushed out of reach, so the shaders stay the same)
     this.scene.background.setHex(th.fog);
+    this.camera.far = th.hub ? 420 : 280; this.camera.updateProjectionMatrix(); // (the hangar's range runs out to 300 m)
     this.hemi.color.setHex(th.hemi || th.light); this.hemi.intensity = th.hemiI || 0.26; // (outdoors at night: moonlight)
   },
   clearLevel() {
@@ -135,7 +136,7 @@ G.R = {
   setViewmodel(def) {
     if (this.vm) { this.vmRoot.remove(this.vm); this.vm.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); }
     this.vm = def ? G.GunModels.viewmodel(def) : null;
-    if (this.vm) this.vmRoot.add(this.vm);
+    if (this.vm) { this.vm.userData.code = def.code; this.vmRoot.add(this.vm); } // (code: which build it shows)
   },
 
   // ------------------------------------------------------------ effects
@@ -418,8 +419,22 @@ G.R = {
       d.lookAt(p.x + n[0], p.y + n[1], p.z + n[2]);
       d.rotation.z = Math.random() * 6;
       d.visible = true;
+      this.lastDecal = d;
       this.onDoor(d);
     }
+  },
+  // A round's mark where it stopped in something solid (a wall, a door, or a target on the range): paper targets show
+  // their holes in their own picture (no mark on top); a steel plate keeps its mark as it swings or falls.
+  impactOn(p, n, solid) {
+    const t = solid && solid.target, on = t && G.Range ? G.Range.markOn(t) : null;
+    this.lastDecal = null;
+    this.impact(p, on === 'paper' ? null : n, 'wall');
+    if (on && on !== 'paper' && this.lastDecal) on.attach(this.lastDecal);
+  },
+  // put marks stuck on something about to be thrown away back in the pool (hidden)
+  freeMarks(obj) {
+    const ms = []; obj.traverse((o) => { if (this.decals.includes(o) || (this.bloodMarks && this.bloodMarks.includes(o))) ms.push(o); });
+    for (const m of ms) { m.visible = false; this.scene.add(m); }
   },
   // A mark that landed on a door's leaf becomes part of the leaf, so it swings with the door. (Marks are pooled:
   // each is put back in the scene before it's used again, and before a level's meshes are thrown away.)
@@ -430,7 +445,7 @@ G.R = {
     const p = m.getWorldPosition(new THREE.Vector3());
     for (const pivot of doors) {
       const leaf = pivot.userData && pivot.userData.leaf;
-      if (!leaf || pivot.position.distanceTo(p) > 2.6) continue;
+      if (!leaf || pivot.getWorldPosition(_tv).distanceTo(p) > 2.6) continue; // (its world position: a door upstairs sits in its floor's group)
       leaf.updateMatrixWorld(true);
       const l = leaf.worldToLocal(p.clone()), g = leaf.geometry.parameters;
       if (Math.abs(l.x) <= g.width / 2 + 0.03 && Math.abs(l.y) <= g.height / 2 + 0.03 && Math.abs(l.z) <= g.depth / 2 + 0.04) { leaf.attach(m); return; }
@@ -546,6 +561,7 @@ G.R = {
     pip.disk.matrixWorld.decompose(sc.position, sc.quaternion, this._pipScale || (this._pipScale = new THREE.Vector3()));
     const d = Math.max(0.03, cam.position.distanceTo(sc.position));
     sc.fov = THREE.MathUtils.radToDeg(2 * Math.atan(pip.r / d)) / pip.mag;
+    sc.far = cam.far; // (as far as you can see without it)
     sc.updateProjectionMatrix();
     const eye = pip.disk.worldToLocal(cam.position.clone());
     pip.mat.uniforms.eye.value.set((eye.x / pip.r) * 0.8, (eye.y / pip.r) * 0.8);
@@ -578,6 +594,7 @@ G.R = {
   },
   render() {
     const r = this.renderer;
+    G.LightGrid.on(true); // (the lamps' light: only for the level's own frame)
     for (const m of this.streaks) if (m.visible && m.userData.f !== this.frameNo) m.visible = false; // (rounds that stopped)
     for (const m of this.glows) if (m.visible && m.userData.f !== this.frameNo) m.visible = false;
     for (const m of this.flares) if (m.visible && m.userData.f !== this.frameNo) m.visible = false;
@@ -636,5 +653,6 @@ G.R = {
     r.clearDepth();
     r.clearStencil(); // reflex sight windows mark the stencil for their reticles
     r.render(this.vmScene, this.camera);
+    G.LightGrid.on(false);
   },
 };

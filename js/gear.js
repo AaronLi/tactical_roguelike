@@ -363,7 +363,6 @@ G.Gear = (() => {
     if (w.noMag) { loadIn(me, w, best.it); w.noMag = false; return 'none'; } // nothing in it to dump
     const old = best.it;
     exchange(me, w, old);
-    if (w.def.enbloc) return 'floor';
     const g = dest && findSpot(dest, old) ? dest : null;
     if (g) { const s = findSpot(g, old); put(g, old, s.x, s.y, s.rot); return 'pouch'; }
     me.dumped = old;
@@ -390,7 +389,7 @@ G.Gear = (() => {
     if (!best) return false;
     if (w.noMag) { removeFrom(best.g, best.it); loadIn(me, w, best.it); w.noMag = false; return true; }
     exchange(me, w, best.it);
-    if (best.it.n <= 0 && w.def.enbloc) removeFrom(best.g, best.it);
+    // (a clip that came out empty goes back where the full one came from, like a magazine)
     return true;
   }
   // Loose rounds out of your boxes: the type you're already using first (prefer), else the first box you

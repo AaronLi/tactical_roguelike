@@ -569,6 +569,22 @@ G.Furniture = (() => {
     k.box(trim, 1.84, 0.16, 0.12, 0, 0.42, 2.1); k.box(trim, 1.84, 0.16, 0.12, 0, 0.42, -2.1); // bumpers
     for (const x of [-0.66, 0.66]) { k.box(k.mat(0xf2efe6, 0.3, 0, { emissive: 0x303030 }), 0.3, 0.1, 0.02, x, 0.74, 2.105); k.box(k.mat(0x8a1010, 0.4, 0, { emissive: 0x200404 }), 0.32, 0.1, 0.02, x, 0.74, -2.105); }
   } };
+  // A patrol car, nose to +z: black and white, its light bar lit (red and blue), a push bar on the front.
+  R.police = { w: 1.9, d: 4.6, cover: 1, boxes: [[0, 0, 1.84, 4.5, 1.5]], build(k) {
+    const black = k.mat(0x111214, 0.35, 0.5), white = k.mat(0xeceae4, 0.35, 0.4), glass = k.mat(0x0c1218, 0.1, 0.6), tyre = k.mat(0x111112, 0.9), trim = k.mat(0x1c1c1e, 0.6);
+    k.box(black, 1.82, 0.62, 4.4, 0, 0.62, 0);
+    k.box(white, 1.84, 0.5, 2.0, 0, 0.66, -0.15); // the doors
+    k.box(white, 1.64, 0.5, 2.15, 0, 1.18, -0.2);
+    k.box(glass, 1.66, 0.36, 1.65, 0, 1.18, -0.2);
+    k.box(glass, 1.5, 0.42, 0.04, 0, 1.17, 0.88, 0, -0.55); k.box(glass, 1.5, 0.38, 0.04, 0, 1.17, -1.3, 0, 0.5);
+    for (const x of [-0.8, 0.8]) for (const z of [-1.4, 1.4]) { k.box(tyre, 0.24, 0.66, 0.66, x, 0.33, z); k.box(k.mat(0x6a6e72, 0.3, 0.8), 0.25, 0.34, 0.34, x, 0.33, z); }
+    k.box(trim, 1.86, 0.16, 0.12, 0, 0.42, -2.2); // rear bumper
+    k.box(trim, 1.2, 0.5, 0.1, 0, 0.62, 2.28); // the push bar
+    k.box(trim, 1.3, 0.08, 0.36, 0, 1.47, -0.15); // the light bar: red one side, blue the other
+    k.box(k.mat(0xff2a1a, 0.3, 0, { emissive: 0xc01208 }), 0.6, 0.1, 0.3, -0.33, 1.52, -0.15);
+    k.box(k.mat(0x2a5aff, 0.3, 0, { emissive: 0x1030d0 }), 0.6, 0.1, 0.3, 0.33, 1.52, -0.15);
+    for (const x of [-0.66, 0.66]) { k.box(k.mat(0xf2efe6, 0.3, 0, { emissive: 0x404040 }), 0.3, 0.1, 0.02, x, 0.74, 2.205); k.box(k.mat(0x8a1010, 0.4, 0, { emissive: 0x200404 }), 0.32, 0.1, 0.02, x, 0.74, -2.205); }
+  } };
   R.bench = { w: 1.8, d: 0.6, boxes: [[0, 0, 1.8, 0.55, 0.85]], build(k) {
     const w = k.mat(k.pick(WOOD), 0.85), iron = k.mat(0x1c1c1e, 0.5, 0.5);
     for (let i = 0; i < 3; i++) k.box(w, 1.8, 0.04, 0.12, 0, 0.45, 0.16 - i * 0.14);
@@ -609,6 +625,8 @@ G.Furniture = (() => {
     hangar: { floor: 'pave', bare: 1 }, pad: { floor: 'pave', bare: 1, out: 1 }, range: { floor: 'pave', bare: 1, out: 1 },
     // outside: the street in front of a house, the lot in front of a building (bins, pallets, crates)
     street: { must: 'bin', wall: ['bin', 'planter', 'bin'], center: [], small: ['planter', 'bin'], floor: 'pave', out: 1 },
+    // a road (the suburbs: the patrol cars are set where the layout says, rm.cars), and a front lawn
+    road: { bare: 1, floor: 'pave', out: 1 }, lawn: { must: 'planter', wall: ['planter', 'bin'], center: ['hedge'], small: ['planter'], floor: 'grass', out: 1 },
     lot: { must: 'crates', wall: ['pallet', 'bin', 'crates', 'pallet'], center: [], small: ['bin', 'cardboard'], floor: 'pave', out: 1 },
     // an apartment block's hallway and the landing at the top of the stairs: bare
     corridor: { floor: 'carpet', bare: 1 }, landing: { floor: 'tile', bare: 1 },
@@ -778,6 +796,13 @@ G.Furniture = (() => {
     for (const rm of rooms) {
       rm.type = rm.type || (r() < home ? homes[hi++ % homes.length] : WORK[wi++ % WORK.length]);
       if (fest && fest[rm.type]) { fest[rm.type](rm); continue; }
+      // patrol cars where the layout puts them: [x, z, along] (coarse tiles; along: lengthwise down the road, else across)
+      for (const [x, z, along] of rm.cars || []) {
+        const [x2, z2] = along ? [x + 1, z] : [x, z + 1];
+        if (t[z * W + x] !== 0 || t[z2 * W + x2] !== 0 || !tryBlock(x, z, 2)) continue;
+        tryBlock(x2, z2, 2); // (its far half: the car's own boxes are what stop you either way)
+        put('police', x, z, along ? (x + 1) * TS : (x + 0.5) * TS, along ? (z + 0.5) * TS : (z + 1) * TS, along ? (r() < 0.5 ? 1 : 3) : (r() < 0.5 ? 0 : 2), r());
+      }
       const spec = ROOMS[rm.type];
       if (spec.bare) continue;
       // the warehouse floor: rows of racking with two-tile aisles between, cut by cross-aisles
