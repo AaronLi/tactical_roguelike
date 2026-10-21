@@ -251,6 +251,7 @@ G.Gear = (() => {
   // medical items you carry, counting what's in each stack
   function medCount(me) { let n = 0; each(body(me), (it) => { if (it.k === 'med') n += it.n || 1; }); return n; }
   const fragItem = () => item({ k: 'frag' });
+  const flashItem = () => item({ k: 'flash' }); // a flashbang: blinds and deafens, hurts nobody
 
   // ---------------------------------------------------------------- grids
   let gid = 1;
@@ -326,7 +327,7 @@ G.Gear = (() => {
   // the guns in your backpack, as [item, grid]
   function packGuns(me) { const out = []; if (me.kit.pack) each(me.kit.pack.grids, (it, g) => { if (it.k === 'gun') out.push([it, g]); }); return out; }
   // In a level you only have what you carry: the locker is back at the quartermaster's.
-  const inField = () => !!(G.Game && G.Game.phase === 'level');
+  const inField = () => !!(G.Game && G.Game.phase === 'level' && !G.Game.hub); // (the hangar's between levels: your stash is there)
   function all(me) { return inField() ? [...body(me), ...molles(me)] : [...body(me), ...molles(me), me.locker]; }
   function each(grids, fn) { for (const g of grids) for (const p of [...g.items]) fn(p.it, g, p); }
   // what a gun can reload from, on you
@@ -590,6 +591,7 @@ G.Gear = (() => {
     if (it.k === 'ammo') return `${(G.CALIBERS[it.key] || {}).name || it.key} ${tag}`;
     if (it.k === 'med') return (G.Med.ITEMS[it.mt] || G.Med.ITEMS.bandage).name; // (a stack's count is on its tile: n/most)
     if (it.k === 'frag') return 'Frag grenade';
+    if (it.k === 'flash') return 'Flashbang';
     if (it.k === 'gun') return it.w.def.name;
     if (it.k === 'pouch') return POUCHES[it.pid].name;
     if (it.k === 'part') return (G.Gunsmith.PARTS[it.pid] || {}).name || it.pid;
@@ -601,6 +603,7 @@ G.Gear = (() => {
     if (it.k === 'ammo') return Math.max(1, Math.round(it.n * roundPrice(it.key, it.am)));
     if (it.k === 'med') return (G.Med.ITEMS[it.mt] || G.Med.ITEMS.bandage).price * (it.n || 1);
     if (it.k === 'frag') return 200;
+    if (it.k === 'flash') return 150;
     if (it.k === 'gun') return Math.floor(G.WEAPONS[it.w.def.id].price * 0.5); // sold for half: what a trade-in gets
     if (it.k === 'pouch') return POUCHES[it.pid].price;
     if (it.k === 'part') return (G.Gunsmith.PARTS[it.pid] || {}).price || 0;
@@ -608,7 +611,7 @@ G.Gear = (() => {
     return d ? d.price : 0;
   }
   return {
-    LIST, DEFS, POUCHES, mixed, pack, unpack, mergeBox, mergeMed, medStack, medCount, absorb, combine, setLoad, loadIn, magShape, magName, magVid, BRANDS: B, ammoFor, ammoItem, gearItem, gunItem, pouchItem, mounted, molles, pickMag, dumpGrid, dumpMag, partItem, partSize, stow, inField, roomFor, unloadMag, unloadGun, fillMag, fillFrom, fillGun, partCount, stashProxy, gunSize, guns, packGuns, medItem, fragItem, grid, size, isGear, fits, put, findSpot, place, removeFrom,
+    LIST, DEFS, POUCHES, mixed, pack, unpack, mergeBox, mergeMed, medStack, medCount, absorb, combine, setLoad, loadIn, magShape, magName, magVid, BRANDS: B, ammoFor, ammoItem, gearItem, gunItem, pouchItem, mounted, molles, pickMag, dumpGrid, dumpMag, partItem, partSize, flashItem, stow, inField, roomFor, unloadMag, unloadGun, fillMag, fillFrom, fillGun, partCount, stashProxy, gunSize, guns, packGuns, medItem, fragItem, grid, size, isGear, fits, put, findSpot, place, removeFrom,
     newKit, starter, body, all, each, feeds, rounds, count, take, swapMag, takeRounds, handOver, receive, refitMags, boxItem, loadMag, loadAll, roundPrice,
     defOf, cond, piece, speed, label, price,
   };

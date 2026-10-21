@@ -68,6 +68,11 @@ G.HUD = {
     this.el.progress.classList.toggle('hidden', !show);
     if (show) { this.el.progressBar.style.width = Math.min(100, f * 100) + '%'; this.set('progressText', label); }
   },
+  // blinded by a flashbang (k 0..1): the screen white, held a moment, then fading back over a few seconds
+  flash(k) {
+    this.flashK = Math.max(this.flashK || 0, k);
+    this.flashHold = Math.max(this.flashHold || 0, 0.4 + 1.8 * k);
+  },
   nadeWarn(n) {
     const el = this.el.nadeWarn;
     el.classList.toggle('hidden', !n);
@@ -89,15 +94,29 @@ G.HUD = {
     this.set('hpText', Math.ceil(Math.max(0, blood)) + '%' + (b && b.pk > 0 ? ' <small>PK</small>' : ''));
     if (b && (this.bodyT = (this.bodyT || 0) - dt) <= 0) {
       this.bodyT = 0.2;
-      this.set('bodyMini', G.Med.figure(b, { cls: 'mini' }) + (G.Med.bleeding(b) ? '<span class="bm-tag">BLEEDING · Tab to treat</span>' : ''));
+      this.set('bodyMini', G.Med.figure(b, { cls: 'mini', glow: Me.treatingParts() }) + (G.Med.bleeding(b) ? '<span class="bm-tag">BLEEDING · Tab to treat</span>' : ''));
     }
     // the condition of what's over your chest (plate, or soft armour); the helmet's after it
     const cd = G.Gear.defOf(chest), hd = G.Gear.defOf(Me.kit.helmet);
     this.el.armorFill.style.width = cd && cd.dur ? Me.vestCond() * 100 + '%' : '0%';
     this.set('armorText', (cd && cd.dur ? Math.round(Me.vestCond() * 100) + '%' : '—') + (hd && hd.dur ? ` <small>HELM ${Math.round(Me.helmCond() * 100)}%</small>` : ''));
-    this.set('items', `<span title="Grenades (G)">● ${Me.nades} <small>FRAG</small></span><span title="Medical items (treat in the Tab screen)">✚ ${Me.meds} <small>MED</small></span>`);
+    // the quick slots (3, 4, 5): what's on each and how many you carry
+    this.set('items', Me.quick.map((kind, i) => { const n = Me.quickCount(kind); return `<span class="qs${n ? '' : ' none'}" title="Key ${i + 3}: ${G.U.esc(Me.quickName(kind))} (drag a grenade onto its box in the inventory to change it)"><b>${i + 3}</b> ${G.U.esc(Me.quickName(kind))}${kind ? ' ' + n : ''}</span>`; }).join(''));
+    // a flashbang's white-out
+    if (this.flashK > 0) {
+      if (this.flashHold > 0) this.flashHold -= dt; else this.flashK = Math.max(0, this.flashK - dt * 0.35);
+      this.el.flashFx.style.opacity = Math.min(1, this.flashK * 1.15).toFixed(3);
+    } else if (this.el.flashFx.style.opacity !== '0') this.el.flashFx.style.opacity = '0';
 
-    // ammo
+    // a grenade in your hand: what it is, how many, and the throw (right click changes it)
+    if (Me.held) {
+      const h = Me.held;
+      this.set('weapName', `${Me.quickName(h.kind)} <small title="Right click changes it">${Me.THROWS[h.str][0].toUpperCase()} THROW</small>${h.cock ? ' <em>pin out: let go to throw</em>' : ''}`);
+      this.set('ammoMag', ''); this.set('ammoRes', ` <small>${Me.quickCount(h.kind)} left</small>`);
+      this.set('weapAlt', `LMB hold, release to throw · RMB ${Me.THROWS.map((t, i) => (i === h.str ? `<b>${t[0]}</b>` : t[0])).join(' / ')}`);
+    }
+    // ammo (a weapon in your hands)
+    if (!Me.held) {
     const modes = def.modes || [def.mode], fm = Me.fireMode ? Me.fireMode(w) : modes[0];
     this.set('weapName', `<span style="color:${G.TIER_COLORS[def.tier]}">${def.name}</span> <small${modes.length > 1 ? ' title="X switches"' : ''}>${G.MODE_NAME[fm] || ''}</small>${w.sup ? ' <small>SUPP</small>' : ''}${def.missing && def.missing.length ? ' <em class="broken">WON\'T FIRE</em>' : ''}${Me.reloading ? ` <em>${{ pouch: 'dump reload (pouch)', floor: 'dump reload' }[Me.reloadMode] || 'reloading'}</em>` : ''}`);
     // No counts, no gauges: check the magazine (hold R) or the chamber (hold I) to know what's in it
@@ -112,8 +131,9 @@ G.HUD = {
     const other = Me.weapons[Me.slot === 'p' ? 's' : 'p'];
     const packed = G.Gear.packGuns(Me).map(([it]) => it.w.def.name);
     this.set('weapAlt', (other ? `${Me.slot === 'p' ? '2' : '1'} · ${other.def.name}` : '') + (packed.length ? `${other ? ' &nbsp; ' : ''}B · ${packed.join(', ')}` : ''));
+    }
     this.set('credits', '¢ ' + G.U.fmt(Me.credits));
-    this.set('levelInfo', `LEVEL ${Gm.level} <span>· ${Gm.map.theme.name}</span>`);
+    this.set('levelInfo', Gm.hub ? `HANGAR <span>· level ${Gm.level} cleared</span>` : `LEVEL ${Gm.level} <span>· ${Gm.map.theme.name}</span>`);
 
     // objectives: order (required), the civilians (optional), then the vote to leave. No counts: how many
     // suspects, civilians, bodies or weapons there are is for you to find out.
@@ -135,6 +155,10 @@ G.HUD = {
     const othersDone = X.active && (!nu || (Gm.unitsCleared || 0) >= nu) && !X.civDead && !(Gm.civsLeft > 0);
     obj += othersDone && !pending ? '<br><b class="go">✔ Also pays: securing bodies and bagging dropped weapons</b>' : '<br><span style="opacity:0.65">Also pays: securing bodies and bagging dropped weapons</span>';
     if (X.active) obj += `<br><b class="go">Press Y to vote to leave</b> — ${X.votes}/${X.need}${X.voted ? ' <span style="opacity:0.7">(you voted)</span>' : ''}`;
+    if (Gm.hub) {
+      const ids = Object.keys(Gm.roster || {}), ready = ids.filter((id) => Gm.roster[id].ready).length;
+      obj = `<b>Kit up, then hold <b>F</b> on the helicopter</b><br><span style="opacity:0.75">Tab: your stash and loadout · ${ready}/${ids.length} ready</span>`;
+    }
     this.set('objective', obj);
 
     // crosshair
@@ -170,6 +194,13 @@ G.HUD = {
     }
     this.dirs = this.dirs.filter((d) => d.t > 0);
 
+    // a teammate putting something on you: who, what, where, and how far along
+    {
+      const tr = Me.treating && !Me.dead ? [...Me.treating.values()].filter((q) => (performance.now() - q.t0) / 1000 < q.dur + 1.5) : [];
+      if (Me.treating) for (const [k, q] of Me.treating) if ((performance.now() - q.t0) / 1000 >= q.dur + 1.5) Me.treating.delete(k); // (the message that ends it never came)
+      this.set('treatFx', tr.map((q) => `<div class="tfx"><b>${G.U.esc(q.name)}</b> is applying ${G.U.esc(G.Med.ITEMS[q.mt].name.toLowerCase())} to your <b>${G.Med.NAME[q.part].toLowerCase()}</b><i><u style="width:${Math.round(G.U.clamp((performance.now() - q.t0) / 1000 / q.dur, 0, 1) * 100)}%"></u></i></div>`).join(''));
+      this.el.treatFx.classList.toggle('hidden', !tr.length);
+    }
     // downed / dead overlays
     this.el.downed.classList.toggle('hidden', !Me.down);
     if (Me.down) this.set('bleed', Me.bleed == null ? (G.Med.cantRevive(Me.body) ? `Stable: you need blood (${Math.round(Me.body.blood)}%) to get up` : 'Stable: a teammate can get you up') : `Bleeding out: ${Math.ceil(Me.bleed)}s`);

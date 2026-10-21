@@ -121,12 +121,12 @@ G.R = {
   },
   // A pool spreading out under someone (owner: anything, so it's started once and can keep growing as they
   // keep bleeding). max: how wide it gets (m), over grow seconds.
-  bloodPool(owner, x, z, max = 0.9, grow = 25) {
+  bloodPool(owner, x, z, max = 0.9, grow = 25, y = 0) { // (y: about where the floor is under them)
     let m = this.pools.find((q) => q.visible && q.userData.owner === owner);
     if (!m) {
       m = this.pools[this.poolIdx]; this.poolIdx = (this.poolIdx + 1) % this.pools.length;
       m.userData = { owner, t: 0, max, grow }; m.rotation.z = Math.random() * 6.28;
-      m.position.set(x, this.bloodFloor(x, z, 0.3) + 0.003, z); m.scale.set(0.05, 0.05, 1); m.visible = true;
+      m.position.set(x, this.bloodFloor(x, z, y + 0.3) + 0.003, z); m.scale.set(0.05, 0.05, 1); m.visible = true;
     } else { m.userData.max = Math.max(m.userData.max, max); m.userData.grow = grow; }
     return m;
   },
@@ -444,6 +444,34 @@ G.R = {
     this.particles(p, 40, 0xffa040, 9, 0.6, 4, 1);
     this.particles(p, 30, 0x444038, 3, 1.4, -0.5, 1);
   },
+  // The throw you're lining up: a dotted arc to where it goes off (G.Views.predictNade), and a ring there. Drawn
+  // the frames it's called; cocked (pin out), brighter.
+  throwArc(pts, cocked) {
+    if (!this._arc) {
+      const N = 400, geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N * 3), 3));
+      const dots = new THREE.Points(geo, new THREE.PointsMaterial({ color: 0xfff1b8, size: 0.05, transparent: true, opacity: 0.8, depthTest: false }));
+      dots.frustumCulled = false; dots.renderOrder = 15;
+      const ring = new THREE.Mesh(new THREE.RingGeometry(0.28, 0.36, 28), new THREE.MeshBasicMaterial({ color: 0xffd060, transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthTest: false }));
+      ring.rotation.x = -Math.PI / 2; ring.renderOrder = 15;
+      this.scene.add(dots, ring);
+      this._arc = { dots, ring, N };
+    }
+    const A = this._arc, pos = A.dots.geometry.attributes.position;
+    let n = 0, last = null;
+    for (let i = 0; i < pts.length && n < A.N; i += 2) { const q = pts[i]; pos.setXYZ(n++, q.x, q.y, q.z); last = q; }
+    last = pts[pts.length - 1] || last;
+    pos.needsUpdate = true; A.dots.geometry.setDrawRange(0, n);
+    A.dots.material.opacity = cocked ? 0.95 : 0.45; A.ring.material.opacity = cocked ? 0.9 : 0.4;
+    if (last) A.ring.position.set(last.x, last.y - 0.04, last.z);
+    A.dots.visible = A.ring.visible = true; A.f = this.frameNo;
+  },
+  // a flashbang going off: a blinding point of light and a burst of sparks
+  flashAt(p) {
+    const l = this.muzzleLights[this.mlIdx = ((this.mlIdx || 0) + 1) % this.muzzleLights.length];
+    if (l) { l.position.copy(p); l.color.setHex(0xffffff); l.intensity = 40; l.distance = 26; l.userData.t = 0.12; }
+    this.particles(p, 30, 0xfff6d8, 5, 0.35, 2, 1.6);
+  },
   muzzleFlashAt(p, color = 0xffb060) {
     const l = this.muzzleLights[this.muzzleIdx]; this.muzzleIdx = (this.muzzleIdx + 1) % this.muzzleLights.length;
     l.position.copy(p); l.color.setHex(color); l.intensity = 2.5; l.userData.t = 0.05;
@@ -553,6 +581,7 @@ G.R = {
     for (const m of this.streaks) if (m.visible && m.userData.f !== this.frameNo) m.visible = false; // (rounds that stopped)
     for (const m of this.glows) if (m.visible && m.userData.f !== this.frameNo) m.visible = false;
     for (const m of this.flares) if (m.visible && m.userData.f !== this.frameNo) m.visible = false;
+    if (this._arc && this._arc.f !== this.frameNo) this._arc.dots.visible = this._arc.ring.visible = false; // (not lining up a throw)
     this.frameNo++;
     this.camera.updateMatrixWorld();
     this.vmHolder.matrix.copy(this.camera.matrixWorld);
@@ -562,6 +591,17 @@ G.R = {
     if (pip) {
       pip.mat.uniforms.live.value = THREE.MathUtils.smoothstep(live, 0.35, 0.8);
       if (live > 0.35) this._renderPip(pip);
+    }
+    // a fisheye (the death camera): the scene goes into a texture, then to the screen through a barrel distortion
+    this.fk = (this.fk || 0) + ((this.fisheye && G.Game && G.Game.phase === 'level' ? 1 : 0) - (this.fk || 0)) * 0.12;
+    const fish = this.fk > 0.01;
+    if (fish) {
+      const sz = r.getDrawingBufferSize(this._fsz || (this._fsz = new THREE.Vector2()));
+      if (!this.fishRT || this.fishRT.width !== sz.x || this.fishRT.height !== sz.y) {
+        if (this.fishRT) this.fishRT.dispose();
+        this.fishRT = new THREE.WebGLRenderTarget(sz.x, sz.y, { samples: 4, stencilBuffer: true });
+      }
+      r.setRenderTarget(this.fishRT);
     }
     r.clear();
     r.render(this.scene, this.camera);
@@ -575,6 +615,23 @@ G.R = {
       cam.layers.set(1); sc.overrideMaterial = this.depthOnly; r.render(sc, cam);
       cam.layers.set(2); sc.overrideMaterial = null; r.render(sc, cam);
       cam.layers.set(0); sc.background = bg;
+    }
+    if (fish) {
+      r.setRenderTarget(null);
+      if (!this.fishQuad) {
+        const mat = new THREE.ShaderMaterial({ depthTest: false, depthWrite: false,
+          uniforms: { map: { value: null }, k: { value: 0 }, ax: { value: 1 } },
+          vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+          // barrel: the edges squeezed in, the middle a little larger; the corners stay the corners
+          fragmentShader: 'uniform sampler2D map; uniform float k; uniform float ax; varying vec2 vUv; void main() { vec2 p = (vUv - 0.5) * 2.0; p.x *= ax; float r2 = dot(p, p), R2 = ax * ax + 1.0; vec2 q = p * (1.0 + k * r2) / (1.0 + k * R2); q.x /= ax; gl_FragColor = texture2D(map, q * 0.5 + 0.5); }' });
+        this.fishQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat); this.fishQuad.frustumCulled = false;
+        this.fishScene = new THREE.Scene(); this.fishScene.add(this.fishQuad);
+        this.fishCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+      }
+      const u = this.fishQuad.material.uniforms;
+      u.map.value = this.fishRT.texture; u.k.value = 0.3 * this.fk; u.ax.value = this.fishRT.width / this.fishRT.height;
+      r.clear();
+      r.render(this.fishScene, this.fishCam);
     }
     r.clearDepth();
     r.clearStencil(); // reflex sight windows mark the stencil for their reticles

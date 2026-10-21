@@ -35,17 +35,18 @@ G.GunAudio = {
   // ------------------------------------------------------------ acoustics
   // Ring of rays from the shooter to the nearest walls -> area, perimeter, corridor-ness,
   // openness -> synth environment preset + Sabine RT60. Memoised per tile per map.
-  acousticsAt(map, x, z) {
-    const L = G.Level, tx = Math.floor(x / L.TS), tz = Math.floor(z / L.TS);
+  // fy: the floor it's on (a building of several floors: the room upstairs, not the one below it)
+  acousticsAt(map, x, z, fy = 0) {
+    const L = G.Level, tx = Math.floor(x / L.TS), tz = Math.floor(z / L.TS), key = tz * map.W + tx + '|' + fy.toFixed(1);
     map._acoustics = map._acoustics || new Map();
-    const memo = map._acoustics.get(tz * map.W + tx);
+    const memo = map._acoustics.get(key);
     if (memo) return memo;
     const cx = (tx + 0.5) * L.TS, cz = (tz + 0.5) * L.TS;
     const RAYS = 24, FAR = 80, OPEN_M = 26, clamp = G.U.clamp;
     const dist = [];
     for (let i = 0; i < RAYS; i++) {
       const a = (i / RAYS) * Math.PI * 2;
-      dist.push(L.raycast(map, cx, 1.5, cz, Math.cos(a), 0, Math.sin(a), FAR).t);
+      dist.push(L.raycast(map, cx, fy + 1.5, cz, Math.cos(a), 0, Math.sin(a), FAR).t);
     }
     const dA = (Math.PI * 2) / RAYS;
     let area = 0, perim = 0;
@@ -73,16 +74,18 @@ G.GunAudio = {
     const alpha = clamp(0.55 - 0.5 * envReflect, 0.18, 0.6);
     const rt60 = clamp((0.161 * V) / Math.max(S * alpha, 1e-3), 0.1, 1.6);
     const out = { env, rt60, envReflect, envMix };
-    map._acoustics.set(tz * map.W + tx, out);
+    map._acoustics.set(key, out);
     return out;
   },
+  // the height of the floor something at p (a muzzle, your eyes) is over
+  floorY(map, p) { return map.floors ? G.Level.floorMap(map, G.Level.floorAt(map, p.x, p.y - 1.4, p.z)).fy || 0 : 0; },
   // Invert the synth's "space size" control (RT60 = base * (0.45 + 1.6 * size)).
   sizeForRt60(env, rt60) {
     const base = window.GunshotSynth.ENVIRONMENTS[env].rt60 || 0;
     return base > 0 ? G.U.clamp((rt60 / base - 0.45) / 1.6, 0, 1) : 0.5;
   },
-  roomSig(map, x, z) {
-    const a = this.acousticsAt(map, x, z), q = (v, s) => +(Math.round(v / s) * s).toFixed(2);
+  roomSig(map, x, z, fy = 0) {
+    const a = this.acousticsAt(map, x, z, fy), q = (v, s) => +(Math.round(v / s) * s).toFixed(2);
     return { env: a.env, envSize: q(this.sizeForRt60(a.env, a.rt60), 0.2), envReflect: q(a.envReflect, 0.25), envMix: q(a.envMix, 0.2) };
   },
   sigKey(sig) { return `${sig.env}|${sig.envSize}|${sig.envReflect}|${sig.envMix}`; },
@@ -148,9 +151,9 @@ G.GunAudio = {
     ids.forEach((id) => this.buildDry(id));
     const sigs = new Map();
     const step = Math.max(1, Math.round(4 / G.Level.TS)); // a sample every ~4 m
-    for (let tz = 1; tz < map.H - 1; tz += step) for (let tx = 1; tx < map.W - 1; tx += step) {
-      if (map.t[tz * map.W + tx] !== 0) continue;
-      const sig = this.roomSig(map, (tx + 0.5) * G.Level.TS, (tz + 0.5) * G.Level.TS);
+    for (const fm of map.floors || [map]) for (let tz = 1; tz < map.H - 1; tz += step) for (let tx = 1; tx < map.W - 1; tx += step) {
+      if (fm.t[tz * map.W + tx] !== 0) continue;
+      const sig = this.roomSig(map, (tx + 0.5) * G.Level.TS, (tz + 0.5) * G.Level.TS, fm.fy || 0);
       sigs.set(this.sigKey(sig), sig);
     }
     for (const id of ids) for (const sig of sigs.values()) this.build(id, sig);
@@ -168,12 +171,12 @@ G.GunAudio = {
   debugEchoes: (() => { try { return new URLSearchParams(location.search).has('echoes'); } catch (e) { return false; } })(),
 
   echoTaps(map, src, lis) {
-    const key = `${Math.round(src.x)},${Math.round(src.z)}|${Math.round(lis.x)},${Math.round(lis.z)}|${map.doorVer || 0}`;
+    const key = `${Math.round(src.x)},${Math.round(src.y)},${Math.round(src.z)}|${Math.round(lis.x)},${Math.round(lis.y)},${Math.round(lis.z)}|${map.doorVer || 0}`;
     const cached = this.echoCache.get(key);
     if (cached && cached.map === map) return cached.taps;
     const L = G.Level, K = this.ECHO_RAYS;
     const refl = 0.55 + (map.theme.reflect || 0.32); // share of pressure a wall throws back (harder themes ring more)
-    const y = G.U.clamp(src.y, 0.5, 3.5), ly = lis.y;
+    const fy = this.floorY(map, src), y = G.U.clamp(src.y, fy + 0.5, fy + 3.5), ly = lis.y; // (between the floor and ceiling of the shooter's own floor)
     const direct = Math.hypot(lis.x - src.x, ly - y, lis.z - src.z);
     const rayNorm = Math.sqrt(8 / K); // each ray stands for a slice of the wavefront
     const bins = new Map();
@@ -234,7 +237,7 @@ G.GunAudio = {
     if (!ctx || !map || !this.spec(id) || !this.available()) return false;
     const cam = G.R.camera.position;
     const src = pos || cam;
-    const sig = this.roomSig(map, src.x, src.z);
+    const sig = this.roomSig(map, src.x, src.z, this.floorY(map, src));
     let buf = this.bufs.get(id + '|' + this.sigKey(sig));
     if (!buf) {
       buf = this.dry.get(id);
@@ -285,7 +288,7 @@ G.GunAudio = {
     // the echoes: the dry report (no baked reverb) replayed from each reflecting wall after its delay,
     // darker with every bounce. Under heavy fire only the two strongest are kept.
     const echoBuf = this.dry.get(id) || buf, now = ctx.currentTime;
-    const n = this.voices > this.MAX_VOICES * 0.6 ? 2 : taps.length;
+    const n = Math.min(taps.length, this.voices > this.MAX_VOICES * 0.6 ? 2 : taps.length); // (there may be fewer than two)
     for (let i = 0; i < n; i++) {
       const tp = taps[i];
       const es = ctx.createBufferSource();

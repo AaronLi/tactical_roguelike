@@ -111,6 +111,28 @@ G.Audio = {
     this._noise(now, 1.1, 1200, 0.5, 1.0 * att, 'lowpass', 80);
     this.tone(90, 0.7, 'sine', 0.9 * att, 25);
   },
+  // a flashbang: a sharp, deafening crack
+  flashbang(dist = 0) {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime, att = 1 / (1 + dist * 0.05);
+    this._noise(now, 0.35, 6000, 0.4, 1.3 * att, 'lowpass', 900);
+    this._noise(now, 0.9, 900, 0.6, 0.6 * att, 'lowpass', 60);
+    this.tone(140, 0.4, 'sine', 0.8 * att, 40);
+  },
+  // deafened (k 0..1): a high ringing that fades, and everything else muffled down and slowly coming back
+  deafen(k) {
+    if (!this.ctx) return;
+    const c = this.ctx, now = c.currentTime, dur = 1.5 + 5.5 * k;
+    const o = c.createOscillator(), g = c.createGain();
+    o.frequency.value = 3400 + Math.random() * 600; o.type = 'sine';
+    g.gain.setValueAtTime(0.12 * k, now); g.gain.exponentialRampToValueAtTime(0.0005, now + dur);
+    o.connect(g); g.connect(this.master); o.start(now); o.stop(now + dur + 0.1);
+    if (!this.muted) {
+      const m = this.master.gain;
+      m.cancelScheduledValues(now); m.setValueAtTime(this.vol * (1 - 0.8 * k), now + 0.05);
+      m.linearRampToValueAtTime(this.vol, now + dur);
+    }
+  },
   rail(dist = 0) {
     if (!this.ctx) return;
     const att = 1 / (1 + dist * 0.06);
@@ -277,21 +299,34 @@ G.Audio = {
     if (kind === 'blood') mat = 'body';
     else if (kind === 'armor') mat = 'metal';
     else if (G.Game && G.Game.map) {
-      const map = G.Game.map, L = G.Level, tx = Math.floor(p.x / L.TS), tz = Math.floor(p.z / L.TS), tile = L.tile(map, tx, tz);
-      if (p.y < 0.06) { const s = G.Casings.surface(map, p.x, p.z, 0); mat = s === 'grass' || s === 'carpet' ? 'soft' : s === 'wood' ? 'wood' : 'wall'; }
+      const map = G.Game.map, L = G.Level, tx = Math.floor(p.x / L.TS), tz = Math.floor(p.z / L.TS), fm = L.floorMap(map, L.floorAt(map, p.x, p.y, p.z)), tile = L.tile(fm, tx, tz);
+      if (p.y - (fm.fy || 0) < 0.06) { const s = G.Casings.surface(map, p.x, p.z, fm.fy || 0); mat = s === 'grass' || s === 'carpet' ? 'soft' : s === 'wood' ? 'wood' : 'wall'; } // (on the floor of whichever floor it's on)
       else if (tile === 3) mat = 'wood'; // a door
       else if (tile === 2 || tile === 4) mat = 'wood'; // furniture, fences
     }
     this.impact(mat, e.d, e.pan);
   },
-  casing(dist, mat, len, surf, speed, pan = 0) {
+  // pos: where it landed (a Vector3): placed there in 3D (HRTF against the listener that follows the camera: left and
+  // right, in front and behind, above and below), muffled if there's a wall between you and it. Without it, just a pan.
+  casing(dist, mat, len, surf, speed, pan = 0, pos = null) {
     if (!this.ctx) return;
     const c = this.ctx, t = c.currentTime, soft = surf === 'carpet' || surf === 'grass';
     const a = this._att(dist) * Math.min(1, speed / 2.2) * (soft ? 0.3 : 1);
     if (a < 0.004) return;
-    const out = c.createStereoPanner ? c.createStereoPanner() : c.createGain();
-    if (out.pan) out.pan.value = pan * 0.8;
-    out.connect(this.master);
+    let out;
+    const cam = pos && G.R && G.R.camera;
+    if (cam) {
+      const map = G.Game && G.Game.map, blocked = map && !G.Level.los(map, cam.position.x, cam.position.y, cam.position.z, pos.x, pos.y + 0.03, pos.z);
+      const pn = c.createPanner(), lp = c.createBiquadFilter(), g = c.createGain();
+      pn.panningModel = 'HRTF'; pn.distanceModel = 'inverse'; pn.rolloffFactor = 0; // (loudness comes from the gain)
+      if (pn.positionX) { pn.positionX.value = pos.x; pn.positionY.value = pos.y; pn.positionZ.value = pos.z; } else pn.setPosition(pos.x, pos.y, pos.z);
+      lp.type = 'lowpass'; lp.frequency.value = blocked ? 1400 : 20000; g.gain.value = blocked ? 0.6 : 1;
+      out = c.createGain(); out.connect(lp); lp.connect(pn); pn.connect(g); g.connect(this.master);
+    } else {
+      out = c.createStereoPanner ? c.createStereoPanner() : c.createGain();
+      if (out.pan) out.pan.value = pan * 0.8;
+      out.connect(this.master);
+    }
     const strike = (f, q, g, dur) => {
       const src = c.createBufferSource(); src.buffer = this.noise;
       const flt = c.createBiquadFilter(); flt.type = 'bandpass'; flt.frequency.value = f; flt.Q.value = q;

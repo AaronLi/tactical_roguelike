@@ -109,12 +109,14 @@ G.Rig = (() => {
     backPatch(rig, k);
     if (!k) return;
     const D = (id) => (id && G.Gear && G.Gear.DEFS[id]) || null;
-    const box = (parent, w, h, d, c, x, y, z, o) => { const m = new T.Mesh(new T.BoxGeometry(w, h, d), KM(c, o)); m.position.set(x, y, z); parent.add(m); rig.kitParts.push(m); return m; };
-    const add = (parent, m, x, y, z) => { m.position.set(x, y, z); parent.add(m); rig.kitParts.push(m); return m; };
+    let part = null; // (which piece of kit the parts being made are: the hangar shows each on its own)
+    const box = (parent, w, h, d, c, x, y, z, o) => { const m = new T.Mesh(new T.BoxGeometry(w, h, d), KM(c, o)); m.position.set(x, y, z); m.userData.part = part; parent.add(m); rig.kitParts.push(m); return m; };
+    const add = (parent, m, x, y, z) => { m.position.set(x, y, z); m.userData.part = part; parent.add(m); rig.kitParts.push(m); return m; };
     const pouches = (parent, n, c, x0, y0, z, w = 0.07, h = 0.09) => { for (let i = 0; i < Math.min(n, 8); i++) box(parent, w, h, 0.05, c, x0 + (i % 4) * (w + 0.015), y0 - Math.floor(i / 4) * (h + 0.015), z); };
     const C = rig.chest, Hd = rig.head, Hp = rig.hips;
     // the helmet: its cut and colour by model; rails and a night-vision mount on the modern ones
     const hd = D(k.helmet);
+    part = 'helmet';
     if (rig.hairMesh) rig.hairMesh.visible = !hd;
     if (hd) {
       const cut = { 'h.bump': [0.146, 0.48], 'h.fast': [0.148, 0.5], 'h.ach': [0.15, 0.58], 'h.rifle': [0.153, 0.58], 'h.visor': [0.153, 0.6] }[hd.id] || [0.15, 0.55];
@@ -128,6 +130,7 @@ G.Rig = (() => {
     }
     // on the helmet's mount: a mandible round the jaw, or a shield over the face
     const fd = D(k.face);
+    part = 'face';
     if (fd && hd) {
       if (fd.cover < 0.9) {
         // a mandible: an arm down from each side of the helmet, into a guard that curves round the front over
@@ -144,6 +147,7 @@ G.Rig = (() => {
     }
     // the carrier: a soft vest, a slick plate carrier, a chest rig, or a full carrier with its pouches
     const cd = D(k.carrier), cc = KIT_COL(cd);
+    part = 'carrier';
     if (cd) {
       if (cd.id === 'c.ghost') box(C, 0.4, 0.27, 0.245, 0x34373b, 0, 0.12, 0);
       else if (cd.id === 'c.recon') { // a chest rig: a panel of pouches across the front, straps over the shoulders
@@ -153,7 +157,7 @@ G.Rig = (() => {
       } else {
         const heavy = cd.id === 'c.heavy', depth = (heavy ? 0.3 : 0.27) + (k.plate ? 0.03 : 0);
         box(C, heavy ? 0.44 : 0.4, heavy ? 0.32 : 0.28, depth, cc, 0, 0.12, 0);
-        if (k.plate) box(C, 0.26, 0.22, 0.02, cc, 0, 0.14, -depth / 2 - 0.005); // the plate's outline at the front
+        if (k.plate) { part = 'plate'; box(C, 0.26, 0.22, 0.02, cc, 0, 0.14, -depth / 2 - 0.005); part = 'carrier'; } // the plate's outline at the front
         pouches(C, k.cp || 0, 0x23251f, -0.16, 0.06, -depth / 2 - 0.03);
         if (heavy || cd.id === 'c.assault') for (const x of [-1, 1]) box(C, 0.13, 0.07, 0.2, cc, x * 0.22, 0.3, 0); // shoulder armour
         if (heavy) { box(C, 0.3, 0.07, 0.26, cc, 0, 0.32, 0.01); box(Hp, 0.2, 0.16, 0.04, cc, 0, -0.06, -0.12); } // collar, groin plate
@@ -161,14 +165,17 @@ G.Rig = (() => {
     }
     // the belt and what's on it; the IFAK at the back
     const bd = D(k.belt);
+    part = 'belt';
     if (bd) {
       box(Hp, 0.35, 0.06, 0.25, bd.id === 'b.war' ? 0x3b3528 : 0x232527, 0, 0.06, 0);
       const n = k.bp || 0;
       for (let i = 0; i < Math.min(n, 6); i++) { const side = i % 2 ? 1 : -1, j = i >> 1; box(Hp, 0.05, 0.08, 0.07, 0x23251f, side * 0.18, 0.04, -0.06 + j * 0.08); }
     }
+    part = 'ifak';
     if (k.ifak) box(bd ? Hp : C, 0.12, 0.1, 0.06, 0x7a2420, 0, bd ? 0.04 : -0.02, bd ? 0.14 : 0.13);
     // the backpack, by size
     const pd = D(k.pack);
+    part = 'pack';
     if (pd) {
       const [w, h, d, y] = PACK[pd.id] || PACK['k.assault'];
       const back = (cd && cd.id !== 'c.recon' ? 0.15 : 0.12) + d / 2;
@@ -191,7 +198,7 @@ G.Rig = (() => {
     // ---- what they're wearing: a look { top, topC, pants, pantsC, eyes, gloves }. Officers bring their own (the
     // main menu); everyone else is dressed for who they are.
     let vestM = null, helmetM = null, headCover = null, hairM = null;
-    const skin = L(pick(PAL.skin));
+    const skin = L(o.mannequin ? 0xa9afb5 : o.skinColor != null ? o.skinColor : pick(PAL.skin)); // (a mannequin: plain grey, no face, no hair: see G.Hangar)
     const gear = L(0x23251f);
     let look;
     if (style === 'tactical') look = Object.assign({}, OFFICER_LOOK, o.look || {});
@@ -210,7 +217,7 @@ G.Rig = (() => {
     const top = L(look.topC), bottom = L(look.pantsC);
     // a combat shirt: a light body (it's worn under armour) with the sleeves in its colour
     const torsoM = look.top === 'combat' ? L(new T.Color(look.topC).lerp(new T.Color(0xb8b0a0), 0.4).getHex()) : top;
-    if (style === 'tactical') { if (o.bare) hairM = L(pick(PAL.hair)); else { vestM = L(0x2a2c28); helmetM = L(0x26282a); } }
+    if (style === 'tactical') { if (o.bare) hairM = o.mannequin ? null : L(pick(PAL.hair)); else { vestM = L(0x2a2c28); helmetM = L(0x26282a); } }
     else if (style === 'armored') { if (!o.dressed) { vestM = L(o.boss ? 0x3a2f24 : 0x3b4232); helmetM = L(0x2a2d30); } headCover = L(0x161616); }
     else if (style === 'suspect') { if (rnd() < 0.6) headCover = L(0x151515); else hairM = L(pick(PAL.hair)); }
     else hairM = L(pick(PAL.hair));
@@ -254,7 +261,7 @@ G.Rig = (() => {
     if (headCover) { // balaclava: the eyes show through a slot
       M_(new T.BoxGeometry(0.12, 0.034, 0.012), skin, 0, 0.136, -0.094, head);
       for (const x of [-0.033, 0.033]) M_(new T.BoxGeometry(0.02, 0.012, 0.006), dark, x, 0.136, -0.1, head);
-    } else {
+    } else if (!o.mannequin) {
       for (const x of [-0.033, 0.033]) { M_(new T.BoxGeometry(0.022, 0.013, 0.008), dark, x, 0.135, -0.097, head); M_(new T.BoxGeometry(0.03, 0.007, 0.01), hairM || dark, x, 0.152, -0.097, head); } // eyes, brows
       M_(new T.BoxGeometry(0.04, 0.006, 0.006), L(0x5a3a32), 0, 0.055, -0.096, head); // mouth
     }
@@ -279,6 +286,20 @@ G.Rig = (() => {
     if (helmetM) {
       M_(new T.SphereGeometry(0.148, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), helmetM, 0, 0.14, 0, head);
       if (style === 'tactical') M_(new T.BoxGeometry(0.06, 0.04, 0.05), gear, 0, 0.2, -0.13, head);
+    }
+    if (o.vex) { // Vex, as his portrait has him: a dark hood, a black visor with two orange eyes, a grey respirator, a gold strap
+      const hoodM = new T.MeshLambertMaterial({ color: 0x1d1c18, side: T.DoubleSide });
+      const hood = M_(new T.SphereGeometry(0.128, 18, 12, 5.58, 4.54, 0, Math.PI * 0.66), hoodM, 0, 0.125, 0.012, head); hood.scale.set(0.98, 1.04, 1.06); // (open at the front)
+      const cowl = M_(new T.CylinderGeometry(0.115, 0.215, 0.17, 16, 1, true), hoodM, 0, 0.3, 0.02, chest); cowl.scale.z = 0.8; // (over the shoulders)
+      M_(new T.BoxGeometry(0.19, 0.052, 0.05), L(0x101010), 0, 0.137, -0.088, head); // the visor
+      const glow = new T.MeshBasicMaterial({ color: 0xff9a2e }), pupil = new T.MeshBasicMaterial({ color: 0xfff3c4 });
+      for (const x of [-0.04, 0.04]) {
+        const e = M_(new T.CylinderGeometry(0.0185, 0.0185, 0.008, 14), glow, x, 0.137, -0.116, head); e.rotation.x = Math.PI / 2;
+        const p = M_(new T.CylinderGeometry(0.0085, 0.0085, 0.009, 10), pupil, x, 0.137, -0.1205, head); p.rotation.x = Math.PI / 2;
+      }
+      const mask = M_(new T.BoxGeometry(0.125, 0.07, 0.05), L(0x3b3b36), 0, 0.055, -0.083, head); mask.rotation.x = 0.12; // the respirator
+      for (const x of [-0.03, 0, 0.03]) { const v = M_(new T.CylinderGeometry(0.0075, 0.0075, 0.006, 8), L(0x1b1b19), x, 0.05, -0.1105, head); v.rotation.x = Math.PI / 2; }
+      const strap = M_(new T.BoxGeometry(0.045, 0.34, 0.012), L(0xc9a227), -0.1, 0.12, -0.151, chest); strap.rotation.z = -0.5; // gold, across the chest
     }
     if (style === 'suspect' && !headCover && rnd() < 0.5) { const capM = L(pick(PAL.hoodie)); M_(new T.BoxGeometry(0.2, 0.05, 0.23), capM, 0, 0.245, 0, head); M_(new T.BoxGeometry(0.18, 0.015, 0.1), capM, 0, 0.225, -0.15, head); }
 
@@ -381,7 +402,9 @@ G.Rig = (() => {
       } else { rig.fallX = Math.random() < 0.6 ? 1 : -1; rig.fallZ = 0; }
       rig.dropGun();
     };
-    rig.throwNade = () => { rig.throwT = 0; };
+    // a throw: an enemy's (the gun still in the other hand), or an officer's from the grenade they're holding
+    // (str 0 underhand, 1-2 overhand)
+    rig.throwNade = (str) => { rig.throwT = 0; rig.throwHand = str != null; rig.throwStr = str; };
     rig.setKit = (k) => setKit(rig, k);
     rig.setCallsign = (id, name) => { rig.callsign = id ? { id, name: name || '' } : null; setKit(rig, rig.kit); };
     setKit(rig, null); // (the back patch, before any kit)
@@ -502,7 +525,11 @@ G.Rig = (() => {
     if (pistol) mount.position.set(0.02, U.lerp(0.18, 0.27, rig.aimW), U.lerp(-0.32, -0.46, rig.aimW));
     else mount.position.set(0.12, U.lerp(0.2, 0.28, rig.aimW) - (gi ? gi.sy * 0.6 : 0), -0.15 + rig.kick * 0.04);
     mount.rotation.set(U.lerp(-0.75, 0, rig.aimW) + rig.kick * 0.12, U.lerp(-0.35, 0, rig.aimW), 0);
-    if (rig.throwT >= 0) mount.rotation.x -= 0.6 * Math.sin(Math.PI * Math.min(1, rig.throwT / 0.9));
+    if (rig.throwT >= 0 && !rig.throwHand) mount.rotation.x -= 0.6 * Math.sin(Math.PI * Math.min(1, rig.throwT / 0.9));
+    // a reload: the gun canted toward the support hand; inspecting it: rolled over and turned to look along it
+    const rl = p.reload != null && p.reload >= 0 ? p.reload : -1, ins = p.inspect != null && p.inspect >= 0 ? p.inspect : -1;
+    if (rl >= 0) { const k = Math.sin(Math.PI * Math.min(1, rl)); mount.rotation.z += 0.5 * k; mount.rotation.x += 0.12 * k; mount.position.y -= 0.03 * k; }
+    if (ins >= 0) { const k = U.smooth(0, 0.15, ins) * (1 - U.smooth(0.85, 1, ins)); mount.rotation.z -= 1.0 * k; mount.rotation.y += 0.55 * k; mount.position.y += 0.05 * k; mount.position.z += 0.06 * k; }
     root.updateMatrixWorld(true);
 
     // legs: feet planted on a stepping cycle along the travel direction
@@ -549,8 +576,26 @@ G.Rig = (() => {
         const wind = t < 0.45 ? t / 0.45 : 1 - (t - 0.45) / 0.55;
         rTarget = rig.chest.localToWorld(new T.Vector3(0.28, U.lerp(0.3, 0.55, wind), U.lerp(-0.45, 0.25, wind)));
       }
+      // the support hand in a reload: to the magazine, down to a pouch on the belt, back up with the new one,
+      // seating it; in a magazine check: the magazine out and up in front of the chest
+      const well = rig.gun.localToWorld(new T.Vector3(gi.grip[2], gi.grip[1] - 0.07, -(gi.grip[0] + 0.09)));
+      let sp = supp;
+      if (rl >= 0) {
+        const pouch = rig.hips.localToWorld(new T.Vector3(-0.2, 0.06, -0.12)), L2 = (a, b, u) => a.clone().lerp(b, U.smooth(0, 1, u));
+        sp = rl < 0.15 ? L2(supp, well, rl / 0.15) : rl < 0.35 ? L2(well, pouch, (rl - 0.15) / 0.2) : rl < 0.6 ? L2(pouch, well, (rl - 0.35) / 0.25) : rl < 0.82 ? well : L2(well, supp, (rl - 0.82) / 0.18);
+      } else if (p.magChk != null && p.magChk >= 0) sp = well.clone().lerp(rig.chest.localToWorld(new T.Vector3(-0.04, 0.32, -0.4)), U.smooth(0.25, 1, p.magChk));
       ik(rig.armR.up, rig.armR.lo, UARM * s, FARM * s, rTarget, rig.chest.localToWorld(new T.Vector3(0.6, -0.2, 0.4)));
-      ik(rig.armL.up, rig.armL.lo, UARM * s, FARM * s, supp, rig.chest.localToWorld(new T.Vector3(-0.6, -0.3, 0.2)));
+      ik(rig.armL.up, rig.armL.lo, UARM * s, FARM * s, sp, rig.chest.localToWorld(new T.Vector3(-0.6, -0.3, 0.2)));
+      // the magazine: in the support hand from when it comes out to when the new one's seated (or while it's
+      // checked), otherwise on the gun
+      const mg = rig.gun.userData.mag;
+      if (mg) {
+        const inHand = (rl >= 0.15 && rl < 0.8) || (p.magChk != null && p.magChk >= 0.12);
+        if (inHand) {
+          const hp = rig.armL.lo.localToWorld(new T.Vector3(0, -FARM - 0.06, -0.01)); // (in the palm)
+          mg.position.copy(rig.gun.worldToLocal(hp));
+        } else mg.position.copy(rig.gun.userData.magHome);
+      }
     } else {
       // unarmed: arms swing opposite the legs
       for (const [arm, side] of [[rig.armL, -1], [rig.armR, 1]]) {
@@ -558,6 +603,28 @@ G.Rig = (() => {
         arm.up.rotation.set(Math.sin(rig.phase + (side > 0 ? 0 : Math.PI)) * 0.55 * moving, 0, side * 0.1);
         arm.lo.rotation.set(0.25 + 0.35 * moving, 0, 0); // elbows bend forward (the rig faces -z)
       }
+    }
+    // a grenade in the hand (an officer's: the weapon slung): held in front, drawn back (high overhand, low
+    // underhand) with the other arm out ahead, then thrown and followed through
+    const handThrow = rig.throwT >= 0 && rig.throwHand;
+    if ((p.hold || handThrow) && !posed) {
+      const h = p.hold || {}, under = (handThrow ? rig.throwStr : h.str) === 0, C = (x, y, z) => rig.chest.localToWorld(new T.Vector3(x, y, z));
+      let rh;
+      if (handThrow) {
+        const t = Math.min(1, rig.throwT / 0.6), a = under ? [C(0.3, -0.32, 0.22), C(0.2, 0.06, -0.55), C(0.2, -0.18, -0.38)] : [C(0.3, 0.5, 0.16), C(0.22, 0.42, -0.6), C(0.2, 0.02, -0.42)];
+        rh = t < 0.35 ? a[0].lerp(a[1], U.smooth(0, 0.35, t)) : a[1].lerp(a[2], U.smooth(0.35, 1, t));
+      } else rh = h.cock ? (under ? C(0.3, -0.32, 0.22) : C(0.3, 0.5, 0.16)) : C(0.2, 0.12, -0.34);
+      ik(rig.armR.up, rig.armR.lo, UARM * s, FARM * s, rh, C(0.7, -0.2, 0.3));
+      const lh = h.cock || handThrow ? C(-0.24, 0.3, -0.46) : C(-0.18, 0.04, -0.3);
+      ik(rig.armL.up, rig.armL.lo, UARM * s, FARM * s, lh, C(-0.7, -0.3, 0.2));
+    }
+    // the grenade itself, in their right hand until it's thrown
+    if (p.hold || rig.handNade) {
+      if (!rig.handNade) {
+        rig.handNade = { frag: new T.Mesh(new T.SphereGeometry(0.04, 10, 8), new T.MeshLambertMaterial({ color: 0x3a4a2a })), flash: new T.Mesh(new T.CylinderGeometry(0.027, 0.027, 0.1, 10), new T.MeshLambertMaterial({ color: 0x7d8388 })) };
+        for (const m of Object.values(rig.handNade)) { m.position.set(0, -FARM - 0.07, -0.03); rig.armR.lo.add(m); }
+      }
+      for (const [k, m] of Object.entries(rig.handNade)) m.visible = !!p.hold && p.hold.kind === k && !handThrow && !posed;
     }
     // door actions: one hand reaches for the handle / door edge (players use the right hand with the
     // weapon put away; an enemy with a gun in hand uses his free left hand)
@@ -740,7 +807,8 @@ G.Rig = (() => {
       // and never through the floor (down on the ground, the hand rests on it instead)
       if (str < 0.4) {
         const low = _gbox.setFromObject(g).min.y;
-        if (low < 0.01) { _gp.set(0, 0.01 - low, 0); g.parent.getWorldQuaternion(_gq).invert(); g.position.add(_gp.applyQuaternion(_gq).divideScalar(g.parent.getWorldScale(_gs).x)); g.updateMatrixWorld(true); }
+        const fl = rig.root.position.y + 0.01; // (the floor they're on)
+        if (low < fl) { _gp.set(0, fl - low, 0); g.parent.getWorldQuaternion(_gq).invert(); g.position.add(_gp.applyQuaternion(_gq).divideScalar(g.parent.getWorldScale(_gs).x)); g.updateMatrixWorld(true); }
       }
       // where the support hand should be on it (next frame, the left hand reaches for it there)
       const gi = rig.gunInfo;
@@ -861,6 +929,19 @@ G.Rig = (() => {
   // bodies land with a dead weight instead of springing back up.
   function collide(rd, i) {
     const p = rd.P[i], q = rd.prev[i], r = rd.r[i], L = G.Level, map = G.Game && G.Game.map;
+    if (map && map.world) { // out of whatever solid it's in (the world's: any floor, a step, a sofa), the shallowest way
+      G.World.query(map.world, [p.x - r, p.y - r, p.z - r], [p.x + r, p.y + r, p.z + r], (s) => {
+        if (!s.move) return;
+        const xl = p.x + r - s.min[0], xh = s.max[0] - (p.x - r), yl = p.y + r - s.min[1], yh = s.max[1] - (p.y - r), zl = p.z + r - s.min[2], zh = s.max[2] - (p.z - r);
+        const ox = Math.min(xl, xh), oy = Math.min(yl, yh), oz = Math.min(zl, zh);
+        if (ox <= 0 || oy <= 0 || oz <= 0) return;
+        // resting on top of it wins for anything low (bodies can end up across a sofa, or down a flight of stairs)
+        if (yh <= yl && (yh < ox && yh < oz || s.max[1] - s.min[1] < 1.4 && yh < 0.5)) { p.y += yh; q.y = Math.max(q.y, p.y); }
+        else if (oy < ox && oy < oz) { p.y -= yl; q.y = Math.min(q.y, p.y); }
+        else if (ox < oz) { p.x += xh < xl ? xh : -xl; q.x = p.x; } else { p.z += zh < zl ? zh : -zl; q.z = p.z; }
+      });
+      return;
+    }
     if (p.y < r) { p.y = r; if (q.y < r) q.y = r; }
     if (!map) return;
     const tx = Math.floor(p.x / L.TS), tz = Math.floor(p.z / L.TS);
@@ -1078,12 +1159,13 @@ G.Rig = (() => {
     if (instant) ragdollStep(rig, 0);
   }
   function dropGun(rig, dt) {
-    const d = rig.dropped, g = d.g;
-    if (g.position.y <= 0.05) return;
+    const d = rig.dropped, g = d.g, map = G.Game && G.Game.map;
+    if (d.floor == null) d.floor = (map ? G.Level.groundAt(map, g.position.x, g.position.z, 0.05, g.position.y, 0.05) : 0) + 0.05; // (the floor it falls to: upstairs or down)
+    if (g.position.y <= d.floor) return;
     d.vy -= 12 * dt;
-    g.position.y = Math.max(0.05, g.position.y + d.vy * dt);
+    g.position.y = Math.max(d.floor, g.position.y + d.vy * dt);
     g.rotation.z += d.spin * dt;
-    if (g.position.y <= 0.05) g.rotation.z = Math.PI / 2;
+    if (g.position.y <= d.floor) g.rotation.z = Math.PI / 2;
   }
 
   // ---------------------------------------------------------------- hitboxes

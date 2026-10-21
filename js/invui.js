@@ -54,7 +54,7 @@ G.InvUI = (() => {
   }
   // Counts: in the stash and the shop, between levels, you can count your rounds; in the field you can't (a
   // magazine's fill shows in its picture; check it with R held).
-  const counted = () => G.Game.phase !== 'level';
+  const counted = () => G.Game.phase !== 'level' || G.Game.hub;
   // how far a job's got (no counts: a bar)
   const bar = (f) => `<i class="jobbar"><b style="width:${Math.round(G.U.clamp(f || 0, 0, 1) * 100)}%"></b></i>`;
   const magPer = (mag) => { const def = G.WEAPONS[mag.wid]; return G.beltFed(def) ? PER.belt : def.cls === 'PST' || def.cls === 'MP' ? PER.pistol : PER.round; };
@@ -127,18 +127,19 @@ G.InvUI = (() => {
     if (!I || !b) return G.Audio.deny();
     const why = G.Med.cantTreat(b, part, it.mt);
     if (why) { G.HUD.toast('', why, 1.6); return G.Audio.deny(); }
-    const who = patient, pv = patientView();
-    queue({ label: `${I.name} on ${who != null && pv ? pv.name + "'s" : 'your'} ${G.Med.NAME[part].toLowerCase()}`, per: I.time, prog: () => '',
+    const who = patient, pv = patientView(), theirs = !!src.theirs;
+    queue({ label: `${I.name}${theirs ? ' (theirs)' : ''} on ${who != null && pv ? pv.name + "'s" : 'your'} ${G.Med.NAME[part].toLowerCase()}`, per: I.time, prog: () => '', tell: who != null ? { tg: who, part, mt: it.mt } : null,
       step(me2) {
-        const s = where(me2, it);
+        const s = theirs ? true : where(me2, it);
         if (!s) return 'done';
         if (who == null) { if (!G.Med.treat(me2.body, part, it.mt)) return 'done'; }
         else {
           const p = G.Views.players.get(who);
           if (!p || p.st.dd || Math.hypot(p.pos.x - me2.pos.x, p.pos.z - me2.pos.z) > 2.6) { G.HUD.toast('', 'Too far away', 1.4); return 'done'; }
-          G.Net.toHost({ t: 'treat', tg: who, part, mt: it.mt });
+          if (theirs) { const i = Object.keys(G.Med.ITEMS).indexOf(it.mt); if (!(p.st.md && p.st.md[i] > 0)) { G.HUD.toast('', `${G.U.esc(p.name)} has none left`, 1.4); return 'done'; } } // (it comes off them where they are)
+          G.Net.toHost({ t: 'treat', tg: who, part, mt: it.mt, th: theirs ? 1 : 0 });
         }
-        if ((it.n || 1) > 1) it.n--; else detach(me2, s); // one off the stack
+        if (!theirs) { if ((it.n || 1) > 1) it.n--; else detach(me2, s); } // one off the stack
         G.Audio.heal();
         return 'done';
       } });
@@ -159,7 +160,14 @@ G.InvUI = (() => {
         return 'done';
       } });
   }
-  function cancelJobs() { const me = G.Me; for (const j of jobs) if (j.end) j.end(me); jobs = []; paintJob(); }
+  // A job on a teammate's body (j.tell: { tg, part, mt }): they're told when it starts (what it is and how long it
+  // takes) and when it stops, so their screen can say who's doing what to which part
+  function told(j, on) {
+    if (!j.tell || !!j.told === on) return;
+    j.told = on;
+    G.Net.toHost({ t: 'applying', tg: j.tell.tg, part: j.tell.part, mt: j.tell.mt, dur: j.per, off: on ? 0 : 1 });
+  }
+  function cancelJobs() { const me = G.Me; for (const j of jobs) { told(j, false); if (j.end) j.end(me); } jobs = []; paintJob(); }
   function jobHTML() {
     if (!jobs.length) return '';
     const j = jobs[0], k = Math.min(1, j.t / j.per);
@@ -188,11 +196,12 @@ G.InvUI = (() => {
     }
     if (!field || !jobs.length) return;
     const j = jobs[0], me = G.Me;
+    told(j, true);
     j.t += dt;
     let stepped = false;
     while (jobs[0] === j && j.t >= j.per) {
       j.t -= j.per; stepped = true;
-      if (j.step(me) !== 'more') { if (j.end) j.end(me); jobs.shift(); }
+      if (j.step(me) !== 'more') { told(j, false); if (j.end) j.end(me); jobs.shift(); }
     }
     if (stepped && !drag && !menu) rerender(); else paintJob(); // (not under an open menu or a drag)
   }
@@ -204,12 +213,12 @@ G.InvUI = (() => {
     if (w && G.R.vm && G.R.vm.userData.code !== w.def.code) { G.R.setViewmodel(w.def); G.R.vm && (G.R.vm.userData.code = w.def.code); }
   }
   let opened = []; // uids of the open containers, newest first
-  const COLORS = { mag: '#3d4a33', ammo: '#4a4130', med: '#5a2a2a', frag: '#3a4237', carrier: '#2f3a44', plate: '#3c3f46', helmet: '#33393f', face: '#30363c', belt: '#3b3528', pack: '#3a3a2c', gun: '#262b30', pouch: '#353a2e', part: '#2c3136' };
+  const COLORS = { mag: '#3d4a33', ammo: '#4a4130', med: '#5a2a2a', frag: '#3a4237', flash: '#3d4247', carrier: '#2f3a44', plate: '#3c3f46', helmet: '#33393f', face: '#30363c', belt: '#3b3528', pack: '#3a3a2c', gun: '#262b30', pouch: '#353a2e', part: '#2c3136' };
   const GS = () => G.Gunsmith;
   const SLOTS = [['wp', 'Primary weapon'], ['ws', 'Sidearm'], ['helmet', 'Helmet'], ['face', 'Face shield / mandible'], ['carrier', 'Body armour / rig'], ['plate', 'Plate'], ['belt', 'Belt'], ['ifak', 'IFAK'], ['pack', 'Backpack']];
   const GEAR_SLOTS = ['helmet', 'face', 'carrier', 'plate', 'belt', 'ifak', 'pack'];
   const WSLOT = { wp: 'p', ws: 's' };
-  const ACCEPT = { mag: 'magazines', ammo: 'ammo', frag: 'grenade', med: 'medkit' };
+  const ACCEPT = { mag: 'magazines', ammo: 'ammo', frag: 'grenade', flash: 'grenade', med: 'medkit' };
 
   // ---------------------------------------------------------------- where things are
   function slotItem(me, s) {
@@ -244,7 +253,7 @@ G.InvUI = (() => {
   function grids(me) {
     const out = GG().all(me), seen = new Set();
     if (field && cab != null) out.push(G.Game.cabGrid(cab));
-    if (!field && G.Game.phase === 'shop') out.push(G.Game.teamGrid());
+    if (!field && G.Game.hub) out.push(G.Game.teamGrid());
     for (let more = true; more;) {
       more = false;
       for (const uid of opened) {
@@ -309,6 +318,14 @@ G.InvUI = (() => {
 
   // ---------------------------------------------------------------- drawing
   // rot: the item is shown turned (its icon is turned with it)
+  // the quick slots (keys 3, 4, 5): a box each, showing what's on it and how many you carry. Drag a grenade or
+  // a flashbang onto one to put that kind on its key (it stays where it is in your kit); × clears it.
+  function quickHTML(me) {
+    return `<div class="inv-quick"><h4>Quick slots <small>drag a grenade onto a key</small></h4><div class="qrow">${me.quick.map((kind, i) => {
+      const n = me.quickCount(kind), icon = kind ? `<img src="${G.Icons.of({ k: kind }, 1, 1)}" alt="">` : '';
+      return `<div class="qbox${kind ? '' : ' empty'}" data-quick="${i}"><b>${i + 3}</b>${icon}<span>${kind ? `${me.quickName(kind)} ×${n}` : 'empty'}</span>${kind ? `<i data-unquick="${i}" title="Clear">×</i>` : ''}</div>`;
+    }).join('')}</div></div>`;
+  }
   function itemHTML(it, w, h, extra = '', rot = false) {
     const Gr = GG(), d = Gr.defOf(it), n = (a, b) => (counted() ? ` <b>${a}</b>/${b}` : ''); // (counts: only out of the field)
     let sub = '';
@@ -413,7 +430,7 @@ G.InvUI = (() => {
     };
     const bl = Math.round(b.blood), bcol = bl > 70 ? '#7fc06a' : bl > 40 ? '#e0b040' : '#e06060';
     // the figure (drop on the part itself), and beside it each part's numbers and what's wrong (drop there too)
-    return `<div class="body-wrap">${G.Med.figure(b, { cls: 'big' })}<div class="body-list">${['head', 'thorax', 'stomach', 'armL', 'armR', 'legL', 'legR'].map(part).join('')}</div></div>
+    return `<div class="body-wrap">${G.Med.figure(b, { cls: 'big', glow: patient == null ? G.Me.treatingParts() : null })}<div class="body-list">${['head', 'thorax', 'stomach', 'armL', 'armR', 'legL', 'legR'].map(part).join('')}</div></div>
       <div class="hl-hp"><span class="hl-k">BLOOD</span><div class="hl-bar"><i style="width:${bl}%;background:${bcol}"></i></div><b>${bl}%</b></div>
       ${b.pk > 0 ? `<div class="hl-status pk">Painkillers: ${patient == null ? Math.ceil(b.pk) + ' s left' : 'on'}</div>` : ''}`;
   }
@@ -423,23 +440,33 @@ G.InvUI = (() => {
     const me = G.Me, b = bodyOf(me);
     if (!b || !b.parts[part]) return;
     closeMenu();
-    const seen = new Set(), opts = [];
+    const seen = new Set(), opts = [], mine = {}; // ({ mt, theirs, n })
+    for (const g of GG().body(me)) for (const p of g.items) if (p.it.k === 'med') mine[p.it.mt] = (mine[p.it.mt] || 0) + (p.it.n || 1);
     for (const g of GG().body(me)) for (const p of g.items) {
       const mt = p.it.k === 'med' && p.it.mt;
       if (!mt || seen.has(mt)) continue;
       seen.add(mt);
-      if (!G.Med.cantTreat(b, part, mt)) opts.push(mt);
+      if (!G.Med.cantTreat(b, part, mt)) opts.push({ mt, theirs: false, n: mine[mt] });
     }
-    const wrong = G.Med.describe(b.parts[part]);
+    // on a teammate: their own medical gear is yours to use on them too (it's taken off them when it goes on)
+    const pt = patientView(), md = patient != null && pt && pt.st && pt.st.md;
+    if (md) Object.keys(G.Med.ITEMS).forEach((mt, i) => { if (md[i] > 0 && !G.Med.cantTreat(b, part, mt)) opts.push({ mt, theirs: true, n: md[i] }); });
+    const wrong = G.Med.describe(b.parts[part]), several = opts.some((o) => o.theirs) && opts.some((o) => !o.theirs);
     menu = document.createElement('div');
     menu.className = 'inv-menu med-menu';
     menu.innerHTML = `<b>${G.Med.NAME[part]}${wrong.length ? ` <small>${wrong.join(', ')}</small>` : ''}</b>`
-      + (opts.length ? opts.map((mt) => `<button data-mt="${mt}">${G.U.esc(G.Med.ITEMS[mt].name)}</button>`).join('') : `<i class="none">${wrong.length ? 'Nothing you carry treats this' : 'Nothing wrong with it'}</i>`);
+      + (opts.length ? opts.map((o) => {
+        // with more than one owner's gear on offer, each says whose it is: their emblem and name
+        const who = o.theirs ? pt : { name: G.Game.myName, animal: G.Game.roster && G.Game.roster[G.Net.myId] && G.Game.roster[G.Net.myId].animal, color: G.Game.myColor };
+        const owner = several && who ? `<span class="mo" style="color:${G.U.hex(who.color)}">${G.Callsigns.html(who.animal)}${G.U.esc(who.name || '')}${o.theirs ? '' : ' <small>(you)</small>'}</span>` : '';
+        return `<button data-mt="${o.mt}" data-th="${o.theirs ? 1 : 0}"><img class="mi" src="${G.Icons.of(GG().medItem(o.mt), 1, 1, false)}" alt=""><span>${G.U.esc(G.Med.ITEMS[o.mt].name)} <small>×${o.n}</small></span>${owner}</button>`;
+      }).join('') : `<i class="none">${wrong.length ? (patient != null ? 'Nothing you or they carry treats this' : 'Nothing you carry treats this') : 'Nothing wrong with it'}</i>`);
     Object.assign(menu.style, { left: Math.min(x, innerWidth - 200) + 'px', top: Math.min(y, innerHeight - 40 - opts.length * 26) + 'px' });
     menu.addEventListener('click', (ev) => {
       const bt = ev.target.closest('[data-mt]');
       if (!bt) return;
       closeMenu();
+      if (bt.dataset.th === '1') { treatOn(me, { theirs: true, it: { k: 'med', mt: bt.dataset.mt, n: 1 } }, part); rerender(); return; }
       const it = GG().body(me).flatMap((g) => g.items).map((p) => p.it).find((q) => q.k === 'med' && q.mt === bt.dataset.mt), src = it && where(me, it);
       if (src) treatOn(me, src, part); else G.Audio.deny();
       rerender();
@@ -503,13 +530,13 @@ G.InvUI = (() => {
     }
     if (field) {
       root.innerHTML = `<div class="inv field">
-        <div class="inv-col eq"><h4>Equipment</h4>${SLOTS.map(([s, n]) => slotHTML(me, s, n)).join('')}${stats(me)}<div class="inv-sell inv-drop" data-drop>Drop here to put it on the ground</div></div>
+        <div class="inv-col eq"><h4>Equipment</h4>${SLOTS.map(([s, n]) => slotHTML(me, s, n)).join('')}${stats(me)}${quickHTML(me)}<div class="inv-sell inv-drop" data-drop>Drop here to put it on the ground</div></div>
         <div class="inv-col"><div id="invJob" class="inv-job">${jobHTML()}</div><h4 class="hd">On you</h4>${body}<p class="inv-hint">Drag to move · R turns what you're holding · double-click opens a pouch, pack or gun · right-click to load or unload (it takes time: a round at a time) · Tab or Esc closes and stops what you're doing</p></div>
         <div class="inv-col">${cab != null ? `<h4 class="hd">First aid cabinet <small>(medical gear only · the squad shares it)</small></h4><div class="inv-row">${gridHTML(G.Game.cabGrid(cab))}</div>` : ''}<h4 class="hd">${patient != null ? 'Treating' : 'Body'}</h4><div id="invHealth">${healthHTML(me)}</div>${openedHTML(me)}</div></div>`;
       return;
     }
     root.innerHTML = `<div class="inv">
-      <div class="inv-col eq"><h4>Equipment</h4>${SLOTS.map(([s, n]) => slotHTML(me, s, n)).join('')}${stats(me)}
+      <div class="inv-col eq"><h4>Equipment</h4>${SLOTS.map(([s, n]) => slotHTML(me, s, n)).join('')}${stats(me)}${quickHTML(me)}
         <div class="inv-sell" data-sell>Drop here to sell for half</div></div>
       <div class="inv-col"><h4 class="hd">On you</h4>${body}<p class="inv-hint">Drag to move · R turns what you're holding · double-click opens a pouch, pack or rig (anything else goes to or from the locker) · right-click for more · drop a box of rounds on a magazine to load it · Edit pouches to move, add or take off MOLLE pouches · stow a gun in a big enough backpack and swap to it in the field with B</p></div>
       <div class="inv-col"><h4 class="hd">Locker <small>(stays here between levels)</small></h4>${gridHTML(me.locker)}
@@ -545,6 +572,13 @@ G.InvUI = (() => {
     if (!t) return render();
     const src = locate(me, d.it.uid);
     if (!src) return render();
+    const qEl = t.closest('[data-quick]');
+    if (qEl) {
+      const kind = G.Me.quickKind(d.it);
+      if (kind) { G.Me.setQuick(+qEl.dataset.quick, kind); G.Audio.click(); }
+      else { G.HUD.toast('', 'Only grenades and flashbangs go on a quick slot', 1.5); G.Audio.deny(); }
+      return rerender();
+    }
     const gEl = t.closest('.inv-grid'), sEl = t.closest('[data-slot]'), sell = t.closest('[data-sell]'), onItem = t.closest('.inv-item');
     if (field && t.closest('[data-drop]')) { dropIt(me, src); return rerender(); }
     // a box dropped on a magazine loads it
@@ -862,6 +896,8 @@ G.InvUI = (() => {
         el.addEventListener('click', (e) => {
           if (!root) return;
           if (e.target.closest('[data-molle]')) { editMolle = !editMolle; G.Audio.click(); render(); }
+          const uq = e.target.closest('[data-unquick]');
+          if (uq) { G.Me.setQuick(+uq.dataset.unquick, null); G.Audio.click(); rerender(); return; }
           if (e.target.closest('[data-jobcancel]')) { cancelJobs(); G.Audio.click(); return; }
           if (e.target.closest('[data-revive]')) { reviveJob(); return; }
           if (e.target.closest('[data-self]')) { patient = null; ptPart = null; G.Audio.click(); render(); return; }

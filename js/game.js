@@ -171,14 +171,19 @@ G.Game = {
       this.locked = document.pointerLockElement === G.R.renderer.domElement;
       if (this.phase !== 'level') return;
       if (this.locked) { this.$('pause').classList.add('hidden'); this.$('clickToPlay').classList.add('hidden'); }
-      else if (!this.chatOpen && !this.invOpen) { this.$('pause').classList.remove('hidden'); this.$('pauseCode').textContent = G.Net.code ? 'Room code: ' + G.Net.code : ''; }
+      else if (!this.chatOpen && !this.invOpen && !this.shopOpen) { this.$('pause').classList.remove('hidden'); this.$('pauseCode').textContent = G.Net.code ? 'Room code: ' + G.Net.code : ''; }
     });
 
     window.addEventListener('keydown', (e) => {
       if (this.phase !== 'level') return;
+      // in the hangar: Esc puts a shop panel away, and Tab is your stash and loadout (the panel's Kit tab), not the field kit
+      if (this.hub) {
+        if (e.code === 'Escape' && this.shopOpen) { this.closeShop(); return; }
+        if (e.code === 'Tab') { e.preventDefault(); if (!this.chatOpen && !e.repeat) { if (this.shopOpen) this.closeShop(); else if (G.Me.seat == null) this.openShop('kit', 'your stash and loadout'); } return; }
+      }
       if (e.code === 'Tab') { e.preventDefault(); if (!this.chatOpen && !e.repeat) this.toggleInv(!this.invOpen); return; }
       if (e.code === 'Escape' && this.invOpen) { this.toggleInv(false); return; }
-      if (e.code === 'KeyY' && !this.chatOpen && !e.repeat) this.vote();
+      if (e.code === 'KeyY' && !this.chatOpen && !e.repeat && !this.hub) this.vote();
       if (e.code === 'Enter') {
         const inp = this.$('chatInput');
         if (!this.chatOpen) { this.chatOpen = true; inp.classList.remove('hidden'); inp.value = ''; setTimeout(() => inp.focus(), 0); G.Me.keys = {}; }
@@ -192,6 +197,29 @@ G.Game = {
       if (e.code === 'Escape' && this.chatOpen) this.closeChat();
     });
 
+  },
+  // A shop panel (the same ones a menu would show: the stock, the gunsmith, your stash and loadout, supplies), opened
+  // from a point of sale in the hangar. The world carries on behind it; you stand where you are.
+  openShop(tab, title) {
+    if (!this.hub || this.shopOpen) return;
+    this.shopOpen = true;
+    G.Me.keys = {}; G.Me.mouse.l = G.Me.mouse.r = false;
+    G.Shop.tab = tab || 'stock'; G.Shop.title = title || null;
+    this.$('pause').classList.add('hidden'); this.$('clickToPlay').classList.add('hidden');
+    if (document.pointerLockElement) document.exitPointerLock();
+    this.screen('shop');
+    G.Shop.render();
+    G.HUD.setPrompt('');
+  },
+  closeShop() {
+    if (!this.shopOpen) return;
+    this.shopOpen = false;
+    G.GunsmithUI.hide(); G.InvUI.hide();
+    this.screen(null);
+    G.HUD.show(true);
+    G.Hangar.refresh();
+    this.lock();
+    setTimeout(() => { if (!this.locked && !this.shopOpen && this.phase === 'level') this.$('clickToPlay').classList.remove('hidden'); }, 300);
   },
   setMuted(m) {
     G.Audio.setMuted(m);
@@ -318,6 +346,7 @@ G.Game = {
     G.Net.leave();
     G.Server.reset();
     G.Views.clearAll();
+    this.leaveHub();
     G.R.clearLevel();
     G.R.setViewmodel(null);
     this.map = null;
@@ -345,9 +374,9 @@ G.Game = {
         if (m.phase === 'route') this.enterRoute(m.level, m.route);
         else if (m.phase === 'level') {
           this.enterLevel(m.level, m.seed, m.th);
-          if (m.doors) m.doors.forEach((o, i) => { if (this.map.doors[i]) this.map.doors[i].open = !!o; });
-          if (m.evidence) m.evidence.forEach(([i, wpn, x, z, sec]) => { G.Views.addEvidence(i, wpn, x, z); if (sec) G.Views.secureEvidence(i); });
-          if (m.bodies) m.bodies.forEach(([id, type, x, z, yaw, sec]) => G.Views.addBody(id, type, x, z, yaw, sec));
+          if (m.doors) m.doors.forEach((o, i) => { const d = this.map.doors[i]; if (d && d.open !== !!o) { d.open = !!o; G.World.door(this.map.world, this.map, d); } });
+          if (m.evidence) m.evidence.forEach(([i, wpn, x, z, sec, y]) => { G.Views.addEvidence(i, wpn, x, z, y); if (sec) G.Views.secureEvidence(i); });
+          if (m.bodies) m.bodies.forEach(([id, type, x, z, yaw, sec, y]) => G.Views.addBody(id, type, x, z, yaw, sec, y));
           this.setCase(m.wcase);
           this.cabs = m.cabs || []; G.Views.syncCabs();
           G.Loot.clear(); for (const a of m.loot || []) G.Loot.add(...a);
@@ -363,7 +392,7 @@ G.Game = {
         for (const [id, r] of Object.entries(this.roster)) if (id !== G.Net.myId && r.ready && prev[id] && !prev[id].ready) this.readyNote(r);
         G.Views.syncRoster(this.roster);
         if (this.phase === 'lobby') this.renderLobby();
-        if (this.phase === 'shop') G.Shop.render();
+        if (this.hub) { G.Shop.render(); G.Hangar.refresh(); }
         if (this.phase === 'route') this.renderRoute();
         break;
       }
@@ -406,15 +435,17 @@ G.Game = {
         break;
       case 'eshot': if (this.phase === 'level') G.Views.enemyShot(m); break;
       case 'shot': if (this.phase === 'level' && m.id !== G.Net.myId) G.Views.remoteShot(m); break;
-      case 'nade': if (this.phase === 'level' && m.id !== G.Net.myId) { G.Views.addNade(new THREE.Vector3(...m.p), new THREE.Vector3(...m.v), m.fuse, false, !!m.en); if (m.en) G.Views.enemyThrow(m.e); } break;
+      case 'nade': if (this.phase === 'level' && m.id !== G.Net.myId) { G.Views.addNade(new THREE.Vector3(...m.p), new THREE.Vector3(...m.v), m.fuse, false, !!m.en, m.k || 'frag'); const tp = !m.en && G.Views.players.get(m.id); if (tp) tp.rig.throwNade(m.s == null ? 2 : m.s); /* (their arm throws it) */ if (m.en) G.Views.enemyThrow(m.e); } break;
       case 'boom': this.onBoom(m); break;
+      case 'flash': this.onFlash(m); break;
       case 'kill': this.onKill(m); break;
       case 'ereload': if (this.phase === 'level') G.Views.enemyReload(m); break;
       case 'clear':
         G.Audio.extract();
         G.HUD.toast('ORDER RESTORED', 'Press Y to vote to leave', 3.5);
         break;
-      case 'treat': if (m.tg === G.Net.myId && this.phase === 'level') G.Me.treated(m.part, m.mt, this.nameOf(m.by)); break;
+      case 'treat': if (m.tg === G.Net.myId && this.phase === 'level') G.Me.treated(m.part, m.mt, this.nameOf(m.by), m.by, !!m.th); break;
+      case 'applying': if (this.phase === 'level') G.Me.beingTreated(m.by, this.nameOf(m.by), m.part, m.mt, m.dur, !!m.off); break;
       case 'revive': {
         if (m.tg === G.Net.myId) G.Me.revived(m.hp);
         const by = this.nameOf(m.by), tg = this.nameOf(m.tg);
@@ -432,7 +463,7 @@ G.Game = {
       case 'ffhit': { // a teammate's rounds in you (or, seen from outside, in someone else)
         if (this.phase !== 'level') break;
         const def = G.Gunsmith.fromCode(m.w), f = new THREE.Vector3(m.f[0], m.f[1], m.f[2]);
-        if (m.tg === G.Net.myId && def) { G.Me.takeHits(m.hz, def, f, this.nameOf(m.by)); G.HUD.toast('', `Friendly fire from ${G.U.esc(this.nameOf(m.by))}`, 1.6); }
+        if (m.tg === G.Net.myId && def) { G.Me.takeHits(m.hz, def, f, true); G.HUD.toast('', 'Friendly fire', 1.6); } // (you're told it was friendly, not whose)
         break;
       }
       case 'left': G.Views.removePlayer(m.id); break;
@@ -440,6 +471,7 @@ G.Game = {
         const d = this.map && this.map.doors[m.i];
         if (!d || this.phase !== 'level') break;
         d.open = !!m.o;
+        G.World.door(this.map.world, this.map, d);
         this.map.doorVer = (this.map.doorVer || 0) + 1; // echo paths change
         const dd = G.R.camera.position.distanceTo(new THREE.Vector3(d.x, 1.2, d.z));
         if (m.k) {
@@ -459,7 +491,7 @@ G.Game = {
         if (m.n > 0) G.HUD.feed(`<b>${G.U.esc(this.nameOf(m.id))}</b>: ${m.n} complying`);
         break;
       }
-      case 'evid': if (this.phase === 'level') G.Views.addEvidence(m.i, m.wpn, m.x, m.z); break;
+      case 'evid': if (this.phase === 'level') G.Views.addEvidence(m.i, m.wpn, m.x, m.z, m.y); break;
       case 'evtake': G.Views.removeEvidence(m.i); break;
       case 'evsec': {
         G.Views.secureEvidence(m.i); // weapon goes into an evidence envelope
@@ -500,7 +532,7 @@ G.Game = {
       }
       case 'refund':
         G.Me.credits += m.amt;
-        if (this.phase === 'shop') G.Shop.render();
+        if (this.hub) G.Shop.render();
         break;
     }
   },
@@ -529,6 +561,22 @@ G.Game = {
     if (d < m.r && G.Level.los(this.map, p.x, p.y + 0.2, p.z, Me.pos.x, cy, Me.pos.z)) {
       Me.takeDamage(m.d * (1 - (d / m.r) * 0.6) * (m.en ? 1 : 0.4), p); // friendly blasts do 40%
     }
+  },
+  // A flashbang went off (the host's word: everyone hears and sees it). On you: blinded by how close it was, and
+  // how squarely you were looking at it (with it out of sight, not at all); deafened by how close, wall or no wall.
+  onFlash(m) {
+    if (this.phase !== 'level' || !Array.isArray(m.p)) return;
+    const p = new THREE.Vector3(m.p[0], m.p[1], m.p[2]), cam = G.R.camera, eye = cam.position, d = eye.distanceTo(p);
+    G.R.flashAt(p);
+    G.Audio.flashbang(d);
+    const Me = G.Me;
+    if (!Me.pos || Me.dead) return;
+    const seen = G.Level.los(this.map, p.x, p.y, p.z, eye.x, eye.y, eye.z);
+    const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion), to = p.clone().sub(eye).normalize(), look = fwd.dot(to);
+    const near = G.U.clamp(1 - d / 16, 0, 1), blind = seen ? near * (look > 0.5 ? 1 : look > 0 ? 0.65 : 0.3) : 0;
+    const deaf = G.U.clamp(1 - d / 22, 0, 1) * (seen ? 1 : 0.6);
+    if (blind > 0.03) G.HUD.flash(blind);
+    if (deaf > 0.03) G.Audio.deafen(deaf);
   },
   onKill(m) {
     if (this.phase !== 'level') return;
@@ -560,6 +608,7 @@ G.Game = {
   // ------------------------------------------------------------- phases
   enterLobby() {
     this.toggleInv(false);
+    this.leaveHub();
     this.phase = 'lobby';
     if (document.pointerLockElement) document.exitPointerLock();
     G.Views.clearLevel();
@@ -638,12 +687,12 @@ G.Game = {
       if ((m.deny || []).length) G.HUD.toast('', 'Someone took that from the team locker first', 1.8);
       if ((m.ret || []).length) G.HUD.toast('', 'The team locker filled up: it went back to your locker', 1.8);
     }
-    if (this.phase === 'shop') G.InvUI.refresh();
+    if (this.hub) G.InvUI.refresh();
   },
   // after a change in the stash: how you left the team locker, to the host
   teamSync() {
     const g = this.tGrid;
-    if (!g || this.phase !== 'shop') return;
+    if (!g || !this.hub) return;
     const keep = [], put = [], here = new Set();
     for (const p of g.items) {
       const r = p.r ? 1 : 0;
@@ -668,6 +717,8 @@ G.Game = {
   },
   enterRoute(level) {
     this.toggleInv(false);
+    this.closeShop();
+    this.hub = false; // (the hangar stays up behind the map: G.Hangar.leave when the level replaces it)
     this.phase = 'route';
     this.level = level;
     if (document.pointerLockElement) document.exitPointerLock();
@@ -705,6 +756,7 @@ G.Game = {
     G.Net.toHost({ t: 'pick', n });
   },
   enterLevel(level, seed, th) {
+    this.leaveHub();
     this.phase = 'level';
     if (G.Me.navRearm) G.Me.navRearm(); // (the mouse's side buttons: see Me.navTrap)
     this.level = level;
@@ -722,34 +774,67 @@ G.Game = {
     // spread the squad out in the spawn room
     const ids = Object.keys(this.roster).sort();
     const i = Math.max(0, ids.indexOf(G.Net.myId));
-    const sp = this.map.spawn;
-    G.Me.spawn(sp.x + ((i % 3) - 1) * 1.3, sp.z + (Math.floor(i / 3) - 0.5) * 1.3);
+    const sp = this.map.spawn, w = this.map.world;
+    // each officer a clear spot of their own, nearest the spawn first (never on the stairs or in a wall)
+    const clear = (x, z) => { let ok = true; G.World.query(w, [x - 0.4, 0.05, z - 0.4], [x + 0.4, 1.8, z + 0.4], (s) => { if (s.move) ok = false; }); return ok; };
+    const spots = [[0, 0]];
+    for (let r = 1; r <= 3; r++) for (let k = 0; k < 8 * r; k++) { const a = (k / (8 * r)) * Math.PI * 2; spots.push([Math.cos(a) * r * 0.9, Math.sin(a) * r * 0.9]); }
+    const free = w ? spots.filter(([dx, dz]) => clear(sp.x + dx, sp.z + dz)) : spots;
+    const [ox, oz] = free[i] || free[0] || [0, 0];
+    G.Me.spawn(sp.x + ox, sp.z + oz);
     this.screen(null);
     G.HUD.show(true);
     G.HUD.toast(`LEVEL ${level}`, this.map.theme.name + (G.Route.isBoss(level) ? ' — <b class="red">THE WARDEN AWAITS</b>' : ''), 3.5);
     if (G.Route.isBoss(level)) G.Audio.alarm();
     if (!this.locked) this.$('clickToPlay').classList.remove('hidden');
   },
+  // Between levels: the hangar (js/hangar.js). To the game it's a level with nothing in it but the shop, so you walk
+  // about it, the squad is there, and rays, steps and sound are all the ordinary ones; the host just doesn't send
+  // enemies. this.hub marks it (the phase is still 'level' here).
   enterShop(level, seed, report) {
     this.toggleInv(false);
-    this.phase = 'shop';
+    this.closeShop();
+    this.hub = true; this.shopOpen = false;
+    this.phase = 'level';
+    if (G.Me.navRearm) G.Me.navRearm();
     G.Shop.report = report || null;
-    if (document.pointerLockElement) document.exitPointerLock();
-    this.$('clickToPlay').classList.add('hidden');
     if (G.Me.pos) {
       const clean = report && report.civKilled === 0 && report.unauth === 0;
       const bonus = Math.round((250 + 75 * level + (clean ? 200 : 0) + (report && report.allRescued ? 150 + 50 * level : 0)));
       G.Me.credits += bonus;
       this.lastBonus = bonus;
     }
+    this.level = level;
+    this.extract = { active: false, votes: 0, need: 0, civDead: 0, voted: false };
+    this.enemiesLeft = 0; this.civsLeft = 0; this.bodiesLeft = 0; this.weaponsLeft = 0; this.unitsCleared = 0;
+    this.map = G.Level.generateHub(seed, level);
+    G.Loot.clear();
+    G.R.setLevel(this.map);
     G.Views.clearLevel();
     G.Me.dead = false; G.Me.down = false;
-    G.Shop.open(level, seed);
-    this.screen('shop');
+    G.Shop.open(level, seed); // (his stock this visit: the whole squad's the same)
+    G.Hangar.enter(this.map);
+    G.HUD.buildMinimap(this.map);
+    // each officer a spot of their own on the pad, in front of the opening
+    const i = Math.max(0, Object.keys(this.roster).sort().indexOf(G.Net.myId)), sp = G.Hangar.spawnAt(i);
+    G.Me.spawn(sp.x, sp.z);
+    G.Me.yaw = 0; // (facing the hall)
+    this.screen(null);
+    G.HUD.show(true);
+    G.HUD.toast('THE HANGAR', `Level ${level} cleared · look at what you want and press <b>F</b>`, 4);
     if (this.lastBonus) G.HUD.chat(null, 0, `Mission bonus: +¢${this.lastBonus}`);
+    if (!this.locked) this.$('clickToPlay').classList.remove('hidden');
+  },
+  // out of the hangar for good (a level, the lobby, the menu)
+  leaveHub() {
+    this.closeShop();
+    this.hub = false;
+    G.Hangar.leave();
   },
   enterGameover(m) {
     this.toggleInv(false);
+    this.closeShop();
+    this.hub = false;
     this.phase = 'gameover';
     if (document.pointerLockElement) document.exitPointerLock();
     this.$('clickToPlay').classList.add('hidden');
@@ -783,6 +868,7 @@ G.Game = {
       if (this.invOpen && (this.invT = (this.invT || 0) + dt) > 0.25) { this.invT = 0; G.InvUI.tick(); this.$('fiScore').innerHTML = G.HUD.scoreboardHTML(); }
       G.Me.update(dt);
       G.GunAudio.updateListener(G.R.camera);
+      if (this.hub) { G.Hangar.update(dt); G.Hangar.mark(); }
       G.Views.update(dt);
       G.Me.flushHits();
       this.updateZone();

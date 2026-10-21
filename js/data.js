@@ -295,7 +295,7 @@ G.ENEMIES = {
 // layout: 'rooms' (rooms and corridors, the default), 'warehouse' or 'houses' (js/level.js)
 // noFog: a clear view to the far end (the fog colour is still the backdrop)
 G.THEMES = [
-  { name: 'Apartment', layout: 'apartments', home: 1, reflect: 0.3, floor: '#4a443d', wall: '#b8ab95', crate: '#8a6a3a', fog: 0x0e0c0a, light: 0xffd8a8, ceil: '#cfc8ba' },
+  { name: 'Apartment', layout: 'apartments', foes: 2, crowd: 2, big: 2, home: 1, reflect: 0.3, floor: '#4a443d', wall: '#b8ab95', crate: '#8a6a3a', fog: 0x0e0c0a, light: 0xffd8a8, ceil: '#cfc8ba' },
   { name: 'Warehouse', layout: 'warehouse', noFog: true, home: 0, reflect: 0.3, floor: '#57504a', wall: '#7c6e5b', crate: '#8a6a3a', fog: 0x16130f, light: 0xffd49a, ceil: '#2a2622' },
   { name: 'Bunker', entry: 'vault', home: 0.45, reflect: 0.4, floor: '#3a4042', wall: '#5a6160', crate: '#4d5a3c', fog: 0x0b0f11, light: 0xa8c8ff, ceil: '#1d2224' },
   { name: 'Suburbs', layout: 'houses', home: 1, reflect: 0.28, floor: '#5a4a3a', wall: '#9fae98', crate: '#8a6a3a', fog: 0x111723, light: 0xffe0b0, ceil: '#d6d2c4' },
@@ -305,6 +305,10 @@ G.THEMES = [
   // a music festival at night, outdoors: big open spaces, the fog pushed far back, moonlight, more people about
   { name: 'Festival', layout: 'festival', fence: 'hoarding', home: 0, reflect: 0.2, floor: '#26331f', wall: '#5b7480', crate: '#8a6a3a', fog: 0x060912, light: 0xffe2c0, ceil: '#d8dcde', fogNear: 30, fogFar: 150, hemi: 0x5a6a96, hemiI: 0.55, crowd: 2, foes: 1.5, night: 35 },
 ];
+
+// the hangar between levels (js/hangar.js): a daylit hall with a helipad outside it
+G.HANGAR_ROWS = 55; // the shooting range north of the hangar: tile rows (js/level.js layHangar; js/hangar.js shifts the hall by two metres a row)
+G.HANGAR_THEME = { name: 'Hangar', layout: 'hangar', hub: true, noFog: true, home: 0, reflect: 0.35, floor: '#6c7075', wall: '#98a0a8', crate: '#8a6a3a', fog: 0x86a6c8, light: 0xfff2dc, ceil: '#c9cdd0', hemi: 0xe4ecf6, hemiI: 0.85 };
 
 G.PLAYER_COLORS = [0x3fa9f5, 0x7bd34a, 0xf5a623, 0xd94fd9, 0x2fd6c4, 0xf2e94e, 0xff6b6b, 0xffffff];
 

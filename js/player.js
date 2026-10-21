@@ -274,7 +274,9 @@ G.Me = {
         case 'KeyR': this.rPress(); break;
         case 'KeyI': this.inspect(); break;
         case 'KeyC': if (!this.down) this.crouch = !this.crouch; break;
-        case 'KeyG': this.throwNade(); break;
+        case 'Digit3': this.equip(0); break;
+        case 'Digit4': this.equip(1); break;
+        case 'Digit5': this.equip(2); break;
         case 'KeyH': this.useMed(); break;
         case 'KeyB': this.packSwap(); break;
         case 'KeyV': this.shout(); break;
@@ -350,7 +352,7 @@ G.Me = {
     this.hp = this.maxHp();
     this.down = false; this.dead = false;
     this.rounds = [];
-    this.crouch = false; this.onGround = true;
+    this.crouch = false; this.onGround = true; this.seat = null; this.treating = new Map();
     this.eyeH = 1.62;
     this.fireCd = 0; this.swapT = 0; this.reloading = false; this.reloadT = 0; this.burstQ = 0;
     this.adsT = 0; this.ads = false; this.kick = 0; this.flashT = 0;
@@ -359,7 +361,7 @@ G.Me = {
     this.sinceHurt = 99; this.sinceFire = 99; this.healLeft = 0;
     this.reviveT = 0; this.bobT = 0;
     this.stateT = 0; this.specIdx = 0; this.pressBuf = 0; this.lastTrigger = false;
-    this.lowToggle = false; this.stowed = false; this.action = null; this.stowW = 0; this.raiseMax = 0.3; this.shakeT = 0;
+    this.lowToggle = false; this.stowed = false; this.action = null; this.held = null; this.stowW = 0; this.raiseMax = 0.3; this.shakeT = 0;
     this.spin = 0; this.hyperQ = 0; this.cylTarget = 0; this.cycleMax = 0; this.flashIdx = 0;
     this.hitQ = new Map();
     if (this.slot === 's' && this.weapons.p) this.slot = 'p';
@@ -383,7 +385,8 @@ G.Me = {
     const map = G.Game.map;
     if (!map || !this.pos) return;
     this.stepRounds(dt);
-    if (this.dead) { this.spectate(); this.sendState(dt); return; }
+    G.R.fisheye = 0; // (spectating turns it on: js/player.js spectate)
+    if (this.dead) { if (G.R.vm) G.R.vm.visible = false; this.spectate(dt); this.sendState(dt); return; } // (no gun of yours in the view of someone else's helmet)
 
     this.sinceHurt += dt; this.sinceFire += dt;
     this.pressBuf = Math.max(0, this.pressBuf - dt);
@@ -405,6 +408,16 @@ G.Me = {
   },
 
   move(dt, map) {
+    // belted into a seat in the hangar's helicopter: nowhere to go, the view turned no further than a head turns
+    if (this.seat != null) {
+      const sp = G.Hangar.seatPos(this.seat);
+      this.pos.set(sp.x, sp.y, sp.z); this.vel.set(0, 0, 0); this.onGround = true; this.hspeed = 0;
+      this.crouch = true; this.stowed = true; this.lowToggle = false;
+      this.yaw = sp.yaw + G.U.clamp(G.U.angDiff(sp.yaw, this.yaw), -1.9, 1.9);
+      this.pitch = G.U.clamp(this.pitch, -0.7, 0.6);
+      this.eyeH += (1.12 - this.eyeH) * Math.min(1, dt * 12);
+      return;
+    }
     const k = this.keys, blocked = this.down || G.Game.chatOpen || !G.Game.locked || !!(this.action && (this.action.kind === 'zip' || this.action.kind === 'bag'));
     let fw = blocked ? 0 : (k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0);
     let st = blocked ? 0 : (k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0);
@@ -427,13 +440,14 @@ G.Me = {
     this.vel.x += (wx * speed - this.vel.x) * Math.min(1, accel * dt);
     this.vel.z += (wz * speed - this.vel.z) * Math.min(1, accel * dt);
     this.vel.y -= 20 * dt;
-    const prevY = this.pos.y;
+    const prevY = this.pos.y, STEP = G.World.STEP, was = this.onGround;
     this.pos.x += this.vel.x * dt;
     this.pos.z += this.vel.z * dt;
-    G.Level.resolve(map, this.pos, 0.35, prevY);
+    G.Level.resolve(map, this.pos, 0.35, prevY, STEP, true); // (anything a step high or less: walked up onto, not into; stairs as slopes)
     this.pos.y += this.vel.y * dt;
-    const g = G.Level.groundAt(map, this.pos.x, this.pos.z, 0.35, prevY);
-    if (this.pos.y <= g) { this.pos.y = g; this.vel.y = 0; this.onGround = true; } else this.onGround = false;
+    const g = G.Level.groundAt(map, this.pos.x, this.pos.z, 0.35, prevY, STEP, true);
+    // on the ground, or a step down from it (walking down stairs: stay on them, don't hop from tread to tread)
+    if (this.pos.y <= g || (was && this.vel.y <= 0 && prevY - g <= STEP + 0.02)) { this.pos.y = g; this.vel.y = 0; this.onGround = true; } else this.onGround = false;
     let eyeTarget = this.down ? 0.45 : this.crouch ? 1.0 : 1.62;
     const ac = this.action;
     if (ac && (ac.kind === 'zip' || ac.kind === 'bag')) { // going down with them / kneeling at the evidence
@@ -442,7 +456,8 @@ G.Me = {
       eyeTarget = G.U.lerp(eyeTarget, ac.kind === 'zip' && ac.living ? 0.88 : 0.95, kneel);
     }
     this.eyeH += (eyeTarget - this.eyeH) * Math.min(1, dt * 12);
-    if (this.pos.y + this.eyeH > G.Level.WALL_H - 0.15) { this.pos.y = G.Level.WALL_H - 0.15 - this.eyeH; this.vel.y = Math.min(0, this.vel.y); }
+    const ceil = map.world ? G.World.ceilingAt(map.world, this.pos.x, this.pos.z, 0.2, this.pos.y + 1.0) : G.Level.WALL_H; // (the ceiling over you, wherever you are: none outdoors)
+    if (this.pos.y + this.eyeH > ceil - 0.15) { this.pos.y = ceil - 0.15 - this.eyeH; this.vel.y = Math.min(0, this.vel.y); }
     this.hspeed = Math.hypot(this.vel.x, this.vel.z);
     if (this.onGround && this.hspeed > 0.5) this.bobT += dt * this.hspeed * 1.8;
   },
@@ -541,16 +556,18 @@ G.Me = {
 
   // ------------------------------------------------------------- weapons
   swap(slot) {
+    if (this.held) { this.unequip(); if (slot === this.slot) return; }
     if (slot === this.slot || this.down || this.dead || !this.weapons[slot]) return;
     this.slot = slot;
     this.reloading = false; this.burstQ = 0;
     this.swapT = this.swapMax = 0.42;
-    this.inspectT = 0; this.rackT = 0; this.magChk = null; this.rHeldAt = 0;
+    this.inspectT = 0; this.act = null; this.magChk = null; this.rHeldAt = 0;
     G.R.setViewmodel(this.cur().def);
     G.Audio.click();
   },
   // R: a tap reloads (on letting go); held, it pulls the magazine to check it (when the gun takes one)
   rPress() {
+    if (this.held) return;
     const w = this.cur();
     if (this.reloading || this.magChk || this.stowed || this.down || !w || w.noMag || !G.VMAnim.canMagCheck(G.R.vm)) { this.reloadKey(); return; }
     this.rHeldAt = performance.now();
@@ -587,19 +604,23 @@ G.Me = {
     this.reloadEmpty = G.chambered(w.def) ? !w.chamber : w.mag === 0; // (dry: it'll need the action worked)
     // A reload is put together from what the gun needs: the magazine change, then from empty either a thumb on
     // the bolt catch (a gun that locked open on its last round: quick) or the action worked by hand (a rack)
-    this.reloadAct = this.reloadEmpty && isMag && !w.def.enbloc && !G.beltFed(w.def) && !w.def.akimbo ? (G.boltHold(w.def) ? 'release' : 'rack') : null;
+    this.reloadAct = this.reloadEmpty && isMag && !w.def.enbloc && !w.def.akimbo && G.VMAnim.kinds(w.def).action ? (G.boltHold(w.def) ? 'release' : 'rack') : null; // (a revolver has nothing to work)
     this.reloadTimes(w.def);
     this.reloadEv = 0;
     G.Casings.emptied(w.def, mag - w.mag, w.spent); w.spent = []; // a revolver or break-action: the empties fall out (each hull its load's colour)
     if (w.def.shell || !G.Audio.sample('pull_magazine')) G.Audio.reload();
   },
   reloadTime(def) { return def.reload; },
-  ACT_T: { release: 0.3, rack: 0.6 },
-  // the reload's length: the magazine change (how depends on where the old one goes) and then the action;
-  // reloadSplit: the share that's the magazine change (js/vmanim.js times the two to it)
+  ACT_T: { release: 0.4, rack: 0.6 },
+  // how far through its motions a magazine change goes before the action, from empty: it stops as the magazine
+  // seats and the hand goes straight on to the catch or the handle (no trip back to the handguard first)
+  SEAT: { retain: 0.78, pouch: 0.78, floor: 0.7, plain: 0.7 },
+  // the reload's length: the magazine change (how depends on where the old one goes; run dry, up to its seating:
+  // reloadSeat). The action after it is its own (workAction).
   reloadTimes(def, done = 0) {
-    const mag = this.reloadTime(def) * this.RELOAD_K[this.reloadMode] * this.reloadPackK, act = this.ACT_T[this.reloadAct] || 0;
-    this.reloadTotal = mag + act; this.reloadSplit = mag / this.reloadTotal;
+    const seat = this.reloadAct && G.VMAnim.kinds(def).reload === 'mag' ? this.SEAT[this.reloadMode] || 0.7 : 1;
+    this.reloadSeat = seat;
+    this.reloadTotal = this.reloadTime(def) * this.RELOAD_K[this.reloadMode] * this.reloadPackK * seat;
     this.reloadT = Math.max(0.05, this.reloadTotal - done);
   },
   // a retention reload turned into a dump reload: where the old magazine goes decides how long it takes
@@ -622,7 +643,7 @@ G.Me = {
   },
   fireMode(w) { const modes = w.def.modes || [w.def.mode]; return modes.includes(w.fm) ? w.fm : modes[0]; },
   inspect() {
-    if (this.reloading || this.magChk || this.stowed || this.swapT > 0 || this.adsT > 0.2 || this.down || this.inspectT > 0) return;
+    if (this.reloading || this.act || this.magChk || this.stowed || this.swapT > 0 || this.adsT > 0.2 || this.down || this.inspectT > 0) return;
     this.inspYaw = this.inspPitch = 0;
     this.inspectDur = this.cur().def.slot === 's' ? 2.0 : 2.6;
     this.inspectT = this.inspectDur;
@@ -639,7 +660,8 @@ G.Me = {
     this.swayStep(dt, def);
 
     this.raiseT = Math.max(0, (this.raiseT || 0) - dt);
-    this.ads = this.mouse.r && !this.magChk && !this.lowReady && !this.stowed && this.raiseT <= 0 && this.swapT <= 0 && !(this.reloading && !def.shell) && G.Game.locked && !def.akimbo;
+    if (this.held) this.heldStep(dt);
+    this.ads = this.mouse.r && !this.held && !this.magChk && !this.lowReady && !this.stowed && this.raiseT <= 0 && this.swapT <= 0 && !(this.reloading && !def.shell) && G.Game.locked && !def.akimbo;
     this.adsT += ((this.ads ? 1 : 0) - this.adsT) * Math.min(1, dt * 9 * (this.cur().def.handling || 1)); // ergonomics: aim speed
 
     // inspecting stops the moment you do anything with the gun; racking after the last shell takes a beat
@@ -667,18 +689,25 @@ G.Me = {
       }
       this.fireCd = Math.max(this.fireCd, 0.12); // (no magazine in it)
     }
-    this.rackT = Math.max(0, (this.rackT || 0) - dt);
-    if (this.rackT > 0) this.fireCd = Math.max(this.fireCd, this.rackT);
+    // the action being worked (js/vmanim.js rack / release): the case it held thrown as it comes back, a round fed
+    // as it goes home
+    const ac = this.act;
+    if (ac) {
+      ac.t += dt / ac.dur;
+      this.fireCd = Math.max(this.fireCd, (1 - ac.t) * ac.dur);
+      const pistol = def.cls === 'PST' || def.cls === 'MP';
+      if (!ac.b && ac.t >= ac.back) { ac.b = true; if (w.spentCh) this.ejectSpent(w, 0); if (ac.kind === 'rack') G.Audio.sample(pistol ? 'drop_slide' : 'rack_slide', 0.8, this.boltGun(def) ? 0.85 : 1); }
+      if (!ac.h && ac.t >= ac.home) { ac.h = true; this.feed(w); if (ac.kind === 'release') G.Audio.sample('drop_slide', 0.9, pistol ? 1 : 0.85); }
+      if (ac.t >= 1) this.act = null;
+    }
     if (this.reloading) {
       this.reloadT -= dt;
       if (!def.shell && this.reloadTotal) {
         const k = 1 - this.reloadT / this.reloadTotal, pistol = def.cls === 'PST' || def.cls === 'MP';
         // the old magazine leaves your hand onto the floor (as the viewmodel lets go of it)
-        if (this.reloadMode === 'floor' && !this.magDropped && !w.noMag && k > (pistol ? 0.06 : 0.2)) this.magDropped = G.Casings.dropMag(def) || true;
-        const km = k / (this.reloadSplit || 1), ka = this.reloadSplit < 1 ? (k - this.reloadSplit) / (1 - this.reloadSplit) : -1; // (through the magazine change; through the action)
+        const km = k * (this.reloadSeat || 1); // (through the magazine change's motions)
+        if (this.reloadMode === 'floor' && !this.magDropped && !w.noMag && km > (pistol ? 0.06 : 0.2)) this.magDropped = G.Casings.dropMag(def) || true;
         if (this.reloadEv === 0 && km > (this.reloadMode === 'retain' || this.reloadMode === 'pouch' ? 0.76 : 0.68)) { this.reloadEv = 1; G.Audio.sample('insert_magazine'); }
-        if (this.reloadEv === 1 && this.reloadAct === 'release' && ka > 0.45) { this.reloadEv = 2; G.Audio.sample('drop_slide', 0.9, pistol ? 1 : 0.85); }
-        if (this.reloadEv === 1 && this.reloadAct === 'rack' && ka > 0.5) { this.reloadEv = 2; G.Audio.sample(pistol ? 'drop_slide' : 'rack_slide'); }
       }
       if (this.reloadT <= 0) {
         if (def.shell) {
@@ -686,7 +715,7 @@ G.Me = {
           const got = w.mag < mag ? G.Gear.takeRounds(this, def, Math.min(def.perLoad || 1, mag - w.mag), w.ammo) : [];
           if (got.length) { w.mag += got.length; w.ammo = got[got.length - 1]; if (w.tube) w.tube.push(...got); G.Audio.sample('insert_magazine', 0.5, 1.6) || G.Audio.shell(); }
           if (w.mag < mag && w.reserve > 0) { this.reloadT = this.reloadTime(def); this.reloadTotal = this.reloadT; }
-          else { this.reloading = false; if (this.reloadEmpty) { this.rackT = 0.5; G.Audio.sample('rack_slide', 0.7, 0.9); } this.feed(w); }
+          else { this.reloading = false; if (this.reloadEmpty) this.rack(w); else this.feed(w); }
         } else {
           // a fresh magazine in (the old one goes back in its pouch), or loose rounds into a break-action
           if (this.reloadMode === 'pouch' || this.reloadMode === 'floor') {
@@ -697,7 +726,8 @@ G.Me = {
           } else if (G.Gear.ammoFor(def).kind === 'mag') G.Gear.swapMag(this, w, mag);
           else { const got = G.Gear.takeRounds(this, def, mag - w.mag, w.ammo); w.mag += got.length; for (const t of got) w.tube.push(t); if (got.length) w.ammo = got[got.length - 1]; }
           this.reloading = false;
-          this.feed(w); // run dry: the reload ended by working the action (its sound is above)
+          if (this.reloadAct) this.workAction(w, this.reloadAct, this.reloadSeat < 1 ? this.reloadSeat : null); // run dry: then the action, straight on
+          else this.feed(w);
           if (!G.Audio.samples.insert_magazine) G.Audio.click();
         }
       }
@@ -712,7 +742,10 @@ G.Me = {
       if (spinning && this.spin === 0) G.Audio.spinUp(def.spinUp);
       this.spin = spinning ? Math.min(1, this.spin + dt / def.spinUp) : Math.max(0, this.spin - dt / (def.spinUp * 1.5));
     }
-    if (this.swapT > 0 || this.lowReady || this.stowed || this.raiseT > 0) { this.burstQ = 0; return; }
+    if (this.swapT > 0 || this.lowReady || this.stowed || this.held || this.raiseT > 0 || (G.Game.hub && !G.Range.on())) { this.burstQ = 0; return; } // (the hangar's no place for it: the range is)
+    // a bolt gun: the shot's case stays in till you work the bolt, which you do as you let go of the trigger (hold
+    // it to stay on the sight and watch where it went)
+    if (w.spentCh && !trigger && this.fireCd <= 0 && !this.act && !this.reloading) { this.rack(w); return; }
     const mode = this.fireMode(w); // where the selector is
     if (mode === 'burst' && this.pressBuf > 0 && this.burstQ === 0 && this.fireCd <= 0) { this.burstQ = def.burst || 3; this.pressBuf = 0; }
     if (mode === 'hyper' && pressed) this.hyperQ = def.hyper;
@@ -729,15 +762,17 @@ G.Me = {
       return;
     }
     const ch = G.chambered(def);
-    if (ch && !w.chamber && w.mag > 0 && (!this.reloading || def.shell) && (pressed || this.pressBuf > 0)) { this.reloading = false; this.rack(w); this.burstQ = 0; this.pressBuf = 0; return; } // click: tap, rack (shells: stop loading and rack)
+    if (ch && !w.chamber && (w.mag > 0 || w.spentCh) && (!this.reloading || def.shell) && (pressed || this.pressBuf > 0)) { this.reloading = false; this.rack(w); this.burstQ = 0; this.pressBuf = 0; return; } // click: tap, rack (shells: stop loading and rack)
     if (ch ? !w.chamber : w.mag <= 0) {
       if (pressed || mode !== 'auto' || !this.dryT || this.dryT < performance.now()) { G.Audio.dry(); this.dryT = performance.now() + 300; }
       this.burstQ = 0; this.pressBuf = 0; // just the click: reloading is up to you (R)
       return;
     }
     if (this.reloading) { if (def.shell) this.reloading = false; else return; }
+    const bolt = ch && this.boltGun(def), round = w.chamber;
     this.shoot(w);
-    if (ch) { w.chamber = null; this.feed(w, true); } else w.mag--; // (the action strips the next round into the chamber)
+    if (bolt) { w.chamber = null; w.spentCh = round || w.ammo; } // (the case stays in: js/player.js rack)
+    else if (ch) { w.chamber = null; this.feed(w, true); } else w.mag--; // (the action strips the next round into the chamber)
     // AN-94 style hyper-burst: the first rounds of each pull leave at a much higher rate. The wait after this
     // round is set by the next one: still part of the pair (hyper rate), or the gun's own cyclic rate after it.
     if (this.hyperQ > 0) this.hyperQ--;
@@ -746,6 +781,7 @@ G.Me = {
     // carries over (the first shot of a pull starts the clock fresh)
     this.fireCd = (this.sinceShot > 60 / rate + 0.034 ? 0 : Math.max(this.fireCd, -0.034)) + 60 / rate;
     this.sinceShot = 0;
+    if (bolt) this.fireCd = Math.max(0.25, this.fireCd - this.BOLT_T); // (the rest of the gun's rate is the bolt, worked by hand)
     this.cycleMax = this.fireCd;
     this.cylTarget += Math.PI / 3;
     if (def.enbloc && w.mag === 0) G.Audio.ping(); // the clip flies out
@@ -759,12 +795,26 @@ G.Me = {
     w.mag--;
     return true;
   },
-  // working the action by hand: a round from the magazine into the chamber (a moment, both hands)
+  // working the action by hand: a round from the magazine into the chamber (a moment, both hands; a bolt gun's
+  // bolt, the right hand, throwing the case it last fired if that's still in there)
+  BOLT_T: 0.7,
   rack(w) {
-    if (!this.feed(w)) return;
-    this.rackT = 0.45; this.fireCd = Math.max(this.fireCd, 0.45);
-    G.Audio.sample(w.def.cls === 'PST' || w.def.cls === 'MP' ? 'drop_slide' : 'rack_slide', 0.8);
+    if (!(G.chambered(w.def) && !w.chamber && w.mag > 0) && !w.spentCh) return;
+    this.workAction(w, 'rack');
   },
+  // The action worked by hand, its own animation (js/vmanim.js): kind 'rack' (pulled through and let go) or
+  // 'release' (locked open: the catch hit). After a magazine change run dry it follows on from the seating (seat:
+  // how far through its motions that went); a partial reload has none. The rounds move as the action does (above).
+  workAction(w, kind, seat = null) {
+    const ev = G.VMAnim.actEvents(kind, G.VMAnim.kinds(w.def).action);
+    const dur = kind === 'release' ? this.ACT_T.release : this.boltGun(w.def) ? this.BOLT_T : seat ? this.ACT_T.rack : 0.45;
+    this.act = { kind, seat, t: 0, dur, back: ev.back, home: ev.home };
+    this.fireCd = Math.max(this.fireCd, dur);
+  },
+  // a bolt-action: its bolt's worked by hand after every shot
+  boltGun(def) { const P = G.Gunsmith.PLATFORMS[def.id]; return !!(P && P.spec && P.spec.bolt); },
+  // the fired case out of the port (at: how long from now)
+  ejectSpent(w, at) { G.Casings.fired(w.def, true, null, null, w.spentCh, at); w.spentCh = null; },
 
   shoot(w) {
     // the round being fired, and the gun as that round sees it (G.roundDef: hollow points, AP, slugs...)
@@ -817,7 +867,7 @@ G.Me = {
       G.R.muzzleFlashAt(muzzle, def.tracer || 0xffb060);
     }
 
-    G.Casings.fired(def, true, null, null, round); // the spent case, out of the port (or when the action's worked)
+    if (!this.boltGun(w.def)) G.Casings.fired(def, true, null, null, round); // the spent case, out of the port (a bolt gun's when the bolt's worked)
     // the kick only throws the muzzle for the next shot: this one already left where you were aiming
     this.recoilKick(def);
     this.kick = Math.min(1, this.kick + 0.35 + def.recoil * 0.06);
@@ -927,8 +977,8 @@ G.Me = {
       const h = G.Rig.raycast(ev.rig, a, dir, wallT);
       if (h) hits.push({ t: h.t, zone: h.zone, c: h.c, up: h.up, side: h.side, head: h.zone === 'head', ev, behind: h.behind });
     }
-    // friendly fire is on: your teammates are in the way too
-    for (const pv of G.Views.players.values()) {
+    // friendly fire is on: your teammates are in the way too (not in the hangar: the range is for everyone)
+    if (!G.Game.hub) for (const pv of G.Views.players.values()) {
       if (!pv.st || pv.st.dd || !pv.rig || !pv.rig.root.visible || b.hit.has(pv)) continue;
       const cx = pv.pos.x - a.x, cy = pv.pos.y + 1 - a.y, cz = pv.pos.z - a.z, along = cx * dir.x + cy * dir.y + cz * dir.z;
       if (along < -1.5 || along > wallT + 1.5) continue;
@@ -978,7 +1028,10 @@ G.Me = {
     this.roundGlass(b, a, dir, wall, endT == null ? len : endT);
     if (endT == null) return null;
     const p = a.clone().addScaledVector(dir, endT);
-    if (hitWall && endT === wallT && !wall.view) G.R.impact(p, wall.n, 'wall'); // (not on the view behind an outside window)
+    if (hitWall && endT === wallT && !wall.view) {
+      if (wall.solid && wall.solid.target) G.Range.hit(wall.solid, p); // (a target on the range)
+      G.R.impact(p, wall.n, 'wall'); // (not on the view behind an outside window)
+    }
     return { p, t: endT };
   },
   // the windows a round went through on the way break (here at once, and for everyone through the host)
@@ -1043,16 +1096,92 @@ G.Me = {
     G.Net.toHost({ t: 'boom', p: [r2(p.x), r2(p.y), r2(p.z)], r: r2(r), d: Math.round(dmg) });
   },
 
-  throwNade() {
-    if (this.down || this.dead || !G.Gear.take(this, 'frag')) return;
-    const cam = G.R.camera;
-    const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
-    const p = cam.position.clone().addScaledVector(fwd, 0.5);
-    const v = fwd.multiplyScalar(15).add(new THREE.Vector3(this.vel.x * 0.5, 3, this.vel.z * 0.5));
-    G.Views.addNade(p, v, 2.2, true);
-    G.Audio.pin();
+  // a flashbang of yours went off: the host works out who it blinds (and tells everyone, you too)
+  flashBang(p) {
+    const r2 = (v) => Math.round(v * 100) / 100;
+    G.Net.toHost({ t: 'flash', p: [r2(p.x), r2(p.y), r2(p.z)] });
+  },
+  // ------------------------------------------------------------- quick slots: 3, 4 and 5
+  // Each holds a kind of throwable: 'frag' or 'flash' (or nothing). The key throws one from your kit. Bound by
+  // dragging a grenade onto the slot's box in the inventory (G.InvUI); kept between sessions.
+  QUICK_DEFAULT: ['frag', 'flash', null],
+  get quick() {
+    if (!this._quick) { const q = G.U.store.get('quick', null); this._quick = Array.isArray(q) && q.length === 3 ? q.slice() : this.QUICK_DEFAULT.slice(); }
+    return this._quick;
+  },
+  setQuick(i, kind) {
+    const q = this.quick, was = kind ? q.indexOf(kind) : -1;
+    if (was >= 0 && was !== i) q[was] = q[i]; // (it was on another key: they swap)
+    q[i] = kind || null;
+    G.U.store.set('quick', q);
+    G.HUD.toast('', kind ? `${this.quickName(kind)} on key ${i + 3}` : `Key ${i + 3} cleared`, 1.2);
+  },
+  // the kind of quick-slot gear an item is (null: not one)
+  // the kind of quick-slot gear an item is: a throwable (null: not one; medical gear isn't)
+  quickKind(it) { return it && (it.k === 'frag' || it.k === 'flash') ? it.k : null; },
+  quickName(kind) { return kind === 'frag' ? 'Frag' : kind === 'flash' ? 'Flashbang' : '—'; },
+  // how many of that kind you carry
+  quickCount(kind) { return this.kit && kind ? G.Gear.count(this, kind) : 0; },
+  // ------------------------------------------------------------- gear in hand (keys 3, 4, 5)
+  // The key brings that grenade into your hand (the weapon goes down; the key again, or 1 / 2, brings it back).
+  // Left click pulls the pin and draws back, letting go throws it; right click picks the throw: underhand (a lob
+  // that rolls on along the floor), weak, or strong. While it's in your hand, its arc shows where it'll go off.
+  // Out of them, the weapon comes back up. held: { kind, cock, str, readyT (bringing it up), throwT (the throw) }.
+  THROWS: [['Underhand', 6.5, 2.4], ['Weak', 10, 3], ['Strong', 15.5, 3.2]],
+  equip(i) {
+    const kind = this.quick[i];
+    if (this.dead || this.down || this.action || G.Game.hub || this.seat != null) return; // (no throwing in the hangar)
+    if (!kind) { G.HUD.toast('', `Nothing on key ${i + 3}: drag a grenade onto its box in the inventory`, 1.6); return; }
+    if (this.held && this.held.kind === kind) { if (this.held.throwT < 0 && !this.held.cock) this.unequip(); return; }
+    if (!this.quickCount(kind)) { G.HUD.toast('', kind === 'flash' ? 'No flashbangs' : 'No grenades', 1.2); G.Audio.deny(); return; }
+    this.held = { kind, cock: false, str: this.throwStr == null ? 2 : this.throwStr, readyT: 0.35, throwT: -1, lastL: true, lastR: true };
+    this.reloading = false; this.burstQ = 0; this.inspectT = 0; this.magChk = null; this.rHeldAt = 0; this.lowToggle = false;
+    G.Audio.click();
+  },
+  unequip() {
+    if (!this.held) return;
+    this.held = null;
+    this.raiseT = this.raiseMax = this.drawTime(); // (the weapon comes back up)
+  },
+  fuseOf(kind) { return kind === 'flash' ? 1.5 : 2.2; },
+  // where a throw of this strength leaves your hand, and how fast (underhand: from the hip, a lob)
+  throwLaunch(str) {
+    const cam = G.R.camera, fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion), [, sp, up] = this.THROWS[str];
+    const from = cam.position.clone(), p = from.clone().addScaledVector(fwd, 0.45);
+    if (str === 0) p.y -= 0.65;
+    // (never from inside a wall you're standing against)
+    const d = p.clone().sub(from), len = d.length(), h = G.Level.raycast(G.Game.map, from.x, from.y, from.z, d.x / len, d.y / len, d.z / len, len);
+    if (h.t < len) p.copy(from).addScaledVector(d, Math.max(0, h.t - 0.12) / len);
+    const v = fwd.multiplyScalar(sp).add(new THREE.Vector3(this.vel.x * 0.5, up, this.vel.z * 0.5));
+    return { p, v };
+  },
+  heldStep(dt) {
+    const h = this.held, ok = G.Game.locked && !G.Game.chatOpen, l = this.mouse.l && ok, r = this.mouse.r && ok;
+    const pressL = l && !h.lastL, pressR = r && !h.lastR;
+    h.lastL = l; h.lastR = r;
+    if (pressR) { h.str = this.throwStr = (h.str + 1) % 3; G.Audio.click(); G.HUD.toast('', `${this.THROWS[h.str][0]} throw`, 0.8); }
+    if (h.throwT >= 0) { // following through; then the next one, or the weapon back
+      h.throwT += dt;
+      if (h.throwT > 0.5) { if (this.quickCount(h.kind)) { h.throwT = -1; h.readyT = 0.3; } else this.unequip(); }
+      return;
+    }
+    if (pressL) h.queued = true; // (pressed while it's still coming up: the pin comes out as soon as it's there)
+    if (!l) h.queued = false;
+    h.readyT -= dt;
+    if (h.readyT > 0) return;
+    if (h.queued && !h.cock) { h.cock = true; h.queued = false; G.Audio.pin(); } // pin out, drawn back
+    if (h.cock && !l) { h.cock = false; this.throwHeld(); } // let go: thrown
+    if (!h.cock && !this.down) { const { p, v } = this.throwLaunch(h.str); G.R.throwArc(G.Views.predictNade(p, v, this.fuseOf(h.kind), G.Game.map), false); }
+    else if (h.cock) { const { p, v } = this.throwLaunch(h.str); G.R.throwArc(G.Views.predictNade(p, v, this.fuseOf(h.kind), G.Game.map), true); }
+  },
+  throwHeld() {
+    const h = this.held, kind = h.kind;
+    if (!G.Gear.take(this, kind)) { this.unequip(); return; }
+    const { p, v } = this.throwLaunch(h.str), fuse = this.fuseOf(kind);
+    G.Views.addNade(p, v, fuse, true, false, kind);
+    h.throwT = 0;
     const r2 = (x) => Math.round(x * 100) / 100;
-    G.Net.toHost({ t: 'nade', p: [p.x, p.y, p.z].map(r2), v: [v.x, v.y, v.z].map(r2), fuse: 2.2 });
+    G.Net.toHost({ t: 'nade', p: [p.x, p.y, p.z].map(r2), v: [v.x, v.y, v.z].map(r2), fuse, k: kind, s: h.str });
   },
   shout() {
     if (this.dead || (this.shoutT || 0) > performance.now()) return;
@@ -1063,11 +1192,38 @@ G.Me = {
   },
   // H: there's no medkit to slap on; your body and your medical gear are in the Tab screen
   useMed() { if (!this.dead) G.Game.toggleInv(true); },
+  // A teammate has started putting something on you (or stopped, or finished): who, what, which part, how long. The
+  // HUD says so while it lasts, with the part lit on your body.
+  beingTreated(by, name, part, mt, dur, off) {
+    this.treating = this.treating || new Map();
+    if (off) { this.treating.delete(by); return; }
+    if (this.dead || !G.Med.ITEMS[mt]) return;
+    this.treating.set(by, { name, part, mt, t0: performance.now(), dur: Math.max(0.5, dur || G.Med.ITEMS[mt].time) });
+  },
+  // how many of each medical item you carry (in the order of G.Med.ITEMS): what a teammate treating you may use of yours
+  medCounts() {
+    const keys = Object.keys(G.Med.ITEMS), out = keys.map(() => 0);
+    if (this.kit) G.Gear.each(G.Gear.body(this), (it) => { if (it.k === 'med') { const i = keys.indexOf(it.mt); if (i >= 0) out[i] += it.n || 1; } });
+    return out;
+  },
+  // one of your medical items, used (by a teammate, on you): off its stack, or out of its pouch
+  takeMed(mt) {
+    for (const g of G.Gear.body(this)) for (const p of g.items) if (p.it.k === 'med' && p.it.mt === mt) {
+      if ((p.it.n || 1) > 1) p.it.n--; else G.Gear.removeFrom(g, p.it);
+      return true;
+    }
+    return false;
+  },
+  treatingParts() { return this.treating && this.treating.size ? [...this.treating.values()].map((q) => q.part) : null; },
   // a teammate treated you (they used their item; it lands here)
-  treated(part, mt, by) {
-    if (this.dead || !G.Med.treat(this.body, part, mt)) return;
+  // theirs: it's your own item they used (it comes off you here); nothing of it left, or no longer needed: it isn't used
+  treated(part, mt, by, byId, theirs) {
+    if (byId != null && this.treating) this.treating.delete(byId); // (done)
+    if (this.dead) return;
+    if (theirs && (G.Med.cantTreat(this.body, part, mt) || !this.takeMed(mt))) return;
+    if (!G.Med.treat(this.body, part, mt)) return;
     G.Audio.heal();
-    G.HUD.toast('', `${by} used ${G.Med.ITEMS[mt].name.toLowerCase()} on your ${G.Med.NAME[part].toLowerCase()}`, 2);
+    G.HUD.toast('', `${by} used ${theirs ? 'your ' : ''}${G.Med.ITEMS[mt].name.toLowerCase()} on your ${G.Med.NAME[part].toLowerCase()}`, 2);
   },
 
   // ------------------------------------------------------------- F interactions
@@ -1076,7 +1232,7 @@ G.Me = {
   // already happened, e.g. the boot has landed). After finishing, F must be released before the next one.
   drawTime() { const d = this.cur().def; return (d.slot === 's' ? 0.65 : 1.0) / (d.handling || 1); },
   // kind drives the animation; events fire part-way through (e.g. the door moves when the push lands)
-  startAction(label, dur, onDone, kind = null, events = []) { this.action = { label, dur, t: 0, onDone, kind, events }; },
+  startAction(label, dur, onDone, kind = null, events = []) { if (this.held && !this.held.cock) this.held = null; this.action = { label, dur, t: 0, onDone, kind, events }; },
   // where you're looking: the camera and the direction through the crosshair
   aimRay() { const cam = G.R.camera; return { o: cam.position.clone(), d: new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion) }; },
   // the person (or body) under the crosshair, within reach: their hitboxes, or within 7 deg of their torso.
@@ -1124,8 +1280,8 @@ G.Me = {
     let best = null, bd = Infinity;
     for (const [i, v] of G.Views.evidence) {
       if (v.secured) continue;
-      const to = new THREE.Vector3(v.x - o.x, 0.04 - o.y, v.z - o.z), dist = to.length();
-      if (Math.hypot(v.x - this.pos.x, v.z - this.pos.z) > reach) continue;
+      const to = new THREE.Vector3(v.x - o.x, (v.y || 0) + 0.04 - o.y, v.z - o.z), dist = to.length();
+      if (Math.hypot(v.x - this.pos.x, v.z - this.pos.z) > reach || Math.abs((v.y || 0) - this.pos.y) > 1.5) continue;
       if (to.normalize().dot(d) > Math.cos(9 * Math.PI / 180) && dist < bd) { bd = dist; best = i; }
     }
     return best;
@@ -1134,13 +1290,14 @@ G.Me = {
   aimedDoor(map) {
     const cam = G.R.camera, L = G.Level, REACH = 1.9;
     const f = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
-    const h = L.raycast(map, cam.position.x, cam.position.y, cam.position.z, f.x, f.y, f.z, REACH);
+    const h = L.raycast(map, cam.position.x, cam.position.y, cam.position.z, f.x, f.y, f.z, REACH, { move: true }); // (what you'd walk into: a door with its glass shot out is still there)
     if (h.t >= REACH || !h.n) return null;
-    const px = cam.position.x + f.x * (h.t + 0.03), pz = cam.position.z + f.z * (h.t + 0.03);
-    const tx = Math.floor(px / L.TS), tz = Math.floor(pz / L.TS);
-    if (L.tile(map, tx, tz) !== 3) return null;
-    const d = map.doorAt.get(tz * map.W + tx);
-    const y = cam.position.y + f.y * h.t;
+    let d = h.solid ? (h.solid.kind === 'door' ? h.solid.door : null) : null;
+    if (!h.solid) { // (no world: the tile the ray stopped in)
+      const px = cam.position.x + f.x * (h.t + 0.03), pz = cam.position.z + f.z * (h.t + 0.03), tx = Math.floor(px / L.TS), tz = Math.floor(pz / L.TS);
+      d = L.tile(map, tx, tz) === 3 ? map.doorAt.get(tz * map.W + tx) : null;
+    }
+    const y = cam.position.y + f.y * h.t - ((d && d.fy) || 0);
     if (!d || d.open || y > L.DOOR_H) return null; // the lintel isn't the door
     return { d, y };
   },
@@ -1149,6 +1306,12 @@ G.Me = {
     const map = G.Game.map, held = this.keys.KeyF && !G.Game.chatOpen;
     if (!held) this.fLatch = false;
     const F = held && !this.fLatch;
+    // the hangar: look at what's for sale or what to use (js/hangar.js)
+    if (G.Game.hub) {
+      const o = G.Hangar.interact(this, dt, held, F);
+      G.HUD.setPrompt(o.prompt); G.HUD.setProgress(o.prog, o.label);
+      return;
+    }
 
     if (this.action) {
       // a timed action in progress: weapon away until it's done
@@ -1218,7 +1381,7 @@ G.Me = {
       if (cuffTgt && evAim !== null) {
         const v = G.Views.evidence.get(evAim), c = new THREE.Vector3();
         (cuffTgt.alive ? cuffTgt.rig.chest : cuffTgt.rig.hips).getWorldPosition(c);
-        if (this.offAim(v.x, 0.04, v.z) < this.offAim(c.x, c.y, c.z)) cuffTgt = null;
+        if (this.offAim(v.x, (v.y || 0) + 0.04, v.z) < this.offAim(c.x, c.y, c.z)) cuffTgt = null;
       }
       if (cuffTgt) {
         const ev = cuffTgt, who = ev.def.civ ? 'civilian' : ev.def.name.toLowerCase();
@@ -1276,8 +1439,8 @@ G.Me = {
             else this.startAction('Opening door', 0.7, null, 'open', [{ at: 0.5, fn: () => G.Net.toHost({ t: 'useDoor', i: id }) }]);
           }
         } else {
-          const near = G.Level.doorNear(map, this.pos.x, this.pos.z, 1.9);
-          if (near && near.open && this.offAim(near.x, 1.1, near.z) < 0.6) { // (facing it, roughly)
+          const near = G.Level.doorNear(map, this.pos.x, this.pos.z, 1.9, this.pos.y);
+          if (near && near.open && this.offAim(near.x, (near.fy || 0) + 1.1, near.z) < 0.6) { // (facing it, roughly)
             prompt = 'Hold <b>F</b> to close door';
             if (F) { const id = near.id; this.startAction('Closing door', 0.6, null, 'close', [{ at: 0.6, fn: () => G.Net.toHost({ t: 'useDoor', i: id }) }]); }
           }
@@ -1358,7 +1521,7 @@ G.Me = {
   // Rounds that hit you, as the enemy's are rolled by the host: [zone, central] per round (or pellet). The
   // same wounds as you deal: an unarmoured head (or a face below the helmet's brim) is a kill; elsewhere your
   // armour stops its share and wears.
-  takeHits(hz, wdef, from, by) { // by: a teammate's name, when it's friendly fire
+  takeHits(hz, wdef, from, friendly) { // friendly: it's a teammate's round (you aren't told whose)
     if (hz && hz.length && G.R.particles) G.R.particles(new THREE.Vector3(this.pos.x, 1.2, this.pos.z), 4 + 2 * hz.length, 0x8a0a0a, 1.5, 1.2, 9, 0.6, null, true); // some of it lands at your feet
     if (this.down || this.dead || G.Game.phase !== 'level' || !hz || !hz.length) return;
     const d = from ? from.distanceTo(this.pos) : 0;
@@ -1381,7 +1544,7 @@ G.Me = {
       if (r === 'dead') fate = 'dead'; else if (r === 'down' && fate !== 'dead') fate = 'down';
     }
     if (rang) G.Audio.armorHit();
-    if (killed || fate === 'dead') { this.killed(from, by ? `Friendly fire: ${by}` : killed || 'A head wound'); return; }
+    if (killed || fate === 'dead') { this.killed(from, friendly ? 'Friendly fire' : killed || 'A head wound'); return; }
     this.hurt(f, from, fate === 'down');
   },
   // a round to the head you weren't wearing a helmet for: no bleeding out, no revive
@@ -1445,6 +1608,7 @@ G.Me = {
     return 'Bled out: nobody stopped it in time';
   },
   die(how) {
+    G.Views.spawnSelfBody(); // (before anything else changes: as you were, then down)
     this.down = false;
     this.dead = true;
     this.hp = 0;
@@ -1452,18 +1616,34 @@ G.Me = {
     G.R.setViewmodel(null);
     G.HUD.toast('KIA', this.deathCause, 3);
   },
-  spectate() {
+  spectate(dt) {
     const alive = [...G.Views.players.values()].filter((p) => p.st && !p.st.dd);
     const cam = G.R.camera;
     if (!alive.length) { cam.position.set(this.pos.x, 3.5, this.pos.z); cam.rotation.set(-1.2, this.yaw, 0); return; }
-    const p = alive[this.specIdx % alive.length];
+    const p = alive[this.specIdx % alive.length], head = p.rig && p.rig.head;
+    if (this.spectating !== p) this._specQ = null; // (a new officer: no easing in from the last one's view)
     this.spectating = p;
-    cam.position.set(p.pos.x, p.pos.y + (p.st.dn ? 0.45 : p.st.cr ? 1.0 : 1.62), p.pos.z);
-    cam.rotation.set(p.st.pt, p.st.yw, 0);
+    if (!head) { cam.position.set(p.pos.x, p.pos.y + (p.st.dn ? 0.45 : p.st.cr ? 1.0 : 1.62), p.pos.z); cam.rotation.set(p.st.pt, p.st.yw, 0); return; }
+    // an action camera on the right side of their helmet, up near the crown, looking where their head looks, a little
+    // in and down so their shoulder, arm and weapon are in the frame (steadied a little, as a camera's stabiliser
+    // would). Wide, with a fisheye's barrel distortion (js/render.js)
+    G.R.fisheye = 1;
+    const wide = G.Game.settings.fov * 1.2;
+    if (Math.abs(cam.fov - wide) > 0.05) { cam.fov = wide; cam.updateProjectionMatrix(); }
+    head.updateWorldMatrix(true, false);
+    const hp = head.getWorldPosition(new THREE.Vector3()), hq = head.getWorldQuaternion(new THREE.Quaternion()), s = (p.rig.scale || 1);
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(hq), fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(hq), right = new THREE.Vector3(1, 0, 0).applyQuaternion(hq);
+    cam.position.copy(hp).addScaledVector(up, 0.27 * s).addScaledVector(right, 0.2 * s).addScaledVector(fwd, 0.02 * s);
+    // its aim: the head's turn, with the pitch they're actually looking at (a rig's head only follows part of it)
+    const look = new THREE.Quaternion().setFromEuler(new THREE.Euler((p.st.pt || 0) - 0.27, (p.st.yw || 0) + 0.13, 0, 'YXZ')), roll = new THREE.Euler().setFromQuaternion(hq, 'YXZ').z;
+    look.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), roll * 0.6));
+    this._specQ = this._specQ ? this._specQ.slerp(look, Math.min(1, (dt || 0.016) * 14)) : look.clone();
+    cam.quaternion.copy(this._specQ);
   },
 
   // ------------------------------------------------------------- camera + viewmodel
   updateCamera(dt) {
+    this._dtCam = dt;
     const cam = G.R.camera, def = this.cur().def;
     // lean: Q left, E right. Never lean the head into a wall.
     const want = this.down || this.dead || this.lowReady || G.Game.chatOpen || !G.Game.locked ? 0 : (this.keys.KeyE ? 1 : 0) - (this.keys.KeyQ ? 1 : 0);
@@ -1512,7 +1692,7 @@ G.Me = {
     let z = G.U.lerp(u.hip.z, u.ads.z, a) + this.kick * 0.045 + Math.max(0, this.rc.p) * 0.35;
     let rx = off.p - punch, ry = off.y - punchY, rz = -this.rc.y * 0.3;
     if (this.lowReady) { ry = 0.35; rx -= 0.6; x -= 0.04; y -= 0.07; } // muzzle down
-    this.stowW = (this.stowW || 0) + ((this.stowed ? 1 : 0) - (this.stowW || 0)) * Math.min(1, dt * 9);
+    this.stowW = (this.stowW || 0) + ((this.stowed || this.held ? 1 : 0) - (this.stowW || 0)) * Math.min(1, dt * 9); // (a grenade in hand: the weapon down too)
     y -= this.stowW * 0.55; rx -= this.stowW * 1.1; // weapon put away while the hands are busy
     if (this.raiseT > 0) { const k = this.raiseT / (this.raiseMax || 0.3); rx -= k * 1.0; y -= k * 0.3; }
     // reloads, racking and inspecting (js/vmanim.js)
@@ -1547,7 +1727,6 @@ G.Me = {
     const cyc = this.cycleMax > 0.2 && this.fireCd > 0 ? Math.sin(Math.PI * Math.min(1, (1 - this.fireCd / this.cycleMax) * 1.25)) : 0;
     if (an.slide) an.slide.position.z = Math.min(0.035, this.kick * 0.04 + (!G.loaded(w) ? 0.035 : 0)); // (locked back: nothing left, chamber included)
     if (an.pump) an.pump.position.z = cyc * 0.085;
-    if (an.bolt) { an.bolt.rotation.z = cyc * 1.3; an.bolt.position.z = Math.max(0, cyc - 0.4) * 0.12; }
     if (an.cyl) an.cyl.rotation.z += (this.cylTarget - an.cyl.rotation.z) * Math.min(1, dt * 18);
     if (an.spin) an.spin.rotation.z += dt * this.spin * 55;
     if (an.magn) an.magn.rotation.z += ((sg.scoped ? 0 : -2.8) - an.magn.rotation.z) * Math.min(1, dt * 14); // a magnifier flips in or out
@@ -1586,9 +1765,12 @@ G.Me = {
     const flapPivot = new T.Group(); flapPivot.position.set(0, 0.007, -0.165); env.add(flapPivot);
     const flap = new T.Mesh(new T.BoxGeometry(0.24, 0.004, 0.08), new T.MeshLambertMaterial({ color: 0xb8975c })); flap.position.z = 0.04; flapPivot.add(flap);
     env.userData.flap = flapPivot;
+    // a grenade in the hand (keys 3, 4, 5): a frag, or a flashbang's can
+    const nade = { frag: new T.Mesh(new T.SphereGeometry(0.038, 12, 8), new T.MeshStandardMaterial({ color: 0x3a4a2a, roughness: 0.7 })), flash: new T.Mesh(new T.CylinderGeometry(0.026, 0.026, 0.1, 12), new T.MeshStandardMaterial({ color: 0x7d8388, roughness: 0.5, metalness: 0.4 })) };
+    for (const m of Object.values(nade)) { m.position.set(0, 0.035, -0.075); m.visible = false; arm.add(m); }
     arm.visible = leg.visible = armL.visible = tie.visible = held.visible = env.visible = false;
     G.R.vmRoot.add(arm, leg, armL, tie, held, env);
-    return (this._limbs = { arm, leg, armL, tie, held, env });
+    return (this._limbs = { arm, leg, armL, tie, held, env, nade });
   },
   // Before laying someone face down: is there room in front of them? Their body will reach ~1.85 m from the
   // knees. If a wall or furniture is in the way, drag them back (toward you) far enough, and step back with them.
@@ -1623,11 +1805,34 @@ G.Me = {
     if (!ac || ac.approach || ac.kind === 'order') return null;
     const t = ac.t / ac.dur;
     if (ac.kind === 'zip') { const ev = G.Views.enemies.get(ac.target); return ev ? { p: G.Views.zipPoint(ev, t, ac.living), w: 1 } : null; }
-    if (ac.kind === 'bag') { const v = G.Views.evidence.get(ac.target); return v ? { p: new THREE.Vector3(v.x, 0.05, v.z), w: 1 - 0.7 * G.U.bagPhases(t).lift * (1 - G.U.bagPhases(t).down) } : null; }
+    if (ac.kind === 'bag') { const v = G.Views.evidence.get(ac.target); return v ? { p: new THREE.Vector3(v.x, (v.y || 0) + 0.05, v.z), w: 1 - 0.7 * G.U.bagPhases(t).lift * (1 - G.U.bagPhases(t).down) } : null; }
     return null;
+  },
+  // a grenade in your hand: brought up, held, drawn back (high for an overhand throw, low for underhand),
+  // thrown and followed through. Eased toward each pose so it moves like an arm. Returns whether it drew.
+  animateHeld(L, dt) {
+    const h = this.held;
+    for (const [k, m] of Object.entries(L.nade)) m.visible = !!h && h.kind === k && h.throwT < 0;
+    if (!h) { this._hp = null; return false; }
+    const under = h.str === 0, P = (x, y, z, rx, rz = 0) => [x, y, z, rx, rz];
+    let want, wantL = null;
+    if (h.throwT >= 0) { const t = h.throwT / 0.5; want = t < 0.35 ? (under ? P(0.14, -0.22, -0.62, -0.2) : P(0.12, -0.08, -0.68, -0.5)) : P(0.22, -0.5, -0.38, -0.4); }
+    else if (h.readyT > 0) want = P(0.3, -0.7, -0.3, -0.6);
+    else if (h.cock) { want = under ? P(0.26, -0.48, -0.16, -0.9) : P(0.33, -0.02, -0.1, 0.5, -0.2); wantL = P(-0.2, -0.14, -0.55, -0.2); }
+    else want = P(0.2, -0.24, -0.42, -0.25);
+    if (!this._hp) this._hp = P(0.3, -0.7, -0.3, -0.6);
+    const k = Math.min(1, (dt || 0.016) * (h.throwT >= 0 ? 22 : 12));
+    this._hp = this._hp.map((v, i) => v + (want[i] - v) * k);
+    const [x, y, z, rx, rz] = this._hp;
+    L.arm.visible = true; L.arm.position.set(x, y, z); L.arm.rotation.set(rx, 0.1, rz);
+    if (wantL) { this._hpL = (this._hpL || wantL).map((v, i) => v + (wantL[i] - v) * k); L.armL.visible = true; L.armL.position.set(...this._hpL.slice(0, 3)); L.armL.rotation.set(this._hpL[3], -0.1, 0); }
+    else this._hpL = null;
+    return true;
   },
   animateLimbs(cam) {
     const L = this.fpLimbs(), a = this.action, kind = a && a.kind, S = G.U.smooth;
+    if (!a && this.animateHeld(L, this._dtCam)) { L.armL.visible = !!this._hpL; L.tie.visible = L.held.visible = L.env.visible = L.leg.visible = false; return; }
+    if (this.held === null || !this.held) for (const m of Object.values(L.nade)) m.visible = false;
     let t = a ? Math.min(1, a.t / a.dur) : 0;
     L.arm.visible = kind === 'open' || kind === 'close' || kind === 'zip' || kind === 'bag';
     L.armL.visible = kind === 'zip' || kind === 'bag';
@@ -1681,7 +1886,7 @@ G.Me = {
       // kneel, pick the weapon up off the floor, slide it into an envelope, seal it, put it down
       const v = G.Views.evidence.get(a.target);
       cam.updateMatrixWorld();
-      const floor = v ? cam.worldToLocal(new THREE.Vector3(v.x, 0.06, v.z)) : new THREE.Vector3(0.05, -0.5, -0.6);
+      const floor = v ? cam.worldToLocal(new THREE.Vector3(v.x, (v.y || 0) + 0.06, v.z)) : new THREE.Vector3(0.05, -0.5, -0.6);
       const H = new THREE.Vector3(0.05, -0.12, -0.42), E = new THREE.Vector3(-0.07, -0.16, -0.4);
       const { reach, lift, envUp, insert, seal, down } = G.U.bagPhases(t);
       if (v && L.held.userData.wpn !== v.wpn) {
@@ -1744,10 +1949,13 @@ G.Me = {
       p: [r2(this.pos.x), r2(this.pos.y), r2(this.pos.z)], yw: r2(this.yaw), pt: r2(this.pitch),
       hp: Math.ceil(this.hp), mhp: this.maxHp(), ar: Math.round(this.vestCond() * 100), amx: G.Gear.piece(this, 'chest') ? 100 : 0,
       dn: this.down ? 1 : 0, dd: this.dead ? 1 : 0, bl: this.down ? (this.bleed == null ? -1 : Math.ceil(this.bleed)) : 0, bd: this.body ? G.Med.encode(this.body) : null,
-      w: this.cur().def.code, tl: this.tacFlags(this.cur()), cr: this.crouch || this.down ? 1 : 0, ln: r2(this.lean || 0), lr: this.lowReady ? 1 : 0, sd: this.steadying ? 1 : 0, sw: this.stowed ? 1 : 0,
+      w: this.cur().def.code, tl: this.tacFlags(this.cur()), cr: this.crouch || this.down ? 1 : 0, ln: r2(this.lean || 0), lr: this.lowReady ? 1 : 0, sd: this.steadying ? 1 : 0, sw: this.stowed || this.held ? 1 : 0,
+      hk: this.held ? (this.held.kind === 'flash' ? 2 : 1) : 0, hc: this.held && this.held.cock ? 1 : 0, hs: this.held ? this.held.str : 0,
+      rl: this.reloading && this.reloadTotal ? r2(G.U.clamp(1 - this.reloadT / this.reloadTotal, 0, 1)) : -1, in: this.inspectT > 0 && this.inspectDur ? r2(1 - this.inspectT / this.inspectDur) : -1,
+      mc: this.magChk ? r2(this.magChk.back > 0 ? Math.max(0, 1 - this.magChk.back) : this.magChk.k) : -1,
       act: this.action && this.action.kind ? this.action.kind[0] : 0, ap: this.action ? r2(Math.min(1, this.action.t / this.action.dur)) : 0, zt: this.action && this.action.kind === 'zip' ? this.action.target : -1, bt: this.action && this.action.kind === 'bag' ? this.action.target : -1, pl: this.action && this.action.pull ? 1 : 0, mv: r2(this.hspeed || 0),
       cred: Math.round(this.credits), sx: [this.stats.kills, Math.round(this.stats.dmg), this.stats.hs, this.stats.downs, this.stats.revives],
-      kt: this.kitLook(),
+      kt: this.kitLook(), md: this.medCounts(),
     };
   },
 };

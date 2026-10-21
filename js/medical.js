@@ -204,7 +204,7 @@ G.Med = (() => {
     const part = (k) => {
       const p = b.parts[k], f = Math.max(0, p.hp / p.max);
       const fill = p.hp <= 0 ? '#2a1010' : `hsl(${Math.round(f * 105)}, 42%, ${24 + f * 16}%)`;
-      const cls = `fp${p.heavy || p.light ? ' bleed' : ''}${p.heavy ? ' heavy' : ''}${p.frac ? ' frac' : ''}${p.lung || p.gut ? ' organ' : ''}`;
+      const cls = `fp${p.heavy || p.light ? ' bleed' : ''}${p.heavy ? ' heavy' : ''}${p.frac ? ' frac' : ''}${p.lung || p.gut ? ' organ' : ''}${opts.glow && opts.glow.includes(k) ? ' treating' : ''}`; // (glow: parts a teammate is working on)
       const tip = `${NAME[k]}: ${Math.ceil(Math.max(0, p.hp))}/${p.max}${describe(p).length ? ' · ' + describe(p).join(', ') : ''}`;
       const tq = p.tq && TQ[k] ? `<line x1="${TQ[k][0]}" y1="${TQ[k][1]}" x2="${TQ[k][2]}" y2="${TQ[k][3]}" class="ftq"/>` : '';
       return `<path d="${SHAPES[k]}" class="${cls}" style="fill:${fill}" data-body="${k}"><title>${tip}</title></path>${tq}`;

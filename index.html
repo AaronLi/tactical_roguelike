@@ -45,7 +45,7 @@
         <b>WASD</b> move &middot; <b>Space</b> toggle lowered weapon &middot; <b>Shift</b> slow &amp; steady &middot; <b>C</b> crouch &middot; <b>Q / E</b> lean<br>
         <b>LMB</b> fire &middot; <b>RMB</b> aim &middot; <b>MMB</b> ping &middot; <b>R</b> reload (<b>R R</b> dump reload, <b>hold R</b> check the magazine) &middot; <b>I</b> inspect (<b>hold I</b> hold the chamber check open; the mouse turns what you hold) &middot; <b>1 / 2 / wheel</b> swap (<b>wheel</b> while aiming: magnification)<br>
         <b>Mouse back</b> weapon light &middot; <b>Mouse forward</b> laser<br>
-        <b>G</b> grenade &middot; <b>H</b> body &amp; kit (as Tab) &middot; hold <b>B</b> swap with the gun in your backpack &middot; <b>V</b> shout compliance &middot; <b>X</b> fire selector<br>
+        <b>3 / 4 / 5</b> a grenade into your hand (frag and flashbang to start; drag one onto a key's box in the inventory to change it): <b>hold LMB</b> to pull the pin, <b>release</b> to throw, <b>RMB</b> underhand / weak / strong; the key again or 1 / 2 puts it away &middot; <b>H</b> body &amp; kit (as Tab) &middot; hold <b>B</b> swap with the gun in your backpack &middot; <b>V</b> shout compliance &middot; <b>X</b> fire selector<br>
         hold <b>F</b> doors (aim high: open, low: kick), bag evidence, arrest, restrain or revive<br>
         <b>Y</b> vote to leave &middot; <b>M</b> mute &middot; <b>F8</b> echo paths &middot; <b>F9</b> hitboxes &middot; <b>Tab</b> inventory, health &amp; scoreboard &middot; <b>Enter</b> chat &middot; <b>Esc</b> menu
       </div>
@@ -74,6 +74,7 @@
 <div id="hud" class="hidden">
   <div id="crosshair"><i class="t"></i><i class="b"></i><i class="l"></i><i class="r"></i><i class="dot"></i></div>
   <div id="vignette"></div>
+  <div id="flashFx"></div>
   <div id="dmgDirs"></div>
 
   <div id="topbar">
@@ -90,6 +91,7 @@
   <div id="prompt"></div>
   <div id="nadeWarn" class="hidden"><i>&#9650;</i>GRENADE</div>
   <div id="progress" class="hidden"><div id="progressBar"></div><span id="progressText"></span></div>
+  <div id="treatFx" class="hidden"></div>
 
   <div id="vitals">
     <div class="vrow"><span class="vlabel">ARMOR</span><div class="bar armor"><div id="armorFill"></div></div><span id="armorText"></span></div>
@@ -197,6 +199,7 @@
 <script src="js/medical.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/level.js"></script>
+<script src="js/world.js"></script>
 <script src="js/furniture.js"></script>
 <script src="js/gunshot-synth.js"></script>
 <script src="js/gunaudio.js"></script>
@@ -216,6 +219,9 @@
 <script src="js/gunsmith.js"></script>
 <script src="js/route.js"></script>
 <script src="js/loot.js"></script>
+<script src="js/range.js"></script>
+<script src="js/hangar.js"></script>
 <script src="js/game.js"></script>
+<script src="js/demo.js"></script>
 </body>
 </html>

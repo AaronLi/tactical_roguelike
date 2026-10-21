@@ -11,6 +11,15 @@ node serve.js
 
 Then open http://localhost:8080. (Any static file server works, e.g. `python -m http.server 8080`.)
 
+**Weapon demo reel:** http://localhost:8080/?demo plays itself (`js/demo.js`). It starts a solo level with
+nobody else in it, stands you at the longest clear line of sight on the ground floor, and loops through the main
+weapon archetypes:
+- **Rifles and SMGs:** AR-15, AK, MP5, AUG, Thompson.
+- **The rest:** Glock, R700, pump shotgun, M249, revolver, double barrel.
+
+Each one is drawn, fired (and cycled), reloaded with rounds left, run dry, reloaded from empty (the action after
+it), its magazine checked and a chamber check held. A caption says what's showing.
+
 ## Playing on your local network
 
 `node serve.js` listens on every network interface and prints the address others can use, for example
@@ -49,10 +58,11 @@ is. The game itself is a static page: `serve.js` is only a convenience, and any 
 anyone who loses the host keeps trying that code for a minute and rejoins as soon as it's hosting again. The
 join box remembers the last code you joined. In the lobby the host can take a **New code** (anyone already
 there is dropped and needs the new one). Your name stays the same through a refresh too.
-When a teammate readies up (in the lobby or the shop), everyone else hears a two-note chime and sees
+When a teammate readies up (in the lobby, or by getting into the helicopter in the hangar), everyone else hears a two-note chime and sees
 "<name> is ready" in the chat.
 **Friendly fire is on.** Your rounds hit teammates in the way as they would anyone (armour and all; a
-shotgun's pellets each count). The one hit is told who it was, and a death from it says so.
+shotgun's pellets each count). The one hit is told it was friendly fire ("Friendly fire", and a death from it
+says the same), but not whose: the shooter's name isn't shown.
 
 ## How a run works
 
@@ -162,9 +172,25 @@ shotgun's pellets each count). The one hit is told who it was, and a death from 
     in front of the building, among bins, pallets and crates. A double door under a lamp leads in. The
     Bunker's is a **vault door**: thick steel with a locking wheel. It's too heavy to kick: you haul it open
     (hold F, 2.4 s), both leaves together. Bunker walls show no windows outside.
-  - **Apartment.** An apartment block. You come up the stairs onto a landing at one end of a lit hallway,
-    with apartments either side, from 4 at level 1 up to about 10.
+  - **Apartment.** An apartment block of two floors. On each, a lit hallway runs the length of the block with
+    apartments either side, and a stairwell at each end of it: the flight up its outer side, a walkway down
+    its inner side to the hall door, and upstairs a glass-railed landing round the drop. The stairwell doors
+    are glass in a steel frame, a push bar across the middle on the side it swings away from and a pull handle
+    on the other. You and the suspects see through them (as through a window) and rounds go through them,
+    shattering the glass for everyone; the frame still stops you until it's opened. You come in at the
+    foot of the west stairs. From about 7 apartments at level 1 up to about 14.
     - **Units:** each apartment is its own home of a few rooms, with one front door onto the hallway.
+    - **Lofts:** about a third of the ground-floor homes are lofts. The living room goes up both floors,
+      with a stair up its wall to an open upper floor over the rest of the home (bedrooms or a study), railed
+      where it looks down into the living room. A loft's upper floor has no door of its own: you go up
+      through the loft. Upstairs, the rest are single-floor apartments.
+    - **Fighting on two floors:** suspects start on both floors and use the stairs, the hallway stairwells
+      and a loft's own, to come up after you or fall back. They can see and shoot up or down through a
+      stairwell's drop or over a loft's railing, as you can.
+    - **How many people:** double any other level's, for the two floors: suspects ×2 (cap 64 instead of 32)
+      and civilians ×2 (cap 16 instead of 8). That's 10 suspects and 4 civilians on level 1, 32 and 12 by level 8.
+      A loft's upper level counts too: spawn spots are kept where the AI can walk to them, and that includes
+      a loft's upper rooms, which are reached only by the loft's own stair (they were missed at first).
     - **Clearing them:** suspects are spread so every apartment has someone in it where numbers allow. The
       objective "Clear every apartment" is ticked once they all are, with no running count. An apartment
       counts once an officer has been inside it and no free, armed suspect is left in it, so an empty one
@@ -258,7 +284,11 @@ shotgun's pellets each count). The one hit is told who it was, and a death from 
     streetlamps, a city skyline under the stars, with parallax). In an apartment block you're high up: a lit
     tower block across the road, its lower floors below you, the city above. Rounds through these stop in the
     wall behind.
-  - **Placement:** windows aren't put behind a first aid cabinet or the weapon case. Bunkers have none.
+  - **Upstairs:** a window has one id across the whole building, and its glass carries that id, so a round
+    through a second-floor window shatters that window. (Each floor numbers its own windows from 0 while it's
+    planned; the glass used to keep that number, so a shot at an upstairs window broke a ground-floor one.)
+  - **Placement:** windows aren't put behind a first aid cabinet or the weapon case. Bunkers and the hangar
+    have none.
 - **Hands busy, weapon away.** Every interaction (restraining, securing, bagging, doors, ammo, reviving)
   puts your weapon away while you do it, and it takes about a second to draw a primary afterwards (0.65 s for a
   sidearm). Cover each other.
@@ -326,8 +356,8 @@ shotgun's pellets each count). The one hit is told who it was, and a death from 
 - **Civilians** pay out when restrained (hold F);
   killing one costs the shooter. Killing a suspect who has surrendered or been cuffed is unauthorised force
   and is penalised too.
-- The shop shows an after-action report (arrests, kills, civilians secured, casualties). A clean operation,
-  with no civilian deaths and no unauthorised force, pays a bonus.
+- The hangar shows an after-action report (arrests, kills, civilians secured, casualties) when you arrive. A
+  clean operation, with no civilian deaths and no unauthorised force, pays a bonus.
 - **First aid cabinets.** About a third of levels have a white cabinet with a red cross on an indoor wall,
   and some have two.
   - **Using one:** hold F to open it. Your inventory opens with the cabinet's 3×2 grid where the locker would
@@ -357,15 +387,54 @@ shotgun's pellets each count). The one hit is told who it was, and a death from 
     you have no primary, you just take it and the case is left empty.
   - **Co-op:** one case for the whole squad. After someone swaps, the next player can take the weapon they
     left.
-- Between levels you shop with Vex the quartermaster. He doesn't sell weapons. Each visit he has just two
-  pieces of gear, of different kinds (carrier or rig, plate, helmet, belt, backpack), picked by rarity, and
-  three weapon parts, plus supplies. A plate carrier comes with a plate fitted, rolled by rarity (soft
+- Between levels you shop with Vex the quartermaster, in the hangar (below). He doesn't sell weapons. Each
+  visit he has three pieces of gear, of different kinds (carrier or rig, plate, helmet, face shield, belt,
+  backpack), picked by rarity, and four weapon parts, plus supplies. A plate carrier comes with a plate fitted, rolled by rarity (soft
   inserts and steel common, multi-hit ceramic rare) and included in its price. Stock is randomised (the whole squad
   sees the same) with better gear deeper in the run. He has one of each piece of kit he lists: once you
-  buy it, it's sold out until the next visit. He also has four random pouch types and empty magazines for
-  four random guns (up to the level's tier, not just yours), 1–3 of each. About half are the gun's standard
+  buy it, it's sold out until the next visit. He also has five random pouch types and empty magazines for
+  five random guns (up to the level's tier, not just yours), 1–3 of each, and a handful of special ammunition in
+  two different calibers. About half the magazines are the gun's standard
   magazine and the rest a variant (compact, extended, drum, belt box). Supplies no longer sells
   magazines; ball ammo for your calibers is always there.
+- **The hangar** (`js/hangar.js`) is where the squad spends the time between levels: a real place you walk
+  about, on the same map machinery as a level (`G.Level.generateHub`: walls, lights, collision, rays, sound).
+  The squad is there together; the host sends no enemies, and you can't fire or throw in it. It's a 48 × 25 m
+  hall (a 16 m opening in its front wall) with a 48 × 12 m helipad outside it, open to the sky.
+  - **Buying:** look at what you want and press F: a price tag shows what it costs, and what you look at is
+    outlined. Or use a point of sale (look at it, press F) to open the shop panel for it, the same panels as
+    before: Vex's till (the whole stock), a workbench computer (the gunsmith), the warehouse console (your stash
+    and loadout) or a vending machine's screen (supplies). Esc or "Back to the hangar" puts a panel away. Tab opens your stash and loadout from
+    anywhere in the hangar.
+  - **The workshop** (west): a bench for each officer (their name on the front; the computer on your own opens
+    the gunsmith), and a pegboard with the gunsmith's parts for sale, bought into your stash.
+  - **The store** (middle): Vex behind his counter (his till is the full stock; he looks like his portrait: dark hood, a black visor with two orange eyes, a grey respirator, a gold strap across the chest), three pedestals with the
+    gear for sale, each piece shown on its own and turning slowly (a helmet with its face guard on it, a
+    carrier with the plate that comes with it standing beside it and turning with it, a plate or a face guard by itself). The sign
+    on the front says what comes with it (a carrier's or belt's pouches, a fitted plate or face guard) and, in
+    orange, what doesn't (a plate with no carrier, a face guard with no helmet, an empty plate pocket). A
+    bought piece leaves its pedestal, a shelf of pouches, and two vending machines:
+    **ammunition** (the special loads, and ball for every caliber you carry a gun in) and **field supplies**
+    (medical items, flashbangs, frags).
+  - **The warehouse** (east): a robotic crane over the stash, which fetches a crate down to a pallet when you
+    use the console beside it. The console opens your stash and loadout.
+  - **The helicopter** (on the pad): hold F on it to climb in and ready up (you sit in your own seat, the
+    same one for everyone: by place in the squad, with a view out of the open side); hold F again to get out
+    and take your readiness back. When everyone's in it the rotor spins up and, after three seconds, it takes
+    off for the route map; anyone getting out stops it.
+  - **The shooting range** (`js/range.js`) is through the garage door in the hall's north wall (where the
+    gunsmith's parts wall used to be; that wall slid east, toward Vex). Past the yard, a pistol range to the west
+    (three lanes, paper at 5, 7 and 10 m and steel at 12 and 15 m) and a rifle range to the east (four lanes, steel
+    at 25, 50, 75 and 100 m), each lane marked in metres on the floor. Guns work here and nowhere else in the hangar:
+    every round, magazine and box you use is put back as it was when you walk out (`snapshot`/`restore`). Rounds
+    hit targets (`G.Range.hit` from `roundSegment`): paper takes holes, steel swings and rings (a beat later, for
+    the distance), and each lane's console counts its hits (F resets its targets). There is no friendly fire in
+    the hangar, and your shots are heard by the others. The map has the range's 55 rows first (`G.HANGAR_ROWS`), so the
+    hall sits 110 m along: `js/hangar.js` keeps to the hall's own coordinates and adds `RZ` where it meets the world.
+  - **Under it** it's an ordinary level with a flag (`G.Game.hub`; the phase is still `'level'`, which is why
+    movement, other players, collision and sound all work). The host's phase stays `'shop'` and only carries
+    the squad about (`G.Server.updateHub`) and times the helicopter. What's on the shelves is the same
+    stock `js/shop.js` always had, drawn from it (`G.Hangar.refresh`), and a purchase is `G.Shop.buy`.
 - **Shared magazines.** Guns built round the same magazine take each other's (`G.MAG_FAMILY` in `data.js`,
   the magazines in `parts.js` `MAG_FAMS`):
 
@@ -409,11 +478,25 @@ shotgun's pellets each count). The one hit is told who it was, and a death from 
   little faster), a twin-shell carrier, or a quad speed loader (four shells a push). A full tube on the Benelli
   takes 3.6 s bare, 2.9 s with the saddle, 2.6 s with the carrier and 1.9 s with the quad loader.
 - **Pistol stocks.** The P9, G18, G19 and Auto-9 have a stock lug: a folding stock, a brace or a carbine stock
-  kit cuts recoil by 14–30% at some cost to handling.
+  kit cuts recoil by 14–30% at some cost to handling. The stock is drawn in first person too (its tube and rails
+  along the bottom of the view; not its pad, which would fill the screen aiming), as well as on the gun in the
+  gunsmith and in other players' hands.
 - If you go down you can still shoot your sidearm. Down, you keep bleeding, a sixteenth as fast as standing
   but nothing clots any more: a heavy bleed at 15% blood gives about two minutes, a light one several, and when
-  the blood's gone you're KIA until the next level. A teammate holds **F** to check you and treats you from their
-  Tab screen. Stopping every bleed only **stabilises** you (the clock stops: the HUD says Stable); to get you up
+  the blood's gone you're KIA until the next level, watching through a camera on the right side of a teammate's helmet, up
+  by the crown, tilted a little in and down so you see their arms, hands and weapon. It's a wide, fisheye-ish
+  lens: the field of view is 20% wider than yours and the edges curve in (a barrel distortion drawn by a small
+  render-to-texture pass in `js/render.js`, only while spectating). It follows where they look;
+  click to switch to another; your own gun isn't drawn in it. **Your body stays where you fell**, a ragdoll
+  with its kit on, for everyone to see, you included (you have no body in first person, so one is made when you
+  die, dressed as you are, `G.Views.spawnSelfBody`); you're a whole officer again next level. A teammate holds **F** to check you and treats you from their
+  Tab screen, with their own medical gear or with yours: click a part and the menu lists what they carry
+  and what you carry (everyone's counts are in their state), and your item comes off you when it lands. When
+  more than one person's gear is on offer, each entry shows its item's icon, its owner's emblem and name
+  ("Seal", or "you") and how many they have. If you used it first, or it's no longer needed, it isn't used. **While they work on you, your screen says so:** a green panel under the crosshair
+  for each teammate treating you ("Seal is applying chest seal to your thorax") with a bar for how far along
+  they are, and that part lit on your body figure (the HUD's, and the one in your Tab screen). It's there from
+  the moment they start until they finish or stop (the host only tells the one it's being done to). Stopping every bleed only **stabilises** you (the clock stops: the HUD says Stable); to get you up
   they also have to get your blood over 50% (blood bags), then revive you. If the whole squad is down, the run
   ends.
 - **Injuries** (`js/medical.js`). There's no health bar and no medkit; your body is seven parts with their
@@ -740,7 +823,25 @@ shotgun's pellets each count). The one hit is told who it was, and a death from 
       put two slugs on top of the buckshot.
     - **Buying:** the quartermaster always sells ball (or buckshot) for every caliber you own a gun in, and
       empty magazines. Each visit he also has one random special load, a handful of rounds.
-  - **Grenades and medical items** are items too: G throws your first grenade, and medical items are used
+  - **Flashbangs** (¢150): a 1.5 s fuse, and they hurt nobody. Anyone with an eye on one when it goes off
+    (in sight of it, within about 14 m) is blinded: suspects for 1.5 to 6 s, more the closer and the more
+    squarely they were facing it. Blinded, a suspect can't see you, stands frozen and loses nerve, and is far
+    easier to talk down (shout while they're dazed); civilians panic. On you (and your teammates: they work on
+    the squad too): the screen goes white and fades back over a few seconds, half as bad facing away and not
+    at all round a wall, and your ears ring with everything muffled for a while. It's heard 30 m off through
+    the building.
+  - **Throwing:** a grenade's key (3, 4, 5) brings it into your hand. While it's there its arc shows, dotted, to a
+    ring where it'll go off (the throw it'll be, from the same flight steps as the real thing, so it's right).
+    Hold left click to pull the pin (brighter), let go to throw. Right click picks the throw: underhand (a lob
+    from the hip, about 7 m, rolling on along the floor), weak (about 13 m) or strong (about 21 m). Grenades
+    bounce off walls, floors and ceilings, losing speed each time, then roll till friction stops them. You keep
+    the next one in hand while you have more; out of them, the weapon comes back up.
+  - **Your squad's hands:** teammates see you reload (the gun canted, the magazine out in the support hand, down to
+    a pouch and back up with the new one, seated), inspect the gun (turned over to look along it), check the
+    magazine (out of the gun and up in front of you), hold a grenade, draw it back (high overhand, low
+    underhand) and throw it. Suspects changing magazines show it the same way. (The magazine shows on the 52 guns
+    that take a detachable one; shotguns, revolvers, bolt-actions and the like load loose rounds.)
+  - **Grenades and medical items** are items too: medical items are used
     on the body in the Tab screen (H opens it).
   - **Locker:** everything else waits in your locker, a 9×7 grid that stays at the quartermaster's between
     levels.
@@ -763,7 +864,7 @@ shotgun's pellets each count). The one hit is told who it was, and a death from 
   - **Ammo resupply** refills your guns and every magazine and box you own. There are no ammo caches in
     levels, so this is how you restock.
   - **Spare magazines or boxes** for each of your guns.
-  - **Medical items** (all six, see Injuries) **and frag grenades.**
+  - **Medical items** (all six, see Injuries), **frag grenades and flashbangs.**
 
   Anything you buy needs room: it goes into a pouch or pocket that takes it, otherwise into your locker. Suppressors are muzzle parts from the gunsmith:
   enemies only hear suppressed shots from about 6 m instead of 28 m, so you can thin out a room before it wakes up.
@@ -805,7 +906,9 @@ shotgun's pellets each count). The one hit is told who it was, and a death from 
     weapon is calibrated so its standard build keeps its stats, and changing a part moves them from there.
   - **Missing parts:** handguards and pistol grips can't be left off. Running without a stock is allowed,
     but costs a lot of recoil.
-  - **Stats:** parts change ergonomics (aim and draw speed), recoil, aimed and hip spread, muzzle velocity
+  - **Stats:** parts change ergonomics (the gun's ergonomics number is its class's base plus its parts; what
+    counts in play is the parts' total change: each point is about 1% on aim-down-sights speed, draw speed and how
+    fast the muzzle comes back after a shot, limited to 0.55–1.45×), recoil, aimed and hip spread, muzzle velocity
     (damage and range), weight (movement speed), tube capacity, and sight magnification.
   - **Magazines aren't parts.** Compact, extended, drum and belt-box variants are magazine items (bought
     with the magazines on the Stock page), each with its own capacity, size and handling. Whichever one is
@@ -1030,14 +1133,20 @@ shotgun's pellets each count). The one hit is told who it was, and a death from 
   magazine or tube; a chamber check shows it (brass in the open port, or nothing). It fires the chambered
   round and the action feeds the next, so a full M4 fires 31. A reload with a round chambered keeps it (30+1);
   run dry, the reload ends by sending a round home (29+1).
-- **Reloads are put together from what the gun needs** (`Me.reloadTimes`, `js/vmanim.js magClip`): the magazine
-  change, then from empty the action.
+- **The action is its own animation, apart from the reload** (`Me.workAction`, `js/vmanim.js actionPose`). A
+  reload is only the magazine change (or the shells, the belt); run dry, the action follows it, and a partial
+  reload has none. The rounds move with the action: the case it held is thrown as it comes back, and a round is
+  fed as it goes home. One pose of each action (slide, charging handle, cocking handle, bolt, pump, lever) at
+  any pull serves every use of it: a rack, a release, the chamber check.
   - **Bolt hold-open** (`G.boltHold`): every pistol with a slide, the AR-15 family, the SCARs, G36, AUG,
     Tavor, FAL, M14/Mk14, SR-25, Barrett, MPX, MP7, Vector, Skorpion and SVD lock open on their last round. From
-    empty it's the magazine change and a thumb on the bolt catch (or the slide stop), +0.3 s, and the slide
-    (or bolt) slams forward.
-  - **Without one** (the AK family, MP5, open-bolt SMGs, bolt-actions): from empty, the magazine change and then
-    the action racked by hand, +0.6 s.
+    empty, the magazine change and then a thumb on the bolt catch (or the slide stop), 0.4 s: the slide (or
+    bolt) slams forward on a round.
+  - **Without one** (the AK family, MP5, open-bolt guns, the belt-feds, bolt-actions): from empty, the magazine
+    change and then the action racked by hand, 0.6 s (a bolt-action's, 0.7 s).
+  - **No pause between them:** from empty, the magazine change stops as the magazine seats and the hand goes
+    straight on to the catch or the handle (`Me.SEAT`), rather than back to the handguard first. So an empty
+    reload is the seating plus the action, a little quicker than a tactical one that keeps its chambered round.
   - **Not empty:** just the magazine change. Pull a magazine and the chambered round is still
   there for one more shot; put one in by hand and the chamber's empty: the first pull of the trigger, or R,
   racks a round in. A pump's tube holds 6 with one more chambered. The round in the chamber keeps its own
@@ -1045,34 +1154,62 @@ shotgun's pellets each count). The one hit is told who it was, and a death from 
   Open-bolt guns (Uzi, MAC-10, PPSh, Thompson, AA-12, the belt-fed guns, the minigun) have nothing waiting in
   the chamber, and neither do guns whose chambers are their magazine (revolvers, break actions, the Garand's
   clip, launchers, the crossbow, the railgun).
+- **Bolt-actions are worked by hand** (R700, Mosin, AWM; `Me.boltGun`). A shot leaves its case in the chamber
+  until you work the bolt, which you do by letting go of the trigger (hold it to stay on the sight and watch
+  the hit) or clicking. That's the same rack as a dry chamber: the right hand on the knob, up, back (the case
+  flies), forward, down, 0.7 s. The time between shots is the same as before.
 
 `js/vmanim.js` animates the first-person weapon.
 
 - **Arms:** both run from fixed shoulders to wherever the hands need to be, so a hand can leave the gun,
   fetch a magazine from the pouch on your hip and come back.
-- **Moving parts** on the gun models: magazine, AR charging handle, AK side bolt handle, HK cocking tube,
-  bullpup side handle, open-bolt top knob, pistol slide, pump, bolt, lever, belt-feed cover, break-open
-  barrels and revolver cylinder.
+- **Moving parts** on the gun models: magazine, cocking handle, pistol slide, pump, bolt, lever, belt-feed
+  cover, break-open barrels and revolver cylinder.
+- **Every cocking handle is where the real one is** (`js/gunmodels.js cockHandle`, the platform's `cock` in
+  `js/parts.js`):
+  - **AR-15 T-handle** at the back of the upper: M4, HK416, M27, SR-25, MPX, AR-9 (and the Mk14, built on an
+    AR upper here).
+  - **Right-side knob:** the AK family, Galil, SVD, VSS, Saiga, Vepr and RPK; the op rods of the Garand and M14;
+    the Benelli's and PPSh's bolt handles; the belt-feds; the Barrett's big one.
+  - **Left side, forward:** the SCARs (a knob), the AUG and Tavor; folding levers on the FAL, Vector and AA-12.
+  - **Others:**
+    - the HK tube over the handguard, front left (MP5, MP5SD), whose tab slides along a tube that stays put;
+    - a T at the rear of the top (G36, MP7);
+    - a knob on top (Uzi, MAC-10, Thompson, and the FAMAS under its carry handle);
+    - a knob on each side (Skorpion, and the P90's low at the front).
+  - **Moving with the bolt:** a handle fixed to the bolt carrier jumps back and home with every shot (AK,
+    SCAR, AUG, op rods, PKM...). On an open-bolt gun (Thompson, MAC-10, PPSh, PKM) it sits back, cocked, while
+    there's a round to fire, and goes forward with the last one. Racking leaves it back.
+  - **The hand takes the handle**, not a point near it, and stays on it through the pull. The right hand
+    follows the bolt knob through its lift and draw.
 - **Reloads by action type:**
   - **Magazine:** the gun lifts and cants so you see the well. You strip the mag, drop it, fetch a new one,
     seat it and slap it home. Pistol magazines fall free when you hit the release.
-  - **Empty reloads add a rack:** AR charging handle, AK/side handle, HK slap, pistol slide or bolt.
+  - **Empty reloads are followed by the action:** the bolt catch or slide stop, or a rack of the charging
+    handle, cocking handle, slide or bolt.
   - **Shell by shell:** tube shotguns, the lever gun, the Mosin and the M32 roll the port toward you and
     load one round at a time, then rack once at the end if they were empty.
   - **Revolver:** swing the cylinder out, muzzle up to eject, then the speed loader in and flick it shut.
   - **Break-open:** the double, sawed-off and derringer open, take shells and close.
-  - **Belt-fed:** open the cover, swap the box, lay the belt, close it.
+  - **Belt-fed:** open the cover, swap the box, lay the belt, close it (from empty, the charging handle after:
+    pushed home on an M249 or M60, left back on a PKM).
   - **Others:** a Garand en-bloc clip, a crossbow bolt laid on the rail, and akimbo magazines both dropping
     at once.
-- **Between shots:** your right hand works the bolt on bolt-actions, and your left rides the pump.
-- **Inspect (I):** show the left side, then the top and right, then a chamber check (charging handle or
-  bolt handle eased back, a press-check on pistols, the pump or lever cracked, the cylinder swung, the
-  barrels broken, or a glance at the magazine). Any action cancels it.
+- **Between shots:** your left hand rides the pump (a bolt-action's bolt is worked as a rack, above).
+- **Inspect (I):** show the left side, then the top and right, then a chamber check: the gun's own action
+  worked part way and held there (`CHECK`: a pistol's slide a third back, a charging or cocking handle 60%, a
+  bolt turned up and half back, the pump or lever cracked), or the cylinder swung, the barrels broken, or a
+  glance at the magazine. Any action cancels it.
+- **The chamber, seen through the port** (`chamberView`): closed, all the port shows is the bolt (on a pistol,
+  the barrel hood, which stays put as the slide moves). Work the action and the bolt face comes back with it,
+  uncovering the round in the chamber, or an empty chamber; a pistol's press check opens a gap behind the hood
+  where the case shows. A gun locked open on its last round shows the bolt back and the chamber empty, and a
+  cocked open-bolt gun's chamber is empty with the bolt back.
   - **Hold I** and it stops at the chamber check and stays there, turned so you can see into the action:
-    - a rifle canted with its port toward you: the bolt locked back (your hand goes back to the handguard) and
-      the round, if there is one, in a dark open port on the right. A bolt gun's bolt stays open on top while
-      your hand goes back to the grip.
-    - a pistol side-on with the slide eased back: its slide has a real ejection port, with the round under it.
+    - a rifle canted with its port toward you, your hand holding the handle back: the bolt face back and the
+      round, if there is one, in the open port on the right. A bolt gun's bolt up and half back, your hand on
+      the knob, its open top toward you.
+    - a pistol side-on with the slide eased back: its slide has a real ejection port, the case behind the hood.
     - a break-action low, barrels dropped, the shell heads in the breech; a revolver's cylinder swung out, a
       brass case head on its back for each round in it.
     - whatever's chambered is what you see.
@@ -1109,8 +1246,10 @@ shotgun's pellets each count). The one hit is told who it was, and a death from 
     rest on their side. They stay on the floor; the oldest are recycled after about 180.
   - **Whose cases:** your own come from your first-person gun's port. Other players' and suspects' cases
     come from beside their muzzle.
-  - **Sound:** each real impact makes its own sound, panned to where it is. The synthesized casing sound
-    that used to be baked into every gunshot is off.
+  - **Sound:** each real impact makes its own sound, placed in 3D where it landed (HRTF, like the other
+    sounds in the world: left and right, in front and behind, above and below), quieter with distance, and
+    muffled if there's a wall between you and it. The synthesized casing sound that used to be baked into
+    every gunshot is off.
     - Brass rings in a few inharmonic modes, at a pitch set by the case's length: about 4.2 kHz for a 9 mm
       case, 2.6 kHz for 5.56, 1.3 kHz for .50 BMG.
     - Steel rings lower and shorter, aluminium higher and deader.
@@ -1177,7 +1316,8 @@ On top of the baked room reverb, echoes are **ray-traced through the level** for
 | Middle click | Ping: a marker on the spot you're looking at, with your animal and your name in its colour, that the whole squad sees through walls for 6 s (it says nothing about what's there) |
 | Mouse back / forward | Weapon light / laser: a tap switches it on or off (each gun remembers its own); held, it's on only while you hold it. In a level they don't navigate the browser: the page keeps a back and a forward history entry of its own and turns a side-button navigation into the button press. Outside a level, back works as usual (twice to leave). |
 | I (hold) | Inspect your weapon; held, the chamber check stays open; mouse side to side rolls the gun, up and down pitches it |
-| G / H | Frag grenade / open your body and kit (as Tab) |
+| H | Open your body and kit (as Tab) |
+| 3 / 4 / 5 | Bring the grenade on that key into your hand (frag on 3 and flashbang on 4 to start; the weapon goes down). Hold LMB to pull the pin and draw back, release to throw; RMB picks underhand, weak or strong. The key again, or 1 / 2, puts it away. Drag a frag or flashbang onto a key's box under Equipment in the inventory to put that kind on it; × clears it. Medical gear doesn't go on them |
 | B (hold) | Swap the gun in your hands with the next one in your backpack |
 | V | Shout compliance ("Police! Show me your hands!") |
 | X | Fire selector: semi / auto (or burst), on guns that have one |
@@ -1211,13 +1351,49 @@ Two checklists cover what a new piece of content touches and how to check it:
   layout, the approach from outside, reachability, furniture and decoration, see-through pieces, lighting,
   surfaces and echo, spawns, doors and objectives.
 
+## Level geometry (in progress: 3D levels)
+
+Levels are moving from a 2D tile grid to real 3D shapes. Every solid thing in a level (floor, ceilings,
+walls, furniture, fences, doors, windows) is a 3D solid in `G.World` (`js/world.js`), indexed in a 3D spatial
+hash, and every ray (rounds, sight, the AI's line of sight), collision and ground query is answered from those
+solids at any height. Doors and windows are dynamic: their solids change as they open, close and break.
+
+- **Done:** the solid store and its queries, the converter from planned levels (`G.World.fromTileMap`), and
+  every ray, sight, collision and ground query in the game switched to it. On all eight level types it
+  matches the old tile queries on over 99.5% of random rays. The differences are old bugs: an open door
+  leaf that stuck out of its tile hid the wall behind it, rays slipped over a zero-thickness roof edge, and
+  you snagged on the seams between wall tiles. It's 1.5 to 3 times faster.
+- **Buildings of several floors** (`G.Level.stack`): each floor is planned as a storey (`plan`), then they're
+  stacked 4.3 m apart into one world. A flight of stairs is about 20 real steps, each a solid block, so
+  rounds and sight stop on them, and bodies, grenades and anything dropped land on the treads. Walking, though,
+  you and the suspects take a flight as a smooth slope through its steps (`G.World.rampAt`), so you rise and
+  fall steadily instead of juddering from tread to tread; its side still stops you (you can't step onto it
+  half way up), as does its high end from underneath. A drop is a hole in the floor above a flight or a
+  double-height room, with railings round it. You and the suspects step up anything 32 cm high or less
+  (`G.World.STEP`), and are stopped by the ceiling over you wherever you are. Grenades bounce off floors, steps and ceilings at any height; bodies, dropped weapons,
+  blood and evidence land on the floor they fall on.
+- **Navigation across floors:** the AI's flow fields span every floor. A flight's cells connect only along
+  it and to the floor at its foot, and its head connects to the floor above (`G.Level.nav`, `flowStep`). On
+  the stairs you count as on the floor at its foot until you step off the top (`G.Level.floorAt`).
+- **Sound across floors:** what suspects hear (shots, doors, footsteps, blasts, breaking glass) travels through
+  the building on every floor: up and down the stairs, straight through a drop (a stairwell, a loft's living
+  room), and through a floor heavily muffled (15 m more), so a shot overhead is heard but footsteps aren't.
+  Gunshot echoes and room tone are traced on the floor the shot is on, and impacts and casings sound like the
+  surface of the floor they land on.
+- **Lights:** the 12 real lights go to the lamps on your own floor first; they cast no shadows, so a lamp
+  downstairs would otherwise light the floor above through its slab.
+- **Still on grids:** the generators plan each floor on a grid.
+- **Next:** meshes built from the solids, and more buildings that go up (houses with an upstairs, a warehouse
+  mezzanine, balconies).
+
 ## Code layout
 
 | File | Purpose |
 | --- | --- |
 | `js/data.js` | All weapons, armour, enemies and their kit, wounds and themes. Tune the game here. |
 | `js/callsigns.js` | Squad animals: the emblems, and the shoulder and back name patches |
-| `js/level.js` | Level generator, collision, raycasting, BFS flow fields |
+| `js/level.js` | Level generator (layouts planned on grids), BFS flow fields; its ray and collision queries hand over to `js/world.js` |
+| `js/world.js` | The level as 3D solids in a 3D spatial hash: raycasts (through glass), sight lines, standing collision, ground and ceiling heights; doors and windows as dynamic solids |
 | `js/furniture.js` | Room types, furniture layout and collision boxes, furniture/decor meshes |
 | `js/server.js` | Host-only authority: phases, enemy AI, damage, objectives and the vote to leave |
 | `js/net.js` | PeerJS star-topology transport (the host is also its own client) |
@@ -1228,7 +1404,9 @@ Two checklists cover what a new piece of content touches and how to check it:
 | `js/parts.js` | Weapon platforms, parts catalogue, builds and how they change stats |
 | `js/gunmodels.js` | Procedural gun models built from parts (first person, third person, gunsmith) |
 | `js/gunsmith.js` | The gunsmith: 3D weapon view and part fitting |
-| `js/hud.js`, `js/shop.js` | UI |
+| `js/hud.js`, `js/shop.js` | UI; the shop's stock and its buying |
+| `js/hangar.js` | The hangar between levels: workshop, store, warehouse, helicopter, and looking-to-buy |
+| `js/range.js` | The shooting range behind the hangar: lanes, targets, and giving your ammunition back |
 | `js/gear.js` | Carriers, plates, helmets, belts; the grid inventory, ammo items and protection |
 | `js/casings.js` | Ejected cases: client-side physics, rendering, and their impact sounds |
 | `js/invui.js` | The Kit tab: equipment slots, pouches, locker, drag and drop |

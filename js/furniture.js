@@ -605,6 +605,8 @@ G.Furniture = (() => {
     yard: { must: 'bbq', wall: ['shed', 'planter', 'bbq', 'shed'], center: ['hedge', 'patio', 'hedge', 'shed'], small: ['planter', 'bin', 'planter'], floor: 'grass', out: 1 },
     // the warehouse floor and loading dock are laid out on their own (plan())
     hall: { floor: null }, dock: { floor: 'pave' },
+    // the hangar between levels (js/hangar.js): dressed by hand, and the helipad outside it
+    hangar: { floor: 'pave', bare: 1 }, pad: { floor: 'pave', bare: 1, out: 1 }, range: { floor: 'pave', bare: 1, out: 1 },
     // outside: the street in front of a house, the lot in front of a building (bins, pallets, crates)
     street: { must: 'bin', wall: ['bin', 'planter', 'bin'], center: [], small: ['planter', 'bin'], floor: 'pave', out: 1 },
     lot: { must: 'crates', wall: ['pallet', 'bin', 'crates', 'pallet'], center: [], small: ['bin', 'cardboard'], floor: 'pave', out: 1 },
@@ -1140,8 +1142,18 @@ G.Furniture = (() => {
         if (spec.floor === 'wood' && rnd() < 0.5) { tex.rotation = Math.PI / 2; }
         const fm = mat(0xffffff, spec.floor === 'tile' ? 0.45 : spec.floor === 'grass' ? 1 : 0.85, 0, { map: tex });
         // a lawn runs under the fences to the edge; inside, the floor stops at the walls
+        let drop = false;
+        for (let z = rm.z; z < rm.z + rm.h && !drop; z++) for (let x = rm.x; x < rm.x + rm.w; x++) if (t[z * W + x] === 5) { drop = true; break; }
         if (rm.out) place(new T.PlaneGeometry(w + 2 * TS, d + TS), fm, x0 + w / 2, 0.004, z0 + d / 2, 0, -Math.PI / 2);
-        else place(new T.PlaneGeometry(w, d), fm, x0 + w / 2, 0.004, z0 + d / 2, 0, -Math.PI / 2);
+        else if (!drop) place(new T.PlaneGeometry(w, d), fm, x0 + w / 2, 0.004, z0 + d / 2, 0, -Math.PI / 2);
+        else for (let z = rm.z; z < rm.z + rm.h; z++) for (let x = rm.x; x < rm.x + rm.w;) { // (round a drop in the floor: a strip per run of floor)
+          if (t[z * W + x] === 5) { x++; continue; }
+          let x1 = x; while (x1 + 1 < rm.x + rm.w && t[z * W + x1 + 1] !== 5) x1++;
+          const g = new T.PlaneGeometry((x1 - x + 1) * TS, TS), uv = g.attributes.uv;
+          for (let k = 0; k < uv.count; k++) uv.setXY(k, (x - rm.x + uv.getX(k) * (x1 - x + 1)) / rm.w, (rm.z + rm.h - 1 - z + uv.getY(k)) / rm.h); // (the room's texture, continuous across strips)
+          place(g, fm, (x + x1 + 1) / 2 * TS, 0.004, (z + 0.5) * TS, 0, -Math.PI / 2);
+          x = x1 + 1;
+        }
       }
       if (rm.out) continue; // no rugs, skirting, pictures or windows out in the garden
       if (spec.rug && rnd() < spec.rug && rm.w >= 3 && rm.h >= 3) {
@@ -1151,7 +1163,7 @@ G.Furniture = (() => {
       }
       let pics = 0, wins = 0, clock = rm.type === 'kitchen' || rm.type === 'office' || rm.type === 'breakroom';
       for (let z = rm.z; z < rm.z + rm.h; z++) for (let x = rm.x; x < rm.x + rm.w; x++) {
-        if (t[z * W + x] === 1) continue; // a wall corner inside the room's rectangle
+        if (t[z * W + x] === 1 || t[z * W + x] === 5) continue; // a wall corner inside the room's rectangle (or a drop)
         for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
           const nx = x + dx, nz = z + dz;
           if (inRoom(rm, nx, nz) || L.tile(map, nx, nz) !== 1) continue;

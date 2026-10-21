@@ -403,7 +403,7 @@ G.GunModels = (() => {
       case 'pdw':
         k.cyl(0.0155, 0.14, M.black(), -0.14, -0.002);
         for (const x of [-0.016, 0.016]) k.box(0.006, 0.01, 0.16, m, -0.18, 0.006, x);
-        k.box(0.044, 0.08, 0.014, M.rubber(), -0.19, -0.02);
+        if (!buildingVM) k.box(0.044, 0.08, 0.014, M.rubber(), -0.19, -0.02); // (its pad: right in front of your eye, aiming, so first person leaves it out)
         break;
       case 'wire':
         k.cyl(0.004, 0.195, M.blued(), -0.195, 0.0, 0.012); k.cyl(0.004, 0.195, M.blued(), -0.195, 0.0, -0.012);
@@ -579,6 +579,30 @@ G.GunModels = (() => {
     if (t === 'ext' || t === 'ambi') k.box(0.012, 0.009, 0.016, M.black(), -0.008, 0.021, -0.02);
     if (t === 'ambi') k.box(0.012, 0.009, 0.016, M.black(), -0.008, 0.021, 0.02);
   }
+  // A cocking handle. h: f, y, x (where it sits), travel (how far back it comes), style, sz (its size), recip (it
+  // rides the bolt: it moves when the gun fires). Styles: 'knob' (a stem out the side with a ball on it: an AK's,
+  // an op rod's), 'pair' (one each side: a Skorpion's, a P90's), 'tube' (HK: a tab in a slot along a tube that stays
+  // put), 'top' (a knob standing up on top: an Uzi's, a Thompson's), 'tee' (a T at the back of the top, like an
+  // AR's: an MP7's, a G36's), 'fold' (a flat lever along the side with its tab folded out: a FAL's, a Vector's).
+  // Sets h.grab, where the hand takes it ([f, y, x]); returns the part that moves (the tube's built outside it).
+  function cockHandle(k, h) {
+    const st = h.style || 'knob', s = Math.sign(h.x) || 1, z = h.sz || 1, B = M.black(), St = M.steel();
+    if (st === 'tube') k.cyl(0.006, 0.09, B, h.f - 0.07, h.y, h.x + 0.002);
+    const p = k.part(h.f, h.y);
+    k.into(p, h.f, h.y);
+    if (st === 'tube') { k.box(0.012, 0.016, 0.01, B, h.f - 0.006, h.y, h.x - 0.006); h.grab = [h.f, h.y + 0.006, h.x - 0.02]; }
+    else if (st === 'top') { k.cylY(0.004, 0.014, St, h.f, h.y + 0.007, h.x); k.box(0.012, 0.009, 0.014, B, h.f - 0.007, h.y + 0.017, h.x); h.grab = [h.f, h.y + 0.032, h.x]; }
+    else if (st === 'tee') { k.box(0.008, 0.006, 0.03, B, h.f - 0.015, h.y, h.x); k.box(0.034, 0.007, 0.008, B, h.f - 0.019, h.y, h.x); h.grab = [h.f - 0.015, h.y + 0.014, h.x]; }
+    else if (st === 'fold') { k.box(0.004, 0.012 * z, 0.032, B, h.f - 0.016, h.y, h.x); k.box(0.016 * z, 0.01 * z, 0.008, B, h.f - 0.004, h.y, h.x + s * 0.009 * z); h.grab = [h.f, h.y + 0.006, h.x + s * 0.028 * z]; }
+    else for (const side of st === 'pair' ? [-1, 1] : [s]) { // (a pair: the left hand takes the left one)
+      const x = side * Math.abs(h.x);
+      k.cylX(0.004 * z, 0.022 * z, St, h.f, h.y, x);
+      k.sphere(0.0065 * z, B, h.f, h.y, x + side * 0.012 * z);
+      if (side === (st === 'pair' ? -1 : s)) h.grab = [h.f, h.y + 0.006, x + side * 0.026 * z];
+    }
+    k.into(null);
+    return p;
+  }
   // Sights by type. top = height of the rail / mounting surface.
   function sightOf(k, o, top, L, bl, br, front, ofs) {
     const frontF = L + Math.min(bl * 0.82, bl - 0.03);
@@ -667,7 +691,7 @@ G.GunModels = (() => {
       k.into(null);
       anim.lever = p;
     }
-    if (rcv === 'ar' || o.ch) {
+    if ((rcv === 'ar' && !o.cock) || o.ch) {
       k.tag('charging');
       const p = k.part();
       k.into(p);
@@ -675,24 +699,21 @@ G.GunModels = (() => {
       k.into(null);
       anim.ch = p;
     }
-    // the handle you rack on everything that isn't an AR or a bolt/pump/lever/break action:
-    // AK side bolt carrier handle, HK cocking tube, bullpup side handle, top knob on open-bolt SMGs
+    // the handle you rack on everything that isn't an AR or a bolt/pump/lever/break action: AK side carrier
+    // handle, HK cocking tube, bullpup side handle, top knob on open-bolt SMGs, an op rod's; or the platform's own
+    // (o.cock, over these: js/parts.js)
     let handle = null;
     if (rcv !== 'ar' && rcv !== 'break' && !o.bolt && !o.pump && !o.lever && !o.ch) {
       const H = o.H || 0.085;
-      if (rcv === 'ak') handle = { f: L * 0.68, y: 0.002, x: 0.026, travel: 0.085 };
+      if (rcv === 'ak') handle = { f: L * 0.68, y: 0.002, x: 0.026, travel: 0.085, recip: true };
       else if (rcv === 'bullpup') handle = { f: L * 0.86, y: 0.018, x: -0.03, travel: 0.08 };
       else if (o.feed) handle = { f: L * 0.55, y: -0.012, x: 0.03, travel: 0.09 };
-      else if (rcv === 'box' && (o.grip || 0) >= 0.05) handle = { f: L * 0.6, y: H * 0.45 + 0.008, x: 0, travel: 0.06 }; // top knob (Uzi, MAC)
-      else if (rcv === 'box') handle = { f: L + 0.025, y: 0.024, x: -0.03, travel: 0.05 }; // HK cocking tube, front left
-      else handle = { f: L * 0.62, y: 0.016, x: 0.024, travel: 0.07 };
-      const p = k.part(handle.f, handle.y);
-      k.into(p, handle.f, handle.y);
-      if (rcv === 'box' && handle.x < 0 && !o.feed) { k.cyl(0.006, 0.07, M.black(), handle.f - 0.035, handle.y, -0.028); k.box(0.012, 0.016, 0.01, M.black(), handle.f - 0.006, handle.y, -0.036); }
-      else { k.cylX(0.004, 0.022, M.steel(), handle.f, handle.y, handle.x); k.sphere(0.0065, M.black(), handle.f, handle.y, handle.x + Math.sign(handle.x || 1) * 0.012); }
-      k.into(null);
-      anim.handle = p;
+      else if (rcv === 'box' && (o.grip || 0) >= 0.05) handle = { f: L * 0.6, y: H * 0.45, x: 0, travel: 0.06, style: 'top' }; // (Uzi, MAC)
+      else if (rcv === 'box') handle = { f: L + 0.025, y: 0.024, x: -0.03, travel: 0.05, style: 'tube' }; // (HK, front left)
+      else handle = { f: L * 0.62, y: 0.016, x: 0.024, travel: 0.07, recip: true }; // (an op rod or a bolt handle: Garand, M14, PPSh, Benelli)
     }
+    if (o.cock) handle = Object.assign(handle || {}, o.cock);
+    if (handle) anim.handle = cockHandle(k, handle);
 
     k.tag('grip');
     if (o.gripT !== 'none') grip(k, gf, o.gm || fm, o.gripT || (rcv === 'ak' ? 'wood' : 'ar'));
@@ -784,7 +805,7 @@ G.GunModels = (() => {
       sy: sight.sy, fSight: sight.fSight, relief: sight.relief,
       muzzles: [[front, by, 0]],
       grip: [gf + 0.005, -0.075, 0], support: [support, o.pump ? -0.03 : -0.028, 0],
-      anim, magAt, handle, port, chamberAt, ch: rcv === 'ar' || o.ch ? [-0.006, 0.026, 0] : null, bolt: o.bolt ? [o.bolt, 0.01, 0.068] : null,
+      anim, magAt, handle, port, chamberAt, ch: (rcv === 'ar' && !o.cock) || o.ch ? [-0.006, 0.026, 0] : null, bolt: o.bolt ? [o.bolt, 0.01, 0.068] : null,
     };
   }
 
@@ -801,11 +822,11 @@ G.GunModels = (() => {
     k.prof([[0, sy], [0, 0.026], [len - 0.012, 0.026], [len, 0.02], [len, sy]], w / 2, sm, -w / 4, null, 0.001);
     k.prof([[0, sy], [0, 0.026], [p0, 0.026], [p0, sy]], w / 2, sm, w / 4, null, 0.001);
     k.prof([[p1, sy], [p1, 0.026], [len - 0.012, 0.026], [len, 0.02], [len, sy]], w / 2, sm, w / 4, null, 0.001);
-    k.box(w / 2 - 0.002, 0.0015, p1 - p0, M.rubber(), p0, sy + 0.0008, w / 4); // (the barrel hood under it)
     for (let i = 0; i < 5; i++) k.box(w + 0.001, 0.016, 0.0025, M.rubber(), 0.01 + i * 0.006, 0.014);
     if (sl.vent) for (let i = 0; i < 4; i++) { const vf = len * 0.45 + i * 0.022; if (vf + 0.012 > p0 - 0.002 && vf < p1 + 0.002) continue; k.box(w + 0.002, 0.006, 0.012, M.rubber(), vf, 0.024); } // (none over the port)
     k.into(null);
     anim.slide = slide;
+    k.box(w / 2 - 0.002, 0.0015, p1 - p0, M.rubber(), p0, sy + 0.0008, w / 4); // (the barrel hood under it: the barrel's, so it stays put)
     let front = len;
     if (sl.comp) { k.box(w, 0.026, 0.03, sm, len, 0.014); front += 0.03; }
     k.tag('base');
@@ -819,7 +840,7 @@ G.GunModels = (() => {
       k.tag('stock');
       const sp = k.part(-0.006, -0.03);
       k.into(sp);
-      stock(k, o.stock, o.sm || M.black());
+      stock(k, o.stock, o.sm || M.black(), true); // (true: shown in first person too: a brace rides along your forearm, in view)
       k.into(null);
     }
     k.tag('mag');
@@ -849,7 +870,7 @@ G.GunModels = (() => {
     return {
       sy: sight.sy, fSight: sight.fSight, relief: o.optic === 'minidot' ? 0.3 : 0.36,
       muzzles: [[front, 0.009, 0]], grip: [0.012, -0.06, 0], support: [0.03, -0.065, -0.022], anim, pistol: true,
-      magAt: [0.012, -0.004], slide: [len * 0.2, 0.02, 0], chamberAt: { side: 'port', f: len * 0.44, y: 0.0205, x: w / 4 }, // (the round's crown, set down in the port)
+      magAt: [0.012, -0.004], slide: [len * 0.2, 0.02, 0], chamberAt: { side: 'port', f: p0 - 0.006, y: 0.0175, x: w / 4 }, // (the round's back end, behind the hood, and its top, just under the hood's)
     };
   }
 
@@ -1037,6 +1058,7 @@ G.GunModels = (() => {
     k.box(0.042, 0.022, 0.24 * Math.min(1.3, mk), M.clear(), 0.04, 0.042);
     k.box(0.03, 0.012, 0.22 * Math.min(1.3, mk), M.brass(), 0.05, 0.04);
     k.into(null);
+    const handle = { f: 0.3, y: -0.032, x: 0.026, travel: 0.06, style: 'pair', sz: 0.8 }, hp = cockHandle(k, handle);
     k.tag('barrel');
     k.cyl(0.008, bl, M.blued(), 0.35, 0);
     let front = 0.35 + bl;
@@ -1044,7 +1066,7 @@ G.GunModels = (() => {
     k.tag('optic');
     const sight = sightOf(k, o, top, 0.35, bl, 0.008, front, 0.2);
     k.tag('base');
-    return { sy: sight.sy, fSight: sight.fSight, relief: sight.relief, muzzles: [[front, 0, 0]], grip: [0.2, -0.07, 0], support: [0.3, -0.06, 0], anim: { mag: magP }, magAt: [0.16, 0.042], magTop: true, chamberAt: { side: 'right', f: 0.06, y: 0, x: 0.025 } };
+    return { sy: sight.sy, fSight: sight.fSight, relief: sight.relief, muzzles: [[front, 0, 0]], grip: [0.2, -0.07, 0], support: [0.3, -0.06, 0], anim: { mag: magP, handle: hp }, handle, magAt: [0.16, 0.042], magTop: true, chamberAt: { side: 'right', f: 0.06, y: 0, x: 0.025 } };
   }
 
   const ARCH = { rifle, pistol, revolver, derringer, minigun, launcher, railgun, crossbow, p90 };
@@ -1266,17 +1288,39 @@ G.GunModels = (() => {
     group.traverse((o) => o.geometry && o.geometry.dispose());
     return out;
   }
+  // (its magazine merged on its own, centred on itself, so a rig can take it off the gun and hold it: a reload,
+  // a magazine check. g.userData.mag: the magazine's group; magHome: where it sits on the gun.)
   function world(def) {
     if (typeof def === 'string') def = G.Gunsmith.fromCode(def);
     let proto = worldCache.get(def.code);
     if (!proto) {
       const k = kit();
       const info = build(k, def);
-      proto = { meshes: merge(k.g), info };
+      let mag = null;
+      const mn = info.anim && info.anim.mag;
+      if (mn && mn.parent && !info.magTop) {
+        k.g.updateMatrixWorld(true);
+        const mw = mn.matrixWorld.clone(), solo = new T.Group();
+        mn.parent.remove(mn);
+        solo.add(mn); mw.decompose(mn.position, mn.quaternion, mn.scale);
+        const meshes = merge(solo), box = new T.Box3();
+        for (const m of meshes) { m.geometry.computeBoundingBox(); box.union(m.geometry.boundingBox); }
+        const c = box.getCenter(new T.Vector3());
+        for (const m of meshes) m.geometry.translate(-c.x, -c.y, -c.z);
+        mag = { meshes, home: c };
+      }
+      proto = { meshes: merge(k.g), info, mag };
       worldCache.set(def.code, proto);
     }
     const g = new T.Group();
     for (const m of proto.meshes) g.add(new T.Mesh(m.geometry, m.material));
+    if (proto.mag) {
+      const mg = new T.Group();
+      for (const m of proto.mag.meshes) mg.add(new T.Mesh(m.geometry, m.material));
+      mg.position.copy(proto.mag.home);
+      g.add(mg);
+      g.userData.mag = mg; g.userData.magHome = proto.mag.home;
+    }
     g.userData.info = proto.info;
     return g;
   }

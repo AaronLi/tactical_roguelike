@@ -91,9 +91,10 @@ G.Casings = (() => {
   }
   // when the gun's action throws the case: now, after it's worked, or not at all
   // am: the round's type (a spent shotgun hull keeps its load's colour)
-  function fired(def, local, from, to, am) {
+  // (at: when, if the caller knows: a bolt worked by hand)
+  function fired(def, local, from, to, am, at) {
     const md = mode(def);
-    if (md === 'shot' || md === 'cycle') queue.push({ t: md === 'cycle' ? Math.min(0.55, (60 / def.rpm) * 0.45) : 0.015, def, local, from: from && from.clone(), to: to && to.clone(), am });
+    if (md === 'shot' || md === 'cycle') queue.push({ t: at != null ? at : md === 'cycle' ? Math.min(0.55, (60 / def.rpm) * 0.45) : 0.015, def, local, from: from && from.clone(), to: to && to.clone(), am });
   }
   // a revolver or break-action opened to reload: the empties come out
   function emptied(def, n, am) {
@@ -169,18 +170,20 @@ G.Casings = (() => {
 
   // ---------------------------------------------------------------- physics
   function surface(map, x, z, y) {
-    if (y > 0.05) return 'wood'; // something's top: a table, a crate, a sofa
+    const L = G.Level, f = map.floors ? L.floorAt(map, x, y, z) : 0, fy = map.floors ? map.floors[f].fy : 0; // (which floor it's on)
+    if (y - fy > 0.05) return 'wood'; // something's top: a table, a crate, a sofa (or a step)
     if (!map.surf) {
-      // what each tile's floor is, from its room
-      map.surf = new Array(map.W * map.H).fill(map.theme.home >= 1 ? 'hard' : 'concrete');
+      // what each tile's floor is, from its room (each floor its own)
+      const WH = map.W * map.H;
+      map.surf = new Array(WH * (map.NF || 1)).fill(map.theme.home >= 1 ? 'hard' : 'concrete');
       for (const rm of map.rooms) {
         const fl = rm.out ? 'grass' : (G.Furniture.ROOMS[rm.type] || {}).floor;
         if (!fl) continue;
-        for (let tz = rm.z; tz < rm.z + rm.h; tz++) for (let tx = rm.x; tx < rm.x + rm.w; tx++) map.surf[tz * map.W + tx] = fl;
+        for (let tz = rm.z; tz < rm.z + rm.h; tz++) for (let tx = rm.x; tx < rm.x + rm.w; tx++) map.surf[(rm.fl || 0) * WH + tz * map.W + tx] = fl;
       }
     }
-    const tx = Math.floor(x / G.Level.TS), tz = Math.floor(z / G.Level.TS);
-    return map.surf[tz * map.W + tx] || 'concrete';
+    const tx = Math.floor(x / L.TS), tz = Math.floor(z / L.TS);
+    return map.surf[f * map.W * map.H + tz * map.W + tx] || 'concrete';
   }
   function impact(c, speed, map) {
     if (speed < 0.35 || sounds > 5) return;
@@ -189,7 +192,7 @@ G.Casings = (() => {
     sounds++;
     // left or right of you
     const rel = V().subVectors(c.p, cam.position).normalize(), right = V().setFromMatrixColumn(cam.matrixWorld, 0);
-    G.Audio.casing(d, c.k.mat, c.k.len, surface(map, c.p.x, c.p.z, c.p.y - c.k.r), speed, G.U.clamp(rel.dot(right), -1, 1));
+    G.Audio.casing(d, c.k.mat, c.k.len, surface(map, c.p.x, c.p.z, c.p.y - c.k.r), speed, G.U.clamp(rel.dot(right), -1, 1), c.p);
   }
   function step(c, h, map) {
     const L = G.Level;

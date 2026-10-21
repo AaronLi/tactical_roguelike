@@ -52,8 +52,9 @@ G.VMAnim = (() => {
     else if (o.bolt) action = 'bolt';
     else if (o.pump) action = 'pump';
     else if (o.lever) action = 'lever';
+    else if (arch === 'p90') action = 'handle';
     else if (arch !== 'rifle') action = null;
-    else if ((o.rcv || 'ar') !== 'ar' && !o.ch) action = o.rcv === 'break' ? null : 'handle';
+    else if (o.cock || ((o.rcv || 'ar') !== 'ar' && !o.ch)) action = o.rcv === 'break' ? null : 'handle';
     return { reload, action };
   }
   function prepare(root, def) {
@@ -62,7 +63,7 @@ G.VMAnim = (() => {
     const hs = u.holders.map(({ holder, info, side }) => {
       const an = info.anim || {};
       const A = { G: v(info.grip), S: v(info.support), W: v(info.magAt), port: v(info.port), ch: v(info.ch), slide: v(info.slide), cyl: v(info.cylAt), bolt: v(info.bolt) };
-      if (info.handle) A.H = v([info.handle.f, info.handle.y, info.handle.x]);
+      if (info.handle) A.H = v(info.handle.grab || [info.handle.f, info.handle.y, info.handle.x]); // (where the hand takes it)
       // the bottom of the magazine, where the hand takes hold of it
       if (an.mag) {
         const box = new T.Box3().setFromObject(an.mag);
@@ -76,7 +77,10 @@ G.VMAnim = (() => {
       if (an.handle) A.handleHome = an.handle.position.clone();
       if (an.ch) A.chHome = an.ch.position.clone();
       if (an.cyl) A.cylHome = an.cyl.position.clone();
-      return { holder, info, side, an, A, travel: info.handle ? info.handle.travel : 0.07 };
+      if (an.bolt) A.boltHome = an.bolt.position.clone();
+      // recip: the handle rides the bolt (it jumps back each shot); open: an open-bolt gun, whose bolt (and a
+      // riding handle with it) sits back, cocked, while there's a round to fire
+      return { holder, info, side, an, A, travel: info.handle ? info.handle.travel : 0.07, recip: !!(info.handle && info.handle.recip), open: G.OPEN_BOLT.includes(def.id) };
     });
     const R = makeArm(M), L = makeArm(M);
     root.add(R.g, L.g);
@@ -122,20 +126,24 @@ G.VMAnim = (() => {
     const r = shot ? 0.0092 : grp === 'pistol' ? 0.0045 : 0.0048, len = shot ? 0.05 : grp === 'pistol' ? 0.026 : 0.042;
     // (a pistol's slide has a real port cut in it: the round just sits in the barrel under it, always there to see.
     // A rifle's receiver is solid, so the open port's drawn: a dark window on its right side.)
-    const g = new T.Group(), real = c.side === 'port', top = c.side === 'top';
-    const plate = real ? null : top ? new T.Mesh(new T.BoxGeometry(Math.min(c.w, 2 * r + 0.006), 0.0012, len + 0.014), DARK) : new T.Mesh(new T.BoxGeometry(0.0012, 2 * r + 0.006, len + 0.014), DARK);
-    if (plate && top) plate.position.set(c.x, c.y + 0.0007, -c.f); else if (plate) plate.position.set(c.x + 0.0007, c.y, -c.f);
+    // (layered out from the receiver: the dark open port, the round, the bolt face over them; a pistol's round sits
+    // under the barrel hood, its case head just behind it: seen in the gap a press check opens behind the hood)
+    const g = new T.Group(), real = c.side === 'port', top = c.side === 'top', win = len + 0.014, ww = top ? Math.min(c.w, 2 * r + 0.006) : 2 * r + 0.006;
+    const plate = real ? null : top ? new T.Mesh(new T.BoxGeometry(ww, 0.0012, win), DARK) : new T.Mesh(new T.BoxGeometry(0.0012, ww, win), DARK);
+    if (plate && top) plate.position.set(c.x, c.y + 0.0005, -c.f); else if (plate) plate.position.set(c.x + 0.0005, c.y, -c.f);
+    const bolt = real ? null : top ? new T.Mesh(new T.BoxGeometry(ww, 0.0008, win), M.steel()) : new T.Mesh(new T.BoxGeometry(0.0008, ww, win), M.steel());
+    if (bolt && top) bolt.position.set(c.x, c.y + 0.0024, -c.f); else if (bolt) bolt.position.set(c.x + 0.0024, c.y, -c.f);
     const round = new T.Group();
     const piece = (rf, rr, l, m, z) => // (front radius, rear radius)
        { const geo = new T.CylinderGeometry(rf, rr, l, 14); geo.rotateX(-Math.PI / 2); /* (its top end to the front) */ const me = new T.Mesh(geo, m); me.position.z = z; round.add(me); return me; };
     let face; // (what shows the load: a shell's hull, a bullet's tip)
     if (shot) { face = piece(r, r, len * 0.75, shellMat('buck'), -len * 0.125); piece(r * 1.04, r * 1.04, len * 0.25, M.brass(), len * 0.375); }
     else { piece(r, r, len * 0.72, M.brass(), len * 0.14); face = piece(0.0012, r * 0.95, len * 0.28, tipMat('ball'), -len * 0.36); }
-    if (real) round.position.set(c.x, c.y - r, -c.f); else if (top) round.position.set(c.x, c.y - r + 0.0028, -c.f); else round.position.set(c.x - r + 0.0028, c.y, -c.f);
-    g.add(round); if (plate) g.add(plate);
+    if (real) round.position.set(c.x, c.y - r, -(c.f + len / 2)); else if (top) round.position.set(c.x, c.y - r + 0.0018, -c.f); else round.position.set(c.x - r + 0.0018, c.y, -c.f);
+    g.add(round); if (plate) g.add(plate); if (bolt) g.add(bolt);
     g.visible = false;
     h.holder.add(g);
-    return { g, round, face, shot, real };
+    return { g, round, face, shot, real, bolt, win, f: c.f };
   }
 
   // ------------------------------------------------------------------ clips
@@ -152,48 +160,86 @@ G.VMAnim = (() => {
   };
   const off = (p, f = 0, y = 0, x = 0) => p.clone().add(new T.Vector3(x, y, -f));
 
-  // Racking: pull the charging handle / bolt handle / slide, let it fly. c: 0..1 over the rack.
-  function rack(c, h, kind, pose) {
+  // a bolt-action's bolt: turned up (radians) and drawn back (m) at full lift and pull; how far a pistol's slide,
+  // an AR's charging handle, a pump come back
+  const BOLT_LIFT = 1.3, BOLT_BACK = 0.12, SLIDE = 0.04, CH = 0.065, PUMP = 0.085;
+  // where the bolt handle's knob is with the bolt turned up by lift (0..1) and drawn back by back (0..1)
+  const knobAt = (A, lift, back) => new T.Vector3(A.bolt.x * Math.cos(lift * BOLT_LIFT), A.bolt.y + A.bolt.x * Math.sin(lift * BOLT_LIFT), A.bolt.z + back * BOLT_BACK);
+  // how far the bolt face comes back off the chamber at full pull (m)
+  const actTravel = (h, kind) => kind === 'pistol' ? SLIDE : kind === 'ar' ? CH : kind === 'handle' ? h.travel : kind === 'bolt' ? BOLT_BACK : kind === 'pump' ? PUMP : kind === 'lever' ? 0.05 : 0;
+  // which action a gun's hands work: 'pistol' (the slide), 'ar' (the charging handle), 'handle' (a cocking handle),
+  // 'bolt', 'pump', 'lever'
+  const actKind = (a, h) => { const ac = a.k.action; return ac === 'pistol' || ac === 'bolt' || ac === 'pump' || ac === 'lever' ? ac : h.A.ch ? 'ar' : 'handle'; };
+
+  // The action, worked by hand: one pose for every use of it (a rack, a release, a chamber check). pull: 0..1 of
+  // its travel (a bolt-action's: the first half turns it up, the second draws it back); on: how far the hand is on
+  // its control (0: where it rests, rest; 1: on it, riding it). Poses the part and the hand, and pose.open: how far
+  // the bolt face has come back off the chamber (m), uncovering the round in the port (chamberView). grab: another
+  // hold on it (a press-check's pinch).
+  function actionPose(kind, h, pose, pull, on, rest, grab) {
+    const A = h.A, R0 = rest || A.S;
+    pose.open = (kind === 'bolt' ? G.U.clamp(pull * 2 - 1, 0, 1) : pull) * actTravel(h, kind);
+    if (kind === 'pistol' && A.slide) { pose.slide = pull; pose.L = lerpV(R0, off(grab || off(A.slide, -0.02, 0.012), -SLIDE * pull), on); }
+    else if (kind === 'ar' && A.ch) { pose.ch = pull; pose.L = lerpV(R0, off(grab || off(A.ch, 0, 0.012), -CH * pull), on); }
+    else if (kind === 'handle' && A.H) { pose.handle = pull; pose.L = lerpV(R0, off(grab || A.H, -h.travel * pull), on); }
+    else if (kind === 'bolt' && A.bolt) { const lift = G.U.clamp(pull * 2, 0, 1), back = G.U.clamp(pull * 2 - 1, 0, 1); pose.bolt = [lift, back]; pose.R = lerpV(A.G, knobAt(A, lift, back), on); }
+    else if (kind === 'pump') { pose.pump = pull; pose.L = off(A.S, -PUMP * pull); } // (the left hand rides it)
+    else if (kind === 'lever') pose.lever = pull;
+  }
+  // when, through a rack (or a release), the action's fully back (the case it held thrown) and home again (a round
+  // fed): js/player.js times the rounds to it
+  function actEvents(kind, action) {
+    if (kind === 'release') return { back: 0, home: 0.38 };
+    if (action === 'bolt') return { back: 0.6, home: 0.85 };
+    if (action === 'pump' || action === 'lever') return { back: 0.45, home: 0.9 };
+    return { back: 0.52, home: 0.6 };
+  }
+  // Racking: the action pulled through and let go (a riding open bolt's left back: cocked). c: 0..1 over it; from:
+  // where the left hand starts, if not on the handguard (the magazine it's just seated)
+  function rack(c, h, kind, pose, from) {
+    const A = h.A, stay = kind === 'handle' && h.open && h.recip;
+    let pull, on;
+    if (kind === 'bolt') { pull = S(0.25, 0.6, c) * (1 - S(0.6, 0.85, c)); on = S(0.08, 0.25, c) * (1 - S(0.85, 1, c)); } // (the right hand: up, back, the case flies, forward, down)
+    else if (kind === 'pump' || kind === 'lever') { pull = S(0.1, 0.45, c) * (1 - S(0.5, 0.9, c)); on = 1; }
+    else { pull = S(0.3, 0.52, c) * (stay ? 1 : 1 - S(0.52, 0.6, c)); on = S(0.05, 0.3, c) * (1 - S(stay ? 0.55 : 0.62, 0.95, c)); }
+    actionPose(kind, h, pose, pull, on, c < 0.5 ? from : null);
+    if (from && kind === 'bolt') pose.L = path(c, [[0, from], [0.3, A.S], [1, A.S]]); // (the left hand back to the handguard)
+    // the gun turned to get at it
+    const r = S(0.05, 0.3, c) * (1 - S(0.7, 1, c));
+    if (kind === 'pistol') { pose.gun[5] -= 0.35 * r; pose.gun[0] -= 0.05 * r; pose.gun[1] += 0.03 * r; pose.gun[3] += 0.15 * r; }
+    else if (kind === 'ar') { pose.gun[3] += 0.35 * r; pose.gun[2] -= 0.1 * r; pose.gun[0] -= 0.04 * r; pose.gun[1] += 0.02 * r; }
+    else if (kind === 'handle' && A.H) {
+      const side = Math.abs(A.H.x) > 0.005 ? Math.sign(A.H.x) : 0; // (turn the handle side toward you; one on top: tip it up)
+      pose.gun[5] += (side > 0 ? 0.45 : side < 0 ? -0.3 : 0) * r; pose.gun[3] += (side ? 0.2 : 0.3) * r; pose.gun[0] -= 0.05 * r; pose.gun[1] += 0.03 * r;
+    } else if (kind === 'bolt') { pose.gun[5] += 0.2 * r; pose.gun[3] += 0.05 * r; } // (canted a little, the bolt toward you)
+  }
+  // Sending the action home from where it locked open: the left thumb on the slide stop (a pistol) or the palm
+  // on the bolt catch over the magazine well (a rifle); the slide (or bolt) slams forward and the gun jumps.
+  function release(c, h, kind, pose, from) {
     const A = h.A;
-    if (kind === 'pistol') {
-      const g = off(A.slide, -0.02, 0.012);
-      pose.L = path(c, [[0, A.S], [0.3, g], [0.55, off(g, -0.045)], [0.62, g], [1, A.S]]);
-      pose.slide = S(0.3, 0.55, c) * (1 - S(0.55, 0.62, c));
-      const r = S(0.1, 0.3, c) * (1 - S(0.7, 1, c));
-      pose.gun[5] -= 0.35 * r; pose.gun[0] -= 0.05 * r; pose.gun[1] += 0.03 * r; pose.gun[3] += 0.15 * r;
-    } else if (kind === 'ar' && A.ch) {
-      pose.L = path(c, [[0, A.S], [0.32, off(A.ch, 0, 0.012)], [0.52, off(A.ch, -0.065, 0.012)], [0.6, off(A.ch, 0, 0.012)], [1, A.S]]);
-      pose.ch = S(0.32, 0.52, c) * (1 - S(0.52, 0.6, c));
-      const r = S(0.05, 0.3, c) * (1 - S(0.7, 1, c));
-      pose.gun[3] += 0.35 * r; pose.gun[2] -= 0.1 * r; pose.gun[0] -= 0.04 * r; pose.gun[1] += 0.02 * r;
-    } else if (kind === 'handle' && A.H) {
-      pose.L = path(c, [[0, A.S], [0.3, A.H], [0.52, off(A.H, -h.travel)], [0.6, A.H], [1, A.S]]);
-      pose.handle = S(0.3, 0.52, c) * (1 - S(0.52, 0.6, c));
-      const r = S(0.05, 0.3, c) * (1 - S(0.7, 1, c));
-      pose.gun[5] += (A.H.x > 0 ? 0.45 : -0.3) * r; pose.gun[3] += 0.2 * r; pose.gun[0] -= 0.05 * r; pose.gun[1] += 0.03 * r; // turn the handle side toward you
-    } else if (kind === 'bolt' && A.bolt) {
-      const knob = off(A.bolt, 0, 0, 0.0);
-      pose.R = path(c, [[0, A.G], [0.25, knob], [0.4, off(knob, 0, 0.02)], [0.6, off(knob, -0.08, 0.02)], [0.75, off(knob, 0, 0.02)], [0.85, knob], [1, A.G]]);
-      pose.bolt = [S(0.25, 0.4, c) * (1 - S(0.75, 0.85, c)), S(0.4, 0.6, c) * (1 - S(0.6, 0.75, c))];
-    } else if (kind === 'pump') {
-      pose.pump = S(0.1, 0.45, c) * (1 - S(0.5, 0.9, c));
-    } else if (kind === 'lever') {
-      pose.lever = S(0.1, 0.45, c) * (1 - S(0.5, 0.9, c));
-    }
+    const at = kind === 'pistol' ? off(A.G, 0.035, 0.045, -0.02) : off(A.W || A.WB || A.S, 0.01, 0.045, -0.03);
+    pose.L = path(c, [[0, from || A.S], [0.28, at], [0.4, off(at, 0, -0.008)], [0.68, A.S], [1, A.S]]);
+    const k = 1 - S(0.34, 0.4, c);
+    if (kind === 'pistol') pose.slide = k;
+    pose.open = k * actTravel(h, kind);
+    const j = c > 0.36 && c < 0.56 ? Math.sin(Math.PI * (c - 0.36) / 0.2) : 0;
+    pose.gun[2] += 0.012 * j; pose.gun[3] += 0.03 * j;
+    const r = S(0, 0.3, c) * (1 - S(0.7, 1, c)); pose.gun[5] -= 0.25 * r; pose.gun[3] += 0.12 * r; // (turned a little to get at it)
   }
 
-  // Box/stick magazine (rifles, SMGs, pistols, P90, minigun box, railgun bank), then, from empty, the action:
-  // act 'release' (it locked open on its last round: a thumb on the bolt catch or the slide stop) or 'rack' (worked
-  // by hand), over the last (1 - split) of the time. how: 'retain' (the old magazine goes back in its pouch first),
-  // 'pouch' (into the dump pouch, lower down), or 'floor' / anything else (let go of it)
-  function magClip(t, h, act, kind, freeDrop, how, split) {
+  // the magazine change's turn of the gun at m through its motions: the well lifted into view, pulled toward the
+  // middle, muzzle up, canted right
+  const magTilt = (m) => S(0.02, 0.14, m) * (1 - S(0.72, 0.9, m));
+  function tiltPose(pose, k) { pose.gun[3] += 0.42 * k; pose.gun[5] -= 0.5 * k; pose.gun[1] += 0.05 * k; pose.gun[0] -= 0.07 * k; pose.gun[2] += 0.02 * k; }
+  // Box/stick magazine (rifles, SMGs, pistols, P90, minigun box, railgun bank). how: 'retain' (the old magazine goes
+  // back in its pouch first), 'pouch' (into the dump pouch, lower down), or 'floor' / anything else (let go of it).
+  // seat: run dry, how far through its motions it goes (js/player.js reloadSeat): it stops as the magazine seats, and
+  // the action (its own clip, after) takes the hand from there
+  function magClip(t, h, freeDrop, how, seat) {
     const A = h.A, pose = base();
-    const e = act ? split || 0.75 : 1, m = Math.min(1, t / e), c = act ? G.U.clamp((t - e) / (1 - e), 0, 1) : 0;
-    if (act === 'release' && kind === 'pistol') pose.slide = 1; // (locked back the whole time, till it's released)
+    const m = t * (seat || 1);
     const WB = A.WB || A.S, below = off(WB, 0.0, -0.07);
-    const tilt = S(0.02, 0.14, m) * (1 - S(0.72, 0.9, m));
-    // bring the magazine well up into view: lift, pull toward the middle, muzzle up, cant right
-    pose.gun[3] += 0.42 * tilt; pose.gun[5] -= 0.5 * tilt; pose.gun[1] += 0.05 * tilt; pose.gun[0] -= 0.07 * tilt; pose.gun[2] += 0.02 * tilt;
+    tiltPose(pose, magTilt(m));
     if (m < 1) {
       if (how === 'retain' || how === 'pouch') {
         // old one out, carried down and stowed (the hand pauses in the pouch), a fresh one out, in
@@ -210,31 +256,19 @@ G.VMAnim = (() => {
       }
       if (how !== 'retain' && how !== 'pouch' && m > 0.66 && m < 0.72) pose.gun[1] += 0.008 * Math.sin(Math.PI * (m - 0.66) / 0.06); // seat it
     }
-    if (act === 'rack' && c > 0) rack(c, h, kind, pose);
-    if (act === 'release' && c > 0) release(c, h, kind, pose);
     return pose;
   }
-  // Sending the action home from where it locked open: the left thumb on the slide stop (a pistol) or the palm
-  // on the bolt catch over the magazine well (a rifle); the slide (or bolt) slams forward and the gun jumps.
-  function release(c, h, kind, pose) {
-    const A = h.A;
-    const at = kind === 'pistol' ? off(A.G, 0.035, 0.045, -0.02) : off(A.W || A.WB || A.S, 0.01, 0.045, -0.03);
-    pose.L = path(c, [[0, A.S], [0.35, at], [0.5, off(at, 0, -0.008)], [0.7, A.S], [1, A.S]]);
-    if (kind === 'pistol') pose.slide = 1 - S(0.42, 0.5, c);
-    const j = c > 0.45 && c < 0.65 ? Math.sin(Math.PI * (c - 0.45) / 0.2) : 0;
-    pose.gun[2] += 0.012 * j; pose.gun[3] += 0.03 * j;
-    const r = S(0, 0.3, c) * (1 - S(0.7, 1, c)); pose.gun[5] -= 0.25 * r; pose.gun[3] += 0.12 * r; // (turned a little to get at it)
-  }
-  // Belt-fed: cover up, box out, new box in, lay the belt, cover down, rack.
-  function beltClip(t, h, empty) {
+  // Belt-fed: cover up, box out, new box in, lay the belt, cover down (run dry, the charging handle after: its
+  // own clip)
+  function beltClip(t, h) {
     const A = h.A, pose = base(), WB = A.WB || A.S;
     const top = off(A.port || A.S, 0, 0.03);
     const tilt = S(0.02, 0.12, t) * (1 - S(0.86, 0.96, t));
     pose.gun[5] += 0.3 * tilt; pose.gun[3] += 0.1 * tilt;
     pose.cover = S(0.06, 0.16, t) * (1 - S(0.74, 0.82, t));
-    pose.L = path(t, [[0, A.S], [0.08, top], [0.16, off(top, 0, 0.04)], [0.24, WB], [0.3, off(WB, 0, -0.08)], [0.4, A.P], [0.46, A.P], [0.58, off(WB, 0, -0.06)], [0.62, WB], [0.7, top], [0.76, off(top, 0, 0.04)], [0.82, top], [0.9, A.S], [1, A.S]]);
+    const keys = [[0, A.S], [0.08, top], [0.16, off(top, 0, 0.04)], [0.24, WB], [0.3, off(WB, 0, -0.08)], [0.4, A.P], [0.46, A.P], [0.58, off(WB, 0, -0.06)], [0.62, WB], [0.7, top], [0.76, off(top, 0, 0.04)], [0.82, top], [0.9, A.S], [1, A.S]];
+    pose.L = path(t, keys);
     pose.mag = t < 0.24 ? { mode: 'in' } : t < 0.3 ? { mode: 'hand' } : t < 0.46 ? { mode: 'drop', at: 0.3 } : t < 0.62 ? { mode: 'hand' } : { mode: 'in' };
-    if (empty && t > 0.84 && A.H) { const c = (t - 0.84) / 0.16; pose.handle = S(0.2, 0.6, c) * (1 - S(0.6, 0.8, c)); }
     return pose;
   }
   // One round at a time into a tube / internal magazine / drum.
@@ -286,9 +320,11 @@ G.VMAnim = (() => {
   // Show it off: left side, then the top and right, then a chamber check. Holding I holds the chamber check
   // open (t stops at INSPECT_HOLD) and the mouse turns the gun (rot: [yaw, pitch]) to look in from either side.
   const INSPECT_HOLD = 0.69;
+  // how far a chamber check opens each action (of its travel): enough to see the round
+  const CHECK = { pistol: 0.35, ar: 0.6, handle: 0.6, bolt: 0.75, pump: 0.35, lever: 0.4 };
   // the chamber check's pose, on top of the turn (gun [x, y, z, rx, ry, rz]): the port faces your eye
   const RIFLE_CV = [-0.03, 0.01, -0.18, 0.21, 0.95, 1.05], PISTOL_CV = [-0.04, 0.04, -0.1, 0.1, 1.7, 0.25], BREAK_CV = [-0.06, -0.08, -0.08, 0.8, 0.4, 0.2], REV_CV = [0.02, 0.02, -0.06, 0.3, -0.5, -0.5], BOLT_CV = [-0.03, -0.01, -0.18, 0.31, 0.55, 0.25]; // (a bolt gun: less cant, its open top toward you) // (a break-action: low, its top tipped up at you, looking down into the breech)
-  function inspectClip(t, h, kind, rot) {
+  function inspectClip(t, h, kind, rot, pl) {
     const A = h.A, pose = base();
     if (rot) { pose.gun[5] -= rot[0]; pose.gun[3] -= rot[1]; } // (side to side rolls it over, up and down tips the muzzle)
     const a = S(0.0, 0.18, t) * (1 - S(0.36, 0.5, t)), b = S(0.4, 0.55, t) * (1 - S(0.8, 0.95, t));
@@ -302,22 +338,12 @@ G.VMAnim = (() => {
     const CV = kind === 'pistol' ? PISTOL_CV : kind === 'break' ? BREAK_CV : kind === 'revolver' ? REV_CV : kind === 'bolt' ? BOLT_CV : RIFLE_CV;
     for (let i = 0; i < 6; i++) pose.gun[i] += CV[i] * cv;
     if (c > 0 && c < 1) {
-      if (kind === 'pistol' && A.slide) { const g = off(A.slide, -0.035, 0.002, -0.024); pose.L = path(c, [[0, A.S], [0.25, g], [0.5, off(g, -0.014)], [0.7, g], [1, A.S]]); /* (pinching the back of the slide from the left, clear of the port) */ pose.slide = 0.35 * S(0.25, 0.5, c) * (1 - S(0.6, 0.75, c)); }
-      else if (kind === 'ar' && A.ch) { // the bolt locked back, then the hand off it and back on the handguard so you can see in
-        pose.L = path(c, [[0, A.S], [0.18, off(A.ch, 0, 0.012)], [0.32, off(A.ch, -0.04, 0.012)], [0.5, A.S], [1, A.S]]);
-        pose.ch = 0.6 * S(0.18, 0.32, c) * (1 - S(0.38, 0.5, c)); // (the handle goes home; the bolt stays locked back)
+      // the action worked part way (CHECK: how far: a press check), held there while you look in, then let home
+      if (kind === 'handle' ? !!A.H : actTravel(h, kind) > 0) {
+        const cocked = kind === 'handle' && h.open && h.recip && G.loaded(pl.cur()) > 0; // (an open bolt with a round to fire's already back)
+        const pull = cocked ? 1 : CHECK[kind] * S(0.18, 0.35, c) * (1 - S(0.65, 0.82, c)), on = S(0, 0.2, c) * (1 - S(0.8, 1, c));
+        actionPose(kind, h, pose, pull, on, null, kind === 'pistol' && A.slide ? off(A.slide, -0.035, 0.002, -0.024) : null); // (a pistol's pinched at the back of the slide from the left, clear of the port)
       }
-      else if (kind === 'handle' && A.H) { // the handle back and caught there (as an HK's is), the hand back on the gun so you can see in
-        pose.L = path(c, [[0, A.S], [0.18, A.H], [0.32, off(A.H, -h.travel * 0.6)], [0.5, A.S], [1, A.S]]);
-        pose.handle = 0.6 * S(0.18, 0.32, c) * (1 - S(0.75, 0.85, c));
-      }
-      else if (kind === 'bolt' && A.bolt) { // bolt up and back, the hand back on the grip while you look in, then it closes it
-        const back = off(A.bolt, -0.06);
-        pose.R = path(c, [[0, A.G], [0.18, A.bolt], [0.34, back], [0.48, A.G], [0.76, A.G], [0.86, back], [0.95, A.bolt], [1, A.G]]);
-        pose.bolt = [S(0.18, 0.26, c) * (1 - S(0.92, 0.97, c)), 0.5 * S(0.26, 0.34, c) * (1 - S(0.86, 0.92, c))];
-      }
-      else if (kind === 'pump') pose.pump = 0.35 * S(0.2, 0.45, c) * (1 - S(0.6, 0.8, c));
-      else if (kind === 'lever') pose.lever = 0.4 * S(0.2, 0.45, c) * (1 - S(0.6, 0.8, c));
       else if (kind === 'break') { pose.brk = S(0.15, 0.4, c) * (1 - S(0.65, 0.85, c)); const low = off(A.S, -0.02, -0.06, -0.05); pose.L = path(c, [[0, A.S], [0.25, low], [0.75, low], [1, A.S]]); } // (the left hand down under the barrels, out of the way)
       else if (kind === 'revolver') { pose.cyl = S(0.15, 0.4, c) * (1 - S(0.65, 0.85, c)); const under = off(A.cyl || A.S, 0.05, -0.035, -0.03); pose.L = path(c, [[0, A.S], [0.2, under], [0.8, under], [1, A.S]]); } // (thumb on the cylinder from in front and below: its back is clear to see)
       else if (A.WB) { pose.mag = { mode: 'peek', d: 0.025 * S(0.2, 0.4, c) * (1 - S(0.6, 0.8, c)) }; pose.L = path(c, [[0, A.S], [0.2, A.WB], [0.8, A.WB], [1, A.S]]); }
@@ -346,7 +372,7 @@ G.VMAnim = (() => {
     const a = vm && vm.userData.vma;
     return !!(a && a.k.reload === 'mag' && !a.def.akimbo && a.hs[0].an.mag && a.hs[0].A.WB && !a.hs[0].info.magTop);
   }
-  const base = () => ({ gun: [0, 0, 0, 0, 0, 0], L: null, R: null, mag: { mode: 'in' }, ch: 0, handle: 0, slide: null, cyl: 0, brk: 0, cover: 0, pump: null, lever: null, bolt: null, prop: null });
+  const base = () => ({ gun: [0, 0, 0, 0, 0, 0], L: null, R: null, mag: { mode: 'in' }, ch: 0, handle: null, open: null, slide: null, cyl: 0, brk: 0, cover: 0, pump: null, lever: null, bolt: null, prop: null });
 
   const _m = new T.Matrix4(), _inv = new T.Matrix4();
   // ------------------------------------------------------------------ per frame
@@ -368,17 +394,20 @@ G.VMAnim = (() => {
       else if (reload === 'break') pose = breakClip(t, h);
       else if (reload === 'enbloc') pose = enblocClip(t, h);
       else if (reload === 'bow') pose = bowClip(t, h);
-      else if (reload === 'belt') pose = beltClip(t, h, pl.reloadEmpty);
+      else if (reload === 'belt') pose = beltClip(t, h);
       else if (reload === 'akimbo') { pose = base(); const tilt = S(0.02, 0.15, t) * (1 - S(0.75, 0.92, t)); pose.gun[3] += 0.4 * tilt; pose.gun[1] -= 0.04 * tilt; pose.mag = t < 0.08 ? { mode: 'in' } : t < 0.4 ? { mode: 'drop', at: 0.08 } : t < 0.62 ? { mode: 'gone' } : { mode: 'rise', k: S(0.62, 0.72, t) }; }
-      else pose = magClip(t, h, pl.reloadAct, action === 'pistol' ? 'pistol' : action === 'bolt' ? 'bolt' : a.hs[0].A.ch ? 'ar' : 'handle', action === 'pistol', pl.reloadMode, pl.reloadSplit);
-    } else if (pl.rackT > 0) {
-      pose = base(); rack(1 - pl.rackT / 0.5, h, action, pose);
+      else pose = magClip(t, h, action === 'pistol', pl.reloadMode, pl.reloadSeat);
+    } else if (pl.act) { // the action, worked by hand (js/player.js workAction): on its own, or straight on from a magazine just seated
+      const ac = pl.act, c = G.U.clamp(ac.t, 0, 1), kind = actKind(a, h), from = ac.seat && h.A.WB ? off(h.A.WB, 0, 0.012) : null;
+      pose = base();
+      if (ac.kind === 'release') release(c, h, kind, pose, from); else rack(c, h, kind, pose, from);
+      if (ac.seat) tiltPose(pose, magTilt(ac.seat) * (1 - S(0, 0.45, c))); // (the gun comes back from the magazine change's turn)
     } else if (pl.magChk && canMagCheck(vm)) {
       const Qh = new T.Quaternion(); _m.copy(vm.matrix).multiply(h.holder.matrix).decompose(new T.Vector3(), Qh, new T.Vector3());
       pose = magCheckClip(pl.magChk, h, Qh);
     } else if (pl.inspectT > 0) {
       const kind = action === 'pistol' || action === 'bolt' || action === 'pump' || action === 'lever' ? action : reload === 'revolver' || reload === 'break' ? reload : h.A.ch ? 'ar' : 'handle';
-      pose = inspectClip(1 - pl.inspectT / pl.inspectDur, h, kind, pl.inspHold || pl.inspYaw || pl.inspPitch ? [pl.inspYaw || 0, pl.inspPitch || 0] : null);
+      pose = inspectClip(1 - pl.inspectT / pl.inspectDur, h, kind === 'ar' || kind === 'handle' ? actKind(a, h) : kind, pl.inspHold || pl.inspYaw || pl.inspPitch ? [pl.inspYaw || 0, pl.inspPitch || 0] : null, pl);
     }
     a.pose = pose;
     a.reloadT = pl.reloading ? 1 - pl.reloadT / (pl.reloadTotal || 1) : -1;
@@ -420,23 +449,28 @@ G.VMAnim = (() => {
         if (mg.mode !== 'drop' && a.drop && a.drop.idx === idx) a.drop = null;
       }
       // handles and slides
-      if (an.ch && A.chHome) an.ch.position.copy(A.chHome).z += (pose ? pose.ch : 0) * 0.065;
-      if (an.handle && A.handleHome) an.handle.position.copy(A.handleHome).z += (pose ? pose.handle : 0) * h.travel;
-      if (an.slide && pose && pose.slide != null) an.slide.position.z = pose.slide * 0.04;
+      if (an.ch && A.chHome) an.ch.position.copy(A.chHome).z += (pose ? pose.ch : 0) * CH;
+      if (an.handle && A.handleHome) {
+        // at rest: home, or (an open bolt with a round to fire) back; a riding handle jumps with each shot: a closed
+        // bolt's back and home, an open bolt's slams home to fire and comes back to be caught
+        const loaded = G.loaded(w) > 0, ts = pl.sinceShot == null ? 9 : pl.sinceShot, CYC = 0.08;
+        let k = h.open && h.recip && loaded ? 1 : 0;
+        if (pose && pose.handle != null) k = pose.handle;
+        else if (h.recip && ts < CYC) k = h.open ? (loaded ? Math.min(1, ts / (CYC * 0.5)) : 0) : Math.sin(Math.PI * ts / CYC);
+        an.handle.position.copy(A.handleHome).z += k * h.travel;
+      }
+      if (an.slide && pose && pose.slide != null) an.slide.position.z = pose.slide * SLIDE;
       if (an.cyl && A.cylHome) { const k = pose ? pose.cyl : 0; an.cyl.position.copy(A.cylHome); an.cyl.position.x -= 0.05 * k; an.cyl.position.y -= 0.016 * k; /* (swung clear of the frame) */ }
       if (an.brk) an.brk.rotation.x = (pose ? pose.brk : 0) * (a.k.reload === 'break' && G.Gunsmith.PLATFORMS[a.def.id].arch === 'derringer' ? -0.9 : -0.55); // (a derringer's hinge is at the top front: its breech swings up)
       if (an.cover) an.cover.rotation.x = (pose ? pose.cover : 0) * 1.1;
-      if (an.pump && pose && pose.pump != null) an.pump.position.z = pose.pump * 0.085;
+      if (an.pump && pose && pose.pump != null) an.pump.position.z = pose.pump * PUMP;
       if (an.lever) an.lever.rotation.x = (pose && pose.lever != null ? pose.lever : cyc && a.k.action === 'lever' ? cyc : 0) * 0.9;
-      if (an.bolt && pose && pose.bolt) { an.bolt.rotation.z = pose.bolt[0] * 1.3; an.bolt.position.z = pose.bolt[1] * 0.12; }
+      if (an.bolt && A.boltHome) { const b = (pose && pose.bolt) || [0, 0]; an.bolt.rotation.z = b[0] * BOLT_LIFT; an.bolt.position.z = A.boltHome.z + b[1] * BOLT_BACK; } // (worked by hand: js/player.js rack)
 
       // hands: resting on the gun unless the clip has them somewhere else
       let Rt = pose && pose.R ? res(pose.R) : A.G.clone(), Lt = pose && pose.L ? res(pose.L) : A.S.clone();
-      // working the action between shots: the right hand on the bolt, the left riding the pump
-      if (!pose && cyc > 0) {
-        if (a.k.action === 'bolt' && A.bolt && an.bolt) Rt = lerpV(A.G, an.bolt.position.clone().add(new T.Vector3(0.068, 0, 0)), Math.min(1, cyc * 2.5));
-        if (a.k.action === 'pump' && an.pump) Lt = A.S.clone().add(new T.Vector3(0, 0, an.pump.position.z));
-      }
+      // working the action between shots: the left hand riding the pump (a bolt's worked as a rack)
+      if (!pose && cyc > 0 && a.k.action === 'pump' && an.pump) Lt = A.S.clone().add(new T.Vector3(0, 0, an.pump.position.z));
       if (a.def.akimbo) { // one gun in each hand
         const arm = h.side > 0 ? a.R : a.L, sh = h.side > 0 ? SHOULDER_R : SHOULDER_L;
         place(arm, sh.clone().applyMatrix4(_inv), A.G.clone().applyMatrix4(h.holder.matrix));
@@ -454,7 +488,7 @@ G.VMAnim = (() => {
         if ((!pose && a.fw < 0.02) || !a.gripQ) { a.gripQ = (a.gripQ || new T.Quaternion()); a.gripQ.copy(gq).invert().multiply(a.R.glove.quaternion); }
         if (a.fw > 0.01) {
           a.R.glove.quaternion.slerp(_q3.copy(gq).multiply(a.gripQ), a.fw);
-          if (pose.mag && pose.mag.mode === 'chk' && an.mag) {
+          if (pose && pose.mag && pose.mag.mode === 'chk' && an.mag) {
             const mq = _q3.copy(h.holder.quaternion).multiply(an.mag.quaternion);
             a.L.glove.quaternion.slerp(mq.multiply(PALM_Q), a.fw);
             a.L.glove.position.add(_v2.set(0, -0.024, 0).applyQuaternion(mq));
@@ -467,7 +501,12 @@ G.VMAnim = (() => {
           if (d.visible && d.userData.ring) d.userData.ring.material = shellMat((w.tube && w.tube[i]) || w.ammo);
         });
         else if (chv) {
-          chv.g.visible = chv.real || !!(pose && pose.chk > 0.35);
+          // the bolt face over the port: closed, it's all you see; worked back (pose.open), it uncovers the round. At
+          // rest it's back if the gun locked open on its last round, or it's an open bolt that's cocked
+          const lockedOpen = !G.loaded(w) && G.boltHold(a.def), hk = actKind(a, h);
+          const open = pose && pose.open != null ? pose.open : lockedOpen || (h.open && w.mag > 0) ? actTravel(h, hk) : 0;
+          chv.g.visible = chv.real || lockedOpen || !!(pose && (pose.chk > 0.35 || pose.open > 0.001));
+          if (chv.bolt) { const Lb = chv.win - Math.min(open, chv.win - 0.002); chv.bolt.scale.z = Lb / chv.win; chv.bolt.position.z = -(chv.f - chv.win / 2 + Lb / 2); }
           // (a gun whose chamber is its magazine's top, a Garand's: the next round, unless it's open-bolt)
           const rd = G.chambered(a.def) ? w.chamber : !G.OPEN_BOLT.includes(a.def.id) && w.mag > 0 ? (w.tube && w.tube.length ? w.tube[w.tube.length - 1] : w.ammo) : null;
           chv.round.visible = !!rd;
@@ -553,5 +592,5 @@ G.VMAnim = (() => {
     arm.glove.quaternion.copy(_q).multiply(RX);
   }
 
-  return { prepare, sample, apply, kinds, canMagCheck, INSPECT_HOLD };
+  return { prepare, sample, apply, kinds, canMagCheck, actEvents, INSPECT_HOLD };
 })();

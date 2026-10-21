@@ -199,6 +199,15 @@ G.Icons = (() => {
     g.strokeStyle = '#8a8f94'; g.lineWidth = 3; g.beginPath(); g.moveTo(W * 0.56, H * 0.22); g.lineTo(W * 0.7, H * 0.5); g.stroke();
     g.beginPath(); g.arc(W * 0.36, H * 0.22, W * 0.07, 0, 7); g.stroke();
   }
+  // a flashbang: a grey steel can with its vent holes, the spoon and pin on top
+  function drawFlash(g, W, H) {
+    g.fillStyle = '#7d8388'; g.fillRect(W * 0.3, H * 0.3, W * 0.4, H * 0.58); shade(g, W * 0.3, H * 0.3, W * 0.4, H * 0.58);
+    g.fillStyle = '#2b2f33'; for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) g.fillRect(W * (0.36 + j * 0.18), H * (0.42 + i * 0.14), W * 0.1, H * 0.05);
+    g.fillStyle = '#c9b45a'; g.fillRect(W * 0.3, H * 0.84, W * 0.4, H * 0.05); // the band
+    g.fillStyle = '#8a8f94'; g.fillRect(W * 0.42, H * 0.18, W * 0.16, H * 0.12);
+    g.strokeStyle = '#8a8f94'; g.lineWidth = 3; g.beginPath(); g.moveTo(W * 0.56, H * 0.22); g.lineTo(W * 0.72, H * 0.52); g.stroke();
+    g.beginPath(); g.arc(W * 0.36, H * 0.22, W * 0.07, 0, 7); g.stroke();
+  }
   const GEAR_COL = (d) => (d.brand && /Sable|Paragon/.test(d.brand) ? '#5a5240' : /Kestrel|Vantage/.test(d.brand || '') ? '#4d5639' : '#2e3236');
   function drawCarrier(g, W, H, d) {
     const col = d.id === 'c.ghost' ? '#3a3d40' : GEAR_COL(d);
@@ -383,6 +392,7 @@ G.Icons = (() => {
     else if (it.k === 'ammo') drawAmmo(g, W, H, it);
     else if (it.k === 'med') drawMedItem(g, W, H, it.mt);
     else if (it.k === 'frag') drawFrag(g, W, H);
+    else if (it.k === 'flash') drawFlash(g, W, H);
     else if (it.k === 'carrier') drawCarrier(g, W, H, d);
     else if (it.k === 'plate') drawPlate(g, W, H, d);
     else if (it.k === 'helmet') { drawHelmet(g, W, H, d); if (it.face) drawFace(g, W, H, G.Gear.defOf(it.face), true); }
