@@ -532,8 +532,40 @@ G.Server = {
     const w = !def.civ && G.WEAPONS[def.wpn];
     if (w && w.mag > 0 && !w.explosive) { e.magMax = w.mag; e.mag = Math.random() < 0.25 ? Math.max(1, Math.ceil(w.mag * (0.3 + Math.random() * 0.6))) : w.mag; }
     if (this.map) G.Level.resolve(this.map, e, 0.38 * def.scale, y, G.World.STEP); // (spots are cell centres: clear of the walls beside them)
+    if (this.map) e.yaw = this.openYaw(e, e.yaw); // (facing into the room, not the wall: a gun at the ready would go through it)
     this.enemies.set(e.id, e);
     return e;
+  },
+  // How far someone can go straight ahead facing `yaw` (to the first thing in the way at the knee or the chest),
+  // up to max.
+  roomAhead(e, yaw, max) {
+    const w = this.map && this.map.world;
+    if (!w) return max;
+    const dx = -Math.sin(yaw), dz = -Math.cos(yaw), y = e.y || 0;
+    return Math.min(G.World.raycast(w, e.x, y + 0.5, e.z, dx, 0, dz, max, { move: true }).t, G.World.raycast(w, e.x, y + 1.3, e.z, dx, 0, dz, max, { move: true }).t);
+  },
+  // A way to face with room in front (not nose to a wall, a gun held out through it): yaw itself if it has, else
+  // the roomiest of a few tries within spread of it.
+  openYaw(e, yaw, spread = Math.PI * 2) {
+    let best = yaw, room = -1;
+    for (let k = 0; k < 6; k++) {
+      const a = k ? yaw + (Math.random() - 0.5) * spread : yaw, d = this.roomAhead(e, a, 1.5);
+      if (d >= 1.5) return a;
+      if (d > room) { room = d; best = a; }
+    }
+    return best;
+  },
+  // Somewhere to amble to, near where they started: a few steps along a way with room to walk it (not toward a
+  // point behind a wall, to stand pressed against the wall till they give up), or null to stay put.
+  amble(e) {
+    for (let k = 0; k < 4; k++) {
+      const a = Math.random() * Math.PI * 2, want = 0.6 + Math.random() * 1.9;
+      const r = Math.min(want, this.roomAhead(e, a, want + 0.8) - 0.8);
+      if (r < 0.5) continue;
+      const x = e.x - Math.sin(a) * r, z = e.z - Math.cos(a) * r;
+      if (Math.hypot(x - e.home.x, z - e.home.z) <= 2.5) return { x, z };
+    }
+    return null;
   },
   draw(e) {
     if (e.def.civ || !e.armed || e.drawn) return;
@@ -1216,9 +1248,8 @@ G.Server = {
         // pottering about like anyone else in the building
         e.idleT -= dt;
         if (e.idleT <= 0) {
-          e.idleT = 2 + Math.random() * 4; e.idleYaw = e.yaw + (Math.random() - 0.5) * 2.6;
-          const a = Math.random() * Math.PI * 2, r = Math.random() * 2.5;
-          e.walkTo = Math.random() < 0.45 ? { x: e.home.x + Math.cos(a) * r, z: e.home.z + Math.sin(a) * r } : null;
+          e.idleT = 2 + Math.random() * 4; e.idleYaw = this.openYaw(e, e.yaw + (Math.random() - 0.5) * 2.6, 2.6);
+          e.walkTo = Math.random() < 0.45 ? this.amble(e) : null;
         }
         if (e.walkTo) {
           const dx = e.walkTo.x - e.x, dz = e.walkTo.z - e.z, d = Math.hypot(dx, dz);
@@ -1487,8 +1518,7 @@ G.Server = {
     e.idleT -= dt;
     if (e.idleT <= 0) {
       e.idleT = 2 + Math.random() * 4;
-      const a = Math.random() * Math.PI * 2, r = Math.random() * 2.5;
-      e.walkTo = Math.random() < 0.55 ? { x: e.home.x + Math.cos(a) * r, z: e.home.z + Math.sin(a) * r } : null;
+      e.walkTo = Math.random() < 0.55 ? this.amble(e) : null;
     }
     if (e.walkTo) {
       const dx = e.walkTo.x - e.x, dz = e.walkTo.z - e.z, d = Math.hypot(dx, dz);
