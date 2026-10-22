@@ -125,7 +125,7 @@ G.Casings = (() => {
   function dropAt(def, item, at) {
     if (!G.R || !G.R.dynRoot) return null;
     const { mesh, r } = magMesh(def, item);
-    const a = Math.random() * Math.PI * 2, p = V().set(at.x + Math.cos(a) * 0.35, 0.6, at.z + Math.sin(a) * 0.35);
+    const a = Math.random() * Math.PI * 2, p = V().set(at.x + Math.cos(a) * 0.35, (at.y || 0) + 0.6, at.z + Math.sin(a) * 0.35);
     const c = { mesh, p, q: new T.Quaternion().setFromEuler(new T.Euler(0.3, a, 0.2)), v: V().set(0, -0.5, 0), w: V().set(2, 1, 2), rest: false, age: 0, k: { mat: 'steel', len: 120, r }, item };
     G.R.dynRoot.add(mesh);
     mags.push(c);
@@ -200,17 +200,29 @@ G.Casings = (() => {
     c.p.addScaledVector(c.v, h);
     const wl = c.w.length();
     if (wl > 1e-3) { tmpQ.setFromAxisAngle(tmpS.copy(c.w).divideScalar(wl), wl * h); c.q.premultiply(tmpQ); }
-    // walls, doors and furniture sides
-    const tx = Math.floor(c.p.x / L.TS), tz = Math.floor(c.p.z / L.TS);
-    for (let oz = -1; oz <= 1; oz++) for (let ox = -1; ox <= 1; ox++) for (const b of L.boxesAt(map, tx + ox, tz + oz)) {
-      if (c.p.y < b.y0 || c.p.y > b.h - 0.01) continue;
-      const px = b.hx + c.k.r - Math.abs(c.p.x - b.cx), pz = b.hz + c.k.r - Math.abs(c.p.z - b.cz);
-      if (px <= 0 || pz <= 0) continue;
+    // walls, doors and furniture sides (the solids of the level, every floor's at its height: the tile plan is
+    // the ground floor's, at ground level, and upstairs or in a basement put walls where there were none)
+    const hit = (cx, cz, hx, hz) => {
+      const px = hx + c.k.r - Math.abs(c.p.x - cx), pz = hz + c.k.r - Math.abs(c.p.z - cz);
+      if (px <= 0 || pz <= 0) return;
       const vn = px < pz ? c.v.x : c.v.z;
-      if (px < pz) { c.p.x += Math.sign(c.p.x - b.cx || 1) * px; c.v.x *= -0.3; c.v.z *= 0.7; }
-      else { c.p.z += Math.sign(c.p.z - b.cz || 1) * pz; c.v.z *= -0.3; c.v.x *= 0.7; }
+      if (px < pz) { c.p.x += Math.sign(c.p.x - cx || 1) * px; c.v.x *= -0.3; c.v.z *= 0.7; }
+      else { c.p.z += Math.sign(c.p.z - cz || 1) * pz; c.v.z *= -0.3; c.v.x *= 0.7; }
       c.w.multiplyScalar(0.7);
       impact(c, Math.abs(vn) * 0.7, map);
+    };
+    if (map.world) {
+      const r = c.k.r;
+      G.World.query(map.world, [c.p.x - r, c.p.y, c.p.z - r], [c.p.x + r, c.p.y, c.p.z + r], (s) => {
+        if (!s.move || c.p.y < s.min[1] || c.p.y > s.max[1] - 0.01) return;
+        hit((s.min[0] + s.max[0]) / 2, (s.min[2] + s.max[2]) / 2, (s.max[0] - s.min[0]) / 2, (s.max[2] - s.min[2]) / 2);
+      });
+    } else {
+      const tx = Math.floor(c.p.x / L.TS), tz = Math.floor(c.p.z / L.TS);
+      for (let oz = -1; oz <= 1; oz++) for (let ox = -1; ox <= 1; ox++) for (const b of L.boxesAt(map, tx + ox, tz + oz)) {
+        if (c.p.y < b.y0 || c.p.y > b.h - 0.01) continue;
+        hit(b.cx, b.cz, b.hx, b.hz);
+      }
     }
     // the floor, or the top of something
     const g = L.groundAt(map, c.p.x, c.p.z, 0.01, c.p.y + 0.03);
