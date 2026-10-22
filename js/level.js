@@ -760,6 +760,7 @@ G.Level = {
     fms.forEach((m, f) => { const up = fms[f + 1]; m.voidAbove = up ? up.t.map((v) => (v === 5 ? 1 : 0)) : null; m.above = up || null; });
     const map = Object.assign({}, fms[base]); // (the level's own map is the ground floor's: the spawn, the outdoors)
     map.floors = fms; map.NF = fms.length; map.base = base;
+    map.minY = -base * FH; // (the lowest floor: a basement's is below the ground)
     map.doors = []; map.windows = []; map.rooms = []; map.cover = []; map.wallSpots = []; map.enemySpots = [];
     fms.forEach((m, f) => {
       if (f !== base) { m.case = null; m.cabinets = []; } // (the weapon case and first aid cabinets: on the ground floor)
@@ -1612,7 +1613,9 @@ G.Level = {
     const ceilGeo = new THREE.PlaneGeometry(TS, TS); ceilGeo.rotateX(Math.PI / 2);
     const ceil = new THREE.InstancedMesh(ceilGeo, new THREE.MeshStandardMaterial({ map: ctex, roughness: 1 }), roofed.length);
     const cm = new THREE.Matrix4();
-    roofed.forEach((i, n) => { cm.makeTranslation(((i % W) + 0.5) * TS, this.WALL_H, (Math.floor(i / W) + 0.5) * TS); ceil.setMatrixAt(n, cm); });
+    // (a centimetre under the tops of the walls: the walls of the floor above stand on them, and their undersides,
+    // level with the ceiling, fought it for the pixels)
+    roofed.forEach((i, n) => { cm.makeTranslation(((i % W) + 0.5) * TS, this.WALL_H - 0.01, (Math.floor(i / W) + 0.5) * TS); ceil.setMatrixAt(n, cm); });
     ceil.layers.enable(1);
     root.add(ceil);
 
@@ -1655,7 +1658,7 @@ G.Level = {
       // eaves past the walls, a gable at each end, fascia boards along the eaves.
       if (th.home >= 1) {
         const up = map.above, sky = new Uint8Array(W * H), seen = new Uint8Array(W * H);
-        for (let i = 0; i < W * H; i++) sky[i] = !map.out[i] && t[i] !== 5 && (!up || up.out[i] || up.t[i] === 5) ? 1 : 0;
+        for (let i = 0; i < W * H; i++) sky[i] = !map.out[i] && t[i] !== 5 && (!up || up.out[i]) ? 1 : 0; // (a hole in the floor above is its stairwell, not sky)
         const gableMat = new THREE.MeshStandardMaterial({ color: 0xd8d2c4, roughness: 0.8 }), O = 0.35, PITCH = 0.55;
         for (let i0 = 0; i0 < W * H; i0++) {
           if (!sky[i0] || seen[i0]) continue;

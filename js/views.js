@@ -715,8 +715,10 @@ G.Views = {
     G.R.tacBegin();
     const me = G.Me, mw = G.Game.phase === 'level' && me.cur ? me.cur() : null, mf = mw && !me.dead ? me.tacFlags(mw) : 0;
     if (mf) {
-      // aimed from the eye along the bore (where the rounds go); drawn from the gun in your hands. With the gun off
-      // the line (lowered, coming up, mid-reload) it's the gun itself that points them: from its muzzle along its barrel.
+      // the gun points them, always: along its barrel as you see it (sway, bob, a turn's lag, the kick: the dot goes
+      // with it), drawn from the gun in your hands. With the gun up that line runs from your eye (where the rounds
+      // start: held steady, the barrel and the bore agree, so the dot is where they go); with the gun off the line
+      // (lowered, coming up, mid-reload) from its muzzle.
       let dir = me.boreDir(), from = G.R.camera.position.clone(), gun = null;
       const vm = G.R.vm, fl = vm && vm.userData.flash;
       if (fl) {
@@ -724,7 +726,7 @@ G.Views = {
         gun = fl.getWorldPosition(new THREE.Vector3());
         const axis = new THREE.Vector3(0, 0, -1).transformDirection(fl.parent.matrixWorld); // (the barrel: -z in its holder)
         const off = THREE.MathUtils.smoothstep(Math.acos(G.U.clamp(axis.dot(dir), -1, 1)), 0.03, 0.12); // (~2° to 7° off)
-        if (off > 0) { dir = dir.lerp(axis, off).normalize(); from.lerp(gun, off); }
+        dir = axis; if (off > 0) from.lerp(gun, off);
       }
       this.tacBeam(from, dir, mf, null, gun);
     }

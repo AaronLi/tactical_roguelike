@@ -900,7 +900,7 @@ G.GunModels = (() => {
     if (o.thread && !sl.comp) { k.cyl(0.0058, 0.012, M.steel(), front, 0.009); front += 0.012; }
     if (o.muzzle && o.thread) { k.tag('muzzle'); front += muzzle(k, o.muzzle, front, 0.0065, 0.009); }
     k.tag('tac');
-    tactical(k, o.tac, len * 0.86, -0.014, -0.01);
+    tactical(k, o.tac, o.tx ? len * 0.97 : len * 0.86, -0.026, -0.01); // (hung under the dust cover's rail, not in it: the TX22's runs to the muzzle)
     k.tag('optic');
     let sight;
     if (o.optic === 'minidot') sight = S.minidot(k, len * 0.32, 0.026, o);
