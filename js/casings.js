@@ -225,7 +225,8 @@ G.Casings = (() => {
         if (vn < 0.6 && Math.hypot(c.v.x, c.v.z) < 0.3) settle(c, g);
       }
     }
-    if (c.p.y < -1) settle(c, 0);
+    const floor = (G.Game.map && G.Game.map.minY) || 0;
+    if (c.p.y < floor - 1) settle(c, floor); // (a basement's floor is below the ground)
   }
   // lying on its side, wherever it stopped
   function settle(c, g) {

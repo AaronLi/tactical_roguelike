@@ -1018,7 +1018,7 @@ G.Me = {
     }
     if (end) { if (b.def.cls === 'RAIL') G.R.tracer(b.muzzle, end.p, b.def.tracer || 0x55ddff, 0.06); return true; } // (a railgun leaves its line hanging)
     b.dist += len; b.p.copy(p1);
-    return b.t > G.ROUND_LIFE.t || b.dist > G.ROUND_LIFE.dist || b.v.length() < G.ROUND_LIFE.v || b.p.y < -2;
+    return b.t > G.ROUND_LIFE.t || b.dist > G.ROUND_LIFE.dist || b.v.length() < G.ROUND_LIFE.v || b.p.y < ((G.Game.map && G.Game.map.minY) || 0) - 2; // (through the lowest floor: a basement's is below ground)
   },
   // A round's step from a along dir for len metres: the world (through windows, breaking them) and the
   // hitboxes of everyone in its way, with penetration through bodies. Returns where it stopped ({ p, t }),
