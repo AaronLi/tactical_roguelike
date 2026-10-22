@@ -211,30 +211,44 @@ G.Me = {
   // page does with the click. So the page keeps three history entries of its own and sits on the middle one:
   // back or forward lands on a neighbour, which it notices (popstate), steps off again, and reads as the button
   // (back: the light, forward: the laser). Only in a level: elsewhere back is left alone (a second back leaves
-  // the page), and entering a level puts it on the middle entry again.
+  // the page), and entering a level puts it on the middle entry again. Arriving on the middle entry is never a
+  // press (it's the page stepping back onto it), so there's nothing to count; the step back waits for the
+  // browser to finish arriving (one asked for inside popstate can be dropped), and if it still didn't happen the
+  // three entries are laid again.
   navTrap() {
     try {
       history.replaceState({ bp: 'base' }, '');
       history.pushState({ bp: 'mid' }, '');
       history.pushState({ bp: 'top' }, '');
-      this.navSkip = 1; history.back(); // (onto the middle one: that popstate is ours)
+      history.back(); // (onto the middle one)
     } catch (e) { return; }
     window.addEventListener('popstate', (e) => {
       const s = e.state && e.state.bp;
-      if (this.navSkip > 0) { this.navSkip--; return; }
-      if (s !== 'base' && s !== 'top') return;
-      if (G.Game.phase !== 'level') return; // (not playing: let it be)
-      this.navSkip = 1;
-      if (s === 'base') history.forward(); else history.back();
+      if ((s !== 'base' && s !== 'top') || G.Game.phase !== 'level') return; // (our own step, or not playing: let it be)
+      this.navCentre();
       // (a browser that let the page cancel the click already toggled it on mousedown)
       if (performance.now() - (this.sideAt || 0) > 500) this.toggleTac(s === 'base' ? 'light' : 'laser');
     });
   },
-  // back on the middle history entry (entering a level after a back or forward outside one)
-  navRearm() {
-    const s = history.state && history.state.bp;
-    if (s === 'base') { this.navSkip = 1; history.forward(); } else if (s === 'top') { this.navSkip = 1; history.back(); }
+  // back onto the middle history entry (after a press, or entering a level after a back or forward outside one)
+  navCentre() {
+    const at = history.state && history.state.bp;
+    if (at !== 'base' && at !== 'top') return;
+    setTimeout(() => {
+      if (history.state && history.state.bp !== at) return;
+      if (at === 'base') history.forward(); else history.back();
+      setTimeout(() => { // (still there: lay the three again, from here)
+        const now = history.state && history.state.bp;
+        if (now !== 'base' && now !== 'top') return;
+        try {
+          if (now === 'base') history.pushState({ bp: 'mid' }, ''); else history.replaceState({ bp: 'mid' }, '');
+          history.pushState({ bp: 'top' }, ''); history.back();
+        } catch (e) { /* (history unavailable) */ }
+      }, 250);
+    }, 0);
   },
+  navRearm() { this.navCentre(); },
+
   // switch the gun's light or laser (it remembers: each gun has its own switches)
   toggleTac(kind) {
     const w = this.cur();
