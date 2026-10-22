@@ -29,7 +29,7 @@ G.LightGrid = (() => {
   const U = {
     lgLight: { value: blank }, lgDir: { value: blank },
     lgGrid: { value: new T.Vector4(0, 0, 1, 0) }, // x0, z0 (the map's corner, metres), cell size, on (0/1)
-    lgSize: { value: new T.Vector4(1, 1, 1, 0) }, // W, H (cells), floors, y of the lowest floor
+    lgSize: { value: new T.Vector4(1, 1, 1, 0) }, // W, H (cells), floors, where the lowest floor's layer starts (y)
     lgFloorH: { value: 4.3 },
   };
   let built = false;
@@ -47,7 +47,7 @@ G.LightGrid = (() => {
   const FS_BODY = `
     if (lgGrid.w > 0.5) {
       vec3 lgn = normalize(vLgN);
-      float lgf = clamp(floor((vLgP.y - lgSize.w + 0.6) / lgFloorH), 0.0, lgSize.z - 1.0); // (which floor's layer)
+      float lgf = clamp(floor((vLgP.y - lgSize.w) / lgFloorH), 0.0, lgSize.z - 1.0); // (which floor's layer)
       vec2 lgc = (vLgP.xz + lgn.xz * 0.3 - lgGrid.xy) / lgGrid.z; // (in cells; a wall's face samples just off it, its own side)
       lgc.y = clamp(lgc.y, 0.5, lgSize.y - 0.5) + lgf * lgSize.y;
       vec2 lguv = vec2(lgc.x / lgSize.x, lgc.y / (lgSize.y * lgSize.z));
@@ -189,7 +189,9 @@ G.LightGrid = (() => {
     flush();
     U.lgLight.value = G0.tl; U.lgDir.value = G0.td;
     U.lgGrid.value.set(0, 0, TS, 0);
-    U.lgSize.value.set(W, H, NF, floors[0].fy || 0);
+    // a floor's layer: from just under its floor (the slab's edge round a drop) to just over its ceiling. (Not
+    // higher: the top of a room's walls and its ceiling took the light of the floor above, and flickered with it.)
+    U.lgSize.value.set(W, H, NF, (floors[0].fy || 0) - (L.FLOOR_H - L.WALL_H) + 0.02);
     U.lgFloorH.value = L.FLOOR_H;
     built = true;
     map.lightGridMs = Math.round(performance.now() - t0);

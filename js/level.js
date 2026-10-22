@@ -1613,7 +1613,9 @@ G.Level = {
     const ceilGeo = new THREE.PlaneGeometry(TS, TS); ceilGeo.rotateX(Math.PI / 2);
     const ceil = new THREE.InstancedMesh(ceilGeo, new THREE.MeshStandardMaterial({ map: ctex, roughness: 1 }), roofed.length);
     const cm = new THREE.Matrix4();
-    roofed.forEach((i, n) => { cm.makeTranslation(((i % W) + 0.5) * TS, this.WALL_H, (Math.floor(i / W) + 0.5) * TS); ceil.setMatrixAt(n, cm); });
+    // (a centimetre under the tops of the walls: the walls of the floor above stand on them, and their undersides,
+    // level with the ceiling, fought it for the pixels)
+    roofed.forEach((i, n) => { cm.makeTranslation(((i % W) + 0.5) * TS, this.WALL_H - 0.01, (Math.floor(i / W) + 0.5) * TS); ceil.setMatrixAt(n, cm); });
     ceil.layers.enable(1);
     root.add(ceil);
 
