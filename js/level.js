@@ -13,6 +13,7 @@ G.Level = {
   CAB_CHANCE: 0.35, // share of levels with a first aid cabinet on a wall (and of those, CAB_TWO with a second)
   CAB_TWO: 0.2,
   ABOX_CHANCE: 0.7, // share of levels with an attachments box
+  SBOX_CHANCE: 0.1, // share of levels with a sticker box (js/stickers.js)
   WALL_H: 4,
   CRATE_H: 1.1,
   CRATE_HX: 0.8,
@@ -39,7 +40,7 @@ G.Level = {
   generateHub(seed, level) {
     const r = G.U.rng(seed), lay = this.layHangar(r, level);
     const map = this.plan(lay, r, seed, level, G.HANGAR_THEME);
-    map.case = null; map.abox = null; map.cabinets = []; map.enemySpots = []; map.hub = true;
+    map.case = null; map.abox = null; map.sbox = null; map.cabinets = []; map.enemySpots = []; map.hub = true;
     G.World.fromTileMap(map);
     G.Hangar.decorate(map);
     return map;
@@ -350,6 +351,27 @@ G.Level = {
         break;
       }
     }
+    // The sticker box: on one level in ten (SBOX_CHANCE), a little display box on the floor against a wall in some room
+    // indoors (not by a door, the weapon case or the attachments box), one sticker in it under a clear lid, for whoever
+    // opens it first (js/server.js, the host's pick of which). Its own random stream from the seed.
+    map.sbox = null;
+    {
+      const rs = U.rng((map.seed ^ 0x571c4e25) >>> 0), far = (o, x, z) => !o || Math.hypot((x + 0.5) * TS - o.x, (z + 0.5) * TS - o.z) > 3;
+      if (rs() < this.SBOX_CHANCE) for (const rm of U.shuffle(rs, rooms.filter(keepIn))) {
+        const spots = [];
+        for (let z = rm.z; z < rm.z + rm.h; z++) for (let x = rm.x; x < rm.x + rm.w; x++) {
+          if (!clear(x, z) || (map.out && map.out[z * W + x]) || !far(map.case, x, z) || !far(map.abox, x, z)) continue;
+          let nearDoor = false;
+          for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) if (t[(z + dz) * W + x + dx] === 3) nearDoor = true;
+          if (nearDoor) continue;
+          for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (t[(z + dz) * W + x + dx] === 1) spots.push([x, z, dx, dz]);
+        }
+        if (!spots.length) continue;
+        const [x, z, dx, dz] = U.pick(rs, spots);
+        map.sbox = { x: (x + 0.5) * TS + dx * (TS / 2 - 0.13), z: (z + 0.5) * TS + dz * (TS / 2 - 0.13), yaw: Math.atan2(-dx, -dz) };
+        break;
+      }
+    }
     // Ceiling lamps: one per room, a grid of them over a warehouse floor, none in the open; porch lanterns over
     // doors that open onto a garden
     map.lights = [];
@@ -483,7 +505,7 @@ G.Level = {
     const add = (cells, nx, nz, ext, kind) => {
       const [a, b] = cells.map((i) => [i % W, (i / W) | 0]);
       const mx = ((a[0] + b[0]) / 2 + 0.5) * TS, mz = ((a[1] + b[1]) / 2 + 0.5) * TS, near = (o) => o && Math.hypot(o.x - mx, o.z - mz) < 1.6;
-      if (!kind && (near(map.case) || near(map.abox) || (map.cabinets || []).some(near))) return; // (not through the wall a cabinet or the weapon case is against)
+      if (!kind && (near(map.case) || near(map.abox) || near(map.sbox) || (map.cabinets || []).some(near))) return; // (not through the wall a cabinet or the weapon case is against)
       const id = map.windows.length;
       // the opening's middle, on the wall's centre line (thru) or the room-side cell's middle (ext)
       const w = { id, cells, nx, nz, ext, broken: false, x: ((a[0] + b[0]) / 2 + 0.5) * TS, z: ((a[1] + b[1]) / 2 + 0.5) * TS, len: 2 * TS };
@@ -954,7 +976,7 @@ G.Level = {
     map.minY = -base * FH; // (the lowest floor: a basement's is below the ground)
     map.doors = []; map.windows = []; map.rooms = []; map.cover = []; map.wallSpots = []; map.enemySpots = [];
     fms.forEach((m, f) => {
-      if (f !== base) { m.case = null; m.abox = null; m.cabinets = []; } // (the weapon case, the attachments box and first aid cabinets: on the ground floor)
+      if (f !== base) { m.case = null; m.abox = null; m.sbox = null; m.cabinets = []; } // (the weapon case, the attachments box, the sticker box and first aid cabinets: on the ground floor)
       for (const d of m.doors) { d.id = map.doors.length; d.fl = f; d.fy = m.fy; map.doors.push(d); }
       for (const w of m.windows) { w.id = map.windows.length; w.fl = f; w.fy = m.fy; map.windows.push(w); }
       for (const rm of m.rooms) { rm.fl = f; map.rooms.push(rm); }
@@ -1866,7 +1888,7 @@ G.Level = {
       (m.winMeshes || []).forEach((p, i) => { if (p) map.winMeshes[i] = p; });
       for (const l of m.lamps) map.lamps.push(Object.assign({}, l, { y: l.y + m.fy, fl: m.fl }));
     }
-    map.caseView = map.floors[map.base || 0].caseView; map.aboxView = map.floors[map.base || 0].aboxView; map.cabViews = map.floors[map.base || 0].cabViews;
+    map.caseView = map.floors[map.base || 0].caseView; map.aboxView = map.floors[map.base || 0].aboxView; map.sboxView = map.floors[map.base || 0].sboxView; map.cabViews = map.floors[map.base || 0].cabViews;
     for (const d of map.doors) if (d.pane) map.winMeshes[d.pane.id] = map.doorMeshes[d.id].userData.leaf; // (a glass door's pane: its leaf)
     // the stairs: each step a block (stone treads, painted risers), and a stringer down the open side
     const tread = new THREE.MeshStandardMaterial(map.railSteel ? { color: 0x5a5e62, roughness: 0.45, metalness: 0.7 } : { color: 0x8a847a, roughness: 0.8 }), riser = new THREE.MeshStandardMaterial(map.railSteel ? { color: 0x34383c, roughness: 0.5, metalness: 0.6 } : { color: 0xcfc8bb, roughness: 0.9 }); // (a foundry's: steel)
@@ -1908,6 +1930,7 @@ G.Level = {
       for (const o of m.winMeshes || []) if (o) keep.add(o);
       if (m.caseView) keep.add(m.caseView.g);
       if (m.aboxView) keep.add(m.aboxView.g);
+      if (m.sboxView) keep.add(m.sboxView.g);
       for (const c of m.cabViews || []) keep.add(c.g);
     }
     const plain = (mt) => (mt.isMeshStandardMaterial || mt.isMeshBasicMaterial || mt.isMeshLambertMaterial || mt.isMeshPhongMaterial) && !mt.transparent
@@ -2245,6 +2268,31 @@ G.Level = {
       g.position.set(map.abox.x, 0, map.abox.z); g.rotation.y = map.abox.yaw;
       root.add(g);
       map.aboxView = { g, lid, lights, key: null, open: 0, synced: false };
+    }
+    // the sticker box: a little bright pink display box on the floor, a clear lid hinged at the back, the sticker lying
+    // on a white card inside (its picture and the lid: G.Views, once the host has said which it is)
+    if (map.sbox) {
+      const M = (color, roughness, metalness = 0) => new THREE.MeshStandardMaterial({ color, roughness, metalness });
+      const pink = M(0xe8287a, 0.55), white = M(0xf2f0ea, 0.8), yel = M(0xffd23a, 0.5);
+      const box = (w, h, d, m, x, y, z, parent) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); parent.add(b); return b; };
+      const g = new THREE.Group(), Lb = 0.24, D = 0.17, H0 = 0.05;
+      box(Lb, 0.008, D, pink, 0, 0.004, 0, g);
+      for (const sd of [-1, 1]) { box(Lb, H0, 0.01, pink, 0, H0 / 2, sd * (D / 2 - 0.005), g); box(0.01, H0, D, pink, sd * (Lb / 2 - 0.005), H0 / 2, 0, g); }
+      for (const sd of [-1, 1]) box(Lb + 0.003, 0.012, 0.003, yel, 0, H0 - 0.014, sd * (D / 2 + 0.001), g); // (a yellow stripe round it)
+      box(Lb - 0.02, 0.022, D - 0.02, white, 0, 0.019, 0, g);
+      // the sticker on its card: a plane, sized to its picture when it's known
+      const card = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.45, transparent: true, alphaTest: 0.03, depthWrite: false }));
+      card.rotation.x = -Math.PI / 2; card.position.y = 0.031; card.visible = false; g.add(card);
+      const lid = new THREE.Group();
+      lid.position.set(0, H0, -D / 2);
+      g.add(lid);
+      const pane = new THREE.MeshStandardMaterial({ color: 0xdfeaf2, roughness: 0.08, metalness: 0, transparent: true, opacity: 0.22, depthWrite: false });
+      box(Lb, 0.004, D, pane, 0, 0.002, D / 2, lid);
+      for (const sd of [-1, 1]) box(0.012, 0.006, D, pink, sd * (Lb / 2 - 0.006), 0.003, D / 2, lid);
+      for (const sd of [0, 1]) box(Lb, 0.006, 0.012, pink, 0, 0.003, sd * (D - 0.012) + 0.006, lid);
+      g.position.set(map.sbox.x, 0, map.sbox.z); g.rotation.y = map.sbox.yaw;
+      root.add(g);
+      map.sboxView = { g, lid, card, open: 0, name: null, synced: false };
     }
     // first aid cabinets: a white steel box on the wall with a red cross on its door (hinged on the left),
     // two shelves inside with whatever's left in it. Contents and door: G.Views.syncCabs.

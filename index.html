@@ -29,6 +29,11 @@
       <button id="btnJoin" class="btn">Join</button>
     </div>
     <div class="lan-row"><button id="btnLan" class="btn small">Find LAN games</button><div id="lanList" class="lan-list"></div></div>
+    <div class="hl-row" title="The hangar's TVs save the last level's highlights as a .zip: this makes the video from one">
+      <button id="btnRender" class="btn small">Render highlights video</button><button id="btnRenderStop" class="btn small hidden">Cancel</button>
+      <input id="hlFile" type="file" accept=".zip,application/zip" hidden>
+      <div class="hl-prog hidden"><i id="hlBar"></i></div><div id="hlMsg" class="hl-msg"></div>
+    </div>
     <div id="menuMsg" class="msg"></div>
 
     <details class="settings">
@@ -196,6 +201,7 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script src="js/util.js"></script>
+<script src="js/zip.js"></script>
 <script src="js/data.js"></script>
 <script src="js/callsigns.js"></script>
 <script src="js/parts.js"></script>
@@ -210,6 +216,7 @@
 <script src="js/gunaudio.js"></script>
 <script src="js/lightgrid.js"></script>
 <script src="js/render.js"></script>
+<script src="js/stickers.js"></script>
 <script src="js/gunmodels.js"></script>
 <script src="js/vmanim.js"></script>
 <script src="js/headgear.js"></script>

@@ -32,7 +32,15 @@ G.Highlights = (() => {
   function officerInfo(id, pv) {
     const me = id === G.Net.myId, g = G.Game, ro = (g.roster || {})[id] || {};
     return { kind: 'p', id, name: me ? g.myName : (pv && pv.name) || ro.name || 'Officer', color: me ? g.myColor : (pv && pv.color) != null ? pv.color : ro.color, animal: me ? g.myAnimal : (pv && pv.animal) || ro.animal,
-      look: me ? g.myLook : (pv && pv.look) || ro.look, kt: me ? G.Me.kitLook() : pv && pv.st ? pv.st.kt : null, gun: me ? G.Me.cur().def.code : pv && pv.st ? pv.st.w : null };
+      look: me ? g.myLook : (pv && pv.look) || ro.look, kt: me ? G.Me.kitLook() : pv && pv.st ? pv.st.kt : null, gun: me ? G.Me.cur().def.code : pv && pv.st ? pv.st.w : null,
+      sk: me ? G.Me.cur().stickers || null : pv && pv.st ? G.Stickers.of(pv.st.sk) : null };
+  }
+  // an officer's record, now: as they are, and the stickers on each gun they've been seen with (skins: code -> list)
+  function officer(k, id, pv) {
+    const A = Object.assign(R.actors.get(k) || {}, officerInfo(id, pv));
+    if (A.gun && A.sk && A.sk.length) (A.skins || (A.skins = {}))[A.gun] = A.sk;
+    delete A.sk;
+    R.actors.set(k, A);
   }
   // one frame: every actor as they are now ([x, y, z, yaw, pitch, flags, lean, zip, ...]; flags: crouch 1, prone 2,
   // alert 4, down 8, dead 16, hands up 32, cuffed 64, cowering 128). zip: how far through being zip-tied (a suspect;
@@ -55,13 +63,13 @@ G.Highlights = (() => {
     for (const pv of G.Views.players.values()) {
       if (!pv.st) continue;
       const st = pv.st, k = 'p' + pv.id;
-      R.actors.set(k, Object.assign(R.actors.get(k) || {}, officerInfo(pv.id, pv)));
+      officer(k, pv.id, pv);
       a[k] = [pv.pos.x, pv.pos.y, pv.pos.z, pv.yaw, pv.pitch, (st.cr ? 1 : 0) | (st.pr ? 2 : 0) | (st.lr ? 0 : 4) | (st.dn ? 8 : 0) | (st.dd ? 16 : 0), st.ln || 0,
         st.act === 'z' ? st.ap || 0 : -1, st.act === 'z' ? st.zt : -1, st.pl ? 1 : 0, st.rl == null ? -1 : st.rl];
     }
     const me = G.Me, k = myKey();
     if (me && me.pos) {
-      R.actors.set(k, Object.assign(R.actors.get(k) || {}, officerInfo(G.Net.myId)));
+      officer(k, G.Net.myId);
       a[k] = [me.pos.x, me.pos.y, me.pos.z, me.yaw, me.pitch, (me.crouch ? 1 : 0) | (me.prone ? 2 : 0) | (me.lowReady ? 0 : 4) | (me.down ? 8 : 0) | (me.dead ? 16 : 0), me.lean || 0, ...zipOf(me.action),
         me.reloading && me.reloadTotal ? G.U.clamp(1 - me.reloadT / me.reloadTotal, 0, 1) : -1];
     }
@@ -308,7 +316,7 @@ G.Highlights = (() => {
   function disposeNodes(nodes) { for (const n of nodes || []) n.traverse((c) => { if (c.geometry) c.geometry.dispose(); if (c.material) (Array.isArray(c.material) ? c.material : [c.material]).forEach((m) => { if (m.map) m.map.dispose(); m.dispose(); }); }); }
   function drop() {
     if (P.level) { disposeNodes(P.level.children.slice()); P.level = null; }
-    P.map = null; P.clips = []; P.video = null; clearRigs();
+    P.map = null; P.clips = []; clearRigs();
   }
 
   // ================================================================ the TVs
@@ -345,22 +353,20 @@ G.Highlights = (() => {
       const scr = new T.Mesh(new T.PlaneGeometry(w, h), mat); scr.position.z = 0.072; body.add(scr);
       const led = new T.Mesh(new T.BoxGeometry(0.05, 0.02, 0.01), new T.MeshBasicMaterial({ color: 0xff2020 })); led.position.set(w / 2 - 0.08, -h / 2 - 0.035, 0.075); body.add(led);
       P.tvs.push({ g, brk, scr, w, h, led });
-      // F at it: the broadcast as a video file, rendered there and then (js/highlights.js exportVideo; the box round the
-      // screen, in the hall's coordinates, for js/hangar.js aim)
+      // F at it: the broadcast saved as a recording, a .zip the main menu makes the video from (exportPack; the box
+      // round the screen, in the hall's coordinates, for js/hangar.js aim)
       if (helpers && helpers.addTarget) {
         const ax = Math.abs(Math.cos(ry)) > 0.5, hw = w / 2 + 0.1, fz = Math.cos(ry) * 0.5, fx = Math.sin(ry) * 0.5;
         helpers.addTarget({ id: 'tv' + P.tvs.length, kind: 'pos', reach: 7, label: 'the highlights',
           box: ax ? [x - hw, y - h / 2 - 0.1, Math.min(z, z + fz), x + hw, y + h / 2 + 0.1, Math.max(z, z + fz)] : [Math.min(x, x + fx), y - h / 2 - 0.1, z - hw, Math.max(x, x + fx), y + h / 2 + 0.1, z + hw],
-          run: () => exportVideo(),
-          get runText() { return P.exporting && !P.video ? `download the highlights video (making it: ${Math.round(P.exporting.p * 100)}%)` : 'download the highlights video'; } });
+          run: () => exportPack(),
+          get runText() { return P.packing ? 'save the highlights (saving...)' : 'save the highlights (a .zip: make the video from it on the main menu)'; } });
       }
     }
     stage();
-    P.prog = program(); P.seg = -1; P.st = 0; P.ready = true; P.time = 0; P.video = null; P.wantSave = false;
+    P.prog = program(); P.seg = -1; P.st = 0; P.ready = true; P.time = 0;
     audio(true);
     next();
-    // the video, made ahead in the background (a moment after arriving: the hangar's own loading first)
-    if (canWorker()) setTimeout(() => { if (P.ready && !P.exporting && !P.video) makeVideo(true); }, 1500);
   }
   // the replay set: the old level, lit like a TV studio would (its own lamps' light grid is the hangar's now)
   function stage() {
@@ -373,7 +379,6 @@ G.Highlights = (() => {
     buildXray();
   }
   function unmount() {
-    if (P.exporting) { P.exporting.cancel = true; if (P.exporting.abort) P.exporting.abort(); } // (left mid-export: it stops)
     for (const tv of P.tvs) { if (tv.g.parent) tv.g.parent.remove(tv.g); if (tv.brk.parent) tv.brk.parent.remove(tv.brk); }
     P.tvs = []; P.ready = false; clearRigs();
     if (P.scene && P.level) P.scene.remove(P.level);
@@ -381,13 +386,16 @@ G.Highlights = (() => {
     audio(false);
   }
 
-  // ================================================================ the video
-  // F at a TV: the whole broadcast as a video file, made there and then rather than filmed: every frame rendered off
-  // screen as fast as the machine goes (30 frames a second of video; a minute of broadcast in a few seconds), encoded
-  // by the browser's own encoder (WebCodecs), the studio audience rendered offline beside it (an OfflineAudioContext,
-  // the same sounds at the same moments) and encoded as Opus, the two put in a WebM (writeWebm). The TVs show it from
-  // the top again when it's done.
-  const FPS = 30;
+  // ================================================================ the recording, and the video
+  // F at a TV: the broadcast saved as a .zip of what it's made from (exportPack): the level's seed (it's built again
+  // from it), the clips (everyone's every move, the rounds, the doors), the stats, the running order as the TVs cut it
+  // (its adverts' pictures with it) and the stickers on the officers' guns; a few hundred kB. The main menu's "Render
+  // highlights video" takes one and makes the video (renderPack): every frame rendered off screen in a worker
+  // (js/exportworker.js: its own renderer on an OffscreenCanvas, as fast as the machine goes; 30 frames a second of
+  // video), encoded by the browser's own encoder (WebCodecs), the studio audience rendered offline beside it (an
+  // OfflineAudioContext, the same sounds at the same moments) and encoded as Opus, the two put in a WebM (writeWebm).
+  // Made there rather than in the hangar: the game isn't running beside it, so it has the memory to itself.
+  const FPS = 30, PACK_V = 1;
   const yieldNow = () => new Promise((r) => { const ch = new MessageChannel(); ch.port1.onmessage = () => r(); ch.port2.postMessage(0); }); // (not throttled in a background tab, as a timer is)
   async function videoCodec() {
     // (VP8 first, in its realtime mode: about 3.5 ms a frame here; VP9 left to take its time, 300)
@@ -397,77 +405,149 @@ G.Highlights = (() => {
     }
     return null;
   }
-  // The export: in a worker when the browser can (js/exportworker.js: its own renderer on an OffscreenCanvas, the level
-  // built again from its seed, the recording sent over as data), so the game doesn't stop while it's made and the TVs
-  // play on; on this thread, a few frames at a time, when it can't (or the worker fails). Either way the sounds come
-  // back as events (what, and when) and are mixed here (mixAudio): Web Audio isn't in workers.
-  // The video's made ahead: in a worker (js/exportworker.js) once you're in the hangar (makeVideo, from mount), paced so
-  // the game keeps its frames, and kept; F at a TV saves it there and then, or as soon as it's done. Without a worker it
-  // waits to be asked, and is made here (the game stutters while it is).
-  const canWorker = () => !!(window.Worker && window.OffscreenCanvas && window.VideoEncoder && window.VideoFrame) && !P.noWorker;
+  const canWorker = () => !!(window.Worker && window.OffscreenCanvas && window.VideoEncoder && window.VideoFrame);
   const say = (t) => { if (G.HUD) G.HUD.toast('HIGHLIGHTS', t, 3); };
-  function exportVideo() {
-    const v = P.video;
-    if (v && v.blob) { save(v); return; }
-    if (P.exporting) { P.wantSave = true; say(`Finishing the video (${Math.round(P.exporting.p * 100)}%): it'll save when it's done`); return; }
-    P.wantSave = true;
-    makeVideo(false);
-  }
-  function save(v) {
-    const url = URL.createObjectURL(v.blob), a = document.createElement('a');
-    a.href = url; a.download = v.name; document.body.append(a); a.click(); a.remove();
+  function save(blob, name) {
+    const url = URL.createObjectURL(blob), a = document.createElement('a');
+    a.href = url; a.download = name; document.body.append(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 60000);
-    say(`Saved ${v.name} (${(v.blob.size / 1048576).toFixed(1)} MB, ${Math.round(v.dur)} s)`);
-    P.wantSave = false;
   }
-  // auto: made on arriving in the hangar (only in a worker, and quietly)
-  async function makeVideo(auto) {
-    if (P.exporting || !P.ready || !P.prog.length) return;
-    if (!window.VideoEncoder || !window.VideoFrame) { if (!auto) say('This browser can\'t make video files (no WebCodecs)'); return; }
-    if (auto && !canWorker()) return;
-    const X = P.exporting = { p: 0, cancel: false, auto };
-    const vc = await videoCodec();
-    if (!vc) { P.exporting = null; if (!auto) say('No video encoder available'); return; }
-    const t0 = performance.now();
-    if (!auto) say('Making the highlights video...');
-    let r = null;
-    if (canWorker()) {
-      try { r = await viaWorker(X, vc); X.how = 'worker'; } catch (e) { if (!X.cancel) console.warn('highlights: the export worker failed' + (P.wantSave ? ', making it here instead' : ''), e); }
-    }
-    if (!r && !X.cancel && P.wantSave) { X.here = true; X.how = 'main'; try { r = await viaMain(X, vc); } catch (e) { r = { err: e }; } }
-    const done = () => { if (X.here) { clearRigs(); P.seg = -1; P.st = 0; P.time = 0; next(); } if (P.exporting === X) P.exporting = null; }; // (the TVs: from the top)
-    if (X.cancel || !r || r.err || !(r.n > 0)) { done(); if (!X.cancel && P.wantSave) { P.wantSave = false; say('The video couldn\'t be made' + (r && r.err ? ': ' + (r.err.message || r.err) : '')); } return; }
-    const dur = r.n / FPS;
-    X.p = 0.92; X.stage = 'audio';
-    const au = await mixAudio(r.events, dur, X);
-    if (X.cancel) { done(); return; }
-    X.p = 0.97;
-    // the file: put together in the worker, where the video is (its 100 MB never come here), or here
-    let blob = null;
-    try { blob = r.mux ? await r.mux(au, dur, vc.id) : writeWebm({ codec: vc.id, video: r.video, audio: au.audio, head: au.head, dur }); } catch (e) { r.err = e; }
-    if (!blob) { done(); if (!X.cancel && P.wantSave) { P.wantSave = false; say('The video couldn\'t be made' + (r.err ?': ' + (r.err.message || r.err) : '')); } return; }
-    P.video = { blob, name: `breach-protocol-level-${P.levelN}-highlights.webm`, dur };
-    P.lastVideo = { name: P.video.name, size: blob.size, dur, ms: performance.now() - t0, audio: au.audio.length > 0, frames: r.frames || r.video.length, how: X.how };
-    done();
-    if (P.wantSave) save(P.video);
-  }
-  // the encoder's output: each chunk's bytes, its time (ms) and whether it's a key frame
-  const chunkOf = (ch) => { const b = new Uint8Array(ch.byteLength); ch.copyTo(b); return { t: ch.timestamp / 1000, key: ch.type === 'key', b, tr: 1 }; };
-  // In a worker: everything it needs as plain data (structured clone: no functions, no meshes; vectors marked to be made
-  // vectors again), the chunks back as they're made, the sounds' events at the end
-  async function viaWorker(X, vc) {
+  const packName = () => `breach-protocol-level-${P.levelN}-highlights`;
+  // ---------------------------------------------------------------- the .zip
+  // what the broadcast's made from, as plain data: the adverts' pictures as their data URLs, the store's stock as it is now
+  function packData() {
     const prog = [];
     for (const s of P.prog) {
-      if (s.kind === 'ad' && s.store) { // (the store's own: its picture as a bitmap, its stock as it is now)
+      if (s.kind === 'ad' && s.store) {
         const st = s.store, im = st.pic && st.pic.im;
-        let pic = null; try { if (im && im.complete && im.naturalWidth) pic = { im: await createImageBitmap(im), w: st.pic.w, h: st.pic.h }; } catch (e) { /* no picture */ }
-        prog.push(Object.assign({}, s, { store: Object.assign({}, st, { pic, left: st.left ? st.left() : 1 }) }));
-      } else if (s.kind === 'gear') prog.push({ kind: 'gear', k: s.k, code: s.code, dur: s.dur }); // (worked out again there)
+        prog.push(Object.assign({}, s, { store: Object.assign({}, st, { pic: im && im.src ? { src: im.src, w: st.pic.w, h: st.pic.h } : null, left: st.left ? st.left() : 1 }) }));
+      } else if (s.kind === 'gear') prog.push({ kind: 'gear', k: s.k, code: s.code, dur: s.dur }); // (worked out again from the rest)
       else prog.push(s);
     }
-    const data = plain({ gen: P.gen, clips: P.clips, stats: P.stats, actors: P.actors, fired: P.fired, kgun: P.kgun, levelN: P.levelN, theme: P.theme, prog });
-    // (the video stays in the worker: when it's done the sounds come back, are mixed here, and go to it with mux(), which
-    // gives back the file)
+    return plain({ v: PACK_V, gen: P.gen, clips: P.clips, stats: P.stats, actors: P.actors, fired: P.fired, kgun: P.kgun, levelN: P.levelN, theme: P.theme, prog });
+  }
+  // the stickers on the officers' guns (js/stickers.js names)
+  function packStickers(actors) {
+    const names = new Set();
+    for (const A of actors.values()) for (const sk of Object.values(A.skins || {})) for (const s of sk || []) if (s && s.s) names.add(s.s);
+    return [...names];
+  }
+  async function exportPack() {
+    if (P.packing || !P.ready) return;
+    P.packing = true;
+    try {
+      const data = packData(), files = [{ name: 'highlights.json', data: toJSON(data) }];
+      files.push({ name: 'info.txt', data: `Breach Protocol highlights: level ${P.levelN}${P.theme ? ` (${P.theme})` : ''}, recorded ${new Date().toISOString()}.\nOpen the game, and on the main menu use "Render highlights video" with this file to make the video.\n` });
+      for (const n of packStickers(P.actors)) { // (their pictures with it: the replay's guns as they were, wherever it's rendered)
+        try { const r = await fetch(G.Stickers.url(n)); if (r.ok) files.push({ name: 'stickers/' + n, data: new Uint8Array(await r.arrayBuffer()) }); } catch (e) { /* that one's left out */ }
+      }
+      const blob = await G.Zip.write(files), name = packName() + '.zip';
+      save(blob, name);
+      say(`Saved ${name} (${Math.max(1, Math.round(blob.size / 1024))} kB): render it to a video from the main menu`);
+    } catch (e) { console.warn('highlights: the recording couldn\'t be saved', e); say('The recording couldn\'t be saved'); }
+    P.packing = false;
+  }
+  // Plain data as JSON, as it is: Maps and Sets kept as what they are ($m, $s), what's referred to from more than one
+  // place written once and referred to after ($i, $r: a kill in a kill sequence is the clip and in it), numbers to five
+  // decimal places (a hundredth of a millimetre), undefined and infinities kept
+  function toJSON(root) {
+    const seen = new Map();
+    const walk = (v) => {
+      if (!v || typeof v !== 'object') return;
+      const n = seen.get(v) || 0; seen.set(v, n + 1); if (n) return;
+      if (v instanceof Map) for (const [k, x] of v) { walk(k); walk(x); }
+      else if (v instanceof Set || Array.isArray(v)) for (const x of v) walk(x);
+      else for (const k of Object.keys(v)) walk(v[k]);
+    };
+    walk(root);
+    const ids = new Map();
+    const enc = (v) => {
+      if (v === undefined) return { $u: 1 };
+      if (typeof v === 'number') return Number.isFinite(v) ? (Number.isInteger(v) ? v : Math.round(v * 1e5) / 1e5) : { $n: String(v) };
+      if (!v || typeof v !== 'object') return v;
+      if (ids.has(v)) return { $r: ids.get(v) };
+      const many = seen.get(v) > 1;
+      if (many) ids.set(v, ids.size);
+      let b;
+      if (v instanceof Map) b = { $m: [...v].map(([k, x]) => [enc(k), enc(x)]) };
+      else if (v instanceof Set) b = { $s: [...v].map(enc) };
+      else if (Array.isArray(v)) b = v.map(enc);
+      else { const o = {}; for (const k of Object.keys(v)) o[k] = enc(v[k]); b = Object.keys(v).some((k) => k[0] === '$') ? { $o: o } : o; }
+      return many ? { $i: ids.get(v), $x: b } : b;
+    };
+    return JSON.stringify(enc(root));
+  }
+  function fromJSON(str) {
+    const ids = new Map();
+    const fill = (b, id) => {
+      let o;
+      if (Array.isArray(b)) { o = []; if (id != null) ids.set(id, o); for (const x of b) o.push(dec(x)); return o; }
+      if (b.$m) { o = new Map(); if (id != null) ids.set(id, o); for (const [k, x] of b.$m) o.set(dec(k), dec(x)); return o; }
+      if (b.$s) { o = new Set(); if (id != null) ids.set(id, o); for (const x of b.$s) o.add(dec(x)); return o; }
+      const src = b.$o || b; o = {}; if (id != null) ids.set(id, o);
+      for (const k of Object.keys(src)) o[k] = dec(src[k]);
+      return o;
+    };
+    const dec = (v) => {
+      if (!v || typeof v !== 'object') return v;
+      if (Array.isArray(v)) return fill(v);
+      if ('$r' in v) return ids.get(v.$r);
+      if ('$u' in v) return undefined;
+      if ('$n' in v) return Number(v.$n);
+      if ('$i' in v) return fill(v.$x, v.$i);
+      return fill(v);
+    };
+    return dec(JSON.parse(str));
+  }
+  // ---------------------------------------------------------------- the video, from a .zip (the main menu)
+  // file: the .zip; report(text, fraction done or null). Resolves when it's saved (or throws: why not).
+  async function renderPack(file, report = () => {}) {
+    if (P.exporting) throw new Error('A video is already being made');
+    if (!canWorker() || !window.Worker) throw new Error('This browser can\'t make video files (it needs WebCodecs and OffscreenCanvas: a recent Chrome, Edge or Firefox)');
+    report('Reading the recording...', null);
+    const files = await G.Zip.read(file), json = files.get('highlights.json');
+    if (!json) throw new Error('That isn\'t a highlights recording (no highlights.json in it)');
+    const data = fromJSON(new TextDecoder().decode(json));
+    if (!data || !data.gen || !Array.isArray(data.prog)) throw new Error('That recording is damaged');
+    if ((data.v | 0) > PACK_V) throw new Error('That recording is from a newer version of the game');
+    // the adverts' pictures, and the stickers', as bitmaps for the worker
+    for (const s of data.prog) {
+      const pic = s.kind === 'ad' && s.store && s.store.pic;
+      if (pic && pic.src) { try { s.store.pic = { im: await createImageBitmap(await (await fetch(pic.src)).blob()), w: pic.w, h: pic.h }; } catch (e) { s.store.pic = null; } }
+    }
+    const stickers = {};
+    for (const [name, b] of files) if (name.startsWith('stickers/')) { try { stickers[name.slice(9)] = await createImageBitmap(new Blob([b])); } catch (e) { /* drawn without it */ } }
+    const vc = await videoCodec();
+    if (!vc) throw new Error('No video encoder available');
+    const X = P.exporting = { p: 0, cancel: false };
+    if (G.Audio.init) G.Audio.init(); // (the crowd's sounds: mixed offline, but from the samples the game's loaded)
+    const hadAu = !!P.au; audio(true); if (P.au && !hadAu) P.au.out.gain.value = 0;
+    const tick = setInterval(() => report(X.stage === 'audio' || X.stage === 'mix' || X.stage === 'opus' || X.stage === 'flush' ? 'Mixing the sound...' : X.p >= 0.97 ? 'Putting the file together...' : `Rendering: ${Math.round(X.p / 0.9 * 100)}%`, Math.min(1, X.p)), 250);
+    try {
+      const t0 = performance.now(), r = await viaWorker(X, vc, data, stickers);
+      if (X.cancel) throw new Error('cancelled');
+      if (!r || !(r.n > 0)) throw new Error('No frames were rendered');
+      const dur = r.n / FPS;
+      X.p = 0.92; X.stage = 'audio';
+      const au = await mixAudio(r.events, dur, X);
+      X.p = 0.97; X.stage = 'mux';
+      const blob = await r.mux(au, dur, vc.id), name = `breach-protocol-level-${data.levelN}-highlights.webm`;
+      save(blob, name);
+      P.lastVideo = { name, size: blob.size, dur, ms: performance.now() - t0, audio: au.audio.length > 0, frames: r.frames };
+      report(`Saved ${name} (${(blob.size / 1048576).toFixed(1)} MB, ${Math.round(dur)} s)`, 1);
+      return P.lastVideo;
+    } finally {
+      clearInterval(tick);
+      if (!hadAu) audio(false);
+      if (P.exporting === X) P.exporting = null;
+    }
+  }
+  function cancelRender() { const X = P.exporting; if (X) { X.cancel = true; if (X.abort) X.abort(); } }
+  // the encoder's output: each chunk's bytes, its time (ms) and whether it's a key frame
+  const chunkOf = (ch) => { const b = new Uint8Array(ch.byteLength); ch.copyTo(b); return { t: ch.timestamp / 1000, key: ch.type === 'key', b, tr: 1 }; };
+  // In a worker: everything it needs as plain data (structured clone), the chunks kept there, the sounds' events back
+  // at the end; then mux() gives it the mixed sound and gets back the file
+  function viaWorker(X, vc, data, stickers) {
     return new Promise((ok, fail) => {
       const w = new Worker('js/exportworker.js');
       let file = null;
@@ -487,11 +567,11 @@ G.Highlights = (() => {
         else if (m.t === 'err') bad(new Error(m.err));
       };
       w.onerror = (e) => { e.preventDefault(); bad(new Error(e.message || 'worker error')); };
-      w.postMessage({ t: 'go', data, cfg: vc.cfg });
+      w.postMessage({ t: 'go', data, cfg: vc.cfg, stickers });
     });
   }
-  // data for the worker: a deep copy without what can't be sent (functions, meshes, materials, DOM nodes, and objects
-  // that carry functions of their own, which are caches it works out again), vectors as {x, y, z, _v3}
+  // data for the recording: a deep copy without what can't be kept (functions, meshes, materials, DOM nodes, and
+  // objects that carry functions of their own, which are caches worked out again), vectors as {x, y, z, _v3}
   function plain(v, memo = new Map()) {
     if (v === null || typeof v !== 'object') return typeof v === 'function' ? undefined : v;
     if (memo.has(v)) return memo.get(v);
@@ -519,18 +599,9 @@ G.Highlights = (() => {
   // In the worker (js/exportworker.js): the level built again, the broadcast acted out from the top on this renderer, each
   // frame the picture and its graphics put together on the canvas (as the TVs do, less the screen's lines) and encoded
   // straight from it. post(message, transfer) talks to the page.
-  // The worker's pace: it renders a frame only on a credit, and the page gives it PACE of them with each frame of its own
-  // (js/highlights.js update), so the GPU's never so busy with the video that the game's frames wait; with no word from
-  // the page for a quarter of a second (a hidden tab: no frames to keep), it goes on by itself
-  const PACE = 2;
-  let credits = 0, wake = null;
-  function credit(n) { credits = Math.min(credits + n, PACE * 3); if (wake) { const w = wake; wake = null; w(); } }
-  const creditOne = () => (credits > 0 ? (credits--, Promise.resolve()) : new Promise((r) => {
-    const go = () => { if (wake === go) wake = null; credits = Math.max(0, credits - 1); r(); };
-    wake = go; setTimeout(() => { if (wake === go) { credits++; go(); } }, 250);
-  }));
   async function exportHere(m, post) {
     const d = revive(m.data);
+    for (const [n, bm] of Object.entries(m.stickers || {})) G.Stickers.provide(n, bm); // (the stickers' pictures, from the file)
     const map = G.Level.generate(d.gen.seed, d.gen.level, d.gen.th);
     G.Game.map = map;
     P.map = map; P.level = new T.Group(); P.level.add(G.Level.buildMesh(map));
@@ -561,7 +632,6 @@ G.Highlights = (() => {
     clearRigs(); P.seg = -1; P.time = 0; next();
     let n = 0;
     for (; n < nF && !err; n++) {
-      await creditOne();
       AT.t = n / FPS;
       if (n && step(1 / FPS) && P.seg === 0) break;
       draw();
@@ -581,42 +651,6 @@ G.Highlights = (() => {
     const blob = writeWebm({ codec: m.codec, video: P.outVideo || [], audio: m.audio, head: m.head, dur: m.dur });
     P.outVideo = null;
     post({ t: 'file', blob });
-  }
-  // Here, on this thread: a few frames at a time (the game stutters while it's made, and the TVs stop)
-  async function viaMain(X, vc) {
-    const total = P.prog.reduce((a, s) => a + s.dur, 0), nF = Math.ceil(total * FPS);
-    const video = []; let err = null;
-    const venc = new VideoEncoder({ output: (ch) => video.push(chunkOf(ch)), error: (e) => { err = e; } });
-    venc.configure(vc.cfg);
-    // each frame: the picture (read back from the render target, the right way up) under the graphics, as the TVs show it,
-    // on canvases kept in memory (not on the GPU) and handed to the encoder as plain pixels: a frame made from a GPU canvas
-    // costs the encoder a read back of its own, 30 to 100 times what it costs to encode
-    const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const g = cv.getContext('2d', { willReadFrequently: true });
-    const tmp = document.createElement('canvas'); tmp.width = P.rt.width; tmp.height = P.rt.height;
-    const tg = tmp.getContext('2d', { willReadFrequently: true }), img = tg.createImageData(tmp.width, tmp.height), px = new Uint8Array(tmp.width * tmp.height * 4), rw = tmp.width * 4;
-    let n = 0, events = null;
-    AT.rec = [];
-    try {
-      clearRigs(); P.seg = -1; P.time = 0; next(); // (from the top: the opening's sounds at 0)
-      for (; n < nF && !X.cancel && !err; n++) {
-        AT.t = n / FPS;
-        if (n && step(1 / FPS) && P.seg === 0) break; // (round to the start again: that's all of it)
-        if (draw()) {
-          G.R.renderer.readRenderTargetPixels(P.rt, 0, 0, tmp.width, tmp.height, px);
-          for (let y = 0; y < tmp.height; y++) img.data.set(px.subarray((tmp.height - 1 - y) * rw, (tmp.height - y) * rw), y * rw);
-          tg.putImageData(img, 0, 0); g.drawImage(tmp, 0, 0, W, H);
-        } else { g.fillStyle = '#000'; g.fillRect(0, 0, W, H); }
-        g.drawImage(P.cv, 0, 0);
-        const fr = new VideoFrame(g.getImageData(0, 0, W, H).data, { format: 'RGBA', codedWidth: W, codedHeight: H, timestamp: Math.round(n * 1e6 / FPS), duration: Math.round(1e6 / FPS) });
-        venc.encode(fr, { keyFrame: n % (FPS * 2) === 0 }); fr.close();
-        X.p = 0.9 * n / nF;
-        if (n % 8 === 0) await yieldNow();
-        while (venc.encodeQueueSize > 10) await yieldNow();
-      }
-      if (!err) await venc.flush();
-    } finally { events = AT.rec; AT.rec = null; }
-    try { venc.close(); } catch (e) { /* closed */ }
-    return err ? { err } : { video, events, n };
   }
   // The audience, offline: the murmur under it all, and every sound the broadcast made (its events: [time, 's' a sound
   // effect and its arguments | 'g' a round's report]) at its moment; then into Opus in 20 ms packets (if this browser
@@ -877,7 +911,7 @@ G.Highlights = (() => {
     } else {
       rig = G.Rig.create({ style: 'tactical', color: A.color, animal: A.animal, callName: A.name, seed: String(A.id).length * 977, bare: true, look: A.look });
       if (A.kt) rig.setKit(A.kt);
-      if (A.gun) rig.setGun(A.gun);
+      if (A.gun) rig.setGun(A.gun, (A0.skins || {})[A.gun]); // (its stickers, as it had them)
     }
     P.scene.add(rig.root);
     return rig;
@@ -1372,7 +1406,7 @@ G.Highlights = (() => {
       P.gcam = new T.PerspectiveCamera(30, 16 / 9, 0.05, 50);
     }
     while (P.gpiv.children.length) P.gpiv.remove(P.gpiv.children[0]);
-    let g = null; try { g = G.GunModels.world(s.code); } catch (e) { /* no model */ }
+    let g = null; try { g = G.GunModels.world(s.code, ((P.actors.get(s.k) || {}).skins || {})[s.code]); } catch (e) { /* no model */ }
     if (!g) return;
     const b = new T.Box3().setFromObject(g), c = b.getCenter(new T.Vector3()), len = Math.max(0.2, b.getSize(new T.Vector3()).length());
     g.position.sub(c); P.gpiv.add(g);
@@ -1589,8 +1623,6 @@ G.Highlights = (() => {
   // ================================================================ every frame (from the hangar)
   function update(dt) {
     if (!P.ready || !P.prog.length) return;
-    if (P.exporting && P.exporting.worker) P.exporting.worker.postMessage({ t: 'tick', n: PACE }); // (the worker's frames: js/highlights.js credit)
-    if (P.exporting && P.exporting.here) { audioLevel(0); return; } // (an export on this thread is playing it, off screen)
     // whether any screen is in view (for the picture), and the sound: only where you'd stand to watch one (in front of it,
     // within about one and a half of its widths at full and three at none, the screen not edge-on, nothing in between)
     const cam = G.R.camera, cp = cam.position; let seen = false, vol = 0;
@@ -2228,5 +2260,5 @@ G.Highlights = (() => {
     }
   }
 
-  return { tick, shot, door, hitBy, kill, suspectDown, saved, incap, arrest, take, drop, mount, unmount, update, reset, exportVideo, exportHere, muxHere, credit, R, P };
+  return { tick, shot, door, hitBy, kill, suspectDown, saved, incap, arrest, take, drop, mount, unmount, update, reset, exportPack, renderPack, cancelRender, exportHere, muxHere, toJSON, fromJSON, R, P };
 })();

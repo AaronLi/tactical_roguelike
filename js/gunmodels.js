@@ -1834,7 +1834,8 @@ G.GunModels = (() => {
     return { disk, r: o.r, mat, mag: def.magnif || 4 };
   }
 
-  function viewmodel(def) {
+  // (skin: the gun's stickers, js/stickers.js: on its parts as built, before the arms go on)
+  function viewmodel(def, skin) {
     const root = new T.Group();
     const guns = def.akimbo ? [-1, 1] : [1];
     let info0 = null, pip = null;
@@ -1844,6 +1845,7 @@ G.GunModels = (() => {
       buildingVM = true;
       let info;
       try { info = build(k, def); } finally { buildingVM = false; }
+      if (skin && skin.length) G.Stickers.decorate(k.g, skin);
       if (k.reflex) reflex(k, k.reflex);
       if (k.pip && !pip) pip = pipLens(k, k.pip, def);
       if (!info0) info0 = info;
@@ -1903,7 +1905,8 @@ G.GunModels = (() => {
   }
   // (its magazine merged on its own, centred on itself, so a rig can take it off the gun and hold it: a reload,
   // a magazine check. g.userData.mag: the magazine's group; magHome: where it sits on the gun.)
-  function world(def) {
+  // (skin: its stickers, js/stickers.js, on this one: the cached model's shared)
+  function world(def, skin) {
     if (typeof def === 'string') def = G.Gunsmith.fromCode(def);
     let proto = worldCache.get(def.code);
     if (!proto) {
@@ -1935,11 +1938,12 @@ G.GunModels = (() => {
       g.userData.mag = mg; g.userData.magHome = proto.mag.home;
     }
     g.userData.info = proto.info;
+    if (skin && skin.length) G.Stickers.decorate(g, skin);
     return g;
   }
 
   // the gunsmith's display model: every part as separate meshes (tagged by slot), stock included
-  function display(def) { const k = kit(); const info = build(k, def); return { group: k.g, info }; }
+  function display(def, skin) { const k = kit(); const info = build(k, def); if (skin && skin.length) G.Stickers.decorate(k.g, skin); return { group: k.g, info }; }
 
   return { M, build, viewmodel, world, display, roundDims };
 })();

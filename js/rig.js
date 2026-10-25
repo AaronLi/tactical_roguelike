@@ -332,7 +332,7 @@ G.Rig = (() => {
       state: 'alive', deadT: 0, fallX: 1, fallZ: 0, downW: 0,
       hb: null, dbg: null,
     };
-    rig.setGun = (code) => setGun(rig, code);
+    rig.setGun = (code, skin) => setGun(rig, code, skin); // (skin: its stickers, js/stickers.js)
     rig.update = (dt, p) => update(rig, dt, p);
     rig.hitboxes = () => hitboxes(rig);
     // a shot: the animation's kick, and on a powered body the gun's muzzle rise (deg, from the host's kickOf)
@@ -440,14 +440,16 @@ G.Rig = (() => {
   }
 
   // code: a build code (or a plain weapon id for its factory build)
-  function setGun(rig, code) {
-    if (rig.gunKey === (code || null)) return;
+  function setGun(rig, code, skin) {
+    const key = code ? code + (skin && skin.length ? '#' + G.Stickers.key(skin) : '') : null;
+    if (rig.gunKey === key) return;
     if (rig.gun && rig.gun.parent) rig.gun.parent.remove(rig.gun);
+    if (rig.gun) rig.gun.traverse((o) => { if (o.userData.sticker) o.geometry.dispose(); }); // (its stickers' own: the model's shared)
     rig.slung = false;
-    rig.gunKey = code || null;
+    rig.gunKey = key;
     const def = code ? G.Gunsmith.fromCode(code) : null;
     if (!def) { rig.gun = null; rig.gunInfo = null; return; }
-    rig.gun = G.GunModels.world(def);
+    rig.gun = G.GunModels.world(def, skin);
     rig.gunInfo = rig.gun.userData.info;
     rig.gunMount.add(rig.gun);
   }

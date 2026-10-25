@@ -229,7 +229,7 @@ G.InvUI = (() => {
     if (!field) return G.Shop.render();
     render();
     const w = G.Me.cur();
-    if (w && G.R.vm && G.R.vm.userData.code !== w.def.code) G.R.setViewmodel(w.def);
+    if (w && G.R.vm && G.R.vm.userData.key !== G.R.vmKey(w.def, w.stickers)) G.R.setViewmodel(w.def);
   }
   let opened = []; // uids of the open containers, newest first
   const COLORS = { mag: '#3d4a33', ammo: '#4a4130', med: '#5a2a2a', frag: '#3a4237', flash: '#3d4247', carrier: '#2f3a44', plate: '#3c3f46', helmet: '#33393f', face: '#30363c', belt: '#3b3528', pack: '#3a3a2c', gun: '#262b30', pouch: '#353a2e', part: '#2c3136' };

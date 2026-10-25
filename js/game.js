@@ -12,6 +12,7 @@ G.Game = {
   runStarted: false,
 
   init() {
+    G.Stickers.load(); // (which stickers there are: js/stickers.js)
     this.settings = { sens: G.U.store.get('sens', 1), fov: G.U.store.get('fov', 80), vol: G.U.store.get('vol', 0.6) };
     this.myName = G.U.store.get('name', 'Operator' + Math.floor(Math.random() * 90 + 10));
     G.U.store.set('name', this.myName); // (kept: the same name after a refresh, so the squad knows who's back)
@@ -150,6 +151,10 @@ G.Game = {
     this.$('joinCode').addEventListener('keydown', (e) => { if (e.key === 'Enter') this.join(); });
     this.$('joinCode').value = G.U.store.get('lastCode', ''); // (the last game you joined)
     this.$('btnLan').onclick = () => this.lanScan();
+    // a highlights recording (a .zip the hangar's TVs saved) made into a video, here (js/highlights.js renderPack)
+    this.$('btnRender').onclick = () => this.$('hlFile').click();
+    this.$('hlFile').onchange = (e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) this.renderHighlights(f); };
+    this.$('btnRenderStop').onclick = () => G.Highlights.cancelRender();
     // your own relay server, if you have one (used for every connection from now on: js/net.js opts)
     { const t = G.U.store.get('turn', {}) || {}, save = () => G.U.store.set('turn', { url: this.$('turnUrl').value.trim(), user: this.$('turnUser').value.trim(), pass: this.$('turnPass').value });
       this.$('turnUrl').value = t.url || ''; this.$('turnUser').value = t.user || ''; this.$('turnPass').value = t.pass || '';
@@ -335,6 +340,18 @@ G.Game = {
       if (this.phase === 'menu') { this.msg('menuMsg', 'Lost connection to the host. Reconnecting...'); setTimeout(() => this.rejoin(code, until), 3000); }
     });
   },
+  async renderHighlights(file) {
+    const msg = this.$('hlMsg'), btn = this.$('btnRender'), stop = this.$('btnRenderStop'), bar = this.$('hlBar'), prog = bar.parentElement;
+    btn.disabled = true; stop.classList.remove('hidden'); prog.classList.remove('hidden'); bar.style.width = '0%'; msg.classList.remove('bad');
+    try {
+      await G.Highlights.renderPack(file, (t, p) => { msg.textContent = t; if (p != null) bar.style.width = Math.round(p * 100) + '%'; });
+    } catch (e) {
+      const why = (e && e.message) || String(e);
+      msg.textContent = why === 'cancelled' ? 'Cancelled' : 'The video couldn\'t be made: ' + why; msg.classList.toggle('bad', why !== 'cancelled');
+      if (why !== 'cancelled') console.warn('highlights: rendering failed', e);
+    }
+    btn.disabled = false; stop.classList.add('hidden'); prog.classList.add('hidden');
+  },
   setBusy(b) { ['btnHost', 'btnSolo', 'btnJoin'].forEach((id) => (this.$(id).disabled = b)); },
   afterConnect() {
     this.msg('menuMsg', '');
@@ -369,6 +386,7 @@ G.Game = {
   onMsg(m) {
     switch (m.t) {
       case 'welcome':
+        G.Stickers.joined(m.skins); // (the stickers on the squad's guns: js/stickers.js)
         this.roster = m.roster;
         if (this.roster[G.Net.myId]) this.setAnimal(this.roster[G.Net.myId].animal);
         G.Views.syncRoster(this.roster);
@@ -379,7 +397,7 @@ G.Game = {
           if (m.doors) m.doors.forEach((o, i) => { const d = this.map.doors[i]; if (d && d.open !== !!o) { d.open = !!o; G.World.door(this.map.world, this.map, d); } });
           if (m.evidence) m.evidence.forEach(([i, wpn, x, z, sec, y]) => { G.Views.addEvidence(i, wpn, x, z, y); if (sec) G.Views.secureEvidence(i); });
           if (m.bodies) m.bodies.forEach(([id, type, x, z, yaw, sec, y]) => G.Views.addBody(id, type, x, z, yaw, sec, y));
-          this.setCase(m.wcase); this.abox = m.abox || null;
+          this.setCase(m.wcase); this.abox = m.abox || null; this.sbox = m.sbox || null;
           this.cabs = m.cabs || []; G.Views.syncCabs();
           G.Loot.clear(); for (const a of m.loot || []) G.Loot.add(...a);
           for (const id of m.glass || []) G.Views.breakGlass(id); // windows already broken when we joined
@@ -407,12 +425,13 @@ G.Game = {
       case 'phase':
         if (m.route) this.setRoute(m.route);
         if (m.phase === 'route') this.enterRoute(m.level, m.route);
-        else if (m.phase === 'level') { this.aboxHide(); this.enterLevel(m.level, m.seed, m.th); this.setCase(m.wcase); this.abox = m.abox || null; this.cabs = m.cabs || []; G.Views.syncCabs(); }
+        else if (m.phase === 'level') { this.aboxHide(); this.enterLevel(m.level, m.seed, m.th); this.setCase(m.wcase); this.abox = m.abox || null; this.sbox = m.sbox || null; this.cabs = m.cabs || []; G.Views.syncCabs(); }
         else if (m.phase === 'shop') this.enterShop(m.level, m.shopSeed, m.report, m.stock);
         else if (m.phase === 'gameover') this.enterGameover(m);
         else if (m.phase === 'lobby') this.enterLobby();
         break;
       case 'snap': if (this.phase === 'level') G.Views.applySnap(m); break;
+      case 'skin': G.Stickers.learn(m.h, m.l); break; // (a gun's stickers, by their hash: js/stickers.js)
       // a first aid cabinet opened, emptied a bit, or put back into
       // things lying about: put down, picked up, and what you picked up
       case 'loot': if (this.phase === 'level') for (const a of m.a || []) G.Loot.add(...a); break;
@@ -429,6 +448,17 @@ G.Game = {
         const took = Object.entries(m.took || {}).filter(([, n]) => n > 0);
         if (m.by && m.by !== G.Net.myId && took.length) G.HUD.feed(`<b>${G.U.esc(this.nameOf(m.by))}</b> took ${took.map(([mt, n]) => (n > 1 ? n + ' ' : '') + G.Med.ITEMS[mt].name.toLowerCase()).join(', ')} from a first aid cabinet`);
         if (G.InvUI.field && G.InvUI.cab === m.i) G.InvUI.render();
+        break;
+      }
+      // the sticker box opened: the sticker's whoever's opened it (yours: into your collection, js/stickers.js)
+      case 'sbox': {
+        const had = this.sbox && this.sbox[1];
+        this.sbox = m.s || null;
+        const [name, by] = this.sbox || [];
+        if (!name || !by || had) break;
+        const nice = G.U.esc(name.replace(/\.[a-z0-9]+$/i, '').replace(/[-_]+/g, ' '));
+        if (by === G.Net.myId) { G.Stickers.give(name); G.Audio.pickup(); G.HUD.toast('STICKER', `<img class="stk-toast" src="${G.Stickers.url(name)}"> Found a sticker: <b>${nice}</b> <small>(stick it on a gun in the gunsmith)</small>`, 3.5); }
+        else G.HUD.feed(`<b>${G.U.esc(this.nameOf(by))}</b> found a sticker: ${nice}`);
         break;
       }
       case 'abox': {
@@ -676,7 +706,7 @@ G.Game = {
   },
   // what's in the level's weapon case: { code, mag, reserve } or null when it's empty
   setCase(c) {
-    this.wcase = c && c[0] ? { code: c[0], mag: c[1], reserve: c[2], am: c[4], kit: c[5] || null } : null;
+    this.wcase = c && c[0] ? { code: c[0], mag: c[1], reserve: c[2], am: c[4], kit: c[5] || null, sk: c[6] || null } : null; // (sk: the stickers on a gun put in it)
     this.caseOpen = !!(c && c[3]);
     G.Views.syncCase();
   },

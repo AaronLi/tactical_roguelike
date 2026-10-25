@@ -44,7 +44,7 @@ G.Views = {
     const me = G.Me, g = G.Game, wasDown = !!me.down;
     const rig = this.newPlayerRig({ color: g.myColor, animal: g.myAnimal, name: g.myName, look: g.myLook }, G.Net.myId || 'me');
     rig.setKit(me.kitLook());
-    rig.setGun(me.cur().def.code);
+    rig.setGun(me.cur().def.code, me.cur().stickers);
     rig.root.visible = true;
     const pos = me.pos.clone(), p = { pos, yaw: me.yaw, pitch: me.pitch, crouch: wasDown || !!me.crouch, alert: false, lean: 0, state: wasDown ? 'down' : 'alive' };
     for (let i = 0; i < 6; i++) rig.update(0.016, p); // (in the pose you were in, then down)
@@ -282,12 +282,12 @@ G.Views = {
     const map = G.Game.map, cv = map && map.caseView;
     if (!cv) return;
     if (!cv.synced) { cv.synced = true; if (G.Game.caseOpen) cv.open = 1; } // joined with it already open
-    const code = G.Game.wcase ? G.Game.wcase.code : null;
-    if (code === cv.code) return;
-    cv.code = code;
+    const code = G.Game.wcase ? G.Game.wcase.code : null, sk = G.Game.wcase && G.Game.wcase.sk, ck = code && code + '#' + G.Stickers.key(sk);
+    if (ck === cv.code) return;
+    cv.code = ck;
     cv.holder.clear();
     if (!code) return;
-    const gun = G.GunModels.world(code), wrap = new THREE.Group(), tmp = new THREE.Group();
+    const gun = G.GunModels.world(code, sk), wrap = new THREE.Group(), tmp = new THREE.Group();
     gun.updateMatrixWorld(true);
     const b0 = new THREE.Box3().setFromObject(gun), len = b0.max.z - b0.min.z;
     gun.scale.setScalar(Math.min(1, 1.28 / len));
@@ -712,7 +712,7 @@ G.Views = {
       pv.pos.lerp(new THREE.Vector3(st.p[0], st.p[1], st.p[2]), Math.min(1, dt * 14));
       pv.yaw += G.U.angDiff(pv.yaw, st.yw) * Math.min(1, dt * 14);
       pv.pitch += (st.pt - pv.pitch) * Math.min(1, dt * 14);
-      pv.rig.setGun(st.w); // their build code: the same parts on their gun
+      pv.rig.setGun(st.w, G.Stickers.of(st.sk)); // their build code: the same parts on their gun (and its stickers, by their hash: js/stickers.js)
       pv.rig.holster(!!st.sw); // hands busy: weapon away
       const act = st.act ? { kind: { o: 'open', c: 'close', k: 'kick', z: 'zip', b: 'bag' }[st.act], t: st.ap || 0, hand: 'R' } : null;
       if (act && act.kind === 'zip') { const tv = this.enemies.get(st.zt); if (tv) act.pt = this.zipPoint(tv, act.t, tv.alive && !tv.down); act.pull = !!st.pl; }
@@ -781,6 +781,21 @@ G.Views = {
       cv.open = want ? Math.min(1, cv.open + dt / 0.5) : 0;
       cv.door.rotation.y = -1.9 * (1 - Math.pow(1 - cv.open, 3));
     });
+    // the sticker box: its sticker on the card (once the host's said which), the lid up and the card gone once it's taken
+    const sv = G.Game.map && G.Game.map.sboxView;
+    if (sv) {
+      const sb = G.Game.sbox, name = sb && sb[0], taken = !!(sb && sb[1]);
+      if (!sv.synced) { sv.synced = true; if (taken) sv.open = 1; } // (joined with it opened)
+      sv.g.visible = !!name;
+      if (name && sv.name !== name) {
+        const p = G.Stickers.pic(name);
+        if (p.bm) { sv.name = name; const k = 0.12 / Math.max(p.w, p.h); sv.card.scale.set(p.w * k, p.h * k, 1); sv.card.material.map = G.Stickers.material(name).map; sv.card.material.needsUpdate = true; }
+      }
+      sv.card.visible = sv.name === name && !taken;
+      if (taken && sv.open === 0) { const b = G.Game.map.sbox; G.Audio.clink(Math.hypot(b.x - G.Me.pos.x, b.z - G.Me.pos.z)); }
+      sv.open = taken ? Math.min(1, sv.open + dt / 0.5) : 0;
+      sv.lid.rotation.x = -1.8 * (1 - Math.pow(1 - sv.open, 3));
+    }
     // the attachments box lid: up and back on its hinge once it's been opened
     const av = G.Game.map && G.Game.map.aboxView;
     if (av) {

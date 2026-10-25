@@ -3,11 +3,17 @@
 // Drag to orbit, scroll to zoom, hover to see what a piece is, click it (or a slot in the list) to pick
 // that slot. Hovering a part in the list previews it on the gun with its stat changes; clicking fits
 // it (buying it first if it isn't in your stash). Parts taken off go to your stash.
+// Stickers (its Stickers tab): pick one you own, click the gun where it goes (it shows there, faint), size it, turn it,
+// mirror it, and stick it on: it's on that gun for good (js/stickers.js).
+
 G.GunsmithUI = (() => {
   const T = THREE, GS = G.Gunsmith;
   let renderer = null, scene, camera, model = null, modelKey = '', canvas, raf = 0, active = false;
   const view = { yaw: Math.PI / 2 - 0.3, pitch: 0.15, dist: 1.4, center: new T.Vector3(), auto: true }; // right side, muzzle to the right
-  const st = { wslot: 'p', slot: null, hoverPart: null, hoverSlot: null };
+  const st = { wslot: 'p', slot: null, hoverPart: null, hoverSlot: null,
+    // the sticker tool: on, the one picked, its size (m), turn (rad) and mirroring, where it's been put (not stuck yet:
+    // { p, n } in the gun's frame) or where the pointer is on the gun (hover), and the faint one to redraw
+    stk: false, stkPick: null, stkK: 0.035, stkR: 0, stkF: 0, stkAt: null, stkHover: null, stkDirty: false };
   const ray = new T.Raycaster();
 
   function init() {
@@ -25,6 +31,7 @@ G.GunsmithUI = (() => {
     let drag = null;
     canvas.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY, moved: 0 }; canvas.setPointerCapture(e.pointerId); view.auto = false; });
     canvas.addEventListener('pointermove', (e) => {
+      if (st.stk && !drag) { stkHoverAt(e); return; }
       if (drag) {
         const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
         drag.moved += Math.abs(dx) + Math.abs(dy); drag.x = e.clientX; drag.y = e.clientY;
@@ -32,22 +39,26 @@ G.GunsmithUI = (() => {
       } else hover(e);
     });
     canvas.addEventListener('pointerup', (e) => {
-      if (drag && drag.moved < 4) { const s = pick(e); if (s) { st.slot = s; G.Audio.click(); refresh(); } }
+      if (drag && drag.moved < 4 && st.stk) stkPlace(e);
+      else if (drag && drag.moved < 4) { const s = pick(e); if (s) { st.slot = s; G.Audio.click(); refresh(); } }
       drag = null;
     });
     canvas.addEventListener('pointerleave', () => { if (st.hoverSlot) { st.hoverSlot = null; paint(); label(null); } });
-    canvas.addEventListener('wheel', (e) => { e.preventDefault(); view.dist = G.U.clamp(view.dist * (1 + Math.sign(e.deltaY) * 0.1), 0.3, 4); }, { passive: false });
+    canvas.addEventListener('wheel', (e) => { e.preventDefault(); if (st.stk && st.stkPick && (e.shiftKey || e.ctrlKey || e.altKey)) return stkWheel(e); view.dist = G.U.clamp(view.dist * (1 + Math.sign(e.deltaY) * 0.1), 0.3, 4); }, { passive: false });
   }
 
   // ------------------------------------------------------------------ model
   function weapon() { const Me = G.Me; return Me.weapons[st.wslot] || Me.weapons.s || Me.weapons.p; }
-  function setModel(def) {
-    if (model && modelKey === def.code) return;
-    if (model) { scene.remove(model); model.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } }); }
+  // (skin: the stickers shown on it, the gun's own by default)
+  function setModel(def, skin = (weapon() || {}).stickers) {
+    const key = def.code + '#' + G.Stickers.key(skin);
+    if (model && modelKey === key) return;
+    if (model) { scene.remove(model); model.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); if (!o.userData.sticker) o.material.dispose(); } }); } // (a sticker's material is the picture's, shared)
     const { group } = G.GunModels.display(def);
     // own materials, so a part can glow when picked
     group.traverse((o) => { if (o.isMesh) o.material = o.material.clone(); });
-    model = group; modelKey = def.code;
+    G.Stickers.decorate(group, skin);
+    model = group; modelKey = key; st.stkDirty = true;
     scene.add(model);
     const box = new T.Box3().setFromObject(model), size = box.getSize(new T.Vector3());
     box.getCenter(view.center);
@@ -95,6 +106,7 @@ G.GunsmithUI = (() => {
   function placeDots() {
     const host = document.getElementById('gsDots');
     if (!host || !model) return;
+    host.style.display = st.stk ? 'none' : ''; // (the sticker tool: no slots to pick)
     const w = weapon(), slots = w ? GS.visibleSlots(w.def.id, w.def.build) : [];
     const shop = slots.map((s) => (buyable(s.slot) ? 1 : 0)).join(''), key = modelKey + '|' + slots.map((s) => s.slot).join(',') + '|' + shop;
     if (host.dataset.key !== key) {
@@ -116,7 +128,7 @@ G.GunsmithUI = (() => {
   function paint() {
     if (!model) return;
     model.traverse((o) => {
-      if (!o.isMesh || !o.material.emissive) return;
+      if (!o.isMesh || o.userData.sticker || !o.material.emissive) return;
       const s = o.userData.slot;
       const on = s === st.hoverSlot ? 0x1c6aa0 : s === st.slot && s !== 'base' ? 0x0c3a5c : 0; // cool blue, so it never reads as brass
       o.material.emissive.setHex(on);
@@ -126,7 +138,7 @@ G.GunsmithUI = (() => {
     if (!model) return null;
     const r = canvas.getBoundingClientRect();
     ray.setFromCamera(new T.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera);
-    const h = ray.intersectObject(model, true)[0];
+    const h = ray.intersectObject(model, true).find((q) => !q.object.userData.sticker);
     return h ? h.object.userData.slot : null;
   }
   function pick(e) { const s = hit(e); return s && s !== 'base' && GS.visibleSlots(weapon().def.id, weapon().def.build).some((x) => x.slot === s) ? s : null; }
@@ -152,6 +164,7 @@ G.GunsmithUI = (() => {
     const c = view.center, d = view.dist;
     camera.position.set(c.x + Math.sin(view.yaw) * Math.cos(view.pitch) * d, c.y + Math.sin(view.pitch) * d, c.z + Math.cos(view.yaw) * Math.cos(view.pitch) * d);
     camera.lookAt(c);
+    if (st.stkDirty) { st.stkDirty = false; G.Stickers.ghost(model, stkTry()); }
     renderer.render(scene, camera);
     placeDots();
   }
@@ -305,6 +318,92 @@ G.GunsmithUI = (() => {
     G.Shop.render();
   }
 
+  // ------------------------------------------------------------------ stickers (js/stickers.js)
+  const SK = () => G.Stickers;
+  const stkName = (n) => n.replace(/\.[a-z0-9]+$/i, '').replace(/[-_]+/g, ' ');
+  // where on the gun the pointer is: a point on its surface and the way that surface faces, in the gun's frame
+  function surfaceAt(e) {
+    if (!model) return null;
+    const r = canvas.getBoundingClientRect();
+    ray.setFromCamera(new T.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera);
+    const h = ray.intersectObject(model, true).find((q) => !q.object.userData.sticker && q.face && !(q.object.material && q.object.material.transparent));
+    if (!h) return null;
+    model.updateMatrixWorld(true);
+    const inv = model.matrixWorld.clone().invert(), n = h.face.normal.clone().applyMatrix3(new T.Matrix3().getNormalMatrix(h.object.matrixWorld)).normalize();
+    if (n.dot(ray.ray.direction) > 0) n.negate(); // (the inside of a part: the side you're looking at)
+    const p = h.point.clone().applyMatrix4(inv); n.transformDirection(inv);
+    return { p: [p.x, p.y, p.z], n: [n.x, n.y, n.z] };
+  }
+  // the sticker as it'd go on: where it's been put, or under the pointer
+  function stkTry() {
+    const at = st.stk && st.stkPick && (st.stkAt || st.stkHover);
+    return at ? { s: st.stkPick, p: at.p, n: at.n, r: st.stkR, k: st.stkK, f: st.stkF } : null;
+  }
+  function stkHoverAt(e) {
+    if (!st.stkPick || st.stkAt) return;
+    const at = surfaceAt(e);
+    if (!at && !st.stkHover) return;
+    st.stkHover = at; st.stkDirty = true;
+  }
+  function stkPlace(e) {
+    const w = weapon();
+    if (!st.stkPick || !w || (w.stickers || []).length >= SK().MAX) return;
+    const at = surfaceAt(e);
+    if (!at) return;
+    st.stkAt = at; st.stkDirty = true; G.Audio.click();
+    stkPanel();
+  }
+  // Shift + scroll: its size; Ctrl (or Alt) + scroll: its turn
+  function stkWheel(e) {
+    const d = Math.sign(e.deltaY);
+    if (e.shiftKey) st.stkK = G.U.clamp(st.stkK * (1 - d * 0.08), SK().MIN_K, SK().MAX_K);
+    else st.stkR = Math.atan2(Math.sin(st.stkR - d * Math.PI / 12), Math.cos(st.stkR - d * Math.PI / 12));
+    st.stkDirty = true; stkControls();
+  }
+  // the sliders (their read-outs) as the numbers are now
+  function stkControls() {
+    const box = document.querySelector('.stk-ctl');
+    if (!box) return;
+    const sz = box.querySelector('[data-gstksize]'), rt = box.querySelector('[data-gstkrot]');
+    if (sz) { sz.value = st.stkK; sz.nextElementSibling.textContent = (st.stkK * 100).toFixed(1) + ' cm'; }
+    if (rt) { rt.value = Math.round(st.stkR * 180 / Math.PI); rt.nextElementSibling.textContent = Math.round(st.stkR * 180 / Math.PI) + '°'; }
+  }
+  function stkInput(e) {
+    const t = e.target;
+    if (t.matches('[data-gstksize]')) st.stkK = G.U.clamp(+t.value, SK().MIN_K, SK().MAX_K);
+    else if (t.matches('[data-gstkrot]')) st.stkR = +t.value * Math.PI / 180;
+    else if (t.matches('[data-gstkflip]')) st.stkF = t.checked ? 1 : 0;
+    else return;
+    st.stkDirty = true; stkControls();
+  }
+  // on, for good: one of yours used up
+  function stickOn() {
+    const w = weapon(), s = stkTry();
+    if (!w || !s || !st.stkAt || G.Shop.ready || (w.stickers || []).length >= SK().MAX || !SK().use(s.s)) return;
+    w.stickers = SK().clean([...(w.stickers || []), s]);
+    st.stkAt = null; st.stkHover = null;
+    if (!SK().owned()[st.stkPick]) st.stkPick = null; // (that was the last of them)
+    G.Audio.pickup();
+    G.HUD.toast('', `Stuck it on your ${w.def.name}`, 1.6);
+    refresh();
+  }
+  function stkPanel() { const el = document.querySelector('.gs-stk'); if (el) el.innerHTML = stkHtml(weapon()); }
+  function stkHtml(w) {
+    const S = SK(), own = S.owned(), names = Object.keys(own).sort(), on = (w.stickers || []).length, full = on >= S.MAX, esc = G.U.esc;
+    const cards = names.map((n) => `<button class="stk-card${st.stkPick === n ? ' on' : ''}" data-gstkpick="${esc(n)}" title="${esc(stkName(n))}"><img src="${S.url(n)}" alt="" draggable="false"><b>×${own[n]}</b></button>`).join('');
+    const deg = Math.round(st.stkR * 180 / Math.PI);
+    return `<div class="gs-sub">Stickers <small>${on} of ${S.MAX} on your ${esc(w.def.name)}</small></div>
+      ${names.length ? `<div class="stk-grid">${cards}</div>` : '<p class="stk-none">You haven\'t found any stickers yet. About one level in ten has a sticker box in it: open it first and the sticker\'s yours.</p>'}
+      <div class="stk-ctl${st.stkPick ? '' : ' off'}">
+        <label>Size <input type="range" data-gstksize min="${S.MIN_K}" max="${S.MAX_K}" step="0.001" value="${st.stkK}"><span>${(st.stkK * 100).toFixed(1)} cm</span></label>
+        <label>Turn <input type="range" data-gstkrot min="-180" max="180" step="1" value="${deg}"><span>${deg}°</span></label>
+        <label class="stk-flip"><input type="checkbox" data-gstkflip ${st.stkF ? 'checked' : ''}> Mirror</label>
+      </div>
+      <div class="stk-act">${st.stkAt ? `<button class="btn small buy" data-gstkapply ${G.Shop.ready ? 'disabled' : ''}>Stick it on <small>(for good)</small></button> <button class="btn small" data-gstkmove>Move it</button>`
+        : `<span>${full ? 'This gun has all the stickers it can take.' : st.stkPick ? 'Click the gun where it goes.' : names.length ? 'Pick a sticker, then click the gun where it goes.' : ''}</span>`}</div>
+      <p class="stk-hint">Shift + scroll: size · Ctrl + scroll: turn · a sticker's on its gun for good, wherever the gun goes</p>`;
+  }
+
   // ------------------------------------------------------------------ html
   function html() {
     const Me = G.Me, w = weapon();
@@ -312,7 +411,9 @@ G.GunsmithUI = (() => {
     const def = w.def, build = def.build, slots = GS.visibleSlots(def.id, build);
     if (!st.slot || !slots.some((s) => s.slot === st.slot)) st.slot = slots[0] && slots[0].slot;
     const preview = st.hoverPart ? previewDef(def, st.slot, st.hoverPart) : null;
-    const tabs = ['p', 's'].map((k) => { const ww = Me.weapons[k]; return `<button class="tab${st.wslot === k ? ' on' : ''}" data-gw="${k}" ${ww ? '' : 'disabled'}>${k === 'p' ? 'Primary' : 'Sidearm'}: ${ww ? ww.def.name : '—'}</button>`; }).join('');
+    const nStk = Object.values(G.Stickers.owned()).reduce((a, n) => a + n, 0);
+    const tabs = ['p', 's'].map((k) => { const ww = Me.weapons[k]; return `<button class="tab${st.wslot === k ? ' on' : ''}" data-gw="${k}" ${ww ? '' : 'disabled'}>${k === 'p' ? 'Primary' : 'Sidearm'}: ${ww ? ww.def.name : '—'}</button>`; }).join('')
+      + `<button class="tab gs-stk-tab${st.stk ? ' on' : ''}" data-gstk>Stickers${nStk ? ` <small>×${nStk}</small>` : ''}</button>`;
     let slotRows = '';
     for (const s of slots) {
       const p = build[s.slot] && GS.PARTS[build[s.slot]];
@@ -342,8 +443,8 @@ G.GunsmithUI = (() => {
     return `<div class="gs-wrap">
       <div class="gs-tabs">${tabs}</div>
       <div class="gs-main">
-        <div class="gs-left"><div class="gs-view"><div id="gsHover" class="gs-hover"></div><div id="gsDots" class="gs-dots"></div><div class="gs-hint">Drag to turn · scroll to zoom · click a part or a dot</div></div>
-        <div class="gs-list"><div class="gs-sub">${cur ? GS.slotLabel(cur) + (cur.req ? '' : ' (optional)') : ''}</div>${list}</div></div>
+        <div class="gs-left"><div class="gs-view"><div id="gsHover" class="gs-hover"></div><div id="gsDots" class="gs-dots"></div><div class="gs-hint">${st.stk ? 'Drag to turn · scroll to zoom · click the gun to put the sticker there' : 'Drag to turn · scroll to zoom · click a part or a dot'}</div></div>
+        ${st.stk ? `<div class="gs-list gs-stk">${stkHtml(w)}</div>` : `<div class="gs-list"><div class="gs-sub">${cur ? GS.slotLabel(cur) + (cur.req ? '' : ' (optional)') : ''}</div>${list}</div>`}</div>
         <div class="gs-side"><div class="gs-title">${def.name}${def.modified ? ' <small>CUSTOM</small>' : ''}${def.missing.length ? ' <small class="broken">WON\'T FIRE</small>' : ''}</div>
           <div class="gs-slots">${slotRows}</div>
           <div class="gs-stats">${sideStats(def, preview, st.hoverPart)}</div></div>
@@ -363,6 +464,7 @@ G.GunsmithUI = (() => {
     container.classList.add('gs-host');
     container.innerHTML = html();
     const w = weapon();
+    if (!container.dataset.gsInput) { container.dataset.gsInput = 1; container.addEventListener('input', (e) => { if (container.classList.contains('gs-host')) stkInput(e); }); } // (the sticker tool's sliders)
     if (w) {
       container.querySelector('.gs-view').prepend(canvas);
       setModel(st.hoverPart ? previewDef(w.def, st.slot, st.hoverPart) : w.def);
@@ -373,7 +475,12 @@ G.GunsmithUI = (() => {
   function refresh() { const el = document.getElementById('shopItems'); if (el && el.classList.contains('gs-host')) show(el); }
   function onClick(e) {
     const t = e.target;
-    const gw = t.closest('[data-gw]'); if (gw && !gw.disabled) { st.wslot = gw.dataset.gw; st.slot = null; st.hoverPart = null; st.hoverSlot = null; view.auto = true; G.Audio.click(); return refresh(); }
+    const gw = t.closest('[data-gw]'); if (gw && !gw.disabled) { st.wslot = gw.dataset.gw; st.slot = null; st.hoverPart = null; st.hoverSlot = null; st.stkAt = null; st.stkHover = null; view.auto = !st.stk; G.Audio.click(); return refresh(); }
+    // the sticker tool: on and off, a sticker picked, stuck on, or put somewhere else
+    if (t.closest('[data-gstk]')) { st.stk = !st.stk; st.stkAt = null; st.stkHover = null; st.hoverPart = null; st.hoverSlot = null; st.stkDirty = true; if (st.stk) view.auto = false; G.Audio.click(); return refresh(); }
+    const sp = t.closest('[data-gstkpick]'); if (sp) { st.stkPick = st.stkPick === sp.dataset.gstkpick ? null : sp.dataset.gstkpick; st.stkDirty = true; G.Audio.click(); return stkPanel(); }
+    if (t.closest('[data-gstkapply]')) return stickOn();
+    if (t.closest('[data-gstkmove]')) { st.stkAt = null; st.stkDirty = true; G.Audio.click(); return stkPanel(); }
     const gs = t.closest('[data-gslot]'); if (gs) { st.slot = gs.dataset.gslot; st.hoverPart = null; G.Audio.click(); return refresh(); }
     const gd = t.closest('[data-gdot]'); if (gd) { st.slot = gd.dataset.gdot; st.hoverPart = null; G.Audio.click(); return refresh(); }
     const gi = t.closest('[data-ginstall]'); if (gi && !gi.disabled) return install(st.slot, gi.dataset.ginstall);
@@ -383,7 +490,7 @@ G.GunsmithUI = (() => {
   // hovering a part previews it on the gun (model and stats)
   function onHover(e) {
     const w = weapon();
-    if (!w) return;
+    if (!w || st.stk) return; // (the sticker tool: nothing to preview)
     const dot = e.target.closest('[data-gdot]');
     if (dot || st.dotHover) { const s = dot ? dot.dataset.gdot : null; if (s !== st.hoverSlot) { st.hoverSlot = s; paint(); label(s); } st.dotHover = !!dot; if (dot) return; }
     const row = e.target.closest('[data-gpart]');
@@ -400,5 +507,5 @@ G.GunsmithUI = (() => {
   }
   function hide() { active = false; cancelAnimationFrame(raf); const el = document.getElementById('shopItems'); if (el) el.classList.remove('gs-host'); }
 
-  return { show, hide, onClick, onHover, refresh, state: st, partEffects, statsHtml, deltaHtml, fitsLine, _setModel: (d) => setModel(d), _view: view, _canvas: () => canvas };
+  return { show, hide, onClick, onHover, refresh, state: st, partEffects, statsHtml, deltaHtml, fitsLine, _setModel: (d) => setModel(d), _view: view, _canvas: () => canvas, _model: () => model };
 })();

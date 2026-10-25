@@ -460,6 +460,7 @@ G.HUD = {
     });
     // the weapon case
     if (map.case && (G.Game.wcase || !G.Game.caseOpen)) { g.fillStyle = '#4fa3ff'; g.fillRect(map.case.x * S - 3, map.case.z * S - 2, 6, 4); }
+    if (map.sbox && G.Game.sbox && G.Game.sbox[0] && !G.Game.sbox[1]) { g.fillStyle = '#ff4fa0'; g.fillRect(map.sbox.x * S - 2, map.sbox.z * S - 2, 4, 4); } // (the sticker box, till someone's opened it)
     if (map.abox && G.Game.abox && !(G.Game.aboxMine() || [])[1]) { g.fillStyle = '#e0a020'; g.fillRect(map.abox.x * S - 2, map.abox.z * S - 2, 4, 4); } // (the attachments box, till you've had your pick)
     // enemies: recent gunfire pings
     for (const pg of G.Views.pings) {

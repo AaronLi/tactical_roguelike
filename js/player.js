@@ -116,7 +116,7 @@ G.Me = {
     G.Audio.pickup();
     if (G.InvUI.field) G.InvUI.render();
   },
-  takeFromCase([code, mag, reserve, am, kit]) {
+  takeFromCase([code, mag, reserve, am, kit, sk]) {
     const def = G.Gunsmith.fromCode(code);
     if (!def) return;
     // a conversion kit packed in with it
@@ -127,6 +127,7 @@ G.Me = {
     const stowed = old && this.caseStow && this.kit.pack && G.Gear.place(this.kit.pack.grids, G.Gear.gunItem(old));
     this.caseStow = false; // (left in the case, it's in there as built: its parts went with it, see the swap below)
     const w = this.makeWeapon(def.id, def.build);
+    if (sk && sk.length) w.stickers = G.Stickers.clean(sk); // (someone's, stuck on it before they put it in)
     w.ammo = G.ammoOk(G.calOf(w.def), am);
     const ch = G.chambered(w.def) && mag > 0; // (the count is everything in it: one of them's in the chamber)
     w.mag = Math.min(mag - (ch ? 1 : 0), this.magSize(w.def));
@@ -480,9 +481,9 @@ G.Me = {
     this.bleed = this.down ? G.Med.bleedOut(this.body) : null; // (seconds left, or null: stable)
 
     this.move(dt, map);
-    // the gun in your hands is the one in view (moved out of its slot in the Tab screen, rebuilt, swapped: whatever changed it)
+    // the gun in your hands is the one in view (moved out of its slot in the Tab screen, rebuilt, swapped, a sticker put on: whatever changed it)
     const cw = this.cur();
-    if (cw ? !G.R.vm || G.R.vm.userData.code !== cw.def.code : G.R.vm) G.R.setViewmodel(cw ? cw.def : null);
+    if (cw ? !G.R.vm || G.R.vm.userData.key !== G.R.vmKey(cw.def, cw.stickers) : G.R.vm) G.R.setViewmodel(cw ? cw.def : null);
     this.weaponUpdate(dt);
     this.interact(dt);
     this.updateCamera(dt);
@@ -1674,6 +1675,18 @@ G.Me = {
           if (F) { this.startAction('Looking in the box', 0.25, () => G.Game.aboxShow(false), 'case'); busy = true; }
         }
       }
+      // the sticker box: close by and facing it, the sticker's yours (the first to open it)
+      const sb = map.sbox, sbs = G.Game.sbox;
+      if (!tgt && !cuffTgt && !prompt && sb && sbs && sbs[0] && Math.hypot(sb.x - this.pos.x, sb.z - this.pos.z) < 1.5) {
+        const fx = -Math.sin(this.yaw), fz = -Math.cos(this.yaw), dx = sb.x - this.pos.x, dz = sb.z - this.pos.z, dl = Math.hypot(dx, dz) || 1;
+        if ((fx * dx + fz * dz) / dl > 0.6) {
+          if (sbs[1]) prompt = 'The sticker box is empty';
+          else {
+            prompt = 'Hold <b>F</b> to open the sticker box';
+            if (F) { this.startAction('Opening the sticker box', 0.6, () => G.Net.toHost({ t: 'openSbox' }), 'case'); busy = true; }
+          }
+        }
+      }
       // the level's weapon case: open it, then take what's inside or swap your weapon of that kind for it
       const mc = map.case, wc = G.Game.wcase;
       if (!tgt && !cuffTgt && !prompt && mc && Math.hypot(mc.x - this.pos.x, mc.z - this.pos.z) < 1.6) {
@@ -1696,7 +1709,7 @@ G.Me = {
               this.caseStow = !!(w && this.packRoom(G.Gear.gunItem(w)));
               // your weapon goes in the case in its standard build: your aftermarket parts stay with you
               // its magazines go into the case with it (unless it's going in your backpack)
-              G.Net.toHost({ t: 'swap', give: w && !this.caseStow ? [w.def.code, G.loaded(w), G.Gear.handOver(this, w.def), w.ammo] : null });
+              G.Net.toHost({ t: 'swap', give: w && !this.caseStow ? [w.def.code, G.loaded(w), G.Gear.handOver(this, w.def), w.ammo, w.stickers || null] : null }); // (its stickers with it)
             }, 'case');
             busy = true;
           }
@@ -2182,7 +2195,7 @@ G.Me = {
       p: [r2(this.pos.x), r2(this.pos.y), r2(this.pos.z)], yw: r2(this.yaw), pt: r2(this.pitch),
       hp: Math.ceil(this.hp), mhp: this.maxHp(), ar: Math.round(this.vestCond() * 100), amx: G.Gear.piece(this, 'chest') ? 100 : 0,
       pr: this.prone ? 1 : 0, dn: this.down ? 1 : 0, uc: this.out ? 1 : 0, dd: this.dead ? 1 : 0, bl: this.down ? (this.bleed == null ? -1 : Math.ceil(this.bleed)) : 0, bd: this.body ? G.Med.encode(this.body) : null,
-      w: this.cur().def.code, tl: this.tacFlags(this.cur()), cr: this.crouch || this.down || this.prone ? 1 : 0, ln: r2(this.lean || 0), lr: this.lowReady ? 1 : 0, sd: this.steadying ? 1 : 0, sw: this.stowed || this.held ? 1 : 0,
+      w: this.cur().def.code, sk: G.Stickers.share(this.cur().stickers) || undefined, tl: this.tacFlags(this.cur()), cr: this.crouch || this.down || this.prone ? 1 : 0, ln: r2(this.lean || 0), lr: this.lowReady ? 1 : 0, sd: this.steadying ? 1 : 0, sw: this.stowed || this.held ? 1 : 0,
       hk: this.held ? (this.held.kind === 'flash' ? 2 : 1) : 0, hc: this.held && this.held.cock ? 1 : 0, hs: this.held ? this.held.str : 0,
       rl: this.reloading && this.reloadTotal ? r2(G.U.clamp(1 - this.reloadT / this.reloadTotal, 0, 1)) : -1, in: this.inspectT > 0 && this.inspectDur ? r2(1 - this.inspectT / this.inspectDur) : this.rChk ? r2(0.58 + (G.VMAnim.INSPECT_HOLD - 0.58) * this.rChk.k) : -1,
       mc: this.magChk ? r2(this.magChk.back > 0 ? Math.max(0, 1 - this.magChk.back) : this.magChk.k) : -1,

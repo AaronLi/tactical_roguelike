@@ -334,6 +334,24 @@ label.check input { width: auto; accent-color: var(--accent); }
 .gs-part:hover { border-color: rgba(255,176,46,0.5); }
 .gs-part.fitted { border-color: var(--good); }
 .gs-part.na { opacity: 0.45; } .gs-part.na:hover { opacity: 0.9; }
+/* the sticker tool (js/gunsmith.js): its tab at the end of the row, the stickers you own, the controls */
+.gs-tabs .gs-stk-tab { margin-left: auto; }
+.gs-tabs .gs-stk-tab small { color: var(--accent); }
+.gs-stk .stk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(76px * var(--ik, 1)), 1fr)); gap: calc(6px * var(--ik, 1)); }
+.gs-stk .stk-card { position: relative; aspect-ratio: 1; padding: calc(6px * var(--ik, 1)); background: var(--panel); border: 1px solid var(--line); border-radius: 3px; cursor: pointer; }
+.gs-stk .stk-card:hover { border-color: rgba(255,176,46,0.5); }
+.gs-stk .stk-card.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.gs-stk .stk-card img { width: 100%; height: 100%; object-fit: contain; display: block; pointer-events: none; }
+.gs-stk .stk-card b { position: absolute; right: 4px; bottom: 2px; font: 700 calc(11px * var(--ik, 1)) var(--mono); color: var(--accent); text-shadow: 0 1px 2px #000; }
+.gs-stk .stk-ctl { display: flex; flex-wrap: wrap; gap: calc(6px * var(--ik, 1)) calc(16px * var(--ik, 1)); align-items: center; font: calc(12px * var(--ik, 1)) var(--mono); color: var(--dim); }
+.gs-stk .stk-ctl.off { opacity: 0.4; pointer-events: none; }
+.gs-stk .stk-ctl label { display: flex; align-items: center; gap: 6px; margin: 0; flex: 1 1 calc(190px * var(--ik, 1)); min-width: 0; }
+.gs-stk .stk-ctl label.stk-flip { flex: 0 0 auto; }
+.gs-stk .stk-ctl input[type=range] { flex: 1 1 auto; min-width: 50px; width: auto; }
+.gs-stk .stk-ctl span { flex: 0 0 4.5em; color: var(--text); white-space: nowrap; }
+.gs-stk .stk-act { display: flex; gap: 6px; align-items: center; min-height: calc(28px * var(--ik, 1)); font: calc(12px * var(--ik, 1)) var(--mono); color: var(--text); }
+.gs-stk .stk-hint, .gs-stk .stk-none { font: calc(11px * var(--ik, 1)) var(--mono); color: var(--dim); margin: 0; }
+#toast .stk-toast { height: 1.8em; vertical-align: middle; margin-right: 4px; }
 .gs-pn { font: 600 calc(12px * var(--ik, 1)) var(--mono); }
 .gs-pn small { display: block; font-weight: 400; font-size: calc(10px * var(--ik, 1)); color: var(--dim); letter-spacing: 1px; text-transform: uppercase; }
 .gs-pe { font: calc(10px * var(--ik, 1)) var(--mono); color: var(--dim); display: flex; flex-wrap: wrap; gap: calc(2px * var(--ik, 1)) calc(10px * var(--ik, 1)); }
@@ -639,3 +657,10 @@ i.c.heavy { background: #a02828; } i.c.light { background: #7a3a30; } i.c.frac {
 #commWheel .cw-it.sel { border-color: var(--accent); background: rgba(255,176,46,0.22); color: #fff; }
 #commWheel .cw-it.off { opacity: 0.4; }
 #commWheel .cw-ptr { position: absolute; left: -5px; top: -5px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 6px rgba(255,176,46,0.8); }
+
+/* the main menu's highlights renderer (js/game.js renderHighlights) */
+.hl-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+.hl-row .hl-prog { flex: 1 1 100%; height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; }
+.hl-row .hl-prog i { display: block; height: 100%; width: 0; background: var(--accent); transition: width 0.25s; }
+.hl-row .hl-msg { flex: 1 1 100%; font: 12px var(--mono); color: var(--dim); }
+.hl-row .hl-msg.bad { color: var(--bad); }

@@ -21,6 +21,7 @@ G.Server = {
   summons: 0,
   accMult: 1,
   dmgMult: 1,
+  skins: new Map(), // the squad's guns' sticker lists by hash (js/stickers.js share): kept for whoever joins
 
   reset() {
     this.players.clear(); this.enemies.clear();
@@ -53,6 +54,7 @@ G.Server = {
           wcase: this.phase === 'level' ? this.caseMsg() : null, cabs: this.phase === 'level' ? this.cabMsg() : null, abox: this.phase === 'level' ? this.aboxMsg() : null,
           loot: this.phase === 'level' && this.loot ? [...this.loot.values()].map((l) => [l.id, l.x, l.y, l.z, l.item, l.yaw]) : null,
           glass: this.phase === 'level' && this.glassBroken ? [...this.glassBroken] : null,
+          skins: [...this.skins], sbox: this.phase === 'level' ? this.sboxMsg() : null,
         });
         if (this.phase === 'shop') G.Net.sendTo(from, this.teamMsg());
         this.sendRoster();
@@ -60,6 +62,15 @@ G.Server = {
         break;
       }
       case 'st': if (p) p.st = m.s; break;
+      // a gun's stickers (js/stickers.js): kept and passed on; asked for by someone who's seen its hash and not it
+      case 'skin': {
+        if (!p || typeof m.h !== 'string' || m.h.length > 24 || this.skins.has(m.h)) break;
+        if (this.skins.size > 300) this.skins.delete(this.skins.keys().next().value);
+        this.skins.set(m.h, G.Stickers.clean(m.l));
+        G.Net.broadcast({ t: 'skin', h: m.h, l: this.skins.get(m.h) });
+        break;
+      }
+      case 'skinReq': if (this.skins.has(m.h)) G.Net.sendTo(from, { t: 'skin', h: m.h, l: this.skins.get(m.h) }); break;
       case 'hit': this.applyHit(m, from); break;
       // an officer's armour stopped rounds and they're still up: everyone's highlights (js/highlights.js saved)
       case 'saved': if (p && this.phase === 'level') G.Net.broadcast({ t: 'saved', id: from, n: Math.max(1, Math.min(9, m.n | 0)) }); break;
@@ -177,6 +188,14 @@ G.Server = {
         }
         break;
       }
+      // the sticker box: the sticker goes to whoever opens it first
+      case 'openSbox': {
+        const b = this.map && this.map.sbox, s = this.sbox;
+        if (this.phase !== 'level' || !b || !s || s.by || !p || !p.st || Math.hypot(b.x - p.st.p[0], b.z - p.st.p[2]) > 2.4) break;
+        s.by = from;
+        G.Net.broadcast({ t: 'sbox', s: this.sboxMsg() });
+        break;
+      }
       // first aid cabinets: opened (once, for everyone), and officers' edits (what they took and put in)
       case 'teamEdit': {
         if (this.phase !== 'shop' || !p) break;
@@ -199,8 +218,8 @@ G.Server = {
         if (this.phase !== 'level' || !c || !got || !this.caseOpen || !p || !p.st || Math.hypot(c.x - p.st.p[0], c.z - p.st.p[2]) > 2.4) break;
         const def = G.Gunsmith.fromCode(got.code), give = Array.isArray(m.give) ? m.give : null;
         if (!def || (give && (G.Gunsmith.fromCode(give[0]) || {}).slot !== def.slot)) break;
-        this.wcase = give ? { code: String(give[0]), mag: +give[1] || 0, reserve: +give[2] || 0, am: String(give[3] || ''), kit: null } : null;
-        G.Net.broadcast({ t: 'wcase', c: this.caseMsg(), by: from, got: [got.code, got.mag, got.reserve, got.am, got.kit || null] });
+        this.wcase = give ? { code: String(give[0]), mag: +give[1] || 0, reserve: +give[2] || 0, am: String(give[3] || ''), kit: null, sk: G.Stickers.clean(give[4]) } : null;
+        G.Net.broadcast({ t: 'wcase', c: this.caseMsg(), by: from, got: [got.code, got.mag, got.reserve, got.am, got.kit || null, got.sk || null] });
         break;
       }
       // "Turn around!": a kneeling suspect (or cowering civilian) turns to face away from the officer
@@ -296,7 +315,10 @@ G.Server = {
     this.cabs = (this.map.cabinets || []).map(() => ({ open: false, ver: 0, items: this.layCab(this.rollCab()) }));
     this.caseOpen = false;
     this.abox = this.map.abox ? { open: false, uses: {} } : null; // uses: player id -> { items, taken }
-    G.Net.broadcast({ t: 'phase', phase: 'level', level: this.level, seed: this.seed, th: this.theme, route: this.routeMsg(), wcase: this.caseMsg(), cabs: this.cabMsg(), abox: this.aboxMsg() });
+    // the sticker box's sticker: one of the host's (js/stickers.js names; none, and the box isn't there)
+    const sn = G.Stickers.names;
+    this.sbox = this.map.sbox && sn.length ? { s: sn[Math.floor(Math.random() * sn.length)], by: null } : null;
+    G.Net.broadcast({ t: 'phase', phase: 'level', level: this.level, seed: this.seed, th: this.theme, route: this.routeMsg(), wcase: this.caseMsg(), cabs: this.cabMsg(), abox: this.aboxMsg(), sbox: this.sboxMsg() });
   },
   // The level's weapon case: a weapon in its standard build, fully loaded, picked by rarity. Each tier has a
   // share (CASE_RARITY), split evenly between that tier's weapons so a tier with many weapons isn't more
@@ -445,6 +467,7 @@ G.Server = {
     return out;
   },
   // [open, { player id: [their three part ids, the one they took (or null)] }] or null when the level has no box
+  sboxMsg() { return this.map && this.map.sbox && this.sbox ? [this.sbox.s, this.sbox.by || 0] : null; }, // [the sticker, who took it]
   aboxMsg() {
     if (!this.map || !this.map.abox || !this.abox) return null;
     const u = {};
@@ -452,7 +475,7 @@ G.Server = {
     return [this.abox.open ? 1 : 0, u];
   },
   // [code (null when empty), mag, reserve, open, ammo type] or null when the level has no case
-  caseMsg() { return this.map && this.map.case ? [this.wcase ? this.wcase.code : null, this.wcase ? this.wcase.mag : 0, this.wcase ? this.wcase.reserve : 0, this.caseOpen ? 1 : 0, this.wcase ? this.wcase.am : null, this.wcase ? this.wcase.kit || null : null] : null; },
+  caseMsg() { return this.map && this.map.case ? [this.wcase ? this.wcase.code : null, this.wcase ? this.wcase.mag : 0, this.wcase ? this.wcase.reserve : 0, this.caseOpen ? 1 : 0, this.wcase ? this.wcase.am : null, this.wcase ? this.wcase.kit || null : null, this.wcase && this.wcase.sk && this.wcase.sk.length ? this.wcase.sk : null] : null; },
   toShop() {
     this.phase = 'shop';
     this.shopSeed = (Math.random() * 2 ** 31) | 0;

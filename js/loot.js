@@ -22,7 +22,7 @@ G.Loot = (() => {
   // icon on top.
   function meshFor(packed) {
     if (packed.k === 'gun' && packed.w) {
-      const code = G.Gunsmith.encode(packed.w.id, packed.w.build), gun = G.GunModels.world(code), wrap = new T.Group(), tmp = new T.Group();
+      const code = G.Gunsmith.encode(packed.w.id, packed.w.build), gun = G.GunModels.world(code, packed.w.sk), wrap = new T.Group(), tmp = new T.Group();
       gun.rotation.z = Math.PI / 2;
       wrap.add(gun); tmp.add(wrap); tmp.updateMatrixWorld(true);
       const b = new T.Box3().setFromObject(wrap);

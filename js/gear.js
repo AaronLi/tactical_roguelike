@@ -121,7 +121,7 @@ G.Gear = (() => {
     for (const k of Object.keys(it)) {
       if (k === 'uid' || (it.r && (k === 'n' || k === 'am'))) continue;
       const v = it[k];
-      if (k === 'w') o.w = { id: v.def.id, build: Object.assign({}, v.def.build), mag: v.mag, ammo: v.ammo, tube: (v.tube || []).slice(), noMag: !!v.noMag, fm: v.fm, chamber: v.chamber || null };
+      if (k === 'w') o.w = { id: v.def.id, build: Object.assign({}, v.def.build), mag: v.mag, ammo: v.ammo, tube: (v.tube || []).slice(), noMag: !!v.noMag, fm: v.fm, chamber: v.chamber || null, sk: v.stickers && v.stickers.length ? v.stickers.slice() : undefined }; // (sk: its stickers, js/stickers.js)
       else if (k === 'grids') o.grids = v.map(packGrid);
       else if (k === 'molle') o.molle = packGrid(v);
       else if (k === 'plate' || k === 'face') o[k] = v ? pack(v) : null;
@@ -141,6 +141,7 @@ G.Gear = (() => {
       const w = G.Me.makeWeapon(o.w.id, o.w.build);
       w.mag = o.w.mag; w.ammo = o.w.ammo; w.tube = (o.w.tube || []).slice(); if (o.w.noMag) w.noMag = true; if (o.w.fm) w.fm = o.w.fm;
       if ('chamber' in o.w) w.chamber = o.w.chamber;
+      if (o.w.sk && o.w.sk.length) w.stickers = G.Stickers.clean(o.w.sk);
       return gunItem(w);
     }
     const rest = {};

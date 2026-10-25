@@ -10,6 +10,15 @@ const server = http.createServer((req, res) => {
   const url = decodeURIComponent(req.url.split('?')[0]);
   const file = path.normalize(path.join(root, url === '/' ? 'index.html' : url));
   if (!file.startsWith(root)) { res.writeHead(403); return res.end(); }
+  // a folder: a listing of its files (how the game finds what's in assets/stickers/, js/stickers.js)
+  if (url !== '/' && url.endsWith('/')) {
+    return fs.readdir(file, { withFileTypes: true }, (err, list) => {
+      if (err) { res.writeHead(404); return res.end('Not found'); }
+      const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+      res.writeHead(200, { 'Content-Type': 'text/html', 'Cache-Control': 'no-store' });
+      res.end(`<!doctype html><ul>${list.filter((d) => d.isFile()).map((d) => `<li><a href="${esc(encodeURIComponent(d.name))}">${esc(d.name)}</a></li>`).join('')}</ul>`);
+    });
+  }
   fs.readFile(file, (err, data) => {
     if (err) { res.writeHead(404); return res.end('Not found'); }
     res.writeHead(200, { 'Content-Type': types[path.extname(file).toLowerCase()] || 'application/octet-stream', 'Cache-Control': 'no-store' });

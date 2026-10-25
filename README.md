@@ -537,6 +537,25 @@ says the same), but not whose: the shooter's name isn't shown.
     in your inventory (on the floor if there's no room). Your light goes dark.
   - **What it does:** hover over a pick and the panel under them shows the weapon in your hands with it fitted, the
     gunsmith's stats with what changes marked (and what it'd replace), each load's muzzle velocity and energy too.
+- **The sticker box** (`map.sbox`, one level in ten: `G.Level.SBOX_CHANCE`): a little hot-pink display box on the
+  floor against a wall in a room indoors (pink on your minimap till it's opened), one sticker lying in it under a
+  clear lid. The host picks which, from the stickers it has. Hold F at it, facing it: the sticker goes into your
+  collection (the first to open it gets it; the squad sees who) and the lid stays up.
+- **Stickers** (`js/stickers.js`, `G.Stickers`): the pictures in `assets/stickers/` (PNG, WebP, JPEG, GIF or AVIF).
+  The game reads the folder's listing (`serve.js` lists a folder; so do most static servers), or `index.json` in it
+  (a list of the file names) where the host doesn't list folders (GitHub Pages: add one). Your collection is kept
+  in this browser, across runs.
+  - **Sticking one on:** the gunsmith's Stickers tab. Pick one of yours, click the gun where it goes (a faint copy
+    follows the pointer, then stays where you clicked), size it (1.2 to 7 cm; Shift + scroll), turn it (Ctrl +
+    scroll), mirror it, and Stick it on: it's on that gun for good, one of yours used up. Twelve to a gun.
+  - **How it's drawn:** a decal: the picture projected onto the gun's own surfaces in a small box (as deep as half
+    its size), only on what faces out its way (not round a right-angled edge, not through to the far side), each
+    piece a child of the part it's on, so it rides on a slide or a magazine. The same on your viewmodel, in the
+    gunsmith, on your body as the squad sees it, on the gun on the floor or in the weapon case, and in the replays.
+  - **On the gun:** `w.stickers` ({ file, point, normal, turn, size, mirrored } in the gun's model space), kept
+    when it's dropped, picked up, stashed or swapped at the weapon case. The squad: a gun's list is sent to the host
+    once (`skin`), kept there and passed on (to anyone joining later too), then only its hash goes in your state
+    (`st.sk`); anyone who hasn't the list asks for it.
 - Between levels you shop with Vex the quartermaster, in the hangar (below). He doesn't sell weapons. Each
   visit he has three pieces of gear, of different kinds (carrier or rig, plate, helmet, face shield, belt,
   backpack), picked by rarity, and four weapon parts, plus supplies. A plate carrier comes with a plate fitted, rolled by rarity (soft
@@ -1951,17 +1970,19 @@ solids at any height. Doors and windows are dynamic: their solids change as they
   lounge's east wall (4.4 m across, facing its sofas); the TVs are around the range's yard (behind the rifle line,
   its east wall, by the course), clear of the IPSC course's board and screens, each tipped forward on its wall
   (hinged at the bottom, its top held out on a strut) to face the eyes of someone standing about one and a third of
-  its widths out. Press F at one to download the broadcast as a video (WebM, 960×540, 30 frames a second, with the
-  audience): it isn't filmed but made there and then, every frame rendered off screen as fast as the machine goes
-  and encoded with the browser's own encoders (WebCodecs: VP8 at 2.5 Mbit/s from plain pixel buffers, the audience
-  rendered in an OfflineAudioContext and encoded as Opus), then put into a WebM by a small muxer in the file (about
-  17 s for a 52 s broadcast). It's made ahead, in a worker, once you're in the hangar (js/exportworker.js: the
-  game's own code loaded there, the level built again from its seed, the recording sent over as data, its own
-  renderer on an OffscreenCanvas, each frame encoded straight from it), paced so the game keeps its frames (the page
-  lets it render two frames for each of its own), and kept: F at a TV saves it there and then, or as soon as it's
-  done. The sounds come back as events and are mixed on the page (Web Audio isn't in workers), then go back to the
-  worker, which puts the file together (the video never comes to the page) and hands it over. Without a worker (no
-  OffscreenCanvas, or it fails) it's made on the page when you ask, a few frames at a time, as before. You hear one
+  its widths out. Press F at one to save the highlights as a recording: a .zip (`breach-protocol-level-N-highlights.zip`,
+  a few hundred kB) of everything the broadcast is made from: the level's seed (it's built again from it), the clips
+  (everyone's every move at 10 Hz, the rounds, the doors), the stats, the running order as the TVs cut it (with its
+  adverts' pictures) and the stickers on the officers' guns (their pictures too), as JSON (`highlights.json`: Maps,
+  Sets and shared objects kept as such, `toJSON` / `fromJSON`). Nothing is rendered in the hangar, so the game keeps
+  its memory. **Render highlights video** on the main menu takes one and makes the video (WebM, 960×540, 30 frames
+  a second, with the audience): every frame rendered off screen in a worker as fast as the machine goes
+  (js/exportworker.js: the game's own code loaded there, the level built again from its seed, its own renderer on an
+  OffscreenCanvas, each frame encoded straight from it with WebCodecs, VP8 at 2.5 Mbit/s), the sounds coming back as
+  events and mixed on the page in an OfflineAudioContext (Web Audio isn't in workers), encoded as Opus, then put into a
+  WebM in the worker by a small muxer (the video never comes to the page), and saved: about 30 s for a 50 s broadcast.
+  It needs WebCodecs and OffscreenCanvas (a recent Chrome, Edge or Firefox); a progress bar shows how far it's got,
+  and Cancel stops it. A recording from a newer version of the game is refused. You hear one
   only where you'd stand to watch it: in front of it, full to about one and a half of its widths and nothing past
   three, not edge-on, nothing in between. There it's a studio audience, kept quiet and short for now (everything at
   about a third, recordings faded out after a second or so): a stadium's murmur on a loop, recorded cheers and
@@ -1987,11 +2008,13 @@ solids at any height. Doors and windows are dynamic: their solids change as they
 | `js/rig.js` | Character skeleton, procedural animation, bone hitboxes |
 | `js/parts.js` | Weapon platforms, parts catalogue, builds and how they change stats |
 | `js/gunmodels.js` | Procedural gun models built from parts (first person, third person, gunsmith) |
-| `js/gunsmith.js` | The gunsmith: 3D weapon view and part fitting |
+| `js/gunsmith.js` | The gunsmith: 3D weapon view, part fitting and the sticker tool |
+| `js/stickers.js` | Stickers: which there are, your collection, decals on guns, the squad's lists by hash |
+| `js/zip.js` | Writing and reading .zip files (the highlights' recordings) |
 | `js/hud.js`, `js/shop.js` | UI; the shop's stock and its buying |
 | `js/hangar.js` | The hangar between levels: workshop, store, warehouse, lounge, helicopter, and looking-to-buy |
 | `js/profiler.js` | The profiler: frame timings by piece of work, saved from the pause menu |
-| `js/highlights.js` | Recording a level and replaying its highlights on the hangar's TVs, as a sports broadcast |
+| `js/highlights.js` | Recording a level and replaying its highlights on the hangar's TVs, as a sports broadcast; saving it as a .zip and rendering the video from one |
 | `js/exportworker.js` | The highlights video made off the main thread: the game's code in a worker, rendering and encoding there |
 | `js/ballistics.js` | Terminal ballistics: the rounds, armour layers, the body's anatomy (fitted to the rigs) and wound tracks |
 | `js/range.js` | The shooting range behind the hangar: lanes, targets, and giving your ammunition back |

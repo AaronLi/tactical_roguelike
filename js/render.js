@@ -177,11 +177,14 @@ G.R = {
   },
 
   // ------------------------------------------------------------ viewmodels
-  setViewmodel(def) {
+  // (skin: its stickers, js/stickers.js; by default the gun in your hands', if that's this build)
+  setViewmodel(def, skin) {
+    if (skin === undefined) { const w = G.Me && G.Me.cur && G.Me.cur(); skin = w && w.def === def ? w.stickers : null; }
     if (this.vm) { this.vmRoot.remove(this.vm); this.vm.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); }
-    this.vm = def ? G.GunModels.viewmodel(def) : null;
-    if (this.vm) { this.vm.userData.code = def.code; this.vmRoot.add(this.vm); } // (code: which build it shows)
+    this.vm = def ? G.GunModels.viewmodel(def, skin) : null;
+    if (this.vm) { this.vm.userData.code = def.code; this.vm.userData.key = this.vmKey(def, skin); this.vmRoot.add(this.vm); } // (code: which build it shows; key: and its stickers)
   },
+  vmKey(def, skin) { return def ? def.code + '#' + G.Stickers.key(skin) : ''; },
 
   // the muzzle flash's star (made once: the highlights' export worker, which never runs init, asks for it too)
   flashTexture() {
