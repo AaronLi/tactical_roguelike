@@ -1,6 +1,23 @@
 'use strict';
 window.G = window.G || {};
 
+// Colour, physically: every colour written down (a hex, a canvas, a picture) is sRGB, as a screen shows it; it's
+// turned linear before it's lit (light adds up in linear: twice the lamps, twice the light), and back to sRGB on its
+// way to the screen. (three's legacy mode lit the sRGB numbers as they were: a saturated colour went fluorescent
+// under a bright lamp, and the falloff into shadow was a cliff.) So: colours convert as they're set, canvas and
+// loaded textures are marked sRGB (decoded as they're sampled; the light grid's and render targets' data stay
+// linear), and every renderer writes sRGB.
+if (window.THREE) {
+  THREE.ColorManagement.legacyMode = false;
+  const CT = THREE.CanvasTexture;
+  THREE.CanvasTexture = class extends CT { constructor(...a) { super(...a); this.encoding = THREE.sRGBEncoding; } };
+  const load = THREE.TextureLoader.prototype.load;
+  THREE.TextureLoader.prototype.load = function (...a) { const t = load.apply(this, a); t.encoding = THREE.sRGBEncoding; return t; };
+  const WR = THREE.WebGLRenderer;
+  THREE.WebGLRenderer = function (...a) { const r = new WR(...a); r.outputEncoding = THREE.sRGBEncoding; return r; };
+  THREE.WebGLRenderer.prototype = WR.prototype;
+}
+
 G.U = {
   // mulberry32 — small deterministic PRNG so every peer generates the same level from a seed
   rng(seed) {

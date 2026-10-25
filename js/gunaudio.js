@@ -16,9 +16,11 @@ G.GunAudio = {
   MIC: { micSim: true, micGain: 1.0, micHardness: 1.0, micAgc: 0.08 },
   CASING: 0, // spent cases are simulated and heard where they land (js/casings.js), not baked into the shot
   GAIN: 0.55,          // level trim for synth buffers vs. the other effects
-  // The synth's mic-overload stage evens out loudness, so a suppressed render peaks as high as an
-  // open one (its longer gas tail even raises RMS). Apply the suppressor's level drop at playback.
-  SUP_GAIN: 0.25,
+  // A suppressor's level drop is in its render (GunshotSynth.suppression: a compact can on a .308 takes off far less
+  // than a long can on a 9 mm). First-round pop: a can that's gone quiet for a while fills back up with air, and the
+  // oxygen burns with the next shot's gas: that shot is a few dB louder than the string that follows.
+  FRP_GAIN: 1.6, FRP_COLD: 8,
+  lastShot: new Map(), // sound key + shooter -> when (s) they last fired it: the can's still full of gas
   MAX_VOICES: 28,
   CEIL_M: G.Level.WALL_H,
 
@@ -116,7 +118,7 @@ G.GunAudio = {
     return Object.assign({
       barrel: g.barrel, caliber: g.caliber, muzzleDevice: g.muzzleDevice, pressure: g.pressure, grain: g.grain,
       bulletWeight: g.bulletWeight, boltSim: true, boltMass: g.boltMass, boltLoudness: g.boltLoudness,
-      actionType: g.actionType, shotCount: g.shotCount, caseMaterial: g.caseMaterial, caseLength: g.caseLength,
+      actionType: g.actionType, shotCount: g.shotCount, caseMaterial: g.caseMaterial, caseLength: g.caseLength, suppressor: g.suppressor,
     }, this.MIC);
   },
   placeParams(id, sig) {
@@ -230,9 +232,17 @@ G.GunAudio = {
   },
 
   // ------------------------------------------------------------ playback
-  // pos = world position of the muzzle, or null for the local player's own gun.
+  // a suppressed gun's first shot after a pause (by shooter: two of them with the same gun are two cans)
+  firstRound(id, who, now) {
+    if (this.spec(id).muzzleDevice !== 'suppressor') return 1;
+    const k = id + '|' + who, t = this.lastShot.get(k);
+    this.lastShot.set(k, now);
+    if (this.lastShot.size > 256) this.lastShot.clear();
+    return t === undefined || now - t > this.FRP_COLD ? this.FRP_GAIN : 1;
+  },
+  // pos = world position of the muzzle, or null for the local player's own gun. who: the shooter (for a can's first-round pop).
   // Returns false when no synth buffer exists yet so the caller can play a fallback.
-  play(id, pos) {
+  play(id, pos, who) {
     const A = G.Audio, ctx = A.ctx, map = G.Game.map;
     if (!ctx || !map || !this.spec(id) || !this.available()) return false;
     const cam = G.R.camera.position;
@@ -246,7 +256,7 @@ G.GunAudio = {
       if (!buf) return false;
     }
 
-    const base = this.GAIN * (this.spec(id).muzzleDevice === 'suppressor' ? this.SUP_GAIN : 1);
+    const base = this.GAIN * this.firstRound(id, who || (pos ? 'x' : 'me'), ctx.currentTime);
     let gain = base, occluded = false, d = 0, panPos = pos, portal = null;
     const taps = this.echoTaps(map, src, cam);
     if (this.debugEchoes) this.drawEchoes(taps, cam);

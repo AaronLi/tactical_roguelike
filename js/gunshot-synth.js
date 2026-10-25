@@ -45,6 +45,36 @@
     suppressor: { label: 'Suppressor',         level: -20, lp: 0.34, decay: 1.85, tang: 0.00, whoosh: 0.85 },
   };
 
+  // Suppressors (the 'suppressor' device, by can). What a can does to the report, from the measurements:
+  //  - It cuts the muzzle blast's peak by roughly 17-24 dB at the shooter's ear (3-32 dB across rifles,
+  //    cans and loads; a supersonic rifle through a can still peaks above 140 dB). The baffles and
+  //    expansion chambers break up the initial shock front, so what's left is a slower-rising, darker
+  //    "pfft" that lasts longer: the can blows down for tens of ms instead of one sharp shock.
+  //  - The ballistic crack forms outside the gun and is untouched: suppressed supersonic rounds still
+  //    crack downrange (only subsonic ammunition removes it), and the action is no quieter, so the bolt
+  //    clatter comes forward.
+  //  - Back pressure: the can holds gas in the bore, so more of it blows back through the action (gas
+  //    in the face, a louder, faster bolt) on gas and blowback guns.
+  //  - First-round pop: the oxygen in a cold can burns with the first shot's gas, making it a few dB
+  //    louder than the shots that follow (applied at playback by the caller: it's one shot in a string).
+  //  - The can itself rings faintly: its gas column (an open-closed pipe of hot gas) and the steel tube.
+  // How much a can takes off depends on how much gas it's asked to hold: its volume against the gas
+  // reaching the muzzle (bore x residual pressure). A full-power .308 through a 5.56-sized can loses
+  // several dB of suppression; a 9 mm through a pistol can gets more.
+  //  db    : blast reduction for the gas the can is sized for (a gasLoad of vol; 5.56 from a 14.5" barrel is 1)
+  //  vol   : relative internal volume (the gas it's sized for, and how long it blows down)
+  //  len   : length (m), for the gas-column ring     back : back pressure into the action (0-1)
+  //  shock : how much of the initial shock front survives the baffles
+  //  ring  : the tube's ring level                    ported: a ported barrel (integral), bleeding gas early
+  const SUPPRESSORS = {
+    full:      { label: 'Full-length can',   db: -24, vol: 1.00, len: 0.17, back: 0.60, shock: 0.18, ring: 0.10 },
+    compact:   { label: 'Compact can',       db: -21, vol: 0.55, len: 0.11, back: 0.45, shock: 0.30, ring: 0.14 },
+    long:      { label: 'Long (pistol) can', db: -27, vol: 1.20, len: 0.20, back: 0.35, shock: 0.14, ring: 0.08 },
+    box:       { label: 'Shotgun can',       db: -22, vol: 2.50, len: 0.26, back: 0.30, shock: 0.32, ring: 0.18 },
+    integral:  { label: 'Integral (ported)', db: -26, vol: 1.30, len: 0.20, back: 0.20, shock: 0.12, ring: 0.06, ported: true },
+    integralX: { label: 'Extended integral', db: -29, vol: 1.60, len: 0.24, back: 0.20, shock: 0.10, ring: 0.05, ported: true },
+  };
+
   // Convert a physical powder grain size (mm) to a normalized burn rate.
   // Small grains have more surface area -> faster burn -> earlier pressure peak.
   const burnRateFromGrain = (mm) => clamp(1 - (mm - 0.2) / 1.8, 0, 1);
@@ -100,6 +130,29 @@
     );
 
     return { v, mach, bore, LD, muzzleFrac, Ppeak, burn };
+  }
+
+  // Gas reaching the muzzle relative to 5.56 from a 14.5" barrel. The powder burnt goes with the muzzle
+  // energy (a 9 mm pistol burns a fifth of a 5.56's charge), and how much of it is still pressure at the
+  // muzzle with the residual fraction (a short barrel vents more of it; a pistol's high fraction is still
+  // a fraction of very little, hence the square root).
+  const gasRaw = (p, b) => 0.5 * Math.max(p.bulletWeight, 1) * GRAIN_KG * b.v * b.v * Math.sqrt(b.muzzleFrac);
+  let GAS_REF = 0;
+  function gasLoad(p, b) {
+    if (!GAS_REF) GAS_REF = gasRaw({ bulletWeight: 62 }, ballistics({ barrel: 14.5, caliber: 5.56, pressure: 55000, grain: 0.7, bulletWeight: 62 }));
+    return gasRaw(p, b || ballistics(p)) / GAS_REF;
+  }
+  // The suppression a shot gets: the can (p.suppressor, else a full-length can) against this round's gas.
+  // Every doubling of gas past what the can is sized for costs ~4 dB of suppression; less gas gains a little.
+  // Returns null for an unsuppressed shot. The drop is in the render itself: a suppressed shot goes into the mic stage
+  // that much quieter, so it doesn't overload it the way an open one does, and keeps its own shape (a soft onset, the
+  // can blowing down) instead of being flattened into the same clipped plateau, only quieter.
+  function suppression(p, b) {
+    if (p.muzzleDevice !== 'suppressor') return null;
+    const can = SUPPRESSORS[p.suppressor] || SUPPRESSORS.full;
+    const over = Math.log2(Math.max(gasLoad(p, b), 0.05) / can.vol);
+    const db = clamp(can.db + 4 * clamp(over, -1, 3) * (over > 0 ? 1 : 0.5), can.db - 3, -8);
+    return { can, db };
   }
 
   // Event schedule shared by the audio renderer and the visual diagram so the
@@ -209,6 +262,8 @@
   // Percussive gain envelope: near-instant attack, exponential decay.
   function percEnv(ctx, t0, peak, attack, tau) {
     const g = ctx.createGain();
+    g.gain.value = 0; // (silent until it starts: before its first event a gain sits at its default of 1, so a source started
+    // ahead of its envelope, as the can's blowdown is, would play flat out until then)
     g.gain.setValueAtTime(0.0001, t0);
     g.gain.linearRampToValueAtTime(peak, t0 + attack);
     g.gain.setTargetAtTime(0.0001, t0 + attack, tau);
@@ -357,18 +412,27 @@
   // reproducing the harsh "digital" edge of phone/action-cam gunshot clips.
   // Build the mic profile once (source stage): the transfer curve and drive
   // amounts derived only from the microphone settings, independent of position.
-  function micProfile(p) {
+  // The drive is set for an open shot, ~160 dB. A suppressed one is already quieter by its can's suppression (sup.db,
+  // taken off the blast in precompute), so it overloads the mic less on its own; driven exactly the same, the
+  // compressor would pump it back up to within ~8 dB of the open shot. So the drive comes down by a share of it
+  // (SUP_DRIVE): measured, an integral can ends ~19 dB under the open gun, a full-length rifle can ~14, a compact one
+  // ~10 (the rifle's crack isn't the can's to take). (It used to come down by all of it, and the output by a quarter
+  // more, on top of the blast's own cut: the can counted two and a quarter times over, an integral can 35-40 dB
+  // under the open gun: a whisper even in your own hands.)
+  const SUP_DRIVE = 0.45;
+  function micProfile(p, sup) {
     const gain = clamp(p.micGain ?? 0.3, 0, 1);
     const hard = clamp(p.micHardness ?? 0.5, 0, 1);
     const agc = clamp(p.micAgc ?? 0.25, 0, 1);
-    return { sim: p.micSim !== false, gain, hard, agc, curve: micCurve(hard) };
+    const driveDb = Math.max(0, gain * 26 + (sup ? sup.db * SUP_DRIVE : 0));
+    return { sim: p.micSim !== false, gain, hard, agc, driveDb, outDb: 0, curve: micCurve(hard) };
   }
 
   function buildMicChain(ctx, input, dest, mic) {
     const { gain, hard, agc } = mic;
 
     const drive = ctx.createGain();
-    drive.gain.value = dbToGain(gain * 26);            // push into overload
+    drive.gain.value = dbToGain(mic.driveDb ?? gain * 26); // push into overload (a suppressed shot, less: micProfile)
 
     const clip = ctx.createWaveShaper();
     clip.curve = mic.curve;                            // precomputed transfer curve
@@ -385,7 +449,7 @@
     comp.release.value = 0.05 + 0.4 * agc;
 
     const trim = ctx.createGain();                     // clipping raises RMS
-    trim.gain.value = dbToGain(-7 * gain);
+    trim.gain.value = dbToGain(-7 * gain + (mic.outDb || 0));
 
     input.connect(drive).connect(clip).connect(hp).connect(comp).connect(trim).connect(dest);
   }
@@ -413,6 +477,7 @@
   function precompute(p) {
     const b = ballistics(p);
     const dev = DEVICES[p.muzzleDevice] || DEVICES.none;
+    const sup = suppression(p, b), can = sup && sup.can;
     const sched = schedule(p);
     const t0 = sched.tExit;
     const dur = 0.6 + (sched.bolt ? sched.bolt.tChamber : 0.15);
@@ -434,7 +499,7 @@
     let fc = 2600 * Math.pow(5.56 / p.caliber, 0.55);
     fc *= (1 - 0.12 * smoothstep(4, 20, p.barrel));
     fc *= (0.80 + 0.55 * smoothstep(20000, 62000, p.pressure));
-    fc = clamp(fc * dev.lp, 500, 6500);
+    fc = clamp(fc * dev.lp * (can ? 1.25 - 0.22 * can.vol : 1), 500, 6500); // (a bigger can, a darker report)
     const blastFc = fc;
 
     const blastAmp = clamp(
@@ -442,8 +507,13 @@
         * (0.7 + 0.6 * smoothstep(20000, 65000, p.pressure)),
       0.05, 2.0
     );
-    const tau = (0.010 + 0.02 * (p.caliber / 9)) * dev.decay * (1 + 0.35 * (1 - b.burn));
-    const g0 = dbToGain(dev.level);   // device level baked into blast + tang
+    // (a can blows down: the more volume, the longer the gas takes to leave it)
+    const tau = (0.010 + 0.02 * (p.caliber / 9)) * (can ? 1 + 0.75 * can.vol : dev.decay) * (1 + 0.35 * (1 - b.burn));
+    const g0 = dbToGain(sup ? sup.db : dev.level);   // device level baked into blast + tang
+    // The action and the crack aren't suppressed: they stay at their own level (the bolt a little harder, with the
+    // can's back pressure driving it), so next to the quieted blast they come forward.
+    const keepBolt = sup ? 1 + 0.5 * can.back : 1;
+    const keepCrack = 1;
 
     // (a) shock front
     const shk = ctx.createBufferSource(); shk.buffer = noiseBuffer(ctx, 0.02);
@@ -451,7 +521,10 @@
     shkHp.type = 'highpass'; shkHp.frequency.value = clamp(fc * 0.7, 350, 4500);
     const shkSat = ctx.createWaveShaper(); shkSat.curve = drive; shkSat.oversample = '4x';
     const shkEnv = ctx.createGain();
-    shkEnv.gain.setValueAtTime(1.25 * blastAmp * g0, t0);
+    // (through a can the baffles break the front up: little of it survives, and it rises slower)
+    const shkPk = 1.25 * blastAmp * g0 * (can ? can.shock : 1);
+    shkEnv.gain.setValueAtTime(can ? 0.0001 : shkPk, t0);
+    if (can) shkEnv.gain.linearRampToValueAtTime(shkPk, t0 + 0.0008);
     shkEnv.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.0045 + 0.01 * (p.caliber / 9));
     shk.connect(shkHp).connect(shkSat).connect(shkEnv).connect(bus[0]);
     shk.start(t0); shk.stop(t0 + 0.03);
@@ -462,7 +535,7 @@
     bLp.type = 'lowpass'; bLp.frequency.value = fc; bLp.Q.value = 0.5;
     const bHp = ctx.createBiquadFilter(); bHp.type = 'highpass'; bHp.frequency.value = 90;
     const bSat = ctx.createWaveShaper(); bSat.curve = drive; bSat.oversample = '4x';
-    const bEnv = percEnv(ctx, t0, blastAmp * g0, 0.0004, tau);
+    const bEnv = percEnv(ctx, t0, blastAmp * g0, can ? 0.0012 : 0.0004, tau);
     bSrc.connect(bHp).connect(bLp).connect(bSat); add(bSat, bEnv, 0);
     bSrc.start(t0); bSrc.stop(t0 + tau * 8);
 
@@ -478,10 +551,25 @@
     // suppressor / brake gas rush -> channel 2 (no device level)
     if (dev.whoosh > 0) {
       const w = ctx.createBufferSource(); w.buffer = noiseBuffer(ctx, 0.4);
-      const wLp = ctx.createBiquadFilter(); wLp.type = 'lowpass'; wLp.frequency.value = 900;
-      const wEnv = percEnv(ctx, t0 + 0.004, dev.whoosh * 0.5, 0.006, tau * 2.2);
+      const wLp = ctx.createBiquadFilter(); wLp.type = 'lowpass'; wLp.frequency.value = can ? 700 + 500 / can.vol : 900;
+      // (through a can: the blowdown, gas still leaving the can after the shot; a ported barrel starts bleeding early)
+      const wAmt = can ? (0.45 + 0.25 * can.vol) * blastAmp * g0 : dev.whoosh * 0.5; // (as loud as what's left of the blast, longer)
+      const wEnv = percEnv(ctx, t0 + (can && can.ported ? 0.001 : 0.004), wAmt, 0.006, tau * 2.2);
       w.connect(wLp); add(wLp, wEnv, 2);
       w.start(t0); w.stop(t0 + tau * 12);
+    }
+    // the can ringing: its column of hot gas (open at the muzzle, closed at the blast baffle: f = c/4L, with c
+    // ~520 m/s in the hot gas) and, fainter and higher, the steel tube
+    if (can && can.ring > 0) {
+      const tone = (f, amp, decay, delay) => {
+        const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = f;
+        const e = percEnv(ctx, t0 + delay, amp, 0.0006, decay); add(o, e, 2);
+        o.start(t0 + delay); o.stop(t0 + delay + decay * 8);
+      };
+      const fGas = 520 / (4 * can.len), amp = can.ring * 2 * blastAmp * g0;
+      tone(fGas, amp, 0.012, 0.001);
+      tone(fGas * 3, amp * 0.5, 0.008, 0.001);
+      tone(clamp(900 / can.len, 3000, 9000), amp * 0.35, 0.02, 0.0015);
     }
 
     // supersonic crack -> channel 3 (Mach-only amplitude; direction applied live)
@@ -495,7 +583,7 @@
       const fCrack = clamp((3200 + 2800 * smoothstep(1, 2.6, b.mach)
         * Math.pow(62 / Math.max(p.bulletWeight, 10), 0.25)) * (shots > 1 ? 0.8 : 1), 2200, 8000);
       const spread = Math.min(shots, 6);
-      const perAmp = crackAmt * 0.7 / Math.sqrt(spread);
+      const perAmp = crackAmt * 0.7 * keepCrack / Math.sqrt(spread);
       for (let s = 0; s < spread; s++) {
         const jt = t0 + (spread > 1 ? Math.random() * 0.008 : 0);   // pellets smear ~8 ms
         const cSrc = ctx.createBufferSource(); cSrc.buffer = noiseBuffer(ctx, 0.05);
@@ -506,7 +594,7 @@
       // Sharp bipolar wavefront transient only for a single projectile.
       if (shots === 1) {
         const tick = ctx.createOscillator(); tick.type = 'sawtooth'; tick.frequency.value = fCrack * 0.6;
-        const tEnv = percEnv(ctx, t0, crackAmt * 0.35, 0.0002, 0.0012);
+        const tEnv = percEnv(ctx, t0, crackAmt * 0.35 * keepCrack, 0.0002, 0.0012);
         add(tick, tEnv, 3); tick.start(t0); tick.stop(t0 + 0.01);
       }
     }
@@ -514,7 +602,7 @@
     // mechanical / bolt -> channel 1 (tang -> channel 0). Neutral internal times.
     if (p.boltSim && sched.bolt) {
       const bm = sched.bolt.bm;
-      const loud = p.boltLoudness ?? 0.55;
+      const loud = (p.boltLoudness ?? 0.55) * keepBolt;
       const pitch = 1 - 0.4 * bm;
       const ping = (t, freq, amp, q, decay, ch) => {
         const s = ctx.createBufferSource(); s.buffer = noiseBuffer(ctx, 0.03);
@@ -539,6 +627,15 @@
       ping(tReturn, 2900 * pitch, 0.15 * loud, 8, 0.006, 1);         // spring return
       thunk(tChamber, 300 * pitch, 0.42 * loud);                      // returns to battery
       ping(tChamber + 0.001, 3400 * pitch, 0.22 * loud, 9, 0.006, 1);
+      // back pressure: gas the can holds in the bore spits out of the action as it opens (a hiss at the shooter's
+      // face), most on direct gas and blowback guns, little on a locked short-recoil or roller action
+      if (can && can.back > 0) {
+        const A = { gas: 1, longstroke: 0.6, blowback: 1, roller: 0.5, recoil: 0.3 }[p.actionType] ?? 0.7;
+        const h = ctx.createBufferSource(); h.buffer = noiseBuffer(ctx, 0.1);
+        const hBp = ctx.createBiquadFilter(); hBp.type = 'bandpass'; hBp.frequency.value = 2400; hBp.Q.value = 0.8;
+        const e = percEnv(ctx, tUnlock, 0.18 * can.back * A * loud, 0.002, 0.014);
+        h.connect(hBp); add(hBp, e, 1); h.start(tUnlock); h.stop(tUnlock + 0.12);
+      }
       if (dev.tang > 0) {
         ping(t0 + 0.001, 4200, dev.tang * 0.4 * g0, 12, 0.01, 0);
         ping(t0 + 0.003, 5600, dev.tang * 0.25 * g0, 14, 0.008, 0);
@@ -548,7 +645,8 @@
     return ctx.startRendering().then((stems) => ({
       params: p, ballistics: b, schedule: sched, blastFc, hasCrack,
       blastPeak: 1.25 * blastAmp * g0,   // reference loudness of the report
-      mic: micProfile(p), stems,
+      suppression: sup,
+      mic: micProfile(p, sup), stems,
     }));
   }
 
@@ -746,6 +844,9 @@
   GunshotSynth.precompute = precompute;
   GunshotSynth.place = place;
   GunshotSynth.DEVICES = DEVICES;
+  GunshotSynth.SUPPRESSORS = SUPPRESSORS;
+  GunshotSynth.suppression = suppression;
+  GunshotSynth.gasLoad = gasLoad;
   GunshotSynth.ENVIRONMENTS = ENVIRONMENTS;
   GunshotSynth.ACTIONS = ACTIONS;
   GunshotSynth.CASE_MATERIALS = CASE_MATERIALS;

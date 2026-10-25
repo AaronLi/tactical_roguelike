@@ -100,7 +100,7 @@ G.World = (() => {
         if (!s || !(mv ? s.move : s.ray) || (skip && skip(s))) continue;
         const h = slab(o, d, s);
         if (!h || h.t > maxT) continue;
-        if (s.glass != null && pass) { if (!crossed.some((q) => q[0] === s.glass)) crossed.push([s.glass, h.t]); continue; }
+        if (s.glass != null && pass && !(s.win && s.win.armor && !sight)) { if (!crossed.some((q) => q[0] === s.glass)) crossed.push([s.glass, h.t]); continue; } // (bulletproof glass: a round stops on it)
         if (s.clear && sight) { seenThru = true; continue; } // (a look through a glass door)
         if (!best || h.t < best.t) { best = h; best.solid = s; best.view = !!s.view; best.pane = s.glass != null ? s.glass : undefined; }
       }
@@ -249,7 +249,12 @@ G.World = (() => {
     };
     // the floor (on the ground: everywhere, under the gardens too, and beyond the edge; upstairs, all but the drops)
     if (o.ground !== false) add(w, box(-TS * 4, Y - 0.5, -TS * 4, (W + 4) * TS, Y, (H + 4) * TS, { kind: 'floor' }));
-    else for (const [x0, z0, x1, z1] of rects((i) => t[i] !== 5)) add(w, box(x0 * TS, Y - SK, z0 * TS, (x1 + 1) * TS, Y, (z1 + 1) * TS, { kind: 'floor' }));
+    else {
+      const gr = map.grate;
+      for (const [x0, z0, x1, z1] of rects((i) => t[i] !== 5 && !(gr && gr[i]))) add(w, box(x0 * TS, Y - SK, z0 * TS, (x1 + 1) * TS, Y, (z1 + 1) * TS, { kind: 'floor' }));
+      // steel grating (a catwalk): it holds you up, but rounds and eyes go through it, from above and from below
+      if (gr) for (const [x0, z0, x1, z1] of rects((i) => gr[i] && t[i] !== 5)) add(w, box(x0 * TS, Y - 0.05, z0 * TS, (x1 + 1) * TS, Y, (z1 + 1) * TS, { kind: 'grate', ray: false }));
+    }
     // ceilings over everything indoors (not under a drop in the floor above)
     for (const [x0, z0, x1, z1] of rects((i) => !map.out[i] && !(va && va[i]))) add(w, box(x0 * TS, Y + WH, z0 * TS, (x1 + 1) * TS, Y + WH + 0.3, (z1 + 1) * TS, { kind: 'ceil' }));
     // walls (not where a window is: its own solids below), and the solid edge round the map

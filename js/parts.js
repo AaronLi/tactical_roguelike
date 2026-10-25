@@ -19,18 +19,20 @@ G.Gunsmith = (() => {
   const PARTS = {}, LIST = [], PLATFORMS = {}, BY_MOUNT = new Map();
   // Shared magazines (G.MAG_FAMILY): [capacity, drum?, price, stats, tier] for each, std the standard one
   const MAG_FAMS = {
-    stanag: { name: 'STANAG 5.56', brand: 'Graywater Arms', std: 30, model: { t: 'curved', len: 0.19, d: 0.064, c: 0.03, well: 'black' }, desc: 'The NATO pattern: fits the M4, HK416, F2000, Tavor, SCAR-L and M27.',
+    stanag: { name: 'STANAG 5.56', brand: 'Graywater Arms', clear: 'Meridian Armor', std: 30, straightShort: true, model: { t: 'curved', len: 0.19, d: 0.066, c: 0.026, st: 0.28, ribs: 2, w: 0.024, well: 'black' }, desc: 'The NATO pattern: fits the M4, HK416, F2000, Tavor, SCAR-L, M27, MCX, G36 and AUG.',
       caps: [[20, false, 90, { reload: -12, ergo: 3, weight: -0.12 }, 1], [30, false, 60, {}, 1], [40, false, 220, { reload: 8, ergo: -2, weight: 0.15 }, 2], [100, true, 620, { reload: 45, ergo: -9, weight: 0.9 }, 3]] },
-    mp5: { name: 'MP5 9mm', brand: 'Kestrel Tactical', std: 30, model: { t: 'curved', len: 0.15, d: 0.04, c: 0.04, w: 0.022 }, desc: 'Fits the MP5 and MP5SD.',
+    mp5: { name: 'MP5 9mm', brand: 'Kestrel Tactical', clear: 'Vantage Industries', std: 30, model: { t: 'curved', len: 0.15, d: 0.04, c: 0.04, w: 0.022 }, desc: 'Fits the MP5 and MP5SD.',
       caps: [[15, false, 70, { reload: -12, ergo: 3, weight: -0.08 }, 1], [30, false, 50, {}, 1], [40, false, 200, { reload: 8, ergo: -2, weight: 0.1 }, 2], [50, true, 480, { reload: 35, ergo: -7, weight: 0.6 }, 3]] },
-    akm: { name: 'AK 7.62x39', brand: 'Northmark', std: 30, model: { t: 'curved', len: 0.23, d: 0.072, c: 0.08, w: 0.028, m: 'park' }, desc: 'The AK pattern: fits the KV-47, Galil ACE and RPK.',
+    akm: { name: 'AK 7.62x39', brand: 'Northmark', clear: 'Halcyon Labs', std: 30, model: { t: 'curved', len: 0.23, d: 0.072, c: 0.08, w: 0.028, m: 'park' }, desc: 'The AK pattern: fits the KV-47, Galil ACE and RPK.',
       caps: [[20, false, 90, { reload: -12, ergo: 3, weight: -0.12 }, 1], [30, false, 60, {}, 1], [40, false, 240, { reload: 10, ergo: -3, weight: 0.2 }, 2], [75, true, 600, { reload: 45, ergo: -9, weight: 1.0 }, 3]] },
-    ak74: { name: 'AK 5.45x39', brand: 'Northmark', std: 30, model: { t: 'curved', len: 0.21, d: 0.068, c: 0.06, w: 0.026, m: 'polymer' }, desc: 'The AK-74 pattern: fits the AK-74M, AKS-74U and AN-94.',
+    ak74: { name: 'AK 5.45x39', brand: 'Northmark', clear: 'Halcyon Labs', std: 30, model: { t: 'curved', len: 0.21, d: 0.068, c: 0.06, w: 0.026, m: 'polymer' }, desc: 'The AK-74 pattern: fits the AK-74M, AKS-74U and AN-94.',
       caps: [[20, false, 90, { reload: -12, ergo: 3, weight: -0.12 }, 1], [30, false, 60, {}, 1], [45, false, 240, { reload: 10, ergo: -3, weight: 0.2 }, 2], [60, false, 520, { reload: 22, ergo: -6, weight: 0.4 }, 3]] },
-    glock: { name: 'Glock 9mm', brand: 'Hollowpoint Co.', std: 17, model: { t: 'pistol', len: 0.15 }, desc: 'The Glock pattern: fits the P9, G18, G19, AR-9 and AUG 9mm.',
+    glock: { name: 'Glock 9mm', brand: 'Hollowpoint Co.', clear: 'Sable Ridge', std: 17, model: { t: 'pistol', len: 0.15 }, desc: 'The Glock pattern: fits the P9, G18, G19, AR-9 and AUG 9mm.',
       caps: [[15, false, 40, { reload: -6, ergo: 2, weight: -0.03 }, 1], [17, false, 40, {}, 1], [33, false, 160, { reload: 10, ergo: -4, weight: 0.12 }, 1], [50, true, 420, { reload: 30, ergo: -10, weight: 0.45 }, 3]] },
     m14: { name: 'M14 7.62', brand: 'Ironvale', std: 20, model: { t: 'straight', len: 0.15, d: 0.07, w: 0.026 }, desc: 'Fits the M14 and the Mk14 EBR.',
       caps: [[10, false, 80, { reload: -12, ergo: 3, weight: -0.15 }, 1], [20, false, 70, {}, 1], [30, false, 280, { reload: 10, ergo: -3, weight: 0.25 }, 2], [50, true, 640, { reload: 40, ergo: -9, weight: 1.0 }, 3]] },
+    qbz: { name: 'QBZ 5.8×42', brand: 'Northmark', clear: 'Halcyon Labs', std: 30, model: { t: 'curved', len: 0.152, d: 0.072, c: 0.068, w: 0.026 }, desc: 'The Chinese 5.8×42 pattern: fits the QBZ-95 and QBZ-192.',
+      caps: [[20, false, 90, { reload: -12, ergo: 3, weight: -0.12 }, 1], [30, false, 60, {}, 1], [45, false, 240, { reload: 10, ergo: -3, weight: 0.2 }, 2], [75, true, 600, { reload: 45, ergo: -9, weight: 1.0 }, 3]] },
     saiga12: { name: 'Saiga 12-gauge', brand: 'Bastion Gearworks', std: 8, model: { t: 'straight', len: 0.13, d: 0.09, w: 0.034, rake: 0.02 }, desc: 'Fits the Saiga-12 and Vepr-12.',
       caps: [[5, false, 80, { reload: -12, ergo: 3, weight: -0.15 }, 1], [8, false, 70, {}, 1], [12, false, 260, { reload: 10, ergo: -3, weight: 0.3 }, 2], [20, true, 620, { reload: 40, ergo: -9, weight: 1.1 }, 3]] },
   };
@@ -83,7 +85,9 @@ G.Gunsmith = (() => {
   // And the left side rail: a second tactical slot ('tac' is the right side's), beside the first.
   const ALIAS = { buttstock: 'stock', riserdot: 'optic', tacL: 'tac' };
   // whether part p goes in slot s (its interface, and its kind or the kind the slot takes)
-  const fitsSlot = (s, p) => !!(s && p) && (s.mount === p.mount || (p.alsoMounts || []).includes(s.mount)) && (s.slot === p.slot || ALIAS[s.slot] === p.slot);
+  const fitsSlot = (s, p, id) => !!(s && p) && (s.mount === p.mount || (p.alsoMounts || []).includes(s.mount)) && (s.slot === p.slot || ALIAS[s.slot] === p.slot) && !(id && p.not && p.not.includes(id)); // (p.not: guns on that mount it still doesn't go on)
+  // what a part's provides (or chassis) gives a slot: a mount, or the slot itself ({ mount, bare, brace })
+  const slotMount = (v) => (typeof v === 'string' ? v : v.mount);
   // display order
   const ORDER = ['receiver', 'slide', 'barrel', 'limbs', 'muzzle', 'handguard', 'railmount', 'pump', 'fg', 'tac', 'tacL', 'optic', 'riserdot', 'magnifier', 'charging', 'grip', 'stock', 'buttstock', 'mag', 'tube', 'loader', 'cap', 'motor'];
 
@@ -106,6 +110,7 @@ G.Gunsmith = (() => {
     flash: 'flash', prong: 'flash', tri: 'flash', slant: 'brake', brake: 'brake', bigbrake: 'brake', comp: 'comp', cutts: 'comp', pcomp: 'comp',
     can: 'suppressor', shortcan: 'suppressor', longcan: 'suppressor', boxcan: 'suppressor', crown: 'none', choke: 'none', breacher: 'brake',
   };
+  const CAN = { can: 'full', shortcan: 'compact', longcan: 'long', boxcan: 'box' }; // model muzzle type -> the synth's suppressor (GunshotSynth.SUPPRESSORS)
   const rifleMuzzles = (fam, cal) => [
     { k: 'prong', b: 'talon', n: `Talon TPF-3 ${cal} flash hider`, t: 'prong', price: 160, st: { recoil: -2, ergo: 0, weight: 0.07 }, d: 'Three-prong flash hider. Kills flash, keeps the barrel light.' },
     { k: 'comp', b: 'kestrel', n: `Kestrel KS-7 ${cal} compensator`, t: 'comp', price: 240, st: { recoil: -9, ergo: -1, weight: 0.09 }, d: 'Vents gas upward. Keeps the muzzle down on follow-ups.' },
@@ -151,11 +156,11 @@ G.Gunsmith = (() => {
   MUZZLES.r45.push({ k: 'cutts', b: 'atlas', n: 'Atlas & Pike Cutts compensator', t: 'cutts', price: 150, st: { recoil: -7, weight: 0.08 }, d: 'Slotted cup compensator, period-correct.' });
   for (const [fam, list] of Object.entries(MUZZLES)) for (const o of list) {
     add({ id: `mz.${fam}.${o.k}`, slot: 'muzzle', mount: 'mz:' + fam, brand: BR[o.b], name: o.n, desc: o.d, price: o.price, tier: o.tier || 1, st: o.st,
-      set: { device: DEV[o.t], sup: !!o.sup }, model: { muzzle: o.t } });
+      set: { device: DEV[o.t], sup: !!o.sup, can: CAN[o.t] }, model: { muzzle: o.t } });
   }
 
   // Handguards. Railed ones (rail, M-LOK) give a foregrip slot and a tactical slot each side.
-  const HG_ST = { rail: { ergo: -3, weight: 0.32 }, mlok: { ergo: 3, weight: 0.16 }, carbine: { ergo: 4, weight: -0.08 }, wood: { ergo: 1, weight: 0.2 }, slim: { ergo: 3, weight: 0.05 }, box: { ergo: 0, weight: 0.2 }, stockfore: { ergo: 0, weight: 0.4 }, shroud: { ergo: 1, weight: 0.15 }, fins: { ergo: -1, weight: 0.25 } };
+  const HG_ST = { vector: { ergo: 0, weight: 0 }, rail: { ergo: -3, weight: 0.32 }, mlok: { ergo: 3, weight: 0.16 }, carbine: { ergo: 4, weight: -0.08 }, wood: { ergo: 1, weight: 0.2 }, slim: { ergo: 3, weight: 0.05 }, box: { ergo: 0, weight: 0.2 }, stockfore: { ergo: 0, weight: 0.4 }, shroud: { ergo: 1, weight: 0.15 }, fins: { ergo: -1, weight: 0.25 } , sig: { ergo: 3, weight: 0.16 }, qbz: { ergo: 0, weight: 0.26 }, g36: { ergo: 1, weight: 0.18 } };
   const HG = {
     ar: [['vantage', 'Vantage VX-10 M-LOK 10"', { t: 'mlok', len: 0.26 }], ['vantage', 'Vantage VX-15 M-LOK 15"', { t: 'mlok', len: 0.36 }, 2], ['ironvale', 'Ironvale IR-12 quad rail', { t: 'rail', len: 0.3 }],
       ['gray', 'Graywater carbine handguard', { t: 'carbine', len: 0.17 }], ['vantage', 'Vantage VX-13 M-LOK (FDE)', { t: 'mlok', len: 0.32, m: 'tan' }, 2]],
@@ -165,7 +170,7 @@ G.Gunsmith = (() => {
     classic: [['sable', 'Sable Ridge walnut fore-end', { t: 'stockfore', len: 0.4, m: 'woodDark' }], ['north', 'Northmark synthetic fore-end', { t: 'stockfore', len: 0.4, m: 'polymer' }], ['ironvale', 'Ironvale chassis rail fore-end', { t: 'rail', len: 0.24 }, 2]],
     shroud: [['north', 'Northmark smooth barrel jacket', { t: 'slim', len: 0.18, m: 'blued' }], ['kodiak', 'Kodiak vented shroud', { t: 'shroud', len: 0.22, m: 'blued' }], ['ironvale', 'Ironvale finned cooler', { t: 'fins', len: 0.14 }]],
   };
-  const railed = (t) => t === 'rail' || t === 'mlok';
+  const railed = (t) => t === 'rail' || t === 'mlok' || t === 'vector' || t === 'sig' || t === 'qbz'; // (the Vector's factory front: the rails under and beside its upper)
   for (const [fam, list] of Object.entries(HG)) list.forEach(([b, n, spec, tier], i) => {
     add({ id: `hg.${fam}.${i}`, slot: 'handguard', mount: 'hg:' + fam, brand: BR[b], name: n, price: railed(spec.t) ? 320 : 180, tier: tier || 1, st: HG_ST[spec.t],
       desc: railed(spec.t) ? 'Railed: takes a foregrip, and a light or laser each side.' : 'No rails.', model: { hg: spec }, provides: railed(spec.t) ? { fg: 'fg', tac: 'tac', tacL: 'tac' } : null });
@@ -176,6 +181,7 @@ G.Gunsmith = (() => {
     m4: { ergo: 2, recoil: 0, weight: 0.25 }, crane: { ergo: -1, recoil: -5, weight: 0.35 }, pdw: { ergo: 6, recoil: 7, weight: 0.15 }, fixed: { ergo: -3, recoil: -8, weight: 0.5 },
     skeleton: { ergo: 3, recoil: -2, weight: 0.3 }, thumbhole: { ergo: -2, recoil: -9, weight: 0.6 }, wood: { ergo: -2, recoil: -6, weight: 0.7 }, akwood: { ergo: -2, recoil: -6, weight: 0.7 }, straight: { ergo: 0, recoil: -4, weight: 0.55 },
     sniper: { ergo: -4, recoil: -12, weight: 0.8 }, barrett: { ergo: -6, recoil: -15, weight: 1.0 }, wire: { ergo: 5, recoil: 4, weight: 0.2 }, folded: { ergo: 9, recoil: 22, weight: 0.1 },
+    scar: { ergo: 1, recoil: -5, weight: 0.45 }, g36: { ergo: 3, recoil: -3, weight: 0.3 }, qbz: { ergo: 1, recoil: -4, weight: 0.38 }, mcx: { ergo: 4, recoil: -2, weight: 0.26 }, spearlt: { ergo: 2, recoil: -5, weight: 0.36 }, rattler: { ergo: 7, recoil: 4, weight: 0.16 },
   };
   const STK = {
     tube: [['kestrel', 'Kestrel CS-4 carbine stock', 'm4'], ['vantage', 'Vantage Crane stock (FDE)', 'crane', 'tan'], ['lynx', 'Lynx PDW-1 minimalist stock', 'pdw'], ['ironvale', 'Ironvale A-Fixed stock', 'fixed'], ['paragon', 'Paragon Raptor skeleton stock', 'skeleton']],
@@ -234,8 +240,8 @@ G.Gunsmith = (() => {
   // magnified sights are looked through (scope overlay with the sight's own reticle)
   // Magnified sights show a picture-in-picture view at their magnification (variable scopes sit at a working
   // power). zoom stays the aim-sensitivity multiplier.
-  const RETICLE = { scope: 'cross', acog: 'chevron', prism: 'chevron', lpvo: 'lpvo' };
-  const scopeMag = (model, zoom) => model.px || ({ prism: 2, acog: 4, lpvo: 4 })[model.optic] || Math.min(8, Math.max(3, Math.round(1.6 / zoom)));
+  const RETICLE = { scope: 'cross', acog: 'chevron', prism: 'chevron', lpvo: 'lpvo', augscope: 'ring' };
+  const scopeMag = (model, zoom) => model.px || ({ prism: 2, acog: 4, lpvo: 4, augscope: 1.5 })[model.optic] || Math.min(8, Math.max(3, Math.round(1.6 / zoom)));
   const sightSet = (model, zoom) => (RETICLE[model.optic] ? { zoom, scoped: true, reticle: RETICLE[model.optic], magnif: scopeMag(model, zoom), levels: model.levels || null } : { zoom, scoped: false });
   const REFLEX = ['reddot', 'holo', 'minidot']; // (a magnifier goes behind these)
   OPTICS.forEach(([b, n, model, zoom, price, st, tier], i) => add({ id: `op.pic.${i}`, slot: 'optic', mount: 'op:pic', brand: BR[b], name: n, price, tier, st, set: sightSet(model, zoom),
@@ -266,8 +272,8 @@ G.Gunsmith = (() => {
   PARTS['fg.4'].retired = true;
   BY_MOUNT.set('fg', BY_MOUNT.get('fg').filter((p) => !p.retired));
   // Lasers and weapon lights. set.laser: its colour (r / g); set.light: how bright. Both are switched on and off
-  // with the mouse's side buttons (back: light, forward: laser); a laser only steadies hip fire while it's on.
-  const tacDesc = (s) => (s.laser && s.light ? 'Laser and light: forward side button for the laser (steadier hip fire), back for the light.' : s.laser ? 'Laser: steadier hip fire while it\'s on (forward side mouse button).' : 'Weapon light: lights the way, and dazzles anyone you shine it at (back side mouse button).');
+  // on the comms wheel (hold the middle button); a laser only steadies hip fire while it's on.
+  const tacDesc = (s) => (s.laser && s.light ? 'Laser and light: each switched on the comms wheel (hold the middle mouse button). The laser steadies hip fire.' : s.laser ? 'Laser: steadier hip fire while it\'s on (switched on the comms wheel: hold the middle mouse button).' : 'Weapon light: lights the way, and dazzles anyone you shine it at (switched on the comms wheel: hold the middle mouse button).');
   [['oberon', 'Oberon LS-1 red laser', 'laser', { hip: -12, weight: 0.1 }, 260, 1, { laser: 'r' }], ['oberon', 'Oberon LS-2G green laser', 'laserG', { hip: -15, weight: 0.1 }, 380, 2, { laser: 'g' }],
     ['halcyon', 'Halcyon PQ-15 aiming module', 'peq', { hip: -19, ergo: -2, weight: 0.24 }, 560, 3, { laser: 'g', light: 1 }],
     ['oberon', 'Oberon WL-3 weapon light', 'light', { weight: 0.12 }, 220, 1, { light: 1 }], ['halcyon', 'Halcyon Torch-X high-output light', 'lightX', { ergo: -1, weight: 0.18 }, 360, 2, { light: 1.6 }]]
@@ -292,13 +298,19 @@ G.Gunsmith = (() => {
     ['lynx', 'Lynx pistol brace', 'pdw', null, { ergo: -1, recoil: -14, hip: -4, weight: 0.2 }, 200, 1],
     ['vantage', 'Vantage carbine stock kit', 'crane', 'tan', { ergo: -7, recoil: -30, hip: -8, weight: 0.45 }, 380, 2]]
     .forEach(([b, n, t, sm, st, price, tier], i) => add({ id: `stk.pistol.${i}`, slot: 'stock', mount: 'stk:pistol', brand: BR[b], name: n, price, tier, stype: t, st, desc: 'Clips to the back of the frame: a shoulder stock on a pistol.', model: { stock: t, sm } }));
+  // What a stock does braced on a handgun's own mount (a chassis's, an SMG stock mount on the lug, the derringer's
+  // lug grip): an SMG stock's figures are against another SMG stock, so this comes on top (sl.brace: compile)
+  const BRACE = { recoil: -25, ergo: -8 };
+  // (the Vantage kit is an SMG stock mount now: on the lug, any SMG stock on it; alone, as good as none)
+  Object.assign(PARTS['stk.pistol.2'], { name: 'Vantage SMG stock mount', price: 160, tier: 1, stype: 'smgmount', st: { ergo: -1, weight: 0.1 }, model: { stock: 'smgmount', sm: null },
+    provides: { buttstock: { mount: 'stk:smg', bare: true, brace: BRACE } }, desc: 'A block on the pistol\'s stock lug with an SMG stock mount on its back: takes any SMG stock. On its own it does nothing.' });
 
   // descriptive names for factory parts, by model type
   const NAMES = {
     muzzle: { flash: 'flash hider', prong: 'three-prong flash hider', slant: 'slant brake', brake: 'muzzle brake', bigbrake: 'heavy muzzle brake', comp: 'compensator', cutts: 'Cutts compensator', tri: 'three-lug adapter', crown: 'crowned muzzle' },
-    handguard: { rail: 'quad rail handguard', mlok: 'M-LOK handguard', wood: 'handguard', slim: 'slim forend', box: 'forend', stockfore: 'fore-end', shroud: 'barrel shroud', fins: 'finned barrel', carbine: 'carbine handguard' },
-    optic: { reddot: 'red dot sight', holo: 'holographic sight', acog: '4× combat scope', prism: '2× prism sight', scope: 'rifle scope', notch: 'iron sights', irons: 'iron sights', bead: 'bead sight', none: 'carry-handle sight' },
-    stock: { m4: 'collapsible stock', crane: 'Crane stock', fixed: 'fixed stock', skeleton: 'skeleton stock', thumbhole: 'thumbhole stock', wood: 'wooden stock', straight: 'straight-grip stock', sniper: 'precision stock', barrett: 'recoil-buffer stock', wire: 'wire stock', folded: 'folding stock (folded)', pdw: 'PDW stock' },
+    handguard: { vector: 'railed front (under and each side)', rail: 'quad rail handguard', mlok: 'M-LOK handguard', wood: 'handguard', slim: 'slim forend', box: 'forend', stockfore: 'fore-end', shroud: 'barrel shroud', fins: 'finned barrel', carbine: 'carbine handguard', sig: 'M-LOK handguard (flush rail)', qbz: 'M-LOK handguard' },
+    optic: { reddot: 'red dot sight', holo: 'holographic sight', acog: '4× combat scope', prism: '2× prism sight', scope: 'rifle scope', notch: 'iron sights', irons: 'iron sights', bead: 'bead sight', none: 'carry-handle sight', augscope: '1.5× optic (in the carrying handle)', qbzirons: 'iron sights (in the carrying handle)' },
+    stock: { m4: 'collapsible stock', crane: 'Crane stock', fixed: 'fixed stock', skeleton: 'skeleton stock', thumbhole: 'thumbhole stock', wood: 'wooden stock', straight: 'straight-grip stock', sniper: 'precision stock', barrett: 'recoil-buffer stock', wire: 'wire stock', folded: 'folding stock (folded)', pdw: 'PDW stock', qbz: 'folding telescoping stock', mcx: 'skeleton folding stock', spearlt: 'padded folding stock', rattler: 'folding strut stock', scar: 'SCAR folding stock', g36: 'G36 folding stock' },
   };
   const MATN = { polymer: 'polymer ', wood: 'wooden ', woodRed: 'laminate ', woodDark: 'walnut ', tan: 'FDE ', od: 'OD ', blued: '' };
 
@@ -311,6 +323,7 @@ G.Gunsmith = (() => {
     'gr:ar': 'AR-15 grip mount', 'gr:ak': 'AK grip mount', 'gr:smg': 'SMG grip frame', 'gr:pistol': 'Pistol grip frame', 'gr:rev': 'Revolver grip frame',
     'hg:ar': 'AR-15 barrel nut', 'hg:ak': 'AK handguard retainer', 'hg:box': 'Rifle forend mount', 'hg:smg': 'SMG forend mount', 'hg:classic': 'Rifle fore-end inletting', 'hg:shroud': 'Barrel jacket mount',
     'ch:ar': 'AR-15 upper receiver', pump: 'Pump action bar', loader: 'Revolver cylinder', 'stk:pistol': 'Pistol stock lug', sgload: 'Shotgun receiver', 'rm:clamp': 'Clamp-on rail mount',
+    'stk:fold': 'Folding stock hinge', 'hg:mcx': 'MCX barrel nut (flush rail)', 'hg:mpx': 'MPX barrel nut (flush rail)', 'hg:qbz': 'QBZ-191 handguard mount', 'hg:g36': 'G36 handguard mount', 'gr:derringer': 'Derringer grip frame', 'rm:derringer': 'Derringer barrel rib',
   };
   function ifaceName(mount) {
     if (IFACE[mount]) return IFACE[mount];
@@ -371,9 +384,9 @@ G.Gunsmith = (() => {
       const patch = (k) => (arch === 'rifle' ? { barrel: Object.assign({}, B, { len: B.len * k }) } : { blen: (B.len || 0.1) * k });
       const thread = s.thread ? { muzzle: 'mz:' + s.thread } : null;
       if (s.integral) { // integrally suppressed: the can is the barrel
-        factory('barrel', mount, { name: `${def.name} integrally suppressed barrel`, model: { integral: s.integral }, set: { barrelIn: inch, sup: true, device: 'suppressor' } });
+        factory('barrel', mount, { name: `${def.name} integrally suppressed barrel`, model: { integral: s.integral }, set: { barrelIn: inch, sup: true, device: 'suppressor', can: 'integral' } });
         own({ id: `${id}.br.long`, slot: 'barrel', mount, brand: brandB, name: `${brandB.split(' ')[0]} extended integral barrel`, price: 520, tier: 2, model: { integral: { len: s.integral.len * 1.2, r: s.integral.r } },
-          st: { vel: 4, acc: -6, ergo: -4, weight: 0.25 }, set: { barrelIn: inch * 1.2, sup: true, device: 'suppressor' }, desc: 'Longer integral suppressor: quieter and more accurate.' });
+          st: { vel: 4, acc: -6, ergo: -4, weight: 0.25 }, set: { barrelIn: inch * 1.2, sup: true, device: 'suppressor', can: 'integralX' }, desc: 'Longer integral suppressor: quieter and more accurate.' });
         own({ id: `${id}.br.open`, slot: 'barrel', mount, brand: brandC, name: `${brandC.split(' ')[0]} unsuppressed conversion barrel`, price: 380, model: { integral: null, barrel: B }, provides: thread,
           st: { vel: 8, ergo: 6, weight: -0.3 }, set: { barrelIn: inch * 1.1, sup: false }, desc: 'Converts it to a normal threaded barrel. Loud, but takes any muzzle device.' });
       } else {
@@ -394,17 +407,17 @@ G.Gunsmith = (() => {
     if (s.handguard) {
       const [fam, hg] = s.handguard, rails = railed(hg.t);
       slot('handguard', 'hg:' + fam, true);
-      std('handguard', 'hg:' + fam, { hg }, { name: `${hg.t === 'stockfore' ? '' : (hg.len * 39.37).toFixed(1) + '" '}${hg.t === 'wood' || hg.t === 'stockfore' ? MATN[hg.m || 'wood'] || '' : hg.m === 'tan' ? 'FDE ' : ''}${NAMES.handguard[hg.t] || 'handguard'}`,
+      std('handguard', 'hg:' + fam, { hg }, { name: `${hg.t === 'stockfore' || hg.t === 'vector' ? '' : (hg.len * 39.37).toFixed(1) + '" '}${hg.t === 'wood' || hg.t === 'stockfore' ? MATN[hg.m || 'wood'] || '' : hg.m === 'tan' ? 'FDE ' : ''}${NAMES.handguard[hg.t] || 'handguard'}`,
         st: HG_ST[hg.t], price: rails ? 300 : 180, desc: rails ? 'Railed: takes a foregrip, and a light or laser each side.' : 'No rails.', provides: rails ? { fg: 'fg', tac: 'tac', tacL: 'tac' } : null });
     }
     if (s.fg) std('fg', 'fg', { fg: s.fg }, { name: `${s.fg} grip` });
     if (s.optic) {
       let [fam, model] = s.optic;
       // everything leaves the factory with iron sights except sniper rifles, which come scoped
-      if (fam === 'pic' && !['irons', 'notch', 'bead', 'none'].includes(model.optic) && def.cls !== 'SNP' && def.cls !== 'RAIL') model = { optic: 'irons' };
+      if (fam === 'pic' && !['irons', 'notch', 'bead', 'none', 'augscope', 'qbzirons'].includes(model.optic) && def.cls !== 'SNP' && def.cls !== 'RAIL') model = { optic: 'irons' };
       slot('optic', 'op:' + fam);
       // a weapon's own iron sights stay with it; anything that mounts on the rail is a product
-      if (['notch', 'bead', 'none'].includes(model.optic)) factory('optic', 'op:' + fam, { name: `${def.name} ${NAMES.optic[model.optic]}`, desc: 'The weapon\'s own sights. Fit an optic to the rail instead.', model, set: sightSet(model, def.zoom) });
+      if (['notch', 'bead', 'none', 'augscope', 'qbzirons'].includes(model.optic)) factory('optic', 'op:' + fam, { name: `${def.name} ${NAMES.optic[model.optic]}`, desc: model.optic === 'augscope' ? 'Its own 1.5× optic, built into the carrying handle. Fit another sight and the handle comes off for a rail.' : model.optic === 'qbzirons' ? 'An aperture in the carrying handle and a hooded front post. Fit another sight and it goes on a rail along the top of the handle.' : 'The weapon\'s own sights. Fit an optic to the rail instead.', model, set: sightSet(model, def.zoom) });
       else std('optic', 'op:' + fam, model, { name: `${model.optic === 'scope' && def.zoom ? scopeMag(model, def.zoom) + '× ' : ''}${NAMES.optic[model.optic] || 'sight'}`, set: sightSet(model, def.zoom), price: { reddot: 240, holo: 420, acog: 850, prism: 550, scope: 750 }[model.optic] || 200 });
     }
     if (s.charging) { slot('charging', 'ch:' + s.charging); std('charging', 'ch:' + s.charging, { ch: 'std' }, { name: 'standard charging handle', price: 50 }); }
@@ -418,7 +431,7 @@ G.Gunsmith = (() => {
       slot('stock', 'stk:' + fam);
       std('stock', 'stk:' + fam, { stock: type, sm: sm || null }, { name: `${sm ? MATN[sm] || '' : ''}${NAMES.stock[type] || 'stock'}`, stype: type, st: STK_ST[type], price: 200 + Math.round((STK_ST[type].weight || 0) * 150) });
     }
-    const fam = G.MAG_FAMILY && G.MAG_FAMILY[id], F = fam && MAG_FAMS[fam];
+    const fam = !NATO_LATE.has(id) && G.MAG_FAMILY && G.MAG_FAMILY[id], F = fam && MAG_FAMS[fam]; // (the G36's and AUG's own magazines are still made: see NATO_LATE)
     if (s.mag && F && s.mag !== 'internal') {
       // a magazine family: one set of magazines (made with the first gun of the family), on a shared mount, so
       // a magazine from any of them is the same part in any of them
@@ -429,9 +442,12 @@ G.Gunsmith = (() => {
         for (const [cap, drum, price, st, tier] of F.caps) {
           add({ id: `${fam}.mag.${cap}`, slot: 'mag', mount, fam, brand: cap === F.std ? 'Factory' : F.brand, factory: cap === F.std, tier, price,
             name: `${F.name} ${cap}-round ${drum ? 'drum' : 'magazine'}`, st, set: { cap },
-            model: { mag: drum ? { t: 'drum', r: 0.068, dw: 0.05, m: M.m || null } : Object.assign({}, M, { len: (M.len || 0.15) * Math.pow(cap / F.std, 0.7) }) },
+            model: { mag: drum ? { t: 'drum', r: 0.068, dw: 0.05, m: M.m || null } : Object.assign({}, M, { len: (M.len || 0.15) * Math.pow(cap / F.std, 0.7) }, F.straightShort && cap < F.std ? { t: 'straight', rake: 0.002 } : {}) }, // (a 20-round STANAG is straight: the curve's in the length the 30 adds)
             desc: `${F.desc} ${drum ? 'Huge capacity; heavy and slow to reload.' : cap < F.std ? 'Short: quicker to swap, fewer rounds.' : cap > F.std ? 'Long: more rounds, slower to swap.' : ''}` });
         }
+        // the clear one: the standard size in translucent polymer (you see how many are left)
+        if (F.clear) add({ id: `${fam}.mag.${F.std}c`, slot: 'mag', mount, fam, brand: F.clear, tier: 1, price: 85, name: `${F.name} ${F.std}-round translucent magazine`, st: { weight: -0.03 }, set: { cap: F.std },
+          model: { mag: Object.assign({}, F.model || s.mag, { m: 'clear' }) }, desc: `${F.desc} Translucent polymer: the rounds left in it show through.` });
       }
       const parts = BY_MOUNT.get(mount);
       plat.defaults.mag = (parts.find((p) => p.set.cap === def.mag) || parts.find((p) => p.set.cap === F.std)).id;
@@ -466,6 +482,8 @@ G.Gunsmith = (() => {
             st: { reload: -12, ergo: 3, weight: -0.12 }, set: { cap: small }, desc: 'Short magazine. Quicker to swap, fewer rounds.' });
           own({ id: `${id}.mag.ext`, slot: 'mag', mount, brand: brandB, name: `${brandB.split(' ')[0]} ${big}-round extended magazine`, price: 260, tier: 2, model: { mag: scaled(1.38) },
             st: { reload: 12, ergo: -3, weight: 0.25 }, set: { cap: big }, desc: 'Long magazine. More rounds, slower to swap.' });
+          if (M.m !== 'clear' && (M.t === 'straight' || M.t === 'curved')) own({ id: `${id}.mag.clear`, slot: 'mag', mount, brand: brandC, name: `${brandC.split(' ')[0]} ${cap}-round translucent magazine`, price: 110, model: { mag: Object.assign({}, M, { m: 'clear' }) },
+            st: { weight: -0.03 }, set: { cap }, desc: 'Translucent polymer: the rounds left in it show through.' });
           if (!s.noDrum && cap >= 15) own({ id: `${id}.mag.drum`, slot: 'mag', mount, brand: brandC, name: `${brandC.split(' ')[0]} ${Math.round(cap * 2.5)}-round drum`, price: 620, tier: 3,
             model: { mag: { t: 'drum', r: 0.068, dw: 0.05, m: M.m || null } }, st: { reload: 45, ergo: -9, weight: 0.9 }, set: { cap: Math.round(cap * 2.5) }, desc: 'Huge capacity. Heavy and slow to reload.' });
         }
@@ -507,6 +525,7 @@ G.Gunsmith = (() => {
       own({ id: `${id}.br.match`, slot: 'barrel', mount, brand: brandB, name: `${brandB.split(' ')[0]} match barrel`, price: 300, tier: 2, model: { match: true }, st: { acc: -15, vel: 4, weight: 0.03 }, set: { barrelIn: (gs.barrel || 4.5) + 0.3 }, desc: 'Tighter tolerances.' });
     }
     if (s.ptac) { slot('tac', 'ptac'); }
+    if (s.tac) slot('tac', 'tac'); // (one side rail on the receiver: the minigun's)
     if (spec.siderails) { slot('tac', 'tac'); slot('tacL', 'tac'); } // (side rails built into the receiver: a bullpup's shell, a P90's)
     if (PSTOCK.has(id)) slot('stock', 'stk:pistol', false, true);
     if (SGLOAD.has(id)) slot('loader', 'sgload', false, true);
@@ -542,16 +561,26 @@ G.Gunsmith = (() => {
     plat.ergo = CLS_ERGO[def.cls] || 50; plat.kg = G.GUN_KG[id] || CLS_KG[def.cls] || 3;
   }
 
+  // the SCARs (gunmodels.js rcv 'scar', traced: scarTrace there): one long upper with its rails built in (no handguard), the
+  // grip, the magazine, the irons (the front on the gas block), a foregrip on the rail under the front, a light or laser
+  // on the side rails. (Its handguard slot comes off at the end, where its own stock is added: a part's id is its place.)
+  const SCAR_SPEC = () => ({ rcv: 'scar', L: 0.379, rm: 'tan', fm: 'tan', grip: 0.055, support: 0.3, siderails: true, mag: { f: 0.168, y: -0.032 }, ironsAt: [0.03, 0.395, 0.0118], fgAt: 0.27,
+    tacAt: { f: 0.35, y: -0.0053, x: 0.026 }, cock: { f: 0.13, y: -0.003, x: -0.021, travel: 0.09, recip: true } });
+  // The G36 and AUG take STANAG magazines (their NATO wells) and nothing else now. Their own magazines are still made as
+  // they were (a part's id in a code is its place in the list), then retired at the end and the slot moved to STANAG.
+  const NATO_LATE = new Set(['g36', 'aug']);
   // Rifles (archetype: rifle). Receivers keep what isn't a part (bullpup shell, carry handles, bolts, levers, bipods on fixed forends).
   P('m4', 'rifle', { L: 0.21 }, { barrel: { len: 0.33 }, thread: 'r556', muzzle: 'flash', handguard: ['ar', { t: 'rail', len: 0.24 }], stock: ['tube', 'm4'], grip: ['ar', 'ar'], mag: { t: 'curved', len: 0.19, d: 0.064, c: 0.03, well: 'black' }, optic: ['pic', { optic: 'reddot' }], charging: 'ar' });
   P('ak', 'rifle', { rcv: 'ak', L: 0.28, rm: 'blued', fm: 'wood' }, { barrel: { len: 0.32 }, thread: 'rak', muzzle: 'slant', handguard: ['ak', { t: 'wood', len: 0.2 }], stock: ['ak', 'akwood'], grip: ['ak', 'wood'], mag: { t: 'curved', len: 0.23, d: 0.072, c: 0.08, w: 0.028, m: 'park' }, optic: ['pic', { optic: 'notch' }] });
   P('f2', 'rifle', { rcv: 'bullpup', siderails: true, L: 0.45, fm: 'polymer', railTop: false, carry: 0.28, cock: { f: 0.305, y: 0.026, x: 0, travel: 0.055, style: 'top' } }, { barrel: { len: 0.25 }, thread: 'r556', muzzle: 'flash', grip: ['ar', 'ar'], mag: { t: 'straight', len: 0.13, d: 0.06 }, optic: ['pic', { optic: 'irons' }] });
-  P('g36', 'rifle', { rcv: 'box', L: 0.3, H: 0.07, W: 0.042, rm: 'green', fm: 'green', optF: 0.17, cock: { f: 0.03, y: 0.035, x: 0, travel: 0.06, style: 'tee' } }, { barrel: { len: 0.32 }, thread: 'r556', muzzle: 'flash', handguard: ['box', { t: 'box', len: 0.2 }], stock: ['heavy', 'skeleton'], grip: ['ar', 'ar'], mag: { t: 'curved', len: 0.17, d: 0.062, c: 0.025, m: 'clear' }, optic: ['pic', { optic: 'acog' }] });
+  P('g36', 'rifle', { rcv: 'g36', L: 0.245, rm: 'polymer', fm: 'polymer', grip: 0.045, optF: 0.15, mag: { f: 0.172, y: -0.03 }, cock: { f: 0.2, y: 0.045, x: 0, travel: 0.075, style: 'tee', recip: false } }, { barrel: { len: 0.425, r: 0.0068 }, thread: 'r556', muzzle: 'flash', handguard: ['box', { t: 'box', len: 0.2 }], stock: ['heavy', 'skeleton'], grip: ['ar', 'ar'], mag: { t: 'curved', len: 0.17, d: 0.062, c: 0.025, m: 'clear' }, optic: ['pic', { optic: 'acog' }] });
   P('br3', 'rifle', { L: 0.23, rm: 'tan', fm: 'tan' }, { barrel: { len: 0.37 }, thread: 'r762', muzzle: 'comp', handguard: ['ar', { t: 'mlok', len: 0.3, m: 'tan' }], stock: ['tube', 'crane'], grip: ['ar', 'ar'], mag: { t: 'curved', len: 0.19, d: 0.064, c: 0.03, well: 'tan' }, optic: ['pic', { optic: 'holo' }], charging: 'ar' });
-  P('scar', 'rifle', { L: 0.28, rm: 'tan', fm: 'tan', cock: { f: 0.21, y: 0.012, x: -0.026, travel: 0.09, recip: true } }, { barrel: { len: 0.33 }, thread: 'r762', muzzle: 'flash', handguard: ['ar', { t: 'rail', len: 0.24, m: 'tan' }], stock: ['heavy', 'fixed'], grip: ['ar', 'ar'], mag: { t: 'straight', len: 0.15, d: 0.07, w: 0.026, well: 'tan' }, optic: ['pic', { optic: 'holo' }] });
+  P('scar', 'rifle', SCAR_SPEC(0.0075), { barrel: { len: 0.22, r: 0.0075 }, thread: 'r762', muzzle: 'flash', handguard: ['ar', { t: 'rail', len: 0.24, m: 'tan' }], stock: ['heavy', 'fixed'], grip: ['ar', 'ar'], mag: { t: 'straight', len: 0.15, d: 0.07, w: 0.026, well: 'tan' }, optic: ['pic', { optic: 'holo' }] });
   P('tavor', 'rifle', { rcv: 'bullpup', siderails: true, L: 0.42, fm: 'od' }, { barrel: { len: 0.24 }, thread: 'r556', muzzle: 'flash', grip: ['ar', 'ar'], mag: { t: 'curved', len: 0.16, d: 0.06, c: 0.02 }, optic: ['pic', { optic: 'reddot' }] });
   P('hk416', 'rifle', { L: 0.22 }, { barrel: { len: 0.35 }, thread: 'r556', muzzle: 'flash', handguard: ['ar', { t: 'rail', len: 0.3 }], fg: 'vertical', stock: ['tube', 'crane'], grip: ['ar', 'ar'], mag: { t: 'curved', len: 0.19, d: 0.064, c: 0.03, well: 'black', m: 'tan' }, optic: ['pic', { optic: 'holo' }], charging: 'ar' });
-  P('aug', 'rifle', { rcv: 'bullpup', siderails: true, L: 0.42, fm: 'od', railTop: false, optF: 0.3, vfg: 0.04, vfgM: 'od', cock: { recip: true } }, { barrel: { len: 0.3, m: 'black' }, thread: 'r556', muzzle: 'flash', grip: ['ar', 'ar'], mag: { t: 'straight', len: 0.15, d: 0.06, m: 'clear' }, optic: ['pic', { optic: 'acog' }] });
+  // the Steyr AUG, traced from a photo (js/gunmodels.js rifle(), rcv 'aug'): one shell from butt to nose, the guard round the whole
+  // hand, the integral optic in its handle (the A3's rail for any other sight)
+  P('aug', 'rifle', { rcv: 'aug', siderails: true, mag: { f: 0.224, y: -0.074 }, L: 0.539, rm: 'black', fm: 'od', grip: 0.339, support: 0.542, optF: 0.42, cheek: 0.19, vfgM: 'od', cock: { f: 0.493, y: 0.0114, x: -0.024, travel: 0.09, recip: true, style: 'fold' } }, { barrel: { len: 0.21, m: 'black' }, thread: 'r556', muzzle: 'flash', grip: ['ar', 'ar'], mag: { t: 'straight', f: 0.224, y: -0.074, len: 0.16, d: 0.06, rake: 0.043, m: 'clear' }, optic: ['pic', { optic: 'augscope' }] });
   P('galil', 'rifle', { rcv: 'ak', L: 0.27, rm: 'black', fm: 'polymer', optF: 0.2 }, { barrel: { len: 0.31 }, thread: 'rak', muzzle: 'brake', handguard: ['ak', { t: 'rail', len: 0.2 }], stock: ['ak', 'skeleton'], grip: ['ak', 'wood'], mag: { t: 'curved', len: 0.24, d: 0.072, c: 0.08, w: 0.028 }, optic: ['pic', { optic: 'reddot' }] });
   P('an94', 'rifle', { rcv: 'ak', L: 0.28, rm: 'black', fm: 'polymer' }, { barrel: { len: 0.32 }, thread: 'rak', muzzle: 'brake', handguard: ['ak', { t: 'wood', len: 0.22, m: 'polymer' }], stock: ['ak', 'skeleton'], grip: ['ak', 'wood'], mag: { t: 'curved', len: 0.21, d: 0.068, c: 0.06, w: 0.026, m: 'polymer' }, optic: ['pic', { optic: 'notch' }] });
   P('fal', 'rifle', { rcv: 'box', L: 0.3, H: 0.07, W: 0.04, rm: 'park', fm: 'polymer', optF: 0.24, carry: 0.15, carrySide: true, cock: { f: 0.27, y: -0.008, x: -0.022, travel: 0.1, style: 'fold' } }, { barrel: { len: 0.44 }, thread: 'r762', muzzle: 'flash', handguard: ['box', { t: 'wood', len: 0.22, m: 'polymer' }], stock: ['heavy', 'fixed'], grip: ['ar', 'ar'], mag: { t: 'straight', len: 0.19, d: 0.07, w: 0.026 }, optic: ['pic', { optic: 'irons' }] });
@@ -567,7 +596,9 @@ G.Gunsmith = (() => {
   P('uzi', 'rifle', { irons: 'ar', rcv: 'box', L: 0.2, H: 0.07, W: 0.045, rm: 'park', grip: 0.07, support: 0.2 }, { barrel: { len: 0.06 }, thread: 'r9', muzzle: 'crown', stock: ['smg', 'wire'], grip: ['smg', 'vertical'], mag: { t: 'straight', f: 0.085, y: -0.14, len: 0.1, d: 0.03, rake: 0 }, optic: ['pic', { optic: 'notch' }] });
   P('mp5', 'rifle', { irons: 'hk', rcv: 'box', L: 0.26, H: 0.06, W: 0.038, optF: 0.12 }, { barrel: { len: 0.1 }, thread: 'r9', muzzle: 'tri', handguard: ['smg', { t: 'slim', len: 0.13, m: 'polymer' }], stock: ['smg', 'fixed'], grip: ['ar', 'ar'], mag: { t: 'curved', len: 0.15, d: 0.04, c: 0.04, w: 0.022 }, optic: ['pic', { optic: 'irons' }] });
   P('mp5sd', 'rifle', { irons: 'hk', rcv: 'box', L: 0.26, H: 0.06, W: 0.038, optF: 0.12, support: 0.36 }, { barrel: { len: 0.1 }, integral: { len: 0.2, r: 0.025 }, thread: 'r9', muzzle: 'crown', stock: ['smg', 'fixed'], grip: ['ar', 'ar'], mag: { t: 'curved', len: 0.15, d: 0.04, c: 0.04, w: 0.022 }, optic: ['pic', { optic: 'irons' }] });
-  P('vector', 'rifle', { rcv: 'box', L: 0.22, H: 0.11, W: 0.05, rm: 'polymer', cock: { f: 0.17, y: 0.03, x: -0.027, travel: 0.07, style: 'fold' } }, { barrel: { len: 0.1 }, thread: 'r45', muzzle: 'flash', handguard: ['smg', { t: 'box', len: 0.06 }], stock: ['tube', 'crane'], grip: ['ar', 'ar'], mag: { t: 'straight', f: 0.13, y: -0.06, len: 0.11, d: 0.03 }, optic: ['pic', { optic: 'reddot' }] });
+  // the KRISS Vector Gen II, traced from a photo (js/gunmodels.js rifle(), rcv 'vector'): the bore low, the magazine raked back
+  // in the foot of the well's leg, the rails on the upper (its factory forend: 'vector', railed)
+  P('vector', 'rifle', { rcv: 'vector', L: 0.365, rm: 'black', fm: 'polymer', grip: 0.046, bIn: 0.065, optF: 0.15, cock: { f: 0.31, y: 0.014, x: -0.027, travel: 0.07, style: 'fold' } }, { barrel: { len: 0.1, r: 0.0085 }, thread: 'r45', muzzle: 'flash', handguard: ['smg', { t: 'vector', len: 0.06 }], stock: ['tube', 'crane'], grip: ['ar', 'ar'], mag: { t: 'straight', f: 0.237, y: -0.1149, len: 0.13, d: 0.032, w: 0.024, rake: -0.052 }, optic: ['pic', { optic: 'reddot' }] });
   P('thompson', 'rifle', { rcv: 'round', L: 0.26, rm: 'blued', fm: 'wood', optF: 0.1, vfg: 0.08, vfgM: 'wood', cock: { f: 0.17, y: 0.026, x: 0, travel: 0.07, style: 'top' } }, { barrel: { len: 0.24 }, thread: 'r45', muzzle: 'cutts', handguard: ['shroud', { t: 'fins', len: 0.12 }], stock: ['classic', 'wood'], grip: ['ak', 'wood'], mag: { t: 'drum', f: 0.14, r: 0.075, dw: 0.05, m: 'blued' }, optic: ['pic', { optic: 'irons' }] });
   P('ppsh', 'rifle', { rcv: 'round', L: 0.22, rm: 'blued', fm: 'wood', gripT: 'none' }, { barrel: { len: 0.27 }, thread: 'r9', muzzle: 'comp', handguard: ['shroud', { t: 'shroud', len: 0.25, m: 'blued' }], stock: ['classic', 'wood'], mag: { t: 'drum', f: 0.08, r: 0.07, dw: 0.045, m: 'blued' }, optic: ['pic', { optic: 'notch' }] });
   P('pump', 'rifle', { rcv: 'round', L: 0.22, rm: 'blued', fm: 'wood', gripT: 'none', pump: { f: 0.05, len: 0.16 } }, { barrel: { len: 0.44, r: 0.0105 }, thread: 'sg', muzzle: 'crown', tube: 0.4, pump: true, stock: ['classic', 'straight'], optic: ['pic', { optic: 'bead' }] });
@@ -581,20 +612,20 @@ G.Gunsmith = (() => {
   P('m60', 'rifle', { rcv: 'box', L: 0.33, H: 0.08, W: 0.05, rm: 'park', fm: 'polymer', feed: true, optF: 0.25, bipod: 0.52, carry: 0.52 }, { barrel: { len: 0.45 }, thread: 'r762', muzzle: 'flash', handguard: ['box', { t: 'box', len: 0.2 }], stock: ['heavy', 'fixed'], grip: ['ar', 'ar'], mag: { t: 'ammobox', f: 0.15, m: 'od' }, optic: ['pic', { optic: 'irons' }] });
   P('skorp', 'rifle', { rcv: 'box', L: 0.16, H: 0.05, W: 0.032, rm: 'blued', grip: 0.01, support: 0.14, cock: { f: 0.08, y: 0.018, x: 0.02, travel: 0.05, style: 'pair', sz: 0.7, recip: true } }, { barrel: { len: 0.08, r: 0.007 }, thread: 'r9', muzzle: 'crown', stock: ['smg', 'folded'], grip: ['ak', 'wood', 'woodDark'], mag: { t: 'curved', f: 0.1, len: 0.1, d: 0.026, c: 0.03, w: 0.016 }, optic: ['pic', { optic: 'notch' }] });
   P('mac10', 'rifle', { irons: 'ar', rcv: 'box', L: 0.22, H: 0.07, W: 0.05, rm: 'park', grip: 0.06, support: 0.2, cock: { recip: true } }, { barrel: { len: 0.04, r: 0.008 }, thread: 'r45', muzzle: 'crown', stock: ['smg', 'folded'], grip: ['smg', 'vertical'], mag: { t: 'straight', f: 0.075, y: -0.14, len: 0.09, d: 0.03, rake: 0 }, optic: ['pic', { optic: 'notch' }] });
-  P('mp7', 'rifle', { rcv: 'box', L: 0.26, H: 0.07, W: 0.042, rm: 'polymer', grip: 0.06, optF: 0.1, vfg: 0.0, vfgM: 'polymer', cock: { f: 0.028, y: 0.027, x: 0, travel: 0.05, style: 'tee' } }, { barrel: { len: 0.06, r: 0.007 }, thread: 'r57', muzzle: 'flash', stock: ['tube', 'm4'], grip: ['smg', 'vertical'], mag: { t: 'straight', f: 0.075, y: -0.14, len: 0.07, d: 0.026, rake: 0 }, noDrum: true, optic: ['pic', { optic: 'reddot' }] });
+  P('mp7', 'rifle', { rcv: 'box', siderails: true, L: 0.26, H: 0.07, W: 0.042, rm: 'polymer', grip: 0.06, optF: 0.1, vfg: 0.0, vfgM: 'polymer', cock: { f: 0.028, y: 0.027, x: 0, travel: 0.05, style: 'tee' } }, { barrel: { len: 0.06, r: 0.007 }, thread: 'r57', muzzle: 'flash', stock: ['tube', 'm4'], grip: ['smg', 'vertical'], mag: { t: 'straight', f: 0.075, y: -0.14, len: 0.07, d: 0.026, rake: 0 }, noDrum: true, optic: ['pic', { optic: 'reddot' }] });
   // the 2nd round
   P('ak74', 'rifle', { rcv: 'ak', L: 0.28, rm: 'black', fm: 'polymer' }, { barrel: { len: 0.31 }, thread: 'rak', muzzle: 'brake', handguard: ['ak', { t: 'wood', len: 0.2, m: 'woodRed' }], stock: ['ak', 'skeleton', 'polymer'], grip: ['ak', 'wood'], mag: { t: 'curved', len: 0.21, d: 0.068, c: 0.06, w: 0.026 }, optic: ['pic', { optic: 'notch' }] });
   P('aks74u', 'rifle', { rcv: 'ak', L: 0.26, rm: 'black', fm: 'woodRed', optF: 0.2 }, { barrel: { len: 0.15 }, thread: 'rak', muzzle: 'cutts', handguard: ['ak', { t: 'wood', len: 0.12, m: 'woodRed' }], stock: ['ak', 'skeleton'], grip: ['ak', 'wood'], mag: { t: 'curved', len: 0.21, d: 0.068, c: 0.06, w: 0.026 }, optic: ['pic', { optic: 'notch' }] });
   P('rpk', 'rifle', { rcv: 'ak', L: 0.3, rm: 'blued', fm: 'wood', bipod: 0.46 }, { barrel: { len: 0.5, taper: 0.9 }, thread: 'rak', muzzle: 'crown', handguard: ['ak', { t: 'wood', len: 0.2 }], stock: ['ak', 'akwood'], grip: ['ak', 'wood'], mag: { t: 'curved', len: 0.23, d: 0.072, c: 0.08, w: 0.028 }, optic: ['pic', { optic: 'notch' }] });
-  P('scarl', 'rifle', { L: 0.27, rm: 'tan', fm: 'tan', cock: { f: 0.2, y: 0.012, x: -0.026, travel: 0.09, recip: true } }, { barrel: { len: 0.3 }, thread: 'r556', muzzle: 'flash', handguard: ['ar', { t: 'rail', len: 0.22, m: 'tan' }], stock: ['heavy', 'fixed'], grip: ['ar', 'ar'], mag: { t: 'curved', len: 0.19, d: 0.064, c: 0.03 }, optic: ['pic', { optic: 'irons' }] });
+  P('scarl', 'rifle', SCAR_SPEC(0.007), { barrel: { len: 0.185, r: 0.007 }, thread: 'r556', muzzle: 'flash', handguard: ['ar', { t: 'rail', len: 0.22, m: 'tan' }], stock: ['heavy', 'fixed'], grip: ['ar', 'ar'], mag: { t: 'curved', len: 0.19, d: 0.064, c: 0.03 }, optic: ['pic', { optic: 'irons' }] });
   P('m27', 'rifle', { L: 0.22 }, { barrel: { len: 0.4 }, thread: 'r556', muzzle: 'flash', handguard: ['ar', { t: 'rail', len: 0.34 }], fg: 'vertical', stock: ['tube', 'crane'], grip: ['ar', 'ar'], mag: { t: 'curved', len: 0.19, d: 0.064, c: 0.03 }, optic: ['pic', { optic: 'irons' }], charging: 'ar' });
   P('m14', 'rifle', { rcv: 'round', L: 0.25, rm: 'park', fm: 'wood', gripT: 'none', optF: 0.14 }, { barrel: { len: 0.45 }, thread: 'r762', muzzle: 'flash', handguard: ['classic', { t: 'stockfore', len: 0.4 }], stock: ['classic', 'wood'], mag: { t: 'straight', len: 0.15, d: 0.07, w: 0.026 }, optic: ['pic', { optic: 'irons' }] });
   P('sr25', 'rifle', { L: 0.25, optF: 0.15 }, { barrel: { len: 0.45 }, thread: 'r762', muzzle: 'flash', handguard: ['ar', { t: 'mlok', len: 0.34 }], stock: ['tube', 'crane'], grip: ['ar', 'ar'], mag: { t: 'straight', len: 0.15, d: 0.07, w: 0.026 }, optic: ['pic', { optic: 'scope', scopeLen: 0.3 }], charging: 'ar' });
-  P('mpx', 'rifle', { L: 0.2, optF: 0.1 }, { barrel: { len: 0.16 }, thread: 'r9', muzzle: 'flash', handguard: ['ar', { t: 'mlok', len: 0.17 }], stock: ['tube', 'pdw'], grip: ['ar', 'ar'], mag: { t: 'straight', len: 0.15, d: 0.034, w: 0.022, rake: 0.008 }, optic: ['pic', { optic: 'irons' }], charging: 'ar' });
+  P('mpx', 'rifle', { rcv: 'mpx', L: 0.2, optF: 0.1, railExt: 0.06 }, { barrel: { len: 0.16 }, thread: 'r9', muzzle: 'flash', handguard: ['ar', { t: 'mlok', len: 0.17 }], stock: ['tube', 'pdw'], grip: ['ar', 'ar'], mag: { t: 'straight', len: 0.15, d: 0.034, w: 0.022, rake: 0.008 }, optic: ['pic', { optic: 'irons' }], charging: 'ar' });
   P('benelli', 'rifle', { rcv: 'round', L: 0.24, rm: 'black', fm: 'polymer', optF: 0.12 }, { barrel: { len: 0.45, r: 0.0105 }, thread: 'sg', muzzle: 'crown', tube: 0.38, handguard: ['classic', { t: 'wood', len: 0.22, m: 'polymer' }], stock: ['tube', 'm4'], grip: ['ar', 'ar'], optic: ['pic', { optic: 'irons' }] });
   P('vepr', 'rifle', { rcv: 'ak', L: 0.34, rm: 'black', fm: 'polymer' }, { barrel: { len: 0.42, r: 0.011 }, thread: 'sg', muzzle: 'crown', handguard: ['ak', { t: 'rail', len: 0.22 }], stock: ['ak', 'skeleton'], grip: ['ak', 'wood'], mag: { t: 'straight', len: 0.13, d: 0.09, w: 0.034, rake: 0.02 }, optic: ['pic', { optic: 'irons' }] });
   P('ar9', 'rifle', { L: 0.21 }, { barrel: { len: 0.2 }, thread: 'r9', muzzle: 'flash', handguard: ['ar', { t: 'carbine', len: 0.17 }], stock: ['tube', 'm4'], grip: ['ar', 'ar'], mag: { t: 'pistol' }, optic: ['pic', { optic: 'irons' }], charging: 'ar' });
-  P('aug9', 'rifle', { rcv: 'bullpup', siderails: true, L: 0.42, fm: 'od', railTop: false, optF: 0.3, vfg: 0.04, vfgM: 'od', cock: { recip: true } }, { barrel: { len: 0.24, m: 'black' }, thread: 'r9', muzzle: 'crown', grip: ['ar', 'ar'], mag: { t: 'pistol' }, optic: ['pic', { optic: 'acog' }] });
+  P('aug9', 'rifle', { rcv: 'aug', siderails: true, mag: { f: 0.224, y: -0.074 }, L: 0.539, rm: 'black', fm: 'od', grip: 0.339, support: 0.542, optF: 0.42, cheek: 0.19, vfgM: 'od', cock: { f: 0.493, y: 0.0114, x: -0.024, travel: 0.09, recip: true, style: 'fold' } }, { barrel: { len: 0.12, m: 'black' }, thread: 'r9', muzzle: 'crown', grip: ['ar', 'ar'], mag: { t: 'pistol', f: 0.224, y: -0.074 }, optic: ['pic', { optic: 'augscope' }] });
   P('sawn', 'rifle', { rcv: 'break', L: 0.12, fm: 'wood', barrels: [-0.0105, 0.0105], gripT: 'wood', grip: 0.0, support: 0.16 }, { barrel: { len: 0.26, r: 0.0105 }, handguard: ['classic', { t: 'wood', len: 0.12 }], grip: ['ak', 'wood', 'wood'], optic: ['pic', { optic: 'bead' }] });
   // pistols
   const pst = (id, slide, gm, extra) => P(id, 'pistol', Object.assign({ gm }, extra), { slide, pbarrel: true, grip: ['pistol', null, gm], mag: { t: 'pistol' }, optic: ['pso', { optic: 'notch' }], ptac: true });
@@ -610,17 +641,18 @@ G.Gunsmith = (() => {
   P('rev', 'revolver', { cl: 0.042, cr: 0.021 }, { barrel: { len: 0.1 }, grip: ['rev', null, 'woodDark'], optic: ['pso', { optic: 'notch' }], loader: true });
   P('hc500', 'revolver', { cl: 0.05, cr: 0.026, comp: true }, { barrel: { len: 0.2 }, grip: ['rev', null, 'woodDark'], optic: ['pso', { optic: 'notch' }], loader: true });
   P('judge', 'revolver', { cl: 0.072, cr: 0.026, m: 'blued' }, { barrel: { len: 0.075 }, grip: ['rev', null, 'rubber'], optic: ['pso', { optic: 'notch' }], loader: true });
-  P('derringer', 'derringer', {}, { barrel: { len: 0.09 }, grip: ['rev', null, 'woodDark'] });
+  P('derringer', 'derringer', {}, { barrel: { len: 0.084 }, grip: ['rev', null, 'woodDark'] });
   // specials
   P('p90', 'p90', { siderails: true }, { barrel: { len: 0.04 }, thread: 'r57', muzzle: 'flash', optic: ['pic', { optic: 'reddot' }], mag: { t: 'p90' }, noDrum: true });
-  P('shredder', 'minigun', {}, { barrel: { len: 0.55 }, motor: true, mag: { t: 'ammobox', f: 0.12, m: 'od' }, optic: ['pic', { optic: 'none' }] });
+  P('shredder', 'minigun', {}, { barrel: { len: 0.55 }, motor: true, mag: { t: 'ammobox', f: 0.12, m: 'od' }, optic: ['pic', { optic: 'irons' }], tac: true }); // (a side handle on the left, a rail on the right)
   P('m32', 'launcher', { drum: true }, { barrel: { len: 0.3 }, stock: ['tube', 'm4'], optic: ['pic', { optic: 'reddot' }] });
   P('pocketgl', 'launcher', {}, { barrel: { len: 0.3 }, stock: ['smg', 'wire'], optic: ['pic', { optic: 'notch' }] });
   P('rail', 'railgun', {}, { barrel: { len: 0.55 }, cap: true, stock: ['precision', 'skeleton'], optic: ['pic', { optic: 'scope', scopeLen: 0.26, scopeObj: 0.022 }] });
   P('crossbow', 'crossbow', {}, { limbs: true, stock: ['precision', 'sniper'], optic: ['pic', { optic: 'reddot' }] });
 
   // anything without a platform entry (shouldn't happen) gets a bare one
-  for (const def of G.WEAPON_LIST) if (!PLATFORMS[def.id]) P(def.id, 'rifle', {}, {});
+  const LATE = new Set(['qbz95', 'qbz192', 'mcx']); // (their platforms are made at the end: a part's id in a code is its place in the list)
+  for (const def of G.WEAPON_LIST) if (!PLATFORMS[def.id] && !LATE.has(def.id)) P(def.id, 'rifle', {}, {});
   // Calibration: the weapon's tuned stats are what its default build shoots like, so each platform carries
   // the negated sum of its default parts' effects. Changing a part changes the stats relative to that.
   const STAT_KEYS = ['ergo', 'recoil', 'acc', 'hip', 'weight', 'vel', 'reload', 'rpm', 'spin'];
@@ -634,9 +666,13 @@ G.Gunsmith = (() => {
   // Slots available with this build: the platform's own, plus whatever the installed parts provide.
   function slotsOf(id, build) {
     const plat = PLATFORMS[id], out = plat.slots.map((s) => Object.assign({ parent: null }, s));
+    const slotOf = (v, sl, parent) => Object.assign({ slot: sl, req: false, parent }, typeof v === 'string' ? { mount: v } : v);
     for (let i = 0; i < out.length; i++) {
       const p = build[out[i].slot] && PARTS[build[out[i].slot]];
-      if (p && p.provides) for (const [sl, mount] of Object.entries(p.provides)) if (!out.some((o) => o.slot === sl)) out.push({ slot: sl, mount, req: false, parent: out[i].slot });
+      if (p && p.provides) for (const [sl, v] of Object.entries(p.provides)) if (!out.some((o) => o.slot === sl)) out.push(slotOf(v, sl, out[i].slot));
+      // a chassis (a pistol's: js below): its slots, in place of the gun's own of that name (its rail for the slide's
+      // optic cut, its side rails for the frame's), or new ones
+      if (p && p.chassis) for (const [sl, v] of Object.entries(p.chassis)) { const j = out.findIndex((o) => o.slot === sl), s = slotOf(v, sl, out[i].slot); if (j >= 0) out[j] = s; else out.push(s); }
     }
     out.sort((a, b) => ORDER.indexOf(a.slot) - ORDER.indexOf(b.slot));
     return out;
@@ -645,7 +681,7 @@ G.Gunsmith = (() => {
   const slotLabel = (s) => (s.slot === 'tac' && s.mount === 'tac' ? 'Tactical (right)' : SLOT_LABEL[s.slot]);
   // where a part goes on this build: a slot it fits, an empty one first (a light with the right rail taken: the left)
   function slotFor(id, build, p) {
-    const c = slotsOf(id, build).filter((s) => fitsSlot(s, p));
+    const c = slotsOf(id, build).filter((s) => fitsSlot(s, p, id));
     return c.find((s) => !build[s.slot]) || c[0] || null;
   }
   // the slots the gunsmith (and the gun's own panel) shows: not the magazine, where it's a magazine you carry
@@ -661,7 +697,7 @@ G.Gunsmith = (() => {
       const avail = slotsOf(id, build);
       for (const [sl, pid] of Object.entries(build)) {
         const s = avail.find((a) => a.slot === sl);
-        if (!s || !PARTS[pid] || (!fitsSlot(s, PARTS[pid]) && !s.req)) { removed.push(pid); delete build[sl]; changed = true; }
+        if (!s || !PARTS[pid] || (!fitsSlot(s, PARTS[pid], id) && !s.req)) { removed.push(pid); delete build[sl]; changed = true; }
       }
     }
     return removed;
@@ -727,7 +763,10 @@ G.Gunsmith = (() => {
     const d = Object.create(base);
     const s = Object.assign({ ergo: 0, recoil: 0, acc: 0, hip: 0, weight: 0, vel: 0, reload: 0, rpm: 0, spin: 0 }, plat.offset);
     for (const sl of slotsOf(id, build)) if (!build[sl.slot] && EMPTY[sl.slot] && !sl.bare) for (const [k, v] of Object.entries(EMPTY[sl.slot])) s[k] += v; // e.g. no stock
-    let perLoad = 1, levels = null, magnifier = 0, light = 0, laser = null, laserHip = 0, laserHipSum = 0, cap = base.mag, zoom = base.zoom, barrelIn = gs.barrel, device = gs.muzzleDevice || 'none', sup = false, hasMuzzleSlot = false, shell = base.shell, reload = base.reload, scoped = base.zoom <= 0.5, reticle = 'cross', magnif = scoped ? scopeMag({}, base.zoom) : 1;
+    // a stock on a slot a handgun's given one by (sl.brace: a chassis's, an SMG stock mount's): what bracing it on your
+    // shoulder does, on top of the stock's own figures (they're for a stock on an SMG, against another stock)
+    for (const sl of slotsOf(id, build)) { const sp = sl.brace && PARTS[build[sl.slot]]; if (sp && sp.stype !== 'folded' && !(sp.provides && sp.provides.buttstock)) for (const [k, v] of Object.entries(sl.brace)) s[k] += v; }
+    let perLoad = 1, levels = null, magnifier = 0, light = 0, laser = null, laserHip = 0, laserHipSum = 0, cap = base.mag, zoom = base.zoom, barrelIn = gs.barrel, device = gs.muzzleDevice || 'none', can = gs.suppressor || null, sup = false, hasMuzzleSlot = false, shell = base.shell, reload = base.reload, scoped = base.zoom <= 0.5, reticle = 'cross', magnif = scoped ? scopeMag({}, base.zoom) : 1;
     const parts = Object.values(build).map((p) => PARTS[p]).filter(Boolean);
     for (const p of parts) {
       for (const k in s) s[k] += p.st[k] || 0;
@@ -742,12 +781,26 @@ G.Gunsmith = (() => {
       if (p.set.magnifier) magnifier = p.set.magnifier;
       if (p.set.light) light = Math.max(light, p.set.light);
       if (p.set.laser) { laser = laser === 'g' ? 'g' : p.set.laser; laserHip = Math.min(laserHip, p.st.hip || 0); laserHipSum += p.st.hip || 0; } // (two lasers: the green one shows, the better one counts)
-      if (p.slot === 'barrel' && p.set.sup != null) { sup = p.set.sup; if (p.set.device) device = p.set.device; }
+      if (p.slot === 'barrel' && p.set.sup != null) { sup = p.set.sup; if (p.set.device) device = p.set.device; can = p.set.can || null; }
       if (p.provides && p.provides.muzzle) hasMuzzleSlot = true;
     }
     s.hip -= laserHipSum - laserHip; // (a second laser doesn't steady it any more)
     const mz = build.muzzle && PARTS[build.muzzle];
-    if (hasMuzzleSlot) { device = mz ? mz.set.device : 'none'; sup = !!(mz && mz.set.sup); }
+    if (hasMuzzleSlot) { device = mz ? mz.set.device : 'none'; sup = !!(mz && mz.set.sup); can = (mz && mz.set.can) || null; }
+    // Velocity: the barrel's length sets it (js/data.js roundSpeed: a fifth power of the length); what changes it without
+    // changing the barrel (a suppressor's longer gas column, a long slide) adds its share on top (velK). s.vel is then the
+    // build's real change from the factory gun's, what its damage and reach follow and what the cards show.
+    const velX = parts.reduce((a, p) => a + (p.set.barrelIn == null ? p.st.vel || 0 : 0), 0) + ((plat.offset && plat.offset.vel) || 0);
+    d.velK = 1 + velX / 100;
+    if (parts.some((p) => p.set.ported)) d.integral = true; // (a ported integral barrel: subsonic, as the MP5SD's: js/data.js roundSpeed)
+    if (gs.barrel && barrelIn) s.vel = (Math.pow(barrelIn / gs.barrel, 0.2) * d.velK - 1) * 100;
+    if (d.integral && G.roundSpeed) { const v0 = G.roundSpeed(base); if (v0) s.vel = (Math.min(v0 * (1 + s.vel / 100), 310) / v0 - 1) * 100; } // (and what it really leaves at, capped)
+    // braced: a stock to put to your shoulder (a folded or deleted one, or a bare buffer tube, isn't). Without a stock
+    // slot, a long gun's stock is part of it and a handgun has none. It decides how much the aim sways (G.aimSway).
+    const slotNames = slotsOf(id, build).map((sl) => sl.slot), stockOf = (sl) => build[sl] && PARTS[build[sl]];
+    if (slotNames.includes('buttstock')) d.braced = !!stockOf('buttstock') && stockOf('buttstock').stype !== 'folded';
+    else if (slotNames.includes('stock')) { const sp = stockOf('stock'); d.braced = !!sp && sp.stype !== 'folded' && !(sp.provides && sp.provides.buttstock); }
+    else d.braced = !(base.cls === 'PST' || base.cls === 'MP');
     d.code = code; d.build = Object.assign({}, build); d.parts = parts; d.stats = s;
     d.modified = parts.some((p) => plat.defaults[p.slot] !== p.id) || Object.keys(build).length !== Object.keys(plat.defaults).length;
     // core parts taken off (a barrel, a grip...): it won't fire until they're back
@@ -781,10 +834,11 @@ G.Gunsmith = (() => {
     d.weight = Math.max(0.3, plat.kg + s.weight);
     d.sup = sup;
     d.device = device;
+    d.can = device === 'suppressor' ? can || 'full' : null; // which suppressor (the synth's)
     d.barrelIn = barrelIn;
     // recoil from this build's weight and barrel (G.physRecoil), then what its parts do to it
     d.recoil = (G.physRecoil(d, d.weight) || base.recoil) * clamp(1 + s.recoil / 100, 0.3, 2);
-    d.soundKey = gs.barrel ? `${id}:${(+barrelIn).toFixed(1)}:${device}` : id;
+    d.soundKey = gs.barrel ? `${id}:${(+barrelIn).toFixed(1)}:${device}${d.can ? ':' + d.can : ''}` : id;
     d.value = base.price + parts.reduce((a, p) => a + (p.factory || plat.defaults[p.slot] === p.id ? 0 : p.price), 0);
     cache.set(code, d);
     return d;
@@ -810,10 +864,10 @@ G.Gunsmith = (() => {
   function soundSpec(key) {
     key = String(key);
     if (specs.has(key)) return specs.get(key);
-    const [base, am] = key.split('@'), [id, inch, dev] = base.split(':');
+    const [base, am] = key.split('@'), [id, inch, dev, can] = base.split(':');
     const g = G.GUN_SPECS[id];
     if (!g) return null;
-    let s = inch === undefined ? g : Object.assign({}, g, { barrel: +inch, muzzleDevice: dev });
+    let s = inch === undefined ? g : Object.assign({}, g, { barrel: +inch, muzzleDevice: dev, suppressor: can || g.suppressor });
     if (LOAD_SOUND[am]) s = Object.assign({}, s, LOAD_SOUND[am](s));
     if (!LOAD_SOUND[am] || window.GunshotSynth) specs.set(key, s); // (a subsonic load's needs the synth to work out)
     return s;
@@ -853,16 +907,124 @@ G.Gunsmith = (() => {
     ['comp', 'redline', 'Redline RC-22 compensator', 'pcomp', 120, { recoil: -12, ergo: -1, weight: 0.03 }, 1, false, 'Ports up top: on full auto, it keeps a .22 on the target.'],
     ['can', 'wraith', 'Wraithworks Whisper-22 rimfire suppressor', 'shortcan', 360, { recoil: -4, ergo: -3, weight: 0.1 }, 1, true, 'A rimfire can: subsonic .22 through it is about as loud as a nail gun.'],
     ['long', 'osprey', 'Osprey Hushpuppy-22 long rimfire suppressor', 'longcan', 520, { recoil: -6, ergo: -6, weight: 0.17, acc: -4 }, 2, true, 'Long and very quiet, and steadies the muzzle.']]
-    .forEach(([k, b, n, t, price, st, tier, sup, d]) => add({ id: `mz.r22.${k}`, slot: 'muzzle', mount: 'mz:r22', brand: BR[b], name: n, desc: d, price, tier, st, set: { device: DEV[t], sup }, model: { muzzle: t } }));
+    .forEach(([k, b, n, t, price, st, tier, sup, d]) => add({ id: `mz.r22.${k}`, slot: 'muzzle', mount: 'mz:r22', brand: BR[b], name: n, desc: d, price, tier, st, set: { device: DEV[t], sup, can: CAN[t] }, model: { muzzle: t } }));
   for (const fam of ['r9', 'r556']) for (const q of BY_MOUNT.get('mz:' + fam).slice()) { q.alsoMounts = (q.alsoMounts || []).concat('mz:r22'); BY_MOUNT.get('mz:r22').push(q); }
   PSTOCK.add('tx22');
   P('tx22', 'pistol', { gm: 'polymer', tx: true }, { slide: { len: 0.164, w: 0.025 }, pbarrel: 'r22', grip: ['pistol', null, 'polymer'], mag: { t: 'pistol', len: 0.13 }, optic: ['pso', { optic: 'notch' }], ptac: true });
   { const plat = PLATFORMS.tx22; plat.offset = {}; for (const k of STAT_KEYS) plat.offset[k] = -Object.values(plat.defaults).reduce((a, pid) => a + ((PARTS[pid] && PARTS[pid].st[k]) || 0), 0); }
+
+  // The QBZ-95, QBZ-192 and SIG MCX (and what they brought: the 5.8×42 thread, the folding-stock hinge the MCX and the
+  // QBZ-191 share, the MCX's handguards and barrels). At the end: a part's id in a weapon's code is its place in the list.
+  THREAD.r58 = '5.8 M14×1 RH';
+  MUZZLES.r58 = rifleMuzzles('r58', '5.8');
+  for (const o of MUZZLES.r58) add({ id: `mz.r58.${o.k}`, slot: 'muzzle', mount: 'mz:r58', brand: BR[o.b], name: o.n, desc: o.d, price: o.price, tier: o.tier || 1, st: o.st, set: { device: DEV[o.t], sup: !!o.sup, can: CAN[o.t] }, model: { muzzle: o.t } });
+  P('qbz95', 'rifle', { rcv: 'qbz95', L: 0.618, fm: 'black', grip: 0.36, support: 0.53, optF: 0.37, mag: { f: 0.218, y: -0.0396 }, cock: { f: 0.4, y: 0.028, x: 0, travel: 0.07, style: 'top' } },
+    { barrel: { len: 0.08, r: 0.0072 }, thread: 'r58', muzzle: 'flash', mag: { t: 'curved', len: 0.152, d: 0.072, c: 0.068, w: 0.026 }, optic: ['pic', { optic: 'qbzirons' }] });
+  P('qbz192', 'rifle', { rcv: 'qbz192', L: 0.235, fm: 'black', grip: 0.03, mag: { f: 0.15, y: -0.05 }, cock: { f: 0.2, y: 0.016, x: 0.018, travel: 0.1, recip: true } },
+    { barrel: { len: 0.24 }, thread: 'r58', muzzle: 'flash', handguard: ['qbz', { t: 'qbz', len: 0.22 }], stock: ['fold', 'qbz'], grip: ['ar', 'ar'], mag: { t: 'curved', len: 0.152, d: 0.072, c: 0.068, w: 0.026 }, optic: ['pic', { optic: 'irons' }] });
+  P('mcx', 'rifle', { rcv: 'mcx', L: 0.22, fm: 'black', railExt: 0.11 }, { barrel: { len: 0.262 }, thread: 'r556', muzzle: 'flash', handguard: ['mcx', { t: 'sig', len: 0.24 }], stock: ['fold', 'mcx'], grip: ['ar', 'ar'],
+    mag: { t: 'curved', len: 0.19, d: 0.064, c: 0.03, well: 'black' }, optic: ['pic', { optic: 'irons' }], charging: 'ar' });
+  // the MCX as its variants: a Rattler's barrel and handguard, the Virtus's longer ones, a Gen 1's KeyMod, a Spear LT's
+  // lightened FDE handguard and padded stock (the QBZ-192 takes the same folding stocks: the same hinge)
+  const thr = { muzzle: 'mz:r556' };
+  [['mcx.br.rattler', 'kestrel', 'Kestrel 5.5" Rattler barrel', 0.125, 5.5, { vel: -22, acc: 16, ergo: 9, weight: -0.5, recoil: 8 }, 380, 2, 'The Rattler\'s: as short as a 5.56 barrel goes. Handy, loud, much less reach.'],
+    ['mcx.br.16', 'meridian', 'Meridian 16" Patrol barrel', 0.365, 16, { vel: 12, acc: -14, ergo: -8, weight: 0.5, recoil: -4 }, 480, 2, 'The Patrol rifle\'s full-length barrel: the most velocity and the most reach.']]
+    .forEach(([id, b, n, len, inch, st, price, tier, desc]) => add({ id, slot: 'barrel', mount: 'br:mcx', plat: 'mcx', brand: BR[b], name: n, price, tier, st, model: { barrel: { len } }, provides: thr, set: { barrelIn: inch }, desc }));
+  add({ id: 'qbz192.br.191', slot: 'barrel', mount: 'br:qbz192', plat: 'qbz192', brand: BR.north, name: 'Northmark 14.5" QBZ-191 rifle barrel', price: 460, tier: 2, model: { barrel: { len: 0.33 } }, provides: { muzzle: 'mz:r58' },
+    st: { vel: 10, acc: -12, ergo: -6, weight: 0.4, recoil: -3 }, set: { barrelIn: 14.5 }, desc: 'The full rifle\'s barrel: a QBZ-191 again.' });
+  // (the MCX's and MPX's handguards: their own, flat-topped, the upper's rail running on flush along them; nothing AR fits)
+  [['hg.mcx.keymod', 'mcx', 'kestrel', 'Kestrel Gen 1 KeyMod handguard', { t: 'sig', len: 0.28, slots: 'keymod' }, { ergo: 1, weight: 0.2 }, 1],
+    ['hg.mcx.lt', 'mcx', 'vantage', 'Vantage LT lightened handguard (FDE)', { t: 'sig', len: 0.28, slots: 'lite', m: 'tan' }, { ergo: 5, weight: 0.1 }, 2],
+    ['hg.mcx.short', 'mcx', 'lynx', 'Lynx Rattler 5" M-LOK handguard', { t: 'sig', len: 0.12 }, { ergo: 6, weight: 0.06 }, 1],
+    ['hg.mcx.long', 'mcx', 'vantage', 'Vantage 15" M-LOK handguard', { t: 'sig', len: 0.36 }, { ergo: 0, weight: 0.24 }, 2],
+    ['oem.hg.mpx.0', 'mpx', 'kestrel', 'Kestrel 6.5" MPX M-LOK handguard', { t: 'sig', len: 0.17 }, HG_ST.sig, 1],
+    ['hg.mpx.keymod', 'mpx', 'kestrel', 'Kestrel Gen 1 MPX KeyMod handguard', { t: 'sig', len: 0.17, slots: 'keymod' }, { ergo: 2, weight: 0.18 }, 1],
+    ['hg.mpx.short', 'mpx', 'lynx', 'Lynx MPX-K 4.5" handguard', { t: 'sig', len: 0.1 }, { ergo: 6, weight: 0.05 }, 1],
+    ['hg.mpx.long', 'mpx', 'vantage', 'Vantage 10" MPX M-LOK handguard (FDE)', { t: 'sig', len: 0.25, m: 'tan' }, { ergo: 1, weight: 0.22 }, 2]]
+    .forEach(([id, fam, b, n, hg, st, tier]) => add({ id, slot: 'handguard', mount: 'hg:' + fam, brand: BR[b], name: n, price: 300, tier, st, desc: 'Railed: takes a foregrip, and a light or laser each side.', model: { hg }, provides: { fg: 'fg', tac: 'tac', tacL: 'tac' } }));
+  Object.assign(PARTS['oem.hg.mpx.0'], { oem: true, price: 120, desc: 'Standard-issue part. Railed: takes a foregrip, and a light or laser each side.' });
+  // the MPX: its own handguards now (it was on the AR's: a part's id in a code is its place, so its slot changes here)
+  { const plat = PLATFORMS.mpx; plat.slots.find((sl) => sl.slot === 'handguard').mount = 'hg:mpx'; plat.defaults.handguard = 'oem.hg.mpx.0'; LATE.add('mpx'); }
+  add({ id: 'hg.qbz.long', slot: 'handguard', mount: 'hg:qbz', brand: BR.north, name: 'Northmark 12" QBZ-191 handguard (FDE)', price: 320, tier: 2, st: HG_ST.qbz, desc: 'The rifle\'s longer handguard. Railed: takes a foregrip, and a light or laser each side.',
+    model: { hg: { t: 'qbz', len: 0.3, m: 'tan' } }, provides: { fg: 'fg', tac: 'tac', tacL: 'tac' } });
+  [['stk.fold.rattler', 'lynx', 'Lynx Rattler folding stock', 'rattler', null, 1], ['stk.fold.spear', 'paragon', 'Paragon LT padded folding stock (FDE)', 'spearlt', 'tan', 2],
+    ['stk.fold.mcx', 'kestrel', 'Kestrel skeleton folding stock (FDE)', 'mcx', 'tan', 1]]
+    .forEach(([id, b, n, type, sm, tier]) => add({ id, slot: 'stock', mount: 'stk:fold', brand: BR[b], name: n, price: 200 + Math.round(STK_ST[type].weight * 150), tier, stype: type, st: STK_ST[type], desc: 'Folds to the side on the hinge.', model: { stock: type, sm } }));
+  tubeAdapter(add({ id: 'stk.fold.tube', slot: 'stock', mount: 'stk:fold' }), 'Vantage folding buffer tube adapter', 'vantage');
+  // the SCARs: no handguard slot (the rails are the upper's), a foregrip slot on the rail under the front; their own stock
+  add({ id: 'stk.heavy.scar', slot: 'stock', mount: 'stk:heavy', brand: 'Factory', oem: true, name: 'SCAR folding stock', price: 260, tier: 1, stype: 'scar', st: STK_ST.scar,
+    desc: 'Folds to the side; a raised comb and an adjustable length.', model: { stock: 'scar', sm: null } });
+  for (const id of ['scar', 'scarl']) {
+    const plat = PLATFORMS[id];
+    plat.slots = plat.slots.filter((sl) => sl.slot !== 'handguard'); delete plat.defaults.handguard;
+    plat.slots.push({ slot: 'fg', mount: 'fg', req: false, bare: true }); plat.slots.sort((a, b) => ORDER.indexOf(a.slot) - ORDER.indexOf(b.slot));
+    plat.defaults.stock = 'stk.heavy.scar'; LATE.add(id);
+  }
+  // the G36 (traced: gunmodels.js rcv 'g36'): its own handguards (the rifle's, the G36K's, a rail system) and folding
+  // stock; a 12.5" barrel and the K's handguard make it a G36K
+  [['oem.hg.g36.0', 'Factory', 'G36 vented handguard', { t: 'g36', len: 0.315 }, HG_ST.g36, 120, 1, null],
+    ['hg.g36.k', BR.lynx, 'Lynx G36K short handguard', { t: 'g36', len: 0.215 }, { ergo: 5, weight: 0.12 }, 160, 1, null],
+    ['hg.g36.ris', BR.ironvale, 'Ironvale G36 rail handguard', { t: 'g36', len: 0.315, rails: true }, { ergo: -2, weight: 0.3 }, 320, 2, { fg: 'fg', tac: 'tac', tacL: 'tac' }]]
+    .forEach(([id, brand, name, hg, st, price, tier, provides]) => add({ id, slot: 'handguard', mount: 'hg:g36', brand, name, price, tier, st, oem: brand === 'Factory' || undefined, provides,
+      desc: provides ? 'Railed: takes a foregrip, and a light or laser each side.' : 'No rails.', model: { hg } }));
+  add({ id: 'g36.br.k', slot: 'barrel', mount: 'br:g36', plat: 'g36', brand: BR.lynx, name: 'Lynx 12.5" G36K barrel', price: 340, tier: 2, model: { barrel: { len: 0.311, r: 0.0068 } }, provides: thr,
+    st: { vel: -12, acc: 10, ergo: 6, weight: -0.35, recoil: 5 }, set: { barrelIn: 12.5 }, desc: 'The G36K\'s: with its short handguard, the carbine. Handier, a little less reach.' });
+  add({ id: 'stk.heavy.g36', slot: 'stock', mount: 'stk:heavy', brand: 'Factory', oem: true, name: 'G36 folding stock', price: 230, tier: 1, stype: 'g36', st: STK_ST.g36,
+    desc: 'A skeleton stock that folds to the right; the rifle still fires folded.', model: { stock: 'g36', sm: null } });
+  { const plat = PLATFORMS.g36; plat.slots.find((sl) => sl.slot === 'handguard').mount = 'hg:g36'; plat.defaults.handguard = 'oem.hg.g36.0'; plat.defaults.stock = 'stk.heavy.g36'; LATE.add('g36'); }
+  // the derringer as a kit: its own grips (one with a stock lug, for any SMG stock), long barrels (a carbine's and a
+  // rifle's: a .44 Magnum from 16" or 20", a rail along their rib for a rifle's sight and a railed forend), and its
+  // own length with an optic cut in the rib for a pistol sight (the sights tip open with the barrels)
+  [['oem.gr.derringer.0', 'Factory', 'Derringer rosewood grips', { gm: 'woodDark' }, {}, 0, 1, null, 'Factory part.'],
+    ['gr.derringer.rubber', BR.bastion, 'Bastion wrap-around rubber grip', { gm: 'rubber' }, { recoil: -6, ergo: 2, weight: 0.02 }, 60, 1, null, 'Soaks up a little of the kick.'],
+    ['gr.derringer.stock', BR.lynx, 'Lynx stock-lug grip', { gripT: 'lug', gm: 'polymer' }, { ergo: -1, weight: 0.08 }, 180, 1, { stock: { mount: 'stk:smg', bare: true, brace: { recoil: -25, ergo: -8 } } }, 'A squared polymer grip with a lug at its back: takes any SMG stock.']]
+    .forEach(([id, brand, name, model, st, price, tier, provides, desc]) => add({ id, slot: 'grip', mount: 'gr:derringer', plat: brand === 'Factory' ? 'derringer' : undefined, brand, name, price, tier, st, provides, desc, model,
+      oem: brand === 'Factory' || undefined }));
+  [['derringer.br.carbine', BR.north, 'Northmark 16" carbine barrels', 0.414, 16, { vel: 18, acc: -14, ergo: -14, weight: 0.9, recoil: -6 }, 420, 2, 'A carbine\'s length, still two over-under: much more speed out of the .44, and it needs two hands.'],
+    ['derringer.br.rifle', BR.meridian, 'Meridian 20" rifle barrels', 0.516, 20, { vel: 22, acc: -18, ergo: -18, weight: 1.15, recoil: -8 }, 520, 2, 'A rifle\'s length: the most out of the .44 Magnum, and long.']]
+    .forEach(([id, brand, name, blen, inch, st, price, tier, desc]) => add({ id, slot: 'barrel', mount: 'br:derringer', plat: 'derringer', brand, name, price, tier, st, model: { blen }, set: { barrelIn: inch },
+      provides: { fg: 'fg', tac: 'tac', tacL: 'tac', optic: 'op:pic' }, desc: desc + ' A rail along the rib for a rifle sight, and a railed forend: a foregrip under, a light or laser each side.' }));
+  add({ id: 'rm.derringer', slot: 'railmount', mount: 'rm:derringer', brand: BR.strix, name: 'Strix derringer sight mount', price: 90, tier: 1, st: { weight: 0.03, ergo: -1 }, provides: { optic: 'op:pso' },
+    desc: 'A plate on the barrels\' rib: takes a pistol sight. It tips open with them.', model: { railmount: 'derringer' } });
+  PARTS['rm.derringer'].retired = true; // (the sight's on the barrels now: the optic-cut pair, or a long pair's rail)
+  add({ id: 'derringer.br.optic', slot: 'barrel', mount: 'br:derringer', plat: 'derringer', brand: BR.strix, name: 'Strix 3" optic-cut barrels', price: 260, tier: 1, st: { weight: 0.02 },
+    model: { blen: 0.084, optCut: true }, set: { barrelIn: 3 }, provides: { optic: 'op:pso' }, desc: 'Its own length, with a pistol optic cut into the rib: takes a pistol sight. It tips open with them.' });
+  // integrally suppressed pairs: each barrel ported inside one oval can round both (the gas bled off through the ports
+  // before the muzzle: the .44 leaves subsonic, set.ported), its own length's or a carbine's (the can over the front of
+  // the barrels, ahead of the railed forend)
+  add({ id: 'derringer.br.sd', slot: 'barrel', mount: 'br:derringer', plat: 'derringer', brand: BR.wraith, name: 'Wraithworks 7" integrally suppressed barrels', price: 480, tier: 2,
+    st: { acc: -4, ergo: -7, weight: 0.32, recoil: -14 }, model: { blen: 0.19, can: { r: 0.0145, from: 0.042 } }, set: { barrelIn: 3, sup: true, device: 'suppressor', can: 'integral', ported: true },
+    desc: 'Both barrels ported inside one oval suppressor: the .44 leaves subsonic and barely makes a sound. Twice as long, still a pocket gun, just.' });
+  add({ id: 'derringer.br.sdcarbine', slot: 'barrel', mount: 'br:derringer', plat: 'derringer', brand: BR.wraith, name: 'Wraithworks 16" integrally suppressed carbine barrels', price: 680, tier: 3,
+    st: { acc: -18, ergo: -16, weight: 1.2, recoil: -16 }, model: { blen: 0.414, can: { r: 0.0155, from: 0.24 } }, set: { barrelIn: 16, sup: true, device: 'suppressor', can: 'integral', ported: true },
+    provides: { fg: 'fg', tac: 'tac', tacL: 'tac', optic: 'op:pic' },
+    desc: 'A carbine\'s length, ported, the front of it a suppressor round both bores: subsonic and quiet, steadier for its weight. A rail along the rib for a rifle sight, and a railed forend: a foregrip under, a light or laser each side.' });
+  { const plat = PLATFORMS.derringer; plat.slots.find((sl) => sl.slot === 'grip').mount = 'gr:derringer'; plat.defaults.grip = 'oem.gr.derringer.0'; LATE.add('derringer'); }
+  // A pistol carbine chassis: the pistol drops into it in place of its grip (the lower: its frame rail and stock lug
+  // shut inside). Its own: a full-length rail over the slide (a rifle's sight, and a magnifier behind a red dot), a rail
+  // each side (a light, a laser) and one under the front (a foregrip), and an SMG stock mount at the back. Not the
+  // akimbo pair's.
+  add({ id: 'gr.pistol.chassis', slot: 'grip', mount: 'gr:pistol', not: ['akimbo'], brand: BR.ironvale, name: 'Ironvale PCC-1 pistol chassis', price: 620, tier: 2,
+    st: { ergo: -6, acc: -4, weight: 0.55 }, model: { chassis: true },
+    chassis: { optic: 'op:pic', tac: 'tac', tacL: 'tac', fg: 'fg', stock: { mount: 'stk:smg', bare: true, brace: { recoil: -25, ergo: -8 } } },
+    desc: 'The pistol drops into a carbine chassis: a full-length rail over the slide (a rifle sight, with room for a magnifier), a rail each side and one under the front, and an SMG stock mount at the back. Its frame rail and stock lug are inside it.' });
+  // the TX22's translucent magazines (its own magazine is a pistol's shape, which the generic clear one isn't made in):
+  // the standard 16 and the extended 24
+  for (const [n, cap, len, price, tier, st] of [['clear', 16, 0.13, 70, 1, { weight: -0.02 }], ['extclear', 24, 0.1794, 170, 2, { reload: 12, ergo: -3, weight: 0.2 }]])
+    add({ id: `tx22.mag.${n}`, slot: 'mag', mount: 'mag:tx22', plat: 'tx22', brand: BR.sable, name: `Sable ${cap}-round translucent magazine`, price, tier, st, set: { cap }, variant: true,
+      model: { mag: { t: 'pistol', len, m: 'clear' } }, desc: `${cap > 16 ? 'Long: more rounds, slower to swap. ' : ''}Translucent polymer: the rounds left in it show through.` });
+  // the G36 and AUG on STANAG magazines: their own retired (not sold, not dropped), the slot moved to the shared mount
+  for (const id of NATO_LATE) {
+    const plat = PLATFORMS[id], sl = plat.slots.find((x) => x.slot === 'mag');
+    for (const p of BY_MOUNT.get(sl.mount) || []) p.retired = true;
+    sl.mount = 'mag:stanag'; plat.defaults.mag = 'stanag.mag.30'; plat.magVariants = true; LATE.add(id);
+  }
+  for (const id of LATE) { const plat = PLATFORMS[id]; plat.offset = {}; for (const k of STAT_KEYS) plat.offset[k] = -Object.values(plat.defaults).reduce((a, pid) => a + ((PARTS[pid] && PARTS[pid].st[k]) || 0), 0); }
   // ...and the long guns that take one: those with no way to a side rail otherwise (nothing that fits them has one)
   {
     const tacOf = (plat) => {
       const mounts = new Set(plat.slots.map((sl) => sl.mount));
-      for (let pass = 0; pass < 2; pass++) for (const m of [...mounts]) for (const q of BY_MOUNT.get(m) || []) if (q.provides && q.mount !== 'rm:clamp') for (const pm of Object.values(q.provides)) mounts.add(pm);
+      for (let pass = 0; pass < 2; pass++) for (const m of [...mounts]) for (const q of BY_MOUNT.get(m) || []) if (q.mount !== 'rm:clamp') for (const pm of [...Object.values(q.provides || {}), ...Object.values(q.chassis || {})]) mounts.add(slotMount(pm));
       return mounts.has('tac') || mounts.has('ptac');
     };
     for (const plat of Object.values(PLATFORMS)) if (plat.arch === 'rifle' && !tacOf(plat)) {
@@ -874,20 +1036,25 @@ G.Gunsmith = (() => {
   const FITS = new Map(); // interface -> weapon ids that have (or can get) a slot for it
   for (const plat of Object.values(PLATFORMS)) {
     const mounts = new Set(plat.slots.map((s) => s.mount));
-    for (let pass = 0; pass < 2; pass++) for (const m of [...mounts]) for (const p of compatible(m)) if (p.provides) for (const pm of Object.values(p.provides)) mounts.add(pm);
+    for (let pass = 0; pass < 2; pass++) for (const m of [...mounts]) for (const p of compatible(m)) if (!(p.not || []).includes(plat.id)) for (const pm of [...Object.values(p.provides || {}), ...Object.values(p.chassis || {})]) mounts.add(slotMount(pm));
     for (const m of mounts) { if (!FITS.has(m)) FITS.set(m, []); FITS.get(m).push(plat.id); }
   }
   const fits = (mount) => FITS.get(mount) || [];
   // every weapon a part fits, through any interface it takes (a 9 mm can on a ½-28 .22)
-  const fitsPart = (p) => [...new Set([p.mount, ...(p.alsoMounts || [])].flatMap((m) => fits(m)))];
+  const fitsPart = (p) => [...new Set([p.mount, ...(p.alsoMounts || [])].flatMap((m) => fits(m)))].filter((id) => !(p.not || []).includes(id));
 
   // ------------------------------------------------------------------ the gunsmith's stock this visit
   // Six parts at a time (on pedestals in the hangar), the same for the whole squad. Parts that fit more weapons turn up more often;
-  // better parts appear deeper in the run.
+  // better parts appear deeper in the run. What the guns already come with seldom does: a part is weighted down by the share
+  // of the weapons it fits that ship with it (the A2 birdcage, the stock red dot), so the shelves are mostly upgrades.
+  const SHIPS = new Map(); // part -> how many weapons have it as their default
+  for (const plat of Object.values(PLATFORMS)) for (const pid of Object.values(plat.defaults)) SHIPS.set(pid, (SHIPS.get(pid) || 0) + 1);
+  const stockShare = (p) => (p.slot === 'receiver' ? 0 : (SHIPS.get(p.id) || 0) / Math.max(1, fitsPart(p).length)); // (a receiver kit is a conversion, not a default)
   function rollStock(level, seed, n = 6) {
     const r = G.U.rng((seed ^ 0x6a5d) >>> 0), maxTier = Math.min(3, 1 + Math.floor(level / 2)), out = new Set();
     // (lights and lasers are few among hundreds of muzzles, stocks and grips: they're weighted up to turn up most visits)
-    const pool = LIST.filter((p) => !p.factory && !p.variant && !p.retired && p.tier <= maxTier).map((p) => ({ p, w: Math.pow(fitsPart(p).length, 0.8) * (p.slot === 'tac' ? 9 : 1) }));
+    const pool = LIST.filter((p) => !p.factory && !p.variant && !p.retired && p.tier <= maxTier)
+      .map((p) => ({ p, w: Math.pow(fitsPart(p).length, 0.8) * (p.slot === 'tac' ? 9 : 1) * Math.max(0.04, Math.pow(1 - stockShare(p), 3)) }));
     while (out.size < n && pool.length) {
       let roll = r() * pool.reduce((a, x) => a + x.w, 0), i = 0;
       while (roll > pool[i].w && i < pool.length - 1) { roll -= pool[i].w; i++; }
@@ -900,8 +1067,19 @@ G.Gunsmith = (() => {
     for (const pid of Object.values(def.build || {})) { const p = PARTS[pid]; if (p && !p.factory && !p.variant && p.becomes !== def.id) stash[pid] = (stash[pid] || 0) + 1; } // (a magazine isn't a part; its own receiver kit is the gun)
   }
 
+  // what an attachments box offers for a weapon: parts that go straight onto it as it's built (a slot it has now, not
+  // what's already in it), not factory parts, magazines, or anything that makes it another gun
+  const ATTACH_SLOTS = new Set(['slide', 'barrel', 'muzzle', 'handguard', 'railmount', 'pump', 'fg', 'tac', 'tacL', 'optic', 'riserdot', 'magnifier', 'charging', 'grip', 'stock', 'buttstock', 'loader']);
+  function attachOptions(id, build) {
+    const out = [];
+    for (const s of slotsOf(id, build)) {
+      if (!ATTACH_SLOTS.has(s.slot)) continue;
+      for (const p of compatible(s.mount)) if (!p.factory && !p.retired && !p.variant && !p.becomes && p.id !== build[s.slot] && fitsSlot(s, p, id) && !out.includes(p)) out.push(p);
+    }
+    return out;
+  }
   return {
-    PARTS, LIST, PLATFORMS, SLOT_LABEL, BRANDS: BR, ifaceName, fits, fitsPart, fitsSlot, ALIAS,
+    PARTS, LIST, PLATFORMS, attachOptions, SLOT_LABEL, BRANDS: BR, ifaceName, fits, fitsPart, fitsSlot, ALIAS,
     defaultBuild, slotsOf, slotFor, slotLabel, visibleSlots, magCap, prune, encode, decode, compile, fromCode, soundSpec, roundSoundKey, modelSpec, rollStock, compatible, strip, convert, kitsFor, convParts, buyPrice, RCV,
     defaultCode: (id) => encode(id, defaultBuild(id)),
   };

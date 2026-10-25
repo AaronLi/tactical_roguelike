@@ -10,6 +10,26 @@ G.Views = {
   laserBeep: 0,
 
   removeRig(rig) { G.R.dynRoot.remove(rig.root); rig.dispose(); },
+  // Could any of them be in view from the camera: a look at their middle, head, feet and both sides (where the body is
+  // drawn: the hips, wherever a fall's taken them), stopped only by walls, floors and ceilings. A look that starts in
+  // one (the camera pressed to a wall) starts again past it.
+  inSight(rig, at) {
+    const map = G.Game.map, w = map && map.world, c = G.R.camera.position;
+    if (!w) return true;
+    const hp = rig.hips.getWorldPosition(this._sp || (this._sp = new THREE.Vector3())), y = at.y;
+    if (Math.hypot(hp.x - c.x, hp.z - c.z) < 2.5) return true;
+    const skip = this._occ || (this._occ = (s) => s.kind !== 'wall' && s.kind !== 'floor' && s.kind !== 'ceil' && s.kind !== 'lintel');
+    const sx = -(hp.z - c.z), sz = hp.x - c.x, sl = Math.hypot(sx, sz) || 1; // (across the view)
+    for (const [a, h] of [[0, 0.9], [0, 1.6], [0, 0.15], [-0.45, 1.0], [0.45, 1.0], [-0.45, 1.5], [0.45, 1.5]]) {
+      const tx = hp.x + (sx / sl) * a, ty = y + h, tz = hp.z + (sz / sl) * a;
+      let dx = tx - c.x, dy = ty - c.y, dz = tz - c.z;
+      const d = Math.hypot(dx, dy, dz); dx /= d; dy /= d; dz /= d;
+      let r = G.World.raycast(w, c.x, c.y, c.z, dx, dy, dz, d, { skip });
+      if (r.t < 0.3) r = G.World.raycast(w, c.x + dx * 0.3, c.y + dy * 0.3, c.z + dz * 0.3, dx, dy, dz, d - 0.3, { skip }), r.t += 0.3;
+      if (r.t >= d - 0.05) return true;
+    }
+    return false;
+  },
   // an officer's body: dressed as they picked, kit from their state (st.kt)
   newPlayerRig(info, id) {
     const rig = G.Rig.create({ style: 'tactical', color: info.color, animal: info.animal, callName: info.name, seed: id.length * 977, bare: true, look: info.look });
@@ -91,10 +111,10 @@ G.Views = {
         if (!G.ENEMIES[type]) continue;
         // the type, with this suspect's kit (weapon | vest | helmet) laid over it
         const def = Object.create(G.ENEMIES[type]);
-        if (kit) { const [wpn, vest, helmet] = kit.split('|'); def.wpn = wpn; def.vest = vest; def.helmet = helmet; }
+        if (kit) { const [wpn, vest, helmet, face] = kit.split('|'); def.wpn = wpn; def.vest = vest; def.helmet = helmet; def.face = face || 0; }
         const rig = G.Rig.create({ style: def.style, scale: def.scale, boss: !!def.boss, seed: id * 7919 + 13, dressed: true });
         rig.powered = true; // a physically simulated body, held up by its muscles (js/rig.js powerStep)
-        if (!def.civ) rig.setKit(G.Rig.armourKit(def.vest, def.helmet, def.style === 'armored')); // their armour, as an officer's would look
+        if (!def.civ) rig.setKit(G.Rig.armourKit(def.vest, def.helmet, def.style === 'armored', def.face)); // their armour, as an officer's would look
         if (def.wpn && armed) { rig.setGun(def.wpn); rig.holster(armed === 1); }
         G.R.dynRoot.add(rig.root);
         ev = { id, type, def, rig, pos: new THREE.Vector3(x, y, z), tgt: new THREE.Vector3(x, y, z), yaw, tgtYaw: yaw, hp, alive: true, deadT: 0, lean: 0 };
@@ -109,7 +129,7 @@ G.Views = {
       ev.selfHit = false;
       ev.tgt.set(x, y, z); ev.tgtYaw = yaw; ev.hp = hp; ev.aim = aim; ev.alert = alert; ev.crouch = !!crouch; ev.lean = lean || 0;
       ev.scode = scode || 0;
-      ev.bleed = !!(fl & 1); ev.limp = !!(fl & 2); ev.reloading = !!(fl & 4); // wounds and reloads, from the host
+      ev.bleed = !!(fl & 1); ev.limp = !!(fl & 2); ev.reloading = !!(fl & 4); ev.down = !!(fl & 8); // wounds, reloads, down for good: from the host
       ev.str = str == null ? 1 : str / 100; // what blood loss leaves them to stand with (js/rig.js powered body)
       // weapon in hand follows the host: dropped on surrender, drawn again by a fake surrender
       if (!armed && ev.rig.gun) { ev.rig.dropGun(); this.discardDrop(ev.rig); }
@@ -189,7 +209,7 @@ G.Views = {
         if (l > 1e-5) clip.xy += d / l * px * clip.w * 2.0 / res;
         gl_Position = clip;
       }`;
-    const fs = 'uniform vec3 color; uniform float opacity; void main() { gl_FragColor = vec4(color, opacity); }';
+    const fs = 'uniform vec3 color; uniform float opacity; void main() { gl_FragColor = linearToOutputTexel(vec4(color, opacity)); }';
     const res = { value: new THREE.Vector2(window.innerWidth, window.innerHeight) };
     const silhouette = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false, fog: false,
       stencilWrite: true, stencilRef: 4, stencilFunc: THREE.AlwaysStencilFunc, stencilZPass: THREE.ReplaceStencilOp });
@@ -328,26 +348,18 @@ G.Views = {
   },
   // where an officer's hands are on someone being restrained: between the shoulder blades while they're
   // shoved down, then at the wrists (shared by first person, teammates' rigs and the camera)
-  zipPoint(ev, t, living) {
-    const rig = ev.rig;
-    rig.root.updateMatrixWorld(true);
-    const wr = rig.armL.tie.getWorldPosition(new THREE.Vector3()).add(rig.armR.tie.getWorldPosition(new THREE.Vector3())).multiplyScalar(0.5);
-    if (!living) { // a body: a hand on the shoulder to turn it over, then at the wrists
-      return rig.chest.localToWorld(new THREE.Vector3(0, 0.22, 0)).lerp(wr, G.U.smooth(0.38, 0.6, t));
-    }
-    return rig.chest.localToWorld(new THREE.Vector3(0, 0.16, 0.14)).lerp(wr, G.U.smooth(0.42, 0.56, t));
-  },
+  zipPoint(ev, t, living) { return G.Rig.zipPoint(ev.rig, t, living); },
   discardDrop(rig) { if (rig.dropped) { if (rig.dropped.g.parent) rig.dropped.g.parent.remove(rig.dropped.g); rig.dropped = null; } },
   // A window breaking: the pane goes, a burst of glass falls both sides of it, and it's heard. at, dir: where
   // the round went through (optional)
   breakGlass(id, at, dir) {
     const map = G.Game.map, w = map && map.windows && map.windows[id];
-    if (!w || w.broken) return;
+    if (!w || w.broken || w.armor) return; // (bulletproof glass doesn't break)
     w.broken = true;
     G.World.windowSolids(map.world, map, w);
     const pane = map.winMeshes && map.winMeshes[id];
     if (pane) pane.visible = false;
-    const Y = w.fy || 0, lo = w.door ? 0.25 : w.rail ? 0.1 : G.Level.SILL, hi = w.door ? G.Level.DOOR_H - 0.1 : w.rail ? G.Level.RAIL_H - 0.05 : G.Level.TOP; // (a glass door: its pane, nearly floor to top rail; a railing's: under its handrail)
+    const Y = w.fy || 0, lo = w.door ? 0.25 : w.rail ? 0.1 : w.sill != null ? w.sill : G.Level.SILL, hi = w.door ? G.Level.DOOR_H - 0.1 : w.rail ? G.Level.RAIL_H - 0.05 : w.top != null ? w.top : G.Level.TOP; // (a glass door: its pane, nearly floor to top rail; a railing's: under its handrail)
     const ax = w.door ? (w.door.axis === 'x' ? 0 : 1) : (w.nz ? 1 : 0), az = w.door ? (w.door.axis === 'x' ? 1 : 0) : (w.nx ? 1 : 0); // (along the glass)
     for (let k = 0; k < 4; k++) {
       const q = new THREE.Vector3(w.x + ax * (Math.random() - 0.5) * w.len, Y + lo + Math.random() * (hi - lo), w.z + az * (Math.random() - 0.5) * w.len);
@@ -414,12 +426,13 @@ G.Views = {
     // decided when it arrives: hits you, or someone else, or the wall
     const ev0 = this.enemies.get(m.e), tr = wdef.cls === 'LMG' && ev0 && ((ev0.shots = (ev0.shots || 0) + 1) % 4 === 1);
     const hitMe = m.d > 0 && m.tg === G.Net.myId, hz = m.hz, fromP = f.clone(), toP = to.clone();
+    if (G.Highlights) { G.Highlights.shot('e' + m.e, f, to, wdef.code || m.w); if (m.d > 0) G.Highlights.hitBy(m.tg, m.e); }
     this.visRound(f, to, wdef, tr ? 'tracer' : G.ballFor(G.calOf(wdef)), () => {
       if (m.d > 0) { if (hitMe) { if (G.Game.phase === 'level') G.Me.takeHits(hz, wdef, fromP); } else G.R.impact(toP, null, 'blood'); }
       else this.wallHit(fromP, toP);
     });
     G.Casings.fired(wdef, false, f, to);
-    if (!G.GunAudio.play(wdef.id, f)) G.Audio.shot(G.CLASS_SND[wdef.cls] || G.CLASS_SND.AR, me.distanceTo(f));
+    if (!G.GunAudio.play(wdef.id, f, 'e' + m.e)) G.Audio.shot(G.CLASS_SND[wdef.cls] || G.CLASS_SND.AR, me.distanceTo(f));
     if (m.tg !== G.Net.myId || !(m.d > 0)) G.Audio.flyby(f, to, wdef, G.ballFor(G.calOf(wdef))); // past you (a hit on you is felt, not heard going by)
     this.pings.push({ x: m.f[0], z: m.f[2], t: 2.5 });
     const ev = this.enemies.get(m.e);
@@ -443,6 +456,7 @@ G.Views = {
     if (!def) return;
     const pv = this.players.get(m.id);
     if (pv) pv.rig.recoil();
+    if (G.Highlights) G.Highlights.shot('p' + m.id, f, to, m.w, m.am, m.tos);
     G.Audio.flyby(f, to, def, m.am || G.ballFor(G.calOf(def))); // a teammate's round going past you
     // their round flies to where it was headed (the walls it'll meet, as the shooter worked it out)
     const am = m.am || G.ballFor(G.calOf(def)), fromP = f.clone(), toP = to.clone();
@@ -455,7 +469,7 @@ G.Views = {
     const d = G.R.camera.position.distanceTo(f);
     if (def.cls === 'RAIL') G.Audio.rail(d);
     else if (def.cls === 'BOW') G.Audio.bow(d);
-    else if (!G.GunAudio.play(G.Gunsmith.roundSoundKey(def, am), f)) G.Audio.shot(m.sil ? G.SUPPRESSOR.snd : def.snd, d);
+    else if (!G.GunAudio.play(G.Gunsmith.roundSoundKey(def, am), f, 'p' + m.id)) G.Audio.shot(m.sil ? G.SUPPRESSOR.snd : def.snd, d);
   },
 
   // ---------------------------------------------------------------- other people's rounds
@@ -616,16 +630,20 @@ G.Views = {
       const aimed = ev.aim === G.Net.myId ? G.Me.pos : ev.aim && this.players.get(ev.aim) ? this.players.get(ev.aim).pos : null;
       const tgt = aimed || (ev.alert ? this.nearestPlayer(ev.pos) : null);
       if (tgt) pitch = Math.atan2(tgt.y + 1.2 - (ev.pos.y + 1.4 * ev.def.scale), Math.max(1, Math.hypot(tgt.x - ev.pos.x, tgt.z - ev.pos.z))); // (from their own height: upstairs, level)
+      ev.recPitch = pitch; // (for the highlights: js/highlights.js)
       let pose = ev.scode === 1 ? 'handsup' : ev.scode === 2 ? 'cuffed' : ev.scode === 3 ? 'cower' : null;
       // being taken down and zip-tied by an officer (me or a teammate)
       let tk = -1;
       const ma = G.Me.action;
       if (ma && ma.kind === 'zip' && ma.target === ev.id) tk = ma.t / ma.dur;
       for (const pv of this.players.values()) if (pv.st && pv.st.act === 'z' && pv.st.zt === ev.id) tk = pv.st.ap || 0;
+      ev.recTk = tk; // (for the highlights: js/highlights.js)
       const tied = ev.scode === 2 || ev.arrested;
-      if (!ev.alive && !ev.def.civ && !ev.bodySecured) ev.rig.secure(tk); // turned over and wrists behind the back
-      if (ev.alive && !tied && tk >= 0) { pose = 'takedown'; ev.rig.zip(tk > 0.8); }
-      else if (ev.alive && ev.rig.zipped !== tied) ev.rig.zip(tied); // let go before the tie was done
+      // (dead, or down for good: limp, turned over and the wrists put behind the back as a body is)
+      const limp = !ev.alive || ev.down;
+      if (limp && !ev.bodySecured && (!ev.def.civ || ev.alive)) ev.rig.secure(tk); // turned over and wrists behind the back
+      if (ev.alive && !limp && !tied && tk >= 0) { pose = 'takedown'; ev.rig.zip(tk > 0.8); }
+      else if (ev.alive && ev.rig.zipped !== tied) ev.rig.zip(tied); // let go before the tie was done (or tied, limp)
       if (ev.arrested && ev.scode !== 2) pose = 'cuffed'; // the arrest message can beat the next snapshot
       let act = null;
       if (ev.alive && ev.doorT != null && ev.doorT < 0.6) { ev.doorT += dt; act = { kind: 'open', t: Math.min(1, ev.doorT / 0.5), hand: ev.rig.gun && !ev.rig.slung ? 'L' : 'R' }; }
@@ -648,17 +666,31 @@ G.Views = {
         }
         if (ev.proneShift) at = ev.pos.clone().add(ev.proneShift);
       }
-      // (the body's physics only near you: farther off they're animated, which no one can tell apart)
-      const near = ev.pos.distanceToSquared(G.R.camera.position) < 40 * 40;
+      // (the body's physics only near you: farther off they're animated, which no one can tell apart; but one you've
+      // hit in the last 8 s is yours to watch wherever it is, so a long shot's hits rock it and it falls from where they
+      // left it: the recording of its fall, js/highlights.js, is yours)
+      const near = ev.pos.distanceToSquared(G.R.camera.position) < 40 * 40 || (ev.engagedT && performance.now() - ev.engagedT < 8000);
+      if (ev.down && ev.alive) ev.rig.goLimp(); // (down for good: a limp body, bleeding out)
       // (what they're aiming at: a weakened or downed suspect points the gun at it from the hand, js/rig.js)
-      const aimAt = tgt && ev.armed === 2 && ev.alert && !ev.surp && !ev.reloading && !pose ? new THREE.Vector3(tgt.x, tgt.y + 1.2, tgt.z) : null;
+      const aimAt = tgt && ev.armed === 2 && ev.alert && !ev.surp && !ev.reloading && !pose && !ev.down ? new THREE.Vector3(tgt.x, tgt.y + 1.2, tgt.z) : null;
       const rlP = ev.reloadAt && ev.reloading ? (performance.now() - ev.reloadAt) / ev.reloadDur : -1; // (how far into a magazine change)
       ev.rig.update(dt, { pos: at, yaw: ev.yaw, pitch, crouch: ev.crouch || (ev.str != null && ev.str < 0.4), alert: !!ev.alert && ev.armed === 2 && !ev.surp && !ev.reloading, lean: ev.lean, pose, tk, act, str: near ? (ev.str == null ? 1 : ev.str) : null, aimAt,
         reload: rlP >= 0 && rlP < 1 ? rlP : -1 });
-      // bleeding: drips falling from them as they go
+      // past the fog (it's the background's colour out there: nothing to see) they aren't drawn, each one's forty-odd
+      // pieces a draw call. The body, not the root: the root's what a shot checks for (js/player.js), and it still hits.
+      // Nor behind a wall, floor or ceiling (furniture, doors, glass, rails and stairs don't count: you might see them
+      // round, over or through it).
+      const fog = G.R.scene.fog, cam = G.R.camera;
+      if (fog) {
+        const e = cam.matrixWorld.elements, depth = -((at.x - e[12]) * e[8] + (at.y - e[13]) * e[9] + (at.z - e[14]) * e[10]); // (along the view, as the fog's reckoned)
+        ev.rig.body.visible = depth < fog.far + 2.5 && this.inSight(ev.rig, at);
+      }
+      // bleeding: drips falling from them as they go; down for good, from the body where it lies (its ragdoll's hips,
+      // not where they last stood)
       if (ev.alive && ev.bleed && (ev.dripT = (ev.dripT || 0) - dt) <= 0) {
         ev.dripT = 0.25 + Math.random() * 0.35;
-        G.R.particles(new THREE.Vector3(ev.pos.x + (Math.random() - 0.5) * 0.3, (ev.crouch ? 0.6 : 0.9) * ev.def.scale, ev.pos.z + (Math.random() - 0.5) * 0.3), 2, 0x7a0808, 0.3, 0.7, 9, 0.2, null, true);
+        const lying = ev.rig.limp, b = lying ? G.Rig.bodyAt(ev.rig) : ev.pos;
+        G.R.particles(new THREE.Vector3(b.x + (Math.random() - 0.5) * (lying ? 0.2 : 0.3), lying ? b.y + 0.05 : (ev.crouch ? 0.6 : 0.9) * ev.def.scale, b.z + (Math.random() - 0.5) * (lying ? 0.2 : 0.3)), 2, 0x7a0808, 0.3, lying ? 0.3 : 0.7, 9, 0.2, null, true);
       }
     }
 
@@ -683,7 +715,7 @@ G.Views = {
       pv.rig.setGun(st.w); // their build code: the same parts on their gun
       pv.rig.holster(!!st.sw); // hands busy: weapon away
       const act = st.act ? { kind: { o: 'open', c: 'close', k: 'kick', z: 'zip', b: 'bag' }[st.act], t: st.ap || 0, hand: 'R' } : null;
-      if (act && act.kind === 'zip') { const tv = this.enemies.get(st.zt); if (tv) act.pt = this.zipPoint(tv, act.t, tv.alive); act.pull = !!st.pl; }
+      if (act && act.kind === 'zip') { const tv = this.enemies.get(st.zt); if (tv) act.pt = this.zipPoint(tv, act.t, tv.alive && !tv.down); act.pull = !!st.pl; }
       // their restraining / bagging sounds, as they reach each step
       if (act && pv.lastAct === st.act) G.Audio.foley(act.kind, pv.lastAp || 0, act.t, pv.pos.distanceTo(G.Me.pos));
       pv.lastAct = st.act; pv.lastAp = act ? act.t : 0;
@@ -749,6 +781,32 @@ G.Views = {
       cv.open = want ? Math.min(1, cv.open + dt / 0.5) : 0;
       cv.door.rotation.y = -1.9 * (1 - Math.pow(1 - cv.open, 3));
     });
+    // the attachments box lid: up and back on its hinge once it's been opened
+    const av = G.Game.map && G.Game.map.aboxView;
+    if (av) {
+      const want = G.Game.abox && G.Game.abox[0] ? 1 : 0;
+      if (!av.synced) { av.synced = true; if (want) av.open = 1; } // (joined with it already open)
+      if (want && av.open === 0) { const ab = G.Game.map.abox; G.Audio.clink(Math.hypot(ab.x - G.Me.pos.x, ab.z - G.Me.pos.z)); }
+      av.open = want ? Math.min(1, av.open + dt / 0.6) : 0;
+      av.lid.rotation.x = -1.9 * (1 - Math.pow(1 - av.open, 3));
+      // its lights: one for each of the squad, lit in their colour till they've had their pick, then dark
+      const ids = Object.keys(G.Game.roster || {}).sort(), uses = (G.Game.abox && G.Game.abox[1]) || {};
+      const key = ids.map((id) => `${id}:${(G.Game.roster[id] || {}).color}:${uses[id] && uses[id][1] ? 1 : 0}`).join('|');
+      if (key !== av.key) {
+        av.key = key;
+        for (const c of av.lights.children) { c.geometry.dispose(); c.material.dispose(); }
+        av.lights.clear();
+        const gap = Math.min(0.05, 0.24 / Math.max(1, ids.length));
+        ids.forEach((id, i) => {
+          const used = uses[id] && uses[id][1], x = (i - (ids.length - 1) / 2) * gap;
+          const bezel = new THREE.Mesh(new THREE.BoxGeometry(Math.min(0.04, gap - 0.006), 0.03, 0.004), new THREE.MeshStandardMaterial({ color: 0x0c0c0c, roughness: 0.6 }));
+          bezel.position.set(x, 0, 0);
+          const lens = new THREE.Mesh(new THREE.BoxGeometry(Math.min(0.032, gap - 0.014), 0.022, 0.004), new THREE.MeshBasicMaterial({ color: used ? 0x1c1c1c : (G.Game.roster[id] || {}).color || 0x44ff66 }));
+          lens.position.set(x, 0, 0.002);
+          av.lights.add(bezel, lens);
+        });
+      }
+    }
     // the weapon case lid: latches clack, then it swings up and back against the wall
     const cv = G.Game.map && G.Game.map.caseView;
     if (cv) {

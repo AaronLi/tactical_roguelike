@@ -7,6 +7,14 @@ G.R = {
     r.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     r.setSize(window.innerWidth, window.innerHeight);
     r.domElement.id = 'c';
+    // Light adds up past what a screen can show (a festival's strings of bulbs over lit stalls, a muzzle flash in a lit
+    // room, a shelf of packets under a shop's panels). Clipped channel by channel, an over-lit orange goes yellow, then
+    // white, and its texture washes out. So the colour is rolled off instead (this.TONE), in linear light, before it's
+    // turned sRGB (js/util.js): untouched below about 80% of full brightness, above that eased toward full, the whole
+    // colour scaled together so it keeps its hue, and the brighter it's pushed the more it goes toward white, as film
+    // does (not a fluorescent version of itself).
+    THREE.ShaderChunk.tonemapping_pars_fragment = THREE.ShaderChunk.tonemapping_pars_fragment.replace('vec3 CustomToneMapping( vec3 color ) { return color; }', this.TONE + ' vec3 CustomToneMapping( vec3 color ) { return bpTone( toneMappingExposure * color ); }');
+    r.toneMapping = THREE.CustomToneMapping;
     document.body.prepend(r.domElement);
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x0b0d10);
@@ -18,7 +26,7 @@ G.R = {
     // Dim by design: rooms are lit by their ceiling lamps, corridors are left in the gloom
     this.hemi = new THREE.HemisphereLight(0xb0c0d0, 0x302820, 0.26);
     this.scene.add(this.hemi);
-    this.ambient = new THREE.AmbientLight(0xffffff, 0.05);
+    this.ambient = new THREE.AmbientLight(0xffffff, 0);
     this.scene.add(this.ambient);
 
     this.muzzleLights = [0, 1, 2].map(() => {
@@ -52,6 +60,11 @@ G.R = {
     this._initFx();
     window.addEventListener('resize', () => this.resize());
   },
+  // the roll-off (the shoulder of Khronos' PBR Neutral, on linear light): a channel's peak over the knee (0.76) eased
+  // toward 1, the colour scaled with it, and toward white by how much was taken off (desaturation 0.15). (Not its toe:
+  // taking the same off every channel near black saturates the dark, and most of a level is dark: a dim brown wall went
+  // orange.)
+  TONE: 'vec3 bpTone( vec3 c ) { float m = max( c.r, max( c.g, c.b ) ); const float k = 0.76, d = 0.24; if ( m < k ) return c; float f = 1.0 - d * d / ( m + d - k ); c *= f / m; return mix( c, vec3( f ), 1.0 - 1.0 / ( 0.15 * ( m - f ) + 1.0 ) ); }',
   // A soft studio-style environment (gradient dome + a few softboxes) baked with PMREM.
   _envMap(r) {
     const env = new THREE.Scene();
@@ -69,6 +82,20 @@ G.R = {
     pm.dispose();
     return tex;
   },
+  // the blood's materials (made once: the highlights' export worker, which never runs init, asks for them too)
+  bloodMaterials() {
+    if (this._bloodMats) return this._bloodMats;
+    const bloodTex = (kind) => {
+      const c = document.createElement('canvas'); c.width = c.height = 64;
+      const g = c.getContext('2d'), blob = (x, y, r, a) => { g.fillStyle = `rgba(${70 + Math.random() * 20},4,6,${a})`; g.beginPath(); g.ellipse(x, y, r, r * (0.8 + Math.random() * 0.4), Math.random() * 3, 0, 7); g.fill(); };
+      if (kind === 'pool') { for (let i = 0; i < 14; i++) { const a = Math.random() * 6.28, d = Math.random() * 12; blob(32 + Math.cos(a) * d, 32 + Math.sin(a) * d, 10 + Math.random() * 9, 0.9); } }
+      else if (kind === 'spatter') { blob(32, 32, 8, 0.9); for (let i = 0; i < 18; i++) { const a = Math.random() * 6.28, d = 8 + Math.random() * 22; blob(32 + Math.cos(a) * d, 32 + Math.sin(a) * d, 1 + Math.random() * 3, 0.85); } }
+      else { blob(32, 32, 13, 0.92); for (let i = 0; i < 5; i++) { const a = Math.random() * 6.28, d = 15 + Math.random() * 12; blob(32 + Math.cos(a) * d, 32 + Math.sin(a) * d, 1.5 + Math.random() * 3, 0.85); } }
+      const t = new THREE.CanvasTexture(c); t.anisotropy = 4; return t;
+    };
+    const bmat = (kind) => new THREE.MeshStandardMaterial({ map: bloodTex(kind), transparent: true, depthWrite: false, roughness: 0.25, metalness: 0.1, polygonOffset: true, polygonOffsetFactor: -3 });
+    return (this._bloodMats = { drop: bmat('drop'), spatter: bmat('spatter'), pool: bmat('pool') });
+  },
   resize() {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.camera.aspect = window.innerWidth / window.innerHeight;
@@ -82,9 +109,26 @@ G.R = {
     this.scene.fog.near = th.noFog ? 1e4 : th.fogNear || 8; this.scene.fog.far = th.noFog ? 2e4 : th.fogFar || 60; // (no fog: pushed out of reach, so the shaders stay the same)
     this.scene.background.setHex(th.fog);
     this.camera.far = th.hub ? 420 : 280; this.camera.updateProjectionMatrix(); // (the hangar's range runs out to 300 m)
-    this.hemi.color.setHex(th.hemi || th.light); this.hemi.intensity = th.hemiI || 0.26; // (outdoors at night: moonlight)
+    // (outdoors at night: moonlight. Its colour a tint as written, as the lamps' are: js/lightgrid.js. The themes' figures were set when light was added up in sRGB; in linear, the same
+    // fill reads far brighter in the dark, so it's squared: about as dark where no lamp reaches as it was)
+    // Most of that fill's in the light grid now (js/lightgrid.js: the sky on what's open to it, the lamps' light bounced
+    // round the rooms): what's left of it flat everywhere is a little, so nowhere's black (all of it in the hangar,
+    // daylit)
+    this.hemi.color.setHex(th.hemi || th.light, THREE.LinearSRGBColorSpace); this.hemi.intensity = (th.hemiI || 0.26) ** 2 * (th.hub ? 1 : G.LightGrid.opts.fill);
+  },
+  // The level's meshes, taken out of the scene without being thrown away (js/highlights.js replays the level in them on
+  // the hangar's TVs, and disposes of them when it's done)
+  detachLevel() {
+    for (const m of [...(this.decals || []), ...(this.bloodMarks || [])]) if (m.parent && m.parent !== this.scene) this.scene.add(m);
+    const out = [...this.levelRoot.children];
+    for (const c of out) this.levelRoot.remove(c);
+    return out;
   },
   clearLevel() {
+    for (const tr of this.trails || []) this.trailDrop(tr);
+    this.trails = []; this.lastShot = null;
+    for (const o of this.wounds || []) { o.removeFromParent(); if (o.geometry !== this.trailDot) o.geometry.dispose(); o.material.dispose(); }
+    this.wounds = []; this.woundsOn = null;
     // marks on doors back into the scene first (they're pooled: they mustn't go with the doors)
     for (const m of [...(this.decals || []), ...(this.bloodMarks || [])]) if (m.parent && m.parent !== this.scene) this.scene.add(m);
     const dispose = (o) => {
@@ -139,9 +183,9 @@ G.R = {
     if (this.vm) { this.vm.userData.code = def.code; this.vmRoot.add(this.vm); } // (code: which build it shows)
   },
 
-  // ------------------------------------------------------------ effects
-  _initFx() {
-    // muzzle flash texture
+  // the muzzle flash's star (made once: the highlights' export worker, which never runs init, asks for it too)
+  flashTexture() {
+    if (this._flashTex) return this._flashTex;
     const c = document.createElement('canvas'); c.width = c.height = 64;
     const g = c.getContext('2d');
     const grd = g.createRadialGradient(32, 32, 0, 32, 32, 32);
@@ -150,7 +194,12 @@ G.R = {
     g.beginPath();
     for (let i = 0; i < 16; i++) { const a = (i / 16) * Math.PI * 2, rr = i % 2 ? 12 : 32; g.lineTo(32 + Math.cos(a) * rr, 32 + Math.sin(a) * rr); }
     g.fill();
-    this.flashTex = new THREE.CanvasTexture(c);
+    return (this._flashTex = new THREE.CanvasTexture(c));
+  },
+
+  // ------------------------------------------------------------ effects
+  _initFx() {
+    this.flashTex = this.flashTexture();
 
     // tracers: stretched boxes
     this.tracers = [];
@@ -232,17 +281,8 @@ G.R = {
     // Blood where it lands: droplets (a drop with a few satellites) and smears on the floor or a tabletop,
     // spatter on walls, and pools that spread under the dead and the badly bleeding. Fixed pools of meshes,
     // reused oldest first.
-    const bloodTex = (kind) => {
-      const c = document.createElement('canvas'); c.width = c.height = 64;
-      const g = c.getContext('2d'), blob = (x, y, r, a) => { g.fillStyle = `rgba(${70 + Math.random() * 20},4,6,${a})`; g.beginPath(); g.ellipse(x, y, r, r * (0.8 + Math.random() * 0.4), Math.random() * 3, 0, 7); g.fill(); };
-      if (kind === 'pool') { for (let i = 0; i < 14; i++) { const a = Math.random() * 6.28, d = Math.random() * 12; blob(32 + Math.cos(a) * d, 32 + Math.sin(a) * d, 10 + Math.random() * 9, 0.9); } }
-      else if (kind === 'spatter') { blob(32, 32, 8, 0.9); for (let i = 0; i < 18; i++) { const a = Math.random() * 6.28, d = 8 + Math.random() * 22; blob(32 + Math.cos(a) * d, 32 + Math.sin(a) * d, 1 + Math.random() * 3, 0.85); } }
-      else { blob(32, 32, 13, 0.92); for (let i = 0; i < 5; i++) { const a = Math.random() * 6.28, d = 15 + Math.random() * 12; blob(32 + Math.cos(a) * d, 32 + Math.sin(a) * d, 1.5 + Math.random() * 3, 0.85); } }
-      const t = new THREE.CanvasTexture(c); t.anisotropy = 4; return t;
-    };
-    const bmat = (kind) => new THREE.MeshStandardMaterial({ map: bloodTex(kind), transparent: true, depthWrite: false, roughness: 0.25, metalness: 0.1, polygonOffset: true, polygonOffsetFactor: -3 });
     const bgeo = new THREE.PlaneGeometry(1, 1);
-    this.bloodMats = { drop: bmat('drop'), spatter: bmat('spatter'), pool: bmat('pool') };
+    this.bloodMats = this.bloodMaterials();
     this.bloodMarks = [];
     for (let i = 0; i < 400; i++) { const m = new THREE.Mesh(bgeo, this.bloodMats.drop); m.visible = false; m.renderOrder = 1; this.scene.add(m); this.bloodMarks.push(m); }
     this.bloodIdx = 0;
@@ -251,14 +291,14 @@ G.R = {
     this.poolIdx = 0;
     this.pBlood = new Uint8Array(this.PN);
 
-    // explosions
-    this.blasts = [];
+    // explosions: six fireballs, and two lights between them (every lit pixel of the level works through every light in
+    // the scene each frame, lit or not; two blasts at once is plenty, and a third takes the dimmer one's light)
+    this.blasts = []; this.blastLights = [];
+    for (let i = 0; i < 2; i++) { const l = new THREE.PointLight(0xff8040, 0, 18, 2); l.userData.by = null; this.scene.add(l); this.blastLights.push(l); }
     for (let i = 0; i < 6; i++) {
       const m = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), new THREE.MeshBasicMaterial({ color: 0xff8830, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
       m.visible = false; m.userData.life = 0;
-      const l = new THREE.PointLight(0xff8040, 0, 18, 2);
-      m.userData.light = l;
-      this.scene.add(m, l); this.blasts.push(m);
+      this.scene.add(m); this.blasts.push(m);
     }
 
     // laser sights for marksmen
@@ -348,6 +388,88 @@ G.R = {
   // A round in flight, this frame (js/player.js fly, js/views.js visRound): head, the way it's going, how far
   // it's come, the gun, a tracer or not, its speed. Ordinary rounds a faint short streak; a tracer long and
   // burning (a core and a glow); a bolt or a grenade drawn solid; a rail slug a long bright line.
+  // ------------------------------------------------------------ F9: rounds' paths
+  // While the hitboxes are shown (js/rig.js debug), each round you fire leaves its path as it actually flew (a point a
+  // frame: drag, gravity; through a body, a point every 4 mm of its track, js/ballistics.js through), a dot where it went
+  // into someone and where it stopped. Coloured by how fast it was going there (trailColour: Mach 2 and over red, down
+  // through the rainbow to violet at a stop: one scale for every gun). The last shot's (all its pellets) stays till you
+  // fire again; older ones fade out over the 3 s after a newer shot takes over. Drawn over everything, so a path through
+  // a body shows.
+  TRAIL_FADE: 3, TRAIL_VMAX: 686,
+  trailColour(v, out) { return out.setHSL(0.78 * (1 - G.U.clamp(v / this.TRAIL_VMAX, 0, 1)), 1, 0.55); },
+  trailStart(shot, p, v) {
+    const N = 2400, geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N * 3), 3)); geo.setDrawRange(0, 0);
+    geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(N * 3), 3));
+    const mat = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, depthTest: false, depthWrite: false });
+    const line = new THREE.Line(geo, mat); line.frustumCulled = false; line.renderOrder = 998;
+    this.scene.add(line);
+    const tr = { line, mat, n: 0, N, shot, old: null, marks: [] };
+    (this.trails = this.trails || []).push(tr);
+    this.lastShot = shot;
+    this.trailAdd(tr, p, false, v);
+    return tr;
+  },
+  trailAdd(tr, p, mark, v = 0) {
+    const c = this.trailColour(v, this._tc || (this._tc = new THREE.Color()));
+    if (tr.n < tr.N) {
+      const g = tr.line.geometry, a = g.attributes.position, k = g.attributes.color;
+      a.setXYZ(tr.n, p.x, p.y, p.z); k.setXYZ(tr.n, c.r, c.g, c.b); tr.n++;
+      a.needsUpdate = k.needsUpdate = true; g.setDrawRange(0, tr.n);
+    }
+    if (mark) {
+      this.trailDot = this.trailDot || new THREE.SphereGeometry(0.018, 8, 6);
+      const m = new THREE.Mesh(this.trailDot, new THREE.MeshBasicMaterial({ color: c.getHex(), transparent: true, depthTest: false, depthWrite: false }));
+      m.position.copy(p); m.renderOrder = 999; this.scene.add(m); tr.marks.push(m);
+    }
+  },
+  // A round's track through someone, kept on them for the level (shown with the hitboxes, as the trails): a line a bone
+  // (the stretch of it in each part of them, in that bone's frame, coloured by its speed as the trail is), and its dots,
+  // so it goes where they go: turning, falling, carried off as a ragdoll. pts: [{ p (world), v, bone (a segment's bone
+  // name, js/ballistics.js), mark }]
+  woundTrack(rig, pts) {
+    const B = G.Ballistics, c = new THREE.Color(), objs = [];
+    rig.root.updateMatrixWorld(true);
+    let i = 0;
+    while (i < pts.length) {
+      const name = pts[i].bone, bone = B.boneOf(rig, name);
+      let j = i; while (j < pts.length && pts[j].bone === name) j++;
+      if (bone) {
+        const run = pts.slice(i, Math.min(pts.length, j + 1)); // (on to the next part's first point: no gap where it crosses)
+        if (run.length > 1) {
+          const pos = new Float32Array(run.length * 3), col = new Float32Array(run.length * 3);
+          run.forEach((q, n) => { const l = bone.worldToLocal(q.p.clone()); pos.set([l.x, l.y, l.z], n * 3); this.trailColour(q.v, c); col.set([c.r, c.g, c.b], n * 3); });
+          const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+          const line = new THREE.Line(g, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.95, depthTest: false, depthWrite: false }));
+          line.renderOrder = 997; line.frustumCulled = false; bone.add(line); objs.push(line);
+        }
+        for (const q of pts.slice(i, j)) if (q.mark) {
+          this.trailDot = this.trailDot || new THREE.SphereGeometry(0.018, 8, 6);
+          const m = new THREE.Mesh(this.trailDot, new THREE.MeshBasicMaterial({ color: this.trailColour(q.v, c).getHex(), depthTest: false, depthWrite: false, transparent: true }));
+          m.position.copy(bone.worldToLocal(q.p.clone())); m.scale.divideScalar(new THREE.Vector3().setFromMatrixScale(bone.matrixWorld).x || 1); m.renderOrder = 999; bone.add(m); objs.push(m);
+        }
+      }
+      i = j;
+    }
+    for (const o of objs) o.visible = !!G.Rig.debug;
+    (this.wounds = this.wounds || []).push(...objs);
+  },
+  trailsUpdate() {
+    const on = G.Rig.debug;
+    if (this.wounds && this.wounds.length && this.woundsOn !== on) { for (const o of this.wounds) o.visible = on; this.woundsOn = on; } // (the tracks kept on bodies: with the hitboxes)
+    if (!this.trails || !this.trails.length) return;
+    const now = performance.now();
+    this.trails = this.trails.filter((tr) => {
+      const last = tr.shot === this.lastShot;
+      if (!last && tr.old == null) tr.old = now; // (the moment a newer shot took over)
+      const k = last ? 1 : 1 - (now - tr.old) / 1000 / this.TRAIL_FADE;
+      if (k <= 0 || !tr.line.parent) { this.trailDrop(tr); return false; }
+      tr.line.visible = on; tr.mat.opacity = k * (last ? 1 : 0.55);
+      for (const m of tr.marks) { m.visible = on; m.material.opacity = k; }
+      return true;
+    });
+  },
+  trailDrop(tr) { tr.line.removeFromParent(); tr.line.geometry.dispose(); tr.mat.dispose(); for (const m of tr.marks) { m.removeFromParent(); m.material.dispose(); } },
   bullet(head, dir, came, def, tracer, sp) {
     const rail = def.cls === 'RAIL', bolt = def.cls === 'BOW', gren = !!def.explosive;
     const L = rail ? 60 : bolt ? 0.7 : gren ? 0.25 : tracer ? G.U.clamp(sp * 0.03, 3, 24) : G.U.clamp(sp * 0.008, 0.6, 5);
@@ -455,7 +577,8 @@ G.R = {
     const m = this.blasts.find((b) => !b.visible) || this.blasts[0];
     m.position.copy(p); m.visible = true;
     m.userData.life = m.userData.max = 0.45; m.userData.r = radius;
-    m.userData.light.position.copy(p); m.userData.light.intensity = 6;
+    const l = this.blastLights.reduce((a, b) => (b.intensity < a.intensity ? b : a));
+    l.position.copy(p); l.intensity = 6; l.userData.by = m;
     this.particles(p, 40, 0xffa040, 9, 0.6, 4, 1);
     this.particles(p, 30, 0x444038, 3, 1.4, -0.5, 1);
   },
@@ -513,8 +636,9 @@ G.R = {
       const k = 1 - b.userData.life / b.userData.max;
       b.scale.setScalar(0.3 + k * b.userData.r);
       b.material.opacity = (1 - k) * 0.8;
-      b.userData.light.intensity = (1 - k) * 6;
-      if (b.userData.life <= 0) { b.visible = false; b.userData.light.intensity = 0; }
+      const l = this.blastLights.find((x) => x.userData.by === b);
+      if (l) l.intensity = b.userData.life > 0 ? (1 - k) * 6 : 0;
+      if (b.userData.life <= 0) { b.visible = false; if (l) l.userData.by = null; }
     }
     for (const m of this.pools || []) {
       if (!m.visible) continue;
@@ -594,6 +718,9 @@ G.R = {
   },
   render() {
     const r = this.renderer;
+    this.trailsUpdate();
+    // (the draw calls and triangles counted over the whole frame, every pass: js/profiler.js reads them after)
+    r.info.autoReset = false; r.info.reset();
     G.LightGrid.on(true); // (the lamps' light: only for the level's own frame)
     for (const m of this.streaks) if (m.visible && m.userData.f !== this.frameNo) m.visible = false; // (rounds that stopped)
     for (const m of this.glows) if (m.visible && m.userData.f !== this.frameNo) m.visible = false;
@@ -616,7 +743,7 @@ G.R = {
       const sz = r.getDrawingBufferSize(this._fsz || (this._fsz = new THREE.Vector2()));
       if (!this.fishRT || this.fishRT.width !== sz.x || this.fishRT.height !== sz.y) {
         if (this.fishRT) this.fishRT.dispose();
-        this.fishRT = new THREE.WebGLRenderTarget(sz.x, sz.y, { samples: 4, stencilBuffer: true });
+        this.fishRT = new THREE.WebGLRenderTarget(sz.x, sz.y, { samples: 4, stencilBuffer: true, type: THREE.HalfFloatType }); // (half float: the over-bright survives, to be rolled off below)
       }
       r.setRenderTarget(this.fishRT);
     }
@@ -640,7 +767,7 @@ G.R = {
           uniforms: { map: { value: null }, k: { value: 0 }, ax: { value: 1 } },
           vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
           // barrel: the edges squeezed in, the middle a little larger; the corners stay the corners
-          fragmentShader: 'uniform sampler2D map; uniform float k; uniform float ax; varying vec2 vUv; void main() { vec2 p = (vUv - 0.5) * 2.0; p.x *= ax; float r2 = dot(p, p), R2 = ax * ax + 1.0; vec2 q = p * (1.0 + k * r2) / (1.0 + k * R2); q.x /= ax; gl_FragColor = texture2D(map, q * 0.5 + 0.5); }' });
+          fragmentShader: this.TONE + ' uniform sampler2D map; uniform float k; uniform float ax; varying vec2 vUv; void main() { vec2 p = (vUv - 0.5) * 2.0; p.x *= ax; float r2 = dot(p, p), R2 = ax * ax + 1.0; vec2 q = p * (1.0 + k * r2) / (1.0 + k * R2); q.x /= ax; vec4 c = texture2D(map, q * 0.5 + 0.5); gl_FragColor = linearToOutputTexel(vec4(bpTone(c.rgb), c.a)); }', toneMapped: false });
         this.fishQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat); this.fishQuad.frustumCulled = false;
         this.fishScene = new THREE.Scene(); this.fishScene.add(this.fishQuad);
         this.fishCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
@@ -654,5 +781,6 @@ G.R = {
     r.clearStencil(); // reflex sight windows mark the stencil for their reticles
     r.render(this.vmScene, this.camera);
     G.LightGrid.on(false);
+    r.info.autoReset = true;
   },
 };

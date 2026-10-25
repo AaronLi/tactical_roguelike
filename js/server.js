@@ -46,11 +46,11 @@ G.Server = {
         this.players.set(from, { id: from, name, color, animal, look: G.Rig.cleanLook(m.look), ready: false, st: null });
         G.Net.sendTo(from, {
           t: 'welcome', id: from, roster: this.roster(), phase: this.phase, level: this.level,
-          seed: this.seed, shopSeed: this.shopSeed, th: this.theme, route: this.routeMsg(),
+          seed: this.seed, shopSeed: this.shopSeed, th: this.theme, route: this.routeMsg(), stock: this.phase === 'shop' ? this.stock : null,
           doors: this.map && this.phase === 'level' ? this.map.doors.map((d) => (d.open ? 1 : 0)) : null,
           evidence: this.phase === 'level' && this.evidence ? this.evidence.filter((v) => !v.taken).map((v) => [v.i, v.wpn, v.x, v.z, v.secured ? 1 : 0, v.y || 0]) : null,
           bodies: this.phase === 'level' && this.bodies ? [...this.bodies.values()].map((b) => [b.id, b.type, b.x, b.z, b.yaw, b.secured ? 1 : 0, b.y || 0]) : null,
-          wcase: this.phase === 'level' ? this.caseMsg() : null, cabs: this.phase === 'level' ? this.cabMsg() : null,
+          wcase: this.phase === 'level' ? this.caseMsg() : null, cabs: this.phase === 'level' ? this.cabMsg() : null, abox: this.phase === 'level' ? this.aboxMsg() : null,
           loot: this.phase === 'level' && this.loot ? [...this.loot.values()].map((l) => [l.id, l.x, l.y, l.z, l.item, l.yaw]) : null,
           glass: this.phase === 'level' && this.glassBroken ? [...this.glassBroken] : null,
         });
@@ -61,10 +61,13 @@ G.Server = {
       }
       case 'st': if (p) p.st = m.s; break;
       case 'hit': this.applyHit(m, from); break;
+      // an officer's armour stopped rounds and they're still up: everyone's highlights (js/highlights.js saved)
+      case 'saved': if (p && this.phase === 'level') G.Net.broadcast({ t: 'saved', id: from, n: Math.max(1, Math.min(9, m.n | 0)) }); break;
       case 'shot':
         if (p && p.st && this.phase === 'level') this.hear(p.st.p[0], p.st.p[2], m.sil === 2 ? 2 : m.sil ? 6 : 28, p.st.p[1]); // (not at the range)
         if (m.f && m.to && this.phase === 'level') this.suppress(m.f, m.to);
-        G.Net.broadcast({ t: 'shot', id: from, f: m.f, to: m.to, w: m.w, sil: m.sil, am: G.AMMO[m.am] ? m.am : undefined }, from);
+        G.Net.broadcast({ t: 'shot', id: from, f: m.f, to: m.to, w: m.w, sil: m.sil, am: G.AMMO[m.am] ? m.am : undefined,
+          tos: Array.isArray(m.tos) && m.tos.length <= 24 && m.tos.every((p) => Array.isArray(p) && p.length === 3 && p.every(Number.isFinite)) ? m.tos : undefined }, from); // (a shotgun's pellets: for the highlights)
         break;
       case 'nade': G.Net.broadcast({ t: 'nade', id: from, p: m.p, v: m.v, fuse: m.fuse, k: m.k === 'flash' ? 'flash' : 'frag', s: [0, 1, 2].includes(m.s) ? m.s : 2 }, from); break;
       case 'flash': if (this.phase === 'level' && Array.isArray(m.p) && m.p.length === 3 && m.p.every(Number.isFinite)) this.flashbang(m.p); break;
@@ -104,7 +107,7 @@ G.Server = {
         break;
       case 'chat': if (p) G.Net.broadcast({ t: 'chat', id: from, m: String(m.m).slice(0, 120) }); break;
       // friendly fire: one officer's rounds in another (the shooter traced them; the one hit takes the wounds)
-      case 'ff': if (p && this.phase === 'level' && this.players.has(m.tg) && Array.isArray(m.hz)) G.Net.broadcast({ t: 'ffhit', by: from, tg: m.tg, hz: m.hz.slice(0, 12), w: m.w, f: m.f }); break;
+      case 'ff': if (p && this.phase === 'level' && this.players.has(m.tg) && Array.isArray(m.hz)) G.Net.broadcast({ t: 'ffhit', by: from, tg: m.tg, hz: m.hz.slice(0, 12), w: m.w, f: m.f, am: G.AMMO[m.am] ? m.am : undefined }); break;
       case 'ping': if (p && Array.isArray(m.p) && m.p.length === 3) G.Net.broadcast({ t: 'ping', id: from, p: m.p.map(Number) }); break;
       // something put down (dropped from an inventory), or picked up: the first to ask gets it
       case 'drop': {
@@ -143,6 +146,7 @@ G.Server = {
       }
       case 'kickDoor': {
         const d = this.map && this.phase === 'level' ? this.map.doors[m.i] : null;
+        if (d && !d.open) { this.kickAt = this.kickAt || {}; this.kickAt[from] = this.clock || 0; } // (a kill soon after: a breach, for the highlights)
         if (d && !d.open && d.kind !== 'vault' && p && p.st && Math.hypot(p.st.p[0] - d.x, p.st.p[2] - d.z) < 2.8 && Math.abs(p.st.p[1] - (d.fy || 0)) < 2) this.kickDoor(d);
         break;
       }
@@ -153,6 +157,24 @@ G.Server = {
         if (this.phase !== 'level' || !c || this.caseOpen || !p || !p.st || Math.hypot(c.x - p.st.p[0], c.z - p.st.p[2]) > 2.4) break;
         this.caseOpen = true;
         G.Net.broadcast({ t: 'wcase', c: this.caseMsg(), opened: from });
+        break;
+      }
+      // the attachments box: one use each. Your first look rolls your three (for the weapon in your hands: its code);
+      // then you take one of them, fitted to your weapon or carried
+      case 'openAbox': case 'takeAbox': {
+        const b = this.map && this.map.abox, a = this.abox;
+        if (this.phase !== 'level' || !b || !a || !p || !p.st || Math.hypot(b.x - p.st.p[0], b.z - p.st.p[2]) > 2.4) break;
+        const mine = a.uses[from];
+        if (m.t === 'openAbox') {
+          if (mine) break;
+          a.open = true; a.uses[from] = { items: this.rollAbox(typeof m.code === 'string' ? m.code : ''), taken: null };
+          G.Net.broadcast({ t: 'abox', a: this.aboxMsg(), opened: from });
+        } else {
+          const pid = mine && !mine.taken ? mine.items[m.i | 0] : null;
+          if (!pid) break;
+          mine.taken = pid;
+          G.Net.broadcast({ t: 'abox', a: this.aboxMsg(), by: from, got: pid, fit: !!m.fit });
+        }
         break;
       }
       // first aid cabinets: opened (once, for everyone), and officers' edits (what they took and put in)
@@ -198,7 +220,15 @@ G.Server = {
         e.dragTo = { x: m.x, z: m.z };
         break;
       }
-      case 'cuff': if (p && p.st && this.phase === 'level') this.cuff(m.e, p, from); break;
+      case 'cuff': if (p && p.st && this.phase === 'level') this.cuff(m.e, p, from, m.at); break;
+      // the store's shared stock (js/shop.js take): one off the shelf if there's one left; put back if it couldn't be paid for
+      case 'stake': {
+        const ok = p && this.phase === 'shop' && this.stock && this.stock[m.k] > 0;
+        if (ok) { this.stock[m.k]--; G.Net.broadcast({ t: 'stock', s: this.stock }); }
+        G.Net.sendTo(from, { t: 'took', q: m.q, ok: ok ? 1 : 0 });
+        break;
+      }
+      case 'sgive': if (p && this.phase === 'shop' && this.stock && m.k in this.stock) { this.stock[m.k]++; G.Net.broadcast({ t: 'stock', s: this.stock }); } break;
       case 'secure': if (p && p.st && this.phase === 'level') this.secure(m.i, p, from); break;
     }
   },
@@ -255,7 +285,7 @@ G.Server = {
     this.enemies.clear();
     this.extract = { active: false, votes: new Set() };
     this.flow = null; this.flowT = 0; this.wipeT = 0; this.summons = 0; this.nadeT = 8;
-    this.report = { kills: 0, arrests: 0, rescued: 0, civKilled: 0, unauth: 0, evidence: 0, bodies: 0 };
+    this.report = { incap: 0, bleedouts: 0, bleedBy: {}, arrests: 0, rescued: 0, civKilled: 0, unauth: 0, evidence: 0, bodies: 0 };
     this.evidence = []; // weapons on the floor: { i, wpn, x, z, owner, secured, taken }
     this.loot = new Map(); // things officers have put down: id -> { id, x, y, z, item (packed), yaw }
     this.glassBroken = new Set(); // windows broken (map.windows ids)
@@ -265,7 +295,8 @@ G.Server = {
     this.wcase = this.map.case ? this.rollCase() : null;
     this.cabs = (this.map.cabinets || []).map(() => ({ open: false, ver: 0, items: this.layCab(this.rollCab()) }));
     this.caseOpen = false;
-    G.Net.broadcast({ t: 'phase', phase: 'level', level: this.level, seed: this.seed, th: this.theme, route: this.routeMsg(), wcase: this.caseMsg(), cabs: this.cabMsg() });
+    this.abox = this.map.abox ? { open: false, uses: {} } : null; // uses: player id -> { items, taken }
+    G.Net.broadcast({ t: 'phase', phase: 'level', level: this.level, seed: this.seed, th: this.theme, route: this.routeMsg(), wcase: this.caseMsg(), cabs: this.cabMsg(), abox: this.aboxMsg() });
   },
   // The level's weapon case: a weapon in its standard build, fully loaded, picked by rarity. Each tier has a
   // share (CASE_RARITY), split evenly between that tier's weapons so a tier with many weapons isn't more
@@ -397,14 +428,38 @@ G.Server = {
     t.items = items; t.ver++;
     return { deny, ret };
   },
+  // An attachments box's three, rolled when it's opened: attachments that go straight onto the weapon in the opener's
+  // hands as it's built (G.Gunsmith.attachOptions), the lower tiers likelier; if that's fewer than three (or they had
+  // nothing in their hands), the rest are attachments for anything, to carry
+  rollAbox(code) {
+    const GS = G.Gunsmith, def = code ? GS.fromCode(code) : null, out = [];
+    const draw = (pool) => {
+      while (out.length < 3 && pool.length) {
+        let r = Math.random() * pool.reduce((a, p) => a + 1 / (p.tier || 1), 0), at = 0;
+        for (; at < pool.length - 1; at++) { r -= 1 / (pool[at].tier || 1); if (r <= 0) break; }
+        out.push(pool[at].id); pool = pool.filter((_, i) => i !== at);
+      }
+    };
+    draw(def ? GS.attachOptions(def.id, def.build) : []);
+    draw(GS.LIST.filter((p) => !p.factory && !p.variant && !p.retired && !p.becomes && (p.tier || 1) <= 2 && !out.includes(p.id) && ['muzzle', 'fg', 'tac', 'optic', 'magnifier', 'stock'].includes(p.slot)));
+    return out;
+  },
+  // [open, { player id: [their three part ids, the one they took (or null)] }] or null when the level has no box
+  aboxMsg() {
+    if (!this.map || !this.map.abox || !this.abox) return null;
+    const u = {};
+    for (const [id, e] of Object.entries(this.abox.uses)) u[id] = [e.items, e.taken];
+    return [this.abox.open ? 1 : 0, u];
+  },
   // [code (null when empty), mag, reserve, open, ammo type] or null when the level has no case
   caseMsg() { return this.map && this.map.case ? [this.wcase ? this.wcase.code : null, this.wcase ? this.wcase.mag : 0, this.wcase ? this.wcase.reserve : 0, this.caseOpen ? 1 : 0, this.wcase ? this.wcase.am : null, this.wcase ? this.wcase.kit || null : null] : null; },
   toShop() {
     this.phase = 'shop';
     this.shopSeed = (Math.random() * 2 ** 31) | 0;
+    this.stock = G.Shop.scaleStock(G.Shop.baseStock(this.level, this.shopSeed), this.players.size); // (as many of each as there are of you)
     this.liftT = null; this.snapT = 0;
     for (const p of this.players.values()) p.ready = false;
-    G.Net.broadcast({ t: 'phase', phase: 'shop', level: this.level, shopSeed: this.shopSeed, report: this.report });
+    G.Net.broadcast({ t: 'phase', phase: 'shop', level: this.level, shopSeed: this.shopSeed, report: this.report, stock: this.stock });
     G.Net.broadcast(this.teamMsg());
     this.sendRoster();
   },
@@ -447,8 +502,8 @@ G.Server = {
       const first = [], seen = new Set();
       for (const sp of spots) { const u = unitOf(sp); if (u >= 0 && !seen.has(u)) { seen.add(u); first.push(sp); } }
       spots = first.concat(spots.filter((sp) => !first.includes(sp)));
-    } else if (this.map.NF > 1) { // houses: a spot in every room indoors, on every floor (the basements and upstairs too), first
-      const OUT = new Set(['yard', 'alley', 'lawn', 'road']), rooms = this.map.rooms;
+    } else if (this.map.NF > 1 || this.map.theme.starter) { // houses (and the corner store): a spot in every room indoors, on every floor (the basements and upstairs too), first
+      const OUT = new Set(['yard', 'alley', 'lawn', 'road', 'lot', 'carpark']), rooms = this.map.rooms;
       const roomOf = (sp) => rooms.findIndex((r) => (r.fl || 0) === (sp[2] || 0) && sp[0] >= r.x && sp[0] < r.x + r.w && sp[1] >= r.z && sp[1] < r.z + r.h);
       const first = [], seen = new Set();
       for (const sp of spots) { const ri = roomOf(sp); if (ri >= 0 && !OUT.has(rooms[ri].type) && !seen.has(ri)) { seen.add(ri); first.push(sp); } }
@@ -504,6 +559,8 @@ G.Server = {
     d.wpn = wpn; d.gear = tier; d.dmg = w.dmg; d.pellets = w.pellets; d.snd = w.cls;
     d.vest = fixed ? fixed.vest[tier - 1] : roll(G2.vest[tier - 1], ['soft', 'steel', 'ceramic', 'none']);
     d.helmet = fixed ? fixed.helmet[tier - 1] : roll(G2.helmet[tier - 1], ['ach', 'riflehelm', 'nohelm']);
+    // a mandible or a face shield on the helmet's mount (a helmet with a visor has its own; no helmet, nowhere to put one)
+    d.face = d.helmet === 'ach' || d.helmet === 'riflehelm' ? (fixed && fixed.face ? fixed.face[tier - 1] || 0 : roll(G2.face[tier - 1], ['f.mandible', 'f.shield', 'f.rifle', 0])) : 0;
     // automatic weapons fire at their own rate in the type's bursts; others as fast as the type works them
     if (base.rof) {
       if (w.mode === 'auto') d.rof = 60 / w.rpm;
@@ -803,10 +860,11 @@ G.Server = {
       } else if (!e.alert) e.pendingAlert = e.pendingAlert >= 0 ? e.pendingAlert : 0.3 + Math.random() * 0.5;
     }
   },
-  remaining(civ = null) { let n = 0; for (const e of this.enemies.values()) if (e.state !== 'cuffed' && (civ === null || !!e.def.civ === civ)) n++; return n; },
+  // (a suspect down and bleeding out is dealt with: they never get up again. A civilian down still needs rescuing.)
+  remaining(civ = null) { let n = 0; for (const e of this.enemies.values()) if (e.state !== 'cuffed' && !(e.down && !e.def.civ) && (civ === null || !!e.def.civ === civ)) n++; return n; },
   openBodies() { let n = 0; for (const b of this.bodies.values()) if (!b.secured) n++; return n; },
   openEvidence() { let n = 0; for (const v of this.evidence) if (!v.secured && !v.taken) n++; return n; },
-  // Objectives. "Bring Order to Chaos" (required): every suspect zip-tied or dead. "Rescue All of the
+  // Objectives. "Bring Order to Chaos" (required): every suspect zip-tied, down or dead. "Rescue All of the
   // Civilians" (optional, a bonus): every civilian secured alive. Bodies and evidence pay too. Once order is
   // restored the squad can vote to leave (Y); the level ends when every officer still alive has voted.
   checkClear() {
@@ -867,7 +925,7 @@ G.Server = {
   breakGlass(ids, p) {
     const ws = this.map && this.map.windows;
     if (!ws) return;
-    const fresh = ids.filter((id) => Number.isInteger(id) && ws[id] && !ws[id].broken).slice(0, 20);
+    const fresh = ids.filter((id) => Number.isInteger(id) && ws[id] && !ws[id].broken && !ws[id].armor).slice(0, 20); // (bulletproof glass doesn't break)
     if (!fresh.length) return;
     for (const id of fresh) { ws[id].broken = true; G.World.windowSolids(this.map.world, this.map, ws[id]); this.glassBroken.add(id); this.hear(ws[id].x, ws[id].z, 16, ws[id].fy || 0); }
     G.Net.broadcast({ t: 'glass', ids: fresh });
@@ -924,45 +982,74 @@ G.Server = {
     G.Net.broadcast({ t: 'evsec', i, by: from, cr: Math.round(this.evidenceValue(v.wpn) / 2), wpn: v.wpn });
     this.checkClear();
   },
-  cuff(eid, p, from) {
+  // at: where the officer saw the body lying, its ragdoll (it can slide or fall a way from where they went down):
+  // in reach of that is in reach, if it's within 4 m of where the host has them
+  cuff(eid, p, from, at) {
     const e = this.enemies.get(eid);
+    const reach = (x, z) => {
+      const ok = Array.isArray(at) && Number.isFinite(+at[0]) && Number.isFinite(+at[1]) && Math.hypot(at[0] - x, at[1] - z) < 4;
+      return Math.min(Math.hypot(x - p.st.p[0], z - p.st.p[2]), ok ? Math.hypot(at[0] - p.st.p[0], at[1] - p.st.p[2]) : Infinity);
+    };
     if (!e) {
       const b = this.bodies.get(eid);
-      if (!b || b.secured || Math.hypot(b.x - p.st.p[0], b.z - p.st.p[2]) > 2.6) return;
+      if (!b || b.secured || reach(b.x, b.z) > 2.6) return;
       b.secured = true;
       this.report.bodies++;
       G.Net.broadcast({ t: 'cuffed', e: eid, by: from, cr: b.civ ? 0 : this.carrierShare(b.def || G.ENEMIES[b.type]), civ: b.civ, ty: b.type, body: true });
       this.checkClear();
       return;
     }
-    if (!e || !(e.state === 'surrender' || (e.def.civ && (e.state === 'cower' || e.state === 'flee')))) return;
-    if (Math.hypot(e.x - p.st.p[0], e.z - p.st.p[2]) > 2.6) return;
+    if (!e || !(e.state === 'surrender' || e.collapsed || (e.def.civ && (e.state === 'cower' || e.state === 'flee')))) return; // (down: no giving up, just cuffed where they lie)
+    if ((e.collapsed ? reach(e.x, e.z) : Math.hypot(e.x - p.st.p[0], e.z - p.st.p[2])) > 2.6) return;
+    const dn = !!e.collapsed; // (cuffed where they lay, bleeding: a living arrest, but no arrest to show in the highlights)
     e.state = 'cuffed'; e.armed = false; e.fake = false;
     const civ = !!e.def.civ;
-    const cr = civ ? 200 + 40 * this.level : Math.round(e.def.cr * 2.5 * (1 + 0.08 * (this.level - 1))) + this.carrierShare(e.def);
-    if (civ) this.report.rescued++; else this.report.arrests++;
-    G.Net.broadcast({ t: 'cuffed', e: e.id, by: from, cr, civ, ty: e.type });
+    // (a suspect cuffed where they lay is already counted, incapacitated: securing them pays like securing a body)
+    const cr = civ ? 200 + 40 * this.level : dn ? this.carrierShare(e.def) : Math.round(e.def.cr * 2.5 * (1 + 0.08 * (this.level - 1))) + this.carrierShare(e.def);
+    if (civ) this.report.rescued++; else if (!dn) this.report.arrests++;
+    G.Net.broadcast({ t: 'cuffed', e: e.id, by: from, cr, civ, ty: e.type, dn: dn ? 1 : 0 });
     this.checkClear();
   },
   // ---------------------------------------------------------------- suspects' injuries
-  // Simpler than an officer's body, the same idea: a wound can bleed (heavy, or light that clots in half a
-  // minute), break an arm (their aim goes) or a leg (they limp), or puncture a lung (both). Bleeding drains
-  // their health and their nerve, and can kill them (credited to whoever shot them). Restraining someone
-  // stops it: you treat them as you cuff them.
-  injure(e, zone, central, through, side) {
-    if (!(through > 0.2)) return;
-    const part = G.Med.partOf(zone, side === 'L' || side === 'R' ? side : null), person = e.maxHp * (100 / e.def.hp);
-    const r = Math.random() / through;
-    if (r < (central ? 0.45 : 0.15)) e.bleedH = (e.bleedH || 0) + person * 0.02; // a standard person gone in ~50 s
-    else if (r < (central ? 0.9 : 0.7)) { e.bleedL = (e.bleedL || 0) + person * 0.004; e.clotT = 0; }
-    if (G.Med.isLimb(part) && Math.random() < (central ? 0.4 : 0.15) * through) { if (part.startsWith('leg')) e.legs = (e.legs || 0) + 1; else e.arms = (e.arms || 0) + 1; }
-    if (part === 'thorax' && central && Math.random() < 0.35 * through) e.lung = true;
+  // The same wounds as an officer's (js/ballistics.js works out what each round did, on the shooter's machine), kept
+  // more simply: bleeding (heavy: a standard person gone in ~50 s; massive, from the heart, aorta or an iliac artery:
+  // in ~8 s; light, which clots in half a minute), a broken arm (their aim goes) or leg (they limp), a collapsed lung
+  // (both), a gut wound (a slow bleed), a spine (they go down and stay down) or a heart wrecked (they black out).
+  // Bleeding drains their health and their nerve, and can kill them (credited to whoever shot them). Restraining
+  // someone stops it: you treat them as you cuff them. organs: what was hit, kept for the record (id:% of it gone).
+  injure(e, part, effs, side, organs) {
+    if (!G.Med.NAME[part]) return;
+    const person = e.maxHp * (100 / e.def.hp), E = new Set(effs.split(',').filter(Boolean));
+    if (E.has('massive')) e.bleedH = (e.bleedH || 0) + person * 0.12;
+    if (E.has('heavy')) e.bleedH = (e.bleedH || 0) + person * 0.02;
+    if (E.has('light') || E.has('gut')) { e.bleedL = (e.bleedL || 0) + person * (E.has('gut') ? 0.006 : 0.004); e.clotT = 0; }
+    if (E.has('frac')) {
+      // which limb (the pelvis: the leg on its side, from the organs), kept for the record (e.broke: the F9 readout)
+      const pl = /pelvis([LR])/.exec(organs || ''), limb = part.startsWith('arm') || part.startsWith('leg') ? part : 'leg' + (pl ? pl[1] : side === 'L' ? 'L' : 'R');
+      e.broke = e.broke || {};
+      if (!e.broke[limb]) { e.broke[limb] = 1; if (limb.startsWith('arm')) e.arms = (e.arms || 0) + 1; else e.legs = (e.legs || 0) + 1; }
+    }
+    if (E.has('lung')) e.lung = true;
+    if (E.has('spine')) e.spine = true;
+    if (E.has('out')) e.out = true;
+    if (E.has('cardiac')) { e.cardiac = true; e.bleedH = (e.bleedH || 0) + person * 0.35; } // (a wrecked heart: gone in a second or two)
+    if (organs) { e.organs = e.organs || {}; for (const o of organs.split(',')) { const [id, pct] = o.split(':'); if (id) e.organs[id] = Math.max(e.organs[id] || 0, +pct || 0); } }
   },
-  // bleeding, every tick; true when it killed them
+  // Would they have given up, told to now (roughly the odds a shout has: js/server.js shout)? For the highlights.
+  wouldYield(e) {
+    if (!e.def.comply || e.state === 'cuffed') return false;
+    const unaware = !e.alert || (e.surprisedT || 0) > 0;
+    let c = e.def.comply + (unaware ? 0.4 : 0) + (!e.drawn ? 0.3 : -0.15) + 0.5 * (1 - (e.str == null ? 1 : e.str)) + (e.collapsed ? 0.3 : 0) + (e.broken ? 0.3 : 0) - Math.max(0, (e.morale || 0) - 0.5) * 0.8;
+    c *= [1, 0.3, 0.08, 0.03][Math.min(3, this.allies ? this.allies(e) : 0)];
+    return c >= 0.55;
+  },
+  // bleeding, every tick; true when it killed them. (BLEED_K: everyone bleeds at this share of the wounds' rates, as
+  // officers do: js/medical.js)
+  BLEED_K: 0.5,
   injuryTick(e, dt) {
     if (e.state === 'cuffed') { e.bleedH = e.bleedL = 0; return false; }
     if (e.bleedL) { e.clotT = (e.clotT || 0) + dt; if (e.clotT > 30) { e.bleedL = 0; e.clotT = 0; } }
-    const b = (e.bleedH || 0) + (e.bleedL || 0);
+    const b = ((e.bleedH || 0) + (e.bleedL || 0)) * this.BLEED_K;
     if (!b) return false;
     e.hp -= b * dt;
     if (!e.def.civ && e.morale != null) e.morale = Math.max(0, e.morale - dt * 0.6 * b / e.maxHp); // weakening: closer to giving up
@@ -1031,15 +1118,15 @@ G.Server = {
     if (this.phase !== 'level') return;
     const e = this.enemies.get(m.e);
     if (!e) return;
-    // the wounds, for injuries (where they landed, through the middle, how much got through armour)
-    if (Array.isArray(m.w)) for (const w of m.w.slice(0, 12)) if (Array.isArray(w)) this.injure(e, String(w[0]), !!w[1], +w[2] || 0, w[3]);
+    // the wounds, for injuries: the part, what the round did there (js/ballistics.js effects), the side, the organs
+    if (Array.isArray(m.w)) for (const w of m.w.slice(0, 12)) if (Array.isArray(w)) this.injure(e, String(w[0]), String(w[1] || ''), w[2], String(w[3] || ''));
     // wounds are a share of a standard person's life (tougher types have proportionally more), so lethality
     // doesn't fall as health scales up with the level and the squad; an unarmoured headshot kills outright
     const person = e.maxHp * (100 / e.def.hp);
     const d = m.k ? e.hp + 1 : Math.min(5000, (+m.d || 0) + Math.min(5, Math.max(0, +m.f || 0)) * person);
     if (!(d > 0)) return;
     e.hp -= d;
-    if (!m.bo) { e.lastHit = from; e.hitState = e.state; } // bleeding out is judged by what they were doing when shot
+    if (!m.bo) { e.lastHit = from; e.lastHitAt = this.clock || 0; e.lastH = !!m.h; e.lastAp = !!m.ap; e.hitState = e.state; e.hitUnaware = !e.alert || (e.surprisedT || 0) > 0; e.hitYield = this.wouldYield(e); } // bleeding out is judged by what they were doing when shot
     // Shock: being hit wrecks your aim for a moment (most of it, for a hard hit), throws off the shot you were
     // about to take, and starts your aim over from the body. It fades over a couple of seconds.
     if (!m.bo) {
@@ -1068,16 +1155,59 @@ G.Server = {
     if (e.hp <= 0) {
       this.dropEvidence(e);
       this.enemies.delete(e.id);
-      this.bodies.set(e.id, { id: e.id, type: e.type, def: e.def, x: e.x, y: e.y || 0, z: e.z, yaw: e.yaw, civ: !!e.def.civ, secured: false });
+      this.bodies.set(e.id, { id: e.id, type: e.type, def: e.def, x: e.x, y: e.y || 0, z: e.z, yaw: e.yaw, civ: !!e.def.civ, secured: false, rec: e }); // (rec: their record as they died: every wound, for the F9 readout, js/hud.js)
       // watching a friend go down rattles everyone nearby
       for (const o of this.enemies.values()) if (!o.def.civ && o.state === 'normal' && Math.hypot(o.x - e.x, o.z - e.z) < 15) o.morale -= 0.2 * (o.def.steady || 1);
-      let cr, why = null;
+      let cr = 0, why = null;
+      const inc = !e.def.civ && !!e.incap; // (counted already: incapacitated when they went down)
       if (e.def.civ) { cr = -(400 + 50 * this.level); why = 'civ'; this.report.civKilled++; }
-      else if ((m.bo ? e.hitState || e.state : e.state) !== 'normal') { cr = -Math.round(e.def.cr * 2); why = 'unauth'; this.report.unauth++; }
-      else { cr = Math.round(e.def.cr * 0.25 * (1 + 0.08 * (this.level - 1))); this.report.kills++; } // lethal force pays least
-      G.Net.broadcast({ t: 'kill', e: e.id, by: from, cr, h: !!m.h, ty: e.type, why });
+      else if (inc) { if (m.bo) { this.report.bleedouts++; const by = e.incap.by; if (by) this.report.bleedBy[by] = (this.report.bleedBy[by] || 0) + 1; } } // (bled out: kept, by who put them down)
+      else ({ cr, why } = this.incapacitate(e, from, m.bo ? e.hitState || e.state : e.state));
+      // and what makes it one for the highlights (js/highlights.js): taken by surprise, would have given up if told to,
+      // just after the killer kicked a door in, how far, what the rounds did inside
+      const kp = from && this.players.get(from), kpos = kp && kp.st && kp.st.p;
+      const hl = { sur: e.hitUnaware && !e.def.civ ? 1 : 0, ws: e.hitYield && !e.def.civ ? 1 : 0, br: from && this.kickAt && this.clock - (this.kickAt[from] == null ? -99 : this.kickAt[from]) < 5 ? 1 : 0,
+        d: kpos ? Math.round(Math.hypot(kpos[0] - e.x, kpos[2] - e.z)) : 0, o: e.organs || undefined,
+        // (bled out: not this round but the wounds, bt seconds after the last one. Within 3 s of it, or through the
+        // heart, it's the round that killed them: a shot kill, hd seconds before they died)
+        ...(() => {
+          const since = m.bo && e.lastHitAt != null ? (this.clock || 0) - e.lastHitAt : null, shot = since != null && (e.cardiac || since < 3);
+          return { bo: m.bo && !shot ? 1 : 0, bt: m.bo && !shot && since != null ? Math.round(since) : 0, hd: shot ? Math.round(since * 100) / 100 : 0 };
+        })() };
+      if (e.lastAp && !hl.bo) hl.ap = 1; // (the round that did it went through their armour)
+      G.Net.broadcast(Object.assign({ t: 'kill', e: e.id, by: from, cr, h: !!m.h, ty: e.type, why, inc: inc ? 1 : 0 }, hl));
       this.checkClear();
     }
+  },
+
+  // A suspect incapacitated: down for good, or dead outright, whichever comes first. It's counted once, then and
+  // there, the same as a kill: the officer's credit and tally, and whether it was authorised (st: what they were
+  // doing when shot). Lethal force pays least. If they bleed out afterwards, that's kept (report.bleedouts, and
+  // bleedBy: by the officer who put them down), not counted again.
+  incapacitate(e, by, st) {
+    e.incap = { by: by || null, t: this.clock || 0 };
+    if (st !== 'normal') { this.report.unauth++; return { cr: -Math.round(e.def.cr * 2), why: 'unauth' }; }
+    this.report.incap++;
+    return { cr: Math.round(e.def.cr * 0.25 * (1 + 0.08 * (this.level - 1))), why: null };
+  },
+  // A suspect down for good: incapacitated, counted now (incapacitate), told to everyone
+  incapMsg(e) {
+    if (e.def.civ || e.incap) return; // (a civilian down still needs rescuing)
+    const { cr, why } = this.incapacitate(e, e.lastHit, e.hitState || e.state);
+    G.Net.broadcast({ t: 'incap', e: e.id, by: e.lastHit || null, cr, h: !!e.lastH, ty: e.type, why });
+  },
+  // A suspect down for good, for the highlights (js/highlights.js suspectDown): incapacitated, their clip. The round
+  // that put them down, with what a kill of it would carry; or, more than 4 s after a round last hit them, a bleed-out
+  // (bo: down from the blood loss, bt seconds after the last round: no round to show). None for a civilian.
+  downMsg(e) {
+    const from = e.lastHit, since = e.lastHitAt != null ? (this.clock || 0) - e.lastHitAt : null;
+    if (!from || e.def.civ) return;
+    const bo = since == null || since > 4;
+    const kp = this.players.get(from), kpos = kp && kp.st && kp.st.p, kick = this.kickAt && this.kickAt[from];
+    G.Net.broadcast({ t: 'edown', e: e.id, by: from, h: !!e.lastH, ty: e.type, why: (e.hitState || e.state) !== 'normal' ? 'unauth' : null,
+      sur: e.hitUnaware ? 1 : 0, ws: e.hitYield ? 1 : 0, br: kick != null && e.lastHitAt - kick < 5 ? 1 : 0,
+      d: kpos ? Math.round(Math.hypot(kpos[0] - e.x, kpos[2] - e.z)) : 0, o: e.organs || undefined, hd: bo ? 0 : Math.round(since * 100) / 100, bo: bo ? 1 : 0, bt: bo && since != null ? Math.round(since) : 0,
+      ap: e.lastAp && !bo ? 1 : undefined });
   },
 
   // Apartments cleared: an officer has been inside, and no suspect in it is still a threat (armed and free).
@@ -1087,7 +1217,7 @@ G.Server = {
     const L = G.Level, TS = L.TS, W = this.map.W, at = (x, y, z) => { const a = L.floorMap(this.map, L.floorAt(this.map, x, y, z)).unitAt; return a ? a[Math.floor(z / TS) * W + Math.floor(x / TS)] : -1; };
     for (const p of this.players.values()) if (p.st && !p.st.dd) { const u = at(p.st.p[0], p.st.p[1], p.st.p[2]); if (u >= 0) this.unitsSeen.add(u); }
     const hot = new Set();
-    for (const e of this.enemies.values()) if (!e.def.civ && e.state !== 'cuffed' && e.state !== 'surrender') { const u = at(e.x, e.y || 0, e.z); if (u >= 0) hot.add(u); }
+    for (const e of this.enemies.values()) if (!e.def.civ && e.state !== 'cuffed' && e.state !== 'surrender' && !e.down) { const u = at(e.x, e.y || 0, e.z); if (u >= 0) hot.add(u); }
     let n = 0;
     for (const u of this.unitsSeen) if (!hot.has(u)) n++;
     return n;
@@ -1142,7 +1272,7 @@ G.Server = {
       const r2 = (v) => Math.round(v * 100) / 100;
       const e = [];
       for (const en of this.enemies.values()) {
-        e.push([en.id, en.type, r2(en.x), r2(en.z), r2(en.yaw), Math.max(1, Math.round((en.hp / en.maxHp) * 100)), en.aiming ? en.tgt : 0, en.alert ? 1 : 0, en.crouch ? 1 : 0, en.leanOut || 0, en.armed ? (en.drawn ? 2 : 1) : 0, STATE_CODE[en.state] || 0, en.surprisedT > 0 ? 1 : 0, en.doorWait > 0 ? 1 : 0, en.def.civ ? 0 : `${en.def.wpn}|${en.def.vest}|${en.def.helmet}`, ((en.bleedH || en.bleedL) ? 1 : 0) | (en.legs ? 2 : 0) | (en.reloadT > 0 ? 4 : 0), Math.round((en.str == null ? 1 : en.str) * 100), r2(en.y || 0)]);
+        e.push([en.id, en.type, r2(en.x), r2(en.z), r2(en.yaw), Math.max(1, Math.round((en.hp / en.maxHp) * 100)), en.aiming ? en.tgt : 0, en.alert ? 1 : 0, en.crouch ? 1 : 0, en.leanOut || 0, en.armed ? (en.drawn ? 2 : 1) : 0, STATE_CODE[en.state] || 0, en.surprisedT > 0 ? 1 : 0, en.doorWait > 0 ? 1 : 0, en.def.civ ? 0 : `${en.def.wpn}|${en.def.vest}|${en.def.helmet}|${en.def.face || ''}`, ((en.bleedH || en.bleedL) ? 1 : 0) | (en.legs ? 2 : 0) | (en.reloadT > 0 ? 4 : 0) | (en.down ? 8 : 0), Math.round(Math.min(en.down ? 0.25 : 1, en.str == null ? 1 : en.str) * 100), r2(en.y || 0)]);
       }
       const p = {};
       for (const pl of all) p[pl.id] = pl.st;
@@ -1172,7 +1302,11 @@ G.Server = {
     if (e.kick) e.kick *= Math.exp(-this.kickBack(e) * dt); // bringing the gun back down
     if (this.injuryTick(e, dt)) return; // bled out
     e.str = this.strength(e);
-    e.collapsed = e.str < this.COLLAPSE && e.state !== 'cuffed';
+    // Down (too weak to stand, a spine, a heart that's stopped): down for good. From there it's only bleeding out (or
+    // being cuffed: it stops it): no more aiming, shooting, turning, moving or giving up.
+    if ((e.str < this.COLLAPSE || e.spine || e.out) && e.state !== 'cuffed' && !e.down) { e.down = true; this.dropEvidence(e); e.armed = false; e.drawn = false; this.downMsg(e); this.incapMsg(e); this.checkClear(); } // (the gun falls from their hand)
+    e.collapsed = !!e.down && e.state !== 'cuffed';
+    if (e.collapsed) { e.aiming = false; e.leanOut = 0; e.cover = null; e.crouch = false; return; }
     if (this.obedient(e) && this.obey(e, dt)) return;
     if (def.civ) return this.thinkCiv(e, dt);
     if (e.state === 'cuffed') return;
@@ -1202,6 +1336,7 @@ G.Server = {
     if (e.percT <= 0) {
       e.percT = 0.12 + Math.random() * 0.1;
       let best = null, bs = 1e9, bvis = false, bd = 99;
+      e.proof = false;
       if (e.flashT > 0) alive = []; // (blinded by a flashbang: sees nobody)
       const ey = (e.y || 0) + Math.min(1.6 * s, 2.4);
       for (const p of alive) {
@@ -1211,11 +1346,16 @@ G.Server = {
         if (d > (map.theme.night && !(p.st.tl & 3) ? map.theme.night : 75)) continue;
         const lx = e.cover && e.cover.lean ? e.cover.px : e.x, lz = e.cover && e.cover.lean ? e.cover.pz : e.z;
         const [hx, hz] = this.headXZ(p.st);
-        const k = L.see(map, lx, ey, lz, hx, py + (p.st.pr ? 0.35 : p.st.cr ? 0.95 : 1.5), hz), vis = k > 0; // (through a window: k < 1)
-        const score = d + (vis ? 0 : 40) + (k < 1 && vis ? 8 : 0);
-        if (score < bs) { bs = score; best = p; bvis = vis; bd = d; e.seeK = k; }
+        const hy = py + (p.st.pr ? 0.35 : p.st.cr ? 0.95 : 1.5), k = L.see(map, lx, ey, lz, hx, hy, hz);
+        // (through a window: k < 1; through bulletproof glass, seen but not to be shot: no round gets through it)
+        let proof = false;
+        if (k > 0 && k < 1) { const dx = hx - lx, dy = hy - ey, dz = hz - lz, dd = Math.hypot(dx, dy, dz) || 1; proof = L.raycast(map, lx, ey, lz, dx / dd, dy / dd, dz / dd, dd, { glass: true }).t < dd - 0.1; }
+        const vis = k > 0 && !proof, score = d + (vis ? 0 : proof ? 30 : 40) + (k < 1 && vis ? 8 : 0);
+        if (score < bs) { bs = score; best = p; bvis = vis; bd = d; e.seeK = k; e.proof = proof; }
       }
       e.tgt = best ? best.id : null; e.canSee = bvis; e.tgtD = bd;
+      // seen behind bulletproof glass: they know where you are (and that shooting's no use): they come round for you
+      if (best && e.proof) { e.alert = true; e.lostT = G.U.clamp(e.lostT || 0, 0.01, 1); e.blind = false; e.lastSeen = { x: best.st.p[0], y: best.st.p[1], z: best.st.p[2] }; }
     }
     const p = e.tgt ? this.players.get(e.tgt) : null;
     const st = p && p.st && !p.st.dn && !p.st.dd ? p.st : null;
@@ -1374,7 +1514,7 @@ G.Server = {
         if (e.cool <= 0) { this.fire(e, p, true); e.cool = U.rf(0.15, 0.4); }
       } else e.cool = Math.max(e.cool, 0.6);
       // lost sight: lob a grenade where they were last seen
-      if (e.lastSeen && e.lostT > 2 && e.lostT < 12) {
+      if (e.lastSeen && e.lostT > 2 && e.lostT < 12 && !e.proof) { // (not at someone behind bulletproof glass: it'd come back at them)
         const ld = Math.hypot(e.lastSeen.x - e.x, e.lastSeen.z - e.z);
         if (ld > 5 && ld < 20) this.tryNade(e, e.lastSeen.x, e.lastSeen.z);
       }

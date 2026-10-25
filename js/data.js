@@ -98,6 +98,9 @@ G.WEAPON_LIST = [
   W({ id: 'vepr', slot: 'p', cls: 'SG', tier: 2, price: 1700, name: 'Vepr-12', dmg: 13, pellets: 8, rpm: 280, mode: 'semi', mag: 8, reserve: 48, reload: 2.5, choke: 0.8, spread: 4.5, ads: 0.05, range: 16, falloff: 0.25, speed: 0.98, desc: 'The better-mannered Saiga: same magazines, softer recoil.' }),
   W({ id: 'ar9', slot: 'p', cls: 'SMG', tier: 1, price: 900, name: 'AR-9', dmg: 22, rpm: 900, mag: 33, reserve: 198, reload: 2.1, spread: 2.6, ads: 0.03333, range: 20, falloff: 0.5, speed: 1.03, desc: 'An M4 lower with a 9mm blowback kit in it: Glock magazines, every AR part. Fit an M4 upper and it\'s a rifle again.' }),
   W({ id: 'aug9', slot: 'p', cls: 'SMG', tier: 2, price: 1500, name: 'AUG 9mm', dmg: 22, rpm: 750, mag: 33, reserve: 198, reload: 2.2, spread: 2.2, ads: 0.03333, range: 24, zoom: 0.62, falloff: 0.5, speed: 1.03, desc: 'The AUG with its 9mm conversion: a long, quiet-handling bullpup SMG on Glock magazines.' }),
+  W({ id: 'qbz95', slot: 'p', cls: 'AR', tier: 2, price: 1600, name: 'QBZ-95', dmg: 30, rpm: 650, mag: 30, reserve: 210, reload: 2.4, spread: 2.4, ads: 0.025, range: 44, zoom: 0.72, speed: 0.97, desc: 'The PLA\'s bullpup: 5.8×42, a long barrel in a short gun, its sights in the carrying handle. Shares its magazines with the QBZ-192.' }),
+  W({ id: 'qbz192', slot: 'p', cls: 'AR', tier: 2, price: 1800, name: 'QBZ-192', dmg: 29, rpm: 750, mag: 30, reserve: 210, reload: 2.2, spread: 2.5, ads: 0.025, range: 36, zoom: 0.72, speed: 0.97, desc: 'The QBZ-95\'s conventional successor, cut down to a carbine: a full-length rail, a side-folding stock, the same 5.8×42 magazines.' }),
+  W({ id: 'mcx', slot: 'p', cls: 'AR', tier: 2, price: 2000, name: 'SIG MCX', dmg: 28, rpm: 850, mag: 30, reserve: 210, reload: 2.1, spread: 2.5, ads: 0.025, range: 34, zoom: 0.72, speed: 0.98, desc: 'A piston AR with no buffer tube: its stock folds. Barrels, handguards and stocks swap to make it a Rattler, a Virtus or a Spear LT. STANAG magazines.' }),
   W({ id: 'crossbow', slot: 'p', cls: 'BOW', tier: 2, price: 1400, name: 'Crossbow', dmg: 210, rpm: 40, mode: 'semi', mag: 1, reserve: 20, reload: 1.7, spread: 0.8, ads: 0.01667, recoil: 1.0, range: 60, falloff: 0.7, zoom: 0.6, speed: 1.0, pen: 1, tracer: 0x8b5a2b, desc: 'Silent. Enemies two steps away won\'t hear it. One bolt per reload.' }),
 
   // ----- SECONDARY -----
@@ -118,7 +121,7 @@ G.WEAPON_LIST = [
   W({ id: 'judge', slot: 's', cls: 'SG', tier: 2, price: 700, name: 'The Judge', dmg: 16, pellets: 5, rpm: 200, mode: 'semi', mag: 5, reserve: 35, reload: 2.6, choke: 2.2, spread: 4.5, ads: 0.1, range: 8, falloff: 0.25, desc: 'A revolver that fires .410 buckshot.' }),
   W({ id: 'g19', slot: 's', cls: 'PST', tier: 1, price: 350, name: 'G19 Compact', dmg: 24, rpm: 450, mode: 'semi', mag: 15, reserve: 90, reload: 1.4, spread: 2.2, ads: 0.08333, range: 18, speed: 1.0, desc: 'Compact 9mm. Takes every Glock magazine, and a stock if you want one.' }),
   W({ id: 'tx22', slot: 's', cls: 'MP', tier: 0, price: 200, name: 'Taurus TX22', dmg: 13, rpm: 1050, mag: 16, reserve: 160, reload: 1.4, spread: 2.4, ads: 0.0833, range: 14, falloff: 0.55, speed: 1.02, desc: 'A rimfire plinker someone made fully automatic: .22 LR, 16 rounds, threaded from the factory, hardly kicks. Lots of small holes.' }),
-  W({ id: 'derringer', slot: 's', cls: 'PST', tier: 1, price: 250, name: 'Derringer', dmg: 70, rpm: 300, mode: 'semi', mag: 2, reserve: 30, reload: 1.6, spread: 2.5, ads: 0.16667, range: 12, desc: 'Two shots of .45 Colt in your palm.' }),
+  W({ id: 'derringer', slot: 's', cls: 'PST', tier: 1, price: 250, name: 'Derringer', dmg: 85, rpm: 300, mode: 'semi', mag: 2, reserve: 30, reload: 1.6, spread: 2.5, ads: 0.16667, range: 13, desc: 'Two rounds of .44 Magnum in your palm. Hold on tight.' }),
 ];
 G.WEAPONS = {};
 // the sidearms a run can start with (picked before the first level: js/game.js pickSidearm)
@@ -151,7 +154,7 @@ G.chambered = (def) => {
 // Bolt hold-open: the action locks back on the last round, so a reload from empty is a magazine change and a
 // thumb on the bolt catch (or the slide stop), not a full rack. Every pistol with a slide, the AR-15 family and the
 // rifles and SMGs built the same way; not the AK family, the MP5's roller bolt, the open-bolt guns or a bolt-action.
-G.BOLT_HOLD = new Set(['scar', 'scarl', 'g36', 'aug', 'aug9', 'tavor', 'fal', 'm14', 'mk14', 'sr25', 'barrett', 'mpx', 'mp7', 'vector', 'skorp', 'svd', 'ar9', 'm27', 'hk416', 'br3']);
+G.BOLT_HOLD = new Set(['scar', 'scarl', 'g36', 'aug', 'aug9', 'tavor', 'fal', 'm14', 'mk14', 'sr25', 'barrett', 'mpx', 'mp7', 'vector', 'skorp', 'svd', 'ar9', 'm27', 'hk416', 'br3', 'qbz192']);
 G.boltHold = (def) => {
   const P = def && G.Gunsmith && G.Gunsmith.PLATFORMS[def.id];
   return !!P && (P.arch === 'pistol' || G.BOLT_HOLD.has(def.id) || (P.arch === 'rifle' && (P.spec.rcv || 'ar') === 'ar')); // (the AR-15 pattern: a bolt catch over the well)
@@ -166,9 +169,10 @@ G.loaded = (w) => (w ? w.mag + (w.chamber ? 1 : 0) : 0);
 //   glock: 9mm Glock pattern: the P9, G18, G19, and the AR-9 and AUG 9mm conversions
 //   m14: the M14 and the Mk14 EBR (an M14 in a chassis)
 //   saiga12: the Saiga-12 and the Vepr-12
-// (The G36 and AUG are 5.56 too but use their own; the other 7.62x51 rifles, and the .45s, each have their own.)
+//   qbz: 5.8x42: the QBZ-95 and QBZ-192
+// (The G36 and AUG are their NATO versions, on STANAG magazines; the other 7.62x51 rifles, and the .45s, each have their own.)
 G.MAG_FAMILY = {
-  m4: 'stanag', hk416: 'stanag', f2: 'stanag', tavor: 'stanag', scarl: 'stanag', m27: 'stanag', mp5: 'mp5', mp5sd: 'mp5', ak: 'akm', galil: 'akm', rpk: 'akm',
+  m4: 'stanag', hk416: 'stanag', f2: 'stanag', tavor: 'stanag', scarl: 'stanag', m27: 'stanag', mcx: 'stanag', g36: 'stanag', aug: 'stanag', qbz95: 'qbz', qbz192: 'qbz', mp5: 'mp5', mp5sd: 'mp5', ak: 'akm', galil: 'akm', rpk: 'akm',
   ak74: 'ak74', aks74u: 'ak74', an94: 'ak74', p9: 'glock', g18: 'glock', g19: 'glock', ar9: 'glock', aug9: 'glock', m14: 'm14', mk14: 'm14', saiga: 'saiga12', vepr: 'saiga12',
 };
 G.magFam = (wid) => G.MAG_FAMILY[wid] || wid;
@@ -237,7 +241,7 @@ G.GUN_SPECS = {
   mac10:    GS(5.75, 11.43, 'none', 21000, 0.40, 230, 0.55, 0.75, 'blowback', 'brass', 23),
   akimbo:   GS(4.9, 9.00, 'none', 35000, 0.35, 124, 0.45, 0.60, 'recoil', 'brass', 19),
   judge:    GS(3.0, 10.4, 'none', 13500, 0.50, 350, 0.05, 0.05, 'recoil', 'plastic', 63, 5),
-  derringer:GS(3.0, 11.43, 'none', 14000, 0.50, 250, 0.05, 0.05, 'recoil', 'brass', 33),
+  derringer:GS(3.0, 10.9, 'none', 36000, 0.60, 240, 0.05, 0.05, 'recoil', 'brass', 33), // (.44 Magnum: one of the American Derringer Model 1's)
   tx22:     GS(4.1, 5.60, 'none', 24000, 0.10, 40, 0.15, 0.40, 'blowback', 'brass', 15),
   ak74:     GS(16.3, 5.60, 'brake', 50000, 0.70, 53, 0.55, 0.60, 'longstroke', 'steel', 39),
   aks74u:   GS(8.1, 5.60, 'comp', 50000, 0.70, 53, 0.50, 0.65, 'longstroke', 'steel', 39),
@@ -252,34 +256,38 @@ G.GUN_SPECS = {
   vepr:     GS(17.0, 18.5, 'none', 11000, 0.55, 432, 0.65, 0.70, 'longstroke', 'plastic', 70, 9),
   ar9:      GS(10.5, 9.00, 'none', 35000, 0.40, 124, 0.45, 0.60, 'blowback', 'brass', 19),
   aug9:     GS(16.0, 9.00, 'none', 35000, 0.40, 124, 0.40, 0.55, 'blowback', 'brass', 19),
+  qbz95:    GS(18.2, 5.80, 'flash', 52000, 0.70, 64, 0.40, 0.55, 'gas', 'brass', 42),
+  qbz192:   GS(10.5, 5.80, 'flash', 52000, 0.70, 64, 0.40, 0.55, 'gas', 'brass', 42),
+  mcx:      GS(11.5, 5.56, 'flash', 55000, 0.70, 62, 0.35, 0.50, 'gas', 'brass', 45),
 };
+// (the integrally suppressed guns: which of the synth's suppressors theirs is, GunshotSynth.SUPPRESSORS)
+G.GUN_SPECS.vss.suppressor = G.GUN_SPECS.mp5sd.suppressor = 'integral';
 
 // Suppressed fire (suppressors are muzzle parts, see js/parts.js): damage factor and the fallback sound.
 G.SUPPRESSOR = { dmg: 0.92, snd: { f: 900, len: 0.12, boom: 0.15, vol: 0.25 } };
 
 // Body armour and helmets that suspects wear (the squad's kit, carriers, plates, helmets and belts, is in
-// js/gear.js, and works the same way). Each protects certain zones; stop[zone] is
-// [vs handgun rounds and buckshot, vs rifle rounds]: the share of a round's wound it stops when new. Armour-
-// piercing rounds (penetration 2+) get through twice as well. It wears: every round it takes costs durability
-// (a rifle round 1, a handgun round 0.5, a pellet 0.2), and protection falls to about a third as it's used up.
-// A stopped round still bruises (blunt trauma: a tenth of the wound). 'head' is the top of the head, which is
-// all a helmet covers; 'face' is below its brim.
+// js/gear.js, and works the same way). Armour is material, so thick, where it is on the body (js/ballistics.js):
+// prot is a list of { at, layers: [[material, mm], ...] }, at 'plate' (front and back of the chest), 'side', 'torso'
+// (soft armour, chest and stomach), 'groin', 'shoulder', 'thigh', 'helmet' (above its brim: cut 'high' or 'full'),
+// 'face'. Whether a round gets through is worked out from the round and the layers; armour wears by the energy it
+// soaks up (dur: how much it takes), and a worn layer is thinner.
 G.ARMOR_LIST = [
-  { id: 'none', kind: 'vest', name: 'No Armour', tier: 0, stop: {}, dur: 0, speed: 1, price: 0, desc: 'Just your shirt.' },
-  { id: 'soft', kind: 'vest', name: 'Soft Vest (IIIA)', tier: 1, stop: { chest: [0.9, 0.12], abdomen: [0.9, 0.12] }, dur: 6, speed: 1, price: 500,
+  { id: 'none', kind: 'vest', name: 'No Armour', tier: 0, prot: [], dur: 0, speed: 1, price: 0, desc: 'Just your shirt.' },
+  { id: 'soft', kind: 'vest', name: 'Soft Vest (IIIA)', tier: 1, prot: [{ at: 'torso', layers: [['aramid', 8]] }], dur: 6, speed: 1, price: 500,
     desc: 'Kevlar panels, chest and stomach. Stops handgun rounds and buckshot; rifle rounds go straight through.' },
-  { id: 'steel', kind: 'vest', name: 'Steel Plate Carrier (III)', tier: 2, stop: { chest: [0.95, 0.85], abdomen: [0.85, 0.1] }, dur: 6, speed: 0.95, price: 1300,
+  { id: 'steel', kind: 'vest', name: 'Steel Plate Carrier (III)', tier: 2, prot: [{ at: 'plate', layers: [['steel', 6.35]] }, { at: 'torso', layers: [['aramid', 6]] }], dur: 6, speed: 0.95, price: 1300,
     desc: 'Steel plates over the heart and lungs, soft armour below. Stops most rifle rounds to the chest. Heavy.' },
-  { id: 'ceramic', kind: 'vest', name: 'Ceramic Plate Carrier (IV)', tier: 3, stop: { chest: [0.97, 0.92], abdomen: [0.9, 0.12] }, dur: 5, speed: 0.97, price: 2200,
+  { id: 'ceramic', kind: 'vest', name: 'Ceramic Plate Carrier (IV)', tier: 3, prot: [{ at: 'plate', layers: [['ceramic', 9], ['pe', 6]] }, { at: 'torso', layers: [['aramid', 6]] }], dur: 5, speed: 0.97, price: 2200,
     desc: 'Ceramic plates: lighter, and they stop even armour-piercing rounds, but they crack as they do.' },
-  { id: 'assault', kind: 'vest', name: 'Assault Armour', tier: 4, stop: { chest: [0.97, 0.92], abdomen: [0.95, 0.65], uarm: [0.8, 0.1], thigh: [0.6, 0.05] }, dur: 8, speed: 0.88, price: 3200,
+  { id: 'assault', kind: 'vest', name: 'Assault Armour', tier: 4, prot: [{ at: 'plate', layers: [['ceramic', 9], ['pe', 6]] }, { at: 'side', layers: [['steel', 5]] }, { at: 'torso', layers: [['aramid', 8]] }, { at: 'groin', layers: [['aramid', 8]] }, { at: 'shoulder', layers: [['aramid', 6]] }, { at: 'thigh', layers: [['aramid', 6]] }], dur: 8, speed: 0.88, price: 3200,
     desc: 'Plates front, back and sides, a groin plate, shoulder and thigh protection. Slow.' },
-  { id: 'nohelm', kind: 'helmet', name: 'No Helmet', tier: 0, stop: {}, dur: 0, speed: 1, price: 0, desc: '' },
-  { id: 'ach', kind: 'helmet', name: 'Ballistic Helmet (IIIA)', tier: 1, stop: { head: [0.9, 0.15] }, dur: 3, speed: 1, price: 600,
+  { id: 'nohelm', kind: 'helmet', name: 'No Helmet', tier: 0, prot: [], dur: 0, speed: 1, price: 0, desc: '' },
+  { id: 'ach', kind: 'helmet', name: 'Ballistic Helmet (IIIA)', tier: 1, cut: 'full', prot: [{ at: 'helmet', layers: [['aramid', 8]] }], dur: 3, speed: 1, price: 600,
     desc: 'Stops handgun rounds to the top of the head. Not to your face.' },
-  { id: 'riflehelm', kind: 'helmet', name: 'Rifle-rated Helmet', tier: 3, stop: { head: [0.95, 0.55] }, dur: 3, speed: 0.99, price: 1700,
+  { id: 'riflehelm', kind: 'helmet', name: 'Rifle-rated Helmet', tier: 3, cut: 'high', prot: [{ at: 'helmet', layers: [['pe', 18]] }], dur: 3, speed: 0.99, price: 1700,
     desc: 'Turns some rifle rounds too. Still not your face.' },
-  { id: 'visor', kind: 'helmet', name: 'Helmet with Ballistic Visor', tier: 4, stop: { head: [0.95, 0.55], face: [0.85, 0.2] }, dur: 4, speed: 0.97, price: 2800,
+  { id: 'visor', kind: 'helmet', name: 'Helmet with Ballistic Visor', tier: 4, cut: 'high', prot: [{ at: 'helmet', layers: [['pe', 18]] }, { at: 'face', layers: [['pc', 10]] }], dur: 4, speed: 0.97, price: 2800,
     desc: 'Rifle-rated, with a visor that stops handgun rounds to the face.' },
 ];
 G.ARMORS = {};
@@ -305,7 +313,7 @@ G.ENEMIES = {
 };
 
 // home: share of rooms furnished as a home (the rest are storage, offices and break rooms)
-// layout: 'rooms' (rooms and corridors, the default), 'warehouse' or 'houses' (js/level.js)
+// layout: 'rooms' (rooms and corridors, the default), 'warehouse', 'houses', 'foundry'... (js/level.js)
 // noFog: a clear view to the far end (the fog colour is still the backdrop)
 G.THEMES = [
   { name: 'Apartment', layout: 'apartments', foes: 2, crowd: 2, big: 2, home: 1, reflect: 0.3, floor: '#4a443d', wall: '#b8ab95', crate: '#8a6a3a', fog: 0x0e0c0a, light: 0xffd8a8, ceil: '#cfc8ba' },
@@ -313,9 +321,12 @@ G.THEMES = [
   { name: 'Bunker', entry: 'vault', home: 0.45, reflect: 0.4, floor: '#3a4042', wall: '#5a6160', crate: '#4d5a3c', fog: 0x0b0f11, light: 0xa8c8ff, ceil: '#1d2224' },
   { name: 'Suburbs', layout: 'houses', foes: 1.8, crowd: 1.6, big: 2, home: 1, reflect: 0.28, floor: '#5a4a3a', wall: '#9fae98', crate: '#8a6a3a', fog: 0x111723, light: 0xffe0b0, ceil: '#d6d2c4' },
   { name: 'Research Lab', home: 0.4, reflect: 0.36, floor: '#8d9399', wall: '#b9bec4', crate: '#5d6b7a', fog: 0x12161a, light: 0xe6f2ff, ceil: '#3a3f44' },
-  { name: 'Foundry', home: 0.3, reflect: 0.3, floor: '#3a2a22', wall: '#5e3d2b', crate: '#6a5a4a', fog: 0x1a0c06, light: 0xff9a5a, ceil: '#24160f' },
+  { name: 'Foundry', layout: 'foundry', home: 0, reflect: 0.3, floor: '#3e3832', wall: '#6e645a', crate: '#6a5a4a', fog: 0x1a0e08, light: 0xffd2a4, ceil: '#2a221c' },
   { name: 'Cold Storage', home: 0.35, reflect: 0.4, floor: '#4f5d68', wall: '#7f97a8', crate: '#5f6f7a', fog: 0x0a1218, light: 0x9fe0ff, ceil: '#26323a' },
   // a music festival at night, outdoors: big open spaces, the fog pushed far back, moonlight, more people about
+  // the first deployment of a run (js/route.js: never anywhere else): a small corner store, its weapon case, attachments
+  // box and first aid cabinet always in its stockroom to get you started
+  { name: 'Convenience Store', layout: 'mart', starter: true, foes: 0.8, crowd: 1.5, home: 0, reflect: 0.35, floor: '#cfd3cd', wall: '#e6e2d6', crate: '#8a6a3a', fog: 0x0d0f12, light: 0xf2f6ff, ceil: '#e8e8e2' },
   { name: 'Festival', layout: 'festival', fence: 'hoarding', home: 0, reflect: 0.2, floor: '#26331f', wall: '#5b7480', crate: '#8a6a3a', fog: 0x060912, light: 0xffe2c0, ceil: '#d8dcde', fogNear: 30, fogFar: 150, hemi: 0x5a6a96, hemiI: 0.55, crowd: 2, foes: 1.5, night: 35 },
 ];
 
@@ -353,33 +364,9 @@ G.VENDOR_QUIPS = {
 };
 
 // ---------------------------------------------------------------- wounds
-// Rounds are lethal the way real ones are, both ways. A round to an unarmoured head kills outright (a helmet
-// covers the top of the head, not the face). Elsewhere a hit takes
-// a share of a person's life (a "standard person": tougher types like the Enforcer and the Kingpin have more),
-// set by where it lands and by the round. [central, peripheral] for a reference 5.56 round (damage 28):
-// central when its path goes through the middle of the part (heart and lungs, liver and spine, the femoral
-// artery), peripheral when it clips a flank or an edge. Centre mass takes about 2 rifle or pistol rounds;
-// heavier rounds take 1-2, limbs 3-5.
-G.WOUNDS = { chest: [0.62, 0.42], abdomen: [0.56, 0.36], uarm: [0.34, 0.24], farm: [0.2, 0.16], thigh: [0.46, 0.3], shin: [0.22, 0.17] };
-G.WOUND_CENTRAL = 0.55; // a path within 55% of the part's radius from its middle counts as central
-G.WOUND_REF = 28;
-// how hard a round hits, relative to the reference: heavier rounds wound more, but not in proportion
-G.woundPower = (dmg) => Math.pow(Math.max(1, dmg) / G.WOUND_REF, 0.7);
-// a wound before armour: the part, whether the round went through its middle, how hard it hits
-G.woundOf = (zone, central, k) => (G.WOUNDS[zone] || G.WOUNDS.thigh)[central ? 0 : 1] * k;
-// what kind of round it is, as far as armour cares (a rimfire round: a .22, light and slow, less than any pistol round)
-G.threat = (def) => (def.pen >= 2 ? 'ap' : (G.CALIBERS[G.calOf(def)] || {}).rimfire ? 'rimfire' : def.cls === 'PST' || def.cls === 'MP' || def.cls === 'SMG' || (def.cls === 'SG' && def.pellets > 1) ? 'handgun' : 'rifle');
-// the share of a wound this armour stops on that zone, at its condition (0 used up .. 1 new). The round
-// matters too: armour-piercing ammo gets through more, hollow points flatten on armour.
-G.armorStop = (a, zone, def, cond = 1) => {
-  const s = a && a.stop[zone];
-  if (!s) return 0;
-  const t = G.threat(def);
-  let v = t === 'handgun' ? s[0] : t === 'rimfire' ? s[0] + (1 - s[0]) * 0.7 : s[1] * (t === 'ap' ? 0.5 : 1); // (rimfire: most of what a pistol round would get through, stopped too)
-  if (def.apRound && t !== 'ap') v *= 0.6; // (a round that's already armour-piercing doesn't get it twice)
-  if (def.armorK) v = Math.min(0.99, v * def.armorK);
-  return v * (0.35 + 0.65 * G.U.clamp(cond, 0, 1));
-};
+// Rounds are worked out physically, through armour and through bodies (js/ballistics.js): what a round does depends
+// on what it is (mass, diameter, core, nose), how fast it's going when it gets there, what armour is in its way and
+// what it goes through inside. Nothing here multiplies a wound.
 
 // ---------------------------------------------------------------- ammunition
 // Calibers (from each gun's G.GUN_SPECS bore and case) and the boxes their loose rounds come in. group decides
@@ -393,10 +380,10 @@ G.CALIBERS = {
   '40/46': { name: '40 mm', group: 'grenade', box: 3, per: 45 }, '7.65/17': { name: '.32 ACP', group: 'pistol', box: 50, per: 0.6 },
   '12.7/33': { name: '.50 AE', group: 'pistol', box: 20, per: 2.5 }, '9.07/33': { name: '.357 Magnum', group: 'pistol', box: 30, per: 1.4 },
   '12.7/41': { name: '.500 S&W', group: 'pistol', box: 20, per: 3.5 }, '4.6/30': { name: '4.6×30', group: 'pistol', box: 40, per: 1.2 },
-  '5.6/39': { name: '5.45×39', group: 'rifle', box: 30, per: 1 }, '7.62/63': { name: '.30-06', group: 'rifle', box: 16, per: 2 },
+  '5.6/39': { name: '5.45×39', group: 'rifle', box: 30, per: 1 }, '5.8/42': { name: '5.8×42', group: 'rifle', box: 30, per: 1.2 }, '7.62/63': { name: '.30-06', group: 'rifle', box: 16, per: 2 },
   '9/39': { name: '9×39', group: 'rifle', box: 20, per: 2.2 }, '11.6/53': { name: '.45-70', group: 'rifle', box: 20, per: 2.5 },
   '8.6/69': { name: '.338 Lapua', group: 'rifle', box: 10, per: 6 }, '7.62/25': { name: '7.62×25', group: 'pistol', box: 50, per: 0.7 },
-  '10.4/63': { name: '.410 bore', group: 'shotgun', box: 15, per: 1.5 }, '11.43/33': { name: '.45 Colt', group: 'pistol', box: 30, per: 1.2 },
+  '10.4/63': { name: '.410 bore', group: 'shotgun', box: 15, per: 1.5 }, '11.43/33': { name: '.45 Colt', group: 'pistol', box: 30, per: 1.2 }, '10.9/33': { name: '.44 Magnum', group: 'pistol', box: 30, per: 1.3 },
   '5.6/15': { name: '.22 LR', group: 'pistol', box: 100, per: 0.15, rimfire: true },
   bolt: { name: 'crossbow bolts', group: 'bolt', box: 6, per: 12 }, cell: { name: 'rail slugs', group: 'cell', box: 8, per: 15 },
 };
@@ -413,19 +400,20 @@ G.stdMag = (cal) => {
   n.sort((a, b) => a - b);
   return n.length ? n[(n.length - 1) >> 1] : (G.CALIBERS[cal] || {}).box || 10;
 };
-// Ammo types. Their effect on the round: dmgK (wound), armorK (how much more armour stops it), apRound (gets
-// through armour), penD (bodies it carries on through), rangeK, spreadK, pelletsK, slug, tracer (colour),
-// quiet (with a suppressor, heard no further than a crossbow). k: price per round relative to ball.
+// Ammo types. What each is physically (its bullet: js/ballistics.js projectile) decides what it does to armour and
+// to people; here, what it does in flight: velK (faster), massK (lighter, for recoil), dragK (blunter: it slows
+// sooner), rangeK, spreadK, pelletsK, slug, tracer (colour), quiet (with a suppressor, heard no further than a
+// crossbow). k: price per round relative to ball.
 G.AMMO = {
   ball: { name: 'FMJ ball', tag: 'FMJ', k: 1, desc: 'Full metal jacket. The standard round.' },
-  hp: { name: 'Hollow point', tag: 'HP', k: 1.8, dmgK: 1.3, armorK: 1.35, penD: -1, dragK: 0.8, desc: 'Opens up in flesh: bigger wounds, stops in the first body. Flattens on armour. Its open nose drags more: it slows and drops sooner than ball.' },
-  ap: { name: 'Armour-piercing', tag: 'AP', k: 2.4, dmgK: 0.9, apRound: true, penD: 1, velK: 1.08, massK: 0.85, desc: 'Hardened core, lighter and faster (8% more speed): punches through armour and through bodies, flatter, smaller wounds.' },
+  hp: { name: 'Hollow point', tag: 'HP', k: 1.8, dragK: 0.8, desc: 'Opens to 1.7× its width in flesh once it\'s going fast enough: a wide track, all its energy spent inside, rarely out the far side. Its soft lead nose flattens on armour. It drags more in the air: it slows and drops sooner than ball.' },
+  ap: { name: 'Armour-piercing', tag: 'AP', k: 2.4, velK: 1.08, massK: 0.85, desc: 'A hardened steel (pistol) or tungsten carbide (rifle) core, lighter and 8% faster: goes through plate that flattens lead, and through people, nose-first and late to tumble: a narrow track.' },
   tracer: { name: 'Tracer', tag: 'TR', k: 1.3, tracer: 0xff4a2a, desc: 'Burns red all the way out: you see exactly where it goes (so do they).' },
-  subsonic: { name: 'Subsonic', tag: 'SUB', k: 1.6, dmgK: 0.85, rangeK: 0.7, quiet: true, desc: 'No supersonic crack: through a suppressor it is barely heard. Weaker, and drops off sooner.' },
+  subsonic: { name: 'Subsonic', tag: 'SUB', k: 1.6, rangeK: 0.7, quiet: true, desc: 'A heavier bullet under the speed of sound: no crack, so through a suppressor it is barely heard. Slow: less energy, and it drops sooner.' },
   buck: { name: '00 buckshot', tag: 'BUCK', k: 1, desc: 'Nine pellets. The standard shotgun load.' },
   slug: { name: 'Slug', tag: 'SLUG', k: 1.7, slug: true, desc: 'One heavy lead slug: accurate, hits like a rifle, goes through.' },
-  birdshot: { name: 'Birdshot', tag: 'BIRD', k: 0.7, pelletsK: 2.5, dmgK: 0.3, spreadK: 1.5, desc: 'A cloud of tiny pellets. Painful, rarely lethal past a few metres, useless on armour.' },
-  flechette: { name: 'Flechette', tag: 'FLCH', k: 2.6, apRound: true, dmgK: 0.75, spreadK: 0.7, desc: 'Steel darts: tight pattern, gets through soft armour.' },
+  birdshot: { name: 'Birdshot', tag: 'BIRD', k: 0.7, pelletsK: 2.5, spreadK: 1.5, desc: 'A cloud of tiny 0.2 g pellets: they shed their speed in a few centimetres of flesh. Painful, rarely lethal past a few metres; armour shrugs them off.' },
+  flechette: { name: 'Flechette', tag: 'FLCH', k: 2.6, spreadK: 0.7, desc: 'Hardened steel darts: a tight pattern, and narrow and hard enough to get through soft armour. Thin tracks.' },
   he: { name: 'HE grenade', tag: 'HE', k: 1, desc: '40 mm high explosive.' },
   broadhead: { name: 'Broadhead bolt', tag: 'BOLT', k: 1, desc: 'A hunting bolt.' },
   railslug: { name: 'Tungsten slug', tag: 'SLUG', k: 1, desc: 'Magnetically launched.' },
@@ -441,8 +429,8 @@ G.MUZZLE_V = {
   '9/19': [370, 4.5, 700], '5.7/29': [715, 10.4, 550], '11.43/23': [260, 5, 1600], '18.5/70': [400, 18, 70],
   '7.62/54': [830, 28, 1100], '12.7/99': [880, 29, 3000], '40/46': [76, 12, 2000], '7.65/17': [300, 4, 500],
   '12.7/33': [450, 6, 850], '9.07/33': [440, 4, 500], '12.7/41': [550, 8, 600], '4.6/30': [720, 7, 550],
-  '5.6/39': [880, 16, 900], '7.62/63': [820, 24, 1100], '9/39': [295, 7.9, 2000], '11.6/53': [600, 22, 700],
-  '8.6/69': [915, 27, 2000], '7.62/25': [450, 4.6, 600], '10.4/63': [330, 3, 60], '11.43/33': [290, 5, 900],
+  '5.6/39': [880, 16, 900], '5.8/42': [930, 18.2, 950], '7.62/63': [820, 24, 1100], '9/39': [295, 7.9, 2000], '11.6/53': [600, 22, 700],
+  '8.6/69': [915, 27, 2000], '7.62/25': [450, 4.6, 600], '10.4/63': [330, 3, 60], '11.43/33': [290, 5, 900], '10.9/33': [410, 6, 800],
   '5.6/15': [370, 4.1, 560], // (.22 LR: a 40-grain round from a pistol, about 85% of its speed left at 100 m)
   bolt: [120, 20, 300], cell: [2000, 20, 3000],
 };
@@ -455,7 +443,7 @@ G.roundSpeed = (def, am, d = 0) => {
   const cal = G.calOf(def), ref = G.MUZZLE_V[cal];
   if (!ref) return 0;
   const barrel = def.barrelIn || (G.GUN_SPECS[def.id] || {}).barrel || ref[1];
-  let v = ref[0] * Math.pow(Math.max(1, barrel) / ref[1], 0.2);
+  let v = ref[0] * Math.pow(Math.max(1, barrel) / ref[1], 0.2) * (def.velK || 1); // (velK: what the build adds besides its barrel's length)
   if (am === 'slug') v = Math.max(v, 470);
   if (G.AMMO[am] && G.AMMO[am].velK) v *= G.AMMO[am].velK; // (AP: a lighter, hard-cored bullet leaves faster)
   // subsonic loads, and guns built to be (the integrally suppressed MP5SD and VSS), stay under Mach 1
@@ -473,12 +461,12 @@ G.roundSpeed = (def, am, d = 0) => {
 G.CHARGE_GR = { // powder charge (grains)
   '5.56/45': 25, '7.62/39': 25, '7/43': 30, '7.62/51': 46, '9/19': 6, '5.7/29': 6.5, '11.43/23': 5.5, '18.5/70': 27,
   '7.62/54': 50, '12.7/99': 235, '40/46': 5, '7.65/17': 2.5, '12.7/33': 25, '9.07/33': 14, '12.7/41': 40, '4.6/30': 6,
-  '5.6/39': 23, '7.62/63': 50, '9/39': 15, '11.6/53': 55, '8.6/69': 90, '7.62/25': 8, '10.4/63': 14, '11.43/33': 9, '5.6/15': 2,
+  '5.6/39': 23, '5.8/42': 26, '7.62/63': 50, '9/39': 15, '11.6/53': 55, '8.6/69': 90, '7.62/25': 8, '10.4/63': 14, '11.43/33': 9, '10.9/33': 22, '5.6/15': 2,
 };
 G.GUN_KG = { // each gun as it comes (kg)
   m4: 2.9, ak: 3.5, f2: 3.6, g36: 3.6, br3: 3.4, scar: 3.6, tavor: 3.3, hk416: 3.5, aug: 3.6, galil: 3.4, an94: 3.85,
   ak74: 3.4, aks74u: 2.7, scarl: 3.3, m27: 3.6, fal: 4.3, m14: 4.5, mk14: 5.1, garand: 4.3, svd: 4.3, vss: 2.6, lever: 3.3,
-  sr25: 4.9, uzi: 1.5, mp5: 2.5, p90: 2.6, vector: 2.7, thompson: 4.9, ppsh: 3.6, mp5sd: 2.9, mpx: 2.7, ar9: 2.9, aug9: 3.3,
+  sr25: 4.9, uzi: 1.5, mp5: 2.5, p90: 2.6, vector: 2.7, thompson: 4.9, ppsh: 3.6, mp5sd: 2.9, mpx: 2.7, ar9: 2.9, aug9: 3.3, qbz95: 3.3, qbz192: 3.0, mcx: 2.7,
   pump: 3.6, dbl: 3.2, saiga: 3.6, aa12: 4.8, ksg: 3.6, slug: 3.6, benelli: 3.8, vepr: 4.0, m249: 7.5, pkm: 7.5, m60: 10.5,
   rpk: 4.8, shredder: 16, r700: 4.1, barrett: 14, mosin: 4.0, awm: 6.5, m32: 5.3, rail: 7.5, crossbow: 3.5,
   p9: 0.75, g19: 0.7, m1911: 1.1, usp: 0.75, auto9: 1.1, deagle: 2.0, rev: 1.1, hc500: 2.0, akimbo: 0.95, derringer: 0.4,
@@ -496,6 +484,17 @@ G.RECOIL_K = (() => {
   return k;
 })();
 G.RECOIL = { K: 0.2045, B: 1.35, A: 0.7, HAND: 1.3, GAS: 1.75 };
+// How much the aim wanders (js/player.js swayStep): sway, the slow breathing drift (heavier guns droop more), and
+// erratic, the quick twitch. A stock to your shoulder is what steadies a gun: a handgun with one (a derringer on a
+// stock-lug grip, a pistol with a shoulder stock) settles almost to a carbine's; a long gun with its stock taken off
+// (or folded away) is held out in the hands like a pistol, and heavier, and wanders worse than one. braced: the
+// build's (js/parts.js compile); a gun as it comes, by its class. score: the two together, an M4's about 1.
+G.aimSway = (def) => {
+  const hand = def.cls === 'PST' || def.cls === 'MP', braced = def.braced != null ? def.braced : !hand, kg = def.weight || G.GUN_KG[def.id] || 3;
+  const sway = braced ? G.U.clamp(0.75 + kg * 0.07, 0.8, 1.6) * (hand ? 0.9 : 1) : hand ? 1.25 : G.U.clamp(1.7 + kg * 0.12, 1.9, 2.8);
+  const erratic = braced ? (def.cls === 'SMG' ? 0.12 : hand ? 0.07 : 0.03) : hand ? 0.35 : 0.42;
+  return { sway, erratic, score: (sway + erratic * 2.5) / 1.05 };
+};
 // the push back of one shot (N·s) from this build with this load, or 0 (a bolt, a rail slug)
 G.recoilImpulse = (def, am) => {
   const g = G.GUN_SPECS[def.id], cal = G.calOf(def), ch = G.CHARGE_GR[cal];
@@ -572,21 +571,15 @@ G.roundDef = (def, am) => {
   const A = G.AMMO[am];
   if (!A || A.k === 1 && !A.tracer && !A.slug) return def;
   const d = Object.create(def);
-  if (A.dmgK) d.dmg = def.dmg * A.dmgK;
-  if (A.penD) d.pen = Math.max(0, (def.pen || 0) + A.penD);
-  if (A.apRound) d.apRound = true;
-  if (A.armorK) d.armorK = A.armorK;
   if (A.rangeK) d.range = def.range * A.rangeK;
   if (A.spreadK) { if (def.choke) d.choke = def.choke * A.spreadK; else { d.spread = def.spread * A.spreadK; d.ads = def.ads * A.spreadK; } } // a shot load opens (or tightens) the pattern
   if (A.pelletsK) d.pellets = Math.max(1, Math.round(def.pellets * A.pelletsK));
-  if (A.slug) { d.dmg = def.dmg * def.pellets * 0.55; d.pellets = 1; d.choke = 0; d.range = def.range * 2; d.pen = (def.pen || 0) + 1; }
+  if (A.slug) { d.pellets = 1; d.choke = 0; d.range = def.range * 2; }
   if (A.tracer) d.tracer = A.tracer;
   if (A.quiet) d.quiet = true;
   if (A.slug || A.velK || am === 'subsonic') { const I0 = G.recoilImpulse(def), I = G.recoilImpulse(def, am); if (I0 && I) d.recoil = def.recoil * Math.pow(I / I0, G.RECOIL.B); } // (a load that pushes harder or softer)
   return d;
 };
-// durability a round costs the armour it hits
-G.armorWear = (def) => (def.pellets > 1 ? 0.2 : G.threat(def) === 'rimfire' ? 0.25 : G.threat(def) === 'handgun' ? 0.5 : 1);
 
 // ---------------------------------------------------------------- enemy kit
 // What suspects carry moves up through gear tiers at its own pace with the level, the way the squad's own
@@ -597,7 +590,7 @@ G.ENEMY_GEAR = {
   // weapon pools by type, tiers 1-4
   weapons: {
     suspect: [['p9', 'rev', 'derringer', 'tx22'], ['p9', 'm1911', 'usp', 'rev', 'g19'], ['usp', 'm1911', 'g18', 'deagle', 'g19'], ['g18', 'deagle', 'usp']],
-    grunt: [['mac10', 'uzi', 'skorp', 'aks74u', 'ar9'], ['ak', 'mp5', 'uzi', 'thompson', 'aks74u', 'ak74', 'mpx'], ['ak', 'm4', 'galil', 'mp5', 'vector', 'ak74', 'scarl', 'aug9'], ['hk416', 'scar', 'an94', 'tavor', 'aug', 'scarl', 'm27']],
+    grunt: [['mac10', 'uzi', 'skorp', 'aks74u', 'ar9'], ['ak', 'mp5', 'uzi', 'thompson', 'aks74u', 'ak74', 'mpx'], ['ak', 'm4', 'galil', 'mp5', 'vector', 'ak74', 'scarl', 'aug9', 'qbz95'], ['hk416', 'scar', 'an94', 'tavor', 'aug', 'scarl', 'm27', 'qbz192', 'mcx']],
     rusher: [['sawn', 'dbl'], ['pump', 'dbl', 'sawn'], ['pump', 'saiga', 'ksg', 'vepr', 'benelli'], ['saiga', 'aa12', 'ksg', 'benelli', 'vepr']],
     marksman: [['lever', 'mosin'], ['mosin', 'r700', 'm14'], ['r700', 'svd', 'mk14', 'm14', 'sr25'], ['svd', 'awm', 'mk14', 'sr25']],
     heavy: [['pkm', 'rpk'], ['pkm', 'm249', 'rpk'], ['m249', 'pkm', 'm60', 'rpk'], ['m60', 'm249']],
@@ -606,9 +599,12 @@ G.ENEMY_GEAR = {
   // chance of a soft vest / steel plates / ceramic plates, and of a IIIA / rifle-rated helmet, by tier
   vest: [[0.04, 0, 0], [0.3, 0.05, 0], [0.4, 0.22, 0.06], [0.35, 0.3, 0.2]],
   helmet: [[0, 0], [0.1, 0], [0.28, 0.05], [0.35, 0.2]],
+  // on a helmet with no visor of its own, the chance of a mandible guard / a IIIA face shield / a rifle-rated one, by
+  // tier (js/gear.js f.*: the officers' own, drawn on the helmet and in the way of rounds just as theirs are)
+  face: [[0, 0, 0], [0.06, 0.02, 0], [0.16, 0.1, 0.02], [0.2, 0.18, 0.08]],
   // the Enforcer is always armoured, more heavily as tiers go up; the Kingpin wears the best
   fixed: {
-    heavy: { vest: ['steel', 'steel', 'ceramic', 'assault'], helmet: ['ach', 'ach', 'riflehelm', 'riflehelm'] },
+    heavy: { vest: ['steel', 'steel', 'ceramic', 'assault'], helmet: ['ach', 'ach', 'riflehelm', 'riflehelm'], face: [0, 0, 'f.mandible', 'f.shield'] },
     boss: { vest: ['assault', 'assault', 'assault', 'assault'], helmet: ['riflehelm', 'visor', 'visor', 'visor'] },
   },
 };

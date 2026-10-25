@@ -271,6 +271,89 @@ G.Furniture = (() => {
       for (const y of RACK_Y) k.box(shelf, 1.88, 0.03, 0.58, 0, y, 0);
       for (const [x, y, bw, bh, bd] of rackLoad(v)) { k.box(k.mat(k.pick(CARD), 0.95), bw, bh, bd, x, y + bh / 2, 0); k.box(k.mat(0xc8b48a, 0.6), bw + 0.002, 0.004, 0.05, x, y + 0.002 + bh, 0); }
     } };
+  // A convenience store's shelving: a low gondola, shelves both sides of a pegboard back (1.45 m: you see over it
+  // standing, not crouched), stocked with packets, tins and bottles
+  R.gondola = { w: 1.9, d: 0.9, cover: 1, boxes: [[0, 0, 1.9, 0.86, 1.45]], build(k) {
+    const frame = k.mat(k.pick([0xd8dcdc, 0x2f3a46, 0xb8463a]), 0.5, 0.3), shelf = k.mat(0xe8eaea, 0.4, 0.2);
+    k.box(frame, 1.9, 0.12, 0.86, 0, 0.06, 0);
+    k.box(frame, 1.9, 1.45, 0.05, 0, 0.725, 0);
+    for (const y of [0.42, 0.78, 1.14]) k.box(shelf, 1.88, 0.025, 0.84, 0, y, 0);
+    for (const sd of [-1, 1]) for (const y of [0.12, 0.42, 0.78, 1.14]) for (let x = -0.86; x < 0.86; x += 0.16 + k.rnd() * 0.08) {
+      if (k.rnd() < 0.15) continue; // (gaps where it's sold)
+      const h = 0.1 + k.rnd() * 0.18, w = 0.1 + k.rnd() * 0.06;
+      k.box(k.mat(k.pick(ACCENT.concat(CARD)), 0.6), w, h, 0.26, x + w / 2, y + 0.012 + h / 2, sd * 0.25);
+    }
+  } };
+  // The cashier's counter: a till, a card reader and a screen on it, a cigarette shelf behind
+  R.register = { w: 1.98, d: 0.64, cover: 1, boxes: [[0, 0, 1.98, 0.64, 0.92]], build(k) {
+    const cab = k.mat(0x3a3f45, 0.6), top = k.mat(0xd8d4cc, 0.35), dark = k.mat(0x16181a, 0.6), screen = k.mat(0x1a2a3a, 0.2, 0, { emissive: 0x2a4a6a });
+    k.box(cab, 1.96, 0.88, 0.58, 0, 0.44, -0.02);
+    k.box(top, 1.98, 0.04, 0.64, 0, 0.9, 0);
+    k.box(dark, 0.42, 0.12, 0.38, -0.4, 0.98, 0.02); // the till
+    k.box(dark, 0.36, 0.24, 0.03, -0.4, 1.16, -0.12); k.box(screen, 0.32, 0.2, 0.005, -0.4, 1.16, -0.103);
+    k.box(dark, 0.09, 0.03, 0.15, 0.25, 0.935, 0.18); // the card reader
+    k.box(k.mat(0xe8e2d0, 0.7), 0.5, 0.18, 0.3, 0.55, 1.01, -0.05); // a stack of papers and gum
+  } };
+  // Stock on a shelf, the way a corner store packs it: faced up to the edge, one thing after another along it (boxes,
+  // bottles, cans, bags), a price strip on the shelf's edge. (x0..x1 along the shelf at height y, its front edge at z
+  // facing dir (+1 or -1), d deep, up to h tall; under: a shelf over it, its shadow on the stock.)
+  function shelfStock(k, x0, x1, y, z, dir, d, h, under) {
+    k.box(k.mat(k.pick([0xf2efe6, 0xf5d020, 0xe8eef2]), 0.5), x1 - x0, 0.035, 0.012, (x0 + x1) / 2, y + 0.005, z + dir * 0.006); // the price strip
+    for (let x = x0 + 0.01; x < x1 - 0.06;) {
+      const kind = k.rnd(), lb = k.label(), n = 2 + Math.floor(k.rnd() * 3); // (a facing: a few of the same, side by side)
+      const m = k.pack(kind < 0.35 || kind >= 0.8 ? 'card' : kind < 0.6 ? 'bottle' : 'tin', under ? 0.72 : 1), ry = dir < 0 ? Math.PI : 0; // (the label to the aisle)
+      for (let j = 0; j < n && x < x1 - 0.06; j++) {
+        if (kind < 0.35) { const w = 0.08 + k.rnd() * 0.05, hh = Math.min(h, 0.18 + k.rnd() * 0.14); k.boxL(m, lb, w, hh, d * 0.9, x + w / 2, y + hh / 2 + 0.02, z - dir * d * 0.47, ry); x += w + 0.008; } // boxes
+        else if (kind < 0.6) { const r = 0.035 + k.rnd() * 0.012, hh = Math.min(h, 0.2 + k.rnd() * 0.12); for (const zz of [0.25, 0.6]) k.cylL(m, lb, r * 0.5, r, hh, x + r, y + hh / 2 + 0.02, z - dir * d * zz, 8); x += 2 * r + 0.01; } // bottles
+        else if (kind < 0.8) { const r = 0.035, hh = Math.min(h, 0.12); for (const zz of [0.2, 0.5, 0.8]) k.cylL(m, lb, r, r, hh, x + r, y + hh / 2 + 0.02, z - dir * d * zz, 8); x += 2 * r + 0.006; } // cans
+        else { const w = 0.14 + k.rnd() * 0.06, hh = Math.min(h, 0.2 + k.rnd() * 0.08); k.boxL(m, lb, w, hh, d * 0.6, x + w / 2, y + hh / 2 + 0.02, z - dir * d * 0.35, ry, 0.12); x += w + 0.01; } // bags, leaning (back, against the shelf: turned with the label)
+      }
+      x += 0.01;
+    }
+  }
+  // A two-sided aisle of shelving (gondola), 2.6 m long, 1.6 m tall: a pegboard spine, four shelves each side packed with
+  // stock, a sign along the top.
+  R.aisle = { w: 2.6, d: 1.2, cover: 1, boxes: [[0, 0, 2.6, 1.15, 1.6]], build(k) {
+    const frame = k.mat(k.pick([0xe8eaea, 0xd8dcdc, 0x3a4048]), 0.5, 0.3), shelf = k.mat(0xdfe2e2, 0.4, 0.3);
+    k.box(frame, 2.6, 1.6, 0.06, 0, 0.8, 0); k.box(frame, 2.6, 0.12, 1.15, 0, 0.06, 0);
+    for (const x of [-1.29, 1.29]) k.box(frame, 0.03, 1.6, 1.15, x, 0.8, 0);
+    for (const sd of [-1, 1]) for (const y of [0.12, 0.5, 0.88, 1.26]) {
+      if (y > 0.12) k.box(shelf, 2.56, 0.025, 0.52, 0, y, sd * 0.31);
+      shelfStock(k, -1.27, 1.27, y + 0.012, sd * 0.57, sd, 0.5, 0.34, y < 1.2);
+    }
+    k.box(k.mat(k.pick([0xd83a2a, 0x2a6ad8, 0x2ab04a, 0xf07a1a]), 0.5), 1.2, 0.22, 0.04, 0, 1.75, 0); // the aisle sign
+  } };
+  // Shelving against a wall, floor to well over your head: five shelves of stock, a sign along the top.
+  R.shopwall = { w: 1.98, d: 0.5, boxes: [[0, 0, 1.98, 0.5, 2.0]], build(k) {
+    const frame = k.mat(k.pick([0xe8eaea, 0x3a4048]), 0.5, 0.3), shelf = k.mat(0xdfe2e2, 0.4, 0.3);
+    k.box(frame, 1.98, 2.0, 0.04, 0, 1.0, -0.23); k.box(frame, 1.98, 0.12, 0.48, 0, 0.06, 0);
+    for (const y of [0.12, 0.48, 0.84, 1.2, 1.56]) { if (y > 0.12) k.box(shelf, 1.96, 0.025, 0.46, 0, y, 0); shelfStock(k, -0.97, 0.97, y + 0.012, 0.24, 1, 0.44, 0.32, y < 1.5); }
+    k.box(k.mat(k.pick([0xd83a2a, 0x2a6ad8, 0xf0c020]), 0.5), 1.98, 0.25, 0.03, 0, 2.1, -0.2);
+  } };
+  // An endcap: a low display at the end of an aisle, cases of soda stacked on it and a promotion over them.
+  R.endcap = { w: 1.2, d: 0.5, cover: 1, boxes: [[0, 0, 1.2, 0.5, 1.3]], build(k) {
+    const frame = k.mat(0xe8eaea, 0.5, 0.3), card = k.pack('card'), c = [k.label(), k.label()];
+    k.box(frame, 1.2, 0.12, 0.48, 0, 0.06, 0);
+    for (let l = 0; l < 3; l++) for (let i = 0; i < 3; i++) k.boxL(card, c[(l + i) % 2], 0.38, 0.3, 0.44, -0.4 + i * 0.4, 0.27 + l * 0.31, 0);
+    k.box(k.mat(0xf5d020, 0.5), 0.6, 0.35, 0.02, 0, 1.25, -0.2); k.box(k.mat(0xd83a2a, 0.5), 0.5, 0.12, 0.022, 0, 1.25, -0.2);
+  } };
+  // The cigarettes behind the till: a wall cabinet of packs in rows, a lit sign over it.
+  R.tobacco = { w: 1.98, d: 0.45, boxes: [[0, 0, 1.98, 0.45, 2.2]], build(k) {
+    const body = k.mat(0x2a2c30, 0.5, 0.3), card = k.pack('card'), packs = [0, 1, 2, 3, 4, 5].map(() => k.label());
+    k.box(body, 1.98, 2.0, 0.42, 0, 1.0, 0); k.box(k.mat(0xb8bcc0, 0.4, 0.3), 1.98, 0.9, 0.5, 0, 0.45, 0.02);
+    for (let r = 0; r < 6; r++) for (let i = 0; i < 16; i++) k.boxL(card, k.pick(packs), 0.09, 0.13, 0.02, -0.88 + i * 0.117, 1.0 + r * 0.16, 0.215);
+    k.box(k.mat(0xffffff, 0.5, 0, { emissive: 0xd83a2a, emissiveIntensity: 0.9 }), 1.6, 0.18, 0.03, 0, 2.08, 0.2);
+  } };
+  R.atm = { w: 0.65, d: 0.6, cover: 1, boxes: [[0, 0, 0.6, 0.6, 1.6]], build(k) {
+    const body = k.mat(0x3a4a5a, 0.5, 0.4), dark = k.mat(0x16181a, 0.5);
+    k.box(body, 0.6, 1.25, 0.58, 0, 0.625, 0); k.box(body, 0.6, 0.4, 0.3, 0, 1.4, -0.14, 0, -0.3);
+    k.box(k.screen(), 0.3, 0.22, 0.01, 0, 1.38, 0.03, 0, -0.3); k.box(dark, 0.26, 0.04, 0.12, 0, 1.0, 0.33); k.box(k.mat(0x30a040, 0.5, 0, { emissive: 0x208030, emissiveIntensity: 1 }), 0.12, 0.02, 0.005, 0.15, 1.1, 0.292);
+  } };
+  R.icechest = { w: 1.3, d: 0.75, cover: 1, boxes: [[0, 0, 1.3, 0.75, 1.05]], build(k) {
+    const white = k.mat(0xeef2f4, 0.45, 0.2), blue = k.mat(0x2a6ad8, 0.5);
+    k.box(white, 1.3, 0.95, 0.75, 0, 0.5, 0); k.box(white, 1.32, 0.08, 0.77, 0, 1.01, 0);
+    k.box(blue, 1.0, 0.3, 0.01, 0, 0.6, 0.376); k.box(white, 0.4, 0.12, 0.012, 0, 0.6, 0.38); // ICE, in white on blue
+  } };
   R.crates = { w: 1.7, d: 1.7, cover: 1, boxes: (v) => v < 0.5 ? [[0, 0, 1.6, 1.6, 1.1], [0.25, -0.2, 0.8, 0.8, 1.75]] : [[0, 0, 1.6, 1.6, 1.1]], build(k, v) {
     const c = k.crate();
     k.box(c, 1.6, 1.1, 1.6, 0, 0.55, 0);
@@ -559,7 +642,7 @@ G.Furniture = (() => {
   // ---------------------------------------------------------------- the town square and the car park
   // A parked car, nose to +z: body, cabin and glass, wheels, lights. Solid cover across two tiles.
   const CAR = [0x8a1c1c, 0x1c3a6a, 0xd8d8d4, 0x2a2a2c, 0x6a6e72, 0x2e5a3a, 0xc8a040, 0x5a2a5a, 0xe8e4da, 0x3a4a5a];
-  R.car = { w: 1.9, d: 4.3, cover: 1, boxes: [[0, 0, 1.82, 4.25, 1.45]], build(k, v) {
+  R.car = { w: 1.9, d: 4.3, cover: 1, boxes: [[0, 0, 1.8, 4.22, 0.93], [0, -0.2, 1.62, 2.1, 1.43, 0.93]], build(k, v) { // (the body, then the cabin on it: over the bonnet and the boot is open air)
     const paint = k.mat(CAR[Math.floor(v * CAR.length) % CAR.length], 0.35, 0.5), glass = k.mat(0x0c1218, 0.1, 0.6), tyre = k.mat(0x111112, 0.9), trim = k.mat(0x1c1c1e, 0.6);
     k.box(paint, 1.8, 0.62, 4.2, 0, 0.62, 0);
     k.box(paint, 1.62, 0.5, 2.1, 0, 1.18, -0.2);
@@ -570,7 +653,7 @@ G.Furniture = (() => {
     for (const x of [-0.66, 0.66]) { k.box(k.mat(0xf2efe6, 0.3, 0, { emissive: 0x303030 }), 0.3, 0.1, 0.02, x, 0.74, 2.105); k.box(k.mat(0x8a1010, 0.4, 0, { emissive: 0x200404 }), 0.32, 0.1, 0.02, x, 0.74, -2.105); }
   } };
   // A patrol car, nose to +z: black and white, its light bar lit (red and blue), a push bar on the front.
-  R.police = { w: 1.9, d: 4.6, cover: 1, boxes: [[0, 0, 1.84, 4.5, 1.5]], build(k) {
+  R.police = { w: 1.9, d: 4.6, cover: 1, boxes: [[0, 0, 1.84, 4.42, 0.93], [0, -0.2, 1.64, 2.15, 1.43, 0.93], [0, -0.15, 1.3, 0.36, 1.57, 1.43], [0, 2.28, 1.2, 0.14, 0.87, 0.37]], build(k) {
     const black = k.mat(0x111214, 0.35, 0.5), white = k.mat(0xeceae4, 0.35, 0.4), glass = k.mat(0x0c1218, 0.1, 0.6), tyre = k.mat(0x111112, 0.9), trim = k.mat(0x1c1c1e, 0.6);
     k.box(black, 1.82, 0.62, 4.4, 0, 0.62, 0);
     k.box(white, 1.84, 0.5, 2.0, 0, 0.66, -0.15); // the doors
@@ -608,6 +691,205 @@ G.Furniture = (() => {
     k.cyl(water, 0.62, 0.62, 0.02, 0, 1.66, 0, 18);
     k.cyl(stone, 0.12, 0.16, 0.5, 0, 1.9, 0, 10);
   } };
+  // ---------------------------------------------------------------- a foundry (js/level.js layFoundry)
+  // fx: what a piece throws off (G.Level.buildFx: 'sparks' and 'jet' along dir, 'embers' off a molten surface r across,
+  // 'smoke', 'steam'), glow: the light it gives (a lamp of its own); both in its own frame, from the floor up.
+  const MOLTEN = [0xffc060, 0.4, 0, { emissive: 0xff7010, emissiveIntensity: 2.6 }], DULL = [0x7a3010, 0.6, 0, { emissive: 0xb02a06, emissiveIntensity: 1.1 }];
+  // An electric arc furnace (across 2 x 2 tiles): a squat steel shell on its tilting rockers, its water-cooled panels'
+  // headers round it, the refractory roof, three graphite electrodes down through it from their arms on the mast at
+  // the back; the slag door glowing at the front, the tapping spout under it.
+  R.furnace = { w: 3.9, d: 3.9, cover: 1, boxes: [[0, 0, 3.4, 3.4, 3.3]], fx: [{ kind: 'sparks', y: 1.5, z: 1.75, r: 0.4, dir: [0, 0.35, 1] }, { kind: 'smoke', y: 3.6, r: 0.6, rate: 1.6 }], glow: { y: 1.8, z: 2.3, color: 0xff6a20, i: 0.55, d: 9 }, build(k) {
+    const shell = k.mat(0x3d4246, 0.55, 0.6), rust = k.mat(0x5a4436, 0.8, 0.3), roof = k.mat(0x6a6660, 0.85), brick = k.mat(0x7a4a36, 0.9);
+    const graphite = k.mat(0x2a2a2c, 0.5, 0.3), arm = k.mat(0x8a8f94, 0.45, 0.7), pipe = k.mat(0x2f5a7a, 0.5, 0.5), hot = k.mat(...MOLTEN), warm = k.mat(...DULL);
+    for (const x of [-1.1, 1.1]) k.box(rust, 0.5, 0.45, 3.4, x, 0.225, 0); // the rockers
+    k.box(shell, 3.4, 0.2, 3.4, 0, 0.55, 0); // the cradle
+    k.cyl(shell, 1.62, 1.5, 2.1, 0, 1.7, 0, 22); // the shell
+    for (const y of [1.0, 1.55, 2.1, 2.6]) k.cyl(pipe, 1.67, 1.67, 0.07, 0, y, 0, 22);
+    k.cyl(roof, 1.2, 1.7, 0.5, 0, 3.0, 0, 22); k.cyl(brick, 0.7, 0.9, 0.2, 0, 3.35, 0, 16);
+    // the mast at the back corner, an arm from it to each electrode
+    const mx = 1.35, mz = -1.35;
+    k.box(arm, 0.42, 6.3, 0.42, mx, 3.15, mz);
+    for (let i = 0; i < 3; i++) {
+      const a = i * Math.PI * 2 / 3 + 0.6, x = Math.cos(a) * 0.45, z = Math.sin(a) * 0.45, y = 5.5 + i * 0.25, dx = x - mx, dz = z - mz;
+      k.cyl(graphite, 0.17, 0.17, 3.2, x, 4.85, z, 10);
+      k.box(arm, Math.hypot(dx, dz), 0.22, 0.26, (x + mx) / 2, y, (z + mz) / 2, Math.atan2(-dz, dx));
+      k.box(arm, 0.5, 0.36, 0.5, x, y, z); // the clamp
+      k.cyl(pipe, 0.05, 0.05, y - 3.4, x + 0.2, (y + 3.4) / 2, z + 0.2, 6); // (its cooling water)
+    }
+    k.box(warm, 0.9, 0.55, 0.06, 0, 1.55, 1.6); k.box(hot, 0.6, 0.3, 0.02, 0, 1.5, 1.64); // the slag door, white hot inside
+    k.box(shell, 1.1, 0.75, 0.2, 0, 1.55, 1.52); // its frame (round the door)
+    k.box(rust, 0.5, 0.22, 0.9, 0, 1.0, 1.85, 0, 0.18); k.box(warm, 0.3, 0.02, 0.8, 0, 1.12, 1.85, 0, 0.18); // the tapping spout
+    for (const x of [-0.9, 0.9]) k.cyl(pipe, 0.08, 0.08, 3.2, x, 1.6, -1.6, 8); // water down the back
+  } };
+  // A ladle of molten steel on its stand (across 2 x 2 tiles): a tapering steel shell banded round, the bail over it on
+  // its trunnions, the lip lined with refractory brick and the steel in it glowing, a crust of slag on it here and there.
+  R.vat = { w: 3.9, d: 3.9, cover: 1, boxes: [[0, 0, 3.1, 3.1, 2.05]], fx: [{ kind: 'embers', y: 2.04, r: 1.1 }, { kind: 'smoke', y: 2.4, r: 1.0, rate: 2.4 }], glow: { y: 2.9, color: 0xff7a28, i: 0.7, d: 10 }, build(k) {
+    const steel = k.mat(0x44484c, 0.7, 0.5), rim = k.mat(0x2e3134, 0.6, 0.6), brick = k.mat(0x6e5244, 0.9), crust = k.mat(0x2a2220, 0.95), hot = k.mat(...MOLTEN);
+    for (const x of [-1.25, 1.25]) for (const z of [-1.25, 1.25]) k.box(steel, 0.3, 0.62, 0.3, x, 0.31, z); // the stand
+    for (const z of [-1.25, 1.25]) k.box(steel, 3.0, 0.14, 0.3, 0, 0.62, z);
+    k.cyl(steel, 1.42, 1.15, 1.35, 0, 1.3, 0, 24);
+    for (const [y, rr] of [[0.92, 1.24], [1.45, 1.36]]) k.cyl(rim, rr, rr, 0.09, 0, y, 0, 24);
+    k.cyl(rim, 1.5, 1.5, 0.12, 0, 1.96, 0, 24); // the lip
+    k.cyl(brick, 1.34, 1.34, 0.02, 0, 2.03, 0, 24);
+    k.cyl(hot, 1.24, 1.24, 0.02, 0, 2.045, 0, 24); // the steel
+    for (let i = 0; i < 6; i++) { const a = k.rnd() * 6.283, rr = 0.3 + k.rnd() * 0.75; k.box(crust, 0.15 + k.rnd() * 0.25, 0.02, 0.12 + k.rnd() * 0.2, Math.cos(a) * rr, 2.06, Math.sin(a) * rr, k.rnd() * 3); }
+    k.box(rim, 0.36, 0.14, 0.42, 0, 1.98, 1.55); // the pouring lip
+    for (const x of [-1, 1]) { k.cylX(rim, 0.17, 0.17, 0.32, x * 1.55, 1.55, 0); k.box(steel, 0.14, 1.95, 0.32, x * 1.69, 2.45, 0); } // the trunnions, the bail's arms
+    k.box(steel, 3.52, 0.22, 0.32, 0, 3.42, 0); k.box(rim, 0.3, 0.4, 0.12, 0, 3.72, 0); // the bail, the crane's eye
+  } };
+  // An ingot mould table: two rows of iron moulds on a frame, some of them full and still glowing, some cooled.
+  R.moulds = { w: 1.98, d: 1.9, cover: 1, boxes: [[0, 0, 1.9, 1.5, 0.8]], fx: [{ kind: 'embers', y: 0.78, r: 0.6, rate: 1.2 }], glow: { y: 1.3, color: 0xff7a30, i: 0.15, d: 4 }, build(k) {
+    const iron = k.mat(0x2c2e30, 0.75, 0.5), frame = k.mat(0x4a4e52, 0.6, 0.5), cool = k.mat(0x8a8e92, 0.4, 0.8), hot = k.mat(...MOLTEN), dull = k.mat(...DULL);
+    for (const x of [-0.85, 0.85]) for (const z of [-0.65, 0.65]) k.box(frame, 0.1, 0.6, 0.1, x, 0.3, z);
+    k.box(frame, 1.9, 0.08, 1.5, 0, 0.62, 0);
+    for (const z of [-0.36, 0.36]) for (let i = 0; i < 4; i++) {
+      const x = -0.68 + i * 0.45;
+      k.box(iron, 0.4, 0.14, 0.6, x, 0.73, z);
+      k.box(k.pick([hot, dull, cool, cool, dull]), 0.3, 0.02, 0.48, x, 0.8, z);
+    }
+  } };
+  // A bank of electrical cabinets against a wall: doors with their handles, lights and a screen on each, a warning sign.
+  R.panel = { w: 1.9, d: 0.6, boxes: [[0, 0, 1.9, 0.55, 2.1]], build(k) {
+    const grey = k.mat(k.pick([0x8a9298, 0x6d7a84, 0xb8bcb4]), 0.5, 0.3), dark = k.mat(0x1a1c1e, 0.6), yel = k.mat(0xf0c020, 0.6);
+    const red = k.mat(0xff3020, 0.4, 0, { emissive: 0xff2010, emissiveIntensity: 1.5 }), green = k.mat(0x30ff60, 0.4, 0, { emissive: 0x20d040, emissiveIntensity: 1.5 });
+    k.box(dark, 1.9, 0.1, 0.52, 0, 0.05, -0.02); k.box(grey, 1.9, 2.0, 0.5, 0, 1.1, -0.02);
+    for (const x of [-0.63, 0, 0.63]) {
+      k.box(dark, 0.01, 1.9, 0.006, x + 0.315, 1.1, 0.232);
+      k.box(dark, 0.03, 0.16, 0.04, x + 0.24, 1.1, 0.24);
+      for (let j = 0; j < 3; j++) k.box(k.rnd() < 0.75 ? green : red, 0.035, 0.035, 0.02, x - 0.18 + j * 0.07, 1.78, 0.236);
+      k.box(k.screen(), 0.22, 0.14, 0.01, x - 0.05, 1.55, 0.234);
+      if (k.rnd() < 0.5) k.box(yel, 0.16, 0.14, 0.006, x - 0.05, 1.3, 0.235); // (the lightning-bolt sign)
+    }
+  } };
+  // A charging bucket of scrap for the furnace: an open steel bin heaped with rusted offcuts.
+  R.scrap = { w: 1.9, d: 1.9, cover: 1, boxes: [[0, 0, 1.8, 1.6, 1.15]], build(k) {
+    const bin = k.mat(0x4a3f36, 0.85, 0.4), RUST = [0x6a4a36, 0x5a5048, 0x7a5a40, 0x4a4a4c, 0x8a6a4a, 0x3a3634];
+    k.box(bin, 1.8, 0.08, 1.6, 0, 0.04, 0);
+    for (const s of [-1, 1]) { k.box(bin, 1.8, 1.1, 0.06, 0, 0.55, s * 0.77); k.box(bin, 0.06, 1.1, 1.6, s * 0.87, 0.55, 0); k.box(bin, 0.12, 0.2, 0.3, s * 0.95, 0.95, 0); }
+    k.box(k.mat(0x3a302a, 1), 1.68, 0.7, 1.48, 0, 0.5, 0); // (the heap's mass, under what shows)
+    for (let i = 0; i < 18; i++) {
+      const m = k.mat(k.pick(RUST), 0.9, 0.3), x = (k.rnd() - 0.5) * 1.5, z = (k.rnd() - 0.5) * 1.3, y = 0.85 + k.rnd() * 0.3;
+      if (k.rnd() < 0.4) k.cyl(m, 0.04 + k.rnd() * 0.05, 0.04 + k.rnd() * 0.05, 0.4 + k.rnd() * 0.5, x, y, z, 6, k.rnd() * 3);
+      else k.box(m, 0.15 + k.rnd() * 0.5, 0.03 + k.rnd() * 0.1, 0.1 + k.rnd() * 0.35, x, y, z, k.rnd() * 6, (k.rnd() - 0.5) * 1.2);
+    }
+  } };
+  // A roller conveyor (one tile of a processing line, running along x): rollers between two side beams on legs, a billet
+  // on it now and then, a hot one glowing.
+  R.conveyor = { w: 1.98, d: 1.2, cover: 1, boxes: [[0, 0, 1.98, 1.1, 0.92]], build(k, v) {
+    const frame = k.mat(k.pick([0x3f6e9a, 0xc89a20, 0x4a5a3a]), 0.5, 0.4), roller = k.mat(0x9aa0a6, 0.3, 0.8), dark = k.mat(0x2a2c2e, 0.6, 0.5);
+    for (const x of [-0.85, 0.85]) for (const z of [-0.45, 0.45]) k.box(dark, 0.08, 0.8, 0.08, x, 0.4, z);
+    for (const z of [-0.5, 0.5]) k.box(frame, 1.98, 0.16, 0.08, 0, 0.82, z);
+    for (let x = -0.9; x <= 0.91; x += 0.18) k.cyl(roller, 0.05, 0.05, 0.94, x, 0.84, 0, 10, Math.PI / 2);
+    if (v < 0.55) k.box(v < 0.22 ? k.mat(...MOLTEN) : k.mat(0x6a6e72, 0.5, 0.7), 1.6, 0.16, 0.16, (v * 7 % 1 - 0.5) * 0.3, 0.97, 0);
+  } };
+  // A rolling mill stand (one tile of the line): a housing post each side, the two work rolls across between them, the
+  // screw-down on top, steam off the rolls.
+  R.mill = { w: 1.98, d: 1.9, cover: 1, boxes: [[0, 0, 1.3, 1.9, 2.7]], fx: [{ kind: 'steam', y: 1.3, r: 0.5, rate: 2.2 }], build(k) {
+    const housing = k.mat(k.pick([0x4d6f8f, 0x5a6a50, 0x8a4a2a]), 0.55, 0.4), roll = k.mat(0xc8ccd0, 0.2, 0.9), dark = k.mat(0x2a2c2e, 0.6, 0.5);
+    k.box(dark, 1.5, 0.2, 1.98, 0, 0.1, 0);
+    for (const z of [-0.78, 0.78]) { k.box(housing, 1.2, 2.5, 0.3, 0, 1.45, z); k.box(dark, 0.5, 0.9, 0.32, 0, 1.0, z); } // (the window the chocks ride in)
+    k.box(housing, 1.3, 0.32, 1.9, 0, 2.55, 0);
+    for (const y of [0.76, 1.22]) k.cyl(roll, 0.22, 0.22, 1.36, 0, y, 0, 18, Math.PI / 2);
+    k.cyl(dark, 0.12, 0.12, 0.45, 0, 2.92, 0, 10);
+    k.box(k.mat(0xf0c020, 0.6), 1.22, 0.06, 0.32, 0, 2.2, -0.78); // (a stripe of warning paint)
+  } };
+  // A hot saw (one tile of the line): a guard over the blade across the line, the motor behind; sparks off it while it cuts.
+  R.saw = { w: 1.98, d: 1.6, cover: 1, boxes: [[0, 0, 1.4, 1.5, 1.75]], fx: [{ kind: 'jet', y: 0.95, z: 0.45, r: 0.1, dir: [0, 0.35, 1] }], build(k) {
+    const body = k.mat(k.pick([0xc8a020, 0xb84a2a, 0x4a6a8a]), 0.5, 0.4), dark = k.mat(0x2a2c2e, 0.6, 0.5), blade = k.mat(0xd0d4d8, 0.2, 0.9);
+    k.box(dark, 1.4, 0.7, 1.4, 0, 0.35, 0);
+    k.cylX(body, 0.66, 0.66, 0.2, 0, 1.15, -0.05, 22); k.cylX(blade, 0.6, 0.6, 0.02, 0, 1.0, 0.1, 22);
+    k.box(body, 0.6, 0.6, 0.7, 0.3, 1.2, -0.5); k.cylX(dark, 0.16, 0.16, 0.5, -0.1, 1.2, -0.5, 10); // the motor, its spindle
+    for (const s of [-1, 1]) k.box(k.mat(0xf0c020, 0.6), 0.04, 0.4, 1.0, s * 0.68, 0.5, 0); // (warning paint)
+  } };
+  // A hydraulic forging press (one tile of the line): four columns between the bed and the crown, the ram on them, its
+  // cylinder on top.
+  R.press = { w: 1.98, d: 1.9, cover: 1, boxes: [[0, 0, 1.8, 1.7, 3.4]], build(k) {
+    const body = k.mat(k.pick([0x3a5a7a, 0x5a5f63, 0x7a3a2a]), 0.5, 0.5), chrome = k.mat(0xd8dce0, 0.15, 0.95), dark = k.mat(0x2a2c2e, 0.6, 0.5);
+    k.box(body, 1.8, 0.7, 1.7, 0, 0.35, 0); k.box(body, 1.8, 0.6, 1.7, 0, 3.1, 0);
+    for (const x of [-0.72, 0.72]) for (const z of [-0.62, 0.62]) k.cyl(chrome, 0.1, 0.1, 2.2, x, 1.8, z, 12);
+    k.box(dark, 1.3, 0.5, 1.2, 0, 2.2, 0); k.cyl(body, 0.4, 0.4, 0.45, 0, 3.6, 0, 16);
+    k.cyl(k.mat(0x1a1a1a, 0.7), 0.03, 0.03, 2.6, 0.85, 2.0, -0.8, 6); // (a hydraulic line)
+  } };
+  // A quench tank at the end of the line: a steel tank of water, steam off it.
+  R.quench = { w: 1.98, d: 1.5, cover: 1, boxes: [[0, 0, 1.9, 1.4, 0.95]], fx: [{ kind: 'steam', y: 0.95, r: 0.8, rate: 3.5 }], build(k) {
+    const steel = k.mat(0x5a5f63, 0.55, 0.6), water = k.mat(0x2a3e48, 0.08, 0.3);
+    k.box(steel, 1.9, 0.08, 1.4, 0, 0.04, 0);
+    for (const s of [-1, 1]) { k.box(steel, 1.9, 0.95, 0.06, 0, 0.475, s * 0.67); k.box(steel, 0.06, 0.95, 1.4, s * 0.92, 0.475, 0); }
+    k.box(water, 1.78, 0.02, 1.28, 0, 0.82, 0);
+  } };
+  // A forklift (across two tiles, lengthwise; the forks at the front, +z): the body and its counterweight, the seat
+  // under the overhead guard, the mast with the carriage and forks down.
+  R.forklift = { w: 1.4, d: 3.4, cover: 1, boxes: [[0, -0.55, 1.25, 2.3, 1.2], [0, -0.5, 1.15, 1.4, 2.2, 2.1], [0, 0.78, 1.0, 0.25, 2.3], [0, 1.28, 0.95, 0.9, 0.12]], build(k) {
+    const paint = k.mat(k.pick([0xe0b020, 0xd86a1a, 0x3a7a3a, 0xc02a1a]), 0.5, 0.2), black = k.mat(0x1a1a1a, 0.7), cw = k.mat(0x3a3c3e, 0.6, 0.4), steel = k.mat(0x5a5e62, 0.4, 0.6), chrome = k.mat(0xd0d4d8, 0.15, 0.9);
+    k.box(paint, 1.2, 0.55, 1.9, 0, 0.6, -0.4); k.box(cw, 1.25, 0.75, 0.45, 0, 0.65, -1.45); // the body, the counterweight
+    k.box(black, 0.5, 0.12, 0.45, 0, 0.95, -0.75); k.box(black, 0.5, 0.45, 0.08, 0, 1.22, -0.98, 0, -0.15); // the seat
+    k.box(black, 0.36, 0.42, 0.16, 0, 1.05, -0.12); k.cyl(black, 0.16, 0.16, 0.03, 0, 1.3, -0.26, 14, -0.9); // the dash, the wheel
+    for (const z of [0.3, -1.2]) for (const s of [-1, 1]) { k.cylX(black, 0.3, 0.3, 0.26, s * 0.5, 0.3, z, 14); k.cylX(steel, 0.14, 0.14, 0.27, s * 0.5, 0.3, z, 10); }
+    for (const x of [-0.54, 0.54]) for (const z of [-1.18, 0.12]) k.box(black, 0.06, 1.3, 0.06, x, 1.5, z); // the overhead guard
+    k.box(black, 1.15, 0.05, 1.4, 0, 2.15, -0.53);
+    k.box(k.mat(0xff8a10, 0.5, 0, { emissive: 0xff6a00, emissiveIntensity: 1.6 }), 0.1, 0.08, 0.1, 0, 2.22, -1.0); // the beacon
+    for (const x of [-0.38, 0.38]) k.box(steel, 0.1, 2.3, 0.14, x, 1.15, 0.72); // the mast
+    k.box(steel, 0.86, 0.08, 0.1, 0, 2.25, 0.72); k.cyl(chrome, 0.04, 0.04, 1.6, 0, 1.1, 0.66, 8);
+    k.box(black, 0.9, 0.4, 0.06, 0, 0.38, 0.84); // the carriage
+    for (const x of [-0.28, 0.28]) { k.box(steel, 0.1, 0.45, 0.05, x, 0.28, 0.86); k.box(steel, 0.1, 0.05, 0.95, x, 0.06, 1.3); } // the forks
+  } };
+  // Raw stock on pallets: billets (square bars in layers, sticks between, banded), ingots (stacked crosswise), coils
+  // of strip steel lying on a cradle.
+  R.billets = { w: 1.9, d: 1.4, cover: 1, boxes: [[0, 0, 1.85, 1.25, 0.9]], build(k) {
+    const wood = k.mat(0x8a6a44, 0.9), band = k.mat(0x2a4a8a, 0.5, 0.4), BAR = [0x6a6e72, 0x5e5a56, 0x7a6a5a, 0x6e5444];
+    for (const z of [-0.5, 0, 0.5]) k.box(wood, 1.85, 0.12, 0.12, 0, 0.06, z);
+    for (let l = 0; l < 4; l++) {
+      const y = 0.18 + l * 0.17;
+      for (let i = 0; i < 6; i++) k.box(k.mat(k.pick(BAR), 0.55, 0.7), 1.8, 0.13, 0.13, 0, y, -0.48 + i * 0.19);
+      if (l < 3) for (const x of [-0.6, 0.6]) k.box(wood, 0.06, 0.04, 1.2, x, y + 0.085, 0);
+    }
+    for (const x of [-0.75, 0.75]) k.box(band, 0.03, 0.72, 1.24, x, 0.48, 0);
+  } };
+  R.ingots = { w: 1.5, d: 1.5, cover: 1, boxes: [[0, 0, 1.3, 1.3, 1.0]], build(k) {
+    const wood = k.mat(0x8a6a44, 0.9), m = k.pick([[0xb8bcc0, 0.35, 0.8], [0xb06a3a, 0.35, 0.8], [0x6a6e72, 0.5, 0.7]]), metal = k.mat(...m);
+    for (const z of [-0.5, 0, 0.5]) k.box(wood, 1.3, 0.12, 0.12, 0, 0.06, z);
+    for (let l = 0; l < 7; l++) for (let i = 0; i < 4; i++) {
+      const y = 0.18 + l * 0.12, o = -0.45 + i * 0.3;
+      if (l % 2) k.box(metal, 0.26, 0.11, 1.25, o, y, 0); else k.box(metal, 1.25, 0.11, 0.26, 0, y, o);
+    }
+  } };
+  R.coils = { w: 1.9, d: 1.9, cover: 1, boxes: [[0, 0, 1.8, 1.5, 1.35]], build(k) {
+    const steel = k.mat(k.pick([0x8a8e92, 0x6a6e72, 0x9a7a5a]), 0.35, 0.8), dark = k.mat(0x1c1d1e, 0.8), cradle = k.mat(0x4a3f36, 0.8, 0.4), band = k.mat(0x2a4a8a, 0.5, 0.4);
+    for (const z of [-0.5, 0.5]) k.box(cradle, 1.8, 0.14, 0.3, 0, 0.07, z);
+    for (const x of [-0.45, 0.45]) {
+      k.cylX(steel, 0.65, 0.65, 0.78, x, 0.72, 0, 26); k.cylX(dark, 0.26, 0.26, 0.79, x, 0.72, 0, 16);
+      k.box(band, 0.04, 1.32, 0.03, x, 0.72, 0); k.box(band, 0.04, 0.03, 1.32, x, 0.72, 0);
+    }
+  } };
+  // A control desk against the window: a sloping panel of buttons, three screens on it, a chair at it.
+  R.console = { w: 1.9, d: 0.95, cover: 1, boxes: [[0, -0.12, 1.9, 0.7, 0.95]], build(k) {
+    const body = k.mat(k.pick([0xc8ccd0, 0x5a6068]), 0.5, 0.2), dark = k.mat(0x1a1c1e, 0.5), BTN = [0xd03020, 0x30a040, 0xe0c020, 0x2a60c0];
+    k.box(body, 1.9, 0.76, 0.7, 0, 0.38, -0.12);
+    k.box(dark, 1.88, 0.04, 0.42, 0, 0.82, 0.02, 0, -0.3);
+    for (let i = 0; i < 14; i++) k.box(k.mat(k.pick(BTN), 0.4, 0, { emissive: 0x202020 }), 0.04, 0.02, 0.04, -0.8 + (i % 7) * 0.26 + k.rnd() * 0.05, 0.84 + (i < 7 ? 0 : 0.05), i < 7 ? 0.12 : -0.04);
+    for (const x of [-0.6, 0, 0.6]) { k.box(dark, 0.06, 0.2, 0.06, x, 0.86, -0.36); k.box(dark, 0.56, 0.36, 0.04, x, 1.15, -0.34); k.box(k.screen(), 0.51, 0.31, 0.005, x, 1.15, -0.318); }
+    k.cyl(dark, 0.22, 0.22, 0.08, 0.1, 0.47, 0.38, 12); k.cyl(dark, 0.03, 0.03, 0.4, 0.1, 0.24, 0.38, 6); k.box(dark, 0.42, 0.45, 0.06, 0.1, 0.78, 0.6);
+  } };
+  // A toilet stall against the wall: partitions either side, the door standing open inward, the toilet at the back.
+  R.stall = { w: 1.9, d: 1.6, boxes: [[-0.92, 0, 0.04, 1.5, 1.9, 0.12], [0.92, 0, 0.04, 1.5, 1.9, 0.12], [0, -0.45, 0.42, 0.66, 0.8]], build(k) {
+    const part = k.mat(k.pick([0x8a9aa8, 0xc8c0b0, 0x5a6a5a]), 0.5, 0.1), steel = k.mat(0xb8bcc0, 0.3, 0.8), white = k.mat(0xeceae4, 0.3);
+    for (const x of [-0.92, 0.92]) { k.box(part, 0.04, 1.78, 1.5, x, 1.01, 0); k.box(steel, 0.05, 0.12, 0.05, x, 0.06, 0.6); }
+    k.box(steel, 1.88, 0.05, 0.05, 0, 1.92, 0.74); // the header rail
+    k.box(part, 0.62, 1.7, 0.035, 0.55, 1.0, 0.45, -1.2); // the door, swung in
+    k.cyl(white, 0.2, 0.15, 0.4, 0, 0.2, -0.38, 14); k.cyl(white, 0.21, 0.21, 0.03, 0, 0.42, -0.38, 14); k.box(white, 0.42, 0.38, 0.18, 0, 0.62, -0.66);
+    k.cyl(k.mat(0xf2f0ea, 0.8), 0.06, 0.06, 0.1, -0.7, 0.75, -0.2, 10, Math.PI / 2); // (the paper)
+  } };
+  // A row of steel lockers.
+  R.lockers = { w: 1.9, d: 0.5, boxes: [[0, 0, 1.9, 0.48, 1.9]], build(k) {
+    const c = k.mat(k.pick([0x4a6a8a, 0x8a9298, 0x6a7a5a, 0x9a4a3a]), 0.5, 0.4), dark = k.mat(0x1a1c1e, 0.6);
+    k.box(dark, 1.9, 0.1, 0.46, 0, 0.05, 0); k.box(c, 1.9, 1.8, 0.46, 0, 1.0, 0);
+    for (let i = 0; i < 5; i++) {
+      const x = -0.76 + i * 0.38;
+      k.box(dark, 0.008, 1.76, 0.006, x + 0.19, 1.0, 0.232);
+      for (const y of [1.65, 1.71, 1.77]) k.box(dark, 0.2, 0.012, 0.006, x, y, 0.232);
+      k.box(dark, 0.03, 0.1, 0.03, x + 0.13, 1.1, 0.24);
+    }
+  } };
   // What goes in each kind of room. `must` is placed first, against a wall.
   const ROOMS = {
     living: { must: 'tv', wall: ['sofa', 'bookshelf', 'dresser', 'bookshelf', 'sofa'], center: ['sofa', 'armchairs'], small: ['plant', 'lamp', 'sidetable', 'plant'], floor: 'wood', rug: 1 },
@@ -638,7 +920,20 @@ G.Furniture = (() => {
     // the shops round the town square
     cafe: { must: 'counter', wall: ['counter', 'fridge', 'bookshelf'], center: ['dining', 'dining'], small: ['plant', 'bin'], floor: 'tile' },
     store: { must: 'counter', wall: ['rack', 'rack', 'files'], center: ['rack'], small: ['cardboard', 'plant'], floor: 'tile', dense: 1 },
+    // a convenience store (js/level.js layMart): laid out on its own (plan())
+    mart: { floor: 'tile' }, cashier: { floor: 'tile' }, stockroom: { floor: null }, freezer: { floor: 'tile' },
     bar: { must: 'counter', wall: ['counter', 'fridge', 'sofa', 'tv'], center: ['dining', 'armchairs'], small: ['plant', 'lamp'], floor: 'wood' },
+    // a foundry (js/level.js layFoundry): its halls, the loading bay, the control room, the toilets and the car park are
+    // laid out on their own (plan()); noArt: no pictures on the walls
+    melt: { floor: null, noArt: 1 }, mill: { floor: null, noArt: 1 }, loading: { floor: 'pave', noArt: 1 }, catwalk: { floor: null, bare: 1, noArt: 1 },
+    control: { floor: 'carpet', noArt: 1 }, restroom: { floor: 'tile', noArt: 1 }, carpark: { floor: 'pave', out: 1 },
+    mcc: { must: 'panel', wall: ['panel', 'panel', 'files'], center: [], small: ['bin'], floor: null, noArt: 1 },
+    locker: { must: 'lockers', wall: ['lockers', 'lockers', 'bench'], center: ['bench'], small: ['bin'], floor: 'tile', noArt: 1 },
+    kitchenette: { must: 'counter', wall: ['fridge', 'counter', 'counter'], center: ['dining'], small: ['bin', 'cooler', 'plant'], floor: 'tile' },
+    lobby: { must: 'counter', wall: ['sofa', 'files', 'sofa'], center: ['armchairs'], small: ['plant', 'plant', 'bin'], floor: 'tile' },
+    observe: { must: 'console', wall: ['desk', 'console', 'desk'], center: ['deskpair'], small: ['plant', 'cooler', 'bin'], floor: 'carpet' },
+    boss: { must: 'desk', wall: ['bookshelf', 'files', 'sofa', 'bookshelf'], center: ['armchairs'], small: ['plant', 'lamp'], floor: 'carpet', rug: 1 },
+    meeting: { must: 'tv', wall: ['files', 'bookshelf'], center: ['dining'], small: ['plant', 'cooler'], floor: 'carpet' },
   };
   // small pieces give only their boxes; they need a footprint too when they're set against a wall
   for (const rec of Object.values(R)) if (rec.w == null || rec.d == null) {
@@ -792,10 +1087,75 @@ G.Furniture = (() => {
         },
       };
     }
-    const fest = map.theme.layout === 'festival' ? festival() : null;
+    // A foundry: the melt shop (its furnaces, the ladles in front of them, the moulds), the processing hall (its two
+    // lines, a way through the middle of each), the loading bay (pallet racking down its east wall, raw stock in two
+    // blocks clear of the doors, two forklifts), the control room (a desk under every window not by a door), the
+    // toilets (stalls along the back wall, the basins by the door) and the car park (cars along the fence).
+    function foundry() {
+      const C = (v) => (v + 0.5) * TS, free = (x, z) => t[z * W + x] === 0;
+      const side = (name, x, z, dx, dz) => { // against the wall in (dx, dz)
+        const rec = R[name];
+        if (!free(x, z) || !tryBlock(x, z, rec.cover ? 2 : 4)) return false;
+        const off = 1 - 0.02 - rec.d / 2; put(name, x, z, C(x) + dx * off, C(z) + dz * off, facing(dx, dz), r(), [[dx, dz]]); return true;
+      };
+      const one = (name, x, z, q = 0) => { if (!free(x, z) || !tryBlock(x, z, R[name].cover ? 2 : 4)) return false; put(name, x, z, C(x), C(z), q, r()); return true; };
+      const big = (name, x, z, q = 0) => { // across 2 x 2 tiles, (x, z) the north-west one
+        const cells = [[x, z], [x + 1, z], [x, z + 1], [x + 1, z + 1]];
+        if (!cells.every(([a, b]) => free(a, b)) || !tryBlock(x, z, 2)) return false;
+        for (const [a, b] of cells.slice(1)) tryBlock(a, b, 2);
+        put(name, x, z, (x + 1) * TS, (z + 1) * TS, q, r()); return true;
+      };
+      const long = (name, x, z, q) => { // across (x, z) and (x, z + 1), lengthwise
+        if (!free(x, z) || !free(x, z + 1) || !tryBlock(x, z, 2)) return false;
+        tryBlock(x, z + 1, 2); put(name, x, z, C(x), (z + 1) * TS, q, r()); return true;
+      };
+      return {
+        melt(rm) {
+          const X = rm.x, Z = rm.z;
+          for (const x of [X + 3, X + 9]) big('furnace', x, Z + 1); // (their tapping spouts toward the ladles)
+          for (const x of [X + 3, X + 9]) big('vat', x, Z + 6, r() < 0.5 ? 0 : 2);
+          for (let x = X + 7; x <= X + 11; x++) one('moulds', x, Z + 9);
+          one('quench', X + 12, Z + 9);
+          for (const x of [X + 6, X + 7]) side('panel', x, Z, 0, -1);
+          for (const z of [Z + 4, Z + 5]) side('panel', X + rm.w - 1, z, 1, 0);
+          for (const z of [Z + 2, Z + 4]) one('scrap', X, z, Math.floor(r() * 4));
+        },
+        mill(rm) {
+          const X = rm.x, Z = rm.z, lines = [['conveyor', 'mill', 'mill', 'conveyor', 'saw', null, 'conveyor', 'press', 'conveyor', 'quench'], ['conveyor', 'conveyor', 'mill', 'conveyor', 'conveyor', null, 'saw', 'conveyor', 'conveyor', 'coils']];
+          if (r() < 0.5) lines.reverse();
+          lines.forEach((ln, i) => ln.forEach((name, k) => { if (name) one(name, X + 1 + k, Z + 2 + i * 5); }));
+          for (const z of [Z + 4, Z + 5]) side('panel', X, z, -1, 0);
+          for (const x of [X + 1, X + 2]) one('billets', x, Z + 9);
+          for (const x of [X + 9, X + 10]) one('coils', x, Z + 9);
+        },
+        loading(rm) {
+          const X = rm.x, Z = rm.z, E = X + rm.w - 1, B = Z + rm.h - 1, stock = ['billets', 'billets', 'ingots', 'coils', 'coils', 'crates', 'pallet'];
+          for (let z = Z + 1; z < B; z++) side('palletrack', E, z, 1, 0);
+          let n = 2;
+          for (const [x, z] of [[X + 6, Z + 2], [X + 8, Z + 4], [X + 1, Z + 5], [X + 13, Z + 2]]) if (n > 0 && long('forklift', x, z, r() < 0.5 ? 0 : 2)) n--;
+          for (const z of [Z + 2, Z + 3, Z + 5]) for (const [x0, x1] of [[X + 2, X + 4], [X + 10, X + 12]]) for (let x = x0; x <= x1; x++) if (r() < 0.8) one(U.pick(r, stock), x, z, r() < 0.5 ? 0 : 2);
+        },
+        control(rm) {
+          for (let z = rm.z; z < rm.z + rm.h; z++) for (const [x, dx] of [[rm.x, -1], [rm.x + rm.w - 1, 1]]) if (t[z * W + x + dx] !== 3) side('console', x, z, dx, 0);
+          side('panel', rm.x + 1, rm.z, 0, -1);
+        },
+        restroom(rm) {
+          const xs = [...Array(rm.w).keys()].map((i) => rm.x + i), door = xs.find((x) => t[(rm.z + rm.h) * W + x] === 3);
+          for (const x of xs) if (x !== door) side('stall', x, rm.z, 0, -1);
+          if (door != null) side('sinks', door, rm.z, 0, -1);
+        },
+        carpark(rm) {
+          const z = rm.z + rm.h - 2;
+          for (let x = rm.x + 1; x < rm.x + rm.w - 1; x += 2) if (r() < 0.6) long('car', x, z, r() < 0.5 ? 0 : 2);
+        },
+      };
+    }
+    const fest = map.theme.layout === 'festival' ? festival() : null, fdy = map.theme.layout === 'foundry' ? foundry() : null;
+    let nFine = 0; // (pieces laid on the fine grid: kept past the tiles' own keys)
     for (const rm of rooms) {
       rm.type = rm.type || (r() < home ? homes[hi++ % homes.length] : WORK[wi++ % WORK.length]);
       if (fest && fest[rm.type]) { fest[rm.type](rm); continue; }
+      if (fdy && fdy[rm.type]) { fdy[rm.type](rm); continue; }
       // patrol cars where the layout puts them: [x, z, along] (coarse tiles; along: lengthwise down the road, else across)
       for (const [x, z, along] of rm.cars || []) {
         const [x2, z2] = along ? [x + 1, z] : [x, z + 1];
@@ -811,6 +1171,44 @@ G.Furniture = (() => {
           if ((x - rm.x) % 7 === 0 || !tryBlock(x, z, 4)) continue;
           put('palletrack', x, z, (x + 0.5) * TS, (z + 0.5) * TS, 0, r());
         }
+        continue;
+      }
+      // a convenience store (js/level.js layMart): the shop floor's aisles of low shelving (a cross-aisle through
+      // them) and shelving down its west wall; the cashier's counter along the inside of its glass, the till at
+      // the end by the door; racks along the back wall of the freezer and of the stockroom (the rest of the
+      // stockroom's walls left for the weapon case, the attachments box and the first aid cabinet)
+      const C2 = (v) => (v + 0.5) * TS, against = (name, x, z, dx, dz) => { const off = 1 - 0.02 - R[name].d / 2; put(name, x, z, C2(x) + dx * off, C2(z) + dz * off, facing(dx, dz), r(), [[dx, dz]]); };
+      // (the shop and the booth: laid on the fine grid, 2/3 m, in metres, each piece blocking what it stands on: block)
+      const lay = (name, x, z, q) => { const rec = R[name], v = r(); map.props.set(W * map.H + nFine++, { name, q, x, z, v, block: rec.small ? 0 : rec.cover ? 2 : 4, boxes: worldBoxes(rec, x, z, q, v) }); };
+      const F = 2 / 3, opn = (x, z) => x >= 0 && z >= 0 && x < W && z < map.H && t[z * W + x] !== 1; // (the room as it'll be: grown into the walls it shares, which thin)
+      const x0 = rm.x * TS - (opn(rm.x - 2, rm.cz) ? F : 0), x1 = (rm.x + rm.w) * TS + (opn(rm.x + rm.w + 1, rm.cz) ? F : 0), z0 = rm.z * TS - (opn(rm.cx, rm.z - 2) ? F : 0), z1 = (rm.z + rm.h) * TS + (opn(rm.cx, rm.z + rm.h + 1) ? F : 0);
+      if (rm.type === 'mart') {
+        // shelving down the west wall; three aisles of it across the floor (each 1.2 m, 1.5 m between: two cells), a
+        // way round the back by the coolers and along the front, an endcap at the front of each; the ATM by the till
+        for (let z = z0 + 1; z < z1 - 1.5; z += 2) lay('shopwall', x0 + 0.26, z, facing(-1, 0));
+        for (let i = 0; i < 3; i++) {
+          const x = x0 + 4 * F + i * 4 * F;
+          for (const z of [z0 + 5 * F, z0 + 9 * F]) lay('aisle', x, z, 1);
+          lay('endcap', x, z0 + 11 * F + 0.26, 0);
+        }
+        lay('atm', x1 - 0.32, z1 - 0.62, facing(1, 0));
+        continue;
+      }
+      if (rm.type === 'cashier') {
+        // the counter along the inside of the glass (the till nearest the door), the cigarettes on the back wall
+        const door = [...Array(rm.h).keys()].map((i) => rm.z + i).find((z) => t[z * W + rm.x - 1] === 3), dz0 = door * TS - 0.3, dz1 = (door + 1) * TS + 0.3;
+        let first = true;
+        for (let z = z0 + 1; z + 1 <= z1; z += 2) { if (z + 1 > dz0 && z - 1 < dz1) continue; lay(first ? 'register' : 'counter', x0 + 0.33, z, facing(-1, 0)); first = false; }
+        for (let z = z0 + 2; z + 1 <= z1; z += 2) lay('tobacco', x1 - 0.23, z, facing(1, 0));
+        continue;
+      }
+      if (rm.type === 'lot' && map.theme.starter) { // (the corner store's: the ice chest against the front wall, clear of the door)
+        const dx = [...Array(W).keys()].find((x) => t[(rm.z - 1) * W + x] === 3), x = dx != null && dx * TS < 5 ? 10.6 : 3.2;
+        lay('icechest', x, rm.z * TS - F + 0.4, 0);
+      }
+      if (rm.type === 'freezer' || rm.type === 'stockroom') {
+        for (let x = rm.x + (rm.type === 'stockroom' ? 1 : 0); x < rm.x + rm.w; x += 2) if (tryBlock(x, rm.z, 4)) against('rack', x, rm.z, 0, -1);
+        if (rm.type === 'stockroom') { const x = rm.x + rm.w - 1, z = rm.z + rm.h - 1; if (tryBlock(x, z, 2)) put('crates', x, z, C2(x), C2(z), Math.floor(r() * 4), r()); }
         continue;
       }
       // the loading dock: pallets and crates waiting to go out, clear of where you come in
@@ -886,6 +1284,58 @@ G.Furniture = (() => {
   }
 
   // ---------------------------------------------------------------- meshes
+  // Packaging: an atlas of printed labels, PACK_N x PACK_N of them, each a product's face (a colour, a band across it,
+  // a maker's mark, lines of type, a printed edge), in the colours print has, not pure ones (made once, kept). A piece
+  // of stock takes one of them over every face (k.boxL, k.cylL): it reads as a packet, a tin, a bottle with a label,
+  // not a block of colour, and the light falls on card and paper, matte.
+  const PACK_N = 8;
+  let packTex = null;
+  function packaging() {
+    if (packTex) return packTex;
+    const S = 128, c = document.createElement('canvas'); c.width = c.height = S * PACK_N;
+    const g = c.getContext('2d'), rnd = G.U.rng(0x9ac4a6e);
+    const INK = ['#b8392e', '#d8a632', '#2c5aa6', '#2f8a48', '#d0702c', '#6c3a9a', '#26262a', '#b8386e', '#3a9a9e', '#9a7238', '#e8e2d2', '#5a2a22', '#c8c03a', '#1e3a5e', '#e6d9b8', '#8a1e24'];
+    const pick = (a) => a[Math.floor(rnd() * a.length)];
+    for (let ty = 0; ty < PACK_N; ty++) for (let tx = 0; tx < PACK_N; tx++) {
+      const x0 = tx * S, y0 = ty * S, bg = pick(INK);
+      let a = pick(INK); while (a === bg) a = pick(INK);
+      g.save(); g.beginPath(); g.rect(x0, y0, S, S); g.clip();
+      g.fillStyle = bg; g.fillRect(x0, y0, S, S);
+      const sh = g.createLinearGradient(0, y0, 0, y0 + S); sh.addColorStop(0, 'rgba(255,255,255,0.10)'); sh.addColorStop(1, 'rgba(0,0,0,0.14)'); g.fillStyle = sh; g.fillRect(x0, y0, S, S);
+      const style = rnd(), light = ['#e8e2d2', '#e6d9b8', '#c8c03a', '#d8a632'].includes(bg), type = light ? '#2a2420' : '#f0ebe0';
+      if (style < 0.4) { // a band across the middle, the mark on it
+        const by = y0 + S * (0.3 + rnd() * 0.15), bh = S * (0.22 + rnd() * 0.12);
+        g.fillStyle = rnd() < 0.5 ? '#ece6d8' : a; g.fillRect(x0, by, S, bh);
+        g.fillStyle = rnd() < 0.5 ? bg : '#26262a'; g.font = `bold ${Math.round(bh * 0.62)}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.fillText(pick(['CRISP', 'ZAP', 'MAXI', 'GOLD', 'FRESH', 'KO', 'BOLT', 'RUSH', 'PURE', 'MEGA', 'SNAX', 'FIZZ']), x0 + S / 2, by + bh / 2, S * 0.9);
+      } else if (style < 0.7) { // a round mark, a burst of colour behind it
+        const cx = x0 + S * (0.35 + rnd() * 0.3), cy = y0 + S * (0.35 + rnd() * 0.2), r = S * (0.18 + rnd() * 0.1);
+        g.fillStyle = a; g.beginPath(); g.ellipse(cx, cy, r * 1.3, r, 0, 0, 7); g.fill();
+        g.fillStyle = '#ece6d8'; g.beginPath(); g.ellipse(cx, cy, r * 0.8, r * 0.55, 0, 0, 7); g.fill();
+        g.fillStyle = a; g.font = `bold ${Math.round(r * 0.6)}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(pick(['Co', 'No.1', 'Hi', 'XL', 'OK', '99']), cx, cy, r * 1.4);
+      } else { // a window onto the product: a lighter panel, a shape in it
+        const px = x0 + S * 0.18, py = y0 + S * 0.3, pw = S * 0.64, ph = S * 0.4;
+        g.fillStyle = '#e8dcc0'; g.fillRect(px, py, pw, ph);
+        g.fillStyle = pick(['#a8642a', '#c89a4a', '#7a3a22', '#d8b060', '#6a8a3a']);
+        for (let i = 0; i < 5; i++) { g.beginPath(); g.ellipse(px + pw * (0.15 + rnd() * 0.7), py + ph * (0.25 + rnd() * 0.5), pw * 0.12, ph * 0.18, rnd() * 3, 0, 7); g.fill(); }
+        g.fillStyle = a; g.fillRect(x0, y0 + S * 0.08, S, S * 0.16);
+      }
+      g.fillStyle = type; g.globalAlpha = 0.8; // lines of type
+      for (let i = 0; i < 3; i++) g.fillRect(x0 + S * 0.14, y0 + S * (0.76 + i * 0.06), S * (0.3 + rnd() * 0.5), S * 0.025);
+      g.globalAlpha = 1;
+      g.fillStyle = a; g.fillRect(x0, y0 + S * 0.94, S, S * 0.06); // the printed edge
+      g.restore();
+    }
+    packTex = new THREE.CanvasTexture(c); packTex.anisotropy = 4;
+    return packTex;
+  }
+  // a geometry's UVs (0..1 a face) squeezed onto one label of the atlas (a little in from its edges: no neighbour bleeds in)
+  function labelUV(geo, i) {
+    const uv = geo.attributes.uv, n = PACK_N, u0 = (i % n) / n, v0 = 1 - (Math.floor(i / n) + 1) / n, s = (1 - 0.06) / n, o = 0.03 / n;
+    for (let j = 0; j < uv.count; j++) uv.setXY(j, u0 + o + uv.getX(j) * s, v0 + o + uv.getY(j) * s);
+    return geo;
+  }
+
   function textures(rnd) {
     const mk = (w, h, draw) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const tx = new THREE.CanvasTexture(c); tx.wrapS = tx.wrapT = THREE.RepeatWrapping; tx.anisotropy = 4; return tx; };
     const speckle = (g, w, h, n, a) => { for (let i = 0; i < n; i++) { const v = rnd() < 0.5 ? 0 : 255; g.fillStyle = `rgba(${v},${v},${v},${rnd() * a})`; g.fillRect(rnd() * w, rnd() * h, 1 + rnd() * 3, 1 + rnd() * 3); } };
@@ -966,7 +1416,9 @@ G.Furniture = (() => {
   // glass: first the ground outside (level with the floor), then a near layer 7 m out (trees, a fence,
   // streetlamps), then a city skyline and sky at infinity. Everything shifts with parallax as you move.
   function outsideMaterial(rnd, drop = 0) {
-    const mk = (w, h, draw) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; t.anisotropy = 4; return t; };
+    // (its pictures sampled as written, sRGB, mixed with the colours below as they're written, and the result turned
+    // linear at the end: js/util.js)
+    const mk = (w, h, draw) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.encoding = THREE.LinearEncoding; t.wrapS = THREE.RepeatWrapping; t.anisotropy = 4; return t; };
     // sky + skyline panorama; the horizon sits at 62% down the canvas
     const sky = mk(2048, 512, (g, w, h) => {
       const hz = Math.round(h * 0.62);
@@ -1070,7 +1522,7 @@ G.Furniture = (() => {
           }
           // a little sheen on the glass
           float fres = pow(1.0 - abs(dot(d, vN)), 3.0);
-          gl_FragColor = vec4(col * 0.9 + vec3(0.02, 0.025, 0.035) + fres * 0.06, 1.0);
+          gl_FragColor = linearToOutputTexel(vec4(pow(col * 0.9 + vec3(0.02, 0.025, 0.035) + fres * 0.06, vec3(2.2)), 1.0));
         }`,
     });
   }
@@ -1078,11 +1530,19 @@ G.Furniture = (() => {
   function build(map, root, crateTex) {
     const T = THREE, L = G.Level, TS = L.TS, { W, t } = map;
     const rnd = G.U.rng((map.seed ^ 0x5eed1e) >>> 0);
-    const cache = new Map();
+    // A piece's colour goes in its vertices: what's drawn is one material per finish (roughness, metalness, texture,
+    // glow), not one per colour as well, so a houseful of furniture is a few dozen draw calls, not hundreds.
+    // (mat() still hands back a material of that colour, to be read and tinted; base is what it's drawn with.)
+    const cache = new Map(), base = new Map(), finish = new Map();
+    const texIds = new Map(), texId = (t) => { if (!texIds.has(t)) texIds.set(t, texIds.size); return texIds.get(t); }; // (by the texture itself, not its uuid)
     const mat = (hex, rough = 0.8, metal = 0, extra) => {
-      const key = hex + '|' + rough + '|' + metal + (extra ? JSON.stringify(Object.keys(extra)) + (extra.map ? extra.map.uuid : '') + (extra.emissive || '') : '');
+      const fk = rough + '|' + metal + (extra ? JSON.stringify(Object.keys(extra)) + (extra.map ? texId(extra.map) : '') + (extra.emissive || '') : ''), key = hex + '|' + fk;
       let m = cache.get(key);
-      if (!m) { m = new T.MeshStandardMaterial(Object.assign({ color: hex, roughness: rough, metalness: metal }, extra || {})); cache.set(key, m); }
+      if (!m) {
+        m = new T.MeshStandardMaterial(Object.assign({ color: hex, roughness: rough, metalness: metal }, extra || {})); cache.set(key, m);
+        if (!finish.has(fk)) finish.set(fk, new T.MeshStandardMaterial(Object.assign({ color: 0xffffff, roughness: rough, metalness: metal, vertexColors: true }, extra || {})));
+        base.set(m, finish.get(fk));
+      }
       return m;
     };
     const tint = (hex, f) => { const c = new T.Color(hex); c.r = Math.min(1, c.r * f); c.g = Math.min(1, c.g * f); c.b = Math.min(1, c.b * f); return c.getHex(); };
@@ -1092,8 +1552,10 @@ G.Furniture = (() => {
     const add = (geo, m, matrix) => {
       const g2 = geo.index ? geo.toNonIndexed() : geo;
       g2.applyMatrix4(matrix);
-      if (!byMat.has(m)) byMat.set(m, []);
-      byMat.get(m).push(g2);
+      const b = base.get(m) || m;
+      if (b !== m) g2.userData.col = m.color; // (its colour, for its vertices: the merge below)
+      if (!byMat.has(b)) byMat.set(b, []);
+      byMat.get(b).push(g2);
       if (g2 !== geo) geo.dispose();
     };
     const tmp = new T.Object3D(); tmp.rotation.order = 'YXZ'; // turn to face the room first, then tilt
@@ -1107,12 +1569,19 @@ G.Furniture = (() => {
       rnd, pick, tint, mat,
       box: (m, w, h, d, x, y, z, ry, rx) => place(new T.BoxGeometry(w, h, d), m, x, y, z, ry, rx),
       cyl: (m, rt, rb, h, x, y, z, seg = 14, rx = 0) => place(new T.CylinderGeometry(rt, rb, h, seg), m, x, y, z, 0, rx),
+      cylX: (m, rt, rb, h, x, y, z, seg = 14) => place(new T.CylinderGeometry(rt, rb, h, seg), m, x, y, z, Math.PI / 2, Math.PI / 2), // (lying along x)
       sph: (m, r, x, y, z) => place(new T.SphereGeometry(r, 8, 6), m, x, y, z),
       ico: (m, r, x, y, z) => place(new T.IcosahedronGeometry(r, 0), m, x, y, z, rnd() * 6),
       leaf: () => mat(pick([0x3f6b35, 0x4d7a3a, 0x2f5a2c, 0x5a8040]), 0.85, 0, { flatShading: true }),
       screen: () => mat(0x0b0f14, 0.15, 0.2, { emissive: pick([0x1a2a3a, 0x0c1622, 0x202a20]), emissiveIntensity: 0.6 }),
       shade: () => shadeMat,
       crate: () => mat(0xffffff, 0.8, 0, { map: crateTex }),
+      // stock: one of the packaging atlas' labels (packaging()) over a box or a cylinder; its material by what it's made
+      // of (card and paper, a tin, a plastic bottle), each a little lighter or darker (shade: in the shadow of a shelf)
+      pack: (kind, shade = 1) => mat(tint(0xffffff, (0.86 + rnd() * 0.14) * shade), kind === 'tin' ? 0.42 : kind === 'bottle' ? 0.3 : 0.82, kind === 'tin' ? 0.15 : 0, { map: packaging() }),
+      label: () => Math.floor(rnd() * PACK_N * PACK_N),
+      boxL: (m, lb, w, h, d, x, y, z, ry, rx) => place(labelUV(new T.BoxGeometry(w, h, d), lb), m, x, y, z, ry, rx),
+      cylL: (m, lb, rt, rb, h, x, y, z, seg = 14) => place(labelUV(new T.CylinderGeometry(rt, rb, h, seg), lb), m, x, y, z),
       tableLamp(x, y, z) { k.cyl(mat(pick([0x2a2a2a, 0xb8a060, 0xe8e4da, 0x6d7b66]), 0.4, 0.3), 0.05, 0.08, 0.22, x, y + 0.11, z); k.cyl(shadeMat, 0.1, 0.16, 0.2, x, y + 0.31, z); },
       plantSmall(x, y, z) { k.cyl(mat(pick([0xa0522d, 0xe8e4da, 0x2f3a40]), 0.7), 0.07, 0.055, 0.12, x, y + 0.06, z); for (let i = 0; i < 3; i++) k.ico(k.leaf(), 0.06 + rnd() * 0.04, x + (rnd() - 0.5) * 0.06, y + 0.16 + rnd() * 0.08, z + (rnd() - 0.5) * 0.06); },
       fruit(x, y, z) { k.cyl(mat(pick([0xe8e4da, 0x6b4428, 0x3a5a6a]), 0.4), 0.13, 0.08, 0.06, x, y + 0.03, z); for (let i = 0; i < 4; i++) k.sph(mat(pick([0xd8642a, 0xc0302a, 0x8fb040, 0xe8c040]), 0.5), 0.04, x + (rnd() - 0.5) * 0.12, y + 0.08, z + (rnd() - 0.5) * 0.12); },
@@ -1209,7 +1678,7 @@ G.Furniture = (() => {
             const open = rnd() < 0.3 ? 0 : 0.15 + rnd() * 0.5; // blinds up, or part-way down
             for (let s = 0; s < 14 * open; s++) place(new T.BoxGeometry(1.1, 0.012, 0.05), blind, cx - dx * 0.06, 2.15 - s * 0.042, cz - dz * 0.06, ry, 0.35);
             place(new T.BoxGeometry(1.3, 0.04, 0.12), sill, cx - dx * 0.05, 0.98, cz - dz * 0.05, ry);
-          } else if (pics < 3 && v < 0.5 && rm.type !== 'washroom' && rm.type !== 'cubicle') { // (no art in a toilet block)
+          } else if (pics < 3 && v < 0.5 && rm.type !== 'washroom' && rm.type !== 'cubicle' && !spec.noArt) { // (no art in a toilet block)
             pics++;
             const fw = 0.5 + rnd() * 0.5, fh = fw * 0.75, y = p ? 1.7 : 1.55;
             place(new T.BoxGeometry(fw + 0.06, fh + 0.06, 0.03), pick(frameMats), cx - dx * 0.015, y, cz - dz * 0.015, ry);
@@ -1228,17 +1697,20 @@ G.Furniture = (() => {
     // merge
     for (const [m, geos] of byMat) {
       let n = 0; for (const g of geos) n += g.attributes.position.count;
-      const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), uv = new Float32Array(n * 2);
+      const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), uv = new Float32Array(n * 2), col = m.vertexColors ? new Float32Array(n * 3) : null;
       let o = 0;
       for (const g of geos) {
+        const c = g.attributes.position.count;
         pos.set(g.attributes.position.array, o * 3); nor.set(g.attributes.normal.array, o * 3);
         if (g.attributes.uv) uv.set(g.attributes.uv.array, o * 2);
-        o += g.attributes.position.count; g.dispose();
+        if (col) { const k = g.userData.col; for (let i = o; i < o + c; i++) { col[i * 3] = k.r; col[i * 3 + 1] = k.g; col[i * 3 + 2] = k.b; } }
+        o += c; g.dispose();
       }
       const bg = new T.BufferGeometry();
       bg.setAttribute('position', new T.BufferAttribute(pos, 3));
       bg.setAttribute('normal', new T.BufferAttribute(nor, 3));
       bg.setAttribute('uv', new T.BufferAttribute(uv, 2));
+      if (col) bg.setAttribute('color', new T.BufferAttribute(col, 3));
       bg.computeBoundingSphere();
       root.add(new T.Mesh(bg, m));
     }

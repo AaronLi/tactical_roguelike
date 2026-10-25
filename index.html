@@ -43,8 +43,7 @@
       </div>
       <div class="controls">
         <b>WASD</b> move &middot; <b>Space</b> toggle lowered weapon &middot; <b>Shift</b> slow &amp; steady &middot; <b>C</b> crouch &middot; <b>Q / E</b> lean<br>
-        <b>LMB</b> fire &middot; <b>RMB</b> aim &middot; <b>MMB</b> ping &middot; <b>R</b> reload (<b>R R</b> dump reload, <b>hold R</b> check the magazine) &middot; <b>I</b> inspect (<b>hold I</b> hold the chamber check open; the mouse turns what you hold) &middot; <b>1 / 2 / wheel</b> swap (<b>wheel</b> while aiming: magnification)<br>
-        <b>Mouse back</b> weapon light &middot; <b>Mouse forward</b> laser<br>
+        <b>LMB</b> fire &middot; <b>RMB</b> aim &middot; <b>MMB</b> ping (<b>hold MMB</b> the comms wheel: light, laser, magnifier, calls to the squad) &middot; <b>R</b> reload (<b>R R</b> dump reload, <b>hold R</b> check the magazine, or the chamber on a gun without one) &middot; <b>I</b> inspect (<b>hold I</b> hold the chamber check open; the mouse turns what you hold) &middot; <b>1 / 2 / wheel</b> swap (<b>wheel</b> while aiming: magnification)<br>
         <b>3 / 4 / 5</b> a grenade into your hand (frag and flashbang to start; drag one onto a key's box in the inventory to change it): <b>hold LMB</b> to pull the pin, <b>release</b> to throw, <b>RMB</b> underhand / weak / strong; the key again or 1 / 2 puts it away &middot; <b>H</b> body &amp; kit (as Tab) &middot; hold <b>B</b> swap with the gun in your backpack &middot; <b>V</b> shout compliance &middot; <b>X</b> fire selector<br>
         hold <b>F</b> doors (aim high: open, low: kick), bag evidence, arrest, restrain or revive<br>
         <b>Y</b> vote to leave &middot; <b>M</b> mute &middot; <b>F8</b> echo paths &middot; <b>F9</b> hitboxes &middot; <b>Tab</b> inventory, health &amp; scoreboard &middot; <b>Enter</b> chat &middot; <b>Esc</b> menu
@@ -87,6 +86,7 @@
   <canvas id="minimap" width="200" height="200" style="display:none"></canvas>
 
   <div id="killfeed"></div>
+  <div id="hbInfo" class="hb-info hidden"></div>
   <div id="toast"></div>
   <div id="prompt"></div>
   <div id="nadeWarn" class="hidden"><i>&#9650;</i>GRENADE</div>
@@ -121,6 +121,7 @@
 
   <div id="scoreboard" class="hidden"></div>
   <div id="fieldInv" class="hidden"><div id="fiScore" class="fi-score"></div><div id="fiBody"></div></div>
+  <div id="aboxPick" class="sidearm-pick abox-pick hidden"></div>
 </div>
 
 <!-- ======================= PAUSE ======================= -->
@@ -138,6 +139,8 @@
       <button id="btnResume" class="btn primary">Resume</button>
       <button id="btnQuit" class="btn">Leave game</button>
     </div>
+    <div class="btn-row"><button id="btnProf" class="btn">Save performance profile</button></div>
+    <div id="profLine" class="small dim"></div>
   </div>
 </div>
 
@@ -198,6 +201,7 @@
 <script src="js/parts.js"></script>
   <script src="js/gear.js"></script>
 <script src="js/medical.js"></script>
+<script src="js/ballistics.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/level.js"></script>
 <script src="js/world.js"></script>
@@ -225,8 +229,10 @@
 <script src="js/loot.js"></script>
 <script src="js/course.js"></script>
 <script src="js/range.js"></script>
+<script src="js/highlights.js"></script>
 <script src="js/hangar.js"></script>
 <script src="js/game.js"></script>
+<script src="js/profiler.js"></script>
 <script src="js/demo.js"></script>
 </body>
 </html>

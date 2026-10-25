@@ -7,7 +7,9 @@ G.Audio = {
   vol: 0.6,
   muted: false,
   samples: {},
-  SAMPLES: ['pull_magazine', 'insert_magazine', 'rack_slide', 'drop_slide', 'drop_bolt', 'drop_magazine', 'door_open', 'door_close'],
+  SAMPLES: ['pull_magazine', 'insert_magazine', 'rack_slide', 'drop_slide', 'drop_bolt', 'drop_magazine', 'door_open', 'door_close',
+    // the highlights' studio audience (js/highlights.js; recordings credited in the README)
+    'crowd_bed', 'crowd_cheer', 'crowd_cheer_big', 'crowd_roar', 'crowd_laugh', 'crowd_laugh_long', 'crowd_ooh', 'crowd_wow', 'crowd_awww'],
   lastShot: 0,
 
   init() {
@@ -223,6 +225,7 @@ G.Audio = {
   // ---------------------------------------------------------------- rounds going past and landing
   // a short filtered noise burst into a panner: the building block for cracks, zips and impacts
   _burst(out, t, f, q, g, dur, type = 'bandpass', fEnd) {
+    if (!Number.isFinite(g) || !Number.isFinite(t)) return; // (a bad distance mustn't take down whatever made the sound)
     const c = this.ctx, src = c.createBufferSource(); src.buffer = this.noise; src.playbackRate.value = 0.9 + Math.random() * 0.2;
     const flt = c.createBiquadFilter(); flt.type = type; flt.frequency.setValueAtTime(f, t); flt.Q.value = q;
     if (fEnd) flt.frequency.exponentialRampToValueAtTime(fEnd, t + dur);
@@ -254,8 +257,8 @@ G.Audio = {
   // ground (grass, earth, carpet), a body.
   impact(mat, dist, pan) {
     if (!this.ctx) return;
-    const t = this.ctx.currentTime, a = this._att(dist) * Math.min(1, 6 / (1 + dist)), out = this._out(pan);
-    if (a < 0.01) return;
+    const t = this.ctx.currentTime, a = this._att(dist) * Math.min(1, 6 / (1 + dist)), out = this._out(Number.isFinite(pan) ? pan : 0);
+    if (!(a >= 0.01)) return;
     if (mat === 'body') { this._burst(out, t, 900, 0.7, 0.5 * a, 0.07, 'lowpass', 300); this._burst(out, t, 2200, 1.2, 0.12 * a, 0.03); return; }
     if (mat === 'metal') { this._burst(out, t, 3800, 1.4, 0.3 * a, 0.03); for (const [f, g] of [[1900, 0.12], [2850, 0.08], [4100, 0.05]]) this.tone(f * (0.95 + Math.random() * 0.1), 0.25, 'sine', g * a); return; }
     if (mat === 'wood') { this._burst(out, t, 750, 3, 0.55 * a, 0.06); this._burst(out, t, 3000, 1, 0.15 * a, 0.015, 'highpass'); return; }

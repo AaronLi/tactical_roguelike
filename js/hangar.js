@@ -5,7 +5,9 @@
 //     gunsmith's parts for sale;
 //   the store (middle): Vex at his counter (his till opens the whole stock), the kit for sale on pedestals,
 //     a shelf of pouches, and two vending machines (ammunition; medical gear and grenades);
-//   the warehouse (east): a robotic crane over the stash, and a console that opens your stash and loadout;
+//   the warehouse (east, at the back): a robotic crane over the stash, and a console that opens your stash and loadout;
+//   the lounge (east, at the front, by the hangar door): sofas in front of a big screen showing the highlights of the
+//     level just played (js/highlights.js);
 //   the helipad (out the front): hold F on the helicopter to climb in and ready up; hold F again to get out.
 // Everything for sale can be bought by looking at it (F); the till, the bench computers, the console and the
 // machines' screens open the same shop panels (js/shop.js) a menu would. Nothing here is on the host: the hangar
@@ -26,8 +28,12 @@ G.Hangar = (() => {
   const ZERO = { x0: 6.3, x1: 8.1, z0: 13.1, z1: 14.9, h: 0.9 }; // the zeroing table, in the middle of the workshop floor
   const PARTS = { x0: 12.9, z: 3.5, step: 1.3, n: 6, top: 0.9 }; // the gunsmith's parts, on pedestals along the north wall (east of the range's garage door)
   const VEND = [{ id: 'ammo', title: 'AMMUNITION', x: 35.0, z: 10.0, cols: 2, rows: 3, tab: 'svc' }, { id: 'supply', title: 'FIELD SUPPLIES', x: 35.0, z: 12.2, cols: 3, rows: 3, tab: 'svc' }];
-  const CONSOLE = { x0: 38.2, x1: 39.1, z0: 12.6, z1: 15.4 };
-  const STACK = { x: 44.5, z: 14 };
+  const CONSOLE = { x0: 38.2, x1: 39.1, z0: 7.6, z1: 10.4 };
+  const STACK = { x: 44.5, z: 6.4 }, BAY_Z = 11.2; // (the stash, and the loadout pallet in front of it)
+  const WARE = { z0: 3, z1: 13 }; // the warehouse's reach (the crane's rails, the racking)
+  // the lounge: the front of the east side, walled off from the warehouse (a gap by the store to walk through), a big
+  // screen on the east wall (js/highlights.js TVS) and two rows of sofas facing it
+  const LOUNGE = { x0: 36, x1: 50, z0: 14.2, z1: 26, wall: 38, sofas: [{ x: 43.4, z0: 17.6, z1: 22.4 }, { x: 40.4, z0: 17.2, z1: 22.8 }], table: [45.0, 19.3, 46.0, 20.7, 0.42], bar: [37.0, 23.4, 38.0, 25.8, 1.0] };
   const REACH = 3.2, HELI_REACH = 4.2, HOLD = 1.1;
 
   const S = { root: null, map: null, targets: [], items: [], stands: [], rigs: [], crane: null, heli: null, vend: [], hover: null, hold: 0, hl: null, t: 0, vexQuip: 0, key: '' };
@@ -47,8 +53,14 @@ G.Hangar = (() => {
     for (const v of VEND) add(v.x, 0, v.z - 0.55, v.x + 1.1, 1.95, v.z + 0.55);
     add(CONSOLE.x0, 0, CONSOLE.z0, CONSOLE.x1, 1.2, CONSOLE.z1);
     add(STACK.x - 1.2, 0, STACK.z - 1.2, STACK.x + 1.2, 1.7, STACK.z + 1.2);
-    for (const [x, z] of [[38.2, 7], [49.6, 7], [38.2, 21], [49.6, 21]]) add(x - 0.2, 0, z - 0.2, x + 0.2, 3.5, z + 0.2); // (the crane's rail posts)
-    add(49.0, 0, 3, 50, 2.4, 11); add(49.0, 0, 17, 50, 2.4, 25); // (racking against the east wall)
+    for (const x of [38.2, 49.6]) for (const z of [WARE.z0 + 0.3, WARE.z1 - 0.3]) add(x - 0.2, 0, z - 0.2, x + 0.2, 3.5, z + 0.2); // (the crane's rail posts)
+    add(49.0, 0, WARE.z0, 50, 2.4, WARE.z1); // (racking against the east wall)
+    // the lounge: its wall, the sofas (seat and back), the coffee table, the snack bar
+    const L = LOUNGE;
+    add(L.wall, 0, L.z0 - 0.2, L.x1, 2.8, L.z0);
+    for (const s of L.sofas) add(s.x - 0.45, 0, s.z0, s.x + 0.45, 0.9, s.z1);
+    add(L.table[0], 0, L.table[1], L.table[2], L.table[4], L.table[3]);
+    add(L.bar[0], 0, L.bar[1], L.bar[2], L.bar[4], L.bar[3]);
     // the helicopter: the cabin and nose, and the tail boom (above head height at its end, but there's no walking through it)
     add(HELI.x - 3.4, 0, HELI.z - 1.35, HELI.x + 2.4, 2.8, HELI.z + 1.35);
     add(HELI.x + 2.4, 1.5, HELI.z - 0.3, HELI.x + 8.0, 2.5, HELI.z + 0.3);
@@ -217,11 +229,13 @@ G.Hangar = (() => {
     S.map = map; S.root = new T.Group(); S.targets = []; S.items = []; S.stands = []; S.rigs = []; S.vend = []; S.t = 0; S.hold = 0; S.vexQuip = 3; S.key = ''; S.rosterKey = rosterKey();
     S.root.position.z = RZ;
     G.R.levelRoot.add(S.root);
-    zones(); workshop(); store(); warehouse(); helicopter(); if (G.Range) G.Range.build(S.root, S, { box, M, signMat, canvasTex, addTarget }); outline();
+    zones(); workshop(); store(); warehouse(); lounge(); helicopter(); if (G.Range) G.Range.build(S.root, S, { box, M, signMat, canvasTex, addTarget }); outline();
+    if (G.Highlights) G.Highlights.mount(S.root, { addTarget }); // (the TVs, showing the level just played, F to record it: js/highlights.js)
     refresh(true);
   }
   function leave() {
     if (G.Range) G.Range.leave();
+    if (G.Highlights) G.Highlights.unmount();
     if (S.root && S.root.parent) S.root.parent.remove(S.root);
     S.root = null; S.map = null; S.targets = []; S.items = []; S.rigs = []; S.crane = null; S.heli = null; S.hover = null;
   }
@@ -241,7 +255,8 @@ G.Hangar = (() => {
     };
     hang('WORKSHOP', 'a bench for each of you', 9, 7.5, '#ffb43a');
     hang('STORE', 'look at it, press F', 26, 8.2, '#58b8ff');
-    hang('WAREHOUSE', 'stash and loadout', 44, 8.5, '#ff7a4a');
+    hang('WAREHOUSE', 'stash and loadout', 44, 2.6, '#ff7a4a');
+    hang('LOUNGE', 'the highlights, on the big screen', 43, 14.6, '#ff7ac8');
     // light fittings over the hall (the real lights are in the map: these are what they hang from)
     for (const L of S.map.lights || []) { if (L.porch || L.kind) continue; box(r, L.x - 0.45, 3.82, L.z - RZ - 0.12, L.x + 0.45, 3.96, L.z - RZ + 0.12, new T.MeshBasicMaterial({ color: 0xfff6e0 })); }
   }
@@ -380,15 +395,16 @@ G.Hangar = (() => {
   function warehouse() {
     const r = S.root;
     // racking and stock against the east wall
-    for (const [z0, z1] of [[3, 11], [17, 25]]) {
+    for (const [z0, z1] of [[WARE.z0, WARE.z1]]) {
       for (const y of [0.35, 1.05, 1.75]) box(r, 49.0, y, z0, 50, y + 0.05, z1, M(0x4a6a8a));
       for (let z = z0; z <= z1; z += 2) box(r, 49.0, 0, z - 0.03, 49.05, 2.4, z + 0.03, M(0xd8602a));
-      for (let k = 0; k < 6; k++) for (const y of [0.4, 1.1, 1.8]) box(r, 49.1, y, z0 + 0.3 + k * 1.25, 49.9, y + 0.5, z0 + 1.2 + k * 1.25, M([0x8a6a3a, 0x6f8a52, 0x7c8a96, 0x8a6a3a][(k + (y > 1 ? 1 : 0)) % 4], { roughness: 0.9 }));
+      for (let k = 0; k * 1.25 + 1.2 <= z1 - z0; k++) for (const y of [0.4, 1.1, 1.8]) box(r, 49.1, y, z0 + 0.3 + k * 1.25, 49.9, y + 0.5, z0 + 1.2 + k * 1.25, M([0x8a6a3a, 0x6f8a52, 0x7c8a96, 0x8a6a3a][(k + (y > 1 ? 1 : 0)) % 4], { roughness: 0.9 }));
     }
     // the console: two screens on a desk-high pedestal, turned to the store
     box(r, CONSOLE.x0, 0, CONSOLE.z0, CONSOLE.x1, 0.95, CONSOLE.z1, M(0x363b41));
     box(r, CONSOLE.x0 - 0.02, 0.95, CONSOLE.z0 - 0.05, CONSOLE.x1, 1.0, CONSOLE.z1 + 0.05, M(0x1c1f22));
-    for (const [z, a, b] of [[13.55, 'STASH', 'your lockers'], [14.45, 'LOADOUT', 'what you carry']]) {
+    const cz = (CONSOLE.z0 + CONSOLE.z1) / 2;
+    for (const [z, a, b] of [[cz - 0.45, 'STASH', 'your lockers'], [cz + 0.45, 'LOADOUT', 'what you carry']]) {
       box(r, CONSOLE.x0 + 0.05, 1.0, z - 0.4, CONSOLE.x0 + 0.13, 1.5, z + 0.4, M(0x16181a));
       const s = new T.Mesh(new T.PlaneGeometry(0.76, 0.46), screenMat(a, [b, 'F: open'], 256, 152, '#ff9a5a')); s.rotation.y = -Math.PI / 2; s.position.set(CONSOLE.x0 + 0.045, 1.25, z); r.add(s);
     }
@@ -400,10 +416,11 @@ G.Hangar = (() => {
     for (const [dx, dz] of [[-1.3, -1.3], [1.3, -1.3], [-1.3, 1.3], [1.3, 1.3]]) box(stack, dx - 0.04, 0, dz - 0.04, dx + 0.04, 1.75, dz + 0.04, M(0xf0c030)); // the cage's corner posts
     const sg = new T.Mesh(new T.PlaneGeometry(1.8, 0.4), signMat(['STASH', 'the crane keeps it'], 384, 96, '#101418', '#ff9a5a', '#cfd6dc')); sg.position.set(STACK.x, 2.05, STACK.z - 1.36); r.add(sg);
     // the loadout bay: a pallet where the crane sets down what you've asked for
-    box(r, STACK.x - 1.2, 0, 19.0, STACK.x + 1.2, 0.14, 21.0, M(0x9a7a4a));
+    box(r, STACK.x - 1.2, 0, BAY_Z - 1.0, STACK.x + 1.2, 0.14, BAY_Z + 1.0, M(0x9a7a4a));
     // the crane: a bridge between two rails, a trolley on the bridge, a hoist with a grab
     const rail = M(0xf0c030), steel = M(0x6e7479, { metalness: 0.6 });
-    box(r, 38.0, 3.5, 6.9, 38.4, 3.7, 21.1, rail); box(r, 49.4, 3.5, 6.9, 49.8, 3.7, 21.1, rail);
+    box(r, 38.0, 3.5, WARE.z0 - 0.1, 38.4, 3.7, WARE.z1 + 0.1, rail); box(r, 49.4, 3.5, WARE.z0 - 0.1, 49.8, 3.7, WARE.z1 + 0.1, rail);
+    for (const x of [38.2, 49.6]) for (const z of [WARE.z0 + 0.3, WARE.z1 - 0.3]) box(r, x - 0.12, 0, z - 0.12, x + 0.12, 3.5, z + 0.12, steel); // (the rails' posts)
     const bridge = new T.Group(); r.add(bridge);
     box(bridge, -5.8, 3.62, -0.25, 5.8, 3.88, 0.25, rail);
     box(bridge, -5.9, 3.5, -0.4, -5.7, 3.9, 0.4, steel); box(bridge, 5.7, 3.5, -0.4, 5.9, 3.9, 0.4, steel);
@@ -415,6 +432,46 @@ G.Hangar = (() => {
     for (const sd of [-1, 1]) { box(grab, sd * 0.4 - 0.03, -0.42, -0.3, sd * 0.4 + 0.03, 0.0, 0.3, steel); box(grab, sd * 0.32, -0.44, -0.3, sd * 0.4, -0.38, 0.3, steel); }
     const carried = new T.Mesh(new T.BoxGeometry(0.76, 0.78, 0.76), M(0x8a6a3a, { roughness: 0.9 })); carried.position.y = -0.43 - 0.39; carried.visible = false; grab.add(carried);
     S.crane = { bridge, trolley, grab, cable, carried, cx: STACK.x, cz: STACK.z, gy: 2.9, state: 'idle', t: 0, queue: 0 };
+  }
+
+  // ---- the lounge: carpet, a wall to the warehouse, two rows of sofas facing the big screen, a coffee table, a snack bar
+  function lounge() {
+    const r = S.root, L = LOUNGE;
+    const carpet = new T.Mesh(new T.PlaneGeometry(L.x1 - L.x0 - 0.1, L.z1 - L.z0 - 0.1), M(0x2a2f3a, { roughness: 1 })); carpet.rotation.x = -Math.PI / 2; carpet.position.set((L.x0 + L.x1) / 2, 0.008, (L.z0 + L.z1) / 2); r.add(carpet);
+    const rug = new T.Mesh(new T.PlaneGeometry(8.6, 7.4), new T.MeshStandardMaterial({ roughness: 1, map: canvasTex(256, 220, (g, w, h) => { g.fillStyle = '#5a2a3a'; g.fillRect(0, 0, w, h); g.strokeStyle = '#d8a84a'; g.lineWidth = 5; g.strokeRect(12, 12, w - 24, h - 24); g.strokeStyle = '#8a4a5a'; g.lineWidth = 3; g.strokeRect(26, 26, w - 52, h - 52); }) }));
+    rug.rotation.x = -Math.PI / 2; rug.position.set(44.4, 0.012, 20); r.add(rug);
+    // the wall to the warehouse: plasterboard on a steel frame, a window strip along its top
+    box(r, L.wall, 0, L.z0 - 0.2, L.x1, 2.0, L.z0, M(0x5a6068));
+    box(r, L.wall, 2.0, L.z0 - 0.2, L.x1, 2.08, L.z0, M(0x30343a));
+    const pane = new T.Mesh(new T.BoxGeometry(L.x1 - L.wall, 0.64, 0.04), new T.MeshStandardMaterial({ color: 0x8ab0c8, transparent: true, opacity: 0.25, roughness: 0.1 })); pane.position.set((L.wall + L.x1) / 2, 2.42, L.z0 - 0.1); r.add(pane);
+    box(r, L.wall, 2.74, L.z0 - 0.2, L.x1, 2.8, L.z0, M(0x30343a));
+    box(r, L.wall - 0.08, 0, L.z0 - 0.24, L.wall, 2.8, L.z0 + 0.04, M(0x30343a)); // (its end post)
+    // the sofas: the seat, the cushions, the back on the side away from the screen (west), the arms
+    const fab = [M(0x3a4a6a, { roughness: 0.95 }), M(0x6a3a3a, { roughness: 0.95 })], cush = [M(0x4a5a7c, { roughness: 0.95 }), M(0x7c4a4a, { roughness: 0.95 })];
+    L.sofas.forEach((s, i) => {
+      box(r, s.x - 0.45, 0, s.z0, s.x + 0.45, 0.42, s.z1, fab[i]);
+      const n = Math.round((s.z1 - s.z0 - 0.4) / 0.95), cw = (s.z1 - s.z0 - 0.4) / n;
+      for (let k = 0; k < n; k++) box(r, s.x - 0.3, 0.42, s.z0 + 0.2 + k * cw + 0.02, s.x + 0.43, 0.52, s.z0 + 0.2 + (k + 1) * cw - 0.02, cush[i]);
+      box(r, s.x - 0.45, 0.42, s.z0, s.x - 0.25, 0.9, s.z1, fab[i]);
+      for (const z of [s.z0, s.z1 - 0.2]) box(r, s.x - 0.45, 0.42, z, s.x + 0.45, 0.66, z + 0.2, fab[i]);
+    });
+    // the coffee table: a top on four legs, a bowl of popcorn
+    const [tx0, tz0, tx1, tz1, th] = L.table;
+    box(r, tx0, th - 0.05, tz0, tx1, th, tz1, M(0x6b4428, { roughness: 0.6 }));
+    for (const x of [tx0 + 0.06, tx1 - 0.06]) for (const z of [tz0 + 0.06, tz1 - 0.06]) box(r, x - 0.03, 0, z - 0.03, x + 0.03, th - 0.05, z + 0.03, M(0x2a2a2a));
+    cyl(r, 0.16, 0.1, M(0xd84a3a), (tx0 + tx1) / 2, th + 0.05, (tz0 + tz1) / 2);
+    for (let k = 0; k < 9; k++) { const a = k * 2.4; cyl(r, 0.035, 0.05, M(0xfff0c0, { roughness: 1 }), (tx0 + tx1) / 2 + Math.cos(a) * 0.08 * (k % 3) / 2, th + 0.12, (tz0 + tz1) / 2 + Math.sin(a) * 0.08 * (k % 3) / 2, 6); }
+    // the snack bar by the front wall: a counter, a popcorn machine (glowing), a drinks fridge
+    const [bx0, bz0, bx1, bz1, bh] = L.bar;
+    box(r, bx0, 0, bz0, bx1, bh - 0.05, bz1, M(0x3b3f44)); box(r, bx0 - 0.03, bh - 0.05, bz0 - 0.03, bx1 + 0.03, bh, bz1 + 0.03, M(0x9a7a50, { roughness: 0.6 }));
+    const pz = bz0 + 0.55;
+    box(r, bx0 + 0.15, bh, pz - 0.3, bx1 - 0.15, bh + 0.06, pz + 0.3, M(0xc0302a));
+    const glass = new T.Mesh(new T.BoxGeometry(bx1 - bx0 - 0.34, 0.5, 0.56), new T.MeshStandardMaterial({ color: 0xffe0a0, emissive: 0x6a4a10, transparent: true, opacity: 0.55 })); glass.position.set((bx0 + bx1) / 2, bh + 0.31, pz); r.add(glass);
+    box(r, bx0 + 0.15, bh + 0.06, pz - 0.26, bx1 - 0.15, bh + 0.22, pz + 0.26, M(0xfff0c0, { roughness: 1 }));
+    box(r, bx0 + 0.15, bh + 0.56, pz - 0.3, bx1 - 0.15, bh + 0.66, pz + 0.3, M(0xc0302a));
+    const fz = bz1 - 0.6;
+    box(r, bx0 + 0.1, bh, fz - 0.4, bx1 - 0.1, bh + 0.9, fz + 0.4, M(0x2d3237));
+    const fg = new T.Mesh(new T.PlaneGeometry(0.66, 0.7), new T.MeshStandardMaterial({ color: 0x9adfff, emissive: 0x1a4a6a, transparent: true, opacity: 0.7 })); fg.rotation.y = Math.PI / 2; fg.position.set(bx1 - 0.08, bh + 0.45, fz); r.add(fg);
   }
 
   // ---- the helicopter
@@ -474,14 +531,14 @@ G.Hangar = (() => {
     const Sh = G.Shop, O = Sh.offers;
     if (S.rosterKey !== rosterKey()) { enter(S.map); return; } // (someone joined or left: the benches are theirs)
     // only when something's changed (each change draws new signs)
-    const parts0 = [...(Sh.partStock || [])], key = JSON.stringify([O.gear, [...Sh.gearSold], parts0, O.pouches.map((o) => Sh.left['pouch:' + o.id]), [...Sh.ammoSold]]);
+    const parts0 = [...(Sh.partStock || [])], key = JSON.stringify([O.gear, parts0, Sh.stock]);
     if (!force && key === S.key) { vending(false); return; }
     S.key = key;
     // the pedestals: the three pieces of gear
     S.stands.forEach((tg, i) => {
       const id = O.gear[i];
       tg.key = id || null;
-      tg.sold = !id || Sh.gearSold.has(id);
+      tg.sold = !id || !Sh.inStock('gear:' + id);
       clear(tg.disp); tg.spin = null;
       if (id && !tg.sold) { const sh = showPiece(id); tg.disp.add(sh.root); tg.spin = sh.spin; }
       const lines = id ? signFor(id, tg.sold) : ['—'], n = lines.length, SH = Math.min(0.78, 0.3 + 0.17 * n); // (as tall as its lines need)
@@ -493,14 +550,15 @@ G.Hangar = (() => {
     // the parts pedestals
     (S.partStands || []).forEach((tg, i) => {
       const id = parts0[i], p = id && G.Gunsmith.PARTS[id];
-      tg.key = id || null; tg.sold = !p;
+      const left = p ? Sh.count('part:' + id) : 0;
+      tg.key = id || null; tg.sold = !p || !left;
       clear(tg.disp); tg.spin = null;
-      if (p) { const sh = partPiece(id); tg.disp.add(sh.root); tg.spin = sh.spin; }
+      if (p && left) { const sh = partPiece(id); tg.disp.add(sh.root); tg.spin = sh.spin; }
       const n = p ? G.Gunsmith.fitsPart(p).length : 0;
-      const lines = p ? [p.name, money(p.price), `${G.Gunsmith.SLOT_LABEL[p.slot]}${n ? ' · fits ' + n + (n > 1 ? ' weapons' : ' weapon') : ''}`] : ['—'];
+      const lines = !p ? ['—'] : !left ? [p.name, 'SOLD'] : [p.name, money(p.price) + (left > 1 ? ' · ' + left + ' left' : ''), `${G.Gunsmith.SLOT_LABEL[p.slot]}${n ? ' · fits ' + n + (n > 1 ? ' weapons' : ' weapon') : ''}`];
       const SH = Math.min(0.62, 0.22 + 0.12 * lines.length);
       if (tg.sign.material.map) tg.sign.material.map.dispose(); tg.sign.material.dispose();
-      tg.sign.material = signMat(lines, 384, Math.round(384 * SH / 0.6), '#101418', '#ffd24a', '#ffffff');
+      tg.sign.material = signMat(lines, 384, Math.round(384 * SH / 0.6), '#101418', left ? '#ffd24a' : '#ff6a5a', '#ffffff');
       tg.sign.scale.set(1, SH / 0.4, 1);
       tg.sign.position.y = 0.08 + (PARTS.top - 0.11) / 2;
     });
@@ -508,9 +566,9 @@ G.Hangar = (() => {
     S.pouchSlots.forEach((slot, i) => {
       clear(slot);
       const tg = S.items.find((q) => q.id === 'pouch' + i), o = O.pouches[i], P = o && G.Gear.POUCHES[o.id];
-      tg.key = o ? o.id : null; tg.sold = !o || !(Sh.left['pouch:' + o.id] > 0);
+      tg.key = o ? o.id : null; tg.sold = !o || !Sh.inStock('pouch:' + o.id);
       if (!P) return;
-      const it = G.Gear.pouchItem(o.id), left = Sh.left['pouch:' + o.id] || 0;
+      const it = G.Gear.pouchItem(o.id), left = Sh.count('pouch:' + o.id);
       product(slot, it, POUCH.x1 + 0.16, 1.0, 0, Math.PI / 2, signMat([P.name, left ? money(P.price) + ' · ' + left + ' left' : 'SOLD'], 400, 100, '#101418', left ? '#ffd24a' : '#ff6a5a', '#ffffff'), 0.16);
     });
     vending(force);
@@ -522,7 +580,7 @@ G.Hangar = (() => {
   function vendList(id) {
     const Sh = G.Shop, Gr = G.Gear, out = [], sv = Sh.services();
     if (id === 'ammo') {
-      for (const o of Sh.offers.ammo) { const A = G.AMMO[o.am], C = G.CALIBERS[o.cal], it = Gr.boxItem(o.cal, o.am, o.n); out.push({ k: 'ammo', key: o.cal, item: it, name: `${C.name} ${A.name} ×${o.n}`, price: Gr.price(it), sold: Sh.ammoSold.has(o.cal) }); }
+      for (const o of Sh.offers.ammo) { const A = G.AMMO[o.am], C = G.CALIBERS[o.cal], it = Gr.boxItem(o.cal, o.am, o.n); out.push({ k: 'ammo', key: o.cal, item: it, name: `${C.name} ${A.name} ×${o.n}`, price: Gr.price(it), sold: !Sh.inStock('ammo:' + o.cal) }); }
       for (const s of sv) if (s.id.startsWith('ball.')) { const cal = s.id.slice(5), C = G.CALIBERS[cal], am = G.ballFor(cal); out.push({ k: 'svc', key: s.id, item: Gr.boxItem(cal, am, C.box), name: s.name, price: s.price, sold: false }); }
     } else {
       for (const s of sv) {
@@ -581,6 +639,7 @@ G.Hangar = (() => {
     }
     craneStep(dt);
     if (G.Range) G.Range.update(dt);
+    if (G.Highlights) G.Highlights.update(dt);
     // a word from Vex now and then, when you're in the store
     if (me.pos && me.pos.x > 16 && me.pos.x < 36 && me.pos.z - RZ < 26 && me.pos.z - RZ > 0 && (S.vexQuip -= dt) <= 0) { S.vexQuip = 40 + Math.random() * 30; if (!G.Game.shopOpen && Math.hypot(me.pos.x - VEX.x, me.pos.z - RZ - VEX.z) < 9) G.HUD.toast('VEX', G.VENDOR_QUIPS.hello[Math.floor(Math.random() * G.VENDOR_QUIPS.hello.length)], 2.4); }
   }
@@ -591,10 +650,9 @@ G.Hangar = (() => {
     const go = (tx, tz, sp) => { const dx = tx - c.cx, dz = tz - c.cz, d = Math.hypot(dx, dz); if (d < 0.02) return true; const k = Math.min(d, sp * dt); c.cx += dx / d * k; c.cz += dz / d * k; return false; };
     const hoist = (to, sp) => { const d = to - c.gy; c.gy += Math.sign(d) * Math.min(Math.abs(d), sp * dt); return Math.abs(to - c.gy) < 0.01; };
     c.t += dt;
-    const BAY_Z = 20.0;
     if (c.state === 'idle') {
       if (c.queue > 0) { c.queue--; c.state = 'toStack'; }
-      else { go(STACK.x + Math.sin(c.t * 0.21) * 3.2, 14 + Math.sin(c.t * 0.15 + 1) * 4, 0.6); hoist(2.9, 0.5); }
+      else { go(STACK.x + Math.sin(c.t * 0.21) * 3.2, (WARE.z0 + WARE.z1) / 2 + Math.sin(c.t * 0.15 + 1) * 3.5, 0.6); hoist(2.9, 0.5); }
     } else if (c.state === 'toStack') { if (go(STACK.x, STACK.z, 3.2) && hoist(2.9, 1.5)) c.state = 'down'; }
     else if (c.state === 'down') { if (hoist(2.45, 1.2)) { c.state = 'lift'; c.carried.visible = true; } }          // (onto the top crate)
     else if (c.state === 'lift') { if (hoist(2.95, 1.2)) c.state = 'toBay'; }
@@ -625,7 +683,7 @@ G.Hangar = (() => {
     _o.copy(cam.position); _d.set(0, 0, -1).applyQuaternion(cam.quaternion);
     let best = null, bt = 1e9;
     for (const t of S.targets) {
-      const reach = t.kind === 'heli' ? HELI_REACH : REACH, d = slab(t.box, _o, _d);
+      const reach = t.reach || (t.kind === 'heli' ? HELI_REACH : REACH), d = slab(t.box, _o, _d); // (t.reach: further, a TV on the wall)
       if (d >= 0 && d < reach && d < bt) { bt = d; best = t; }
     }
     return best;
@@ -642,10 +700,10 @@ G.Hangar = (() => {
     }
     // something for sale
     let name, price, sold = !!t.sold, extra = '', buy = null;
-    if (t.what === 'gear') { if (!t.key) return { html: '' }; const d = gearOf(t.key); name = d.name; price = Sh.gearPrice(t.key); sold = Sh.gearSold.has(t.key); extra = d.plate && Sh.offers.plates[t.key] ? ' (plate fitted)' : needs(d) ? ` <small>(${needs(d)})</small>` : ''; buy = ['gear', t.key]; }
-    else if (t.what === 'part') { if (!t.key) return { html: '' }; const p = G.Gunsmith.PARTS[t.key]; name = p.name; price = p.price; sold = !Sh.partStock.has(t.key); extra = ' <small>(to your stash)</small>'; buy = ['part', t.key]; }
-    else if (t.what === 'pouch') { if (!t.key) return { html: '' }; const P = G.Gear.POUCHES[t.key]; name = P.name; price = P.price; sold = !(Sh.left['pouch:' + t.key] > 0); buy = ['pouch', t.key]; }
-    else if (t.what === 'ammo') { name = t.name; price = t.price; sold = Sh.ammoSold.has(t.key); buy = ['ammo', t.key]; }
+    if (t.what === 'gear') { if (!t.key) return { html: '' }; const d = gearOf(t.key); name = d.name; price = Sh.gearPrice(t.key); sold = !Sh.inStock('gear:' + t.key); extra = d.plate && Sh.offers.plates[t.key] ? ' (plate fitted)' : needs(d) ? ` <small>(${needs(d)})</small>` : ''; buy = ['gear', t.key]; }
+    else if (t.what === 'part') { if (!t.key) return { html: '' }; const p = G.Gunsmith.PARTS[t.key]; name = p.name; price = p.price; sold = !Sh.inStock('part:' + t.key); extra = ' <small>(to your stash)</small>'; buy = ['part', t.key]; }
+    else if (t.what === 'pouch') { if (!t.key) return { html: '' }; const P = G.Gear.POUCHES[t.key]; name = P.name; price = P.price; sold = !Sh.inStock('pouch:' + t.key); buy = ['pouch', t.key]; }
+    else if (t.what === 'ammo') { name = t.name; price = t.price; sold = !Sh.inStock('ammo:' + t.key); buy = ['ammo', t.key]; }
     else if (t.what === 'svc') { const s = Sh.services().find((q) => q.id === t.key); if (!s) return { html: '' }; name = s.name; price = s.price; sold = !!s.disabled; extra = s.disabled ? ' <small>(no room, or nothing to do)</small>' : ''; buy = ['svc', t.key]; }
     if (!buy) return { html: '' };
     if (sold) return { html: `<b>${G.U.esc(name)}</b> <small>sold out${t.what === 'gear' ? '' : extra}</small>` };

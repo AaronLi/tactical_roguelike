@@ -163,10 +163,10 @@ G.Rig = (() => {
     }
   }
   // A suspect's armour (G.ARMORS ids) as the gear an officer would wear: the same models for the same kit
-  function armourKit(vest, helmet, armored) {
+  function armourKit(vest, helmet, armored, face) {
     const V = { soft: ['c.ghost', 0, 0], steel: ['c.patrol', 1, 2], ceramic: ['c.assault', 1, 3], assault: ['c.heavy', 1, 2] }[vest] || (armored ? ['c.heavy', 1, 2] : null);
     const H = { ach: 'h.ach', riflehelm: 'h.rifle', visor: 'h.visor' }[helmet] || (armored ? 'h.rifle' : 0);
-    return { helmet: H, face: 0, carrier: V ? V[0] : 0, plate: V ? V[1] : 0, cp: V ? V[2] : 0, belt: armored ? 'b.battle' : 0, bp: armored ? 2 : 0, pack: 0, ifak: 0 };
+    return { helmet: H, face: (H && face) || 0, carrier: V ? V[0] : 0, plate: V ? V[1] : 0, cp: V ? V[2] : 0, belt: armored ? 'b.battle' : 0, bp: armored ? 2 : 0, pack: 0, ifak: 0 };
   }
   function create(o) {
     const s = o.scale || 1, style = o.style || 'tactical';
@@ -367,6 +367,13 @@ G.Rig = (() => {
       rig.dropped = { g, vy: 1.5, spin: (Math.random() - 0.5) * 6 };
       rig.gun = null; rig.gunInfo = null; rig.gunKey = null;
     };
+    // Down for good (alive, bleeding out): limp, the same ragdoll as the dead, carrying on from however the body was
+    // moving (its powered ragdoll, if it had one), no muscles pulling it toward a pose to snap back to.
+    rig.goLimp = () => {
+      if (rig.limp || rig.state === 'dead') return;
+      rig.limp = true; rig.deadT = 0;
+      if (rig.rd) { rig.rd.drive = null; rig.rd.asleep = false; rig.rd.still = 0; } else ragdollInit(rig, null);
+    };
     rig.die = (dir) => {
       if (rig.state === 'dead') return;
       rig.state = 'dead'; rig.deadT = 0;
@@ -393,7 +400,7 @@ G.Rig = (() => {
     };
     // zip-tie the wrists (living arrests and secured bodies)
     rig.zip = (on, instant) => {
-      if (on && !rig.zipped && rig.state === 'dead') rollFaceDown(rig, instant);
+      if (on && !rig.zipped && (rig.state === 'dead' || rig.limp)) rollFaceDown(rig, instant);
       rig.zipped = on; rig.armL.tie.visible = rig.armR.tie.visible = on;
     };
     // An officer securing this body: t is their progress (0..1), or -1 once nobody is. They turn it onto its
@@ -422,7 +429,13 @@ G.Rig = (() => {
       if (rig.rd) ragdollPose(rig);
     };
     rig.startle = () => { rig.flinch.set(0.7, 0, 1); }; // a jolt backward
-    rig.dispose = () => { if (rig.dropped && rig.dropped.g.parent) rig.dropped.g.parent.remove(rig.dropped.g); if (rig.dbg) rig.dbg.forEach((m) => m.parent && m.parent.remove(m)); };
+    // (its geometry is its own, each piece made for it: thrown away with it, or every body that's ever left the scene
+    // stays on the graphics card. The materials are shared between bodies, so they stay.)
+    rig.dispose = () => {
+      if (rig.dropped && rig.dropped.g.parent) rig.dropped.g.parent.remove(rig.dropped.g);
+      if (rig.dbg) rig.dbg.forEach((m) => m.parent && m.parent.remove(m));
+      for (const o of [rig.root, rig.dropped && rig.dropped.g]) if (o) o.traverse((c) => { if (c.geometry) c.geometry.dispose(); });
+    };
     return rig;
   }
 
@@ -456,11 +469,11 @@ G.Rig = (() => {
     if (dt > 0) rig.vel.lerp(dv.multiplyScalar(1 / dt), Math.min(1, dt * 10));
     root.position.copy(p.pos);
     root.rotation.y = p.yaw;
-    if (rig.powered && rig.state !== 'dead') gunHome(rig); // (before the hands reach for it)
+    if (rig.powered && rig.state !== 'dead' && !rig.limp) gunHome(rig); // (before the hands reach for it)
     root.updateMatrixWorld(true);
 
 
-    if (rig.state === 'dead') { animateDeath(rig, dt); drawDebug(rig); return; }
+    if (rig.state === 'dead' || rig.limp) { animateDeath(rig, dt); drawDebug(rig); return; }
 
     const sy = Math.sin(p.yaw), cy = Math.cos(p.yaw);
     const vx = rig.vel.x, vz = rig.vel.z;
@@ -1188,8 +1201,9 @@ G.Rig = (() => {
   }
 
   // ---------------------------------------------------------------- hitboxes
-  // Zones: head, chest (heart, lungs), abdomen (liver, gut, spine), upper arm, forearm, thigh, shin. How bad a
-  // hit is depends on the zone and on how centrally the round passes through it (G.WOUNDS).
+  // Zones: head, chest (heart, lungs), abdomen (liver, gut, spine), upper arm, forearm, thigh, shin. These capsules
+  // are what a round is checked against first; what it does inside is worked out on the body's real shape, organ by
+  // organ (js/ballistics.js).
   function hitboxes(rig) {
     if (!rig.hb) {
       const mk = (zone, r, side) => ({ zone, r, side, a: new T.Vector3(), b: new T.Vector3() });
@@ -1288,8 +1302,18 @@ G.Rig = (() => {
     });
   }
 
+  // where an officer's hands are on someone being restrained: between the shoulder blades while they're shoved down,
+  // then at the wrists (a body: a hand on the shoulder to turn it over, then at the wrists)
+  function zipPoint(rig, t, living) {
+    rig.root.updateMatrixWorld(true);
+    const wr = rig.armL.tie.getWorldPosition(new THREE.Vector3()).add(rig.armR.tie.getWorldPosition(new THREE.Vector3())).multiplyScalar(0.5);
+    if (!living) return rig.chest.localToWorld(new THREE.Vector3(0, 0.22, 0)).lerp(wr, G.U.smooth(0.38, 0.6, t));
+    return rig.chest.localToWorld(new THREE.Vector3(0, 0.16, 0.14)).lerp(wr, G.U.smooth(0.42, 0.56, t));
+  }
+  // where someone lying (dead, or down for good) is: their ragdoll's hips, wherever it came to rest
+  function bodyAt(rig) { return (rig.hips || rig.root).getWorldPosition(new THREE.Vector3()); }
   return {
-    create, raycast, rayCapsule, OFFICER_LOOK, LOOKS, cleanLook, armourKit,
+    create, raycast, rayCapsule, OFFICER_LOOK, LOOKS, cleanLook, armourKit, zipPoint, bodyAt,
     get debug() { return debug; },
     toggleDebug() { debug = !debug; return debug; },
   };

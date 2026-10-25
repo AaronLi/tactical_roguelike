@@ -153,6 +153,21 @@ img.anim { width: 1.25em; height: 1.25em; vertical-align: -0.3em; margin-right: 
 #minimap { position: absolute; right: 16px; top: 16px; width: 200px; height: 200px; }
 
 #killfeed { position: absolute; right: 16px; top: 228px; text-align: right; font-size: 12px; }
+/* F9's readout: everything about whoever's under the crosshair (js/hud.js debugTarget) */
+.hb-info { position: absolute; left: 16px; top: 96px; width: 360px; max-height: calc(100vh - 330px); overflow: hidden; padding: 8px 10px; background: rgba(6, 8, 10, 0.78); border: 1px solid rgba(255, 255, 255, 0.12); font: 11px/1.45 var(--mono); color: #c9d1d6; pointer-events: none; }
+.hb-info.hidden { display: none; }
+.hb-info h4 { margin: 0 0 4px; font: 600 12px var(--mono); color: #fff; }
+.hb-info h4 small { color: #8a959c; font-weight: 400; }
+.hb-info .hb-sec { margin-top: 6px; padding-top: 4px; border-top: 1px dashed rgba(255, 255, 255, 0.12); }
+.hb-info .hb-k { color: #8a959c; }
+.hb-info .hb-line b { color: #ffb43a; }
+.hb-info .hb-old { opacity: 0.6; }
+.hb-info .hb-legend i { display: block; height: 6px; margin: 3px 0 1px; border-radius: 2px; }
+.hb-info .hb-legend { margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px dashed rgba(255, 255, 255, 0.12); font-size: 10px; }
+.hb-info .bad { color: #ff7a6a; } .hb-info .warn { color: #ffc65a; } .hb-info .ok { color: #8fd18a; }
+.hb-info .hb-row { display: flex; justify-content: space-between; gap: 8px; }
+.hb-info .hb-org { display: grid; grid-template-columns: 1fr 1fr; column-gap: 14px; margin-top: 4px; line-height: 1.3; }
+.hb-info .hb-reg { grid-column: 1 / -1; margin-top: 3px; color: #8a959c; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; }
 #killfeed div { background: rgba(0,0,0,0.45); padding: 3px 8px; margin-bottom: 3px; display: inline-block; clear: both; float: right; transition: opacity 1s; }
 #killfeed .fade { opacity: 0; }
 #killfeed .hs { color: #ff5050; }
@@ -245,6 +260,7 @@ img.anim { width: 1.25em; height: 1.25em; vertical-align: -0.3em; margin-right: 
 .card { background: var(--panel); border: 1px solid var(--line); padding: calc(14px * var(--ik, 1)); display: flex; flex-direction: column; gap: calc(6px * var(--ik, 1)); }
 .card.owned { border-color: var(--good); }
 .card.squad { border-color: rgba(61,255,122,0.35); background: linear-gradient(180deg, rgba(61,255,122,0.06), var(--panel)); }
+.card .load-sel { width: 100%; background: #14181b; color: #e8eef2; border: 1px solid #3a424a; padding: calc(4px * var(--ik, 1)); font: calc(12px * var(--ik, 1)) var(--mono); }
 .ch { display: flex; justify-content: space-between; align-items: baseline; gap: calc(8px * var(--ik, 1)); }
 .cn { font: 700 calc(15px * var(--ik, 1)) var(--mono); }
 .tier { font: 600 calc(10px * var(--ik, 1)) var(--mono); letter-spacing: 1px; text-transform: uppercase; color: var(--dim); white-space: nowrap; }
@@ -292,6 +308,9 @@ label.check input { width: auto; accent-color: var(--accent); }
 .gs-slot.on { background: rgba(255,176,46,0.14); }
 .gs-slot.on span { color: var(--accent); }
 .gs-stats { display: flex; flex-direction: column; gap: calc(3px * var(--ik, 1)); }
+.gs-change { padding: calc(6px * var(--ik, 1)) calc(8px * var(--ik, 1)); margin-bottom: calc(4px * var(--ik, 1)); border: 1px dashed var(--line); background: rgba(255,255,255,0.03); }
+.gs-change .gs-ch-h { font: 600 calc(10px * var(--ik, 1)) var(--mono); color: var(--text); margin-bottom: calc(4px * var(--ik, 1)); }
+.gs-change .gs-pe { color: var(--text); }
 .gs-stat { display: grid; grid-template-columns: calc(86px * var(--ik, 1)) 1fr calc(92px * var(--ik, 1)); gap: calc(6px * var(--ik, 1)); align-items: center; font: calc(10px * var(--ik, 1)) var(--mono); color: var(--dim); }
 .gs-stat div { height: calc(4px * var(--ik, 1)); background: rgba(255,255,255,0.08); }
 .gs-stat i { display: block; height: 100%; background: var(--accent); }
@@ -299,6 +318,13 @@ label.check input { width: auto; accent-color: var(--accent); }
 .gs-stat.up b, .gs-stat.up em { color: var(--good); }
 .gs-stat.down b, .gs-stat.down em { color: #ff6b6b; }
 .gs-stat em { font-style: normal; font-size: calc(9px * var(--ik, 1)); }
+/* each load through the build's barrel: muzzle velocity and energy */
+.gs-loads { display: grid; grid-template-columns: 1fr auto auto; gap: calc(2px * var(--ik, 1)) calc(10px * var(--ik, 1)); margin-top: calc(6px * var(--ik, 1)); padding-top: calc(6px * var(--ik, 1)); border-top: 1px solid rgba(255,255,255,0.08); font: calc(10px * var(--ik, 1)) var(--mono); color: var(--dim); }
+.gs-loads > span:nth-child(-n+3) { color: var(--accent); font-size: calc(9px * var(--ik, 1)); letter-spacing: 0.06em; text-transform: uppercase; }
+.gs-loads b { color: var(--text); font-weight: 600; text-align: right; }
+.gs-loads b.up, .gs-loads b.up em { color: var(--good); }
+.gs-loads b.down, .gs-loads b.down em { color: #ff6b6b; }
+.gs-loads em { font-style: normal; font-size: calc(9px * var(--ik, 1)); }
 .gs-list { display: flex; flex-direction: column; gap: calc(4px * var(--ik, 1)); }
 .gs-sub { font: 600 calc(11px * var(--ik, 1)) var(--mono); color: var(--dim); letter-spacing: 2px; text-transform: uppercase; margin-top: 2px; }
 .gs-left { display: flex; flex-direction: column; gap: calc(10px * var(--ik, 1)); min-width: 0; }
@@ -307,7 +333,7 @@ label.check input { width: auto; accent-color: var(--accent); }
 .gs-slot.misfit b, .gs-slot.misfit b i { color: #ff8a7a; }
 .gs-part:hover { border-color: rgba(255,176,46,0.5); }
 .gs-part.fitted { border-color: var(--good); }
-.gs-part.na { opacity: 0.45; }
+.gs-part.na { opacity: 0.45; } .gs-part.na:hover { opacity: 0.9; }
 .gs-pn { font: 600 calc(12px * var(--ik, 1)) var(--mono); }
 .gs-pn small { display: block; font-weight: 400; font-size: calc(10px * var(--ik, 1)); color: var(--dim); letter-spacing: 1px; text-transform: uppercase; }
 .gs-pe { font: calc(10px * var(--ik, 1)) var(--mono); color: var(--dim); display: flex; flex-wrap: wrap; gap: calc(2px * var(--ik, 1)) calc(10px * var(--ik, 1)); }
@@ -574,3 +600,42 @@ i.c.heavy { background: #a02828; } i.c.light { background: #7a3a30; } i.c.frac {
 .sidearm-pick .arm-who i > * { width: 14px !important; height: 14px !important; margin: 0 !important; }
 .sidearm-pick .arm.sel { border-color: var(--accent); background: #232016; box-shadow: 0 0 0 2px var(--accent) inset; }
 .sidearm-pick .arm-ok { margin-top: 16px; min-width: 260px; }
+/* the attachments box: three wheels, each spun till you stop it, then fit what it landed on or carry it (js/game.js aboxShow) */
+.abox-pick { position: fixed; z-index: 45; pointer-events: auto; }
+.abox-pick .arm { cursor: default; min-height: 300px; }
+.abox-pick .abox-win { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; padding: 10px 6px; border: 1px solid var(--line); background: #0d1013; overflow: hidden; }
+.abox-pick .abox-reel { position: relative; width: 100%; overflow: hidden; border: 1px solid var(--line); background: #0d1013; }
+.abox-pick .abox-reel::before, .abox-pick .abox-reel::after { content: ''; position: absolute; left: 0; right: 0; height: 26px; z-index: 1; pointer-events: none; }
+.abox-pick .abox-reel::before { top: 0; background: linear-gradient(#0d1013, rgba(13, 16, 19, 0)); }
+.abox-pick .abox-reel::after { bottom: 0; background: linear-gradient(rgba(13, 16, 19, 0), #0d1013); }
+.abox-pick .abox-strip { will-change: transform; }
+.abox-pick .abox-face { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 0 6px; box-sizing: border-box; border-bottom: 1px solid #1a1f25; }
+.abox-pick .abox-face img { height: 64px; }
+.abox-pick .abox-win small { font: 11px var(--mono); color: var(--dim); text-transform: uppercase; letter-spacing: 1px; }
+.abox-pick .abox-acts { display: flex; flex-direction: column; gap: 6px; width: 100%; margin-top: auto; }
+.abox-pick .abox-acts .btn { width: 100%; }
+.abox-pick .arm.taken { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
+.abox-pick .arm.gone { opacity: 0.45; }
+.abox-pick .abox-close { margin-top: 16px; min-width: 200px; }
+/* an armour card's make-up and what it stops (js/shop.js gearCard, from js/ballistics.js rating) */
+.card .arm-rate { font-size: 11px; line-height: 1.35; margin: 4px 0 2px; }
+.card .arm-rate small { opacity: 0.7; display: block; }
+.card .arm-rate b { display: inline-block; min-width: 34px; color: #cfd6dc; }
+
+/* the attachments box: what the pick you're over does to your gun */
+.abox-stats { margin: 12px auto 0; max-width: 560px; text-align: left; padding: 10px 12px; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.08); }
+.abox-stats h4 { margin: 0 0 6px; font: 600 12px var(--mono); color: var(--text); }
+.abox-stats h4 small { color: var(--dim); font-weight: 400; }
+.abox-stats .gs-pe { margin-bottom: 6px; }
+.abox-stats .abox-hint { margin: 0; color: var(--dim); font: 11px var(--mono); }
+.abox-stats .gs-stats { display: grid; grid-template-columns: 1fr 1fr; column-gap: 18px; }
+.abox-stats .gs-loads { grid-column: 1 / -1; }
+/* the comms wheel (hold the middle button: js/player.js wheelOpen): eight slices round the crosshair, a pointer the mouse moves */
+#commWheel { position: fixed; left: 50%; top: 50%; width: 0; height: 0; z-index: 40; pointer-events: none; opacity: 0; transition: opacity 0.08s; }
+#commWheel.on { opacity: 1; }
+#commWheel::before { content: ''; position: absolute; left: -165px; top: -165px; width: 330px; height: 330px; border-radius: 50%; background: radial-gradient(circle, rgba(10,12,14,0.25) 0 22%, rgba(10,12,14,0.72) 23% 100%); border: 1px solid rgba(255,255,255,0.1); }
+#commWheel .cw-it { position: absolute; transform: translate(-50%, -50%); width: 92px; padding: 6px 4px; text-align: center; font: 600 12px var(--mono); color: var(--text); background: rgba(20,24,28,0.85); border: 1px solid rgba(255,255,255,0.12); }
+#commWheel .cw-it small { display: block; font-weight: 400; font-size: 10px; color: var(--dim); margin-top: 2px; }
+#commWheel .cw-it.sel { border-color: var(--accent); background: rgba(255,176,46,0.22); color: #fff; }
+#commWheel .cw-it.off { opacity: 0.4; }
+#commWheel .cw-ptr { position: absolute; left: -5px; top: -5px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 6px rgba(255,176,46,0.8); }

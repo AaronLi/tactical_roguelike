@@ -97,13 +97,16 @@ says the same), but not whose: the shooter's name isn't shown.
   - **The off hand:** with the strength for it (0.4 and up, about 37% health) it's on the gun's forend.
     Below that they can't hold the gun up two-handed: they shoot one-handed (worse aim, more kick) and the off
     hand props them up, on the floor beside them if it can reach, or leaning on the knee, the elbow locked.
-  - **Collapse:** below strength 0.3 (about 31% health) their legs give out: they go down and can't get up,
-    though they can still shoot, badly, from the floor.
+  - **Collapse:** below strength 0.3 (about 31% health), a spine or a stopped heart, they're down for good: the
+    gun falls from their hand (evidence, as when they give up) and the body goes limp, the same ragdoll as the dead
+    but still alive, bleeding out. No aiming or shooting, no turning or moving, no giving up, and no pose for the
+    body to snap back to. You cuff them where they lie as you would a body (turned onto the front, wrists behind),
+    which stops the bleeding.
   - **Dead:** the muscles are gone.
   - Only suspects within 40 m of you are simulated; farther off they're animated.
 - **Their gun is in their hand.** It goes with the simulated right hand, held the right way up (it can't roll
   more than 25° off level), and while they're aiming the arms hold it on their target as hard as they still
-  can: dead on at full strength, 8° off at half, about 40° off from the floor. Their rounds leave that gun's
+  can: dead on at full strength, 8° off at half. Their rounds leave that gun's
   muzzle as you see it, and a miss from a gun pointing well off the line flies where the barrel points.
 - **They fire when the gun's on you, and it kicks.** Each shot kicks the muzzle up by the weapon's recoil
   (about 5° for an AK, 3° for an M4, 12° or more for a shotgun; half again one-handed and weak) and shoves the
@@ -113,10 +116,9 @@ says the same), but not whose: the shooter's name isn't shown.
   the more the gun's still jumping. So recoil sets their pace: at full strength an AK's burst goes out about
   0.11–0.17 s a round; weakened and one-handed, the same gun manages a round every 0.6 s.
 - **The weaker they are, the more readily they give up.** Weakness adds to the chance they surrender when
-  shouted at (up to half again), collapse adds more, and it overrides what normally keeps them fighting:
+  shouted at (up to half again), and it overrides what normally keeps them fighting:
   armed friends nearby, and having already been shooting at you. A lone gunman, gun up, who's been shooting:
-  about 1.5% at full strength, about 50% at strength 0.3, about 85% collapsed; with two armed friends in
-  sight, about 0.1%, 24% and 73%.
+  about 1.5% at full strength, about 50% at strength 0.3; with two armed friends in sight, about 0.1% and 24%.
 - **Hits and near misses rattle them.** Being hit gives a shock that takes up to half their accuracy and
   fades over about two seconds; it also throws off the shot they were about to take and starts their aim over
   from the body. Rounds passing or striking near them build suppression (more the closer: a round past the
@@ -138,13 +140,22 @@ says the same), but not whose: the shooter's name isn't shown.
   - Marks last the level: 400 drops and splashes, oldest replaced first, and 24 pools.
 - **Suspects get hurt.** The host records where each of your rounds landed (part, side, through the middle,
   how much got past armour):
-  - **Bleeding:** a heavy bleed takes a standard suspect in under a minute, and light bleeds clot after about
-    30 s. Bleeding drains health and nerve, so a bleeding suspect is likelier to give up. Blood drips from them
+  - **Bleeding:** a heavy bleed takes a standard suspect in under two minutes (about 100 s from full health), and light bleeds clot after about
+    30 s. (Everyone, suspects and officers, bleeds at half the wounds' rates: `BLEED_K`.) Bleeding drains health and nerve, so a bleeding suspect is likelier to give up. Blood drips from them
     as they move.
   - **Bones and lungs:** a broken leg makes them limp (two, crawling pace), a broken arm ruins their aim, and
     a punctured lung slows them and spoils their aim.
-  - **Bleed-outs:** a suspect who bleeds out is credited to whoever shot them, and judged by what they were
-    doing when shot. Zip-tying a suspect stops their bleeding.
+  - **Incapacitated:** a suspect counts as incapacitated the moment they go down for good, the same as a kill.
+    Whoever last shot them gets the credit and the tally, judged by what the suspect was doing when shot. Lethal
+    force pays least, and an unauthorised one costs.
+    - **Killed outright:** they count as incapacitated when they die.
+    - **Down, then dead:** if a downed suspect bleeds out or is finished off, they aren't counted again.
+      A bleed-out is kept in the level report ("3 incapacitated (1 bled out)"), and the host also records it
+      against the officer who put them down (`report.bleedBy`) for later use.
+    - **Cuffed while down:** that stops the bleeding and pays like securing a body (the carrier's share). It's
+      not counted as an arrest.
+    - **Bleeding out on their feet:** a suspect who never went down is credited to whoever shot them,
+      judged the same way.
 - **Thin walls** (`js/level.js`: `refine`). Levels are planned on a 2 m grid (rooms, corridors, doors,
   furniture), then refined to a 0.67 m grid that everything plays on.
   - **Walls between spaces:** a wall between two rooms, or between a house and its garden, is one 0.67 m cell
@@ -172,20 +183,95 @@ says the same), but not whose: the shooter's name isn't shown.
   their number changes: measured on the festival, 12 put 40% on a frame, 48 160%, 96 320%. The old pool of 12
   that followed you is gone; the grid draws a frame 20-27% faster than it did.) Muzzle flashes, weapon lights
   and blasts are still real lights.
+  - **Colour is handled physically** (`js/util.js`): every colour written down (a hex, a canvas, a loaded picture)
+    is sRGB, decoded to linear before it's lit, lit in linear (light adds up as light does), and encoded back to sRGB
+    on the way to the screen (three's colour management, `outputEncoding` sRGB on every renderer). Before, three's
+    legacy mode lit the sRGB numbers as they were: a saturated colour under a bright lamp went fluorescent, and the
+    falloff into shadow was a cliff. Lamp colours are tints of white picked by eye, so they're taken as written
+    (decoded, a warm white's blue drops by a third and every room goes amber); the hemisphere fill is squared, so
+    where no lamp reaches is as dark as it was. Custom shaders end in `linearToOutputTexel`; the window backdrop
+    works in its pictures' sRGB and converts at the end; particle colours are converted as they're emitted.
+  - **Over-bright light is rolled off, not clipped** (`G.R.TONE`, a custom tone mapping in `js/render.js`, on linear
+    light): the shoulder of Khronos' PBR Neutral. Under about 76% of full nothing changes; above, the whole colour is
+    eased toward full together, keeping its hue, and toward white by how far it was pushed, as film does (not its
+    toe: taking the same off every channel near black saturates the dark, and most of a level is dark). The death
+    camera's fisheye pass, a scope's picture and the hangar's TVs render the scene to a target and apply the same
+    curve themselves. The festival's lamps
+    were also turned down (strings 0.5, street lamps 0.85, the stage's 1.3): they're many and overlapping, and the
+    light under them was 2.5× a room lamp's at the median, 5× in the brightest tenth; now it's about a room lamp's.
   - **Doors shut the light in.** The grid is worked out with every opaque door shut (a glass stairwell door lets it
     through), and each door keeps a layer of its own: the light that gets past it once it's open, and its doorway
     lit. As a door swings its layer blends in by how far open it is (all of it by the time it's well ajar) and
     back out as it shuts: only the tiles it reaches change, so the shader's still the one lookup. A room's light
     spills into the hall when you open its door, and a dark room stays dark until someone does. (Light through
     two shut doors in a row doesn't count: each door's layer is what that door alone lets by.)
-  - **Light bounces.** Lamps light what they can see; the light that comes back off the floor, walls and ceiling
-    is worked out too: each layer's light (the base's and every door's) spread over the open floor round it,
-    stopped by walls and shut doors as the light was, and 45% of it added back, coming mostly up off the floor.
-    Corners a lamp can't see aren't black, and ceilings (which no lamp hanging from them lights) show. A room
-    measured 15-25% brighter for it. The whole grid, layers and bounce, takes about 150 ms when a level's built.
+  - **Light bounces, twice, in the room's colour.** Lamps light what they can see; the light that comes back off
+    the floor, walls and ceiling is worked out too: spread over the open floor round it, stopped by walls and shut
+    doors as the light was (glass passes it on), tinted by the theme's floor, walls and ceiling (half their hue, so
+    a beige hall doesn't go yellow) and scaled by how pale they are (about 0.45 a bounce in a pale room, 0.3 in a
+    foundry, never over 0.5), then spread and bounced again, so it reaches round corners and down corridors.
+    Out under the sky most of it goes up and away (30% stays). Corners a lamp can't see aren't black, and
+    ceilings (which no lamp hanging from them lights) show.
+  - **The sky is baked too, and the flat fill's mostly gone.** The theme's night-sky fill used to light every
+    surface evenly, indoors and out. Now it falls on what's open to the sky (and, at 60%, through an outside
+    window onto the room behind it), and bounces in through doorways and windows like lamplight; lamplight goes
+    through windows as well. The flat hemisphere fill left everywhere is a quarter of what it was (the hangar,
+    daylit, keeps all of it), and the ambient light is off. Each door's layer is now what opening it changes:
+    everything round it bounced with the doorway open, less the same with it shut, so an open front door lets the
+    street's sky in and a lit room's glow reaches the dark room next door. Against before, at the median tile: a
+    pale level (apartment, store) is 7-20% brighter, a dark one (foundry, bunker) 10-20% darker, and the darkest
+    corners are lit by bounce instead of flat fill. Building the grid takes 50-300 ms (`G.LightGrid.opts`:
+    `bounce`, `bounces`, `sky`, `fill`).
 - Themes: Apartment, Warehouse, Bunker, Suburbs, Research Lab, Foundry, Cold Storage, Festival (the route map picks
-  which). **Every level starts outside the target** (`js/level.js`), and you breach in:
-  - **Rooms and corridors** (Bunker, Research Lab, Foundry, Cold Storage). You start on a fenced, paved lot
+  which), and the Convenience Store, the first deployment of every run and nowhere else. **Every level starts outside
+  the target** (`js/level.js`), and you breach in:
+  - **The convenience store** (`layout: 'mart'`, `layMart`): small and crowded, 20 x 26 m with its lot (from photos of
+    real ones: tall shelving packed close, narrow aisles, a wall of cooler doors, the till behind its glass). You
+    start on the fenced lot out front (an ice chest against the wall); a double door between shop windows into the
+    shop floor, about 10.5 x 9.5 m: three aisles of two-sided shelving (1.6 m: you just see over it standing), 1.5 m
+    apart, an endcap of soda cases at the front of each, full-height shelving down the west wall, an ATM by the till,
+    a way round the back by the coolers and along the front; flat panel lights. Stock is faced up along every shelf
+    (boxes, bottles, cans, bags) over price strips, each in printed packaging: a label from an atlas of 64 (a
+    colour, a band or a mark, lines of type, a printed edge, in print's colours, not pure ones) over every face, on
+    matte card and paper (tins and bottles a little glossier), the stock under a shelf in its shadow; the endcaps'
+    cases and the cigarette wall too (`packaging()`, `k.boxL`/`k.cylL` in `js/furniture.js`). The shop and the booth are laid on the fine grid (`block` on a
+    piece: what it stands on is blocked, cell by cell), which is what makes the aisles narrower than a tile. Behind the shop, the walk-in freezer and the stockroom (a door between them, a
+    door from the shop up into the stockroom); the freezer's front wall is the coolers, glass doors from near the
+    floor onto the shop (they break like any window). The cashier's booth is behind a wall of wired, bulletproof
+    glass from counter height (steel wire in it, a heavy steel frame): it stops rounds and never breaks, but you see
+    through it, and so do they. One door through it; the till and a counter along the inside of the glass, the
+    cigarette wall behind; more of the glass onto the street. Suspects who see you through it hold their fire (no round
+    gets through) and come round for you instead; they don't throw grenades at it either. A suspect starts in every
+    room (the booth, the stockroom and the freezer too) before the rest are spread round. Its
+    weapon case, attachments box and first aid cabinet are always there, all three in the stockroom (`starter` in
+    `G.THEMES`). Glass between rooms is the layout's (`glass`: runs of coarse wall, each with its own sill and top;
+    `armor` for bulletproof, `cooler` for a cooler's doors), placed by `placeWindows`.
+  - **The foundry** (`layout: 'foundry'`, `layFoundry`): a steel works of two storeys, 68 x 56 m with its car park.
+    - **The melt shop** (west) and **the processing hall** (east) are the building's full height (8.3 m). In the
+      melt shop: two electric arc furnaces (electrodes down through the roof from arms on a mast, the slag door
+      glowing), a ladle of molten steel in front of each, a row of ingot moulds, scrap buckets, electrical cabinets.
+      In the processing hall: two lines of roller conveyors through rolling mills, hot saws, a forging press and
+      quench tanks, a way through the middle of each; billets and coils waiting.
+    - **Catwalks** run round both halls upstairs and across them (a bridge over the ladles, a spine between the
+      furnaces, a walkway between the lines), with a steel stair up to them in each hall. Their floor is **steel
+      grating** (`grate` on the layout, carried to the fine grid by `refine`): it holds you up, but rounds and sight
+      go straight through it, from above and from below. Steel railings (a top rail, a knee rail, a toe board, no
+      glass: the layout's `rail: 'steel'`) wherever they're over the drop; hanger rods up to the roof.
+    - **Between the halls**, the switchgear room and the locker room downstairs (a door from each into both
+      halls); over them, the **control room** (desks with screens under the windows) and an observation office,
+      glass down both sides onto the halls and doors out onto both halls' catwalks.
+    - **The office wing** (south-west): a stairwell (its door into the melt shop), the kitchenette, the men's and
+      women's toilets (stalls, basins and a mirror), reception (the front doors onto the car park) and two offices.
+      Upstairs, two observation offices looking into the melt shop through glass (doors out onto its catwalk), the
+      manager's office and the meeting room.
+    - **The loading bay** (south-east), full height: raw stock on pallets (billets, ingots, coils), two forklifts,
+      pallet racking; a roller door up into the processing hall, two out onto the car park and a door between.
+    - You start in the car park, in front of either the offices or the loading bay.
+    - Particles (`buildFx`): sparks off the furnaces' slag doors and the hot saws, embers rising off the molten
+      steel (now and then a spatter of bright drops), smoke over them, steam off the mills and quench tanks. A
+      piece of machinery names what it throws off and the light it gives (`fx`, `glow` in `js/furniture.js`); the
+      halls' high-bay lamps and that glow light the catwalks above too (`up`, copied up by `stack`).
+  - **Rooms and corridors** (Bunker, Research Lab, Cold Storage). You start on a fenced, paved lot
     in front of the building, among bins, pallets and crates. A double door under a lamp leads in. The
     Bunker's is a **vault door**: thick steel with a locking wheel. It's too heavy to kick: you haul it open
     (hold F, 2.4 s), both leaves together. Bunker walls show no windows outside.
@@ -285,9 +371,12 @@ says the same), but not whose: the shooter's name isn't shown.
     pull their wrists behind them and cinch the tie (about 2 s). You hear the scuffle, the body hitting the floor
     and the ratchet of the tie, and so do teammates nearby.
     Let go early and they're left on the floor untied. Restrained suspects stay prone.
+    A body, or a suspect down for good, is tied where their ragdoll lies, not where they dropped: whether it's in
+    reach goes by the ragdoll's hips, wherever it came to rest, and you kneel by its shoulder and tie its wrists
+    (the host accepts that spot if it's within 4 m of where it has them).
 
   There are two objectives:
-  - **Bring Order to Chaos** (required): every suspect arrested or neutralised.
+  - **Bring Order to Chaos** (required): every suspect arrested or neutralised (down and bleeding out counts: they never get up again, and the area they're in counts as cleared).
   - **Rescue All of the Civilians** (optional): restrain every civilian the same way, alive. It fails if
     any civilian dies. Completing it pays ¢150 + ¢50 a level on top of the mission bonus.
 
@@ -392,7 +481,8 @@ says the same), but not whose: the shooter's name isn't shown.
   clean operation, with no civilian deaths and no unauthorised force, pays a bonus.
 - **First aid cabinets.** About a third of levels have a white cabinet with a red cross on an indoor wall,
   and some have two.
-  - **Using one:** hold F to open it. Your inventory opens with the cabinet's 3×2 grid where the locker would
+  - **Using one:** look at it (the crosshair on the cabinet itself, within arm's reach, nothing in between: not
+    from behind its wall) and hold F to open it. Your inventory opens with the cabinet's 3×2 grid where the locker would
     be at the quartermaster's. Move medical gear in and out of it like any other container: drag it, stack it,
     or treat yourself straight from it. It closes if you walk away.
   - **Contents:** one to three items, mostly bandages, painkillers and tourniquets, sometimes gauze, a chest
@@ -410,7 +500,8 @@ says the same), but not whose: the shooter's name isn't shown.
     16 rounds, made fully automatic: 1,050 rounds a minute, hardly any kick, small holes, threaded from the
     factory; it looks like one: a steep bevel down the front of the slide and deep slanted serrations at both
     ends, a dust cover out to the muzzle with rail slots under it, a squared trigger guard, a hard-raked grip
-    with stippled panels and a flared base), the **P9** (9 mm, 15 rounds, semi) or the **derringer** (two shots of .45 Colt). It comes loaded with
+    with stippled panels and a flared base; its magazines: an 11-round compact, a 24-round extended, a 40-round drum,
+    and translucent 16- and 24-rounders that show the rounds left), the **P9** (9 mm, 15 rounds, semi) or the **derringer** (two shots of .44 Magnum). It comes loaded with
     tracers, with two spare loads in your small pockets (two magazines, or for the derringer two boxes of 12).
   - **What's inside:** a weapon in its standard build, fully loaded. It's a long gun three times in four,
     picked by rarity. Each tier has a share of the odds, split evenly between its weapons, and deeper
@@ -431,16 +522,36 @@ says the same), but not whose: the shooter's name isn't shown.
     you have no primary, you just take it and the case is left empty.
   - **Co-op:** one case for the whole squad. After someone swaps, the next player can take the weapon they
     left.
+- **The attachments box** (`map.abox`, most levels: `G.Level.ABOX_CHANCE`): a small black hard case with a yellow band,
+  on the floor against a wall in a room away from the spawn (yellow on your minimap till you've had your pick).
+  - **One use each:** a light on its front for each of the squad, in their colour, lit till they've had their pick.
+  - **Your turn:** hold F at it. The host rolls your three: attachments for the weapon in your hands as it's built
+    (`G.Gunsmith.attachOptions`: a slot it has now, not what's in it already; no magazines, factory parts or
+    conversion kits), lower tiers likelier; if it takes fewer than three (or your hands are empty), the rest are
+    attachments for anything. The lid stays up once anyone's opened it.
+  - **The reels:** the first time, your three are slot-machine reels spinning down through attachments for your
+    weapon; Stop on each eases it out onto what the host rolled (stopping only shows it: the roll's the host's).
+    Look in again and they've landed.
+  - **Taking one:** one of your three. Fit it straight to the weapon in your hands (what it replaces, and anything
+    that no longer has a place on the gun, goes into your inventory, or onto the floor if there's no room) or put it
+    in your inventory (on the floor if there's no room). Your light goes dark.
+  - **What it does:** hover over a pick and the panel under them shows the weapon in your hands with it fitted, the
+    gunsmith's stats with what changes marked (and what it'd replace), each load's muzzle velocity and energy too.
 - Between levels you shop with Vex the quartermaster, in the hangar (below). He doesn't sell weapons. Each
   visit he has three pieces of gear, of different kinds (carrier or rig, plate, helmet, face shield, belt,
   backpack), picked by rarity, and four weapon parts, plus supplies. A plate carrier comes with a plate fitted, rolled by rarity (soft
   inserts and steel common, multi-hit ceramic rare) and included in its price. Stock is randomised (the whole squad
-  sees the same) with better gear deeper in the run. He has one of each piece of kit he lists: once you
-  buy it, it's sold out until the next visit. He also has five random pouch types and empty magazines for
-  five random guns (up to the level's tier, not just yours), 1–3 of each, and three standard magazines' worth of a special
-  load in two different calibers. About half the magazines are the gun's standard
+  sees the same) with better gear deeper in the run. The stock is the squad's, shared, with as many of each thing
+  as there are of you: one of each piece of kit, part and special load per player, and five random pouch types and
+  empty magazines for five random guns (up to the level's tier, not just yours), 1–3 of each per player, the special
+  loads three standard magazines' worth in two different calibers. Whoever buys one first gets it; once they're all
+  gone it's sold out until the next visit (the host keeps the count: buying asks it for one, you pay once it's yours,
+  and it goes back on the shelf if you can't). About half the magazines are the gun's standard
   magazine and the rest a variant (compact, extended, drum, belt box). Supplies no longer sells
-  magazines; ball ammo for your calibers is always there, by the box.
+  magazines; ammo for your calibers is always there, by the box, in any load: a dropdown on the box's card picks it
+  (ball, hollow point, AP, tracer, subsonic; buck, slug, birdshot, flechette), each priced by what it does (`G.AMMO`
+  `k`: birdshot 0.7× ball, tracer 1.3×, subsonic 1.6×, a slug 1.7×, hollow points 1.8×, AP 2.4×, flechettes
+  2.6×), with what the load is under it.
 - **The hangar** (`js/hangar.js`) is where the squad spends the time between levels: a real place you walk
   about, on the same map machinery as a level (`G.Level.generateHub`: walls, lights, collision, rays, sound).
   The squad is there together; the host sends no enemies, and you can't fire or throw in it. It's a 48 × 25 m
@@ -454,17 +565,22 @@ says the same), but not whose: the shooter's name isn't shown.
     the gunsmith), the zeroing table in the middle of the floor (a shooting bench with sandbag rests and a
     screen: F to zero your sights), and six pedestals along the north wall with the gunsmith's parts for sale (bought into your
     stash): each part shown on its own and turning slowly, its sign on the front (name, price, the slot it goes in
-    and how many weapons it fits).
+    and how many weapons it fits). What the guns already come with seldom turns up: a part is weighted down by the
+    share of the weapons it fits that ship with it (the A2 birdcage, the stock red dot, the standard grip), so most
+    of the stock is upgrades that change how a gun performs.
   - **The store** (middle): Vex behind his counter (his till is the full stock; he looks like his portrait: dark hood, a black visor with two orange eyes, a grey respirator, a gold strap across the chest), three pedestals with the
     gear for sale, each piece shown on its own and turning slowly (a helmet with its face guard on it, a
     carrier with the plate that comes with it standing beside it and turning with it, a plate or a face guard by itself). The sign
     on the front says what comes with it (a carrier's or belt's pouches, a fitted plate or face guard) and, in
     orange, what doesn't (a plate with no carrier, a face guard with no helmet, an empty plate pocket). A
     bought piece leaves its pedestal, a shelf of pouches, and two vending machines:
-    **ammunition** (the special loads, and ball for every caliber you carry a gun in) and **field supplies**
+    **ammunition** (the special loads, and a box of any load for every caliber you carry a gun in) and **field supplies**
     (medical items, flashbangs, frags).
-  - **The warehouse** (east): a robotic crane over the stash, which fetches a crate down to a pallet when you
-    use the console beside it. The console opens your stash and loadout.
+  - **The warehouse** (east, at the back): a robotic crane over the stash, which fetches a crate down to a pallet
+    when you use the console beside it. The console opens your stash and loadout.
+  - **The lounge** (east, at the front by the hangar door, walled off from the warehouse): two rows of sofas on a
+    rug facing a big screen on the east wall, which shows the highlights of the level just played; a coffee table
+    with popcorn and a snack bar.
   - **The helicopter** (on the pad): hold F on it to climb in and ready up (you sit in your own seat, the
     same one for everyone: by place in the squad, with a view out of the open side); hold F again to get out
     and take your readiness back. When everyone's in it the rotor spins up and, after three seconds, it takes
@@ -506,7 +622,8 @@ says the same), but not whose: the shooter's name isn't shown.
 
   | Pattern | Guns | Magazines |
   |---|---|---|
-  | STANAG 5.56 | M4, HK416, F2 Bullpup, TX-9 Tavor, SCAR-L, M27 IAR | 20, 30, 40, 100-round drum |
+  | STANAG 5.56 | M4, HK416, F2 Bullpup, TX-9 Tavor, SCAR-L, M27 IAR, SIG MCX, G36, Steyr AUG | 20, 30, 40, 100-round drum |
+  | QBZ 5.8x42 | QBZ-95, QBZ-192 | 20, 30, 45, 75-round drum |
   | MP5 9mm | MP5, MP5SD | 15, 30, 40, 50-round drum |
   | AK 7.62x39 | KV-47, Galil ACE, RPK | 20, 30, 40, 75-round drum |
   | AK 5.45x39 | AK-74M, AKS-74U, AN-94 | 20, 30, 45, 60 |
@@ -515,8 +632,9 @@ says the same), but not whose: the shooter's name isn't shown.
   | Saiga 12-gauge | Saiga-12, Vepr-12 | 5, 8, 12, 20-round drum |
 
   A magazine from one goes in any of the others: reloading, dragging it onto the gun, and the shop's
-  "Fits your …" all count the whole pattern. The G36 and AUG keep their own magazines, as do the SCAR-H,
-  FAL and SR-25. An LMG that takes rifle magazines (the RPK) uses them like a rifle; the belt-fed ones
+  "Fits your …" all count the whole pattern. The G36 and AUG are their NATO versions (HK's STANAG well, Steyr's NATO
+  stock), so every 5.56 rifle shares one magazine; their own magazines are retired (`NATO_LATE` in `parts.js`). The SCAR-H,
+  FAL and SR-25 keep their own. An LMG that takes rifle magazines (the RPK) uses them like a rifle; the belt-fed ones
   (`G.beltFed`) use boxes. There are no perks: your kit is what keeps you alive.
 - **Conversion kits** (`parts.js` `RCV`). Some guns are one core (a lower, a frame, an action) with a
   different kit in it. Fit another kit of the same group in the gunsmith, or drag one onto the gun's
@@ -543,13 +661,23 @@ says the same), but not whose: the shooter's name isn't shown.
 - **Shotgun loaders.** The tube shotguns (870, KSG, Slug Gun, Benelli M4) take a side saddle (each shell a
   little faster), a twin-shell carrier, or a quad speed loader (four shells a push). A full tube on the Benelli
   takes 3.6 s bare, 2.9 s with the saddle, 2.6 s with the carrier and 1.9 s with the quad loader.
-- **Pistol stocks.** The P9, G18, G19, Auto-9 and TX22 have a stock lug: a folding stock, a brace or a carbine stock
-  kit cuts recoil by 14–30% at some cost to handling. The stock is drawn in first person too (its tube and rails
-  along the bottom of the view; not its pad, which would fill the screen aiming), as well as on the gun in the
-  gunsmith and in other players' hands.
+- **Pistol stocks.** The P9, G18, G19, Auto-9 and TX22 have a stock lug: a folding stock or a brace cuts recoil by
+  14–22% at some cost to handling, or the Vantage SMG stock mount (a block on the lug) takes any SMG stock. The
+  stock is drawn in first person too (its tube and rails along the bottom of the view; not its pad, which would fill
+  the screen aiming), as well as on the gun in the gunsmith and in other players' hands. An SMG stock on a handgun's
+  mount (that one, the chassis's, the derringer's lug grip) is a brace a stock on an SMG isn't: on top of the stock's
+  own figures, recoil −25 and ergonomics −8 (a slot's `brace`, js/parts.js; an empty one costs nothing).
+- **Pistol carbine chassis** (the Ironvale PCC-1, a grip-slot part for every single pistol, not the akimbo pair): the
+  pistol drops into a polymer chassis in place of its grip, its frame rail and stock lug shut inside. Its own slots
+  replace them (a part's `chassis`: its slots, taking over the gun's of the same name or added): a full-length rail
+  over the slide for a rifle's sight (a magnifier behind a red dot: the sight goes forward, the magnifier's mount on
+  the rail; with nothing on it, folding irons at its ends), a rail each side of the shroud ahead of the slide (a
+  light, a laser) and one under it (a foregrip: where your other hand goes), and an SMG stock mount at the back. The
+  slide still runs inside it, a window over the ejection port on the right. A P9 in one with a fixed SMG stock, a
+  2× prism, a foregrip and a light: recoil 1.44° to 0.44°, aim sway 202% to 93%, 0.75 kg to 2 kg.
 - If you go down you can still shoot your sidearm; unconscious (15% blood or less) you can do nothing, and the
   screen's all but black. Down, you keep bleeding, a sixteenth as fast as standing
-  but nothing clots any more: a heavy bleed at 15% blood gives about two minutes, a light one several, and when
+  but nothing clots any more: a heavy bleed at 15% blood gives about four minutes, a light one several more, and when
   the blood's gone you're KIA until the next level, watching through a camera on the right side of a teammate's helmet, up
   by the crown, tilted a little in and down so you see their arms, hands and weapon. It's a wide, fisheye-ish
   lens: the field of view is 20% wider than yours and the edges curve in (a barrel distortion drawn by a small
@@ -588,7 +716,7 @@ says the same), but not whose: the shooter's name isn't shown.
       bleeding finishes it unless someone stops it)
   - **A part at zero only stops working:** a wrecked arm throws your aim, a wrecked leg slows you, a wrecked
     chest leaves you short of breath (aim and pace, like a punctured lung), a wrecked stomach slows you. The
-    head is the exception: an unarmoured head is a kill, and the head at zero is death.
+    head is the exception: the head at zero is death.
 
     Whatever kills you shows on the body (an unprotected head shot leaves the head destroyed and
     bleeding), and the KIA message says what it was: shot in the head or face, killed by the blast,
@@ -638,7 +766,7 @@ says the same), but not whose: the shooter's name isn't shown.
   own map running left to right. The map is wider than the screen: it scrolls sideways (the mouse wheel
   works too) and opens on where the squad is. Before every level the squad votes on where to go next, and the most votes wins (a tie is a
   coin toss).
-  - **Shape:** an act starts at a single way in (the first act in the apartments), fans out into four routes
+  - **Shape:** an act starts at a single way in (the first act at the convenience store), fans out into four routes
     that wander and sometimes cross paths, and they all come back together at the Kingpin.
   - **Environments:** each node is an environment (apartment, warehouse, bunker, suburbs, research lab,
     foundry, cold storage), so the route you take picks the places you'll fight in.
@@ -656,7 +784,8 @@ says the same), but not whose: the shooter's name isn't shown.
   - **AN-94 hyper-burst**: the first two rounds of each trigger pull fire at 1800 rpm.
   - **M1 Garand**: en-bloc clip that only reloads when empty, and pings when it ejects: the empty clip goes back
     in your kit (on the floor if there's no room), the gun stands open, and the next reload pushes a full one in.
-  - **Minigun**: has to spin up before it fires.
+  - **Minigun**: has to spin up before it fires. Held by a side handle on the left (no carry handle over the top,
+    so its iron sights, or any optic, sit low on the rail), with a side rail on the right for a light or laser.
   - **Shell by shell**: lever-action, Mosin, pump shotguns, the KSG and the Benelli load one round at a time
     (a speed loader pushes in two or four).
   - **Conversions**: some guns turn into others with a kit (an M4 into a 9mm AR-9, an AK into an RPK).
@@ -696,6 +825,12 @@ says the same), but not whose: the shooter's name isn't shown.
     each build's figure (barrels and the like move it). That's the gun alone, as if clamped in a vise: on top of it
     comes what you add holding it (breathing sway, moving, recoil, a flinch when hit), and from the hip a wider
     cone of its own.
+  - **Aim sway and stocks** (`G.aimSway`): a stock to your shoulder is what steadies a gun. A build is `braced` when
+    it has a real stock fitted (a folded or deleted stock, or a bare buffer tube, isn't one; a long gun without a
+    stock slot has its stock built in; a handgun has none). A handgun on a stock (the derringer on its stock-lug
+    grip with an SMG stock) sways about as little as a carbine; a rifle or SMG with its stock taken off is held out
+    in the hands like a pistol, heavier, and wanders worse than one (about three times an M4's). The gunsmith shows
+    it as Aim sway (an M4 100%, a pistol about 200%, a stockless rifle about 290%).
   - **Shotgun patterns:** a shot has one aim error, the same as any gun (wide from the hip, tight aimed
     down the bead), and the pellets spread around that point in the gun's own pattern, denser in the
     middle. With buckshot, 90% of pellets land within about 25 cm at 10 m from the double barrel, 32 cm from
@@ -721,6 +856,11 @@ says the same), but not whose: the shooter's name isn't shown.
     - **Where to get them:** they turn up in the quartermaster's gear rotation. A helmet with a mount is
       sometimes offered with one already fitted (about a third, by rarity: mostly mandibles), with its price
       included.
+    - **Suspects wear them too**, deeper in a run: on a full-cut or rifle-rated helmet (a visor has its own), by
+      gear tier, a mandible / IIIA shield / rifle shield at 6/2/0% at tier 2, 16/10/2% at tier 3, 20/18/8% at
+      tier 4 (none at tier 1); the Enforcer always, from tier 3 (a mandible, then a IIIA shield). It's on their
+      helmet as it is on yours and in the way of your rounds the same (`ENEMY_GEAR.face`, js/data.js; sent with
+      their kit, the fourth field).
     - Without one, a face hit on an open-faced helmet is still a kill.
   - **Bodies.** Everyone has the same build:
     - a rounded head with a jaw, nose, ears, eyes, brows and mouth; hair as a cap, hidden under a helmet (the
@@ -816,20 +956,27 @@ says the same), but not whose: the shooter's name isn't shown.
     a pistol is 2×1, a compact SMG 3×2, a Thompson or PPSh 4×2, a carbine, rifle or shotgun 5×2, and a
     sniper rifle, LMG or long battle rifle 6×2. Guns only go in a backpack or the locker.
 
-  | Kind | Products (brand) | Stops handgun / rifle rounds (new) | Durability |
-  | --- | --- | --- | --- |
-  | Vest / carrier | Ghost concealable vest (Northmark), PC-1 slick carrier (Kestrel), Patrol carrier (Ironvale), Recon chest rig (Vantage), Assaulter carrier (Paragon), Heavy assault armour (Sable Ridge) | Soft armour 85–95% / 10–12%; the heavy armour also covers the stomach at 65% vs rifles, plus shoulders and thighs | 0–9 |
-  | Plate | IIIA soft insert (Graywater), AR550 steel (Ironvale), UHMWPE (Meridian), ceramic (Halcyon), multi-hit ceramic (Vantage) | 92% / 12% up to 97% / 94% | 4–8 |
-  | Helmet | Bump (Northmark), high-cut IIIA (Kestrel), full-cut IIIA (Ironvale), rifle-rated (Meridian), visor (Sable Ridge) | 30% / 0% up to 95% / 55%, visor 85% / 20% on the face | 2–4 |
-  | Face (on a helmet's mount) | Mandible guard (Kestrel), IIIA face shield (Ironvale), rifle face shield (Meridian) | face: 85% / 10% (on 40% of face hits), 88% / 12%, 95% / 50% (on 90%) | 2–3 |
-  | Belt | Duty (Graywater), battle (Kestrel), war belt with dump pouch (Paragon) | — | — |
-  | Backpack | Sling pack 4×3 (Graywater: pistols, compact SMGs), 3-day assault pack 5×3 (Kestrel: up to rifles and shotguns), large rucksack 6×5 (Sable Ridge: any gun, 3% slower) | — | — |
+  | Kind | Products (brand) | Made of (where), and what it stops head-on new (worked out: js/ballistics.js) |
+  | --- | --- | --- |
+  | Vest / carrier | Ghost concealable vest (Northmark), PC-1 slick carrier (Kestrel), Patrol carrier (Ironvale), Recon chest rig (Vantage), Assaulter carrier (Paragon), Heavy assault armour (Sable Ridge) | Soft aramid round the chest and stomach, 6–8 mm: 8 mm stops 9 mm, .45 ACP, .44 Magnum and buckshot, not 5.7x28 or any rifle (6 mm not the .44). The heavy armour adds 5 mm steel side plates (stops 7.62x39 and 7.62x51, not 5.56) and aramid over the groin, shoulders and thighs. The slick carrier and chest rig have none |
+  | Plate (front and back of the chest, 25 x 32 cm) | IIIA soft insert (12 mm aramid), AR550 steel (6.35 mm), UHMWPE (20 mm), ceramic (9 mm on 6 mm PE), multi-hit ceramic (9.5 on 8) | Soft insert: handguns and 5.7x28. Steel: 7.62x39, 5.56 and 7.62x51 ball, not armour-piercing. UHMWPE: 7.62x39 and 7.62x51, not 5.56. Ceramic: armour-piercing 5.56 and 7.62x39, .338 Lapua; not .50 BMG |
+  | Helmet (the skull above its brim: a high cut clears the ears, a full cut covers them) | Bump (3 mm ABS), high-cut IIIA (8 mm aramid), full-cut IIIA (9 mm), rifle-rated (18 mm PE), visor (18 mm PE + 10 mm polycarbonate visor) | Bump: nothing. IIIA: handguns to .44 Magnum. Rifle-rated: 7.62x39 and 7.62x51, not 5.56. Visor: 9 mm, .45 and buckshot to the face |
+  | Face (on a helmet's mount) | Mandible guard (Kestrel: the jaw), IIIA face shield (Ironvale), rifle face shield (Meridian: 14 mm polycarbonate on 10 mm PE) | Polycarbonate 10 mm: 9 mm, .45 and buckshot. The rifle shield: 7.62x51 too, not 7.62x39 or 5.56 |
+  | Belt | Duty (Graywater), battle (Kestrel), war belt with dump pouch (Paragon) | — |
+  | Backpack | Sling pack 4×3 (Graywater: pistols, compact SMGs), 3-day assault pack 5×3 (Kestrel: up to rifles and shotguns), large rucksack 6×5 (Sable Ridge: any gun, 3% slower) | — |
 
-  - **Rounds:** buckshot counts as a handgun round. Armour-piercing rounds (penetration 2+: the snipers)
-    get through twice as well.
-  - **Wear:** every hit costs the piece it strikes durability (a rifle round 1, a handgun round 0.5, a
-    pellet 0.2), and protection falls to about a third as it's used up.
-  - **Bruising:** a stopped round still bruises, for a tenth of the wound.
+  - **Rounds against armour** are worked out physically (`js/ballistics.js`, `G.Ballistics`). Each layer has a
+    ballistic limit for each round, de Marre's, from its thickness and the round's diameter and mass, met by the
+    round's speed when it arrives times how well its core works on that material. Fabric catches soft lead pistol
+    rounds and lets narrow hard ones through; hard plate flattens lead and breaks mild steel, and a hardened steel
+    or tungsten core gets through it. At an angle a layer is thicker along the path, and a hard face can glance a
+    round off. A round that gets through comes out slower, and through a hard plate, flattened and tumbling. A
+    plate's back face does it too: a round through you can stop in your back plate. The shop's cards and the Kit
+    tab's armour readout show what each piece stops, from the same sums (`rating`).
+  - **Wear:** armour wears by the energy it soaks up (each material its own: steel takes the most, ceramic cracks
+    soonest), and a worn layer is thinner.
+  - **Blunt trauma:** a stopped round still bruises, by the share of its energy the material passes on (soft
+    armour most).
   - **Weight:** heavy kit slows you down (steel plates and heavy armour most).
 - **Inventory** (Tarkov-style, the Kit tab at the quartermaster's):
   - **Grids:** your pockets are two 1×2 (a rifle magazine each) and two 1×1. The pouches on your carrier's and belt's MOLLE are small
@@ -902,14 +1049,14 @@ says the same), but not whose: the shooter's name isn't shown.
     | Type | What it does |
     | --- | --- |
     | FMJ ball | The standard round |
-    | Hollow point | Wounds ×1.3 and stops in the first body; armour stops it more. Its open nose drags more (20% shorter drag length): an M4's keeps 594 m/s at 300 m to ball's 642, and drops 33 cm to 29 |
-    | Armour-piercing | Gets through armour and through bodies; wounds ×0.9. A lighter, hard-cored bullet: leaves 8% faster (an M4: 952 m/s to ball's 881), so it drops less (19 cm at 300 m to ball's 29) and kicks a touch less |
+    | Hollow point | Opens to 1.37× its width once it's in flesh fast enough (pistol 260 m/s, rifle 480, or 70% of its own muzzle speed if that's lower): a wide track, its energy all spent inside, rarely out the far side; its soft nose flattens on armour. Its open nose drags more (20% shorter drag length): an M4's keeps 594 m/s at 300 m to ball's 642, and drops 33 cm to 29 |
+    | Armour-piercing | A hardened steel (pistol) or tungsten carbide (rifle) core: goes through plate that flattens lead, and through people, late to tumble (a narrower track). A lighter, hard-cored bullet: leaves 8% faster (an M4: 952 m/s to ball's 881), so it drops less (19 cm at 300 m to ball's 29) and kicks a touch less |
     | Tracer | Burns red all the way out: a bright core with a glow, from a couple of metres past the muzzle to where it lands. Your starting P9 and its two spare magazines are loaded with them |
-    | Subsonic | Wounds ×0.85, shorter range; through a suppressor it's heard no further than a crossbow |
+    | Subsonic | A heavier bullet under the speed of sound: less energy, shorter range; through a suppressor it's heard no further than a crossbow |
     | Buckshot | The standard shotgun load |
-    | Slug | One heavy slug: accurate, hits like a rifle round, goes through |
-    | Birdshot | A cloud of tiny pellets: painful, rarely lethal, useless on armour |
-    | Flechette | Steel darts in a tight pattern that get through soft armour |
+    | Slug | One 28 g soft lead slug that opens up: accurate, a huge wound, stopped by most armour |
+    | Birdshot | A cloud of 0.2 g pellets that stop within centimetres: painful, rarely lethal past a few metres; armour shrugs them off |
+    | Flechette | Hardened steel darts in a tight pattern: narrow and hard enough to get through soft armour; thin tracks |
 
     - **Magazines:** a magazine holds one type at a time. Drop a box on a magazine in the Kit tab to load it;
       if it held a different type, those rounds come out into a box of their own first. The free Load
@@ -996,7 +1143,7 @@ says the same), but not whose: the shooter's name isn't shown.
     | --- | --- | --- |
     | Picatinny top rail | red dots, holos, prisms, scopes | 46 weapons |
     | Underside rail (M-LOK / Picatinny) | foregrips | 26 weapons (only with a railed handguard) |
-    | Side rail (right and left) | lasers and weapon lights, one each side | 53 weapons (built into the F2000, Tavor, AUGs and P90; otherwise a railed handguard or pump forend, or a clamp-on rail mount) |
+    | Side rail (right and left) | lasers and weapon lights, one each side | 53 weapons (built into the F2000, Tavor, AUGs, P90 and MP7; otherwise a railed handguard or pump forend, or a clamp-on rail mount) |
     | Clamp-on rail mount | barrel clamps with a side rail on the right, or both sides | 9 weapons: the long guns with no railed part to fit (integrally suppressed and jacketed guns, the PKM, the machine pistols) |
     | AR-15 grip mount | pistol grips | 20 weapons |
     | Other stock mounts | stocks | AR-15 buffer tube, AK trunnion, rifle stock, SMG, precision and machine-gun mounts |
@@ -1022,7 +1169,7 @@ says the same), but not whose: the shooter's name isn't shown.
   - **Sound:** barrel length and the muzzle device feed the gunshot synth, so a short barrel or a brake
     sounds different.
   - **Using it:** the 3D view orbits and zooms. Hover a piece to see what it is, or click it to pick its
-    slot. Hover a part in the list to preview it on the gun with its stat changes, and click to fit it. A slot
+    slot. Hover a part in the list to preview it on the gun with its stat changes (at the top of the stat card, what it changes, old to new, as the attachments box shows; below it each stat marks its change and by how much), and click to fit it. A slot
     the gunsmith has a part for in stock (one that fits it, not the one on it) shows a red "!", on its dot on the
     model and on its row in the list.
   - **Stash:** fitting buys the part if it isn't in your stash. Parts you take off go to your stash, and
@@ -1087,35 +1234,107 @@ says the same), but not whose: the shooter's name isn't shown.
     it onto its front, draw the wrists together behind its back, then tie them. Teammates see the body move with it.
 - **Hitboxes** ride the animated bones: head, chest, abdomen, upper arms, forearms, thighs and shins.
   The zones are head, chest, abdomen, upper arm, forearm, thigh and shin.
-- **Lethality** (`G.WOUNDS` in `js/data.js`): rounds kill the way real ones do.
-  - **Heads:** a round to an unarmoured head always kills. A helmet covers the top of the head, not the face
-    below its brim.
-  - **Body:** elsewhere a hit takes a share of a person's life. The share depends on the body part, on how
-    centrally the round passes through it (heart and lungs, liver and spine, the femoral artery hurt most),
-    and on the round: heavier rounds wound more, though not in proportion.
-  - **Arms:** a round through an arm held across the body carries on into the chest behind it.
-  - **Both ways:** it works the same on you. Enemy rounds that hit you land on a body part (leaning shows
-    your head and shoulder, crouching hides your legs, an aimed marksman goes for the head). A round to your
-    unarmoured head or face kills you outright: no bleeding out, no revive. Everywhere else, see Injuries.
-  - **Body armour and helmets:** they stop handgun rounds better than rifle rounds, and they wear (see the
-    kit table above). A rimfire round (the TX22's .22 LR) does worst of all: armour stops most of what a pistol
-    round would get through too (96–99% of a hit on a vest's chest, against 85–95% for 9 mm), and it wears
-    armour half as fast as a pistol round.
+- **Wounds are simulated** (`js/ballistics.js`), not multiplied: the damage and health model from tactical_game
+  (its 3D anatomy and wound tracks, `src/preview3d.ts`), refitted to these bodies and made physical.
+  - **The body is the rig's own shape:** each part a tapered elliptical cylinder or an ellipsoid in its bone's
+    frame, the same sizes as the meshes (the chest 40 cm across and 25 deep, the head its cranium and jaw), with the
+    organs inside where they are in a person. The skull holds the brain and brainstem; the neck the cervical spine,
+    both carotid arteries and the airway; the chest the heart, lungs, aorta, thoracic spine and the top of the
+    liver; below that the liver, stomach, spleen, kidneys, bowel, lumbar spine and abdominal aorta; the pelvis its
+    bones and iliac arteries. Each limb has its long bone or bones, and the upper arm and thigh their arteries.
+    Every organ there are two of is its own, one a side (left and right carotid, kidney, iliac artery, half of the
+    pelvis, and each limb's bones and artery): a wound to one isn't a wound to the other, in an officer's body and in
+    a suspect's record alike, and a suspect's broken bones are kept by limb. A broken half of the pelvis takes the
+    leg on its side.
+  - **A round's track through you:** the round is a physical thing (mass, diameter, length, core, nose) at the
+    speed it arrives (it flies with drag). It passes your armour first, layer by layer, then the body, a few
+    millimetres at a time. In tissue it slows by drag (dv/dx = -ρ·Cd·A/2m · v) and by the tissue's strength (a
+    steady 0.4 MPa on its face, less in lung, more in bone), which is what stops slow rounds, nose-first and then,
+    for a rifle round past its yaw depth (12 cm for 5.56, 26 for 7.62x39), tumbling side-on. Skin is tougher: each
+    time a round crosses it, in and out, it costs what 5 cm of tissue would, the chest's wall (ribs, breastbone)
+    3 cm of bone more, and a round with under 70 m/s left at the far side stays under the skin. Calibrated against
+    bare ballistic gelatin: .22 LR about 33 cm, 9 mm FMJ 65 and hollow point 35, .45 FMJ 65, a 00 buck pellet 30,
+    5.56 about 35, 7.62x39 55, 7.62x51 50. So full-metal-jacket pistol and rifle rounds go through a torso, a .22
+    about half the time front on, buckshot and hollow points mostly don't. A hollow point opens out (to 1.37×, at
+    70% of its own muzzle speed at most, so a slow .45 opens too), a .22's soft lead flattens (1.3×), a tumbling 5.56 or 7.62x51 round over its fragmentation speed (760 / 790 m/s)
+    breaks up into fragments that tear their own tracks, and bone tips a round over. Lung is light, bone dense.
+    Along the track it crushes what it passes through (its area times the distance) and gives up energy,
+    stretching the tissue round it to a radius set by the energy per centimetre: that tears brain, liver,
+    spleen and kidneys and barely bothers lung or muscle. Tissue gives about 2.5 cm of stretch; beyond that (a cavity of radius r: within
+    r - 2.5 cm of the track) an organ that doesn't stretch well (brain, brainstem, heart, liver, spleen, kidneys, the
+    big arteries) is torn apart, without the round touching it: a rifle-class deposit (about 100 J/cm: 600 m/s and up,
+    or a big magnum). A handgun's cavity (2-3 cm) tears nothing; a 5.56's (5 cm) about 3 cm round the track, a
+    7.62x51's (8 cm) 6 cm, but only once the round's yawed, past its first 12-17 cm (front on, the heart's in that
+    neck; side on, or deeper, it's in the cavity). A liver, spleen or kidney torn apart bleeds out in seconds. It comes out the far side at whatever speed it has left,
+    into whoever's behind (an arm held across the chest doesn't stop a round reaching the chest).
+  - **What the organs do:**
+    - the brain: dead (a graze only knocks you out); the brainstem or the spine in the neck: any round that touches
+      it, dead on the spot;
+    - the heart: any round through it wrecks it: down at once, dead a second or two later (one that only passes
+      close, its cavity stretching it, bleeds it out in seconds);
+    - the aorta or an iliac artery: bleeding out in seconds;
+    - a lung or the airway: a punctured lung;
+    - liver, spleen or kidney: heavy bleeding (packing gauze stops it);
+    - stomach or bowel: a gut wound;
+    - the spine lower down: a suspect's down for good; an officer just takes the damage and bleeding (no paralysis);
+    - a long bone or the pelvis: a fracture;
+    - an arm's or thigh's artery: heavy bleeding (a tourniquet stops it).
+
+    A part's own damage and the blood it costs come from the energy given up in it and the volume crushed, a
+    shot's wounds (all its pellets together) on a curve that grows slower than they do (1.225·f^0.65 of a person):
+    unarmoured torso hits front on, a .22 takes about a quarter of a person (5 to kill), 9 mm 0.38 (3), a 9 mm or
+    .45 hollow point about half (2-3), 5.56 and 7.62x39 0.75 (2), 7.62x51 all of them (1), a 00 buck blast at
+    close range all of them, before any bleeding. Your wounds use the same curve. The
+    Tab screen's body figure lists the organs each part has had hit (grazed, badly hurt, destroyed).
+  - **Both ways:** it works the same on suspects (worked out on the shooter's machine, the injuries applied by the
+    host: a spine or a stopped heart puts them down for good) and on you (the host says which part an enemy round
+    hit; your machine traces it from the shooter through a body posed as yours, through your own kit).
   - **Toughness:** wounds don't scale with enemy health, so a person is as easy to kill on level 10 as on
     level 1. Only the tougher types (the Enforcer, about 1.5×, and the Kingpin, about 6×) take more.
-  - **Explosions:** they still do plain damage.
+  - **Explosions:** they still do plain damage; your torso armour stops its share of the fragments (each a ragged
+    0.3 g chip at about 900 m/s, through the same layer sums).
 
-  Rounds to kill an unarmoured suspect at close range:
+  One round at 10 m into an unarmoured body, through the middle of the part (averaged over a dozen tracks with
+  `js/ballistics.js`): the points of a 100-point person it costs at once, and what it usually leaves (in brackets:
+  sometimes). Bleeding then does the rest: heavy bleeding takes a person in under a minute, massive in seconds.
 
-  | Weapon | Head | Chest | Chest (flank) | Abdomen | Thigh | Arm |
-  | --- | --- | --- | --- | --- | --- | --- |
-  | 9 mm pistol | 1 | 2 | 3 | 2 | 3 | 4–6 |
-  | .45 pistol / AK | 1 | 2 | 2 | 2 | 2–3 | 3–5 |
-  | 5.56 rifle | 1 | 2 | 3 | 2 | 3 | 3–5 |
-  | 7.62 battle rifle | 1 | 2 | 2 | 2 | 2–3 | 3–4 |
-  | Marksman rifle (SVD) | 1 | 1 | 2 | 1–2 | 1–2 | 2–3 |
-  | Bolt-action sniper | 1 | 1 | 1 | 1–2 | 1–2 | 2–3 |
+  | Round | Head | Chest | Abdomen | Thigh | Upper arm |
+  | --- | --- | --- | --- | --- | --- |
+  | 9 mm ball | 18, dead | 12, lung (heart or aorta: massive) | 16, gut, bleeding | 15, bleeding (fracture) | 10, bleeding |
+  | 9 mm hollow point | 29, dead | 30, lung, heavy (massive) | 29, gut, heavy | 27, heavy (fracture) | 22, heavy |
+  | .45 ACP ball | 20, dead | 15, lung, heavy | 16, heavy (gut) | 15, heavy | 11, bleeding |
+  | 00 buck, one pellet of nine | 12, dead | 10, bleeding (lung) | 10, bleeding (gut) | 10, bleeding | 7, bleeding |
+  | 5.56 ball | 52, dead | 47, lung, massive | 46, gut, heavy, massive | 47, heavy (fracture) | 33, bleeding (fracture) |
+  | 7.62x39 ball | 73, dead | 29, lung (massive) | 48, gut, heavy (spine) | 61, heavy, fracture | 45, heavy (fracture) |
+  | 7.62x51 ball | 103, dead | 72, lung (heavy, massive) | 66, gut, heavy | 64, heavy (fracture) | 55, bleeding (fracture) |
+  | .30-06 bolt gun | 109, dead | 84, lung (massive) | 84, gut, heavy, massive | 81, heavy (fracture) | 54, bleeding (fracture) |
+
+  The 7.62x39 round's chest figure is low because it runs nose-first through a chest (it doesn't tumble until about
+  26 cm in) and leaves with most of its energy. The 5.56 round tumbles at 12 cm and, fast enough, breaks up.
   Press **F9**, or add `?hitboxes` to the URL, to draw them.
+  With them shown, a panel on the left reads out whoever is under the crosshair, up to the first wall: what the line
+  from your eye crosses in them (each body segment, front to back, and the organs in it in order, `G.Ballistics.probe`),
+  their condition (on the host, a suspect's whole record: health, strength, every bleed with its rate and how long
+  they have, fractures, a collapsed lung, spine, heart; nerve, awareness, state; and every organ by region, intact,
+  how much of it is gone, or destroyed), their
+  armour with its condition, and their weapon and what's loaded. A teammate shows every body part and organ as they
+  send it. A client sees what the host sends of a suspect (health, strength, bleeding, a broken leg).
+  The x-ray, as the killcam's: everyone in clear view within 30 m shows their organs through their body, coloured by
+  what's been done to them (red destroyed, amber hurt, bone white or green intact; a client sees a suspect's as intact,
+  the host keeps the record), and whoever the readout's on is turned to glass, their organs bright.
+  The readout is sticky: look away (or at nothing) and it stays on the last person you looked at, marked "last seen",
+  still live (their condition as it changes, the distance to them now), with the line through them dimmed as it was
+  when you last had them in your sights, until you look at someone else or they leave the level.
+  Each round you fire with them shown leaves its path as it actually flew (a point a frame in the air: drag, gravity;
+  inside a body a point every 4 mm of its track, as it slows; drawn over everything, so it shows inside a body), with a
+  dot where it went into someone and where it stopped. It's coloured by its speed there, one scale for every gun: Mach
+  2 (686 m/s) and over red, down through the rainbow to violet at a stop (`G.R.trailColour`, the scale at the top of
+  the panel), so a rifle round shifts through the spectrum within a chest, and a pistol round starts green-yellow. The
+  last shot's (every pellet of it) stays until you fire again; older ones dim and fade out over the 3 s after a newer
+  shot takes over (`TRAIL_FADE`).
+  The stretch of it inside someone is also kept on them for the rest of the level (`G.R.woundTrack`): a line on each
+  bone it crossed, in that bone's frame, coloured the same, with its entry and stop dots, so it turns, falls and ragdolls
+  with them. Shown whenever the hitboxes are.
 - **Gun models** (`js/gunmodels.js`) are built from parametric parts at real-world scale: receivers, stocks,
   curved, straight and drum mags, handguards, muzzle devices, rails, optics, foregrips and lasers. Each
   weapon's build (`js/parts.js`) patches its receiver's model spec part by part. The same build makes the
@@ -1162,8 +1381,8 @@ says the same), but not whose: the shooter's name isn't shown.
     circle-dot). A dark crescent creeps in when your eye isn't on the scope's axis, such as while you're
     still bringing it up.
 - **Weapon lights and lasers** (a side rail, either side, or a pistol's frame rail). A light on one side and a
-  laser on the other gives you both; a second laser doesn't steady your hip fire any further. The back side button on your mouse
-  switches the light, the forward one the laser. A light is a real spotlight from the gun that your squad sees
+  laser on the other gives you both; a second laser doesn't steady your hip fire any further. Each is switched on the comms wheel
+  (hold the middle mouse button). A light is a real spotlight from the gun that your squad sees
   too, and shone into a suspect's face from up to 15 m (22 m for the high-output one) it ruins their aim: they
   hit about half as often while it's in their eyes. A laser puts a red or green dot where the bore points (on a
   wall or on someone), and only tightens your hip fire while it's on. The PQ-15 module and the pistol combo
@@ -1177,17 +1396,86 @@ says the same), but not whose: the shooter's name isn't shown.
   receiver, since the chamber end sits inside it. It's visual only: ballistics come from the barrel length in
   `G.GUN_SPECS`. Larger gaps are deliberate: the G18 carries an add-on compensator, and revolvers and the
   derringer run up to 9% short.
+- **Traced from references.** Some guns' outlines are traced from a side photo or drawing rather than built from
+  generic parts, the pixels mapped to metres at a known scale. **The KRISS Vector** (`rcv: 'vector'` in
+  `rifle()`, `vecTrace`) is traced from a right-side photo of a Gen II (Wikimedia Commons, "Kriss-Vector-CRB.jpg",
+  Waltherppx, CC BY-SA 4.0) at 0.87 mm a pixel, checked against KRISS USA's figures (5.5" barrel, 658.6 / 706.1 mm
+  overall with the stock collapsed / extended; the stockless SDP is 406 mm). Its Super V action drives the bolt
+  down into the lower instead of straight back, so the bore sits low and in line with the hand. The lower follows
+  from that: a raked grip, an enclosed trigger opening raked forward, the deep V body, and in front of it the
+  magazine well. The well is a leg raked back, its front edge serrated, and the Glock-pattern magazine goes in at
+  its foot along the same rake. On top is a full-length rail with flip-up sights at its two ends (folded flat
+  when there's an optic), with the ejection port over the well. The front of the upper has a rail underneath and
+  short rails each side: its factory forend (`'vector'`) is railed, so it takes a foregrip, a light and a laser.
+  Most of the barrel is inside the upper (`bIn`), and the stock tube sits level with the top of the receiver.
+  The folding charging handle is at the front left. **The Steyr AUG** (`rcv: 'aug'`, `augTrace`) is traced from a
+  side photo of an AUG A1 / StG 77 (Wikimedia Commons, "Steyr AUG 5,56 mm.JPG", MoserB, public domain) at 0.57 mm
+  a pixel: 790 mm overall with its 508 mm barrel, Steyr's figures. It's one moulded shell from the butt to the
+  nose under the barrel lock, with the magazine well behind the grip and a clear magazine raked a little forward.
+  The trigger guard is a bar from the nose to the foot of the grip, enclosing the whole hand. On top is the
+  aluminium receiver housing with the bolt carrier's rods showing, the barrel lock at its front, and the folding
+  foregrip hinged under that. Its factory sight is the integral 1.5x optic in the carrying handle (`augscope`, a
+  black ring reticle). Fit any other sight and the handle gives way to the A3 M2's rail system: a flat-top receiver
+  with no hump, its Picatinny rail running the length of it from the barrel lock back over the front of the shell
+  (25 slots, about 26 cm), short side rails on the barrel lock for a light and a laser, and the square folding
+  charging handle. Its width is the Austrian army's figure for the StG 77, 85 mm across everything (the charging
+  handle and sling swivels stand proud). The shell is about 70 mm with flat flanks up to a crease just above the bore,
+  then a roof: its top sides lean in to a top a little under half as wide, which keeps it slender from above. The grip is
+  slim (about 40 mm front to back) and raked back, the hand opening running down under its slanted front edge, and
+  the receiver housing is 48 mm. Sights sit well forward on the M2 rail (`optF: 0.42`, about over the magazine well) so
+  a red dot and a magnifier behind it both stay on the rail; being a bullpup, the eye is set by the cheek weld on the
+  stock (`cheek: 0.19` m from the butt), not by the sight's eye relief, so aiming down sights doesn't pull the gun
+  back into your face. The AUG 9 mm uses the same receiver with a pistol-magazine well. **The P90** is traced from FN's side view.
+  **The QBZ-95** (`rcv: 'qbz95'`, `qbzTrace`) is traced from a right-side photo (Wikimedia Commons, "QBZ95 automatic
+  rifle mod noBG.png") at 0.574 mm a pixel, 760 mm overall: the one-piece shell from the butt to the front cap, the
+  carrying handle's loop with the rear aperture and the cocking knob in its opening, the raked grip and the trigger
+  guard's bar to the front grip, the ribs under the nose, the ejection port over the magazine. Its sights stay on
+  whatever's fitted; another sight goes on a rail along the top of the handle, very high over the bore as on the
+  real one. **The QBZ-192** (`rcv: 'qbz192'`) is built by eye from photos: a tall flat-sided upper railed its whole
+  length, the rail carried on over a deep squared handguard (`hg: 'qbz'`), the lower's flared well, the charging
+  handle at the front right, a folding telescoping stock (`stock: 'qbz'`). **The SIG MCX and MPX** (`rcv: 'mcx'`,
+  `'mpx'`): AR-shaped, no buffer tube (the stock hinges on the back of the upper; the MPX keeps its tube stock), the
+  magazine well flaring at its foot (much deeper on the MPX). The upper's top rail is one piece running on forward of
+  the receiver (`railExt`: 0.11 m on the MCX, 0.06 on the MPX, from SIG's handguards, cut down at the back to take it)
+  over the back of the handguard. Their handguards are their own (`hg: 'sig'`, on the
+  `hg:mcx` and `hg:mpx` interfaces): the upper's rail runs on flush along a flat top, so no AR handguard fits.
+  The MCX's variants are parts: a 5.5" barrel, short handguard and strut stock make a Rattler; 11.5" (factory) a
+  Virtus SBR; the 16" barrel, the lightened FDE handguard and the padded stock a Spear LT; the KeyMod handguard a
+  Gen 1. The QBZ-192 takes the same folding stocks (`stk:fold`, a hinge), and a 14.5" barrel makes it a QBZ-191.
+  **The FN SCAR** (`rcv: 'scar'`, `scarTrace`) is traced from a right-side photo of a SCAR-L (Wikimedia Commons, "FN
+  SCAR-L noBG.png") at 0.59 mm a pixel: the one long upper from the hinge to the gas block with its top rail, a short
+  rail each side of the front and one under it, the polymer lower (grip mount, trigger guard and magazine well in one),
+  and its folding stock with the raised comb (`stock: 'scar'`). The rails are the upper's, so the SCARs have no
+  handguard slot: a foregrip goes on the rail under the front (`fgAt`), lights and lasers on the side rails.
+  **The G36** (`rcv: 'g36'`, `g36Trace`) is traced from a right-side photo (Wikimedia Commons, "Gewehr G36 weiss.jpg")
+  at 0.945 mm a pixel: the polymer receiver, the trigger group pinned under it with the magazine well raked back at
+  its foot, the carrying handle's loop from the back of the receiver out over the handguard with the charging handle
+  under it and a rail along its top (the export handle: a sight sits very high over the bore, as on the real one),
+  the deep vented handguard (`hg: 'g36'`, its own `hg:g36` interface) with the bayonet lug's sleeve ahead of it,
+  and the skeleton folding stock (`stock: 'g36'`). The G36K is parts: the 12.5" barrel and the short handguard.
+  **The derringer** (`derTrace`) is traced from a photo of an American Derringer Model 1 (Wikimedia Commons,
+  "American Corp. Derringer M1.jpg") at 0.167 mm a pixel: the stainless frame with its spur trigger and hammer, the
+  bird's-head grip, the two-barrel block hinged on the frame's ears at the top of its back, tipping up muzzles first
+  to load. It's chambered in .44 Magnum (the Model 1 is). It builds up as a kit: its own grips (`gr:derringer`: the
+  factory rosewood, a rubber wrap, and a squared stock-lug grip that takes any SMG stock), barrels to a carbine's 16"
+  and a rifle's 20" (the other hand goes out under them; a railed forend clamped round them takes a foregrip
+  and a light or laser each side, and a rail along the rib that takes rifle sights), and a 3" pair with an optic cut
+  in the rib for the pistol sights. The sights tip open with the barrels. Two integrally suppressed pairs
+  (Wraithworks): a compact 7" pair, one oval can round both barrels, and a 16" carbine pair (the can over the front,
+  the railed forend behind it). Both barrels are ported inside the can (`set.ported`), so the .44 leaves subsonic
+  (310 m/s, as the MP5SD's 9 mm does) with the integral suppressor's sound; the can tips open with them. (The
+  clamp-on sight mount it had for a while, `rm.derringer`, is retired.)
 
   | Model | Ours (mm) | Real (mm) | Model | Ours (mm) | Real (mm) |
   | --- | --- | --- | --- | --- | --- |
   | M4 | 857 | 838 | MP5 | 712 | 680 |
   | HK416 (14.5") | 902 | 900 | MP5SD | 782 | 805 |
   | AK-47 | 906 | 880 | Micro Uzi | 460 | 460 |
-  | FAMAS | 779 | 757 | Vector | 652 | 620 |
-  | G36 | 985 | 999 | MP7 | 637 | 638 |
+  | FAMAS | 779 | 757 | Vector | 732 | 706 |
+  | G36 | 1009 | 999 | MP7 | 637 | 638 |
   | SCAR-H | 987 | 965 | P90 | 477 | 505 |
   | Tavor | 739 | 720 | Thompson | 882 | 860 |
-  | AUG | 799 | 790 | PPSh-41 | 857 | 843 |
+  | AUG | 804 | 790 | PPSh-41 | 857 | 843 |
   | Galil ACE | 955 | 927 | Remington 870 | 982 | 978 |
   | AN-94 | 975 | 943 | Saiga-12 | 1120 | 1145 |
   | FAL | 1117 | 1090 | AA-12 | 987 | 966 |
@@ -1206,7 +1494,7 @@ says the same), but not whose: the shooter's name isn't shown.
   velocity (`G.MUZZLE_V`, adjusted for barrel length and load: subsonic rounds stay under 310 m/s), slows with
   drag and falls with gravity. It's stepped a frame at a time against the walls, windows and everyone's
   hitboxes as they stand that frame, so a running target can step out of a slow pistol round's way at range.
-  Penetration through bodies, damage falloff past a gun's range and suppressors work as before.
+  What it does to whoever it reaches is worked out from what it is and how fast it's still going (see Wounds).
   - **Zeroing:** sights are zeroed (`G.zeroOf`): handguns, SMGs and shotguns at 25 m, carbines and machine
     guns at 50, marksman and sniper rifles at 100, the grenade launchers at 40. The sights sit above the bore
     (`G.sightH`: 2 cm on a pistol, 6.5 on a rifle), so a round starts that far under your eye and climbs to
@@ -1260,7 +1548,7 @@ says the same), but not whose: the shooter's name isn't shown.
   fed as it goes home. One pose of each action (slide, charging handle, cocking handle, bolt, pump, lever) at
   any pull serves every use of it: a rack, a release, the chamber check.
   - **Bolt hold-open** (`G.boltHold`): every pistol with a slide, the AR-15 family, the SCARs, G36, AUG,
-    Tavor, FAL, M14/Mk14, SR-25, Barrett, MPX, MP7, Vector, Skorpion and SVD lock open on their last round. From
+    Tavor, FAL, M14/Mk14, SR-25, Barrett, MPX, MCX, QBZ-192, MP7, Vector, Skorpion and SVD lock open on their last round. From
     empty, the magazine change and then a thumb on the bolt catch (or the slide stop), 0.4 s: the slide (or
     bolt) slams forward on a round.
   - **Without one** (the AK family, MP5, open-bolt guns, the belt-feds, bolt-actions): from empty, the magazine
@@ -1311,7 +1599,10 @@ says the same), but not whose: the shooter's name isn't shown.
   - **Shell by shell:** tube shotguns, the lever gun, the Mosin and the M32 roll the port toward you and
     load one round at a time, then rack once at the end if they were empty.
   - **Revolver:** swing the cylinder out, muzzle up to eject, then the speed loader in and flick it shut.
-  - **Break-open:** the double, sawed-off and derringer open, take shells and close.
+  - **Break-open:** the double and sawed-off open, take shells and close. The derringer is turned upside down in
+    the hand first, then its barrels swing open 165° over the hinge (hanging straight down, their breeches up), a
+    round (its real size: the case, the rim, the bullet) drops into each empty bore from above, and it's shut and turned back. It fires the top barrel first, so with
+    one shot gone it takes just the one round, into the top, in about four-fifths of the time.
   - **Belt-fed:** open the cover, swap the box, lay the belt, close it (from empty, the charging handle after:
     pushed home on an M249 or M60, left back on a PKM).
   - **Others:** a Garand en-bloc clip, a crossbow bolt laid on the rail, and akimbo magazines both dropping
@@ -1349,7 +1640,14 @@ says the same), but not whose: the shooter's name isn't shown.
   look down on the top round (its tip coloured for the load) or away. Opaque
   magazines have a column of witness holes down the back, each stamped with the count it stands for
   (5 / 10 / 15 / 20 / 25 on a 30-rounder); brass in a hole means at least that many. Clear magazines
-  (G36, AUG) show the rounds themselves. Let go of R, or fire, aim or move off, and it goes back in.
+  show the rounds themselves, one drawn for each it holds and only as many as are in it, the top ones staying as
+  the follower rises. Each is its real cartridge from the gun's caliber (a rifle round's bottlenecked case and
+  bullet, a pistol round's straight case, a shell), its base against the back wall, double-stacked in a zig-zag
+  half a round apart (a single column of shells in a shotgun's). The G36 and AUG come with them. A translucent
+  magazine is also sold for every gun with its own box magazine, and for the STANAG, MP5, both AK and Glock
+  families: the same capacity, a little lighter (on a pistol, Glock-pattern ones too, down into the extension of
+  a long one). A drum shows its top round in the feed tower; a clear one (the G36's and AUG's) shows the rest
+  wound round inside it, ring by ring round the hub, emptying from the tower. Let go of R, or fire, aim or move off, and it goes back in.
 - **Handling:**
   - The gun lags behind fast mouse movement and leans into strafes, much less while aiming.
   - Swapping weapons draws in an arc from low right.
@@ -1380,7 +1678,11 @@ says the same), but not whose: the shooter's name isn't shown.
 - **Rounds going past and landing** (`js/audio.js`):
   - **Cracks are for supersonic rounds only.** A round that passes within 5 m of you cracks only if it's
     still faster than sound (343 m/s) where it passes. Its speed comes from:
-    - its caliber's real muzzle velocity, scaled a little by the build's barrel length
+    - its caliber's real muzzle velocity, scaled by the build's barrel length (a fifth power of the length: a 25%
+      longer barrel is about 4.6% faster), times whatever else in the build adds velocity without changing the
+      barrel (a suppressor, a long slide: `velK`). A part card's Velocity % is that real change (a barrel's worked
+      out from its length), and so is the build's damage and reach. The gunsmith's stats list each load's muzzle
+      velocity and energy through the build, and the zeroing table flies the same numbers.
     - its load: subsonic loads and the integrally suppressed MP5SD and VSS stay under 310 m/s; slugs leave
       at about 440
     - how far it has flown: buckshot pellets shed speed fast, pistol rounds moderately, rifle rounds slowly
@@ -1395,14 +1697,45 @@ says the same), but not whose: the shooter's name isn't shown.
     wall's smack and grit, the thunk of a door or furniture, a hard floor, the dull thud of grass, earth
     or carpet, a wet hit on a body, or a ring off armour.
 
-Gunshots come from the physics-based gunshot synthesizer from `tactical_game/synth`, copied verbatim
-into `js/gunshot-synth.js`. Each weapon has interior-ballistics inputs in `G.GUN_SPECS` (`js/data.js`):
+Gunshots come from the physics-based gunshot synthesizer from `tactical_game/synth`, copied
+into `js/gunshot-synth.js` (since extended with suppressors, below). Each weapon has interior-ballistics inputs in `G.GUN_SPECS` (`js/data.js`):
 barrel length, caliber, chamber pressure, powder grain, bullet weight, action type, muzzle device and case.
 `js/gunaudio.js` (a port of tactical_game's `gunAudio.ts` + `acoustics.ts`) ray-casts the room
 around each shooter to choose a reverb environment. It renders and caches one buffer per weapon and room
 type in the background when a level loads, then plays shots with 3D HRTF panning, distance falloff, air
 absorption, and muffling through walls. Each build has a sound key (`weapon:barrelInches:muzzleDevice`), so
 barrel length and muzzle device (suppressor, brake, compensator, flash hider) change how it sounds. Reload foley uses the recorded samples from tactical_game (`assets/audio`).
+
+**Suppressors** have their own parameters in the synth (`GunshotSynth.SUPPRESSORS`), and a suppressed
+build's sound key names its can (`weapon:barrelInches:suppressor:can`). The cans are full-length, compact,
+long (pistol), shotgun, integral and extended integral. What they do comes from published measurements
+(NIOSH/Murphy et al. 2018, *Int J Audiol*; the AR-15 suppressor studies; *Proceedings of Meetings on
+Acoustics* 2019):
+- **The blast drops 17–24 dB at the shooter's ear** for typical guns (3–32 dB across rifles, cans and
+  loads). How much depends on the can's volume against the gas reaching the muzzle (muzzle energy ×
+  the residual pressure fraction). On the same can, a .308 loses about 3 dB of suppression against a
+  5.56, and a compact can loses more; a 9 mm through a pistol can gains some. Measured in game against
+  the open gun: M4 with a full can −22 dB peak, with a compact −13, .308 −16, 9 mm SMG −19, MP5SD −24
+  (against the MP5), pump shotgun with its can −11.
+- **The baffles break up the shock front**, so what's left rises more slowly, is darker (a bigger can is
+  darker still), and lasts longer: the can blows down for tens of ms. A ported integral barrel starts
+  bleeding gas sooner.
+- **The ballistic crack and the action aren't suppressed.** Supersonic rounds still crack downrange, and
+  the bolt clatter comes forward (only subsonic ammunition removes the crack).
+- **Back pressure:** the can holds gas in the bore, so it spits out of the action as it opens. That's a
+  hiss at the shooter's face and a harder bolt, most on direct-gas and blowback guns.
+- **The can rings faintly:** its column of hot gas (an open–closed pipe) and the steel tube.
+- **First-round pop:** a can that has sat for 8 s fills back up with air. The oxygen burns with the next
+  shot's gas, so that shot is about 4 dB louder (tracked per shooter, at playback).
+
+The level drop is in the render itself. Every shot is "recorded" through an overloaded mic (a hard clipper,
+then auto-gain), set for an open shot's ~160 dB. A suppressed shot goes into it as much quieter as its can
+makes it, and the mic's drive drops by 45% of that (`SUP_DRIVE`): it clips far less, so it keeps its own shape
+(a soft onset, then the can blowing down over tens of ms) instead of being pumped into the open shot's loud
+plateau. Measured against the open gun: an integral can about 19 dB down, a full-length rifle can about 14,
+a compact can about 10. (The drive used to drop by all of it and the output by a quarter more, on top of the
+blast's own cut: an integral can ended 35-40 dB down, a whisper even in your own hands.) The crack and the bolt stay at their own level, so
+next to the quieted blast they come forward.
 The railgun and explosions still use the simple procedural sounds.
 
 On top of the baked room reverb, echoes are **ray-traced through the level** for every shot:
@@ -1432,11 +1765,11 @@ On top of the baked room reverb, echoes are **ray-traced through the level** for
 | Z | Go prone, or get up (to a crouch). It takes 0.8 s either way, no shooting meanwhile. Lying down you crawl, can't lean, and hold the gun steadiest of all: a quarter of the standing sway, 60% of the recoil, half the spread. Suspects see less of you and hit you less often |
 | LMB / RMB | Fire / aim down sights |
 | R | Reload (retention: the old magazine goes back in its pouch) |
-| R (hold) | Magazine check: out into your hand; the mouse turns it to read the witness holes or see the rounds |
+| R (hold) | Magazine check: out into your hand; the mouse turns it to read the witness holes or see the rounds. A gun with no magazine to pull (a revolver, a shotgun's tube, a break-action, the derringer) goes straight into the chamber check a held inspect ends on (the cylinder out, the barrels broken open, the action pulled back), turned by the mouse, and back when you let go |
 | R R (double tap) | Dump reload: the old magazine goes into your dump pouch, or onto the floor without one |
 | 1, 2, mouse wheel | Switch weapon (the wheel while aiming steps a variable scope or flips a magnifier) |
 | Middle click | Ping: a marker on the spot you're looking at, with your animal and your name in its colour, that the whole squad sees through walls for 6 s (it says nothing about what's there) |
-| Mouse back / forward | Weapon light / laser: a tap switches it on or off (each gun remembers its own); held, it's on only while you hold it. In a level they don't navigate the browser: the page keeps a back and a forward history entry of its own and turns a side-button navigation into the button press. Outside a level, back works as usual (twice to leave). |
+| Hold middle button | The comms wheel: eight slices round the crosshair, the mouse moves a pointer onto one, let go to pick it (in the middle: nothing). Your gun's light, laser, a magnifier flipped in or out (greyed when it has none), and calls to the squad in the chat: your injuries (each hurt part and what's wrong with it, your blood), your ammo (in the gun, spare, about how many reloads), contact (with a ping where you're looking), clear, holding. (The mouse's side buttons no longer do anything: a browser's back and forward can't be reliably kept off them.) |
 | I (hold) | Inspect your weapon; held, the chamber check stays open; mouse side to side rolls the gun, up and down pitches it |
 | H | Open your body and kit (as Tab) |
 | 3 / 4 / 5 | Bring the grenade on that key into your hand (frag on 3 and flashbang on 4 to start; the weapon goes down). Hold LMB to pull the pin and draw back, release to throw; RMB picks underhand, weak or strong. The key again, or 1 / 2, puts it away. Drag a frag or flashbang onto a key's box under Equipment in the inventory to put that kind on it; × clears it. Medical gear doesn't go on them |
@@ -1446,7 +1779,7 @@ On top of the baked room reverb, echoes are **ray-traced through the level** for
 | F (hold) | Doors (aim at the door above 1.3 m, a little over its middle, to open it, lower to kick it; face an open door to close it; reach 1.9 m), bag evidence (aim at the weapon), swap with the weapon case, arrest, zip-tie or report (aim at the person or body; whichever of a body and its dropped weapon is nearer the centre of your view), check or treat a teammate (put the crosshair on them). Every interaction is a hold: let go and it's abandoned. Any of these puts your weapon away; drawing it again takes about 1 s (0.65 s for a sidearm). |
 | M | Mute / unmute (also `?mute` in the URL) |
 | F8 | Show / hide gunshot echo paths |
-| F9 | Show / hide hitboxes |
+| F9 | Show / hide hitboxes (with the readout of whoever you're looking at, and your rounds' paths) |
 | Tab | Inventory, health and scoreboard (Tab or Esc closes) |
 | Y | Vote to leave, once order is restored (again to take it back) |
 | Enter / Esc | Chat / pause |
@@ -1513,6 +1846,132 @@ solids at any height. Doors and windows are dynamic: their solids change as they
 
 ## Code layout
 
+- **The profiler** (`js/profiler.js`, `G.Prof`) is always on. It times the game's main pieces of work (the loop's
+  steps, `Me.update` and its parts, `Views.update`, the host's server tick and enemy AI, pathfinding, the world's
+  ray casts and collision queries, `R.render`, the HUD, the network handlers by message kind), adds each one up per
+  frame, and keeps the last 3600 frames in typed arrays set aside at load (about 1.5 MB, the same after an hour as
+  after a minute), with the renderer's draw calls, triangles, geometries, textures and shader programs, the JS heap
+  (Chrome), rounds in flight and enemies. It also keeps the 40 worst frames of the level with their breakdowns, a
+  histogram of frame times, and totals per network message kind (the first 64 kinds). Esc shows a one-line summary
+  of the last stretch and a **Save performance profile** button: a JSON file with the context (map size, solids,
+  lights, props, players, settings), the summary per piece of work (average, p50/p95/p99, worst, calls a frame),
+  the worst frames, the histogram, network handling, and every frame in the ring. "frame" is one animation frame
+  to the next (what you feel: GPU and browser included); "cpu" is the game's loop; the pieces are inclusive.
+- **Draw calls** are what a frame costs most (Firefox above all). The level's static meshes (window walls and frames,
+  roofs, lamp fittings, lintels, steps, rails, the festival's dressing) are baked into one mesh per material and 24 m
+  stretch (`G.Level.mergeStatic`); what moves, breaks or is see-through is left alone. Furniture carries its colour
+  in its vertices, so it's one material per finish, not per colour. Suspects' bodies (forty-odd pieces each) aren't
+  drawn past the fog or behind walls, floors and ceilings (`G.Views.inSight`: a few rays from the camera; furniture,
+  doors, glass, rails and stairs never hide one); their roots stay visible, so shots still find them. A body taken
+  out of the scene frees its geometry (`rig.dispose`). The two blast lights are shared by the six fireballs: every
+  light in the scene costs every lit pixel, lit or not.
+
+- **After-action highlights** (`js/highlights.js`, `G.Highlights`): while you play, a level is recorded at 10 Hz
+  (everyone's position, facing, pose, shots, doors) in a bounded ring (each machine records its own; the edit's choices,
+  ads, sponsors, x-ray or breakdown, camera angles, clip tiebreaks, are drawn from the level's seed, so the host and
+  every client cut the same broadcast), with each officer's rounds by gun and load,
+  the gun each kill was made with, and the guns and kit everyone had in each clip (so a replay shows what they
+  carried then). Kills, arrests (a suspect cuffed alive and on their feet), officers downed and fouls (a civilian or a surrendered
+  suspect killed) are cut into clips, and saves: an officer's armour stopping rounds while they stay up (the hit
+  officer's machine works out its own wounds and tells the host, which tells everyone; rounds within 3 s of each other
+  are one save, how many it stopped counted; going down within 4 s takes it back), MERIDIAN ARMOR's "STOPS WHAT YOUR
+  FEELINGS CAN'T" save of the night, "STOPPED COLD!", "NOT TODAY!". A suspect down for good is a kill there and then, cut as they went down: the
+  round that put them down if one hit them in the last 4 s, else the bleed-out camera (down from the blood loss).
+  A suspect who bleeds to death on their feet gets the bleed-out camera too. Whatever comes after (dying, finished
+  off, cuffed where they lie) makes no clip and isn't counted again. Clips have the 5 s before (a breach kill: from 1.5 s before the door went in, so its
+  replay opens on the kick, then shows it again through the kicker's eyes, BREACH CAM: the door at half speed, real time on to the kill, and slow again for the killing round) and 3 s
+  after, scored (headshots, breach kills within 5 s
+  of kicking a door, taken by surprise, would have surrendered if told to ("TAP-OUT DENIED!"), long shots (25 m or
+  more), through the armour (the round that did it went through their vest or helmet: "STRAIGHT THROUGH THE
+  ARMOUR!", REDLINE FIREARMS' "WHAT VEST?" round of the night), spray-downs: six or more rounds back to back, each
+  within 0.16 s of the last, ending on the kill;
+  bleed-outs, which the host flags with how long after the last round they came; one within 3 s of it, or through
+  the heart, counts as the round's kill, its clip on the round). A bleed-out has no killing round
+  to follow: it's them going down, from across the room and through their own eyes, a heart monitor's trace beating
+  weaker down to a thready pulse (they're down, not dead), BLED OUT stamped over it and how many seconds after the last round they went down (its sponsor: "SHOULD'VE
+  PACKED AN IFAK"); it doesn't count toward a streak. An officer's kills each within 6 s of the last become a kill
+  sequence: one clip of the whole run (live, then at half speed over their shoulder or from their helmet), the
+  camera turning to whoever's next, a counter lighting a pip a kill and "DOUBLE KILL!", "TRIPLE KILL!"... at each;
+  the kills in it aren't shown on their own. An arrest is the feel-good segment: SUNSET ACRES' "EVERYBODY GOES HOME"
+  MOMENT in pink and lilac, then the arrest live and in slow motion from the cuff cam (low beside them, watching the
+  officer's hands go to the wrists): the whole takedown as it happened (the shove down, the officer kneeling over
+  them, the tie going on and their gun as it was: the recording keeps how far through the zip-tie each was), hearts
+  drifting up, CUFFED, NOT STUFFED!, PEACE · LOVE · DUE PROCESS, the presenters melting and the crowd going "awww";
+  the standings count it (CUFFS). When their hands went up more than a few seconds before the cuffs went on, the
+  segment opens with the surrender: the five seconds before it live (whoever was near, and every officer), HANDS UP!
+  and DON'T MOVE! as they comply, then a pink sweep, MOMENTS LATER... and how many seconds of compliance, into the
+  arrest (each suspect's latest surrender is kept for it: `handsUp`). Back in the hangar, the level's own meshes are kept out of sight and the clips are
+  replayed in them on the lounge's big screen and TVs on the range's walls, like a sports broadcast: an opening
+  lineup, each clip from a wide camera (a fixed one in the room, picked from 40 places for having both of them in
+  the picture, most of each body in clear sight (knees to head and either side of the chest, so racking's gaps don't
+  count) at five moments through the clip, side-on to the line between them, as far back as they're apart, the lens
+  widened to fit them if it must), then the shooter's helmet, gun or over-the-shoulder camera in super slow-mo, then
+  the other side's. A shotgun's shot keeps every pellet (where each was headed, sent with the shot so the squad's
+  recordings have them; a suspect's, spread round the one end the host sends by the gun's choke), and each is drawn.
+  A round's recorded end is where the walls stop it, worked out as it's fired, so a hit is found by where its path
+  passes through someone (the line up their middle), and the killing one (a shotgun's: the pellet nearest their
+  middle) is cut short there. In the slow-motion angles each round is a bullet you can see, flying at its real speed
+  downrange (the game's own, G.roundSpeed: its time of flight, speed and gravity drop worked out over the distance)
+  with a trail, and the victim falls when the killing one gets there; replayed bodies fall onto the replayed level's
+  floors. Each clip keeps every door's state from when its footage begins (the doors as they were then, the door
+  events since undone), so a door opened before it (or shut after it) shows as it was; the doors snap to that at
+  each angle's start and follow the clip's own openings and kicks, and the replayed level's door solids go with
+  them. A long shot's slow-motion angle is the bullet cam: behind the muzzle, then riding just behind the round in
+  extreme slow motion (the flight stretched to 3 s), then held back along its line watching them go down, with its
+  distance, speed and time on screen and a trajectory analysis (powered by SABLE RIDGE BALLISTICS): drop against at
+  least 10 cm and speed from zero, so the scales are honest, and its time of flight, drop and energy on arrival.
+  Blood in the replays is worked out as they play (the recording keeps where rounds went, not what they hit): a
+  round whose path goes through someone in the replay bleeds there, as it reaches them. There's a puff of mist
+  back out of the entry wound and, through and through, a spray out of the far side carried on with the round.
+  The drops fall in clip time and land as marks on the floor, with spatter on a wall close behind. A pool spreads
+  under anyone who dies or goes down. All of it is cleared at each angle's start.
+  After a suspect's kill, either an x-ray breakdown (the organs and what the rounds did to them, and each round that
+  hit them run through the body again, traced (js/ballistics.js through: taken into their frame as they were when it
+  hit, the body posed as they were then, crouched, hands up or cowering, against their armour) and shown going in at
+  them as they were (the body moves through the sequence as they did in the replay, stepping, turning, crouching,
+  and is where they were for each round as that round goes in, the clip's time between rounds taken at the pace that
+  keeps that; each round's track stays where it went, and the camera frames it all; after the last, they go down as
+  the replay has them, falling the way it pushed them, the camera following them down) and shown going in one after
+  another: its line in, the crushed channel growing behind it, the temporary cavity flaring round it and settling,
+  fragments, where it tumbled or opened up, and its way out or where it came to rest or the armour that stopped it,
+  each with a line on the read-out; a shotgun's pellets all go in together, one line for the shot: how many hit
+  them, how many went through) or, about half the time, the slow-motion angle is the X-ray cam instead: close on the
+  suspect, their body turned to glass, the round's flight stretched to nearly 2 s so it's seen going in (on through
+  the body), each wounded organ flaring as it reaches it and sliding into a read-out, then 1.5 s of them falling,
+  the camera fixed where it started and turning to follow the wounded organs down (their middle, not their hips).
+  The close cameras keep out of walls and bodies (pulled back toward the head, nudged clear, and anything still in
+  the lens left undrawn for that frame; the helmet cam leaves out its wearer's head, and a suspect's, once they're
+  hit, follows their head as they fall, eased and kept off the floor). The Gear Room, before the standings, takes
+  each officer's main gun (the one they fired most) onto a turntable: its build (the parts that aren't factory),
+  caliber, load, rate and weight, rounds fired, kills, rounds a kill, headshots, their other guns and their kit, and
+  the pundits' verdicts stamped on it (SURGICAL, SPRAY & PRAY, HEADHUNTER, QUIET PROFESSIONAL, ALL BARK...).
+  Sponsored segments, ads every few clips (mostly for what Vex has in this visit: its icon, price, a line, and how
+  many are left, live, so something bought while it's on shows SOLD OUT; now and then a fake one), final standings,
+  a ticker, lower thirds and two game-show presenters who cheer, gasp, laugh and cry. The big screen is on the
+  lounge's east wall (4.4 m across, facing its sofas); the TVs are around the range's yard (behind the rifle line,
+  its east wall, by the course), clear of the IPSC course's board and screens, each tipped forward on its wall
+  (hinged at the bottom, its top held out on a strut) to face the eyes of someone standing about one and a third of
+  its widths out. Press F at one to download the broadcast as a video (WebM, 960×540, 30 frames a second, with the
+  audience): it isn't filmed but made there and then, every frame rendered off screen as fast as the machine goes
+  and encoded with the browser's own encoders (WebCodecs: VP8 at 2.5 Mbit/s from plain pixel buffers, the audience
+  rendered in an OfflineAudioContext and encoded as Opus), then put into a WebM by a small muxer in the file (about
+  17 s for a 52 s broadcast). It's made ahead, in a worker, once you're in the hangar (js/exportworker.js: the
+  game's own code loaded there, the level built again from its seed, the recording sent over as data, its own
+  renderer on an OffscreenCanvas, each frame encoded straight from it), paced so the game keeps its frames (the page
+  lets it render two frames for each of its own), and kept: F at a TV saves it there and then, or as soon as it's
+  done. The sounds come back as events and are mixed on the page (Web Audio isn't in workers), then go back to the
+  worker, which puts the file together (the video never comes to the page) and hands it over. Without a worker (no
+  OffscreenCanvas, or it fails) it's made on the page when you ask, a few frames at a time, as before. You hear one
+  only where you'd stand to watch it: in front of it, full to about one and a half of its widths and nothing past
+  three, not edge-on, nothing in between. There it's a studio audience, kept quiet and short for now (everything at
+  about a third, recordings faded out after a second or so): a stadium's murmur on a loop, recorded cheers and
+  laughter, an impressed "OOOH!" (rising) for headshots, long shots and a third kill in a row, a warm "awww" for
+  arrests (the sad "aww", for fouls and officers down, is an "ohhh" pitched down and sliding), with synthesised
+  stingers (ding, horn, boing, sad trombone, jingle), and the replays' gunfire: each round's report the game's own
+  synthesised gunshot for that gun and load (its dry render, js/gunaudio.js), kept quiet, through the TV's speaker
+  (a low-pass), slower and deeper in slow motion, quieter suppressed; in a video too. The replay renders at 640×360,
+  20 times a second.
+
 | File | Purpose |
 | --- | --- |
 | `js/data.js` | All weapons, armour, enemies and their kit, wounds and themes. Tune the game here. |
@@ -1530,7 +1989,11 @@ solids at any height. Doors and windows are dynamic: their solids change as they
 | `js/gunmodels.js` | Procedural gun models built from parts (first person, third person, gunsmith) |
 | `js/gunsmith.js` | The gunsmith: 3D weapon view and part fitting |
 | `js/hud.js`, `js/shop.js` | UI; the shop's stock and its buying |
-| `js/hangar.js` | The hangar between levels: workshop, store, warehouse, helicopter, and looking-to-buy |
+| `js/hangar.js` | The hangar between levels: workshop, store, warehouse, lounge, helicopter, and looking-to-buy |
+| `js/profiler.js` | The profiler: frame timings by piece of work, saved from the pause menu |
+| `js/highlights.js` | Recording a level and replaying its highlights on the hangar's TVs, as a sports broadcast |
+| `js/exportworker.js` | The highlights video made off the main thread: the game's code in a worker, rendering and encoding there |
+| `js/ballistics.js` | Terminal ballistics: the rounds, armour layers, the body's anatomy (fitted to the rigs) and wound tracks |
 | `js/range.js` | The shooting range behind the hangar: lanes, targets, and giving your ammunition back |
 | `js/gear.js` | Carriers, plates, helmets, belts; the grid inventory, ammo items and protection |
 | `js/casings.js` | Ejected cases: client-side physics, rendering, and their impact sounds |
@@ -1538,3 +2001,18 @@ solids at any height. Doors and windows are dynamic: their solids change as they
 | `js/icons.js` | Item icons drawn on a canvas and cached (magazines, ammo, gear, medical items, grenades) |
 | `js/medical.js` | Officers' injuries: body parts, bleeding, fractures, organs, blood, treatment |
 | `js/game.js` | Menus, message dispatch, main loop |
+
+## Audio credits
+
+The highlights' crowd (`assets/audio/crowd_*.ogg`) is cut from recordings on Wikimedia Commons, trimmed, made mono
+and level-matched:
+
+| File | From | By | Licence |
+| --- | --- | --- | --- |
+| `crowd_bed`, `crowd_roar` | "WWS FootballAustriavs.Sweden.ogg" (Ernst Happel Stadium, Vienna) | Work With Sounds / Torsten Nilsson | CC BY 4.0 |
+| `crowd_cheer_big` | "Arrowhead Stadium crowd noise.wav" | Kj1595 | CC BY-SA 4.0 |
+| `crowd_cheer` | "Clapping hurray.ogg" | starlite | Public domain |
+| `crowd_ooh` | "Ohhh ahhh.ogg" | starlite | Public domain |
+| `crowd_laugh`, `crowd_laugh_long` | "72842 lonemonk approx-800-laugh-1.wav", "72844 lonemonk approx-800-laughter-and-clapter-1.wav" (freesound.org) | lonemonk | CC BY 3.0 |
+| `crowd_wow` | "Group Ooh Aah" (freesound.org, sound 870652) | CHallSmith | CC0 |
+| `crowd_awww` | "aww.wav" (freesound.org, sound 124996) | phmiller42 | CC0 |

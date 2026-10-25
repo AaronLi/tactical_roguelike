@@ -45,14 +45,16 @@ G.Route = (() => {
     const boss = node(COLS - 1, mid);
     for (const n of nodes.values()) if (n.c === COLS - 2) edges.push([COLS - 2, n.r, boss.r]);
     for (const [c, a, b] of edges) { const f = nodes.get(id(c, a)), t = nodes.get(id(c + 1, b)); if (!f.next.includes(t.id)) { f.next.push(t.id); t.prev.push(f.id); } }
-    // environments: no two in a row along a link where it can be helped, and each column a mix
-    const nT = G.THEMES.length, order = [...nodes.values()].sort((a, b) => a.c - b.c || a.r - b.r);
+    // environments: no two in a row along a link where it can be helped, and each column a mix. (The starter, the
+    // convenience store, is the first act's way in and nowhere else: the rest are drawn from the others.)
+    const pool = G.THEMES.map((T, i) => i).filter((i) => !G.THEMES[i].starter), nT = pool.length, starter = G.THEMES.findIndex((T) => T.starter);
+    const order = [...nodes.values()].sort((a, b) => a.c - b.c || a.r - b.r);
     for (const n of order) {
       const avoid = new Set(n.prev.map((p) => nodes.get(p).th));
       for (const o of order) if (o.c === n.c && o !== n && o.r < n.r) avoid.add(o.th);
-      let th = Math.floor(r() * nT);
-      for (let k = 0; k < nT && avoid.has(th); k++) th = (th + 1) % nT;
-      n.th = n === start && act === 1 ? 0 : th; // the first act starts in the apartments
+      let k0 = Math.floor(r() * nT);
+      for (let k = 0; k < nT && avoid.has(pool[k0]); k++) k0 = (k0 + 1) % nT;
+      n.th = n === start && act === 1 && starter >= 0 ? starter : pool[k0]; // the first act starts at the convenience store
     }
     const cols = [];
     for (let c = 0; c < COLS; c++) cols.push(order.filter((n) => n.c === c));
@@ -69,7 +71,7 @@ G.Route = (() => {
     Apartment: 'M-6 6V-2L0-7 6-2V6Z M-2 6V1H2V6', Warehouse: 'M-7 6V-3L0-7 7-3V6Z M-4 6V0H4V6 M-4 3H4',
     Bunker: 'M-7 5Q0-9 7 5Z M-3 5V1H3V5', Suburbs: 'M-7 6V0L-3.5-4 0 0V6Z M1 6V-2L4-5 7-2V6',
     'Research Lab': 'M-2-7H2 M-1-7V-2L-6 6H6L1-2V-7', Foundry: 'M-7 6V-1L-3-4V-1L1-4V-1L5-4V6Z M4-4V-8H6V-3',
-    'Cold Storage': 'M0-7V7 M-6-3.5L6 3.5 M-6 3.5L6-3.5',
+    'Cold Storage': 'M0-7V7 M-6-3.5L6 3.5 M-6 3.5L6-3.5', 'Convenience Store': 'M-7 6V-2H7V6Z M-7-2L-5-6H5L7-2 M-4 6V1H0V6 M2 1H5V4H2Z',
   };
   // wider than the screen: the map scrolls sideways (js/game.js keeps where you are in view)
   const STEP = 150, PADX = 80, PADY = 56, W = 2 * PADX + (COLS - 1) * STEP, H = 600;

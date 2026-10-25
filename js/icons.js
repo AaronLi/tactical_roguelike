@@ -31,7 +31,7 @@ G.Icons = (() => {
     if (def.id === 'thompson' || def.id === 'ppsh') return 'drum';
     if (def.cls === 'PST' || def.cls === 'MP') return 'pistol';
     if (def.cls === 'SMG') return def.id.startsWith('mp5') ? 'curved' : 'straight';
-    if (cal === '7.62/39' || cal === '5.6/39' || cal === '7.62/54') return 'banana';
+    if (cal === '7.62/39' || cal === '5.6/39' || cal === '5.8/42' || cal === '7.62/54') return 'banana';
     return def.mag > 20 ? 'curved' : 'straight';
   }
   // How full a container is (0..1), and how many of k slots that fills (at least one if there's any in it)
@@ -232,7 +232,7 @@ G.Icons = (() => {
     g.fillStyle = d.id === 'h.bump' ? '#3a3d40' : d.id === 'h.fast' ? '#5a5240' : '#3d4232';
     g.beginPath(); g.moveTo(W * 0.12, H * 0.72); g.quadraticCurveTo(W * 0.14, H * 0.12, W * 0.55, H * 0.14); g.quadraticCurveTo(W * 0.9, H * 0.18, W * 0.88, H * 0.66); g.lineTo(W * 0.66, H * 0.62); g.lineTo(W * 0.62, H * 0.72); g.closePath(); g.fill(); shade(g, W * 0.12, H * 0.12, W * 0.78, H * 0.6);
     g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(W * 0.22, H * 0.5, W * 0.14, H * 0.1); // rail / ear cut
-    if (d.stop && d.stop.face) { g.fillStyle = 'rgba(120,150,170,0.55)'; g.beginPath(); g.moveTo(W * 0.6, H * 0.4); g.lineTo(W * 0.92, H * 0.42); g.lineTo(W * 0.88, H * 0.92); g.lineTo(W * 0.62, H * 0.86); g.closePath(); g.fill(); }
+    if (d.prot && d.prot.some((p) => p.at === 'face')) { g.fillStyle = 'rgba(120,150,170,0.55)'; g.beginPath(); g.moveTo(W * 0.6, H * 0.4); g.lineTo(W * 0.92, H * 0.42); g.lineTo(W * 0.88, H * 0.92); g.lineTo(W * 0.62, H * 0.86); g.closePath(); g.fill(); }
   }
   // a face shield (a tinted polycarbonate shield with its mounting arms) or a mandible (a curved guard
   // round the jaw); on: drawn onto a helmet's icon

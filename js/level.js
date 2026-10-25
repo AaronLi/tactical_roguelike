@@ -12,6 +12,7 @@ G.Level = {
   CASE_CHANCE: 1, // share of levels with a weapon case (every one)
   CAB_CHANCE: 0.35, // share of levels with a first aid cabinet on a wall (and of those, CAB_TWO with a second)
   CAB_TWO: 0.2,
+  ABOX_CHANCE: 0.7, // share of levels with an attachments box
   WALL_H: 4,
   CRATE_H: 1.1,
   CRATE_HX: 0.8,
@@ -24,7 +25,9 @@ G.Level = {
     // the layout: an apartment block, a warehouse, two houses back to back with their gardens between, or a
     // building of rooms and corridors. Every one starts outside it (or, for the apartments, on the stairs).
     const lay = theme.layout === 'apartments' ? this.layApartments(r, level) : theme.layout === 'warehouse' ? this.layWarehouse(r, level)
-      : theme.layout === 'houses' ? this.layHouses(r, level) : theme.layout === 'festival' ? this.layFestival(r, level) : this.approach(this.layRooms(r, level), r, theme);
+      : theme.layout === 'houses' ? this.layHouses(r, level) : theme.layout === 'festival' ? this.layFestival(r, level) : theme.layout === 'mart' ? this.layMart(r, level)
+      : theme.layout === 'foundry' ? this.layFoundry(r, level)
+      : this.approach(this.layRooms(r, level), r, theme);
     // a building of several floors: each one planned as a storey, then stacked (stack: the stairs between them)
     if (lay.floors) return this.stack(lay.floors.map((fl) => this.plan(fl, r, seed, level, theme)), lay);
     const map = this.plan(lay, r, seed, level, theme);
@@ -36,7 +39,7 @@ G.Level = {
   generateHub(seed, level) {
     const r = G.U.rng(seed), lay = this.layHangar(r, level);
     const map = this.plan(lay, r, seed, level, G.HANGAR_THEME);
-    map.case = null; map.cabinets = []; map.enemySpots = []; map.hub = true;
+    map.case = null; map.abox = null; map.cabinets = []; map.enemySpots = []; map.hub = true;
     G.World.fromTileMap(map);
     G.Hangar.decorate(map);
     return map;
@@ -75,7 +78,7 @@ G.Level = {
     });
     for (const [x, z, axis, open, mirror, kind] of lay.doors || []) if (t[z * W + x] !== 3) addDoor(x, z, axis, open, mirror, kind);
     // The coarse plan. out: tiles open to the sky (gardens); fences: garden fence tiles [x, z, axis].
-    const c = { W, H, t, rooms, seed, level, doors, doorAt, out: lay.out || new Uint8Array(W * H), fences: lay.fences || [], TS: this.CTS, theme };
+    const c = { W, H, t, rooms, seed, level, doors, doorAt, out: lay.out || new Uint8Array(W * H), fences: lay.fences || [], grate: lay.grate || null, TS: this.CTS, theme };
     const spawnRoom = lay.spawn || rooms[0];
     const distFromSpawn = this.flow(c, [[spawnRoom.cx, spawnRoom.cz]]);
     const seeds = [[spawnRoom.cx, spawnRoom.cz]].concat(lay.entries || []); // (upstairs: the stair heads too, so a loft's upper floor counts)
@@ -104,6 +107,7 @@ G.Level = {
     map.entries = (lay.entries || []).map(([x, z]) => [x * this.K + 1, z * this.K + 1]); // (upstairs: where a loft's own stair comes up, on the fine grid: spawn spots count from there too)
     map.units = lay.units || 0; // apartments: how many (rooms carry .unit)
     map.underground = !!lay.underground; // (a basement: no windows)
+    map.glassRuns = lay.glass || null; // (glass the layout puts in walls between rooms: placeWindows)
     // roller doors (rolled up): [x from, x to, z of the wall] in metres
     map.rollers = (lay.rollers || []).map(([x0, z, w]) => [x0 * this.CTS, (x0 + w) * this.CTS, (z + 0.5) * this.CTS]);
     map.fest = c.fest || null; map.civSpots = c.civSpots || null; // (a festival: its light strings, where civilians hide)
@@ -127,6 +131,8 @@ G.Level = {
     const cout = (x, z) => x >= 0 && z >= 0 && x < c.W && z < c.H && !!c.out[z * c.W + x];
     const solid = (x, z) => { const v = cv(x, z); return v === 1 || v === 3; };
     const fenceC = new Map(c.fences.map(([x, z, axis]) => [z * c.W + x, axis])), fenceAx = new Map();
+    // steel grating (a foundry's catwalks, upstairs): floor you stand on that rounds and eyes go through (c.grate, coarse)
+    const cg = c.grate, grate = cg ? new Uint8Array(W * H) : null, cgr = (x, z) => !!cg && x >= 0 && z >= 0 && x < c.W && z < c.H && !!cg[z * c.W + x];
     // A thin wall separates two spaces (open on both sides along one axis). A wall where thin walls meet (a T or
     // a corner) is thinned with them. Thinning keeps the wall's centre line and its arms toward the walls it
     // joins; the rest of the tile opens up to the spaces around it. Walls with solid mass behind them (the
@@ -150,17 +156,19 @@ G.Level = {
           if (!faces.length) continue;
           // (facing nothing but open air, upstairs outside a house: open air too, not a ledge to stand on)
           t[fi] = faces.every(([a, b]) => cv(a, b) === 5) ? 5 : 0; out[fi] = faces.some(([a, b]) => cout(a, b)) ? 1 : 0;
+          if (grate && t[fi] === 0 && faces.some(([a, b]) => cgr(a, b))) grate[fi] = 1; // (beside a catwalk: the catwalk's)
           continue;
         }
         if (v === 3) {
           const d = c.doorAt.get(ci), along = d.axis === 'z' ? i : j, across = d.axis === 'z' ? j : i;
-          if (across !== 1) { t[fi] = 0; out[fi] = cout(...(d.axis === 'z' ? [x, z + (j ? 1 : -1)] : [x + (i ? 1 : -1), z])) ? 1 : 0; continue; }
+          if (across !== 1) { const nb = d.axis === 'z' ? [x, z + (j ? 1 : -1)] : [x + (i ? 1 : -1), z]; t[fi] = 0; out[fi] = cout(...nb) ? 1 : 0; if (grate && cgr(...nb)) grate[fi] = 1; continue; }
           t[fi] = (d.mirror ? along <= 1 : along >= 1) ? 3 : 1;
           continue;
         }
         if (v === 5) { t[fi] = 5; out[fi] = c.out[ci] ? 1 : 0; continue; } // a drop: no floor (the floor below shows through), or upstairs, the open air outside
         if (v === 6) { t[fi] = 7; continue; } // a flight of stairs (its steps are solids: G.Level.stack)
         t[fi] = 0; out[fi] = c.out[ci] ? 1 : 0; // floor (furniture is laid on it below)
+        if (grate && cg[ci]) grate[fi] = 1;
       }
     }
     // fence lines run through to the fence tiles beside them (no gap where a side fence meets the middle one)
@@ -208,7 +216,7 @@ G.Level = {
       }
       const p = Object.assign({}, p0, { x, z, boxes: wb(R[p0.name], x, z, p0.q, p0.v) });
       propList.push(p);
-      const blocks = c.t[ci] === 2 || c.t[ci] === 4;
+      const bv = p0.block || (c.t[ci] === 2 || c.t[ci] === 4 ? c.t[ci] : 0), blocks = !!bv; // (block: a piece laid on the fine grid itself, not on a tile: what it blocks, 2 or 4)
       let any = false;
       for (const b of p.boxes) {
         for (let fz = Math.floor((b.cz - b.hz) / cs); fz <= Math.floor((b.cz + b.hz) / cs); fz++) for (let fx = Math.floor((b.cx - b.hx) / cs); fx <= Math.floor((b.cx + b.hx) / cs); fx++) {
@@ -217,7 +225,7 @@ G.Level = {
           if (t[i] !== 0 && !(blocks && (t[i] === 2 || t[i] === 4))) continue;
           hang(i, p); any = true;
           // a cell whose middle it covers is blocked (a small thing in a corner leaves the floor walkable)
-          if (blocks && Math.abs((fx + 0.5) * cs - b.cx) <= b.hx + 0.05 && Math.abs((fz + 0.5) * cs - b.cz) <= b.hz + 0.05) t[i] = c.t[ci];
+          if (blocks && Math.abs((fx + 0.5) * cs - b.cx) <= b.hx + 0.05 && Math.abs((fz + 0.5) * cs - b.cz) <= b.hz + 0.05) t[i] = bv;
         }
       }
       if (!any) hang(Math.floor(z / cs) * W + Math.floor(x / cs), p);
@@ -231,7 +239,7 @@ G.Level = {
       p.boxes = wb(R[name], p.x, p.z, p.q, p.v);
       props.set(i, p); propList.push(p);
     }
-    return { W, H, t, out, rooms, seed: c.seed, level: c.level, doors, doorAt, props, propList, theme: c.theme };
+    return { W, H, t, out, grate, rooms, seed: c.seed, level: c.level, doors, doorAt, props, propList, theme: c.theme };
   },
 
   // Everything placed on the fine grid: cover spots, hiding spots, where suspects start, the weapon case, the
@@ -274,9 +282,10 @@ G.Level = {
     // The weapon case: only some levels have one (CASE_CHANCE, from the level seed so everyone agrees), on the
     // floor along a wall in a room away from the spawn: two clear cells side by side against the wall
     map.case = null;
-    const hasCase = r() < this.CASE_CHANCE;
+    const hasCase = r() < this.CASE_CHANCE || !!map.theme.starter;
+    const keepIn = (q) => !map.theme.starter || q.type === 'stockroom'; // (a starter level: its stockroom has them all)
     const clear = (x, z) => t[z * W + x] === 0 && !map.props.has(z * W + x);
-    if (hasCase) for (const rm of U.shuffle(r, rooms.filter((q) => q !== spawnRoom))) {
+    if (hasCase) for (const rm of U.shuffle(r, rooms.filter((q) => q !== spawnRoom && keepIn(q)))) {
       const spots = [];
       for (let z = rm.z; z < rm.z + rm.h; z++) for (let x = rm.x; x < rm.x + rm.w; x++) {
         let nearDoor = false;
@@ -298,9 +307,9 @@ G.Level = {
     map.cabinets = [];
     {
       const rc = U.rng((map.seed ^ 0x5eed0cab) >>> 0);
-      const want = rc() < this.CAB_CHANCE ? (rc() < this.CAB_TWO ? 2 : 1) : 0;
+      const want = rc() < this.CAB_CHANCE || map.theme.starter ? (rc() < this.CAB_TWO && !map.theme.starter ? 2 : 1) : 0;
       const used = new Set();
-      for (const rm of U.shuffle(rc, rooms.slice())) {
+      for (const rm of U.shuffle(rc, rooms.filter(keepIn))) {
         if (map.cabinets.length >= want) break;
         if (used.has(rm)) continue;
         const spots = [];
@@ -318,11 +327,43 @@ G.Level = {
         map.cabinets.push({ x: (x + 0.5) * TS + dx * (TS / 2 - 0.075), z: (z + 0.5) * TS + dz * (TS / 2 - 0.075), yaw: Math.atan2(-dx, -dz) });
       }
     }
+    // The attachments box: on most levels (ABOX_CHANCE), a small hard case on the floor against a wall in a room away
+    // from the spawn (not by a door, not by the weapon case). Opened, it holds three attachments for the weapon in
+    // the opener's hands (js/server.js rollAbox). Its own random stream from the seed, like the cabinets'.
+    map.abox = null;
+    {
+      const ra = U.rng((map.seed ^ 0xa77ac4ed) >>> 0);
+      if (ra() < this.ABOX_CHANCE || map.theme.starter) for (const rm of U.shuffle(ra, rooms.filter((q) => q !== spawnRoom && keepIn(q)))) {
+        const spots = [];
+        for (let z = rm.z; z < rm.z + rm.h; z++) for (let x = rm.x; x < rm.x + rm.w; x++) {
+          if (!clear(x, z) || (map.out && map.out[z * W + x])) continue;
+          if (map.case && Math.hypot((x + 0.5) * TS - map.case.x, (z + 0.5) * TS - map.case.z) < 3) continue;
+          let nearDoor = false;
+          for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) if (t[(z + dz) * W + x + dx] === 3) nearDoor = true;
+          if (nearDoor) continue;
+          for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (t[(z + dz) * W + x + dx] === 1) spots.push([x, z, dx, dz]);
+        }
+        if (!spots.length) continue;
+        const [x, z, dx, dz] = U.pick(ra, spots);
+        // the hinge against the wall, the latches facing the room
+        map.abox = { x: (x + 0.5) * TS + dx * (TS / 2 - 0.24), z: (z + 0.5) * TS + dz * (TS / 2 - 0.24), yaw: Math.atan2(-dx, -dz) };
+        break;
+      }
+    }
     // Ceiling lamps: one per room, a grid of them over a warehouse floor, none in the open; porch lanterns over
     // doors that open onto a garden
     map.lights = [];
     for (const rm of rooms) {
-      if (rm.out) continue;
+      if (rm.out || rm.type === 'catwalk') continue; // (a catwalk: lit by its hall's lamps, high over it)
+      if (rm.tall) { // a hall the building's full height: high-bay lamps under its roof, a grid of them (lighting the catwalks too: stack)
+        for (let z = rm.z + 5; z < rm.z + rm.h - 2; z += 12) for (let x = rm.x + 6; x < rm.x + rm.w - 2; x += 15) map.lights.push({ kind: 'highbay', x: (x + 0.5) * TS, z: (z + 0.5) * TS, y: this.FLOOR_H + this.WALL_H - 0.6, color: 0xffe2b8, i: 0.5, d: 17, up: 1 });
+        continue;
+      }
+      if (rm.type === 'mart' || rm.type === 'cashier') { // a shop's: flat panels in rows, every three metres or so
+        const x0 = rm.x * TS, z0 = rm.z * TS, nx = Math.max(1, Math.round(rm.w * TS / 3.2)), nz = Math.max(1, Math.round(rm.h * TS / 3.2));
+        for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) map.lights.push({ kind: 'panel', x: x0 + (i + 0.5) * rm.w * TS / nx, z: z0 + (j + 0.5) * rm.h * TS / nz });
+        continue;
+      }
       if (rm.type === 'corridor') { for (let x = rm.x + 2; x < rm.x + rm.w; x += 7) map.lights.push({ x: (x + 0.5) * TS, z: (rm.cz + 0.5) * TS }); continue; } // down a hallway
       if (rm.type === 'hangar') { // a lamp every 8 m by 6 m down the hall
         for (let z = rm.z + 3; z < rm.z + rm.h; z += 9) for (let x = rm.x + 6; x < rm.x + rm.w - 2; x += 12) map.lights.push({ x: (x + 0.5) * TS, z: (z + 0.5) * TS });
@@ -337,18 +378,33 @@ G.Level = {
       const dir = below ? 1 : -1, pair = map.doors.find((o) => o !== d && o.mirror && Math.abs(o.x - d.x) < 1.5 && Math.abs(o.z - d.z) < 0.1);
       map.lights.push({ x: pair ? (d.x + pair.x) / 2 : d.x, z: d.z + dir * (TS / 2 + 0.06), y: 2.55, porch: dir });
     }
-    // a festival: real lights along the strings (a warm pool every few metres) and coloured ones over the stage
+    // what machinery gives off (js/furniture.js R[name].glow, .fx, in the piece's own frame): its glow, a lamp of its own
+    // (lighting the floor above too: up), and what it throws off (sparks, embers, smoke, steam: buildFx)
+    map.fx = [];
+    for (const p of map.propList || []) {
+      const rec = G.Furniture.R[p.name];
+      if (!rec.glow && !rec.fx) continue;
+      const s = Math.round(Math.sin(p.q * Math.PI / 2)), c = Math.round(Math.cos(p.q * Math.PI / 2)), at = (lx, lz) => [p.x + lx * c + lz * s, p.z - lx * s + lz * c];
+      if (rec.glow) { const g = rec.glow, [x, z] = at(g.x || 0, g.z || 0); map.lights.push({ kind: 'string', x, z, y: g.y, color: g.color, i: g.i, d: g.d, up: 1 }); }
+      for (const f of rec.fx || []) {
+        const [x, z] = at(f.x || 0, f.z || 0), d = f.dir ? [f.dir[0] * c + f.dir[2] * s, f.dir[1], -f.dir[0] * s + f.dir[2] * c] : null;
+        map.fx.push(Object.assign({}, f, { x, z, dir: d }));
+      }
+    }
+    // a festival: real lights along the strings (a warm pool every few metres) and coloured ones over the stage. They're
+    // many and close together, so each is dim: what they add up to is a lit night (the light under the strings about a
+    // room lamp's), not every surface past white
     if (map.fest) {
       for (const s of map.fest.strings) {
         const len = Math.hypot(s.b[0] - s.a[0], s.b[2] - s.a[2]), n = Math.max(1, Math.round(len / 9));
         for (let i = 0; i < n; i++) {
           const u = (i + 0.5) / n;
-          map.lights.push({ kind: 'string', x: s.a[0] + (s.b[0] - s.a[0]) * u, z: s.a[2] + (s.b[2] - s.a[2]) * u, y: s.a[1] + (s.b[1] - s.a[1]) * u - 0.6, color: s.kind === 'lantern' ? 0xffa868 : 0xffd29a, i: 1.25, d: 16 });
+          map.lights.push({ kind: 'string', x: s.a[0] + (s.b[0] - s.a[0]) * u, z: s.a[2] + (s.b[2] - s.a[2]) * u, y: s.a[1] + (s.b[1] - s.a[1]) * u - 0.6, color: s.kind === 'lantern' ? 0xffa868 : 0xffd29a, i: 0.5, d: 11 });
         }
       }
-      for (const [x, z] of map.fest.lamps) map.lights.push({ kind: 'string', x, z, y: 5.6, color: 0xffcf98, i: 1.7, d: 24 }); // street lamps
+      for (const [x, z] of map.fest.lamps) map.lights.push({ kind: 'string', x, z, y: 5.6, color: 0xffcf98, i: 0.85, d: 17 }); // street lamps
       const st = map.fest.stage;
-      if (st) [0xff3fa0, 0x40c0ff, 0xffb040].forEach((color, i) => map.lights.push({ kind: 'string', x: st.x0 + (st.x1 - st.x0) * (0.2 + i * 0.3), z: st.z1 - 0.6, y: 5.5, color, i: 2.2, d: 22 }));
+      if (st) [0xff3fa0, 0x40c0ff, 0xffb040].forEach((color, i) => map.lights.push({ kind: 'string', x: st.x0 + (st.x1 - st.x0) * (0.2 + i * 0.3), z: st.z1 - 0.6, y: 5.5, color, i: 1.3, d: 20 }));
     }
     // the lamps nearest where you come in first (only the first dozen are real lights)
     { const sx = (spawnRoom.cx + 0.5) * TS, sz = (spawnRoom.cz + 0.5) * TS; map.lights.sort((a, b) => Math.hypot(a.x - sx, a.z - sz) - Math.hypot(b.x - sx, b.z - sz)); }
@@ -403,7 +459,7 @@ G.Level = {
       const e = near[k];
       if (!e) { pl.intensity = 0; return; }
       const l = e[0];
-      pl.position.set(l.x, l.y, l.z); pl.color.setHex(l.color); pl.intensity = l.i; pl.distance = l.d;
+      pl.position.set(l.x, l.y, l.z); pl.color.setHex(l.color, THREE.LinearSRGBColorSpace); pl.intensity = l.i; pl.distance = l.d;
     });
   },
   // ---------------------------------------------------------------- windows
@@ -424,25 +480,40 @@ G.Level = {
     const nearDoor = (x, z) => { for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) if (t[(z + dz) * W + x + dx] === 3) return true; return false; };
     const tall = (i) => { const p = map.props && map.props.get(i); return !!(p && p.boxes[0] && p.boxes[0].h > 1.0); };
     const inside = (x, z) => x > 0 && z > 0 && x < W - 1 && z < H - 1;
-    const add = (cells, nx, nz, ext) => {
+    const add = (cells, nx, nz, ext, kind) => {
       const [a, b] = cells.map((i) => [i % W, (i / W) | 0]);
       const mx = ((a[0] + b[0]) / 2 + 0.5) * TS, mz = ((a[1] + b[1]) / 2 + 0.5) * TS, near = (o) => o && Math.hypot(o.x - mx, o.z - mz) < 1.6;
-      if (near(map.case) || (map.cabinets || []).some(near)) return; // (not through the wall a cabinet or the weapon case is against)
+      if (!kind && (near(map.case) || near(map.abox) || (map.cabinets || []).some(near))) return; // (not through the wall a cabinet or the weapon case is against)
       const id = map.windows.length;
       // the opening's middle, on the wall's centre line (thru) or the room-side cell's middle (ext)
       const w = { id, cells, nx, nz, ext, broken: false, x: ((a[0] + b[0]) / 2 + 0.5) * TS, z: ((a[1] + b[1]) / 2 + 0.5) * TS, len: 2 * TS };
+      if (kind && kind.armor) w.armor = true; // (wired, bulletproof: it stops rounds, never breaks; you see through it)
+      if (kind && kind.cooler) w.cooler = true; // (a cooler's glass doors)
+      // (its own sill and top: a cooler's doors nearly to the floor, a cashier's glass from the counter up)
+      const S0 = kind && kind.sill != null ? kind.sill : this.SILL, T0 = kind && kind.top != null ? kind.top : this.TOP;
+      if (S0 !== this.SILL || T0 !== this.TOP) { w.sill = S0; w.top = T0; }
       map.windows.push(w);
       for (const i of cells) {
         used.add(i);
         const cx = ((i % W) + 0.5) * TS, cz = (((i / W) | 0) + 0.5) * TS, h = TS / 2, along = nx ? { hx: 0.02, hz: h } : { hx: h, hz: 0.02 };
         const full = { cx, cz, hx: h, hz: h };
-        const boxes = [Object.assign({ y0: 0, h: this.SILL }, full), Object.assign({ y0: this.TOP, h: this.WALL_H }, full)];
-        const glass = Object.assign({ cx, cz, y0: this.SILL, h: this.TOP, glass: id }, along);
+        const boxes = [Object.assign({ y0: 0, h: S0 }, full), Object.assign({ y0: T0, h: this.WALL_H }, full)];
+        const glass = Object.assign({ cx, cz, y0: S0, h: T0, glass: id }, along);
         // an outside window: what's past the glass is the view (the wall behind): rounds stop there, unseen
         const back = ext ? Object.assign({ cx: cx + nx * (h - 0.01), cz: cz + nz * (h - 0.01), y0: this.SILL, h: this.TOP, view: true }, nx ? { hx: 0.01, hz: h } : { hx: h, hz: 0.01 }) : null;
         map.winAt.set(i, { win: w, open: back ? boxes.concat([back]) : boxes, shut: (back ? boxes.concat([back]) : boxes).concat([glass]) });
       }
     };
+    // glass the layout puts in walls between rooms (runs of coarse wall tiles: a convenience store's coolers and its
+    // cashier's bulletproof glass): along the thinned wall's middle line, two cells to a pane, wherever there's floor
+    // both sides (not a door, not a corner)
+    for (const run of map.glassRuns || []) {
+      const horiz = !run.v, nx = horiz ? 0 : 1, nz = horiz ? 1 : 0, cells = []; // (v: a north-south wall)
+      if (horiz) { const z = run.z0 * K + 1; for (let x = run.x0 * K; x < (run.x1 + 1) * K; x++) cells.push(z * W + x); }
+      else { const x = run.x0 * K + 1; for (let z = run.z0 * K; z < (run.z1 + 1) * K; z++) cells.push(z * W + x); }
+      const ok = (i) => t[i] === 1 && !used.has(i) && floor(i - nx - nz * W) && floor(i + nx + nz * W);
+      for (let k = 0; k + 1 < cells.length; k++) if (ok(cells[k]) && ok(cells[k + 1])) { add([cells[k], cells[k + 1]], nx, nz, false, run); k++; }
+    }
     // a wall cell with floor either side along one axis (a thin wall), indoors on one side and outdoors on the other
     const thruAt = (x, z) => {
       const i = z * W + x;
@@ -559,6 +630,118 @@ G.Level = {
   // Each returns { W, H, t, rooms, doors?, ringDoors?, out?, fences?, spawn? } on the coarse grid. t starts as all wall
   // (1); rooms are carved to floor (0).
   _room(x, z, w, h, o) { return Object.assign({ x, z, w, h, cx: x + (w >> 1), cz: z + (h >> 1) }, o || {}); },
+
+  // A corner convenience store, small and crowded, the first deployment of a run (by the look of real ones: tall shelving
+  // packed close, aisles a little over a metre wide, a wall of cooler doors, the till behind its glass). 20 x 26 m with
+  // its lot. Coarse tiles (2 m), north (low z) to south:
+  //   the back: the walk-in freezer (west) and the stockroom (east), a door between them; the freezer's front wall is
+  //     the coolers, glass doors onto the shop (glass: windows in it, js/level.js placeWindows);
+  //   the shop floor (west, about 10.5 x 9.5 m), a door up into the stockroom; the cashier's booth (east), behind a
+  //     wall of wired, bulletproof glass (it stops rounds, not looks) with one door through it, more of it onto the street;
+  //   the front wall, glass either side of its double door, and the lot outside it (fenced), where you come in.
+  // The shelving is laid on the fine grid (js/furniture.js plan, mart), not tile by tile: that's what makes the aisles narrow.
+  // Its weapon case, attachments box and first aid cabinet are always in the stockroom (G.THEMES starter).
+  layMart(r, level) {
+    const W = 10, B = 9, D = 4, H = B + D, U = G.U;
+    const t = new Uint8Array(W * H).fill(1), out = new Uint8Array(W * H), fences = [], doors = [];
+    const fill = (x0, z0, w, h) => { for (let z = z0; z < z0 + h; z++) for (let x = x0; x < x0 + w; x++) t[z * W + x] = 0; };
+    fill(1, 1, 3, 2); fill(5, 1, 4, 2); // the freezer, the stockroom
+    fill(1, 4, 5, 4); fill(7, 4, 2, 4); // the shop floor, the cashier's booth
+    const freezer = this._room(1, 1, 3, 2, { type: 'freezer' }), stock = this._room(5, 1, 4, 2, { type: 'stockroom' });
+    const shop = this._room(1, 4, 5, 4, { type: 'mart' }), till = this._room(7, 4, 2, 4, { type: 'cashier' });
+    doors.push([4, 1 + U.ri(r, 0, 1), 'x', false, false]); // freezer <-> stockroom
+    doors.push([5, 3, 'z', false, false]); // shop floor -> stockroom
+    const tillDoor = 4 + U.ri(r, 0, 1);
+    doors.push([6, tillDoor, 'x', false, false]); // the one door through the cashier's glass
+    // the front: the double door, the lot outside
+    const ex = U.ri(r, 2, 3);
+    doors.push([ex, B - 1, 'z', false, false], [ex + 1, B - 1, 'z', false, true]);
+    for (let z = B; z < H; z++) for (let x = 0; x < W; x++) out[z * W + x] = 1;
+    for (let z = B; z < H - 1; z++) for (let x = 1; x < W - 1; x++) t[z * W + x] = 0;
+    for (let x = 0; x < W; x++) { t[(H - 1) * W + x] = 4; fences.push([x, H - 1, 'x']); }
+    for (let z = B; z < H - 1; z++) for (const x of [0, W - 1]) { t[z * W + x] = 4; fences.push([x, z, 'z']); }
+    const lot = this._room(1, B, W - 2, D - 1, { type: 'lot', out: true });
+    // glass between rooms: the coolers (the freezer's front wall), the cashier's wall (all of it but its door) and the
+    // booth's front; the shop's front windows either side of the door
+    const glass = [{ x0: 1, z0: 3, x1: 3, z1: 3, cooler: true, sill: 0.12, top: 2.05 }];
+    for (const [z0, z1] of [[4, tillDoor - 1], [tillDoor + 1, B - 2]]) if (z1 >= z0) glass.push({ x0: 6, z0, x1: 6, z1, armor: true, v: 1, sill: 0.95, top: 2.7 }); // (either side of its door; v: down a wall that runs north-south)
+    glass.push({ x0: 7, z0: B - 1, x1: 8, z1: B - 1, armor: true, sill: 0.95, top: 2.7 }, { x0: 1, z0: B - 1, x1: 5, z1: B - 1, sill: 0.5, top: 2.7 });
+    return { W, H, t, rooms: [lot, shop, till, stock, freezer], doors, out, fences, glass, spawn: lot };
+  },
+
+  // A steel foundry, two storeys, 68 x 56 m. Coarse tiles (2 m), north (low z) to south:
+  //   the melt shop (west) and the processing hall (east), each the building's full height (8.3 m): on the ground,
+  //     the melt shop's arc furnaces, the ladles of molten steel in front of them and the ingot moulds; the hall's two
+  //     processing lines (roller conveyors through rolling mills, hot saws, a press, a quench tank). Upstairs in each,
+  //     catwalks of steel grating round the walls and across it (over the ladles, between the lines), seen and shot
+  //     through from above and below, railed where they're over the drop; a stair up to them in each hall.
+  //   between them, a block of three: the switchgear room and the locker room on the ground, a door from each into both
+  //     halls; over them, the control room and an observation office, glass down both sides looking into the halls and
+  //     doors out onto both halls' catwalks.
+  //   the office wing (south-west): a stairwell at its west end, a corridor from it to the loading bay; the kitchenette
+  //     and the toilets on one side, reception (its front door onto the car park) and offices on the other. Upstairs,
+  //     two observation offices looking north into the melt shop through glass (doors out onto its catwalk), the
+  //     manager's office and the meeting room. A door from the stairwell into the melt shop.
+  //   the loading bay (south-east), full height too: raw stock on pallets (billets, ingots, coils), forklifts, pallet
+  //     racking; a roller door up into the processing hall, two out onto the car park and a door between them.
+  //   the car park along the front, fenced, where you come in: in front of the offices or of the loading bay.
+  // Floors: 0 the ground, 1 upstairs (tile 5 the drop, open to the floor below; grate: the catwalks).
+  layFoundry(r, level) {
+    const W = 34, H = 28, LZ = 22; // the car park from row LZ
+    const mk = () => ({ t: new Uint8Array(W * H).fill(1), out: new Uint8Array(W * H), rooms: [], doors: [], glass: [] });
+    const F0 = mk(), F1 = mk(), grate = new Uint8Array(W * H), fences = [], stairs = [];
+    const fill = (F, x0, z0, w, h, v = 0) => { for (let z = z0; z < z0 + h; z++) for (let x = x0; x < x0 + w; x++) F.t[z * W + x] = v; };
+    const room = (F, x, z, w, h, type, o) => { const q = this._room(x, z, w, h, Object.assign({ type }, o)); F.rooms.push(q); return q; };
+    const door = (F, x, z, axis, mirror) => F.doors.push([x, z, axis, false, !!mirror]);
+    // ---- the car park: open to the sky on both floors, fenced
+    for (let z = LZ; z < H; z++) for (let x = 0; x < W; x++) { F0.out[z * W + x] = 1; F1.out[z * W + x] = 1; F1.t[z * W + x] = 5; }
+    fill(F0, 1, LZ, W - 2, H - LZ - 1);
+    for (let x = 0; x < W; x++) { F0.t[(H - 1) * W + x] = 4; fences.push([x, H - 1, 'x']); }
+    for (let z = LZ; z < H - 1; z++) for (const x of [0, W - 1]) { F0.t[z * W + x] = 4; fences.push([x, z, 'z']); }
+    const lotW = room(F0, 1, LZ, 16, H - LZ - 1, 'carpark', { out: true }), lotE = room(F0, 17, LZ, W - 18, H - LZ - 1, 'carpark', { out: true });
+    // ---- the ground floor
+    fill(F0, 1, 1, 14, 11); fill(F0, 3, 10, 3, 1, 6); room(F0, 1, 1, 14, 11, 'melt', { tall: true }); // the melt shop, its stair up the south wall
+    stairs.push({ f: 0, x0: 3, z0: 10, x1: 5, z1: 10, axis: 'x', up: -1 });
+    fill(F0, 16, 1, 3, 5); room(F0, 16, 1, 3, 5, 'mcc'); fill(F0, 16, 7, 3, 5); room(F0, 16, 7, 3, 5, 'locker');
+    fill(F0, 20, 1, 13, 11); fill(F0, 32, 8, 1, 3, 6); room(F0, 20, 1, 13, 11, 'mill', { tall: true }); // the processing hall, its stair up the east wall
+    stairs.push({ f: 0, x0: 32, z0: 8, x1: 32, z1: 10, axis: 'z', up: -1 });
+    fill(F0, 17, 13, 16, 8); room(F0, 17, 13, 16, 8, 'loading', { tall: true });
+    fill(F0, 1, 13, 2, 8); fill(F0, 1, 14, 1, 3, 6); room(F0, 1, 13, 2, 8, 'landing', { stairs: true }); // the office stairwell
+    stairs.push({ f: 0, x0: 1, z0: 14, x1: 1, z1: 16, axis: 'z', up: -1 });
+    fill(F0, 3, 16, 13, 1); room(F0, 3, 16, 13, 1, 'corridor');
+    fill(F0, 4, 13, 4, 2); room(F0, 4, 13, 4, 2, 'kitchenette');
+    fill(F0, 9, 13, 3, 2); room(F0, 9, 13, 3, 2, 'restroom'); fill(F0, 13, 13, 3, 2); room(F0, 13, 13, 3, 2, 'restroom');
+    fill(F0, 4, 18, 5, 3); room(F0, 4, 18, 5, 3, 'lobby');
+    fill(F0, 10, 18, 3, 3); room(F0, 10, 18, 3, 3, 'office'); fill(F0, 14, 18, 2, 3); room(F0, 14, 18, 2, 3, 'office');
+    door(F0, 2, 12, 'z'); // the stairwell into the melt shop
+    door(F0, 5, 15, 'z'); door(F0, 9, 15, 'z'); door(F0, 13, 15, 'z'); door(F0, 6, 17, 'z'); door(F0, 11, 17, 'z'); door(F0, 14, 17, 'z');
+    door(F0, 5, 21, 'z'); door(F0, 6, 21, 'z', true); // reception's front doors
+    door(F0, 16, 16, 'x'); // the corridor into the loading bay
+    door(F0, 15, 3, 'x'); door(F0, 19, 3, 'x'); door(F0, 15, 9, 'x'); door(F0, 19, 9, 'x'); door(F0, 17, 6, 'z'); // the block between the halls
+    door(F0, 24, 21, 'z'); // the loading bay's own door out
+    const rollers = [[24, 12, 3], [19, 21, 3], [27, 21, 3]]; // (rolled up: wide openings) the bay into the hall; the bay out onto the car park
+    for (const [x0, z, w] of rollers) for (let x = x0; x < x0 + w; x++) F0.t[z * W + x] = 0;
+    // ---- upstairs: the halls' and the bay's drops, the catwalks over them
+    fill(F1, 1, 1, 14, 11, 5); fill(F1, 20, 1, 13, 11, 5); fill(F1, 17, 13, 16, 8, 5);
+    const walk = (x, z, w, h) => { fill(F1, x, z, w, h); for (let zz = z; zz < z + h; zz++) for (let xx = x; xx < x + w; xx++) grate[zz * W + xx] = 1; return room(F1, x, z, w, h, 'catwalk'); };
+    walk(1, 11, 14, 1); walk(1, 1, 14, 1); walk(1, 2, 1, 9); walk(14, 2, 1, 9); walk(7, 2, 2, 5); walk(2, 7, 12, 1); walk(2, 10, 1, 1); // the melt shop's: round it, a spine between the furnaces, a bridge over the ladles, the stair's head
+    walk(20, 1, 13, 1); walk(20, 2, 1, 10); walk(32, 2, 1, 6); walk(21, 6, 11, 1); // the processing hall's: round it, and across between the lines
+    fill(F1, 16, 1, 3, 5); room(F1, 16, 1, 3, 5, 'control'); fill(F1, 16, 7, 3, 5); room(F1, 16, 7, 3, 5, 'observe');
+    door(F1, 15, 2, 'x'); door(F1, 19, 3, 'x'); door(F1, 17, 6, 'z'); door(F1, 15, 10, 'x'); door(F1, 19, 9, 'x');
+    fill(F1, 1, 13, 2, 8); fill(F1, 1, 14, 1, 3, 5); room(F1, 1, 13, 2, 8, 'landing', { stairs: true });
+    fill(F1, 3, 16, 13, 1); room(F1, 3, 16, 13, 1, 'corridor');
+    fill(F1, 4, 13, 6, 2); room(F1, 4, 13, 6, 2, 'observe'); fill(F1, 11, 13, 5, 2); room(F1, 11, 13, 5, 2, 'observe');
+    fill(F1, 4, 18, 6, 3); room(F1, 4, 18, 6, 3, 'boss'); fill(F1, 11, 18, 5, 3); room(F1, 11, 18, 5, 3, 'meeting');
+    door(F1, 2, 12, 'z'); door(F1, 8, 12, 'z'); door(F1, 12, 12, 'z'); // out onto the melt shop's catwalk
+    door(F1, 6, 15, 'z'); door(F1, 13, 15, 'z'); door(F1, 6, 17, 'z'); door(F1, 13, 17, 'z');
+    // glass looking into the halls: the control block's both sides, the observation offices' north wall
+    const look = { sill: 0.9, top: 2.75 };
+    F1.glass.push(Object.assign({ x0: 15, z0: 1, x1: 15, z1: 11, v: 1 }, look), Object.assign({ x0: 19, z0: 1, x1: 19, z1: 11, v: 1 }, look), Object.assign({ x0: 4, z0: 12, x1: 14, z1: 12 }, look));
+    const spawn = r() < 0.5 ? lotW : lotE; // (in front of the offices, or of the loading bay)
+    const floor0 = { W, H, t: F0.t, out: F0.out, rooms: F0.rooms, doors: F0.doors, fences, spawn, rollers, glass: F0.glass };
+    const floor1 = { W, H, t: F1.t, out: F1.out, rooms: F1.rooms, doors: F1.doors, fences: [], spawn: F1.rooms[0], grate, glass: F1.glass, entries: [[2, 10], [32, 7], [1, 13]] };
+    return { floors: [floor0, floor1], stairs, rail: 'steel' };
+  },
 
   // Rooms joined by corridors (apartments, bunkers, labs...).
   layRooms(r, level) {
@@ -757,13 +940,21 @@ G.Level = {
   stack(fms, lay) {
     const FH = this.FLOOR_H, TS = this.TS, CTS = this.CTS, base = lay.base || 0;
     fms.forEach((m, f) => { m.fl = f; m.fy = (f - base) * FH; m.skirt = f ? FH - this.WALL_H : 0; });
-    fms.forEach((m, f) => { const up = fms[f + 1]; m.voidAbove = up ? up.t.map((v) => (v === 5 ? 1 : 0)) : null; m.above = up || null; });
+    fms.forEach((m, f) => { const up = fms[f + 1]; m.voidAbove = up ? up.t.map((v, i) => (v === 5 || (up.grate && up.grate[i]) ? 1 : 0)) : null; m.above = up || null; }); // (over a drop or a grating: no ceiling)
+    // a hall the full height of the building: its lamps, and what glows in it, light the floor above as well (its catwalks)
+    fms.forEach((m, f) => {
+      const up = fms[f + 1];
+      if (up) for (const l of m.lights) if (l.up) {
+        const i = Math.floor(l.z / TS) * up.W + Math.floor(l.x / TS);
+        if (up.t[i] === 5 || (up.grate && up.grate[i])) up.lights.push({ kind: 'string', x: l.x, z: l.z, y: l.y - FH, color: l.color, i: l.i, d: l.d });
+      }
+    });
     const map = Object.assign({}, fms[base]); // (the level's own map is the ground floor's: the spawn, the outdoors)
     map.floors = fms; map.NF = fms.length; map.base = base;
     map.minY = -base * FH; // (the lowest floor: a basement's is below the ground)
     map.doors = []; map.windows = []; map.rooms = []; map.cover = []; map.wallSpots = []; map.enemySpots = [];
     fms.forEach((m, f) => {
-      if (f !== base) { m.case = null; m.cabinets = []; } // (the weapon case and first aid cabinets: on the ground floor)
+      if (f !== base) { m.case = null; m.abox = null; m.cabinets = []; } // (the weapon case, the attachments box and first aid cabinets: on the ground floor)
       for (const d of m.doors) { d.id = map.doors.length; d.fl = f; d.fy = m.fy; map.doors.push(d); }
       for (const w of m.windows) { w.id = map.windows.length; w.fl = f; w.fy = m.fy; map.windows.push(w); }
       for (const rm of m.rooms) { rm.fl = f; map.rooms.push(rm); }
@@ -796,8 +987,10 @@ G.Level = {
         }
       }
     });
-    // each railing's glass is a pane like a window's (shot through and shot out, for everyone: map.windows)
-    for (const r of map.rails) {
+    // each railing's glass is a pane like a window's (shot through and shot out, for everyone: map.windows); steel
+    // railings (a foundry's catwalks: lay.rail) have none, only rails, open between
+    map.railSteel = lay.rail === 'steel';
+    if (!map.railSteel) for (const r of map.rails) {
       const alongX = r.x1 - r.x0 > r.z1 - r.z0;
       r.pane = { id: map.windows.length, rail: r, x: (r.x0 + r.x1) / 2, z: (r.z0 + r.z1) / 2, fy: r.y, fl: r.f, broken: false, cells: [], len: alongX ? r.x1 - r.x0 : r.z1 - r.z0, nz: alongX ? 1 : 0, nx: alongX ? 0 : 1 };
       map.windows.push(r.pane);
@@ -811,7 +1004,7 @@ G.Level = {
     for (const rl of map.rails) {
       G.World.add(w, G.World.box(rl.x0, rl.y, rl.z0, rl.x1, rl.y + this.RAIL_H, rl.z1, { kind: 'rail', ray: false }));
       G.World.add(w, G.World.box(rl.x0, rl.y + this.RAIL_H - 0.05, rl.z0, rl.x1, rl.y + this.RAIL_H, rl.z1, { kind: 'rail', move: false }));
-      rl.pane.solids = []; G.World.windowSolids(w, map, rl.pane);
+      if (rl.pane) { rl.pane.solids = []; G.World.windowSolids(w, map, rl.pane); }
     }
     map.world = w; fms.forEach((m) => { m.world = w; });
     return map;
@@ -1063,9 +1256,9 @@ G.Level = {
   see(map, ax, ay, az, bx, by, bz) {
     const dx = bx - ax, dy = by - ay, dz = bz - az, d = Math.hypot(dx, dy, dz);
     if (d < 0.01) return 1;
-    const h = this.raycast(map, ax, ay, az, dx / d, dy / d, dz / d, d, { glass: true });
+    const h = this.raycast(map, ax, ay, az, dx / d, dy / d, dz / d, d, { glass: true, sight: true }); // (a look: through bulletproof glass too)
     if (h.t < d - 0.05) return 0;
-    return h.glass && h.glass.length ? this.GLASS_SEE : 1;
+    return (h.glass && h.glass.length) || h.clear ? this.GLASS_SEE : 1;
   },
   _slab(ox, oy, oz, dx, dy, dz, b) {
     let tmin = -Infinity, tmax = Infinity, n = null;
@@ -1333,26 +1526,39 @@ G.Level = {
     // tinted, a little reflective, seen from both sides: it has to read as glass, not a hole
     const glassMat = new THREE.MeshStandardMaterial({ color: 0x7e98a8, transparent: true, opacity: 0.38, roughness: 0.08, metalness: 0.55, depthWrite: false, side: THREE.DoubleSide, envMapIntensity: 1.2 });
     const view = map.windows.some((w) => w.ext) ? G.Furniture.outsideMaterial(G.U.rng((map.seed ^ 0x77) >>> 0), map.theme.layout === 'apartments' ? 18 : 0) : null;
-    const opening = this.TOP - this.SILL;
+    // bulletproof glass with steel wire in it: the grid drawn into the pane (and a grey steel frame round it)
+    let wiredMat = null, coolerMat = null;
+    if (map.windows.some((w) => w.armor)) {
+      const cv = typeof document !== 'undefined' ? document.createElement('canvas') : new OffscreenCanvas(128, 128); cv.width = cv.height = 128; // (the highlights' export rebuilds the level in a worker)
+      const g = cv.getContext('2d'); g.clearRect(0, 0, 128, 128); g.strokeStyle = 'rgba(40,44,48,0.85)'; g.lineWidth = 2;
+      for (let i = 0; i <= 128; i += 16) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i, 128); g.stroke(); g.beginPath(); g.moveTo(0, i); g.lineTo(128, i); g.stroke(); }
+      const tex = new THREE.CanvasTexture(cv); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(4, 4);
+      wiredMat = new THREE.MeshStandardMaterial({ color: 0x9fb2b8, map: tex, transparent: true, opacity: 0.5, roughness: 0.2, metalness: 0.4, depthWrite: false, side: THREE.DoubleSide });
+    }
+    if (map.windows.some((w) => w.cooler)) coolerMat = new THREE.MeshStandardMaterial({ color: 0xbfe6ff, transparent: true, opacity: 0.32, roughness: 0.05, metalness: 0.3, emissive: 0x0d2a3a, depthWrite: false, side: THREE.DoubleSide });
+    const steelFrame = new THREE.MeshStandardMaterial({ color: 0x6a7076, roughness: 0.45, metalness: 0.6 }), whiteFrame = new THREE.MeshStandardMaterial({ color: 0xf0f2f2, roughness: 0.4 });
     for (const w of map.windows) {
+      const SL = w.sill != null ? w.sill : this.SILL, TP = w.top != null ? w.top : this.TOP, opening = TP - SL; // (its own, or the usual)
       const along = w.nx ? 'z' : 'x', ry = Math.atan2(-w.nx, -w.nz);
       const g = new THREE.Group(); g.position.set(w.x, 0, w.z); g.rotation.y = ry; // local: x along the wall, z out of it (toward -n... see below)
       // wall below and above (the full depth of the cell)
-      const SK = map.skirt || 0, below = new THREE.Mesh(new THREE.BoxGeometry(w.len, this.SILL + SK, TS), wallMat); below.position.y = (this.SILL - SK) / 2; g.add(below);
-      const above = new THREE.Mesh(new THREE.BoxGeometry(w.len, this.WALL_H - this.TOP, TS), wallMat); above.position.y = (this.TOP + this.WALL_H) / 2; g.add(above);
+      const SK = map.skirt || 0, below = new THREE.Mesh(new THREE.BoxGeometry(w.len, SL + SK, TS), wallMat); below.position.y = (SL - SK) / 2; g.add(below);
+      const above = new THREE.Mesh(new THREE.BoxGeometry(w.len, this.WALL_H - TP, TS), wallMat); above.position.y = (TP + this.WALL_H) / 2; g.add(above);
       for (const m of [below, above]) m.layers.enable(1);
       // the frame: sill, head, jambs and a mullion
-      const fr = (bw, bh, bd, x, y) => { const m = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd), frameMat); m.position.set(x, y, 0); g.add(m); };
-      fr(w.len, 0.05, 0.1, 0, this.SILL + 0.025); fr(w.len, 0.05, 0.08, 0, this.TOP - 0.025);
-      for (const x of [-1, 1]) fr(0.05, opening, 0.08, x * (w.len / 2 - 0.025), (this.SILL + this.TOP) / 2);
-      fr(0.04, opening, 0.05, 0, (this.SILL + this.TOP) / 2);
+      const fm = w.armor ? steelFrame : w.cooler ? whiteFrame : frameMat;
+      const fr = (bw, bh, bd, x, y) => { const m = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd * (w.armor ? 1.6 : 1)), fm); m.position.set(x, y, 0); g.add(m); };
+      fr(w.len, 0.05, 0.1, 0, SL + 0.025); fr(w.len, 0.05, 0.08, 0, TP - 0.025);
+      for (const x of [-1, 1]) fr(0.05, opening, 0.08, x * (w.len / 2 - 0.025), (SL + TP) / 2);
+      fr(0.04, opening, 0.05, 0, (SL + TP) / 2);
       // the pane
-      const pane = new THREE.Mesh(new THREE.PlaneGeometry(w.len - 0.08, opening - 0.08), glassMat); pane.position.y = (this.SILL + this.TOP) / 2; g.add(pane);
+      const pane = new THREE.Mesh(new THREE.PlaneGeometry(w.len - 0.08, opening - 0.08), w.armor ? wiredMat : w.cooler ? coolerMat : glassMat); pane.position.y = (SL + TP) / 2; g.add(pane);
+      if (w.cooler) for (const y of [SL + 0.4, SL + 0.85, SL + 1.3]) fr(w.len - 0.1, 0.02, 0.5, 0, y); // (the shelves behind a cooler's door)
       pane.material.side = THREE.DoubleSide; pane.renderOrder = 2;
       map.winMeshes[w.id] = pane;
       // outside: the view, at the back of the opening (n points out of the building: the group's -z)
       if (w.ext && view) {
-        const v = new THREE.Mesh(new THREE.PlaneGeometry(w.len, opening), view); v.position.set(0, (this.SILL + this.TOP) / 2, -(h - 0.01)); g.add(v);
+        const v = new THREE.Mesh(new THREE.PlaneGeometry(w.len, opening), view); v.position.set(0, (SL + TP) / 2, -(h - 0.01)); g.add(v);
       }
       if (w.broken) pane.visible = false;
       root.add(g);
@@ -1362,6 +1568,117 @@ G.Level = {
   // The lawn, the night sky (stars and a moon), the strings of lights on their poles (bulbs, or paper lanterns
   // over the food court, each with a soft glow; the real lights along them are in map.lights), the stage's
   // truss with coloured lamps throwing beams, its backdrop, and the arch over the gate.
+  // ---------------------------------------------------------------- steel grating
+  // A catwalk's floor (map.grate): bar grating, bearing bars a few centimetres apart and a cross bar every so often,
+  // seen through from above and below. Under it, a steel channel along every edge that's over the drop, and hanger
+  // rods up to the roof from them every few metres.
+  buildGrate(map, root) {
+    const T = THREE, TS = this.TS, { W, H, t, grate: gr } = map;
+    const cv = typeof document !== 'undefined' ? document.createElement('canvas') : new OffscreenCanvas(96, 96); cv.width = cv.height = 96;
+    const g = cv.getContext('2d'); g.clearRect(0, 0, 96, 96); g.fillStyle = '#fff';
+    for (let x = 0; x < 96; x += 6) g.fillRect(x, 0, 2, 96); // the bearing bars
+    for (let y = 0; y < 96; y += 32) g.fillRect(0, y, 96, 2); // the cross bars
+    const tex = new T.CanvasTexture(cv); tex.wrapS = tex.wrapT = T.RepeatWrapping;
+    const mat = new T.MeshStandardMaterial({ color: 0x7a7e80, map: tex, alphaTest: 0.5, roughness: 0.5, metalness: 0.7, side: T.DoubleSide });
+    const cells = [];
+    for (let i = 0; i < W * H; i++) if (gr[i] && t[i] !== 1 && t[i] !== 5) cells.push(i);
+    const pg = new T.PlaneGeometry(TS, TS); pg.rotateX(-Math.PI / 2);
+    const im = new T.InstancedMesh(pg, mat, cells.length), m4 = new T.Matrix4();
+    cells.forEach((i, n) => { m4.makeTranslation(((i % W) + 0.5) * TS, -0.01, (Math.floor(i / W) + 0.5) * TS); im.setMatrixAt(n, m4); });
+    root.add(im);
+    const steel = new T.MeshStandardMaterial({ color: 0x3e4246, roughness: 0.5, metalness: 0.7 });
+    let k = 0;
+    for (const i of cells) {
+      const x = i % W, z = (i / W) | 0;
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        if (t[(z + dz) * W + x + dx] !== 5) continue;
+        const ex = (x + 0.5 + dx * 0.5) * TS - dx * 0.04, ez = (z + 0.5 + dz * 0.5) * TS - dz * 0.04;
+        const b = new T.Mesh(new T.BoxGeometry(dx ? 0.08 : TS, 0.22, dz ? 0.08 : TS), steel); b.position.set(ex, -0.13, ez); root.add(b);
+        if (k++ % 5 === 0) { const rod = new T.Mesh(new T.CylinderGeometry(0.018, 0.018, this.WALL_H - 1.0), steel); rod.position.set(ex + dx * 0.06, (this.WALL_H + 1.0) / 2, ez + dz * 0.06); root.add(rod); }
+      }
+    }
+  },
+  // ---------------------------------------------------------------- what a foundry's machinery gives off
+  // Sparks off the furnaces' slag doors and the hot saws, embers rising off the molten steel in the ladles and the
+  // moulds (and a spatter of bright drops now and then), smoke over them, steam off the quench tank and the mills: points
+  // that move on their own (each frame they're drawn), from the emitters the pieces name (js/furniture.js R[name].fx,
+  // placed in finish: map.fx). Only the look: nothing in the game knows about them.
+  buildFx(map, root) {
+    const T = THREE, R = Math.random;
+    const dot = (soft) => {
+      const cv = typeof document !== 'undefined' ? document.createElement('canvas') : new OffscreenCanvas(32, 32); cv.width = cv.height = 32;
+      const g = cv.getContext('2d'), gr = g.createRadialGradient(16, 16, 0, 16, 16, 16);
+      gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(soft ? 0.25 : 0.4, soft ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.9)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = gr; g.fillRect(0, 0, 32, 32);
+      return new T.CanvasTexture(cv);
+    };
+    const pool = (n, size, soft) => {
+      const geo = new T.BufferGeometry(), pos = new Float32Array(n * 3).fill(-100), col = new Float32Array(n * 3);
+      geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('color', new T.BufferAttribute(col, 3));
+      const pts = new T.Points(geo, new T.PointsMaterial({ size, map: dot(soft), vertexColors: true, transparent: true, depthWrite: false, blending: T.AdditiveBlending }));
+      pts.frustumCulled = false; root.add(pts);
+      return { pts, geo, pos, col, n, i: 0, soft, vel: new Float32Array(n * 3), life: new Float32Array(n), max: new Float32Array(n), base: new Float32Array(n * 3), grav: new Float32Array(n), drag: new Float32Array(n) };
+    };
+    const hot = pool(1600, 0.08, false), haze = pool(240, 1.2, true);
+    // one more of them: from (x, y, z) at (vx, vy, vz) for `life` seconds, its colour (r, g, b, sRGB: kept linear), falling
+    // at `grav` (rising if it's less than 0), slowed by `drag` a second
+    const emit = (P, x, y, z, vx, vy, vz, life, r, g, b, grav, drag) => {
+      const i = P.i; P.i = (i + 1) % P.n;
+      P.pos[i * 3] = x; P.pos[i * 3 + 1] = y; P.pos[i * 3 + 2] = z; P.vel[i * 3] = vx; P.vel[i * 3 + 1] = vy; P.vel[i * 3 + 2] = vz;
+      P.life[i] = P.max[i] = life; P.base[i * 3] = r ** 2.2; P.base[i * 3 + 1] = g ** 2.2; P.base[i * 3 + 2] = b ** 2.2; P.grav[i] = grav; P.drag[i] = drag;
+    };
+    const em = map.fx.map((f) => Object.assign({ acc: R(), t: R() * 6, on: 0, next: R() * 4 }, f));
+    const spray = (e, n, speed, spread, up, life, cool) => { // (a burst along e.dir)
+      const d = e.dir || [0, 0, 1];
+      for (let k = 0; k < n; k++) {
+        const s = speed * (0.6 + R() * 0.7);
+        emit(hot, e.x + (R() - 0.5) * (e.r || 0.2), e.y + (R() - 0.5) * 0.2, e.z + (R() - 0.5) * (e.r || 0.2), d[0] * s + (R() - 0.5) * spread, d[1] * s + up * R(), d[2] * s + (R() - 0.5) * spread, life * (0.5 + R()), 1, cool ? 0.7 : 0.9, cool ? 0.3 : 0.55, 9.8, 0.25);
+      }
+    };
+    const step = (dt) => {
+      for (const e of em) {
+        e.t += dt;
+        if (e.kind === 'embers') { // rising slowly off molten metal, drifting, winking out
+          e.acc += dt * (e.rate || 9);
+          while (e.acc >= 1) { e.acc--; const a = R() * 6.283, rr = Math.sqrt(R()) * e.r; emit(hot, e.x + Math.cos(a) * rr, e.y, e.z + Math.sin(a) * rr, (R() - 0.5) * 0.35, 0.4 + R() * 1.2, (R() - 0.5) * 0.35, 1.6 + R() * 2.8, 1, 0.42 + R() * 0.3, 0.08, -0.12, 0.35); }
+          if (R() < dt * 0.3 * (e.rate || 9) / 9) for (let k = 0; k < 16; k++) emit(hot, e.x + (R() - 0.5) * e.r, e.y + 0.05, e.z + (R() - 0.5) * e.r, (R() - 0.5) * 2.4, 1.8 + R() * 2.6, (R() - 0.5) * 2.4, 0.5 + R() * 0.7, 1, 0.85, 0.45, 9.8, 0.1); // (a pop: a spatter of bright drops)
+        } else if (e.kind === 'sparks') { // bursts off a furnace's slag door, arcing out onto the floor
+          if (e.t > e.next) { e.next = e.t + 1.2 + R() * 4; e.on = 0.2 + R() * 0.5; }
+          if (e.on > 0) { e.on -= dt; e.acc += dt * 150; const n = Math.floor(e.acc); e.acc -= n; spray(e, n, 4.5, 2.4, 2.5, 1.1, true); }
+        } else if (e.kind === 'jet') { // a hot saw's spray, while it cuts
+          if (e.t > e.next) { e.next = e.t + 2.5 + R() * 5; e.on = 1 + R() * 1.6; }
+          if (e.on > 0) { e.on -= dt; e.acc += dt * 140; const n = Math.floor(e.acc); e.acc -= n; spray(e, n, 7, 1.2, 0.8, 0.6, false); }
+        } else { // smoke (dim, warm: lit by what's under it) or steam (pale), rising and spreading
+          const steam = e.kind === 'steam';
+          e.acc += dt * (e.rate || 2.2);
+          while (e.acc >= 1) { e.acc--; const v = steam ? 0.16 : 0.06; emit(haze, e.x + (R() - 0.5) * (e.r || 0.4), e.y, e.z + (R() - 0.5) * (e.r || 0.4), (R() - 0.5) * 0.25, 0.35 + R() * 0.5, (R() - 0.5) * 0.25, 3 + R() * 3.5, v * (steam ? 0.95 : 1.25), v * (steam ? 1 : 0.85), v * (steam ? 1.05 : 0.6), -0.04, 0.15); }
+        }
+      }
+      for (const P of [hot, haze]) {
+        const { pos, vel, life, max, col, base, grav, drag } = P;
+        for (let i = 0; i < P.n; i++) {
+          if (life[i] <= 0) continue;
+          life[i] -= dt;
+          if (life[i] <= 0) { pos[i * 3 + 1] = -100; col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = 0; continue; }
+          const k = 1 - drag[i] * dt;
+          vel[i * 3] *= k; vel[i * 3 + 2] *= k; vel[i * 3 + 1] = vel[i * 3 + 1] * k - grav[i] * dt;
+          pos[i * 3] += vel[i * 3] * dt; pos[i * 3 + 1] += vel[i * 3 + 1] * dt; pos[i * 3 + 2] += vel[i * 3 + 2] * dt;
+          if (pos[i * 3 + 1] < 0.02) { pos[i * 3 + 1] = 0.02; vel[i * 3 + 1] *= -0.3; vel[i * 3] *= 0.5; vel[i * 3 + 2] *= 0.5; } // (sparks skitter on the floor)
+          const u = life[i] / max[i];
+          if (P.soft) { const f = Math.sin(Math.PI * u); col[i * 3] = base[i * 3] * f; col[i * 3 + 1] = base[i * 3 + 1] * f; col[i * 3 + 2] = base[i * 3 + 2] * f; }
+          else { const f = Math.min(1, u * 3); col[i * 3] = base[i * 3] * f; col[i * 3 + 1] = base[i * 3 + 1] * f * u; col[i * 3 + 2] = base[i * 3 + 2] * f * u * u; } // (cooling: yellow to red to nothing)
+        }
+        P.geo.attributes.position.needsUpdate = true; P.geo.attributes.color.needsUpdate = true;
+      }
+    };
+    let last = 0;
+    hot.pts.onBeforeRender = () => { // (once a frame, however many views draw it)
+      const now = performance.now();
+      if (last && now - last < 4) return;
+      const dt = last ? Math.min(0.05, (now - last) / 1000) : 0;
+      last = now; step(dt);
+    };
+  },
   buildFestival(map, root) {
     const T = THREE, f = map.fest, TS = this.TS, rnd = G.U.rng((map.seed ^ 0xfe57) >>> 0), Wm = map.W * TS, Hm = map.H * TS;
     const tx = G.Furniture.textures(rnd);
@@ -1423,7 +1740,7 @@ G.Level = {
         const a = rnd() * Math.PI * 2, e = Math.asin(0.08 + rnd() * 0.92), R = 145; // (inside the camera's far plane from anywhere on the field)
         pos.set([Wm / 2 + Math.cos(a) * Math.cos(e) * R, Math.sin(e) * R, Hm / 2 + Math.sin(a) * Math.cos(e) * R], i * 3);
         const b = 0.35 + rnd() * 0.65, warm = rnd();
-        col.set([b * (warm < 0.2 ? 1 : 0.85), b * 0.9, b * (warm > 0.8 ? 1 : 0.85)], i * 3);
+        col.set([b * (warm < 0.2 ? 1 : 0.85), b * 0.9, b * (warm > 0.8 ? 1 : 0.85)].map((v) => v ** 2.2), i * 3); // (linear)
       }
       const g = new T.BufferGeometry(); g.setAttribute('position', new T.BufferAttribute(pos, 3)); g.setAttribute('color', new T.BufferAttribute(col, 3));
       root.add(new T.Points(g, new T.PointsMaterial({ size: 1.6, sizeAttenuation: false, vertexColors: true, fog: false, depthWrite: false })));
@@ -1549,10 +1866,10 @@ G.Level = {
       (m.winMeshes || []).forEach((p, i) => { if (p) map.winMeshes[i] = p; });
       for (const l of m.lamps) map.lamps.push(Object.assign({}, l, { y: l.y + m.fy, fl: m.fl }));
     }
-    map.caseView = map.floors[map.base || 0].caseView; map.cabViews = map.floors[map.base || 0].cabViews;
+    map.caseView = map.floors[map.base || 0].caseView; map.aboxView = map.floors[map.base || 0].aboxView; map.cabViews = map.floors[map.base || 0].cabViews;
     for (const d of map.doors) if (d.pane) map.winMeshes[d.pane.id] = map.doorMeshes[d.id].userData.leaf; // (a glass door's pane: its leaf)
     // the stairs: each step a block (stone treads, painted risers), and a stringer down the open side
-    const tread = new THREE.MeshStandardMaterial({ color: 0x8a847a, roughness: 0.8 }), riser = new THREE.MeshStandardMaterial({ color: 0xcfc8bb, roughness: 0.9 });
+    const tread = new THREE.MeshStandardMaterial(map.railSteel ? { color: 0x5a5e62, roughness: 0.45, metalness: 0.7 } : { color: 0x8a847a, roughness: 0.8 }), riser = new THREE.MeshStandardMaterial(map.railSteel ? { color: 0x34383c, roughness: 0.5, metalness: 0.6 } : { color: 0xcfc8bb, roughness: 0.9 }); // (a foundry's: steel)
     for (const st of map.stairs) for (const s of st.steps || []) {
       const w = s.max[0] - s.min[0], h = s.max[1] - s.min[1], d = s.max[2] - s.min[2];
       const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), [riser, riser, tread, riser, riser, riser]);
@@ -1561,34 +1878,106 @@ G.Level = {
       root.add(m);
     }
     // railings: a steel top rail on posts over a glass panel
-    const steel = new THREE.MeshStandardMaterial({ color: 0x2e3236, roughness: 0.4, metalness: 0.7 });
+    const steel = map.railSteel ? new THREE.MeshStandardMaterial({ color: 0xd8a820, roughness: 0.55, metalness: 0.3 }) : new THREE.MeshStandardMaterial({ color: 0x2e3236, roughness: 0.4, metalness: 0.7 }), railMat = steel; // (a foundry's: safety yellow)
     const glass = new THREE.MeshStandardMaterial({ color: 0x9ab0bc, transparent: true, opacity: 0.22, roughness: 0.1, metalness: 0.4, depthWrite: false, side: THREE.DoubleSide });
     for (const r of map.rails) {
       const w = r.x1 - r.x0, d = r.z1 - r.z0, cx = (r.x0 + r.x1) / 2, cz = (r.z0 + r.z1) / 2, H = this.RAIL_H;
       const top = new THREE.Mesh(new THREE.BoxGeometry(w + 0.02, 0.05, d + 0.02), steel); top.position.set(cx, r.y + H - 0.025, cz); root.add(top);
       const post = new THREE.Mesh(new THREE.BoxGeometry(0.04, H, 0.04), steel); post.position.set(r.x0 + (w > d ? 0.02 : w / 2), r.y + H / 2, r.z0 + (w > d ? d / 2 : 0.02)); root.add(post);
+      if (map.railSteel) { // steel: a knee rail and a toe board under the top rail, open between
+        for (const [y, h] of [[0.5, 0.04], [0.06, 0.12]]) { const b = new THREE.Mesh(new THREE.BoxGeometry(w + 0.01, h, d + 0.01), railMat); b.position.set(cx, r.y + y, cz); root.add(b); }
+        continue;
+      }
       const pane = new THREE.Mesh(new THREE.BoxGeometry(Math.max(w - 0.04, 0.01), H - 0.12, Math.max(d - 0.04, 0.01)), glass); pane.position.set(cx, r.y + H / 2 + 0.02, cz); pane.renderOrder = 2; root.add(pane);
       if (r.pane) map.winMeshes[r.pane.id] = pane; // (hidden when it's shot out: js/views.js breakGlass)
     }
     map.lightPool = [];
     G.LightGrid.build(map); // every lamp, on every floor: js/lightgrid.js
+    this.mergeStatic(root, map);
     return root;
+  },
+  // Every mesh of the level that never moves or changes (the walls round the windows and their frames, roofs, lamp
+  // fittings, lintels, steps, rails, the festival's dressing...) baked into one mesh per material and stretch of the
+  // map: a few dozen draw calls where there were hundreds. Left as they are: what moves or changes (the doors, the
+  // weapon case, the cabinets, the panes that break), anything see-through (drawn in order), and anything with a
+  // material of its own making.
+  mergeStatic(root, map, CH = 24) {
+    const T = THREE, keep = new Set();
+    for (const m of [map, ...(map.floors || [])]) {
+      for (const o of m.doorMeshes || []) keep.add(o);
+      for (const o of m.winMeshes || []) if (o) keep.add(o);
+      if (m.caseView) keep.add(m.caseView.g);
+      if (m.aboxView) keep.add(m.aboxView.g);
+      for (const c of m.cabViews || []) keep.add(c.g);
+    }
+    const plain = (mt) => (mt.isMeshStandardMaterial || mt.isMeshBasicMaterial || mt.isMeshLambertMaterial || mt.isMeshPhongMaterial) && !mt.transparent
+      && (!mt.hasOwnProperty('onBeforeCompile'));
+    root.updateMatrixWorld(true);
+    const inv = new T.Matrix4().copy(root.matrixWorld).invert(), M = new T.Matrix4(), c = new T.Vector3(), bins = new Map(), took = [];
+    const ids = new Map(), idOf = (mt) => { if (!ids.has(mt)) ids.set(mt, ids.size); return ids.get(mt); }; // (by the material itself, not its uuid)
+    const walk = (o) => {
+      if (keep.has(o) || !o.visible) return;
+      for (const ch of [...o.children]) walk(ch);
+      if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || o.children.length || o.renderOrder || o.morphTargetInfluences) return;
+      const g = o.geometry, mats = Array.isArray(o.material) ? o.material : [o.material];
+      if (!g.attributes.position || !mats.every(plain) || Object.values(g.attributes).some((a) => !(a.array instanceof Float32Array))) return;
+      M.multiplyMatrices(inv, o.matrixWorld);
+      if (M.determinant() <= 0) return; // (mirrored: its faces would turn inside out)
+      if (!g.boundingSphere) g.computeBoundingSphere();
+      c.copy(g.boundingSphere.center).applyMatrix4(M);
+      const names = Object.keys(g.attributes).sort().join(','), cell = Math.floor(c.x / CH) + ',' + Math.floor(c.y / 8) + ',' + Math.floor(c.z / CH);
+      const ng = g.index ? g.toNonIndexed() : g.clone();
+      ng.applyMatrix4(M);
+      const parts = Array.isArray(o.material) ? (g.groups.length ? g.groups : [{ start: 0, count: Infinity, materialIndex: 0 }]) : [{ start: 0, count: Infinity, materialIndex: 0 }];
+      for (const p of parts) {
+        const mt = mats[p.materialIndex] || mats[0], key = idOf(mt) + '|' + o.layers.mask + '|' + names + '|' + cell;
+        let b = bins.get(key);
+        if (!b) bins.set(key, (b = { mt, mask: o.layers.mask, names, list: [] }));
+        b.list.push({ g: ng, start: p.start, count: Math.min(p.count, ng.attributes.position.count - p.start), o });
+      }
+      took.push(o);
+    };
+    walk(root);
+    const merged = new Set();
+    for (const b of bins.values()) {
+      if (b.list.length < 2) continue; // (alone in its stretch: nothing to save)
+      const out = new T.BufferGeometry(), first = b.list[0].g;
+      let n = 0; for (const e of b.list) n += e.count;
+      for (const name of b.names.split(',')) {
+        const sz = first.attributes[name].itemSize, arr = new Float32Array(n * sz);
+        let off = 0;
+        for (const e of b.list) { const a = e.g.attributes[name]; arr.set(a.array.subarray(e.start * sz, (e.start + e.count) * sz), off * sz); off += e.count; }
+        out.setAttribute(name, new T.BufferAttribute(arr, sz, first.attributes[name].normalized));
+      }
+      out.computeBoundingSphere();
+      const m = new T.Mesh(out, b.mt);
+      m.layers.mask = b.mask; m.matrixAutoUpdate = false;
+      root.add(m);
+      for (const e of b.list) merged.add(e.o);
+    }
+    // what went into them: out of the scene (and its geometry thrown away, unless something left still uses it)
+    const used = new Set();
+    for (const o of took) if (merged.has(o)) o.removeFromParent();
+    root.traverse((o) => { if (o.geometry) used.add(o.geometry); });
+    for (const o of merged) if (!used.has(o.geometry)) o.geometry.dispose();
+    for (const b of bins.values()) for (const e of b.list) e.g.dispose();
+    return merged.size;
   },
   buildMesh(map, opts) {
     if (map.floors) return this.buildStack(map);
     const TS = this.TS, th = map.theme, root = new THREE.Group(), pool = !opts || opts.pool !== false;
-    const { W, H, t } = map, SK = map.skirt || 0, va = map.voidAbove;
-    // floor + ceiling (upstairs, the floor only where there is one: not over a drop)
+    const { W, H, t } = map, SK = map.skirt || 0, va = map.voidAbove, gr = map.grate;
+    // floor + ceiling (upstairs, the floor only where there is one: not over a drop, and steel grating where it's a catwalk)
     const ftex = this._tex('floor', th.floor); ftex.repeat.set(W / this.K, H / this.K);
     const fmat = new THREE.MeshStandardMaterial({ map: ftex, roughness: 0.92 });
-    if (!t.includes(5)) {
+    if (!t.includes(5) && !gr) {
       const floor = new THREE.Mesh(new THREE.PlaneGeometry(W * TS, H * TS), fmat);
       floor.rotation.x = -Math.PI / 2; floor.position.set((W * TS) / 2, 0, (H * TS) / 2);
       floor.layers.enable(1); // layer 1: what hides the evidence glow (walls, floors, doors)
       root.add(floor);
     } else {
       const cells = [];
-      for (let i = 0; i < W * H; i++) if (t[i] !== 5) cells.push(i);
+      for (let i = 0; i < W * H; i++) if (t[i] !== 5 && !(gr && gr[i])) cells.push(i);
       const fg = new THREE.PlaneGeometry(TS, TS); fg.rotateX(-Math.PI / 2);
       const fl = new THREE.InstancedMesh(fg, new THREE.MeshStandardMaterial({ map: this._tex('floor', th.floor), roughness: 0.92 }), cells.length), fm4 = new THREE.Matrix4();
       fl.material.map.repeat.set(1 / this.K, 1 / this.K);
@@ -1598,14 +1987,16 @@ G.Level = {
       // the slab's edge round a drop
       const slab = new THREE.MeshStandardMaterial({ color: 0xbdb6aa, roughness: 0.9 });
       for (let z = 0; z < H; z++) for (let x = 0; x < W; x++) {
-        if (t[z * W + x] === 5 || t[z * W + x] === 1) continue;
+        if (t[z * W + x] === 5 || t[z * W + x] === 1 || (gr && gr[z * W + x])) continue;
         for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-          if (t[(z + dz) * W + x + dx] !== 5) continue;
+          const n = (z + dz) * W + x + dx;
+          if (t[n] !== 5 && !(gr && gr[n])) continue;
           const e = new THREE.Mesh(new THREE.BoxGeometry(dx ? 0.02 : TS, SK, dz ? 0.02 : TS), slab);
           e.position.set((x + 0.5 + dx * 0.5) * TS - dx * 0.01, -SK / 2, (z + 0.5 + dz * 0.5) * TS - dz * 0.01); root.add(e);
         }
       }
     }
+    if (gr) this.buildGrate(map, root);
     // ceiling over everything indoors (gardens are open to the night sky; nor under a drop in the floor above)
     const ctex = this._tex('floor', th.ceil); ctex.repeat.set(0.5, 0.5);
     const roofed = [];
@@ -1700,6 +2091,9 @@ G.Level = {
     const lampGeo = new THREE.SphereGeometry(0.32, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2);
     lampGeo.scale(1, 0.45, 1); lampGeo.rotateX(Math.PI);
     const lampMat = new THREE.MeshBasicMaterial({ color: th.light });
+    const bayMat = new THREE.MeshStandardMaterial({ color: 0x3a3e42, roughness: 0.5, metalness: 0.6, side: THREE.DoubleSide }), bayGeo = new THREE.CylinderGeometry(0.1, 0.42, 0.32, 16, 1, true);
+    const bayLens = new THREE.CircleGeometry(0.38, 16); bayLens.rotateX(Math.PI / 2);
+    const panelGeo = new THREE.BoxGeometry(1.2, 0.04, 0.6), panelMat = new THREE.MeshBasicMaterial({ color: 0xf4f8ff });
     const porchMat = new THREE.MeshBasicMaterial({ color: 0xffe2a8 }), porchBox = new THREE.MeshStandardMaterial({ color: 0x1c1c1e, roughness: 0.6 });
     // every lamp's fitting, and where its light comes from: the light grid lights the level from them all
     // (js/lightgrid.js; a building of several floors builds it once, from every floor's lamps: buildStack)
@@ -1712,6 +2106,19 @@ G.Level = {
         map.lamps.push({ x: l.x, y: l.y - 0.1, z: l.z + l.porch * 0.5, color: 0xffd59a, i: 0.9, d: 11 });
         return;
       }
+      if (l.kind === 'panel') { // a shop's flat ceiling panel
+        const pn = new THREE.Mesh(panelGeo, panelMat); pn.position.set(l.x, this.WALL_H - 0.02, l.z); root.add(pn);
+        map.lamps.push({ x: l.x, y: this.WALL_H - 0.4, z: l.z, color: 0xf2f6ff, i: 0.45, d: 9 });
+        return;
+      }
+      if (l.kind === 'highbay') { // a hall's: a dome on a rod down from the roof (the floor above's ceiling)
+        const roof = this.FLOOR_H + this.WALL_H, rod = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, roof - l.y), bayMat);
+        rod.position.set(l.x, (roof + l.y) / 2, l.z); root.add(rod);
+        const dome = new THREE.Mesh(bayGeo, bayMat); dome.position.set(l.x, l.y - 0.1, l.z); root.add(dome);
+        const glow = new THREE.Mesh(bayLens, lampMat); glow.position.set(l.x, l.y - 0.26, l.z); root.add(glow);
+        map.lamps.push({ x: l.x, y: l.y - 0.4, z: l.z, color: l.color, i: l.i, d: l.d });
+        return;
+      }
       const lamp = new THREE.Mesh(lampGeo, lampMat);
       lamp.position.set(l.x, this.WALL_H, l.z);
       root.add(lamp);
@@ -1721,7 +2128,7 @@ G.Level = {
     if (pool) G.LightGrid.build(map);
 
     // doors: a lintel over the frame and a leaf on a hinge (rotation animated by G.Game.updateDoors)
-    const metal = th.name === 'Bunker' || th.name === 'Research Lab' || th.name === 'Cold Storage';
+    const metal = th.name === 'Bunker' || th.name === 'Research Lab' || th.name === 'Cold Storage' || th.name === 'Foundry';
     const leafMat = new THREE.MeshStandardMaterial({ color: metal ? 0x5d666e : 0x6e4a2c, roughness: metal ? 0.5 : 0.75, metalness: metal ? 0.5 : 0 });
     const lintelMat = new THREE.MeshStandardMaterial({ map: wtex, roughness: 0.85 });
     const knobMat = new THREE.MeshStandardMaterial({ color: 0xb8a060, roughness: 0.3, metalness: 0.9 });
@@ -1774,6 +2181,7 @@ G.Level = {
     });
 
     if (map.fest) this.buildFestival(map, root);
+    if (map.fx && map.fx.length) this.buildFx(map, root);
     // (no extraction zone: the squad votes to leave once order's restored)
 
     // the weapon case: a hard-shell long-gun case lying along the wall. The lid is hinged at the back (on the
@@ -1807,6 +2215,37 @@ G.Level = {
       root.add(g);
       map.caseView = { g, lid, holder, open: 0, code: null, synced: false };
     }
+    // the attachments box: a small hard case (black, a yellow band round it) on the floor, its lid hinged at the back,
+    // three cut-outs in the foam inside. Its lid: G.Views (opened once, for everyone).
+    if (map.abox) {
+      const M = (color, roughness, metalness = 0) => new THREE.MeshStandardMaterial({ color, roughness, metalness });
+      const shell = M(0x17191b, 0.6), band = M(0xe0a020, 0.5), steel = M(0x9aa0a6, 0.3, 0.8), foam = M(0x2a2c30, 1), hole = M(0x0c0d0e, 1);
+      const box = (w, h, d, m, x, y, z, parent) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); parent.add(b); return b; };
+      const g = new THREE.Group(), Lb = 0.5, D = 0.34, H0 = 0.09, H1 = 0.05;
+      box(Lb, 0.012, D, shell, 0, 0.006, 0, g);
+      for (const sd of [-1, 1]) { box(Lb, H0, 0.014, shell, 0, H0 / 2, sd * (D / 2 - 0.007), g); box(0.014, H0, D, shell, sd * (Lb / 2 - 0.007), H0 / 2, 0, g); }
+      for (const sd of [-1, 1]) { box(Lb + 0.004, 0.018, 0.004, band, 0, H0 - 0.02, sd * (D / 2 + 0.001), g); box(0.004, 0.018, D + 0.004, band, sd * (Lb / 2 + 0.001), H0 - 0.02, 0, g); } // (the band: round the outside)
+      box(Lb - 0.028, 0.03, D - 0.028, foam, 0, 0.03, 0, g);
+      for (let i = 0; i < 3; i++) box(0.11, 0.004, 0.2, hole, -0.15 + i * 0.15, 0.046, 0, g);
+      for (const x of [-0.14, 0.14]) box(0.05, 0.035, 0.012, steel, x, H0 - 0.012, D / 2 + 0.008, g);
+      const handle = new THREE.Mesh(new THREE.TorusGeometry(0.04, 0.009, 6, 12, Math.PI), M(0x111111, 0.8));
+      handle.rotation.set(Math.PI / 2, 0, Math.PI); handle.position.set(0, 0.05, D / 2 + 0.012); g.add(handle);
+      const lid = new THREE.Group();
+      lid.position.set(0, H0, -D / 2);
+      g.add(lid);
+      box(Lb, 0.012, D, shell, 0, H1 - 0.006, D / 2, lid);
+      for (const sd of [-1, 1]) { box(Lb, H1, 0.014, shell, 0, H1 / 2, D / 2 + sd * (D / 2 - 0.007), lid); box(0.014, H1, D, shell, sd * (Lb / 2 - 0.007), H1 / 2, D / 2, lid); }
+      box(Lb - 0.028, 0.016, D - 0.028, foam, 0, H1 - 0.02, D / 2, lid);
+      box(0.2, 0.002, 0.07, new THREE.MeshBasicMaterial({ color: 0xe0a020 }), 0, H1 + 0.002, D / 2, lid);
+      // a light for each of the squad on the front, between the latches (G.Views: lit in their colour till they've had
+      // their pick)
+      const lights = new THREE.Group();
+      lights.position.set(0, 0.04, D / 2 + 0.008);
+      g.add(lights);
+      g.position.set(map.abox.x, 0, map.abox.z); g.rotation.y = map.abox.yaw;
+      root.add(g);
+      map.aboxView = { g, lid, lights, key: null, open: 0, synced: false };
+    }
     // first aid cabinets: a white steel box on the wall with a red cross on its door (hinged on the left),
     // two shelves inside with whatever's left in it. Contents and door: G.Views.syncCabs.
     map.cabViews = (map.cabinets || []).map((c) => {
@@ -1833,6 +2272,7 @@ G.Level = {
       root.add(g);
       return { g, door, slots, open: 0, key: null };
     });
+    if (pool) this.mergeStatic(root, map); // (a floor of a building: merged with the rest, buildStack)
     return root;
   },
 };

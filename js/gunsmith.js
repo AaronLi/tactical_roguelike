@@ -164,7 +164,8 @@ G.GunsmithUI = (() => {
     ['Recoil', (d) => d.recoil, -1, (v) => v.toFixed(2) + '°', [0, 6]],
     ['Accuracy', (d) => d.ads * 120, -1, (v) => (v < 10 ? v.toFixed(1) : Math.round(v)) + ' MOA', [0, 20]], // (aimed: the group the gun itself makes)
     ['Hip spread', (d) => d.spread, -1, (v) => v.toFixed(1) + '°', [0, 8]],
-    ['Damage', (d) => (d.explosive ? d.explosive.dmg : d.dmg * d.pellets), 1, (v) => Math.round(v), [0, 300]],
+    ['Aim sway', (d) => G.aimSway(d).score * 100, -1, (v) => Math.round(v) + '%', [0, 400]], // (an M4's 100%: a stock to your shoulder steadies it most)
+    ['Energy', (d) => (d.explosive ? d.explosive.dmg : G.Ballistics.energy(d)), 1, (v) => G.U.fmt(Math.round(v)) + ' J', [0, 4000]], // (its round's at 10 m, with ball: js/ballistics.js)
     ['Range', (d) => d.range, 1, (v) => Math.round(v) + ' m', [0, 150]],
     ['Fire rate', (d) => d.rpm, 1, (v) => Math.round(v) + ' rpm', [0, 2000]],
     ['Capacity', (d) => d.mag, 1, (v) => Math.round(v), [0, 200]],
@@ -177,14 +178,46 @@ G.GunsmithUI = (() => {
     let h = '';
     for (const [name, f, better, fmt, [lo, hi]] of ROWS) {
       const a = f(cur), b = prev ? f(prev) : a;
-      const diff = b - a, good = better === 0 || Math.abs(diff) < 1e-6 ? '' : (diff > 0) === (better > 0) ? 'up' : 'down';
+      const diff = b - a, good = better === 0 || Math.abs(diff) < 1e-6 || fmt(a) === fmt(b) ? '' : (diff > 0) === (better > 0) ? 'up' : 'down';
       const w = G.U.clamp((b - lo) / (hi - lo), 0, 1) * 100;
-      h += `<div class="gs-stat ${good}"><span>${name}</span><div><i style="width:${w}%"></i></div><b>${fmt(b)}${good ? ` <em>${diff > 0 ? '▲' : '▼'}</em>` : ''}</b></div>`;
+      h += `<div class="gs-stat ${good}"><span>${name}</span><div><i style="width:${w}%"></i></div><b>${fmt(b)}${good ? ` <em>${diff > 0 ? '▲' : '▼'} ${fmt(Math.abs(diff))}</em>` : ''}</b></div>`;
     }
     const c0 = G.CALIBERS[G.calOf(cur)], c1 = G.CALIBERS[G.calOf(prev || cur)];
     if (c1) h += `<div class="gs-stat${c0 !== c1 ? ' up' : ''}"><span>Caliber</span><div></div><b>${c1.name}${prev && prev.id !== cur.id ? ` <em>${G.U.esc(prev.name)}</em>` : ''}</b></div>`;
     h += `<div class="gs-stat"><span>Report</span><div></div><b>${(prev || cur).sup ? 'Suppressed' : (prev || cur).device === 'none' ? 'Bare muzzle' : (prev || cur).device}</b></div>`;
+    // each load through this build's barrel: how fast it leaves, and the energy it leaves with (all its pellets)
+    const d = prev || cur, cal = G.calOf(d), grp = G.CALIBERS[cal] && G.AMMO_TYPES[G.CALIBERS[cal].group];
+    if (grp && G.MUZZLE_V[cal] && !d.explosive && d.cls !== 'RAIL') {
+      h += `<div class="gs-loads"><span>Load</span><span>Muzzle</span><span>Energy</span>`;
+      for (const am of grp) {
+        const v = G.roundSpeed(d, am), v0 = G.roundSpeed(cur, am), e = G.Ballistics.energy(d, am, 0), ch = Math.round(v) - Math.round(v0);
+        const cls = ch ? (ch > 0 ? ' class="up"' : ' class="down"') : '';
+        h += `<span>${G.AMMO[am].name}</span><b${cls}>${Math.round(v)} m/s${ch ? ` <em>${ch > 0 ? '+' : ''}${ch}</em>` : ''}</b><b${cls}>${G.U.fmt(Math.round(e))} J</b>`;
+      }
+      h += '</div>';
+    }
     return h;
+  }
+  // the stat card's: what the part you're hovering would change (with a receiver kit, the gun it makes), then the stats
+  function sideStats(cur, prev, pid) {
+    const p = pid && GS.PARTS[pid];
+    const head = prev ? `<div class="gs-change"><div class="gs-ch-h">${p ? `Fitting ${G.U.esc(p.name)}` : 'With this part'}</div><div class="gs-pe">${prev.id !== cur.id ? `<span class="g">Makes it a ${G.U.esc(prev.name)}</span>` : ''}${deltaHtml(cur, prev)}</div></div>` : '';
+    return head + statsHtml(cur, prev);
+  }
+  // just what a change would change, old to new (good green, bad red)
+  function deltaHtml(cur, prev) {
+    const out = [];
+    for (const [name, f, better, fmt] of ROWS) {
+      const a = f(cur), b = f(prev);
+      if (Math.abs(b - a) < 1e-6 || fmt(a) === fmt(b)) continue;
+      out.push(`<span class="${better === 0 ? '' : (b > a) === (better > 0) ? 'g' : 'b'}">${name} ${fmt(a)} → ${fmt(b)}</span>`);
+    }
+    const c0 = G.CALIBERS[G.calOf(cur)], c1 = G.CALIBERS[G.calOf(prev)];
+    if (c1 && c0 !== c1) out.push(`<span class="g">${c0 ? c0.name + ' → ' : ''}${c1.name}</span>`);
+    if (!!cur.sup !== !!prev.sup) out.push(`<span class="${prev.sup ? 'g' : 'b'}">${prev.sup ? 'Suppressed' : 'Unsuppressed'}</span>`);
+    const v0 = G.roundSpeed(cur), v1 = G.roundSpeed(prev);
+    if (v0 && v1 && Math.round(v0) !== Math.round(v1)) out.push(`<span class="${v1 > v0 ? 'g' : 'b'}">Muzzle ${Math.round(v0)} → ${Math.round(v1)} m/s</span>`);
+    return out.length ? out.join('') : '<span>No change to the numbers</span>';
   }
   function partEffects(p) {
     const s = p.st || {}, out = [];
@@ -193,7 +226,10 @@ G.GunsmithUI = (() => {
     if (s.recoil) add(`Recoil ${pct(s.recoil)}`, s.recoil < 0);
     if (s.acc) add(`Spread ${pct(s.acc)}`, s.acc < 0);
     if (s.hip) add(`Hip ${pct(s.hip)}`, s.hip < 0);
-    if (s.vel) add(`Velocity ${pct(s.vel)}`, s.vel > 0);
+    // (a barrel's: from its length against the factory one's, as it flies: js/data.js roundSpeed)
+    const gb = p.set && p.set.barrelIn != null && p.plat && (G.GUN_SPECS[p.plat] || {}).barrel, vel = gb ? Math.round((Math.pow(p.set.barrelIn / gb, 0.2) - 1) * 100) : s.vel;
+    if (p.set && (p.set.ported || (p.set.sup && p.slot === 'barrel' && (G.WEAPONS[p.plat] || {}).integral))) add('Subsonic (ported)', false); // (an integral barrel: it leaves under 310 m/s whatever its length)
+    else if (vel) add(`Velocity ${pct(vel)}`, vel > 0);
     if (s.rpm) add(`Rate ${pct(s.rpm)}`, s.rpm > 0);
     if (s.spin) add(`Spin-up ${pct(s.spin)}`, s.spin < 0);
     if (s.reload) add(`Reload ${pct(s.reload)}`, s.reload < 0);
@@ -208,6 +244,7 @@ G.GunsmithUI = (() => {
     if (p.set && p.set.laser) out.push(`<span>${p.set.laser === 'g' ? 'Green' : 'Red'} laser</span>`);
     if (p.set && p.set.sup) out.push('<span class="g">Suppressed</span>');
     if (p.provides) out.push(`<span>+ ${Object.keys(p.provides).map((k) => GS.SLOT_LABEL[k]).join(', ')}</span>`);
+    if (p.chassis) out.push(`<span>Its own ${Object.keys(p.chassis).map((k) => GS.SLOT_LABEL[k]).join(', ')}</span>`);
     return out.join(' ');
   }
 
@@ -223,7 +260,7 @@ G.GunsmithUI = (() => {
   const fromStash = (pid) => { const s = stash(); if (!s[pid]) return false; if (--s[pid] <= 0) delete s[pid]; return true; };
   // for sale: what he has in stock, and always the right core part for a gun that's missing one or has one
   // that doesn't fit (its own barrel, after a receiver swap)
-  const forSale = (p) => (!p.factory && G.Shop.partStock && G.Shop.partStock.has(p.id)) || needed(p);
+  const forSale = (p) => (!p.factory && G.Shop.partStock && G.Shop.partStock.has(p.id) && G.Shop.inStock('part:' + p.id)) || needed(p);
   const needed = (p) => { const w = weapon(), d = w && w.def; return !!d && GS.PLATFORMS[d.id].defaults[p.slot] === p.id && d.missing.includes(p.slot); };
   // does the store have a part for this slot of the gun you're working on (one that fits it, and isn't the one on it)?
   // Its dot on the model and its row in the list get a "!".
@@ -239,8 +276,10 @@ G.GunsmithUI = (() => {
     const w = weapon(), build = Object.assign({}, w.def.build), p = GS.PARTS[pid];
     if (!p || build[slot] === pid || G.Shop.ready) return;
     if (!fromStash(pid)) {
-      if (!forSale(p) || !G.Shop.spend(GS.buyPrice(p))) return;
-      if (G.Shop.partStock) G.Shop.partStock.delete(pid); // one of each in stock
+      if (!forSale(p) || !G.Shop.afford(GS.buyPrice(p))) return;
+      // from his stock (the squad's: the host's count, js/shop.js take), unless it's the core part the gun needs
+      if (!needed(p)) { G.Shop.take('part:' + pid, () => { if (weapon() !== w || !G.Shop.spend(GS.buyPrice(p))) return false; toStash(pid); install(slot, pid); }); return; }
+      if (!G.Shop.spend(GS.buyPrice(p))) return;
     } else G.Audio.pickup();
     if (build[slot]) toStash(build[slot]);
     build[slot] = pid;
@@ -284,7 +323,7 @@ G.GunsmithUI = (() => {
     const cur = slots.find((s) => s.slot === st.slot);
     let list = '';
     if (cur) {
-      const parts = GS.compatible(cur.mount).filter((p) => !p.factory || p.plat === def.id || (Me.stash || {})[p.id] || build[cur.slot] === p.id);
+      const parts = GS.compatible(cur.mount).filter((p) => (!p.factory || p.plat === def.id || (Me.stash || {})[p.id] || build[cur.slot] === p.id) && !(p.not || []).includes(def.id));
       const rank = (p) => (build[cur.slot] === p.id ? 0 : (Me.stash || {})[p.id] ? 1 : forSale(p) ? 2 : 3);
       parts.sort((a, b) => rank(a) - rank(b) || a.price - b.price);
       for (const p of parts) {
@@ -307,7 +346,7 @@ G.GunsmithUI = (() => {
         <div class="gs-list"><div class="gs-sub">${cur ? GS.slotLabel(cur) + (cur.req ? '' : ' (optional)') : ''}</div>${list}</div></div>
         <div class="gs-side"><div class="gs-title">${def.name}${def.modified ? ' <small>CUSTOM</small>' : ''}${def.missing.length ? ' <small class="broken">WON\'T FIRE</small>' : ''}</div>
           <div class="gs-slots">${slotRows}</div>
-          <div class="gs-stats">${statsHtml(def, preview)}</div></div>
+          <div class="gs-stats">${sideStats(def, preview, st.hoverPart)}</div></div>
       </div>
     </div>`;
   }
@@ -354,12 +393,12 @@ G.GunsmithUI = (() => {
     st.hoverPart = pid;
     const prev = pid ? previewDef(w.def, st.slot, pid) : null;
     const statsEl = document.querySelector('.gs-stats');
-    if (statsEl) statsEl.innerHTML = statsHtml(w.def, prev);
+    if (statsEl) statsEl.innerHTML = sideStats(w.def, prev, pid); // (what it'd change, at the top of the stat card)
     setModel(prev || w.def);
     st.hoverSlot = pid ? st.slot : null;
     paint();
   }
   function hide() { active = false; cancelAnimationFrame(raf); const el = document.getElementById('shopItems'); if (el) el.classList.remove('gs-host'); }
 
-  return { show, hide, onClick, onHover, refresh, state: st, partEffects, fitsLine, _setModel: (d) => setModel(d), _view: view, _canvas: () => canvas };
+  return { show, hide, onClick, onHover, refresh, state: st, partEffects, statsHtml, deltaHtml, fitsLine, _setModel: (d) => setModel(d), _view: view, _canvas: () => canvas };
 })();

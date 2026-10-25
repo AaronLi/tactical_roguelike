@@ -537,9 +537,16 @@ G.InvUI = (() => {
       ${piece('Helmet', me.kit.helmet)}${me.kit.helmet && me.kit.helmet.face ? piece('Face', me.kit.helmet.face) : ''}${piece('Armour', me.kit.carrier)}${me.kit.carrier ? piece('Plate', me.kit.carrier.plate) : ''}`;
   }
   function stats(me) {
-    const Gr = GG(), zone = (z) => { const pc = Gr.piece(me, z), d = Gr.defOf(pc), st = d && d.stop[z]; return st ? `${Math.round(st[0] * 100)} / ${Math.round(st[1] * 100)}%` : '—'; };
+    // each zone: the hardest to stop of the reference rounds what's there stops head-on, new (js/ballistics.js rating)
+    const Gr = GG(), B = G.Ballistics, AT = { head: ['helmet'], face: ['face'], chest: ['plate', 'torso'], abdomen: ['torso'] };
+    const zone = (z) => {
+      const L = [];
+      for (const a of B.kitArmour(me)) for (const pr of a.def.prot) if (AT[z].includes(pr.at) && !(z === 'face' && a.def.lower)) L.push(...pr.layers);
+      if (!L.length) return '—';
+      return B.rating(L).best || 'nothing';
+    };
     return `<div class="inv-stats"><div><span>Head</span><b>${zone('head')}</b></div><div><span>Face</span><b>${zone('face')}</b></div><div><span>Chest</span><b>${zone('chest')}</b></div>
-      <div><span>Stomach</span><b>${zone('abdomen')}</b></div><div><span>Speed</span><b>${Math.round(Gr.speed(me) * 100)}%</b></div><small>Stops handgun / rifle rounds, new</small></div>`;
+      <div><span>Stomach</span><b>${zone('abdomen')}</b></div><div><span>Speed</span><b>${Math.round(Gr.speed(me) * 100)}%</b></div><small>The hardest round to stop that it stops head-on, new</small></div>`;
   }
   // the cabinet's contents as you've left them, to the host: what you took out, what you put in, the layout
   function cabSync() {
