@@ -103,12 +103,12 @@ G.Med = (() => {
     b.blood = Math.max(Math.min(b.blood, 1), b.blood - dmg * HIT_BLOOD[isLimb(part) ? 'limb' : part === 'head' ? 'thorax' : part]);
     for (const [id, d, hp] of organs || []) p.org[id] = Math.min(1, (p.org[id] || 0) + d / hp);
     if (E.has('dead')) { b.parts.head.hp = 0; return 'dead'; }
-    if (E.has('massive')) p.massive = true;
+    // if (E.has('massive')) p.massive = true;
     if (E.has('heavy')) { p.heavy = true; if (isLimb(part)) p.tq = false; } // (a new wound past the tourniquet)
     if (E.has('light') && !p.heavy) bleed(p);
     if (E.has('frac')) { if (isLimb(part)) p.frac = true; else { const pl = (organs || []).find(([id]) => id === 'pelvisL' || id === 'pelvisR'); b.parts[pl ? 'leg' + pl[0].slice(-1) : Math.random() < 0.5 ? 'legL' : 'legR'].frac = true; } } // (the pelvis: the leg on its side won't take your weight)
     if (E.has('lung')) b.parts.thorax.lung = true;
-    if (E.has('gut')) p.gut = true;
+    // if (E.has('gut')) p.gut = true;
     // (a spinal hit lower than the neck doesn't paralyse an officer: it's its damage and bleeding, like any other. The
     // neck's is the end: 'dead', above. p.spine stays in the state for its format.)
     if (E.has('out')) b.blood = Math.min(b.blood, UNCON); // (the heart wrecked: you black out where you stand)
