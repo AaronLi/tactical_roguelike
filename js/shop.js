@@ -79,18 +79,11 @@ G.Shop = {
       gear: (() => {
         const all = G.Gear.LIST.filter((d) => ['carrier', 'plate', 'helmet', 'face', 'belt', 'pack'].includes(d.kind));
         const out = [];
-        for (let i = 0; i < 3; i++) { const d = pickW(all.filter((x) => !out.some((o) => o.kind === x.kind)), 1)[0]; if (d) out.push(d); }
+        for (let i = 0; i < 4; i++) { const d = pickW(all.filter((x) => !out.some((o) => o.kind === x.kind)), 1)[0]; if (d) out.push(d); }
         return out.sort((x, y) => x.price - y.price).map((d) => d.id);
       })(),
       // three standard magazines' worth of something other than ball, for two random calibers
-      ammo: (() => {
-        const cals = Object.keys(G.CALIBERS).filter((c) => ['rifle', 'pistol', 'shotgun'].includes(G.CALIBERS[c].group)), out = [];
-        while (out.length < 2 && cals.length) {
-          const cal = cals.splice(Math.floor(r() * cals.length), 1)[0], types = G.AMMO_TYPES[G.CALIBERS[cal].group].slice(1);
-          out.push({ cal, am: types[Math.floor(r() * types.length)], n: 3 * G.stdMag(cal) });
-        }
-        return out;
-      })(),
+      ammo: [],
       // five kinds of pouch, a few of each (big ones are rarer)
       pouches: (() => {
         const pool = Object.keys(G.Gear.POUCHES), out = [];
@@ -104,7 +97,7 @@ G.Shop = {
       })(),
       // empty magazines for five guns (any guns, not just yours), a few of each
       // (about half are the gun's standard magazine; the rest a compact, extended, drum... variant)
-      mags: pickW(weapons.filter((w) => G.Gear.ammoFor(w).kind === 'mag'), 5).map((w) => {
+      mags: pickW(weapons.filter((w) => G.Gear.ammoFor(w).kind === 'mag'), 6).map((w) => {
         const vs = G.Gunsmith.LIST.filter((p) => p.variant && !p.factory && !p.retired && (p.plat === w.id || (p.fam && p.fam === G.MAG_FAMILY[w.id])) && p.tier <= maxTier && p.id !== G.Gunsmith.defaultBuild(w.id).mag);
         const vid = vs.length && r() < 0.5 ? vs[Math.floor(r() * vs.length)].id : G.Gunsmith.defaultBuild(w.id).mag;
         return { id: vid ? w.id + '|' + vid : w.id, n: 1 + Math.floor(r() * 3) };

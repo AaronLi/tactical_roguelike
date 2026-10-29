@@ -23,15 +23,15 @@ G.Gear = (() => {
     { id: 'c.slick', kind: 'carrier', brand: B.kest, name: 'PC-1 slick carrier', tier: 1, price: 380, speed: 1, dur: 4, plate: true,
       prot: [], molle: [3, 2], pouches: [['q.rifle', 0, 0]], desc: 'Just a plate pocket and a little MOLLE, one magazine pouch as issued. Light and low.' },
     { id: 'c.patrol', kind: 'carrier', brand: B.iron, name: 'Patrol plate carrier', tier: 2, price: 900, speed: 0.99, dur: 6, plate: true,
-      prot: [{ at: 'torso', layers: [['aramid', 6]] }], molle: [6, 2], pouches: [['q.rifle', 0, 0], ['q.rifle', 1, 0]],
+      prot: [{ at: 'torso', layers: [['aramid', 6]] }], molle: [4, 2], pouches: [['q.rifle', 0, 0], ['q.rifle', 1, 0]],
       desc: 'Soft backer. Issued with two magazine pouches; the rest of the MOLLE is yours to fill.' },
     { id: 'c.recon', kind: 'carrier', brand: B.vant, name: 'Recon chest rig', tier: 2, price: 650, speed: 1, dur: 0, plate: false,
       prot: [], molle: [7, 2], pouches: [['q.rifle', 0, 0], ['q.rifle', 1, 0]], desc: 'No armour at all: wide MOLLE, two magazine pouches as issued. Fast.' },
     { id: 'c.assault', kind: 'carrier', brand: B.para, name: 'Assaulter carrier', tier: 3, price: 1500, speed: 0.98, dur: 7, plate: true,
-      prot: [{ at: 'torso', layers: [['aramid', 7]] }], molle: [8, 2], pouches: [['q.rifle2', 0, 0], ['q.rifle', 2, 0]],
+      prot: [{ at: 'torso', layers: [['aramid', 7]] }], molle: [5, 2], pouches: [['q.rifle2', 0, 0], ['q.rifle', 2, 0]],
       desc: 'The most MOLLE: issued with a double and a single magazine pouch, the rest to fill.' },
     { id: 'c.heavy', kind: 'carrier', brand: B.sable, name: 'Heavy assault armour', tier: 4, price: 2600, speed: 0.9, dur: 9, plate: true,
-      prot: [{ at: 'side', layers: [['steel', 5]] }, { at: 'torso', layers: [['aramid', 8]] }, { at: 'groin', layers: [['aramid', 8]] }, { at: 'shoulder', layers: [['aramid', 6]] }, { at: 'thigh', layers: [['aramid', 6]] }], molle: [6, 2], pouches: [['q.rifle', 0, 0], ['q.rifle', 1, 0], ['q.med', 2, 0]],
+      prot: [{ at: 'side', layers: [['steel', 5]] }, { at: 'torso', layers: [['aramid', 8]] }, { at: 'groin', layers: [['aramid', 8]] }, { at: 'shoulder', layers: [['aramid', 6]] }, { at: 'thigh', layers: [['aramid', 6]] }], molle: [5, 2], pouches: [['q.rifle', 0, 0], ['q.rifle', 1, 0], ['q.med', 2, 0]],
       desc: "Side and groin plates, shoulder and thigh protection. Slow, and less MOLLE than you'd like." },
     // ---------------------------------------------------------------- plates (go in a carrier's plate pocket; cover the chest)
     { id: 'p.soft', kind: 'plate', brand: B.gray, name: 'IIIA soft insert', tier: 1, price: 250, speed: 1, dur: 6, prot: [{ at: 'plate', layers: [['aramid', 12]] }], desc: 'Stops handgun rounds and buckshot. Not rifles.' },
@@ -49,13 +49,13 @@ G.Gear = (() => {
     { id: 'f.mandible', kind: 'face', brand: B.kest, name: 'Mandible guard', tier: 1, price: 350, speed: 0.995, dur: 2, cover: 0.4, lower: true, prot: [{ at: 'face', layers: [['pc', 10]] }], desc: 'Bolts on under the rim and guards the jaw: in the way of about two face hits in five. Handgun-rated.' },
     { id: 'f.shield', kind: 'face', brand: B.iron, name: 'Ballistic face shield (IIIA)', tier: 2, price: 750, speed: 0.985, dur: 3, cover: 0.9, prot: [{ at: 'face', layers: [['pc', 10]] }], desc: 'A polycarbonate shield over the whole face. Stops handgun rounds, not rifles.' },
     { id: 'f.rifle', kind: 'face', brand: B.mer, name: 'Rifle-rated face shield', tier: 3, price: 1900, speed: 0.97, dur: 3, cover: 0.9, prot: [{ at: 'face', layers: [['pc', 14], ['pe', 10]] }], desc: 'Thick laminated shield over the whole face: turns some rifle rounds too. Heavy.' },
-    { id: 'h.visor', kind: 'helmet', brand: B.sable, name: 'Helmet with ballistic visor', tier: 4, price: 2800, speed: 0.97, dur: 4, cut: 'high', prot: [{ at: 'helmet', layers: [['pe', 18]] }, { at: 'face', layers: [['pc', 10]] }], desc: 'Rifle-rated, and a visor that stops handgun rounds to the face.' },
+    // { id: 'h.visor', kind: 'helmet', brand: B.sable, name: 'Helmet with ballistic visor', tier: 4, price: 2800, speed: 0.97, dur: 4, cut: 'high', prot: [{ at: 'helmet', layers: [['pe', 18]] }, { at: 'face', layers: [['pc', 10]] }], desc: 'Rifle-rated, and a visor that stops handgun rounds to the face.' },
     // ---------------------------------------------------------------- belts (more pouches)
-    { id: 'b.duty', kind: 'belt', brand: B.gray, name: 'Duty belt', tier: 1, price: 120, speed: 1, molle: [4, 1], pouches: [['q.pistol', 0, 0]], desc: 'One row of MOLLE, one pistol magazine pouch as issued. Too shallow for rifle pouches.' },
-    { id: 'b.battle', kind: 'belt', brand: B.kest, name: 'Battle belt', tier: 2, price: 400, speed: 1, molle: [6, 2], pouches: [['q.rifle', 0, 0], ['q.med', 1, 0]], desc: 'A magazine pouch and a medkit pouch as issued, plenty of MOLLE spare.' },
+    { id: 'b.duty', kind: 'belt', brand: B.gray, name: 'Duty belt', tier: 1, price: 120, speed: 1, molle: [3, 1], pouches: [['q.pistol', 0, 0]], desc: 'One row of MOLLE, one pistol magazine pouch as issued. Too shallow for rifle pouches.' },
+    { id: 'b.battle', kind: 'belt', brand: B.kest, name: 'Battle belt', tier: 2, price: 400, speed: 1, molle: [4, 2], pouches: [['q.rifle', 0, 0], ['q.med', 1, 0]], desc: 'A magazine pouch and a medkit pouch as issued, plenty of MOLLE spare.' },
+    { id: 'b.war', kind: 'belt', brand: B.para, name: 'War belt with dump pouch', tier: 3, price: 700, speed: 0.995, molle: [5, 2], pouches: [['q.dump', 0, 0]], desc: 'Comes with its dump pouch and nothing else: wide MOLLE to fill.' },
     // ---------------------------------------------------------------- the IFAK (its own slot, on the hip: medical gear only)
     { id: 'm.ifak', kind: 'ifak', brand: B.halc, name: 'IFAK', tier: 1, price: 150, speed: 1, sz: [2, 3], grids: [[2, 3, MED]], desc: 'Individual first aid kit: room for a bandage, a tourniquet, gauze, a chest seal and a splint.' },
-    { id: 'b.war', kind: 'belt', brand: B.para, name: 'War belt with dump pouch', tier: 3, price: 700, speed: 0.995, molle: [7, 2], pouches: [['q.dump', 0, 0]], desc: 'Comes with its dump pouch and nothing else: wide MOLLE to fill.' },
     // ---------------------------------------------------------------- backpacks (one big grid; a big enough one takes a spare gun)
     { id: 'k.sling', kind: 'pack', brand: B.gray, name: 'Sling pack', tier: 1, price: 250, speed: 1, sz: [3, 3], grids: [[4, 3, null]], desc: 'Room for spare magazines, a pistol or a compact SMG.' },
     { id: 'k.assault', kind: 'pack', brand: B.kest, name: '3-day assault pack', tier: 2, price: 650, speed: 0.99, sz: [3, 4], grids: [[5, 3, null]], desc: 'Takes a carbine or shotgun, with a row to spare.' },
@@ -66,12 +66,12 @@ G.Gear = (() => {
   // pouches: w x h is what they hold (their grid inside, and their size stowed); mw x mh is the MOLLE they
   // take mounted (the same unless said: a rifle mag pouch or a med pouch hangs from one 1x1 slot)
   const POUCHES = {
-    'q.pistol': { name: 'Pistol mag pouch', brand: B.gray, w: 2, h: 1, mw: 1, mh: 1, split: 2, acc: MAG, price: 30, desc: 'Two pockets, a pistol magazine, speedloader or box of shells in each, from a single MOLLE slot.' },
-    'q.rifle': { name: 'Rifle mag pouch', brand: B.kest, w: 1, h: 2, mw: 1, mh: 1, acc: MAG, price: 45, desc: 'One rifle magazine, from a single MOLLE slot.' },
-    'q.rifle2': { name: 'Double rifle mag pouch', brand: B.iron, w: 2, h: 2, acc: MAG, price: 85, desc: 'Two rifle magazines side by side (or four pistol ones).' },
-    'q.rifle3': { name: 'Triple mag shingle', brand: B.para, w: 3, h: 2, acc: MAG, price: 120, desc: 'Three rifle magazines in one wide pouch, or an LMG box.' },
-    'q.dump': { name: 'Dump pouch', brand: B.vant, w: 2, h: 2, mw: 2, mh: 1, acc: null, dump: true, price: 60, desc: 'Takes anything. A dump reload (double-tap R) drops the old magazine in here instead of on the floor.' },
-    'q.med': { name: 'Med pouch', brand: B.halc, w: 2, h: 2, mw: 1, mh: 1, acc: MED, price: 60, desc: 'A 2×2 roll-out medical pouch on a single MOLLE slot: a splint and a few more.' },
+    'q.pistol': { name: 'Pistol mag pouch', brand: B.gray, w: 2, h: 1, mw: 1, mh: 1, split: 2, acc: MAG, price: 45, desc: 'Two pockets, a pistol magazine, speedloader or box of shells in each, from a single MOLLE slot.' },
+    'q.rifle': { name: 'Rifle mag pouch', brand: B.kest, w: 1, h: 2, mw: 1, mh: 1, acc: MAG, price: 90, desc: 'One rifle magazine, from a single MOLLE slot.' },
+    'q.rifle2': { name: 'Double rifle mag pouch', brand: B.iron, w: 2, h: 2, mw: 1, mh: 2, acc: MAG, price: 150, desc: 'Two rifle magazines side by side (or four pistol ones).' },
+    'q.rifle3': { name: 'Triple mag shingle', brand: B.para, w: 3, h: 2, mw: 2, mh: 2, acc: MAG, price: 350, desc: 'Three rifle magazines in one wide pouch, or an LMG box.' },
+    'q.dump': { name: 'Dump pouch', brand: B.vant, w: 2, h: 2, mw: 2, mh: 1, acc: null, dump: true, price: 150, desc: 'Takes anything. A dump reload (double-tap R) drops the old magazine in here instead of on the floor.' },
+    'q.med': { name: 'Med pouch', brand: B.halc, w: 2, h: 2, mw: 1, mh: 1, acc: MED, price: 150, desc: 'A 2×2 roll-out medical pouch on a single MOLLE slot: a splint and a few more.' },
   };
   // how gear sits in the locker
   const GEAR_SIZE = { carrier: [3, 3], plate: [2, 3], helmet: [2, 2], face: [2, 2], belt: [3, 1], pack: [3, 3], ifak: [2, 3] };
