@@ -390,7 +390,9 @@ G.Views = {
     for (const ev of this.enemies.values()) if (ev.alive && ev !== selfEv) body(ev.pos, ev.crouch ? 1.2 : 1.8);
     for (const [id, pv] of this.players) if (id !== skip && pv.st && !pv.st.dd) body(pv.pos, pv.st.cr ? 1.2 : 1.8);
     if (skip != null) body(G.Me.pos, G.Me.crouch ? 1.2 : 1.8);
-    G.R.tacLaser(src, from.clone().addScaledVector(dir, t - 0.01), !!(fl & 4));
+    const end = from.clone().addScaledVector(dir, t - 0.01);
+    G.R.tacLaser(src, end, !!(fl & 4));
+    if (G.Highlights) G.Highlights.laser(selfEv ? skip : skip == null ? null : 'p' + skip, end, !!(fl & 4)); // (where it landed: the replays show it)
   },
   // the light or laser on a suspect's gun, to see: a little black housing under the barrel
   tacOnGun(rig, tac) {

@@ -48,7 +48,7 @@ G.Highlights = (() => {
   // alert 4, down 8, dead 16, hands up 32, cuffed 64, cowering 128). zip: how far through being zip-tied (a suspect;
   // -1 not) and then whether they've still a gun in hand (0 dropped, 1 slung, 2 in hand); for an officer how far
   // through zip-tying someone (-1 not), then whose ('e' id) and whether pulling them up. [10]: how far through a
-  // reload (-1 not), everyone's
+  // reload (-1 not), everyone's. [11]: their laser, if it's on: where it landed and whether it's green ([x, y, z, green])
   const zipOf = (a) => (a && a.kind === 'zip' ? [Math.min(1, a.t / a.dur), a.target, a.pull ? 1 : 0] : [-1, -1, 0]);
   function frame() {
     const a = {};
@@ -75,8 +75,14 @@ G.Highlights = (() => {
       a[k] = [me.pos.x, me.pos.y, me.pos.z, me.yaw, me.pitch, (me.crouch ? 1 : 0) | (me.prone ? 2 : 0) | (me.lowReady ? 0 : 4) | (me.down ? 8 : 0) | (me.dead ? 16 : 0), me.lean || 0, ...zipOf(me.action),
         me.reloading && me.reloadTotal ? G.U.clamp(1 - me.reloadT / me.reloadTotal, 0, 1) : -1];
     }
+    const now = performance.now();
+    for (const [key, L] of lasers) if (a[key] && now - L[4] < 400) a[key][11] = L.slice(0, 4);
+    lasers.clear();
     return { t: R.t, a };
   }
+  // a laser drawn this frame (js/views.js tacBeam; key: whose, null yours), kept for the next recorded frame
+  const lasers = new Map();
+  function laser(key, p, green) { lasers.set(key || myKey(), [+p.x.toFixed(2), +p.y.toFixed(2), +p.z.toFixed(2), green ? 1 : 0, performance.now()]); }
   function tick(dt) {
     const g = G.Game;
     if (g.phase !== 'level' || g.hub || !g.map) return;
@@ -1001,6 +1007,7 @@ G.Highlights = (() => {
     o[3] = a[3] + G.U.angDiff(a[3], b[3]) * u;
     if (a[7] >= 0 && b[7] >= 0) o[7] = a[7] + (b[7] - a[7]) * u;
     if (a[10] >= 0 && b[10] >= a[10]) o[10] = a[10] + (b[10] - a[10]) * u; // (one reload going on: not one ending and the next starting)
+    if (a[11] && b[11]) o[11] = [0, 1, 2].map((j) => a[11][j] + (b[11][j] - a[11][j]) * u).concat(a[11][3]);
     return o;
   }
   // when someone in a clip is killed in it (its victim; a kill sequence's, each of them), or null
@@ -1025,6 +1032,7 @@ G.Highlights = (() => {
     // doors: as they were then
     doorsAt(c, s.tau, s.snapDoors); s.snapDoors = false;
     glassAt(s.tau);
+    lasersAt(s);
     // the x-ray cam: every wounded organ is lit by the killing moment; the lit ones flare and settle
     if (s.xr && P.xo) {
       if (s.tau >= deathT(c, c.v) + 0.01) for (const o of P.xo.hit) lightOrgan(o);
@@ -1072,6 +1080,28 @@ G.Highlights = (() => {
       const reload = !r.died && !act && p[10] != null && p[10] >= 0 && p[10] < 1 ? p[10] : -1; // (a magazine change, as it was played)
       r.rig.update(Math.max(0.001, dt * s.rate), { pos: new T.Vector3(p[0], p[1], p[2]), yaw: p[3], pitch: p[4], crouch, prone: !!(fl & 2), alert: !!(fl & 4) && !act && reload < 0, lean: p[6], pose, tk, act, reload, state: r.died ? 'dead' : fl & 8 ? 'down' : 'alive' });
     }
+  }
+  // Lasers, as they were: from the gun in their hands to where it landed then (frame [11]): the line and a glowing dot, from a pool
+  function lasersAt(s) {
+    if (!P.las || P.las.root !== P.fxRoot) P.las = { root: P.fxRoot, pool: [] };
+    const pool = P.las.pool; let n = 0;
+    for (const [k, r] of P.rigs) {
+      const p = stateAt(s.clip, k, s.tau), L = p && p[11], gun = r.rig.gun, gi = r.rig.gunInfo;
+      if (!L || r.died || !gun || !gi || !gi.muzzles || r.rig.slung || !r.rig.root.visible) continue;
+      gun.updateMatrixWorld(true);
+      const a = gun.localToWorld(new T.Vector3(gi.muzzles[0][2], gi.muzzles[0][1], -gi.muzzles[0][0])), b = new T.Vector3(L[0], L[1], L[2]), col = L[3] ? 0x30ff40 : 0xff2010;
+      let q = pool[n];
+      if (!q) {
+        const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(new Float32Array(6), 3));
+        q = pool[n] = { line: new T.Line(geo, new T.LineBasicMaterial({ transparent: true, opacity: 0.6, blending: T.AdditiveBlending, depthWrite: false })), dot: new T.Mesh(glowGeo, new T.MeshBasicMaterial({ transparent: true, blending: T.AdditiveBlending, depthWrite: false })) };
+        q.line.frustumCulled = false; P.fxRoot.add(q.line, q.dot);
+      }
+      const pa = q.line.geometry.attributes.position; pa.setXYZ(0, a.x, a.y, a.z); pa.setXYZ(1, b.x, b.y, b.z); pa.needsUpdate = true;
+      q.line.material.color.setHex(col); q.dot.material.color.setHex(col);
+      q.dot.position.copy(b); q.dot.scale.setScalar(1.6 + P.cam.position.distanceTo(b) * 0.12);
+      q.line.visible = q.dot.visible = true; n++;
+    }
+    for (; n < pool.length; n++) pool[n].line.visible = pool[n].dot.visible = false;
   }
   const tracerMat = (col) => new T.LineBasicMaterial({ color: col, transparent: true, opacity: 1, blending: T.AdditiveBlending, depthWrite: false });
   function fire(sh, s) {
@@ -2675,5 +2705,5 @@ G.Highlights = (() => {
     }
   }
 
-  return { tick, shot, roundPath, glass, door, hitBy, kill, suspectDown, saved, incap, arrest, take, drop, mount, unmount, update, reset, exportPack, renderPack, cancelRender, exportHere, muxHere, toJSON, fromJSON, R, P };
+  return { tick, shot, roundPath, glass, door, laser, hitBy, kill, suspectDown, saved, incap, arrest, take, drop, mount, unmount, update, reset, exportPack, renderPack, cancelRender, exportHere, muxHere, toJSON, fromJSON, R, P };
 })();

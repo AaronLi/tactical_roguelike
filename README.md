@@ -1325,6 +1325,7 @@ says the same), but not whose: the shooter's name isn't shown.
   at first, about three in four lights and over half lasers at the top; an Enforcer always has the light from the second tier, the Kingpin both.
   The light's on with the gun out, the laser once they're alert, both on whoever they're aiming at, and they use the same lights, beams and
   dots as the squad's.
+- **Lasers show in the replays**: where each laser landed is recorded with everyone's position, and the replay (and the video) draws it from the gun in their hands to that spot, red or green, as long as it was on.
 - **Lights dazzle** (`js/glare.js`): looking into anyone's weapon light, a suspect's or your squad's, blooms round the lamp with streaks across
   your view, washing out the picture when it's bad. It takes a light pointing near you, you looking near it, and nothing in between, and it's
   worse the closer and brighter it is. It comes on quickly and goes slowly: look away and it fades over a few seconds, leaving a greenish after-image.
