@@ -1049,7 +1049,12 @@ G.Me = {
   // whether it came out]).
   roundIndex(shot) { shot.n = (shot.n || 0) + 1; return shot.n - 1; },
   newPath(p, v) { return { p: [[+p.x.toFixed(2), +p.y.toFixed(2), +p.z.toFixed(2), Math.round(v)]], ev: [], hit: [] }; },
-  pathPt(b, p, v) { b.path.p.push([+p.x.toFixed(2), +p.y.toFixed(2), +p.z.toFixed(2), Math.round(v)]); return b.path.p.length - 1; },
+  pathPt(b, p, v) {
+    const P = b.path.p, q = [+p.x.toFixed(2), +p.y.toFixed(2), +p.z.toFixed(2), Math.round(v)], l = P[P.length - 1];
+    if (l[0] === q[0] && l[1] === q[1] && l[2] === q[2]) { l[3] = q[3]; return P.length - 1; } // (the same spot: not a leg of its own)
+    P.push(q);
+    return P.length - 1;
+  },
   // it's finished: its path to the replays, here and on the squad's machines
   roundDone(b) {
     const key = b.enemy ? 'e' + b.enemy : 'p' + G.Net.myId, sh = b.shot;
