@@ -1092,6 +1092,7 @@ G.Me = {
     for (const sh of shots) {
       if (sh.ff.size) { for (const [tg, q] of sh.ff) G.Net.toHost(Object.assign({ t: 'ff', tg, f: sh.f, e: sh.enemy }, q)); sh.ff.clear(); } // (what they did to a teammate)
       if (sh.fx && sh.fx.length) G.Net.toHost({ t: 'rfx', a: sh.fx.splice(0, 32) }); // (the marks it left, for the squad)
+      if (sh.holes && sh.holes.length) G.Net.toHost({ t: 'hole', a: sh.holes.splice(0, 32) }); // (and what it took out of the walls)
       if (sh.paths && sh.paths.length) G.Net.toHost({ t: 'rpath', sid: sh.sid, e: sh.enemy, ps: sh.paths.splice(0) }); // (and where it went, for their replays)
     }
   },
@@ -1200,10 +1201,12 @@ G.Me = {
       }
       if (!hitWall) { on(rest); break; }
       // the solid it's met: a target if it's that, and then what it's made of
-      const s = wall.solid, at = o.clone().addScaledVector(d, wall.t), vIn = v, r = B.crossSolid(map, b.proj, v, wall, o, d);
+      const s = wall.solid, at = o.clone().addScaledVector(d, wall.t), vIn = v, r = B.crossSolid(map, b.proj, v, wall, o, d), Jin = 0.5 * b.proj.m * vIn * vIn;
+      const cut = G.Damage.hit(map, s, at, d, wall.n, r, o, Jin, b.proj.d * 1000); // (what it takes out of a wall or a door)
+      if (s.door && !r.ric) { const pt = G.Damage.partAt(s.door, at.toArray()); if (pt != null) G.Net.toHost({ t: 'dhit', i: s.door.id, pt, J: Math.round(Jin), dir: [+d.x.toFixed(2), +d.z.toFixed(2)] }); } // (its handle, a hinge: the host keeps the score)
       if (s.target) G.Range.hit(s, at, d, b.proj.m * vIn);
       if (wall.pane != null && !(s.win && s.win.armor)) this.roundPane(wall.pane, at, d);
-      if (!wall.view) this.roundMark(b, at, wall.n, r.fx, r.ric ? 'r' : 'e', vIn, s, r.name, { m: r.mat, dir: d, stop: !r.ric && !r.v });
+      if (!wall.view) this.roundMark(b, at, wall.n, r.fx, r.ric ? 'r' : 'e', vIn, s, r.name, { m: r.mat, dir: d, stop: !r.ric && !r.v, cut: cut ? cut.r : 0, depth: r.depth });
       else { this.pathPt(b, at, vIn); if (b.trail) G.R.trailAdd(b.trail, at, true, vIn); }
       if (r.ric) {
         on(wall.t);
@@ -1212,10 +1215,11 @@ G.Me = {
         if (G.Audio.ricochet) G.Audio.ricochet(at);
         continue;
       }
+      if (cut && G.Damage.apply(map, cut.rec)) (b.shot.holes = b.shot.holes || []).push(cut.rec);
       if (!r.v) return stopped(at, done + wall.t, false, vIn); // (v: how fast it struck)
       const n0 = wall.n;
       on(r.t);
-      if (!wall.view) this.roundMark(b, o, r.nOut, r.fxOut, 'x', r.v, null, r.nameOut, { m: r.matOut, dir: d });
+      if (!wall.view) this.roundMark(b, o, r.nOut, r.fxOut, 'x', r.v, null, r.nameOut, { m: r.matOut, dir: d, cut: cut ? cut.rOut : 0 });
       turn(B.deflect(d, r, n0), r.v);
       o.addScaledVector(d, 0.004);
     }
@@ -1264,8 +1268,8 @@ G.Me = {
   // where a round struck or left something: its mark here (s: a target's own, its picture), on its trail, and for the squad
   // how: { m (what it's made of: '' nothing to damage), dir (the way it was going), stop (it stopped in it) }
   roundMark(b, p, n, fx, kind, v, s, name, how = {}) {
-    const o = { m: how.m, fx, k: kind, n, dir: how.dir, J: 0.5 * b.proj.m * v * v, stop: !!how.stop, cal: b.proj.d * 1000 };
-    b.path.ev.push([this.pathPt(b, p, v), kind, fx, n[0], n[1], n[2], name || '', how.m, Math.round(o.J), o.stop ? 1 : 0]);
+    const o = { m: how.m, fx, k: kind, n, dir: how.dir, J: 0.5 * b.proj.m * v * v, stop: !!how.stop, cal: b.proj.d * 1000, cut: how.cut || 0 };
+    b.path.ev.push([this.pathPt(b, p, v), kind, fx, n[0], n[1], n[2], name || '', how.m, Math.round(o.J), o.stop ? 1 : 0, +(how.depth || 0).toFixed(3), +o.cal.toFixed(1)]);
     G.R.impactOn(p, n, s, fx, o);
     if (b.trail) G.R.trailAdd(b.trail, p, true, v);
     (b.shot.fx = b.shot.fx || []).push(G.Ballistics.mark(p, n, fx, kind, o));

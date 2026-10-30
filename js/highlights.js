@@ -232,6 +232,7 @@ G.Highlights = (() => {
     if (!map || !map.doors) return out;
     map.doors.forEach((d, i) => { out[i] = !!d.open; });
     for (let j = R.doors.length - 1; j >= 0 && R.doors[j].t >= t0; j--) out[R.doors[j].i] = !R.doors[j].open;
+    for (const q of R.doors) if (q.fall && q.t < t0) out['f' + q.i] = q.fall; // (already down)
     return out;
   }
   const near = (s, c) => Math.hypot(s.f[0] - c.x, s.f[2] - c.z) < NEAR + 10 || Math.hypot(s.to[0] - c.x, s.to[2] - c.z) < NEAR;
@@ -295,9 +296,10 @@ G.Highlights = (() => {
     if (!sh._pel) sh._pel = sh.tos.map((to, i) => { const path = sh.paths && sh.paths[i]; return { t: sh.t, a: sh.a, f: sh.f, to: path && path.p.length > 1 ? path.p[path.p.length - 1].slice(0, 3) : to, code: sh.code, am: sh.am, of: sh, path }; });
     return sh._pel;
   }
-  function door(i, open, kicked) {
+  // (fall: shot off its hinges, as js/damage.js fall takes it)
+  function door(i, open, kicked, fall) {
     if (G.Game.phase !== 'level' || G.Game.hub) return;
-    const d = { t: R.t, i, open: !!open, kicked: !!kicked };
+    const d = { t: R.t, i, open: !!open, kicked: !!kicked, fall };
     R.doors.push(d);
     for (const c of R.open) c.doors.push(d);
   }
@@ -970,6 +972,7 @@ G.Highlights = (() => {
     for (const d of P.drops) if (d.m.parent) d.m.parent.remove(d.m);
     for (const m of P.marks) if (m.parent) m.parent.remove(m);
     if (P.debris) P.debris.clear();
+    if (P.map) G.Damage.reset(P.map); // (the walls whole again: the clip's rounds will cut them)
     P.drops = []; P.marks = [];
     if (P.xo) { for (const m of P.xo.all) { m.geometry.dispose(); m.material.dispose(); } P.xo = null; }
   }
@@ -1139,7 +1142,7 @@ G.Highlights = (() => {
       const pos = (x) => { const i = leg(x); return verts[i].clone().addScaledVector(dirs[i], x - xs[i]); };
       const along = (k, v) => { for (let i = 1; i <= N; i++) if (pts[i][k] >= v) { const a = pts[i - 1], b = pts[i], u = (v - a[k]) / Math.max(1e-9, b[k] - a[k]); return { x: a.x + (b.x - a.x) * u, t: a.t + (b.t - a.t) * u, v: a.v + (b.v - a.v) * u, drop: a.drop + (b.drop - a.drop) * u }; } return pts[N]; };
       return (sh.fl = { f: verts[0], to: verts[N], len, dir: dirs[0], dirEnd: dirs[N - 1], dirAt, pos, verts, xs, def, am, m, pts, tof: pts[N].t, v0: pts[0].v, vEnd: pts[N].v,
-        events: q.ev.map((e) => ({ i: e[0], x: xs[e[0]], p: verts[e[0]], k: e[1], fx: e[2], n: [e[3], e[4], e[5]], name: e[6], m: e[7], J: e[8], stop: !!e[9], dir: dirs[Math.max(0, Math.min(N - 1, e[0] - 1))] })), at: (t) => along('t', t), atX: (x) => along('x', x), xAt: (t) => along('t', Math.min(t, pts[N].t)).x });
+        events: linked(q.ev.map((e) => ({ i: e[0], x: xs[e[0]], p: verts[e[0]], k: e[1], fx: e[2], n: [e[3], e[4], e[5]], name: e[6], m: e[7], J: e[8], stop: !!e[9], depth: e[10] || 0, cal: e[11] || 8, dir: dirs[Math.max(0, Math.min(N - 1, e[0] - 1))] }))), at: (t) => along('t', t), atX: (x) => along('x', x), xAt: (t) => along('t', Math.min(t, pts[N].t)).x });
     }
     const f = new T.Vector3(...sh.f), to = new T.Vector3(...sh.to), len = Math.max(0.1, f.distanceTo(to));
     const vAt = (x) => { let v = 0; try { v = def ? G.roundSpeed(def, am || 'ball', x) : 0; } catch (e) { /* no speed */ } return v > 30 ? v : 380; };
@@ -1165,10 +1168,14 @@ G.Highlights = (() => {
   const _yUp = new T.Vector3(0, 1, 0), holeGeo = new T.CircleGeometry(0.5, 12);
   // A round reaches something it went through or off (flightOf events): the damage it did (js/scars.js, as in the game), what it
   // threw out of it, and a flash
+  // (each way in with the way out of the same thing, if it came out: e.then)
+  function linked(evs) { evs.forEach((e, i) => { if (e.k === 'e' && evs[i + 1] && evs[i + 1].k === 'x') e.then = evs[i + 1]; }); return evs; }
   function struck(e) {
     const fxs = G.R.IMPACT[e.fx] || G.R.IMPACT.stone, col = e.k === 'r' ? 0xfff0c0 : (fxs.s || fxs.d)[0];
     if (e.m !== '' && e.name !== 'armour') {
-      const o = { m: e.m, fx: e.fx, k: e.k, n: e.n, dir: e.dir, J: e.J, stop: e.stop };
+      const rec = e.k === 'e' && P.map ? G.Damage.ofEvent(e, e.then) : null, cut = rec && G.Damage.apply(P.map, rec) ? G.Damage.radius(e.m, e.J, e.cal) : e.k === 'x' && e.cutBy ? e.cutBy : 0; // (what it took out of the wall, as it did in the game)
+      if (e.then && e.k === 'e') e.then.cutBy = cut * 1.25;
+      const o = { m: e.m, fx: e.fx, k: e.k, n: e.n, dir: e.dir, J: e.J, stop: e.stop, cut };
       for (const m of G.Scars.meshes(o, e.p, P.fxRoot)) { P.marks.push(m); if (P.marks.length > 160) { const q = P.marks.shift(); if (q.parent) q.parent.remove(q); } }
       if (P.debris) P.debris.burst(e.p, o);
     }
@@ -1319,6 +1326,15 @@ G.Highlights = (() => {
     for (let i = 0; i < n; i++) {
       const piv = dm[i], l = c._byDoor.get(i);
       if (!piv || (init[i] == null && !l)) continue;
+      // (shot off its hinges: where its fall's got to, or lying where it fell)
+      const fell = init['f' + i] ? { t: -1e3, fall: init['f' + i] } : l && l.find((d) => d.fall && d.t <= tau);
+      if (fell) {
+        const dd = map.doors[i], u = piv.userData;
+        u.track = u.track && u.trackOf === fell ? u.track : G.Damage.fallTrack(map, dd, fell.fall[0], fell.fall[1], fell.fall[2]); u.trackOf = fell; u.centre = u.track.centre;
+        const fr = u.track.frames; G.Damage.setPose(piv, u, fr[Math.min(fr.length - 1, Math.floor((tau - fell.t) * 60))], dd.fy || 0);
+        continue;
+      }
+      if (piv.userData.track) { const u = piv.userData; u.track = null; piv.quaternion.identity(); piv.rotation.y = u.base; piv.position.copy(u.p0); }
       let before = null; if (l) for (const d of l) if (d.t <= tau) before = d;
       const open = before ? before.open : init[i] != null ? init[i] : !l[0].open, kicked = before && before.kicked && tau - before.t < 0.3;
       const u = piv.userData, tgt = open ? 1 : 0;

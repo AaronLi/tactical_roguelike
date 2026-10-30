@@ -28,7 +28,7 @@ G.Views = {
       if (r.t < 0.3) r = G.World.raycast(w, c.x + dx * 0.3, c.y + dy * 0.3, c.z + dz * 0.3, dx, dy, dz, d - 0.3, { skip }), r.t += 0.3;
       if (r.t >= d - 0.05) return true;
     }
-    return false;
+    return G.Damage.seenThrough(map, c, hp); // (or down a hole shot through the wall)
   },
   // an officer's body: dressed as they picked, kit from their state (st.kt)
   newPlayerRig(info, id) {
@@ -447,7 +447,7 @@ G.Views = {
     let last = null;
     (list || []).forEach((f, i) => {
       const p = new THREE.Vector3(f[0], f[1], f[2]);
-      if (!(skip && i === 0)) G.R.impactOn(p, f.slice(3, 6), null, f[6], f.length > 8 ? { m: f[12], k: f[7], dir: f.slice(8, 11), J: f[11], stop: !!f[13], cal: f[14] } : undefined);
+      if (!(skip && i === 0)) G.R.impactOn(p, f.slice(3, 6), null, f[6], f.length > 8 ? { m: f[12], k: f[7], dir: f.slice(8, 11), J: f[11], stop: !!f[13], cal: f[14], cut: f[15] || 0 } : undefined);
       if (last && last[7] === 'r') G.R.tracer(new THREE.Vector3(last[0], last[1], last[2]), p, 0xffd080, 0.05);
       if (f[7] === 'r' && G.Audio.ricochet) G.Audio.ricochet(p);
       last = f;

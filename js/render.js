@@ -608,7 +608,8 @@ G.R = {
       if (!leaf || pivot.getWorldPosition(_tv).distanceTo(p) > 2.6) continue; // (its world position: a door upstairs sits in its floor's group)
       leaf.updateMatrixWorld(true);
       const l = leaf.worldToLocal(p.clone()), g = leaf.geometry.parameters;
-      if (Math.abs(l.x) <= g.width / 2 + 0.03 && Math.abs(l.y) <= g.height / 2 + 0.03 && Math.abs(l.z) <= g.depth / 2 + 0.04) { leaf.attach(m); return; }
+      // (a door's solid is thicker than its leaf: on the leaf's own face, not in the air in front of it)
+      if (Math.abs(l.x) <= g.width / 2 + 0.03 && Math.abs(l.y) <= g.height / 2 + 0.03 && Math.abs(l.z) <= 0.09) { leaf.attach(m); m.position.z = Math.sign(l.z || 1) * (g.depth / 2 + 0.004); return; }
     }
   },
   explosion(p, radius) {
@@ -746,6 +747,7 @@ G.R = {
       if (G.Casings.warm) for (const m of G.Casings.warm()) put(m);
       if (G.Loot.meshFor) { put(G.Loot.meshFor(G.Gear.pack(G.Gear.medItem('bandage')))); }
       put(new THREE.Mesh(new THREE.PlaneGeometry(1, 1), this.bloodMats.spatter));
+      if (G.Game.map) for (const m of G.Damage.warm(G.Game.map)) put(m);
     } catch (e) { console.warn('warmup', e); }
     const hidden = [];
     for (const sc of [this.scene, this.vmScene]) sc.traverse((o) => { if (!o.visible) { o.visible = true; hidden.push(o); } });

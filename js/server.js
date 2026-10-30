@@ -49,6 +49,7 @@ G.Server = {
           t: 'welcome', id: from, roster: this.roster(), phase: this.phase, level: this.level,
           seed: this.seed, shopSeed: this.shopSeed, th: this.theme, route: this.routeMsg(), stock: this.phase === 'shop' ? this.stock : null,
           doors: this.map && this.phase === 'level' ? this.map.doors.map((d) => (d.open ? 1 : 0)) : null,
+          holes: this.phase === 'level' ? this.holes || null : null, fallen: this.phase === 'level' ? this.fallen || null : null,
           evidence: this.phase === 'level' && this.evidence ? this.evidence.filter((v) => !v.taken).map((v) => [v.i, v.wpn, v.x, v.z, v.secured ? 1 : 0, v.y || 0]) : null,
           bodies: this.phase === 'level' && this.bodies ? [...this.bodies.values()].map((b) => [b.id, b.type, b.x, b.z, b.yaw, b.secured ? 1 : 0, b.y || 0]) : null,
           wcase: this.phase === 'level' ? this.caseMsg() : null, cabs: this.phase === 'level' ? this.cabMsg() : null, abox: this.phase === 'level' ? this.aboxMsg() : null,
@@ -63,6 +64,14 @@ G.Server = {
       }
       case 'st': if (p) p.st = m.s; break;
       case 'rfx': if (p && Array.isArray(m.a)) G.Net.broadcast({ t: 'rfx', a: m.a.slice(0, 32) }, from); break; // (the marks a round left on what it went through or off)
+      case 'hole': // (what it took out of them, js/damage.js: kept for whoever joins, and here for the suspects' eyes and rounds)
+        if (p && Array.isArray(m.a) && this.map && this.phase === 'level') {
+          const a = m.a.slice(0, 32); (this.holes = this.holes || []).push(...a);
+          for (const h of a) G.Damage.apply(this.map, h);
+          G.Net.broadcast({ t: 'hole', a }, from);
+        }
+        break;
+      case 'dhit': { const d = this.map && this.phase === 'level' ? this.map.doors[m.i] : null; if (d && p) this.doorHit(d, m.pt, m.J, m.dir); break; }
       case 'rpath': if (p && Array.isArray(m.ps)) G.Net.broadcast({ t: 'rpath', k: m.e ? 'e' + m.e : 'p' + from, sid: m.sid, ps: m.ps.slice(0, 32) }, from); break; // (where it went: for everyone's replays)
       // a gun's stickers (js/stickers.js): kept and passed on; asked for by someone who's seen its hash and not it
       case 'skin': {
@@ -860,9 +869,26 @@ G.Server = {
     e.leanOut = e.peeking && h.lean ? h.lean : 0;
     return true;
   },
+  // A round struck what holds a door. Its handle gone, the latch lets go and it swings open; all its hinges gone, nothing's holding
+  // it up, and it falls (js/damage.js: the same fall for everyone, from what's said here).
+  doorHit(d, pt, J, dir) {
+    if (d.fallen || d.kind === 'vault' || !(pt === 'h' || pt === 0 || pt === 1 || pt === 2) || !Array.isArray(dir)) return;
+    const hp = d.hp || (d.hp = { h: G.Damage.PARTS.handle, 0: G.Damage.PARTS.hinge, 1: G.Damage.PARTS.hinge, 2: G.Damage.PARTS.hinge });
+    if (hp[pt] <= 0) return;
+    hp[pt] -= Math.max(0, +J || 0);
+    if (hp[pt] > 0) return;
+    G.Net.broadcast({ t: 'dpart', i: d.id, pt });
+    if (pt === 'h' && !d.open) this.setDoor(d.id, true, true);
+    if (hp[0] <= 0 && hp[1] <= 0 && hp[2] <= 0) {
+      const fall = [d.open ? 1 : 0, [dir[0], dir[1]], (Math.random() * 1e9) | 0];
+      (this.fallen = this.fallen || []).push([d.id, ...fall]);
+      G.Damage.fall(this.map, d, ...fall);
+      G.Net.broadcast({ t: 'dfall', i: d.id, f: fall });
+    }
+  },
   setDoor(id, open, kicked) {
     const d = this.map && this.map.doors[id];
-    if (!d || d.open === open) return;
+    if (!d || d.open === open || d.fallen) return;
     d.open = open;
     G.World.door(this.map.world, this.map, d);
     this.map.doorVer = (this.map.doorVer || 0) + 1; // sound paths change

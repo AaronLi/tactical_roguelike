@@ -395,6 +395,8 @@ G.Game = {
         else if (m.phase === 'level') {
           this.enterLevel(m.level, m.seed, m.th);
           if (m.doors) m.doors.forEach((o, i) => { const d = this.map.doors[i]; if (d && d.open !== !!o) { d.open = !!o; G.World.door(this.map.world, this.map, d); } });
+          if (m.holes) for (const h of m.holes) G.Damage.apply(this.map, h); // (what's been shot out of the place)
+          if (m.fallen) for (const [i, ang, dir, seed] of m.fallen) G.Damage.fall(this.map, this.map.doors[i], ang, dir, seed, true);
           if (m.evidence) m.evidence.forEach(([i, wpn, x, z, sec, y]) => { G.Views.addEvidence(i, wpn, x, z, y); if (sec) G.Views.secureEvidence(i); });
           if (m.bodies) m.bodies.forEach(([id, type, x, z, yaw, sec, y]) => G.Views.addBody(id, type, x, z, yaw, sec, y));
           this.setCase(m.wcase); this.abox = m.abox || null; this.sbox = m.sbox || null;
@@ -432,6 +434,15 @@ G.Game = {
         break;
       case 'snap': if (this.phase === 'level') G.Views.applySnap(m); break;
       case 'rfx': if (this.phase === 'level') G.Views.roundFx(m.a); break;
+      case 'hole': if (this.phase === 'level') for (const h of m.a || []) G.Damage.apply(this.map, h); break;
+      case 'dpart': if (this.phase === 'level' && this.map.doors[m.i]) G.Damage.partGone(this.map, this.map.doors[m.i], m.pt); break;
+      case 'dfall': { // (shot off its hinges)
+        const d = this.map && this.phase === 'level' ? this.map.doors[m.i] : null;
+        if (!d) break;
+        if (G.Highlights) G.Highlights.door(m.i, 1, 0, m.f);
+        G.Damage.fall(this.map, d, ...m.f);
+        break;
+      }
       case 'rpath': for (const [i, path] of m.ps || []) { const s = G.Highlights && G.Highlights.roundPath(m.k, m.sid, i, path), def = s && (G.WEAPONS[s.code] || G.Gunsmith.fromCode(s.code)); if (G.ShotLog) G.ShotLog.keep(path, { holder: G.ShotLog.remote(m.k, m.sid), name: def ? def.name : '' }); } break;
       case 'skin': G.Stickers.learn(m.h, m.l); break; // (a gun's stickers, by their hash: js/stickers.js)
       // a first aid cabinet opened, emptied a bit, or put back into
@@ -1156,12 +1167,14 @@ G.Game = {
     if (!m || !m.doorMeshes) return;
     m.doors.forEach((d, i) => {
       const piv = m.doorMeshes[i], u = piv.userData;
+      if (u.fallen) { G.LightGrid.setDoor(i, 1); return; } // (off its hinges: js/damage.js has it)
       u.ang += ((d.open ? 1 : 0) - u.ang) * Math.min(1, dt * (u.rate || 7));
       piv.rotation.y = u.base + u.ang * Math.PI / 2 * 0.95 * (u.sign || 1);
       const k = Math.min(1, u.ang * 2.5); // (the lamps' light past it: all in by the time it's well ajar)
       G.LightGrid.setDoor(i, k < 0.01 ? 0 : k > 0.99 ? 1 : k);
     });
     G.LightGrid.flush();
+    G.Damage.update(m, dt);
   },
   updateZone() { /* no exit zone: the squad votes to leave (Y) once order's restored */ },
 };

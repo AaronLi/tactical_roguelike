@@ -1313,6 +1313,17 @@ says the same), but not whose: the shooter's name isn't shown.
   muzzle, where it fell through each Mach number (from 3 to 0.5, and how far out), what it went through or off, its entry speed and energy,
   its speed past their armour and the energy that cost, its exit speed or where it stopped and in what, where it broke up, and how far
   each piece went and what it weighed. The readout lists the same for each shot.
+- **Rounds cut real holes in walls and doors** (`js/damage.js`): the wall's geometry is rebuilt with the hole left out of it and a bore lined down the
+  way the round went, so an angled shot leaves an angled hole. You can see down a hole, and shoot down it, and a suspect on the far side shows
+  through it. Concrete, block and brick crack, the cracks real slits running out of the hole; wood's torn long along the grain with splinters at
+  its ends; metal tears, its petals bent along the round's line going in and coming out; a round steel stops only dents it. A round that stops in a
+  wall leaves a blind hole, and the next one into it starts from the bottom, so a wall too thick to go through is shot through by hitting
+  the same place (67 cm of concrete takes a 7.62x51 about 17 rounds). Everyone sees the same holes, whoever joins later included, and the
+  replays cut them as the rounds get there. Furniture, floors, ceilings, lintels and the wall round a window keep their marks instead.
+- **Doors can be shot apart** (`js/damage.js`, `js/server.js` doorHit): a door's handle and each of its three hinges take a certain amount of energy (400 J the
+  handle, 600 J a hinge: a rifle round or two pistol rounds). Shoot out the handle and the latch lets go and it swings open. Shoot out all
+  its hinges and nothing's holding it: it falls, a rigid body on what's round it, tipped the way the last round was going. Its fall's worked out
+  once, so everyone and every replay sees the same one, and it lies where it lands, walked over and stopping rounds. Vault doors don't do this.
 - **Rounds damage what they hit, by what it is** (`js/scars.js`): a mark and what's thrown out, from the material, whether the round went
   in, came out, skidded or stopped, which way it was going and how much energy it had. Metal dimples toward the hole, dragged along
   the round's line, and comes out of the far side in petals bent the way it was going; a round it stops leaves a dent with lead in it, and
@@ -2112,6 +2123,7 @@ solids at any height. Doors and windows are dynamic: their solids change as they
 | `js/hud.js`, `js/shop.js` | UI; the shop's stock and its buying |
 | `js/hangar.js` | The hangar between levels: workshop, store, warehouse, lounge, helicopter, and looking-to-buy |
 | `js/profiler.js` | The profiler: frame timings by piece of work, saved from the pause menu |
+| `js/damage.js` | What a round takes out of walls and doors: holes cut in their geometry, bores rays go down, doors shot off their hinges and falling |
 | `js/scars.js` | What a round does to a surface, by its material: the marks, what stands proud of them, and the chips and dust thrown out |
 | `js/glare.js` | Being dazzled by someone's weapon light |
 | `js/shotlog.js` | F9's record of the shots that hit someone: ghosts of them, the trails, and speed markers in the world |

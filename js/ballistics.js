@@ -208,12 +208,14 @@ G.Ballistics = (() => {
       for (let i = c.skin.length - 1; i >= 0; i--) seq.push([c.skin[i][0], c.skin[i][1], cosT]);
     }
     if (!seq.length) seq.push([c.core || 'concrete', 1, cosT]); // (met right at its far edge)
-    const out = { v: 0, t: h.t, n: h.n, nOut: sp.n, dev: 0, bend: 0, absorbed: 0, fx: MAT[seq[0][0]].fx, fxOut: MAT[seq[seq.length - 1][0]].fx, name: MAT[seq[0][0]].name, nameOut: MAT[seq[seq.length - 1][0]].name, mat: seq[0][0], matOut: seq[seq.length - 1][0] };
+    const total = seq.reduce((n, l) => n + l[1], 0); let done = 0; // (how far in it got, for what it left: js/damage.js)
+    const out = { v: 0, t: h.t, n: h.n, nOut: sp.n, dev: 0, bend: 0, absorbed: 0, depth: 0, fx: MAT[seq[0][0]].fx, fxOut: MAT[seq[seq.length - 1][0]].fx, name: MAT[seq[0][0]].name, nameOut: MAT[seq[seq.length - 1][0]].name, mat: seq[0][0], matOut: seq[seq.length - 1][0] };
     for (let i = 0; i < seq.length; i++) {
       const [m, mm, cs] = seq[i], r = i === 0 && !inside && glances(p, v, m, mm, cosT) ? ricochet(p, v, m, cosT) : strike(p, v, m, mm, 1, cs);
       out.absorbed += r.absorbed;
       if (r.ric) return Object.assign(out, { ric: true, v: r.v, along: r.along, off: r.off });
-      if (!r.through) return out;
+      if (!r.through) { out.depth = G.U.clamp(path * (done + mm * (r.depth || 0.5)) / total, 0.012, path); return out; }
+      done += mm;
       v = r.v; out.dev = Math.hypot(out.dev, r.dev); out.bend += r.bend;
     }
     out.v = v; out.t = sp.t;
@@ -232,7 +234,7 @@ G.Ballistics = (() => {
   const gauss = () => Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(Math.PI * 2 * Math.random()) * 0.7;
   // a mark for everyone to draw: where, the surface's normal, what it looks like, and e(ntry), x (exit) or r(icochet)
   // (and, after them, what js/scars.js needs to damage it the same on every screen: the way it was going, its energy, what it hit, whether it stopped, its width)
-  const mark = (at, n, fx, k, o = {}) => [+at.x.toFixed(2), +at.y.toFixed(2), +at.z.toFixed(2), n ? n[0] : 0, n ? n[1] : 1, n ? n[2] : 0, fx, k, ...(o.dir ? [o.dir.x, o.dir.y, o.dir.z].map((x) => +x.toFixed(2)) : [0, 0, 0]), Math.round(o.J || 0), o.m == null ? null : o.m, o.stop ? 1 : 0, +(o.cal || 8).toFixed(1)];
+  const mark = (at, n, fx, k, o = {}) => [+at.x.toFixed(2), +at.y.toFixed(2), +at.z.toFixed(2), n ? n[0] : 0, n ? n[1] : 1, n ? n[2] : 0, fx, k, ...(o.dir ? [o.dir.x, o.dir.y, o.dir.z].map((x) => +x.toFixed(2)) : [0, 0, 0]), Math.round(o.J || 0), o.m == null ? null : o.m, o.stop ? 1 : 0, +(o.cal || 8).toFixed(1), o.cut ? +o.cut.toFixed(3) : 0];
 
   // Where armour is on a body: each piece's protection is a list of { at, layers: [[material, mm], ...] }, at one of
   //   'plate' (front and back of the chest, a SAPI-sized 25 x 32 cm plate), 'side' (the flanks under the arms),

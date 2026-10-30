@@ -73,7 +73,7 @@ G.World = (() => {
     if (tmax < 0) return null;
     const n = [0, 0, 0];
     if (ax >= 0) n[ax] = sg; else n[1] = 1; // (starting inside it)
-    return { t: Math.max(0, tmin), n };
+    return { t: Math.max(0, tmin), n, out: tmax };
   }
 
   // The nearest solid from o along the unit direction d, within maxT: { t, n, solid, view, pane }, or { t: maxT }
@@ -100,6 +100,9 @@ G.World = (() => {
         if (!s || !(mv ? s.move : s.ray) || (skip && skip(s))) continue;
         const h = slab(o, d, s);
         if (!h || h.t > maxT) continue;
+        // (shot through: down a hole in it there's nothing to meet, and a blind hole's met at its floor: js/damage.js)
+        if (!mv && s.holes && s.holes.length) { const c = G.Damage.clear(s, o, d, h.t, h.out); if (c >= h.out - 1e-3) continue; h.t = c; if (c > maxT) continue; }
+        if (!mv && s.door && s.door.holes && s.door.holes.length) { const q = (h.t + h.out) / 2; if (G.Damage.doorHole(s.door, [o[0] + d[0] * q, o[1] + d[1] * q, o[2] + d[2] * q])) continue; }
         if (s.glass != null && pass && !(s.win && s.win.armor && !sight)) { if (!crossed.some((q) => q[0] === s.glass)) crossed.push([s.glass, h.t]); continue; } // (bulletproof glass: a round stops on it)
         if (s.clear && sight) { seenThru = true; continue; } // (a look through a glass door)
         if (!best || h.t < best.t) { best = h; best.solid = s; best.view = !!s.view; best.pane = s.glass != null ? s.glass : undefined; }
@@ -334,7 +337,8 @@ G.World = (() => {
         } else d.solids.push(add(w, box(cx - hx, Y, cz - hz, cx + hx, Y + L.WALL_H, cz + hz, { kind: 'door', door: d })));
       }
     }
-    if (d.open && d.leaf && !(d.pane && d.pane.broken)) { // (a glass leaf standing open: glass too; shot out, nothing much to stop anything)
+    if (d.rest) d.solids.push(add(w, box(...d.rest, { kind: 'prop', move: false, mat: G.Materials.of(map, { kind: 'door', door: d }) }))); // (shot off its hinges, lying where it fell: js/damage.js)
+    if (d.open && d.leaf && !d.fallen && !(d.pane && d.pane.broken)) { // (a glass leaf standing open: glass too; shot out, nothing much to stop anything)
       const b = d.leaf;
       d.solids.push(add(w, box(b.cx - b.hx, Y + b.y0, b.cz - b.hz, b.cx + b.hx, Y + b.h, b.cz + b.hz, { kind: 'leaf', door: d, move: false, glass: d.pane ? d.pane.id : undefined })));
     }

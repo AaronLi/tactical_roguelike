@@ -1987,6 +1987,7 @@ G.Level = {
     return merged.size;
   },
   buildMesh(map, opts) {
+    if (!opts || opts.pool !== false) { map.dmg = null; for (const d of map.doors || []) { d.holes = null; d.gone = null; d.fallen = false; d.rest = null; } } // (a fresh start: js/damage.js)
     if (map.floors) return this.buildStack(map);
     const TS = this.TS, th = map.theme, root = new THREE.Group(), pool = !opts || opts.pool !== false;
     const { W, H, t } = map, SK = map.skirt || 0, va = map.voidAbove, gr = map.grate;
@@ -2057,6 +2058,8 @@ G.Level = {
     });
     wm.layers.enable(1);
     root.add(wm);
+    // (which of them's which tile, and how they stood: a round takes cubes out of it, js/damage.js)
+    map.wallMesh = wm; map.wallIdx = new Map(walls.map(([x, z], i) => [z * W + x, i])); map.wallBase = wm.instanceMatrix.array.slice();
 
     // Houses seen from the garden: a pitched roof with eaves along every wall that faces it, and lit windows
     // behind drawn curtains (just the look: the wall is still solid).
@@ -2151,7 +2154,7 @@ G.Level = {
     if (pool) G.LightGrid.build(map);
 
     // doors: a lintel over the frame and a leaf on a hinge (rotation animated by G.Game.updateDoors)
-    const metal = th.name === 'Bunker' || th.name === 'Research Lab' || th.name === 'Cold Storage' || th.name === 'Foundry';
+    const metal = th.name === 'Bunker' || th.name === 'Research Lab' || th.name === 'Cold Storage' || th.name === 'Foundry' || th.name === 'Warehouse'; // (as js/materials.js builds them)
     const leafMat = new THREE.MeshStandardMaterial({ color: metal ? 0x5d666e : 0x6e4a2c, roughness: metal ? 0.5 : 0.75, metalness: metal ? 0.5 : 0 });
     const lintelMat = new THREE.MeshStandardMaterial({ map: wtex, roughness: 0.85 });
     const knobMat = new THREE.MeshStandardMaterial({ color: 0xb8a060, roughness: 0.3, metalness: 0.9 });
@@ -2192,12 +2195,18 @@ G.Level = {
       leaf.layers.enable(1);
       pivot.add(leaf);
       pivot.userData.leaf = leaf; // (bullet holes and blood on it go with it: G.R.onDoor)
-      if (!glassDoor) for (const side of [-1, 1]) { const k = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 6), knobMat); k.position.set(leafL - 0.08, 1.0, side * 0.045); pivot.add(k); }
+      const knobs = [], hinges = [];
+      if (!glassDoor) for (const side of [-1, 1]) { const k = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 6), knobMat); k.position.set(leafL - 0.08, 1.0, side * 0.045); pivot.add(k); knobs.push(k); }
+      // its hinges: a knuckle and a leaf on the side it opens toward (shot out, they're gone, and when they all are so's the door: js/damage.js)
+      if (!vault) for (const y of G.Damage.HINGES) {
+        const k = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.1, 8), steelMat), pl = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.09, 0.004), steelMat);
+        k.position.set(0.005, y, -0.03); pl.position.set(0.04, y, -0.0275); pivot.add(k, pl); hinges.push([k, pl]);
+      }
       // hinge on one jamb; the second leaf of a double door hinges on the opposite jamb and swings the other way
       const m = d.mirror ? -1 : 1;
       if (d.axis === 'x') { pivot.position.set(d.x, 0, d.z - half * m); pivot.rotation.y = -Math.PI / 2 * m; }
       else { pivot.position.set(d.x - half * m, 0, d.z); if (d.mirror) pivot.rotation.y = Math.PI; }
-      pivot.userData = { base: pivot.rotation.y, ang: d.open ? 1 : 0, sign: m, leaf };
+      pivot.userData = { base: pivot.rotation.y, ang: d.open ? 1 : 0, sign: m, leaf, knobs, hinges };
       pivot.rotation.y = pivot.userData.base + (d.open ? Math.PI / 2 * 0.95 * m : 0);
       root.add(pivot);
       return pivot;
