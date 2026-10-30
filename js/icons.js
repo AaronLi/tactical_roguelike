@@ -11,7 +11,7 @@ G.Icons = (() => {
   // spent hulls: js/casings.js): a shotgun shell's hull is colour-coded by its load; a bullet's tip shows its type.
   const shellCol = (am) => ({ slug: '#d8c040', flechette: '#3a6ab0', birdshot: '#3a8a3a', he: '#e07a1a' })[am] || '#b02a22'; // (buckshot red)
   const tipCol = (am) => ({ ap: '#2a2a2a', tracer: '#c03020', hp: '#d8b070', subsonic: '#5a6a3a' })[am] || '#b87333'; // (ball: copper)
-  const TYPE_COL = { ball: '#c9a14a', hp: '#e0604a', ap: '#4a90e0', tracer: '#ff6a2a', subsonic: '#9aa4ac', buck: '#c03a2a', slug: '#e8c050', birdshot: '#8ab040', flechette: '#4a90e0', he: '#c8b040', broadhead: '#8a6a40', railslug: '#40c8e0' };
+  const TYPE_COL = { ball: '#c9a14a', hp: '#e0604a', ap: '#4a90e0', tracer: '#ff6a2a', subsonic: '#9aa4ac', buck: '#c03a2a', slug: '#e8c050', birdshot: '#8ab040', flechette: '#4a90e0', he: '#c8b040', broadhead: '#39c060', mechanical: '#e09020', bodkin: '#d040b0', railslug: '#40c8e0' };
 
   function rr(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
   function shade(g, x, y, w, h) { const gr = g.createLinearGradient(x, y, x + w, y); gr.addColorStop(0, 'rgba(255,255,255,0.18)'); gr.addColorStop(0.5, 'rgba(255,255,255,0)'); gr.addColorStop(1, 'rgba(0,0,0,0.25)'); g.fillStyle = gr; g.fill(); }

@@ -64,6 +64,7 @@ G.Server = {
       }
       case 'st': if (p) p.st = m.s; break;
       case 'rfx': if (p && Array.isArray(m.a)) G.Net.broadcast({ t: 'rfx', a: m.a.slice(0, 32) }, from); break; // (the marks a round left on what it went through or off)
+      case 'bstk': if (p) G.Net.broadcast(m, from); break; // (a bolt that stuck: js/bolts.js)
       case 'hole': // (what it took out of them, js/damage.js: kept for whoever joins, and here for the suspects' eyes and rounds)
         if (p && Array.isArray(m.a) && this.map && this.phase === 'level') {
           const a = m.a.slice(0, 32); (this.holes = this.holes || []).push(...a);

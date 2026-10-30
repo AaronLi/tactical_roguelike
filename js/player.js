@@ -1136,7 +1136,7 @@ G.Me = {
     // the streak you see: from the muzzle side, closing onto the true path over the first 12 m
     if (b.show || b.tracer) {
       const came = b.dist + (end ? end.t : len), near = Math.max(0, 1 - came / 12);
-      G.R.bullet(head.clone().addScaledVector(b.off, near), way, came - (b.came0 || 0), b.def, b.tracer, sp);
+      G.R.bullet(head.clone().addScaledVector(b.off, near), way, came - (b.came0 || 0), b.def, b.tracer, sp, b.am);
     }
     if (end) {
       this.pathPt(b, end.p, end.v);
@@ -1216,7 +1216,7 @@ G.Me = {
           this.roundMark(b, o, r.ric.n, 'metal', 'r', v, null, 'armour', { m: '' });
           continue legs;
         }
-        if (!r.exitV) return stopped(o.clone().addScaledVector(d, r.entryT), done + r.entryT, true, 0);
+        if (!r.exitV) { if (ev && b.def.cls === 'BOW') this.boltIn(ev, r, o, d, b.am); return stopped(o.clone().addScaledVector(d, r.entryT), done + r.entryT, true, 0); }
         on(r.exitT);
         this.pathPt(b, o, r.exitV);
         turn(B.deflect(d, { dev: r.dev, bend: 0 }, null), r.exitV);
@@ -1240,7 +1240,7 @@ G.Me = {
         continue;
       }
       if (cut && G.Damage.apply(map, cut.rec)) (b.shot.holes = b.shot.holes || []).push(cut.rec);
-      if (!r.v) return stopped(at, done + wall.t, false, vIn); // (v: how fast it struck)
+      if (!r.v) { if (b.def.cls === 'BOW' && !s.door && !wall.view && G.Bolts.holds(r.fx)) this.boltStuck(at.clone().addScaledVector(d, Math.min(r.depth || 0, 0.08)), d, b.am); return stopped(at, done + wall.t, false, vIn); } // (v: how fast it struck)
       if (wall.pane == null && !wall.view) b.walled = true; // (through something a person could hide behind)
       const n0 = wall.n;
       on(r.t);
@@ -1256,6 +1256,21 @@ G.Me = {
       b.off.set(0, 0, 0);
     }
     return null;
+  },
+  // A bolt that didn't come out stays in them, where it stopped, on the bone it's in: unless it's met a hard plate, which
+  // it breaks or skates off, or it's gone in so far there's nothing left to see
+  boltIn(ev, r, o, d, am) {
+    const armourStop = r.stopped && (r.log || []).filter((q) => q.k).pop(), B = G.Ballistics, depth = (r.exitT || 0) - r.entryT;
+    if (r.glance || (armourStop && !G.Materials.MAT[armourStop.k].soft) || depth > G.Bolts.LEN - 0.08) return;
+    const seg = B.segs().find((s) => s.id === (r.hits[r.hits.length - 1] || {}).seg) || B.segs().find((s) => s.id === 'chest'), bone = seg && B.boneOf(ev.rig, seg.bone);
+    if (!bone) return;
+    const l = G.Bolts.onBone(ev.rig, bone, o.clone().addScaledVector(d, r.stopped ? r.entryT + 0.02 : r.exitT), d, am);
+    G.Net.toHost({ t: 'bstk', e: ev.id, b: seg.bone, l, am });
+  },
+  // into a wall, a target, a beam
+  boltStuck(at, d, am) {
+    G.Bolts.inWorld(at, d, am);
+    G.Net.toHost({ t: 'bstk', at: at.toArray().map((x) => Math.round(x * 1000) / 1000), u: d.toArray().map((x) => Math.round(x * 1000) / 1000), am });
   },
   // who's on the line from a along dir, out to t, nearest first
   roundHits(b, a, dir, wallT) {

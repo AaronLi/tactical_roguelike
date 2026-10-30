@@ -29,7 +29,7 @@ G.Materials = (() => {
   const m = (name, K, rho, sig, fx, o) => Object.assign({ name, K, rho, sig, fx, E: CORE_E, mu: 0.3, e: 0.15 }, o || {});
   const MAT = {
     // armour (K, E, blunt, wearJ: the NIJ calibration, js/ballistics.js)
-    aramid: m('aramid', 72, 1440, 3e8, 'soft', { E: { lead: 1, mild: 1.25, hard: 1.45, wc: 1.5 }, blunt: 0.25, wearJ: 900, soft: true, noRic: true, damp: 0.6 }),
+    aramid: m('aramid', 72, 1440, 3e8, 'soft', { E: { lead: 1, mild: 1.25, hard: 1.45, wc: 1.5 }, blunt: 0.25, wearJ: 900, soft: true, noRic: true, damp: 0.6, weave: 0.1 }), // (weave: the share of it a spike has to get through, js/ballistics.js vLimit)
     pe: m('UHMWPE', 77, 970, 2.5e8, 'soft', { E: { lead: 1, mild: 1.35, hard: 1.75, wc: 2 }, blunt: 0.15, wearJ: 2200, noRic: true, damp: 0.7 }),
     steel: m('steel', 163, 7850, 2.4e9, 'metal', { E: { lead: 0.9, mild: 1.1, hard: 1.5, wc: 1.9 }, blunt: 0.1, wearJ: 4500, hard: true, mu: 0.1, e: 0.25 }),
     ceramic: m('ceramic', 146, 3900, 4e9, 'stone', { E: { lead: 0.8, mild: 0.9, hard: 1, wc: 1.25 }, blunt: 0.08, wearJ: 1600, hard: true, mu: 0.15, e: 0.2 }),

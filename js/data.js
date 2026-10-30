@@ -421,10 +421,14 @@ G.AMMO = {
   birdshot: { name: 'Birdshot', tag: 'BIRD', k: 0.7, pelletsK: 2.5, spreadK: 1.5, desc: 'A cloud of tiny 0.2 g pellets: they shed their speed in a few centimetres of flesh. Painful, rarely lethal past a few metres; armour shrugs them off.' },
   flechette: { name: 'Flechette', tag: 'FLCH', k: 2.6, spreadK: 0.7, desc: 'Hardened steel darts: a tight pattern, and narrow and hard enough to get through soft armour. Thin tracks.' },
   he: { name: 'HE grenade', tag: 'HE', k: 1, desc: '40 mm high explosive.' },
-  broadhead: { name: 'Broadhead bolt', tag: 'BOLT', k: 1, desc: 'A hunting bolt.' },
+  // Bolts kill by cutting, not by energy: about what a .22 carries, on a head that opens a wound and lets it bleed.
+  // (glow: the lit nock's colour, in flight and where it sticks: js/bolts.js)
+  broadhead: { name: 'Broadhead bolt', tag: 'BOLT', k: 1, glow: 0x39ff5a, desc: 'A hunting bolt: three fixed blades, 30 mm across. Goes deep and bleeds them, often right through. A vest stops it.' },
+  mechanical: { name: 'Mechanical broadhead', tag: 'MECH', k: 1.6, glow: 0xffa020, desc: 'Blades that swing open on impact, 50 mm across: the worst wound there is, but opening costs it its depth, so it stays in them.' },
+  bodkin: { name: 'Bodkin bolt', tag: 'BDKN', k: 2.2, velK: 0.79, massK: 1.6, glow: 0xff3ad0, desc: 'A heavy hardened needle, the old answer to mail: it parts a soft vest\'s weave where a bullet would be caught, and leaves a narrow wound. A hard plate still stops it.' },
   railslug: { name: 'Tungsten slug', tag: 'SLUG', k: 1, desc: 'Magnetically launched.' },
 };
-G.AMMO_TYPES = { rifle: ['ball', 'hp', 'ap', 'tracer', 'subsonic'], pistol: ['ball', 'hp', 'ap', 'tracer', 'subsonic'], shotgun: ['buck', 'slug', 'birdshot', 'flechette'], grenade: ['he'], bolt: ['broadhead'], cell: ['railslug'] };
+G.AMMO_TYPES = { rifle: ['ball', 'hp', 'ap', 'tracer', 'subsonic'], pistol: ['ball', 'hp', 'ap', 'tracer', 'subsonic'], shotgun: ['buck', 'slug', 'birdshot', 'flechette'], grenade: ['he'], bolt: ['broadhead', 'mechanical', 'bodkin'], cell: ['railslug'] };
 // How fast a round leaves the muzzle (m/s), for whether it cracks going past (only above the speed of sound,
 // 343 m/s). Reference velocities by caliber at a reference barrel length (inches), scaled gently by the
 // build's barrel; how far it carries before drag takes 63% of its speed (m: pellets slow fast).
@@ -563,7 +567,7 @@ G.CLICK = 0.0001;
 G.boreTip = (w) => { const d = w.def; if (d.cls === 'RAIL') return 0; const k = G.zeroSlope(d, G.ballFor(G.calOf(d)), G.zeroOf(d)); return (k == null ? 0 : k) + (w.clicks || 0) * G.CLICK; };
 G.ballFor = (cal) => G.AMMO_TYPES[(G.CALIBERS[cal] || { group: 'cell' }).group][0];
 // how often each type turns up loaded in a found gun (relative): ball and buckshot mostly, AP and flechette rarely
-G.AMMO_RARITY = { ball: 10, hp: 3, tracer: 3, subsonic: 2, ap: 1, buck: 10, slug: 4, birdshot: 3, flechette: 1, he: 1, broadhead: 1, railslug: 1 };
+G.AMMO_RARITY = { ball: 10, hp: 3, tracer: 3, subsonic: 2, ap: 1, buck: 10, slug: 4, birdshot: 3, flechette: 1, he: 1, broadhead: 3, mechanical: 2, bodkin: 1, railslug: 1 };
 G.rollAmmo = (cal, rnd = Math.random) => {
   const types = G.AMMO_TYPES[(G.CALIBERS[cal] || { group: 'cell' }).group];
   let x = rnd() * types.reduce((a, t) => a + (G.AMMO_RARITY[t] || 1), 0);

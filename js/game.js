@@ -435,6 +435,7 @@ G.Game = {
         break;
       case 'snap': if (this.phase === 'level') G.Views.applySnap(m); break;
       case 'rfx': if (this.phase === 'level') G.Views.roundFx(m.a); break;
+      case 'bstk': if (this.phase === 'level') G.Bolts.fromNet(m); break;
       case 'hole': if (this.phase === 'level') for (const h of m.a || []) G.Damage.apply(this.map, h); break;
       case 'dpart': if (this.phase === 'level' && this.map.doors[m.i]) G.Damage.partGone(this.map, this.map.doors[m.i], m.pt); break;
       case 'dfall': { // (shot off its hinges)

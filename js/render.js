@@ -497,7 +497,7 @@ G.R = {
     });
   },
   trailDrop(tr) { tr.line.removeFromParent(); tr.line.geometry.dispose(); tr.mat.dispose(); for (const m of tr.marks) { m.removeFromParent(); m.material.dispose(); } },
-  bullet(head, dir, came, def, tracer, sp) {
+  bullet(head, dir, came, def, tracer, sp, am) {
     const rail = def.cls === 'RAIL', bolt = def.cls === 'BOW', gren = !!def.explosive;
     const L = rail ? 60 : bolt ? 0.7 : gren ? 0.25 : tracer ? G.U.clamp(sp * 0.03, 3, 24) : G.U.clamp(sp * 0.008, 0.6, 5);
     const lead = bolt || gren ? 0.3 : 2; // (nothing shows in the first couple of metres: it's still in the muzzle's flash)
@@ -508,7 +508,12 @@ G.R = {
       this.streak(tail, head, hot, 0.008, 1, false, 1.5);
       if (came > 4) { this.glow(tail, head, col, 0.18, 1, 24); this.flare(head, col, 0.2, 1, 18); }
     } else if (rail) { this.streak(tail, head, col, 0.02, 1, false, 2); this.glow(tail, head, col, 0.25, 0.7, 20); }
-    else if (bolt) this.streak(tail, head, 0x6b4a2a, 0.012, 1, true, 1.5);
+    else if (bolt) { // solid, its lit nock on the tail, and a faint line of it behind (js/bolts.js)
+      const nock = G.Bolts.colour(am);
+      this.streak(tail, head, 0x24262a, 0.012, 1, true, 1.5);
+      this.flare(tail, nock, 0.06, 1, 7);
+      this.glow(tail.clone().addScaledVector(dir, -Math.min(2.5, came - lead)), tail, nock, 0.02, 0.5, 2);
+    }
     else if (gren) this.streak(tail, head, 0x3a4a2a, 0.045, 1, true, 2);
     else this.streak(tail, head, col, 0.01, 0.4, false, 1);
   },

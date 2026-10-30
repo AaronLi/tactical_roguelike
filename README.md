@@ -1546,6 +1546,13 @@ says the same), but not whose: the shooter's name isn't shown.
   Thor** is the EAA/Tanfoglio Thor (Raptor): a 1911 frame, a hinged breech sleeve with a full-length Weaver rail, a long
   thin barrel, a filler block where the magazine would be. It breaks open on the pin under the barrel, and its sights and
   rail mount tip with it. Its listed chamberings stop well short of .50 BMG; the game's doesn't.
+- **Crossbow bolts** kill by cutting, not by energy: about 170 J, a .22's, on a head that opens a wound. In `js/ballistics.js` a
+  broadhead's blades are thin (`blade`, what they shove through tissue with) and open what they pass beside (`cut`, either side of
+  the track). Three loads: the **broadhead** (deep, bleeds them, often right through), the **mechanical** (blades that swing open:
+  the worst wound, but it stays in them) and the **bodkin** (a heavy needle: `spike` parts a soft vest's weave, a material's `weave`,
+  where a bullet is caught; a hard plate still stops it). A bolt that doesn't come out stays where it stopped (`js/bolts.js`):
+  following the bone it's in, or in timber and plasterboard, not in metal, stone or a hard plate, which it breaks on. Its lit nock
+  stays on in the load's colour (`glow`), in flight and where it sticks. Whoever fired it decides, and tells the squad (`bstk`).
 - **Traced from references.** Some guns' outlines are traced from a side photo or drawing rather than built from
   generic parts, the pixels mapped to metres at a known scale. **The KRISS Vector** (`rcv: 'vector'` in
   `rifle()`, `vecTrace`) is traced from a right-side photo of a Gen II (Wikimedia Commons, "Kriss-Vector-CRB.jpg",

@@ -91,7 +91,11 @@ G.Ballistics = (() => {
     else if (am === 'slug') { p.m = 0.028; p.d = 0.0185; p.len = 0.02; p.n = 1; p.nose = 'hp'; p.vExp = opens(300); }
     else if (am === 'birdshot') { p.m = 0.0002; p.d = 0.0033; p.len = 0.0033; p.n = Math.round((def.pellets || 9) * 2.5); }
     else if (am === 'flechette') { p.m = 0.0005; p.d = 0.002; p.len = 0.03; p.core = 'hard'; p.nose = 'dart'; }
-    else if (am === 'broadhead') { p.nose = 'broad'; } // (cuts a 30 mm wound; to armour it's a steel point)
+    // A bolt's head is thin blades, not a solid: blade, the width it shoves through tissue with; cut, how far either side of
+    // the track they open it. To armour it's a steel point. A mechanical's open wider and lose the depth to it.
+    else if (am === 'broadhead') { p.nose = 'broad'; p.blade = 0.012; p.cut = 0.015; }
+    else if (am === 'mechanical') { p.nose = 'broad'; p.blade = 0.017; p.cut = 0.025; }
+    else if (am === 'bodkin') { p.nose = 'dart'; p.m = 0.04; p.d = 0.008; p.spike = true; } // (a heavy needle: it parts a weave, vLimit)
     if (p.n > 1 && am !== 'birdshot' && am !== 'flechette') p.nose = 'ball';
     if (p.n > 1) p.n = def.pellets || p.n; // (the gun's pattern: the round as fired is one pellet)
     p.d0 = p.d; p.m0 = p.m; p.ang = 0; // (as it left the gun; ang: how far it's yawed off its line, rad)
@@ -115,6 +119,7 @@ G.Ballistics = (() => {
     let dEff = Math.sqrt(4 * presented(p) / Math.PI) * 1000, core = p.core;
     if (p.nose === 'hp') dEff *= M.soft ? 1.3 : 1.15; // (a blunt nose spreads its load)
     if (p.nose === 'broad') core = 'hard', dEff = 6;
+    if (p.spike && M.weave) mm *= M.weave; // (a woven fabric catches a bullet across its fibres; a point slips between them. Plates aren't woven.)
     return M.K * Math.pow(mm, 0.7) * Math.pow(dEff, 0.75) / Math.sqrt(p.m * 1000) / (M.E[core] || 1);
   }
   // One layer: does the round get through, and how fast does it come out? cond (0..1): a worn layer is thinner.
@@ -483,7 +488,7 @@ G.Ballistics = (() => {
       return true;
     };
     // how it presents now: frontal area and drag (nose-first, tumbling, opened)
-    const shape = () => [p.nose === 'broad' ? area(0.03) : yawed ? p.d * p.len * 0.85 : area(p.d) * (p.nose === 'dart' ? 0.6 : 1),
+    const shape = () => [p.nose === 'broad' ? area(p.blade) : yawed ? p.d * p.len * 0.85 : area(p.d) * (p.nose === 'dart' ? 0.6 : 1),
       yawed ? CD.yaw : expanded || p.flat ? CD.open : p.nose === 'ball' ? CD.ball : CD.fmj];
     const log = res.log = [], note = (name) => { if (!log.length || log[log.length - 1].m !== name) log.push({ m: name, v: Math.round(v), t }); }; // (what it went through, and how fast it was going into each: the F9 readout)
     // which segment is this point in (the deepest, where two meet)?
@@ -553,10 +558,11 @@ G.Ballistics = (() => {
         // the temporary cavity: its reach, and the organs it stretches (and those the track crushes). Skin and bone give up their
         // energy tearing and breaking, not throwing tissue outward: it's the flesh it's moving through that makes the cavity
         const dC = hard ? 0.5 * p.m * (v * v - slow(v, p.m, A, Cd, G.Materials.TISSUE.muscle, ds) ** 2) : dE, rT = Math.sqrt(dC / ds / (Math.PI * CAV_C));
+        const cut = p.cut || 0, rR = Math.max(rT, cut); // (a blade opens what it passes beside, not just what it goes through)
         for (const [oid, sh, bb] of s.organs || []) {
-          if (cq.x < bb[0] - rT || cq.x > bb[3] + rT || cq.y < bb[1] - rT || cq.y > bb[4] + rT || cq.z < bb[2] - rT || cq.z > bb[5] + rT) continue;
+          if (cq.x < bb[0] - rR || cq.x > bb[3] + rR || cq.y < bb[1] - rR || cq.y > bb[4] + rR || cq.z < bb[2] - rR || cq.z > bb[5] + rR) continue;
           const dist = orgDist(sh, cq), O = ORG[oid];
-          if (dist <= 0) { h.organs[oid] = (h.organs[oid] || 0) + crush + dC * (O.stretch || 0) * 0.01; (h.pierced || (h.pierced = {}))[oid] = 1; }
+          if (dist <= cut) { h.organs[oid] = (h.organs[oid] || 0) + crush + dC * (O.stretch || 0) * 0.01; (h.pierced || (h.pierced = {}))[oid] = 1; }
           else if (dist < rT && O.stretch) {
             h.organs[oid] = (h.organs[oid] || 0) + dC * O.stretch * 0.01 * (1 - dist / rT);
             if (O.stretch >= TEAR_S && dist < rT - CAV_TEAR) (h.torn || (h.torn = {}))[oid] = 1;

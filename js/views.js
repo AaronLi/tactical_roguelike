@@ -61,6 +61,7 @@ G.Views = {
   clearLevel() {
     this.vRounds = [];
     G.Casings.clear();
+    G.Bolts.clear();
     if (this.pings2) { for (const q of this.pings2.values()) { G.R.dynRoot.remove(q.s); q.s.material.map.dispose(); q.s.material.dispose(); } this.pings2.clear(); }
     for (const ev of this.enemies.values()) this.removeRig(ev.rig);
     this.enemies.clear();
@@ -492,7 +493,7 @@ G.Views = {
     const len = f.distanceTo(to);
     if (len < 0.05) { arrive(); return; }
     const rail = def.cls === 'RAIL';
-    (this.vRounds = this.vRounds || []).push({ f: f.clone(), dir: to.clone().sub(f).divideScalar(len), len, d: 0, def, arrive,
+    (this.vRounds = this.vRounds || []).push({ f: f.clone(), dir: to.clone().sub(f).divideScalar(len), len, d: 0, def, am, arrive,
       v: rail ? 3000 : Math.max(40, G.roundSpeed(def, am) || 400), drag: rail ? 1e9 : G.dragOf(def, am), tracer: !!(G.AMMO[am] && G.AMMO[am].tracer) });
   },
   stepRounds(dt) {
@@ -503,7 +504,7 @@ G.Views = {
       const b = rs[i], step = b.v * dt;
       b.d = Math.min(b.len, b.d + step);
       b.v *= Math.exp(-step / b.drag);
-      G.R.bullet(b.f.clone().addScaledVector(b.dir, b.d), b.dir, b.d, b.def, b.tracer, b.v);
+      G.R.bullet(b.f.clone().addScaledVector(b.dir, b.d), b.dir, b.d, b.def, b.tracer, b.v, b.am);
       if (b.d >= b.len || b.v < 30) { rs.splice(i, 1); b.arrive(); }
     }
   },
@@ -607,6 +608,7 @@ G.Views = {
   },
   update(dt) {
     G.Casings.update(dt);
+    G.Bolts.update();
     this.updatePings(dt);
     this.stepRounds(dt);
     if (G.Game.map && G.R.camera) { // the lights follow you (and, aiming, what you're aiming at)
