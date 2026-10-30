@@ -273,6 +273,33 @@ G.GunTraces = {
       { on: 'grip', m: 'frame', pts: [[150, 112], [210, 112], [210, 226], [150, 226]], w: 0.031, b: 0.001 }, // (the well)
     ],
   },
+  // Baikal IZH-43E (a Russian side-by-side, boxlock, top lever, double triggers, Monte Carlo stock with a pistol grip), left
+  // side ("ИЖ-43Е (1).jpg", Wikimedia Commons, ViktorJulin, CC BY-SA 4.0), scaled so its barrels, hinge to muzzle, are the
+  // game's 60 cm: 0.55 mm a pixel. x0: the back of the action; the barrels hinge on the pin in its knuckle, the forend, rib
+  // and bead tipping with them. The stock and forend are drawn from here only while the factory ones are fitted (the
+  // gunsmith's others are the generic stocks and forends).
+  dbl: {
+    ref: 'ИЖ-43Е (1).jpg', url: 'https://commons.wikimedia.org/wiki/File:%D0%98%D0%96-43%D0%95_(1).jpg', mm: 0.55, x0: 1300, y0: 200, by: 0, dir: -1, topY: 180, pin: [1182, 248], sightF: 0.09, sh: 0.006, sw: 0.007, rib: true,
+    parts: [
+      // the boxlock action, the tang strap over the stock's top, the top lever, the pins
+      { pts: [[1176, 176], [1262, 176], [1286, 184], [1300, 190], [1300, 272], [1286, 272], [1176, 257]], w: 0.044, m: 'blued', b: 0.003 },
+      { pts: [[1300, 189], [1318, 191], [1346, 200], [1386, 214], [1386, 218], [1346, 207], [1318, 198], [1300, 196]], w: 0.018, m: 'blued', b: 0.0005 },
+      { pts: [[1296, 183], [1318, 183], [1344, 192], [1352, 206], [1332, 204], [1306, 196]], w: 0.008, m: 'steel', b: 0.001 },
+      { pts: ring(1188, 244, 3.5, 8), w: 0.0012, x: 0.0222, two: true, m: 'steel', b: 0.0003 },
+      { pts: ring(1262, 232, 4, 8), w: 0.0012, x: 0.0222, two: true, m: 'steel', b: 0.0003 },
+      // the trigger guard, a loop under it, and the two triggers (one behind the other)
+      { pts: [[1262, 262], [1266, 288], [1280, 311], [1300, 322], [1340, 322], [1364, 314], [1376, 292], [1392, 272], [1392, 262]], holes: [[[1275, 268], [1280, 288], [1292, 305], [1306, 311], [1338, 311], [1356, 305], [1366, 288], [1380, 270]]], w: 0.0085, m: 'blued', b: 0.0012 },
+      { pts: [[1298, 270], [1311, 270], [1314, 290], [1310, 304], [1303, 306], [1305, 290]], w: 0.005, m: 'steel', b: 0.0006 },
+      { pts: [[1332, 272], [1344, 272], [1347, 284], [1358, 293], [1354, 297], [1340, 288]], w: 0.005, m: 'steel', b: 0.0006 },
+      // the forend: a splinter, wrapping the barrels' undersides, its tip rounded; the escutcheons on it
+      { on: 'fore', m: 'fore', pts: [[838, 226], [850, 213], [872, 208], [1000, 202], [1100, 201], [1176, 210], [1176, 257], [1100, 253], [1000, 245], [900, 237], [850, 233]], w: 0.046, b: 0.012 },
+      { on: 'fore', m: 'steel', pts: ring(1062, 236, 6, 8), w: 0.0012, x: 0.0232, two: true, b: 0.0003 },
+      { on: 'fore', m: 'steel', pts: ring(906, 243, 5, 8), w: 0.0012, x: 0.0232, two: true, b: 0.0003 },
+      // the stock: the Monte Carlo comb, the pistol grip and its cap, the recoil pad
+      { on: 'stock', m: 'stock', pts: [[1298, 203], [1314, 197], [1346, 211], [1390, 221], [1470, 245], [1498, 244], [1518, 232], [1554, 232], [1662, 246], [1700, 248], [1745, 262], [1790, 288], [1796, 292], [1796, 462], [1694, 419], [1658, 402], [1570, 361], [1558, 359], [1550, 367], [1510, 380], [1494, 380], [1486, 343], [1462, 311], [1426, 291], [1390, 273], [1326, 262], [1298, 262]], w: 0.042, b: 0.008 },
+      { on: 'stock', m: 'rubber', pts: [[1790, 288], [1833, 291], [1829, 470], [1794, 462]], w: 0.045, b: 0.003 },
+    ],
+  },
   // EAA / Tanfoglio Thor (Raptor), left side: a 1911 frame carrying a hinged breech sleeve with a Weaver rail, a
   // long thin barrel, a block where the magazine would be. From IMFDB ("EAA Thor", THOR_.45-70.jpg, 445 px) at 405 mm
   // (all4shooters, Tanfoglio Raptor). It breaks open on the pin in the block under the barrel: its muzzle drops.
