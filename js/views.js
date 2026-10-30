@@ -281,7 +281,7 @@ G.Views = {
   syncCase() {
     const map = G.Game.map, cv = map && map.caseView;
     if (!cv) return;
-    if (!cv.synced) { cv.synced = true; if (G.Game.caseOpen) cv.open = 1; } // joined with it already open
+    if (!cv.synced) { cv.synced = true; if (G.Game.caseOpen && G.Game.caseSeen()) cv.open = 1; } // joined with it already open
     const code = G.Game.wcase ? G.Game.wcase.code : null, sk = G.Game.wcase && G.Game.wcase.sk, ck = code && code + '#' + G.Stickers.key(sk);
     if (ck === cv.code) return;
     cv.code = ck;
@@ -852,7 +852,7 @@ G.Views = {
     // the weapon case lid: latches clack, then it swings up and back against the wall
     const cv = G.Game.map && G.Game.map.caseView;
     if (cv) {
-      const want = G.Game.caseOpen ? 1 : 0;
+      const want = G.Game.caseOpen && G.Game.caseSeen() ? 1 : 0;
       if (want && cv.open === 0) { const mc = G.Game.map.case; G.Audio.clink(Math.hypot(mc.x - G.Me.pos.x, mc.z - G.Me.pos.z)); }
       cv.open = want ? Math.min(1, cv.open + dt / 0.8) : 0;
       cv.lid.rotation.x = -1.78 * (1 - Math.pow(1 - cv.open, 3));

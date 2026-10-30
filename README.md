@@ -522,7 +522,7 @@ says the same), but not whose: the shooter's name isn't shown.
     you have no primary, you just take it and the case is left empty.
   - **Co-op:** one case for the whole squad. After someone swaps, the next player can take the weapon they
     left.
-- **The weapon case's wheel** (`js/game.js` caseShow): opening the case spins one wide reel through guns till you stop it, and it lands on what's really in there (the host's roll: stopping only shows it). Looking again, it's landed. Take it from there, swapped for your weapon of that kind or with yours into your backpack, or leave it.
+- **The weapon case's wheel** (`js/game.js` caseShow): the first time you look in the case (a teammate may have opened it) one wide reel spins through guns till you stop it, and it lands on what's really in there (the host's roll: stopping only shows it). Its lid stays down on your screen till then, so the gun in it can't give it away. Looking again, it's landed. Take it from there, swapped for your weapon of that kind or with yours into your backpack, or leave it.
 - **The attachments box** (`map.abox`, most levels: `G.Level.ABOX_CHANCE`): a small black hard case with a yellow band,
   on the floor against a wall in a room away from the spawn (yellow on your minimap till you've had your pick).
   - **One use each:** a light on its front for each of the squad, in their colour, lit till they've had their pick.

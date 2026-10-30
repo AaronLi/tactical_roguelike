@@ -881,13 +881,15 @@ G.Game = {
     for (const b of this.$('aboxPick').querySelectorAll('[data-fit],[data-take]')) b.disabled = true;
   },
   // ------------------------------------------------------------- the weapon case
-  // One weapon, one wheel, wider than the attachment box's: the first time you open it up it spins through what could have been in there till you
-  // stop it, and lands on what's really in it (the host's, as ever: stopping only shows it). Looking again, it's landed. Take it or leave it.
+  // One weapon, one wheel, wider than the attachment box's: the first time you look in it (whoever opened it) it spins through what could have been in
+  // there till you stop it, and lands on what's really in it (the host's, as ever: stopping only shows it). Looking again, it's landed. Take it or leave it.
+  // Its lid stays down on your screen till then (js/views.js), so the gun in it doesn't give the wheel away.
+  caseSeen() { return !this.wcase || !!(this.caseUI && this.caseUI.lv === this.level && this.caseUI.wh.landed); },
   caseShow(spin) {
     if (this.phase !== 'level') return;
     let ui = this.caseUI && this.caseUI.lv === this.level ? this.caseUI : null;
     if (!ui) {
-      ui = this.caseUI = { lv: this.level, wh: { landed: !spin || !this.wcase, stop: null, off: 0, strip: null } };
+      ui = this.caseUI = { lv: this.level, wh: { landed: !this.wcase, stop: null, off: 0, strip: null } };
       if (!ui.wh.landed) {
         const pool = G.WEAPON_LIST.filter((w) => G.obtainable(w)).map((w) => G.Gunsmith.defaultCode(w.id)), R = this.REEL, one = [];
         for (let i = 0; i < R.M; i++) one.push(pool[(Math.random() * pool.length) | 0]);
@@ -1110,6 +1112,7 @@ G.Game = {
     G.Net.toHost({ t: 'pick', n });
   },
   enterLevel(level, seed, th) {
+    this.caseUI = null; // (a new run's level 1 has a new case, whatever the last one's number was)
     this.leaveHub();
     this.phase = 'level';
     this.level = level;
