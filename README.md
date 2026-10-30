@@ -1581,14 +1581,18 @@ says the same), but not whose: the shooter's name isn't shown.
   carrying handle's loop with the rear aperture and the cocking knob in its opening, the raked grip and the trigger
   guard's bar to the front grip, the ribs under the nose, the ejection port over the magazine. Its sights stay on
   whatever's fitted; another sight goes on a rail along the top of the handle, very high over the bore as on the
-  real one. **The F2 Bullpup** (`rcv: 'f2'`, `f2Trace`) is a FAMAS F1, traced from a right-side photo (Wikimedia
-  Commons, "FAMAS Assaultrifle FRA noBG.png", CC BY-SA 4.0) at 0.339 mm a pixel, 757 mm overall, the F1's figure: the
-  composite shell from the ribbed butt through the cheek step and the ejection port to the magazine well, the belly
-  arching up to a raked, grooved grip, and the thin loop of the F1's trigger guard (the G2's is the big one). Over the
-  receiver is the carrying handle, a hollow box of two walls and a roof with the cocking lever in its window, so the
-  aperture and the front post sit down the tunnel between them; another sight goes on a rail along the top of the
-  handle. Under the handguard are its cooling bumps, then the grenade sight folded on the receiver, the spigot's
-  ridges and the flash hider. The shared STANAG magazines are drawn to fit it (`magFit`): a short, near-straight box level with the grip, as an F1's, whatever they hold. **The QBZ-192** (`rcv: 'qbz192'`) is built by eye from photos: a tall flat-sided upper railed its whole
+  real one. **The F2 Bullpup** (`rcv: 'f2'`, `f2Trace`) is a FAMAS G2, traced from a right-side photo (Wikimedia Commons,
+  "FAMAS-G2-IMG 8894-white.jpg", CC BY-SA 2.0 fr) at 0.3554 mm a pixel, 757 mm overall, the G2's figure. It was first
+  cut from an F1 photo ("FAMAS Assaultrifle FRA noBG.png", CC BY-SA 4.0), which has the same handle and upper but
+  its grip and magazine well further forward and a thin trigger guard; the game's gun is the G2: 5.56 on STANAG magazines. The composite shell runs from the ribbed butt through the cheek step and
+  the ejection port to the magazine well; the belly arches up to a raked, grooved grip; and the guard is the G2's, one
+  moulding with the grip, a band from the grip's foot up to the handguard enclosing the whole hand (the F1's is a thin
+  loop). Over the receiver is the carrying handle, a hollow box of two walls and a roof with the cocking lever in its
+  window, so the aperture and the front post sit down the tunnel between them; another sight goes on a rail along the
+  top of the handle. Under the handguard are its cooling bumps, then the grenade sight's rod along the receiver, the
+  spigot's ridges and the flash hider. A STANAG sits seated in the well as the photo's does (`magFit` draws the shared
+  magazines to it: about 11 cm below the well, moderately curved, whatever they hold). A grip sleeve (the Talon
+  vertical grip) replaces the traced grip, on the same joint and rake and clear of the guard; the other grips recolour it. **The QBZ-192** (`rcv: 'qbz192'`) is built by eye from photos: a tall flat-sided upper railed its whole
   length, the rail carried on over a deep squared handguard (`hg: 'qbz'`), the lower's flared well, the charging
   handle at the front right, a folding telescoping stock (`stock: 'qbz'`). **The SIG MCX and MPX** (`rcv: 'mcx'`,
   `'mpx'`): AR-shaped, no buffer tube (the stock hinges on the back of the upper; the MPX keeps its tube stock), the
@@ -1628,7 +1632,7 @@ says the same), but not whose: the shooter's name isn't shown.
   | M4 | 857 | 838 | MP5 | 712 | 680 |
   | HK416 (14.5") | 902 | 900 | MP5SD | 782 | 805 |
   | AK-47 | 906 | 880 | Micro Uzi | 460 | 460 |
-  | FAMAS | 779 | 757 | Vector | 732 | 706 |
+  | FAMAS | 760 | 757 | Vector | 732 | 706 |
   | G36 | 1009 | 999 | MP7 | 637 | 638 |
   | SCAR-H | 987 | 965 | P90 | 477 | 505 |
   | Tavor | 739 | 720 | Thompson | 882 | 860 |

@@ -821,9 +821,9 @@ G.GunModels = (() => {
   // the QBZ-95's trace (rifle(), rcv 'qbz95'): a pixel of its reference photo ([x, y]: x forward from the butt at 88, y
   // down from the bore at 262, the photo drawn 1500 px wide) to gun space ([forward, up], metres)
   const qbzTrace = ([x, y]) => [(x - 88) * 0.000574, (262 - y) * 0.000574];
-  // the F2's trace (rifle(), rcv 'f2'): a pixel of its reference photo ([x, y]: x forward from the butt at 104, y down
-  // from the bore at 372, the photo drawn 2450 px wide) to gun space ([forward, up], metres)
-  const f2Trace = ([x, y]) => [(x - 104) * 0.000339, (372 - y) * 0.000339];
+  // the F2's trace (rifle(), rcv 'f2'): a pixel of its reference photo ([x, y]: x forward from the butt at 204, y down
+  // from the bore at 931, the photo drawn 3000 px wide) to gun space ([forward, up], metres)
+  const f2Trace = ([x, y]) => [(x - 204) * 0.0003554, (931 - y) * 0.0003554];
   // the SCAR's trace (rifle(), rcv 'scar', and its stock): a pixel of its reference photo ([x, y]: x forward from the back
   // of the upper at 400, y down from the bore at 245, the photo drawn 1500 px wide) to gun space ([forward, up], metres)
   const scarTrace = ([x, y]) => [(x - 400) * 0.00059, (245 - y) * 0.00059];
@@ -935,48 +935,53 @@ G.GunModels = (() => {
       k.prof(pts([[1098, 198], [1156, 206], [1150, 166], [1104, 166]]), 0.028, sh, 0, null, 0.003);
       top = V([0, 204])[1];
     } else if (rcv === 'f2') {
-      // The FAMAS F1 (this is the F2), traced from a side photo of the right side (Wikimedia Commons, "FAMAS Assaultrifle
-      // FRA noBG.png", CC BY-SA 4.0) at 0.339 mm a pixel: 757 mm overall, the F1's figure, the barrel nearly all inside.
-      // A bullpup in a composite shell: the butt and cheek step, the ejection port, the magazine well behind the hand, and
-      // the belly arching up to the grip. Over the receiver the carrying handle, a hollow box (two walls and a roof, the
-      // sights looking down the tunnel between them) with the cocking lever in its window; the handguard's cooling bumps
-      // underneath, the grenade sight lying folded on the receiver, the spigot's ridges and the flash hider out front.
-      // The trigger guard is a thin loop (the G2's is the big one).
+      // The FAMAS G2 (this is the F2), traced from a side photo of the right side (Wikimedia Commons, "FAMAS-G2-IMG
+      // 8894-white.jpg", CC BY-SA 2.0 fr; the first cut of it, an F1, was "FAMAS Assaultrifle FRA noBG.png", CC BY-SA 4.0,
+      // the same shell) at 0.3554 mm a pixel: 757 mm overall, the G2's figure, the barrel nearly all inside. A bullpup
+      // in a composite shell: the butt and cheek step, the ejection port, the magazine well behind the hand, the belly
+      // arching up to the grip. What makes it a G2 is the guard: one moulding with the grip, a band from the grip's foot
+      // up to the handguard that encloses the whole hand (the F1's is a thin loop). Over the receiver the carrying
+      // handle, a hollow box (two walls and a roof, the sights looking down the tunnel between them) with the cocking
+      // lever in its window; the handguard's cooling bumps underneath, the grenade sight along the receiver, the spigot's
+      // ridges and the flash hider out front.
       const V = f2Trace, pts = (a) => a.map(V), B = M.black(), D = M.rubber(), sh = fm;
       // the shell from the butt to the front of the magazine well, wider than the receiver
-      k.prof(pts([[105, 278], [115, 252], [136, 248], [390, 245], [461, 300], [536, 304], [553, 304], [561, 287], [577, 273], [915, 269], [945, 269], [945, 640], [748, 647], [746, 628], [738, 615], [720, 607],
-        [685, 617], [673, 553], [614, 555], [519, 586], [515, 600], [506, 609], [480, 617], [470, 632], [453, 639], [440, 638], [421, 613], [278, 648], [270, 664], [161, 665], [146, 654], [141, 627], [133, 617],
-        [141, 593], [124, 573], [130, 552], [118, 539], [124, 519], [112, 500], [116, 480], [105, 468], [105, 460], [111, 454], [104, 407]]), 0.064, sh, 0, null, 0.007);
+      k.prof(pts([[205, 949], [225, 827], [239, 815], [252, 823], [265, 816], [280, 817], [304, 818], [470, 818], [510, 868], [520, 871], [603, 873], [611, 862], [624, 861], [905, 854], [905, 1150], [896, 1155], [861, 1161],
+        [652, 1170], [651, 1106], [623, 1103], [610, 1115], [528, 1133], [515, 1151], [486, 1159], [461, 1175], [449, 1174], [441, 1158], [434, 1156], [322, 1181], [307, 1195], [285, 1196], [277, 1203], [237, 1203],
+        [226, 1193], [211, 1162], [217, 1155], [209, 1143], [208, 1123], [215, 1119], [207, 1107], [206, 1088], [213, 1083], [204, 1068], [203, 1035]]), 0.064, sh, 0, null, 0.007);
       // the receiver and handguard: the belly arching up behind the grip, the bumps along the underside, the barrel's collar at the front
-      k.prof(pts([[931, 269], [1970, 271], [1969, 288], [1983, 333], [1990, 346], [1995, 418], [1981, 419], [1970, 435], [1911, 483], [1894, 490], [1846, 484], [1821, 493], [1784, 494], [1770, 485], [1749, 485],
-        [1732, 495], [1699, 496], [1686, 483], [1665, 483], [1646, 496], [1614, 500], [1606, 498], [1597, 486], [1587, 486], [1544, 501], [1516, 503], [1505, 498], [1500, 503], [1490, 503], [1490, 484], [1157, 485],
-        [1127, 476], [1094, 464], [1055, 467], [1027, 476], [987, 493], [964, 513], [944, 550], [936, 613], [931, 613]]), 0.052, sh, 0, null, 0.006);
-      // the grip (in the grip panels' colour, if they're a colour), raked back, the finger grooves down its front
-      k.prof(pts([[1157, 470], [1149, 550], [1114, 596], [1093, 649], [1086, 702], [1093, 755], [1107, 782], [1132, 799], [1165, 809], [1212, 811], [1234, 802], [1240, 793], [1239, 747], [1263, 713], [1262, 671],
-        [1284, 643], [1280, 606], [1305, 571], [1310, 540], [1310, 480]]), 0.034, o.gm || sh, 0, null, 0.006);
+      k.prof(pts([[905, 846], [1992, 846], [1990, 862], [2000, 893], [2008, 975], [1995, 976], [1985, 991], [1928, 1037], [1905, 1052], [1881, 1062], [1840, 1062], [1815, 1054], [1758, 1063], [1704, 1050], [1681, 1063],
+        [1661, 1063], [1608, 1052], [1595, 1063], [1522, 1065], [1522, 1058], [1117, 1056], [1116, 1049], [1083, 1031], [1010, 1042], [953, 1076], [922, 1110], [896, 1155], [905, 1150]]), 0.052, sh, 0, null, 0.006);
+      // the grip and its guard, one moulding. The grip is raked back with finger grooves down its front; fit a grip sleeve
+      // ('vertical', or any shape that isn't the F2's own) and it takes the grip's place on the same joint and rake; the
+      // guard is the band from its foot up to the handguard, clear of both
+      k.tag('grip');
+      if ((o.gripT || 'ar') === 'ar') k.prof(pts([[1117, 1056], [1109, 1083], [1040, 1157], [1002, 1246], [1003, 1289], [1014, 1305], [1050, 1329], [1114, 1351], [1150, 1345], [1142, 1300], [1147, 1284], [1168, 1268],
+        [1176, 1231], [1205, 1202], [1213, 1165], [1241, 1135], [1235, 1106], [1253, 1065], [1265, 1050]]), 0.034, o.gm || sh, 0, null, 0.006);
+      else k.prof(pts([[1140, 1056], [1245, 1056], [1160, 1338], [1066, 1338]]), 0.03, o.gm || sh, 0, null, 0.004);
+      k.tag('base');
+      k.prof(pts([[1452, 1066], [1444, 1087], [1332, 1242], [1307, 1260], [1204, 1296], [1142, 1300], [1114, 1351], [1232, 1348], [1361, 1300], [1384, 1275], [1522, 1065], [1530, 1060], [1452, 1060]]), 0.012, B, 0, null, 0.002);
+      // the trigger, and the selector's bar behind it
+      k.prof(pts([[1281, 1062], [1308, 1062], [1306, 1096], [1328, 1118], [1318, 1125], [1287, 1094]]), 0.007, B, 0, null, 0.0008);
+      k.prof(pts([[1326, 1064], [1370, 1064], [1343, 1099], [1318, 1092]]), 0.01, B, 0, null, 0.001);
       // the carrying handle: two walls and a roof, so the sight line runs down the tunnel between them; the window shows the lever
-      const win = pts([[1080, 222], [1098, 211], [1366, 208], [1496, 206], [1751, 203], [1784, 202], [1805, 209], [1829, 231], [1838, 254], [1838, 274], [1166, 272], [1080, 272]]);
-      for (const x of [-0.0165, 0.0165]) k.prof(pts([[937, 290], [937, 143], [947, 129], [986, 110], [1333, 111], [1900, 129], [1925, 141], [1947, 172], [1970, 271], [1970, 290]]), 0.006, sh, x, [win], 0.0008);
-      k.prof(pts([[937, 143], [947, 129], [986, 110], [1333, 111], [1900, 129], [1925, 141], [1947, 172], [1953, 200], [937, 200]]), 0.04, sh, 0, null, 0.005);
-      // the grenade sight folded along the receiver in the window, its pivot, the ear at its front
-      k.box(0.008, V([0, 258])[1] - V([0, 274])[1], V([1838, 0])[0] - V([1618, 0])[0], B, V([1618, 0])[0], (V([0, 258])[1] + V([0, 274])[1]) / 2);
-      k.box(0.008, V([0, 236])[1] - V([0, 252])[1], V([1661, 0])[0] - V([1633, 0])[0], B, V([1633, 0])[0], (V([0, 236])[1] + V([0, 252])[1]) / 2);
-      { const [f, y] = V([1862, 266]); k.cylX(0.0065, 0.054, M.steel(), f, y); }
-      // the trigger guard (a thin loop), the trigger, the selector's bar in front of it
-      k.prof(pts([[1305, 470], [1494, 470], [1494, 538], [1489, 563], [1477, 581], [1457, 590], [1355, 588], [1321, 580], [1305, 571]]), 0.004, B, 0,
-        [pts([[1310, 484], [1470, 486], [1473, 526], [1473, 557], [1468, 570], [1455, 576], [1369, 568], [1335, 567], [1319, 559], [1313, 540], [1314, 506], [1306, 496]])], 0.0005);
-      k.prof(pts([[1338, 482], [1350, 483], [1352, 520], [1369, 560], [1376, 572], [1360, 568], [1344, 526], [1338, 490]]), 0.007, B, 0, null, 0.0008);
-      k.box(0.014, 0.0183, 0.0139, B, V([1376, 0])[0], V([0, 511])[1]);
-      // the butt pad, the sling loop on its side, the ejection port (right side) with the bolt in it, the pins
-      k.prof(pts([[136, 248], [115, 252], [105, 278], [104, 407], [111, 454], [105, 460], [105, 468], [116, 480], [112, 500], [124, 519], [118, 539], [130, 552], [124, 573], [141, 593], [133, 617], [141, 627], [146, 654],
-        [161, 665], [190, 662], [180, 250]]), 0.0662, D, 0, null, 0.0005);
-      k.prof(pts([[190, 388], [214, 388], [218, 486], [194, 486]]), 0.003, M.steel(), 0.0325, [pts([[197, 396], [209, 396], [212, 478], [199, 478]])], 0.0004);
-      k.box(0.002, V([0, 327])[1] - V([0, 376])[1], V([919, 0])[0] - V([601, 0])[0], D, V([601, 0])[0], V([0, 351])[1], 0.0321);
-      k.box(0.003, 0.009, V([910, 0])[0] - V([612, 0])[0], M.steel(), V([612, 0])[0], V([0, 346])[1], 0.0322);
-      { const [f, y] = V([918, 438]); k.cylX(0.0072, 0.067, B, f, y); }
-      { const [f, y] = V([1038, 292]); k.cylX(0.005, 0.054, M.steel(), f, y); }
+      const win = pts([[1126, 803], [1131, 794], [1165, 776], [1486, 772], [1550, 770], [1821, 767], [1876, 768], [1872, 819], [1688, 819], [1666, 810], [1641, 825], [1638, 845], [1580, 840], [1463, 839], [1138, 823]]);
+      for (const x of [-0.0165, 0.0165]) k.prof(pts([[972, 860], [972, 844], [1001, 712], [1014, 693], [1034, 683], [1143, 682], [1849, 690], [1939, 693], [1953, 699], [1991, 737], [2000, 756], [2000, 860]]), 0.006, sh, x, [win], 0.0008);
+      k.prof(pts([[989, 768], [1001, 712], [1014, 693], [1034, 683], [1143, 682], [1849, 690], [1939, 693], [1953, 699], [1991, 737], [2000, 756], [2000, 768]]), 0.04, sh, 0, null, 0.005);
+      // the grenade sight's rod along the right of the receiver, its ear standing in the window
+      { const [f0, y] = V([1140, 902]); k.cyl(0.0045, V([1710, 0])[0] - f0, M.gunmetal(), f0, y, 0.0275); }
+      k.box(0.008, V([0, 810])[1] - V([0, 845])[1], V([1666, 0])[0] - V([1638, 0])[0], B, V([1638, 0])[0], (V([0, 810])[1] + V([0, 845])[1]) / 2);
+      // the butt pad, the sling loop on its side, the ejection port (right side) with the bolt in it, the pins, the magazine catch
+      k.prof(pts([[239, 815], [225, 827], [205, 949], [203, 1035], [204, 1068], [213, 1083], [206, 1088], [207, 1107], [215, 1119], [208, 1123], [209, 1143], [217, 1155], [211, 1162], [226, 1193], [237, 1203], [277, 1203],
+        [285, 1196], [290, 820], [265, 816]]), 0.0662, D, 0, null, 0.0005);
+      k.prof(pts([[262, 1002], [297, 1002], [300, 1078], [266, 1078]]), 0.003, M.steel(), 0.0325, [pts([[270, 1010], [289, 1010], [292, 1070], [274, 1070]])], 0.0004);
+      k.box(0.002, V([0, 933])[1] - V([0, 979])[1], V([956, 0])[0] - V([647, 0])[0], D, V([647, 0])[0], V([0, 956])[1], 0.0321);
+      k.box(0.003, 0.009, V([946, 0])[0] - V([657, 0])[0], M.steel(), V([657, 0])[0], V([0, 950])[1], 0.0322);
+      { const [f, y] = V([909, 1049]); k.cylX(0.0075, 0.067, B, f, y); }
+      { const [f, y] = V([1065, 889]); k.cylX(0.0058, 0.054, M.steel(), f, y); }
+      { const [f, y] = V([688, 1078]); k.cylX(0.0058, 0.066, B, f, y); }
       if (o.siderails) for (const x of [-0.029, 0.029]) sideRail(k, L - 0.065, 0.055, -0.006, x); // (short rails on the handguard's flanks, the light and laser's)
-      top = V([0, 270])[1];
+      top = V([0, 846])[1];
     } else if (rcv === 'qbz192') {
       // The QBZ-192 (the QBZ-191 carbine), from photos (Wikimedia Commons, "QBZ-192 extended stock.jpg") and its 10.5"
       // barrel: a conventional layout. A tall flat-sided upper with a rail its whole length, carried on over the
@@ -1154,7 +1159,7 @@ G.GunModels = (() => {
 
     k.tag('grip');
     if (tr) tracedParts(k, tr, VT, 'grip', mats);
-    else if (o.gripT !== 'none' && rcv !== 'qbz95' && !((rcv === 'vector' || rcv === 'aug' || rcv === 'f2') && (o.gripT || 'ar') === 'ar')) grip(k, gf, o.gm || fm, o.gripT || (rcv === 'ak' ? 'wood' : 'ar')); // (the Vector's own is part of its lower)
+    else if (o.gripT !== 'none' && rcv !== 'qbz95' && rcv !== 'f2' && !((rcv === 'vector' || rcv === 'aug') && (o.gripT || 'ar') === 'ar')) grip(k, gf, o.gm || fm, o.gripT || (rcv === 'ak' ? 'wood' : 'ar')); // (the Vector's own is part of its lower)
     k.tag('stock');
     if (rcv === 'vector' && o.stock) { const sp = k.part(0, vecTrace([0, 110])[1]); k.into(sp); stock(k, o.stock, o.sm || fm, false); k.into(null); } // (its tube level with the top of the receiver: the bore's below the shoulder)
     else if (!bull && o.stock) stock(k, o.stock, o.sm || fm, o.gripT === 'none');
@@ -1296,9 +1301,9 @@ G.GunModels = (() => {
     } else if (rcv === 'f2') {
       // its own sights stay whatever's fitted: the aperture in the handle's rear leg, the post in its front, the line between
       // them down the tunnel; anything else goes on a rail along the top of the handle, as high over the bore as the real handle
-      const V = f2Trace, own = S.irons(k, 0.3, 0.6, V([0, 233])[1], top, top, 'ar');
+      const V = f2Trace, own = S.irons(k, 0.3, 0.6, V([0, 798])[1], top, top, 'ar');
       if (!o.optic || ['irons', 'notch'].includes(o.optic)) sight = Object.assign(own, { relief: 0.14 }); // (the eye well back from the handle's rear leg)
-      else { const [ra] = V([1000, 0]), [rb] = V([1760, 0]); sight = sightOf(k, o, S.rail(k, ra, rb - ra, V([0, 114])[1], rm), L, bl, br, front, ofs); }
+      else { const [ra] = V([1050, 0]), [rb] = V([1783, 0]); sight = sightOf(k, o, S.rail(k, ra, rb - ra, V([0, 692])[1], rm), L, bl, br, front, ofs); }
     } else if (rcv === 'g36' && ['irons', 'notch', undefined].includes(o.optic)) sight = S.irons(k, g36Trace([362, 0])[0], g36Trace([632, 0])[0], top + 0.016, top, top, 'ar'); // (low ones at the ends of the handle's rail)
     else if (o.ironsAt && ['irons', 'notch', undefined].includes(o.optic)) sight = S.irons(k, o.ironsAt[0], o.ironsAt[1], top + 0.034, top, o.ironsAt[2] != null ? o.ironsAt[2] : top, 'ar'); // (the upper's own flip-ups: the SCAR's, the front on its gas block)
     else sight = rcv === 'vector' && ['irons', 'notch', undefined].includes(o.optic) ? S.irons(k, vecTrace([358, 0])[0], vecTrace([700, 0])[0], top + 0.034, top, top, 'ar') // (the flip-ups at the rail's two ends, raised)
@@ -1316,7 +1321,7 @@ G.GunModels = (() => {
     const chamberAt = tr && tr.chamber ? { side: 'breech', heads: [[0, by - hy]], z: L - tr.chamber, r: 0.0064 } // (the Thor's: at the back of its sleeve)
       : rcv === 'break' ? { side: 'breech', heads: (o.barrels || [0]).map((x) => [x, by + 0.035]), z: -0.0005, r: br } // (in the barrels' hinge frame)
       : o.bolt ? { side: 'top', f: o.bolt - 0.05, y: rcv === 'round' ? top - 0.0015 : top, x: rcv === 'round' ? 0.006 : 0.011, w: 0.024 } // (a bolt gun's port is its open top, to the right of a scope's line, above the stock)
-      : { side: 'right', f: o.lever ? L * 0.55 : magAt ? magAt[0] + 0.005 : !o.pump && handle && handle.x > 0 ? handle.f + 0.026 : o.pump || o.tube ? L * 0.55 : L * 0.5, y: by, x: hw };
+      : { side: 'right', f: o.lever ? L * 0.55 : magAt ? magAt[0] + 0.005 : !o.pump && handle && handle.x > 0 ? handle.f + 0.026 : o.pump || o.tube ? L * 0.55 : L * 0.5, y: o.chY != null ? o.chY : by, x: hw };
     return {
       sy: sight.sy, fSight: sight.fSight, relief: sight.relief,
       muzzles: [[front, by, 0]],
