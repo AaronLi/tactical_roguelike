@@ -120,7 +120,7 @@ G.Ballistics = (() => {
   // One layer: does the round get through, and how fast does it come out? cond (0..1): a worn layer is thinner.
   function layer(p, v, mat, mm, cond = 1, cosT = 1) {
     const M = MAT[mat], tEff = mm * (0.3 + 0.7 * G.U.clamp(cond, 0, 1)) / Math.max(0.26, cosT), vReq = vLimit(p, M, tEff), E0 = 0.5 * p.m * v * v;
-    if (v <= vReq) return { through: false, v: 0, absorbed: E0 };
+    if (v <= vReq) return { through: false, v: 0, absorbed: E0, depth: Math.pow(v / vReq, 1 / 0.7) }; // (depth: the share of the way in it got)
     const vo = Math.sqrt(v * v - vReq * vReq);
     return { through: true, v: vo, absorbed: E0 - 0.5 * p.m * vo * vo };
   }
@@ -180,7 +180,7 @@ G.Ballistics = (() => {
       const [mat, mm] = layers[i], M = MAT[mat], v0 = v, q = strike(p, v, mat, mm, cond, cosT, first);
       if (first && !M.noRic) first = false; // (it's the first thing that can turn it that can: not a nylon cover)
       absorbed += q.absorbed;
-      if (log) log.push({ m: M.name, v: Math.round(v0) });
+      if (log) log.push({ m: M.name, v: Math.round(v0), k: mat, mm, o: Math.round(q.v) || 0, s: q.depth, d: p.d, l: p.len, g: p.m, a: p.ang || 0, gl: !!q.ric, rest: q.through ? null : layers.slice(i + 1) });
       if (q.ric) return { through: false, v: 0, absorbed, blunt: 0, glance: true, ric: q, stoppedBy: mat };
       if (!q.through) {
         blunt = q.absorbed * M.blunt; // (the back face bulges: what's behind it takes some of that)
@@ -459,7 +459,9 @@ G.Ballistics = (() => {
       const cosT = Math.abs(normal(m.s, q, _n).dot(_ud));
       const h = hitOf(m.s);
       for (const { a, pr, L } of cov) {
-        const r = stack(p, v, L, a.cond, cosT, res.log);
+        const at0 = res.log.length, r = stack(p, v, L, a.cond, cosT, res.log);
+        for (let i = at0; i < res.log.length; i++) Object.assign(res.log[i], { pc: a.def.name, cos: cosT, cond: a.cond });
+        if (!r.through) { const q = res.log[res.log.length - 1], later = cov.slice(cov.findIndex((x) => x.a === a && x.pr === pr) + 1); for (const x of later) q.rest = q.rest.concat(x.L); } // (and what was behind it, untouched)
         a.wear = (a.wear || 0) + r.absorbed;
         h.armour.push({ piece: a, through: r.through, glance: r.glance, absorbed: r.absorbed, at: pr.at });
         if (r.ric) { glanced(m, q, r.ric); h.blunt += r.absorbed * MAT[r.stoppedBy].blunt; return false; } // (off the plate and away)
@@ -472,7 +474,7 @@ G.Ballistics = (() => {
     // how it presents now: frontal area and drag (nose-first, tumbling, opened)
     const shape = () => [p.nose === 'broad' ? area(0.03) : yawed ? p.d * p.len * 0.85 : area(p.d) * (p.nose === 'dart' ? 0.6 : 1),
       yawed ? CD.yaw : expanded || p.flat ? CD.open : p.nose === 'ball' ? CD.ball : CD.fmj];
-    const log = res.log = [], note = (name) => { if (!log.length || log[log.length - 1].m !== name) log.push({ m: name, v: Math.round(v) }); }; // (what it went through, and how fast it was going into each: the F9 readout)
+    const log = res.log = [], note = (name) => { if (!log.length || log[log.length - 1].m !== name) log.push({ m: name, v: Math.round(v), t }); }; // (what it went through, and how fast it was going into each: the F9 readout)
     // which segment is this point in (the deepest, where two meet)?
     const locate = (tt) => {
       _w.copy(o).addScaledVector(u, tt);
@@ -672,6 +674,22 @@ G.Ballistics = (() => {
     add(k.helmet, 'helmet'); add(k.helmet && k.helmet.face, 'face'); add(k.carrier, 'carrier'); add(k.carrier && k.carrier.plate, 'plate');
     return out;
   }
+  // What a round did in the armour it met and the body behind it, layer by layer, for the replays to show (js/highlights.js
+  // armour cam), from through's log: r, a row a layer, in the order it met them ({ k: its material, mm, v in, o out, s: the share
+  // of the way in it stopped, d, l, g, a: the round after it, pc: the piece, un: never reached } for armour, { n: its name, mm, v, o }
+  // for a body); b, the joules that got to the body as blunt trauma; e, how it ended (armour: stopped before it reached them,
+  // glance, in: stopped in them or the armour on their far side, out); cos, how square it struck; null if it met none.
+  function armourLog(r) {
+    const L = r.log, first = L && L.find((q) => q.k);
+    if (!first) return null;
+    const mm3 = (x) => +(x * 1000).toFixed(2), rows = [];
+    L.slice(0, 20).forEach((q, i) => {
+      if (!q.k) { const nx = L.slice(i + 1).find((x) => x.t != null); rows.push({ n: q.m, mm: Math.max(1, Math.round(((nx ? nx.t : r.exitT) - q.t) * 1000)), v: q.v, o: L[i + 1] ? L[i + 1].v : Math.round(r.exitV) }); return; }
+      rows.push({ k: q.k, mm: q.mm, v: q.v, o: q.o, s: q.s == null ? null : +Math.min(1, q.s).toFixed(2), d: mm3(q.d), l: mm3(q.l), g: +(q.g * 1000).toFixed(2), a: +q.a.toFixed(2), pc: q.pc, gl: q.gl ? 1 : undefined });
+      for (const [k, mm] of q.rest || []) rows.push({ k, mm, v: 0, o: 0, pc: q.pc, un: 1 });
+    });
+    return { r: rows, b: Math.round(r.hits.reduce((a, h) => a + h.blunt, 0)), e: r.ric ? 'glance' : r.exitV ? 'out' : r.stopped && L.every((q) => q.k) ? 'armour' : 'in', cos: +first.cos.toFixed(3), cond: first.cond };
+  }
   // What an officer's wearing, for their state (st.ac: what they're wearing is in the world, so whoever shoots them works it
   // out against it, js/player.js roundSegment), and the same back as pieces, from that state
   const armourState = (me) => kitArmour(me).map((a) => [a.key, a.item.gid, Math.round(a.cond * 100) / 100]);
@@ -787,5 +805,5 @@ G.Ballistics = (() => {
   const AT_NAME = { plate: 'chest plate', side: 'sides', torso: 'chest and stomach', groin: 'groin', shoulder: 'shoulders', thigh: 'thighs', helmet: 'head', face: 'face' };
   const layersText = (L) => L.map(([m, mm]) => `${mm} mm ${MAT[m].name}`).join(' + ');
 
-  return { CAL, MAT, ORG, EFFECT, PERSON_J, energy, flightDrag, snap, unsnap, strike, crossSolid, deflect, mark, armourState, stateArmour, outcome, loadNotes, mainLayers, AT_NAME, layersText, projectile, layer, stack, through, probe, boneOf, effects, segs, covers, brim, kitArmour, suspectArmour, wearOut, self, rating, THREATS };
+  return { CAL, MAT, ORG, EFFECT, PERSON_J, energy, flightDrag, snap, unsnap, strike, crossSolid, deflect, mark, armourState, stateArmour, outcome, armourLog, loadNotes, mainLayers, AT_NAME, layersText, projectile, layer, stack, through, probe, boneOf, effects, segs, covers, brim, kitArmour, suspectArmour, wearOut, self, rating, THREATS };
 })();

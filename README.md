@@ -1305,6 +1305,18 @@ says the same), but not whose: the shooter's name isn't shown.
   exits and ricochet flashes appear as it gets to them, only those it really hit bleed, windows break when they
   did, and the x-ray re-runs the actual round as it arrived, listing what it went through, walls and armour and tissue,
   layer by layer. All of it goes in the recording .zip; older recordings still play, with straight lines.
+- **Wallbangs and ricochets are highlights** (`js/highlights.js`): a kill whose round went through something (not a pane of glass)
+  or off something on its way there is called out from its recorded path. It gets the bullet cam, round every turn the round
+  took, then a wall cam from the far side of the hole or a ricochet cam out in front of the surface, the round's line left hanging in
+  the air, each thing it met tagged where it happened (how fast in and out, the energy it cost, the angle it skipped at), and whoever it's
+  going for lit through the walls until it gets there. A kill like that keeps its own segment even inside a kill streak.
+- **The armour cam** (`js/highlights.js`, `acPlan`): after a kill through armour, an officer going down through it, or a plate saving
+  an officer, the replay shows that round's way through the armour as a cross-section. Their ghost first, with where it struck; then the
+  layers cut in half in the order it met them (cover, plate, liner, pad, soft armour, then skin, fat, muscle, bone...), the round
+  running through the cut, slowing as it did and changing shape as it did. Ceramic cones and cracks, plies part, the back face bulges by the
+  joules that got through, and what it never reached stays untouched. Beside it a table of each layer's speed in and out, and a bar of
+  where its energy went. It's all what the round recorded when it was fired (`G.Ballistics.armourLog`, on its path: the layers, its
+  speed and shape after each, how far into the last one it got), so it's in the .zip and plays the same for everyone.
 - **Damage is the energy a round leaves** (`js/ballistics.js` effects): what it deposited in a part, plus what reached the
   body through armour as blunt trauma, as a share of what a person can take (`PERSON_J`, 1600 J). Nothing else: no
   multipliers, no curve. Square on an unarmoured torso that's about 10% for a .22, 20% for 9 mm, 29% for a hollow point,
