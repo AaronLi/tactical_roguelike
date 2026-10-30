@@ -136,7 +136,7 @@ G.Server = {
         break;
       case 'chat': if (p) G.Net.broadcast({ t: 'chat', id: from, m: String(m.m).slice(0, 120) }); break;
       // friendly fire: one officer's rounds in another (the shooter traced them; the one hit takes the wounds)
-      case 'ff': if (p && this.phase === 'level' && this.players.has(m.tg) && Array.isArray(m.ws)) G.Net.broadcast({ t: 'ffhit', by: from, tg: m.tg, ws: m.ws.slice(0, 24), rang: m.rang, stopped: m.stopped, wear: m.wear, at: m.at, f: m.f, e: m.e, fc: Array.isArray(m.fc) ? m.fc.slice(0, 12) : undefined }); break; // (what someone's round did to an officer, as they worked it out; e: a suspect's)
+      case 'ff': if (p && this.phase === 'level' && this.players.has(m.tg) && Array.isArray(m.ws)) G.Net.broadcast({ t: 'ffhit', by: from, tg: m.tg, ws: m.ws.slice(0, 24), rang: m.rang, stopped: m.stopped, wear: m.wear, at: m.at, f: m.f, e: m.e, fc: Array.isArray(m.fc) ? m.fc.slice(0, 12) : undefined, hd: Array.isArray(m.hd) ? m.hd.slice(0, 12) : undefined }); break; // (what someone's round did to an officer, as they worked it out; e: a suspect's)
       case 'ping': if (p && Array.isArray(m.p) && m.p.length === 3) G.Net.broadcast({ t: 'ping', id: from, p: m.p.map(Number) }); break;
       // something put down (dropped from an inventory), or picked up: the first to ask gets it
       case 'drop': {

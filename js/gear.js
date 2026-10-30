@@ -40,15 +40,15 @@ G.Gear = (() => {
     { id: 'p.ceramic', kind: 'plate', brand: B.halc, name: 'Ceramic plate (IV)', tier: 3, price: 1600, speed: 0.98, dur: 4, prot: [{ at: 'plate', layers: [['ceramic', 9], ['pe', 6]] }], desc: 'Stops even armour-piercing rounds, cracking as it does.' },
     { id: 'p.ceramic2', kind: 'plate', brand: B.vant, name: 'Multi-hit ceramic plate (IV)', tier: 4, price: 2400, speed: 0.975, dur: 7, prot: [{ at: 'plate', layers: [['ceramic', 9.5], ['pe', 8]] }], desc: 'Level IV that holds together hit after hit.' },
     // ---------------------------------------------------------------- helmets (the top of the head; a visor covers the face)
-    { id: 'h.bump', kind: 'helmet', brand: B.north, name: 'Bump helmet', tier: 1, price: 150, speed: 1, dur: 2, cut: 'high', prot: [{ at: 'helmet', layers: [['abs', 3]] }], desc: 'For doorframes, not bullets. Turns the odd handgun round.' },
-    { id: 'h.fast', kind: 'helmet', brand: B.kest, name: 'High-cut ballistic helmet (IIIA)', tier: 1, price: 600, speed: 1, dur: 3, face: true, cut: 'high', prot: [{ at: 'helmet', layers: [['aramid', 8]] }], desc: 'Stops handgun rounds to the top of the head. Not your face.' },
-    { id: 'h.ach', kind: 'helmet', brand: B.iron, name: 'Full-cut combat helmet (IIIA)', tier: 2, price: 800, speed: 0.995, dur: 4, face: true, cut: 'full', prot: [{ at: 'helmet', layers: [['aramid', 9]] }], desc: 'More coverage, more hits before it gives.' },
-    { id: 'h.rifle', kind: 'helmet', brand: B.mer, name: 'Rifle-rated helmet', tier: 3, price: 1700, speed: 0.99, dur: 3, face: true, cut: 'high', prot: [{ at: 'helmet', layers: [['pe', 18]] }], desc: 'Turns some rifle rounds too. Still not your face.' },
+    { id: 'h.bump', kind: 'helmet', brand: B.north, name: 'Bump helmet', tier: 1, price: 150, kg: 0.55, speed: 1, dur: 2, cut: 'high', prot: [{ at: 'helmet', layers: [['abs', 3]] }], desc: 'For doorframes, not bullets. Turns the odd handgun round.' },
+    { id: 'h.fast', kind: 'helmet', brand: B.kest, name: 'High-cut ballistic helmet (IIIA)', tier: 1, price: 600, kg: 1.1, speed: 1, dur: 3, face: true, cut: 'high', prot: [{ at: 'helmet', layers: [['aramid', 8]] }], desc: 'Stops handgun rounds to the top of the head. Not your face.' },
+    { id: 'h.ach', kind: 'helmet', brand: B.iron, name: 'Full-cut combat helmet (IIIA)', tier: 2, price: 800, kg: 1.45, speed: 0.995, dur: 4, face: true, cut: 'full', prot: [{ at: 'helmet', layers: [['aramid', 9]] }], desc: 'More coverage, more hits before it gives.' },
+    { id: 'h.rifle', kind: 'helmet', brand: B.mer, name: 'Rifle-rated helmet', tier: 3, price: 1700, kg: 1.6, speed: 0.99, dur: 3, face: true, cut: 'high', prot: [{ at: 'helmet', layers: [['pe', 18]] }], desc: 'Turns some rifle rounds too. Still not your face.' },
     // ---------------------------------------------------------------- face protection (on a helmet's mount: face: true)
     // cover: the share of rounds to the face it's in the way of (a mandible guards the jaw, a shield the lot)
-    { id: 'f.mandible', kind: 'face', brand: B.kest, name: 'Mandible guard', tier: 1, price: 350, speed: 0.995, dur: 2, cover: 0.4, lower: true, prot: [{ at: 'face', layers: [['pc', 10]] }], desc: 'Bolts on under the rim and guards the jaw: in the way of about two face hits in five. Handgun-rated.' },
-    { id: 'f.shield', kind: 'face', brand: B.iron, name: 'Ballistic face shield (IIIA)', tier: 2, price: 750, speed: 0.985, dur: 3, cover: 0.9, prot: [{ at: 'face', layers: [['pc', 10]] }], desc: 'A polycarbonate shield over the whole face. Stops handgun rounds, not rifles.' },
-    { id: 'f.rifle', kind: 'face', brand: B.mer, name: 'Rifle-rated face shield', tier: 3, price: 1900, speed: 0.97, dur: 3, cover: 0.9, prot: [{ at: 'face', layers: [['pc', 14], ['pe', 10]] }], desc: 'Thick laminated shield over the whole face: turns some rifle rounds too. Heavy.' },
+    { id: 'f.mandible', kind: 'face', brand: B.kest, name: 'Mandible guard', tier: 1, price: 350, kg: 0.45, speed: 0.995, dur: 2, cover: 0.4, lower: true, prot: [{ at: 'face', layers: [['pc', 10]] }], desc: 'Bolts on under the rim and guards the jaw: in the way of about two face hits in five. Handgun-rated.' },
+    { id: 'f.shield', kind: 'face', brand: B.iron, name: 'Ballistic face shield (IIIA)', tier: 2, price: 750, kg: 1.1, speed: 0.985, dur: 3, cover: 0.9, prot: [{ at: 'face', layers: [['pc', 10]] }], desc: 'A polycarbonate shield over the whole face. Stops handgun rounds, not rifles.' },
+    { id: 'f.rifle', kind: 'face', brand: B.mer, name: 'Rifle-rated face shield', tier: 3, price: 1900, kg: 2.4, speed: 0.97, dur: 3, cover: 0.9, prot: [{ at: 'face', layers: [['pc', 14], ['pe', 10]] }], desc: 'Thick laminated shield over the whole face: turns some rifle rounds too. Heavy.' },
     // { id: 'h.visor', kind: 'helmet', brand: B.sable, name: 'Helmet with ballistic visor', tier: 4, price: 2800, speed: 0.97, dur: 4, cut: 'high', prot: [{ at: 'helmet', layers: [['pe', 18]] }, { at: 'face', layers: [['pc', 10]] }], desc: 'Rifle-rated, and a visor that stops handgun rounds to the face.' },
     // ---------------------------------------------------------------- belts (more pouches)
     { id: 'b.duty', kind: 'belt', brand: B.gray, name: 'Duty belt', tier: 1, price: 120, speed: 1, molle: [3, 1], pouches: [['q.pistol', 0, 0]], desc: 'One row of MOLLE, one pistol magazine pouch as issued. Too shallow for rifle pouches.' },
@@ -448,8 +448,9 @@ G.Gear = (() => {
   // (in a level: only on you, unless the locker's asked for by name; false if there's no room)
   function stow(me, it, pref) {
     const gs = [...(pref || []), ...body(me), ...(inField() ? [] : [me.locker])];
+    const some = (it.k === 'ammo' || it.k === 'med') && it.n > 0; // (an empty box has nothing to pour away: it's a box, wanted for rounds to come)
     absorb(it, gs); // loose rounds top up the boxes you have first (and bandages their stacks)
-    if ((it.k === 'ammo' || it.k === 'med') && it.n <= 0) return true;
+    if (some && it.n <= 0) return true;
     if (place(gs, it)) return true;
     if (inField() && !(pref || []).includes(me.locker)) return false;
     me.locker.h += 2;
@@ -550,6 +551,8 @@ G.Gear = (() => {
   // ---------------------------------------------------------------- protection
   const defOf = (it) => (it ? DEFS[it.gid] : null);
   const cond = (it) => { const d = defOf(it); return d && d.dur ? it.dur / d.dur : 0; };
+  // what you've got on your head (kg): the helmet, and what's on its mount
+  const headKg = (me) => { const h = me.kit.helmet; return h ? (defOf(h).kg || 0) + (h.face ? defOf(h.face).kg || 0 : 0) : 0; };
   // which piece of kit a round to that zone meets: the helmet for the head and face, the plate over the chest
   // (if there is one), the carrier's soft armour anywhere else it covers
   function piece(me, zone, roll) {
@@ -611,7 +614,7 @@ G.Gear = (() => {
     return d ? d.price : 0;
   }
   return {
-    LIST, DEFS, POUCHES, mixed, pack, unpack, mergeBox, mergeMed, medStack, medCount, absorb, combine, setLoad, loadIn, magShape, magName, magVid, BRANDS: B, ammoFor, ammoItem, gearItem, gunItem, pouchItem, mounted, molles, pickMag, dumpGrid, dumpMag, partItem, partSize, flashItem, stow, inField, roomFor, unloadMag, unloadGun, fillMag, fillFrom, fillGun, partCount, stashProxy, gunSize, guns, packGuns, medItem, fragItem, grid, size, isGear, fits, put, findSpot, place, removeFrom,
+    LIST, DEFS, POUCHES, headKg, mixed, pack, unpack, mergeBox, mergeMed, medStack, medCount, absorb, combine, setLoad, loadIn, magShape, magName, magVid, BRANDS: B, ammoFor, ammoItem, gearItem, gunItem, pouchItem, mounted, molles, pickMag, dumpGrid, dumpMag, partItem, partSize, flashItem, stow, inField, roomFor, unloadMag, unloadGun, fillMag, fillFrom, fillGun, partCount, stashProxy, gunSize, guns, packGuns, medItem, fragItem, grid, size, isGear, fits, put, findSpot, place, removeFrom,
     newKit, starter, body, all, each, feeds, rounds, count, take, swapMag, takeRounds, handOver, receive, refitMags, boxItem, loadMag, loadAll, roundPrice,
     defOf, cond, piece, speed, label, price,
   };

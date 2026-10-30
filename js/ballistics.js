@@ -441,7 +441,14 @@ G.Ballistics = (() => {
     const p = Object.assign({}, p0), hits = new Map(), res = { hits: [], exitV: v, stopped: false, entryT: null, glance: false, exitT: 0, dev: 0, ric: null };
     const v0 = v;
     let prev = null, prevQ = null, depth = 0, yawed = (p.ang || 0) > 0.6, expanded = false, t = tLo; // (yawed: it arrives tumbling, from whatever it's been through)
-    const hitOf = (s) => { let h = hits.get(s); if (!h) { h = { part: s.part, side: s.side || null, seg: s.id, E: 0, crush: 0, organs: {}, blunt: 0, armour: [] }; hits.set(s, h); res.hits.push(h); } return h; };
+        const hitOf = (s) => {
+      let h = hits.get(s);
+      if (!h) {
+        h = { part: s.part, side: s.side || null, seg: s.id, E: 0, crush: 0, organs: {}, blunt: 0, armour: [] }; hits.set(s, h); res.hits.push(h);
+        if (s.part === 'head' && rig.neck) { const at = o.clone().addScaledVector(u, t).sub(rig.neck.getWorldPosition(new T.Vector3())); h.strike = { at: [at.x, at.y, at.z], u: [u.x, u.y, u.z], m: p.m, v }; } // (where it struck, from the neck that has to take it: outcome)
+      }
+      return h;
+    };
     const frags = [];
     // it glanced off them, off armour or the curve of the skull: it goes on from here (res.ric: its way out, in the world)
     const glanced = (m, q, r) => {
@@ -709,6 +716,8 @@ G.Ballistics = (() => {
       if (h.armour.some((q) => !q.through)) o.rang = 1;
       if (w.dmg >= 0.05 || w.effects.length) o.ws.push([w.part, Math.round(w.dmg * 100) / 100, w.effects, w.organs, w.seg]);
       for (const q of h.armour) if (q.fp) (o.fc = o.fc || []).push([q.fp[0], q.fp[1], q.glance ? 2 : q.through ? 1 : 0]);
+      // (a round to the head: where it struck and what it left there, stopped by a helmet or not. A glance leaves little: js/player.js headHit)
+      if (h.strike) { const q = h.strike, mv = q.m * (q.v - (r.exitV || 0)) * (r.glance ? 0.35 : 1); (o.hd = o.hd || []).push([...q.at, ...q.u, mv].map((x) => Math.round(x * 1000) / 1000)); }
     }
     for (const a of armour) if (a.wear) { o.wear[a.key] = Math.round(a.wear); a.wear = 0; }
     return o;

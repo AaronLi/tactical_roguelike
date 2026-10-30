@@ -437,6 +437,7 @@ G.Me = {
     this.adsT = 0; this.ads = false; this.kick = 0; this.flashT = 0;
     this.rc = { y: 0, p: 0, vy: 0, vp: 0 }; // recoil: aim offset (rad, yaw left / pitch up) and its momentum
     this.shove = 0; this.shoveV = 0; // and the gun driven back into the shoulder (m) and how fast
+    this.hk = { y: 0, p: 0, r: 0, vy: 0, vp: 0, vr: 0, w: 15 }; // a head hit: how far your head's been thrown (rad: yaw left, pitch up, roll), how fast, and how fast it comes back
     this.flinch = { y: 0, p: 0 }; this.swayOff = { y: 0, p: 0 }; this.swayT = Math.random() * 20; this.walkAmp = 0;
     this.sinceHurt = 99; this.sinceFire = 99; this.healLeft = 0;
     this.reviveT = 0; this.bobT = 0;
@@ -610,6 +611,21 @@ G.Me = {
     rc.y = G.U.clamp(rc.y, -m.capSide, m.capSide);
     rc.p = G.U.clamp(rc.p, -m.capUp * 0.4, m.capUp);
     const f = Math.exp(-6 * dt); this.flinch.y *= f; this.flinch.p *= f;
+    const hk = this.hk, c = hk.w * hk.w, d = hk.w; // (your neck bringing it back, a little past and settling)
+    hk.vy += (-c * hk.y - d * hk.vy) * dt; hk.vp += (-c * hk.p - d * hk.vp) * dt; hk.vr += (-c * hk.r - d * hk.vr) * dt;
+    hk.y = G.U.clamp(hk.y + hk.vy * dt, -0.6, 0.6); hk.p = G.U.clamp(hk.p + hk.vp * dt, -0.6, 0.6); hk.r = G.U.clamp(hk.r + hk.vr * dt, -0.6, 0.6);
+  },
+  // Rounds to your head (js/ballistics.js outcome: [where from the neck x y z, its way x y z, momentum left there]) throw it, as a blow does: about your neck, so
+  // the forehead tips it back, the side rolls it away and a cheek turns it. What's on your head makes it worse: your neck has more to stop, so it goes further and
+  // comes back slower. Only your head goes: the gun's still where you were aiming (update: it's in with the recoil's punch).
+  HEAD_KICK: { K: 3.6, PER_KG: 0.2, W: 15, SLOW: 0.4 },
+  headHit(hd) {
+    const H = this.HEAD_KICK, kg = G.Gear.headKg(this), hk = this.hk, inv = new THREE.Quaternion().setFromEuler(new THREE.Euler(this.pitch, this.yaw, 0, 'YXZ')).invert(), k = H.K * (1 + kg * H.PER_KG);
+    hk.w = H.W / Math.sqrt(1 + kg * H.SLOW);
+    for (const [x, y, z, ux, uy, uz, mv] of hd) {
+      const r = new THREE.Vector3(x, y, z).applyQuaternion(inv), p = new THREE.Vector3(ux, uy, uz).applyQuaternion(inv).multiplyScalar(mv), t = r.cross(p); // (in your view: x right, y up, z back; so t.x's pitch up, t.y yaw left, t.z roll)
+      hk.vp += t.x * k; hk.vy += t.y * k; hk.vr += t.z * k;
+    }
   },
   // how far the gun can come back toward you (m): aiming, its sight's eye relief short of your eye; from the hip, more
   shoveRoom() {
@@ -1178,7 +1194,7 @@ G.Me = {
             this.applyWounds(out, o.clone(), !b.enemy);
           } else { // (theirs to take, as it was here: told to them at the end of the frame)
             const q = b.shot.ff.get(mate.id) || { ws: [], rang: 0, stopped: 0, wear: {}, at: hp.toArray().map((x) => Math.round(x * 100) / 100) };
-            q.ws.push(...out.ws); q.rang |= out.rang; q.stopped += out.stopped; if (out.fc) q.fc = (q.fc || []).concat(out.fc);
+            q.ws.push(...out.ws); q.rang |= out.rang; q.stopped += out.stopped; if (out.fc) q.fc = (q.fc || []).concat(out.fc); if (out.hd) q.hd = (q.hd || []).concat(out.hd);
             for (const [k, j] of Object.entries(out.wear)) q.wear[k] = (q.wear[k] || 0) + j;
             b.shot.ff.set(mate.id, q);
             mate.rig.hit(d);
@@ -1857,6 +1873,7 @@ G.Me = {
     for (const a of armour) if (o.wear && o.wear[a.key]) a.wear = o.wear[a.key];
     B.wearOut(armour);
     if (o.rang) G.Audio.armorHit();
+    if (Array.isArray(o.hd)) this.headHit(o.hd);
     if (killed) { this.killed(from, friendly ? 'Friendly fire' : killed); return; }
     if (fate === 'dead') { this.killed(from, friendly ? 'Friendly fire' : this.body.parts.head.hp <= 0 ? 'A head wound' : 'Bled out where they fell'); return; }
     if (o.stopped && !friendly) G.Net.toHost({ t: 'saved', n: o.stopped }); // (your armour stopped them: js/highlights.js saved)
@@ -2013,10 +2030,10 @@ G.Me = {
     if (this.shakeT > 0) { this.shakeT -= dt; const j = this.shakeT * 0.08; cam.rotation.x += (Math.random() - 0.5) * j; cam.rotation.z += (Math.random() - 0.5) * j; }
     // most of the kick shows as the view itself punching up and aside (with a touch of roll); the rest is
     // the gun turning on screen. Where the rounds go is the same either way: along the bore.
-    const R = this.RECOIL, punch = this.rc.p * R.PUNCH, punchY = this.rc.y * R.PUNCH_Y;
+    const R = this.RECOIL, punch = this.rc.p * R.PUNCH + this.hk.p, punchY = this.rc.y * R.PUNCH_Y + this.hk.y;
     cam.rotation.x += punch;
     cam.rotation.y += punchY;
-    cam.rotation.z -= this.rc.y * R.ROLL;
+    cam.rotation.z += this.hk.r - this.rc.y * R.ROLL;
     // magnified optics are picture-in-picture: the view itself only tightens a little, like any other sight
     const sg = this.sight(this.cur());
     const fov = G.Game.settings.fov * G.U.lerp(1, sg.scoped ? 0.8 : sg.zoom, this.adsT);
