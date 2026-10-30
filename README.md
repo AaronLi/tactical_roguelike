@@ -1299,6 +1299,12 @@ says the same), but not whose: the shooter's name isn't shown.
   round cancellous bone or marrow. A bone deforms a round, turns it, tips it over, and shatters: its splinters tear
   tracks of their own. With the hitboxes on (F9) the readout lists the last round's path through its target, layer by
   layer, with its speed into each.
+- **The highlights replay rounds as they really flew** (`js/highlights.js`): each round's path is kept (`js/player.js` newPath: every
+  point, its speed, what it went through or off, who it went into, and the state it reached them in) and shared with the squad,
+  suspects' rounds and every shotgun pellet too (`rpath`). Tracers and the bullet cam follow it round ricochets, the holes,
+  exits and ricochet flashes appear as it gets to them, only those it really hit bleed, windows break when they
+  did, and the x-ray re-runs the actual round as it arrived, listing what it went through, walls and armour and tissue,
+  layer by layer. All of it goes in the recording .zip; older recordings still play, with straight lines.
 - **Damage is the energy a round leaves** (`js/ballistics.js` effects): what it deposited in a part, plus what reached the
   body through armour as blunt trauma, as a share of what a person can take (`PERSON_J`, 1600 J). Nothing else: no
   multipliers, no curve. Square on an unarmoured torso that's about 10% for a .22, 20% for 9 mm, 29% for a hollow point,

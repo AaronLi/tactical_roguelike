@@ -356,6 +356,7 @@ G.Views = {
     const map = G.Game.map, w = map && map.windows && map.windows[id];
     if (!w || w.broken || w.armor) return; // (bulletproof glass doesn't break)
     w.broken = true;
+    if (G.Highlights) G.Highlights.glass(id);
     G.World.windowSolids(map.world, map, w);
     const pane = map.winMeshes && map.winMeshes[id];
     if (pane) pane.visible = false;
@@ -421,7 +422,7 @@ G.Views = {
     // what you see of their round (a machine gunner's belt has a tracer every fourth): what it does is the host's, flown there
     // (js/player.js enemyRound), its marks and wounds told to you as they happen
     const ev0 = this.enemies.get(m.e), tr = wdef.cls === 'LMG' && ev0 && ((ev0.shots = (ev0.shots || 0) + 1) % 4 === 1);
-    if (G.Highlights) G.Highlights.shot('e' + m.e, f, to, wdef.code || m.w);
+    if (G.Highlights) G.Highlights.shot('e' + m.e, f, to, wdef.code || m.w, undefined, undefined, m.sid);
     this.visRound(f, to, wdef, tr ? 'tracer' : G.ballFor(G.calOf(wdef)), () => {});
     G.Casings.fired(wdef, false, f, to);
     if (!G.GunAudio.play(wdef.id, f, 'e' + m.e)) G.Audio.shot(G.CLASS_SND[wdef.cls] || G.CLASS_SND.AR, me.distanceTo(f));
@@ -449,7 +450,7 @@ G.Views = {
     if (!def) return;
     const pv = this.players.get(m.id);
     if (pv) pv.rig.recoil();
-    if (G.Highlights) G.Highlights.shot('p' + m.id, f, to, m.w, m.am, m.tos);
+    if (G.Highlights) G.Highlights.shot('p' + m.id, f, to, m.w, m.am, m.tos, m.sid);
     G.Audio.flyby(f, to, def, m.am || G.ballFor(G.calOf(def))); // a teammate's round going past you
     // their round flies to where it was headed (the walls it'll meet, as the shooter worked it out)
     const am = m.am || G.ballFor(G.calOf(def)), fromP = f.clone(), toP = to.clone();

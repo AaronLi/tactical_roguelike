@@ -103,6 +103,9 @@ G.Ballistics = (() => {
   // how far it carries now, from how far it carried as it left the gun: the air takes it by area over mass
   const flightDrag = (p, drag) => drag * (p.m / (p.m0 || p.m)) * (area(p.d0 || p.d) / presented(p));
 
+  // a round's state, to keep (its path, for the replays: js/highlights.js) and to put back on a fresh one
+  const snap = (p) => [+p.m.toFixed(5), +p.d.toFixed(5), +p.len.toFixed(5), +(p.ang || 0).toFixed(2), p.nose, p.frag || 0, p.deformed ? 1 : 0];
+  function unsnap(p, q) { if (Array.isArray(q)) { p.m = +q[0] || p.m; p.d = +q[1] || p.d; p.len = +q[2] || p.len; p.ang = +q[3] || 0; p.nose = q[4] || p.nose; p.frag = +q[5] || 0; p.deformed = !!q[6]; } return p; }
   // ---------------------------------------------------------------- armour
   // K: the de Marre constant (v_bl = K·t^0.7·d^0.75/m^0.5, t and d in mm, m in g); E: how well each core works on it;
   // blunt: the share of a stopped round's energy that reaches the body; wearJ: joules soaked per point of durability.
@@ -205,7 +208,7 @@ G.Ballistics = (() => {
       for (let i = c.skin.length - 1; i >= 0; i--) seq.push([c.skin[i][0], c.skin[i][1], cosT]);
     }
     if (!seq.length) seq.push([c.core || 'concrete', 1, cosT]); // (met right at its far edge)
-    const out = { v: 0, t: h.t, n: h.n, nOut: sp.n, dev: 0, bend: 0, absorbed: 0, fx: MAT[seq[0][0]].fx, fxOut: MAT[seq[seq.length - 1][0]].fx };
+    const out = { v: 0, t: h.t, n: h.n, nOut: sp.n, dev: 0, bend: 0, absorbed: 0, fx: MAT[seq[0][0]].fx, fxOut: MAT[seq[seq.length - 1][0]].fx, name: MAT[seq[0][0]].name, nameOut: MAT[seq[seq.length - 1][0]].name };
     for (let i = 0; i < seq.length; i++) {
       const [m, mm, cs] = seq[i], r = i === 0 && !inside && glances(p, v, m, mm, cosT) ? ricochet(p, v, m, cosT) : strike(p, v, m, mm, 1, cs);
       out.absorbed += r.absorbed;
@@ -784,5 +787,5 @@ G.Ballistics = (() => {
   const AT_NAME = { plate: 'chest plate', side: 'sides', torso: 'chest and stomach', groin: 'groin', shoulder: 'shoulders', thigh: 'thighs', helmet: 'head', face: 'face' };
   const layersText = (L) => L.map(([m, mm]) => `${mm} mm ${MAT[m].name}`).join(' + ');
 
-  return { CAL, MAT, ORG, EFFECT, PERSON_J, energy, flightDrag, strike, crossSolid, deflect, mark, armourState, stateArmour, outcome, loadNotes, mainLayers, AT_NAME, layersText, projectile, layer, stack, through, probe, boneOf, effects, segs, covers, brim, kitArmour, suspectArmour, wearOut, self, rating, THREATS };
+  return { CAL, MAT, ORG, EFFECT, PERSON_J, energy, flightDrag, snap, unsnap, strike, crossSolid, deflect, mark, armourState, stateArmour, outcome, loadNotes, mainLayers, AT_NAME, layersText, projectile, layer, stack, through, probe, boneOf, effects, segs, covers, brim, kitArmour, suspectArmour, wearOut, self, rating, THREATS };
 })();

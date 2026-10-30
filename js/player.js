@@ -974,7 +974,7 @@ G.Me = {
     const pr = Math.tan(((def.choke || 0) * Math.PI) / 180);
     // each round (or pellet) leaves as a projectile (fly); the squad is told where it's headed, as far as the
     // walls go (to draw it and hear it go by)
-    const shot = { ff: new Map(), w: w.def.code, am: round, f: [origin.x, origin.y, origin.z].map((v) => Math.round(v * 100) / 100), tos: def.pellets > 1 ? [] : null }; // (tos: each pellet's end, for the highlights)
+    const shot = { sid: (this.sidN = (this.sidN || 0) + 1), ff: new Map(), w: w.def.code, am: round, f: [origin.x, origin.y, origin.z].map((v) => Math.round(v * 100) / 100), tos: def.pellets > 1 ? [] : null }; // (tos: each pellet's end, for the highlights)
     for (let i = 0; i < def.pellets; i++) {
       let dir = aim;
       if (def.pellets > 1 && pr > 0) {
@@ -1003,8 +1003,8 @@ G.Me = {
     const r2 = (v) => Math.round(v * 100) / 100;
     // (a shotgun's: every pellet's end, so the squad's highlights show the pattern)
     const tos = shot.tos ? shot.tos.slice(0, 24).map((p) => [r2(p.x), r2(p.y), r2(p.z)]) : undefined;
-    if (G.Highlights) { shot.rec = G.Highlights.shot('p' + G.Net.myId, muzzle, firstEnd, def.code, round, tos); if (shot.rec) shot.rec.f0 = muzzle.clone(); }
-    G.Net.toHost({ t: 'shot', f: [r2(muzzle.x), r2(muzzle.y), r2(muzzle.z)], to: [r2(firstEnd.x), r2(firstEnd.y), r2(firstEnd.z)], tos, w: def.code, am: round, sil: def.cls === 'BOW' ? 2 : w.sup ? (def.quiet ? 2 : 1) : 0 });
+    if (G.Highlights) G.Highlights.shot('p' + G.Net.myId, muzzle, firstEnd, def.code, round, tos, shot.sid);
+    G.Net.toHost({ t: 'shot', f: [r2(muzzle.x), r2(muzzle.y), r2(muzzle.z)], to: [r2(firstEnd.x), r2(firstEnd.y), r2(firstEnd.z)], tos, sid: shot.sid, w: def.code, am: round, sil: def.cls === 'BOW' ? 2 : w.sup ? (def.quiet ? 2 : 1) : 0 });
   },
 
   // ---------------------------------------------------------------- rounds in flight
@@ -1033,14 +1033,28 @@ G.Me = {
     if (!shot.to || shot.tos) { const end = this.predictEnd(start, d.clone().multiplyScalar(v0), drag, rail ? 0 : G.GRAVITY); if (!shot.to) shot.to = end; if (shot.tos) shot.tos.push(end); }
     this.rounds.push({ p: start, v: d.multiplyScalar(v0), def, am, drag, drag0: drag, grav: rail ? 0 : G.GRAVITY,
       n: 0, dist: 0, t: 0, off: muzzle.clone().sub(start), muzzle: muzzle.clone(), show, tracer, shot, hit: new Set(), proj: G.Ballistics.projectile(def, am), // (proj: the round itself, js/ballistics.js)
+      i: this.roundIndex(shot), path: this.newPath(start, v0),
       trail: G.Rig.debug ? G.R.trailStart(shot, start, v0) : null }); // (F9: its path drawn as it flies, coloured by its speed, js/render.js trails)
   },
   // A suspect's round (the host's, from js/server.js fire): as any other, flown here where the shooter's run. It goes by
   // suspects and civilians, and what it does to an officer is worked out here, as your rounds' are.
   enemyRound(id, from, dir, def, am, shot) {
     const drag = G.dragOf(def, am), v0 = Math.max(40, G.roundSpeed(def, am) || 400);
-    (this.rounds = this.rounds || []).push({ p: from.clone(), v: dir.clone().multiplyScalar(v0), def, am, drag, drag0: drag, grav: G.GRAVITY, n: 0, dist: 0, t: 0, off: new THREE.Vector3(), muzzle: from.clone(), show: false, tracer: false, shot, hit: new Set(), proj: G.Ballistics.projectile(def, am), enemy: id,
+    (this.rounds = this.rounds || []).push({ p: from.clone(), v: dir.clone().multiplyScalar(v0), def, am, drag, drag0: drag, grav: G.GRAVITY, n: 0, dist: 0, t: 0, off: new THREE.Vector3(), muzzle: from.clone(), show: false, tracer: false, shot, hit: new Set(), proj: G.Ballistics.projectile(def, am), enemy: id, i: this.roundIndex(shot), path: this.newPath(from, v0),
       trail: G.Rig.debug ? G.R.trailStart(shot, from, v0) : null });
+  },
+  // A round's path, for the replays (js/highlights.js roundPath): p, the points it passed ([x, y, z, speed]: everything it met,
+  // and every so often in the air); ev, what it did to things ([point, e(ntry) x (exit) r(icochet), what it looks like, the
+  // surface's normal, what it was]); hit, who it went into ([point, their key, its speed, its state then, its direction,
+  // whether it came out]).
+  roundIndex(shot) { shot.n = (shot.n || 0) + 1; return shot.n - 1; },
+  newPath(p, v) { return { p: [[+p.x.toFixed(2), +p.y.toFixed(2), +p.z.toFixed(2), Math.round(v)]], ev: [], hit: [] }; },
+  pathPt(b, p, v) { b.path.p.push([+p.x.toFixed(2), +p.y.toFixed(2), +p.z.toFixed(2), Math.round(v)]); return b.path.p.length - 1; },
+  // it's finished: its path to the replays, here and on the squad's machines
+  roundDone(b) {
+    const key = b.enemy ? 'e' + b.enemy : 'p' + G.Net.myId, sh = b.shot;
+    if (G.Highlights) G.Highlights.roundPath(key, sh.sid, b.i, b.path);
+    (sh.paths = sh.paths || []).push([b.i, b.path]);
   },
   // where a round would end up if nobody's in the way: its arc, stepped against the walls only (what the squad
   // is told, to draw it going there)
@@ -1067,11 +1081,12 @@ G.Me = {
     for (let i = rs.length - 1; i >= 0; i--) {
       const b = rs[i];
       shots.add(b.shot);
-      if (!G.Game.map || this.stepRound(b, dt)) rs.splice(i, 1);
+      if (!G.Game.map || this.stepRound(b, dt)) { this.roundDone(b); rs.splice(i, 1); }
     }
     for (const sh of shots) {
       if (sh.ff.size) { for (const [tg, q] of sh.ff) G.Net.toHost(Object.assign({ t: 'ff', tg, f: sh.f, e: sh.enemy }, q)); sh.ff.clear(); } // (what they did to a teammate)
-      if (sh.fx && sh.fx.length) G.Net.toHost({ t: 'rfx', a: sh.fx.splice(0, 32), e: sh.end, w: sh.w }); // (the marks it left, for the squad)
+      if (sh.fx && sh.fx.length) G.Net.toHost({ t: 'rfx', a: sh.fx.splice(0, 32) }); // (the marks it left, for the squad)
+      if (sh.paths && sh.paths.length) G.Net.toHost({ t: 'rpath', sid: sh.sid, e: sh.enemy, ps: sh.paths.splice(0) }); // (and where it went, for their replays)
     }
   },
   // one round, one frame: true when it's done (stopped in something, spent, out of range)
@@ -1093,12 +1108,13 @@ G.Me = {
       const came = b.dist + (end ? end.t : len), near = Math.max(0, 1 - came / 12);
       G.R.bullet(head.clone().addScaledVector(b.off, near), way, came - (b.came0 || 0), b.def, b.tracer, sp);
     }
-    if (end) { // (where it ended up, if it came here more or less straight: the replays draw it to here, js/highlights.js)
-      if (b.shot.rec && !b.def.explosive && b.def.pellets <= 1 && b.events && b.p.clone().sub(b.shot.rec.f0).normalize().dot(way) > 0.99) { b.shot.rec.to = end.p.toArray().map((q) => Math.round(q * 100) / 100); b.shot.end = b.shot.rec.to; }
+    if (end) {
+      this.pathPt(b, end.p, end.v);
       if (b.def.cls === 'RAIL') G.R.tracer(b.muzzle, end.p, b.def.tracer || 0x55ddff, 0.06); // (a railgun leaves its line hanging)
       return true;
     }
     b.dist += len; b.p.copy(head); b.turned = false;
+    { const q = b.path.p[b.path.p.length - 1]; if (Math.hypot(head.x - q[0], head.y - q[1], head.z - q[2]) > 12) this.pathPt(b, head, b.v.length()); } // (its arc)
     return b.t > G.ROUND_LIFE.t || b.dist > G.ROUND_LIFE.dist || b.v.length() < G.ROUND_LIFE.v || b.p.y < ((G.Game.map && G.Game.map.minY) || 0) - 2; // (through the lowest floor: a basement's is below ground)
   },
   // A round's step from a along dir for len metres, a leg at a time: everyone in its way and the first solid (nearest
@@ -1127,11 +1143,12 @@ G.Me = {
       for (const h of this.roundHits(b, o, d, wallT)) {
         const tr = b.trail ? [] : null, ev = h.ev, mate = h.mate; // (F9: the track through them, a step at a time, for the trail)
         // Whoever fired it decides what it did, on what they can see: the body as it stands on this screen, and what it's wearing
-        const rig = ev ? ev.rig : mate ? mate.rig : h.rig, armour = ev ? B.suspectArmour(ev) : mate ? B.stateArmour(mate.st) : B.kitArmour(this);
+        const rig = ev ? ev.rig : mate ? mate.rig : h.rig, armour = ev ? B.suspectArmour(ev) : mate ? B.stateArmour(mate.st) : B.kitArmour(this), arrived = B.snap(b.proj);
         const r = B.through(rig, o, d, v, b.proj, armour, look, tr);
         if (!r || r.entryT == null) continue; // (inside the hitbox, outside the body: a near miss)
         b.hit.add(ev || mate || this);
         const hp = o.clone().addScaledVector(d, r.entryT);
+        b.path.hit.push([this.pathPt(b, hp, v), ev ? 'e' + ev.id : 'p' + (mate ? mate.id : G.Net.myId), Math.round(v), arrived, +d.x.toFixed(4), +d.y.toFixed(4), +d.z.toFixed(4), r.exitV ? 1 : 0]);
         if (tr) { this.trailTrack(b, o, d, r, v, tr, h.self ? null : rig); G.HUD.hbPath = r.log.concat({ m: r.exitV ? 'out' : 'stopped', v: Math.round(r.exitV) }); } // (F9: what it went through)
         if (ev) {
           B.wearOut(armour);
@@ -1164,11 +1181,12 @@ G.Me = {
           on(r.ric.t);
           turn(B.deflect(d, r.ric, r.ric.n), r.ric.v);
           o.addScaledVector(d, 0.02);
-          this.roundMark(b, o, r.ric.n, 'metal', 'r', v);
+          this.roundMark(b, o, r.ric.n, 'metal', 'r', v, null, 'armour');
           continue legs;
         }
         if (!r.exitV) return stopped(o.clone().addScaledVector(d, r.entryT), done + r.entryT, true, 0);
         on(r.exitT);
+        this.pathPt(b, o, r.exitV);
         turn(B.deflect(d, { dev: r.dev, bend: 0 }, null), r.exitV);
         continue legs;
       }
@@ -1177,8 +1195,8 @@ G.Me = {
       const s = wall.solid, at = o.clone().addScaledVector(d, wall.t), vIn = v, r = B.crossSolid(map, b.proj, v, wall, o, d);
       if (s.target) G.Range.hit(s, at, d, b.proj.m * vIn);
       if (wall.pane != null && !(s.win && s.win.armor)) this.roundPane(wall.pane, at, d);
-      if (!wall.view) this.roundMark(b, at, wall.n, r.fx, r.ric ? 'r' : 'e', vIn, s);
-      else if (b.trail) G.R.trailAdd(b.trail, at, true, vIn);
+      if (!wall.view) this.roundMark(b, at, wall.n, r.fx, r.ric ? 'r' : 'e', vIn, s, r.name);
+      else { this.pathPt(b, at, vIn); if (b.trail) G.R.trailAdd(b.trail, at, true, vIn); }
       if (r.ric) {
         on(wall.t);
         o.addScaledVector(new THREE.Vector3(...wall.n), 0.004);
@@ -1189,7 +1207,7 @@ G.Me = {
       if (!r.v) return stopped(at, done + wall.t, false, vIn); // (v: how fast it struck)
       const n0 = wall.n;
       on(r.t);
-      if (!wall.view) this.roundMark(b, o, r.nOut, r.fxOut, 'x', r.v);
+      if (!wall.view) this.roundMark(b, o, r.nOut, r.fxOut, 'x', r.v, null, r.nameOut);
       turn(B.deflect(d, r, n0), r.v);
       o.addScaledVector(d, 0.004);
     }
@@ -1236,7 +1254,8 @@ G.Me = {
     return hits.sort((x, y) => x.t - y.t);
   },
   // where a round struck or left something: its mark here (s: a target's own, its picture), on its trail, and for the squad
-  roundMark(b, p, n, fx, kind, v, s) {
+  roundMark(b, p, n, fx, kind, v, s, name) {
+    b.path.ev.push([this.pathPt(b, p, v), kind, fx, n[0], n[1], n[2], name || '']);
     G.R.impactOn(p, n, s, fx);
     if (b.trail) G.R.trailAdd(b.trail, p, true, v);
     (b.shot.fx = b.shot.fx || []).push(G.Ballistics.mark(p, n, fx, kind));

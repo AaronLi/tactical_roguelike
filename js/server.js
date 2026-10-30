@@ -62,7 +62,8 @@ G.Server = {
         break;
       }
       case 'st': if (p) p.st = m.s; break;
-      case 'rfx': if (p && Array.isArray(m.a)) G.Net.broadcast({ t: 'rfx', a: m.a.slice(0, 32), e: m.e, id: from, w: m.w }, from); break; // (the marks a round left on what it went through or off)
+      case 'rfx': if (p && Array.isArray(m.a)) G.Net.broadcast({ t: 'rfx', a: m.a.slice(0, 32) }, from); break; // (the marks a round left on what it went through or off)
+      case 'rpath': if (p && Array.isArray(m.ps)) G.Net.broadcast({ t: 'rpath', k: m.e ? 'e' + m.e : 'p' + from, sid: m.sid, ps: m.ps.slice(0, 32) }, from); break; // (where it went: for everyone's replays)
       // a gun's stickers (js/stickers.js): kept and passed on; asked for by someone who's seen its hash and not it
       case 'skin': {
         if (!p || typeof m.h !== 'string' || m.h.length > 24 || this.skins.has(m.h)) break;
@@ -78,7 +79,7 @@ G.Server = {
       case 'shot':
         if (p && p.st && this.phase === 'level') this.hear(p.st.p[0], p.st.p[2], m.sil === 2 ? 2 : m.sil ? 6 : 28, p.st.p[1]); // (not at the range)
         if (m.f && m.to && this.phase === 'level') this.suppress(m.f, m.to);
-        G.Net.broadcast({ t: 'shot', id: from, f: m.f, to: m.to, w: m.w, sil: m.sil, am: G.AMMO[m.am] ? m.am : undefined,
+        G.Net.broadcast({ t: 'shot', id: from, sid: m.sid, f: m.f, to: m.to, w: m.w, sil: m.sil, am: G.AMMO[m.am] ? m.am : undefined,
           tos: Array.isArray(m.tos) && m.tos.length <= 24 && m.tos.every((p) => Array.isArray(p) && p.length === 3 && p.every(Number.isFinite)) ? m.tos : undefined }, from); // (a shotgun's pellets: for the highlights)
         break;
       case 'nade': G.Net.broadcast({ t: 'nade', id: from, p: m.p, v: m.v, fuse: m.fuse, k: m.k === 'flash' ? 'flash' : 'frag', s: [0, 1, 2].includes(m.s) ? m.s : 2 }, from); break;
@@ -1836,14 +1837,14 @@ G.Server = {
     const fv = new THREE.Vector3(...from), aim = new THREE.Vector3(tx + (-dz / d) * ex, ty + ey, tz + (dx / d) * ex).sub(fv), far = aim.length();
     aim.divideScalar(far); aim.y += G.GRAVITY * far / (2 * v0 * v0); aim.normalize(); // (held up for the drop: they've used this gun before)
     const right = new THREE.Vector3(-aim.z, 0, aim.x).normalize(), upv = new THREE.Vector3().crossVectors(right, aim), pr = Math.tan(((wdef.choke || 0) * Math.PI) / 180), pellets = def.pellets || 1;
-    const r2 = (v) => Math.round(v * 100) / 100, shot = { ff: new Map(), w: wdef.code || def.wpn, am, f: from.map(r2), tos: null, enemy: e.id };
+    const r2 = (v) => Math.round(v * 100) / 100, shot = { sid: (this.eSid = (this.eSid || 0) + 1), ff: new Map(), w: wdef.code || def.wpn, am, f: from.map(r2), tos: null, enemy: e.id };
     for (let i = 0; i < pellets; i++) {
       let dir = aim;
       if (pellets > 1 && pr > 0) { const a = Math.random() * Math.PI * 2, rr = pr * Math.min(1.6, Math.abs(norm()) * 0.6); dir = aim.clone().addScaledVector(right, Math.cos(a) * rr).addScaledVector(upv, Math.sin(a) * rr).normalize(); }
       G.Me.enemyRound(e.id, fv, dir, wdef, am, shot);
     }
     const to = G.Me.predictEnd(fv, aim.clone().multiplyScalar(v0), G.dragOf(wdef, am), G.GRAVITY).toArray();
-    G.Net.broadcast({ t: 'eshot', e: e.id, ty: e.type, w: def.wpn, f: from.map(r2), to: to.map(r2), tg: p.id });
+    G.Net.broadcast({ t: 'eshot', e: e.id, ty: e.type, w: def.wpn, f: from.map(r2), to: to.map(r2), tg: p.id, sid: shot.sid });
   },
   BODY_R: 0.24,
 };
