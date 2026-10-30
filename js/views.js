@@ -352,6 +352,16 @@ G.Views = {
   discardDrop(rig) { if (rig.dropped) { if (rig.dropped.g.parent) rig.dropped.g.parent.remove(rig.dropped.g); rig.dropped = null; } },
   // A window breaking: the pane goes, a burst of glass falls both sides of it, and it's heard. at, dir: where
   // the round went through (optional)
+  // A pane that's taken its first round: fractured right across from where it was hit (js/damage.js crack), still up
+  crackGlass(id, at, dir) {
+    const map = G.Game.map, w = map && map.windows && map.windows[id];
+    if (!w || w.broken || w.armor || w.cracked) return;
+    w.cracked = true; map.cracked = true;
+    if (G.Highlights) G.Highlights.crack(id, at);
+    G.Damage.crack(map.winMeshes && map.winMeshes[id], at);
+    G.R.particles(at, 8, 0xd8eef5, 1.2, 0.8, 9, 0.7, dir ? [dir.x, 0, dir.z] : null);
+    if (G.Me && G.Me.pos) G.Audio.glass(Math.hypot(w.x - G.Me.pos.x, w.z - G.Me.pos.z) + 10);
+  },
   breakGlass(id, at, dir) {
     const map = G.Game.map, w = map && map.windows && map.windows[id];
     if (!w || w.broken || w.armor) return; // (bulletproof glass doesn't break)

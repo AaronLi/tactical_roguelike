@@ -14,7 +14,7 @@
 //   - cardboard, paper, cloth, foam, wool and stock tear and let go of what's in them, which drifts
 //   - glass and tile star; plastic whitens and stars; earth and sand crater; water splashes; leaves fall
 G.Scars = (() => {
-  const T = THREE, CELLS = 4, PX = 256, CUT_R = 0.28; // (CUT_R: the hole in a mark that's been cut, as a share of the mark's radius)
+  const T = THREE, CELLS = 4, PX = 256;
   // chips: n, size (m), speed (m/s), gravity, shape (chunk, sliver, flake), colours, drag (flakes drift), how long they lie
   const CHIP = {
     chunk: (cols, n = 8, size = 0.012, v = 3.2) => ({ n, size, v, g: 9.8, shape: 'chunk', cols, drag: 0, life: 40 }),
@@ -45,7 +45,7 @@ G.Scars = (() => {
   // ---------------------------------------------------------------- the sheet of marks
   const CELL = { dent: 0, dentStop: 1, gouge: 2, stone: 3, spall: 4, woodIn: 5, woodOut: 6, chip: 7, plasIn: 8, plasOut: 9, paper: 10, fluff: 11, star: 12, plastic: 13, soil: 14, tile: 15, brick: 16, brickOut: 17 };
   const ROWS = 5;
-  function sheet(cut) {
+  function sheet() {
     const W = CELLS * PX, Hh = ROWS * PX, cv = typeof document !== 'undefined' ? Object.assign(document.createElement('canvas'), { width: W, height: Hh }) : new OffscreenCanvas(W, Hh), g = cv.getContext('2d');
     const at = (i, fn) => { g.save(); g.translate((i % CELLS) * PX, Math.floor(i / CELLS) * PX); g.beginPath(); g.rect(0, 0, PX, PX); g.clip(); g.translate(PX / 2, PX / 2); fn(rngOf(i * 7919 + 1)); g.restore(); };
     const blob = (r, rnd, jag, sx = 1, sy = 1, n = 28) => { g.beginPath(); for (let i = 0; i <= n; i++) { const a = i / n * Math.PI * 2, q = r * (1 - jag + rnd() * jag * 2); g[i ? 'lineTo' : 'moveTo'](Math.cos(a) * q * sx, Math.sin(a) * q * sy); } g.closePath(); };
@@ -59,8 +59,7 @@ G.Scars = (() => {
         g.stroke();
       }
     };
-    // (a hole. On a sheet for what's really been cut (js/damage.js), it's nothing at all, and the same size in every mark: CUT_R)
-    const hole = (r, rnd, jag = 0.15, x = 0) => { g.save(); g.translate(x, 0); if (cut) { g.globalCompositeOperation = 'destination-out'; g.beginPath(); g.arc(0, 0, CUT_R * PX / 2, 0, 7); g.fillStyle = '#000'; g.fill(); } else { blob(r, rnd, jag); g.fillStyle = 'rgba(8,7,6,0.97)'; g.fill(); } g.restore(); };
+    const hole = (r, rnd, jag = 0.15, x = 0) => { g.save(); g.translate(x, 0); blob(r, rnd, jag); g.fillStyle = 'rgba(8,7,6,0.97)'; g.fill(); g.restore(); };
     // (the dents are lit from above, as a dimple would be: dark where it falls away from the light, bright where it turns to it.
     // The round went toward +x: it's dragged out that way, the hole at the near end)
     const dent = (holed) => (rnd) => {
@@ -104,10 +103,10 @@ G.Scars = (() => {
     const tex = new T.CanvasTexture(cv); tex.colorSpace = T.SRGBColorSpace || tex.colorSpace; if (T.sRGBEncoding) tex.encoding = T.sRGBEncoding; tex.anisotropy = 4;
     return tex;
   }
-  let matD = null, matC = null; const geos = new Map(), mats = new Map();
-  const decalMat = (tint, cut) => {
-    const k = (tint || 0xffffff) + (cut ? 'c' : '');
-    if (!mats.has(k)) { const tex = cut ? (matC = matC || sheet(true)) : (matD = matD || sheet()); mats.set(k, new T.MeshLambertMaterial({ map: tex, color: k, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 })); }
+  let matD = null; const geos = new Map(), mats = new Map();
+  const decalMat = (tint) => {
+    const k = tint || 0xffffff;
+    if (!mats.has(k)) { matD = matD || sheet(); mats.set(k, new T.MeshLambertMaterial({ map: matD, color: k, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 })); }
     return mats.get(k);
   };
   function cellGeo(i) {
@@ -158,8 +157,7 @@ G.Scars = (() => {
       return new T.Quaternion().setFromRotationMatrix(new T.Matrix4().makeBasis(x, y, z));
     };
     const J = o.J == null ? 800 : o.J, sz = G.U.clamp(Math.sqrt(J / 1000), 0.55, 1.7), cal = (o.cal || 8) / 8, tint = L.tint, out = [];
-    const cutR = o.cut || 0; // (really cut: the mark's sized to go round the hole)
-    const decal = (cell, r, spin = true, sy = 1, t = tint) => { const R = cutR && o.k !== 'r' ? cutR / CUT_R : r; out.push({ geo: cellGeo(cell), mat: decalMat(t, cutR && o.k !== 'r'), s: [R * 2, R * 2 * sy, 1], q: q(spin), off: 0.004 }); };
+    const decal = (cell, r0, spin = true, sy = 1, t = tint) => { const r = Math.max(r0, o.fit || 0); out.push({ geo: cellGeo(cell), mat: decalMat(t), s: [r * 2, r * 2 * sy, 1], q: q(spin), off: 0.004 }); }; // (o.fit: at least this wide: round a hole, js/damage.js)
     const look = L.look, x = o.k === 'x', v = Math.floor(Math.random() * 3);
     if (o.k === 'r') { // (a skid: along the way it was going, as long as it was shallow)
       const r = 0.05 + 0.08 * sz;
@@ -168,23 +166,19 @@ G.Scars = (() => {
     }
     if (look === 'metal') {
       if (x) { // (out of the far side: torn open, the petals bent on the way it was going)
-        const slant = Math.round(Math.min(1, lean * 1.6) * 2), r = cutR ? cutR / 0.4 : (L.soft ? 0.05 : 0.04) * sz * cal;
+        const slant = Math.round(Math.min(1, lean * 1.6) * 2), r = (L.soft ? 0.05 : 0.04) * sz * cal;
         decal(CELL.dent, r * 0.9, true);
         out.push({ geo: flapGeo(`petal${v}${slant}`, () => flaps(11 + v * 7 + slant, 7, 0.26, 1, 0.8, slant * 0.5, 0.92)), mat: flapMat(L.soft ? 0xd4d8dc : 0xaeb6be, true), s: [r, r, r], q: q(false), off: 0.002 });
-      } else {
-        decal(o.stop && !cutR ? CELL.dentStop : CELL.dent, (L.soft ? 0.05 : 0.038) * sz * cal, false);
-        // (going in: the edge of it torn in, down the way it went)
-        if (cutR) { const r = cutR * 1.3; out.push({ geo: flapGeo(`petal${v}2`, () => flaps(11 + v * 7 + 2, 7, 0.5, 1, 0.8, 1, 0.92)), mat: flapMat(L.soft ? 0xd4d8dc : 0xaeb6be, true), s: [r, r, -r * 0.9], q: q(false), off: -0.001 }); }
-      }
+      } else decal(o.stop ? CELL.dentStop : CELL.dent, (L.soft ? 0.05 : 0.038) * sz * cal, false);
     } else if (look === 'stone' || look === 'brick') decal(look === 'brick' ? (x ? CELL.brickOut : CELL.brick) : x ? CELL.spall : CELL.stone, (x ? 0.1 : 0.058) * sz, true);
     else if (look === 'tile') decal(CELL.tile, 0.09 * sz, true);
     else if (look === 'wood') {
       decal(x ? CELL.woodOut : CELL.woodIn, (x ? 0.07 : 0.034) * sz, true, 1, L.dark ? 0xb08a60 : undefined);
-      if (x) { const r = cutR ? cutR / 0.16 : 0.085 * sz; out.push({ geo: flapGeo(`spl${v}`, () => flaps(31 + v * 13, 13, 0.16, 1, 0.75, 0.25, 0.3, 0.7)), mat: flapMat(L.dark ? 0x9a6a3a : 0xd8bb82), s: [r, r, r], q: q(false), off: 0.002 }); }
+      if (x) { const r = 0.085 * sz; out.push({ geo: flapGeo(`spl${v}`, () => flaps(31 + v * 13, 13, 0.16, 1, 0.75, 0.25, 0.3, 0.7)), mat: flapMat(L.dark ? 0x9a6a3a : 0xd8bb82), s: [r, r, r], q: q(false), off: 0.002 }); }
     } else if (look === 'chipboard') decal(CELL.chip, (x ? 0.07 : 0.04) * sz, true);
     else if (look === 'plaster') {
       decal(x ? CELL.plasOut : CELL.plasIn, (x ? 0.085 : 0.036) * sz, true);
-      if (x) { const r = cutR ? cutR / 0.42 : 0.06 * sz; out.push({ geo: flapGeo(`pap${v}`, () => flaps(51 + v * 3, 6, 0.42, 1, 0.3, 0.2, 0.8)), mat: flapMat(0xf0ece0), s: [r, r, r], q: q(true), off: 0.002 }); }
+      if (x) { const r = 0.06 * sz; out.push({ geo: flapGeo(`pap${v}`, () => flaps(51 + v * 3, 6, 0.42, 1, 0.3, 0.2, 0.8)), mat: flapMat(0xf0ece0), s: [r, r, r], q: q(true), off: 0.002 }); }
     } else if (look === 'paper') { decal(CELL.paper, 0.022 * sz * cal, true); if (x) { const r = 0.024 * sz; out.push({ geo: flapGeo(`pap${v}`, () => flaps(51 + v * 3, 6, 0.42, 1, 0.3, 0.2, 0.8)), mat: flapMat(key === 'paper' ? 0xf2f0e6 : 0xc8a878), s: [r, r, r], q: q(true), off: 0.002 }); } }
     else if (look === 'fluff') decal(CELL.fluff, (x ? 0.06 : 0.042) * sz, true);
     else if (look === 'glass') decal(CELL.star, (key === 'bpglass' ? 0.1 : 0.13) * sz, true);

@@ -403,6 +403,7 @@ G.Game = {
           this.cabs = m.cabs || []; G.Views.syncCabs();
           G.Loot.clear(); for (const a of m.loot || []) G.Loot.add(...a);
           for (const id of m.glass || []) G.Views.breakGlass(id); // windows already broken when we joined
+          for (const [id, p] of m.cracked || []) G.Views.crackGlass(id, new THREE.Vector3(...p));
         } else if (m.phase === 'shop') this.enterShop(m.level, m.shopSeed, null, m.stock);
         else this.enterLobby();
         break;
@@ -450,6 +451,7 @@ G.Game = {
       case 'loot': if (this.phase === 'level') for (const a of m.a || []) G.Loot.add(...a); break;
       case 'lootRm': G.Loot.remove(m.id); break;
       case 'glass': if (this.phase === 'level') for (const id of m.ids || []) G.Views.breakGlass(id); break;
+      case 'crack': if (this.phase === 'level') G.Views.crackGlass(m.id, new THREE.Vector3(...m.p)); break;
       case 'lootGot': G.Me.lootGot(m.item, m.x, m.z); break;
       case 'team': this.teamSet(m); break;
       case 'cab': {
@@ -485,6 +487,8 @@ G.Game = {
       }
       case 'wcase':
         this.setCase(m.c);
+        if (m.opened === G.Net.myId) this.caseShow(true); // (opened it: its wheel spins)
+        else if (this.aboxOpen && this.caseUI && this.caseUI.on) this.caseRender();
         if (m.by === G.Net.myId && m.got) G.Me.takeFromCase(m.got);
         else if (m.by) { const d = m.got && G.Gunsmith.fromCode(m.got[0]); if (d) G.HUD.feed(`<b>${G.U.esc(this.nameOf(m.by))}</b> took the ${d.name} from the weapon case`); }
         break;
@@ -764,10 +768,11 @@ G.Game = {
   // a stop eases out over the next few faces, starting at the reel's own speed
   REEL: { H: 132, M: 10, V: 1100, WH: 176 },
   aboxHide() {
-    cancelAnimationFrame(this.aboxRaf);
+    cancelAnimationFrame(this.aboxRaf); cancelAnimationFrame(this.caseRaf);
     if (!this.aboxOpen) return;
     this.aboxOpen = false;
-    this.$('aboxPick').classList.add('hidden');
+    if (this.caseUI) this.caseUI.on = false;
+    this.$('aboxPick').classList.add('hidden'); this.$('casePick').classList.add('hidden');
     if (this.phase !== 'level' || this.invOpen) return;
     this.lock();
     setTimeout(() => { if (!this.locked && !this.invOpen && !this.aboxOpen && this.phase === 'level') this.$('clickToPlay').classList.remove('hidden'); }, 300);
@@ -874,6 +879,84 @@ G.Game = {
     const fit = t.dataset.fit != null && !!this.aboxSlot(mine[0][i]);
     G.Net.toHost({ t: 'takeAbox', i, fit });
     for (const b of this.$('aboxPick').querySelectorAll('[data-fit],[data-take]')) b.disabled = true;
+  },
+  // ------------------------------------------------------------- the weapon case
+  // One weapon, one wheel, wider than the attachment box's: the first time you open it up it spins through what could have been in there till you
+  // stop it, and lands on what's really in it (the host's, as ever: stopping only shows it). Looking again, it's landed. Take it or leave it.
+  caseShow(spin) {
+    if (this.phase !== 'level') return;
+    let ui = this.caseUI && this.caseUI.lv === this.level ? this.caseUI : null;
+    if (!ui) {
+      ui = this.caseUI = { lv: this.level, wh: { landed: !spin || !this.wcase, stop: null, off: 0, strip: null } };
+      if (!ui.wh.landed) {
+        const pool = G.WEAPON_LIST.filter((w) => G.obtainable(w)).map((w) => G.Gunsmith.defaultCode(w.id)), R = this.REEL, one = [];
+        for (let i = 0; i < R.M; i++) one.push(pool[(Math.random() * pool.length) | 0]);
+        ui.wh.strip = one.concat(one, one); ui.wh.off = Math.random() * R.M * R.H;
+      }
+    }
+    ui.on = true; this.aboxOpen = true;
+    G.Me.keys = {}; G.Me.mouse.l = G.Me.mouse.r = false;
+    this.$('pause').classList.add('hidden'); this.$('clickToPlay').classList.add('hidden');
+    if (document.pointerLockElement) document.exitPointerLock();
+    const el = this.$('casePick');
+    el.classList.remove('hidden');
+    if (!el.dataset.bound) { el.dataset.bound = 1; el.addEventListener('click', (e) => this.caseClick(e)); }
+    this.caseRender();
+    cancelAnimationFrame(this.caseRaf); this.caseT = 0;
+    if (!ui.wh.landed) this.caseRaf = requestAnimationFrame((t) => this.caseSpin(t));
+    if (spin) G.Audio.click();
+  },
+  caseFace(code) {
+    const def = G.Gunsmith.fromCode(code);
+    if (!def) return '<b>—</b>';
+    const it = G.Gear.gunItem({ def }), [cw, ch] = G.Gear.size(it);
+    return `<img src="${G.Icons.of(it, cw, ch, false)}" alt=""><b style="color:${G.TIER_COLORS[def.tier]}">${G.U.esc(def.name)}</b><small>${G.U.esc(G.calOf(def) || def.cls || '')}</small>`;
+  },
+  caseRender() {
+    const el = this.$('casePick'), ui = this.caseUI, wc = this.wcase, R = this.REEL;
+    if (!el || !ui) return;
+    const wh = ui.wh, def = wc && G.Gunsmith.fromCode(wc.code), mine = def && G.Me.weapons[def.slot], stow = mine && G.Me.packRoom(G.Gear.gunItem(mine));
+    const win = wh.landed || !wh.strip ? `<div class="abox-win">${wc ? this.caseFace(wc.code) : '<b>Empty</b>'}</div>`
+      : `<div class="abox-reel" style="height:${R.WH}px"><div class="abox-strip">${wh.strip.map((q) => `<div class="abox-face" style="height:${R.H}px">${this.caseFace(q)}</div>`).join('')}</div></div>`;
+    const take = !mine ? `Take the ${G.U.esc(def ? def.name : '')}` : stow ? `Take it <small>(your ${G.U.esc(mine.def.name)} goes in your backpack)</small>` : `Swap your ${G.U.esc(mine.def.name)} for it`;
+    const acts = !wh.landed ? `<button class="btn primary" data-stop ${wh.stop ? 'disabled' : ''}>${wh.stop ? 'Stopping...' : 'Stop'}</button>` : wc ? `<button class="btn primary" data-take>${take}</button>` : '';
+    const stats = wh.landed && def ? `<div class="abox-stats"><h4>${mine ? `Against your ${G.U.esc(mine.def.name)}` : G.U.esc(def.name)}</h4><div class="gs-stats">${G.GunsmithUI.statsHtml(mine ? mine.def : def, def)}</div></div>` : '';
+    el.innerHTML = `<div class="arm-box"><h2>Weapon case</h2><p>${!wh.landed ? 'Stop the wheel to see what\'s in it.' : wc ? 'One weapon, for whoever takes it.' : 'Nothing left in it.'}</p>
+      <div class="arms"><div class="arm${wh.landed ? '' : ' spinning'}" data-wheel="0">${win}<div class="abox-acts">${acts}</div></div></div>${stats}<button class="btn abox-close" data-close>Close <small>(Esc)</small></button></div>`;
+    this.casePlace();
+  },
+  casePlace() {
+    const R = this.REEL, wh = this.caseUI.wh, st = !wh.landed && this.$('casePick').querySelector('.abox-strip');
+    if (st) st.style.transform = `translateY(${(wh.off - 2 * R.M * R.H + (R.WH - R.H) / 2).toFixed(1)}px)`;
+  },
+  caseSpin(t) {
+    const ui = this.caseUI, R = this.REEL;
+    if (!ui || !ui.on) return;
+    const dt = this.caseT ? Math.min(0.05, (t - this.caseT) / 1000) : 0, wh = ui.wh;
+    this.caseT = t;
+    if (wh.stop) {
+      const s = wh.stop, u = Math.min(1, (t - s.t0) / s.T);
+      wh.off = s.o0 + (s.o1 - s.o0) * (1 - Math.pow(1 - u, 3));
+      if (u >= 1) { wh.landed = true; wh.stop = null; G.Audio.click(); return this.caseRender(); }
+    } else wh.off = (wh.off + R.V * dt) % (R.M * R.H);
+    this.casePlace();
+    this.caseRaf = requestAnimationFrame((tt) => this.caseSpin(tt));
+  },
+  caseClick(e) {
+    const t = e.target.closest('button'), ui = this.caseUI;
+    if (!t || t.disabled || !ui) return;
+    if (t.dataset.close != null) return this.aboxHide();
+    if (t.dataset.stop != null) { // (as the attachment box's: far enough down the reel to ease out onto it, and what's in the case goes on that face)
+      const wh = ui.wh, R = this.REEL;
+      if (wh.landed || wh.stop) return;
+      const c = 2 * R.M - wh.off / R.H, k = Math.floor(c - (R.V * 1.2 / 3) / R.H), dist = (c - k) * R.H;
+      if (!this.wcase) { wh.landed = true; return this.caseRender(); }
+      wh.strip[k] = this.wcase.code;
+      wh.stop = { t0: performance.now(), o0: wh.off, o1: wh.off + dist, T: (3 * dist / R.V) * 1000 };
+      G.Audio.click();
+      return this.caseRender();
+    }
+    if (t.dataset.take != null) { this.aboxHide(); G.Me.caseTake(); }
   },
   // ------------------------------------------------------------- first aid cabinets
   // each cabinet's grid here (3x2, medical gear only), kept as the host has it: you move things in and out of

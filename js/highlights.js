@@ -270,6 +270,8 @@ G.Highlights = (() => {
   }
   // a pane shot out
   function glass(id) { if (G.Game.phase === 'level' && !G.Game.hub) R.glass.push({ t: R.t, id }); }
+  // (a pane fractured, and where: p)
+  function crack(id, p) { if (G.Game.phase === 'level' && !G.Game.hub) R.glass.push({ t: R.t, id, p: [p.x, p.y, p.z] }); }
   // pellets round one end: a cone of the choke's half-angle (degrees), denser in the middle, as the guns throw them
   function spread(f, to, n, choke) {
     const F0 = new T.Vector3(...f), d = new T.Vector3(...to).sub(F0), len = d.length(); d.divideScalar(len || 1);
@@ -1176,7 +1178,7 @@ G.Highlights = (() => {
       const rec = e.k === 'e' && P.map ? G.Damage.ofEvent(e, e.then) : null, cut = rec && G.Damage.apply(P.map, rec) ? G.Damage.radius(e.m, e.J, e.cal) : e.k === 'x' && e.cutBy ? e.cutBy : 0; // (what it took out of the wall, as it did in the game)
       if (e.then && e.k === 'e') e.then.cutBy = cut * 1.25;
       const o = { m: e.m, fx: e.fx, k: e.k, n: e.n, dir: e.dir, J: e.J, stop: e.stop, cut };
-      if (!cut) for (const m of G.Scars.meshes(o, e.p, P.fxRoot)) { P.marks.push(m); if (P.marks.length > 160) { const q = P.marks.shift(); if (q.parent) q.parent.remove(q); } }
+      if (!cut && e.m !== 'glass') for (const m of G.Scars.meshes(o, e.p, P.fxRoot)) { P.marks.push(m); if (P.marks.length > 160) { const q = P.marks.shift(); if (q.parent) q.parent.remove(q); } }
       if (P.debris) P.debris.burst(e.p, o);
     }
     const sp = new T.Mesh(new T.SphereGeometry(e.k === 'r' ? 0.09 : 0.06, 8, 6), new T.MeshBasicMaterial({ color: col, transparent: true, blending: T.AdditiveBlending, depthWrite: false })); sp.position.copy(e.p); P.fxRoot.add(sp);
@@ -1317,7 +1319,7 @@ G.Highlights = (() => {
   // door events have them, swinging (snapped at a segment's first frame, not swung over from the last clip's). The
   // replayed level's door solids follow (js/world.js door), so the cameras' sight lines and the falling bodies see them.
   // the panes as they were: whole till they were shot out
-  function glassAt(tau) { for (const g of P.glass || []) { const pane = P.map && P.map.winMeshes && P.map.winMeshes[g.id]; if (pane) pane.visible = tau < g.t; } }
+  function glassAt(tau) { for (const g of P.glass || []) { const pane = P.map && P.map.winMeshes && P.map.winMeshes[g.id]; if (!pane) continue; if (g.p) { const m = G.Damage.crack(pane, new T.Vector3(...g.p)); if (m) m.visible = tau >= g.t; } else pane.visible = tau < g.t; } }
   function doorsAt(c, tau, snap) {
     const map = P.map, dm = map && map.doorMeshes;
     if (!dm) return;
@@ -2721,5 +2723,5 @@ G.Highlights = (() => {
     }
   }
 
-  return { tick, shot, roundPath, glass, door, laser, hitBy, kill, suspectDown, saved, incap, arrest, take, drop, mount, unmount, update, reset, exportPack, renderPack, cancelRender, exportHere, muxHere, toJSON, fromJSON, R, P };
+  return { tick, shot, roundPath, glass, crack, door, laser, hitBy, kill, suspectDown, saved, incap, arrest, take, drop, mount, unmount, update, reset, exportPack, renderPack, cancelRender, exportHere, muxHere, toJSON, fromJSON, R, P };
 })();

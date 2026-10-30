@@ -532,6 +532,11 @@ G.Me = {
     this.pos.z += this.vel.z * dt;
     G.Level.resolve(map, this.pos, 0.35, prevY, STEP, true); // (anything a step high or less: walked up onto, not into; stairs as slopes)
     this.pos.y += this.vel.y * dt;
+    // (shoulder a fractured pane and it comes down)
+    if (map.cracked && this.vel.x * this.vel.x + this.vel.z * this.vel.z > 0.5) {
+      const sp = Math.hypot(this.vel.x, this.vel.z), ux = this.vel.x / sp, uz = this.vel.z / sp, h = G.Level.raycast(map, this.pos.x, this.pos.y + 1.1, this.pos.z, ux, 0, uz, 0.8); // (past the sill you're stopped by: a pane's set back in its wall)
+      if (h.pane != null && map.windows[h.pane] && map.windows[h.pane].cracked) this.roundPane(h.pane, new THREE.Vector3(this.pos.x + ux * h.t, this.pos.y + 1.1, this.pos.z + uz * h.t), new THREE.Vector3(ux, 0, uz), true);
+    }
     const g = G.Level.groundAt(map, this.pos.x, this.pos.z, 0.35, prevY, STEP, true);
     // on the ground, or a step down from it (walking down stairs: stay on them, don't hop from tread to tread)
     if (this.pos.y <= g || (was && this.vel.y <= 0 && prevY - g <= STEP + 0.02)) { this.pos.y = g; this.vel.y = 0; this.onGround = true; } else this.onGround = false;
@@ -1205,8 +1210,9 @@ G.Me = {
       const cut = G.Damage.hit(map, s, at, d, wall.n, r, o, Jin, b.proj.d * 1000); // (what it takes out of a wall or a door)
       if (s.door && !r.ric) { const pt = G.Damage.partAt(s.door, at.toArray()); if (pt != null) G.Net.toHost({ t: 'dhit', i: s.door.id, pt, J: Math.round(Jin), dir: [+d.x.toFixed(2), +d.z.toFixed(2)] }); } // (its handle, a hinge: the host keeps the score)
       if (s.target) G.Range.hit(s, at, d, b.proj.m * vIn);
+      const pane0 = wall.pane != null && !(s.win && s.win.armor) && !r.ric; // (glass shows what it took across the whole pane: no mark on it)
       if (wall.pane != null && !(s.win && s.win.armor)) this.roundPane(wall.pane, at, d);
-      if (!wall.view) this.roundMark(b, at, wall.n, r.fx, r.ric ? 'r' : 'e', vIn, s, r.name, { m: r.mat, dir: d, stop: !r.ric && !r.v, cut: cut ? cut.r : 0, depth: r.depth });
+      if (!wall.view) this.roundMark(b, at, wall.n, r.fx, r.ric ? 'r' : 'e', vIn, s, r.name, { m: r.mat, dir: d, stop: !r.ric && !r.v, cut: cut ? cut.r : pane0 ? 1 : 0, depth: r.depth });
       else { this.pathPt(b, at, vIn); if (b.trail) G.R.trailAdd(b.trail, at, true, vIn); }
       if (r.ric) {
         on(wall.t);
@@ -1219,7 +1225,7 @@ G.Me = {
       if (!r.v) return stopped(at, done + wall.t, false, vIn); // (v: how fast it struck)
       const n0 = wall.n;
       on(r.t);
-      if (!wall.view) this.roundMark(b, o, r.nOut, r.fxOut, 'x', r.v, null, r.nameOut, { m: r.matOut, dir: d, cut: cut ? cut.rOut : 0 });
+      if (!wall.view) this.roundMark(b, o, r.nOut, r.fxOut, 'x', r.v, null, r.nameOut, { m: r.matOut, dir: d, cut: cut ? cut.rOut : pane0 ? 1 : 0 });
       turn(B.deflect(d, r, n0), r.v);
       o.addScaledVector(d, 0.004);
     }
@@ -1265,6 +1271,20 @@ G.Me = {
     }
     return hits.sort((x, y) => x.t - y.t);
   },
+  // Take what's in the weapon case (js/game.js caseShow): swapped for your weapon of that kind, or with room, yours goes in your backpack
+  caseTake() {
+    const wc = G.Game.wcase, inCase = wc && G.Gunsmith.fromCode(wc.code);
+    if (!inCase) return;
+    const slot = inCase.slot;
+    this.startAction('Swapping weapons', 1.2, () => {
+      const w = this.weapons[slot];
+      this.caseStow = !!(w && this.packRoom(G.Gear.gunItem(w)));
+      // your weapon goes in the case in its standard build: your aftermarket parts stay with you
+      // its magazines go into the case with it (unless it's going in your backpack)
+      G.Net.toHost({ t: 'swap', give: w && !this.caseStow ? [w.def.code, G.loaded(w), G.Gear.handOver(this, w.def), w.ammo, w.stickers || null] : null }); // (its stickers with it)
+    }, 'case');
+    this.action.free = true;
+  },
   // where a round struck or left something: its mark here (s: a target's own, its picture), on its trail, and for the squad
   // how: { m (what it's made of: '' nothing to damage), dir (the way it was going), stop (it stopped in it) }
   roundMark(b, p, n, fx, kind, v, s, name, how = {}) {
@@ -1275,9 +1295,11 @@ G.Me = {
     (b.shot.fx = b.shot.fx || []).push(G.Ballistics.mark(p, n, fx, kind, o));
   },
   // a pane a round went through breaks (here at once, and for everyone through the host)
-  roundPane(id, at, dir) {
+  // The first round fractures it, and it stays up; the next one, or a blast (all), or someone walking into it, brings it down.
+  roundPane(id, at, dir, all) {
     const win = G.Game.map.windows[id];
     if (!win || win.broken) return;
+    if (!win.cracked && !all) { G.Views.crackGlass(id, at, dir); G.Net.toHost({ t: 'crack', id, p: [+at.x.toFixed(3), +at.y.toFixed(3), +at.z.toFixed(3)] }); return; }
     G.Views.breakGlass(id, at, dir);
     G.Net.toHost({ t: 'glass', ids: [id] });
   },
@@ -1301,7 +1323,7 @@ G.Me = {
   },
   // the windows a blast round went through on the way break
   roundGlass(a, dir, wall, upTo) {
-    for (const [id, gt] of wall.glass || []) if (gt < upTo) this.roundPane(id, a.clone().addScaledVector(dir, gt), dir);
+    for (const [id, gt] of wall.glass || []) if (gt < upTo) this.roundPane(id, a.clone().addScaledVector(dir, gt), dir, true);
   },
   // A round's wounds on a suspect, from its track through them (js/ballistics.js): each part's damage (a share of a
   // standard person's life) and what it did there (bleeding, a broken bone, a collapsed lung, the organs it went
@@ -1606,7 +1628,7 @@ G.Me = {
       const evd = a.kind === 'bag' ? G.Views.evidence.get(a.target) : null;
       const lost = (a.kind === 'zip' && (!tgt || (a.living && !tgt.alive) || Math.hypot(tgt.pos.x - this.pos.x, tgt.pos.z - this.pos.z) > 2.8)) ||
         (a.kind === 'bag' && (!evd || evd.secured));
-      const kept = a.key ? this.keys[a.key] && !G.Game.chatOpen : held; // most are F; a backpack swap is B
+      const kept = a.free || (a.key ? this.keys[a.key] && !G.Game.chatOpen : held); // most are F; a backpack swap is B; one from a menu just runs
       if (!kept && !committed || this.down || lost) this.action = null; // let go: abandoned
       else if (a.approach) { // too far for the animation: walk into position first (it starts once you're there)
         busy = true; label = a.label; prog = 0;
@@ -1801,23 +1823,8 @@ G.Me = {
           if (F) { this.startAction('Opening the case', 1.0, () => G.Net.toHost({ t: 'openCase' }), 'case'); busy = true; }
         } else if (!inCase) prompt = 'The weapon case is empty';
         else {
-          const mine = this.weapons[inCase.slot], col = G.TIER_COLORS[inCase.tier];
-          // with room in your backpack, yours goes in there instead of the case
-          const stow = mine && this.packRoom(G.Gear.gunItem(mine));
-          prompt = stow ? `Hold <b>F</b> to take the <b style="color:${col}">${inCase.name}</b> (your ${mine.def.name} goes in your backpack)`
-            : mine ? `Hold <b>F</b> to swap your ${mine.def.name} for the <b style="color:${col}">${inCase.name}</b> in the case`
-            : `Hold <b>F</b> to take the <b style="color:${col}">${inCase.name}</b> from the case`;
-          if (F) {
-            const slot = inCase.slot;
-            this.startAction('Swapping weapons', 1.2, () => {
-              const w = this.weapons[slot];
-              this.caseStow = !!(w && this.packRoom(G.Gear.gunItem(w)));
-              // your weapon goes in the case in its standard build: your aftermarket parts stay with you
-              // its magazines go into the case with it (unless it's going in your backpack)
-              G.Net.toHost({ t: 'swap', give: w && !this.caseStow ? [w.def.code, G.loaded(w), G.Gear.handOver(this, w.def), w.ammo, w.stickers || null] : null }); // (its stickers with it)
-            }, 'case');
-            busy = true;
-          }
+          prompt = 'Hold <b>F</b> to look in the weapon case';
+          if (F) { this.startAction('Looking in the case', 0.25, () => G.Game.caseShow(false), 'case'); busy = true; }
         }
       }
     }

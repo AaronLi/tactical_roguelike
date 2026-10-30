@@ -522,6 +522,7 @@ says the same), but not whose: the shooter's name isn't shown.
     you have no primary, you just take it and the case is left empty.
   - **Co-op:** one case for the whole squad. After someone swaps, the next player can take the weapon they
     left.
+- **The weapon case's wheel** (`js/game.js` caseShow): opening the case spins one wide reel through guns till you stop it, and it lands on what's really in there (the host's roll: stopping only shows it). Looking again, it's landed. Take it from there, swapped for your weapon of that kind or with yours into your backpack, or leave it.
 - **The attachments box** (`map.abox`, most levels: `G.Level.ABOX_CHANCE`): a small black hard case with a yellow band,
   on the floor against a wall in a room away from the spawn (yellow on your minimap till you've had your pick).
   - **One use each:** a light on its front for each of the squad, in their colour, lit till they've had their pick.
@@ -1315,12 +1316,16 @@ says the same), but not whose: the shooter's name isn't shown.
   each piece went and what it weighed. The readout lists the same for each shot.
 - **Rounds cut real holes in walls and doors** (`js/damage.js`): the wall's geometry is rebuilt with the hole left out of it and a bore lined down the
   way the round went, so an angled shot leaves an angled hole. Holes that touch fuse into one: a single ragged outline with the material between them
-  gone, one bore that shape and one set of marks round it, so a burst tears a wide gap instead of leaving a row of neat holes. You can see down a hole, and shoot down it, and a suspect on the far side shows
+  gone, one bore that shape and one set of marks round it, so a burst tears a wide gap instead of leaving a row of neat holes. Marks are cut against
+  every opening and stop at the wall's ends, and a strip too thin to stand crumbles, so nothing lies across a hole or hangs in the air. Near a wall's end (a door jamb, a corner) a hit breaks a
+  piece off the corner instead, into both faces, and more fire takes more, wider and deeper, the way a machine gun eats the end of a brick wall. You can see down a hole, and shoot down it, and a suspect on the far side shows
   through it. Concrete, block and brick crack, the cracks real slits running out of the hole; wood's torn long along the grain with splinters at
   its ends; metal tears, its petals bent along the round's line going in and coming out; a round steel stops only dents it. A round that stops in a
   wall leaves a blind hole, and the next one into it starts from the bottom, so a wall too thick to go through is shot through by hitting
   the same place (67 cm of concrete takes a 7.62x51 about 17 rounds). Everyone sees the same holes, whoever joins later included, and the
   replays cut them as the rounds get there. Furniture, floors, ceilings, lintels and the wall round a window keep their marks instead.
+- **Glass fractures before it falls** (`js/damage.js` crack): a round through a pane cracks all of it, from where it struck out to the frame, and it stays up. A second round
+  brings it down, or a blast, or walking into it. Bulletproof glass still just stars.
 - **Doors can be shot apart** (`js/damage.js`, `js/server.js` doorHit): a door's handle and each of its three hinges take a certain amount of energy (400 J the
   handle, 600 J a hinge: a rifle round or two pistol rounds). Shoot out the handle and the latch lets go and it swings open. Shoot out all
   its hinges and nothing's holding it: it falls, a rigid body on what's round it, tipped the way the last round was going. Its fall's worked out

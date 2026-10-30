@@ -54,7 +54,7 @@ G.Server = {
           bodies: this.phase === 'level' && this.bodies ? [...this.bodies.values()].map((b) => [b.id, b.type, b.x, b.z, b.yaw, b.secured ? 1 : 0, b.y || 0]) : null,
           wcase: this.phase === 'level' ? this.caseMsg() : null, cabs: this.phase === 'level' ? this.cabMsg() : null, abox: this.phase === 'level' ? this.aboxMsg() : null,
           loot: this.phase === 'level' && this.loot ? [...this.loot.values()].map((l) => [l.id, l.x, l.y, l.z, l.item, l.yaw]) : null,
-          glass: this.phase === 'level' && this.glassBroken ? [...this.glassBroken] : null,
+          glass: this.phase === 'level' && this.glassBroken ? [...this.glassBroken] : null, cracked: this.phase === 'level' ? this.glassCracked || null : null,
           skins: [...this.skins], sbox: this.phase === 'level' ? this.sboxMsg() : null,
         });
         if (this.phase === 'shop') G.Net.sendTo(from, this.teamMsg());
@@ -95,6 +95,13 @@ G.Server = {
       case 'flash': if (this.phase === 'level' && Array.isArray(m.p) && m.p.length === 3 && m.p.every(Number.isFinite)) this.flashbang(m.p); break;
       // an officer's round went through these windows
       case 'glass': if (this.phase === 'level' && Array.isArray(m.ids)) this.breakGlass(m.ids, m.p); break;
+      case 'crack': { // (a first round through a pane: it's fractured, and it's heard)
+        const w = this.phase === 'level' && this.map && this.map.windows && this.map.windows[m.id];
+        if (!w || w.broken || w.armor || w.cracked || !Array.isArray(m.p)) break;
+        w.cracked = true; this.glassCracked.push([m.id, m.p]); this.hear(w.x, w.z, 10, w.fy || 0);
+        G.Net.broadcast({ t: 'crack', id: m.id, p: m.p }, from);
+        break;
+      }
       case 'boom':
         this.hear(m.p[0], m.p[2], 35, m.p[1] || 0);
         // the blast takes out the windows round it
@@ -318,7 +325,8 @@ G.Server = {
     this.report = { incap: 0, bleedouts: 0, bleedBy: {}, arrests: 0, rescued: 0, civKilled: 0, unauth: 0, evidence: 0, bodies: 0 };
     this.evidence = []; // weapons on the floor: { i, wpn, x, z, owner, secured, taken }
     this.loot = new Map(); // things officers have put down: id -> { id, x, y, z, item (packed), yaw }
-    this.glassBroken = new Set(); // windows broken (map.windows ids)
+    this.glassBroken = new Set(); this.glassCracked = []; // windows broken (map.windows ids), and fractured ([id, where])
+    this.holes = []; this.fallen = []; // (what's been shot out of the place: js/damage.js)
     this.bodies = new Map(); // the dead, until secured: id -> { id, type, x, z, yaw, civ, secured }
     for (const p of this.players.values()) { p.ready = false; p.st = null; }
     this.spawnEnemies();
