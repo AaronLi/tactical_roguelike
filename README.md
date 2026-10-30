@@ -1301,8 +1301,8 @@ says the same), but not whose: the shooter's name isn't shown.
   layer, with its speed into each.
 - **Damage is the energy a round leaves** (`js/ballistics.js` effects): what it deposited in a part, plus what reached the
   body through armour as blunt trauma, as a share of what a person can take (`PERSON_J`, 1600 J). Nothing else: no
-  multipliers, no curve. Square on an unarmoured torso that's about 11% for a .22, 27% for 9 mm, 30% for a hollow point,
-  93% for 5.56 or 7.62x39, 170% for 7.62x51, and 13% a pellet for 00 buck. A limb counts for only so much (`PART_J`), the rest
+  multipliers, no curve. Square on an unarmoured torso that's about 10% for a .22, 20% for 9 mm, 29% for a hollow point,
+  70% for 5.56 or 7.62x39, 100% for 7.62x51, and 12% a pellet for 00 buck. A limb counts for only so much (`PART_J`), the rest
   going into tissue already wrecked. What a track does to an organ on the way (below) is on top of that. Armour wears by
   the joules it soaks, and a steel target on the range swings by the round's momentum.
 - **Wounds are simulated** (`js/ballistics.js`), not multiplied: the damage and health model from tactical_game

@@ -637,8 +637,7 @@ G.Ballistics = (() => {
   };
   for (const id of PAIRED) { for (const S of ['L', 'R']) EFFECT[id + S] = EFFECT[id]; delete EFFECT[id]; }
   // What a wound costs: the energy the round left in that part (and what got through their armour as blunt trauma) as a
-  // share of PERSON_J, what a person can take. Square on an unarmoured torso a .22 leaves about 170 J, a 9 mm that goes
-  // through 430, a hollow point 480, 5.56 and 7.62x39 1500, 7.62x51 2700, a 00 buck pellet 210, a slug 2800. There's only so much
+  // share of PERSON_J, what a person can take. Square on an unarmoured torso a .22 leaves about 165 J, a 9 mm that goes through 320, a hollow point 460, 5.56 1200, 7.62x39 1050, 7.62x51 1700, a 00 buck pellet 195. There's only so much
   // of a limb: PART_J, what a part can count for at most, the rest going into tissue already wrecked (what the track
   // did to the bone and the artery in it is the wound, whatever the energy: effects).
   const PERSON_J = 1600, DMG_PER_J = 100 / PERSON_J, PART_J = { farm: 300, uarm: 450, shin: 450, thigh: 650, neck: 800, pelvis: 1200, abdomen: 1400 };
