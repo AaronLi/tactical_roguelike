@@ -33,4 +33,4 @@ date doesn't say which came first. `traced`: from a photo. `by eye`: built looki
 | deagle | 2026-10-30 | traced | 12674e8 | "Desert-Eagle-p1030134.jpg" |
 | fiveseven | 2026-10-30 | traced | 12674e8 | "FN Five Seven (cropped).jpg" |
 | thor | 2026-10-30 | traced | 12674e8 | IMFDB "THOR_.45-70.jpg"; the EAA/Tanfoglio Thor |
-| f2 | 2026-10-30 | traced | 6390c31 | "FAMAS Assaultrifle FRA noBG.png" (a FAMAS F1) |
+| f2 | 2026-10-30 | traced | 05b7420 | "FAMAS-G2-IMG 8894-white.jpg" (a FAMAS G2; first traced as an F1 in 6390c31) |
