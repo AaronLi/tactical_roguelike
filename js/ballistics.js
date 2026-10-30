@@ -413,7 +413,8 @@ G.Ballistics = (() => {
   // o, u: the round's world origin and unit direction; v: its speed (m/s) arriving; tMax: how far to look.
   // trace (an array, optional): filled with the track, a step at a time inside the body ({ t: metres along the ray, rP:
   // the crushed channel's radius, rT: the temporary cavity's, v, yawed, expanded }), and trace.frags with each fragment's
-  // track ({ t: where it broke off, dir, len }): for showing it (js/highlights.js, the x-ray breakdown).
+  // track ({ t: where it broke off, dir, len: how far through them, v0: its speed there, v: what it left them at (0: it stopped
+  // in them), m, sp: a splinter of bone }): for showing it (js/highlights.js, the x-ray breakdown; js/shotlog.js, F9's record).
   function through(rig, o, u, v, p0, armour, tMax = 3, trace = null) {
     const S = segs(), mats = [];
     rig.root.updateMatrixWorld(true);
@@ -528,7 +529,7 @@ G.Ballistics = (() => {
         if (bone && !yawed && !expanded && p.nose === 'fmj' && p.yaw) yawed = true; // (bone tips it over)
         if (bone && !inBone) { // into a bone: it does to the round what any hard thing does, and it shatters (splinters flying on along the track)
           deform(p, v, v, MAT.bone, 8);
-          if (v > 250) for (let i = 0; i < 3; i++) frags.push({ t, v: v * 0.45, m: 0.0003, dir: jitter(u, 0.5) });
+          if (v > 250) for (let i = 0; i < 3; i++) frags.push({ t, v: v * 0.45, m: 0.0003, dir: jitter(u, 0.5), sp: 1 });
         }
         inBone = bone;
         // fragmenting: tumbling above its threshold, the core sheds 40% of itself as six fragments
@@ -560,7 +561,7 @@ G.Ballistics = (() => {
       prev = cur; prevQ = cq; t += ds;
     }
     // the fragments: each tears its own short track from where it broke off (the same sums, a small jagged chip)
-    for (const f of frags) { const len = fragment(mats, o, u, f, hitOf); if (trace) (trace.frags = trace.frags || []).push({ t: f.t, dir: f.dir, len }); }
+    for (const f of frags) { const q = fragment(mats, o, u, f, hitOf); if (trace) (trace.frags = trace.frags || []).push({ t: f.t, dir: f.dir, len: q.len, v0: f.v, v: q.v, m: f.m, sp: f.sp }); }
     res.exitV = res.stopped ? 0 : v > V_STOP ? v : 0;
     res.exitT = t;
     if (res.exitV) { // (out the far side: thrown off line by what it lost in them, and it's left them turning)
@@ -614,19 +615,21 @@ G.Ballistics = (() => {
   function jitter(u, a) { const d = u.clone().add(new T.Vector3((Math.random() - 0.5) * a, (Math.random() - 0.5) * a, (Math.random() - 0.5) * a)); return d.normalize(); }
   function fragment(mats, o, u, f, hitOf) {
     const start = o.clone().addScaledVector(u, f.t);
-    let v = f.v, t = 0;
+    let v = f.v, t = 0, end = 0, inside = false;
     const A = area(0.0025), Cd = 1.2;
     for (let i = 0; i < 80 && v > V_STOP; i++, t += STEP) {
       _w.copy(start).addScaledVector(f.dir, t);
       let cur = null, cq = null;
       for (const m of mats) { _q.copy(_w).applyMatrix4(m.inv); if (inSeg(m.s, _q) >= 0) { cur = m; cq = _q.clone(); break; } }
+      inside = !!cur;
       if (!cur) continue;
+      end = t;
       const v1 = slow(v, f.m, A, Cd, G.Materials.TISSUE.muscle, STEP), dE = 0.5 * f.m * (v * v - v1 * v1), crush = A * STEP * 1e6, h = hitOf(cur.s);
       h.E += dE; h.crush += crush;
       for (const [oid, sh] of cur.s.organs || []) if (orgDist(sh, cq) <= 0) h.organs[oid] = (h.organs[oid] || 0) + crush + dE * (ORG[oid].stretch || 0) * 0.01;
       v = v1;
     }
-    return t; // (how far it went)
+    return { len: end, v: !inside && v > V_STOP ? v : 0 }; // (how far through them it went, and what it came out at, if it did)
   }
 
   // ---------------------------------------------------------------- what the wounds do

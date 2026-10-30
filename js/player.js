@@ -1147,16 +1147,17 @@ G.Me = {
       const wall = L.raycast(map, o.x, o.y, o.z, d.x, d.y, d.z, rest), hitWall = !!wall.solid && wall.t < rest - 1e-4, wallT = Math.min(wall.t, rest);
       const look = hitWall ? wallT : rest + 0.8; // (a body that straddles the end of this step: all of it, now)
       for (const h of this.roundHits(b, o, d, wallT)) {
-        const tr = b.trail ? [] : null, ev = h.ev, mate = h.mate; // (F9: the track through them, a step at a time, for the trail)
+        const tr = [], ev = h.ev, mate = h.mate; // (F9: the track through them, a step at a time, for the trail, and its fragments)
         // Whoever fired it decides what it did, on what they can see: the body as it stands on this screen, and what it's wearing
         const rig = ev ? ev.rig : mate ? mate.rig : h.rig, armour = ev ? B.suspectArmour(ev) : mate ? B.stateArmour(mate.st) : B.kitArmour(this), arrived = B.snap(b.proj);
         const r = B.through(rig, o, d, v, b.proj, armour, look, tr);
         if (!r || r.entryT == null) continue; // (inside the hitbox, outside the body: a near miss)
         b.hit.add(ev || mate || this);
         const hp = o.clone().addScaledVector(d, r.entryT);
-        b.path.hit.push([this.pathPt(b, hp, v), ev ? 'e' + ev.id : 'p' + (mate ? mate.id : G.Net.myId), Math.round(v), arrived, +d.x.toFixed(4), +d.y.toFixed(4), +d.z.toFixed(4), r.exitV ? 1 : 0, B.armourLog(r), [+(r.exitT - r.entryT).toFixed(3), r.log.length ? r.log[r.log.length - 1].m : '']]);
-        if (!h.self && G.ShotLog) G.ShotLog.pose(b.shot, b.path.hit[b.path.hit.length - 1][1], rig); // (F9: them as they stood)
-        if (tr) { this.trailTrack(b, o, d, r, v, tr, h.self ? null : rig); G.HUD.hbPath = r.log.concat({ m: r.exitV ? 'out' : 'stopped', v: Math.round(r.exitV) }); } // (F9: what it went through)
+        b.path.hit.push([this.pathPt(b, hp, v), ev ? 'e' + ev.id : 'p' + (mate ? mate.id : G.Net.myId), Math.round(v), arrived, +d.x.toFixed(4), +d.y.toFixed(4), +d.z.toFixed(4), r.exitV ? 1 : 0, B.armourLog(r), [+(r.exitT - r.entryT).toFixed(3), r.log.length ? r.log[r.log.length - 1].m : ''], this.pathFrags(o, d, tr)]);
+        const hk = b.path.hit[b.path.hit.length - 1][1];
+        if (!h.self && G.ShotLog) G.ShotLog.pose(b.shot, hk, rig); // (F9: them as they stood)
+        if (b.trail) { (b.trail.keys = b.trail.keys || new Set()).add(hk); this.trailTrack(b, o, d, r, v, tr, h.self ? null : rig); G.HUD.hbPath = r.log.concat({ m: r.exitV ? 'out' : 'stopped', v: Math.round(r.exitV) }); } // (F9: what it went through)
         if (ev) {
           B.wearOut(armour);
           this.hitEnemy(ev, r);
@@ -1275,6 +1276,13 @@ G.Me = {
     if (!win || win.broken) return;
     G.Views.breakGlass(id, at, dir);
     G.Net.toHost({ t: 'glass', ids: [id] });
+  },
+  // the fragments of a round in someone, for its path: [x0, y0, z0, x1, y1, z1 (where it broke off, where it ended), speed there, speed out of them (0: stopped in them), grams, a splinter of bone?]
+  pathFrags(a, dir, tr) {
+    return (tr.frags || []).map((f) => {
+      const q = a.clone().addScaledVector(dir, f.t), e = q.clone().addScaledVector(f.dir, f.len);
+      return [q.x, q.y, q.z, e.x, e.y, e.z].map((x) => +x.toFixed(3)).concat(Math.round(f.v0), Math.round(f.v), +(f.m * 1000).toFixed(2), f.sp ? 1 : 0);
+    });
   },
   // F9: a round's track through someone on its trail: in at the speed it arrived (marked), each step inside at its speed
   // as it slowed (js/ballistics.js through, traced), and where it stopped, if it did (marked)

@@ -1306,10 +1306,13 @@ says the same), but not whose: the shooter's name isn't shown.
   did, and the x-ray re-runs the actual round as it arrived, listing what it went through, walls and armour and tissue,
   layer by layer. All of it goes in the recording .zip; older recordings still play, with straight lines.
 - **F9 keeps every shot that hit someone** (`js/shotlog.js`): for the level (the last 32), whether or not the hitboxes were on when it
-  was fired, the round's whole trail stays, coloured by speed, with a ghost of whoever it hit as they stood when it struck. Look at
-  someone and the trails of the shots that hit them light up with markers in the world: the speed at the muzzle, where it fell
-  through each Mach number (from 3 to 0.5, and how far out), what it went through or off, its entry speed and energy, its speed past
-  their armour and the energy that cost, its exit speed or where it stopped and in what. The readout lists the same for each shot.
+  was fired, the round's whole trail stays, coloured by speed, with a ghost of whoever it hit as they stood when it struck, and the
+  track of every fragment and bone splinter it threw off inside them. It's shown one body at a time: put the crosshair on someone (they
+  stay picked out when you look away) and the trails and ghosts of the shots that hit them appear, along with the tracks kept on their
+  body, and nobody else's do; with nobody picked out it's the shots that hit you. The trails carry markers in the world: the speed at the
+  muzzle, where it fell through each Mach number (from 3 to 0.5, and how far out), what it went through or off, its entry speed and energy,
+  its speed past their armour and the energy that cost, its exit speed or where it stopped and in what, where it broke up, and how far
+  each piece went and what it weighed. The readout lists the same for each shot.
 - **Rounds damage what they hit, by what it is** (`js/scars.js`): a mark and what's thrown out, from the material, whether the round went
   in, came out, skidded or stopped, which way it was going and how much energy it had. Metal dimples toward the hole, dragged along
   the round's line, and comes out of the far side in petals bent the way it was going; a round it stops leaves a dent with lead in it, and

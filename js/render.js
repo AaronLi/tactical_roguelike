@@ -130,7 +130,7 @@ G.R = {
     if (G.ShotLog) G.ShotLog.clear();
     if (this.debris) this.debris.clear();
     for (const o of this.wounds || []) { o.removeFromParent(); if (o.geometry !== this.trailDot) o.geometry.dispose(); o.material.dispose(); }
-    this.wounds = []; this.woundsOn = null;
+    this.wounds = [];
     // marks on doors back into the scene first (they're pooled: they mustn't go with the doors)
     for (const m of [...(this.decals || []), ...(this.bloodMarks || [])]) if (m.parent && m.parent !== this.scene) this.scene.add(m);
     const dispose = (o) => {
@@ -475,13 +475,14 @@ G.R = {
       }
       i = j;
     }
-    for (const o of objs) o.visible = !!G.Rig.debug;
+    for (const o of objs) { o.visible = false; o.onRig = rig; }
     (this.wounds = this.wounds || []).push(...objs);
   },
   trailsUpdate() {
     const on = G.Rig.debug;
     if (G.ShotLog) G.ShotLog.frame(); // (the shots that hit someone: their ghosts, trails and markers)
-    if (this.wounds && this.wounds.length && this.woundsOn !== on) { for (const o of this.wounds) o.visible = on; this.woundsOn = on; } // (the tracks kept on bodies: with the hitboxes)
+    const L = G.ShotLog && G.HUD.hbLast, fk = G.ShotLog ? G.ShotLog.focus() : null;
+    for (const o of this.wounds || []) o.visible = !!on && !!L && o.onRig === L.who.rig; // (the tracks kept on bodies: with the hitboxes, on whoever you've picked out)
     if (!this.trails || !this.trails.length) return;
     const now = performance.now();
     this.trails = this.trails.filter((tr) => {
@@ -489,8 +490,9 @@ G.R = {
       if (!last && tr.old == null) tr.old = now; // (the moment a newer shot took over)
       const k = last ? 1 : 1 - (now - tr.old) / 1000 / this.TRAIL_FADE;
       if (k <= 0 || !tr.line.parent) { this.trailDrop(tr); return false; }
-      tr.line.visible = on; tr.mat.opacity = k * (last ? 1 : 0.55);
-      for (const m of tr.marks) { m.visible = on; m.material.opacity = k; }
+      const see = on && (!tr.keys || tr.keys.has(fk)); // (a round that went into someone: only with them picked out)
+      tr.line.visible = see; tr.mat.opacity = k * (last ? 1 : 0.55);
+      for (const m of tr.marks) { m.visible = see; m.material.opacity = k; }
       return true;
     });
   },

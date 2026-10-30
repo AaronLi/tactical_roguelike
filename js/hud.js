@@ -209,7 +209,7 @@ G.HUD = {
     }
     // every shot that's hit them: what it was going at each stage (its trail, ghost and markers in the world: js/shotlog.js)
     const shots = G.ShotLog.of(kind === 'e' ? 'e' + who.id : 'p' + (this.hbLast || {}).id);
-    if (shots.length) out.splice(2, 0, `<div class="hb-sec"><span class="hb-k">Shots that hit them: ${shots.length}</span>${shots.slice(-5).reverse().map((h) => `<div class="hb-shot"><b>#${h.n}</b> ${esc(h.name)} <span class="hb-k">· ${h.range} m · ${G.U.fmt(h.J)} J</span><br>${[`muzzle ${h.muzzle}`, `in ${h.vIn}`, h.post != null ? `past armour ${h.post}` : null, h.out != null ? `out ${h.out}` : null].filter(Boolean).join(' › ')}${h.stop ? ` <span class="warn">stopped: ${esc(h.stop)}</span>` : ''}</div>`).join('')}</div>`);
+    if (shots.length) out.splice(2, 0, `<div class="hb-sec"><span class="hb-k">Shots that hit them: ${shots.length}</span>${shots.slice(-5).reverse().map((h) => `<div class="hb-shot"><b>#${h.n}</b> ${esc(h.name)} <span class="hb-k">· ${h.range} m · ${G.U.fmt(h.J)} J</span><br>${[`muzzle ${h.muzzle}`, `in ${h.vIn}`, h.post != null ? `past armour ${h.post}` : null, h.out != null ? `out ${h.out}` : null].filter(Boolean).join(' › ')}${h.stop ? ` <span class="warn">stopped: ${esc(h.stop)}</span>` : ''}${h.frags ? ` <span class="hb-k">· ${h.frags}</span>` : ''}</div>`).join('')}</div>`);
     if (this.hbPath) out.push(`<div class="hb-sec"><span class="hb-k">Last round through them</span><div class="hb-path">${this.hbPath.map((q) => `${esc(q.m)} <b>${q.v}</b>`).join(' › ')}</div></div>`);
     this.set('hbInfo', this.trailLegend() + out.join(''));
     this.xray(who, true);
