@@ -602,6 +602,8 @@ G.ENEMY_GEAR = {
   // on a helmet with no visor of its own, the chance of a mandible guard / a IIIA face shield / a rifle-rated one, by
   // tier (js/gear.js f.*: the officers' own, drawn on the helmet and in the way of rounds just as theirs are)
   face: [[0, 0, 0], [0.06, 0.02, 0], [0.16, 0.1, 0.02], [0.2, 0.18, 0.08]],
+  // chance of a light / a laser on their gun, by tier (an Enforcer from the second always has the light, the Kingpin both)
+  tac: { light: [0, 0.2, 0.5, 0.8], laser: [0, 0.1, 0.35, 0.6] },
   // the Enforcer is always armoured, more heavily as tiers go up; the Kingpin wears the best
   fixed: {
     heavy: { vest: ['steel', 'steel', 'ceramic', 'assault'], helmet: ['ach', 'ach', 'riflehelm', 'riflehelm'], face: [0, 0, 'f.mandible', 'f.shield'] },

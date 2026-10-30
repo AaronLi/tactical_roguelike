@@ -1,5 +1,5 @@
 'use strict';
-const _tv = new THREE.Vector3();
+const _tv = new THREE.Vector3(), _tv2 = new THREE.Vector3();
 // Three.js scene, character models, first-person viewmodels and particle effects.
 G.R = {
   init() {
@@ -128,6 +128,7 @@ G.R = {
     for (const tr of this.trails || []) this.trailDrop(tr);
     this.trails = []; this.lastShot = null;
     if (G.ShotLog) G.ShotLog.clear();
+    if (this.debris) this.debris.clear();
     for (const o of this.wounds || []) { o.removeFromParent(); if (o.geometry !== this.trailDot) o.geometry.dispose(); o.material.dispose(); }
     this.wounds = []; this.woundsOn = null;
     // marks on doors back into the scene first (they're pooled: they mustn't go with the doors)
@@ -279,7 +280,7 @@ G.R = {
     dg.fillStyle = dgr; dg.fillRect(0, 0, 32, 32);
     const decalMat = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(dc), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 });
     const dgeo = new THREE.PlaneGeometry(0.14, 0.14);
-    for (let i = 0; i < 150; i++) { const d = new THREE.Mesh(dgeo, decalMat); d.visible = false; this.scene.add(d); this.decals.push(d); }
+    for (let i = 0; i < 260; i++) { const d = new THREE.Mesh(dgeo, decalMat); d.visible = false; this.scene.add(d); this.decals.push(d); }
     this.decalIdx = 0;
 
     // Blood where it lands: droplets (a drop with a few satellites) and smears on the floor or a tabletop,
@@ -319,18 +320,31 @@ G.R = {
     // weapon lights and lasers (yours and the squad's): a fixed pool, always in the scene (lit or not), so
     // switching one on never changes the shaders
     this.spots = [];
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 6; i++) {
       const s = new THREE.SpotLight(0xfff1dc, 0, 34, 0.3, 0.6, 1.6);
       s.target = new THREE.Object3D();
       this.scene.add(s, s.target); this.spots.push(s);
     }
+    // what you see of someone else's light: its beam in the air, and the lamp itself
+    this.cones = [];
+    const cg = new THREE.ConeGeometry(1, 1, 18, 1, true).translate(0, -0.5, 0), cc = new Float32Array(cg.attributes.position.count * 3);
+    for (let i = 0; i < cg.attributes.position.count; i++) { const k = cg.attributes.position.getY(i) > -0.5 ? 1 : 0; cc.set([k, k * 0.95, k * 0.86], i * 3); } // (bright at the lamp, nothing by the far end)
+    cg.setAttribute('color', new THREE.BufferAttribute(cc, 3));
     const lc = document.createElement('canvas'); lc.width = lc.height = 32;
     const lg = lc.getContext('2d'), lgr = lg.createRadialGradient(16, 16, 0, 16, 16, 16);
     lgr.addColorStop(0, 'rgba(255,255,255,1)'); lgr.addColorStop(0.25, 'rgba(255,255,255,0.8)'); lgr.addColorStop(1, 'rgba(255,255,255,0)');
     lg.fillStyle = lgr; lg.fillRect(0, 0, 32, 32);
     const laserDotTex = new THREE.CanvasTexture(lc);
+    for (let i = 0; i < 6; i++) {
+      const cone = new THREE.Mesh(cg, this.coneMat || (this.coneMat = new THREE.ShaderMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+        // (brightest down the middle of it, nothing at its edges: no hard line round a beam in the air)
+        vertexShader: 'varying vec3 vC, vN, vV; void main() { vC = color; vN = normalMatrix * normal; vec4 q = modelViewMatrix * vec4(position, 1.0); vV = -q.xyz; gl_Position = projectionMatrix * q; }',
+        fragmentShader: 'varying vec3 vC, vN, vV; void main() { float a = abs(dot(normalize(vN), normalize(vV))); gl_FragColor = vec4(vC * a * a * a * 0.11, 1.0); }' })));
+      const lamp = new THREE.Sprite(new THREE.SpriteMaterial({ map: laserDotTex, color: 0xfff4e0, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+      cone.visible = lamp.visible = false; cone.frustumCulled = false; this.scene.add(cone, lamp); this.cones.push({ cone, lamp });
+    }
     this.pLasers = [];
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 8; i++) {
       const geo = new THREE.BufferGeometry();
       geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
       const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0xff2010, transparent: true, opacity: 0.45, depthWrite: false }));
@@ -340,11 +354,16 @@ G.R = {
       this.scene.add(line, dot); this.pLasers.push({ line, dot });
     }
   },
-  tacBegin() { this.spotUsed = 0; this.pLaserUsed = 0; },
-  // a weapon light at pos shining along dir (k: how bright)
-  tacLight(pos, dir, k = 1) {
+  tacBegin() { this.spotUsed = 0; this.pLaserUsed = 0; this.coneUsed = 0; },
+  // a weapon light at pos shining along dir (k: how bright; seen: someone else's, so you see the beam and the lamp)
+  tacLight(pos, dir, k = 1, seen = false) {
     const s = this.spots[this.spotUsed++]; if (!s) return;
     s.position.copy(pos); s.target.position.copy(pos).add(dir); s.intensity = 0.9 * k; s.distance = 24 + 10 * k;
+    const C = seen && this.cones[this.coneUsed++];
+    if (!C) return;
+    const len = 9 * k, r = len * Math.tan(0.3), at = _tv.subVectors(this.camera.position, pos).normalize().dot(dir); // (at: how nearly it's pointing at you)
+    C.cone.position.copy(pos); C.cone.quaternion.setFromUnitVectors(_tv2.set(0, -1, 0), _tv.copy(dir)); C.cone.scale.set(r, len, r); C.cone.visible = true;
+    C.lamp.position.copy(pos).addScaledVector(dir, 0.02); C.lamp.scale.setScalar(0.1 + 0.5 * k * Math.max(0, at) ** 3); C.lamp.visible = true;
   },
   // a laser from a to b (where it lands), red or green: a faint beam and a bright dot
   tacLaser(a, b, green) {
@@ -360,6 +379,7 @@ G.R = {
   },
   tacEnd() {
     for (let i = this.spotUsed; i < this.spots.length; i++) this.spots[i].intensity = 0;
+    for (let i = this.coneUsed; i < this.cones.length; i++) this.cones[i].cone.visible = this.cones[i].lamp.visible = false;
     for (let i = this.pLaserUsed; i < this.pLasers.length; i++) this.pLasers[i].line.visible = this.pLasers[i].dot.visible = false;
   },
   tracer(from, to, color = 0xffd080, width = 0.018, life) {
@@ -538,31 +558,36 @@ G.R = {
     metal: { s: [0xffc070, 12, 5, 0.22, 12], d: null }, stone: { s: [0xffc070, 3, 3, 0.15, 12], d: [0x9a958a, 8, 1.5] }, wood: { s: null, d: [0xa8824e, 9, 2.2] }, plaster: { s: null, d: [0xe8e4da, 10, 1.2] },
     soft: { s: null, d: [0xcfc8b8, 6, 1] }, glass: { s: null, d: [0xcfe6f0, 8, 2.5] }, soil: { s: null, d: [0x6a5238, 10, 2] }, plastic: { s: null, d: [0x77787a, 5, 2] }, water: { s: null, d: [0xa8c8d8, 8, 2.5] },
   },
-  impact(p, n, kind, fx) {
+  impact(p, n, kind, fx, o) {
     if (G.Audio && G.Audio.impactAt) G.Audio.impactAt(p, kind, fx); // heard when it's close
     if (kind === 'blood') { this.particles(p, 8, 0x8a0a0a, 2.5, 1.2, 9, 0.8, n, true); return; } // (each leaves a drop where it lands)
     if (kind === 'armor') { this.particles(p, 6, 0x9fd8ff, 3, 0.25, 6, 1); return; }
     const fxs = this.IMPACT[fx] || this.IMPACT.stone;
     if (fxs.s) this.particles(p, fxs.s[1], fxs.s[0], fxs.s[2], fxs.s[3], fxs.s[4], 0.8, n);
-    if (fxs.d) this.particles(p, fxs.d[1], fxs.d[0], fxs.d[2], 0.6, 1, 0.6, n);
-    if (n && fx !== 'water') {
+    if (fxs.d && !o) this.particles(p, fxs.d[1], fxs.d[0], fxs.d[2], 0.6, 1, 0.6, n); // (the rest of what's thrown out: js/scars.js)
+    if (kind !== 'wall' || (o && o.m === '')) return; // (o.m '': nothing there to damage)
+    // the damage it did, and what it threw out of it (js/scars.js), by what it hit and how; marks are from the pool, so a reused
+    // one has to come off the door it was on
+    const q = Object.assign({ fx, k: 'e', n }, o, { n });
+    (this.debris || (this.debris = G.Scars.debris(this.scene, (x, z, y) => { const map = G.Game.map; return map ? G.Level.groundAt(map, x, z, 0.01, y) : 0; }))).burst(p, q);
+    if (!n) return;
+    for (const c of G.Scars.plan(q)) {
       const d = this.decals[this.decalIdx]; this.decalIdx = (this.decalIdx + 1) % this.decals.length;
-      if (d.parent !== this.scene) this.scene.add(d); // (a reused hole: off the door it was on)
-      d.position.set(p.x + n[0] * 0.01, p.y + n[1] * 0.01, p.z + n[2] * 0.01);
-      d.lookAt(p.x + n[0], p.y + n[1], p.z + n[2]);
-      d.rotation.z = Math.random() * 6;
+      if (d.parent !== this.scene) this.scene.add(d);
+      d.geometry = c.geo; d.material = c.mat; d.quaternion.copy(c.q); d.scale.set(c.s[0], c.s[1], c.s[2]);
+      d.position.set(p.x + n[0] * c.off, p.y + n[1] * c.off, p.z + n[2] * c.off);
       d.visible = true;
-      this.lastDecal = d;
+      if (this.lastDecals) this.lastDecals.push(d);
       this.onDoor(d);
     }
   },
   // A round's mark where it stopped in something solid (a wall, a door, or a target on the range): paper targets show
   // their holes in their own picture (no mark on top); a steel plate keeps its mark as it swings or falls.
-  impactOn(p, n, solid, fx) {
+  impactOn(p, n, solid, fx, o) {
     const t = solid && solid.target, on = t && G.Range ? G.Range.markOn(t) : null;
-    this.lastDecal = null;
-    this.impact(p, on === 'paper' ? null : n, 'wall', fx);
-    if (on && on !== 'paper' && this.lastDecal) on.attach(this.lastDecal);
+    this.lastDecals = [];
+    this.impact(p, on === 'paper' ? null : n, 'wall', fx, o);
+    if (on && on !== 'paper') for (const d of this.lastDecals) on.attach(d);
   },
   // put marks stuck on something about to be thrown away back in the pool (hidden)
   freeMarks(obj) {
@@ -730,6 +755,7 @@ G.R = {
   render() {
     const r = this.renderer;
     this.trailsUpdate();
+    if (this.debris) { const now = performance.now(); this.debris.update(Math.min(0.05, (now - (this.debrisT || now)) / 1000)); this.debrisT = now; }
     // (the draw calls and triangles counted over the whole frame, every pass: js/profiler.js reads them after)
     r.info.autoReset = false; r.info.reset();
     G.LightGrid.on(true); // (the lamps' light: only for the level's own frame)

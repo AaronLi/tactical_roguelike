@@ -1310,6 +1310,24 @@ says the same), but not whose: the shooter's name isn't shown.
   someone and the trails of the shots that hit them light up with markers in the world: the speed at the muzzle, where it fell
   through each Mach number (from 3 to 0.5, and how far out), what it went through or off, its entry speed and energy, its speed past
   their armour and the energy that cost, its exit speed or where it stopped and in what. The readout lists the same for each shot.
+- **Rounds damage what they hit, by what it is** (`js/scars.js`): a mark and what's thrown out, from the material, whether the round went
+  in, came out, skidded or stopped, which way it was going and how much energy it had. Metal dimples toward the hole, dragged along
+  the round's line, and comes out of the far side in petals bent the way it was going; a round it stops leaves a dent with lead in it, and
+  a ricochet a bright gouge. Concrete, block and brick crater and crack and throw chips and dust, spalling wider out of the back than the
+  front. Wood takes a ragged hole and blows out in splinters; particle board crumbles; plasterboard takes a neat hole in and a torn,
+  paper-edged blowout out, and hangs in the air as dust. Tile, cast iron, glass and plastic star and crack; paper, cloth, foam and wool
+  tear and shed what drifts; earth craters, water splashes, leaves fall. Chips land on the floor and lie there a while. Marks stay on
+  doors as they swing, every player sees the same damage, and the replays show it too.
+- **A face shield shows what it caught** (`js/hud.js` maskHit): where a round strikes a shield or mandible guard shows on your view through
+  it: a star of cracks and a pulverised patch where it stopped one, a hole and a wide web where one came through, a short crack where one
+  skipped off. They stay on that shield, wherever it goes, and don't show once you're dead.
+- **Better-equipped suspects carry lights and lasers** (`G.ENEMY_GEAR.tac`): by the same gear tier as their weapons and armour, none to speak of
+  at first, about three in four lights and over half lasers at the top; an Enforcer always has the light from the second tier, the Kingpin both.
+  The light's on with the gun out, the laser once they're alert, both on whoever they're aiming at, and they use the same lights, beams and
+  dots as the squad's.
+- **Lights dazzle** (`js/glare.js`): looking into anyone's weapon light, a suspect's or your squad's, blooms round the lamp with streaks across
+  your view, washing out the picture when it's bad. It takes a light pointing near you, you looking near it, and nothing in between, and it's
+  worse the closer and brighter it is. It comes on quickly and goes slowly: look away and it fades over a few seconds, leaving a greenish after-image.
 - **Wallbangs and ricochets are highlights** (`js/highlights.js`): a kill whose round went through something (not a pane of glass)
   or off something on its way there is called out from its recorded path. It gets the bullet cam, round every turn the round
   took, then a wall cam from the far side of the hole or a ricochet cam out in front of the surface, the round's line left hanging in
@@ -2089,6 +2107,8 @@ solids at any height. Doors and windows are dynamic: their solids change as they
 | `js/hud.js`, `js/shop.js` | UI; the shop's stock and its buying |
 | `js/hangar.js` | The hangar between levels: workshop, store, warehouse, lounge, helicopter, and looking-to-buy |
 | `js/profiler.js` | The profiler: frame timings by piece of work, saved from the pause menu |
+| `js/scars.js` | What a round does to a surface, by its material: the marks, what stands proud of them, and the chips and dust thrown out |
+| `js/glare.js` | Being dazzled by someone's weapon light |
 | `js/shotlog.js` | F9's record of the shots that hit someone: ghosts of them, the trails, and speed markers in the world |
 | `js/highlights.js` | Recording a level and replaying its highlights on the hangar's TVs, as a sports broadcast; saving it as a .zip and rendering the video from one |
 | `js/exportworker.js` | The highlights video made off the main thread: the game's code in a worker, rendering and encoding there |

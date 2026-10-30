@@ -411,6 +411,7 @@ G.Highlights = (() => {
     const dl = new T.DirectionalLight(0xffffff, 0.55); dl.position.set(0.4, 1, 0.3); P.scene.add(dl);
     P.cam = new T.PerspectiveCamera(60, 16 / 9, 0.05, 200);
     P.scene.add(P.fxRoot = new T.Group());
+    P.debris = G.Scars.debris(P.scene, (x, z, y) => floorAt(x, z, y));
     buildXray();
   }
   function unmount() {
@@ -962,6 +963,7 @@ G.Highlights = (() => {
     P.bullets = [];
     for (const d of P.drops) if (d.m.parent) d.m.parent.remove(d.m);
     for (const m of P.marks) if (m.parent) m.parent.remove(m);
+    if (P.debris) P.debris.clear();
     P.drops = []; P.marks = [];
     if (P.xo) { for (const m of P.xo.all) { m.geometry.dispose(); m.material.dispose(); } P.xo = null; }
   }
@@ -1107,7 +1109,7 @@ G.Highlights = (() => {
       const pos = (x) => { const i = leg(x); return verts[i].clone().addScaledVector(dirs[i], x - xs[i]); };
       const along = (k, v) => { for (let i = 1; i <= N; i++) if (pts[i][k] >= v) { const a = pts[i - 1], b = pts[i], u = (v - a[k]) / Math.max(1e-9, b[k] - a[k]); return { x: a.x + (b.x - a.x) * u, t: a.t + (b.t - a.t) * u, v: a.v + (b.v - a.v) * u, drop: a.drop + (b.drop - a.drop) * u }; } return pts[N]; };
       return (sh.fl = { f: verts[0], to: verts[N], len, dir: dirs[0], dirEnd: dirs[N - 1], dirAt, pos, verts, xs, def, am, m, pts, tof: pts[N].t, v0: pts[0].v, vEnd: pts[N].v,
-        events: q.ev.map((e) => ({ i: e[0], x: xs[e[0]], p: verts[e[0]], k: e[1], fx: e[2], n: [e[3], e[4], e[5]], name: e[6] })), at: (t) => along('t', t), atX: (x) => along('x', x), xAt: (t) => along('t', Math.min(t, pts[N].t)).x });
+        events: q.ev.map((e) => ({ i: e[0], x: xs[e[0]], p: verts[e[0]], k: e[1], fx: e[2], n: [e[3], e[4], e[5]], name: e[6], m: e[7], J: e[8], stop: !!e[9], dir: dirs[Math.max(0, Math.min(N - 1, e[0] - 1))] })), at: (t) => along('t', t), atX: (x) => along('x', x), xAt: (t) => along('t', Math.min(t, pts[N].t)).x });
     }
     const f = new T.Vector3(...sh.f), to = new T.Vector3(...sh.to), len = Math.max(0.1, f.distanceTo(to));
     const vAt = (x) => { let v = 0; try { v = def ? G.roundSpeed(def, am || 'ball', x) : 0; } catch (e) { /* no speed */ } return v > 30 ? v : 380; };
@@ -1131,10 +1133,15 @@ G.Highlights = (() => {
     P.bullets.push({ sh, fl, mesh, glow, trail, ext, extT: ext / fl.vEnd, prev: fl.f.clone(), done: false, hits: hitsOf(sh), evs: fl.events.map((e) => Object.assign({}, e)) });
   }
   const _yUp = new T.Vector3(0, 1, 0), holeGeo = new T.CircleGeometry(0.5, 12);
-  // A round reaches something it went through or off (flightOf events): the hole it left and a flash of what it threw up
+  // A round reaches something it went through or off (flightOf events): the damage it did (js/scars.js, as in the game), what it
+  // threw out of it, and a flash
   function struck(e) {
     const fxs = G.R.IMPACT[e.fx] || G.R.IMPACT.stone, col = e.k === 'r' ? 0xfff0c0 : (fxs.s || fxs.d)[0];
-    if (e.fx !== 'water') mark('hole', e.p, e.k === 'x' ? 0.028 : 0.02, e.n);
+    if (e.m !== '' && e.name !== 'armour') {
+      const o = { m: e.m, fx: e.fx, k: e.k, n: e.n, dir: e.dir, J: e.J, stop: e.stop };
+      for (const m of G.Scars.meshes(o, e.p, P.fxRoot)) { P.marks.push(m); if (P.marks.length > 160) { const q = P.marks.shift(); if (q.parent) q.parent.remove(q); } }
+      if (P.debris) P.debris.burst(e.p, o);
+    }
     const sp = new T.Mesh(new T.SphereGeometry(e.k === 'r' ? 0.09 : 0.06, 8, 6), new T.MeshBasicMaterial({ color: col, transparent: true, blending: T.AdditiveBlending, depthWrite: false })); sp.position.copy(e.p); P.fxRoot.add(sp);
     P.fx.push({ obj: sp, life: 0.08, max: 0.08 });
   }
@@ -2017,6 +2024,7 @@ G.Highlights = (() => {
     const s = P.prog[P.seg];
     if (s.kind === 'clip') {
       act(s, dt);
+      if (P.debris) P.debris.update(dt * (s.rate || 1));
       // the kill moment: the crowd goes off (once a clip; a kill sequence's, at each kill, louder each time)
       if (s.clip.kind === 'seq') { while ((s.kn || 0) < s.clip.kills.length && s.tau >= s.clip.kills[s.kn || 0].t) { s.kn = (s.kn || 0) + 1; sfxFor(s, 'moment'); } }
       else if (!s.fired && s.tau >= momentT(s.clip)) { s.fired = true; sfxFor(s, 'moment'); }

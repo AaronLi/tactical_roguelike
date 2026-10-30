@@ -208,7 +208,7 @@ G.Ballistics = (() => {
       for (let i = c.skin.length - 1; i >= 0; i--) seq.push([c.skin[i][0], c.skin[i][1], cosT]);
     }
     if (!seq.length) seq.push([c.core || 'concrete', 1, cosT]); // (met right at its far edge)
-    const out = { v: 0, t: h.t, n: h.n, nOut: sp.n, dev: 0, bend: 0, absorbed: 0, fx: MAT[seq[0][0]].fx, fxOut: MAT[seq[seq.length - 1][0]].fx, name: MAT[seq[0][0]].name, nameOut: MAT[seq[seq.length - 1][0]].name };
+    const out = { v: 0, t: h.t, n: h.n, nOut: sp.n, dev: 0, bend: 0, absorbed: 0, fx: MAT[seq[0][0]].fx, fxOut: MAT[seq[seq.length - 1][0]].fx, name: MAT[seq[0][0]].name, nameOut: MAT[seq[seq.length - 1][0]].name, mat: seq[0][0], matOut: seq[seq.length - 1][0] };
     for (let i = 0; i < seq.length; i++) {
       const [m, mm, cs] = seq[i], r = i === 0 && !inside && glances(p, v, m, mm, cosT) ? ricochet(p, v, m, cosT) : strike(p, v, m, mm, 1, cs);
       out.absorbed += r.absorbed;
@@ -231,7 +231,8 @@ G.Ballistics = (() => {
   }
   const gauss = () => Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(Math.PI * 2 * Math.random()) * 0.7;
   // a mark for everyone to draw: where, the surface's normal, what it looks like, and e(ntry), x (exit) or r(icochet)
-  const mark = (at, n, fx, k) => [+at.x.toFixed(2), +at.y.toFixed(2), +at.z.toFixed(2), n ? n[0] : 0, n ? n[1] : 1, n ? n[2] : 0, fx, k];
+  // (and, after them, what js/scars.js needs to damage it the same on every screen: the way it was going, its energy, what it hit, whether it stopped, its width)
+  const mark = (at, n, fx, k, o = {}) => [+at.x.toFixed(2), +at.y.toFixed(2), +at.z.toFixed(2), n ? n[0] : 0, n ? n[1] : 1, n ? n[2] : 0, fx, k, ...(o.dir ? [o.dir.x, o.dir.y, o.dir.z].map((x) => +x.toFixed(2)) : [0, 0, 0]), Math.round(o.J || 0), o.m == null ? null : o.m, o.stop ? 1 : 0, +(o.cal || 8).toFixed(1)];
 
   // Where armour is on a body: each piece's protection is a list of { at, layers: [[material, mm], ...] }, at one of
   //   'plate' (front and back of the chest, a SAPI-sized 25 x 32 cm plate), 'side' (the flanks under the arms),
@@ -463,7 +464,7 @@ G.Ballistics = (() => {
         for (let i = at0; i < res.log.length; i++) Object.assign(res.log[i], { pc: a.def.name, cos: cosT, cond: a.cond });
         if (!r.through) { const q = res.log[res.log.length - 1], later = cov.slice(cov.findIndex((x) => x.a === a && x.pr === pr) + 1); for (const x of later) q.rest = q.rest.concat(x.L); } // (and what was behind it, untouched)
         a.wear = (a.wear || 0) + r.absorbed;
-        h.armour.push({ piece: a, through: r.through, glance: r.glance, absorbed: r.absorbed, at: pr.at });
+        h.armour.push({ piece: a, through: r.through, glance: r.glance, absorbed: r.absorbed, at: pr.at, fp: pr.at === 'face' && rig.head ? (({ x, y }) => [+x.toFixed(3), +y.toFixed(3)])(rig.head.worldToLocal(o.clone().addScaledVector(u, t))) : null }); // (fp: where on a face shield, in the head's frame: js/hud.js maskHit)
         if (r.ric) { glanced(m, q, r.ric); h.blunt += r.absorbed * MAT[r.stoppedBy].blunt; return false; } // (off the plate and away)
         if (!r.through) { h.blunt += r.blunt; res.stopped = true; res.glance = r.glance; res.exitV = 0; return false; }
         v = r.v;
@@ -702,6 +703,7 @@ G.Ballistics = (() => {
       const w = effects(h);
       if (h.armour.some((q) => !q.through)) o.rang = 1;
       if (w.dmg >= 0.05 || w.effects.length) o.ws.push([w.part, Math.round(w.dmg * 100) / 100, w.effects, w.organs, w.seg]);
+      for (const q of h.armour) if (q.fp) (o.fc = o.fc || []).push([q.fp[0], q.fp[1], q.glance ? 2 : q.through ? 1 : 0]);
     }
     for (const a of armour) if (a.wear) { o.wear[a.key] = Math.round(a.wear); a.wear = 0; }
     return o;

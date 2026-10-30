@@ -1171,7 +1171,7 @@ G.Me = {
             this.applyWounds(out, o.clone(), !b.enemy);
           } else { // (theirs to take, as it was here: told to them at the end of the frame)
             const q = b.shot.ff.get(mate.id) || { ws: [], rang: 0, stopped: 0, wear: {}, at: hp.toArray().map((x) => Math.round(x * 100) / 100) };
-            q.ws.push(...out.ws); q.rang |= out.rang; q.stopped += out.stopped;
+            q.ws.push(...out.ws); q.rang |= out.rang; q.stopped += out.stopped; if (out.fc) q.fc = (q.fc || []).concat(out.fc);
             for (const [k, j] of Object.entries(out.wear)) q.wear[k] = (q.wear[k] || 0) + j;
             b.shot.ff.set(mate.id, q);
             mate.rig.hit(d);
@@ -1188,7 +1188,7 @@ G.Me = {
           on(r.ric.t);
           turn(B.deflect(d, r.ric, r.ric.n), r.ric.v);
           o.addScaledVector(d, 0.02);
-          this.roundMark(b, o, r.ric.n, 'metal', 'r', v, null, 'armour');
+          this.roundMark(b, o, r.ric.n, 'metal', 'r', v, null, 'armour', { m: '' });
           continue legs;
         }
         if (!r.exitV) return stopped(o.clone().addScaledVector(d, r.entryT), done + r.entryT, true, 0);
@@ -1202,7 +1202,7 @@ G.Me = {
       const s = wall.solid, at = o.clone().addScaledVector(d, wall.t), vIn = v, r = B.crossSolid(map, b.proj, v, wall, o, d);
       if (s.target) G.Range.hit(s, at, d, b.proj.m * vIn);
       if (wall.pane != null && !(s.win && s.win.armor)) this.roundPane(wall.pane, at, d);
-      if (!wall.view) this.roundMark(b, at, wall.n, r.fx, r.ric ? 'r' : 'e', vIn, s, r.name);
+      if (!wall.view) this.roundMark(b, at, wall.n, r.fx, r.ric ? 'r' : 'e', vIn, s, r.name, { m: r.mat, dir: d, stop: !r.ric && !r.v });
       else { this.pathPt(b, at, vIn); if (b.trail) G.R.trailAdd(b.trail, at, true, vIn); }
       if (r.ric) {
         on(wall.t);
@@ -1214,7 +1214,7 @@ G.Me = {
       if (!r.v) return stopped(at, done + wall.t, false, vIn); // (v: how fast it struck)
       const n0 = wall.n;
       on(r.t);
-      if (!wall.view) this.roundMark(b, o, r.nOut, r.fxOut, 'x', r.v, null, r.nameOut);
+      if (!wall.view) this.roundMark(b, o, r.nOut, r.fxOut, 'x', r.v, null, r.nameOut, { m: r.matOut, dir: d });
       turn(B.deflect(d, r, n0), r.v);
       o.addScaledVector(d, 0.004);
     }
@@ -1261,11 +1261,13 @@ G.Me = {
     return hits.sort((x, y) => x.t - y.t);
   },
   // where a round struck or left something: its mark here (s: a target's own, its picture), on its trail, and for the squad
-  roundMark(b, p, n, fx, kind, v, s, name) {
-    b.path.ev.push([this.pathPt(b, p, v), kind, fx, n[0], n[1], n[2], name || '']);
-    G.R.impactOn(p, n, s, fx);
+  // how: { m (what it's made of: '' nothing to damage), dir (the way it was going), stop (it stopped in it) }
+  roundMark(b, p, n, fx, kind, v, s, name, how = {}) {
+    const o = { m: how.m, fx, k: kind, n, dir: how.dir, J: 0.5 * b.proj.m * v * v, stop: !!how.stop, cal: b.proj.d * 1000 };
+    b.path.ev.push([this.pathPt(b, p, v), kind, fx, n[0], n[1], n[2], name || '', how.m, Math.round(o.J), o.stop ? 1 : 0]);
+    G.R.impactOn(p, n, s, fx, o);
     if (b.trail) G.R.trailAdd(b.trail, p, true, v);
-    (b.shot.fx = b.shot.fx || []).push(G.Ballistics.mark(p, n, fx, kind));
+    (b.shot.fx = b.shot.fx || []).push(G.Ballistics.mark(p, n, fx, kind, o));
   },
   // a pane a round went through breaks (here at once, and for everyone through the host)
   roundPane(id, at, dir) {
@@ -1823,6 +1825,7 @@ G.Me = {
   // through the host, your own off a ricochet here): the wounds on your body, the wear on what you're wearing. from:
   // where it came from; friendly: it wasn't a suspect's (you aren't told whose).
   applyWounds(o, from, friendly) {
+    if (o.fc) G.HUD.maskHit(o.fc); // (what your face shield caught, on your view of it)
     if (o.ws && o.ws.length && G.R.particles) G.R.particles(new THREE.Vector3(this.pos.x, 1.2, this.pos.z), 4 + 2 * o.ws.length, 0x8a0a0a, 1.5, 1.2, 9, 0.6, null, true); // some of it lands at your feet
     if (this.down || this.dead || G.Game.phase !== 'level' || !from) return;
     const B = G.Ballistics, armour = B.kitArmour(this);

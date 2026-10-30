@@ -120,7 +120,7 @@ G.Server = {
         break;
       case 'chat': if (p) G.Net.broadcast({ t: 'chat', id: from, m: String(m.m).slice(0, 120) }); break;
       // friendly fire: one officer's rounds in another (the shooter traced them; the one hit takes the wounds)
-      case 'ff': if (p && this.phase === 'level' && this.players.has(m.tg) && Array.isArray(m.ws)) G.Net.broadcast({ t: 'ffhit', by: from, tg: m.tg, ws: m.ws.slice(0, 24), rang: m.rang, stopped: m.stopped, wear: m.wear, at: m.at, f: m.f, e: m.e }); break; // (what someone's round did to an officer, as they worked it out; e: a suspect's)
+      case 'ff': if (p && this.phase === 'level' && this.players.has(m.tg) && Array.isArray(m.ws)) G.Net.broadcast({ t: 'ffhit', by: from, tg: m.tg, ws: m.ws.slice(0, 24), rang: m.rang, stopped: m.stopped, wear: m.wear, at: m.at, f: m.f, e: m.e, fc: Array.isArray(m.fc) ? m.fc.slice(0, 12) : undefined }); break; // (what someone's round did to an officer, as they worked it out; e: a suspect's)
       case 'ping': if (p && Array.isArray(m.p) && m.p.length === 3) G.Net.broadcast({ t: 'ping', id: from, p: m.p.map(Number) }); break;
       // something put down (dropped from an inventory), or picked up: the first to ask gets it
       case 'drop': {
@@ -586,6 +586,9 @@ G.Server = {
     d.helmet = fixed ? fixed.helmet[tier - 1] : roll(G2.helmet[tier - 1], ['ach', 'riflehelm', 'nohelm']);
     // a mandible or a face shield on the helmet's mount (a helmet with a visor has its own; no helmet, nowhere to put one)
     d.face = d.helmet === 'ach' || d.helmet === 'riflehelm' ? (fixed && fixed.face ? fixed.face[tier - 1] || 0 : roll(G2.face[tier - 1], ['f.mandible', 'f.shield', 'f.rifle', 0])) : 0;
+    // a light and a laser on the gun, more often the better equipped they are (flags as an officer's: js/player.js tacFlags)
+    const tl = G2.tac, always = base.boss || (fixed && tier >= 2);
+    d.tac = (always || Math.random() < tl.light[tier - 1] ? 1 | (tier >= 4 ? 8 : 0) : 0) | (base.boss || Math.random() < tl.laser[tier - 1] ? 2 | (Math.random() < 0.35 ? 4 : 0) : 0);
     // automatic weapons fire at their own rate in the type's bursts; others as fast as the type works them
     if (base.rof) {
       if (w.mode === 'auto') d.rof = 60 / w.rpm;
@@ -1297,7 +1300,7 @@ G.Server = {
       const r2 = (v) => Math.round(v * 100) / 100;
       const e = [];
       for (const en of this.enemies.values()) {
-        e.push([en.id, en.type, r2(en.x), r2(en.z), r2(en.yaw), Math.max(1, Math.round((en.hp / en.maxHp) * 100)), en.aiming ? en.tgt : 0, en.alert ? 1 : 0, en.crouch ? 1 : 0, en.leanOut || 0, en.armed ? (en.drawn ? 2 : 1) : 0, STATE_CODE[en.state] || 0, en.surprisedT > 0 ? 1 : 0, en.doorWait > 0 ? 1 : 0, en.def.civ ? 0 : `${en.def.wpn}|${en.def.vest}|${en.def.helmet}|${en.def.face || ''}`, ((en.bleedH || en.bleedL) ? 1 : 0) | (en.legs ? 2 : 0) | (en.reloadT > 0 ? 4 : 0) | (en.down ? 8 : 0), Math.round(Math.min(en.down ? 0.25 : 1, en.str == null ? 1 : en.str) * 100), r2(en.y || 0)]);
+        e.push([en.id, en.type, r2(en.x), r2(en.z), r2(en.yaw), Math.max(1, Math.round((en.hp / en.maxHp) * 100)), en.aiming ? en.tgt : 0, en.alert ? 1 : 0, en.crouch ? 1 : 0, en.leanOut || 0, en.armed ? (en.drawn ? 2 : 1) : 0, STATE_CODE[en.state] || 0, en.surprisedT > 0 ? 1 : 0, en.doorWait > 0 ? 1 : 0, en.def.civ ? 0 : `${en.def.wpn}|${en.def.vest}|${en.def.helmet}|${en.def.face || ''}|${en.def.tac || 0}`, ((en.bleedH || en.bleedL) ? 1 : 0) | (en.legs ? 2 : 0) | (en.reloadT > 0 ? 4 : 0) | (en.down ? 8 : 0), Math.round(Math.min(en.down ? 0.25 : 1, en.str == null ? 1 : en.str) * 100), r2(en.y || 0)]);
       }
       const p = {};
       for (const pl of all) p[pl.id] = pl.st;

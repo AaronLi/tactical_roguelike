@@ -111,13 +111,13 @@ G.Views = {
         if (!G.ENEMIES[type]) continue;
         // the type, with this suspect's kit (weapon | vest | helmet) laid over it
         const def = Object.create(G.ENEMIES[type]);
-        if (kit) { const [wpn, vest, helmet, face] = kit.split('|'); def.wpn = wpn; def.vest = vest; def.helmet = helmet; def.face = face || 0; }
+        if (kit) { const [wpn, vest, helmet, face, tac] = kit.split('|'); def.wpn = wpn; def.vest = vest; def.helmet = helmet; def.face = face || 0; def.tac = +tac || 0; }
         const rig = G.Rig.create({ style: def.style, scale: def.scale, boss: !!def.boss, seed: id * 7919 + 13, dressed: true });
         rig.powered = true; // a physically simulated body, held up by its muscles (js/rig.js powerStep)
         if (!def.civ) rig.setKit(G.Rig.armourKit(def.vest, def.helmet, def.style === 'armored', def.face)); // their armour, as an officer's would look
-        if (def.wpn && armed) { rig.setGun(def.wpn); rig.holster(armed === 1); }
+        if (def.wpn && armed) { rig.setGun(def.wpn); rig.holster(armed === 1); this.tacOnGun(rig, def.tac); }
         G.R.dynRoot.add(rig.root);
-        ev = { id, type, def, rig, pos: new THREE.Vector3(x, y, z), tgt: new THREE.Vector3(x, y, z), yaw, tgtYaw: yaw, hp, alive: true, deadT: 0, lean: 0 };
+        ev = { id, type, def, rig, tac: def.tac || 0, pos: new THREE.Vector3(x, y, z), tgt: new THREE.Vector3(x, y, z), yaw, tgtYaw: yaw, hp, alive: true, deadT: 0, lean: 0 };
         this.enemies.set(id, ev);
       }
       if (!ev.alive) continue;
@@ -370,11 +370,12 @@ G.Views = {
   },
   // A weapon light and/or laser from `from` along dir: the light shines, the laser lands on the first wall or
   // person in its way (a person as a rough column: standing up to 1.8 m, 0.25 m round). skip: whose it is.
-  tacBeam(from, dir, fl, skip, drawFrom) {
+  // (selfEv: a suspect's own: their body doesn't stop their laser.) Anyone else's light can dazzle you: js/glare.js.
+  tacBeam(from, dir, fl, skip, drawFrom, selfEv) {
     const map = G.Game.map;
     if (!map) return;
     const src = drawFrom || from; // (where the light and the beam visibly come from)
-    if (fl & 1) G.R.tacLight(src, dir, fl & 8 ? 1.6 : 1);
+    if (fl & 1) { G.R.tacLight(src, dir, fl & 8 ? 1.6 : 1, skip != null); if (skip != null) G.Glare.add(skip, src, dir, fl & 8 ? 1.6 : 1); }
     if (!(fl & 2)) return;
     let t = G.Level.raycast(map, from.x, from.y, from.z, dir.x, dir.y, dir.z, 60, { glass: true }).t;
     const hz = Math.hypot(dir.x, dir.z) || 1e-6;
@@ -386,10 +387,17 @@ G.Views = {
       const y = from.y + dir.y * tt;
       if (y > p.y && y < p.y + h) t = tt;
     };
-    for (const ev of this.enemies.values()) if (ev.alive) body(ev.pos, ev.crouch ? 1.2 : 1.8);
+    for (const ev of this.enemies.values()) if (ev.alive && ev !== selfEv) body(ev.pos, ev.crouch ? 1.2 : 1.8);
     for (const [id, pv] of this.players) if (id !== skip && pv.st && !pv.st.dd) body(pv.pos, pv.st.cr ? 1.2 : 1.8);
     if (skip != null) body(G.Me.pos, G.Me.crouch ? 1.2 : 1.8);
     G.R.tacLaser(src, from.clone().addScaledVector(dir, t - 0.01), !!(fl & 4));
+  },
+  // the light or laser on a suspect's gun, to see: a little black housing under the barrel
+  tacOnGun(rig, tac) {
+    const gi = rig.gunInfo, m = gi && gi.muzzles && gi.muzzles[0];
+    if (!tac || !rig.gun || !m) return;
+    const box = new THREE.Mesh(this.tacGeo || (this.tacGeo = new THREE.CylinderGeometry(0.014, 0.016, 0.08, 8).rotateX(Math.PI / 2)), this.tacMat || (this.tacMat = new THREE.MeshLambertMaterial({ color: 0x17181a })));
+    box.position.set(m[2], m[1] - 0.032, -m[0] * 0.72); rig.gun.add(box);
   },
   // a suspect reloading: the magazine out and in (or shells going in one by one), heard if you're close
   enemyReload(m) {
@@ -437,7 +445,7 @@ G.Views = {
     let last = null;
     (list || []).forEach((f, i) => {
       const p = new THREE.Vector3(f[0], f[1], f[2]);
-      if (!(skip && i === 0)) G.R.impactOn(p, f.slice(3, 6), null, f[6]);
+      if (!(skip && i === 0)) G.R.impactOn(p, f.slice(3, 6), null, f[6], f.length > 8 ? { m: f[12], k: f[7], dir: f.slice(8, 11), J: f[11], stop: !!f[13], cal: f[14] } : undefined);
       if (last && last[7] === 'r') G.R.tracer(new THREE.Vector3(last[0], last[1], last[2]), p, 0xffd080, 0.05);
       if (f[7] === 'r' && G.Audio.ricochet) G.Audio.ricochet(p);
       last = f;
@@ -667,6 +675,7 @@ G.Views = {
       // (what they're aiming at: a weakened or downed suspect points the gun at it from the hand, js/rig.js)
       const aimAt = tgt && ev.armed === 2 && ev.alert && !ev.surp && !ev.reloading && !pose && !ev.down ? new THREE.Vector3(tgt.x, tgt.y + 1.2, tgt.z) : null;
       const rlP = ev.reloadAt && ev.reloading ? (performance.now() - ev.reloadAt) / ev.reloadDur : -1; // (how far into a magazine change)
+      ev.aimP = aimed ? aimAt : null; // (who they're on: where their light and laser go)
       ev.rig.update(dt, { pos: at, yaw: ev.yaw, pitch, crouch: ev.crouch || (ev.str != null && ev.str < 0.4), alert: !!ev.alert && ev.armed === 2 && !ev.surp && !ev.reloading, lean: ev.lean, pose, tk, act, str: near ? (ev.str == null ? 1 : ev.str) : null, aimAt,
         reload: rlP >= 0 && rlP < 1 ? rlP : -1 });
       // past the fog (it's the background's colour out there: nothing to see) they aren't drawn, each one's forty-odd
@@ -728,7 +737,7 @@ G.Views = {
       let b;
       if (ev.aim === G.Net.myId) { b = G.R.camera.position.clone(); b.y -= 0.25; aimedAtMe = true; }
       else { const pv = this.players.get(ev.aim); if (!pv) continue; b = pv.pos.clone(); b.y += 1.3; }
-      G.R.laser(a, b);
+      if (!(ev.tac & 2)) G.R.laser(a, b); // (one on their gun shows for itself, below)
     }
     G.R.endLasers();
     this.laserBeep -= dt;
@@ -737,7 +746,7 @@ G.Views = {
 
     // weapon lights and lasers: yours (from the gun in your hands, along its bore) and your squad's (flags in
     // their state: 1 light, 2 laser, 4 the laser's green, 8 a bright light)
-    G.R.tacBegin();
+    G.R.tacBegin(); G.Glare.begin();
     const me = G.Me, mw = G.Game.phase === 'level' && me.cur ? me.cur() : null, mf = mw && !me.dead ? me.tacFlags(mw) : 0;
     if (mf) {
       // the gun points them, always: along its barrel as you see it (sway, bob, a turn's lag, the kick: the dot goes
@@ -764,7 +773,20 @@ G.Views = {
       const gi = pv.rig.gunInfo, from = pv.rig.gun && gi ? pv.rig.gun.localToWorld(new THREE.Vector3(gi.muzzles[0][2], gi.muzzles[0][1], -gi.muzzles[0][0])) : pv.pos.clone().add(new THREE.Vector3(0, 1.4, 0)).addScaledVector(dir, 0.5);
       this.tacBeam(from, dir, st.tl, id);
     }
-    G.R.tacEnd();
+    // and suspects': the light's on with the gun out, the laser once they're alert; the nearest get what's left of the pool
+    const tac = [];
+    if (G.Game.phase === 'level') for (const ev of this.enemies.values()) {
+      if (!ev.tac || !ev.alive || ev.down || ev.scode || !ev.rig.gun || ev.rig.slung) continue;
+      const d = ev.pos.distanceToSquared(G.R.camera.position), f = ev.tac & (ev.alert ? 15 : 9);
+      if (f && d < 2500) tac.push([d, ev, f]);
+    }
+    tac.sort((a, b) => a[0] - b[0]);
+    for (const [, ev, f] of tac) {
+      const gun = ev.rig.gun, gi = ev.rig.gunInfo; gun.updateMatrixWorld(true);
+      const from = gun.localToWorld(new THREE.Vector3(gi.muzzles[0][2], gi.muzzles[0][1], -gi.muzzles[0][0])), dir = ev.aimP ? ev.aimP.clone().sub(from).normalize() : new THREE.Vector3(0, 0, -1).transformDirection(gun.matrixWorld);
+      this.tacBeam(from, dir, f, 'e' + ev.id, null, ev);
+    }
+    G.R.tacEnd(); G.Glare.end(dt);
 
     // first aid cabinet doors swinging open
     const cabV = G.Game.map && G.Game.map.cabViews;

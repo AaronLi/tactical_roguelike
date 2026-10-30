@@ -73,6 +73,44 @@ G.HUD = {
     this.flashK = Math.max(this.flashK || 0, k);
     this.flashHold = Math.max(this.flashHold || 0, 0.4 + 1.8 * k);
   },
+  // Your face shield catching a round: where it struck, on your view through it, and it stays that way (list: [x, y, what it did: 0
+  // stopped, 1 through, 2 glanced], in the head's frame: js/ballistics.js). Kept on the shield, so it goes where the shield goes.
+  maskHit(list) {
+    const k = G.Me.kit, it = k && k.helmet && (k.helmet.face || k.helmet);
+    if (!it) return;
+    const cr = it.cracks || (it.cracks = []);
+    for (const [x, y, st] of list) cr.push([G.U.clamp(0.5 + x / 0.1 * 0.4, 0.06, 0.94), G.U.clamp(0.5 - (y - 0.05) / 0.1 * 0.4, 0.06, 0.94), st, (Math.random() * 1e9) | 0]);
+    if (cr.length > 14) cr.splice(0, cr.length - 14);
+    this.maskPop = 1;
+  },
+  // what's on the shield you're wearing, drawn when it changes
+  maskDraw(dt) {
+    const k = G.Me.kit, it = k && k.helmet && (k.helmet.face || k.helmet), cr = (it && it.cracks) || [], cv = this.el.maskFx, W = window.innerWidth, H = window.innerHeight, key = `${cr.length}|${cr.length ? cr[cr.length - 1][3] : 0}|${W}x${H}`;
+    if (this.maskPop > 0) { this.maskPop = Math.max(0, this.maskPop - dt * 3.5); cv.style.filter = `brightness(${(1 + this.maskPop * 1.6).toFixed(2)})`; } else if (cv.style.filter) cv.style.filter = '';
+    cv.classList.toggle('hidden', !cr.length || G.Me.dead); // (not while you're watching someone else)
+    if (key === this.maskKey) return;
+    this.maskKey = key;
+    cv.width = W; cv.height = H;
+    const g = cv.getContext('2d'), R0 = Math.min(W, H);
+    for (const [u, v, st, seed] of cr) {
+      let s = seed; const rnd = () => { s = (Math.imul(s, 1597334677) + 12345) | 0; return ((s ^ (s >>> 15)) >>> 0) / 4294967296; };
+      const x = u * W, y = v * H, big = st === 1 ? 0.42 : st === 2 ? 0.2 : 0.3, n = st === 2 ? 7 : 12 + Math.floor(rnd() * 5), rays = [];
+      g.lineCap = 'round';
+      for (let i = 0; i < n; i++) {
+        let a = (st === 2 ? 0.7 : 1) * (i / n * Math.PI * 2 + rnd() * 0.4) + (st === 2 ? rnd() : 0), q = R0 * 0.012, px = x + Math.cos(a) * q, py = y + Math.sin(a) * q; const end = R0 * big * (0.35 + rnd() * 0.65), pts = [[px, py]];
+        while (q < end) { const d = R0 * (0.014 + rnd() * 0.03); q += d; a += (rnd() - 0.5) * 0.5; px += Math.cos(a) * d; py += Math.sin(a) * d; pts.push([px, py]); }
+        rays.push(pts);
+      }
+      const stroke = (col, w) => { g.strokeStyle = col; g.lineWidth = w; for (const pts of rays) { g.beginPath(); pts.forEach((p, i) => g[i ? 'lineTo' : 'moveTo'](p[0], p[1])); g.stroke(); } };
+      stroke('rgba(0,0,0,0.3)', 3); stroke('rgba(228,240,246,0.72)', 1.4);
+      // (the web between the rays, and the pulverised patch where it struck)
+      g.strokeStyle = 'rgba(226,238,244,0.38)'; g.lineWidth = 1;
+      for (let ring = 1; ring <= (st === 2 ? 1 : 3); ring++) { g.beginPath(); rays.forEach((pts, i) => { const p = pts[Math.min(pts.length - 1, ring * 2)]; g[i ? 'lineTo' : 'moveTo'](p[0], p[1]); }); g.closePath(); g.stroke(); }
+      const r = R0 * (st === 1 ? 0.03 : st === 2 ? 0.012 : 0.038), gr = g.createRadialGradient(x, y, 0, x, y, r);
+      if (st === 1) { gr.addColorStop(0, 'rgba(4,4,6,0.95)'); gr.addColorStop(0.6, 'rgba(4,4,6,0.9)'); gr.addColorStop(0.72, 'rgba(235,242,246,0.85)'); gr.addColorStop(1, 'rgba(235,242,246,0)'); } else { gr.addColorStop(0, 'rgba(244,248,250,0.92)'); gr.addColorStop(0.55, 'rgba(226,236,242,0.6)'); gr.addColorStop(1, 'rgba(226,236,242,0)'); }
+      g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill();
+    }
+  },
   nadeWarn(n) {
     const el = this.el.nadeWarn;
     el.classList.toggle('hidden', !n);
@@ -288,6 +326,7 @@ G.HUD = {
     this.set('armorText', (cd && cd.dur ? Math.round(Me.vestCond() * 100) + '%' : '—') + (hd && hd.dur ? ` <small>HELM ${Math.round(Me.helmCond() * 100)}%</small>` : ''));
     // the quick slots (3, 4, 5): what's on each and how many you carry
     this.set('items', Me.quick.map((kind, i) => { const n = Me.quickCount(kind); return `<span class="qs${n ? '' : ' none'}" title="Key ${i + 3}: ${G.U.esc(Me.quickName(kind))} (drag a grenade onto its box in the inventory to change it)"><b>${i + 3}</b> ${G.U.esc(Me.quickName(kind))}${kind ? ' ' + n : ''}</span>`; }).join(''));
+    this.maskDraw(dt);
     // a flashbang's white-out
     if (this.flashK > 0) {
       if (this.flashHold > 0) this.flashHold -= dt; else this.flashK = Math.max(0, this.flashK - dt * 0.35);
