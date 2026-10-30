@@ -20,12 +20,12 @@ G.Me = {
     this.credits = 500;
     this.stk = {}; // (the stickers you've found: yours for the run, js/stickers.js)
     G.Gear.starter(this); // kit, pockets and locker (js/gear.js)
-    this.weapons = {}; this.setSidearm('p9'); // just a sidearm: the first primary comes from the shop (G.Game's picker: the P9, TX22 or derringer)
+    this.weapons = {}; this.setSidearm('p9'); // just a sidearm: the first primary comes from the shop (G.Game's picker: what you've earned of js/arsenal.js)
     this.sidearmChosen = false;
     this.stash = G.Gear.stashProxy(this); // weapon parts owned but not fitted: items, read as { partId: count }
     this.stats = { kills: 0, dmg: 0, hs: 0, downs: 0, revives: 0 };
   },
-  // the sidearm you start a run with (G.STARTERS), loaded with tracers, and two spare loads of them in the small
+  // the sidearm you start a run with (js/arsenal.js), loaded with tracers, and two spare loads of them in the small
   // pockets (in place of the last one's)
   setSidearm(id) {
     const w = this.makeWeapon(id), am = G.ammoOk(G.calOf(w.def), 'tracer');
@@ -1184,7 +1184,7 @@ G.Me = {
         if (b.trail) { (b.trail.keys = b.trail.keys || new Set()).add(hk); this.trailTrack(b, o, d, r, v, tr, h.self ? null : rig); G.HUD.hbPath = r.log.concat({ m: r.exitV ? 'out' : 'stopped', v: Math.round(r.exitV) }); } // (F9: what it went through)
         if (ev) {
           B.wearOut(armour);
-          this.hitEnemy(ev, r);
+          this.hitEnemy(ev, r, b);
           ev.engagedT = performance.now(); // (yours to watch: its body's physics wherever it is, js/views.js)
           ev.rig.hit(d);
           ev.selfHit = true;
@@ -1241,6 +1241,7 @@ G.Me = {
       }
       if (cut && G.Damage.apply(map, cut.rec)) (b.shot.holes = b.shot.holes || []).push(cut.rec);
       if (!r.v) return stopped(at, done + wall.t, false, vIn); // (v: how fast it struck)
+      if (wall.pane == null && !wall.view) b.walled = true; // (through something a person could hide behind)
       const n0 = wall.n;
       on(r.t);
       if (!wall.view) this.roundMark(b, o, r.nOut, r.fxOut, 'x', r.v, null, r.nameOut, { m: r.matOut, dir: d, cut: cut ? cut.rOut : pane0 ? 1 : 0 });
@@ -1347,7 +1348,7 @@ G.Me = {
   // standard person's life) and what it did there (bleeding, a broken bone, a collapsed lung, the organs it went
   // through), for the host to apply (js/server.js applyHit, injure). A round through the brain, brainstem or the
   // spine in the neck is the end of them.
-  hitEnemy(ev, r) {
+  hitEnemy(ev, r, b) {
     let f = 0, kill = false, head = false, ap = false;
     this.hitQ = this.hitQ || new Map();
     const q = this.hitQ.get(ev.id) || { d: 0, f: 0, h: false, k: false };
@@ -1362,6 +1363,7 @@ G.Me = {
     }
     q.f += f; q.h = q.h || head; q.k = q.k || kill; q.ap = q.ap || ap;
     this.hitQ.set(ev.id, q);
+    if (b && f > 0 && G.Arsenal) G.Arsenal.hit(ev, b);
   },
   // d: plain damage (blasts); f: wounds, as a share of a standard person's life; k: a killing headshot
   queueHit(eid, dmg, head, f = 0, kill = false) {

@@ -122,10 +122,10 @@ G.WEAPON_LIST = [
   W({ id: 'g19', slot: 's', cls: 'PST', tier: 1, price: 350, name: 'G19 Compact', dmg: 24, rpm: 450, mode: 'semi', mag: 15, reserve: 90, reload: 1.4, spread: 2.2, ads: 0.08333, range: 18, speed: 1.0, desc: 'Compact 9mm. Takes every Glock magazine, and a stock if you want one.' }),
   W({ id: 'tx22', slot: 's', cls: 'MP', tier: 0, price: 200, name: 'Taurus TX22', dmg: 13, rpm: 1050, mag: 16, reserve: 160, reload: 1.4, spread: 2.4, ads: 0.0833, range: 14, falloff: 0.55, speed: 1.02, desc: 'A rimfire plinker someone made fully automatic: .22 LR, 16 rounds, threaded from the factory, hardly kicks. Lots of small holes.' }),
   W({ id: 'derringer', slot: 's', cls: 'PST', tier: 1, price: 250, name: 'Derringer', dmg: 85, rpm: 300, mode: 'semi', mag: 2, reserve: 30, reload: 1.6, spread: 2.5, ads: 0.16667, range: 13, desc: 'Two rounds of .44 Magnum in your palm. Hold on tight.' }),
+  W({ id: 'fiveseven', slot: 's', cls: 'PST', tier: 2, price: 1100, name: 'Five-seveN', dmg: 28, rpm: 450, mode: 'semi', mag: 20, reserve: 100, reload: 1.6, spread: 1.8, ads: 0.06667, range: 28, pen: 1, desc: 'Twenty rounds of 5.7 mm, flat and fast. A rifle round\'s manners in a pistol.' }),
+  W({ id: 'thor', slot: 's', cls: 'PST', tier: 4, price: 4500, name: 'Thor .50', dmg: 220, rpm: 40, mode: 'semi', mag: 1, reserve: 10, reload: 3.2, spread: 3, ads: 0.03, range: 60, pen: 3, desc: 'One round of .50 BMG, in a pistol, because someone asked if it could be done. It can. Hold on.' }),
 ];
 G.WEAPONS = {};
-// the sidearms a run can start with (picked before the first level: js/game.js pickSidearm)
-G.STARTERS = ['tx22', 'p9', 'derringer'];
 G.WEAPON_LIST.forEach((w) => { w.snd = G.CLASS_SND[w.cls]; G.WEAPONS[w.id] = w; });
 // Explosive weapons (the grenade launchers) are switched off for now: no case, shop or kit turns one up.
 G.EXPLOSIVES_OFF = true;
@@ -241,6 +241,8 @@ G.GUN_SPECS = {
   mac10:    GS(5.75, 11.43, 'none', 21000, 0.40, 230, 0.55, 0.75, 'blowback', 'brass', 23),
   akimbo:   GS(4.9, 9.00, 'none', 35000, 0.35, 124, 0.45, 0.60, 'recoil', 'brass', 19),
   judge:    GS(3.0, 10.4, 'none', 13500, 0.50, 350, 0.05, 0.05, 'recoil', 'plastic', 63, 5),
+  fiveseven:GS(4.8, 5.70, 'none', 50000, 0.35, 31, 0.30, 0.50, 'blowback', 'brass', 29),
+  thor:     GS(15.0, 12.7, 'brake', 55000, 1.60, 660, 0.05, 0.05, 'recoil', 'brass', 99),
   derringer:GS(3.0, 10.9, 'none', 36000, 0.60, 240, 0.05, 0.05, 'recoil', 'brass', 33), // (.44 Magnum: one of the American Derringer Model 1's)
   tx22:     GS(4.1, 5.60, 'none', 24000, 0.10, 40, 0.15, 0.40, 'blowback', 'brass', 15),
   ak74:     GS(16.3, 5.60, 'brake', 50000, 0.70, 53, 0.55, 0.60, 'longstroke', 'steel', 39),
@@ -469,7 +471,7 @@ G.GUN_KG = { // each gun as it comes (kg)
   sr25: 4.9, uzi: 1.5, mp5: 2.5, p90: 2.6, vector: 2.7, thompson: 4.9, ppsh: 3.6, mp5sd: 2.9, mpx: 2.7, ar9: 2.9, aug9: 3.3, qbz95: 3.3, qbz192: 3.0, mcx: 2.7,
   pump: 3.6, dbl: 3.2, saiga: 3.6, aa12: 4.8, ksg: 3.6, slug: 3.6, benelli: 3.8, vepr: 4.0, m249: 7.5, pkm: 7.5, m60: 10.5,
   rpk: 4.8, shredder: 16, r700: 4.1, barrett: 14, mosin: 4.0, awm: 6.5, m32: 5.3, rail: 7.5, crossbow: 3.5,
-  p9: 0.75, g19: 0.7, m1911: 1.1, usp: 0.75, auto9: 1.1, deagle: 2.0, rev: 1.1, hc500: 2.0, akimbo: 0.95, derringer: 0.4,
+  p9: 0.75, g19: 0.7, m1911: 1.1, usp: 0.75, fiveseven: 0.75, thor: 5.4, auto9: 1.1, deagle: 2.0, rev: 1.1, hc500: 2.0, akimbo: 0.95, derringer: 0.4,
   g18: 0.9, skorp: 1.3, mp7: 1.9, mac10: 2.8, tx22: 0.6, sawn: 2.0, judge: 0.85, pocketgl: 1.8,
 };
 G.RECOIL_K = (() => {

@@ -125,7 +125,7 @@ G.Server = {
         break;
       // a vote on the route map for where to go next
       case 'arm': // a player's own sidearm for the run (not a vote: everyone's told who took what)
-        if (p && G.STARTERS.includes(m.id)) { this.arms = this.arms || {}; this.arms[from] = m.id; G.Net.broadcast({ t: 'arms', a: this.arms }); }
+        if (p && G.Arsenal.has(m.id)) { this.arms = this.arms || {}; this.arms[from] = m.id; G.Net.broadcast({ t: 'arms', a: this.arms }); }
         break;
       case 'pick':
         if (p && this.phase === 'route' && G.Route.options(this.routeMap, this.route.path[this.route.path.length - 1]).includes(m.n)) {

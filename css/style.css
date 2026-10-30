@@ -626,6 +626,51 @@ i.c.heavy { background: #a02828; } i.c.light { background: #7a3a30; } i.c.frac {
 .sidearm-pick .arm-who i > * { width: 14px !important; height: 14px !important; margin: 0 !important; }
 .sidearm-pick .arm.sel { border-color: var(--accent); background: #232016; box-shadow: 0 0 0 2px var(--accent) inset; }
 .sidearm-pick .arm-ok { margin-top: 16px; min-width: 260px; }
+.sidearm-pick:has(.web-full) { position: fixed; inset: 0; z-index: 60; background: #080a0d; }
+.web-full { position: absolute; inset: 0; display: flex; }
+.web-view { position: relative; flex: 1 1 auto; min-width: 0; overflow: hidden; cursor: grab; touch-action: none; user-select: none; background: radial-gradient(circle at 50% 50%, #151a20 0, #080a0d 75%); }
+.web-view:active { cursor: grabbing; }
+.web-world { position: absolute; left: 50%; top: 50%; width: 0; height: 0; transform-origin: 0 0; }
+.web-world.glide { transition: transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.web-world svg { position: absolute; overflow: visible; pointer-events: none; }
+.web-lines polygon, .web-lines line { fill: none; stroke: #2b333b; stroke-width: 1.5; }
+.web-world .strand { stroke: #47535e; stroke-width: 5; stroke-linecap: round; }
+.web-world .strand.on { stroke: var(--accent); stroke-width: 7; }
+.web-path { position: absolute; transform: translate(-50%, -50%); font: 700 15px var(--mono); letter-spacing: 3px; text-transform: uppercase; color: #8b98a4; white-space: nowrap; pointer-events: none; }
+.web-node { position: absolute; transform: translate(-50%, -50%); width: 176px; padding: 10px 8px; display: flex; flex-direction: column; align-items: center; gap: 4px; background: #14181d; border: 1px solid var(--line); border-radius: 6px; color: #dfe5ea; cursor: pointer; }
+.web-node img { height: 72px; max-width: 100%; object-fit: contain; pointer-events: none; }
+.web-node b { font: 700 15px var(--mono); line-height: 1.15; text-align: center; color: inherit; }
+.web-node small { font: 11.5px var(--mono); color: var(--accent); text-align: center; line-height: 1.25; }
+.web-node:hover { border-color: var(--accent); }
+.web-node.got { border-color: #6d6240; }
+.web-node.next { color: #aab5bf; border-style: dashed; }
+.web-node.next img { filter: grayscale(1) brightness(0.8); }
+.web-node.far { color: #66717b; background: #0f1215; }
+.web-node.far img { filter: grayscale(1) brightness(0.3); }
+.web-node.far small { color: #66717b; }
+.web-node.look { box-shadow: 0 0 0 2px #dfe5ea; }
+.web-node.sel { border-color: var(--accent); background: #232016; box-shadow: 0 0 0 3px var(--accent); }
+.web-head { position: absolute; left: 20px; top: 16px; pointer-events: none; text-align: left; }
+.sidearm-pick .web-head h2 { margin: 0; font-size: 22px; }
+.sidearm-pick .web-head p { margin: 2px 0 0; font-size: 12.5px; }
+.web-home { position: absolute; left: 20px; bottom: 16px; }
+.web-side { flex: 0 0 310px; box-sizing: border-box; padding: 18px; background: #0d1014; border-left: 1px solid var(--line); display: flex; flex-direction: column; gap: 9px; overflow-y: auto; text-align: left; }
+.web-side > img { height: 96px; max-width: 100%; object-fit: contain; align-self: center; }
+.web-side h3 { font: 700 20px var(--mono); color: var(--accent); margin: 0; }
+.web-side h4 { font: 700 11px var(--mono); letter-spacing: 1px; text-transform: uppercase; color: var(--dim); margin: 6px 0 0; }
+.web-side em { font-size: 13px; color: var(--dim); font-style: normal; line-height: 1.4; }
+.web-side .arm-stats { display: flex; flex-wrap: wrap; gap: 4px 12px; font: 12px var(--mono); color: #b8c2cc; }
+.web-ask { border-left: 3px solid var(--accent); padding: 4px 0 4px 8px; font-size: 13px; color: #dfe5ea; }
+.web-ask.far { border-color: var(--line); color: var(--dim); }
+.web-ask b { font-family: var(--mono); }
+.web-ask small, .web-next small { display: block; color: var(--dim); font-size: 12px; margin-top: 2px; }
+.web-next { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; font-size: 13px; color: #dfe5ea; }
+.web-next span { font-family: var(--mono); color: var(--accent); }
+.web-foot { margin-top: auto; padding-top: 10px; }
+.sidearm-pick .web-foot p { margin: 0 0 8px; font-size: 12px; line-height: 1.4; }
+.web-side .arm-ok { margin-top: 4px; min-width: 0; width: 100%; }
+.web-side .arm-who { justify-content: flex-start; }
+@media (max-width: 720px) { .web-full { flex-direction: column; } .web-view { flex: 1 1 55%; } .web-side { flex: 0 0 45%; border-left: 0; border-top: 1px solid var(--line); } }
 /* the attachments box: three wheels, each spun till you stop it, then fit what it landed on or carry it (js/game.js aboxShow) */
 .abox-pick { position: fixed; z-index: 45; pointer-events: auto; }
 .abox-pick .arm { cursor: default; min-height: 300px; }

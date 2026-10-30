@@ -688,6 +688,7 @@ G.Game = {
       Me.credits += cr;
       Me.stats.kills++;
       if (m.h) Me.stats.hs++;
+      if (G.Arsenal) G.Arsenal.kill(m);
       G.HUD.feed(`<span class="cr">+¢${cr}</span>`);
     }
   },
@@ -1047,37 +1048,88 @@ G.Game = {
     this.renderRoute();
     this.sidearmPick();
   },
-  // Before the first level of a run: which sidearm you start with (G.STARTERS). Your own choice (the squad's aren't
-  // waited on); the route's yours to vote on once you've made it.
+  // Before the first level of a run: which sidearm you start with, from what you've earned of the tree (js/arsenal.js). Your own choice (the squad's
+  // aren't waited on); the route's yours to vote on once you've made it. A web, the P9 in the middle, to move about on: drag it, scroll to zoom, and a
+  // gun you click on comes to the middle. A strand fills as you get on with what it asks.
   sidearmPick() {
-    const el = this.$('sidearmPick'), arms = this.arms || {}, roster = this.roster || {};
+    const el = this.$('sidearmPick'), arms = this.arms || {}, roster = this.roster || {}, A = G.Arsenal;
     if (G.Me.sidearmChosen) { el.classList.add('hidden'); return; }
+    if (!this.armLook) { this.armLook = this.armSel = 'p9'; this.armView = { x: 0, y: 0, z: 0.7 }; }
     // who's taken it (the squad's own picks: told by the host)
     const takers = (id) => Object.entries(arms).filter(([pid, a]) => a === id && roster[pid]).map(([pid]) => `<i style="color:${G.U.hex(roster[pid].color)}">${G.Callsigns.html(roster[pid].animal)}${G.U.esc(roster[pid].name)}</i>`);
     const others = Object.keys(roster).filter((pid) => pid !== G.Net.myId), waiting = others.filter((pid) => !arms[pid]).length;
-    const card = (id) => {
-      const d = G.WEAPONS[id], w = G.Me.makeWeapon(id), it = G.Gear.gunItem(w), [cw, ch] = G.Gear.size(it), cal = G.CALIBERS[G.calOf(d)];
-      const modes = (d.modes || [d.mode]).map((m) => G.MODE_NAME[m]).join(' / ');
-      return `<button class="arm${this.armSel === id ? ' sel' : ''}" data-arm="${id}"><img src="${G.Icons.of(it, cw, ch, false)}" alt=""><b>${G.U.esc(d.name)}</b>
-        <span class="arm-stats"><span>${cal ? cal.name : ''}</span><span>${d.mag} rounds</span><span>${modes}</span><span>${G.U.fmt(Math.round(G.Ballistics.energy(d)))} J · ${d.rpm} rpm</span></span>
-        <em>${G.U.esc(d.desc)}</em>${others.length ? `<span class="arm-who">${takers(id).join('') || '<small>no one yet</small>'}</span>` : ''}</button>`;
-    };
-    el.innerHTML = `<div class="arm-box"><h2>Pick your own sidearm</h2><p>This is <b>your</b> equipment, not a squad vote: each of you picks your own, and any number of you can take the same one. A primary comes later, from what you find and what the quartermaster has. It starts loaded with tracers, two spare loads in your pockets.</p>
-      <div class="arms">${G.STARTERS.map(card).join('')}</div>
-      <button class="btn primary arm-ok" data-armok ${this.armSel ? '' : 'disabled'}>${this.armSel ? `Confirm: ${G.U.esc(G.WEAPONS[this.armSel].name)}` : 'Choose one, then confirm'}</button>${others.length ? `<p class="arm-note">Under each: who in the squad took it${waiting ? ` (${waiting} still choosing)` : ''}.</p>` : ''}</div>`;
+    const pic = (id) => { const it = G.Gear.gunItem(G.Me.makeWeapon(id)), [cw, ch] = G.Gear.size(it); return G.Icons.of(it, cw, ch, false); };
+    // the web: a ring for each step out, spokes between, and the paths on it
+    const W = 1200, spokes = [...Array(6)].map((_, i) => ((-90 + i * 60) * Math.PI) / 180), spot = (a, r) => [Math.cos(a) * r, Math.sin(a) * r], rings = A.RINGS.slice(1);
+    const web = rings.map((r) => `<polygon points="${spokes.map((a) => spot(a, r).map((v) => v.toFixed(1)).join()).join(' ')}"/>`).join('') + spokes.map((a) => { const [x, y] = spot(a, rings[rings.length - 1]); return `<line x1="0" y1="0" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"/>`; }).join('');
+    const strands = A.NODES.filter((q) => q.from).map((q) => {
+      const [x0, y0] = A.at(A.BY.get(q.from)), [x1, y1] = A.at(q), got = A.open(q.id), f = got ? 1 : A.open(q.from) ? A.left(q) / q.n : 0;
+      return `<line class="strand" x1="${x0}" y1="${y0}" x2="${x1}" y2="${y1}"/>${f > 0 ? `<line class="strand on" x1="${x0}" y1="${y0}" x2="${(x0 + (x1 - x0) * f).toFixed(1)}" y2="${(y0 + (y1 - y0) * f).toFixed(1)}"/>` : ''}`;
+    }).join('');
+    const nodes = A.NODES.map((q) => {
+      const [x, y] = A.at(q), st = A.open(q.id) ? 'got' : A.open(q.from) ? 'next' : 'far', tip = st === 'next' ? `<small>${A.left(q)}/${q.n} ${G.U.esc(q.what)}</small>` : st === 'far' ? '<small>Locked</small>' : '';
+      return `<button class="web-node ${st}${this.armLook === q.id ? ' look' : ''}${this.armSel === q.id ? ' sel' : ''}" data-arm="${q.id}" style="left:${x.toFixed(1)}px;top:${y.toFixed(1)}px"><img src="${pic(q.id)}" alt="" draggable="false"><b>${G.U.esc(A.name(q.id))}</b>${tip}</button>`;
+    }).join('');
+    const paths = Object.entries(A.PATHS).map(([k, p]) => { const [x, y] = A.along(k, A.RINGS[p.len] + 165); return `<span class="web-path" style="left:${x.toFixed(1)}px;top:${y.toFixed(1)}px">${p.name}</span>`; }).join('');
+    // what you're looking at: the gun, and what it takes
+    const id = this.armLook, q = A.BY.get(id), d = G.WEAPONS[id], cal = G.CALIBERS[G.calOf(d)], got = A.open(id), modes = (d.modes || [d.mode]).map((m) => G.MODE_NAME[m]).join(' / ');
+    const nextOn = A.NODES.filter((c) => c.from === id && !A.open(c.id)).map((c) => `<li><b>${G.U.esc(A.name(c.id))}</b> <span>${A.left(c)}/${c.n}</span> ${G.U.esc(c.what)}<small>${G.U.esc(c.how)}</small></li>`).join('');
+    const ask = got ? '' : A.open(q.from) ? `<div class="web-ask"><b>${A.left(q)}/${q.n} ${G.U.esc(q.what)}</b> with the ${G.U.esc(A.name(q.from))}<small>${G.U.esc(q.how)}</small></div>` : `<div class="web-ask far"><b>Locked</b> Earn the ${G.U.esc(A.name(q.from))} first.</div>`;
+    const was = el.querySelector('.web-world');
+    el.innerHTML = `<div class="web-full"><div class="web-view"><div class="web-world"><svg viewBox="${-W} ${-W} ${W * 2} ${W * 2}" style="left:${-W}px;top:${-W}px;width:${W * 2}px;height:${W * 2}px" aria-hidden="true"><g class="web-lines">${web}</g>${strands}</svg>${paths}${nodes}</div>
+        <div class="web-head"><h2>Your sidearm</h2><p>Drag to move · scroll to zoom · click a gun</p></div><button class="btn web-home" data-armhome>Back to the P9</button></div>
+      <aside class="web-side"><img src="${pic(id)}" alt=""><h3>${G.U.esc(d.name)}</h3><div class="arm-stats"><span>${cal ? cal.name : ''}</span><span>${d.mag} round${d.mag === 1 ? '' : 's'}</span><span>${modes}</span><span>${G.U.fmt(Math.round(G.Ballistics.energy(d)))} J · ${d.rpm} rpm</span></div><em>${G.U.esc(d.desc)}</em>${ask}
+        ${nextOn ? `<h4>With this gun</h4><ul class="web-next">${nextOn}</ul>` : ''}${others.length && got ? `<span class="arm-who">${takers(id).join('') || '<small>no one yet</small>'}</span>` : ''}
+        <div class="web-foot"><p>Your own equipment, not a squad vote, and what you earn here stays yours. It starts loaded with tracers, two spare loads in your pocket.</p>${others.length ? `<p class="arm-note">${waiting ? `${waiting} of the squad still choosing.` : 'The squad have all chosen.'}</p>` : ''}
+        <button class="btn primary arm-ok" data-armok ${got ? '' : 'disabled'}>${got ? `Take the ${G.U.esc(d.name)}` : 'Not yet yours'}</button></div></aside></div>`;
     el.classList.remove('hidden');
+    const place = () => { const v = this.armView, w = el.querySelector('.web-world'); if (w) w.style.transform = `translate(${v.x.toFixed(1)}px, ${v.y.toFixed(1)}px) scale(${v.z.toFixed(3)})`; };
+    this.armPlace = place;
+    // (where it was, then across to where it's going: the map's built afresh each time)
+    if (this.armFrom) { const w = el.querySelector('.web-world'); w.style.transform = this.armFrom; this.armFrom = null; requestAnimationFrame(() => { w.classList.add('glide'); place(); }); } else place();
+    if (was) was.remove();
     if (!el.dataset.bound) {
       el.dataset.bound = 1;
+      let drag = null, moved = false;
+      const go = (x, y) => { const v = this.armView, w = el.querySelector('.web-world'); this.armFrom = w ? w.style.transform : null; v.x = x * v.z; v.y = y * v.z; };
+      el.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0 || !e.target.closest('.web-view') || e.target.closest('.web-home')) return;
+        drag = { x: e.clientX, y: e.clientY, vx: this.armView.x, vy: this.armView.y }; moved = false;
+        const w = el.querySelector('.web-world'); if (w) w.classList.remove('glide');
+      });
+      window.addEventListener('pointermove', (e) => {
+        if (!drag) return;
+        const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+        if (Math.hypot(dx, dy) > 5) moved = true;
+        if (moved) { const v = this.armView, R = 1050 * v.z; v.x = G.U.clamp(drag.vx + dx, -R, R); v.y = G.U.clamp(drag.vy + dy, -R, R); this.armPlace(); }
+      });
+      window.addEventListener('pointerup', () => { drag = null; });
+      el.addEventListener('wheel', (e) => {
+        const view = e.target.closest('.web-view');
+        if (!view) return;
+        e.preventDefault();
+        const v = this.armView, r = view.getBoundingClientRect(), z = G.U.clamp(v.z * Math.exp(-e.deltaY * 0.0012), 0.4, 1.5), k = z / v.z, cx = e.clientX - r.left - r.width / 2, cy = e.clientY - r.top - r.height / 2; // (about the cursor: what's under it stays there)
+        v.x = cx - (cx - v.x) * k; v.y = cy - (cy - v.y) * k; v.z = z;
+        const w = el.querySelector('.web-world'); if (w) w.classList.remove('glide');
+        this.armPlace();
+      }, { passive: false });
       el.addEventListener('click', (e) => {
+        const dragged = moved; moved = false;
         if (G.Me.sidearmChosen) return;
         const b = e.target.closest('[data-arm]'), ok = e.target.closest('[data-armok]');
-        if (b) { this.armSel = b.dataset.arm; G.Audio.click(); return this.sidearmPick(); } // (chosen, not yet taken)
-        if (!ok || ok.disabled || !this.armSel) return;
-        const id = this.armSel;
+        if (e.target.closest('[data-armhome]')) { go(0, 0); G.Audio.click(); return this.sidearmPick(); }
+        if (b) {
+          if (dragged) return; // (it was a drag that started on it)
+          this.armLook = b.dataset.arm; if (G.Arsenal.open(this.armLook)) this.armSel = this.armLook;
+          const [x, y] = G.Arsenal.at(G.Arsenal.BY.get(this.armLook)); go(-x, -y);
+          G.Audio.click(); return this.sidearmPick(); // (chosen, not yet taken)
+        }
+        if (!ok || ok.disabled || !G.Arsenal.open(this.armLook)) return;
+        const id = this.armLook;
         G.Me.setSidearm(id); G.Audio.click();
         G.Net.toHost({ t: 'arm', id }); // (so the squad sees it)
         G.HUD.toast('', `Sidearm: ${G.WEAPONS[id].name}`, 1.4);
-        this.armSel = null; this.sidearmPick(); this.renderRoute();
+        this.armSel = this.armLook = null; this.sidearmPick(); this.renderRoute();
       });
     }
   },

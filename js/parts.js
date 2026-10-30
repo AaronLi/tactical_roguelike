@@ -636,12 +636,14 @@ G.Gunsmith = (() => {
   pst('auto9', { len: 0.25, sm: 'gunmetal', vent: true, w: 0.03 }, 'gunmetal', { fm: 'gunmetal', ext: 1 });
   pst('deagle', { len: 0.252, sm: 'steel', w: 0.032 }, 'rubber', { fm: 'steel' });
   pst('g19', { len: 0.17 }, 'polymer');
+  pst('fiveseven', { len: 0.208, w: 0.026 }, 'polymer');
   pst('akimbo', { len: 0.2, sm: 'blued', w: 0.026 }, 'woodDark', { fm: 'blued' });
   // revolvers
   P('rev', 'revolver', { cl: 0.042, cr: 0.021 }, { barrel: { len: 0.1 }, grip: ['rev', null, 'woodDark'], optic: ['pso', { optic: 'notch' }], loader: true });
   P('hc500', 'revolver', { cl: 0.05, cr: 0.026, comp: true }, { barrel: { len: 0.2 }, grip: ['rev', null, 'woodDark'], optic: ['pso', { optic: 'notch' }], loader: true });
   P('judge', 'revolver', { cl: 0.072, cr: 0.026, m: 'blued' }, { barrel: { len: 0.075 }, grip: ['rev', null, 'rubber'], optic: ['pso', { optic: 'notch' }], loader: true });
   P('derringer', 'derringer', {}, { barrel: { len: 0.084 }, grip: ['rev', null, 'woodDark'] });
+  P('thor', 'rifle', { rcv: 'break', L: 0.15, fm: 'steel', barrels: [0], gripT: 'wood', grip: 0.0, support: 0.2 }, { barrel: { len: 0.38, r: 0.017 }, handguard: ['classic', { t: 'wood', len: 0.1 }], grip: ['ak', 'wood', 'wood'], optic: ['pic', { optic: 'notch' }] });
   // specials
   P('p90', 'p90', { siderails: true }, { barrel: { len: 0.04 }, thread: 'r57', muzzle: 'flash', optic: ['pic', { optic: 'reddot' }], mag: { t: 'p90' }, noDrum: true });
   P('shredder', 'minigun', {}, { barrel: { len: 0.55 }, motor: true, mag: { t: 'ammobox', f: 0.12, m: 'od' }, optic: ['pic', { optic: 'irons' }], tac: true }); // (a side handle on the left, a rail on the right)
