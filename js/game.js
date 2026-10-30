@@ -1077,14 +1077,14 @@ G.Game = {
     const ask = got ? '' : A.open(q.from) ? `<div class="web-ask"><b>${A.left(q)}/${q.n} ${G.U.esc(q.what)}</b> with the ${G.U.esc(A.name(q.from))}<small>${G.U.esc(q.how)}</small></div>` : `<div class="web-ask far"><b>Locked</b> Earn the ${G.U.esc(A.name(q.from))} first.</div>`;
     // its pro build: what it takes, or the choice of starting with it
     const P = q.pro, parts = A.partNames(id).map((n) => `<li>${G.U.esc(n)}</li>`).join('');
-    const pro = !got ? '' : `<h4>Pro build</h4><div class="web-pro${A.proGot(id) ? ' got' : ''}"><b>${G.U.esc(P.name)}</b><ul>${parts}</ul>${A.proGot(id) ? `<label><input type="checkbox" data-armpro ${A.proOn(id) ? 'checked' : ''}> Start in pro mode</label>` : `<span>${Math.min(P.n, A.count(id, P.stat))}/${P.n}</span> ${G.U.esc(P.what)} with this gun`}</div>`;
+    const pro = !got ? '' : `<h4>Pro build</h4><div class="web-pro${A.proGot(id) ? ' got' : ''}" tabindex="0" title=""><b>${G.U.esc(P.name)}</b><ul>${parts}</ul>${A.proGot(id) ? `<label><input type="checkbox" data-armpro ${A.proOn(id) ? 'checked' : ''}> Start in pro mode</label>` : `<span>${Math.min(P.n, A.count(id, P.stat))}/${P.n}</span> ${G.U.esc(P.what)} with this gun`}</div>`;
     const was = el.querySelector('.web-world');
     el.innerHTML = `<div class="web-full"><div class="web-view"><div class="web-world"><svg viewBox="${-W} ${-W} ${W * 2} ${W * 2}" style="left:${-W}px;top:${-W}px;width:${W * 2}px;height:${W * 2}px" aria-hidden="true"><g class="web-lines">${web}</g>${strands}</svg>${paths}${nodes}</div>
         <div class="web-head"><h2>Your sidearm</h2><p>Drag to move · scroll to zoom · click a gun</p></div><button class="btn web-home" data-armhome>Back to the P9</button></div>
       <aside class="web-side"><img src="${pic(id)}" alt=""><h3>${G.U.esc(d.name)}</h3><div class="arm-stats"><span>${cal ? cal.name : ''}</span><span>${d.mag} round${d.mag === 1 ? '' : 's'}</span><span>${modes}</span><span>${G.U.fmt(Math.round(G.Ballistics.energy(d)))} J · ${d.rpm} rpm</span></div><em>${G.U.esc(d.desc)}</em>${ask}
         ${nextOn ? `<h4>With this gun</h4><ul class="web-next">${nextOn}</ul>` : ''}${pro}${others.length && got ? `<span class="arm-who">${takers(id).join('') || '<small>no one yet</small>'}</span>` : ''}
         <div class="web-foot"><p>Your own equipment, not a squad vote, and what you earn here stays yours. It starts loaded with tracers, two spare loads in your pocket.</p>${others.length ? `<p class="arm-note">${waiting ? `${waiting} of the squad still choosing.` : 'The squad have all chosen.'}</p>` : ''}
-        <button class="btn primary arm-ok" data-armok ${got ? '' : 'disabled'}>${got ? `Take the ${G.U.esc(d.name)}${A.proOn(id) ? ` ${G.U.esc(P.name)}` : ''}` : 'Not yet yours'}</button></div></aside></div>`;
+        <button class="btn primary arm-ok" data-armok ${got ? '' : 'disabled'}>${got ? `Take the ${G.U.esc(d.name)}${A.proOn(id) ? ` ${G.U.esc(P.name)}` : ''}` : 'Not yet yours'}</button></div></aside><div class="web-preview hidden"></div></div>`;
     el.classList.remove('hidden');
     const place = () => { const v = this.armView, w = el.querySelector('.web-world'); if (w) w.style.transform = `translate(${v.x.toFixed(1)}px, ${v.y.toFixed(1)}px) scale(${v.z.toFixed(3)})`; };
     this.armPlace = place;
@@ -1094,6 +1094,16 @@ G.Game = {
     if (!el.dataset.bound) {
       el.dataset.bound = 1;
       let drag = null, moved = false;
+      // over the pro build: what it'd be, beside it, against the gun as it comes
+      const preview = (on) => {
+        const box = el.querySelector('.web-preview');
+        if (!box) return;
+        if (!on) { box.classList.add('hidden'); return; }
+        const A = G.Arsenal, id = this.armLook, q = A.BY.get(id), w = G.Me.makeWeapon(id, A.build(id)), it = G.Gear.gunItem(w), [cw, ch] = G.Gear.size(it);
+        box.innerHTML = `<img src="${G.Icons.of(it, cw, ch, false)}" alt=""><h3>${G.U.esc(A.name(id))} <b>${G.U.esc(q.pro.name)}</b></h3><ul>${A.partNames(id).map((n) => `<li>${G.U.esc(n)}</li>`).join('')}</ul><h4>Against the stock gun</h4><div class="gs-stats">${G.GunsmithUI.statsHtml(G.Me.makeWeapon(id).def, w.def)}</div>`;
+        box.classList.remove('hidden');
+      };
+      for (const [ev, on] of [['pointerover', true], ['pointerout', false], ['focusin', true], ['focusout', false]]) el.addEventListener(ev, (e) => { if (e.target.closest && e.target.closest('.web-pro')) preview(on); });
       const go = (x, y) => { const v = this.armView, w = el.querySelector('.web-world'); this.armFrom = w ? w.style.transform : null; v.x = x * v.z; v.y = y * v.z; };
       el.addEventListener('pointerdown', (e) => {
         if (e.button !== 0 || !e.target.closest('.web-view') || e.target.closest('.web-home')) return;

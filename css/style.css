@@ -673,6 +673,13 @@ i.c.heavy { background: #a02828; } i.c.light { background: #7a3a30; } i.c.frac {
 .web-pro span { font-family: var(--mono); color: var(--accent); }
 .web-pro label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-weight: 600; }
 .web-pro label input { width: auto; flex: 0 0 auto; margin: 0; }
+.web-pro:hover, .web-pro:focus-visible { background: #14181d; outline: none; }
+.web-preview { position: absolute; right: 322px; top: 50%; transform: translateY(-50%); width: min(360px, calc(100vw - 350px)); max-height: calc(100% - 24px); overflow-y: auto; box-sizing: border-box; padding: 14px; background: #0d1014; border: 1px solid var(--accent); border-radius: 6px; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6); display: flex; flex-direction: column; gap: 8px; text-align: left; pointer-events: none; z-index: 2; }
+.web-preview img { height: 110px; max-width: 100%; object-fit: contain; align-self: center; }
+.web-preview h3 { font: 700 16px var(--mono); color: #dfe5ea; margin: 0; }
+.web-preview h3 b { color: var(--accent); }
+.web-preview h4 { font: 700 11px var(--mono); letter-spacing: 1px; text-transform: uppercase; color: var(--dim); margin: 2px 0 0; }
+.web-preview ul { list-style: none; margin: 0; padding: 0; color: var(--dim); font-size: 12.5px; line-height: 1.4; }
 .web-foot { margin-top: auto; padding-top: 10px; }
 .sidearm-pick .web-foot p { margin: 0 0 8px; font-size: 12px; line-height: 1.4; }
 .web-side .arm-ok { margin-top: 4px; min-width: 0; width: 100%; }
