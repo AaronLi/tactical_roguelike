@@ -273,6 +273,38 @@ G.GunTraces = {
       { on: 'grip', m: 'frame', pts: [[150, 112], [210, 112], [210, 226], [150, 226]], w: 0.031, b: 0.001 }, // (the well)
     ],
   },
+  // The AR-9's receiver pair, from the Colt 9mm SMG (AR-pattern, a 9 mm blowback in an AR-15 lower, left side). Read off
+  // "AR Colt 9mm left.jpg" (Wikimedia Commons, CC BY-SA 3.0, Arthurrh) turned 1.6 degrees clockwise (rot) to level the
+  // bore, at 0.506 mm a pixel: the upper's length (back of the tube nut to its front, 415 px) is the 210 mm of an AR upper;
+  // the handguard and grip heights agree with it. Taken the carry handle and the long barrel off: the upper is flat to the
+  // rail's seat, the handguard, barrel and stock are the gun's own parts. x0: the back of the upper, f = 0; y0: the bore.
+  // Only the lower and upper are traced: no forward assist (the Colt SMG has none), the dust cover over the port
+  // on the right, a case deflector behind it.
+  ar9: {
+    ref: 'AR Colt 9mm left.jpg', rot: 1.6, mm: 0.506, x0: 1340, y0: 222, dir: -1, by: 0,
+    parts: [
+      // the upper: one box to the barrel nut, flat on top where the rail sits
+      { pts: [[925, 171], [1340, 171], [1340, 250], [925, 250]], w: 0.0305, m: 'slide', b: 0.0025 },
+      // the lower: the well's flat front and its flared, raked floor, the rear tang under the tube
+      { pts: [[925, 250], [1340, 250], [1340, 292], [1295, 337], [1222, 337], [1103, 337], [1100, 392], [958, 364], [940, 338], [935, 290], [925, 262]], w: 0.0285, m: 'slide', b: 0.0015 },
+      // the guard: a thin loop round the trigger
+      { pts: [[1100, 337], [1226, 337], [1226, 399], [1100, 399]], holes: [[[1112, 345], [1216, 345], [1216, 388], [1112, 388]]], w: 0.0075, m: 'slide', b: 0.001 },
+      { pts: [[1158, 340], [1184, 338], [1202, 364], [1196, 396], [1182, 402], [1183, 372]], w: 0.0055, m: 'black', b: 0.0006 },
+      // the magazine catch on the left, the bolt catch above it, the selector, the pins
+      { pts: ring(1043, 298, 10, 12), w: 0.003, x: -0.0148, m: 'black', b: 0 },
+      { pts: [[1095, 236], [1122, 236], [1124, 286], [1097, 286]], w: 0.003, x: -0.0148, m: 'black', b: 0.0003 },
+      { pts: [[1226, 292], [1244, 292], [1247, 346], [1230, 346]], w: 0.003, x: -0.0148, m: 'black', b: 0.0003 },
+      { pts: ring(1236, 298, 10, 12), w: 0.003, x: 0.0148, m: 'black', b: 0 },
+      { pts: ring(935, 258, 8, 10), w: 0.003, x: 0.0144, two: true, m: 'steel', b: 0 },
+      { pts: ring(1214, 284, 7, 10), w: 0.003, x: 0.0144, two: true, m: 'steel', b: 0 },
+      { pts: ring(1265, 284, 7, 10), w: 0.003, x: 0.0144, two: true, m: 'steel', b: 0 },
+      // the ejection port's dust cover and the case deflector behind it (right)
+      { pts: [[990, 182], [1135, 182], [1135, 214], [990, 214]], w: 0.001, x: 0.0156, m: 'rubber', b: 0 },
+      { pts: [[1135, 196], [1190, 196], [1195, 232], [1135, 232]], w: 0.003, x: 0.0152, m: 'slide', b: 0.001 },
+      // the grip: the finger groove cut into the front strap, the backstrap raked out to the heel
+      { on: 'grip', m: 'grip', pts: [[1222, 337], [1295, 337], [1330, 420], [1396, 505], [1283, 540], [1250, 483], [1222, 470], [1222, 455], [1226, 440], [1222, 388]], w: 0.0305, b: 0.004 },
+    ],
+  },
   // EAA / Tanfoglio Thor (Raptor), left side: a 1911 frame carrying a hinged breech sleeve with a Weaver rail, a
   // long thin barrel, a block where the magazine would be. From IMFDB ("EAA Thor", THOR_.45-70.jpg, 445 px) at 405 mm
   // (all4shooters, Tanfoglio Raptor). It breaks open on the pin in the block under the barrel: its muzzle drops.
