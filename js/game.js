@@ -432,7 +432,7 @@ G.Game = {
         break;
       case 'snap': if (this.phase === 'level') G.Views.applySnap(m); break;
       case 'rfx': if (this.phase === 'level') G.Views.roundFx(m.a); break;
-      case 'rpath': if (G.Highlights) for (const [i, path] of m.ps || []) G.Highlights.roundPath(m.k, m.sid, i, path); break;
+      case 'rpath': for (const [i, path] of m.ps || []) { const s = G.Highlights && G.Highlights.roundPath(m.k, m.sid, i, path), def = s && (G.WEAPONS[s.code] || G.Gunsmith.fromCode(s.code)); if (G.ShotLog) G.ShotLog.keep(path, { holder: G.ShotLog.remote(m.k, m.sid), name: def ? def.name : '' }); } break;
       case 'skin': G.Stickers.learn(m.h, m.l); break; // (a gun's stickers, by their hash: js/stickers.js)
       // a first aid cabinet opened, emptied a bit, or put back into
       // things lying about: put down, picked up, and what you picked up

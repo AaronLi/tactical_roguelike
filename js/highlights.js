@@ -251,7 +251,7 @@ G.Highlights = (() => {
       if (s.a !== a || s.sid !== sid) continue;
       (s.paths = s.paths || [])[i] = path;
       if (!s.tos && path.p.length > 1) s.to = path.p[path.p.length - 1].slice(0, 3);
-      return;
+      return s;
     }
   }
   const pathOf = (sh) => sh.path || (sh.paths && sh.paths[0]) || null;

@@ -1046,7 +1046,7 @@ G.Me = {
   // A round's path, for the replays (js/highlights.js roundPath): p, the points it passed ([x, y, z, speed]: everything it met,
   // and every so often in the air); ev, what it did to things ([point, e(ntry) x (exit) r(icochet), what it looks like, the
   // surface's normal, what it was]); hit, who it went into ([point, their key, its speed, its state then, its direction,
-  // whether it came out, what it did in their armour: js/ballistics.js armourLog]).
+  // whether it came out, what it did in their armour: js/ballistics.js armourLog, how far in it got and what it was in last]).
   roundIndex(shot) { shot.n = (shot.n || 0) + 1; return shot.n - 1; },
   newPath(p, v) { return { p: [[+p.x.toFixed(2), +p.y.toFixed(2), +p.z.toFixed(2), Math.round(v)]], ev: [], hit: [] }; },
   pathPt(b, p, v) {
@@ -1060,6 +1060,7 @@ G.Me = {
     const key = b.enemy ? 'e' + b.enemy : 'p' + G.Net.myId, sh = b.shot;
     if (G.Highlights) G.Highlights.roundPath(key, sh.sid, b.i, b.path);
     (sh.paths = sh.paths || []).push([b.i, b.path]);
+    if (G.ShotLog) G.ShotLog.keep(b.path, { holder: sh, name: `${b.def.name}${G.AMMO[b.am] ? ' ' + G.AMMO[b.am].name : ''}` }); // (F9: what it did, kept)
   },
   // where a round would end up if nobody's in the way: its arc, stepped against the walls only (what the squad
   // is told, to draw it going there)
@@ -1153,7 +1154,8 @@ G.Me = {
         if (!r || r.entryT == null) continue; // (inside the hitbox, outside the body: a near miss)
         b.hit.add(ev || mate || this);
         const hp = o.clone().addScaledVector(d, r.entryT);
-        b.path.hit.push([this.pathPt(b, hp, v), ev ? 'e' + ev.id : 'p' + (mate ? mate.id : G.Net.myId), Math.round(v), arrived, +d.x.toFixed(4), +d.y.toFixed(4), +d.z.toFixed(4), r.exitV ? 1 : 0, B.armourLog(r)]);
+        b.path.hit.push([this.pathPt(b, hp, v), ev ? 'e' + ev.id : 'p' + (mate ? mate.id : G.Net.myId), Math.round(v), arrived, +d.x.toFixed(4), +d.y.toFixed(4), +d.z.toFixed(4), r.exitV ? 1 : 0, B.armourLog(r), [+(r.exitT - r.entryT).toFixed(3), r.log.length ? r.log[r.log.length - 1].m : '']]);
+        if (!h.self && G.ShotLog) G.ShotLog.pose(b.shot, b.path.hit[b.path.hit.length - 1][1], rig); // (F9: them as they stood)
         if (tr) { this.trailTrack(b, o, d, r, v, tr, h.self ? null : rig); G.HUD.hbPath = r.log.concat({ m: r.exitV ? 'out' : 'stopped', v: Math.round(r.exitV) }); } // (F9: what it went through)
         if (ev) {
           B.wearOut(armour);

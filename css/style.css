@@ -156,6 +156,10 @@ img.anim { width: 1.25em; height: 1.25em; vertical-align: -0.3em; margin-right: 
 /* F9's readout: everything about whoever's under the crosshair (js/hud.js debugTarget) */
 .hb-info { position: absolute; left: 16px; top: 96px; width: 360px; max-height: calc(100vh - 330px); overflow: hidden; padding: 8px 10px; background: rgba(6, 8, 10, 0.78); border: 1px solid rgba(255, 255, 255, 0.12); font: 11px/1.45 var(--mono); color: #c9d1d6; pointer-events: none; }
 .hb-info.hidden { display: none; }
+.hb-marks { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; }
+.hb-marks.hidden { display: none; }
+.hb-info .hb-shot { margin-top: 3px; font-size: 10px; line-height: 1.35; }
+.hb-info .hb-shot b { color: #ffb43a; }
 .hb-info h4 { margin: 0 0 4px; font: 600 12px var(--mono); color: #fff; }
 .hb-info h4 small { color: #8a959c; font-weight: 400; }
 .hb-info .hb-sec { margin-top: 6px; padding-top: 4px; border-top: 1px dashed rgba(255, 255, 255, 0.12); }

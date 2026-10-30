@@ -127,6 +127,7 @@ G.R = {
   clearLevel() {
     for (const tr of this.trails || []) this.trailDrop(tr);
     this.trails = []; this.lastShot = null;
+    if (G.ShotLog) G.ShotLog.clear();
     for (const o of this.wounds || []) { o.removeFromParent(); if (o.geometry !== this.trailDot) o.geometry.dispose(); o.material.dispose(); }
     this.wounds = []; this.woundsOn = null;
     // marks on doors back into the scene first (they're pooled: they mustn't go with the doors)
@@ -459,6 +460,7 @@ G.R = {
   },
   trailsUpdate() {
     const on = G.Rig.debug;
+    if (G.ShotLog) G.ShotLog.frame(); // (the shots that hit someone: their ghosts, trails and markers)
     if (this.wounds && this.wounds.length && this.woundsOn !== on) { for (const o of this.wounds) o.visible = on; this.woundsOn = on; } // (the tracks kept on bodies: with the hitboxes)
     if (!this.trails || !this.trails.length) return;
     const now = performance.now();

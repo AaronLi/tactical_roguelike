@@ -1305,6 +1305,11 @@ says the same), but not whose: the shooter's name isn't shown.
   exits and ricochet flashes appear as it gets to them, only those it really hit bleed, windows break when they
   did, and the x-ray re-runs the actual round as it arrived, listing what it went through, walls and armour and tissue,
   layer by layer. All of it goes in the recording .zip; older recordings still play, with straight lines.
+- **F9 keeps every shot that hit someone** (`js/shotlog.js`): for the level (the last 32), whether or not the hitboxes were on when it
+  was fired, the round's whole trail stays, coloured by speed, with a ghost of whoever it hit as they stood when it struck. Look at
+  someone and the trails of the shots that hit them light up with markers in the world: the speed at the muzzle, where it fell
+  through each Mach number (from 3 to 0.5, and how far out), what it went through or off, its entry speed and energy, its speed past
+  their armour and the energy that cost, its exit speed or where it stopped and in what. The readout lists the same for each shot.
 - **Wallbangs and ricochets are highlights** (`js/highlights.js`): a kill whose round went through something (not a pane of glass)
   or off something on its way there is called out from its recorded path. It gets the bullet cam, round every turn the round
   took, then a wall cam from the far side of the hole or a ricochet cam out in front of the surface, the round's line left hanging in
@@ -1868,7 +1873,7 @@ On top of the baked room reverb, echoes are **ray-traced through the level** for
 | F (hold) | Doors (aim at the door above 1.3 m, a little over its middle, to open it, lower to kick it; face an open door to close it; reach 1.9 m), bag evidence (aim at the weapon), swap with the weapon case, arrest, zip-tie or report (aim at the person or body; whichever of a body and its dropped weapon is nearer the centre of your view), check or treat a teammate (put the crosshair on them). Every interaction is a hold: let go and it's abandoned. Any of these puts your weapon away; drawing it again takes about 1 s (0.65 s for a sidearm). |
 | M | Mute / unmute (also `?mute` in the URL) |
 | F8 | Show / hide gunshot echo paths |
-| F9 | Show / hide hitboxes (with the readout of whoever you're looking at, and your rounds' paths) |
+| F9 | Show / hide hitboxes (with the readout of whoever you're looking at, your rounds' paths, and every shot that's hit someone: ghosts, trails, speed markers) |
 | Tab | Inventory, health and scoreboard (Tab or Esc closes) |
 | Y | Vote to leave, once order is restored (again to take it back) |
 | Enter / Esc | Chat / pause |
@@ -2084,6 +2089,7 @@ solids at any height. Doors and windows are dynamic: their solids change as they
 | `js/hud.js`, `js/shop.js` | UI; the shop's stock and its buying |
 | `js/hangar.js` | The hangar between levels: workshop, store, warehouse, lounge, helicopter, and looking-to-buy |
 | `js/profiler.js` | The profiler: frame timings by piece of work, saved from the pause menu |
+| `js/shotlog.js` | F9's record of the shots that hit someone: ghosts of them, the trails, and speed markers in the world |
 | `js/highlights.js` | Recording a level and replaying its highlights on the hangar's TVs, as a sports broadcast; saving it as a .zip and rendering the video from one |
 | `js/exportworker.js` | The highlights video made off the main thread: the game's code in a worker, rendering and encoding there |
 | `js/ballistics.js` | Terminal ballistics: the rounds as they change, penetration, deformation and ricochet in any material, armour layers, the body's anatomy (fitted to the rigs) and wound tracks |
