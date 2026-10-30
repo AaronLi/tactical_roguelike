@@ -130,6 +130,24 @@ G.World = (() => {
     return (h.glass && h.glass.length) || h.clear ? GLASS_SEE : 1;
   }
 
+  // Where a round going from o along unit d comes out of solid s: { t, n (the far face's normal) }. Walls that butt up to
+  // each other are the one wall (the planner merges tiles into boxes, wherever it happens to), floors and ceilings too.
+  const family = (s) => (s.kind === 'wall' || s.kind === 'lintel' ? 'w' : s.kind === 'floor' || s.kind === 'ceil' || s.kind === 'step' ? 'f' : null);
+  function span(w, s, o, d) {
+    const O = [o.x, o.y, o.z], D = [d.x, d.y, d.z], fam = family(s), seen = new Set([s]);
+    const exit = (q) => { let t = Infinity, ax = 0; for (let a = 0; a < 3; a++) { if (Math.abs(D[a]) < 1e-9) continue; const tt = ((D[a] > 0 ? q.max[a] : q.min[a]) - O[a]) / D[a]; if (tt < t) { t = tt; ax = a; } } return { t, ax }; };
+    let e = exit(s);
+    for (let i = 0; fam && i < 16; i++) {
+      const x = O[0] + D[0] * (e.t + 0.003), y = O[1] + D[1] * (e.t + 0.003), z = O[2] + D[2] * (e.t + 0.003);
+      let next = null;
+      query(w, [x - 0.001, y - 0.001, z - 0.001], [x + 0.001, y + 0.001, z + 0.001], (q) => { if (!next && q.ray && !seen.has(q) && family(q) === fam) next = q; });
+      if (!next) break;
+      seen.add(next); e = exit(next);
+    }
+    const n = [0, 0, 0]; n[e.ax] = D[e.ax] > 0 ? 1 : -1;
+    return { t: e.t, n };
+  }
+
   // every solid whose box overlaps [min, max] (each once)
   function query(w, min, max, fn) {
     const stamp = ++w.stamp, mark = w.mark;
@@ -339,5 +357,5 @@ G.World = (() => {
     }
   }
 
-  return { CELL, STEP, HEIGHT, GLASS_SEE, create, add, remove, reshape, box, raycast, los, see, query, resolve, groundAt, rampAt, ceilingAt, fromTileMap, stairs, door, windowSolids };
+  return { CELL, STEP, HEIGHT, GLASS_SEE, create, add, remove, reshape, box, raycast, span, los, see, query, resolve, groundAt, rampAt, ceilingAt, fromTileMap, stairs, door, windowSolids };
 })();

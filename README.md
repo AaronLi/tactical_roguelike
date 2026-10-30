@@ -543,14 +543,15 @@ says the same), but not whose: the shooter's name isn't shown.
   collection (the first to open it gets it; the squad sees who) and the lid stays up.
 - **Stickers** (`js/stickers.js`, `G.Stickers`): the pictures in `assets/stickers/` (PNG, WebP, JPEG, GIF or AVIF).
   The game reads the folder's listing (`serve.js` lists a folder; so do most static servers), or `index.json` in it
-  (a list of the file names) where the host doesn't list folders (GitHub Pages: add one). Your collection is kept
-  in this browser, across runs.
+  (a list of the file names) where the host doesn't list folders (GitHub Pages: add one). What you find is yours for
+  the run.
   - **Sticking one on:** the gunsmith's Stickers tab. Pick one of yours, click the gun where it goes (a faint copy
     follows the pointer, then stays where you clicked), size it (1.2 to 7 cm; Shift + scroll), turn it (Ctrl +
     scroll), mirror it, and Stick it on: it's on that gun for good, one of yours used up. Twelve to a gun.
-  - **How it's drawn:** a decal: the picture projected onto the gun's own surfaces in a small box (as deep as half
-    its size), only on what faces out its way (not round a right-angled edge, not through to the far side), each
-    piece a child of the part it's on, so it rides on a slide or a magazine. The same on your viewmodel, in the
+  - **How it's drawn:** a decal laid on the gun's own surfaces as a real sticker is: flat where you put it, and past
+    an edge or round a curve the surface beyond is unfolded into the sticker's plane, so it folds over a corner and
+    carries on down the far side without stretching. Each piece is a child of the part it's on, so it rides on a
+    slide or a magazine. The same on your viewmodel, in the
     gunsmith, on your body as the squad sees it, on the gun on the floor or in the weapon case, and in the replays.
   - **On the gun:** `w.stickers` ({ file, point, normal, turn, size, mirrored } in the gun's model space), kept
     when it's dropped, picked up, stashed or swapped at the weapon case. The squad: a gun's list is sent to the host
@@ -1253,6 +1254,43 @@ says the same), but not whose: the shooter's name isn't shown.
     it onto its front, draw the wrists together behind its back, then tie them. Teammates see the body move with it.
 - **Hitboxes** ride the animated bones: head, chest, abdomen, upper arms, forearms, thighs and shins.
   The zones are head, chest, abdomen, upper arm, forearm, thigh and shin.
+- **Rounds are simulated through everything they meet** (`js/ballistics.js`, `js/materials.js`). A round is stepped a
+  frame at a time as a changing thing (mass, diameter, length, yaw), and everything it hits is made of something.
+  - **Materials** (`G.Materials.MAT`): armour, steel, cast iron, aluminium, concrete, block, brick, sanitaryware,
+    hardwood, softwood, plywood, particle board, plasterboard, cardboard, packed paper, upholstery, foams, stock, plastic,
+    earth, sand, water, glass, laminated glass. Each has a ballistic-limit constant (the speed to get through t mm is
+    K·t^0.7·d^0.75/√m, the same de Marre law as armour, fitted to known results: 9 mm stopped by about 3 mm of mild steel and
+    85 mm of pine, a brick stopping 5.56 and 7.62x39 and passing 7.62x51 slowly), a density and a strength.
+  - **Constructions:** a solid in the world is a box, and a wall's box is 67 cm thick, so each has a construction: the
+    skin on each face, what's between them, and the framing. A partition is plasterboard either side of a void with a stud
+    every 40 cm (hit one and it's 89 mm of pine); apartments have brick outside, warehouses block inside and sheet steel
+    outside, a bunker's walls are concrete all through, cold storage is steel-skinned foam. Every piece of furniture has its
+    own (a fridge is thin steel and foam, a bookshelf mostly paper, a car thin steel with an engine in it). A wall
+    much thicker than a partition is a mass of building and stops anything. See `PROPS` and `WALLS`.
+  - **Through:** each layer takes speed (√(v² - v_limit²)), more at an angle, and what it took is the energy left in it.
+    The round comes out off line, by more the more speed it lost, a hard core turning toward the surface's normal and a
+    soft one away.
+  - **Deformation:** the pressure on its nose is half ρv² plus the material's strength. Past what its core can stand it
+    flows: wider and shorter (volume kept), by how far past and how much material it had to shove aside. Far past, it sheds
+    jacket and nose. A fragmenting round comes apart, a hard core shatters on a harder face, and a hollow point's nose
+    plugs in plasterboard or wood, so it doesn't open afterwards. That round goes on as it now is: a bigger frontal area
+    against the next thing, more drag in the air, and into a body already tumbling (it can't expand a second time).
+  - **Ricochet:** past about 40° off the normal, if its speed into the surface couldn't take it a calibre in, it glances,
+    losing a share of its speed along the surface and most of its speed into it, flattened and tumbling. So a 9 mm skips
+    off concrete at a shallower-than-30° angle where a rifle round digs in, and almost anything skips off steel. It happens
+    on armour and on the curve of the skull too. It goes on from there with what it has left, into whoever's in the way,
+    and that can be you. You hear it go.
+  - **Suspects' rounds** are flown the same way on the host (`trace`): cover they can get through lets the round through
+    slower and off line, which spoils their aim, and it reaches you in the state it's in. (Their aim is still a roll: only the
+    round aimed at you is checked against you, so a stray doesn't hit a bystander.)
+  - **The squad** sees the holes, exits and ricochets of your rounds as you made them (`rfx`). A teammate's wound is worked
+    out on their machine, from the speed and state your round reached them in.
+- **Damage is the energy a round leaves** (`js/ballistics.js` effects): what it deposited in a part, plus what reached the
+  body through armour as blunt trauma, as a share of what a person can take (`PERSON_J`, 1600 J). Nothing else: no
+  multipliers, no curve. Square on an unarmoured torso that's about 11% for a .22, 27% for 9 mm, 30% for a hollow point,
+  93% for 5.56 or 7.62x39, 170% for 7.62x51, and 13% a pellet for 00 buck. A limb counts for only so much (`PART_J`), the rest
+  going into tissue already wrecked. What a track does to an organ on the way (below) is on top of that. Armour wears by
+  the joules it soaks, and a steel target on the range swings by the round's momentum.
 - **Wounds are simulated** (`js/ballistics.js`), not multiplied: the damage and health model from tactical_game
   (its 3D anatomy and wound tracks, `src/preview3d.ts`), refitted to these bodies and made physical.
   - **The body is the rig's own shape:** each part a tapered elliptical cylinder or an ellipsoid in its bone's
@@ -2016,7 +2054,8 @@ solids at any height. Doors and windows are dynamic: their solids change as they
 | `js/profiler.js` | The profiler: frame timings by piece of work, saved from the pause menu |
 | `js/highlights.js` | Recording a level and replaying its highlights on the hangar's TVs, as a sports broadcast; saving it as a .zip and rendering the video from one |
 | `js/exportworker.js` | The highlights video made off the main thread: the game's code in a worker, rendering and encoding there |
-| `js/ballistics.js` | Terminal ballistics: the rounds, armour layers, the body's anatomy (fitted to the rigs) and wound tracks |
+| `js/ballistics.js` | Terminal ballistics: the rounds as they change, penetration, deformation and ricochet in any material, armour layers, the body's anatomy (fitted to the rigs) and wound tracks |
+| `js/materials.js` | What everything's made of: every material's numbers, and each solid's construction |
 | `js/range.js` | The shooting range behind the hangar: lanes, targets, and giving your ammunition back |
 | `js/gear.js` | Carriers, plates, helmets, belts; the grid inventory, ammo items and protection |
 | `js/casings.js` | Ejected cases: client-side physics, rendering, and their impact sounds |

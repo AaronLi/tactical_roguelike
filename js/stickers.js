@@ -3,13 +3,14 @@
 //
 // WHICH: whatever pictures are in assets/stickers/ (its index.json, a list of their file names, if it has one; else
 // the folder's listing, which serve.js and most static servers give). Found in levels (a small sticker box in about
-// one in ten: js/level.js, the host's pick of what's in it: js/server.js), kept in your collection (this browser's,
-// across runs: owned / give / use), each stuck on one gun used up.
+// one in ten: js/level.js, the host's pick of what's in it: js/server.js), kept for the run (G.Me.stk: owned / give /
+// use), each stuck on one gun used up.
 //
 // ON A GUN: w.stickers, a list of { s: file name, p: where on the gun, n: the surface's normal there (the gun's model
-// space: its bore along -Z, up +Y), r: turned about n (rad), k: its longest side (m), f: mirrored }. Drawn as decals:
-// the picture projected onto the gun's own surfaces in a small box round p (clipped to it, only what faces out along
-// n), so it wraps round an edge or a curve as a real sticker would, and moves with the part it's on (a slide, a mag).
+// space: its bore along -Z, up +Y), r: turned about n (rad), k: its longest side (m), f: mirrored }. Drawn as decals
+// laid on the gun as a real sticker is: flat where it was put, and over an edge or round a curve the surface beyond is
+// unfolded into the sticker's plane (place), so it folds over a corner without stretching and carries on down the far
+// side. It moves with the part it's on (a slide, a mag).
 // The same on your viewmodel, the gunsmith's model, your body as others see it, a gun lying on the floor, the replays.
 //
 // THE SQUAD: a gun's list is sent once (to the host, who passes it on and keeps it for anyone joining later: share),
@@ -32,9 +33,9 @@ G.Stickers = (() => {
   const url = (name) => S.base + DIR + encodeURIComponent(name);
 
   // ---------------------------------------------------------------- your collection (name -> how many)
-  const owned = () => { const o = G.U.store.get('stickers', {}); return o && typeof o === 'object' ? o : {}; };
-  function give(name) { if (!ok(name)) return; const o = owned(); o[name] = (o[name] || 0) + 1; G.U.store.set('stickers', o); }
-  function use(name) { const o = owned(); if (!o[name]) return false; if (--o[name] <= 0) delete o[name]; G.U.store.set('stickers', o); return true; }
+  const owned = () => (G.Me.stk || (G.Me.stk = {}));
+  function give(name) { if (!ok(name)) return; const o = owned(); o[name] = (o[name] || 0) + 1; }
+  function use(name) { const o = owned(); if (!o[name]) return false; if (--o[name] <= 0) delete o[name]; return true; }
 
   // ---------------------------------------------------------------- the pictures
   // name -> { bm: its ImageBitmap once loaded, w, h, ready (a promise), bad, tex, mat, ghost (a placement's preview) }
@@ -90,15 +91,13 @@ G.Stickers = (() => {
   }
 
   // ---------------------------------------------------------------- decals
-  // A sticker's box in the gun's space: x across the picture, y up it, z out of the surface (unit box: -0.5..0.5 each
-  // way). Upright as seen from in front of it with the gun's up (+Y) as up (from above or below: its back, +Z), then
-  // turned by r; as deep as half its size (from 6 mm to 2.5 cm), so it reaches round an edge but not through to the far side
+  // A sticker's frame in the gun's space: x across the picture, y up it, z out of the surface, in metres. Upright as seen
+  // from in front of it with the gun's up (+Y) as up (from above or below: its back, +Z), then turned by r.
   function frame(s, aspect) {
     const n = new THREE.Vector3(...s.n).normalize(), ref = Math.abs(n.y) > 0.95 ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(0, 1, 0);
     const x = new THREE.Vector3().crossVectors(ref, n).normalize(), y = new THREE.Vector3().crossVectors(n, x);
     const c = Math.cos(s.r), sn = Math.sin(s.r), xr = x.clone().multiplyScalar(c).addScaledVector(y, sn), yr = y.clone().multiplyScalar(c).addScaledVector(x, -sn);
-    const w = aspect >= 1 ? s.k : s.k * aspect, h = aspect >= 1 ? s.k / aspect : s.k, d = Math.min(0.025, Math.max(0.006, s.k * 0.5));
-    return new THREE.Matrix4().makeBasis(xr.multiplyScalar(s.f ? -w : w), yr.multiplyScalar(h), n.clone().multiplyScalar(d)).setPosition(new THREE.Vector3(...s.p));
+    return { M: new THREE.Matrix4().makeBasis(xr, yr, n).setPosition(new THREE.Vector3(...s.p)), w: (aspect >= 1 ? s.k : s.k * aspect) * (s.f ? -1 : 1), h: aspect >= 1 ? s.k / aspect : s.k, d: Math.min(0.025, Math.max(0.006, s.k * 0.5)) };
   }
   // the meshes under a gun's root a sticker can go on (its own parts: not a sight's glass, a glow, a sticker), each with
   // its place in the root's frame, as they are now
@@ -113,58 +112,87 @@ G.Stickers = (() => {
     });
     return out;
   }
-  // a polygon (points { p in the sticker's box, n the surface's normal in the mesh's frame }) cut down to one face of the box
+  // a polygon (points { p: x, y, z in the sticker's unit box, q: where in its mesh, n: the normal there }) cut down to one face of the box
   function cut(poly, ax, sg) {
     const out = [];
     for (let i = 0; i < poly.length; i++) {
       const a = poly[i], b = poly[(i + 1) % poly.length], da = sg * a.p[ax] - 0.5, db = sg * b.p[ax] - 0.5;
       if (da <= 0) out.push(a);
-      if ((da <= 0) !== (db <= 0)) { const t = da / (da - db); out.push({ p: a.p.clone().lerp(b.p, t), n: a.n.clone().lerp(b.n, t) }); }
+      if ((da <= 0) !== (db <= 0)) { const t = da / (da - db); out.push({ p: a.p.clone().lerp(b.p, t), q: a.q.clone().lerp(b.q, t), n: a.n.clone().lerp(b.n, t) }); }
     }
     return out;
   }
-  const BOX = [new THREE.Vector3(-0.5, -0.5, -0.5), new THREE.Vector3(0.5, 0.5, 0.5)];
-  // one sticker on one mesh: the triangles of it inside its box that face out its way, clipped to the box, as a geometry
-  // in the mesh's frame (or null: it doesn't touch it)
-  function onMesh(sf, F, nOut) {
-    const geo = sf.mesh.geometry, Dm = sf.rel.clone().invert().multiply(F), Di = Dm.clone().invert();
-    if (!geo.boundingBox) geo.computeBoundingBox();
-    const bb = geo.boundingBox.clone().applyMatrix4(Di);
-    if (bb.min.x > 0.5 || bb.max.x < -0.5 || bb.min.y > 0.5 || bb.max.y < -0.5 || bb.min.z > 0.5 || bb.max.z < -0.5) return null;
-    const pos = geo.attributes.position, nor = geo.attributes.normal, idx = geo.index, cnt = idx ? idx.count : pos.count;
-    const nm = new THREE.Matrix3().getNormalMatrix(sf.rel), P = [], N = [], UV = [];
-    const v = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()], e1 = new THREE.Vector3(), e2 = new THREE.Vector3(), fn = new THREE.Vector3(), wn = new THREE.Vector3(), q = new THREE.Vector3();
-    for (let i = 0; i + 2 < cnt; i += 3) {
-      const ids = [0, 1, 2].map((j) => (idx ? idx.getX(i + j) : i + j));
-      for (let j = 0; j < 3; j++) v[j].fromBufferAttribute(pos, ids[j]);
-      fn.crossVectors(e1.subVectors(v[1], v[0]), e2.subVectors(v[2], v[0]));
-      if (fn.lengthSq() < 1e-16) continue;
-      fn.normalize();
-      if (wn.copy(fn).applyMatrix3(nm).normalize().dot(nOut) < 0.25) continue; // (facing away: the far side, a wall at right angles)
-      let poly = v.map((p, j) => ({ p: p.clone().applyMatrix4(Di), n: nor ? new THREE.Vector3().fromBufferAttribute(nor, ids[j]) : fn.clone() }));
-      if (poly.every((a) => a.p.x > 0.5) || poly.every((a) => a.p.x < -0.5) || poly.every((a) => a.p.y > 0.5) || poly.every((a) => a.p.y < -0.5) || poly.every((a) => a.p.z > 0.5) || poly.every((a) => a.p.z < -0.5)) continue;
-      for (const ax of ['x', 'y', 'z']) { poly = cut(poly, ax, 1); if (poly.length < 3) break; poly = cut(poly, ax, -1); if (poly.length < 3) break; }
-      if (poly.length < 3) continue;
-      for (let j = 1; j + 1 < poly.length; j++) for (const a of [poly[0], poly[j], poly[j + 1]]) {
-        q.copy(a.p).applyMatrix4(Dm); P.push(q.x, q.y, q.z);
-        const an = a.n.lengthSq() > 1e-8 ? a.n.clone().normalize() : fn; N.push(an.x, an.y, an.z);
-        UV.push(a.p.x + 0.5, 0.5 - a.p.y);
+  // One sticker on the gun. The triangles near it (in its frame, with their edges joined up by where their corners are);
+  // those lying under it, facing out its way, it sits on as it is; from them it spreads edge by edge, each next triangle
+  // turned about the edge it shares with the last (every turn added to the last), so the surface comes flat into the
+  // sticker's plane however it bends, over a corner, round a tube, down the far side. What ends up outside the picture
+  // stops it there. Each mesh's share of it is a mesh of its own, a child of that one (so it moves with it).
+  function place(sfs, s, ghost) {
+    const pc = pic(s.s);
+    if (!pc.bm) return [];
+    const { M: F, w, h, d } = frame(s, pc.w / pc.h), Fi = F.clone().invert(), W = Math.abs(w), reach = Math.hypot(W, h) / 2 + 0.003;
+    const tris = [], edges = new Map(), ids = new Map();
+    const idOf = (v) => { const k = `${Math.round(v.x * 2e4)},${Math.round(v.y * 2e4)},${Math.round(v.z * 2e4)}`; let i = ids.get(k); if (i == null) ids.set(k, (i = ids.size)); return i; };
+    const e1 = new THREE.Vector3(), e2 = new THREE.Vector3();
+    sfs.forEach((sf, si) => {
+      const geo = sf.mesh.geometry, M = Fi.clone().multiply(sf.rel);
+      if (!geo.boundingBox) geo.computeBoundingBox();
+      const bb = geo.boundingBox.clone().applyMatrix4(M);
+      if (bb.min.x > reach || bb.max.x < -reach || bb.min.y > reach || bb.max.y < -reach || bb.min.z > reach || bb.max.z < -reach) return;
+      const pos = geo.attributes.position, nor = geo.attributes.normal, idx = geo.index, cnt = idx ? idx.count : pos.count;
+      const lo = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
+      for (let i = 0; i + 2 < cnt; i += 3) {
+        const iv = [0, 1, 2].map((j) => (idx ? idx.getX(i + j) : i + j));
+        for (let j = 0; j < 3; j++) lo[j].fromBufferAttribute(pos, iv[j]);
+        const v = lo.map((q) => q.clone().applyMatrix4(M));
+        if (Math.min(v[0].x, v[1].x, v[2].x) > reach || Math.max(v[0].x, v[1].x, v[2].x) < -reach || Math.min(v[0].y, v[1].y, v[2].y) > reach || Math.max(v[0].y, v[1].y, v[2].y) < -reach || Math.min(v[0].z, v[1].z, v[2].z) > reach || Math.max(v[0].z, v[1].z, v[2].z) < -reach) continue;
+        const fn = new THREE.Vector3().crossVectors(e1.subVectors(v[1], v[0]), e2.subVectors(v[2], v[0]));
+        if (fn.lengthSq() < 1e-16) continue;
+        fn.normalize();
+        const lf = new THREE.Vector3().crossVectors(e1.subVectors(lo[1], lo[0]), e2.subVectors(lo[2], lo[0])).normalize();
+        const t = { si, v, q: lo.map((q) => q.clone()), ln: iv.map((k) => (nor ? new THREE.Vector3().fromBufferAttribute(nor, k) : lf.clone())), n: fn, T: null, seed: false };
+        const c = v.map(idOf);
+        for (let j = 0; j < 3; j++) { const a = c[j], b = c[(j + 1) % 3], k = a < b ? `${a}|${b}` : `${b}|${a}`; let l = edges.get(k); if (!l) edges.set(k, (l = [])); l.push([t, v[j], v[(j + 1) % 3]]); }
+        t.c = c; tris.push(t);
+      }
+    });
+    // what it sits on as it is: under it, facing out
+    const queue = [], I = new THREE.Matrix4();
+    for (const t of tris) {
+      if (t.n.z < 0.9) continue;
+      const out = (f, lim) => f(t.v[0]) > lim && f(t.v[1]) > lim && f(t.v[2]) > lim;
+      if (out((q) => q.x, W / 2) || out((q) => -q.x, W / 2) || out((q) => q.y, h / 2) || out((q) => -q.y, h / 2) || out((q) => q.z, d / 2) || out((q) => -q.z, d / 2)) continue;
+      t.T = I; t.seed = true; queue.push(t);
+    }
+    const buckets = new Map(), a = new THREE.Vector3(), tmp = new THREE.Vector3(), cr = new THREE.Vector3(), R = new THREE.Matrix4(), TA = new THREE.Matrix4(), TB = new THREE.Matrix4();
+    for (let head = 0; head < queue.length && head < 4000; head++) {
+      const t = queue[head];
+      let poly = t.v.map((v, j) => { tmp.copy(v).applyMatrix4(t.T); return { p: new THREE.Vector3(tmp.x / w, tmp.y / h, t.seed ? tmp.z / d : 0), q: t.q[j], n: t.ln[j] }; });
+      for (const [ax, sg] of [['x', 1], ['x', -1], ['y', 1], ['y', -1], ['z', 1], ['z', -1]]) { poly = cut(poly, ax, sg); if (poly.length < 3) break; }
+      if (poly.length < 3) continue; // (off the picture: it stops here)
+      let B = buckets.get(t.si);
+      if (!B) buckets.set(t.si, (B = { P: [], N: [], UV: [] }));
+      for (let j = 1; j + 1 < poly.length; j++) for (const q of [poly[0], poly[j], poly[j + 1]]) {
+        B.P.push(q.q.x, q.q.y, q.q.z); const an = q.n.clone().normalize(); B.N.push(an.x, an.y, an.z); B.UV.push(q.p.x + 0.5, 0.5 - q.p.y);
+      }
+      // on to what's over each of its edges, turned about that edge to lie as this one does
+      for (let j = 0; j < 3; j++) {
+        const c0 = t.c[j], c1 = t.c[(j + 1) % 3], key = c0 < c1 ? `${c0}|${c1}` : `${c1}|${c0}`;
+        for (const [o, p0, p1] of edges.get(key)) {
+          if (o === t || o.T || o.n.dot(t.n) < -0.7) continue; // (the far side of a thin sheet: not a fold)
+          a.subVectors(p1, p0).normalize();
+          const ang = Math.atan2(cr.crossVectors(o.n, t.n).dot(a), o.n.dot(t.n));
+          R.makeRotationAxis(a, ang); TA.makeTranslation(p0.x, p0.y, p0.z); TB.makeTranslation(-p0.x, -p0.y, -p0.z);
+          o.T = t.T.clone().multiply(TA).multiply(R).multiply(TB);
+          queue.push(o);
+        }
       }
     }
-    if (!P.length) return null;
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(UV, 2));
-    g.computeBoundingSphere();
-    return g;
-  }
-  // one sticker on the gun: its pieces, each a child of the mesh it's on (so it moves with it)
-  function place(sfs, s, ghost) {
-    const p = pic(s.s);
-    if (!p.bm) return [];
-    const F = frame(s, p.w / p.h), nOut = new THREE.Vector3(...s.n).normalize(), mat = material(s.s, ghost), out = [];
-    for (const sf of sfs) {
-      const g = onMesh(sf, F, nOut);
-      if (!g) continue;
+    const mat = material(s.s, ghost), out = [];
+    for (const [si, B] of buckets) {
+      const sf = sfs[si], g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(B.P, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(B.N, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(B.UV, 2));
+      g.computeBoundingSphere();
       const m = new THREE.Mesh(g, mat);
       m.userData.sticker = ghost ? 'ghost' : 1; m.renderOrder = (sf.mesh.renderOrder || 0) + 1; m.layers.mask = sf.mesh.layers.mask; m.castShadow = false;
       sf.mesh.add(m); out.push(m);

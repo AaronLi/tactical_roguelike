@@ -431,6 +431,7 @@ G.Game = {
         else if (m.phase === 'lobby') this.enterLobby();
         break;
       case 'snap': if (this.phase === 'level') G.Views.applySnap(m); break;
+      case 'rfx': if (this.phase === 'level') { G.Views.roundFx(m.a); if (Array.isArray(m.e) && G.Highlights) G.Highlights.shotEnd('p' + m.id, m.e); } break;
       case 'skin': G.Stickers.learn(m.h, m.l); break; // (a gun's stickers, by their hash: js/stickers.js)
       // a first aid cabinet opened, emptied a bit, or put back into
       // things lying about: put down, picked up, and what you picked up

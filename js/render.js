@@ -531,13 +531,19 @@ G.R = {
       this.pBase[i * 3] = col.r * v; this.pBase[i * 3 + 1] = col.g * v; this.pBase[i * 3 + 2] = col.b * v;
     }
   },
-  impact(p, n, kind) {
-    if (G.Audio && G.Audio.impactAt) G.Audio.impactAt(p, kind); // heard when it's close
+  // what a round throws up, by what it hit (js/materials.js fx): sparks [colour, how many, speed, life, gravity], and the puff of it
+  IMPACT: {
+    metal: { s: [0xffc070, 12, 5, 0.22, 12], d: null }, stone: { s: [0xffc070, 3, 3, 0.15, 12], d: [0x9a958a, 8, 1.5] }, wood: { s: null, d: [0xa8824e, 9, 2.2] }, plaster: { s: null, d: [0xe8e4da, 10, 1.2] },
+    soft: { s: null, d: [0xcfc8b8, 6, 1] }, glass: { s: null, d: [0xcfe6f0, 8, 2.5] }, soil: { s: null, d: [0x6a5238, 10, 2] }, plastic: { s: null, d: [0x77787a, 5, 2] }, water: { s: null, d: [0xa8c8d8, 8, 2.5] },
+  },
+  impact(p, n, kind, fx) {
+    if (G.Audio && G.Audio.impactAt) G.Audio.impactAt(p, kind, fx); // heard when it's close
     if (kind === 'blood') { this.particles(p, 8, 0x8a0a0a, 2.5, 1.2, 9, 0.8, n, true); return; } // (each leaves a drop where it lands)
     if (kind === 'armor') { this.particles(p, 6, 0x9fd8ff, 3, 0.25, 6, 1); return; }
-    this.particles(p, 6, 0xffc070, 4, 0.22, 12, 0.8, n);
-    this.particles(p, 4, 0x777066, 1.2, 0.6, 1, 0.6, n);
-    if (n) {
+    const fxs = this.IMPACT[fx] || this.IMPACT.stone;
+    if (fxs.s) this.particles(p, fxs.s[1], fxs.s[0], fxs.s[2], fxs.s[3], fxs.s[4], 0.8, n);
+    if (fxs.d) this.particles(p, fxs.d[1], fxs.d[0], fxs.d[2], 0.6, 1, 0.6, n);
+    if (n && fx !== 'water') {
       const d = this.decals[this.decalIdx]; this.decalIdx = (this.decalIdx + 1) % this.decals.length;
       if (d.parent !== this.scene) this.scene.add(d); // (a reused hole: off the door it was on)
       d.position.set(p.x + n[0] * 0.01, p.y + n[1] * 0.01, p.z + n[2] * 0.01);
@@ -550,10 +556,10 @@ G.R = {
   },
   // A round's mark where it stopped in something solid (a wall, a door, or a target on the range): paper targets show
   // their holes in their own picture (no mark on top); a steel plate keeps its mark as it swings or falls.
-  impactOn(p, n, solid) {
+  impactOn(p, n, solid, fx) {
     const t = solid && solid.target, on = t && G.Range ? G.Range.markOn(t) : null;
     this.lastDecal = null;
-    this.impact(p, on === 'paper' ? null : n, 'wall');
+    this.impact(p, on === 'paper' ? null : n, 'wall', fx);
     if (on && on !== 'paper' && this.lastDecal) on.attach(this.lastDecal);
   },
   // put marks stuck on something about to be thrown away back in the pool (hidden)

@@ -227,7 +227,10 @@ G.Highlights = (() => {
       const e = m.get(code) || { n: 0, am: {} }; e.n++; if (am) e.am[am] = (e.am[am] || 0) + 1; m.set(code, e);
     }
     for (const c of R.open) if (near(s, c.at)) c.shots.push(s);
+    return s;
   }
+  // a round that went on through things ended up further than the walls said when it was fired: to there
+  function shotEnd(a, to) { for (let i = R.shots.length - 1; i >= 0; i--) if (R.shots[i].a === a) { R.shots[i].to = to; return; } }
   // pellets round one end: a cone of the choke's half-angle (degrees), denser in the middle, as the guns throw them
   function spread(f, to, n, choke) {
     const F0 = new T.Vector3(...f), d = new T.Vector3(...to).sub(F0), len = d.length(); d.divideScalar(len || 1);
@@ -2260,5 +2263,5 @@ G.Highlights = (() => {
     }
   }
 
-  return { tick, shot, door, hitBy, kill, suspectDown, saved, incap, arrest, take, drop, mount, unmount, update, reset, exportPack, renderPack, cancelRender, exportHere, muxHere, toJSON, fromJSON, R, P };
+  return { tick, shot, shotEnd, door, hitBy, kill, suspectDown, saved, incap, arrest, take, drop, mount, unmount, update, reset, exportPack, renderPack, cancelRender, exportHere, muxHere, toJSON, fromJSON, R, P };
 })();

@@ -62,6 +62,7 @@ G.Server = {
         break;
       }
       case 'st': if (p) p.st = m.s; break;
+      case 'rfx': if (p && Array.isArray(m.a)) G.Net.broadcast({ t: 'rfx', a: m.a.slice(0, 32), e: m.e, id: from, w: m.w }, from); break; // (the marks a round left on what it went through or off)
       // a gun's stickers (js/stickers.js): kept and passed on; asked for by someone who's seen its hash and not it
       case 'skin': {
         if (!p || typeof m.h !== 'string' || m.h.length > 24 || this.skins.has(m.h)) break;
@@ -1826,28 +1827,30 @@ G.Server = {
     const distF = 0.9 * G.U.clamp(0.95 - 0.8 * Math.pow(d / def.range, 1.2), 0.12, 0.95);
     const moveF = st.mv > 3 ? 0.72 : st.mv > 0.5 ? 0.88 : 1;
     const chance = (blind ? 0.15 : 1) * (1 - 0.2 * up) * this.injAim(e) * def.acc * distF * moveF * (st.pr ? 0.6 : st.cr ? 0.8 : 1) * this.accMult * (1 - 0.6 * (e.sup || 0)) * (1 - 0.5 * Math.min(1, e.shock || 0)) * (e.collapsed ? 0.4 : 1) * (e.str != null && e.str < this.TWO_HAND ? 0.7 : 1) * (1 - Math.min(0.5, kickNow / 16)) * (e.broken ? (e.fleeT > 0 ? 0.4 : 0.8) : 1) * this.dazzle(e, st);
-    // anything solid between muzzle and target stops the round: a closed door right in front of the player included
-    // a blind round can only find someone still standing where they were, with nothing in the way
-    const thru = (ax, ay, az, bx, by, bz) => { const ddx = bx - ax, ddy = by - ay, ddz = bz - az, dd = Math.hypot(ddx, ddy, ddz) || 1; const h = L.raycast(map, ax, ay, az, ddx / dd, ddy / dd, ddz / dd, dd, { glass: true }); return { clear: h.t >= dd - 0.05, glass: h.glass || [] }; };
-    const path = blind ? thru(from[0], from[1], from[2], hx, realY, hz) : thru(from[0], from[1], from[2], tx, ty, tz);
-    const blocked = blind ? Math.hypot(hx - e.lastSeen.x, hz - e.lastSeen.z) > 1.2 || !path.clear : !path.clear;
-    const intact = path.glass.some(([id]) => map.windows && map.windows[id] && !map.windows[id].broken);
+    // Their round, flown to the target through whatever's between (js/ballistics.js trace): cover it can get through it comes
+    // out of slower, changed and off line (which spoils the aim), and cover it can't, it stays in; a closed door right in front
+    // of the player's no different. A blind round can only find someone still standing where they were.
+    const wdef = G.WEAPONS[def.wpn] || G.WEAPONS.p9, am = G.ballFor(G.calOf(wdef)), B = G.Ballistics, fv = new THREE.Vector3(...from), v0 = G.roundSpeed(wdef, am) || 400, drag = G.dragOf(wdef, am);
+    const fly = (bx, by, bz, far) => { const u = new THREE.Vector3(bx - from[0], by - from[1], bz - from[2]), dd = u.length() || 1; return B.trace(map, fv, u.divideScalar(dd), far || dd, B.projectile(wdef, am), v0, drag); };
+    const path = blind ? fly(hx, realY, hz) : fly(tx, ty, tz);
+    const blocked = blind ? Math.hypot(hx - e.lastSeen.x, hz - e.lastSeen.z) > 1.2 || !path.v : !path.v;
+    const intact = path.glass.some((id) => map.windows && map.windows[id] && !map.windows[id].broken), wob = 1 / (1 + (path.dev / 0.03) ** 2);
     const wounds = [];
-    if (!blocked) for (let i = 0; i < def.pellets; i++) if (Math.random() < chance * (intact ? 0.75 : 1)) wounds.push(this.hitZone(st, def, up));
-    if (!blocked && path.glass.length) this.breakGlass(path.glass.map(([id]) => id), from);
-    let to;
+    if (!blocked) for (let i = 0; i < def.pellets; i++) if (Math.random() < chance * wob * (intact ? 0.75 : 1)) wounds.push(path.crossed ? [...this.hitZone(st, def, up), Math.round(path.v), B.packP(path.p)] : this.hitZone(st, def, up));
+    if (path.glass.length) this.breakGlass(path.glass, from);
+    let to, marks = path.fx;
     if (wounds.length) to = [tx + (Math.random() - 0.5) * 0.3, ty + (Math.random() - 0.5) * 0.3, tz + (Math.random() - 0.5) * 0.3];
     else {
       // miss: aim off to the side, then extend into the world
       const off = 0.6 + Math.random() * 1.2, side = Math.random() < 0.5 ? -1 : 1;
       const mxp = tx + (-dz / d) * off * side, myp = ty + (Math.random() - 0.4) * 1.2, mzp = tz + (dx / d) * off * side;
-      const ddx = mxp - from[0], ddy = myp - from[1], ddz = mzp - from[2], dd = Math.hypot(ddx, ddy, ddz);
-      const h = L.raycast(map, from[0], from[1], from[2], ddx / dd, ddy / dd, ddz / dd, 90, { glass: true });
-      to = [from[0] + (ddx / dd) * h.t, from[1] + (ddy / dd) * h.t, from[2] + (ddz / dd) * h.t];
-      if (h.glass && h.glass.length) this.breakGlass(h.glass.map(([id]) => id), from); // a miss through a window takes it out
+      const h = fly(mxp, myp, mzp, 90);
+      to = h.to ? h.to.toArray() : [mxp, myp, mzp];
+      marks = h.fx;
+      if (h.glass.length) this.breakGlass(h.glass, from); // a miss through a window takes it out
     }
     const r2 = (v) => Math.round(v * 100) / 100;
-    G.Net.broadcast({ t: 'eshot', e: e.id, ty: e.type, w: def.wpn, f: from.map(r2), to: to.map(r2), tg: p.id, d: wounds.length, hz: wounds });
+    G.Net.broadcast({ t: 'eshot', e: e.id, ty: e.type, w: def.wpn, f: from.map(r2), to: to.map(r2), tg: p.id, d: wounds.length, hz: wounds, fx: marks.length ? marks.slice(0, 12) : undefined });
   },
   // Where a round that hits an officer lands: [zone, central]. A leaning officer shows head and shoulder, a
   // crouched one less leg; a marksman taking an aimed shot goes for the head and lands more centrally. A head

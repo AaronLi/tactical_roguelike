@@ -425,11 +425,12 @@ G.Views = {
     // their round flies there (a machine gunner's belt has a tracer every fourth), and does what the host
     // decided when it arrives: hits you, or someone else, or the wall
     const ev0 = this.enemies.get(m.e), tr = wdef.cls === 'LMG' && ev0 && ((ev0.shots = (ev0.shots || 0) + 1) % 4 === 1);
-    const hitMe = m.d > 0 && m.tg === G.Net.myId, hz = m.hz, fromP = f.clone(), toP = to.clone();
+    const hitMe = m.d > 0 && m.tg === G.Net.myId, hz = m.hz, fromP = f.clone(), toP = to.clone(), rfx = m.fx;
     if (G.Highlights) { G.Highlights.shot('e' + m.e, f, to, wdef.code || m.w); if (m.d > 0) G.Highlights.hitBy(m.tg, m.e); }
     this.visRound(f, to, wdef, tr ? 'tracer' : G.ballFor(G.calOf(wdef)), () => {
       if (m.d > 0) { if (hitMe) { if (G.Game.phase === 'level') G.Me.takeHits(hz, wdef, fromP); } else G.R.impact(toP, null, 'blood'); }
       else this.wallHit(fromP, toP);
+      this.roundFx(rfx, !(m.d > 0)); // (what it went through or off on the way)
     });
     G.Casings.fired(wdef, false, f, to);
     if (!G.GunAudio.play(wdef.id, f, 'e' + m.e)) G.Audio.shot(G.CLASS_SND[wdef.cls] || G.CLASS_SND.AR, me.distanceTo(f));
@@ -437,6 +438,18 @@ G.Views = {
     this.pings.push({ x: m.f[0], z: m.f[2], t: 2.5 });
     const ev = this.enemies.get(m.e);
     if (ev) ev.rig.recoil(G.Server.kickOf({ str: ev.str }, wdef)); // (the same kick the host gave it)
+  },
+  // The marks a round left (js/ballistics.js mark: [x, y, z, normal, what it looks like, e(ntry) x (exit) r(icochet)]), on your
+  // screen: skip the first (the arrival drew it). A ricochet's next leg shows as a streak.
+  roundFx(list, skip) {
+    let last = null;
+    (list || []).forEach((f, i) => {
+      const p = new THREE.Vector3(f[0], f[1], f[2]);
+      if (!(skip && i === 0)) G.R.impactOn(p, f.slice(3, 6), null, f[6]);
+      if (last && last[7] === 'r') G.R.tracer(new THREE.Vector3(last[0], last[1], last[2]), p, 0xffd080, 0.05);
+      if (f[7] === 'r' && G.Audio.ricochet) G.Audio.ricochet(p);
+      last = f;
+    });
   },
   // a round that missed: where its line meets a wall (or a door, or furniture), with the surface's normal so it
   // leaves a hole there; sparks only if it ends in the air

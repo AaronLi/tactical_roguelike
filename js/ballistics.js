@@ -14,6 +14,19 @@
 // oblique on a hard face, the round glances off. A round that gets through comes out slower (v_r = √(v² - v_bl²)) and,
 // through a hard plate, deformed (blunter, lighter, tumbling). One that doesn't still hits the body behind the armour
 // with some of its energy (blunt trauma). Armour wears by the energy it soaks up, and a worn layer is thinner.
+// Everything else a round meets is the same sum with its own numbers (js/materials.js): walls, doors, floors, furniture,
+// glass. strike is one layer of anything, crossSolid a solid's whole construction, a layer at a time.
+//
+// The round is a state, and it changes (p: m, d, len, ang; d0, m0 what it left the gun as). What's in front of its nose
+// pushes back with a pressure, half ρ v² (of the speed into the surface) plus the material's strength, and if that's
+// past what the core can stand it flows (deform): it widens and shortens (volume kept), by how far past it is and by how
+// much of the material it actually shoves aside, sheds mass (jacket, nose) when it's far past, a fragmenting round
+// breaks, a hard core shatters on a harder face, a hollow point's nose plugs in plasterboard or wood and it won't open.
+// Each thing it goes through also knocks it off line and starts it yawing (ang), more the more of its speed that took, and
+// long thin rounds most of all: a wider, lighter or yawing round has more drag from there on (flightDrag), meets the next
+// thing with a bigger frontal area, and enters a body already tumbling. Past about 40° off the normal, if the speed
+// into the surface couldn't take it a calibre in, it glances instead (glances, ricochet): it keeps most of its speed
+// along the surface and a little of the speed into it, flattened and tumbling.
 // Calibrated against NIJ ratings: soft IIIA aramid stops 9 mm and .44 Magnum and not 5.56, 7.62x39, 5.7x28 or .500 S&W;
 // level III steel stops M80 7.62x51 and 5.56 ball but not 5.56 or 7.62x39 armour-piercing, .338 or .50 BMG; level IV
 // ceramic stops .30-06 M2 AP and tungsten 5.56.
@@ -35,11 +48,11 @@
 // tips the round over). Along the track: the crushed volume (its permanent cavity, the area it presents times the
 // distance), and the energy it gives up (its temporary cavity: tissue stretched out to a radius set by the energy per
 // centimetre, which tears inelastic organs (brain, liver, spleen, kidneys) and barely bothers lung and muscle). Each
-// organ the track crushes or stretches takes damage; what that does depends on the organ (js/ballistics.js EFFECT): a
+// organ the track crushes or stretches is wounded; what that does depends on the organ (js/ballistics.js EFFECT): a
 // brain, brainstem or cervical spine is the end; a heart, aorta or iliac artery bleeds out in seconds; a lung collapses;
 // the liver, spleen and kidneys bleed heavily; stomach and bowel are a gut wound; the spine lower down paralyses; a long
-// bone breaks; a limb's artery bleeds heavily (a tourniquet stops it). The part's own damage and blood loss come from the
-// energy and the crushed volume. Calibrated against bare ballistic gelatin (10%, the usual published tests): .22 LR
+// bone breaks; a limb's artery bleeds heavily (a tourniquet stops it). The part's own damage and blood loss are the energy
+// the round left in it, as a share of what a person can take (PERSON_J). Calibrated against bare ballistic gelatin (10%, the usual published tests): .22 LR
 // about 33 cm, .32 ACP 45, 9 mm FMJ 65 and hollow point 35, .45 ACP FMJ 65 and hollow point 33, a 00 buck pellet 30, a
 // 12 gauge slug 35, 5.56 about 35, 7.62x39 55, 7.62x51 50.
 G.Ballistics = (() => {
@@ -75,49 +88,164 @@ G.Ballistics = (() => {
     else if (am === 'broadhead') { p.nose = 'broad'; } // (cuts a 30 mm wound; to armour it's a steel point)
     if (p.n > 1 && am !== 'birdshot' && am !== 'flechette') p.nose = 'ball';
     if (p.n > 1) p.n = def.pellets || p.n; // (the gun's pattern: the round as fired is one pellet)
+    p.d0 = p.d; p.m0 = p.m; p.ang = 0; // (as it left the gun; ang: how far it's yawed off its line, rad)
     return p;
   }
   const area = (d) => Math.PI / 4 * d * d;
+  // the area it shows going forward: its nose, turning to its side as it yaws
+  const presented = (p) => { const a = Math.min(Math.PI / 2, p.ang || 0); return area(p.d) * Math.cos(a) + p.d * p.len * 0.85 * Math.sin(a); };
+  // how far it carries now, from how far it carried as it left the gun: the air takes it by area over mass
+  const flightDrag = (p, drag) => drag * (p.m / (p.m0 || p.m)) * (area(p.d0 || p.d) / presented(p));
+  // a round's state to send (a teammate's wound is worked out on their machine), and back on to a fresh one
+  const packP = (p) => [+p.m.toFixed(5), +p.d.toFixed(5), +p.len.toFixed(5), +(p.ang || 0).toFixed(2), p.nose, p.frag || 0, p.deformed ? 1 : 0];
+  function unpackP(p, q) { if (Array.isArray(q)) { p.m = +q[0] || p.m; p.d = +q[1] || p.d; p.len = +q[2] || p.len; p.ang = +q[3] || 0; p.nose = q[4] || p.nose; p.frag = +q[5] || 0; p.deformed = !!q[6]; } return p; }
 
   // ---------------------------------------------------------------- armour
   // K: the de Marre constant (v_bl = K·t^0.7·d^0.75/m^0.5, t and d in mm, m in g); E: how well each core works on it;
   // blunt: the share of a stopped round's energy that reaches the body; wearJ: joules soaked per point of durability.
-  const MAT = {
-    aramid: { name: 'aramid', K: 72, E: { lead: 1, mild: 1.25, hard: 1.45, wc: 1.5 }, blunt: 0.25, wearJ: 900, soft: true },
-    pe: { name: 'UHMWPE', K: 77, E: { lead: 1, mild: 1.35, hard: 1.75, wc: 2 }, blunt: 0.15, wearJ: 2200 },
-    steel: { name: 'steel', K: 163, E: { lead: 0.9, mild: 1.1, hard: 1.5, wc: 1.9 }, blunt: 0.1, wearJ: 4500, hard: true },
-    ceramic: { name: 'ceramic', K: 146, E: { lead: 0.8, mild: 0.9, hard: 1, wc: 1.25 }, blunt: 0.08, wearJ: 1600, hard: true },
-    pc: { name: 'polycarbonate', K: 55, E: { lead: 1, mild: 1.2, hard: 1.4, wc: 1.5 }, blunt: 0.2, wearJ: 900 },
-    abs: { name: 'ABS', K: 25, E: { lead: 1, mild: 1.1, hard: 1.2, wc: 1.3 }, blunt: 0.4, wearJ: 300 },
-  };
-  // One layer: does the round get through, and how fast does it come out? cond (0..1): a worn layer is thinner.
-  // cosT: the cosine of the angle off the layer's normal.
-  function layer(p, v, mat, mm, cond = 1, cosT = 1) {
-    const M = MAT[mat], tEff = mm * (0.3 + 0.7 * G.U.clamp(cond, 0, 1)) / Math.max(0.26, cosT);
-    let dEff = p.d * 1000, core = p.core;
-    if (p.nose === 'hp' || p.deformed) dEff *= M.soft ? 1.3 : 1.15; // (a blunt or flattened nose spreads its load)
+  const MAT = G.Materials.MAT;
+  // the speed it takes to get through mm of this material (a worn layer's thinner; cosT: the cosine off its normal)
+  function vLimit(p, M, mm) {
+    let dEff = Math.sqrt(4 * presented(p) / Math.PI) * 1000, core = p.core;
+    if (p.nose === 'hp') dEff *= M.soft ? 1.3 : 1.15; // (a blunt nose spreads its load)
     if (p.nose === 'broad') core = 'hard', dEff = 6;
-    const vbl = M.K * Math.pow(tEff, 0.7) * Math.pow(dEff, 0.75) / Math.sqrt(p.m * 1000);
-    const vReq = vbl / (M.E[core] || 1), E0 = 0.5 * p.m * v * v;
-    // glancing off a hard face
-    if (M.hard && cosT < 0.34 && Math.random() < 0.7) return { through: false, v: 0, absorbed: E0 * 0.3, glance: true };
+    return M.K * Math.pow(mm, 0.7) * Math.pow(dEff, 0.75) / Math.sqrt(p.m * 1000) / (M.E[core] || 1);
+  }
+  // One layer: does the round get through, and how fast does it come out? cond (0..1): a worn layer is thinner.
+  function layer(p, v, mat, mm, cond = 1, cosT = 1) {
+    const M = MAT[mat], tEff = mm * (0.3 + 0.7 * G.U.clamp(cond, 0, 1)) / Math.max(0.26, cosT), vReq = vLimit(p, M, tEff), E0 = 0.5 * p.m * v * v;
     if (v <= vReq) return { through: false, v: 0, absorbed: E0 };
     const vo = Math.sqrt(v * v - vReq * vReq);
     return { through: true, v: vo, absorbed: E0 - 0.5 * p.m * vo * vo };
   }
-  // A stack of layers, outside in: what's left of the round. A hard layer it gets through leaves a lead or mild-steel
-  // round deformed and tumbling (and a fragmenting one's fragments in the armour).
+  // What the material does to the round. Y: the stress its core flows at (a lead core in a jacket, mild steel, hard steel,
+  // tungsten carbide; bare lead and a hollow point's open nose give sooner); D_MAX: how wide it can end up, as a share of
+  // what it left the gun as. tMm: how much of it the round goes through. The strain it takes is the log of how far past Y
+  // the pressure is, times how much of the material it's had to shove aside against its own mass.
+  const CORE_Y = { lead: 1.5e8, mild: 9e8, hard: 2.4e9, wc: 6e9 }, D_MAX = { lead: 2, mild: 1.35, hard: 1.08, wc: 1.02 };
+  function deform(p, v, vn, M, tMm) {
+    if (p.nose === 'hp' && M.clog) { p.nose = 'fmj'; p.vExp = 0; } // (its nose packed solid: it goes on as a ball round)
+    if (p.nose === 'broad' || !CORE_Y[p.core]) return;
+    const Y = CORE_Y[p.core] * (p.nose === 'ball' || p.soft ? 0.4 : p.nose === 'hp' ? 0.6 : 1), over = (0.5 * M.rho * vn * vn + M.sig) / Y;
+    if (over <= 1) return;
+    const x = 1 - Math.exp(-(M.rho * area(p.d) * tMm * 0.001 / p.m) / 0.15), d0 = p.d0 || p.d;
+    const d1 = Math.min(d0 * D_MAX[p.core], p.d * Math.exp(0.45 * x * Math.log(over)));
+    if (d1 > p.d) { p.len = Math.max(p.len * (p.d / d1) ** 2, d1 * 0.4); p.d = d1; }
+    if (over > 5) p.m *= 1 - Math.min(0.6, 0.05 + 0.12 * Math.log(over / 5)) * x; // (jacket and nose stripped off)
+    if (p.frag && v >= p.frag && over > 2 && x > 0.2) { p.m *= 0.6; p.frag = 0; p.broke = true; } // (it comes apart, as it does in flesh)
+    if ((p.core === 'hard' || p.core === 'wc') && over > 1.3 && x > 0.3) p.m *= 0.7; // (a hard core shatters on a harder face)
+    if (p.d > d0 * 1.06) { p.deformed = true; p.frag = 0; p.yaw = Math.min(p.yaw || 4, 4); }
+  }
+  // does it glance? Well off the normal, with too little speed into the surface to get a calibre in (a little of chance:
+  // no two rounds or surfaces alike)
+  function glances(p, v, mat, mm, cosT) {
+    const M = MAT[mat];
+    return !M.noRic && cosT < 0.77 && v * cosT < vLimit(p, M, Math.min(mm, p.d * 1000)) * (0.8 + 0.4 * Math.random());
+  }
+  // It glances: along the surface it loses mu of its speed, into it it keeps e of it, turned over and flattened on the way.
+  // along, off: its way out, as shares of along the surface and away from it.
+  function ricochet(p, v, mat, cosT) {
+    const M = MAT[mat], E0 = 0.5 * p.m * v * v, vn = v * cosT, vt = v * Math.sqrt(Math.max(0, 1 - cosT * cosT));
+    deform(p, v, vn, M, p.d * 1500);
+    const t = vt * (1 - M.mu * (0.7 + 0.6 * Math.random())), n = vn * M.e * (0.6 + 0.8 * Math.random()), vo = Math.hypot(t, n);
+    p.ang = Math.min(Math.PI / 2, (p.ang || 0) + 0.5 + Math.random() * 0.8);
+    return { through: false, ric: true, v: vo, along: t / vo, off: n / vo, absorbed: Math.max(0, E0 - 0.5 * p.m * vo * vo) };
+  }
+  // One layer of anything, physically: it glances (if it's the first thing met, and first: true), or the round's changed by
+  // it (deform) and gets through or doesn't. Through: dev, how far it's thrown off line at random (rad); bend, how far it
+  // turns toward the surface's normal (a hard core bites in and turns in; a soft one's flattened nose steers it away).
+  function strike(p, v, mat, mm, cond = 1, cosT = 1, first = false) {
+    if (first && glances(p, v, mat, mm, cosT)) return ricochet(p, v, mat, cosT);
+    const M = MAT[mat], E0 = 0.5 * p.m * v * v;
+    const q = layer(p, v, mat, mm, cond, cosT); // (K's fitted to real rounds, flattening as they go: what it does to this one shows on what's next)
+    deform(p, v, v * cosT, M, mm / Math.max(0.26, cosT));
+    if (!q.through) { q.absorbed = E0; return q; }
+    const loss = 1 - q.v / v, thin = p.len / p.d, soft = p.core === 'lead' || p.deformed, sinT = Math.sqrt(Math.max(0, 1 - cosT * cosT));
+    q.absorbed = Math.max(0, E0 - 0.5 * p.m * q.v * q.v);
+    q.dev = (0.004 + 0.3 * loss) * (soft ? 1.4 : 1);
+    q.bend = 0.3 * sinT * loss * (soft ? -0.5 : 1);
+    if (thin > 1.3) p.ang = Math.min(Math.PI / 2, (p.ang || 0) + (0.01 + 0.6 * loss) * Math.min(2, (thin / 3) ** 2) * (0.5 + Math.random()));
+    return q;
+  }
+  // A stack of layers, outside in: what's left of the round (ric: it glanced off the first).
   function stack(p, v, layers, cond, cosT) {
     let absorbed = 0, blunt = 0;
-    for (const [mat, mm] of layers) {
-      const r = layer(p, v, mat, mm, cond, cosT);
-      absorbed += r.absorbed;
-      if (!r.through) { blunt = r.glance ? 0 : r.absorbed * MAT[mat].blunt; return { through: false, v: 0, absorbed, blunt, glance: !!r.glance, stoppedBy: mat }; }
-      v = r.v;
-      if (MAT[mat].hard && (p.core === 'lead' || p.core === 'mild')) { p.deformed = true; p.m *= 0.85; p.frag = 0; p.yaw = Math.min(p.yaw || 4, 4); }
+    for (let i = 0; i < layers.length; i++) {
+      const [mat, mm] = layers[i], q = strike(p, v, mat, mm, cond, cosT, i === 0);
+      absorbed += q.absorbed;
+      if (q.ric) return { through: false, v: 0, absorbed, blunt: 0, glance: true, ric: q, stoppedBy: mat };
+      if (!q.through) { blunt = q.absorbed * MAT[mat].blunt; return { through: false, v: 0, absorbed, blunt, glance: false, stoppedBy: mat }; }
+      v = q.v;
     }
     return { through: true, v, absorbed, blunt: 0 };
   }
+  // ---------------------------------------------------------------- a solid in the world
+  // A round (p, at v) meets solid h.solid at h.t along o + u t (js/world.js raycast), and goes through what it's built of
+  // (js/materials.js of): the skin of the near face, the core or void, a stud if it's there, the far face's skin. Returns
+  // { v (0: stopped in it), ric (it glanced: along, off), t (where the round left it, or stopped), n, nOut (the far
+  // face's normal), dev, bend, absorbed (joules left in it), fx }.
+  const VOID_MAX = 0.9; // (thicker than that, a "void" wall's a mass of building, not a partition)
+  function crossSolid(map, p, v, h, o, u) {
+    const sp = G.World.span(map.world, h.solid, o, u), a = o.clone().addScaledVector(u, h.t), q = o.clone().addScaledVector(u, sp.t), path = Math.max(0, sp.t - h.t);
+    const c = G.Materials.of(map, h.solid, a, q), inside = h.t <= 1e-6, cosT = inside ? 1 : Math.max(0.03, Math.abs(u.x * h.n[0] + u.y * h.n[1] + u.z * h.n[2]));
+    const skinM = c.skin.reduce((n, l) => n + l[1], 0) / 1000 / cosT, seq = c.skin.map(([m, mm]) => [m, mm, cosT]), inner = path - skinM * (c.one ? 1 : 2);
+    if (!c.one) {
+      if (inner > 0 && c.core) seq.push([c.core, inner * 1000 * c.fill, 1]);
+      else if (inner * cosT > VOID_MAX) seq.push(['concrete', (inner * cosT - VOID_MAX) * 1000, 1]);
+      if (c.stud && inner > 0) { const coord = Math.abs(h.n[0]) > 0.5 ? (a.z + q.z) / 2 : (a.x + q.x) / 2, st = c.stud; if ((coord % st.every + st.every) % st.every < st.w) seq.push([st.mat, st.mm, 1]); }
+      for (let i = c.skin.length - 1; i >= 0; i--) seq.push([c.skin[i][0], c.skin[i][1], cosT]);
+    }
+    if (!seq.length) seq.push([c.core || 'concrete', 1, cosT]); // (met right at its far edge)
+    const out = { v: 0, t: h.t, n: h.n, nOut: sp.n, dev: 0, bend: 0, absorbed: 0, fx: MAT[seq[0][0]].fx, fxOut: MAT[seq[seq.length - 1][0]].fx };
+    for (let i = 0; i < seq.length; i++) {
+      const [m, mm, cs] = seq[i], r = i === 0 && !inside && glances(p, v, m, mm, cosT) ? ricochet(p, v, m, cosT) : strike(p, v, m, mm, 1, cs);
+      out.absorbed += r.absorbed;
+      if (r.ric) return Object.assign(out, { ric: true, v: r.v, along: r.along, off: r.off });
+      if (!r.through) return out;
+      v = r.v; out.dev = Math.hypot(out.dev, r.dev); out.bend += r.bend;
+    }
+    out.v = v; out.t = sp.t;
+    return out;
+  }
+  // the way out of it: off the surface (ric), or on through, turned and thrown off line. Returns the new unit direction.
+  function deflect(u, r, n) {
+    const d = u.clone();
+    if (r.ric) {
+      const nv = new T.Vector3(n[0], n[1], n[2]); if (nv.dot(u) > 0) nv.negate();
+      d.addScaledVector(nv, -nv.dot(u)).normalize().multiplyScalar(r.along).addScaledVector(nv, r.off);
+    } else if (n) d.addScaledVector(new T.Vector3(n[0], n[1], n[2]), Math.sign(u.x * n[0] + u.y * n[1] + u.z * n[2] || 1) * r.bend);
+    const a = r.ric ? 0.04 : r.dev || 0;
+    return d.add(new T.Vector3(gauss() * a, gauss() * a, gauss() * a)).normalize();
+  }
+  const gauss = () => Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(Math.PI * 2 * Math.random()) * 0.7;
+  // A round flown straight through the level without a body in the way, for those whose rounds aren't stepped (a suspect's,
+  // on the host: js/server.js): from f along u for dist metres. Returns { v (how fast it got there: 0, it didn't), p (the
+  // round as it got there), dev (how far off line it's been thrown), crossed (how many solids), to (where the first thing
+  // stopped or met it), glass ([pane ids]), fx (marks for everyone: js/views.js roundFx) }.
+  function trace(map, f, u, dist, p, v, drag) {
+    const out = { v: 0, p, dev: 0, crossed: 0, to: null, glass: [], fx: [] };
+    const o = f.clone(); let d = u.clone(), rest = dist, reach = true;
+    for (let leg = 0; leg < 6 && v > 30; leg++) {
+      const h = G.Level.raycast(map, o.x, o.y, o.z, d.x, d.y, d.z, rest);
+      v *= Math.exp(-Math.min(h.t, rest) / flightDrag(p, drag));
+      if (!h.solid || h.t >= rest - 0.03) { if (reach) { out.v = v; out.to = out.to || o.clone().addScaledVector(d, Math.min(h.t, rest)); } return out; }
+      const at = o.clone().addScaledVector(d, h.t), r = crossSolid(map, p, v, h, o, d);
+      if (!out.to) out.to = at.clone();
+      if (h.pane != null && !(h.solid.win && h.solid.win.armor)) out.glass.push(h.pane);
+      if (!h.view) out.fx.push(mark(at, h.n, r.fx, r.ric ? 'r' : 'e'));
+      if (!r.v) return out;
+      out.crossed++;
+      v = r.v; rest -= r.t;
+      if (r.ric) { reach = false; rest = Math.min(rest, 30); d = deflect(d, r, r.n); o.copy(at).addScaledVector(new T.Vector3(...r.n), 0.004); continue; }
+      o.addScaledVector(d, r.t);
+      out.fx.push(mark(o, r.nOut, r.fxOut, 'x'));
+      d = deflect(d, r, r.n); out.dev = Math.hypot(out.dev, Math.acos(G.U.clamp(d.dot(u), -1, 1)));
+      o.addScaledVector(d, 0.004);
+    }
+    return out;
+  }
+  // a mark for everyone to draw: where, the surface's normal, what it looks like, and e(ntry), x (exit) or r(icochet)
+  const mark = (at, n, fx, k) => [+at.x.toFixed(2), +at.y.toFixed(2), +at.z.toFixed(2), n ? n[0] : 0, n ? n[1] : 1, n ? n[2] : 0, fx, k];
 
   // Where armour is on a body: each piece's protection is a list of { at, layers: [[material, mm], ...] }, at one of
   //   'plate' (front and back of the chest, a SAPI-sized 25 x 32 cm plate), 'side' (the flanks under the arms),
@@ -281,14 +409,20 @@ G.Ballistics = (() => {
         t0 = Math.max(t0, q0); t1 = Math.min(t1, q1); if (t0 > t1) { ok = false; break; }
       }
       if (!ok) continue;
-      mats.push({ s, inv, sc, t0: t0 * sc, t1: t1 * sc }); // (world metres along the ray: a uniform scale)
+      mats.push({ s, inv, sc, bone, t0: t0 * sc, t1: t1 * sc }); // (world metres along the ray: a uniform scale)
       tLo = Math.min(tLo, t0 * sc); tHi = Math.max(tHi, t1 * sc);
     }
     if (!mats.length) return null;
-    const p = Object.assign({}, p0), hits = new Map(), res = { hits: [], exitV: v, stopped: false, entryT: null, glance: false };
-    let prev = null, prevQ = null, depth = 0, yawed = false, expanded = false, t = tLo;
+    const p = Object.assign({}, p0), hits = new Map(), res = { hits: [], exitV: v, stopped: false, entryT: null, glance: false, exitT: 0, dev: 0, ric: null };
+    const v0 = v;
+    let prev = null, prevQ = null, depth = 0, yawed = (p.ang || 0) > 0.6, expanded = false, t = tLo; // (yawed: it arrives tumbling, from whatever it's been through)
     const hitOf = (s) => { let h = hits.get(s); if (!h) { h = { part: s.part, side: s.side || null, seg: s.id, E: 0, crush: 0, organs: {}, blunt: 0, armour: [] }; hits.set(s, h); res.hits.push(h); } return h; };
     const frags = [];
+    // it glanced off them, off armour or the curve of the skull: it goes on from here (res.ric: its way out, in the world)
+    const glanced = (m, q, r) => {
+      res.stopped = true; res.glance = true; res.exitV = 0;
+      res.ric = Object.assign({}, r, { n: normal(m.s, q, new T.Vector3()).transformDirection(m.bone.matrixWorld).toArray(), t });
+    };
     const armourAt = (m, q, entering) => {
       // the layers that cover this point, outside in (plates, then the soft armour behind them)
       const out = [];
@@ -307,6 +441,7 @@ G.Ballistics = (() => {
         const r = stack(p, v, pr.layers, a.cond, cosT);
         a.wear = (a.wear || 0) + r.absorbed;
         h.armour.push({ piece: a, through: r.through, glance: r.glance, absorbed: r.absorbed, at: pr.at });
+        if (r.ric) { glanced(m, q, r.ric); h.blunt += r.absorbed * MAT[r.stoppedBy].blunt; return false; } // (off the plate and away)
         if (!r.through) { h.blunt += r.blunt; res.stopped = true; res.glance = r.glance; res.exitV = 0; return false; }
         v = r.v;
         if (p.deformed && p.yaw) yawed = depth >= 0; // (tumbling out of a hard plate)
@@ -334,6 +469,11 @@ G.Ballistics = (() => {
       if (cur && !prev) { // into the body (or back into it) from outside: armour on the way in, then the skin
         if (res.entryT == null) res.entryT = t;
         if (!armourPass(cur, cq, true)) break;
+        if (cur.s.shell) { // (the skull's curve: a round coming in shallow skids round it, under the scalp, and off)
+          _ud.copy(u).transformDirection(cur.inv);
+          const cs = Math.abs(normal(cur.s, cq, _n).dot(_ud));
+          if (glances(p, v, 'bone', cur.s.shell * 1000, cs)) { const rr = ricochet(p, v, 'bone', cs); hitOf(cur.s).E += rr.absorbed; hitOf(cur.s).crush += 0.5; glanced(cur, cq, rr); break; }
+        }
         skin(cur); if (v <= V_STOP) break;
       } else if (!cur && prev) { // out of it: the skin, then armour on the way out (the back plate)
         skin(prev); if (v <= SURF.vSkin) { hitOf(prev.s).E += 0.5 * p.m * v * v; v = 0; break; } // (it stops there: all of it left in them)
@@ -352,11 +492,12 @@ G.Ballistics = (() => {
         const bone = inOrg && ORG[inOrg].bone;
         // how it's flying: nose first, tumbling side-on, or opened up
         depth += ds * 100;
-        if (p.nose === 'hp' && !expanded && v >= (p.vExp || 300) && depth > 0.8) { expanded = true; p.d *= EXPAND; p.yaw = 0; }
-        if (p.soft && !p.flat && depth > 2) { p.flat = true; p.d *= p.soft; }
+        if (p.nose === 'hp' && !expanded && !p.deformed && v >= (p.vExp || 300) && depth > 0.8) { expanded = true; p.d *= EXPAND; p.yaw = 0; }
+        if (p.soft && !p.flat && !p.deformed && depth > 2) { p.flat = true; p.d *= p.soft; }
         if (!yawed && !expanded && p.yaw && depth >= p.yaw) yawed = true;
         if (bone && !yawed && !expanded && p.nose === 'fmj' && p.yaw) yawed = true; // (bone tips it over)
         if (bone && p.core === 'lead' && !p.deformed) { p.deformed = true; p.d *= 1.15; }
+        if (bone) res.dev = Math.hypot(res.dev, 0.03);
         // fragmenting: tumbling above its threshold, the core sheds 40% of itself as six fragments
         if (yawed && p.frag && v >= p.frag && !p.split) {
           p.split = true; const mf = p.m * 0.4 / 6; p.m *= 0.6;
@@ -385,6 +526,12 @@ G.Ballistics = (() => {
     // the fragments: each tears its own short track from where it broke off (the same sums, a small jagged chip)
     for (const f of frags) { const len = fragment(mats, o, u, f, hitOf); if (trace) (trace.frags = trace.frags || []).push({ t: f.t, dir: f.dir, len }); }
     res.exitV = res.stopped ? 0 : v > V_STOP ? v : 0;
+    res.exitT = t;
+    if (res.exitV) { // (out the far side: thrown off line by what it lost in them, and it's left them turning)
+      const loss = 1 - res.exitV / v0;
+      res.dev = Math.hypot(res.dev, 0.01 + 0.15 * loss);
+      if (yawed) p.ang = Math.max(p.ang || 0, 1.2); else if (p.len / p.d > 1.3) p.ang = Math.min(Math.PI / 2, (p.ang || 0) + 0.5 * loss);
+    }
     res.p = p;
     return res;
   }
@@ -459,13 +606,12 @@ G.Ballistics = (() => {
     brachial: ['heavy'], femoral: ['heavy'],
   };
   for (const id of PAIRED) { for (const S of ['L', 'R']) EFFECT[id + S] = EFFECT[id]; delete EFFECT[id]; }
-  const DMG_E = 0.03, DMG_CRUSH = 0.4; // a part's damage: per joule given up in it, per cm³ crushed
-  // What a shot's wounds take of a person (f, the share their direct damage adds up to: all its pellets together): a curve
-  // that grows slower than the damage does, k·f^p, so a pistol round isn't negligible and a rifle round isn't all of
-  // them. Unarmoured torso hits, front on: .22 about a quarter of a person (4-5 hits), 9 mm a third (3), 5.56 and
-  // 7.62x39 about 0.7 (2), 7.62x51 nearly all (1-2), a 00 buck blast at close range all of it, a slug more.
-  const LETHAL = { k: 1.225, p: 0.65 };
-  const lethal = (f) => (f > 0 ? LETHAL.k * Math.pow(f, LETHAL.p) : 0);
+  // What a wound costs: the energy the round left in that part (and what got through their armour as blunt trauma) as a
+  // share of PERSON_J, what a person can take. Square on an unarmoured torso a .22 leaves about 170 J, a 9 mm that goes
+  // through 430, a hollow point 480, 5.56 and 7.62x39 1500, 7.62x51 2700, a 00 buck pellet 210, a slug 2800. There's only so much
+  // of a limb: PART_J, what a part can count for at most, the rest going into tissue already wrecked (what the track
+  // did to the bone and the artery in it is the wound, whatever the energy: effects).
+  const PERSON_J = 1600, DMG_PER_J = 100 / PERSON_J, PART_J = { farm: 300, uarm: 450, shin: 450, thigh: 650, neck: 800, pelvis: 1200, abdomen: 1400 };
   const WRECK = new Set(['heart', 'brainstem', 'spineC']);
   function effects(h) {
     const eff = new Set(), organs = [];
@@ -482,7 +628,7 @@ G.Ballistics = (() => {
       if (id === 'brain' && d < 0.3) { eff.delete('dead'); eff.add('out'); } // (a graze: knocked out, not killed)
     }
     if (h.crush >= 15) eff.add('heavy'); else if (h.crush >= 1.5) eff.add('light');
-    const dmg = h.E * DMG_E + h.crush * DMG_CRUSH + h.blunt * 0.02;
+    const dmg = Math.min(h.E + h.blunt, PART_J[h.seg] || Infinity) * DMG_PER_J;
     return { part: h.part, side: h.side, seg: h.seg, dmg, effects: [...eff], organs, blunt: h.blunt, armour: h.armour };
   }
 
@@ -606,5 +752,5 @@ G.Ballistics = (() => {
   const AT_NAME = { plate: 'chest plate', side: 'sides', torso: 'chest and stomach', groin: 'groin', shoulder: 'shoulders', thigh: 'thighs', helmet: 'head', face: 'face' };
   const layersText = (L) => L.map(([m, mm]) => `${mm} mm ${MAT[m].name}`).join(' + ');
 
-  return { CAL, MAT, ORG, EFFECT, SURF, LETHAL, lethal, energy, loadNotes, mainLayers, AT_NAME, layersText, projectile, layer, stack, through, probe, boneOf, effects, segs, covers, brim, kitArmour, suspectArmour, wearOut, self, aimPoint, rating, THREATS };
+  return { CAL, MAT, ORG, EFFECT, SURF, PERSON_J, energy, flightDrag, packP, unpackP, strike, crossSolid, deflect, trace, mark, loadNotes, mainLayers, AT_NAME, layersText, projectile, layer, stack, through, probe, boneOf, effects, segs, covers, brim, kitArmour, suspectArmour, wearOut, self, aimPoint, rating, THREATS };
 })();

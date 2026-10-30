@@ -268,6 +268,17 @@ G.Audio = {
     this._burst(out, t, 3600, 1.2, 0.2 * a, 0.02, 'highpass');
     this._burst(out, t + 0.02, 5000, 0.5, 0.06 * a, 0.25, 'highpass');
   },
+  // a round going off something, close by: the whine of it tumbling away, falling in pitch
+  ricochet(p) {
+    const e = this._ear(p);
+    if (!this.ctx || !e || e.d > 40) return;
+    const c = this.ctx, t = c.currentTime, a = this._att(e.d) * Math.min(1, 8 / (1 + e.d)), f0 = 2200 + Math.random() * 1800, dur = 0.25 + Math.random() * 0.3;
+    if (!(a >= 0.01)) return;
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = 'triangle'; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f0 * (0.35 + Math.random() * 0.25), t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.14 * a, t + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(this._out(e.pan)); o.start(t); o.stop(t + dur + 0.02);
+  },
   // where you're listening from, and how far right of you a point is (-1 .. 1)
   _ear(p) {
     const cam = G.R && G.R.camera;
@@ -295,12 +306,13 @@ G.Audio = {
     this.crack(miss, pe.pan, size * G.U.clamp((v / G.SOUND_SPEED - 1) * 3, 0.35, 1));
   },
   // a round's impact point: heard if it's close, as whatever it hit
-  impactAt(p, kind) {
+  impactAt(p, kind, fx) {
     const e = this._ear(p);
     if (!e || e.d > 15) return;
     let mat = 'wall';
     if (kind === 'blood') mat = 'body';
     else if (kind === 'armor') mat = 'metal';
+    else if (fx) mat = fx === 'metal' || fx === 'glass' ? 'metal' : fx === 'wood' ? 'wood' : fx === 'soft' || fx === 'soil' || fx === 'water' ? 'soft' : 'wall'; // (what it really hit: js/materials.js)
     else if (G.Game && G.Game.map) {
       const map = G.Game.map, L = G.Level, tx = Math.floor(p.x / L.TS), tz = Math.floor(p.z / L.TS), fm = L.floorMap(map, L.floorAt(map, p.x, p.y, p.z)), tile = L.tile(fm, tx, tz);
       if (p.y - (fm.fy || 0) < 0.06) { const s = G.Casings.surface(map, p.x, p.z, fm.fy || 0); mat = s === 'grass' || s === 'carpet' ? 'soft' : s === 'wood' ? 'wood' : 'wall'; } // (on the floor of whichever floor it's on)

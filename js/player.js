@@ -18,6 +18,7 @@ G.Me = {
   // ------------------------------------------------------------- run state
   newRun() {
     this.credits = 500;
+    this.stk = {}; // (the stickers you've found: yours for the run, js/stickers.js)
     G.Gear.starter(this); // kit, pockets and locker (js/gear.js)
     this.weapons = {}; this.setSidearm('p9'); // just a sidearm: the first primary comes from the shop (G.Game's picker: the P9, TX22 or derringer)
     this.sidearmChosen = false;
@@ -1002,7 +1003,7 @@ G.Me = {
     const r2 = (v) => Math.round(v * 100) / 100;
     // (a shotgun's: every pellet's end, so the squad's highlights show the pattern)
     const tos = shot.tos ? shot.tos.slice(0, 24).map((p) => [r2(p.x), r2(p.y), r2(p.z)]) : undefined;
-    if (G.Highlights) G.Highlights.shot('p' + G.Net.myId, muzzle, firstEnd, def.code, round, tos);
+    if (G.Highlights) { shot.rec = G.Highlights.shot('p' + G.Net.myId, muzzle, firstEnd, def.code, round, tos); if (shot.rec) shot.rec.f0 = muzzle.clone(); }
     G.Net.toHost({ t: 'shot', f: [r2(muzzle.x), r2(muzzle.y), r2(muzzle.z)], to: [r2(firstEnd.x), r2(firstEnd.y), r2(firstEnd.z)], tos, w: def.code, am: round, sil: def.cls === 'BOW' ? 2 : w.sup ? (def.quiet ? 2 : 1) : 0 });
   },
 
@@ -1030,7 +1031,7 @@ G.Me = {
     const tracer = !!(G.AMMO[am] && G.AMMO[am].tracer);
     this.rounds = this.rounds || [];
     if (!shot.to || shot.tos) { const end = this.predictEnd(start, d.clone().multiplyScalar(v0), drag, rail ? 0 : G.GRAVITY); if (!shot.to) shot.to = end; if (shot.tos) shot.tos.push(end); }
-    this.rounds.push({ p: start, v: d.multiplyScalar(v0), def, am, drag, grav: rail ? 0 : G.GRAVITY,
+    this.rounds.push({ p: start, v: d.multiplyScalar(v0), def, am, drag, drag0: drag, grav: rail ? 0 : G.GRAVITY,
       n: 0, dist: 0, t: 0, off: muzzle.clone().sub(start), muzzle: muzzle.clone(), show, tracer, shot, hit: new Set(), proj: G.Ballistics.projectile(def, am), // (proj: the round itself, js/ballistics.js)
       trail: G.Rig.debug ? G.R.trailStart(shot, start, v0) : null }); // (F9: its path drawn as it flies, coloured by its speed, js/render.js trails)
   },
@@ -1061,9 +1062,9 @@ G.Me = {
       shots.add(b.shot);
       if (!G.Game.map || this.stepRound(b, dt)) rs.splice(i, 1);
     }
-    for (const sh of shots) if (sh.ff.size) {
-      for (const [tg, hz] of sh.ff) G.Net.toHost({ t: 'ff', tg, hz, w: sh.w, f: sh.f, am: sh.am });
-      sh.ff.clear();
+    for (const sh of shots) {
+      if (sh.ff.size) { for (const [tg, hz] of sh.ff) G.Net.toHost({ t: 'ff', tg, hz, w: sh.w, f: sh.f, am: sh.am }); sh.ff.clear(); }
+      if (sh.fx && sh.fx.length) G.Net.toHost({ t: 'rfx', a: sh.fx.splice(0, 32), e: sh.end, w: sh.w }); // (the marks it left, for the squad)
     }
   },
   // one round, one frame: true when it's done (stopped in something, spent, out of range)
@@ -1078,25 +1079,125 @@ G.Me = {
     const k = Math.exp(-len / b.drag);
     b.v.multiplyScalar(k); b.v.y -= b.grav * dt;
     b.t += dt;
-    const head = end ? end.p : p1;
+    const head = end ? end.p : b.turned ? b.at : p1, way = b.turned ? b.v.clone().normalize() : dir;
     if (b.trail && !(end && end.body)) G.R.trailAdd(b.trail, head, !!end, end ? end.v : b.v.length()); // (stopped in someone: its track through them ends the trail)
     // the streak you see: from the muzzle side, closing onto the true path over the first 12 m
     if (b.show || b.tracer) {
       const came = b.dist + (end ? end.t : len), near = Math.max(0, 1 - came / 12);
-      G.R.bullet(head.clone().addScaledVector(b.off, near), dir, came, b.def, b.tracer, sp);
+      G.R.bullet(head.clone().addScaledVector(b.off, near), way, came - (b.came0 || 0), b.def, b.tracer, sp);
     }
-    if (end) { if (b.def.cls === 'RAIL') G.R.tracer(b.muzzle, end.p, b.def.tracer || 0x55ddff, 0.06); return true; } // (a railgun leaves its line hanging)
-    b.dist += len; b.p.copy(p1);
+    if (end) { // (where it ended up, if it came here more or less straight: the replays draw it to here, js/highlights.js)
+      if (b.shot.rec && !b.def.explosive && b.def.pellets <= 1 && b.events && b.p.clone().sub(b.shot.rec.f0).normalize().dot(way) > 0.99) { b.shot.rec.to = end.p.toArray().map((q) => Math.round(q * 100) / 100); b.shot.end = b.shot.rec.to; }
+      if (b.def.cls === 'RAIL') G.R.tracer(b.muzzle, end.p, b.def.tracer || 0x55ddff, 0.06); // (a railgun leaves its line hanging)
+      return true;
+    }
+    b.dist += len; b.p.copy(head); b.turned = false;
     return b.t > G.ROUND_LIFE.t || b.dist > G.ROUND_LIFE.dist || b.v.length() < G.ROUND_LIFE.v || b.p.y < ((G.Game.map && G.Game.map.minY) || 0) - 2; // (through the lowest floor: a basement's is below ground)
   },
-  // A round's step from a along dir for len metres: the world (through windows, breaking them) and everyone in its
-  // way. A body it meets is worked out physically (js/ballistics.js through: their armour, then the track through
-  // them, organ by organ), and it comes out the other side as fast as it's left (or not at all), slowed, on into
-  // whoever's behind. Returns where it stopped ({ p, t }), or null if it flies on.
+  // A round's step from a along dir for len metres, a leg at a time: everyone in its way and the first solid (nearest
+  // first). A body is worked out physically (js/ballistics.js through: their armour, then the track through them, organ by
+  // organ), and a solid from what it's built of (crossSolid: js/materials.js); either can stop it, turn it (a ricochet)
+  // or let it through, slower, off line and changed (b.proj, the round as it now is: its drag goes with it), and it goes
+  // on from there with what's left of the step. Returns where it stopped ({ p, t }), or null if it flies on (b.at, if it
+  // was turned: where it's got to, and b.v what it's doing now).
   roundSegment(b, a, dir, len) {
-    const map = G.Game.map, L = G.Level, def = b.def;
-    const wall = L.raycast(map, a.x, a.y, a.z, dir.x, dir.y, dir.z, len, { glass: true });
-    const wallT = Math.min(wall.t, len), hitWall = wall.t < len - 1e-4;
+    const map = G.Game.map, L = G.Level, def = b.def, B = G.Ballistics;
+    if (def.explosive) {
+      const wall = L.raycast(map, a.x, a.y, a.z, dir.x, dir.y, dir.z, len, { glass: true }), hitWall = wall.t < len - 1e-4, wallT = Math.min(wall.t, len), hits = this.roundHits(b, a, dir, wallT), t = hits.length ? hits[0].t : hitWall ? wallT : null;
+      if (t == null) { this.roundGlass(a, dir, wall, len); return null; }
+      const p = a.clone().addScaledVector(dir, Math.max(0, t - 0.15));
+      this.explode(p, def.explosive.r, def.explosive.dmg, false);
+      return { p, t };
+    }
+    const o = a.clone(), v0 = b.v.length();
+    let d = dir.clone(), rest = len, v = v0, done = 0, turned = false;
+    const on = (t) => { o.addScaledVector(d, t); rest -= t; done += t; }; // (along this leg)
+    const turn = (nd, nv) => { d = nd; v = nv; turned = true; b.events = (b.events || 0) + 1; };
+    const stopped = (p, t, body, vs) => ({ p, t, body, v: vs });
+    legs: for (let leg = 0; leg < 12 && rest > 1e-4 && v > G.ROUND_LIFE.v; leg++) {
+      const wall = L.raycast(map, o.x, o.y, o.z, d.x, d.y, d.z, rest), hitWall = !!wall.solid && wall.t < rest - 1e-4, wallT = Math.min(wall.t, rest);
+      const look = hitWall ? wallT : rest + 0.8; // (a body that straddles the end of this step: all of it, now)
+      for (const h of this.roundHits(b, o, d, wallT)) {
+        const tr = b.trail ? [] : null, P = b.proj; // (F9: the track through them, a step at a time, for the trail)
+        let r;
+        if (h.mate || h.self) { // a teammate (or you, off a ricochet): the wound's theirs to take (js/player.js takeHits, on their machine, through their own kit)
+          r = B.through(h.mate ? h.mate.rig : h.rig, o, d, v, P, [], look, tr);
+          if (!r || r.entryT == null) continue;
+          if (tr) this.trailTrack(b, o, d, r, v, tr, h.mate ? h.mate.rig : null);
+          b.hit.add(h.mate || this);
+          const e = [h.zone, h.c < 0.5 ? 1 : 0, h.side || 'R', Math.round(v), B.packP(P), [o.x, o.y, o.z].map((q) => Math.round(q * 100) / 100)]; // (central: through the middle of the part; how fast, in what state, from where)
+          if (h.self) this.takeHits([e], def, o.clone(), true, b.am);
+          else {
+            const list = b.shot.ff.get(h.mate.id) || [];
+            list.push(e); b.shot.ff.set(h.mate.id, list);
+            h.mate.rig.hit(d);
+            G.R.impact(o.clone().addScaledVector(d, r.entryT), null, 'blood');
+          }
+        } else {
+          const ev = h.ev, armour = B.suspectArmour(ev);
+          r = B.through(ev.rig, o, d, v, P, armour, look, tr);
+          if (!r || r.entryT == null) continue; // (inside the hitbox, outside the body: a near miss)
+          b.hit.add(ev);
+          B.wearOut(armour);
+          const hp = o.clone().addScaledVector(d, r.entryT);
+          if (tr) this.trailTrack(b, o, d, r, v, tr, ev.rig);
+          this.hitEnemy(ev, r);
+          ev.engagedT = performance.now(); // (yours to watch: its body's physics wherever it is, js/views.js)
+          ev.rig.hit(d);
+          ev.selfHit = true;
+          ev.lastHitDir = d.clone().setY(0).normalize();
+          if (r.hits.some((x) => x.armour.some((q) => !q.through))) { G.R.impact(hp, null, 'armor'); if (G.Audio.armorHit) G.Audio.armorHit(); }
+          if (r.hits.some((x) => x.E > 1)) {
+            G.R.impact(hp, null, 'blood');
+            // out the far side onto a wall close behind them
+            if (r.exitV) { const back = L.raycast(map, hp.x, hp.y, hp.z, d.x, d.y, d.z, 1.6); if (back.n && back.t < 1.6) G.R.bloodWall(hp.clone().addScaledVector(d, back.t), back.n, 0.25 + 0.25 * (1 - back.t / 1.6)); }
+          }
+        }
+        b.proj = r.p;
+        if (r.ric) { // off their armour (or round their skull) and away
+          on(r.ric.t);
+          turn(B.deflect(d, r.ric, r.ric.n), r.ric.v);
+          o.addScaledVector(d, 0.02);
+          this.roundMark(b, o, r.ric.n, 'metal', 'r', v);
+          continue legs;
+        }
+        if (!r.exitV) return stopped(o.clone().addScaledVector(d, r.entryT), done + r.entryT, true, 0);
+        on(r.exitT);
+        turn(B.deflect(d, { dev: r.dev, bend: 0 }, null), r.exitV);
+        continue legs;
+      }
+      if (!hitWall) { on(rest); break; }
+      // the solid it's met: a target if it's that, and then what it's made of
+      const s = wall.solid, at = o.clone().addScaledVector(d, wall.t), vIn = v, r = B.crossSolid(map, b.proj, v, wall, o, d);
+      if (s.target) G.Range.hit(s, at, d, b.proj.m * vIn);
+      if (wall.pane != null && !(s.win && s.win.armor)) this.roundPane(wall.pane, at, d);
+      if (!wall.view) this.roundMark(b, at, wall.n, r.fx, r.ric ? 'r' : 'e', vIn, s);
+      else if (b.trail) G.R.trailAdd(b.trail, at, true, vIn);
+      if (r.ric) {
+        on(wall.t);
+        o.addScaledVector(new THREE.Vector3(...wall.n), 0.004);
+        turn(B.deflect(d, r, wall.n), r.v);
+        if (G.Audio.ricochet) G.Audio.ricochet(at);
+        continue;
+      }
+      if (!r.v) return stopped(at, done + wall.t, false, vIn); // (v: how fast it struck)
+      const n0 = wall.n;
+      on(r.t);
+      if (!wall.view) this.roundMark(b, o, r.nOut, r.fxOut, 'x', r.v);
+      turn(B.deflect(d, r, n0), r.v);
+      o.addScaledVector(d, 0.004);
+    }
+    if (v <= G.ROUND_LIFE.v) return stopped(o.clone(), done, false, v);
+    if (turned) {
+      b.at = o.clone(); b.v.copy(d).multiplyScalar(v); b.turned = true;
+      b.drag = B.flightDrag(b.proj, b.drag0);
+      if (done > 0) b.came0 = b.dist + done; // (the streak starts over from the last thing it left)
+      b.off.set(0, 0, 0);
+    }
+    return null;
+  },
+  // who's on the line from a along dir, out to t, nearest first
+  roundHits(b, a, dir, wallT) {
     const hits = [];
     for (const ev of G.Views.enemies.values()) {
       if (!ev.alive || b.hit.has(ev) || !ev.rig) continue;
@@ -1118,65 +1219,28 @@ G.Me = {
       const h = G.Rig.raycast(pv.rig, a, dir, wallT);
       if (h) hits.push({ t: h.t, zone: h.zone, c: h.c, side: h.side, mate: pv, behind: h.behind });
     }
-    hits.sort((x, y) => x.t - y.t);
-    let endT = hitWall ? wallT : null;
-
-    if (def.explosive) {
-      const t = hits.length ? hits[0].t : endT;
-      if (t == null) { this.roundGlass(b, a, dir, wall, len); return null; }
-      const p = a.clone().addScaledVector(dir, Math.max(0, t - 0.15));
-      this.explode(p, def.explosive.r, def.explosive.dmg, false);
-      return { p, t };
-    }
-
-    let v = b.v.length(), inBody = false;
-    const look = hitWall ? wallT : len + 0.8; // (a body that straddles the end of this step: all of it, now)
-    for (const h of hits) {
-      const B = G.Ballistics, P = b.proj || (b.proj = B.projectile(def, b.am));
-      const tr = b.trail ? [] : null; // (F9: the track through them, a step at a time, for the trail)
-      if (h.mate) { // a teammate: the wound's theirs to take (js/player.js takeHits, on their machine, through their own kit)
-        const r = B.through(h.mate.rig, a, dir, v, P, [], look, tr);
-        if (!r || r.entryT == null) continue;
-        if (tr) this.trailTrack(b, a, dir, r, v, tr, h.mate.rig);
-        b.hit.add(h.mate);
-        const list = b.shot.ff.get(h.mate.id) || [];
-        list.push([h.zone, h.c < 0.5 ? 1 : 0, h.side || 'R']); // (central: through the middle of the part)
-        b.shot.ff.set(h.mate.id, list);
-        h.mate.rig.hit(dir);
-        G.R.impact(a.clone().addScaledVector(dir, r.entryT), null, 'blood');
-        if (!r.exitV) { endT = r.entryT; inBody = true; break; }
-        v = r.exitV; continue;
+    // and once it's been turned, you: a round can come back
+    if (b.events && !G.Game.hub && !b.hit.has(this) && !this.down && !this.dead) {
+      const cx = this.pos.x - a.x, cy = this.pos.y + 1 - a.y, cz = this.pos.z - a.z, along = cx * dir.x + cy * dir.y + cz * dir.z;
+      if (along > -1 && along < wallT + 1 && Math.hypot(cx - dir.x * along, cy - dir.y * along, cz - dir.z * along) < 1.3) {
+        const rig = G.Ballistics.self(), h = G.Rig.raycast(rig, a, dir, wallT);
+        if (h) hits.push({ t: h.t, zone: h.zone, c: h.c, side: h.side, self: true, rig });
       }
-      const ev = h.ev, armour = B.suspectArmour(ev), r = B.through(ev.rig, a, dir, v, P, armour, look, tr);
-      if (!r || r.entryT == null) continue; // (inside the hitbox, outside the body: a near miss)
-      b.hit.add(ev);
-      B.wearOut(armour);
-      const hp = a.clone().addScaledVector(dir, r.entryT);
-      if (tr) this.trailTrack(b, a, dir, r, v, tr, ev.rig);
-      this.hitEnemy(ev, r);
-      ev.engagedT = performance.now(); // (yours to watch: its body's physics wherever it is, js/views.js)
-      ev.rig.hit(dir);
-      ev.selfHit = true;
-      ev.lastHitDir = dir.clone().setY(0).normalize();
-      const pierced = r.hits.some((x) => x.E > 1);
-      if (r.hits.some((x) => x.armour.some((q) => !q.through))) { G.R.impact(hp, null, 'armor'); if (G.Audio.armorHit) G.Audio.armorHit(); }
-      if (pierced) {
-        G.R.impact(hp, null, 'blood');
-        // out the far side onto a wall close behind them
-        if (r.exitV) { const back = L.raycast(map, hp.x, hp.y, hp.z, dir.x, dir.y, dir.z, 1.6); if (back.n && back.t < 1.6) G.R.bloodWall(hp.clone().addScaledVector(dir, back.t), back.n, 0.25 + 0.25 * (1 - back.t / 1.6)); }
-      }
-      if (!r.exitV) { endT = r.entryT; inBody = true; break; }
-      v = r.exitV; // (on through them, slower, and a little off line)
     }
-    if (endT == null && v < b.v.length() - 1e-3) b.v.setLength(v).add(new THREE.Vector3((Math.random() - 0.5) * v * 0.04, (Math.random() - 0.5) * v * 0.04, (Math.random() - 0.5) * v * 0.04));
-    this.roundGlass(b, a, dir, wall, endT == null ? len : endT);
-    if (endT == null) return null;
-    const p = a.clone().addScaledVector(dir, endT);
-    if (hitWall && endT === wallT && !wall.view) {
-      if (wall.solid && wall.solid.target) G.Range.hit(wall.solid, p, dir); // (a target on the range, or the course)
-      G.R.impactOn(p, wall.n, wall.solid); // (not on the view behind an outside window)
-    }
-    return { p, t: endT, body: inBody, v: inBody ? 0 : v * Math.exp(-endT / b.drag) }; // (v: how fast it struck)
+    return hits.sort((x, y) => x.t - y.t);
+  },
+  // where a round struck or left something: its mark here (s: a target's own, its picture), on its trail, and for the squad
+  roundMark(b, p, n, fx, kind, v, s) {
+    G.R.impactOn(p, n, s, fx);
+    if (b.trail) G.R.trailAdd(b.trail, p, true, v);
+    (b.shot.fx = b.shot.fx || []).push(G.Ballistics.mark(p, n, fx, kind));
+  },
+  // a pane a round went through breaks (here at once, and for everyone through the host)
+  roundPane(id, at, dir) {
+    const win = G.Game.map.windows[id];
+    if (!win || win.broken) return;
+    G.Views.breakGlass(id, at, dir);
+    G.Net.toHost({ t: 'glass', ids: [id] });
   },
   // F9: a round's track through someone on its trail: in at the speed it arrived (marked), each step inside at its speed
   // as it slowed (js/ballistics.js through, traced), and where it stopped, if it did (marked)
@@ -1189,13 +1253,9 @@ G.Me = {
     if (!r.exitV && tr.length) { G.R.trailAdd(b.trail, at(tr[tr.length - 1].t), true, 0); pts.push({ p: at(tr[tr.length - 1].t), v: 0, bone: tr[tr.length - 1].bone, mark: true }); }
     if (rig && pts.length > 1) G.R.woundTrack(rig, pts);
   },
-  // the windows a round went through on the way break (here at once, and for everyone through the host)
-  roundGlass(b, a, dir, wall, upTo) {
-    const map = G.Game.map;
-    const panes = (wall.glass || []).filter(([id, gt]) => gt < upTo && map.windows[id] && !map.windows[id].broken);
-    if (!panes.length) return;
-    for (const [id, gt] of panes) G.Views.breakGlass(id, a.clone().addScaledVector(dir, gt), dir);
-    G.Net.toHost({ t: 'glass', ids: panes.map(([id]) => id) });
+  // the windows a blast round went through on the way break
+  roundGlass(a, dir, wall, upTo) {
+    for (const [id, gt] of wall.glass || []) if (gt < upTo) this.roundPane(id, a.clone().addScaledVector(dir, gt), dir);
   },
   // A round's wounds on a suspect, from its track through them (js/ballistics.js): each part's damage (a share of a
   // standard person's life) and what it did there (bleeding, a broken bone, a collapsed lung, the organs it went
@@ -1226,7 +1286,6 @@ G.Me = {
   flushHits() {
     if (!this.hitQ || !this.hitQ.size) return;
     for (const [e, q] of this.hitQ) {
-      q.f = G.Ballistics.lethal(q.f); // (this frame's rounds into them, a shotgun's pellets together: js/ballistics.js lethal)
       G.Net.toHost({ t: 'hit', e, d: Math.round(q.d), f: Math.round(q.f * 1000) / 1000, k: q.k ? 1 : 0, h: q.h, ap: q.ap ? 1 : undefined, w: q.w ? q.w.slice(0, 12) : undefined });
       this.stats.dmg += q.d + q.f * 100 + (q.k ? 100 : 0);
     }
@@ -1736,13 +1795,15 @@ G.Me = {
     if (hz && hz.length && G.R.particles) G.R.particles(new THREE.Vector3(this.pos.x, 1.2, this.pos.z), 4 + 2 * hz.length, 0x8a0a0a, 1.5, 1.2, 9, 0.6, null, true); // some of it lands at your feet
     if (this.down || this.dead || G.Game.phase !== 'level' || !hz || !hz.length || !from) return;
     const B = G.Ballistics, load = G.ammoOk(G.calOf(wdef), am), rig = B.self(), armour = B.kitArmour(this);
-    const dist = from.distanceTo(this.pos), v0 = G.roundSpeed(wdef, load, dist) || 300;
     let f = 0, killed = false, rang = false, fate = null, stopped = 0;
     const ws = [];
-    for (const [zone, central, side] of hz) {
-      const to = B.aimPoint(rig, zone, !!central, side, from);
+    // (vAt, ps, org: how fast the round got here, the state it was in and where it last turned, if it's been through or off
+    // anything on the way: js/ballistics.js packP)
+    for (const [zone, central, side, vAt, ps, org] of hz) {
+      const src = Array.isArray(org) ? new THREE.Vector3(...org) : from, dist = src.distanceTo(this.pos), v0 = +vAt || G.roundSpeed(wdef, load, dist) || 300;
+      const to = B.aimPoint(rig, zone, !!central, side, src);
       if (!to) continue;
-      const dir = to.clone().sub(from).normalize(), r = B.through(rig, from, dir, v0, B.projectile(wdef, load), armour, dist + 2);
+      const dir = to.clone().sub(src).normalize(), r = B.through(rig, src, dir, v0, B.unpackP(B.projectile(wdef, load), ps), armour, dist + 2);
       if (!r || r.entryT == null) continue; // (it went past)
       if (r.stopped && !r.glance) stopped++;
       for (const h of r.hits) {
@@ -1752,10 +1813,7 @@ G.Me = {
         ws.push(w); f += w.dmg;
       }
     }
-    // the same curve as yours on them (js/ballistics.js lethal), on this burst's wounds together, shared out by part
-    const sc = f > 0 ? B.lethal(f / 100) * 100 / f : 1;
-    f *= sc;
-    for (const w of ws) fate = this.worse(fate, G.Med.wound(this.body, w.part, w.dmg * sc, w.effects, w.organs));
+    for (const w of ws) fate = this.worse(fate, G.Med.wound(this.body, w.part, w.dmg, w.effects, w.organs));
     B.wearOut(armour);
     if (rang) G.Audio.armorHit();
     if (killed) { this.killed(from, friendly ? 'Friendly fire' : killed); return; }

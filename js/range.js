@@ -254,7 +254,8 @@ G.Range = (() => {
   }
 
   // ---------------------------------------------------------------- a round meets a target (js/player.js roundSegment)
-  function hit(solid, p, dir) {
+  // (mv: the round's momentum, kg m/s: what swings a steel plate)
+  function hit(solid, p, dir, mv = 4) {
     const t = solid && solid.target;
     if (!t || !S.root) return;
     if (t.kind === 'course') return G.Course.hit(t, p, dir); // (the IPSC course: js/course.js)
@@ -267,7 +268,7 @@ G.Range = (() => {
     }
     t.hits++; t.lane.hits++; t.lane.last = `${t.kind} ${t.d} m`;
     if (t.kind === 'steel') {
-      t.vel -= 5.5 / (0.4 + t.size); t.flash = 0.25;
+      t.vel -= 1.4 * mv / (0.4 + t.size); t.flash = 0.25;
       // the ring arrives with the speed of sound
       const cam = G.R.camera, dist = cam ? Math.hypot(cam.position.x - p.x, cam.position.z - p.z) : t.d;
       setTimeout(() => { if (S.root && G.Audio.impact) G.Audio.impact('metal', Math.min(14, dist * 0.35), 0); }, Math.min(900, dist / 343 * 1000));
