@@ -821,6 +821,9 @@ G.GunModels = (() => {
   // the QBZ-95's trace (rifle(), rcv 'qbz95'): a pixel of its reference photo ([x, y]: x forward from the butt at 88, y
   // down from the bore at 262, the photo drawn 1500 px wide) to gun space ([forward, up], metres)
   const qbzTrace = ([x, y]) => [(x - 88) * 0.000574, (262 - y) * 0.000574];
+  // the F2's trace (rifle(), rcv 'f2'): a pixel of its reference photo ([x, y]: x forward from the butt at 104, y down
+  // from the bore at 372, the photo drawn 2450 px wide) to gun space ([forward, up], metres)
+  const f2Trace = ([x, y]) => [(x - 104) * 0.000339, (372 - y) * 0.000339];
   // the SCAR's trace (rifle(), rcv 'scar', and its stock): a pixel of its reference photo ([x, y]: x forward from the back
   // of the upper at 400, y down from the bore at 245, the photo drawn 1500 px wide) to gun space ([forward, up], metres)
   const scarTrace = ([x, y]) => [(x - 400) * 0.00059, (245 - y) * 0.00059];
@@ -931,6 +934,49 @@ G.GunModels = (() => {
       // the front sight's base (the post on it, below: the sights)
       k.prof(pts([[1098, 198], [1156, 206], [1150, 166], [1104, 166]]), 0.028, sh, 0, null, 0.003);
       top = V([0, 204])[1];
+    } else if (rcv === 'f2') {
+      // The FAMAS F1 (this is the F2), traced from a side photo of the right side (Wikimedia Commons, "FAMAS Assaultrifle
+      // FRA noBG.png", CC BY-SA 4.0) at 0.339 mm a pixel: 757 mm overall, the F1's figure, the barrel nearly all inside.
+      // A bullpup in a composite shell: the butt and cheek step, the ejection port, the magazine well behind the hand, and
+      // the belly arching up to the grip. Over the receiver the carrying handle, a hollow box (two walls and a roof, the
+      // sights looking down the tunnel between them) with the cocking lever in its window; the handguard's cooling bumps
+      // underneath, the grenade sight lying folded on the receiver, the spigot's ridges and the flash hider out front.
+      // The trigger guard is a thin loop (the G2's is the big one).
+      const V = f2Trace, pts = (a) => a.map(V), B = M.black(), D = M.rubber(), sh = fm;
+      // the shell from the butt to the front of the magazine well, wider than the receiver
+      k.prof(pts([[105, 278], [115, 252], [136, 248], [390, 245], [461, 300], [536, 304], [553, 304], [561, 287], [577, 273], [915, 269], [945, 269], [945, 640], [748, 647], [746, 628], [738, 615], [720, 607],
+        [685, 617], [673, 553], [614, 555], [519, 586], [515, 600], [506, 609], [480, 617], [470, 632], [453, 639], [440, 638], [421, 613], [278, 648], [270, 664], [161, 665], [146, 654], [141, 627], [133, 617],
+        [141, 593], [124, 573], [130, 552], [118, 539], [124, 519], [112, 500], [116, 480], [105, 468], [105, 460], [111, 454], [104, 407]]), 0.064, sh, 0, null, 0.007);
+      // the receiver and handguard: the belly arching up behind the grip, the bumps along the underside, the barrel's collar at the front
+      k.prof(pts([[931, 269], [1970, 271], [1969, 288], [1983, 333], [1990, 346], [1995, 418], [1981, 419], [1970, 435], [1911, 483], [1894, 490], [1846, 484], [1821, 493], [1784, 494], [1770, 485], [1749, 485],
+        [1732, 495], [1699, 496], [1686, 483], [1665, 483], [1646, 496], [1614, 500], [1606, 498], [1597, 486], [1587, 486], [1544, 501], [1516, 503], [1505, 498], [1500, 503], [1490, 503], [1490, 484], [1157, 485],
+        [1127, 476], [1094, 464], [1055, 467], [1027, 476], [987, 493], [964, 513], [944, 550], [936, 613], [931, 613]]), 0.052, sh, 0, null, 0.006);
+      // the grip (in the grip panels' colour, if they're a colour), raked back, the finger grooves down its front
+      k.prof(pts([[1157, 470], [1149, 550], [1114, 596], [1093, 649], [1086, 702], [1093, 755], [1107, 782], [1132, 799], [1165, 809], [1212, 811], [1234, 802], [1240, 793], [1239, 747], [1263, 713], [1262, 671],
+        [1284, 643], [1280, 606], [1305, 571], [1310, 540], [1310, 480]]), 0.034, o.gm || sh, 0, null, 0.006);
+      // the carrying handle: two walls and a roof, so the sight line runs down the tunnel between them; the window shows the lever
+      const win = pts([[1080, 222], [1098, 211], [1366, 208], [1496, 206], [1751, 203], [1784, 202], [1805, 209], [1829, 231], [1838, 254], [1838, 274], [1166, 272], [1080, 272]]);
+      for (const x of [-0.0165, 0.0165]) k.prof(pts([[937, 290], [937, 143], [947, 129], [986, 110], [1333, 111], [1900, 129], [1925, 141], [1947, 172], [1970, 271], [1970, 290]]), 0.006, sh, x, [win], 0.0008);
+      k.prof(pts([[937, 143], [947, 129], [986, 110], [1333, 111], [1900, 129], [1925, 141], [1947, 172], [1953, 200], [937, 200]]), 0.04, sh, 0, null, 0.005);
+      // the grenade sight folded along the receiver in the window, its pivot, the ear at its front
+      k.box(0.008, V([0, 258])[1] - V([0, 274])[1], V([1838, 0])[0] - V([1618, 0])[0], B, V([1618, 0])[0], (V([0, 258])[1] + V([0, 274])[1]) / 2);
+      k.box(0.008, V([0, 236])[1] - V([0, 252])[1], V([1661, 0])[0] - V([1633, 0])[0], B, V([1633, 0])[0], (V([0, 236])[1] + V([0, 252])[1]) / 2);
+      { const [f, y] = V([1862, 266]); k.cylX(0.0065, 0.054, M.steel(), f, y); }
+      // the trigger guard (a thin loop), the trigger, the selector's bar in front of it
+      k.prof(pts([[1305, 470], [1494, 470], [1494, 538], [1489, 563], [1477, 581], [1457, 590], [1355, 588], [1321, 580], [1305, 571]]), 0.004, B, 0,
+        [pts([[1310, 484], [1470, 486], [1473, 526], [1473, 557], [1468, 570], [1455, 576], [1369, 568], [1335, 567], [1319, 559], [1313, 540], [1314, 506], [1306, 496]])], 0.0005);
+      k.prof(pts([[1338, 482], [1350, 483], [1352, 520], [1369, 560], [1376, 572], [1360, 568], [1344, 526], [1338, 490]]), 0.007, B, 0, null, 0.0008);
+      k.box(0.014, 0.0183, 0.0139, B, V([1376, 0])[0], V([0, 511])[1]);
+      // the butt pad, the sling loop on its side, the ejection port (right side) with the bolt in it, the pins
+      k.prof(pts([[136, 248], [115, 252], [105, 278], [104, 407], [111, 454], [105, 460], [105, 468], [116, 480], [112, 500], [124, 519], [118, 539], [130, 552], [124, 573], [141, 593], [133, 617], [141, 627], [146, 654],
+        [161, 665], [190, 662], [180, 250]]), 0.0662, D, 0, null, 0.0005);
+      k.prof(pts([[190, 388], [214, 388], [218, 486], [194, 486]]), 0.003, M.steel(), 0.0325, [pts([[197, 396], [209, 396], [212, 478], [199, 478]])], 0.0004);
+      k.box(0.002, V([0, 327])[1] - V([0, 376])[1], V([919, 0])[0] - V([601, 0])[0], D, V([601, 0])[0], V([0, 351])[1], 0.0321);
+      k.box(0.003, 0.009, V([910, 0])[0] - V([612, 0])[0], M.steel(), V([612, 0])[0], V([0, 346])[1], 0.0322);
+      { const [f, y] = V([918, 438]); k.cylX(0.0072, 0.067, B, f, y); }
+      { const [f, y] = V([1038, 292]); k.cylX(0.005, 0.054, M.steel(), f, y); }
+      if (o.siderails) for (const x of [-0.029, 0.029]) sideRail(k, L - 0.065, 0.055, -0.006, x); // (short rails on the handguard's flanks, the light and laser's)
+      top = V([0, 270])[1];
     } else if (rcv === 'qbz192') {
       // The QBZ-192 (the QBZ-191 carbine), from photos (Wikimedia Commons, "QBZ-192 extended stock.jpg") and its 10.5"
       // barrel: a conventional layout. A tall flat-sided upper with a rail its whole length, carried on over the
@@ -1053,7 +1099,7 @@ G.GunModels = (() => {
       if (tr) { tracedParts(k, tr, VT, 'base', mats); top = VT([0, tr.topY])[1]; }
       else { k.prof([[0, -0.04], [0, 0.012], [L, 0.012], [L, -0.04]], 0.044, o.rm || M.steel()); top = 0.012; }
     }
-    if (!tr && rcv !== 'vector' && rcv !== 'aug' && rcv !== 'qbz95' && rcv !== 'scar') triggerGuard(k, gf, rm); // (the SCAR's is its lower's) // (the QBZ-95's is its shell) // (the Vector's opening is in its lower; the AUG's guard is its shell)
+    if (!tr && rcv !== 'vector' && rcv !== 'aug' && rcv !== 'qbz95' && rcv !== 'scar' && rcv !== 'f2') triggerGuard(k, gf, rm); // (the F2's is a loop of its own) // (the SCAR's is its lower's) // (the QBZ-95's is its shell) // (the Vector's opening is in its lower; the AUG's guard is its shell)
     if (o.extra === 'ksgTubes') for (const x of [-0.013, 0.013]) k.cyl(0.011, 0.3, M.black(), 0.1, -0.03, x);
     // a carry handle: low enough to keep clear of the line of sight (the irons sit 34 mm over the top), or,
     // like the FAL's, folded down along the left side of the receiver
@@ -1108,7 +1154,7 @@ G.GunModels = (() => {
 
     k.tag('grip');
     if (tr) tracedParts(k, tr, VT, 'grip', mats);
-    else if (o.gripT !== 'none' && rcv !== 'qbz95' && !((rcv === 'vector' || rcv === 'aug') && (o.gripT || 'ar') === 'ar')) grip(k, gf, o.gm || fm, o.gripT || (rcv === 'ak' ? 'wood' : 'ar')); // (the Vector's own is part of its lower)
+    else if (o.gripT !== 'none' && rcv !== 'qbz95' && !((rcv === 'vector' || rcv === 'aug' || rcv === 'f2') && (o.gripT || 'ar') === 'ar')) grip(k, gf, o.gm || fm, o.gripT || (rcv === 'ak' ? 'wood' : 'ar')); // (the Vector's own is part of its lower)
     k.tag('stock');
     if (rcv === 'vector' && o.stock) { const sp = k.part(0, vecTrace([0, 110])[1]); k.into(sp); stock(k, o.stock, o.sm || fm, false); k.into(null); } // (its tube level with the top of the receiver: the bore's below the shoulder)
     else if (!bull && o.stock) stock(k, o.stock, o.sm || fm, o.gripT === 'none');
@@ -1139,6 +1185,10 @@ G.GunModels = (() => {
       const bIn = o.bIn || 0; // (how much of it's inside the receiver: a Vector's is mostly)
       if (o.barrels) for (const x of o.barrels) k.cyl(br, bl, b.m || M.blued(), L, by, x);
       else k.cyl(br, bl, b.m || M.blued(), L - bIn, by, 0, br * (b.taper || 1), 14);
+      if (rcv === 'f2') { // the collar and the grenade spigot's ridges (as much of them as the barrel has)
+        k.cyl(0.0105, Math.min(0.022, bl), M.black(), L + 0.003, by, 0, br);
+        for (let i = 0; i < 10 && 0.022 + i * 0.0049 < bl - 0.006; i++) k.ringZ(br + 0.0004, 0.0014, M.black(), L + 0.022 + i * 0.0049, by);
+      }
       front = L - bIn + bl;
     }
     let hgLen = 0;
@@ -1242,6 +1292,12 @@ G.GunModels = (() => {
         const [ra] = V([598, 0]), [rb] = V([862, 0]), hy = V([0, 97])[1];
         sight = sightOf(k, o, S.rail(k, ra, rb - ra, hy, rm), L, bl, br, front, ofs);
       }
+    } else if (rcv === 'f2') {
+      // its own sights stay whatever's fitted: the aperture in the handle's rear leg, the post in its front, the line between
+      // them down the tunnel; anything else goes on a rail along the top of the handle, as high over the bore as the real handle
+      const V = f2Trace, own = S.irons(k, 0.3, 0.6, V([0, 233])[1], top, top, 'ar');
+      if (!o.optic || ['irons', 'notch'].includes(o.optic)) sight = Object.assign(own, { relief: 0.14 }); // (the eye well back from the handle's rear leg)
+      else { const [ra] = V([1000, 0]), [rb] = V([1760, 0]); sight = sightOf(k, o, S.rail(k, ra, rb - ra, V([0, 114])[1], rm), L, bl, br, front, ofs); }
     } else if (rcv === 'g36' && ['irons', 'notch', undefined].includes(o.optic)) sight = S.irons(k, g36Trace([362, 0])[0], g36Trace([632, 0])[0], top + 0.016, top, top, 'ar'); // (low ones at the ends of the handle's rail)
     else if (o.ironsAt && ['irons', 'notch', undefined].includes(o.optic)) sight = S.irons(k, o.ironsAt[0], o.ironsAt[1], top + 0.034, top, o.ironsAt[2] != null ? o.ironsAt[2] : top, 'ar'); // (the upper's own flip-ups: the SCAR's, the front on its gas block)
     else sight = rcv === 'vector' && ['irons', 'notch', undefined].includes(o.optic) ? S.irons(k, vecTrace([358, 0])[0], vecTrace([700, 0])[0], top + 0.034, top, top, 'ar') // (the flip-ups at the rail's two ends, raised)
@@ -1255,7 +1311,7 @@ G.GunModels = (() => {
     const port = o.bolt ? [o.bolt - 0.02, top - 0.004, 0] : o.lever ? [L * 0.55, 0.0, 0.02] : o.pump || o.tube ? [L * 0.62, -0.042, 0] : rcv === 'break' ? [L, 0.0, 0] : [L * 0.5, top, 0];
     // where a chamber check shows the round: through the ejection port on the right (js/vmanim.js), or for a
     // break-action, the shell heads in the breech
-    const hw = { ar: 0.0178, ak: 0.022, box: (o.W || 0.045) / 2, round: 0.018, bullpup: 0.023, vector: 0.026, aug: 0.029, qbz95: 0.027, qbz192: 0.0172, scar: 0.0172, g36: 0.022, mcx: 0.0156, mpx: 0.0156 }[rcv] || 0.018;
+    const hw = { ar: 0.0178, ak: 0.022, box: (o.W || 0.045) / 2, round: 0.018, bullpup: 0.023, vector: 0.026, aug: 0.029, f2: 0.032, qbz95: 0.027, qbz192: 0.0172, scar: 0.0172, g36: 0.022, mcx: 0.0156, mpx: 0.0156 }[rcv] || 0.018;
     const chamberAt = tr && tr.chamber ? { side: 'breech', heads: [[0, by - hy]], z: L - tr.chamber, r: 0.0064 } // (the Thor's: at the back of its sleeve)
       : rcv === 'break' ? { side: 'breech', heads: (o.barrels || [0]).map((x) => [x, by + 0.035]), z: -0.0005, r: br } // (in the barrels' hinge frame)
       : o.bolt ? { side: 'top', f: o.bolt - 0.05, y: rcv === 'round' ? top - 0.0015 : top, x: rcv === 'round' ? 0.006 : 0.011, w: 0.024 } // (a bolt gun's port is its open top, to the right of a scope's line, above the stock)

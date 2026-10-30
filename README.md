@@ -1581,7 +1581,14 @@ says the same), but not whose: the shooter's name isn't shown.
   carrying handle's loop with the rear aperture and the cocking knob in its opening, the raked grip and the trigger
   guard's bar to the front grip, the ribs under the nose, the ejection port over the magazine. Its sights stay on
   whatever's fitted; another sight goes on a rail along the top of the handle, very high over the bore as on the
-  real one. **The QBZ-192** (`rcv: 'qbz192'`) is built by eye from photos: a tall flat-sided upper railed its whole
+  real one. **The F2 Bullpup** (`rcv: 'f2'`, `f2Trace`) is a FAMAS F1, traced from a right-side photo (Wikimedia
+  Commons, "FAMAS Assaultrifle FRA noBG.png", CC BY-SA 4.0) at 0.339 mm a pixel, 757 mm overall, the F1's figure: the
+  composite shell from the ribbed butt through the cheek step and the ejection port to the magazine well, the belly
+  arching up to a raked, grooved grip, and the thin loop of the F1's trigger guard (the G2's is the big one). Over the
+  receiver is the carrying handle, a hollow box of two walls and a roof with the cocking lever in its window, so the
+  aperture and the front post sit down the tunnel between them; another sight goes on a rail along the top of the
+  handle. Under the handguard are its cooling bumps, then the grenade sight folded on the receiver, the spigot's
+  ridges and the flash hider. **The QBZ-192** (`rcv: 'qbz192'`) is built by eye from photos: a tall flat-sided upper railed its whole
   length, the rail carried on over a deep squared handguard (`hg: 'qbz'`), the lower's flared well, the charging
   handle at the front right, a folding telescoping stock (`stock: 'qbz'`). **The SIG MCX and MPX** (`rcv: 'mcx'`,
   `'mpx'`): AR-shaped, no buffer tube (the stock hinges on the back of the upper; the MPX keeps its tube stock), the
