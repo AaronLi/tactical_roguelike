@@ -18,7 +18,7 @@ G.Arsenal = (() => {
     { id: 'deagle', from: 'rev', path: 'heavy', ring: 3, stat: 'armed', n: 15, what: 'kills on armoured suspects', how: "A vest or a helmet: it doesn't save them. Pick your spot, or hit them hard enough." },
     { id: 'thor', from: 'deagle', path: 'heavy', ring: 4, stat: 'wall', n: 15, what: 'wall-bang kills', how: 'Through a wall, a door or whatever they thought was cover.' },
     { id: 'm1911', from: 'p9', path: 'modern', ring: 1, stat: 'hs', n: 15, what: 'headshot kills', how: 'Put it where it counts.' },
-    { id: 'usp', from: 'm1911', path: 'modern', ring: 2, stat: 'sur', n: 15, what: 'kills they never saw coming', how: 'Down before they knew you were there.' },
+    { id: 'usp', from: 'm1911', path: 'modern', ring: 2, stat: 'sur', n: 15, what: 'kills on unaware suspects', how: 'Down a suspect before they react. If they have seen you or heard gunfire, it does not count.' },
     { id: 'fiveseven', from: 'usp', path: 'modern', ring: 3, stat: 'far', n: 15, what: 'kills past 20 m', how: 'A pistol, at a rifle\'s distance.' },
   ];
   const PATHS = { auto: { name: 'Full auto', a: -90, len: 3 }, heavy: { name: 'Heavy calibre', a: 30, len: 4 }, modern: { name: 'Modern classics', a: 150, len: 3 } };

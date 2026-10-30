@@ -1256,7 +1256,7 @@ G.Server = {
   incapMsg(e) {
     if (e.def.civ || e.incap) return; // (a civilian down still needs rescuing)
     const { cr, why } = this.incapacitate(e, e.lastHit, e.hitState || e.state);
-    G.Net.broadcast({ t: 'incap', e: e.id, by: e.lastHit || null, cr, h: !!e.lastH, ty: e.type, why });
+    G.Net.broadcast({ t: 'incap', e: e.id, by: e.lastHit || null, cr, h: !!e.lastH, ty: e.type, why, sur: e.hitUnaware ? 1 : 0 });
   },
   // A suspect down for good, for the highlights (js/highlights.js suspectDown): incapacitated, their clip. The round
   // that put them down, with what a kill of it would carry; or, more than 4 s after a round last hit them, a bleed-out
