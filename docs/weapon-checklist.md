@@ -81,6 +81,8 @@ the game muted (`G.Game.setMuted(true)`) unless you're checking sound.
 
 ## 3. Model and sights: `js/gunmodels.js`
 
+To rebuild a gun from photographs, use the `rework-gun` skill (`.claude/skills/rework-gun/SKILL.md`); `docs/gun-reworks.md` logs what's been done.
+
 - [ ] It builds without errors in both the world model (`G.GunModels.world(code)`) and the viewmodel. Check
   the console.
 - [ ] Proportions look right next to the officer's hands: grip under the hand (`grip`), support hand on the
