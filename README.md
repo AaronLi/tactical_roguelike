@@ -1588,7 +1588,7 @@ says the same), but not whose: the shooter's name isn't shown.
   receiver is the carrying handle, a hollow box of two walls and a roof with the cocking lever in its window, so the
   aperture and the front post sit down the tunnel between them; another sight goes on a rail along the top of the
   handle. Under the handguard are its cooling bumps, then the grenade sight folded on the receiver, the spigot's
-  ridges and the flash hider. **The QBZ-192** (`rcv: 'qbz192'`) is built by eye from photos: a tall flat-sided upper railed its whole
+  ridges and the flash hider. The shared STANAG magazines are drawn to fit it (`magFit`): a short, near-straight box level with the grip, as an F1's, whatever they hold. **The QBZ-192** (`rcv: 'qbz192'`) is built by eye from photos: a tall flat-sided upper railed its whole
   length, the rail carried on over a deep squared handguard (`hg: 'qbz'`), the lower's flared well, the charging
   handle at the front right, a folding telescoping stock (`stock: 'qbz'`). **The SIG MCX and MPX** (`rcv: 'mcx'`,
   `'mpx'`): AR-shaped, no buffer tube (the stock hinges on the back of the upper; the MPX keeps its tube stock), the

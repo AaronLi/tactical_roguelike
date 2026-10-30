@@ -1163,6 +1163,7 @@ G.GunModels = (() => {
     if (o.mag && o.mag.t !== 'internal') {
       const mo = Object.assign({ f: bull ? L * 0.22 : gf + 0.078, y: rcv === 'ak' ? -0.046 : rcv === 'box' ? -(o.H || 0.085) * 0.55 : -0.042 }, o.mag);
       if (rcv !== 'ar') mo.well = null; // (a magazine's well block is an AR lower's; any other gun's well is its own)
+      if (o.magFit && mo.len) { mo.len *= o.magFit.len; mo.c = (mo.c || 0) * o.magFit.c; mo.d = o.magFit.d; } // (a shared magazine drawn to this gun's: the F2's short near-straight box)
       const p = k.part(mo.f, mo.y);
       k.into(p, mo.f, mo.y);
       const chk = mag(k, mo);
