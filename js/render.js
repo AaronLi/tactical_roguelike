@@ -749,7 +749,12 @@ G.R = {
     } catch (e) { console.warn('warmup', e); }
     const hidden = [];
     for (const sc of [this.scene, this.vmScene]) sc.traverse((o) => { if (!o.visible) { o.visible = true; hidden.push(o); } });
-    try { this.renderer.compile(this.scene, this.camera); this.renderer.compile(this.vmScene, this.camera); } catch (e) { console.warn('warmup', e); }
+    try {
+      this.renderer.compile(this.scene, this.camera); this.renderer.compile(this.vmScene, this.camera);
+      // (and the scope's picture: anything drawn into a texture is a different shader from the same thing on the screen, for
+      // all of the scene's materials, whatever gun you've got now: you can pick one up)
+      this.pipTexture(); this.renderer.setRenderTarget(this.pipRT); this.renderer.compile(this.scene, this.camera); this.renderer.setRenderTarget(null);
+    } catch (e) { console.warn('warmup', e); }
     for (const o of hidden) o.visible = false;
     for (const m of extras) { m.removeFromParent(); m.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); }
     return performance.now() - t0;
