@@ -42,8 +42,9 @@ G.Damage = (() => {
   const ring = (rad, c) => rad.map((k, i) => { const a = (i / N) * Math.PI * 2; return [c[0] + Math.cos(a) * k, c[1] + Math.sin(a) * k]; });
   const nth = (a) => ((Math.round((a / (Math.PI * 2)) * N) % N) + N) % N;
   // A hole's shape: F.c its middle, F.rad its outline, F.core the same without the spikes (the bore's shape), F.max how far that reaches, F.pts its points
+  let shapes = 0; // (every outline ever drawn has its own number: what a face was cut by: side, below)
   function shape(F, c, rad) {
-    F.c = c; F.rad = rad; F.pts = ring(rad, c); F.v = (F.v || 0) + 1;
+    F.c = c; F.rad = rad; F.pts = ring(rad, c); F.v = (F.v || 0) + 1; F.drawn = ++shapes;
     F.core = rad.map((r, i) => Math.min(r, [-2, -1, 0, 1, 2].map((k) => rad[(i + k + N) % N]).sort((a, b) => a - b)[2]));
     F.max = Math.max(...F.core);
   }
@@ -253,9 +254,9 @@ G.Damage = (() => {
     // (u along the face, v up it, and the texture across it as a BoxGeometry's runs: seen from outside, left to right)
     const side = (ax, sg, c, a0, a1, nx, nz, nbr) => {
       if (nbr === 1 && !(fm.winAt && fm.winAt.has(nbrI))) return;
-      const list = D.faces.get(faceKey(fm, ax, sg, c)) || [], was = tile.faces[ax + sg], ver = list.reduce((s, f) => s + f.v, 0); // (only the face it hit has changed)
+      const list = D.faces.get(faceKey(fm, ax, sg, c)) || [], was = tile.faces[`${ax}${sg}`], ver = list.map((f) => f.drawn).join(); // (only the face it hit has changed)
       let tris = was && was.n === ver ? was.tris : null;
-      if (!tris) { tris = []; faceTris(a0, a1, v0, v1, list.map((f) => f.pts.map((p) => [p[0], p[1] - Y])), tris); tile.faces[ax + sg] = { n: ver, tris }; }
+      if (!tris) { tris = []; faceTris(a0, a1, v0, v1, list.map((f) => f.pts.map((p) => [p[0], p[1] - Y])), tris); tile.faces[`${ax}${sg}`] = { n: ver, tris }; }
       for (let n = 0; n < tris.length; n += 6) {
         const a = [tris[n], tris[n + 1], tris[n + 2], tris[n + 3], tris[n + 4], tris[n + 5]];
         const order = (ax === 2) === (sg > 0) ? [0, 2, 4] : [0, 4, 2]; // (facing out)
