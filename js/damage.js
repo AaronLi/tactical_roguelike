@@ -48,6 +48,8 @@ G.Damage = (() => {
     F.core = rad.map((r, i) => Math.min(r, [-2, -1, 0, 1, 2].map((k) => rad[(i + k + N) % N]).sort((a, b) => a - b)[2]));
     F.max = Math.max(...F.core);
   }
+  // how wide a mark round a hole is: from how wide it mostly is, not its widest, or a ragged hole's a little opening in a big flat picture of one
+  const fitOf = (F) => [...F.core].sort((a, b) => a - b)[N >> 1] * 1.25;
   // is an outline at c2 near enough to fuse with this one? (nearly touching's enough: what's between two holes that close has nothing left to hold it)
   const touches = (F, c2, r) => { const dx = c2[0] - F.c[0], dy = c2[1] - F.c[1]; return Math.hypot(dx, dy) < F.core[nth(Math.atan2(dy, dx))] + r * 1.7; };
   // Two outlines become one: from a middle between them (the bigger counts for more), as far out as either goes at each angle. Nothing
@@ -182,7 +184,7 @@ G.Damage = (() => {
   }
   // the marks round a hole's edge (a face's, on its side of the wall): js/scars.js's, less anything it'd stand up: rimFlaps has that
   function marksOf(F, H, k) {
-    const h = HOLE[F.m] || H.look, dir = new T.Vector3(...H.u), n = new T.Vector3(...F.n), o = { m: F.m, k, n: F.n, dir, J: H.J, stop: k === 'e' && !H.fb, cal: H.c, fit: F.max * 1.5 }, ua = F.ax === 0 ? 2 : 0, sd = (F.v * 31 + Math.round(F.a[1] * 500)) | 0;
+    const h = HOLE[F.m] || H.look, dir = new T.Vector3(...H.u), n = new T.Vector3(...F.n), o = { m: F.m, k, n: F.n, dir, J: H.J, stop: k === 'e' && !H.fb, cal: H.c, fit: fitOf(F) }, ua = F.ax === 0 ? 2 : 0, sd = (F.v * 31 + Math.round(F.a[1] * 500)) | 0;
     F.marks = G.Scars.plan(o).filter((c) => c.mat.map);
     F.flip = [Math.sign(dir.getComponent(ua)) || 1, sd & 1 ? 1 : -1];
     F.flap = !H.bite && h.flap && (k === 'x' || h.flap.in) ? { h: h.flap, geo: rimFlaps(ring3(F, 0.999), new T.Vector3(...F.a), k === 'x' ? n : n.clone().negate(), dir, H.R0 * h.flap.l, H.R0 * h.flap.h, sd, F.rad, F.core) } : null;
@@ -274,7 +276,7 @@ G.Damage = (() => {
     const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new T.Float32BufferAttribute(nor, 3)); g.setAttribute('uv', new T.Float32BufferAttribute(uvs, 2));
     const m = new T.Mesh(g, wallMat(map, fm, tile.shade)); m.layers.enable(1); tile.group.add(m);
     const by = new Map();
-    for (const H of tile.holes) { const c = H.look.lining, b = by.get(c) || { pos: [], col: [] }; by.set(c, b); const q = H.geo || (H.geo = H.bite ? biteGeo(H) : bore(H)); for (let n = 0; n < q.pos.length; n++) b.pos.push(q.pos[n]); for (let n = 0; n < q.col.length; n++) b.col.push(q.col[n]); }
+    for (const H of tile.holes) { const c = H.look.lining, b = by.get(c) || { pos: [], col: [] }; by.set(c, b); const q = H.geo || (H.geo = H.bite ? biteGeo(H, fm) : bore(H)); for (let n = 0; n < q.pos.length; n++) b.pos.push(q.pos[n]); for (let n = 0; n < q.col.length; n++) b.col.push(q.col[n]); }
     const off = new T.Vector3(0, -Y, 0);
     for (const [c, b] of by) tile.group.add(lined(b.pos, b.col, liningMat(map, c), off));
     // (what's round each hole, on this tile's account however far it reaches)
@@ -358,22 +360,30 @@ G.Damage = (() => {
     const dx = x - B.p[0], dy = y - B.p[1], dz = z - B.p[2], a = dx * B.in1[0] + dz * B.in1[2], b = dx * B.in2[0] + dz * B.in2[2];
     return a > -0.03 - pad && b > -0.03 - pad && a + b < B.d * 1.1 + pad && Math.abs(dy) < Math.max(B.fa.max, B.fb.max) * (1 - G.U.clamp((a + b) / (B.d * 1.3), 0, 1)) + pad;
   };
-  function biteGeo(B) {
+  // What's left of the wall round a bite: one surface from the edge of the break in to the back of it. The break's edge is one loop round the corner, over
+  // one face and back over the other: an outline's middle is on the corner, so its half on the wall runs from straight up to straight down of it, and nothing's
+  // left on the corner between those: that's what's gone. (Kept to the wall: a bite wider than the wall's thick doesn't line the air past it.)
+  function biteGeo(B, fm) {
     const pos = [], col = [], rnd = rngOf(seedOf(B.p)), apex = new T.Vector3(B.p[0] + (B.in1[0] + B.in2[0]) * B.d * 0.6, B.p[1], B.p[2] + (B.in1[2] + B.in2[2]) * B.d * 0.6);
-    for (const F of [B.fa, B.fb]) {
-      // (its outline, kept to the wall's side of the corner)
-      const ownUp = F === B.fa ? B.dir : Math.sign(B.n1[B.ax]), lim = F === B.fa ? B.p[B.ua] : B.p[B.ax];
-      const rim = F.pts.map(([u, v]) => { const k = ownUp > 0 ? Math.min(u, lim) : Math.max(u, lim); return F.ax === 0 ? new T.Vector3(F.plane, v, k) : new T.Vector3(k, v, F.plane); });
-      const mid = rim.map((p) => p.clone().lerp(apex, 0.5).add(new T.Vector3((rnd() - 0.5) * B.d * 0.25, (rnd() - 0.5) * B.d * 0.25, (rnd() - 0.5) * B.d * 0.25)));
-      strip(rim, mid, 0.74, 0.5, pos, col); strip(mid, rim.map(() => apex), 0.5, 0.3, pos, col);
-    }
+    const half = (F, ownUp) => { // (top to bottom)
+      const [lo, hi] = spanOf(fm, F), lim = F.c[0], out = [];
+      for (let i = N / 4; i <= (3 * N) / 4; i++) {
+        const [u, v] = F.pts[ownUp > 0 ? i : ((3 * N) / 4 + (i - N / 4)) % N], k = G.U.clamp(ownUp > 0 ? Math.min(u, lim) : Math.max(u, lim), lo, hi);
+        out.push(F.ax === 0 ? new T.Vector3(F.plane, v, k) : new T.Vector3(k, v, F.plane));
+      }
+      return ownUp > 0 ? out : out.reverse();
+    };
+    const rim = [...half(B.fa, B.dir), ...half(B.fb, Math.sign(B.n1[B.ax])).reverse()];
+    const mid = rim.map((p) => p.clone().lerp(apex, 0.5).add(new T.Vector3((rnd() - 0.5) * B.d * 0.25, (rnd() - 0.5) * B.d * 0.25, (rnd() - 0.5) * B.d * 0.25)));
+    strip(rim, mid, 0.74, 0.5, pos, col); strip(mid, rim.map(() => apex), 0.5, 0.3, pos, col);
     return { pos, col };
   }
   function bite(map, fm, rec, e, look, R, seed, into) {
     const D = st(map), n = rec.n, ax = axisOf(n), p = into ? [into.p[0], rec.a[1], into.p[2]] : [...rec.a], n2 = [0, 0, 0]; if (!into) p[e.ua] = e.b; n2[e.ua] = e.dir;
-    const rad = outline(seed, look, R * 1.9), rad2 = outline(seed + 3, look, R * 1.9);
     const near = (q, y) => Math.hypot(q.p[0] - p[0], q.p[2] - p[2]) < 0.02 && Math.abs(q.p[1] - y) < q.fa.max + R * 2.6;
     let B = into || D.bites.find((q) => near(q, p[1]));
+    // (it's broken off, not cracked: rough all round, and the deeper it's gone the more of the wall each round brings away with it)
+    const chunk = Object.assign({}, look, { spikes: 0 }), wide = Math.max(R * 1.9, B ? B.d * 0.5 : 0), rad = outline(seed, chunk, wide), rad2 = outline(seed + 3, chunk, wide);
     if (B) {
       fuse(B.fa, uvOf(B.fa, p), rad); located(B.fa); fuse(B.fb, uvOf(B.fb, p), rad2); located(B.fb);
       B.p[1] = B.fa.c[1]; B.d = Math.min(0.55, B.d + R * 0.9); B.J = Math.max(B.J, rec.J);
@@ -476,7 +486,7 @@ G.Damage = (() => {
       const look = HOLE[q.m], dir = q.dirL, mid = new T.Vector3(q.c[0] - cx, q.c[1] - cy, 0), sg = dir.z > 0 ? -1 : 1, flip = [Math.sign(dir.x) || 1, 1]; // (sg: the side it came in by)
       for (const [side, k] of [[sg, 'e'], [-sg, 'x']]) {
         const n = [0, 0, side], put = (u, v) => [u - cx, v - cy, side * (t + 0.003)];
-        for (const c of G.Scars.plan({ m: q.m, k, n, dir, J: q.J, cal: q.c0, fit: q.max * 1.5 }).filter((c) => c.mat.map)) clipInto(by, c, q.c[0], q.c[1], rect, polys, flip, put, n, side > 0 ? [0, 2, 4] : [0, 4, 2]);
+        for (const c of G.Scars.plan({ m: q.m, k, n, dir, J: q.J, cal: q.c0, fit: fitOf(q) }).filter((c) => c.mat.map)) clipInto(by, c, q.c[0], q.c[1], rect, polys, flip, put, n, side > 0 ? [0, 2, 4] : [0, 4, 2]);
         if (look.flap && (k === 'x' || look.flap.in)) { const rim = q.core.map((r, i) => { const a = (i / N) * Math.PI * 2; return new T.Vector3(mid.x + Math.cos(a) * r, mid.y + Math.sin(a) * r, side * t); }); faces.push({ flap: { h: look.flap, geo: rimFlaps(rim, mid.clone().setZ(side * t), new T.Vector3(0, 0, k === 'x' ? side : -side), dir, q.R0 * look.flap.l, q.R0 * look.flap.h, (q.v * 31 + i0(q)) | 0, q.rad, q.core) } }); }
       }
     }

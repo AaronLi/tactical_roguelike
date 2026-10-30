@@ -157,7 +157,7 @@ G.Scars = (() => {
       return new T.Quaternion().setFromRotationMatrix(new T.Matrix4().makeBasis(x, y, z));
     };
     const J = o.J == null ? 800 : o.J, sz = G.U.clamp(Math.sqrt(J / 1000), 0.55, 1.7), cal = (o.cal || 8) / 8, tint = L.tint, out = [];
-    const decal = (cell, r0, spin = true, sy = 1, t = tint) => { const r = Math.max(r0, o.fit || 0); out.push({ geo: cellGeo(cell), mat: decalMat(t), s: [r * 2, r * 2 * sy, 1], q: q(spin), off: 0.004 }); }; // (o.fit: at least this wide: round a hole, js/damage.js)
+    const decal = (cell, r0, spin = true, sy = 1, t = tint) => { const r = o.fit || r0; out.push({ geo: cellGeo(cell), mat: decalMat(t), s: [r * 2, r * 2 * sy, 1], q: q(spin), off: 0.004 }); }; // (o.fit: this wide: round a hole, js/damage.js: the hole sets it)
     const look = L.look, x = o.k === 'x', v = Math.floor(Math.random() * 3);
     if (o.k === 'r') { // (a skid: along the way it was going, as long as it was shallow)
       const r = 0.05 + 0.08 * sz;
