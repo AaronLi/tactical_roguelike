@@ -260,5 +260,5 @@ G.Scars = (() => {
     function clear() { for (const b of P) if (b.on) { b.on = false; mesh.setMatrixAt(b.i, zero); } mesh.instanceMatrix.needsUpdate = true; for (const u of puffs) u.obj.visible = false; }
     return { burst, update, clear };
   }
-  return { plan, meshes, debris };
+  return { plan, meshes, debris, flapMat };
 })();

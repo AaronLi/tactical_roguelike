@@ -1176,7 +1176,7 @@ G.Highlights = (() => {
       const rec = e.k === 'e' && P.map ? G.Damage.ofEvent(e, e.then) : null, cut = rec && G.Damage.apply(P.map, rec) ? G.Damage.radius(e.m, e.J, e.cal) : e.k === 'x' && e.cutBy ? e.cutBy : 0; // (what it took out of the wall, as it did in the game)
       if (e.then && e.k === 'e') e.then.cutBy = cut * 1.25;
       const o = { m: e.m, fx: e.fx, k: e.k, n: e.n, dir: e.dir, J: e.J, stop: e.stop, cut };
-      for (const m of G.Scars.meshes(o, e.p, P.fxRoot)) { P.marks.push(m); if (P.marks.length > 160) { const q = P.marks.shift(); if (q.parent) q.parent.remove(q); } }
+      if (!cut) for (const m of G.Scars.meshes(o, e.p, P.fxRoot)) { P.marks.push(m); if (P.marks.length > 160) { const q = P.marks.shift(); if (q.parent) q.parent.remove(q); } }
       if (P.debris) P.debris.burst(e.p, o);
     }
     const sp = new T.Mesh(new T.SphereGeometry(e.k === 'r' ? 0.09 : 0.06, 8, 6), new T.MeshBasicMaterial({ color: col, transparent: true, blending: T.AdditiveBlending, depthWrite: false })); sp.position.copy(e.p); P.fxRoot.add(sp);

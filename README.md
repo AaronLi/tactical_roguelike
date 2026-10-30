@@ -1314,7 +1314,8 @@ says the same), but not whose: the shooter's name isn't shown.
   its speed past their armour and the energy that cost, its exit speed or where it stopped and in what, where it broke up, and how far
   each piece went and what it weighed. The readout lists the same for each shot.
 - **Rounds cut real holes in walls and doors** (`js/damage.js`): the wall's geometry is rebuilt with the hole left out of it and a bore lined down the
-  way the round went, so an angled shot leaves an angled hole. You can see down a hole, and shoot down it, and a suspect on the far side shows
+  way the round went, so an angled shot leaves an angled hole. Holes that touch fuse into one: a single ragged outline with the material between them
+  gone, one bore that shape and one set of marks round it, so a burst tears a wide gap instead of leaving a row of neat holes. You can see down a hole, and shoot down it, and a suspect on the far side shows
   through it. Concrete, block and brick crack, the cracks real slits running out of the hole; wood's torn long along the grain with splinters at
   its ends; metal tears, its petals bent along the round's line going in and coming out; a round steel stops only dents it. A round that stops in a
   wall leaves a blind hole, and the next one into it starts from the bottom, so a wall too thick to go through is shot through by hitting

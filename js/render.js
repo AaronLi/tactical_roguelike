@@ -136,7 +136,7 @@ G.R = {
     const dispose = (o) => {
       o.traverse((c) => {
         if (c.geometry) c.geometry.dispose();
-        if (c.material) (Array.isArray(c.material) ? c.material : [c.material]).forEach((m) => { if (m.map) m.map.dispose(); m.dispose(); });
+        if (c.material && !c.userData.keepMat) (Array.isArray(c.material) ? c.material : [c.material]).forEach((m) => { if (m.map) m.map.dispose(); m.dispose(); }); // (keepMat: shared, js/scars.js's)
       });
     };
     while (this.levelRoot.children.length) { const c = this.levelRoot.children[0]; dispose(c); this.levelRoot.remove(c); }
@@ -572,7 +572,7 @@ G.R = {
     // one has to come off the door it was on
     const q = Object.assign({ fx, k: 'e', n }, o, { n });
     (this.debris || (this.debris = G.Scars.debris(this.scene, (x, z, y) => { const map = G.Game.map; return map ? G.Level.groundAt(map, x, z, 0.01, y) : 0; }))).burst(p, q);
-    if (!n) return;
+    if (!n || q.cut) return; // (what's been cut has its marks with the cut: js/damage.js)
     for (const c of G.Scars.plan(q)) {
       const d = this.decals[this.decalIdx]; this.decalIdx = (this.decalIdx + 1) % this.decals.length;
       if (d.parent !== this.scene) this.scene.add(d);
