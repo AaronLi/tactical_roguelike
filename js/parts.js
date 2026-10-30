@@ -611,7 +611,7 @@ G.Gunsmith = (() => {
   P('pkm', 'rifle', { rcv: 'box', L: 0.33, H: 0.075, W: 0.045, rm: 'blued', fm: 'woodRed', feed: true, bipod: 0.56, cock: { recip: true } }, { barrel: { len: 0.52, taper: 0.9 }, thread: 'r762', muzzle: 'flash', stock: ['heavy', 'thumbhole'], grip: ['ak', 'wood'], mag: { t: 'ammobox', f: 0.13, m: 'park' }, optic: ['pic', { optic: 'notch' }] });
   P('m60', 'rifle', { rcv: 'box', L: 0.33, H: 0.08, W: 0.05, rm: 'park', fm: 'polymer', feed: true, optF: 0.25, bipod: 0.52, carry: 0.52 }, { barrel: { len: 0.45 }, thread: 'r762', muzzle: 'flash', handguard: ['box', { t: 'box', len: 0.2 }], stock: ['heavy', 'fixed'], grip: ['ar', 'ar'], mag: { t: 'ammobox', f: 0.15, m: 'od' }, optic: ['pic', { optic: 'irons' }] });
   P('skorp', 'rifle', { rcv: 'box', L: 0.16, H: 0.05, W: 0.032, rm: 'blued', grip: 0.01, support: 0.14, cock: { f: 0.08, y: 0.018, x: 0.02, travel: 0.05, style: 'pair', sz: 0.7, recip: true } }, { barrel: { len: 0.08, r: 0.007 }, thread: 'r9', muzzle: 'crown', stock: ['smg', 'folded'], grip: ['ak', 'wood', 'woodDark'], mag: { t: 'curved', f: 0.1, len: 0.1, d: 0.026, c: 0.03, w: 0.016 }, optic: ['pic', { optic: 'notch' }] });
-  P('mac10', 'rifle', { irons: 'ar', rcv: 'box', L: 0.22, H: 0.07, W: 0.05, rm: 'park', grip: 0.06, support: 0.2, cock: { recip: true } }, { barrel: { len: 0.04, r: 0.008 }, thread: 'r45', muzzle: 'crown', stock: ['smg', 'folded'], grip: ['smg', 'vertical'], mag: { t: 'straight', f: 0.075, y: -0.14, len: 0.09, d: 0.03, rake: 0 }, optic: ['pic', { optic: 'notch' }] });
+  P('mac10', 'rifle', { irons: 'ar', rcv: 'box', look: 'mac10', L: 0.253, H: 0.07, W: 0.05, rm: 'park', grip: 0.095, support: 0.235, cock: { recip: true, f: 0.147, y: 0.0337, stem: 0.004 } }, { barrel: { len: 0.04, r: 0.008 }, thread: 'r45', muzzle: 'crown', stock: ['smg', 'folded'], grip: ['smg', 'vertical'], mag: { t: 'straight', f: 0.108, y: -0.034, len: 0.09, d: 0.042, rake: 0 }, optic: ['pic', { optic: 'notch' }] });
   P('mp7', 'rifle', { rcv: 'box', siderails: true, L: 0.26, H: 0.07, W: 0.042, rm: 'polymer', grip: 0.06, optF: 0.1, vfg: 0.0, vfgM: 'polymer', cock: { f: 0.028, y: 0.027, x: 0, travel: 0.05, style: 'tee' } }, { barrel: { len: 0.06, r: 0.007 }, thread: 'r57', muzzle: 'flash', stock: ['tube', 'm4'], grip: ['smg', 'vertical'], mag: { t: 'straight', f: 0.075, y: -0.14, len: 0.07, d: 0.026, rake: 0 }, noDrum: true, optic: ['pic', { optic: 'reddot' }] });
   // the 2nd round
   P('ak74', 'rifle', { rcv: 'ak', L: 0.28, rm: 'black', fm: 'polymer' }, { barrel: { len: 0.31 }, thread: 'rak', muzzle: 'brake', handguard: ['ak', { t: 'wood', len: 0.2, m: 'woodRed' }], stock: ['ak', 'skeleton', 'polymer'], grip: ['ak', 'wood'], mag: { t: 'curved', len: 0.21, d: 0.068, c: 0.06, w: 0.026 }, optic: ['pic', { optic: 'notch' }] });
@@ -629,23 +629,23 @@ G.Gunsmith = (() => {
   P('sawn', 'rifle', { rcv: 'break', L: 0.12, fm: 'wood', barrels: [-0.0105, 0.0105], gripT: 'wood', grip: 0.0, support: 0.16 }, { barrel: { len: 0.26, r: 0.0105 }, handguard: ['classic', { t: 'wood', len: 0.12 }], grip: ['ak', 'wood', 'wood'], optic: ['pic', { optic: 'bead' }] });
   // pistols
   const pst = (id, slide, gm, extra) => P(id, 'pistol', Object.assign({ gm }, extra), { slide, pbarrel: true, grip: ['pistol', null, gm], mag: { t: 'pistol' }, optic: ['pso', { optic: 'notch' }], ptac: true });
-  pst('p9', { len: 0.186 }, 'polymer');
-  pst('usp', { len: 0.182, w: 0.028 }, 'polymer');
-  pst('m1911', { len: 0.196, sm: 'blued', w: 0.024 }, 'wood', { fm: 'blued', hammer: true });
-  pst('g18', { len: 0.17, comp: true }, 'polymer', { ext: 1 });
+  pst('p9', { len: 0.175, w: 0.0275 }, 'polymer', { look: 'p9' });
+  pst('usp', { len: 0.2, w: 0.0285 }, 'polymer', { look: 'usp' });
+  pst('m1911', { len: 0.191, sm: 'blued', w: 0.0235 }, 'chequerWood', { fm: 'blued', look: 'm1911' });
+  pst('g18', { len: 0.186, w: 0.0255 }, 'polymer', { ext: 1, look: 'g18' });
   pst('auto9', { len: 0.25, sm: 'gunmetal', vent: true, w: 0.03 }, 'gunmetal', { fm: 'gunmetal', ext: 1 });
-  pst('deagle', { len: 0.252, sm: 'steel', w: 0.032 }, 'rubber', { fm: 'steel' });
+  pst('deagle', { len: 0.2454, sm: 'steel', w: 0.0318 }, 'stipple', { fm: 'steel', look: 'deagle' });
   pst('g19', { len: 0.17 }, 'polymer');
-  pst('fiveseven', { len: 0.208, w: 0.026 }, 'polymer');
-  pst('b92', { len: 0.217, sm: 'blued', w: 0.03 }, 'polymer', { fm: 'blued' });
-  pst('ppk', { len: 0.155, sm: 'steel', w: 0.023 }, 'polymer', { fm: 'steel', hammer: true });
+  pst('fiveseven', { len: 0.205, sm: 'polymer', w: 0.0265 }, 'polymer', { look: 'fiveseven' });
+  pst('b92', { len: 0.2137, sm: 'blued', w: 0.0285 }, 'chequer', { fm: 'blued', look: 'b92' });
+  pst('ppk', { len: 0.1467, sm: 'steel', w: 0.0205 }, 'black', { fm: 'steel', look: 'ppk' });
   pst('akimbo', { len: 0.2, sm: 'blued', w: 0.026 }, 'woodDark', { fm: 'blued' });
   // revolvers
-  P('rev', 'revolver', { cl: 0.042, cr: 0.021 }, { barrel: { len: 0.1 }, grip: ['rev', null, 'woodDark'], optic: ['pso', { optic: 'notch' }], loader: true });
+  P('rev', 'revolver', { cl: 0.0461, cr: 0.0205, look: 'rev' }, { barrel: { len: 0.1 }, grip: ['rev', null, 'chequer'], optic: ['pso', { optic: 'notch' }], loader: true });
   P('hc500', 'revolver', { cl: 0.05, cr: 0.026, comp: true }, { barrel: { len: 0.2 }, grip: ['rev', null, 'woodDark'], optic: ['pso', { optic: 'notch' }], loader: true });
   P('judge', 'revolver', { cl: 0.072, cr: 0.026, m: 'blued' }, { barrel: { len: 0.075 }, grip: ['rev', null, 'rubber'], optic: ['pso', { optic: 'notch' }], loader: true });
   P('derringer', 'derringer', {}, { barrel: { len: 0.084 }, grip: ['rev', null, 'woodDark'] });
-  P('thor', 'rifle', { rcv: 'break', L: 0.15, fm: 'steel', barrels: [0], gripT: 'wood', grip: 0.0, support: 0.2 }, { barrel: { len: 0.38, r: 0.017 }, handguard: ['classic', { t: 'wood', len: 0.1 }], grip: ['ak', 'wood', 'wood'], optic: ['pic', { optic: 'notch' }] });
+  P('thor', 'rifle', { rcv: 'break', look: 'thor', L: 0.151, fm: 'blued', grip: 0.03, support: 0.175 }, { barrel: { len: 0.224, r: 0.0097 }, grip: ['ak', 'chequer', 'chequer'], optic: ['pic', { optic: 'notch' }] });
   // specials
   P('p90', 'p90', { siderails: true }, { barrel: { len: 0.04 }, thread: 'r57', muzzle: 'flash', optic: ['pic', { optic: 'reddot' }], mag: { t: 'p90' }, noDrum: true });
   P('shredder', 'minigun', {}, { barrel: { len: 0.55 }, motor: true, mag: { t: 'ammobox', f: 0.12, m: 'od' }, optic: ['pic', { optic: 'irons' }], tac: true }); // (a side handle on the left, a rail on the right)
@@ -914,7 +914,7 @@ G.Gunsmith = (() => {
     .forEach(([k, b, n, t, price, st, tier, sup, d]) => add({ id: `mz.r22.${k}`, slot: 'muzzle', mount: 'mz:r22', brand: BR[b], name: n, desc: d, price, tier, st, set: { device: DEV[t], sup, can: CAN[t] }, model: { muzzle: t } }));
   for (const fam of ['r9', 'r556']) for (const q of BY_MOUNT.get('mz:' + fam).slice()) { q.alsoMounts = (q.alsoMounts || []).concat('mz:r22'); BY_MOUNT.get('mz:r22').push(q); }
   PSTOCK.add('tx22');
-  P('tx22', 'pistol', { gm: 'polymer', tx: true }, { slide: { len: 0.164, w: 0.025 }, pbarrel: 'r22', grip: ['pistol', null, 'polymer'], mag: { t: 'pistol', len: 0.13 }, optic: ['pso', { optic: 'notch' }], ptac: true });
+  P('tx22', 'pistol', { gm: 'polymer', look: 'tx22' }, { slide: { len: 0.1728, w: 0.0255 }, pbarrel: 'r22', grip: ['pistol', null, 'polymer'], mag: { t: 'pistol', len: 0.13 }, optic: ['pso', { optic: 'notch' }], ptac: true });
   { const plat = PLATFORMS.tx22; plat.offset = {}; for (const k of STAT_KEYS) plat.offset[k] = -Object.values(plat.defaults).reduce((a, pid) => a + ((PARTS[pid] && PARTS[pid].st[k]) || 0), 0); }
 
   // The QBZ-95, QBZ-192 and SIG MCX (and what they brought: the 5.8×42 thread, the folding-stock hinge the MCX and the

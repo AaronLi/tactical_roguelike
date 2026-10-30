@@ -1535,8 +1535,17 @@ says the same), but not whose: the shooter's name isn't shown.
   built model, is within about 6% of the published length of the gun it's based on (stock extended; sources
   are the weapons' Wikipedia spec boxes). The model barrel length is the part that shows forward of the
   receiver, since the chamber end sits inside it. It's visual only: ballistics come from the barrel length in
-  `G.GUN_SPECS`. Larger gaps are deliberate: the G18 carries an add-on compensator, and revolvers and the
-  derringer run up to 9% short.
+  `G.GUN_SPECS`. Larger gaps are deliberate: revolvers and the derringer run up to 9% short.
+- **The sidearm web, traced from photographs** (`js/guntraces.js`, drawn by `pistol()`, `tracedRevolver()` and the
+  `look` receivers in `rifle()`). Every gun on the web is read off a side-on photo, checked by laying the rendered model
+  over it. A slide is swept along the bore, not extruded: its traced top and bottom edges with chamfered or rounded
+  top corners, the ejection port cut from the right, and a long slide stretching its front half. So the 92FS has its
+  open top with the barrel bare along it, the Desert Eagle its fixed barrel block with the slide's arms running beside
+  it, the PPK and M1911 their round tops, and the 686 its fluted cylinder and full under-lug. Sight heights, the
+  magazine's rake, the hands, the stock lug and the rail all come from the trace, so attachments follow each gun. **The
+  Thor** is the EAA/Tanfoglio Thor (Raptor): a 1911 frame, a hinged breech sleeve with a full-length Weaver rail, a long
+  thin barrel, a filler block where the magazine would be. It breaks open on the pin under the barrel, and its sights and
+  rail mount tip with it. Its listed chamberings stop well short of .50 BMG; the game's doesn't.
 - **Traced from references.** Some guns' outlines are traced from a side photo or drawing rather than built from
   generic parts, the pixels mapped to metres at a known scale. **The KRISS Vector** (`rcv: 'vector'` in
   `rifle()`, `vecTrace`) is traced from a right-side photo of a Gen II (Wikimedia Commons, "Kriss-Vector-CRB.jpg",
@@ -2130,6 +2139,7 @@ solids at any height. Doors and windows are dynamic: their solids change as they
 | `js/rig.js` | Character skeleton, procedural animation, bone hitboxes |
 | `js/parts.js` | Weapon platforms, parts catalogue, builds and how they change stats |
 | `js/gunmodels.js` | Procedural gun models built from parts (first person, third person, gunsmith) |
+| `js/guntraces.js` | The sidearms' outlines, traced from photographs |
 | `js/gunsmith.js` | The gunsmith: 3D weapon view, part fitting and the sticker tool |
 | `js/stickers.js` | Stickers: which there are, your collection, decals on guns, the squad's lists by hash |
 | `js/zip.js` | Writing and reading .zip files (the highlights' recordings) |
