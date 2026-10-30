@@ -11,7 +11,7 @@ G.Arsenal = (() => {
   const NODES = [
     { id: 'p9', ring: 0 },
     { id: 'tx22', from: 'p9', path: 'auto', ring: 1, stat: 'tap', n: 15, what: 'double-tap kills', how: 'Two hits on them inside half a second, and they go down.' },
-    { id: 'g18', from: 'tx22', path: 'auto', ring: 2, stat: 'dump', n: 15, what: 'mag-dump kills', how: 'Four hits on them inside a second.' },
+    { id: 'g18', from: 'tx22', path: 'auto', ring: 2, stat: 'burst', n: 15, what: 'five-hit bursts', how: 'Five hits on one suspect inside a second, once a suspect. They needn\'t go down.' },
     { id: 'mac10', from: 'g18', path: 'auto', ring: 3, stat: 'multi', n: 10, what: 'double kills', how: 'Two suspects down inside three seconds.' },
     { id: 'derringer', from: 'p9', path: 'heavy', ring: 1, stat: 'close', n: 15, what: 'kills within 5 m', how: 'Get close enough that it can\'t go wrong.' },
     { id: 'rev', from: 'derringer', path: 'heavy', ring: 2, stat: 'one', n: 16, what: 'one-round kills', how: 'One round fired at them, and they\'re done.' },
@@ -22,7 +22,7 @@ G.Arsenal = (() => {
     { id: 'fiveseven', from: 'usp', path: 'modern', ring: 3, stat: 'far', n: 15, what: 'kills past 20 m', how: 'A pistol, at a rifle\'s distance.' },
   ];
   const PATHS = { auto: { name: 'Full auto', a: -90, len: 3 }, heavy: { name: 'Heavy calibre', a: 30, len: 4 }, modern: { name: 'Modern classics', a: 150, len: 3 } };
-  const RINGS = [0, 250, 470, 690, 910], BY = new Map(NODES.map((q) => [q.id, q])), TAP = 500, DUMP = 1000, MULTI = 3000, CLOSE = 5, FAR = 20;
+  const RINGS = [0, 250, 470, 690, 910], BY = new Map(NODES.map((q) => [q.id, q])), TAP = 500, BURST = 5, BURST_MS = 1000, MULTI = 3000, CLOSE = 5, FAR = 20;
   let save = null;
   const data = () => { if (!save) { const s = G.U.store.get('arsenal', null); save = s && s.got && s.n ? s : { got: [], n: {} }; } return save; };
   const keep = () => G.U.store.set('arsenal', data());
@@ -59,7 +59,6 @@ G.Arsenal = (() => {
     const id = k.wid, ts = k.ts, n = ts.length, now = performance.now();
     const within = (hits, ms) => n >= hits && ts[n - 1] - ts[n - hits] <= ms;
     if (within(2, TAP)) tally(id, 'tap');
-    if (within(4, DUMP)) tally(id, 'dump');
     if (lastKill.has(id) && now - lastKill.get(id) <= MULTI) { tally(id, 'multi'); lastKill.delete(id); } else lastKill.set(id, now); // (a pair's a pair: the next is the first of another)
     if (k.d <= CLOSE) tally(id, 'close');
     if (k.d >= FAR) tally(id, 'far');
@@ -75,6 +74,7 @@ G.Arsenal = (() => {
     if (!k || k.wid !== b.def.id) k = ev.mine = { wid: b.def.id, ts: [], shots: new Set(), wall: false, d: 0 };
     const f = b.shot.f, p = ev.rig && ev.rig.root.position;
     k.ts.push(performance.now()); k.shots.add(b.shot.sid); k.wall = !!b.walled;
+    if (!k.burst && k.ts.length >= BURST && k.ts[k.ts.length - 1] - k.ts[k.ts.length - BURST] <= BURST_MS) { k.burst = true; tally(k.wid, 'burst'); } // (the hits are the thing: down or not)
     k.d = p && f ? Math.hypot(p.x - f[0], p.z - f[2]) : 0;
   }
   return { NODES, PATHS, RINGS, BY, along, has, open, count, name, at, left, tally, hit, kill, get all() { return data(); } };
