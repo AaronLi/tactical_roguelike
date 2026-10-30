@@ -68,9 +68,9 @@ G.ShotLog = (() => {
       const q = P[e[0]], nx = path.ev.find((z) => z[1] === 'x' && z[0] > e[0]), out = e[1] === 'r' ? P[e[0] + 1] : nx ? P[nx[0]] : null;
       mark(q.p, `${e[1] === 'r' ? 'Off' : 'Into'} ${e[6] || 'it'} ${q.v}${out ? ' → ' + out.v : ''} m/s`, css(q.v), 2);
     }
-    // the stretch into someone it stopped in
+    // the stretch into someone it stopped in (not one it glanced off inside them: that goes on from there)
     const end = path.hit[path.hit.length - 1];
-    if (!end[7] && end[9] && end[9][0] > 0) { const q = P[end[0]].p.clone().add(new T.Vector3(end[4], end[5], end[6]).multiplyScalar(end[9][0])); add(q, 0); mark(q, `Stopped in ${end[9][1]} · ${Math.round(end[9][0] * 100)} cm in`, css(0), 4, end[1]); }
+    if (!end[7] && end[0] === P.length - 1 && end[9] && end[9][0] > 0) { const q = P[end[0]].p.clone().add(new T.Vector3(end[4], end[5], end[6]).multiplyScalar(end[9][0])); add(q, 0); mark(q, `Stopped in ${end[9][1]} · ${Math.round(end[9][0] * 100)} cm in`, css(0), 4, end[1]); }
     const pos = new Float32Array(verts.length * 3), col = new Float32Array(verts.length * 3), c = new T.Color();
     verts.forEach((q, i) => { pos.set([q.p.x, q.p.y, q.p.z], i * 3); G.R.trailColour(q.v, c); col.set([c.r, c.g, c.b], i * 3); });
     const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('color', new T.BufferAttribute(col, 3));
