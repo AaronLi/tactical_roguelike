@@ -504,7 +504,7 @@ says the same), but not whose: the shooter's name isn't shown.
     and translucent 16- and 24-rounders that show the rounds left), the **P9** (9 mm, 15 rounds, semi) or the **derringer** (two shots of .44 Magnum). It comes loaded with
     tracers, with two spare loads in your small pockets (two magazines, or for the derringer two boxes of 12).
   - **The sidearm web** (`js/arsenal.js`): what you can start with, a map you drag about and zoom, the P9 in the middle and three paths out of it. Each gun's earned with the one before it, by
-    doing what its path is about, and it's yours for good on this machine. Full auto: TX22 (15 double-tap kills with the P9), G18 (15 five-hit bursts: five hits on one suspect inside a second, once a suspect, down or not), MAC-10 (10 double kills: two inside 3 s). Heavy calibre: derringer (15 kills within 5 m), .357 Revolver (16 one-round kills), Desert Eagle (15 kills on armoured suspects), Thor .50 (15 wall-bang kills). Modern classics: M1911 (15 headshot kills), USP (15 kills on unaware suspects: down before they react, and not once they've seen you or heard gunfire), Five-seveN (15 kills past 20 m). Civilians and those who've given up don't count, and a gun only counts once it's yours.
+    doing what its path is about, and it's yours for good on this machine. Full auto: TX22 (15 double-tap kills with the P9), 92FS Burst (15 five-hit bursts: five hits on one suspect inside a second, once a suspect, down or not), G18 (15 burst kills: three hits inside 0.35 s), MAC-10 (10 double kills: two inside 3 s). Heavy calibre: derringer (15 kills within 5 m), .357 Revolver (16 one-round kills), Desert Eagle (15 kills on armoured suspects), Thor .50 (15 wall-bang kills). Modern classics: Walther PPK (15 kills on unaware suspects: down before they react, and not once they've seen you or heard gunfire), M1911 (15 headshot kills), USP (15 headshot kills past 10 m), Five-seveN (15 kills past 20 m). Each gun has a pro build too, a named set of parts earned by mastering that gun (more of what it's best at), and once it's yours you choose whether the gun starts in pro mode. Civilians and those who've given up don't count, and a gun only counts once it's yours.
   - **What's inside:** a weapon in its standard build, fully loaded. It's a long gun three times in four,
     picked by rarity. Each tier has a share of the odds, split evenly between its weapons, and deeper
     levels shift the odds toward rarer tiers. Legendaries only appear from level 3. Every weapon can turn up,
@@ -801,7 +801,7 @@ says the same), but not whose: the shooter's name isn't shown.
 
 - **53 primaries**: assault and battle rifles, SMGs, shotguns, LMGs, DMRs, bolt-action and anti-materiel snipers,
   a grenade launcher (switched off for now), a railgun and a crossbow
-- **20 sidearms**: pistols, machine pistols (a full-auto Taurus TX22 in .22 LR among them), revolvers (including a .410 shotgun revolver), a derringer,
+- **22 sidearms**: pistols, machine pistols (a full-auto Taurus TX22 in .22 LR among them), revolvers (including a .410 shotgun revolver), a derringer,
   a sawed-off, a pocket grenade launcher (switched off for now) and akimbo Berettas
 - Weapons differ in how they work, not just in stats:
   - **AN-94 hyper-burst**: the first two rounds of each trigger pull fire at 1800 rpm.

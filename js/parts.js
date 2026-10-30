@@ -637,6 +637,8 @@ G.Gunsmith = (() => {
   pst('deagle', { len: 0.252, sm: 'steel', w: 0.032 }, 'rubber', { fm: 'steel' });
   pst('g19', { len: 0.17 }, 'polymer');
   pst('fiveseven', { len: 0.208, w: 0.026 }, 'polymer');
+  pst('b92', { len: 0.217, sm: 'blued', w: 0.03 }, 'polymer', { fm: 'blued' });
+  pst('ppk', { len: 0.155, sm: 'steel', w: 0.023 }, 'polymer', { fm: 'steel', hammer: true });
   pst('akimbo', { len: 0.2, sm: 'blued', w: 0.026 }, 'woodDark', { fm: 'blued' });
   // revolvers
   P('rev', 'revolver', { cl: 0.042, cr: 0.021 }, { barrel: { len: 0.1 }, grip: ['rev', null, 'woodDark'], optic: ['pso', { optic: 'notch' }], loader: true });

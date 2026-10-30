@@ -1058,7 +1058,7 @@ G.Game = {
     // who's taken it (the squad's own picks: told by the host)
     const takers = (id) => Object.entries(arms).filter(([pid, a]) => a === id && roster[pid]).map(([pid]) => `<i style="color:${G.U.hex(roster[pid].color)}">${G.Callsigns.html(roster[pid].animal)}${G.U.esc(roster[pid].name)}</i>`);
     const others = Object.keys(roster).filter((pid) => pid !== G.Net.myId), waiting = others.filter((pid) => !arms[pid]).length;
-    const pic = (id) => { const it = G.Gear.gunItem(G.Me.makeWeapon(id)), [cw, ch] = G.Gear.size(it); return G.Icons.of(it, cw, ch, false); };
+    const pic = (id) => { const it = G.Gear.gunItem(G.Me.makeWeapon(id, A.proOn(id) ? A.build(id) : undefined)), [cw, ch] = G.Gear.size(it); return G.Icons.of(it, cw, ch, false); };
     // the web: a ring for each step out, spokes between, and the paths on it
     const W = 1200, spokes = [...Array(6)].map((_, i) => ((-90 + i * 60) * Math.PI) / 180), spot = (a, r) => [Math.cos(a) * r, Math.sin(a) * r], rings = A.RINGS.slice(1);
     const web = rings.map((r) => `<polygon points="${spokes.map((a) => spot(a, r).map((v) => v.toFixed(1)).join()).join(' ')}"/>`).join('') + spokes.map((a) => { const [x, y] = spot(a, rings[rings.length - 1]); return `<line x1="0" y1="0" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"/>`; }).join('');
@@ -1067,7 +1067,7 @@ G.Game = {
       return `<line class="strand" x1="${x0}" y1="${y0}" x2="${x1}" y2="${y1}"/>${f > 0 ? `<line class="strand on" x1="${x0}" y1="${y0}" x2="${(x0 + (x1 - x0) * f).toFixed(1)}" y2="${(y0 + (y1 - y0) * f).toFixed(1)}"/>` : ''}`;
     }).join('');
     const nodes = A.NODES.map((q) => {
-      const [x, y] = A.at(q), st = A.open(q.id) ? 'got' : A.open(q.from) ? 'next' : 'far', tip = st === 'next' ? `<small>${A.left(q)}/${q.n} ${G.U.esc(q.what)}</small>` : st === 'far' ? '<small>Locked</small>' : '';
+      const [x, y] = A.at(q), st = A.open(q.id) ? 'got' : A.open(q.from) ? 'next' : 'far', tip = st === 'next' ? `<small>${A.left(q)}/${q.n} ${G.U.esc(q.what)}</small>` : st === 'far' ? '<small>Locked</small>' : A.proGot(q.id) ? `<small>${A.proOn(q.id) ? 'Pro: ' : 'Pro earned: '}${G.U.esc(q.pro.name)}</small>` : '';
       return `<button class="web-node ${st}${this.armLook === q.id ? ' look' : ''}${this.armSel === q.id ? ' sel' : ''}" data-arm="${q.id}" style="left:${x.toFixed(1)}px;top:${y.toFixed(1)}px"><img src="${pic(q.id)}" alt="" draggable="false"><b>${G.U.esc(A.name(q.id))}</b>${tip}</button>`;
     }).join('');
     const paths = Object.entries(A.PATHS).map(([k, p]) => { const [x, y] = A.along(k, A.RINGS[p.len] + 165); return `<span class="web-path" style="left:${x.toFixed(1)}px;top:${y.toFixed(1)}px">${p.name}</span>`; }).join('');
@@ -1075,13 +1075,16 @@ G.Game = {
     const id = this.armLook, q = A.BY.get(id), d = G.WEAPONS[id], cal = G.CALIBERS[G.calOf(d)], got = A.open(id), modes = (d.modes || [d.mode]).map((m) => G.MODE_NAME[m]).join(' / ');
     const nextOn = A.NODES.filter((c) => c.from === id && !A.open(c.id)).map((c) => `<li><b>${G.U.esc(A.name(c.id))}</b> <span>${A.left(c)}/${c.n}</span> ${G.U.esc(c.what)}<small>${G.U.esc(c.how)}</small></li>`).join('');
     const ask = got ? '' : A.open(q.from) ? `<div class="web-ask"><b>${A.left(q)}/${q.n} ${G.U.esc(q.what)}</b> with the ${G.U.esc(A.name(q.from))}<small>${G.U.esc(q.how)}</small></div>` : `<div class="web-ask far"><b>Locked</b> Earn the ${G.U.esc(A.name(q.from))} first.</div>`;
+    // its pro build: what it takes, or the choice of starting with it
+    const P = q.pro, parts = A.partNames(id).map((n) => `<li>${G.U.esc(n)}</li>`).join('');
+    const pro = !got ? '' : `<h4>Pro build</h4><div class="web-pro${A.proGot(id) ? ' got' : ''}"><b>${G.U.esc(P.name)}</b><ul>${parts}</ul>${A.proGot(id) ? `<label><input type="checkbox" data-armpro ${A.proOn(id) ? 'checked' : ''}> Start in pro mode</label>` : `<span>${Math.min(P.n, A.count(id, P.stat))}/${P.n}</span> ${G.U.esc(P.what)} with this gun`}</div>`;
     const was = el.querySelector('.web-world');
     el.innerHTML = `<div class="web-full"><div class="web-view"><div class="web-world"><svg viewBox="${-W} ${-W} ${W * 2} ${W * 2}" style="left:${-W}px;top:${-W}px;width:${W * 2}px;height:${W * 2}px" aria-hidden="true"><g class="web-lines">${web}</g>${strands}</svg>${paths}${nodes}</div>
         <div class="web-head"><h2>Your sidearm</h2><p>Drag to move · scroll to zoom · click a gun</p></div><button class="btn web-home" data-armhome>Back to the P9</button></div>
       <aside class="web-side"><img src="${pic(id)}" alt=""><h3>${G.U.esc(d.name)}</h3><div class="arm-stats"><span>${cal ? cal.name : ''}</span><span>${d.mag} round${d.mag === 1 ? '' : 's'}</span><span>${modes}</span><span>${G.U.fmt(Math.round(G.Ballistics.energy(d)))} J · ${d.rpm} rpm</span></div><em>${G.U.esc(d.desc)}</em>${ask}
-        ${nextOn ? `<h4>With this gun</h4><ul class="web-next">${nextOn}</ul>` : ''}${others.length && got ? `<span class="arm-who">${takers(id).join('') || '<small>no one yet</small>'}</span>` : ''}
+        ${nextOn ? `<h4>With this gun</h4><ul class="web-next">${nextOn}</ul>` : ''}${pro}${others.length && got ? `<span class="arm-who">${takers(id).join('') || '<small>no one yet</small>'}</span>` : ''}
         <div class="web-foot"><p>Your own equipment, not a squad vote, and what you earn here stays yours. It starts loaded with tracers, two spare loads in your pocket.</p>${others.length ? `<p class="arm-note">${waiting ? `${waiting} of the squad still choosing.` : 'The squad have all chosen.'}</p>` : ''}
-        <button class="btn primary arm-ok" data-armok ${got ? '' : 'disabled'}>${got ? `Take the ${G.U.esc(d.name)}` : 'Not yet yours'}</button></div></aside></div>`;
+        <button class="btn primary arm-ok" data-armok ${got ? '' : 'disabled'}>${got ? `Take the ${G.U.esc(d.name)}${A.proOn(id) ? ` ${G.U.esc(P.name)}` : ''}` : 'Not yet yours'}</button></div></aside></div>`;
     el.classList.remove('hidden');
     const place = () => { const v = this.armView, w = el.querySelector('.web-world'); if (w) w.style.transform = `translate(${v.x.toFixed(1)}px, ${v.y.toFixed(1)}px) scale(${v.z.toFixed(3)})`; };
     this.armPlace = place;
@@ -1117,6 +1120,8 @@ G.Game = {
         const dragged = moved; moved = false;
         if (G.Me.sidearmChosen) return;
         const b = e.target.closest('[data-arm]'), ok = e.target.closest('[data-armok]');
+        const tick = e.target.closest('[data-armpro]');
+        if (tick) { G.Arsenal.proSet(this.armLook, tick.checked); G.Audio.click(); return this.sidearmPick(); }
         if (e.target.closest('[data-armhome]')) { go(0, 0); G.Audio.click(); return this.sidearmPick(); }
         if (b) {
           if (dragged) return; // (it was a drag that started on it)
@@ -1126,7 +1131,7 @@ G.Game = {
         }
         if (!ok || ok.disabled || !G.Arsenal.open(this.armLook)) return;
         const id = this.armLook;
-        G.Me.setSidearm(id); G.Audio.click();
+        G.Me.setSidearm(id, G.Arsenal.proOn(id) ? G.Arsenal.build(id) : undefined); G.Audio.click();
         G.Net.toHost({ t: 'arm', id }); // (so the squad sees it)
         G.HUD.toast('', `Sidearm: ${G.WEAPONS[id].name}`, 1.4);
         this.armSel = this.armLook = null; this.sidearmPick(); this.renderRoute();

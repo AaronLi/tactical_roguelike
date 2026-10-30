@@ -27,8 +27,8 @@ G.Me = {
   },
   // the sidearm you start a run with (js/arsenal.js), loaded with tracers, and two spare loads of them in the small
   // pockets (in place of the last one's)
-  setSidearm(id) {
-    const w = this.makeWeapon(id), am = G.ammoOk(G.calOf(w.def), 'tracer');
+  setSidearm(id, build) {
+    const w = this.makeWeapon(id, build), am = G.ammoOk(G.calOf(w.def), 'tracer');
     w.ammo = am; w.tube = w.tube.map(() => am); if (w.chamber) w.chamber = am;
     this.weapons.s = w; this.slot = 's';
     for (const g of [this.pockets[2], this.pockets[3]]) {
