@@ -1073,8 +1073,8 @@ G.Game = {
     const paths = Object.entries(A.PATHS).map(([k, p]) => { const [x, y] = A.along(k, A.RINGS[p.len] + 165); return `<span class="web-path" style="left:${x.toFixed(1)}px;top:${y.toFixed(1)}px">${p.name}</span>`; }).join('');
     // what you're looking at: the gun, and what it takes
     const id = this.armLook, q = A.BY.get(id), d = G.WEAPONS[id], cal = G.CALIBERS[G.calOf(d)], got = A.open(id), modes = (d.modes || [d.mode]).map((m) => G.MODE_NAME[m]).join(' / ');
-    const nextOn = A.NODES.filter((c) => c.from === id && !A.open(c.id)).map((c) => `<li><b>${G.U.esc(A.name(c.id))}</b> <span>${A.left(c)}/${c.n}</span> ${G.U.esc(c.what)}<small>${G.U.esc(c.how)} At most ${c.most} a level.</small></li>`).join('');
-    const ask = got ? '' : A.open(q.from) ? `<div class="web-ask"><b>${A.left(q)}/${q.n} ${G.U.esc(q.what)}</b> with the ${G.U.esc(A.name(q.from))}<small>${G.U.esc(q.how)} At most ${q.most} a level.</small></div>` : `<div class="web-ask far"><b>Locked</b> Earn the ${G.U.esc(A.name(q.from))} first.</div>`;
+    const nextOn = A.NODES.filter((c) => c.from === id && !A.open(c.id)).map((c) => `<li><b>${G.U.esc(A.name(c.id))}</b> <span>${A.left(c)}/${c.n}</span> ${G.U.esc(c.what)}<small>${G.U.esc(c.how)}</small></li>`).join('');
+    const ask = got ? '' : A.open(q.from) ? `<div class="web-ask"><b>${A.left(q)}/${q.n} ${G.U.esc(q.what)}</b> with the ${G.U.esc(A.name(q.from))}<small>${G.U.esc(q.how)}</small></div>` : `<div class="web-ask far"><b>Locked</b> Earn the ${G.U.esc(A.name(q.from))} first.</div>`;
     const was = el.querySelector('.web-world');
     el.innerHTML = `<div class="web-full"><div class="web-view"><div class="web-world"><svg viewBox="${-W} ${-W} ${W * 2} ${W * 2}" style="left:${-W}px;top:${-W}px;width:${W * 2}px;height:${W * 2}px" aria-hidden="true"><g class="web-lines">${web}</g>${strands}</svg>${paths}${nodes}</div>
         <div class="web-head"><h2>Your sidearm</h2><p>Drag to move · scroll to zoom · click a gun</p></div><button class="btn web-home" data-armhome>Back to the P9</button></div>
@@ -1164,7 +1164,6 @@ G.Game = {
     G.Net.toHost({ t: 'pick', n });
   },
   enterLevel(level, seed, th) {
-    if (G.Arsenal) G.Arsenal.level(`${seed}:${level}`);
     this.caseUI = null; // (a new run's level 1 has a new case, whatever the last one's number was)
     this.leaveHub();
     this.phase = 'level';
