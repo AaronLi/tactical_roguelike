@@ -29,13 +29,17 @@ G.Materials = (() => {
   const m = (name, K, rho, sig, fx, o) => Object.assign({ name, K, rho, sig, fx, E: CORE_E, mu: 0.3, e: 0.15 }, o || {});
   const MAT = {
     // armour (K, E, blunt, wearJ: the NIJ calibration, js/ballistics.js)
-    aramid: m('aramid', 72, 1440, 3e8, 'soft', { E: { lead: 1, mild: 1.25, hard: 1.45, wc: 1.5 }, blunt: 0.25, wearJ: 900, soft: true, noRic: true }),
-    pe: m('UHMWPE', 77, 970, 2.5e8, 'soft', { E: { lead: 1, mild: 1.35, hard: 1.75, wc: 2 }, blunt: 0.15, wearJ: 2200, noRic: true }),
+    aramid: m('aramid', 72, 1440, 3e8, 'soft', { E: { lead: 1, mild: 1.25, hard: 1.45, wc: 1.5 }, blunt: 0.25, wearJ: 900, soft: true, noRic: true, damp: 0.6 }),
+    pe: m('UHMWPE', 77, 970, 2.5e8, 'soft', { E: { lead: 1, mild: 1.35, hard: 1.75, wc: 2 }, blunt: 0.15, wearJ: 2200, noRic: true, damp: 0.7 }),
     steel: m('steel', 163, 7850, 2.4e9, 'metal', { E: { lead: 0.9, mild: 1.1, hard: 1.5, wc: 1.9 }, blunt: 0.1, wearJ: 4500, hard: true, mu: 0.1, e: 0.25 }),
     ceramic: m('ceramic', 146, 3900, 4e9, 'stone', { E: { lead: 0.8, mild: 0.9, hard: 1, wc: 1.25 }, blunt: 0.08, wearJ: 1600, hard: true, mu: 0.15, e: 0.2 }),
     pc: m('polycarbonate', 55, 1200, 1.2e8, 'plastic', { E: { lead: 1, mild: 1.2, hard: 1.4, wc: 1.5 }, blunt: 0.2, wearJ: 900 }),
     abs: m('ABS', 25, 1050, 6e7, 'plastic', { E: { lead: 1, mild: 1.1, hard: 1.2, wc: 1.3 }, blunt: 0.4, wearJ: 300 }),
-    // people: the skull's outer table, for a round skimming it (the rest of a body: js/ballistics.js through)
+    // armour's trimmings (ARMOUR): damp, the share of a stopped round's back-face energy that gets past a layer behind it
+    nylon: m('nylon cover', 1.2, 1150, 8e7, 'soft', { noRic: true, blunt: 0.3, wearJ: 900, damp: 0.95 }),
+    polyurea: m('spall liner', 4, 1100, 3e7, 'plastic', { noRic: true, blunt: 0.3, wearJ: 900, damp: 0.8 }),
+    pad: m('trauma pad', 0.5, 90, 4e5, 'soft', { noRic: true, blunt: 0.3, wearJ: 900, damp: 0.55 }),
+    // people: the skull's outer table, for a round skimming it (the rest of a body: TISSUE)
     bone: m('bone', 14, 1900, 1.6e8, 'soft', { mu: 0.2, e: 0.15 }),
     // metals
     mild: m('mild steel', 120, 7850, 1.2e9, 'metal', { E: { lead: 1, mild: 0.85, hard: 1.4, wc: 1.6 }, mu: 0.12, e: 0.22 }),
@@ -72,6 +76,31 @@ G.Materials = (() => {
     bpglass: m('laminated glass', 30, 2300, 2e8, 'glass', { mu: 0.15, e: 0.2 }),
     paperT: m('paper target', 0.5, 700, 1e6, 'soft', { noRic: true }),
   };
+  // What a body's made of, for a round going through it a step at a time (js/ballistics.js through): density, and the stress it
+  // stands up to, which is what a round has to pay per unit of its track whatever its speed. Skin is tough (about 10 J for a
+  // 9 mm to break through it, why a spent round stops under the skin on its way out); bone is hard and dense in its cortex
+  // and light inside; lung is mostly air. bone: it deforms and turns a round, and breaks into fragments of its own.
+  const TISSUE = {
+    skin: { name: 'skin', rho: 1100, sig: 8e7 }, fat: { name: 'fat', rho: 920, sig: 2e5 }, muscle: { name: 'muscle', rho: 1060, sig: 4e5 },
+    viscera: { name: 'viscera', rho: 1040, sig: 2.5e5 }, liver: { name: 'liver', rho: 1060, sig: 2.5e5 }, heart: { name: 'heart', rho: 1060, sig: 4e5 },
+    brain: { name: 'brain', rho: 1040, sig: 1.5e5 }, lung: { name: 'lung', rho: 400, sig: 1.5e5 }, airway: { name: 'airway', rho: 600, sig: 2e5 }, vessel: { name: 'blood vessel', rho: 1060, sig: 2e5 },
+    cortical: { name: 'cortical bone', rho: 1900, sig: 1.6e8, bone: true }, cancellous: { name: 'cancellous bone', rho: 1000, sig: 8e6, bone: true }, marrow: { name: 'marrow', rho: 980, sig: 2e5 },
+    rib: { name: 'rib', rho: 1500, sig: 7e7, bone: true }, diploe: { name: 'diploë', rho: 1200, sig: 1.5e7, bone: true },
+  };
+  // What's over a plate or a panel, and behind it, as worn, by where it's worn (the ballistic element itself: each piece's
+  // prot layers, js/gear.js): the carrier's cover, a steel plate's spall liner, the trauma pad against your chest, a
+  // helmet's cover and its pads.
+  const ARMOUR = {
+    plate: [[['nylon', 1]], [['pad', 8], ['nylon', 1]]], side: [[['nylon', 1]], [['pad', 5], ['nylon', 1]]], torso: [[['nylon', 1]], [['nylon', 1]]],
+    groin: [[['nylon', 1]], [['nylon', 1]]], shoulder: [[['nylon', 1]], [['nylon', 1]]], thigh: [[['nylon', 1]], [['nylon', 1]]],
+    helmet: [[['nylon', 0.5]], [['pad', 15]]], face: [[], []],
+  };
+  // a piece's protection as it's really layered, outside in
+  function built(pr) {
+    const [over, under] = ARMOUR[pr.at] || [[], []], core = [];
+    for (const l of pr.layers) { core.push(l); if (l[0] === 'steel') core.push(['polyurea', 3]); }
+    return [...over, ...core, ...under];
+  }
   const C = (skin, core = null, fill = 1, stud = null) => ({ skin, core, fill, stud });
   const SOLID = (mat) => C([], mat), ONE = (skin) => Object.assign(C(skin), { one: true }); // (ONE: a single sheet, however thick its box: a pane, a plank fence)
   const STUD = { every: 0.4, w: 0.038, mat: 'pine', mm: 89 }, STEELSTUD = { every: 0.6, w: 0.04, mat: 'mild', mm: 1.8 };
@@ -140,5 +169,5 @@ G.Materials = (() => {
         return theme.hub ? SOLID('concrete') : CRATE;
     }
   }
-  return { MAT, CORE_E, PROPS, WALLS, of, outAt };
+  return { MAT, TISSUE, CORE_E, PROPS, WALLS, of, outAt, built };
 })();

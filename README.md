@@ -1290,6 +1290,15 @@ says the same), but not whose: the shooter's name isn't shown.
     finished wounds go to whoever was hit, who takes them as they are (`applyWounds`), wear on their armour included.
     So what you saw land is what landed.
   - **The squad** sees the holes, exits and ricochets of a round as they happened (`rfx`).
+- **Armour and bodies are layers** (`js/materials.js` TISSUE, ARMOUR; `js/ballistics.js` through), met in order and each worked out
+  as itself. Armour as worn: the carrier's cover, the strike face, the backer, a steel plate's spall liner, the trauma pad;
+  the other way round leaving through a back plate. A stopped round's back-face energy is damped by each layer behind
+  what stopped it. A body: skin (about 10 J for a 9 mm to break through, why a spent round stops under it on the way out),
+  fat, muscle, each part its own thicknesses; the ribcage (ribs about every 3 cm with muscle between, the breastbone, the
+  shoulder blades); the skull as outer table, diploë and inner table; organs in their own tissues; bones a cortical shell
+  round cancellous bone or marrow. A bone deforms a round, turns it, tips it over, and shatters: its splinters tear
+  tracks of their own. With the hitboxes on (F9) the readout lists the last round's path through its target, layer by
+  layer, with its speed into each.
 - **Damage is the energy a round leaves** (`js/ballistics.js` effects): what it deposited in a part, plus what reached the
   body through armour as blunt trauma, as a share of what a person can take (`PERSON_J`, 1600 J). Nothing else: no
   multipliers, no curve. Square on an unarmoured torso that's about 11% for a .22, 27% for 9 mm, 30% for a hollow point,

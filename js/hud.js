@@ -169,6 +169,7 @@ G.HUD = {
         out.push(`<div class="hb-sec"><div class="hb-row"><span>Blood ${Math.round(b.blood)}%</span><span>${b.pk ? 'painkillers' : ''}${st.dn && st.bl > 0 ? ` · bleeds out in ${st.bl} s` : ''}</span></div>${rows.join('')}</div>`);
       }
     }
+    if (this.hbPath) out.push(`<div class="hb-sec"><span class="hb-k">Last round through them</span><div class="hb-path">${this.hbPath.map((q) => `${esc(q.m)} <b>${q.v}</b>`).join(' › ')}</div></div>`);
     this.set('hbInfo', this.trailLegend() + out.join(''));
     this.xray(who, true);
   },

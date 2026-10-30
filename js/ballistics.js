@@ -39,9 +39,15 @@
 // bone(s) and (arm and thigh) its artery. Ported from tactical_game's anatomy (src/preview3d.ts) and refitted to these
 // bodies.
 //
+// Armour and a body are both worked out layer by layer, in the order the round meets them. A piece of armour is what it is
+// as worn (js/materials.js built): the carrier's cover, the strike face, the backer, a steel plate's spall liner, the
+// trauma pad, each struck in turn (the other way about, leaving through a back plate); a stopped round's back-face energy
+// is damped by each layer behind the one that stopped it. A body is skin, fat and muscle (each part its own thicknesses:
+// seg.wall), the ribcage in the chest (real ribs, gaps between them, the breastbone and shoulder blades), the skull as its
+// outer table, diploë and inner table, the organs, and the bones as a cortical shell round cancellous bone or marrow,
+// each its own density and strength (js/materials.js TISSUE), stepped at a millimetre where layers are thin.
 // In tissue a round sheds speed with depth as a projectile does in a dense, slightly solid medium (Poncelet): drag,
-// dv/dx = -ρ·Cd·A/(2m)·v, and the tissue's strength, σ·A of force whatever the speed (SIGMA, less in aerated lung, more
-// in bone), which is what stops slow rounds: its frontal area A and drag Cd set by how it's flying: nose-first, then
+// dv/dx = -ρ·Cd·A/(2m)·v, and the tissue's strength, σ·A of force whatever the speed, which is what stops slow rounds: its frontal area A and drag Cd set by how it's flying: nose-first, then
 // (rifle rounds, past their yaw depth: 12 cm for 5.56, 26 for 7.62x39) tumbling side-on; a hollow point opens to 1.37×
 // its diameter once it's going fast enough (70% of its own muzzle speed, or less); a .22's soft lead flattens to 1.3×; a rifle round tumbling above its fragmentation speed (5.56 ball at ~760 m/s) breaks, its core going on
 // and a spray of fragments tearing their own short tracks. Lung is light (aerated), bone dense (and it breaks, and
@@ -165,13 +171,19 @@ G.Ballistics = (() => {
     return q;
   }
   // A stack of layers, outside in: what's left of the round (ric: it glanced off the first).
-  function stack(p, v, layers, cond, cosT) {
-    let absorbed = 0, blunt = 0;
+  function stack(p, v, layers, cond, cosT, log) {
+    let absorbed = 0, blunt = 0, first = true;
     for (let i = 0; i < layers.length; i++) {
-      const [mat, mm] = layers[i], q = strike(p, v, mat, mm, cond, cosT, i === 0);
+      const [mat, mm] = layers[i], M = MAT[mat], v0 = v, q = strike(p, v, mat, mm, cond, cosT, first);
+      if (first && !M.noRic) first = false; // (it's the first thing that can turn it that can: not a nylon cover)
       absorbed += q.absorbed;
+      if (log) log.push({ m: M.name, v: Math.round(v0) });
       if (q.ric) return { through: false, v: 0, absorbed, blunt: 0, glance: true, ric: q, stoppedBy: mat };
-      if (!q.through) { blunt = q.absorbed * MAT[mat].blunt; return { through: false, v: 0, absorbed, blunt, glance: false, stoppedBy: mat }; }
+      if (!q.through) {
+        blunt = q.absorbed * M.blunt; // (the back face bulges: what's behind it takes some of that)
+        for (let j = i + 1; j < layers.length; j++) blunt *= MAT[layers[j][0]].damp == null ? 0.9 : MAT[layers[j][0]].damp;
+        return { through: false, v: 0, absorbed, blunt, glance: false, stoppedBy: mat };
+      }
       v = q.v;
     }
     return { through: true, v, absorbed, blunt: 0 };
@@ -272,6 +284,19 @@ G.Ballistics = (() => {
   // L: the body's left (-x in the torso's frames; the left limbs' bones).
   const PAIRED = ['carotid', 'kidney', 'iliac', 'pelvis', 'humerus', 'forearm', 'brachial', 'femur', 'femoral', 'tibia'];
   for (const id of PAIRED) { const o = ORG[id]; delete ORG[id]; for (const [S, w] of [['L', 'Left'], ['R', 'Right']]) ORG[id + S] = Object.assign({}, o, { label: `${w} ${o.label[0].toLowerCase()}${o.label.slice(1)}`, pair: id }); }
+  // the materials of the organs (TISSUE), and of the bones, their cortical shell's thickness (m) and what's inside it
+  for (const [id, O] of Object.entries(ORG)) {
+    const k = O.pair || id;
+    O.mat = { brain: 'brain', brainstem: 'brain', heart: 'heart', lungL: 'lung', lungR: 'lung', liver: 'liver', trachea: 'airway', carotid: 'vessel', aorta: 'vessel', iliac: 'vessel', brachial: 'vessel', femoral: 'vessel' }[k] || 'viscera';
+    const b = { spineC: [0.002, 'cancellous'], spineT: [0.0025, 'cancellous'], pelvis: [0.0025, 'cancellous'], skull: [0.002, 'diploe'], humerus: [0.004, 'marrow'], forearm: [0.003, 'marrow'], femur: [0.006, 'marrow'], tibia: [0.005, 'marrow'] }[k];
+    if (b) [O.cortex, O.core] = b;
+  }
+  // a segment's layers from the skin in ([tissue, mm]), and what fills the rest
+  const WALL = {
+    cranium: [[['skin', 2], ['fat', 4], ['cortical', 2], ['diploe', 3], ['cortical', 2]], 'brain'], jaw: [[['skin', 2], ['muscle', 8], ['cortical', 3]], 'muscle'], neck: [[['skin', 2], ['fat', 3]], 'muscle'],
+    chest: [[['skin', 2], ['fat', 8], ['muscle', 16], ['rib', 12]], 'viscera'], abdomen: [[['skin', 2], ['fat', 18], ['muscle', 12]], 'viscera'], pelvis: [[['skin', 2], ['fat', 18], ['muscle', 25]], 'viscera'],
+    uarm: [[['skin', 2], ['fat', 4]], 'muscle'], farm: [[['skin', 2], ['fat', 3]], 'muscle'], thigh: [[['skin', 2], ['fat', 8]], 'muscle'], shin: [[['skin', 2], ['fat', 3]], 'muscle'],
+  };
   function segs() {
     if (segs.list) return segs.list;
     const L = [];
@@ -295,7 +320,10 @@ G.Ballistics = (() => {
       L.push(cyl('thigh', 'th' + S, leg, -0.44, 0, 0.064, 0.088, 1, { side: S, organs: [['femur' + S, C_([0, -0.02, 0.005], [0, -0.42, 0.005], 0.016)], ['femoral' + S, C_([-s * 0.03, -0.03, -0.035], [-s * 0.02, -0.3, -0.02], 0.006)]] }));
       L.push(cyl('shin', 'sh' + S, leg, -0.44, 0, 0.046, 0.061, 1, { side: S, organs: [['tibia' + S, C_([0, -0.02, -0.02], [0, -0.4, -0.02], 0.013)], ['tibia' + S, C_([s * 0.025, -0.03, 0.005], [s * 0.025, -0.4, 0.005], 0.006)]] }));
     }
-    for (const sg of L) { sg.bb = bbox(sg); for (const o of sg.organs || []) o.push(shapeBox(o[1])); }
+    for (const sg of L) {
+      sg.bb = bbox(sg); for (const o of sg.organs || []) o.push(shapeBox(o[1]));
+      [sg.wall, sg.fill] = WALL[sg.id]; sg.wallT = sg.wall.reduce((a, l) => a + l[1], 0) / 1000;
+    }
     return (segs.list = L);
   }
   // the local bounding box of a segment, and of an organ's shape (inflated later by the temporary cavity's reach)
@@ -314,6 +342,29 @@ G.Ballistics = (() => {
     if (q.y < s.y0 || q.y > s.y1) return -1;
     const rx = s.rx(q.y), rz = rx * s.kz, k = (q.x / rx) ** 2 + (q.z / rz) ** 2;
     return k <= 1 ? 1 - Math.sqrt(k) : -1;
+  }
+  // how far under the skin q is (m), along the way out from the middle (k: inSeg's)
+  function under(s, q, k) {
+    if (s.kind === 'ell') { const rho = 1 - k; return rho > 1e-3 ? k * Math.hypot(q.x - s.c[0], q.y - s.c[1], q.z - s.c[2]) / rho : 1; }
+    const rho = 1 - k; return rho > 1e-3 ? k * Math.hypot(q.x, q.z) / rho : 1;
+  }
+  // the layer of the wall of that part at dep under the skin (a key of js/materials.js TISSUE), or null: past it. In the chest
+  // the ribs are bands round it (one about every 3 cm, each 1.5 cm wide), muscle between; the breastbone's down the front,
+  // the shoulder blades over the back.
+  function wallAt(s, q, dep) {
+    if (dep >= s.wallT) return null;
+    let d = 0;
+    for (const [mat, mm] of s.wall) {
+      d += mm / 1000;
+      if (dep >= d) continue;
+      if (mat !== 'rib') {
+        if (s.id === 'chest' && mat === 'muscle' && q.z > 0.04 && q.y > 0.15 && Math.abs(q.x) > 0.05 && Math.abs(q.x) < 0.14 && dep > d - 0.006) return 'cortical'; // (a shoulder blade)
+        return mat;
+      }
+      if (q.z < 0 && Math.abs(q.x) < 0.03) return 'rib'; // (the breastbone)
+      return ((q.y % 0.032) + 0.032) % 0.032 < 0.015 ? 'rib' : 'muscle';
+    }
+    return null;
   }
   // the surface normal at (or near) local point q
   function normal(s, q, out) {
@@ -339,7 +390,7 @@ G.Ballistics = (() => {
   }
 
   // ---------------------------------------------------------------- a round through a body
-  const RHO_SOFT = 1060, CAV_C = 1.5e6, V_STOP = 45, STEP = 0.004;
+  const CAV_C = 1.5e6, V_STOP = 45, STEP = 0.004, FINE = 0.001; // (STEP: through soft tissue; FINE: through thin layers and bone)
   // The temporary cavity tears what can't stretch that far: tissue gives about CAV_TEAR (2.5 cm) of it, and inside what's
   // left (a cavity of radius r: within r - CAV_TEAR of the track) an organ that doesn't stretch well (stretch >= TEAR_S:
   // brain, brainstem, heart, liver, spleen, kidneys, the big arteries) is torn apart. Lung, bowel, stomach and muscle
@@ -349,13 +400,9 @@ G.Ballistics = (() => {
   const CAV_TEAR = 0.025, TEAR_S = 0.5;
   // tissue strength (Pa, at soft tissue's density: scaled by density, so lung resists less and bone more), and drag:
   // nose-first round-nosed, a pellet (a sphere), tumbling side-on, opened (a hollow point, flattened lead)
-  const SIGMA = 0.4e6, CD = { fmj: 0.66, ball: 0.75, yaw: 0.62, open: 0.66 }, EXPAND = 1.37;
-  // skin: tougher than what's under it, each time a round crosses it (in, and out again) it costs what some centimetres of
-  // tissue would (so a slow round that's nearly spent stops under the skin on the way out, as they do)
-  // and the chest's wall (ribs, breastbone, the muscle between): bone-dense, 3 cm of it, at its front and back (skin: 5 cm)
-  const SURF = { skin: 0.05, wall: 0.03, vSkin: 70 }; // (and what's left under vSkin at the far side stays under it)
-  // one step of tissue: the speed after it, through drag then the tissue's strength (0 when that stops it)
-  const slow = (v, m, A, Cd, rho, ds) => { const v1 = v * Math.exp(-rho * Cd * A / (2 * m) * ds), e = 0.5 * m * v1 * v1 - SIGMA * (rho / RHO_SOFT) * A * ds; return e > 0 ? Math.sqrt(2 * e / m) : 0; };
+  const CD = { fmj: 0.66, ball: 0.75, yaw: 0.62, open: 0.66 }, EXPAND = 1.37;
+  // one step of a tissue: the speed after it, through drag then the tissue's strength (0 when that stops it)
+  const slow = (v, m, A, Cd, M, ds) => { const v1 = v * Math.exp(-M.rho * Cd * A / (2 * m) * ds), e = 0.5 * m * v1 * v1 - M.sig * A * ds; return e > 0 ? Math.sqrt(2 * e / m) : 0; };
   const _o = new T.Vector3(), _u = new T.Vector3(), _q = new T.Vector3(), _w = new T.Vector3(), _n = new T.Vector3(), _ud = new T.Vector3();
   // armour pieces on that body: [{ piece (its def), cond (0..1), wear(J) (to record what it soaked) }]
   // Returns { hits: [ { part, side, seg, E, crush, organs: { id: dmg }, blunt, armour: [...] } ], exitV, stopped, entryT }
@@ -397,7 +444,7 @@ G.Ballistics = (() => {
     const armourAt = (m, q, entering) => {
       // the layers that cover this point, outside in (plates, then the soft armour behind them)
       const out = [];
-      for (const a of armour || []) for (const pr of a.def.prot || []) if (covers(pr.at, a.def, m.s, q)) out.push({ a, pr });
+      for (const a of armour || []) for (const pr of a.def.prot || []) if (covers(pr.at, a.def, m.s, q)) out.push({ a, pr, L: entering ? G.Materials.built(pr) : G.Materials.built(pr).reverse() });
       out.sort((x, y) => (x.pr.at === 'torso' ? 1 : 0) - (y.pr.at === 'torso' ? 1 : 0)); // (soft backers last)
       if (!entering) out.reverse();
       return out;
@@ -408,8 +455,8 @@ G.Ballistics = (() => {
       _ud.copy(u).transformDirection(m.inv);
       const cosT = Math.abs(normal(m.s, q, _n).dot(_ud));
       const h = hitOf(m.s);
-      for (const { a, pr } of cov) {
-        const r = stack(p, v, pr.layers, a.cond, cosT);
+      for (const { a, pr, L } of cov) {
+        const r = stack(p, v, L, a.cond, cosT, res.log);
         a.wear = (a.wear || 0) + r.absorbed;
         h.armour.push({ piece: a, through: r.through, glance: r.glance, absorbed: r.absorbed, at: pr.at });
         if (r.ric) { glanced(m, q, r.ric); h.blunt += r.absorbed * MAT[r.stoppedBy].blunt; return false; } // (off the plate and away)
@@ -422,22 +469,24 @@ G.Ballistics = (() => {
     // how it presents now: frontal area and drag (nose-first, tumbling, opened)
     const shape = () => [p.nose === 'broad' ? area(0.03) : yawed ? p.d * p.len * 0.85 : area(p.d) * (p.nose === 'dart' ? 0.6 : 1),
       yawed ? CD.yaw : expanded || p.flat ? CD.open : p.nose === 'ball' ? CD.ball : CD.fmj];
-    const skin = (m) => {
-      const [A, Cd] = shape(); let v1 = slow(v, p.m, A, Cd, RHO_SOFT, SURF.skin);
-      if (m.s.id === 'chest' && v1 > 0) v1 = slow(v1, p.m, A, Cd, 1900, SURF.wall);
-      hitOf(m.s).E += 0.5 * p.m * (v * v - v1 * v1); v = v1;
-    };
-    for (let guard = 0; guard < 2000 && t <= tHi && v > V_STOP; guard++) {
-      _w.copy(o).addScaledVector(u, t);
-      // which segment is this point in (the deepest, where two meet)?
-      let cur = null, cq = null, best = -1;
+    const log = res.log = [], note = (name) => { if (!log.length || log[log.length - 1].m !== name) log.push({ m: name, v: Math.round(v) }); }; // (what it went through, and how fast it was going into each: the F9 readout)
+    // which segment is this point in (the deepest, where two meet)?
+    const locate = (tt) => {
+      _w.copy(o).addScaledVector(u, tt);
+      let c = null, q = null, b = -1;
       for (const m of mats) {
-        if (t < m.t0 - STEP || t > m.t1 + STEP) continue;
+        if (tt < m.t0 - STEP || tt > m.t1 + STEP) continue;
         _q.copy(_w).applyMatrix4(m.inv);
         const k = inSeg(m.s, _q);
-        if (k >= 0 && k > best) { best = k; cur = m; cq = _q.clone(); }
+        if (k >= 0 && k > b) { b = k; c = m; q = _q.clone(); }
       }
-      if (cur && !prev) { // into the body (or back into it) from outside: armour on the way in, then the skin
+      return { c, q, b };
+    };
+    let ds = STEP, inBone = false;
+    for (let guard = 0; guard < 6000 && t <= tHi && v > V_STOP; guard++) {
+      let { c: cur, q: cq, b: best } = locate(t);
+      if (cur && !prev) { // into the body (or back into it) from outside: back to the skin itself, then armour on the way in
+        if (guard) { let lo = t - ds, hi = t; for (let i = 0; i < 7; i++) { const mid = (lo + hi) / 2; if (locate(mid).c) hi = mid; else lo = mid; } t = hi; ({ c: cur, q: cq, b: best } = locate(t)); }
         if (res.entryT == null) res.entryT = t;
         if (!armourPass(cur, cq, true)) break;
         if (cur.s.shell) { // (the skull's curve: a round coming in shallow skids round it, under the scalp, and off)
@@ -445,54 +494,64 @@ G.Ballistics = (() => {
           const cs = Math.abs(normal(cur.s, cq, _n).dot(_ud));
           if (glances(p, v, 'bone', cur.s.shell * 1000, cs)) { const rr = ricochet(p, v, 'bone', cs); hitOf(cur.s).E += rr.absorbed; hitOf(cur.s).crush += 0.5; glanced(cur, cq, rr); break; }
         }
-        skin(cur); if (v <= V_STOP) break;
-      } else if (!cur && prev) { // out of it: the skin, then armour on the way out (the back plate)
-        skin(prev); if (v <= SURF.vSkin) { hitOf(prev.s).E += 0.5 * p.m * v * v; v = 0; break; } // (it stops there: all of it left in them)
+      } else if (!cur && prev) { // out of it: armour on the way out (the back plate)
         if (!armourPass(prev, prevQ, false)) break;
       }
+      ds = STEP;
       if (cur) {
-        const s = cur.s, h = hitOf(s), ds = STEP;
-        // what it's going through here: an organ, the skull, or flesh
-        let rho = RHO_SOFT, inOrg = null;
-        for (const [oid, sh, bb] of s.organs || []) {
-          if (cq.x < bb[0] - 0.12 || cq.x > bb[3] + 0.12 || cq.y < bb[1] - 0.12 || cq.y > bb[4] + 0.12 || cq.z < bb[2] - 0.12 || cq.z > bb[5] + 0.12) continue;
+        const s = cur.s, h = hitOf(s);
+        // what it's going through here: the layer of the wall it's in, an organ or a bone, or what fills the part
+        const dep = under(s, cq, best), wl = wallAt(s, cq, dep);
+        let key = wl || s.fill, inOrg = null;
+        if (wl !== 'skin') for (const [oid, sh, bb] of s.organs || []) {
+          if (cq.x < bb[0] || cq.x > bb[3] || cq.y < bb[1] || cq.y > bb[4] || cq.z < bb[2] || cq.z > bb[5]) continue;
           const dist = orgDist(sh, cq);
-          if (dist <= 0) { inOrg = inOrg || oid; rho = ORG[oid].tissue; }
+          if (dist > 0) continue;
+          inOrg = inOrg || oid;
+          const O = ORG[oid]; key = O.bone ? (-dist < O.cortex ? 'cortical' : O.core) : O.mat;
         }
-        if (s.shell && best < s.shell / Math.min(...s.r)) { rho = 1900; inOrg = inOrg || 'skull'; }
-        const bone = inOrg && ORG[inOrg].bone;
+        if (s.shell && (wl === 'cortical' || wl === 'diploe')) inOrg = inOrg || 'skull';
+        const M = G.Materials.TISSUE[key], bone = !!M.bone, hard = bone || wl === 'skin';
+        if (wl || bone) ds = FINE;
+        note(M.name);
         // how it's flying: nose first, tumbling side-on, or opened up
         depth += ds * 100;
         if (p.nose === 'hp' && !expanded && !p.deformed && v >= (p.vExp || 300) && depth > 0.8) { expanded = true; p.d *= EXPAND; p.yaw = 0; }
         if (p.soft && !p.flat && !p.deformed && depth > 2) { p.flat = true; p.d *= p.soft; }
         if (!yawed && !expanded && p.yaw && depth >= p.yaw) yawed = true;
         if (bone && !yawed && !expanded && p.nose === 'fmj' && p.yaw) yawed = true; // (bone tips it over)
-        if (bone && p.core === 'lead' && !p.deformed) { p.deformed = true; p.d *= 1.15; }
-        if (bone) res.dev = Math.hypot(res.dev, 0.03);
+        if (bone && !inBone) { // into a bone: it does to the round what any hard thing does, and it shatters (splinters flying on along the track)
+          deform(p, v, v, MAT.bone, 8);
+          if (v > 250) for (let i = 0; i < 3; i++) frags.push({ t, v: v * 0.45, m: 0.0003, dir: jitter(u, 0.5) });
+        }
+        inBone = bone;
         // fragmenting: tumbling above its threshold, the core sheds 40% of itself as six fragments
         if (yawed && p.frag && v >= p.frag && !p.split) {
           p.split = true; const mf = p.m * 0.4 / 6; p.m *= 0.6;
           for (let i = 0; i < 6; i++) frags.push({ t, v, m: mf, dir: jitter(u, 0.18) });
         }
-        const [A, Cd] = shape(), v1 = slow(v, p.m, A, Cd, rho, ds), dE = 0.5 * p.m * (v * v - v1 * v1);
+        const [A, Cd] = shape(), v1 = slow(v, p.m, A, Cd, M, ds), dE = 0.5 * p.m * (v * v - v1 * v1);
         const crush = A * ds * 1e6 * (p.nose === 'broad' ? 1.5 : 1); // cm³
         h.E += dE; h.crush += crush;
-        // the temporary cavity: its reach, and the organs it stretches (and those the track crushes)
-        const rT = Math.sqrt(dE / ds / (Math.PI * CAV_C));
+        if (bone && v1 > 0) res.dev = Math.hypot(res.dev, (1 - v1 / v) * 0.7); // (a bone throws it off line by what it took)
+        // the temporary cavity: its reach, and the organs it stretches (and those the track crushes). Skin and bone give up their
+        // energy tearing and breaking, not throwing tissue outward: it's the flesh it's moving through that makes the cavity
+        const dC = hard ? 0.5 * p.m * (v * v - slow(v, p.m, A, Cd, G.Materials.TISSUE.muscle, ds) ** 2) : dE, rT = Math.sqrt(dC / ds / (Math.PI * CAV_C));
         for (const [oid, sh, bb] of s.organs || []) {
           if (cq.x < bb[0] - rT || cq.x > bb[3] + rT || cq.y < bb[1] - rT || cq.y > bb[4] + rT || cq.z < bb[2] - rT || cq.z > bb[5] + rT) continue;
           const dist = orgDist(sh, cq), O = ORG[oid];
-          if (dist <= 0) { h.organs[oid] = (h.organs[oid] || 0) + crush + dE * (O.stretch || 0) * 0.01; (h.pierced || (h.pierced = {}))[oid] = 1; }
+          if (dist <= 0) { h.organs[oid] = (h.organs[oid] || 0) + crush + dC * (O.stretch || 0) * 0.01; (h.pierced || (h.pierced = {}))[oid] = 1; }
           else if (dist < rT && O.stretch) {
-            h.organs[oid] = (h.organs[oid] || 0) + dE * O.stretch * 0.01 * (1 - dist / rT);
+            h.organs[oid] = (h.organs[oid] || 0) + dC * O.stretch * 0.01 * (1 - dist / rT);
             if (O.stretch >= TEAR_S && dist < rT - CAV_TEAR) (h.torn || (h.torn = {}))[oid] = 1;
           }
         }
         if (inOrg === 'skull') h.organs.skull = (h.organs.skull || 0) + crush;
         if (trace) trace.push({ t, rP: Math.sqrt(A / Math.PI), rT, v: v1, yawed, expanded, bone: s.bone }); // (bone: the one the segment it's in hangs from)
         v = v1;
+        if (v <= V_STOP) { h.E += 0.5 * p.m * v * v; v = 0; } // (the last of it, left where it stopped)
       }
-      prev = cur; prevQ = cq; t += STEP;
+      prev = cur; prevQ = cq; t += ds;
     }
     // the fragments: each tears its own short track from where it broke off (the same sums, a small jagged chip)
     for (const f of frags) { const len = fragment(mats, o, u, f, hitOf); if (trace) (trace.frags = trace.frags || []).push({ t: f.t, dir: f.dir, len }); }
@@ -556,7 +615,7 @@ G.Ballistics = (() => {
       let cur = null, cq = null;
       for (const m of mats) { _q.copy(_w).applyMatrix4(m.inv); if (inSeg(m.s, _q) >= 0) { cur = m; cq = _q.clone(); break; } }
       if (!cur) continue;
-      const v1 = slow(v, f.m, A, Cd, RHO_SOFT, STEP), dE = 0.5 * f.m * (v * v - v1 * v1), crush = A * STEP * 1e6, h = hitOf(cur.s);
+      const v1 = slow(v, f.m, A, Cd, G.Materials.TISSUE.muscle, STEP), dE = 0.5 * f.m * (v * v - v1 * v1), crush = A * STEP * 1e6, h = hitOf(cur.s);
       h.E += dE; h.crush += crush;
       for (const [oid, sh] of cur.s.organs || []) if (orgDist(sh, cq) <= 0) h.organs[oid] = (h.organs[oid] || 0) + crush + dE * (ORG[oid].stretch || 0) * 0.01;
       v = v1;
@@ -726,5 +785,5 @@ G.Ballistics = (() => {
   const AT_NAME = { plate: 'chest plate', side: 'sides', torso: 'chest and stomach', groin: 'groin', shoulder: 'shoulders', thigh: 'thighs', helmet: 'head', face: 'face' };
   const layersText = (L) => L.map(([m, mm]) => `${mm} mm ${MAT[m].name}`).join(' + ');
 
-  return { CAL, MAT, ORG, EFFECT, SURF, PERSON_J, energy, flightDrag, strike, crossSolid, deflect, mark, armourState, stateArmour, outcome, loadNotes, mainLayers, AT_NAME, layersText, projectile, layer, stack, through, probe, boneOf, effects, segs, covers, brim, kitArmour, suspectArmour, wearOut, self, rating, THREATS };
+  return { CAL, MAT, ORG, EFFECT, PERSON_J, energy, flightDrag, strike, crossSolid, deflect, mark, armourState, stateArmour, outcome, loadNotes, mainLayers, AT_NAME, layersText, projectile, layer, stack, through, probe, boneOf, effects, segs, covers, brim, kitArmour, suspectArmour, wearOut, self, rating, THREATS };
 })();

@@ -1132,7 +1132,7 @@ G.Me = {
         if (!r || r.entryT == null) continue; // (inside the hitbox, outside the body: a near miss)
         b.hit.add(ev || mate || this);
         const hp = o.clone().addScaledVector(d, r.entryT);
-        if (tr) this.trailTrack(b, o, d, r, v, tr, h.self ? null : rig);
+        if (tr) { this.trailTrack(b, o, d, r, v, tr, h.self ? null : rig); G.HUD.hbPath = r.log.concat({ m: r.exitV ? 'out' : 'stopped', v: Math.round(r.exitV) }); } // (F9: what it went through)
         if (ev) {
           B.wearOut(armour);
           this.hitEnemy(ev, r);
