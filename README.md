@@ -1328,9 +1328,9 @@ says the same), but not whose: the shooter's name isn't shown.
 - **Glass fractures before it falls** (`js/damage.js` crack): a round through a pane cracks all of it, from where it struck out to the frame, and it stays up. A second round
   brings it down, or a blast, or walking into it. Bulletproof glass still just stars.
 - **A round to the head throws it** (`js/player.js` headHit): the round's momentum is a blow about your neck, from where it struck and the way it was going, so the
-  forehead tips your head back, the side rolls it away, a cheek turns it, and a helmet that stops the round doesn't stop that. The more you've got on your head the
-  further it goes and the slower it comes back (a helmet and what's on its mount weigh what they weigh: `kg` in `js/gear.js`): a 7.62 to the forehead is about 5 degrees bare-headed and
-  17 under a rifle helmet and face shield. Only your view goes: the gun stays where you were aiming.
+  forehead tips your head back, the side rolls it away, a cheek turns it, and a helmet that stops the round doesn't stop that. What's on your head is more for the blow to
+  move and for your neck to bring back, so it goes a little less far and takes longer about it, and what hangs out in front of your neck (`kg` and `fwd` in `js/gear.js`: a face shield) tips it
+  further. Only your view goes: the gun stays where you were aiming.
 - **Doors can be shot apart** (`js/damage.js`, `js/server.js` doorHit): a door's handle and each of its three hinges take a certain amount of energy (400 J the
   handle, 600 J a hinge: a rifle round or two pistol rounds). Shoot out the handle and the latch lets go and it swings open. Shoot out all
   its hinges and nothing's holding it: it falls, a rigid body on what's round it, tipped the way the last round was going. Its fall's worked out

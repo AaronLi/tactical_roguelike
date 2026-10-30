@@ -616,15 +616,17 @@ G.Me = {
     hk.y = G.U.clamp(hk.y + hk.vy * dt, -0.6, 0.6); hk.p = G.U.clamp(hk.p + hk.vp * dt, -0.6, 0.6); hk.r = G.U.clamp(hk.r + hk.vr * dt, -0.6, 0.6);
   },
   // Rounds to your head (js/ballistics.js outcome: [where from the neck x y z, its way x y z, momentum left there]) throw it, as a blow does: about your neck, so
-  // the forehead tips it back, the side rolls it away and a cheek turns it. What's on your head makes it worse: your neck has more to stop, so it goes further and
-  // comes back slower. Only your head goes: the gun's still where you were aiming (update: it's in with the recoil's punch).
-  HEAD_KICK: { K: 3.6, PER_KG: 0.2, W: 15, SLOW: 0.4 },
+  // the forehead tips it back, the side rolls it away and a cheek turns it. What's on your head is more for the blow to move and for your neck to bring back, so it
+  // goes a little less far and takes longer about it; what hangs out in front (a face shield) tips it further. Only your head goes: the gun's still where you were
+  // aiming (update: it's in with the recoil's punch).
+  // (K: the kick for a bare head. INERTIA: what a kg on your head adds to moving it. W: how fast a bare head comes back. NOSE: the tip for each kg m out in front.)
+  HEAD_KICK: { K: 7, INERTIA: 0.3, W: 15, NOSE: 1.5 },
   headHit(hd) {
-    const H = this.HEAD_KICK, kg = G.Gear.headKg(this), hk = this.hk, inv = new THREE.Quaternion().setFromEuler(new THREE.Euler(this.pitch, this.yaw, 0, 'YXZ')).invert(), k = H.K * (1 + kg * H.PER_KG);
-    hk.w = H.W / Math.sqrt(1 + kg * H.SLOW);
+    const H = this.HEAD_KICK, load = G.Gear.headLoad(this), I = 1 + load.kg * H.INERTIA, hk = this.hk, inv = new THREE.Quaternion().setFromEuler(new THREE.Euler(this.pitch, this.yaw, 0, 'YXZ')).invert(), k = H.K / I;
+    hk.w = H.W / Math.sqrt(I);
     for (const [x, y, z, ux, uy, uz, mv] of hd) {
       const r = new THREE.Vector3(x, y, z).applyQuaternion(inv), p = new THREE.Vector3(ux, uy, uz).applyQuaternion(inv).multiplyScalar(mv), t = r.cross(p); // (in your view: x right, y up, z back; so t.x's pitch up, t.y yaw left, t.z roll)
-      hk.vp += t.x * k; hk.vy += t.y * k; hk.vr += t.z * k;
+      hk.vp += t.x * k * (1 + load.nose * H.NOSE); hk.vy += t.y * k; hk.vr += t.z * k;
     }
   },
   // how far the gun can come back toward you (m): aiming, its sight's eye relief short of your eye; from the hip, more
