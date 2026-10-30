@@ -1315,7 +1315,7 @@ says the same), but not whose: the shooter's name isn't shown.
   its speed past their armour and the energy that cost, its exit speed or where it stopped and in what, where it broke up, and how far
   each piece went and what it weighed. The readout lists the same for each shot.
 - **Rounds cut real holes in walls and doors** (`js/damage.js`): the wall's geometry is rebuilt with the hole left out of it and a bore lined down the
-  way the round went, so an angled shot leaves an angled hole. Every round leaves its own hole, overlapping whatever's there, with each lining stopping where it
+  way the round went, so an angled shot leaves an angled hole. A round into a flat face leaves a crater, its mouth wider than the bullet and its sides broken in to the bore (not sheet metal: that tears, nor doors); a round into a crater starts its own from that depth, wider the deeper it is, so fire into one place digs a funnel till it comes out of the back of the wall. Every round leaves its own hole, overlapping whatever's there, with each lining stopping where it
   comes out into the next. What's between a round and the nearest holes chips away from both sides, further the bigger the hole, and close enough it breaks
   through; a round landing mostly in what's already gone only chews the edge of it. So a burst tears a ragged gap with every round still to be seen in its outline. Marks are cut against
   every opening and stop at the wall's ends, and a strip too thin to stand crumbles, so nothing lies across a hole or hangs in the air. Near a wall's end (a door jamb, a corner) a hit breaks a
@@ -1323,7 +1323,7 @@ says the same), but not whose: the shooter's name isn't shown.
   through it. Concrete, block and brick crack, the cracks real slits running out of the hole; wood's torn long along the grain with splinters at
   its ends; metal tears, its petals bent along the round's line going in and coming out; a round steel stops only dents it. A round that stops in a
   wall leaves a blind hole, and the next one into it starts from the bottom, so a wall too thick to go through is shot through by hitting
-  the same place (67 cm of concrete takes a 7.62x51 about 17 rounds). Everyone sees the same holes, whoever joins later included, and the
+  the same place (67 cm of concrete takes a rifle about 28 rounds). Everyone sees the same holes, whoever joins later included, and the
   replays cut them as the rounds get there. Furniture, floors, ceilings, lintels and the wall round a window keep their marks instead.
 - **Glass fractures before it falls** (`js/damage.js` crack): a round through a pane cracks all of it, from where it struck out to the frame, and it stays up. A second round
   brings it down, or a blast, or walking into it. Bulletproof glass still just stars.

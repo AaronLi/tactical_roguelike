@@ -2,7 +2,7 @@
 // What a round really does to a wall or a door: it takes the material away. js/scars.js draws what's left round the damage; this cuts it.
 //   A hit's a record (rec, below) that means the same on every screen, told to the squad as the marks are ('hole'), and it's the
 //   same record in the replays (from a round's path). apply() takes one and:
-//   - bores a hole along the round's line: the hole's outline in the face it went in by, a bore lined down the way it went, the outline in
+//   - bores a hole along the round's line: the hole's outline in the face it went in by, a crater in from that to a bore lined down the way it went, the outline in
 //     the face it came out of, or a floor where it stopped. Rounds and looks go down a bore (js/world.js raycast: bore), and one that
 //     comes to the floor of a blind hole starts from there, so a wall too thick to go through is shot through by hitting the same place.
 //   - leaves it its own hole, whatever's beside it: holes overlap, and each one's lining stops where it comes out into the next (inBore). What's between two
@@ -18,12 +18,13 @@
 //   Furniture, floors, ceilings, lintels and the wall round a window aren't cut: they keep their marks.
 G.Damage = (() => {
   const T = THREE, N = 36, MAX = 900, BORE = 0.85, REACH = 0.17, THIN = 0.012; // (N: the points round a hole. MAX: holes in a level; after that, marks only. BORE: how wide it is past its mouth, as a share of its radius. REACH: how near a wall's end a hit breaks a piece off it. THIN: narrower than this, what's left between two holes has crumbled)
-  const CRACK = (o) => Object.assign({ jag: 0.22, sy: 1, spikes: 5, reach: 5, r: 0.026, lining: 0x6c6a64 }, o);
-  // what a hole is like in each material: r its radius (m) for a rifle round, how rough, how long up the grain, cracks or splinters
+  const CRACK = (o) => Object.assign({ jag: 0.22, sy: 1, spikes: 5, reach: 5, r: 0.026, pit: 1.9, lining: 0x6c6a64 }, o);
+  // what a hole is like in each material: r its radius (m) for a rifle round, how rough, how long up the grain, cracks or splinters, and pit: how many times that its
+  // mouth is, sloping in to the bore (a crater: what's round the round breaks away). Metal doesn't: it tears
   const HOLE = {
     concrete: CRACK({}), cmu: CRACK({ r: 0.03, lining: 0x7a7870 }), brick: CRACK({ r: 0.03, lining: 0x7c4230 }), ceram: CRACK({ lining: 0xcfcdc6, r: 0.016 }), iron: CRACK({ r: 0.016, lining: 0x3a3a3c }),
-    pine: { r: 0.03, jag: 0.42, sy: 1.7, spikes: 6, reach: 2.4, lining: 0xb89a68, grain: true, flap: { c: 0xd8bb82, l: 1.5, h: 0.9 } }, ply: { r: 0.03, jag: 0.45, sy: 1.5, spikes: 6, reach: 2.2, lining: 0xb89a68, grain: true, flap: { c: 0xd8bb82, l: 1.5, h: 0.9 } }, hardwood: { r: 0.028, jag: 0.4, sy: 1.7, spikes: 6, reach: 2.4, lining: 0x7e5430, grain: true, flap: { c: 0x9a6a3a, l: 1.5, h: 0.9 } },
-    mdf: { r: 0.03, jag: 0.34, sy: 1, spikes: 0, reach: 1, lining: 0xa08458 }, gypsum: { r: 0.026, jag: 0.2, sy: 1, spikes: 2, reach: 2, lining: 0xcfcabc, flap: { c: 0xf0ece0, l: 0.8, h: 0.3 } },
+    pine: { r: 0.03, pit: 1.5, jag: 0.42, sy: 1.7, spikes: 6, reach: 2.4, lining: 0xb89a68, grain: true, flap: { c: 0xd8bb82, l: 1.5, h: 0.9 } }, ply: { r: 0.03, pit: 1.5, jag: 0.45, sy: 1.5, spikes: 6, reach: 2.2, lining: 0xb89a68, grain: true, flap: { c: 0xd8bb82, l: 1.5, h: 0.9 } }, hardwood: { r: 0.028, pit: 1.5, jag: 0.4, sy: 1.7, spikes: 6, reach: 2.4, lining: 0x7e5430, grain: true, flap: { c: 0x9a6a3a, l: 1.5, h: 0.9 } },
+    mdf: { r: 0.03, pit: 1.6, jag: 0.34, sy: 1, spikes: 0, reach: 1, lining: 0xa08458 }, gypsum: { r: 0.026, pit: 1.7, jag: 0.2, sy: 1, spikes: 2, reach: 2, lining: 0xcfcabc, flap: { c: 0xf0ece0, l: 0.8, h: 0.3 } },
     mild: { r: 0.016, jag: 0.14, sy: 1, spikes: 0, reach: 1, lining: 0x8a929a, metal: true, flap: { c: 0xaeb6be, m: 1, l: 1.3, h: 1, in: 1 } }, steel: { r: 0.014, jag: 0.14, sy: 1, spikes: 0, reach: 1, lining: 0x8a929a, metal: true, flap: { c: 0xaeb6be, m: 1, l: 1.3, h: 1, in: 1 } }, alu: { r: 0.018, jag: 0.18, sy: 1, spikes: 0, reach: 1, lining: 0xb8bec4, metal: true, flap: { c: 0xd4d8dc, m: 1, l: 1.5, h: 1, in: 1 } },
   };
   const rngOf = (s) => () => { s = (Math.imul(s, 1597334677) + 12345) | 0; return ((s ^ (s >>> 15)) >>> 0) / 4294967296; };
@@ -175,26 +176,33 @@ G.Damage = (() => {
     return p;
   });
   const i0 = (q) => Math.round(q.c[0] * 500 + q.c[1] * 700);
+  // how wide a hole is that far down it, as a share of its outline: a crater closing to its bore, or a bore all the way
+  const wideAt = (H, s) => (!H.pit ? BORE : s < H.pit ? 1 + ((H.neck - 1) * Math.max(s, 0)) / H.pit : H.neck);
   // Is a point inside a hole, down its bore or in its mouths? (k: a little inside its edge, so linings meet in a rough edge, with no gap between them)
   function inBore(O, p, k = 0.9) {
     const x = p.x - O.a[0], y = p.y - O.a[1], z = p.z - O.a[2], u = O.u, s = x * u[0] + y * u[1] + z * u[2];
     if (s < -0.03 || s > O.len + 0.004) return false;
     const py = y - u[1] * s, h = O.fa.ax === 0 ? z - u[2] * s : x - u[0] * s, a = Math.atan2(py, h), M = O.fb && s > O.len - 0.03 ? O.fb : s < 0.03 ? O.fa : null;
-    return Math.hypot(h, py) <= (M ? radAt(M, a) : O.fa.core[nth(a)] * BORE) * k;
+    return Math.hypot(h, py) <= (M ? radAt(M, a) : O.fa.core[nth(a)] * wideAt(O, s)) * k;
   }
-  // the holes whose bores reach into this one, in either of its faces
+  // the holes whose bores reach into this one, in either of its faces (the nearest of them: a wall that's been shot to bits has dozens)
   function neighbours(D, H) {
     const out = new Set();
     for (const F of [H.fa, H.fb]) if (F) for (const f of D.faces.get(F.key) || []) { const o = f.owner; if (o && o !== H && !o.bite && Math.hypot(f.c[0] - F.c[0], f.c[1] - F.c[1]) < f.max + F.max + 0.02) out.add(o); }
-    return [...out];
+    return [...out].sort((a, b) => Math.hypot(a.a[0] - H.a[0], a.a[1] - H.a[1], a.a[2] - H.a[2]) - Math.hypot(b.a[0] - H.a[0], b.a[1] - H.a[1], b.a[2] - H.a[2])).slice(0, 8);
   }
   // the bore's lining, and its floor if it's blind: not where it's come out into a hole beside it (cut small there, to follow it)
   function bore(H, D) {
     const pos = [], col = [], u = new T.Vector3(...H.u), F = H.fa, FB = H.fb, shallow = Math.min(0.02, H.len * 0.3), near = neighbours(D, H), keep = near.length ? (p) => !near.some((o) => inBore(o, p)) : null;
     const run = (A, B, ka, kb, n = 1) => { const m = keep ? n : 1; let P = A, kp = ka; for (let s = 1; s <= m; s++) { const Q = s === m ? B : A.map((q, i) => q.clone().lerp(B[i], s / m)), kq = ka + ((kb - ka) * s) / m; strip(P, Q, kp, kq, pos, col, keep); P = Q; kp = kq; } };
     // (its mouth goes straight back, cracks and all, then in to the bore: nothing stands across the opening)
-    const a0 = ring3(F), aD = ring3(F, 1, u, shallow), a1 = ring3(F, BORE, u, shallow), z1 = FB ? ring3(FB, BORE, u, -shallow) : ring3(F, BORE, u, H.len);
-    run(a0, aD, 0.72, 0.6); run(aD, a1, 0.6, 0.5, 3); run(a1, z1, 0.5, FB ? 0.5 : 0.22, Math.ceil(H.len / 0.1));
+    const neck = H.pit ? H.neck : BORE, a0 = ring3(F), aD = ring3(F, 1, u, shallow), a1 = ring3(F, neck, u, H.pit || shallow), z1 = FB ? ring3(FB, BORE, u, -shallow) : ring3(F, neck, u, H.len);
+    run(a0, aD, 0.72, 0.6);
+    if (H.pit) { // (a crater's sides: rough, broken in to the bore)
+      const rnd = rngOf(i0(F)), J = H.pit * 0.16, mid = aD.map((p, i) => p.clone().lerp(a1[i], 0.5).add(new T.Vector3((rnd() - 0.5) * J, (rnd() - 0.5) * J, (rnd() - 0.5) * J)));
+      run(aD, mid, 0.6, 0.48, 2); run(mid, a1, 0.48, 0.36, 2);
+    } else run(aD, a1, 0.6, 0.5, 3);
+    run(a1, z1, H.pit ? 0.36 : 0.5, FB ? 0.5 : 0.22, Math.ceil(H.len / 0.1));
     if (FB) { const zD = ring3(FB, 1, u, -shallow); run(z1, zD, 0.5, 0.6, 3); run(zD, ring3(FB), 0.6, 0.72); }
     else { const mid = z1.reduce((s, p) => s.add(p), new T.Vector3()).divideScalar(N); run(z1, z1.map(() => mid), 0.18, 0.18, 3); }
     return { pos, col };
@@ -457,7 +465,7 @@ G.Damage = (() => {
     const inside = H.bite ? (t) => inBite(H, o[0] + d[0] * t, o[1] + d[1] * t, o[2] + d[2] * t) : (t) => {
       const x = o[0] + d[0] * t - A[0], y = o[1] + d[1] * t - A[1], z = o[2] + d[2] * t - A[2], s = x * u[0] + y * u[1] + z * u[2];
       if (s < -0.03 || s > H.len) return false;
-      const px = x - u[0] * s, py = y - u[1] * s, pz = z - u[2] * s, h = F.ax === 0 ? pz : px, rr = F.core[nth(Math.atan2(py, h))] * BORE * 0.95;
+      const px = x - u[0] * s, py = y - u[1] * s, pz = z - u[2] * s, h = F.ax === 0 ? pz : px, rr = F.core[nth(Math.atan2(py, h))] * wideAt(H, s) * 0.95;
       return h * h + py * py <= rr * rr;
     };
     if (!inside(t0 + 1e-3)) return t0;
@@ -545,6 +553,13 @@ G.Damage = (() => {
     rec.id = seedOf(a) ^ (seedOf(rec.b || u.map((v) => v * 40)) * 7);
     return rec;
   }
+  function forget(D, H) {
+    D.holes.splice(D.holes.indexOf(H), 1);
+    for (const F of [H.fa, H.fb]) if (F) { const l = D.faces.get(F.key) || [], i = l.indexOf(F); if (i >= 0) l.splice(i, 1); }
+    if (H.home) H.home.holes.splice(H.home.holes.indexOf(H), 1);
+    for (const q of H.solids || []) q.holes.splice(q.holes.indexOf(H), 1);
+    unline(H);
+  }
   const gone = (F, O) => F.pts.filter((p) => inOutline(O, p)).length >= N * 0.75;
   // (a round breaks through to what's nearest it, not to everything in reach)
   const nearest = (F, list) => [...list].sort((a, b) => Math.hypot(a.c[0] - F.c[0], a.c[1] - F.c[1]) - Math.hypot(b.c[0] - F.c[0], b.c[1] - F.c[1])).slice(0, 2);
@@ -555,7 +570,7 @@ G.Damage = (() => {
     D.seen.add(rec.id);
     const a = rec.a, n = rec.n, in0 = [a[0] - n[0] * 0.01, a[1] - n[1] * 0.01, a[2] - n[2] * 0.01];
     let door = null, wall = false;
-    G.World.query(w, in0.map((v) => v - 0.02), in0.map((v) => v + 0.02), (s) => { if (s.door && (s.kind === 'door' || s.kind === 'leaf') && s.glass == null) door = s.door; else if (s.kind === 'wall' && !s.edge && !s.win) wall = true; });
+    G.World.query(w, in0.map((v) => v - 0.02), in0.map((v) => v + 0.02), (s) => { if (s.door && (s.kind === 'door' || s.kind === 'leaf') && s.glass == null) door = s.door; else if (s.kind === 'wall' && !s.edge && !s.win) wall = s; });
     const look = HOLE[rec.m] || HOLE.concrete, R = radius(rec.m, rec.J, rec.c), seed = seedOf(a);
     if (door) {
       if (!rec.b) return false;
@@ -575,7 +590,7 @@ G.Damage = (() => {
     if (!wall) return false;
     const fm = floorOf(map, a[1]), ax = axisOf(n), len = rec.b ? Math.hypot(rec.b[0] - a[0], rec.b[1] - a[1], rec.b[2] - a[2]) : rec.d;
     // down a hole that's already there, to its floor: it goes deeper
-    const deep = D.holes.find((H) => { const x = a[0] - H.a[0], y = a[1] - H.a[1], z = a[2] - H.a[2], s = x * H.u[0] + y * H.u[1] + z * H.u[2], r = H.fa.max * 1.1; return s > 0.02 && s < H.len + 0.05 && x * x + y * y + z * z - s * s < r * r; });
+    const deep = D.holes.find((H) => { if (H.pit) return false; const x = a[0] - H.a[0], y = a[1] - H.a[1], z = a[2] - H.a[2], s = x * H.u[0] + y * H.u[1] + z * H.u[2], r = H.fa.max * 1.1; return s > 0.02 && s < H.len + 0.05 && x * x + y * y + z * z - s * s < r * r; });
     if (deep) {
       const s = (a[0] - deep.a[0]) * deep.u[0] + (a[1] - deep.a[1]) * deep.u[1] + (a[2] - deep.a[2]) * deep.u[2];
       deep.len = Math.max(deep.len, s + len);
@@ -592,15 +607,30 @@ G.Damage = (() => {
       if (rec.b && axisOf(rec.nb) >= 0) apply(map, { a: rec.b, u: rec.u, n: rec.nb, m: rec.mo || rec.m, J: rec.J, c: rec.c, d: 0.03, id: rec.id + 1 }); // (the far side: what's blown out of it)
       return true;
     }
-    const out = rec.b && axisOf(rec.nb) >= 0 ? rec.b : null;
-    const H = { u: rec.u, len, r: R, R0: R, look, m: rec.m, J: rec.J, c: rec.c };
-    H.fa = inFace(fm, rec.m, a, n, outline(seed, look, R)); H.a = H.fa.a;
-    if (out) H.fb = inFace(fm, rec.mo || rec.m, out, rec.nb, outline(seed + 5, look, R, 1.3));
+    let out = rec.b && axisOf(rec.nb) >= 0 ? rec.b : null, nOut = rec.nb;
+    // (into a crater, however far down: its own, from as deep as that is, with its mouth on the same face and wider the deeper it's gone. So rounds into the same
+    // place dig in and open it up, as they do a wall's end, a wall too thick to go through is gone through, and every one of them's still there to see)
+    let base = 0, dug = null;
+    for (const q of D.holes) {
+      if (!q.pit || !(q.solids || []).includes(wall)) continue; // (a crater's in its own wall: what it's come out onto is another)
+      const x = a[0] - q.a[0], y = a[1] - q.a[1], z = a[2] - q.a[2], t = x * q.u[0] + y * q.u[1] + z * q.u[2];
+      if (t > 0.004 && t < q.len + 0.03 && t > base && x * x + y * y + z * z - t * t < (q.fa.far * 1.2) ** 2) { base = t; dug = q; }
+    }
+    const at = [...a]; if (dug) at[ax] = dug.fa.plane;
+    const pit = look.pit || 0, wide = pit ? Math.min(0.32, R * pit + base * 0.4) : R, down = base ? Math.max(len, R * 0.9) : Math.max(len, R * 2.4), thick = Math.abs(at[ax] - (n[ax] > 0 ? wall.min[ax] : wall.max[ax])) / Math.max(0.2, Math.abs(rec.u[ax]));
+    let deepTo = rec.b ? len + base : pit ? base + down : len;
+    // (dug as far as the back of the wall: it's come out there, whatever a whole wall's worth would have done to the round)
+    if (pit && !out && deepTo >= thick - 0.04) { out = at.map((v, i) => +(v + rec.u[i] * thick).toFixed(4)); nOut = n.map((v) => -v); deepTo = thick; }
+    const H = { u: rec.u, len: deepTo, r: R, R0: R, look, m: rec.m, J: rec.J, c: rec.c, pit: pit ? Math.min(deepTo, base + R * 2.4) : 0, neck: pit ? (0.85 * R) / wide : 0 };
+    H.fa = inFace(fm, rec.m, at, n, pit ? outline(seed, Object.assign({}, look, { reach: Math.max(1, (look.reach * R) / wide) }), wide) : outline(seed, look, R)); H.a = H.fa.a;
+    if (out) H.fb = inFace(fm, rec.mo || rec.m, out, nOut, outline(seed + 5, look, R, 1.3));
     // (its own hole, beside whatever's there, and what's between them chips. One that's mostly gone already only chews the edge of what it landed in)
     const others = (F) => (D.faces.get(F.key) || []).filter((f) => f.owner && !f.owner.bite), rnd = rngOf(seed + 9), mine = others(H.fa);
     for (const F of [H.fa, H.fb]) if (F) for (const f of nearest(F, others(F))) chip(F, f, rnd, R);
     const home = H.fa.pts.filter((p) => mine.some((f) => inOutline(f, p))).length >= N * 0.75 && mine.find((f) => inOutline(f, H.fa.c));
-    if (home) { redraw(map, fm, home.owner); return true; }
+    if (home && !base) { redraw(map, fm, home.owner); return true; }
+    // (a crater that's taken in an older, shallower one all round: nothing of that's left to see)
+    for (const f of mine) { const o = f.owner; if (o.pit && o.len <= H.len && !o.fb && f.pts.filter((p) => inOutline(H.fa, p)).length >= N - 5) forget(D, o); }
     D.holes.push(H);
     aim(H); H.r = H.fa.max;
     onSolids(map, H); redraw(map, fm, H);
