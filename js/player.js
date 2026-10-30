@@ -1035,6 +1035,13 @@ G.Me = {
       n: 0, dist: 0, t: 0, off: muzzle.clone().sub(start), muzzle: muzzle.clone(), show, tracer, shot, hit: new Set(), proj: G.Ballistics.projectile(def, am), // (proj: the round itself, js/ballistics.js)
       trail: G.Rig.debug ? G.R.trailStart(shot, start, v0) : null }); // (F9: its path drawn as it flies, coloured by its speed, js/render.js trails)
   },
+  // A suspect's round (the host's, from js/server.js fire): as any other, flown here where the shooter's run. It goes by
+  // suspects and civilians, and what it does to an officer is worked out here, as your rounds' are.
+  enemyRound(id, from, dir, def, am, shot) {
+    const drag = G.dragOf(def, am), v0 = Math.max(40, G.roundSpeed(def, am) || 400);
+    (this.rounds = this.rounds || []).push({ p: from.clone(), v: dir.clone().multiplyScalar(v0), def, am, drag, drag0: drag, grav: G.GRAVITY, n: 0, dist: 0, t: 0, off: new THREE.Vector3(), muzzle: from.clone(), show: false, tracer: false, shot, hit: new Set(), proj: G.Ballistics.projectile(def, am), enemy: id,
+      trail: G.Rig.debug ? G.R.trailStart(shot, from, v0) : null });
+  },
   // where a round would end up if nobody's in the way: its arc, stepped against the walls only (what the squad
   // is told, to draw it going there)
   predictEnd(p0, v0, drag, grav) {
@@ -1063,7 +1070,7 @@ G.Me = {
       if (!G.Game.map || this.stepRound(b, dt)) rs.splice(i, 1);
     }
     for (const sh of shots) {
-      if (sh.ff.size) { for (const [tg, hz] of sh.ff) G.Net.toHost({ t: 'ff', tg, hz, w: sh.w, f: sh.f, am: sh.am }); sh.ff.clear(); }
+      if (sh.ff.size) { for (const [tg, q] of sh.ff) G.Net.toHost(Object.assign({ t: 'ff', tg, f: sh.f, e: sh.enemy }, q)); sh.ff.clear(); } // (what they did to a teammate)
       if (sh.fx && sh.fx.length) G.Net.toHost({ t: 'rfx', a: sh.fx.splice(0, 32), e: sh.end, w: sh.w }); // (the marks it left, for the squad)
     }
   },
@@ -1102,7 +1109,7 @@ G.Me = {
   // was turned: where it's got to, and b.v what it's doing now).
   roundSegment(b, a, dir, len) {
     const map = G.Game.map, L = G.Level, def = b.def, B = G.Ballistics;
-    if (def.explosive) {
+    if (def.explosive && !b.enemy) {
       const wall = L.raycast(map, a.x, a.y, a.z, dir.x, dir.y, dir.z, len, { glass: true }), hitWall = wall.t < len - 1e-4, wallT = Math.min(wall.t, len), hits = this.roundHits(b, a, dir, wallT), t = hits.length ? hits[0].t : hitWall ? wallT : null;
       if (t == null) { this.roundGlass(a, dir, wall, len); return null; }
       const p = a.clone().addScaledVector(dir, Math.max(0, t - 0.15));
@@ -1118,40 +1125,39 @@ G.Me = {
       const wall = L.raycast(map, o.x, o.y, o.z, d.x, d.y, d.z, rest), hitWall = !!wall.solid && wall.t < rest - 1e-4, wallT = Math.min(wall.t, rest);
       const look = hitWall ? wallT : rest + 0.8; // (a body that straddles the end of this step: all of it, now)
       for (const h of this.roundHits(b, o, d, wallT)) {
-        const tr = b.trail ? [] : null, P = b.proj; // (F9: the track through them, a step at a time, for the trail)
-        let r;
-        if (h.mate || h.self) { // a teammate (or you, off a ricochet): the wound's theirs to take (js/player.js takeHits, on their machine, through their own kit)
-          r = B.through(h.mate ? h.mate.rig : h.rig, o, d, v, P, [], look, tr);
-          if (!r || r.entryT == null) continue;
-          if (tr) this.trailTrack(b, o, d, r, v, tr, h.mate ? h.mate.rig : null);
-          b.hit.add(h.mate || this);
-          const e = [h.zone, h.c < 0.5 ? 1 : 0, h.side || 'R', Math.round(v), B.packP(P), [o.x, o.y, o.z].map((q) => Math.round(q * 100) / 100)]; // (central: through the middle of the part; how fast, in what state, from where)
-          if (h.self) this.takeHits([e], def, o.clone(), true, b.am);
-          else {
-            const list = b.shot.ff.get(h.mate.id) || [];
-            list.push(e); b.shot.ff.set(h.mate.id, list);
-            h.mate.rig.hit(d);
-            G.R.impact(o.clone().addScaledVector(d, r.entryT), null, 'blood');
-          }
-        } else {
-          const ev = h.ev, armour = B.suspectArmour(ev);
-          r = B.through(ev.rig, o, d, v, P, armour, look, tr);
-          if (!r || r.entryT == null) continue; // (inside the hitbox, outside the body: a near miss)
-          b.hit.add(ev);
+        const tr = b.trail ? [] : null, ev = h.ev, mate = h.mate; // (F9: the track through them, a step at a time, for the trail)
+        // Whoever fired it decides what it did, on what they can see: the body as it stands on this screen, and what it's wearing
+        const rig = ev ? ev.rig : mate ? mate.rig : h.rig, armour = ev ? B.suspectArmour(ev) : mate ? B.stateArmour(mate.st) : B.kitArmour(this);
+        const r = B.through(rig, o, d, v, b.proj, armour, look, tr);
+        if (!r || r.entryT == null) continue; // (inside the hitbox, outside the body: a near miss)
+        b.hit.add(ev || mate || this);
+        const hp = o.clone().addScaledVector(d, r.entryT);
+        if (tr) this.trailTrack(b, o, d, r, v, tr, h.self ? null : rig);
+        if (ev) {
           B.wearOut(armour);
-          const hp = o.clone().addScaledVector(d, r.entryT);
-          if (tr) this.trailTrack(b, o, d, r, v, tr, ev.rig);
           this.hitEnemy(ev, r);
           ev.engagedT = performance.now(); // (yours to watch: its body's physics wherever it is, js/views.js)
           ev.rig.hit(d);
           ev.selfHit = true;
           ev.lastHitDir = d.clone().setY(0).normalize();
-          if (r.hits.some((x) => x.armour.some((q) => !q.through))) { G.R.impact(hp, null, 'armor'); if (G.Audio.armorHit) G.Audio.armorHit(); }
-          if (r.hits.some((x) => x.E > 1)) {
-            G.R.impact(hp, null, 'blood');
-            // out the far side onto a wall close behind them
-            if (r.exitV) { const back = L.raycast(map, hp.x, hp.y, hp.z, d.x, d.y, d.z, 1.6); if (back.n && back.t < 1.6) G.R.bloodWall(hp.clone().addScaledVector(d, back.t), back.n, 0.25 + 0.25 * (1 - back.t / 1.6)); }
+        } else {
+          const out = B.outcome(r, armour);
+          if (h.self) {
+            if (b.enemy && G.Highlights) G.Highlights.hitBy(G.Net.myId, b.enemy);
+            this.applyWounds(out, o.clone(), !b.enemy);
+          } else { // (theirs to take, as it was here: told to them at the end of the frame)
+            const q = b.shot.ff.get(mate.id) || { ws: [], rang: 0, stopped: 0, wear: {}, at: hp.toArray().map((x) => Math.round(x * 100) / 100) };
+            q.ws.push(...out.ws); q.rang |= out.rang; q.stopped += out.stopped;
+            for (const [k, j] of Object.entries(out.wear)) q.wear[k] = (q.wear[k] || 0) + j;
+            b.shot.ff.set(mate.id, q);
+            mate.rig.hit(d);
           }
+        }
+        if (r.hits.some((x) => x.armour.some((q) => !q.through))) { G.R.impact(hp, null, 'armor'); if (G.Audio.armorHit) G.Audio.armorHit(); }
+        if (r.hits.some((x) => x.E > 1)) {
+          G.R.impact(hp, null, 'blood');
+          // out the far side onto a wall close behind them
+          if (r.exitV) { const back = L.raycast(map, hp.x, hp.y, hp.z, d.x, d.y, d.z, 1.6); if (back.n && back.t < 1.6) G.R.bloodWall(hp.clone().addScaledVector(d, back.t), back.n, 0.25 + 0.25 * (1 - back.t / 1.6)); }
         }
         b.proj = r.p;
         if (r.ric) { // off their armour (or round their skull) and away
@@ -1199,7 +1205,7 @@ G.Me = {
   // who's on the line from a along dir, out to t, nearest first
   roundHits(b, a, dir, wallT) {
     const hits = [];
-    for (const ev of G.Views.enemies.values()) {
+    if (!b.enemy) for (const ev of G.Views.enemies.values()) { // (a suspect's round looks for officers: it goes by anyone else)
       if (!ev.alive || b.hit.has(ev) || !ev.rig) continue;
       const sc = ev.def.scale;
       // cheap reject: the segment must pass within ~1.4 m of the body before testing bone capsules
@@ -1213,14 +1219,14 @@ G.Me = {
     }
     // friendly fire is on: your teammates are in the way too (not in the hangar: the range is for everyone)
     if (!G.Game.hub) for (const pv of G.Views.players.values()) {
-      if (!pv.st || pv.st.dd || !pv.rig || !pv.rig.root.visible || b.hit.has(pv)) continue;
+      if (!pv.st || pv.st.dd || !pv.st.p || !pv.rig || !pv.rig.root.visible || b.hit.has(pv)) continue;
       const cx = pv.pos.x - a.x, cy = pv.pos.y + 1 - a.y, cz = pv.pos.z - a.z, along = cx * dir.x + cy * dir.y + cz * dir.z;
       if (along < -1.5 || along > wallT + 1.5) continue;
       const h = G.Rig.raycast(pv.rig, a, dir, wallT);
       if (h) hits.push({ t: h.t, zone: h.zone, c: h.c, side: h.side, mate: pv, behind: h.behind });
     }
-    // and once it's been turned, you: a round can come back
-    if (b.events && !G.Game.hub && !b.hit.has(this) && !this.down && !this.dead) {
+    // and you: once it's been turned, a round can come back; a suspect's is meant for you
+    if ((b.events || b.enemy) && !G.Game.hub && !b.hit.has(this) && !this.down && !this.dead) {
       const cx = this.pos.x - a.x, cy = this.pos.y + 1 - a.y, cz = this.pos.z - a.z, along = cx * dir.x + cy * dir.y + cz * dir.z;
       if (along > -1 && along < wallT + 1 && Math.hypot(cx - dir.x * along, cy - dir.y * along, cz - dir.z * along) < 1.3) {
         const rig = G.Ballistics.self(), h = G.Rig.raycast(rig, a, dir, wallT);
@@ -1787,38 +1793,25 @@ G.Me = {
   // Rounds that hit you, as the enemy's are rolled by the host: [zone, central] per round (or pellet). The
   // same wounds as you deal: an unarmoured head (or a face below the helmet's brim) is a kill; elsewhere your
   // armour stops its share and wears.
-  // Rounds that hit you (the host says where: [zone, central, side] each, and from where), worked out here, physically
-  // (js/ballistics.js): from the shooter to that part of a body posed as yours is, through your kit (helmet, face
-  // shield, plate, the carrier's soft armour, as worn: each layer's condition) and then through you, organ by organ.
-  // am: the load (ball if not said).
-  takeHits(hz, wdef, from, friendly, am) { // friendly: it's a teammate's round (you aren't told whose)
-    if (hz && hz.length && G.R.particles) G.R.particles(new THREE.Vector3(this.pos.x, 1.2, this.pos.z), 4 + 2 * hz.length, 0x8a0a0a, 1.5, 1.2, 9, 0.6, null, true); // some of it lands at your feet
-    if (this.down || this.dead || G.Game.phase !== 'level' || !hz || !hz.length || !from) return;
-    const B = G.Ballistics, load = G.ammoOk(G.calOf(wdef), am), rig = B.self(), armour = B.kitArmour(this);
-    let f = 0, killed = false, rang = false, fate = null, stopped = 0;
-    const ws = [];
-    // (vAt, ps, org: how fast the round got here, the state it was in and where it last turned, if it's been through or off
-    // anything on the way: js/ballistics.js packP)
-    for (const [zone, central, side, vAt, ps, org] of hz) {
-      const src = Array.isArray(org) ? new THREE.Vector3(...org) : from, dist = src.distanceTo(this.pos), v0 = +vAt || G.roundSpeed(wdef, load, dist) || 300;
-      const to = B.aimPoint(rig, zone, !!central, side, src);
-      if (!to) continue;
-      const dir = to.clone().sub(src).normalize(), r = B.through(rig, src, dir, v0, B.unpackP(B.projectile(wdef, load), ps), armour, dist + 2);
-      if (!r || r.entryT == null) continue; // (it went past)
-      if (r.stopped && !r.glance) stopped++;
-      for (const h of r.hits) {
-        const w = B.effects(h);
-        if (h.armour.some((q) => !q.through)) rang = true;
-        if (w.effects.includes('dead')) killed = h.seg === 'jaw' ? 'Shot in the face' : h.seg === 'neck' ? 'Shot through the neck' : 'Shot in the head';
-        ws.push(w); f += w.dmg;
-      }
+  // A round's wounds on you, whole, as whoever fired it worked them out (js/ballistics.js outcome: a teammate's or a suspect's
+  // through the host, your own off a ricochet here): the wounds on your body, the wear on what you're wearing. from:
+  // where it came from; friendly: it wasn't a suspect's (you aren't told whose).
+  applyWounds(o, from, friendly) {
+    if (o.ws && o.ws.length && G.R.particles) G.R.particles(new THREE.Vector3(this.pos.x, 1.2, this.pos.z), 4 + 2 * o.ws.length, 0x8a0a0a, 1.5, 1.2, 9, 0.6, null, true); // some of it lands at your feet
+    if (this.down || this.dead || G.Game.phase !== 'level' || !from) return;
+    const B = G.Ballistics, armour = B.kitArmour(this);
+    let f = 0, killed = false, fate = null;
+    for (const [part, dmg, effects, organs, seg] of o.ws || []) {
+      if (effects.includes('dead')) killed = seg === 'jaw' ? 'Shot in the face' : seg === 'neck' ? 'Shot through the neck' : 'Shot in the head';
+      f += dmg;
+      fate = this.worse(fate, G.Med.wound(this.body, part, dmg, effects, organs));
     }
-    for (const w of ws) fate = this.worse(fate, G.Med.wound(this.body, w.part, w.dmg, w.effects, w.organs));
+    for (const a of armour) if (o.wear && o.wear[a.key]) a.wear = o.wear[a.key];
     B.wearOut(armour);
-    if (rang) G.Audio.armorHit();
+    if (o.rang) G.Audio.armorHit();
     if (killed) { this.killed(from, friendly ? 'Friendly fire' : killed); return; }
     if (fate === 'dead') { this.killed(from, friendly ? 'Friendly fire' : this.body.parts.head.hp <= 0 ? 'A head wound' : 'Bled out where they fell'); return; }
-    if (stopped && !friendly) G.Net.toHost({ t: 'saved', n: stopped }); // (your armour stopped them: js/highlights.js saved)
+    if (o.stopped && !friendly) G.Net.toHost({ t: 'saved', n: o.stopped }); // (your armour stopped them: js/highlights.js saved)
     this.hurt(f, from, fate);
   },
   // a round to the head you weren't wearing a helmet for: no bleeding out, no revive
@@ -2253,7 +2246,7 @@ G.Me = {
       p: [r2(this.pos.x), r2(this.pos.y), r2(this.pos.z)], yw: r2(this.yaw), pt: r2(this.pitch),
       hp: Math.ceil(this.hp), mhp: this.maxHp(), ar: Math.round(this.vestCond() * 100), amx: G.Gear.piece(this, 'chest') ? 100 : 0,
       pr: this.prone ? 1 : 0, dn: this.down ? 1 : 0, uc: this.out ? 1 : 0, dd: this.dead ? 1 : 0, bl: this.down ? (this.bleed == null ? -1 : Math.ceil(this.bleed)) : 0, bd: this.body ? G.Med.encode(this.body) : null,
-      w: this.cur().def.code, sk: G.Stickers.share(this.cur().stickers) || undefined, tl: this.tacFlags(this.cur()), cr: this.crouch || this.down || this.prone ? 1 : 0, ln: r2(this.lean || 0), lr: this.lowReady ? 1 : 0, sd: this.steadying ? 1 : 0, sw: this.stowed || this.held ? 1 : 0,
+      w: this.cur().def.code, ac: G.Ballistics.armourState(this), sk: G.Stickers.share(this.cur().stickers) || undefined, tl: this.tacFlags(this.cur()), cr: this.crouch || this.down || this.prone ? 1 : 0, ln: r2(this.lean || 0), lr: this.lowReady ? 1 : 0, sd: this.steadying ? 1 : 0, sw: this.stowed || this.held ? 1 : 0,
       hk: this.held ? (this.held.kind === 'flash' ? 2 : 1) : 0, hc: this.held && this.held.cock ? 1 : 0, hs: this.held ? this.held.str : 0,
       rl: this.reloading && this.reloadTotal ? r2(G.U.clamp(1 - this.reloadT / this.reloadTotal, 0, 1)) : -1, in: this.inspectT > 0 && this.inspectDur ? r2(1 - this.inspectT / this.inspectDur) : this.rChk ? r2(0.58 + (G.VMAnim.INSPECT_HOLD - 0.58) * this.rChk.k) : -1,
       mc: this.magChk ? r2(this.magChk.back > 0 ? Math.max(0, 1 - this.magChk.back) : this.magChk.k) : -1,

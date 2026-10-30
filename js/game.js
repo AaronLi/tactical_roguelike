@@ -512,8 +512,10 @@ G.Game = {
       case 'ping': if (this.phase === 'level') G.Views.addPing(m.id, m.p); break;
       case 'ffhit': { // a teammate's rounds in you (or, seen from outside, in someone else)
         if (this.phase !== 'level') break;
-        const def = G.Gunsmith.fromCode(m.w), f = new THREE.Vector3(m.f[0], m.f[1], m.f[2]);
-        if (m.tg === G.Net.myId && def) { G.Me.takeHits(m.hz, def, f, true, m.am); G.HUD.toast('', 'Friendly fire', 1.6); } // (you're told it was friendly, not whose)
+        const f = new THREE.Vector3(m.f[0], m.f[1], m.f[2]);
+        if (m.e && G.Highlights) G.Highlights.hitBy(m.tg, m.e);
+        if (m.tg === G.Net.myId) { G.Me.applyWounds(m, f, !m.e); if (!m.e) G.HUD.toast('', 'Friendly fire', 1.6); } // (you're told it was friendly, not whose)
+        else if (m.by !== G.Net.myId && m.at) G.R.impact(new THREE.Vector3(...m.at), null, 'blood');
         break;
       }
       case 'left': G.Views.removePlayer(m.id); break;

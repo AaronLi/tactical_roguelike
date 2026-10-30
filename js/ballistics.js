@@ -96,9 +96,6 @@ G.Ballistics = (() => {
   const presented = (p) => { const a = Math.min(Math.PI / 2, p.ang || 0); return area(p.d) * Math.cos(a) + p.d * p.len * 0.85 * Math.sin(a); };
   // how far it carries now, from how far it carried as it left the gun: the air takes it by area over mass
   const flightDrag = (p, drag) => drag * (p.m / (p.m0 || p.m)) * (area(p.d0 || p.d) / presented(p));
-  // a round's state to send (a teammate's wound is worked out on their machine), and back on to a fresh one
-  const packP = (p) => [+p.m.toFixed(5), +p.d.toFixed(5), +p.len.toFixed(5), +(p.ang || 0).toFixed(2), p.nose, p.frag || 0, p.deformed ? 1 : 0];
-  function unpackP(p, q) { if (Array.isArray(q)) { p.m = +q[0] || p.m; p.d = +q[1] || p.d; p.len = +q[2] || p.len; p.ang = +q[3] || 0; p.nose = q[4] || p.nose; p.frag = +q[5] || 0; p.deformed = !!q[6]; } return p; }
 
   // ---------------------------------------------------------------- armour
   // K: the de Marre constant (v_bl = K·t^0.7·d^0.75/m^0.5, t and d in mm, m in g); E: how well each core works on it;
@@ -218,32 +215,6 @@ G.Ballistics = (() => {
     return d.add(new T.Vector3(gauss() * a, gauss() * a, gauss() * a)).normalize();
   }
   const gauss = () => Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(Math.PI * 2 * Math.random()) * 0.7;
-  // A round flown straight through the level without a body in the way, for those whose rounds aren't stepped (a suspect's,
-  // on the host: js/server.js): from f along u for dist metres. Returns { v (how fast it got there: 0, it didn't), p (the
-  // round as it got there), dev (how far off line it's been thrown), crossed (how many solids), to (where the first thing
-  // stopped or met it), glass ([pane ids]), fx (marks for everyone: js/views.js roundFx) }.
-  function trace(map, f, u, dist, p, v, drag) {
-    const out = { v: 0, p, dev: 0, crossed: 0, to: null, glass: [], fx: [] };
-    const o = f.clone(); let d = u.clone(), rest = dist, reach = true;
-    for (let leg = 0; leg < 6 && v > 30; leg++) {
-      const h = G.Level.raycast(map, o.x, o.y, o.z, d.x, d.y, d.z, rest);
-      v *= Math.exp(-Math.min(h.t, rest) / flightDrag(p, drag));
-      if (!h.solid || h.t >= rest - 0.03) { if (reach) { out.v = v; out.to = out.to || o.clone().addScaledVector(d, Math.min(h.t, rest)); } return out; }
-      const at = o.clone().addScaledVector(d, h.t), r = crossSolid(map, p, v, h, o, d);
-      if (!out.to) out.to = at.clone();
-      if (h.pane != null && !(h.solid.win && h.solid.win.armor)) out.glass.push(h.pane);
-      if (!h.view) out.fx.push(mark(at, h.n, r.fx, r.ric ? 'r' : 'e'));
-      if (!r.v) return out;
-      out.crossed++;
-      v = r.v; rest -= r.t;
-      if (r.ric) { reach = false; rest = Math.min(rest, 30); d = deflect(d, r, r.n); o.copy(at).addScaledVector(new T.Vector3(...r.n), 0.004); continue; }
-      o.addScaledVector(d, r.t);
-      out.fx.push(mark(o, r.nOut, r.fxOut, 'x'));
-      d = deflect(d, r, r.n); out.dev = Math.hypot(out.dev, Math.acos(G.U.clamp(d.dot(u), -1, 1)));
-      o.addScaledVector(d, 0.004);
-    }
-    return out;
-  }
   // a mark for everyone to draw: where, the surface's normal, what it looks like, and e(ntry), x (exit) or r(icochet)
   const mark = (at, n, fx, k) => [+at.x.toFixed(2), +at.y.toFixed(2), +at.z.toFixed(2), n ? n[0] : 0, n ? n[1] : 1, n ? n[2] : 0, fx, k];
 
@@ -635,10 +606,26 @@ G.Ballistics = (() => {
   // ---------------------------------------------------------------- the target's armour, as pieces
   // An officer's kit (js/gear.js): helmet and face, carrier (soft), plate, each with its condition
   function kitArmour(me) {
-    const k = me.kit, out = [], add = (it) => { const d = it && G.Gear.defOf(it); if (d && d.prot) out.push({ def: d, cond: G.Gear.cond(it), item: it }); };
+    const k = me.kit, out = [], add = (it, key) => { const d = it && G.Gear.defOf(it); if (d && d.prot) out.push({ def: d, cond: G.Gear.cond(it), item: it, key }); };
     if (!k) return out;
-    add(k.helmet); add(k.helmet && k.helmet.face); add(k.carrier); add(k.carrier && k.carrier.plate);
+    add(k.helmet, 'helmet'); add(k.helmet && k.helmet.face, 'face'); add(k.carrier, 'carrier'); add(k.carrier && k.carrier.plate, 'plate');
     return out;
+  }
+  // What an officer's wearing, for their state (st.ac: what they're wearing is in the world, so whoever shoots them works it
+  // out against it, js/player.js roundSegment), and the same back as pieces, from that state
+  const armourState = (me) => kitArmour(me).map((a) => [a.key, a.item.gid, Math.round(a.cond * 100) / 100]);
+  const stateArmour = (st) => (st && st.ac || []).map(([key, gid, cond]) => ({ def: G.Gear.DEFS[gid], cond, key })).filter((a) => a.def && a.def.prot);
+  // What a round did to an officer, whole, as the shooter worked it out, for them to take (js/player.js applyWounds): the
+  // wounds ([part, damage, effects, organs, segment]), whether armour rang, stopped it, and the joules each piece soaked.
+  function outcome(r, armour) {
+    const o = { ws: [], rang: 0, stopped: r.stopped && !r.glance ? 1 : 0, wear: {} };
+    for (const h of r.hits) {
+      const w = effects(h);
+      if (h.armour.some((q) => !q.through)) o.rang = 1;
+      if (w.dmg >= 0.05 || w.effects.length) o.ws.push([w.part, Math.round(w.dmg * 100) / 100, w.effects, w.organs, w.seg]);
+    }
+    for (const a of armour) if (a.wear) { o.wear[a.key] = Math.round(a.wear); a.wear = 0; }
+    return o;
   }
   // a suspect's (js/data.js G.ARMORS; a mandible or face shield is an officer's, js/gear.js), its condition kept on the
   // view (ev.vc vest, ev.hc helmet, ev.fc face)
@@ -673,19 +660,6 @@ G.Ballistics = (() => {
     selfRig.root.updateMatrixWorld(true);
     return selfRig;
   }
-  // a point on that part of the body (zone and side, as the host reports a hit), a central one or not, facing `from`
-  function aimPoint(rig, zone, central, side, from) {
-    const segId = zone === 'face' ? 'jaw' : zone === 'head' ? 'cranium' : zone, S = segs().filter((s) => s.id === segId && (!s.side || !side || s.side === side));
-    const s = S[Math.floor(Math.random() * S.length)] || segs()[3];
-    const bone = boneOf(rig, s.bone);
-    if (!bone) return null;
-    const c = s.kind === 'ell' ? new T.Vector3(...s.c) : new T.Vector3(0, lerp(s.y0, s.y1, 0.2 + Math.random() * 0.6), 0);
-    if (zone === 'face') c.z -= 0.04;
-    const w = bone.localToWorld(c), to = w.clone().sub(from).normalize(), up = new T.Vector3(0, 1, 0), side3 = new T.Vector3().crossVectors(to, up).normalize();
-    const r = (s.kind === 'ell' ? s.r[0] : s.rx((s.y0 + s.y1) / 2)) * (central ? Math.random() * 0.4 : 0.5 + Math.random() * 0.4) * (Math.random() < 0.5 ? -1 : 1);
-    return w.addScaledVector(side3, r);
-  }
-
   // ---------------------------------------------------------------- what armour is rated for (head-on, at 10 m)
   const THREATS = [['.22 LR', '5.6/15', 'ball'], ['9 mm', '9/19', 'ball'], ['.45 ACP', '11.43/23', 'ball'], ['.44 Magnum', null, null, [15.6, 10.9, 'lead', 436]],
     ['5.7x28', '5.7/29', 'ball'], ['00 buck', '18.5/70', 'buck'], ['12 ga slug', '18.5/70', 'slug'], ['7.62x39', '7.62/39', 'ball'], ['5.56', '5.56/45', 'ball'],
@@ -752,5 +726,5 @@ G.Ballistics = (() => {
   const AT_NAME = { plate: 'chest plate', side: 'sides', torso: 'chest and stomach', groin: 'groin', shoulder: 'shoulders', thigh: 'thighs', helmet: 'head', face: 'face' };
   const layersText = (L) => L.map(([m, mm]) => `${mm} mm ${MAT[m].name}`).join(' + ');
 
-  return { CAL, MAT, ORG, EFFECT, SURF, PERSON_J, energy, flightDrag, packP, unpackP, strike, crossSolid, deflect, trace, mark, loadNotes, mainLayers, AT_NAME, layersText, projectile, layer, stack, through, probe, boneOf, effects, segs, covers, brim, kitArmour, suspectArmour, wearOut, self, aimPoint, rating, THREATS };
+  return { CAL, MAT, ORG, EFFECT, SURF, PERSON_J, energy, flightDrag, strike, crossSolid, deflect, mark, armourState, stateArmour, outcome, loadNotes, mainLayers, AT_NAME, layersText, projectile, layer, stack, through, probe, boneOf, effects, segs, covers, brim, kitArmour, suspectArmour, wearOut, self, rating, THREATS };
 })();

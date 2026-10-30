@@ -278,7 +278,7 @@ G.Highlights = (() => {
     if (c && m.hd > 0) c.t -= Math.min(4, m.hd);
     if (c && !c.fl.why && !c.fl.bo) streak(c);
   }
-  // An officer's armour stopped rounds and they stayed up (js/player.js takeHits, through the host): a clip of the save,
+  // An officer's armour stopped rounds and they stayed up (js/player.js applyWounds, through the host): a clip of the save,
   // the suspect who fired it to them; rounds in quick succession are the one save (n: how many it stopped). Their
   // going down a moment later takes it back (tick).
   function saved(m) {

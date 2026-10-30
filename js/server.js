@@ -119,7 +119,7 @@ G.Server = {
         break;
       case 'chat': if (p) G.Net.broadcast({ t: 'chat', id: from, m: String(m.m).slice(0, 120) }); break;
       // friendly fire: one officer's rounds in another (the shooter traced them; the one hit takes the wounds)
-      case 'ff': if (p && this.phase === 'level' && this.players.has(m.tg) && Array.isArray(m.hz)) G.Net.broadcast({ t: 'ffhit', by: from, tg: m.tg, hz: m.hz.slice(0, 12), w: m.w, f: m.f, am: G.AMMO[m.am] ? m.am : undefined }); break;
+      case 'ff': if (p && this.phase === 'level' && this.players.has(m.tg) && Array.isArray(m.ws)) G.Net.broadcast({ t: 'ffhit', by: from, tg: m.tg, ws: m.ws.slice(0, 24), rang: m.rang, stopped: m.stopped, wear: m.wear, at: m.at, f: m.f, e: m.e }); break; // (what someone's round did to an officer, as they worked it out; e: a suspect's)
       case 'ping': if (p && Array.isArray(m.p) && m.p.length === 3) G.Net.broadcast({ t: 'ping', id: from, p: m.p.map(Number) }); break;
       // something put down (dropped from an inventory), or picked up: the first to ask gets it
       case 'drop': {
@@ -1820,55 +1820,30 @@ G.Server = {
     // aim at the exposed part: a leaning player shows head and shoulder, not centre mass
     const [hx, hz] = this.headXZ(st), leaning = Math.abs(st.ln || 0) > 0.3;
     let tx = hx, ty = st.p[1] + (st.pr ? 0.25 : st.cr ? 0.75 : 1.2) + (leaning ? 0.3 : 0) + (leaning ? 0 : up * (st.pr ? 0.08 : st.cr ? 0.25 : 0.38)), tz = hz; // (prone: low, a small target)
-    const realY = ty;
     if (blind) { tx = e.lastSeen.x + (Math.random() - 0.5) * 1.4; tz = e.lastSeen.z + (Math.random() - 0.5) * 1.4; ty = (e.lastSeen.y || 0) + 0.8 + Math.random() * 0.9; }
     const dx = tx - from[0], dy = ty - from[1], dz = tz - from[2], d = Math.hypot(dx, dy, dz);
     // a bit worse up close, much worse at range: at their weapon's range they hit about a sixth as often
     const distF = 0.9 * G.U.clamp(0.95 - 0.8 * Math.pow(d / def.range, 1.2), 0.12, 0.95);
     const moveF = st.mv > 3 ? 0.72 : st.mv > 0.5 ? 0.88 : 1;
-    const chance = (blind ? 0.15 : 1) * (1 - 0.2 * up) * this.injAim(e) * def.acc * distF * moveF * (st.pr ? 0.6 : st.cr ? 0.8 : 1) * this.accMult * (1 - 0.6 * (e.sup || 0)) * (1 - 0.5 * Math.min(1, e.shock || 0)) * (e.collapsed ? 0.4 : 1) * (e.str != null && e.str < this.TWO_HAND ? 0.7 : 1) * (1 - Math.min(0.5, kickNow / 16)) * (e.broken ? (e.fleeT > 0 ? 0.4 : 0.8) : 1) * this.dazzle(e, st);
-    // Their round, flown to the target through whatever's between (js/ballistics.js trace): cover it can get through it comes
-    // out of slower, changed and off line (which spoils the aim), and cover it can't, it stays in; a closed door right in front
-    // of the player's no different. A blind round can only find someone still standing where they were.
-    const wdef = G.WEAPONS[def.wpn] || G.WEAPONS.p9, am = G.ballFor(G.calOf(wdef)), B = G.Ballistics, fv = new THREE.Vector3(...from), v0 = G.roundSpeed(wdef, am) || 400, drag = G.dragOf(wdef, am);
-    const fly = (bx, by, bz, far) => { const u = new THREE.Vector3(bx - from[0], by - from[1], bz - from[2]), dd = u.length() || 1; return B.trace(map, fv, u.divideScalar(dd), far || dd, B.projectile(wdef, am), v0, drag); };
-    const path = blind ? fly(hx, realY, hz) : fly(tx, ty, tz);
-    const blocked = blind ? Math.hypot(hx - e.lastSeen.x, hz - e.lastSeen.z) > 1.2 || !path.v : !path.v;
-    const intact = path.glass.some((id) => map.windows && map.windows[id] && !map.windows[id].broken), wob = 1 / (1 + (path.dev / 0.03) ** 2);
-    const wounds = [];
-    if (!blocked) for (let i = 0; i < def.pellets; i++) if (Math.random() < chance * wob * (intact ? 0.75 : 1)) wounds.push(path.crossed ? [...this.hitZone(st, def, up), Math.round(path.v), B.packP(path.p)] : this.hitZone(st, def, up));
-    if (path.glass.length) this.breakGlass(path.glass, from);
-    let to, marks = path.fx;
-    if (wounds.length) to = [tx + (Math.random() - 0.5) * 0.3, ty + (Math.random() - 0.5) * 0.3, tz + (Math.random() - 0.5) * 0.3];
-    else {
-      // miss: aim off to the side, then extend into the world
-      const off = 0.6 + Math.random() * 1.2, side = Math.random() < 0.5 ? -1 : 1;
-      const mxp = tx + (-dz / d) * off * side, myp = ty + (Math.random() - 0.4) * 1.2, mzp = tz + (dx / d) * off * side;
-      const h = fly(mxp, myp, mzp, 90);
-      to = h.to ? h.to.toArray() : [mxp, myp, mzp];
-      marks = h.fx;
-      if (h.glass.length) this.breakGlass(h.glass, from); // a miss through a window takes it out
+    const chance = (blind ? 0.15 : 1) * (1 - 0.2 * up) * this.injAim(e) * def.acc * distF * moveF * this.accMult * (1 - 0.6 * (e.sup || 0)) * (1 - 0.5 * Math.min(1, e.shock || 0)) * (e.collapsed ? 0.4 : 1) * (e.str != null && e.str < this.TWO_HAND ? 0.7 : 1) * (1 - Math.min(0.5, kickNow / 16)) * (e.broken ? (e.fleeT > 0 ? 0.4 : 0.8) : 1) * this.dazzle(e, st);
+    // Their round is a round, flown from here as yours are (js/player.js enemyRound) to whatever it meets. All that's rolled is
+    // how well it's aimed: chance is the share that would land on a body a BODY_R across at that distance, so the aim's
+    // error at the target is the spread that gives that (a two-dimensional normal: 1 - exp(-R²/2σ²)). The rest is what's
+    // there: how much of you shows, what's in the way, what the round does.
+    const wdef = G.WEAPONS[def.wpn] || G.WEAPONS.p9, am = G.ballFor(G.calOf(wdef)), v0 = G.roundSpeed(wdef, am) || 400;
+    const norm = () => Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(Math.PI * 2 * Math.random());
+    const sd = this.BODY_R / Math.sqrt(-2 * Math.log(1 - G.U.clamp(chance, 0.01, 0.97))), ex = norm() * sd, ey = norm() * sd;
+    const fv = new THREE.Vector3(...from), aim = new THREE.Vector3(tx + (-dz / d) * ex, ty + ey, tz + (dx / d) * ex).sub(fv), far = aim.length();
+    aim.divideScalar(far); aim.y += G.GRAVITY * far / (2 * v0 * v0); aim.normalize(); // (held up for the drop: they've used this gun before)
+    const right = new THREE.Vector3(-aim.z, 0, aim.x).normalize(), upv = new THREE.Vector3().crossVectors(right, aim), pr = Math.tan(((wdef.choke || 0) * Math.PI) / 180), pellets = def.pellets || 1;
+    const r2 = (v) => Math.round(v * 100) / 100, shot = { ff: new Map(), w: wdef.code || def.wpn, am, f: from.map(r2), tos: null, enemy: e.id };
+    for (let i = 0; i < pellets; i++) {
+      let dir = aim;
+      if (pellets > 1 && pr > 0) { const a = Math.random() * Math.PI * 2, rr = pr * Math.min(1.6, Math.abs(norm()) * 0.6); dir = aim.clone().addScaledVector(right, Math.cos(a) * rr).addScaledVector(upv, Math.sin(a) * rr).normalize(); }
+      G.Me.enemyRound(e.id, fv, dir, wdef, am, shot);
     }
-    const r2 = (v) => Math.round(v * 100) / 100;
-    G.Net.broadcast({ t: 'eshot', e: e.id, ty: e.type, w: def.wpn, f: from.map(r2), to: to.map(r2), tg: p.id, d: wounds.length, hz: wounds, fx: marks.length ? marks.slice(0, 12) : undefined });
+    const to = G.Me.predictEnd(fv, aim.clone().multiplyScalar(v0), G.dragOf(wdef, am), G.GRAVITY).toArray();
+    G.Net.broadcast({ t: 'eshot', e: e.id, ty: e.type, w: def.wpn, f: from.map(r2), to: to.map(r2), tg: p.id });
   },
-  // Where a round that hits an officer lands: [zone, central]. A leaning officer shows head and shoulder, a
-  // crouched one less leg; a marksman taking an aimed shot goes for the head and lands more centrally. A head
-  // hit is 'face' (below a helmet's brim) more often than not, since they're shooting at the front of you.
-  // up: how far their aim has walked from your body to your head (0 .. 1, see fire).
-  hitZone(st, def, up = 0) {
-    const lean = Math.abs(st.ln || 0) > 0.3;
-    const W = lean ? { head: 0.4, chest: 0.3, uarm: 0.2, farm: 0.1 }
-      : st.cr ? { head: 0.14, chest: 0.4, abdomen: 0.14, uarm: 0.14, farm: 0.1, thigh: 0.08 }
-      : { head: 0.1, chest: 0.34, abdomen: 0.2, uarm: 0.1, farm: 0.07, thigh: 0.14, shin: 0.05 };
-    if (def.aimTime) W.head *= 2.5;
-    if (!lean) { // centre mass first (head hits rare, legs more likely), then the head (about 35-45% of hits)
-      W.head *= 0.4 + 4.6 * up;
-      for (const z of ['thigh', 'shin']) if (W[z]) W[z] *= 1 - 0.6 * up;
-    }
-    let x = Math.random() * Object.values(W).reduce((a, b) => a + b, 0), zone = 'chest';
-    for (const [z, w] of Object.entries(W)) { if (x < w) { zone = z; break; } x -= w; }
-    if (zone === 'head') zone = Math.random() < 0.6 ? 'face' : 'head';
-    return [zone, Math.random() < (def.aimTime ? 0.7 : 0.45) ? 1 : 0, Math.random() < 0.5 ? 'L' : 'R'];
-  },
+  BODY_R: 0.24,
 };

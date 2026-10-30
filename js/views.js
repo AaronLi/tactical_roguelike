@@ -414,27 +414,18 @@ G.Views = {
     if (gi && gi.muzzles && gi.muzzles[0]) {
       sh.rig.gun.updateMatrixWorld(true);
       f = sh.rig.gun.localToWorld(new THREE.Vector3(gi.muzzles[0][2], gi.muzzles[0][1], -gi.muzzles[0][0]));
-      // a miss from a gun pointing well off the line (someone weak, shooting from the floor) goes where the
-      // barrel points, to whatever it meets
-      const bore = new THREE.Vector3(0, 0, -1).transformDirection(sh.rig.gun.matrixWorld), line = to.clone().sub(f).normalize();
-      if (!(m.d > 0) && bore.dot(line) < Math.cos(10 * Math.PI / 180) && G.Game.map) to = f.clone().addScaledVector(bore, G.Level.raycast(G.Game.map, f.x, f.y, f.z, bore.x, bore.y, bore.z, 60).t);
     }
     G.R.muzzleFlashAt(f);
     const me = G.R.camera.position;
     const wdef = G.WEAPONS[m.w] || G.WEAPONS[G.ENEMIES[m.ty].wpn];
-    // their round flies there (a machine gunner's belt has a tracer every fourth), and does what the host
-    // decided when it arrives: hits you, or someone else, or the wall
+    // what you see of their round (a machine gunner's belt has a tracer every fourth): what it does is the host's, flown there
+    // (js/player.js enemyRound), its marks and wounds told to you as they happen
     const ev0 = this.enemies.get(m.e), tr = wdef.cls === 'LMG' && ev0 && ((ev0.shots = (ev0.shots || 0) + 1) % 4 === 1);
-    const hitMe = m.d > 0 && m.tg === G.Net.myId, hz = m.hz, fromP = f.clone(), toP = to.clone(), rfx = m.fx;
-    if (G.Highlights) { G.Highlights.shot('e' + m.e, f, to, wdef.code || m.w); if (m.d > 0) G.Highlights.hitBy(m.tg, m.e); }
-    this.visRound(f, to, wdef, tr ? 'tracer' : G.ballFor(G.calOf(wdef)), () => {
-      if (m.d > 0) { if (hitMe) { if (G.Game.phase === 'level') G.Me.takeHits(hz, wdef, fromP); } else G.R.impact(toP, null, 'blood'); }
-      else this.wallHit(fromP, toP);
-      this.roundFx(rfx, !(m.d > 0)); // (what it went through or off on the way)
-    });
+    if (G.Highlights) G.Highlights.shot('e' + m.e, f, to, wdef.code || m.w);
+    this.visRound(f, to, wdef, tr ? 'tracer' : G.ballFor(G.calOf(wdef)), () => {});
     G.Casings.fired(wdef, false, f, to);
     if (!G.GunAudio.play(wdef.id, f, 'e' + m.e)) G.Audio.shot(G.CLASS_SND[wdef.cls] || G.CLASS_SND.AR, me.distanceTo(f));
-    if (m.tg !== G.Net.myId || !(m.d > 0)) G.Audio.flyby(f, to, wdef, G.ballFor(G.calOf(wdef))); // past you (a hit on you is felt, not heard going by)
+    G.Audio.flyby(f, to, wdef, G.ballFor(G.calOf(wdef)));
     this.pings.push({ x: m.f[0], z: m.f[2], t: 2.5 });
     const ev = this.enemies.get(m.e);
     if (ev) ev.rig.recoil(G.Server.kickOf({ str: ev.str }, wdef)); // (the same kick the host gave it)
@@ -451,17 +442,6 @@ G.Views = {
       last = f;
     });
   },
-  // a round that missed: where its line meets a wall (or a door, or furniture), with the surface's normal so it
-  // leaves a hole there; sparks only if it ends in the air
-  wallHit(f, to) {
-    const map = G.Game.map, d = to.clone().sub(f), len = d.length();
-    if (map && len > 0.01) {
-      d.divideScalar(len);
-      const h = G.Level.raycast(map, f.x, f.y, f.z, d.x, d.y, d.z, len + 0.5);
-      if (h.n && h.t <= len + 0.45 && !h.view) { G.R.impactOn(f.clone().addScaledVector(d, h.t), h.n, h.solid); return; }
-    }
-    G.R.impact(to, null, 'wall');
-  },
   enemyThrow(id) { const ev = this.enemies.get(id); if (ev && ev.alive) ev.rig.throwNade(); },
   remoteShot(m) {
     const f = new THREE.Vector3(m.f[0], m.f[1], m.f[2]), to = new THREE.Vector3(m.to[0], m.to[1], m.to[2]);
@@ -475,7 +455,6 @@ G.Views = {
     const am = m.am || G.ballFor(G.calOf(def)), fromP = f.clone(), toP = to.clone();
     this.visRound(f, to, def, am, () => {
       if (def.cls === 'RAIL') G.R.tracer(fromP, toP, def.tracer || 0x55ddff, 0.06);
-      if (!def.explosive) this.wallHit(fromP, toP);
     });
     if (!m.sil) G.R.muzzleFlashAt(f, def.tracer || 0xffb060);
     G.Casings.fired(def, false, f, to, m.am);

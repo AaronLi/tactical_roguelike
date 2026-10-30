@@ -1280,11 +1280,16 @@ says the same), but not whose: the shooter's name isn't shown.
     off concrete at a shallower-than-30° angle where a rifle round digs in, and almost anything skips off steel. It happens
     on armour and on the curve of the skull too. It goes on from there with what it has left, into whoever's in the way,
     and that can be you. You hear it go.
-  - **Suspects' rounds** are flown the same way on the host (`trace`): cover they can get through lets the round through
-    slower and off line, which spoils their aim, and it reaches you in the state it's in. (Their aim is still a roll: only the
-    round aimed at you is checked against you, so a stray doesn't hit a bystander.)
-  - **The squad** sees the holes, exits and ricochets of your rounds as you made them (`rfx`). A teammate's wound is worked
-    out on their machine, from the speed and state your round reached them in.
+  - **Suspects' rounds** are rounds: the host flies them as yours are, and they go by other suspects and civilians. What's
+    rolled is only how well they're aimed: their hit chance sets the spread of their aim at the target, and whether that
+    hits you is what's there: how much of you shows (crouched or prone you're a smaller target, no modifier), what's in
+    the way, what the round does.
+  - **Whoever fires a round decides what it did**, on what's on their screen: the bodies as they stand there and what those
+    bodies are wearing (each officer's state carries their armour pieces and condition, `st.ac`). Your rounds on suspects,
+    your rounds on a teammate and a suspect's on an officer (the host being its shooter) all work the same way: the
+    finished wounds go to whoever was hit, who takes them as they are (`applyWounds`), wear on their armour included.
+    So what you saw land is what landed.
+  - **The squad** sees the holes, exits and ricochets of a round as they happened (`rfx`).
 - **Damage is the energy a round leaves** (`js/ballistics.js` effects): what it deposited in a part, plus what reached the
   body through armour as blunt trauma, as a share of what a person can take (`PERSON_J`, 1600 J). Nothing else: no
   multipliers, no curve. Square on an unarmoured torso that's about 11% for a .22, 27% for 9 mm, 30% for a hollow point,
