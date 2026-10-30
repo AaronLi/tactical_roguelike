@@ -587,8 +587,8 @@ G.Server = {
     // a mandible or a face shield on the helmet's mount (a helmet with a visor has its own; no helmet, nowhere to put one)
     d.face = d.helmet === 'ach' || d.helmet === 'riflehelm' ? (fixed && fixed.face ? fixed.face[tier - 1] || 0 : roll(G2.face[tier - 1], ['f.mandible', 'f.shield', 'f.rifle', 0])) : 0;
     // a light and a laser on the gun, more often the better equipped they are (flags as an officer's: js/player.js tacFlags)
-    const tl = G2.tac, always = base.boss || (fixed && tier >= 2);
-    d.tac = (always || Math.random() < tl.light[tier - 1] ? 1 | (tier >= 4 ? 8 : 0) : 0) | (base.boss || Math.random() < tl.laser[tier - 1] ? 2 | (Math.random() < 0.35 ? 4 : 0) : 0);
+    const tl = G2.tac, always = base.boss || (fixed && tier >= 2), light = this.level >= tl.lightFrom && (always || Math.random() < tl.light[tier - 1]), laser = this.level >= tl.laserFrom && (base.boss || Math.random() < tl.laser[tier - 1]);
+    d.tac = (light ? 1 | (tier >= 4 ? 8 : 0) : 0) | (laser ? 2 | (Math.random() < 0.35 ? 4 : 0) : 0);
     // automatic weapons fire at their own rate in the type's bursts; others as fast as the type works them
     if (base.rof) {
       if (w.mode === 'auto') d.rof = 60 / w.rpm;

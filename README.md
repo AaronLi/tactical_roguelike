@@ -1324,8 +1324,9 @@ says the same), but not whose: the shooter's name isn't shown.
 - **A face shield shows what it caught** (`js/hud.js` maskHit): where a round strikes a shield or mandible guard shows on your view through
   it: a star of cracks and a pulverised patch where it stopped one, a hole and a wide web where one came through, a short crack where one
   skipped off. They stay on that shield, wherever it goes, and don't show once you're dead.
-- **Better-equipped suspects carry lights and lasers** (`G.ENEMY_GEAR.tac`): by the same gear tier as their weapons and armour, none to speak of
-  at first, about three in four lights and over half lasers at the top; an Enforcer always has the light from the second tier, the Kingpin both.
+- **Better-equipped suspects carry lights and lasers** (`G.ENEMY_GEAR.tac`): none in the first half of the game, lights from level 5 and lasers from
+  level 7, then by the same gear tier as their weapons and armour, about three in four lights and over half lasers at the top; from level 5 an
+  Enforcer always has the light, and the Kingpin has both.
   The light's on with the gun out, the laser once they're alert, both on whoever they're aiming at, and they use the same lights, beams and
   dots as the squad's.
 - **Lasers show in the replays**: where each laser landed is recorded with everyone's position, and the replay (and the video) draws it from the gun in their hands to that spot, red or green, as long as it was on.
