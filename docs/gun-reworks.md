@@ -37,3 +37,4 @@ date doesn't say which came first. `traced`: from a photo. `by eye`: built looki
 | crossbow | 2026-10-30 | by eye | bae22cf | "Crossbow TenPoint Stealth SS.png", "Horton Hunter Supreme by IvE.jpg": no level side photo, so proportions from the TenPoint's specs |
 | dbl | 2026-10-30 | traced | 2068cbc | "ИЖ-43Е (1).jpg" (an IZH-43E) |
 | pump | 2026-10-30 | traced | 32272b8 | "Remington 870 Wmaster.jpg" (a Wingmaster) |
+| aks74u | 2026-10-30 | traced | c665baf | "AK74andAKS74U.jpg", cross-checked against "Stepanov AKS-74Us.jpg" and "AKSU-74.jpg" |
