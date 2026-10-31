@@ -459,6 +459,8 @@ G.VMAnim = (() => {
       if (an.quarrel) {
         const ld = G.loaded(w) > 0, rt = a.reloadT == null ? -1 : a.reloadT;
         an.quarrel.visible = ld || rt >= BOW_LOAD; an.stringCocked.visible = ld || rt >= BOW_COCK; an.stringSlack.visible = !an.stringCocked.visible;
+        const am = (w.tube && w.tube.length && w.tube[w.tube.length - 1]) || w.ammo, N = h.info.quarrelMats && h.info.quarrelMats.nock; // (its lit nock, in the load's colour: js/bolts.js)
+        if (N && h.boltAm !== am) { h.boltAm = am; const c = G.Bolts.colour(am); N.color.setHex(c); if (N.emissive) N.emissive.setHex(c); }
       }
       // magazine
       if (an.mag && A.magHome) {
