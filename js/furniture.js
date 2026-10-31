@@ -912,6 +912,7 @@ G.Furniture = (() => {
     lot: { must: 'crates', wall: ['pallet', 'bin', 'crates', 'pallet'], center: [], small: ['bin', 'cardboard'], floor: 'pave', out: 1 },
     // an apartment block's hallway and the landing at the top of the stairs: bare
     corridor: { floor: 'carpet', bare: 1 }, landing: { floor: 'tile', bare: 1 },
+    bathroom: { floor: 'tile', bare: 1, noArt: 1 }, // (only ever carved out of a resident's room: js/homes.js)
     alley: { floor: 'pave', bare: 1, out: 1 }, // the passage between two houses
     // a festival (laid out on its own: plan()); the field's lawn is laid in G.Level.buildFestival
     stage: { floor: null, out: 1 }, seating: { floor: null, out: 1 }, court: { floor: null, out: 1 }, picnic: { floor: null, out: 1 }, gate: { floor: null, out: 1 },
@@ -1366,6 +1367,22 @@ G.Furniture = (() => {
         speckle(g, w, h, 300, 0.06);
       }),
       carpet: (base) => mk(128, 128, (g, w, h) => { g.fillStyle = base; g.fillRect(0, 0, w, h); speckle(g, w, h, 2500, 0.12); }),
+      // lino in a check of two colours, scuffed
+      lino: (base, other) => mk(128, 128, (g, w, h) => {
+        const s = w / 2;
+        g.fillStyle = base; g.fillRect(0, 0, w, h); g.fillStyle = other; g.fillRect(0, 0, s, s); g.fillRect(s, s, s, s);
+        g.strokeStyle = 'rgba(0,0,0,0.18)'; g.lineWidth = 1; g.strokeRect(0, 0, s, s); g.strokeRect(s, s, s, s);
+        speckle(g, w, h, 500, 0.08);
+      }),
+      // parquet in a herringbone: blocks four long by one wide, laid out on a lattice that repeats every eight
+      parquet: (base) => mk(256, 256, (g, w, h) => {
+        const u = w / 8, block = (x, y, bw, bh) => { const v = (rnd() - 0.5) * 0.2; g.fillStyle = base; g.fillRect(x, y, bw, bh); g.fillStyle = v > 0 ? `rgba(255,235,200,${v})` : `rgba(0,0,0,${-v})`; g.fillRect(x, y, bw, bh); g.strokeStyle = 'rgba(30,15,0,0.55)'; g.lineWidth = 1.5; g.strokeRect(x, y, bw, bh); };
+        for (let i = -16; i <= 16; i++) for (let j = -6; j <= 6; j++) {
+          const x = (i + 4 * j) * u, y = (i - 4 * j) * u;
+          if (x < -5 * u || y < -5 * u || x > w + u || y > h + u) continue;
+          block(x, y, 4 * u, u); block(x + 4 * u, y - 3 * u, u, 4 * u);
+        }
+      }),
       // a lawn at night: dark green with blades and the odd bare patch
       grass: () => mk(256, 256, (g, w, h) => {
         g.fillStyle = '#2c4423'; g.fillRect(0, 0, w, h);
@@ -1631,18 +1648,18 @@ G.Furniture = (() => {
       return true;
     };
     // a floor covering over a room (a lawn runs under the fences to the edge; inside, the floor stops at the walls)
-    const layFloor = (rm, fm) => {
+    const layFloor = (rm, fm, y = 0.004) => {
       const x0 = rm.x * TS, z0 = rm.z * TS, w = rm.w * TS, d = rm.h * TS;
       let drop = false;
       for (let z = rm.z; z < rm.z + rm.h && !drop; z++) for (let x = rm.x; x < rm.x + rm.w; x++) if (t[z * W + x] === 5) { drop = true; break; }
-      if (rm.out) place(new T.PlaneGeometry(w + 2 * TS, d + TS), fm, x0 + w / 2, 0.004, z0 + d / 2, 0, -Math.PI / 2);
-      else if (!drop) place(new T.PlaneGeometry(w, d), fm, x0 + w / 2, 0.004, z0 + d / 2, 0, -Math.PI / 2);
+      if (rm.out) place(new T.PlaneGeometry(w + 2 * TS, d + TS), fm, x0 + w / 2, y, z0 + d / 2, 0, -Math.PI / 2);
+      else if (!drop) place(new T.PlaneGeometry(w, d), fm, x0 + w / 2, y, z0 + d / 2, 0, -Math.PI / 2);
       else for (let z = rm.z; z < rm.z + rm.h; z++) for (let x = rm.x; x < rm.x + rm.w;) { // (round a drop in the floor: a strip per run of floor)
         if (t[z * W + x] === 5) { x++; continue; }
         let x1 = x; while (x1 + 1 < rm.x + rm.w && t[z * W + x1 + 1] !== 5) x1++;
         const g = new T.PlaneGeometry((x1 - x + 1) * TS, TS), uv = g.attributes.uv;
         for (let k = 0; k < uv.count; k++) uv.setXY(k, (x - rm.x + uv.getX(k) * (x1 - x + 1)) / rm.w, (rm.z + rm.h - 1 - z + uv.getY(k)) / rm.h); // (the room's texture, continuous across strips)
-        place(g, fm, (x + x1 + 1) / 2 * TS, 0.004, (z + 0.5) * TS, 0, -Math.PI / 2);
+        place(g, fm, (x + x1 + 1) / 2 * TS, y, (z + 0.5) * TS, 0, -Math.PI / 2);
         x = x1 + 1;
       }
     };
@@ -1654,7 +1671,7 @@ G.Furniture = (() => {
       const tex = tx[f.kind](f.color, f.grout || '#7a7670');
       tex.repeat.set(rm.w, rm.h);
       const fm = mat(0xffffff, f.kind === 'tile' ? 0.45 : 0.85, 0, { map: tex }), mine = new Set(dr.cells);
-      layFloor(rm, fm);
+      layFloor(rm, fm, rm.carved ? 0.006 : 0.004); // (a carved room's floor lies over the floor of the room it came out of)
       const trim = mat(parseInt(dr.trim.slice(1), 16), 0.5);
       for (const i of dr.cells) {
         const x = i % W, z = (i / W) | 0;
@@ -1676,9 +1693,10 @@ G.Furniture = (() => {
       frame = new T.Matrix4(); cur = rnd0;
     };
     for (const rm of map.rooms) {
+      if (rm.carved) { dressRoom(rm); continue; } // (a room that wouldn't have been: nothing to go through)
+      if (rm.dress) { G.Homes.swap(map, rm); sink = true; } // (the room as it would have been, for the stream's sake)
       const spec = ROOMS[rm.type] || {};
       const x0 = rm.x * TS, z0 = rm.z * TS, w = rm.w * TS, d = rm.h * TS;
-      if (rm.dress) { G.Homes.swap(map, rm); sink = true; } // (the room as it would have been, for the stream's sake)
       if (spec.floor) {
         let tex;
         if (spec.floor === 'wood') tex = tx.wood(pick(['#7a5232', '#9a6e44', '#5e4028', '#a88458']));

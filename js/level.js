@@ -428,15 +428,7 @@ G.Level = {
     // An open door's leaf stands out into the room beside its hinge; it hides whoever's behind it and stops
     // rounds (like the closed door), though you can walk past it. Which cells it stands in, per door.
     map.leafAt = new Map();
-    for (const d of map.doors) {
-      d.leaf = this.leafBox(d);
-      const b = d.leaf;
-      for (let z = Math.floor((b.cz - b.hz) / TS); z <= Math.floor((b.cz + b.hz) / TS); z++) for (let x = Math.floor((b.cx - b.hx) / TS); x <= Math.floor((b.cx + b.hx) / TS); x++) {
-        const i = z * W + x;
-        if (!map.leafAt.has(i)) map.leafAt.set(i, []);
-        map.leafAt.get(i).push(d);
-      }
-    }
+    for (const d of map.doors) this.hangLeaf(map, d);
     map.unitAt = null;
     if (map.units) {
       map.unitAt = new Int8Array(W * H).fill(-1);
@@ -453,6 +445,25 @@ G.Level = {
     map.spawn = { x: (spawnRoom.cx + 0.5) * TS, z: (spawnRoom.cz + 0.5) * TS };
     map.extract = { x: (exitRoom.cx + 0.5) * TS, z: (exitRoom.cz + 0.5) * TS, r: 3 };
     return map;
+  },
+  // which cells a door's open leaf stands in
+  hangLeaf(map, d) {
+    const TS = this.TS, b = d.leaf = this.leafBox(d);
+    for (let z = Math.floor((b.cz - b.hz) / TS); z <= Math.floor((b.cz + b.hz) / TS); z++) for (let x = Math.floor((b.cx - b.hx) / TS); x <= Math.floor((b.cx + b.hx) / TS); x++) {
+      const i = z * map.W + x;
+      if (!map.leafAt.has(i)) map.leafAt.set(i, []);
+      map.leafAt.get(i).push(d);
+    }
+  },
+  // A door added once the floor's planned (js/homes.js cut): two wall cells on the fine grid, [x, z] each, shut. A record as
+  // refine makes them. (id: numbered through as the floors stack.)
+  layDoor(map, cells, axis) {
+    const cs = this.TS, ids = cells.map(([x, z]) => z * map.W + x);
+    const d = { id: map.doors.length, i: ids[0], cells: ids, tx: cells[0][0], tz: cells[0][1], axis, open: false, mirror: false, kind: null, w: 2 * cs,
+      x: ((cells[0][0] + cells[1][0] + 1) / 2) * cs, z: ((cells[0][1] + cells[1][1] + 1) / 2) * cs };
+    map.doors.push(d); ids.forEach((i) => { map.t[i] = 3; map.doorAt.set(i, d); });
+    this.hangLeaf(map, d);
+    return d;
   },
   // the cover spots of a floor cell, if it's beside furniture you can hide behind
   coverAt(map, x, z) {

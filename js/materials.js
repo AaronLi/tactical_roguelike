@@ -135,6 +135,7 @@ G.Materials = (() => {
     picnic: ONE([['pine', 38]]), bench: ONE([['pine', 38]]), booth: C([['ply', 12]]), stall: C([['ply', 12]]), sinks: C([['ceram', 8]], 'goods', 0.05), toilet: C([['ceram', 8]], 'water', 0.2), car: SHEET(0.9, 'iron', 0.05), police: SHEET(0.9, 'iron', 0.05), tree: SOLID('hardwood'), fountain: C([['concrete', 100]], 'water'),
     furnace: C([['mild', 12], ['brick', 110]], 'brick', 0.6), vat: C([['mild', 15]], 'iron', 0.5), moulds: C([['sand', 200]], 'sand'), panel: SHEET(1.5, 'mild', 0.02), scrap: C([['mild', 5]], 'mild', 0.25), conveyor: SHEET(4, 'rubber', 0.1), mill: MACHINE, saw: MACHINE, press: MACHINE, quench: SHEET(10, 'water'),
     couch: C([['fabric', 8]], 'foam'), easy: C([['fabric', 8]], 'foam'), crt: C([['hdpe', 3]], 'mdf', 0.05), china: C([['hardwood', 16]], 'ceram', 0.06), treadle: C([['hardwood', 19]], 'iron', 0.08), tallplant: C([['hdpe', 3]], 'soil', 0.6), guides: SOLID('paper'), cuptable: CAB,
+    canisters: C([['mdf', 18]], 'goods', 0.15), almond: SHEET(0.7, 'pur', 0.5), lacetable: ONE([['hardwood', 28]]), shrine: CAB, halfbed: C([['fabric', 6]], 'foam'), nightstand: CAB, photodresser: CAB,
     forklift: SHEET(4, 'iron', 0.2), billets: SOLID('mild'), ingots: SOLID('alu'), coils: C([['mild', 20]], 'mild', 0.6), console: C([['mild', 1.5]], 'goods', 0.1),
   };
   const CRATE = PROPS.crates, RAIL = ONE([['mild', 3]]), GRATE = ONE([['mild', 4]]); // (a bar of it: what a round has to get through is js/world.js barHit's)

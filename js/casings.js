@@ -166,7 +166,7 @@ G.Casings = (() => {
       const WH = map.W * map.H;
       map.surf = new Array(WH * (map.NF || 1)).fill(map.theme.home >= 1 ? 'hard' : 'concrete');
       for (const rm of map.rooms) {
-        const fl = rm.out ? 'grass' : rm.dress ? rm.dress.floor.kind : (G.Furniture.ROOMS[rm.type] || {}).floor; // (a resident's room has its own: js/homes.js)
+        const fl = rm.out ? 'grass' : rm.dress ? rm.dress.floor.sound || rm.dress.floor.kind : (G.Furniture.ROOMS[rm.type] || {}).floor; // (a resident's room has its own: js/homes.js)
         if (!fl) continue;
         for (let tz = rm.z; tz < rm.z + rm.h; tz++) for (let tx = rm.x; tx < rm.x + rm.w; tx++) map.surf[(rm.fl || 0) * WH + tz * map.W + tx] = fl;
       }
