@@ -34,3 +34,5 @@ date doesn't say which came first. `traced`: from a photo. `by eye`: built looki
 | fiveseven | 2026-10-30 | traced | 12674e8 | "FN Five Seven (cropped).jpg" |
 | thor | 2026-10-30 | traced | 12674e8 | IMFDB "THOR_.45-70.jpg"; the EAA/Tanfoglio Thor |
 | f2 | 2026-10-30 | traced | 05b7420 | "FAMAS-G2-IMG 8894-white.jpg" (a FAMAS G2; first traced as an F1 in 6390c31) |
+| crossbow | 2026-10-30 | by eye | bae22cf | "Crossbow TenPoint Stealth SS.png", "Horton Hunter Supreme by IvE.jpg": no level side photo, so proportions from the TenPoint's specs |
+| dbl | 2026-10-30 | traced | 2068cbc | "ИЖ-43Е (1).jpg" (an IZH-43E) |

@@ -1162,7 +1162,7 @@ G.GunModels = (() => {
     else if (o.gripT !== 'none' && rcv !== 'qbz95' && rcv !== 'f2' && !((rcv === 'vector' || rcv === 'aug') && (o.gripT || 'ar') === 'ar')) grip(k, gf, o.gm || fm, o.gripT || (rcv === 'ak' ? 'wood' : 'ar')); // (the Vector's own is part of its lower)
     k.tag('stock');
     if (rcv === 'vector' && o.stock) { const sp = k.part(0, vecTrace([0, 110])[1]); k.into(sp); stock(k, o.stock, o.sm || fm, false); k.into(null); } // (its tube level with the top of the receiver: the bore's below the shoulder)
-    else if (tr && o.stock === 'wood' && tr.parts.some((p) => p.on === 'stock')) { if (!buildingVM || o.gripT === 'none') tracedParts(k, tr, VT, 'stock', mats); } // (the traced stock, while the factory one's fitted)
+    else if (tr && o.stock === 'wood' && tr.parts.some((p) => p.on === 'stock')) tracedParts(k, tr, buildingVM ? (q) => { const [f, y] = VT(q); return [Math.max(f, -0.15), y]; } : VT, 'stock', mats); // (the traced stock, while the factory one's fitted: in first person just its wrist, what the hand holds, or the rest of it stands in front of your eye)
     else if (!bull && o.stock) stock(k, o.stock, o.sm || fm, o.gripT === 'none');
     k.tag('mag');
     let magAt = null;
