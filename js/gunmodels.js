@@ -1819,30 +1819,107 @@ G.GunModels = (() => {
     return { sy: sight.sy, fSight: sight.fSight, relief: sight.relief, muzzles: [[0.34 + bl, 0, 0]], grip: [0.065, -0.075, 0], support: [0.5, -0.03, 0], anim, magAt: [0.19, -0.04] };
   }
 
+  // A crossbow bolt (a quarrel), built along -z with its nock at z = 0 (centred: its middle at 0, for the hand): a nock, a
+  // carbon shaft, three vanes (the odd one down, into the rail's slot) and a head, 0.40 m in all. The nock, the head, the
+  // vanes and the shaft each have a material of their own, so a bolt type can recolour them (js/data.js, js/ballistics.js).
+  function quarrel(centre) {
+    const g = new T.Group(), z0 = centre ? 0.2 : 0;
+    const mats = {
+      nock: new T.MeshStandardMaterial({ color: 0xe8e2d0, roughness: 0.5 }),
+      shaft: new T.MeshStandardMaterial({ color: 0x2a2c30, roughness: 0.7, metalness: 0 }),
+      vane: new T.MeshStandardMaterial({ color: 0xf0661a, roughness: 0.7, side: T.DoubleSide }),
+      head: new T.MeshStandardMaterial({ color: 0xb9bec4, roughness: 0.3, metalness: 0.85 }),
+    };
+    const cyl = (r, rFront, len, f0, m) => { const geo = new T.CylinderGeometry(r, rFront, len, 10); geo.rotateX(Math.PI / 2); const o = new T.Mesh(geo, m); o.position.z = -(f0 + len / 2) + z0; return o; };
+    const fin = (a, r, w, h, len, f0, m) => { const o = new T.Mesh(new T.BoxGeometry(w, h, len), m); o.position.set(Math.sin(a) * r, Math.cos(a) * r, -(f0 + len / 2) + z0); o.rotation.z = -a; return o; };
+    const nock = new T.Group(), head = new T.Group(), vanes = new T.Group(), shaft = cyl(0.0042, 0.0042, 0.335, 0.018, mats.shaft);
+    nock.add(cyl(0.0052, 0.0046, 0.018, 0, mats.nock));
+    const slot = new T.Mesh(new T.BoxGeometry(0.0016, 0.0032, 0.007), mats.shaft); slot.position.set(0, 0.0036, -0.0035 + z0); nock.add(slot); // (the string's slot across its tail)
+    for (const a of [Math.PI, Math.PI / 3, -Math.PI / 3]) vanes.add(fin(a, 0.0042 + 0.0053, 0.0008, 0.0106, 0.05, 0.025, mats.vane));
+    head.add(cyl(0.0042, 0.0042, 0.012, 0.353, mats.head), cyl(0.0042, 0.0006, 0.035, 0.365, mats.head));
+    for (const a of [0, (Math.PI * 2) / 3, (Math.PI * 4) / 3]) head.add(fin(a, 0.0042 + 0.0065, 0.0008, 0.013, 0.03, 0.362, mats.head));
+    g.add(nock, shaft, vanes, head);
+    return { group: g, nock, head, vanes, mats };
+  }
+
+  // The crossbow, traced from the TenPoint Stealth SS (a modern compound hunting crossbow: 874 mm with its stirrup) and,
+  // for the limbs from above, the Horton Hunter Supreme. A flat aluminium flight rail with the bolt in its deck, a latch
+  // where the string cocks, a riser at the front clamped round the rail with a limb pocket each side, split limbs with a
+  // cam at each tip, string and cables, a steel stirrup, a scope rail bridged over the bolt's vane, a thumbhole stock and
+  // a fore-end. (Forward from the stock's front, f = 0: the latch at 0.075, the riser 0.31-0.375, the stirrup to 0.51.)
+  // anim: quarrel (the bolt on the rail: gone once it's shot), stringCocked (the string back at the latch) and stringSlack
+  // (forward at the cams): one shows at a time, js/vmanim.js. quarrelHead and quarrelNock are the bolt's head and nock.
   function crossbow(k, o) {
+    const B = M.black(), GM = M.gunmetal(), ya = 0.0165, yc = 0.014;
+    const heavy = o.limb === 'heavy', compact = o.limb === 'compact', Tx = heavy ? 0.19 : compact ? 0.135 : 0.17, lw = heavy ? 1.6 : 1, LM = heavy ? GM : B;
     k.tag('base');
-    k.box(0.036, 0.04, 0.6, M.black(), 0.0, -0.01);
-    k.box(0.01, 0.006, 0.6, M.gunmetal(), 0.0, 0.012);
+    // the flight rail: a deep extrusion (lightening slots down its side) with a slotted deck for the odd vane
+    k.box(0.036, 0.032, 0.4, B, 0.0, -0.008);
+    for (const x of [-0.0125, 0.0125]) k.box(0.011, 0.004, 0.4, GM, 0.0, 0.01, x);
+    for (let i = 0; i < 7; i++) for (const x of [-0.0185, 0.0185]) k.box(0.0012, 0.012, 0.022, GM, 0.1 + i * 0.04, -0.008, x);
+    k.box(0.03, 0.012, 0.04, GM, 0.055, 0.006); // the latch, the string's seat
+    for (const x of [-0.009, 0.009]) k.box(0.004, 0.011, 0.014, GM, 0.058, 0.0185, x); // its claws
     grip(k, 0.03, M.polymer());
-    triggerGuard(k, 0.03, M.black());
-    k.cyl(0.004, 0.42, M.woodDark(), 0.2, 0.016);
-    k.cyl(0.006, 0.03, M.steel(), 0.62, 0.016, 0, 0.0005, 8);
-    k.box(0.04, 0.03, 0.05, M.black(), 0.6, -0.02);
-    const top = S.rail(k, 0.06, 0.16, 0.015, M.black());
-    k.tag('stock');
-    stock(k, o.stock || 'sniper', o.sm || M.polymer());
-    k.tag('limbs');
-    const ll = o.limb === 'heavy' ? 0.37 : o.limb === 'compact' ? 0.26 : 0.33, lw = o.limb === 'heavy' ? 1.6 : 1;
+    triggerGuard(k, 0.03, B);
+    // the trigger housing under the rail behind the grip, the fore-end under it
+    k.box(0.034, 0.022, 0.08, B, 0.0, -0.035);
+    k.prof([[0.1, -0.024], [0.31, -0.024], [0.312, -0.056], [0.292, -0.072], [0.2, -0.078], [0.125, -0.066], [0.1, -0.05]], 0.034, M.polymer());
+    // the riser: two cheeks round the rail leaving the bolt's path open, a limb pocket each side, the cable slide below
     for (const s of [-1, 1]) {
-      const limb = new T.Mesh(new T.BoxGeometry(0.03, 0.012 * lw, ll), o.limb === 'heavy' ? M.gunmetal() : M.black());
-      limb.position.set(s * ll * 0.45, 0.0, -0.56); limb.rotation.y = s * 1.25; k.add(limb);
-      const str = new T.Mesh(new T.CylinderGeometry(0.0015, 0.0015, ll * 1.27, 4), M.string());
-      str.rotation.z = Math.PI / 2; str.rotation.y = s * -0.55; str.position.set(s * ll * 0.45, 0.012, -0.38); k.add(str);
+      k.box(0.022, 0.07, 0.065, GM, 0.31, 0.004, s * 0.029);
+      k.box(0.035, 0.052, 0.05, B, 0.318, 0.014, s * 0.0585);
     }
-    k.tag('optic');
-    const sight = sightOf(k, o, top, 0.3, 0.3, 0.004, 0.62, 0.14);
+    k.box(0.01, 0.01, 0.02, GM, 0.275, -0.029);
+    // the stirrup: a steel loop out in front of the riser to put your foot in
+    for (const s of [-1, 1]) k.cyl(0.0045, 0.14, M.steel(), 0.37, -0.016, s * 0.033);
+    k.cylX(0.0045, 0.075, M.steel(), 0.51, -0.016, 0, 8);
+    const top = S.rail(k, 0.1, 0.2, 0.025, B);
+    for (const f of [0.1, 0.275]) for (const x of [-0.0125, 0.0125]) k.box(0.004, 0.018, 0.02, B, f, 0.017, x); // (the posts that bridge it over the bolt)
+    k.tag('stock');
+    const stk = o.stock || 'sniper';
+    if (stk !== 'sniper') stock(k, stk, o.sm || M.polymer());
+    else if (!buildingVM) { // the factory stock: a thumbhole with a high comb, the pad on its butt
+      k.prof([[0, -0.024], [0, 0.012], [-0.1, 0.012], [-0.18, 0.026], [-0.33, 0.034], [-0.356, 0.03], [-0.364, -0.13], [-0.33, -0.14], [-0.26, -0.13], [-0.19, -0.1], [-0.13, -0.075], [-0.07, -0.082], [-0.01, -0.095], [0.0, -0.05]], 0.042, o.sm || M.polymer(), 0,
+        [[[-0.03, -0.012], [-0.15, -0.002], [-0.2, -0.04], [-0.12, -0.07], [-0.04, -0.06]]]);
+      k.box(0.044, 0.15, 0.012, M.rubber(), -0.376, -0.056);
+    }
+    k.tag('limbs');
+    // split limbs: two plates (above and below the bolt's plane) from each pocket out to a cam, sweeping back a little
+    const R = 0.07, fR = 0.343, fT = 0.3, sc = new T.Group(), sl = new T.Group(), V = (x, y, f) => new T.Vector3(x, y, -f);
+    const seg = (grp, a, b, r, m, sides = 5) => {
+      const d = new T.Vector3().subVectors(b, a), mesh = new T.Mesh(new T.CylinderGeometry(r, r, d.length(), sides), m);
+      mesh.position.copy(a).addScaledVector(d, 0.5); mesh.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), d.normalize()); mesh.userData.slot = 'limbs'; grp.add(mesh);
+    };
+    for (const s of [-1, 1]) {
+      const dx = s * (Tx - R), dz = fR - fT, len = Math.hypot(dx, dz);
+      for (const dy of [-0.0105, 0.0105]) {
+        const limb = new T.Mesh(new T.BoxGeometry(0.03, 0.008 * lw, len), LM);
+        limb.position.set(s * R + dx / 2, yc + dy, -(fR + fT) / 2); limb.rotation.y = Math.atan2(dx, dz); k.add(limb);
+        k.cylY(0.021, 0.004, GM, fT - 0.005, yc + dy * 1.15, s * Tx, 20);
+        k.cylY(0.007, 0.006, B, fT - 0.005, yc + dy * 1.15, s * Tx, 8);
+      }
+      k.cylY(0.004, 0.036, M.steel(), fT - 0.005, yc, s * Tx, 8); // (the axle through both)
+      k.box(0.02, 0.006 + 0.022 * lw, 0.012, B, fR - 0.012, yc, s * (R - 0.012)); // (the limb bolt clamp at its root)
+      // the string leaves the cam's rear: cocked, back to the latch; slack, nearly straight across the rail's front
+      const rim = V(s * (Tx - 0.008), ya, fT - 0.025);
+      seg(sc, rim, V(0, ya, 0.0745), 0.0016, M.string());
+      seg(sl, rim, V(0, ya, 0.275), 0.0016, M.string());
+      // the cables: from each cam under the rail to the slide
+      for (const dy of [-0.0105, 0.0105]) for (const grp of [sc, sl]) seg(grp, V(s * (Tx - 0.01), yc + dy, fT + 0.015), V(s * 0.004, -0.029, 0.285), 0.0011, B, 4);
+    }
+    k.add(sc); k.add(sl);
+    sl.visible = false;
+    // the bolt, cocked and ready: its nock on the string at the latch
     k.tag('base');
-    return { sy: sight.sy, fSight: sight.fSight, relief: sight.relief, muzzles: [[0.62, 0.016, 0]], grip: [0.035, -0.075, 0], support: [0.3, -0.03, 0], anim: {}, port: [0.2, 0.02, 0] };
+    const q = quarrel(false);
+    q.group.position.set(0, ya, -0.077);
+    q.group.traverse((m) => { m.userData.slot = 'base'; });
+    k.add(q.group);
+    k.tag('optic');
+    const sight = sightOf(k, o, top, 0.2, 0.3, 0.004, 0.48, 0.2);
+    k.tag('base');
+    return { sy: sight.sy, fSight: sight.fSight, relief: sight.relief, muzzles: [[0.47, ya, 0]], grip: [0.035, -0.075, 0], support: [0.2, -0.05, 0], port: [0.16, 0.03, 0],
+      anim: { quarrel: q.group, quarrelHead: q.head, quarrelNock: q.nock, stringCocked: sc, stringSlack: sl }, quarrelMats: q.mats };
   }
 
   // The P90, traced from FN's side view (500 mm overall): a thumbhole stock and a finger hole through one moulded
@@ -2143,7 +2220,18 @@ G.GunModels = (() => {
         for (const m of meshes) m.geometry.translate(-c.x, -c.y, -c.z);
         mag = { meshes, home: c };
       }
-      proto = { meshes: merge(k.g), info, mag };
+      // (a crossbow's bolt and its two strings, kept as groups of their own: the bolt's gone once it's shot, the string's
+      // forward until it's cocked. Merged on their own, each in place; setLoaded)
+      const xb = {};
+      k.g.updateMatrixWorld(true);
+      for (const [key, name] of [['bolt', 'quarrel'], ['cocked', 'stringCocked'], ['slack', 'stringSlack']]) {
+        const n = info.anim && info.anim[name];
+        if (!n || !n.parent) continue;
+        const solo = new T.Group();
+        n.parent.remove(n); solo.add(n); n.visible = true;
+        xb[key] = merge(solo);
+      }
+      proto = { meshes: merge(k.g), info, mag, xb: xb.bolt ? xb : null };
       worldCache.set(def.code, proto);
     }
     const g = new T.Group();
@@ -2155,13 +2243,30 @@ G.GunModels = (() => {
       g.add(mg);
       g.userData.mag = mg; g.userData.magHome = proto.mag.home;
     }
+    if (proto.xb) {
+      g.userData.xb = {};
+      for (const [key, list] of Object.entries(proto.xb)) {
+        const sub = new T.Group();
+        for (const m of list) sub.add(new T.Mesh(m.geometry, m.material));
+        g.add(sub); g.userData.xb[key] = sub;
+      }
+      g.userData.xb.slack.visible = false;
+    }
     g.userData.info = proto.info;
     if (skin && skin.length) G.Stickers.decorate(g, skin);
     return g;
+  }
+  // A world model's crossbow: whether its bolt's on the rail (bolt) and its string's cocked (cocked: back at the latch).
+  // Other guns have no such parts. A bolt that's on the rail is always on a cocked string.
+  function setLoaded(g, bolt, cocked) {
+    const x = g && g.userData.xb;
+    if (!x) return;
+    if (cocked == null) cocked = bolt;
+    x.bolt.visible = !!bolt; x.cocked.visible = !!cocked; x.slack.visible = !cocked;
   }
 
   // the gunsmith's display model: every part as separate meshes (tagged by slot), stock included
   function display(def, skin) { const k = kit(); const info = build(k, def); if (skin && skin.length) G.Stickers.decorate(k.g, skin); return { group: k.g, info }; }
 
-  return { M, build, viewmodel, world, display, roundDims };
+  return { M, build, viewmodel, world, display, roundDims, setLoaded, quarrel };
 })();

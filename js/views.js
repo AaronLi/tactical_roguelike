@@ -738,7 +738,7 @@ G.Views = {
       const kneel = (st.act === 'z' && (st.ap || 0) > 0.3) || st.act === 'b';
       const hold = st.hk ? { kind: st.hk === 2 ? 'flash' : 'frag', cock: !!st.hc, str: st.hs == null ? 2 : st.hs } : null; // (a grenade in their hand)
       pv.rig.update(dt, { pos: pv.pos, yaw: pv.yaw, pitch: pv.pitch, crouch: (!!st.cr || kneel) && !st.dn, prone: !!st.pr, alert: !st.lr && !st.sw, lean: st.ln || 0, state: st.dn ? 'down' : 'alive', act,
-        hold, reload: st.rl == null ? -1 : st.rl, inspect: st.in == null ? -1 : st.in, magChk: st.mc == null ? -1 : st.mc });
+        hold, reload: st.rl == null ? -1 : st.rl, loaded: st.ld == null ? null : !!st.ld, inspect: st.in == null ? -1 : st.in, magChk: st.mc == null ? -1 : st.mc });
       if (pv.tag) pv.tag.position.y = st.dn ? 0.8 : st.cr ? 1.7 : 2.15;
     }
 

@@ -1621,6 +1621,17 @@ says the same), but not whose: the shooter's name isn't shown.
   under it and a rail along its top (the export handle: a sight sits very high over the bore, as on the real one),
   the deep vented handguard (`hg: 'g36'`, its own `hg:g36` interface) with the bayonet lug's sleeve ahead of it,
   and the skeleton folding stock (`stock: 'g36'`). The G36K is parts: the 12.5" barrel and the short handguard.
+  **The crossbow** is a modern compound hunting crossbow, a TenPoint Stealth SS (874 mm with its stirrup), drawn by eye
+  from a three-quarter photo (Wikimedia Commons, "Crossbow TenPoint Stealth SS.png", CC0, from Pixabay) with the
+  limbs' plan from a top-down one ("Horton Hunter Supreme by IvE.jpg", CC BY-SA 3.0): a deep flat flight rail with
+  lightening slots and a slotted deck, the latch where the string cocks, a riser clamped round the rail (the bolt
+  passes between its cheeks) with a limb pocket each side, split limbs (two plates each) with a cam at each tip, string and
+  cables, a steel stirrup in front, a scope rail bridged over the bolt's vane, a thumbhole stock and a fore-end. The
+  limbs options change the span (compact, standard, heavy: 31, 38, 42 cm over the cams). The bolt (`anim.quarrel`:
+  a nock, a shaft, three vanes and a head, 40 cm) sits on the string and is gone once it's shot; the string
+  (`anim.stringCocked`, `anim.stringSlack`) is back at the latch while it's cocked and forward at the cams once it's
+  shot. A reload cocks the string at 30% and lays the bolt on the rail at 72%. Others see the same, and a crossbow lying
+  in the world shows what it holds.
   **The derringer** (`derTrace`) is traced from a photo of an American Derringer Model 1 (Wikimedia Commons,
   "American Corp. Derringer M1.jpg") at 0.167 mm a pixel: the stainless frame with its spur trigger and hammer, the
   bird's-head grip, the two-barrel block hinged on the frame's ears at the top of its back, tipping up muzzles first
