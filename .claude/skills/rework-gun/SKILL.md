@@ -83,6 +83,8 @@ const mem = {}; G.U.store = { get: (k, d) => (k in mem ? mem[k] : d), set: (k, v
   stock across the view.
 - **Other guns** sharing what you touched still build.
 
+Browser traps: pass your tabId on every call and check `location.href` first, because a call without one lands on whatever tab is in front, which has put agents' scripts on the user's port. A tab that isn't in front stops ticking: the game loop freezes, so `adsT` stays 0 and reloads never end, and `tabs_select` is what fixes it. Some levels are blackouts: a black first-person view may be the level, so raise the AmbientLight's intensity in the test before suspecting the gun. `G.R.render()` called directly gives a frame even so. Don't leave `M.reloading` forced off and read the magazine: wait for it to finish.
+
 Browser quirks: screenshots go stale, so wait about 2 s and hover somewhere new first. `javascript_tool` times out at 45 s, so
 run long loops in the background and poll a `window` variable. To get images out, POST them to a throwaway Node server in the
 scratchpad; never trigger a download.
@@ -102,7 +104,7 @@ Parallel agents editing one checkout overwrite each other, so:
 
 1. Wait for anything already editing the same files to commit.
 2. One agent a gun, `model: "sonnet"` unless told otherwise, `isolation: "worktree"`, `run_in_background`, each told to follow
-   this skill. Start a few at a time: a large batch can hit the usage limit mid-run. An agent stopped that way loses
+   this skill. Run two at a time, starting the next as each finishes: five at once hit the usage limit twice. A worktree can start on an old commit: have the agent check `.claude/skills/rework-gun` and `js/guntraces.js` are there. Start a few at a time: a large batch can hit the usage limit mid-run. An agent stopped that way loses
    uncommitted work unless it committed as it went, so tell agents to commit early; continue it with `SendMessage`.
 3. Each serves its own worktree on its own port, starting at 8091: `PORT=8091 node serve.js`, run in the background from the
    worktree, stopped when done. It never touches 8080, nor any tab it didn't open: the user may be playing there.
@@ -110,7 +112,7 @@ Parallel agents editing one checkout overwrite each other, so:
    Agents leave `docs/gun-reworks.md` to the orchestrator.
 5. Review each result yourself before relaying it: rerender it, and close-check whatever the agent says it couldn't see.
    Reports overstate: "sits sensibly" has been wrong.
-6. Merge the branches one at a time into the working branch, resolve conflicts, run the attachment sweep across all the merged
+6. Merge the branches one at a time into the working branch, resolve conflicts (`node --check` every file before committing: keeping both sides of a conflict can drop a shared closing line), run the attachment sweep across all the merged
    guns, add the log rows, and delete the worktrees.
 
 ## 7. The contact sheet
