@@ -3,7 +3,7 @@
 // pixels, at the scale the file is served at 1920 wide (ref: the Wikimedia Commons file unless noted). mm: millimetres a
 // pixel, from the gun's real length. x0, y0: the back of the slide and the bore's height. dir: -1 when the muzzle's at the
 // photo's left. top, bot: the slide's edges, rear to front. port: the ejection port's ends, along x. sights: where the rear
-// and front sights stand. hold: the middle of the firing hand. lug: where a stock clips on. tac: the accessory rail.
+// and front sights stand. hold: the middle of the firing hand. lug: where a stock clips on. tac: the front of an accessory and the underside it hangs from: far enough on that its body clears the trigger guard.
 // parts: outlines, see js/gunmodels.js tracedParts.
 {
 const ring = (x, y, r, n = 14) => Array.from({ length: n }, (_, i) => [x + Math.cos((i / n) * Math.PI * 2) * r, y + Math.sin((i / n) * Math.PI * 2) * r]);
@@ -11,7 +11,7 @@ G.GunTraces = {
   // Walther P99, left side: 175 mm. The slide's rear corner sweeps down in one curve; a raised grip panel, a long
   // finger-rest shelf at the heel, the trigger guard's squared front.
   p9: {
-    ref: 'Walther P99-JH01.jpg', mm: 0.105, x0: 1775, y0: 265, dir: -1, c: 0.0035, seg: 1, bore: 0.0046, sights: [1640, 215], lug: [1660, 560], tac: [230, 470], hold: [1440, 860],
+    ref: 'Walther P99-JH01.jpg', mm: 0.105, x0: 1775, y0: 265, dir: -1, c: 0.0035, seg: 1, bore: 0.0046, sights: [1640, 215], lug: [1660, 560], tac: [37, 494], hold: [1440, 860],
     top: [[1775, 350], [1772, 270], [1762, 225], [1745, 185], [1725, 150], [105, 150]],
     bot: [[1775, 350], [105, 350]],
     port: [1000, 745], portY: 200,
@@ -42,7 +42,7 @@ G.GunTraces = {
   // Glock 18C, left side: a Gen 3 frame and slide, 186 mm. A box of a slide, the frame's dust cover flush under it, finger
   // grooves up the front strap and the selector, on a disc, at the back of the slide.
   g18: {
-    ref: 'Glock 18C.jpg', mm: 0.1106, x0: 1752, y0: 172, dir: -1, c: 0.0012, seg: 1, bore: 0.0046, sights: [1625, 160], lug: [1760, 400], tac: [240, 400], hold: [1530, 800],
+    ref: 'Glock 18C.jpg', mm: 0.1106, x0: 1752, y0: 172, dir: -1, c: 0.0012, seg: 1, bore: 0.0046, sights: [1625, 160], lug: [1760, 400], tac: [193, 398], hold: [1530, 800],
     top: [[1752, 265], [1752, 90], [1738, 70], [85, 70], [68, 88]],
     bot: [[1752, 265], [75, 270], [68, 255]],
     port: [1074, 757], portY: 109,
@@ -96,7 +96,7 @@ G.GunTraces = {
   // Walther PPK, right side ("Walther PPK .32 379804k R DSC 7786.jpg"): 155 mm. A round-topped steel slide with the
   // recoil spring round the barrel, the ring hammer, one-piece wraparound grips, the spur on the frame, a finger rest.
   ppk: {
-    ref: 'Walther PPK .32 379804k R DSC 7786.jpg', mm: 0.137, x0: 474, y0: 305, dir: 1, c: 0.0075, seg: 3, bore: 0.0032, sights: [608, 1505], sh: 0.003, sw: 0.0052, serM: 'gunmetal', lug: [520, 480], tac: [1380, 440], hold: [620, 720],
+    ref: 'Walther PPK .32 379804k R DSC 7786.jpg', mm: 0.137, x0: 474, y0: 305, dir: 1, c: 0.0075, seg: 3, bore: 0.0032, sights: [608, 1505], sh: 0.003, sw: 0.0052, serM: 'gunmetal', lug: [520, 480], tac: [1673, 432], hold: [620, 720],
     top: [[474, 412], [506, 359], [539, 318], [576, 276], [605, 236], [1522, 233], [1546, 252], [1548, 330]],
     bot: [[474, 412], [1488, 412], [1505, 375], [1548, 350]],
     port: [935, 1145], portY: 270,
@@ -118,7 +118,7 @@ G.GunTraces = {
   // Remington Rand M1911A1, left side ("Remington Rand M1911A1 (6825681098).jpg"): 216 mm. The full-length round-topped
   // slide with its bushing, narrow military sights, the spur hammer and grip safety, the arched mainspring housing.
   m1911: {
-    ref: 'Remington Rand M1911A1 (6825681098).jpg', mm: 0.124, x0: 1603, y0: 245, dir: -1, c: 0.0075, seg: 3, bore: 0.0057, sights: [1456, 135], sh: 0.0042, sw: 0.0052, serM: 'black', lug: [1620, 560], tac: [440, 400], hold: [1450, 700],
+    ref: 'Remington Rand M1911A1 (6825681098).jpg', mm: 0.124, x0: 1603, y0: 245, dir: -1, c: 0.0075, seg: 3, bore: 0.0057, sights: [1456, 135], sh: 0.0042, sw: 0.0052, serM: 'black', lug: [1620, 560], tac: [361, 400], hold: [1450, 700],
     top: [[1603, 293], [1586, 175], [1569, 141], [1547, 102], [62, 102]],
     bot: [[1603, 293], [405, 293], [399, 389], [62, 389]],
     port: [1038, 756], portY: 175,
@@ -142,7 +142,7 @@ G.GunTraces = {
   // H&K USP, left side ("First-year H&K USP 9mm (32415150000) modified.png"), scaled to the .45's 200 mm. The heavily
   // chamfered slide, big raked serrations, the decocking lever and exposed hammer, the moulded rail grooves, toothed straps.
   usp: {
-    ref: 'First-year H&K USP 9mm (32415150000) modified.png', mm: 0.1405, x0: 1618, y0: 240, dir: -1, c: 0.0052, seg: 1, bore: 0.0057, sights: [1458, 296], sh: 0.005, lug: [1640, 520], tac: [260, 440], hold: [1370, 800],
+    ref: 'First-year H&K USP 9mm (32415150000) modified.png', mm: 0.1405, x0: 1618, y0: 240, dir: -1, c: 0.0052, seg: 1, bore: 0.0057, sights: [1458, 296], sh: 0.005, lug: [1640, 520], tac: [215, 440], hold: [1370, 800],
     top: [[1618, 347], [1596, 270], [1575, 190], [1564, 150], [212, 150], [195, 215]],
     bot: [[1618, 347], [204, 347], [193, 288]],
     port: [971, 774], portY: 178,
@@ -169,7 +169,7 @@ G.GunTraces = {
   // FN Five-seveN, right side ("FN Five Seven (cropped).jpg"): 208 mm. Tall thin polymer-clad slide, a recessed
   // panel of serrations at the back, adjustable sights, an ambidextrous safety, a toothed rail, a long grip for the long round.
   fiveseven: {
-    ref: 'FN Five Seven (cropped).jpg', mm: 0.122, x0: 120, y0: 222, dir: 1, c: 0.002, seg: 1, bore: 0.0029, sights: [250, 1700], sh: 0.0083, sw: 0.0095, lug: [180, 480], tac: [1500, 440], hold: [380, 900],
+    ref: 'FN Five Seven (cropped).jpg', mm: 0.122, x0: 120, y0: 222, dir: 1, c: 0.002, seg: 1, bore: 0.0029, sights: [250, 1700], sh: 0.0083, sw: 0.0095, lug: [180, 480], tac: [1655, 470], hold: [380, 900],
     top: [[120, 305], [122, 294], [134, 199], [168, 154], [202, 140], [1800, 140]],
     bot: [[120, 305], [1800, 305]],
     port: [837, 1153], portY: 225,
@@ -198,7 +198,7 @@ G.GunTraces = {
   // Desert Eagle, right side ("Desert-Eagle-p1030134.jpg"): 273 mm. The barrel is fixed: a heavy block with a flat top
   // runs right out to the muzzle and the slide rides round it, its arms running forward along each side; a huge grip.
   deagle: {
-    ref: 'Desert-Eagle-p1030134.jpg', mm: 0.1552, x0: 250, y0: 215, dir: 1, nose: 1831, noseTop: 134, frontY: 134, c: 0.003, seg: 1, bore: 0.0066, sights: [430, 1725], sh: 0.003, sw: 0.0095, serM: 'gunmetal', lug: [240, 470], tac: [1600, 420], hold: [420, 760],
+    ref: 'Desert-Eagle-p1030134.jpg', mm: 0.1552, x0: 250, y0: 215, dir: 1, nose: 1831, noseTop: 134, frontY: 134, c: 0.003, seg: 1, bore: 0.0066, sights: [430, 1725], sh: 0.003, sw: 0.0095, serM: 'gunmetal', lug: [240, 470], tac: [1600, 402], hold: [420, 760],
     top: [[250, 298], [316, 154], [382, 112], [826, 112], [830, 200], [1637, 202], [1662, 290]],
     bot: [[250, 298], [1662, 298]],
     port: [690, 815], portY: 190,
@@ -223,7 +223,7 @@ G.GunTraces = {
   // Taurus TX22, right side ("TX22 with magazine.jpg", laid at an angle: rot levels it): 178 mm. Its slide's front is
   // bevelled away, deep raked serrations at both ends, the grip raked hard back and flared at the base, a safety lever.
   tx22: {
-    ref: 'TX22 with magazine.jpg', rot: -41.7, mm: 0.16, x0: 475, y0: 355, dir: 1, c: 0.0026, seg: 1, bore: 0.0034, serM: 'gunmetal', sights: [600, 1490], lug: [470, 500], tac: [1500, 560], hold: [560, 760],
+    ref: 'TX22 with magazine.jpg', rot: -41.7, mm: 0.16, x0: 475, y0: 355, dir: 1, c: 0.0026, seg: 1, bore: 0.0034, serM: 'gunmetal', sights: [600, 1490], lug: [470, 500], tac: [1555, 556], hold: [560, 760],
     top: [[475, 444], [478, 400], [508, 292], [1530, 300], [1555, 430]],
     bot: [[475, 444], [1555, 444]],
     port: [888, 1116], portY: 310,

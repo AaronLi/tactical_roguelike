@@ -1469,7 +1469,7 @@ G.GunModels = (() => {
     if (ch) sight = ch.sights(anim);
     else {
       k.tag('tac');
-      const [tf, ty] = tr ? V(tr.tac) : [len * 0.86, -0.026];
+      const [tf, ty] = tr ? V(tr.tac).map((n, i) => (i ? n - 0.0115 : n)) : [len * 0.86, -0.026]; // (traced: its top, r 11 mm, on the frame's underside)
       tactical(k, o.tac, tf, ty, -0.01); // (hung under the dust cover's rail)
       k.tag('optic');
       if (o.optic === 'minidot') sight = S.minidot(k, len * 0.32, topAt(len * 0.32), o);
