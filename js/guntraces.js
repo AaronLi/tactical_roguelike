@@ -7,6 +7,7 @@
 // parts: outlines, see js/gunmodels.js tracedParts.
 {
 const ring = (x, y, r, n = 14) => Array.from({ length: n }, (_, i) => [x + Math.cos((i / n) * Math.PI * 2) * r, y + Math.sin((i / n) * Math.PI * 2) * r]);
+const pill = (x0, y0, x1, y1) => { const r = (y1 - y0) / 2, c = [], n = 6; for (let i = 0; i <= n; i++) { const a = -Math.PI / 2 + Math.PI * i / n; c.push([x1 - r + Math.cos(a) * r, y0 + r + Math.sin(a) * r]); } for (let i = 0; i <= n; i++) { const a = Math.PI / 2 + Math.PI * i / n; c.push([x0 + r + Math.cos(a) * r, y0 + r + Math.sin(a) * r]); } return c; }; // (a stadium: a long port)
 G.GunTraces = {
   // Walther P99, left side: 175 mm. The slide's rear corner sweeps down in one curve; a raised grip panel, a long
   // finger-rest shelf at the heel, the trigger guard's squared front.
@@ -321,6 +322,34 @@ G.GunTraces = {
       // the rubber wraparound, its finger grooves; the filler block under it
       { on: 'grip', m: 'grip', pts: [[352, 56], [386, 58], [405, 92], [422, 143], [360, 150], [356, 131], [352, 120], [356, 108], [353, 97]], w: 0.031, b: 0.004 },
       { on: 'grip', m: 'frame', pts: [[352, 150], [416, 149], [423, 145], [426, 158], [360, 172], [354, 166]], w: 0.0245, b: 0.002 },
+    ],
+  },
+  // Remington 870 Wingmaster, right side: a 12-gauge pump with a walnut stock and a recoil pad, from Wikimedia Commons
+  // ("Remington 870 Wmaster.jpg", Burnyburnout, CC BY-SA 4.0), 1920 px wide here. mm: 0.53, from a 14 in length of pull
+  // (the trigger to the middle of the pad) and the 22 mm barrel. x0: the back of the receiver; y0: the bore. The receiver
+  // is a steel block with a long ejection port, the trigger guard hangs off its plate, the forend rides the action bars.
+  pump: {
+    stockT: 'straight', ref: 'Remington 870 Wmaster.jpg', mm: 0.53, x0: 648, y0: 41, dir: 1, by: 0, topY: 18,
+    parts: [
+      // the receiver, rounded over on top, with the cross-bolt safety, two screws and the carrier's window
+      { pts: [[642, 44], [660, 35], [688, 28], [720, 23], [757, 20], [800, 19], [998, 18], [998, 129], [840, 127], [760, 125], [700, 122], [656, 119]], w: 0.034, m: 'frame', b: 0.007 },
+      { pts: pill(837, 22, 972, 62), w: 0.0012, x: 0.0171, m: 'black', b: 0 }, // (the ejection port, the bolt showing in it)
+      { pts: pill(846, 28, 966, 56), w: 0.0012, x: 0.0176, m: 'steel', b: 0 },
+      { pts: pill(846, 111, 968, 123), w: 0.0012, x: 0.0171, two: true, m: 'black', b: 0 },
+      { pts: ring(675, 90, 3.5, 8), w: 0.001, x: 0.0171, m: 'black', b: 0 },
+      { pts: ring(768, 89, 3.5, 8), w: 0.001, x: 0.0171, m: 'black', b: 0 },
+      { pts: ring(665, 127, 5.5, 10), w: 0.0345, m: 'steel', b: 0.0005 },
+      // the trigger guard, a bow off the receiver's plate, and the trigger in it
+      { pts: [[660, 118], [662, 142], [668, 155], [679, 165], [695, 171], [722, 172], [750, 166], [774, 155], [795, 141], [808, 130], [824, 124], [838, 118], [838, 113], [700, 113]],
+        holes: [[[676, 127], [676, 142], [682, 152], [692, 159], [710, 162], [735, 158], [752, 148], [762, 138], [766, 127]]], w: 0.009, m: 'frame', b: 0.002 },
+      { pts: [[698, 126], [705, 126], [701, 145], [694, 158], [688, 164], [685, 160], [690, 148], [695, 135]], w: 0.006, m: 'black', b: 0.0008 },
+      // the walnut stock, straight-gripped, and its recoil pad
+      { on: 'stock', m: 'stock', pts: [[85, 127], [250, 109], [400, 92], [459, 87], [500, 91], [523, 90], [562, 69], [607, 52], [648, 43], [656, 100], [660, 125], [631, 134], [597, 148], [567, 170], [548, 200], [534, 222], [511, 224], [494, 219], [450, 214], [400, 216], [300, 251], [200, 289], [80, 337]], w: 0.036, b: 0.008 },
+      { on: 'stock', m: 'rubber', pts: [[42, 131], [66, 128], [85, 127], [80, 336], [55, 344], [24, 350], [17, 344]], w: 0.0375, b: 0.003 },
+      // the forend: the action bars joining it to the bolt (they slide back into the receiver), the walnut with its grooves
+      { on: 'pump', m: 'black', pts: [[996, 62], [1176, 62], [1176, 78], [996, 78]], w: 0.004, x: 0.011, two: true, b: 0.0005 },
+      { on: 'pump', m: 'forend', pts: [[1170, 48], [1176, 42], [1300, 41], [1480, 40], [1514, 42], [1520, 50], [1520, 128], [1512, 133], [1480, 134], [1300, 140], [1180, 139], [1171, 132]], w: 0.042, b: 0.008 },
+      { on: 'pump', strips: Array.from({ length: 15 }, (_, i) => [[1215 + i * 20, 72], [1219 + i * 20, 72], [1219 + i * 20, 124], [1215 + i * 20, 124]]), w: 0.001, x: 0.0207, two: true, m: 'woodDark' },
     ],
   },
 };

@@ -1644,6 +1644,14 @@ says the same), but not whose: the shooter's name isn't shown.
   the railed forend behind it). Both barrels are ported inside the can (`set.ported`), so the .44 leaves subsonic
   (310 m/s, as the MP5SD's 9 mm does) with the integral suppressor's sound; the can tips open with them. (The
   clamp-on sight mount it had for a while, `rm.derringer`, is retired.)
+  **The Remington 870** (`look: 'pump'` on the `rcv: 'round'` branch, which the Garand, M14, Mosin and lever-action keep
+  as they were) is traced from a right-side photo of a Wingmaster (Wikimedia Commons, "Remington 870 Wmaster.jpg",
+  Burnyburnout, CC BY-SA 4.0) at 0.53 mm a pixel, scaled from a 14 in length of pull and checked against the 22 mm
+  barrel. The receiver is one steel block, rounded over its top, with the long ejection port (the bolt showing in it), the
+  cross-bolt safety, and the trigger guard hung off its plate. The straight-grip walnut stock and its ribbed recoil pad
+  are traced too (the 'straight' stock only; the other stocks still fit on the back of the receiver). The forend is the
+  walnut with its grooves, riding two action bars that slide back into the receiver when it's racked; the magazine
+  tube sits lower than the barrel under a deeper cap. The model keeps the 18.5 in barrel, not the photo's longer one.
 
   | Model | Ours (mm) | Real (mm) | Model | Ours (mm) | Real (mm) |
   | --- | --- | --- | --- | --- | --- |
@@ -1655,7 +1663,7 @@ says the same), but not whose: the shooter's name isn't shown.
   | SCAR-H | 987 | 965 | P90 | 477 | 505 |
   | Tavor | 739 | 720 | Thompson | 882 | 860 |
   | AUG | 804 | 790 | PPSh-41 | 857 | 843 |
-  | Galil ACE | 955 | 927 | Remington 870 | 982 | 978 |
+  | Galil ACE | 955 | 927 | Remington 870 | 976 | 978 |
   | AN-94 | 975 | 943 | Saiga-12 | 1120 | 1145 |
   | FAL | 1117 | 1090 | AA-12 | 987 | 966 |
   | Mk 14 | 932 | 889 | KSG | 684 | 680 |
