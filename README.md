@@ -1592,7 +1592,11 @@ says the same), but not whose: the shooter's name isn't shown.
   top of the handle. Under the handguard are its cooling bumps, then the grenade sight's rod along the receiver, the
   spigot's ridges and the flash hider. A STANAG sits seated in the well as the photo's does (`magFit` draws the shared
   magazines to it: about 11 cm below the well, moderately curved, whatever they hold). A grip sleeve (the Talon
-  vertical grip) replaces the traced grip, on the same joint and rake and clear of the guard; the other grips recolour it. **The QBZ-192** (`rcv: 'qbz192'`) is built by eye from photos: a tall flat-sided upper railed its whole
+  vertical grip) replaces the traced grip, on the same joint and rake and clear of the guard; the other grips recolour it. **The AR-9** (`look: 'ar9'` on the default `'ar'` receiver, `G.GunTraces.ar9`) is modelled on the Colt 9mm SMG, an AR-15 lower and upper with a 9 mm blowback
+  barrel and a magazine well fitted for the smaller cartridge, traced from a left-side photo (Wikimedia Commons, "AR Colt 9mm left.jpg", Arthurrh, CC BY-SA 3.0, turned 1.6 degrees to level the bore) at 0.506 mm a pixel, so its upper is the 210 mm of a real AR's. The real
+  gun takes Colt stick magazines; the game's takes Glock ones, in the same well. Only the receiver pair is traced: the upper, flat to the rail's seat, with the dust cover and a case deflector on the right and no forward assist (the Colt has
+  none); the lower, with its flat-fronted well flaring to a raked floor, the thin trigger guard, the A1-style grip, the magazine catch, bolt catch and selector. The carrying handle, barrel and stock are the photo's own and aren't modelled: the
+  handguard, barrel, muzzle, stock, rail and optics are the gun's usual parts, and the Glock magazine seats in the traced well. Another grip option replaces the traced grip (the lower stays); the other AR-pattern rifles still build the generic receiver. **The QBZ-192** (`rcv: 'qbz192'`) is built by eye from photos: a tall flat-sided upper railed its whole
   length, the rail carried on over a deep squared handguard (`hg: 'qbz'`), the lower's flared well, the charging
   handle at the front right, a folding telescoping stock (`stock: 'qbz'`). **The SIG MCX and MPX** (`rcv: 'mcx'`,
   `'mpx'`): AR-shaped, no buffer tube (the stock hinges on the back of the upper; the MPX keeps its tube stock), the
