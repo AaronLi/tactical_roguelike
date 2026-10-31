@@ -299,6 +299,8 @@ G.GunTraces = {
       // the stock: the Monte Carlo comb, the pistol grip and its cap, the recoil pad
       { on: 'stock', m: 'stock', pts: [[1298, 203], [1314, 197], [1346, 211], [1390, 221], [1470, 245], [1498, 244], [1518, 232], [1554, 232], [1662, 246], [1700, 248], [1745, 262], [1790, 288], [1796, 292], [1796, 462], [1694, 419], [1658, 402], [1570, 361], [1558, 359], [1550, 367], [1510, 380], [1494, 380], [1486, 343], [1462, 311], [1426, 291], [1390, 273], [1326, 262], [1298, 262]], w: 0.042, b: 0.008 },
       { on: 'stock', m: 'rubber', pts: [[1790, 288], [1833, 291], [1829, 470], [1794, 462]], w: 0.045, b: 0.003 },
+    ],
+  },
   // The AR-9's receiver pair, from the Colt 9mm SMG (AR-pattern, a 9 mm blowback in an AR-15 lower, left side). Read off
   // "AR Colt 9mm left.jpg" (Wikimedia Commons, CC BY-SA 3.0, Arthurrh) turned 1.6 degrees clockwise (rot) to level the
   // bore, at 0.506 mm a pixel: the upper's length (back of the tube nut to its front, 415 px) is the 210 mm of an AR upper;
