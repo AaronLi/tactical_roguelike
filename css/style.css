@@ -782,12 +782,6 @@ i.c.heavy { background: #a02828; } i.c.light { background: #7a3a30; } i.c.frac {
 .abox-pick .arm.gone { opacity: 0.45; }
 .abox-pick .abox-close { margin-top: 16px; min-width: 200px; }
 /* the weapon case: one wheel, wide enough for a long gun (js/game.js caseShow) */
-.case-pick { overflow-y: auto; align-items: flex-start; }
-.case-pick .arm-box { margin: auto; }
-.case-pick .arm { width: 620px; max-width: 86vw; min-height: 0; }
-.case-pick .abox-face img, .case-pick .abox-win img { height: 88px; max-width: 92%; }
-.case-pick .abox-face b, .case-pick .abox-win b { font: 700 18px var(--mono); }
-.case-pick .abox-face small { font: 11px var(--mono); color: var(--dim); text-transform: uppercase; letter-spacing: 1px; }
 /* an armour card's make-up and what it stops (js/shop.js gearCard, from js/ballistics.js rating) */
 .card .arm-rate { font-size: 11px; line-height: 1.35; margin: 4px 0 2px; }
 .card .arm-rate small { opacity: 0.7; display: block; }

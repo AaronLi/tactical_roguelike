@@ -1529,7 +1529,12 @@ G.Furniture = (() => {
 
   function build(map, root, crateTex) {
     const T = THREE, L = G.Level, TS = L.TS, { W, t } = map;
-    const rnd = G.U.rng((map.seed ^ 0x5eed1e) >>> 0);
+    // (the one stream everything's looks draw on, in turn, so a room that's built differently would change every room
+    // after it. A resident's room: what it would have been is still built, into nothing (sink), and what's really there
+    // draws on a stream of its own (cur). Every other room comes out the same, Harold's or no.)
+    const rnd0 = G.U.rng((map.seed ^ 0x5eed1e) >>> 0);
+    let cur = rnd0, sink = false;
+    const rnd = () => cur();
     // A piece's colour goes in its vertices: what's drawn is one material per finish (roughness, metalness, texture,
     // glow), not one per colour as well, so a houseful of furniture is a few dozen draw calls, not hundreds.
     // (mat() still hands back a material of that colour, to be read and tinted; base is what it's drawn with.)
@@ -1550,6 +1555,7 @@ G.Furniture = (() => {
     // everything static is merged into one mesh per material
     const byMat = new Map();
     const add = (geo, m, matrix) => {
+      if (sink) { geo.dispose(); return; }
       const g2 = geo.index ? geo.toNonIndexed() : geo;
       g2.applyMatrix4(matrix);
       const b = base.get(m) || m;
@@ -1590,8 +1596,10 @@ G.Furniture = (() => {
     // furniture
     for (const p of map.propList || new Set(map.props.values())) {
       frame = new T.Matrix4().compose(new T.Vector3(p.x, 0, p.z), new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), p.q * Math.PI / 2), new T.Vector3(1, 1, 1));
-      R[p.name].build(k, p.v);
+      sink = !!p.gone; cur = p.own ? G.U.rng(Math.floor(p.v * 4294967295)) : rnd0; // (p.gone, p.own: js/homes.js)
+      R[p.name].build(k, p.v, p.style);
     }
+    sink = false; cur = rnd0;
     frame = new T.Matrix4();
 
     // rooms: floor covering, rug, baseboards, art and windows on the walls
@@ -1622,9 +1630,55 @@ G.Furniture = (() => {
       for (const s of [-1, 0, 1]) hung.add((z + az * s) * W + x + ax * s);
       return true;
     };
+    // a floor covering over a room (a lawn runs under the fences to the edge; inside, the floor stops at the walls)
+    const layFloor = (rm, fm) => {
+      const x0 = rm.x * TS, z0 = rm.z * TS, w = rm.w * TS, d = rm.h * TS;
+      let drop = false;
+      for (let z = rm.z; z < rm.z + rm.h && !drop; z++) for (let x = rm.x; x < rm.x + rm.w; x++) if (t[z * W + x] === 5) { drop = true; break; }
+      if (rm.out) place(new T.PlaneGeometry(w + 2 * TS, d + TS), fm, x0 + w / 2, 0.004, z0 + d / 2, 0, -Math.PI / 2);
+      else if (!drop) place(new T.PlaneGeometry(w, d), fm, x0 + w / 2, 0.004, z0 + d / 2, 0, -Math.PI / 2);
+      else for (let z = rm.z; z < rm.z + rm.h; z++) for (let x = rm.x; x < rm.x + rm.w;) { // (round a drop in the floor: a strip per run of floor)
+        if (t[z * W + x] === 5) { x++; continue; }
+        let x1 = x; while (x1 + 1 < rm.x + rm.w && t[z * W + x1 + 1] !== 5) x1++;
+        const g = new T.PlaneGeometry((x1 - x + 1) * TS, TS), uv = g.attributes.uv;
+        for (let k = 0; k < uv.count; k++) uv.setXY(k, (x - rm.x + uv.getX(k) * (x1 - x + 1)) / rm.w, (rm.z + rm.h - 1 - z + uv.getY(k)) / rm.h); // (the room's texture, continuous across strips)
+        place(g, fm, (x + x1 + 1) / 2 * TS, 0.004, (z + 0.5) * TS, 0, -Math.PI / 2);
+        x = x1 + 1;
+      }
+    };
+    // A resident's room (js/homes.js, rm.dress): its floor, its trim round the walls, what hangs on them. Its walls and
+    // ceiling are G.Level.buildMesh's; its furniture went by with the rest.
+    const dressRoom = (rm) => {
+      const dr = rm.dress, f = dr.floor;
+      cur = G.U.rng((map.seed ^ Math.imul(rm.z * W + rm.x + 1, 0x9e3779b1)) >>> 0);
+      const tex = tx[f.kind](f.color, f.grout || '#7a7670');
+      tex.repeat.set(rm.w, rm.h);
+      const fm = mat(0xffffff, f.kind === 'tile' ? 0.45 : 0.85, 0, { map: tex }), mine = new Set(dr.cells);
+      layFloor(rm, fm);
+      const trim = mat(parseInt(dr.trim.slice(1), 16), 0.5);
+      for (const i of dr.cells) {
+        const x = i % W, z = (i / W) | 0;
+        if (t[i] === 1 || t[i] === 5) continue;
+        if (!inRoom(rm, x, z)) { // (a strip off the side of the room: the room's floor carried on over it)
+          const g = new T.PlaneGeometry(TS, TS), uv = g.attributes.uv;
+          for (let n = 0; n < uv.count; n++) uv.setXY(n, (x - rm.x + uv.getX(n)) / rm.w, (rm.z + rm.h - 1 - z + uv.getY(n)) / rm.h);
+          place(g, fm, (x + 0.5) * TS, 0.004, (z + 0.5) * TS, 0, -Math.PI / 2);
+        }
+        for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          if (mine.has(z * W + x + dx + dz * W) || L.tile(map, x + dx, z + dz) !== 1) continue;
+          place(new T.BoxGeometry(TS, 0.14, 0.03), trim, (x + 0.5) * TS + dx * (TS / 2 - 0.02), 0.07, (z + 0.5) * TS + dz * (TS / 2 - 0.02), Math.atan2(-dx, -dz));
+        }
+      }
+      for (const h of dr.hung) {
+        frame = new T.Matrix4().compose(new T.Vector3(h.x, 0, h.z), new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), h.q * Math.PI / 2), new T.Vector3(1, 1, 1));
+        R[h.name].build(k, h.v, h.style);
+      }
+      frame = new T.Matrix4(); cur = rnd0;
+    };
     for (const rm of map.rooms) {
       const spec = ROOMS[rm.type] || {};
       const x0 = rm.x * TS, z0 = rm.z * TS, w = rm.w * TS, d = rm.h * TS;
+      if (rm.dress) { G.Homes.swap(map, rm); sink = true; } // (the room as it would have been, for the stream's sake)
       if (spec.floor) {
         let tex;
         if (spec.floor === 'wood') tex = tx.wood(pick(['#7a5232', '#9a6e44', '#5e4028', '#a88458']));
@@ -1634,20 +1688,7 @@ G.Furniture = (() => {
         else tex = tx.carpet(pick(['#5a5f6a', '#6a5a4a', '#4a5a52', '#7a6e62', '#3d4452']));
         tex.repeat.set(rm.w, rm.h);
         if (spec.floor === 'wood' && rnd() < 0.5) { tex.rotation = Math.PI / 2; }
-        const fm = mat(0xffffff, spec.floor === 'tile' ? 0.45 : spec.floor === 'grass' ? 1 : 0.85, 0, { map: tex });
-        // a lawn runs under the fences to the edge; inside, the floor stops at the walls
-        let drop = false;
-        for (let z = rm.z; z < rm.z + rm.h && !drop; z++) for (let x = rm.x; x < rm.x + rm.w; x++) if (t[z * W + x] === 5) { drop = true; break; }
-        if (rm.out) place(new T.PlaneGeometry(w + 2 * TS, d + TS), fm, x0 + w / 2, 0.004, z0 + d / 2, 0, -Math.PI / 2);
-        else if (!drop) place(new T.PlaneGeometry(w, d), fm, x0 + w / 2, 0.004, z0 + d / 2, 0, -Math.PI / 2);
-        else for (let z = rm.z; z < rm.z + rm.h; z++) for (let x = rm.x; x < rm.x + rm.w;) { // (round a drop in the floor: a strip per run of floor)
-          if (t[z * W + x] === 5) { x++; continue; }
-          let x1 = x; while (x1 + 1 < rm.x + rm.w && t[z * W + x1 + 1] !== 5) x1++;
-          const g = new T.PlaneGeometry((x1 - x + 1) * TS, TS), uv = g.attributes.uv;
-          for (let k = 0; k < uv.count; k++) uv.setXY(k, (x - rm.x + uv.getX(k) * (x1 - x + 1)) / rm.w, (rm.z + rm.h - 1 - z + uv.getY(k)) / rm.h); // (the room's texture, continuous across strips)
-          place(g, fm, (x + x1 + 1) / 2 * TS, 0.004, (z + 0.5) * TS, 0, -Math.PI / 2);
-          x = x1 + 1;
-        }
+        layFloor(rm, mat(0xffffff, spec.floor === 'tile' ? 0.45 : spec.floor === 'grass' ? 1 : 0.85, 0, { map: tex }));
       }
       if (rm.out) continue; // no rugs, skirting, pictures or windows out in the garden
       if (spec.rug && rnd() < spec.rug && rm.w >= 3 && rm.h >= 3) {
@@ -1692,6 +1733,7 @@ G.Furniture = (() => {
           }
         }
       }
+      if (rm.dress) { G.Homes.swap(map, rm); sink = false; dressRoom(rm); }
     }
 
     // merge
@@ -1716,5 +1758,5 @@ G.Furniture = (() => {
     }
   }
 
-  return { plan, build, R, ROOMS, worldBoxes, outsideMaterial, textures };
+  return { plan, build, R, ROOMS, worldBoxes, facing, outsideMaterial, textures };
 })();

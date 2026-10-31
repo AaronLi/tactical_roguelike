@@ -23,10 +23,10 @@ G.Hangar = (() => {
   const HELI = { x: 26, z: 36.2, floor: 0.55, seats: 6 };
   const BENCH = (i) => ({ x: 2.1, x1: 3.25, z: 4 + i * 4 });
   const COUNTER = { x0: 22, x1: 28, z0: 4, z1: 5, h: 1.05 }, VEX = { x: 25, z: 2.9 };
-  const STAND = { z: 12.5, xs: [20.5, 23.5, 26.5, 29.5], top: 0.95 };
+  const STAND = { z: 12.5, xs: [20.5, 23, 25.5, 28, 30.5], top: 0.95 };
   const POUCH = { x0: 17.2, x1: 18.0, z0: 8.7, step: 1.12, n: 5 };
   const ZERO = { x0: 6.3, x1: 8.1, z0: 13.1, z1: 14.9, h: 0.9 }; // the zeroing table, in the middle of the workshop floor
-  const PARTS = { x0: 12.9, z: 3.5, step: 1.3, n: 6, top: 0.9 }; // the gunsmith's parts, on pedestals along the north wall (east of the range's garage door)
+  const PARTS = { x0: 12.9, z: 3.5, step: 1.15, n: 7, top: 0.9 }; // the gunsmith's parts, on pedestals along the north wall (east of the range's garage door)
   const VEND = [{ id: 'ammo', title: 'AMMUNITION', x: 35.0, z: 10.0, cols: 2, rows: 3, tab: 'svc' }, { id: 'supply', title: 'FIELD SUPPLIES', x: 35.0, z: 12.2, cols: 3, rows: 3, tab: 'svc' }];
   const CONSOLE = { x0: 38.2, x1: 39.1, z0: 7.6, z1: 10.4 };
   const STACK = { x: 44.5, z: 6.4 }, BAY_Z = 11.2; // (the stash, and the loadout pallet in front of it)
@@ -348,7 +348,7 @@ G.Hangar = (() => {
     vex.setKit({ carrier: 'c.recon', cp: 3, belt: 'b.battle', bp: 2, ifak: 1 });
     vex.root.position.set(VEX.x, 0, VEX.z); r.add(vex.root); S.rigs.push({ rig: vex, x: VEX.x, z: VEX.z, yaw: Math.PI, vex: true });
 
-    // pedestals: one for each of the four pieces of gear for sale, the piece turning slowly on top, its sign on the front
+    // pedestals: one for each of the five pieces of gear for sale, the piece turning slowly on top, its sign on the front
     S.stands = [];
     STAND.xs.forEach((x, i) => {
       box(r, x - 0.8, 0, STAND.z - 0.8, x + 0.8, 0.1, STAND.z + 0.8, M(0x30353b));
@@ -560,7 +560,7 @@ G.Hangar = (() => {
     const parts0 = [...(Sh.partStock || [])], key = JSON.stringify([O.gear, parts0, Sh.stock]);
     if (!force && key === S.key) { vending(false); return; }
     S.key = key;
-    // the pedestals: the four pieces of gear
+    // the pedestals: the five pieces of gear
     S.stands.forEach((tg, i) => {
       const id = O.gear[i];
       tg.key = id || null;

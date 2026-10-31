@@ -116,21 +116,10 @@ G.Casings = (() => {
       return { mesh: new T.Mesh(geo, magMat), r: w / 2 };
     }
     // thickness (it lies on this), height, depth; a box of rounds is a cardboard box
-    const [x, y, z] = item && item.k === 'ammo' ? [0.05, 0.09, 0.12] : G.beltFed(def) ? [0.09, 0.1, 0.13] : am.label === 'LOADER' ? [0.04, 0.03, 0.04] : pistol ? [0.022, 0.11, 0.032] : am.h === 1 ? [0.026, 0.11, 0.06] : [0.026, 0.18, 0.065];
+    const [x, y, z] = item && item.k === 'ammo' ? [0.05, 0.09, 0.12] : G.beltFed(def) ? [0.09, 0.1, 0.13] : pistol ? [0.022, 0.11, 0.032] : am.h === 1 ? [0.026, 0.11, 0.06] : [0.026, 0.18, 0.065];
     if (!magMat) magMat = new T.MeshStandardMaterial({ color: 0x232527, roughness: 0.55, metalness: 0.3 });
     if (!boxMat) boxMat = new T.MeshStandardMaterial({ color: 0xb0915e, roughness: 0.9 });
     return { mesh: new T.Mesh(new T.BoxGeometry(x, y, z), item && item.k === 'ammo' ? boxMat : magMat), r: x / 2 };
-  }
-  // a magazine (or box) put down at someone's feet (what came in the weapon case that didn't fit on them)
-  function dropAt(def, item, at) {
-    if (!G.R || !G.R.dynRoot) return null;
-    const { mesh, r } = magMesh(def, item);
-    const a = Math.random() * Math.PI * 2, p = V().set(at.x + Math.cos(a) * 0.35, (at.y || 0) + 0.6, at.z + Math.sin(a) * 0.35);
-    const c = { mesh, p, q: new T.Quaternion().setFromEuler(new T.Euler(0.3, a, 0.2)), v: V().set(0, -0.5, 0), w: V().set(2, 1, 2), rest: false, age: 0, k: { mat: 'steel', len: 120, r }, item };
-    G.R.dynRoot.add(mesh);
-    mags.push(c);
-    draw(c);
-    return c;
   }
   function dropMag(def) {
     const vm = G.R.vm, a = vm && vm.userData.vma, h = vm && vm.userData.holders && vm.userData.holders[0];
@@ -157,13 +146,13 @@ G.Casings = (() => {
     if (c.mesh.parent) c.mesh.parent.remove(c.mesh);
     c.mesh.geometry.dispose();
   }
-  // the nearest dropped magazine you can pick up, within r of p (on the floor, roughly level with you)
-  function nearMag(p, r) {
-    let best = null, bd = r;
+  // the dropped magazine under the crosshair (o, d: your aim) that you can pick up, within reach
+  function aimedMag(o, d, reach = 2.2) {
+    let best = null, bd = reach;
     for (const c of mags) {
       if (!c.item) continue;
-      const d = Math.hypot(c.p.x - p.x, c.p.z - p.z);
-      if (d < bd && Math.abs(c.p.y - (p.y || 0)) < 2) { bd = d; best = c; }
+      const t = G.Loot.rayHit(o, d, c.mesh, c.box || (c.box = G.Loot.boxOf(c.mesh)), bd);
+      if (t < bd) { bd = t; best = c; }
     }
     return best;
   }
@@ -177,7 +166,7 @@ G.Casings = (() => {
       const WH = map.W * map.H;
       map.surf = new Array(WH * (map.NF || 1)).fill(map.theme.home >= 1 ? 'hard' : 'concrete');
       for (const rm of map.rooms) {
-        const fl = rm.out ? 'grass' : (G.Furniture.ROOMS[rm.type] || {}).floor;
+        const fl = rm.out ? 'grass' : rm.dress ? rm.dress.floor.kind : (G.Furniture.ROOMS[rm.type] || {}).floor; // (a resident's room has its own: js/homes.js)
         if (!fl) continue;
         for (let tz = rm.z; tz < rm.z + rm.h; tz++) for (let tx = rm.x; tx < rm.x + rm.w; tx++) map.surf[(rm.fl || 0) * WH + tz * map.W + tx] = fl;
       }
@@ -263,7 +252,7 @@ G.Casings = (() => {
   }
 
   return {
-    mode, fired, emptied, dropMag, dropAt, takeMag, nearMag, surface,
+    mode, fired, emptied, dropMag, magMesh, takeMag, aimedMag, surface,
     // for G.R.warmup: the cases' meshes in the scene now, and a sample magazine and box (not kept)
     warm() { attach(); const def = G.WEAPONS.m4; return [magMesh(def, null).mesh, magMesh(def, { k: 'ammo' }).mesh]; },
     get mags() { return mags; }, // for debugging

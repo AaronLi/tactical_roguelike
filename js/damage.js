@@ -137,7 +137,7 @@ G.Damage = (() => {
   // a wall's material, in the tile's shade (the cube was one of many, each its own: js/level.js)
   const wallMat = (map, fm, shade) => {
     const D = st(map), k = 'w' + fm.wallMesh.uuid + Math.round(shade * 16);
-    if (!D.mats.has(k)) { const m = fm.wallMesh.material.clone(); m.color.setRGB(shade, shade, shade); D.mats.set(k, m); }
+    if (!D.mats.has(k)) { const m = fm.wallMesh.material.clone(); m.defines = Object.assign({}, fm.wallMesh.material.defines); m.color.setRGB(shade, shade, shade); D.mats.set(k, m); } // (a clone loses its defines: a resident's wall colour, js/lightgrid.js)
     return D.mats.get(k);
   };
   // the sides of a ring of points round a hole, from ring a to ring b: positions and a shade for each

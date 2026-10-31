@@ -30,7 +30,11 @@ G.Level = {
       : theme.layout === 'foundry' ? this.layFoundry(r, level)
       : this.approach(this.layRooms(r, level), r, theme);
     // a building of several floors: each one planned as a storey, then stacked (stack: the stairs between them)
-    if (lay.floors) return this.stack(lay.floors.map((fl) => this.plan(fl, r, seed, level, theme)), lay);
+    if (lay.floors) {
+      // (who lives where: nothing to do with the layout, and from the seed alone: js/homes.js)
+      if (theme.residents) { const homes = G.Homes.start(seed); lay.floors.forEach((fl) => { fl.homes = homes; }); }
+      return this.stack(lay.floors.map((fl) => this.plan(fl, r, seed, level, theme)), lay);
+    }
     const map = this.plan(lay, r, seed, level, theme);
     G.World.fromTileMap(map); // the level as 3D solids (js/world.js): what every ray, sight line and step is asked of
     return map;
@@ -114,7 +118,11 @@ G.Level = {
     map.fest = c.fest || null; map.civSpots = c.civSpots || null; // (a festival: its light strings, where civilians hide)
     map.spawnRoom = map.rooms[rooms.indexOf(spawnRoom)];
     map.exitRoom = map.rooms[rooms.indexOf(exitRoom)];
-    return this.finish(map, r);
+    this.finish(map, r);
+    // the walls, the doors and everything else are done: now who lives here redoes the rooms they have (after all of
+    // it, on its own random stream, so nothing else on the map moves for them)
+    if (lay.homes) G.Homes.fill(map, lay.homes);
+    return map;
   },
 
   // Coarse plan -> fine grid (K x K cells per tile).
@@ -206,7 +214,6 @@ G.Level = {
     });
     // furniture: slid out to its wall's new face, then laid on the cells it covers
     const R = G.Furniture.R, wb = G.Furniture.worldBoxes, props = new Map(), propList = [];
-    const hang = (i, p) => { const q = props.get(i); props.set(i, q ? { name: q.name, boxes: q.boxes.concat(p.boxes).sort((a, b) => b.h - a.h) } : p); };
     for (const [ci, p0] of c.props) {
       if (fenceC.has(ci)) continue;
       const cx = ci % c.W, cz = (ci / c.W) | 0;
@@ -216,20 +223,7 @@ G.Level = {
         if (t[fz * W + fx] === 0) { x += dx * cs; z += dz * cs; }
       }
       const p = Object.assign({}, p0, { x, z, boxes: wb(R[p0.name], x, z, p0.q, p0.v) });
-      propList.push(p);
-      const bv = p0.block || (c.t[ci] === 2 || c.t[ci] === 4 ? c.t[ci] : 0), blocks = !!bv; // (block: a piece laid on the fine grid itself, not on a tile: what it blocks, 2 or 4)
-      let any = false;
-      for (const b of p.boxes) {
-        for (let fz = Math.floor((b.cz - b.hz) / cs); fz <= Math.floor((b.cz + b.hz) / cs); fz++) for (let fx = Math.floor((b.cx - b.hx) / cs); fx <= Math.floor((b.cx + b.hx) / cs); fx++) {
-          if (fx < 0 || fz < 0 || fx >= W || fz >= H) continue;
-          const i = fz * W + fx;
-          if (t[i] !== 0 && !(blocks && (t[i] === 2 || t[i] === 4))) continue;
-          hang(i, p); any = true;
-          // a cell whose middle it covers is blocked (a small thing in a corner leaves the floor walkable)
-          if (blocks && Math.abs((fx + 0.5) * cs - b.cx) <= b.hx + 0.05 && Math.abs((fz + 0.5) * cs - b.cz) <= b.hz + 0.05) t[i] = bv;
-        }
-      }
-      if (!any) hang(Math.floor(z / cs) * W + Math.floor(x / cs), p);
+      this.layProp({ W, H, t, props, propList }, p, p0.block || (c.t[ci] === 2 || c.t[ci] === 4 ? c.t[ci] : 0)); // (block: a piece laid on the fine grid itself, not on a tile: what it blocks, 2 or 4)
     }
     // garden fence panels
     for (let i = 0; i < W * H; i++) {
@@ -242,6 +236,24 @@ G.Level = {
     }
     return { W, H, t, out, grate, rooms, seed: c.seed, level: c.level, doors, doorAt, props, propList, theme: c.theme };
   },
+  // A piece on the fine grid: hung on every cell it covers, those it stands on blocked (bv: 2 or 4; 0: it blocks nothing).
+  layProp(m, p, bv) {
+    const { W, H, t, props } = m, cs = this.TS, blocks = !!bv;
+    const hang = (i) => { const q = props.get(i); props.set(i, q ? { name: q.name, boxes: q.boxes.concat(p.boxes).sort((a, b) => b.h - a.h) } : p); };
+    m.propList.push(p);
+    let any = false;
+    for (const b of p.boxes) {
+      for (let fz = Math.floor((b.cz - b.hz) / cs); fz <= Math.floor((b.cz + b.hz) / cs); fz++) for (let fx = Math.floor((b.cx - b.hx) / cs); fx <= Math.floor((b.cx + b.hx) / cs); fx++) {
+        if (fx < 0 || fz < 0 || fx >= W || fz >= H) continue;
+        const i = fz * W + fx;
+        if (t[i] !== 0 && !(blocks && (t[i] === 2 || t[i] === 4))) continue;
+        hang(i); any = true;
+        // a cell whose middle it covers is blocked (a small thing in a corner leaves the floor walkable)
+        if (blocks && Math.abs((fx + 0.5) * cs - b.cx) <= b.hx + 0.05 && Math.abs((fz + 0.5) * cs - b.cz) <= b.hz + 0.05) t[i] = bv;
+      }
+    }
+    if (!any) hang(Math.floor(p.z / cs) * W + Math.floor(p.x / cs));
+  },
 
   // Everything placed on the fine grid: cover spots, hiding spots, where suspects start, the weapon case, the
   // lights, spawn and extraction.
@@ -249,27 +261,10 @@ G.Level = {
     const U = G.U, { W, H, t, rooms, spawnRoom, exitRoom } = map, TS = this.TS, K = this.K;
     // Cover spots: floor cells beside furniture you can hide behind, tight against its side
     map.cover = [];
-    for (let z = 1; z < H - 1; z++) for (let x = 1; x < W - 1; x++) {
-      if (t[z * W + x] !== 0) continue;
-      const tcx = (x + 0.5) * TS, tcz = (z + 0.5) * TS;
-      for (const [ox, oz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-        if (t[(z + oz) * W + x + ox] !== 2) continue;
-        const b = this.boxesAt(map, x + ox, z + oz)[0];
-        if (!b || b.h < 0.85) continue;
-        // stand half a metre off the face nearest this cell, level with its centre
-        const sx = ox ? b.cx - ox * (b.hx + 0.5) : tcx, sz = oz ? b.cz - oz * (b.hz + 0.5) : tcz;
-        if (ox ? Math.abs(tcz - b.cz) > b.hz + 0.1 : Math.abs(tcx - b.cx) > b.hx + 0.1) continue;
-        if (Math.abs(sx - tcx) > 0.8 || Math.abs(sz - tcz) > 0.8) continue;
-        if (map.cover.some((q) => Math.abs(q.x - sx) < 0.5 && Math.abs(q.z - sz) < 0.5)) continue;
-        map.cover.push({ x: sx, z: sz, cx: b.cx, cz: b.cz });
-      }
-    }
+    for (let z = 1; z < H - 1; z++) for (let x = 1; x < W - 1; x++) this.coverAt(map, x, z);
     // spots by a wall edge to lean out from (every third cell is plenty)
     map.wallSpots = [];
-    for (let z = 1; z < H - 1; z++) for (let x = 1; x < W - 1; x++) {
-      if (t[z * W + x] !== 0 || (x + z) % 2) continue;
-      if (t[z * W + x - 1] === 1 || t[z * W + x + 1] === 1 || t[(z - 1) * W + x] === 1 || t[(z + 1) * W + x] === 1) map.wallSpots.push({ x: (x + 0.5) * TS, z: (z + 0.5) * TS });
-    }
+    for (let z = 1; z < H - 1; z++) for (let x = 1; x < W - 1; x++) this.wallSpotAt(map, x, z);
     // Enemy candidate spots: floor cells in rooms away from the spawn
     const dist2 = this.flow(map, [[spawnRoom.cx, spawnRoom.cz]].concat(map.entries || [])); // (a loft's upper floor is reached by its own stair: from its head too)
     map.enemySpots = [];
@@ -459,6 +454,41 @@ G.Level = {
     map.extract = { x: (exitRoom.cx + 0.5) * TS, z: (exitRoom.cz + 0.5) * TS, r: 3 };
     return map;
   },
+  // the cover spots of a floor cell, if it's beside furniture you can hide behind
+  coverAt(map, x, z) {
+    const { W, t } = map, TS = this.TS;
+    if (t[z * W + x] !== 0) return;
+    const tcx = (x + 0.5) * TS, tcz = (z + 0.5) * TS;
+    for (const [ox, oz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      if (t[(z + oz) * W + x + ox] !== 2) continue;
+      const b = this.boxesAt(map, x + ox, z + oz)[0];
+      if (!b || b.h < 0.85) continue;
+      // stand half a metre off the face nearest this cell, level with its centre
+      const sx = ox ? b.cx - ox * (b.hx + 0.5) : tcx, sz = oz ? b.cz - oz * (b.hz + 0.5) : tcz;
+      if (ox ? Math.abs(tcz - b.cz) > b.hz + 0.1 : Math.abs(tcx - b.cx) > b.hx + 0.1) continue;
+      if (Math.abs(sx - tcx) > 0.8 || Math.abs(sz - tcz) > 0.8) continue;
+      if (map.cover.some((q) => Math.abs(q.x - sx) < 0.5 && Math.abs(q.z - sz) < 0.5)) continue;
+      map.cover.push({ x: sx, z: sz, cx: b.cx, cz: b.cz });
+    }
+  },
+  wallSpotAt(map, x, z) {
+    const { W, t } = map;
+    if (t[z * W + x] !== 0 || (x + z) % 2) return;
+    if (t[z * W + x - 1] === 1 || t[z * W + x + 1] === 1 || t[(z - 1) * W + x] === 1 || t[(z + 1) * W + x] === 1) map.wallSpots.push({ x: (x + 0.5) * this.TS, z: (z + 0.5) * this.TS });
+  },
+  // A room's spots again, after its furniture's changed (js/homes.js): cover, wall spots and where suspects can start
+  respot(map, rm) {
+    const { W, t } = map, TS = this.TS, K = this.K, x1 = rm.x + rm.w, z1 = rm.z + rm.h;
+    const inside = (c) => c.x >= rm.x * TS && c.x < x1 * TS && c.z >= rm.z * TS && c.z < z1 * TS;
+    map.cover = map.cover.filter((c) => !inside(c)); map.wallSpots = map.wallSpots.filter((c) => !inside(c));
+    map.enemySpots = map.enemySpots.filter(([x, z]) => x < rm.x || x >= x1 || z < rm.z || z >= z1);
+    const dist = this.flow(map, [[map.spawnRoom.cx, map.spawnRoom.cz]].concat(map.entries || []));
+    for (let z = rm.z; z < z1; z++) for (let x = rm.x; x < x1; x++) {
+      this.coverAt(map, x, z); this.wallSpotAt(map, x, z);
+      const i = z * W + x;
+      if (t[i] === 0 && !map.props.has(i) && dist[i] > 5 * K) map.enemySpots.push([x, z]);
+    }
+  },
   // the real lights go to the lamps nearest p (a few times a second; now if `now`)
   LIGHTS: 12,
   // focus: where you're aiming, when you are (outdoors at night a third of the lights go to the lamps nearest it,
@@ -568,7 +598,7 @@ G.Level = {
           const wx = x + dx, wz = z + dz, ax = dz ? 1 : 0, az = dx ? 1 : 0, w2 = (wz + az) * W + wx + ax;
           if (!solidOut(wx, wz, dx, dz) || !solidOut(wx + ax, wz + az, dx, dz) || used.has(wz * W + wx) || used.has(w2) || !floor((z + az) * W + x + ax) || out[(z + az) * W + x + ax]) continue;
           if (nearDoor(wx, wz) || nearDoor(wx + ax, wz + az) || tall(z * W + x) || tall((z + az) * W + x + ax) || used.has((wz - az) * W + wx - ax) || used.has((wz + 2 * az) * W + wx + 2 * ax)) continue;
-          if (rw() > 0.12) continue;
+          if (rw() > (map.theme.winRate || 0.12)) continue;
           add([wz * W + wx, w2], dx, dz, true); n++;
           break;
         }
@@ -824,16 +854,19 @@ G.Level = {
 
   // A home split into rooms (the houses' splitter): a door between every room and the next until they're all
   // reached, now and then another. c: { r, t, W, ids, rooms, doors }. Returns its rooms.
+  // c.even (an apartment): no corridors for rooms. A split lands near the middle, and a room twice as long as it's wide
+  // is split again if it can be, however deep. (Without it a home can leave a room 4 tiles by 2.)
   _house(c, x0, z0, w, h) {
     const U = G.U, { r, t, W, ids, rooms, doors } = c;
     const fill = (x1, z1, w1, h1) => { for (let z = z1; z < z1 + h1; z++) for (let x = x1; x < x1 + w1; x++) t[z * W + x] = 0; };
     const leaves = [], lo = c.lo || 3; // the smallest room, in tiles
     const split = (x, z, w, h, depth) => {
       const canV = w >= 2 * lo + 1, canH = h >= 2 * lo + 1;
-      if ((!canV && !canH) || depth > 3 || (depth >= 2 && r() < 0.3)) { leaves.push([x, z, w, h]); return; }
+      if ((!canV && !canH) || depth > 3 || (depth >= 2 && r() < 0.3 && !(c.even && Math.max(w, h) >= 2 * Math.min(w, h)))) { leaves.push([x, z, w, h]); return; }
       const vert = canV && (!canH || (w >= h ? r() < 0.8 : r() < 0.2));
-      if (vert) { const s = U.ri(r, lo, w - lo - 1); split(x, z, s, h, depth + 1); split(x + s + 1, z, w - s - 1, h, depth + 1); }
-      else { const s = U.ri(r, lo, h - lo - 1); split(x, z, w, s, depth + 1); split(x, z + s + 1, w, h - s - 1, depth + 1); }
+      const at = (n) => { const s = U.ri(r, lo, n - lo - 1), m = (n - 1) >> 1; return c.even ? U.clamp(s, m, n - 1 - m) : s; }; // (the two sides of a wall n long: no more than a tile apart, if even)
+      if (vert) { const s = at(w); split(x, z, s, h, depth + 1); split(x + s + 1, z, w - s - 1, h, depth + 1); }
+      else { const s = at(h); split(x, z, w, s, depth + 1); split(x, z + s + 1, w, h - s - 1, depth + 1); }
     };
     split(x0, z0, w, h, 0);
     const base = rooms.length;
@@ -861,7 +894,7 @@ G.Level = {
   // An apartment block of two floors. On each, a hallway runs the length of the block with apartments either side,
   // each its own home (a few rooms, one front door onto the hallway), and a stairwell at each end of it: the
   // flight up its outer side, a walkway down its inner side from the foot of the stairs to the hall door. You
-  // come in at the foot of the west stairs. A third or so of the ground-floor homes are lofts: the living room
+  // come in at the foot of the west stairs. A third or so of the ground-floor homes try to be lofts: the living room
   // goes up two floors with a stair up its wall, to an open upper floor over the rest of the home (railed where
   // it looks down into the living room). Upstairs are single-floor apartments and the lofts' upper floors. Each
   // apartment has to be cleared. Tile values on the plan: 5 a drop (no floor), 6 a flight of stairs.
@@ -899,14 +932,18 @@ G.Level = {
       rooms.push(this._room(xa0, hz, xa1 - xa0 + 1, 1, { type: 'corridor' }));
       for (const u of homes) {
         if (f === 0 || !u.loft) {
-          const mine = this._house({ r, t, W, ids, rooms, doors, lo: 2 }, u.x, u.z0, u.w, u.h), id = unit++;
+          // (a home that may become a loft keeps the long room its stair needs: no `even`)
+          const mine = this._house({ r, t, W, ids, rooms, doors, lo: 2, even: !(f === 0 && u.loft) }, u.x, u.z0, u.w, u.h), id = unit++;
           if (f === 0) u.unit = id;
           mine.forEach((q) => { q.unit = id; });
-          // the front door, from the hallway into a room along it
+          // the front door, from the hallway into a room along it: the smallest with a way on to the back of the home
+          // (the living room goes there, where the windows are: _program)
           const front = mine.filter((q) => (u.wallZ < u.z0 ? q.z === u.z0 : q.z + q.h === u.wallZ) && q.w >= 2);
-          const fr = front.length ? U.pick(r, front) : mine[0];
+          const back = (q) => (u.wallZ < u.z0 ? q.z + q.h === u.z0 + u.h : q.z === u.z0), through = front.filter((q) => this._through(q, mine, doors).some(back));
+          const fr = (through.length ? through : front.length ? front : mine).reduce((a, q) => (q.w * q.h < a.w * a.h ? q : a));
           doors.push([U.ri(r, fr.x, fr.x + fr.w - 1), u.wallZ, 'z', false, false]);
           if (f === 0 && u.loft && !this._loftStairs(r, u, mine, t, W, doors, stairs)) u.loft = false; // (no room for a stair: a flat after all)
+          this._program(r, mine, doors, fr, back);
         } else {
           // a loft's upper floor: the drop over its living room, and a room over the rest of the home
           fill(u.x, u.z0, u.w, u.h);
@@ -921,6 +958,26 @@ G.Level = {
     }
     for (const fl of floors) fl.units = unit;
     return { floors, stairs, units: unit };
+  },
+  // the rooms of a home with a door to q
+  _through(q, mine, doors) {
+    const inside = (o, x, z) => x >= o.x && x < o.x + o.w && z >= o.z && z < o.z + o.h;
+    return mine.filter((o) => o !== q && doors.some(([x, z, axis]) => {
+      const dx = axis === 'x' ? 1 : 0, dz = 1 - dx;
+      return (inside(q, x - dx, z - dz) && inside(o, x + dx, z + dz)) || (inside(o, x - dx, z - dz) && inside(q, x + dx, z + dz));
+    }));
+  },
+  // What each room of a home is, so it's a home and not a deal of the cards: the front door opens into the kitchen, the
+  // biggest room through it at the back of the home is the living room (a loft's already is), and the rest are a bedroom,
+  // the biggest, then whatever suits. Set here, the types don't come from G.Furniture.plan's deal.
+  _program(r, mine, doors, fr, back) {
+    const U = G.U, size = (q) => q.w * q.h, big = (a, b) => size(b) - size(a), next = this._through(fr, mine, doors);
+    const living = mine.find((q) => q.type === 'living') || (back(fr) ? null : next.filter(back).sort(big)[0]) || fr;
+    const near = this._through(living, mine, doors);
+    const kitchen = living !== fr && near.includes(fr) ? fr : near.concat(mine.filter((q) => q !== living)).sort((a, b) => (near.includes(b) - near.includes(a)) || big(b, a))[0];
+    living.type = 'living';
+    if (kitchen) kitchen.type = 'kitchen';
+    mine.filter((q) => q !== living && q !== kitchen).sort(big).forEach((q, i) => { q.type = i ? U.pick(r, ['bedroom', 'dining', 'office']) : 'bedroom'; });
   },
   // A loft's stair: up the wall of one of its rooms (which becomes the double-height living room), its foot in the
   // room and its head over the wall at the room's end, onto the upper floor. Not against a doorway, and the head
@@ -2037,6 +2094,9 @@ G.Level = {
     // (a centimetre under the tops of the walls: the walls of the floor above stand on them, and their undersides,
     // level with the ceiling, fought it for the pixels)
     roofed.forEach((i, n) => { cm.makeTranslation(((i % W) + 0.5) * TS, this.WALL_H - 0.01, (Math.floor(i / W) + 0.5) * TS); ceil.setMatrixAt(n, cm); });
+    // (a resident's room has its own ceiling colour: a tint on its cells. The walls' colour: paintWalls, below)
+    const ceilTint = G.Homes.ceilings(map);
+    if (ceilTint) { const plain = new THREE.Color(1, 1, 1); roofed.forEach((i, n) => ceil.setColorAt(n, ceilTint.get(i) || plain)); }
     ceil.layers.enable(1);
     root.add(ceil);
 
@@ -2064,6 +2124,8 @@ G.Level = {
     });
     wm.layers.enable(1);
     root.add(wm);
+    const paintWalls = map.rooms.some((rm) => rm.dress);
+    if (paintWalls) wm.material.defines.LG_PAINT = 1; // (a resident's wallpaper: js/homes.js paint)
     // (which of them's which tile, and how they stood: a round takes cubes out of it, js/damage.js)
     map.wallMesh = wm; map.wallIdx = new Map(walls.map(([x, z], i) => [z * W + x, i])); map.wallBase = wm.instanceMatrix.array.slice();
 
@@ -2163,6 +2225,7 @@ G.Level = {
     const metal = th.name === 'Bunker' || th.name === 'Research Lab' || th.name === 'Cold Storage' || th.name === 'Foundry' || th.name === 'Warehouse'; // (as js/materials.js builds them)
     const leafMat = new THREE.MeshStandardMaterial({ color: metal ? 0x5d666e : 0x6e4a2c, roughness: metal ? 0.5 : 0.75, metalness: metal ? 0.5 : 0 });
     const lintelMat = new THREE.MeshStandardMaterial({ map: wtex, roughness: 0.85 });
+    if (paintWalls) lintelMat.defines.LG_PAINT = 1;
     const knobMat = new THREE.MeshStandardMaterial({ color: 0xb8a060, roughness: 0.3, metalness: 0.9 });
     const vaultMat = new THREE.MeshStandardMaterial({ color: 0x7a8288, roughness: 0.35, metalness: 0.85 });
     const steelMat = new THREE.MeshStandardMaterial({ color: 0x3a3f44, roughness: 0.45, metalness: 0.7 }), barMat = new THREE.MeshStandardMaterial({ color: 0xc4c8cc, roughness: 0.25, metalness: 0.9 });
@@ -2223,10 +2286,10 @@ G.Level = {
     // (no extraction zone: the squad votes to leave once order's restored)
 
     // the weapon case: a hard-shell long-gun case lying along the wall. The lid is hinged at the back (on the
-    // wall side); the weapon lies in the foam. What's in it and whether it's open: G.Views.syncCase.
+    // wall side); the weapon lies in the foam (G.Server.casePut). Whether it's open: G.Views.syncCase.
     if (map.case) {
       const M = (color, roughness, metalness = 0) => new THREE.MeshStandardMaterial({ color, roughness, metalness });
-      const shell = M(0x2b3026, 0.65), steel = M(0x9aa0a6, 0.3, 0.8), foam = M(0x1c1d20, 1), box = (w, h, d, m, x, y, z, parent) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); parent.add(b); return b; };
+      const shell = M(0x2b3026, 0.65), steel = M(0x9aa0a6, 0.3, 0.8), foam = M(0x5c6064, 1), box = (w, h, d, m, x, y, z, parent) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); parent.add(b); return b; };
       const g = new THREE.Group(), Lc = 1.35, D = 0.4, H0 = 0.075, H1 = 0.055;
       // bottom half: floor, walls, foam
       box(Lc, 0.012, D, shell, 0, 0.006, 0, g);
@@ -2246,12 +2309,9 @@ G.Level = {
       for (let i = 0; i < 6; i++) box(0.03, 0.006, D + 0.004, shell, -0.55 + i * 0.22, H1 + 0.002, D / 2, lid);
       for (const x of [-0.5, 0.5]) box(0.05, 0.012, 0.016, steel, x, 0.004, -0.004, lid); // hinges
       box(0.18, 0.002, 0.08, new THREE.MeshBasicMaterial({ color: 0xffb02e }), -0.3, H1 + 0.006, D / 2, lid);
-      const holder = new THREE.Group();
-      holder.position.y = 0.032;
-      g.add(holder);
       g.position.set(map.case.x, 0, map.case.z); g.rotation.y = map.case.yaw;
       root.add(g);
-      map.caseView = { g, lid, holder, open: 0, code: null, synced: false };
+      map.caseView = { g, lid, open: 0, synced: false };
     }
     // the attachments box: a small hard case (black, a yellow band round it) on the floor, its lid hinged at the back,
     // three cut-outs in the foam inside. Its lid: G.Views (opened once, for everyone).

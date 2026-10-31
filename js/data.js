@@ -110,15 +110,15 @@ G.WEAPON_LIST = [
   W({ id: 'skorp', slot: 's', cls: 'MP', tier: 1, price: 450, name: 'Skorpion', rpm: 950, mag: 20, reserve: 140, reload: 1.8, spread: 3, ads: 0.1, range: 14, falloff: 0.5, desc: 'Tiny machine pistol, controllable bite.' }),
   W({ id: 'auto9', slot: 's', cls: 'PST', tier: 2, price: 750, name: 'Auto-9', rpm: 1100, mode: 'burst', burst: 3, mag: 18, reserve: 108, reload: 1.7, spread: 2.2, ads: 0.06667, range: 20, desc: 'Burst-fire sidearm for decisive people.' }),
   W({ id: 'deagle', slot: 's', cls: 'PST', tier: 2, price: 900, name: 'Desert Eagle', rpm: 220, mode: 'semi', mag: 7, reserve: 42, reload: 1.9, spread: 2.5, ads: 0.06667, range: 30, pen: 1, desc: '.50 AE hand-howitzer.' }),
-  W({ id: 'rev', slot: 's', cls: 'PST', tier: 2, price: 800, name: '.357 Revolver', rpm: 160, mode: 'semi', mag: 6, reserve: 42, reload: 2.8, spread: 1.8, ads: 0.05, range: 30, pen: 1, desc: 'Six for sure.' }),
+  W({ id: 'rev', slot: 's', cls: 'PST', tier: 2, price: 800, name: '.357 Revolver', rpm: 160, mode: 'semi', mag: 6, reserve: 42, reload: 0.6, shell: true, loadFull: 2.8, spread: 1.8, ads: 0.05, range: 30, pen: 1, desc: 'Six for sure.' }),
   W({ id: 'sawn', slot: 's', cls: 'SG', tier: 2, price: 650, name: 'Sawed-Off', pellets: 8, rpm: 400, mode: 'semi', mag: 2, reserve: 24, reload: 1.8, choke: 1.8, spread: 6, ads: 0.08333, range: 9, falloff: 0.25, desc: 'Pocket shotgun for close friends.' }),
-  W({ id: 'hc500', slot: 's', cls: 'PST', tier: 3, price: 1400, name: '.500 Hand Cannon', rpm: 110, mode: 'semi', mag: 5, reserve: 30, reload: 2.6, spread: 2, ads: 0.05, range: 40, pen: 2, desc: 'Sidearm with sniper-rifle opinions.' }),
+  W({ id: 'hc500', slot: 's', cls: 'PST', tier: 3, price: 1400, name: '.500 Hand Cannon', rpm: 110, mode: 'semi', mag: 5, reserve: 30, reload: 0.7, shell: true, loadFull: 2.6, spread: 2, ads: 0.05, range: 40, pen: 2, desc: 'Sidearm with sniper-rifle opinions.' }),
   W({ id: 'pocketgl', slot: 's', cls: 'GL', tier: 3, price: 1500, name: 'Pocket Launcher', explosive: { r: 3.6, dmg: 130 }, rpm: 60, mode: 'semi', mag: 1, reserve: 8, reload: 1.6, spread: 1, ads: 0.5, range: 80, desc: 'Single-shot 40mm. Emergency room-clearer.' }),
   W({ id: 'mp7', slot: 's', cls: 'MP', tier: 3, price: 1300, name: 'MP7 Compact', rpm: 950, mag: 30, reserve: 180, reload: 1.9, spread: 2.2, ads: 0.02917, range: 20, pen: 1, desc: 'A full SMG that fits in a holster.' }),
   W({ id: 'usp', slot: 's', cls: 'PST', tier: 1, price: 500, name: 'USP .45', rpm: 380, mode: 'semi', mag: 12, reserve: 72, reload: 1.6, spread: 1.8, ads: 0.06667, range: 22, desc: 'Match-grade .45. Takes a suppressor beautifully.' }),
   W({ id: 'mac10', slot: 's', cls: 'MP', tier: 1, price: 450, name: 'MAC-10', rpm: 1100, mag: 30, reserve: 150, reload: 1.8, spread: 3.8, ads: 0.11667, range: 12, falloff: 0.5, desc: 'A brick that sprays .45 ACP.' }),
   W({ id: 'akimbo', slot: 's', cls: 'PST', tier: 2, price: 900, name: 'Akimbo Berettas', rpm: 700, mode: 'semi', mag: 30, reserve: 150, reload: 2.6, spread: 2.8, ads: 2.8, range: 18, akimbo: true, desc: 'One in each hand, alternating. No aiming down sights, no regrets.' }),
-  W({ id: 'judge', slot: 's', cls: 'SG', tier: 2, price: 700, name: 'The Judge', pellets: 5, rpm: 200, mode: 'semi', mag: 5, reserve: 35, reload: 2.6, choke: 2.2, spread: 4.5, ads: 0.1, range: 8, falloff: 0.25, desc: 'A revolver that fires .410 buckshot.' }),
+  W({ id: 'judge', slot: 's', cls: 'SG', tier: 2, price: 700, name: 'The Judge', pellets: 5, rpm: 200, mode: 'semi', mag: 5, reserve: 35, reload: 0.65, shell: true, loadFull: 2.6, choke: 2.2, spread: 4.5, ads: 0.1, range: 8, falloff: 0.25, desc: 'A revolver that fires .410 buckshot.' }),
   W({ id: 'g19', slot: 's', cls: 'PST', tier: 1, price: 350, name: 'G19 Compact', rpm: 450, mode: 'semi', mag: 15, reserve: 90, reload: 1.4, spread: 2.2, ads: 0.08333, range: 18, speed: 1.0, desc: 'Compact 9mm. Takes every Glock magazine, and a stock if you want one.' }),
   W({ id: 'tx22', slot: 's', cls: 'MP', tier: 0, price: 200, name: 'Taurus TX22', rpm: 1050, mag: 16, reserve: 160, reload: 1.4, spread: 2.4, ads: 0.0833, range: 14, falloff: 0.55, speed: 1.02, desc: 'A rimfire plinker someone made fully automatic: .22 LR, 16 rounds, threaded from the factory, hardly kicks. Lots of small holes.' }),
   W({ id: 'derringer', slot: 's', cls: 'PST', tier: 1, price: 250, name: 'Derringer', rpm: 300, mode: 'semi', mag: 2, reserve: 30, reload: 1.6, spread: 2.5, ads: 0.16667, range: 13, desc: 'Two rounds of .44 Magnum in your palm. Hold on tight.' }),
@@ -155,6 +155,12 @@ G.chambered = (def) => {
   const P = G.Gunsmith && G.Gunsmith.PLATFORMS[def.id];
   return !(P && (P.arch === 'revolver' || P.arch === 'derringer' || (P.spec && P.spec.rcv === 'break')));
 };
+// A revolver takes loose rounds, a round at a time (its reload figure's a round's), with the cylinder swung out first
+// and shut after; a speed loader or moon clips fill it all at once (loadFull, before the part's own figure: js/parts.js).
+G.revolver = (def) => { const P = def && G.Gunsmith && G.Gunsmith.PLATFORMS[def.id]; return !!P && P.arch === 'revolver'; };
+G.REV = { open: 0.55, close: 0.35 };
+// a whole reload from empty, as the stat cards show it (a revolver loaded by hand; a tube's stays its figure a shell)
+G.fullReload = (d) => (G.revolver(d) && d.shell ? G.REV.open + d.reload * d.mag + G.REV.close : d.reload);
 // Bolt hold-open: the action locks back on the last round, so a reload from empty is a magazine change and a
 // thumb on the bolt catch (or the slide stop), not a full rack. Every pistol with a slide, the AR-15 family and the
 // rifles and SMGs built the same way; not the AK family, the MP5's roller bolt, the open-bolt guns or a bolt-action.
@@ -329,7 +335,7 @@ G.ENEMIES = {
 // layout: 'rooms' (rooms and corridors, the default), 'warehouse', 'houses', 'foundry'... (js/level.js)
 // noFog: a clear view to the far end (the fog colour is still the backdrop)
 G.THEMES = [
-  { name: 'Apartment', layout: 'apartments', foes: 2, crowd: 2, big: 2, home: 1, reflect: 0.3, floor: '#4a443d', wall: '#b8ab95', crate: '#8a6a3a', fog: 0x0e0c0a, light: 0xffd8a8, ceil: '#cfc8ba' },
+  { name: 'Apartment', layout: 'apartments', residents: 1, winRate: 0.3, foes: 2, crowd: 2, big: 2, home: 1, reflect: 0.3, floor: '#4a443d', wall: '#b8ab95', crate: '#8a6a3a', fog: 0x0e0c0a, light: 0xffd8a8, ceil: '#cfc8ba' },
   { name: 'Warehouse', layout: 'warehouse', noFog: true, home: 0, reflect: 0.3, floor: '#57504a', wall: '#7c6e5b', crate: '#8a6a3a', fog: 0x16130f, light: 0xffd49a, ceil: '#2a2622' },
   { name: 'Bunker', entry: 'vault', home: 0.45, reflect: 0.4, floor: '#3a4042', wall: '#5a6160', crate: '#4d5a3c', fog: 0x0b0f11, light: 0xa8c8ff, ceil: '#1d2224' },
   { name: 'Suburbs', layout: 'houses', foes: 1.8, crowd: 1.6, big: 2, home: 1, reflect: 0.28, floor: '#5a4a3a', wall: '#9fae98', crate: '#8a6a3a', fog: 0x111723, light: 0xffe0b0, ceil: '#d6d2c4' },

@@ -39,7 +39,7 @@ G.VMAnim = (() => {
       add(new T.CylinderGeometry(rd.bd / 2, rd.bd * 0.22, ex, 10), new T.MeshStandardMaterial({ color: 0x8a8f96, roughness: 0.55, metalness: 0.3 }), -oal / 2 + ex / 2);
       g.userData.cart = true;
     } else if (kind === 'shell') { const c = new T.Mesh(new T.CylinderGeometry(0.0095, 0.0095, 0.06, 10), new T.MeshStandardMaterial({ color: 0xa82a20, roughness: 0.6 })); c.rotation.x = Math.PI / 2; g.add(c); const b = new T.Mesh(new T.CylinderGeometry(0.0098, 0.0098, 0.014, 10), M.brass()); b.rotation.x = Math.PI / 2; b.position.z = 0.024; g.add(b); }
-    else if (kind === 'loader') { const r = new T.Mesh(new T.CylinderGeometry(0.02, 0.02, 0.012, 14), M.black()); r.rotation.x = Math.PI / 2; g.add(r); for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; const c = new T.Mesh(new T.CylinderGeometry(0.0045, 0.0045, 0.035, 8), M.brass()); c.rotation.x = Math.PI / 2; c.position.set(Math.cos(a) * 0.012, Math.sin(a) * 0.012, -0.02); g.add(c); } }
+    else if (kind === 'loader') { const plat = G.Gunsmith.PLATFORMS[def.id], n = (plat && plat.spec.chambers) || 6, r = new T.Mesh(new T.CylinderGeometry(0.02, 0.02, 0.012, 14), M.black()); r.rotation.x = Math.PI / 2; g.add(r); for (let i = 0; i < n; i++) { const a = (i / n) * Math.PI * 2; const c = new T.Mesh(new T.CylinderGeometry(0.0045, 0.0045, 0.035, 8), M.brass()); c.rotation.x = Math.PI / 2; c.position.set(Math.cos(a) * 0.012, Math.sin(a) * 0.012, -0.02); g.add(c); } }
     else if (kind === 'clip') { const c = new T.Mesh(new T.BoxGeometry(0.014, 0.03, 0.06), M.brass()); g.add(c); }
     else if (kind === 'bolt') g.add(G.GunModels.quarrel(true).group); // (the crossbow's own bolt: nock, shaft, vanes and head)
     g.visible = false;
@@ -94,7 +94,7 @@ G.VMAnim = (() => {
     });
     const R = makeArm(M), L = makeArm(M);
     root.add(R.g, L.g);
-    const props = { shell: prop('shell', M, def), loader: prop('loader', M), clip: prop('clip', M), bolt: prop('bolt', M) };
+    const props = { shell: prop('shell', M, def), loader: prop('loader', M, def), clip: prop('clip', M), bolt: prop('bolt', M) };
     for (const p of Object.values(props)) hs[0].holder.add(p);
     u.vma = { def, k, hs, R, L, props, drop: null, chv: chamberView(hs[0], def, M), fw: 0 };
   }
@@ -102,26 +102,37 @@ G.VMAnim = (() => {
   // What a chamber check shows: the ejection port open (a dark window on the right of the receiver, or on top of
   // a pistol's slide) with the round in it, if there is one, its case and tip set in just under the edge; on a
   // break-action, the shell heads sitting in the breech (seen whenever the barrels are open).
-  // a case head seen from behind: brass; a shotshell's with a ring of its hull's colour round it (its load)
+  // a case head seen from behind: brass; a shotshell's with a ring of its hull's colour round it (its load); a primer
+  // in the middle of it, with the firing pin's dent in it once it's been fired
   function head(r, th, shot, M) {
     const g = new T.Group(), b = new T.Mesh(new T.CylinderGeometry(shot ? r * 0.8 : r, shot ? r * 0.8 : r, th, 16), M.brass());
     b.rotation.x = Math.PI / 2; b.position.z = shot ? 0.0005 : 0; g.add(b);
     if (shot) { const ring = new T.Mesh(new T.CylinderGeometry(r, r, th, 16), shellMat('buck')); ring.rotation.x = Math.PI / 2; g.add(ring); g.userData.ring = ring; }
+    const disc = (rad, mat, z) => { const m = new T.Mesh(new T.CylinderGeometry(rad, rad, 0.0002, 12), mat); m.rotation.x = Math.PI / 2; m.position.z = z; g.add(m); return m; };
+    const top = th / 2 + (shot ? 0.0005 : 0);
+    disc(r * 0.36, PRIMER, top + 0.0001);
+    g.userData.dent = disc(r * 0.17, DENT, top + 0.0002);
+    // a lick of paint in from the rim, for a round you couldn't otherwise tell from behind (turned as the round is: js/vmanim.js apply)
+    if (!shot) {
+      const lick = new T.Group(), m = new T.Mesh(new T.BoxGeometry(r * 0.62, r * 0.44, 0.00022), PRIMER);
+      m.position.set(r * 0.7, 0, top + 0.00011);
+      lick.add(m); lick.visible = false; g.add(lick); g.userData.lick = lick; g.userData.lickM = m;
+    }
     return g;
   }
   function chamberView(h, def, M) {
     const c = h.info.chamberAt;
     if (!c) return null;
     const grp = (G.CALIBERS[G.calOf(def)] || { group: 'rifle' }).group, shot = grp === 'shotgun';
-    if (c.side === 'cyl') { // a revolver: six case heads on the back of the cylinder, one per round in it
+    if (c.side === 'cyl') { // a revolver: a case head on the back of the cylinder for each chamber, one per round in it
       if (!h.an.cyl) return null;
       const heads = [];
-      for (let i = 0; i < 6; i++) {
-        const a = (i / 6) * Math.PI * 2, d = head(c.r * 1.15, 0.0016, shot, M);
+      for (let i = 0; i < c.n; i++) {
+        const a = (i / c.n) * Math.PI * 2, d = head(c.r * 1.15, 0.0016, shot, M);
         d.position.set(Math.sin(a) * c.R, Math.cos(a) * c.R, c.z + 0.0006);
         h.an.cyl.add(d); heads.push(d);
       }
-      return { heads, shot };
+      return { heads, shot, cyl: true };
     }
     if (c.side === 'breech') {
       if (!h.an.brk) return null;
@@ -303,6 +314,29 @@ G.VMAnim = (() => {
     if (t > 0.48 && t < 0.74) pose.prop = { kind: 'loader' };
     return pose;
   }
+  // A revolver loaded by hand (js/player.js): the cylinder out and the empties shaken clear as the first round's reload
+  // begins, a round from the pouch into it each time round, and shut at the end. pl.reloadTotal: this round's.
+  function revolverRound(t, h, pl) {
+    const A = h.A, cyl = A.cyl || A.S, pose = base();
+    if (pl.revClose) {
+      pose.cyl = 1 - S(0.15, 0.6, t);
+      pose.gun[5] += 0.55 * (1 - S(0.2, 1, t)); pose.gun[3] -= 0.25 * (1 - S(0.2, 1, t));
+      pose.L = path(t, [[0, A.P], [0.35, off(cyl, 0, -0.01, -0.03)], [0.6, off(cyl, 0, -0.01, -0.03)], [1, A.S]]);
+      return pose;
+    }
+    let rt = t;
+    if (pl.revOpen) {
+      const k = G.REV.open / pl.reloadTotal;
+      if (t < k) return revolverClip(0.5 * t / k, h);
+      rt = (t - k) / (1 - k);
+    }
+    pose.cyl = 1;
+    pose.gun[5] += 0.55; pose.gun[3] -= 0.25;
+    const behind = off(cyl, -0.05, 0, -0.03);
+    pose.L = path(rt, [[0, A.P], [0.25, A.P], [0.6, behind], [0.76, off(behind, 0.02)], [1, A.P]]);
+    if (rt < 0.72) pose.prop = { kind: 'shell' };
+    return pose;
+  }
   function breakClip(t, h, n) {
     const A = h.A, pose = base(), port = A.port || A.S;
     pose.brk = S(0.04, 0.16, t) * (1 - S(0.8, 0.9, t));
@@ -350,14 +384,15 @@ G.VMAnim = (() => {
   // how far a chamber check opens each action (of its travel): enough to see the round
   const CHECK = { pistol: 0.35, ar: 0.6, handle: 0.6, bolt: 0.75, pump: 0.35, lever: 0.4 };
   // the chamber check's pose, on top of the turn (gun [x, y, z, rx, ry, rz]): the port faces your eye
-  const RIFLE_CV = [-0.03, 0.01, -0.18, 0.21, 0.95, 1.05], PISTOL_CV = [-0.04, 0.04, -0.1, 0.1, 1.7, 0.25], BREAK_CV = [-0.06, -0.08, -0.08, 0.8, 0.4, 0.2], REV_CV = [0.02, 0.02, -0.06, 0.3, -0.5, -0.5], BOLT_CV = [-0.03, -0.01, -0.18, 0.31, 0.55, 0.25]; // (a bolt gun: less cant, its open top toward you) // (a break-action: low, its top tipped up at you, looking down into the breech)
+  const RIFLE_CV = [-0.03, 0.01, -0.18, 0.21, 0.95, 1.05], PISTOL_CV = [-0.04, 0.04, -0.1, 0.1, 1.7, 0.25], BREAK_CV = [-0.06, -0.08, -0.08, 0.8, 0.4, 0.2], REV_CV = [-0.085, 0.05, -0.04, -0.12, 0.1, 0], BOLT_CV = [-0.03, -0.01, -0.18, 0.31, 0.55, 0.25]; // (a bolt gun: less cant, its open top toward you) // (a break-action: low, its top tipped up at you, looking down into the breech)
   // (quick: held R on a gun with no magazine to pull, js/player.js rChk: straight from rest into the held check, 0..1,
   // missing out the turn to the left side: the top-and-right turn and the check come in together)
   function inspectClip(t, h, kind, rot, pl, quick) {
     const A = h.A, pose = base();
     if (rot) { pose.gun[5] -= rot[0]; pose.gun[3] -= rot[1]; } // (side to side rolls it over, up and down tips the muzzle)
     const a = quick != null ? 0 : S(0.0, 0.18, t) * (1 - S(0.36, 0.5, t)), b = quick != null ? S(0, 0.6, quick) : S(0.4, 0.55, t) * (1 - S(0.8, 0.95, t));
-    pose.gun[4] += 0.95 * a - 0.5 * b; pose.gun[5] += -0.3 * a + 0.35 * b; pose.gun[3] += 0.12 * a + 0.32 * b;
+    const rev = kind === 'revolver', tb = rev ? 0 : b; // (a revolver has no port on its right to turn to: held straight, its cylinder swings out to the left)
+    pose.gun[4] += 0.95 * a - 0.5 * tb; pose.gun[5] += -0.3 * a + 0.35 * tb; pose.gun[3] += 0.12 * a + 0.32 * tb;
     pose.gun[0] -= 0.02 * a; pose.gun[2] += 0.04 * (a + b); pose.gun[1] += 0.02 * a;
     const c = quick != null ? 0.5 * S(0.2, 1, quick) : G.U.clamp((t - 0.58) / 0.22, 0, 1);
     // for the chamber check: muzzle level, nearer, canted so the port faces you
@@ -419,7 +454,7 @@ G.VMAnim = (() => {
     if (pl.reloading && pl.reloadTotal) {
       const t = G.U.clamp(1 - pl.reloadT / pl.reloadTotal, 0, 1);
       if (reload === 'shell') pose = shellClip(t, h);
-      else if (reload === 'revolver') pose = revolverClip(t, h);
+      else if (reload === 'revolver') pose = a.def.shell ? revolverRound(t, h, pl) : revolverClip(t, h);
       else if (reload === 'break') pose = breakClip(t, h, pl.reloadN);
       else if (reload === 'enbloc') pose = enblocClip(t, h);
       else if (reload === 'bow') pose = bowClip(t, h);
@@ -533,10 +568,24 @@ G.VMAnim = (() => {
         }
         // the chamber: the port open during a check, the round in it if there is one
         const chv = a.chv;
-        if (chv && chv.heads) chv.heads.forEach((d, i) => { // (a head per round in it, each ringed for its own load)
-          d.visible = i < (w.mag || 0);
-          if (d.visible && d.userData.ring) d.userData.ring.material = shellMat((w.tube && w.tube[i]) || w.ammo);
-        });
+        if (chv && chv.heads) {
+          // a head per case in it, each ringed for its own load: the live rounds, and the empties till they're out. Round a
+          // cylinder, the next to fire's the one under the hammer (it turns a chamber a shot) and the empties are the ones
+          // behind it; in a break-action, the live ones first
+          const n = chv.heads.length, live = w.mag || 0, spent = w.spent || [], gone = (pl.ejecting || 0) + spent.length, top = chv.cyl ? pl.cylShots % n : 0;
+          chv.heads.forEach((d, i) => {
+            const j = chv.cyl ? (i - top + n) % n : i, k = chv.cyl ? n - 1 - j : j - live, fired = j >= live && k >= 0 && k < gone; // (k: how many shots ago)
+            d.visible = j < live || fired;
+            d.userData.dent.visible = fired;
+            const am = d.visible ? (fired ? pl.ejected && k >= spent.length ? pl.ejected[k - spent.length] : spent[k] || w.ammo : (w.tube && w.tube[chv.cyl ? live - 1 - j : i]) || w.ammo) : null;
+            if (am && d.userData.ring) d.userData.ring.material = shellMat(am);
+            if (d.userData.lick && am !== d.userData.am) { // (a new round in it: whichever way it went in)
+              d.userData.lick.visible = !!am && am !== G.ballFor(G.calOf(a.def));
+              if (d.userData.lick.visible) { d.userData.lick.rotation.z = Math.random() * Math.PI * 2; d.userData.lickM.material = lickMat(am); }
+            }
+            d.userData.am = am;
+          });
+        }
         else if (chv) {
           // the bolt face over the port: closed, it's all you see; worked back (pose.open), it uncovers the round. At
           // rest it's back if the gun locked open on its last round, or it's an open bolt that's cocked
@@ -566,9 +615,11 @@ G.VMAnim = (() => {
   // what a magazine shows: the top round (its tip coloured for the load) if there is one, witness holes showing brass
   // down to where the stack ends, or the rounds through a clear body (js/gunmodels.js magCheck)
   const DARK = new T.MeshStandardMaterial({ color: 0x0a0b0c, roughness: 0.9 });
-  const NUMS = new Map(), SHELLS = new Map(), TIPS = new Map();
+  const PRIMER = new T.MeshStandardMaterial({ color: 0xc9c2b4, roughness: 0.4, metalness: 0.6 }), DENT = new T.MeshStandardMaterial({ color: 0x26211b, roughness: 0.8 }); // (a primer, and the firing pin's dent in it)
+  const NUMS = new Map(), SHELLS = new Map(), TIPS = new Map(), LICKS = new Map();
   // the colour code (js/icons.js): a shell's hull for its load, a bullet's tip for its type
   function shellMat(am) { if (!SHELLS.has(am)) SHELLS.set(am, new T.MeshStandardMaterial({ color: G.Icons.shellCol(am), roughness: 0.55 })); return SHELLS.get(am); }
+  function lickMat(am) { if (!LICKS.has(am)) LICKS.set(am, new T.MeshStandardMaterial({ color: am === 'hp' ? 0xf2efe6 : G.Icons.tipCol(am), roughness: 0.75 })); return LICKS.get(am); } // (hollow point's own tan is lost on brass)
   function tipMat(am) { if (!TIPS.has(am)) TIPS.set(am, new T.MeshStandardMaterial({ color: G.Icons.tipCol(am), roughness: 0.4, metalness: 0.6 })); return TIPS.get(am); }
   function numMat(n) { // a count stamped beside a witness hole, white on the polymer
     if (NUMS.has(n)) return NUMS.get(n);

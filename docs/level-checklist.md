@@ -51,6 +51,10 @@ so anything random in generation must come from the level's rng (`r`, or a `G.U.
   - `map.unitAt` covers every floor cell of a unit, including its internal doorways
   - it never covers the shared hallway
   - the objective line shows
+- [ ] **Homes** (the apartments): `_program` types each home's rooms from where they are, before `G.Furniture.plan`
+  (which only types what's left untyped). Every home has a living room, a kitchen and a bedroom; the kitchen has a door
+  to the living room. A shared helper that changes for one theme goes behind an option or a theme field (`c.even` in
+  `_house`, which the houses use too; `winRate`), and the other themes' hashes stay the same.
 
 ## 3. Furniture and decoration: `js/furniture.js`
 
@@ -78,9 +82,28 @@ so anything random in generation must come from the level's rng (`r`, or a `G.U.
   - outside faces show windows (none for a bunker)
   - pitched roofs only on homes (`th.home >= 1`)
 
+## 3a. Residents: `js/homes.js`
+
+Apartment only (`residents: 1` in the theme). The layout comes first and knows nothing of them: `fill` runs on each
+floor after `finish`.
+
+- [ ] **A new resident is data:** an entry in `RESIDENTS` (`home`, `rate`, and per room type `wall`, `ceil`, `trim`,
+  `floor`, `items`). New pieces go in `G.Furniture.R` with their colours in `style`, and in `js/materials.js` `PROPS`,
+  or they stop rounds as particle board. A new floor `kind` needs a texture in `textures()`, and `js/casings.js surface`
+  plays it by that name.
+- [ ] **Random:** the assignment from `G.Homes.start` (the level's seed), the placing from the room's own stream. Never
+  the level's `r` or `Math.random`. In `build`, what's drawn for a resident draws on `cur`, never `rnd0`.
+- [ ] **Nothing else moves:** with `G.Homes.RESIDENTS[0].rate = 0` a level matches what it was; with a resident, every
+  triangle outside their rooms matches that (a sum of the merged meshes' triangles, skipping the rooms).
+- [ ] **It adapts:** look at a small room (7 x 7 cells), a long one (8 x 16), one with windows, and one with the
+  weapon case or a first aid cabinet in it. Set `rate` to 1 to see more of them.
+- [ ] **Access:** doors clear to 2.7 m in, the room's middle free, nothing that was reachable cut off, spawn spots on
+  floor you can reach, suspects walking in and out.
+- [ ] **Walls:** the far side of a papered wall keeps its own colour, and the paper stays round a bullet hole.
+
 ## 3b. Windows
 
-- [ ] **Placement:** `placeWindows` gives a reasonable number: indoor/outdoor windows on thin walls between
+- [ ] **Placement:** `placeWindows` gives a reasonable number (`theme.winRate`: the chance at each spot on an outer wall): indoor/outdoor windows on thin walls between
   inside and outside floor, outside-view windows on outer walls. None by doors, behind tall furniture, or
   behind a cabinet or the weapon case.
 - [ ] **Rays through a window:**

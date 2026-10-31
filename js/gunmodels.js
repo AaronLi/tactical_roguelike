@@ -1658,7 +1658,7 @@ G.GunModels = (() => {
   // A revolver traced from its photo (o.look): the frame with its window, the barrel with its rib and full under-lug (a
   // longer barrel stretches them), and the cylinder swept in the round, its flutes running in from the front.
   function tracedRevolver(k, o, t) {
-    const V = tracer(t), fm = o.m || M.steel(), bl = o.blen || 0.1, cl = o.cl, cr = o.cr, anim = {}, mats = { frame: fm, grip: o.gm || M.chequer() };
+    const V = tracer(t), fm = o.m || M.steel(), bl = o.blen || 0.1, cl = o.cl, cr = o.cr, n = o.chambers || 6, step = (Math.PI * 2) / n, anim = {}, mats = { frame: fm, grip: o.gm || M.chequer() };
     const f1 = V([t.frameF, 0])[0], bl0 = V([t.muzzle, 0])[0] - f1, stretch = ([x, y]) => { const [f, u] = V([x, y]); return [f <= f1 ? f : f1 + (f - f1) * bl / bl0, u]; };
     const fc = V([t.cyl[0], 0])[0], axis = V([0, t.cyl[2]])[1], Rc = 0.009 - axis, top = V([0, t.topY])[1], front0 = f1 + bl;
     k.tag('base');
@@ -1666,11 +1666,11 @@ G.GunModels = (() => {
     const cyl = k.part(fc + cl / 2, axis);
     k.into(cyl, fc + cl / 2, axis);
     const round = (rim, flute) => Array.from({ length: 48 }, (_, i) => {
-      const a = (i / 48) * Math.PI * 2, d = Math.abs(((a - Math.PI / 2 - Math.PI / 6 + Math.PI * 40) % (Math.PI / 3)) - Math.PI / 6) - Math.PI / 6, u = Math.max(0, 1 - (d / 0.42) ** 2), r = cr - rim - flute * u;
+      const a = (i / 48) * Math.PI * 2, d = Math.abs(((a - Math.PI / 2 - step / 2 + step * 100) % step) - step / 2) - step / 2, u = Math.max(0, 1 - (d / 0.42) ** 2), r = cr - rim - flute * u;
       return [Math.cos(a) * r, axis + Math.sin(a) * r];
     });
     k.loft([[fc, round(0.0012, 0)], [fc + 0.0012, round(0, 0)], [fc + 0.018, round(0, 0)], [fc + 0.026, round(0, 0.0032)], [fc + cl - 0.0012, round(0, 0.0032)], [fc + cl, round(0.001, 0.0032)]], fm);
-    for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; k.cyl(0.0047, 0.002, M.rubber(), fc + cl - 0.0015, axis + Math.cos(a) * Rc, Math.sin(a) * Rc, 0.0047, 10); }
+    for (let i = 0; i < n; i++) { const a = i * step; k.cyl(0.0047, 0.002, M.rubber(), fc + cl - 0.0015, axis + Math.cos(a) * Rc, Math.sin(a) * Rc, 0.0047, 10); }
     k.into(null);
     anim.cyl = cyl;
     k.tag('barrel');
@@ -1689,19 +1689,19 @@ G.GunModels = (() => {
     if (o.optic === 'night') { k.cyl(0.0011, 0.0006, M.tritium(), front0 - 0.0122, sy - 0.002); for (const x of [-1, 1]) k.cyl(0.001, 0.0006, M.tritium(), fR - 0.0063, sy - 0.0023, x * 0.0045); }
     k.tag('base');
     const hold = V(t.hold);
-    return { sy: sight.sy, fSight: sight.fSight, relief: o.optic === 'minidot' ? 0.3 : 0.36, muzzles: [[front, 0.009, 0]], grip: [hold[0], hold[1], 0], support: [hold[0] + 0.02, hold[1] - 0.005, -0.022], anim, pistol: true, cylAt: [fc + cl / 2, axis, 0], chamberAt: { side: 'cyl', z: cl / 2, R: Rc, r: 0.0047 } };
+    return { sy: sight.sy, fSight: sight.fSight, relief: o.optic === 'minidot' ? 0.3 : 0.36, muzzles: [[front, 0.009, 0]], grip: [hold[0], hold[1], 0], support: [hold[0] + 0.02, hold[1] - 0.005, -0.022], anim, pistol: true, cylAt: [fc + cl / 2, axis, 0], chamberAt: { side: 'cyl', z: cl / 2, R: Rc, r: 0.0047, n } };
   }
 
   function revolver(k, o) {
     if (o.look) return tracedRevolver(k, o, G.GunTraces[o.look]);
-    const fm = o.m || M.steel(), bl = o.blen || 0.1, cl = o.cl || 0.042, cr = o.cr || 0.021;
+    const fm = o.m || M.steel(), bl = o.blen || 0.1, cl = o.cl || 0.042, cr = o.cr || 0.021, n = o.chambers || 6;
     const anim = {};
     k.tag('base');
     k.prof([[-0.012, 0.022], [0.06 + cl, 0.024], [0.06 + cl, -0.026], [0.02, -0.026], [0.0, -0.01], [-0.012, 0.0]], 0.024, fm);
     const cyl = k.part(0.03 + cl / 2, -0.004);
     k.into(cyl, 0.03 + cl / 2, -0.004);
     k.cyl(cr, cl, fm, 0.03, -0.004, 0, cr, 18);
-    for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; k.cyl(cr * 0.28, 0.002, M.rubber(), 0.03 + cl, -0.004 + Math.cos(a) * cr * 0.6, Math.sin(a) * cr * 0.6, cr * 0.28, 8); }
+    for (let i = 0; i < n; i++) { const a = (i / n) * Math.PI * 2; k.cyl(cr * 0.28, 0.002, M.rubber(), 0.03 + cl, -0.004 + Math.cos(a) * cr * 0.6, Math.sin(a) * cr * 0.6, cr * 0.28, 8); }
     k.into(null);
     anim.cyl = cyl;
     k.box(0.008, 0.016, 0.012, fm, -0.018, 0.02);
@@ -1719,7 +1719,7 @@ G.GunModels = (() => {
     const sight = o.optic === 'minidot' ? S.minidot(k, 0.02 + cl * 0.5, 0.024, o) : S.revSights(k, 0.006, front - 0.006, 0.0295, 0.022, fm);
     if (o.optic === 'night') { k.cyl(0.0011, 0.0006, M.tritium(), front - 0.0122, 0.0275); for (const x of [-1, 1]) k.cyl(0.001, 0.0006, M.tritium(), -0.0003, 0.0272, x * 0.0045); }
     k.tag('base');
-    return { sy: sight.sy, fSight: sight.fSight, relief: o.optic === 'minidot' ? 0.3 : 0.36, muzzles: [[front, 0.009, 0]], grip: [0.0, -0.06, 0], support: [0.02, -0.065, -0.022], anim, pistol: true, cylAt: [0.03 + cl / 2, -0.004, 0], chamberAt: { side: 'cyl', z: cl / 2, R: cr * 0.6, r: cr * 0.28 } }; // (the case heads on the cylinder's back face)
+    return { sy: sight.sy, fSight: sight.fSight, relief: o.optic === 'minidot' ? 0.3 : 0.36, muzzles: [[front, 0.009, 0]], grip: [0.0, -0.06, 0], support: [0.02, -0.065, -0.022], anim, pistol: true, cylAt: [0.03 + cl / 2, -0.004, 0], chamberAt: { side: 'cyl', z: cl / 2, R: cr * 0.6, r: cr * 0.28, n } }; // (the case heads on the cylinder's back face)
   }
 
   // the derringer's trace: a pixel of its reference photo ([x, y]: x forward from the breech face at 314, y down from the

@@ -106,7 +106,7 @@ G.InvUI = (() => {
         if (w.mag >= cap) return 'done';
         const b = box ? (box.n > 0 && where(me, box) ? box : null) : boxes(me, G.calOf(w.def), w.mag ? w.ammo : null)[0];
         if (!b) return 'done';
-        w.mag++; b.n--; w.ammo = b.am; w.tube.push(b.am);
+        b.n--; GG().chamberIn(w, [b.am]);
         if (b.n <= 0) dropItem(me, b);
         G.Audio.shell ? G.Audio.shell() : G.Audio.click();
         return w.mag >= cap ? 'done' : 'more';

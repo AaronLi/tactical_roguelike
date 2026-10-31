@@ -286,7 +286,7 @@ G.Gunsmith = (() => {
   [['north', 'Northmark polymer forend', { m: 'polymer' }, { ergo: 3, weight: -0.1 }], ['ironvale', 'Ironvale railed forend', { m: 'black', rail: true }, { ergo: -1, weight: 0.12 }, true], ['sable', 'Sable Ridge walnut forend', { m: 'woodDark' }, { ergo: 1 }]]
     .forEach(([b, n, pm, st, rails], i) => add({ id: `pump.${i}`, slot: 'pump', mount: 'pump', brand: BR[b], name: n, price: 140, st, desc: rails ? 'Railed: takes a light or laser each side.' : '', model: { pumpPatch: pm }, provides: rails ? { tac: 'tac', tacL: 'tac' } : null }));
   [['kestrel', 'Kestrel speed loader', { reload: -30 }, 120], ['redline', 'Redline moon clips', { reload: -42 }, 220]]
-    .forEach(([b, n, st, price], i) => add({ id: `ld.${i}`, slot: 'loader', mount: 'loader', brand: BR[b], name: n, price, st, desc: 'Reloads the whole cylinder at once.' }));
+    .forEach(([b, n, st, price], i) => add({ id: `ld.${i}`, slot: 'loader', mount: 'loader', brand: BR[b], name: n, price, st, set: { full: true }, desc: 'Fills the whole cylinder at once from your loose rounds, however many are left in it.' }));
   // Tube shotguns: shells on the receiver, or a loader that pushes several into the tube at a go (perLoad: shells
   // per push, each push slower than a single shell)
   [['bastion', 'Bastion six-shell side saddle', 'saddle', { reload: -18, ergo: -2, weight: 0.18 }, null, 140, 1, 'Shells on the receiver, right where your hand goes: each one loads a little faster.'],
@@ -644,8 +644,8 @@ G.Gunsmith = (() => {
   pst('akimbo', { len: 0.2, sm: 'blued', w: 0.026 }, 'woodDark', { fm: 'blued' });
   // revolvers
   P('rev', 'revolver', { cl: 0.0461, cr: 0.0205, look: 'rev' }, { barrel: { len: 0.1 }, grip: ['rev', null, 'chequer'], optic: ['pso', { optic: 'notch' }], loader: true });
-  P('hc500', 'revolver', { cl: 0.05, cr: 0.026, comp: true }, { barrel: { len: 0.2 }, grip: ['rev', null, 'woodDark'], optic: ['pso', { optic: 'notch' }], loader: true });
-  P('judge', 'revolver', { cl: 0.072, cr: 0.026, m: 'blued' }, { barrel: { len: 0.075 }, grip: ['rev', null, 'rubber'], optic: ['pso', { optic: 'notch' }], loader: true });
+  P('hc500', 'revolver', { cl: 0.05, cr: 0.026, comp: true, chambers: 5 }, { barrel: { len: 0.2 }, grip: ['rev', null, 'woodDark'], optic: ['pso', { optic: 'notch' }], loader: true });
+  P('judge', 'revolver', { cl: 0.072, cr: 0.026, m: 'blued', chambers: 5 }, { barrel: { len: 0.075 }, grip: ['rev', null, 'rubber'], optic: ['pso', { optic: 'notch' }], loader: true });
   P('derringer', 'derringer', {}, { barrel: { len: 0.084 }, grip: ['rev', null, 'woodDark'] });
   P('thor', 'rifle', { rcv: 'break', look: 'thor', L: 0.151, fm: 'blued', grip: 0.03, support: 0.175 }, { barrel: { len: 0.224, r: 0.0097 }, grip: ['ak', 'chequer', 'chequer'], optic: ['pic', { optic: 'notch' }] });
   // specials
@@ -793,6 +793,7 @@ G.Gunsmith = (() => {
       if (p.set.scoped != null) { scoped = p.set.scoped; reticle = p.set.reticle || 'cross'; magnif = p.set.magnif || 1; }
       if (p.set.barrelIn != null) barrelIn = p.set.barrelIn;
       if (p.set.shell != null) shell = p.set.shell;
+      if (p.set.full) { shell = false; reload = base.loadFull; } // (a revolver filled all at once: js/data.js)
       if (p.set.reload != null) reload = p.set.reload;
       if (p.set.perLoad != null) perLoad = p.set.perLoad;
       if (p.set.levels) levels = p.set.levels;
@@ -1069,7 +1070,7 @@ G.Gunsmith = (() => {
   const SHIPS = new Map(); // part -> how many weapons have it as their default
   for (const plat of Object.values(PLATFORMS)) for (const pid of Object.values(plat.defaults)) SHIPS.set(pid, (SHIPS.get(pid) || 0) + 1);
   const stockShare = (p) => (p.slot === 'receiver' ? 0 : (SHIPS.get(p.id) || 0) / Math.max(1, fitsPart(p).length)); // (a receiver kit is a conversion, not a default)
-  function rollStock(level, seed, n = 6) {
+  function rollStock(level, seed, n = 7) {
     const r = G.U.rng((seed ^ 0x6a5d) >>> 0), maxTier = Math.min(3, 1 + Math.floor(level / 2)), out = new Set();
     // (lights and lasers are few among hundreds of muzzles, stocks and grips: they're weighted up to turn up most visits)
     const pool = LIST.filter((p) => !p.factory && !p.variant && !p.retired && !plainGrip(p) && p.tier <= maxTier)

@@ -53,7 +53,7 @@ G.Server = {
           evidence: this.phase === 'level' && this.evidence ? this.evidence.filter((v) => !v.taken).map((v) => [v.i, v.wpn, v.x, v.z, v.secured ? 1 : 0, v.y || 0]) : null,
           bodies: this.phase === 'level' && this.bodies ? [...this.bodies.values()].map((b) => [b.id, b.type, b.x, b.z, b.yaw, b.secured ? 1 : 0, b.y || 0]) : null,
           wcase: this.phase === 'level' ? this.caseMsg() : null, cabs: this.phase === 'level' ? this.cabMsg() : null, abox: this.phase === 'level' ? this.aboxMsg() : null,
-          loot: this.phase === 'level' && this.loot ? [...this.loot.values()].map((l) => [l.id, l.x, l.y, l.z, l.item, l.yaw]) : null,
+          loot: this.phase === 'level' && this.loot ? [...this.loot.values()].map((l) => this.lootMsg(l)) : null,
           glass: this.phase === 'level' && this.glassBroken ? [...this.glassBroken] : null, cracked: this.phase === 'level' ? this.glassCracked || null : null,
           skins: [...this.skins], sbox: this.phase === 'level' ? this.sboxMsg() : null,
         });
@@ -147,10 +147,10 @@ G.Server = {
         let x = +m.x, z = +m.z;
         if (!isFinite(x) || !isFinite(z)) { if (!p.st) break; x = p.st.p[0]; z = p.st.p[2]; }
         if (p.st && Math.hypot(x - p.st.p[0], z - p.st.p[2]) > 2.5) { x = p.st.p[0]; z = p.st.p[2]; }
-        const l = { id: (this.lootId = (this.lootId || 0) + 1), x, z, y: G.Level.groundAt(this.map, x, z, 0.05, ((p.st && p.st.p[1]) || 0) + 1.2), item: m.item, yaw: Math.random() * Math.PI * 2 };
-        this.loot.set(l.id, l);
-        if (this.loot.size > 80) { const old = this.loot.keys().next().value; this.loot.delete(old); G.Net.broadcast({ t: 'lootRm', id: old }); }
-        G.Net.broadcast({ t: 'loot', a: [[l.id, l.x, l.y, l.z, l.item, l.yaw]], by: from });
+        // (at: back where something else lay, a gun swapped for one in the weapon case, or what you'd no room for: its height, yaw and fit)
+        const back = Array.isArray(m.at) && x === +m.x && z === +m.z ? m.at : null;
+        const l = this.lootAdd(x, back ? +back[0] || 0 : G.Level.groundAt(this.map, x, z, 0.05, ((p.st && p.st.p[1]) || 0) + 1.2), z, m.item, back ? +back[1] || 0 : Math.random() * Math.PI * 2, back ? back[2] : undefined);
+        G.Net.broadcast({ t: 'loot', a: [this.lootMsg(l)], by: from });
         break;
       }
       case 'take': {
@@ -158,7 +158,7 @@ G.Server = {
         if (this.phase !== 'level' || !l || !p || !p.st || Math.hypot(l.x - p.st.p[0], l.z - p.st.p[2]) > 2.5) break;
         this.loot.delete(l.id);
         G.Net.broadcast({ t: 'lootRm', id: l.id });
-        G.Net.sendTo(from, { t: 'lootGot', item: l.item, x: l.x, z: l.z });
+        G.Net.sendTo(from, { t: 'lootGot', item: l.item, x: l.x, z: l.z, at: [l.y, l.yaw, l.fit] });
         break;
       }
       case 'useDoor': {
@@ -186,7 +186,8 @@ G.Server = {
         const c = this.map && this.map.case;
         if (this.phase !== 'level' || !c || this.caseOpen || !p || !p.st || Math.hypot(c.x - p.st.p[0], c.z - p.st.p[2]) > 2.4) break;
         this.caseOpen = true;
-        G.Net.broadcast({ t: 'wcase', c: this.caseMsg(), opened: from });
+        G.Net.broadcast({ t: 'wcase', c: this.caseMsg() });
+        this.casePut();
         break;
       }
       // the attachments box: one use each. Your first look rolls your three (for the weapon in your hands: its code);
@@ -229,16 +230,6 @@ G.Server = {
         if (m.t === 'openCab') { if (cab.open) break; cab.open = true; }
         else { if (!cab.open) break; r = this.cabEdit(cab, m); }
         G.Net.broadcast({ t: 'cab', i: m.i, c: [cab.open ? 1 : 0, cab.items, cab.ver], by: r ? from : null, took: r && r.took, deny: r && r.deny, ret: r && r.ret });
-        break;
-      }
-      // swap a weapon with the (open) case: what's in it goes to them, what they gave goes in
-      case 'swap': {
-        const c = this.map && this.map.case, got = this.wcase;
-        if (this.phase !== 'level' || !c || !got || !this.caseOpen || !p || !p.st || Math.hypot(c.x - p.st.p[0], c.z - p.st.p[2]) > 2.4) break;
-        const def = G.Gunsmith.fromCode(got.code), give = Array.isArray(m.give) ? m.give : null;
-        if (!def || (give && (G.Gunsmith.fromCode(give[0]) || {}).slot !== def.slot)) break;
-        this.wcase = give ? { code: String(give[0]), mag: +give[1] || 0, reserve: +give[2] || 0, am: String(give[3] || ''), kit: null, sk: G.Stickers.clean(give[4]) } : null;
-        G.Net.broadcast({ t: 'wcase', c: this.caseMsg(), by: from, got: [got.code, got.mag, got.reserve, got.am, got.kit || null, got.sk || null] });
         break;
       }
       // "Turn around!": a kneeling suspect (or cowering civilian) turns to face away from the officer
@@ -378,7 +369,30 @@ G.Server = {
     // rounds to match.
     const kits = G.Gunsmith.kitsFor(w.id).filter((k) => G.obtainable(G.WEAPONS[G.Gunsmith.PARTS[k].becomes]));
     if (kits.length && Math.random() < 0.35) w = G.WEAPONS[G.Gunsmith.PARTS[kits[Math.floor(Math.random() * kits.length)]].becomes] || w;
-    return { code: G.Gunsmith.defaultCode(w.id), mag: w.mag, reserve: w.mag * 2, am: G.rollAmmo(G.calOf(w)), kit: null };
+    return { code: G.Gunsmith.defaultCode(w.id), mag: w.mag, reserve: w.mag * 2, am: G.rollAmmo(G.calOf(w)) };
+  },
+  // Something lying in the world (G.Loot), and how it's sent
+  lootAdd(x, y, z, item, yaw, fit) {
+    const l = { id: (this.lootId = (this.lootId || 0) + 1), x, y, z, item, yaw, fit };
+    this.loot.set(l.id, l);
+    if (this.loot.size > 80) { const old = this.loot.keys().next().value; this.loot.delete(old); G.Net.broadcast({ t: 'lootRm', id: old }); }
+    return l;
+  },
+  lootMsg(l) { return [l.id, l.x, l.y, l.z, l.item, l.yaw, l.fit]; },
+  // The case, opened: what's in it is loose in the foam, to be picked up like anything else lying about. The gun along
+  // the back with its grip to the front, and its spares in a row along the front, by the muzzle.
+  casePut() {
+    const c = this.map.case, got = this.wcase, def = got && G.Gunsmith.fromCode(got.code);
+    if (!def) return;
+    this.wcase = null;
+    const Gr = G.Gear, w = G.Me.makeWeapon(def.id, def.build), ch = G.chambered(def) && got.mag > 0; // (the count is everything in it: one of them's in the chamber)
+    w.ammo = G.ammoOk(G.calOf(def), got.am);
+    w.mag = Math.min(got.mag - (ch ? 1 : 0), G.Me.magSize(def));
+    if (w.tube) w.tube = Array(w.mag).fill(w.ammo);
+    w.chamber = ch ? w.ammo : null;
+    const cos = Math.cos(c.yaw), sin = Math.sin(c.yaw), FOAM = 0.032;
+    const put = (it, lx, lz, turn, fit) => this.lootMsg(this.lootAdd(c.x + lx * cos + lz * sin, FOAM, c.z - lx * sin + lz * cos, Gr.pack(it), c.yaw + turn, fit));
+    G.Net.broadcast({ t: 'loot', a: [put(Gr.gunItem(w), 0, -0.03, -Math.PI / 2, 1.28), ...Gr.spares(def, got.reserve, w.ammo).map((it, i) => put(it, 0.55 - i * 0.2, 0.13, 0))] });
   },
   // A first aid cabinet's contents: one to three things, mostly bandages and painkillers, now and then a
   // tourniquet, gauze, a chest seal or a splint. [[mt, n], ...], like kinds stacked together.
@@ -507,7 +521,7 @@ G.Server = {
     return [this.abox.open ? 1 : 0, u];
   },
   // [code (null when empty), mag, reserve, open, ammo type] or null when the level has no case
-  caseMsg() { return this.map && this.map.case ? [this.wcase ? this.wcase.code : null, this.wcase ? this.wcase.mag : 0, this.wcase ? this.wcase.reserve : 0, this.caseOpen ? 1 : 0, this.wcase ? this.wcase.am : null, this.wcase ? this.wcase.kit || null : null, this.wcase && this.wcase.sk && this.wcase.sk.length ? this.wcase.sk : null] : null; },
+  caseMsg() { return !!this.caseOpen; },
   toShop() {
     this.phase = 'shop';
     this.shopSeed = (Math.random() * 2 ** 31) | 0;
@@ -795,6 +809,9 @@ G.Server = {
   // have a moment up before the next can do it: fire keeps them rattled, but no one gun holds anyone down for good. A
   // boss and a rusher, who never take cover, take it on their feet.
   FLINCH: { R: 1.5, T: 0.35, SUP: 0.4, UP: 0.5 },
+  // coming out of cover to shoot: how long before they can fire (their body's still coming out: js/views.js), and the
+  // least they stay out, from when they start, whether or not the shot's done
+  PEEK: { UP: 0.7, MIN: 1.5 },
   nearMiss(e, miss) {
     const F = this.FLINCH;
     e.sup = Math.min(1, (e.sup || 0) + 0.12 + 0.3 * (1 - miss / 2.2));
@@ -912,7 +929,7 @@ G.Server = {
     e.peekT -= dt;
     if (e.peekT <= 0) {
       e.peeking = !e.peeking;
-      e.peekT = e.peeking ? 0.6 + Math.random() * 1.1 : 2 + Math.random() * 3.5;
+      e.peekT = e.peeking ? this.PEEK.MIN + Math.random() * 1.1 : 2 + Math.random() * 3.5;
       if (!e.peeking && Math.random() < 0.15) e.relocate = true;
     }
     const look = e.threat;
@@ -1589,7 +1606,7 @@ G.Server = {
       if (d < def.range && e.drawT <= 0 && !e.flinchT) {
         e.cool -= dt;
         const ready = def.aimTime ? e.aiming || e.cool <= 0 : e.cool <= 0;
-        if (e.inCover && ready && !e.peek) { e.peek = true; e.peekT = 0.35; }
+        if (e.inCover && ready && !e.peek) { e.peek = true; e.peekT = this.PEEK.UP; e.peekOut = this.PEEK.MIN; e.peekDone = false; }
         if (e.peek && e.peekT > 0) e.peekT -= dt;
         const canFire = !e.inCover || (e.peek && e.peekT <= 0);
         if (canFire) {
@@ -1598,21 +1615,21 @@ G.Server = {
             if (e.aiming) {
               sp = 0;
               e.aimT -= dt;
-              if (e.aimT <= 0 && this.onTarget(e, st, dt)) { this.fire(e, p); e.aiming = false; e.peek = false; e.cool = U.rf(def.pause[0], def.pause[1]); }
+              if (e.aimT <= 0 && this.onTarget(e, st, dt)) { this.fire(e, p); e.aiming = false; e.peekDone = true; e.cool = U.rf(def.pause[0], def.pause[1]); }
             }
           } else if (e.cool <= 0 && this.onTarget(e, st, dt)) {
             if (e.burstLeft <= 0) e.burstLeft = def.burst[0] + Math.floor(Math.random() * (def.burst[1] - def.burst[0] + 1));
             this.fire(e, p);
             e.burstLeft--;
             if (e.burstLeft > 0) e.cool = def.rof;
-            else { e.cool = U.rf(def.pause[0], def.pause[1]); e.peek = false; }
+            else { e.cool = U.rf(def.pause[0], def.pause[1]); e.peekDone = true; }
           }
         }
       }
       // flush a target that's ducked behind cover we can't shoot through
       if (st.cr && d > 5 && d < 20 && !L.los(map, e.x, (e.y || 0) + 1.35 * s, e.z, st.p[0], st.p[1] + 0.75, st.p[2])) this.tryNade(e, st.p[0], st.p[2]);
     } else {
-      e.aiming = false; e.peek = false; e.leanOut = 0;
+      e.aiming = false; e.peekDone = true; e.leanOut = 0;
       // just lost sight of them (round a door, behind its leaf): about half keep firing for a moment at where
       // they were, blind. Rounds rarely land, and only if you're still there and in the open.
       if (e.lostT === 0) e.blind = !def.aimTime && Math.random() < 0.5;
@@ -1638,6 +1655,7 @@ G.Server = {
       }
       if (mx || mz) e.yaw += U.angDiff(e.yaw, Math.atan2(-mx, -mz)) * Math.min(1, dt * 6);
     }
+    if (e.peek) { e.peekOut -= dt; if (e.peekDone && e.peekOut <= 0) e.peek = false; }
     const corner = e.cover && e.cover.lean;
     if (st && e.canSee) e.holding = false;
     e.crouch = e.flinchT > 0 || (e.inCover && !e.peek && !corner) || (e.holding && !mx && !mz && !e.inCover) || (e.reloadT > 0 && e.inCover && !corner);

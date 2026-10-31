@@ -84,7 +84,7 @@ G.Gear = (() => {
   // pouches: w x h is what they hold (their grid inside, and their size stowed); mw x mh is the MOLLE they
   // take mounted (the same unless said: a rifle mag pouch or a med pouch hangs from one 1x1 slot)
   const POUCHES = {
-    'q.pistol': { name: 'Pistol mag pouch', brand: B.gray, w: 2, h: 1, mw: 1, mh: 1, split: 2, acc: MAG, price: 45, desc: 'Two pockets, a pistol magazine, speedloader or box of shells in each, from a single MOLLE slot.' },
+    'q.pistol': { name: 'Pistol mag pouch', brand: B.gray, w: 2, h: 1, mw: 1, mh: 1, split: 2, acc: MAG, price: 45, desc: 'Two pockets, a pistol magazine or box of shells in each, from a single MOLLE slot.' },
     'q.rifle': { name: 'Rifle mag pouch', brand: B.kest, w: 1, h: 2, mw: 1, mh: 1, acc: MAG, price: 90, desc: 'One rifle magazine, from a single MOLLE slot.' },
     'q.rifle2': { name: 'Double rifle mag pouch', brand: B.iron, w: 2, h: 2, mw: 1, mh: 2, acc: MAG, price: 150, desc: 'Two rifle magazines side by side (or four pistol ones).' },
     'q.rifle3': { name: 'Triple mag shingle', brand: B.para, w: 3, h: 2, mw: 2, mh: 2, acc: MAG, price: 350, desc: 'Three rifle magazines in one wide pouch, or an LMG box.' },
@@ -105,19 +105,18 @@ G.Gear = (() => {
   }
 
   // ---------------------------------------------------------------- ammo items
-  // What a gun reloads from: magazines (and speedloaders and en-bloc clips) for that gun, or loose rounds of
+  // What a gun reloads from: magazines (and en-bloc clips) for that gun, or loose rounds of
   // its caliber in a box. Magazines belong to one gun; boxes of a caliber feed every gun that takes it.
   // Rounds come in types (G.AMMO): a box holds one type, and so does a magazine (loaded from a box).
   const bigBox = (cal) => { const g = (G.CALIBERS[cal] || {}).group; return g === 'grenade' || g === 'bolt'; };
   function ammoFor(def) {
-    const loose = def.shell || def.mag <= 2;
+    const loose = def.shell || def.mag <= 2 || G.revolver(def); // (a revolver's speed loader's a part: it's filled from loose rounds too)
     if (loose) {
       const cal = G.calOf(def), C = G.CALIBERS[cal];
       return { kind: 'ammo', key: cal, w: 1, h: bigBox(cal) ? 2 : 1, cap: C.box, label: C.name };
     }
-    const plat = G.Gunsmith.PLATFORMS[def.id], rev = plat && plat.arch === 'revolver';
     if (G.beltFed(def)) return { kind: 'mag', key: def.id, w: 2, h: 2, cap: def.mag, label: 'BOX' };
-    return { kind: 'mag', key: def.id, w: 1, h: def.mag <= 20 ? 1 : 2, cap: def.mag, label: rev ? 'LOADER' : def.enbloc ? 'CLIP' : 'MAG' };
+    return { kind: 'mag', key: def.id, w: 1, h: def.mag <= 20 ? 1 : 2, cap: def.mag, label: def.enbloc ? 'CLIP' : 'MAG' };
   }
   let uid = 1;
   const item = (o) => Object.assign({ uid: uid++ }, o);
@@ -139,7 +138,7 @@ G.Gear = (() => {
     for (const k of Object.keys(it)) {
       if (k === 'uid' || (it.r && (k === 'n' || k === 'am'))) continue;
       const v = it[k];
-      if (k === 'w') o.w = { id: v.def.id, build: Object.assign({}, v.def.build), mag: v.mag, ammo: v.ammo, tube: (v.tube || []).slice(), noMag: !!v.noMag, fm: v.fm, chamber: v.chamber || null, sk: v.stickers && v.stickers.length ? v.stickers.slice() : undefined }; // (sk: its stickers, js/stickers.js)
+      if (k === 'w') o.w = { id: v.def.id, build: Object.assign({}, v.def.build), mag: v.mag, ammo: v.ammo, tube: (v.tube || []).slice(), spent: v.spent && v.spent.length ? v.spent.slice() : undefined, noMag: !!v.noMag, fm: v.fm, chamber: v.chamber || null, sk: v.stickers && v.stickers.length ? v.stickers.slice() : undefined }; // (sk: its stickers, js/stickers.js)
       else if (k === 'grids') o.grids = v.map(packGrid);
       else if (k === 'molle') o.molle = packGrid(v);
       else if (MOUNTS[k]) o[k] = v ? pack(v) : null;
@@ -159,9 +158,11 @@ G.Gear = (() => {
       const w = G.Me.makeWeapon(o.w.id, o.w.build);
       w.mag = o.w.mag; w.ammo = o.w.ammo; w.tube = (o.w.tube || []).slice(); if (o.w.noMag) w.noMag = true; if (o.w.fm) w.fm = o.w.fm;
       if ('chamber' in o.w) w.chamber = o.w.chamber;
+      if (o.w.spent) w.spent = o.w.spent.slice();
       if (o.w.sk && o.w.sk.length) w.stickers = G.Stickers.clean(o.w.sk);
       return gunItem(w);
     }
+    if (o.k === 'mag' && G.revolver(G.WEAPONS[o.wid])) { const cal = G.calOf(G.WEAPONS[o.wid]), r = o.r || []; return boxItem(cal, r[r.length - 1] || o.am0 || G.ballFor(cal), r.length); } // (a save from when revolvers had loaders: the rounds in it, loose)
     const rest = {};
     for (const k of Object.keys(o)) if (!MOUNTS[k] && !['grids', 'molle', 'r', 'am0'].includes(k)) rest[k] = o[k] && typeof o[k] === 'object' ? JSON.parse(JSON.stringify(o[k])) : o[k];
     const it = o.r ? magItem(rest, o.r.slice()) : item(rest);
@@ -192,7 +193,7 @@ G.Gear = (() => {
   function magShape(def, cap, vid) {
     const a = ammoFor(def), drum = vid && G.Gunsmith.PARTS[vid] && G.Gunsmith.PARTS[vid].model && G.Gunsmith.PARTS[vid].model.mag && G.Gunsmith.PARTS[vid].model.mag.t === 'drum';
     if (G.beltFed(def)) return cap > def.mag * 1.2 ? [2, 3] : cap < def.mag * 0.8 ? [2, 1] : [2, 2];
-    if (a.label !== 'MAG') return [1, 1]; // speedloaders, clips
+    if (a.label !== 'MAG') return [1, 1]; // clips
     if (drum || cap > 60) return [2, 2];
     return [1, cap <= 20 ? 1 : 2];
   }
@@ -387,6 +388,14 @@ G.Gear = (() => {
     return 'floor';
   }
   // a gun's rounds are now these (the magazine's own stack: the gun fires off the top of it)
+  // loose rounds into a gun: the last in fires first, but a revolver's go round the cylinder behind the ones it has
+  function chamberIn(w, rounds) {
+    if (!rounds.length) return;
+    w.mag += rounds.length;
+    if (w.tube && G.revolver(w.def)) { w.tube.unshift(...rounds.slice().reverse()); w.ammo = w.tube[w.tube.length - 1]; return; }
+    if (w.tube) w.tube.push(...rounds);
+    w.ammo = rounds[rounds.length - 1];
+  }
   function setLoad(w, rounds) { w.tube = rounds; w.mag = rounds.length; if (rounds.length) w.ammo = rounds[rounds.length - 1]; }
   // a magazine goes in: its rounds are the gun's, and its variant is the gun's magazine (capacity, reload)
   function loadIn(me, w, mag) {
@@ -541,26 +550,14 @@ G.Gear = (() => {
       has(_, pid) { return partCount(me, pid) > 0; },
     });
   }
-  // a gun leaving you (into the weapon case): its magazines go with it; returns the rounds handed over
-  function handOver(me, def) {
-    let n = 0;
-    // (its magazines: any of its pattern, unless another gun of yours takes them too, in which case they stay)
-    const others = guns(me).filter((w) => w.def.id !== def.id);
-    each(body(me), (it, g) => { if (it.k === 'mag' && G.magFits(it.wid, def.id) && !others.some((w) => G.magFits(it.wid, w.def.id))) { n += it.n; removeFrom(g, it); } });
-    return n;
-  }
-  // a gun arriving: the rounds that came with it, as full magazines (or boxes) where they fit on you
-  // ...of one type; what doesn't fit on you is dropped at your feet. { placed, dropped }
-  function receive(me, def, nRounds, am) {
-    const a = ammoFor(def), cal = G.calOf(def);
-    let left = nRounds, placed = 0, dropped = 0;
-    while (left > 0 && placed + dropped < 6) {
-      const n = Math.min(a.cap, left), it = a.kind === 'mag' ? ammoItem(def, n, am) : boxItem(cal, am || G.ballFor(cal), n);
-      if (place(body(me), it)) placed++;
-      else { dropped++; if (G.Casings && me.pos) G.Casings.dropAt(def, it, me.pos); }
-      left -= n;
+  // the rounds that come with a found gun, as full magazines (or boxes) of one type
+  function spares(def, nRounds, am) {
+    const a = ammoFor(def), cal = G.calOf(def), out = [];
+    for (let left = nRounds; left > 0 && out.length < 3; left -= a.cap) {
+      const n = Math.min(a.cap, left);
+      out.push(a.kind === 'mag' ? ammoItem(def, n, am) : boxItem(cal, am || G.ballFor(cal), n));
     }
-    return { placed, dropped };
+    return out;
   }
   // the gunsmith changed a gun's magazine size: its magazines follow
   function refitMags() { /* magazines keep their own capacity: it's theirs, not the gun's */ }
@@ -636,7 +633,7 @@ G.Gear = (() => {
   }
   return {
     LIST, DEFS, POUCHES, MOUNTS, mountOn, mountFree, headLoad, mixed, pack, unpack, mergeBox, mergeMed, medStack, medCount, absorb, combine, setLoad, loadIn, magShape, magName, magVid, BRANDS: B, ammoFor, ammoItem, gearItem, gunItem, pouchItem, mounted, molles, pickMag, dumpGrid, dumpMag, partItem, partSize, flashItem, stow, inField, roomFor, unloadMag, unloadGun, fillMag, fillFrom, fillGun, partCount, stashProxy, gunSize, guns, packGuns, medItem, fragItem, grid, size, isGear, fits, put, findSpot, place, removeFrom,
-    newKit, starter, body, all, each, feeds, rounds, count, take, swapMag, takeRounds, handOver, receive, refitMags, boxItem, loadMag, loadAll, roundPrice,
+    newKit, starter, body, all, each, feeds, rounds, count, take, swapMag, takeRounds, chamberIn, spares, refitMags, boxItem, loadMag, loadAll, roundPrice,
     defOf, cond, piece, speed, label, price,
   };
 })();

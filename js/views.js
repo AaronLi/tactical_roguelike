@@ -193,15 +193,17 @@ G.Views = {
     mesh.position.set(x, y + 0.05, z);
     mesh.rotation.set(0, Math.random() * Math.PI * 2, Math.PI / 2); // lying on its side
     // a glowing yellow outline until it's bagged, seen through anything but walls and floors (G.R.render)
-    this.addOutline(mesh);
+    mesh.userData.outline = this.addOutline(mesh);
     G.R.dynRoot.add(mesh);
     this.evidence.set(i, { mesh, wpn, x, y, z });
   },
   // Outline: the gun's silhouette marks the stencil, then three shells pushed out along the surface normals
   // by a fixed number of pixels draw only outside it: a bright line fading out in two softer bands. Each band
   // draws a pixel once (it marks the stencil as it goes), so overlapping triangles don't stack up.
-  outlineMats() {
-    if (this._outline) return this._outline;
+  // (blue: the halo on what F would take: G.Views.setHalo)
+  outlineMats(blue) {
+    const key = blue ? '_haloMats' : '_outline';
+    if (this[key]) return this[key];
     const vs = `uniform float px; uniform vec2 res;
       void main() {
         vec4 clip = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
@@ -211,19 +213,19 @@ G.Views = {
         gl_Position = clip;
       }`;
     const fs = 'uniform vec3 color; uniform float opacity; void main() { gl_FragColor = linearToOutputTexel(vec4(color, opacity)); }';
-    const res = { value: new THREE.Vector2(window.innerWidth, window.innerHeight) };
+    const res = this._outRes || (this._outRes = { value: new THREE.Vector2(window.innerWidth, window.innerHeight) });
     const silhouette = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false, fog: false,
       stencilWrite: true, stencilRef: 4, stencilFunc: THREE.AlwaysStencilFunc, stencilZPass: THREE.ReplaceStencilOp });
     // ref 3, 2, 1: each band draws where the stencil is still below its ref, then raises it
     const bands = [[3, 2.2, 1], [2, 5, 0.42], [1, 9, 0.16]].map(([ref, px, op], i) => {
       const m = new THREE.ShaderMaterial({ vertexShader: vs, fragmentShader: fs, transparent: true, depthWrite: false,
-        uniforms: { px: { value: px }, res, color: { value: new THREE.Color(0xffc830) }, opacity: { value: op } },
+        uniforms: { px: { value: px }, res, color: { value: new THREE.Color(blue ? 0x3a9dff : 0xffc830) }, opacity: { value: op } },
         stencilWrite: true, stencilRef: ref, stencilFunc: THREE.GreaterStencilFunc, stencilZPass: THREE.ReplaceStencilOp });
       m.userData.base = op;
       m.userData.order = i + 1;
       return m;
     });
-    return (this._outline = { silhouette, bands, res });
+    return (this[key] = { silhouette, bands, res });
   },
   // the world model's merged meshes have flat (per-face) normals; the outline needs them averaged per corner
   // so the pushed-out shells stay closed
@@ -244,26 +246,39 @@ G.Views = {
     out = new THREE.BufferGeometry();
     out.setAttribute('position', pos);
     out.setAttribute('normal', new THREE.BufferAttribute(n, 3));
+    if (geo.index) out.setIndex(geo.index);
     out.boundingSphere = geo.boundingSphere;
     this._smooth.set(geo, out);
     return out;
   },
-  addOutline(mesh) {
-    const O = this.outlineMats();
-    // (the gun's own meshes, and its magazine's, which is a group of its own: js/gunmodels.js world)
-    const parts = [];
-    for (const c of mesh.children) { if (c.geometry) parts.push([mesh, c]); else for (const m of c.children) if (m.geometry) parts.push([c, m]); }
-    for (const [parent, part] of parts) {
+  addOutline(mesh, blue) {
+    const O = this.outlineMats(blue), parts = [], shells = [];
+    // (every mesh in it, each outlined where it sits: a gun's, its magazine's, which is a group of its own: js/gunmodels.js world)
+    mesh.traverse((o) => { if (o.geometry && !o.layers.isEnabled(2)) parts.push(o); });
+    for (const part of parts) {
       const sil = new THREE.Mesh(part.geometry, O.silhouette);
-      sil.layers.set(2);
-      parent.add(sil);
+      sil.layers.set(2); sil.frustumCulled = false;
+      part.add(sil); shells.push(sil);
       const sg = this.smoothGeo(part.geometry);
       for (const m of O.bands) {
         const b = new THREE.Mesh(sg, m);
         b.layers.set(2); b.renderOrder = m.userData.order; b.frustumCulled = false;
-        parent.add(b);
+        part.add(b); shells.push(b);
       }
     }
+    return shells;
+  },
+  // A blue halo round what you'd take if you held F (obj: its mesh; null, nothing), in place of evidence's yellow while it's on
+  setHalo(obj) {
+    const was = this._haloOn || null;
+    if (obj === was) return;
+    const show = (o, on) => {
+      for (const s of o.userData.halo) s.visible = on;
+      for (const s of o.userData.outline || []) s.visible = !on;
+    };
+    if (was) show(was, false);
+    if (obj) { if (!obj.userData.halo) obj.userData.halo = this.addOutline(obj, true); show(obj, true); }
+    this._haloOn = obj;
   },
   // First aid cabinets: what's on the shelves (a box per stack, in its item's colour), and the door
   syncCabs() {
@@ -277,28 +292,12 @@ G.Views = {
       cv.slots.forEach((s, k) => { s.visible = k < items.length; if (s.visible) s.material.color.setHex(COL[items[k][0]] || 0xffffff); });
     });
   },
-  // The weapon case's contents and lid. The gun lies on its side in the foam, centred, muzzle to one end
-  // (scaled down only if it's longer than the case).
+  // The weapon case's lid (what's in it is G.Loot's)
   syncCase() {
     const map = G.Game.map, cv = map && map.caseView;
-    if (!cv) return;
-    if (!cv.synced) { cv.synced = true; if (G.Game.caseOpen && G.Game.caseSeen()) cv.open = 1; } // joined with it already open
-    const code = G.Game.wcase ? G.Game.wcase.code : null, sk = G.Game.wcase && G.Game.wcase.sk, ck = code && code + '#' + G.Stickers.key(sk);
-    if (ck === cv.code) return;
-    cv.code = ck;
-    cv.holder.clear();
-    if (!code) return;
-    const gun = G.GunModels.world(code, sk), wrap = new THREE.Group(), tmp = new THREE.Group();
-    gun.updateMatrixWorld(true);
-    const b0 = new THREE.Box3().setFromObject(gun), len = b0.max.z - b0.min.z;
-    gun.scale.setScalar(Math.min(1, 1.28 / len));
-    gun.rotation.z = Math.PI / 2; // on its side
-    wrap.rotation.y = Math.PI / 2; // along the case
-    wrap.add(gun); tmp.add(wrap); tmp.updateMatrixWorld(true);
-    const b = new THREE.Box3().setFromObject(wrap);
-    wrap.position.set(-(b.min.x + b.max.x) / 2, -b.min.y, -(b.min.z + b.max.z) / 2);
-    tmp.remove(wrap);
-    cv.holder.add(wrap);
+    if (!cv || cv.synced) return;
+    cv.synced = true;
+    if (G.Game.caseOpen) cv.open = 1; // joined with it already open
   },
   // a body that died before we joined: lay it out where it fell
   addBody(id, type, x, z, yaw, secured, y = 0) {
@@ -667,7 +666,8 @@ G.Views = {
       let at = ev.pos;
       // Leaning out round a corner, the body really is out at the lean point (where the host shoots from: 0.55 m
       // to the side), not tilting from behind the edge (eased in and out with the lean itself)
-      ev.leanS = (ev.leanS || 0) + ((ev.alive ? ev.lean : 0) - (ev.leanS || 0)) * Math.min(1, dt * 7);
+      const leanTo = ev.alive ? ev.lean : 0;
+      ev.leanS = (ev.leanS || 0) + (leanTo - (ev.leanS || 0)) * Math.min(1, dt * (Math.abs(leanTo) > Math.abs(ev.leanS || 0) ? 3.5 : 7)); // (out slowly, the Server's PEEK.UP; back quickly)
       if (Math.abs(ev.leanS) > 0.01) at = ev.pos.clone().add(new THREE.Vector3(Math.cos(ev.yaw), 0, -Math.sin(ev.yaw)).multiplyScalar(ev.leanS * 0.45 * (ev.def.scale || 1)));
       if (ev.alive && (pose === 'cuffed' || pose === 'takedown')) {
         const key = `${ev.pos.x.toFixed(2)},${ev.pos.z.toFixed(2)},${ev.yaw.toFixed(2)}`;
@@ -689,7 +689,7 @@ G.Views = {
       const aimAt = tgt && ev.armed === 2 && ev.alert && !ev.surp && !ev.reloading && !pose && !ev.down ? new THREE.Vector3(tgt.x, tgt.y + 1.2, tgt.z) : null;
       const rlP = ev.reloadAt && ev.reloading ? (performance.now() - ev.reloadAt) / ev.reloadDur : -1; // (how far into a magazine change)
       ev.aimP = aimed ? aimAt : null; // (who they're on: where their light and laser go)
-      ev.rig.update(dt, { pos: at, yaw: ev.yaw, pitch, crouch: ev.crouch || (ev.str != null && ev.str < 0.4), alert: !!ev.alert && ev.armed === 2 && !ev.surp && !ev.reloading, lean: ev.lean, pose, tk, act, str: near ? (ev.str == null ? 1 : ev.str) : null, aimAt,
+      ev.rig.update(dt, { pos: at, yaw: ev.yaw, pitch, crouch: ev.crouch || (ev.str != null && ev.str < 0.4), rise: 3.5, alert: !!ev.alert && ev.armed === 2 && !ev.surp && !ev.reloading, lean: ev.leanS, pose, tk, act, str: near ? (ev.str == null ? 1 : ev.str) : null, aimAt,
         reload: rlP >= 0 && rlP < 1 ? rlP : -1 });
       // past the fog (it's the background's colour out there: nothing to see) they aren't drawn, each one's forty-odd
       // pieces a draw call. The body, not the root: the root's what a shot checks for (js/player.js), and it still hits.
@@ -853,7 +853,7 @@ G.Views = {
     // the weapon case lid: latches clack, then it swings up and back against the wall
     const cv = G.Game.map && G.Game.map.caseView;
     if (cv) {
-      const want = G.Game.caseOpen && G.Game.caseSeen() ? 1 : 0;
+      const want = G.Game.caseOpen ? 1 : 0;
       if (want && cv.open === 0) { const mc = G.Game.map.case; G.Audio.clink(Math.hypot(mc.x - G.R.camera.position.x, mc.z - G.R.camera.position.z)); }
       cv.open = want ? Math.min(1, cv.open + dt / 0.8) : 0;
       cv.lid.rotation.x = -1.78 * (1 - Math.pow(1 - cv.open, 3));
@@ -862,10 +862,11 @@ G.Views = {
     // evidence outline: on while any weapon is still to be bagged, gently pulsing
     let glowing = false;
     for (const v of this.evidence.values()) if (!v.secured && v.mesh.visible) { glowing = true; break; }
-    G.R.hasGlow = glowing;
+    G.R.hasGlow = glowing || !!this._haloOn;
+    if (this._haloMats) for (const m of this._haloMats.bands) m.uniforms.opacity.value = m.userData.base;
+    if (G.R.hasGlow) this._outRes.value.set(window.innerWidth, window.innerHeight);
     if (glowing && this._outline) {
       const p = 0.5 + 0.5 * Math.sin(performance.now() / 300);
-      this._outline.res.value.set(window.innerWidth, window.innerHeight);
       for (const m of this._outline.bands) m.uniforms.opacity.value = m.userData.base * (0.7 + 0.3 * p);
     }
 

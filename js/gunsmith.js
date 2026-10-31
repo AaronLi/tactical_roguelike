@@ -182,7 +182,7 @@ G.GunsmithUI = (() => {
     ['Range', (d) => d.range, 1, (v) => Math.round(v) + ' m', [0, 150]],
     ['Fire rate', (d) => d.rpm, 1, (v) => Math.round(v) + ' rpm', [0, 2000]],
     ['Capacity', (d) => d.mag, 1, (v) => Math.round(v), [0, 200]],
-    ['Reload', (d) => d.reload, -1, (v) => v.toFixed(2) + ' s', [0, 6]],
+    ['Reload', (d) => G.fullReload(d), -1, (v) => v.toFixed(2) + ' s', [0, 6]],
     ['Weight', (d) => d.weight, -1, (v) => v.toFixed(2) + ' kg', [0, 12]],
     ['Mobility', (d) => d.speed * 100, 1, (v) => Math.round(v) + '%', [60, 110]],
     ['Sight', (d) => (d.magLevels ? d.magLevels[d.magLevels.length - 1] : d.magnif || 1), 0, (v) => v + '×', [1, 8]],

@@ -129,6 +129,8 @@ says the same), but not whose: the shooter's name isn't shown.
   they stand, out of any peek, not moving or firing, for 0.35 s and up to 0.4 s more with suppression, and then get
   half a second before another can do it, so sustained fire rattles them without holding them down for good. Bosses
   and rushers don't flinch. Blood loss wears their aim down too, to 60% near the end.
+  Coming out of cover to shoot takes them 0.7 s before they can fire, and they stay out at least 1.5 s from when they
+  start, shot done or not (`G.Server.PEEK`): only a flinch sends them back sooner. They duck back twice as fast.
 - **Suspects reload.** Each carries their gun's real magazine, sometimes part-used. When it runs dry they
   reload, taking the gun's reload time; pump and lever guns load shell by shell and fire again from a
   part-loaded tube if you're in sight. With nobody in sight and the magazine half spent, they top up. They
@@ -290,8 +292,16 @@ says the same), but not whose: the shooter's name isn't shown.
     on the other. You and the suspects see through them (as through a window) and rounds go through them,
     shattering the glass for everyone; the frame still stops you until it's opened. You come in at the
     foot of the west stairs. From about 7 apartments at level 1 up to about 14.
-    - **Units:** each apartment is its own home of a few rooms, with one front door onto the hallway.
-    - **Lofts:** about a third of the ground-floor homes are lofts. The living room goes up both floors,
+    - **Units:** each apartment is its own home of a few rooms (usually four), with one front door onto the
+      hallway.
+    - **What's what:** a home's rooms are worked out from where they are (`G.Level._program`), so every home is
+      a home. The front door opens into the kitchen, through it the biggest room at the back is the living
+      room, where the outside wall and its windows are, and of the rest the biggest is a bedroom. Anything over
+      that is a bedroom, dining room or study. Rooms split near the middle, and a room twice as long as it's
+      wide is split again if it can be, so few are corridors (`c.even` in `G.Level._house`). Most rooms on the
+      outside wall have a window (`winRate` in the theme), and a home with none is rare.
+    - **Lofts:** about a third of the ground-floor homes try to be lofts, and those with a room long enough for
+      the stair are: about 1 in 12, less than one a level. The living room goes up both floors,
       with a stair up its wall to an open upper floor over the rest of the home (bedrooms or a study), railed
       where it looks down into the living room. A loft's upper floor has no door of its own: you go up
       through the loft. Upstairs, the rest are single-floor apartments.
@@ -306,6 +316,27 @@ says the same), but not whose: the shooter's name isn't shown.
       objective "Clear every apartment" is ticked once they all are, with no running count. An apartment
       counts once an officer has been inside it and no free, armed suspect is left in it, so an empty one
       still has to be checked.
+    - **Residents:** some homes belong to someone (`js/homes.js`, from `docs/apartment-personas/`; so far Harold
+      Pruitt's living room). The block is generated first, knowing nothing of them, walls, doors, furniture,
+      windows and all. Then, from the level's seed alone, each home in turn may turn out to be a resident's
+      (Harold: 8% of each single-floor home, at most once a level, so he's in about 57% of
+      Apartment levels), and the room's done over to suit what it turned out to be:
+      - **Who fits where:** a resident needs a kind of home (a flat or a loft) and the rooms they list. A room
+        type they don't list stays as the level made it.
+      - **The room:** its own furniture comes out and the resident's list goes in, piece by piece: by rule
+        (the longest free wall, facing the sofa, beside his chair, in a corner), kept off doors and where they
+        swing, off the weapon case, attachments box and first aid cabinets and the way to them, and tall things
+        off windows. A piece goes in only if every cell you could walk to still can be walked to with room to
+        spare. What doesn't fit is swapped for what's next on its list, or left out: a 4.7 m room has his
+        chair, the sofa, the television and the wall things; a big one has it all, the sofa stood out from the
+        wall. Everything spot-like in the room (cover, suspects' starts) is worked out again from what's there.
+      - **Colours:** a wall cell is one box with a room on each side, so walls take their colour in the shader,
+        each face from the floor plan just off it (`G.LightGrid`, a texture a level with a resident has one of):
+        the next room keeps its own, it costs no draw calls, and bullet holes show as they do anywhere. Ceilings
+        are a tint on their cells, floors the room's own texture, its skirting the resident's trim.
+      - **Everything else stays put:** it's all on random streams of its own, and the room as it would have
+        been is still built, into nothing, so the stream the rest of the block's looks are drawn from is the
+        same. Outside the room the level's triangle for triangle the same as with nobody home.
   - **Warehouse.** You start on the loading dock outside, among pallets and crates, fenced at the sides.
     Two roller doors (rolled up: wide openings under the shutter drum, with guide rails either side) and a door
     between them lead onto the warehouse floor: rows
@@ -512,7 +543,7 @@ says the same), but not whose: the shooter's name isn't shown.
     and translucent 16- and 24-rounders that show the rounds left), the **P9** (9 mm, 15 rounds, semi) or the **derringer** (two shots of .44 Magnum). It comes loaded with
     tracers, with two spare loads in your small pockets (two magazines, or for the derringer two boxes of 12).
   - **The sidearm web** (`js/arsenal.js`): what you can start with, a map you drag about and zoom, the P9 in the middle and three paths out of it. Each gun's earned with the one before it, by
-    doing what its path is about, and it's yours for good on this machine. Full auto: TX22 (15 double-tap kills with the P9), 92FS Burst (15 five-hit bursts: five hits on one suspect inside a second, once a suspect, down or not), G18 (15 burst kills: three hits inside 0.35 s), MAC-10 (10 double kills: two inside 3 s). Heavy calibre: derringer (15 kills within 5 m), .357 Revolver (16 one-round kills), Desert Eagle (15 kills on armoured suspects), Thor .50 (15 wall-bang kills). Modern classics: Walther PPK (15 kills on unaware suspects: down before they react, and not once they've seen you or heard gunfire), M1911 (15 headshot kills), USP (15 headshot kills past 10 m), Five-seveN (15 kills past 20 m). Each gun has a pro build too, a named set of parts earned by mastering that gun (more of what it's best at), and once it's yours you choose whether the gun starts in pro mode. Civilians and those who've given up don't count, and a gun only counts once it's yours.
+    doing what its path is about, and it's yours for good on this machine. Full auto: TX22 (15 double-tap kills with the P9), 92FS Burst (15 five-hit bursts: five hits on one suspect inside a second, once a suspect, down or not), G18 (15 burst kills: three hits inside 0.35 s), MAC-10 (10 double kills: two inside 3 s). Heavy calibre: derringer (15 kills within 5 m), .357 Revolver (16 one-round kills), Desert Eagle (15 kills on armoured suspects), Thor .50 (15 wall-bang kills), and a branch off the revolver, The Judge (15 kills within 5 m with the revolver; its pro build, Hanging Judge, takes 20 double kills). Modern classics: Walther PPK (15 kills on unaware suspects: down before they react, and not once they've seen you or heard gunfire), M1911 (15 headshot kills), USP (15 headshot kills past 10 m), Five-seveN (15 kills past 20 m). Each gun has a pro build too, a named set of parts earned by mastering that gun (more of what it's best at), and once it's yours you choose whether the gun starts in pro mode. Civilians and those who've given up don't count, and a gun only counts once it's yours.
   - **What's inside:** a weapon in its standard build, fully loaded. It's a long gun three times in four,
     picked by rarity. Each tier has a share of the odds, split evenly between its weapons, and deeper
     levels shift the odds toward rarer tiers. Legendaries only appear from level 3. Every weapon can turn up,
@@ -527,13 +558,14 @@ says the same), but not whose: the shooter's name isn't shown.
     | 6 | 31% | 33% | 27% | 9% |
   - **Opening:** hold F at the case to open it. The latches clack, the lid swings up against the wall and the
     weapon lies in the foam for everyone to see. It's opened once for the whole squad.
-  - **Swapping:** with the case open, hold F to look in it, and take the gun. It's in your hands and ready to fire at
-    once, with no swap or draw to wait for. Your gun goes into the case in its standard build, keeping the ammo it
-    had, and your aftermarket parts come off into your stash. If you have no primary, you just take it and the case
-    is left empty.
-  - **Co-op:** one case for the whole squad. After someone swaps, the next player can take the weapon they
-    left.
-- **The weapon case's wheel** (`js/game.js` caseShow): the first time you look in the case (a teammate may have opened it) one wide reel spins through guns till you stop it, and it lands on what's really in there (the host's roll: stopping only shows it). Its lid stays down on your screen till then, so the gun in it can't give it away. Looking again, it's landed. Take it from there, swapped for your weapon of that kind or with yours into your backpack, or leave it.
+  - **What's in it:** the gun lies along the back of the foam, grip to the front, with its spare magazines (or boxes)
+    in a row along the front by the muzzle. They're ordinary items in the world (`G.Server.casePut`, `G.Loot`), so
+    nothing's handed to you: aim at each one and hold F. Leave the spares and they stay there, for you or anyone.
+  - **Taking the gun:** it goes straight into your hands (a short draw, as with any gun). The one you had of that
+    kind goes in your backpack if there's room; if not, the prompt says it's a swap and yours is left lying where
+    the new one was, its own build, stickers and the rounds in it included. Your spare magazines stay with you.
+  - **Co-op:** one case for the whole squad. Whatever's left in it, or left in place of what was taken, is there for
+    the next player.
 - **The attachments box** (`map.abox`, most levels: `G.Level.ABOX_CHANCE`): a small black hard case with a yellow band,
   on the floor against a wall in a room away from the spawn (yellow on your minimap till you've had your pick).
   - **One use each:** a light on its front for each of the squad, in their colour, lit till they've had their pick.
@@ -570,12 +602,12 @@ says the same), but not whose: the shooter's name isn't shown.
     once (`skin`), kept there and passed on (to anyone joining later too), then only its hash goes in your state
     (`st.sk`); anyone who hasn't the list asks for it.
 - Between levels you shop with Vex the quartermaster, in the hangar (below). He doesn't sell weapons. Each
-  visit he has four pieces of gear, of different kinds (carrier or rig, plate, helmet, face shield, shoulder, pelvis or
-  leg armour, belt, backpack), picked by rarity, and four weapon parts, plus supplies. A plate carrier comes with a plate fitted, rolled by rarity (soft
+  visit he has five pieces of gear, of different kinds (carrier or rig, plate, helmet, face shield, shoulder, pelvis or
+  leg armour, belt, backpack), picked by rarity, and seven weapon parts, plus supplies. A plate carrier comes with a plate fitted, rolled by rarity (soft
   inserts and steel common, multi-hit ceramic rare) and included in its price. Stock is randomised (the whole squad
   sees the same) with better gear deeper in the run. The stock is the squad's, shared, with as many of each thing
   as there are of you: one of each piece of kit, part and special load per player, and five random pouch types and
-  empty magazines for five random guns (up to the level's tier, not just yours), 1–3 of each per player, the special
+  empty magazines for seven random guns (up to the level's tier, not just yours), 1–3 of each per player, the special
   loads three standard magazines' worth in two different calibers. Whoever buys one first gets it; once they're all
   gone it's sold out until the next visit (the host keeps the count: buying asks it for one, you pay once it's yours,
   and it goes back on the shelf if you can't). About half the magazines are the gun's standard
@@ -595,12 +627,12 @@ says the same), but not whose: the shooter's name isn't shown.
     anywhere in the hangar.
   - **The workshop** (west): a bench for each officer (their name on the front; the computer on your own opens
     the gunsmith), the zeroing table in the middle of the floor (a shooting bench with sandbag rests and a
-    screen: F to zero your sights), and six pedestals along the north wall with the gunsmith's parts for sale (bought into your
+    screen: F to zero your sights), and seven pedestals along the north wall with the gunsmith's parts for sale (bought into your
     stash): each part shown on its own and turning slowly, its sign on the front (name, price, the slot it goes in
     and how many weapons it fits). What the guns already come with seldom turns up: a part is weighted down by the
     share of the weapons it fits that ship with it (the A2 birdcage, the stock red dot, the standard grip), so most
     of the stock is upgrades that change how a gun performs.
-  - **The store** (middle): Vex behind his counter (his till is the full stock; he looks like his portrait: dark hood, a black visor with two orange eyes, a grey respirator, a gold strap across the chest), three pedestals with the
+  - **The store** (middle): Vex behind his counter (his till is the full stock; he looks like his portrait: dark hood, a black visor with two orange eyes, a grey respirator, a gold strap across the chest), five pedestals with the
     gear for sale, each piece shown on its own and turning slowly (a helmet with its face guard on it, a
     carrier with the plate that comes with it standing beside it and turning with it, a plate or a face guard by itself). The sign
     on the front says what comes with it (a carrier's or belt's pouches, a fitted plate or face guard) and, in
@@ -692,6 +724,10 @@ says the same), but not whose: the shooter's name isn't shown.
   The converted guns are guns in their own right: they're sold, carried by suspects, and found in weapon
   cases. A convertible gun rolled for a weapon case comes built on one of its alternate receiver
   groups 35% of the time (an M4 as an AR-9, an AK as an RPK), fitted and working. The gunsmith stocks receiver groups now and then.
+- **Revolver loaders.** A revolver loads loose rounds by hand, one at a time, so a top-up is quick and a full cylinder
+  is slow (the .357 takes 4.5 s from empty: 0.55 s to open, 0.6 s a round, 0.35 s to shut). A speed loader or moon
+  clips (the Loading slot) fill it all at once, however many are left in it: 2.0 s or 1.6 s on the .357. Either way
+  it's fed from boxes of its caliber: revolvers have no magazines of their own.
 - **Shotgun loaders.** The tube shotguns (870, KSG, Slug Gun, Benelli M4) take a side saddle (each shell a
   little faster), a twin-shell carrier, or a quad speed loader (four shells a push). A full tube on the Benelli
   takes 3.6 s bare, 2.9 s with the saddle, 2.6 s with the carrier and 1.9 s with the quad loader.
@@ -943,7 +979,7 @@ says the same), but not whose: the shooter's name isn't shown.
 
     | Pouch | On MOLLE | Holds (and stowed size) |
     | --- | --- | --- |
-    | Pistol mag | 1×1 | two 1×1 pockets: a pistol magazine, speedloader or box of shells in each |
+    | Pistol mag | 1×1 | two 1×1 pockets: a pistol magazine or box of shells in each |
     | Rifle mag | 1×1 | 1×2: a rifle magazine (two pouches stack in one column of a 2-row panel) |
     | Double rifle mag | 2×2 | 2×2: two rifle magazines |
     | Triple mag shingle | 3×2 | 3×2: three rifle magazines, or an LMG box |
@@ -1028,10 +1064,10 @@ says the same), but not whose: the shooter's name isn't shown.
   - **Grids:** your pockets are two 1×2 (a rifle magazine each) and two 1×1. The pouches on your carrier's and belt's MOLLE are small
     grids, most limited to magazines, a grenade or a medkit; dump pouches take anything. A pouch can hold more
     than the MOLLE it takes: med pouches are 2×2 on one slot, rifle pouches 1×2 on one, dump pouches 2×2 on a 2×1 strip.
-  - **Item sizes:** a rifle or SMG magazine is 1×2, a pistol magazine, speedloader, en-bloc clip or box of
+  - **Item sizes:** a rifle or SMG magazine is 1×2, a pistol magazine, en-bloc clip or box of
     shells is 1×1, an LMG belt box is 2×2, and medkits and grenades are 1×1. Items turn (1×2 to 2×1).
   - **Icons:** every item has a picture, drawn in code (`js/icons.js`). Magazines look like their gun's
-    (curved, AK banana, straight pistol, drum, P90 top magazine, ammo can, speedloader, en-bloc clip) and
+    (curved, AK banana, straight pistol, drum, P90 top magazine, ammo can, en-bloc clip) and
     show a round on top when loaded. Ammo boxes show the caliber with a stripe in the ammo type's colour.
     Gear is drawn by kind and tint. Guns are their own 3D model as built, rendered side-on. Icons turn
     with the item, and shop cards show them too.
@@ -1041,8 +1077,8 @@ says the same), but not whose: the shooter's name isn't shown.
     is free. A gun dropped on the sell box sells for a quarter of its price, and its aftermarket parts go to
     your stash. Ammo, magazines and Load Magazines cover stowed guns too.
   - **In the field:** hold **B** to swap the gun in your hands of that kind for the next one in your
-    backpack (2.2 s; your old one goes in its place). Release B to cancel. At the weapon case, if your pack
-    has room, your old gun goes in your backpack instead of the case. The HUD lists what's in your pack.
+    backpack (2.2 s; your old one goes in its place). Release B to cancel. Picking up a gun from the floor or the weapon
+    case, if your pack has room, your old gun goes in your backpack instead of being left in its place. The HUD lists what's in your pack.
   - **In a level, Tab** opens the same Kit screen for what you carry. Your body (see Injuries) replaces
     the locker, and the scoreboard sits on top. The level
     keeps going and you stand still while it's open.
@@ -1149,11 +1185,10 @@ says the same), but not whose: the shooter's name isn't shown.
   - **Carriers keep their contents:** swapping carriers moves the old one, pouches and plate included, into
     your locker.
   - **Weapon case:** a found gun comes loaded with two full spare magazines (or two loads of rounds in
-    boxes for a loose-fed gun), all of one ammo type. The type is rolled by rarity: in a rifle or pistol
+    boxes for a loose-fed gun), all of one ammo type, lying beside it. The type is rolled by rarity: in a rifle or pistol
     caliber, about 53% ball, 15% hollow point, 15% tracer, 10% subsonic and 5% AP; in a shotgun, about
-    55% buckshot, 22% slug, 17% birdshot and 6% flechette. The spares go wherever they fit on you, and any
-    that don't are dropped at your feet to pick up. A gun you swap into the case takes its magazines and
-    its ammo type with it.
+    55% buckshot, 22% slug, 17% birdshot and 6% flechette. You pick each spare up yourself; one you've no
+    room for stays where it is. A gun you leave in the case keeps what's loaded in it, not your spares.
 - Supplies:
   - **Ammo resupply** refills your guns and every magazine and box you own. There are no ammo caches in
     levels, so this is how you restock.
@@ -1845,7 +1880,15 @@ says the same), but not whose: the shooter's name isn't shown.
     handle, cocking handle, slide or bolt.
   - **Shell by shell:** tube shotguns, the lever gun, the Mosin and the M32 roll the port toward you and
     load one round at a time, then rack once at the end if they were empty.
-  - **Revolver:** swing the cylinder out, muzzle up to eject, then the speed loader in and flick it shut.
+  - **Revolver:** swing the cylinder out, muzzle up to eject, then a round at a time from the pouch into it, and shut
+    (pull the trigger part way through and it's shut first, on what's in it, and the shot goes). With a speed loader or
+    moon clips it's the whole cylinder in one push, and flick it shut. The cylinder, its flutes and the loader all
+    have the gun's own number of chambers (five on the .500 Hand Cannon and The Judge), and each shot turns it by one. A fired
+    round stays in its chamber as an empty, its primer dented by the firing pin, till the gun's opened and it falls out:
+    the same on a break-action's shells (`chamberView`). From behind you can't tell one
+    cartridge from another, so anything but ball has a lick of paint in from the rim of its case in its load's colour (hollow
+    point white, AP black, tracer red, subsonic olive), at whatever angle the round went in; a revolver's rounds go in behind
+    the ones already in it, so what's where is what you see.
   - **Break-open:** the double and sawed-off open, take shells and close. The derringer is turned upside down in
     the hand first, then its barrels swing open 165° over the hinge (hanging straight down, their breeches up), a
     round (its real size: the case, the rim, the bullet) drops into each empty bore from above, and it's shut and turned back. It fires the top barrel first, so with
@@ -2023,7 +2066,7 @@ On top of the baked room reverb, echoes are **ray-traced through the level** for
 | B (hold) | Swap the gun in your hands with the next one in your backpack |
 | V | Shout compliance ("Police! Show me your hands!") |
 | X | Fire selector: semi / auto (or burst), on guns that have one |
-| F (hold) | Doors (aim at the door above 1.3 m, a little over its middle, to open it, lower to kick it; face an open door to close it; reach 1.9 m), bag evidence (aim at the weapon), swap with the weapon case, arrest, zip-tie or report (aim at the person or body; whichever of a body and its dropped weapon is nearer the centre of your view), check or treat a teammate (put the crosshair on them). Every interaction is a hold: let go and it's abandoned. Any of these puts your weapon away; drawing it again takes about 1 s (0.65 s for a sidearm). |
+| F (hold) | Doors (aim at the door above 1.3 m, a little over its middle, to open it, lower to kick it; face an open door to close it; reach 1.9 m), bag evidence (aim at the weapon), open the weapon case, pick up something lying about (aim right at it: the gun or magazine in the weapon case, anything dropped, within about 2 m of your eyes; a blue halo marks what F would take, evidence included), arrest, zip-tie or report (aim at the person or body; whichever of a body and its dropped weapon is nearer the centre of your view), check or treat a teammate (put the crosshair on them). Every interaction is a hold: let go and it's abandoned. Any of these puts your weapon away; drawing it again takes about 1 s (0.65 s for a sidearm). |
 | M | Mute / unmute (also `?mute` in the URL) |
 | F8 | Show / hide gunshot echo paths |
 | F9 | Show / hide hitboxes (with the readout of whoever you're looking at, your rounds' paths, and every shot that's hit someone: ghosts, trails, speed markers) |

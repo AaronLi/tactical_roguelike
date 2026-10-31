@@ -119,7 +119,7 @@ To rebuild a gun from photographs, use the `rework-gun` skill (`.claude/skills/r
   and it doesn't clip the camera at full auto.
 - [ ] **Animations:**
   - slide/bolt cycles (`anim.slide`, `anim.bolt`, pump/lever)
-  - cylinder turns (revolvers: `cylAt`)
+  - cylinder turns (revolvers: `cylAt`; `chambers` in the platform's spec if it doesn't hold 6, matching the gun's `mag`)
   - feed cover lifts (belt-fed)
   - the magazine leaves and returns on reload
 - [ ] **Muzzle flash** position matches the muzzle (`muzzles`), including with suppressors, brakes and short

@@ -7,7 +7,7 @@
 // that they're down (js/game.js credit) brings it here. Only a gun you've earned counts: one that turned up in a case has its own path to come.
 // Each asks for more than a level has suspects (8 to 13, the act's last aside), so every gun takes several levels of play.
 G.Arsenal = (() => {
-  // id, what it's reached from, which path, how far out; and what it takes: stat, how many, of what
+  // id, what it's reached from, which path, how far out (a: a branch off its path: its own angle and r, its distance out); and what it takes: stat, how many, of what
   // pro: mastering it, with it: what it takes, and the named build that earns you, to start with if you like (parts: on top of its own)
   const NODES = [
     { id: 'p9', ring: 0, pro: { name: 'Patrolman', stat: 'kills', n: 30, what: 'kills', parts: { tac: 'ptac.2', grip: 'gr.pistol.2' } } },
@@ -23,6 +23,8 @@ G.Arsenal = (() => {
       pro: { name: 'Last Word', stat: 'close', n: 30, what: 'kills within 5 m', parts: { barrel: 'derringer.br.long', grip: 'gr.derringer.rubber' } } },
     { id: 'rev', from: 'derringer', path: 'heavy', ring: 2, stat: 'one', n: 16, what: 'one-round kills', how: "One round fired at them, and they're done.",
       pro: { name: 'Peacemaker', stat: 'one', n: 30, what: 'one-round kills', parts: { barrel: 'rev.br.long', loader: 'ld.0', optic: 'op.pso.0' } } },
+    { id: 'judge', from: 'rev', path: 'heavy', ring: 3, a: 60, r: 600, stat: 'close', n: 15, what: 'kills within 5 m', how: 'In the room with them, where a cylinder of buckshot starts to look like the better idea.',
+      pro: { name: 'Hanging Judge', stat: 'multi', n: 20, what: 'double kills', parts: { barrel: 'judge.br.long', loader: 'ld.1', optic: 'op.pso.5' } } },
     { id: 'deagle', from: 'rev', path: 'heavy', ring: 3, stat: 'armed', n: 15, what: 'kills on armoured suspects', how: "A vest or a helmet: it doesn't save them. Pick your spot, or hit them hard enough.",
       pro: { name: 'Sledgehammer', stat: 'armed', n: 25, what: 'kills on armoured suspects', parts: { slide: 'deagle.sl.comp', optic: 'op.pso.2', grip: 'gr.pistol.2' } } },
     { id: 'thor', from: 'deagle', path: 'heavy', ring: 4, stat: 'wall', n: 15, what: 'wall-bang kills', how: 'Through a wall, a door or whatever they thought was cover.',
@@ -52,8 +54,9 @@ G.Arsenal = (() => {
   const count = (id, stat) => (data().n[id] && data().n[id][stat]) || 0;
   const name = (id) => (G.WEAPONS[id] ? G.WEAPONS[id].name : id);
   // where it goes on the map: [x, y] from the P9, in pixels at full size
-  const along = (path, r) => { const a = (PATHS[path].a * Math.PI) / 180; return [Math.cos(a) * r, Math.sin(a) * r]; };
-  const at = (q) => (q.ring ? along(q.path, RINGS[q.ring]) : [0, 0]);
+  const polar = (deg, r) => { const a = (deg * Math.PI) / 180; return [Math.cos(a) * r, Math.sin(a) * r]; };
+  const along = (path, r) => polar(PATHS[path].a, r);
+  const at = (q) => (q.a != null ? polar(q.a, q.r) : q.ring ? along(q.path, RINGS[q.ring]) : [0, 0]);
   // what's next from a gun: how far along each it's got
   const left = (q) => Math.min(q.n, count(q.from, q.stat));
   // one more of something, with that gun: what it's for, and whatever that's earned

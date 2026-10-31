@@ -14,7 +14,7 @@ G.Shop = {
     this.level = level;
     this.ready = false;
     this.genOffers(level, seed);
-    this.partStock = G.Gunsmith.rollStock(level, seed, 6); // the gunsmith's parts this visit (same for the whole squad)
+    this.partStock = G.Gunsmith.rollStock(level, seed); // the gunsmith's parts this visit (same for the whole squad)
     // the shared stock: the host's count when it's come, until then what it starts at (the same reckoning the host's)
     this.stock = stock || G.Shop.scaleStock(this.baseStock(level, seed), Object.keys(G.Game.roster || {}).length || 1);
     this.pend = new Map(); this.qn = 0;
@@ -32,7 +32,7 @@ G.Shop = {
     for (const o of O.ammo) s['ammo:' + o.cal] = 1;
     for (const o of O.pouches) s['pouch:' + o.id] = o.n;
     for (const o of O.mags) s['mag:' + o.id] = o.n;
-    for (const id of G.Gunsmith.rollStock(level, seed, 6)) s['part:' + id] = 1;
+    for (const id of G.Gunsmith.rollStock(level, seed)) s['part:' + id] = 1;
     return s;
   },
   scaleStock(s, n) { const o = {}; for (const k in s) o[k] = s[k] * Math.max(1, n); return o; },
@@ -75,11 +75,11 @@ G.Shop = {
     this.offers = {
       p: pickW(weapons.filter((w) => w.slot === 'p'), 3).map((w) => w.id),
       s: pickW(weapons.filter((w) => w.slot === 's'), 2).map((w) => w.id),
-      // kit: four pieces, of different kinds (carrier, plate, helmet, shoulders, pelvis, legs, belt, pack), by rarity
+      // kit: five pieces, of different kinds (carrier, plate, helmet, shoulders, pelvis, legs, belt, pack), by rarity
       gear: (() => {
         const all = G.Gear.LIST.filter((d) => ['carrier', 'plate', 'helmet', 'face', 'shoulder', 'groin', 'legs', 'belt', 'pack'].includes(d.kind));
         const out = [];
-        for (let i = 0; i < 4; i++) { const d = pickW(all.filter((x) => !out.some((o) => o.kind === x.kind)), 1)[0]; if (d) out.push(d); }
+        for (let i = 0; i < 5; i++) { const d = pickW(all.filter((x) => !out.some((o) => o.kind === x.kind)), 1)[0]; if (d) out.push(d); }
         return out.sort((x, y) => x.price - y.price).map((d) => d.id);
       })(),
       // three standard magazines' worth of something other than ball, for two random calibers
@@ -95,9 +95,9 @@ G.Shop = {
         }
         return out;
       })(),
-      // empty magazines for five guns (any guns, not just yours), a few of each
+      // empty magazines for seven guns (any guns, not just yours), a few of each
       // (about half are the gun's standard magazine; the rest a compact, extended, drum... variant)
-      mags: pickW(weapons.filter((w) => G.Gear.ammoFor(w).kind === 'mag'), 6).map((w) => {
+      mags: pickW(weapons.filter((w) => G.Gear.ammoFor(w).kind === 'mag'), 7).map((w) => {
         const vs = G.Gunsmith.LIST.filter((p) => p.variant && !p.factory && !p.retired && (p.plat === w.id || (p.fam && p.fam === G.MAG_FAMILY[w.id])) && p.tier <= maxTier && p.id !== G.Gunsmith.defaultBuild(w.id).mag);
         const vid = vs.length && r() < 0.5 ? vs[Math.floor(r() * vs.length)].id : G.Gunsmith.defaultBuild(w.id).mag;
         return { id: vid ? w.id + '|' + vid : w.id, n: 1 + Math.floor(r() * 3) };

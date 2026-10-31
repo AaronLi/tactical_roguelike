@@ -62,21 +62,23 @@ G.Me = {
     Object.defineProperty(w, 'reserve', { get: () => (G.Me.kit ? G.Gear.rounds(G.Me, w.def) : 0) });
     return w;
   },
-  // the host handed us the case's weapon (after we put ours in): it replaces ours in that slot
-  // something you picked up, from the host: onto you (no room after all: put back down)
-  lootGot(packed, x, z) {
+  // something you picked up, from the host: onto you (no room after all: put back down, where it lay)
+  lootGot(packed, x, z, at) {
     const Gr = G.Gear, it = Gr.unpack(packed), name = G.Loot.name(packed);
     let ok = false;
-    if (it.k === 'gun') { // into your hands if that slot's free, else a backpack
-      const slot = it.w.def.slot;
-      if (!this.weapons[slot]) { this.weapons[slot] = it.w; ok = true; if (G.R.vm && this.cur() === it.w) G.R.setViewmodel(it.w.def); }
-      else ok = !!Gr.place(Gr.body(this).filter((g) => g.pack), it);
-    } else if (Gr.isGear(it) && !Gr.MOUNTS[it.k] && !this.kit[it.k]) { this.kit[it.k] = it; ok = true; } // worn, if that's free
+    if (it.k === 'gun') { // into your hands; the one you had there into your backpack if there's room, or down where this one lay
+      const slot = it.w.def.slot, old = this.weapons[slot], stow = old && this.packRoom(Gr.gunItem(old));
+      if (stow) Gr.place(this.kit.pack.grids, Gr.gunItem(old));
+      else if (old) G.Net.toHost({ t: 'drop', item: Gr.pack(Gr.gunItem(old)), x, z, at });
+      this.weapons[slot] = it.w;
+      return this.inHand(slot, `${name}${!old ? '' : stow ? ` — your ${old.def.name} is in your backpack` : ` — your ${old.def.name} is left in its place`}`);
+    }
+    if (Gr.isGear(it) && !Gr.MOUNTS[it.k] && !this.kit[it.k]) { this.kit[it.k] = it; ok = true; } // worn, if that's free
     else if (Gr.MOUNTS[it.k] && Gr.mountFree(this, it.k)) { Gr.mountOn(this, it.k)[it.k] = it; ok = true; } // fitted, likewise
     else if (it.k === 'pouch') ok = !!Gr.place(Gr.molles(this), it) || Gr.stow(this, it); // a pouch: straight onto your MOLLE if there's room
     else ok = Gr.stow(this, it);
     if (ok) { G.HUD.toast('', `Picked up: ${name}`, 1.4); G.Audio.pickup(); if (G.InvUI.field) G.InvUI.render(); }
-    else { G.HUD.toast('', `No room on you for the ${name}`, 1.6); G.Net.toHost({ t: 'drop', item: packed, x, z }); }
+    else { G.HUD.toast('', `No room on you for the ${name}`, 1.6); G.Net.toHost({ t: 'drop', item: packed, x, z, at }); }
   },
   // put something down at your feet (from the inventory): it's the host's to hand out now
   dropItem(it) {
@@ -115,30 +117,6 @@ G.Me = {
     } else G.HUD.toast('', keep(pid) ? `${p.name}: in your inventory` : `No room on you for the ${p.name}: on the floor`, 1.8);
     G.Audio.pickup();
     if (G.InvUI.field) G.InvUI.render();
-  },
-  takeFromCase([code, mag, reserve, am, kit, sk]) {
-    const def = G.Gunsmith.fromCode(code);
-    if (!def) return;
-    // a conversion kit packed in with it
-    const kits = (Array.isArray(kit) ? kit : kit ? [kit] : []).filter((pid) => G.Gunsmith.PARTS[pid]), K = kits.length ? G.Gunsmith.PARTS[kits[0]] : null;
-    for (const pid of kits) { const it = G.Gear.partItem(pid); if (!G.Gear.stow(this, it)) this.dropItem(it); }
-    const old = this.weapons[def.slot];
-    // ours went in the case, or (if we said so and there's room) into our backpack, build and all
-    const stowed = old && this.caseStow && this.kit.pack && G.Gear.place(this.kit.pack.grids, G.Gear.gunItem(old));
-    this.caseStow = false; // (left in the case, it's in there as built: its parts went with it, see the swap below)
-    const w = this.makeWeapon(def.id, def.build);
-    if (sk && sk.length) w.stickers = G.Stickers.clean(sk); // (someone's, stuck on it before they put it in)
-    w.ammo = G.ammoOk(G.calOf(w.def), am);
-    const ch = G.chambered(w.def) && mag > 0; // (the count is everything in it: one of them's in the chamber)
-    w.mag = Math.min(mag - (ch ? 1 : 0), this.magSize(w.def));
-    if (w.tube) w.tube = Array(w.mag).fill(w.ammo);
-    w.chamber = ch ? w.ammo : null;
-    // the magazines that came in the case, where they fit on you (the rest on the floor at your feet)
-    const spare = G.Gear.receive(this, w.def, reserve, w.ammo), A = G.AMMO[w.ammo];
-    this.weapons[def.slot] = w;
-    const what = `${spare.placed ? `, ${spare.placed} spare ${G.Gear.ammoFor(w.def).kind === 'mag' ? 'magazine' : 'box'}${spare.placed > 1 ? 's' : ''}` : ''}${spare.dropped ? ` (${spare.dropped} on the floor: no room)` : ''}${A && A.k !== 1 ? ` · loaded with ${A.name}` : ''}`;
-    this.inHand(def.slot, `${def.name}${what}${K ? ', and a ' + K.name + (kits.length > 1 ? ' with the parts for it' : '') : ''} — ${!old ? 'taken from the case' : stowed ? 'your ' + old.def.name + ' is in your backpack' : 'your ' + old.def.name + ' is in the case'}`);
-    this.raiseT = 0; // (up and ready at once: the wheel was the wait)
   },
   // a different gun in that slot now: it's the one in your hands, drawn
   inHand(slot, msg) {
@@ -443,7 +421,7 @@ G.Me = {
     this.reviveT = 0; this.bobT = 0;
     this.stateT = 0; this.specIdx = 0; this.pressBuf = 0; this.lastTrigger = false;
     this.lowToggle = false; this.stowed = false; this.action = null; this.held = null; this.stowW = 0; this.raiseMax = 0.3; this.shakeT = 0;
-    this.spin = 0; this.hyperQ = 0; this.cylTarget = 0; this.cycleMax = 0; this.flashIdx = 0;
+    this.spin = 0; this.hyperQ = 0; this.cylShots = 0; this.cycleMax = 0; this.flashIdx = 0;
     this.hitQ = new Map();
     if (this.slot === 's' && this.weapons.p) this.slot = 'p';
     if (!this.weapons[this.slot]) this.slot = Object.keys(this.weapons)[0];
@@ -744,11 +722,17 @@ G.Me = {
     // the bolt catch (a gun that locked open on its last round: quick) or the action worked by hand (a rack)
     this.reloadAct = this.reloadEmpty && isMag && !w.def.enbloc && !w.def.akimbo && G.VMAnim.kinds(w.def).action ? (G.boltHold(w.def) ? 'release' : 'rack') : null; // (a revolver has nothing to work)
     this.reloadTimes(w.def);
+    this.revOpen = this.revHand(w.def); this.revClose = false; // (a revolver by hand: the cylinder comes out first)
+    if (this.revOpen) { this.reloadTotal += G.REV.open; this.reloadT = this.reloadTotal; }
     this.reloadEv = 0;
-    G.Casings.emptied(w.def, mag - w.mag, w.spent); w.spent = []; // a revolver or break-action: the empties fall out (each hull its load's colour)
+    G.Casings.emptied(w.def, mag - w.mag, w.spent); // a revolver or break-action: the empties fall out (each hull its load's colour)
+    this.ejected = w.spent; this.ejecting = (w.spent || []).length; this.ejectT = 0.25; w.spent = []; // (still in it till they do: js/vmanim.js)
     if (w.def.shell || !G.Audio.sample('pull_magazine')) G.Audio.reload();
   },
   reloadTime(def) { return def.reload; },
+  // a revolver loaded a round at a time: it stays open till it's shut, which takes a moment
+  revHand(def) { return G.revolver(def) && def.shell; },
+  revShut() { this.revClose = true; this.reloadT = this.reloadTotal = G.REV.close; },
   ACT_T: { release: 0.4, rack: 0.6 },
   // how far through its motions a magazine change goes before the action, from empty: it stops as the magazine
   // seats and the hand goes straight on to the catch or the handle (no trip back to the handguard first)
@@ -801,7 +785,7 @@ G.Me = {
 
     this.raiseT = Math.max(0, (this.raiseT || 0) - dt);
     if (this.held) this.heldStep(dt);
-    this.ads = this.mouse.r && !this.held && !this.magChk && !this.lowReady && !this.stowed && !(this.stanceT > 0) && this.raiseT <= 0 && this.swapT <= 0 && !(this.reloading && !def.shell) && G.Game.locked && !def.akimbo;
+    this.ads = this.mouse.r && !this.held && !this.magChk && !this.lowReady && !this.stowed && !(this.stanceT > 0) && this.raiseT <= 0 && this.swapT <= 0 && !(this.reloading && (!def.shell || this.revHand(def))) && G.Game.locked && !def.akimbo;
     this.adsT += ((this.ads ? 1 : 0) - this.adsT) * Math.min(1, dt * 9 * (this.cur().def.handling || 1)); // ergonomics: aim speed
 
     // inspecting stops the moment you do anything with the gun; racking after the last shell takes a beat
@@ -850,6 +834,7 @@ G.Me = {
       if (!ac.h && ac.t >= ac.home) { ac.h = true; this.feed(w); if (ac.kind === 'release') G.Audio.sample('drop_slide', 0.9, pistol ? 1 : 0.85); }
       if (ac.t >= 1) this.act = null;
     }
+    if (this.ejecting && (this.ejectT -= dt) <= 0) this.ejecting = 0;
     if (this.reloading) {
       this.reloadT -= dt;
       if (!def.shell && this.reloadTotal) {
@@ -860,11 +845,14 @@ G.Me = {
         if (this.reloadEv === 0 && km > (this.reloadMode === 'retain' || this.reloadMode === 'pouch' ? 0.76 : 0.68)) { this.reloadEv = 1; G.Audio.sample('insert_magazine'); }
       }
       if (this.reloadT <= 0) {
-        if (def.shell) {
+        if (this.revClose) { this.revClose = false; this.reloading = false; } // (shut: ready)
+        else if (def.shell) {
           // one shell, or with a speed loader several at a push
+          this.revOpen = false;
           const got = w.mag < mag ? G.Gear.takeRounds(this, def, Math.min(def.perLoad || 1, mag - w.mag), w.ammo) : [];
-          if (got.length) { w.mag += got.length; w.ammo = got[got.length - 1]; if (w.tube) w.tube.push(...got); G.Audio.sample('insert_magazine', 0.5, 1.6) || G.Audio.shell(); }
+          if (got.length) { G.Gear.chamberIn(w, got); G.Audio.sample('insert_magazine', 0.5, 1.6) || G.Audio.shell(); }
           if (w.mag < mag && w.reserve > 0) { this.reloadT = this.reloadTime(def); this.reloadTotal = this.reloadT; }
+          else if (this.revHand(def)) this.revShut();
           else { this.reloading = false; if (this.reloadEmpty) this.rack(w); else this.feed(w); }
         } else {
           // a fresh magazine in (the old one goes back in its pouch), or loose rounds into a break-action
@@ -874,7 +862,7 @@ G.Me = {
             // the magazine on the floor is that one (it can be picked up again)
             if (went === 'floor') { const c = this.magDropped && this.magDropped !== true ? this.magDropped : G.Casings.dropMag(def); if (c && this.dumped) c.item = this.dumped; }
           } else if (G.Gear.ammoFor(def).kind === 'mag') G.Gear.swapMag(this, w, mag);
-          else { const got = G.Gear.takeRounds(this, def, mag - w.mag, w.ammo); w.mag += got.length; for (const t of got) w.tube.push(t); if (got.length) w.ammo = got[got.length - 1]; }
+          else G.Gear.chamberIn(w, G.Gear.takeRounds(this, def, mag - w.mag, w.ammo));
           this.reloading = false;
           if (this.reloadAct) this.workAction(w, this.reloadAct, this.reloadSeat < 1 ? this.reloadSeat : null); // run dry: then the action, straight on
           else this.feed(w);
@@ -919,7 +907,10 @@ G.Me = {
       this.burstQ = 0; this.hyperQ = 0; this.pressBuf = 0; // just the click: reloading is up to you (R)
       return;
     }
-    if (this.reloading) { if (def.shell) this.reloading = false; else return; }
+    if (this.reloading) {
+      if (this.revHand(def)) { if (!this.revClose) { this.revShut(); this.pressBuf = G.REV.close + 0.05; } return; } // (the cylinder shut first, on what's in it: the shot goes as it does)
+      if (def.shell) this.reloading = false; else return;
+    }
     const bolt = ch && this.boltGun(def), round = w.chamber;
     this.shoot(w);
     if (bolt) { w.chamber = null; w.spentCh = round || w.ammo; } // (the case stays in: js/player.js rack)
@@ -934,7 +925,7 @@ G.Me = {
     this.sinceShot = 0;
     if (bolt) this.fireCd = Math.max(0.25, this.fireCd - this.BOLT_T); // (the rest of the gun's rate is the bolt, worked by hand)
     this.cycleMax = this.fireCd;
-    this.cylTarget += Math.PI / 3;
+    this.cylShots++; // (the cylinder turns one chamber: js/player.js moving parts)
     if (def.enbloc && w.mag === 0) { // the clip flies out with the last round's case ("ping"): it goes back in your kit, empty
       G.Audio.ping();
       const clip = G.Gear.ammoItem(w.def, 0, w.ammo, w.def.build && w.def.build.mag);
@@ -1316,16 +1307,6 @@ G.Me = {
     }
     return hits.sort((x, y) => x.t - y.t);
   },
-  // Take what's in the weapon case (js/game.js caseShow): swapped for your weapon of that kind, or with room, yours goes in your backpack
-  caseTake() {
-    const wc = G.Game.wcase, inCase = wc && G.Gunsmith.fromCode(wc.code);
-    if (!inCase) return;
-    const w = this.weapons[inCase.slot];
-    this.caseStow = !!(w && this.packRoom(G.Gear.gunItem(w)));
-    // your weapon goes in the case in its standard build: your aftermarket parts stay with you
-    // its magazines go into the case with it (unless it's going in your backpack)
-    G.Net.toHost({ t: 'swap', give: w && !this.caseStow ? [w.def.code, G.loaded(w), G.Gear.handOver(this, w.def), w.ammo, w.stickers || null] : null }); // (its stickers with it)
-  },
   // where a round struck or left something: its mark here (s: a target's own, its picture), on its trail, and for the squad
   // how: { m (what it's made of: '' nothing to damage), dir (the way it was going), stop (it stopped in it) }
   roundMark(b, p, n, fx, kind, v, s, name, how = {}) {
@@ -1623,15 +1604,14 @@ G.Me = {
   },
   // how far off the crosshair a point is (radians)
   offAim(x, y, z) { const { o, d } = this.aimRay(), to = new THREE.Vector3(x - o.x, y - o.y, z - o.z).normalize(); return Math.acos(G.U.clamp(to.dot(d), -1, 1)); },
-  // the dropped weapon under the crosshair (within about 9 deg), within reach
-  aimedEvidence(reach = 1.8) {
+  // the dropped weapon under the crosshair, within reach
+  aimedEvidence(reach = 2.2) {
     const { o, d } = this.aimRay();
-    let best = null, bd = Infinity;
+    let best = null, bd = reach;
     for (const [i, v] of G.Views.evidence) {
-      if (v.secured) continue;
-      const to = new THREE.Vector3(v.x - o.x, (v.y || 0) + 0.04 - o.y, v.z - o.z), dist = to.length();
-      if (Math.hypot(v.x - this.pos.x, v.z - this.pos.z) > reach || Math.abs((v.y || 0) - this.pos.y) > 1.5) continue;
-      if (to.normalize().dot(d) > Math.cos(9 * Math.PI / 180) && dist < bd) { bd = dist; best = i; }
+      if (v.secured || !v.mesh.visible) continue;
+      const t = G.Loot.rayHit(o, d, v.mesh, v.box || (v.box = G.Loot.boxOf(v.mesh)), bd);
+      if (t < bd) { bd = t; best = i; }
     }
     return best;
   },
@@ -1651,7 +1631,7 @@ G.Me = {
     return { d, y };
   },
   interact(dt) {
-    let prompt = '', prog = -1, label = '', busy = false;
+    let prompt = '', prog = -1, label = '', busy = false, halo = null; // (halo: the thing lying about that F would take)
     const map = G.Game.map, held = this.keys.KeyF && !G.Game.chatOpen;
     if (!held) this.fLatch = false;
     const F = held && !this.fLatch;
@@ -1766,6 +1746,7 @@ G.Me = {
       if (evTgt !== null) {
         const w = G.WEAPONS[G.Views.evidence.get(evTgt).wpn];
         prompt = 'Hold <b>F</b> to bag evidence' + (w ? ' (' + G.U.esc(w.name) + ')' : '');
+        halo = G.Views.evidence.get(evTgt).mesh;
         if (F) {
           const i = evTgt, ev = G.Views.evidence.get(i);
           this.startAction('Bagging evidence', 2.3, () => G.Net.toHost({ t: 'secure', i }), 'bag');
@@ -1775,9 +1756,14 @@ G.Me = {
         }
       }
 
+      // something lying about, under your crosshair (dropped from someone's inventory, or in the weapon case): before
+      // the door behind it. Or a magazine you dropped
+      const free = !tgt && !cuffTgt && evTgt === null, ray = free && this.aimRay();
+      const lt = free ? G.Loot.aimed(ray.o, ray.d) : null, dm = free && !lt ? G.Casings.aimedMag(ray.o, ray.d) : null;
+
       // doors: look at the door above its middle to open it quietly, lower to kick it (the line is at 1.3 m
       // of a 2.3 m door: a little above the middle, about where a boot lands on a kick); open doors close
-      if (!tgt && !cuffTgt && evTgt === null) {
+      if (free && !lt && !dm) {
         const aimed = this.aimedDoor(map);
         if (aimed) {
           const vault = aimed.d.kind === 'vault', kick = aimed.y < KICK_H && !vault, id = aimed.d.id;
@@ -1797,15 +1783,15 @@ G.Me = {
         }
       }
 
-      // something lying on the floor (dropped from someone's inventory): pick it up
-      const lt = !tgt && !cuffTgt && !prompt ? G.Loot.near(this.pos, this.yaw) : null;
       if (lt) {
-        prompt = `Hold <b>F</b> to pick up the ${G.Loot.name(lt.item)}`;
+        halo = lt.mesh;
+        const gun = lt.item.k === 'gun' && lt.item.w && G.WEAPONS[lt.item.w.id], mine = gun && this.weapons[gun.slot], n = G.Loot.name(lt.item);
+        prompt = !mine ? `Hold <b>F</b> to pick up the ${n}` : this.packRoom(G.Gear.gunItem(mine)) ? `Hold <b>F</b> to take the ${n} <small>(your ${mine.def.name} goes in your backpack)</small>` : `Hold <b>F</b> to swap your ${mine.def.name} for the ${n}`;
         if (F) { const id = lt.id; this.startAction('Picking up', 0.5, () => G.Net.toHost({ t: 'take', id }), 'case'); busy = true; }
       }
-      // a magazine you dropped: pick it back up (if there's somewhere on you for it)
-      const dm = !tgt && !cuffTgt && !prompt ? G.Casings.nearMag(this.pos, 1.3) : null;
+      // (if there's somewhere on you for it)
       if (dm) {
+        halo = dm.mesh;
         const it = dm.item, name = it.k === 'mag' ? G.Gear.magName(it) : G.Gear.label(it);
         const room = G.Gear.body(this).some((g) => G.Gear.findSpot(g, it));
         prompt = room ? `Hold <b>F</b> to pick up the ${name} (${it.n} rounds)` : `No room on you for the ${name}`;
@@ -1856,18 +1842,11 @@ G.Me = {
           }
         }
       }
-      // the level's weapon case: open it, then take what's inside or swap your weapon of that kind for it
-      const mc = map.case, wc = G.Game.wcase;
-      if (!tgt && !cuffTgt && !prompt && mc && Math.hypot(mc.x - this.pos.x, mc.z - this.pos.z) < 1.6) {
-        const inCase = wc && G.Gunsmith.fromCode(wc.code);
-        if (!G.Game.caseOpen) {
-          prompt = 'Hold <b>F</b> to open the weapon case';
-          if (F) { this.startAction('Opening the case', 1.0, () => G.Net.toHost({ t: 'openCase' }), 'case'); busy = true; }
-        } else if (!inCase) prompt = 'The weapon case is empty';
-        else {
-          prompt = 'Hold <b>F</b> to look in the weapon case';
-          if (F) { this.startAction('Looking in the case', 0.25, () => G.Game.caseShow(false), 'case'); busy = true; }
-        }
+      // the level's weapon case: open it, and what's inside is there to be picked up (js/server.js casePut)
+      const mc = map.case;
+      if (!tgt && !cuffTgt && !prompt && mc && !G.Game.caseOpen && Math.hypot(mc.x - this.pos.x, mc.z - this.pos.z) < 1.6) {
+        prompt = 'Hold <b>F</b> to open the weapon case';
+        if (F) { this.startAction('Opening the case', 1.0, () => G.Net.toHost({ t: 'openCase' }), 'case'); busy = true; }
       }
     }
 
@@ -1876,6 +1855,7 @@ G.Me = {
     else if (!busy && this.stowed) { this.stowed = false; this.raiseT = this.raiseMax = this.drawTime(); }
     G.HUD.setPrompt(this.action ? '' : prompt);
     G.HUD.setProgress(prog, label);
+    G.Views.setHalo(this.action ? null : halo);
   },
 
   // ------------------------------------------------------------- damage
@@ -2115,7 +2095,7 @@ G.Me = {
     const cyc = this.cycleMax > 0.2 && this.fireCd > 0 ? Math.sin(Math.PI * Math.min(1, (1 - this.fireCd / this.cycleMax) * 1.25)) : 0;
     if (an.slide) an.slide.position.z = Math.min(0.035, this.kick * 0.04 + (!G.loaded(w) ? 0.035 : 0)); // (locked back: nothing left, chamber included)
     if (an.pump) an.pump.position.z = cyc * 0.085;
-    if (an.cyl) an.cyl.rotation.z += (this.cylTarget - an.cyl.rotation.z) * Math.min(1, dt * 18);
+    if (an.cyl) an.cyl.rotation.z += (this.cylShots * (Math.PI * 2) / u.info.chamberAt.n - an.cyl.rotation.z) * Math.min(1, dt * 18);
     if (an.spin) an.spin.rotation.z += dt * this.spin * 55;
     if (an.magn) an.magn.rotation.z += ((sg.scoped ? 0 : -2.8) - an.magn.rotation.z) * Math.min(1, dt * 14); // a magnifier flips in or out
     G.VMAnim.apply(this, vm, cyc); // hands and the parts they work

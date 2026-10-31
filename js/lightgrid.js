@@ -31,6 +31,7 @@ G.LightGrid = (() => {
     lgGrid: { value: new T.Vector4(0, 0, 1, 0) }, // x0, z0 (the map's corner, metres), cell size, on (0/1)
     lgSize: { value: new T.Vector4(1, 1, 1, 0) }, // W, H (cells), floors, where the lowest floor's layer starts (y)
     lgFloorH: { value: 4.3 },
+    lgPaint: { value: blank }, // (residents' wall colours, a cell of the floor plan each: js/homes.js paint)
   };
   let built = false;
   // bounce: how much of what a surface reflects comes back into the room (on top of its colour: the theme's walls',
@@ -46,7 +47,29 @@ G.LightGrid = (() => {
       lgp = instanceMatrix * lgp; lgn = mat3(instanceMatrix) * lgn;
       #endif
       lgp = modelMatrix * lgp; vLgP = lgp.xyz; vLgN = normalize(mat3(modelMatrix) * lgn); }`;
-  const FS_HEAD = `varying vec3 vLgP;\nvarying vec3 vLgN;\nuniform sampler2D lgLight;\nuniform sampler2D lgDir;\nuniform vec4 lgGrid;\nuniform vec4 lgSize;\nuniform float lgFloorH;\n`;
+  const FS_HEAD = `varying vec3 vLgP;\nvarying vec3 vLgN;\nuniform sampler2D lgLight;\nuniform sampler2D lgDir;\nuniform vec4 lgGrid;\nuniform vec4 lgSize;\nuniform float lgFloorH;\nuniform sampler2D lgPaint;\n`;
+  // A wall's colour by the room it faces (a material with LG_PAINT: only a level with a resident's room). A wall cell is one
+  // box with a room on each side, so the box can't be tinted: each face takes it from the floor plan, just off the face on
+  // its own side, as it does the light, so the room next door keeps its own, and so do a wall's faces once they've been
+  // shot (js/damage.js: the same material). Stored as a share of the theme's wall colour, halved to fit a byte; a: 0 not
+  // painted, 0.5 painted, 1 papered (a faint stripe up the wall).
+  const FS_PAINT = `
+    #include <color_fragment>
+    #ifdef LG_PAINT
+    if (lgGrid.w > 0.5) {
+      vec3 lpn = normalize(vLgN);
+      if (abs(lpn.y) < 0.5) {
+        float lpf = clamp(floor((vLgP.y - lgSize.w) / lgFloorH), 0.0, lgSize.z - 1.0);
+        vec2 lpc = (vLgP.xz + lpn.xz * 0.3 - lgGrid.xy) / lgGrid.z;
+        lpc.y = clamp(lpc.y, 0.5, lgSize.y - 0.5) + lpf * lgSize.y;
+        vec4 lpp = texture2D(lgPaint, vec2(lpc.x / lgSize.x, lpc.y / (lgSize.y * lgSize.z)));
+        if (lpp.a > 0.25) {
+          diffuseColor.rgb *= lpp.rgb * 2.0;
+          if (lpp.a > 0.75) diffuseColor.rgb *= 1.0 - 0.07 * step(0.5, fract((abs(lpn.x) > 0.5 ? vLgP.z : vLgP.x) / 0.36));
+        }
+      }
+    }
+    #endif`;
   const FS_BODY = `
     if (lgGrid.w > 0.5) {
       vec3 lgn = normalize(vLgN);
@@ -66,7 +89,7 @@ G.LightGrid = (() => {
     if (!shader.fragmentShader.includes('#include <lights_fragment_end>') || !shader.vertexShader.includes('#include <worldpos_vertex>')) return;
     Object.assign(shader.uniforms, U);
     shader.vertexShader = VS_HEAD + shader.vertexShader.replace('#include <worldpos_vertex>', '#include <worldpos_vertex>' + VS_BODY);
-    shader.fragmentShader = FS_HEAD + shader.fragmentShader.replace('#include <lights_fragment_end>', FS_BODY);
+    shader.fragmentShader = FS_HEAD + shader.fragmentShader.replace('#include <color_fragment>', FS_PAINT).replace('#include <lights_fragment_end>', FS_BODY);
   }
   for (const C of [T.MeshStandardMaterial, T.MeshLambertMaterial, T.MeshPhongMaterial]) C.prototype.onBeforeCompile = patch;
   // and anything can be shaded from a weapon light (js/render.js), not only what's been told to
@@ -242,6 +265,7 @@ G.LightGrid = (() => {
     doors.forEach((d, i) => setDoor(i, d.open ? 1 : 0));
     flush();
     U.lgLight.value = G0.tl; U.lgDir.value = G0.td;
+    U.lgPaint.value = G.Homes.paint(map) || blank;
     U.lgGrid.value.set(0, 0, TS, 0);
     // a floor's layer: from just under its floor (the slab's edge round a drop) to just over its ceiling. (Not
     // higher: the top of a room's walls and its ceiling took the light of the floor above, and flickered with it.)
@@ -277,7 +301,7 @@ G.LightGrid = (() => {
     G0.tl.needsUpdate = G0.td.needsUpdate = true;
   }
   function dispose() {
-    for (const k of ['lgLight', 'lgDir']) if (U[k].value !== blank) { U[k].value.dispose(); U[k].value = blank; }
+    for (const k of ['lgLight', 'lgDir', 'lgPaint']) if (U[k].value !== blank) { U[k].value.dispose(); U[k].value = blank; }
     G0 = null; built = false;
   }
   // on while the level's drawn (G.R.render), off for anything else drawn with the same materials

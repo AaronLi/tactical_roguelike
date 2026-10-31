@@ -1,7 +1,7 @@
 'use strict';
 // Item icons for the inventory and the shop: little drawings made on a canvas, cached as images.
 // G.Icons.of(item, w, h, rot) -> data URL for an item shown w x h cells (rot: shown turned, so the drawing is
-// turned with it). Magazines look like the gun's (curved rifle, straight pistol, drum, belt box, speedloader,
+// turned with it). Magazines look like the gun's (curved rifle, straight pistol, drum, belt box,
 // en-bloc clip), ammo boxes carry their caliber and a stripe in the ammo type's colour, and gear is drawn by
 // kind (a soft vest, a plate carrier with its pouches, a chest rig, a plate, a helmet, a belt, a backpack).
 // Guns are the weapon's own 3D model (as built, parts and all), rendered side-on once and kept.
@@ -23,9 +23,8 @@ G.Icons = (() => {
 
   // ---------------------------------------------------------------- magazines
   function magStyle(def) {
-    const plat = G.Gunsmith.PLATFORMS[def.id], cal = G.calOf(def);
+    const cal = G.calOf(def);
     if (G.beltFed(def)) return 'box';
-    if (plat && plat.arch === 'revolver') return 'loader';
     if (def.enbloc) return 'clip';
     if (def.id === 'p90') return 'p90';
     if (def.id === 'thompson' || def.id === 'ppsh') return 'drum';
@@ -38,7 +37,7 @@ G.Icons = (() => {
   const fillOf = (it) => (it.cap ? G.U.clamp(it.n / it.cap, 0, 1) : it.n > 0 ? 1 : 0);
   const slotsOf = (it, k) => (it.n > 0 ? Math.max(1, Math.round(fillOf(it) * k)) : 0);
   // Every container is drawn as full as it is: a box magazine's rounds from the feed lips down, then the
-  // follower and the spring; a drum's round its ring; a belt box's belt; a speedloader's or clip's rounds.
+  // follower and the spring; a drum's round its ring; a belt box's belt; a clip's rounds.
   function drawMag(g, W, H, it) {
     const def = G.WEAPONS[it.wid] || {}, full = it.n > 0, am = TYPE_COL[it.am] || TYPE_COL.ball, frac = fillOf(it);
     // the variant's own shape: a drum for a drum, a box for a stick magazine on a drum gun
@@ -52,12 +51,6 @@ G.Icons = (() => {
       g.fillStyle = '#3a4229'; g.fillRect(W * 0.3, H * 0.15, W * 0.4, H * 0.12);
       for (let i = 0, k = slotsOf(it, 6); i < k; i++) round(g, W * 0.18 + i * W * 0.11, H * 0.06, W * 0.07, H * 0.22, '#b87333', am);
       g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(W * 0.16, H * 0.29, W * 0.68 * (1 - frac), H * 0.05); // (the can's level: what's gone)
-      return;
-    }
-    if (st === 'loader') { // six rounds in a ring
-      g.fillStyle = '#1c1c1e'; g.beginPath(); g.arc(W / 2, H / 2, W * 0.36, 0, 7); g.fill();
-      for (let i = 0, k = slotsOf(it, 6); i < 6; i++) { const a = i / 6 * Math.PI * 2 - Math.PI / 2; g.fillStyle = i < k ? am : '#555'; g.beginPath(); g.arc(W / 2 + Math.cos(a) * W * 0.2, H / 2 + Math.sin(a) * W * 0.2, W * 0.08, 0, 7); g.fill(); g.fillStyle = 'rgba(0,0,0,0.4)'; g.beginPath(); g.arc(W / 2 + Math.cos(a) * W * 0.2, H / 2 + Math.sin(a) * W * 0.2, W * 0.03, 0, 7); g.fill(); }
-      g.fillStyle = '#8a8f94'; g.beginPath(); g.arc(W / 2, H / 2, W * 0.07, 0, 7); g.fill();
       return;
     }
     if (st === 'clip') { // an en-bloc clip of rounds
@@ -452,7 +445,7 @@ G.Icons = (() => {
   }
   const GW = 'rgba(255,255,255,0.95)', GD = 'rgba(255,255,255,0.14)';
   function gauge(kind, n, cap, W, H) {
-    const frac = cap ? G.U.clamp(n / cap, 0, 1) : n > 0 ? 1 : 0, q = kind === 'tube' || kind === 'loader' || kind === 'clip' ? n : Math.round(frac * 40);
+    const frac = cap ? G.U.clamp(n / cap, 0, 1) : n > 0 ? 1 : 0, q = kind === 'tube' || kind === 'clip' ? n : Math.round(frac * 40);
     const key = ['gauge', kind, q, cap, W, H].join('|');
     let url = cache.get(key);
     if (url) return url;
@@ -474,10 +467,6 @@ G.Icons = (() => {
         rr(g, x, y, cw * 0.72, ch * 0.88, Math.min(4, cw * 0.2));
         if (i < n) { g.fillStyle = GW; g.fill(); } else { g.fillStyle = GD; g.fill(); g.stroke(); }
       }
-    } else if (kind === 'loader') { // a cylinder: six chambers, the loaded ones solid
-      const cx = W / 2, cy = H / 2, R = Math.min(W, H) * 0.44;
-      g.beginPath(); g.arc(cx, cy, R, 0, 7); g.stroke();
-      for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 - Math.PI / 2; g.beginPath(); g.arc(cx + Math.cos(a) * R * 0.55, cy + Math.sin(a) * R * 0.55, R * 0.22, 0, 7); g.fillStyle = i < Math.round(frac * 6) ? GW : GD; g.fill(); if (!(i < Math.round(frac * 6))) g.stroke(); }
     } else if (kind === 'box' || kind === 'p90') { // a can (or the P90's top magazine), filled from the bottom
       rr(g, lw, H * 0.12, W - lw * 2, H * 0.84, 5); fillBelow(H * 0.12 + 2 + (H * 0.84 - 4) * (1 - frac));
       g.fillStyle = GW; g.fillRect(W * 0.3, 1, W * 0.4, H * 0.08);

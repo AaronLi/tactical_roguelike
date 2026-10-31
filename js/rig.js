@@ -540,7 +540,8 @@ G.Rig = (() => {
     rig.proneS = (rig.proneS || 0) + ((p.prone && !posed && p.state !== 'down' ? 1 : 0) - (rig.proneS || 0)) * Math.min(1, dt * 4);
     const lie = Math.max(rig.proneW, rig.proneS);
     if (rig.proneS > 0.001) { root.position.x += Math.sin(p.yaw) * 1.45 * s * rig.proneS; root.position.z += Math.cos(p.yaw) * 1.45 * s * rig.proneS; }
-    rig.crouchW += ((p.crouch || posed ? 1 - lie : 0) - rig.crouchW) * Math.min(1, dt * 9);
+    const crouchTo = p.crouch || posed ? 1 - lie : 0;
+    rig.crouchW += (crouchTo - rig.crouchW) * Math.min(1, dt * (crouchTo < rig.crouchW && p.rise || 9)); // (rise: a suspect comes up out of cover slower than they duck)
     rig.downW += ((p.state === 'down' ? 1 : 0) - rig.downW) * Math.min(1, dt * 5);
     rig.aimW += ((p.alert && !posed && !rig.slung ? 1 : 0) - rig.aimW) * Math.min(1, dt * 6);
     rig.lean += ((p.lean || 0) - rig.lean) * Math.min(1, dt * 8);
@@ -603,7 +604,8 @@ G.Rig = (() => {
       }
       if (p.act && p.act.kind === 'kick' && side > 0) { const k = G.U.kickFoot(p.act.t); fx = 0.1; fy = k.y; fz = k.z; } // right leg kicks
       const target = rig.body.localToWorld(_c.set(fx, fy, fz)).clone();
-      const pole = legPole || rig.body.localToWorld(_d.set(fx, 0.6, -1.2)).clone();
+      const pole = rig.body.localToWorld(_d.set(fx, 0.6, -1.2)).clone();
+      if (legPole) pole.lerp(legPole, U.smooth(0.3, 0.9, rig.proneS)); // (the knees turn out once the body's most of the way down, not as it starts)
       ik(leg.th, leg.sh, THIGH * s, SHIN * s, target, pole);
     }
 

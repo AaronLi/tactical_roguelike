@@ -351,7 +351,7 @@ G.HUD = {
     // the magazines (or boxes of rounds) you carry for it with something in them: one small white icon each, no count
     const spare = Gr.feeds(Me, def).length, isMag = af.kind === 'mag';
     const sk = isMag ? G.Icons.styleFor(def, def.build && def.build.mag) : 'box', [iw, ih] = !isMag || sk === 'box' ? [16, 13] : sk === 'drum' ? [16, 16] : sk === 'p90' ? [22, 9] : [9, sk === 'pistol' ? 16 : 20];
-    const icon = G.Icons.gauge(sk === 'tube' || sk === 'loader' ? 'box' : sk, 1, 1, iw, ih), shown = Math.min(spare, 12);
+    const icon = G.Icons.gauge(sk === 'tube' ? 'box' : sk, 1, 1, iw, ih), shown = Math.min(spare, 12);
     this.set('ammoRes', ` <span class="spare" title="${isMag ? 'Loaded magazines' : 'Boxes of rounds'} on you">${Array.from({ length: shown }, () => `<img src="${icon}" style="width:${iw}px;height:${ih}px">`).join('')}${spare > shown ? '<i>+</i>' : ''}${spare ? '' : '<i class="none">none</i>'}</span>` + (am ? ` <small class="amtag">${am.tag}</small>` : ''));
     const other = Me.weapons[Me.slot === 'p' ? 's' : 'p'];
     const packed = G.Gear.packGuns(Me).map(([it]) => it.w.def.name);
@@ -502,7 +502,7 @@ G.HUD = {
       g.fillStyle = '#e04040'; g.fillRect(c.x * S - 3, c.z * S - 1, 6, 2); g.fillRect(c.x * S - 1, c.z * S - 3, 2, 6);
     });
     // the weapon case
-    if (map.case && (G.Game.wcase || !G.Game.caseOpen)) { g.fillStyle = '#4fa3ff'; g.fillRect(map.case.x * S - 3, map.case.z * S - 2, 6, 4); }
+    if (map.case && !G.Game.caseOpen) { g.fillStyle = '#4fa3ff'; g.fillRect(map.case.x * S - 3, map.case.z * S - 2, 6, 4); }
     if (map.sbox && G.Game.sbox && G.Game.sbox[0] && !G.Game.sbox[1]) { g.fillStyle = '#ff4fa0'; g.fillRect(map.sbox.x * S - 2, map.sbox.z * S - 2, 4, 4); } // (the sticker box, till someone's opened it)
     if (map.abox && G.Game.abox && !(G.Game.aboxMine() || [])[1]) { g.fillStyle = '#e0a020'; g.fillRect(map.abox.x * S - 2, map.abox.z * S - 2, 4, 4); } // (the attachments box, till you've had your pick)
     // enemies: recent gunfire pings

@@ -10,7 +10,7 @@ self.document = {
   addEventListener() {},
 };
 importScripts('https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js');
-importScripts(...['util', 'data', 'callsigns', 'parts', 'gear', 'medical', 'materials', 'ballistics', 'damage', 'level', 'world', 'furniture', 'lightgrid', 'render',
+importScripts(...['util', 'data', 'callsigns', 'parts', 'gear', 'medical', 'materials', 'ballistics', 'damage', 'level', 'world', 'furniture', 'homes', 'lightgrid', 'render',
   'stickers', 'gunmodels', 'vmanim', 'headgear', 'rig', 'scars', 'highlights'].map((f) => f + '.js'));
 // (the game the replay borrows from: the map the bodies fall on, and nobody's id)
 G.Game = { map: null, phase: 'level' };
