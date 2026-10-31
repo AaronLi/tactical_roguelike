@@ -2,14 +2,16 @@
 // Who lives in the apartments (docs/apartment-personas/). The block's layout knows nothing of them: its walls, doors,
 // lofts and stairs, its rooms' types and everything planned on them come first (js/level.js layApartments, plan, finish).
 // Then, floor by floor, fill() goes through the homes and now and then one gets a resident, from the level's seed alone
-// (start()), and that resident's rooms are done over to suit whatever size and shape they turned out:
-//   the room's own furniture comes out, and what's on its list goes in against walls that are really free, one piece
-//   at a time, biggest say first, each kept clear of doors, windows, the weapon case and the like, and each only if every
-//   cell that could be walked to still can be. What doesn't fit is swapped for what's next on its list, or left out.
+// (start()), and that resident's whole home is done over to suit whatever size and shape it turned out, or none of it is:
+//   cast() says which room is which (a room the home can spare can become what's missing). In each, the furniture comes out,
+//   and what's on its list goes in against walls that are really free, one piece at a time, the main ones first, each kept
+//   clear of doors, windows, the weapon case and the like, and each only if every cell that could be walked to still can
+//   be. What doesn't fit is swapped for what's next on its list, or left out. A room that isn't there (a bathroom) is cut
+//   from a corner of one that is. The rest of the home is painted and floored to match, its furniture left in it.
 //   rm.dress holds what's left to draw: the wall, ceiling, trim and floor colours and what hangs on the walls. Walls:
 //   js/lightgrid.js (from paint()); ceilings: js/level.js buildMesh; floor, trim, hung things: js/furniture.js dressRoom.
 // All of it's on its own random streams and comes after everything else, so a home that gets a resident changes nothing
-// outside the rooms it redoes.
+// outside itself.
 //
 // RESIDENTS is the data: adding a resident is adding an entry (and any new pieces, below, and their js/materials.js PROPS).
 //   home: 'flat' a single-floor home, 'loft' a home with a loft
@@ -385,12 +387,13 @@ G.Homes = (() => {
   // whatever's left painted and floored to match with its furniture left in it.
   function dressHome(map, who, plan, seed) {
     const home = { who, seed, taken: new Set(), off: new Set(), bath: null }, done = [], bathSpec = Object.values(who.rooms).find((s) => s.carve);
-    const host = bathSpec && bathSpec.carve.from.map((ty) => plan.find((e) => e[2] === ty)).find(Boolean);
-    for (const e of plan) {
-      const [rm, spec, ty] = e;
+    // (the rooms a carved room can come out of first, in the order it'd rather: before their own furniture goes in)
+    const from = bathSpec ? bathSpec.carve.from : [], rank = (e) => { const i = from.indexOf(e[2]); return i < 0 ? from.length : i; };
+    for (const e of plan.slice().sort((a, b) => rank(a) - rank(b))) {
+      const [rm, spec, ty] = e, host = from.includes(ty) && !home.bath;
       done.push(rm);
-      const ok = dress(map, rm, spec, ty, home, e === host ? bathSpec.carve : null);
-      if (e === host && home.bath) { done.push(home.bath); dress(map, home.bath, bathSpec, 'bathroom', home); }
+      const ok = dress(map, rm, spec, ty, home, host ? bathSpec.carve : null);
+      if (host && home.bath) { done.push(home.bath); dress(map, home.bath, bathSpec, 'bathroom', home); }
       if (!ok) { for (const q of done.reverse()) if (q.dress) undress(map, q); return false; }
     }
     for (const rm of plan.rest) if (who.rest) { rm.dress = Object.assign({}, who.rest, { who: who.id, type0: rm.type, cells: cellsOf(map, rm, home), hung: [], was: new Map(), gone: [], own: [] }); }
@@ -606,6 +609,9 @@ G.Homes = (() => {
       for (const b of boxes) under(b, (cx, cz) => { tight[cz * W + cx] = 4; return true; });
       const p = { name: o.piece, q, x, z, v, style: o.style || {}, boxes, own: true };
       L.layProp(map, p, rec.small ? 0 : rec.cover ? 2 : 4);
+      // (every cell it touches, not only those whose middle it covers: these stand out along the walls, not tucked in a
+      // corner, and a path through a cell a nightstand's half in walks suspects into it)
+      for (const b of boxes) under(b, (cx, cz) => { const i = cz * W + cx; if (t[i] === 0) t[i] = rec.cover ? 2 : 4; return true; });
       own.push(p); placed.push({ id: item.id, at: item.at, side, x, z, boxes });
       return true;
     };

@@ -44,6 +44,8 @@ G.Materials = (() => {
     bone: m('bone', 14, 1900, 1.6e8, 'soft', { mu: 0.2, e: 0.15 }),
     // metals
     mild: m('mild steel', 120, 7850, 1.2e9, 'metal', { E: { lead: 1, mild: 0.85, hard: 1.4, wc: 1.6 }, mu: 0.12, e: 0.22 }),
+    // (sheet, 1.5 mm and under: it tears and gives where plate has to be punched. Set so a 9 mm ball goes through about nine layers of 0.6 mm, in the 7 to 11 it does in tests)
+    sheet: m('sheet steel', 55, 7850, 4e8, 'metal', { E: { lead: 1, mild: 0.85, hard: 1.4, wc: 1.6 }, mu: 0.12, e: 0.22 }),
     iron: m('cast iron', 150, 7200, 1.6e9, 'metal', { mu: 0.12, e: 0.2 }),
     alu: m('aluminium', 62, 2700, 4e8, 'metal', { mu: 0.2, e: 0.15 }),
     // masonry
@@ -110,33 +112,41 @@ G.Materials = (() => {
   // walls by environment: indoors, and those with the outside on one side
   const WALLS = {
     Apartment: [PLASTER, C([['gypsum', 13], ['brick', 102]])],
-    Warehouse: [C([['cmu', 32]]), C([['mild', 0.8]], 'wool', 0.2)],
+    Warehouse: [C([['cmu', 32]]), C([['sheet', 0.8]], 'wool', 0.2)],
     Bunker: [SOLID('concrete'), SOLID('concrete')],
     Suburbs: [PLASTER, C([['pine', 16], ['gypsum', 13]], 'wool', 0.15, STUD)],
     'Research Lab': [C([['gypsum', 13], ['gypsum', 13]], 'wool', 0.1, STEELSTUD), C([['concrete', 150]])],
     Foundry: [C([['brick', 215]]), C([['brick', 215]])],
-    'Cold Storage': [C([['mild', 0.7]], 'pur'), C([['mild', 0.7]], 'pur')],
+    'Cold Storage': [C([['sheet', 0.7]], 'pur'), C([['sheet', 0.7]], 'pur')],
     'Convenience Store': [PLASTER, C([['cmu', 32]], 'wool', 0.1)],
     Festival: [C([['ply', 12]], null, 1, STUD), C([['ply', 12]], null, 1, STUD)],
     Hangar: [SOLID('concrete'), SOLID('concrete')],
   };
   // floors and ceilings by environment: [the ground's, between storeys]
   const SLAB = SOLID('concrete'), JOISTS = C([['ply', 18], ['gypsum', 13]], 'wool', 0.1);
-  const DECK = { Apartment: SLAB, Suburbs: JOISTS, Festival: C([['ply', 18]]), 'Cold Storage': C([['mild', 0.7]], 'pur'), Warehouse: C([['mild', 1.5]], 'wool', 0.1) };
+  const DECK = { Apartment: SLAB, Suburbs: JOISTS, Festival: C([['ply', 18]]), 'Cold Storage': C([['sheet', 0.7]], 'pur'), Warehouse: C([['sheet', 1.5]], 'wool', 0.1) };
   // furniture, by the piece (js/furniture.js)
-  const CAB = C([['mdf', 18]]), SHEET = (mm, core = null, fill = 1) => C([['mild', mm]], core, fill), MACHINE = C([['mild', 12]], 'iron', 0.35);
+  const CAB = C([['mdf', 18]]), SHEET = (mm, core = null, fill = 1) => C([[mm <= 1.5 ? 'sheet' : 'mild', mm]], core, fill), MACHINE = C([['mild', 12]], 'iron', 0.35);
   const PROPS = {
     sofa: C([['fabric', 8]], 'foam'), armchairs: C([['fabric', 8]], 'foam'), bed: C([['fabric', 6]], 'foam'), tv: C([['hdpe', 3]], 'mdf', 0.05),
     bookshelf: C([['mdf', 18]], 'paper', 0.55), counter: C([['mdf', 18]], 'goods', 0.15), island: C([['mdf', 18]], 'goods', 0.15), dining: ONE([['hardwood', 28]]), dresser: CAB, wardrobe: CAB, desk: ONE([['mdf', 25]]),
     deskpair: ONE([['mdf', 25]]), files: SHEET(0.9, 'paper', 0.4), lockers: SHEET(0.8), fridge: SHEET(0.7, 'pur', 0.5), icechest: SHEET(0.8, 'pur'), cooler: C([['hdpe', 4]], 'pur'), atm: SHEET(6, 'mild', 0.03), register: C([['mdf', 18]], 'goods', 0.1),
-    rack: SHEET(2, 'goods', 0.3), gondola: SHEET(0.9, 'goods', 0.25), aisle: SHEET(0.9, 'goods', 0.25), shopwall: SHEET(0.9, 'goods', 0.25), endcap: SHEET(0.9, 'goods', 0.25), tobacco: C([['mdf', 15]], 'goods', 0.4), palletrack: SHEET(3, 'goods', 0.35),
+    rack: SHEET(2, 'goods', 0.3), gondola: SHEET(0.6, 'goods', 0.01), aisle: SHEET(0.6, 'goods', 0.01), shopwall: SHEET(0.6, 'goods', 0.01), endcap: SHEET(0.6, 'goods', 0.25), tobacco: C([['mdf', 15]], 'goods', 0.4), palletrack: SHEET(3, 'goods', 0.35),
     crates: C([['pine', 20]], 'goods', 0.5), pallet: C([['card', 5]], 'goods', 0.6), cardboard: C([['card', 5]]), plant: C([['hdpe', 3]], 'soil', 0.6), planter: C([['hdpe', 5]], 'soil', 0.8), lamp: SHEET(1), sidetable: CAB, bin: C([['hdpe', 3]], 'goods', 0.3),
     fence: ONE([['pine', 18]]), hoarding: ONE([['ply', 12]]), hedge: SOLID('foliage'), shed: C([['pine', 16]], 'goods', 0.05), bbq: SHEET(2), patio: ONE([['pine', 28]]), seats: ONE([['hdpe', 5]]), stagedeck: C([['ply', 18]], 'pine', 0.1), speaker: C([['ply', 18]], 'wool'), foh: C([['ply', 12]], 'goods', 0.2),
     picnic: ONE([['pine', 38]]), bench: ONE([['pine', 38]]), booth: C([['ply', 12]]), stall: C([['ply', 12]]), sinks: C([['ceram', 8]], 'goods', 0.05), toilet: C([['ceram', 8]], 'water', 0.2), car: SHEET(0.9, 'iron', 0.05), police: SHEET(0.9, 'iron', 0.05), tree: SOLID('hardwood'), fountain: C([['concrete', 100]], 'water'),
     furnace: C([['mild', 12], ['brick', 110]], 'brick', 0.6), vat: C([['mild', 15]], 'iron', 0.5), moulds: C([['sand', 200]], 'sand'), panel: SHEET(1.5, 'mild', 0.02), scrap: C([['mild', 5]], 'mild', 0.25), conveyor: SHEET(4, 'rubber', 0.1), mill: MACHINE, saw: MACHINE, press: MACHINE, quench: SHEET(10, 'water'),
     couch: C([['fabric', 8]], 'foam'), easy: C([['fabric', 8]], 'foam'), crt: C([['hdpe', 3]], 'mdf', 0.05), china: C([['hardwood', 16]], 'ceram', 0.06), treadle: C([['hardwood', 19]], 'iron', 0.08), tallplant: C([['hdpe', 3]], 'soil', 0.6), guides: SOLID('paper'), cuptable: CAB,
     canisters: C([['mdf', 18]], 'goods', 0.15), almond: SHEET(0.7, 'pur', 0.5), lacetable: ONE([['hardwood', 28]]), shrine: CAB, halfbed: C([['fabric', 6]], 'foam'), nightstand: CAB, photodresser: CAB,
-    forklift: SHEET(4, 'iron', 0.2), billets: SOLID('mild'), ingots: SOLID('alu'), coils: C([['mild', 20]], 'mild', 0.6), console: C([['mild', 1.5]], 'goods', 0.1),
+    forklift: SHEET(4, 'iron', 0.2), billets: SOLID('mild'), ingots: SOLID('alu'), coils: C([['mild', 20]], 'mild', 0.6), console: C([['sheet', 1.5]], 'goods', 0.1),
+  };
+  // what shelving's parts are made of, one by one (a ray box of an open piece: js/furniture.js)
+  const PARTS = {
+    post: C([['sheet', 1.5]]), deck: ONE([['mild', 2]]), // light racking: a box-section post, a steel shelf
+    upright: C([['mild', 2]]), beam: C([['mild', 1.8]]), skid: C([['pine', 20]]), // pallet racking: a roll-formed upright and beam, a pallet's boards
+    plinth: C([['sheet', 0.6]]), peg: ONE([['sheet', 0.6]]), shelf: ONE([['sheet', 0.6]]), // shop shelving: a kick plate, a perforated back and a shelf, thin sheet
+    carton: C([['card', 3]], 'goods', 0.6), wrapped: C([['hdpe', 0.3], ['card', 3]], 'goods', 0.7), drum: C([['sheet', 1]], 'water', 0.9), // the load
+    stock: C([['card', 0.1]], 'goods', 0.01), // a shelf's run of packets, tins and bottles: mostly air, next to nothing to a round (a look it still stops)
   };
   const CRATE = PROPS.crates, RAIL = ONE([['mild', 3]]), GRATE = ONE([['mild', 4]]); // (a bar of it: what a round has to get through is js/world.js barHit's)
   // the same construction with only what's needed changed: a void wall's stud, say
@@ -162,7 +172,7 @@ G.Materials = (() => {
         const d = s.door || {};
         if (d.kind === 'vault') return C([['mild', 25]], 'mild', 0.04);
         if (s.glass != null) return ONE([['glass', 8]]);
-        return theme.name === 'Bunker' || theme.name === 'Foundry' || theme.name === 'Warehouse' ? C([['mild', 1.5]], 'wool', 0.5) : theme.name === 'Cold Storage' || theme.name === 'Research Lab' ? C([['mild', 1]], 'pur') : C([['hardwood', 4]]); // (hollow-core timber, or a steel fire door)
+        return theme.name === 'Bunker' || theme.name === 'Foundry' || theme.name === 'Warehouse' ? C([['sheet', 1.5]], 'wool', 0.5) : theme.name === 'Cold Storage' || theme.name === 'Research Lab' ? C([['sheet', 1]], 'pur') : C([['hardwood', 4]]); // (hollow-core timber, or a steel fire door)
       }
       case 'glass': return s.win && s.win.armor ? ONE([['bpglass', 40]]) : ONE([['glass', 5]]);
       case 'rail': return RAIL;
@@ -174,5 +184,5 @@ G.Materials = (() => {
         return theme.hub ? SOLID('concrete') : CRATE;
     }
   }
-  return { MAT, TISSUE, CORE_E, PROPS, WALLS, of, outAt, built };
+  return { MAT, TISSUE, CORE_E, PROPS, PARTS, WALLS, of, outAt, built };
 })();

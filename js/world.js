@@ -316,7 +316,7 @@ G.World = (() => {
       if (seen.has(p)) continue;
       seen.add(p);
       for (const b of p.boxes) {
-        if (b.ray) { add(w, fromB(b, { kind: 'prop', prop: p, ray: false })); for (const q of b.ray) add(w, fromB(q, { kind: 'prop', prop: p, move: false })); }
+        if (b.ray) { add(w, fromB(b, { kind: 'prop', prop: p, ray: false })); for (const q of b.ray) add(w, fromB(q, Object.assign({ kind: 'prop', prop: p, move: false }, q.m ? { mat: G.Materials.PARTS[q.m] } : null))); }
         else add(w, fromB(b, { kind: 'prop', prop: p }));
       }
     }

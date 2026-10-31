@@ -29,6 +29,7 @@ G.Damage = (() => {
   };
   const rngOf = (s) => () => { s = (Math.imul(s, 1597334677) + 12345) | 0; return ((s ^ (s >>> 15)) >>> 0) / 4294967296; };
   const seedOf = (a) => (Math.round(a[0] * 997) * 31 + Math.round(a[1] * 991) * 17 + Math.round(a[2] * 983)) | 0;
+  HOLE.sheet = HOLE.mild;
   const radius = (m, J, cal) => { const h = HOLE[m]; return h ? h.r * G.U.clamp(Math.sqrt((J || 800) / 800), 0.7, 1.35) * G.U.clamp((cal || 8) / 8, 0.8, 1.3) : 0; };
   // a hole's outline: how far out it is at each of N angles (m), rough all round, with spikes that run out of it (cracks, splinters),
   // long up the grain

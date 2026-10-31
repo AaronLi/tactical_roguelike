@@ -317,26 +317,36 @@ says the same), but not whose: the shooter's name isn't shown.
       counts once an officer has been inside it and no free, armed suspect is left in it, so an empty one
       still has to be checked.
     - **Residents:** some homes belong to someone (`js/homes.js`, from `docs/apartment-personas/`; so far Harold
-      Pruitt's living room). The block is generated first, knowing nothing of them, walls, doors, furniture,
-      windows and all. Then, from the level's seed alone, each home in turn may turn out to be a resident's
-      (Harold: 8% of each single-floor home, at most once a level, so he's in about 57% of
-      Apartment levels), and the room's done over to suit what it turned out to be:
+      Pruitt's flat). The block is generated first, knowing nothing of them, walls, doors, furniture, windows
+      and all. Then, from the level's seed alone, each home in turn may turn out to be a resident's (Harold: 8%
+      of each single-floor home with four rooms or more, at most once a level, so he's in about 58% of Apartment
+      levels), and the whole home's done over to suit what it turned out to be, or none of it is:
       - **Who fits where:** a resident needs a kind of home (a flat or a loft) and the rooms they list. A room
-        type they don't list stays as the level made it.
-      - **The room:** its own furniture comes out and the resident's list goes in, piece by piece: by rule
-        (the longest free wall, facing the sofa, beside his chair, in a corner), kept off doors and where they
-        swing, off the weapon case, attachments box and first aid cabinets and the way to them, and tall things
-        off windows. A piece goes in only if every cell you could walk to still can be walked to with room to
-        spare. What doesn't fit is swapped for what's next on its list, or left out: a 4.7 m room has his
-        chair, the sofa, the television and the wall things; a big one has it all, the sofa stood out from the
-        wall. Everything spot-like in the room (cover, suspects' starts) is worked out again from what's there.
+        they mark `spare` needn't be there: one the home can spare becomes it (Harold's fourth room, an office
+        or a second bedroom, becomes his dining room). No walls move. Any room over stays what it was, with its
+        furniture, painted and floored to match, and so does any strip of floor off the side of a room.
+      - **The rooms:** each one's furniture comes out and the resident's list goes in, piece by piece: by rule
+        (the longest free wall, facing the sofa, beside the bed, in a corner, out on the floor), kept off
+        doors and where they swing, off the weapon case, attachments box and first aid cabinets and the way to
+        them, and tall things off windows. A piece goes in only if every cell you could walk to still can be
+        walked to with room to spare, and every cell it touches is blocked, so nobody's path runs into it. What
+        doesn't fit is swapped for what's next on its list, or left out. A room's main piece (`must`: the bed, the
+        counter, the table) may come as close to a door as the doorway itself rather than be left out. The
+        rest of the room is worked out again from what's there (cover, suspects' starts).
+      - **A carved room:** the bathroom isn't in the layout, so it's cut from a corner of a room on the list
+        (the bedroom, else the dining room, else the kitchen): a one-cell wall round its open sides, a door, a
+        lamp and a room record, on the fine grid, before the walls and solids are built, so peers all get it. It
+        keeps off doors, windows and the case, and it's only cut if everything round it stays reachable. If
+        no corner will take it the home goes without. It's the only thing a resident does to walls.
       - **Colours:** a wall cell is one box with a room on each side, so walls take their colour in the shader,
         each face from the floor plan just off it (`G.LightGrid`, a texture a level with a resident has one of):
         the next room keeps its own, it costs no draw calls, and bullet holes show as they do anywhere. Ceilings
-        are a tint on their cells, floors the room's own texture, its skirting the resident's trim.
-      - **Everything else stays put:** it's all on random streams of its own, and the room as it would have
+        are a tint on their cells, floors the room's own texture (carpet, tile, and now mustard check lino and
+        herringbone parquet, each with the sound of its `sound`), its skirting the resident's trim. Door jambs
+        keep the theme's colour.
+      - **Everything else stays put:** it's all on random streams of its own, and each room as it would have
         been is still built, into nothing, so the stream the rest of the block's looks are drawn from is the
-        same. Outside the room the level's triangle for triangle the same as with nobody home.
+        same. Outside the home the level's triangle for triangle the same as with nobody home.
   - **Warehouse.** You start on the loading dock outside, among pallets and crates, fenced at the sides.
     Two roller doors (rolled up: wide openings under the shutter drum, with guide rails either side) and a door
     between them lead onto the warehouse floor: rows
@@ -1354,7 +1364,8 @@ says the same), but not whose: the shooter's name isn't shown.
   - **Constructions:** a solid in the world is a box, and a wall's box is 67 cm thick, so each has a construction: the
     skin on each face, what's between them, and the framing. A partition is plasterboard either side of a void with a stud
     every 40 cm (hit one and it's 89 mm of pine); apartments have brick outside, warehouses block inside and sheet steel
-    outside, a bunker's walls are concrete all through, cold storage is steel-skinned foam. Every piece of furniture has its
+    outside, a bunker's walls are concrete all through, cold storage is steel-skinned foam. Shelving's parts each have their own (`PARTS`: 0.6 mm steel shelves and pegboard (sheet steel, anything 1.5 mm or under, tears where plate has to be punched: a 9 mm ball goes through about nine layers of 0.6 mm), cartons, a band of
+    shelf stock that stops a look but next to nothing else, a pallet's boards, drums of liquid). Every piece of furniture has its
     own (a fridge is thin steel and foam, a bookshelf mostly paper, a car thin steel with an engine in it). A wall
     much thicker than a partition is a mass of building and stops anything. See `PROPS` and `WALLS`.
   - **Through:** each layer takes speed (√(v² - v_limit²)), more at an angle, and what it took is the energy left in it.
@@ -1597,8 +1608,10 @@ says the same), but not whose: the shooter's name isn't shown.
     both ends) in their optic cut.
   - **Adapters** take a slot and give you one of their own: the pistol optic riser goes on a rifle's rail and
     lifts any pistol red dot to rifle height ("Sight (on the riser)"); a buffer tube adapter (AK, SMG or
-    machine gun) is a bare AR-15 buffer tube that takes any AR stock ("Stock (on the adapter)"). On its own an
-    adapter is as good as nothing in that slot.
+    machine gun) is a bare AR-15 buffer tube that takes any AR stock ("Stock (on the AR-15 buffer tube)"). On its own an
+    adapter is as good as nothing in that slot. They nest: an adapter on an adapter opens the next slot of that kind
+    (`buttstock`, `buttstock2`...), so a P9 takes an SMG stock mount on its lug, a buffer tube adapter on the mount and an AR
+    stock on the tube. What the first slot was to the gun carries up the chain, and the end of it is what meets your shoulder.
   - **Magnified optics are picture-in-picture.** Prisms, combat scopes, LPVOs and rifle scopes show the world
     on their ocular lens, rendered from the lens along the scope's axis. The field of view is the lens's
     apparent size divided by the magnification. Prisms come in 1×, 1.5×, 2× and 3×; the combat scope is 4×.

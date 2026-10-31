@@ -1035,8 +1035,8 @@ G.GunModels = (() => {
     } else if (rcv === 'aksu') {
       // The AKS-74U (the Krinkov), traced from a side photo of the right side (Wikimedia Commons, "AK74andAKS74U.jpg", CC BY-SA 4.0,
       // Sandalov and Kuzmin) at 1.0716 mm a pixel, the scale that gives the AK-74 beside it its 943 mm: 735 mm overall with the
-      // stock out, 490 folded. A stamped AK receiver, 264 mm, under a hinged top cover that carries the rear sight (a hump
-      // with the aperture on it); the trunnion block at the back takes the stock's hinge. The gas tube is under the upper
+      // stock out, 490 folded. A stamped AK receiver, 264 mm, under a hinged top cover that carries the rear sight (a flip
+      // aperture between two guards); the trunnion block at the back takes the stock's hinge. The gas tube is under the upper
       // handguard, so the gas block and the front sight's ears stand right at the end of the wood, the short barrel then the
       // booster out front (the barrel stage, and the muzzle). The pistol grip and trigger guard are the AK's, the grip
       // bakelite; the selector lever sweeps the right side and the ejection port is on the right under the cover.
@@ -1044,7 +1044,7 @@ G.GunModels = (() => {
       k.prof(pts([[258, 352], [262, 344], [284, 336], [504, 336], [504, 394], [400, 395], [262, 394], [258, 388]]), 0.037, rm, 0, null, 0.003);
       k.prof(pts([[262, 346], [266, 341], [272, 339], [278, 333], [284, 329], [398, 327], [440, 325], [486, 323], [504, 324], [504, 342], [262, 342]]), 0.034, rm, 0, null, 0.005);
       k.prof(pts([[254, 358], [262, 344], [284, 334], [284, 394], [254, 394]]), 0.04, rm, 0, null, 0.003);
-      k.box(0.014, 0.012, 0.012, rm, V([484, 0])[0], V([0, 320])[1]); // (the cover's latch at its front)
+      k.box(0.014, 0.005, 0.012, rm, V([484, 0])[0], V([0, 326])[1]); // (the cover's latch at its front: low, under the line of the sights)
       k.tag('grip');
       if (o.gripT !== 'none') k.prof(pts([[271, 388], [270, 440], [262, 470], [261, 482], [264, 491], [278, 497], [300, 497], [303, 488], [304, 470], [309, 458], [313, 440], [319, 420], [327, 410], [329, 396], [326, 388]]), 0.03, o.gm || M.plum(), 0, null, 0.004);
       k.tag('base');
@@ -1409,11 +1409,12 @@ G.GunModels = (() => {
       if (!o.optic || ['irons', 'notch'].includes(o.optic)) sight = Object.assign(own, { relief: 0.14 }); // (the eye well back from the handle's rear leg)
       else { const [ra] = V([1050, 0]), [rb] = V([1783, 0]); sight = sightOf(k, o, S.rail(k, ra, rb - ra, V([0, 692])[1], rm), L, bl, br, front, ofs); }
     } else if (rcv === 'aksu' && (!o.optic || o.optic === 'notch')) {
-      // its own sights: the hump on the cover with the aperture on its back, and the post between the ears out on the gas block
+      // its own sights: a guard each side of the flip aperture on the cover, open between them to the post, itself between
+      // its ears out on the gas block
       const V = akuTrace, sy = 0.0505, fR = V([405, 0])[0], B = M.black();
-      k.prof([V([400, 326]), V([404, 318]), V([410, 312]), V([418, 309]), V([428, 309]), V([432, 314]), V([436, 326])], 0.01, M.gunmetal(), 0, null, 0.001);
-      k.box(0.01, 0.01, 0.006, B, fR - 0.004, sy - 0.004);
-      k.annulus(0.0017, 0.0045, 0.003, B, fR - 0.007, sy);
+      for (const x of [-0.0078, 0.0078]) k.prof([V([400, 327]), V([404, 318]), V([410, 312]), V([418, 309]), V([428, 309]), V([432, 314]), V([436, 327])], 0.0026, M.gunmetal(), x, null, 0.0004);
+      k.box(0.0055, 0.0045, 0.003, B, fR - 0.007, sy - 0.0065); // (the flip's foot, on the cover)
+      k.annulus(0.003, 0.005, 0.002, B, fR - 0.007, sy);
       sight = { sy, fSight: fR - 0.007, relief: 0.17 };
     } else if (rcv === 'g36' && ['irons', 'notch', undefined].includes(o.optic)) sight = S.irons(k, g36Trace([362, 0])[0], g36Trace([632, 0])[0], top + 0.016, top, top, 'ar'); // (low ones at the ends of the handle's rail)
     else if (o.ironsAt && ['irons', 'notch', undefined].includes(o.optic)) sight = S.irons(k, o.ironsAt[0], o.ironsAt[1], top + 0.034, top, o.ironsAt[2] != null ? o.ironsAt[2] : top, 'ar'); // (the upper's own flip-ups: the SCAR's, the front on its gas block)
@@ -1538,7 +1539,7 @@ G.GunModels = (() => {
       k.tag('stock');
       // (an SMG stock mount on the lug, js/parts.js stk.pistol.2: a block, and the SMG stock on its back if there is one)
       const mount = o.stock === 'smgmount' || (o.slotOf && o.slotOf.stock === 'stk.pistol.2');
-      if (mount) { const [lf, ly] = tr ? V(tr.lug) : [-0.006, -0.03]; k.box(0.024, 0.032, 0.03, M.black(), lf - 0.028, ly + 0.004); k.box(0.016, 0.012, 0.006, M.steel(), lf - 0.034, ly + 0.012); }
+      if (mount) { const [lf, ly] = tr ? V(tr.lug) : [-0.006, -0.03]; k.box(0.024, 0.032, 0.046, M.black(), lf - 0.028, ly + 0.004); k.box(0.016, 0.012, 0.006, M.steel(), lf - 0.034, ly + 0.012); }
       if (o.stock !== 'smgmount') {
         const [lf, ly] = tr ? V(tr.lug) : [-0.006, -0.03], sp = mount ? k.part(lf - 0.034, ly + 0.012) : k.part(lf, ly);
         k.into(sp);

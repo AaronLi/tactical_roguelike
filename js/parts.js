@@ -83,9 +83,13 @@ G.Gunsmith = (() => {
   // Adapters: a part in a slot that gives another slot of the same kind on top of it (a buffer tube adapter in
   // the stock slot takes any AR stock; a riser on the rail takes a pistol red dot). slot -> the kind it takes.
   // And the left side rail: a second tactical slot ('tac' is the right side's), beside the first.
+  // Adapters nest: one on another (a buffer tube adapter on an SMG stock mount on a pistol's lug) opens the same kind of
+  // slot again, numbered (buttstock, buttstock2...), as deep as the parts go. kindOf: a slot's kind, whichever one it is.
   const ALIAS = { buttstock: 'stock', riserdot: 'optic', tacL: 'tac' };
+  const kindOf = (sl) => sl.replace(/\d+$/, '');
+  const slotRank = (sl) => ORDER.indexOf(kindOf(sl)) + (parseInt((sl.match(/\d+$/) || [])[0], 10) || 0) * 0.01; // (the display order, each level of a nest after the last)
   // whether part p goes in slot s (its interface, and its kind or the kind the slot takes)
-  const fitsSlot = (s, p, id) => !!(s && p) && (s.mount === p.mount || (p.alsoMounts || []).includes(s.mount)) && (s.slot === p.slot || ALIAS[s.slot] === p.slot) && !(id && p.not && p.not.includes(id)); // (p.not: guns on that mount it still doesn't go on)
+  const fitsSlot = (s, p, id) => !!(s && p) && (s.mount === p.mount || (p.alsoMounts || []).includes(s.mount)) && (s.slot === p.slot || ALIAS[kindOf(s.slot)] === p.slot) && !(id && p.not && p.not.includes(id)); // (p.not: guns on that mount it still doesn't go on)
   // what a part's provides (or chassis) gives a slot: a mount, or the slot itself ({ mount, bare, brace })
   const slotMount = (v) => (typeof v === 'string' ? v : v.mount);
   // display order
@@ -338,6 +342,7 @@ G.Gunsmith = (() => {
   const canon = (m) => JSON.stringify(m || {}, (k, v) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.keys(v).sort().reduce((o, kk) => { if (v[kk] != null) o[kk] = v[kk]; return o; }, {}) : v));
   // Parts missing from a slot cost something (a rifle with no stock is hard to control).
   const EMPTY = { stock: { recoil: 25, ergo: 8 }, buttstock: { recoil: 25, ergo: 8 } }; // (an adapter with nothing on it: no stock)
+  const isAdapter = (p) => !!(p.provides && p.provides.buttstock); // (it holds a stock: it isn't one)
   const GRIP_NAME = { ar: 'A2 pistol grip', wood: 'wooden grip', vertical: 'grip sleeve' };
 
   // ------------------------------------------------------------------ platforms
@@ -675,16 +680,21 @@ G.Gunsmith = (() => {
     const slotOf = (v, sl, parent) => Object.assign({ slot: sl, req: false, parent }, typeof v === 'string' ? { mount: v } : v);
     for (let i = 0; i < out.length; i++) {
       const p = build[out[i].slot] && PARTS[build[out[i].slot]];
-      if (p && p.provides) for (const [sl, v] of Object.entries(p.provides)) if (!out.some((o) => o.slot === sl)) out.push(slotOf(v, sl, out[i].slot));
+      if (p && p.provides) for (const [sl, v] of Object.entries(p.provides)) {
+        // (an adapter on an adapter: the next level up, carrying what its parent's slot was to the gun)
+        if (kindOf(out[i].slot) === sl) { const n = (parseInt((out[i].slot.match(/\d+$/) || [])[0], 10) || 1) + 1, q = out[i]; out.push(Object.assign(slotOf(v, sl + n, q.slot), q.bare ? { bare: true } : null, q.brace ? { brace: q.brace } : null)); continue; }
+        if (!out.some((o) => o.slot === sl)) { const q = out[i], sameKind = ALIAS[sl] === kindOf(q.slot); out.push(Object.assign(slotOf(v, sl, q.slot), sameKind && q.bare ? { bare: true } : null, sameKind && q.brace ? { brace: q.brace } : null)); }
+      }
       // a chassis (a pistol's: js below): its slots, in place of the gun's own of that name (its rail for the slide's
       // optic cut, its side rails for the frame's), or new ones
       if (p && p.chassis) for (const [sl, v] of Object.entries(p.chassis)) { const j = out.findIndex((o) => o.slot === sl), s = slotOf(v, sl, out[i].slot); if (j >= 0) out[j] = s; else out.push(s); }
     }
-    out.sort((a, b) => ORDER.indexOf(a.slot) - ORDER.indexOf(b.slot));
+    out.sort((a, b) => slotRank(a.slot) - slotRank(b.slot));
     return out;
   }
-  // a slot's name as shown: the right rail says so where there's a left one (a long gun's side rail; a pistol's is under it)
-  const slotLabel = (s) => (s.slot === 'tac' && s.mount === 'tac' ? 'Tactical (right)' : SLOT_LABEL[s.slot]);
+  // a slot's name as shown: the right rail says so where there's a left one (a long gun's side rail; a pistol's is under
+  // it), a stock on an adapter what it's on
+  const slotLabel = (s) => (s.slot === 'tac' && s.mount === 'tac' ? 'Tactical (right)' : kindOf(s.slot) === 'buttstock' ? `Stock (on the ${ifaceName(s.mount).replace(/^[A-Z][a-z]/, (c) => c.toLowerCase())})` : SLOT_LABEL[kindOf(s.slot)]);
   // where a part goes on this build: a slot it fits, an empty one first (a light with the right rail taken: the left)
   function slotFor(id, build, p) {
     const c = slotsOf(id, build).filter((s) => fitsSlot(s, p, id));
@@ -716,15 +726,19 @@ G.Gunsmith = (() => {
   function decode(code) {
     const [id, rest] = String(code).split('/');
     if (rest === undefined) return { id, build: defaultBuild(id) };
-    const build = {};
+    const build = {}, left = [];
     for (const s of rest.split('.')) {
-      const left = s.endsWith('_'), p = LIST[parseInt(left ? s.slice(0, -1) : s, 36)];
+      const l = s.endsWith('_'), p = LIST[parseInt(l ? s.slice(0, -1) : s, 36)];
       if (!p || p.retired) continue;
-      if (left && p.slot === 'tac') { build.tacL = p.id; continue; }
-      const alt = Object.keys(ALIAS).find((a) => ALIAS[a] === p.slot);
-      build[build[p.slot] && alt ? alt : p.slot] = p.id; // (two of a kind: one's on the other's adapter)
+      if (l && p.slot === 'tac') build.tacL = p.id; else left.push(p);
     }
-    for (const [alt, sl] of Object.entries(ALIAS)) if (alt !== 'tacL' && build[alt] && build[sl] && !(PARTS[build[sl]].provides || {})[alt]) [build[sl], build[alt]] = [build[alt], build[sl]]; // (an adapter's: the left rail's isn't on the right's)
+    // each part into a free slot it fits, the slots a part opens going to the next (an adapter's stock waits for the adapter)
+    for (let i = 0; i < left.length;) {
+      const s = PLATFORMS[id] && slotsOf(id, build).find((a) => !build[a.slot] && fitsSlot(a, left[i], id));
+      if (s) { build[s.slot] = left[i].id; left.splice(i, 1); i = 0; } else i++;
+    }
+    // (what's left doesn't fit: a core part of another gun's stays on, and won't fire till it's changed)
+    for (const p of left) if (!build[p.slot]) build[p.slot] = p.id;
     prune(id, build);
     return { id, build };
   }
@@ -739,7 +753,7 @@ G.Gunsmith = (() => {
     const to = r.becomes, nb = { receiver: build.receiver }, off = [];
     const magSlot = PLATFORMS[to].slots.find((x) => x.slot === 'mag');
     if (magSlot) nb.mag = build.mag && PARTS[build.mag] && PARTS[build.mag].mount === magSlot.mount ? build.mag : PLATFORMS[to].defaults.mag; // (the magazine in it: see Me.convert)
-    const carried = Object.entries(build).filter(([sl]) => sl !== 'receiver' && sl !== 'mag').sort((a, b) => ORDER.indexOf(a[0]) - ORDER.indexOf(b[0]));
+    const carried = Object.entries(build).filter(([sl]) => sl !== 'receiver' && sl !== 'mag').sort((a, b) => slotRank(a[0]) - slotRank(b[0]));
     for (const [sl, pid] of carried) {
       const p = PARTS[pid], s = p && slotsOf(to, nb).find((x) => x.slot === sl);
       if (s && (s.mount === p.mount || s.req)) nb[sl] = pid; else if (p) off.push(pid);
@@ -780,10 +794,10 @@ G.Gunsmith = (() => {
     const base = G.WEAPONS[id], plat = PLATFORMS[id], gs = G.GUN_SPECS[id] || {};
     const d = Object.create(base);
     const s = Object.assign({ ergo: 0, recoil: 0, acc: 0, hip: 0, weight: 0, vel: 0, reload: 0, rpm: 0, spin: 0 }, plat.offset);
-    for (const sl of slotsOf(id, build)) if (!build[sl.slot] && EMPTY[sl.slot] && !sl.bare) for (const [k, v] of Object.entries(EMPTY[sl.slot])) s[k] += v; // e.g. no stock
+    for (const sl of slotsOf(id, build)) if (!build[sl.slot] && EMPTY[kindOf(sl.slot)] && !sl.bare) for (const [k, v] of Object.entries(EMPTY[kindOf(sl.slot)])) s[k] += v; // e.g. no stock
     // a stock on a slot a handgun's given one by (sl.brace: a chassis's, an SMG stock mount's): what bracing it on your
     // shoulder does, on top of the stock's own figures (they're for a stock on an SMG, against another stock)
-    for (const sl of slotsOf(id, build)) { const sp = sl.brace && PARTS[build[sl.slot]]; if (sp && sp.stype !== 'folded' && !(sp.provides && sp.provides.buttstock)) for (const [k, v] of Object.entries(sl.brace)) s[k] += v; }
+    for (const sl of slotsOf(id, build)) { const sp = sl.brace && PARTS[build[sl.slot]]; if (sp && sp.stype !== 'folded' && !isAdapter(sp)) for (const [k, v] of Object.entries(sl.brace)) s[k] += v; }
     let perLoad = 1, levels = null, magnifier = 0, light = 0, laser = null, laserHip = 0, laserHipSum = 0, cap = base.mag, zoom = base.zoom, barrelIn = gs.barrel, device = gs.muzzleDevice || 'none', can = gs.suppressor || null, sup = false, hasMuzzleSlot = false, shell = base.shell, reload = base.reload, scoped = base.zoom <= 0.5, reticle = 'cross', magnif = scoped ? scopeMag({}, base.zoom) : 1;
     const parts = Object.values(build).map((p) => PARTS[p]).filter(Boolean);
     for (const p of parts) {
@@ -816,9 +830,8 @@ G.Gunsmith = (() => {
     if (d.integral && G.roundSpeed) { const v0 = G.roundSpeed(base); if (v0) s.vel = (Math.min(v0 * (1 + s.vel / 100), 310) / v0 - 1) * 100; } // (and what it really leaves at, capped)
     // braced: a stock to put to your shoulder (a folded or deleted one, or a bare buffer tube, isn't). Without a stock
     // slot, a long gun's stock is part of it and a handgun has none. It decides how much the aim sways (G.aimSway).
-    const slotNames = slotsOf(id, build).map((sl) => sl.slot), stockOf = (sl) => build[sl] && PARTS[build[sl]];
-    if (slotNames.includes('buttstock')) d.braced = !!stockOf('buttstock') && stockOf('buttstock').stype !== 'folded';
-    else if (slotNames.includes('stock')) { const sp = stockOf('stock'); d.braced = !!sp && sp.stype !== 'folded' && !(sp.provides && sp.provides.buttstock); }
+    const stockSlots = slotsOf(id, build).filter((sl) => sl.slot === 'stock' || kindOf(sl.slot) === 'buttstock');
+    if (stockSlots.length) { const sp = PARTS[build[stockSlots[stockSlots.length - 1].slot]]; d.braced = !!sp && sp.stype !== 'folded' && !isAdapter(sp); } // (the end of the chain's what meets your shoulder)
     else d.braced = !(base.cls === 'PST' || base.cls === 'MP');
     d.code = code; d.build = Object.assign({}, build); d.parts = parts; d.stats = s;
     d.modified = parts.some((p) => plat.defaults[p.slot] !== p.id) || Object.keys(build).length !== Object.keys(plat.defaults).length;
@@ -896,15 +909,14 @@ G.Gunsmith = (() => {
     const spec = JSON.parse(JSON.stringify(plat.spec));
     // (in slot order, by the slot each is in: what's on an adapter goes over the adapter)
     const fitted = Object.entries(def.build || defaultBuild(def.id)).filter(([, p]) => PARTS[p])
-      .sort((a, b) => ORDER.indexOf(a[0]) - ORDER.indexOf(b[0]));
-    const parts = fitted.map(([, p]) => PARTS[p]);
+      .sort((a, b) => slotRank(a[0]) - slotRank(b[0]));
     for (const [sl, pid] of fitted) for (let [k, v] of Object.entries(PARTS[pid].model || {})) {
       if (k === 'tac' && sl === 'tacL') k = 'tacL'; // (the left rail's)
       if (k === 'pumpPatch') { spec.pump = Object.assign({}, spec.pump || {}, v); continue; }
       if (v && typeof v === 'object' && !Array.isArray(v) && spec[k] && typeof spec[k] === 'object') spec[k] = Object.assign({}, spec[k], v);
       else spec[k] = v;
     }
-    spec.slotOf = {}; for (const p of parts) spec.slotOf[p.slot] = p.id;
+    spec.slotOf = Object.fromEntries(fitted);
     return spec;
   }
 
@@ -1093,13 +1105,13 @@ G.Gunsmith = (() => {
   function attachOptions(id, build) {
     const out = [];
     for (const s of slotsOf(id, build)) {
-      if (!ATTACH_SLOTS.has(s.slot)) continue;
+      if (!ATTACH_SLOTS.has(kindOf(s.slot))) continue;
       for (const p of compatible(s.mount)) if (!p.factory && !p.retired && !p.variant && !p.becomes && !plainHere(p, id) && p.id !== build[s.slot] && fitsSlot(s, p, id) && !out.includes(p)) out.push(p);
     }
     return out;
   }
   return {
-    PARTS, LIST, PLATFORMS, attachOptions, SLOT_LABEL, BRANDS: BR, ifaceName, fits, fitsPart, fitsSlot, ALIAS,
+    PARTS, LIST, PLATFORMS, attachOptions, SLOT_LABEL, BRANDS: BR, ifaceName, fits, fitsPart, fitsSlot, ALIAS, kindOf,
     defaultBuild, slotsOf, slotFor, slotLabel, visibleSlots, magCap, prune, encode, decode, compile, fromCode, soundSpec, roundSoundKey, modelSpec, rollStock, compatible, strip, convert, kitsFor, convParts, buyPrice, sellPrice, plainGrip, plainHere, skins, RCV,
     defaultCode: (id) => encode(id, defaultBuild(id)),
   };

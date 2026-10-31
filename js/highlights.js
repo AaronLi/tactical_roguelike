@@ -818,8 +818,8 @@ G.Highlights = (() => {
     if (!def) return null;
     const kg = P.kgun.get(k) || new Map(), kx = kg.get(code) || { kills: 0, hs: 0, d: 0 }, am = Object.entries(e.am).sort((a, b) => b[1] - a[1])[0];
     const A = P.actors.get(k) || {}, kt = A.kt || {};
-    const parts = Object.entries(def.build || {}).map(([slot, id]) => [slot, G.Gunsmith.PARTS[id]]).filter(([slot, p]) => p && !p.factory && ['optic', 'riserdot', 'magnifier', 'muzzle', 'barrel', 'stock', 'buttstock', 'handguard', 'fg', 'tac', 'tacL', 'mag', 'grip'].includes(slot))
-      .map(([slot, p]) => [(G.Gunsmith.SLOT_LABEL[slot] || slot).replace(/ \(.*\)/, '').toUpperCase(), p.name]);
+    const parts = Object.entries(def.build || {}).map(([slot, id]) => [slot, G.Gunsmith.PARTS[id]]).filter(([slot, p]) => p && !p.factory && ['optic', 'riserdot', 'magnifier', 'muzzle', 'barrel', 'stock', 'buttstock', 'handguard', 'fg', 'tac', 'tacL', 'mag', 'grip'].includes(G.Gunsmith.kindOf(slot)))
+      .map(([slot, p]) => [(G.Gunsmith.SLOT_LABEL[G.Gunsmith.kindOf(slot)] || slot).replace(/ \(.*\)/, '').toUpperCase(), p.name]);
     const kit = [['HELMET', kt.helmet], ['FACE', kt.face], ['CARRIER', kt.carrier], ['SHOULDERS', kt.sh], ['PELVIS', kt.gr], ['BELT', kt.belt], ['LEGS', kt.lg], ['PACK', kt.pack]].filter(([, id]) => id && G.Gear.DEFS[id]).map(([n, id]) => [n, G.Gear.DEFS[id].name + (n === 'CARRIER' && kt.plate ? ' + plate' : '')]);
     // the verdicts: what the numbers say about them (two of them, the strongest first)
     const rpk = kx.kills ? e.n / kx.kills : Infinity, v = [];

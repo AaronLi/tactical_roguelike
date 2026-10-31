@@ -243,7 +243,8 @@ G.Furniture = (() => {
   } };
   // ---------------------------------------------------------------- storage
   // Open shelving: what's on it is laid out from the piece's own seed (v), so the meshes and what stops a
-  // round or blocks a look (ray: posts, shelves, cartons, not the gaps) agree on every peer.
+  // round or blocks a look (ray: posts, shelves, cartons, not the gaps) agree on every peer. A ray box's last figure is
+  // what that part's made of (js/materials.js PARTS).
   const RACK_Y = [0.12, 0.7, 1.3, 1.9];
   const rackLoad = (v) => {
     const r = G.U.rng(Math.floor(v * 4294967295)), out = [];
@@ -261,9 +262,9 @@ G.Furniture = (() => {
   };
   R.rack = { w: 1.9, d: 0.6, boxes: [[0, 0, 1.9, 0.6, 2.0]],
     ray: (v) => [
-      ...[-0.92, 0.92].flatMap((x) => [-0.27, 0.27].map((z) => [x, z, 0.04, 0.04, 2.0, 0])),
-      ...RACK_Y.map((y) => [0, 0, 1.88, 0.58, y + 0.015, y - 0.015]),
-      ...rackLoad(v).map(([x, y, bw, bh, bd]) => [x, 0, bw, bd, y + bh, y]),
+      ...[-0.92, 0.92].flatMap((x) => [-0.27, 0.27].map((z) => [x, z, 0.04, 0.04, 2.0, 0, 'post'])),
+      ...RACK_Y.map((y) => [0, 0, 1.88, 0.58, y + 0.015, y - 0.015, 'deck']),
+      ...rackLoad(v).map(([x, y, bw, bh, bd]) => [x, 0, bw, bd, y + bh, y, 'carton']),
     ],
     build(k, v) {
       const metal = k.mat(k.pick([0x3f5a7a, 0x8a8f94, 0xc06a2a]), 0.5, 0.6), shelf = k.mat(0x9a9ea2, 0.5, 0.6);
@@ -273,7 +274,12 @@ G.Furniture = (() => {
     } };
   // A convenience store's shelving: a low gondola, shelves both sides of a pegboard back (1.45 m: you see over it
   // standing, not crouched), stocked with packets, tins and bottles
-  R.gondola = { w: 1.9, d: 0.9, cover: 1, boxes: [[0, 0, 1.9, 0.86, 1.45]], build(k) {
+  // (shop shelving, for rounds and eyes: the pegboard, the shelves and a band of stock on each, a shot passing over what's
+  // on a shelf; the stock's packed by hand, so its band is the shelf's run of it, not each packet)
+  const shopRay = (L, D, H, ys, stock) => [[0, 0, L, D, 0.12, 0, 'plinth'], [0, 0, L, 0.05, H, 0, 'peg'], ...ys.filter((y) => y > 0.12).map((y) => [0, 0, L - 0.02, D - 0.02, y + 0.0125, y - 0.0125, 'shelf']), ...ys.flatMap(stock)];
+  R.gondola = { w: 1.9, d: 0.9, cover: 1, boxes: [[0, 0, 1.9, 0.86, 1.45]],
+    ray: () => shopRay(1.9, 0.86, 1.45, [0.12, 0.42, 0.78, 1.14], (y) => [-1, 1].map((sd) => [0, sd * 0.25, 1.72, 0.26, y + 0.21, y + 0.012, 'stock'])),
+    build(k) {
     const frame = k.mat(k.pick([0xd8dcdc, 0x2f3a46, 0xb8463a]), 0.5, 0.3), shelf = k.mat(0xe8eaea, 0.4, 0.2);
     k.box(frame, 1.9, 0.12, 0.86, 0, 0.06, 0);
     k.box(frame, 1.9, 1.45, 0.05, 0, 0.725, 0);
@@ -313,7 +319,10 @@ G.Furniture = (() => {
   }
   // A two-sided aisle of shelving (gondola), 2.6 m long, 1.6 m tall: a pegboard spine, four shelves each side packed with
   // stock, a sign along the top.
-  R.aisle = { w: 2.6, d: 1.2, cover: 1, boxes: [[0, 0, 2.6, 1.15, 1.6]], build(k) {
+  R.aisle = { w: 2.6, d: 1.2, cover: 1, boxes: [[0, 0, 2.6, 1.15, 1.6]],
+    ray: () => [...shopRay(2.6, 1.15, 1.6, [0.12, 0.5, 0.88, 1.26], (y) => [-1, 1].map((sd) => [0, sd * 0.32, 2.54, 0.48, y + 0.32, y + 0.03, 'stock'])),
+      ...[-1.29, 1.29].map((x) => [x, 0, 0.03, 1.15, 1.6, 0, 'peg']), [0, 0, 1.2, 0.04, 1.86, 1.64, 'peg']],
+    build(k) {
     const frame = k.mat(k.pick([0xe8eaea, 0xd8dcdc, 0x3a4048]), 0.5, 0.3), shelf = k.mat(0xdfe2e2, 0.4, 0.3);
     k.box(frame, 2.6, 1.6, 0.06, 0, 0.8, 0); k.box(frame, 2.6, 0.12, 1.15, 0, 0.06, 0);
     for (const x of [-1.29, 1.29]) k.box(frame, 0.03, 1.6, 1.15, x, 0.8, 0);
@@ -324,14 +333,19 @@ G.Furniture = (() => {
     k.box(k.mat(k.pick([0xd83a2a, 0x2a6ad8, 0x2ab04a, 0xf07a1a]), 0.5), 1.2, 0.22, 0.04, 0, 1.75, 0); // the aisle sign
   } };
   // Shelving against a wall, floor to well over your head: five shelves of stock, a sign along the top.
-  R.shopwall = { w: 1.98, d: 0.5, boxes: [[0, 0, 1.98, 0.5, 2.0]], build(k) {
+  R.shopwall = { w: 1.98, d: 0.5, boxes: [[0, 0, 1.98, 0.5, 2.0]],
+    ray: () => [[0, -0.23, 1.98, 0.04, 2.0, 0, 'peg'], [0, 0, 1.98, 0.48, 0.12, 0, 'plinth'], ...[0.48, 0.84, 1.2, 1.56].map((y) => [0, 0, 1.96, 0.46, y + 0.0125, y - 0.0125, 'shelf']),
+      ...[0.12, 0.48, 0.84, 1.2, 1.56].map((y) => [0, 0.02, 1.94, 0.42, y + 0.3, y + 0.03, 'stock']), [0, -0.2, 1.98, 0.03, 2.225, 1.975, 'peg']],
+    build(k) {
     const frame = k.mat(k.pick([0xe8eaea, 0x3a4048]), 0.5, 0.3), shelf = k.mat(0xdfe2e2, 0.4, 0.3);
     k.box(frame, 1.98, 2.0, 0.04, 0, 1.0, -0.23); k.box(frame, 1.98, 0.12, 0.48, 0, 0.06, 0);
     for (const y of [0.12, 0.48, 0.84, 1.2, 1.56]) { if (y > 0.12) k.box(shelf, 1.96, 0.025, 0.46, 0, y, 0); shelfStock(k, -0.97, 0.97, y + 0.012, 0.24, 1, 0.44, 0.32, y < 1.5); }
     k.box(k.mat(k.pick([0xd83a2a, 0x2a6ad8, 0xf0c020]), 0.5), 1.98, 0.25, 0.03, 0, 2.1, -0.2);
   } };
   // An endcap: a low display at the end of an aisle, cases of soda stacked on it and a promotion over them.
-  R.endcap = { w: 1.2, d: 0.5, cover: 1, boxes: [[0, 0, 1.2, 0.5, 1.3]], build(k) {
+  R.endcap = { w: 1.2, d: 0.5, cover: 1, boxes: [[0, 0, 1.2, 0.5, 1.3]],
+    ray: () => [[0, 0, 1.2, 0.48, 0.12, 0, 'plinth'], ...[0, 1, 2].flatMap((l) => [0, 1, 2].map((i) => [-0.4 + i * 0.4, 0, 0.38, 0.44, 0.42 + l * 0.31, 0.12 + l * 0.31, 'carton'])), [0, -0.2, 0.6, 0.02, 1.425, 1.075, 'peg']],
+    build(k) {
     const frame = k.mat(0xe8eaea, 0.5, 0.3), card = k.pack('card'), c = [k.label(), k.label()];
     k.box(frame, 1.2, 0.12, 0.48, 0, 0.06, 0);
     for (let l = 0; l < 3; l++) for (let i = 0; i < 3; i++) k.boxL(card, c[(l + i) % 2], 0.38, 0.3, 0.44, -0.4 + i * 0.4, 0.27 + l * 0.31, 0);
@@ -421,14 +435,14 @@ G.Furniture = (() => {
   R.palletrack = { w: 1.98, d: 1.15, boxes: [[0, 0, 1.98, 1.15, 2.7]],
     ray: (v) => {
       const o = [];
-      for (const x of [-0.97, 0.97]) for (const z of [-0.54, 0.54]) o.push([x, z, 0.06, 0.06, 2.7, 0]); // uprights
+      for (const x of [-0.97, 0.97]) for (const z of [-0.54, 0.54]) o.push([x, z, 0.06, 0.06, 2.7, 0, 'upright']); // uprights
       for (const [y, kind, hs] of prackLoad(v)) {
-        for (const z of [-0.54, 0.54]) o.push([0, z, 1.9, 0.05, y + 0.05, y - 0.05]); // beams
+        for (const z of [-0.54, 0.54]) o.push([0, z, 1.9, 0.05, y + 0.05, y - 0.05, 'beam']); // beams
         if (!kind) continue;
-        o.push([0, 0, 1.2, 1.0, y + 0.17, y + 0.05]); // the pallet
-        if (kind === 1) o.push([0, 0, 1.15, 0.95, y + 0.5 + hs[0] / 2, y + 0.5 - hs[0] / 2]);
-        else if (kind === 2) PRACK_XZ.forEach(([x, z], i) => o.push([x, z, 0.56, 0.45, y + 0.4 + hs[i] / 2, y + 0.4 - hs[i] / 2]));
-        else for (const [x, z] of PRACK_XZ) o.push([x, z, 0.34, 0.34, y + 0.79, y + 0.17]); // drums (the square inside each)
+        o.push([0, 0, 1.2, 1.0, y + 0.17, y + 0.05, 'skid']); // the pallet
+        if (kind === 1) o.push([0, 0, 1.15, 0.95, y + 0.5 + hs[0] / 2, y + 0.5 - hs[0] / 2, 'wrapped']);
+        else if (kind === 2) PRACK_XZ.forEach(([x, z], i) => o.push([x, z, 0.56, 0.45, y + 0.4 + hs[i] / 2, y + 0.4 - hs[i] / 2, 'carton']));
+        else for (const [x, z] of PRACK_XZ) o.push([x, z, 0.34, 0.34, y + 0.79, y + 0.17, 'drum']); // drums (the square inside each)
       }
       return o;
     },
@@ -947,9 +961,9 @@ G.Furniture = (() => {
   // world-space collision boxes for a piece placed at (x, z) turned q quarter-turns
   function worldBoxes(rec, x, z, q, v) {
     const s = Math.round(Math.sin(q * Math.PI / 2)), c = Math.round(Math.cos(q * Math.PI / 2));
-    const at = (list) => list.map(([lx, lz, w, d, h, y0 = 0]) => ({
+    const at = (list) => list.map(([lx, lz, w, d, h, y0 = 0, m]) => ({
       cx: x + lx * c + lz * s, cz: z - lx * s + lz * c,
-      hx: (c ? w : d) / 2, hz: (c ? d : w) / 2, y0, h,
+      hx: (c ? w : d) / 2, hz: (c ? d : w) / 2, y0, h, m,
     }));
     const out = at(typeof rec.boxes === 'function' ? rec.boxes(v) : rec.boxes).sort((a, b) => b.h - a.h);
     // open pieces (shelving): you walk into the whole footprint, but rounds and eyes meet only what's solid
@@ -1379,7 +1393,7 @@ G.Furniture = (() => {
         const u = w / 8, block = (x, y, bw, bh) => { const v = (rnd() - 0.5) * 0.2; g.fillStyle = base; g.fillRect(x, y, bw, bh); g.fillStyle = v > 0 ? `rgba(255,235,200,${v})` : `rgba(0,0,0,${-v})`; g.fillRect(x, y, bw, bh); g.strokeStyle = 'rgba(30,15,0,0.55)'; g.lineWidth = 1.5; g.strokeRect(x, y, bw, bh); };
         for (let i = -16; i <= 16; i++) for (let j = -6; j <= 6; j++) {
           const x = (i + 4 * j) * u, y = (i - 4 * j) * u;
-          if (x < -5 * u || y < -5 * u || x > w + u || y > h + u) continue;
+          if (x < -5 * u || y < -5 * u || x > w + u || y > h + 4 * u) continue;
           block(x, y, 4 * u, u); block(x + 4 * u, y - 3 * u, u, 4 * u);
         }
       }),

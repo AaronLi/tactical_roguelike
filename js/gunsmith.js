@@ -77,10 +77,12 @@ G.GunsmithUI = (() => {
     const bore = mid('barrel') || c, hg = by.handguard && !by.handguard.isEmpty() ? by.handguard : null, front = (k) => box.min.z + sz.z * k;
     const out = {};
     for (const s of GS.visibleSlots(def.id, def.build)) {
-      let p = mid(s.slot);
+      const kind = GS.kindOf(s.slot), up = (parseInt((s.slot.match(/\d+$/) || [])[0], 10) || (kind === 'buttstock' ? 1 : 0));
+      let p = mid(kind === 'buttstock' ? 'stock' : s.slot); // (a nest of stocks all draw as the one: each dot a step further back)
+      if (p && kind === 'buttstock') p.z += 0.03 * up;
       // a barrel inside a handguard: its dot on the stretch that shows, in front of the handguard
       if (s.slot === 'barrel' && p && hg && by.barrel.min.z < hg.min.z - 0.02) p.z = (by.barrel.min.z + hg.min.z) / 2;
-      if (!p) switch (s.slot) {
+      if (!p) switch (kind) {
         case 'muzzle': p = new T.Vector3(c.x, bore.y, by.barrel ? by.barrel.min.z : box.min.z); break;
         case 'optic': p = new T.Vector3(c.x, box.max.y, c.z); break;
         case 'magnifier': { const o = mid('optic') || new T.Vector3(c.x, box.max.y, c.z); p = new T.Vector3(o.x, o.y, o.z + 0.08); break; }
@@ -92,7 +94,7 @@ G.GunsmithUI = (() => {
           break;
         }
         case 'railmount': p = new T.Vector3(c.x, bore.y, hg ? hg.min.z - 0.03 : by.barrel ? by.barrel.max.z - 0.05 : front(0.3)); break;
-        case 'stock': p = new T.Vector3(c.x, c.y, box.max.z); break;
+        case 'stock': case 'buttstock': p = new T.Vector3(c.x, c.y, box.max.z + 0.03 * up); break;
         case 'loader': p = new T.Vector3(box.min.x, c.y, c.z); break;
         case 'receiver': p = mid('base') || c; break;
         default: p = c.clone();

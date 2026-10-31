@@ -23,7 +23,7 @@ G.Scars = (() => {
   };
   const CONC = [0x8f8d86, 0x77756f, 0xa4a198], CMU = [0x8a8780, 0x9d9a90, 0x6f6c66], BRICK = [0xa85a3e, 0x8f4a32, 0xbf7350], PINE = [0xd8bb82, 0xc4a266, 0xe6d2a4], HARD = [0x9a6a3a, 0x7e5430, 0xb6865a], STEEL = [0xc8d0d8, 0x9aa4ae];
   const LOOK = {
-    steel: { look: 'metal', chips: CHIP.chunk(STEEL, 3, 0.005, 5) }, mild: { look: 'metal', chips: CHIP.chunk(STEEL, 3, 0.005, 5) }, alu: { look: 'metal', soft: true, chips: CHIP.flake([0xdfe3e6], 5, 0.008, 2.5, 6, 1) },
+    steel: { look: 'metal', chips: CHIP.chunk(STEEL, 3, 0.005, 5) }, mild: { look: 'metal', chips: CHIP.chunk(STEEL, 3, 0.005, 5) }, sheet: { look: 'metal', chips: CHIP.chunk(STEEL, 3, 0.005, 5) }, alu: { look: 'metal', soft: true, chips: CHIP.flake([0xdfe3e6], 5, 0.008, 2.5, 6, 1) },
     iron: { look: 'tile', tint: 0x3a3a3c, chips: CHIP.chunk([0x4a4a4c, 0x35353a], 8, 0.01, 4), dust: 0x55524e },
     concrete: { look: 'stone', chips: CHIP.chunk(CONC, 12), dust: 0xa8a59c }, cmu: { look: 'stone', chips: CHIP.chunk(CMU, 11), dust: 0xb0ada2 }, brick: { look: 'brick', chips: CHIP.chunk(BRICK, 10), dust: 0xb07858 },
     ceram: { look: 'tile', tint: 0xf2f0ea, chips: CHIP.sliver([0xf4f2ec, 0xe2e0da], 10, 0.02, 3.6), dust: 0xe8e6e0 }, bone: { look: 'stone', chips: CHIP.chunk([0xe6dcc4], 4) },

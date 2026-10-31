@@ -87,18 +87,26 @@ so anything random in generation must come from the level's rng (`r`, or a `G.U.
 Apartment only (`residents: 1` in the theme). The layout comes first and knows nothing of them: `fill` runs on each
 floor after `finish`.
 
-- [ ] **A new resident is data:** an entry in `RESIDENTS` (`home`, `rate`, and per room type `wall`, `ceil`, `trim`,
-  `floor`, `items`). New pieces go in `G.Furniture.R` with their colours in `style`, and in `js/materials.js` `PROPS`,
-  or they stop rounds as particle board. A new floor `kind` needs a texture in `textures()`, and `js/casings.js surface`
-  plays it by that name.
+- [ ] **A new resident is data:** an entry in `RESIDENTS`: `home`, `rate`, `rest` (what any room they've no list for is
+  painted and floored as) and per room type `wall`, `ceil`, `trim`, `floor`, `items`. The notes at the top of the file say
+  what each field does. `spare` on a room type: one the home can spare becomes it. `carve`: a room cut from a corner.
+  `must` on an item: its main piece. New pieces go in `G.Furniture.R` with their colours in `style`, and in
+  `js/materials.js` `PROPS`, or they stop rounds as particle board. A new floor `kind` needs a texture in `textures()`
+  and a `sound` if it isn't one `js/casings.js surface` knows (`wood`, `tile`, `carpet`).
 - [ ] **Random:** the assignment from `G.Homes.start` (the level's seed), the placing from the room's own stream. Never
   the level's `r` or `Math.random`. In `build`, what's drawn for a resident draws on `cur`, never `rnd0`.
 - [ ] **Nothing else moves:** with `G.Homes.RESIDENTS[0].rate = 0` a level matches what it was; with a resident, every
-  triangle outside their rooms matches that (a sum of the merged meshes' triangles, skipping the rooms).
+  triangle outside their home matches that (a sum of the merged meshes' triangles, skipping `rm.dress.cells`).
+- [ ] **A home is all or nothing:** force a `need` item that can't fit, and the level matches the one with nobody home, a
+  carved room's door, lamp and room record gone too.
+- [ ] **A carved room:** its door opens, closes and takes a round; it's reachable; `G.Homes.swap` still gives the room it
+  came from back as it was (`build` depends on that). A room that wouldn't have been (`rm.carved`) draws on nothing but its
+  own stream.
 - [ ] **It adapts:** look at a small room (7 x 7 cells), a long one (8 x 16), one with windows, and one with the
   weapon case or a first aid cabinet in it. Set `rate` to 1 to see more of them.
-- [ ] **Access:** doors clear to 2.7 m in, the room's middle free, nothing that was reachable cut off, spawn spots on
-  floor you can reach, suspects walking in and out.
+- [ ] **Access:** doors clear to 2.7 m in (the doorway alone for a `must` piece), nothing that was reachable cut off,
+  spawn spots on floor you can reach, suspects walking in and out. Walking a home by `flowStep` and `resolve`, stop at
+  shut doors or open them: a walker that doesn't will look stuck.
 - [ ] **Walls:** the far side of a papered wall keeps its own colour, and the paper stays round a bullet hole.
 
 ## 3b. Windows
