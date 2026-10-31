@@ -824,9 +824,8 @@ G.Gunsmith = (() => {
     // core parts taken off (a barrel, a grip...): it won't fire until they're back
     d.missing = slotsOf(id, build).filter((sl) => sl.req && !build[sl.slot]).map((sl) => sl.slot);
     // ...or a core part made for another gun (a barrel of the wrong calibre, after a receiver swap)
-    d.misfit = slotsOf(id, build).filter((sl) => sl.req && build[sl.slot] && PARTS[build[sl.slot]] && PARTS[build[sl.slot]].mount !== sl.mount).map((sl) => sl.slot);
+    d.misfit = slotsOf(id, build).filter((sl) => sl.req && build[sl.slot] && PARTS[build[sl.slot]] && !fitsSlot(sl, PARTS[build[sl.slot]], id)).map((sl) => sl.slot);
     d.missing = d.missing.concat(d.misfit);
-    d.dmg = Math.round(base.dmg * (1 + s.vel * 0.006) * 10) / 10;
     d.range = Math.round(base.range * (1 + s.vel * 0.01));
     d.spread = base.spread * clamp(1 + (s.hip + s.acc * 0.35) / 100, 0.3, 2);
     d.ads = base.ads * clamp(1 + s.acc / 100, 0.25, 2);
@@ -1037,6 +1036,8 @@ G.Gunsmith = (() => {
     for (const p of BY_MOUNT.get(sl.mount) || []) p.retired = true;
     sl.mount = 'mag:stanag'; plat.defaults.mag = 'stanag.mag.30'; plat.magVariants = true; LATE.add(id);
   }
+  // the belt boxes of G.BELT_FAMILY go in each other's guns
+  { const fam = Object.keys(G.BELT_FAMILY); for (const id of fam) for (const p of BY_MOUNT.get('mag:' + id)) p.alsoMounts = fam.filter((o) => o !== id).map((o) => 'mag:' + o); }
   for (const id of LATE) { const plat = PLATFORMS[id]; plat.offset = {}; for (const k of STAT_KEYS) plat.offset[k] = -Object.values(plat.defaults).reduce((a, pid) => a + ((PARTS[pid] && PARTS[pid].st[k]) || 0), 0); }
   // ...and the long guns that take one: those with no way to a side rail otherwise (nothing that fits them has one)
   {

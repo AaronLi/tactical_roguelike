@@ -11,7 +11,7 @@ the game muted (`G.Game.setMuted(true)`) unless you're checking sound.
   - `cls`: class (AR, BR, SMG, PST, SG, DMR, SNP, LMG, GL, BOW, RAIL)
   - `tier`: 1–4
   - `price`, `name`, `desc`
-  - Rounds: `dmg`, `rpm`, `mode` (`auto`/`semi`/`burst`/`hyper`), `mag`, `reserve`, `reload`
+  - Rounds: `rpm`, `mode` (`auto`/`semi`/`burst`/`hyper`), `mag`, `reserve`, `reload`
   - Handling: `spread`, `ads`, `recoil`, `range`, `zoom`, `speed`, `falloff`, `pen`
 - [ ] **Special flags, if they apply:**
   - `pellets` + `choke` (shotguns: pattern half-angle, separate from aim error)

@@ -820,7 +820,8 @@ says the same), but not whose: the shooter's name isn't shown.
     kick lands.
   - **M1 Garand**: en-bloc clip that only reloads when empty, and pings when it ejects: the empty clip goes back
     in your kit (on the floor if there's no room), the gun stands open, and the next reload pushes a full one in.
-  - **Minigun**: has to spin up before it fires. Held by a side handle on the left (no carry handle over the top,
+  - **Minigun**: a 5.56 microgun on the same linked belts as the M249: either gun takes the other's boxes, the
+    bag and the assault box too (`G.BELT_FAMILY`). Has to spin up before it fires. Held by a side handle on the left (no carry handle over the top,
     so its iron sights, or any optic, sit low on the rail), with a side rail on the right for a light or laser.
   - **Shell by shell**: lever-action, Mosin, pump shotguns, the KSG and the Benelli load one round at a time
     (a speed loader pushes in two or four).
@@ -1400,8 +1401,8 @@ says the same), but not whose: the shooter's name isn't shown.
   it: a star of cracks and a pulverised patch where it stopped one, a hole and a wide web where one came through, a short crack where one
   skipped off. They stay on that shield, wherever it goes, and don't show once you're dead.
 - **Better-equipped suspects carry lights and lasers** (`G.ENEMY_GEAR.tac`): none in the first half of the game, lights from level 5 and lasers from
-  level 7, then by the same gear tier as their weapons and armour, about three in four lights and over half lasers at the top; from level 5 an
-  Enforcer always has the light, and the Kingpin has both.
+  level 7, then by the same gear tier as their weapons and armour, about three in ten lights and over half lasers at the top; the Kingpin has
+  both.
   The light's on with the gun out, the laser once they're alert, both on whoever they're aiming at, and they use the same lights, beams and
   dots as the squad's.
 - **Lasers show in the replays**: where each laser landed is recorded with everyone's position, and the replay (and the video) draws it from the gun in their hands to that spot, red or green, as long as it was on.
@@ -1577,7 +1578,7 @@ says the same), but not whose: the shooter's name isn't shown.
     still bringing it up.
 - **Weapon lights and lasers** (a side rail, either side, or a pistol's frame rail). A light on one side and a
   laser on the other gives you both; a second laser doesn't steady your hip fire any further. Each is switched on the comms wheel
-  (hold the middle mouse button). A light is a real spotlight from the gun that your squad sees
+  (hold the middle mouse button). A light is a real spotlight from the gun, stopped by walls, floors and doors (a shadow map a light, drawn only while it's on; its beam in the air ends at the same place, and glass and gratings let it through), that your squad sees
   too, and shone into a suspect's face from up to 15 m (22 m for the high-output one) it ruins their aim: they
   hit about half as often while it's in their eyes. A laser puts a red or green dot where the bore points (on a
   wall or on someone), and only tightens your hip fire while it's on. The PQ-15 module and the pistol combo

@@ -620,7 +620,7 @@ G.Server = {
     const kitL = Math.max(1, this.level + (tier - G.gearTier(this.level)) * 2); // (a tier up or down is dressed a couple of levels on or back)
     const fixed = base.armor && G2.fixed[base.armor];
     const d = Object.create(base);
-    d.wpn = wpn; d.gear = tier; d.dmg = w.dmg; d.pellets = w.pellets; d.snd = w.cls;
+    d.wpn = wpn; d.gear = tier; d.pellets = w.pellets; d.snd = w.cls;
     d.vest = fixed ? fixed.vest[tier - 1] : this.armourRoll('vest', kitL) || 'none';
     d.helmet = fixed ? fixed.helmet[tier - 1] : this.armourRoll('helmet', kitL) || 'nohelm';
     // a mandible or a face shield on the helmet's mount (a helmet with a visor has its own; no helmet, nowhere to put one)
@@ -628,7 +628,7 @@ G.Server = {
     // shoulder, pelvis and leg armour, on what a plate carrier can take
     d.ex = fixed ? (fixed.ex || [])[tier - 1] || [] : d.vest === 'steel' || d.vest === 'ceramic' ? ['shoulder', 'groin', 'legs'].map((k) => this.armourRoll(k, kitL)).filter(Boolean) : [];
     // a light and a laser on the gun, more often the better equipped they are (flags as an officer's: js/player.js tacFlags)
-    const tl = G2.tac, always = base.boss || (fixed && tier >= 2), light = this.level >= tl.lightFrom && (always || Math.random() < tl.light[tier - 1]), laser = this.level >= tl.laserFrom && (base.boss || Math.random() < tl.laser[tier - 1]);
+    const tl = G2.tac, light = this.level >= tl.lightFrom && (base.boss || Math.random() < tl.light[tier - 1]), laser = this.level >= tl.laserFrom && (base.boss || Math.random() < tl.laser[tier - 1]);
     d.tac = (light ? 1 | (tier >= 4 ? 8 : 0) : 0) | (laser ? 2 | (Math.random() < 0.35 ? 4 : 0) : 0);
     // automatic weapons fire at their own rate in the type's bursts; others as fast as the type works them
     if (base.rof) {

@@ -398,7 +398,7 @@ G.Gear = (() => {
   function exchange(me, w, mag) {
     const inR = mag.r, inV = mag.vid, inCap = mag.cap, outV = w.def.build && w.def.build.mag;
     mag.r = w.tube || []; mag.base = w.ammo;
-    if (outV) { mag.vid = outV; mag.cap = G.Gunsmith.magCap(w.def.id, outV); }
+    if (outV) { mag.vid = outV; mag.cap = G.Gunsmith.magCap(w.def.id, outV); mag.wid = mag.key = w.def.id; } // (its name and shape are the gun's it came out of: a shared box)
     loadIn(me, w, { r: inR, vid: inV, cap: inCap });
   }
   // A normal (retention) reload: the old magazine goes back in the pouch the fresh one came out of.

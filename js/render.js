@@ -15,6 +15,7 @@ G.R = {
     // does (not a fluorescent version of itself).
     THREE.ShaderChunk.tonemapping_pars_fragment = THREE.ShaderChunk.tonemapping_pars_fragment.replace('vec3 CustomToneMapping( vec3 color ) { return color; }', this.TONE + ' vec3 CustomToneMapping( vec3 color ) { return bpTone( toneMappingExposure * color ); }');
     r.toneMapping = THREE.CustomToneMapping;
+    r.shadowMap.enabled = true; // (only the weapon lights cast any: this.spots)
     document.body.prepend(r.domElement);
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x0b0d10);
@@ -104,6 +105,9 @@ G.R = {
   setLevel(map) {
     this.clearLevel();
     this.levelRoot.add(G.Level.buildMesh(map));
+    // what stops a weapon light: the level, bar what you can see through (glass, a grating)
+    const solid = (mt) => !mt.transparent && !mt.alphaTest;
+    this.levelRoot.traverse((o) => { if (o.isMesh) o.castShadow = Array.isArray(o.material) ? o.material.every(solid) : solid(o.material); });
     const th = map.theme;
     this.scene.fog.color.setHex(th.fog);
     this.scene.fog.near = th.noFog ? 1e4 : th.fogNear || 8; this.scene.fog.far = th.noFog ? 2e4 : th.fogFar || 60; // (no fog: pushed out of reach, so the shaders stay the same)
@@ -318,11 +322,14 @@ G.R = {
     this.laserUsed = 0;
 
     // weapon lights and lasers (yours and the squad's): a fixed pool, always in the scene (lit or not), so
-    // switching one on never changes the shaders
+    // switching one on never changes the shaders. Each casts a shadow, so a wall or a floor stops it: its map is drawn
+    // only in a frame it's on (tacLight), once, however many times the scene's drawn (the scope, the fisheye).
     this.spots = [];
     for (let i = 0; i < 6; i++) {
       const s = new THREE.SpotLight(0xfff1dc, 0, 34, 0.3, 0.6, 1.6);
       s.target = new THREE.Object3D();
+      s.castShadow = true; s.shadow.autoUpdate = false; s.shadow.camera.near = 0.1;
+      s.shadow.map = new THREE.WebGLRenderTarget(512, 512, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
       this.scene.add(s, s.target); this.spots.push(s);
     }
     // what you see of someone else's light: its beam in the air, and the lamp itself
@@ -336,10 +343,11 @@ G.R = {
     lg.fillStyle = lgr; lg.fillRect(0, 0, 32, 32);
     const laserDotTex = new THREE.CanvasTexture(lc);
     for (let i = 0; i < 6; i++) {
-      const cone = new THREE.Mesh(cg, this.coneMat || (this.coneMat = new THREE.ShaderMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
-        // (brightest down the middle of it, nothing at its edges: no hard line round a beam in the air)
-        vertexShader: 'varying vec3 vC, vN, vV; void main() { vC = color; vN = normalMatrix * normal; vec4 q = modelViewMatrix * vec4(position, 1.0); vV = -q.xyz; gl_Position = projectionMatrix * q; }',
-        fragmentShader: 'varying vec3 vC, vN, vV; void main() { float a = abs(dot(normalize(vN), normalize(vV))); gl_FragColor = vec4(vC * a * a * a * 0.11, 1.0); }' })));
+      const sh = this.spots[i].shadow, cone = new THREE.Mesh(cg, new THREE.ShaderMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+        uniforms: { shMap: { value: sh.map.texture }, shMat: { value: sh.matrix } },
+        // (brightest down the middle of it, nothing at its edges: no hard line round a beam in the air; it stops where its light does)
+        vertexShader: 'uniform mat4 shMat; varying vec3 vC, vN, vV; varying vec4 vS; void main() { vC = color; vN = normalMatrix * normal; vec4 q = modelViewMatrix * vec4(position, 1.0); vV = -q.xyz; vS = shMat * modelMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * q; }',
+        fragmentShader: '#include <packing>\nuniform sampler2D shMap; varying vec3 vC, vN, vV; varying vec4 vS; void main() { vec3 s = vS.xyz / vS.w; if (s.z > unpackRGBAToDepth(texture2D(shMap, s.xy))) discard; float a = abs(dot(normalize(vN), normalize(vV))); gl_FragColor = vec4(vC * a * a * a * 0.11, 1.0); }' }));
       const lamp = new THREE.Sprite(new THREE.SpriteMaterial({ map: laserDotTex, color: 0xfff4e0, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
       cone.visible = lamp.visible = false; cone.frustumCulled = false; this.scene.add(cone, lamp); this.cones.push({ cone, lamp });
     }
@@ -358,7 +366,7 @@ G.R = {
   // a weapon light at pos shining along dir (k: how bright; seen: someone else's, so you see the beam and the lamp)
   tacLight(pos, dir, k = 1, seen = false) {
     const s = this.spots[this.spotUsed++]; if (!s) return;
-    s.position.copy(pos); s.target.position.copy(pos).add(dir); s.intensity = 0.9 * k; s.distance = 24 + 10 * k;
+    s.position.copy(pos); s.target.position.copy(pos).add(dir); s.intensity = 0.9 * k; s.distance = 24 + 10 * k; s.shadow.needsUpdate = true;
     const C = seen && this.cones[this.coneUsed++];
     if (!C) return;
     const len = 9 * k, r = len * Math.tan(0.3), at = _tv.subVectors(this.camera.position, pos).normalize().dot(dir); // (at: how nearly it's pointing at you)

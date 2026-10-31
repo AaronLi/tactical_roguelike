@@ -803,6 +803,14 @@ G.GunModels = (() => {
     return p;
   }
   // Sights by type. top = height of the rail / mounting surface.
+  // a sight's place on a rail from f0, rl long: forward with a magnifier behind it, so the magnifier's mount is on the rail too
+  const magOfs = (o, f0, rl, plain) => (o.magnifier ? f0 + Math.max(rl * 0.55, Math.min(rl - 0.035, 0.15)) : plain);
+  // and the magnifier, if there's one behind a red dot
+  function magIn(k, sight, top, o, anim) {
+    if (!o.magnifier || !k.reflex) return sight;
+    k.tag('magnifier');
+    return S.magnifier(k, sight, top, o.magnifier, anim);
+  }
   function sightOf(k, o, top, L, bl, br, front, ofs) {
     const frontF = L + Math.min(bl * 0.82, bl - 0.03);
     if (o.optic === 'riser') k.box(0.024, o.riser || 0.022, 0.034, M.black(), ofs - 0.017, top + (o.riser || 0.022) / 2); // a pistol optic riser with nothing on it (the irons still work)
@@ -1855,7 +1863,7 @@ G.GunModels = (() => {
     k.tag('optic');
     let sight;
     if (!o.optic || o.optic === 'none' || o.optic === 'irons') sight = S.irons(k, 0.04, 0.17, top + 0.034, top, top, 'ar'); // (low on the rail: no carry handle in the way any more)
-    else sight = sightOf(k, o, top, 0.22, bl, 0.01, 0.22 + bl, 0.12);
+    else sight = magIn(k, sightOf(k, o, top, 0.22, bl, 0.01, 0.22 + bl, magOfs(o, 0.03, 0.15, 0.12)), top, o, anim);
     k.tag('base');
     return { sy: sight.sy, fSight: sight.fSight, relief: sight.relief, muzzles: [[0.22 + bl, -0.01, 0]], grip: [0.035, -0.08, 0], support: [0.184, -0.03, -0.128], anim, magAt: [0.12, -0.06] };
   }
@@ -1881,7 +1889,7 @@ G.GunModels = (() => {
       k.tag('stock');
       stock(k, o.stock || 'm4', o.sm || M.polymer());
       k.tag('optic');
-      const sight = sightOf(k, o, top, 0.24, bl, 0.024, 0.24 + bl, 0.34);
+      const sight = magIn(k, sightOf(k, o, top, 0.24, bl, 0.024, 0.24 + bl, magOfs(o, 0.24, 0.2, 0.34)), top, o, anim);
       k.tag('base');
       return { sy: sight.sy, fSight: sight.fSight, relief: sight.relief, muzzles: [[0.24 + bl, 0.04, 0]], grip: [0.035, -0.075, 0], support: [0.38, -0.06, 0], anim, port: [0.24, -0.005, 0] };
     }
@@ -1895,7 +1903,8 @@ G.GunModels = (() => {
     k.tag('stock');
     stock(k, o.stock || 'wire', o.sm || M.blued());
     k.tag('optic');
-    const sight = o.optic && o.optic !== 'notch' ? sightOf(k, o, S.rail(k, 0.05, 0.12, 0.024, M.black()), bl, bl, 0.024, bl, 0.1) : S.notch(k, 0.05, bl - 0.03, 0.042, 0.024, 0.024);
+    const rt = o.optic && o.optic !== 'notch' && S.rail(k, 0.05, 0.12, 0.024, M.black());
+    const sight = rt ? magIn(k, sightOf(k, o, rt, bl, bl, 0.024, bl, magOfs(o, 0.05, 0.12, 0.1)), rt, o, anim) : S.notch(k, 0.05, bl - 0.03, 0.042, 0.024, 0.024);
     k.tag('base');
     return { sy: sight.sy, fSight: sight.fSight, relief: sight.relief || 0.3, muzzles: [[bl, 0, 0]], grip: [0.035, -0.075, 0], support: [0.2, -0.03, 0], anim, port: [0.0, 0.0, 0] };
   }
@@ -1921,7 +1930,7 @@ G.GunModels = (() => {
     k.into(null);
     const anim = { mag: capP };
     k.tag('optic');
-    const sight = sightOf(k, o, top, 0.34, bl, 0.006, 0.34 + bl, 0.18);
+    const sight = magIn(k, sightOf(k, o, top, 0.34, bl, 0.006, 0.34 + bl, magOfs(o, 0.08, 0.22, 0.18)), top, o, anim);
     k.tag('base');
     return { sy: sight.sy, fSight: sight.fSight, relief: sight.relief, muzzles: [[0.34 + bl, 0, 0]], grip: [0.065, -0.075, 0], support: [0.5, -0.03, 0], anim, magAt: [0.19, -0.04] };
   }
@@ -2023,10 +2032,11 @@ G.GunModels = (() => {
     q.group.traverse((m) => { m.userData.slot = 'base'; });
     k.add(q.group);
     k.tag('optic');
-    const sight = sightOf(k, o, top, 0.2, 0.3, 0.004, 0.48, 0.2);
+    const anim = { quarrel: q.group, quarrelHead: q.head, quarrelNock: q.nock, stringCocked: sc, stringSlack: sl };
+    const sight = magIn(k, sightOf(k, o, top, 0.2, 0.3, 0.004, 0.48, magOfs(o, 0.1, 0.2, 0.2)), top, o, anim);
     k.tag('base');
     return { sy: sight.sy, fSight: sight.fSight, relief: sight.relief, muzzles: [[0.47, ya, 0]], grip: [0.035, -0.075, 0], support: [0.2, -0.05, 0], port: [0.16, 0.03, 0],
-      anim: { quarrel: q.group, quarrelHead: q.head, quarrelNock: q.nock, stringCocked: sc, stringSlack: sl }, quarrelMats: q.mats };
+      anim, quarrelMats: q.mats };
   }
 
   // The P90, traced from FN's side view (500 mm overall): a thumbhole stock and a finger hole through one moulded
@@ -2072,9 +2082,10 @@ G.GunModels = (() => {
     if (o.muzzle) { k.tag('muzzle'); front += muzzle(k, o.muzzle, front, 0.0085, 0); }
     k.tag('optic');
     // (irons at the two ends of the housing's rail; anything else in the middle of it)
-    const sight = ['irons', 'notch', undefined].includes(o.optic) ? S.irons(k, F(440), F(210), top + 0.034, top, top, o.irons || 'ar') : sightOf(k, o, top, F(167), bl, 0.0085, front, F(325));
+    const anim = { mag: magP, handle: hp };
+    const sight = ['irons', 'notch', undefined].includes(o.optic) ? S.irons(k, F(440), F(210), top + 0.034, top, top, o.irons || 'ar') : magIn(k, sightOf(k, o, top, F(167), bl, 0.0085, front, magOfs(o, F(445), F(200) - F(445), F(325))), top, o, anim);
     k.tag('base');
-    return { sy: sight.sy, fSight: sight.fSight, relief: sight.relief, muzzles: [[front, 0, 0]], grip: [F(468), Y(425), 0], support: [F(300), Y(445), 0], anim: { mag: magP, handle: hp }, handle,
+    return { sy: sight.sy, fSight: sight.fSight, relief: sight.relief, muzzles: [[front, 0, 0]], grip: [F(468), Y(425), 0], support: [F(300), Y(445), 0], anim, handle,
       magAt: [m0 + 0.08, my], magTop: true, chamberAt: { side: 'right', f: F(780), y: Y(275), x: 0.028 } };
   }
 

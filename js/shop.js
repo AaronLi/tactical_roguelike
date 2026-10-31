@@ -307,7 +307,7 @@ G.Shop = {
   magCard(key) {
     const [wid, vid] = key.split('|'), Me = G.Me, def = G.WEAPONS[wid], a = G.Gear.ammoFor(def), it = G.Gear.ammoItem(def, 0, null, vid), price = G.Gear.price(it), left = this.count('mag:' + key);
     const takers = G.Gear.guns(Me).filter((w) => G.magFits(wid, w.def.id)).map((w) => w.def.name), [sw, sh] = G.Gear.size(it), p = G.Gunsmith.PARTS[vid];
-    const family = G.MAG_FAMILY[wid] ? G.WEAPON_LIST.filter((w) => G.magFits(wid, w.id)).map((w) => w.name) : null;
+    const family = G.magFam(wid) !== wid ? G.WEAPON_LIST.filter((w) => G.magFits(wid, w.id)).map((w) => w.name) : null;
     const fx = p && !p.factory ? G.GunsmithUI.partEffects(p) : 'The standard magazine.';
     return `<div class="card pouch">
       <div class="ch"><img class="ci" src="${G.Icons.of(it, sw, sh, false)}"><span class="cn">${G.U.esc(G.Gear.magName(it))}</span><span class="tier">${a.label} ${sw}×${sh}</span></div>

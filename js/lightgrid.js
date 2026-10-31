@@ -69,6 +69,8 @@ G.LightGrid = (() => {
     shader.fragmentShader = FS_HEAD + shader.fragmentShader.replace('#include <lights_fragment_end>', FS_BODY);
   }
   for (const C of [T.MeshStandardMaterial, T.MeshLambertMaterial, T.MeshPhongMaterial]) C.prototype.onBeforeCompile = patch;
+  // and anything can be shaded from a weapon light (js/render.js), not only what's been told to
+  Object.defineProperty(T.Mesh.prototype, 'receiveShadow', { get: () => true, set() {} });
 
   // ---- building it
   // (A lamp's colour is a tint of white, picked by eye: taken as written, not decoded from sRGB as a surface's is. Decoded,
