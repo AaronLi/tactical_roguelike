@@ -279,7 +279,7 @@ G.GunTraces = {
   // and bead tipping with them. The stock and forend are drawn from here only while the factory ones are fitted (the
   // gunsmith's others are the generic stocks and forends).
   dbl: {
-    ref: 'ИЖ-43Е (1).jpg', url: 'https://commons.wikimedia.org/wiki/File:%D0%98%D0%96-43%D0%95_(1).jpg', mm: 0.55, x0: 1300, y0: 200, by: 0, dir: -1, topY: 180, pin: [1182, 248], sightF: 0.09, sh: 0.006, sw: 0.007, rib: true,
+    ref: 'ИЖ-43Е (1).jpg', url: 'https://commons.wikimedia.org/wiki/File:%D0%98%D0%96-43%D0%95_(1).jpg', mm: 0.55, x0: 1300, y0: 200, by: 0, dir: -1, topY: 180, pin: [1182, 248], sightF: 0.09, sh: 0.006, sw: 0.007, rib: true, foreLen: 0.18,
     parts: [
       // the boxlock action, the tang strap over the stock's top, the top lever, the pins
       { pts: [[1176, 176], [1262, 176], [1286, 184], [1300, 190], [1300, 272], [1286, 272], [1176, 257]], w: 0.044, m: 'blued', b: 0.003 },

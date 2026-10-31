@@ -1207,7 +1207,7 @@ G.GunModels = (() => {
       hgLen = hg.len;
       if (hg.t === 'sig') hg.ext = o.railExt || 0;
       if (hg.t === 'g36') hg.bl = bl;
-      if (tr && tr.parts.some((p) => p.on === 'fore') && hg.t === 'wood') tracedParts(k, tr, VT, 'fore', Object.assign({}, mats, { fore: hg.m ? M[hg.m]() : fm })); // (the traced forend, while the factory one's fitted)
+      if (tr && tr.parts.some((p) => p.on === 'fore') && hg.t === 'wood') { const sc = (hg.len - 0.03) / (tr.foreLen - 0.03), VF = (p) => { const [f, y] = VT(p); return [f > L + 0.03 ? L + 0.03 + (f - L - 0.03) * sc : f, y]; }; tracedParts(k, tr, VF, 'fore', Object.assign({}, mats, { fore: hg.m || fm })); } // (the traced forend, stretched or shortened ahead of the action to the wooden hand guard's length)
       else handguard(k, hg, L, fm, rm);
     }
     if (o.tube) { k.tag('tube'); k.cyl(0.0105, o.tube, M.blued(), L, -0.026); k.cyl(0.012, 0.012, M.blued(), L + o.tube - 0.012, -0.026); }
