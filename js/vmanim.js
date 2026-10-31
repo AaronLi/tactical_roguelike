@@ -41,7 +41,7 @@ G.VMAnim = (() => {
     } else if (kind === 'shell') { const c = new T.Mesh(new T.CylinderGeometry(0.0095, 0.0095, 0.06, 10), new T.MeshStandardMaterial({ color: 0xa82a20, roughness: 0.6 })); c.rotation.x = Math.PI / 2; g.add(c); const b = new T.Mesh(new T.CylinderGeometry(0.0098, 0.0098, 0.014, 10), M.brass()); b.rotation.x = Math.PI / 2; b.position.z = 0.024; g.add(b); }
     else if (kind === 'loader') { const r = new T.Mesh(new T.CylinderGeometry(0.02, 0.02, 0.012, 14), M.black()); r.rotation.x = Math.PI / 2; g.add(r); for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; const c = new T.Mesh(new T.CylinderGeometry(0.0045, 0.0045, 0.035, 8), M.brass()); c.rotation.x = Math.PI / 2; c.position.set(Math.cos(a) * 0.012, Math.sin(a) * 0.012, -0.02); g.add(c); } }
     else if (kind === 'clip') { const c = new T.Mesh(new T.BoxGeometry(0.014, 0.03, 0.06), M.brass()); g.add(c); }
-    else if (kind === 'bolt') { const c = new T.Mesh(new T.CylinderGeometry(0.003, 0.003, 0.36, 6), M.woodDark()); c.rotation.x = Math.PI / 2; g.add(c); }
+    else if (kind === 'bolt') g.add(G.GunModels.quarrel(true).group); // (the crossbow's own bolt: nock, shaft, vanes and head)
     g.visible = false;
     return g;
   }
@@ -336,11 +336,12 @@ G.VMAnim = (() => {
     if (t > 0.56 && t < 0.62) pose.gun[2] += 0.02 * Math.sin(Math.PI * (t - 0.56) / 0.06); // op rod slams home
     return pose;
   }
+  const BOW_COCK = 0.3, BOW_LOAD = 0.72; // (a crossbow reload: when the string's cocked, when the bolt's laid on the rail)
   function bowClip(t, h) {
     const A = h.A, pose = base(), port = A.port || A.S;
     pose.gun[3] += 0.35 * S(0.0, 0.15, t) * (1 - S(0.85, 1, t));
     pose.L = path(t, [[0, A.S], [0.25, A.P], [0.32, A.P], [0.5, off(port, -0.05, 0.03)], [0.7, off(port, 0.12, 0.03)], [0.85, A.S], [1, A.S]]);
-    if (t > 0.3 && t < 0.72) pose.prop = { kind: 'bolt' };
+    if (t > BOW_COCK && t < BOW_LOAD) pose.prop = { kind: 'bolt' };
     return pose;
   }
   // Show it off: left side, then the top and right, then a chamber check. Holding I holds the chamber check
@@ -453,6 +454,12 @@ G.VMAnim = (() => {
       const A = h.A, an = h.an;
       h.holder.updateMatrix();
       const res = (p) => p;
+      // a crossbow: the bolt's on the rail while there's one loaded (and from when a reload lays it there), the string's
+      // back at the latch once it's cocked (a reload cocks it first); shot, the bolt's gone and the string's forward
+      if (an.quarrel) {
+        const ld = G.loaded(w) > 0, rt = a.reloadT == null ? -1 : a.reloadT;
+        an.quarrel.visible = ld || rt >= BOW_LOAD; an.stringCocked.visible = ld || rt >= BOW_COCK; an.stringSlack.visible = !an.stringCocked.visible;
+      }
       // magazine
       if (an.mag && A.magHome) {
         const mg = pose ? pose.mag : { mode: 'in' };

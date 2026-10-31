@@ -473,6 +473,12 @@ G.Rig = (() => {
     root.rotation.y = p.yaw;
     if (rig.powered && rig.state !== 'dead' && !rig.limp) gunHome(rig); // (before the hands reach for it)
     root.updateMatrixWorld(true);
+    // a crossbow: its bolt's on the rail while it's loaded (a reload lays it there at 0.72, cocking the string at 0.3)
+    if (rig.gun && rig.gun.userData.xb) {
+      const ld = p.loaded == null ? rig.xbLoaded !== false : !!p.loaded, rl = p.reload == null ? -1 : p.reload;
+      rig.xbLoaded = ld;
+      G.GunModels.setLoaded(rig.gun, ld || rl >= 0.72, ld || rl >= 0.3);
+    }
 
 
     if (rig.state === 'dead' || rig.limp) { animateDeath(rig, dt); drawDebug(rig); return; }
