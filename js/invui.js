@@ -397,7 +397,7 @@ G.InvUI = (() => {
     const Gr = GG(), w = gunIt.w, def = w.def, slots = GS().visibleSlots(def.id, def.build);
     let rows = slots.map((s) => {
       const pid = def.build[s.slot], it = pid ? fittedItem(w, s.slot, pid) : null, [iw, ih] = it ? Gr.partSize(pid) : [1, 1];
-      const bad = it && GS().PARTS[pid].mount !== s.mount;
+      const bad = it && !GS().fitsSlot(s, GS().PARTS[pid], w.def.id);
       return `<div class="gun-slot${(!it || bad) && s.req ? ' missing' : ''}" data-wslot="${gunIt.uid}|${s.slot}"><small>${GS().slotLabel(s)}${s.req ? '' : ' <i>optional</i>'}${bad ? ' <i class="broken">doesn\'t fit: it won\'t fire</i>' : ''}</small>${it ? itemHTML(it, iw, ih, 'position:relative') : s.req ? '<em>missing: it won\'t fire</em>' : '<em>empty</em>'}</div>`;
     }).join('');
     const mi = magItem(w), a = mi ? (([w0, h0]) => ({ w: w0, h: h0 }))(Gr.size(mi)) : null;
@@ -704,7 +704,7 @@ G.InvUI = (() => {
     const [uid, slot] = key.split('|'), gun = findIn(me, grids(me), +uid), it = src.it;
     if (!gun || it.k !== 'part') return G.Audio.deny();
     const w = gun.w, p = GS().PARTS[it.pid], sl = GS().visibleSlots(w.def.id, w.def.build).find((s) => s.slot === slot);
-    if (!p || !sl || p.mount !== sl.mount) return G.HUD.toast('', `It doesn't fit there (${GS().ifaceName(p ? p.mount : '')})`, 1.5), G.Audio.deny();
+    if (!p || !sl || !GS().fitsSlot(sl, p, w.def.id)) return G.HUD.toast('', `It doesn't fit there (${GS().ifaceName(p ? p.mount : '')})`, 1.5), G.Audio.deny();
     if (src.gunPart && src.gunPart.w === w && src.gunPart.slot === slot) return;
     if (src.gunPart) { const o = src.gunPart, b = Object.assign({}, o.w.def.build); delete b[o.slot]; setBuild(me, o.w, b); } // off the other gun, quietly
     else detach(me, src);

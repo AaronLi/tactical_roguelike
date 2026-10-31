@@ -1634,10 +1634,14 @@ G.GunModels = (() => {
       sights(anim) {
         k.tag('optic');
         let sight;
-        if (o.optic && !['irons', 'notch', 'bead', 'none', 'night', 'minidot', 'riser'].includes(o.optic)) {
-          sight = sightOf(k, o, top, f0, rl, 0.01, fN, f0 + (o.magnifier ? Math.max(rl * 0.55, Math.min(rl - 0.035, 0.15)) : rl * 0.5));
+        const ofs = f0 + (o.magnifier ? Math.max(rl * 0.55, Math.min(rl - 0.035, 0.15)) : rl * 0.5);
+        if (o.optic && !['irons', 'notch', 'bead', 'none', 'night', 'riser'].includes(o.optic)) { // (a pistol dot's here on a riser: the slide's own sight isn't drawn in a chassis)
+          sight = sightOf(k, o, top, f0, rl, 0.01, fN, ofs);
           if (o.magnifier && k.reflex) { k.tag('magnifier'); sight = S.magnifier(k, sight, top, o.magnifier, anim); }
-        } else sight = S.irons(k, f0 + 0.012, fN - 0.014, top + 0.026, top, top, 'ar');
+        } else {
+          if (o.optic === 'riser') k.box(0.024, o.riser || 0.022, 0.034, B, ofs - 0.017, top + (o.riser || 0.022) / 2); // (with nothing on it: the irons still work)
+          sight = S.irons(k, f0 + 0.012, fN - 0.014, top + 0.026, top, top, 'ar');
+        }
         return sight;
       },
     };
@@ -1673,7 +1677,7 @@ G.GunModels = (() => {
     tracedParts(k, t, V, 'grip', mats);
     k.tag('optic');
     const fR = V([t.sights[0], 0])[0], sy = V([0, t.sights[1]])[1];
-    const sight = o.optic === 'minidot' ? S.minidot(k, fc + cl * 0.5, top) : S.revSights(k, fR, front0 - 0.006, sy, top, fm);
+    const sight = o.optic === 'minidot' ? S.minidot(k, fc + cl * 0.5, top, o) : S.revSights(k, fR, front0 - 0.006, sy, top, fm);
     if (o.optic === 'night') { k.cyl(0.0011, 0.0006, M.tritium(), front0 - 0.0122, sy - 0.002); for (const x of [-1, 1]) k.cyl(0.001, 0.0006, M.tritium(), fR - 0.0063, sy - 0.0023, x * 0.0045); }
     k.tag('base');
     const hold = V(t.hold);
@@ -1704,7 +1708,7 @@ G.GunModels = (() => {
     k.tag('grip');
     k.prof([[-0.012, 0.0], [0.022, -0.012], [0.016, -0.11], [-0.03, -0.1], [-0.024, -0.02]], 0.032, o.gm || M.woodDark());
     k.tag('optic');
-    const sight = o.optic === 'minidot' ? S.minidot(k, 0.02 + cl * 0.5, 0.024) : S.revSights(k, 0.006, front - 0.006, 0.0295, 0.022, fm);
+    const sight = o.optic === 'minidot' ? S.minidot(k, 0.02 + cl * 0.5, 0.024, o) : S.revSights(k, 0.006, front - 0.006, 0.0295, 0.022, fm);
     if (o.optic === 'night') { k.cyl(0.0011, 0.0006, M.tritium(), front - 0.0122, 0.0275); for (const x of [-1, 1]) k.cyl(0.001, 0.0006, M.tritium(), -0.0003, 0.0272, x * 0.0045); }
     k.tag('base');
     return { sy: sight.sy, fSight: sight.fSight, relief: o.optic === 'minidot' ? 0.3 : 0.36, muzzles: [[front, 0.009, 0]], grip: [0.0, -0.06, 0], support: [0.02, -0.065, -0.022], anim, pistol: true, cylAt: [0.03 + cl / 2, -0.004, 0], chamberAt: { side: 'cyl', z: cl / 2, R: cr * 0.6, r: cr * 0.28 } }; // (the case heads on the cylinder's back face)
