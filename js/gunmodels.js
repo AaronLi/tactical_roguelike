@@ -874,9 +874,12 @@ G.GunModels = (() => {
     const rcv = o.rcv || 'ar', tr = o.look && G.GunTraces[o.look], VT = tr ? tracer(tr) : null, mats = { frame: o.rm || fm, grip: o.gm || fm, slide: rm, stock: o.sm || fm, forend: (o.pump && o.pump.m) || fm }; // (traced: js/guntraces.js)
     k.tag('base');
     if (rcv === 'ar') {
-      k.prof([[0, -0.012], [0, 0.026], [L, 0.026], [L, -0.012]], 0.03, rm);
-      k.prof([[0.004, -0.012], [0.004, -0.034], [0.03, -0.042], [L * 0.74, -0.042], [L * 0.8, -0.012]], 0.028, rm);
-      k.box(0.004, 0.013, 0.045, M.black(), L * 0.36, 0.007, 0.0158);
+      if (tr) tracedParts(k, tr, VT, 'base', mats); // (a traced upper and lower: the AR-9's, js/guntraces.js)
+      else {
+        k.prof([[0, -0.012], [0, 0.026], [L, 0.026], [L, -0.012]], 0.03, rm);
+        k.prof([[0.004, -0.012], [0.004, -0.034], [0.03, -0.042], [L * 0.74, -0.042], [L * 0.8, -0.012]], 0.028, rm);
+        k.box(0.004, 0.013, 0.045, M.black(), L * 0.36, 0.007, 0.0158);
+      }
       top = o.railTop === false ? 0.026 : S.rail(k, 0.004, L - 0.008, 0.026, rm);
     } else if (rcv === 'ak') {
       k.prof([[0, -0.046], [0, 0.014], [0.012, 0.026], [L - 0.01, 0.026], [L, 0.016], [L, -0.046]], 0.036, rm);
@@ -1226,7 +1229,7 @@ G.GunModels = (() => {
     if (handle) anim.handle = cockHandle(k, handle);
 
     k.tag('grip');
-    if (tr) tracedParts(k, tr, VT, 'grip', mats);
+    if (tr && !(rcv === 'ar' && o.gripT && o.gripT !== 'ar')) tracedParts(k, tr, VT, 'grip', mats); // (an AR lower's own grip comes off for another shape: the lower stays)
     else if (o.gripT !== 'none' && rcv !== 'qbz95' && rcv !== 'f2' && rcv !== 'aksu' && !((rcv === 'vector' || rcv === 'aug') && (o.gripT || 'ar') === 'ar')) grip(k, gf, o.gm || fm, o.gripT || (rcv === 'ak' ? 'wood' : 'ar')); // (the Vector's own is part of its lower)
     k.tag('stock');
     if (rcv === 'vector' && o.stock) { const sp = k.part(0, vecTrace([0, 110])[1]); k.into(sp); stock(k, o.stock, o.sm || fm, false); k.into(null); } // (its tube level with the top of the receiver: the bore's below the shoulder)

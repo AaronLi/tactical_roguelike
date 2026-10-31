@@ -38,3 +38,4 @@ date doesn't say which came first. `traced`: from a photo. `by eye`: built looki
 | dbl | 2026-10-30 | traced | 2068cbc | "ИЖ-43Е (1).jpg" (an IZH-43E) |
 | pump | 2026-10-30 | traced | 32272b8 | "Remington 870 Wmaster.jpg" (a Wingmaster) |
 | aks74u | 2026-10-30 | traced | c665baf | "AK74andAKS74U.jpg", cross-checked against "Stepanov AKS-74Us.jpg" and "AKSU-74.jpg" |
+| ar9 | 2026-10-30 | traced | feb9d29 | "AR Colt 9mm left.jpg" (the Colt 9mm SMG's receiver pair; the Glock magazine goes in the same well) |
