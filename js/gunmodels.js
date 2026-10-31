@@ -835,7 +835,7 @@ G.GunModels = (() => {
     const gf = o.grip != null ? o.grip : bull ? L * 0.62 : 0.045;
     const anim = {};
     let top;
-    const rcv = o.rcv || 'ar', tr = o.look && G.GunTraces[o.look], VT = tr ? tracer(tr) : null, mats = { frame: o.rm || fm, grip: o.gm || fm, slide: rm }; // (traced: js/guntraces.js)
+    const rcv = o.rcv || 'ar', tr = o.look && G.GunTraces[o.look], VT = tr ? tracer(tr) : null, mats = { frame: o.rm || fm, grip: o.gm || fm, slide: rm, stock: o.sm || fm }; // (traced: js/guntraces.js)
     k.tag('base');
     if (rcv === 'ar') {
       k.prof([[0, -0.012], [0, 0.026], [L, 0.026], [L, -0.012]], 0.03, rm);
@@ -1162,6 +1162,7 @@ G.GunModels = (() => {
     else if (o.gripT !== 'none' && rcv !== 'qbz95' && rcv !== 'f2' && !((rcv === 'vector' || rcv === 'aug') && (o.gripT || 'ar') === 'ar')) grip(k, gf, o.gm || fm, o.gripT || (rcv === 'ak' ? 'wood' : 'ar')); // (the Vector's own is part of its lower)
     k.tag('stock');
     if (rcv === 'vector' && o.stock) { const sp = k.part(0, vecTrace([0, 110])[1]); k.into(sp); stock(k, o.stock, o.sm || fm, false); k.into(null); } // (its tube level with the top of the receiver: the bore's below the shoulder)
+    else if (tr && o.stock === 'wood' && tr.parts.some((p) => p.on === 'stock')) { if (!buildingVM || o.gripT === 'none') tracedParts(k, tr, VT, 'stock', mats); } // (the traced stock, while the factory one's fitted)
     else if (!bull && o.stock) stock(k, o.stock, o.sm || fm, o.gripT === 'none');
     k.tag('mag');
     let magAt = null;
@@ -1191,6 +1192,7 @@ G.GunModels = (() => {
       const bIn = o.bIn || 0; // (how much of it's inside the receiver: a Vector's is mostly)
       if (o.barrels) for (const x of o.barrels) k.cyl(br, bl, b.m || M.blued(), L, by, x);
       else k.cyl(br, bl, b.m || M.blued(), L - bIn, by, 0, br * (b.taper || 1), 14);
+      if (o.barrels && tr && tr.rib) { k.box(0.008, 0.0102, bl, b.m || M.blued(), L, by + 0.0091); k.box(0.008, 0.008, bl, b.m || M.blued(), L, by - 0.008); } // (the ribs filling the valleys between the barrels, over and under)
       if (rcv === 'f2') { // the collar and the grenade spigot's ridges (as much of them as the barrel has)
         k.cyl(0.0105, Math.min(0.022, bl), M.black(), L + 0.003, by, 0, br);
         for (let i = 0; i < 10 && 0.022 + i * 0.0049 < bl - 0.006; i++) k.ringZ(br + 0.0004, 0.0014, M.black(), L + 0.022 + i * 0.0049, by);
@@ -1205,7 +1207,8 @@ G.GunModels = (() => {
       hgLen = hg.len;
       if (hg.t === 'sig') hg.ext = o.railExt || 0;
       if (hg.t === 'g36') hg.bl = bl;
-      handguard(k, hg, L, fm, rm);
+      if (tr && tr.parts.some((p) => p.on === 'fore') && hg.t === 'wood') { const sc = (hg.len - 0.03) / (tr.foreLen - 0.03), VF = (p) => { const [f, y] = VT(p); return [f > L + 0.03 ? L + 0.03 + (f - L - 0.03) * sc : f, y]; }; tracedParts(k, tr, VF, 'fore', Object.assign({}, mats, { fore: hg.m || fm })); } // (the traced forend, stretched or shortened ahead of the action to the wooden hand guard's length)
+      else handguard(k, hg, L, fm, rm);
     }
     if (o.tube) { k.tag('tube'); k.cyl(0.0105, o.tube, M.blued(), L, -0.026); k.cyl(0.012, 0.012, M.blued(), L + o.tube - 0.012, -0.026); }
     if (o.saddle) { // shells on the left of the receiver (a side saddle), or a loader's caddy of 2 or 4
@@ -1319,7 +1322,7 @@ G.GunModels = (() => {
     // break-action, the shell heads in the breech
     const hw = { ar: 0.0178, ak: 0.022, box: (o.W || 0.045) / 2, round: 0.018, bullpup: 0.023, vector: 0.026, aug: 0.029, f2: 0.032, qbz95: 0.027, qbz192: 0.0172, scar: 0.0172, g36: 0.022, mcx: 0.0156, mpx: 0.0156 }[rcv] || 0.018;
     const chamberAt = tr && tr.chamber ? { side: 'breech', heads: [[0, by - hy]], z: L - tr.chamber, r: 0.0064 } // (the Thor's: at the back of its sleeve)
-      : rcv === 'break' ? { side: 'breech', heads: (o.barrels || [0]).map((x) => [x, by + 0.035]), z: -0.0005, r: br } // (in the barrels' hinge frame)
+      : rcv === 'break' ? { side: 'breech', heads: (o.barrels || [0]).map((x) => [x, by - hy]), z: -0.0005, r: br } // (in the barrels' hinge frame)
       : o.bolt ? { side: 'top', f: o.bolt - 0.05, y: rcv === 'round' ? top - 0.0015 : top, x: rcv === 'round' ? 0.006 : 0.011, w: 0.024 } // (a bolt gun's port is its open top, to the right of a scope's line, above the stock)
       : { side: 'right', f: o.lever ? L * 0.55 : magAt ? magAt[0] + 0.005 : !o.pump && handle && handle.x > 0 ? handle.f + 0.026 : o.pump || o.tube ? L * 0.55 : L * 0.5, y: o.chY != null ? o.chY : by, x: hw };
     return {
