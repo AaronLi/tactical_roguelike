@@ -75,9 +75,9 @@ G.Shop = {
     this.offers = {
       p: pickW(weapons.filter((w) => w.slot === 'p'), 3).map((w) => w.id),
       s: pickW(weapons.filter((w) => w.slot === 's'), 2).map((w) => w.id),
-      // kit: three pieces, of different kinds (carrier, plate, helmet, belt, pack), by rarity
+      // kit: four pieces, of different kinds (carrier, plate, helmet, shoulders, pelvis, legs, belt, pack), by rarity
       gear: (() => {
-        const all = G.Gear.LIST.filter((d) => ['carrier', 'plate', 'helmet', 'face', 'belt', 'pack'].includes(d.kind));
+        const all = G.Gear.LIST.filter((d) => ['carrier', 'plate', 'helmet', 'face', 'shoulder', 'groin', 'legs', 'belt', 'pack'].includes(d.kind));
         const out = [];
         for (let i = 0; i < 4; i++) { const d = pickW(all.filter((x) => !out.some((o) => o.kind === x.kind)), 1)[0]; if (d) out.push(d); }
         return out.sort((x, y) => x.price - y.price).map((d) => d.id);
@@ -160,14 +160,13 @@ G.Shop = {
       if (fc) it.face = G.Gear.gearItem(fc); // and a helmet with its face shield
       if (!this.inStock('gear:' + id)) { G.Audio.deny(); return; }
       // straight on if the slot's free, else into the locker
-      const free = () => (d.kind === 'plate' ? Me.kit.carrier && G.Gear.defOf(Me.kit.carrier).plate && !Me.kit.carrier.plate
-        : d.kind === 'face' ? Me.kit.helmet && G.Gear.defOf(Me.kit.helmet).face && !Me.kit.helmet.face : !Me.kit[d.kind]);
+      const free = () => (G.Gear.MOUNTS[d.kind] ? G.Gear.mountFree(Me, d.kind) : !Me.kit[d.kind]);
       const fits = () => free() || G.Gear.findSpot(Me.locker, it);
       if (!fits()) { G.HUD.toast('', 'No room in your locker', 1.5); G.Audio.deny(); return; }
       if (!this.afford(this.gearPrice(id))) return;
       this.take('gear:' + id, () => {
         if (!fits() || !this.spend(this.gearPrice(id))) return false;
-        if (free()) { if (d.kind === 'plate') Me.kit.carrier.plate = it; else if (d.kind === 'face') Me.kit.helmet.face = it; else Me.kit[d.kind] = it; } else G.Gear.place([Me.locker], it);
+        if (free()) { if (G.Gear.MOUNTS[d.kind]) G.Gear.mountOn(Me, d.kind)[d.kind] = it; else Me.kit[d.kind] = it; } else G.Gear.place([Me.locker], it);
       });
       return;
     } else if (kind === 'ammo') {
@@ -354,7 +353,7 @@ G.Shop = {
   gearCard(d) {
     const sold = !this.inStock('gear:' + d.id), pl = this.offers && this.offers.plates && G.Gear.DEFS[this.offers.plates[d.id]], price = this.gearPrice(d.id);
     const Me = G.Me, ZN = { chest: 'chest', abdomen: 'stomach', uarm: 'shoulders', thigh: 'thighs', head: 'top of head', face: 'face' };
-    const KN = { carrier: d.dur ? (d.plate ? 'PLATE CARRIER' : 'SOFT VEST') : 'CHEST RIG', plate: 'PLATE', helmet: 'HELMET', face: d.cover < 0.9 ? 'MANDIBLE' : 'FACE SHIELD', belt: 'BELT', pack: 'BACKPACK' };
+    const KN = { carrier: d.dur ? (d.plate ? 'PLATE CARRIER' : 'SOFT VEST') : 'CHEST RIG', plate: 'PLATE', helmet: 'HELMET', face: d.cover < 0.9 ? 'MANDIBLE' : 'FACE SHIELD', shoulder: 'SHOULDER ARMOUR', groin: 'PELVIS ARMOUR', legs: 'LEG ARMOUR', belt: 'BELT', pack: 'BACKPACK' };
     const fc = this.offers && this.offers.faces && G.Gear.DEFS[this.offers.faces[d.id]];
     const cardIt = G.Gear.gearItem(d.id); if (fc) cardIt.face = G.Gear.gearItem(fc.id); // (its icon shows what's fitted)
     const B = G.Ballistics, L = B.mainLayers(d, pl), rt = L && B.rating(L);
@@ -368,7 +367,9 @@ G.Shop = {
     const foot = [d.prot && d.prot.length ? 'Covers ' + [...new Set(d.prot.map((p) => B.AT_NAME[p.at] || p.at))].join(', ') : '', d.plate ? (pl ? `Fitted with <b style="color:${G.TIER_COLORS[pl.tier]}">${G.U.esc(pl.name)}</b> (${G.TIER_NAMES[pl.tier]}, ¢${G.U.fmt(pl.price)} of the price)` : 'Plate pocket') : '', pouches.length ? 'Holds ' + pouches.join(', ') + ': ' + this.packFits(d) : '', d.molle ? `MOLLE ${d.molle[0]}×${d.molle[1]}, issued with ${this.issued(d)}` : '',
       d.kind === 'helmet' && d.face ? (fc ? `Fitted with <b style="color:${G.TIER_COLORS[fc.tier]}">${G.U.esc(fc.name)}</b> (${G.TIER_NAMES[fc.tier]}, ¢${G.U.fmt(fc.price)} of the price)` : 'Mount for a face shield or mandible') : '',
       d.kind === 'face' ? `Fits helmets with a mount · in the way of ${Math.round((d.cover || 1) * 100)}% of face hits · <b>helmet not included</b>` : '',
-      d.kind === 'plate' ? '<b>Carrier not included</b>: it goes in a plate carrier\'s pocket' : ''].filter(Boolean).join(' · ');
+      d.kind === 'plate' ? '<b>Carrier not included</b>: it goes in a plate carrier\'s pocket' : '',
+      d.kind === 'shoulder' || d.kind === 'groin' ? '<b>Carrier not included</b>: it fits a plate carrier\'s mounts' : '', d.kind === 'legs' ? '<b>Belt not included</b>: it hangs from a battle belt or war belt' : '',
+      d.kind === 'carrier' && (d.shoulder || d.groin) ? 'Mounts for shoulder and pelvis armour' : '', d.kind === 'belt' && d.legs ? 'Hangers for leg armour' : ''].filter(Boolean).join(' · ');
     return `<div class="card gear">
       <div class="ch"><img class="ci" src="${G.Icons.of(cardIt, ...G.Gear.size(cardIt))}"><span class="cn">${G.U.esc(d.name)}</span><span class="tier" style="color:${G.TIER_COLORS[d.tier]}">${G.TIER_NAMES[d.tier]} ${KN[d.kind]}</span></div>
       <div class="cd"><small class="brand">${G.U.esc(d.brand)}</small> ${G.U.esc(d.desc)}</div>
@@ -437,6 +438,7 @@ G.Shop = {
       if (b && !b.disabled) this.buy(b.dataset.k, b.dataset.id);
     });
     items.addEventListener('mouseover', (e) => { if (this.tab === 'gunsmith') G.GunsmithUI.onHover(e); });
+    items.addEventListener('change', (e) => { if (this.tab === 'gunsmith') G.GunsmithUI.onChange(e); });
     items.addEventListener('change', (e) => { const s = e.target.closest('.load-sel'); if (s) { this.loadSel[s.dataset.cal] = s.value; G.Audio.click(); this.render(); } }); // (the load a box on Supplies is of)
     document.getElementById('btnReady').addEventListener('click', () => (G.Game.hub ? G.Game.closeShop() : this.setReady(!this.ready)));
   },

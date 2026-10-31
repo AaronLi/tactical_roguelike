@@ -14,6 +14,7 @@
 //   fx     what a hit looks and sounds like (js/render.js IMPACT).
 //   blunt, wearJ, soft, hard: armour's (js/ballistics.js): the share of a stopped round's energy the body behind it
 //          takes, joules per point of durability, and how it behaves.
+//   spall  a hard plate's: the share of the plug a round pushes out of it that flies off its back as chips (stack).
 // Fitted to: 9 mm ball stopped by about 3 mm of mild steel and 85 mm of pine, through a dozen sheets of plasterboard; M193
 // 5.56 through 8 mm of mild steel; a single brick stopping 5.56 and 7.62x39 and passing 7.62x51 slowly; hollow block's
 // shell not stopping a rifle, stopping a pistol; 100 mm of concrete stopping 7.62x51; a car door nothing to anyone.
@@ -31,13 +32,13 @@ G.Materials = (() => {
     // armour (K, E, blunt, wearJ: the NIJ calibration, js/ballistics.js)
     aramid: m('aramid', 72, 1440, 3e8, 'soft', { E: { lead: 1, mild: 1.25, hard: 1.45, wc: 1.5 }, blunt: 0.25, wearJ: 900, soft: true, noRic: true, damp: 0.6, weave: 0.1 }), // (weave: the share of it a spike has to get through, js/ballistics.js vLimit)
     pe: m('UHMWPE', 77, 970, 2.5e8, 'soft', { E: { lead: 1, mild: 1.35, hard: 1.75, wc: 2 }, blunt: 0.15, wearJ: 2200, noRic: true, damp: 0.7 }),
-    steel: m('steel', 163, 7850, 2.4e9, 'metal', { E: { lead: 0.9, mild: 1.1, hard: 1.5, wc: 1.9 }, blunt: 0.1, wearJ: 4500, hard: true, mu: 0.1, e: 0.25 }),
-    ceramic: m('ceramic', 146, 3900, 4e9, 'stone', { E: { lead: 0.8, mild: 0.9, hard: 1, wc: 1.25 }, blunt: 0.08, wearJ: 1600, hard: true, mu: 0.15, e: 0.2 }),
+    steel: m('steel', 163, 7850, 2.4e9, 'metal', { E: { lead: 0.9, mild: 1.1, hard: 1.5, wc: 1.9 }, blunt: 0.1, wearJ: 4500, hard: true, mu: 0.1, e: 0.25, spall: 0.15 }),
+    ceramic: m('ceramic', 146, 3900, 4e9, 'stone', { E: { lead: 0.8, mild: 0.9, hard: 1, wc: 1.25 }, blunt: 0.08, wearJ: 1600, hard: true, mu: 0.15, e: 0.2, spall: 0.3 }),
     pc: m('polycarbonate', 55, 1200, 1.2e8, 'plastic', { E: { lead: 1, mild: 1.2, hard: 1.4, wc: 1.5 }, blunt: 0.2, wearJ: 900 }),
     abs: m('ABS', 25, 1050, 6e7, 'plastic', { E: { lead: 1, mild: 1.1, hard: 1.2, wc: 1.3 }, blunt: 0.4, wearJ: 300 }),
     // armour's trimmings (ARMOUR): damp, the share of a stopped round's back-face energy that gets past a layer behind it
     nylon: m('nylon cover', 1.2, 1150, 8e7, 'soft', { noRic: true, blunt: 0.3, wearJ: 900, damp: 0.95 }),
-    polyurea: m('spall liner', 4, 1100, 3e7, 'plastic', { noRic: true, blunt: 0.3, wearJ: 900, damp: 0.8 }),
+    polyurea: m('spall liner', 30, 1100, 3e7, 'plastic', { noRic: true, blunt: 0.3, wearJ: 900, damp: 0.8 }),
     pad: m('trauma pad', 0.5, 90, 4e5, 'soft', { noRic: true, blunt: 0.3, wearJ: 900, damp: 0.55 }),
     // people: the skull's outer table, for a round skimming it (the rest of a body: TISSUE)
     bone: m('bone', 14, 1900, 1.6e8, 'soft', { mu: 0.2, e: 0.15 }),
@@ -93,6 +94,7 @@ G.Materials = (() => {
   const ARMOUR = {
     plate: [[['nylon', 1]], [['pad', 8], ['nylon', 1]]], side: [[['nylon', 1]], [['pad', 5], ['nylon', 1]]], torso: [[['nylon', 1]], [['nylon', 1]]],
     groin: [[['nylon', 1]], [['nylon', 1]]], shoulder: [[['nylon', 1]], [['nylon', 1]]], thigh: [[['nylon', 1]], [['nylon', 1]]],
+    axilla: [[['nylon', 1]], [['nylon', 1]]], pelvis: [[['nylon', 1]], [['nylon', 1]]], groinplate: [[['nylon', 1]], [['pad', 5], ['nylon', 1]]], legwrap: [[['nylon', 1]], [['nylon', 1]]], shin: [[], [['pad', 5]]],
     helmet: [[['nylon', 0.5]], [['pad', 15]]], face: [[], []],
   };
   // a piece's protection as it's really layered, outside in
@@ -134,7 +136,7 @@ G.Materials = (() => {
     furnace: C([['mild', 12], ['brick', 110]], 'brick', 0.6), vat: C([['mild', 15]], 'iron', 0.5), moulds: C([['sand', 200]], 'sand'), panel: SHEET(1.5, 'mild', 0.02), scrap: C([['mild', 5]], 'mild', 0.25), conveyor: SHEET(4, 'rubber', 0.1), mill: MACHINE, saw: MACHINE, press: MACHINE, quench: SHEET(10, 'water'),
     forklift: SHEET(4, 'iron', 0.2), billets: SOLID('mild'), ingots: SOLID('alu'), coils: C([['mild', 20]], 'mild', 0.6), console: C([['mild', 1.5]], 'goods', 0.1),
   };
-  const CRATE = PROPS.crates, RAIL = ONE([['mild', 3]]);
+  const CRATE = PROPS.crates, RAIL = ONE([['mild', 3]]), GRATE = ONE([['mild', 4]]); // (a bar of it: what a round has to get through is js/world.js barHit's)
   // the same construction with only what's needed changed: a void wall's stud, say
   const wallOf = (theme, out) => { const w = WALLS[theme.name] || WALLS.Apartment; return w[out ? 1 : 0]; };
   // is this point outdoors (on its floor's plan)?
@@ -162,6 +164,7 @@ G.Materials = (() => {
       }
       case 'glass': return s.win && s.win.armor ? ONE([['bpglass', 40]]) : ONE([['glass', 5]]);
       case 'rail': return RAIL;
+      case 'grate': return GRATE;
       case 'view': return SOLID('soil');
       case 'target': return s.target && (s.target.kind === 'steel' || (s.target.q && s.target.q.kind === 'steel')) ? ONE([['steel', 10]]) : ONE([['paperT', 2]]);
       case 'prop': default:

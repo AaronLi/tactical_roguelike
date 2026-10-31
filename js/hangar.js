@@ -23,7 +23,7 @@ G.Hangar = (() => {
   const HELI = { x: 26, z: 36.2, floor: 0.55, seats: 6 };
   const BENCH = (i) => ({ x: 2.1, x1: 3.25, z: 4 + i * 4 });
   const COUNTER = { x0: 22, x1: 28, z0: 4, z1: 5, h: 1.05 }, VEX = { x: 25, z: 2.9 };
-  const STAND = { z: 12.5, xs: [22, 25, 28], top: 0.95 };
+  const STAND = { z: 12.5, xs: [20.5, 23.5, 26.5, 29.5], top: 0.95 };
   const POUCH = { x0: 17.2, x1: 18.0, z0: 8.7, step: 1.12, n: 5 };
   const ZERO = { x0: 6.3, x1: 8.1, z0: 13.1, z1: 14.9, h: 0.9 }; // the zeroing table, in the middle of the workshop floor
   const PARTS = { x0: 12.9, z: 3.5, step: 1.3, n: 6, top: 0.9 }; // the gunsmith's parts, on pedestals along the north wall (east of the range's garage door)
@@ -63,7 +63,7 @@ G.Hangar = (() => {
     add(L.bar[0], 0, L.bar[1], L.bar[2], L.bar[4], L.bar[3]);
     // the helicopter: the cabin and nose, and the tail boom (above head height at its end, but there's no walking through it)
     add(HELI.x - 3.4, 0, HELI.z - 1.35, HELI.x + 2.4, 2.8, HELI.z + 1.35);
-    add(HELI.x + 2.4, 1.5, HELI.z - 0.3, HELI.x + 8.0, 2.5, HELI.z + 0.3);
+    add(HELI.x + 2.4, 1.5, HELI.z - 0.3, HELI.x + 8.3, 2.5, HELI.z + 0.3);
   }
 
   // ------------------------------------------------------------------------ drawing helpers
@@ -139,7 +139,7 @@ G.Hangar = (() => {
   function addTarget(t) { t.box = [t.box[0], t.box[1], t.box[2] + RZ, t.box[3], t.box[4], t.box[5] + RZ]; S.targets.push(t); return t; } // (boxes are said in the hall's coordinates, kept in the world's)
   const gearOf = (id) => G.Gear.DEFS[id];
   // what a piece of gear fits on that isn't part of the sale (a plate goes in a carrier, a face guard on a helmet)
-  const needs = (d) => (d.kind === 'plate' ? 'carrier not included' : d.kind === 'face' ? 'helmet not included' : null);
+  const needs = (d) => (d.kind === 'plate' || d.kind === 'shoulder' || d.kind === 'groin' ? 'carrier not included' : d.kind === 'face' ? 'helmet not included' : d.kind === 'legs' ? 'belt not included' : null);
   // The piece on show, on its own. The same models the squad wears (js/rig.js setKit makes them in the frames of a body):
   // built on a body that's thrown away, each part lifted out by what it is (helmet, face guard, carrier, belt, pack) and
   // set down where it hung. A plate isn't part of a carrier's model: it's drawn here, to stand beside it.
@@ -150,12 +150,12 @@ G.Hangar = (() => {
     box(g, -0.115 * k, 0.02 * k, 0.012 * k, 0.115 * k, 0.34 * k, 0.017 * k, M(c, { roughness: 0.9 })); // (its face: a raised panel)
     return g;
   }
-  const SHOW = { carrier: ['carrier'], helmet: ['helmet', 'face'], face: ['face'], belt: ['belt'], pack: ['pack'] }, SCALE = { carrier: 1.45, helmet: 1.9, face: 2.1, belt: 1.7, pack: 1.5 };
+  const SHOW = { carrier: ['carrier'], helmet: ['helmet', 'face'], face: ['face'], shoulder: ['shoulder'], groin: ['groin'], legs: ['legs'], belt: ['belt'], pack: ['pack'] }, SCALE = { carrier: 1.45, helmet: 1.9, face: 2.1, shoulder: 1.5, groin: 2, legs: 1.1, belt: 1.7, pack: 1.5 };
   function showPiece(id) {
     const d = gearOf(id), O = G.Shop.offers || {}, np = (d.pouches || []).length, root = new T.Group();
     if (d.kind === 'plate') { const p = plateMesh(id, 2.3); p.position.y = STAND.top + 0.14; p.rotation.x = -0.14; root.add(p); return { root, spin: null }; }
     const kit = d.kind === 'carrier' ? { carrier: id, plate: 0, cp: np } : d.kind === 'helmet' ? { helmet: id, face: O.faces && O.faces[id] || 0 }
-      : d.kind === 'face' ? { helmet: 'h.fast', face: id } : d.kind === 'belt' ? { belt: id, bp: np } : { pack: id };
+      : d.kind === 'face' ? { helmet: 'h.fast', face: id } : d.kind === 'shoulder' ? { sh: id } : d.kind === 'groin' ? { gr: id } : d.kind === 'legs' ? { lg: id } : d.kind === 'belt' ? { belt: id, bp: np } : { pack: id };
     const rig = G.Rig.create({ style: 'tactical', bare: true, mannequin: true, look: { top: 'tshirt', topC: 0xb4bac0, pants: 'jeans', pantsC: 0x9aa1a8, eyes: 'none', gloves: 'none' }, seed: 5 });
     rig.setKit(kit); rig.root.updateMatrixWorld(true);
     const g = new T.Group();
@@ -218,8 +218,7 @@ G.Hangar = (() => {
       if (fc) L.push('face guard included: ' + fc.name); else if (d.face) L.push('!face guard not included');
     } else if (d.kind === 'belt') L.push('comes with: ' + Sh.issued(d));
     else if (d.kind === 'pack') { const [w, h] = d.grids[0]; L.push(`holds ${w}×${h}`); }
-    else if (d.kind === 'plate') L.push('!carrier not included');
-    else if (d.kind === 'face') L.push('!helmet not included');
+    else if (needs(d)) L.push('!' + needs(d));
     return L;
   }
 
@@ -349,7 +348,7 @@ G.Hangar = (() => {
     vex.setKit({ carrier: 'c.recon', cp: 3, belt: 'b.battle', bp: 2, ifak: 1 });
     vex.root.position.set(VEX.x, 0, VEX.z); r.add(vex.root); S.rigs.push({ rig: vex, x: VEX.x, z: VEX.z, yaw: Math.PI, vex: true });
 
-    // pedestals: one for each of the three pieces of gear for sale, the piece turning slowly on top, its sign on the front
+    // pedestals: one for each of the four pieces of gear for sale, the piece turning slowly on top, its sign on the front
     S.stands = [];
     STAND.xs.forEach((x, i) => {
       box(r, x - 0.8, 0, STAND.z - 0.8, x + 0.8, 0.1, STAND.z + 0.8, M(0x30353b));
@@ -474,45 +473,72 @@ G.Hangar = (() => {
     const fg = new T.Mesh(new T.PlaneGeometry(0.66, 0.7), new T.MeshStandardMaterial({ color: 0x9adfff, emissive: 0x1a4a6a, transparent: true, opacity: 0.7 })); fg.rotation.y = Math.PI / 2; fg.position.set(bx1 - 0.08, bh + 0.45, fz); r.add(fg);
   }
 
-  // ---- the helicopter
+  // ---- the helicopter: an armoured tiltrotor dropship, nose to the west, with ducted fans on stub wings
   function helicopter() {
     const r = S.root, h = new T.Group(), P = HELI;
     h.position.set(P.x, 0, P.z); r.add(h);
-    const body = M(0x56684f, { roughness: 0.55, metalness: 0.25, emissive: 0x141a12 }), dark = M(0x23272b), inside = M(0x6b7279, { emissive: 0x2a3036 }), glass = new T.MeshStandardMaterial({ color: 0x78a8c8, transparent: true, opacity: 0.4, roughness: 0.1, metalness: 0.3 });
+    const body = M(0x9aa7b3, { roughness: 0.5, metalness: 0.3, emissive: 0x20262c }), armor = M(0x56626e, { roughness: 0.55, metalness: 0.4, emissive: 0x12161a }), dark = M(0x2a3036), inside = M(0x6b7279, { emissive: 0x2a3036 });
+    const accent = M(0xd9922a, { emissive: 0x3a2308 }), duct = M(0x56626e, { roughness: 0.55, metalness: 0.4, emissive: 0x12161a, side: T.DoubleSide });
+    const glass = new T.MeshStandardMaterial({ color: 0x78a8c8, transparent: true, opacity: 0.4, roughness: 0.1, metalness: 0.3 });
+    const glow = new T.MeshBasicMaterial({ color: 0x1a6a40 }); // status strips: red to green as the squad gets in
+    const thrust = new T.MeshBasicMaterial({ color: 0x5ad0ff, transparent: true, opacity: 0.2, side: T.DoubleSide, depthWrite: false, blending: T.AdditiveBlending });
+    const part = (g, mesh, x, y, z) => { mesh.position.set(x, y, z); g.add(mesh); return mesh; };
     // helipad: a painted H on the paving
     const pad = new T.Mesh(new T.PlaneGeometry(13, 11), new T.MeshBasicMaterial({ map: canvasTex(256, 220, (g, w, hh) => { g.fillStyle = '#34383d'; g.fillRect(0, 0, w, hh); g.strokeStyle = '#e8c030'; g.lineWidth = 6; g.strokeRect(10, 10, w - 20, hh - 20); g.fillStyle = '#e8c030'; g.fillRect(w / 2 - 38, hh / 2 - 50, 14, 100); g.fillRect(w / 2 + 24, hh / 2 - 50, 14, 100); g.fillRect(w / 2 - 38, hh / 2 - 7, 76, 14); }) }));
     pad.rotation.x = -Math.PI / 2; pad.position.set(P.x + 0.4, 0.014, P.z); r.add(pad);
     // cabin: the floor, the roof, the back (south), the bulkheads; the north side is open (a door's length), with
     // a bench along the south wall facing out of it
     box(h, -3.2, P.floor - 0.1, -1.3, 2.4, P.floor, 1.3, inside);
-    box(h, -2.4, 2.45, -1.3, 2.4, 2.65, 1.3, inside);
+    box(h, -2.4, 2.45, -1.3, 2.4, 2.65, 1.3, M(0x8a929a, { emissive: 0x555d66 }));
     box(h, -2.4, P.floor, 1.2, 2.4, 2.45, 1.32, body);
     box(h, 2.28, P.floor, -1.3, 2.4, 2.45, 1.3, body);
     box(h, -2.4, P.floor, -1.32, -1.5, 2.45, -1.2, body); box(h, 2.0, P.floor, -1.32, 2.4, 2.45, -1.2, body); // the door posts
     box(h, -2.5, P.floor, -1.3, -2.4, 2.45, 1.3, body);
-    // the nose: a cockpit, tapering, with a windscreen
-    const nose = new T.Mesh(new T.BoxGeometry(1.0, 1.5, 2.2), body); nose.position.set(-2.95, 1.3, 0); r.add(nose); nose.position.set(P.x - 2.95, 1.3, P.z);
-    const wind = new T.Mesh(new T.BoxGeometry(0.06, 1.0, 1.8), glass); wind.position.set(P.x - 3.45, 1.45, P.z); r.add(wind);
-    box(h, -3.25, 0.58, -0.95, -2.4, 0.8, 0.95, body);
-    // tail boom and fin
-    box(h, 2.4, 1.7, -0.22, 8.0, 2.3, 0.22, body);
-    box(h, 7.4, 1.7, -0.04, 8.1, 3.1, 0.04, body);
+    box(h, -2.4, 2.4, -1.3, 2.4, 2.45, -1.2, accent); // the door's lintel, with a light strip under it and one along the cabin roof
+    box(h, -1.5, 2.37, -1.26, 2.0, 2.4, -1.22, glow); box(h, -2.2, 2.43, 0.42, 2.2, 2.45, 0.5, glow);
+    // armour: plates over the door posts and along the flanks, a spine along the roof with a sensor dome and a mast
+    for (const [x0, x1] of [[-2.45, -1.5], [2.0, 2.45]]) { box(h, x0, 0.9, -1.5, x1, 2.4, -1.32, armor); box(h, x0, 0.7, -1.4, x1, 0.9, -1.32, armor); box(h, x0 + 0.1, 1.2, -1.53, x1 - 0.1, 1.26, -1.5, accent); }
+    for (const [x0, x1] of [[-2.2, -0.6], [-0.4, 1.2]]) { box(h, x0, 0.8, 1.32, x1, 2.3, 1.46, armor); box(h, x0 + 0.1, 1.7, 1.46, x1 - 0.1, 1.76, 1.5, glow); }
+    box(h, -1.9, 2.65, -0.5, 2.3, 2.85, 0.5, armor); box(h, -2.4, 2.65, -0.7, -1.9, 2.75, 0.7, accent);
+    part(h, new T.Mesh(new T.SphereGeometry(0.22, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), dark), -1.5, 2.85, 0);
+    box(h, -1.0, 2.85, -0.02, -0.96, 3.5, 0.02, dark);
+    // the nose: a faceted cockpit wedge, a visor, and a sensor ball under the chin
+    const wedge = new T.CylinderGeometry(0.4, 1.7, 1.0, 4); wedge.rotateY(Math.PI / 4); wedge.rotateZ(Math.PI / 2);
+    const nose = part(h, new T.Mesh(wedge, body), -2.95, 1.4, 0); nose.scale.set(1, 0.58, 0.97);
+    const visor = part(h, new T.Mesh(new T.BoxGeometry(0.05, 0.55, 1.5), glass), -3.12, 1.92, 0); visor.rotation.z = -0.55;
+    box(h, -3.3, 0.55, -0.45, -2.45, 0.85, 0.45, armor);
+    part(h, new T.Mesh(new T.SphereGeometry(0.2, 12, 8), dark), -2.95, 0.55, 0);
+    box(h, -3.12, 0.5, -0.08, -3.1, 0.6, 0.08, glow);
+    // tail boom, a ducted fan on its end, and a canted pair of fins
+    box(h, 2.4, 1.7, -0.22, 7.8, 2.3, 0.22, body); box(h, 2.4, 2.3, -0.16, 7.6, 2.4, 0.16, armor); box(h, 3.0, 1.9, 0.22, 6.8, 1.96, 0.25, glow);
+    const cowl = part(h, new T.Mesh(new T.CylinderGeometry(0.55, 0.55, 0.5, 14, 1, true), duct), 8.0, 2.05, 0); cowl.rotation.x = Math.PI / 2;
+    for (const s of [-1, 1]) { const fin = part(h, new T.Mesh(new T.BoxGeometry(0.7, 0.9, 0.04), armor), 7.4, 2.7, s * 0.28); fin.rotation.x = s * 0.5; }
+    const tail = new T.Group(); tail.position.set(8.0, 2.05, 0); h.add(tail);
+    for (let b = 0; b < 3; b++) { const bl = new T.Mesh(new T.BoxGeometry(0.05, 0.5, 0.12), dark); bl.rotation.x = b * Math.PI / 3; tail.add(bl); }
+    // stub wings, swept back, each with a ducted rotor at its tip, a missile pod underneath and a nav light (all above head height)
+    const rotors = [];
+    for (const s of [-1, 1]) {
+      const wing = part(h, new T.Mesh(new T.BoxGeometry(1.3, 0.16, 3.5), armor), 1.45, 2.6, s * 1.75); wing.rotation.y = -s * 0.2;
+      const pod = part(h, new T.Mesh(new T.BoxGeometry(0.9, 0.22, 0.28), dark), 1.5, 2.36, s * 2.3);
+      pod.rotation.y = -s * 0.2;
+      const ring = part(h, new T.Mesh(new T.CylinderGeometry(0.98, 0.98, 0.6, 20, 1, true), duct), 1.8, 2.8, s * 3.4);
+      const lip = part(h, new T.Mesh(new T.TorusGeometry(0.98, 0.05, 6, 24), glow), 1.8, 3.1, s * 3.4); lip.rotation.x = Math.PI / 2;
+      part(h, new T.Mesh(new T.CircleGeometry(0.9, 20), thrust), 1.8, 2.5, s * 3.4).rotation.x = Math.PI / 2;
+      const rot = new T.Group(); rot.position.set(1.8, 2.85, s * 3.4); h.add(rot); rotors.push(rot);
+      for (let b = 0; b < 3; b++) { const arm = new T.Group(); arm.rotation.y = b * Math.PI * 2 / 3; rot.add(arm); part(arm, new T.Mesh(new T.BoxGeometry(0.88, 0.03, 0.2), dark), 0.46, 0, 0); }
+      part(rot, new T.Mesh(new T.CylinderGeometry(0.14, 0.14, 0.14, 10), accent), 0, 0, 0);
+      box(h, 1.7, 2.58, s * 3.4 + s * 0.98, 1.9, 2.66, s * 3.4 + s * 1.04, s < 0 ? M(0xff3030, { emissive: 0xc01010 }) : M(0x30ff60, { emissive: 0x10c030 }));
+    }
     // skids
     for (const z of [-1.0, 1.0]) { box(h, -2.9, 0.08, z - 0.05, 2.6, 0.16, z + 0.05, dark); for (const x of [-1.8, 1.4]) box(h, x - 0.04, 0.16, z - 0.04, x + 0.04, P.floor - 0.1, z + 0.04, dark); }
-    // the main rotor: a mast, a hub, four blades
-    box(h, -0.1, 2.65, -0.1, 0.1, 3.3, 0.1, dark);
-    const rotor = new T.Group(); rotor.position.set(0, 3.3, 0); h.add(rotor);
-    for (let b = 0; b < 4; b++) { const arm = new T.Group(); arm.rotation.y = b * Math.PI / 2; const bl = new T.Mesh(new T.BoxGeometry(5.3, 0.04, 0.26), dark); bl.position.x = 2.75; arm.add(bl); rotor.add(arm); }
-    const hub = new T.Mesh(new T.CylinderGeometry(0.18, 0.18, 0.16, 12), dark); rotor.add(hub);
-    const tail = new T.Group(); tail.position.set(8.0, 2.4, 0.12); h.add(tail);
-    for (let b = 0; b < 2; b++) { const bl = new T.Mesh(new T.BoxGeometry(0.05, 1.1, 0.14), dark); bl.rotation.x = b * Math.PI / 2; tail.add(bl); }
     // the bench and its six seats along the south wall, facing the open side
-    box(h, -1.6, P.floor, 0.55, 1.75, P.floor + 0.42, 1.18, M(0x3a3e43, { emissive: 0x15171a }));
-    box(h, -1.6, P.floor + 0.42, 1.12, 1.75, P.floor + 1.3, 1.2, M(0x3a3e43, { emissive: 0x15171a }));
-    for (let i = 0; i < P.seats; i++) { const x = -1.3 + i * 0.5; box(h, x - 0.2, P.floor + 0.42, 0.6, x + 0.2, P.floor + 0.48, 1.1, M(0x6a7076, { emissive: 0x202328 })); }
-    for (let i = 0; i < P.seats; i++) { const x = -1.3 + i * 0.5; box(h, x - 0.2, P.floor + 0.55, 1.05, x + 0.2, P.floor + 1.0, 1.12, M(0x6a7076, { emissive: 0x202328 })); } // seat backs
-    const hs = new T.Mesh(new T.PlaneGeometry(2.4, 0.5), signMat(['READY ROOM', 'hold F to board'], 384, 80, '#101418', '#7dff9a', '#cfd6dc')); hs.rotation.y = Math.PI; hs.position.set(P.x - 0.2, 2.98, P.z - 1.36); r.add(hs);
-    S.heli = { group: h, rotor, tail, speed: 3, spin: 0 };
+    const seat = M(0x6a7076, { emissive: 0x202328 }), bench = M(0x3a3e43, { emissive: 0x15171a });
+    box(h, -1.6, P.floor, 0.55, 1.75, P.floor + 0.42, 1.18, bench);
+    box(h, -1.6, P.floor + 0.42, 1.12, 1.75, P.floor + 1.3, 1.2, bench);
+    for (let i = 0; i < P.seats; i++) { const x = -1.3 + i * 0.5; box(h, x - 0.2, P.floor + 0.42, 0.6, x + 0.2, P.floor + 0.48, 1.1, seat); }
+    for (let i = 0; i < P.seats; i++) { const x = -1.3 + i * 0.5; box(h, x - 0.2, P.floor + 0.55, 1.05, x + 0.2, P.floor + 1.0, 1.12, seat); } // seat backs
+    const hs = new T.Mesh(new T.PlaneGeometry(2.4, 0.5), signMat(['READY ROOM', 'hold F to board'], 384, 80, '#101418', '#7dff9a', '#cfd6dc')); hs.rotation.y = Math.PI; hs.position.set(P.x - 0.5, 2.98, P.z - 1.36); r.add(hs);
+    S.heli = { group: h, rotor: rotors[0], rotors, tail, glow, thrust, speed: 3, spin: 0 };
     addTarget({ id: 'heli', kind: 'heli', box: [P.x - 3.5, 0.2, P.z - 1.4, P.x + 2.5, 2.9, P.z + 1.4], label: 'the helicopter' });
   }
   const seatPos = (i) => ({ x: HELI.x - 1.3 + i * 0.5, y: HELI.floor, z: RZ + HELI.z + 0.85, yaw: 0 });
@@ -534,7 +560,7 @@ G.Hangar = (() => {
     const parts0 = [...(Sh.partStock || [])], key = JSON.stringify([O.gear, parts0, Sh.stock]);
     if (!force && key === S.key) { vending(false); return; }
     S.key = key;
-    // the pedestals: the three pieces of gear
+    // the pedestals: the four pieces of gear
     S.stands.forEach((tg, i) => {
       const id = O.gear[i];
       tg.key = id || null;
@@ -634,7 +660,8 @@ G.Hangar = (() => {
       const ids = Object.keys(G.Game.roster || {}), ready = ids.filter((id) => G.Game.roster[id].ready).length;
       const target = ids.length && ready === ids.length ? 38 : 2 + 14 * (ids.length ? ready / ids.length : 0);
       H.spin += (target - H.spin) * Math.min(1, dt * 0.8);
-      H.rotor.rotation.y += H.spin * dt; H.tail.rotation.z += H.spin * 1.6 * dt;
+      H.rotors.forEach((o, i) => { o.rotation.y += (i ? -1 : 1) * H.spin * dt; }); H.tail.rotation.z += H.spin * 1.6 * dt;
+      const k = ids.length ? ready / ids.length : 0; H.glow.color.setRGB(0.9 - 0.8 * k, 0.15 + 0.75 * k, 0.1 + 0.2 * k); H.thrust.opacity = 0.08 + 0.4 * Math.min(1, H.spin / 38); // (status strips: red to green as the squad gets in)
       H.rotor.rotation.x = Math.sin(S.t * 0.7) * 0.004 * (1 + H.spin * 0.05);
     }
     craneStep(dt);

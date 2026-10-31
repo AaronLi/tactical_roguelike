@@ -69,8 +69,9 @@ G.Rig = (() => {
   };
 
   // ---------------------------------------------------------------- an officer's kit, as worn
-  // k: { helmet, face, carrier, plate, cp (pouches on the carrier), belt, bp (on the belt), pack, ifak } (gear ids, or
-  // flags). Built from boxes in the chest / head / hips frames: x right, y up, -z the front.
+  // k: { helmet, face, carrier, plate, sh (shoulder armour), gr (pelvis armour), cp (pouches on the carrier), belt, lg (leg
+  // armour), bp (on the belt), pack, ifak } (gear ids, or flags). Built from boxes in the chest / head / hips / limb frames:
+  // x right, y up, -z the front.
   // An officer's own look (the main menu), and what they wear if they haven't picked
   const OFFICER_LOOK = { top: 'combat', topC: 0x3a4048, pants: 'combat', pantsC: 0x2e3238, eyes: 'shooting', gloves: 'tactical' };
   const LOOKS = { top: ['combat', 'longsleeve', 'tshirt', 'hoodie'], pants: ['combat', 'cargo', 'jeans'], eyes: ['none', 'glasses', 'shooting', 'goggles'], gloves: ['tactical', 'leather', 'fingerless', 'none'] };
@@ -94,7 +95,7 @@ G.Rig = (() => {
     const D = (id) => (id && G.Gear && G.Gear.DEFS[id]) || null, cd = D(k && k.carrier), pd = D(k && k.pack);
     let y = 0.22, z = 0.128;
     if (pd) { const [, h, d, py] = PACK[pd.id] || PACK['k.assault']; z = (cd && cd.id !== 'c.recon' ? 0.15 : 0.12) + d + 0.003; y = py + h / 2 - 0.05; }
-    else if (cd && cd.id === 'c.ghost') z = 0.126;
+    else if (cd && cd.thin) z = 0.126;
     else if (cd && cd.id !== 'c.recon') { y = 0.2; z = ((cd.id === 'c.heavy' ? 0.3 : 0.27) + (k.plate ? 0.03 : 0)) / 2 + 0.003; }
     const m = new T.Mesh(new T.PlaneGeometry(0.2, 0.05), new T.MeshLambertMaterial({ map: G.Callsigns.backTex(cs.id, cs.name) }));
     m.position.set(0, y, z);
@@ -128,7 +129,7 @@ G.Rig = (() => {
     const cd = D(k.carrier), cc = KIT_COL(cd);
     part = 'carrier';
     if (cd) {
-      if (cd.id === 'c.ghost') box(C, 0.4, 0.27, 0.245, 0x34373b, 0, 0.12, 0);
+      if (cd.thin) box(C, 0.4, 0.27, 0.245, cd.col, 0, 0.12, 0);
       else if (cd.id === 'c.recon') { // a chest rig: a panel of pouches across the front, straps over the shoulders
         box(C, 0.36, 0.15, 0.06, cc, 0, 0.03, -0.13);
         for (const x of [-1, 1]) box(C, 0.04, 0.26, 0.24, cc, x * 0.12, 0.17, 0);
@@ -138,8 +139,39 @@ G.Rig = (() => {
         box(C, heavy ? 0.44 : 0.4, heavy ? 0.32 : 0.28, depth, cc, 0, 0.12, 0);
         if (k.plate) { part = 'plate'; box(C, 0.26, 0.22, 0.02, cc, 0, 0.14, -depth / 2 - 0.005); part = 'carrier'; } // the plate's outline at the front
         pouches(C, k.cp || 0, 0x23251f, -0.16, 0.06, -depth / 2 - 0.03);
-        if (heavy || cd.id === 'c.assault') for (const x of [-1, 1]) box(C, 0.13, 0.07, 0.2, cc, x * 0.22, 0.3, 0); // shoulder armour
+        if (heavy) for (const x of [-1, 1]) box(C, 0.13, 0.07, 0.2, cc, x * 0.22, 0.3, 0); // shoulder armour
         if (heavy) { box(C, 0.3, 0.07, 0.26, cc, 0, 0.32, 0.01); box(Hp, 0.2, 0.16, 0.04, cc, 0, -0.06, -0.12); } // collar, groin plate
+      }
+    }
+    // what's mounted on the carrier and belt, on the limbs they cover: pads and caps round the top of each arm, a panel or a
+    // wrap at the hips, panels, wraps and guards down the legs (each where its protection is: js/ballistics.js covers)
+    const tube = (parent, r0, r1, h, c, y, z = 0) => add(parent, new T.Mesh(new T.CylinderGeometry(r0, r1, h, 12), KM(c)), 0, y, z);
+    const sd = D(k.sh);
+    part = 'shoulder';
+    if (sd) {
+      const hard = sd.id === 's.plate', c = KIT_COL(sd);
+      for (const arm of [rig.armL, rig.armR]) {
+        tube(arm.up, 0.066, 0.064, 0.13, hard ? 0x4a4438 : c, -0.065);
+        if (hard) add(arm.sh, new T.Mesh(new T.SphereGeometry(0.08, 10, 8), KM(0x4a4438)), 0, 0.005, 0);
+        else box(arm.sh, 0.1, 0.03, 0.1, c, 0, 0.055, 0);
+      }
+    }
+    const gd = D(k.gr);
+    part = 'groin';
+    if (gd) {
+      const c = KIT_COL(gd) === 0x2e3236 ? 0x34383c : KIT_COL(gd);
+      if (gd.id === 'g.pelvis') { const w = add(Hp, new T.Mesh(new T.CylinderGeometry(0.17, 0.175, 0.18, 12), KM(c)), 0, -0.02, 0); w.scale.z = 0.72; }
+      else box(Hp, 0.2, 0.17, 0.025, c, 0, -0.06, -0.122);
+      if (gd.id === 'g.plate') box(Hp, 0.15, 0.13, 0.015, 0x3d4044, 0, -0.06, -0.142);
+    }
+    const ld = D(k.lg);
+    part = 'legs';
+    if (ld) {
+      const c = KIT_COL(ld) === 0x2e3236 ? 0x34383c : KIT_COL(ld), shin = ld.id === 'l.shin' || ld.id === 'l.full', wrap = ld.id === 'l.wrap' || ld.id === 'l.full';
+      for (const leg of [rig.legL, rig.legR]) {
+        if (ld.id === 'l.thigh') box(leg.th, 0.13, 0.22, 0.025, c, 0, -0.12, -0.088);
+        if (wrap) tube(leg.th, 0.096, 0.074, 0.34, c, -0.18);
+        if (shin) { box(leg.sh, 0.085, 0.31, 0.02, 0x4a4f55, 0, -0.21, -0.062); box(leg.sh, 0.1, 0.09, 0.03, 0x4a4f55, 0, -0.01, -0.066); }
       }
     }
     // the belt and what's on it; the IFAK at the back
@@ -163,10 +195,11 @@ G.Rig = (() => {
     }
   }
   // A suspect's armour (G.ARMORS ids) as the gear an officer would wear: the same models for the same kit
-  function armourKit(vest, helmet, armored, face) {
-    const V = { soft: ['c.ghost', 0, 0], steel: ['c.patrol', 1, 2], ceramic: ['c.assault', 1, 3], assault: ['c.heavy', 1, 2] }[vest] || (armored ? ['c.heavy', 1, 2] : null);
+  function armourKit(vest, helmet, armored, face, ex) {
+    const V = { soft2: ['c.lite', 0, 0], soft: ['c.ghost', 0, 0], steel: ['c.patrol', 1, 2], ceramic: ['c.assault', 1, 3], assault: ['c.heavy', 1, 2] }[vest] || (armored ? ['c.heavy', 1, 2] : null);
     const H = { ach: 'h.ach', riflehelm: 'h.rifle', visor: 'h.visor' }[helmet] || (armored ? 'h.rifle' : 0);
-    return { helmet: H, face: (H && face) || 0, carrier: V ? V[0] : 0, plate: V ? V[1] : 0, cp: V ? V[2] : 0, belt: armored ? 'b.battle' : 0, bp: armored ? 2 : 0, pack: 0, ifak: 0 };
+    const X = (kind) => (ex || []).find((id) => G.Gear.DEFS[id] && G.Gear.DEFS[id].kind === kind) || 0;
+    return { helmet: H, face: (H && face) || 0, carrier: V ? V[0] : 0, plate: V ? V[1] : 0, sh: X('shoulder'), gr: X('groin'), cp: V ? V[2] : 0, belt: armored ? 'b.battle' : 0, lg: X('legs'), bp: armored ? 2 : 0, pack: 0, ifak: 0 };
   }
   function create(o) {
     const s = o.scale || 1, style = o.style || 'tactical';
@@ -200,8 +233,8 @@ G.Rig = (() => {
     else if (style === 'armored') { if (!o.dressed) { vestM = L(o.boss ? 0x3a2f24 : 0x3b4232); helmetM = L(0x2a2d30); } headCover = L(0x161616); }
     else if (style === 'suspect') { if (rnd() < 0.6) headCover = L(0x151515); else hairM = L(pick(PAL.hair)); }
     else hairM = L(pick(PAL.hair));
-    // armour worn over street clothes (o.vest: 'soft' or a plate carrier; o.helmet)
-    if (!o.dressed && o.vest && !vestM) vestM = L(o.vest === 'soft' ? 0x34373b : 0x3b4232);
+    // armour worn over street clothes (o.vest: 'soft', 'soft2' or a plate carrier; o.helmet)
+    if (!o.dressed && o.vest && !vestM) vestM = L(o.vest === 'soft2' ? 0x5c5a50 : o.vest === 'soft' ? 0x34373b : 0x3b4232);
     if (!o.dressed && o.helmet && !helmetM) { helmetM = L(0x2a2d30); hairM = null; }
     const gloveM = { tactical: L(0x1c1d1f), leather: L(0x5e3e24), fingerless: L(0x1c1d1f) }[look.gloves] || null;
     const bootM = style === 'civ' ? L(pick([0xeeeeee, 0x3a2a1a, 0x222222])) : L(0x1e1f21);
@@ -346,13 +379,18 @@ G.Rig = (() => {
       const back = new T.Vector3(0, 0, 1).transformDirection(g.matrixWorld), k = Math.min(0.03, deg * 0.0018);
       for (const [i, f] of [[11, 1], [10, 0.8], [9, 0.7], [8, 0.5], [5, 0.45], [4, 0.3], [3, 0.25], [7, 0.15]]) rd.prev[i].addScaledVector(back, -k * f);
     };
-    rig.hit = (dir) => { // dir: world-space direction the bullet travelled
+    // mv: its momentum, kg m/s (a rifle round's about 4)
+    rig.hit = (dir, mv = 4) => { // dir: world-space direction the bullet travelled
       const inv = rig.root.quaternion.clone().invert();
       const l = dir.clone().applyQuaternion(inv);
       rig.flinch.set(l.z * 0.35, l.x * 0.35, 1); // a flinch away from it (no colour flash)
-      // a powered body takes it physically: the upper body's knocked the way the round went
+      // a powered body takes it physically: the upper body's knocked the way the round went, by its momentum, in the next
+      // physics step (everything that lands in one step is one shove: a shell's pellets aren't twenty)
       const rd = rig.rd;
-      if (rig.powered && rd && rig.state !== 'dead') [[3, 0.055], [4, 0.045], [5, 0.045], [6, 0.05], [7, 0.055], [0, 0.02]].forEach(([i, k]) => rd.prev[i].addScaledVector(dir, -k * (0.8 + Math.random() * 0.4)));
+      if (!rig.powered || !rd || rig.state === 'dead') return;
+      rig.hitDir = dir.clone().setY(0).normalize();
+      rd.push = (rd.push || new T.Vector3()).addScaledVector(dir, mv);
+      rd.asleep = false; rd.still = 0;
     };
     // let go of the weapon: it falls and stays on the floor
     rig.dropGun = () => {
@@ -373,6 +411,8 @@ G.Rig = (() => {
       if (rig.limp || rig.state === 'dead') return;
       rig.limp = true; rig.deadT = 0;
       if (rig.rd) { rig.rd.drive = null; rig.rd.asleep = false; rig.rd.still = 0; } else ragdollInit(rig, null);
+      // they go over the way they were last hit, or forward over their knees
+      rig.rd.topple = rig.hitDir ? rig.hitDir.clone() : new T.Vector3(-Math.sin(rig.root.rotation.y), 0, -Math.cos(rig.root.rotation.y));
     };
     rig.die = (dir) => {
       if (rig.state === 'dead') return;
@@ -425,7 +465,7 @@ G.Rig = (() => {
     };
     // a body that was already lying there when we arrived: let it fall and come to rest at once
     rig.settle = (sec = 3) => {
-      for (let t = 0; t < sec; t += 1 / 30) { rig.deadT += 1 / 30; if (rig.rd) ragdollStep(rig, 1 / 30); }
+      for (let t = 0; t < sec; t += STEP) { rig.deadT += STEP; if (rig.rd) ragdollStep(rig, STEP); }
       if (rig.rd) ragdollPose(rig);
     };
     rig.startle = () => { rig.flinch.set(0.7, 0, 1); }; // a jolt backward
@@ -743,7 +783,7 @@ G.Rig = (() => {
     if (rig.braceW > 0.02) {
       // on the floor beside them if it can reach (down there, or folded over), else leaning on the knee
       const P0 = rig.rd && rig.rd.P, sh = P0 ? P0[4] : Tg[4], kn = P0 ? P0[12] : Tg[12], reach = rig.rd && rig.rd.armL ? rig.rd.armL : 0.56 * rig.scale;
-      _gb.set(Tg[0].x - rx * 0.3 * rig.scale + fx * 0.12, 0.04, Tg[0].z - rz * 0.3 * rig.scale + fz * 0.12);
+      _gb.set(Tg[0].x - rx * 0.3 * rig.scale + fx * 0.12, rig.root.position.y + 0.04, Tg[0].z - rz * 0.3 * rig.scale + fz * 0.12);
       if (_gb.distanceTo(sh) > reach * 0.98) _gb.set(kn.x + fx * 0.03, kn.y + 0.07 * rig.scale, kn.z + fz * 0.03);
       Tg[10].lerp(_gb, rig.braceW);
     }
@@ -767,7 +807,7 @@ G.Rig = (() => {
       const t = rig.effT, a = 0.13 * sway * rig.scale, sx = Math.sin(t * 1.3 + rig.effPh) + 0.5 * Math.sin(t * 2.9 + rig.effPh * 2), sz = Math.cos(t * 0.9 + rig.effPh * 3) + 0.5 * Math.sin(t * 2.3);
       for (const [i, k] of [[0, 0.4], [1, 0.4], [2, 0.4], [3, 0.9], [4, 0.9], [5, 0.9], [6, 1], [7, 1.1], [8, 0.9], [9, 0.9], [10, 0.9], [11, 0.9]]) { Tg[i].x += sx * a * k; Tg[i].z += sz * a * k; }
     }
-    const steps = Math.max(1, Math.min(3, Math.round(dt * 60)));
+    const steps = stepsFor(rd, dt);
     for (let s = 0; s < steps; s++) {
       const f = (s + 1) / steps;
       rd.drive = {
@@ -781,10 +821,10 @@ G.Rig = (() => {
         self: m < 0.45, // (strong, the muscles keep the limbs apart; weak, they can tangle, so check)
       };
       rd.asleep = false; rd.still = 0;
-      ragdollStep(rig, dt / steps);
+      ragdollStep(rig, STEP);
     }
     rd.drive = null;
-    rd.Tprev = Tg;
+    if (steps) rd.Tprev = Tg;
     ragdollPose(rig);
     // the gun moves with the right forearm: by exactly what the forearm moved from its animated pose (none at
     // full strength; weak, it sags and swings with the hand; down, it hangs from it)
@@ -868,6 +908,23 @@ G.Rig = (() => {
   // [a, b, fraction of rest length they can't get closer than]: stops the spine, neck and limbs folding flat
   const MIN = [[1, 5, 0.85], [2, 4, 0.85], [0, 6, 0.92], [4, 7, 0.9], [5, 7, 0.9], [4, 10, 0.45], [5, 11, 0.45], [1, 14, 0.6], [2, 15, 0.6], [0, 7, 0.9]];
   const GRAV = 9.8;
+  // The physics runs on its own clock, whatever the frame rate: everything below is per step of STEP seconds, and a frame takes
+  // as many as its time comes to (at most MAX_STEPS, so a stall doesn't pile up), the rest carried over. What's drawn is
+  // between the last two steps (ragdollPose), so it's smooth at any rate.
+  const STEP = 1 / 60, MAX_STEPS = 4;
+  function stepsFor(rd, dt) {
+    rd.acc = (rd.acc || 0) + dt;
+    const n = Math.min(MAX_STEPS, Math.floor(rd.acc / STEP + 1e-9));
+    rd.acc = Math.min(rd.acc - n * STEP, STEP);
+    return n;
+  }
+  // A dead body's going over: the pull on the upper body (m/s²), fading out over this long (s), and the feet take the other way
+  // (they're what it pivots on: it's a push against the floor, not a wind)
+  const TOPPLE_A = 9, TOPPLE_T = 0.6, TIP_A = 7, TIP_T = 2.5, TIP_STALL = 0.006;
+  // What the solver may do to a body with nothing driving it, each step (m): a contact can only push a joint so far (PUSH, a
+  // pass), and the corrections can only add so much speed to a joint (V_GAIN) or take it past V_MAX (about what a long fall comes to). A correction's a change in position, and to Verlet that's speed: without these, a joint
+  // pushed out of a desk throws the body that's hanging from it.
+  const PUSH = 0.015, V_GAIN = 0.03, V_MAX = 0.14, HOP_MAX = 0.16;
   // Joints aren't free: each has a range, the body has a twist limit, limbs are capsules that can't pass
   // through the torso or each other, and every joint has some friction (relative motion across a bone is
   // damped), so a limb swings and stops rather than spinning loose.
@@ -950,7 +1007,7 @@ G.Rig = (() => {
     for (const k of [12, 13]) { prev[k].addScaledVector(fwd, -0.02); prev[k].y += 0.01; }
     const rest = (a, b) => P[a].distanceTo(P[b]);
     rig.rd = {
-      P, prev, r: RAD.map((r) => r * s), still: 0, asleep: false, roll: null,
+      P, prev, r: RAD.map((r) => r * s), still: 0, asleep: false, roll: null, on: new Uint8Array(P.length), sp: new Float32Array(P.length), // (on: what's resting on something; sp: its speed before the solver)
       rigid: RIGID.map(([a, b]) => [a, b, rest(a, b)]),
       topple: push.clone(), // the way the upper body goes over (the way the shot was travelling)
       min: MIN.map(([a, b, f]) => [a, b, rest(a, b) * f]),
@@ -966,7 +1023,7 @@ G.Rig = (() => {
     pa.addScaledVector(_a, k); pb.addScaledVector(_a, -k);
   }
   // Contacts are inelastic: pushing a joint out of the floor or a box also cancels its velocity into it, so
-  // bodies land with a dead weight instead of springing back up.
+  // bodies land with a dead weight instead of springing back up. A joint pushed up off something is resting on it (rd.on).
   function collide(rd, i) {
     const p = rd.P[i], q = rd.prev[i], r = rd.r[i], L = G.Level, map = G.Game && G.Game.map;
     if (map && map.world) { // out of whatever solid it's in (the world's: any floor, a step, a sofa), the shallowest way
@@ -976,13 +1033,13 @@ G.Rig = (() => {
         const ox = Math.min(xl, xh), oy = Math.min(yl, yh), oz = Math.min(zl, zh);
         if (ox <= 0 || oy <= 0 || oz <= 0) return;
         // resting on top of it wins for anything low (bodies can end up across a sofa, or down a flight of stairs)
-        if (yh <= yl && (yh < ox && yh < oz || s.max[1] - s.min[1] < 1.4 && yh < 0.5)) { p.y += yh; q.y = Math.max(q.y, p.y); }
-        else if (oy < ox && oy < oz) { p.y -= yl; q.y = Math.min(q.y, p.y); }
-        else if (ox < oz) { p.x += xh < xl ? xh : -xl; q.x = p.x; } else { p.z += zh < zl ? zh : -zl; q.z = p.z; }
+        if (yh <= yl && (yh < ox && yh < oz || s.max[1] - s.min[1] < 1.4 && yh < 0.5)) { p.y += Math.min(yh, PUSH); q.y = Math.max(q.y, p.y); rd.on[i] = 1; }
+        else if (oy < ox && oy < oz) { p.y -= Math.min(yl, PUSH); q.y = Math.min(q.y, p.y); }
+        else if (ox < oz) { p.x += xh < xl ? Math.min(xh, PUSH) : -Math.min(xl, PUSH); q.x = p.x; } else { p.z += zh < zl ? Math.min(zh, PUSH) : -Math.min(zl, PUSH); q.z = p.z; }
       });
       return;
     }
-    if (p.y < r) { p.y = r; if (q.y < r) q.y = r; }
+    if (p.y < r) { p.y = r; if (q.y < r) q.y = r; rd.on[i] = 1; }
     if (!map) return;
     const tx = Math.floor(p.x / L.TS), tz = Math.floor(p.z / L.TS);
     for (let oz = -1; oz <= 1; oz++) for (let ox = -1; ox <= 1; ox++) for (const b of L.boxesAt(map, tx + ox, tz + oz)) {
@@ -1002,31 +1059,47 @@ G.Rig = (() => {
   }
   function ragdollStep(rig, dt) {
     const rd = rig.rd, P = rd.P, prev = rd.prev;
+    if (!rd.Pold) rd.Pold = P.map((p) => p.clone()); else rd.Pold.forEach((o, i) => o.copy(P[i])); // (where it was: what's drawn is between this and P)
     if (rd.roll) { // rolling the body face down to secure it
       const ro = rd.roll;
       if (!ro.driven) ro.t = Math.min(1, ro.t + dt / 0.5);
       const q = new T.Quaternion().setFromAxisAngle(ro.axis, ro.angle * G.U.smooth(0, 1, ro.t));
       let sink = 0;
-      P.forEach((p, i) => { p.copy(ro.base[i]).sub(ro.pivot).applyQuaternion(q).add(ro.pivot); sink = Math.max(sink, rd.r[i] - p.y); });
+      P.forEach((p, i) => { p.copy(ro.base[i]).sub(ro.pivot).applyQuaternion(q).add(ro.pivot); sink = Math.max(sink, ro.ground + rd.r[i] - p.y); });
       const up = Math.max(0, sink) + ro.lift * Math.sin(Math.PI * ro.t); // nothing passes through the floor
       P.forEach((p, i) => { p.y += up; prev[i].copy(p); });
       if (ro.t >= 1 && !ro.driven) { rd.roll = null; rd.asleep = false; rd.still = 0; rd.calm = 0.8; rd.pinT = 0; }
       return;
     }
     if (rd.asleep) return;
-    const h = Math.min(dt, 1 / 30), h2 = h * h;
+    const h = dt, h2 = h * h;
+    // the shots that landed since the last step: the upper body's knocked the way they went, less the less there is of them.
+    // Limp, there's no muscle behind it either, and not much to shove
+    if (rd.push) {
+      const J = rd.push.length(), f = Math.min(1.5, Math.sqrt(J / 4)) * (rd.drive ? 1 : 0.4);
+      if (J > 1e-6) { rd.push.multiplyScalar(1 / J); for (const [i, k] of [[3, 0.055], [4, 0.045], [5, 0.045], [6, 0.05], [7, 0.055], [0, 0.02]]) prev[i].addScaledVector(rd.push, -k * f * (0.8 + Math.random() * 0.4)); }
+      rd.push = null;
+    }
     // A clean fall: while the spine is still upright, the chest, shoulders and head are pulled over the way
     // the body's going, so it ends up lying down rather than balanced on its knees or sitting up.
     const upright = _a.subVectors(P[6], P[0]).normalize().y;
-    if (upright > 0.3 && rig.deadT < 3 && rd.topple && !rd.handled && !rig.zipped) {
-      const acc = 9 * upright * h2;
+    if (upright > 0.3 && rig.deadT < TOPPLE_T && rd.topple && !rd.handled && !rig.zipped && !rd.drive && (rd.on[14] || rd.on[15])) {
+      const acc = TOPPLE_A * upright * (1 - rig.deadT / TOPPLE_T) * h2;
       for (const i of [3, 4, 5, 6, 7]) P[i].addScaledVector(rd.topple, acc);
+      for (const i of [14, 15]) P[i].addScaledVector(rd.topple, -acc * 2.5);
+    }
+    // Come to a stop sitting up, or propped on its knees: nothing's holding it there, so it goes on over the way it was going.
+    // The knees and feet take the other way: it turns it over, and can't drive it anywhere.
+    if (upright > 0.45 && !rd.drive && rig.deadT >= TOPPLE_T && rig.deadT < TIP_T && !rd.handled && !rig.zipped && !rd.roll && rd.topple && rd.sp[3] < TIP_STALL && rd.sp[6] < TIP_STALL && (rd.on[0] || rd.on[1] || rd.on[2] || rd.on[12] || rd.on[13])) {
+      const acc = TIP_A * h2;
+      for (const i of [3, 4, 5, 6, 7]) P[i].addScaledVector(rd.topple, acc);
+      for (const i of [12, 13, 14, 15]) P[i].addScaledVector(rd.topple, -acc * 1.25);
     }
     const down = upright < 0.5; // lying, more or less
     for (let i = 0; i < P.length; i++) {
       const p = P[i], q = prev[i];
       let k = rd.calm > 0 ? 0.85 : rig.deadT > 2.5 ? 0.8 : 0.975; // damping (heavier while settling after being moved, and once it's been down a while)
-      if (down && p.y <= rd.r[i] + 0.02) k = Math.min(k, 0.88); // down on the floor: it stops, it doesn't bounce about
+      if (down && rd.on[i]) k = Math.min(k, 0.88); // down on the floor: it stops, it doesn't bounce about
       const vx = (p.x - q.x) * k, vy = (p.y - q.y) * k, vz = (p.z - q.z) * k;
       q.copy(p);
       p.x += vx; p.y += vy - GRAV * h2; p.z += vz;
@@ -1052,6 +1125,8 @@ G.Rig = (() => {
       const f = 0.2; // stiff enough that limbs follow the body down instead of flailing
       qa.copy(pa).sub(_c.lerp(_e, f)); qb.copy(pb).sub(_d.lerp(_e, f));
     }
+    for (let i = 0; i < P.length; i++) rd.sp[i] = P[i].distanceTo(prev[i]);
+    rd.on.fill(0);
     // secured: wrists pulled together at the small of the back
     let wrist = null;
     if (rd.calm > 0) rd.calm -= h;
@@ -1110,11 +1185,21 @@ G.Rig = (() => {
     }
     // a last pass of body-on-body, then the floor, so neither is left the loser
     for (let it = 0; it < 2; it++) { if (self) for (const [x, y, skip] of SELF) separate(P, CAPS[x], CAPS[y], skip, rig.scale); for (let i = 0; i < P.length; i++) collide(rd, i); }
-    // friction against the floor; sleep once everything has come to rest
+    // the solver keeps a body together, it doesn't throw it: how far a joint can go in a step, and what its corrections left
+    // in the speed, capped (a joint caught out of place comes back over a few steps, not in one)
+    if (!D) for (let i = 0; i < P.length; i++) {
+      _a.subVectors(P[i], rd.Pold[i]);
+      const m = _a.length();
+      if (m > HOP_MAX) P[i].copy(rd.Pold[i]).addScaledVector(_a, HOP_MAX / m);
+      _a.subVectors(P[i], prev[i]);
+      const l = _a.length(), lim = Math.min(V_MAX, rd.sp[i] + V_GAIN);
+      if (l > lim) prev[i].copy(P[i]).addScaledVector(_a, -lim / l);
+    }
+    // friction against whatever it's lying on; sleep once everything has come to rest
     let moved = 0;
     for (let i = 0; i < P.length; i++) {
       const p = P[i], q = prev[i];
-      if (p.y <= rd.r[i] + 0.01) { q.x += (p.x - q.x) * 0.5; q.z += (p.z - q.z) * 0.5; } // heavy: drags, doesn't skate
+      if (rd.on[i]) { q.x += (p.x - q.x) * 0.5; q.z += (p.z - q.z) * 0.5; } // heavy: drags, doesn't skate
       moved = Math.max(moved, p.distanceToSquared(q));
     }
     rd.still = moved < 4e-6 && (down || rig.deadT > 3) ? rd.still + 1 : 0;
@@ -1126,7 +1211,9 @@ G.Rig = (() => {
     _m.makeBasis(x, y, z); return new T.Quaternion().setFromRotationMatrix(_m);
   }
   function ragdollPose(rig) {
-    const P = rig.rd.P, { root, body, hips, spine, chest, neck, head } = rig;
+    const rd = rig.rd, f = (rd.acc || 0) / STEP, { root, body, hips, spine, chest, neck, head } = rig;
+    let P = rd.P;
+    if (rd.Pold) { P = rd.R || (rd.R = rd.P.map((p) => p.clone())); P.forEach((p, i) => p.copy(rd.Pold[i]).lerp(rd.P[i], f)); } // (between the last two steps)
     root.updateMatrixWorld(true);
     hips.position.copy(body.worldToLocal(P[0].clone()));
     hips.updateMatrixWorld(true);
@@ -1170,7 +1257,7 @@ G.Rig = (() => {
   function animateDeath(rig, dt) {
     rig.deadT += dt;
     if (!rig.rd) ragdollInit(rig, null);
-    ragdollStep(rig, dt);
+    for (let n = stepsFor(rig.rd, dt); n > 0; n--) ragdollStep(rig, STEP);
     ragdollPose(rig);
     if (rig.dropped) dropGun(rig, dt);
   }
@@ -1184,7 +1271,7 @@ G.Rig = (() => {
     const zp = f.z.clone().addScaledVector(axis, -axis.dot(f.z)), up = UP.clone().addScaledVector(axis, -axis.dot(UP));
     const angle = Math.atan2(axis.dot(new T.Vector3().crossVectors(zp, up)), zp.dot(up));
     if (Math.abs(angle) < 0.6) return null; // already face down enough
-    return { axis, angle, pivot: P[0].clone(), base: P.map((p) => p.clone()), t: 0, lift: 0.15 * rig.scale };
+    return { axis, angle, pivot: P[0].clone(), base: P.map((p) => p.clone()), t: 0, lift: 0.15 * rig.scale, ground: Math.min(...P.map((p, i) => p.y - rd.r[i])) }; // (ground: what it's lying on)
   }
   function rollFaceDown(rig, instant) {
     const rd = rig.rd; if (!rd) return;

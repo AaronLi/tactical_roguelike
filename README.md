@@ -123,7 +123,12 @@ says the same), but not whose: the shooter's name isn't shown.
   fades over about two seconds; it also throws off the shot they were about to take and starts their aim over
   from the body. Rounds passing or striking near them build suppression (more the closer: a round past the
   ear counts far more than one a couple of metres off), which takes up to 60% of their accuracy and wears off
-  over a few seconds; a close burst pins them at 40%. Blood loss wears their aim down too, to 60% near the end.
+  over a few seconds; a close burst pins them at 40%. It reaches them when the round does, or its report if that's
+  first (the speed of sound, 343 m/s, for a subsonic round), plus their reaction time: 100 to 200 ms, mostly about
+  150, and nothing changes in them till then. A round within 1.5 m makes them flinch: they crouch where
+  they stand, out of any peek, not moving or firing, for 0.35 s and up to 0.4 s more with suppression, and then get
+  half a second before another can do it, so sustained fire rattles them without holding them down for good. Bosses
+  and rushers don't flinch. Blood loss wears their aim down too, to 60% near the end.
 - **Suspects reload.** Each carries their gun's real magazine, sometimes part-used. When it runs dry they
   reload, taking the gun's reload time; pump and lever guns load shell by shell and fire again from a
   part-loaded tube if you're in sight. With nobody in sight and the magazine half spent, they top up. They
@@ -254,8 +259,11 @@ says the same), but not whose: the shooter's name isn't shown.
       quench tanks, a way through the middle of each; billets and coils waiting.
     - **Catwalks** run round both halls upstairs and across them (a bridge over the ladles, a spine between the
       furnaces, a walkway between the lines), with a steel stair up to them in each hall. Their floor is **steel
-      grating** (`grate` on the layout, carried to the fine grid by `refine`): it holds you up, but rounds and sight
-      go straight through it, from above and from below. Steel railings (a top rail, a knee rail, a toe board, no
+      grating** (`grate` on the layout, carried to the fine grid by `refine`): it holds you up, and sight goes through
+      it from above and below. Rounds meet the bars where they're drawn (`G.Level.onBar`, `barHit` in `js/world.js`):
+      between them a round flies on untouched, on one it throws sparks and is slowed, turned, stopped or glanced off
+      by up to 4 mm of mild steel. Pistol rounds mostly stop on a bar and rifle rounds punch through, and the lower the
+      angle the more of it is bar, and the more rounds glance off. Steel railings (a top rail, a knee rail, a toe board, no
       glass: the layout's `rail: 'steel'`) wherever they're over the drop; hanger rods up to the roof.
     - **Between the halls**, the switchgear room and the locker room downstairs (a door from each into both
       halls); over them, the **control room** (desks with screens under the windows) and an observation office,
@@ -519,9 +527,10 @@ says the same), but not whose: the shooter's name isn't shown.
     | 6 | 31% | 33% | 27% | 9% |
   - **Opening:** hold F at the case to open it. The latches clack, the lid swings up against the wall and the
     weapon lies in the foam for everyone to see. It's opened once for the whole squad.
-  - **Swapping:** with the case open, hold F to swap your weapon of that kind for it. Your gun goes into the case in
-    its standard build, keeping the ammo it had, and your aftermarket parts come off into your stash. If
-    you have no primary, you just take it and the case is left empty.
+  - **Swapping:** with the case open, hold F to look in it, and take the gun. It's in your hands and ready to fire at
+    once, with no swap or draw to wait for. Your gun goes into the case in its standard build, keeping the ammo it
+    had, and your aftermarket parts come off into your stash. If you have no primary, you just take it and the case
+    is left empty.
   - **Co-op:** one case for the whole squad. After someone swaps, the next player can take the weapon they
     left.
 - **The weapon case's wheel** (`js/game.js` caseShow): the first time you look in the case (a teammate may have opened it) one wide reel spins through guns till you stop it, and it lands on what's really in there (the host's roll: stopping only shows it). Its lid stays down on your screen till then, so the gun in it can't give it away. Looking again, it's landed. Take it from there, swapped for your weapon of that kind or with yours into your backpack, or leave it.
@@ -561,8 +570,8 @@ says the same), but not whose: the shooter's name isn't shown.
     once (`skin`), kept there and passed on (to anyone joining later too), then only its hash goes in your state
     (`st.sk`); anyone who hasn't the list asks for it.
 - Between levels you shop with Vex the quartermaster, in the hangar (below). He doesn't sell weapons. Each
-  visit he has three pieces of gear, of different kinds (carrier or rig, plate, helmet, face shield, belt,
-  backpack), picked by rarity, and four weapon parts, plus supplies. A plate carrier comes with a plate fitted, rolled by rarity (soft
+  visit he has four pieces of gear, of different kinds (carrier or rig, plate, helmet, face shield, shoulder, pelvis or
+  leg armour, belt, backpack), picked by rarity, and four weapon parts, plus supplies. A plate carrier comes with a plate fitted, rolled by rarity (soft
   inserts and steel common, multi-hit ceramic rare) and included in its price. Stock is randomised (the whole squad
   sees the same) with better gear deeper in the run. The stock is the squad's, shared, with as many of each thing
   as there are of you: one of each piece of kit, part and special load per player, and five random pouch types and
@@ -604,7 +613,9 @@ says the same), but not whose: the shooter's name isn't shown.
   - **The lounge** (east, at the front by the hangar door, walled off from the warehouse): two rows of sofas on a
     rug facing a big screen on the east wall, which shows the highlights of the level just played; a coffee table
     with popcorn and a snack bar.
-  - **The helicopter** (on the pad): hold F on it to climb in and ready up (you sit in your own seat, the
+  - **The helicopter** (on the pad): an armoured tiltrotor dropship, nose to the west: faceted grey hull plates with
+    amber trim and light strips (red to green as the squad gets in), a sensor ball under the chin, a ducted fan on the
+    tail, and swept stub wings carrying a ducted rotor and a missile pod each. Hold F on it to climb in and ready up (you sit in your own seat, the
     same one for everyone: by place in the squad, with a view out of the open side); hold F again to get out
     and take your readiness back. When everyone's in it the rotor spins up and, after three seconds, it takes
     off for the route map; anyone getting out stops it.
@@ -705,7 +716,8 @@ says the same), but not whose: the shooter's name isn't shown.
   by the crown, tilted a little in and down so you see their arms, hands and weapon. It's a wide, fisheye-ish
   lens: the field of view is 20% wider than yours and the edges curve in (a barrel distortion drawn by a small
   render-to-texture pass in `js/render.js`, only while spectating). It follows where they look;
-  click to switch to another; your own gun isn't drawn in it. **Your body stays where you fell**, a ragdoll
+  click to switch to another; your own gun isn't drawn in it. You hear from the camera too: every sound's distance,
+  direction and wall muffling, and a flashbang's blinding and deafening, are theirs, not where you fell. **Your body stays where you fell**, a ragdoll
   with its kit on, for everyone to see, you included (you have no body in first person, so one is made when you
   die, dressed as you are, `G.Views.spawnSelfBody`); you're a whole officer again next level. A teammate holds **F** to check you, or clicks your health bar in the squad list under their own
   body in the Tab screen (within reach), and treats you from there, with their own medical gear or with yours: click a part and the menu lists what they carry
@@ -804,7 +816,8 @@ says the same), but not whose: the shooter's name isn't shown.
 - **22 sidearms**: pistols, machine pistols (a full-auto Taurus TX22 in .22 LR among them), revolvers (including a .410 shotgun revolver), a derringer,
   a sawed-off, a pocket grenade launcher (switched off for now) and akimbo Berettas
 - Weapons differ in how they work, not just in stats:
-  - **AN-94 hyper-burst**: the first two rounds of each trigger pull fire at 1800 rpm.
+  - **AN-94 hyper-burst**: the first two rounds of each trigger pull fire at 1800 rpm, on one line, before either
+    kick lands.
   - **M1 Garand**: en-bloc clip that only reloads when empty, and pings when it ejects: the empty clip goes back
     in your kit (on the floor if there's no room), the gun stands open, and the next reload pushes a full one in.
   - **Minigun**: has to spin up before it fires. Held by a side handle on the left (no carry handle over the top,
@@ -869,6 +882,11 @@ says the same), but not whose: the shooter's name isn't shown.
     panel for pouches. The chest rig has no armour at all, and it and the assaulter carrier have the most
     MOLLE.
   - **Plates** go in a carrier's plate pocket and cover the chest. They're what stops rifle rounds.
+  - **Shoulder, pelvis and leg armour** are attachments, each with its own equipment slot (`G.Gear.MOUNTS`).
+    Shoulders and pelvis go on the PC-1, Patrol or Assaulter carrier; legs hang from a battle or war belt. They stay on
+    what they're fitted to when you take it off. A soft vest, a chest rig and a duty belt have no mounts, and the heavy
+    assault armour has its own groin, shoulder and thigh protection instead. They slow you down, the heaviest set by about
+    12%, and only the hard pieces do anything against rifles.
   - **Helmets** cover the top of the head. The visor model covers the face too.
   - **Face shields and mandibles.** The high-cut, full-cut and rifle-rated helmets have a mount for one. It
     goes in its own equipment slot ("Face shield / mandible") under the helmet, and comes off with the helmet
@@ -879,11 +897,10 @@ says the same), but not whose: the shooter's name isn't shown.
     - **Where to get them:** they turn up in the quartermaster's gear rotation. A helmet with a mount is
       sometimes offered with one already fitted (about a third, by rarity: mostly mandibles), with its price
       included.
-    - **Suspects wear them too**, deeper in a run: on a full-cut or rifle-rated helmet (a visor has its own), by
-      gear tier, a mandible / IIIA shield / rifle shield at 6/2/0% at tier 2, 16/10/2% at tier 3, 20/18/8% at
-      tier 4 (none at tier 1); the Enforcer always, from tier 3 (a mandible, then a IIIA shield). It's on their
-      helmet as it is on yours and in the way of your rounds the same (`ENEMY_GEAR.face`, js/data.js; sent with
-      their kit, the fourth field).
+    - **Suspects wear them too**, deeper in a run: on a full-cut or rifle-rated helmet (a visor has its own), a
+      mandible / IIIA shield / rifle shield at 6/2/0% on level 3, 20/16/6% on level 8 and 20/25/15% by level 18;
+      the Enforcer always, from tier 3 (a mandible, then a IIIA shield). It's on their helmet as it is on yours and
+      in the way of your rounds the same (`ENEMY_GEAR.odds.face`, js/data.js; sent with their kit, the fourth field).
     - Without one, a face hit on an open-faced helmet is still a kill.
   - **Bodies.** Everyone has the same build:
     - a rounded head with a jaw, nose, ears, eyes, brows and mouth; hair as a cap, hidden under a helmet (the
@@ -909,9 +926,11 @@ says the same), but not whose: the shooter's name isn't shown.
     - **On the helmet:** a mandible (arms down from the helmet's sides into a guard curving round over the
       mouth, chin and top of the neck), or a tinted shield over the face (darker and thicker for
       the rifle-rated one).
-    - **Body:** a soft vest, a slick plate carrier, a chest rig, or a full carrier. With a plate in, the
-      outline shows at the front. Each mounted pouch shows. Assault and heavy carriers add shoulder armour,
-      and the heavy one a collar and groin plate.
+    - **Body:** a soft vest (Level II paler than IIIA), a slick plate carrier, a chest rig, or a full carrier. With
+      a plate in, the outline shows at the front. Each mounted pouch shows. The heavy one adds shoulder armour, a collar
+      and a groin plate.
+    - **Shoulders, pelvis, legs:** pads or hard caps round the top of each arm, a flap, plate or wrap at the hips, and
+      panels, wraps or guards on the legs, moving with the limbs.
     - **Belt, pack, IFAK:** the belt and its pouches; a sling, assault or ruck pack sized to match; the IFAK
       at the back.
     - Wearing nothing, an officer is in their team-colour shirt, bareheaded.
@@ -981,11 +1000,14 @@ says the same), but not whose: the shooter's name isn't shown.
 
   | Kind | Products (brand) | Made of (where), and what it stops head-on new (worked out: js/ballistics.js) |
   | --- | --- | --- |
-  | Vest / carrier | Ghost concealable vest (Northmark), PC-1 slick carrier (Kestrel), Patrol carrier (Ironvale), Recon chest rig (Vantage), Assaulter carrier (Paragon), Heavy assault armour (Sable Ridge) | Soft aramid round the chest and stomach, 6–8 mm: 8 mm stops 9 mm, .45 ACP, .44 Magnum and buckshot, not 5.7x28 or any rifle (6 mm not the .44). The heavy armour adds 5 mm steel side plates (stops 7.62x39 and 7.62x51, not 5.56) and aramid over the groin, shoulders and thighs. The slick carrier and chest rig have none |
+  | Vest / carrier | Lightline concealable vest (Graywater: Level II, 6 mm aramid: 9 mm, .45 and buckshot, not .44 Magnum), Ghost concealable vest (Northmark), PC-1 slick carrier (Kestrel), Patrol carrier (Ironvale), Recon chest rig (Vantage), Assaulter carrier (Paragon), Heavy assault armour (Sable Ridge) | Soft aramid round the chest and stomach, 6–8 mm: 8 mm stops 9 mm, .45 ACP, .44 Magnum and buckshot, not 5.7x28 or any rifle (6 mm not the .44). The heavy armour adds 5 mm steel side plates (stops 7.62x39 and 7.62x51, not 5.56) and aramid over the groin, shoulders and thighs. The slick carrier and chest rig have none |
   | Plate (front and back of the chest, 25 x 32 cm) | IIIA soft insert (12 mm aramid), AR550 steel (6.35 mm), UHMWPE (20 mm), ceramic (9 mm on 6 mm PE), multi-hit ceramic (9.5 on 8) | Soft insert: handguns and 5.7x28. Steel: 7.62x39, 5.56 and 7.62x51 ball, not armour-piercing. UHMWPE: 7.62x39 and 7.62x51, not 5.56. Ceramic: armour-piercing 5.56 and 7.62x39, .338 Lapua; not .50 BMG |
   | Helmet (the skull above its brim: a high cut clears the ears, a full cut covers them) | Bump (3 mm ABS), high-cut IIIA (8 mm aramid), full-cut IIIA (9 mm), rifle-rated (18 mm PE), visor (18 mm PE + 10 mm polycarbonate visor) | Bump: nothing. IIIA: handguns to .44 Magnum. Rifle-rated: 7.62x39 and 7.62x51, not 5.56. Visor: 9 mm, .45 and buckshot to the face |
   | Face (on a helmet's mount) | Mandible guard (Kestrel: the jaw), IIIA face shield (Ironvale), rifle face shield (Meridian: 14 mm polycarbonate on 10 mm PE) | Polycarbonate 10 mm: 9 mm, .45 and buckshot. The rifle shield: 7.62x51 too, not 7.62x39 or 5.56 |
-  | Belt | Duty (Graywater), battle (Kestrel), war belt with dump pouch (Paragon) | — |
+  | Shoulders (on a carrier) | Deltoid pads II (Graywater: 6 mm aramid), deltoid and axillary set IIIA (Kestrel: 8 mm aramid, and under the arm), hard shoulder guards (Sable Ridge: 18 mm PE, and 8 mm aramid under the arm) | II: 9 mm, .45, not .44 Magnum. IIIA: .44 Magnum too. Hard: 7.62x39 and 7.62x51, not 5.56 |
+  | Pelvis (on a carrier) | Groin flap II (Graywater: 6 mm aramid, the front), pelvic wrap IIIA (Ironvale: 8 mm aramid, all round), steel groin plate III (Ironvale: 6.35 mm AR550 on the middle of a soft flap) | II and IIIA as above. The plate: 5.56 and 7.62x51 ball, on the plate only |
+  | Legs (on a belt) | Shin guards (Northmark: 6 mm polycarbonate), thigh panels IIIA (Kestrel: 8 mm aramid, the front), thigh wraps IIIA (Meridian: 8 mm aramid, all round, nearly to the knee), full leg armour (Sable Ridge: 10 mm aramid wraps and 10 mm polycarbonate shins) | Shin guards: .22, .45 and buckshot, not 9 mm. Panels, wraps: to .44 Magnum. Full: to .44 Magnum on the thigh, 9 mm on the shin |
+  | Belt | Duty (Graywater), battle (Kestrel: leg hangers), war belt with dump pouch (Paragon: leg hangers) | — |
   | Backpack | Sling pack 4×3 (Graywater: pistols, compact SMGs), 3-day assault pack 5×3 (Kestrel: up to rifles and shotguns), large rucksack 6×5 (Sable Ridge: any gun, 3% slower) | — |
 
   - **Rounds against armour** are worked out physically (`js/ballistics.js`, `G.Ballistics`). Each layer has a
@@ -1072,14 +1094,14 @@ says the same), but not whose: the shooter's name isn't shown.
     | Type | What it does |
     | --- | --- |
     | FMJ ball | The standard round |
-    | Hollow point | Opens to 1.37× its width once it's in flesh fast enough (pistol 260 m/s, rifle 480, or 70% of its own muzzle speed if that's lower): a wide track, its energy all spent inside, rarely out the far side; its soft nose flattens on armour. Its open nose drags more (20% shorter drag length): an M4's keeps 594 m/s at 300 m to ball's 642, and drops 33 cm to 29 |
-    | Armour-piercing | A hardened steel (pistol) or tungsten carbide (rifle) core: goes through plate that flattens lead, and through people, late to tumble (a narrower track). A lighter, hard-cored bullet: leaves 8% faster (an M4: 952 m/s to ball's 881), so it drops less (19 cm at 300 m to ball's 29) and kicks a touch less |
+    | Hollow point | Opens in flesh by how fast it's going: it starts at 3/4 of its opening speed and is fully open, at 1.37× its width, by 5/4 of it (the opening speed is pistol 260 m/s, rifle 480, or 70% of its own muzzle speed if that's lower), and past 1.6× it its petals tear off as fragments: a wide track, its energy all spent inside, rarely out the far side; its soft nose flattens on armour. Its open nose drags more (20% shorter drag length): an M4's keeps 594 m/s at 300 m to ball's 642, and drops 33 cm to 29 |
+    | Armour-piercing | A hardened steel (pistol) or tungsten carbide (rifle) core: goes through plate that flattens lead, and through people, late to tumble (a narrower track). A lighter, hard-cored bullet: leaves 8% faster (an M4: 952 m/s to ball's 881), so it drops less (19 cm at 300 m to ball's 29) and kicks a touch less. It's a hard core in a soft jacket (35% of a rifle round, 30% of a pistol's): the first hard plate strips the jacket, and the core goes on alone, lighter and 20% narrower |
     | Tracer | Burns red all the way out: a bright core with a glow, from a couple of metres past the muzzle to where it lands. Your starting P9 and its two spare magazines are loaded with them |
     | Subsonic | A heavier bullet under the speed of sound: less energy, shorter range; through a suppressor it's heard no further than a crossbow |
     | Buckshot | The standard shotgun load |
     | Slug | One 28 g soft lead slug that opens up: accurate, a huge wound, stopped by most armour |
     | Birdshot | A cloud of 0.2 g pellets that stop within centimetres: painful, rarely lethal past a few metres; armour shrugs them off |
-    | Flechette | Hardened steel darts in a tight pattern: narrow and hard enough to get through soft armour; thin tracks |
+    | Flechette | Twenty 0.52 g hardened steel darts, 2.5× a load's usual pellets, 20% faster than buckshot and carrying further: about 1,000 J a shell to buckshot's 1,700. They part a soft vest's weave and a hard plate stops them. Thin tracks, which open out once a dart tumbles, 10 cm in |
 
     - **Magazines:** a magazine holds one type at a time. Drop a box on a magazine in the Kit tab to load it;
       if it held a different type, those rounds come out into a box of their own first. The free Load
@@ -1144,9 +1166,11 @@ says the same), but not whose: the shooter's name isn't shown.
   - **No semi:** cheap open-bolt guns and belt-fed machine guns are full auto only: the MAC-10, Micro Uzi,
     AA-12, M249, PKM, M60 and the minigun.
   - **Bursts:** the BR-3 has semi and a three-round burst at 1600 rpm, just short of the AN-94's hyper burst; the Auto-9 semi and burst; the AN-94 semi and its fast
-    two-round "hyper" burst. The pair leaves before the recoil reaches you, so together they kick a little
-    less than two rounds would. Then it settles to its own 600 rpm. Overall the AN-94 handles like a 5.56 rifle,
-    about 15% livelier.
+    two-round "hyper" burst. The first round's kick waits for the second, so the second leaves on the same line with
+    the same error, and a pull fires the whole pair however quickly you let go. Then you take the two as one kick, 1.8×
+    a round's. Held down it settles to its own 600 rpm, each round kicking 1.35× as hard (the works slamming home), harder
+    than an AK-74 but always the same way: where every other gun's side kick flips at random, the AN-94 pulls steadily a
+    little to the right, with hardly any scatter, so you can hold against it.
   - Semi-only guns (pistols, shotguns, rifles with no auto) are unchanged. The shop's RATE line lists each
     gun's modes.
 - **Gunsmith** (a shop tab, Tarkov-style). Every weapon is a platform, its receiver and trigger group, with
@@ -1196,7 +1220,12 @@ says the same), but not whose: the shooter's name isn't shown.
     the gunsmith has a part for in stock (one that fits it, not the one on it) shows a red "!", on its dot on the
     model and on its row in the list.
   - **Stash:** fitting buys the part if it isn't in your stash. Parts you take off go to your stash, and
-    stash parts sell back for half. Swapping a weapon at a case strips its aftermarket parts into your stash.
+    stash parts sell back for half. A gun's own factory parts sell too: half what a new one costs, up to a tenth of
+    the gun's price, so stripping a gun never pays better than what it cost. Swapping a weapon at a case strips its
+    aftermarket parts into your stash.
+  - **Grip finishes:** standard grips with no stats are one grip in different finishes (six on the pistol mount, three
+    on the AK's). A gun whose stock grip is one has a picker on that row: free, and it changes only the look. They
+    aren't sold or found as parts, and a gun whose stock grip has its own stats doesn't get the picker.
   - **Stock:** the gunsmith has three random parts for sale each visit, the same for the whole squad. They
     show in the Stock tab, marked with which of your guns they fit, and in the Gunsmith. Parts that fit many
     weapons turn up more often, and better parts appear deeper in the run. Buying one takes it out of
@@ -1212,12 +1241,29 @@ says the same), but not whose: the shooter's name isn't shown.
 
     | Levels | Tier | Typical kit |
     | --- | --- | --- |
-    | 1–2 | 1 | Cheap handguns, derringers, sawn-offs, street SMGs. Almost no armour. |
-    | 3–4 | 2 | AKs, MP5s, pump guns, hunting rifles; a quarter in soft vests, the odd helmet. |
-    | 5–7 | 3 | Carbines and semi-auto shotguns; most armoured, some in plates, a third in helmets. |
-    | 8+ | 4 | Modern rifles, AA-12s, DMRs; plates common, half in helmets. |
+    | 1–2 | 1 | Cheap handguns, derringers, sawn-offs, street SMGs. |
+    | 3–4 | 2 | AKs, MP5s, pump guns, hunting rifles. |
+    | 5–7 | 3 | Carbines and semi-auto shotguns. |
+    | 8+ | 4 | Modern rifles, AA-12s, DMRs. |
 
-    Suspects wearing armour show it, with a vest over their clothes and a helmet.
+    **Armour goes by the level itself**, in a line between the levels below and no further than level 18, so it goes on
+    getting heavier after the guns stop changing (`ENEMY_GEAR.odds`). A suspect a tier up or down is dressed as for two
+    levels on or back. As rolled, for a typical suspect:
+
+    | Level | No armour | Soft II | Soft IIIA | Steel | Ceramic | Assault | Helmet |
+    | --- | --- | --- | --- | --- | --- | --- | --- |
+    | 1 | 91% | 8% | 1% | | | | 1% |
+    | 3 | 65% | 26% | 7% | 1% | | | 10% |
+    | 5 | 29% | 36% | 26% | 8% | 1% | | 25% |
+    | 8 | 14% | 20% | 35% | 24% | 7% | | 43% |
+    | 12 | 10% | 6% | 29% | 34% | 19% | 2% | 58% |
+    | 18+ | 4% | | 14% | 32% | 37% | 11% | 74% |
+
+    Those in plates can have shoulder, pelvis and leg armour too, from level 5: about one in five plate carriers has
+    each on level 8, and about half by level 18. Enforcers wear a set by the book: a groin flap from tier 2, shoulders, flap and
+    thigh panels at tier 3, and shin guards under assault armour at tier 4; the Kingpin wears shin guards from tier 2.
+    Suspects wearing armour show it, with a vest over their clothes and a helmet, and what's mounted on it. Their kit
+    goes with the rest of it in the snapshot (its sixth field) and into the replays.
   - They have human health and wear the same armour you do, so pick your shot: the face, the stomach below
     the plates, the limbs, or a heavier round.
   - Rounds passing close by suppress them: they shoot worse and duck into cover.
@@ -1242,7 +1288,12 @@ says the same), but not whose: the shooter's name isn't shown.
   - It covers low-ready versus shouldered aim, crouch (a kneel), corner leans, recoil, hit flinches,
     grenade throws and a downed sit-up pose. Death is a ragdoll: Verlet particles at the joints, held by distance
     constraints with knee and elbow hinges, fall under gravity and collide with the floor, walls, doors and furniture
-    (a body can end up draped over a sofa). Joints have real ranges:
+    (a body can end up draped over a sofa). It runs on its own clock, 60 steps a second whatever the frame rate, and what's
+    drawn is between the last two steps. Friction goes by what a joint is actually resting on, on any floor. A shot knocks a
+    body by its momentum, and everything landing in one step is one shove, a shell's pellets included; a limp body takes less
+    of it. A dead body's upper half is pulled over the way the shot went for 0.6 s at most, fading, with the feet taking the
+    other way, and one that stalls sitting or kneeling is tipped on over. The solver can't launch a body: a contact pushes a
+    joint so far a pass, a joint moves at most 16 cm a step, and corrections can only add so much speed. Joints have real ranges:
     - hips: about 115° forward, 25° back
     - shoulders: a wide 105° cone
     - neck: 35° on the chest; head: 45° on the neck
@@ -1399,6 +1450,9 @@ says the same), but not whose: the shooter's name isn't shown.
     about half the time front on, buckshot and hollow points mostly don't. A hollow point opens out (to 1.37×, at
     70% of its own muzzle speed at most, so a slow .45 opens too), a .22's soft lead flattens (1.3×), a tumbling 5.56 or 7.62x51 round over its fragmentation speed (760 / 790 m/s)
     breaks up into fragments that tear their own tracks, and bone tips a round over. Lung is light, bone dense.
+    Armour throws off fragments too: whatever comes off a round in a plate, and the chips a hard plate throws off its back
+    when it's holed or nearly, fly on through what's behind them. A steel plate's spall liner slows them and a soft backer
+    catches them, so a plate alone in a slick carrier adds wounds that the same plate with a backer doesn't.
     Along the track it crushes what it passes through (its area times the distance) and gives up energy,
     stretching the tissue round it to a radius set by the energy per centimetre: that tears brain, liver,
     spleen and kidneys and barely bothers lung or muscle. Tissue gives about 2.5 cm of stretch; beyond that (a cavity of radius r: within
@@ -1985,7 +2039,16 @@ On top of the baked room reverb, echoes are **ray-traced through the level** for
 - **No stall on first use:** shaders are compiled the first time something's drawn, which caused a spike on
   the first shot of a session (the casing, tracer, bullet hole and blood all drawn for the first time) and
   again for the first explosion or the first suspect to come into view. Once each level is built and
-  populated, everything is compiled up front (`G.R.warmup`, about 70 ms during loading).
+  populated, everything is compiled up front (`G.R.warmup`, during loading).
+- **Loading goes behind a wipe** (`G.Game.veil`, `G.Server.overBlack`): the picture stands still while a level or the
+  hangar is built and compiled, so the host sends a black panel with slanted edges down every screen first (covered
+  in 0.35 s), builds it there, and the panel pulls away off the bottom (0.65 s) once warmup's done and three frames
+  have been drawn. Its edges ripple like jelly as it lands and leaves, while the words on it stay still and fade. Its
+  travel and the spinner are CSS transforms, which the browser's compositor runs, so they keep moving while the page
+  is busy; the ripple is the page's own, but it's off the screen by then. A small grey line under Loading says what's being done
+  (`G.Game.veilSay`), the old line turning quickly down out of sight as a new one comes over, and the last one going when it's done. It only changes between the long
+  steps, which don't let the page draw. Clicks are held off till then, and it lifts anyway after 15 s if something
+  goes wrong.
 
 ## Adding content
 
@@ -2140,7 +2203,8 @@ solids at any height. Doors and windows are dynamic: their solids change as they
   Sponsored segments, ads every few clips (mostly for what Vex has in this visit: its icon, price, a line, and how
   many are left, live, so something bought while it's on shows SOLD OUT; now and then a fake one), final standings,
   a ticker, lower thirds and two game-show presenters who cheer, gasp, laugh and cry. The big screen is on the
-  lounge's east wall (4.4 m across, facing its sofas); the TVs are around the range's yard (behind the rifle line,
+  lounge's east wall (4.4 m across, facing its sofas); a small muted one hangs from the helicopter's cabin roof, tipped
+  down to the bench, to watch while the squad's getting in; the TVs are around the range's yard (behind the rifle line,
   its east wall, by the course), clear of the IPSC course's board and screens, each tipped forward on its wall
   (hinged at the bottom, its top held out on a strut) to face the eyes of someone standing about one and a third of
   its widths out. Press F at one to save the highlights as a recording: a .zip (`breach-protocol-level-N-highlights.zip`,

@@ -48,6 +48,34 @@ G.Game = {
     for (const s of ['menu', 'lobby', 'shop', 'route', 'gameover', 'pause']) this.$(s).classList.toggle('hidden', s !== id);
     G.HUD.show(this.phase === 'level');
   },
+  // The loading veil: a change of scene goes behind a black panel, wobbled down the screen on a slant (css/style.css #veil). A
+  // level's built, and its shaders compiled, in one go on the main thread, and the picture stands still while that's
+  // done. So the host sends the panel across first (G.Server.overBlack) and does it there, and the panel wipes on off
+  // the bottom once the new place has drawn a few frames (js/views.js applySnap).
+  VEIL_MS: 350, VEIL_OUT: 650,
+  veil(on, instant) {
+    const el = this.$('veil'), was = el.classList.contains('on');
+    if (!on && !was && !instant) return; // (not up, or already on its way off)
+    clearTimeout(this.veilT); this.veilN = 0;
+    if (on) this.veilT = setTimeout(() => this.veil(false), 15000); // (whatever goes wrong, never left in the dark)
+    if (on && was) return; // (it's up, and may still be settling: leave it)
+    if (!on && was) this.veilSay(null); // (done: the line turns away as it goes)
+    el.classList.toggle('now', !!instant);
+    el.classList.toggle('on', !!on);
+    el.classList.toggle('out', !on && was && !instant);
+    if (on) { this.$('veilStatus').textContent = ''; this.veilSay('Building the map'); }
+    else if (el.classList.contains('out')) this.veilT = setTimeout(() => el.classList.remove('out'), this.VEIL_OUT + 50); // (back above the screen for next time)
+  },
+  // The line under it: what's being done now, the last one turning down out of sight. It can only change between the
+  // long steps: they don't let the page draw. (Called while it's down, it does nothing. No text: the last one goes, and nothing comes.)
+  veilSay(text) {
+    const box = this.$('veilStatus');
+    if (!this.$('veil').classList.contains('on') || this.veilLine === text && box.lastElementChild) return;
+    this.veilLine = text;
+    for (const q of box.querySelectorAll('span:not(.gone)')) { q.classList.add('gone'); setTimeout(() => q.remove(), 170); }
+    if (!text) return;
+    const n = document.createElement('span'); n.textContent = text; box.appendChild(n);
+  },
   // ------------------------------------------------------------- your look (top, pants, eyewear, gloves)
   // the menu's options, a preview of you, and your own arms in first person
   bindLook() {
@@ -371,6 +399,7 @@ G.Game = {
     this.map = null;
     this.phase = 'menu';
     if (document.pointerLockElement) document.exitPointerLock();
+    this.veil(false, true);
     this.screen('menu');
     this.menuBackdrop();
     this.msg('menuMsg', reason || '', !!reason);
@@ -425,6 +454,7 @@ G.Game = {
         this.tGrid = null; this.arms = {}; this.armSel = null;
         G.Me.newRun();
             break;
+      case 'veil': this.veil(true); break;
       case 'phase':
         if (m.route) this.setRoute(m.route);
         if (m.phase === 'route') this.enterRoute(m.level, m.route);
@@ -642,7 +672,7 @@ G.Game = {
     G.R.flashAt(p);
     G.Audio.flashbang(d);
     const Me = G.Me;
-    if (!Me.pos || Me.dead) return;
+    if (!Me.pos || (Me.dead && !Me.spectating)) return; // (dead, on someone's helmet cam: it's them it blinds and deafens, as you see and hear it)
     const seen = G.Level.los(this.map, p.x, p.y, p.z, eye.x, eye.y, eye.z);
     const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion), to = p.clone().sub(eye).normalize(), look = fwd.dot(to);
     const near = G.U.clamp(1 - d / 16, 0, 1), blind = seen ? near * (look > 0.5 ? 1 : look > 0 ? 0.65 : 0.3) : 0;
@@ -1036,6 +1066,7 @@ G.Game = {
     this.routeSt = { path: r.path || [], votes: r.votes || {} };
   },
   enterRoute(level) {
+    this.veil(false);
     this.toggleInv(false);
     this.closeShop();
     this.hub = false; // (the hangar stays up behind the map: G.Hangar.leave when the level replaces it)
@@ -1180,6 +1211,7 @@ G.Game = {
     G.Net.toHost({ t: 'pick', n });
   },
   enterLevel(level, seed, th) {
+    this.veil(true, true); // (already black, unless you've just joined)
     this.caseUI = null; // (a new run's level 1 has a new case, whatever the last one's number was)
     this.leaveHub();
     this.phase = 'level';
@@ -1213,11 +1245,13 @@ G.Game = {
     G.HUD.toast(`LEVEL ${level}`, this.map.theme.name + (G.Route.isBoss(level) ? ' — <b class="red">THE WARDEN AWAITS</b>' : ''), 3.5);
     if (G.Route.isBoss(level)) G.Audio.alarm();
     if (!this.locked) this.$('clickToPlay').classList.remove('hidden');
+    this.veilSay('Placing everyone');
   },
   // Between levels: the hangar (js/hangar.js). To the game it's a level with nothing in it but the shop, so you walk
   // about it, the squad is there, and rays, steps and sound are all the ordinary ones; the host just doesn't send
   // enemies. this.hub marks it (the phase is still 'level' here).
   enterShop(level, seed, report, stock) {
+    this.veil(true, true);
     this.toggleInv(false);
     this.closeShop();
     this.hub = true; this.shopOpen = false;
@@ -1236,6 +1270,7 @@ G.Game = {
     // the level just played stays, out of sight, for the highlights on the hangar's TVs (js/highlights.js)
     if (G.Highlights && this.map && !this.map.hub) G.Highlights.take(this.map, G.R.detachLevel());
     this.map = G.Level.generateHub(seed, level);
+    G.Views.warmed = false; // (compiled under the veil too, and what lifts it)
     G.Loot.clear();
     G.R.setLevel(this.map);
     G.Views.clearLevel();
@@ -1252,6 +1287,7 @@ G.Game = {
     G.HUD.toast('THE HANGAR', `Level ${level} cleared · look at what you want and press <b>F</b>`, 4);
     if (this.lastBonus) G.HUD.chat(null, 0, `Mission bonus: +¢${this.lastBonus}`);
     if (!this.locked) this.$('clickToPlay').classList.remove('hidden');
+    this.veilSay('Placing everyone');
   },
   // out of the hangar for good (a level, the lobby, the menu)
   leaveHub() {
@@ -1260,6 +1296,7 @@ G.Game = {
     G.Hangar.leave();
   },
   enterGameover(m) {
+    this.veil(false);
     this.toggleInv(false);
     this.closeShop();
     this.hub = false;
@@ -1296,10 +1333,10 @@ G.Game = {
       if (this.invOpen && (this.invT = (this.invT || 0) + dt) > 0.25) { this.invT = 0; G.InvUI.tick(); this.$('fiScore').innerHTML = G.HUD.scoreboardHTML(); }
       G.Me.update(dt);
       if (G.Highlights && !this.hub) G.Highlights.tick(dt); // (recording the level, for the hangar's TVs)
-      G.GunAudio.updateListener(G.R.camera);
       if (this.hub) { G.Hangar.update(dt); G.Hangar.mark(); }
       G.Views.update(dt);
       if (G.Me.dead) G.Me.spectate(dt); // (after the rigs are posed: the helmet camera's on a head as it is this frame)
+      G.GunAudio.updateListener(G.R.camera); // (after that: dead, you hear from where the camera is, not where you fell)
       G.Me.flushHits();
       this.updateZone();
       this.updateDoors(dt);
@@ -1314,6 +1351,7 @@ G.Game = {
     G.R.update(dt);
     G.HUD.update(dt);
     G.R.render();
+    if (this.veilN > 0 && --this.veilN === 0) this.veil(false); // (the new place has drawn: js/views.js applySnap)
   },
   // swing door leaves toward their open/closed state
   updateDoors(dt) {

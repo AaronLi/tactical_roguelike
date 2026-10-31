@@ -1593,13 +1593,19 @@ G.Level = {
   // ---------------------------------------------------------------- steel grating
   // A catwalk's floor (map.grate): bar grating, bearing bars a few centimetres apart and a cross bar every so often,
   // seen through from above and below. Under it, a steel channel along every edge that's over the drop, and hanger
-  // rods up to the roof from them every few metres.
+  // rods up to the roof from them every few metres. Rounds meet the bars drawn here, where they're drawn: onBar.
+  GRATE: { PX: 96, PITCH: 6, CROSS: 32, BAR: 2 }, // (a tile's worth, in the texture's pixels)
+  // is this point on the floor over a bar? 1 a bearing bar, 2 a cross bar, 0 a gap
+  onBar(x, z) {
+    const { PX, PITCH, CROSS, BAR } = this.GRATE, k = PX / this.TS, a = ((x * k) % PX + PX) % PX, b = ((z * k) % PX + PX) % PX;
+    return a % PITCH < BAR ? 1 : b % CROSS < BAR ? 2 : 0;
+  },
   buildGrate(map, root) {
-    const T = THREE, TS = this.TS, { W, H, t, grate: gr } = map;
-    const cv = typeof document !== 'undefined' ? document.createElement('canvas') : new OffscreenCanvas(96, 96); cv.width = cv.height = 96;
-    const g = cv.getContext('2d'); g.clearRect(0, 0, 96, 96); g.fillStyle = '#fff';
-    for (let x = 0; x < 96; x += 6) g.fillRect(x, 0, 2, 96); // the bearing bars
-    for (let y = 0; y < 96; y += 32) g.fillRect(0, y, 96, 2); // the cross bars
+    const T = THREE, TS = this.TS, { W, H, t, grate: gr } = map, { PX, PITCH, CROSS, BAR } = this.GRATE;
+    const cv = typeof document !== 'undefined' ? document.createElement('canvas') : new OffscreenCanvas(PX, PX); cv.width = cv.height = PX;
+    const g = cv.getContext('2d'); g.clearRect(0, 0, PX, PX); g.fillStyle = '#fff';
+    for (let x = 0; x < PX; x += PITCH) g.fillRect(x, 0, BAR, PX); // the bearing bars
+    for (let y = 0; y < PX; y += CROSS) g.fillRect(0, y, PX, BAR); // the cross bars
     const tex = new T.CanvasTexture(cv); tex.wrapS = tex.wrapT = T.RepeatWrapping;
     const mat = new T.MeshStandardMaterial({ color: 0x7a7e80, map: tex, alphaTest: 0.5, roughness: 0.5, metalness: 0.7, side: T.DoubleSide });
     const cells = [];

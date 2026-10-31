@@ -76,12 +76,38 @@ G.World = (() => {
     return { t: Math.max(0, tmin), n, out: tmax };
   }
 
+  // A round's way through a grating (h: its way through the whole box): down between the bars it meets nothing. The first
+  // bar it comes to moves h.t and h.n there, and h.bar is its way out of that: { t, n, mm (of steel) }. Struck on its edge a
+  // bar's still only a thin strip: it's bent aside, or the round breaks round it, and it never takes more than going through it would.
+  // (BAR_DEEP: as deep as the flat picture of them shows: a gap you can see is one you can shoot through.)
+  const BAR_STEP = 0.003, BAR_MM = 4, BAR_DEEP = 0.012;
+  function barHit(o, d, h, s) {
+    const L = G.Level, at = (t) => L.onBar(o[0] + d[0] * t, o[2] + d[2] * t), face = (b, g) => { const n = [0, 0, 0], a = b === 1 ? 0 : 2; n[a] = g * Math.sign(d[a] || 1); return n; };
+    const top = s.max[1], t1 = (top - o[1]) / d[1], t2 = (top - BAR_DEEP - o[1]) / d[1], flat = Math.abs(d[1]) < 1e-9;
+    if (flat && (o[1] > top || o[1] < top - BAR_DEEP)) return false;
+    const lo = flat ? h.t : Math.max(h.t, Math.min(t1, t2)), hi = flat ? h.out : Math.min(h.out, Math.max(t1, t2));
+    if (lo >= hi) return false;
+    let t = lo, b = at(t), was = 0, n0 = lo > h.t ? [0, -Math.sign(d[1]), 0] : h.n;
+    if (!b) {
+      do { t += BAR_STEP; b = t < hi ? at(t) : 0; } while (!b && t < hi);
+      if (!b) return false;
+      n0 = face(b, -1);
+    }
+    const t0 = t;
+    for (was = b; t < hi; t += BAR_STEP) { b = at(t); if (!b) break; was = b; }
+    const end = Math.min(t, hi), n = end < hi ? face(was, 1) : [0, Math.sign(d[1] || 1), 0];
+    h.t = t0; h.n = n0;
+    h.bar = { t: end, n, mm: Math.min(BAR_MM, Math.max(1, (end - t0) * 1000)) };
+    return true;
+  }
+
   // The nearest solid from o along the unit direction d, within maxT: { t, n, solid, view, pane }, or { t: maxT }
   // when nothing's there. opts.glass: through glass (the panes crossed, nearest first, in .glass);
   // opts.skip(solid): solids to ignore; opts.move: what stops people instead of what stops rays; opts.sight: a
-  // look, not a round: it goes through clear solids (a glass door), with .clear set when it did.
+  // look, not a round: it goes through clear solids (a glass door), with .clear set when it did. opts.bars: a round: it
+  // meets a grating's bars (.bar: see barHit), where anything else goes through it.
   function raycast(w, ox, oy, oz, dx, dy, dz, maxT, opts) {
-    const o = [ox, oy, oz], d = [dx, dy, dz], pass = !!(opts && opts.glass), skip = opts && opts.skip, mv = !!(opts && opts.move), sight = !!(opts && opts.sight);
+    const o = [ox, oy, oz], d = [dx, dy, dz], pass = !!(opts && opts.glass), skip = opts && opts.skip, mv = !!(opts && opts.move), sight = !!(opts && opts.sight), bars = !!(opts && opts.bars);
     let seenThru = false;
     const crossed = pass ? [] : null, stamp = ++w.stamp, mark = w.mark;
     let best = null;
@@ -97,9 +123,10 @@ G.World = (() => {
         if (mark[id] === stamp) continue;
         mark[id] = stamp;
         const s = w.solids[id];
-        if (!s || !(mv ? s.move : s.ray) || (skip && skip(s))) continue;
+        if (!s || !(mv ? s.move : s.ray || (bars && s.bars)) || (skip && skip(s))) continue;
         const h = slab(o, d, s);
         if (!h || h.t > maxT) continue;
+        if (s.bars && !mv && (!barHit(o, d, h, s) || h.t > maxT)) continue;
         // (shot through: down a hole in it there's nothing to meet, and a blind hole's met at its floor: js/damage.js)
         if (!mv && s.holes && s.holes.length) { const c = G.Damage.clear(s, o, d, h.t, h.out); if (c >= h.out - 1e-3) continue; h.t = c; if (c > maxT) continue; }
         if (!mv && s.door && s.door.holes && s.door.holes.length) { const q = (h.t + h.out) / 2; if (G.Damage.doorHole(s.door, [o[0] + d[0] * q, o[1] + d[1] * q, o[2] + d[2] * q])) continue; }
@@ -273,8 +300,8 @@ G.World = (() => {
     else {
       const gr = map.grate;
       for (const [x0, z0, x1, z1] of rects((i) => t[i] !== 5 && !(gr && gr[i]))) add(w, box(x0 * TS, Y - SK, z0 * TS, (x1 + 1) * TS, Y, (z1 + 1) * TS, { kind: 'floor' }));
-      // steel grating (a catwalk): it holds you up, but rounds and eyes go through it, from above and from below
-      if (gr) for (const [x0, z0, x1, z1] of rects((i) => gr[i] && t[i] !== 5)) add(w, box(x0 * TS, Y - 0.05, z0 * TS, (x1 + 1) * TS, Y, (z1 + 1) * TS, { kind: 'grate', ray: false }));
+      // steel grating (a catwalk): it holds you up, and eyes go through it from above and below; a round goes between its bars, or meets one (barHit)
+      if (gr) for (const [x0, z0, x1, z1] of rects((i) => gr[i] && t[i] !== 5)) add(w, box(x0 * TS, Y - 0.05, z0 * TS, (x1 + 1) * TS, Y, (z1 + 1) * TS, { kind: 'grate', ray: false, bars: true }));
     }
     // ceilings over everything indoors (not under a drop in the floor above)
     for (const [x0, z0, x1, z1] of rects((i) => !map.out[i] && !(va && va[i]))) add(w, box(x0 * TS, Y + WH, z0 * TS, (x1 + 1) * TS, Y + WH + 0.3, (z1 + 1) * TS, { kind: 'ceil' }));

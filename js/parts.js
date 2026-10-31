@@ -424,7 +424,7 @@ G.Gunsmith = (() => {
     if (s.grip) {
       const [fam, t, gm] = s.grip;
       slot('grip', 'gr:' + fam, true);
-      std('grip', 'gr:' + fam, t ? { gripT: t, gm: gm || null } : { gm: gm || null }, { name: `${gm ? MATN[gm] || '' : ''}${GRIP_NAME[t] || 'grip panels'}${gm ? '' : ' (matches the furniture)'}`, price: 70 });
+      std('grip', 'gr:' + fam, t ? { gripT: t, gm: gm || null } : { gm: gm || null }, { name: `${gm && !(gm === 'wood' && t === 'wood') ? MATN[gm] || '' : ''}${GRIP_NAME[t] || 'grip panels'}${gm ? '' : ' (matches the furniture)'}`, price: 70 });
     }
     if (s.stock) {
       const [fam, type, sm] = s.stock;
@@ -757,6 +757,18 @@ G.Gunsmith = (() => {
   }
   // a part's price when it's bought outright (a gun's own factory parts have none: they come with it)
   const buyPrice = (p) => p.price || ({ barrel: 320, slide: 260, handguard: 200 })[p.slot] || 150;
+  // What it sells back for: half that. A gun's own parts, with no price of their own, go for a tenth of the gun at most,
+  // so stripping one for its parts and trading in the rest never comes to more than it cost.
+  const sellPrice = (p) => {
+    const half = Math.floor(buyPrice(p) * 0.5), gun = p.factory && !p.price && G.WEAPONS[p.plat];
+    return gun ? Math.min(half, Math.max(5, Math.floor((gun.price || 0) * 0.1))) : half;
+  };
+  // A standard grip with nothing to it (js/parts.js std): the stock one on the guns that come with it, so it stays in
+  // the list, but no upgrade on any gun, so nothing sells or offers it for another. Those of a mount are the one grip in
+  // different finishes: a gun whose stock grip is one can have any of them, for nothing (skins: the gunsmith's picker).
+  const plainGrip = (p) => p.slot === 'grip' && p.oem && !Object.keys(p.st || {}).length;
+  const plainHere = (p, id) => plainGrip(p) && PLATFORMS[id].defaults.grip !== p.id;
+  const skins = (id) => { const d = PARTS[PLATFORMS[id].defaults.grip]; return d && plainGrip(d) ? compatible(d.mount).filter((p) => plainGrip(p) && !(p.not || []).includes(id)) : []; };
 
   // ------------------------------------------------------------------ compile: build -> weapon def
   const cache = new Map();
@@ -861,7 +873,7 @@ G.Gunsmith = (() => {
     },
     slug: () => ({ shotCount: 1, bulletWeight: 437 }),
     birdshot: (g) => ({ shotCount: 16, bulletWeight: g.bulletWeight * 0.9 }),
-    flechette: (g) => ({ shotCount: 16, bulletWeight: g.bulletWeight * 0.7 }),
+    flechette: (g) => ({ shotCount: 20, bulletWeight: g.bulletWeight * 0.7 }),
   };
   // the sound key for this gun firing a round of this type ("<soundKey>@<type>" when the load changes the report)
   const roundSoundKey = (def, am) => (LOAD_SOUND[am] && G.GUN_SPECS[def.id] ? `${def.soundKey}@${am}` : def.soundKey);
@@ -1059,7 +1071,7 @@ G.Gunsmith = (() => {
   function rollStock(level, seed, n = 6) {
     const r = G.U.rng((seed ^ 0x6a5d) >>> 0), maxTier = Math.min(3, 1 + Math.floor(level / 2)), out = new Set();
     // (lights and lasers are few among hundreds of muzzles, stocks and grips: they're weighted up to turn up most visits)
-    const pool = LIST.filter((p) => !p.factory && !p.variant && !p.retired && p.tier <= maxTier)
+    const pool = LIST.filter((p) => !p.factory && !p.variant && !p.retired && !plainGrip(p) && p.tier <= maxTier)
       .map((p) => ({ p, w: Math.pow(fitsPart(p).length, 0.8) * (p.slot === 'tac' ? 9 : 1) * Math.max(0.04, Math.pow(1 - stockShare(p), 3)) }));
     while (out.size < n && pool.length) {
       let roll = r() * pool.reduce((a, x) => a + x.w, 0), i = 0;
@@ -1080,13 +1092,13 @@ G.Gunsmith = (() => {
     const out = [];
     for (const s of slotsOf(id, build)) {
       if (!ATTACH_SLOTS.has(s.slot)) continue;
-      for (const p of compatible(s.mount)) if (!p.factory && !p.retired && !p.variant && !p.becomes && p.id !== build[s.slot] && fitsSlot(s, p, id) && !out.includes(p)) out.push(p);
+      for (const p of compatible(s.mount)) if (!p.factory && !p.retired && !p.variant && !p.becomes && !plainHere(p, id) && p.id !== build[s.slot] && fitsSlot(s, p, id) && !out.includes(p)) out.push(p);
     }
     return out;
   }
   return {
     PARTS, LIST, PLATFORMS, attachOptions, SLOT_LABEL, BRANDS: BR, ifaceName, fits, fitsPart, fitsSlot, ALIAS,
-    defaultBuild, slotsOf, slotFor, slotLabel, visibleSlots, magCap, prune, encode, decode, compile, fromCode, soundSpec, roundSoundKey, modelSpec, rollStock, compatible, strip, convert, kitsFor, convParts, buyPrice, RCV,
+    defaultBuild, slotsOf, slotFor, slotLabel, visibleSlots, magCap, prune, encode, decode, compile, fromCode, soundSpec, roundSoundKey, modelSpec, rollStock, compatible, strip, convert, kitsFor, convParts, buyPrice, sellPrice, plainGrip, plainHere, skins, RCV,
     defaultCode: (id) => encode(id, defaultBuild(id)),
   };
 })();

@@ -71,9 +71,8 @@ G.Me = {
       const slot = it.w.def.slot;
       if (!this.weapons[slot]) { this.weapons[slot] = it.w; ok = true; if (G.R.vm && this.cur() === it.w) G.R.setViewmodel(it.w.def); }
       else ok = !!Gr.place(Gr.body(this).filter((g) => g.pack), it);
-    } else if (Gr.isGear(it) && it.k !== 'plate' && it.k !== 'face' && !this.kit[it.k]) { this.kit[it.k] = it; ok = true; } // worn, if that's free
-    else if (it.k === 'plate' && this.kit.carrier && Gr.defOf(this.kit.carrier).plate && !this.kit.carrier.plate) { this.kit.carrier.plate = it; ok = true; }
-    else if (it.k === 'face') { if (this.kit.helmet && Gr.defOf(this.kit.helmet).face && !this.kit.helmet.face) { this.kit.helmet.face = it; ok = true; } else ok = Gr.stow(this, it); }
+    } else if (Gr.isGear(it) && !Gr.MOUNTS[it.k] && !this.kit[it.k]) { this.kit[it.k] = it; ok = true; } // worn, if that's free
+    else if (Gr.MOUNTS[it.k] && Gr.mountFree(this, it.k)) { Gr.mountOn(this, it.k)[it.k] = it; ok = true; } // fitted, likewise
     else if (it.k === 'pouch') ok = !!Gr.place(Gr.molles(this), it) || Gr.stow(this, it); // a pouch: straight onto your MOLLE if there's room
     else ok = Gr.stow(this, it);
     if (ok) { G.HUD.toast('', `Picked up: ${name}`, 1.4); G.Audio.pickup(); if (G.InvUI.field) G.InvUI.render(); }
@@ -139,6 +138,7 @@ G.Me = {
     this.weapons[def.slot] = w;
     const what = `${spare.placed ? `, ${spare.placed} spare ${G.Gear.ammoFor(w.def).kind === 'mag' ? 'magazine' : 'box'}${spare.placed > 1 ? 's' : ''}` : ''}${spare.dropped ? ` (${spare.dropped} on the floor: no room)` : ''}${A && A.k !== 1 ? ` · loaded with ${A.name}` : ''}`;
     this.inHand(def.slot, `${def.name}${what}${K ? ', and a ' + K.name + (kits.length > 1 ? ' with the parts for it' : '') : ''} — ${!old ? 'taken from the case' : stowed ? 'your ' + old.def.name + ' is in your backpack' : 'your ' + old.def.name + ' is in the case'}`);
+    this.raiseT = 0; // (up and ready at once: the wheel was the wait)
   },
   // a different gun in that slot now: it's the one in your hands, drawn
   inHand(slot, msg) {
@@ -634,15 +634,22 @@ G.Me = {
     const u = G.R && G.R.vm && G.R.vm.userData, give = Math.max(0.006, ((u && u.info && u.info.relief) || 0.3) - 0.04);
     return G.U.lerp(this.RECOIL.SHOVE.HIP, give, this.adsT || 0);
   },
-  recoilKick(def) {
+  // lone: a pair's first round, whose second never came: its own kick, as it was held
+  recoilKick(def, lone) {
     const R = this.RECOIL, rc = this.rc, m = this.recoilModel(def);
-    // a hyper-burst pair (AN-94) leaves before the recoil reaches you: the two rounds kick less than two
-    const hyper = this.fireMode && this.fireMode(this.cur()) === 'hyper' && this.hyperQ > 0 ? 0.7 : 1;
-    const k = this.steadiness() * (this.prone ? 0.6 : this.crouch ? 0.8 : 1) * (this.adsT > 0.5 ? 0.85 : 1) * hyper; // (prone: the ground takes it)
-    const up0 = m.up * (0.85 + Math.random() * 0.3) * k, dir = Math.random() < 0.5 ? -1 : 1;
+    // A hyper-burst pair (AN-94) leaves before the recoil reaches you: the first round's kick waits for the second, so the
+    // second leaves on the same line, and then you take the two as one. The rounds after them kick for themselves.
+    const hyper = !lone && this.fireMode && this.fireMode(this.cur()) === 'hyper';
+    if (hyper && this.hyperQ > 1) { this.pairHeld = def; return; }
+    const paired = hyper && this.hyperQ === 1 && this.pairHeld;
+    this.pairHeld = null;
+    const kind = paired ? def.hyperKick || 1 : hyper ? def.autoKick || 1 : 1;
+    const k = this.steadiness() * (this.prone ? 0.6 : this.crouch ? 0.8 : 1) * (this.adsT > 0.5 ? 0.85 : 1) * kind; // (prone: the ground takes it)
+    // (a gun with a pull kicks the same way every time, so you can hold against it: a little to the right, a steady climb)
+    const up0 = m.up * (def.pull ? 0.95 + Math.random() * 0.1 : 0.85 + Math.random() * 0.3) * k, dir = def.pull || Math.random() < 0.5 ? -1 : 1;
     // driven back near the limit: what's left of the kick comes out sideways and up
     const S = R.SHOVE, c = G.U.smooth(0.55, 1, this.shove / this.shoveRoom());
-    const side = dir * (m.side * (0.9 + Math.random() * 0.8) * k + up0 * S.SIDE * c); // never fires flat
+    const side = dir * (m.side * (def.pull ? def.pull * (0.9 + Math.random() * 0.2) : 0.9 + Math.random() * 0.8) * k + up0 * S.SIDE * c); // never fires flat
     const up = up0 * (1 + S.UP * c);
     this.shoveV += S.J * (0.35 + def.recoil * 0.06) * k * (1 - 0.6 * c);
     rc.y += side * R.POS; rc.vy += side * R.VEL;
@@ -770,7 +777,7 @@ G.Me = {
     if (!w || this.down || this.dead) return;
     if (modes.length < 2) { G.HUD.toast('', `The ${w.def.name} has no selector: ${G.MODE_NAME[modes[0]].toLowerCase()} only`, 1.4); G.Audio.deny(); return; }
     w.fm = modes[(modes.indexOf(this.fireMode(w)) + 1) % modes.length];
-    this.burstQ = 0; this.hyperQ = 0;
+    this.burstQ = 0; this.hyperQ = 0; this.pairAim = null;
     G.Audio.click();
     G.HUD.toast('', G.MODE_NAME[w.fm], 0.9);
   },
@@ -885,6 +892,7 @@ G.Me = {
       if (spinning && this.spin === 0) G.Audio.spinUp(def.spinUp);
       this.spin = spinning ? Math.min(1, this.spin + dt / def.spinUp) : Math.max(0, this.spin - dt / (def.spinUp * 1.5));
     }
+    if (this.pairHeld && (this.hyperQ !== 1 || this.sinceShot > 0.25)) { const d = this.pairHeld; this.pairHeld = null; this.hyperQ = 0; this.recoilKick(d, true); } // (the pair's second round never came: the first's kick lands anyway)
     if (this.out || this.stanceT > 0 || this.swapT > 0 || this.lowReady || this.stowed || this.held || this.raiseT > 0 || (G.Game.hub && !G.Range.on())) { this.burstQ = 0; return; } // (the hangar's no place for it: the range is)
     // a bolt gun: the shot's case stays in till you work the bolt, which you do as you let go of the trigger (hold
     // it to stay on the sight and watch where it went)
@@ -892,8 +900,8 @@ G.Me = {
     const mode = this.fireMode(w); // where the selector is
     if (mode === 'burst' && this.pressBuf > 0 && this.burstQ === 0 && this.fireCd <= 0) { this.burstQ = def.burst || 3; this.pressBuf = 0; }
     if (mode === 'hyper' && pressed) this.hyperQ = def.hyper;
-    if (mode === 'hyper' && !trigger) this.hyperQ = 0;
-    const want = mode === 'auto' || mode === 'hyper' ? trigger && (!def.spinUp || this.spin >= 1) : mode === 'semi' ? this.pressBuf > 0 : this.burstQ > 0;
+    if (mode === 'hyper' && !trigger && this.hyperQ !== 1) this.hyperQ = 0; // (a pair once begun finishes: it's too quick to let go of)
+    const want = mode === 'hyper' && this.hyperQ === 1 ? true : mode === 'auto' || mode === 'hyper' ? trigger && (!def.spinUp || this.spin >= 1) : mode === 'semi' ? this.pressBuf > 0 : this.burstQ > 0;
     if (!want || this.fireCd > 0) return;
     if (def.missing && def.missing.length) { // a core part off: the trigger does nothing
       if (pressed || this.pressBuf > 0) {
@@ -908,7 +916,7 @@ G.Me = {
     if (ch && !w.chamber && (w.mag > 0 || w.spentCh) && (!this.reloading || def.shell) && (pressed || this.pressBuf > 0)) { this.reloading = false; this.rack(w); this.burstQ = 0; this.pressBuf = 0; return; } // click: tap, rack (shells: stop loading and rack)
     if (ch ? !w.chamber : w.mag <= 0) {
       if (pressed || mode !== 'auto' || !this.dryT || this.dryT < performance.now()) { G.Audio.dry(); this.dryT = performance.now() + 300; }
-      this.burstQ = 0; this.pressBuf = 0; // just the click: reloading is up to you (R)
+      this.burstQ = 0; this.hyperQ = 0; this.pressBuf = 0; // just the click: reloading is up to you (R)
       return;
     }
     if (this.reloading) { if (def.shell) this.reloading = false; else return; }
@@ -992,7 +1000,10 @@ G.Me = {
 
     // where the gun actually points this shot (one error for the whole shot), then for a shotgun the pattern
     // around it: the choke's cone, denser in the middle (roughly normal, clipped at 1.6x)
-    const a0 = Math.random() * Math.PI * 2, r0 = Math.sqrt(Math.random()) * Math.tan(sr);
+    // (a hyper pair's second round: the same error as the first's, near enough: the gun hasn't moved)
+    const pair2 = this.hyperQ === 1 && this.pairAim && this.fireMode(w) === 'hyper';
+    const a0 = pair2 ? this.pairAim[0] : Math.random() * Math.PI * 2, r0 = pair2 ? this.pairAim[1] : Math.sqrt(Math.random()) * Math.tan(sr);
+    this.pairAim = this.hyperQ === 2 ? [a0, r0] : null;
     const aim = fwd.clone().addScaledVector(right, Math.cos(a0) * r0).addScaledVector(up, Math.sin(a0) * r0).normalize();
     const pr = Math.tan(((def.choke || 0) * Math.PI) / 180);
     // each round (or pellet) leaves as a projectile (fly); the squad is told where it's headed, as far as the
@@ -1168,7 +1179,7 @@ G.Me = {
     const turn = (nd, nv) => { d = nd; v = nv; turned = true; b.events = (b.events || 0) + 1; };
     const stopped = (p, t, body, vs) => ({ p, t, body, v: vs });
     legs: for (let leg = 0; leg < 12 && rest > 1e-4 && v > G.ROUND_LIFE.v; leg++) {
-      const wall = L.raycast(map, o.x, o.y, o.z, d.x, d.y, d.z, rest), hitWall = !!wall.solid && wall.t < rest - 1e-4, wallT = Math.min(wall.t, rest);
+      const wall = L.raycast(map, o.x, o.y, o.z, d.x, d.y, d.z, rest, { bars: true }), hitWall = !!wall.solid && wall.t < rest - 1e-4, wallT = Math.min(wall.t, rest);
       const look = hitWall ? wallT : rest + 0.8; // (a body that straddles the end of this step: all of it, now)
       for (const h of this.roundHits(b, o, d, wallT)) {
         const tr = [], ev = h.ev, mate = h.mate; // (F9: the track through them, a step at a time, for the trail, and its fragments)
@@ -1186,7 +1197,7 @@ G.Me = {
           B.wearOut(armour);
           this.hitEnemy(ev, r, b);
           ev.engagedT = performance.now(); // (yours to watch: its body's physics wherever it is, js/views.js)
-          ev.rig.hit(d);
+          ev.rig.hit(d, b.proj.m * v);
           ev.selfHit = true;
           ev.lastHitDir = d.clone().setY(0).normalize();
         } else {
@@ -1199,7 +1210,7 @@ G.Me = {
             q.ws.push(...out.ws); q.rang |= out.rang; q.stopped += out.stopped; if (out.fc) q.fc = (q.fc || []).concat(out.fc); if (out.hd) q.hd = (q.hd || []).concat(out.hd);
             for (const [k, j] of Object.entries(out.wear)) q.wear[k] = (q.wear[k] || 0) + j;
             b.shot.ff.set(mate.id, q);
-            mate.rig.hit(d);
+            mate.rig.hit(d, b.proj.m * v);
           }
         }
         if (r.hits.some((x) => x.armour.some((q) => !q.through))) { G.R.impact(hp, null, 'armor'); if (G.Audio.armorHit) G.Audio.armorHit(); }
@@ -1230,7 +1241,7 @@ G.Me = {
       if (s.target) G.Range.hit(s, at, d, b.proj.m * vIn);
       const pane0 = wall.pane != null && !(s.win && s.win.armor) && !r.ric; // (glass shows what it took across the whole pane: no mark on it)
       if (wall.pane != null && !(s.win && s.win.armor)) this.roundPane(wall.pane, at, d);
-      if (!wall.view) this.roundMark(b, at, wall.n, r.fx, r.ric ? 'r' : 'e', vIn, s, r.name, { m: r.mat, dir: d, stop: !r.ric && !r.v, cut: cut ? cut.r : pane0 ? 1 : 0, depth: r.depth });
+      if (!wall.view) this.roundMark(b, at, wall.n, r.fx, r.ric ? 'r' : 'e', vIn, s, r.name, { m: s.bars ? '' : r.mat, dir: d, stop: !r.ric && !r.v, cut: cut ? cut.r : pane0 ? 1 : 0, depth: r.depth });
       else { this.pathPt(b, at, vIn); if (b.trail) G.R.trailAdd(b.trail, at, true, vIn); }
       if (r.ric) {
         on(wall.t);
@@ -1244,7 +1255,7 @@ G.Me = {
       if (wall.pane == null && !wall.view) b.walled = true; // (through something a person could hide behind)
       const n0 = wall.n;
       on(r.t);
-      if (!wall.view) this.roundMark(b, o, r.nOut, r.fxOut, 'x', r.v, null, r.nameOut, { m: r.matOut, dir: d, cut: cut ? cut.rOut : pane0 ? 1 : 0 });
+      if (!wall.view) this.roundMark(b, o, r.nOut, r.fxOut, 'x', r.v, null, r.nameOut, { m: s.bars ? '' : r.matOut, dir: d, cut: cut ? cut.rOut : pane0 ? 1 : 0 });
       turn(B.deflect(d, r, n0), r.v);
       o.addScaledVector(d, 0.004);
     }
@@ -1309,15 +1320,11 @@ G.Me = {
   caseTake() {
     const wc = G.Game.wcase, inCase = wc && G.Gunsmith.fromCode(wc.code);
     if (!inCase) return;
-    const slot = inCase.slot;
-    this.startAction('Swapping weapons', 1.2, () => {
-      const w = this.weapons[slot];
-      this.caseStow = !!(w && this.packRoom(G.Gear.gunItem(w)));
-      // your weapon goes in the case in its standard build: your aftermarket parts stay with you
-      // its magazines go into the case with it (unless it's going in your backpack)
-      G.Net.toHost({ t: 'swap', give: w && !this.caseStow ? [w.def.code, G.loaded(w), G.Gear.handOver(this, w.def), w.ammo, w.stickers || null] : null }); // (its stickers with it)
-    }, 'case');
-    this.action.free = true;
+    const w = this.weapons[inCase.slot];
+    this.caseStow = !!(w && this.packRoom(G.Gear.gunItem(w)));
+    // your weapon goes in the case in its standard build: your aftermarket parts stay with you
+    // its magazines go into the case with it (unless it's going in your backpack)
+    G.Net.toHost({ t: 'swap', give: w && !this.caseStow ? [w.def.code, G.loaded(w), G.Gear.handOver(this, w.def), w.ammo, w.stickers || null] : null }); // (its stickers with it)
   },
   // where a round struck or left something: its mark here (s: a target's own, its picture), on its trail, and for the squad
   // how: { m (what it's made of: '' nothing to damage), dir (the way it was going), stop (it stopped in it) }
@@ -2322,7 +2329,7 @@ G.Me = {
   // what you're wearing, as others see it (js/rig.js setKit)
   kitLook() {
     const k = this.kit || {}, g = (it) => (it ? it.gid : 0), n = (it) => (it && it.molle ? it.molle.items.length : 0);
-    return { helmet: g(k.helmet), face: k.helmet && k.helmet.face ? k.helmet.face.gid : 0, carrier: g(k.carrier), plate: k.carrier && k.carrier.plate ? 1 : 0, cp: n(k.carrier), belt: g(k.belt), bp: n(k.belt), pack: g(k.pack), ifak: k.ifak ? 1 : 0 };
+    return { helmet: g(k.helmet), face: k.helmet && k.helmet.face ? k.helmet.face.gid : 0, carrier: g(k.carrier), plate: k.carrier && k.carrier.plate ? 1 : 0, sh: k.carrier && k.carrier.shoulder ? k.carrier.shoulder.gid : 0, gr: k.carrier && k.carrier.groin ? k.carrier.groin.gid : 0, cp: n(k.carrier), belt: g(k.belt), lg: k.belt && k.belt.legs ? k.belt.legs.gid : 0, bp: n(k.belt), pack: g(k.pack), ifak: k.ifak ? 1 : 0 };
   },
   state() {
     const r2 = (v) => Math.round(v * 100) / 100;

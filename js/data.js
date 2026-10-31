@@ -67,7 +67,7 @@ G.WEAPON_LIST = [
   W({ id: 'hk416', slot: 'p', cls: 'AR', tier: 2, price: 1700, name: 'HK416', dmg: 30, rpm: 820, mag: 30, reserve: 210, reload: 2.2, spread: 2.4, ads: 0.01667, range: 40, zoom: 0.7, speed: 0.95, desc: 'Piston-driven carbine. Clean, flat, dependable.' }),
   W({ id: 'aug', slot: 'p', cls: 'AR', tier: 2, price: 1800, name: 'Steyr AUG', dmg: 31, rpm: 700, mag: 30, reserve: 210, reload: 2.4, spread: 2.4, ads: 0.02083, range: 45, zoom: 0.62, speed: 0.97, desc: 'Bullpup. Long barrel, short gun.' }),
   W({ id: 'galil', slot: 'p', cls: 'AR', tier: 2, price: 1500, name: 'Galil ACE', dmg: 37, rpm: 650, mag: 35, reserve: 210, reload: 2.5, spread: 3.0, ads: 0.025, range: 36, zoom: 0.75, speed: 0.94, pen: 1, desc: 'Kalashnikov guts, better manners. 35-round mags.' }),
-  W({ id: 'an94', slot: 'p', cls: 'AR', tier: 3, price: 2700, name: 'AN-94', dmg: 33, rpm: 600, mode: 'hyper', hyper: 2, hyperRpm: 1800, mag: 30, reserve: 210, reload: 2.4, spread: 2.4, ads: 0.02083, range: 45, zoom: 0.75, speed: 0.95, desc: 'Hyper-burst: the first two rounds of every pull leave at 1800 rpm, before the recoil lands.' }),
+  W({ id: 'an94', slot: 'p', cls: 'AR', tier: 3, price: 2700, name: 'AN-94', dmg: 33, rpm: 600, mode: 'hyper', hyper: 2, hyperRpm: 1800, hyperKick: 1.8, autoKick: 1.35, pull: 0.45, mag: 30, reserve: 210, reload: 2.4, spread: 2.4, ads: 0.02083, range: 45, zoom: 0.75, speed: 0.95, desc: 'Hyper-burst: the first two rounds of every pull leave at 1800 rpm on one line, before either kick lands, then you take both at once. Held down it settles to 600 rpm and kicks hard, but always the same way.' }),
   W({ id: 'fal', slot: 'p', cls: 'BR', tier: 3, price: 2500, name: 'FN FAL', dmg: 52, rpm: 650, mag: 20, reserve: 140, reload: 2.6, spread: 3.0, ads: 0.025, range: 55, zoom: 0.8, speed: 0.92, pen: 1, desc: 'The right arm of the free world. Full-power 7.62, full-auto, full send.' }),
   W({ id: 'garand', slot: 'p', cls: 'DMR', tier: 2, price: 1600, name: 'M1 Garand', dmg: 78, rpm: 300, mode: 'semi', mag: 8, reserve: 64, reload: 2.2, enbloc: true, spread: 2.2, ads: 0.02083, range: 70, zoom: 0.8, speed: 0.93, pen: 1, desc: 'En-bloc clip: can only be reloaded when empty, and it pings when it is.' }),
   W({ id: 'svd', slot: 'p', cls: 'DMR', tier: 3, price: 2600, name: 'SVD Dragunov', dmg: 85, rpm: 260, mode: 'semi', mag: 10, reserve: 60, reload: 2.8, spread: 2.8, ads: 0.0125, range: 80, zoom: 0.4, speed: 0.92, pen: 1, desc: 'Semi-auto marksman rifle. Wants a scope on that rail.' }),
@@ -135,7 +135,9 @@ G.obtainable = (w) => !!w && !(G.EXPLOSIVES_OFF && w.explosive);
 // Fire selectors (X): the positions a gun has, the first its default. Most select-fire guns come set to semi
 // with full auto a click away. Cheap open-bolt guns and belt-fed machine guns have no semi: full auto only.
 // The burst guns have semi and their burst (burstRpm: a burst faster than the gun's cyclic rate); the AN-94
-// semi and its two-round hyper burst.
+// semi and its two-round hyper burst (hyperKick: what the pair's kick comes to, both landing together after the second
+// round's gone; autoKick: each round's after that, the gun's works slamming home with nothing to hide it; pull: its
+// side kick, a steady pull one way as a share of the usual, where every other gun's flips at random: js/player.js recoilKick).
 G.AUTO_ONLY = ['mac10', 'uzi', 'aa12', 'm249', 'pkm', 'm60', 'shredder'];
 G.FIRE_MODES = { br3: ['semi', 'burst'], an94: ['semi', 'hyper'], auto9: ['semi', 'burst'], b92: ['burst', 'semi'], tx22: ['auto', 'semi'] }; // (the TX22: made full auto, it comes set to it)
 G.WEAPON_LIST.forEach((w) => { w.modes = G.FIRE_MODES[w.id] || (w.mode === 'semi' ? ['semi'] : G.AUTO_ONLY.includes(w.id) ? [w.mode] : ['semi', w.mode]); });
@@ -276,10 +278,12 @@ G.SUPPRESSOR = { dmg: 0.92, snd: { f: 900, len: 0.12, boom: 0.15, vol: 0.25 } };
 // js/gear.js, and works the same way). Armour is material, so thick, where it is on the body (js/ballistics.js):
 // prot is a list of { at, layers: [[material, mm], ...] }, at 'plate' (front and back of the chest), 'side', 'torso'
 // (soft armour, chest and stomach), 'groin', 'shoulder', 'thigh', 'helmet' (above its brim: cut 'high' or 'full'),
-// 'face'. Whether a round gets through is worked out from the round and the layers; armour wears by the energy it
+// 'face' (the rest of them: js/ballistics.js covers). Whether a round gets through is worked out from the round and the layers; armour wears by the energy it
 // soaks up (dur: how much it takes), and a worn layer is thinner.
 G.ARMOR_LIST = [
   { id: 'none', kind: 'vest', name: 'No Armour', tier: 0, prot: [], dur: 0, speed: 1, price: 0, desc: 'Just your shirt.' },
+  { id: 'soft2', kind: 'vest', name: 'Soft Vest (II)', tier: 1, prot: [{ at: 'torso', layers: [['aramid', 6]] }], dur: 4, speed: 1, price: 300,
+    desc: 'Thin Kevlar panels. Stops 9 mm, .45 and buckshot, not a magnum, and it soon wears through.' },
   { id: 'soft', kind: 'vest', name: 'Soft Vest (IIIA)', tier: 1, prot: [{ at: 'torso', layers: [['aramid', 8]] }], dur: 6, speed: 1, price: 500,
     desc: 'Kevlar panels, chest and stomach. Stops handgun rounds and buckshot; rifle rounds go straight through.' },
   { id: 'steel', kind: 'vest', name: 'Steel Plate Carrier (III)', tier: 2, prot: [{ at: 'plate', layers: [['steel', 6.35]] }, { at: 'torso', layers: [['aramid', 6]] }], dur: 6, speed: 0.95, price: 1300,
@@ -412,14 +416,14 @@ G.stdMag = (cal) => {
 // crossbow). k: price per round relative to ball.
 G.AMMO = {
   ball: { name: 'FMJ ball', tag: 'FMJ', k: 1, desc: 'Full metal jacket. The standard round.' },
-  hp: { name: 'Hollow point', tag: 'HP', k: 1.8, dragK: 0.8, desc: 'Opens to 1.7× its width in flesh once it\'s going fast enough: a wide track, all its energy spent inside, rarely out the far side. Its soft lead nose flattens on armour. It drags more in the air: it slows and drops sooner than ball.' },
+  hp: { name: 'Hollow point', tag: 'HP', k: 1.8, dragK: 0.8, desc: 'Opens to as much as 1.37× its width in flesh, the faster the wider: a wide track, all its energy spent inside, rarely out the far side. Its soft lead nose flattens on armour. It drags more in the air: it slows and drops sooner than ball.' },
   ap: { name: 'Armour-piercing', tag: 'AP', k: 2.4, velK: 1.08, massK: 0.85, desc: 'A hardened steel (pistol) or tungsten carbide (rifle) core, lighter and 8% faster: goes through plate that flattens lead, and through people, nose-first and late to tumble: a narrow track.' },
   tracer: { name: 'Tracer', tag: 'TR', k: 1.3, tracer: 0xff4a2a, desc: 'Burns red all the way out: you see exactly where it goes (so do they).' },
   subsonic: { name: 'Subsonic', tag: 'SUB', k: 1.6, rangeK: 0.7, quiet: true, desc: 'A heavier bullet under the speed of sound: no crack, so through a suppressor it is barely heard. Slow: less energy, and it drops sooner.' },
   buck: { name: '00 buckshot', tag: 'BUCK', k: 1, desc: 'Nine pellets. The standard shotgun load.' },
   slug: { name: 'Slug', tag: 'SLUG', k: 1.7, slug: true, desc: 'One heavy lead slug: accurate, hits like a rifle, goes through.' },
   birdshot: { name: 'Birdshot', tag: 'BIRD', k: 0.7, pelletsK: 2.5, spreadK: 1.5, desc: 'A cloud of tiny 0.2 g pellets: they shed their speed in a few centimetres of flesh. Painful, rarely lethal past a few metres; armour shrugs them off.' },
-  flechette: { name: 'Flechette', tag: 'FLCH', k: 2.6, spreadK: 0.7, desc: 'Hardened steel darts: a tight pattern, and narrow and hard enough to get through soft armour. Thin tracks.' },
+  flechette: { name: 'Flechette', tag: 'FLCH', k: 2.6, spreadK: 0.7, pelletsK: 2.5, velK: 1.2, massK: 0.35, dragK: 1.6, desc: 'Twenty hardened steel darts: a tight, fast pattern that carries, and they part a soft vest\'s weave. A hard plate stops them. Thin tracks that open out when they tumble, deep in.' },
   he: { name: 'HE grenade', tag: 'HE', k: 1, desc: '40 mm high explosive.' },
   // Bolts kill by cutting, not by energy: about what a .22 carries, on a head that opens a wound and lets it bleed.
   // (glow: the lit nock's colour, in flight and where it sticks: js/bolts.js)
@@ -593,8 +597,8 @@ G.roundDef = (def, am) => {
 
 // ---------------------------------------------------------------- enemy kit
 // What suspects carry moves up through gear tiers at its own pace with the level, the way the squad's own
-// kit does: early levels are cheap handguns, sawn-offs and street SMGs with no armour; later ones bring rifles,
-// plate carriers and helmets. Each suspect rolls its own tier around the level's (a few a tier lower or higher).
+// kit does: early levels are cheap handguns, sawn-offs and street SMGs, in a thin soft vest if anything; later ones bring
+// rifles, plate carriers and helmets. Each suspect rolls its own tier around the level's (a few a tier lower or higher).
 G.gearTier = (level) => (level <= 2 ? 1 : level <= 4 ? 2 : level <= 7 ? 3 : 4);
 G.ENEMY_GEAR = {
   // weapon pools by type, tiers 1-4
@@ -606,18 +610,27 @@ G.ENEMY_GEAR = {
     heavy: [['pkm', 'rpk'], ['pkm', 'm249', 'rpk'], ['m249', 'pkm', 'm60', 'rpk'], ['m60', 'm249']],
     warden: [['scar'], ['scar', 'fal'], ['scar', 'fal'], ['scar', 'hk416']],
   },
-  // chance of a soft vest / steel plates / ceramic plates, and of a IIIA / rifle-rated helmet, by tier
-  vest: [[0.04, 0, 0], [0.3, 0.05, 0], [0.4, 0.22, 0.06], [0.35, 0.3, 0.2]],
-  helmet: [[0, 0], [0.1, 0], [0.28, 0.05], [0.35, 0.2]],
-  // on a helmet with no visor of its own, the chance of a mandible guard / a IIIA face shield / a rifle-rated one, by
-  // tier (js/gear.js f.*: the officers' own, drawn on the helmet and in the way of rounds just as theirs are)
-  face: [[0, 0, 0], [0.06, 0.02, 0], [0.16, 0.1, 0.02], [0.2, 0.18, 0.08]],
+  // What they wear by the level: the chance of each, in the order of ids, at the levels in at, in a line between them, and
+  // no further than the last. Armour's weighted by the level and not the tier, so it goes on getting heavier after the
+  // guns stop changing. (A suspect a gear tier up or down is dressed as for two levels on or back: js/server.js equip.)
+  at: [1, 3, 5, 8, 12, 18],
+  odds: {
+    // what they've got on, Level II first: early on most have a shirt, and the odd one that
+    vest: { ids: ['soft2', 'soft', 'steel', 'ceramic', 'assault'], by: [[0.05, 0, 0, 0, 0], [0.3, 0.06, 0, 0, 0], [0.4, 0.3, 0.08, 0.01, 0], [0.16, 0.36, 0.26, 0.08, 0], [0.05, 0.28, 0.36, 0.2, 0.02], [0, 0.14, 0.32, 0.38, 0.12]] },
+    helmet: { ids: ['ach', 'riflehelm'], by: [[0, 0], [0.1, 0], [0.25, 0.03], [0.33, 0.12], [0.35, 0.25], [0.3, 0.45]] },
+    // on a helmet with no visor of its own (js/gear.js f.*: the officers' own, drawn on the helmet and in the way of rounds just as theirs are)
+    face: { ids: ['f.mandible', 'f.shield', 'f.rifle'], by: [[0, 0, 0], [0.06, 0.02, 0], [0.14, 0.08, 0.01], [0.2, 0.16, 0.06], [0.2, 0.2, 0.1], [0.2, 0.25, 0.15]] },
+    // and what's mounted on it (js/gear.js s.*, g.*, l.*): only on a plate carrier, as yours has to be, and not on assault armour, which has its own
+    shoulder: { ids: ['s.deltoid', 's.axil', 's.plate'], by: [[0, 0, 0], [0, 0, 0], [0.05, 0, 0], [0.15, 0.05, 0], [0.2, 0.15, 0.03], [0.2, 0.25, 0.1]] },
+    groin: { ids: ['g.flap', 'g.pelvis', 'g.plate'], by: [[0, 0, 0], [0, 0, 0], [0.1, 0, 0], [0.2, 0.06, 0.02], [0.2, 0.15, 0.08], [0.15, 0.25, 0.15]] },
+    legs: { ids: ['l.shin', 'l.thigh', 'l.wrap', 'l.full'], by: [[0, 0, 0, 0], [0, 0, 0, 0], [0.05, 0, 0, 0], [0.12, 0.06, 0, 0], [0.15, 0.15, 0.06, 0], [0.1, 0.2, 0.15, 0.05]] },
+  },
   // chance of a light / a laser on their gun, by tier (an Enforcer from the second always has the light, the Kingpin both), and
   // the levels they first turn up on, whatever the tier: none in the first half of an act, and lights before lasers
   tac: { light: [0, 0.2, 0.5, 0.8], laser: [0, 0.1, 0.35, 0.6], lightFrom: 5, laserFrom: 7 },
   // the Enforcer is always armoured, more heavily as tiers go up; the Kingpin wears the best
   fixed: {
-    heavy: { vest: ['steel', 'steel', 'ceramic', 'assault'], helmet: ['ach', 'ach', 'riflehelm', 'riflehelm'], face: [0, 0, 'f.mandible', 'f.shield'] },
-    boss: { vest: ['assault', 'assault', 'assault', 'assault'], helmet: ['riflehelm', 'visor', 'visor', 'visor'] },
+    heavy: { vest: ['steel', 'steel', 'ceramic', 'assault'], helmet: ['ach', 'ach', 'riflehelm', 'riflehelm'], face: [0, 0, 'f.mandible', 'f.shield'], ex: [[], ['g.flap'], ['s.axil', 'g.flap', 'l.thigh'], ['l.shin']] },
+    boss: { vest: ['assault', 'assault', 'assault', 'assault'], helmet: ['riflehelm', 'visor', 'visor', 'visor'], ex: [[], ['l.shin'], ['l.shin'], ['l.shin']] },
   },
 };

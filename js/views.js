@@ -103,19 +103,19 @@ G.Views = {
   },
 
   applySnap(m) {
-    if (!this.warmed) { this.warmed = true; setTimeout(() => G.R.warmup(), 0); } // (compile everything once the level's full)
+    if (!this.warmed) { this.warmed = true; G.Game.veilSay('Compiling shaders'); setTimeout(() => { G.R.warmup(); G.Game.veilN = 3; }, 60); } // (compile everything once the level's full, then a few frames drawn and the veil lifts: js/game.js veil. The wait: time to draw that line first)
     const seen = new Set();
     for (const [id, type, x, z, yaw, hp, aim, alert, crouch, lean, armed, scode, surp, door, kit, fl, str, y = 0] of m.e) {
       seen.add(id);
       let ev = this.enemies.get(id);
       if (!ev) {
         if (!G.ENEMIES[type]) continue;
-        // the type, with this suspect's kit (weapon | vest | helmet) laid over it
+        // the type, with this suspect's kit (weapon | vest | helmet | face | tac | what's mounted) laid over it
         const def = Object.create(G.ENEMIES[type]);
-        if (kit) { const [wpn, vest, helmet, face, tac] = kit.split('|'); def.wpn = wpn; def.vest = vest; def.helmet = helmet; def.face = face || 0; def.tac = +tac || 0; }
+        if (kit) { const [wpn, vest, helmet, face, tac, ex] = kit.split('|'); def.wpn = wpn; def.vest = vest; def.helmet = helmet; def.face = face || 0; def.tac = +tac || 0; def.ex = ex ? ex.split(',') : []; }
         const rig = G.Rig.create({ style: def.style, scale: def.scale, boss: !!def.boss, seed: id * 7919 + 13, dressed: true });
         rig.powered = true; // a physically simulated body, held up by its muscles (js/rig.js powerStep)
-        if (!def.civ) rig.setKit(G.Rig.armourKit(def.vest, def.helmet, def.style === 'armored', def.face)); // their armour, as an officer's would look
+        if (!def.civ) rig.setKit(G.Rig.armourKit(def.vest, def.helmet, def.style === 'armored', def.face, def.ex)); // their armour, as an officer's would look
         if (def.wpn && armed) { rig.setGun(def.wpn); rig.holster(armed === 1); this.tacOnGun(rig, def.tac); }
         G.R.dynRoot.add(rig.root);
         ev = { id, type, def, rig, tac: def.tac || 0, pos: new THREE.Vector3(x, y, z), tgt: new THREE.Vector3(x, y, z), yaw, tgtYaw: yaw, hp, alive: true, deadT: 0, lean: 0 };
@@ -361,7 +361,7 @@ G.Views = {
     if (G.Highlights) G.Highlights.crack(id, at);
     G.Damage.crack(map.winMeshes && map.winMeshes[id], at);
     G.R.particles(at, 8, 0xd8eef5, 1.2, 0.8, 9, 0.7, dir ? [dir.x, 0, dir.z] : null);
-    if (G.Me && G.Me.pos) G.Audio.glass(Math.hypot(w.x - G.Me.pos.x, w.z - G.Me.pos.z) + 10);
+    G.Audio.glass(Math.hypot(w.x - G.R.camera.position.x, w.z - G.R.camera.position.z) + 10); // (from the camera: on a helmet cam, what they hear)
   },
   breakGlass(id, at, dir) {
     const map = G.Game.map, w = map && map.windows && map.windows[id];
@@ -377,7 +377,7 @@ G.Views = {
       const q = new THREE.Vector3(w.x + ax * (Math.random() - 0.5) * w.len, Y + lo + Math.random() * (hi - lo), w.z + az * (Math.random() - 0.5) * w.len);
       G.R.particles(q, 14, 0xd8eef5, 1.6, 1.2, 9, 0.7, dir ? [dir.x * 1.5, 0, dir.z * 1.5] : null);
     }
-    if (G.Me && G.Me.pos) G.Audio.glass(Math.hypot(w.x - G.Me.pos.x, w.z - G.Me.pos.z));
+    G.Audio.glass(Math.hypot(w.x - G.R.camera.position.x, w.z - G.R.camera.position.z));
   },
   // A weapon light and/or laser from `from` along dir: the light shines, the laser lands on the first wall or
   // person in its way (a person as a rough column: standing up to 1.8 m, 0.25 m round). skip: whose it is.
@@ -415,9 +415,8 @@ G.Views = {
   // a suspect reloading: the magazine out and in (or shells going in one by one), heard if you're close
   enemyReload(m) {
     const ev = this.enemies.get(m.e);
-    if (!ev || !ev.alive || !G.Me || !G.Me.pos) return;
-    const d = ev.pos.distanceTo(G.Me.pos);
-    if (d > 25) return;
+    if (!ev || !ev.alive) return;
+    if (ev.pos.distanceTo(G.R.camera.position) > 25) return;
     const A = G.Audio, dur = Math.min(5, +m.dur || 2) * 1000;
     if (!(m.n > 0)) { ev.reloadAt = performance.now(); ev.reloadDur = dur; } // (a magazine change: their hands show it, js/rig.js)
     // from their hands, wherever they are when each part of it happens (heard from that side, muffled through walls)
@@ -733,7 +732,7 @@ G.Views = {
       const act = st.act ? { kind: { o: 'open', c: 'close', k: 'kick', z: 'zip', b: 'bag' }[st.act], t: st.ap || 0, hand: 'R' } : null;
       if (act && act.kind === 'zip') { const tv = this.enemies.get(st.zt); if (tv) act.pt = this.zipPoint(tv, act.t, tv.alive && !tv.down); act.pull = !!st.pl; }
       // their restraining / bagging sounds, as they reach each step
-      if (act && pv.lastAct === st.act) G.Audio.foley(act.kind, pv.lastAp || 0, act.t, pv.pos.distanceTo(G.Me.pos));
+      if (act && pv.lastAct === st.act) G.Audio.foley(act.kind, pv.lastAp || 0, act.t, pv.pos.distanceTo(G.R.camera.position));
       pv.lastAct = st.act; pv.lastAp = act ? act.t : 0;
       const kneel = (st.act === 'z' && (st.ap || 0) > 0.3) || st.act === 'b';
       const hold = st.hk ? { kind: st.hk === 2 ? 'flash' : 'frag', cock: !!st.hc, str: st.hs == null ? 2 : st.hs } : null; // (a grenade in their hand)
@@ -806,7 +805,7 @@ G.Views = {
     const cabV = G.Game.map && G.Game.map.cabViews;
     if (cabV) cabV.forEach((cv, i) => {
       const want = G.Game.cabs && G.Game.cabs[i] && G.Game.cabs[i][0] ? 1 : 0;
-      if (want && cv.open === 0) { const c = G.Game.map.cabinets[i]; G.Audio.clink(Math.hypot(c.x - G.Me.pos.x, c.z - G.Me.pos.z)); }
+      if (want && cv.open === 0) { const c = G.Game.map.cabinets[i]; G.Audio.clink(Math.hypot(c.x - G.R.camera.position.x, c.z - G.R.camera.position.z)); }
       cv.open = want ? Math.min(1, cv.open + dt / 0.5) : 0;
       cv.door.rotation.y = -1.9 * (1 - Math.pow(1 - cv.open, 3));
     });
@@ -821,7 +820,7 @@ G.Views = {
         if (p.bm) { sv.name = name; const k = 0.12 / Math.max(p.w, p.h); sv.card.scale.set(p.w * k, p.h * k, 1); sv.card.material.map = G.Stickers.material(name).map; sv.card.material.needsUpdate = true; }
       }
       sv.card.visible = sv.name === name && !taken;
-      if (taken && sv.open === 0) { const b = G.Game.map.sbox; G.Audio.clink(Math.hypot(b.x - G.Me.pos.x, b.z - G.Me.pos.z)); }
+      if (taken && sv.open === 0) { const b = G.Game.map.sbox; G.Audio.clink(Math.hypot(b.x - G.R.camera.position.x, b.z - G.R.camera.position.z)); }
       sv.open = taken ? Math.min(1, sv.open + dt / 0.5) : 0;
       sv.lid.rotation.x = -1.8 * (1 - Math.pow(1 - sv.open, 3));
     }
@@ -830,7 +829,7 @@ G.Views = {
     if (av) {
       const want = G.Game.abox && G.Game.abox[0] ? 1 : 0;
       if (!av.synced) { av.synced = true; if (want) av.open = 1; } // (joined with it already open)
-      if (want && av.open === 0) { const ab = G.Game.map.abox; G.Audio.clink(Math.hypot(ab.x - G.Me.pos.x, ab.z - G.Me.pos.z)); }
+      if (want && av.open === 0) { const ab = G.Game.map.abox; G.Audio.clink(Math.hypot(ab.x - G.R.camera.position.x, ab.z - G.R.camera.position.z)); }
       av.open = want ? Math.min(1, av.open + dt / 0.6) : 0;
       av.lid.rotation.x = -1.9 * (1 - Math.pow(1 - av.open, 3));
       // its lights: one for each of the squad, lit in their colour till they've had their pick, then dark
@@ -855,7 +854,7 @@ G.Views = {
     const cv = G.Game.map && G.Game.map.caseView;
     if (cv) {
       const want = G.Game.caseOpen && G.Game.caseSeen() ? 1 : 0;
-      if (want && cv.open === 0) { const mc = G.Game.map.case; G.Audio.clink(Math.hypot(mc.x - G.Me.pos.x, mc.z - G.Me.pos.z)); }
+      if (want && cv.open === 0) { const mc = G.Game.map.case; G.Audio.clink(Math.hypot(mc.x - G.R.camera.position.x, mc.z - G.R.camera.position.z)); }
       cv.open = want ? Math.min(1, cv.open + dt / 0.8) : 0;
       cv.lid.rotation.x = -1.78 * (1 - Math.pow(1 - cv.open, 3));
     }

@@ -310,10 +310,18 @@ G.GunsmithUI = (() => {
     apply(w, build); G.Audio.click();
     G.Shop.render();
   }
+  // the gun's stock grip in another finish: it's the same grip, so it costs nothing and goes on as it is
+  function reskin(pid) {
+    const w = weapon(), build = Object.assign({}, w.def.build);
+    if (!GS.skins(w.def.id).some((p) => p.id === pid) || !GS.plainGrip(GS.PARTS[build.grip] || {}) || G.Shop.ready) return;
+    build.grip = pid;
+    apply(w, build); G.Audio.click();
+    G.Shop.render();
+  }
   function sell(pid) {
     const p = GS.PARTS[pid];
-    if (!p || p.factory || G.Shop.ready || !fromStash(pid)) return;
-    G.Me.credits += Math.floor(p.price * 0.5);
+    if (!p || G.Shop.ready || !fromStash(pid)) return;
+    G.Me.credits += GS.sellPrice(p);
     G.Audio.buy();
     G.Shop.render();
   }
@@ -424,14 +432,18 @@ G.GunsmithUI = (() => {
     const cur = slots.find((s) => s.slot === st.slot);
     let list = '';
     if (cur) {
-      const parts = GS.compatible(cur.mount).filter((p) => (!p.factory || p.plat === def.id || (Me.stash || {})[p.id] || build[cur.slot] === p.id) && !(p.not || []).includes(def.id));
+      // (of the plain grips, just the one on it, or the gun's own: the rest are finishes of it, in the picker on that row)
+      const fitted = GS.PARTS[build[cur.slot]], skins = cur.slot === 'grip' ? GS.skins(def.id) : [], skinned = skins.includes(fitted);
+      const plainOut = (p) => (skinned ? GS.plainGrip(p) : GS.plainHere(p, def.id));
+      const parts = GS.compatible(cur.mount).filter((p) => (!p.factory || p.plat === def.id || (Me.stash || {})[p.id] || build[cur.slot] === p.id) && !(p.not || []).includes(def.id) && (!plainOut(p) || (Me.stash || {})[p.id] || build[cur.slot] === p.id));
       const rank = (p) => (build[cur.slot] === p.id ? 0 : (Me.stash || {})[p.id] ? 1 : forSale(p) ? 2 : 3);
       parts.sort((a, b) => rank(a) - rank(b) || a.price - b.price);
       for (const p of parts) {
         const r = rank(p), n = (Me.stash || {})[p.id] || 0, factoryHere = p.factory && p.plat === def.id;
         let action;
         if (r === 0) action = cur.req ? '<span class="tag">Fitted</span>' : `<button class="btn small" data-gremove="${cur.slot}">Remove</button>`;
-        else if (r === 1) action = `<button class="btn small buy" data-ginstall="${p.id}">Fit (stash ×${n})</button>${p.factory ? '' : ` <button class="btn small" data-gsell="${p.id}">Sell ¢${G.U.fmt(Math.floor(p.price * 0.5))}</button>`}`;
+        if (r === 0 && skinned && skins.length > 1) action = `<select class="gs-skin" data-gskin ${G.Shop.ready ? 'disabled' : ''}>${skins.map((q) => `<option value="${q.id}"${q === p ? ' selected' : ''}>${G.U.esc(q.name)}</option>`).join('')}</select>`;
+        else if (r === 1) action = `<button class="btn small buy" data-ginstall="${p.id}">Fit (stash ×${n})</button> <button class="btn small" data-gsell="${p.id}">Sell ¢${G.U.fmt(GS.sellPrice(p))}</button>`;
         else if (r === 2) action = `<button class="btn small buy" data-ginstall="${p.id}" ${Me.credits < GS.buyPrice(p) ? 'disabled' : ''}>¢${G.U.fmt(GS.buyPrice(p))}</button>`;
         else action = `<span class="tag">${factoryHere ? 'Comes with the gun' : p.tier > Math.min(3, 1 + Math.floor((G.Shop.level || 1) / 2)) ? 'Available later' : 'Out of stock'}</span>`;
         list += `<div class="gs-part${r === 0 ? ' fitted' : ''}${r === 3 ? ' na' : ''}" data-gpart="${p.id}">
@@ -487,6 +499,7 @@ G.GunsmithUI = (() => {
     const gr = t.closest('[data-gremove]'); if (gr) return remove(gr.dataset.gremove);
     const gl = t.closest('[data-gsell]'); if (gl) return sell(gl.dataset.gsell);
   }
+  function onChange(e) { if (e.target.dataset.gskin != null) reskin(e.target.value); }
   // hovering a part previews it on the gun (model and stats)
   function onHover(e) {
     const w = weapon();
@@ -507,5 +520,5 @@ G.GunsmithUI = (() => {
   }
   function hide() { active = false; cancelAnimationFrame(raf); const el = document.getElementById('shopItems'); if (el) el.classList.remove('gs-host'); }
 
-  return { show, hide, onClick, onHover, refresh, state: st, partEffects, statsHtml, deltaHtml, fitsLine, _setModel: (d) => setModel(d), _view: view, _canvas: () => canvas, _model: () => model };
+  return { show, hide, onClick, onChange, onHover, refresh, state: st, partEffects, statsHtml, deltaHtml, fitsLine, _setModel: (d) => setModel(d), _view: view, _canvas: () => canvas, _model: () => model };
 })();

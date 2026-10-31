@@ -25,7 +25,7 @@ G.Server = {
 
   reset() {
     this.players.clear(); this.enemies.clear();
-    this.phase = 'lobby'; this.level = 0; this.map = null;
+    this.phase = 'lobby'; this.level = 0; this.map = null; this.leaving = null;
   },
   roster() {
     const r = {};
@@ -88,7 +88,7 @@ G.Server = {
       case 'saved': if (p && this.phase === 'level') G.Net.broadcast({ t: 'saved', id: from, n: Math.max(1, Math.min(9, m.n | 0)) }); break;
       case 'shot':
         if (p && p.st && this.phase === 'level') this.hear(p.st.p[0], p.st.p[2], m.sil === 2 ? 2 : m.sil ? 6 : 28, p.st.p[1]); // (not at the range)
-        if (m.f && m.to && this.phase === 'level') this.suppress(m.f, m.to);
+        if (m.f && m.to && this.phase === 'level') this.suppress(m.f, m.to, G.Gunsmith.fromCode(m.w), G.AMMO[m.am] ? m.am : undefined);
         G.Net.broadcast({ t: 'shot', id: from, sid: m.sid, f: m.f, to: m.to, w: m.w, sil: m.sil, am: G.AMMO[m.am] ? m.am : undefined,
           tos: Array.isArray(m.tos) && m.tos.length <= 24 && m.tos.every((p) => Array.isArray(p) && p.length === 3 && p.every(Number.isFinite)) ? m.tos : undefined }, from); // (a shotgun's pellets: for the highlights)
         break;
@@ -306,7 +306,7 @@ G.Server = {
   },
   routeMsg() { return this.route ? { seed: this.route.seed, act: this.route.act, path: this.route.path, votes: this.route.votes } : null; },
   checkPicks() {
-    if (this.phase !== 'route' || !this.players.size) return;
+    if (this.phase !== 'route' || !this.players.size || this.leaving) return;
     for (const id of this.players.keys()) if (this.route.votes[id] == null) return;
     const tally = {};
     for (const n of Object.values(this.route.votes)) tally[n] = (tally[n] || 0) + 1;
@@ -314,7 +314,19 @@ G.Server = {
     const n = +best[Math.floor(Math.random() * best.length)];
     this.route.path.push(n);
     this.theme = this.routeMap.nodes.get(n).th;
-    this.startLevel();
+    this.overBlack(() => this.startLevel());
+  },
+  // Building the next place stalls the host, and it's built before anyone's told: so everyone's screen goes black first
+  // (js/game.js veil), and go runs once it has, if the phase is still the one it was asked from. Only one at a time.
+  overBlack(go) {
+    if (this.leaving) return;
+    const run = this.leaving = {}, from = this.phase;
+    G.Net.broadcast({ t: 'veil' });
+    setTimeout(() => {
+      if (this.leaving !== run) return; // (gone back to the menu)
+      this.leaving = null;
+      if (this.phase === from) go();
+    }, G.Game.VEIL_MS + 40);
   },
   startLevel() {
     this.phase = 'level';
@@ -589,6 +601,15 @@ G.Server = {
       b.guard = true;
     }
   },
+  // The chance of each of a kind of armour (G.ENEMY_GEAR.odds) on someone dressed for level L, and one of them rolled (0: none)
+  armourRoll(kind, L) {
+    const G2 = G.ENEMY_GEAR, at = G2.at, o = G2.odds[kind];
+    let i = 0; while (i < at.length - 2 && L >= at[i + 1]) i++;
+    const f = G.U.clamp((L - at[i]) / (at[i + 1] - at[i]), 0, 1);
+    let x = Math.random();
+    for (let k = 0; k < o.ids.length; k++) { x -= o.by[i][k] + (o.by[i + 1][k] - o.by[i][k]) * f; if (x < 0) return o.ids[k]; }
+    return 0;
+  },
   // A suspect's kit for this level: a weapon from its type's pool and armour, at a gear tier around the level's.
   // The def is the type's, with the kit laid over it (weapon, its damage, pellets and rate of fire, armour).
   equip(type) {
@@ -596,14 +617,16 @@ G.Server = {
     if (base.civ || !G2.weapons[type]) return base;
     const r = Math.random(), tier = base.boss ? G.gearTier(this.level) : G.U.clamp(G.gearTier(this.level) + (r < 0.2 ? -1 : r > 0.88 ? 1 : 0), 1, 4);
     const pool = G2.weapons[type][tier - 1], wpn = pool[Math.floor(Math.random() * pool.length)], w = G.WEAPONS[wpn];
-    const roll = (chances, ids) => { let x = Math.random(); for (let i = 0; i < chances.length; i++) { if (x < chances[i]) return ids[i]; x -= chances[i]; } return ids[chances.length]; };
+    const kitL = Math.max(1, this.level + (tier - G.gearTier(this.level)) * 2); // (a tier up or down is dressed a couple of levels on or back)
     const fixed = base.armor && G2.fixed[base.armor];
     const d = Object.create(base);
     d.wpn = wpn; d.gear = tier; d.dmg = w.dmg; d.pellets = w.pellets; d.snd = w.cls;
-    d.vest = fixed ? fixed.vest[tier - 1] : roll(G2.vest[tier - 1], ['soft', 'steel', 'ceramic', 'none']);
-    d.helmet = fixed ? fixed.helmet[tier - 1] : roll(G2.helmet[tier - 1], ['ach', 'riflehelm', 'nohelm']);
+    d.vest = fixed ? fixed.vest[tier - 1] : this.armourRoll('vest', kitL) || 'none';
+    d.helmet = fixed ? fixed.helmet[tier - 1] : this.armourRoll('helmet', kitL) || 'nohelm';
     // a mandible or a face shield on the helmet's mount (a helmet with a visor has its own; no helmet, nowhere to put one)
-    d.face = d.helmet === 'ach' || d.helmet === 'riflehelm' ? (fixed && fixed.face ? fixed.face[tier - 1] || 0 : roll(G2.face[tier - 1], ['f.mandible', 'f.shield', 'f.rifle', 0])) : 0;
+    d.face = d.helmet === 'ach' || d.helmet === 'riflehelm' ? (fixed && fixed.face ? fixed.face[tier - 1] || 0 : this.armourRoll('face', kitL)) : 0;
+    // shoulder, pelvis and leg armour, on what a plate carrier can take
+    d.ex = fixed ? (fixed.ex || [])[tier - 1] || [] : d.vest === 'steel' || d.vest === 'ceramic' ? ['shoulder', 'groin', 'legs'].map((k) => this.armourRoll(k, kitL)).filter(Boolean) : [];
     // a light and a laser on the gun, more often the better equipped they are (flags as an officer's: js/player.js tacFlags)
     const tl = G2.tac, always = base.boss || (fixed && tier >= 2), light = this.level >= tl.lightFrom && (always || Math.random() < tl.light[tier - 1]), laser = this.level >= tl.laserFrom && (base.boss || Math.random() < tl.laser[tier - 1]);
     d.tac = (light ? 1 | (tier >= 4 ? 8 : 0) : 0) | (laser ? 2 | (Math.random() < 0.35 ? 4 : 0) : 0);
@@ -750,18 +773,38 @@ G.Server = {
   // worse. Suppression (e.sup, 0..1) builds with every round, more the closer it comes (a round past the ear
   // counts for a lot, one a couple of metres off for little), so sustained close fire pins them; it wears off
   // over a few seconds. It costs them up to 60% of their accuracy.
-  suppress(f, to) {
-    const ax = f[0], az = f[2], bx = to[0] - ax, bz = to[2] - az, len2 = bx * bx + bz * bz || 1;
+  // It reaches them when the round does, or its report if that's first (a subsonic round's), and then it takes a person
+  // a moment to react, 100 to 200 ms, mostly about 150, a startle's time: nothing changes in them till then, so a
+  // shot they're taking still goes. What the shooter fired is told here, and each suspect it passes close to gets it
+  // from e.supQ ([when, how close]) in their own time: nearMiss.
+  SOUND: 343, REACT: [0.1, 0.2],
+  suppress(f, to, def, am) {
+    const ax = f[0], ay = f[1], az = f[2], bx = to[0] - ax, by = to[1] - ay, bz = to[2] - az, len2 = bx * bx + by * by + bz * bz || 1;
+    const v0 = def ? G.roundSpeed(def, am) : 0;
     for (const e of this.enemies.values()) {
       if (e.def.civ || e.state !== 'normal') continue;
-      const t = G.U.clamp(((e.x - ax) * bx + (e.z - az) * bz) / len2, 0, 1);
-      const miss = Math.hypot(ax + bx * t - e.x, az + bz * t - e.z);
+      const ey = (e.y || 0) + 1.2 * e.def.scale, t = G.U.clamp(((e.x - ax) * bx + (ey - ay) * by + (e.z - az) * bz) / len2, 0, 1);
+      const miss = Math.hypot(ax + bx * t - e.x, ay + by * t - ey, az + bz * t - e.z);
       if (miss >= 2.2) continue;
-      e.sup = Math.min(1, (e.sup || 0) + 0.12 + 0.3 * (1 - miss / 2.2));
-      e.suppressT = Math.max(e.suppressT, 1.2 + 2 * e.sup);
-      // a burst is frightening, but not once per round: at most one morale hit every 0.35 s
-      if (this.clock - (e.supAt || -9) > 0.35) { e.morale -= 0.06 * (e.def.steady || 1); e.supAt = this.clock; }
-      this.alertEnemy(e, false);
+      const d = t * Math.sqrt(len2), v = def ? (v0 + G.roundSpeed(def, am, d)) / 2 : 0; // (its average speed over the way there)
+      const react = this.REACT[0] + (this.REACT[1] - this.REACT[0]) * (Math.random() + Math.random()) / 2;
+      (e.supQ = e.supQ || []).push([(this.clock || 0) + d / Math.max(this.SOUND, v) + react, miss]);
+    }
+  },
+  // A round's gone past. Close enough to feel it, they get down where they stand, out of a peek, for a moment. Then they
+  // have a moment up before the next can do it: fire keeps them rattled, but no one gun holds anyone down for good. A
+  // boss and a rusher, who never take cover, take it on their feet.
+  FLINCH: { R: 1.5, T: 0.35, SUP: 0.4, UP: 0.5 },
+  nearMiss(e, miss) {
+    const F = this.FLINCH;
+    e.sup = Math.min(1, (e.sup || 0) + 0.12 + 0.3 * (1 - miss / 2.2));
+    e.suppressT = Math.max(e.suppressT, 1.2 + 2 * e.sup);
+    // a burst is frightening, but not once per round: at most one morale hit every 0.35 s
+    if (this.clock - (e.supAt || -9) > 0.35) { e.morale -= 0.06 * (e.def.steady || 1); e.supAt = this.clock; }
+    this.alertEnemy(e, false);
+    if (miss < F.R && !e.def.boss && e.type !== 'rusher' && this.clock >= (e.flinchOk || 0)) {
+      e.flinchT = F.T + F.SUP * e.sup; e.flinchOk = this.clock + e.flinchT + F.UP;
+      e.peek = false; e.aiming = false;
     }
   },
   suspect(e, x, z) {
@@ -1319,7 +1362,7 @@ G.Server = {
     for (const id of [...this.extract.votes]) if (!living.some((p) => p.id === id)) this.extract.votes.delete(id);
     if (this.extract.active && living.length && living.every((p) => this.extract.votes.has(p.id))) {
       this.report.allRescued = this.allRescued();
-      this.toShop();
+      this.overBlack(() => this.toShop());
       return;
     }
 
@@ -1335,7 +1378,7 @@ G.Server = {
       const r2 = (v) => Math.round(v * 100) / 100;
       const e = [];
       for (const en of this.enemies.values()) {
-        e.push([en.id, en.type, r2(en.x), r2(en.z), r2(en.yaw), Math.max(1, Math.round((en.hp / en.maxHp) * 100)), en.aiming ? en.tgt : 0, en.alert ? 1 : 0, en.crouch ? 1 : 0, en.leanOut || 0, en.armed ? (en.drawn ? 2 : 1) : 0, STATE_CODE[en.state] || 0, en.surprisedT > 0 ? 1 : 0, en.doorWait > 0 ? 1 : 0, en.def.civ ? 0 : `${en.def.wpn}|${en.def.vest}|${en.def.helmet}|${en.def.face || ''}|${en.def.tac || 0}`, ((en.bleedH || en.bleedL) ? 1 : 0) | (en.legs ? 2 : 0) | (en.reloadT > 0 ? 4 : 0) | (en.down ? 8 : 0), Math.round(Math.min(en.down ? 0.25 : 1, en.str == null ? 1 : en.str) * 100), r2(en.y || 0)]);
+        e.push([en.id, en.type, r2(en.x), r2(en.z), r2(en.yaw), Math.max(1, Math.round((en.hp / en.maxHp) * 100)), en.aiming ? en.tgt : 0, en.alert ? 1 : 0, en.crouch ? 1 : 0, en.leanOut || 0, en.armed ? (en.drawn ? 2 : 1) : 0, STATE_CODE[en.state] || 0, en.surprisedT > 0 ? 1 : 0, en.doorWait > 0 ? 1 : 0, en.def.civ ? 0 : `${en.def.wpn}|${en.def.vest}|${en.def.helmet}|${en.def.face || ''}|${en.def.tac || 0}|${(en.def.ex || []).join(',')}`, ((en.bleedH || en.bleedL) ? 1 : 0) | (en.legs ? 2 : 0) | (en.reloadT > 0 ? 4 : 0) | (en.down ? 8 : 0), Math.round(Math.min(en.down ? 0.25 : 1, en.str == null ? 1 : en.str) * 100), r2(en.y || 0)]);
       }
       const p = {};
       for (const pl of all) p[pl.id] = pl.st;
@@ -1361,6 +1404,7 @@ G.Server = {
     if (e.flashT > 0) e.flashT -= dt;
     e.complyCd = Math.max(0, e.complyCd - dt);
     e.suppressT = Math.max(0, e.suppressT - dt);
+    e.flinchT = Math.max(0, (e.flinchT || 0) - dt);
     e.sup = Math.max(0, (e.sup || 0) - dt * 0.3); e.shock = Math.max(0, (e.shock || 0) - dt * 0.35); // (rattled, and getting over it)
     if (e.kick) e.kick *= Math.exp(-this.kickBack(e) * dt); // bringing the gun back down
     if (this.injuryTick(e, dt)) return; // bled out
@@ -1376,6 +1420,7 @@ G.Server = {
     if (e.state === 'surrender') return this.thinkSurrendered(e, dt, alive);
     this.reloadTick(e, dt);
     if (e.pendingAlert >= 0) { e.pendingAlert -= dt; if (e.pendingAlert < 0) this.alertEnemy(e, false, true); }
+    if (e.supQ && e.supQ.length) e.supQ = e.supQ.filter((q) => { if (q[0] > this.clock) return true; if (e.state === 'normal') this.nearMiss(e, q[1]); return false; });
     if (e.suppressT > 0 && !e.cover) e.coverT = Math.min(e.coverT, 0); // get behind something
     // nerve recovers slowly while nobody is shooting at them, and drains while they're pinned
     if (e.suppressT > 0) e.morale -= dt * 0.04 * (def.steady || 1); else e.morale = Math.min(def.morale, e.morale + dt * 0.01);
@@ -1470,7 +1515,7 @@ G.Server = {
       e.surprisedT -= dt;
       e.cool -= dt; // the initial hesitation runs out during the freeze, not after it
       if (st) e.yaw += U.angDiff(e.yaw, Math.atan2(-(st.p[0] - e.x), -(st.p[2] - e.z))) * Math.min(1, dt * 3);
-      e.crouch = false; e.aiming = false;
+      e.crouch = e.flinchT > 0; e.aiming = false;
       return;
     }
 
@@ -1541,7 +1586,7 @@ G.Server = {
       }
 
       // shooting: from cover, stand up first (a short window where the head is exposed)
-      if (d < def.range && e.drawT <= 0) {
+      if (d < def.range && e.drawT <= 0 && !e.flinchT) {
         e.cool -= dt;
         const ready = def.aimTime ? e.aiming || e.cool <= 0 : e.cool <= 0;
         if (e.inCover && ready && !e.peek) { e.peek = true; e.peekT = 0.35; }
@@ -1572,7 +1617,7 @@ G.Server = {
       // they were, blind. Rounds rarely land, and only if you're still there and in the open.
       if (e.lostT === 0) e.blind = !def.aimTime && Math.random() < 0.5;
       e.lostT += dt;
-      if (e.blind && st && e.drawn && e.lastSeen && e.lostT < 1.1 && e.tgtD < def.range) {
+      if (e.blind && !e.flinchT && st && e.drawn && e.lastSeen && e.lostT < 1.1 && e.tgtD < def.range) {
         e.cool -= dt;
         if (e.cool <= 0) { this.fire(e, p, true); e.cool = U.rf(0.15, 0.4); }
       } else e.cool = Math.max(e.cool, 0.6);
@@ -1595,10 +1640,10 @@ G.Server = {
     }
     const corner = e.cover && e.cover.lean;
     if (st && e.canSee) e.holding = false;
-    e.crouch = (e.inCover && !e.peek && !corner) || (e.holding && !mx && !mz && !e.inCover) || (e.reloadT > 0 && e.inCover && !corner);
+    e.crouch = e.flinchT > 0 || (e.inCover && !e.peek && !corner) || (e.holding && !mx && !mz && !e.inCover) || (e.reloadT > 0 && e.inCover && !corner);
     e.leanOut = e.inCover && e.peek && corner ? e.cover.lean : 0;
 
-    if (mx || mz) this.moveEntity(e, mx, mz, def.speed * sp, dt);
+    if ((mx || mz) && !e.flinchT) this.moveEntity(e, mx, mz, def.speed * sp, dt);
   },
 
   // where a player's head actually is: leaning (Q/E) moves it sideways off their feet position

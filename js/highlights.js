@@ -54,7 +54,7 @@ G.Highlights = (() => {
     const a = {};
     for (const ev of G.Views.enemies.values()) {
       const k = 'e' + ev.id;
-      if (!R.actors.has(k)) R.actors.set(k, { kind: 'e', id: ev.id, type: ev.type, wpn: ev.def.wpn, vest: ev.def.vest, helmet: ev.def.helmet, face: ev.def.face || 0, civ: !!ev.def.civ, scale: ev.def.scale || 1, boss: !!ev.def.boss, style: ev.def.style });
+      if (!R.actors.has(k)) R.actors.set(k, { kind: 'e', id: ev.id, type: ev.type, wpn: ev.def.wpn, vest: ev.def.vest, helmet: ev.def.helmet, face: ev.def.face || 0, ex: ev.def.ex || [], civ: !!ev.def.civ, scale: ev.def.scale || 1, boss: !!ev.def.boss, style: ev.def.style });
       // (where their body is drawn, which is what rounds hit: out at the lean point leaning round a corner, slid back
       // from a wall lying prone, js/views.js; and crouched as drawn, weakened ones too)
       const at = ev.rig && ev.rig.root ? ev.rig.root.position : ev.pos, cr = ev.crouch || (ev.str != null && ev.str < 0.4);
@@ -373,6 +373,9 @@ G.Highlights = (() => {
     // spectator screens, x 11..22: js/course.js), the yard's east wall, and its west wall by the course
     [25.2, 2.7, -0.06, Math.PI, 2.6], [31.4, 2.7, -0.06, Math.PI, 2.6], [35.94, 2.6, -3, -Math.PI / 2, 2.2], [2.06, 2.5, -3, Math.PI / 2, 2.0],
   ];
+  // and a small one in the helicopter, hung from the cabin roof and tipped down to the bench, to watch while the squad's getting in: muted
+  // ([eyes' height, how far off they are], the roof it hangs from; js/hangar.js helicopter)
+  const cabinTv = (H) => [H.x - 0.05, 2.02, H.z - 0.55, 0, 0.72, { eye: [1.55, 1.4], roof: 2.45 }];
   function mount(root, helpers) {
     unmount();
     if (!P.level) return;
@@ -387,20 +390,22 @@ G.Highlights = (() => {
           c *= 0.93 + 0.07 * sin(vUv.y * 900.0 + time * 3.0); vec2 d = vUv - 0.5; c *= 1.0 - dot(d, d) * 0.6; gl_FragColor = linearToOutputTexel(vec4(c * 1.08, 1.0)); }` });
     P.mat = mat;
     const dark = new T.MeshStandardMaterial({ color: 0x0c0d0f, roughness: 0.4, metalness: 0.3 }), steel = new T.MeshStandardMaterial({ color: 0x3a3e44, roughness: 0.5, metalness: 0.6 });
-    for (const [x, y, z, ry, w] of TVS) {
+    for (const [x, y, z, ry, w, cab] of TVS.concat([cabinTv(G.Hangar.HELI)])) {
       // tipped forward to face the eyes (1.6 m up) of someone standing about one and a third of its widths out, where it's
       // best watched: hinged at its bottom edge against the wall, its top held out by a strut
-      const h = w * 9 / 16, tilt = Math.atan2(y - 1.6, w * 1.33), g = new T.Group(), out = (h + 0.1) * Math.sin(tilt), top = y - h / 2 - 0.05 + (h + 0.1) * Math.cos(tilt);
+      const h = w * 9 / 16, tilt = cab ? Math.atan2(y - cab.eye[0], cab.eye[1]) : Math.atan2(y - 1.6, w * 1.33), g = new T.Group(), out = (h + 0.1) * Math.sin(tilt), top = y - h / 2 - 0.05 + (h + 0.1) * Math.cos(tilt);
       g.position.set(x, y - h / 2 - 0.05, z); g.rotation.set(tilt, ry, 0, 'YXZ'); root.add(g);
-      const brk = new T.Mesh(new T.BoxGeometry(w * 0.5, 0.05, out + 0.02), steel); brk.position.set(x, top - 0.08, z); brk.rotation.y = ry; brk.translateZ((out + 0.02) / 2); root.add(brk);
+      const brk = new T.Mesh(cab ? new T.BoxGeometry(0.04, cab.roof - top + 0.02, 0.04) : new T.BoxGeometry(w * 0.5, 0.05, out + 0.02), steel); // (in the cabin, a drop rod from the roof)
+      if (cab) brk.position.set(x, (top + cab.roof) / 2, z + out); else { brk.position.set(x, top - 0.08, z); brk.rotation.y = ry; brk.translateZ((out + 0.02) / 2); }
+      root.add(brk);
       const body = new T.Group(); body.position.y = h / 2 + 0.05; g.add(body);
       const bez = new T.Mesh(new T.BoxGeometry(w + 0.1, h + 0.1, 0.07), dark); bez.position.z = 0.035; body.add(bez);
       const scr = new T.Mesh(new T.PlaneGeometry(w, h), mat); scr.position.z = 0.072; body.add(scr);
       const led = new T.Mesh(new T.BoxGeometry(0.05, 0.02, 0.01), new T.MeshBasicMaterial({ color: 0xff2020 })); led.position.set(w / 2 - 0.08, -h / 2 - 0.035, 0.075); body.add(led);
-      P.tvs.push({ g, brk, scr, w, h, led });
+      P.tvs.push({ g, brk, scr, w, h, led, cab: !!cab });
       // F at it: the broadcast saved as a recording, a .zip the main menu makes the video from (exportPack; the box
       // round the screen, in the hall's coordinates, for js/hangar.js aim)
-      if (helpers && helpers.addTarget) {
+      if (helpers && helpers.addTarget && !cab) {
         const ax = Math.abs(Math.cos(ry)) > 0.5, hw = w / 2 + 0.1, fz = Math.cos(ry) * 0.5, fx = Math.sin(ry) * 0.5;
         helpers.addTarget({ id: 'tv' + P.tvs.length, kind: 'pos', reach: 7, label: 'the highlights',
           box: ax ? [x - hw, y - h / 2 - 0.1, Math.min(z, z + fz), x + hw, y + h / 2 + 0.1, Math.max(z, z + fz)] : [Math.min(x, x + fx), y - h / 2 - 0.1, z - hw, Math.max(x, x + fx), y + h / 2 + 0.1, z + hw],
@@ -815,7 +820,7 @@ G.Highlights = (() => {
     const A = P.actors.get(k) || {}, kt = A.kt || {};
     const parts = Object.entries(def.build || {}).map(([slot, id]) => [slot, G.Gunsmith.PARTS[id]]).filter(([slot, p]) => p && !p.factory && ['optic', 'riserdot', 'magnifier', 'muzzle', 'barrel', 'stock', 'buttstock', 'handguard', 'fg', 'tac', 'tacL', 'mag', 'grip'].includes(slot))
       .map(([slot, p]) => [(G.Gunsmith.SLOT_LABEL[slot] || slot).replace(/ \(.*\)/, '').toUpperCase(), p.name]);
-    const kit = [['HELMET', kt.helmet], ['FACE', kt.face], ['CARRIER', kt.carrier], ['BELT', kt.belt], ['PACK', kt.pack]].filter(([, id]) => id && G.Gear.DEFS[id]).map(([n, id]) => [n, G.Gear.DEFS[id].name + (n === 'CARRIER' && kt.plate ? ' + plate' : '')]);
+    const kit = [['HELMET', kt.helmet], ['FACE', kt.face], ['CARRIER', kt.carrier], ['SHOULDERS', kt.sh], ['PELVIS', kt.gr], ['BELT', kt.belt], ['LEGS', kt.lg], ['PACK', kt.pack]].filter(([, id]) => id && G.Gear.DEFS[id]).map(([n, id]) => [n, G.Gear.DEFS[id].name + (n === 'CARRIER' && kt.plate ? ' + plate' : '')]);
     // the verdicts: what the numbers say about them (two of them, the strongest first)
     const rpk = kx.kills ? e.n / kx.kills : Infinity, v = [];
     if (kx.kills && rpk <= 2) v.push(['SURGICAL', 'One round, one problem solved.']);
@@ -987,7 +992,7 @@ G.Highlights = (() => {
     if (A.kind === 'e') {
       const def = G.ENEMIES[A.type] || {};
       rig = G.Rig.create({ style: A.style || def.style, scale: A.scale, boss: A.boss, seed: A.id * 7919 + 13, dressed: true });
-      if (!A.civ) rig.setKit(G.Rig.armourKit(A.vest, A.helmet, (A.style || def.style) === 'armored', A.face));
+      if (!A.civ) rig.setKit(G.Rig.armourKit(A.vest, A.helmet, (A.style || def.style) === 'armored', A.face, A.ex));
       if (A.wpn && !A.civ) rig.setGun(A.wpn);
     } else {
       rig = G.Rig.create({ style: 'tactical', color: A.color, animal: A.animal, callName: A.name, seed: String(A.id).length * 977, bare: true, look: A.look });
@@ -1615,7 +1620,7 @@ G.Highlights = (() => {
       if (had) B.unsnap(p0, had[3]); // (as it was when it got there: whatever it had been through had changed it)
       const vIn = had ? had[2] : fl.atX(Math.min(nb.x, fl.len)).v; // (its speed where it met them)
       const before = had ? fl.events.filter((e) => e.x < nb.x && e.k !== 'x').map((e) => (e.k === 'r' ? 'off ' : '') + e.name) : [];
-      const armour = () => (A && A.kind === 'e' && !A.civ ? B.suspectArmour({ def: { vest: A.vest, helmet: A.helmet, face: A.face } }) : []);
+      const armour = () => (A && A.kind === 'e' && !A.civ ? B.suspectArmour({ def: { vest: A.vest, helmet: A.helmet, face: A.face, ex: A.ex } }) : []);
       let trace = [], r = B.through(rig, o, u, vIn, Object.assign({}, p0), armour(), 3, trace);
       if (!r || (!trace.length && !r.stopped)) {
         const ch = new T.Vector3(0, 1.25, 0), w = ch.sub(o); o.add(w.sub(u.clone().multiplyScalar(w.dot(u))));
@@ -2047,7 +2052,8 @@ G.Highlights = (() => {
     P.losT = (P.losT || 0) - dt;
     for (const tv of P.tvs) {
       const p = tv.scr.getWorldPosition(_a), d = p.distanceTo(cp);
-      if (d < 45) { const f = _b.set(0, 0, -1).applyQuaternion(cam.quaternion); if (f.dot(p.clone().sub(cp).normalize()) > 0.2) seen = true; }
+      if (d < (tv.cab ? 6 : 45)) { const f = _b.set(0, 0, -1).applyQuaternion(cam.quaternion); if (f.dot(p.clone().sub(cp).normalize()) > 0.2) seen = true; }
+      if (tv.cab) continue; // (muted: no sound of its own)
       const n = _b.set(0, 0, 1).applyQuaternion(tv.scr.getWorldQuaternion(new T.Quaternion())), v = cp.clone().sub(p), front = v.dot(n) / Math.max(1e-3, d);
       let k = G.U.clamp((tv.w * 3 - d) / (tv.w * 1.5), 0, 1) * G.U.clamp((front - 0.25) / 0.35, 0, 1);
       if (k > 0) {

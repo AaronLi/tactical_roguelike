@@ -234,16 +234,18 @@ G.InvUI = (() => {
   let opened = []; // uids of the open containers, newest first
   const COLORS = { mag: '#3d4a33', ammo: '#4a4130', med: '#5a2a2a', frag: '#3a4237', flash: '#3d4247', carrier: '#2f3a44', plate: '#3c3f46', helmet: '#33393f', face: '#30363c', belt: '#3b3528', pack: '#3a3a2c', gun: '#262b30', pouch: '#353a2e', part: '#2c3136' };
   const GS = () => G.Gunsmith;
-  const SLOTS = [['wp', 'Primary weapon'], ['ws', 'Sidearm'], ['helmet', 'Helmet'], ['face', 'Face shield / mandible'], ['carrier', 'Body armour / rig'], ['plate', 'Plate'], ['belt', 'Belt'], ['ifak', 'IFAK'], ['pack', 'Backpack']];
-  const GEAR_SLOTS = ['helmet', 'face', 'carrier', 'plate', 'belt', 'ifak', 'pack'];
+  const SLOTS = [['wp', 'Primary weapon'], ['ws', 'Sidearm'], ['helmet', 'Helmet'], ['face', 'Face shield / mandible'], ['carrier', 'Body armour / rig'], ['plate', 'Plate'], ['shoulder', 'Shoulders'], ['groin', 'Pelvis'], ['belt', 'Belt'], ['legs', 'Legs'], ['ifak', 'IFAK'], ['pack', 'Backpack']];
+  const GEAR_SLOTS = ['helmet', 'face', 'carrier', 'plate', 'shoulder', 'groin', 'belt', 'legs', 'ifak', 'pack'];
+  // an empty mount's slot, and which gear it's missing: what it says when it can't be used
+  const NO_MOUNT = { face: 'no mount on this helmet', plate: 'no plate pocket', shoulder: 'no shoulder mounts', groin: 'no pelvis mount', legs: 'no leg hangers' };
   const WSLOT = { wp: 'p', ws: 's' };
   const ACCEPT = { mag: 'magazines', ammo: 'ammo', frag: 'grenade', flash: 'grenade', med: 'medkit' };
 
   // ---------------------------------------------------------------- where things are
   function slotItem(me, s) {
     if (WSLOT[s]) { const w = me.weapons[WSLOT[s]]; return w ? GG().gunItem(w) : null; }
-    if (s === 'face') return me.kit.helmet ? me.kit.helmet.face || null : null; // on the helmet's mount
-    return s === 'plate' ? (me.kit.carrier ? me.kit.carrier.plate : null) : me.kit[s];
+    if (GG().MOUNTS[s]) { const h = me.kit[GG().MOUNTS[s]]; return h ? h[s] || null : null; } // on what it's mounted on
+    return me.kit[s];
   }
   // a container's grids: a pouch's or pack's own, or a carrier's or belt's MOLLE and the pouches on it
   const isContainer = (it) => !!(it.grids || it.molle);
@@ -319,8 +321,7 @@ G.InvUI = (() => {
     if (src.g) GG().removeFrom(src.g, src.it);
     else if (src.gunPart) { const { w, slot } = src.gunPart, b = Object.assign({}, w.def.build); delete b[slot]; setBuild(me, w, b); }
     else if (src.gunMag) { const w = src.gunMag; w.mag = 0; w.noMag = true; if (w.tube) w.tube = []; magItems.delete(w); }
-    else if (src.slot === 'plate') me.kit.carrier.plate = null;
-    else if (src.slot === 'face') me.kit.helmet.face = null;
+    else if (GG().MOUNTS[src.slot]) me.kit[GG().MOUNTS[src.slot]][src.slot] = null;
     else if (WSLOT[src.slot]) { delete me.weapons[WSLOT[src.slot]]; if (!me.weapons[me.slot]) me.slot = Object.keys(me.weapons)[0]; }
     else me.kit[src.slot] = null;
   }
@@ -328,12 +329,11 @@ G.InvUI = (() => {
   const lastGun = (me, src) => WSLOT[src.slot] && Object.keys(me.weapons).length <= 1;
   // can an item go in that equipment slot?
   function slotOK(me, s, it) {
-    if (s === 'plate') return it.k === 'plate' && me.kit.carrier && GG().defOf(me.kit.carrier).plate;
-    if (s === 'face') return it.k === 'face' && me.kit.helmet && GG().defOf(me.kit.helmet).face;
+    if (GG().MOUNTS[s]) return it.k === s && !!GG().mountOn(me, s);
     if (WSLOT[s]) return it.k === 'gun' && it.w.def.slot === WSLOT[s];
     return it.k === s;
   }
-  const hasContents = (it) => (it.grids && it.grids.some((g) => g.items.length)) || !!it.plate || !!it.face || !!(it.molle && it.molle.items.some((p) => hasContents(p.it)));
+  const hasContents = (it) => (it.grids && it.grids.some((g) => g.items.length)) || Object.keys(GG().MOUNTS).some((m) => it[m]) || !!(it.molle && it.molle.items.some((p) => hasContents(p.it)));
 
   // ---------------------------------------------------------------- drawing
   // rot: the item is shown turned (its icon is turned with it)
@@ -423,8 +423,7 @@ G.InvUI = (() => {
   }
   function slotHTML(me, s, name) {
     const it = slotItem(me, s);
-    if (s === 'face' && !(me.kit.helmet && GG().defOf(me.kit.helmet).face)) return `<div class="inv-slot off"><small>${name}</small><em>${me.kit.helmet ? 'no mount on this helmet' : '—'}</em></div>`;
-    if (s === 'plate' && !(me.kit.carrier && GG().defOf(me.kit.carrier).plate)) return `<div class="inv-slot off"><small>${name}</small><em>${me.kit.carrier ? 'no plate pocket' : '—'}</em></div>`;
+    if (GG().MOUNTS[s] && !GG().mountOn(me, s)) return `<div class="inv-slot off"><small>${name}</small><em>${me.kit[GG().MOUNTS[s]] ? NO_MOUNT[s] : '—'}</em></div>`;
     // shown at its own proportions (a plate is 2x3, a helmet 2x2), scaled down to fit 3 cells
     let [w, h] = s === 'wp' ? [4, 1.5] : s === 'ws' ? [3, 1] : it ? GG().size(it) : [3, 1];
     if (!WSLOT[s]) { const k = Math.min(1, 3 / w, 3 / h); w *= k; h *= k; }
@@ -534,11 +533,11 @@ G.InvUI = (() => {
     return `<div class="hl-status ${G.Med.bleeding(me.body) ? 'bad' : ''}">${status}</div>${bodyHTML(me.body)}
       <p class="inv-hint">Click a part to treat it with what you carry, or drag a medical item onto it (it takes a few seconds). Click the blood bar for a blood bag.</p>
       ${squadHTML(me)}
-      ${piece('Helmet', me.kit.helmet)}${me.kit.helmet && me.kit.helmet.face ? piece('Face', me.kit.helmet.face) : ''}${piece('Armour', me.kit.carrier)}${me.kit.carrier ? piece('Plate', me.kit.carrier.plate) : ''}`;
+      ${piece('Helmet', me.kit.helmet)}${me.kit.helmet && me.kit.helmet.face ? piece('Face', me.kit.helmet.face) : ''}${piece('Armour', me.kit.carrier)}${me.kit.carrier ? piece('Plate', me.kit.carrier.plate) + piece('Shoulders', me.kit.carrier.shoulder) + piece('Pelvis', me.kit.carrier.groin) : ''}${me.kit.belt ? piece('Legs', me.kit.belt.legs) : ''}`;
   }
   function stats(me) {
     // each zone: the hardest to stop of the reference rounds what's there stops head-on, new (js/ballistics.js rating)
-    const Gr = GG(), B = G.Ballistics, AT = { head: ['helmet'], face: ['face'], chest: ['plate', 'torso'], abdomen: ['torso'] };
+    const Gr = GG(), B = G.Ballistics, AT = { head: ['helmet'], face: ['face'], chest: ['plate', 'torso'], abdomen: ['torso'], shoulder: ['shoulder'], pelvis: ['groin', 'groinplate', 'pelvis'], thigh: ['thigh', 'legwrap'], shin: ['shin'] };
     const zone = (z) => {
       const L = [];
       for (const a of B.kitArmour(me)) for (const pr of a.def.prot) if (AT[z].includes(pr.at) && !(z === 'face' && a.def.lower)) L.push(...pr.layers);
@@ -546,7 +545,8 @@ G.InvUI = (() => {
       return B.rating(L).best || 'nothing';
     };
     return `<div class="inv-stats"><div><span>Head</span><b>${zone('head')}</b></div><div><span>Face</span><b>${zone('face')}</b></div><div><span>Chest</span><b>${zone('chest')}</b></div>
-      <div><span>Stomach</span><b>${zone('abdomen')}</b></div><div><span>Speed</span><b>${Math.round(Gr.speed(me) * 100)}%</b></div><small>The hardest round to stop that it stops head-on, new</small></div>`;
+      <div><span>Stomach</span><b>${zone('abdomen')}</b></div><div><span>Shoulders</span><b>${zone('shoulder')}</b></div><div><span>Pelvis</span><b>${zone('pelvis')}</b></div>
+      <div><span>Thighs</span><b>${zone('thigh')}</b></div><div><span>Shins</span><b>${zone('shin')}</b></div><div><span>Speed</span><b>${Math.round(Gr.speed(me) * 100)}%</b></div><small>The hardest round to stop that it stops head-on, new</small></div>`;
   }
   // the cabinet's contents as you've left them, to the host: what you took out, what you put in, the layout
   function cabSync() {
@@ -613,7 +613,7 @@ G.InvUI = (() => {
   }
   function setSlot(me, s, it) {
     if (WSLOT[s]) { me.weapons[WSLOT[s]] = it.w; if (!me.weapons[me.slot]) me.slot = WSLOT[s]; }
-    else if (s === 'plate') me.kit.carrier.plate = it; else if (s === 'face') me.kit.helmet.face = it; else me.kit[s] = it;
+    else if (GG().MOUNTS[s]) GG().mountOn(me, s)[s] = it; else me.kit[s] = it;
   }
   function drop(e) {
     const me = G.Me, d = drag;
@@ -793,7 +793,7 @@ G.InvUI = (() => {
   function quickLabel(me, src) {
     if (src.g !== me.locker && !(src.g && src.g.team)) return lastGun(me, src) ? null : 'Send to locker';
     const it = src.it;
-    if (GG().isGear(it)) return it.k === 'plate' ? 'Fit in carrier' : it.k === 'face' ? 'Fit to helmet' : 'Wear';
+    if (GG().isGear(it)) return it.k === 'plate' ? 'Fit in carrier' : GG().MOUNTS[it.k] ? `Fit to ${GG().MOUNTS[it.k]}` : 'Wear';
     if (it.k === 'gun') return me.weapons[it.w.def.slot] ? null : 'Carry';
     if (it.k === 'pouch') return 'Mount on MOLLE';
     return 'Take with you';
@@ -806,7 +806,7 @@ G.InvUI = (() => {
       else if (GG().findSpot(me.locker, src.it)) { detach(me, src); ok = GG().stow(me, src.it, [me.locker]); }
       else G.HUD.toast('', 'No room in your locker', 1.5);
     } else if (inLocker) {
-      if (GG().isGear(src.it)) { const s = src.it.k === 'plate' ? 'plate' : src.it.k; ok = slotOK(me, s, src.it) && equip(me, s, src.it, src); }
+      if (GG().isGear(src.it)) { const s = src.it.k; ok = slotOK(me, s, src.it) && equip(me, s, src.it, src); }
       else if (src.it.k === 'gun' && !me.weapons[src.it.w.def.slot]) ok = equip(me, src.it.w.def.slot === 'p' ? 'wp' : 'ws', src.it, src);
       else if (src.it.k === 'pouch') { detach(me, src); ok = !!GG().place(GG().molles(me), src.it); if (!ok) GG().put(src.g, src.it, src.p.x, src.p.y, src.p.r); }
       else { detach(me, src); ok = !!GG().place(GG().body(me), src.it); if (!ok) GG().put(src.g, src.it, src.p.x, src.p.y, src.p.r); }

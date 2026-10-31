@@ -101,6 +101,84 @@ img.anim { width: 1.25em; height: 1.25em; vertical-align: -0.3em; margin-right: 
 
 #clickToPlay { position: fixed; left: 50%; top: 58%; transform: translateX(-50%); z-index: 15; background: var(--panel); border: 1px solid var(--accent); color: var(--accent); padding: 12px 24px; font: 700 14px var(--mono); letter-spacing: 3px; text-transform: uppercase; cursor: pointer; animation: pulse 1.4s infinite; }
 @keyframes pulse { 50% { opacity: 0.55; } }
+/* the loading veil (js/game.js veil): over everything, and takes the clicks while it's up. Two layers. The shape: a black panel with slanted top and bottom edges,
+   wobbling down the screen like jelly, settling over it, and pulling away off the bottom. --s: how far its edges fall across the screen; --m: how far past the screen it
+   reaches, so the wobble never shows round it. What's on it stays still and fades (a jelly's for the edges, not the words).
+   It's covered by about 0.34 s (G.Game.VEIL_MS); the way out's time is js/game.js VEIL_OUT. The shape's travel, its slant, the words and the spinner are transforms and opacity, which the compositor
+   runs, so they keep going while the page is busy building a level. The ripple along its edges (d) is the page's own: it stalls if the page does, but
+   by then the edges are off the screen. VEIL_IN and VEIL_OUT below are made together: a wave running along each edge, by moving the handles of one curve in a 100 x 100 box stretched over the panel. */
+#veil { --s: 28vh; --m: 12vh; position: fixed; inset: 0; z-index: 90; visibility: hidden; pointer-events: none; }
+#veil.on { visibility: visible; pointer-events: auto; }
+#veil.out { visibility: visible; }
+.veil-shape { position: absolute; left: 0; top: calc(-1 * (var(--s) + var(--m))); width: 100%; height: calc(100vh + 2 * (var(--s) + var(--m))); overflow: visible; fill: #000; transform: translateY(-100%); will-change: transform; }
+#veil.on .veil-shape { transform: none; animation: veilIn 0.8s both; }
+#veil.out .veil-shape { transform: translateY(106%); animation: veilOut 0.65s both; }
+#veil.on path { animation: veilInEdge 0.8s linear both; }
+#veil.out path { animation: veilOutEdge 0.65s linear both; }
+#veil.now .veil-shape, #veil.now path, #veil.now .veil-load { animation: none; }
+@keyframes veilIn {
+  0% { transform: translateY(-100%) skewY(-7deg) scaleY(1.14); animation-timing-function: cubic-bezier(0.5, 0, 0.75, 0.7); }
+  42% { transform: translateY(3%) skewY(4deg) scaleY(1.05); animation-timing-function: cubic-bezier(0.3, 0, 0.6, 1); }
+  62% { transform: translateY(-1.8%) skewY(-2.2deg) scaleY(0.985); animation-timing-function: cubic-bezier(0.3, 0, 0.6, 1); }
+  80% { transform: translateY(0.7%) skewY(1deg) scaleY(1.006); animation-timing-function: cubic-bezier(0.3, 0, 0.6, 1); }
+  100% { transform: none; }
+}
+@keyframes veilOut {
+  0% { transform: none; animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1); }
+  20% { transform: translateY(-2.4%) skewY(-2.5deg) scaleY(1.02); animation-timing-function: cubic-bezier(0.55, 0, 0.9, 0.5); }
+  100% { transform: translateY(106%) skewY(7deg) scaleY(1.14); }
+}
+@keyframes veilInEdge {
+  0% { d: path("M0 15.6C33 15.6 66 2.7 100 0L100 84.4C66 98.1 33 102 0 100Z"); }
+  6% { d: path("M0 15.6C33 13.2 66 0.8 100 0L100 84.4C66 101.8 33 90.4 0 100Z"); }
+  12% { d: path("M0 15.6C33 9.7 66 2.2 100 0L100 84.4C66 96.9 33 85.3 0 100Z"); }
+  19% { d: path("M0 15.6C33 7.6 66 5 100 0L100 84.4C66 89.2 33 87.7 0 100Z"); }
+  25% { d: path("M0 15.6C33 7.8 66 7.2 100 0L100 84.4C66 84.3 33 93.6 0 100Z"); }
+  31% { d: path("M0 15.6C33 9.6 66 7.6 100 0L100 84.4C66 84.2 33 98.3 0 100Z"); }
+  38% { d: path("M0 15.6C33 11.4 66 6.3 100 0L100 84.4C66 87.4 33 99.3 0 100Z"); }
+  44% { d: path("M0 15.6C33 12.1 66 4.7 100 0L100 84.4C66 90.9 33 97.3 0 100Z"); }
+  50% { d: path("M0 15.6C33 11.6 66 3.9 100 0L100 84.4C66 92.5 33 94.4 0 100Z"); }
+  56% { d: path("M0 15.6C33 10.5 66 4 100 0L100 84.4C66 91.7 33 92.7 0 100Z"); }
+  62% { d: path("M0 15.6C33 9.6 66 4.9 100 0L100 84.4C66 90 33 92.9 0 100Z"); }
+  69% { d: path("M0 15.6C33 9.5 66 5.7 100 0L100 84.4C66 88.6 33 94.1 0 100Z"); }
+  75% { d: path("M0 15.6C33 10 66 6 100 0L100 84.4C66 88.2 33 95.4 0 100Z"); }
+  81% { d: path("M0 15.6C33 10.6 66 5.7 100 0L100 84.4C66 88.9 33 95.9 0 100Z"); }
+  88% { d: path("M0 15.6C33 10.9 66 5.2 100 0L100 84.4C66 89.7 33 95.6 0 100Z"); }
+  94% { d: path("M0 15.6C33 10.9 66 4.8 100 0L100 84.4C66 90.2 33 94.9 0 100Z"); }
+  100% { d: path("M0 15.6C33 10.4 66 5.2 100 0L100 84.4C66 89.6 33 94.8 0 100Z"); }
+}
+@keyframes veilOutEdge {
+  0% { d: path("M0 15.6C33 10.4 66 5.2 100 0L100 84.4C66 89.6 33 94.8 0 100Z"); }
+  6% { d: path("M0 15.6C33 12.9 66 4.9 100 0L100 84.4C66 90.2 33 95.5 0 100Z"); }
+  12% { d: path("M0 15.6C33 14.2 66 2.4 100 0L100 84.4C66 90.7 33 95 0 100Z"); }
+  19% { d: path("M0 15.6C33 13.6 66 0.4 100 0L100 84.4C66 90.8 33 94 0 100Z"); }
+  25% { d: path("M0 15.6C33 10.5 66 0.6 100 0L100 84.4C66 90.1 33 93.2 0 100Z"); }
+  31% { d: path("M0 15.6C33 6.1 66 3.8 100 0L100 84.4C66 88.8 33 92.9 0 100Z"); }
+  38% { d: path("M0 15.6C33 2.9 66 8.9 100 0L100 84.4C66 87.6 33 93.8 0 100Z"); }
+  44% { d: path("M0 15.6C33 3 66 13.2 100 0L100 84.4C66 87.1 33 95.4 0 100Z"); }
+  50% { d: path("M0 15.6C33 7.3 66 14.1 100 0L100 84.4C66 87.9 33 97.1 0 100Z"); }
+  56% { d: path("M0 15.6C33 14.3 66 10.4 100 0L100 84.4C66 89.8 33 97.9 0 100Z"); }
+  62% { d: path("M0 15.6C33 20.5 66 3.1 100 0L100 84.4C66 92 33 97.2 0 100Z"); }
+  69% { d: path("M0 15.6C33 22.4 66 -4.4 100 0L100 84.4C66 93.3 33 95.1 0 100Z"); }
+  75% { d: path("M0 15.6C33 18.3 66 -8 100 0L100 84.4C66 92.8 33 92.5 0 100Z"); }
+  81% { d: path("M0 15.6C33 9.5 66 -5.3 100 0L100 84.4C66 90.6 33 90.7 0 100Z"); }
+  88% { d: path("M0 15.6C33 -0.1 66 3.3 100 0L100 84.4C66 87.5 33 90.8 0 100Z"); }
+  94% { d: path("M0 15.6C33 -5.6 66 14 100 0L100 84.4C66 85.1 33 93 0 100Z"); }
+  100% { d: path("M0 15.6C33 -3.5 66 21.5 100 0L100 84.4C66 84.7 33 96.4 0 100Z"); }
+}
+.veil-load { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 8px; }
+#veil.on .veil-load { animation: veilText 0.2s 0.3s ease-out both; }
+#veil.out .veil-load { opacity: 0; animation: veilText 0.14s 0.12s ease-in reverse both; }
+@keyframes veilText { from { opacity: 0; } to { opacity: 1; } }
+.veil-row { display: flex; align-items: center; gap: 14px; color: var(--accent); font: 700 14px var(--mono); letter-spacing: 3px; text-transform: uppercase; }
+.veil-spin { width: 20px; height: 20px; box-sizing: border-box; border: 3px solid rgba(255, 255, 255, 0.16); border-top-color: var(--accent); border-radius: 50%; will-change: transform; animation: veilSpin 0.8s linear infinite; }
+@keyframes veilSpin { to { transform: rotate(360deg); } }
+/* what it's doing now: the line turns down out of sight and the next comes over from above, as on a drum */
+#veilStatus { position: relative; width: 240px; height: 16px; overflow: hidden; perspective: 60px; color: #7d8288; font: 11px var(--mono); letter-spacing: 1px; text-align: center; }
+#veilStatus span { position: absolute; inset: 0; line-height: 16px; backface-visibility: hidden; will-change: transform, opacity; animation: statusIn 0.14s ease-out both; }
+#veilStatus span.gone { animation: statusOut 0.14s ease-in both; }
+@keyframes statusIn { from { transform: translateY(-100%) rotateX(80deg); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes statusOut { to { transform: translateY(100%) rotateX(-80deg); opacity: 0; } }
 
 /* ---------- HUD ---------- */
 #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; font-family: var(--mono); }
@@ -366,6 +444,7 @@ label.check input { width: auto; accent-color: var(--accent); }
 .gs-pe .g { color: var(--good); }
 .gs-pe .b { color: #ff8a7a; }
 .gs-pa { display: flex; gap: calc(4px * var(--ik, 1)); align-items: center; white-space: nowrap; }
+.gs-skin { max-width: calc(250px * var(--ik, 1)); background: #14181b; color: #e8eef2; border: 1px solid #3a424a; padding: calc(3px * var(--ik, 1)); font: calc(11px * var(--ik, 1)) var(--mono); }
 .gs-pa .tag { font: calc(10px * var(--ik, 1)) var(--mono); color: var(--dim); letter-spacing: 1px; text-transform: uppercase; }
 .gs-empty { font: calc(13px * var(--ik, 1)) var(--mono); color: var(--dim); padding: calc(20px * var(--ik, 1)); }
 @media (max-width: 900px) { .gs-main { grid-template-columns: 1fr; } }

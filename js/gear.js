@@ -3,7 +3,8 @@
 //
 // Gear: helmets, plate carriers (and soft vests), armour plates and belts, each a named product from a brand.
 // A carrier gives soft armour where it covers, a slot for a plate (the plate is what stops rifle rounds over
-// the chest), and a MOLLE panel: rows of webbing that pouches mount on, column by column. A pouch is an item
+// the chest), mounts for shoulder and pelvis armour, and a MOLLE panel: rows of webbing that pouches mount on, column by
+// column. Leg armour hangs from a belt that can take it. What goes on what: MOUNTS. A pouch is an item
 // you can move, buy and sell; mounted, it's a small grid (its own footprint), some only for magazines,
 // grenades or medkits. Gear comes with pouches as issued; rearrange them in the Kit tab. A belt has MOLLE too.
 // A dump pouch takes anything, and it's where a dump reload (double-tap R) puts the empty magazine. Your pockets are two 1x2 (a rifle magazine each) and two 1x1, whatever you wear.
@@ -18,21 +19,35 @@ G.Gear = (() => {
   const MAG = ['mag', 'ammo'], MED = ['med'];
   const LIST = [
     // ---------------------------------------------------------------- carriers and vests: soft armour + plate slot + pouches
-    { id: 'c.ghost', kind: 'carrier', brand: B.north, name: 'Ghost concealable vest', tier: 1, price: 450, speed: 1, dur: 6, plate: false,
+    { id: 'c.lite', kind: 'carrier', brand: B.gray, name: 'Lightline concealable vest (II)', tier: 1, price: 220, speed: 1, dur: 4, plate: false, thin: true, col: 0x5c5a50,
+      prot: [{ at: 'torso', layers: [['aramid', 6]] }], desc: 'Thin soft Level II panels: stops 9 mm, .45 and buckshot, not a magnum, and wears through sooner. No plate pocket, no MOLLE.' },
+    { id: 'c.ghost', kind: 'carrier', brand: B.north, name: 'Ghost concealable vest', tier: 1, price: 450, speed: 1, dur: 6, plate: false, thin: true, col: 0x34373b,
       prot: [{ at: 'torso', layers: [['aramid', 8]] }], desc: 'Soft IIIA panels under a shirt. No plate pocket, no MOLLE.' },
-    { id: 'c.slick', kind: 'carrier', brand: B.kest, name: 'PC-1 slick carrier', tier: 1, price: 380, speed: 1, dur: 4, plate: true,
+    { id: 'c.slick', kind: 'carrier', brand: B.kest, name: 'PC-1 slick carrier', tier: 1, price: 380, speed: 1, dur: 4, plate: true, shoulder: true, groin: true,
       prot: [], molle: [3, 2], pouches: [['q.rifle', 0, 0]], desc: 'Just a plate pocket and a little MOLLE, one magazine pouch as issued. Light and low.' },
-    { id: 'c.patrol', kind: 'carrier', brand: B.iron, name: 'Patrol plate carrier', tier: 2, price: 900, speed: 0.99, dur: 6, plate: true,
+    { id: 'c.patrol', kind: 'carrier', brand: B.iron, name: 'Patrol plate carrier', tier: 2, price: 900, speed: 0.99, dur: 6, plate: true, shoulder: true, groin: true,
       prot: [{ at: 'torso', layers: [['aramid', 6]] }], molle: [4, 2], pouches: [['q.rifle', 0, 0], ['q.rifle', 1, 0]],
       desc: 'Soft backer. Issued with two magazine pouches; the rest of the MOLLE is yours to fill.' },
     { id: 'c.recon', kind: 'carrier', brand: B.vant, name: 'Recon chest rig', tier: 2, price: 650, speed: 1, dur: 0, plate: false,
       prot: [], molle: [7, 2], pouches: [['q.rifle', 0, 0], ['q.rifle', 1, 0]], desc: 'No armour at all: wide MOLLE, two magazine pouches as issued. Fast.' },
-    { id: 'c.assault', kind: 'carrier', brand: B.para, name: 'Assaulter carrier', tier: 3, price: 1500, speed: 0.98, dur: 7, plate: true,
+    { id: 'c.assault', kind: 'carrier', brand: B.para, name: 'Assaulter carrier', tier: 3, price: 1500, speed: 0.98, dur: 7, plate: true, shoulder: true, groin: true,
       prot: [{ at: 'torso', layers: [['aramid', 7]] }], molle: [5, 2], pouches: [['q.rifle2', 0, 0], ['q.rifle', 2, 0]],
       desc: 'The most MOLLE: issued with a double and a single magazine pouch, the rest to fill.' },
     { id: 'c.heavy', kind: 'carrier', brand: B.sable, name: 'Heavy assault armour', tier: 4, price: 2600, speed: 0.9, dur: 9, plate: true,
       prot: [{ at: 'side', layers: [['steel', 5]] }, { at: 'torso', layers: [['aramid', 8]] }, { at: 'groin', layers: [['aramid', 8]] }, { at: 'shoulder', layers: [['aramid', 6]] }, { at: 'thigh', layers: [['aramid', 6]] }], molle: [5, 2], pouches: [['q.rifle', 0, 0], ['q.rifle', 1, 0], ['q.med', 2, 0]],
       desc: "Side and groin plates, shoulder and thigh protection. Slow, and less MOLLE than you'd like." },
+    // ---------------------------------------------------------------- shoulder and pelvis armour (on a plate carrier's mounts)
+    { id: 's.deltoid', kind: 'shoulder', brand: B.gray, name: 'Deltoid pads (II)', tier: 1, price: 280, speed: 0.995, dur: 3, prot: [{ at: 'shoulder', layers: [['aramid', 6]] }], desc: 'Soft pads strapped to the carrier over the top of each arm. Handgun-rated, not a magnum.' },
+    { id: 's.axil', kind: 'shoulder', brand: B.kest, name: 'Deltoid and axillary set (IIIA)', tier: 2, price: 700, speed: 0.99, dur: 4, prot: [{ at: 'shoulder', layers: [['aramid', 8]] }, { at: 'axilla', layers: [['aramid', 8]] }], desc: 'Shoulder pads with a panel on down under the arm, closing the gap a vest leaves there. Handgun-rated.' },
+    { id: 's.plate', kind: 'shoulder', brand: B.sable, name: 'Hard shoulder guards', tier: 3, price: 1500, speed: 0.97, dur: 4, prot: [{ at: 'shoulder', layers: [['pe', 18]] }, { at: 'axilla', layers: [['aramid', 8]] }], desc: 'Moulded polyethylene caps, with soft panels under the arm. Turns 7.62, not 5.56. Heavy on the arms.' },
+    { id: 'g.flap', kind: 'groin', brand: B.gray, name: 'Groin flap (II)', tier: 1, price: 200, speed: 1, dur: 3, prot: [{ at: 'groin', layers: [['aramid', 6]] }], desc: 'A soft panel hanging from the carrier, across the front of the pelvis. Handgun-rated, not a magnum.' },
+    { id: 'g.pelvis', kind: 'groin', brand: B.iron, name: 'Pelvic wrap (IIIA)', tier: 2, price: 700, speed: 0.985, dur: 4, prot: [{ at: 'pelvis', layers: [['aramid', 8]] }], desc: 'Soft armour all the way round the hips, over the arteries there. Handgun-rated.' },
+    { id: 'g.plate', kind: 'groin', brand: B.iron, name: 'Steel groin plate (III)', tier: 3, price: 1250, speed: 0.97, dur: 6, prot: [{ at: 'groinplate', layers: [['steel', 6.35]] }, { at: 'groin', layers: [['aramid', 8]] }], desc: 'A small AR550 plate over the middle of the pelvis, on a soft flap. Stops rifle rounds there, and costs you some stride.' },
+    // ---------------------------------------------------------------- leg armour (on a belt's hangers)
+    { id: 'l.shin', kind: 'legs', brand: B.north, name: 'Shin guards', tier: 1, price: 240, speed: 0.99, dur: 3, prot: [{ at: 'shin', layers: [['pc', 6]] }], desc: 'Hard polycarbonate down the front of each shin. Stops .22, .45 and buckshot, not 9 mm. Needs a battle or war belt.' },
+    { id: 'l.thigh', kind: 'legs', brand: B.kest, name: 'Thigh panels (IIIA)', tier: 2, price: 520, speed: 0.98, dur: 3, prot: [{ at: 'thigh', layers: [['aramid', 8]] }], desc: 'Soft panels hung from the belt over the front of the thighs. Handgun-rated. Needs a battle or war belt.' },
+    { id: 'l.wrap', kind: 'legs', brand: B.mer, name: 'Thigh wraps (IIIA)', tier: 3, price: 950, speed: 0.965, dur: 4, prot: [{ at: 'legwrap', layers: [['aramid', 8]] }], desc: 'All the way round the thigh almost to the knee, where the femoral artery runs. Handgun-rated. Slows you. Needs a battle or war belt.' },
+    { id: 'l.full', kind: 'legs', brand: B.sable, name: 'Full leg armour', tier: 4, price: 1900, speed: 0.94, dur: 6, prot: [{ at: 'legwrap', layers: [['aramid', 10]] }, { at: 'shin', layers: [['pc', 10]] }], desc: 'Thigh wraps and hard shin guards together: handgun-rated all the way down, bar a 5.7. Slow. Needs a battle or war belt.' },
     // ---------------------------------------------------------------- plates (go in a carrier's plate pocket; cover the chest)
     { id: 'p.soft', kind: 'plate', brand: B.gray, name: 'IIIA soft insert', tier: 1, price: 250, speed: 1, dur: 6, prot: [{ at: 'plate', layers: [['aramid', 12]] }], desc: 'Stops handgun rounds and buckshot. Not rifles.' },
     { id: 'p.steel', kind: 'plate', brand: B.iron, name: 'AR550 steel plate (III)', tier: 2, price: 600, speed: 0.96, dur: 8, prot: [{ at: 'plate', layers: [['steel', 6.35]] }], desc: 'Stops rifle rounds and takes a beating. Heavy.' },
@@ -51,9 +66,9 @@ G.Gear = (() => {
     { id: 'f.rifle', kind: 'face', brand: B.mer, name: 'Rifle-rated face shield', tier: 3, price: 1900, kg: 2.4, fwd: 0.13, speed: 0.97, dur: 3, cover: 0.9, prot: [{ at: 'face', layers: [['pc', 14], ['pe', 10]] }], desc: 'Thick laminated shield over the whole face: turns some rifle rounds too. Heavy.' },
     // { id: 'h.visor', kind: 'helmet', brand: B.sable, name: 'Helmet with ballistic visor', tier: 4, price: 2800, speed: 0.97, dur: 4, cut: 'high', prot: [{ at: 'helmet', layers: [['pe', 18]] }, { at: 'face', layers: [['pc', 10]] }], desc: 'Rifle-rated, and a visor that stops handgun rounds to the face.' },
     // ---------------------------------------------------------------- belts (more pouches)
-    { id: 'b.duty', kind: 'belt', brand: B.gray, name: 'Duty belt', tier: 1, price: 120, speed: 1, molle: [3, 1], pouches: [['q.pistol', 0, 0]], desc: 'One row of MOLLE, one pistol magazine pouch as issued. Too shallow for rifle pouches.' },
-    { id: 'b.battle', kind: 'belt', brand: B.kest, name: 'Battle belt', tier: 2, price: 400, speed: 1, molle: [4, 2], pouches: [['q.rifle', 0, 0], ['q.med', 1, 0]], desc: 'A magazine pouch and a medkit pouch as issued, plenty of MOLLE spare.' },
-    { id: 'b.war', kind: 'belt', brand: B.para, name: 'War belt with dump pouch', tier: 3, price: 700, speed: 0.995, molle: [5, 2], pouches: [['q.dump', 0, 0]], desc: 'Comes with its dump pouch and nothing else: wide MOLLE to fill.' },
+    { id: 'b.duty', kind: 'belt', brand: B.gray, name: 'Duty belt', tier: 1, price: 120, speed: 1, molle: [3, 1], pouches: [['q.pistol', 0, 0]], desc: 'One row of MOLLE, one pistol magazine pouch as issued. Too shallow for rifle pouches, and no mount for leg armour.' },
+    { id: 'b.battle', kind: 'belt', brand: B.kest, name: 'Battle belt', tier: 2, price: 400, speed: 1, legs: true, molle: [4, 2], pouches: [['q.rifle', 0, 0], ['q.med', 1, 0]], desc: 'A magazine pouch and a medkit pouch as issued, plenty of MOLLE spare. Takes leg armour.' },
+    { id: 'b.war', kind: 'belt', brand: B.para, name: 'War belt with dump pouch', tier: 3, price: 700, speed: 0.995, legs: true, molle: [5, 2], pouches: [['q.dump', 0, 0]], desc: 'Comes with its dump pouch and nothing else: wide MOLLE to fill. Takes leg armour.' },
     // ---------------------------------------------------------------- the IFAK (its own slot, on the hip: medical gear only)
     { id: 'm.ifak', kind: 'ifak', brand: B.halc, name: 'IFAK', tier: 1, price: 150, speed: 1, sz: [2, 3], grids: [[2, 3, MED]], desc: 'Individual first aid kit: room for a bandage, a tourniquet, gauze, a chest seal and a splint.' },
     // ---------------------------------------------------------------- backpacks (one big grid; a big enough one takes a spare gun)
@@ -63,6 +78,9 @@ G.Gear = (() => {
   ];
   const DEFS = {};
   LIST.forEach((d) => (DEFS[d.id] = d));
+  // What's fitted to something you wear: its kind, and the kind of gear it goes on, which has to say so (d.plate, d.face...).
+  // On it, it's it.plate, it.face...: it comes off with it, and goes wherever it goes.
+  const MOUNTS = { plate: 'carrier', face: 'helmet', shoulder: 'carrier', groin: 'carrier', legs: 'belt' };
   // pouches: w x h is what they hold (their grid inside, and their size stowed); mw x mh is the MOLLE they
   // take mounted (the same unless said: a rifle mag pouch or a med pouch hangs from one 1x1 slot)
   const POUCHES = {
@@ -74,7 +92,7 @@ G.Gear = (() => {
     'q.med': { name: 'Med pouch', brand: B.halc, w: 2, h: 2, mw: 1, mh: 1, acc: MED, price: 150, desc: 'A 2×2 roll-out medical pouch on a single MOLLE slot: a splint and a few more.' },
   };
   // how gear sits in the locker
-  const GEAR_SIZE = { carrier: [3, 3], plate: [2, 3], helmet: [2, 2], face: [2, 2], belt: [3, 1], pack: [3, 3], ifak: [2, 3] };
+  const GEAR_SIZE = { carrier: [3, 3], plate: [2, 3], helmet: [2, 2], face: [2, 2], shoulder: [2, 2], groin: [2, 2], legs: [2, 3], belt: [3, 1], pack: [3, 3], ifak: [2, 3] };
   // A gun as an item (stowed in a backpack or the locker): it's the weapon itself, magazine, build and all.
   // Long guns are wide: a pistol 2x1, a compact SMG 3x2, a carbine, rifle or shotgun 5x2, a sniper rifle or
   // LMG 6x2.
@@ -124,7 +142,7 @@ G.Gear = (() => {
       if (k === 'w') o.w = { id: v.def.id, build: Object.assign({}, v.def.build), mag: v.mag, ammo: v.ammo, tube: (v.tube || []).slice(), noMag: !!v.noMag, fm: v.fm, chamber: v.chamber || null, sk: v.stickers && v.stickers.length ? v.stickers.slice() : undefined }; // (sk: its stickers, js/stickers.js)
       else if (k === 'grids') o.grids = v.map(packGrid);
       else if (k === 'molle') o.molle = packGrid(v);
-      else if (k === 'plate' || k === 'face') o[k] = v ? pack(v) : null;
+      else if (MOUNTS[k]) o[k] = v ? pack(v) : null;
       else o[k] = v && typeof v === 'object' ? JSON.parse(JSON.stringify(v)) : v;
     }
     if (it.r) o.am0 = it.base; // what an empty magazine last held
@@ -145,13 +163,12 @@ G.Gear = (() => {
       return gunItem(w);
     }
     const rest = {};
-    for (const k of Object.keys(o)) if (!['grids', 'molle', 'plate', 'face', 'r', 'am0'].includes(k)) rest[k] = o[k] && typeof o[k] === 'object' ? JSON.parse(JSON.stringify(o[k])) : o[k];
+    for (const k of Object.keys(o)) if (!MOUNTS[k] && !['grids', 'molle', 'r', 'am0'].includes(k)) rest[k] = o[k] && typeof o[k] === 'object' ? JSON.parse(JSON.stringify(o[k])) : o[k];
     const it = o.r ? magItem(rest, o.r.slice()) : item(rest);
     if (o.r) it.base = o.am0 || o.r[o.r.length - 1];
     if (o.grids) it.grids = o.grids.map(unpackGrid);
     if (o.molle) it.molle = unpackGrid(o.molle);
-    if ('plate' in o) it.plate = o.plate ? unpack(o.plate) : null;
-    if ('face' in o) it.face = o.face ? unpack(o.face) : null;
+    for (const m of Object.keys(MOUNTS)) if (m in o) it[m] = o[m] ? unpack(o[m]) : null;
     return it;
   }
   function unpackGrid(o) {
@@ -220,7 +237,7 @@ G.Gear = (() => {
     if (d.grids) it.grids = d.grids.map(([w, h, acc]) => Object.assign(grid(w, h, acc), d.kind === 'pack' ? { pack: true } : {}));
     if (d.molle) { it.molle = Object.assign(grid(d.molle[0], d.molle[1], ['pouch'], 'MOLLE'), { molle: true }); for (const [pid, x, y] of d.pouches || []) put(it.molle, pouchItem(pid), x, y, 0); }
     if (d.kind === 'carrier') it.plate = null;
-    if (d.kind === 'helmet' && d.face) it.face = null; // the mount for a face shield or mandible
+    for (const m of Object.keys(MOUNTS)) if (MOUNTS[m] === d.kind && d[m]) it[m] = null; // the mounts it has
     return it;
   }
   // a weapon's item (made once and kept on it, so it's the same item wherever it goes)
@@ -551,6 +568,10 @@ G.Gear = (() => {
   // ---------------------------------------------------------------- protection
   const defOf = (it) => (it ? DEFS[it.gid] : null);
   const cond = (it) => { const d = defOf(it); return d && d.dur ? it.dur / d.dur : 0; };
+  // what you're wearing that takes something of that kind, if it has the mount for it
+  const mountOn = (me, m) => { const h = me.kit[MOUNTS[m]]; return h && defOf(h)[m] ? h : null; };
+  // is that mount there, with nothing on it?
+  const mountFree = (me, m) => { const h = mountOn(me, m); return !!h && !h[m]; };
   // what you've got on your head: the helmet and what's on its mount, how heavy (kg) and how far that hangs in front of your neck (kg m: fwd, m, each)
   const headLoad = (me) => { const h = me.kit.helmet, ds = h ? [defOf(h), h.face && defOf(h.face)].filter(Boolean) : []; return { kg: ds.reduce((s, d) => s + (d.kg || 0), 0), nose: ds.reduce((s, d) => s + (d.kg || 0) * (d.fwd || 0), 0) }; };
   // which piece of kit a round to that zone meets: the helmet for the head and face, the plate over the chest
@@ -566,7 +587,7 @@ G.Gear = (() => {
     return k.carrier;
   }
   function speed(me) {
-    const k = me.kit, ds = [k.helmet, k.helmet && k.helmet.face, k.carrier, k.carrier && k.carrier.plate, k.belt, k.pack, k.ifak].map(defOf).filter(Boolean);
+    const k = me.kit, ds = [k.helmet, k.helmet && k.helmet.face, k.carrier, k.carrier && k.carrier.plate, k.carrier && k.carrier.shoulder, k.carrier && k.carrier.groin, k.belt, k.belt && k.belt.legs, k.pack, k.ifak].map(defOf).filter(Boolean);
     return ds.reduce((a, d) => a * (d.speed || 1), 1);
   }
   // the starting kit: a worn bump helmet and concealable vest, two spare pistol magazines in your pockets (no
@@ -609,12 +630,12 @@ G.Gear = (() => {
     if (it.k === 'flash') return 150;
     if (it.k === 'gun') return Math.floor(G.WEAPONS[it.w.def.id].price * 0.5); // sold for half: what a trade-in gets
     if (it.k === 'pouch') return POUCHES[it.pid].price;
-    if (it.k === 'part') return (G.Gunsmith.PARTS[it.pid] || {}).price || 0;
+    if (it.k === 'part') { const p = G.Gunsmith.PARTS[it.pid]; return !p ? 0 : p.price || G.Gunsmith.sellPrice(p) * 2; } // (a gun's own part has no price: it's worth what it sells for)
     const d = defOf(it);
     return d ? d.price : 0;
   }
   return {
-    LIST, DEFS, POUCHES, headLoad, mixed, pack, unpack, mergeBox, mergeMed, medStack, medCount, absorb, combine, setLoad, loadIn, magShape, magName, magVid, BRANDS: B, ammoFor, ammoItem, gearItem, gunItem, pouchItem, mounted, molles, pickMag, dumpGrid, dumpMag, partItem, partSize, flashItem, stow, inField, roomFor, unloadMag, unloadGun, fillMag, fillFrom, fillGun, partCount, stashProxy, gunSize, guns, packGuns, medItem, fragItem, grid, size, isGear, fits, put, findSpot, place, removeFrom,
+    LIST, DEFS, POUCHES, MOUNTS, mountOn, mountFree, headLoad, mixed, pack, unpack, mergeBox, mergeMed, medStack, medCount, absorb, combine, setLoad, loadIn, magShape, magName, magVid, BRANDS: B, ammoFor, ammoItem, gearItem, gunItem, pouchItem, mounted, molles, pickMag, dumpGrid, dumpMag, partItem, partSize, flashItem, stow, inField, roomFor, unloadMag, unloadGun, fillMag, fillFrom, fillGun, partCount, stashProxy, gunSize, guns, packGuns, medItem, fragItem, grid, size, isGear, fits, put, findSpot, place, removeFrom,
     newKit, starter, body, all, each, feeds, rounds, count, take, swapMag, takeRounds, handOver, receive, refitMags, boxItem, loadMag, loadAll, roundPrice,
     defOf, cond, piece, speed, label, price,
   };

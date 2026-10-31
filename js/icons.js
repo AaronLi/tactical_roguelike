@@ -210,7 +210,7 @@ G.Icons = (() => {
   }
   const GEAR_COL = (d) => (d.brand && /Sable|Paragon/.test(d.brand) ? '#5a5240' : /Kestrel|Vantage/.test(d.brand || '') ? '#4d5639' : '#2e3236');
   function drawCarrier(g, W, H, d) {
-    const col = d.id === 'c.ghost' ? '#3a3d40' : GEAR_COL(d);
+    const col = d.id === 'c.lite' ? '#5c5a50' : d.id === 'c.ghost' ? '#3a3d40' : GEAR_COL(d);
     // vest silhouette: shoulders, neck cut-out, body
     g.beginPath();
     g.moveTo(W * 0.2, H * 0.12); g.lineTo(W * 0.38, H * 0.12); g.quadraticCurveTo(W * 0.5, H * 0.3, W * 0.62, H * 0.12); g.lineTo(W * 0.8, H * 0.12);
@@ -227,6 +227,20 @@ G.Icons = (() => {
     g.fillStyle = 'rgba(255,255,255,0.7)'; g.font = `bold ${Math.round(W * 0.13)}px Consolas, monospace`; g.textAlign = 'center';
     const lvl = d.name.match(/\(([^)]+)\)/) || d.name.match(/^(IIIA)/);
     g.fillText(lvl ? lvl[1] : '', W / 2, H * 0.6);
+  }
+  // what's mounted on a carrier or belt: a pair of shoulder caps, a pelvis panel, a pair of leg guards
+  function drawAddon(g, W, H, d) {
+    const col = d.id.startsWith('g.plate') ? '#6a6f74' : GEAR_COL(d) === '#2e3236' ? '#4a4f55' : GEAR_COL(d);
+    g.fillStyle = col;
+    if (d.kind === 'shoulder') {
+      for (const x of [0.28, 0.72]) { g.beginPath(); g.ellipse(W * x, H * 0.46, W * 0.17, H * 0.3, 0, Math.PI, 0); g.lineTo(W * (x + 0.13), H * 0.74); g.lineTo(W * (x - 0.13), H * 0.74); g.closePath(); g.fill(); }
+    } else if (d.kind === 'groin') {
+      g.beginPath(); g.moveTo(W * 0.14, H * 0.2); g.lineTo(W * 0.86, H * 0.2); g.lineTo(W * 0.74, H * 0.5); g.lineTo(W * 0.58, H * 0.88); g.lineTo(W * 0.42, H * 0.88); g.lineTo(W * 0.26, H * 0.5); g.closePath(); g.fill();
+    } else for (const x of [0.28, 0.72]) {
+      if (d.id !== 'l.shin') rr(g, W * (x - 0.17), H * 0.08, W * 0.34, H * 0.42, 5), g.fill();
+      if (d.id === 'l.shin' || d.id === 'l.full') rr(g, W * (x - 0.13), d.id === 'l.shin' ? H * 0.2 : H * 0.54, W * 0.26, d.id === 'l.shin' ? H * 0.7 : H * 0.38, 5), g.fill();
+    }
+    shade(g, W * 0.12, H * 0.08, W * 0.76, H * 0.84);
   }
   function drawHelmet(g, W, H, d) {
     g.fillStyle = d.id === 'h.bump' ? '#3a3d40' : d.id === 'h.fast' ? '#5a5240' : '#3d4232';
@@ -397,6 +411,7 @@ G.Icons = (() => {
     else if (it.k === 'plate') drawPlate(g, W, H, d);
     else if (it.k === 'helmet') { drawHelmet(g, W, H, d); if (it.face) drawFace(g, W, H, G.Gear.defOf(it.face), true); }
     else if (it.k === 'face') drawFace(g, W, H, d);
+    else if (it.k === 'shoulder' || it.k === 'groin' || it.k === 'legs') drawAddon(g, W, H, d);
     else if (it.k === 'belt') drawBelt(g, W, H, d);
     else if (it.k === 'pack') drawPack(g, W, H, d);
     else if (it.k === 'pouch') drawPouch(g, W, H, it);
