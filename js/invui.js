@@ -398,7 +398,7 @@ G.InvUI = (() => {
     let rows = slots.map((s) => {
       const pid = def.build[s.slot], it = pid ? fittedItem(w, s.slot, pid) : null, [iw, ih] = it ? Gr.partSize(pid) : [1, 1];
       const bad = it && !GS().fitsSlot(s, GS().PARTS[pid], w.def.id);
-      return `<div class="gun-slot${(!it || bad) && s.req ? ' missing' : ''}" data-wslot="${gunIt.uid}|${s.slot}"><small>${GS().slotLabel(s)}${s.req ? '' : ' <i>optional</i>'}${bad ? ' <i class="broken">doesn\'t fit: it won\'t fire</i>' : ''}</small>${it ? itemHTML(it, iw, ih, 'position:relative') : s.req ? '<em>missing: it won\'t fire</em>' : '<em>empty</em>'}</div>`;
+      return `<div class="gun-slot${(!it || bad) && s.req ? ' missing' : ''}" data-wslot="${gunIt.uid}|${s.slot}"><small>${GS().slotLabel(s)}${s.req ? '' : ' <i>optional</i>'}${bad ? ' <i class="broken">doesn\'t fit: it won\'t fire</i>' : ''}</small>${it ? itemHTML(it, iw, ih, 'position:relative') : s.req ? '<em>missing: it won\'t fire</em>' : s.slot === 'loader' ? '<em>by hand</em>' : '<em>empty</em>'}</div>`;
     }).join('');
     const mi = magItem(w), a = mi ? (([w0, h0]) => ({ w: w0, h: h0 }))(Gr.size(mi)) : null;
     rows += isMagGun(w)
@@ -590,7 +590,7 @@ G.InvUI = (() => {
     }
     root.innerHTML = `<div class="inv">
       <div class="inv-col eq"><h4>Equipment</h4>${SLOTS.map(([s, n]) => slotHTML(me, s, n)).join('')}${stats(me)}${quickHTML(me)}
-        <div class="inv-sell" data-sell>Drop here to sell for half</div></div>
+        <div class="inv-sell" data-sell>Drop here to sell</div></div>
       <div class="inv-col"><h4 class="hd">On you</h4>${body}<p class="inv-hint">Drag to move · R turns what you're holding · double-click opens a pouch, pack or rig (anything else goes to or from the locker) · right-click for more · drop a box of rounds on a magazine to load it · Edit pouches to move, add or take off MOLLE pouches · stow a gun in a big enough backpack and swap to it in the field with B</p></div>
       <div class="inv-col"><h4 class="hd">Locker <small>(stays here between levels)</small></h4>${gridHTML(me.locker)}
         <h4 class="hd">Team locker <small>(the whole squad shares it)</small></h4>${gridHTML(G.Game.teamGrid())}${openedHTML(me)}</div></div>`;
@@ -747,7 +747,7 @@ G.InvUI = (() => {
     if (hasContents(src.it)) return G.HUD.toast('', 'Empty it first (double-click to open it)', 1.5), G.Audio.deny();
     if (cantDetach(src)) return G.HUD.toast('', cantDetach(src), 2), G.Audio.deny();
     if (lastGun(me, src)) return G.HUD.toast('', 'Keep at least one weapon in hand', 1.5), G.Audio.deny();
-    detach(me, src); me.credits += Math.floor(GG().price(src.it) * 0.5); G.Audio.buy();
+    detach(me, src); me.credits += GG().sale(src.it); G.Audio.buy();
     if (src.it.k === 'gun') G.Gunsmith.strip(src.it.w.def, me.stash); // its aftermarket parts stay with you
   }
   function onMove(e) {
@@ -920,7 +920,7 @@ G.InvUI = (() => {
     const q = field ? null : quickLabel(me, src);
     if (q && !(src.gunPart && cantDetach(src))) acts.push(['move', src.gunPart ? 'Take off (to locker)' : src.gunMag ? 'Take out (to locker)' : q]);
     if (field && !src.gunPart) acts.push(['drop', 'Drop on the ground']);
-    const price = Math.floor(Gr.price(src.it) * 0.5);
+    const price = Gr.sale(src.it);
     if (!field && price > 0 && !hasContents(src.it) && !lastGun(me, src) && !cantDetach(src)) acts.push(['sell', `Sell for ¢${G.U.fmt(price)}`]);
     if (!acts.length) return;
     menu = document.createElement('div');

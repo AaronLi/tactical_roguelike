@@ -739,6 +739,7 @@ G.R = {
     sc.fov = THREE.MathUtils.radToDeg(2 * Math.atan(pip.r / d)) / pip.mag;
     sc.far = cam.far; // (as far as you can see without it)
     sc.updateProjectionMatrix();
+    pip.mat.uniforms.pmil.value = 0.001 / Math.tan(THREE.MathUtils.degToRad(sc.fov) / 2); // (a mil's share of the lens's radius, at this power)
     const eye = pip.disk.worldToLocal(cam.position.clone());
     pip.mat.uniforms.eye.value.set((eye.x / pip.r) * 0.8, (eye.y / pip.r) * 0.8);
     const r = this.renderer;

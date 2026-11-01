@@ -337,7 +337,7 @@ G.GunTraces = {
   // long thin barrel, a block where the magazine would be. From IMFDB ("EAA Thor", THOR_.45-70.jpg, 445 px) at 405 mm
   // (all4shooters, Tanfoglio Raptor). It breaks open on the pin in the block under the barrel: its muzzle drops.
   thor: {
-    ref: 'imfdb THOR_.45-70.jpg', url: 'https://www.imfdb.org/images/6/60/THOR_.45-70.jpg', mm: 0.976, x0: 400, y0: 33, by: 0, dir: -1, topY: 11, pin: [245, 48], chamber: 0.044, sightF: 0.06, sh: 0.0075, sw: 0.0085,
+    ref: 'imfdb THOR_.45-70.jpg', url: 'https://www.imfdb.org/images/6/60/THOR_.45-70.jpg', mm: 0.976, x0: 400, y0: 33, by: 0, dir: -1, topY: 11, pin: [245, 48], chamber: 0.044, sightF: 0.06, sh: 0.0075, sw: 0.0085, lug: { pts: [[392, 60], [436, 60], [436, 86], [408, 86]], at: [436, 72] }, sleeve: { top: [275, 13], under: [0, 47], rail: [0, 12], railBack: 353, w: 0.0225, pitch: 0.00937 },
     parts: [
       // the frame: the long front with the hinge block, the rear of the breech, the tang
       { pts: [[203, 66], [199, 50], [217, 46], [247, 47], [353, 45], [353, 11], [400, 11], [400, 40], [418, 52], [431, 56], [431, 60], [412, 60], [398, 70], [388, 90], [352, 90], [356, 68], [300, 67]], w: 0.0225, m: 'frame', b: 0.0014 },

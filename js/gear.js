@@ -552,9 +552,9 @@ G.Gear = (() => {
   }
   // the rounds that come with a found gun, as full magazines (or boxes) of one type
   function spares(def, nRounds, am) {
-    const a = ammoFor(def), cal = G.calOf(def), out = [];
-    for (let left = nRounds; left > 0 && out.length < 3; left -= a.cap) {
-      const n = Math.min(a.cap, left);
+    const a = ammoFor(def), cal = G.calOf(def), out = [], cap = a.kind === 'mag' ? a.cap : boxCap(cal); // (boxes as full as they go, not as they're sold)
+    for (let left = nRounds; left > 0 && out.length < 3; left -= cap) {
+      const n = Math.min(cap, left);
       out.push(a.kind === 'mag' ? ammoItem(def, n, am) : boxItem(cal, am || G.ballFor(cal), n));
     }
     return out;
@@ -631,9 +631,15 @@ G.Gear = (() => {
     const d = defOf(it);
     return d ? d.price : 0;
   }
+  // What the quartermaster gives for it: half its price, and worn gear far less, by the square of what's left of it (at 80%
+  // a third of new, at 50% an eighth; shot through, a credit for the scrap)
+  function sale(it) {
+    const d = defOf(it), base = price(it) * 0.5, c = d && d.dur ? Math.min(1, cond(it)) : 1;
+    return base > 0 ? Math.max(1, Math.floor(base * c * c)) : 0;
+  }
   return {
     LIST, DEFS, POUCHES, MOUNTS, mountOn, mountFree, headLoad, mixed, pack, unpack, mergeBox, mergeMed, medStack, medCount, absorb, combine, setLoad, loadIn, magShape, magName, magVid, BRANDS: B, ammoFor, ammoItem, gearItem, gunItem, pouchItem, mounted, molles, pickMag, dumpGrid, dumpMag, partItem, partSize, flashItem, stow, inField, roomFor, unloadMag, unloadGun, fillMag, fillFrom, fillGun, partCount, stashProxy, gunSize, guns, packGuns, medItem, fragItem, grid, size, isGear, fits, put, findSpot, place, removeFrom,
-    newKit, starter, body, all, each, feeds, rounds, count, take, swapMag, takeRounds, chamberIn, spares, refitMags, boxItem, loadMag, loadAll, roundPrice,
-    defOf, cond, piece, speed, label, price,
+    newKit, starter, body, all, each, feeds, rounds, count, take, swapMag, takeRounds, chamberIn, spares, refitMags, boxItem, boxCap, loadMag, loadAll, roundPrice,
+    defOf, cond, piece, speed, label, price, sale,
   };
 })();

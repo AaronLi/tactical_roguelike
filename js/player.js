@@ -726,8 +726,11 @@ G.Me = {
     this.revOpen = this.revHand(w.def); this.revClose = false; // (a revolver by hand: the cylinder comes out first)
     if (this.revOpen) { this.reloadTotal += G.REV.open; this.reloadT = this.reloadTotal; }
     this.reloadEv = 0;
-    G.Casings.emptied(w.def, mag - w.mag, w.spent); // a revolver or break-action: the empties fall out (each hull its load's colour)
-    this.ejected = w.spent; this.ejecting = (w.spent || []).length; this.ejectT = 0.25; w.spent = []; // (still in it till they do: js/vmanim.js)
+    // a breech with nothing to throw the empty out (a Thor's): it's pulled by hand (js/vmanim.js breakClip), and falls when it's let go
+    const info = G.R.vm && G.R.vm.userData.info;
+    this.handCase = info && info.breech && w.spent && w.spent.length ? w.spent[0] : null; this.handOut = false;
+    if (!this.handCase) G.Casings.emptied(w.def, mag - w.mag, w.spent); // a revolver or break-action: the empties fall out (each hull its load's colour)
+    this.ejected = w.spent; this.ejecting = (w.spent || []).length; this.ejectT = this.handCase ? this.reloadTotal * 0.3 : 0.25; w.spent = []; // (still in it till they do: js/vmanim.js)
     if (w.def.shell || !G.Audio.sample('pull_magazine')) G.Audio.reload();
   },
   reloadTime(def) { return def.reload; },

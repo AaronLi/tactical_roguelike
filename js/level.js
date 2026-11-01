@@ -562,7 +562,7 @@ G.Level = {
   placeWindows(map) {
     const { W, H, t, out, rooms } = map, TS = this.TS, K = this.K, U = G.U, rw = U.rng((map.seed ^ 0x51d0b0) >>> 0);
     map.windows = []; map.winAt = new Map();
-    if (map.theme.entry === 'vault' || map.theme.hub || map.underground) return; // a bunker has none, nor does the hangar, nor a basement
+    if (map.theme.entry === 'vault' || map.theme.hub || map.underground || rooms.some((q) => q.lid)) return; // a bunker has none, nor does the hangar, nor a basement, nor a roof's stair heads
     const used = new Set(), floor = (i) => t[i] === 0 || t[i] === 2 || t[i] === 4 || (t[i] === 5 && out[i]); // (upstairs, the open air outside a house counts)
     const nearDoor = (x, z) => { for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) if (t[(z + dz) * W + x + dx] === 3) return true; return false; };
     const tall = (i) => { const p = map.props && map.props.get(i); return !!(p && p.boxes[0] && p.boxes[0].h > 1.0); };
@@ -1043,7 +1043,7 @@ G.Level = {
         for (let z = hz - 2; z <= hz + 2; z++) for (let x = lx; x < lx + 3; x++) t[z * W + x] = 0;
         for (let z = hz - 1; z <= hz + 1; z++) t[z * W + xm] = 5;
         rooms.push(this._room(lx, hz - 2, 3, 5, { type: 'landing', stairs: true, lid: true }));
-        doors.push([dx, hd, 'x', false, false]); entries.push([xm, hd]);
+        doors.push([dx, hd, 'x', false, false, 'fire']); entries.push([xm, hd]); // (a steel door, as a way onto a roof is)
       }
       floors.push({ W, H, t, out, rooms, doors, fences: fences.filter(([x, z]) => t[z * W + x] === 4), spawn: roof, entries, units: 0 }); // (the stair heads stand where the parapet would)
     }
@@ -1107,6 +1107,9 @@ G.Level = {
   // everything that's counted across floors (doors, windows, rooms, spots) gathered from all of them (and ids
   // numbered through); map.floors holds each floor's own.
   // lay.base: which floor is at ground level (0 unless there's a basement under it: floors below it are below ground).
+  // the floor above has a hole over the top of this wall (the edge of a stairwell): the wall stops short of that floor by the
+  // thickness of the slab, and the slab's what fills it, or there's a ledge down there and the wall above's underside in the dark
+  _capped(m, up, i) { return m.t[i] === 1 && up.t[i] === 5 && !(up.out && up.out[i]); },
   stack(fms, lay) {
     const FH = this.FLOOR_H, TS = this.TS, CTS = this.CTS, base = lay.base || 0;
     fms.forEach((m, f) => { m.fl = f; m.fy = (f - base) * FH; m.skirt = f ? FH - this.WALL_H : 0; });
@@ -1169,6 +1172,7 @@ G.Level = {
     const w = G.World.create();
     fms.forEach((m, f) => G.World.fromTileMap(m, { world: w, y: m.fy, skirt: m.skirt, voidAbove: m.voidAbove, ground: f === 0 && base === 0 })); // (over a basement, the ground floor has its stair holes)
     for (const st of map.stairs) G.World.stairs(w, st);
+    fms.forEach((m, f) => { const up = fms[f + 1]; if (up) for (let i = 0; i < m.W * m.H; i++) if (this._capped(m, up, i)) { const x = (i % m.W) * TS, z = Math.floor(i / m.W) * TS; G.World.add(w, G.World.box(x, m.fy + this.WALL_H, z, x + TS, up.fy, z + TS, { kind: 'floor' })); } });
     // a railing stops you walking off the drop (glass or not); only its steel handrail stops a round: under it, the
     // glass is a pane (its solids: G.World.windowSolids), shot through and out
     for (const rl of map.rails) {
@@ -2179,6 +2183,14 @@ G.Level = {
         }
       }
     }
+    const capUp = map.above, caps = [];
+    if (capUp) for (let i = 0; i < W * H; i++) if (this._capped(map, capUp, i)) caps.push(i);
+    if (caps.length) {
+      const cap = new THREE.InstancedMesh(new THREE.BoxGeometry(TS, capUp.skirt, TS), new THREE.MeshStandardMaterial({ color: 0xbdb6aa, roughness: 0.9 }), caps.length), cm4 = new THREE.Matrix4();
+      caps.forEach((i, n) => { cm4.makeTranslation(((i % W) + 0.5) * TS, this.WALL_H + capUp.skirt / 2, (Math.floor(i / W) + 0.5) * TS); cap.setMatrixAt(n, cm4); });
+      cap.layers.enable(1);
+      root.add(cap);
+    }
     if (gr) this.buildGrate(map, root);
     // ceiling over everything indoors (gardens are open to the night sky; nor under a drop in the floor above)
     const ctex = this._tex('floor', th.ceil); ctex.repeat.set(0.5, 0.5);
@@ -2220,7 +2232,8 @@ G.Level = {
         if (vis) walls.push([x, z]);
       }
     }
-    const wtex = this._tex(th.home >= 1 ? 'plaster' : 'wall', th.wall); wtex.repeat.set(1, 2);
+    const heads = map.rooms.some((q) => q.lid); // (a roof's stair heads: bare grey render, a flat top, not the homes' paint and a pitched roof)
+    const wtex = this._tex(heads || th.home >= 1 ? 'plaster' : 'wall', heads ? '#7f807c' : th.wall); wtex.repeat.set(1, 2);
     const wm = new THREE.InstancedMesh(new THREE.BoxGeometry(TS, this.WALL_H + SK, TS), new THREE.MeshStandardMaterial({ map: wtex, roughness: 0.85 }), walls.length);
     const m4 = new THREE.Matrix4(), col = new THREE.Color();
     walls.forEach(([x, z], i) => {
@@ -2247,7 +2260,7 @@ G.Level = {
       // A home's roof: over each part of the house with the sky above it on this floor (the whole top storey, or
       // a lower part nothing's built on), a gable roof: its ridge along the long side, the two slopes down to
       // eaves past the walls, a gable at each end, fascia boards along the eaves.
-      if (th.home >= 1) {
+      if (th.home >= 1 && !heads) {
         const up = map.above, sky = new Uint8Array(W * H), seen = new Uint8Array(W * H);
         for (let i = 0; i < W * H; i++) sky[i] = !map.out[i] && t[i] !== 5 && (!up || up.out[i]) ? 1 : 0; // (a hole in the floor above is its stairwell, not sky)
         const gableMat = new THREE.MeshStandardMaterial({ color: 0xd8d2c4, roughness: 0.8 }), O = 0.35, PITCH = 0.55;
@@ -2332,6 +2345,7 @@ G.Level = {
     const leafMat = new THREE.MeshStandardMaterial({ color: metal ? 0x5d666e : 0x6e4a2c, roughness: metal ? 0.5 : 0.75, metalness: metal ? 0.5 : 0 });
     const lintelMat = new THREE.MeshStandardMaterial({ map: wtex, roughness: 0.85 });
     if (paintWalls) lintelMat.defines.LG_PAINT = 1;
+    const fireMat = new THREE.MeshStandardMaterial({ color: 0x5d666e, roughness: 0.5, metalness: 0.5 });
     const knobMat = new THREE.MeshStandardMaterial({ color: 0xb8a060, roughness: 0.3, metalness: 0.9 });
     const vaultMat = new THREE.MeshStandardMaterial({ color: 0x7a8288, roughness: 0.35, metalness: 0.85 });
     const steelMat = new THREE.MeshStandardMaterial({ color: 0x3a3f44, roughness: 0.45, metalness: 0.7 }), barMat = new THREE.MeshStandardMaterial({ color: 0xc4c8cc, roughness: 0.25, metalness: 0.9 });
@@ -2345,7 +2359,7 @@ G.Level = {
       const pivot = new THREE.Group();
       const vault = d.kind === 'vault';
       const glassDoor = d.kind === 'stair', LH = this.DOOR_H - 0.04;
-      const leaf = new THREE.Mesh(new THREE.BoxGeometry(leafL, LH, vault ? 0.2 : 0.05), vault ? vaultMat : glassDoor ? doorGlass : leafMat);
+      const leaf = new THREE.Mesh(new THREE.BoxGeometry(leafL, LH, vault ? 0.2 : 0.05), vault ? vaultMat : glassDoor ? doorGlass : d.kind === 'fire' ? fireMat : leafMat);
       if (glassDoor) {
         // a stairwell door: a glass leaf in a steel frame. It swings away from the side with the push bar (the bar
         // across the middle), toward the side with the pull handle (upright, by the latch edge).

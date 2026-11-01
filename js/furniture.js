@@ -1713,12 +1713,12 @@ G.Furniture = (() => {
     const layFloor = (rm, fm, y = 0.004) => {
       const x0 = rm.x * TS, z0 = rm.z * TS, w = rm.w * TS, d = rm.h * TS;
       let drop = false;
-      for (let z = rm.z; z < rm.z + rm.h && !drop; z++) for (let x = rm.x; x < rm.x + rm.w; x++) if (t[z * W + x] === 5) { drop = true; break; }
-      if (rm.out) place(new T.PlaneGeometry(w + 2 * TS, d + TS), fm, x0 + w / 2, y, z0 + d / 2, 0, -Math.PI / 2);
+      for (let z = rm.z; z < rm.z + rm.h && !drop; z++) for (let x = rm.x; x < rm.x + rm.w; x++) if (t[z * W + x] === 5 && !(rm.out && map.out[z * W + x])) { drop = true; break; } // (outdoors upstairs, open air's no hole in it)
+      if (rm.out && !drop) place(new T.PlaneGeometry(w + 2 * TS, d + TS), fm, x0 + w / 2, y, z0 + d / 2, 0, -Math.PI / 2);
       else if (!drop) place(new T.PlaneGeometry(w, d), fm, x0 + w / 2, y, z0 + d / 2, 0, -Math.PI / 2);
-      else for (let z = rm.z; z < rm.z + rm.h; z++) for (let x = rm.x; x < rm.x + rm.w;) { // (round a drop in the floor: a strip per run of floor)
-        if (t[z * W + x] === 5) { x++; continue; }
-        let x1 = x; while (x1 + 1 < rm.x + rm.w && t[z * W + x1 + 1] !== 5) x1++;
+      else for (let z = Math.max(0, rm.z - (rm.out ? 1 : 0)), x0 = Math.max(0, rm.x - (rm.out ? 1 : 0)), ze = Math.min(map.H, rm.z + rm.h + (rm.out ? 1 : 0)), xe = Math.min(W, rm.x + rm.w + (rm.out ? 1 : 0)), gap = (i) => (rm.out ? !map.out[i] : t[i] === 5); z < ze; z++) for (let x = x0; x < xe;) { // (round a drop in the floor: a strip per run of floor. A roof: round what's built on it too, out to its edge)
+        if (gap(z * W + x)) { x++; continue; }
+        let x1 = x; while (x1 + 1 < xe && !gap(z * W + x1 + 1)) x1++;
         const g = new T.PlaneGeometry((x1 - x + 1) * TS, TS), uv = g.attributes.uv;
         for (let k = 0; k < uv.count; k++) uv.setXY(k, (x - rm.x + uv.getX(k) * (x1 - x + 1)) / rm.w, (rm.z + rm.h - 1 - z + uv.getY(k)) / rm.h); // (the room's texture, continuous across strips)
         place(g, fm, (x + x1 + 1) / 2 * TS, y, (z + 0.5) * TS, 0, -Math.PI / 2);
@@ -1764,13 +1764,14 @@ G.Furniture = (() => {
         if (spec.floor === 'wood') tex = tx.wood(pick(['#7a5232', '#9a6e44', '#5e4028', '#a88458']));
         else if (spec.floor === 'grass') tex = tx.grass();
         else if (spec.floor === 'pave') tex = tx.tile(pick(['#55524c', '#4a4844', '#5e5a52']), '#34322e');
+        else if (rm.lid) tex = tx.concrete('#6e6d69');
         else if (spec.floor === 'tile') tex = tx.tile(pick(['#d8d4cc', '#b8c0c4', '#e4dccc', '#3a3d40']), '#7a7670');
         else tex = tx.carpet(pick(['#5a5f6a', '#6a5a4a', '#4a5a52', '#7a6e62', '#3d4452']));
         tex.repeat.set(rm.w, rm.h);
         if (spec.floor === 'wood' && rnd() < 0.5) { tex.rotation = Math.PI / 2; }
         layFloor(rm, mat(0xffffff, spec.floor === 'tile' ? 0.45 : spec.floor === 'grass' ? 1 : 0.85, 0, { map: tex }));
       }
-      if (rm.out) continue; // no rugs, skirting, pictures or windows out in the garden
+      if (rm.out || rm.lid) continue; // no rugs, skirting, pictures or windows out in the garden, nor in a roof's stair head
       if (spec.rug && rnd() < spec.rug && rm.w >= 3 && rm.h >= 3) {
         const rw = Math.min(3.6, w - 2.4), rd = Math.min(2.6, d - 2.4);
         const rt = tx.rug(pick(['#7a2e2e', '#2e4a6a', '#5a4a3a', '#3a5a4a', '#6a5a7a']), pick(['#d8c8a0', '#c0a060', '#e8e0d0']), pick(['#2a2a2a', '#5a2a1a', '#1a2a3a']));

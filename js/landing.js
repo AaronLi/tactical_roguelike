@@ -117,9 +117,14 @@ G.Landing = (() => {
       g.fillStyle = '#0d0f11'; g.fillRect(0, 0, w, w); g.fillStyle = '#17191c'; g.fillRect(0, 0, w, 44); g.fillRect(0, 0, 44, w);
       g.fillStyle = '#b89a5a'; for (let i = 60; i < w; i += 64) { g.fillRect(i, 40, 4, 4); g.fillRect(40, i, 4, 4); } // (street lamps)
     });
-    ground.repeat.set((2 * R + Wm) / CELL, (2 * R + Hm) / CELL);
-    const gm = new T.Mesh(new T.PlaneGeometry(2 * R + Wm, 2 * R + Hm), new T.MeshBasicMaterial({ map: ground }));
-    gm.rotation.x = -Math.PI / 2; gm.position.set(Wm / 2, -0.4, Hm / 2); root.add(gm);
+    // (a frame round the level, a little way in under its edges: never under it, where a basement's stairs go down through it)
+    const gm = new T.MeshBasicMaterial({ map: ground }), RIM = 1;
+    for (const [x0, z0, x1, z1] of [[-R, -R, Wm + R, RIM], [-R, Hm - RIM, Wm + R, Hm + R], [-R, RIM, RIM, Hm - RIM], [Wm - RIM, RIM, Wm + R, Hm - RIM]]) {
+      const g = new T.PlaneGeometry(x1 - x0, z1 - z0), p = g.attributes.position, uv = g.attributes.uv;
+      g.rotateX(-Math.PI / 2); g.translate((x0 + x1) / 2, -0.4, (z0 + z1) / 2);
+      for (let i = 0; i < p.count; i++) uv.setXY(i, p.getX(i) / CELL, p.getZ(i) / CELL); // (the streets run on from one side to the next)
+      root.add(new T.Mesh(g, gm));
+    }
     const face = tex(128, 128, (g, w) => {
       g.fillStyle = '#16181b'; g.fillRect(0, 0, w, w);
       for (let y = 6; y < w; y += 16) for (let x = 6; x < w; x += 14) { const u = r(); g.fillStyle = u < 0.14 ? '#d8b070' : u < 0.2 ? '#8aa0b8' : '#0c0d0f'; g.fillRect(x, y, 8, 9); }

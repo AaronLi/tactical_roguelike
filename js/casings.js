@@ -101,6 +101,13 @@ G.Casings = (() => {
     if (mode(def) === 'reload' && n > 0) queue.push({ t: 0.25, def, local: true, drop: true, n: Math.min(n, 8), am });
   }
 
+  // one let go of by hand, at pos (holder: the gun in the hand, for which way's which)
+  function loose(def, pos, holder, am) {
+    holder.updateMatrixWorld(true);
+    const m = holder.matrixWorld, right = V().setFromMatrixColumn(m, 0).normalize(), up = V().setFromMatrixColumn(m, 1).normalize(), fwd = V().setFromMatrixColumn(m, 2).normalize().negate();
+    spawn(def, pos, right, up, fwd, G.Me.vel ? V().set(G.Me.vel.x, 0, G.Me.vel.z) : null, true, am);
+  }
+
   // ---------------------------------------------------------------- dropped magazines
   const MAX_MAGS = 40;
   let mags = [], magMat = null;
@@ -252,7 +259,7 @@ G.Casings = (() => {
   }
 
   return {
-    mode, fired, emptied, dropMag, magMesh, takeMag, aimedMag, surface,
+    mode, fired, emptied, loose, dropMag, magMesh, takeMag, aimedMag, surface,
     // for G.R.warmup: the cases' meshes in the scene now, and a sample magazine and box (not kept)
     warm() { attach(); const def = G.WEAPONS.m4; return [magMesh(def, null).mesh, magMesh(def, { k: 'ammo' }).mesh]; },
     get mags() { return mags; }, // for debugging

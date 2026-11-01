@@ -523,7 +523,8 @@ G.Ballistics = (() => {
       return true;
     };
     // how it presents now: frontal area and drag (nose-first, tumbling, opened)
-    const shape = () => [p.nose === 'broad' ? area(p.blade) : yawed ? p.d * p.len * 0.85 : area(p.d) * (p.nose === 'dart' ? 0.6 : 1),
+    // (a bolt's head: its blades shove flesh aside, but into bone it's the pointed ferrule between them that bears, and skin they slice, not punch: inBone)
+    const shape = (inBone) => [p.nose === 'broad' ? (inBone ? area(p.d) * 0.7 : area(p.blade)) : yawed ? p.d * p.len * 0.85 : area(p.d) * (p.nose === 'dart' ? 0.6 : 1),
       yawed ? CD.yaw : expanded || p.flat ? CD.open : p.nose === 'ball' ? CD.ball : CD.fmj];
     const log = res.log = [], note = (name) => { if (!log.length || log[log.length - 1].m !== name) log.push({ m: name, v: Math.round(v), t }); }; // (what it went through, and how fast it was going into each: the F9 readout)
     // which segment is this point in (the deepest, where two meet)?
@@ -587,20 +588,21 @@ G.Ballistics = (() => {
           if ((p.shed || 0) - off0 > 2e-5) for (const c of chips(p.shed - off0, v * 0.7, 4)) frags.push({ t, v: c.v, m: c.m, d: c.d, dir: jitter(u, 0.3) });
           if (v > 250) for (let i = 0; i < 3; i++) frags.push({ t, v: v * 0.45, m: Math.min(0.0003, p.m * 0.1), dir: jitter(u, 0.5), sp: 1 });
         }
+        if (inBone && !bone && s.shell) h.inside = true; // (through the skull's wall)
         inBone = bone;
         // fragmenting: tumbling above its threshold, the core sheds 40% of itself as six fragments
         if (yawed && p.frag && v >= p.frag && !p.split) {
           p.split = true; const mf = p.m * 0.4 / 6; p.m *= 0.6;
           for (let i = 0; i < 6; i++) frags.push({ t, v, m: mf, dir: jitter(u, 0.18) });
         }
-        const [A, Cd] = shape(), v1 = slow(v, p.m, A, Cd, M, ds), dE = 0.5 * p.m * (v * v - v1 * v1);
+        const [A, Cd] = shape(bone || wl === 'skin'), v1 = slow(v, p.m, A, Cd, M, ds), dE = 0.5 * p.m * (v * v - v1 * v1);
         const crush = A * ds * 1e6 * (p.nose === 'broad' ? 1.5 : 1); // cm³
         h.E += dE; h.crush += crush;
         if (bone && v1 > 0) res.dev = Math.hypot(res.dev, (1 - v1 / v) * 0.7); // (a bone throws it off line by what it took)
         // the temporary cavity: its reach, and the organs it stretches (and those the track crushes). Skin and bone give up their
         // energy tearing and breaking, not throwing tissue outward: it's the flesh it's moving through that makes the cavity
         const dC = hard ? 0.5 * p.m * (v * v - slow(v, p.m, A, Cd, G.Materials.TISSUE.muscle, ds) ** 2) : dE, rT = Math.sqrt(dC / ds / (Math.PI * CAV_C));
-        const cut = p.cut || 0, rR = Math.max(rT, cut); // (a blade opens what it passes beside, not just what it goes through)
+        const cut = s.shell && !h.inside ? 0 : p.cut || 0, rR = Math.max(rT, cut); // (a blade opens what it passes beside, not just what it goes through; not through a skull it's not yet inside)
         for (const [oid, sh, bb] of s.organs || []) {
           if (cq.x < bb[0] - rR || cq.x > bb[3] + rR || cq.y < bb[1] - rR || cq.y > bb[4] + rR || cq.z < bb[2] - rR || cq.z > bb[5] + rR) continue;
           const dist = orgDist(sh, cq), O = ORG[oid];

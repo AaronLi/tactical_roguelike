@@ -506,7 +506,11 @@ G.Gunsmith = (() => {
       own({ id: `${id}.tube.short`, slot: 'tube', mount, brand: brandB, name: `${brandB.split(' ')[0]} short tube`, price: 80, model: { tube: Math.max(0.12, s.tube - 0.12) }, st: { ergo: 4, weight: -0.15 }, set: { cap: Math.max(2, cap - 2) }, desc: 'Lighter, two fewer shells.' });
     }
     if (s.pump) { slot('pump', 'pump'); factory('pump', 'pump', { model: { pumpPatch: {} } }); }
-    if (s.loader) { slot('loader', 'loader'); factory('loader', 'loader', { name: `${def.name} loose rounds`, desc: 'Load the cylinder by hand.' }); }
+    if (s.loader) { // nothing comes fitted: with no loader on it, it's loaded by hand. (The part it once came with stays in the list, so the weapon codes don't shift)
+      slot('loader', 'loader', false, true);
+      add({ id: `${id}.loader`, slot: 'loader', mount: 'loader', brand: 'Factory', name: `${def.name} loose rounds`, desc: 'Load the cylinder by hand.', price: 0, factory: true, plat: id, retired: true });
+      BY_MOUNT.set('loader', BY_MOUNT.get('loader').filter((p) => !p.retired));
+    }
     if (s.slide) {
       const mount = 'sl:' + id, S0 = s.slide;
       slot('slide', mount, true);
@@ -789,6 +793,7 @@ G.Gunsmith = (() => {
   const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
   function compile(id, build) {
     build = build || defaultBuild(id);
+    if (Object.values(build).some((pid) => PARTS[pid] && PARTS[pid].retired)) build = Object.fromEntries(Object.entries(build).filter(([, pid]) => !(PARTS[pid] && PARTS[pid].retired))); // (a saved gun with a part that's gone)
     const code = encode(id, build);
     if (cache.has(code)) return cache.get(code);
     const base = G.WEAPONS[id], plat = PLATFORMS[id], gs = G.GUN_SPECS[id] || {};
@@ -1048,6 +1053,26 @@ G.Gunsmith = (() => {
     const plat = PLATFORMS[id], sl = plat.slots.find((x) => x.slot === 'mag');
     for (const p of BY_MOUNT.get(sl.mount) || []) p.retired = true;
     sl.mount = 'mag:stanag'; plat.defaults.mag = 'stanag.mag.30'; plat.magVariants = true; LATE.add(id);
+  }
+  // The Thor with 30 inches of barrel, an AR barrel nut on it: it takes an M4's handguard, and whatever goes on that. (Measured from
+  // the chamber, 44 mm behind the pin the model's barrel starts from; hgGap: the sleeve's carried on past the frame's nose, or the
+  // handguard would swing down through it as the barrel tips open, and the handguard starts there; sightRise: its irons on a riser and a tall front base, 15 mm clear of the tallest rail: js/gunmodels.js.)
+  add({ id: 'thor.br.30', slot: 'barrel', mount: 'br:thor', plat: 'thor', brand: BR.kodiak, name: 'Kodiak Longshot 30" barrel', price: 2400, tier: 3,
+    model: { barrel: { len: 0.718, r: 0.0118, taper: 0.72 }, hgGap: 0.066, sightRise: 0.019 }, provides: { handguard: 'hg:ar' }, st: { acc: -25, ergo: -32, weight: 3.2, recoil: -10 }, set: { barrelIn: 30 },
+    desc: 'Thirty inches on a break-action pistol. Far more velocity, and an AR barrel nut: it takes an M4 handguard, and the grips, lights and lasers that go on one.' });
+  // Its grip with a stock lug on the back of it, as the derringer's: any SMG stock, braced as a handgun's is. (On the AK grip mount, which it
+  // shares with every AK: not.)
+  add({ id: 'thor.gr.lug', slot: 'grip', mount: 'gr:ak', plat: 'thor', brand: BR.bastion, name: 'Bastion stock-lug grip', price: 340, tier: 2, st: { weight: 0.12, ergo: -1 },
+    not: Object.keys(PLATFORMS).filter((id) => id !== 'thor' && PLATFORMS[id].slots.some((sl) => sl.mount === 'gr:ak')),
+    model: Object.assign({}, PARTS[PLATFORMS.thor.defaults.grip].model, { gripT: 'lug' }), provides: { stock: { mount: 'stk:smg', bare: true, brace: BRACE } },
+    desc: 'The Thor\'s grip with a steel lug on its back: takes any SMG stock. On its own it does nothing.' });
+  // The crossbow's own sight, its marks worked out for its bolts (js/gunmodels.js bdcTex). (Added late: a part's place in the list is its id in a code.)
+  {
+    const plat = PLATFORMS.crossbow, p = add({ id: 'crossbow.optic', slot: 'optic', mount: 'op:pic', plat: 'crossbow', factory: true, brand: BR.meridian, name: 'Meridian LV-12 1-12× FFP', price: 0,
+      model: { optic: 'scope', scopeLen: 0.27, scopeObj: 0.028, px: 4, levels: [1, 2, 3, 4, 6, 8, 10, 12] }, st: { ergo: -7, acc: -9 },
+      set: { zoom: 0.45, scoped: true, reticle: 'bdc', magnif: 4, levels: [1, 2, 3, 4, 6, 8, 10, 12] },
+      desc: '1-12× variable: scroll while aiming to change power. First focal plane: the marks grow with the picture, so they\'re true at any power. Bolt-drop rungs out to 150 m, each as wide as a man\'s shoulders at that range; figures on the left arm to range him by.' });
+    plat.defaults.optic = p.id; LATE.add('crossbow');
   }
   // the belt boxes of G.BELT_FAMILY go in each other's guns
   { const fam = Object.keys(G.BELT_FAMILY); for (const id of fam) for (const p of BY_MOUNT.get('mag:' + id)) p.alsoMounts = fam.filter((o) => o !== id).map((o) => 'mag:' + o); }

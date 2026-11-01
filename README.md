@@ -131,6 +131,13 @@ says the same), but not whose: the shooter's name isn't shown.
   and rushers don't flinch. Blood loss wears their aim down too, to 60% near the end.
   Coming out of cover to shoot takes them 0.7 s before they can fire, and they stay out at least 1.5 s from when they
   start, shot done or not (`G.Server.PEEK`): only a flinch sends them back sooner. They duck back twice as fast.
+- **Bold suspects check doors** (`G.Server.doorPeek`). Something like half of them (the steadier, the likelier; not
+  rushers, lookouts or bosses) act on what they hear, and catch footsteps 2.4 times as far off as anyone else, far enough to
+  hear a walk through a shut door, not a crouched step. If a sound comes through a door within 9 m of them, and from no more than
+  12 m behind it, they think you're there: they come up beside it, the far side of the frame from the sound and out of the door's line, gun drawn, wait a moment,
+  ease a shut door open (you hear it), then lean out across the frame for a look, up to three times. See you, and it's the
+  same lean-and-shoot as a corner, with little delay, since they're already out. They're going by ear, to within a
+  metre or so. Shot near, flashed, hurt or losing their nerve, they leave it, and don't try again for 10 to 18 s.
 - **Suspects reload.** Each carries their gun's real magazine, sometimes part-used. When it runs dry they
   reload, taking the gun's reload time; pump and lever guns load shell by shell and fire again from a
   part-loaded tube if you're in sight. With nobody in sight and the magazine half spent, they top up. They
@@ -746,9 +753,15 @@ says the same), but not whose: the shooter's name isn't shown.
   The converted guns are guns in their own right: they're sold, carried by suspects, and found in weapon
   cases. A convertible gun rolled for a weapon case comes built on one of its alternate receiver
   groups 35% of the time (an M4 as an AR-9, an AK as an RPK), fitted and working. The gunsmith stocks receiver groups now and then.
-- **Revolver loaders.** A revolver loads loose rounds by hand, one at a time, so a top-up is quick and a full cylinder
+- **The crossbow's scope.** It comes with a Meridian LV-12 1-12× (scroll while aiming), its marks in the first focal plane:
+  they're fixed in angle and grow with the picture, so they're true at any power (`js/gunmodels.js` `bdcTex`, in mils, drawn
+  from the same sums that fly the bolts, as the gun comes from the factory: clicks at the zeroing table move the shots, not the marks). Down the post, a rung for each range to
+  150 m for a broadhead or mechanical (hold it on the target), each as wide as a man's shoulders (0.5 m) at that range;
+  ticks on the left of the post for a bodkin, which drops much further. On the left wire stand men 1.75 m tall at
+  20 to 150 m: put his feet on the wire, find the one his size, and that's his range. A lit dot and horseshoe to pick up at low power.
+- **Revolver loaders.** With nothing in its Loading slot, a revolver loads loose rounds by hand, one at a time, so a top-up is quick and a full cylinder
   is slow (the .357 takes 4.5 s from empty: 0.55 s to open, 0.6 s a round, 0.35 s to shut). A speed loader or moon
-  clips (the Loading slot) fill it all at once, however many are left in it: 2.0 s or 1.6 s on the .357. Either way
+  clips fill it all at once, however many are left in it: 2.0 s or 1.6 s on the .357. Either way
   it's fed from boxes of its caliber: revolvers have no magazines of their own.
 - **Shotgun loaders.** The tube shotguns (870, KSG, Slug Gun, Benelli M4) take a side saddle (each shell a
   little faster), a twin-shell carrier, or a quad speed loader (four shells a push). A full tube on the Benelli
@@ -1206,7 +1219,7 @@ says the same), but not whose: the shooter's name isn't shown.
     you and the locker. Drop anything on the sell box for half its price.
   - **Carriers keep their contents:** swapping carriers moves the old one, pouches and plate included, into
     your locker.
-  - **Weapon case:** a found gun comes loaded with two full spare magazines (or two loads of rounds in
+  - **Weapon case:** a found gun comes loaded with two full spare magazines (one full box, for a gun that only holds one or two rounds; or two loads of rounds in
     boxes for a loose-fed gun), all of one ammo type, lying beside it. The type is rolled by rarity: in a rifle or pistol
     caliber, about 53% ball, 15% hollow point, 15% tracer, 10% subsonic and 5% AP; in a shotgun, about
     55% buckshot, 22% slug, 17% birdshot and 6% flechette. You pick each spare up yourself; one you've no
@@ -1660,10 +1673,13 @@ says the same), but not whose: the shooter's name isn't shown.
   magazine's rake, the hands, the stock lug and the rail all come from the trace, so attachments follow each gun. **The
   Thor** is the EAA/Tanfoglio Thor (Raptor): a 1911 frame, a hinged breech sleeve with a full-length Weaver rail, a long
   thin barrel, a filler block where the magazine would be. It breaks open on the pin under the barrel, and its sights and
-  rail mount tip with it. Its listed chamberings stop well short of .50 BMG; the game's doesn't.
+  rail mount tip with it. Nothing throws the empty out: the left hand takes it by the rim, draws it back up the barrel's line and
+  lets it fall, then fetches the next round (`js/vmanim.js` breakClip). The Kodiak Longshot 30" barrel (`thor.br.30`) brings an AR barrel
+  nut: it takes an M4 handguard, which tips open with it, and the grips, lights and lasers on that. Its irons sit on a riser and a tall front base, to see over the rail. The Bastion stock-lug grip (`thor.gr.lug`) has a steel lug on its back for any SMG stock. Its listed chamberings stop well short of .50 BMG; the game's doesn't.
 - **Crossbow bolts** kill by cutting, not by energy: about 170 J, a .22's, on a head that opens a wound. In `js/ballistics.js` a
   broadhead's blades are thin (`blade`, what they shove through tissue with) and open what they pass beside (`cut`, either side of
-  the track). Three loads: the **broadhead** (deep, bleeds them, often right through), the **mechanical** (blades that swing open:
+  the track). Into bone it's the pointed ferrule between them that bears, so a skull's no bar to one at the range you'd shoot, and
+  the blades cut nothing behind a skull until the head's through it. Three loads: the **broadhead** (deep, bleeds them, often right through), the **mechanical** (blades that swing open:
   the worst wound, but it stays in them) and the **bodkin** (a heavy needle: `spike` parts a soft vest's weave, a material's `weave`,
   where a bullet is caught; a hard plate still stops it). A bolt that doesn't come out stays where it stopped (`js/bolts.js`):
   following the bone it's in, or in timber and plasterboard, not in metal, stone or a hard plate, which it breaks on. Its lit nock

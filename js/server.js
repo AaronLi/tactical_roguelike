@@ -170,7 +170,7 @@ G.Server = {
             if (partner) this.setDoor(partner.id, d.open);
           }
           const field = this.soundField(d.x, d.z, d.fy || 0);
-          for (const e of this.enemies.values()) if (this.heardAt(field, e.x, e.z, e.y) < 7) this.suspect(e, d.x, d.z); // a door is heard
+          for (const e of this.enemies.values()) if (this.heardAt(field, e.x, e.z, e.y) < 7) { this.suspect(e, d.x, d.z); if (!e.def.civ && e.state === 'normal') this.noted(e, d.x, d.fy || 0, d.z); } // a door is heard
         }
         break;
       }
@@ -362,14 +362,14 @@ G.Server = {
     const odds = this.caseOdds(this.level, Math.random() < 0.75 ? 'p' : 's');
     let x = Math.random() * odds.reduce((a, [, wt]) => a + wt, 0), w = odds[0][0];
     for (const [cand, wt] of odds) { x -= wt; if (x <= 0) { w = cand; break; } }
-    // loaded, with two full spare magazines (or that many rounds), all of one type: mostly ball, now and then
+    // loaded, with two full spare magazines (or that many rounds; a full box, for a gun that only holds a round or two), all of one type: mostly ball, now and then
     // something better
     // A gun that takes other receiver groups (js/parts.js RCV) now and then turns up built on one of them: an M4
     // lower with the AR-9 kit in it, an AK with the RPK's, fitted and working (its barrel and all), magazines and
     // rounds to match.
     const kits = G.Gunsmith.kitsFor(w.id).filter((k) => G.obtainable(G.WEAPONS[G.Gunsmith.PARTS[k].becomes]));
     if (kits.length && Math.random() < 0.35) w = G.WEAPONS[G.Gunsmith.PARTS[kits[Math.floor(Math.random() * kits.length)]].becomes] || w;
-    return { code: G.Gunsmith.defaultCode(w.id), mag: w.mag, reserve: w.mag * 2, am: G.rollAmmo(G.calOf(w)) };
+    return { code: G.Gunsmith.defaultCode(w.id), mag: w.mag, reserve: w.mag > 2 ? w.mag * 2 : G.Gear.boxCap(G.calOf(w)), am: G.rollAmmo(G.calOf(w)) };
   },
   // Something lying in the world (G.Loot), and how it's sent
   lootAdd(x, y, z, item, yaw, fit) {
@@ -661,6 +661,7 @@ G.Server = {
       cover: null, inCover: false, peek: false, peekT: 0, coverT: Math.random(), coverStuck: 0, crouch: false,
       nadeT: 4 + Math.random() * 6, lastSeen: null,
       morale: def.morale != null ? def.morale : 0.5, broken: false, noise: null, holding: false,
+      bold: !def.civ && !def.boss && !def.aimTime && type !== 'rusher' && Math.random() < 0.2 + (def.morale || 0) * 0.5, // (goes and looks: doorPeek)
       // the magazine in their gun (a part-used one, sometimes), and injuries (see injure)
       mag: 0, magMax: 0, reloadT: 0, bleedH: 0, bleedL: 0, clotT: 0, legs: 0, arms: 0, lung: false,
       // unaware suspects carry their weapon holstered/slung; drawing it takes def.draw seconds
@@ -779,7 +780,7 @@ G.Server = {
     for (const e of this.enemies.values()) {
       if (this.heardAt(field, e.x, e.z, e.y) > radius) continue;
       if (e.def.civ) { this.panic(e, { x, z }); continue; }
-      if (e.state === 'normal') e.noise = { x, z };
+      if (e.state === 'normal') { e.noise = { x, z }; this.noted(e, x, y, z); }
       if (!e.alert && e.state === 'normal') e.pendingAlert = e.pendingAlert >= 0 ? e.pendingAlert : 0.2 + Math.random() * 0.5;
     }
   },
@@ -844,9 +845,10 @@ G.Server = {
       const [px, py, pz] = p.st.p;
       const field = this.soundField(px, pz, py);
       for (const e of this.enemies.values()) {
-        if (e.def.civ || e.alert || e.state !== 'normal') continue;
-        if (this.heardAt(field, e.x, e.z, e.y) > r) continue;
-        this.suspect(e, px, pz);
+        if (e.def.civ || e.state !== 'normal') continue;
+        const hd = this.heardAt(field, e.x, e.z, e.y);
+        if (hd <= r * (e.bold ? this.DOORPEEK.LISTEN : 1) && !p.st.sd) this.noted(e, px, py, pz); // (a bold one's listening: a shut door doesn't hide a walk, a crouched step still gets past)
+        if (hd <= r) this.suspect(e, px, pz);
       }
     }
   },
@@ -1074,7 +1076,7 @@ G.Server = {
   },
   surrender(e) {
     e.state = 'surrender';
-    e.aiming = false; e.cover = null; e.inCover = false; e.peek = false; e.leanOut = 0; e.crouch = false; e.hide = null; e.lurk = false;
+    e.aiming = false; e.cover = null; e.inCover = false; e.peek = false; e.leanOut = 0; e.crouch = false; e.hide = null; e.lurk = false; e.dp = null;
     if (!e.def.civ) {
       this.dropEvidence(e);
       e.armed = false; e.drawn = false;
@@ -1431,7 +1433,7 @@ G.Server = {
     // being cuffed: it stops it): no more aiming, shooting, turning, moving or giving up.
     if ((e.str < this.COLLAPSE || e.spine || e.out) && e.state !== 'cuffed' && !e.down) { e.down = true; this.dropEvidence(e); e.armed = false; e.drawn = false; this.downMsg(e); this.incapMsg(e); this.checkClear(); } // (the gun falls from their hand)
     e.collapsed = !!e.down && e.state !== 'cuffed';
-    if (e.collapsed) { e.aiming = false; e.leanOut = 0; e.cover = null; e.crouch = false; return; }
+    if (e.collapsed) { e.aiming = false; e.leanOut = 0; e.cover = null; e.crouch = false; e.dp = null; return; }
     if (this.obedient(e) && this.obey(e, dt)) return;
     if (def.civ) return this.thinkCiv(e, dt);
     if (e.state === 'cuffed') return;
@@ -1470,7 +1472,7 @@ G.Server = {
         const d = Math.hypot(px - e.x, pz - e.z);
         // (outdoors at night they can't pick you out past `night` metres, unless your light or laser gives you away)
         if (d > (map.theme.night && !(p.st.tl & 3) ? map.theme.night : 75)) continue;
-        const lx = e.cover && e.cover.lean ? e.cover.px : e.x, lz = e.cover && e.cover.lean ? e.cover.pz : e.z;
+        const lp = e.dp ? (e.leanOut ? e.dp : null) : e.cover && e.cover.lean ? e.cover : null, lx = lp ? lp.px : e.x, lz = lp ? lp.pz : e.z;
         const [hx, hz] = this.headXZ(p.st);
         const hy = py + (p.st.pr ? 0.35 : p.st.cr ? 0.95 : 1.5), k = L.see(map, lx, ey, lz, hx, hy, hz);
         // (through a window: k < 1; through bulletproof glass, seen but not to be shot: no round gets through it)
@@ -1495,7 +1497,7 @@ G.Server = {
         const toYaw = Math.atan2(-(st.p[0] - e.x), -(st.p[2] - e.z));
         const inFov = Math.abs(U.angDiff(e.yaw, toYaw)) < 1.2 || e.tgtD < 5;
         if (inFov && e.tgtD < def.range * 1.4) {
-          const rate = (1.7 - e.tgtD / (def.range * 1.4)) * (st.pr ? 0.5 : st.cr ? 0.7 : 1) * 1.3 * (e.suspicious ? 1.8 : 1) * (e.seeK == null ? 1 : e.seeK); // slower through glass
+          const rate = (1.7 - e.tgtD / (def.range * 1.4)) * (st.pr ? 0.5 : st.cr ? 0.7 : 1) * 1.3 * (e.suspicious ? 1.8 : 1) * (e.dp ? 2.5 : 1) * (e.seeK == null ? 1 : e.seeK); // slower through glass (and looking for you, quicker)
           e.spot += dt * rate;
           if (e.spot >= 1) {
             // caught off guard: police appear close by while they weren't expecting anyone
@@ -1505,6 +1507,7 @@ G.Server = {
           }
         }
       } else e.spot = Math.max(0, e.spot - dt * 0.3);
+      if ((e.dp || e.suspicious || e.heard) && this.doorPeek(e, dt)) return;
       if (e.suspicious) {
         // weapon out, watching where the noise came from; settles back down if nothing else happens
         if (e.noise) e.idleYaw = Math.atan2(-(e.noise.x - e.x), -(e.noise.z - e.z));
@@ -1549,6 +1552,7 @@ G.Server = {
     e.coverT -= dt;
     e.nadeT -= dt;
     const usesCover = !def.boss && e.type !== 'rusher';
+    if (st && e.canSee) { if (e.dp) this.doorShot(e); } else if (this.doorPeek(e, dt)) return;
     // lurking: heard the police but hasn't seen them, so it hides and peeks like anyone else would, gun still
     // away. The moment it sees an officer it draws.
     if (e.lurk) {
@@ -1671,12 +1675,118 @@ G.Server = {
     return [st.p[0] + Math.cos(yw) * ln * 0.38, st.p[2] - Math.sin(yw) * ln * 0.38];
   },
   brave(e) { return !!e.def.hunt && e.morale > 0.6; },
+  // Bold suspects go and look. Someone heard through a door (footsteps, a door, a shot), they think the police are behind it:
+  // they get beside it, on their own side of the wall and the far side of the frame from the sound, gun out, and listen; then ease a shut door open and
+  // lean out across the frame for a look, back, and once or twice more. See anyone, and it's the lean-out-and-shoot of a corner
+  // (doorShot). Shot at, hurt or rattled, they leave it, and it's a while before they'll try again.
+  //   REACH: how far off a door they'll go to (m); BEHIND: how far behind it the sound can be, through the building;
+  //   HEARD: how long they'll act on it (s); TUCK: off the door's line, into their own room; EDGE: past the frame, to stand;
+  //   LISTEN: how much further off than anyone else they catch a footstep
+  DOORPEEK: { REACH: 9, BEHIND: 12, HEARD: 6, TUCK: 0.8, EDGE: 0.4, LEAN: 0.55, LISTEN: 2.4 },
+  // what a suspect who's bold makes of a sound: about where it was (they're going by ear)
+  noted(e, x, y, z) { if (e.bold) e.heard = { x: x + (Math.random() - 0.5) * 1.5, y, z: z + (Math.random() - 0.5) * 1.5, at: this.clock }; },
+  // the door with what they heard behind it, and the spot beside it to look from
+  doorFor(e) {
+    const L = G.Level, map = this.map, P = this.DOORPEEK, h = e.heard, field = this.soundField(h.x, h.z, h.y || 0), ey = 1.6 * e.def.scale;
+    let best = null, bs = 1e9;
+    for (const d of map.doors) {
+      const y = d.fy || 0, dist = Math.hypot(d.x - e.x, d.z - e.z);
+      if (d.kind === 'vault' || d.fallen || dist > P.REACH || Math.abs(y - (e.y || 0)) > 1.5) continue;
+      const nx = d.axis === 'x' ? 1 : 0, nz = 1 - nx, tx = nz, tz = nx, s = (e.x - d.x) * nx + (e.z - d.z) * nz < 0 ? -1 : 1, half = (d.w || L.TS) / 2;
+      const near = this.heardAt(field, d.x + nx * s * 0.9, d.z + nz * s * 0.9, y), far = this.heardAt(field, d.x - nx * s * 0.9, d.z - nz * s * 0.9, y);
+      if (!(far <= P.BEHIND) || !(far < near - 0.5) || this.heardAt(field, e.x, e.z, e.y) < near - 1) continue; // (it's through this door they heard it)
+      const score = dist + far * 0.5;
+      if (score >= bs) continue;
+      let claimed = false;
+      for (const o of this.enemies.values()) if (o !== e && o.dp && o.dp.d === d) { claimed = true; break; }
+      if (claimed) continue;
+      const fm = L.floorMap(map, d.fl || 0), m = d.mirror ? -1 : 1, yaw = Math.atan2(nx * s, nz * s); // (facing the door square on; m: the latch's side, the leaf hanging from the other)
+      // the far side of the frame from the sound, so the look goes across the doorway towards it; the leaf swings out from its
+      // hinge (+x through an x door, -z through a z door), and they'll not stand where it comes round
+      const ht = (h.x - d.x) * tx + (h.z - d.z) * tz, sides = Math.abs(ht) > 0.5 ? [ht > 0 ? -1 : 1, ht > 0 ? 1 : -1] : [m, -m], leafS = d.axis === 'x' ? 1 : -1;
+      for (const side of sides) {
+        if (side === -m && s === leafS) continue;
+        const off = side * (half + P.EDGE), x = d.x + nx * s * P.TUCK + tx * off, z = d.z + nz * s * P.TUCK + tz * off, px = x - tx * side * P.LEAN, pz = z - tz * side * P.LEAN;
+        if (L.tile(fm, Math.floor(x / L.TS), Math.floor(z / L.TS)) !== 0 || L.tile(fm, Math.floor(px / L.TS), Math.floor(pz / L.TS)) !== 0) continue;
+        if (!this.leanClear(x, z, px, pz, y + ey, y) || L.los(map, x, y + ey, z, d.x - nx * s * 1.5, y + ey, d.z - nz * s * 1.5)) continue; // (out of the doorway's line, with a clear way to lean)
+        const fx = -Math.sin(yaw), fz = -Math.cos(yaw), lean = (px - x) * -fz + (pz - z) * fx > 0 ? 1 : -1; // (which way it is, facing the door)
+        best = { d, x, y, z, px, pz, lean, yaw, fl: d.fl || 0, phase: 'go', t: 8, n: 1 + Math.floor(Math.random() * 3) };
+        bs = score;
+        break;
+      }
+    }
+    if (best) best.flow = L.flow(map, [L.src(map, best.x, best.y, best.z)]);
+    return best;
+  },
+  // Returns true while it's what they're doing.
+  doorPeek(e, dt) {
+    const U = G.U, L = G.Level, P = this.DOORPEEK, def = e.def;
+    const rattled = e.flinchT > 0 || e.suppressT > 0 || e.flashT > 0 || e.morale < def.morale * 0.7 || (e.str != null && e.str < 0.6);
+    const stop = () => { e.dp = null; e.leanOut = 0; e.crouch = false; e.dpOk = this.clock + 10 + Math.random() * 8; return false; };
+    if (e.dp && rattled) return stop();
+    if (!e.dp) {
+      if (!e.bold || rattled || e.reloadT > 0 || e.guard || this.clock < (e.dpOk || 0) || !e.heard || this.clock - e.heard.at > P.HEARD) return false;
+      if (e.alert && (this.clock - (e.engagedAt || -99) < 3 || e.lostT < 1.5 && e.lastSeen)) return false; // (not in the middle of a fight)
+      if ((e.dpT = (e.dpT || 0) - dt) > 0) return false;
+      e.dpT = 0.5;
+      if (!(e.dp = this.doorFor(e))) return false;
+      e.lurk = false; e.hide = null; e.cover = null; e.inCover = false; e.peek = false; e.holding = false; e.walkTo = null; e.aiming = false;
+      this.suspect(e, e.heard.x, e.heard.z); // (unaware till now: wary, gun out)
+      if (!e.drawn) this.draw(e);
+    }
+    const q = e.dp, turn = (yaw, k) => { e.yaw += U.angDiff(e.yaw, yaw) * Math.min(1, dt * k); };
+    if (!e.alert) e.calmT = Math.max(e.calmT, 4); // (not settling down halfway through it)
+    q.t -= dt;
+    if (q.phase === 'go') {
+      const d = Math.hypot(q.x - e.x, q.z - e.z);
+      if (d > 0.3) {
+        if (q.t <= 0) return stop();
+        const step = d > 1.6 ? L.flowStep(this.map, q.flow, e.x, e.z, e.y) : null, tx = step ? step.x : q.x, tz = step ? step.z : q.z, dx = tx - e.x, dz = tz - e.z, dd = Math.hypot(dx, dz) || 1;
+        turn(Math.atan2(-dx, -dz), 8);
+        e.crouch = false; e.leanOut = 0;
+        this.moveEntity(e, dx / dd, dz / dd, def.speed * (d < 3 ? 0.55 : 0.8), dt); // (slowing as they get there)
+        return true;
+      }
+      q.phase = 'set'; q.t = 0.5 + Math.random() * 0.7;
+    }
+    if (q.phase === 'set') {
+      turn(q.yaw, 5);
+      if (q.t > 0) return true;
+      if (!q.d.open && !q.d.fallen) { this.setDoor(q.d.id, true); q.phase = 'open'; q.t = 0.5; return true; }
+      q.phase = 'look'; q.t = 1.4 + Math.random();
+    }
+    if (q.phase === 'open') {
+      if (q.t > 0) return true;
+      q.phase = 'look'; q.t = 1.4 + Math.random();
+    }
+    if (q.phase === 'look') {
+      turn(q.yaw, 5);
+      e.leanOut = q.lean;
+      if (q.t > 0) return true;
+      e.leanOut = 0;
+      if (--q.n <= 0) return stop();
+      q.phase = 'back'; q.t = 0.8 + Math.random() * 0.8;
+      return true;
+    }
+    if (q.t <= 0) { q.phase = 'look'; q.t = 1.4 + Math.random(); } // (back behind the frame, and out again)
+    return true;
+  },
+  // They've seen someone from beside the door: it's a corner, and they're at it with the gun up, and quick about it (already out
+  // for a look, quicker still). Off their spot, or with the door's line open on you, it's no corner, and coverValid drops it.
+  doorShot(e) {
+    const q = e.dp, out = !!e.leanOut, there = Math.hypot(q.x - e.x, q.z - e.z) < 0.3;
+    e.dp = null; e.dpOk = this.clock + 10 + Math.random() * 8;
+    e.cool = Math.min(e.cool, 0.3);
+    if (!there) { e.leanOut = 0; return; }
+    e.cover = { x: q.x, y: q.y, z: q.z, lean: q.lean, px: q.px, pz: q.pz, fl: q.fl };
+    e.inCover = true; e.peek = true; e.peekT = out ? 0.2 : 0.45; e.peekOut = this.PEEK.MIN; e.peekDone = false; e.coverT = 3; e.coverStuck = 0; e.coverFlow = null;
+  },
 
   // Broken: run from the police, then hide. Panicked, inaccurate shots only; a cornered suspect with
   // nothing left may give up without being told. Nerve comes back slowly.
   thinkBroken(e, dt, p, st) {
     const L = G.Level, U = G.U;
-    e.aiming = false; e.peek = false; e.leanOut = 0; e.cover = null; e.inCover = false;
+    e.aiming = false; e.peek = false; e.leanOut = 0; e.cover = null; e.inCover = false; e.dp = null;
     if (e.fleeT > 0) {
       e.fleeT -= dt;
       e.crouch = false;

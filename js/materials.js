@@ -178,6 +178,7 @@ G.Materials = (() => {
         const d = s.door || {};
         if (d.kind === 'vault') return C([['mild', 25]], 'mild', 0.04);
         if (s.glass != null) return ONE([['glass', 8]]);
+        if (d.kind === 'fire') return C([['sheet', 1.5]], 'wool', 0.5); // (a roof's)
         return theme.name === 'Bunker' || theme.name === 'Foundry' || theme.name === 'Warehouse' ? C([['sheet', 1.5]], 'wool', 0.5) : theme.name === 'Cold Storage' || theme.name === 'Research Lab' ? C([['sheet', 1]], 'pur') : C([['hardwood', 4]]); // (hollow-core timber, or a steel fire door)
       }
       case 'glass': return s.win && s.win.armor ? ONE([['bpglass', 40]]) : ONE([['glass', 5]]);
