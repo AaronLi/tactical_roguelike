@@ -290,8 +290,8 @@ says the same), but not whose: the shooter's name isn't shown.
     its inner side to the hall door, and upstairs a glass-railed landing round the drop. The stairwell doors
     are glass in a steel frame, a push bar across the middle on the side it swings away from and a pull handle
     on the other. You and the suspects see through them (as through a window) and rounds go through them,
-    shattering the glass for everyone; the frame still stops you until it's opened. You come in at the
-    foot of the west stairs. From about 7 apartments at level 1 up to about 14.
+    shattering the glass for everyone; the frame still stops you until it's opened. You come in on the
+    roof (see **Arrival**), a stair head at each end with a flight down the middle of its stairwell. From about 7 apartments at level 1 up to about 14.
     - **Units:** each apartment is its own home of a few rooms (usually four), with one front door onto the
       hallway.
     - **What's what:** a home's rooms are worked out from where they are (`G.Level._program`), so every home is
@@ -316,11 +316,11 @@ says the same), but not whose: the shooter's name isn't shown.
       objective "Clear every apartment" is ticked once they all are, with no running count. An apartment
       counts once an officer has been inside it and no free, armed suspect is left in it, so an empty one
       still has to be checked.
-    - **Residents:** some homes belong to someone (`js/homes.js`, from `docs/apartment-personas/`; so far Harold
-      Pruitt's flat). The block is generated first, knowing nothing of them, walls, doors, furniture, windows
-      and all. Then, from the level's seed alone, each home in turn may turn out to be a resident's (Harold: 8%
-      of each single-floor home with four rooms or more, at most once a level, so he's in about 58% of Apartment
-      levels), and the whole home's done over to suit what it turned out to be, or none of it is:
+    - **Residents:** some homes belong to someone (`js/homes.js`, `js/residents.js`, from `docs/apartment-personas/`: all
+      twelve of them, six in flats and six in lofts, a loft's resident dressing both its floors). The block is generated first, knowing nothing of them, walls, doors, furniture, windows
+      and all. Then, from the level's seed alone, each home in turn may turn out to be a resident's (a flat's: 5.5-8% each,
+      at most once a level, so each is in about half of Apartment levels; a loft's: 15% each, and nearly every loft
+      gets one; about 3.7 residents a level in all), and the whole home's done over to suit what it turned out to be, or none of it is:
       - **Who fits where:** a resident needs a kind of home (a flat or a loft) and the rooms they list. A room
         they mark `spare` needn't be there: one the home can spare becomes it (Harold's fourth room, an office
         or a second bedroom, becomes his dining room). No walls move. Any room over stays what it was, with its
@@ -347,7 +347,7 @@ says the same), but not whose: the shooter's name isn't shown.
       - **Everything else stays put:** it's all on random streams of its own, and each room as it would have
         been is still built, into nothing, so the stream the rest of the block's looks are drawn from is the
         same. Outside the home the level's triangle for triangle the same as with nobody home.
-  - **Warehouse.** You start on the loading dock outside, among pallets and crates, fenced at the sides.
+  - **Warehouse.** You start in the yard past the loading dock, the dock among pallets and crates, fenced at the sides.
     Two roller doors (rolled up: wide openings under the shutter drum, with guide rails either side) and a door
     between them lead onto the warehouse floor: rows
     of pallet racking taller than you (cartons, drums, shrink-wrapped stacks), with aisles between the rows
@@ -384,7 +384,7 @@ says the same), but not whose: the shooter's name isn't shown.
     and fenced with event fencing (steel mesh panels, dark scrim, the odd sponsor's banner). The fog's pushed far
     back and the moon's up: a lot of open ground and long sight lines. More suspects (×1.5) and civilians (×2)
     than elsewhere.
-    - **The car park** along the south, where you come in: two rows of parked cars (cover) in painted bays,
+    - **The car park** along the south, the overflow field past it where you come in: two rows of parked cars (cover) in painted bays,
       aisles between, tall street lamps. The festival's gate (under the WELCOME arch, ticket booths either side
       inside) and the street into the town square open off it.
     - **The town square** to the west, behind the festival fence with a side gate through. Shops down the west
@@ -431,6 +431,18 @@ says the same), but not whose: the shooter's name isn't shown.
 
   Securing bodies (suspects' hands zip-tied behind the back, dead civilians reported) and bagging dropped
   weapons into evidence envelopes pay too. All of it can still be done after order is restored.
+
+  **Arrival.** Every level has a helicopter pad, and you ride in belted into the dropship you boarded at the hangar
+  (`js/landing.js`): in from the distance, once round the site, spiralling in, a hover and a turn onto the pad's heading,
+  down, over a town of lit windows and under clouds (drawn for the ride, not in the world). Hold **F** in the air to skip
+  it, on the ground to get out. Its attitude comes from how it moves (leaning into
+  what the rotors have to do: nose down at speed, over in the turns, up in the flare); you're safe in it, officers staying
+  in their seats on the pad as far as the host's concerned, and suspects paying no attention to anyone aboard. It waits up to 14 s (flying alone, 2.5 s after you're out),
+  then lifts off, putting out anyone still aboard. The apartments' pad is on the roof among the air handlers and the
+  water tank, a parapet round it; the others' are in an expanded lot (the suburbs': a turning circle at the west end of
+  the street), what you'd find there parked between them and the target (`G.Level.LZ_KIT`: delivery trucks at the
+  store, shipping containers in the warehouse yard and at the foundry, reefers at cold storage, earth-filled gabions at the
+  bunker, trucks and portaloos at the festival, a removal van in the suburbs). No suspect starts within 22 m of a pad on its level or with a line of sight to it (`G.Level.landing`).
 
   There's no exit zone. Once order is restored, press **Y** to vote to leave (Y again takes it back). The
   level ends when every officer still alive has voted, downed ones included; solo, that's you. The HUD

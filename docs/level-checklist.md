@@ -26,8 +26,11 @@ so anything random in generation must come from the level's rng (`r`, or a `G.U.
     - `t`: 1 wall, 0 floor, 4 fence/furniture
     - `out`: open to the sky
     - doors: `[x, z, axis, open, mirror, kind]`
-- [ ] **It starts outside the target** (or, like the apartments, at the threshold). The spawn room is outdoor
-  (`out: true`, type `street`/`lot`/`dock`) or a landing. There's a real entrance:
+- [ ] **It starts at a landing pad** (`lz: { x, z, f? }` on the layout, its `spawn` an `lz` room): `G.Level.LZ_W` x `LZ_H`
+  coarse tiles of clear ground (the apartments: the roof), out of sight of the target. `_pad` shelters it with what
+  belongs there (`LZ_KIT`, `rm.cover`), and `G.Level.landing` drops every suspect spot that can see it or is within `LZ_NEAR` on its level. A lot
+  between the pad and the building has `front: true` (no suspects, no weapon case). Check no spot sees the pad and
+  everyone's seated in the helicopter on load (`js/landing.js`). There's a real entrance:
   - a door (double, or a special `kind`) under a lamp
   - porch lanterns are added automatically for z-axis doors between outside and inside
 - [ ] **Outside areas** are fenced at the map edge (fence tiles + the `fences` list), and `out` is set for
@@ -87,11 +90,11 @@ so anything random in generation must come from the level's rng (`r`, or a `G.U.
 Apartment only (`residents: 1` in the theme). The layout comes first and knows nothing of them: `fill` runs on each
 floor after `finish`.
 
-- [ ] **A new resident is data:** an entry in `RESIDENTS`: `home`, `rate`, `rest` (what any room they've no list for is
+- [ ] **A new resident is data:** an entry in `RESIDENTS` (`js/residents.js`): `home`, `rate`, `rest` (what any room they've no list for is
   painted and floored as) and per room type `wall`, `ceil`, `trim`, `floor`, `items`. The notes at the top of the file say
   what each field does. `spare` on a room type: one the home can spare becomes it. `carve`: a room cut from a corner.
   `must` on an item: its main piece. New pieces go in `G.Furniture.R` with their colours in `style`, and in
-  `js/materials.js` `PROPS`, or they stop rounds as particle board. A new floor `kind` needs a texture in `textures()`
+  `js/materials.js` `PROPS`, or they stop rounds as particle board. A new floor `kind` (there are `concrete` and `laminate` too) needs a texture in `textures()`
   and a `sound` if it isn't one `js/casings.js surface` knows (`wood`, `tile`, `carpet`).
 - [ ] **Random:** the assignment from `G.Homes.start` (the level's seed), the placing from the room's own stream. Never
   the level's `r` or `Math.random`. In `build`, what's drawn for a resident draws on `cur`, never `rnd0`.
@@ -130,6 +133,7 @@ floor after `finish`.
 - [ ] Outside: lit by the entrance lamp. Check the approach is readable but dark.
 - [ ] Fog and light colours suit the theme. Check the skybox/backdrop from outside areas looks right (the
   exterior shader draws ground and streetlamps beyond the walls).
+- [ ] A roof over everything from the air (`buildMesh`: you ride in over the level), no peeking in; the ride's path clear.
 - [ ] Ceilings everywhere indoors, none over `out` tiles. Rounds fired up outside keep going.
 
 ## 5. Sound

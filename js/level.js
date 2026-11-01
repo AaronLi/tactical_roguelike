@@ -33,10 +33,33 @@ G.Level = {
     if (lay.floors) {
       // (who lives where: nothing to do with the layout, and from the seed alone: js/homes.js)
       if (theme.residents) { const homes = G.Homes.start(seed); lay.floors.forEach((fl) => { fl.homes = homes; }); }
-      return this.stack(lay.floors.map((fl) => this.plan(fl, r, seed, level, theme)), lay);
+      return this.landing(this.stack(lay.floors.map((fl) => this.plan(fl, r, seed, level, theme)), lay), lay.lz);
     }
     const map = this.plan(lay, r, seed, level, theme);
     G.World.fromTileMap(map); // the level as 3D solids (js/world.js): what every ray, sight line and step is asked of
+    return this.landing(map, lay.lz);
+  },
+  // Where the helicopter sets the squad down (js/landing.js): a pad of LZ_W x LZ_H coarse tiles, its rectangle the layout's
+  // (lz: { x, z, f }, f the floor it's on). The cabin sits at the pad's west end, the tail out over the rest. Nobody can
+  // start in view of it, or close by on its level: a suspect's spot with a line to the pad is dropped (what's parked round it
+  // does most of that), and any within LZ_NEAR of it. LZ_FAR: further than anyone's rifle reaches, no need to look.
+  LZ_W: 7, LZ_H: 5, LZ_NEAR: 22, LZ_FAR: 70,
+  landing(map, lz) {
+    if (!lz) return map;
+    const cs = this.CTS, m = this.floorMap(map, lz.f || 0), y = m.fy || 0, x = lz.x * cs + 3.8, z = (lz.z + this.LZ_H / 2) * cs;
+    map.lz = { x, y, z, f: lz.f || 0 };
+    map.spawn = { x, z };
+    m.lights.unshift({ kind: 'string', x: x + 2.5, z: z - 3, y: 5, color: 0xffe6c4, i: 0.8, d: 16 }); // (a work light over the pad)
+    for (const [lx, lz2] of lz.lamps || []) m.lights.unshift({ kind: 'string', x: lx * cs, z: lz2 * cs, y: 3, color: 0xffd59a, i: 0.7, d: 11 }); // (and one at each way off it)
+    // (the pad's middle and corners, the bench, and the line you step out along: at a head's height, a crouch's and a stood officer's)
+    const eyes = [[0, 0], [-3, -4], [-3, 4], [9, -4], [9, 4], [3, 0]].map(([dx, dz]) => [x + dx, y + 1.5, z + dz]);
+    for (let dx = -1.4; dx <= 1.4; dx += 0.7) for (const [dz, h] of [[0.85, 1.7], [-2.6, 1.6], [-2.6, 1.05]]) eyes.push([x + dx, y + h, z + dz]);
+    const seen = ([tx, tz, f]) => {
+      const fy = this.floorMap(map, f || 0).fy || 0, sx = (tx + 0.5) * this.TS, sz = (tz + 0.5) * this.TS, d = Math.hypot(sx - x - 2.5, sz - z);
+      if (d < this.LZ_NEAR && Math.abs(fy - y) < 2) return true;
+      return d < this.LZ_FAR && eyes.some(([ex, ey, ez]) => this.see(map, sx, fy + 1.6, sz, ex, ey, ez) > 0);
+    };
+    map.enemySpots = map.enemySpots.filter((sp) => !seen(sp));
     return map;
   },
   // The hangar between levels (js/hangar.js): the whole map is the same as any level's (the same walls, floor,
@@ -140,6 +163,7 @@ G.Level = {
     const cout = (x, z) => x >= 0 && z >= 0 && x < c.W && z < c.H && !!c.out[z * c.W + x];
     const solid = (x, z) => { const v = cv(x, z); return v === 1 || v === 3; };
     const fenceC = new Map(c.fences.map(([x, z, axis]) => [z * c.W + x, axis])), fenceAx = new Map();
+    const fenceName = new Map(c.fences.filter((f) => f[3]).map(([x, z, , name]) => [z * c.W + x, name])); // (a fourth figure: what it is, if it isn't the theme's fencing)
     // steel grating (a foundry's catwalks, upstairs): floor you stand on that rounds and eyes go through (c.grate, coarse)
     const cg = c.grate, grate = cg ? new Uint8Array(W * H) : null, cgr = (x, z) => !!cg && x >= 0 && z >= 0 && x < c.W && z < c.H && !!cg[z * c.W + x];
     // A thin wall separates two spaces (open on both sides along one axis). A wall where thin walls meet (a T or
@@ -229,7 +253,7 @@ G.Level = {
     for (let i = 0; i < W * H; i++) {
       if (t[i] !== 4 || props.has(i)) continue;
       const x = i % W, z = (i / W) | 0;
-      const name = c.theme.fence || 'fence'; // (a festival's site fencing)
+      const name = fenceName.get(((z / K) | 0) * c.W + ((x / K) | 0)) || c.theme.fence || 'fence'; // (a festival's site fencing)
       const p = { name, q: fenceAx.get(i) === 'z' ? 1 : 0, x: (x + 0.5) * cs, z: (z + 0.5) * cs, v: ((x * 7 + z * 13) % 17) / 17 };
       p.boxes = wb(R[name], p.x, p.z, p.q, p.v);
       props.set(i, p); propList.push(p);
@@ -269,7 +293,7 @@ G.Level = {
     const dist2 = this.flow(map, [[spawnRoom.cx, spawnRoom.cz]].concat(map.entries || [])); // (a loft's upper floor is reached by its own stair: from its head too)
     map.enemySpots = [];
     rooms.forEach((rm) => {
-      if (rm === spawnRoom || rm.type === 'road' || rm.type === 'lawn') return; // (not out on the street among the patrol cars)
+      if (rm === spawnRoom || rm.front || rm.type === 'road' || rm.type === 'lawn' || rm.type === 'roof' || rm.lid) return; // (not out on the street among the patrol cars, nor out the front by the pad)
       for (let z = rm.z; z < rm.z + rm.h; z++) for (let x = rm.x; x < rm.x + rm.w; x++) {
         const i = z * W + x;
         if (t[i] === 0 && !map.props.has(i) && dist2[i] > 5 * K) map.enemySpots.push([x, z]);
@@ -281,7 +305,7 @@ G.Level = {
     const hasCase = r() < this.CASE_CHANCE || !!map.theme.starter;
     const keepIn = (q) => !map.theme.starter || q.type === 'stockroom'; // (a starter level: its stockroom has them all)
     const clear = (x, z) => t[z * W + x] === 0 && !map.props.has(z * W + x);
-    if (hasCase) for (const rm of U.shuffle(r, rooms.filter((q) => q !== spawnRoom && keepIn(q)))) {
+    if (hasCase) for (const rm of U.shuffle(r, rooms.filter((q) => q !== spawnRoom && !q.front && !q.lid && q.type !== 'roof' && keepIn(q)))) {
       const spots = [];
       for (let z = rm.z; z < rm.z + rm.h; z++) for (let x = rm.x; x < rm.x + rm.w; x++) {
         let nearDoor = false;
@@ -650,7 +674,7 @@ G.Level = {
   //    and the street into the square opening off it.
   // (What goes where: G.Furniture.plan's festival(); the lights, sky and stage rig: buildFestival.)
   layFestival(r, level) {
-    const U = G.U, W = 58 + Math.min(level, 4) * 2, H = 54, TX = 17, PZ = H - 12; // the town west of TX; the car park south of PZ
+    const U = G.U, W = 58 + Math.min(level, 4) * 2, H = 61, TX = 17, PZ = 42; // the town west of TX; the car park south of PZ, the overflow beyond it where the helicopter lands
     const t = new Uint8Array(W * H).fill(1), out = new Uint8Array(W * H).fill(1), rooms = [], doors = [], fences = [];
     const fill = (x0, z0, w, h) => { for (let z = z0; z < z0 + h; z++) for (let x = x0; x < x0 + w; x++) t[z * W + x] = 0; };
     const solid = (x0, z0, x1, z1) => { for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) { t[z * W + x] = 1; out[z * W + x] = 0; } }; // a building's footprint
@@ -685,14 +709,42 @@ G.Level = {
     const picnic = this._room(bx0, bz1 + 1, x1 - bx0 + 1, PZ - 6 - bz1, { type: 'picnic', out: true });
     const gate = this._room(x0, PZ - 5, fw, 5, { type: 'gate', out: true });
     const plaza = this._room(6, 6, TX - 6, PZ - 6, { type: 'plaza', out: true });
-    const lot = this._room(1, PZ + 1, W - 2, H - PZ - 2, { type: 'parking', out: true });
+    const lot = this._room(1, PZ + 1, W - 2, 10, { type: 'parking', out: true });
     const aisle = this._room(1, PZ + 4, W - 2, 2, { type: 'aisle', out: true }); // (the lane between the rows of cars: where you come in)
-    rooms.unshift(stage, seating, court, picnic, gate, plaza, lot, aisle);
-    return { W, H, t, rooms, doors, out, fences, spawn: aisle };
+    const over = this._room(1, PZ + 12, W - 2, 6, { type: 'lz', out: true }), lz = this._pad(over, W, (W - this.LZ_W) >> 1, PZ + 12, this.LZ_KIT.festival);
+    rooms.unshift(stage, seating, court, picnic, gate, plaza, lot, aisle, over);
+    return { W, H, t, rooms, doors, out, fences, spawn: over, lz };
   },
   // Each returns { W, H, t, rooms, doors?, ringDoors?, out?, fences?, spawn? } on the coarse grid. t starts as all wall
   // (1); rooms are carved to floor (0).
   _room(x, z, w, h, o) { return Object.assign({ x, z, w, h, cx: x + (w >> 1), cz: z + (h >> 1) }, o || {}); },
+  // A landing pad on open ground, the building to the north, and what's parked or stacked there that shelters it, what you'd
+  // find in that kind of place (LZ_KIT): a row of the long thing along the pad's north side with room to walk between, the
+  // short thing turned at each end of it. (east: the threat's east, not north: across that end of the pad instead.)
+  // On rm (the pad's room): js/furniture.js plan lays rm.cover. Returns the layout's lz.
+  LZ_KIT: {
+    store: { long: 'boxtruck', short: 'dumpster', style: { c: 0xdcd8cc, stripe: 0xb02a2a } },
+    yard: { long: 'container', short: 'dumpster', style: { c: 0x2f5a7a } },
+    Bunker: { long: 'hesco', short: 'hesco', style: {} },
+    'Research Lab': { long: 'boxtruck', short: 'dumpster', style: { c: 0xe4e6e6, stripe: 0x3a7aa8 } },
+    'Cold Storage': { long: 'container', short: 'dumpster', style: { c: 0xdfe4e6, chill: 1 } },
+    foundry: { long: 'container', short: 'scrap', style: { c: 0x7a3f28 } },
+    festival: { long: 'boxtruck', short: 'portaloo', style: { c: 0x2a2a32, stripe: 0xd94fa0 } },
+    suburbs: { long: 'boxtruck', short: 'hedge', style: { c: 0xe0d8c8, stripe: 0x2f7a4a } },
+  },
+  _pad(rm, W, x, z, kit, east) {
+    const c = rm.cover = [], cs = this.CTS, GAP = 1.6, put = (name, px, pz, q) => c.push([name, px, pz, q, kit.style]);
+    if (east) { const px = (x + this.LZ_W) * cs + 1; put(kit.long, px, (z + 2.5) * cs, 1); put(kit.short, px, (z + 0.6) * cs, 1); return { x, z }; }
+    const x0 = Math.max(3, (x - 1) * cs), x1 = Math.min(W * cs - 3, (x + this.LZ_W + 1) * cs), L = G.Furniture.R[kit.long].w, n = Math.max(1, Math.floor((x1 - x0 + GAP) / (L + GAP))), run = n * L + (n - 1) * GAP, a0 = (x0 + x1 - run) / 2, pz = (z - 0.5) * cs - 0.5;
+    for (let i = 0; i < n; i++) put(kit.long, a0 + L / 2 + i * (L + GAP), pz, 0);
+    // (a row that doesn't fill its side: the short thing either end of it, a step's gap off; else turned at the ends)
+    const S = G.Furniture.R[kit.short].w, side = a0 - x0;
+    for (const [px, sn] of [[a0, -1], [a0 + run, 1]]) {
+      if (side >= S + 1) put(kit.short, px + sn * (1 + S / 2), pz, 0);
+      if (px + sn * 2.4 > 2 && px + sn * 2.4 < W * cs - 2) put(kit.short, px + sn * (side >= S + 1 ? 2 + S : 1.2), z * cs + 1.6, 1);
+    }
+    return { x, z };
+  },
 
   // A corner convenience store, small and crowded, the first deployment of a run (by the look of real ones: tall shelving
   // packed close, aisles a little over a metre wide, a wall of cooler doors, the till behind its glass). 20 x 26 m with
@@ -701,11 +753,12 @@ G.Level = {
   //     the coolers, glass doors onto the shop (glass: windows in it, js/level.js placeWindows);
   //   the shop floor (west, about 10.5 x 9.5 m), a door up into the stockroom; the cashier's booth (east), behind a
   //     wall of wired, bulletproof glass (it stops rounds, not looks) with one door through it, more of it onto the street;
-  //   the front wall, glass either side of its double door, and the lot outside it (fenced), where you come in.
+  //   the front wall, glass either side of its double door, and the lot outside it (fenced), delivery trucks parked across
+  //     it and the helicopter's pad behind them, where you come in.
   // The shelving is laid on the fine grid (js/furniture.js plan, mart), not tile by tile: that's what makes the aisles narrow.
   // Its weapon case, attachments box and first aid cabinet are always in the stockroom (G.THEMES starter).
   layMart(r, level) {
-    const W = 10, B = 9, D = 4, H = B + D, U = G.U;
+    const W = 10, B = 9, D = 10, H = B + D, U = G.U;
     const t = new Uint8Array(W * H).fill(1), out = new Uint8Array(W * H), fences = [], doors = [];
     const fill = (x0, z0, w, h) => { for (let z = z0; z < z0 + h; z++) for (let x = x0; x < x0 + w; x++) t[z * W + x] = 0; };
     fill(1, 1, 3, 2); fill(5, 1, 4, 2); // the freezer, the stockroom
@@ -723,13 +776,14 @@ G.Level = {
     for (let z = B; z < H - 1; z++) for (let x = 1; x < W - 1; x++) t[z * W + x] = 0;
     for (let x = 0; x < W; x++) { t[(H - 1) * W + x] = 4; fences.push([x, H - 1, 'x']); }
     for (let z = B; z < H - 1; z++) for (const x of [0, W - 1]) { t[z * W + x] = 4; fences.push([x, z, 'z']); }
-    const lot = this._room(1, B, W - 2, D - 1, { type: 'lot', out: true });
+    // the lot: the two rows in front of the shop, the delivery trucks parked across it, the pad behind them
+    const lot = this._room(1, B, W - 2, 2, { type: 'lot', out: true, front: true }), pad = this._room(1, B + 3, W - 2, 6, { type: 'lz', out: true }), lz = this._pad(pad, W, 2, B + 3, this.LZ_KIT.store);
     // glass between rooms: the coolers (the freezer's front wall), the cashier's wall (all of it but its door) and the
     // booth's front; the shop's front windows either side of the door
     const glass = [{ x0: 1, z0: 3, x1: 3, z1: 3, cooler: true, sill: 0.12, top: 2.05 }];
     for (const [z0, z1] of [[4, tillDoor - 1], [tillDoor + 1, B - 2]]) if (z1 >= z0) glass.push({ x0: 6, z0, x1: 6, z1, armor: true, v: 1, sill: 0.95, top: 2.7 }); // (either side of its door; v: down a wall that runs north-south)
     glass.push({ x0: 7, z0: B - 1, x1: 8, z1: B - 1, armor: true, sill: 0.95, top: 2.7 }, { x0: 1, z0: B - 1, x1: 5, z1: B - 1, sill: 0.5, top: 2.7 });
-    return { W, H, t, rooms: [lot, shop, till, stock, freezer], doors, out, fences, glass, spawn: lot };
+    return { W, H, t, rooms: [pad, lot, shop, till, stock, freezer], doors, out, fences, glass, spawn: pad, lz };
   },
 
   // A steel foundry, two storeys, 68 x 56 m. Coarse tiles (2 m), north (low z) to south:
@@ -747,10 +801,10 @@ G.Level = {
   //     manager's office and the meeting room. A door from the stairwell into the melt shop.
   //   the loading bay (south-east), full height too: raw stock on pallets (billets, ingots, coils), forklifts, pallet
   //     racking; a roller door up into the processing hall, two out onto the car park and a door between them.
-  //   the car park along the front, fenced, where you come in: in front of the offices or of the loading bay.
+  //   the car park along the front, fenced; past it, behind a row of containers, the helicopter's pad, where you come in.
   // Floors: 0 the ground, 1 upstairs (tile 5 the drop, open to the floor below; grate: the catwalks).
   layFoundry(r, level) {
-    const W = 34, H = 28, LZ = 22; // the car park from row LZ
+    const W = 34, H = 35, LZ = 22; // the car park from row LZ; past it, behind the containers along row 27, the pad
     const mk = () => ({ t: new Uint8Array(W * H).fill(1), out: new Uint8Array(W * H), rooms: [], doors: [], glass: [] });
     const F0 = mk(), F1 = mk(), grate = new Uint8Array(W * H), fences = [], stairs = [];
     const fill = (F, x0, z0, w, h, v = 0) => { for (let z = z0; z < z0 + h; z++) for (let x = x0; x < x0 + w; x++) F.t[z * W + x] = v; };
@@ -761,7 +815,8 @@ G.Level = {
     fill(F0, 1, LZ, W - 2, H - LZ - 1);
     for (let x = 0; x < W; x++) { F0.t[(H - 1) * W + x] = 4; fences.push([x, H - 1, 'x']); }
     for (let z = LZ; z < H - 1; z++) for (const x of [0, W - 1]) { F0.t[z * W + x] = 4; fences.push([x, z, 'z']); }
-    const lotW = room(F0, 1, LZ, 16, H - LZ - 1, 'carpark', { out: true }), lotE = room(F0, 17, LZ, W - 18, H - LZ - 1, 'carpark', { out: true });
+    const lotW = room(F0, 1, LZ, 16, 5, 'carpark', { out: true, front: true }), lotE = room(F0, 17, LZ, W - 18, 5, 'carpark', { out: true, front: true });
+    const pad = room(F0, 1, 28, W - 2, 6, 'lz', { out: true }), lz = this._pad(pad, W, 13, 28, this.LZ_KIT.foundry);
     // ---- the ground floor
     fill(F0, 1, 1, 14, 11); fill(F0, 3, 10, 3, 1, 6); room(F0, 1, 1, 14, 11, 'melt', { tall: true }); // the melt shop, its stair up the south wall
     stairs.push({ f: 0, x0: 3, z0: 10, x1: 5, z1: 10, axis: 'x', up: -1 });
@@ -800,10 +855,9 @@ G.Level = {
     // glass looking into the halls: the control block's both sides, the observation offices' north wall
     const look = { sill: 0.9, top: 2.75 };
     F1.glass.push(Object.assign({ x0: 15, z0: 1, x1: 15, z1: 11, v: 1 }, look), Object.assign({ x0: 19, z0: 1, x1: 19, z1: 11, v: 1 }, look), Object.assign({ x0: 4, z0: 12, x1: 14, z1: 12 }, look));
-    const spawn = r() < 0.5 ? lotW : lotE; // (in front of the offices, or of the loading bay)
-    const floor0 = { W, H, t: F0.t, out: F0.out, rooms: F0.rooms, doors: F0.doors, fences, spawn, rollers, glass: F0.glass };
+    const floor0 = { W, H, t: F0.t, out: F0.out, rooms: F0.rooms, doors: F0.doors, fences, spawn: pad, rollers, glass: F0.glass };
     const floor1 = { W, H, t: F1.t, out: F1.out, rooms: F1.rooms, doors: F1.doors, fences: [], spawn: F1.rooms[0], grate, glass: F1.glass, entries: [[2, 10], [32, 7], [1, 13]] };
-    return { floors: [floor0, floor1], stairs, rail: 'steel' };
+    return { floors: [floor0, floor1], stairs, rail: 'steel', lz };
   },
 
   // Rooms joined by corridors (apartments, bunkers, labs...).
@@ -845,22 +899,24 @@ G.Level = {
     return { W, H, t, rooms, ringDoors: true };
   },
 
-  // Outside the building: a lot along its front (open to the sky, fenced), and the way in, a corridor from the
-  // nearest room out to a double door in the front wall (a vault door into a bunker).
+  // Outside the building: a lot along its front (open to the sky, fenced), the helicopter's pad at the far side of it behind
+  // what's parked there (LZ_KIT), and the way in, a corridor from the nearest room out to a double door in the front wall (a vault door
+  // into a bunker).
   approach(lay, r, theme) {
-    const D = 4, { W, H } = lay, H2 = H + D, t = new Uint8Array(W * H2).fill(1), out = new Uint8Array(W * H2), fences = [], doors = lay.doors ? lay.doors.slice() : [];
+    const D = 10, { W, H } = lay, H2 = H + D, t = new Uint8Array(W * H2).fill(1), out = new Uint8Array(W * H2), fences = [], doors = lay.doors ? lay.doors.slice() : [];
     t.set(lay.t);
     for (let z = H; z < H2; z++) for (let x = 0; x < W; x++) out[z * W + x] = 1;
     for (let z = H; z < H2 - 1; z++) for (let x = 1; x < W - 1; x++) t[z * W + x] = 0;
     for (let x = 0; x < W; x++) { t[(H2 - 1) * W + x] = 4; fences.push([x, H2 - 1, 'x']); }
     for (let z = H; z < H2 - 1; z++) for (const x of [0, W - 1]) { t[z * W + x] = 4; fences.push([x, z, 'z']); }
-    const lot = this._room(1, H, W - 2, D - 1, { type: 'lot', out: true });
+    const lot = this._room(1, H, W - 2, 2, { type: 'lot', out: true, front: true }), pad = this._room(1, H + 3, W - 2, 6, { type: 'lz', out: true });
+    const lz = this._pad(pad, W, (W - this.LZ_W) >> 1, H + 3, this.LZ_KIT[theme.name] || this.LZ_KIT.store);
     // the room nearest the front, and a two-wide corridor from it to the front wall
     const rm = lay.rooms.reduce((a, b) => (b.z + b.h > a.z + a.h ? b : a));
     const x0 = G.U.clamp(rm.cx, 2, W - 4);
     for (let z = rm.z + rm.h; z < H - 1; z++) for (const x of [x0, x0 + 1]) t[z * W + x] = 0;
     doors.push([x0, H - 1, 'z', false, false, theme.entry || null], [x0 + 1, H - 1, 'z', false, true, theme.entry || null]);
-    return Object.assign({}, lay, { H: H2, t, out, fences, doors, rooms: lay.rooms.concat([lot]), spawn: lot });
+    return Object.assign({}, lay, { H: H2, t, out, fences, doors, rooms: lay.rooms.concat([lot, pad]), spawn: pad, lz });
   },
 
   // A home split into rooms (the houses' splitter): a door between every room and the next until they're all
@@ -904,15 +960,16 @@ G.Level = {
 
   // An apartment block of two floors. On each, a hallway runs the length of the block with apartments either side,
   // each its own home (a few rooms, one front door onto the hallway), and a stairwell at each end of it: the
-  // flight up its outer side, a walkway down its inner side from the foot of the stairs to the hall door. You
-  // come in at the foot of the west stairs. A third or so of the ground-floor homes try to be lofts: the living room
+  // flight up its outer side, a walkway down its inner side from the foot of the stairs to the hall door. Upstairs a
+  // second flight, in the lane between them, goes on up to the roof: you come in there, the helicopter's pad out on it, a
+  // parapet round the edge and the two stair heads either end. A third or so of the ground-floor homes try to be lofts: the living room
   // goes up two floors with a stair up its wall, to an open upper floor over the rest of the home (railed where
   // it looks down into the living room). Upstairs are single-floor apartments and the lofts' upper floors. Each
   // apartment has to be cleared. Tile values on the plan: 5 a drop (no floor), 6 a flight of stairs.
   layApartments(r, level) {
     const U = G.U, per = 2 + Math.min(level >> 1, 2); // apartments each side of the hallway
     const ud = U.ri(r, 5, 6), ud2 = U.ri(r, 5, 6);
-    const W = 8 + per * 8, hz = ud + 2, H = hz + 2 + ud2 + 1, xa0 = 4, xa1 = W - 5; // (the homes between the stairwells)
+    const W = 10 + per * 8, hz = ud + 2, H = hz + 2 + ud2 + 1, xa0 = 5, xa1 = W - 6; // (the homes between the stairwells)
     // the homes along each side, the same on both floors (a loft's upper floor sits over it)
     const homes = [];
     for (const [z0, h, wallZ] of [[1, ud, hz - 1], [hz + 2, ud2, hz + 1]]) {
@@ -930,13 +987,16 @@ G.Level = {
       const t = new Uint8Array(W * H).fill(1), rooms = [], doors = [], ids = new Int16Array(W * H).fill(-1), entries = [];
       const fill = (x0, z0, w, h, v = 0) => { for (let z = z0; z < z0 + h; z++) for (let x = x0; x < x0 + w; x++) t[z * W + x] = v; };
       // the stairwells: [outer lane, inner lane, the way the flight climbs (z), the hall door's x]
-      for (const [xo, xi, up, dx] of [[1, 2, -1, 3], [W - 2, W - 3, 1, W - 4]]) {
+      for (const [xo, xm, xi, up, dx] of [[1, 2, 3, -1, 4], [W - 2, W - 3, W - 4, 1, W - 5]]) {
         const x0 = Math.min(xo, xi);
-        fill(x0, hz - 2, 2, 5);
-        rooms.push(this._room(x0, hz - 2, 2, 5, { type: 'landing', stairs: true }));
+        fill(x0, hz - 2, 3, 5);
+        rooms.push(this._room(x0, hz - 2, 3, 5, { type: 'landing', stairs: true }));
         doors.push([dx, hz, 'x', false, false, 'stair']); // (a stairwell door: glass, a push bar one side, a pull handle the other)
         if (f === 0) { fill(xo, hz - 1, 1, 3, 6); stairs.push({ f: 0, x0: xo, z0: hz - 1, x1: xo, z1: hz + 1, axis: 'z', up }); }
-        else { fill(xo, hz - 1, 1, 3, 5); entries.push([xo, up < 0 ? hz - 2 : hz + 2]); } // (over the flight: the drop; where you come up)
+        else {
+          fill(xo, hz - 1, 1, 3, 5); entries.push([xo, up < 0 ? hz - 2 : hz + 2]); // (over the flight: the drop; where you come up)
+          fill(xm, hz - 1, 1, 3, 6); stairs.push({ f: 1, x0: xm, z0: hz - 1, x1: xm, z1: hz + 1, axis: 'z', up: -up }); // (and the flight on up, climbing back the other way)
+        }
       }
       // the hallway between them
       fill(xa0, hz, xa1 - xa0 + 1, 1);
@@ -967,8 +1027,28 @@ G.Level = {
       }
       floors.push({ W, H, t, rooms, doors, spawn: rooms[0], entries: f ? entries : null, units: 0 });
     }
+    // the roof: open to the sky, a parapet round it, a stair head over each stairwell (its door onto the roof, the hole the
+    // flight comes up through)
+    {
+      const t = new Uint8Array(W * H), out = new Uint8Array(W * H).fill(1), doors = [], fences = [], entries = [];
+      const wall = (x, z, axis) => { t[z * W + x] = 4; fences.push([x, z, axis, 'parapet']); };
+      for (let x = 0; x < W; x++) { wall(x, 0, 'x'); wall(x, H - 1, 'x'); }
+      for (let z = 1; z < H - 1; z++) { wall(0, z, 'z'); wall(W - 1, z, 'z'); }
+      const roof = this._room(1, 1, W - 2, H - 2, { type: 'roof', out: true }), rooms = [roof], mid = W; // (x in metres: W tiles of 2 m, halved)
+      // what a roof has on it: air handlers to either side of the pad, the block's water tank
+      roof.cover = [['hvac', mid - 11, 4, 0], ['hvac', mid + 11, 4, 0], ['hvac', mid - 11, H * 2 - 4, 2], ['hvac', mid + 6, H * 2 - 4, 2], ['watertank', mid - 2, 4, 0]];
+      for (const [x0, xm, up, dx] of [[0, 2, 1, 4], [W - 5, W - 3, -1, W - 5]]) {
+        const hd = up > 0 ? hz + 2 : hz - 2, lx = x0 ? x0 + 1 : 1;
+        for (let z = hz - 3; z <= hz + 3; z++) for (let x = x0; x < x0 + 5; x++) { t[z * W + x] = 1; out[z * W + x] = 0; }
+        for (let z = hz - 2; z <= hz + 2; z++) for (let x = lx; x < lx + 3; x++) t[z * W + x] = 0;
+        for (let z = hz - 1; z <= hz + 1; z++) t[z * W + xm] = 5;
+        rooms.push(this._room(lx, hz - 2, 3, 5, { type: 'landing', stairs: true, lid: true }));
+        doors.push([dx, hd, 'x', false, false]); entries.push([xm, hd]);
+      }
+      floors.push({ W, H, t, out, rooms, doors, fences: fences.filter(([x, z]) => t[z * W + x] === 4), spawn: roof, entries, units: 0 }); // (the stair heads stand where the parapet would)
+    }
     for (const fl of floors) fl.units = unit;
-    return { floors, stairs, units: unit };
+    return { floors, stairs, units: unit, lz: { x: (W - this.LZ_W) >> 1, z: (H - this.LZ_H) >> 1, f: 2, lamps: [[5.8, hz + 2.5], [W - 5.8, hz - 1.5]] } };
   },
   // the rooms of a home with a door to q
   _through(q, mine, doors) {
@@ -1112,9 +1192,10 @@ G.Level = {
   src(map, x, y, z) { return [Math.floor(x / this.TS), Math.floor(z / this.TS), this.floorAt(map, x, y || 0, z)]; },
 
   // A warehouse: a row of offices along the back wall, then the warehouse floor (rows of pallet racks with
-  // aisles between and cross-aisles through them), open at the front onto the loading dock where you come in.
+  // aisles between and cross-aisles through them), open at the front onto the loading dock, the yard past it, where you
+  // come in: the helicopter's pad behind a row of containers.
   layWarehouse(r, level) {
-    const U = G.U, W = 26 + Math.min(level, 4), H = 22 + Math.min(level, 3);
+    const U = G.U, W = 26 + Math.min(level, 4), lzH = 7, H = 22 + Math.min(level, 3) + lzH; // (the last rows: the blast walls and the helicopter's pad past the dock)
     const t = new Uint8Array(W * H).fill(1), rooms = [], doors = [];
     const fill = (x0, z0, w, h) => { for (let z = z0; z < z0 + h; z++) for (let x = x0; x < x0 + w; x++) t[z * W + x] = 0; };
     // offices, 4 tiles deep, side by side with a wall between each
@@ -1130,19 +1211,20 @@ G.Level = {
     }
     // the floor inside, then the front wall, then the loading dock outside (where you come in): two roller doors
     // (rolled up: wide openings) and a door between them
-    const hz = od + 2, dockH = 4, hallH = H - 2 - hz - dockH, fz = hz + hallH, out = new Uint8Array(W * H), fences = [];
+    const hz = od + 2, dockH = 4, hallH = H - 2 - hz - dockH - lzH, fz = hz + hallH, out = new Uint8Array(W * H), fences = [];
     fill(1, hz, W - 2, hallH);
-    fill(1, fz + 1, W - 2, dockH);
+    fill(1, fz + 1, W - 2, dockH + lzH);
     for (let z = fz + 1; z < H; z++) for (let x = 0; x < W; x++) out[z * W + x] = 1;
     const rollers = [U.ri(r, 3, (W >> 1) - 4), U.ri(r, (W >> 1) + 2, W - 6)];
     for (const x0 of rollers) for (let x = x0; x < x0 + 3; x++) t[fz * W + x] = 0;
     doors.push([(rollers[0] + rollers[1] + 3) >> 1, fz, 'z', false, false]);
     for (let x = 0; x < W; x++) { t[(H - 1) * W + x] = 4; fences.push([x, H - 1, 'x']); }
     for (let z = fz + 1; z < H - 1; z++) for (const x of [0, W - 1]) { t[z * W + x] = 4; fences.push([x, z, 'z']); }
-    const dock = this._room(1, fz + 1, W - 2, dockH, { type: 'dock', out: true });
+    const dock = this._room(1, fz + 1, W - 2, dockH, { type: 'dock', out: true, front: true });
     const hall = this._room(1, hz, W - 2, hallH, { type: 'hall' });
-    rooms.push(dock, hall, ...offices);
-    return { W, H, t, rooms, doors, out, fences, spawn: dock, rollers: rollers.map((x0) => [x0, fz, 3]) };
+    const pz = fz + dockH + 2, pad = this._room(1, pz, W - 2, 6, { type: 'lz', out: true }), lz = this._pad(pad, W, (W - this.LZ_W) >> 1, pz, this.LZ_KIT.yard);
+    rooms.push(pad, dock, hall, ...offices);
+    return { W, H, t, rooms, doors, out, fences, spawn: pad, lz, rollers: rollers.map((x0) => [x0, fz, 3]) };
   },
 
   // The hangar: one big hall (the workshop, the store and the warehouse side by side in it), a wide opening in its
@@ -1175,9 +1257,10 @@ G.Level = {
 
   // The suburbs: two detached family homes side by side on a street, the houses of interest, each with a basement, a
   // ground floor and an upstairs. Coarse tiles (2 m), north (low z) to south:
-  //   the street, four tiles wide (a road with its pavements), running the whole width. You start at its west end,
-  //     behind the roadblock: two patrol cars staggered across the road (a gap to walk through), with the neighbour's
-  //     house on the corner between you and the houses' windows. More patrol cars at the kerb in front of the houses
+  //   the street, four tiles wide (a road with its pavements), running the whole width. You start at its west end, on the
+  //     helicopter's pad on the turning circle there, a removal van across the road east of it, then the roadblock: two
+  //     patrol cars staggered across the road (a gap to walk through), with the neighbour's house on the corner between
+  //     you and the houses' windows. More patrol cars at the kerb in front of the houses
   //     and across the far end.
   //   front lawns, then the houses (18-22 m across, 12-14 m deep), a narrow alley between them and a path down the
   //     east side, and the back gardens behind, joined by a gap in the fence between them.
@@ -1188,7 +1271,7 @@ G.Level = {
   // Floors: 0 the basement, 1 the ground floor (base), 2 upstairs. Upstairs, everything outside the houses is open
   // air (tile 5, open to the sky): nothing to stand on, no ceiling, and a roof over the top.
   layHouses(r, level) {
-    const U = G.U, S = 4, SP = 12; // the street, S tiles deep; its west end, SP tiles, before the houses
+    const U = G.U, S = 4, SP = 21, TC = 8; // the street, S tiles deep; its west end, SP tiles, before the houses; the first TC of them the turning circle
     const grow = Math.min(level >> 1, 2);
     const hwA = U.ri(r, 9, 10) + (grow >> 1), hwB = U.ri(r, 9, 10) + (grow >> 1), hh = U.ri(r, 6, 7), yd = U.ri(r, 5, 6);
     const zF = S + 3, z0 = zF + 1, zb = z0 + hh, H = zb + yd + 2; // the front wall row, the first row inside, the back wall row
@@ -1208,9 +1291,10 @@ G.Level = {
     fill(Gf, SP + 1, zb + 1, W - SP - 2, yd); setOut(Gf, SP, zb + 1, W - SP, yd + 1, 1); // the back gardens
     // the neighbour on the corner: a front garden behind a fence, their house (not to be entered) behind it
     fill(Gf, 1, S + 1, SP - 1, 2); setOut(Gf, 0, S + 1, SP, 2, 1);
-    for (let x = 1; x < SP; x++) fence(x, S + 1, 'x');
+    for (let x = TC + 1; x < SP; x++) fence(x, S + 1, 'x');
     for (let x = 0; x < W; x++) { fence(x, 0, 'x'); fence(x, H - 1, 'x'); }
     for (let z = 1; z <= S; z++) { fence(0, z, 'z'); fence(W - 1, z, 'z'); }
+    for (let z = S + 1; z < S + 3; z++) fence(0, z, 'z'); // (the turning circle's west side)
     for (let z = S + 1; z < H - 1; z++) { fence(SP, z, 'z'); fence(W - 1, z, 'z'); } // (the neighbour's side, and the east edge)
     for (let z = zb + 2; z <= zb + yd; z++) if (z !== zb + 3) fence(xl, z, 'z'); // between the gardens, a gap near the house
     // ---- the houses, floor by floor
@@ -1251,7 +1335,7 @@ G.Level = {
     }
     // ---- the outdoor rooms; the street, its patrol cars
     const curb = S; // (the row along the lawns)
-    const spawn = this._room(1, 1, SP - 3, S, { type: 'road', out: true });
+    const spawn = this._room(1, 1, TC, S + 2, { type: 'lz', out: true }), way = this._room(TC + 1, 1, SP - TC - 3, S, { type: 'road', out: true });
     const road = this._room(SP - 2, 1, W - SP + 1, S, { type: 'road', out: true, cars: [
       [SP - 1, 1, false], [SP + 1, 3, false], // the roadblock: staggered across the road
       [xA + 1, curb, true], [xB + hwB - 4, curb, true], // at the kerb in front of the houses
@@ -1260,10 +1344,11 @@ G.Level = {
     const lawnA = this._room(SP + 1, S + 1, xl - SP - 1, zF - S - 1, { type: 'lawn', out: true }), lawnB = this._room(xl, S + 1, W - xl - 1, zF - S - 1, { type: 'lawn', out: true });
     const alley = this._room(xl, zF, 1, zb - zF + 1, { type: 'alley', out: true }), path = this._room(xE, zF, 1, zb - zF + 1, { type: 'alley', out: true });
     const yardA = this._room(SP + 1, zb + 1, xl - SP - 1, yd, { type: 'yard', out: true }), yardB = this._room(xl + 1, zb + 1, W - xl - 2, yd, { type: 'yard', out: true });
-    const nbr = this._room(1, S + 2, SP - 1, 1, { type: 'lawn', out: true });
-    Gf.rooms.push(yardA, yardB, alley, path, lawnA, lawnB, nbr, road, spawn);
+    const nbr = this._room(TC + 1, S + 2, SP - TC - 1, 1, { type: 'lawn', out: true });
+    const lz = this._pad(spawn, W, 1, 2, this.LZ_KIT.suburbs, true);
+    Gf.rooms.push(yardA, yardB, alley, path, lawnA, lawnB, nbr, road, way, spawn);
     const floor = (F, f) => ({ W, H, t: F.t, out: F.out, rooms: F.rooms, doors: F.doors, fences: F.fences, spawn: f === 1 ? spawn : F.rooms[0], entries: f === 1 ? null : entries[f], underground: f === 0 });
-    return { floors: [floor(B, 0), floor(Gf, 1), floor(Up, 2)], stairs, base: 1 };
+    return { floors: [floor(B, 0), floor(Gf, 1), floor(Up, 2)], stairs, base: 1, lz: Object.assign(lz, { f: 1 }) };
   },
 
   tile(map, tx, tz) {
@@ -2100,6 +2185,16 @@ G.Level = {
     const roofed = [];
     for (let i = 0; i < W * H; i++) if (!map.out[i] && !(va && va[i])) roofed.push(i);
     const ceilGeo = new THREE.PlaneGeometry(TS, TS); ceilGeo.rotateX(Math.PI / 2);
+    // the top of it, for what's looking down from the air (you ride in over the roofs: js/landing.js), wherever nothing's
+    // built on it; a flat felt roof (a home's pitched one sits over it). Its back to the rooms below.
+    const up = map.above, tops = [];
+    for (let i = 0; i < W * H; i++) if (!map.out[i] && (!up || (up.out[i] && up.t[i] === 5))) tops.push(i);
+    if (tops.length) {
+      const g = new THREE.PlaneGeometry(TS, TS); g.rotateX(-Math.PI / 2);
+      const top = new THREE.InstancedMesh(g, new THREE.MeshBasicMaterial({ color: 0x1e1f21 }), tops.length), tm = new THREE.Matrix4();
+      tops.forEach((i, n) => { tm.makeTranslation(((i % W) + 0.5) * TS, this.WALL_H + 0.02, (Math.floor(i / W) + 0.5) * TS); top.setMatrixAt(n, tm); });
+      root.add(top);
+    }
     const ceil = new THREE.InstancedMesh(ceilGeo, new THREE.MeshStandardMaterial({ map: ctex, roughness: 1 }), roofed.length);
     const cm = new THREE.Matrix4();
     // (a centimetre under the tops of the walls: the walls of the floor above stand on them, and their undersides,

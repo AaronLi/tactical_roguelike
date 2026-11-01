@@ -653,6 +653,44 @@ G.Furniture = (() => {
     if (v < 0.5) k.box(k.mat(0x6a6e72, 0.9), 0.2, 0.12, 0.6, -0.32, 0.06, 0);
   } };
 
+  // What shelters a helicopter's pad (js/level.js LZ_KIT), what's there anyway. A shipping container, its sides ribbed. style: c; chill, a reefer's unit on its end
+  R.container = { w: 6.06, d: 2.44, cover: 1, boxes: [[0, 0, 6.06, 2.44, 2.6]], build(k, v, s) {
+    const c = k.mat(s.c, 0.6, 0.3), d = k.mat(k.tint(s.c, 0.8), 0.6, 0.3), dark = k.mat(0x1c1c1e, 0.7);
+    k.box(c, 6.06, 2.42, 2.3, 0, 1.31, 0); k.box(dark, 6.06, 0.1, 2.44, 0, 0.05, 0);
+    for (let i = 0; i < 34; i++) for (const q of [-1, 1]) k.box(d, 0.08, 2.3, 0.05, -2.9 + i * 0.176, 1.3, q * 1.18);
+    for (const x of [-3, 3]) for (const z of [-1.17, 1.17]) k.box(d, 0.1, 2.56, 0.1, x, 1.3, z);
+    if (s.chill) { k.box(k.mat(0xc8ccd0, 0.5, 0.3), 0.3, 2.2, 2.2, 3.1, 1.25, 0); for (const y of [0.7, 1.7]) k.cyl(dark, 0.3, 0.3, 0.02, 3.26, y, 0, 14, 0); }
+  } };
+  // A box truck parked up. style: c, stripe
+  R.boxtruck = { w: 6.6, d: 2.3, cover: 1, boxes: [[0.9, 0, 4.7, 2.3, 2.9], [-2.3, 0, 1.9, 2.2, 2.2]], build(k, v, s) {
+    const c = k.mat(s.c, 0.5, 0.1), dk = k.mat(0x18181a, 0.8), m = k.mat(0xb8bcc0, 0.3, 0.8), cab = k.mat(0xe8e6e0, 0.35, 0.2), gl = k.mat(0x20303a, 0.1, 0.4);
+    k.box(c, 4.7, 2.3, 2.3, 0.9, 1.75, 0); k.box(dk, 6.4, 0.2, 1.2, 0, 0.55, 0); k.box(k.mat(s.stripe || 0x884444, 0.5), 4.7, 0.3, 2.32, 0.9, 1.5, 0);
+    k.box(cab, 1.8, 1.5, 2.2, -2.3, 1.45, 0); k.box(gl, 0.02, 0.6, 1.9, -3.21, 1.75, 0); for (const q of [-1, 1]) k.box(gl, 1.0, 0.5, 0.02, -2.4, 1.8, q * 1.11);
+    k.box(dk, 0.2, 0.3, 2.2, -3.25, 0.65, 0); for (const x of [-2.4, 1.8]) for (const q of [-1, 1]) { k.cyl(dk, 0.48, 0.48, 0.3, x, 0.48, q * 1.0, 16, Math.PI / 2); k.cyl(m, 0.24, 0.24, 0.31, x, 0.48, q * 1.0, 12, Math.PI / 2); }
+  } };
+  R.dumpster = { w: 1.9, d: 1.1, cover: 1, boxes: [[0, 0, 1.9, 1.1, 1.3]], build(k) {
+    const c = k.mat(k.pick([0x2f5a3a, 0x3a4a5a, 0x5a3a2a]), 0.7, 0.3); k.box(c, 1.9, 1.15, 1.1, 0, 0.67, 0); k.box(k.mat(0x18181a, 0.8), 1.96, 0.05, 1.16, 0, 1.27, 0, 0, -0.06); for (const x of [-0.8, 0.8]) for (const z of [-0.4, 0.4]) k.box(k.mat(0x18181a, 0.8), 0.1, 0.1, 0.1, x, 0.05, z);
+  } };
+  // Earth-filled gabions round a bunker's approach: wire mesh, a sack liner, dirt on top, three bays
+  R.hesco = { w: 3.1, d: 1.1, cover: 1, boxes: [[0, 0, 3.1, 1.1, 2.1]], build(k) {
+    const c = k.mat(0x8a8468, 0.95), m = k.mat(0x5a5e58, 0.4, 0.6), d = k.mat(0x4a3e2c, 1);
+    for (let i = 0; i < 3; i++) { const x = -1.03 + i * 1.03; k.box(c, 1.0, 2.06, 1.06, x, 1.03, 0); k.box(d, 0.96, 0.03, 1.02, x, 2.07, 0); for (const y of [0.35, 0.7, 1.05, 1.4, 1.75]) k.box(m, 1.02, 0.015, 1.08, x, y, 0); for (const a of [-0.34, 0, 0.34]) k.box(m, 0.015, 2.06, 1.08, x + a, 1.03, 0); }
+  } };
+  R.portaloo = { w: 1.2, d: 1.2, boxes: [[0, 0, 1.15, 1.15, 2.3]], build(k) {
+    const c = k.mat(k.pick([0x2a6a9a, 0x3a7a4a]), 0.5), d = k.mat(0xdcdcd4, 0.6); k.box(d, 1.15, 0.1, 1.15, 0, 0.05, 0); k.box(c, 1.12, 2.0, 1.12, 0, 1.1, 0); k.box(d, 1.2, 0.14, 1.2, 0, 2.2, 0); k.box(k.mat(0x1c2c3a, 0.5), 0.8, 1.8, 0.02, 0, 1.05, 0.57);
+  } };
+  // On a roof: an air handler, its fan on top; the block's water tank on a steel stand
+  R.hvac = { w: 2.0, d: 1.2, cover: 1, boxes: [[0, 0, 2.0, 1.2, 1.35]], build(k) {
+    const c = k.mat(0xa8aaa6, 0.5, 0.4), d = k.mat(0x2a2c2e, 0.6); k.box(d, 1.9, 0.1, 1.1, 0, 0.05, 0); k.box(c, 2.0, 1.15, 1.2, 0, 0.67, 0); for (let i = 0; i < 12; i++) k.box(d, 0.03, 0.9, 0.01, -0.86 + i * 0.156, 0.67, 0.605); k.cyl(d, 0.42, 0.42, 0.12, 0.4, 1.3, 0, 16); k.cyl(k.mat(0x6a6c6e, 0.4, 0.5), 0.04, 0.04, 0.14, 0.4, 1.31, 0, 8); k.box(k.mat(0x6a6c6e, 0.4, 0.5), 0.72, 0.02, 0.08, 0.4, 1.36, 0, 0.7);
+  } };
+  R.watertank = { w: 2.2, d: 2.2, cover: 1, boxes: [[0, 0, 2.2, 2.2, 2.9]], build(k) {
+    const s = k.mat(0x4a4e52, 0.5, 0.5), c = k.mat(0x8a8e8a, 0.6, 0.3); for (const x of [-0.9, 0.9]) for (const z of [-0.9, 0.9]) k.box(s, 0.1, 0.9, 0.1, x, 0.45, z); k.box(s, 2.0, 0.08, 2.0, 0, 0.92, 0); k.cyl(c, 1.05, 1.05, 1.8, 0, 1.86, 0, 20); k.cyl(k.mat(0x6a6e6a, 0.6, 0.3), 0.1, 1.08, 0.3, 0, 2.9, 0, 20);
+  } };
+  // A roof's parapet: a low concrete wall with a steel cap
+  R.parapet = { w: 0.68, d: 0.3, boxes: [[0, 0, 0.68, 0.3, 1.15]], build(k) {
+    k.box(k.mat(0x8a857b, 0.95), 0.68, 1.1, 0.3, 0, 0.55, 0); k.box(k.mat(0x5a5e62, 0.5, 0.5), 0.68, 0.05, 0.36, 0, 1.125, 0);
+  } };
+
   // ---------------------------------------------------------------- the town square and the car park
   // A parked car, nose to +z: body, cabin and glass, wheels, lights. Solid cover across two tiles.
   const CAR = [0x8a1c1c, 0x1c3a6a, 0xd8d8d4, 0x2a2a2c, 0x6a6e72, 0x2e5a3a, 0xc8a040, 0x5a2a5a, 0xe8e4da, 0x3a4a5a];
@@ -919,6 +957,7 @@ G.Furniture = (() => {
     hall: { floor: null }, dock: { floor: 'pave' },
     // the hangar between levels (js/hangar.js): dressed by hand, and the helipad outside it
     hangar: { floor: 'pave', bare: 1 }, pad: { floor: 'pave', bare: 1, out: 1 }, range: { floor: 'pave', bare: 1, out: 1 },
+    lz: { floor: 'pave', bare: 1, out: 1 }, roof: { floor: 'pave', bare: 1, out: 1 }, // (where the helicopter sets you down: js/level.js landing)
     // outside: the street in front of a house, the lot in front of a building (bins, pallets, crates)
     street: { must: 'bin', wall: ['bin', 'planter', 'bin'], center: [], small: ['planter', 'bin'], floor: 'pave', out: 1 },
     // a road (the suburbs: the patrol cars are set where the layout says, rm.cars), and a front lawn
@@ -1169,6 +1208,8 @@ G.Furniture = (() => {
     let nFine = 0; // (pieces laid on the fine grid: kept past the tiles' own keys)
     for (const rm of rooms) {
       rm.type = rm.type || (r() < home ? homes[hi++ % homes.length] : WORK[wi++ % WORK.length]);
+      // what the layout stands out in the open: [name, x, z (metres), quarter-turns, style] (js/level.js _pad)
+      for (const [name, x, z, q, st] of rm.cover || []) { const rec = R[name], v = r(); map.props.set(W * map.H + nFine++, { name, q, x, z, v, style: st || {}, block: rec.small ? 0 : rec.cover ? 2 : 4, boxes: worldBoxes(rec, x, z, q, v) }); }
       if (fest && fest[rm.type]) { fest[rm.type](rm); continue; }
       if (fdy && fdy[rm.type]) { fdy[rm.type](rm); continue; }
       // patrol cars where the layout puts them: [x, z, along] (coarse tiles; along: lengthwise down the road, else across)
@@ -1231,7 +1272,7 @@ G.Furniture = (() => {
         let n = Math.floor((rm.w * rm.h) / 9);
         for (let a = 0; a < 80 && n > 0; a++) {
           const x = U.ri(r, rm.x, rm.x + rm.w - 1), z = U.ri(r, rm.z, rm.z + rm.h - 2);
-          if (rm === spawnRoom && Math.abs(x - rm.cx) <= 2) continue;
+          if ((rm === spawnRoom || rm.front) && Math.abs(x - rm.cx) <= 2) continue;
           if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a2, b]) => t[(z + b) * W + x + a2] === 2)) continue;
           const name = r() < 0.6 ? 'pallet' : 'crates';
           if (!tryBlock(x, z, 2)) continue;
@@ -1381,6 +1422,13 @@ G.Furniture = (() => {
         speckle(g, w, h, 300, 0.06);
       }),
       carpet: (base) => mk(128, 128, (g, w, h) => { g.fillStyle = base; g.fillRect(0, 0, w, h); speckle(g, w, h, 2500, 0.12); }),
+      // bare concrete, cloudy, a few stains
+      concrete: (base) => mk(256, 256, (g, w, h) => {
+        g.fillStyle = base; g.fillRect(0, 0, w, h);
+        for (let i = 0; i < 26; i++) { g.fillStyle = `rgba(${rnd() < 0.5 ? '0,0,0' : '255,255,255'},${0.02 + rnd() * 0.05})`; g.beginPath(); g.arc(rnd() * w, rnd() * h, 14 + rnd() * 50, 0, 7); g.fill(); }
+        for (let i = 0; i < 3; i++) { g.fillStyle = 'rgba(20,16,10,0.14)'; g.beginPath(); g.arc(rnd() * w, rnd() * h, 6 + rnd() * 16, 0, 7); g.fill(); }
+        speckle(g, w, h, 1800, 0.08);
+      }),
       // lino in a check of two colours, scuffed
       lino: (base, other) => mk(128, 128, (g, w, h) => {
         const s = w / 2;
@@ -1682,7 +1730,7 @@ G.Furniture = (() => {
     const dressRoom = (rm) => {
       const dr = rm.dress, f = dr.floor;
       cur = G.U.rng((map.seed ^ Math.imul(rm.z * W + rm.x + 1, 0x9e3779b1)) >>> 0);
-      const tex = tx[f.kind](f.color, f.grout || '#7a7670');
+      const tex = tx[f.kind === 'laminate' ? 'wood' : f.kind](f.color, f.grout || '#7a7670');
       tex.repeat.set(rm.w, rm.h);
       const fm = mat(0xffffff, f.kind === 'tile' ? 0.45 : 0.85, 0, { map: tex }), mine = new Set(dr.cells);
       layFloor(rm, fm, rm.carved ? 0.006 : 0.004); // (a carved room's floor lies over the floor of the room it came out of)

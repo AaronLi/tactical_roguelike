@@ -1142,17 +1142,11 @@ G.Game = {
     G.HUD.buildMinimap(this.map);
     const team = [...G.Views.players.values()].map((p) => p.st && p.st.w && G.Gunsmith.fromCode(p.st.w)).filter(Boolean).map((d) => d.soundKey);
     G.GunAudio.prewarm([...Object.values(G.Me.weapons).flatMap((w) => [w.def.soundKey, G.Gunsmith.roundSoundKey(w.def, w.chamber || w.ammo)]), ...this.enemyGuns(level), ...team], this.map);
-    // spread the squad out in the spawn room
-    const ids = Object.keys(this.roster).sort();
-    const i = Math.max(0, ids.indexOf(G.Net.myId));
-    const sp = this.map.spawn, w = this.map.world;
-    // each officer a clear spot of their own, nearest the spawn first (never on the stairs or in a wall)
-    const clear = (x, z) => { let ok = true; G.World.query(w, [x - 0.4, 0.05, z - 0.4], [x + 0.4, 1.8, z + 0.4], (s) => { if (s.move) ok = false; }); return ok; };
-    const spots = [[0, 0]];
-    for (let r = 1; r <= 3; r++) for (let k = 0; k < 8 * r; k++) { const a = (k / (8 * r)) * Math.PI * 2; spots.push([Math.cos(a) * r * 0.9, Math.sin(a) * r * 0.9]); }
-    const free = w ? spots.filter(([dx, dz]) => clear(sp.x + dx, sp.z + dz)) : spots;
-    const [ox, oz] = free[i] || free[0] || [0, 0];
-    G.Me.spawn(sp.x + ox, sp.z + oz);
+    // everyone in a seat of their own in the helicopter, on the pad (the same on every machine: by the sorted roster)
+    const i = Math.max(0, Object.keys(this.roster).sort().indexOf(G.Net.myId));
+    G.Landing.enter(this.map);
+    G.Me.spawn(this.map.spawn.x, this.map.spawn.z);
+    G.Landing.board(G.Me, Math.min(i, G.Hangar.HELI.seats - 1));
     this.screen(null);
     G.HUD.show(true);
     G.HUD.toast(`LEVEL ${level}`, this.map.theme.name + (G.Route.isBoss(level) ? ' — <b class="red">THE WARDEN AWAITS</b>' : ''), 3.5);
@@ -1248,6 +1242,7 @@ G.Game = {
       if (G.Highlights && !this.hub) G.Highlights.tick(dt); // (recording the level, for the hangar's TVs)
       if (this.hub) { G.Hangar.update(dt); G.Hangar.mark(); }
       G.Views.update(dt);
+      if (!this.hub) G.Landing.update(dt); // (after everyone's posed: in the air it moves the camera, and hides who's riding with you)
       if (G.Me.dead) G.Me.spectate(dt); // (after the rigs are posed: the helmet camera's on a head as it is this frame)
       G.GunAudio.updateListener(G.R.camera); // (after that: dead, you hear from where the camera is, not where you fell)
       G.Me.flushHits();

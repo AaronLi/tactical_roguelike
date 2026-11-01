@@ -32,9 +32,12 @@
 //       hang: hung at this height on a free wall, not over a window or anything that tall (no collision: as a picture)
 //       pull: stood this far out from the wall, if the room's deep enough to walk round behind it
 //       must: the room's main piece: if it won't go anywhere clear, it can come as close to a door as the doorway itself
+//     up: a room they'd have if the home's got one, not one it has to (a loft's gallery rooms, whichever its floors have)
 //       need: without this the home's not theirs after all (all of it's left as it was)
 //       swap: what to try instead, smaller (a list of { piece, style, at }) } }
-// A home needs the room types its resident lists (bar spare and carved ones): a room type left out is painted by `rest`.
+// A home needs the room types its resident lists (bar spare, up and carved ones): a room type left out is painted by `rest`.
+// A loft is one home on two floors: its resident's chosen on the ground floor and dresses the upper floor too (lofts).
+// More residents: js/residents.js.
 G.Homes = (() => {
   const U = G.U, F = G.Furniture, R = F.R;
   const CREAM = '#d9d0b0'; // (smoke-stained, every ceiling of his but the bathroom's)
@@ -48,8 +51,8 @@ G.Homes = (() => {
           { id: 'his', piece: 'easy', at: 'cross:sofa', need: 1, style: { fabric: 0x6e5a3e, worn: 0xa89a7c, slippers: 1 } }, // (worn bald: his)
           { id: 'cups', piece: 'cuptable', at: 'beside:his' },
           { id: 'hers', piece: 'easy', at: 'away:his', style: { fabric: 0xc8601e, vinyl: 1 } }, // (orange vinyl, hers, untouched)
-          { id: 'lamp', piece: 'lamp', at: 'beside:sofa' },
-          { id: 'china', piece: 'china', at: 'wall', swap: [{ piece: 'sidetable' }] },
+          { id: 'lamp', piece: 'flamp', at: 'beside:sofa' },
+          { id: 'china', piece: 'china', at: 'wall', swap: [{ piece: 'cuptable' }] },
           { id: 'sewing', piece: 'treadle', at: 'wall', swap: [{ piece: 'guides' }] },
           { id: 'plant', piece: 'tallplant', at: 'corner', swap: [{ piece: 'tallplant', at: 'wall' }] },
           { id: 'guides', piece: 'guides', at: 'beside:his' },
@@ -76,7 +79,7 @@ G.Homes = (() => {
           { id: 'photo', piece: 'photo', hang: 1.6, at: 'beside:bed' },
         ] },
         bathroom: { carve: { from: ['bedroom', 'dining', 'kitchen'], size: [3, 4] }, tight: 1, wall: '#9fc2b8', ceil: '#e4dfd0', trim: '#3f6f66', floor: { kind: 'tile', color: '#7fa89d', grout: '#5a7a72' }, items: [
-          { id: 'sinks', piece: 'sinks', at: 'long' },
+          { id: 'basin', piece: 'basin', at: 'wall' },
           { id: 'toilet', piece: 'toilet', at: 'corner', swap: [{ piece: 'toilet', at: 'wall' }] },
         ] },
       } },
@@ -87,12 +90,13 @@ G.Homes = (() => {
   // A deep old sofa, a crocheted throw of squares over its back and down onto the seat
   R.couch = { w: 2.0, d: 0.92, cover: 1, boxes: [[0, 0, 2.0, 0.92, 0.88]], build(k, v, s) {
     const f = k.mat(s.fabric, 0.95), f2 = k.mat(k.tint(s.fabric, 1.14), 0.95), dark = k.mat(0x3a2414, 0.5);
-    for (const x of [-0.88, 0.88]) for (const z of [-0.38, 0.38]) k.box(dark, 0.07, 0.1, 0.07, x, 0.05, z);
+    for (const x of [-0.88, 0.88]) for (const z of [-0.38, 0.38]) k.box(dark, 0.07, 0.1, 0.07, x, 0.05, z); // (style: fabric; plain, no throw)
     k.box(f, 2.0, 0.32, 0.92, 0, 0.26, 0);
     for (const x of [-0.42, 0.42]) k.box(f2, 0.82, 0.14, 0.66, x, 0.49, 0.1);
     for (const x of [-0.42, 0.42]) k.box(f2, 0.8, 0.42, 0.18, x, 0.7, -0.26, 0, -0.12);
     k.box(f, 1.7, 0.56, 0.16, 0, 0.62, -0.38);
     for (const x of [-0.92, 0.92]) { k.box(f, 0.18, 0.3, 0.92, x, 0.54, 0); k.cyl(f2, 0.1, 0.1, 0.92, x, 0.69, 0, 8, Math.PI / 2); } // (rolled arms)
+    if (s.plain) return;
     const yarn = [0xe6dcc4, 0xb5492a, 0x6f7a3c, 0xd2a03c, 0xe6dcc4].map((c) => k.mat(c, 1)), cols = 7, sq = 0.145, x0 = 0.42 - ((cols - 1) * sq) / 2;
     for (let i = 0; i < cols; i++) {
       const x = x0 + i * sq;
@@ -344,7 +348,7 @@ G.Homes = (() => {
 
   // ---------------------------------------------------------------- who lives where
   // the level's: a random stream from its seed and nothing else, and who's still to find a home
-  const start = (seed) => { const r = U.rng((seed ^ 0x48a401d) >>> 0); return { seed, r, left: U.shuffle(r, RESIDENTS.slice()) }; };
+  const start = (seed) => { const r = U.rng((seed ^ 0x48a401d) >>> 0); return { seed, r, left: U.shuffle(r, RESIDENTS.slice()), lofts: new Map() }; };
 
   // Which of a home's rooms is which for this resident: [[room, its spec, its type]], or null if the home can't be theirs.
   // A spare room type goes to a room of that type, else to one the home can spare (no walls move). Left over: the
@@ -356,7 +360,7 @@ G.Homes = (() => {
     for (const [ty, spec] of rooms) {
       if (spec.spare) continue;
       const q = left.filter((o) => o.type === ty).sort(big)[0]; // (the biggest of them, if there are two)
-      if (!q) return null;
+      if (!q) { if (spec.up) continue; return null; }
       out.push([take(q), spec, ty]);
     }
     for (const [ty, spec] of rooms) {
@@ -368,11 +372,29 @@ G.Homes = (() => {
     out.rest = left;
     return out;
   }
+  // A loft's upper floor, for the resident of the home under it: the rooms they've a list for and haven't yet had, in the order
+  // they're listed, each taking a room of its type or the biggest going.
+  function castUp(p, mine, had) {
+    const left = mine.slice(), out = [], big = (a, b) => b.w * b.h - a.w * a.h;
+    for (const [ty, spec] of Object.entries(p.rooms)) {
+      if (spec.carve || !spec.up || had.has(ty) || !left.length) continue;
+      const q = left.filter((o) => o.type === ty).sort(big)[0] || left.slice().sort(big)[0];
+      left.splice(left.indexOf(q), 1);
+      out.push([q, spec, ty]);
+    }
+    out.rest = left;
+    return out;
+  }
   // One floor's homes, each roll from the level's stream. A loft's rooms all carry `loft` or live under one that does.
   function fill(map, ctx) {
     const units = [...new Set(map.rooms.filter((q) => q.unit != null).map((q) => q.unit))].sort((a, b) => a - b);
     for (const id of units) {
       const mine = map.rooms.filter((q) => q.unit === id), loft = mine.some((q) => q.loft), roll = ctx.r();
+      if (mine.every((q) => q.loft)) { // (a loft's upper floor: the home under it's)
+        const up = ctx.lofts.get(id);
+        if (up) dressHome(map, up.who, castUp(up.who, mine, up.had), ctx.seed);
+        continue;
+      }
       let sum = 0, who = null, plan = null;
       for (const p of ctx.left) {
         if ((p.home === 'loft') !== loft || !(plan = cast(p, mine))) continue;
@@ -380,7 +402,9 @@ G.Homes = (() => {
         if (roll < sum) { who = p; break; }
       }
       if (!who) continue;
-      if (dressHome(map, who, plan, ctx.seed)) ctx.left.splice(ctx.left.indexOf(who), 1);
+      if (!dressHome(map, who, plan, ctx.seed)) continue;
+      ctx.left.splice(ctx.left.indexOf(who), 1);
+      if (loft) ctx.lofts.set(id, { who, had: new Set(plan.map((e) => e[2])) });
     }
   }
   // A whole home, room by room, or none of it: the rooms first, the carved room with the room it comes out of, then
@@ -478,6 +502,8 @@ G.Homes = (() => {
         for (let d = 0; d < (tight ? 2 : 4); d++) for (let s = tight ? 0 : -1; s <= (tight ? 0 : 1); s++) mark(x - dx * d + dz * s, z - dz * d + dx * s);
       }
       if (map.leafAt && map.leafAt.has(z * W + x)) keep.add(z * W + x);
+      // (the way onto a loft's stairs: nothing within two cells of them)
+      for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) if (t[(z + dz) * W + x + dx] === 7) keep.add(z * W + x);
     }
     for (const o of [map.case, map.abox, map.sbox, ...(map.cabinets || [])]) {
       if (!o) continue;
@@ -648,7 +674,7 @@ G.Homes = (() => {
         if (hung.some((h) => Math.hypot(h.x - x, h.z - z) < (rec.w + R[h.name].w) / 2 + 0.3)) continue;
         if (own.some((p) => p.boxes.some((b) => Math.abs(b.cx - x) < b.hx + rec.w / 2 + 0.05 && Math.abs(b.cz - z) < b.hz + rec.w / 2 + 0.05 && b.h > y - 0.35))) continue;
         if ((map.cabinets || []).some((c) => Math.hypot(c.x - x, c.z - z) < 1)) continue;
-        hung.push({ name: item.piece, x, z, q: F.facing(s.n[0], s.n[1]), v: r(), style: { h: y } });
+        hung.push({ name: item.piece, x, z, q: F.facing(s.n[0], s.n[1]), v: r(), style: Object.assign({}, item.style, { h: y }) });
         return true;
       }
       return false;

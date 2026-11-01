@@ -472,9 +472,10 @@ G.Me = {
   },
 
   move(dt, map) {
-    // belted into a seat in the hangar's helicopter: nowhere to go, the view turned no further than a head turns
+    // belted into a seat in the helicopter (the hangar's, or the one that's brought you in): nowhere to go, the view turned
+    // no further than a head turns
     if (this.seat != null) {
-      const sp = G.Hangar.seatPos(this.seat);
+      const sp = (G.Game.hub ? G.Hangar : G.Landing).seatPos(this.seat);
       this.pos.set(sp.x, sp.y, sp.z); this.vel.set(0, 0, 0); this.onGround = true; this.hspeed = 0;
       this.crouch = true; this.stowed = true; this.lowToggle = false;
       this.yaw = sp.yaw + G.U.clamp(G.U.angDiff(sp.yaw, this.yaw), -1.9, 1.9);
@@ -1641,6 +1642,12 @@ G.Me = {
       G.HUD.setPrompt(o.prompt); G.HUD.setProgress(o.prog, o.label);
       return;
     }
+    // in the helicopter that's brought you in (js/landing.js)
+    if (this.seat != null) {
+      const o = G.Landing.interact(this, dt, held);
+      G.HUD.setPrompt(o.prompt); G.HUD.setProgress(o.prog, o.label);
+      return;
+    }
 
     if (this.action) {
       // a timed action in progress: weapon away until it's done
@@ -2316,7 +2323,7 @@ G.Me = {
     return {
       p: [r2(this.pos.x), r2(this.pos.y), r2(this.pos.z)], yw: r2(this.yaw), pt: r2(this.pitch),
       hp: Math.ceil(this.hp), mhp: this.maxHp(), ar: Math.round(this.vestCond() * 100), amx: G.Gear.piece(this, 'chest') ? 100 : 0,
-      pr: this.prone ? 1 : 0, dn: this.down ? 1 : 0, uc: this.out ? 1 : 0, dd: this.dead ? 1 : 0, bl: this.down ? (this.bleed == null ? -1 : Math.ceil(this.bleed)) : 0, bd: this.body ? G.Med.encode(this.body) : null,
+      pr: this.prone ? 1 : 0, sd: this.seat != null ? 1 : 0, dn: this.down ? 1 : 0, uc: this.out ? 1 : 0, dd: this.dead ? 1 : 0, bl: this.down ? (this.bleed == null ? -1 : Math.ceil(this.bleed)) : 0, bd: this.body ? G.Med.encode(this.body) : null,
       w: this.cur().def.code, ac: G.Ballistics.armourState(this), sk: G.Stickers.share(this.cur().stickers) || undefined, tl: this.tacFlags(this.cur()), cr: this.crouch || this.down || this.prone ? 1 : 0, ln: r2(this.lean || 0), lr: this.lowReady ? 1 : 0, sd: this.steadying ? 1 : 0, sw: this.stowed || this.held ? 1 : 0,
       hk: this.held ? (this.held.kind === 'flash' ? 2 : 1) : 0, hc: this.held && this.held.cock ? 1 : 0, hs: this.held ? this.held.str : 0,
       ld: G.loaded(this.cur()) > 0 ? 1 : 0, rl: this.reloading && this.reloadTotal ? r2(G.U.clamp(1 - this.reloadT / this.reloadTotal, 0, 1)) : -1, in: this.inspectT > 0 && this.inspectDur ? r2(1 - this.inspectT / this.inspectDur) : this.rChk ? r2(0.58 + (G.VMAnim.INSPECT_HOLD - 0.58) * this.rChk.k) : -1,

@@ -475,17 +475,29 @@ G.Hangar = (() => {
 
   // ---- the helicopter: an armoured tiltrotor dropship, nose to the west, with ducted fans on stub wings
   function helicopter() {
-    const r = S.root, h = new T.Group(), P = HELI;
+    const r = S.root, P = HELI, sh = ship(), h = sh.group;
     h.position.set(P.x, 0, P.z); r.add(h);
+    const pad = padMesh(true); pad.position.set(P.x + 0.4, 0.014, P.z); r.add(pad);
+    const hs = new T.Mesh(new T.PlaneGeometry(2.4, 0.5), signMat(['READY ROOM', 'hold F to board'], 384, 80, '#101418', '#7dff9a', '#cfd6dc')); hs.rotation.y = Math.PI; hs.position.set(P.x - 0.5, 2.98, P.z - 1.36); r.add(hs);
+    S.heli = Object.assign(sh, { rotor: sh.rotors[0], speed: 3, spin: 0 });
+    addTarget({ id: 'heli', kind: 'heli', box: [P.x - 3.5, 0.2, P.z - 1.4, P.x + 2.5, 2.9, P.z + 1.4], label: 'the helicopter' });
+  }
+  // helipad: a painted H on the paving (lit: the hangar's own daylight; in a level, what's there)
+  function padMesh(lit) {
+    const mat = { map: canvasTex(256, 220, (g, w, hh) => { g.fillStyle = '#34383d'; g.fillRect(0, 0, w, hh); g.strokeStyle = '#e8c030'; g.lineWidth = 6; g.strokeRect(10, 10, w - 20, hh - 20); g.fillStyle = '#e8c030'; g.fillRect(w / 2 - 38, hh / 2 - 50, 14, 100); g.fillRect(w / 2 + 24, hh / 2 - 50, 14, 100); g.fillRect(w / 2 - 38, hh / 2 - 7, 76, 14); }) };
+    const pad = new T.Mesh(new T.PlaneGeometry(13, 11), lit ? new T.MeshBasicMaterial(mat) : new T.MeshStandardMaterial(Object.assign(mat, { roughness: 0.9 })));
+    pad.rotation.x = -Math.PI / 2;
+    return pad;
+  }
+  // the machine itself, on the ground at the group's origin (the hangar's, and the one that brings you in: js/landing.js)
+  function ship() {
+    const h = new T.Group(), P = HELI;
     const body = M(0x9aa7b3, { roughness: 0.5, metalness: 0.3, emissive: 0x20262c }), armor = M(0x56626e, { roughness: 0.55, metalness: 0.4, emissive: 0x12161a }), dark = M(0x2a3036), inside = M(0x6b7279, { emissive: 0x2a3036 });
     const accent = M(0xd9922a, { emissive: 0x3a2308 }), duct = M(0x56626e, { roughness: 0.55, metalness: 0.4, emissive: 0x12161a, side: T.DoubleSide });
     const glass = new T.MeshStandardMaterial({ color: 0x78a8c8, transparent: true, opacity: 0.4, roughness: 0.1, metalness: 0.3 });
     const glow = new T.MeshBasicMaterial({ color: 0x1a6a40 }); // status strips: red to green as the squad gets in
     const thrust = new T.MeshBasicMaterial({ color: 0x5ad0ff, transparent: true, opacity: 0.2, side: T.DoubleSide, depthWrite: false, blending: T.AdditiveBlending });
     const part = (g, mesh, x, y, z) => { mesh.position.set(x, y, z); g.add(mesh); return mesh; };
-    // helipad: a painted H on the paving
-    const pad = new T.Mesh(new T.PlaneGeometry(13, 11), new T.MeshBasicMaterial({ map: canvasTex(256, 220, (g, w, hh) => { g.fillStyle = '#34383d'; g.fillRect(0, 0, w, hh); g.strokeStyle = '#e8c030'; g.lineWidth = 6; g.strokeRect(10, 10, w - 20, hh - 20); g.fillStyle = '#e8c030'; g.fillRect(w / 2 - 38, hh / 2 - 50, 14, 100); g.fillRect(w / 2 + 24, hh / 2 - 50, 14, 100); g.fillRect(w / 2 - 38, hh / 2 - 7, 76, 14); }) }));
-    pad.rotation.x = -Math.PI / 2; pad.position.set(P.x + 0.4, 0.014, P.z); r.add(pad);
     // cabin: the floor, the roof, the back (south), the bulkheads; the north side is open (a door's length), with
     // a bench along the south wall facing out of it
     box(h, -3.2, P.floor - 0.1, -1.3, 2.4, P.floor, 1.3, inside);
@@ -537,9 +549,7 @@ G.Hangar = (() => {
     box(h, -1.6, P.floor + 0.42, 1.12, 1.75, P.floor + 1.3, 1.2, bench);
     for (let i = 0; i < P.seats; i++) { const x = -1.3 + i * 0.5; box(h, x - 0.2, P.floor + 0.42, 0.6, x + 0.2, P.floor + 0.48, 1.1, seat); }
     for (let i = 0; i < P.seats; i++) { const x = -1.3 + i * 0.5; box(h, x - 0.2, P.floor + 0.55, 1.05, x + 0.2, P.floor + 1.0, 1.12, seat); } // seat backs
-    const hs = new T.Mesh(new T.PlaneGeometry(2.4, 0.5), signMat(['READY ROOM', 'hold F to board'], 384, 80, '#101418', '#7dff9a', '#cfd6dc')); hs.rotation.y = Math.PI; hs.position.set(P.x - 0.5, 2.98, P.z - 1.36); r.add(hs);
-    S.heli = { group: h, rotor: rotors[0], rotors, tail, glow, thrust, speed: 3, spin: 0 };
-    addTarget({ id: 'heli', kind: 'heli', box: [P.x - 3.5, 0.2, P.z - 1.4, P.x + 2.5, 2.9, P.z + 1.4], label: 'the helicopter' });
+    return { group: h, rotors, tail, glow, thrust };
   }
   const seatPos = (i) => ({ x: HELI.x - 1.3 + i * 0.5, y: HELI.floor, z: RZ + HELI.z + 0.85, yaw: 0 });
   const exitPos = (i) => ({ x: HELI.x - 1.3 + i * 0.5, y: 0, z: RZ + HELI.z - 2.6 });
@@ -796,5 +806,5 @@ G.Hangar = (() => {
   // where you stand when you come in: on the pad, in front of the opening
   function spawnAt(i) { const x = 26 + (i % 3 - 1) * 1.6, z = RZ + 30.4 + Math.floor(i / 3) * 1.4; return { x, z }; }
 
-  return { decorate, enter, leave, update, refresh, aim, interact, mark, seatPos, exitPos, spawnAt, S, HELI, HOLD, RZ };
+  return { decorate, enter, leave, update, refresh, aim, interact, mark, seatPos, exitPos, spawnAt, ship, padMesh, S, HELI, HOLD, RZ };
 })();

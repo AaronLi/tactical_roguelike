@@ -1362,7 +1362,8 @@ G.Server = {
     this.nadeT -= dt;
     this.noiseT = (this.noiseT || 0) - dt;
     if (this.noiseT <= 0) { this.noiseT = 0.25; this.footsteps(alive); }
-    for (const e of this.enemies.values()) this.think(e, dt, alive);
+    const onFoot = alive.filter((p) => !p.st.sd); // (still in the helicopter that brought them: nobody's to aim at yet, js/landing.js)
+    for (const e of this.enemies.values()) this.think(e, dt, onFoot);
 
     // keep enemies from stacking
     const es = [...this.enemies.values()];
