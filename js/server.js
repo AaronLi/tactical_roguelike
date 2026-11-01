@@ -184,7 +184,7 @@ G.Server = {
       // open the weapon case (once, for everyone)
       case 'openCase': {
         const c = this.map && this.map.case;
-        if (this.phase !== 'level' || !c || this.caseOpen || !p || !p.st || Math.hypot(c.x - p.st.p[0], c.z - p.st.p[2]) > 2.4) break;
+        if (this.phase !== 'level' || !c || this.caseOpen || !p || !p.st || Math.hypot(c.x - p.st.p[0], c.z - p.st.p[2]) > 2.4 || Math.abs(p.st.p[1]) > 1.5) break; // (on the ground floor: this one and the two boxes)
         this.caseOpen = true;
         G.Net.broadcast({ t: 'wcase', c: this.caseMsg() });
         this.casePut();
@@ -194,7 +194,7 @@ G.Server = {
       // then you take one of them, fitted to your weapon or carried
       case 'openAbox': case 'takeAbox': {
         const b = this.map && this.map.abox, a = this.abox;
-        if (this.phase !== 'level' || !b || !a || !p || !p.st || Math.hypot(b.x - p.st.p[0], b.z - p.st.p[2]) > 2.4) break;
+        if (this.phase !== 'level' || !b || !a || !p || !p.st || Math.hypot(b.x - p.st.p[0], b.z - p.st.p[2]) > 2.4 || Math.abs(p.st.p[1]) > 1.5) break;
         const mine = a.uses[from];
         if (m.t === 'openAbox') {
           if (mine) break;
@@ -211,7 +211,7 @@ G.Server = {
       // the sticker box: the sticker goes to whoever opens it first
       case 'openSbox': {
         const b = this.map && this.map.sbox, s = this.sbox;
-        if (this.phase !== 'level' || !b || !s || s.by || !p || !p.st || Math.hypot(b.x - p.st.p[0], b.z - p.st.p[2]) > 2.4) break;
+        if (this.phase !== 'level' || !b || !s || s.by || !p || !p.st || Math.hypot(b.x - p.st.p[0], b.z - p.st.p[2]) > 2.4 || Math.abs(p.st.p[1]) > 1.5) break;
         s.by = from;
         G.Net.broadcast({ t: 'sbox', s: this.sboxMsg() });
         break;

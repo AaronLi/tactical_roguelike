@@ -1829,7 +1829,7 @@ G.Me = {
       // the attachments box: one use each. Your first look rolls your three (for the weapon in your hands); then look
       // in again till you've taken one
       const ab = map.abox, abs = G.Game.abox, mineAb = G.Game.aboxMine();
-      if (!tgt && !cuffTgt && !prompt && ab && abs && Math.hypot(ab.x - this.pos.x, ab.z - this.pos.z) < 1.4) {
+      if (!tgt && !cuffTgt && !prompt && ab && abs && Math.hypot(ab.x - this.pos.x, ab.z - this.pos.z) < 1.4 && Math.abs(this.pos.y) < 1.5) { // (it's on the ground floor: not from the floor above or a basement)
         if (!mineAb) {
           const w = this.cur();
           prompt = `Hold <b>F</b> to ${abs[0] ? 'take your turn at' : 'open'} the attachments box${w ? ` <small>(three attachments for your ${w.def.name})</small>` : ''}`;
@@ -1842,7 +1842,7 @@ G.Me = {
       }
       // the sticker box: close by and facing it, the sticker's yours (the first to open it)
       const sb = map.sbox, sbs = G.Game.sbox;
-      if (!tgt && !cuffTgt && !prompt && sb && sbs && sbs[0] && Math.hypot(sb.x - this.pos.x, sb.z - this.pos.z) < 1.5) {
+      if (!tgt && !cuffTgt && !prompt && sb && sbs && sbs[0] && Math.hypot(sb.x - this.pos.x, sb.z - this.pos.z) < 1.5 && Math.abs(this.pos.y) < 1.5) {
         const fx = -Math.sin(this.yaw), fz = -Math.cos(this.yaw), dx = sb.x - this.pos.x, dz = sb.z - this.pos.z, dl = Math.hypot(dx, dz) || 1;
         if ((fx * dx + fz * dz) / dl > 0.6) {
           if (sbs[1]) prompt = 'The sticker box is empty';
@@ -1854,7 +1854,7 @@ G.Me = {
       }
       // the level's weapon case: open it, and what's inside is there to be picked up (js/server.js casePut)
       const mc = map.case;
-      if (!tgt && !cuffTgt && !prompt && mc && !G.Game.caseOpen && Math.hypot(mc.x - this.pos.x, mc.z - this.pos.z) < 1.6) {
+      if (!tgt && !cuffTgt && !prompt && mc && !G.Game.caseOpen && Math.hypot(mc.x - this.pos.x, mc.z - this.pos.z) < 1.6 && Math.abs(this.pos.y) < 1.5) {
         prompt = 'Hold <b>F</b> to open the weapon case';
         if (F) { this.startAction('Opening the case', 1.0, () => G.Net.toHost({ t: 'openCase' }), 'case'); busy = true; }
       }
