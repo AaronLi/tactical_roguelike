@@ -573,6 +573,12 @@ G.GunModels = (() => {
   // A cartridge's dimensions (metres) from the gun's caliber (G.GUN_SPECS: bullet diameter and case length, mm): a
   // bottlenecked rifle case's head is about 3.6 mm wider than its bullet; a straight pistol case's, 0.9; a shotgun
   // shell is its bore and its length.
+  // A cartridge drawn to its real profile, for one that's handled in plain sight: [radius, distance from the base] in metres
+  // up the case and the bullet. .50 BMG (12.7x99): rim 20.42 mm, 2.26 thick, the extractor groove, the body tapering to the
+  // shoulder at 18.14, the neck 14.22, the case 99.31 long, the bullet 12.98 and a long ogive, 138.43 overall (the
+  // cartridge's published figures; where the shoulder starts is judged from photographs).
+  const BMG = { oal: 0.13843, case: [[0, 0], [0.01021, 0], [0.01021, 0.00226], [0.0088, 0.00286], [0.0088, 0.0048], [0.01015, 0.0062], [0.00907, 0.0775], [0.00711, 0.0845], [0.00711, 0.09931], [0, 0.09931]], bullet: [[0, 0.09931], [0.00649, 0.09931], [0.00649, 0.1035], [0.0058, 0.116], [0.0036, 0.1305], [0.0014, 0.1376], [0, 0.13843]] };
+  const roundShape = (def) => { const g = G.GUN_SPECS[def.id]; return g && g.caliber === 12.7 && g.caseLength === 99 ? BMG : null; };
   function roundDims(def) {
     const g = G.GUN_SPECS[def.id];
     if (!g || !g.caliber || !g.caseLength) return null;
@@ -1430,7 +1436,7 @@ G.GunModels = (() => {
     // where a chamber check shows the round: through the ejection port on the right (js/vmanim.js), or for a
     // break-action, the shell heads in the breech
     const hw = { ar: 0.0178, ak: 0.022, aksu: 0.0192, box: (o.W || 0.045) / 2, round: 0.018, bullpup: 0.023, vector: 0.026, aug: 0.029, f2: 0.032, qbz95: 0.027, qbz192: 0.0172, scar: 0.0172, g36: 0.022, mcx: 0.0156, mpx: 0.0156 }[rcv] || 0.018;
-    const chamberAt = tr && tr.chamber ? { side: 'breech', heads: [[0, by - hy]], z: L - tr.chamber, r: 0.0064 } // (the Thor's: at the back of its sleeve)
+    const chamberAt = tr && tr.chamber ? { side: 'breech', heads: [[0, by - hy]], z: L - tr.chamber, r: 0.0097, bore: true } // (the Thor's: in the back face of its sleeve, half proud of it, the bore there when it's empty)
       : rcv === 'break' ? { side: 'breech', heads: (o.barrels || [0]).map((x) => [x, by - hy]), z: -0.0005, r: br } // (in the barrels' hinge frame)
       : o.bolt ? { side: 'top', f: o.bolt - 0.05, y: rcv === 'round' ? top - 0.0015 : top, x: rcv === 'round' ? 0.006 : 0.011, w: 0.024 } // (a bolt gun's port is its open top, to the right of a scope's line, above the stock)
       : { side: 'right', f: o.chF != null ? o.chF : o.lever ? L * 0.55 : magAt ? magAt[0] + 0.005 : !o.pump && handle && handle.x > 0 ? handle.f + 0.026 : o.pump || o.tube ? L * 0.55 : L * 0.5, y: o.chY != null ? o.chY : by, x: hw };
@@ -1438,7 +1444,7 @@ G.GunModels = (() => {
       sy: sight.sy, fSight: sight.fSight, relief: sight.relief,
       muzzles: [[front, by, 0]],
       grip: [gf + 0.005, -0.075, 0], support: [support, o.pump ? -0.03 : -0.028, 0],
-      anim, magAt, handle, port, chamberAt, ch: (rcv === 'ar' && !o.cock) || o.ch ? [-0.006, 0.026, 0] : null, bolt: o.bolt ? [o.bolt, 0.01, 0.068] : null,
+      anim, magAt, handle, port, chamberAt, breech: tr && tr.chamber ? breechAt(L, hy, L - tr.chamber, by - hy, BRK_OPEN) : null, ch: (rcv === 'ar' && !o.cock) || o.ch ? [-0.006, 0.026, 0] : null, bolt: o.bolt ? [o.bolt, 0.01, 0.068] : null,
       cheek: o.cheek != null ? o.cheek : null, // (a bullpup: where your eye is, whatever's on the rail: js/gunmodels.js viewmodel)
     };
   }
@@ -1479,6 +1485,10 @@ G.GunModels = (() => {
   }
   // the rest of a trace: outlines ({ on: which part they're tagged as, pts, holes, w, x, m, b: bevel, two: both sides at
   // +x and -x }), m a material's name, or the gun's own frame, grip or slide
+  // Where a breech at the far end of a tipping barrel is once it's open (a Thor's: the barrel and its sleeve hinge at the
+  // front, the breech out at the back of them): [forward, up] from the pin at (L, hy), z back and y up from it in the hinge's frame
+  const BRK_OPEN = -0.55;
+  const breechAt = (L, hy, z, y, a) => ({ at: [L - (y * Math.sin(a) + z * Math.cos(a)), hy + y * Math.cos(a) - z * Math.sin(a)], pitch: a });
   function tracedParts(k, t, V, on, mats) {
     for (const p of t.parts || []) {
       if ((p.on || 'base') !== on) continue;
@@ -2387,5 +2397,5 @@ G.GunModels = (() => {
   // the gunsmith's display model: every part as separate meshes (tagged by slot), stock included
   function display(def, skin) { const k = kit(); const info = build(k, def); if (skin && skin.length) G.Stickers.decorate(k.g, skin); return { group: k.g, info }; }
 
-  return { M, build, viewmodel, world, display, roundDims, setLoaded, quarrel };
+  return { M, build, viewmodel, world, display, roundDims, roundShape, setLoaded, quarrel };
 })();
