@@ -59,6 +59,7 @@ G.WEAPON_LIST = [
   W({ id: 'mk14', slot: 'p', cls: 'DMR', tier: 2, price: 1800, name: 'Mk14 EBR', rpm: 330, mode: 'semi', mag: 20, reserve: 120, reload: 2.6, spread: 2.5, ads: 0.01458, range: 60, zoom: 0.45, speed: 0.93, pen: 1, desc: 'Semi-auto marksman rifle. Put a magnified optic on it.' }),
   W({ id: 'r700', slot: 'p', cls: 'SNP', tier: 2, price: 1700, name: 'R700 Bolt', rpm: 48, mode: 'semi', mag: 5, reserve: 40, reload: 3.0, spread: 6, ads: 0.00625, range: 100, zoom: 0.3, speed: 0.9, pen: 2, desc: 'One shot, one problem solved. Bolt-action.' }),
   W({ id: 'barrett', slot: 'p', cls: 'SNP', tier: 4, price: 4200, name: 'M82 Anti-Materiel', rpm: 90, mode: 'semi', mag: 10, reserve: 40, reload: 3.8, spread: 7, ads: 0.01667, range: 120, zoom: 0.28, speed: 0.85, pen: 5, desc: '.50 BMG. Goes through walls of people.' }),
+  W({ id: 'gm6', slot: 'p', cls: 'SNP', tier: 4, price: 4600, name: 'GM6 Lynx', rpm: 80, mode: 'semi', mag: 5, reserve: 30, reload: 4.0, spread: 6.5, ads: 0.01667, range: 120, zoom: 0.26, speed: 0.88, pen: 5, desc: 'The Hungarian bullpup .50. The whole barrel slams back into the body every shot (long recoil): a shove, not a kick, from a gun a foot shorter than the M82.' }),
   // ----- PRIMARY: specials -----
   W({ id: 'm32', slot: 'p', cls: 'GL', tier: 3, price: 3200, name: 'M32 Launcher', explosive: { r: 4.5, dmg: 170 }, rpm: 110, mode: 'semi', mag: 6, reserve: 18, reload: 0.7, shell: true, spread: 1, ads: 0.5, range: 100, zoom: 0.75, speed: 0.9, desc: 'Six-shot revolving grenade launcher. Mind the blast.' }),
   W({ id: 'rail', slot: 'p', cls: 'RAIL', tier: 4, price: 4800, name: 'Arc Railgun', rpm: 50, mode: 'semi', mag: 4, reserve: 24, reload: 3.2, spread: 0.6, ads: 0, recoil: 5, range: 200, zoom: 0.5, speed: 0.9, pen: 99, tracer: 0x55ddff, desc: 'Magnetically accelerated slug. Penetrates everything alive.' }),
@@ -164,7 +165,7 @@ G.fullReload = (d) => (G.revolver(d) && d.shell ? G.REV.open + d.reload * d.mag 
 // Bolt hold-open: the action locks back on the last round, so a reload from empty is a magazine change and a
 // thumb on the bolt catch (or the slide stop), not a full rack. Every pistol with a slide, the AR-15 family and the
 // rifles and SMGs built the same way; not the AK family, the MP5's roller bolt, the open-bolt guns or a bolt-action.
-G.BOLT_HOLD = new Set(['scar', 'scarl', 'g36', 'aug', 'aug9', 'tavor', 'fal', 'm14', 'mk14', 'sr25', 'barrett', 'mpx', 'mp7', 'vector', 'skorp', 'svd', 'ar9', 'm27', 'hk416', 'br3', 'qbz192']);
+G.BOLT_HOLD = new Set(['scar', 'scarl', 'g36', 'aug', 'aug9', 'tavor', 'fal', 'm14', 'mk14', 'sr25', 'barrett', 'gm6', 'mpx', 'mp7', 'vector', 'skorp', 'svd', 'ar9', 'm27', 'hk416', 'br3', 'qbz192']);
 G.boltHold = (def) => {
   const P = def && G.Gunsmith && G.Gunsmith.PLATFORMS[def.id];
   return !!P && (P.arch === 'pistol' || G.BOLT_HOLD.has(def.id) || (P.arch === 'rifle' && (P.spec.rcv || 'ar') === 'ar')); // (the AR-15 pattern: a bolt catch over the well)
@@ -221,6 +222,7 @@ G.GUN_SPECS = {
   mk14:     GS(18.0, 7.62, 'flash', 60000, 0.90, 168, 0.55, 0.55, 'gas', 'brass', 51),
   r700:     GS(24.0, 7.62, 'none', 60000, 1.10, 175, 0.05, 0.10, 'recoil', 'brass', 51),
   barrett:  GS(29.0, 12.7, 'brake', 55000, 1.60, 660, 0.80, 0.70, 'recoil', 'brass', 99),
+  gm6:      GS(28.7, 12.7, 'brake', 55000, 1.60, 660, 0.90, 0.75, 'recoil', 'brass', 99),
   m32:      GS(12.0, 40.0, 'none', 1200, 1.20, 3500, 0.10, 0.10, 'recoil', 'aluminum', 46),
   p9:       GS(4.5, 9.00, 'none', 35000, 0.35, 115, 0.45, 0.60, 'recoil', 'brass', 19),
   m1911:    GS(5.0, 11.43, 'none', 21000, 0.40, 230, 0.50, 0.60, 'recoil', 'brass', 23),
@@ -347,12 +349,12 @@ G.THEMES = [
   // box and first aid cabinet always in its stockroom to get you started
   { name: 'Convenience Store', layout: 'mart', starter: true, foes: 0.8, crowd: 1.5, home: 0, reflect: 0.35, floor: '#cfd3cd', wall: '#e6e2d6', crate: '#8a6a3a', fog: 0x0d0f12, light: 0xf2f6ff, ceil: '#e8e8e2' },
   { name: 'Festival', layout: 'festival', fence: 'hoarding', home: 0, reflect: 0.2, floor: '#26331f', wall: '#5b7480', crate: '#8a6a3a', fog: 0x060912, light: 0xffe2c0, ceil: '#d8dcde', fogNear: 30, fogFar: 150, hemi: 0x5a6a96, hemiI: 0.55, crowd: 2, foes: 1.5, night: 35 },
-];
-
   // the top of the Sandia Mountains over Albuquerque at sundown, outdoors: two summits of pink granite with a gorge between,
   // long sight lines across it (a sniper's level), the city's lights coming on far below. rock: the walls are outcrops
   // (js/level.js buildMesh); far: how far the camera sees (the view off the mountain); lookouts: more marksmen among them
   { name: 'Sandia Crest', layout: 'crest', rock: 1, fence: 'cliffwall', home: 0, reflect: 0.1, floor: '#8c7660', wall: '#e2d6cc', crate: '#8a6a3a', fog: 0xd99a7c, light: 0xffe4c0, ceil: '#d6cfc4', fogNear: 160, fogFar: 900, far: 1400, hemi: 0xffd6b8, hemiI: 0.85, cloud: 0xb98c8a, crowd: 0.8, foes: 1.4, big: 1.5, lookouts: 2.5 },
+];
+
 // the hangar between levels (js/hangar.js): a daylit hall with a helipad outside it
 G.HANGAR_ROWS = 156; // the shooting range (300 m of rifle lanes) north of the hangar: tile rows (js/level.js layHangar; js/hangar.js shifts the hall by two metres a row)
 G.HANGAR_THEME = { name: 'Hangar', layout: 'hangar', hub: true, noFog: true, home: 0, reflect: 0.35, floor: '#6c7075', wall: '#98a0a8', crate: '#8a6a3a', fog: 0x86a6c8, light: 0xfff2dc, ceil: '#c9cdd0', hemi: 0xe4ecf6, hemiI: 0.85 };
@@ -495,7 +497,7 @@ G.GUN_KG = { // each gun as it comes (kg)
   ak74: 3.4, aks74u: 2.7, scarl: 3.3, m27: 3.6, fal: 4.3, m14: 4.5, mk14: 5.1, garand: 4.3, svd: 4.3, vss: 2.6, lever: 3.3,
   sr25: 4.9, uzi: 1.5, mp5: 2.5, p90: 2.6, vector: 2.7, thompson: 4.9, ppsh: 3.6, mp5sd: 2.9, mpx: 2.7, ar9: 2.9, aug9: 3.3, qbz95: 3.3, qbz192: 3.0, mcx: 2.7,
   pump: 3.6, dbl: 3.2, saiga: 3.6, aa12: 4.8, ksg: 3.6, slug: 3.6, benelli: 3.8, vepr: 4.0, m249: 7.5, pkm: 7.5, m60: 10.5,
-  rpk: 4.8, shredder: 16, r700: 4.1, barrett: 14, mosin: 4.0, awm: 6.5, m32: 5.3, rail: 7.5, crossbow: 3.5,
+  rpk: 4.8, shredder: 16, r700: 4.1, barrett: 14, gm6: 11.5, mosin: 4.0, awm: 6.5, m32: 5.3, rail: 7.5, crossbow: 3.5,
   p9: 0.75, g19: 0.7, m1911: 1.1, usp: 0.75, fiveseven: 0.75, thor: 5.4, b92: 0.97, ppk: 0.59, auto9: 1.1, deagle: 2.0, rev: 1.1, hc500: 2.0, akimbo: 0.95, derringer: 0.4,
   g18: 0.9, skorp: 1.3, mp7: 1.9, mac10: 2.8, tx22: 0.6, sawn: 2.0, judge: 0.85, pocketgl: 1.8,
 };
@@ -508,6 +510,7 @@ G.RECOIL_K = (() => {
   set('g36', 0.75);
   set('shredder', 0.4); // (braced on its harness)
   set('barrett', 0.65); // (its barrel recoils inside the receiver, and the brake takes much of the rest)
+  set('gm6', 0.6); // (all of its barrel and bolt run back together, a long stroke: the impulse spread out, and the brake)
   return k;
 })();
 G.RECOIL = { K: 0.2045, B: 1.35, A: 0.7, HAND: 1.3, GAS: 1.75 };

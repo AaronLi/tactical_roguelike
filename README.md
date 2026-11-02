@@ -942,7 +942,7 @@ says the same), but not whose: the shooter's name isn't shown.
     your wrist), scaled so a 2.9 kg M4 kicks 1.1° a shot. On top of that, design: a stock that drops below the
     bore (AKs, old wooden stocks) climbs 25% more, a manual action (bolt, pump, lever, break-open, revolver)
     40% more (nothing in it softens the kick), and a few guns are built against it (the Vector's bolt goes
-    down, the G36, the M82's recoiling barrel, the harness-braced minigun). Every gun has its real weight now
+    down, the G36, the M82's recoiling barrel, the GM6 Lynx's long-recoil barrel, the harness-braced minigun). Every gun has its real weight now
     (an M249 7.5 kg, a PKM 7.5, an M60 10.5, an RPK 4.8, a P9 0.75, a TX22 0.6). So an M249 kicks 0.62° to
     the M4's 1.1, a PKM 1.5 to a SCAR-H's 2.3 and an AK's 1.7 on the same class of round. Your build counts:
     its own weight (a 0.5 kg suppressor takes about 8% off before its own effect), its barrel (a longer one
@@ -1901,7 +1901,7 @@ says the same), but not whose: the shooter's name isn't shown.
   fed as it goes home. One pose of each action (slide, charging handle, cocking handle, bolt, pump, lever) at
   any pull serves every use of it: a rack, a release, the chamber check.
   - **Bolt hold-open** (`G.boltHold`): every pistol with a slide, the AR-15 family, the SCARs, G36, AUG,
-    Tavor, FAL, M14/Mk14, SR-25, Barrett, MPX, MCX, QBZ-192, MP7, Vector, Skorpion and SVD lock open on their last round. From
+    Tavor, FAL, M14/Mk14, SR-25, Barrett, GM6 Lynx, MPX, MCX, QBZ-192, MP7, Vector, Skorpion and SVD lock open on their last round. From
     empty, the magazine change and then a thumb on the bolt catch (or the slide stop), 0.4 s: the slide (or
     bolt) slams forward on a round.
   - **Without one** (the AK family, MP5, open-bolt guns, the belt-feds, bolt-actions): from empty, the magazine
@@ -1932,7 +1932,16 @@ says the same), but not whose: the shooter's name isn't shown.
   - **AR-15 T-handle** at the back of the upper: M4, HK416, M27, SR-25, MPX, AR-9 (and the Mk14, built on an
     AR upper here).
   - **Right-side knob:** the AK family, Galil, SVD, VSS, Saiga, Vepr and RPK; the op rods of the Garand and M14;
-    the Benelli's and PPSh's bolt handles; the belt-feds; the Barrett's big one.
+    the Benelli's and PPSh's bolt handles; the belt-feds; the Barrett's big one; the GM6 Lynx's, over its grip.
+- **The GM6 Lynx's barrel recoils** (a platform's `recoilBarrel` in `js/parts.js`: how far; `js/gunmodels.js` puts the
+  barrel, its collar and whatever's on its muzzle on a part of their own, and `js/vmanim.js` moves it): the Hungarian
+  bullpup .50 is a long-recoil gun, so each shot slams the whole barrel 15 cm back into the tube in front of the grip
+  in 25 ms, holds it there while the bolt unlocks, and runs it home over the next 0.15 s, a suppressor or brake riding
+  with it (a short barrel's stroke stops short of the bipod's clamp). Traced from the maker's side-on studio shot (IMFDB,
+  "GepardM6.jpg") at its real 1126 mm, the front end checked against "Sniper rifle (18218366812) (GM6 Lynx).jpg"
+  (Wikimedia Commons, CC BY 2.0): the long box body with the butt and cheek, the tall 5-round magazine behind the grip
+  with its witness holes, the open grip frame, the tube with its sling plates and short rail, the bipod clamped on its
+  end with the legs folded back, and the GM6's own brake (a slim neck, a blocky head with one big port).
   - **Left side, forward:** the SCARs (a knob), the AUG and Tavor; folding levers on the FAL, Vector and AA-12.
   - **Others:**
     - the HK tube over the handguard, front left (MP5, MP5SD), whose tab slides along a tube that stays put;

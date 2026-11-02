@@ -646,6 +646,11 @@ G.GunModels = (() => {
         return 0.057;
       case 'brake': k.box(0.04, 0.026, 0.065, M.black(), f0, y); for (let i = 0; i < 3; i++) k.box(0.044, 0.012, 0.008, M.rubber(), f0 + 0.012 + i * 0.016, y); return 0.065;
       case 'bigbrake': k.box(0.06, 0.04, 0.11, M.black(), f0, y); for (let i = 0; i < 3; i++) k.box(0.064, 0.02, 0.014, M.rubber(), f0 + 0.02 + i * 0.03, y); return 0.11;
+      case 'lynx': // the GM6's: a collar, a slim neck, a blocky head with one big port right through it, its nose rounded
+        k.cyl(0.018, 0.007, M.black(), f0, y); k.cyl(0.0118, 0.045, M.black(), f0 + 0.007, y);
+        k.box(0.04, 0.033, 0.041, M.black(), f0 + 0.052, y); k.box(0.042, 0.017, 0.022, M.rubber(), f0 + 0.06, y);
+        k.cyl(0.0165, 0.004, M.black(), f0 + 0.093, y);
+        return 0.097;
       case 'comp': k.cyl(br * 1.45, 0.045, M.black(), f0, y); for (let i = 0; i < 3; i++) k.box(0.006, 0.004, 0.006, M.rubber(), f0 + 0.01 + i * 0.012, y + br * 1.45); return 0.045;
       case 'slant': k.cyl(br * 1.35, 0.05, M.black(), f0, y); k.box(0.012, 0.006, 0.012, M.rubber(), f0 + 0.032, y + br * 1.35); return 0.05;
       case 'cutts': k.cyl(br * 1.5, 0.06, M.blued(), f0, y); for (let i = 0; i < 4; i++) k.box(0.012, 0.004, 0.005, M.rubber(), f0 + 0.015 + i * 0.01, y + br * 1.5); return 0.06;
@@ -854,6 +859,9 @@ G.GunModels = (() => {
   // the F2's trace (rifle(), rcv 'f2'): a pixel of its reference photo ([x, y]: x forward from the butt at 204, y down
   // from the bore at 931, the photo drawn 3000 px wide) to gun space ([forward, up], metres)
   const f2Trace = ([x, y]) => [(x - 204) * 0.0003554, (931 - y) * 0.0003554];
+  // the GM6 Lynx's trace (rifle(), rcv 'gm6'): a pixel of its reference photo ([x, y]: x forward from the butt at 5, y down from
+  // the bore at 114) to gun space ([forward, up], metres)
+  const gm6Trace = ([x, y]) => [(x - 5) * 0.001215, (114 - y) * 0.001215];
   // the AKS-74U's trace (rifle(), rcv 'aksu', its handguard and its stock): a pixel of its reference photo ([x, y]: x forward
   // from the back of the receiver at 258, y down from the bore at 367.5, the photo 945 px wide) to gun space ([forward, up], metres)
   const akuTrace = ([x, y]) => [(x - 258) * 0.0010716, (367.5 - y) * 0.0010716];
@@ -962,6 +970,47 @@ G.GunModels = (() => {
       k.prof(pts([[445, 405], [492, 405], [492, 430], [445, 430]]), 0.03, rm);
       k.prof(pts([[402, 425], [470, 425], [470, 598], [458, 604], [412, 602], [402, 590]]), 0.03, o.vfgM || sh);
       top = V([0, 330])[1];
+    } else if (rcv === 'gm6') {
+      // The Gepárd GM6 Lynx, traced from a side photo of the right side (IMFDB, "GepardM6.jpg", a studio shot) at 1.215 mm a
+      // pixel: 1126 mm overall with the barrel run out, the maker's figure (926 mm with it run back in to carry). A bullpup .50
+      // on the long-recoil system: the barrel and the bolt locked to it run back together the whole stroke each shot, the
+      // barrel sliding into the tube in front of the grip (recoilBarrel, below: its own part); the bolt unlocks, the barrel runs
+      // home and the bolt follows it, stripping the next round. The body's a long box, the butt and cheek at the back, the
+      // tall magazine behind the grip; the grip frame open behind the grip, its guard a loop forward; a rail from the cheek
+      // to the bipod's clamp on the end of the tube.
+      const V = gm6Trace, pts = (a) => a.map(V), B = M.black(), D = M.rubber(), sh = fm;
+      // the body: butt, cheek and receiver, its underside stepping down from the butt to the magazine and the grip frame
+      k.prof(pts([[32, 93], [205, 93], [212, 88], [402, 88], [402, 140], [396, 146], [345, 150], [145, 150], [125, 147], [60, 152], [32, 160]]), 0.058, sh, 0, null, 0.004);
+      // the seam along the butt between its halves, the screws through it, the charging handle's slot over the grip
+      k.box(0.0585, 0.002, V([240, 0])[0] - V([32, 0])[0], D, V([32, 0])[0], V([0, 124])[1]);
+      for (const x of [50, 85, 120]) { const [f, y] = V([x, 136]); k.cylX(0.004, 0.0595, M.steel(), f, y); }
+      k.box(0.002, 0.008, V([350, 0])[0] - V([310, 0])[0], D, V([310, 0])[0], V([0, 128])[1], 0.0291);
+      // the butt pad
+      k.prof(pts([[6, 82], [14, 74], [28, 72], [34, 76], [34, 160], [18, 163], [8, 158], [5, 140]]), 0.06, D, 0, null, 0.004);
+      // the grip frame: the grip raked back from the body to its foot, the frame open behind it down to the magazine's front
+      // (another grip fitted: just the frame, the grip in front of it); the trigger guard a loop forward, the trigger
+      k.tag('grip');
+      if ((o.gripT || 'ar') === 'ar') k.prof(pts([[258, 150], [348, 150], [350, 160], [338, 200], [320, 232], [305, 252], [300, 262], [262, 262], [258, 256]]), 0.036, o.gm || sh, 0, [pts([[267, 157], [297, 157], [301, 194], [273, 199], [267, 193]])], 0.004);
+      else k.prof(pts([[258, 150], [300, 150], [300, 262], [258, 262]]), 0.036, sh, 0, null, 0.003);
+      k.tag('base');
+      k.prof(pts([[345, 148], [412, 148], [418, 156], [418, 196], [410, 202], [338, 202]]), 0.012, sh, 0, [pts([[352, 152], [409, 152], [411, 193], [350, 194]])], 0.002);
+      k.box(0.006, V([0, 152])[1] - V([0, 180])[1], 0.007, B, V([357, 0])[0], (V([0, 152])[1] + V([0, 180])[1]) / 2);
+      // the tube the barrel runs in, from the front of the body to the bipod: a sling plate each side at its back, a short rail
+      // under it, a riser carrying the top rail over it
+      const [tf0, ty] = V([402, 117]), [tf1] = V([648, 0]), tR = 0.027;
+      k.cyl(tR, tf1 - tf0, rm, tf0, ty);
+      for (const x of [-1, 1]) {
+        k.box(0.004, 0.026, V([440, 0])[0] - V([406, 0])[0], rm, V([406, 0])[0], ty, x * (tR + 0.001));
+        for (const hx of [414, 428]) k.cylX(0.004, 2 * tR + 0.008, M.steel(), V([hx, 0])[0], ty);
+      }
+      k.box(0.024, 0.009, V([560, 0])[0] - V([505, 0])[0], rm, V([505, 0])[0], V([0, 145])[1]);
+      k.box(0.03, V([0, 88])[1] - V([0, 98])[1], tf1 - tf0, rm, tf0, (V([0, 88])[1] + V([0, 98])[1]) / 2);
+      // the bipod: its clamp on the end of the tube, the yoke over and under it, the legs folded back along the tube's sides
+      const [cf0] = V([648, 0]), [cf1] = V([695, 0]), [lf] = V([520, 0]);
+      k.cyl(0.034, cf1 - cf0, B, cf0, ty);
+      k.box(0.026, V([0, 85])[1] - V([0, 145])[1], 0.03, B, cf0 + 0.008, (V([0, 85])[1] + V([0, 145])[1]) / 2);
+      for (const x of [-1, 1]) { k.cyl(0.006, cf0 + 0.02 - lf, B, lf, V([0, 132])[1], x * (tR + 0.008)); k.box(0.016, 0.008, 0.02, D, lf, V([0, 132])[1], x * (tR + 0.008)); }
+      top = S.rail(k, V([212, 0])[0], V([640, 0])[0] - V([212, 0])[0], V([0, 88])[1], rm);
     } else if (rcv === 'qbz95') {
       // The QBZ-95 (Type 95), traced from a side photo of the right side (Wikimedia Commons, "QBZ95 automatic rifle mod
       // noBG.png") at 0.574 mm a pixel: 760 mm overall, the PLA's figure, its 463 mm barrel nearly all inside. A bullpup in
@@ -1190,7 +1239,7 @@ G.GunModels = (() => {
       if (tr) { tracedParts(k, tr, VT, 'base', mats); top = VT([0, tr.topY])[1]; }
       else { k.prof([[0, -0.04], [0, 0.012], [L, 0.012], [L, -0.04]], 0.044, o.rm || M.steel()); top = 0.012; }
     }
-    if (!tr && rcv !== 'vector' && rcv !== 'aug' && rcv !== 'qbz95' && rcv !== 'scar' && rcv !== 'f2' && rcv !== 'aksu') triggerGuard(k, gf, rm); // (the F2's is a loop of its own) // (the SCAR's is its lower's) // (the QBZ-95's is its shell) // (the Vector's opening is in its lower; the AUG's guard is its shell)
+    if (!tr && rcv !== 'vector' && rcv !== 'aug' && rcv !== 'qbz95' && rcv !== 'scar' && rcv !== 'f2' && rcv !== 'aksu' && rcv !== 'gm6') triggerGuard(k, gf, rm); // (the F2's is a loop of its own) // (the SCAR's is its lower's) // (the QBZ-95's is its shell) // (the Vector's opening is in its lower; the AUG's guard is its shell)
     if (o.extra === 'ksgTubes') for (const x of [-0.013, 0.013]) k.cyl(0.011, 0.3, M.black(), 0.1, -0.03, x);
     // a carry handle: low enough to keep clear of the line of sight (the irons sit 34 mm over the top), or,
     // like the FAL's, folded down along the left side of the receiver
@@ -1251,7 +1300,7 @@ G.GunModels = (() => {
       k.prof(tr.lug.pts.map(VT), 0.02, M.steel(), 0, null, 0.0015);
       if (o.stock) { k.tag('stock'); const [sf, sy] = VT(tr.lug.at), sp = k.part(sf, sy); k.into(sp, sf, sy); stock(k, o.stock, o.sm || M.black(), false); k.into(null); k.tag('grip'); } // (not in first person, as a rifle's isn't: it'd stand in front of your eye)
     }
-    else if (o.gripT !== 'none' && rcv !== 'qbz95' && rcv !== 'f2' && rcv !== 'aksu' && !((rcv === 'vector' || rcv === 'aug') && (o.gripT || 'ar') === 'ar')) grip(k, gf, o.gm || fm, o.gripT || (rcv === 'ak' ? 'wood' : 'ar')); // (the Vector's own is part of its lower)
+    else if (o.gripT !== 'none' && rcv !== 'qbz95' && rcv !== 'f2' && rcv !== 'aksu' && !((rcv === 'vector' || rcv === 'aug' || rcv === 'gm6') && (o.gripT || 'ar') === 'ar')) grip(k, gf, o.gm || fm, o.gripT || (rcv === 'ak' ? 'wood' : 'ar')); // (the Vector's own is part of its lower)
     k.tag('stock');
     if (rcv === 'vector' && o.stock) { const sp = k.part(0, vecTrace([0, 110])[1]); k.into(sp); stock(k, o.stock, o.sm || fm, false); k.into(null); } // (its tube level with the top of the receiver: the bore's below the shoulder)
     else if (tr && o.stock === (tr.stockT || 'wood') && tr.parts.some((p) => p.on === 'stock')) tracedParts(k, tr, buildingVM ? (q) => { const [f, y] = VT(q); return [Math.max(f, -0.15), y]; } : VT, 'stock', mats); // (the traced stock, while the factory one's fitted: in first person just its wrist, what the hand holds, or the rest of it stands in front of your eye)
@@ -1277,6 +1326,10 @@ G.GunModels = (() => {
     k.tag('barrel');
     const hy = tr && tr.pin ? VT(tr.pin)[1] : -0.035, brk = rcv === 'break' ? k.part(L, hy) : null;
     if (brk) { k.into(brk, L, hy); anim.brk = brk; if (tr) tracedParts(k, tr, VT, 'brk', mats); } // (the Thor's breech sleeve and its rail tip up with the barrel)
+    // a long-recoil barrel (the GM6's): it, its collar and whatever's on its muzzle on a part of their own, run back into the
+    // receiver each shot (js/vmanim.js), as far as the barrel showing allows (rcTravel)
+    const rcl = !brk && o.recoilBarrel ? k.part(L, by) : null, rcTravel = rcl ? Math.min(o.recoilBarrel, bl - 0.02) : 0;
+    if (rcl) { k.into(rcl, L, by); anim.barrel = rcl; k.cyl(0.0148, 0.012, b.m || M.blued(), L - 0.002, by); }
     if (o.integral) {
       k.cyl(o.integral.r, o.integral.len, M.black(), L, by);
       for (let i = 0; i < 3; i++) k.ringZ(o.integral.r, 0.0012, M.rubber(), L + 0.03 + i * o.integral.len * 0.3, by);
@@ -1292,6 +1345,7 @@ G.GunModels = (() => {
       }
       front = L - bIn + bl;
     }
+    if (rcl) k.into(null); // (the handguard, if any, stays put: only the muzzle device rides on with it)
     let hgLen = 0;
     const hgF = L + (o.hgGap || 0); // (where a handguard starts)
     // a traced breech sleeve carried forward to take a handguard (the Thor's long barrel): the same square section over the barrel's
@@ -1339,8 +1393,8 @@ G.GunModels = (() => {
       k.box(0.004, 0.03, n * 0.025 + 0.006, M.black(), f0 - 0.003, -0.012, x + 0.008);
       for (let i = 0; i < n; i++) { k.cylY(0.0095, 0.05, M.redInsert(), f0 + 0.0125 + i * 0.025, -0.008, x); k.cylY(0.0098, 0.012, M.brass(), f0 + 0.0125 + i * 0.025, -0.038, x); }
     }
-    if (!o.integral && o.muzzle) { k.tag('muzzle'); front += rcv === 'aksu' && o.muzzle === 'cutts' ? aksuBooster(k, front, by) : muzzle(k, o.muzzle, front, br, by); } // (the AKS-74U's booster is its own: the Thompson's Cutts is the plain one)
-    if (brk) k.into(null);
+    if (!o.integral && o.muzzle) { k.tag('muzzle'); if (rcl) k.into(rcl, L, by); front += rcv === 'aksu' && o.muzzle === 'cutts' ? aksuBooster(k, front, by) : muzzle(k, o.muzzle, front, br, by); } // (the AKS-74U's booster is its own: the Thompson's Cutts is the plain one)
+    if (brk || rcl) k.into(null);
     if (o.pump) {
       k.tag('pump');
       const p = k.part();
@@ -1455,7 +1509,7 @@ G.GunModels = (() => {
     const port = o.bolt ? [o.bolt - 0.02, top - 0.004, 0] : o.lever ? [L * 0.55, 0.0, 0.02] : o.pump || o.tube ? [L * 0.62, -0.042, 0] : rcv === 'break' ? [L, 0.0, 0] : [L * 0.5, top, 0];
     // where a chamber check shows the round: through the ejection port on the right (js/vmanim.js), or for a
     // break-action, the shell heads in the breech
-    const hw = { ar: 0.0178, ak: 0.022, aksu: 0.0192, box: (o.W || 0.045) / 2, round: 0.018, bullpup: 0.023, vector: 0.026, aug: 0.029, f2: 0.032, qbz95: 0.027, qbz192: 0.0172, scar: 0.0172, g36: 0.022, mcx: 0.0156, mpx: 0.0156 }[rcv] || 0.018;
+    const hw = { ar: 0.0178, ak: 0.022, aksu: 0.0192, box: (o.W || 0.045) / 2, round: 0.018, bullpup: 0.023, vector: 0.026, aug: 0.029, gm6: 0.03, f2: 0.032, qbz95: 0.027, qbz192: 0.0172, scar: 0.0172, g36: 0.022, mcx: 0.0156, mpx: 0.0156 }[rcv] || 0.018;
     const chamberAt = tr && tr.chamber ? { side: 'breech', heads: [[0, by - hy]], z: L - tr.chamber, r: 0.0097, bore: true } // (the Thor's: in the back face of its sleeve, half proud of it, the bore there when it's empty)
       : rcv === 'break' ? { side: 'breech', heads: (o.barrels || [0]).map((x) => [x, by - hy]), z: -0.0005, r: br } // (in the barrels' hinge frame)
       : o.bolt ? { side: 'top', f: o.bolt - 0.05, y: rcv === 'round' ? top - 0.0015 : top, x: rcv === 'round' ? 0.006 : 0.011, w: 0.024 } // (a bolt gun's port is its open top, to the right of a scope's line, above the stock)
@@ -1466,6 +1520,7 @@ G.GunModels = (() => {
       grip: [gf + 0.005, -0.075, 0], support: [support, o.pump ? -0.03 : -0.028, 0],
       anim, magAt, handle, port, chamberAt, breech: tr && tr.chamber ? Object.assign(breechAt(L, hy, L - tr.chamber, by - hy, BRK_OPEN), { long: o.hgGap ? (o.optic === 'notch' ? 'irons' : 'rail') : null }) : null, ch: (rcv === 'ar' && !o.cock) || o.ch ? [-0.006, 0.026, 0] : null, bolt: o.bolt ? [o.bolt, 0.01, 0.068] : null,
       cheek: o.cheek != null ? o.cheek : null, // (a bullpup: where your eye is, whatever's on the rail: js/gunmodels.js viewmodel)
+      recoilBarrel: rcTravel, // (a long-recoil barrel: how far it runs back each shot, js/vmanim.js)
     };
   }
 
