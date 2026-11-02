@@ -351,8 +351,9 @@ G.THEMES = [
   { name: 'Festival', layout: 'festival', fence: 'hoarding', home: 0, reflect: 0.2, floor: '#26331f', wall: '#5b7480', crate: '#8a6a3a', fog: 0x060912, light: 0xffe2c0, ceil: '#d8dcde', fogNear: 30, fogFar: 150, hemi: 0x5a6a96, hemiI: 0.55, crowd: 2, foes: 1.5, night: 35 },
   // the top of the Sandia Mountains over Albuquerque at sundown, outdoors: two summits of pink granite with a gorge between,
   // long sight lines across it (a sniper's level), the city's lights coming on far below. rock: the walls are outcrops
-  // (js/level.js buildMesh); far: how far the camera sees (the view off the mountain); lookouts: more marksmen among them
-  { name: 'Sandia Crest', layout: 'crest', rock: 1, fence: 'cliffwall', home: 0, reflect: 0.1, floor: '#8c7660', wall: '#e2d6cc', crate: '#8a6a3a', fog: 0xd99a7c, light: 0xffe4c0, ceil: '#d6cfc4', fogNear: 280, fogFar: 1100, far: 1600, hemi: 0xffd6b8, hemiI: 0.85, cloud: 0xb98c8a, crowd: 0.8, foes: 1.4, big: 1.5, lookouts: 2.5 },
+  // (js/level.js buildMesh); far: how far the camera sees (the view off the mountain); lookouts: more marksmen among them;
+  // from: the first level it can come up at on the route map (js/route.js): not till after the third
+  { name: 'Sandia Crest', layout: 'crest', from: 4, rock: 1, fence: 'cliffwall', home: 0, reflect: 0.1, floor: '#8c7660', wall: '#e2d6cc', crate: '#8a6a3a', fog: 0xd99a7c, light: 0xffe4c0, ceil: '#d6cfc4', fogNear: 280, fogFar: 1100, far: 1600, hemi: 0xffd6b8, hemiI: 0.85, cloud: 0xb98c8a, crowd: 0.8, foes: 1.4, big: 1.5, lookouts: 2.5 },
 ];
 
 // the hangar between levels (js/hangar.js): a daylit hall with a helipad outside it

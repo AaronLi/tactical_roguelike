@@ -46,10 +46,12 @@ G.Route = (() => {
     for (const n of nodes.values()) if (n.c === COLS - 2) edges.push([COLS - 2, n.r, boss.r]);
     for (const [c, a, b] of edges) { const f = nodes.get(id(c, a)), t = nodes.get(id(c + 1, b)); if (!f.next.includes(t.id)) { f.next.push(t.id); t.prev.push(f.id); } }
     // environments: no two in a row along a link where it can be helped, and each column a mix. (The starter, the
-    // convenience store, is the first act's way in and nowhere else: the rest are drawn from the others.)
-    const pool = G.THEMES.map((T, i) => i).filter((i) => !G.THEMES[i].starter), nT = pool.length, starter = G.THEMES.findIndex((T) => T.starter);
+    // convenience store, is the first act's way in and nowhere else: the rest are drawn from the others, each from its
+    // theme's `from`, the first level it can come up at: the Sandia Crest's after the third.)
+    const all = G.THEMES.map((T, i) => i).filter((i) => !G.THEMES[i].starter), starter = G.THEMES.findIndex((T) => T.starter);
     const order = [...nodes.values()].sort((a, b) => a.c - b.c || a.r - b.r);
     for (const n of order) {
+      const level = (act - 1) * COLS + n.c + 1, pool = all.filter((i) => !(G.THEMES[i].from > level)), nT = pool.length;
       const avoid = new Set(n.prev.map((p) => nodes.get(p).th));
       for (const o of order) if (o.c === n.c && o !== n && o.r < n.r) avoid.add(o.th);
       let k0 = Math.floor(r() * nT);

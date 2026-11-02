@@ -416,7 +416,8 @@ says the same), but not whose: the shooter's name isn't shown.
     - Built in `js/level.js` (`layFestival`, `buildFestival`) and `js/furniture.js` (the pieces and `plan`'s
       `festival()`).
   - **Sandia Crest** (`layout: 'crest'`, `layCrest`): the top of the Sandia Mountains over Albuquerque at sundown,
-    about 334 × 92 m, all of it open to the sky. It's built for long-range sniping: two summits of pink granite with a
+    about 334 × 92 m, all of it open to the sky. Locked till after level 3: the route map only offers it from level 4 on
+    (the theme's `from`, `js/route.js`). It's built for long-range sniping: two summits of pink granite with a
     236 m gorge between them; across it on foot is the saddle at the north end (the way the suspects come), or a zipline
     each way over the gorge. A low stone wall runs round every edge,
     hip high, so you see and shoot over it and crouch behind it. More suspects (×1.4), and more of them are
