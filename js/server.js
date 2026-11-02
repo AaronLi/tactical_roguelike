@@ -562,7 +562,7 @@ G.Server = {
     const hpMult = 1 + 0.04 * (L - 1) + 0.1 * (np - 1);
     this.accMult = Math.min(1 + 0.03 * (L - 1), 1.5);
     this.dmgMult = 1 + 0.07 * (L - 1);
-    const weights = [['suspect', 4], ['grunt', 2.5 + L * 0.2], ['rusher', 1 + L * 0.2], ['marksman', L >= 2 ? 0.8 + L * 0.15 : 0], ['heavy', L >= 3 ? 0.4 + L * 0.2 : 0]];
+    const weights = [['suspect', 4], ['grunt', 2.5 + L * 0.2], ['rusher', 1 + L * 0.2], ['marksman', L >= 2 ? (0.8 + L * 0.15) * (this.map.theme.lookouts || 1) : this.map.theme.lookouts ? 0.6 : 0], ['heavy', L >= 3 ? 0.4 + L * 0.2 : 0]];
     const total = weights.reduce((a, w) => a + w[1], 0);
     // (a spot: [tx, tz] on the fine grid, and in a building of several floors its floor)
     let spots = U.shuffle(Math.random, this.map.enemySpots.slice());

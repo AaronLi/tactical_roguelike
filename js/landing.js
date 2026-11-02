@@ -117,9 +117,10 @@ G.Landing = (() => {
       g.fillStyle = '#0d0f11'; g.fillRect(0, 0, w, w); g.fillStyle = '#17191c'; g.fillRect(0, 0, w, 44); g.fillRect(0, 0, 44, w);
       g.fillStyle = '#b89a5a'; for (let i = 60; i < w; i += 64) { g.fillRect(i, 40, 4, 4); g.fillRect(40, i, 4, 4); } // (street lamps)
     });
-    // (a frame round the level, a little way in under its edges: never under it, where a basement's stairs go down through it)
-    const gm = new T.MeshBasicMaterial({ map: ground }), RIM = 1;
-    for (const [x0, z0, x1, z1] of [[-R, -R, Wm + R, RIM], [-R, Hm - RIM, Wm + R, Hm + R], [-R, RIM, RIM, Hm - RIM], [Wm - RIM, RIM, Wm + R, Hm - RIM]]) {
+    // (a frame round the level, a little way in under its edges: never under it, where a basement's stairs go down through it.
+    // A mountain top has none: what's round it is the mountain, js/level.js buildCrest)
+    const gm = new T.MeshBasicMaterial({ map: ground }), RIM = 1, wild = !!map.crest;
+    if (!wild) for (const [x0, z0, x1, z1] of [[-R, -R, Wm + R, RIM], [-R, Hm - RIM, Wm + R, Hm + R], [-R, RIM, RIM, Hm - RIM], [Wm - RIM, RIM, Wm + R, Hm - RIM]]) {
       const g = new T.PlaneGeometry(x1 - x0, z1 - z0), p = g.attributes.position, uv = g.attributes.uv;
       g.rotateX(-Math.PI / 2); g.translate((x0 + x1) / 2, -0.4, (z0 + z1) / 2);
       for (let i = 0; i < p.count; i++) uv.setXY(i, p.getX(i) / CELL, p.getZ(i) / CELL); // (the streets run on from one side to the next)
@@ -129,7 +130,7 @@ G.Landing = (() => {
       g.fillStyle = '#16181b'; g.fillRect(0, 0, w, w);
       for (let y = 6; y < w; y += 16) for (let x = 6; x < w; x += 14) { const u = r(); g.fillStyle = u < 0.14 ? '#d8b070' : u < 0.2 ? '#8aa0b8' : '#0c0d0f'; g.fillRect(x, y, 8, 9); }
     });
-    for (let x = -R; x < Wm + R; x += CELL) for (let z = -R; z < Hm + R; z += CELL) {
+    if (!wild) for (let x = -R; x < Wm + R; x += CELL) for (let z = -R; z < Hm + R; z += CELL) {
       if (x > -CELL - 8 && x < Wm + 8 && z > -CELL - 8 && z < Hm + 8) continue; // (not on the level)
       if (r() > 0.15) spots.push([x + CELL / 2, z + CELL / 2]);
     }
@@ -146,7 +147,7 @@ G.Landing = (() => {
       for (let k = 0; k < 7; k++) pts.push(x + (r() - 0.5) * 70, y + (r() - 0.5) * 8, z + (r() - 0.5) * 70);
     }
     const cg = new T.BufferGeometry(); cg.setAttribute('position', new T.Float32BufferAttribute(pts, 3));
-    S.cloud = new T.Points(cg, new T.PointsMaterial({ map: puff, color: 0x59606e, size: 62, sizeAttenuation: true, transparent: true, opacity: 0.6, depthWrite: false, fog: false }));
+    S.cloud = new T.Points(cg, new T.PointsMaterial({ map: puff, color: map.theme.cloud || 0x59606e, size: 62, sizeAttenuation: true, transparent: true, opacity: 0.6, depthWrite: false, fog: false }));
     S.cloud.frustumCulled = false; root.add(S.cloud);
   }
   function enter(map) {
@@ -160,10 +161,10 @@ G.Landing = (() => {
     G.R.levelRoot.add(root);
     S.fly = plan(map);
     S.fog = [G.R.scene.fog.near, G.R.scene.fog.far];
-    pose(0); air(1); reach(620);
+    pose(0); air(1); reach(Math.max(620, map.theme.far || 0));
   }
   function touchdown() {
-    S.landed = true; S.t = 0; air(0); reach(280); S.ship.group.quaternion.identity(); S.ship.group.position.set(S.lz.x, S.lz.y, S.lz.z);
+    S.landed = true; S.t = 0; air(0); reach(S.map.theme.far || 280); S.ship.group.quaternion.identity(); S.ship.group.position.set(S.lz.x, S.lz.y, S.lz.z);
     // the cabin and the boom, while it's there (as in the hangar's)
     const { x, y, z } = S.lz, w = S.map.world, add = (x0, y0, z0, x1, y1, z1) => S.solids.push(G.World.add(w, G.World.box(x + x0, y + y0, z + z0, x + x1, y + y1, z + z1, { kind: 'prop' })));
     add(-3.4, 0, -1.35, 2.4, 2.8, 1.35);

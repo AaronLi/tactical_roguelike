@@ -73,6 +73,7 @@ G.Materials = (() => {
     // ground and water
     soil: m('earth', 3.8, 1600, 5e6, 'soil', { mu: 0.4, e: 0.1 }),
     sand: m('sand', 5, 1600, 8e6, 'soil', { mu: 0.4, e: 0.1 }),
+    granite: m('granite', 42, 2700, 3e8, 'stone', { E: { lead: 1, mild: 1, hard: 1.05, wc: 1.1 }, mu: 0.18, e: 0.22 }), // (the Sandias' outcrops)
     water: m('water', 1.1, 1000, 0, 'water', { mu: 0.3, e: 0.2 }),
     // glass
     glass: m('glass', 12, 2500, 1.5e8, 'glass', { mu: 0.15, e: 0.2 }),
@@ -120,6 +121,7 @@ G.Materials = (() => {
     'Cold Storage': [C([['sheet', 0.7]], 'pur'), C([['sheet', 0.7]], 'pur')],
     'Convenience Store': [PLASTER, C([['cmu', 32]], 'wool', 0.1)],
     Festival: [C([['ply', 12]], null, 1, STUD), C([['ply', 12]], null, 1, STUD)],
+    'Sandia Crest': [SOLID('granite'), SOLID('granite')], // (the outcrops, and the Crest House is built of the same stone)
     Hangar: [SOLID('concrete'), SOLID('concrete')],
   };
   // floors and ceilings by environment: [the ground's, between storeys]
@@ -134,7 +136,7 @@ G.Materials = (() => {
     rack: SHEET(2, 'goods', 0.3), gondola: SHEET(0.6, 'goods', 0.01), aisle: SHEET(0.6, 'goods', 0.01), shopwall: SHEET(0.6, 'goods', 0.01), endcap: SHEET(0.6, 'goods', 0.25), tobacco: C([['mdf', 15]], 'goods', 0.4), palletrack: SHEET(3, 'goods', 0.35),
     crates: C([['pine', 20]], 'goods', 0.5), pallet: C([['card', 5]], 'goods', 0.6), cardboard: C([['card', 5]]), plant: C([['hdpe', 3]], 'soil', 0.6), planter: C([['hdpe', 5]], 'soil', 0.8), lamp: SHEET(1), sidetable: CAB, bin: C([['hdpe', 3]], 'goods', 0.3),
     container: SHEET(2, 'goods', 0.3), boxtruck: SHEET(1.2, 'goods', 0.2), dumpster: SHEET(3, 'goods', 0.3), hesco: SOLID('sand'), portaloo: C([['hdpe', 5]], 'water', 0.1), hvac: SHEET(1, 'iron', 0.2), watertank: SHEET(3, 'water', 0.8), parapet: ONE([['concrete', 200]]), fence: ONE([['pine', 18]]), hoarding: ONE([['ply', 12]]), hedge: SOLID('foliage'), shed: C([['pine', 16]], 'goods', 0.05), bbq: SHEET(2), patio: ONE([['pine', 28]]), seats: ONE([['hdpe', 5]]), stagedeck: C([['ply', 18]], 'pine', 0.1), speaker: C([['ply', 18]], 'wool'), foh: C([['ply', 12]], 'goods', 0.2),
-    picnic: ONE([['pine', 38]]), bench: ONE([['pine', 38]]), booth: C([['ply', 12]]), stall: C([['ply', 12]]), sinks: C([['ceram', 8]], 'goods', 0.05), toilet: C([['ceram', 8]], 'water', 0.2), car: SHEET(0.9, 'iron', 0.05), police: SHEET(0.9, 'iron', 0.05), tree: SOLID('hardwood'), fountain: C([['concrete', 100]], 'water'),
+    picnic: ONE([['pine', 38]]), bench: ONE([['pine', 38]]), booth: C([['ply', 12]]), stall: C([['ply', 12]]), sinks: C([['ceram', 8]], 'goods', 0.05), toilet: C([['ceram', 8]], 'water', 0.2), car: SHEET(0.9, 'iron', 0.05), bmw340: SHEET(0.9, 'iron', 0.05), police: SHEET(0.9, 'iron', 0.05), tree: SOLID('hardwood'), fountain: C([['concrete', 100]], 'water'),
     furnace: C([['mild', 12], ['brick', 110]], 'brick', 0.6), vat: C([['mild', 15]], 'iron', 0.5), moulds: C([['sand', 200]], 'sand'), panel: SHEET(1.5, 'mild', 0.02), scrap: C([['mild', 5]], 'mild', 0.25), conveyor: SHEET(4, 'rubber', 0.1), mill: MACHINE, saw: MACHINE, press: MACHINE, quench: SHEET(10, 'water'),
     couch: C([['fabric', 8]], 'foam'), easy: C([['fabric', 8]], 'foam'), crt: C([['hdpe', 3]], 'mdf', 0.05), china: C([['hardwood', 16]], 'ceram', 0.06), treadle: C([['hardwood', 19]], 'iron', 0.08), tallplant: C([['hdpe', 3]], 'soil', 0.6), guides: SOLID('paper'), cuptable: CAB,
     // (what the residents own: js/residents.js)
@@ -144,6 +146,8 @@ G.Materials = (() => {
     yogamat: C([['foam', 20]]), textbooks: SOLID('paper'), boots: C([['fabric', 3]]), kiln: SHEET(1.5, 'cmu', 0.7), wheel: C([['hdpe', 3]], 'iron', 0.2), dryrack: ONE([['mild', 2]]), glazes: C([['hdpe', 3]], 'water', 0.8), claysacks: SOLID('soil'), clothesrail: C([['fabric', 3]]), canpyramid: SHEET(0.2, null, 0.02), pctower: SHEET(0.8, 'goods', 0.1),
     barcart: ONE([['glass', 6]]), treadmill: C([['mild', 3]], 'iron', 0.1), winefridge: SHEET(0.7, 'water', 0.3), standdesk: ONE([['mdf', 25]]), piano: C([['hardwood', 19]], 'iron', 0.2), grandclock: C([['hardwood', 12]]), chaise: C([['fabric', 8]], 'foam'), dressform: C([['fabric', 4]], 'foam'), rolledcarpet: SOLID('wool'), samovar: ONE([['mild', 2]]),
     canisters: C([['mdf', 18]], 'goods', 0.15), almond: SHEET(0.7, 'pur', 0.5), lacetable: ONE([['hardwood', 28]]), shrine: CAB, halfbed: C([['fabric', 6]], 'foam'), nightstand: CAB, photodresser: CAB,
+    boulder: SOLID('granite'), juniper: SOLID('foliage'), pinon: SOLID('hardwood'), cholla: SOLID('foliage'), chilebed: C([['pine', 38]], 'soil'), potbench: C([['pine', 22]], 'soil', 0.25), // (the Sandia Crest)
+    fruittree: SOLID('hardwood'), ristra: C([['pine', 60]], 'foliage', 0.3), scope: SHEET(3, 'iron', 0.4), cliffwall: SOLID('granite'), coyote: ONE([['pine', 50]]), mast: SHEET(2, 'goods', 0.3),
     forklift: SHEET(4, 'iron', 0.2), billets: SOLID('mild'), ingots: SOLID('alu'), coils: C([['mild', 20]], 'mild', 0.6), console: C([['sheet', 1.5]], 'goods', 0.1),
   };
   // what shelving's parts are made of, one by one (a ray box of an open piece: js/furniture.js)

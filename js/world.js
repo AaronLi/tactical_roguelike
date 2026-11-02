@@ -296,7 +296,11 @@ G.World = (() => {
       return out;
     };
     // the floor (on the ground: everywhere, under the gardens too, and beyond the edge; upstairs, all but the drops)
-    if (o.ground !== false) add(w, box(-TS * 4, Y - 0.5, -TS * 4, (W + 4) * TS, Y, (H + 4) * TS, { kind: 'floor' }));
+    // (a mountain top's gorge, map.chasm metres deep: nothing under its open air but the gorge's floor, far down)
+    if (o.ground !== false && map.chasm) {
+      for (const [x0, z0, x1, z1] of rects((i) => t[i] !== 5)) add(w, box(x0 * TS, Y - 0.5, z0 * TS, (x1 + 1) * TS, Y, (z1 + 1) * TS, { kind: 'floor' }));
+      add(w, box(-TS * 4, Y - map.chasm - 0.5, -TS * 4, (W + 4) * TS, Y - map.chasm, (H + 4) * TS, { kind: 'floor' }));
+    } else if (o.ground !== false) add(w, box(-TS * 4, Y - 0.5, -TS * 4, (W + 4) * TS, Y, (H + 4) * TS, { kind: 'floor' }));
     else {
       const gr = map.grate;
       for (const [x0, z0, x1, z1] of rects((i) => t[i] !== 5 && !(gr && gr[i]))) add(w, box(x0 * TS, Y - SK, z0 * TS, (x1 + 1) * TS, Y, (z1 + 1) * TS, { kind: 'floor' }));
@@ -308,7 +312,8 @@ G.World = (() => {
     // walls (not where a window is: its own solids below), and the solid edge round the map
     for (const [x0, z0, x1, z1] of rects((i) => t[i] === 1 && !(map.winAt && map.winAt.has(i)))) add(w, box(x0 * TS, Y - SK, z0 * TS, (x1 + 1) * TS, Y + WH, (z1 + 1) * TS, { kind: 'wall' }));
     const E = TS * 4;
-    for (const b of [[-E, 0, -E, 0, WH, H * TS + E], [W * TS, 0, -E, W * TS + E, WH, H * TS + E], [0, 0, -E, W * TS, WH, 0], [0, 0, H * TS, W * TS, WH, H * TS + E]]) { b[1] = Y - SK; b[4] += Y; add(w, box(...b, { kind: 'wall', edge: true })); }
+    // (on a mountain top it reaches down to the gorge's floor, and rounds fly on over it: there's only air past the wall)
+    for (const b of [[-E, 0, -E, 0, WH, H * TS + E], [W * TS, 0, -E, W * TS + E, WH, H * TS + E], [0, 0, -E, W * TS, WH, 0], [0, 0, H * TS, W * TS, WH, H * TS + E]]) { b[1] = Y - SK - (map.chasm || 0); b[4] += Y; add(w, box(...b, { kind: 'wall', edge: true, ray: !map.chasm })); }
     // furniture and fences: each piece's boxes (a piece hangs on every tile it covers: once each)
     const fromB = (b, q) => box(b.cx - b.hx, Y + b.y0, b.cz - b.hz, b.cx + b.hx, Y + b.h, b.cz + b.hz, q);
     const seen = new Set();

@@ -349,6 +349,10 @@ G.THEMES = [
   { name: 'Festival', layout: 'festival', fence: 'hoarding', home: 0, reflect: 0.2, floor: '#26331f', wall: '#5b7480', crate: '#8a6a3a', fog: 0x060912, light: 0xffe2c0, ceil: '#d8dcde', fogNear: 30, fogFar: 150, hemi: 0x5a6a96, hemiI: 0.55, crowd: 2, foes: 1.5, night: 35 },
 ];
 
+  // the top of the Sandia Mountains over Albuquerque at sundown, outdoors: two summits of pink granite with a gorge between,
+  // long sight lines across it (a sniper's level), the city's lights coming on far below. rock: the walls are outcrops
+  // (js/level.js buildMesh); far: how far the camera sees (the view off the mountain); lookouts: more marksmen among them
+  { name: 'Sandia Crest', layout: 'crest', rock: 1, fence: 'cliffwall', home: 0, reflect: 0.1, floor: '#8c7660', wall: '#e2d6cc', crate: '#8a6a3a', fog: 0xd99a7c, light: 0xffe4c0, ceil: '#d6cfc4', fogNear: 160, fogFar: 900, far: 1400, hemi: 0xffd6b8, hemiI: 0.85, cloud: 0xb98c8a, crowd: 0.8, foes: 1.4, big: 1.5, lookouts: 2.5 },
 // the hangar between levels (js/hangar.js): a daylit hall with a helipad outside it
 G.HANGAR_ROWS = 156; // the shooting range (300 m of rifle lanes) north of the hangar: tile rows (js/level.js layHangar; js/hangar.js shifts the hall by two metres a row)
 G.HANGAR_THEME = { name: 'Hangar', layout: 'hangar', hub: true, noFog: true, home: 0, reflect: 0.35, floor: '#6c7075', wall: '#98a0a8', crate: '#8a6a3a', fog: 0x86a6c8, light: 0xfff2dc, ceil: '#c9cdd0', hemi: 0xe4ecf6, hemiI: 0.85 };

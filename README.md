@@ -236,7 +236,7 @@ says the same), but not whose: the shooter's name isn't shown.
     pale level (apartment, store) is 7-20% brighter, a dark one (foundry, bunker) 10-20% darker, and the darkest
     corners are lit by bounce instead of flat fill. Building the grid takes 50-300 ms (`G.LightGrid.opts`:
     `bounce`, `bounces`, `sky`, `fill`).
-- Themes: Apartment, Warehouse, Bunker, Suburbs, Research Lab, Foundry, Cold Storage, Festival (the route map picks
+- Themes: Apartment, Warehouse, Bunker, Suburbs, Research Lab, Foundry, Cold Storage, Festival, Sandia Crest (the route map picks
   which), and the Convenience Store, the first deployment of every run and nowhere else. **Every level starts outside
   the target** (`js/level.js`), and you breach in:
   - **The convenience store** (`layout: 'mart'`, `layMart`): small and crowded, 20 x 26 m with its lot (from photos of
@@ -415,6 +415,35 @@ says the same), but not whose: the shooter's name isn't shown.
       while a scope still finds them across the field.
     - Built in `js/level.js` (`layFestival`, `buildFestival`) and `js/furniture.js` (the pieces and `plan`'s
       `festival()`).
+  - **Sandia Crest** (`layout: 'crest'`, `layCrest`): the top of the Sandia Mountains over Albuquerque at sundown,
+    about 156 × 92 m, all of it open to the sky. It's built for sniping: two summits of pink granite with a gorge
+    between them, and the only way across is a saddle at the north end. A low stone wall runs round every edge,
+    hip high, so you see and shoot over it and crouch behind it. More suspects (×1.4), and more of them are
+    Lookouts (marksmen, from level 1), most of them on the east summit (`G.Level.plan` thins the spots on the west
+    summit to a fifth and on the saddle to two-fifths).
+    - **The west summit**, where you come in: the crest's parking lot (south-west), the pad on it behind the Forest
+      Service's trucks, and someone's silver 2017 BMW 340i xDrive with the M Performance parts nosed in at the lot's east
+      end (`R.bmw340`: the F30's side profile drawn across it at its real size, black kidneys and mirror caps, the carbon
+      boot spoiler, the sill stripes, blue calipers behind 19-inch 405M wheels; cover). A band of outcrops north of it has one way through to the **Crest House**, a stone gift shop
+      with its office and storeroom behind (the level's indoor rooms: the attachments box and the first aid cabinets go
+      here). Then a trail runs north among outcrops, boulders, junipers, piñons and cholla to the **overlook**, a
+      flagstone terrace out over the gorge with two coin-op viewers and a bench. Nobody starts on it. From it the
+      garden is 54–104 m off (78 m in the middle): standing, you see 80% of it over the wall.
+    - **The east summit:** a chile garden (raised beds in rows running north-south, side-on to the overlook, so a
+      crouching suspect is hidden behind them, plus fruit trees and ristras drying), round a **greenhouse** in the
+      middle: glass on all four sides from a low sill, a glass roof, two rows of potting benches, double doors on the
+      west and one on the east. South of the garden, behind a coyote fence with a gate, the **antenna farm**: lattice
+      masts with red beacons on their equipment huts, and air handlers.
+    - **The gorge:** 45 m of open air between the summits (`lay.chasm`; tile 5 on the ground floor, with no floor
+      under it in `js/world.js`, only the gorge's own floor down there), its cliffs ragged and lit pink by the low sun.
+      Rounds fly on past the map's edge (`ray: false` on its edge walls) instead of stopping in the air.
+    - **Past the walls** (`buildCrest`, not in the world): the evening sky (gold toward the sun going down over the
+      West Mesa, the belt of Venus opposite), the ranges on the horizon (Mount Taylor, the Jemez, the Manzanos), the
+      mountain under you (the sheer granite west face, the forested east side, the crest running on north and south), the
+      city's lights coming on in the valley below with the interstates and the river, and the tramway's cables
+      dropping down the face to it. The far parts are lit into their colours on unlit materials, from the low sun in the
+      west. The theme's `far` lets the camera see 1400 m, and the ride in skips the usual town of lit windows.
+    - Built in `js/level.js` (`layCrest`, `buildCrest`) and `js/furniture.js` (the pieces and `plan`'s `crestPlan()`).
 - **Clear the level** by arresting (zip-tying) or killing every suspect.
   - **Arresting:** get behind them first. A
     surrendered suspect watches you approach but holds still once you're close, so walk round, or from the front
@@ -449,7 +478,8 @@ says the same), but not whose: the shooter's name isn't shown.
   water tank, a parapet round it; the others' are in an expanded lot (the suburbs': a turning circle at the west end of
   the street), what you'd find there parked between them and the target (`G.Level.LZ_KIT`: delivery trucks at the
   store, shipping containers in the warehouse yard and at the foundry, reefers at cold storage, earth-filled gabions at the
-  bunker, trucks and portaloos at the festival, a removal van in the suburbs). No suspect starts within 22 m of a pad on its level or with a line of sight to it (`G.Level.landing`).
+  bunker, trucks and portaloos at the festival, a removal van in the suburbs, the Forest Service's trucks and granite
+  boulders on the Sandia Crest). No suspect starts within 22 m of a pad on its level or with a line of sight to it (`G.Level.landing`).
 
   There's no exit zone. Once order is restored, press **Y** to vote to leave (Y again takes it back). The
   level ends when every officer still alive has voted, downed ones included; solo, that's you. The HUD
