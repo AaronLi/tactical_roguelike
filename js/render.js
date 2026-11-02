@@ -112,7 +112,7 @@ G.R = {
     this.scene.fog.color.setHex(th.fog);
     this.scene.fog.near = th.noFog ? 1e4 : th.fogNear || 8; this.scene.fog.far = th.noFog ? 2e4 : th.fogFar || 60; // (no fog: pushed out of reach, so the shaders stay the same)
     this.scene.background.setHex(th.fog);
-    this.camera.far = th.hub ? 420 : 280; this.camera.updateProjectionMatrix(); // (the hangar's range runs out to 300 m)
+    this.camera.far = th.far || (th.hub ? 420 : 280); this.camera.updateProjectionMatrix(); // (the hangar's range runs out to 300 m; a mountain top sees further)
     // (outdoors at night: moonlight. Its colour a tint as written, as the lamps' are: js/lightgrid.js. The themes' figures were set when light was added up in sRGB; in linear, the same
     // fill reads far brighter in the dark, so it's squared: about as dark where no lamp reaches as it was)
     // Most of that fill's in the light grid now (js/lightgrid.js: the sky on what's open to it, the lamps' light bounced

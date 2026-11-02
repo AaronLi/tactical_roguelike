@@ -942,6 +942,164 @@ G.Furniture = (() => {
       k.box(dark, 0.03, 0.1, 0.03, x + 0.13, 1.1, 0.24);
     }
   } };
+  // ---------------------------------------------------------------- the Sandia Crest
+  // (js/level.js layCrest: the outcrops are its walls; what stands about on them is here)
+  const GRANITE = [0xb08478, 0xa47a6e, 0xba8e80, 0x9a7468, 0xc49a8a];
+  // A granite boulder, waist high: cover. A lump and a smaller one leaning on it, lichen here and there.
+  R.boulder = { w: 1.9, d: 1.5, cover: 1, boxes: [[0, 0, 1.6, 1.25, 1.1]], build(k) {
+    const g = k.mat(k.pick(GRANITE), 0.95, 0, { flatShading: true }), g2 = k.mat(k.tint(g.color.getHex(), 0.88), 0.95, 0, { flatShading: true });
+    k.ico(g, 0.72, (k.rnd() - 0.5) * 0.2, 0.38, (k.rnd() - 0.5) * 0.15);
+    k.ico(g2, 0.42 + k.rnd() * 0.12, 0.45 * (k.rnd() < 0.5 ? -1 : 1), 0.28, 0.25 * (k.rnd() - 0.5));
+    k.ico(g2, 0.3, (k.rnd() - 0.5) * 0.8, 0.12, 0.4);
+    const lichen = k.mat(k.pick([0x8a9a6a, 0xb4b080, 0x6a7a5a]), 1, 0, { flatShading: true });
+    for (let i = 0; i < 3; i++) k.ico(lichen, 0.08 + k.rnd() * 0.06, (k.rnd() - 0.5) * 0.9, 0.7 + k.rnd() * 0.3, (k.rnd() - 0.5) * 0.6);
+  } };
+  // A one-seed juniper, a dense bush about head high, blue-green: you can hide in it, not stop a round with it.
+  R.juniper = { w: 1.6, d: 1.4, cover: 1, boxes: [[0, 0, 1.4, 1.2, 1.5]], build(k) {
+    const leaf = k.mat(k.pick([0x4a5e48, 0x50644c, 0x44584a]), 0.95, 0, { flatShading: true });
+    k.cyl(k.mat(0x5a4a3a, 0.95), 0.06, 0.1, 0.5, 0, 0.25, 0, 6);
+    for (let i = 0; i < 9; i++) k.ico(leaf, 0.35 + k.rnd() * 0.2, (k.rnd() - 0.5) * 1.0, 0.45 + k.rnd() * 0.85, (k.rnd() - 0.5) * 0.8);
+    const berry = k.mat(0x7a8aa8, 0.6);
+    for (let i = 0; i < 8; i++) k.sph(berry, 0.03, (k.rnd() - 0.5) * 1.1, 0.5 + k.rnd() * 0.9, (k.rnd() - 0.5) * 0.9);
+  } };
+  // A piñon pine: a short twisted trunk you can stand behind, a round crown low over it (only the trunk stops you).
+  R.pinon = { small: 1, w: 0.6, d: 0.6, boxes: [[0, 0, 0.4, 0.4, 2.4]], build(k) {
+    const bark = k.mat(0x4e3c2e, 0.95);
+    k.cyl(bark, 0.12, 0.2, 1.4, 0, 0.7, 0, 7); k.cyl(bark, 0.07, 0.1, 1.0, 0.2, 1.6, 0.05, 6, 0.4);
+    const leaf = k.mat(k.pick([0x37502e, 0x3e5632, 0x324a2c]), 0.95, 0, { flatShading: true });
+    for (let i = 0; i < 10; i++) k.ico(leaf, 0.55 + k.rnd() * 0.35, (k.rnd() - 0.5) * 1.8, 1.6 + k.rnd() * 1.4, (k.rnd() - 0.5) * 1.8);
+  } };
+  // A cholla: a cactus of jointed arms, waist high, yellow fruit on the ends.
+  R.cholla = { small: 1, boxes: [[0, 0, 0.5, 0.5, 1.1]], build(k) {
+    const g = k.mat(0x6a7a48, 0.9, 0, { flatShading: true }), fr = k.mat(0xd8c048, 0.8);
+    k.cyl(g, 0.06, 0.08, 0.7, 0, 0.35, 0, 6);
+    for (let i = 0; i < 5; i++) { const a = k.rnd() * 6.28, x = Math.cos(a) * 0.18, z = Math.sin(a) * 0.18, y = 0.55 + k.rnd() * 0.35; k.cyl(g, 0.045, 0.055, 0.4, x, y, z, 6, 0.6 * (k.rnd() - 0.5)); k.sph(fr, 0.04, x * 1.3, y + 0.22, z * 1.3); }
+  } };
+  // A raised bed of chile plants: a timber frame of earth, a row of bushes with green and red pods. Knee high: cover crouching.
+  R.chilebed = { w: 1.9, d: 0.9, cover: 1, boxes: [[0, 0, 1.9, 0.9, 0.55]], build(k) {
+    const wood = k.mat(k.pick([0x7a5a3a, 0x6b4c30, 0x8a6a48]), 0.9), soil = k.mat(0x3e2c1e, 1);
+    k.box(wood, 1.9, 0.4, 0.9, 0, 0.2, 0); k.box(soil, 1.8, 0.02, 0.8, 0, 0.41, 0);
+    const leaf = k.mat(k.pick([0x3e6a2e, 0x4a7a34, 0x36602a]), 0.85, 0, { flatShading: true }), red = k.mat(0xb02018, 0.5), green = k.mat(0x3a7a22, 0.5);
+    for (let i = 0; i < 5; i++) {
+      const x = -0.72 + i * 0.36;
+      for (let j = 0; j < 3; j++) k.ico(leaf, 0.13 + k.rnd() * 0.06, x + (k.rnd() - 0.5) * 0.15, 0.55 + k.rnd() * 0.12, (k.rnd() - 0.5) * 0.35);
+      for (let j = 0; j < 3; j++) k.cyl(k.rnd() < 0.55 ? red : green, 0.018, 0.008, 0.12, x + (k.rnd() - 0.5) * 0.25, 0.5 + k.rnd() * 0.12, (k.rnd() - 0.5) * 0.4, 5, 0.3);
+    }
+  } };
+  // A greenhouse's potting bench: a slatted table on legs, seedlings in pots along it, a few trays under it.
+  R.potbench = { w: 1.9, d: 0.8, cover: 1, boxes: [[0, 0, 1.9, 0.8, 0.9]], build(k) {
+    const wood = k.mat(k.pick([0x9a7a54, 0x8a6a48]), 0.85), pot = k.mat(0xb0603a, 0.8), tray = k.mat(0x1c1c1e, 0.7);
+    for (let i = 0; i < 6; i++) k.box(wood, 1.9, 0.03, 0.11, 0, 0.82, -0.33 + i * 0.132);
+    for (const x of [-0.88, 0.88]) for (const z of [-0.34, 0.34]) k.box(wood, 0.06, 0.82, 0.06, x, 0.41, z);
+    k.box(wood, 1.8, 0.03, 0.7, 0, 0.18, 0);
+    for (let i = 0; i < 2; i++) k.box(tray, 0.5, 0.06, 0.35, -0.5 + i * 0.9, 0.22, (k.rnd() - 0.5) * 0.2);
+    for (let i = 0; i < 8; i++) for (let j = 0; j < 2; j++) {
+      const x = -0.8 + i * 0.23, z = -0.18 + j * 0.36;
+      k.cyl(pot, 0.07, 0.05, 0.11, x, 0.89, z, 8);
+      if (k.rnd() < 0.85) k.ico(k.leaf(), 0.06 + k.rnd() * 0.05, x, 1.0 + k.rnd() * 0.04, z);
+    }
+  } };
+  // A fruit tree in the garden, an apple: a short trunk, a round crown, fruit in it.
+  R.fruittree = { small: 1, w: 0.6, d: 0.6, boxes: [[0, 0, 0.35, 0.35, 2.4]], build(k) {
+    k.cyl(k.mat(0x5a4632, 0.95), 0.1, 0.15, 1.6, 0, 0.8, 0, 7);
+    const leaf = k.mat(k.pick([0x4a7034, 0x547a3a, 0x40662e]), 0.9, 0, { flatShading: true }), fruit = k.mat(k.pick([0xb8281e, 0xc8a030]), 0.5);
+    for (let i = 0; i < 8; i++) k.ico(leaf, 0.45 + k.rnd() * 0.3, (k.rnd() - 0.5) * 1.4, 2.0 + k.rnd() * 0.9, (k.rnd() - 0.5) * 1.4);
+    for (let i = 0; i < 10; i++) k.sph(fruit, 0.05, (k.rnd() - 0.5) * 1.5, 1.7 + k.rnd() * 1.1, (k.rnd() - 0.5) * 1.5);
+  } };
+  // Ristras drying: two long strings of red chiles hung from a timber frame.
+  R.ristra = { small: 1, boxes: [[0, 0, 0.9, 0.3, 2.0]], build(k) {
+    const wood = k.mat(0x6a4a2e, 0.9), red = k.mat(0x9a1a12, 0.55), stem = k.mat(0x6a6a2a, 0.8);
+    for (const x of [-0.42, 0.42]) k.box(wood, 0.08, 2.0, 0.08, x, 1.0, 0);
+    k.box(wood, 0.98, 0.08, 0.08, 0, 1.98, 0);
+    for (const x of [-0.18, 0.18]) {
+      k.box(stem, 0.02, 0.2, 0.02, x, 1.84, 0);
+      for (let i = 0; i < 26; i++) { const a = i * 1.3, y = 1.72 - i * 0.045; k.cyl(red, 0.025, 0.006, 0.13, x + Math.cos(a) * 0.07, y, Math.sin(a) * 0.07, 5, 0.4); }
+    }
+  } };
+  // A coin-operated viewer on the overlook: a post, the binocular head on it looking out (-z: away from you).
+  R.scope = { small: 1, boxes: [[0, 0, 0.4, 0.4, 1.45]], build(k) {
+    const paint = k.mat(0x2e5a3a, 0.5, 0.3), dark = k.mat(0x1c1c1e, 0.5, 0.4), steel = k.mat(0x9aa0a6, 0.3, 0.7);
+    k.cyl(dark, 0.18, 0.2, 0.06, 0, 0.03, 0, 12); k.cyl(paint, 0.05, 0.06, 1.1, 0, 0.6, 0, 10);
+    k.box(paint, 0.34, 0.24, 0.3, 0, 1.28, 0); k.box(steel, 0.1, 0.06, 0.02, 0, 1.24, 0.16);
+    for (const x of [-0.08, 0.08]) { k.cyl(dark, 0.055, 0.06, 0.16, x, 1.33, -0.2, 10, Math.PI / 2); k.cyl(dark, 0.035, 0.035, 0.06, x, 1.33, 0.17, 8, Math.PI / 2); }
+  } };
+  // The low stone wall along a cliff's edge (the theme's fence): granite set in mortar, a flat coping, about hip high. You see,
+  // and shoot, over it; crouch behind it.
+  R.cliffwall = { w: 0.68, d: 0.42, boxes: [[0, 0, 0.68, 0.42, 0.95]], build(k, v) {
+    const mortar = k.mat(0x9a8a7e, 1), cap = k.mat(0x8a7468, 0.9);
+    k.box(mortar, 0.68, 0.86, 0.38, 0, 0.43, 0);
+    for (let i = 0; i < 3; i++) for (const s of [-1, 1]) k.box(k.mat(GRANITE[Math.floor((v * 7 + i * 3 + s + 1) * 5) % GRANITE.length], 0.95), 0.2 + k.rnd() * 0.1, 0.2 + k.rnd() * 0.06, 0.04, -0.22 + i * 0.22 + (k.rnd() - 0.5) * 0.04, 0.16 + (i % 2) * 0.26 + k.rnd() * 0.1, s * 0.19);
+    k.box(cap, 0.7, 0.09, 0.44, 0, 0.905, 0);
+  } };
+  // A coyote fence: latillas (peeled poles) side by side, ragged along the top, wired to rails. Too tall to see over.
+  R.coyote = { w: 0.68, d: 0.14, boxes: [[0, 0, 0.68, 0.14, 1.6]], build(k, v) {
+    const wire = k.mat(0x5a5a5a, 0.5, 0.6);
+    for (const y of [0.3, 1.2]) k.box(wire, 0.68, 0.02, 0.02, 0, y, 0.06);
+    for (let i = 0; i < 7; i++) { const h = 1.35 + k.rnd() * 0.35; k.cyl(k.mat(k.pick([0x8a7058, 0x7a6048, 0x9a8068, 0x6e5640]), 0.95), 0.035, 0.045, h, -0.29 + i * 0.097, h / 2, (k.rnd() - 0.5) * 0.03, 6); }
+  } };
+  // A mast on the antenna farm: its equipment hut at the foot (what stops you), a steel lattice tower up out of it, dishes and
+  // panels on it, red beacons up its length.
+  R.mast = { w: 1.9, d: 1.9, cover: 1, boxes: [[0, 0, 1.8, 1.8, 2.5]], build(k, v) {
+    const hut = k.mat(0xc8c4b8, 0.7), roof = k.mat(0x5a5e62, 0.6, 0.4), steel = k.mat(0xb8bcc0, 0.4, 0.6), red = k.mat(0xff2a1a, 0.4, 0, { emissive: 0xff2010, emissiveIntensity: 1.6 }), white = k.mat(0xe8e8e4, 0.5);
+    k.box(hut, 1.8, 2.4, 1.8, 0, 1.2, 0); k.box(roof, 1.9, 0.1, 1.9, 0, 2.45, 0); k.box(k.mat(0x5a5e62, 0.5, 0.4), 0.8, 1.9, 0.03, 0, 0.95, 0.91);
+    const H = 14 + v * 5, a = 0.36; // (its height over the hut, a leg's offset from the middle)
+    for (const x of [-a, a]) for (const z of [-a, a]) k.cyl(steel, 0.035, 0.045, H, x, 2.5 + H / 2, z, 6);
+    for (let y = 2.9; y < 2.5 + H; y += 1.4) for (const s of [-a, a]) { k.box(steel, 2 * a, 0.035, 0.035, 0, y, s); k.box(steel, 0.035, 0.035, 2 * a, s, y, 0); }
+    for (let i = 0; i < 3; i++) k.cyl(white, 0.45, 0.45, 0.12, 0, 2.5 + H * (0.45 + i * 0.18), a + 0.1, 14, Math.PI / 2); // (dishes, facing out)
+    for (let i = 0; i < 4; i++) k.box(white, 0.18, 1.2, 0.08, Math.cos(i * 1.57) * (a + 0.08), 2.5 + H - 0.8, Math.sin(i * 1.57) * (a + 0.08));
+    k.cyl(steel, 0.03, 0.03, 2.2, 0, 2.5 + H + 1.1, 0, 6);
+    k.sph(red, 0.14, 0, 2.5 + H + 2.25, 0); k.sph(red, 0.1, a, 2.5 + H * 0.55, a);
+  } };
+
+  // A 2017 BMW 340i xDrive (the F30) with the M Performance parts, in Glacier Silver, nose to +z: BMW's figures, 4633 mm long,
+  // 1811 wide, 1429 high on a 2810 mm wheelbase, the axles 0.76 m from the nose and 1.06 from the tail. The body's side
+  // profile drawn across it (the shoulder line, the long bonnet, the short boot, the arches cut round the wheels), the glass
+  // house on it narrower (its tumblehome), the roof over that, the Hofmeister kink in the pillar behind the back door. The
+  // M Performance kit: black kidneys, black mirror caps, the carbon lip spoiler on the boot, the stripe along the sills with
+  // its lettering; the M Sport bumpers' big intakes, blue M Sport calipers behind 19-inch double-spoke wheels (the 405M),
+  // twin tailpipes, the "Air Breather" behind each front arch. Solid cover across two tiles.
+  R.bmw340 = { w: 1.85, d: 4.65, cover: 1, boxes: [[0, 0, 1.81, 4.6, 0.99], [0, -0.25, 1.48, 2.5, 1.43, 0.99]], build(k) {
+    const paint = k.mat(0x8c9399, 0.3, 0.62), glass = k.mat(0x111a20, 0.06, 0.7), black = k.mat(0x0e0f10, 0.35, 0.3), trim = k.mat(0x1c1d1f, 0.55), chrome = k.mat(0xd8dcde, 0.12, 1);
+    const tyre = k.mat(0x121213, 0.92), rim = k.mat(0xaab0b5, 0.3, 0.55), carbon = k.mat(0x1a1b1d, 0.2, 0.4), blue = k.mat(0x1f4fa8, 0.4, 0.3);
+    const FA = 1.557, RA = -1.253, R = 0.33, arch = (c, s) => [[c + s * 0.395, 0.17], [c + s * 0.375, 0.33], [c + s * 0.3, 0.56], [c + s * 0.16, 0.69], [c, 0.72], [c - s * 0.16, 0.69], [c - s * 0.3, 0.56], [c - s * 0.375, 0.33], [c - s * 0.395, 0.16]];
+    // the body: the tail, up over the boot to the shoulder, along it, down the bonnet to the nose, under it and round both arches
+    k.side(paint, [[-2.3, 0.24], [-2.33, 0.55], [-2.3, 0.87], [-2.21, 0.985], [-1.6, 1.0], [0.6, 0.995], [1.15, 0.985], [1.75, 0.93], [2.15, 0.85], [2.29, 0.77], [2.33, 0.62], [2.32, 0.45], [2.26, 0.23],
+      ...arch(FA, 1), ...arch(RA, 1).slice(0)], 1.77, 0, 0.02);
+    // the glass house, the roof and the pillars over it
+    k.side(glass, [[-1.62, 0.99], [-0.98, 1.36], [-0.62, 1.41], [0.15, 1.415], [0.42, 1.385], [1.17, 0.99]], 1.42, 0, 0.02);
+    k.side(paint, [[-0.8, 1.385], [-0.62, 1.425], [0.15, 1.43], [0.44, 1.4], [0.4, 1.38], [0.15, 1.405], [-0.62, 1.4], [-0.77, 1.37]], 1.44, 0, 0.004);
+    for (const s of [-1, 1]) {
+      k.side(paint, [[-1.62, 0.99], [-0.98, 1.36], [-0.8, 1.385], [-0.93, 1.19], [-0.9, 1.05], [-0.98, 0.99]], 0.02, s * 0.725); // the C-pillar, its kink
+      k.side(black, [[1.17, 0.99], [0.42, 1.385], [0.36, 1.37], [1.08, 0.99]], 0.02, s * 0.725); // the A-pillar's black trim
+      k.box(black, 0.02, 0.36, 0.08, s * 0.725, 1.18, -0.08); // the B-pillar
+      k.box(trim, 0.012, 0.02, 2.75, s * 0.73, 0.995, -0.22); // the Shadowline trim round the windows
+      // the mirror on its stalk (its cap black), the Air Breather, the door handles, the sill stripe and its lettering
+      k.box(paint, 0.1, 0.05, 0.12, s * 0.95, 1.02, 1.0); k.box(black, 0.14, 0.11, 0.14, s * 1.0, 1.06, 0.98);
+      k.box(chrome, 0.012, 0.035, 0.14, s * 0.892, 0.68, 1.1);
+      for (const z of [0.35, -0.75]) k.box(chrome, 0.02, 0.02, 0.14, s * 0.893, 0.93, z);
+      k.box(black, 0.004, 0.05, 1.95, s * 0.889, 0.24, 0.02); k.box(black, 0.004, 0.022, 1.15, s * 0.889, 0.3, 0.38);
+      // the wheels: a tyre, the 405M's ten spokes in five pairs, the hub and its roundel, the blue caliper behind
+      for (const z of [FA, RA]) {
+        k.cylX(tyre, R, R, 0.235, s * 0.77, R, z, 22); k.cylX(rim, 0.235, 0.235, 0.02, s * 0.88, R, z, 22);
+        for (let i = 0; i < 10; i++) { const a = (Math.floor(i / 2) * 72 + (i % 2 ? 7 : -7)) * Math.PI / 180; k.box(rim, 0.034, 0.2, 0.034, s * 0.9, R + Math.cos(a) * 0.13, z + Math.sin(a) * 0.13, 0, a); }
+        k.cylX(rim, 0.05, 0.05, 0.03, s * 0.9, R, z, 12); k.cylX(k.mat(0x2a5aa8, 0.4), 0.025, 0.025, 0.005, s * 0.917, R, z, 12);
+        k.box(blue, 0.06, 0.1, 0.14, s * 0.83, R + 0.13, z - 0.1);
+      }
+      // the headlamp (its angel eyes), the M Sport bumper's side intake, the tail lamp wrapping round, the tailpipe
+      k.box(glass, 0.42, 0.1, 0.06, s * 0.58, 0.79, 2.27, 0, -0.2); for (const x of [0.48, 0.68]) k.cyl(k.mat(0xeef4ff, 0.3, 0, { emissive: 0x9ab0c8, emissiveIntensity: 0.5 }), 0.035, 0.035, 0.012, s * x, 0.79, 2.305, 14, Math.PI / 2);
+      k.box(black, 0.3, 0.15, 0.04, s * 0.6, 0.42, 2.31);
+      k.box(k.mat(0x7a0c0c, 0.3, 0.2, { emissive: 0x200303 }), 0.4, 0.1, 0.05, s * 0.62, 0.86, -2.3); k.box(k.mat(0x7a0c0c, 0.3, 0.2), 0.04, 0.09, 0.3, s * 0.88, 0.86, -2.17);
+      k.cyl(chrome, 0.045, 0.045, 0.12, s * 0.56, 0.27, -2.32, 16, Math.PI / 2); k.cyl(black, 0.036, 0.036, 0.122, s * 0.56, 0.27, -2.32, 16, Math.PI / 2);
+    }
+    // the black kidneys, the centre intake, the number plates, the carbon spoiler on the boot's lip, the diffuser, the badges
+    for (const s of [-1, 1]) { k.box(chrome, 0.27, 0.17, 0.03, s * 0.165, 0.73, 2.3); k.box(black, 0.24, 0.14, 0.035, s * 0.165, 0.73, 2.303); }
+    k.box(black, 0.72, 0.12, 0.04, 0, 0.36, 2.31);
+    k.box(k.mat(0xf2f0e6, 0.5), 0.52, 0.12, 0.02, 0, 0.53, 2.33); k.box(k.mat(0xf2f0e6, 0.5), 0.32, 0.16, 0.02, 0, 0.62, -2.335);
+    k.box(carbon, 1.22, 0.03, 0.1, 0, 1.0, -2.18, 0, -0.12);
+    k.box(black, 1.3, 0.1, 0.06, 0, 0.27, -2.3);
+    k.cyl(k.mat(0x2a5aa8, 0.4, 0.2), 0.04, 0.04, 0.01, 0, 0.96, 2.2, 14, -1.2); k.box(chrome, 0.1, 0.025, 0.01, 0.5, 0.8, -2.334);
+  } };
+
   // What goes in each kind of room. `must` is placed first, against a wall.
   const ROOMS = {
     living: { must: 'tv', wall: ['sofa', 'bookshelf', 'dresser', 'bookshelf', 'sofa'], center: ['sofa', 'armchairs'], small: ['plant', 'lamp', 'sidetable', 'plant'], floor: 'wood', rug: 1 },
@@ -988,6 +1146,12 @@ G.Furniture = (() => {
     observe: { must: 'console', wall: ['desk', 'console', 'desk'], center: ['deskpair'], small: ['plant', 'cooler', 'bin'], floor: 'carpet' },
     boss: { must: 'desk', wall: ['bookshelf', 'files', 'sofa', 'bookshelf'], center: ['armchairs'], small: ['plant', 'lamp'], floor: 'carpet', rug: 1 },
     meeting: { must: 'tv', wall: ['files', 'bookshelf'], center: ['dining'], small: ['plant', 'cooler'], floor: 'carpet' },
+    // the Sandia Crest (js/level.js layCrest): out on the mountain, laid out on its own (plan()); the Crest House furnished
+    // as any room is. sound: what a case lands on, outdoors (js/casings.js), if it isn't soft ground.
+    trail: { floor: 'dirt', out: 1 }, ridge: { floor: 'dirt', out: 1 }, saddle: { floor: 'dirt', out: 1 }, overlook: { floor: 'flag', out: 1, sound: 'concrete' },
+    garden: { floor: 'soil', out: 1 }, greenhouse: { floor: 'flag', out: 1, sound: 'concrete' }, antennas: { floor: 'dirt', out: 1 },
+    giftshop: { must: 'counter', wall: ['shopwall', 'rack', 'shopwall', 'files'], center: ['endcap'], small: ['plant', 'cardboard', 'bin'], floor: 'wood' },
+    storeroom: { must: 'rack', wall: ['rack', 'crates', 'rack'], center: [], small: ['cardboard', 'bin'], floor: null, noArt: 1 },
   };
   // small pieces give only their boxes; they need a footprint too when they're set against a wall
   for (const rec of Object.values(R)) if (rec.w == null || rec.d == null) {
@@ -1204,7 +1368,68 @@ G.Furniture = (() => {
         },
       };
     }
-    const fest = map.theme.layout === 'festival' ? festival() : null, fdy = map.theme.layout === 'foundry' ? foundry() : null;
+    // The Sandia Crest (js/level.js layCrest): boulders, junipers, piñons and the odd cholla about the trail, the ridge and
+    // the saddle, never two side by side nor against the wall along the edge; the overlook's viewers and its bench; the
+    // garden's raised beds in rows running north-south (side on to the overlook: what you'd crouch behind from it), fruit
+    // trees and the rest between; the greenhouse's potting benches; the masts on the antenna farm (map.crest.masts, where
+    // they stand: buildCrest), their air handlers and huts.
+    function crestPlan() {
+      const cr = map.crest, ends = new Set(cr.lines.flatMap((l) => l.keep.map(([x, z]) => z * W + x))); // (where you step on and off a zipline: kept clear)
+      const C = (v) => (v + 0.5) * TS, free = (x, z) => t[z * W + x] === 0 && !ends.has(z * W + x);
+      const byDoor = (x, z) => { for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) if (t[(z + dz) * W + x + dx] === 3) return true; return false; };
+      const lone = (x, z) => ![[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => { const v = t[(z + dz) * W + x + dx]; return v === 2 || v === 4 || map.props.has((z + dz) * W + x + dx); });
+      // (exact: square in its tile, else a little off it, as things lie about outdoors)
+      const one = (name, x, z, q, exact) => {
+        if (!free(x, z) || byDoor(x, z) || !tryBlock(x, z, R[name].cover ? 2 : 4)) return false;
+        const j = exact ? 0 : 0.3;
+        put(name, x, z, C(x) + (r() - 0.5) * j, C(z) + (r() - 0.5) * j, q == null ? Math.floor(r() * 4) : q, r()); return true;
+      };
+      const small = (name, x, z) => { if (!free(x, z) || byDoor(x, z) || map.props.has(z * W + x)) return false; put(name, x, z, C(x) + (r() - 0.5) * 0.6, C(z) + (r() - 0.5) * 0.6, Math.floor(r() * 4), r()); return true; };
+      // about one thing every `per` tiles of the room, from mix
+      const wild = (rm, per, mix) => {
+        let n = Math.round(rm.w * rm.h / per);
+        for (let a = 0; a < 80 && n > 0; a++) {
+          const x = rm.x + Math.floor(r() * rm.w), z = rm.z + Math.floor(r() * rm.h), name = U.pick(r, mix);
+          if (lone(x, z) && (R[name].small ? small(name, x, z) : one(name, x, z))) n--;
+        }
+      };
+      return {
+        trail(rm) { wild(rm, rm.front ? 22 : 12, ['boulder', 'boulder', 'juniper', 'pinon', 'pinon', 'cholla']); },
+        ridge(rm) { wild(rm, 13, ['boulder', 'juniper', 'pinon', 'pinon', 'pinon', 'cholla']); },
+        saddle(rm) { wild(rm, 15, ['boulder', 'boulder', 'juniper', 'pinon']); },
+        overlook() { // the viewers at the wall either end, looking out over the gorge (cr.scopes: where, and which way, for
+          // js/player.js to look through); a bench against the north wall
+          const x = (cr.OX1 + 1) * TS - 0.55;
+          for (const z of [cr.OZ0, cr.OZ1]) { put('scope', cr.OX1, z, x, C(z), facing(1, 0), r()); cr.scopes.push({ x, z: C(z), yaw: -Math.PI / 2 }); }
+          const bx = cr.CX0 + 1;
+          if (tryBlock(bx, cr.OZ0, 4)) put('bench', bx, cr.OZ0, C(bx), cr.OZ0 * TS + 0.32, facing(0, -1), r());
+        },
+        garden(rm) {
+          const gate = (x, z) => z >= 30 && x > cr.gh[0] && x < cr.gh[0] + 6; // (the way to the coyote fence's gate)
+          for (let x = rm.x + 1; x < rm.x + rm.w; x += 3) for (let z = rm.z + 1; z < rm.z + rm.h - 1; z++) if ((z - rm.z) % 5 && !gate(x, z)) one('chilebed', x, z, 1, true);
+          for (let n = 0, a = 0; n < 2 && a < 30; a++) if (small('fruittree', rm.x + Math.floor(r() * rm.w), rm.z + Math.floor(r() * rm.h))) n++;
+          for (let n = 0, a = 0, what = U.pick(r, ['ristra', 'bench', 'shed', 'watertank', 'patio']); n < 1 && a < 30; a++) {
+            const x = rm.x + Math.floor(r() * rm.w), z = rm.z + Math.floor(r() * rm.h);
+            if (!gate(x, z) && lone(x, z) && (R[what].small ? small(what, x, z) : one(what, x, z, Math.floor(r() * 4), true))) n++;
+          }
+        },
+        greenhouse(rm) { // two rows of potting benches lengthwise, a way across the middle between its doors; ristras by the door
+          for (const x of [rm.x + 1, rm.x + 3]) for (let z = rm.z + 1; z < rm.z + rm.h - 1; z++) if (z !== rm.cz) one('potbench', x, z, 1, true);
+          small('ristra', rm.x + rm.w - 1, rm.z);
+        },
+        antennas(rm) {
+          for (const [x0, z0] of [[rm.x + 3, rm.z + 3], [rm.x + 11, rm.z + 6], [rm.x + 17, rm.z + 2]]) for (let a = 0; a < 8; a++) {
+            const x = x0 + U.ri(r, -1, 1), z = z0 + U.ri(r, -1, 1);
+            if (!lone(x, z) || !one('mast', x, z, 0, true)) continue;
+            cr.masts.push([C(x), C(z)]);
+            if (lone(x + 1, z)) one('hvac', x + 1, z, 1, true);
+            break;
+          }
+          wild(rm, 16, ['shed', 'hvac', 'boulder', 'cholla', 'juniper']);
+        },
+      };
+    }
+    const fest = map.theme.layout === 'festival' ? festival() : null, fdy = map.theme.layout === 'foundry' ? foundry() : null, cst = map.theme.layout === 'crest' ? crestPlan() : null;
     let nFine = 0; // (pieces laid on the fine grid: kept past the tiles' own keys)
     for (const rm of rooms) {
       rm.type = rm.type || (r() < home ? homes[hi++ % homes.length] : WORK[wi++ % WORK.length]);
@@ -1212,6 +1437,7 @@ G.Furniture = (() => {
       for (const [name, x, z, q, st] of rm.cover || []) { const rec = R[name], v = r(); map.props.set(W * map.H + nFine++, { name, q, x, z, v, style: st || {}, block: rec.small ? 0 : rec.cover ? 2 : 4, boxes: worldBoxes(rec, x, z, q, v) }); }
       if (fest && fest[rm.type]) { fest[rm.type](rm); continue; }
       if (fdy && fdy[rm.type]) { fdy[rm.type](rm); continue; }
+      if (cst && cst[rm.type]) { cst[rm.type](rm); continue; }
       // patrol cars where the layout puts them: [x, z, along] (coarse tiles; along: lengthwise down the road, else across)
       for (const [x, z, along] of rm.cars || []) {
         const [x2, z2] = along ? [x + 1, z] : [x, z + 1];
@@ -1451,6 +1677,23 @@ G.Furniture = (() => {
         for (let i = 0; i < 6; i++) { g.fillStyle = `rgba(${60 + rnd() * 30},${50 + rnd() * 20},30,0.25)`; g.beginPath(); g.arc(rnd() * w, rnd() * h, 10 + rnd() * 25, 0, 7); g.fill(); }
         for (let i = 0; i < 5000; i++) { const v = rnd(); g.fillStyle = v < 0.5 ? `rgba(20,40,15,${0.3 + rnd() * 0.4})` : `rgba(${80 + rnd() * 40},${110 + rnd() * 50},${50 + rnd() * 30},${0.25 + rnd() * 0.35})`; g.fillRect(rnd() * w, rnd() * h, 1, 2 + rnd() * 4); }
       }),
+      // a mountain trail: decomposed granite, tan grit and pebbles, the odd tuft (soil: a garden's dark, worked earth)
+      dirt: (base, dark) => mk(256, 256, (g, w, h) => {
+        g.fillStyle = base; g.fillRect(0, 0, w, h);
+        for (let i = 0; i < 14; i++) { g.fillStyle = `rgba(${rnd() < 0.5 ? '40,24,12' : '255,236,210'},${0.04 + rnd() * 0.06})`; g.beginPath(); g.arc(rnd() * w, rnd() * h, 16 + rnd() * 50, 0, 7); g.fill(); }
+        for (let i = 0; i < 2600; i++) { const v = rnd(); g.fillStyle = v < 0.4 ? `rgba(30,18,10,${0.2 + rnd() * 0.3})` : v < 0.8 ? `rgba(255,240,220,${0.12 + rnd() * 0.2})` : `rgba(190,120,100,${0.3 + rnd() * 0.3})`; const s = 1 + rnd() * 2.5; g.fillRect(rnd() * w, rnd() * h, s, s); }
+        if (!dark) for (let i = 0; i < 40; i++) { g.fillStyle = `rgba(${90 + rnd() * 40},${100 + rnd() * 30},60,0.5)`; const x = rnd() * w, y = rnd() * h; for (let j = 0; j < 6; j++) g.fillRect(x + (rnd() - 0.5) * 6, y + (rnd() - 0.5) * 3, 1, 3 + rnd() * 3); }
+      }),
+      // flagstones: irregular slabs of pinkish stone in grey mortar
+      flag: (base) => mk(256, 256, (g, w, h) => {
+        g.fillStyle = '#6e645c'; g.fillRect(0, 0, w, h);
+        for (let j = 0; j < 4; j++) for (let i = 0; i < 4; i++) {
+          const x = i * 64 + (j % 2) * 20, y = j * 64, v = (rnd() - 0.5) * 0.18;
+          g.fillStyle = base; g.beginPath(); g.moveTo(x + 3 + rnd() * 6, y + 3 + rnd() * 5); g.lineTo(x + 58 + rnd() * 5, y + 2 + rnd() * 6); g.lineTo(x + 61, y + 58 + rnd() * 4); g.lineTo(x + 2 + rnd() * 6, y + 60); g.closePath(); g.fill();
+          g.fillStyle = v > 0 ? `rgba(255,235,220,${v})` : `rgba(0,0,0,${-v})`; g.fill();
+        }
+        speckle(g, w, h, 1500, 0.08);
+      }),
       rug: (a, b, c) => mk(256, 256, (g, w, h) => {
         g.fillStyle = a; g.fillRect(0, 0, w, h);
         g.strokeStyle = b; g.lineWidth = 14; g.strokeRect(14, 14, w - 28, h - 28);
@@ -1657,6 +1900,13 @@ G.Furniture = (() => {
       cylX: (m, rt, rb, h, x, y, z, seg = 14) => place(new T.CylinderGeometry(rt, rb, h, seg), m, x, y, z, Math.PI / 2, Math.PI / 2), // (lying along x)
       sph: (m, r, x, y, z) => place(new T.SphereGeometry(r, 8, 6), m, x, y, z),
       ico: (m, r, x, y, z) => place(new T.IcosahedronGeometry(r, 0), m, x, y, z, rnd() * 6),
+      // a side profile ([z, y] points: along the piece and up) drawn across w at x, its edges rounded by b (a car's body)
+      side: (m, pts, w, x = 0, b = 0) => {
+        const sh = new T.Shape(pts.map(([z, y]) => new T.Vector2(z, y)));
+        const g = new T.ExtrudeGeometry(sh, { depth: w - 2 * b, bevelEnabled: b > 0, bevelThickness: b, bevelSize: b, bevelSegments: 2, curveSegments: 4 });
+        g.translate(0, 0, -(w - 2 * b) / 2); g.rotateY(-Math.PI / 2);
+        place(g, m, x, 0, 0);
+      },
       leaf: () => mat(pick([0x3f6b35, 0x4d7a3a, 0x2f5a2c, 0x5a8040]), 0.85, 0, { flatShading: true }),
       screen: () => mat(0x0b0f14, 0.15, 0.2, { emissive: pick([0x1a2a3a, 0x0c1622, 0x202a20]), emissiveIntensity: 0.6 }),
       shade: () => shadeMat,
@@ -1714,7 +1964,7 @@ G.Furniture = (() => {
       const x0 = rm.x * TS, z0 = rm.z * TS, w = rm.w * TS, d = rm.h * TS;
       let drop = false;
       for (let z = rm.z; z < rm.z + rm.h && !drop; z++) for (let x = rm.x; x < rm.x + rm.w; x++) if (t[z * W + x] === 5 && !(rm.out && map.out[z * W + x])) { drop = true; break; } // (outdoors upstairs, open air's no hole in it)
-      if (rm.out && !drop) place(new T.PlaneGeometry(w + 2 * TS, d + TS), fm, x0 + w / 2, y, z0 + d / 2, 0, -Math.PI / 2);
+      if (rm.out && !drop && !rm.flush) place(new T.PlaneGeometry(w + 2 * TS, d + TS), fm, x0 + w / 2, y, z0 + d / 2, 0, -Math.PI / 2); // (flush: outdoors, but up against the next room's ground, not over it)
       else if (!drop) place(new T.PlaneGeometry(w, d), fm, x0 + w / 2, y, z0 + d / 2, 0, -Math.PI / 2);
       else for (let z = Math.max(0, rm.z - (rm.out ? 1 : 0)), x0 = Math.max(0, rm.x - (rm.out ? 1 : 0)), ze = Math.min(map.H, rm.z + rm.h + (rm.out ? 1 : 0)), xe = Math.min(W, rm.x + rm.w + (rm.out ? 1 : 0)), gap = (i) => (rm.out ? !map.out[i] : t[i] === 5); z < ze; z++) for (let x = x0; x < xe;) { // (round a drop in the floor: a strip per run of floor. A roof: round what's built on it too, out to its edge)
         if (gap(z * W + x)) { x++; continue; }
@@ -1763,13 +2013,16 @@ G.Furniture = (() => {
         let tex;
         if (spec.floor === 'wood') tex = tx.wood(pick(['#7a5232', '#9a6e44', '#5e4028', '#a88458']));
         else if (spec.floor === 'grass') tex = tx.grass();
+        else if (spec.floor === 'dirt') tex = tx.dirt(pick(['#9a8068', '#a08670', '#94806c']));
+        else if (spec.floor === 'soil') tex = tx.dirt('#5a4232', true);
+        else if (spec.floor === 'flag') tex = tx.flag(pick(['#b0948a', '#a8968a', '#b89c8e']));
         else if (spec.floor === 'pave') tex = tx.tile(pick(['#55524c', '#4a4844', '#5e5a52']), '#34322e');
         else if (rm.lid) tex = tx.concrete('#6e6d69');
         else if (spec.floor === 'tile') tex = tx.tile(pick(['#d8d4cc', '#b8c0c4', '#e4dccc', '#3a3d40']), '#7a7670');
         else tex = tx.carpet(pick(['#5a5f6a', '#6a5a4a', '#4a5a52', '#7a6e62', '#3d4452']));
         tex.repeat.set(rm.w, rm.h);
         if (spec.floor === 'wood' && rnd() < 0.5) { tex.rotation = Math.PI / 2; }
-        layFloor(rm, mat(0xffffff, spec.floor === 'tile' ? 0.45 : spec.floor === 'grass' ? 1 : 0.85, 0, { map: tex }));
+        layFloor(rm, mat(0xffffff, spec.floor === 'tile' ? 0.45 : spec.floor === 'grass' || spec.floor === 'dirt' || spec.floor === 'soil' ? 1 : 0.85, 0, { map: tex }));
       }
       if (rm.out || rm.lid) continue; // no rugs, skirting, pictures or windows out in the garden, nor in a roof's stair head
       if (spec.rug && rnd() < spec.rug && rm.w >= 3 && rm.h >= 3) {

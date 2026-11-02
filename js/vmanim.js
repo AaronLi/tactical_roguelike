@@ -94,6 +94,7 @@ G.VMAnim = (() => {
       if (an.ch) A.chHome = an.ch.position.clone();
       if (an.cyl) A.cylHome = an.cyl.position.clone();
       if (an.bolt) A.boltHome = an.bolt.position.clone();
+      if (an.barrel) A.barrelHome = an.barrel.position.clone(); // (a long-recoil barrel's)
       // recip: the handle rides the bolt (it jumps back each shot); open: an open-bolt gun, whose bolt (and a
       // riding handle with it) sits back, cocked, while there's a round to fire
       return { holder, info, side, an, A, travel: info.handle ? info.handle.travel : 0.07, recip: !!(info.handle && info.handle.recip), open: G.OPEN_BOLT.includes(def.id) };
@@ -564,6 +565,13 @@ G.VMAnim = (() => {
         if (pose && pose.handle != null) k = pose.handle;
         else if (h.recip && ts < CYC) k = h.open ? (loaded ? Math.min(1, ts / (CYC * 0.5)) : 0) : Math.sin(Math.PI * ts / CYC);
         an.handle.position.copy(A.handleHome).z += k * h.travel;
+      }
+      // a long-recoil barrel (the GM6's): slammed back the whole stroke with the shot, the bolt locked to it; a moment there while
+      // the bolt unlocks and is held, then it runs home ahead of the bolt (eased in at the end, as the spring's spent)
+      if (an.barrel && A.barrelHome) {
+        const ts = pl.sinceShot == null ? 9 : pl.sinceShot, back = 0.025, hold = 0.03, home = 0.15;
+        const kb = ts < back ? ts / back : ts < back + hold ? 1 : Math.max(0, 1 - (ts - back - hold) / home);
+        an.barrel.position.copy(A.barrelHome).z += kb * kb * (3 - 2 * kb) * (h.info.recoilBarrel || 0);
       }
       if (an.slide && pose && pose.slide != null) an.slide.position.z = pose.slide * SLIDE;
       if (an.cyl && A.cylHome) { const k = pose ? pose.cyl : 0; an.cyl.position.copy(A.cylHome); an.cyl.position.x -= 0.05 * k; an.cyl.position.y -= 0.016 * k; /* (swung clear of the frame) */ }

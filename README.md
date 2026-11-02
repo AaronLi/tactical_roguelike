@@ -236,7 +236,7 @@ says the same), but not whose: the shooter's name isn't shown.
     pale level (apartment, store) is 7-20% brighter, a dark one (foundry, bunker) 10-20% darker, and the darkest
     corners are lit by bounce instead of flat fill. Building the grid takes 50-300 ms (`G.LightGrid.opts`:
     `bounce`, `bounces`, `sky`, `fill`).
-- Themes: Apartment, Warehouse, Bunker, Suburbs, Research Lab, Foundry, Cold Storage, Festival (the route map picks
+- Themes: Apartment, Warehouse, Bunker, Suburbs, Research Lab, Foundry, Cold Storage, Festival, Sandia Crest (the route map picks
   which), and the Convenience Store, the first deployment of every run and nowhere else. **Every level starts outside
   the target** (`js/level.js`), and you breach in:
   - **The convenience store** (`layout: 'mart'`, `layMart`): small and crowded, 20 x 26 m with its lot (from photos of
@@ -415,6 +415,49 @@ says the same), but not whose: the shooter's name isn't shown.
       while a scope still finds them across the field.
     - Built in `js/level.js` (`layFestival`, `buildFestival`) and `js/furniture.js` (the pieces and `plan`'s
       `festival()`).
+  - **Sandia Crest** (`layout: 'crest'`, `layCrest`): the top of the Sandia Mountains over Albuquerque at sundown,
+    about 334 × 92 m, all of it open to the sky. Locked till after level 3: the route map only offers it from level 4 on
+    (the theme's `from`, `js/route.js`). It's built for long-range sniping: two summits of pink granite with a
+    236 m gorge between them; across it on foot is the saddle at the north end (the way the suspects come), or a zipline
+    each way over the gorge. A low stone wall runs round every edge,
+    hip high, so you see and shoot over it and crouch behind it. More suspects (×1.4), and more of them are
+    Lookouts (marksmen, from level 1), most of them on the east summit (`G.Level.plan` thins the spots on the west
+    summit to a fifth and on the saddle to two-fifths).
+    - **The west summit**, where you come in: the crest's parking lot (south-west), the pad on it behind the Forest
+      Service's trucks, and someone's silver 2017 BMW 340i xDrive with the M Performance parts nosed in at the lot's east
+      end (`R.bmw340`: the F30's side profile drawn across it at its real size, black kidneys and mirror caps, the carbon
+      boot spoiler, the sill stripes, blue calipers behind 19-inch 405M wheels; cover). A band of outcrops north of it has one way through to the **Crest House**, a stone gift shop
+      with its office and storeroom behind (the level's indoor rooms: the attachments box and the first aid cabinets go
+      here). Then a trail runs north among outcrops, boulders, junipers, piñons and cholla to the **overlook**, a
+      flagstone terrace out over the gorge with two coin-op viewers and a bench. Nobody starts on it. The viewers work:
+      press F at one to put your eyes to it (a 15× view through two round fields, swinging 70° either side of straight out,
+      the mouse slowed to match, the weapon away) and spot who's where in the garden before you shoot; F again, or a step,
+      and you're off it (`crest.scopes`; `js/player.js` `VIEWER`). From it the
+      greenhouse is 254 m off and the garden 232–278 m (255 m in the middle): standing, you see 83% of it over the wall.
+      That's past where a suspect can pick anyone out (75 m), so from the overlook you're unseen until you start shooting
+      and they come for you over the saddle.
+    - **The east summit:** a chile garden (raised beds in rows running north-south, side-on to the overlook, so a
+      crouching suspect is hidden behind them, plus fruit trees and ristras drying), round a **greenhouse** in the
+      middle: glass on all four sides from a low sill, a glass roof, two rows of potting benches, double doors on the
+      west and one on the east. South of the garden, behind a coyote fence with a gate, the **antenna farm**: lattice
+      masts with red beacons on their equipment huts, and air handlers.
+    - **The gorge:** 45 m of open air between the summits (`lay.chasm`; tile 5 on the ground floor, with no floor
+      under it in `js/world.js`, only the gorge's own floor down there), its cliffs ragged and lit pink by the low sun.
+      Rounds fly on past the map's edge (`ray: false` on its edge walls) instead of stopping in the air.
+    - **The ziplines** (`crest.lines`; `js/player.js` `zipStep`): one from the ridge just north of the overlook down to the
+      garden's west edge, one back from the garden's south-west to the strip beside the Crest House. Stand at the foot of a
+      start pole and hold F (0.4 s) to clip on: you're lifted onto the bar, carried 236 m in about 14 s under a cable sagging
+      7 m in the middle (slow at the ends, about 24 m/s down its middle, the gorge's floor 50 m under your feet), and set
+      down past the far wall. The weapon's away the whole way, so clear where you're landing first: the over line comes down
+      at the edge of the garden. Steel poles on the rims with an arm out over the wall and a stay back to a footing, the cable
+      a tube you can see from across the gorge (`buildCrest`, `G.Level.zipPoint` for its shape, shared with the ride).
+    - **Past the walls** (`buildCrest`, not in the world): the evening sky (gold toward the sun going down over the
+      West Mesa, the belt of Venus opposite), the ranges on the horizon (Mount Taylor, the Jemez, the Manzanos), the
+      mountain under you (the sheer granite west face, the forested east side, the crest running on north and south), the
+      city's lights coming on in the valley below with the interstates and the river, and the tramway's cables
+      dropping down the face to it. The far parts are lit into their colours on unlit materials, from the low sun in the
+      west. The theme's `far` lets the camera see 1400 m, and the ride in skips the usual town of lit windows.
+    - Built in `js/level.js` (`layCrest`, `buildCrest`) and `js/furniture.js` (the pieces and `plan`'s `crestPlan()`).
 - **Clear the level** by arresting (zip-tying) or killing every suspect.
   - **Arresting:** get behind them first. A
     surrendered suspect watches you approach but holds still once you're close, so walk round, or from the front
@@ -449,7 +492,8 @@ says the same), but not whose: the shooter's name isn't shown.
   water tank, a parapet round it; the others' are in an expanded lot (the suburbs': a turning circle at the west end of
   the street), what you'd find there parked between them and the target (`G.Level.LZ_KIT`: delivery trucks at the
   store, shipping containers in the warehouse yard and at the foundry, reefers at cold storage, earth-filled gabions at the
-  bunker, trucks and portaloos at the festival, a removal van in the suburbs). No suspect starts within 22 m of a pad on its level or with a line of sight to it (`G.Level.landing`).
+  bunker, trucks and portaloos at the festival, a removal van in the suburbs, the Forest Service's trucks and granite
+  boulders on the Sandia Crest). No suspect starts within 22 m of a pad on its level or with a line of sight to it (`G.Level.landing`).
 
   There's no exit zone. Once order is restored, press **Y** to vote to leave (Y again takes it back). The
   level ends when every officer still alive has voted, downed ones included; solo, that's you. The HUD
@@ -912,7 +956,7 @@ says the same), but not whose: the shooter's name isn't shown.
     your wrist), scaled so a 2.9 kg M4 kicks 1.1° a shot. On top of that, design: a stock that drops below the
     bore (AKs, old wooden stocks) climbs 25% more, a manual action (bolt, pump, lever, break-open, revolver)
     40% more (nothing in it softens the kick), and a few guns are built against it (the Vector's bolt goes
-    down, the G36, the M82's recoiling barrel, the harness-braced minigun). Every gun has its real weight now
+    down, the G36, the M82's recoiling barrel, the GM6 Lynx's long-recoil barrel, the harness-braced minigun). Every gun has its real weight now
     (an M249 7.5 kg, a PKM 7.5, an M60 10.5, an RPK 4.8, a P9 0.75, a TX22 0.6). So an M249 kicks 0.62° to
     the M4's 1.1, a PKM 1.5 to a SCAR-H's 2.3 and an AK's 1.7 on the same class of round. Your build counts:
     its own weight (a 0.5 kg suppressor takes about 8% off before its own effect), its barrel (a longer one
@@ -1871,7 +1915,7 @@ says the same), but not whose: the shooter's name isn't shown.
   fed as it goes home. One pose of each action (slide, charging handle, cocking handle, bolt, pump, lever) at
   any pull serves every use of it: a rack, a release, the chamber check.
   - **Bolt hold-open** (`G.boltHold`): every pistol with a slide, the AR-15 family, the SCARs, G36, AUG,
-    Tavor, FAL, M14/Mk14, SR-25, Barrett, MPX, MCX, QBZ-192, MP7, Vector, Skorpion and SVD lock open on their last round. From
+    Tavor, FAL, M14/Mk14, SR-25, Barrett, GM6 Lynx, MPX, MCX, QBZ-192, MP7, Vector, Skorpion and SVD lock open on their last round. From
     empty, the magazine change and then a thumb on the bolt catch (or the slide stop), 0.4 s: the slide (or
     bolt) slams forward on a round.
   - **Without one** (the AK family, MP5, open-bolt guns, the belt-feds, bolt-actions): from empty, the magazine
@@ -1902,7 +1946,16 @@ says the same), but not whose: the shooter's name isn't shown.
   - **AR-15 T-handle** at the back of the upper: M4, HK416, M27, SR-25, MPX, AR-9 (and the Mk14, built on an
     AR upper here).
   - **Right-side knob:** the AK family, Galil, SVD, VSS, Saiga, Vepr and RPK; the op rods of the Garand and M14;
-    the Benelli's and PPSh's bolt handles; the belt-feds; the Barrett's big one.
+    the Benelli's and PPSh's bolt handles; the belt-feds; the Barrett's big one; the GM6 Lynx's, over its grip.
+- **The GM6 Lynx's barrel recoils** (a platform's `recoilBarrel` in `js/parts.js`: how far; `js/gunmodels.js` puts the
+  barrel, its collar and whatever's on its muzzle on a part of their own, and `js/vmanim.js` moves it): the Hungarian
+  bullpup .50 is a long-recoil gun, so each shot slams the whole barrel 15 cm back into the tube in front of the grip
+  in 25 ms, holds it there while the bolt unlocks, and runs it home over the next 0.15 s, a suppressor or brake riding
+  with it (a short barrel's stroke stops short of the bipod's clamp). Traced from the maker's side-on studio shot (IMFDB,
+  "GepardM6.jpg") at its real 1126 mm, the front end checked against "Sniper rifle (18218366812) (GM6 Lynx).jpg"
+  (Wikimedia Commons, CC BY 2.0): the long box body with the butt and cheek, the tall 5-round magazine behind the grip
+  with its witness holes, the open grip frame, the tube with its sling plates and short rail, the bipod clamped on its
+  end with the legs folded back, and the GM6's own brake (a slim neck, a blocky head with one big port).
   - **Left side, forward:** the SCARs (a knob), the AUG and Tavor; folding levers on the FAL, Vector and AA-12.
   - **Others:**
     - the HK tube over the handguard, front left (MP5, MP5SD), whose tab slides along a tube that stays put;

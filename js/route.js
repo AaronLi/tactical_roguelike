@@ -46,10 +46,12 @@ G.Route = (() => {
     for (const n of nodes.values()) if (n.c === COLS - 2) edges.push([COLS - 2, n.r, boss.r]);
     for (const [c, a, b] of edges) { const f = nodes.get(id(c, a)), t = nodes.get(id(c + 1, b)); if (!f.next.includes(t.id)) { f.next.push(t.id); t.prev.push(f.id); } }
     // environments: no two in a row along a link where it can be helped, and each column a mix. (The starter, the
-    // convenience store, is the first act's way in and nowhere else: the rest are drawn from the others.)
-    const pool = G.THEMES.map((T, i) => i).filter((i) => !G.THEMES[i].starter), nT = pool.length, starter = G.THEMES.findIndex((T) => T.starter);
+    // convenience store, is the first act's way in and nowhere else: the rest are drawn from the others, each from its
+    // theme's `from`, the first level it can come up at: the Sandia Crest's after the third.)
+    const all = G.THEMES.map((T, i) => i).filter((i) => !G.THEMES[i].starter), starter = G.THEMES.findIndex((T) => T.starter);
     const order = [...nodes.values()].sort((a, b) => a.c - b.c || a.r - b.r);
     for (const n of order) {
+      const level = (act - 1) * COLS + n.c + 1, pool = all.filter((i) => !(G.THEMES[i].from > level)), nT = pool.length;
       const avoid = new Set(n.prev.map((p) => nodes.get(p).th));
       for (const o of order) if (o.c === n.c && o !== n && o.r < n.r) avoid.add(o.th);
       let k0 = Math.floor(r() * nT);
@@ -72,6 +74,7 @@ G.Route = (() => {
     Bunker: 'M-7 5Q0-9 7 5Z M-3 5V1H3V5', Suburbs: 'M-7 6V0L-3.5-4 0 0V6Z M1 6V-2L4-5 7-2V6',
     'Research Lab': 'M-2-7H2 M-1-7V-2L-6 6H6L1-2V-7', Foundry: 'M-7 6V-1L-3-4V-1L1-4V-1L5-4V6Z M4-4V-8H6V-3',
     'Cold Storage': 'M0-7V7 M-6-3.5L6 3.5 M-6 3.5L6-3.5', 'Convenience Store': 'M-7 6V-2H7V6Z M-7-2L-5-6H5L7-2 M-4 6V1H0V6 M2 1H5V4H2Z',
+    'Sandia Crest': 'M-7 6L-3-5 0 1 3-7 7 6Z M-4.5-1.5L-3-0.5-1.5-1.5',
   };
   // wider than the screen: the map scrolls sideways (js/game.js keeps where you are in view)
   const STEP = 150, PADX = 80, PADY = 56, W = 2 * PADX + (COLS - 1) * STEP, H = 600;

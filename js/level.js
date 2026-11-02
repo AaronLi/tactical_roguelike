@@ -27,7 +27,7 @@ G.Level = {
     // building of rooms and corridors. Every one starts outside it (or, for the apartments, on the stairs).
     const lay = theme.layout === 'apartments' ? this.layApartments(r, level) : theme.layout === 'warehouse' ? this.layWarehouse(r, level)
       : theme.layout === 'houses' ? this.layHouses(r, level) : theme.layout === 'festival' ? this.layFestival(r, level) : theme.layout === 'mart' ? this.layMart(r, level)
-      : theme.layout === 'foundry' ? this.layFoundry(r, level)
+      : theme.layout === 'foundry' ? this.layFoundry(r, level) : theme.layout === 'crest' ? this.layCrest(r, level)
       : this.approach(this.layRooms(r, level), r, theme);
     // a building of several floors: each one planned as a storey, then stacked (stack: the stairs between them)
     if (lay.floors) {
@@ -106,7 +106,7 @@ G.Level = {
     });
     for (const [x, z, axis, open, mirror, kind] of lay.doors || []) if (t[z * W + x] !== 3) addDoor(x, z, axis, open, mirror, kind);
     // The coarse plan. out: tiles open to the sky (gardens); fences: garden fence tiles [x, z, axis].
-    const c = { W, H, t, rooms, seed, level, doors, doorAt, out: lay.out || new Uint8Array(W * H), fences: lay.fences || [], grate: lay.grate || null, TS: this.CTS, theme };
+    const c = { W, H, t, rooms, seed, level, doors, doorAt, out: lay.out || new Uint8Array(W * H), fences: lay.fences || [], grate: lay.grate || null, crest: lay.crest || null, TS: this.CTS, theme };
     const spawnRoom = lay.spawn || rooms[0];
     const distFromSpawn = this.flow(c, [[spawnRoom.cx, spawnRoom.cz]]);
     const seeds = [[spawnRoom.cx, spawnRoom.cz]].concat(lay.entries || []); // (upstairs: the stair heads too, so a loft's upper floor counts)
@@ -139,9 +139,19 @@ G.Level = {
     // roller doors (rolled up): [x from, x to, z of the wall] in metres
     map.rollers = (lay.rollers || []).map(([x0, z, w]) => [x0 * this.CTS, (x0 + w) * this.CTS, (z + 0.5) * this.CTS]);
     map.fest = c.fest || null; map.civSpots = c.civSpots || null; // (a festival: its light strings, where civilians hide)
+    map.crest = c.crest; map.chasm = lay.chasm || 0; // (the Sandia Crest: which walls are rock, where the masts stand; how far down the gorge's floor is)
     map.spawnRoom = map.rooms[rooms.indexOf(spawnRoom)];
     map.exitRoom = map.rooms[rooms.indexOf(exitRoom)];
+    // (a gorge: the strip of ground past the wall along its rim, that nobody can reach, is the gorge's air; the wall stands on the edge)
+    if (map.chasm) {
+      const { W, H, t } = map, f = this.flow(map, [[map.spawnRoom.cx, map.spawnRoom.cz]]), nb = (i, v) => [i - 1, i + 1, i - W, i + W].some((j) => j >= 0 && j < W * H && t[j] === v);
+      const air = []; for (let i = 0; i < W * H; i++) if (t[i] === 0 && f[i] < 0 && nb(i, 4) && nb(i, 5)) air.push(i);
+      for (const i of air) t[i] = 5;
+    }
     this.finish(map, r);
+    // (the Sandia Crest's a sniper's level: most of them over on the east summit, across the gorge from the overlook; a few
+    // on the saddle, fewer still on the way up the west summit)
+    if (map.crest) { const cr = map.crest, west = cr.CX0 * this.CTS, east = (cr.CX1 + 1) * this.CTS; map.enemySpots = map.enemySpots.filter(([x]) => { const m = (x + 0.5) * this.TS; return m >= east || r() < (m < west ? 0.2 : 0.4); }); }
     // the walls, the doors and everything else are done: now who lives here redoes the rooms they have (after all of
     // it, on its own random stream, so nothing else on the map moves for them)
     if (lay.homes) G.Homes.fill(map, lay.homes);
@@ -715,6 +725,131 @@ G.Level = {
     rooms.unshift(stage, seating, court, picnic, gate, plaza, lot, aisle, over);
     return { W, H, t, rooms, doors, out, fences, spawn: over, lz };
   },
+  // The top of the Sandia Mountains over Albuquerque at sundown: two summits of pink granite either side of a gorge, a
+  // saddle between them at the north end, 334 x 92 m, all of it open to the sky. A sniper's level: from the overlook on the
+  // west summit the greenhouse on the east one is about 250 m off across the gorge. The way over on foot is the saddle (the
+  // way the suspects come); a zipline each way across the gorge is quicker (crest.lines: js/player.js rides them).
+  //  - The west summit, where you come in: the crest's parking lot (south-west), the helicopter's pad on it; north of it a
+  //    band of outcrops with a way through, the Crest House past it (a stone gift shop, its office and storeroom behind), then
+  //    the trail north among the outcrops to the overlook, a flagstone terrace out over the gorge. North of that the ridge,
+  //    and the saddle over to the east summit.
+  //  - The east summit: a chile garden (raised beds, fruit trees) round a glass greenhouse in the middle of it; south of
+  //    the garden, behind a coyote fence, the antenna farm (masts on their equipment huts).
+  //  - The gorge: open air (5) CHASM metres down to its floor (lay.chasm: js/world.js puts the ground there), a low stone
+  //    wall (the theme's fence) along every edge of it and round the map.
+  // The outcrops (wall tiles, lay.crest.kind 1) are laid in blobs, each kept only if every bit of ground is still reached,
+  // and never a tile thick (a wall that thick between two open spaces thins to a slab: refine).
+  // (What goes where: G.Furniture.plan's crest(); the sky, the mountain under it and the city below: buildCrest.)
+  CHASM: 45,
+  layCrest(r, level) {
+    const U = G.U, CX0 = 24, CX1 = 142, W = CX1 + 25, H = 46, SZ = 6; // the gorge from x CX0 to CX1 (236 m across), south of the saddle's wall (row SZ)
+    const OZ0 = 12, OZ1 = 17, OX1 = CX0 + 3; // the overlook: its rows, its east side
+    const HX = 13, HZ = 23, GX = CX1 + 9, GZ = 13; // the Crest House's and the greenhouse's north-west corners (walls and all)
+    // the ziplines, a tile each end to step on and off them ([x, z], coarse): over, from the ridge north of the overlook down to
+    // the garden's west edge; back, from the garden's south-west down to the strip beside the Crest House
+    const ZL = [{ on: [CX0 - 2, 8], off: [CX1 + 2, 10] }, { on: [CX1 + 2, 27], off: [CX0 - 2, 23] }];
+    const t = new Uint8Array(W * H), out = new Uint8Array(W * H).fill(1), kind = new Uint8Array(W * H), rooms = [], doors = [], fences = [], glass = [];
+    const at = (x, z) => z * W + x;
+    const fill = (x0, z0, w, h, v) => { for (let z = z0; z < z0 + h; z++) for (let x = x0; x < x0 + w; x++) t[at(x, z)] = v; };
+    const fence = (x, z, axis, name) => { t[at(x, z)] = 4; fences.push(name ? [x, z, axis, name] : [x, z, axis]); };
+    const room = (x, z, w, h, type, o) => { const q = this._room(x, z, w, h, Object.assign({ type, out: true, flush: true }, o)); rooms.push(q); return q; };
+    // the gorge, the overlook out over it
+    fill(CX0, SZ + 1, CX1 - CX0 + 1, H - SZ - 1, 5);
+    fill(CX0, OZ0, OX1 - CX0 + 1, OZ1 - OZ0 + 1, 0);
+    // the low stone wall: round the map (not across the gorge), along the gorge's rims and the saddle's, round the overlook
+    for (let x = 0; x < W; x++) for (const z of [0, H - 1]) if (t[at(x, z)] !== 5) fence(x, z, 'x');
+    for (let z = 1; z < H - 1; z++) for (const x of [0, W - 1]) fence(x, z, 'z');
+    for (let x = CX0; x <= CX1; x++) fence(x, SZ, 'x');
+    for (let z = SZ; z < H - 1; z++) { if (z < OZ0 || z > OZ1) fence(CX0 - 1, z, 'z'); fence(CX1 + 1, z, 'z'); }
+    for (let x = CX0; x <= OX1 + 1; x++) { fence(x, OZ0 - 1, 'x'); fence(x, OZ1 + 1, 'x'); }
+    for (let z = OZ0; z <= OZ1; z++) fence(OX1 + 1, z, 'z');
+    // the Crest House, 9 x 9 tiles: the gift shop across the front (south), its double door under a lantern; the office
+    // and the storeroom behind it, the storeroom's door out the back
+    fill(HX, HZ, 9, 9, 1);
+    for (let z = HZ; z < HZ + 9; z++) for (let x = HX; x < HX + 9; x++) { out[at(x, z)] = 0; kind[at(x, z)] = 2; }
+    fill(HX + 1, HZ + 4, 7, 4, 0); fill(HX + 1, HZ + 1, 3, 2, 0); fill(HX + 5, HZ + 1, 3, 2, 0);
+    room(HX + 1, HZ + 4, 7, 4, 'giftshop', { out: false }); room(HX + 1, HZ + 1, 3, 2, 'office', { out: false }); room(HX + 5, HZ + 1, 3, 2, 'storeroom', { out: false });
+    doors.push([HX + 3, HZ + 8, 'z', false, false], [HX + 4, HZ + 8, 'z', false, true]);
+    doors.push([HX + 2, HZ + 3, 'z', false, false], [HX + 6, HZ + 3, 'z', false, false], [HX + 6, HZ, 'z', false, false]);
+    // the greenhouse, 7 x 9 tiles: glass all round from a low sill (lay.glass), a double door on the west (toward the
+    // overlook), one on the east; no roof over it but glass (open to the sky: buildCrest's)
+    fill(GX, GZ, 7, 9, 1); fill(GX + 1, GZ + 1, 5, 7, 0);
+    for (let z = GZ; z < GZ + 9; z++) for (let x = GX; x < GX + 7; x++) if (t[at(x, z)] === 1) kind[at(x, z)] = 3;
+    doors.push([GX, GZ + 3, 'x', false, false], [GX, GZ + 4, 'x', false, true], [GX + 6, GZ + 4, 'x', false, false]);
+    const pane = { sill: 0.3, top: 3.75 };
+    glass.push(Object.assign({ x0: GX, z0: GZ + 1, x1: GX, z1: GZ + 7, v: 1 }, pane), Object.assign({ x0: GX + 6, z0: GZ + 1, x1: GX + 6, z1: GZ + 7, v: 1 }, pane),
+      Object.assign({ x0: GX + 1, z0: GZ, x1: GX + 5, z1: GZ }, pane), Object.assign({ x0: GX + 1, z0: GZ + 8, x1: GX + 5, z1: GZ + 8 }, pane));
+    // the coyote fence between the garden and the antenna farm, a gate in the middle
+    for (let x = CX1 + 2; x < W - 1; x++) if (x < GX + 2 || x > GX + 4) fence(x, 32, 'x', 'coyote');
+    // the outcrops. Where none go: the lot and the pad's shelter, in front of every door, the way onto the overlook, the
+    // saddle's ends, the garden.
+    const keep = new Uint8Array(W * H);
+    const clear = (x0, z0, x1, z1) => { for (let z = Math.max(0, z0); z <= Math.min(H - 1, z1); z++) for (let x = Math.max(0, x0); x <= Math.min(W - 1, x1); x++) keep[at(x, z)] = 1; };
+    clear(0, 37, CX0, H - 1); clear(CX0 - 3, OZ0 - 1, CX0, OZ1 + 1); clear(CX0 - 2, 0, CX0 + 1, SZ); clear(CX1 - 1, 0, CX1 + 3, SZ); clear(CX1 + 1, 0, W - 1, 33);
+    for (const [x, z, axis] of doors) clear(x - (axis === 'x' ? 2 : 1), z - (axis === 'z' ? 2 : 1), x + (axis === 'x' ? 2 : 1), z + (axis === 'z' ? 2 : 1));
+    for (const l of ZL) for (const [x, z] of [l.on, l.off]) clear(x - 1, z - 1, x + 1, z + 1); // (the zipline's ends)
+    // (ground that's reached: from the lot, through the doors as if they were open)
+    const doorAt = new Set(doors.map(([x, z]) => at(x, z))), walk = (i) => t[i] === 0 || doorAt.has(i);
+    const reached = () => {
+      const seen = new Uint8Array(W * H), q = [at(5, 41)]; seen[q[0]] = 1; let n = 1;
+      while (q.length) { const i = q.pop(), x = i % W; for (const j of [x > 0 ? i - 1 : -1, x < W - 1 ? i + 1 : -1, i - W, i + W]) if (j >= 0 && j < W * H && !seen[j] && walk(j)) { seen[j] = 1; n++; q.push(j); } }
+      return n;
+    };
+    let ground = 0; for (let i = 0; i < W * H; i++) if (walk(i)) ground++;
+    const open = (x, z) => x < 0 || z < 0 || x >= W || z >= H || t[at(x, z)] !== 1;
+    // a blob of rock round (cx, cz), rx by rz tiles out from it, a ragged edge; then no rock a tile thick anywhere in it
+    const blob = (cx, cz, rx, rz) => {
+      const put = [];
+      for (let z = cz - rz; z <= cz + rz; z++) for (let x = cx - rx; x <= cx + rx; x++) {
+        if (x < 1 || z < 1 || x >= W - 1 || z >= H - 1 || keep[at(x, z)] || t[at(x, z)] !== 0) continue;
+        const e = ((x - cx) / (rx + 0.5)) ** 2 + ((z - cz) / (rz + 0.5)) ** 2;
+        if (e <= 0.8 + r() * 0.4) put.push(at(x, z));
+      }
+      for (const i of put) { t[i] = 1; kind[i] = 1; }
+      for (let pass = 0, thin = true; thin && pass < 6; pass++) {
+        thin = false;
+        for (const i of put) {
+          if (t[i] !== 1) continue;
+          const x = i % W, z = (i / W) | 0;
+          if ((open(x - 1, z) && open(x + 1, z)) || (open(x, z - 1) && open(x, z + 1))) { t[i] = 0; kind[i] = 0; thin = true; }
+        }
+      }
+      const left = put.filter((i) => t[i] === 1).length;
+      if (left && reached() !== ground - left) { for (const i of put) { t[i] = 0; kind[i] = 0; } return 0; } // (it cut something off)
+      ground -= left;
+      return left;
+    };
+    // the band between the lot and the Crest House, a way through it somewhere along it; the outcrops along the trail
+    // and on the ridge; a couple on the saddle and round the antenna farm
+    const gap = U.ri(r, 3, 9);
+    for (let x = 2; x <= 20; x += 3) if (Math.abs(x - gap) > 2) blob(x, 35, 2, 1);
+    blob(8, 17, 2, 2); blob(18, 19, 3, 1); blob(3, 6, 2, 2); blob(14, 4, 2, 1);
+    for (let n = 0, tries = 0; n < 5 + U.ri(r, 0, 3) && tries < 40; tries++) if (blob(U.ri(r, 3, 20), U.ri(r, 3, 20), U.ri(r, 1, 2), U.ri(r, 1, 2))) n++;
+    for (let n = 0, tries = 0; n < 10 && tries < 60; tries++) if (blob(U.ri(r, CX0 + 3, CX1 - 3), U.ri(r, 2, 4), 1, 1)) n++;
+    blob(U.ri(r, CX1 + 19, CX1 + 22), U.ri(r, 36, 41), 2, 2); blob(U.ri(r, CX1 + 4, CX1 + 7), U.ri(r, 40, 43), 1, 1);
+    // the rooms: the lot (where you come in), the trail up to the Crest House and round it (out the front: no suspects
+    // there), the approach to the overlook, the overlook, the ridge, the saddle; the garden round the greenhouse in four,
+    // the greenhouse, the antenna farm
+    const lot = room(1, 37, CX0 - 2, 8, 'lz'), lz = this._pad(lot, W, 3, 39, this.LZ_KIT.crest);
+    lot.cover.push(['bmw340', 40, 84, 1, {}]); // (someone's up here for the sunset: a silver 340i nosed in toward the rim at the lot's east end)
+    room(1, 32, CX0 - 2, 5, 'trail', { front: true }); room(1, 21, HX - 1, 11, 'trail', { front: true }); room(HX, 21, CX0 - 1 - HX, 2, 'trail');
+    room(1, 11, CX0 - 2, 10, 'trail'); room(1, 1, CX0 - 2, 10, 'ridge');
+    room(CX0 - 1, OZ0, OX1 - CX0 + 2, OZ1 - OZ0 + 1, 'overlook', { front: true }); // (yours: nobody starts on it)
+    room(CX0 - 1, 1, CX1 - CX0 + 3, SZ - 1, 'saddle');
+    room(CX1 + 2, 1, W - CX1 - 3, 3, 'ridge');
+    room(CX1 + 2, 4, GX - CX1 - 2, 28, 'garden'); room(GX + 7, 4, W - GX - 8, 28, 'garden'); room(GX, 4, 7, GZ - 4, 'garden'); room(GX, GZ + 9, 7, 32 - GZ - 9, 'garden');
+    room(GX + 1, GZ + 1, 5, 7, 'greenhouse');
+    room(CX1 + 2, 33, W - CX1 - 3, H - 34, 'antennas');
+    // each zipline in metres: its cable from the top of the pole at the start, just out past the wall, to the bottom of the pole
+    // at the end (a, b: [x, y, z]), how far it sags in the middle, and the ground you step on and off at
+    const CS = this.CTS, wRim = (CX0 - 0.5) * CS + 0.9, eRim = (CX1 + 1.5) * CS - 0.9, C = ([x, z]) => [(x + 0.5) * CS, (z + 0.5) * CS];
+    const lines = ZL.map(({ on, off }) => {
+      const east = off[0] > on[0];
+      return { a: [east ? wRim : eRim, 6.6, C(on)[1]], b: [east ? eRim : wRim, 3.9, C(off)[1]], sag: 7, on: C(on), off: C(off), keep: [on, off] };
+    });
+    const crest = { W, H, kind, CX0, CX1, SZ, OZ0, OZ1, OX1, house: [HX, HZ], gh: [GX, GZ], masts: [], scopes: [], lines };
+    return { W, H, t, rooms, doors, out, fences, glass, spawn: lot, lz, crest, chasm: this.CHASM };
+  },
   // Each returns { W, H, t, rooms, doors?, ringDoors?, out?, fences?, spawn? } on the coarse grid. t starts as all wall
   // (1); rooms are carved to floor (0).
   _room(x, z, w, h, o) { return Object.assign({ x, z, w, h, cx: x + (w >> 1), cz: z + (h >> 1) }, o || {}); },
@@ -731,6 +866,7 @@ G.Level = {
     foundry: { long: 'container', short: 'scrap', style: { c: 0x7a3f28 } },
     festival: { long: 'boxtruck', short: 'portaloo', style: { c: 0x2a2a32, stripe: 0xd94fa0 } },
     suburbs: { long: 'boxtruck', short: 'hedge', style: { c: 0xe0d8c8, stripe: 0x2f7a4a } },
+    crest: { long: 'boxtruck', short: 'boulder', style: { c: 0xe6e2d6, stripe: 0x2f6a44 } }, // (the Forest Service's)
   },
   _pad(rm, W, x, z, kit, east) {
     const c = rm.cover = [], cs = this.CTS, GAP = 1.6, put = (name, px, pz, q) => c.push([name, px, pz, q, kit.style]);
@@ -1673,6 +1809,10 @@ G.Level = {
       g.strokeRect(1, 1, 126, 126);
       g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(0, 100, 128, 6);
       g.fillStyle = 'rgba(255,255,255,0.06)'; g.fillRect(0, 20, 128, 3);
+    } else if (kind === 'rock') { // (granite: crystals, cracks, no courses or skirting)
+      for (let i = 0; i < 700; i++) { g.fillStyle = `rgba(${Math.random() < 0.5 ? '40,30,30' : '255,250,245'},${0.08 + Math.random() * 0.14})`; g.fillRect(Math.random() * 128, Math.random() * 128, 1 + Math.random() * 2, 1 + Math.random() * 2); }
+      g.strokeStyle = 'rgba(40,24,20,0.3)'; g.lineWidth = 1;
+      for (let i = 0; i < 5; i++) { let x = Math.random() * 128, y = Math.random() * 128; g.beginPath(); g.moveTo(x, y); for (let j = 0; j < 5; j++) { x += (Math.random() - 0.5) * 30; y += Math.random() * 22; g.lineTo(x, y); } g.stroke(); }
     } else if (kind === 'plaster') {
       g.fillStyle = 'rgba(255,255,255,0.05)'; g.fillRect(0, 0, 128, 128);
     } else if (kind === 'crate') {
@@ -1863,6 +2003,240 @@ G.Level = {
       const dt = last ? Math.min(0.05, (now - last) / 1000) : 0;
       last = now; step(dt);
     };
+  },
+  // The Sandia Crest's world past its walls (map.crest; layCrest): the evening sky, the sun going down over the West Mesa,
+  // the ranges round the horizon; the mountain under the summits, its granite west face dropping to the city and its
+  // forested east side, the crest running on north and south; the gorge's cliffs down to its floor; Albuquerque's lights
+  // coming on far below; the tramway's cables down the west face; the outcrops' rough tops; the greenhouse's glass roof.
+  // None of it's solid (the gorge's floor is: js/world.js). What's far off is lit as it would be at sundown, into its
+  // colours (unlit materials: the light grid only knows the level), the sun from low in the west.
+  // a point on a zipline's cable (crest.lines), s from 0 at its start to 1 at its end: straight between its ends, sagging in
+  // the middle (a parabola's near enough to the catenary)
+  zipPoint(l, s) { return [l.a[0] + (l.b[0] - l.a[0]) * s, l.a[1] + (l.b[1] - l.a[1]) * s - l.sag * 4 * s * (1 - s), l.a[2] + (l.b[2] - l.a[2]) * s]; },
+  buildCrest(map, root) {
+    const T = THREE, cr = map.crest, TS = this.TS, CS = this.CTS, Wm = map.W * TS, Hm = map.H * TS, D = map.chasm, rnd = G.U.rng((map.seed ^ 0x5a7d1a) >>> 0);
+    const cx = Wm / 2, cz = Hm / 2, col = new T.Color();
+    const sun = new T.Vector3(-1, 0.075, 0.32).normalize();
+    // a colour (sRGB) as it's lit facing (nx, ny, nz): the sky's blue from above, the sun's orange where it faces west. ao: how shut in
+    const lit = (r, g, b, nx, ny, nz, ao = 1) => {
+      const s = Math.max(0, nx * sun.x + ny * sun.y + nz * sun.z), a = (0.4 + 0.16 * ny) * ao;
+      return col.setRGB(Math.min(1, r * (a * 0.95 + s * 1.1)), Math.min(1, g * (a * 0.95 + s * 0.78)), Math.min(1, b * (a * 1.15 + s * 0.55))).convertSRGBToLinear();
+    };
+    const hash = (x, z) => { const s = Math.sin(x * 127.1 + z * 311.7) * 43758.5453; return s - Math.floor(s); };
+    const vn = (x, z) => {
+      const xi = Math.floor(x), zi = Math.floor(z), fx = x - xi, fz = z - zi, u = fx * fx * (3 - 2 * fx), v = fz * fz * (3 - 2 * fz);
+      const a = hash(xi, zi), b = hash(xi + 1, zi), c = hash(xi, zi + 1), d = hash(xi + 1, zi + 1);
+      return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+    };
+    const fbm = (x, z) => vn(x, z) * 0.5 + vn(x * 2.1 + 5, z * 2.1) * 0.25 + vn(x * 4.3, z * 4.3 + 9) * 0.125 - 0.4375;
+    const sm = (a, b, x) => { const k = G.U.clamp((x - a) / (b - a), 0, 1); return k * k * (3 - 2 * k); }; // (smoothstep)
+    // ---- the mountain: the height of the ground at (x, z), metres from the summits' (under the map, just under its floor)
+    const c0 = cr.CX0 * CS, c1 = (cr.CX1 + 1) * CS, zs = (cr.SZ + 1) * CS, STEP = 10;
+    const height = (x, z) => {
+      const w = -x, e = x - Wm, n = -z, s = z - Hm, off = Math.max(0, w, e, n, s), along = Math.max(0, n, s);
+      // (the west face, sheer, down to the valley floor and on gently down to the city; the east side, falling more gently.
+      // Not to scale: the valley's far nearer than it is, so it's seen over the wall)
+      let h = w > 0 ? -Math.min(170, 1.1 * w + 0.004 * w * w) - Math.max(0, w - 140) * 0.05 : e > 0 ? -Math.min(300, 0.5 * e + 0.0012 * e * e) : -0.6;
+      h -= 0.1 * along + 0.0003 * along * along; // (the crest falling away north and south)
+      h += fbm(x * 0.012, z * 0.012) * Math.min(1, off / 30) * (5 + 26 * (x < 0 ? G.U.clamp((h + 165) / 40, 0, 1) : 1)); // (rough on the mountain, flat on the plain)
+      // the gorge, on under the rims a step (their cliffs hide that) and on south past the map, deeper and wider as it goes
+      const sp = Math.max(0, s), half = (c1 - c0) / 2 + STEP + sp * 0.2, gx = half - Math.abs(x - (c0 + c1) / 2);
+      if (gx > 0 && z > zs - STEP) {
+        const fl = -D - sp * 0.35 + (sp > 0 ? fbm(x * 0.05, z * 0.05) * 8 : 0); // (flat where it's solid: on the map)
+        h = Math.min(h, sp > 0 ? fl + Math.max(0, 30 - gx) * 1.6 : fl);
+      }
+      return h;
+    };
+    const SIZE = 3000, N = 240, ground = new T.PlaneGeometry(SIZE, SIZE, N, N); ground.rotateX(-Math.PI / 2);
+    const gp = ground.attributes.position;
+    for (let i = 0; i < gp.count; i++) { const x = gp.getX(i) + cx, z = gp.getZ(i) + cz; gp.setXYZ(i, x, height(x, z), z); }
+    ground.computeVertexNormals();
+    const gn = ground.attributes.normal, gc = new Float32Array(gp.count * 3);
+    for (let i = 0; i < gp.count; i++) {
+      const x = gp.getX(i), y = gp.getY(i), z = gp.getZ(i), ny = gn.getY(i), steep = 1 - ny, v = 0.86 + hash(x * 0.37, z * 0.37) * 0.24, f = fbm(x * 0.02, z * 0.02);
+      let c;
+      if (y < -D + 3 && y > -D - 40 && x > c0 - STEP && x < c1 + STEP) c = [0.5, 0.42, 0.39]; // scree on the gorge's floor
+      else if (x < -100 && y < -150 && steep < 0.2) c = f > 0.05 ? [0.58, 0.5, 0.42] : [0.66, 0.58, 0.48]; // the valley's desert floor
+      else if (steep > 0.3 + f * 0.2) c = [0.72, 0.5, 0.44]; // granite
+      else if (y > -120) c = f > 0.12 ? [0.6, 0.47, 0.42] : [0.2, 0.27, 0.18]; // spruce and fir, ponderosa lower down, rock showing through
+      else c = [0.44, 0.41, 0.31]; // piñon and juniper
+      lit(c[0] * v, c[1] * v, c[2] * v, gn.getX(i), ny, gn.getZ(i));
+      gc[i * 3] = col.r; gc[i * 3 + 1] = col.g; gc[i * 3 + 2] = col.b;
+    }
+    ground.setAttribute('color', new T.BufferAttribute(gc, 3));
+    const gm = new T.Mesh(ground, new T.MeshBasicMaterial({ vertexColors: true })); gm.renderOrder = 1; root.add(gm); // (renderOrder: left out of mergeStatic)
+    // ---- the gorge's cliffs: down from every edge of the summits' ground that has the gorge's air beside it, ragged below the rim
+    const { W, H, t } = map, cp = [], cc = [], bands = [0, -0.8, -2.2, -4.5, -7.5, -11, -15, -20, -26, -32, -38, -D - 1.5];
+    const jit = (x, y, z) => { const a = Math.min(1, -y / 2.5) * 1.3; return [x + (vn(x * 0.45 + 7, y * 0.22 + z * 0.45) - 0.5) * 2 * a, z + (vn(z * 0.45 - 3, y * 0.22 + x * 0.45) - 0.5) * 2 * a]; };
+    const tri = [new T.Vector3(), new T.Vector3(), new T.Vector3()], e1 = new T.Vector3(), e2 = new T.Vector3();
+    for (let z = 0; z < H; z++) for (let x = 0; x < W; x++) {
+      if (t[z * W + x] === 5) continue;
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx, nz = z + dz;
+        if (nx < 0 || nz < 0 || nx >= W || nz >= H || t[nz * W + nx] !== 5) continue;
+        // the edge's two ends, along it
+        const ex = (x + 0.5 + dx * 0.5) * TS, ez = (z + 0.5 + dz * 0.5) * TS, ax = dz ? TS / 2 : 0, az = dx ? TS / 2 : 0;
+        const ends = [[ex - ax, ez - az], [ex + ax, ez + az]];
+        // in bands down the face, each a pair of triangles lit by its own slant (ragged: facets catch the sun or don't); streaks of
+        // darker varnish down it, paler bands across
+        for (let b = 0; b + 1 < bands.length; b++) for (const q of [[[0, b], [1, b], [1, b + 1]], [[0, b], [1, b + 1], [0, b + 1]]]) {
+          q.forEach(([e, k], j) => { const y = bands[k], [px, pz] = jit(ends[e][0], y, ends[e][1]); tri[j].set(px, y, pz); });
+          e1.subVectors(tri[1], tri[0]); e2.subVectors(tri[2], tri[0]); e1.cross(e2).normalize();
+          if (e1.x * dx + e1.z * dz < 0) e1.negate(); // (facing out over the gorge)
+          for (const p of tri) {
+            const streak = vn((p.x + p.z) * 0.6, 3.3), band = fbm(p.y * 0.25 + (p.x + p.z) * 0.02, 1.7), ao = 0.45 + 0.55 * (1 + p.y / (D + 2)), k2 = 0.85 + band * 0.45 - (streak > 0.7 ? 0.18 : 0);
+            cp.push(p.x, p.y, p.z);
+            lit(0.72 * k2, 0.5 * k2, 0.45 * k2, e1.x, e1.y, e1.z, ao);
+            cc.push(col.r, col.g, col.b);
+          }
+        }
+      }
+    }
+    const cg = new T.BufferGeometry(); cg.setAttribute('position', new T.Float32BufferAttribute(cp, 3)); cg.setAttribute('color', new T.Float32BufferAttribute(cc, 3));
+    const cm = new T.Mesh(cg, new T.MeshBasicMaterial({ vertexColors: true, side: T.DoubleSide })); cm.renderOrder = 1; root.add(cm);
+    // ---- trees on the mountain (none on the west face's cliffs, nor down on the plain), a few on the gorge's floor; boulders down there
+    const trees = [];
+    for (let a = 0; a < 6000 && trees.length < 2200; a++) {
+      const x = cx + (rnd() - 0.5) * 1500, z = cz + (rnd() - 0.5) * 1500;
+      if (x > -14 && x < Wm + 14 && z > -14 && z < Hm + 14) continue;
+      const h = height(x, z), sl = Math.abs(height(x + 4, z) - h) + Math.abs(height(x, z + 4) - h);
+      if (sl > 6 || (x < -100 && h < -150) || (x < 0 && rnd() < 0.6)) continue;
+      trees.push([x, h - 0.5, z, 5 + rnd() * 8]);
+    }
+    for (let a = 0; a < 24; a++) trees.push([c0 + 4 + rnd() * (c1 - c0 - 8), -D - 0.3, zs + 4 + rnd() * (Hm - zs - 4), 6 + rnd() * 8]);
+    const cone = new T.ConeGeometry(1, 1, 6); cone.translate(0, 0.5, 0);
+    const tm = new T.InstancedMesh(cone, new T.MeshBasicMaterial({ color: 0xffffff }), trees.length), m4 = new T.Matrix4(), q0 = new T.Quaternion(), sc = new T.Vector3(), at = new T.Vector3();
+    trees.forEach(([x, y, z, h], i) => {
+      m4.compose(at.set(x, y, z), q0, sc.set(h * 0.3, h, h * 0.3)); tm.setMatrixAt(i, m4);
+      const g = 0.85 + rnd() * 0.3; lit(0.17 * g, 0.25 * g, 0.16 * g, -0.5, 0.75, 0.2, y < -D + 1 ? 0.6 : 1); tm.setColorAt(i, col);
+    });
+    tm.renderOrder = 1; root.add(tm);
+    const rocks = new T.InstancedMesh(new T.IcosahedronGeometry(1, 0), new T.MeshBasicMaterial({ color: 0xffffff }), 70);
+    for (let i = 0; i < 70; i++) {
+      const s = 0.5 + rnd() * rnd() * 2.5, q = new T.Quaternion().setFromEuler(new T.Euler(rnd() * 3, rnd() * 3, rnd() * 3));
+      m4.compose(at.set(c0 + 1 + rnd() * (c1 - c0 - 2), -D - s * 0.3, zs + 1 + rnd() * (Hm - zs + 30)), q, sc.set(s, s * (0.6 + rnd() * 0.4), s)); rocks.setMatrixAt(i, m4);
+      lit(0.62, 0.46, 0.42, 0.3, 0.8, 0.2, 0.62 + rnd() * 0.2); rocks.setColorAt(i, col);
+    }
+    rocks.renderOrder = 1; root.add(rocks);
+    // ---- Albuquerque: the city's lights on the valley floor west of the mountain, a grid of streets (the big roads brighter,
+    // a dark strip where the river runs), glowing through the haze (not fogged out: their own light, fainter further off)
+    const lp = [], lc = [];
+    // (out to 1300 m from the summits, thinning toward there: the camera sees no further)
+    const reachK = (x, z) => 1 - sm(850, 1300, Math.hypot(x - cx, z - cz));
+    const lamp = (x, z, hex, k) => { const f = k * 0.6 * reachK(x, z); lp.push(x, height(x, z) + 2, z); col.setHex(hex); lc.push(col.r * f, col.g * f, col.b * f); };
+    const X0 = -1300, X1 = -260, Z0 = -900, Z1 = 1000, river = (z) => -1000 + Math.sin(z / 210) * 60 + Math.sin(z / 73) * 15;
+    const city = (x, z) => x < X1 && Math.abs(x - river(z)) > 28 && height(x, z) < -155 && fbm(x * 0.006, z * 0.006) > -0.12 && rnd() < reachK(x, z);
+    const LIGHTS = [0xffb25a, 0xffb25a, 0xffc070, 0xfff1dc, 0xdfe8ff];
+    for (let gx = X0; gx < X1; gx += 34) for (let z = Z0; z < Z1; z += 12) if (city(gx, z) && rnd() < 0.45) lamp(gx + (rnd() - 0.5) * 3, z, U8(), 0.75);
+    for (let gz = Z0; gz < Z1; gz += 34) for (let x = X0; x < X1; x += 12) if (city(x, gz) && rnd() < 0.45) lamp(x, gz + (rnd() - 0.5) * 3, U8(), 0.75);
+    for (let i = 0; i < 2500; i++) { const x = X0 + rnd() * (X1 - X0), z = Z0 + rnd() * (Z1 - Z0); if (city(x, z)) lamp(x, z, U8(), 0.5); } // (homes, signs)
+    for (let z = Z0; z < Z1; z += 5) { const x = -700 + z * 0.06; if (Math.abs(x - river(z)) > 28 && rnd() < reachK(x, z)) { lamp(x, z, 0xfff4e0, 1); lamp(x + 6, z + 2, 0xff4030, 0.7); } } // the interstate north-south
+    for (let x = X0; x < X1; x += 5) { const z = cz + 90; if (Math.abs(x - river(z)) > 28 && rnd() < reachK(x, z)) { lamp(x, z, 0xfff4e0, 1); lamp(x + 2, z + 6, 0xff4030, 0.7); } } // and east-west
+    function U8() { return LIGHTS[Math.floor(rnd() * LIGHTS.length)]; }
+    const lg = new T.BufferGeometry(); lg.setAttribute('position', new T.Float32BufferAttribute(lp, 3)); lg.setAttribute('color', new T.Float32BufferAttribute(lc, 3));
+    const cityPts = new T.Points(lg, new T.PointsMaterial({ size: 2.8, sizeAttenuation: true, vertexColors: true, transparent: true, depthWrite: false, blending: T.AdditiveBlending, fog: false }));
+    cityPts.renderOrder = 2; root.add(cityPts);
+    // ---- the sky: blue overhead, gold toward the sun and pink opposite it (the belt of Venus over the earth's shadow),
+    // the haze's colour (the fog's) at the horizon and under it
+    const fogC = new T.Color(map.theme.fog).convertLinearToSRGB(), mix = (a, b, k) => a.map((v, i) => v + (b[i] - v) * k);
+    const haze = [fogC.r, fogC.g, fogC.b], gold = [1.0, 0.76, 0.5], belt = [0.85, 0.6, 0.62], shadow = [0.55, 0.53, 0.66], upper = [0.5, 0.58, 0.78], zenith = [0.2, 0.32, 0.56];
+    const sky = new T.SphereGeometry(1300, 64, 32), sp2 = sky.attributes.position, skc = new Float32Array(sp2.count * 3), dv = new T.Vector3();
+    for (let i = 0; i < sp2.count; i++) {
+      dv.set(sp2.getX(i), sp2.getY(i), sp2.getZ(i)).normalize();
+      const e = Math.asin(dv.y), hl = Math.hypot(dv.x, dv.z) || 1, toward = (dv.x * sun.x + dv.z * sun.z) / hl / Math.hypot(sun.x, sun.z), sunK = Math.max(0, toward) ** 2, anti = Math.max(0, -toward);
+      let c = mix(mix(belt, gold, sunK), shadow, anti * (1 - sm(0.0, 0.06, e)));
+      c = mix(c, belt, anti * sm(0.03, 0.08, e) * (1 - sm(0.1, 0.3, e)) * 0.7);
+      c = mix(c, upper, sm(0.06, 0.5, e)); c = mix(c, zenith, sm(0.45, 1.3, e));
+      const g = Math.max(0, dv.dot(sun)); c = c.map((v, k) => Math.min(1, v + gold[k] * (g ** 24 * 0.45 + g ** 400 * 0.6)));
+      c = mix(haze, c, sm(-0.01, 0.035, e)); // (down to the haze at the horizon)
+      col.setRGB(c[0], c[1], c[2]).convertSRGBToLinear(); skc[i * 3] = col.r; skc[i * 3 + 1] = col.g; skc[i * 3 + 2] = col.b;
+    }
+    sky.setAttribute('color', new T.BufferAttribute(skc, 3));
+    const dome = new T.Mesh(sky, new T.MeshBasicMaterial({ vertexColors: true, side: T.BackSide, fog: false, depthWrite: false }));
+    dome.position.set(cx, 0, cz); dome.renderOrder = -3; root.add(dome);
+    const disc = new T.Mesh(new T.CircleGeometry(20, 32), new T.MeshBasicMaterial({ color: 0xfff0d4, fog: false, depthWrite: false }));
+    disc.position.set(cx + sun.x * 1200, sun.y * 1200, cz + sun.z * 1200); disc.lookAt(cx, 0, cz); disc.renderOrder = -2; root.add(disc);
+    // the ranges round the horizon, hazy: Mount Taylor out west, the West Mesa's low line, the Jemez to the north, the Manzanos
+    // south, the Sangres far off to the north-east
+    const peaks = [[Math.atan2(-0.35, -1), 0.1, 0.02], [Math.atan2(-0.9, -0.45), 0.45, 0.014], [Math.atan2(1, 0.15), 0.25, 0.024], [Math.atan2(-0.8, 0.55), 0.3, 0.009], [Math.PI, 0.9, 0.004]];
+    const rp = [], rc = [], R0 = 1200;
+    for (let k = 0; k <= 360; k++) {
+      const az = (k / 360) * Math.PI * 2 - Math.PI;
+      let el = 0.002 + (vn(k * 0.12, 3) - 0.5) * 0.004;
+      for (const [a, w, hgt] of peaks) { const d = Math.abs(Math.atan2(Math.sin(az - a), Math.cos(az - a))); el += hgt * Math.exp(-((d / w) ** 2)); }
+      const x = cx + Math.cos(az) * R0, z = cz + Math.sin(az) * R0, toward = Math.max(0, Math.cos(az - Math.atan2(sun.z, sun.x)));
+      const top = mix(mix([0.62, 0.52, 0.64], [0.78, 0.55, 0.5], toward ** 2), haze, 0.35);
+      rp.push(x, R0 * Math.tan(el), z, x, -260, z);
+      for (const c of [top, haze]) { col.setRGB(c[0], c[1], c[2]).convertSRGBToLinear(); rc.push(col.r, col.g, col.b); }
+    }
+    const ri = []; for (let k = 0; k < 360; k++) { const a = k * 2; ri.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+    const rg = new T.BufferGeometry(); rg.setAttribute('position', new T.Float32BufferAttribute(rp, 3)); rg.setAttribute('color', new T.Float32BufferAttribute(rc, 3)); rg.setIndex(ri);
+    const ranges = new T.Mesh(rg, new T.MeshBasicMaterial({ vertexColors: true, side: T.DoubleSide, fog: false, depthWrite: false })); ranges.renderOrder = -1; root.add(ranges);
+    // ---- the tramway: its top station at the west edge of the summit, two cables sagging down the face to the city, a tower
+    // on a spur on the way, a car on its way up
+    const top0 = new T.Vector3(-10.5, -3, 52), foot = new T.Vector3(-700, height(-700, 120) + 14, 120), sag = 40, dark = new T.MeshBasicMaterial({ color: 0x2a2c30 });
+    const cable = (s, off) => { const p = top0.clone().lerp(foot, s); p.y -= sag * 4 * s * (1 - s); p.z += off; return p; };
+    for (const off of [-2.5, 2.5]) { const pts = []; for (let i = 0; i <= 120; i++) pts.push(cable(i / 120, off)); root.add(new T.Line(new T.BufferGeometry().setFromPoints(pts), new T.LineBasicMaterial({ color: 0x30302e }))); }
+    const tw = cable(0.33, 0), tgy = height(tw.x, tw.z), tower = new T.Mesh(new T.CylinderGeometry(0.8, 2.6, tw.y + 2 - tgy, 4), dark);
+    tower.position.set(tw.x, (tw.y + 2 + tgy) / 2, tw.z); tower.renderOrder = 1; root.add(tower);
+    const arm = new T.Mesh(new T.BoxGeometry(1.2, 1, 7), dark); arm.position.set(tw.x, tw.y + 1.5, tw.z); arm.renderOrder = 1; root.add(arm);
+    const car = cable(0.12, -2.5), carG = new T.Group();
+    const part = (w, h, d, hex, y) => { const m = new T.Mesh(new T.BoxGeometry(w, h, d), new T.MeshBasicMaterial({ color: hex })); m.position.y = y; carG.add(m); };
+    part(3.6, 2.4, 2.6, 0xb02a26, -4.2); part(3.62, 0.5, 2.62, 0xe8e4dc, -3.7); part(3.64, 0.8, 2.64, 0x22282e, -4.2); part(0.25, 3.0, 0.25, 0x3a3c40, -1.6); part(1.6, 0.4, 0.5, 0x3a3c40, 0);
+    carG.position.copy(car); carG.rotation.y = Math.atan2(foot.z - top0.z, top0.x - foot.x); root.add(carG);
+    // (the station hangs off the face below the wall, its roof under your sight line over it: a concrete box, a dark band of glass)
+    const conc = new T.MeshStandardMaterial({ color: 0xb4ab9e, roughness: 0.9 });
+    const station = new T.Mesh(new T.BoxGeometry(9, 9, 13), conc); station.position.set(-6, -6.2, 52); root.add(station);
+    const band = new T.Mesh(new T.BoxGeometry(9.1, 1.6, 13.1), new T.MeshStandardMaterial({ color: 0x1c2228, roughness: 0.2, metalness: 0.5 })); band.position.set(-6, -3.4, 52); root.add(band);
+    // ---- the outcrops' tops, rough (and a lump or two at their feet): granite like their walls, lit as they are
+    const rockTiles = []; for (let i = 0; i < cr.W * cr.H; i++) if (cr.kind[i] === 1) rockTiles.push(i);
+    const caps = new T.InstancedMesh(new T.IcosahedronGeometry(1, 0), new T.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, flatShading: true }), rockTiles.length * 3);
+    let nc = 0;
+    const open = (x, z) => x >= 0 && z >= 0 && x < cr.W && z < cr.H && cr.kind[z * cr.W + x] !== 1 && cr.kind[z * cr.W + x] !== 2;
+    for (const i of rockTiles) {
+      const x = i % cr.W, z = (i / cr.W) | 0, X = (x + 0.5) * CS, Z = (z + 0.5) * CS;
+      const put = (px, py, pz, sx, sy, sz) => {
+        m4.compose(at.set(px, py, pz), new T.Quaternion().setFromEuler(new T.Euler(rnd() * 3, rnd() * 3, rnd() * 3)), sc.set(sx, sy, sz)); caps.setMatrixAt(nc, m4);
+        const p = 0.9 + rnd() * 0.15; col.setRGB(0.69 * p, 0.5 * p, 0.45 * p).convertSRGBToLinear(); caps.setColorAt(nc++, col);
+      };
+      put(X + (rnd() - 0.5) * 0.6, this.WALL_H - 0.1 + rnd() * 0.3, Z + (rnd() - 0.5) * 0.6, 1.05 + rnd() * 0.25, 0.5 + rnd() * 0.7, 1.05 + rnd() * 0.25);
+      if (rnd() < 0.4) put(X + (rnd() - 0.5) * 0.8, this.WALL_H + 0.3 + rnd() * 0.4, Z + (rnd() - 0.5) * 0.8, 0.6, 0.5 + rnd() * 0.4, 0.6);
+      const side = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => open(x + dx, z + dz));
+      if (side.length && rnd() < 0.7) { const [dx, dz] = side[Math.floor(rnd() * side.length)]; put(X + dx * 0.5, 0.15, Z + dz * 0.5, 0.6, 0.45 + rnd() * 0.3, 0.6); }
+    }
+    caps.count = nc; caps.layers.enable(1); root.add(caps);
+    // ---- the ziplines: a steel pole each end on the rim, an arm out over the wall to the cable, a stay back to a footing; the
+    // cable sagging between; at the start, the trolley and its grab bar waiting (js/player.js rides them)
+    const steel = new T.MeshStandardMaterial({ color: 0x4a4e52, roughness: 0.5, metalness: 0.6 }), cableM = new T.MeshStandardMaterial({ color: 0x26282a, roughness: 0.4, metalness: 0.7 }), yel = new T.MeshStandardMaterial({ color: 0xe0b020, roughness: 0.5 });
+    for (const l of cr.lines) {
+      const cp2 = []; for (let i = 0; i <= 200; i++) cp2.push(new T.Vector3(...this.zipPoint(l, i / 200)));
+      root.add(new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(cp2), 400, 0.018, 5), cableM));
+      for (const p of [l.a, l.b]) {
+        const sx = Math.sign(p === l.a ? l.a[0] - l.b[0] : l.b[0] - l.a[0]), px = p[0] + sx * 1.3, h = p[1] + 0.5; // (sx: back onto the land)
+        const pole = new T.Mesh(new T.CylinderGeometry(0.11, 0.14, h, 10), steel); pole.position.set(px, h / 2, p[2]); root.add(pole);
+        const arm = new T.Mesh(new T.BoxGeometry(1.5, 0.12, 0.12), steel); arm.position.set(px - sx * 0.6, p[1] + 0.12, p[2]); root.add(arm);
+        const top = new T.Vector3(px, h, p[2]), foot = new T.Vector3(px + sx * 2.6, 0, p[2]), stay = new T.Mesh(new T.CylinderGeometry(0.03, 0.03, top.distanceTo(foot), 6), steel);
+        stay.position.copy(top).add(foot).multiplyScalar(0.5); stay.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), top.clone().sub(foot).normalize()); root.add(stay);
+        const pulley = new T.Mesh(new T.CylinderGeometry(0.13, 0.13, 0.06, 14), yel); pulley.rotation.x = Math.PI / 2; pulley.position.set(p[0], p[1] + 0.02, p[2]); root.add(pulley);
+      }
+      const tro = new T.Mesh(new T.BoxGeometry(0.28, 0.16, 0.12), yel); tro.position.set(l.a[0], l.a[1] - 0.13, l.a[2]); root.add(tro);
+      const strap = new T.Mesh(new T.BoxGeometry(0.03, 0.75, 0.03), steel); strap.position.set(l.a[0], l.a[1] - 0.58, l.a[2]); root.add(strap);
+      const bar = new T.Mesh(new T.CylinderGeometry(0.02, 0.02, 0.5, 6), steel); bar.rotation.x = Math.PI / 2; bar.position.set(l.a[0], l.a[1] - 0.96, l.a[2]); root.add(bar);
+    }
+    // ---- the greenhouse's roof: a ridge down its length, white glazing bars, glass between
+    const [gx0, gz0] = cr.gh, x0 = gx0 * CS + 1, x1 = (gx0 + 6) * CS + 1, z0 = gz0 * CS + 1, z1 = (gz0 + 8) * CS + 1, ridge = 2.2, Y = this.WALL_H, half = (x1 - x0) / 2, slope = Math.hypot(half, ridge), ang = Math.atan2(ridge, half);
+    const bar = new T.MeshStandardMaterial({ color: 0xeceae4, roughness: 0.5 }), pane = new T.MeshStandardMaterial({ color: 0x9fb8c0, transparent: true, opacity: 0.22, roughness: 0.05, metalness: 0.4, depthWrite: false, side: T.DoubleSide });
+    for (const s of [-1, 1]) { // (each slope: level, then tipped down toward its eave)
+      const g = new T.PlaneGeometry(slope, z1 - z0); g.rotateX(-Math.PI / 2);
+      const gl = new T.Mesh(g, pane); gl.rotation.z = -s * ang; gl.position.set((x0 + x1) / 2 + s * half / 2, Y + ridge / 2, (z0 + z1) / 2); gl.renderOrder = 2; root.add(gl);
+      for (let z = z0; z <= z1 + 0.01; z += 2) { const b = new T.Mesh(new T.BoxGeometry(slope, 0.06, 0.06), bar); b.rotation.z = -s * ang; b.position.set((x0 + x1) / 2 + s * half / 2, Y + ridge / 2, z); root.add(b); }
+    }
+    const rb = new T.Mesh(new T.BoxGeometry(0.12, 0.12, z1 - z0), bar); rb.position.set((x0 + x1) / 2, Y + ridge, (z0 + z1) / 2); root.add(rb);
+    const gable = new T.Shape(); gable.moveTo(-half, 0); gable.lineTo(half, 0); gable.lineTo(0, ridge); gable.closePath();
+    for (const z of [z0, z1]) {
+      const gp2 = new T.Mesh(new T.ShapeGeometry(gable), pane); gp2.position.set((x0 + x1) / 2, Y, z); gp2.renderOrder = 2; root.add(gp2);
+      const post = new T.Mesh(new T.BoxGeometry(0.06, ridge, 0.06), bar); post.position.set((x0 + x1) / 2, Y + ridge / 2, z); root.add(post);
+    }
   },
   buildFestival(map, root) {
     const T = THREE, f = map.fest, TS = this.TS, rnd = G.U.rng((map.seed ^ 0xfe57) >>> 0), Wm = map.W * TS, Hm = map.H * TS;
@@ -2155,7 +2529,7 @@ G.Level = {
     const TS = this.TS, th = map.theme, root = new THREE.Group(), pool = !opts || opts.pool !== false;
     const { W, H, t } = map, SK = map.skirt || 0, va = map.voidAbove, gr = map.grate;
     // floor + ceiling (upstairs, the floor only where there is one: not over a drop, and steel grating where it's a catwalk)
-    const ftex = this._tex('floor', th.floor); ftex.repeat.set(W / this.K, H / this.K);
+    const ftex = this._tex(th.rock ? 'rock' : 'floor', th.floor); ftex.repeat.set(W / this.K, H / this.K);
     const fmat = new THREE.MeshStandardMaterial({ map: ftex, roughness: 0.92 });
     if (!t.includes(5) && !gr) {
       const floor = new THREE.Mesh(new THREE.PlaneGeometry(W * TS, H * TS), fmat);
@@ -2166,14 +2540,14 @@ G.Level = {
       const cells = [];
       for (let i = 0; i < W * H; i++) if (t[i] !== 5 && !(gr && gr[i])) cells.push(i);
       const fg = new THREE.PlaneGeometry(TS, TS); fg.rotateX(-Math.PI / 2);
-      const fl = new THREE.InstancedMesh(fg, new THREE.MeshStandardMaterial({ map: this._tex('floor', th.floor), roughness: 0.92 }), cells.length), fm4 = new THREE.Matrix4();
+      const fl = new THREE.InstancedMesh(fg, new THREE.MeshStandardMaterial({ map: this._tex(th.rock ? 'rock' : 'floor', th.floor), roughness: 0.92 }), cells.length), fm4 = new THREE.Matrix4();
       fl.material.map.repeat.set(1 / this.K, 1 / this.K);
       cells.forEach((i, n) => { fm4.makeTranslation(((i % W) + 0.5) * TS, 0, (Math.floor(i / W) + 0.5) * TS); fl.setMatrixAt(n, fm4); });
       fl.layers.enable(1);
       root.add(fl);
-      // the slab's edge round a drop
+      // the slab's edge round a drop (a mountain top's gorge has cliffs instead: buildCrest)
       const slab = new THREE.MeshStandardMaterial({ color: 0xbdb6aa, roughness: 0.9 });
-      for (let z = 0; z < H; z++) for (let x = 0; x < W; x++) {
+      if (!map.chasm) for (let z = 0; z < H; z++) for (let x = 0; x < W; x++) {
         if (t[z * W + x] === 5 || t[z * W + x] === 1 || (gr && gr[z * W + x])) continue;
         for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
           const n = (z + dz) * W + x + dx;
@@ -2200,7 +2574,8 @@ G.Level = {
     // the top of it, for what's looking down from the air (you ride in over the roofs: js/landing.js), wherever nothing's
     // built on it; a flat felt roof (a home's pitched one sits over it). Its back to the rooms below.
     const up = map.above, tops = [];
-    for (let i = 0; i < W * H; i++) if (!map.out[i] && (!up || (up.out[i] && up.t[i] === 5))) tops.push(i);
+    const rockAt = (i) => map.crest && map.crest.kind[(((i / W) | 0) / this.K | 0) * map.crest.W + ((i % W) / this.K | 0)]; // (the Sandia Crest: 1 an outcrop, 2 the Crest House's stone, 3 the greenhouse's frame)
+    for (let i = 0; i < W * H; i++) if (!map.out[i] && (!up || (up.out[i] && up.t[i] === 5)) && !(rockAt(i) & 1)) tops.push(i); // (no felt roof on a rock, nor on the greenhouse)
     if (tops.length) {
       const g = new THREE.PlaneGeometry(TS, TS); g.rotateX(-Math.PI / 2);
       const top = new THREE.InstancedMesh(g, new THREE.MeshBasicMaterial({ color: 0x1e1f21 }), tops.length), tm = new THREE.Matrix4();
@@ -2233,13 +2608,16 @@ G.Level = {
       }
     }
     const heads = map.rooms.some((q) => q.lid); // (a roof's stair heads: bare grey render, a flat top, not the homes' paint and a pitched roof)
-    const wtex = this._tex(heads || th.home >= 1 ? 'plaster' : 'wall', heads ? '#7f807c' : th.wall); wtex.repeat.set(1, 2);
+    const wtex = this._tex(heads || th.home >= 1 ? 'plaster' : th.rock ? 'rock' : 'wall', heads ? '#7f807c' : th.wall); wtex.repeat.set(1, 2);
     const wm = new THREE.InstancedMesh(new THREE.BoxGeometry(TS, this.WALL_H + SK, TS), new THREE.MeshStandardMaterial({ map: wtex, roughness: 0.85 }), walls.length);
     const m4 = new THREE.Matrix4(), col = new THREE.Color();
     walls.forEach(([x, z], i) => {
       m4.makeTranslation((x + 0.5) * TS, (this.WALL_H - SK) / 2, (z + 0.5) * TS);
       wm.setMatrixAt(i, m4);
-      const s = 0.85 + Math.random() * 0.2; col.setRGB(s, s, s); wm.setColorAt(i, col);
+      const s = 0.85 + Math.random() * 0.2; col.setRGB(s, s, s);
+      const rk = rockAt(z * W + x); // (pink granite, grey stone, a greenhouse's white frame: the theme's pale stone tinted)
+      if (rk === 1) { const p = 0.92 + Math.random() * 0.1; col.setRGB(s * 0.86, s * 0.62 * p, s * 0.57 * p); } else if (rk === 2) col.setRGB(s * 0.78, s * 0.74, s * 0.7);
+      wm.setColorAt(i, col);
     });
     wm.layers.enable(1);
     root.add(wm);
@@ -2402,6 +2780,7 @@ G.Level = {
     });
 
     if (map.fest) this.buildFestival(map, root);
+    if (map.crest) this.buildCrest(map, root);
     if (map.fx && map.fx.length) this.buildFx(map, root);
     // (no extraction zone: the squad votes to leave once order's restored)
 
