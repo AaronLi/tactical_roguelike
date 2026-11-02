@@ -101,6 +101,17 @@ G.Rig = (() => {
     m.position.set(0, y, z);
     rig.chest.add(m); rig.kitParts.push(m);
   }
+  // a callsign with "thicc" in it: a fuller seat to the trousers, behind the pelvis and under the belt and the kit at the back
+  function setSeat(rig) {
+    const on = !!(rig.callsign && /thicc/i.test(rig.callsign.name));
+    if (!!rig.seat === on) return;
+    if (rig.seat) { for (const m of rig.seat) { rig.hips.remove(m); m.geometry.dispose(); } rig.seat = null; return; }
+    rig.seat = [-1, 1].map((x) => {
+      const m = new T.Mesh(new T.SphereGeometry(0.1, 14, 10), rig.pantsM);
+      m.position.set(x * 0.068, -0.075, 0.075); m.scale.set(1, 0.9, 1.1); rig.hips.add(m);
+      return m;
+    });
+  }
   function setKit(rig, k) {
     const key = JSON.stringify(k || {}) + (rig.callsign ? '|' + rig.callsign.id + '|' + rig.callsign.name : '');
     if (rig.kitKey === key) return;
@@ -357,7 +368,7 @@ G.Rig = (() => {
     const hipMount = joint(hips, 0.2, 0.02, -0.02); hipMount.rotation.set(-Math.PI / 2, 0, 0);
 
     const rig = {
-      hairMesh, look, kitParts: [], kitKey: null, kit: null, callsign: o.animal ? { id: o.animal, name: o.callName || '' } : null,
+      hairMesh, look, pantsM: bottom, seat: null, kitParts: [], kitKey: null, kit: null, callsign: o.animal ? { id: o.animal, name: o.callName || '' } : null,
       root, body, hips, spine, chest, neck, head, armL, armR, legL, legR, gunMount, slingMount, hipMount, slung: false, mats, scale: s, style,
       gun: null, gunInfo: null, gunKey: null,
       phase: rnd() * 10, vel: new T.Vector3(), lastPos: null,
@@ -429,8 +440,9 @@ G.Rig = (() => {
     // (str 0 underhand, 1-2 overhand)
     rig.throwNade = (str) => { rig.throwT = 0; rig.throwHand = str != null; rig.throwStr = str; };
     rig.setKit = (k) => setKit(rig, k);
-    rig.setCallsign = (id, name) => { rig.callsign = id ? { id, name: name || '' } : null; setKit(rig, rig.kit); };
+    rig.setCallsign = (id, name) => { rig.callsign = id ? { id, name: name || '' } : null; setKit(rig, rig.kit); setSeat(rig); };
     setKit(rig, null); // (the back patch, before any kit)
+    setSeat(rig);
     // put the weapon away (true) or bring it to the hands (false)
     rig.holster = (on) => {
       if (!rig.gun || rig.slung === on) return;
