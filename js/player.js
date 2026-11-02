@@ -409,7 +409,7 @@ G.Me = {
     this.hp = this.maxHp();
     this.down = false; this.out = false; this.dead = false; // (out: unconscious, as well as down)
     this.rounds = [];
-    this.crouch = false; this.prone = false; this.stanceT = 0; this.onGround = true; this.seat = null; this.treating = new Map();
+    this.crouch = false; this.prone = false; this.stanceT = 0; this.onGround = true; this.seat = null; this.zipRide = null; this.treating = new Map();
     this.eyeH = 1.62;
     this.fireCd = 0; this.swapT = 0; this.reloading = false; this.reloadT = 0; this.burstQ = 0;
     this.adsT = 0; this.ads = false; this.kick = 0; this.flashT = 0;
@@ -483,6 +483,7 @@ G.Me = {
       this.eyeH += (1.12 - this.eyeH) * Math.min(1, dt * 12);
       return;
     }
+    if (this.zipRide) { this.zipStep(dt); return; } // (on a zipline: carried, not walking)
     const k = this.keys, blocked = this.down || G.Game.chatOpen || !G.Game.locked || !!(this.action && (this.action.kind === 'zip' || this.action.kind === 'bag'));
     let fw = blocked ? 0 : (k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0);
     let st = blocked ? 0 : (k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0);
@@ -532,6 +533,32 @@ G.Me = {
     if (this.pos.y + this.eyeH > ceil - 0.15) { this.pos.y = ceil - 0.15 - this.eyeH; this.vel.y = Math.min(0, this.vel.y); }
     this.hspeed = Math.hypot(this.vel.x, this.vel.z);
     if (this.onGround && this.hspeed > 0.5) this.bobT += dt * this.hspeed * 1.8;
+  },
+  // A zipline (the Sandia Crest's: js/level.js crest.lines): lifted onto its bar (UP s), carried along under the cable, slowest
+  // at the ends and fastest down the middle of it (V0 + V1 m/s), and let down onto the far side (DOWN s), hanging HANG m under
+  // it. The weapon's away the whole way; you can look round. The host takes where you are as it does any time.
+  ZIP: { UP: 0.7, DOWN: 0.5, HANG: 2.0, V0: 7, V1: 17, REACH: 1.6, HOLD: 0.4 },
+  zipNear(map) {
+    const ls = map && map.crest && map.crest.lines;
+    return (ls && Math.abs(this.pos.y) < 0.5 && ls.find((l) => Math.hypot(l.on[0] - this.pos.x, l.on[1] - this.pos.z) < this.ZIP.REACH)) || null;
+  },
+  zipStep(dt) {
+    const z = this.zipRide, l = z.l, Z = this.ZIP, under = (s) => { const p = G.Level.zipPoint(l, s); return new THREE.Vector3(p[0], p[1] - Z.HANG, p[2]); };
+    z.t += dt;
+    let p;
+    if (z.ph === 'up') { p = z.from.clone().lerp(under(0), G.U.smooth(0, 1, z.t / Z.UP)); if (z.t >= Z.UP) { z.ph = 'ride'; z.t = 0; } }
+    else if (z.ph === 'ride') {
+      const L = z.L || (z.L = Math.hypot(l.b[0] - l.a[0], l.b[2] - l.a[2]));
+      z.s = Math.min(1, z.s + (Z.V0 + Z.V1 * Math.sin(Math.PI * z.s)) * dt / L);
+      p = under(z.s);
+      if (z.s >= 1) { z.ph = 'down'; z.t = 0; }
+    } else {
+      p = under(1).lerp(new THREE.Vector3(l.off[0], 0, l.off[1]), G.U.smooth(0, 1, z.t / Z.DOWN));
+      if (z.t >= Z.DOWN) this.zipRide = null;
+    }
+    this.pos.copy(p); this.vel.set(0, 0, 0); this.onGround = true; this.hspeed = 0; this.crouch = false; this.prone = false;
+    this.stowed = this.zipRide ? true : z.was; this.lowToggle = false;
+    this.eyeH += (1.62 - this.eyeH) * Math.min(1, dt * 12);
   },
   // Spread/recoil multiplier from steadiness: holding Shift tightens it.
   steadiness() { return this.steadying ? 0.65 : 1; },
@@ -1649,6 +1676,16 @@ G.Me = {
     if (this.seat != null) {
       const o = G.Landing.interact(this, dt, held);
       G.HUD.setPrompt(o.prompt); G.HUD.setProgress(o.prog, o.label);
+      return;
+    }
+    // on a zipline, hands on the bar till the far side; at the foot of one, hold F to clip on (zipStep)
+    if (this.zipRide) { G.HUD.setPrompt(''); G.HUD.setProgress(-1, ''); return; }
+    const zl = !this.action && !this.down && !this.dead && this.zipNear(map);
+    if (zl) {
+      this.zipHold = F ? (this.zipHold || 0) + dt : 0;
+      G.HUD.setPrompt('Hold <b>F</b> to ride the zipline across the gorge');
+      G.HUD.setProgress(this.zipHold > 0 ? this.zipHold / this.ZIP.HOLD : -1, this.zipHold > 0 ? 'Clipping on' : '');
+      if (this.zipHold >= this.ZIP.HOLD) { this.zipHold = 0; this.fLatch = true; this.zipRide = { l: zl, ph: 'up', t: 0, s: 0, from: this.pos.clone(), was: !!this.stowed }; G.Audio.click(); }
       return;
     }
 

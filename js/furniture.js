@@ -1374,7 +1374,8 @@ G.Furniture = (() => {
     // trees and the rest between; the greenhouse's potting benches; the masts on the antenna farm (map.crest.masts, where
     // they stand: buildCrest), their air handlers and huts.
     function crestPlan() {
-      const C = (v) => (v + 0.5) * TS, free = (x, z) => t[z * W + x] === 0, cr = map.crest;
+      const cr = map.crest, ends = new Set(cr.lines.flatMap((l) => l.keep.map(([x, z]) => z * W + x))); // (where you step on and off a zipline: kept clear)
+      const C = (v) => (v + 0.5) * TS, free = (x, z) => t[z * W + x] === 0 && !ends.has(z * W + x);
       const byDoor = (x, z) => { for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) if (t[(z + dz) * W + x + dx] === 3) return true; return false; };
       const lone = (x, z) => ![[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => { const v = t[(z + dz) * W + x + dx]; return v === 2 || v === 4 || map.props.has((z + dz) * W + x + dx); });
       // (exact: square in its tile, else a little off it, as things lie about outdoors)

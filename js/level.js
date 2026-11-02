@@ -726,8 +726,9 @@ G.Level = {
     return { W, H, t, rooms, doors, out, fences, spawn: over, lz };
   },
   // The top of the Sandia Mountains over Albuquerque at sundown: two summits of pink granite either side of a gorge, a
-  // saddle between them at the north end, 156 x 92 m, all of it open to the sky. A sniper's level: from the overlook on the
-  // west summit the garden on the east one is 60 to 90 m off across the gorge, and the saddle is the only way over.
+  // saddle between them at the north end, 334 x 92 m, all of it open to the sky. A sniper's level: from the overlook on the
+  // west summit the greenhouse on the east one is about 250 m off across the gorge. The way over on foot is the saddle (the
+  // way the suspects come); a zipline each way across the gorge is quicker (crest.lines: js/player.js rides them).
   //  - The west summit, where you come in: the crest's parking lot (south-west), the helicopter's pad on it; north of it a
   //    band of outcrops with a way through, the Crest House past it (a stone gift shop, its office and storeroom behind), then
   //    the trail north among the outcrops to the overlook, a flagstone terrace out over the gorge. North of that the ridge,
@@ -741,9 +742,12 @@ G.Level = {
   // (What goes where: G.Furniture.plan's crest(); the sky, the mountain under it and the city below: buildCrest.)
   CHASM: 45,
   layCrest(r, level) {
-    const U = G.U, W = 78, H = 46, CX0 = 24, CX1 = 53, SZ = 6; // the gorge from x CX0 to CX1, south of the saddle's wall (row SZ)
+    const U = G.U, CX0 = 24, CX1 = 142, W = CX1 + 25, H = 46, SZ = 6; // the gorge from x CX0 to CX1 (236 m across), south of the saddle's wall (row SZ)
     const OZ0 = 12, OZ1 = 17, OX1 = CX0 + 3; // the overlook: its rows, its east side
-    const HX = 13, HZ = 23, GX = 62, GZ = 13; // the Crest House's and the greenhouse's north-west corners (walls and all)
+    const HX = 13, HZ = 23, GX = CX1 + 9, GZ = 13; // the Crest House's and the greenhouse's north-west corners (walls and all)
+    // the ziplines, a tile each end to step on and off them ([x, z], coarse): over, from the ridge north of the overlook down to
+    // the garden's west edge; back, from the garden's south-west down to the strip beside the Crest House
+    const ZL = [{ on: [CX0 - 2, 8], off: [CX1 + 2, 10] }, { on: [CX1 + 2, 27], off: [CX0 - 2, 23] }];
     const t = new Uint8Array(W * H), out = new Uint8Array(W * H).fill(1), kind = new Uint8Array(W * H), rooms = [], doors = [], fences = [], glass = [];
     const at = (x, z) => z * W + x;
     const fill = (x0, z0, w, h, v) => { for (let z = z0; z < z0 + h; z++) for (let x = x0; x < x0 + w; x++) t[at(x, z)] = v; };
@@ -783,6 +787,7 @@ G.Level = {
     const clear = (x0, z0, x1, z1) => { for (let z = Math.max(0, z0); z <= Math.min(H - 1, z1); z++) for (let x = Math.max(0, x0); x <= Math.min(W - 1, x1); x++) keep[at(x, z)] = 1; };
     clear(0, 37, CX0, H - 1); clear(CX0 - 3, OZ0 - 1, CX0, OZ1 + 1); clear(CX0 - 2, 0, CX0 + 1, SZ); clear(CX1 - 1, 0, CX1 + 3, SZ); clear(CX1 + 1, 0, W - 1, 33);
     for (const [x, z, axis] of doors) clear(x - (axis === 'x' ? 2 : 1), z - (axis === 'z' ? 2 : 1), x + (axis === 'x' ? 2 : 1), z + (axis === 'z' ? 2 : 1));
+    for (const l of ZL) for (const [x, z] of [l.on, l.off]) clear(x - 1, z - 1, x + 1, z + 1); // (the zipline's ends)
     // (ground that's reached: from the lot, through the doors as if they were open)
     const doorAt = new Set(doors.map(([x, z]) => at(x, z))), walk = (i) => t[i] === 0 || doorAt.has(i);
     const reached = () => {
@@ -820,8 +825,8 @@ G.Level = {
     for (let x = 2; x <= 20; x += 3) if (Math.abs(x - gap) > 2) blob(x, 35, 2, 1);
     blob(8, 17, 2, 2); blob(18, 19, 3, 1); blob(3, 6, 2, 2); blob(14, 4, 2, 1);
     for (let n = 0, tries = 0; n < 5 + U.ri(r, 0, 3) && tries < 40; tries++) if (blob(U.ri(r, 3, 20), U.ri(r, 3, 20), U.ri(r, 1, 2), U.ri(r, 1, 2))) n++;
-    for (let n = 0, tries = 0; n < 3 && tries < 20; tries++) if (blob(U.ri(r, CX0 + 3, CX1 - 3), U.ri(r, 2, 4), 1, 1)) n++;
-    blob(U.ri(r, 72, 75), U.ri(r, 36, 41), 2, 2); blob(U.ri(r, 57, 60), U.ri(r, 40, 43), 1, 1);
+    for (let n = 0, tries = 0; n < 10 && tries < 60; tries++) if (blob(U.ri(r, CX0 + 3, CX1 - 3), U.ri(r, 2, 4), 1, 1)) n++;
+    blob(U.ri(r, CX1 + 19, CX1 + 22), U.ri(r, 36, 41), 2, 2); blob(U.ri(r, CX1 + 4, CX1 + 7), U.ri(r, 40, 43), 1, 1);
     // the rooms: the lot (where you come in), the trail up to the Crest House and round it (out the front: no suspects
     // there), the approach to the overlook, the overlook, the ridge, the saddle; the garden round the greenhouse in four,
     // the greenhouse, the antenna farm
@@ -835,7 +840,14 @@ G.Level = {
     room(CX1 + 2, 4, GX - CX1 - 2, 28, 'garden'); room(GX + 7, 4, W - GX - 8, 28, 'garden'); room(GX, 4, 7, GZ - 4, 'garden'); room(GX, GZ + 9, 7, 32 - GZ - 9, 'garden');
     room(GX + 1, GZ + 1, 5, 7, 'greenhouse');
     room(CX1 + 2, 33, W - CX1 - 3, H - 34, 'antennas');
-    const crest = { W, H, kind, CX0, CX1, SZ, OZ0, OZ1, OX1, house: [HX, HZ], gh: [GX, GZ], masts: [] };
+    // each zipline in metres: its cable from the top of the pole at the start, just out past the wall, to the bottom of the pole
+    // at the end (a, b: [x, y, z]), how far it sags in the middle, and the ground you step on and off at
+    const CS = this.CTS, wRim = (CX0 - 0.5) * CS + 0.9, eRim = (CX1 + 1.5) * CS - 0.9, C = ([x, z]) => [(x + 0.5) * CS, (z + 0.5) * CS];
+    const lines = ZL.map(({ on, off }) => {
+      const east = off[0] > on[0];
+      return { a: [east ? wRim : eRim, 6.6, C(on)[1]], b: [east ? eRim : wRim, 3.9, C(off)[1]], sag: 7, on: C(on), off: C(off), keep: [on, off] };
+    });
+    const crest = { W, H, kind, CX0, CX1, SZ, OZ0, OZ1, OX1, house: [HX, HZ], gh: [GX, GZ], masts: [], lines };
     return { W, H, t, rooms, doors, out, fences, glass, spawn: lot, lz, crest, chasm: this.CHASM };
   },
   // Each returns { W, H, t, rooms, doors?, ringDoors?, out?, fences?, spawn? } on the coarse grid. t starts as all wall
@@ -1998,6 +2010,9 @@ G.Level = {
   // coming on far below; the tramway's cables down the west face; the outcrops' rough tops; the greenhouse's glass roof.
   // None of it's solid (the gorge's floor is: js/world.js). What's far off is lit as it would be at sundown, into its
   // colours (unlit materials: the light grid only knows the level), the sun from low in the west.
+  // a point on a zipline's cable (crest.lines), s from 0 at its start to 1 at its end: straight between its ends, sagging in
+  // the middle (a parabola's near enough to the catenary)
+  zipPoint(l, s) { return [l.a[0] + (l.b[0] - l.a[0]) * s, l.a[1] + (l.b[1] - l.a[1]) * s - l.sag * 4 * s * (1 - s), l.a[2] + (l.b[2] - l.a[2]) * s]; },
   buildCrest(map, root) {
     const T = THREE, cr = map.crest, TS = this.TS, CS = this.CTS, Wm = map.W * TS, Hm = map.H * TS, D = map.chasm, rnd = G.U.rng((map.seed ^ 0x5a7d1a) >>> 0);
     const cx = Wm / 2, cz = Hm / 2, col = new T.Color();
@@ -2190,6 +2205,24 @@ G.Level = {
       if (side.length && rnd() < 0.7) { const [dx, dz] = side[Math.floor(rnd() * side.length)]; put(X + dx * 0.5, 0.15, Z + dz * 0.5, 0.6, 0.45 + rnd() * 0.3, 0.6); }
     }
     caps.count = nc; caps.layers.enable(1); root.add(caps);
+    // ---- the ziplines: a steel pole each end on the rim, an arm out over the wall to the cable, a stay back to a footing; the
+    // cable sagging between; at the start, the trolley and its grab bar waiting (js/player.js rides them)
+    const steel = new T.MeshStandardMaterial({ color: 0x4a4e52, roughness: 0.5, metalness: 0.6 }), cableM = new T.MeshStandardMaterial({ color: 0x26282a, roughness: 0.4, metalness: 0.7 }), yel = new T.MeshStandardMaterial({ color: 0xe0b020, roughness: 0.5 });
+    for (const l of cr.lines) {
+      const cp2 = []; for (let i = 0; i <= 200; i++) cp2.push(new T.Vector3(...this.zipPoint(l, i / 200)));
+      root.add(new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(cp2), 400, 0.018, 5), cableM));
+      for (const p of [l.a, l.b]) {
+        const sx = Math.sign(p === l.a ? l.a[0] - l.b[0] : l.b[0] - l.a[0]), px = p[0] + sx * 1.3, h = p[1] + 0.5; // (sx: back onto the land)
+        const pole = new T.Mesh(new T.CylinderGeometry(0.11, 0.14, h, 10), steel); pole.position.set(px, h / 2, p[2]); root.add(pole);
+        const arm = new T.Mesh(new T.BoxGeometry(1.5, 0.12, 0.12), steel); arm.position.set(px - sx * 0.6, p[1] + 0.12, p[2]); root.add(arm);
+        const top = new T.Vector3(px, h, p[2]), foot = new T.Vector3(px + sx * 2.6, 0, p[2]), stay = new T.Mesh(new T.CylinderGeometry(0.03, 0.03, top.distanceTo(foot), 6), steel);
+        stay.position.copy(top).add(foot).multiplyScalar(0.5); stay.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), top.clone().sub(foot).normalize()); root.add(stay);
+        const pulley = new T.Mesh(new T.CylinderGeometry(0.13, 0.13, 0.06, 14), yel); pulley.rotation.x = Math.PI / 2; pulley.position.set(p[0], p[1] + 0.02, p[2]); root.add(pulley);
+      }
+      const tro = new T.Mesh(new T.BoxGeometry(0.28, 0.16, 0.12), yel); tro.position.set(l.a[0], l.a[1] - 0.13, l.a[2]); root.add(tro);
+      const strap = new T.Mesh(new T.BoxGeometry(0.03, 0.75, 0.03), steel); strap.position.set(l.a[0], l.a[1] - 0.58, l.a[2]); root.add(strap);
+      const bar = new T.Mesh(new T.CylinderGeometry(0.02, 0.02, 0.5, 6), steel); bar.rotation.x = Math.PI / 2; bar.position.set(l.a[0], l.a[1] - 0.96, l.a[2]); root.add(bar);
+    }
     // ---- the greenhouse's roof: a ridge down its length, white glazing bars, glass between
     const [gx0, gz0] = cr.gh, x0 = gx0 * CS + 1, x1 = (gx0 + 6) * CS + 1, z0 = gz0 * CS + 1, z1 = (gz0 + 8) * CS + 1, ridge = 2.2, Y = this.WALL_H, half = (x1 - x0) / 2, slope = Math.hypot(half, ridge), ang = Math.atan2(ridge, half);
     const bar = new T.MeshStandardMaterial({ color: 0xeceae4, roughness: 0.5 }), pane = new T.MeshStandardMaterial({ color: 0x9fb8c0, transparent: true, opacity: 0.22, roughness: 0.05, metalness: 0.4, depthWrite: false, side: T.DoubleSide });

@@ -416,8 +416,9 @@ says the same), but not whose: the shooter's name isn't shown.
     - Built in `js/level.js` (`layFestival`, `buildFestival`) and `js/furniture.js` (the pieces and `plan`'s
       `festival()`).
   - **Sandia Crest** (`layout: 'crest'`, `layCrest`): the top of the Sandia Mountains over Albuquerque at sundown,
-    about 156 × 92 m, all of it open to the sky. It's built for sniping: two summits of pink granite with a gorge
-    between them, and the only way across is a saddle at the north end. A low stone wall runs round every edge,
+    about 334 × 92 m, all of it open to the sky. It's built for long-range sniping: two summits of pink granite with a
+    236 m gorge between them; across it on foot is the saddle at the north end (the way the suspects come), or a zipline
+    each way over the gorge. A low stone wall runs round every edge,
     hip high, so you see and shoot over it and crouch behind it. More suspects (×1.4), and more of them are
     Lookouts (marksmen, from level 1), most of them on the east summit (`G.Level.plan` thins the spots on the west
     summit to a fifth and on the saddle to two-fifths).
@@ -428,7 +429,9 @@ says the same), but not whose: the shooter's name isn't shown.
       with its office and storeroom behind (the level's indoor rooms: the attachments box and the first aid cabinets go
       here). Then a trail runs north among outcrops, boulders, junipers, piñons and cholla to the **overlook**, a
       flagstone terrace out over the gorge with two coin-op viewers and a bench. Nobody starts on it. From it the
-      garden is 54–104 m off (78 m in the middle): standing, you see 80% of it over the wall.
+      greenhouse is 254 m off and the garden 232–278 m (255 m in the middle): standing, you see 83% of it over the wall.
+      That's past where a suspect can pick anyone out (75 m), so from the overlook you're unseen until you start shooting
+      and they come for you over the saddle.
     - **The east summit:** a chile garden (raised beds in rows running north-south, side-on to the overlook, so a
       crouching suspect is hidden behind them, plus fruit trees and ristras drying), round a **greenhouse** in the
       middle: glass on all four sides from a low sill, a glass roof, two rows of potting benches, double doors on the
@@ -437,6 +440,13 @@ says the same), but not whose: the shooter's name isn't shown.
     - **The gorge:** 45 m of open air between the summits (`lay.chasm`; tile 5 on the ground floor, with no floor
       under it in `js/world.js`, only the gorge's own floor down there), its cliffs ragged and lit pink by the low sun.
       Rounds fly on past the map's edge (`ray: false` on its edge walls) instead of stopping in the air.
+    - **The ziplines** (`crest.lines`; `js/player.js` `zipStep`): one from the ridge just north of the overlook down to the
+      garden's west edge, one back from the garden's south-west to the strip beside the Crest House. Stand at the foot of a
+      start pole and hold F (0.4 s) to clip on: you're lifted onto the bar, carried 236 m in about 14 s under a cable sagging
+      7 m in the middle (slow at the ends, about 24 m/s down its middle, the gorge's floor 50 m under your feet), and set
+      down past the far wall. The weapon's away the whole way, so clear where you're landing first: the over line comes down
+      at the edge of the garden. Steel poles on the rims with an arm out over the wall and a stay back to a footing, the cable
+      a tube you can see from across the gorge (`buildCrest`, `G.Level.zipPoint` for its shape, shared with the ride).
     - **Past the walls** (`buildCrest`, not in the world): the evening sky (gold toward the sun going down over the
       West Mesa, the belt of Venus opposite), the ranges on the horizon (Mount Taylor, the Jemez, the Manzanos), the
       mountain under you (the sheer granite west face, the forested east side, the crest running on north and south), the
