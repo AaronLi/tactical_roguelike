@@ -15,6 +15,7 @@ G.Shop = {
     this.ready = false;
     this.genOffers(level, seed);
     this.partStock = G.Gunsmith.rollStock(level, seed); // the gunsmith's parts this visit (same for the whole squad)
+    this.precStock = G.Gunsmith.rollPrecision(level, seed); // and the precision showcase's (js/hangar.js)
     // the shared stock: the host's count when it's come, until then what it starts at (the same reckoning the host's)
     this.stock = stock || G.Shop.scaleStock(this.baseStock(level, seed), Object.keys(G.Game.roster || {}).length || 1);
     this.pend = new Map(); this.qn = 0;
@@ -33,6 +34,7 @@ G.Shop = {
     for (const o of O.pouches) s['pouch:' + o.id] = o.n;
     for (const o of O.mags) s['mag:' + o.id] = o.n;
     for (const id of G.Gunsmith.rollStock(level, seed)) s['part:' + id] = 1;
+    for (const id of G.Gunsmith.rollPrecision(level, seed)) s['part:' + id] = 1; // (the precision showcase's)
     return s;
   },
   scaleStock(s, n) { const o = {}; for (const k in s) o[k] = s[k] * Math.max(1, n); return o; },

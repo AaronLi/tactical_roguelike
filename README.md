@@ -705,6 +705,15 @@ says the same), but not whose: the shooter's name isn't shown.
     and how many weapons it fits). What the guns already come with seldom turns up: a part is weighted down by the
     share of the weapons it fits that ship with it (the A2 birdcage, the stock red dot, the standard grip), so most
     of the stock is upgrades that change how a gun performs.
+  - **Timberline Outfitters** (the front of the workshop side, by the hangar door): the precision shooting showcase, done
+    up like a hunting superstore. A plank floor inside log rails (a way in off the hall under the carved sign, and one from
+    the workshop), fibreglass rockwork along the front wall with a waterfall into a pond, a stuffed grizzly reared up on
+    its boulder with its claws out, pines, and a red canoe hung from the roof. On eight tree stumps, its own stock, apart
+    from the gunsmith's and never the same parts as his this visit (`G.Gunsmith.rollPrecision`): three magnified scopes
+    (the named glass first, a tier deeper than his shelves), the Kodiak Ridge bipod (back after being retired, sold only
+    here: a folding bipod on the underside rail, recoil down, handling slower) and four match barrels for the long guns,
+    the marksman and sniper rifles first. Each turns over its stump at 0.9 m, its card on the stump's face; F buys it into
+    your stash, counted by the host like everything else.
   - **The store** (middle): Vex behind his counter (his till is the full stock; he looks like his portrait: dark hood, a black visor with two orange eyes, a grey respirator, a gold strap across the chest), five pedestals with the
     gear for sale, each piece shown on its own and turning slowly (a helmet with its face guard on it, a
     carrier with the plate that comes with it standing beside it and turning with it, a plate or a face guard by itself). The sign
@@ -1304,7 +1313,7 @@ says the same), but not whose: the shooter's name isn't shown.
     | Interface | Takes | Fits |
     | --- | --- | --- |
     | Picatinny top rail | red dots, holos, prisms, scopes | 46 weapons |
-    | Underside rail (M-LOK / Picatinny) | foregrips | 26 weapons (only with a railed handguard) |
+    | Underside rail (M-LOK / Picatinny) | foregrips and the bipod | 26 weapons (only with a railed handguard) |
     | Side rail (right and left) | lasers and weapon lights, one each side | 53 weapons (built into the F2000, Tavor, AUGs, P90 and MP7; otherwise a railed handguard or pump forend, or a clamp-on rail mount) |
     | Clamp-on rail mount | barrel clamps with a side rail on the right, or both sides | 9 weapons: the long guns with no railed part to fit (integrally suppressed and jacketed guns, the PKM, the machine pistols) |
     | AR-15 grip mount | pistol grips | 20 weapons |

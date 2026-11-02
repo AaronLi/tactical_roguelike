@@ -271,10 +271,8 @@ G.Gunsmith = (() => {
   [['talon', 'Talon VG-1 vertical grip', 'vertical', { recoil: -6, ergo: -2, weight: 0.12 }, 120], ['paragon', 'Paragon AFG angled grip', 'angled', { recoil: -3, ergo: 3, weight: 0.08 }, 150],
     ['lynx', 'Lynx Stub stubby grip', 'stubby', { recoil: -4, ergo: 1, weight: 0.07 }, 110], ['bastion', 'Bastion hand stop', 'stop', { recoil: -2, ergo: 4, weight: 0.03 }, 70],
     ['kodiak', 'Kodiak Ridge bipod', 'bipod', { recoil: -9, ergo: -6, weight: 0.42 }, 260]]
-    .forEach(([b, n, t, st, price], i) => add({ id: `fg.${i}`, slot: 'fg', mount: 'fg', brand: BR[b], name: n, price, st, desc: '', model: { fg: t } }));
-  // (the bipod's gone: it stays in the list, so the weapon codes don't shift, but nothing fits, sells or drops it)
-  PARTS['fg.4'].retired = true;
-  BY_MOUNT.set('fg', BY_MOUNT.get('fg').filter((p) => !p.retired));
+    .forEach(([b, n, t, st, price], i) => add({ id: `fg.${i}`, slot: 'fg', mount: 'fg', brand: BR[b], name: n, price, st, desc: t === 'bipod' ? 'Folding legs under the handguard: a steadier, heavier gun, slower to swing.' : '', model: { fg: t } }));
+  // (the bipod was retired for a while; it's back, sold at the hangar's precision showcase: rollPrecision, js/hangar.js)
   // Lasers and weapon lights. set.laser: its colour (r / g); set.light: how bright. Both are switched on and off
   // on the comms wheel (hold the middle button); a laser only steadies hip fire while it's on.
   const tacDesc = (s) => (s.laser && s.light ? 'Laser and light: each switched on the comms wheel (hold the middle mouse button). The laser steadies hip fire.' : s.laser ? 'Laser: steadier hip fire while it\'s on (switched on the comms wheel: hold the middle mouse button).' : 'Weapon light: lights the way, and dazzles anyone you shine it at (switched on the comms wheel: hold the middle mouse button).');
@@ -1113,7 +1111,7 @@ G.Gunsmith = (() => {
   function rollStock(level, seed, n = 7) {
     const r = G.U.rng((seed ^ 0x6a5d) >>> 0), maxTier = Math.min(3, 1 + Math.floor(level / 2)), out = new Set();
     // (lights and lasers are few among hundreds of muzzles, stocks and grips: they're weighted up to turn up most visits)
-    const pool = LIST.filter((p) => !p.factory && !p.variant && !p.retired && !plainGrip(p) && p.tier <= maxTier)
+    const pool = LIST.filter((p) => !p.factory && !p.variant && !p.retired && !plainGrip(p) && p.tier <= maxTier && p.id !== 'fg.4') // (the bipod's the showcase's: rollPrecision)
       .map((p) => ({ p, w: Math.pow(fitsPart(p).length, 0.8) * (p.slot === 'tac' ? 9 : 1) * Math.max(0.04, Math.pow(1 - stockShare(p), 3)) }));
     while (out.size < n && pool.length) {
       let roll = r() * pool.reduce((a, x) => a + x.w, 0), i = 0;
@@ -1121,6 +1119,21 @@ G.Gunsmith = (() => {
       out.add(pool.splice(i, 1)[0].p.id);
     }
     return out;
+  }
+  // The precision showcase's stock this visit (js/hangar.js: the hunting-store corner at the front of the workshop), the same for
+  // the whole squad and none of what's on the gunsmith's pedestals: rifle scopes (the magnified ones, a tier deeper than his),
+  // the bipod, and match barrels for the long guns (the marksman and sniper rifles first).
+  function rollPrecision(level, seed, n = 8) {
+    const r = G.U.rng((seed ^ 0x5c09e) >>> 0), maxTier = Math.min(3, 2 + Math.floor(level / 2)), his = rollStock(level, seed);
+    const ok = (p) => !p.factory && !p.retired && !his.has(p.id) && (p.tier || 1) <= maxTier;
+    const take = (list, k) => G.U.shuffle(r, list.filter(ok)).slice(0, k).map((p) => p.id);
+    const magnified = LIST.filter((p) => p.slot === 'optic' && p.model && ['scope', 'lpvo', 'acog'].includes(p.model.optic));
+    const scopes = take(magnified.filter((p) => !p.oem), 3); // (the named glass first; the plain rifle scopes the guns ship with if it's short)
+    if (scopes.length < 3) scopes.push(...take(magnified.filter((p) => p.oem), 3 - scopes.length));
+    const long = (cls) => LIST.filter((p) => p.slot === 'barrel' && p.id.endsWith('.br.long') && G.WEAPONS[p.plat] && cls.includes(G.WEAPONS[p.plat].cls));
+    const barrels = take(long(['SNP', 'DMR']), 4);
+    if (barrels.length < 4) barrels.push(...take(long(['BR', 'AR', 'LMG']), 4 - barrels.length));
+    return [...scopes, ...(ok(PARTS['fg.4']) ? ['fg.4'] : []), ...barrels].slice(0, n);
   }
   // Take the aftermarket parts off a weapon (traded in or replaced) and put them in a stash.
   function strip(def, stash) {
@@ -1140,7 +1153,7 @@ G.Gunsmith = (() => {
   }
   return {
     PARTS, LIST, PLATFORMS, attachOptions, SLOT_LABEL, BRANDS: BR, ifaceName, fits, fitsPart, fitsSlot, ALIAS, kindOf,
-    defaultBuild, slotsOf, slotFor, slotLabel, visibleSlots, magCap, prune, encode, decode, compile, fromCode, soundSpec, roundSoundKey, modelSpec, rollStock, compatible, strip, convert, kitsFor, convParts, buyPrice, sellPrice, plainGrip, plainHere, skins, RCV,
+    defaultBuild, slotsOf, slotFor, slotLabel, visibleSlots, magCap, prune, encode, decode, compile, fromCode, soundSpec, roundSoundKey, modelSpec, rollStock, rollPrecision, compatible, strip, convert, kitsFor, convParts, buyPrice, sellPrice, plainGrip, plainHere, skins, RCV,
     defaultCode: (id) => encode(id, defaultBuild(id)),
   };
 })();
