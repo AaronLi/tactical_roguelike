@@ -429,7 +429,10 @@ says the same), but not whose: the shooter's name isn't shown.
       boot spoiler, the sill stripes, blue calipers behind 19-inch 405M wheels; cover). A band of outcrops north of it has one way through to the **Crest House**, a stone gift shop
       with its office and storeroom behind (the level's indoor rooms: the attachments box and the first aid cabinets go
       here). Then a trail runs north among outcrops, boulders, junipers, piñons and cholla to the **overlook**, a
-      flagstone terrace out over the gorge with two coin-op viewers and a bench. Nobody starts on it. From it the
+      flagstone terrace out over the gorge with two coin-op viewers and a bench. Nobody starts on it. The viewers work:
+      press F at one to put your eyes to it (a 15× view through two round fields, swinging 70° either side of straight out,
+      the mouse slowed to match, the weapon away) and spot who's where in the garden before you shoot; F again, or a step,
+      and you're off it (`crest.scopes`; `js/player.js` `VIEWER`). From it the
       greenhouse is 254 m off and the garden 232–278 m (255 m in the middle): standing, you see 83% of it over the wall.
       That's past where a suspect can pick anyone out (75 m), so from the overlook you're unseen until you start shooting
       and they come for you over the saddle.

@@ -1397,9 +1397,10 @@ G.Furniture = (() => {
         trail(rm) { wild(rm, rm.front ? 22 : 12, ['boulder', 'boulder', 'juniper', 'pinon', 'pinon', 'cholla']); },
         ridge(rm) { wild(rm, 13, ['boulder', 'juniper', 'pinon', 'pinon', 'pinon', 'cholla']); },
         saddle(rm) { wild(rm, 15, ['boulder', 'boulder', 'juniper', 'pinon']); },
-        overlook() { // the viewers at the wall either end, looking out over the gorge; a bench against the north wall
+        overlook() { // the viewers at the wall either end, looking out over the gorge (cr.scopes: where, and which way, for
+          // js/player.js to look through); a bench against the north wall
           const x = (cr.OX1 + 1) * TS - 0.55;
-          for (const z of [cr.OZ0, cr.OZ1]) put('scope', cr.OX1, z, x, C(z), facing(1, 0), r());
+          for (const z of [cr.OZ0, cr.OZ1]) { put('scope', cr.OX1, z, x, C(z), facing(1, 0), r()); cr.scopes.push({ x, z: C(z), yaw: -Math.PI / 2 }); }
           const bx = cr.CX0 + 1;
           if (tryBlock(bx, cr.OZ0, 4)) put('bench', bx, cr.OZ0, C(bx), cr.OZ0 * TS + 0.32, facing(0, -1), r());
         },

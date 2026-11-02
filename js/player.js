@@ -389,7 +389,7 @@ G.Me = {
     document.addEventListener('mousemove', (e) => {
       if (!G.Game.locked || this.dead || this.out) return; // (out cold: no looking round)
       if (this.wheel) { this.wheelMove(e.movementX, e.movementY); return; } // (the comms wheel open: the mouse picks on it)
-      const z = G.U.lerp(1, this.sight(this.cur()).zoom, this.adsT || 0);
+      const z = this.viewer ? 1 / this.VIEWER.MAG : G.U.lerp(1, this.sight(this.cur()).zoom, this.adsT || 0); // (a viewer's magnification slows the view as much)
       const s = 0.0022 * G.Game.settings.sens * z;
       // a magazine in your hand, or the gun held open for a chamber check: the mouse turns that, not your view
       const mc = this.magChk;
@@ -409,7 +409,7 @@ G.Me = {
     this.hp = this.maxHp();
     this.down = false; this.out = false; this.dead = false; // (out: unconscious, as well as down)
     this.rounds = [];
-    this.crouch = false; this.prone = false; this.stanceT = 0; this.onGround = true; this.seat = null; this.zipRide = null; this.treating = new Map();
+    this.crouch = false; this.prone = false; this.stanceT = 0; this.onGround = true; this.seat = null; this.zipRide = null; this.viewer = null; this.viewerMask(false); this.treating = new Map();
     this.eyeH = 1.62;
     this.fireCd = 0; this.swapT = 0; this.reloading = false; this.reloadT = 0; this.burstQ = 0;
     this.adsT = 0; this.ads = false; this.kick = 0; this.flashT = 0;
@@ -484,6 +484,11 @@ G.Me = {
       return;
     }
     if (this.zipRide) { this.zipStep(dt); return; } // (on a zipline: carried, not walking)
+    if (this.viewer) { // (at a viewer: standing still, till you walk off)
+      const k = this.keys;
+      if (k.KeyW || k.KeyA || k.KeyS || k.KeyD || this.down || this.dead) this.viewerOff();
+      else { this.vel.set(0, 0, 0); this.hspeed = 0; return; }
+    }
     const k = this.keys, blocked = this.down || G.Game.chatOpen || !G.Game.locked || !!(this.action && (this.action.kind === 'zip' || this.action.kind === 'bag'));
     let fw = blocked ? 0 : (k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0);
     let st = blocked ? 0 : (k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0);
@@ -533,6 +538,32 @@ G.Me = {
     if (this.pos.y + this.eyeH > ceil - 0.15) { this.pos.y = ceil - 0.15 - this.eyeH; this.vel.y = Math.min(0, this.vel.y); }
     this.hspeed = Math.hypot(this.vel.x, this.vel.z);
     if (this.onGround && this.hspeed > 0.5) this.bobT += dt * this.hspeed * 1.8;
+  },
+  // A coin-op viewer (the Sandia Crest's overlook: crest.scopes, js/furniture.js): press F at one to put your eyes to it, a
+  // MAG-power view out over the gorge, turned no further than YAW either side of where it points, UP and DOWN; the weapon away.
+  // F again, or a step, and you're off it. REACH: how close you have to be; EYE: the eyepieces' height; AHEAD: how far in front
+  // of the viewer's middle the view starts (just past its lenses, so its own head isn't in the way)
+  VIEWER: { MAG: 15, REACH: 1.3, EYE: 1.36, AHEAD: 0.24, YAW: 1.2, UP: 0.25, DOWN: 0.45 },
+  viewerNear(map) {
+    const sc = map && map.crest && map.crest.scopes;
+    return (sc && Math.abs(this.pos.y) < 0.5 && sc.find((v) => Math.hypot(v.x - this.pos.x, v.z - this.pos.z) < this.VIEWER.REACH)) || null;
+  },
+  viewerOn(v) { this.viewer = { v, was: !!this.stowed, yaw: this.yaw, pitch: this.pitch }; this.yaw = v.yaw; this.pitch = 0; this.stowed = true; this.lowToggle = false; this.mouse.r = false; G.Audio.click(); },
+  viewerOff() { const w = this.viewer; if (!w) return; this.viewer = null; this.viewerMask(false); if (G.R.vmRoot) G.R.vmRoot.visible = true; this.stowed = w.was; this.yaw = w.v.yaw + G.U.clamp(G.U.angDiff(w.v.yaw, this.yaw), -this.VIEWER.YAW, this.VIEWER.YAW); G.Audio.click(); },
+  // the binoculars' two round fields, soft at their edges, the rest black (an overlay over the view, while you're at one)
+  viewerMask(on) {
+    let el = document.getElementById('viewerMask');
+    if (!el && !on) return;
+    if (!el) {
+      el = document.createElement('div'); el.id = 'viewerMask';
+      el.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:4;display:none';
+      el.innerHTML = '<svg width="100%" height="100%"><defs><radialGradient id="vmEdge"><stop offset="0.86" stop-color="#000"/><stop offset="1" stop-color="#fff"/></radialGradient>'
+        + '<mask id="vmHole"><rect width="100%" height="100%" fill="#fff"/><circle cx="39%" cy="50%" r="30%" fill="url(#vmEdge)"/><circle cx="61%" cy="50%" r="30%" fill="url(#vmEdge)"/></mask></defs>'
+        + '<rect width="100%" height="100%" fill="#050505" mask="url(#vmHole)"/></svg>'
+        + `<div style="position:absolute;left:50%;bottom:6%;transform:translateX(-50%);font:12px monospace;letter-spacing:2px;color:#9a9a9a">VIEWER · ${this.VIEWER.MAG}× · F TO STEP BACK</div>`;
+      document.body.appendChild(el);
+    }
+    el.style.display = on ? 'block' : 'none';
   },
   // A zipline (the Sandia Crest's: js/level.js crest.lines): lifted onto its bar (UP s), carried along under the cable, slowest
   // at the ends and fastest down the middle of it (V0 + V1 m/s), and let down onto the far side (DOWN s), hanging HANG m under
@@ -1680,6 +1711,14 @@ G.Me = {
     }
     // on a zipline, hands on the bar till the far side; at the foot of one, hold F to clip on (zipStep)
     if (this.zipRide) { G.HUD.setPrompt(''); G.HUD.setProgress(-1, ''); return; }
+    // at a viewer (or by one): F to look, F to step back
+    if (this.viewer) { G.HUD.setPrompt(''); G.HUD.setProgress(-1, ''); if (F) { this.fLatch = true; this.viewerOff(); } return; }
+    const vw = !this.action && !this.down && !this.dead && !this.reloading && this.viewerNear(map);
+    if (vw) {
+      G.HUD.setPrompt('Press <b>F</b> to look through the viewer'); G.HUD.setProgress(-1, '');
+      if (F) { this.fLatch = true; this.viewerOn(vw); }
+      return;
+    }
     const zl = !this.action && !this.down && !this.dead && this.zipNear(map);
     if (zl) {
       this.zipHold = F ? (this.zipHold || 0) + dt : 0;
@@ -2059,6 +2098,19 @@ G.Me = {
   updateCamera(dt) {
     this._dtCam = dt;
     const cam = G.R.camera, def = this.cur().def;
+    // at a viewer: your eyes at its eyepieces, the view narrowed to its power, the gun out of sight
+    this.viewerMask(!!this.viewer);
+    if (G.R.vmRoot) G.R.vmRoot.visible = !this.viewer;
+    if (this.viewer) {
+      const v = this.viewer.v, V = this.VIEWER;
+      this.yaw = v.yaw + G.U.clamp(G.U.angDiff(v.yaw, this.yaw), -V.YAW, V.YAW); this.pitch = G.U.clamp(this.pitch, -V.DOWN, V.UP);
+      cam.position.set(v.x - Math.sin(v.yaw) * V.AHEAD, (this.pos.y || 0) + V.EYE, v.z - Math.cos(v.yaw) * V.AHEAD);
+      cam.rotation.set(this.pitch, this.yaw, 0);
+      const fov = G.Game.settings.fov / V.MAG;
+      if (Math.abs(cam.fov - fov) > 0.01) { cam.fov = fov; cam.updateProjectionMatrix(); }
+      G.R.pipLive = 0;
+      return;
+    }
     // lean: Q left, E right. Never lean the head into a wall.
     const want = this.down || this.dead || this.lowReady || this.prone || G.Game.chatOpen || !G.Game.locked ? 0 : (this.keys.KeyE ? 1 : 0) - (this.keys.KeyQ ? 1 : 0);
     const sideX = Math.cos(this.yaw), sideZ = -Math.sin(this.yaw), eye = this.pos.y + this.eyeH;

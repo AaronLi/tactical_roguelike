@@ -847,7 +847,7 @@ G.Level = {
       const east = off[0] > on[0];
       return { a: [east ? wRim : eRim, 6.6, C(on)[1]], b: [east ? eRim : wRim, 3.9, C(off)[1]], sag: 7, on: C(on), off: C(off), keep: [on, off] };
     });
-    const crest = { W, H, kind, CX0, CX1, SZ, OZ0, OZ1, OX1, house: [HX, HZ], gh: [GX, GZ], masts: [], lines };
+    const crest = { W, H, kind, CX0, CX1, SZ, OZ0, OZ1, OX1, house: [HX, HZ], gh: [GX, GZ], masts: [], scopes: [], lines };
     return { W, H, t, rooms, doors, out, fences, glass, spawn: lot, lz, crest, chasm: this.CHASM };
   },
   // Each returns { W, H, t, rooms, doors?, ringDoors?, out?, fences?, spawn? } on the coarse grid. t starts as all wall
