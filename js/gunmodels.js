@@ -752,9 +752,15 @@ G.GunModels = (() => {
       case 'angled': k.prof([[f - 0.045, -0.022], [f + 0.03, -0.022], [f + 0.012, -0.058], [f - 0.03, -0.05]], 0.026, m); break;
       case 'stubby': k.prof([[f - 0.01, -0.022], [f + 0.016, -0.022], [f + 0.014, -0.068], [f - 0.008, -0.068]], 0.026, m); k.box(0.03, 0.006, 0.03, M.rubber(), f - 0.012, -0.07); break;
       case 'stop': k.box(0.02, 0.016, 0.014, M.black(), f, -0.03); break;
-      case 'bipod':
-        k.box(0.03, 0.016, 0.03, M.black(), f - 0.015, -0.03);
-        for (const x of [-0.012, 0.012]) { k.cyl(0.004, 0.2, M.black(), f - 0.2, -0.04, x); k.box(0.012, 0.008, 0.01, M.rubber(), f - 0.21, -0.04, x); }
+      case 'bipod': // a folding bipod: its clamp on the rail, the yoke across under it, the legs folded forward (steel extensions, rubber feet)
+        k.box(0.034, 0.02, 0.036, M.black(), f - 0.018, -0.032);
+        k.box(0.052, 0.012, 0.022, M.black(), f - 0.012, -0.046);
+        for (const x of [-0.019, 0.019]) {
+          k.cyl(0.0058, 0.13, M.black(), f - 0.004, -0.048, x);
+          k.cyl(0.0043, 0.1, M.steel(), f + 0.126, -0.048, x);
+          k.box(0.016, 0.014, 0.018, M.rubber(), f + 0.226, -0.048, x);
+        }
+        k.cyl(0.003, 0.03, M.steel(), f - 0.004, -0.046, 0); // (the spring between the legs)
         break;
     }
   }
