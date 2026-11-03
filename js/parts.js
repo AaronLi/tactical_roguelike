@@ -804,7 +804,7 @@ G.Gunsmith = (() => {
     // a stock on a slot a handgun's given one by (sl.brace: a chassis's, an SMG stock mount's): what bracing it on your
     // shoulder does, on top of the stock's own figures (they're for a stock on an SMG, against another stock)
     for (const sl of slotsOf(id, build)) { const sp = sl.brace && PARTS[build[sl.slot]]; if (sp && sp.stype !== 'folded' && !isAdapter(sp)) for (const [k, v] of Object.entries(sl.brace)) s[k] += v; }
-    let perLoad = 1, levels = null, magnifier = 0, light = 0, laser = null, laserHip = 0, laserHipSum = 0, cap = base.mag, zoom = base.zoom, barrelIn = gs.barrel, device = gs.muzzleDevice || 'none', can = gs.suppressor || null, sup = false, hasMuzzleSlot = false, shell = base.shell, reload = base.reload, scoped = base.zoom <= 0.5, reticle = 'cross', magnif = scoped ? scopeMag({}, base.zoom) : 1;
+    let perLoad = 1, levels = null, magnifier = 0, light = 0, laser = null, laserHip = 0, laserHipSum = 0, cap = base.mag, zoom = base.zoom, barrelIn = gs.barrel, device = gs.muzzleDevice || 'none', can = gs.suppressor || null, sup = false, hasMuzzleSlot = false, shell = base.shell, reload = base.reload, fullSt = null, scoped = base.zoom <= 0.5, reticle = 'cross', magnif = scoped ? scopeMag({}, base.zoom) : 1;
     const parts = Object.values(build).map((p) => PARTS[p]).filter(Boolean);
     for (const p of parts) {
       for (const k in s) s[k] += p.st[k] || 0;
@@ -813,7 +813,7 @@ G.Gunsmith = (() => {
       if (p.set.scoped != null) { scoped = p.set.scoped; reticle = p.set.reticle || 'cross'; magnif = p.set.magnif || 1; }
       if (p.set.barrelIn != null) barrelIn = p.set.barrelIn;
       if (p.set.shell != null) shell = p.set.shell;
-      if (p.set.full) { shell = false; reload = base.loadFull; } // (a revolver filled all at once: js/data.js)
+      if (p.set.full) { shell = false; reload = base.loadFull; fullSt = p.st.reload || 0; } // (a revolver filled all at once: js/data.js)
       if (p.set.reload != null) reload = p.set.reload;
       if (p.set.perLoad != null) perLoad = p.set.perLoad;
       if (p.set.levels) levels = p.set.levels;
@@ -853,6 +853,9 @@ G.Gunsmith = (() => {
     d.shell = shell;
     d.perLoad = perLoad; // shells pushed into the tube at a time
     d.reload = reload * clamp(1 + s.reload / 100, 0.4, 2);
+    // a speed loader only goes in an empty cylinder: with rounds still in it, it's topped up by hand, a round at a time
+    // (js/player.js byHand), at the hand's pace (the loader's own figure is for the loader)
+    if (fullSt != null) d.handReload = base.reload * clamp(1 + (s.reload - fullSt) / 100, 0.4, 2);
     d.rpm = Math.round(base.rpm * clamp(1 + s.rpm / 100, 0.5, 1.6));
     if (base.spinUp) d.spinUp = base.spinUp * clamp(1 + s.spin / 100, 0.3, 2);
     d.speed = base.speed * clamp(1 - s.weight * 0.02, 0.75, 1.1);

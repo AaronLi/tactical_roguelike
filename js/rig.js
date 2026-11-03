@@ -522,7 +522,9 @@ G.Rig = (() => {
     rig.lastPos.copy(p.pos);
     if (dt > 0) rig.vel.lerp(dv.multiplyScalar(1 / dt), Math.min(1, dt * 10));
     root.position.copy(p.pos);
-    root.rotation.y = p.yaw;
+    // (on a zipline: facing the way they're carried, as they've been moving; lifted straight up onto it, the way they faced)
+    if (p.zip) { if (rig.zipYaw == null) rig.zipYaw = p.yaw; if (Math.hypot(rig.vel.x, rig.vel.z) > 1.5) rig.zipYaw = Math.atan2(-rig.vel.x, -rig.vel.z); } else rig.zipYaw = null;
+    root.rotation.y = p.climb ? p.climb.yaw : p.zip ? rig.zipYaw : p.yaw; // (on a ladder: facing it, wherever they're looking)
     if (rig.powered && rig.state !== 'dead' && !rig.limp) gunHome(rig); // (before the hands reach for it)
     root.updateMatrixWorld(true);
     // a crossbow: its bolt's on the rail while it's loaded (a reload lays it there at 0.72, cocking the string at 0.3)
@@ -539,7 +541,7 @@ G.Rig = (() => {
     const vx = rig.vel.x, vz = rig.vel.z;
     const localRight = vx * cy - vz * sy;          // +x in rig space
     const localFwd = -(vx * sy + vz * cy);         // forward (-z) in rig space
-    const speed = Math.hypot(vx, vz) / s;
+    const speed = p.zip || p.climb ? 0 : Math.hypot(vx, vz) / s; // (carried, not walking)
     const moving = speed > 0.25 ? 1 : speed / 0.25;
 
     const posed = p.pose === 'handsup' || p.pose === 'cuffed' || p.pose === 'cower' || p.pose === 'takedown';
@@ -690,6 +692,8 @@ G.Rig = (() => {
           mg.position.copy(rig.gun.worldToLocal(hp));
         } else mg.position.copy(rig.gun.userData.magHome);
       }
+      // the bipod's legs: down when they've put it down (a quarter of a second either way)
+      if (rig.gun.userData.bipod) { rig.bipodK = U.clamp((rig.bipodK || 0) + (p.bipod ? 1 : -1) * dt * 4, 0, 1); G.GunModels.bipodPose(rig.gun.userData.bipod, rig.bipodK); }
     } else {
       // unarmed: arms swing opposite the legs
       for (const [arm, side] of [[rig.armL, -1], [rig.armR, 1]]) {
@@ -746,6 +750,30 @@ G.Rig = (() => {
       ik(rig.armR.up, rig.armR.lo, UARM * s, FARM * s, rig.body.localToWorld(rh), rig.chest.localToWorld(new T.Vector3(0.7, -0.3, 0.2)));
       ik(rig.armL.up, rig.armL.lo, UARM * s, FARM * s, rig.body.localToWorld(lh), rig.chest.localToWorld(new T.Vector3(-0.7, -0.3, 0.2)));
     }
+    // on a ladder (p.climb: the ladder, a level's crest.ladder): hands and feet on its rungs, where G.Level.ladderGrip has them
+    // for how high their feet are; the hips held off it a little and sat down into the lower foot (so it reaches its rung),
+    // the knees and elbows out from it
+    if (p.climb) {
+      const l = p.climb, y = p.pos.y, at = (k) => new T.Vector3(...G.Level.ladderGrip(l, y, k));
+      rig.hips.position.z += 0.06; rig.hips.position.y -= 0.17; rig.spine.rotation.x -= 0.08;
+      root.updateMatrixWorld(true);
+      for (const [leg, side, k] of [[rig.legL, -1, 'fL'], [rig.legR, 1, 'fR']]) ik(leg.th, leg.sh, THIGH * s, SHIN * s, at(k), new T.Vector3(l.x - 0.6, y + 0.7, l.z - side * 0.25));
+      for (const [arm, side, k] of [[rig.armL, -1, 'hL'], [rig.armR, 1, 'hR']]) ik(arm.up, arm.lo, UARM * s, FARM * s, at(k), new T.Vector3(l.x + 0.5, y + 1.0, l.z - side * 0.7));
+    }
+    // on a zipline (p.zip): hanging by both hands from the grab bar over their head, a trolley and its bar going with them
+    // (G.Level.zipKit, the cable ZIP_HANG over their feet); the body hanging under it, the legs a little bent and swinging
+    if (p.zip) {
+      const L = G.Level;
+      if (!rig.zipKit) { rig.zipKit = L.zipKit(); root.add(rig.zipKit); }
+      rig.zipKit.visible = true; rig.zipKit.position.set(0, L.ZIP_HANG, 0);
+      rig.zipT = (rig.zipT || 0) + dt;
+      const sw = Math.sin(rig.zipT * 2.3) * 0.12, bar = L.ZIP_HANG - L.ZIP_BAR;
+      rig.hips.position.z -= sw * 0.3; rig.spine.rotation.x += sw * 0.3; rig.chest.rotation.x -= 0.1;
+      root.updateMatrixWorld(true);
+      const R = (x, y, z) => root.localToWorld(new T.Vector3(x, y, z));
+      for (const [arm, side] of [[rig.armL, -1], [rig.armR, 1]]) ik(arm.up, arm.lo, UARM * s, FARM * s, R(side * 0.17, bar, 0), R(side * 0.9, 1.3, 0.1));
+      for (const [leg, side] of [[rig.legL, -1], [rig.legR, 1]]) ik(leg.th, leg.sh, THIGH * s, SHIN * s, rig.body.localToWorld(new T.Vector3(side * 0.12, 0.12 + Math.max(0, sw) * 0.3, -0.12 - sw * (side > 0 ? 1.2 : 0.8))), R(side * 0.15, 0.7, -1.2));
+    } else if (rig.zipKit) { rig.zipKit.visible = false; rig.zipT = 0; }
     if (rig.powered && p.str != null) powerStep(rig, dt, p.str, p.aimAt);
     else if (rig.powered) rig.rd = null; // (far off: animated only; the body starts again from the pose when near)
     if (rig.dropped) dropGun(rig, dt);

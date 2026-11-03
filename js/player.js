@@ -409,7 +409,7 @@ G.Me = {
     this.hp = this.maxHp();
     this.down = false; this.out = false; this.dead = false; // (out: unconscious, as well as down)
     this.rounds = [];
-    this.crouch = false; this.prone = false; this.stanceT = 0; this.onGround = true; this.seat = null; this.zipRide = null; this.viewer = null; this.viewerMask(false); this.treating = new Map();
+    this.crouch = false; this.prone = false; this.stanceT = 0; this.onGround = true; this.seat = null; this.zipRide = null; this.climb = null; this.viewer = null; this.viewerMask(false); this.treating = new Map();
     this.eyeH = 1.62;
     this.fireCd = 0; this.swapT = 0; this.reloading = false; this.reloadT = 0; this.burstQ = 0;
     this.adsT = 0; this.ads = false; this.kick = 0; this.flashT = 0;
@@ -484,6 +484,7 @@ G.Me = {
       return;
     }
     if (this.zipRide) { this.zipStep(dt); return; } // (on a zipline: carried, not walking)
+    if (this.climb) { this.climbStep(dt); return; } // (on the ladder, likewise)
     if (this.viewer) { // (at a viewer: standing still, till you walk off)
       const k = this.keys;
       if (k.KeyW || k.KeyA || k.KeyS || k.KeyD || this.down || this.dead) this.viewerOff();
@@ -568,7 +569,7 @@ G.Me = {
   // A zipline (the Sandia Crest's: js/level.js crest.lines): lifted onto its bar (UP s), carried along under the cable, slowest
   // at the ends and fastest down the middle of it (V0 + V1 m/s), and let down onto the far side (DOWN s), hanging HANG m under
   // it. The weapon's away the whole way; you can look round. The host takes where you are as it does any time.
-  ZIP: { UP: 0.7, DOWN: 0.5, HANG: 2.0, V0: 7, V1: 17, REACH: 1.6, HOLD: 0.4 },
+  ZIP: { UP: 0.7, DOWN: 0.5, HANG: G.Level.ZIP_HANG, V0: 7, V1: 17, REACH: 1.6, HOLD: 0.4 }, // (HANG: hanging by the bar, js/level.js zipKit)
   zipNear(map) {
     const ls = map && map.crest && map.crest.lines;
     return (ls && Math.abs(this.pos.y) < 0.5 && ls.find((l) => Math.hypot(l.on[0] - this.pos.x, l.on[1] - this.pos.z) < this.ZIP.REACH)) || null;
@@ -590,6 +591,71 @@ G.Me = {
     this.pos.copy(p); this.vel.set(0, 0, 0); this.onGround = true; this.hspeed = 0; this.crouch = false; this.prone = false;
     this.stowed = this.zipRide ? true : z.was; this.lowToggle = false;
     this.eyeH += (1.62 - this.eyeH) * Math.min(1, dt * 12);
+  },
+  // The ladder up the Crest House (crest.ladder: js/level.js crestLadder): hold F at its foot to climb onto the roof, or at its
+  // head on the roof to climb down. Onto it (ON s), carried up or down it (CLIMB m/s), off it onto the roof or the ground (OFF
+  // s); the weapon's away till you're off, and you can look round. REACH: how close to an end you have to be.
+  LADDER: { CLIMB: 1.3, ON: 0.35, OFF: 0.45, REACH: 1.1, HOLD: 0.3, OUT: 0.42 },
+  ladderNear(map) {
+    const l = map && map.crest && map.crest.ladder, R = this.LADDER.REACH;
+    if (!l) return null;
+    if (Math.abs(this.pos.y) < 0.5 && Math.hypot(l.foot[0] - this.pos.x, l.foot[1] - this.pos.z) < R) return { l, up: true };
+    if (Math.abs(this.pos.y - l.top) < 0.5 && Math.hypot(l.head[0] - this.pos.x, l.head[1] - this.pos.z) < R) return { l, up: false };
+    return null;
+  },
+  climbStep(dt) {
+    const c = this.climb, l = c.l, C = this.LADDER, on = (y) => new THREE.Vector3(l.x + C.OUT, y, l.z); // (on it: just out from the wall)
+    c.t += dt;
+    let p;
+    if (c.ph === 'on') { p = c.from.clone().lerp(on(c.from.y), G.U.smooth(0, 1, c.t / C.ON)); if (c.t >= C.ON) { c.ph = 'climb'; c.t = 0; c.y = c.from.y; } }
+    else if (c.ph === 'climb') {
+      const to = c.up ? l.top : 0;
+      c.y += (c.up ? 1 : -1) * C.CLIMB * dt;
+      if (c.up ? c.y >= to : c.y <= to) { c.y = to; c.ph = 'off'; c.t = 0; }
+      p = on(c.y);
+    } else {
+      const end = c.up ? new THREE.Vector3(l.head[0], l.top, l.head[1]) : new THREE.Vector3(l.foot[0], 0, l.foot[1]);
+      p = on(c.up ? l.top : 0).lerp(end, G.U.smooth(0, 1, c.t / C.OFF));
+      if (c.t >= C.OFF) this.climb = null;
+    }
+    this.pos.copy(p); this.vel.set(0, 0, 0); this.onGround = true; this.hspeed = 0; this.crouch = false; this.prone = false;
+    this.stowed = this.climb ? true : c.was; this.lowToggle = false;
+    this.eyeH += (1.62 - this.eyeH) * Math.min(1, dt * 12);
+  },
+  // Your own arms while your hands are on something (the gun's away): a sleeved forearm and a glove each, in the world, from
+  // in front of your shoulder to where the hand is. On the ladder, where G.Level.ladderGrip has it on a rung (each one holding
+  // as you rise past it, then reaching up two); on a zipline, on the grab bar over your head, the trolley above it on the
+  // cable (G.Level.zipKit). Everyone else sees the whole of you (js/rig.js).
+  holdArms(cam) {
+    let A = this._climbArms;
+    const z = this.zipRide;
+    if (this._zipKit) this._zipKit.visible = !!z;
+    if (!this.climb && !z) { if (A) A.g.visible = false; return; }
+    const T = THREE, L = G.Level;
+    let hands;
+    if (z) {
+      const k = this._zipKit || (this._zipKit = L.zipKit()), dx = z.l.b[0] - z.l.a[0], dz = z.l.b[2] - z.l.a[2], n = Math.hypot(dx, dz), bar = this.pos.y + L.ZIP_HANG - L.ZIP_BAR;
+      if (!k.parent) G.R.scene.add(k);
+      k.visible = true; k.position.set(this.pos.x, this.pos.y + L.ZIP_HANG, this.pos.z); k.rotation.y = Math.atan2(dx, dz); // (along the cable; the bar across it)
+      hands = [-1, 1].map((sd) => new T.Vector3(this.pos.x - sd * 0.17 * dz / n, bar, this.pos.z + sd * 0.17 * dx / n)); // (left, right: facing along the cable, its right is (-dz, dx))
+    } else hands = ['hL', 'hR'].map((k) => new T.Vector3(...L.ladderGrip(this.climb.l, this.pos.y, k)));
+    if (!A) {
+      const sleeve = new T.MeshStandardMaterial({ color: 0x3a3f36, roughness: 0.9 }), glove = new T.MeshStandardMaterial({ color: 0x1e1f1c, roughness: 0.8 }), g = new T.Group(), arms = [];
+      for (let i = 0; i < 2; i++) { const s = new T.Mesh(new T.CylinderGeometry(0.042, 0.048, 1, 10), sleeve), h = new T.Mesh(new T.BoxGeometry(0.1, 0.11, 0.05), glove); g.add(s, h); arms.push({ s, h }); }
+      G.R.scene.add(g);
+      A = this._climbArms = { g, arms };
+    }
+    A.g.visible = true;
+    cam.updateMatrixWorld();
+    const up = new T.Vector3(0, 1, 0);
+    [-1, 1].forEach((side, i) => {
+      const { s, h } = A.arms[i], hand = hands[i];
+      const sh = new T.Vector3(side * 0.2, -0.32, 0.05).applyMatrix4(cam.matrixWorld), dir = hand.clone().sub(sh), len = Math.min(0.34, dir.length() * 0.6);
+      dir.normalize();
+      const from = hand.clone().addScaledVector(dir, -len);
+      s.position.copy(from).add(hand).multiplyScalar(0.5); s.scale.set(1, len, 1); s.quaternion.setFromUnitVectors(up, dir);
+      h.position.copy(hand).addScaledVector(dir, 0.03); h.quaternion.copy(s.quaternion);
+    });
   },
   // Spread/recoil multiplier from steadiness: holding Shift tightens it.
   steadiness() { return this.steadying ? 0.65 : 1; },
@@ -681,7 +747,7 @@ G.Me = {
     const paired = hyper && this.hyperQ === 1 && this.pairHeld;
     this.pairHeld = null;
     const kind = paired ? def.hyperKick || 1 : hyper ? def.autoKick || 1 : 1;
-    const k = this.steadiness() * (this.prone ? 0.6 : this.crouch ? 0.8 : 1) * (this.adsT > 0.5 ? 0.85 : 1) * kind; // (prone: the ground takes it)
+    const k = this.steadiness() * (this.prone ? 0.6 : this.crouch ? 0.8 : 1) * (this.adsT > 0.5 ? 0.85 : 1) * G.U.lerp(1, this.BIPOD.KICK, this.bipodT || 0) * kind; // (prone: the ground takes it; a bipod, more of it)
     // (a gun with a pull kicks the same way every time, so you can hold against it: a little to the right, a steady climb)
     const up0 = m.up * (def.pull ? 0.95 + Math.random() * 0.1 : 0.85 + Math.random() * 0.3) * k, dir = def.pull || Math.random() < 0.5 ? -1 : 1;
     // driven back near the limit: what's left of the kick comes out sideways and up
@@ -695,16 +761,37 @@ G.Me = {
     this.pitch = Math.min(1.45, this.pitch + up * R.VIEW.p);
     this.yaw += side * R.VIEW.y;
   },
+  // A bipod (the Kodiak, or one the gun's built with: js/gunmodels.js bipodLeg) goes down when you're lying behind it, or
+  // crouched with something in front to stand it on: a top from 35 cm under the gun to 10 cm over it (you come up onto
+  // a counter), 30 to 80 cm out, nothing in the way over it. Held still and not aimed steeply. bipodT: how far down it is (the legs: js/vmanim.js; what it
+  // does to the sway and kick: swayStep, recoilKick). BIPOD: what's left of the sway and the twitch, and of the kick.
+  BIPOD: { SWAY: 0.12, ERRATIC: 0.1, KICK: 0.55, RATE: 4 },
+  bipodStep(dt) {
+    const a = G.R.vm && G.R.vm.userData.vma, has = !!(a && a.hs[0].an.bipod);
+    let on = false;
+    if (has && !this.stowed && !this.held && this.onGround && (this.hspeed || 0) < 0.4 && Math.abs(this.pitch) < 0.35) {
+      if (this.prone && this.stanceT <= 0) on = true;
+      else if (this.crouch && G.Game.map && G.Game.map.world) {
+        const w = G.Game.map.world, dx = -Math.sin(this.yaw), dz = -Math.cos(this.yaw), y = this.pos.y + this.eyeH - 0.1 + 0.15; // (just over the gun)
+        if (G.World.raycast(w, this.pos.x, y, this.pos.z, dx, 0, dz, 1).t >= 1) {
+          for (const d of [0.35, 0.55, 0.75]) { const t = G.World.raycast(w, this.pos.x + dx * d, y, this.pos.z + dz * d, 0, -1, 0, 0.5).t; if (t >= 0.05 && t < 0.5) { on = true; break; } }
+        }
+      }
+    }
+    if (on && !this.bipodOn && (this.bipodT || 0) < 0.1) G.Audio.click();
+    this.bipodOn = on;
+    this.bipodT = G.U.clamp((this.bipodT || 0) + (on ? 1 : -1) * dt * this.BIPOD.RATE, 0, 1);
+  },
   // Breathing (two slow frequencies), the erratic twitch, walking and the low-health tremor. Looser from the
-  // hip, tighter crouched or holding your breath (Shift).
+  // hip, tighter crouched or holding your breath (Shift); on a bipod, hardly any.
   swayStep(dt, def) {
     const m = this.recoilModel(def), a = this.adsT || 0, low = this.lowHealth();
     this.swayT += dt;
     this.walkAmp += ((this.onGround ? Math.min((this.hspeed || 0) / this.SPEED.walk, 1.4) : 0) - this.walkAmp) * Math.min(1, dt * 4);
     const t = this.swayT, atro = 1 + low * 1.4, hold = this.steadying ? 0.4 : 1, lying = this.prone && this.stanceT <= 0;
     // prone, the gun rests on your elbows and the ground: the least sway there is (breathing barely moves it)
-    const amp = m.sway * G.U.lerp(1.6, 1, a) * (lying ? 0.25 : this.crouch ? 0.75 : 1) * hold * atro;
-    const er = m.erratic * atro * hold * (lying ? 0.3 : 1), wa = this.walkAmp * (1 - a * 0.5);
+    const bp = this.bipodT || 0, amp = m.sway * G.U.lerp(1.6, 1, a) * (lying ? 0.25 : this.crouch ? 0.75 : 1) * hold * atro * G.U.lerp(1, this.BIPOD.SWAY, bp);
+    const er = m.erratic * atro * hold * (lying ? 0.3 : 1) * G.U.lerp(1, this.BIPOD.ERRATIC, bp), wa = this.walkAmp * (1 - a * 0.5);
     const tremor = (s) => low * (0.004 * Math.sin(t * 11.3 + s) + 0.0035 * Math.sin(t * 17.7 + s * 2) + 0.003 * Math.sin(t * 24.9 + s * 3));
     // breathing traces a slow, lopsided figure eight (pitch at twice the yaw rate), with a drift and a faster
     // wander on top; SWAY_GAIN scales the lot
@@ -779,6 +866,7 @@ G.Me = {
     this.reloadN = mag - w.mag; // (rounds to go in: a derringer with one fired takes just the one)
     // A reload is put together from what the gun needs: the magazine change, then from empty either a thumb on
     // the bolt catch (a gun that locked open on its last round: quick) or the action worked by hand (a rack)
+    this.byHand = !!w.def.handReload && w.mag > 0; // (a speed loader with rounds still in the cylinder: by hand, a round at a time)
     this.reloadAct = this.reloadEmpty && isMag && !w.def.enbloc && !w.def.akimbo && G.VMAnim.kinds(w.def).action ? (G.boltHold(w.def) ? 'release' : 'rack') : null; // (a revolver has nothing to work)
     this.reloadTimes(w.def);
     this.revOpen = this.revHand(w.def); this.revClose = false; // (a revolver by hand: the cylinder comes out first)
@@ -789,11 +877,13 @@ G.Me = {
     this.handCase = info && info.breech && w.spent && w.spent.length ? w.spent[0] : null; this.handOut = false;
     if (!this.handCase) G.Casings.emptied(w.def, mag - w.mag, w.spent); // a revolver or break-action: the empties fall out (each hull its load's colour)
     this.ejected = w.spent; this.ejecting = (w.spent || []).length; this.ejectT = this.handCase ? this.reloadTotal * 0.3 : 0.25; w.spent = []; // (still in it till they do: js/vmanim.js)
-    if (w.def.shell || !G.Audio.sample('pull_magazine')) G.Audio.reload();
+    if (this.loose(w.def) || !G.Audio.sample('pull_magazine')) G.Audio.reload();
   },
-  reloadTime(def) { return def.reload; },
+  reloadTime(def) { return this.byHand && def.handReload ? def.handReload : def.reload; },
+  // loaded a round (or a push of shells) at a time, this reload: a shell-fed gun, or a revolver topped up by hand
+  loose(def) { return def.shell || (!!this.byHand && G.revolver(def)); },
   // a revolver loaded a round at a time: it stays open till it's shut, which takes a moment
-  revHand(def) { return G.revolver(def) && def.shell; },
+  revHand(def) { return G.revolver(def) && this.loose(def); },
   revShut() { this.revClose = true; this.reloadT = this.reloadTotal = G.REV.close; },
   ACT_T: { release: 0.4, rack: 0.6 },
   // how far through its motions a magazine change goes before the action, from empty: it stops as the magazine
@@ -843,11 +933,12 @@ G.Me = {
     this.flashT = Math.max(0, this.flashT - dt);
     this.kick = Math.max(0, this.kick - dt * 8);
     this.recoilStep(dt, def);
+    this.bipodStep(dt);
     this.swayStep(dt, def);
 
     this.raiseT = Math.max(0, (this.raiseT || 0) - dt);
     if (this.held) this.heldStep(dt);
-    this.ads = this.mouse.r && !this.held && !this.magChk && !this.lowReady && !this.stowed && !(this.stanceT > 0) && this.raiseT <= 0 && this.swapT <= 0 && !(this.reloading && (!def.shell || this.revHand(def))) && G.Game.locked && !def.akimbo;
+    this.ads = this.mouse.r && !this.held && !this.magChk && !this.lowReady && !this.stowed && !(this.stanceT > 0) && this.raiseT <= 0 && this.swapT <= 0 && !(this.reloading && (!this.loose(def) || this.revHand(def))) && G.Game.locked && !def.akimbo;
     this.adsT += ((this.ads ? 1 : 0) - this.adsT) * Math.min(1, dt * 9 * (this.cur().def.handling || 1)); // ergonomics: aim speed
 
     // inspecting stops the moment you do anything with the gun; racking after the last shell takes a beat
@@ -899,7 +990,7 @@ G.Me = {
     if (this.ejecting && (this.ejectT -= dt) <= 0) this.ejecting = 0;
     if (this.reloading) {
       this.reloadT -= dt;
-      if (!def.shell && this.reloadTotal) {
+      if (!this.loose(def) && this.reloadTotal) {
         const k = 1 - this.reloadT / this.reloadTotal, pistol = def.cls === 'PST' || def.cls === 'MP';
         // the old magazine leaves your hand onto the floor (as the viewmodel lets go of it)
         const km = k * (this.reloadSeat || 1); // (through the magazine change's motions)
@@ -908,7 +999,7 @@ G.Me = {
       }
       if (this.reloadT <= 0) {
         if (this.revClose) { this.revClose = false; this.reloading = false; } // (shut: ready)
-        else if (def.shell) {
+        else if (this.loose(def)) {
           // one shell, or with a speed loader several at a push
           this.revOpen = false;
           const got = w.mag < mag ? G.Gear.takeRounds(this, def, Math.min(def.perLoad || 1, mag - w.mag), w.ammo) : [];
@@ -971,7 +1062,7 @@ G.Me = {
     }
     if (this.reloading) {
       if (this.revHand(def)) { if (!this.revClose) { this.revShut(); this.pressBuf = G.REV.close + 0.05; } return; } // (the cylinder shut first, on what's in it: the shot goes as it does)
-      if (def.shell) this.reloading = false; else return;
+      if (this.loose(def)) this.reloading = false; else return;
     }
     const bolt = ch && this.boltGun(def), round = w.chamber;
     this.shoot(w);
@@ -1710,7 +1801,7 @@ G.Me = {
       return;
     }
     // on a zipline, hands on the bar till the far side; at the foot of one, hold F to clip on (zipStep)
-    if (this.zipRide) { G.HUD.setPrompt(''); G.HUD.setProgress(-1, ''); return; }
+    if (this.zipRide || this.climb) { G.HUD.setPrompt(''); G.HUD.setProgress(-1, ''); return; }
     // at a viewer (or by one): F to look, F to step back
     if (this.viewer) { G.HUD.setPrompt(''); G.HUD.setProgress(-1, ''); if (F) { this.fLatch = true; this.viewerOff(); } return; }
     const vw = !this.action && !this.down && !this.dead && !this.reloading && this.viewerNear(map);
@@ -1725,6 +1816,15 @@ G.Me = {
       G.HUD.setPrompt('Hold <b>F</b> to ride the zipline across the gorge');
       G.HUD.setProgress(this.zipHold > 0 ? this.zipHold / this.ZIP.HOLD : -1, this.zipHold > 0 ? 'Clipping on' : '');
       if (this.zipHold >= this.ZIP.HOLD) { this.zipHold = 0; this.fLatch = true; this.zipRide = { l: zl, ph: 'up', t: 0, s: 0, from: this.pos.clone(), was: !!this.stowed }; G.Audio.click(); }
+      return;
+    }
+    // at the foot of the Crest House's ladder, or at its head on the roof: hold F to climb (climbStep)
+    const ld = !this.action && !this.down && !this.dead && this.ladderNear(map);
+    if (ld) {
+      this.ladderHold = F ? (this.ladderHold || 0) + dt : 0;
+      G.HUD.setPrompt(ld.up ? 'Hold <b>F</b> to climb the ladder to the roof' : 'Hold <b>F</b> to climb down the ladder');
+      G.HUD.setProgress(this.ladderHold > 0 ? this.ladderHold / this.LADDER.HOLD : -1, this.ladderHold > 0 ? 'Climbing on' : '');
+      if (this.ladderHold >= this.LADDER.HOLD) { this.ladderHold = 0; this.fLatch = true; this.climb = { l: ld.l, up: ld.up, ph: 'on', t: 0, from: this.pos.clone(), was: !!this.stowed }; G.Audio.click(); }
       return;
     }
 
@@ -2100,7 +2200,7 @@ G.Me = {
     const cam = G.R.camera, def = this.cur().def;
     // at a viewer: your eyes at its eyepieces, the view narrowed to its power, the gun out of sight
     this.viewerMask(!!this.viewer);
-    if (G.R.vmRoot) G.R.vmRoot.visible = !this.viewer;
+    if (G.R.vmRoot) G.R.vmRoot.visible = !this.viewer && !this.climb && !this.zipRide; // (on a ladder or a zipline: your hands are on it, holdArms)
     if (this.viewer) {
       const v = this.viewer.v, V = this.VIEWER;
       this.yaw = v.yaw + G.U.clamp(G.U.angDiff(v.yaw, this.yaw), -V.YAW, V.YAW); this.pitch = G.U.clamp(this.pitch, -V.DOWN, V.UP);
@@ -2143,6 +2243,7 @@ G.Me = {
     const sg = this.sight(this.cur());
     const fov = G.Game.settings.fov * G.U.lerp(1, sg.scoped ? 0.8 : sg.zoom, this.adsT);
     if (Math.abs(cam.fov - fov) > 0.05) { cam.fov = fov; cam.updateProjectionMatrix(); }
+    this.holdArms(cam);
 
     const vm = G.R.vm;
     if (!vm) return;
@@ -2415,7 +2516,7 @@ G.Me = {
     return {
       p: [r2(this.pos.x), r2(this.pos.y), r2(this.pos.z)], yw: r2(this.yaw), pt: r2(this.pitch),
       hp: Math.ceil(this.hp), mhp: this.maxHp(), ar: Math.round(this.vestCond() * 100), amx: G.Gear.piece(this, 'chest') ? 100 : 0,
-      pr: this.prone ? 1 : 0, sd: this.seat != null ? 1 : 0, dn: this.down ? 1 : 0, uc: this.out ? 1 : 0, dd: this.dead ? 1 : 0, bl: this.down ? (this.bleed == null ? -1 : Math.ceil(this.bleed)) : 0, bd: this.body ? G.Med.encode(this.body) : null,
+      pr: this.prone ? 1 : 0, bp: this.bipodT > 0.5 ? 1 : 0, cl: this.climb ? 1 : 0, zp: this.zipRide ? 1 : 0, sd: this.seat != null ? 1 : 0, dn: this.down ? 1 : 0, uc: this.out ? 1 : 0, dd: this.dead ? 1 : 0, bl: this.down ? (this.bleed == null ? -1 : Math.ceil(this.bleed)) : 0, bd: this.body ? G.Med.encode(this.body) : null,
       w: this.cur().def.code, ac: G.Ballistics.armourState(this), sk: G.Stickers.share(this.cur().stickers) || undefined, tl: this.tacFlags(this.cur()), cr: this.crouch || this.down || this.prone ? 1 : 0, ln: r2(this.lean || 0), lr: this.lowReady ? 1 : 0, sd: this.steadying ? 1 : 0, sw: this.stowed || this.held ? 1 : 0,
       hk: this.held ? (this.held.kind === 'flash' ? 2 : 1) : 0, hc: this.held && this.held.cock ? 1 : 0, hs: this.held ? this.held.str : 0,
       ld: G.loaded(this.cur()) > 0 ? 1 : 0, rl: this.reloading && this.reloadTotal ? r2(G.U.clamp(1 - this.reloadT / this.reloadTotal, 0, 1)) : -1, in: this.inspectT > 0 && this.inspectDur ? r2(1 - this.inspectT / this.inspectDur) : this.rChk ? r2(0.58 + (G.VMAnim.INSPECT_HOLD - 0.58) * this.rChk.k) : -1,

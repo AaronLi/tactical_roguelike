@@ -1924,7 +1924,8 @@ G.Furniture = (() => {
 
     // furniture
     for (const p of map.propList || new Set(map.props.values())) {
-      frame = new T.Matrix4().compose(new T.Vector3(p.x, 0, p.z), new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), p.q * Math.PI / 2), new T.Vector3(1, 1, 1));
+      // (gy: on rolling ground, a rock or a tree where it lies: G.Level.crestGround)
+      frame = new T.Matrix4().compose(new T.Vector3(p.x, p.gy || 0, p.z), new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), p.q * Math.PI / 2), new T.Vector3(1, 1, 1));
       sink = !!p.gone; cur = p.own ? G.U.rng(Math.floor(p.v * 4294967295)) : rnd0; // (p.gone, p.own: js/homes.js)
       R[p.name].build(k, p.v, p.style);
     }
@@ -1964,6 +1965,20 @@ G.Furniture = (() => {
       const x0 = rm.x * TS, z0 = rm.z * TS, w = rm.w * TS, d = rm.h * TS;
       let drop = false;
       for (let z = rm.z; z < rm.z + rm.h && !drop; z++) for (let x = rm.x; x < rm.x + rm.w; x++) if (t[z * W + x] === 5 && !(rm.out && map.out[z * W + x])) { drop = true; break; } // (outdoors upstairs, open air's no hole in it)
+      // on rolling ground (map.terrain: the Sandia Crest's), over it as it lies: a corner at each of the cells' (split as the
+      // ground is, so it sits the same few millimetres over it everywhere)
+      const tr = map.terrain;
+      if (tr && rm.out && rm.flush && !drop) {
+        let hilly = false;
+        for (let z = rm.z; z <= rm.z + rm.h && !hilly; z++) for (let x = rm.x; x <= rm.x + rm.w; x++) if (tr.v[z * tr.VW + x] > 1e-3) { hilly = true; break; }
+        if (hilly) {
+          const g = new T.PlaneGeometry(w, d, rm.w, rm.h), p = g.attributes.position;
+          for (let k = 0; k < p.count; k++) p.setZ(k, G.World.terrainAt(tr, x0 + w / 2 + p.getX(k), z0 + d / 2 - p.getY(k))); // (the plane's z is up once it's laid flat)
+          g.computeVertexNormals();
+          place(g, fm, x0 + w / 2, y, z0 + d / 2, 0, -Math.PI / 2);
+          return;
+        }
+      }
       if (rm.out && !drop && !rm.flush) place(new T.PlaneGeometry(w + 2 * TS, d + TS), fm, x0 + w / 2, y, z0 + d / 2, 0, -Math.PI / 2); // (flush: outdoors, but up against the next room's ground, not over it)
       else if (!drop) place(new T.PlaneGeometry(w, d), fm, x0 + w / 2, y, z0 + d / 2, 0, -Math.PI / 2);
       else for (let z = Math.max(0, rm.z - (rm.out ? 1 : 0)), x0 = Math.max(0, rm.x - (rm.out ? 1 : 0)), ze = Math.min(map.H, rm.z + rm.h + (rm.out ? 1 : 0)), xe = Math.min(W, rm.x + rm.w + (rm.out ? 1 : 0)), gap = (i) => (rm.out ? !map.out[i] : t[i] === 5); z < ze; z++) for (let x = x0; x < xe;) { // (round a drop in the floor: a strip per run of floor. A roof: round what's built on it too, out to its edge)

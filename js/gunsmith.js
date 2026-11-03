@@ -275,7 +275,9 @@ G.GunsmithUI = (() => {
   const fromStash = (pid) => { const s = stash(); if (!s[pid]) return false; if (--s[pid] <= 0) delete s[pid]; return true; };
   // for sale: what he has in stock, and always the right core part for a gun that's missing one or has one
   // that doesn't fit (its own barrel, after a receiver swap)
-  const forSale = (p) => (!p.factory && G.Shop.partStock && G.Shop.partStock.has(p.id) && G.Shop.inStock('part:' + p.id)) || needed(p);
+  // (Timberline's too: the precision showcase by the hangar door, js/hangar.js. Its own section in the list.)
+  const forSale = (p) => (!p.factory && G.Shop.partStock && G.Shop.partStock.has(p.id) && G.Shop.inStock('part:' + p.id)) || atShowcase(p) || needed(p);
+  const atShowcase = (p) => !p.factory && !!G.Shop.precStock && G.Shop.precStock.includes(p.id) && G.Shop.inStock('part:' + p.id);
   const needed = (p) => { const w = weapon(), d = w && w.def; return !!d && GS.PLATFORMS[d.id].defaults[p.slot] === p.id && d.missing.includes(p.slot); };
   // does the store have a part for this slot of the gun you're working on (one that fits it, and isn't the one on it)?
   // Its dot on the model and its row in the list get a "!".
@@ -430,7 +432,7 @@ G.GunsmithUI = (() => {
       const bad = p && !GS.fitsSlot(s, p, def.id);
       slotRows += `<div class="gs-slot${s.slot === st.slot ? ' on' : ''}${s.parent ? ' sub' : ''}${bad || (!p && s.req) ? ' misfit' : ''}" data-gslot="${s.slot}"><span>${GS.slotLabel(s)}${s.req ? '' : ' <small>opt.</small>'}${buyable(s.slot) ? ' <i class="gs-bang" title="Parts for it in the store">!</i>' : ''}</span><b>${p ? G.U.esc(p.name) : s.slot === 'loader' ? '<em>by hand</em>' : '<em>empty</em>'}<i>${bad ? `doesn't fit the ${G.U.esc(GS.ifaceName(s.mount))}: it won't fire` : G.U.esc(GS.ifaceName(s.mount))}</i></b></div>`;
     }
-    // parts that fit the picked slot: fitted, in your stash, for sale, then the rest (out of stock / later)
+    // parts that fit the picked slot: fitted, in your stash, for sale (his, then Timberline's), then the rest (out of stock / later)
     const cur = slots.find((s) => s.slot === st.slot);
     let list = '';
     if (cur) {
@@ -438,17 +440,19 @@ G.GunsmithUI = (() => {
       const fitted = GS.PARTS[build[cur.slot]], skins = cur.slot === 'grip' ? GS.skins(def.id) : [], skinned = skins.includes(fitted);
       const plainOut = (p) => (skinned ? GS.plainGrip(p) : GS.plainHere(p, def.id));
       const parts = GS.compatible(cur.mount).filter((p) => (!p.factory || p.plat === def.id || (Me.stash || {})[p.id] || build[cur.slot] === p.id) && !(p.not || []).includes(def.id) && (!plainOut(p) || (Me.stash || {})[p.id] || build[cur.slot] === p.id));
-      const rank = (p) => (build[cur.slot] === p.id ? 0 : (Me.stash || {})[p.id] ? 1 : forSale(p) ? 2 : 3);
+      const rank = (p) => (build[cur.slot] === p.id ? 0 : (Me.stash || {})[p.id] ? 1 : atShowcase(p) && !needed(p) ? 3 : forSale(p) ? 2 : 4);
       parts.sort((a, b) => rank(a) - rank(b) || a.price - b.price);
+      let head = false;
       for (const p of parts) {
         const r = rank(p), n = (Me.stash || {})[p.id] || 0, factoryHere = p.factory && p.plat === def.id;
+        if (r === 3 && !head) { head = true; list += '<div class="gs-sub">At Timberline Outfitters <small>(by the hangar door)</small></div>'; }
         let action;
-        if (r === 0) action = cur.req ? '<span class="tag">Fitted</span>' : `<button class="btn small" data-gremove="${cur.slot}">Remove</button>`;
-        if (r === 0 && skinned && skins.length > 1) action = `<select class="gs-skin" data-gskin ${G.Shop.ready ? 'disabled' : ''}>${skins.map((q) => `<option value="${q.id}"${q === p ? ' selected' : ''}>${G.U.esc(q.name)}</option>`).join('')}</select>`;
+        if (r === 0 && !(skinned && skins.length > 1)) action = cur.req ? '<span class="tag">Fitted</span>' : `<button class="btn small" data-gremove="${cur.slot}">Remove</button>`;
+        else if (r === 0) action = `<select class="gs-skin" data-gskin ${G.Shop.ready ? 'disabled' : ''}>${skins.map((q) => `<option value="${q.id}"${q === p ? ' selected' : ''}>${G.U.esc(q.name)}</option>`).join('')}</select>`;
         else if (r === 1) action = `<button class="btn small buy" data-ginstall="${p.id}">Fit (stash ×${n})</button> <button class="btn small" data-gsell="${p.id}">Sell ¢${G.U.fmt(GS.sellPrice(p))}</button>`;
-        else if (r === 2) action = `<button class="btn small buy" data-ginstall="${p.id}" ${Me.credits < GS.buyPrice(p) ? 'disabled' : ''}>¢${G.U.fmt(GS.buyPrice(p))}</button>`;
+        else if (r === 2 || r === 3) action = `<button class="btn small buy" data-ginstall="${p.id}" ${Me.credits < GS.buyPrice(p) ? 'disabled' : ''}>¢${G.U.fmt(GS.buyPrice(p))}</button>`;
         else action = `<span class="tag">${factoryHere ? 'Comes with the gun' : p.tier > Math.min(3, 1 + Math.floor((G.Shop.level || 1) / 2)) ? 'Available later' : 'Out of stock'}</span>`;
-        list += `<div class="gs-part${r === 0 ? ' fitted' : ''}${r === 3 ? ' na' : ''}" data-gpart="${p.id}">
+        list += `<div class="gs-part${r === 0 ? ' fitted' : ''}${r === 4 ? ' na' : ''}" data-gpart="${p.id}">
           <div class="gs-pn"><small>${G.U.esc(p.brand)}</small>${G.U.esc(p.name)}${fitsLine(p, def.id)}</div>
           <div class="gs-pe">${partEffects(p) || '<span>—</span>'}</div>
           <div class="gs-pa">${action}</div></div>`;

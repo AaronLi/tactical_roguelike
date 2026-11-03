@@ -489,7 +489,7 @@ G.VMAnim = (() => {
     if (pl.reloading && pl.reloadTotal) {
       const t = G.U.clamp(1 - pl.reloadT / pl.reloadTotal, 0, 1);
       if (reload === 'shell') pose = shellClip(t, h);
-      else if (reload === 'revolver') pose = a.def.shell ? revolverRound(t, h, pl) : revolverClip(t, h);
+      else if (reload === 'revolver') pose = pl.revHand(a.def) ? revolverRound(t, h, pl) : revolverClip(t, h);
       else if (reload === 'break') pose = breakClip(t, h, pl.reloadN, pl);
       else if (reload === 'enbloc') pose = enblocClip(t, h);
       else if (reload === 'bow') pose = bowClip(t, h);
@@ -577,6 +577,7 @@ G.VMAnim = (() => {
       if (an.cyl && A.cylHome) { const k = pose ? pose.cyl : 0; an.cyl.position.copy(A.cylHome); an.cyl.position.x -= 0.05 * k; an.cyl.position.y -= 0.016 * k; /* (swung clear of the frame) */ }
       if (an.brk) an.brk.rotation.x = (pose ? pose.brk : 0) * (A.load ? A.load.pitch : A.breech ? A.breech.pitch : -0.55); // (a derringer's hinge is at the top of the barrels' back: they tip up, muzzles first)
       if (an.cover) an.cover.rotation.x = (pose ? pose.cover : 0) * 1.1;
+      if (an.bipod) G.GunModels.bipodPose(an.bipod, pl.bipodT || 0); // (down on the ground or a ledge: js/player.js bipodStep)
       if (an.pump && pose && pose.pump != null) an.pump.position.z = pose.pump * PUMP;
       if (an.lever) an.lever.rotation.x = (pose && pose.lever != null ? pose.lever : cyc && a.k.action === 'lever' ? cyc : 0) * 0.9;
       if (an.bolt && A.boltHome) { const b = (pose && pose.bolt) || [0, 0]; an.bolt.rotation.z = b[0] * BOLT_LIFT; an.bolt.position.z = A.boltHome.z + b[1] * BOLT_BACK; } // (worked by hand: js/player.js rack)
