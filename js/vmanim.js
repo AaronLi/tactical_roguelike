@@ -515,7 +515,7 @@ G.VMAnim = (() => {
 
     // After the viewmodel is posed: parts and hands.
   function apply(pl, vm, cyc) {
-    const u = vm.userData, a = u.vma;
+    const a = vm.userData.vma;
     if (!a) return;
     const pose = a.pose, w = pl.cur();
     vm.updateMatrix();

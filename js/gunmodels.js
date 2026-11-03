@@ -1643,7 +1643,7 @@ G.GunModels = (() => {
     let front = len;
     if (sl.comp) { const fb = len - 0.014, y1 = tr && tr.noseTop ? V([0, tr.noseTop])[1] : topAt(fb), y0 = ts ? along(ts.lo, fb) : 0.001; k.box(w, y1 - y0, 0.03, sm, len, (y1 + y0) / 2); front += 0.03; }
     k.tag('base');
-    const ch = o.chassis ? pistolChassis(k, o, len, w, p0, p1) : null;
+    const ch = o.chassis ? pistolChassis(k, o, len, w, p0, p1, anim) : null;
     if (ch) { /* (the frame's inside it) */ } else if (tr) tracedParts(k, tr, V, 'base', mats);
     else {
       k.prof([[0.004, 0.002], [len * 0.92, 0.002], [len * 0.92, -0.014], [0.07, -0.016], [0.05, -0.012], [0.004, -0.012]], w - 0.002, fm);
@@ -1724,7 +1724,7 @@ G.GunModels = (() => {
   // over the top; a grip round the magazine well and a big trigger guard; a rail each side and one under the shroud; an
   // SMG stock mount at the back. The slide still runs inside it. Returns its sights (drawn after the rest: sights(anim)),
   // where the other hand goes, and how far the shroud runs.
-  function pistolChassis(k, o, len, w, p0, p1) {
+  function pistolChassis(k, o, len, w, p0, p1, anim) {
     const C = M.polymer(), B = M.black(), W = w + 0.014, f0 = -0.05, fN = len + 0.045, rl = fN - f0;
     k.tag('grip');
     // the lower: under the frame from the stock mount to the shroud's front, its belly down to the bottom rail

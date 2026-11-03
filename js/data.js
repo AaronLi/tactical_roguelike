@@ -348,7 +348,7 @@ G.THEMES = [
   // the first deployment of a run (js/route.js: never anywhere else): a small corner store, its weapon case, attachments
   // box and first aid cabinet always in its stockroom to get you started
   { name: 'Convenience Store', layout: 'mart', starter: true, foes: 0.8, crowd: 1.5, home: 0, reflect: 0.35, floor: '#cfd3cd', wall: '#e6e2d6', crate: '#8a6a3a', fog: 0x0d0f12, light: 0xf2f6ff, ceil: '#e8e8e2' },
-  { name: 'Festival', layout: 'festival', fence: 'hoarding', home: 0, reflect: 0.2, floor: '#26331f', wall: '#5b7480', crate: '#8a6a3a', fog: 0x060912, light: 0xffe2c0, ceil: '#d8dcde', fogNear: 30, fogFar: 150, hemi: 0x5a6a96, hemiI: 0.55, crowd: 2, foes: 1.5, night: 35 },
+  { name: 'Festival', layout: 'festival', fence: 'hoarding', from: 2, home: 0, reflect: 0.2, floor: '#26331f', wall: '#5b7480', crate: '#8a6a3a', fog: 0x060912, light: 0xffe2c0, ceil: '#d8dcde', fogNear: 30, fogFar: 150, hemi: 0x5a6a96, hemiI: 0.55, crowd: 2, foes: 1.5, night: 35 },
   // the top of the Sandia Mountains over Albuquerque at sundown, outdoors: two summits of pink granite with a gorge between,
   // long sight lines across it (a sniper's level), the city's lights coming on far below. rock: the walls are outcrops
   // (js/level.js buildMesh); far: how far the camera sees (the view off the mountain); lookouts: more marksmen among them;
