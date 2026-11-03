@@ -243,10 +243,19 @@ G.World = (() => {
   // the highest surface under someone at (x, z) with their feet at y: the top of anything under them no higher
   // than a step up (-Infinity: nothing, they're falling into the void)
   // smooth: a walker's ground (stairs as their slope, not their treads: rampAt)
+  // Rolling ground (a level's terrain: G.Level.crestGround): its height at (x, z), across a cell the two triangles between
+  // its corners (corner 00 to 10 to 01, and 10 to 11 to 01), as it's drawn. 0 off it.
+  function terrainAt(tr, x, z) {
+    const fx = x / tr.TS, fz = z / tr.TS, cx = Math.floor(fx), cz = Math.floor(fz);
+    if (cx < 0 || cz < 0 || cx >= tr.VW - 1 || cz >= tr.VH - 1) return 0;
+    const u = fx - cx, q = fz - cz, k = cz * tr.VW + cx, v = tr.v, a = v[k], b = v[k + 1], c = v[k + tr.VW], d = v[k + tr.VW + 1];
+    return u + q <= 1 ? a + (b - a) * u + (c - a) * q : d + (c - d) * (1 - u) + (b - d) * (1 - q);
+  }
   function groundAt(w, x, z, r, y, step = STEP, smooth = false) {
     let g = -Infinity;
     const k = r * 0.6;
     query(w, [x - k, y - 50, z - k], [x + k, y + step, z + k], (s) => { if (s.move && !(smooth && s.stair) && s.max[1] <= y + step + 1e-6 && s.max[1] > g) g = s.max[1]; });
+    if (w.terrain) { const th = terrainAt(w.terrain, x, z); if (th <= y + step + 1e-6 && th > g) g = th; } // (walked on as it lies: its blocks are for rays)
     if (smooth) for (const st of w.ramps || []) {
       const q = rampAt(st, x, z);
       if (q.across && q.u > 0 && q.u < q.len && q.h <= y + step + 1e-6 && q.h > g) g = q.h;
@@ -307,6 +316,17 @@ G.World = (() => {
       // steel grating (a catwalk): it holds you up, and eyes go through it from above and below; a round goes between its bars, or meets one (barHit)
       if (gr) for (const [x0, z0, x1, z1] of rects((i) => gr[i] && t[i] !== 5)) add(w, box(x0 * TS, Y - 0.05, z0 * TS, (x1 + 1) * TS, Y, (z1 + 1) * TS, { kind: 'grate', ray: false, bars: true }));
     }
+    // rolling ground over it (map.terrain): for rays and sight, a block under each cell up to its corners' mean (5 cm
+    // steps, merged); feet go by the slope itself (groundAt), so the blocks don't stop anyone
+    if (map.terrain && o.ground !== false) {
+      const tr = map.terrain, q = new Int16Array(W * H), tops = new Set();
+      for (let i = 0; i < W * H; i++) {
+        const x = i % W, z = (i / W) | 0, k = z * tr.VW + x, m = (tr.v[k] + tr.v[k + 1] + tr.v[k + tr.VW] + tr.v[k + tr.VW + 1]) / 4;
+        q[i] = Math.round(m / 0.05); if (q[i] > 0) tops.add(q[i]);
+      }
+      for (const n of tops) for (const [x0, z0, x1, z1] of rects((i) => q[i] === n)) add(w, box(x0 * TS, Y - 0.5, z0 * TS, (x1 + 1) * TS, Y + n * 0.05, (z1 + 1) * TS, { kind: 'floor', terrain: true, move: false }));
+      w.terrain = tr;
+    }
     // ceilings over everything indoors (not under a drop in the floor above)
     for (const [x0, z0, x1, z1] of rects((i) => !map.out[i] && !(va && va[i]))) add(w, box(x0 * TS, Y + WH, z0 * TS, (x1 + 1) * TS, Y + WH + 0.3, (z1 + 1) * TS, { kind: 'ceil' }));
     // walls (not where a window is: its own solids below), and the solid edge round the map
@@ -315,13 +335,13 @@ G.World = (() => {
     // (on a mountain top it reaches down to the gorge's floor, and rounds fly on over it: there's only air past the wall)
     for (const b of [[-E, 0, -E, 0, WH, H * TS + E], [W * TS, 0, -E, W * TS + E, WH, H * TS + E], [0, 0, -E, W * TS, WH, 0], [0, 0, H * TS, W * TS, WH, H * TS + E]]) { b[1] = Y - SK - (map.chasm || 0); b[4] += Y; add(w, box(...b, { kind: 'wall', edge: true, ray: !map.chasm })); }
     // furniture and fences: each piece's boxes (a piece hangs on every tile it covers: once each)
-    const fromB = (b, q) => box(b.cx - b.hx, Y + b.y0, b.cz - b.hz, b.cx + b.hx, Y + b.h, b.cz + b.hz, q);
+    const fromB = (b, q, gy = b.gy || 0) => box(b.cx - b.hx, Y + gy + b.y0, b.cz - b.hz, b.cx + b.hx, Y + gy + b.h, b.cz + b.hz, q); // (gy: a piece on rolling ground)
     const seen = new Set();
     for (const [i, p] of map.props || []) {
       if (seen.has(p)) continue;
       seen.add(p);
       for (const b of p.boxes) {
-        if (b.ray) { add(w, fromB(b, { kind: 'prop', prop: p, ray: false })); for (const q of b.ray) add(w, fromB(q, Object.assign({ kind: 'prop', prop: p, move: false }, q.m ? { mat: G.Materials.PARTS[q.m] } : null))); }
+        if (b.ray) { add(w, fromB(b, { kind: 'prop', prop: p, ray: false })); for (const q of b.ray) add(w, fromB(q, Object.assign({ kind: 'prop', prop: p, move: false }, q.m ? { mat: G.Materials.PARTS[q.m] } : null), b.gy || 0)); }
         else add(w, fromB(b, { kind: 'prop', prop: p }));
       }
     }
@@ -393,5 +413,5 @@ G.World = (() => {
     }
   }
 
-  return { CELL, STEP, HEIGHT, GLASS_SEE, create, add, remove, reshape, box, raycast, span, los, see, query, resolve, groundAt, rampAt, ceilingAt, fromTileMap, stairs, door, windowSolids };
+  return { CELL, STEP, HEIGHT, GLASS_SEE, create, add, remove, reshape, box, raycast, span, los, see, query, resolve, groundAt, terrainAt, rampAt, ceilingAt, fromTileMap, stairs, door, windowSolids };
 })();

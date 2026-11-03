@@ -249,8 +249,12 @@ G.InvUI = (() => {
   }
   // a container's grids: a pouch's or pack's own, or a carrier's or belt's MOLLE and the pouches on it
   const isContainer = (it) => !!(it.grids || it.molle);
+  // in the team locker: the host only hears where its items sit, not what's in them (G.Game.teamSync), so nothing
+  // there is opened or changed in place (or what you took out of a belt there would still be in it for everyone else)
+  const inTeam = (src) => !!(src && src.g && src.g.team);
+  const TEAM_NO = 'Take it out of the team locker first';
   // open-able: a container that isn't on you already (worn, or a pouch on what you wear)
-  const canOpen = (me, src) => (src.it.k === 'gun' && !src.gunPart) || (isContainer(src.it) && !src.slot && !GG().molles(me).includes(src.g));
+  const canOpen = (me, src) => !inTeam(src) && ((src.it.k === 'gun' && !src.gunPart) || (isContainer(src.it) && !src.slot && !GG().molles(me).includes(src.g)));
   // the part items fitted to a gun (one per slot, kept so they keep their uid), and the magazine in it
   const fittedItems = new WeakMap(), magItems = new WeakMap();
   function fittedItem(w, slot, pid) {
@@ -567,8 +571,8 @@ G.InvUI = (() => {
     cabSync();
     if (!field) G.Game.teamSync();
     closeMenu();
-    // gone, sold, or now worn (on you, or a pouch mounted on what you wear): closed
-    opened = opened.filter((uid) => { const s = locate(me, uid); return s && (s.it.k === 'gun' || (!s.slot && !GG().molles(me).includes(s.g))); });
+    // gone, sold, now worn (on you, or a pouch mounted on what you wear) or put in the team locker: closed
+    opened = opened.filter((uid) => { const s = locate(me, uid); return s && !inTeam(s) && (s.it.k === 'gun' || (!s.slot && !GG().molles(me).includes(s.g))); });
     let body = `<div class="inv-sec"><h4>Pockets</h4><div class="inv-row">${me.pockets.map((g) => gridHTML(g)).join('')}</div></div>`;
     if (k.carrier && k.carrier.molle) body += molleHTML(k.carrier);
     if (k.belt && k.belt.molle) body += molleHTML(k.belt);
@@ -636,6 +640,9 @@ G.InvUI = (() => {
     if (field && t.closest('[data-drop]')) { dropIt(me, src); return rerender(); }
     // a box dropped on a magazine loads it
     const target = onItem && locate(me, +onItem.dataset.uid);
+    if (inTeam(target) && target.it !== d.it && ((d.it.k === 'med' && target.it.k === 'med') || (d.it.k === 'ammo' && ['ammo', 'mag', 'gun'].includes(target.it.k)) || (['mag', 'part'].includes(d.it.k) && target.it.k === 'gun'))) {
+      G.HUD.toast('', TEAM_NO, 1.5); G.Audio.deny(); return rerender();
+    }
     if (target && target.it !== d.it && d.it.k === 'med' && target.it.k === 'med' && d.it.mt === target.it.mt && GG().medStack(d.it) > 1) {
       if (!GG().mergeMed(d.it, target.it)) { G.HUD.toast('', 'That stack is full', 1.2); G.Audio.deny(); return rerender(); }
       if ((d.it.n || 0) <= 0) detach(me, src);
@@ -775,6 +782,7 @@ G.InvUI = (() => {
   }
   // open a container (one you're wearing is already shown under "On you")
   function open(me, src) {
+    if (inTeam(src)) return G.HUD.toast('', TEAM_NO, 1.5);
     if (src.it.k !== 'gun' && (src.slot || GG().molles(me).includes(src.g))) return G.HUD.toast('', 'You are wearing it: its contents are under On you', 1.5);
     opened = [src.it.uid, ...opened.filter((u) => u !== src.it.uid)].slice(0, 4);
     G.Audio.click();
@@ -847,7 +855,7 @@ G.InvUI = (() => {
       if (!src.gunMag) Gr.guns(me).forEach((w, i) => { if (isMagGun(w) && G.magFits(it.wid, w.def.id) && w !== (src.gunMag || null)) out.push(['magto', `Put in your ${w.def.name}${w.noMag ? '' : ' (swap)'}`, i]); });
     }
     if (it.k === 'ammo') {
-      let others = 0; Gr.each(grids(me), (b) => { if (b !== it && b.k === 'ammo' && b.key === it.key && b.am === it.am) others++; });
+      let others = 0; Gr.each(grids(me).filter((g) => !g.team), (b) => { if (b !== it && b.k === 'ammo' && b.key === it.key && b.am === it.am) others++; });
       if (others && (it.n < it.cap || others > 1)) out.push(['combine', `Combine with your other ${G.AMMO[it.am] ? G.AMMO[it.am].tag + ' ' : ''}boxes (${others})`]);
     }
     if (it.k === 'ammo' && it.n) {
@@ -891,7 +899,7 @@ G.InvUI = (() => {
     fillfrom: (me, src) => { GG().each(grids(me), (m) => { if (m.k === 'mag' && m.n < m.cap && G.calOf(G.WEAPONS[m.wid]) === src.it.key) queue(loadJob(m, src.it)); }); },
   };
   const doAct = {
-    combine: (me, src) => { const n = GG().combine(grids(me), src.it.key, src.it.am); toast(n, 'Combined:'); G.Audio.click(); },
+    combine: (me, src) => { const n = GG().combine(grids(me).filter((g) => !g.team), src.it.key, src.it.am); toast(n, 'Combined:'); G.Audio.click(); },
     magout: (me, src) => { const m = magItem(src.it.w); if (field && !GG().roomFor(me, m)) return G.HUD.toast('', 'No room on you for the magazine', 1.5); detach(me, { gunMag: src.it.w }); GG().stow(me, m); G.Audio.click(); },
     magin: (me, src) => { const m = bestMag(me, src.it.w); if (m) intoGun(me, locate(me, m.uid), src.it); },
     magto: (me, src, i) => { const w = GG().guns(me)[+i]; if (w) intoGun(me, src, GG().gunItem(w)); },
@@ -916,7 +924,7 @@ G.InvUI = (() => {
     if (!src) return;
     const Gr = GG(), acts = [];
     if (canOpen(me, src)) acts.push(['open', src.it.k === 'gun' ? 'Open (parts, magazine)' : 'Open']);
-    acts.push(...itemActs(me, src));
+    if (!inTeam(src)) acts.push(...itemActs(me, src));
     const q = field ? null : quickLabel(me, src);
     if (q && !(src.gunPart && cantDetach(src))) acts.push(['move', src.gunPart ? 'Take off (to locker)' : src.gunMag ? 'Take out (to locker)' : q]);
     if (field && !src.gunPart) acts.push(['drop', 'Drop on the ground']);

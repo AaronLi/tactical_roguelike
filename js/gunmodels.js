@@ -85,6 +85,7 @@ G.GunModels = (() => {
       // animated sub-assembly pivoting at (f, y); parts added after into() use absolute gun coordinates
       part(f = 0, y = 0) { const p = new T.Group(); p.position.set(0, y, -f); g.add(p); return p; },
       into(p, f = 0, y = 0) { tgt = p || g; of = p ? f : 0; oy = p ? y : 0; },
+      get inPart() { return tgt !== g; },
       box: (w, h, len, m, f0, y = 0, x = 0) => put(new T.BoxGeometry(w, h, len), m, x, y, f0 + len / 2),
       // cylinder along the bore from f0 to f0 + len (rRear at f0, rFront at the far end)
       cyl(r, len, m, f0, y = 0, x = 0, rFront = r, seg = 16, open = false) {
@@ -750,8 +751,25 @@ G.GunModels = (() => {
   }
 
   // ---------------------------------------------------------------- attachments
+  // A bipod leg hinged at (f, y): drawn by draw() in gun coordinates, on a part of its own that swings it down to stand
+  // the gun on (anim.bipod, posed by bipodPose). back: folded back along the gun (its foot behind the hinge), else forward.
+  // (Inside another moving part it's drawn fixed, folded.)
+  function bipodLeg(k, anim, f, y, x, back, draw) {
+    if (!anim || k.inPart) { draw(); return; }
+    const p = k.part(f, y);
+    k.into(p, f, y); draw(); k.into(null);
+    (anim.bipod || (anim.bipod = [])).push({ p, back, side: Math.sign(x) || 1 });
+  }
+  // The legs down by k (0 folded, 1 standing the gun up): about their hinges to point at the ground, splayed a little.
+  // legs: anim.bipod (the viewmodel's), or a world model's userData.bipod (js/rig.js).
+  const BIPOD_SPLAY = 0.2;
+  function bipodPose(legs, k) {
+    if (!legs) return;
+    const e = k * k * (3 - 2 * k);
+    for (const l of legs) (l.sub || l.p).rotation.set(e * (l.back ? 1 : -1) * Math.PI / 2, e * l.side * BIPOD_SPLAY * (l.back ? 1 : -1), 0);
+  }
   // Foregrips hang under the handguard at forward position f.
-  function foregrip(k, t, f, m) {
+  function foregrip(k, t, f, m, anim) {
     switch (t) {
       case 'vertical': k.prof([[f - 0.012, -0.022], [f + 0.016, -0.022], [f + 0.014, -0.11], [f - 0.01, -0.11]], 0.026, m); break;
       case 'angled': k.prof([[f - 0.045, -0.022], [f + 0.03, -0.022], [f + 0.012, -0.058], [f - 0.03, -0.05]], 0.026, m); break;
@@ -760,11 +778,11 @@ G.GunModels = (() => {
       case 'bipod': // a folding bipod: its clamp on the rail, the yoke across under it, the legs folded forward (steel extensions, rubber feet)
         k.box(0.034, 0.02, 0.036, M.black(), f - 0.018, -0.032);
         k.box(0.052, 0.012, 0.022, M.black(), f - 0.012, -0.046);
-        for (const x of [-0.019, 0.019]) {
+        for (const x of [-0.019, 0.019]) bipodLeg(k, anim, f - 0.004, -0.048, x, false, () => {
           k.cyl(0.0058, 0.13, M.black(), f - 0.004, -0.048, x);
           k.cyl(0.0043, 0.1, M.steel(), f + 0.126, -0.048, x);
           k.box(0.016, 0.014, 0.018, M.rubber(), f + 0.226, -0.048, x);
-        }
+        });
         k.cyl(0.003, 0.03, M.steel(), f - 0.004, -0.046, 0); // (the spring between the legs)
         break;
     }
@@ -1015,7 +1033,7 @@ G.GunModels = (() => {
       const [cf0] = V([648, 0]), [cf1] = V([695, 0]), [lf] = V([520, 0]);
       k.cyl(0.034, cf1 - cf0, B, cf0, ty);
       k.box(0.026, V([0, 85])[1] - V([0, 145])[1], 0.03, B, cf0 + 0.008, (V([0, 85])[1] + V([0, 145])[1]) / 2);
-      for (const x of [-1, 1]) { k.cyl(0.006, cf0 + 0.02 - lf, B, lf, V([0, 132])[1], x * (tR + 0.008)); k.box(0.016, 0.008, 0.02, D, lf, V([0, 132])[1], x * (tR + 0.008)); }
+      for (const x of [-1, 1]) bipodLeg(k, anim, cf0 + 0.02, V([0, 132])[1], x, true, () => { k.cyl(0.006, cf0 + 0.02 - lf, B, lf, V([0, 132])[1], x * (tR + 0.008)); k.box(0.016, 0.008, 0.02, D, lf, V([0, 132])[1], x * (tR + 0.008)); });
       top = S.rail(k, V([212, 0])[0], V([640, 0])[0] - V([212, 0])[0], V([0, 88])[1], rm);
     } else if (rcv === 'qbz95') {
       // The QBZ-95 (Type 95), traced from a side photo of the right side (Wikimedia Commons, "QBZ95 automatic rifle mod
@@ -1418,11 +1436,11 @@ G.GunModels = (() => {
       anim.pump = p;
     }
     k.tag('base');
-    if (o.bipod) for (const x of [-0.012, 0.012]) { k.cyl(0.004, 0.2, M.black(), L + o.bipod - 0.2, -0.032, x); k.box(0.012, 0.008, 0.01, M.rubber(), L + o.bipod - 0.21, -0.032, x); }
+    if (o.bipod) for (const x of [-0.012, 0.012]) bipodLeg(k, anim, L + o.bipod, -0.032, x, true, () => { k.cyl(0.004, 0.2, M.black(), L + o.bipod - 0.2, -0.032, x); k.box(0.012, 0.008, 0.01, M.rubber(), L + o.bipod - 0.21, -0.032, x); });
     if (o.vfg != null) k.prof([[L + o.vfg - 0.012, -0.022], [L + o.vfg + 0.016, -0.022], [L + o.vfg + 0.014, -0.11], [L + o.vfg - 0.01, -0.11]], 0.026, o.vfgM || fm);
     let fgF = null;
-    if (o.fg && !hgLen && o.fgAt != null) { k.tag('fg'); fgF = o.fgAt; foregrip(k, o.fg, fgF, fm); } // (a rail under the receiver itself: the SCAR's)
-    else if (o.fg && hgLen) { k.tag('fg'); fgF = rcv === 'vector' && o.hg && o.hg.t === 'vector' ? L - 0.05 : hgF + Math.min(hgLen * 0.35, 0.09, hgLen - 0.04); foregrip(k, o.fg, fgF, fm); } // (the Vector's: on the rail under the front of the upper) // (near the rail's back: the support arm bent, the gun out in front)
+    if (o.fg && !hgLen && o.fgAt != null) { k.tag('fg'); fgF = o.fgAt; foregrip(k, o.fg, fgF, fm, anim); } // (a rail under the receiver itself: the SCAR's)
+    else if (o.fg && hgLen) { k.tag('fg'); fgF = rcv === 'vector' && o.hg && o.hg.t === 'vector' ? L - 0.05 : hgF + Math.min(hgLen * 0.35, 0.09, hgLen - 0.04); foregrip(k, o.fg, fgF, fm, anim); } // (the Vector's: on the rail under the front of the upper) // (near the rail's back: the support arm bent, the gun out in front)
     // a clamp-on rail mount: a collar round the barrel (or the can), in front of any jacket, a short rail on one side or both
     let tacAt = o.tacAt ? Object.assign({}, o.tacAt) : rcv === 'vector' && o.hg && o.hg.t === 'vector' ? { f: L - 0.012, y: vecTrace([0, 132])[1], x: 0.027 } // (on the short rails each side of the front)
       : hgLen && !o.pump ? { f: hgF + hgLen - 0.01, y: 0, x: 0.024 } : o.siderails ? (rcv === 'box' ? { f: L - 0.012, y: -0.004, x: (o.W || 0.045) / 2 + 0.0075 } : { f: L - 0.02, y: -0.006, x: 0.029 }) : null;
@@ -1732,7 +1750,7 @@ G.GunModels = (() => {
     k.box(0.02, 0.004, RL, B, rf, -0.018);
     for (let i = 0; i < Math.floor(RL / 0.0105); i++) k.box(0.022, 0.003, 0.0052, B, rf + 0.003 + i * 0.0105, -0.0215);
     let fgF = null;
-    if (o.fg) { k.tag('fg'); fgF = rf + RL * 0.45; foregrip(k, o.fg, fgF, M.polymer()); }
+    if (o.fg) { k.tag('fg'); fgF = rf + RL * 0.45; foregrip(k, o.fg, fgF, M.polymer(), anim); }
     if (o.tac) { k.tag('tac'); tactical(k, o.tac, rf + RL - 0.004, -0.006, W / 2 + 0.006); }
     if (o.tacL) { k.tag('tacL'); tactical(k, o.tacL, rf + RL - 0.004, -0.006, -(W / 2 + 0.006), -1); }
     if (o.stock) { k.tag('stock'); const sp = k.part(f0 - 0.018, -0.004); k.into(sp); stock(k, o.stock, o.sm || M.black(), true); k.into(null); }
@@ -1893,7 +1911,7 @@ G.GunModels = (() => {
       k.box(0.02, 0.006, RL + 0.034, B, f0, y1 - 0.003);
       for (let i = 0; i < 4; i++) k.box(0.022, 0.004, 0.0052, B, r0 + 0.003 + i * 0.0105, y1 - 0.008);
       for (const x of [-1, 1]) sideRail(k, r0, RL, lo / 2, x * 0.0135);
-      if (o.fg) { k.tag('fg'); fgF = r0 + RL / 2 - 0.002; foregrip(k, o.fg, fgF, o.fm || M.polymer()); }
+      if (o.fg) { k.tag('fg'); fgF = r0 + RL / 2 - 0.002; foregrip(k, o.fg, fgF, o.fm || M.polymer(), anim); }
       if (o.tac) { k.tag('tac'); tactical(k, o.tac, r0 + RL - 0.004, lo / 2, 0.017); }
       if (o.tacL) { k.tag('tacL'); tactical(k, o.tacL, r0 + RL - 0.004, lo / 2, -0.017, -1); }
       k.tag('barrel');
@@ -2518,7 +2536,13 @@ G.GunModels = (() => {
         n.parent.remove(n); solo.add(n); n.visible = true;
         xb[key] = merge(solo);
       }
-      proto = { meshes: merge(k.g), info, mag, xb: xb.bolt ? xb : null };
+      // (a bipod's legs, each on its own about its hinge, so they swing down: js/rig.js)
+      const legs = (info.anim && info.anim.bipod || []).filter((l) => l.p.parent).map((l) => {
+        const home = l.p.position.clone(), solo = new T.Group();
+        l.p.parent.remove(l.p); l.p.position.set(0, 0, 0); solo.add(l.p);
+        return { meshes: merge(solo), home, back: l.back, side: l.side };
+      });
+      proto = { meshes: merge(k.g), info, mag, xb: xb.bolt ? xb : null, legs };
       worldCache.set(def.code, proto);
     }
     const g = new T.Group();
@@ -2539,6 +2563,12 @@ G.GunModels = (() => {
       }
       g.userData.xb.slack.visible = false;
     }
+    if (proto.legs.length) g.userData.bipod = proto.legs.map((l) => {
+      const sub = new T.Group();
+      for (const m of l.meshes) sub.add(new T.Mesh(m.geometry, m.material));
+      sub.position.copy(l.home); g.add(sub);
+      return { sub, back: l.back, side: l.side };
+    });
     g.userData.info = proto.info;
     if (skin && skin.length) G.Stickers.decorate(g, skin);
     return g;
@@ -2555,5 +2585,5 @@ G.GunModels = (() => {
   // the gunsmith's display model: every part as separate meshes (tagged by slot), stock included
   function display(def, skin) { const k = kit(); const info = build(k, def); if (skin && skin.length) G.Stickers.decorate(k.g, skin); return { group: k.g, info }; }
 
-  return { M, build, viewmodel, world, display, roundDims, roundShape, setLoaded, quarrel };
+  return { M, build, viewmodel, world, display, roundDims, roundShape, setLoaded, quarrel, bipodPose };
 })();

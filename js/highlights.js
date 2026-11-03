@@ -66,13 +66,13 @@ G.Highlights = (() => {
       if (!pv.st) continue;
       const st = pv.st, k = 'p' + pv.id;
       officer(k, pv.id, pv);
-      a[k] = [pv.pos.x, pv.pos.y, pv.pos.z, pv.yaw, pv.pitch, (st.cr ? 1 : 0) | (st.pr ? 2 : 0) | (st.lr ? 0 : 4) | (st.dn ? 8 : 0) | (st.dd ? 16 : 0), st.ln || 0,
+      a[k] = [pv.pos.x, pv.pos.y, pv.pos.z, pv.yaw, pv.pitch, (st.cr ? 1 : 0) | (st.pr ? 2 : 0) | (st.lr ? 0 : 4) | (st.dn ? 8 : 0) | (st.dd ? 16 : 0) | (st.cl ? 256 : 0) | (st.zp ? 512 : 0), st.ln || 0,
         st.act === 'z' ? st.ap || 0 : -1, st.act === 'z' ? st.zt : -1, st.pl ? 1 : 0, st.rl == null ? -1 : st.rl];
     }
     const me = G.Me, k = myKey();
     if (me && me.pos) {
       officer(k, G.Net.myId);
-      a[k] = [me.pos.x, me.pos.y, me.pos.z, me.yaw, me.pitch, (me.crouch ? 1 : 0) | (me.prone ? 2 : 0) | (me.lowReady ? 0 : 4) | (me.down ? 8 : 0) | (me.dead ? 16 : 0), me.lean || 0, ...zipOf(me.action),
+      a[k] = [me.pos.x, me.pos.y, me.pos.z, me.yaw, me.pitch, (me.crouch ? 1 : 0) | (me.prone ? 2 : 0) | (me.lowReady ? 0 : 4) | (me.down ? 8 : 0) | (me.dead ? 16 : 0) | (me.climb ? 256 : 0) | (me.zipRide ? 512 : 0), me.lean || 0, ...zipOf(me.action),
         me.reloading && me.reloadTotal ? G.U.clamp(1 - me.reloadT / me.reloadTotal, 0, 1) : -1];
     }
     const now = performance.now();
@@ -936,7 +936,7 @@ G.Highlights = (() => {
     clearRigs();
     P.seg = (P.seg + 1) % P.prog.length; P.st = 0;
     const s = P.prog[P.seg];
-    s.react = null; s.fired = false; s.kn = 0; s.mSt = null; s.snapDoors = true; s.prevTau = null; s.xp = null; s.frz = null; s.frzCand = null; s.look = null; s.lookT = null; s.fq = null; s.fp = null; if (s.cam === 'wide') s.pos = null; s.cp = null; if (s.rates) s.rate = s.rates[0][1];
+    s.react = null; s.fired = false; s.kn = 0; s.mSt = null; s.snapDoors = true; s.prevTau = null; s.xp = null; s.frz = null; s.frzCand = null; s.look = null; s.lookT = null; s.fq = null; s.fp = null; if (s.cam === 'wide') { s.pos = null; s.shot = null; } s.cp = null; if (s.rates) s.rate = s.rates[0][1];
     acClear();
     if (s.kind === 'clip') {
       buildRigs(s.clip); s.tau = s.t0; if (s.xr) overlayFor(s);
@@ -1086,9 +1086,11 @@ G.Highlights = (() => {
         crouch = crouch || zt > 0.3;
         r.rig.holster(true); r.zipping = true;
       } else if (r.zipping) { r.zipping = false; r.rig.holster(false); }
+      // an officer on a ladder (256) or a zipline (512): weapon slung, hands and feet on the rungs, or hanging off the bar (js/rig.js)
+      if (fl & 768) { if (!r.climbing) { r.climbing = true; r.rig.holster(true); } } else if (r.climbing) { r.climbing = false; r.rig.holster(false); }
       if (k[0] === 'e' && fl & 8 && !r.died) { r.rig.goLimp(); pool(r); } // (a suspect down for good: limp, bleeding out)
       const reload = !r.died && !act && p[10] != null && p[10] >= 0 && p[10] < 1 ? p[10] : -1; // (a magazine change, as it was played)
-      r.rig.update(Math.max(0.001, dt * s.rate), { pos: new T.Vector3(p[0], p[1], p[2]), yaw: p[3], pitch: p[4], crouch, prone: !!(fl & 2), alert: !!(fl & 4) && !act && reload < 0, lean: p[6], pose, tk, act, reload, state: r.died ? 'dead' : fl & 8 ? 'down' : 'alive' });
+      r.rig.update(Math.max(0.001, dt * s.rate), { pos: new T.Vector3(p[0], p[1], p[2]), yaw: p[3], pitch: p[4], crouch, prone: !!(fl & 2), climb: fl & 256 && P.map && P.map.crest ? P.map.crest.ladder : null, zip: !!(fl & 512), alert: !!(fl & 4) && !act && reload < 0 && !(fl & 768), lean: p[6], pose, tk, act, reload, state: r.died ? 'dead' : fl & 8 ? 'down' : 'alive' });
     }
   }
   // Lasers, as they were: from the gun in their hands to where it landed then (frame [11]): the line and a glowing dot, from a pool
@@ -1441,16 +1443,48 @@ G.Highlights = (() => {
     s.pos = best ? best.p : mid.clone().add(new T.Vector3(0, 1.2, 0)).addScaledVector(line.clone().applyAxisAngle(new T.Vector3(0, 1, 0), Math.PI / 2), 3);
     s.fov = best ? best.fov : 70; s.wideScore = best ? best.sc / (pts.length * 3.5) : 0;
   }
+  // The wide angle for a long shot (further apart than PAN_D): a camera a few metres off the shooter's side (the side with
+  // room, picked once), on them till the shot, then panning along the line to the target over the round's flight (half a
+  // second at least: a whip, not a cut) as the lens closes from 55 degrees to one that has the target filling the frame.
+  // shot: the killing round's time (or a beat before the kill); imp: when it lands. Returns the lens.
+  const PAN_D = 30;
+  function panWide(s, c, W0, A0, cam) {
+    if (s.shot == null) {
+      const ks = c.kind === 'kill' && c.killShot, q = c.kind === 'seq' && c.kills.find((x) => x.v === s.at);
+      s.shot = ks ? ks.t : (q ? q.t : c.t) - 0.3; s.imp = ks ? ks.t + flightOf(ks).tof : q ? q.t : c.t;
+    }
+    if (!s.pos) {
+      const st = stateAt(c, s.who, s.shot), h = st ? new T.Vector3(st[0], st[1] + 1.5, st[2]) : W0.clone();
+      const d = A0.clone().sub(h).setY(0).normalize(), side = new T.Vector3(-d.z, 0, d.x);
+      let best = null;
+      for (const sg of [1, -1]) for (const back of [1.6, 0.6]) {
+        const p = h.clone().addScaledVector(side, 2.6 * sg).addScaledVector(d, -back).add(new T.Vector3(0, 0.35, 0)), v = p.clone().sub(h), l = v.length();
+        const room = G.Level.raycast(P.map, h.x, h.y, h.z, v.x / l, v.y / l, v.z / l, l + 0.3).t; // (a clear line from the shooter to it: not in a wall or over the drop)
+        if (!best || room > best.room) best = { p: room >= l + 0.2 ? p : h.clone().addScaledVector(v, Math.max(0.4, room - 0.3) / l), room };
+        if (room >= l + 0.2) break;
+      }
+      s.pos = best.p;
+    }
+    const k = G.U.clamp((s.tau - s.shot) / Math.max(0.5, s.imp - s.shot), 0, 1);
+    const e = k * k * (3 - 2 * k), look = W0.clone().lerp(A0, e), far = s.pos.distanceTo(A0);
+    cam.position.copy(s.pos); cam.lookAt(look);
+    const tele = G.U.clamp(2 * Math.atan(2.4 / far) * 180 / Math.PI, 2.5, 55); // (a person, and some of the ground round them)
+    return 55 + (tele - 55) * e;
+  }
   function headOf(k) { const r = P.rigs.get(k); return r && r.rig.head ? r.rig.head.getWorldPosition(new T.Vector3()) : null; }
   function camFor(s) {
     const c = s.clip, cam = P.cam;
     // (a kill sequence: looking at whoever's next, the fixed camera picked again when that changes)
-    if (c.kind === 'seq') { const nx = (c.kills.find((q) => q.t >= s.tau - 0.4) || c.kills[c.kills.length - 1]).v; if (nx !== s.at) { s.at = nx; s.pos = null; } }
+    if (c.kind === 'seq') { const nx = (c.kills.find((q) => q.t >= s.tau - 0.4) || c.kills[c.kills.length - 1]).v; if (nx !== s.at) { s.at = nx; s.pos = null; s.shot = null; } }
     const who = s.who && stateAt(c, s.who, s.tau), at = s.at && stateAt(c, s.at, s.tau);
     P.hide = []; P.esc = P.esc || new T.Vector3(); P.esc.set(0, 1, 0);
     const W0 = who ? new T.Vector3(who[0], who[1] + 1.5, who[2]) : c.at.clone().setY(1.5), A0 = at ? new T.Vector3(at[0], at[1] + 1.2, at[2]) : c.at.clone().setY(1.2);
     let fov = 60;
-    if (s.cam === 'wide') {
+    if (s.cam === 'wide' && s.who && s.at && s.who !== s.at && Math.hypot(W0.x - A0.x, W0.z - A0.z) > PAN_D) {
+      // too far apart to have both in one picture (a shot across the Sandia gorge): beside the shooter, panning to the
+      // target as the round goes, the lens closing on them (panWide)
+      fov = panWide(s, c, W0, A0, cam);
+    } else if (s.cam === 'wide') {
       // a fixed camera in the room that keeps them both in the picture (picked once: js/highlights.js pickWide)
       if (!s.pos) pickWide(s, c, W0, A0);
       cam.position.copy(s.pos); cam.lookAt(W0.clone().add(A0).multiplyScalar(0.5)); fov = s.fov || 58;
@@ -1561,7 +1595,7 @@ G.Highlights = (() => {
       else s.frzCand = { p: cam.position.clone(), q: cam.quaternion.clone() };
     }
     // a little handheld drift, more for the action cameras
-    const sh = s.cam === 'wide' ? 0.004 : s.cam === 'bullet' || s.cam === 'event' ? 0 : 0.012; cam.rotation.x += Math.sin(P.time * 1.7) * sh; cam.rotation.y += Math.sin(P.time * 1.3 + 1) * sh;
+    const sh = (s.cam === 'wide' ? 0.004 : s.cam === 'bullet' || s.cam === 'event' ? 0 : 0.012) * Math.min(1, fov / 40); // (less through a long lens, where it'd be a lurch) cam.rotation.x += Math.sin(P.time * 1.7) * sh; cam.rotation.y += Math.sin(P.time * 1.3 + 1) * sh;
     if (Math.abs(cam.fov - fov) > 0.1) { cam.fov = fov; cam.updateProjectionMatrix(); }
   }
 

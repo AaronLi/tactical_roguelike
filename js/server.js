@@ -602,7 +602,17 @@ G.Server = {
       c.state = 'hide'; c.hide = { x: s.x, z: s.z, lean: 0 }; c.crouch = true; c.yaw = s.yaw; c.peekT = 1 + Math.random() * 3;
       placed++;
     }
-    for (const [tx, tz, tf] of spots) {
+    // the rest anywhere a suspect could be or in sight of the pad (js/level.js landing), one in each room indoors first:
+    // wherever it is, there's someone caught up in it
+    let civAt = U.shuffle(Math.random, spots.concat(this.map.lzSpots || []));
+    if (this.map.rooms) {
+      const OUT = new Set(['yard', 'alley', 'lawn', 'road', 'lot', 'carpark']), rooms = this.map.rooms;
+      const roomOf = (sp) => rooms.findIndex((r) => (r.fl || 0) === (sp[2] || 0) && sp[0] >= r.x && sp[0] < r.x + r.w && sp[1] >= r.z && sp[1] < r.z + r.h);
+      const first = [], seen = new Set();
+      for (const sp of civAt) { const ri = roomOf(sp); if (ri >= 0 && !rooms[ri].out && !OUT.has(rooms[ri].type) && !seen.has(ri)) { seen.add(ri); first.push(sp); } }
+      civAt = first.concat(civAt.filter((sp) => !first.includes(sp)));
+    }
+    for (const [tx, tz, tf] of civAt) {
       if (placed >= civs) break;
       if (close(tx, tz, tf)) continue;
       used.push([tx, tz, tf]);
@@ -652,6 +662,7 @@ G.Server = {
     return d;
   },
   addEnemy(type, x, z, hpMult, y = 0) {
+    if (this.map) y = Math.max(y, G.Level.groundHeight(this.map, x, z)); // (on the ground where it rolls: the Sandia Crest's)
     const def = this.equip(type);
     const e = {
       id: this.nextEid++, type, def, x, z, yaw: Math.random() * Math.PI * 2,
