@@ -1,7 +1,7 @@
 'use strict';
 // First-person weapon handling: the arms, reloads, racking and inspecting.
 //
-// The viewmodel (js/gunmodels.ts, js/viewmodel.ts) is bound to its gun's parts by js/gunrig.ts: it gives each gun its moving parts (magazine, charging handle, side bolt
+// The viewmodel (js/gunmodels.ts, js/viewmodel.ts) is bound to its gun by js/gunrig.ts, which gives each gun its moving parts (magazine, charging handle, side bolt
 // handle, slide, pump, bolt, lever, belt cover, break-open barrels, revolver cylinder) and anchor points
 // (grip, support hand, magazine well, ports). Every frame G.VMAnim.update() samples the clip that's
 // playing for the current state (reloading, racking after the last shell, inspecting) and poses the parts

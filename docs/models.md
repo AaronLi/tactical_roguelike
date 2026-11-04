@@ -21,6 +21,20 @@ The guns are built procedurally (`js/gunmodels.ts`). This pipeline bakes them to
 - `?checkModels`: validates each model in the browser as it loads (console errors and warnings).
 - `index.html` has an importmap mapping `three` to `assets/vendor/three-global.js`, a generated shim re-exporting the page's global `THREE` (the CDN's r149), so the ES-module `GLTFLoader` builds the game's own classes (two copies of three break `instanceof`). A module script loads `GLTFLoader` and the meshopt decoder from jsDelivr and exposes `G.GLB = { ready, load(url) }` (cached). Classic scripts never need it at parse time.
 
+## Layers: geometry, rig, first-person extras
+
+A gun model is three separate things, each working on the model (nodes + extras), not on how it was made:
+
+| layer | where | what it does |
+| --- | --- | --- |
+| geometry | `js/gunmodels.ts` recipes, or a `.glb` (`js/glb.ts`) | slot-tagged meshes, `part_<key>` nodes with their pivots, `info` |
+| rig | `js/gunrig.ts` | `G.GunRig.bind(group, info, { def, side })`: finds the moving parts (`info.anim`: nodes, or the node names of a loaded file), the hand anchors in the gun's space, where the parts rest, the magazine-check data. `js/vmanim.ts` (the clips) reads nothing else off the gun |
+| first-person extras | `js/viewmodel.ts` | `G.Viewmodel.assemble(def, models)`: a reflex sight's reticle (`info.reflex`), a scope's lens (`info.pip`), muzzle flashes (one per `info.muzzles`), `display_<name>` surfaces (a CanvasTexture each: `G.Viewmodel.surfaces(group)`), then the rig and arms. And `worldProto` / `worldInstance`: the third-person model, merged one mesh per material, with the magazine, a crossbow's bolt and strings and a bipod's legs pulled out |
+
+`G.GunModels.viewmodel(def)` / `world(def)` only fetch geometry and hand it over. `world()` takes the baked model with `?bakedGuns` (a default build, loaded, no bipod: the bipod's legs are not parts of a baked model yet), else the recipe's. `viewmodel()` is built from the recipes in both cases: the first-person build leaves the stock off, which the baked (display) model doesn't, and a baked model doesn't carry `info.reflex` / `info.pip` yet. A model that has them goes straight to `G.Viewmodel.assemble`.
+
+`bake_models.mjs` calls `G.GunRig.describe(group)` first: a recipe's magazine-check data is meshes held by reference, which a file can't carry, so it is written down as tags on the nodes (see "Magazine check" in the contract).
+
 ## The contract
 
 **The contract is code**: `GUN_MODEL_CONTRACT` and `INFO_FIELDS` in `js/glb.ts`. Everything else is generated from it, or checked against it:
