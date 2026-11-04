@@ -135,6 +135,8 @@ const G_GunModels = (() => {
       g,
       // everything built after this belongs to that slot's part (the gunsmith highlights and picks by it)
       tag(s?: string) { slot = s || 'base'; },
+      // build something under another slot's tag, then go back to the one before (geometry that belongs to a different part than the code around it)
+      under<T>(s: string, fn: () => T): T { const was = slot; slot = s; try { return fn(); } finally { slot = was; } },
       add(mesh: THREE.Object3D) { mesh.userData.slot = slot; g.add(mesh); return mesh; },
       place(geo: THREE.BufferGeometry, m: THREE.Material, x: number, y: number, f: number) { return put(geo, m, x, y, f); }, // (a shape of your own, on whatever part it's built on: it tips with a hinge, as add doesn't)
       hang(o: THREE.Object3D, x: number, y: number, f: number) { o.position.set(x, y - oy, -(f - of)); tgt.add(o); return o; }, // (a group of your own, likewise)
@@ -997,7 +999,7 @@ const G_GunModels = (() => {
       if (tr) { tracedParts(k, tr, VT, 'base', mats); top = VT([0, tr.topY])[1]; }
       else { k.prof([[0, -H * 0.55], [0, H * 0.45], [L, H * 0.45], [L, -H * 0.55]], Wd, rm); top = H * 0.45; }
       if (o.siderails) for (const x of [-1, 1]) sideRail(k, L * 0.58, L * 0.38, -0.004, x * (Wd / 2 + 0.0035)); // (a short rail each side of the front: an MP7's)
-      if (o.optic && !(['irons', 'notch', 'bead', 'none'] as (string | undefined)[]).includes(o.optic)) top = S.rail(k, L * 0.15, L * 0.7, top, rm);
+      if (o.optic && !(['irons', 'notch', 'bead', 'none'] as (string | undefined)[]).includes(o.optic)) top = k.under('optic', () => S.rail(k, L * 0.15, L * 0.7, top, rm)); // (the optic's rail: it is there only with one)
     } else if (rcv === 'round') {
       if (tr) { tracedParts(k, tr, VT, 'base', mats); top = VT([0, tr.topY])[1]; } // (the 870's: traced)
       else {
@@ -1009,7 +1011,7 @@ const G_GunModels = (() => {
       k.prof([[-0.01, 0.03], [L, 0.03], [L, -0.045], [L * 0.32, -0.045], [0.06, -0.06], [0.04, -0.135], [-0.01, -0.135]], 0.046, fm);
       k.box(0.05, 0.17, 0.014, M.rubber(), -0.024, -0.052);
       if (o.siderails) for (const x of [-0.028, 0.028]) sideRail(k, L - 0.14, 0.12, -0.006, x); // (on the front of the shell, each side)
-      top = o.railTop === false && (['irons', 'notch', 'bead'] as (string | undefined)[]).includes(o.optic) ? 0.03 : S.rail(k, L * 0.35, L * 0.6, 0.03, rm);
+      top = o.railTop === false && (['irons', 'notch', 'bead'] as (string | undefined)[]).includes(o.optic) ? 0.03 : k.under(o.railTop === false ? 'optic' : 'base', () => S.rail(k, L * 0.35, L * 0.6, 0.03, rm)); // (with railTop false the rail is the optic's)
     } else if (rcv === 'aug') {
       // The Steyr AUG (A1, the StG 77), traced from a side photo (Wikimedia Commons, "Steyr AUG 5,56 mm.JPG", MoserB,
       // public domain) at 0.57 mm a pixel: 790 mm overall with its 508 mm barrel, Steyr's figures. A bullpup: the
@@ -1198,7 +1200,7 @@ const G_GunModels = (() => {
       k.box(0.003, 0.008, V([414, 0])[0] - V([356, 0])[0], St, V([356, 0])[0], V([0, 343])[1], 0.0188);
       // the cover's top: the rear sight stands on it, or (any other sight) a rail takes its place, as the railed covers do
       if (!o.optic || o.optic === 'notch') top = V([0, 327])[1];
-      else top = S.rail(k, V([290, 0])[0], V([492, 0])[0] - V([290, 0])[0], V([0, 327])[1], rm);
+      else top = k.under('optic', () => S.rail(k, V([290, 0])[0], V([492, 0])[0] - V([290, 0])[0], V([0, 327])[1], rm)); // (the optic's rail)
     } else if (rcv === 'qbz192') {
       // The QBZ-192 (the QBZ-191 carbine), from photos (Wikimedia Commons, "QBZ-192 extended stock.jpg") and its 10.5"
       // barrel: a conventional layout. A tall flat-sided upper with a rail its whole length, carried on over the
@@ -1315,7 +1317,7 @@ const G_GunModels = (() => {
       k.box(0.05, V([0, 92])[1] - V([0, 128])[1], 0.01, B, -0.01, V([0, 110])[1]);
       top = S.rail(k, V([322, 0])[0], V([735, 0])[0] - V([322, 0])[0], V([0, 90])[1], up);
       // the flip-up sights folded flat at the rail's two ends when there's an optic on it (up, they're the irons below)
-      if (o.optic && !(['irons', 'notch'] as (string | undefined)[]).includes(o.optic)) { k.box(0.024, 0.009, 0.026, B, V([346, 0])[0], top + 0.0045); k.box(0.022, 0.009, 0.022, B, V([690, 0])[0], top + 0.0045); }
+      if (o.optic && !(['irons', 'notch'] as (string | undefined)[]).includes(o.optic)) k.under('optic', () => { k.box(0.024, 0.009, 0.026, B, V([346, 0])[0], top + 0.0045); k.box(0.022, 0.009, 0.022, B, V([690, 0])[0], top + 0.0045); }); // (the sights' own: they're the optic's, as the raised irons are)
     } else if (rcv === 'break') {
       // the action: the barrels hinge at its front (L), so it's as long as the receiver
       if (tr) { tracedParts(k, tr, VT, 'base', mats); top = VT([0, tr.topY])[1]; }
@@ -1373,7 +1375,7 @@ const G_GunModels = (() => {
       else handle = { f: L * 0.62, y: 0.016, x: 0.024, travel: 0.07, recip: true }; // (an op rod or a bolt handle: Garand, M14, PPSh, Benelli)
     }
     if (o.cock) handle = Object.assign(handle || {}, o.cock) as CockHandle;
-    if (handle) anim.handle = cockHandle(k, handle);
+    if (handle) { const h = handle; anim.handle = k.under(rcv === 'mpx' || rcv === 'mcx' ? 'charging' : k.slot, () => cockHandle(k, h)); } // (the MPX's and MCX's: it stands in for the charging part when that slot's empty, so it's that part's)
 
     k.tag('grip');
     if (tr && !(rcv === 'ar' && o.gripT && o.gripT !== 'ar')) tracedParts(k, tr, VT, 'grip', mats); // (an AR lower's own grip comes off for another shape: the lower stays)
