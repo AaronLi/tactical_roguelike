@@ -1,9 +1,8 @@
-// How one tag's geometry differs between two builds: the same, a rigid move, a 1-D stretch along the forward axis between two planes, or a different shape.
+// How one tag's geometry differs between two builds: the same, a rigid move, or a different shape.
 // Used by the baker's coupling detection (tools/model_packs.mjs). Positions are world-space (tools/model_sweep.mjs meshesOf), metres, in glTF axes
 // (x right, y up, z = -forward); displacements are reported as [forward, up, right] = [-dz, dy, dx], the contract's order.
 
 export const TOL = 2e-6;        // metres: float noise of the recipe's own arithmetic ("the same", "a rigid move")
-export const WARP_TOL = 5e-5;   // metres (0.05 mm, half the 0.1 mm hash step): how far a stretch may be from the recipe's own geometry (it scales a taper with length, say)
 
 /** The two units (arrays of { mat, node, v }) have the same layout: mesh count, materials, nodes, vertex counts. */
 export function aligned(a, b) {
@@ -13,53 +12,21 @@ export function aligned(a, b) {
 }
 
 /**
- * Classifies b against a. Returns { kind: 'same' } | { kind: 'move', d: [df, du, dr] } (every vertex moved alike) |
- * { kind: 'warp', from, to, front: [df, 0, 0] } (the forward axis stretched: behind `from` nothing moves, ahead of `to` everything moves
- * by `front`, linear between) | { kind: 'shape' }.   `loose` = the largest deviation from the fitted model that was accepted (<= WARP_TOL).
+ * Classifies b against a. Returns { kind: 'same' } | { kind: 'move', d: [df, du, dr] } (every vertex moved alike) | { kind: 'shape' }.
  */
 export function diffUnits(a, b) {
   if (!a && !b) return { kind: 'same' };
   if (!a || !b || !aligned(a, b)) return { kind: 'shape' };
   let n = 0; for (const m of a) n += m.v.length / 3;
   if (!n) return { kind: 'same' };
-  const fa = new Float64Array(n), df = new Float64Array(n), dy = new Float64Array(n), dx = new Float64Array(n);
-  let k = 0, same = true;
+  let d0 = null, same = true, rigid = true;
   for (let i = 0; i < a.length; i++) for (let j = 0; j < a[i].v.length; j += 3) {
-    const ddx = b[i].v[j] - a[i].v[j], ddy = b[i].v[j + 1] - a[i].v[j + 1], ddz = b[i].v[j + 2] - a[i].v[j + 2];
-    fa[k] = -a[i].v[j + 2]; df[k] = -ddz; dy[k] = ddy; dx[k] = ddx;
-    if (Math.abs(ddx) > TOL || Math.abs(ddy) > TOL || Math.abs(ddz) > TOL) same = false;
-    k++;
+    const dx = b[i].v[j] - a[i].v[j], dy = b[i].v[j + 1] - a[i].v[j + 1], dz = b[i].v[j + 2] - a[i].v[j + 2];
+    if (Math.abs(dx) > TOL || Math.abs(dy) > TOL || Math.abs(dz) > TOL) same = false;
+    if (!d0) d0 = [dx, dy, dz]; else if (Math.abs(dx - d0[0]) > TOL * 2 || Math.abs(dy - d0[1]) > TOL * 2 || Math.abs(dz - d0[2]) > TOL * 2) rigid = false;
   }
   if (same) return { kind: 'same' };
-  for (const tol of [TOL * 2, WARP_TOL]) {
-    const r = fit(fa, df, dy, dx, n, tol); if (r) return r;
-  }
-  return { kind: 'shape' };
-}
-
-function fit(fa, df, dy, dx, n, tol) {
-  // sideways / up displacement: the same for every vertex (a rigid component), or nothing beyond tol
-  let uy = dy[0], ux = dx[0], uniform = true;
-  for (let i = 1; i < n; i++) if (Math.abs(dy[i] - uy) > tol || Math.abs(dx[i] - ux) > tol) { uniform = false; break; }
-  if (!uniform) { // not uniform: acceptable only as noise around zero
-    for (let i = 0; i < n; i++) if (Math.abs(dy[i]) > tol || Math.abs(dx[i]) > tol) return null;
-    uy = 0; ux = 0;
-  }
-  let mn = Infinity, mx = -Infinity, rear = 0, front = 0;
-  for (let i = 0; i < n; i++) { if (fa[i] < mn) { mn = fa[i]; rear = df[i]; } if (fa[i] > mx) { mx = fa[i]; front = df[i]; } }
-  let rigid = true;
-  for (let i = 0; i < n; i++) if (Math.abs(df[i] - rear) > tol) { rigid = false; break; }
-  if (rigid) return { kind: 'move', d: [rear, uy, ux] };
-  if (uy !== 0 || ux !== 0 || Math.abs(rear) > tol) return null; // a stretch holds its rear still
-  let f0 = mn, f1 = mx;
-  for (let i = 0; i < n; i++) if (Math.abs(df[i]) <= tol && fa[i] > f0) f0 = fa[i];
-  for (let i = 0; i < n; i++) if (Math.abs(df[i] - front) <= tol && fa[i] < f1) f1 = fa[i];
-  if (!(f1 > f0)) return null;
-  for (let i = 0; i < n; i++) {
-    const t = fa[i] <= f0 ? 0 : fa[i] >= f1 ? 1 : (fa[i] - f0) / (f1 - f0);
-    if (Math.abs(df[i] - front * t) > tol * 2) return null;
-  }
-  return { kind: 'warp', from: f0, to: f1, front: [front, 0, 0] };
+  return rigid ? { kind: 'move', d: [-d0[2], d0[1], d0[0]] } : { kind: 'shape' };
 }
 
 /** The largest coordinate difference between two aligned units (Infinity if they are not aligned). */

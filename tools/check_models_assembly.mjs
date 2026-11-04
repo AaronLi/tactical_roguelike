@@ -4,7 +4,7 @@
 // built twice, by the recipe (js/gunmodels.ts) and by G.Models.assemble(def) from the packs, and compared:
 //   exact      the same triangles: an order-independent hash of every triangle's world position to 0.1 mm and its material (as the sweep fingerprints do)
 //   tolerance  not hash-equal, but the same meshes (per slot) and no vertex further than --tol (default 0.05 mm = half the hash step: the 14-bit
-//              position quantisation of the files, and the rounding of a stretch)
+//              position quantisation of the files)
 //   FAIL       anything else (a different shape, a missing slot, a vertex further off): the test fails
 // and the `info` (every leaf, 1e-6), the animated part nodes (names and pivots) and the slot of every mesh are compared too.
 // Then N random builds per platform (two or three parts changed at once: not in the sweep, with a seed the baker did not learn from) as a held-out

@@ -60,38 +60,6 @@
                   ],
                   "description": "The pack's file under the platform folder; null when the tag is empty for this key."
                 },
-                "stretch": {
-                  "oneOf": [
-                    {
-                      "type": "object",
-                      "properties": {
-                        "from": {
-                          "type": "number",
-                          "description": "Forward position (metres, the pack's own frame) behind which the pack does not stretch."
-                        },
-                        "to": {
-                          "type": "number",
-                          "description": "Forward position ahead of which the pack moves bodily by the provider's stretch anchor."
-                        },
-                        "gain": {
-                          "type": "number",
-                          "description": "Multiplies the provider's stretch anchor (1 for a part that follows its barrel exactly)."
-                        }
-                      },
-                      "required": [
-                        "from",
-                        "to",
-                        "gain"
-                      ],
-                      "additionalProperties": false,
-                      "description": "The pack stretches along the forward axis (GUN_MODEL_CONTRACT.packs.stretch)."
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "description": "The pack stretches along the forward axis (GUN_MODEL_CONTRACT.packs.stretch)."
-                },
                 "tris": {
                   "oneOf": [
                     {
@@ -146,7 +114,7 @@
           "maxItems": 3
         }
       },
-      "description": "Offsets parts give other slots: \"<buildSlot>=<partId>\" -> { mount_<tag>: [forward, up, right], stretch_<tag>: [forward, up, right] } (metres, added up over the build)."
+      "description": "Offsets parts give other slots: \"<buildSlot>=<partId>\" -> { mount_<tag>: [forward, up, right] } (metres, added up over the build)."
     },
     "bases": {
       "type": "array",

@@ -179,8 +179,8 @@ if (doParts) {
   const old2 = fs.existsSync(PARTS_DIR + 'index.json') ? JSON.parse(fs.readFileSync(PARTS_DIR + 'index.json', 'utf8')).platforms : {};
   const plats = { ...(only.length ? old2 : {}), ...r.summary };
   const vals = Object.values(plats), sum = (k) => vals.reduce((a, x) => a + (x[k] || 0), 0);
-  const totals = { platforms: vals.length, packs: sum('packs'), files: sum('files'), bytes: sum('bytes'), gz: sum('gz'), index: sum('index'), indexGz: sum('indexGz'), sweepBuilds: sum('sweepBuilds'), exactBuilds: sum('exactBuilds'), stretchBuilds: sum('stretchBuilds') };
+  const totals = { platforms: vals.length, packs: sum('packs'), files: sum('files'), bytes: sum('bytes'), gz: sum('gz'), index: sum('index'), indexGz: sum('indexGz'), sweepBuilds: sum('sweepBuilds'), exactBuilds: sum('exactBuilds') };
   fs.writeFileSync(PARTS_DIR + 'index.json', JSON.stringify({ version: 1, src, platforms: plats, totals }, null, 1));
-  console.log(`\nbaked packs for ${vals.length} platforms: ${totals.packs} packs in ${totals.files} files, ${totals.bytes} B, ${totals.gz} B gzipped (+ indexes ${totals.index} B, ${totals.indexGz} gzipped); ${totals.sweepBuilds} sweep builds assemble from them (${totals.exactBuilds} exact, ${totals.stretchBuilds} with a stretch)`);
+  console.log(`\nbaked packs for ${vals.length} platforms: ${totals.packs} packs in ${totals.files} files, ${totals.bytes} B, ${totals.gz} B gzipped (+ indexes ${totals.index} B, ${totals.indexGz} gzipped); ${totals.sweepBuilds} sweep builds assemble from them (${totals.exactBuilds} exact)`);
 }
 process.exit(fails ? 1 : 0);

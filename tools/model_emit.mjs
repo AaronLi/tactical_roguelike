@@ -57,19 +57,14 @@ export async function makeEmitter({ G, GM, Models }) {
   }
 
   /**
-   * Builds the THREE scene of one pack from its capture: { root, hash, tris }. `off` = { rigid [f,u,r], F } the capture carries (undone here),
-   * `st` = the stretch region (for undoing a stretch), `key` = { slot: part } for the root's extras.
+   * Builds the THREE scene of one pack from its capture: { root, hash, tris }. `off` = { rigid [f,u,r] } the capture carries (undone here).
    */
   function buildPack({ id, tag, entry, name }) {
-    const cap = entry.capture, off = entry.off, st = entry.stretch || (entry.region || null);
+    const cap = entry.capture, off = entry.off;
     const { group, info } = GM.display(defOf(G, id, cap.build));
     const fr = fragments(group, info, tag);
-    const [rf, ru, rr] = off.rigid, shift = new T.Vector3(rr, ru, -rf), bake = !!(off.F && st);
-    const un = (v) => { // a point of the capture's frame back to the pack's
-      v.sub(shift);
-      if (bake) { const g = -v.z, L = st.to - st.from; let d = 0; if (g > st.from) d = g >= st.to + off.F ? off.F : g - (st.from + ((g - st.from) * L) / (L + off.F)); v.z += d; }
-      return v;
-    };
+    const [rf, ru, rr] = off.rigid, shift = new T.Vector3(rr, ru, -rf);
+    const un = (v) => v.sub(shift); // a point of the capture's frame back to the pack's
     const dep = {}; entry.dep.forEach((s, i) => (dep[s] = entry.key[i]));
     const pk = { platform: id, tag, key: dep };
     const root = new T.Group(); root.name = name; root.userData = { pack: pk };
@@ -78,34 +73,25 @@ export async function makeEmitter({ G, GM, Models }) {
     const catalogue = Models.contract.materials.names;
     const nameOfMat = (m) => m.name || matName.get(m) || ('m_' + m.color.getHexString());
     const needUv = (o) => !!((catalogue[nameOfMat(o.material)] || {}).bump || o.material.map || o.userData.display || (o.name || '').startsWith('display_'));
-    const addMesh = (o, into, bakeFrom) => {
+    const addMesh = (o, into) => {
       const c = new T.Mesh(o.geometry, matCopy(o.material, nameOfMat(o.material))); c.userData = { slot: tag }; if (o.userData.display) c.userData.display = o.userData.display;
       c.position.copy(o.position); c.quaternion.copy(o.quaternion); c.scale.copy(o.scale); c.name = o.name && o.name.startsWith('display_') ? o.name : `${tag}_${++n}`;
       if (!needUv(o) && c.geometry.attributes.uv) { c.geometry = c.geometry.clone(); c.geometry.deleteAttribute('uv'); }
       const m = c.material;
-      if (bake) { // the capture was stretched: put the vertices back where the pack keeps them (the mesh's own transform baked in)
-        const g = c.geometry.clone(), pos = g.attributes.position, arr = new Float32Array(pos.count * 3), v = new T.Vector3(); c.updateMatrix();
-        const M = c.matrix, piv = bakeFrom || new T.Vector3();
-        for (let i = 0; i < pos.count; i++) { v.fromBufferAttribute(pos, i).applyMatrix4(M).add(piv); un(v); v.sub(into.__piv || new T.Vector3()); arr[i * 3] = v.x; arr[i * 3 + 1] = v.y; arr[i * 3 + 2] = v.z; }
-        g.setAttribute('position', new T.BufferAttribute(arr, 3));
-        const nor = g.attributes.normal; if (nor) { const NM = new T.Matrix3().getNormalMatrix(M), v2 = new T.Vector3(); for (let i = 0; i < nor.count; i++) { v2.fromBufferAttribute(nor, i).applyMatrix3(NM).normalize(); nor.setXYZ(i, v2.x, v2.y, v2.z); } }
-        c.geometry = g; c.position.set(0, 0, 0); c.quaternion.identity(); c.scale.set(1, 1, 1);
-      }
       const pos = c.geometry.attributes.position, idx = c.geometry.index; tris += (idx ? idx.count : pos.count) / 3;
       h.update(`${c.userData.slot}|${m.name}|${c.name.startsWith('display_') ? c.name : ''}|${Array.from(c.position.toArray().concat(c.quaternion.toArray(), c.scale.toArray()), (x) => Math.round(x * 1e6)).join(',')}|${pos.count}|`);
       h.update(Buffer.from(new Float32Array(pos.array).buffer)); if (idx) h.update(Buffer.from(new Uint32Array(idx.array).buffer));
       into.add(c);
     };
-    for (const o of fr.root) { const tmp = new T.Group(); addMesh(o, tmp, null); const c = tmp.children[0]; if (!bake) c.position.sub(shift); else { /* baked above, in gun frame */ } root.add(c); h.update('r'); }
+    for (const o of fr.root) { const tmp = new T.Group(); addMesh(o, tmp); const c = tmp.children[0]; c.position.sub(shift); root.add(c); h.update('r'); }
     for (const [nm, nd] of fr.nodes) {
       const g = new T.Group(); g.name = nm;
       const piv = nd.pivot.clone(); un(piv); g.position.copy(piv);
       g.userData = { ...(nm.startsWith('part_') ? { part: nm.slice(5) } : {}), owner: ownerTag(nm) === tag, ...(nd.parent ? { parent: nd.parent } : {}) };
       g.__piv = piv; h.update(`n|${nm}|${nd.parent}|${g.userData.owner}|${piv.toArray().map((x) => Math.round(x * 1e6)).join(',')}|`);
-      for (const o of nd.meshes) addMesh(o, g, bake ? nd.pivot : null);
+      for (const o of nd.meshes) addMesh(o, g);
       root.add(g);
     }
-    if (entry.stretch) { pk.stretch = entry.stretch; h.update(JSON.stringify(entry.stretch)); }
     return { root, hash: h.digest('hex').slice(0, 16), tris };
   }
 

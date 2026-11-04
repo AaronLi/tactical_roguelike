@@ -33,7 +33,7 @@ export function collapse(ix, packs) {
       again = false;
       for (let i = 0; i < ti.dep.length; i++) {
         const buckets = new Map();
-        for (const e of list) { const k = e.key.map((v, j) => (j === i ? '#' : v)).join('|') + '|' + (e.file || '') + '|' + JSON.stringify(e.stretch || null); if (!buckets.has(k)) buckets.set(k, []); buckets.get(k).push(e); }
+        for (const e of list) { const k = e.key.map((v, j) => (j === i ? '#' : v)).join('|') + '|' + (e.file || ''); if (!buckets.has(k)) buckets.set(k, []); buckets.get(k).push(e); }
         const byOther = new Map();
         for (const e of list) { const k = e.key.map((v, j) => (j === i ? '#' : v)).join('|'); byOther.set(k, (byOther.get(k) || 0) + 1); }
         const next = [];
@@ -85,8 +85,8 @@ export async function bakeParts(env, Models, ids, src, log = console.log) {
       let collapsed = true;
       if (res2.bad.length || res2.infoBad) { for (const [t, l] of Object.entries(saved)) ix.tags[t].packs = l; collapsed = false; log(`  ${id}: collapsing keys broke ${res2.bad.length} builds; kept the full keys`); }
       // the index as written: only what the contract lists
-      const out = { ...ix, tags: Object.fromEntries(Object.entries(ix.tags).map(([t, ti]) => [t, { dep: ti.dep, packs: ti.packs.map((e) => ({ key: e.key, file: e.file, ...(e.stretch ? { stretch: e.stretch } : {}), ...(e.file ? { tris: e.tris, bytes: e.bytes } : {}) })) }])) };
-      out.totals = { ...ix.totals, entries: Object.values(ix.tags).reduce((a, t) => a + t.packs.length, 0), files, bytes, gz, sweepBuilds: res.builds, exactBuilds: res.exact, stretchBuilds: res.stretch, maxDevM: res.maxDev };
+      const out = { ...ix, tags: Object.fromEntries(Object.entries(ix.tags).map(([t, ti]) => [t, { dep: ti.dep, packs: ti.packs.map((e) => ({ key: e.key, file: e.file, ...(e.file ? { tris: e.tris, bytes: e.bytes } : {}) })) }])) };
+      out.totals = { ...ix.totals, entries: Object.values(ix.tags).reduce((a, t) => a + t.packs.length, 0), files, bytes, gz, sweepBuilds: res.builds, exactBuilds: res.exact, maxDevM: res.maxDev };
       const rep = Models.validatePartsIndex(out); if (rep.errors.length) throw new Error(`${id}: index breaks the contract:\n  ` + rep.errors.join('\n  '));
       const text = JSON.stringify(out); fs.writeFileSync(dir + 'index.json', text);
       const ixGz = zlib.gzipSync(text, { level: 9 }).length;
