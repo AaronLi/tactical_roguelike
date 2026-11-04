@@ -10,7 +10,7 @@
 // The placed buffer is then positioned in 3D (HRTF panner, distance gain, air absorption,
 // wall occlusion), so moving around never re-renders anything. Until a room render is ready
 // the dry render plays; until that exists, the old procedural shot (G.Audio.shot) plays.
-G.GunAudio = {
+const G_GunAudio = {
   // Fixed reference listener baked into every placed buffer: right at the shooter.
   REF: { lisBearing: 105, lisDist: 1.2 },
   MIC: { micSim: true, micGain: 1.0, micHardness: 1.0, micAgc: 0.08 },
@@ -94,7 +94,7 @@ G.GunAudio = {
 
   // ------------------------------------------------------------ rendering (serial queue)
   // One render at a time keeps the main thread smooth while a level is being prewarmed.
-  enqueue(key, job, urgent) {
+  enqueue(key, job, urgent?) {
     if (this.pending.has(key)) return;
     this.pending.add(key);
     const item = { key, job };
@@ -130,14 +130,14 @@ G.GunAudio = {
     if (!s) { s = window.GunshotSynth.precompute(this.sourceParams(id)); this.sources.set(id, s); }
     return s;
   },
-  buildDry(id, urgent) {
+  buildDry(id, urgent?) {
     if (this.dry.has(id)) return;
     const dryPlace = { env: 'none', envSize: 0, envReflect: 0, envMix: 0 };
     this.enqueue('dry:' + id, () => this.getSource(id)
       .then((src) => window.GunshotSynth.place(src, this.placeParams(id, dryPlace)))
       .then((buf) => { this.dry.set(id, buf); }), urgent);
   },
-  build(id, sig, urgent) {
+  build(id, sig, urgent?) {
     const key = id + '|' + this.sigKey(sig);
     if (this.bufs.has(key)) return;
     this.enqueue(key, () => this.getSource(id)
@@ -147,7 +147,7 @@ G.GunAudio = {
 
   // Pre-render every distinct acoustic space in the level for the given weapons, so shots
   // rarely need the dry fallback. Room signatures collapse to a handful per level.
-  prewarm(ids, map) {
+  prewarm(ids, map?) {
     if (!this.available()) return;
     ids = [...new Set(ids)].filter((id) => this.spec(id));
     ids.forEach((id) => this.buildDry(id));
@@ -242,7 +242,7 @@ G.GunAudio = {
   },
   // pos = world position of the muzzle, or null for the local player's own gun. who: the shooter (for a can's first-round pop).
   // Returns false when no synth buffer exists yet so the caller can play a fallback.
-  play(id, pos, who) {
+  play(id, pos, who?) {
     const A = G.Audio, ctx = A.ctx, map = G.Game.map;
     if (!ctx || !map || !this.spec(id) || !this.available()) return false;
     const cam = G.R.camera.position;
@@ -340,3 +340,5 @@ G.GunAudio = {
     }
   },
 };
+G.GunAudio = G_GunAudio;
+interface GameModules { GunAudio: typeof G_GunAudio; }

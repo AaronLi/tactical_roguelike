@@ -1,12 +1,12 @@
 'use strict';
 // Fully synthesized sound effects (no asset files needed).
-G.Audio = {
+const G_Audio = {
   ctx: null,
   master: null,
   noise: null,
   vol: 0.6,
   muted: false,
-  samples: {},
+  samples: {} as Record<string, AudioBuffer>,
   SAMPLES: ['pull_magazine', 'insert_magazine', 'rack_slide', 'drop_slide', 'drop_bolt', 'drop_magazine', 'door_open', 'door_close',
     // the highlights' studio audience (js/highlights.ts; recordings credited in the README)
     'crowd_bed', 'crowd_cheer', 'crowd_cheer_big', 'crowd_roar', 'crowd_laugh', 'crowd_laugh_long', 'crowd_ooh', 'crowd_wow', 'crowd_awww'],
@@ -77,7 +77,7 @@ G.Audio = {
     src.connect(flt); flt.connect(g); g.connect(this.master);
     src.start(t, Math.random() * 0.5); src.stop(t + dur + 0.05);
   },
-  tone(freq, dur, type = 'sine', gain = 0.2, freqEnd, delay = 0) {
+  tone(freq, dur, type = 'sine', gain = 0.2, freqEnd?, delay = 0) {
     if (!this.ctx) return;
     const c = this.ctx, t = c.currentTime + delay;
     const o = c.createOscillator();
@@ -211,7 +211,7 @@ G.Audio = {
     zip: [[0.05, 'grab'], [0.38, 'thud'], [0.5, 'zipOut'], [0.84, 'zipTie']],
     bag: [[0.21, 'clink'], [0.33, 'rustle'], [0.5, 'rustle'], [0.63, 'tape'], [0.93, 'rustle']],
   },
-  foley(kind, from, to, dist = 0, living) {
+  foley(kind, from, to, dist = 0, living?) {
     const list = this.FOLEY[kind];
     if (!list || !this.ctx || dist > 25) return;
     for (const [at, snd] of list) if (from < at && to >= at) this[snd](dist); // bodies: the grab and the thud are the turn-over
@@ -404,3 +404,5 @@ G.Audio = {
   tape(dist = 0) { const a = this._att(dist), t = this.ctx.currentTime; this._noise(t, 0.22, 1300, 2, 0.2 * a, 'bandpass', 5200); this._noise(t + 0.26, 0.06, 800, 1, 0.18 * a, 'lowpass'); },
   heal() { this.tone(600, 0.25, 'sine', 0.15, 900); },
 };
+G.Audio = G_Audio;
+interface GameModules { Audio: typeof G_Audio; }

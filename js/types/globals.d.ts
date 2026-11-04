@@ -1,12 +1,10 @@
 // What every file of the game shares. The game is plain scripts (no import/export: each js/*.ts compiles to a
 // dist/js/*.js that index.html loads with a <script> tag, in order), so everything a file makes for the others goes on
-// one global object, G (G.U, G.Level, G.Player...). Each file says what it adds by extending GameNamespace here or in
-// itself (interfaces merge); anything not described yet is still reachable, untyped, through the index signature.
+// one global object, G (G.U, G.Level, G.Me...). Each file declares what it adds (GameModules, below; interfaces merge
+// across the scripts), and G has nothing else: a name no file declares is an error.
 
 /** The game's namespace: each file's module, hung off one global. */
-interface GameNamespace extends GameModules {
-  [module: string]: any;
-}
+interface GameNamespace extends GameModules {}
 
 /**
  * What each file puts on G, by name, as it's made. A file declares its own: `const G_Level = { ... }; G.Level = G_Level;`
