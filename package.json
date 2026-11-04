@@ -1,0 +1,16 @@
+{
+  "name": "breach-protocol",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Peer-to-peer co-op roguelike tactical FPS that runs in the browser. TypeScript (js/*.ts, compiled to dist/js/), Three.js for rendering, WebRTC (via PeerJS) for networking.",
+  "scripts": {
+    "build": "tsc -p .",
+    "dev": "node tools/dev.js",
+    "typecheck": "tsc -p . --noEmit",
+    "typecheck:strict": "tsc -p . --noEmit --strict"
+  },
+  "license": "ISC",
+  "devDependencies": {
+    "typescript": "^7.0.2"
+  }
+}

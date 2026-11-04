@@ -4,17 +4,17 @@ A level is an environment (a theme) plus a layout. Everything in it is generated
 so anything random in generation must come from the level's rng (`r`, or a `G.U.rng` seeded from
 `map.seed`), never `Math.random`. Test muted (`G.Game.setMuted(true)`).
 
-## 1. The theme: `js/data.js` `G.THEMES`
+## 1. The theme: `js/data.ts` `G.THEMES`
 
 - [ ] **`{ name, layout?, entry?, home, reflect, floor, wall, crate, fog, light, ceil }`:**
   - `home`: 1 is all residential, 0 is all work rooms; in between mixes them (`furniture.js` HOME/WORK)
   - `reflect`: how hard the surfaces ring (gun echoes, `gunaudio.js`)
   - `entry: 'vault'`: the entrance gets a vault door
-- [ ] **Route map:** give it an icon path in `js/route.js` `ICON` (a 14 px glyph centred on 0,0). Its
+- [ ] **Route map:** give it an icon path in `js/route.ts` `ICON` (a 14 px glyph centred on 0,0). Its
   `wall`/`floor` colours tint its node.
 - [ ] The route can now roll it as a node. Check a few `G.Route.gen(seed, act)` maps show it.
 
-## 2. The layout: `js/level.js`
+## 2. The layout: `js/level.ts`
 
 - [ ] **Pick or write a layout:**
   - `layApartments` (hallway + units)
@@ -30,7 +30,7 @@ so anything random in generation must come from the level's rng (`r`, or a `G.U.
   coarse tiles of clear ground (the apartments: the roof), out of sight of the target. `_pad` shelters it with what
   belongs there (`LZ_KIT`, `rm.cover`), and `G.Level.landing` drops every suspect spot that can see it or is within `LZ_NEAR` on its level. A lot
   between the pad and the building has `front: true` (no suspects, no weapon case). Check no spot sees the pad and
-  everyone's seated in the helicopter on load (`js/landing.js`). There's a real entrance:
+  everyone's seated in the helicopter on load (`js/landing.ts`). There's a real entrance:
   - a door (double, or a special `kind`) under a lamp
   - porch lanterns are added automatically for z-axis doors between outside and inside
 - [ ] **Outside areas** are fenced at the map edge (fence tiles + the `fences` list), and `out` is set for
@@ -59,7 +59,7 @@ so anything random in generation must come from the level's rng (`r`, or a `G.U.
   to the living room. A shared helper that changes for one theme goes behind an option or a theme field (`c.even` in
   `_house`, which the houses use too; `winRate`), and the other themes' hashes stay the same.
 
-## 3. Furniture and decoration: `js/furniture.js`
+## 3. Furniture and decoration: `js/furniture.ts`
 
 - [ ] **Room types:** every room type the layout uses exists in `ROOMS`:
   - fields: `must`, `wall`, `center`, `small`, `floor` (`wood`/`tile`/`carpet`/`grass`/`pave`/null), `out`
@@ -85,17 +85,17 @@ so anything random in generation must come from the level's rng (`r`, or a `G.U.
   - outside faces show windows (none for a bunker)
   - pitched roofs only on homes (`th.home >= 1`)
 
-## 3a. Residents: `js/homes.js`
+## 3a. Residents: `js/homes.ts`
 
 Apartment only (`residents: 1` in the theme). The layout comes first and knows nothing of them: `fill` runs on each
 floor after `finish`.
 
-- [ ] **A new resident is data:** an entry in `RESIDENTS` (`js/residents.js`): `home`, `rate`, `rest` (what any room they've no list for is
+- [ ] **A new resident is data:** an entry in `RESIDENTS` (`js/residents.ts`): `home`, `rate`, `rest` (what any room they've no list for is
   painted and floored as) and per room type `wall`, `ceil`, `trim`, `floor`, `items`. The notes at the top of the file say
   what each field does. `spare` on a room type: one the home can spare becomes it. `carve`: a room cut from a corner.
   `must` on an item: its main piece. New pieces go in `G.Furniture.R` with their colours in `style`, and in
-  `js/materials.js` `PROPS`, or they stop rounds as particle board. A new floor `kind` (there are `concrete` and `laminate` too) needs a texture in `textures()`
-  and a `sound` if it isn't one `js/casings.js surface` knows (`wood`, `tile`, `carpet`).
+  `js/materials.ts` `PROPS`, or they stop rounds as particle board. A new floor `kind` (there are `concrete` and `laminate` too) needs a texture in `textures()`
+  and a `sound` if it isn't one `js/casings.ts surface` knows (`wood`, `tile`, `carpet`).
 - [ ] **Random:** the assignment from `G.Homes.start` (the level's seed), the placing from the room's own stream. Never
   the level's `r` or `Math.random`. In `build`, what's drawn for a resident draws on `cur`, never `rnd0`.
 - [ ] **Nothing else moves:** with `G.Homes.RESIDENTS[0].rate = 0` a level matches what it was; with a resident, every
@@ -138,14 +138,14 @@ floor after `finish`.
 
 ## 5. Sound
 
-- [ ] **Surfaces** (`js/casings.js` `surface`): casings and magazines land with the right sound
+- [ ] **Surfaces** (`js/casings.ts` `surface`): casings and magazines land with the right sound
   (`wood`/`tile`/`concrete`/`grass`/`carpet`). Outdoor floors count as their material.
 - [ ] **Echo:** gunshots ring for the theme's `reflect`. Open spaces leak more (`gunaudio.js`
   `acousticsAt`).
 - [ ] **Impacts near you:** walls, wood (doors, furniture), metal, soft ground (`G.Audio.impactAt`).
 - [ ] **Doors:** opening and kicking are heard by suspects nearby. Special doors make their own noise.
 
-## 6. Gameplay placement: `finish()`, `js/server.js`
+## 6. Gameplay placement: `finish()`, `js/server.ts`
 
 - [ ] **Suspects** spawn in rooms away from the spawn (`enemySpots`), spread out, never in the spawn room
   or its approach. With units, every unit gets one first.
