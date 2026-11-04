@@ -31,6 +31,9 @@ interface Part { // a part as the catalog holds it
   brand: string; name: string; desc: string; price: number; model?: PartModel; provides?: Record<string, string | { mount: string; bare?: boolean; brace?: Record<string, number> }> | null;
   chassis?: Record<string, string | { mount: string; bare?: boolean; brace?: Record<string, number> }>; not?: string[]; alsoMounts?: string[]; factory?: boolean; oem?: boolean; fam?: string; plat?: string;
   stype?: string; variant?: boolean; retired?: boolean; becomes: string /* (a receiver kit: the gun it makes) */;
+  skin?: string; alt?: boolean; skinName?: string; /* (a skin family: the parts of one mount that are one part in different finishes; skin is the family's root part, alt a member that isn't it, skinName the finish) */
+  into?: string; /* (a part merged into another, the same part in the same finish: it's retired, and a saved gun with it gets that one) */
+  fit?: boolean; hgScale?: boolean; /* (a handguard with no rails: it runs the barrel's length, whatever its own; one with rails: its figures follow its length against the gun's own handguard's) */
   len?: number; /* (a shared long-gun barrel: its length in inches, what fits is each gun's factory length's 0.6x-1.6x) */
 }
 interface MagFam {
@@ -40,7 +43,7 @@ interface MagFam {
 interface Slot { // a slot on a weapon platform (a nested one also has the parent slot it opens from)
   slot: SlotName; mount: string; req: boolean; bare?: boolean; parent?: string | null; brace?: Record<string, number>;
 }
-interface Platform { id: string; arch: ArchKind; spec: ModelSpec; slots: Slot[]; defaults: Record<string, string>; offset?: Record<string, number>; magVariants?: boolean; kg?: number; ergo?: number; barrelModel?: Record<string, any>; /* (its own barrel's shape, what a shared barrel of any length is scaled from) */ }
+interface Platform { id: string; arch: ArchKind; spec: ModelSpec; slots: Slot[]; defaults: Record<string, string>; offset?: Record<string, number>; hgLen?: number; /* (its own handguard's length: what a fitted one is scaled from, what a railed one's figures are against) */ magVariants?: boolean; kg?: number; ergo?: number; barrelModel?: Record<string, any>; /* (its own barrel's shape, what a shared barrel of any length is scaled from) */ }
 type RcvKit = [string, string, number, number, string]; // brand, name, price, tier, description
 const G_Gunsmith = (() => {
   const PARTS: Record<string, Part> = {}, LIST: Part[] = [], PLATFORMS: Record<string, Platform> = {}, BY_MOUNT = new Map<string, Part[]>();
@@ -142,8 +145,21 @@ const G_Gunsmith = (() => {
     }
     return o;
   };
-  // a part's stats on this gun (a shared barrel's depend on the gun's own length)
-  const partSt = (p: Part, id?: string | null): Record<string, number> => (p.len != null && id && (G.GUN_SPECS[id] || {}).barrel ? lenSt(p.len / G.GUN_SPECS[id].barrel) : p.st);
+  // What a railed handguard's length does, from its length against the gun's own handguard's: k = length / that. Nothing at k = 1 (so a
+  // gun's own keeps its figures). Longer: heavier (in proportion), a little less handy, a little steadier (the foregrip sits further out,
+  // more of the barrel is held); shorter, the other way. ln k for the handling, as the barrel's curve does.
+  const HG_W = 1.5, HG_ERGO = -4, HG_RECOIL = -5, HG_ACC = -4;
+  const hgSt = (st: Record<string, number>, k: number): Record<string, number> => {
+    if (k === 1) return st;
+    const kk = Math.min(2.2, Math.max(0.45, k)), u = Math.log(kk), r1 = (v: number) => Math.round(v * 10) / 10;
+    return Object.assign({}, st, { ergo: r1((st.ergo || 0) + HG_ERGO * u), recoil: r1((st.recoil || 0) + HG_RECOIL * u), acc: r1((st.acc || 0) + HG_ACC * u), weight: Math.round(((st.weight || 0) * (1 + HG_W * (kk - 1))) * 1000) / 1000 });
+  };
+  // a part's stats on this gun (a shared barrel's depend on the gun's own length, a railed handguard's on its length against the gun's own)
+  const partSt = (p: Part, id?: string | null): Record<string, number> => {
+    if (p.len != null && id && (G.GUN_SPECS[id] || {}).barrel) return lenSt(p.len / G.GUN_SPECS[id].barrel);
+    if (p.hgScale && id && PLATFORMS[id]) return hgSt(p.st, p.model!.hg!.len! / (PLATFORMS[id].hgLen || 0.24)); // (a gun with no handguard of its own, the Thor with an AR barrel nut: against a carbine's)
+    return p.st;
+  };
   // a barrel part's length on this gun, inches (a pistol's: the gun's own, and what it adds)
   const barrelOf = (p: Part, id?: string | null): number | null => {
     const f = id && (G.GUN_SPECS[id] || {}).barrel;
@@ -813,7 +829,9 @@ const G_Gunsmith = (() => {
     if (rest === undefined) return { id, build: defaultBuild(id) };
     const build: any = {}, left: Part[] = [];
     for (const s of rest.split('.')) {
-      const l = s.endsWith('_'), p = LIST[parseInt(l ? s.slice(0, -1) : s, 36)];
+      const l = s.endsWith('_');
+      let p = LIST[parseInt(l ? s.slice(0, -1) : s, 36)];
+      if (p && p.into) p = PARTS[p.into]; // (a part that's been merged into another: the same part)
       if (!p || p.retired) continue;
       if (l && p.slot === 'tac') build.tacL = p.id; else left.push(p);
     }
@@ -887,14 +905,24 @@ const G_Gunsmith = (() => {
   // the list, but no upgrade on any gun, so nothing sells or offers it for another. Those of a mount are the one grip in
   // different finishes: a gun whose stock grip is one can have any of them, for nothing (skins: the gunsmith's picker).
   const plainGrip = (p: Part) => p.slot === 'grip' && p.oem && !Object.keys(p.st || {}).length;
-  const plainHere = (p: Part, id: string) => plainGrip(p) && PLATFORMS[id].defaults.grip !== p.id;
+  const plainHere = (p: Part, id: string) => (plainGrip(p) && PLATFORMS[id].defaults.grip !== p.id) || !!p.alt;
   const skins = (id: string) => { const d = PARTS[PLATFORMS[id].defaults.grip]; return d && plainGrip(d) ? compatible(d.mount).filter((p: Part) => plainGrip(p) && !(p.not || []).includes(id)) : []; };
+  // The same part in other finishes (a skin family: parts of one mount with the same figures and shape, differing in finish only, made
+  // in the pass at the end of this file). They're one part: offered and sold as one, a finish costs nothing to change. The family
+  // of a part, those that go on this gun (a plain grip's: the gun's stock grip's, above); an empty list where it has none.
+  const skinsOf = (id: string, p: Part | null | undefined): Part[] => {
+    if (!p) return [];
+    if (plainGrip(p)) return skins(id).includes(p) ? skins(id) : [];
+    return p.skin ? compatible(p.mount).filter((q: Part) => q.skin === p.skin && !(q.not || []).includes(id)) : [];
+  };
+  const sameFamily = (a: Part | null | undefined, b: Part | null | undefined) => !!a && !!b && !!a.skin && a.skin === b.skin;
 
   // ------------------------------------------------------------------ compile: build -> weapon def
   const cache = new Map();
   const clamp = (v: number, a: number, b: number) => (v < a ? a : v > b ? b : v);
   function compile(id: string, build: Record<string, string>) {
     build = build || defaultBuild(id);
+    if (Object.values(build).some((pid) => PARTS[pid] && PARTS[pid].into)) build = Object.fromEntries(Object.entries(build).map(([sl, pid]) => [sl, PARTS[pid] && PARTS[pid].into ? PARTS[pid].into! : pid]));
     if (Object.values(build).some((pid) => PARTS[pid] && PARTS[pid].retired)) build = Object.fromEntries(Object.entries(build).filter(([, pid]) => !(PARTS[pid] && PARTS[pid].retired))); // (a saved gun with a part that's gone)
     const code = encode(id, build);
     if (cache.has(code)) return cache.get(code);
@@ -981,7 +1009,8 @@ const G_Gunsmith = (() => {
     // recoil from this build's weight and barrel (G.physRecoil), then what its parts do to it
     d.recoil = (G.physRecoil(d, d.weight) || base.recoil) * clamp(1 + s.recoil / 100, 0.3, 2);
     d.soundKey = gs.barrel ? `${id}:${(+barrelIn).toFixed(1)}:${device}${d.can ? ':' + d.can : ''}` : id;
-    d.value = base.price + parts.reduce((a, p) => a + (p.factory || plat.defaults[p.slot] === p.id ? 0 : p.price), 0);
+    // (what the gun's worth: its price and what's been added; the gun's own part in another finish is still its own: a skin adds nothing)
+    d.value = base.price + parts.reduce((a, p) => a + (p.factory || plat.defaults[p.slot] === p.id || sameFamily(PARTS[plat.defaults[p.slot]], p) || (plainGrip(p) && !!PARTS[plat.defaults.grip] && plainGrip(PARTS[plat.defaults.grip])) ? 0 : p.price), 0);
     cache.set(code, d);
     return d;
   }
@@ -1019,6 +1048,12 @@ const G_Gunsmith = (() => {
     const plat = PLATFORMS[id], B = plat.barrelModel || {}, k = p.len! / (G.GUN_SPECS[id].barrel || p.len!);
     return plat.arch === 'rifle' ? { barrel: Object.assign({}, B, { len: B.len * k }) } : { blen: (B.len || 0.1) * k };
   }
+  // A handguard with no rails on this gun: as long as the gun's own handguard, and longer or shorter as the barrel on it is, against the
+  // gun's factory barrel (the model then keeps it back from the muzzle: js/gunmodels.ts)
+  function fitModel(id: string, p: Part, barrelId?: string): Record<string, any> {
+    const ref = PLATFORMS[id].hgLen, gb = (G.GUN_SPECS[id] || {}).barrel, bp = barrelId ? PARTS[barrelId] : null, bi = bp && barrelOf(bp, id);
+    return { hg: Object.assign({}, p.model!.hg, ref ? { len: ref * (gb && bi ? bi / gb : 1) } : {}) };
+  }
   // The model spec for a build: the platform's receiver spec with every installed part's patch applied.
   function modelSpec(def: any) {
     const plat = PLATFORMS[def.id];
@@ -1026,7 +1061,7 @@ const G_Gunsmith = (() => {
     // (in slot order, by the slot each is in: what's on an adapter goes over the adapter)
     const fitted = Object.entries(def.build || defaultBuild(def.id)).filter(([, p]) => PARTS[p])
       .sort((a, b) => slotRank(a[0]) - slotRank(b[0]));
-    for (const [sl, pid] of fitted) for (let [k, v] of Object.entries(PARTS[pid].len != null ? lenModel(def.id, PARTS[pid]) : PARTS[pid].model || {})) {
+    for (const [sl, pid] of fitted) for (let [k, v] of Object.entries(PARTS[pid].len != null ? lenModel(def.id, PARTS[pid]) : PARTS[pid].fit ? fitModel(def.id, PARTS[pid], (def.build || {}).barrel) : PARTS[pid].model || {})) {
       if (k === 'tac' && sl === 'tacL') k = 'tacL'; // (the left rail's)
       if (k === 'pumpPatch') { spec.pump = Object.assign({}, spec.pump || {}, v); continue; }
       if (v && typeof v === 'object' && !Array.isArray(v) && spec[k] && typeof spec[k] === 'object') spec[k] = Object.assign({}, spec[k], v);
@@ -1226,6 +1261,58 @@ const G_Gunsmith = (() => {
       plat.slots.sort((a: Slot, b: Slot) => ORDER.indexOf(a.slot) - ORDER.indexOf(b.slot));
     }
   }
+  // ------------------------------------------------------------------ no part twice (handguards and stocks)
+  // For any one gun, no two stocks or handguards it takes read the same: parts of one mount that differ in finish alone are one part in
+  // different finishes (a skin family: the gunsmith's picker, free to change), the same part twice in one finish is merged (the one a gun
+  // comes with stays: the other is retired, `into` it), and the rest differ in what they do:
+  //   - a handguard with no rails (wood, slim, box, fore-end, shroud, fins, carbine): one part for the type on a mount, as long as the
+  //     gun's own handguard is, longer or shorter with the barrel (modelSpec: fitModel);
+  //   - one with rails or M-LOK: a part for each length, its figures from its length against the gun's own handguard's (hgSt).
+  // Their own handguards (the MCX's, MPX's and G36's) already differ in figures; a part's id in a code is its place in the list, so
+  // none is removed: a merged part is retired and a saved gun with it gets the one it went into (decode, compile).
+  for (const plat of Object.values(PLATFORMS)) { const h = plat.defaults.handguard && PARTS[plat.defaults.handguard]; if (h && h.model && h.model.hg && h.model.hg.len) plat.hgLen = h.model.hg.len; }
+  {
+    const PLAIN_HG = new Set(['wood', 'slim', 'box', 'stockfore', 'shroud', 'fins', 'carbine']), SCALED_HG = new Set(['rail', 'mlok', 'qbz']);
+    const FINISH: Record<string, string> = { f: 'Factory finish', tan: 'FDE', polymer: 'Polymer', woodRed: 'Laminate', woodDark: 'Walnut', wood: 'Wood', park: 'Parkerized', black: 'Black', blued: 'Blued', od: 'OD' };
+    const hgKey = (p: Part) => { const t = p.model!.hg!.t!; return PLAIN_HG.has(t) ? `${t}` : SCALED_HG.has(t) ? `${t}:${p.model!.hg!.len}` : null; };
+    const merge = (slot: string, keyOf: (p: Part) => string | null, finOf: (p: Part) => string) => {
+      for (const mount of [...BY_MOUNT.keys()]) {
+        const groups = new Map<string, Part[]>();
+        for (const p of BY_MOUNT.get(mount)!) { const k = p.slot === slot && !p.retired && p.model ? keyOf(p) : null; if (k != null) { const g = `${k}|${JSON.stringify(p.st)}`; if (!groups.has(g)) groups.set(g, []); groups.get(g)!.push(p); } }
+        for (const ms of groups.values()) {
+          const byFin = new Map<string, Part[]>();
+          for (const p of ms) { const f = finOf(p); if (!byFin.has(f)) byFin.set(f, []); byFin.get(f)!.push(p); }
+          const keep: Part[] = [];
+          for (const g of byFin.values()) { // (one part in each finish: the one a gun comes with, else the first)
+            g.sort((a, b) => (b.oem ? 1 : 0) - (a.oem ? 1 : 0) || a.idx - b.idx);
+            keep.push(g[0]);
+            for (const q of g.slice(1)) { q.retired = true; q.into = g[0].id; }
+          }
+          if (keep.length < 2) continue;
+          const score = (p: Part) => (p.oem ? 2 : 0) + (finOf(p) === 'f' ? 1 : 0);
+          const root = keep.slice().sort((a, b) => score(b) - score(a) || a.idx - b.idx)[0];
+          for (const p of keep) {
+            p.skin = root.id; p.alt = p !== root; p.skinName = FINISH[finOf(p)] || finOf(p);
+            p.price = root.price; p.tier = root.tier; p.brand = root.brand;
+            if (p.alt) p.name = `${root.name} (${p.skinName.toLowerCase() === 'factory finish' ? 'factory' : p.skinName})`;
+          }
+        }
+        BY_MOUNT.set(mount, BY_MOUNT.get(mount)!.filter((p) => !p.into));
+      }
+    };
+    merge('handguard', hgKey, (p) => p.model!.hg!.m || 'f');
+    merge('stock', (p) => (p.model!.stock as string) || null, (p) => (p.model!.sm as string) || 'f');
+    for (const plat of Object.values(PLATFORMS)) for (const [sl, pid] of Object.entries(plat.defaults)) if (PARTS[pid] && PARTS[pid].into) plat.defaults[sl] = PARTS[pid].into!;
+    for (const p of LIST) {
+      if (p.slot !== 'handguard' || p.retired || !p.model || !p.model.hg) continue;
+      const t = p.model.hg.t!;
+      if (PLAIN_HG.has(t)) { // (no rails: named for what it is, for it has no length of its own)
+        p.fit = true; p.desc = 'No rails. Fitted to the barrel: it runs as far as the barrel does, longer or shorter with it.';
+        const base = `${p.brand.split(' ')[0]} ${NAMES.handguard[t] || 'handguard'}`;
+        p.name = p.alt ? `${base} (${p.skinName})` : base;
+      } else if (SCALED_HG.has(t)) p.hgScale = true;
+    }
+  }
   const compatible = (mount: string) => BY_MOUNT.get(mount) || [];
   const FITS = new Map(); // interface -> weapon ids that have (or can get) a slot for it
   for (const plat of Object.values(PLATFORMS)) {
@@ -1242,12 +1329,12 @@ const G_Gunsmith = (() => {
   // better parts appear deeper in the run. What the guns already come with seldom does: a part is weighted down by the share
   // of the weapons it fits that ship with it (the A2 birdcage, the stock red dot), so the shelves are mostly upgrades.
   const SHIPS = new Map(); // part -> how many weapons have it as their default
-  for (const plat of Object.values(PLATFORMS)) for (const pid of Object.values(plat.defaults)) SHIPS.set(pid, (SHIPS.get(pid) || 0) + 1);
-  const stockShare = (p: Part) => (p.slot === 'receiver' ? 0 : (SHIPS.get(p.id) || 0) / Math.max(1, fitsPart(p).length)); // (a receiver kit is a conversion, not a default)
+  for (const plat of Object.values(PLATFORMS)) for (const pid of Object.values(plat.defaults)) { const f = (PARTS[pid] && PARTS[pid].skin) || pid; SHIPS.set(f, (SHIPS.get(f) || 0) + 1); } // (a skin family: by its root, whichever finish a gun comes in)
+  const stockShare = (p: Part) => (p.slot === 'receiver' ? 0 : (SHIPS.get(p.skin || p.id) || 0) / Math.max(1, fitsPart(p).length)); // (a receiver kit is a conversion, not a default)
   function rollStock(level: number, seed: number, n = 7) {
     const r = G.U.rng((seed ^ 0x6a5d) >>> 0), maxTier = Math.min(3, 1 + Math.floor(level / 2)), out = new Set();
     // (lights and lasers are few among hundreds of muzzles, stocks and grips: they're weighted up to turn up most visits)
-    const pool = LIST.filter((p) => !p.factory && !p.variant && !p.retired && !plainGrip(p) && p.tier <= maxTier && p.id !== 'fg.4') // (the bipod's the showcase's: rollPrecision)
+    const pool = LIST.filter((p) => !p.factory && !p.variant && !p.retired && !p.alt && !plainGrip(p) && p.tier <= maxTier && p.id !== 'fg.4') // (the bipod's the showcase's: rollPrecision)
       .map((p) => ({ p, w: Math.pow(fitsPart(p).length, 0.8) * (p.slot === 'tac' ? 9 : 1) * Math.max(0.04, Math.pow(1 - stockShare(p), 3)) }));
     while (out.size < n && pool.length) {
       let roll = r() * pool.reduce((a, x) => a + x.w, 0), i = 0;
@@ -1261,7 +1348,7 @@ const G_Gunsmith = (() => {
   // the bipod, and match barrels for the long guns (the marksman and sniper rifles first).
   function rollPrecision(level: number, seed: number, n = 8) {
     const r = G.U.rng((seed ^ 0x5c09e) >>> 0), maxTier = Math.min(3, 2 + Math.floor(level / 2)), his = rollStock(level, seed);
-    const ok = (p: Part) => !p.factory && !p.retired && !his.has(p.id) && (p.tier || 1) <= maxTier;
+    const ok = (p: Part) => !p.factory && !p.retired && !p.alt && !his.has(p.id) && (p.tier || 1) <= maxTier;
     const take = (list: Part[], k: number) => G.U.shuffle(r, list.filter(ok)).slice(0, k).map((p) => p.id);
     const magnified = LIST.filter((p) => p.slot === 'optic' && p.model && (['scope', 'lpvo', 'acog'] as (string | undefined)[]).includes(p.model.optic));
     const scopes = take(magnified.filter((p) => !p.oem), 3); // (the named glass first; the plain rifle scopes the guns ship with if it's short)
@@ -1290,7 +1377,7 @@ const G_Gunsmith = (() => {
   }
   return {
     PARTS, LIST, PLATFORMS, attachOptions, SLOT_LABEL, BRANDS: BR, ifaceName, fits, fitsPart, fitsSlot, fitsLen, partSt, barrelOf, ALIAS, kindOf,
-    defaultBuild, slotsOf, slotFor, slotLabel, visibleSlots, magCap, prune, encode, decode, compile, fromCode, soundSpec, roundSoundKey, modelSpec, rollStock, rollPrecision, compatible, strip, convert, kitsFor, convParts, buyPrice, sellPrice, plainGrip, plainHere, skins, RCV,
+    defaultBuild, slotsOf, slotFor, slotLabel, visibleSlots, magCap, prune, encode, decode, compile, fromCode, soundSpec, roundSoundKey, modelSpec, rollStock, rollPrecision, compatible, strip, convert, kitsFor, convParts, buyPrice, sellPrice, plainGrip, plainHere, skins, skinsOf, sameFamily, RCV,
     defaultCode: (id: string) => encode(id, defaultBuild(id)),
   };
 })();

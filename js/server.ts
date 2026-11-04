@@ -595,7 +595,7 @@ const G_Server = {
       }
     };
     draw(def ? GS.attachOptions(def.id, def.build) : []);
-    draw(GS.LIST.filter((p: Loose) => !p.factory && !p.variant && !p.retired && !p.becomes && (p.tier || 1) <= 2 && !out.includes(p.id) && ['muzzle', 'fg', 'tac', 'optic', 'magnifier', 'stock'].includes(p.slot)));
+    draw(GS.LIST.filter((p: Loose) => !p.factory && !p.variant && !p.retired && !p.alt && !p.becomes && (p.tier || 1) <= 2 && !out.includes(p.id) && ['muzzle', 'fg', 'tac', 'optic', 'magnifier', 'stock'].includes(p.slot)));
     return out;
   },
   // [open, { player id: [their three part ids, the one they took (or null)] }] or null when the level has no box

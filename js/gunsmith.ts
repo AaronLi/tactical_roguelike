@@ -179,7 +179,7 @@ const G_GunsmithUI = (() => {
   }
 
   // ------------------------------------------------------------------ stats
-  const pct = (v: number) => `${v > 0 ? '+' : ''}${Math.round(v)}%`;
+  const pct = (v: number) => `${v > 0 ? '+' : ''}${Math.round(v) === 0 && v !== 0 ? v.toFixed(1) : Math.round(v)}%`; // (a fraction of a percent, as a handguard's length makes: not "0%")
   // [label, value(def), better: 1 higher / -1 lower / 0 n/a, format, bar range]
   // name, the stat, which way is better (1 up, -1 down, 0 neither), its format, the bar's range
   const ROWS: [string, (d: any) => number, number, (v: number) => string | number, [number, number]][] = [
@@ -259,6 +259,9 @@ const G_GunsmithUI = (() => {
     if (s.rpm) add(`Rate ${pct(s.rpm)}`, s.rpm > 0);
     if (s.spin) add(`Spin-up ${pct(s.spin)}`, s.spin < 0);
     if (s.reload) add(`Reload ${pct(s.reload)}`, s.reload < 0);
+    if (p.slot === 'handguard' && p.model && p.model.hg) { // (no rails: it runs as far as the barrel does; rails: its length)
+      if (p.fit) out.push('<span>Fits the barrel</span>'); else if (p.hgScale) out.push(`<span>${(p.model.hg.len! * 39.37).toFixed(1)}"</span>`);
+    }
     if (s.weight) add(`${s.weight > 0 ? '+' : ''}${s.weight.toFixed(2)} kg`, s.weight < 0);
     if (p.becomes) out.push(`<span class="g">Becomes the ${G.U.esc(G.WEAPONS[p.becomes].name)} (${(G.CALIBERS as Record<string, CaliberDef>)[G.calOf(G.WEAPONS[p.becomes])].name})</span>`);
     if (p.set && p.set.perLoad) out.push(`<span>${p.set.perLoad} shells a push</span>`);
@@ -294,7 +297,7 @@ const G_GunsmithUI = (() => {
   // Its dot on the model and its row in the list get a "!".
   function buyable(slot: string) {
     const w = weapon(), s = w && GS.visibleSlots(w.def.id, w.def.build).find((q: Slot) => q.slot === slot);
-    return !!s && GS.compatible(s.mount).some((p: Part) => p.id !== w.def.build[slot] && GS.fitsLen(p, w.def.id) && forSale(p));
+    return !!s && GS.compatible(s.mount).some((p: Part) => p.id !== w.def.build[slot] && !GS.sameFamily(p, GS.PARTS[w.def.build[slot]]) && GS.fitsLen(p, w.def.id) && forSale(p));
   }
   function apply(w: any, build: any) {
     G.Me.refit(w, build);
@@ -325,12 +328,20 @@ const G_GunsmithUI = (() => {
     apply(w, build); G.Audio.click();
     G.Shop.render();
   }
-  // the gun's stock grip in another finish: it's the same grip, so it costs nothing and goes on as it is
+  // the part on the picked slot in another finish (the gun's stock grip, or a part with a skin family: GS.skinsOf): it's the same part,
+  // so it costs nothing and goes on as it is
   function reskin(pid: string) {
-    const w = weapon(), build = Object.assign({}, w.def.build);
-    if (!GS.skins(w.def.id).some((p: Part) => p.id === pid) || !GS.plainGrip(GS.PARTS[build.grip] || {}) || G.Shop.ready) return;
-    build.grip = pid;
+    const w = weapon(), build = Object.assign({}, w.def.build), slot = st.slot;
+    if (!slot || !build[slot] || !GS.skinsOf(w.def.id, GS.PARTS[build[slot]]).some((p: Part) => p.id === pid) || G.Shop.ready) return;
+    build[slot] = pid;
     apply(w, build); G.Audio.click();
+    G.Shop.render();
+  }
+  // one in the stash, in another finish: the item becomes that one (a part's worth is the same in any: nothing's gained)
+  function restash(from: string, to: string) {
+    const w = weapon(), a = GS.PARTS[from], b = GS.PARTS[to];
+    if (!w || !a || !b || a === b || !GS.sameFamily(a, b) || !GS.skinsOf(w.def.id, a).includes(b) || G.Shop.ready || !fromStash(from)) return;
+    toStash(to); G.Audio.click();
     G.Shop.render();
   }
   function sell(pid: string) {
@@ -448,9 +459,12 @@ const G_GunsmithUI = (() => {
     let list = '';
     if (cur) {
       // (of the plain grips, just the one on it, or the gun's own: the rest are finishes of it, in the picker on that row)
-      const fitted = GS.PARTS[build[cur.slot]], skins = cur.slot === 'grip' ? GS.skins(def.id) : [], skinned = skins.includes(fitted);
-      const plainOut = (p: Part) => (skinned ? GS.plainGrip(p) : GS.plainHere(p, def.id));
-      const parts = GS.compatible(cur.mount).filter((p: Part) => GS.fitsLen(p, def.id) && (!p.factory || p.plat === def.id || (Me.stash || {})[p.id] || build[cur.slot] === p.id) && !(p.not || []).includes(def.id) && (!plainOut(p) || (Me.stash || {})[p.id] || build[cur.slot] === p.id));
+      // (a part with a skin family: the one on it, or those in the stash, or else the family's own, once: the rest are its finishes)
+      const fitted = GS.PARTS[build[cur.slot]], skins = GS.skinsOf(def.id, fitted), skinned = skins.includes(fitted);
+      const own = (p: Part) => (Me.stash || {})[p.id] || build[cur.slot] === p.id;
+      const famStashed = (p: Part) => !!p.skin && Object.keys(Me.stash || {}).some((q) => GS.PARTS[q] && GS.PARTS[q].skin === p.skin);
+      const plainOut = (p: Part) => (cur.slot === 'grip' ? (skinned ? GS.plainGrip(p) : GS.plainHere(p, def.id)) : !!p.skin && (p.alt || GS.sameFamily(fitted, p) || famStashed(p)));
+      const parts = GS.compatible(cur.mount).filter((p: Part) => GS.fitsLen(p, def.id) && (!p.factory || p.plat === def.id || (Me.stash || {})[p.id] || build[cur.slot] === p.id) && !(p.not || []).includes(def.id) && (!plainOut(p) || own(p)));
       const rank = (p: Part) => (build[cur.slot] === p.id ? 0 : (Me.stash || {})[p.id] ? 1 : atShowcase(p) && !needed(p) ? 3 : forSale(p) ? 2 : 4);
       parts.sort((a: Part, b: Part) => rank(a) - rank(b) || (a.len != null && b.len != null ? a.len - b.len : 0) || a.price - b.price); // (barrels: by length)
       let head = false;
@@ -459,8 +473,8 @@ const G_GunsmithUI = (() => {
         if (r === 3 && !head) { head = true; list += '<div class="gs-sub">At Timberline Outfitters <small>(by the hangar door)</small></div>'; }
         let action;
         if (r === 0 && !(skinned && skins.length > 1)) action = cur.req ? '<span class="tag">Fitted</span>' : `<button class="btn small" data-gremove="${cur.slot}">Remove</button>`;
-        else if (r === 0) action = `<select class="gs-skin" data-gskin ${G.Shop.ready ? 'disabled' : ''}>${skins.map((q: any) => `<option value="${q.id}"${q === p ? ' selected' : ''}>${G.U.esc(q.name)}</option>`).join('')}</select>`;
-        else if (r === 1) action = `<button class="btn small buy" data-ginstall="${p.id}">Fit (stash ×${n})</button> <button class="btn small" data-gsell="${p.id}">Sell ¢${G.U.fmt(GS.sellPrice(p))}</button>`;
+        else if (r === 0) action = `<select class="gs-skin" data-gskin ${G.Shop.ready ? 'disabled' : ''}>${skins.map((q: any) => `<option value="${q.id}"${q === p ? ' selected' : ''}>${G.U.esc(q.skinName || q.name)}</option>`).join('')}</select>`;
+        else if (r === 1) action = `<button class="btn small buy" data-ginstall="${p.id}">Fit (stash ×${n})</button> <button class="btn small" data-gsell="${p.id}">Sell ¢${G.U.fmt(GS.sellPrice(p))}</button>${p.skin && GS.skinsOf(def.id, p).length > 1 ? ` <select class="gs-skin" data-gskinstash="${p.id}" ${G.Shop.ready ? 'disabled' : ''}>${GS.skinsOf(def.id, p).map((q: any) => `<option value="${q.id}"${q === p ? ' selected' : ''}>${G.U.esc(q.skinName || q.name)}</option>`).join('')}</select>` : ''}`;
         else if (r === 2 || r === 3) action = `<button class="btn small buy" data-ginstall="${p.id}" ${Me.credits < GS.buyPrice(p) ? 'disabled' : ''}>¢${G.U.fmt(GS.buyPrice(p))}</button>`;
         else action = `<span class="tag">${factoryHere ? 'Comes with the gun' : p.tier > Math.min(3, 1 + Math.floor((G.Shop.level || 1) / 2)) ? 'Available later' : 'Out of stock'}</span>`;
         list += `<div class="gs-part${r === 0 ? ' fitted' : ''}${r === 4 ? ' na' : ''}" data-gpart="${p.id}">
@@ -516,7 +530,11 @@ const G_GunsmithUI = (() => {
     const gr = t.closest('[data-gremove]'); if (gr) return remove(gr.dataset.gremove);
     const gl = t.closest('[data-gsell]'); if (gl) return sell(gl.dataset.gsell);
   }
-  function onChange(e: Event) { if ((e.target as HTMLSelectElement).dataset.gskin != null) reskin((e.target as HTMLSelectElement).value); }
+  function onChange(e: Event) {
+    const el = e.target as HTMLSelectElement;
+    if (el.dataset.gskin != null) reskin(el.value);
+    else if (el.dataset.gskinstash) restash(el.dataset.gskinstash, el.value);
+  }
   // hovering a part previews it on the gun (model and stats)
   function onHover(e: Event) {
     const w = weapon();
