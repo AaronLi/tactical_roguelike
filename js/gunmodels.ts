@@ -129,12 +129,12 @@ const G_GunModels = (() => {
   // ---------------------------------------------------------------- primitive kit
   function kit() {
     const g = new T.Group();
-    let tgt: THREE.Object3D = g, of = 0, oy = 0, slot = 'base', at: string | null = null;
+    let tgt: THREE.Object3D = g, of = 0, oy = 0, slot = 'base', at: string | null = null, rec: THREE.Mesh[] | null = null;
     // what a part provides for the baker (js/gunmodels.ts build(): g.userData.bake): anchors[slot][name] = [forward, up, right] in the gun's
     // frame (mount_<slot>: where a part of that slot goes; others as info's), stretch[key] = [f0, f1]: the forward planes between which that
     // part's geometry scales when its length changes (everything behind them stays, everything ahead translates by the change)
     const bake: { anchors: Record<string, Record<string, number[] | number[][]>>; stretch: Record<string, number[]> } = { anchors: {}, stretch: {} };
-    const put = (geo: THREE.BufferGeometry, m: THREE.Material, x: number, y: number, f: number) => { const mesh = new T.Mesh(geo, m); mesh.position.set(x, y - oy, -(f - of)); mesh.userData.slot = slot; if (at) mesh.userData.at = at; tgt.add(mesh); return mesh; };
+    const put = (geo: THREE.BufferGeometry, m: THREE.Material, x: number, y: number, f: number) => { const mesh = new T.Mesh(geo, m); mesh.position.set(x, y - oy, -(f - of)); mesh.userData.slot = slot; if (at) mesh.userData.at = at; tgt.add(mesh); if (rec) rec.push(mesh); return mesh; };
     return {
       g,
       // everything built after this belongs to that slot's part (the gunsmith highlights and picks by it)
@@ -145,7 +145,7 @@ const G_GunModels = (() => {
       // owner: 'barrel' = it stands on the barrel, at the barrel's mount_frontsight): it is baked as a piece of its own, which only
       // translates (or, for a rib, stretches, info.stretch) with that part
       at<T>(a: string, fn: () => T): T { const was = at; at = a; try { return fn(); } finally { at = was; } },
-      add(mesh: THREE.Object3D) { mesh.userData.slot = slot; if (at) mesh.userData.at = at; g.add(mesh); return mesh; },
+      add(mesh: THREE.Object3D) { mesh.userData.slot = slot; if (at) mesh.userData.at = at; g.add(mesh); if (rec && (mesh as THREE.Mesh).isMesh) rec.push(mesh as THREE.Mesh); return mesh; },
       place(geo: THREE.BufferGeometry, m: THREE.Material, x: number, y: number, f: number) { return put(geo, m, x, y, f); }, // (a shape of your own, on whatever part it's built on: it tips with a hinge, as add doesn't)
       hang(o: THREE.Object3D, x: number, y: number, f: number) { o.position.set(x, y - oy, -(f - of)); tgt.add(o); return o; }, // (a group of your own, likewise)
       get slot() { return slot; },
@@ -156,18 +156,21 @@ const G_GunModels = (() => {
       // from its back end, so the details keep their COUNT (a rail's teeth, a handguard's slots) and a length change is a clean stretch,
       // geometry between two planes scaling and the ends staying. Returns [back, front] in forward metres: the planes as built at `len`.
       stretched(ref: number, len: number, fn: () => void): [number, number] {
-        const n = g.children.length; fn();
-        const ms = g.children.slice(n) as THREE.Mesh[], vs = new T.Vector3();
+        const was = rec, ms: THREE.Mesh[] = (rec = []);
+        try { fn(); } finally { rec = was; }
+        g.updateMatrixWorld(true);
+        const vs = new T.Vector3();
         let a = Infinity, b = -Infinity;
-        for (const m of ms) { m.updateMatrix(); const pa = m.geometry.attributes.position as THREE.BufferAttribute; for (let i = 0; i < pa.count; i++) { vs.fromBufferAttribute(pa, i).applyMatrix4(m.matrix); a = Math.min(a, -vs.z); b = Math.max(b, -vs.z); } }
+        for (const m of ms) { const pa = m.geometry.attributes.position as THREE.BufferAttribute; for (let i = 0; i < pa.count; i++) { vs.fromBufferAttribute(pa, i).applyMatrix4(m.matrixWorld); a = Math.min(a, -vs.z); b = Math.max(b, -vs.z); } }
         if (len === ref || !(b > a)) return [a, b];
         const sc = (b - a + len - ref) / (b - a), nv = new T.Vector3();
         for (const m of ms) {
-          const geo = m.geometry.clone().applyMatrix4(m.matrix), pa = geo.attributes.position as THREE.BufferAttribute, na = geo.attributes.normal as THREE.BufferAttribute | undefined;
+          const geo = m.geometry.clone().applyMatrix4(m.matrixWorld), pa = geo.attributes.position as THREE.BufferAttribute, na = geo.attributes.normal as THREE.BufferAttribute | undefined;
           for (let i = 0; i < pa.count; i++) {
             pa.setZ(i, -(a + (-pa.getZ(i) - a) * sc));
             if (na) { nv.fromBufferAttribute(na, i); nv.z /= sc; nv.normalize(); na.setXYZ(i, nv.x, nv.y, nv.z); }
           }
+          geo.applyMatrix4(new T.Matrix4().copy(m.parent!.matrixWorld).invert()); // (back into its parent's frame: a part's)
           geo.computeBoundingSphere(); geo.computeBoundingBox();
           m.geometry = geo; m.position.set(0, 0, 0); m.quaternion.identity(); m.scale.set(1, 1, 1); m.updateMatrix();
         }
@@ -519,11 +522,8 @@ const G_GunModels = (() => {
     k.box(0.01, 0.024, 0.004, m, gf + 0.076, -0.05);
     k.box(0.004, 0.02, 0.005, M.black(), gf + 0.04, -0.048);
   }
-  // Stocks sit behind the eye in first person and only read as stray geometry at the screen edge,
-  // so the viewmodel build skips them (third-person models keep them).
-  let buildingVM = false;
-  function stock(k: Kit, type: string, m: THREE.Material, wrist?: boolean) {
-    if (buildingVM && !wrist) return; // (wrist: the stock is what the hand holds, on guns with no pistol grip)
+  // Stocks: the first-person model has them too (it is the same geometry as display()).
+  function stock(k: Kit, type: string, m: THREE.Material, _wrist?: boolean): void {
     const pad = (f: number, y: number, h: number) => k.box(0.044, h, 0.012, M.rubber(), f - 0.012, y);
     switch (type) {
       case 'tubeonly': // a buffer tube adapter with nothing on it
@@ -577,7 +577,7 @@ const G_GunModels = (() => {
       case 'pdw':
         k.cyl(0.0155, 0.14, M.black(), -0.14, -0.002);
         for (const x of [-0.016, 0.016]) k.box(0.006, 0.01, 0.16, m, -0.18, 0.006, x);
-        if (!buildingVM) k.box(0.044, 0.08, 0.014, M.rubber(), -0.19, -0.02); // (its pad: right in front of your eye, aiming, so first person leaves it out)
+        k.box(0.044, 0.08, 0.014, M.rubber(), -0.19, -0.02); // (its pad)
         break;
       case 'wire':
         k.cyl(0.004, 0.195, M.blued(), -0.195, 0.0, 0.012); k.cyl(0.004, 0.195, M.blued(), -0.195, 0.0, -0.012);
@@ -833,7 +833,7 @@ const G_GunModels = (() => {
       case 'box': k.box(0.046, 0.05, len, m, f0, -0.005); return;
       case 'g36': { // the G36's: deep, its top just under the receiver's, a sloped nose, a lip along its foot, vents high
         // on its sides (from the front back: six on the rifle's, fewer on the G36K's), or (rails) a rail each side and
-        // under; ahead of it, round the barrel, the sleeve with the bayonet lug (o.bl: the barrel, if there's room)
+        // under
         const V = (px: number) => px * 0.000945, top = V(37.6), bot = V(-13.4), lip = V(-29.4), x = 0.021;
         k.prof([[f0, top], [f0 + len - V(22), top], [f0 + len, V(5.6)], [f0 + len, bot], [f0 + len - V(40), bot], [f0 + len - V(46), lip], [f0 + V(28), lip], [f0, V(-36)]], 0.042, m, 0, null, 0.003);
         if (o.rails) { for (const sd of [-1, 1]) sideRail(k, f0 + 0.04, len - 0.07, V(4), sd * (x + 0.0035)); S.rail(k, f0 + 0.04, len - 0.08, lip - 0.0045, M.black()); k.box(0.02, 0.005, len - 0.08, M.black(), f0 + 0.04, lip - 0.002); }
@@ -984,7 +984,7 @@ const G_GunModels = (() => {
       case 'prism': return S.prism(k, ofs, top, o);
       case 'lpvo': return S.scope(k, ofs, top, 0.24, 0.022, 0.038);
       case 'scope': return S.scope(k, ofs, top, o.scopeLen, o.scopeObj);
-      case 'bead': { const sy = Math.max(top, onBarrel ? 0.014 : br) + 0.009; return S.bead(k, 0.02, front - 0.008, sy, [L, front - 0.006], onBarrel ? by + 0.004 : br, onBarrel); } // clear of the receiver's (bevelled) top
+      case 'bead': { if (onBarrel) k.region('optic@barrel', L, front - 0.0116); const sy = Math.max(top, onBarrel ? 0.014 : br) + 0.009; return S.bead(k, 0.02, front - 0.008, sy, [L, front - 0.006], onBarrel ? by + 0.004 : br, onBarrel); } // clear of the receiver's (bevelled) top
       case 'notch': if ((o.irons || 'ak') === 'ak') return S.irons(k, L * 0.85, frontF, top + 0.02, top, onBarrel ? by : br, 'ak', onBarrel);
       // falls through: a gun whose own sights are an aperture
       default: {
@@ -1032,6 +1032,7 @@ const G_GunModels = (() => {
     k.prof(pts([[521, 327], [629, 327], [629, 353], [521, 353]]), 0.037, m, 0, null, 0.005);
     k.prof(pts([[508, 354], [629, 354], [629, 387], [600, 391], [520, 399], [511, 399], [507, 393]]), 0.044, m, 0, null, 0.005);
     for (const [a, b] of [[535, 568], [578, 612]]) k.box(0.0385, 0.003, (b - a) / 122 * len, D, fx(a), V([0, 353.5])[1]);
+    k.cyl(0.0195, 0.007, M.gunmetal(), f0 + len, 0); // (its ferrule, where it ends)
   }
   // the SCAR's trace (rifle(), rcv 'scar', and its stock): a pixel of its reference photo ([x, y]: x forward from the back
   // of the upper at 400, y down from the bore at 245, the photo drawn 1500 px wide) to gun space ([forward, up], metres)
@@ -1453,7 +1454,7 @@ const G_GunModels = (() => {
     else if (o.gripT !== 'none' && rcv !== 'qbz95' && rcv !== 'f2' && rcv !== 'aksu' && !((rcv === 'vector' || rcv === 'aug' || rcv === 'gm6') && (o.gripT || 'ar') === 'ar')) grip(k, gf, o.gm || fm, o.gripT || (rcv === 'ak' ? 'wood' : 'ar')); // (the Vector's own is part of its lower)
     k.tag('stock');
     if (rcv === 'vector' && o.stock) { const sp = k.part(0, vecTrace([0, 110])[1]); k.into(sp); stock(k, o.stock, o.sm || fm, false); k.into(null); } // (its tube level with the top of the receiver: the bore's below the shoulder)
-    else if (tr && o.stock === (tr.stockT || 'wood') && tr.parts.some((p: TracePart) => p.on === 'stock')) tracedParts(k, tr, buildingVM ? (q) => { const [f, y] = VT(q); return [Math.max(f, -0.15), y]; } : VT, 'stock', mats); // (the traced stock, while the factory one's fitted: in first person just its wrist, what the hand holds, or the rest of it stands in front of your eye)
+    else if (tr && o.stock === (tr.stockT || 'wood') && tr.parts.some((p: TracePart) => p.on === 'stock')) tracedParts(k, tr, VT, 'stock', mats); // (the traced stock, while the factory one's fitted: in first person just its wrist, what the hand holds, or the rest of it stands in front of your eye)
     else if (!bull && o.stock && rcv === 'aksu') { const st = ({ skeleton: 'aksu', folded: 'aksufold' } as Record<string, string>)[o.stock] || o.stock; stock(k, st, o.sm || (st === 'akwood' || st === 'm4' ? fm : rm), false); } // (a skeleton stock here is its triangular side-folder, black steel unless painted)
     else if (!bull && o.stock && !lugGrip) stock(k, o.stock, o.sm || fm, o.gripT === 'none');
     k.tag('mag');
@@ -1491,7 +1492,7 @@ const G_GunModels = (() => {
       if (o.barrels && tr && tr.rib) { k.box(0.008, 0.0102, bl, b.m || M.blued(), L, by + 0.0091); k.box(0.008, 0.008, bl, b.m || M.blued(), L, by - 0.008); } // (the ribs filling the valleys between the barrels, over and under)
       if (rcv === 'f2') { // the collar and the grenade spigot's ridges (as much of them as the barrel has)
         k.cyl(0.0105, Math.min(0.022, bl), M.black(), L + 0.003, by, 0, br);
-        for (let i = 0; i < 9; i++) k.ringZ(br + 0.0004, 0.0014, M.black(), L + 0.022 + (bl - 0.0288) * i / 8, by); // (nine, spread over what there is: the pitch is 4.9 mm on the 68 mm barrel; the count doesn't depend on the length)
+        for (let i = 0; i < 9; i++) k.ringZ(br + 0.0004, 0.0014, M.black(), L + 0.022 + 0.852 * (bl - 0.022) * i / 8, by); // (nine, spread in proportion to the barrel (the pitch is 4.9 mm on the 68 mm one): the count doesn't depend on the length)
       }
       front = L - bIn + bl;
     }
@@ -1519,7 +1520,7 @@ const G_GunModels = (() => {
       hgLen = hg.len;
       if (rcv === 'aksu') { hg.len = Math.min(hg.len, 0.134); if (hg.t === 'wood') hg.aksu = true; }
       if (hg.t === 'sig') hg.ext = o.railExt || 0;
-      if (tr && tr.parts.some((p: TracePart) => p.on === 'fore') && hg.t === 'wood') { const sc = (hg.len - 0.03) / (tr.foreLen - 0.03), VF = (p: number[]) => { const [f, y] = VT(p); return [f > L + 0.03 ? L + 0.03 + (f - L - 0.03) * sc : f, y]; }; tracedParts(k, tr, VF, 'fore', Object.assign({}, mats, { fore: hg.m || fm })); k.region('handguard', L + 0.03, L + hg.len); } // (the traced forend, stretched or shortened ahead of the action to the wooden hand guard's length)
+      if (tr && tr.parts.some((p: TracePart) => p.on === 'fore') && hg.t === 'wood') { const sc = (hg.len - 0.03) / (tr.foreLen - 0.03), VF = (p: number[]) => { const [f, y] = VT(p); return [f > L + 0.03 ? L + 0.03 + (f - L - 0.03) * sc : f, y]; }; const [, fEnd] = k.stretched(1, 1, () => tracedParts(k, tr, VF, 'fore', Object.assign({}, mats, { fore: hg.m || fm }))); k.region('handguard', L + 0.03, fEnd); } // (the traced forend, stretched or shortened ahead of the action to the wooden hand guard's length)
       else {
         // built at its own length (so its details are the part's: the count of a rail's teeth, a handguard's slots) and stretched to the length the barrel leaves it
         const [a, b] = k.stretched(hgRef, hg.len, () => handguard(k, Object.assign({}, hg, { len: hgRef }), hgF, fm, rm));
@@ -1535,8 +1536,6 @@ const G_GunModels = (() => {
       if (o.tubeY != null) k.cyl(0.0155, 0.017, M.black(), L + o.tube - 0.017, ty); else k.cyl(0.012, 0.012, M.blued(), L + o.tube - 0.012, ty);
     }
     if (rcv === 'aksu' && !o.integral) { // the handguard's ferrule, the gas block and the front sight's ears and post, ending where the booster starts
-      k.tag('handguard');
-      k.cyl(0.0195, 0.007, M.gunmetal(), L + hgLen, by); // (the handguard's ferrule: the handguard's, where it ends)
       k.tag('barrel');
       const V = akuTrace, B = M.black(), g0 = front - 0.022, sy = 0.0505, hy = (y: number) => V([0, y])[1];
       k.cyl(0.0125, 0.022, B, g0, by);
@@ -2262,7 +2261,7 @@ const G_GunModels = (() => {
     k.tag('stock');
     const stk = o.stock || 'sniper';
     if (stk !== 'sniper') stock(k, stk, o.sm || M.polymer());
-    else if (!buildingVM) { // the factory stock: a thumbhole with a high comb, the pad on its butt
+    else { // the factory stock: a thumbhole with a high comb, the pad on its butt
       k.prof([[0, -0.024], [0, 0.012], [-0.1, 0.012], [-0.18, 0.026], [-0.33, 0.034], [-0.356, 0.03], [-0.364, -0.13], [-0.33, -0.14], [-0.26, -0.13], [-0.19, -0.1], [-0.13, -0.075], [-0.07, -0.082], [-0.01, -0.095], [0.0, -0.05]], 0.042, o.sm || M.polymer(), 0,
         [[[-0.03, -0.012], [-0.15, -0.002], [-0.2, -0.04], [-0.12, -0.07], [-0.04, -0.06]]]);
       k.box(0.044, 0.15, 0.012, M.rubber(), -0.376, -0.056);
@@ -2378,6 +2377,8 @@ const G_GunModels = (() => {
     const info = (ARCH[plat.arch] || rifle)(k, spec);
     k.tag('base');
     info.anim = info.anim || {};
+    if (k.reflex) info.reflex = Object.assign({}, k.reflex); // (a reflex sight's window and a scope's picture-in-picture lens, for the viewmodel: js/glb.ts)
+    if (k.pip) { const q = k.pip; info.pip = { f: q.f, y: q.y, r: q.r }; if (q.parent) { info.pip.parent = 'magn'; info.pip.pos = [q.f, q.y, 0]; } }
     k.g.userData.bake = k.bake; // (what each part provides: anchors and stretch regions, for the baker; not info, whose fields are the contract's)
     return info;
   }
@@ -2581,9 +2582,7 @@ const G_GunModels = (() => {
     const flashes = [], holders = [];
     for (const side of guns) {
       const k: any = kit();
-      buildingVM = true;
-      let info;
-      try { info = build(k, def); } finally { buildingVM = false; }
+      const info = build(k, def);
       if (skin && skin.length) G.Stickers.decorate(k.g, skin);
       if (k.reflex) reflex(k, k.reflex);
       if (k.pip && !pip) pip = pipLens(k, k.pip, def);

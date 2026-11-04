@@ -275,7 +275,23 @@ const G_R = {
     if (skin === undefined) { const w = G.Me && G.Me.cur && G.Me.cur(); skin = w && w.def === def ? w.stickers : null; }
     if (this.vm) { this.vmRoot.remove(this.vm); this.vm.traverse((o: any) => { if (o.geometry) o.geometry.dispose(); }); }
     this.vm = def ? G.GunModels.viewmodel(def, skin) : null;
+    if (this.vm) this.clearStockNearEye(this.vm);
     if (this.vm) { this.vm.userData.code = def.code; this.vm.userData.key = this.vmKey(def, skin); this.vmRoot.add(this.vm); } // (code: which build it shows; key: and its stickers)
+  },
+  // The stock is part of the gun in first person, and when you aim the eye sits inside it: its comb and tube would fill the bottom of the
+  // screen in front of the sight. So the stock's meshes (slot 'stock') are clipped to what is more than STOCK_CLEAR metres in front of the eye
+  // (a clipping plane on the camera, on a copy of each material: the shared ones stay whole), the rest of it showing as it always does.
+  STOCK_CLEAR: 0.1,
+  clearStockNearEye(vm: THREE.Object3D) {
+    this.renderer.localClippingEnabled = true;
+    const plane = new THREE.Plane(), fwd = new THREE.Vector3(), eye = new THREE.Vector3(), clear = this.STOCK_CLEAR;
+    vm.traverse((o: any) => {
+      if (!o.isMesh || o.userData.slot !== 'stock') return;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      const own = mats.map((m: THREE.Material) => { const c = m.clone(); c.clippingPlanes = [plane]; return c; });
+      o.material = Array.isArray(o.material) ? own : own[0];
+      o.onBeforeRender = (_r: any, _s: any, cam: THREE.Camera) => { cam.getWorldDirection(fwd); eye.setFromMatrixPosition(cam.matrixWorld); plane.setFromNormalAndCoplanarPoint(fwd, eye.addScaledVector(fwd, clear)); };
+    });
   },
   vmKey(def: any, skin: any) { return def ? def.code + '#' + G.Stickers.key(skin) : ''; },
 
