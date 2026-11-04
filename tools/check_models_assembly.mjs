@@ -9,8 +9,8 @@
 // and the `info` (every leaf, 1e-6), the animated part nodes (names and pivots) and the slot of every mesh are compared too.
 // Then N random builds per platform (two or three parts changed at once: not in the sweep, with a seed the baker did not learn from) as a held-out
 // measure: where the packs cover the build (assemble() returns a model) the same comparison; where they do not, the game builds it from the recipe.
-import crypto from 'crypto';
-import { loadGameWithModels, loadModels } from './model_env.mjs';
+import crypto from 'crypto'; import fs from 'fs'; import path from 'path';
+import { loadGameWithModels, loadModels, ROOT } from './model_env.mjs';
 import { sweepOf, defOf, meshesOf, randomBuilds, buildKey } from './model_sweep.mjs';
 import { cleanInfo } from './model_packs.mjs';
 import { matchTriangles } from './model_diff.mjs';
@@ -37,6 +37,10 @@ function compare(def, asm, proc) {
   // info
   const ia = Models.infoLeaves(cleanInfo(Object.fromEntries(Object.entries(asm.info).filter(([k]) => k !== 'mounts')))), ip = Models.infoLeaves(cleanInfo(proc.info));
   for (const k of new Set([...Object.keys(ia), ...Object.keys(ip)])) { const x = ia[k], y = ip[k]; if (!(typeof x === 'number' && typeof y === 'number' ? Math.abs(x - y) < 1e-6 : JSON.stringify(x) === JSON.stringify(y))) return { kind: 'fail', why: `info ${k}: assembled ${JSON.stringify(x)}, recipe ${JSON.stringify(y)}` }; }
+  // the geometry's cached bounds (frustum culling and the gunsmith's framing use them) must belong to the vertices it has now
+  let stale = null;
+  asm.group.traverse((o) => { if (!stale && o.isMesh && o.geometry.boundingBox) { const b = o.geometry.boundingBox.clone(); o.geometry.boundingBox = null; o.geometry.computeBoundingBox(); if (b.min.distanceTo(o.geometry.boundingBox.min) > 1e-5 || b.max.distanceTo(o.geometry.boundingBox.max) > 1e-5) stale = o.name; } });
+  if (stale) return { kind: 'fail', why: 'mesh ' + stale + ' has stale cached bounds' };
   // animated parts: the same keys, the same pivots
   const ka = Object.keys(asm.info.anim).sort(), kp = Object.keys(proc.info.anim).filter((k) => proc.info.anim[k] && proc.info.anim[k].isObject3D).sort();
   if (ka.join() !== kp.join()) return { kind: 'fail', why: `animated parts: assembled ${ka}, recipe ${kp}` };
@@ -59,6 +63,8 @@ const t0 = Date.now();
 for (const id of plats) {
   const n = await M.preloadPlatform(id);
   if (!M.platformLoaded(id)) { console.error(`FAIL ${id}: no packs (run npm run bake:models)`); failures.push(id + ': no packs'); continue; }
+  // (the game computes bounds on the loaded packs as it renders them: an assembled copy must not inherit them)
+  for (const t of Object.values(JSON.parse(fs.readFileSync(path.join(ROOT, 'assets/models/parts', id, 'index.json'), 'utf8')).tags)) for (const e of t.packs) if (e.file) (await G.GLB.load('assets/models/parts/' + id + '/' + e.file)).traverse((o) => { if (o.isMesh) { o.geometry.computeBoundingBox(); o.geometry.computeBoundingSphere(); } });
   const { bases, list } = sweepOf(GS, id), mine = { n: 0, exact: 0, tol: 0, fail: 0 };
   for (const e of list) {
     const def = defOf(G, id, e.build), asm = M.assemble(def);

@@ -763,7 +763,7 @@ interface BakedIndex { version: number; three: string; src: string; guns: Record
           v.fromBufferAttribute(pos, i).applyMatrix4(M); if (from) v.add(from);
           op(s, v.x, v.y, v.z, q); if (pivot) q.sub(pivot); arr[i * 3] = q.x; arr[i * 3 + 1] = q.y; arr[i * 3 + 2] = q.z;
         }
-        g.setAttribute('position', new T.BufferAttribute(arr, 3));
+        g.setAttribute('position', new T.BufferAttribute(arr, 3)); g.boundingBox = null; g.boundingSphere = null; // (the clone carries the source's bounds: stale once the vertices move)
         if (nor) { const na = new Float32Array(n * 3); for (let i = 0; i < n; i++) { v.fromBufferAttribute(nor, i).applyMatrix3(NM).normalize(); na[i * 3] = v.x; na[i * 3 + 1] = v.y; na[i * 3 + 2] = v.z; } g.setAttribute('normal', new T.BufferAttribute(na, 3)); }
         c.geometry = g; c.position.set(0, 0, 0); c.quaternion.identity(); c.scale.set(1, 1, 1); c.userData.own = true;
       }
