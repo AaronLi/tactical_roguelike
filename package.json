@@ -10,7 +10,7 @@
     "typecheck:strict": "tsc -p . --noEmit --strict",
     "bake:models": "tsc -p . && node tools/bake_models.mjs",
     "check:models": "tsc -p . && node tools/check_models.mjs",
-    "test:models": "tsc -p . && node tools/check_models.mjs --selftest && node tools/check_models.test.mjs"
+    "test:models": "tsc -p . && node tools/check_models.mjs --selftest && node tools/check_models.test.mjs && node tools/check_models_assembly.mjs --quiet"
   },
   "license": "ISC",
   "devDependencies": {

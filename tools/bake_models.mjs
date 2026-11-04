@@ -1,6 +1,7 @@
 // Bakes the game's procedural guns into glTF binaries (.glb), so the browser can load a model instead of building it.
 //   npm run bake:models              (tsc, then this)         node tools/bake_models.mjs [id ...]   (just those guns)
 //   node tools/bake_models.mjs --check                        lists the bakes that are stale against the current code
+//   node tools/bake_models.mjs --guns | --parts [id ...]      only the whole default guns / only the per-part packs (default: both)
 //
 // WHAT IT DOES. Loads the compiled game (dist/js) in a vm with the node build of three r149, builds every platform's
 // DEFAULT build with G.GunModels.display(G.Gunsmith.compile(id, defaultBuild(id))), exports it with three's GLTFExporter,
@@ -21,15 +22,11 @@
 // `import ... from 'three'`; index.html's importmap maps 'three' to assets/vendor/three-global.js, which re-exports
 // window.THREE, so the loader builds the game's own classes (two copies of three break instanceof).
 //
-// LAYOUT PLAN (milestone 2: per-part packs, runtime assembly). Add, next to guns/:
-//   assets/models/parts/<platform>/<slot>/<partId>.glb    one part as it sits on that platform in that slot (its meshes in
-//                                                         the gun's own frame, so assembly is just adding the groups; named
-//                                                         `part_<animKey>` nodes for animated ones, extras.slot / extras.part)
-//   assets/models/parts/<platform>/index.json             (slot -> partId -> { file, hash }) and which slots depend on which
-//                                                         (a handguard length moves the muzzle, a magwell moves the mag)
-//   assets/models/parts/<platform>/base.glb               the receiver and fixed furniture with every slot empty
-// guns/<id>.glb stays as the default-build fast path and as the reference the packs are verified against (an assembled gun's
-// triangles must hash-equal the whole bake). Per-pack hashes use the same scheme (hash of triangles + slot + material names).
+// PER-PART PACKS (milestone 2; tools/bake_parts.mjs, model_packs.mjs, model_emit.mjs, docs/models.md): next to guns/,
+//   assets/models/parts/<platform>/index.json            the platform index: which slots shape which (JOINT packs), the anchors (offsets
+//                                                        parts give other slots), the info model, the pack list per slot
+//   assets/models/parts/<platform>/<slot>/<file>.glb     one pack: one slot's meshes for a combination of parts, in the gun's frame
+// guns/<id>.glb stays the fast path for default builds; js/glb.ts assemble(def) builds any build from the packs.
 import fs from 'fs'; import path from 'path'; import zlib from 'zlib'; import crypto from 'crypto';
 import { ROOT, loadGame, loadModels } from './model_env.mjs';
 import * as THREE_NS from 'three';
@@ -38,9 +35,11 @@ import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { dedup, weld, quantize, meshopt, prune } from '@gltf-transform/functions';
 import { MeshoptEncoder, MeshoptDecoder } from 'meshoptimizer';
+import { bakeParts, staleParts, PARTS_DIR } from './bake_parts.mjs';
 
 const OUT = path.join(ROOT, 'assets/models/guns/'), VENDOR = path.join(ROOT, 'assets/vendor/');
 const args = process.argv.slice(2), check = args.includes('--check'), only = args.filter((a) => !a.startsWith('--'));
+const doGuns = !args.includes('--parts') || args.includes('--guns'), doParts = !args.includes('--guns') || args.includes('--parts');
 
 // ---- the importmap shim: every export name of the three module, re-exported from the global
 fs.mkdirSync(VENDOR, { recursive: true });
@@ -65,6 +64,8 @@ for (const [k, f] of Object.entries(GM.M)) { try { const m = f(); if (m && m.isM
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.encoder': MeshoptEncoder, 'meshopt.decoder': MeshoptDecoder });
 await MeshoptEncoder.ready; await MeshoptDecoder.ready;
 
+const copies = new Map(); // (shared game material -> its export copy)
+const copyOf = (m, name) => { let c = copies.get(m); if (!c) { c = m.clone(); c.bumpMap = null; c.name = name; copies.set(m, c); } return c; };
 /** Names the group's nodes and materials for export; returns the glTF extras.info and a triangle hash. */
 function prepare(id, group, info) {
   const animNames = new Map();
@@ -74,14 +75,15 @@ function prepare(id, group, info) {
   group.name = id; group.updateMatrixWorld(true);
   // UVs are kept only where something uses them: a bump map (rebuilt at load, needs them to tile) or a display surface
   const needUv = new Set();
-  group.traverse((o) => { if (o.isMesh && (o.material.bumpMap || o.material.map || (o.userData.display) || (o.name || '').startsWith('display_'))) needUv.add(o.geometry); });
+  // (the bump map is a property of the catalogue's material, found by NAME: the game's materials are shared, so never read or change them here)
+  const bumpy = (m) => !!(Models.contract.materials.names[m.name || matName.get(m)] || {}).bump;
+  group.traverse((o) => { if (o.isMesh && (bumpy(o.material) || o.material.map || (o.userData.display) || (o.name || '').startsWith('display_'))) needUv.add(o.geometry); });
   group.traverse((o) => { if (o.isMesh && !needUv.has(o.geometry) && o.geometry.attributes.uv) o.geometry.deleteAttribute('uv'); });
   group.traverse((o) => {
     if (o === group) return;
     if (o.isMesh) {
       meshes++; n++; o.name = (o.userData.slot || 'base') + '_' + n;
-      const m = o.material; if (!m.name) m.name = matName.get(m) || ('m_' + m.color.getHexString());
-      if (m.bumpMap) m.bumpMap = null; // (rebuilt at load from the catalogue, by name)
+      const m0 = o.material, m = copyOf(m0, m0.name || matName.get(m0) || ('m_' + m0.color.getHexString())); o.material = m; // (a copy without the bump map: rebuilt at load from the catalogue, by name)
       const pos = o.geometry.attributes.position, idx = o.geometry.index;
       tris += (idx ? idx.count : pos.count) / 3;
       h.update(o.userData.slot + '|' + m.name + '|' + pos.count + '|' + Array.from(pos.array, (x) => Math.round(x * 1e5)).join(','));
@@ -108,7 +110,7 @@ const indexFile = OUT + 'index.json';
 const old = fs.existsSync(indexFile) ? JSON.parse(fs.readFileSync(indexFile, 'utf8')) : { guns: {} };
 const index = { version: 1, three: THREE_NS.REVISION, src, guns: only.length || check ? { ...old.guns } : {} };
 let fails = 0, rawTotal = 0, gzTotal = 0, stale = 0;
-for (const id of ids2) {
+for (const id of doGuns ? ids2 : []) {
   try {
     const def = GS.compile(id, GS.defaultBuild(id));
     const { group, info } = GM.display(def);
@@ -128,9 +130,27 @@ for (const id of ids2) {
     console.log(id.padEnd(14), String(p.meshes).padStart(4), 'meshes', String(p.tris).padStart(7), 'tris', String(buf.length).padStart(7), 'B', String(gz).padStart(7), 'gz');
   } catch (e) { fails++; console.error('FAIL', id, (e && e.stack) || e); }
 }
-if (check) { console.log(stale ? `${stale} stale: run npm run bake:models` : 'all baked guns are current'); process.exit(stale ? 1 : 0); }
-const all = Object.values(index.guns);
-index.totals = { guns: all.length, bytes: all.reduce((a, g) => a + g.bytes, 0), gz: all.reduce((a, g) => a + g.gz, 0) };
-fs.writeFileSync(indexFile, JSON.stringify(index, null, 1));
-console.log(`\nbaked ${all.length} guns (${fails} failed): ${index.totals.bytes} B, ${index.totals.gz} B gzipped (this run: ${rawTotal} / ${gzTotal})`);
+if (check) {
+  let staleP = 0;
+  if (doParts) { const sp = staleParts(ids2, src); staleP = sp.length; for (const id of sp) console.log('STALE parts', id); }
+  console.log(stale || staleP ? `${stale} stale guns, ${staleP} stale part sets: run npm run bake:models` : 'all baked guns and packs are current');
+  process.exit(stale || staleP ? 1 : 0);
+}
+if (doGuns) {
+  const all = Object.values(index.guns);
+  index.totals = { guns: all.length, bytes: all.reduce((a, g) => a + g.bytes, 0), gz: all.reduce((a, g) => a + g.gz, 0) };
+  fs.writeFileSync(indexFile, JSON.stringify(index, null, 1));
+  console.log(`\nbaked ${all.length} guns (${fails} failed): ${index.totals.bytes} B, ${index.totals.gz} B gzipped (this run: ${rawTotal} / ${gzTotal})`);
+}
+if (doParts) {
+  console.log('\nper-part packs:');
+  const r = await bakeParts({ G, GS, GM }, Models, ids2, src);
+  fails += r.fails;
+  const old2 = fs.existsSync(PARTS_DIR + 'index.json') ? JSON.parse(fs.readFileSync(PARTS_DIR + 'index.json', 'utf8')).platforms : {};
+  const plats = { ...(only.length ? old2 : {}), ...r.summary };
+  const vals = Object.values(plats), sum = (k) => vals.reduce((a, x) => a + (x[k] || 0), 0);
+  const totals = { platforms: vals.length, packs: sum('packs'), files: sum('files'), bytes: sum('bytes'), gz: sum('gz'), index: sum('index'), indexGz: sum('indexGz'), sweepBuilds: sum('sweepBuilds'), exactBuilds: sum('exactBuilds'), stretchBuilds: sum('stretchBuilds') };
+  fs.writeFileSync(PARTS_DIR + 'index.json', JSON.stringify({ version: 1, src, platforms: plats, totals }, null, 1));
+  console.log(`\nbaked packs for ${vals.length} platforms: ${totals.packs} packs in ${totals.files} files, ${totals.bytes} B, ${totals.gz} B gzipped (+ indexes ${totals.index} B, ${totals.indexGz} gzipped); ${totals.sweepBuilds} sweep builds assemble from them (${totals.exactBuilds} exact, ${totals.stretchBuilds} with a stretch)`);
+}
 process.exit(fails ? 1 : 0);

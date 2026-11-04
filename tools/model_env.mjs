@@ -19,13 +19,35 @@ export function loadModels() {
 }
 
 /** The game's data and gun-building files, on the node build of three (ONE copy: the game's and the exporter's). */
-export function loadGame() {
+export function loadGame(withModels = false, extra = {}) {
   const THREE = { ...THREE_NS };
   const ctx2d = new Proxy({}, { get: (t, k) => (k in t ? t[k] : () => ({ addColorStop() {} })), set: (t, k, v) => { t[k] = v; return true; } });
   const document = { createElement: () => ({ width: 64, height: 64, getContext: () => ctx2d, style: {} }) };
   const ctx = { console, Math, JSON, Set, Map, WeakMap, Object, Array, Number, String, Boolean, Uint8Array, Int8Array, Int16Array, Int32Array, Uint16Array, Uint32Array, Float32Array, Float64Array, Infinity, NaN, isFinite, parseInt, parseFloat, Error, Symbol, Date, Proxy, Reflect, THREE, document, performance };
-  ctx.window = ctx; ctx.self = ctx; ctx.G = { R: { flashTexture: () => null, _envMap: () => null } };
+  Object.assign(ctx, extra); ctx.window = ctx; ctx.self = ctx; ctx.G = { R: { flashTexture: () => null, _envMap: () => null } };
   vm.createContext(ctx);
   for (const f of ['util', 'data', 'callsigns', 'arsenal', 'parts', 'gear', 'medical', 'materials', 'stickers', 'guntraces', 'gunmodels']) vm.runInContext(readDist(f), ctx, { filename: f + '.js' });
+  if (withModels) vm.runInContext(readDist("glb"), ctx, { filename: "glb.js" });
   return ctx.G;
+}
+
+/**
+ * The game as loadGame() gives it, plus js/glb.js running the way it does in the browser with ?bakedGuns: a G.GLB made of three's own GLTFLoader (on the
+ * files under assets/models, with the meshopt decoder) and a fetch that reads those files. For tests that assemble guns from the packs (check_models_assembly.mjs).
+ */
+export async function loadGameWithModels() {
+  const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
+  const { MeshoptDecoder } = await import('three/examples/jsm/libs/meshopt_decoder.module.js');
+  await MeshoptDecoder.ready;
+  const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder), cache = new Map();
+  const file = (url) => path.join(ROOT, url);
+  const G = loadGame(true, {
+    location: { search: '?bakedGuns' }, URLSearchParams, TextDecoder, addEventListener() {},
+    fetch: async (url) => { const f = file(url); if (!fs.existsSync(f) || /guns\/index\.json$/.test(url)) return { ok: false }; return { ok: true, json: async () => JSON.parse(fs.readFileSync(f, 'utf8')) }; },
+  });
+  G.GLB = {
+    ready: Promise.resolve(true),
+    load: (url) => { if (!cache.has(url)) { const b = fs.readFileSync(file(url)); cache.set(url, new Promise((res, rej) => loader.parse(b.buffer.slice(b.byteOffset, b.byteOffset + b.length), '', (g) => res(g.scene), rej))); } return cache.get(url); },
+  };
+  return G;
 }
