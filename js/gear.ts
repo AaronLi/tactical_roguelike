@@ -13,6 +13,13 @@
 // an LMG belt box 2x2. Items can be turned (1x2 <-> 2x1). Ammo isn't a number any more: it's the magazines
 // and boxes you carry for each gun, and a reload takes one of them. Medkits and grenades are items too.
 // Between levels everything you aren't carrying sits in your locker (a big grid) at the quartermaster's.
+type GMe = typeof G.Me;
+type GTbl = Record<string, any>; // a data table indexed by key (js/data.ts CALIBERS, AMMO)
+type GDef = Record<string, any>; // a gun's definition (js/data.ts WEAPONS) or a gear definition
+type GWeapon = Record<string, any>; // a weapon as carried (Me.makeWeapon)
+interface GItem { k: string; uid?: number; [field: string]: any; } // an item: what k says it is decides which other fields it has
+interface GCell { it: GItem; x: number; y: number; r: number; }
+interface GGrid { id: number; w: number; h: number; accept: string[] | null; label: string; items: GCell[]; locker?: boolean; pack?: boolean; molle?: boolean; dump?: boolean; [field: string]: any; }
 const G_Gear = (() => {
   const B = { north: 'Northmark Defense', kest: 'Kestrel Tactical', iron: 'Ironvale Arms', mer: 'Meridian Armor', sable: 'Sable Ridge', para: 'Paragon Systems', halc: 'Halcyon Labs', gray: 'Graywater Supply', vant: 'Vantage Industries' };
   // pouch grids: [w, h, accepts] (accepts: null = anything small, or a list of item kinds)
@@ -76,14 +83,14 @@ const G_Gear = (() => {
     { id: 'k.assault', kind: 'pack', brand: B.kest, name: '3-day assault pack', tier: 2, price: 650, speed: 0.99, sz: [3, 4], grids: [[5, 3, null]], desc: 'Takes a carbine or shotgun, with a row to spare.' },
     { id: 'k.ruck', kind: 'pack', brand: B.sable, name: 'Large rucksack', tier: 3, price: 1200, speed: 0.97, sz: [4, 4], grids: [[6, 5, null]], desc: 'Any long gun, even a sniper rifle or an LMG, and plenty besides. Heavy.' },
   ];
-  const DEFS = {};
+  const DEFS: Record<string, GDef> = {};
   LIST.forEach((d) => (DEFS[d.id] = d));
   // What's fitted to something you wear: its kind, and the kind of gear it goes on, which has to say so (d.plate, d.face...).
   // On it, it's it.plate, it.face...: it comes off with it, and goes wherever it goes.
-  const MOUNTS = { plate: 'carrier', face: 'helmet', shoulder: 'carrier', groin: 'carrier', legs: 'belt' };
+  const MOUNTS: Record<string, string> = { plate: 'carrier', face: 'helmet', shoulder: 'carrier', groin: 'carrier', legs: 'belt' };
   // pouches: w x h is what they hold (their grid inside, and their size stowed); mw x mh is the MOLLE they
   // take mounted (the same unless said: a rifle mag pouch or a med pouch hangs from one 1x1 slot)
-  const POUCHES = {
+  const POUCHES: Record<string, GDef> = {
     'q.pistol': { name: 'Pistol mag pouch', brand: B.gray, w: 2, h: 1, mw: 1, mh: 1, split: 2, acc: MAG, price: 45, desc: 'Two pockets, a pistol magazine or box of shells in each, from a single MOLLE slot.' },
     'q.rifle': { name: 'Rifle mag pouch', brand: B.kest, w: 1, h: 2, mw: 1, mh: 1, acc: MAG, price: 90, desc: 'One rifle magazine, from a single MOLLE slot.' },
     'q.rifle2': { name: 'Double rifle mag pouch', brand: B.iron, w: 2, h: 2, mw: 1, mh: 2, acc: MAG, price: 150, desc: 'Two rifle magazines side by side (or four pistol ones).' },
@@ -92,11 +99,11 @@ const G_Gear = (() => {
     'q.med': { name: 'Med pouch', brand: B.halc, w: 2, h: 2, mw: 1, mh: 1, acc: MED, price: 150, desc: 'A 2×2 roll-out medical pouch on a single MOLLE slot: a splint and a few more.' },
   };
   // how gear sits in the locker
-  const GEAR_SIZE = { carrier: [3, 3], plate: [2, 3], helmet: [2, 2], face: [2, 2], shoulder: [2, 2], groin: [2, 2], legs: [2, 3], belt: [3, 1], pack: [3, 3], ifak: [2, 3] };
+  const GEAR_SIZE: Record<string, number[]> = { carrier: [3, 3], plate: [2, 3], helmet: [2, 2], face: [2, 2], shoulder: [2, 2], groin: [2, 2], legs: [2, 3], belt: [3, 1], pack: [3, 3], ifak: [2, 3] };
   // A gun as an item (stowed in a backpack or the locker): it's the weapon itself, magazine, build and all.
   // Long guns are wide: a pistol 2x1, a compact SMG 3x2, a carbine, rifle or shotgun 5x2, a sniper rifle or
   // LMG 6x2.
-  function gunSize(def) {
+  function gunSize(def: GDef) {
     if (def.slot === 's') return [2, 1];
     if (def.id === 'thompson' || def.id === 'ppsh' || def.cls === 'GL') return [4, 2];
     if (def.cls === 'SMG') return [3, 2];
@@ -108,32 +115,32 @@ const G_Gear = (() => {
   // What a gun reloads from: magazines (and en-bloc clips) for that gun, or loose rounds of
   // its caliber in a box. Magazines belong to one gun; boxes of a caliber feed every gun that takes it.
   // Rounds come in types (G.AMMO): a box holds one type, and so does a magazine (loaded from a box).
-  const bigBox = (cal) => { const g = (G.CALIBERS[cal] || {}).group; return g === 'grenade' || g === 'bolt'; };
-  function ammoFor(def) {
+  const bigBox = (cal: string) => { const g = ((G.CALIBERS as GTbl)[cal] || {}).group; return g === 'grenade' || g === 'bolt'; };
+  function ammoFor(def: GDef) {
     const loose = def.shell || def.mag <= 2 || G.revolver(def); // (a revolver's speed loader's a part: it's filled from loose rounds too)
     if (loose) {
-      const cal = G.calOf(def), C = G.CALIBERS[cal];
+      const cal = G.calOf(def), C = (G.CALIBERS as GTbl)[cal];
       return { kind: 'ammo', key: cal, w: 1, h: bigBox(cal) ? 2 : 1, cap: C.box, label: C.name };
     }
     if (G.beltFed(def)) return { kind: 'mag', key: def.id, w: 2, h: 2, cap: def.mag, label: 'BOX' };
     return { kind: 'mag', key: def.id, w: 1, h: def.mag <= 20 ? 1 : 2, cap: def.mag, label: def.enbloc ? 'CLIP' : 'MAG' };
   }
   let uid = 1;
-  const item = (o) => Object.assign({ uid: uid++ }, o);
+  const item = (o: Record<string, any>): GItem => Object.assign({ uid: uid++ }, o) as GItem;
   // A magazine holds its rounds in order: r is the stack, bottom first, so the last round loaded is the
   // first fired, and a magazine can hold mixed types (a few tracers at the bottom, say). n and am are read
   // from it: the count, and the type of the round on top (or what it last held, when empty).
-  function magItem(o, rounds) {
+  function magItem(o: Record<string, any>, rounds: string[]) {
     const it = item(o);
     it.r = rounds;
     Object.defineProperty(it, 'n', { get() { return this.r.length; }, enumerable: true });
     Object.defineProperty(it, 'am', { get() { return this.r.length ? this.r[this.r.length - 1] : this.base; }, set(v) { this.base = v; }, enumerable: true });
     return it;
   }
-  const mixed = (it) => !!(it && it.r && it.r.some((t) => t !== it.r[0]));
+  const mixed = (it: GItem) => !!(it && it.r && it.r.some((t: string) => t !== it.r[0]));
   // An item as plain data (to send, or to leave lying on the floor), and back. Everything inside comes with
   // it: a container's grids and what's in them, a carrier's MOLLE and plate, a gun's build and rounds.
-  function pack(it) {
+  function pack(it: GItem) {
     const o: any = {};
     for (const k of Object.keys(it)) {
       if (k === 'uid' || (it.r && (k === 'n' || k === 'am'))) continue;
@@ -147,13 +154,13 @@ const G_Gear = (() => {
     if (it.r) o.am0 = it.base; // what an empty magazine last held
     return o;
   }
-  function packGrid(g) {
+  function packGrid(g: GGrid) {
     const o: any = {};
     for (const k of Object.keys(g)) if (k !== 'id' && k !== 'items') o[k] = Array.isArray(g[k]) ? g[k].slice() : g[k];
-    o.items = g.items.map((p) => ({ x: p.x, y: p.y, r: p.r, it: pack(p.it) }));
+    o.items = g.items.map((p: GCell) => ({ x: p.x, y: p.y, r: p.r, it: pack(p.it) }));
     return o;
   }
-  function unpack(o) {
+  function unpack(o: any) {
     if (o.k === 'gun' && o.w) {
       const w = G.Me.makeWeapon(o.w.id, o.w.build);
       w.mag = o.w.mag; w.ammo = o.w.ammo; w.tube = (o.w.tube || []).slice(); if (o.w.noMag) w.noMag = true; if (o.w.fm) w.fm = o.w.fm;
@@ -163,7 +170,7 @@ const G_Gear = (() => {
       return gunItem(w);
     }
     if (o.k === 'mag' && G.revolver(G.WEAPONS[o.wid])) { const cal = G.calOf(G.WEAPONS[o.wid]), r = o.r || []; return boxItem(cal, r[r.length - 1] || o.am0 || G.ballFor(cal), r.length); } // (a save from when revolvers had loaders: the rounds in it, loose)
-    const rest = {};
+    const rest: Record<string, any> = {};
     for (const k of Object.keys(o)) if (!MOUNTS[k] && !['grids', 'molle', 'r', 'am0'].includes(k)) rest[k] = o[k] && typeof o[k] === 'object' ? JSON.parse(JSON.stringify(o[k])) : o[k];
     const it = o.r ? magItem(rest, o.r.slice()) : item(rest);
     if (o.r) it.base = o.am0 || o.r[o.r.length - 1];
@@ -172,16 +179,16 @@ const G_Gear = (() => {
     for (const m of Object.keys(MOUNTS)) if (m in o) it[m] = o[m] ? unpack(o[m]) : null;
     return it;
   }
-  function unpackGrid(o) {
+  function unpackGrid(o: any) {
     const g = grid(o.w, o.h, o.accept, o.label);
     for (const k of Object.keys(o)) if (!['w', 'h', 'accept', 'label', 'items'].includes(k)) g[k] = o[k];
-    g.items = (o.items || []).map((p) => ({ x: p.x, y: p.y, r: p.r, it: unpack(p.it) }));
+    g.items = (o.items || []).map((p: any) => ({ x: p.x, y: p.y, r: p.r, it: unpack(p.it) }));
     return g;
   }
   // A full magazine (or box) for a gun, of ball unless said otherwise. vid: which magazine (a variant part:
   // compact, extended, drum...), by default the kind that's in that gun now, or its standard one.
-  const magVid = (def, vid) => vid || (def.build && def.build.mag) || G.Gunsmith.defaultBuild(def.id).mag || null;
-  function ammoItem(def, n?, am?, vid?) {
+  const magVid = (def: GDef, vid?: string) => vid || (def.build && def.build.mag) || G.Gunsmith.defaultBuild(def.id).mag || null;
+  function ammoItem(def: GDef, n?: number | null, am?: string, vid?: string) {
     const a = ammoFor(def), type = am || G.ballFor(G.calOf(def));
     if (a.kind !== 'mag') { const count = n == null ? a.cap : n; return item({ k: a.kind, key: a.key, wid: def.id, cap: Math.max(count, boxCap(a.key)), n: count, am: type }); }
     const v = magVid(def, vid), cap = G.Gunsmith.magCap(def.id, v), count = Math.min(cap, n == null ? cap : n);
@@ -190,7 +197,7 @@ const G_Gear = (() => {
     return it;
   }
   // a magazine's shape in the grid, by what it holds
-  function magShape(def, cap, vid) {
+  function magShape(def: GDef, cap: number, vid: string) {
     const a = ammoFor(def), drum = vid && G.Gunsmith.PARTS[vid] && G.Gunsmith.PARTS[vid].model && G.Gunsmith.PARTS[vid].model.mag && G.Gunsmith.PARTS[vid].model.mag.t === 'drum';
     if (G.beltFed(def)) return cap > def.mag * 1.2 ? [2, 3] : cap < def.mag * 0.8 ? [2, 1] : [2, 2];
     if (a.label !== 'MAG') return [1, 1]; // clips
@@ -198,7 +205,7 @@ const G_Gear = (() => {
     return [1, cap <= 20 ? 1 : 2];
   }
   // what a magazine's called: the gun and the variant
-  function magName(it) {
+  function magName(it: GItem) {
     const def = G.WEAPONS[it.wid] || { name: it.wid }, p = it.vid && G.Gunsmith.PARTS[it.vid];
     if (p && p.fam) return p.name; // a shared magazine goes by its pattern (STANAG 5.56 30-round magazine)
     if (p && !p.factory) return `${def.name} · ${p.name.replace(/^\S+ /, '')}`;
@@ -206,10 +213,10 @@ const G_Gear = (() => {
   }
   // a box of loose rounds of a caliber
   // (a box holds two of the boxes you buy: the caliber's box size is what's sold, twice that is what fits)
-  const boxCap = (cal) => G.CALIBERS[cal].box * 2;
-  function boxItem(cal, am, n) { return item({ k: 'ammo', key: cal, am, cap: Math.max(n, boxCap(cal)), n }); }
+  const boxCap = (cal: string) => (G.CALIBERS as GTbl)[cal].box * 2;
+  function boxItem(cal: string, am: string, n: number) { return item({ k: 'ammo', key: cal, am, cap: Math.max(n, boxCap(cal)), n }); }
   // Pour one box into another of the same caliber and type, as far as it'll go. Returns the rounds moved.
-  function mergeBox(from, into) {
+  function mergeBox(from: GItem, into: GItem) {
     if (from === into || from.k !== 'ammo' || into.k !== 'ammo' || from.key !== into.key || from.am !== into.am) return 0;
     const t = Math.min(into.cap - into.n, from.n);
     into.n += t; from.n -= t;
@@ -217,38 +224,38 @@ const G_Gear = (() => {
   }
   // a box arriving: topped into the part-used boxes of its kind in these grids first; what's left (n may now
   // be 0) still needs a place
-  function absorb(it, grids) {
-    if (it.k === 'med') { if (medStack(it) > 1) each(grids, (b) => { if (it.n > 0 && b !== it) mergeMed(it, b); }); return; }
+  function absorb(it: GItem, grids: GGrid[]) {
+    if (it.k === 'med') { if (medStack(it) > 1) each(grids, (b: GItem) => { if (it.n > 0 && b !== it) mergeMed(it, b); }); return; }
     if (it.k !== 'ammo') return;
-    each(grids, (b) => { if (it.n > 0 && b !== it && b.k === 'ammo' && b.n < b.cap) mergeBox(it, b); });
+    each(grids, (b: GItem) => { if (it.n > 0 && b !== it && b.k === 'ammo' && b.n < b.cap) mergeBox(it, b); });
   }
   // every part-used box of that kind in these grids combined into as few as will hold them (the emptied ones go)
-  function combine(grids, key, am) {
-    const list = [];
-    each(grids, (b, g) => { if (b.k === 'ammo' && b.key === key && b.am === am) list.push([b, g]); });
+  function combine(grids: GGrid[], key: string, am: string) {
+    const list: [GItem, GGrid][] = [];
+    each(grids, (b: GItem, g: GGrid) => { if (b.k === 'ammo' && b.key === key && b.am === am) list.push([b, g]); });
     list.sort((a, c) => c[0].n - a[0].n); // fill the fullest first
     let moved = 0;
     for (let i = 0; i < list.length; i++) for (let j = list.length - 1; j > i; j--) moved += mergeBox(list[j][0], list[i][0]);
     for (const [b, g] of list) if (b.n <= 0) removeFrom(g, b);
     return moved;
   }
-  function gearItem(id) {
+  function gearItem(id: string) {
     const d = DEFS[id];
     const it = item({ k: d.kind, gid: id, dur: d.dur || 0 });
-    if (d.grids) it.grids = d.grids.map(([w, h, acc]) => Object.assign(grid(w, h, acc), d.kind === 'pack' ? { pack: true } : {}));
+    if (d.grids) it.grids = d.grids.map(([w, h, acc]: [number, number, string[] | null]) => Object.assign(grid(w, h, acc), d.kind === 'pack' ? { pack: true } : {}));
     if (d.molle) { it.molle = Object.assign(grid(d.molle[0], d.molle[1], ['pouch'], 'MOLLE'), { molle: true }); for (const [pid, x, y] of d.pouches || []) put(it.molle, pouchItem(pid), x, y, 0); }
     if (d.kind === 'carrier') it.plate = null;
     for (const m of Object.keys(MOUNTS)) if (MOUNTS[m] === d.kind && d[m]) it[m] = null; // the mounts it has
     return it;
   }
   // a weapon's item (made once and kept on it, so it's the same item wherever it goes)
-  function gunItem(w) { if (!w.item) Object.defineProperty(w, 'item', { value: item({ k: 'gun', w }), enumerable: false }); return w.item; }
+  function gunItem(w: GWeapon) { if (!w.item) Object.defineProperty(w, 'item', { value: item({ k: 'gun', w }), enumerable: false }); return w.item; }
   // (split: that many separate 1x1 pockets side by side, instead of one w x h grid)
-  function pouchItem(pid) { const P = POUCHES[pid]; return item({ k: 'pouch', pid, grids: P.split ? Array.from({ length: P.split }, () => grid(1, 1, P.acc)) : [Object.assign(grid(P.w, P.h, P.acc), P.dump ? { dump: true } : {})] }); }
+  function pouchItem(pid: string) { const P = POUCHES[pid]; return item({ k: 'pouch', pid, grids: P.split ? Array.from({ length: P.split }, () => grid(1, 1, P.acc)) : [Object.assign(grid(P.w, P.h, P.acc), P.dump ? { dump: true } : {})] }); }
   // a weapon part (off the gun): its footprint by what it is
-  function partItem(pid) { return item({ k: 'part', pid }); }
-  const PART_SIZE = { barrel: [3, 1], limbs: [3, 1], handguard: [2, 1], stock: [2, 1], slide: [2, 1], pump: [2, 1], tube: [2, 1], mag: [1, 2] };
-  function partSize(pid) {
+  function partItem(pid: string) { return item({ k: 'part', pid }); }
+  const PART_SIZE: Record<string, number[]> = { barrel: [3, 1], limbs: [3, 1], handguard: [2, 1], stock: [2, 1], slide: [2, 1], pump: [2, 1], tube: [2, 1], mag: [1, 2] };
+  function partSize(pid: string) {
     const p = G.Gunsmith.PARTS[pid];
     if (!p) return [1, 1];
     if (p.slot === 'optic') return p.set && p.set.magnif > 1.5 ? [2, 1] : [1, 1];
@@ -258,9 +265,9 @@ const G_Gear = (() => {
   // a medical item (js/medical.ts: bandage, tourniquet, gauze, seal, splint, pills)
   const medItem = (mt = 'bandage', n = 1) => item({ k: 'med', mt, n });
   // how many of a medical item go in one slot (bandages and painkillers stack)
-  const medStack = (it) => (it && it.k === 'med' && G.Med.ITEMS[it.mt] && G.Med.ITEMS[it.mt].stack) || 1;
+  const medStack = (it: GItem) => (it && it.k === 'med' && G.Med.ITEMS[it.mt] && G.Med.ITEMS[it.mt].stack) || 1;
   // one stack of medical items onto another of the same kind, as far as it goes; returns how many moved
-  function mergeMed(from, into) {
+  function mergeMed(from: GItem, into: GItem) {
     if (from === into || from.k !== 'med' || into.k !== 'med' || from.mt !== into.mt) return 0;
     const t = Math.min(medStack(into) - (into.n || 1), from.n || 1);
     if (t <= 0) return 0;
@@ -268,16 +275,16 @@ const G_Gear = (() => {
     return t;
   }
   // medical items you carry, counting what's in each stack
-  function medCount(me) { let n = 0; each(body(me), (it) => { if (it.k === 'med') n += it.n || 1; }); return n; }
+  function medCount(me: GMe) { let n = 0; each(body(me), (it: GItem) => { if (it.k === 'med') n += it.n || 1; }); return n; }
   const fragItem = () => item({ k: 'frag' });
   const flashItem = () => item({ k: 'flash' }); // a flashbang: blinds and deafens, hurts nobody
 
   // ---------------------------------------------------------------- grids
   let gid = 1;
-  function grid(w, h, accept, label?) { return { id: gid++, w, h, accept: accept || null, label: label || '', items: [] as any[] } as { id: number; w: any; h: any; accept: any; label: any; items: any[]; locker: boolean }; }
+  function grid(w: number, h: number, accept?: string[] | null, label?: string): GGrid { return { id: gid++, w, h, accept: accept || null, label: label || '', items: [] }; }
   // an item's footprint [w, h], turned or not
   // (g: the grid it's in or going into: a pouch on MOLLE takes its mounted size)
-  function size(it, rot?, g?) {
+  function size(it: GItem, rot?: boolean | number, g?: GGrid) {
     let w = 1, h = 1;
     if (it.k === 'mag') [w, h] = magShape(G.WEAPONS[it.wid], it.cap, it.vid);
     else if (it.k === 'ammo') h = bigBox(it.key) ? 2 : 1;
@@ -289,8 +296,8 @@ const G_Gear = (() => {
     else if (GEAR_SIZE[it.k]) [w, h] = GEAR_SIZE[it.k];
     return rot ? [h, w] : [w, h];
   }
-  const isGear = (it) => !!GEAR_SIZE[it.k];
-  function fits(g, it, x, y, rot, ignore?) {
+  const isGear = (it: GItem) => !!GEAR_SIZE[it.k];
+  function fits(g: GGrid, it: GItem, x: number, y: number, rot: boolean | number, ignore?: GItem) {
     const [w, h] = size(it, rot, g);
     if (x < 0 || y < 0 || x + w > g.w || y + h > g.h) return false;
     if (g.accept && !g.accept.includes(it.k)) return false;
@@ -305,27 +312,27 @@ const G_Gear = (() => {
     }
     return true;
   }
-  function put(g, it, x, y, rot) { g.items.push({ it, x, y, r: rot ? 1 : 0 }); }
-  function findSpot(g, it) {
+  function put(g: GGrid, it: GItem, x: number, y: number, rot: boolean | number) { g.items.push({ it, x, y, r: rot ? 1 : 0 }); }
+  function findSpot(g: GGrid, it: GItem) {
     for (const rot of [0, 1]) for (let y = 0; y < g.h; y++) for (let x = 0; x < g.w; x++) if (fits(g, it, x, y, rot)) return { x, y, rot };
     return null;
   }
-  function place(grids, it) {
+  function place(grids: GGrid[], it: GItem) {
     for (const g of grids) { const s = findSpot(g, it); if (s) { put(g, it, s.x, s.y, s.rot); return g; } }
     return null;
   }
-  function removeFrom(g, it) { const i = g.items.findIndex((p) => p.it === it); if (i >= 0) g.items.splice(i, 1); }
+  function removeFrom(g: GGrid, it: GItem) { const i = g.items.findIndex((p: GCell) => p.it === it); if (i >= 0) g.items.splice(i, 1); }
 
   // ---------------------------------------------------------------- a player's kit
   // Me.kit = { helmet, carrier, belt } (items); Me.pockets: two 1x2 grids and two 1x1; Me.locker: the stash grid
-  function newKit(me) {
+  function newKit(me: GMe) {
     me.kit = { helmet: null, carrier: null, belt: null, pack: null, ifak: null };
     me.pockets = [[1, 2], [1, 2], [1, 1], [1, 1]].map(([w, h]) => grid(w, h, null, 'Pocket'));
     me.locker = grid(9, 7, null, 'Locker');
     me.locker.locker = true;
   }
   // every grid you carry, pockets first
-  function body(me) {
+  function body(me: GMe) {
     const out = [...me.pockets];
     out.push(...mounted(me.kit.carrier), ...mounted(me.kit.belt));
     if (me.kit.pack) out.push(...me.kit.pack.grids);
@@ -334,48 +341,48 @@ const G_Gear = (() => {
   }
   // the grids of the pouches mounted on a carrier's or belt's MOLLE
   // (left to right across the panel, top to bottom in a column: the order you'd reach for them)
-  function mounted(gear) { return gear && gear.molle ? [...gear.molle.items].sort((a, b) => a.x - b.x || a.y - b.y).flatMap((p) => p.it.grids) : []; }
+  function mounted(gear: GItem) { return gear && gear.molle ? [...gear.molle.items].sort((a, b) => a.x - b.x || a.y - b.y).flatMap((p) => p.it.grids) : []; }
   // the MOLLE panels you wear
-  function molles(me) { return [me.kit.carrier, me.kit.belt].filter((g) => g && g.molle).map((g) => g.molle); }
+  function molles(me: GMe) { return [me.kit.carrier, me.kit.belt].filter((g) => g && g.molle).map((g) => g.molle); }
   // the guns you have: in your hands, then any stowed in your backpack or locker
-  function guns(me) {
+  function guns(me: GMe) {
     const out = Object.values(me.weapons).filter(Boolean);
-    each(all(me), (it) => { if (it.k === 'gun') out.push(it.w); });
+    each(all(me), (it: GItem) => { if (it.k === 'gun') out.push(it.w); });
     return out;
   }
   // the guns in your backpack, as [item, grid]
-  function packGuns(me) { const out = []; if (me.kit.pack) each(me.kit.pack.grids, (it, g) => { if (it.k === 'gun') out.push([it, g]); }); return out; }
+  function packGuns(me: GMe) { const out: [GItem, GGrid][] = []; if (me.kit.pack) each(me.kit.pack.grids, (it: GItem, g: GGrid) => { if (it.k === 'gun') out.push([it, g]); }); return out; }
   // In a level you only have what you carry: the locker is back at the quartermaster's.
   const inField = () => !!(G.Game && G.Game.phase === 'level' && !G.Game.hub); // (the hangar's between levels: your stash is there)
-  function all(me) { return inField() ? [...body(me), ...molles(me)] : [...body(me), ...molles(me), me.locker]; }
-  function each(grids, fn) { for (const g of grids) for (const p of [...g.items]) fn(p.it, g, p); }
+  function all(me: GMe) { return inField() ? [...body(me), ...molles(me)] : [...body(me), ...molles(me), me.locker]; }
+  function each(grids: GGrid[], fn: (it: GItem, g: GGrid, p: GCell) => void) { for (const g of grids) for (const p of [...g.items]) fn(p.it, g, p); }
   // what a gun can reload from, on you
   // what a gun can be fed from on you: its magazines, or boxes of its caliber
-  const feeds = (me, def) => { const a = ammoFor(def), cal = G.calOf(def), out = []; each(body(me), (it, g) => { if (it.k === a.kind && (a.kind === 'mag' ? G.magFits(it.wid, def.id) : it.key === cal) && it.n > 0) out.push({ it, g }); }); return out; };
+  const feeds = (me: GMe, def: GDef) => { const a = ammoFor(def), cal = G.calOf(def), out: { it: GItem; g: GGrid }[] = []; each(body(me), (it: GItem, g: GGrid) => { if (it.k === a.kind && (a.kind === 'mag' ? G.magFits(it.wid, def.id) : it.key === cal) && it.n > 0) out.push({ it, g }); }); return out; };
   // rounds you carry for a gun (the HUD's reserve)
-  const rounds = (me, def) => feeds(me, def).reduce((a, f) => a + f.it.n, 0);
-  const count = (me, k) => { let n = 0; each(body(me), (it) => { if (it.k === k) n++; }); return n; };
-  function take(me, k) { for (const g of body(me)) { const p = g.items.find((q) => q.it.k === k); if (p) { removeFrom(g, p.it); return p.it; } } return null; }
+  const rounds = (me: GMe, def: GDef) => feeds(me, def).reduce((a, f) => a + f.it.n, 0);
+  const count = (me: GMe, k: string) => { let n = 0; each(body(me), (it: GItem) => { if (it.k === k) n++; }); return n; };
+  function take(me: GMe, k: string) { for (const g of body(me)) { const p = g.items.find((q: GCell) => q.it.k === k); if (p) { removeFrom(g, p.it); return p.it; } } return null; }
   // Reloading. A magazine gun swaps magazines: the fullest one on you goes in, the one that was in goes into
   // its pouch (an empty en-bloc clip is thrown away). Loose rounds come out of the emptiest box first.
   // Which magazine a reload reaches for: the fullest with more in it than the gun has, from your pouches and
   // pockets; only if there's none there, from your backpack (slow: you're digging for it).
-  const inPack = (me, g) => !!(me.kit.pack && me.kit.pack.grids.includes(g));
+  const inPack = (me: GMe, g: GGrid) => !!(me.kit.pack && me.kit.pack.grids.includes(g));
   // Any magazine with rounds in it will do (even one with fewer than the gun has: you asked for it): the one
   // with the most rounds, and between equals the first you come to (pockets, then the rig's pouches left to
   // right, then the belt, each top to bottom). The backpack only when there's nothing nearer.
-  function pickMag(me, w) {
-    const grids = body(me), rank = (f) => { const p = f.g.items.find((q) => q.it === f.it); return grids.indexOf(f.g) * 1000 + (p ? p.y * 50 + p.x : 0); };
+  function pickMag(me: GMe, w: GWeapon) {
+    const grids = body(me), rank = (f: { it: GItem; g: GGrid }) => { const p = f.g.items.find((q: GCell) => q.it === f.it); return grids.indexOf(f.g) * 1000 + (p ? p.y * 50 + p.x : 0); };
     const fs = feeds(me, w.def).filter((f) => f.it.n > 0), near = fs.filter((f) => !inPack(me, f.g));
     const best = (near.length ? near : fs).sort((a, b) => b.it.n - a.it.n || rank(a) - rank(b))[0];
     return best ? Object.assign(best, { pack: inPack(me, best.g) }) : null;
   }
   // a dump pouch with room for one of that gun's magazines
-  function dumpGrid(me, def) { const probe = ammoItem(def, 0); return body(me).find((g) => g.dump && findSpot(g, probe)) || null; }
+  function dumpGrid(me: GMe, def: GDef) { const probe = ammoItem(def, 0); return body(me).find((g) => g.dump && findSpot(g, probe)) || null; }
   // A dump reload: the fresh magazine in, the old one into the dump pouch (dest) if there's room, else it's
   // on the floor (where you can pick it up again). Returns 'pouch', 'floor' or null; me.dumped is the
   // magazine that hit the floor.
-  function dumpMag(me, w, cap, dest) {
+  function dumpMag(me: GMe, w: GWeapon, cap: number, dest: GGrid) {
     const best = pickMag(me, w);
     if (!best) return null;
     removeFrom(best.g, best.it);
@@ -383,35 +390,35 @@ const G_Gear = (() => {
     const old = best.it;
     exchange(me, w, old);
     const g = dest && findSpot(dest, old) ? dest : null;
-    if (g) { const s = findSpot(g, old); put(g, old, s.x, s.y, s.rot); return 'pouch'; }
-    me.dumped = old;
+    if (g) { const s = findSpot(g, old)!; put(g, old, s.x, s.y, s.rot); return 'pouch'; }
+    (me as GTbl).dumped = old;
     return 'floor';
   }
   // a gun's rounds are now these (the magazine's own stack: the gun fires off the top of it)
   // loose rounds into a gun: the last in fires first, but a revolver's go round the cylinder behind the ones it has
-  function chamberIn(w, rounds) {
+  function chamberIn(w: GWeapon, rounds: string[]) {
     if (!rounds.length) return;
     w.mag += rounds.length;
     if (w.tube && G.revolver(w.def)) { w.tube.unshift(...rounds.slice().reverse()); w.ammo = w.tube[w.tube.length - 1]; return; }
     if (w.tube) w.tube.push(...rounds);
     w.ammo = rounds[rounds.length - 1];
   }
-  function setLoad(w, rounds) { w.tube = rounds; w.mag = rounds.length; if (rounds.length) w.ammo = rounds[rounds.length - 1]; }
+  function setLoad(w: GWeapon, rounds: string[]) { w.tube = rounds; w.mag = rounds.length; if (rounds.length) w.ammo = rounds[rounds.length - 1]; }
   // a magazine goes in: its rounds are the gun's, and its variant is the gun's magazine (capacity, reload)
-  function loadIn(me, w, mag) {
+  function loadIn(me: GMe, w: GWeapon, mag: GItem | { r: string[]; vid?: string; cap?: number }) {
     setLoad(w, mag.r);
     if (mag.vid && w.def.build && w.def.build.mag !== mag.vid && me.refit) me.refit(w, Object.assign({}, w.def.build, { mag: mag.vid }));
   }
   // the magazine item becomes the one that was in the gun (its rounds and its variant), and the gun gets what
   // the item held
-  function exchange(me, w, mag) {
+  function exchange(me: GMe, w: GWeapon, mag: GItem) {
     const inR = mag.r, inV = mag.vid, inCap = mag.cap, outV = w.def.build && w.def.build.mag;
     mag.r = w.tube || []; mag.base = w.ammo;
     if (outV) { mag.vid = outV; mag.cap = G.Gunsmith.magCap(w.def.id, outV); mag.wid = mag.key = w.def.id; } // (its name and shape are the gun's it came out of: a shared box)
     loadIn(me, w, { r: inR, vid: inV, cap: inCap });
   }
   // A normal (retention) reload: the old magazine goes back in the pouch the fresh one came out of.
-  function swapMag(me, w, cap) {
+  function swapMag(me: GMe, w: GWeapon, cap: number) {
     const best = pickMag(me, w);
     if (!best) return false;
     if (w.noMag) { removeFrom(best.g, best.it); loadIn(me, w, best.it); w.noMag = false; return true; }
@@ -421,7 +428,7 @@ const G_Gear = (() => {
   }
   // Loose rounds out of your boxes: the type you're already using first (prefer), else the first box you
   // carry; the emptiest box of a type goes first. Returns the type of each round taken.
-  function takeRounds(me, def, want, prefer) {
+  function takeRounds(me: GMe, def: GDef, want: number, prefer: string | null) {
     const out = [], fs = feeds(me, def);
     const first = fs.find((f) => f.it.am === prefer) ? prefer : fs.length ? fs[0].it.am : null;
     for (const f of fs.filter((q) => q.it.am === first).sort((a, b) => a.it.n - b.it.n)) {
@@ -434,20 +441,20 @@ const G_Gear = (() => {
   }
   // Loading a magazine from a box of its caliber: the rounds go in on top of whatever's there (mixed types
   // are fine; they come out in reverse order). Returns the rounds loaded.
-  function loadMag(me, mag, box) {
+  function loadMag(me: GMe, mag: GItem, box: GItem) {
     if (mag.k !== 'mag' || box.k !== 'ammo' || box.key !== G.calOf(G.WEAPONS[mag.wid]) || mag.n >= mag.cap) return 0;
     const n = Math.min(mag.cap - mag.n, box.n);
     for (let i = 0; i < n; i++) mag.r.push(box.am);
     box.n -= n;
-    if (box.n <= 0) each(all(me), (it, g) => { if (it === box) removeFrom(g, it); });
+    if (box.n <= 0) each(all(me), (it: GItem, g: GGrid) => { if (it === box) removeFrom(g, it); });
     return n;
   }
   // Every magazine you own topped up from your boxes (same type first; an empty one takes any), and the guns
   // themselves. Returns the rounds loaded.
-  function loadAll(me) {
+  function loadAll(me: GMe) {
     let n = 0;
-    const boxes = () => { const o = []; each(all(me), (it) => { if (it.k === 'ammo' && it.n > 0) o.push(it); }); return o; };
-    each(all(me), (mag) => {
+    const boxes = () => { const o: GItem[] = []; each(all(me), (it: GItem) => { if (it.k === 'ammo' && it.n > 0) o.push(it); }); return o; };
+    each(all(me), (mag: GItem) => {
       if (mag.k !== 'mag' || mag.n >= mag.cap) return;
       const cal = G.calOf(G.WEAPONS[mag.wid]);
       const list = boxes().filter((q) => q.key === cal).sort((a, c) => (c.am === mag.am ? 1 : 0) - (a.am === mag.am ? 1 : 0));
@@ -459,20 +466,20 @@ const G_Gear = (() => {
     for (const w of guns(me)) {
       if (w.noMag) continue; // no magazine in it to load
       const cap = me.magSize(w.def), cal = G.calOf(w.def);
-      if (G.chambered(w.def) && !w.chamber) { const b = boxes().find((q) => q.key === cal); if (b) { w.chamber = b.am; b.n--; n++; if (b.n <= 0) each(all(me), (it, g) => { if (it === b) removeFrom(g, it); }); } }
+      if (G.chambered(w.def) && !w.chamber) { const b = boxes().find((q) => q.key === cal); if (b) { w.chamber = b.am; b.n--; n++; if (b.n <= 0) each(all(me), (it: GItem, g: GGrid) => { if (it === b) removeFrom(g, it); }); } }
       for (const b of boxes().filter((q) => q.key === cal).sort((a, c) => +(c.am === w.ammo) - +(a.am === w.ammo))) {
         if (w.mag >= cap) break;
         const t = Math.min(cap - w.mag, b.n);
         w.mag += t; b.n -= t; w.ammo = b.am; n += t;
         if (w.tube) for (let i = 0; i < t; i++) w.tube.push(b.am);
-        if (b.n <= 0) each(all(me), (it, g) => { if (it === b) removeFrom(g, it); });
+        if (b.n <= 0) each(all(me), (it: GItem, g: GGrid) => { if (it === b) removeFrom(g, it); });
       }
     }
     return n;
   }
   // somewhere for a new item: near `pref` if given, else on you, else the locker (which grows if it's full)
   // (in a level: only on you, unless the locker's asked for by name; false if there's no room)
-  function stow(me, it, pref?) {
+  function stow(me: GMe, it: GItem, pref?: GGrid[]) {
     const gs = [...(pref || []), ...body(me), ...(inField() ? [] : [me.locker])];
     const some = (it.k === 'ammo' || it.k === 'med') && it.n > 0; // (an empty box has nothing to pour away: it's a box, wanted for rounds to come)
     absorb(it, gs); // loose rounds top up the boxes you have first (and bandages their stacks)
@@ -483,10 +490,10 @@ const G_Gear = (() => {
     return !!place([me.locker], it);
   }
   // is there room on you for a box of those rounds (before unloading in the field)?
-  const roomFor = (me, it) => body(me).some((g) => findSpot(g, it));
+  const roomFor = (me: GMe, it: GItem) => body(me).some((g) => findSpot(g, it));
   // the rounds in a magazine (or gun) as boxes, one per type: counts [[type, n], ...]
-  function toBoxes(me, cal, counts, pref?) { for (const [am, n] of counts) if (n > 0) stow(me, boxItem(cal, am, n), pref); }
-  function unloadMag(me, mag, pref) {
+  function toBoxes(me: GMe, cal: string, counts: [string, number][], pref?: GGrid[]) { for (const [am, n] of counts) if (n > 0) stow(me, boxItem(cal, am, n), pref); }
+  function unloadMag(me: GMe, mag: GItem, pref: GGrid[]) {
     if (mag.k !== 'mag' || !mag.n) return 0;
     const n = mag.n, counts = new Map();
     for (const t of mag.r) counts.set(t, (counts.get(t) || 0) + 1);
@@ -495,7 +502,7 @@ const G_Gear = (() => {
     return n;
   }
   // a gun's loaded rounds out (a tube keeps its order of types)
-  function unloadGun(me, w) {
+  function unloadGun(me: GMe, w: GWeapon) {
     const n = w.mag + (w.chamber ? 1 : 0);
     if (!n) return 0;
     const counts = new Map();
@@ -506,25 +513,25 @@ const G_Gear = (() => {
     return n;
   }
   // one magazine topped up from your boxes of its caliber (same type first)
-  function fillMag(me, mag) {
+  function fillMag(me: GMe, mag: GItem) {
     let n = 0;
-    const cal = G.calOf(G.WEAPONS[mag.wid]), boxes = [];
-    each(all(me), (it) => { if (it.k === 'ammo' && it.n > 0 && it.key === cal) boxes.push(it); });
+    const cal = G.calOf(G.WEAPONS[mag.wid]), boxes: GItem[] = [];
+    each(all(me), (it: GItem) => { if (it.k === 'ammo' && it.n > 0 && it.key === cal) boxes.push(it); });
     boxes.sort((a, c) => (c.am === mag.am ? 1 : 0) - (a.am === mag.am ? 1 : 0));
     for (const b of boxes) { n += loadMag(me, mag, b); if (mag.n >= mag.cap) break; }
     return n;
   }
   // a box's rounds into the magazines that take them
-  function fillFrom(me, box) {
+  function fillFrom(me: GMe, box: GItem) {
     let n = 0;
-    each(all(me), (mag) => { if (box.n > 0 && mag.k === 'mag' && mag.n < mag.cap && G.calOf(G.WEAPONS[mag.wid]) === box.key) n += loadMag(me, mag, box); });
+    each(all(me), (mag: GItem) => { if (box.n > 0 && mag.k === 'mag' && mag.n < mag.cap && G.calOf(G.WEAPONS[mag.wid]) === box.key) n += loadMag(me, mag, box); });
     return n;
   }
   // a loose-fed gun (tube, break-action) loaded from your boxes
-  function fillGun(me, w) {
+  function fillGun(me: GMe, w: GWeapon) {
     let n = 0;
     const cap = me.magSize(w.def), cal = G.calOf(w.def);
-    each(all(me), (b, g) => {
+    each(all(me), (b: GItem, g: GGrid) => {
       if (b.k !== 'ammo' || b.key !== cal || w.mag >= cap) return;
       const t = Math.min(cap - w.mag, b.n);
       w.mag += t; b.n -= t; w.ammo = b.am; n += t;
@@ -536,22 +543,22 @@ const G_Gear = (() => {
   // Weapon parts you own but haven't fitted are items (in your locker, or wherever you put them). The old
   // { partId: count } stash still works on top of them, for the gunsmith: reading a part's count counts its
   // items, setting it adds items (to the locker) or takes them away.
-  function partCount(me, pid) { let n = 0; each(all(me), (it) => { if (it.k === 'part' && it.pid === pid) n++; }); return n; }
-  function stashProxy(me) {
+  function partCount(me: GMe, pid: string) { let n = 0; each(all(me), (it: GItem) => { if (it.k === 'part' && it.pid === pid) n++; }); return n; }
+  function stashProxy(me: GMe) {
     return new Proxy({}, {
       get(_, pid) { return typeof pid === 'string' && G.Gunsmith.PARTS[pid] ? partCount(me, pid) || undefined : undefined; },
-      set(_, pid, v) {
+      set(_, pid: string, v: number) {
         let have = partCount(me, pid);
         for (; have < v; have++) stow(me, partItem(pid), [me.locker]);
-        for (; have > v; have--) { let done = false; for (const g of [me.locker, ...body(me)]) { const p = !done && g.items.find((q) => q.it.k === 'part' && q.it.pid === pid); if (p) { removeFrom(g, p.it); done = true; } } if (!done) break; }
+        for (; have > v; have--) { let done = false; for (const g of [me.locker, ...body(me)]) { const p = !done && g.items.find((q: GCell) => q.it.k === 'part' && q.it.pid === pid); if (p) { removeFrom(g, p.it); done = true; } } if (!done) break; }
         return true;
       },
-      deleteProperty(_, pid) { (this as any).set(_, pid, 0); return true; },
-      has(_, pid) { return partCount(me, pid) > 0; },
+      deleteProperty(_, pid: string) { (this as any).set(_, pid, 0); return true; },
+      has(_, pid: string) { return partCount(me, pid) > 0; },
     });
   }
   // the rounds that come with a found gun, as full magazines (or boxes) of one type
-  function spares(def, nRounds, am) {
+  function spares(def: GDef, nRounds: number, am: string) {
     const a = ammoFor(def), cal = G.calOf(def), out = [], cap = a.kind === 'mag' ? a.cap : boxCap(cal); // (boxes as full as they go, not as they're sold)
     for (let left = nRounds; left > 0 && out.length < 3; left -= cap) {
       const n = Math.min(cap, left);
@@ -560,37 +567,37 @@ const G_Gear = (() => {
     return out;
   }
   // the gunsmith changed a gun's magazine size: its magazines follow
-  function refitMags(_me?, _def?) { /* magazines keep their own capacity: it's theirs, not the gun's */ }
+  function refitMags(_me?: GMe, _def?: GDef) { /* magazines keep their own capacity: it's theirs, not the gun's */ }
 
   // ---------------------------------------------------------------- protection
-  const defOf = (it) => (it ? DEFS[it.gid] : null);
-  const cond = (it) => { const d = defOf(it); return d && d.dur ? it.dur / d.dur : 0; };
+  const defOf = (it?: GItem | null): GDef | null => (it ? DEFS[it.gid] : null);
+  const cond = (it: GItem) => { const d = defOf(it); return d && d.dur ? it.dur / d.dur : 0; };
   // what you're wearing that takes something of that kind, if it has the mount for it
-  const mountOn = (me, m) => { const h = me.kit[MOUNTS[m]]; return h && defOf(h)[m] ? h : null; };
+  const mountOn = (me: GMe, m: string) => { const h = me.kit[MOUNTS[m]]; return h && defOf(h)![m] ? h : null; };
   // is that mount there, with nothing on it?
-  const mountFree = (me, m) => { const h = mountOn(me, m); return !!h && !h[m]; };
+  const mountFree = (me: GMe, m: string) => { const h = mountOn(me, m); return !!h && !h[m]; };
   // what you've got on your head: the helmet and what's on its mount, how heavy (kg) and how far that hangs in front of your neck (kg m: fwd, m, each)
-  const headLoad = (me) => { const h = me.kit.helmet, ds = h ? [defOf(h), h.face && defOf(h.face)].filter(Boolean) : []; return { kg: ds.reduce((s, d) => s + (d.kg || 0), 0), nose: ds.reduce((s, d) => s + (d.kg || 0) * (d.fwd || 0), 0) }; };
+  const headLoad = (me: GMe) => { const h = me.kit.helmet, ds = h ? [defOf(h), h.face && defOf(h.face)].filter(Boolean) : []; return { kg: ds.reduce((s, d) => s + (d.kg || 0), 0), nose: ds.reduce((s, d) => s + (d.kg || 0) * (d.fwd || 0), 0) }; };
   // which piece of kit a round to that zone meets: the helmet for the head and face, the plate over the chest
   // (if there is one), the carrier's soft armour anywhere else it covers
-  function piece(me, zone, roll?) {
+  function piece(me: GMe, zone: string, roll?: boolean) {
     const k = me.kit;
     if (zone === 'face' && k.helmet && k.helmet.face) {
-      const c = defOf(k.helmet.face).cover || 1;
+      const c = defOf(k.helmet.face)!.cover || 1;
       if (roll ? Math.random() < c : c >= 0.9) return k.helmet.face;
     }
     if (zone === 'head' || zone === 'face') return k.helmet;
     if (zone === 'chest' && k.carrier && k.carrier.plate) return k.carrier.plate;
     return k.carrier;
   }
-  function speed(me) {
-    const k = me.kit, ds = [k.helmet, k.helmet && k.helmet.face, k.carrier, k.carrier && k.carrier.plate, k.carrier && k.carrier.shoulder, k.carrier && k.carrier.groin, k.belt, k.belt && k.belt.legs, k.pack, k.ifak].map(defOf).filter(Boolean);
+  function speed(me: GMe) {
+    const k = me.kit, ds = [k.helmet, k.helmet && k.helmet.face, k.carrier, k.carrier && k.carrier.plate, k.carrier && k.carrier.shoulder, k.carrier && k.carrier.groin, k.belt, k.belt && k.belt.legs, k.pack, k.ifak].map(defOf).filter(Boolean) as GDef[];
     return ds.reduce((a, d) => a * (d.speed || 1), 1);
   }
   // the starting kit: a worn bump helmet and concealable vest, two spare pistol magazines in your pockets (no
   // grenade), and an IFAK with one of each
   // basic piece of medical gear (no painkillers)
-  function starter(me) {
+  function starter(me: GMe) {
     newKit(me);
     const p9 = G.WEAPONS.p9;
     // two spare magazines of tracers (you see every round go), in the small pockets: the tall ones are left for rifle magazines
@@ -604,12 +611,12 @@ const G_Gear = (() => {
     put(g, medItem('bandage'), 1, 0, 0); put(g, medItem('tourniquet'), 1, 1, 0);
     put(g, medItem('gauze'), 0, 2, 0); put(g, medItem('seal'), 1, 2, 0);
   }
-  const roundPrice = (cal, am) => (G.CALIBERS[cal] ? G.CALIBERS[cal].per : 1) * (G.AMMO[am] ? G.AMMO[am].k : 1);
+  const roundPrice = (cal: string, am: string) => ((G.CALIBERS as GTbl)[cal] ? (G.CALIBERS as GTbl)[cal].per : 1) * ((G.AMMO as GTbl)[am] ? (G.AMMO as GTbl)[am].k : 1);
   // what an item's called and worth
-  function label(it) {
-    const tag = it.am && G.AMMO[it.am] ? G.AMMO[it.am].tag : '';
+  function label(it: GItem) {
+    const tag = it.am && (G.AMMO as GTbl)[it.am] ? (G.AMMO as GTbl)[it.am].tag : '';
     if (it.k === 'mag') return `${magName(it)}${it.n ? ' · ' + (mixed(it) ? 'mixed, ' + tag + ' next' : tag) : ''}`;
-    if (it.k === 'ammo') return `${(G.CALIBERS[it.key] || {}).name || it.key} ${tag}`;
+    if (it.k === 'ammo') return `${((G.CALIBERS as GTbl)[it.key] || {}).name || it.key} ${tag}`;
     if (it.k === 'med') return (G.Med.ITEMS[it.mt] || G.Med.ITEMS.bandage).name; // (a stack's count is on its tile: n/most)
     if (it.k === 'frag') return 'Frag grenade';
     if (it.k === 'flash') return 'Flashbang';
@@ -619,8 +626,8 @@ const G_Gear = (() => {
     const d = defOf(it);
     return d ? d.name : it.k;
   }
-  function price(it) {
-    if (it.k === 'mag') { const cal = G.calOf(G.WEAPONS[it.wid]), v = it.vid && G.Gunsmith.PARTS[it.vid]; return Math.max(20 + Math.round((it.cap || 10) * 0.6), v && !v.factory ? Math.round(v.price * 0.6) : 0) + Math.round((it.r || []).reduce((a, t) => a + roundPrice(cal, t), 0)); }
+  function price(it: GItem) {
+    if (it.k === 'mag') { const cal = G.calOf(G.WEAPONS[it.wid]), v = it.vid && G.Gunsmith.PARTS[it.vid]; return Math.max(20 + Math.round((it.cap || 10) * 0.6), v && !v.factory ? Math.round(v.price * 0.6) : 0) + Math.round((it.r || []).reduce((a: number, t: string) => a + roundPrice(cal, t), 0)); }
     if (it.k === 'ammo') return Math.max(1, Math.round(it.n * roundPrice(it.key, it.am)));
     if (it.k === 'med') return (G.Med.ITEMS[it.mt] || G.Med.ITEMS.bandage).price * (it.n || 1);
     if (it.k === 'frag') return 200;
@@ -633,7 +640,7 @@ const G_Gear = (() => {
   }
   // What the quartermaster gives for it: half its price, and worn gear far less, by the square of what's left of it (at 80%
   // a third of new, at 50% an eighth; shot through, a credit for the scrap)
-  function sale(it) {
+  function sale(it: GItem) {
     const d = defOf(it), base = price(it) * 0.5, c = d && d.dur ? Math.min(1, cond(it)) : 1;
     return base > 0 ? Math.max(1, Math.floor(base * c * c)) : 0;
   }

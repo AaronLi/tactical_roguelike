@@ -17,47 +17,52 @@
 // then only its hash, in your state (st.sk: js/player.ts state), which everyone looks up (of).
 const G_Stickers = (() => {
   const DIR = 'assets/stickers/', EXT = /\.(png|webp|jpe?g|gif|avif)$/i;
-  const S = { base: '', names: [], MAX: 12, MIN_K: 0.012, MAX_K: 0.07 }; // (MAX on a gun; k's range, m. base: the game's folder, from a worker's: js/exportworker.ts)
-  const ok = (n) => typeof n === 'string' && n.length < 100 && EXT.test(n) && !/[\\/]|^\./.test(n);
+  interface Skin { s: string; p: number[]; n: number[]; r: number; k: number; f: number | boolean }
+  interface Pic { bm: any; w: number; h: number; bad: boolean; tex: any; mat: any; ghost: any; ready: Promise<any>; [k: string]: any }
+  interface Poly { p: THREE.Vector3; q: THREE.Vector3; n: THREE.Vector3 }
+  interface Tri { si: number; v: THREE.Vector3[]; q: THREE.Vector3[]; ln: THREE.Vector3[]; n: THREE.Vector3; T: THREE.Matrix4 | null; seed: boolean; c: number[] }
+  interface Surf { mesh: any; rel: THREE.Matrix4 }
+  const S = { base: '', names: [] as string[], MAX: 12, MIN_K: 0.012, MAX_K: 0.07 }; // (MAX on a gun; k's range, m. base: the game's folder, from a worker's: js/exportworker.ts)
+  const ok = (n: any) => typeof n === 'string' && n.length < 100 && EXT.test(n) && !/[\\/]|^\./.test(n);
 
   // ---------------------------------------------------------------- which there are
-  let loading = null;
+  let loading: any = null;
   function load() {
     if (loading) return loading;
-    const names = (a) => [...new Set(a.map((n) => { try { return decodeURIComponent(String(n)).split('/').pop(); } catch (e) { return ''; } }).filter(ok))].sort();
+    const names = (a: any[]) => [...new Set(a.map((n: any) => { try { return decodeURIComponent(String(n)).split('/').pop(); } catch (e) { return ''; } }).filter(ok))].sort();
     loading = fetch(S.base + DIR + 'index.json', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : Promise.reject(new Error('no index'))))
       .catch(() => fetch(S.base + DIR, { cache: 'no-store' }).then((r) => (r.ok ? r.text() : '')).then((t) => [...t.matchAll(/href\s*=\s*["']([^"'?#]+)["']/gi)].map((m) => m[1])))
-      .catch(() => []).then((a) => (S.names = names(Array.isArray(a) ? a : [])));
+      .catch(() => []).then((a: any) => (S.names = names(Array.isArray(a) ? a : []) as string[]));
     return loading;
   }
-  const url = (name) => S.base + DIR + encodeURIComponent(name);
+  const url = (name: string) => S.base + DIR + encodeURIComponent(name);
 
   // ---------------------------------------------------------------- your collection (name -> how many)
   const owned = () => (G.Me.stk || (G.Me.stk = {}));
-  function give(name) { if (!ok(name)) return; const o = owned(); o[name] = (o[name] || 0) + 1; }
-  function use(name) { const o = owned(); if (!o[name]) return false; if (--o[name] <= 0) delete o[name]; return true; }
+  function give(name: string) { if (!ok(name)) return; const o = owned(); o[name] = (o[name] || 0) + 1; }
+  function use(name: string) { const o = owned(); if (!o[name]) return false; if (--o[name] <= 0) delete o[name]; return true; }
 
   // ---------------------------------------------------------------- the pictures
   // name -> { bm: its ImageBitmap once loaded, w, h, ready (a promise), bad, tex, mat, ghost (a placement's preview) }
-  const pics = new Map();
-  function pic(name) {
+  const pics = new Map<string, Pic>();
+  function pic(name: string): Pic {
     let p = pics.get(name);
     if (!p) {
-      p = { bm: null, w: 1, h: 1, bad: false, tex: null, mat: null, ghost: null };
+      p = { bm: null, w: 1, h: 1, bad: false, tex: null, mat: null, ghost: null } as Pic;
       pics.set(name, p);
-      p.ready = ok(name) ? fetch(url(name)).then((r) => (r.ok ? r.blob() : Promise.reject(new Error(String(r.status))))).then((b) => createImageBitmap(b)).then((bm) => set(p, bm)).catch(() => { p.bad = true; return p; })
+      p.ready = ok(name) ? fetch(url(name)).then((r) => (r.ok ? r.blob() : Promise.reject(new Error(String(r.status))))).then((b) => createImageBitmap(b)).then((bm) => set(p!, bm)).catch(() => { p!.bad = true; return p!; })
         : Promise.resolve((p.bad = true, p));
     }
     return p;
   }
-  function set(p, bm) {
+  function set(p: Pic, bm: any) {
     p.bm = bm; p.w = bm.width || 1; p.h = bm.height || 1; p.bad = false;
     if (p.tex) { p.tex.image = bm; p.tex.needsUpdate = true; }
     return p;
   }
   // a picture handed over (a replay's file brought its own: js/highlights.ts renderPack, in the worker)
-  function provide(name, bm) { const p = pics.get(name) || pic(name); set(p, bm); p.ready = Promise.resolve(p); }
-  function material(name, ghost?) {
+  function provide(name: string, bm: any) { const p = pics.get(name) || pic(name); set(p, bm); p.ready = Promise.resolve(p); }
+  function material(name: string, ghost?: any) {
     const p = pic(name);
     if (!p.tex) {
       // (an ImageBitmap isn't turned over on upload: its top row is v = 0, as the decals' UVs have it)
@@ -75,17 +80,17 @@ const G_Stickers = (() => {
   }
 
   // ---------------------------------------------------------------- tidy data (from anyone)
-  const num = (v, lo, hi, d = 0) => (Number.isFinite(+v) ? Math.min(hi, Math.max(lo, +v)) : d);
-  const r4 = (v) => Math.round(v * 1e4) / 1e4;
-  function clean(list) {
+  const num = (v: any, lo: number, hi: number, d = 0) => (Number.isFinite(+v) ? Math.min(hi, Math.max(lo, +v)) : d);
+  const r4 = (v: number) => Math.round(v * 1e4) / 1e4;
+  function clean(list: any): Skin[] {
     if (!Array.isArray(list)) return [];
-    const out = [];
+    const out: Skin[] = [];
     for (const s of list.slice(0, S.MAX)) {
       if (!s || !ok(s.s) || !Array.isArray(s.p) || !Array.isArray(s.n)) continue;
       const n = new THREE.Vector3(num(s.n[0], -1, 1), num(s.n[1], -1, 1), num(s.n[2], -1, 1));
       if (n.lengthSq() < 1e-6) continue;
       n.normalize();
-      out.push({ s: s.s, p: s.p.slice(0, 3).map((v) => r4(num(v, -3, 3))), n: [r4(n.x), r4(n.y), r4(n.z)], r: r4(num(s.r, -Math.PI, Math.PI)), k: r4(num(s.k, S.MIN_K, S.MAX_K, 0.03)), f: s.f ? 1 : 0 });
+      out.push({ s: s.s, p: s.p.slice(0, 3).map((v: any) => r4(num(v, -3, 3))), n: [r4(n.x), r4(n.y), r4(n.z)], r: r4(num(s.r, -Math.PI, Math.PI)), k: r4(num(s.k, S.MIN_K, S.MAX_K, 0.03)), f: s.f ? 1 : 0 });
     }
     return out;
   }
@@ -93,18 +98,18 @@ const G_Stickers = (() => {
   // ---------------------------------------------------------------- decals
   // A sticker's frame in the gun's space: x across the picture, y up it, z out of the surface, in metres. Upright as seen
   // from in front of it with the gun's up (+Y) as up (from above or below: its back, +Z), then turned by r.
-  function frame(s, aspect) {
-    const n = new THREE.Vector3(...s.n).normalize(), ref = Math.abs(n.y) > 0.95 ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(0, 1, 0);
+  function frame(s: Skin, aspect: number) {
+    const n = new THREE.Vector3(...(s.n as [number, number, number])).normalize(), ref = Math.abs(n.y) > 0.95 ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(0, 1, 0);
     const x = new THREE.Vector3().crossVectors(ref, n).normalize(), y = new THREE.Vector3().crossVectors(n, x);
     const c = Math.cos(s.r), sn = Math.sin(s.r), xr = x.clone().multiplyScalar(c).addScaledVector(y, sn), yr = y.clone().multiplyScalar(c).addScaledVector(x, -sn);
-    return { M: new THREE.Matrix4().makeBasis(xr, yr, n).setPosition(new THREE.Vector3(...s.p)), w: (aspect >= 1 ? s.k : s.k * aspect) * (s.f ? -1 : 1), h: aspect >= 1 ? s.k / aspect : s.k, d: Math.min(0.025, Math.max(0.006, s.k * 0.5)) };
+    return { M: new THREE.Matrix4().makeBasis(xr, yr, n).setPosition(new THREE.Vector3(...(s.p as [number, number, number]))), w: (aspect >= 1 ? s.k : s.k * aspect) * (s.f ? -1 : 1), h: aspect >= 1 ? s.k / aspect : s.k, d: Math.min(0.025, Math.max(0.006, s.k * 0.5)) };
   }
   // the meshes under a gun's root a sticker can go on (its own parts: not a sight's glass, a glow, a sticker), each with
   // its place in the root's frame, as they are now
-  function surfaces(root) {
+  function surfaces(root: any): Surf[] {
     root.updateMatrixWorld(true);
-    const inv = root.matrixWorld.clone().invert(), out = [];
-    root.traverse((o) => {
+    const inv = root.matrixWorld.clone().invert(), out: Surf[] = [];
+    root.traverse((o: any) => {
       if (!o.isMesh || o.userData.sticker || o.userData.noSticker || !o.geometry || !o.geometry.attributes.position) return;
       const m = Array.isArray(o.material) ? o.material[0] : o.material;
       if (!m || m.transparent || m.isMeshBasicMaterial || m.isShaderMaterial) return;
@@ -113,8 +118,8 @@ const G_Stickers = (() => {
     return out;
   }
   // a polygon (points { p: x, y, z in the sticker's unit box, q: where in its mesh, n: the normal there }) cut down to one face of the box
-  function cut(poly, ax, sg) {
-    const out = [];
+  function cut(poly: Poly[], ax: 'x' | 'y' | 'z', sg: number) {
+    const out: Poly[] = [];
     for (let i = 0; i < poly.length; i++) {
       const a = poly[i], b = poly[(i + 1) % poly.length], da = sg * a.p[ax] - 0.5, db = sg * b.p[ax] - 0.5;
       if (da <= 0) out.push(a);
@@ -127,14 +132,14 @@ const G_Stickers = (() => {
   // turned about the edge it shares with the last (every turn added to the last), so the surface comes flat into the
   // sticker's plane however it bends, over a corner, round a tube, down the far side. What ends up outside the picture
   // stops it there. Each mesh's share of it is a mesh of its own, a child of that one (so it moves with it).
-  function place(sfs, s, ghost?) {
+  function place(sfs: Surf[], s: Skin, ghost?: any): any[] {
     const pc = pic(s.s);
     if (!pc.bm) return [];
     const { M: F, w, h, d } = frame(s, pc.w / pc.h), Fi = F.clone().invert(), W = Math.abs(w), reach = Math.hypot(W, h) / 2 + 0.003;
-    const tris = [], edges = new Map(), ids = new Map();
-    const idOf = (v) => { const k = `${Math.round(v.x * 2e4)},${Math.round(v.y * 2e4)},${Math.round(v.z * 2e4)}`; let i = ids.get(k); if (i == null) ids.set(k, (i = ids.size)); return i; };
+    const tris: Tri[] = [], edges = new Map<string, any[]>(), ids = new Map<string, number>();
+    const idOf = (v: THREE.Vector3) => { const k = `${Math.round(v.x * 2e4)},${Math.round(v.y * 2e4)},${Math.round(v.z * 2e4)}`; let i = ids.get(k); if (i == null) ids.set(k, (i = ids.size)); return i; };
     const e1 = new THREE.Vector3(), e2 = new THREE.Vector3();
-    sfs.forEach((sf, si) => {
+    sfs.forEach((sf: Surf, si: number) => {
       const geo = sf.mesh.geometry, M = Fi.clone().multiply(sf.rel);
       if (!geo.boundingBox) geo.computeBoundingBox();
       const bb = geo.boundingBox.clone().applyMatrix4(M);
@@ -150,25 +155,25 @@ const G_Stickers = (() => {
         if (fn.lengthSq() < 1e-16) continue;
         fn.normalize();
         const lf = new THREE.Vector3().crossVectors(e1.subVectors(lo[1], lo[0]), e2.subVectors(lo[2], lo[0])).normalize();
-        const t: any = { si, v, q: lo.map((q) => q.clone()), ln: iv.map((k) => (nor ? new THREE.Vector3().fromBufferAttribute(nor, k) : lf.clone())), n: fn, T: null, seed: false };
+        const t = { si, v, q: lo.map((q) => q.clone()), ln: iv.map((k) => (nor ? new THREE.Vector3().fromBufferAttribute(nor, k) : lf.clone())), n: fn, T: null, seed: false } as Tri; // (its c: set below)
         const c = v.map(idOf);
         for (let j = 0; j < 3; j++) { const a = c[j], b = c[(j + 1) % 3], k = a < b ? `${a}|${b}` : `${b}|${a}`; let l = edges.get(k); if (!l) edges.set(k, (l = [])); l.push([t, v[j], v[(j + 1) % 3]]); }
         t.c = c; tris.push(t);
       }
     });
     // what it sits on as it is: under it, facing out
-    const queue = [], I = new THREE.Matrix4();
+    const queue: Tri[] = [], I = new THREE.Matrix4();
     for (const t of tris) {
       if (t.n.z < 0.9) continue;
-      const out = (f, lim) => f(t.v[0]) > lim && f(t.v[1]) > lim && f(t.v[2]) > lim;
-      if (out((q) => q.x, W / 2) || out((q) => -q.x, W / 2) || out((q) => q.y, h / 2) || out((q) => -q.y, h / 2) || out((q) => q.z, d / 2) || out((q) => -q.z, d / 2)) continue;
+      const out = (f: (q: THREE.Vector3) => number, lim: number) => f(t.v[0]) > lim && f(t.v[1]) > lim && f(t.v[2]) > lim;
+      if (out((q: THREE.Vector3) => q.x, W / 2) || out((q: THREE.Vector3) => -q.x, W / 2) || out((q: THREE.Vector3) => q.y, h / 2) || out((q: THREE.Vector3) => -q.y, h / 2) || out((q: THREE.Vector3) => q.z, d / 2) || out((q: THREE.Vector3) => -q.z, d / 2)) continue;
       t.T = I; t.seed = true; queue.push(t);
     }
-    const buckets = new Map(), a = new THREE.Vector3(), tmp = new THREE.Vector3(), cr = new THREE.Vector3(), R = new THREE.Matrix4(), TA = new THREE.Matrix4(), TB = new THREE.Matrix4();
+    const buckets = new Map<number, { P: number[]; N: number[]; UV: number[] }>(), a = new THREE.Vector3(), tmp = new THREE.Vector3(), cr = new THREE.Vector3(), R = new THREE.Matrix4(), TA = new THREE.Matrix4(), TB = new THREE.Matrix4();
     for (let head = 0; head < queue.length && head < 4000; head++) {
       const t = queue[head];
-      let poly = t.v.map((v, j) => { tmp.copy(v).applyMatrix4(t.T); return { p: new THREE.Vector3(tmp.x / w, tmp.y / h, t.seed ? tmp.z / d : 0), q: t.q[j], n: t.ln[j] }; });
-      for (const [ax, sg] of [['x', 1], ['x', -1], ['y', 1], ['y', -1], ['z', 1], ['z', -1]]) { poly = cut(poly, ax, sg); if (poly.length < 3) break; }
+      let poly: Poly[] = t.v.map((v: THREE.Vector3, j: number) => { tmp.copy(v).applyMatrix4(t.T!); return { p: new THREE.Vector3(tmp.x / w, tmp.y / h, t.seed ? tmp.z / d : 0), q: t.q[j], n: t.ln[j] }; });
+      for (const [ax, sg] of [['x', 1], ['x', -1], ['y', 1], ['y', -1], ['z', 1], ['z', -1]] as ['x' | 'y' | 'z', number][]) { poly = cut(poly, ax, sg); if (poly.length < 3) break; }
       if (poly.length < 3) continue; // (off the picture: it stops here)
       let B = buckets.get(t.si);
       if (!B) buckets.set(t.si, (B = { P: [], N: [], UV: [] }));
@@ -177,13 +182,13 @@ const G_Stickers = (() => {
       }
       // on to what's over each of its edges, turned about that edge to lie as this one does
       for (let j = 0; j < 3; j++) {
-        const c0 = t.c[j], c1 = t.c[(j + 1) % 3], key = c0 < c1 ? `${c0}|${c1}` : `${c1}|${c0}`;
-        for (const [o, p0, p1] of edges.get(key)) {
+        const c0: number = t.c[j], c1: number = t.c[(j + 1) % 3], key: string = c0 < c1 ? `${c0}|${c1}` : `${c1}|${c0}`;
+        for (const [o, p0, p1] of edges.get(key)! as [Tri, THREE.Vector3, THREE.Vector3][]) {
           if (o === t || o.T || o.n.dot(t.n) < -0.7) continue; // (the far side of a thin sheet: not a fold)
           a.subVectors(p1, p0).normalize();
           const ang = Math.atan2(cr.crossVectors(o.n, t.n).dot(a), o.n.dot(t.n));
           R.makeRotationAxis(a, ang); TA.makeTranslation(p0.x, p0.y, p0.z); TB.makeTranslation(-p0.x, -p0.y, -p0.z);
-          o.T = t.T.clone().multiply(TA).multiply(R).multiply(TB);
+          o.T = t.T!.clone().multiply(TA).multiply(R).multiply(TB);
           queue.push(o);
         }
       }
@@ -199,14 +204,14 @@ const G_Stickers = (() => {
     }
     return out;
   }
-  function strip(root, kind) {
-    const gone = [];
-    root.traverse((o) => { if (o.userData.sticker && (kind == null || o.userData.sticker === kind)) gone.push(o); });
+  function strip(root: any, kind?: any) {
+    const gone: any[] = [];
+    root.traverse((o: any) => { if (o.userData.sticker && (kind == null || o.userData.sticker === kind)) gone.push(o); });
     for (const o of gone) { o.removeFromParent(); o.geometry.dispose(); }
   }
   // A gun's stickers on its model (root: the model's root, the gun's own frame): any it had come off first. The meshes
   // are taken as they are now; a picture still loading goes on when it's in (if the model hasn't been given others since).
-  function decorate(root, skin) {
+  function decorate(root: any, skin: any) {
     if (!root) return;
     strip(root, 1);
     const list = clean(skin);
@@ -217,7 +222,7 @@ const G_Stickers = (() => {
     if (wait.length) Promise.all(wait.map((p) => p.ready)).then(go); else go();
   }
   // a placement being tried (the gunsmith's sticker tool): shown faint, any other tried one gone; null clears it
-  function ghost(root, s) {
+  function ghost(root: any, s: any) {
     if (!root) return;
     strip(root, 'ghost');
     root.userData.stkGhost = s;
@@ -229,7 +234,7 @@ const G_Stickers = (() => {
 
   // ---------------------------------------------------------------- the squad: a list's hash, and the lists by hash
   const hashes = new WeakMap(), reg = new Map(), sent = new Set(), asked = new Map();
-  function key(skin) {
+  function key(skin: any) {
     if (!skin || !skin.length) return '';
     let h = hashes.get(skin);
     if (h == null) {
@@ -241,13 +246,13 @@ const G_Stickers = (() => {
     return h;
   }
   // yours: told to the squad (once), its hash for your state
-  function share(skin) {
+  function share(skin: any) {
     const h = key(skin);
     if (h && !sent.has(h) && G.Net && G.Net.myId) { sent.add(h); reg.set(h, clean(skin)); G.Net.toHost({ t: 'skin', h, l: clean(skin) }); }
     return h;
   }
   // someone's, by its hash (null till it's known: asked for, now and then)
-  function of(h) {
+  function of(h: any) {
     if (!h || typeof h !== 'string') return null;
     const l = reg.get(h);
     if (l) return l;
@@ -255,9 +260,9 @@ const G_Stickers = (() => {
     if (!(asked.get(h) > t - 3000) && G.Net && G.Net.myId) { asked.set(h, t); G.Net.toHost({ t: 'skinReq', h }); }
     return null;
   }
-  function learn(h, l) { if (typeof h === 'string' && h.length < 24) reg.set(h, clean(l)); }
+  function learn(h: any, l: any) { if (typeof h === 'string' && h.length < 24) reg.set(h, clean(l)); }
   // joined a game: what this host has heard of, and ours to tell it again
-  function joined(list) { sent.clear(); for (const [h, l] of Array.isArray(list) ? list : []) learn(h, l); }
+  function joined(list: any) { sent.clear(); for (const [h, l] of Array.isArray(list) ? list : []) learn(h, l); }
 
   return Object.assign(S, { load, url, owned, give, use, pic, provide, material, clean, decorate, ghost, key, share, of, learn, joined });
 })();

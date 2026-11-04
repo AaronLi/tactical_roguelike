@@ -21,7 +21,7 @@ const G_Hangar = (() => {
   // RZ in (so meshes just use the hall's), and what's in the world (solids, targets, where you stand) adds it.
   const RZ = G.HANGAR_ROWS * 2;
   const HELI = { x: 26, z: 36.2, floor: 0.55, seats: 6 };
-  const BENCH = (i) => ({ x: 2.1, x1: 3.25, z: 4 + i * 4 });
+  const BENCH = (i: number) => ({ x: 2.1, x1: 3.25, z: 4 + i * 4 });
   const COUNTER = { x0: 22, x1: 28, z0: 4, z1: 5, h: 1.05 }, VEX = { x: 25, z: 2.9 };
   const STAND = { z: 12.5, xs: [20.5, 23, 25.5, 28, 30.5], top: 0.95 };
   const POUCH = { x0: 17.2, x1: 18.0, z0: 8.7, step: 1.12, n: 5 };
@@ -41,11 +41,13 @@ const G_Hangar = (() => {
   const OUT = { x0: 5.4, x1: 16.6, z0: 16.4, z1: 26, rows: [18.6, 21.6], xs: [7.6, 9.8, 12.0, 14.2], top: 0.9, size: 0.9, rocks: 24.9, pond: [10.0, 23.0, 14.8, 25.4], bear: [7.0, 24.0], pines: [[15.9, 25.0], [6.1, 17.2]], door: [19.0, 21.2], back: 8.4 };
   const REACH = 3.2, HELI_REACH = 4.2, HOLD = 1.1;
 
+  // one thing for sale or to use (see addTarget); the fields vary with its kind
+  interface HangarTarget { id: string; kind: string; box: number[]; key: string | null; sold?: boolean; disp: THREE.Group; sign: THREE.Mesh<any, any>; spin: THREE.Object3D | null; signTop?: number; [field: string]: any; }
   const S: any = { root: null, map: null, targets: [], items: [], stands: [], rigs: [], crane: null, heli: null, vend: [], hover: null, hold: 0, hl: null, t: 0, vexQuip: 0, key: '' };
 
   // ------------------------------------------------------------------------ the solids (every machine's map has them)
-  function decorate(map) {
-    const w = map.world, add = (x0, y0, z0, x1, y1, z1, o?) => G.World.add(w, G.World.box(x0, y0, z0 + RZ, x1, y1, z1 + RZ, Object.assign({ kind: 'prop' }, o || {})));
+  function decorate(map: LvMap) {
+    const w = map.world, add = (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, o?: Record<string, any>) => G.World.add(w, G.World.box(x0, y0, z0 + RZ, x1, y1, z1 + RZ, Object.assign({ kind: 'prop' }, o || {})));
     for (let i = 0; i < 6; i++) { const b = BENCH(i); add(b.x, 0, b.z - 1.1, b.x1, 0.9, b.z + 1.1); }
     for (let i = 0; i < PARTS.n; i++) { const x = PARTS.x0 + i * PARTS.step; add(x - 0.36, 0, PARTS.z - 0.34, x + 0.36, 1.5, PARTS.z + 0.34); } // (a parts pedestal, and the air its part turns in)
     add(ZERO.x0, 0, ZERO.z0, ZERO.x1, ZERO.h + 0.05, ZERO.z1); // (the zeroing table)
@@ -81,29 +83,29 @@ const G_Hangar = (() => {
   }
 
   // ------------------------------------------------------------------------ drawing helpers
-  const mats = {};
-  const M = (c, o?) => { const k = c + JSON.stringify(o || {}); return mats[k] || (mats[k] = new T.MeshStandardMaterial(Object.assign({ color: c, roughness: 0.75, metalness: 0.15 }, o || {}))); };
-  const box = (parent, x0, y0, z0, x1, y1, z1, mat) => {
+  const mats: Record<string, THREE.MeshStandardMaterial> = {};
+  const M = (c: number, o?: Record<string, any>) => { const k = c + JSON.stringify(o || {}); return mats[k] || (mats[k] = new T.MeshStandardMaterial(Object.assign({ color: c, roughness: 0.75, metalness: 0.15 }, o || {}))); };
+  const box = (parent: THREE.Object3D, x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, mat: THREE.Material) => {
     const m = new T.Mesh(new T.BoxGeometry(x1 - x0, y1 - y0, z1 - z0), mat);
     m.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); parent.add(m); return m;
   };
-  const cyl = (parent, r, h, mat, x, y, z, seg = 14) => { const m = new T.Mesh(new T.CylinderGeometry(r, r, h, seg), mat); m.position.set(x, y, z); parent.add(m); return m; };
-  function canvasTex(w, h, draw) {
+  const cyl = (parent: THREE.Object3D, r: number, h: number, mat: THREE.Material, x: number, y: number, z: number, seg = 14) => { const m = new T.Mesh(new T.CylinderGeometry(r, r, h, seg), mat); m.position.set(x, y, z); parent.add(m); return m; };
+  function canvasTex(w: number, h: number, draw: (g: CanvasRenderingContext2D, w: number, h: number) => void) {
     const c = document.createElement('canvas'); c.width = w; c.height = h;
-    draw(c.getContext('2d'), w, h);
+    draw(c.getContext('2d')!, w, h);
     const t = new T.CanvasTexture(c); t.anisotropy = 4; return t;
   }
-  const fit = (g, text, max) => { let s = 1; while (s < 60 && g.measureText(text).width > max) { s++; g.font = g.font.replace(/\d+px/, (n) => (parseInt(n) - 1) + 'px'); } };
+  const fit = (g: CanvasRenderingContext2D, text: string, max: number) => { let s = 1; while (s < 60 && g.measureText(text).width > max) { s++; g.font = g.font.replace(/\d+px/, (n) => (parseInt(n) - 1) + 'px'); } };
   // a sign: lines of text on a coloured board (a line starting with ! is a warning, in orange). The name and the price
   // are as big as fit; the lines under them share one size, the smallest any of them needs.
-  function signMat(lines, w, h, bg, fg, sub?) {
+  function signMat(lines: string[], w: number, h: number, bg: string, fg: string, sub?: string) {
     return new T.MeshBasicMaterial({ map: canvasTex(w, h, (g) => {
       g.fillStyle = bg; g.fillRect(0, 0, w, h); g.strokeStyle = fg; g.lineWidth = 3; g.strokeRect(4, 4, w - 8, h - 8);
       g.textAlign = 'center'; g.textBaseline = 'middle';
-      const n = lines.length, lh = h / n, text = (l) => (l[0] === '!' ? l.slice(1) : l);
+      const n = lines.length, lh = h / n, text = (l: string) => (l[0] === '!' ? l.slice(1) : l);
       const ys = n === 1 ? [0.5] : n === 2 ? [0.33, 0.72] : lines.map((_, i) => (i + 0.5) / n);
       const want = n === 1 ? [0.5 * h] : n === 2 ? [0.42 * h, 0.28 * h] : lines.map((_, i) => (i < 2 ? 0.6 : 0.44) * lh);
-      const size = (t, px, bold) => { g.font = `${bold ? 'bold ' : ''}${Math.round(px)}px sans-serif`; const m = g.measureText(t).width; return m > w - 24 ? Math.max(8, Math.floor(px * (w - 24) / m)) : Math.round(px); };
+      const size = (t: string, px: number, bold: boolean) => { g.font = `${bold ? 'bold ' : ''}${Math.round(px)}px sans-serif`; const m = g.measureText(t).width; return m > w - 24 ? Math.max(8, Math.floor(px * (w - 24) / m)) : Math.round(px); };
       const detail = lines.length > 2 ? Math.min(...lines.slice(2).map((l) => size(text(l), want[2], false))) : 0;
       lines.forEach((l, i) => {
         const warn = l[0] === '!', px = i >= 2 ? detail : size(text(l), want[i], i === 0);
@@ -113,7 +115,7 @@ const G_Hangar = (() => {
     }) });
   }
   // a screen: a title, and a few lines
-  function screenMat(title, lines, w = 256, h = 160, color = '#7fe0ff') {
+  function screenMat(title: string, lines: string[], w = 256, h = 160, color = '#7fe0ff') {
     return new T.MeshBasicMaterial({ map: canvasTex(w, h, (g) => {
       g.fillStyle = '#05121a'; g.fillRect(0, 0, w, h);
       g.fillStyle = 'rgba(80,200,255,0.06)'; for (let y = 0; y < h; y += 4) g.fillRect(0, y, w, 1);
@@ -122,22 +124,22 @@ const G_Hangar = (() => {
       lines.forEach((ln, i) => g.fillText(ln, w / 2, h * (0.55 + i * 0.17)));
     }) });
   }
-  const texCache = new Map();
-  function iconMat(url) {
+  const texCache = new Map<string, THREE.MeshBasicMaterial>();
+  function iconMat(url: string) {
     if (!texCache.has(url)) { const t = new T.TextureLoader().load(url); t.anisotropy = 4; const m = new T.MeshBasicMaterial({ map: t, transparent: true }); m.userData.keep = true; texCache.set(url, m); }
     return texCache.get(url);
   }
   // take everything out of a group, signs' textures and all (the shared icon materials stay)
-  function clear(g) {
+  function clear(g: THREE.Object3D) {
     while (g.children.length) {
       const c = g.children[0]; g.remove(c);
-      c.traverse((o) => { if (o.geometry) o.geometry.dispose(); const m = o.material; if (m && !m.userData.keep) { if (m.map) m.map.dispose(); m.dispose(); } });
+      c.traverse((o: any) => { if (o.geometry) o.geometry.dispose(); const m = o.material; if (m && !m.userData.keep) { if (m.map) m.map.dispose(); m.dispose(); } });
     }
   }
-  const money = (n) => '¢' + G.U.fmt(n);
+  const money = (n: number) => '¢' + G.U.fmt(n);
 
   // a product on display: a card with the item's icon, `s` metres per cell of it, and a tag under it
-  function product(parent, item, x, y, z, yaw, tag, s = 0.13, tagMat = null) {
+  function product(parent: THREE.Object3D, item: any, x: number, y: number, z: number, yaw: number, tag: THREE.Material | null, s = 0.13, tagMat = null) {
     const [cw, ch] = G.Gear.size(item), w = Math.max(0.22, cw * s), h = Math.max(0.22, ch * s), g = new T.Group();
     g.position.set(x, y, z); g.rotation.y = yaw;
     const back = new T.Mesh(new T.BoxGeometry(w + 0.04, h + 0.04, 0.03), M(0x1b1e22)); back.position.z = 0; g.add(back);
@@ -149,23 +151,23 @@ const G_Hangar = (() => {
 
   // ------------------------------------------------------------------------ what's for sale: one row per thing
   // A thing for sale or to use: its box (what you look at), what it says, and what F does.
-  function addTarget(t) { t.box = [t.box[0], t.box[1], t.box[2] + RZ, t.box[3], t.box[4], t.box[5] + RZ]; S.targets.push(t); return t; } // (boxes are said in the hall's coordinates, kept in the world's)
-  const gearOf = (id) => G.Gear.DEFS[id];
+  function addTarget(t: any) { t.box = [t.box[0], t.box[1], t.box[2] + RZ, t.box[3], t.box[4], t.box[5] + RZ]; S.targets.push(t); return t; } // (boxes are said in the hall's coordinates, kept in the world's)
+  const gearOf = (id: string) => G.Gear.DEFS[id];
   // what a piece of gear fits on that isn't part of the sale (a plate goes in a carrier, a face guard on a helmet)
-  const needs = (d) => (d.kind === 'plate' || d.kind === 'shoulder' || d.kind === 'groin' ? 'carrier not included' : d.kind === 'face' ? 'helmet not included' : d.kind === 'legs' ? 'belt not included' : null);
+  const needs = (d: any) => (d.kind === 'plate' || d.kind === 'shoulder' || d.kind === 'groin' ? 'carrier not included' : d.kind === 'face' ? 'helmet not included' : d.kind === 'legs' ? 'belt not included' : null);
   // The piece on show, on its own. The same models the squad wears (js/rig.ts setKit makes them in the frames of a body):
   // built on a body that's thrown away, each part lifted out by what it is (helmet, face guard, carrier, belt, pack) and
   // set down where it hung. A plate isn't part of a carrier's model: it's drawn here, to stand beside it.
-  const PLATE_COL = { 'p.soft': 0x5a6a78, 'p.steel': 0x3d4044, 'p.pe': 0xcfd2d6, 'p.ceramic': 0xb8a888, 'p.ceramic2': 0xd6cdb4 };
-  function plateMesh(id, k = 1) {
+  const PLATE_COL: Record<string, number> = { 'p.soft': 0x5a6a78, 'p.steel': 0x3d4044, 'p.pe': 0xcfd2d6, 'p.ceramic': 0xb8a888, 'p.ceramic2': 0xd6cdb4 };
+  function plateMesh(id: string, k = 1) {
     const g = new T.Group(), c = PLATE_COL[id] || 0x4a4f55;
     box(g, -0.14 * k, 0, -0.012 * k, 0.14 * k, 0.36 * k, 0.012 * k, M(c, { roughness: 0.5, metalness: 0.4 }));
     box(g, -0.115 * k, 0.02 * k, 0.012 * k, 0.115 * k, 0.34 * k, 0.017 * k, M(c, { roughness: 0.9 })); // (its face: a raised panel)
     return g;
   }
-  const SHOW = { carrier: ['carrier'], helmet: ['helmet', 'face'], face: ['face'], shoulder: ['shoulder'], groin: ['groin'], legs: ['legs'], belt: ['belt'], pack: ['pack'] }, SCALE = { carrier: 1.45, helmet: 1.9, face: 2.1, shoulder: 1.5, groin: 2, legs: 1.1, belt: 1.7, pack: 1.5 };
-  function showPiece(id) {
-    const d = gearOf(id), O = G.Shop.offers || {}, np = (d.pouches || []).length, root = new T.Group();
+  const SHOW: Record<string, string[]> = { carrier: ['carrier'], helmet: ['helmet', 'face'], face: ['face'], shoulder: ['shoulder'], groin: ['groin'], legs: ['legs'], belt: ['belt'], pack: ['pack'] }, SCALE: Record<string, number> = { carrier: 1.45, helmet: 1.9, face: 2.1, shoulder: 1.5, groin: 2, legs: 1.1, belt: 1.7, pack: 1.5 };
+  function showPiece(id: string) {
+    const d = gearOf(id), O: any = G.Shop.offers || {}, np = (d.pouches || []).length, root = new T.Group();
     if (d.kind === 'plate') { const p = plateMesh(id, 2.3); p.position.y = STAND.top + 0.14; p.rotation.x = -0.14; root.add(p); return { root, spin: null }; }
     const kit = d.kind === 'carrier' ? { carrier: id, plate: 0, cp: np } : d.kind === 'helmet' ? { helmet: id, face: O.faces && O.faces[id] || 0 }
       : d.kind === 'face' ? { helmet: 'h.fast', face: id } : d.kind === 'shoulder' ? { sh: id } : d.kind === 'groin' ? { gr: id } : d.kind === 'legs' ? { lg: id } : d.kind === 'belt' ? { belt: id, bp: np } : { pack: id };
@@ -174,7 +176,7 @@ const G_Hangar = (() => {
     const g = new T.Group();
     for (const m of rig.kitParts) {
       if (!SHOW[d.kind].includes(m.userData.part)) continue;
-      const c = new T.Mesh(m.geometry, m.material); m.updateWorldMatrix(true, false); m.matrixWorld.decompose(c.position, c.quaternion, c.scale); g.add(c);
+      const c = new T.Mesh((m as THREE.Mesh).geometry, (m as THREE.Mesh).material); m.updateWorldMatrix(true, false); m.matrixWorld.decompose(c.position, c.quaternion, c.scale); g.add(c);
     }
     // a plate that comes with a carrier stands beside it, in the same turning group (so they turn together)
     const pl = d.kind === 'carrier' && O.plates && O.plates[id];
@@ -193,7 +195,7 @@ const G_Hangar = (() => {
   // A gunsmith's part on show, on its own: built on a gun it fits (in a slot it takes there), all but the part left
   // out. If it can't be (a receiver kit, a dot that sits on a riser), its card instead.
   // (size: how long it's drawn, its longest side; top: what it stands over. The showcase's are bigger: OUT)
-  function partPiece(id, size = 0.5, top = PARTS.top) {
+  function partPiece(id: string, size = 0.5, top = PARTS.top) {
     const GS = G.Gunsmith, p = GS.PARTS[id], root = new T.Group();
     let g = null;
     for (const gid of GS.fits(p.mount)) {
@@ -201,7 +203,7 @@ const G_Hangar = (() => {
       if (!sl) continue;
       b[sl.slot] = id; GS.prune(gid, b);
       if (b[sl.slot] !== id) continue;
-      const { group } = G.GunModels.display(GS.compile(gid, b)), keep = [];
+      const { group } = G.GunModels.display(GS.compile(gid, b)), keep: THREE.Mesh<any, any>[] = [];
       group.updateMatrixWorld(true);
       group.traverse((o: any) => { if (o.isMesh && o.userData.slot === sl.slot) keep.push(o); });
       if (keep.length) {
@@ -221,8 +223,8 @@ const G_Hangar = (() => {
     return { root, spin: pivot };
   }
   // what's on the sign: the name, the price, and everything that comes with it (or doesn't)
-  function signFor(id, sold) {
-    const d = gearOf(id), Sh = G.Shop, O = Sh.offers, L = [d.name, sold ? 'SOLD' : money(Sh.gearPrice(id))];
+  function signFor(id: string, sold: boolean) {
+    const d = gearOf(id), Sh = G.Shop, O: any = Sh.offers, L = [d.name, sold ? 'SOLD' : money(Sh.gearPrice(id))];
     if (sold) return L;
     const pl = O.plates && O.plates[id] && gearOf(O.plates[id]), fc = O.faces && O.faces[id] && gearOf(O.faces[id]);
     if (d.kind === 'carrier') {
@@ -237,7 +239,7 @@ const G_Hangar = (() => {
   }
 
   // ------------------------------------------------------------------------ building the scene
-  function enter(map) {
+  function enter(map: LvMap) {
     leave();
     S.map = map; S.root = new T.Group(); S.targets = []; S.items = []; S.stands = []; S.rigs = []; S.vend = []; S.t = 0; S.hold = 0; S.vexQuip = 3; S.key = ''; S.rosterKey = rosterKey();
     S.root.position.z = RZ;
@@ -257,10 +259,10 @@ const G_Hangar = (() => {
   // floor markings and the signs hung over each part of the hall
   function zones() {
     const r = S.root;
-    const stripe = (x0, z0, x1, z1, c) => { const m = new T.Mesh(new T.PlaneGeometry(x1 - x0, z1 - z0), new T.MeshBasicMaterial({ color: c })); m.rotation.x = -Math.PI / 2; m.position.set((x0 + x1) / 2, 0.012, (z0 + z1) / 2); r.add(m); };
+    const stripe = (x0: number, z0: number, x1: number, z1: number, c: number) => { const m = new T.Mesh(new T.PlaneGeometry(x1 - x0, z1 - z0), new T.MeshBasicMaterial({ color: c })); m.rotation.x = -Math.PI / 2; m.position.set((x0 + x1) / 2, 0.012, (z0 + z1) / 2); r.add(m); };
     for (const x of [16, 36]) for (let z = 3; z < 26; z += 1.2) stripe(x - 0.06, z, x + 0.06, z + 0.6, 0xe8c030); // (dashed yellow between the three parts)
     for (let x = 18; x < 34; x += 1.2) stripe(x, 26.7, x + 0.6, 26.86, 0x303438);
-    const hang = (text, sub, x, z, color) => {
+    const hang = (text: string, sub: string, x: number, z: number, color: string) => {
       const m = new T.Mesh(new T.PlaneGeometry(4.2, 0.95), signMat([text, sub], 512, 128, '#0f1215', color, '#cfd6dc'));
       m.position.set(x, 3.15, z); r.add(m);
       const b = m.clone(); b.rotation.y = Math.PI; b.position.z = z - 0.02; r.add(b);
@@ -346,7 +348,7 @@ const G_Hangar = (() => {
     const r = S.root, O = OUT, rnd = G.U.rng(0x7b3a5e);
     // a log from (x0, y0, z0) to (x1, y1, z1), bark on it
     const bark = M(0x5a3f28, { roughness: 1 }), barkD = M(0x46301e, { roughness: 1 }), up = new T.Vector3(0, 1, 0);
-    const log = (a, b, rad, mat = bark) => {
+    const log = (a: [number, number, number], b: [number, number, number], rad: number, mat: THREE.Material = bark) => {
       const A = new T.Vector3(...a), B = new T.Vector3(...b), m = new T.Mesh(new T.CylinderGeometry(rad, rad, A.distanceTo(B), 10), mat);
       m.position.copy(A).add(B).multiplyScalar(0.5); m.quaternion.setFromUnitVectors(up, B.clone().sub(A).normalize()); r.add(m); return m;
     };
@@ -358,7 +360,7 @@ const G_Hangar = (() => {
     const fl = new T.Mesh(new T.PlaneGeometry(O.x1 - O.x0, O.z1 - O.z0), new T.MeshStandardMaterial({ map: planks, roughness: 0.8 }));
     fl.rotation.x = -Math.PI / 2; fl.position.set((O.x0 + O.x1) / 2, 0.014, (O.z0 + O.z1) / 2); r.add(fl);
     // the log rails: posts, two rails between each, along the north side (from the gap by the workshop) and the east (a gap to walk in)
-    const rail = (x0, z0, x1, z1) => {
+    const rail = (x0: number, z0: number, x1: number, z1: number) => {
       const n = Math.max(1, Math.round(Math.hypot(x1 - x0, z1 - z0) / 1.6));
       for (let i = 0; i <= n; i++) { const x = x0 + (x1 - x0) * i / n, z = z0 + (z1 - z0) * i / n; log([x, 0, z], [x, 1.05, z], 0.07, barkD); }
       for (const y of [0.45, 0.88]) log([x0, y, z0], [x1, y, z1], 0.055);
@@ -387,9 +389,9 @@ const G_Hangar = (() => {
     // the bear: a stuffed grizzly reared up on its hind legs on its boulder, arms up, claws out, turned to the way in
     {
       const b = new T.Group(), fur = M(0x5a3a22, { roughness: 1 }), furL = M(0x7a5434, { roughness: 1 }), dark = M(0x1a1410, { roughness: 0.4 }), claw = M(0xd8ceb4, { roughness: 0.5 });
-      const part = (geo, mat, x, y, z, sx = 1, sy = 1, sz = 1) => { const m = new T.Mesh(geo, mat); m.position.set(x, y, z); m.scale.set(sx, sy, sz); b.add(m); return m; };
-      const limb = (a, c, rad, mat = fur) => { const A = new T.Vector3(...a), B = new T.Vector3(...c), m = new T.Mesh(new T.CylinderGeometry(rad, rad * 1.1, A.distanceTo(B), 10), mat); m.position.copy(A).add(B).multiplyScalar(0.5); m.quaternion.setFromUnitVectors(up, B.clone().sub(A).normalize()); b.add(m); };
-      const sph = (rad) => new T.SphereGeometry(rad, 14, 10);
+      const part = (geo: THREE.BufferGeometry, mat: THREE.Material, x: number, y: number, z: number, sx = 1, sy = 1, sz = 1) => { const m = new T.Mesh(geo, mat); m.position.set(x, y, z); m.scale.set(sx, sy, sz); b.add(m); return m; };
+      const limb = (a: [number, number, number], c: [number, number, number], rad: number, mat: THREE.Material = fur) => { const A = new T.Vector3(...a), B = new T.Vector3(...c), m = new T.Mesh(new T.CylinderGeometry(rad, rad * 1.1, A.distanceTo(B), 10), mat); m.position.copy(A).add(B).multiplyScalar(0.5); m.quaternion.setFromUnitVectors(up, B.clone().sub(A).normalize()); b.add(m); };
+      const sph = (rad: number) => new T.SphereGeometry(rad, 14, 10);
       for (const s of [-1, 1]) { limb([s * 0.22, 0.05, 0.05], [s * 0.22, 0.75, 0], 0.17); part(new T.BoxGeometry(0.26, 0.1, 0.36), fur, s * 0.22, 0.05, 0.12); }
       part(sph(0.44), fur, 0, 0.85, 0, 1, 0.85, 0.85); // the haunches
       part(sph(0.46), fur, 0, 1.45, 0.02, 1, 1.45, 0.85); // the body
@@ -496,7 +498,7 @@ const G_Hangar = (() => {
     for (const [x, z] of [[18.6, 18.5], [19.8, 18.7], [33.2, 19]]) box(r, x - 0.4, 0, z - 0.4, x + 0.4, 0.8, z + 0.4, M(0x8a6a3a, { roughness: 0.9 }));
   }
   // a vending machine: a cabinet with a screen across the top and a window of slots
-  function machine(v) {
+  function machine(v: any) {
     const r = S.root, x1 = v.x + 1.1;
     box(r, v.x, 0, v.z - 0.55, x1, 1.95, v.z + 0.55, M(0x2d3237));
     box(r, v.x - 0.02, 1.6, v.z - 0.55, v.x + 0.02, 1.95, v.z + 0.55, M(0x15181b));
@@ -603,7 +605,7 @@ const G_Hangar = (() => {
     addTarget({ id: 'heli', kind: 'heli', box: [P.x - 3.5, 0.2, P.z - 1.4, P.x + 2.5, 2.9, P.z + 1.4], label: 'the helicopter' });
   }
   // helipad: a painted H on the paving (lit: the hangar's own daylight; in a level, what's there)
-  function padMesh(lit?) {
+  function padMesh(lit?: boolean) {
     const mat = { map: canvasTex(256, 220, (g, w, hh) => { g.fillStyle = '#34383d'; g.fillRect(0, 0, w, hh); g.strokeStyle = '#e8c030'; g.lineWidth = 6; g.strokeRect(10, 10, w - 20, hh - 20); g.fillStyle = '#e8c030'; g.fillRect(w / 2 - 38, hh / 2 - 50, 14, 100); g.fillRect(w / 2 + 24, hh / 2 - 50, 14, 100); g.fillRect(w / 2 - 38, hh / 2 - 7, 76, 14); }) };
     const pad = new T.Mesh(new T.PlaneGeometry(13, 11), lit ? new T.MeshBasicMaterial(mat) : new T.MeshStandardMaterial(Object.assign(mat, { roughness: 0.9 })));
     pad.rotation.x = -Math.PI / 2;
@@ -617,7 +619,7 @@ const G_Hangar = (() => {
     const glass = new T.MeshStandardMaterial({ color: 0x78a8c8, transparent: true, opacity: 0.4, roughness: 0.1, metalness: 0.3 });
     const glow = new T.MeshBasicMaterial({ color: 0x1a6a40 }); // status strips: red to green as the squad gets in
     const thrust = new T.MeshBasicMaterial({ color: 0x5ad0ff, transparent: true, opacity: 0.2, side: T.DoubleSide, depthWrite: false, blending: T.AdditiveBlending });
-    const part = (g, mesh, x, y, z) => { mesh.position.set(x, y, z); g.add(mesh); return mesh; };
+    const part = (g: THREE.Object3D, mesh: THREE.Mesh, x: number, y: number, z: number) => { mesh.position.set(x, y, z); g.add(mesh); return mesh; };
     // cabin: the floor, the roof, the back (south), the bulkheads; the north side is open (a door's length), with
     // a bench along the south wall facing out of it
     box(h, -3.2, P.floor - 0.1, -1.3, 2.4, P.floor, 1.3, inside);
@@ -671,8 +673,8 @@ const G_Hangar = (() => {
     for (let i = 0; i < P.seats; i++) { const x = -1.3 + i * 0.5; box(h, x - 0.2, P.floor + 0.55, 1.05, x + 0.2, P.floor + 1.0, 1.12, seat); } // seat backs
     return { group: h, rotors, tail, glow, thrust };
   }
-  const seatPos = (i) => ({ x: HELI.x - 1.3 + i * 0.5, y: HELI.floor, z: RZ + HELI.z + 0.85, yaw: 0 });
-  const exitPos = (i) => ({ x: HELI.x - 1.3 + i * 0.5, y: 0, z: RZ + HELI.z - 2.6 });
+  const seatPos = (i: number) => ({ x: HELI.x - 1.3 + i * 0.5, y: HELI.floor, z: RZ + HELI.z + 0.85, yaw: 0 });
+  const exitPos = (i: number) => ({ x: HELI.x - 1.3 + i * 0.5, y: 0, z: RZ + HELI.z - 2.6 });
 
   // the outline shown round what you're looking at
   function outline() {
@@ -682,16 +684,16 @@ const G_Hangar = (() => {
 
   // ------------------------------------------------------------------------ what's on display, from the shop's stock
   // Called when the stock changes (and once on entering): puts each thing for sale in its place, taking away what's sold.
-  function refresh(force?) {
+  function refresh(force?: boolean) {
     if (!S.root || !G.Shop.offers) return;
-    const Sh = G.Shop, O = Sh.offers;
+    const Sh = G.Shop, O: any = Sh.offers;
     if (S.rosterKey !== rosterKey()) { enter(S.map); return; } // (someone joined or left: the benches are theirs)
     // only when something's changed (each change draws new signs)
     const parts0 = [...(Sh.partStock || [])], prec0 = [...(Sh.precStock || [])], key = JSON.stringify([O.gear, parts0, prec0, Sh.stock]);
     if (!force && key === S.key) { vending(false); return; }
     S.key = key;
     // the pedestals: the five pieces of gear
-    S.stands.forEach((tg, i) => {
+    S.stands.forEach((tg: HangarTarget, i: number) => {
       const id = O.gear[i];
       tg.key = id || null;
       tg.sold = !id || !Sh.inStock('gear:' + id);
@@ -704,8 +706,8 @@ const G_Hangar = (() => {
       tg.sign.position.y = 0.1 + (STAND.top - 0.14) / 2;
     });
     // the parts pedestals, and the precision showcase's stumps
-    const onShow = (S.partStands || []).map((tg, i) => [tg, parts0[i]]).concat((S.precStands || []).map((tg, i) => [tg, prec0[i]]));
-    onShow.forEach(([tg, id]) => {
+    const onShow = (S.partStands || []).map((tg: HangarTarget, i: number) => [tg, parts0[i]]).concat((S.precStands || []).map((tg: HangarTarget, i: number) => [tg, prec0[i]]));
+    onShow.forEach(([tg, id]: [HangarTarget, string]) => {
       const p = id && G.Gunsmith.PARTS[id];
       const left = p ? Sh.count('part:' + id) : 0;
       tg.key = id || null; tg.sold = !p || !left;
@@ -720,9 +722,9 @@ const G_Hangar = (() => {
       tg.sign.position.y = 0.08 + ((tg.signTop || PARTS.top) - 0.11) / 2;
     });
     // the pouch shelf
-    S.pouchSlots.forEach((slot, i) => {
+    S.pouchSlots.forEach((slot: THREE.Group, i: number) => {
       clear(slot);
-      const tg = S.items.find((q) => q.id === 'pouch' + i), o = O.pouches[i], P = o && G.Gear.POUCHES[o.id];
+      const tg = S.items.find((q: HangarTarget) => q.id === 'pouch' + i), o = O.pouches[i], P = o && G.Gear.POUCHES[o.id];
       tg.key = o ? o.id : null; tg.sold = !o || !Sh.inStock('pouch:' + o.id);
       if (!P) return;
       const it = G.Gear.pouchItem(o.id), left = Sh.count('pouch:' + o.id);
@@ -734,11 +736,11 @@ const G_Hangar = (() => {
 
   // the vending machines' contents: ammunition (the special loads, and ball for every caliber you carry a gun in), and
   // field supplies (medical items, flashbangs and frags)
-  function vendList(id) {
+  function vendList(id: string) {
     const Sh = G.Shop, Gr = G.Gear, out = [], sv = Sh.services();
     if (id === 'ammo') {
-      for (const o of Sh.offers.ammo) { const A = G.AMMO[o.am], C = G.CALIBERS[o.cal], it = Gr.boxItem(o.cal, o.am, o.n); out.push({ k: 'ammo', key: o.cal, item: it, name: `${C.name} ${A.name} ×${o.n}`, price: Gr.price(it), sold: !Sh.inStock('ammo:' + o.cal) }); }
-      for (const s of sv) if (s.id.startsWith('ball.')) { const cal = s.id.slice(5), C = G.CALIBERS[cal], am = G.ballFor(cal); out.push({ k: 'svc', key: s.id, item: Gr.boxItem(cal, am, C.box), name: s.name, price: s.price, sold: false }); }
+      for (const o of (Sh.offers as any).ammo) { const A = (G.AMMO as Record<string, any>)[o.am], C = (G.CALIBERS as Record<string, any>)[o.cal], it = Gr.boxItem(o.cal, o.am, o.n); out.push({ k: 'ammo', key: o.cal, item: it, name: `${C.name} ${A.name} ×${o.n}`, price: Gr.price(it), sold: !Sh.inStock('ammo:' + o.cal) }); }
+      for (const s of sv) if (s.id.startsWith('ball.')) { const cal = s.id.slice(5), C = (G.CALIBERS as Record<string, any>)[cal], am = G.ballFor(cal); out.push({ k: 'svc', key: s.id, item: Gr.boxItem(cal, am, C.box), name: s.name, price: s.price, sold: false }); }
     } else {
       for (const s of sv) {
         if (s.id.startsWith('med.')) out.push({ k: 'svc', key: s.id, item: Gr.medItem(s.id.slice(4)), name: s.name, price: s.price, sold: false });
@@ -748,14 +750,14 @@ const G_Hangar = (() => {
     }
     return out;
   }
-  function vending(force) {
+  function vending(force?: boolean) {
     for (const m of S.vend) {
       const list = vendList(m.v.id), key = list.map((q) => q.k + q.key + (q.sold ? 's' : '')).join('|');
       if (!force && key === m.key) continue;
       m.key = key;
       clear(m.group);
-      S.targets = S.targets.filter((t) => t.vendOf !== m);
-      S.items = S.items.filter((t) => t.vendOf !== m);
+      S.targets = S.targets.filter((t: HangarTarget) => t.vendOf !== m);
+      S.items = S.items.filter((t: HangarTarget) => t.vendOf !== m);
       const { v } = m, cols = v.cols, rows = v.rows, cw = 0.9 / cols, ch = 1.3 / rows;
       list.slice(0, cols * rows).forEach((q, i) => {
         const c = i % cols, rw = Math.floor(i / cols), z = v.z - 0.45 + cw * (c + 0.5), y = 1.5 - ch * (rw + 0.5) + 0.05;
@@ -773,7 +775,7 @@ const G_Hangar = (() => {
   }
 
   // ------------------------------------------------------------------------ every frame
-  function update(dt) {
+  function update(dt: number) {
     if (!S.root) return;
     S.t += dt;
     const me = G.Me;
@@ -791,7 +793,7 @@ const G_Hangar = (() => {
       const ids = Object.keys(G.Game.roster || {}), ready = ids.filter((id) => G.Game.roster[id].ready).length;
       const target = ids.length && ready === ids.length ? 38 : 2 + 14 * (ids.length ? ready / ids.length : 0);
       H.spin += (target - H.spin) * Math.min(1, dt * 0.8);
-      H.rotors.forEach((o, i) => { o.rotation.y += (i ? -1 : 1) * H.spin * dt; }); H.tail.rotation.z += H.spin * 1.6 * dt;
+      H.rotors.forEach((o: THREE.Object3D, i: number) => { o.rotation.y += (i ? -1 : 1) * H.spin * dt; }); H.tail.rotation.z += H.spin * 1.6 * dt;
       const k = ids.length ? ready / ids.length : 0; H.glow.color.setRGB(0.9 - 0.8 * k, 0.15 + 0.75 * k, 0.1 + 0.2 * k); H.thrust.opacity = 0.08 + 0.4 * Math.min(1, H.spin / 38); // (status strips: red to green as the squad gets in)
       H.rotor.rotation.x = Math.sin(S.t * 0.7) * 0.004 * (1 + H.spin * 0.05);
     }
@@ -802,11 +804,11 @@ const G_Hangar = (() => {
     if (me.pos && me.pos.x > 16 && me.pos.x < 36 && me.pos.z - RZ < 26 && me.pos.z - RZ > 0 && (S.vexQuip -= dt) <= 0) { S.vexQuip = 40 + Math.random() * 30; if (!G.Game.shopOpen && Math.hypot(me.pos.x - VEX.x, me.pos.z - RZ - VEX.z) < 9) G.HUD.toast('VEX', G.VENDOR_QUIPS.hello[Math.floor(Math.random() * G.VENDOR_QUIPS.hello.length)], 2.4); }
   }
   // the crane: drifts about the stash; when sent, picks a crate off the stack and sets it on the loadout pallet (and back)
-  function craneStep(dt) {
+  function craneStep(dt: number) {
     const c = S.crane;
     if (!c) return;
-    const go = (tx, tz, sp) => { const dx = tx - c.cx, dz = tz - c.cz, d = Math.hypot(dx, dz); if (d < 0.02) return true; const k = Math.min(d, sp * dt); c.cx += dx / d * k; c.cz += dz / d * k; return false; };
-    const hoist = (to, sp) => { const d = to - c.gy; c.gy += Math.sign(d) * Math.min(Math.abs(d), sp * dt); return Math.abs(to - c.gy) < 0.01; };
+    const go = (tx: number, tz: number, sp: number) => { const dx = tx - c.cx, dz = tz - c.cz, d = Math.hypot(dx, dz); if (d < 0.02) return true; const k = Math.min(d, sp * dt); c.cx += dx / d * k; c.cz += dz / d * k; return false; };
+    const hoist = (to: number, sp: number) => { const d = to - c.gy; c.gy += Math.sign(d) * Math.min(Math.abs(d), sp * dt); return Math.abs(to - c.gy) < 0.01; };
     c.t += dt;
     if (c.state === 'idle') {
       if (c.queue > 0) { c.queue--; c.state = 'toStack'; }
@@ -824,7 +826,7 @@ const G_Hangar = (() => {
 
   // ------------------------------------------------------------------------ looking and pressing F
   const _o = new T.Vector3(), _d = new T.Vector3();
-  function slab(b, o, d) {
+  function slab(b: number[], o: THREE.Vector3, d: THREE.Vector3) {
     let t0 = 0, t1 = 1e9;
     for (let a = 0; a < 3; a++) {
       const lo = b[a], hi = b[a + 3], oo = a === 0 ? o.x : a === 1 ? o.y : o.z, dd = a === 0 ? d.x : a === 1 ? d.y : d.z;
@@ -846,9 +848,9 @@ const G_Hangar = (() => {
     }
     return best;
   }
-  const afford = (price) => G.Me.credits >= price;
+  const afford = (price: number) => G.Me.credits >= price;
   // what a thing says when you look at it, and what F does
-  function describe(t) {
+  function describe(t: HangarTarget) {
     const Sh = G.Shop;
     if (t.kind === 'heli') return { html: '' };
     if (t.kind === 'pos') {
@@ -857,30 +859,30 @@ const G_Hangar = (() => {
       return { html: `Press <b>F</b> to use ${G.U.esc(t.label)} <small>· ${G.U.esc(t.title)}</small>`, act: () => open(t) };
     }
     // something for sale
-    let name, price, sold = !!t.sold, extra = '', buy = null;
-    if (t.what === 'gear') { if (!t.key) return { html: '' }; const d = gearOf(t.key); name = d.name; price = Sh.gearPrice(t.key); sold = !Sh.inStock('gear:' + t.key); extra = d.plate && Sh.offers.plates[t.key] ? ' (plate fitted)' : needs(d) ? ` <small>(${needs(d)})</small>` : ''; buy = ['gear', t.key]; }
+    let name: string, price, sold = !!t.sold, extra = '', buy = null;
+    if (t.what === 'gear') { if (!t.key) return { html: '' }; const d = gearOf(t.key); name = d.name; price = Sh.gearPrice(t.key); sold = !Sh.inStock('gear:' + t.key); extra = d.plate && (Sh.offers as any).plates[t.key] ? ' (plate fitted)' : needs(d) ? ` <small>(${needs(d)})</small>` : ''; buy = ['gear', t.key]; }
     else if (t.what === 'part') { if (!t.key) return { html: '' }; const p = G.Gunsmith.PARTS[t.key]; name = p.name; price = p.price; sold = !Sh.inStock('part:' + t.key); extra = ' <small>(to your stash)</small>'; buy = ['part', t.key]; }
     else if (t.what === 'pouch') { if (!t.key) return { html: '' }; const P = G.Gear.POUCHES[t.key]; name = P.name; price = P.price; sold = !Sh.inStock('pouch:' + t.key); buy = ['pouch', t.key]; }
     else if (t.what === 'ammo') { name = t.name; price = t.price; sold = !Sh.inStock('ammo:' + t.key); buy = ['ammo', t.key]; }
     else if (t.what === 'svc') { const s = Sh.services().find((q) => q.id === t.key); if (!s) return { html: '' }; name = s.name; price = s.price; sold = !!s.disabled; extra = s.disabled ? ' <small>(no room, or nothing to do)</small>' : ''; buy = ['svc', t.key]; }
     if (!buy) return { html: '' };
-    if (sold) return { html: `<b>${G.U.esc(name)}</b> <small>sold out${t.what === 'gear' ? '' : extra}</small>` };
-    return { html: `Press <b>F</b> to buy <b>${G.U.esc(name)}</b>${extra} — <b${afford(price) ? '' : ' style="color:#ff6a5a"'}>${money(price)}</b>`, act: () => purchase(buy[0], buy[1], name) };
+    if (sold) return { html: `<b>${G.U.esc(name!)}</b> <small>sold out${t.what === 'gear' ? '' : extra}</small>` };
+    return { html: `Press <b>F</b> to buy <b>${G.U.esc(name!)}</b>${extra} — <b${afford(price) ? '' : ' style="color:#ff6a5a"'}>${money(price)}</b>`, act: () => purchase(buy[0]!, buy[1]!, name!) };
   }
-  function purchase(kind, key, name) {
+  function purchase(kind: string, key: string, name: string) {
     const Me = G.Me, before = Me.credits;
     G.Shop.buy(kind, key);
     if (Me.credits < before) G.HUD.toast('', `Bought ${G.U.esc(name)} <small>−${money(before - Me.credits)}</small>`, 1.4);
     refresh();
   }
-  function open(t) {
+  function open(t: HangarTarget) {
     if (t.crane && S.crane) S.crane.queue = Math.min(2, S.crane.queue + 1);
     G.Game.openShop(t.tab, t.title);
   }
   // seated: which seat is mine (the same on every machine: by position in the sorted roster)
-  function mySeat() { const ids = Object.keys(G.Game.roster || {}).sort(); return Math.max(0, Math.min(HELI.seats - 1, ids.indexOf(G.Net.myId))); }
+  function mySeat() { const ids = Object.keys(G.Game.roster || {}).sort(); return Math.max(0, Math.min(HELI.seats - 1, ids.indexOf(G.Net.myId!))); }
   // F, from the player's interact(): returns { prompt, prog, label }; walking up to a thing and pressing F
-  function interact(me, dt, held, edge) {
+  function interact(me: any, dt: number, held: boolean, edge: boolean) {
     const out = { prompt: '', prog: -1, label: '' };
     if (G.Game.shopOpen) return out;
     // seated in the helicopter: hold F to get out
@@ -903,13 +905,13 @@ const G_Hangar = (() => {
     if (edge && d.act) { me.fLatch = true; d.act(); }
     return out;
   }
-  function seat(me) {
+  function seat(me: any) {
     const i = mySeat(), p = seatPos(i);
     me.seat = i; me.pos.set(p.x, p.y, p.z); me.vel.set(0, 0, 0); me.yaw = p.yaw; me.pitch = 0; me.crouch = true; me.stowed = true; me.mouse.l = me.mouse.r = false;
     G.Shop.setReady(true);
     G.Audio.click();
   }
-  function unseat(me) {
+  function unseat(me: any) {
     const p = exitPos(me.seat);
     me.seat = null; me.pos.set(p.x, p.y, p.z); me.vel.set(0, 0, 0); me.crouch = false; me.stowed = false; me.yaw = Math.PI;
     G.Shop.setReady(false);
@@ -925,7 +927,7 @@ const G_Hangar = (() => {
     hl.visible = true; hl.position.set((b[0] + b[3]) / 2, (b[1] + b[4]) / 2, (b[2] + b[5]) / 2 - RZ); hl.scale.set(b[3] - b[0], b[4] - b[1], b[5] - b[2]);
   }
   // where you stand when you come in: on the pad, in front of the opening
-  function spawnAt(i) { const x = 26 + (i % 3 - 1) * 1.6, z = RZ + 30.4 + Math.floor(i / 3) * 1.4; return { x, z }; }
+  function spawnAt(i: number) { const x = 26 + (i % 3 - 1) * 1.6, z = RZ + 30.4 + Math.floor(i / 3) * 1.4; return { x, z }; }
 
   return { decorate, enter, leave, update, refresh, aim, interact, mark, seatPos, exitPos, spawnAt, ship, padMesh, S, HELI, HOLD, RZ };
 })();

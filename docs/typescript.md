@@ -21,42 +21,46 @@ The files are **scripts, not modules**: no `import`/`export` (`"moduleDetection"
 Everything a file makes for the others goes on one global object, `G` (`G.U`, `G.Level`, `G.Server`...), exactly as
 before. `js/types/globals.d.ts` declares what all of them share:
 
-- `G` (the `GameNamespace` interface), `THREE` and `Peer` (both from the CDN, untyped for now);
+- `G` (the `GameNamespace` interface) and `Peer` (PeerJS, from the CDN, untyped);
 - browser extras the standard library doesn't know (`webkitAudioContext`, `performance.memory`).
 
-A file can type what it puts on `G` by extending the interface (interfaces merge across scripts):
+`THREE` (value and types) comes from `@types/three` 0.149.0, the game's r149, as the global `THREE` namespace;
+`js/types/three-extra.d.ts` adds the two colour-space constants those types leave out.
+
+Each file declares what it puts on `G` (interfaces merge across scripts):
 
 ```ts
-interface GameNamespace { U: typeof U; }
+const G_Level = { ... };
+G.Level = G_Level;
+interface GameModules { Level: typeof G_Level; }
 ```
 
-Until a module is described there, `G.Anything` is `any` (the interface's index signature), so typing can
-proceed one module at a time without breaking the rest.
+`GameNamespace extends GameModules` and has no index signature, so a module name nobody declares (a typo) is an
+error, and every call from one file into another is checked against the callee's real signature. Fields a module
+gains at runtime go in a `NameFields` interface next to it (`typeof G_Me & MeFields`).
 
 Adding a file: create `js/<name>.ts`, add `<script src="dist/js/<name>.js">` to `index.html` in the right order,
 and to `js/exportworker.ts`'s list if the highlights' replay needs it.
 
 ## Status
 
-The `tsconfig.json` has `strict` off for now: the checks still catch calls with the wrong number of arguments,
-misspelt properties, wrong types where they're known, and names that don't exist (the first pass found a
-`ReferenceError` waiting in the minimap's drawing, never called; the minimap's gone now).
+`tsconfig.json` has `strict` off but turns on its parts one by one. On: `strictNullChecks`, `noImplicitAny`,
+`strictFunctionTypes`, `strictBindCallApply`, `useUnknownInCatchVariables`, `alwaysStrict`, plus `noImplicitReturns`
+and `noUnusedLocals`. Off: `noImplicitThis` (the module literals' `this` lacks the fields added at runtime) and
+`noFallthroughCasesInSwitch`.
 
-**Checked:** all 53 files, with no `@ts-nocheck`, `@ts-ignore` or `@ts-expect-error` left. Getting there was
-type-only: every file's compiled JavaScript was compared with what it compiled to before and came out the same (two
-exceptions, on purpose: the snapshot key below, and `SCAR_SPEC()` losing an argument it never took). Most of the work
-was of two kinds:
+All 53 files pass, with no `@ts-nocheck`, `@ts-ignore` or `@ts-expect-error`. Getting there was type-only: each
+step's compiled JavaScript was compared with the step before and came out the same (exceptions, on purpose: the
+snapshot key below, `SCAR_SPEC()` losing an argument it never took, and the `const G_Name` binding each module now
+has). Where strictNullChecks found a value that really can be null, the code keeps its behaviour (`x!`) and the spot
+is listed as a suspected bug to look at, not fixed silently.
 
-- **A property added to an object after it's made** (TS2339): the object typed where it's made (an interface, a
-  `Record<...>` for a dictionary, or `: any` for a grab-bag).
-- **A call that leaves off trailing arguments** (TS2554): the parameter marked optional (`col?`) where it's defined.
+Real bugs found so far: a `ReferenceError` waiting in the minimap's drawing (never called; the minimap's gone now),
+and the snapshot each officer sends the host carrying `sd` twice (the helicopter seat, then steadying, which won):
+the seat is `se` now.
 
-It found two real bugs: a `ReferenceError` waiting in the minimap's drawing (never called; the minimap's gone now), and the snapshot each
-officer sends the host carrying `sd` twice (the helicopter seat, then steadying, which won): the seat is `se` now.
-
-**Next: strict mode.** `npm run typecheck:strict` counts 8,355 errors, three quarters of them parameters with no type
-yet (TS7006), then values that may be null (TS18047). Types for `G`'s modules (`GameNamespace`, one module at a time)
-and three.js's (`@types/three` for r149) would cut the most.
+**Left:** `noImplicitThis`; the weapon/part tables (`G.WEAPONS`, `GUN_SPECS`, `PARTS`, `PLATFORMS`) are still
+`Record<string, any>`; `npm run typecheck:strict` (full `--strict`) shows what remains.
 
 ## The Rust port
 

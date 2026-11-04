@@ -10,14 +10,14 @@
 const G_GunModels = (() => {
   const T = THREE;
   const cache: any = {};
-  const std = (key, color, roughness, metalness, extra?) =>
+  const std = (key: string, color: number, roughness: number, metalness: number, extra?: any) =>
     cache[key] || (cache[key] = new T.MeshStandardMaterial(Object.assign({ color, roughness, metalness }, extra)));
   // a relief map tiling every `cell` metres: diamonds (chequering) or scattered pits (stippling), on a part's flat faces
-  const relief = (kind, cell) => {
+  const relief = (kind: string, cell: number) => {
     const key = 'relief' + kind;
     if (cache[key]) return cache[key];
     const c = document.createElement('canvas'); c.width = c.height = 64;
-    const g = c.getContext('2d');
+    const g = c.getContext('2d')!;
     g.fillStyle = '#808080'; g.fillRect(0, 0, 64, 64);
     if (kind === 'chq') {
       g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 7;
@@ -69,42 +69,50 @@ const G_GunModels = (() => {
   // a shotgun's front bead: bright brass with a little glow, so it reads against a dark room
   const BEAD = new T.MeshStandardMaterial({ color: 0xf2dc96, emissive: 0x5a4210, roughness: 0.3, metalness: 0.6 });
 
+  const Mk = M as Record<string, () => THREE.MeshStandardMaterial>; // (a material looked up by name)
+  type Tracer = (p: number[]) => number[]; // a traced reference photo's pixel -> [forward, up] in gun space
+  type Trace = Record<string, any>; // one of js/guntraces.ts's tables of traced outlines
+  type Anim = Record<string, any>; // a recipe's animated parts, by name
+  type Sight = { sy: number; fSight: number; relief: number };
+  interface RoundDims { head: number; cs: number; bl: number; bd: number; shell?: boolean; pistol?: boolean; cap?: number }
+  interface BipodLeg { p: THREE.Object3D; sub?: THREE.Object3D; back: boolean; side: number }
+
   // ---------------------------------------------------------------- primitive kit
   function kit() {
     const g = new T.Group();
-    let tgt = g, of = 0, oy = 0, slot = 'base';
-    const put = (geo, m, x, y, f) => { const mesh = new T.Mesh(geo, m); mesh.position.set(x, y - oy, -(f - of)); mesh.userData.slot = slot; tgt.add(mesh); return mesh; };
+    let tgt: THREE.Object3D = g, of = 0, oy = 0, slot = 'base';
+    const put = (geo: THREE.BufferGeometry, m: THREE.Material, x: number, y: number, f: number) => { const mesh = new T.Mesh(geo, m); mesh.position.set(x, y - oy, -(f - of)); mesh.userData.slot = slot; tgt.add(mesh); return mesh; };
     return {
       g,
       // everything built after this belongs to that slot's part (the gunsmith highlights and picks by it)
-      tag(s) { slot = s || 'base'; },
-      add(mesh) { mesh.userData.slot = slot; g.add(mesh); return mesh; },
-      place(geo, m, x, y, f) { return put(geo, m, x, y, f); }, // (a shape of your own, on whatever part it's built on: it tips with a hinge, as add doesn't)
-      hang(o, x, y, f) { o.position.set(x, y - oy, -(f - of)); tgt.add(o); return o; }, // (a group of your own, likewise)
+      tag(s?: string) { slot = s || 'base'; },
+      add(mesh: THREE.Object3D) { mesh.userData.slot = slot; g.add(mesh); return mesh; },
+      place(geo: THREE.BufferGeometry, m: THREE.Material, x: number, y: number, f: number) { return put(geo, m, x, y, f); }, // (a shape of your own, on whatever part it's built on: it tips with a hinge, as add doesn't)
+      hang(o: THREE.Object3D, x: number, y: number, f: number) { o.position.set(x, y - oy, -(f - of)); tgt.add(o); return o; }, // (a group of your own, likewise)
       get slot() { return slot; },
       // animated sub-assembly pivoting at (f, y); parts added after into() use absolute gun coordinates
-      part(f = 0, y = 0) { const p = new T.Group(); p.position.set(0, y, -f); g.add(p); return p; },
-      into(p, f = 0, y = 0) { tgt = p || g; of = p ? f : 0; oy = p ? y : 0; },
+      part(f: number = 0, y: number = 0) { const p = new T.Group(); p.position.set(0, y, -f); g.add(p); return p; },
+      into(p?: THREE.Object3D | null, f: number = 0, y: number = 0) { tgt = p || g; of = p ? f : 0; oy = p ? y : 0; },
       get inPart() { return tgt !== g; },
-      box: (w, h, len, m, f0, y = 0, x = 0) => put(new T.BoxGeometry(w, h, len), m, x, y, f0 + len / 2),
+      box: (w: number, h: number, len: number, m: THREE.Material, f0: number, y = 0, x = 0) => put(new T.BoxGeometry(w, h, len), m, x, y, f0 + len / 2),
       // cylinder along the bore from f0 to f0 + len (rRear at f0, rFront at the far end)
-      cyl(r, len, m, f0, y = 0, x = 0, rFront = r, seg = 16, open = false) {
+      cyl(r: number, len: number, m: THREE.Material, f0: number, y = 0, x = 0, rFront = r, seg = 16, open = false) {
         const geo = new T.CylinderGeometry(r, rFront, len, seg, 1, open);
         geo.rotateX(Math.PI / 2);
         return put(geo, m, x, y, f0 + len / 2);
       },
-      cylX(r, w, m, f, y = 0, x = 0, seg = 16) { const geo = new T.CylinderGeometry(r, r, w, seg); geo.rotateZ(Math.PI / 2); return put(geo, m, x, y, f); },
-      cylY: (r, h, m, f, y = 0, x = 0, seg = 12, rBot = r) => put(new T.CylinderGeometry(r, rBot, h, seg), m, x, y, f),
-      sphere: (r, m, f, y = 0, x = 0) => put(new T.SphereGeometry(r, 12, 8), m, x, y, f),
+      cylX(r: number, w: number, m: THREE.Material, f: number, y = 0, x = 0, seg = 16) { const geo = new T.CylinderGeometry(r, r, w, seg); geo.rotateZ(Math.PI / 2); return put(geo, m, x, y, f); },
+      cylY: (r: number, h: number, m: THREE.Material, f: number, y = 0, x = 0, seg = 12, rBot = r) => put(new T.CylinderGeometry(r, rBot, h, seg), m, x, y, f),
+      sphere: (r: number, m: THREE.Material, f: number, y = 0, x = 0) => put(new T.SphereGeometry(r, 12, 8), m, x, y, f),
       // ring in the side plane (axis across the gun)
-      ringX(r, tube, m, f, y = 0, x = 0, arc = Math.PI * 2, rot = 0) {
+      ringX(r: number, tube: number, m: THREE.Material, f: number, y = 0, x = 0, arc = Math.PI * 2, rot = 0) {
         const geo = new T.TorusGeometry(r, tube, 6, 20, arc); geo.rotateZ(rot); geo.rotateY(Math.PI / 2);
         return put(geo, m, x, y, f);
       },
       // ring facing down the bore (axis along the gun)
-      ringZ(r, tube, m, f, y = 0, x = 0) { return put(new T.TorusGeometry(r, tube, 6, 20), m, x, y, f); },
+      ringZ(r: number, tube: number, m: THREE.Material, f: number, y = 0, x = 0) { return put(new T.TorusGeometry(r, tube, 6, 20), m, x, y, f); },
       // a flat ring facing down the bore (a rear aperture): hole radius rIn, edge rOut, thick along the bore from f0
-      annulus(rIn, rOut, thick, m, f0, y = 0, x = 0) {
+      annulus(rIn: number, rOut: number, thick: number, m: THREE.Material, f0: number, y = 0, x = 0) {
         const s = new T.Shape(); s.absarc(0, 0, rOut, 0, Math.PI * 2, false);
         const h = new T.Path(); h.absarc(0, 0, rIn, 0, Math.PI * 2, true); s.holes.push(h);
         const geo = new T.ExtrudeGeometry(s, { depth: thick, bevelEnabled: false, curveSegments: 24 });
@@ -112,7 +120,7 @@ const G_GunModels = (() => {
         return put(geo, m, x, y, f0 + thick / 2);
       },
       // a flat plate facing down the bore, outline [[x, y], ...] as you'd see it from behind the gun
-      plate(pts, thick, m, f0) {
+      plate(pts: number[][], thick: number, m: THREE.Material, f0: number) {
         const s = new T.Shape();
         pts.forEach(([x, y], i) => (i ? s.lineTo(x, y) : s.moveTo(x, y)));
         const geo = new T.ExtrudeGeometry(s, { depth: thick, bevelEnabled: false });
@@ -121,18 +129,18 @@ const G_GunModels = (() => {
       },
       // a short tube along the bore with an opening of `gap` radians at the top (a front sight hood)
       // a ring facing down the bore with an opening of `gap` radians at the top (a hood's rim)
-      arcRing(r, tube, m, f, y, gap = 0) {
+      arcRing(r: number, tube: number, m: THREE.Material, f: number, y: number, gap = 0) {
         const geo = new T.TorusGeometry(r, tube, 6, 28, Math.PI * 2 - gap);
         geo.rotateZ(Math.PI / 2 + gap / 2);
         return put(geo, m, 0, y, f);
       },
-      hood(r, len, m, f0, y, gap = 0) {
+      hood(r: number, len: number, m: THREE.Material, f0: number, y: number, gap = 0) {
         const geo = new T.CylinderGeometry(r, r, len, 24, 1, true, Math.PI + gap / 2, Math.PI * 2 - gap);
         geo.rotateX(Math.PI / 2);
         return put(geo, m, 0, y, f0 + len / 2);
       },
       // side profile [[f, y], ...] extruded to width w, centred on x; optional holes
-      prof(pts, w, m, x = 0, holes, bevel = 0.002) {
+      prof(pts: number[][], w: number, m: THREE.Material, x = 0, holes?: number[][][] | null, bevel = 0.002) {
         const shape = new T.Shape();
         pts.forEach(([f, y], i) => (i ? shape.lineTo(f, y) : shape.moveTo(f, y)));
         (holes || []).forEach((h) => { const p = new T.Path(); h.forEach(([f, y], i) => (i ? p.lineTo(f, y) : p.moveTo(f, y))); shape.holes.push(p); });
@@ -144,7 +152,7 @@ const G_GunModels = (() => {
         return put(geo, m, 0, 0, 0);
       },
       // many small outlines (serrations, chequering) as one mesh, w thick, centred on x
-      profs(list, w, m, x = 0) {
+      profs(list: number[][][], w: number, m: THREE.Material, x = 0) {
         const shapes = list.map((pts) => { const sh = new T.Shape(); pts.forEach(([f, y], i) => (i ? sh.lineTo(f, y) : sh.moveTo(f, y))); return sh; });
         const geo = new T.ExtrudeGeometry(shapes, { depth: w, bevelEnabled: false, curveSegments: 4 });
         geo.rotateY(Math.PI / 2);
@@ -153,14 +161,14 @@ const G_GunModels = (() => {
       },
       // a section swept along the bore: stations [[f, [[x, y], ...]], ...] rear to front, every section the same length,
       // anticlockwise seen from behind, closed at both ends (two stations at one f make a step)
-      loft(st, m) {
-        const pos = [], n = st[0][1].length;
-        const v = (f, [x, y]) => [x, y, -f], tri = (a, b, c) => pos.push(...a, ...b, ...c);
+      loft(st: [number, number[][]][], m: THREE.Material) {
+        const pos: number[] = [], n = st[0][1].length;
+        const v = (f: number, [x, y]: number[]) => [x, y, -f], tri = (a: number[], b: number[], c: number[]) => pos.push(...a, ...b, ...c);
         for (let s = 0; s + 1 < st.length; s++) for (let i = 0; i < n; i++) {
           const j = (i + 1) % n, a = v(st[s][0], st[s][1][i]), b = v(st[s + 1][0], st[s + 1][1][i]), a2 = v(st[s][0], st[s][1][j]), b2 = v(st[s + 1][0], st[s + 1][1][j]);
           tri(a, b, a2); tri(a2, b, b2);
         }
-        const cap = ([f, sec], flip) => {
+        const cap = ([f, sec]: [number, number[][]], flip: boolean) => {
           const mid: any = [0, 0]; for (const p of sec) { mid[0] += p[0] / n; mid[1] += p[1] / n; }
           for (let i = 0; i < n; i++) { const a = v(f, sec[i]), b = v(f, sec[(i + 1) % n]), c = v(f, mid); if (flip) tri(c, b, a); else tri(c, a, b); }
         };
@@ -172,17 +180,18 @@ const G_GunModels = (() => {
       },
     };
   }
+  type Kit = ReturnType<typeof kit> & Record<string, any>;
 
   // ---------------------------------------------------------------- sights (return sight line height + eye relief)
   const S = {
-    rail(k, f0, len, y, m = M.black()) {
+    rail(k: Kit, f0: number, len: number, y: number, m: THREE.Material = M.black()) {
       k.box(0.021, 0.007, len, m, f0, y + 0.0035);
       const n = Math.floor(len / 0.0105);
       for (let i = 0; i < n; i++) k.box(0.023, 0.004, 0.0052, m, f0 + 0.003 + i * 0.0105, y + 0.009);
       return y + 0.011;
     },
     // Reflex sights record their window in k.reflex; the viewmodel puts a collimated reticle behind it.
-    reddot(k, f, top, o: any = {}) { // a tube on a QD riser (30 mm by default): turrets, brightness dial
+    reddot(k: Kit, f: number, top: number, o: any = {}) { // a tube on a QD riser (30 mm by default): turrets, brightness dial
       const R = o.dotR || 0.02, len = o.dotLen || 0.056, f0 = f - len / 2, sy = top + 0.014 + R;
       k.box(0.03, 0.01, 0.05, M.black(), f - 0.025, top + 0.005);
       k.box(0.02, sy - top - 0.012, 0.03, M.black(), f - 0.015, (sy + top) / 2 - 0.006);
@@ -198,7 +207,7 @@ const G_GunModels = (() => {
       k.reflex = { f: f0 + len - 0.006, y: sy, w: (R - 0.0022) * 2, h: (R - 0.0022) * 2, round: true, kind: o.ret || 'dot' };
       return { sy, fSight: f0, relief: 0.085 };
     },
-    holo(k, f, top) { // box-hooded holographic sight, battery and electronics in the base
+    holo(k: Kit, f: number, top: number) { // box-hooded holographic sight, battery and electronics in the base
       const sy = top + 0.033, wW = 0.033, wH = 0.027, f0 = f - 0.034, f1 = f + 0.03;
       const yb = top + 0.012, yt = sy + wH / 2 + 0.003, hl = f1 - f0 - 0.012;
       k.box(0.04, 0.012, f1 - f0, M.black(), f0, top + 0.006);
@@ -213,7 +222,7 @@ const G_GunModels = (() => {
       k.reflex = { f: f1 - 0.007, y: sy, w: wW, h: wH, kind: 'holo' };
       return { sy, fSight: f0 + 0.012, relief: 0.1 };
     },
-    acog(k, f, top) {
+    acog(k: Kit, f: number, top: number) {
       const sy = top + 0.036;
       k.box(0.03, 0.016, 0.05, M.black(), f - 0.025, top + 0.008);
       k.cyl(0.015, 0.15, M.tubeDS(), f - 0.075, sy, 0, 0.021, 18, true);
@@ -224,7 +233,7 @@ const G_GunModels = (() => {
       k.pip = { f: f - 0.0765, y: sy, r: 0.0125 };
       return { sy, fSight: f - 0.075, relief: 0.06 };
     },
-    scope(k, f, top, len = 0.33, obj = 0.025, h = 0.04) {
+    scope(k: Kit, f: number, top: number, len = 0.33, obj = 0.025, h = 0.04) {
       const sy = top + h;
       for (const rf of [f - len * 0.22, f + len * 0.18]) { k.box(0.026, sy - top, 0.014, M.black(), rf - 0.007, top + (sy - top) / 2); k.ringZ(0.0135, 0.004, M.black(), rf, sy); }
       k.cyl(0.0127, len * 0.55, M.black(), f - len * 0.3, sy);
@@ -247,9 +256,9 @@ const G_GunModels = (() => {
     //  'ak'       U-notch on a tangent leaf partway down the gun; round front post under a hood open at the top.
     //             The post top sits level with the top of the notch. (AK, SVD, PKM, PPSh, Mosin)
     //  'buckhorn' semi-buckhorn rear blade (curved wings, a small V at the centre); gold bead front. (lever guns)
-    irons(k, fR, fF, sy, rb, fb, style = 'ar') {
+    irons(k: Kit, fR: number, fF: number, sy: number, rb: number, fb: number, style = 'ar') {
       const B = M.black();
-      const col = (w, y0, y1, len, f0, x = 0) => { if (y1 - y0 > 0.0008) k.box(w, y1 - y0, len, B, f0, (y0 + y1) / 2, x); };
+      const col = (w: number, y0: number, y1: number, len: number, f0: number, x = 0) => { if (y1 - y0 > 0.0008) k.box(w, y1 - y0, len, B, f0, (y0 + y1) / 2, x); };
       if (style === 'ak') {
         // rear: the leaf rises toward you from its hinge; the notch blade stands at its back end
         k.prof([[fR - 0.004, sy - 0.007], [fR + 0.05, rb + 0.002], [fR + 0.05, rb], [fR - 0.004, rb]], 0.017, B);
@@ -297,11 +306,11 @@ const G_GunModels = (() => {
       col(0.0021, sy - 0.016, sy, 0.0021, fF - 0.001);
       return { sy, fSight: fR - 0.003, relief: 0.1 };
     },
-    notch(k, fRear, fFront, sy, rearBase, frontBase) { return S.irons(k, fRear, fFront, sy, rearBase, frontBase, 'ak'); },
+    notch(k: Kit, fRear: number, fFront: number, sy: number, rearBase: number, frontBase: number) { return S.irons(k, fRear, fFront, sy, rearBase, frontBase, 'ak'); },
     // Pistol sights: a dovetailed rear blade with a U-notch and a front blade, tops level. Factory sights have a
     // white outline round the notch and a white dot on the front ("ball in a cup"); night sights put tritium dots
     // either side of the notch and on the front instead (three green dots in a row).
-    pistolSights(k, fR, fF, sy, base, night, rearBase = base, hw = 0.0105) {
+    pistolSights(k: Kit, fR: number, fF: number | null | undefined, sy: number, base: number, night?: boolean, rearBase = base, hw = 0.0105) {
       const B = M.black(), paint = night ? M.tritium() : M.sightPaint(), nw = 0.0019, nd = Math.min(0.0035, (sy - rearBase) * 0.6), rh = sy - rearBase;
       for (const x of [-1, 1]) k.box(hw - nw, rh, 0.008, B, fR - 0.004, rearBase + rh / 2, x * (nw + (hw - nw) / 2));
       k.box(2 * nw, rh - nd, 0.008, B, fR - 0.004, rearBase + (rh - nd) / 2);
@@ -313,13 +322,13 @@ const G_GunModels = (() => {
       if (fF != null) S.pistolFront(k, fF, sy, base, night);
       return { sy, fSight: fR - 0.004, relief: 0.36 };
     },
-    pistolFront(k, fF, sy, base, night) {
+    pistolFront(k: Kit, fF: number, sy: number, base: number, night?: boolean) {
       const h = sy - base;
       k.box(0.0034, h, 0.007, M.black(), fF - 0.0035, base + h / 2);
       k.cyl(night ? 0.0011 : 0.0012, 0.0006, night ? M.tritium() : M.sightPaint(), fF - 0.0041, sy - Math.min(0.0019, h * 0.5));
     },
     // Revolver: the rear notch is cut into the topstrap; the front is a ramp with a red insert.
-    revSights(k, fR, fF, sy, base, m) {
+    revSights(k: Kit, fR: number, fF: number, sy: number, base: number, m: THREE.Material) {
       const nw = 0.0019, hw = 0.0085;
       for (const x of [-1, 1]) k.box(hw - nw, sy - base, 0.012, m, fR - 0.006, (sy + base) / 2, x * (nw + (hw - nw) / 2));
       k.prof([[fF - 0.016, base], [fF - 0.001, sy], [fF + 0.001, sy], [fF + 0.001, base]], 0.0034, m);
@@ -328,7 +337,7 @@ const G_GunModels = (() => {
       k.prof([[fa, sy - 0.0048], [fb, sy - 0.0005], [fb, sy], [fa, sy - 0.0041]], 0.0036, M.redInsert());
       return { sy, fSight: fR - 0.006, relief: 0.36 };
     },
-    prism(k, f, top, o: any = {}) { // a prism sight: longer the more it magnifies
+    prism(k: Kit, f: number, top: number, o: any = {}) { // a prism sight: longer the more it magnifies
       const px = o.px || 2, hl = px <= 1 ? 0.024 : px < 2 ? 0.029 : px < 3 ? 0.035 : 0.042, sy = top + 0.03;
       k.box(0.03, 0.012, 0.05, M.black(), f - 0.025, top + 0.006);
       k.box(0.034, 0.034, hl * 2, M.black(), f - hl, sy);
@@ -341,7 +350,7 @@ const G_GunModels = (() => {
     },
     // An open reflex sight (pistol size, on the slide; o.riser lifts it to rifle height on a rail), or an enclosed
     // one (o.closed: a hood all round, glass at both ends)
-    minidot(k, f, top, o: any = {}) {
+    minidot(k: Kit, f: number, top: number, o: any = {}) {
       if (o.riser) { k.box(0.024, o.riser, 0.034, M.black(), f - 0.017, top + o.riser / 2); top += o.riser; }
       const sy = top + 0.016;
       k.box(0.024, 0.008, 0.032, M.black(), f - 0.016, top + 0.004);
@@ -356,13 +365,13 @@ const G_GunModels = (() => {
     },
     // A flip-to-side magnifier behind a reflex sight, on a hinge at its lower right: in line (anim.magn at 0) it
     // magnifies the dot; swung out and down beside the receiver (about -160°) you look past it. Its rear lens is the picture-in-picture lens.
-    magnifier(k, sight, top, m, anim) {
+    magnifier(k: Kit, sight: { sy: number; fSight: number }, top: number, m: any, anim: Anim) {
       const sy = sight.sy, len = m.len || 0.085, R = 0.0165, fRear = sight.fSight - 0.025 - len, fc = fRear + len * 0.5;
       const hx = 0.024, hy = top + 0.014;
       k.box(0.03, 0.012, 0.034, M.black(), fc - 0.017, top + 0.006);
       k.box(0.008, 0.014, 0.03, M.black(), fc - 0.015, hy, hx);
       const hinge = k.hang(new T.Group(), hx, hy, fc);
-      const add = (geo, mat, x, y, f) => { const mesh = new T.Mesh(geo, mat); mesh.position.set(x - hx, y - hy, -(f - fc)); mesh.userData.slot = k.slot; hinge.add(mesh); return mesh; };
+      const add = (geo: THREE.BufferGeometry, mat: THREE.Material, x: number, y: number, f: number) => { const mesh = new T.Mesh(geo, mat); mesh.position.set(x - hx, y - hy, -(f - fc)); mesh.userData.slot = k.slot; hinge.add(mesh); return mesh; };
       const tube = new T.CylinderGeometry(R, R * 1.08, len, 24, 1, true); tube.rotateX(Math.PI / 2); add(tube, M.tubeDS(), 0, sy, fc);
       for (const ff of [fRear, fRear + len]) { const ring = new T.TorusGeometry(R, 0.0025, 6, 24); add(ring, M.black(), 0, sy, ff); }
       add(new T.BoxGeometry(0.02, sy - hy - R + 0.004, 0.026), M.black(), hx * 0.45, (sy - R + hy) / 2, fc);
@@ -374,7 +383,7 @@ const G_GunModels = (() => {
     // A shotgun's bead: a flat rib from the receiver to the muzzle, level with the top of the receiver (on
     // posts where the barrel sits lower), and the brass bead on its front end. You look along the rib; the
     // bead sits on it at the far end, the barrel(s) below.
-    bead(k, fRear, fFront, sy, rib, barrelTop) {
+    bead(k: Kit, fRear: number, fFront: number, sy: number, rib: number[] | null | undefined, barrelTop: number) {
       if (rib) {
         const ry = sy - 0.0065, len = rib[1] - rib[0];
         k.box(0.007, 0.003, len, M.black(), rib[0], ry);
@@ -388,13 +397,13 @@ const G_GunModels = (() => {
   };
 
   // ---------------------------------------------------------------- shared parts
-  function grip(k, gf, m, type = 'ar') {
+  function grip(k: Kit, gf: number, m: THREE.Material, type = 'ar') {
     if (type === 'none') return;
     if (type === 'wood') { k.prof([[gf - 0.005, -0.04], [gf + 0.035, -0.04], [gf + 0.02, -0.13], [gf - 0.025, -0.125]], 0.032, m); return; }
     if (type === 'vertical') { k.prof([[gf - 0.01, -0.035], [gf + 0.03, -0.035], [gf + 0.028, -0.135], [gf - 0.012, -0.135]], 0.03, m); return; }
     k.prof([[gf - 0.012, -0.036], [gf + 0.028, -0.036], [gf + 0.012, -0.132], [gf - 0.028, -0.124]], 0.03, m);
   }
-  function triggerGuard(k, gf, m) {
+  function triggerGuard(k: Kit, gf: number, m: THREE.Material) {
     k.box(0.01, 0.004, 0.06, m, gf + 0.02, -0.062);
     k.box(0.01, 0.024, 0.004, m, gf + 0.076, -0.05);
     k.box(0.004, 0.02, 0.005, M.black(), gf + 0.04, -0.048);
@@ -402,9 +411,9 @@ const G_GunModels = (() => {
   // Stocks sit behind the eye in first person and only read as stray geometry at the screen edge,
   // so the viewmodel build skips them (third-person models keep them).
   let buildingVM = false;
-  function stock(k, type, m, wrist?) {
+  function stock(k: Kit, type: string, m: THREE.Material, wrist?: boolean) {
     if (buildingVM && !wrist) return; // (wrist: the stock is what the hand holds, on guns with no pistol grip)
-    const pad = (f, y, h) => k.box(0.044, h, 0.012, M.rubber(), f - 0.012, y);
+    const pad = (f: number, y: number, h: number) => k.box(0.044, h, 0.012, M.rubber(), f - 0.012, y);
     switch (type) {
       case 'tubeonly': // a buffer tube adapter with nothing on it
         k.cyl(0.0155, 0.2, M.black(), -0.2, -0.002);
@@ -489,7 +498,7 @@ const G_GunModels = (() => {
         break;
       case 'scar': { // the SCAR's: its hinge on the back of the receiver, a raised comb for the cheek, the butt raked a
         // little, its lower front edge ribbed (traced with the receiver: scarTrace)
-        const V = scarTrace, pts = (a) => a.map(V);
+        const V = scarTrace, pts = (a: number[][]) => a.map(V);
         k.box(0.036, V([0, 199])[1] - V([0, 324])[1], 0.03, m, V([388, 0])[0] - 0.01, (V([0, 199])[1] + V([0, 324])[1]) / 2);
         k.prof(pts([[390, 196], [241, 206], [113, 216], [114, 224], [148, 425], [160, 415], [238, 309], [390, 310]]), 0.04, m, 0, null, 0.004);
         k.prof(pts([[100, 220], [114, 216], [150, 427], [137, 429]]), 0.042, M.rubber(), 0, null, 0.0008);
@@ -498,7 +507,7 @@ const G_GunModels = (() => {
       }
       case 'g36': { // the G36's: a skeleton folding on the hinge at the back of the receiver, a window through it and a
         // small one ahead of that, the strut under them sweeping down to the foot of the butt (traced with the receiver)
-        const V = g36Trace, pts = (a) => a.map(V);
+        const V = g36Trace, pts = (a: number[][]) => a.map(V);
         k.prof(pts([[318, 96], [300, 104], [287, 114], [220, 126], [42, 122], [33, 272], [35, 276], [61, 276], [64, 265], [77, 234], [103, 209], [154, 191], [241, 183], [318, 183]]), 0.03, m, 0,
           [pts([[70, 132], [220, 132], [220, 170], [86, 186], [70, 186]]), pts([[233, 138], [285, 138], [285, 167], [233, 167]])], 0.003);
         k.prof(pts([[40, 122], [49, 122], [41, 276], [31, 274]]), 0.032, M.rubber(), 0, null, 0.001);
@@ -508,7 +517,7 @@ const G_GunModels = (() => {
         // the back of the receiver, a top strut, the butt plate, and a strut sloping up from its foot back to the hinge; folded,
         // the same frame swung forward on the hinge to lie along the receiver's left side
         const fold = type === 'aksufold', V = akuTrace, fh = V([247, 0])[0], xo = fold ? -0.0285 : 0;
-        const pts = (a) => a.map((p) => { const [f, y] = V(p); return [fold ? 2 * fh - f : f, y]; });
+        const pts = (a: number[][]) => a.map((p) => { const [f, y] = V(p); return [fold ? 2 * fh - f : f, y]; });
         k.prof(pts([[46, 380], [70, 375], [212, 364], [250, 358], [258, 357], [258, 408], [232, 412], [218, 416], [98, 454], [80, 463], [62, 467], [57, 460], [54, 440], [50, 410], [47, 395]]), 0.013, m, xo,
           [pts([[76, 393], [226, 383], [226, 397], [79, 441]])], 0.002);
         k.prof(pts([[46, 380], [64, 378], [76, 466], [58, 467], [54, 440], [49, 400]]), 0.036, m, xo, null, 0.003);
@@ -530,19 +539,19 @@ const G_GunModels = (() => {
   // (anything wider than a round and a half) zig-zags, each round half a diameter down from the last, offset each
   // side; a single stack (a shotgun's shells) is one column. Which of them show follows the rounds in it: the top
   // ones stay, the follower rises (js/vmanim.ts magFill). An opaque magazine shows its witness holes instead.
-  function magCheck(k, rear, top, len, w, d, clear, rnd) {
-    const R = rnd || { head: Math.min(0.009, w * 0.4), cs: d * 0.5, bl: d * 0.16, bd: Math.min(0.0085, w * 0.35), shell: false };
+  function magCheck(k: Kit, rear: (t: number) => number, top: number, len: number, w: number, d: number, clear: boolean, rnd?: RoundDims | null) {
+    const R: RoundDims = rnd || { head: Math.min(0.009, w * 0.4), cs: d * 0.5, bl: d * 0.16, bd: Math.min(0.0085, w * 0.35), shell: false };
     const r = R.head / 2, oal = Math.min(R.cs + R.bl, d * 0.94), cs = oal * R.cs / (R.cs + R.bl), bl = oal - cs, rb = R.bd / 2;
-    const chk: any = { holes: [], rounds: [], w }, yAt = (t) => top - 0.012 - t * (len - 0.026), back = (t) => rear(t) + Math.max(0.002, (d - oal) * 0.25);
+    const chk: any = { holes: [], rounds: [], w }, yAt = (t: number) => top - 0.012 - t * (len - 0.026), back = (t: number) => rear(t) + Math.max(0.002, (d - oal) * 0.25);
     // the feed lips, and the top round sitting down between them (its crown just under their edges)
     for (const s of [-1, 1]) k.box(w * 0.16, 0.003, d * 0.6, M.black(), rear(0) + 0.004, top + 0.0015, s * w * 0.42);
     const ty = top - r + 0.0024;
-    const round = (f, y, x) => [k.cyl(r * 0.97, cs, M.brass(), f, y, x, R.shell ? r * 0.97 : rb * 1.15, 10), R.shell ? null : k.cyl(rb, bl, M.brass(), f + cs, y, x, rb * (R.pistol ? 0.55 : 0.18), 8)];
+    const round = (f: number, y: number, x: number) => [k.cyl(r * 0.97, cs, M.brass(), f, y, x, R.shell ? r * 0.97 : rb * 1.15, 10), R.shell ? null : k.cyl(rb, bl, M.brass(), f + cs, y, x, rb * (R.pistol ? 0.55 : 0.18), 8)];
     chk.top = round(back(0), ty, 0); if (!chk.top[1]) chk.top[1] = k.box(0.0001, 0.0001, 0.0001, M.brass(), back(0), ty);
     if (clear) {
       // as many as it holds under the top round (one drawn for each: R.cap), at the stack's pitch from the top down
-      const dbl = w > r * 2 * 1.45, pitch = dbl ? r * 1.05 : r * 2.02, fit = Math.max(2, Math.floor((len - 0.026) / pitch)), n = R.cap > 1 ? R.cap - 1 : fit, xo = dbl ? Math.min(w / 2 - r - 0.0012, r * 0.86) : 0;
-      const tOf = (j) => Math.min(1, j * Math.min(pitch, (len - 0.026) / n) / (len - 0.026)); // (packed tighter if it holds more than fits at its pitch)
+      const dbl = w > r * 2 * 1.45, pitch = dbl ? r * 1.05 : r * 2.02, fit = Math.max(2, Math.floor((len - 0.026) / pitch)), n = R.cap! > 1 ? R.cap! - 1 : fit, xo = dbl ? Math.min(w / 2 - r - 0.0012, r * 0.86) : 0;
+      const tOf = (j: number) => Math.min(1, j * Math.min(pitch, (len - 0.026) / n) / (len - 0.026)); // (packed tighter if it holds more than fits at its pitch)
       for (let j = 1; j <= n; j++) { // each with its own tip (or, a shotgun's, its hull coloured): js/vmanim.ts magFill
         const t = tOf(j), x = dbl ? (j % 2 ? 1 : -1) * xo : 0, [mesh, tip] = round(back(t), yAt(t), x);
         chk.rounds.push({ t, mesh, tip });
@@ -554,21 +563,21 @@ const G_GunModels = (() => {
   // A drum's, for the same check: the top round up in its feed tower and (a clear drum) the rest wound round inside
   // it, each lying along the bore, ring by ring from the outside in round the hub, the ones nearest the tower (the
   // next to feed, t near 0) first. As many as fit, standing for as many as it holds (js/vmanim.ts scales the count).
-  function drumCheck(k, f, y, R, dw, d, w, clear, rnd) {
-    const C = rnd || { head: 0.0096, cs: 0.045, bl: 0.012, bd: 0.0057, shell: false };
+  function drumCheck(k: Kit, f: number, y: number, R: number, dw: number, d: number, w: number, clear: boolean, rnd?: RoundDims | null) {
+    const C: RoundDims = rnd || { head: 0.0096, cs: 0.045, bl: 0.012, bd: 0.0057, shell: false };
     const r = C.head / 2, oal = Math.min(C.cs + C.bl, dw * 0.92), cs = oal * C.cs / (C.cs + C.bl), bl = oal - cs, rb = C.bd / 2;
-    const round = (f0, yy, x) => [k.cyl(r * 0.97, cs, M.brass(), f0, yy, x, C.shell ? r * 0.97 : rb * 1.15, 10), C.shell ? null : k.cyl(rb, bl, M.brass(), f0 + cs, yy, x, rb * (C.pistol ? 0.55 : 0.18), 8)];
+    const round = (f0: number, yy: number, x: number) => [k.cyl(r * 0.97, cs, M.brass(), f0, yy, x, C.shell ? r * 0.97 : rb * 1.15, 10), C.shell ? null : k.cyl(rb, bl, M.brass(), f0 + cs, yy, x, rb * (C.pistol ? 0.55 : 0.18), 8)];
     const chk: any = { holes: [], rounds: [], w };
     const tf = f - d * 0.35 - Math.min(oal, d * 0.7) / 2 + 0.002; // (the feed tower)
     for (const sd of [-1, 1]) k.box(w * 0.16, 0.003, d * 0.6, M.black(), f - d * 0.35 - d * 0.3 + 0.004, y + 0.0015, sd * w * 0.42);
     chk.top = round(tf, y - r + 0.0024, 0); if (!chk.top[1]) chk.top[1] = k.box(0.0001, 0.0001, 0.0001, M.brass(), tf, y);
     if (clear) {
-      const cy = y - R * 0.95, f0 = f - dw / 2 + (dw - oal) / 2, step = r * 2.1, spots = [];
+      const cy = y - R * 0.95, f0 = f - dw / 2 + (dw - oal) / 2, step = r * 2.1, spots: number[][] = [];
       for (let rr = R - r - 0.004; rr > R * 0.35 + r + 0.001; rr -= step) {
         const n = Math.floor((2 * Math.PI * rr) / step);
         for (let i = 0; i < n; i++) { const a = Math.PI / 2 + (i / n) * Math.PI * 2; spots.push([Math.cos(a) * rr, cy + Math.sin(a) * rr]); }
       }
-      const n = Math.min(spots.length, rnd && rnd.cap > 1 ? rnd.cap - 1 : spots.length);
+      const n = Math.min(spots.length, rnd && rnd.cap! > 1 ? rnd.cap! - 1 : spots.length);
       for (let j = 0; j < n; j++) { const [x, yy] = spots[j], [mesh, tip] = round(f0, yy, x); chk.rounds.push({ t: (j + 1) / n, mesh, tip }); }
     }
     return chk;
@@ -581,8 +590,8 @@ const G_GunModels = (() => {
   // shoulder at 18.14, the neck 14.22, the case 99.31 long, the bullet 12.98 and a long ogive, 138.43 overall (the
   // cartridge's published figures; where the shoulder starts is judged from photographs).
   const BMG = { oal: 0.13843, case: [[0, 0], [0.01021, 0], [0.01021, 0.00226], [0.0088, 0.00286], [0.0088, 0.0048], [0.01015, 0.0062], [0.00907, 0.0775], [0.00711, 0.0845], [0.00711, 0.09931], [0, 0.09931]], bullet: [[0, 0.09931], [0.00649, 0.09931], [0.00649, 0.1035], [0.0058, 0.116], [0.0036, 0.1305], [0.0014, 0.1376], [0, 0.13843]] };
-  const roundShape = (def) => { const g = G.GUN_SPECS[def.id]; return g && g.caliber === 12.7 && g.caseLength === 99 ? BMG : null; };
-  function roundDims(def) {
+  const roundShape = (def: { id: string }) => { const g = G.GUN_SPECS[def.id]; return g && g.caliber === 12.7 && g.caseLength === 99 ? BMG : null; };
+  function roundDims(def: { id: string }): RoundDims | null {
     const g = G.GUN_SPECS[def.id];
     if (!g || !g.caliber || !g.caseLength) return null;
     const cal = g.caliber, cl = g.caseLength;
@@ -591,7 +600,7 @@ const G_GunModels = (() => {
     return { head: (cal + (rifle ? 3.6 : 0.9)) / 1000, cs: cl / 1000, bl: cal * (rifle ? 1.6 : 1.15) / 1000, bd: cal / 1000, pistol: !rifle };
   }
   // Magazines hang from y (the receiver's underside) at forward position f.
-  function mag(k, o) {
+  function mag(k: Kit, o: any) {
     const m = o.m || M.black(), y = o.y, len = o.len || 0.18, d = o.d || 0.06, w = o.w || 0.024;
     if (o.well) k.box(w + 0.01, 0.014, d + 0.016, o.well, o.f - d / 2 - 0.008, y - 0.006);
     switch (o.t) {
@@ -601,8 +610,8 @@ const G_GunModels = (() => {
         // (st: how much of it runs straight down before the bend, as a STANAG's top does; ribs: the grooves pressed down
         // each side, following the curve)
         const c = o.c || 0.05, st = o.st || 0, N = 14, front = [], rear = [];
-        const at = (t) => { const u = Math.max(0, (t - st) / (1 - st)), sl = 2 * c * u / (1 - st), n = Math.hypot(len, sl); return [o.f + c * u * u, y - len * t, len / n, sl / n]; }; // [f, y, normal f, normal y]
-        const edge = (k0) => { const out = []; for (let i = 0; i <= N; i++) { const [cf, cy, nf, ny] = at(i / N); out.push([cf + nf * d * k0, cy + ny * d * k0]); } return out; };
+        const at = (t: number) => { const u = Math.max(0, (t - st) / (1 - st)), sl = 2 * c * u / (1 - st), n = Math.hypot(len, sl); return [o.f + c * u * u, y - len * t, len / n, sl / n]; }; // [f, y, normal f, normal y]
+        const edge = (k0: number) => { const out = []; for (let i = 0; i <= N; i++) { const [cf, cy, nf, ny] = at(i / N); out.push([cf + nf * d * k0, cy + ny * d * k0]); } return out; };
         front.push(...edge(0.5)); rear.push(...edge(-0.5));
         k.prof(front.concat(rear.reverse()), w, m);
         for (const k0 of (o.ribs && !m.transparent ? [-0.18, 0.18] : [])) { const a = edge(k0 - 0.04), b = edge(k0 + 0.04); k.prof(a.slice(1, -1).concat(b.slice(1, -1).reverse()), w + 0.0012, M.rubber(), 0, null, 0); }
@@ -638,7 +647,7 @@ const G_GunModels = (() => {
       }
     }
   }
-  function muzzle(k, type, f0, br, y = 0) {
+  function muzzle(k: Kit, type: string, f0: number, br: number, y = 0) {
     switch (type) {
       case 'flash': k.cyl(br * 1.3, 0.055, M.black(), f0, y); for (let i = 0; i < 3; i++) k.box(0.0035, br * 2.7, 0.03, M.rubber(), f0 + 0.02, y, (i - 1) * br * 0.9); return 0.055;
       case 'prong':
@@ -669,7 +678,7 @@ const G_GunModels = (() => {
       default: return 0;
     }
   }
-  function handguard(k, o, f0, fm, rm) {
+  function handguard(k: Kit, o: any, f0: number, fm: THREE.Material, rm: THREE.Material) {
     const len = o.len, m = o.m || fm;
     switch (o.t) {
       case 'rail': {
@@ -714,7 +723,7 @@ const G_GunModels = (() => {
       case 'g36': { // the G36's: deep, its top just under the receiver's, a sloped nose, a lip along its foot, vents high
         // on its sides (from the front back: six on the rifle's, fewer on the G36K's), or (rails) a rail each side and
         // under; ahead of it, round the barrel, the sleeve with the bayonet lug (o.bl: the barrel, if there's room)
-        const V = (px) => px * 0.000945, top = V(37.6), bot = V(-13.4), lip = V(-29.4), x = 0.021;
+        const V = (px: number) => px * 0.000945, top = V(37.6), bot = V(-13.4), lip = V(-29.4), x = 0.021;
         k.prof([[f0, top], [f0 + len - V(22), top], [f0 + len, V(5.6)], [f0 + len, bot], [f0 + len - V(40), bot], [f0 + len - V(46), lip], [f0 + V(28), lip], [f0, V(-36)]], 0.042, m, 0, null, 0.003);
         if (o.rails) { for (const sd of [-1, 1]) sideRail(k, f0 + 0.04, len - 0.07, V(4), sd * (x + 0.0035)); S.rail(k, f0 + 0.04, len - 0.08, lip - 0.0045, M.black()); k.box(0.02, 0.005, len - 0.08, M.black(), f0 + 0.04, lip - 0.002); }
         else for (let i = 0; i < 6; i++) { const f = f0 + len - V(49) - i * V(30); if (f < f0 + 0.05) break; for (const sd of [-1, 1]) k.box(0.0006, V(4.5), V(20), M.rubber(), f, V(30.6), sd * x); }
@@ -754,7 +763,7 @@ const G_GunModels = (() => {
   // A bipod leg hinged at (f, y): drawn by draw() in gun coordinates, on a part of its own that swings it down to stand
   // the gun on (anim.bipod, posed by bipodPose). back: folded back along the gun (its foot behind the hinge), else forward.
   // (Inside another moving part it's drawn fixed, folded.)
-  function bipodLeg(k, anim, f, y, x, back, draw) {
+  function bipodLeg(k: Kit, anim: Anim | null | undefined, f: number, y: number, x: number, back: boolean, draw: () => void) {
     if (!anim || k.inPart) { draw(); return; }
     const p = k.part(f, y);
     k.into(p, f, y); draw(); k.into(null);
@@ -763,13 +772,13 @@ const G_GunModels = (() => {
   // The legs down by k (0 folded, 1 standing the gun up): about their hinges to point at the ground, splayed a little.
   // legs: anim.bipod (the viewmodel's), or a world model's userData.bipod (js/rig.ts).
   const BIPOD_SPLAY = 0.2;
-  function bipodPose(legs, k) {
+  function bipodPose(legs: BipodLeg[] | null | undefined, k: number) {
     if (!legs) return;
     const e = k * k * (3 - 2 * k);
     for (const l of legs) (l.sub || l.p).rotation.set(e * (l.back ? 1 : -1) * Math.PI / 2, e * l.side * BIPOD_SPLAY * (l.back ? 1 : -1), 0);
   }
   // Foregrips hang under the handguard at forward position f.
-  function foregrip(k, t, f, m, anim) {
+  function foregrip(k: Kit, t: string, f: number, m: THREE.Material, anim?: Anim | null) {
     switch (t) {
       case 'vertical': k.prof([[f - 0.012, -0.022], [f + 0.016, -0.022], [f + 0.014, -0.11], [f - 0.01, -0.11]], 0.026, m); break;
       case 'angled': k.prof([[f - 0.045, -0.022], [f + 0.03, -0.022], [f + 0.012, -0.058], [f - 0.03, -0.05]], 0.026, m); break;
@@ -788,7 +797,7 @@ const G_GunModels = (() => {
     }
   }
   // Laser / aiming modules on a side rail at forward position f: the right (side 1), or the left (-1), mirrored.
-  function tactical(k, t, f, y, x, side = 1) {
+  function tactical(k: Kit, t: string | null | undefined, f: number, y: number, x: number, side = 1) {
     if (!t) return;
     if (t === 'light' || t === 'lightX' || t === 'plight' || t === 'pcombo') { // a weapon light: a tube with a lens on the front
       const r = t === 'lightX' ? 0.016 : t === 'light' ? 0.013 : 0.011, len = t === 'lightX' ? 0.12 : t === 'light' ? 0.095 : 0.055, cx = x + side * r * 0.9;
@@ -804,13 +813,13 @@ const G_GunModels = (() => {
     if (peq) k.cyl(0.006, 0.004, M.lens(), f, y - 0.008, x + side * 0.01 * big);
   }
   // A short rail on the side (standing on edge, its teeth outward) from f0, len long, centred at y, its face at x.
-  function sideRail(k, f0, len, y, x, m = M.black()) {
+  function sideRail(k: Kit, f0: number, len: number, y: number, x: number, m: THREE.Material = M.black()) {
     const s = Math.sign(x) || 1;
     k.box(0.007, 0.019, len, m, f0, y, x - s * 0.0035);
     for (let i = 0; i < Math.floor(len / 0.0105); i++) k.box(0.004, 0.021, 0.0052, m, f0 + 0.003 + i * 0.0105, y, x + s * 0.002);
   }
   // Charging handle at the back of an AR upper.
-  function charging(k, t, rm) {
+  function charging(k: Kit, t: string | null | undefined, rm: THREE.Material) {
     k.box(0.03, 0.007, 0.022, rm, -0.012, 0.02);
     if (t === 'ext' || t === 'ambi') k.box(0.012, 0.009, 0.016, M.black(), -0.008, 0.021, -0.02);
     if (t === 'ambi') k.box(0.012, 0.009, 0.016, M.black(), -0.008, 0.021, 0.02);
@@ -821,7 +830,7 @@ const G_GunModels = (() => {
   // put), 'top' (a knob standing up on top: an Uzi's, a Thompson's), 'tee' (a T at the back of the top, like an
   // AR's: an MP7's, a G36's), 'fold' (a flat lever along the side with its tab folded out: a FAL's, a Vector's).
   // Sets h.grab, where the hand takes it ([f, y, x]); returns the part that moves (the tube's built outside it).
-  function cockHandle(k, h) {
+  function cockHandle(k: Kit, h: { f: number; y: number; x: number; style?: string; sz?: number; stem?: number; grab?: number[]; [key: string]: any }) {
     const st = h.style || 'knob', s = Math.sign(h.x) || 1, z = h.sz || 1, B = M.black(), St = M.steel();
     if (st === 'tube') k.cyl(0.006, 0.09, B, h.f - 0.07, h.y, h.x + 0.002);
     const p = k.part(h.f, h.y);
@@ -841,14 +850,14 @@ const G_GunModels = (() => {
   }
   // Sights by type. top = height of the rail / mounting surface.
   // a sight's place on a rail from f0, rl long: forward with a magnifier behind it, so the magnifier's mount is on the rail too
-  const magOfs = (o, f0, rl, plain) => (o.magnifier ? f0 + Math.max(rl * 0.55, Math.min(rl - 0.035, 0.15)) : plain);
+  const magOfs = (o: any, f0: number, rl: number, plain: number) => (o.magnifier ? f0 + Math.max(rl * 0.55, Math.min(rl - 0.035, 0.15)) : plain);
   // and the magnifier, if there's one behind a red dot
-  function magIn(k, sight, top, o, anim) {
+  function magIn(k: Kit, sight: Sight, top: number, o: any, anim: Anim) {
     if (!o.magnifier || !k.reflex) return sight;
     k.tag('magnifier');
     return S.magnifier(k, sight, top, o.magnifier, anim);
   }
-  function sightOf(k, o, top, L, bl, br, front, ofs) {
+  function sightOf(k: Kit, o: any, top: number, L: number, bl: number, br: number, front: number, ofs: number) {
     const frontF = L + Math.min(bl * 0.82, bl - 0.03);
     if (o.optic === 'riser') k.box(0.024, o.riser || 0.022, 0.034, M.black(), ofs - 0.017, top + (o.riser || 0.022) / 2); // a pistol optic riser with nothing on it (the irons still work)
     switch (o.optic || 'irons') {
@@ -873,24 +882,24 @@ const G_GunModels = (() => {
   // Long gun: receiver (base), then every part in its slot.
   // the AUG's trace (rifle(), rcv 'aug'): a pixel of its reference photo ([x, y]: x back from the muzzle to the butt at
   // 1385, y down from the bore at 365) to gun space ([forward from the butt, up], metres)
-  const augTrace = ([x, y]) => [(1385 - x) * 0.00057, (365 - y) * 0.00057];
+  const augTrace = ([x, y]: number[]) => [(1385 - x) * 0.00057, (365 - y) * 0.00057];
   // the Vector's trace (rifle(), rcv 'vector'): a pixel of the reference photo ([x, y], x forward from the receiver's back
   // at 318, y down from the bore at 140) to gun space ([forward, up], metres)
-  const vecTrace = ([x, y]) => [(x - 318) * 0.00087, (140 - y) * 0.00087];
+  const vecTrace = ([x, y]: number[]) => [(x - 318) * 0.00087, (140 - y) * 0.00087];
   // the QBZ-95's trace (rifle(), rcv 'qbz95'): a pixel of its reference photo ([x, y]: x forward from the butt at 88, y
   // down from the bore at 262, the photo drawn 1500 px wide) to gun space ([forward, up], metres)
-  const qbzTrace = ([x, y]) => [(x - 88) * 0.000574, (262 - y) * 0.000574];
+  const qbzTrace = ([x, y]: number[]) => [(x - 88) * 0.000574, (262 - y) * 0.000574];
   // the F2's trace (rifle(), rcv 'f2'): a pixel of its reference photo ([x, y]: x forward from the butt at 204, y down
   // from the bore at 931, the photo drawn 3000 px wide) to gun space ([forward, up], metres)
-  const f2Trace = ([x, y]) => [(x - 204) * 0.0003554, (931 - y) * 0.0003554];
+  const f2Trace = ([x, y]: number[]) => [(x - 204) * 0.0003554, (931 - y) * 0.0003554];
   // the GM6 Lynx's trace (rifle(), rcv 'gm6'): a pixel of its reference photo ([x, y]: x forward from the butt at 5, y down from
   // the bore at 114) to gun space ([forward, up], metres)
-  const gm6Trace = ([x, y]) => [(x - 5) * 0.001215, (114 - y) * 0.001215];
+  const gm6Trace = ([x, y]: number[]) => [(x - 5) * 0.001215, (114 - y) * 0.001215];
   // the AKS-74U's trace (rifle(), rcv 'aksu', its handguard and its stock): a pixel of its reference photo ([x, y]: x forward
   // from the back of the receiver at 258, y down from the bore at 367.5, the photo 945 px wide) to gun space ([forward, up], metres)
-  const akuTrace = ([x, y]) => [(x - 258) * 0.0010716, (367.5 - y) * 0.0010716];
+  const akuTrace = ([x, y]: number[]) => [(x - 258) * 0.0010716, (367.5 - y) * 0.0010716];
   // the AKS-74U's muzzle booster from f0: a collar and a cylinder, then the flared cone with its notched lip
-  function aksuBooster(k, f0, y) {
+  function aksuBooster(k: Kit, f0: number, y: number) {
     const B = M.black();
     k.cyl(0.0147, 0.019, B, f0, y);
     k.ringZ(0.0148, 0.0012, M.gunmetal(), f0 + 0.0185, y);
@@ -902,24 +911,24 @@ const G_GunModels = (() => {
   }
   // the AKS-74U's handguard from f0, len long (traced at 131 mm): the upper half over the gas tube with its vent slots, the deeper
   // lower half under it, its heel rounded and its underside rising toward the front
-  function aksuGuard(k, f0, len, m) {
-    const V = akuTrace, fx = (x) => f0 + (x - 507) / 122 * len, pts = (a) => a.map(([x, y]) => [fx(x), V([0, y])[1]]), D = M.rubber();
+  function aksuGuard(k: Kit, f0: number, len: number, m: THREE.Material) {
+    const V = akuTrace, fx = (x: number) => f0 + (x - 507) / 122 * len, pts = (a: number[][]) => a.map(([x, y]) => [fx(x), V([0, y])[1]]), D = M.rubber();
     k.prof(pts([[521, 327], [629, 327], [629, 353], [521, 353]]), 0.037, m, 0, null, 0.005);
     k.prof(pts([[508, 354], [629, 354], [629, 387], [600, 391], [520, 399], [511, 399], [507, 393]]), 0.044, m, 0, null, 0.005);
     for (const [a, b] of [[535, 568], [578, 612]]) k.box(0.0385, 0.003, (b - a) / 122 * len, D, fx(a), V([0, 353.5])[1]);
   }
   // the SCAR's trace (rifle(), rcv 'scar', and its stock): a pixel of its reference photo ([x, y]: x forward from the back
   // of the upper at 400, y down from the bore at 245, the photo drawn 1500 px wide) to gun space ([forward, up], metres)
-  const scarTrace = ([x, y]) => [(x - 400) * 0.00059, (245 - y) * 0.00059];
+  const scarTrace = ([x, y]: number[]) => [(x - 400) * 0.00059, (245 - y) * 0.00059];
   // the G36's trace (rifle(), rcv 'g36', its handguard and its stock): a pixel of its reference photo ([x, y]: x forward
   // from the stock's hinge at 330, y down from the bore at 143.6) to gun space ([forward, up], metres)
-  const g36Trace = ([x, y]) => [(x - 330) * 0.000945, (143.6 - y) * 0.000945];
-  function rifle(k, o) {
+  const g36Trace = ([x, y]: number[]) => [(x - 330) * 0.000945, (143.6 - y) * 0.000945];
+  function rifle(k: Kit, o: any) {
     const L = o.L || 0.26, rm = o.rm || M.black(), fm = o.fm || M.polymer(), bull = o.rcv === 'bullpup' || o.rcv === 'qbz95';
     const gf = o.grip != null ? o.grip : bull ? L * 0.62 : 0.045;
     const anim: any = {};
-    let top;
-    const rcv = o.rcv || 'ar', tr = o.look && G.GunTraces[o.look], VT = tr ? tracer(tr) : null, mats = { frame: o.rm || fm, grip: o.gm || fm, slide: rm, stock: o.sm || fm, forend: (o.pump && o.pump.m) || fm }; // (traced: js/guntraces.ts)
+    let top!: number;
+    const rcv = o.rcv || 'ar', tr = o.look && (G.GunTraces as Record<string, Trace>)[o.look], VT = (tr ? tracer(tr) : null) as Tracer, mats = { frame: o.rm || fm, grip: o.gm || fm, slide: rm, stock: o.sm || fm, forend: (o.pump && o.pump.m) || fm }; // (traced: js/guntraces.ts)
     k.tag('base');
     if (rcv === 'ar') {
       if (tr) tracedParts(k, tr, VT, 'base', mats); // (a traced upper and lower: the AR-9's, js/guntraces.ts)
@@ -963,13 +972,13 @@ const G_GunModels = (() => {
       // magazine is clear, raked a little forward. Its width is the Bundesheer's figure for the StG 77, 85 mm across
       // everything (the charging handle and the sling swivels standing proud): the shell 70 mm, bevelled round, the
       // grip and guard narrower, the receiver housing 48.
-      const V = augTrace, pts = (a) => a.map(V), B = M.black(), D = M.rubber(), sh = fm;
+      const V = augTrace, pts = (a: number[][]) => a.map(V), B = M.black(), D = M.rubber(), sh = fm;
       // the shell: butt, cheek and the magazine well behind the grip, its nose under the receiver
       const shell = k.prof(pts([[490, 400], [690, 400], [700, 330], [1240, 330], [1300, 334], [1350, 345], [1385, 368], [1372, 425], [1336, 608], [1318, 626], [1215, 622], [1198, 600], [1160, 556], [1110, 526], [1098, 505],
         [1062, 492], [940, 492], [928, 478], [900, 463], [870, 450], [845, 443], [805, 440], [712, 438], [540, 440], [488, 428]]), 0.07, sh, 0, null, 0.007);
       // its top is a roof: the flanks are flat up to a crease just above the bore line, then lean in to a top a little
       // under half as wide (what keeps it slender from above and from the front)
-      { const ys = V([0, 358])[1], yt = V([0, 330])[1], pa = shell.geometry.attributes.position;
+      { const ys = V([0, 358])[1], yt = V([0, 330])[1], pa = shell.geometry.attributes.position as THREE.BufferAttribute;
         for (let i = 0; i < pa.count; i++) { const y = pa.getY(i); if (y > ys) pa.setX(i, pa.getX(i) * (1 - 0.56 * Math.min(1, (y - ys) / (yt - ys)))); }
         pa.needsUpdate = true; shell.geometry.computeVertexNormals(); }
       // the grip and the trigger guard: one moulding, the bar from the nose down round the whole hand to the grip's foot.
@@ -1002,7 +1011,7 @@ const G_GunModels = (() => {
       // home and the bolt follows it, stripping the next round. The body's a long box, the butt and cheek at the back, the
       // tall magazine behind the grip; the grip frame open behind the grip, its guard a loop forward; a rail from the cheek
       // to the bipod's clamp on the end of the tube.
-      const V = gm6Trace, pts = (a) => a.map(V), B = M.black(), D = M.rubber(), sh = fm;
+      const V = gm6Trace, pts = (a: number[][]) => a.map(V), B = M.black(), D = M.rubber(), sh = fm;
       // the body: butt, cheek and receiver, its underside stepping down from the butt to the magazine and the grip frame
       k.prof(pts([[32, 93], [205, 93], [212, 88], [402, 88], [402, 140], [396, 146], [345, 150], [145, 150], [125, 147], [60, 152], [32, 160]]), 0.058, sh, 0, null, 0.004);
       // the seam along the butt between its halves, the screws through it, the charging handle's slot over the grip
@@ -1042,7 +1051,7 @@ const G_GunModels = (() => {
       // the grip the long nose, ribbed underneath, ending at the front sight. Over it all the carrying handle, a loop
       // from the magazine well to the front sight with the rear aperture and the cocking handle in its opening. The
       // grip is raked back, the trigger guard a bar from its top to the "front grip" moulded under the nose.
-      const V = qbzTrace, pts = (a) => a.map(V), B = M.black(), D = M.rubber(), sh = fm;
+      const V = qbzTrace, pts = (a: number[][]) => a.map(V), B = M.black(), D = M.rubber(), sh = fm;
       k.prof(pts([[88, 192], [110, 187], [200, 192], [214, 204], [420, 210], [545, 212], [640, 207], [890, 204], [935, 199], [1092, 197], [1158, 210], [1165, 222], [1165, 300],
         [1100, 302], [965, 302], [950, 317], [938, 350], [930, 420], [882, 420], [882, 312], [785, 313], [780, 330], [690, 328], [545, 331], [400, 331], [275, 331],
         [260, 335], [245, 342], [230, 361], [215, 387], [200, 394], [95, 394], [88, 388]]), 0.054, sh, 0, null, 0.007);
@@ -1075,7 +1084,7 @@ const G_GunModels = (() => {
       // handle, a hollow box (two walls and a roof, the sights looking down the tunnel between them) with the cocking
       // lever in its window; the handguard's cooling bumps underneath, the grenade sight along the receiver, the spigot's
       // ridges and the flash hider out front.
-      const V = f2Trace, pts = (a) => a.map(V), B = M.black(), D = M.rubber(), sh = fm;
+      const V = f2Trace, pts = (a: number[][]) => a.map(V), B = M.black(), D = M.rubber(), sh = fm;
       // the shell from the butt to the front of the magazine well, wider than the receiver
       k.prof(pts([[205, 949], [225, 827], [239, 815], [252, 823], [265, 816], [280, 817], [304, 818], [470, 818], [510, 868], [520, 871], [603, 873], [611, 862], [624, 861], [905, 854], [905, 1150], [896, 1155], [861, 1161],
         [652, 1170], [651, 1106], [623, 1103], [610, 1115], [528, 1133], [515, 1151], [486, 1159], [461, 1175], [449, 1174], [441, 1158], [434, 1156], [322, 1181], [307, 1195], [285, 1196], [277, 1203], [237, 1203],
@@ -1121,7 +1130,7 @@ const G_GunModels = (() => {
       // handguard, so the gas block and the front sight's ears stand right at the end of the wood, the short barrel then the
       // booster out front (the barrel stage, and the muzzle). The pistol grip and trigger guard are the AK's, the grip
       // bakelite; the selector lever sweeps the right side and the ejection port is on the right under the cover.
-      const V = akuTrace, pts = (a) => a.map(V), B = M.black(), D = M.rubber(), St = M.steel();
+      const V = akuTrace, pts = (a: number[][]) => a.map(V), B = M.black(), D = M.rubber(), St = M.steel();
       k.prof(pts([[258, 352], [262, 344], [284, 336], [504, 336], [504, 394], [400, 395], [262, 394], [258, 388]]), 0.037, rm, 0, null, 0.003);
       k.prof(pts([[262, 346], [266, 341], [272, 339], [278, 333], [284, 329], [398, 327], [440, 325], [486, 323], [504, 324], [504, 342], [262, 342]]), 0.034, rm, 0, null, 0.005);
       k.prof(pts([[254, 358], [262, 344], [284, 334], [284, 394], [254, 394]]), 0.04, rm, 0, null, 0.003);
@@ -1181,7 +1190,7 @@ const G_GunModels = (() => {
       // side of its front and one under it (so no handguard: the rails are the upper's); the charging handle rides a slot
       // along its side. The lower is polymer: the grip, the trigger guard and the magazine well in one moulding. The H
       // is the same gun scaled up in the magazine well (its 7.62 magazine) with a longer barrel.
-      const V = scarTrace, pts = (a) => a.map(V), B = M.black(), D = M.rubber(), up = rm, lo = fm;
+      const V = scarTrace, pts = (a: number[][]) => a.map(V), B = M.black(), D = M.rubber(), up = rm, lo = fm;
       k.prof(pts([[400, 188], [1042, 188], [1042, 269], [750, 269], [745, 281], [400, 281]]), 0.034, up);
       // (the magazine well: its front face straight down from a curve in under the upper, its mouth sloping up toward the
       // front, the magazine going in along it)
@@ -1206,7 +1215,7 @@ const G_GunModels = (() => {
       // stock's hinge at its back. Over it the carrying handle, a loop from the back of the receiver to over the
       // handguard, the charging handle under it; this one has a rail along the top of the handle in place of the
       // German army's built-in sights (the export guns' and the G36KV's), so a sight sits as high over the bore as theirs
-      const V = g36Trace, pts = (a) => a.map(V), B = M.black(), D = M.rubber();
+      const V = g36Trace, pts = (a: number[][]) => a.map(V), B = M.black(), D = M.rubber();
       k.prof(pts([[322, 95], [589, 100], [589, 165], [322, 170]]), 0.044, rm, 0, null, 0.003);
       k.prof(pts([[318, 92], [346, 92], [346, 184], [318, 184]]), 0.047, rm, 0, null, 0.003); // (the hinge block)
       k.prof(pts([[338, 150], [589, 156], [589, 163], [561, 209], [473, 232], [466, 226], [466, 186], [354, 187], [340, 178]]), 0.04, fm, 0, null, 0.003);
@@ -1227,7 +1236,7 @@ const G_GunModels = (() => {
       // opening raked forward, the deep V body, and in front the magazine well, a leg raked back (its front edge
       // serrated), the Glock-pattern magazine going in at its foot along the rake. An aluminium upper with a
       // full-length rail, the ejection port over the well, a rail under the front; a polymer lower.
-      const V = vecTrace, pts = (a) => a.map(V), up = rm, lo = fm, B = M.black(), D = M.rubber();
+      const V = vecTrace, pts = (a: number[][]) => a.map(V), up = rm, lo = fm, B = M.black(), D = M.rubber();
       // the upper: the rail's length, the tang curving down over the hand at the back, deep at the front (the barrel
       // runs into it), stepping down under the front to the bottom rail
       k.prof(pts([[318, 92], [738, 90], [738, 168], [652, 168], [640, 160], [600, 136], [580, 128], [382, 128], [362, 141], [332, 139], [318, 128]]), 0.052, up);
@@ -1327,8 +1336,8 @@ const G_GunModels = (() => {
     else if (o.gripT !== 'none' && rcv !== 'qbz95' && rcv !== 'f2' && rcv !== 'aksu' && !((rcv === 'vector' || rcv === 'aug' || rcv === 'gm6') && (o.gripT || 'ar') === 'ar')) grip(k, gf, o.gm || fm, o.gripT || (rcv === 'ak' ? 'wood' : 'ar')); // (the Vector's own is part of its lower)
     k.tag('stock');
     if (rcv === 'vector' && o.stock) { const sp = k.part(0, vecTrace([0, 110])[1]); k.into(sp); stock(k, o.stock, o.sm || fm, false); k.into(null); } // (its tube level with the top of the receiver: the bore's below the shoulder)
-    else if (tr && o.stock === (tr.stockT || 'wood') && tr.parts.some((p) => p.on === 'stock')) tracedParts(k, tr, buildingVM ? (q) => { const [f, y] = VT(q); return [Math.max(f, -0.15), y]; } : VT, 'stock', mats); // (the traced stock, while the factory one's fitted: in first person just its wrist, what the hand holds, or the rest of it stands in front of your eye)
-    else if (!bull && o.stock && rcv === 'aksu') { const st = { skeleton: 'aksu', folded: 'aksufold' }[o.stock] || o.stock; stock(k, st, o.sm || (st === 'akwood' || st === 'm4' ? fm : rm), false); } // (a skeleton stock here is its triangular side-folder, black steel unless painted)
+    else if (tr && o.stock === (tr.stockT || 'wood') && tr.parts.some((p: Trace) => p.on === 'stock')) tracedParts(k, tr, buildingVM ? (q) => { const [f, y] = VT(q); return [Math.max(f, -0.15), y]; } : VT, 'stock', mats); // (the traced stock, while the factory one's fitted: in first person just its wrist, what the hand holds, or the rest of it stands in front of your eye)
+    else if (!bull && o.stock && rcv === 'aksu') { const st = ({ skeleton: 'aksu', folded: 'aksufold' } as Record<string, string>)[o.stock] || o.stock; stock(k, st, o.sm || (st === 'akwood' || st === 'm4' ? fm : rm), false); } // (a skeleton stock here is its triangular side-folder, black steel unless painted)
     else if (!bull && o.stock && !lugGrip) stock(k, o.stock, o.sm || fm, o.gripT === 'none');
     k.tag('mag');
     let magAt = null;
@@ -1390,7 +1399,7 @@ const G_GunModels = (() => {
       if (rcv === 'aksu') { hg.len = Math.min(hg.len, 0.134); if (hg.t === 'wood') hg.aksu = true; }
       if (hg.t === 'sig') hg.ext = o.railExt || 0;
       if (hg.t === 'g36') hg.bl = bl;
-      if (tr && tr.parts.some((p) => p.on === 'fore') && hg.t === 'wood') { const sc = (hg.len - 0.03) / (tr.foreLen - 0.03), VF = (p) => { const [f, y] = VT(p); return [f > L + 0.03 ? L + 0.03 + (f - L - 0.03) * sc : f, y]; }; tracedParts(k, tr, VF, 'fore', Object.assign({}, mats, { fore: hg.m || fm })); } // (the traced forend, stretched or shortened ahead of the action to the wooden hand guard's length)
+      if (tr && tr.parts.some((p: Trace) => p.on === 'fore') && hg.t === 'wood') { const sc = (hg.len - 0.03) / (tr.foreLen - 0.03), VF = (p: number[]) => { const [f, y] = VT(p); return [f > L + 0.03 ? L + 0.03 + (f - L - 0.03) * sc : f, y]; }; tracedParts(k, tr, VF, 'fore', Object.assign({}, mats, { fore: hg.m || fm })); } // (the traced forend, stretched or shortened ahead of the action to the wooden hand guard's length)
       else handguard(k, hg, hgF, fm, rm);
     }
     if (o.tube) {
@@ -1401,7 +1410,7 @@ const G_GunModels = (() => {
     }
     if (rcv === 'aksu' && !o.integral) { // the handguard's ferrule, the gas block and the front sight's ears and post, ending where the booster starts
       k.tag('barrel');
-      const V = akuTrace, B = M.black(), g0 = front - 0.022, sy = 0.0505, hy = (y) => V([0, y])[1];
+      const V = akuTrace, B = M.black(), g0 = front - 0.022, sy = 0.0505, hy = (y: number) => V([0, y])[1];
       k.cyl(0.0195, 0.007, M.gunmetal(), L + hgLen, by);
       k.cyl(0.0125, 0.022, B, g0, by);
       for (const x of [-0.0066, 0.0066]) k.prof([[g0 + 0.001, hy(378)], [g0 + 0.001, hy(330)], [g0 + 0.005, hy(311)], [g0 + 0.021, hy(309)], [g0 + 0.021, hy(378)]], 0.003, B, x, null, 0.0005);
@@ -1424,7 +1433,7 @@ const G_GunModels = (() => {
       const p = k.part();
       k.into(p);
       const pm = o.pump.m || fm;
-      if (tr && tr.parts.some((q) => q.on === 'pump')) tracedParts(k, tr, VT, 'pump', mats); // (the 870's forend and action bars)
+      if (tr && tr.parts.some((q: Trace) => q.on === 'pump')) tracedParts(k, tr, VT, 'pump', mats); // (the 870's forend and action bars)
       else {
         k.cyl(0.021, o.pump.len, pm, L + o.pump.f, -0.025, 0, 0.021, 14);
         for (let i = 0; i < 6; i++) k.ringZ(0.021, 0.0016, M.rubber(), L + o.pump.f + 0.02 + i * (o.pump.len - 0.04) / 5, -0.025);
@@ -1533,9 +1542,9 @@ const G_GunModels = (() => {
     const port = o.bolt ? [o.bolt - 0.02, top - 0.004, 0] : o.lever ? [L * 0.55, 0.0, 0.02] : o.pump || o.tube ? [L * 0.62, -0.042, 0] : rcv === 'break' ? [L, 0.0, 0] : [L * 0.5, top, 0];
     // where a chamber check shows the round: through the ejection port on the right (js/vmanim.ts), or for a
     // break-action, the shell heads in the breech
-    const hw = { ar: 0.0178, ak: 0.022, aksu: 0.0192, box: (o.W || 0.045) / 2, round: 0.018, bullpup: 0.023, vector: 0.026, aug: 0.029, gm6: 0.03, f2: 0.032, qbz95: 0.027, qbz192: 0.0172, scar: 0.0172, g36: 0.022, mcx: 0.0156, mpx: 0.0156 }[rcv] || 0.018;
+    const hw = ({ ar: 0.0178, ak: 0.022, aksu: 0.0192, box: (o.W || 0.045) / 2, round: 0.018, bullpup: 0.023, vector: 0.026, aug: 0.029, gm6: 0.03, f2: 0.032, qbz95: 0.027, qbz192: 0.0172, scar: 0.0172, g36: 0.022, mcx: 0.0156, mpx: 0.0156 } as Record<string, number>)[rcv] || 0.018;
     const chamberAt = tr && tr.chamber ? { side: 'breech', heads: [[0, by - hy]], z: L - tr.chamber, r: 0.0097, bore: true } // (the Thor's: in the back face of its sleeve, half proud of it, the bore there when it's empty)
-      : rcv === 'break' ? { side: 'breech', heads: (o.barrels || [0]).map((x) => [x, by - hy]), z: -0.0005, r: br } // (in the barrels' hinge frame)
+      : rcv === 'break' ? { side: 'breech', heads: (o.barrels || [0]).map((x: number) => [x, by - hy]), z: -0.0005, r: br } // (in the barrels' hinge frame)
       : o.bolt ? { side: 'top', f: o.bolt - 0.05, y: rcv === 'round' ? top - 0.0015 : top, x: rcv === 'round' ? 0.006 : 0.011, w: 0.024 } // (a bolt gun's port is its open top, to the right of a scope's line, above the stock)
       : { side: 'right', f: o.chF != null ? o.chF : o.lever ? L * 0.55 : magAt ? magAt[0] + 0.005 : !o.pump && handle && handle.x > 0 ? handle.f + 0.026 : o.pump || o.tube ? L * 0.55 : L * 0.5, y: o.chY != null ? o.chY : by, x: hw };
     return {
@@ -1550,7 +1559,7 @@ const G_GunModels = (() => {
 
   // A traced gun's own irons lifted clear of a handguard (rise: how far): the rear on a riser clamped to the rail, the front on a
   // tall base clamped round the muzzle
-  function raisedSights(k, tr, front, top, rise, by) {
+  function raisedSights(k: Kit, tr: Trace, front: number, top: number, rise: number, by: number) {
     const sy = top + (tr.sh || 0.0075) + rise, rb = top + rise, fF = front - 0.012, fb = sy - 0.006, B = M.black();
     k.box(0.024, 0.005, 0.032, B, tr.sightF - 0.016, top + 0.0025); // (its clamp on the rail)
     k.prof([[tr.sightF - 0.016, top + 0.005], [tr.sightF + 0.016, top + 0.005], [tr.sightF + 0.006, rb], [tr.sightF - 0.006, rb]], 0.018, B, 0, null, 0.001);
@@ -1560,8 +1569,8 @@ const G_GunModels = (() => {
   }
   // A pistol traced from its reference photo (o.look: js/guntraces.ts). Each trace's numbers are pixels of the photo; its
   // V() turns one into gun space ([forward, up], metres), the bore at y = 0.009 and the back of the slide at f = 0.
-  const tracer = (t) => ([x, y]) => [t.dir * (x - t.x0) * t.mm * 0.001, (t.y0 - y) * t.mm * 0.001 + (t.by != null ? t.by : 0.009)];
-  const along = (pts, f) => { // the height of an edge ([[f, y], ...], rear to front) at f
+  const tracer = (t: Trace): Tracer => ([x, y]) => [t.dir * (x - t.x0) * t.mm * 0.001, (t.y0 - y) * t.mm * 0.001 + (t.by != null ? t.by : 0.009)];
+  const along = (pts: number[][], f: number) => { // the height of an edge ([[f, y], ...], rear to front) at f
     if (f <= pts[0][0]) return pts[0][1];
     for (let i = 1; i < pts.length; i++) if (f <= pts[i][0]) { const [a, b] = [pts[i - 1], pts[i]]; return b[0] > a[0] ? a[1] + (b[1] - a[1]) * (f - a[0]) / (b[0] - a[0]) : b[1]; }
     return pts[pts.length - 1][1];
@@ -1569,13 +1578,13 @@ const G_GunModels = (() => {
   // The slide: the section swept from its traced top and bottom edges, its top corners chamfered or rounded (t.c: how far
   // in, t.seg: how many facets), the ejection port cut out of the right of it from xp over. A long slide stretches
   // its front half. Returns its edges, for what sits on them.
-  function tracedSlide(k, t, V, len, w, m) {
-    const hi = t.top.map(V), lo = t.bot.map(V), L0 = t.nose ? V([t.nose, 0])[0] : hi[hi.length - 1][0], reach = (f) => (f <= L0 / 2 ? f : L0 / 2 + (f - L0 / 2) * (len - L0 / 2) / (L0 / 2));
+  function tracedSlide(k: Kit, t: Trace, V: Tracer, len: number, w: number, m: THREE.Material) {
+    const hi = t.top.map(V), lo = t.bot.map(V), L0 = t.nose ? V([t.nose, 0])[0] : hi[hi.length - 1][0], reach = (f: number) => (f <= L0 / 2 ? f : L0 / 2 + (f - L0 / 2) * (len - L0 / 2) / (L0 / 2));
     for (const e of [hi, lo]) for (const p of e) p[0] = reach(p[0]);
-    const [p1, p0] = t.port.map((x) => V([x, 0])[0]).sort((a, b) => b - a), yP = t.portY != null ? V([0, t.portY])[1] : 0.016, xp = -0.0015, seg = t.seg || 1;
-    const sec = (f, cut) => {
+    const [p1, p0] = t.port.map((x: number) => V([x, 0])[0]).sort((a: number, b: number) => b - a), yP = t.portY != null ? V([0, t.portY])[1] : 0.016, xp = -0.0015, seg = t.seg || 1;
+    const sec = (f: number, cut: boolean) => {
       const y1 = along(hi, f), y0 = along(lo, f), hw = w / 2, c = Math.min(t.c || 0.002, hw - 0.002, Math.max(0, (y1 - y0) * 0.45));
-      const arc = (sx) => Array.from({ length: seg + 1 }, (_, i) => { const a = (i / seg) * Math.PI / 2; return [sx * (hw - c + c * Math.cos(a)), y1 - c + c * Math.sin(a)]; });
+      const arc = (sx: number) => Array.from({ length: seg + 1 }, (_, i) => { const a = (i / seg) * Math.PI / 2; return [sx * (hw - c + c * Math.cos(a)), y1 - c + c * Math.sin(a)]; });
       const R = arc(1), L = arc(-1).reverse();
       if (cut) { const n = R.length; R.forEach((p, i) => { const u = n > 1 ? i / (n - 1) : 0; p[0] = hw + (xp - hw) * u; p[1] = yP; }); }
       return [[-hw, y0], [hw, y0], ...R, [xp, y1], ...L];
@@ -1583,7 +1592,7 @@ const G_GunModels = (() => {
     const fs = [...new Set([...hi, ...lo].map((p) => p[0]))].sort((a, b) => a - b);
     for (const f of [p0, p1]) if (!fs.includes(f)) fs.push(f);
     fs.sort((a, b) => a - b);
-    const st = [];
+    const st: [number, number[][]][] = [];
     for (const f of fs) {
       if (f === p0) st.push([f, sec(f, false)], [f, sec(f, true)]);
       else if (f === p1) st.push([f, sec(f, true)], [f, sec(f, false)]);
@@ -1597,17 +1606,17 @@ const G_GunModels = (() => {
   // Where a breech at the far end of a tipping barrel is once it's open (a Thor's: the barrel and its sleeve hinge at the
   // front, the breech out at the back of them): [forward, up] from the pin at (L, hy), z back and y up from it in the hinge's frame
   const BRK_OPEN = -0.55;
-  const breechAt = (L, hy, z, y, a) => ({ at: [L - (y * Math.sin(a) + z * Math.cos(a)), hy + y * Math.cos(a) - z * Math.sin(a)], pitch: a });
-  function tracedParts(k, t, V, on, mats) {
+  const breechAt = (L: number, hy: number, z: number, y: number, a: number) => ({ at: [L - (y * Math.sin(a) + z * Math.cos(a)), hy + y * Math.cos(a) - z * Math.sin(a)], pitch: a });
+  function tracedParts(k: Kit, t: Trace, V: Tracer, on: string, mats: Record<string, THREE.Material>) {
     for (const p of t.parts || []) {
       if ((p.on || 'base') !== on) continue;
-      if (p.strips) { const list = p.strips.map((q) => q.map(V)); for (const x of p.two ? [p.x, -p.x] : [p.x || 0]) k.profs(list, p.w, M[p.m](), x); continue; }
-      const mat = mats[p.m] || (M[p.m] ? M[p.m]() : mats.frame), pts = p.pts.map(V), holes = p.holes && p.holes.map((h) => h.map(V));
+      if (p.strips) { const list = p.strips.map((q: number[][]) => q.map(V)); for (const x of p.two ? [p.x, -p.x] : [p.x || 0]) k.profs(list, p.w, Mk[p.m](), x); continue; }
+      const mat = mats[p.m] || (Mk[p.m] ? Mk[p.m]() : mats.frame), pts = p.pts.map(V), holes = p.holes && p.holes.map((h: number[][]) => h.map(V));
       for (const x of p.two ? [p.x, -p.x] : [p.x || 0]) k.prof(pts, p.w, mat, x, holes, p.b != null ? p.b : 0.001);
     }
   }
   // serrations: { from, to: px along, n, y: [top, bottom] px, rake: how far the bottom's offset, px } cut in each side
-  function tracedSer(k, list, V, w, m) {
+  function tracedSer(k: Kit, list: Trace[] | null | undefined, V: Tracer, w: number, m: THREE.Material) {
     for (const s of list || []) {
       const strips = [];
       for (let i = 0; i < s.n; i++) {
@@ -1618,18 +1627,18 @@ const G_GunModels = (() => {
     }
   }
 
-  function pistol(k, o) {
-    const sl = o.slide || {}, tr = o.look && G.GunTraces[o.look], V = tr ? tracer(tr) : null, len = sl.len || 0.19, w = sl.w || 0.026, sm = sl.sm || M.black(), fm = o.fm || M.polymer(), gm = o.gm || fm;
+  function pistol(k: Kit, o: any) {
+    const sl = o.slide || {}, tr = o.look && (G.GunTraces as Record<string, Trace>)[o.look], V = (tr ? tracer(tr) : null) as Tracer, len = sl.len || 0.19, w = sl.w || 0.026, sm = sl.sm || M.black(), fm = o.fm || M.polymer(), gm = o.gm || fm;
     const anim: any = {}, mats = { frame: fm, grip: gm, slide: sm };
     k.tag('slide');
     const slide = k.part();
     k.into(slide);
     // the slide, with its ejection port: a cut out of the right half of its top, over the chamber (forward of where
     // a pistol dot sits), so a press-check shows the round in the barrel
-    const ts = tr ? tracedSlide(k, tr, V, len, w, sm) : null, pc = len * 0.44, p0 = ts ? ts.p0 : pc - 0.016, p1 = ts ? ts.p1 : pc + 0.016, sy = ts ? ts.yP : 0.016, topAt = (f) => (ts ? along(ts.hi, f) : 0.026);
+    const ts = tr ? tracedSlide(k, tr, V, len, w, sm) : null, pc = len * 0.44, p0 = ts ? ts.p0 : pc - 0.016, p1 = ts ? ts.p1 : pc + 0.016, sy = ts ? ts.yP : 0.016, topAt = (f: number) => (ts ? along(ts.hi, f) : 0.026);
     if (!ts) k.prof([[0, 0.002], [0, sy], [len, sy], [len, 0.002]], w, sm, 0, null, 0.001);
     const nose = 0.012, noseY = 0.02;
-    if (ts) { tracedSer(k, tr.ser, V, w, M[tr.serM] ? M[tr.serM]() : M.rubber()); tracedParts(k, tr, V, 'slide', mats); }
+    if (ts) { tracedSer(k, tr.ser, V, w, Mk[tr.serM] ? Mk[tr.serM]() : M.rubber()); tracedParts(k, tr, V, 'slide', mats); }
     else {
       k.prof([[0, sy], [0, 0.026], [len - nose, 0.026], [len, noseY], [len, sy]], w / 2, sm, -w / 4, null, 0.001);
       k.prof([[0, sy], [0, 0.026], [p0, 0.026], [p0, sy]], w / 2, sm, w / 4, null, 0.001);
@@ -1679,7 +1688,7 @@ const G_GunModels = (() => {
     // carrying straight on out of it as long as it really is (a 33-rounder ~11 cm more), one piece, its floorplate on the end
     const K = (mf - bf) / (my - by), L = (tm ? my - by : 0.096) + out, tilt = -Math.atan(K);
     k.prof([[mf, my], [mf + mD, my], [bf + mD - K * out + (tm ? 0 : 0.002), by - out - (tm ? 0 : 0.006)], [bf - K * out, by - out]], mW, mm);
-    if (tm && tm.foot) { const foot = tm.foot.map(V).map(([f, y]) => [f - K * out, y - out]); k.prof(foot, tm.fw || mW + 0.005, M[tm.fm] ? M[tm.fm]() : M.black(), 0, null, 0.001); }
+    if (tm && tm.foot) { const foot = tm.foot.map(V).map(([f, y]: number[]) => [f - K * out, y - out]); k.prof(foot, tm.fw || mW + 0.005, Mk[tm.fm] ? Mk[tm.fm]() : M.black(), 0, null, 0.001); }
     else if (ext === 1) k.box(0.024, 0.008, 0.035, M.black(), bf - 0.002 - K * out, by - 0.007 - out).rotation.x = tilt; // (f runs along -z: tilting the bottom back is a negative turn)
     if (ext === 2) { k.box(0.022, 0.03, 0.03, M.black(), bf + 0.012, by - 0.016); k.cyl(0.045, 0.034, M.black(), bf + 0.01, by - 0.058, 0, 0.045, 20); } // (a drum, face toward the shooter)
     else if (ext === 0 && !tm) k.box(0.026, 0.008, 0.032, M.black(), -0.006, -0.112);
@@ -1689,10 +1698,10 @@ const G_GunModels = (() => {
     k.into(null);
     anim.mag = magP;
     k.tag('barrel');
-    if (tr) tracedParts(k, tr, ([x, y]) => { const [f, u] = V([x, y]); return [ts.reach(f), u]; }, 'barrel', mats); // (the Desert Eagle's fixed barrel block: a long slide's stretches it too)
+    if (tr) tracedParts(k, tr, ([x, y]) => { const [f, u] = V([x, y]); return [ts!.reach(f), u]; }, 'barrel', mats); // (the Desert Eagle's fixed barrel block: a long slide's stretches it too)
     k.cyl(tr ? tr.bore : 0.0065, 0.01, M.rubber(), len - 0.009, 0.009);
     if (tr) k.ringZ(tr.bore + 0.0008, 0.0008, M.gunmetal(), len + 0.0004, 0.009); // (the barrel's lip, in the end of the slide)
-    if (tr && tr.tube) k.cyl(tr.tube.r, len + tr.tube.out - tr.tube.from, M[tr.tube.m] ? M[tr.tube.m]() : M.gunmetal(), tr.tube.from, 0.009, 0, tr.tube.r, 20); // (an open-topped slide's: it shows, and it stays put)
+    if (tr && tr.tube) k.cyl(tr.tube.r, len + tr.tube.out - tr.tube.from, Mk[tr.tube.m] ? Mk[tr.tube.m]() : M.gunmetal(), tr.tube.from, 0.009, 0, tr.tube.r, 20); // (an open-topped slide's: it shows, and it stays put)
     if (o.match && !sl.comp) { k.cyl(0.0068, 0.012, M.steel(), len, 0.009); front += 0.012; }
     if (o.thread && !sl.comp) { k.cyl(0.0058, 0.012, M.steel(), front, 0.009); front += 0.012; }
     if (o.muzzle && o.thread) { k.tag('muzzle'); front += muzzle(k, o.muzzle, front, 0.0065, 0.009); }
@@ -1705,7 +1714,7 @@ const G_GunModels = (() => {
       k.tag('optic');
       if (o.optic === 'minidot') sight = S.minidot(k, len * 0.32, topAt(len * 0.32), o);
       else {
-        const fR = tr ? V([tr.sights[0], 0])[0] : 0.012, fF = tr ? ts.reach(V([tr.sights[1], 0])[0]) : len - 0.01, base = tr && tr.frontY ? V([0, tr.frontY])[1] : topAt(fF), rb = topAt(fR), sy1 = Math.max(base, rb) + (tr && tr.sh || 0.0075);
+        const fR = tr ? V([tr.sights[0], 0])[0] : 0.012, fF = tr ? ts!.reach(V([tr.sights[1], 0])[0]) : len - 0.01, base = tr && tr.frontY ? V([0, tr.frontY])[1] : topAt(fF), rb = topAt(fR), sy1 = Math.max(base, rb) + (tr && tr.sh || 0.0075);
         k.into(slide); sight = S.pistolSights(k, fR, tr && tr.frontY ? null : fF, sy1, base, o.optic === 'night', rb, tr && tr.sw); k.into(null);
         if (tr && tr.frontY) S.pistolFront(k, fF, sy1, base, o.optic === 'night'); // (on the fixed barrel: the slide runs back under it)
       }
@@ -1724,7 +1733,7 @@ const G_GunModels = (() => {
   // over the top; a grip round the magazine well and a big trigger guard; a rail each side and one under the shroud; an
   // SMG stock mount at the back. The slide still runs inside it. Returns its sights (drawn after the rest: sights(anim)),
   // where the other hand goes, and how far the shroud runs.
-  function pistolChassis(k, o, len, w, p0, p1, anim) {
+  function pistolChassis(k: Kit, o: any, len: number, w: number, p0: number, p1: number, anim: Anim) {
     const C = M.polymer(), B = M.black(), W = w + 0.014, f0 = -0.05, fN = len + 0.045, rl = fN - f0;
     k.tag('grip');
     // the lower: under the frame from the stock mount to the shroud's front, its belly down to the bottom rail
@@ -1759,7 +1768,7 @@ const G_GunModels = (() => {
       front: fN, support: fgF != null && o.fg !== 'bipod' ? [fgF, -0.07, 0] : [len * 0.72, -0.034, -0.004],
       // a rifle's sight on the rail (with a magnifier behind a red dot, the sight forward so the magnifier's mount is on
       // the rail too); with none, flip-up irons at its ends
-      sights(anim) {
+      sights(anim: Anim) {
         k.tag('optic');
         let sight;
         const ofs = f0 + (o.magnifier ? Math.max(rl * 0.55, Math.min(rl - 0.035, 0.15)) : rl * 0.5);
@@ -1777,15 +1786,15 @@ const G_GunModels = (() => {
 
   // A revolver traced from its photo (o.look): the frame with its window, the barrel with its rib and full under-lug (a
   // longer barrel stretches them), and the cylinder swept in the round, its flutes running in from the front.
-  function tracedRevolver(k, o, t) {
+  function tracedRevolver(k: Kit, o: any, t: Trace) {
     const V = tracer(t), fm = o.m || M.steel(), bl = o.blen || 0.1, cl = o.cl, cr = o.cr, n = o.chambers || 6, step = (Math.PI * 2) / n, anim: any = {}, mats = { frame: fm, grip: o.gm || M.chequer() };
-    const f1 = V([t.frameF, 0])[0], bl0 = V([t.muzzle, 0])[0] - f1, stretch = ([x, y]) => { const [f, u] = V([x, y]); return [f <= f1 ? f : f1 + (f - f1) * bl / bl0, u]; };
+    const f1 = V([t.frameF, 0])[0], bl0 = V([t.muzzle, 0])[0] - f1, stretch = ([x, y]: number[]) => { const [f, u] = V([x, y]); return [f <= f1 ? f : f1 + (f - f1) * bl / bl0, u]; };
     const fc = V([t.cyl[0], 0])[0], axis = V([0, t.cyl[2]])[1], Rc = 0.009 - axis, top = V([0, t.topY])[1], front0 = f1 + bl;
     k.tag('base');
     tracedParts(k, t, V, 'base', mats);
     const cyl = k.part(fc + cl / 2, axis);
     k.into(cyl, fc + cl / 2, axis);
-    const round = (rim, flute) => Array.from({ length: 48 }, (_, i) => {
+    const round = (rim: number, flute: number) => Array.from({ length: 48 }, (_, i) => {
       const a = (i / 48) * Math.PI * 2, d = Math.abs(((a - Math.PI / 2 - step / 2 + step * 100) % step) - step / 2) - step / 2, u = Math.max(0, 1 - (d / 0.42) ** 2), r = cr - rim - flute * u;
       return [Math.cos(a) * r, axis + Math.sin(a) * r];
     });
@@ -1812,8 +1821,8 @@ const G_GunModels = (() => {
     return { sy: sight.sy, fSight: sight.fSight, relief: o.optic === 'minidot' ? 0.3 : 0.36, muzzles: [[front, 0.009, 0]], grip: [hold[0], hold[1], 0], support: [hold[0] + 0.02, hold[1] - 0.005, -0.022], anim, pistol: true, cylAt: [fc + cl / 2, axis, 0], chamberAt: { side: 'cyl', z: cl / 2, R: Rc, r: 0.0047, n } };
   }
 
-  function revolver(k, o) {
-    if (o.look) return tracedRevolver(k, o, G.GunTraces[o.look]);
+  function revolver(k: Kit, o: any) {
+    if (o.look) return tracedRevolver(k, o, (G.GunTraces as Record<string, Trace>)[o.look]);
     const fm = o.m || M.steel(), bl = o.blen || 0.1, cl = o.cl || 0.042, cr = o.cr || 0.021, n = o.chambers || 6;
     const anim: any = {};
     k.tag('base');
@@ -1844,14 +1853,14 @@ const G_GunModels = (() => {
 
   // the derringer's trace: a pixel of its reference photo ([x, y]: x forward from the breech face at 314, y down from the
   // top barrel's bore at 155) to gun space ([forward, up], metres)
-  const derTrace = ([x, y]) => [(x - 314) * 0.000167, (155 - y) * 0.000167];
-  function derringer(k, o) {
+  const derTrace = ([x, y]: number[]) => [(x - 314) * 0.000167, (155 - y) * 0.000167];
+  function derringer(k: Kit, o: any) {
     // The American Derringer Model 1 (the Remington over-under's pattern in stainless), traced from a side photo of the
     // right side (Wikimedia Commons, "American Corp. Derringer M1.jpg", public domain) at 0.167 mm a pixel: 122 mm
     // overall, the maker's figure. Two barrels in one block, one over the other, hinged at the top of their back on the
     // frame: they tip up, muzzles first, to load (the breech drops forward off the standing breech). A spur trigger
     // (no guard), the hammer behind, the bird's-head grip. In .44 Magnum (the Model 1 is made in it).
-    const V = derTrace, pts = (a) => a.map(V), S0 = M.steel(), D = M.rubber();
+    const V = derTrace, pts = (a: number[][]) => a.map(V), S0 = M.steel(), D = M.rubber();
     const bl = o.blen || 0.084, [, y0] = V([0, 107]), [, y1] = V([0, 299]), [, yS] = V([0, 81]);
     k.tag('base');
     // the frame: the standing breech, the strap under the barrels, the grip frame; the spur trigger; the hammer
@@ -1941,7 +1950,7 @@ const G_GunModels = (() => {
     anim.brk = brk;
     k.tag('base');
     // where the breeches are with the barrels tipped open (js/vmanim.ts: the rounds go in there, up the bores)
-    const OPEN = 2.88, c = Math.cos(OPEN), s = Math.sin(OPEN), at = (y) => [pf - pf * c + (py - y) * s, py - pf * s - (py - y) * c];
+    const OPEN = 2.88, c = Math.cos(OPEN), s = Math.sin(OPEN), at = (y: number) => [pf - pf * c + (py - y) * s, py - pf * s - (py - y) * c];
     // (long barrels, a carbine's or a rifle's: the other hand out under them)
     return { sy: sight ? sight.sy : canTop != null ? canTop + 0.0045 + FS : yF + 0.001, fSight: sight ? sight.fSight : 0.0, relief: sight ? sight.relief : 0.36, muzzles: [[bl, 0, 0], [bl, lo, 0]], grip: [-0.016, -0.042, 0], // (the top barrel fires first)
       support: fgF != null && o.fg !== 'bipod' ? [fgF, -0.07, 0] : bl > 0.2 ? [Math.min(bl * 0.45, 0.2), lo - 0.016, 0] : [0.002, -0.05, -0.02], anim, pistol: true, port: [0.0, 0.0, 0], // (on the foregrip if there's one)
@@ -1949,7 +1958,7 @@ const G_GunModels = (() => {
       chamberAt: { side: 'breech', heads: [[0, lo - py], [0, -py]], z: pf + 0.0026, r: 0.0066 } }; // (in the hinge's frame: just proud of the block's back; the bottom's first, the round left when the top's fired)
   }
 
-  function minigun(k, o) {
+  function minigun(k: Kit, o: any) {
     const anim: any = {}, bl = o.blen || 0.55;
     k.tag('base');
     k.box(0.09, 0.1, 0.22, M.gunmetal(), 0, -0.01);
@@ -1988,7 +1997,7 @@ const G_GunModels = (() => {
     return { sy: sight.sy, fSight: sight.fSight, relief: sight.relief, muzzles: [[0.22 + bl, -0.01, 0]], grip: [0.035, -0.08, 0], support: [0.184, -0.03, -0.128], anim, magAt: [0.12, -0.06] };
   }
 
-  function launcher(k, o) {
+  function launcher(k: Kit, o: any) {
     const anim: any = {}, bl = o.blen || 0.3;
     if (o.drum) {
       k.tag('base');
@@ -2029,7 +2038,7 @@ const G_GunModels = (() => {
     return { sy: sight.sy, fSight: sight.fSight, relief: sight.relief || 0.3, muzzles: [[bl, 0, 0]], grip: [0.035, -0.075, 0], support: [0.2, -0.03, 0], anim, port: [0.0, 0.0, 0] };
   }
 
-  function railgun(k, o) {
+  function railgun(k: Kit, o: any) {
     const bl = o.blen || 0.55;
     k.tag('base');
     k.prof([[0, -0.05], [0, 0.03], [0.34, 0.03], [0.36, 0.0], [0.34, -0.05]], 0.05, M.gunmetal());
@@ -2058,7 +2067,7 @@ const G_GunModels = (() => {
   // A crossbow bolt (a quarrel), built along -z with its nock at z = 0 (centred: its middle at 0, for the hand): a nock, a
   // carbon shaft, three vanes (the odd one down, into the rail's slot) and a head, 0.40 m in all. The nock, the head, the
   // vanes and the shaft each have a material of their own, so a bolt type can recolour them (js/data.ts, js/ballistics.ts).
-  function quarrel(centre) {
+  function quarrel(centre: boolean) {
     const g = new T.Group(), z0 = centre ? 0.2 : 0;
     const mats = {
       nock: new T.MeshStandardMaterial({ color: 0xe8e2d0, roughness: 0.5 }),
@@ -2066,8 +2075,8 @@ const G_GunModels = (() => {
       vane: new T.MeshStandardMaterial({ color: 0xf0661a, roughness: 0.7, side: T.DoubleSide }),
       head: new T.MeshStandardMaterial({ color: 0xb9bec4, roughness: 0.3, metalness: 0.85 }),
     };
-    const cyl = (r, rFront, len, f0, m) => { const geo = new T.CylinderGeometry(r, rFront, len, 10); geo.rotateX(Math.PI / 2); const o = new T.Mesh(geo, m); o.position.z = -(f0 + len / 2) + z0; return o; };
-    const fin = (a, r, w, h, len, f0, m) => { const o = new T.Mesh(new T.BoxGeometry(w, h, len), m); o.position.set(Math.sin(a) * r, Math.cos(a) * r, -(f0 + len / 2) + z0); o.rotation.z = -a; return o; };
+    const cyl = (r: number, rFront: number, len: number, f0: number, m: THREE.Material) => { const geo = new T.CylinderGeometry(r, rFront, len, 10); geo.rotateX(Math.PI / 2); const o = new T.Mesh(geo, m); o.position.z = -(f0 + len / 2) + z0; return o; };
+    const fin = (a: number, r: number, w: number, h: number, len: number, f0: number, m: THREE.Material) => { const o = new T.Mesh(new T.BoxGeometry(w, h, len), m); o.position.set(Math.sin(a) * r, Math.cos(a) * r, -(f0 + len / 2) + z0); o.rotation.z = -a; return o; };
     const nock = new T.Group(), head = new T.Group(), vanes = new T.Group(), shaft = cyl(0.0042, 0.0042, 0.335, 0.018, mats.shaft);
     nock.add(cyl(0.0052, 0.0046, 0.018, 0, mats.nock));
     const slot = new T.Mesh(new T.BoxGeometry(0.0016, 0.0032, 0.007), mats.shaft); slot.position.set(0, 0.0036, -0.0035 + z0); nock.add(slot); // (the string's slot across its tail)
@@ -2085,7 +2094,7 @@ const G_GunModels = (() => {
   // a fore-end. (Forward from the stock's front, f = 0: the latch at 0.075, the riser 0.31-0.375, the stirrup to 0.51.)
   // anim: quarrel (the bolt on the rail: gone once it's shot), stringCocked (the string back at the latch) and stringSlack
   // (forward at the cams): one shows at a time, js/vmanim.ts. quarrelHead and quarrelNock are the bolt's head and nock.
-  function crossbow(k, o) {
+  function crossbow(k: Kit, o: any) {
     const B = M.black(), GM = M.gunmetal(), ya = 0.0165, yc = 0.014;
     const heavy = o.limb === 'heavy', compact = o.limb === 'compact', Tx = heavy ? 0.19 : compact ? 0.135 : 0.17, lw = heavy ? 1.6 : 1, LM = heavy ? GM : B;
     k.tag('base');
@@ -2121,8 +2130,8 @@ const G_GunModels = (() => {
     }
     k.tag('limbs');
     // split limbs: two plates (above and below the bolt's plane) from each pocket out to a cam, sweeping back a little
-    const R = 0.07, fR = 0.343, fT = 0.3, sc = new T.Group(), sl = new T.Group(), V = (x, y, f) => new T.Vector3(x, y, -f);
-    const seg = (grp, a, b, r, m, sides = 5) => {
+    const R = 0.07, fR = 0.343, fT = 0.3, sc = new T.Group(), sl = new T.Group(), V = (x: number, y: number, f: number) => new T.Vector3(x, y, -f);
+    const seg = (grp: THREE.Object3D, a: THREE.Vector3, b: THREE.Vector3, r: number, m: THREE.Material, sides = 5) => {
       const d = new T.Vector3().subVectors(b, a), mesh = new T.Mesh(new T.CylinderGeometry(r, r, d.length(), sides), m);
       mesh.position.copy(a).addScaledVector(d, 0.5); mesh.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), d.normalize()); mesh.userData.slot = 'limbs'; grp.add(mesh);
     };
@@ -2163,10 +2172,10 @@ const G_GunModels = (() => {
   // frame; the magazine lying along the top behind a sight housing (a post in front, a leg slanting back over it,
   // a beam between carrying the optic rail, a short side rail each side); the cocking handles low at the front.
   // (Points are the photo's pixels, butt at x 1110 and bore at y 287, 0.485 mm each.)
-  function p90(k, o) {
-    const bl = o.blen || 0.04, PX = 0.5 / 1032, F = (x) => -0.03 + (1110 - x) * PX, Y = (y) => (287 - y) * PX;
-    const pts = (a) => a.map(([x, y]) => [F(x), Y(y)]);
-    const oval = (cx, cy, rx, ry, n = 14) => Array.from({ length: n }, (_, i) => [F(cx + Math.cos((i / n) * Math.PI * 2) * rx), Y(cy + Math.sin((i / n) * Math.PI * 2) * ry)]);
+  function p90(k: Kit, o: any) {
+    const bl = o.blen || 0.04, PX = 0.5 / 1032, F = (x: number) => -0.03 + (1110 - x) * PX, Y = (y: number) => (287 - y) * PX;
+    const pts = (a: number[][]) => a.map(([x, y]) => [F(x), Y(y)]);
+    const oval = (cx: number, cy: number, rx: number, ry: number, n = 14) => Array.from({ length: n }, (_, i) => [F(cx + Math.cos((i / n) * Math.PI * 2) * rx), Y(cy + Math.sin((i / n) * Math.PI * 2) * ry)]);
     const P0 = M.polymer(), B = M.black();
     k.tag('base');
     // the frame: the stock; underneath, the grip lobe round the thumbhole, a notch, the front lobe round the finger hole
@@ -2209,19 +2218,19 @@ const G_GunModels = (() => {
       magAt: [m0 + 0.08, my], magTop: true, chamberAt: { side: 'right', f: F(780), y: Y(275), x: 0.028 } };
   }
 
-  const ARCH = { rifle, pistol, revolver, derringer, minigun, launcher, railgun, crossbow, p90 };
+  const ARCH: Record<string, (k: Kit, o: any) => any> = { rifle, pistol, revolver, derringer, minigun, launcher, railgun, crossbow, p90 };
   // Material names in a model spec ('tan', 'woodDark') become materials.
   const MAT_KEYS = new Set(['rm', 'fm', 'sm', 'gm', 'm', 'well', 'vfgM']);
-  function resolveMats(o) {
+  function resolveMats(o: Record<string, any>) {
     if (!o || typeof o !== 'object') return o;
     for (const [key, v] of Object.entries(o)) {
-      if (typeof v === 'string' && MAT_KEYS.has(key)) o[key] = M[v] ? M[v]() : null;
+      if (typeof v === 'string' && MAT_KEYS.has(key)) o[key] = Mk[v] ? Mk[v]() : null;
       else if (v && typeof v === 'object' && !Array.isArray(v)) resolveMats(v);
     }
     return o;
   }
 
-  function build(k, def) {
+  function build(k: Kit, def: any) {
     const plat = G.Gunsmith.PLATFORMS[def.id];
     const spec = resolveMats(G.Gunsmith.modelSpec(def));
     if (spec.mag && typeof spec.mag === 'object') { spec.mag.rnd = roundDims(def); if (spec.mag.rnd) spec.mag.rnd.cap = def.mag; } // (the cartridges a clear magazine shows, as many as it holds)
@@ -2232,7 +2241,7 @@ const G_GunModels = (() => {
   }
 
   // ---------------------------------------------------------------- muzzle flash sprite
-  function flashMesh(color) {
+  function flashMesh(color: number) {
     const m = new T.Mesh(new T.PlaneGeometry(0.2, 0.2), new T.MeshBasicMaterial({ map: G.R.flashTexture(), transparent: true, blending: T.AdditiveBlending, depthWrite: false, color }));
     m.visible = false;
     return m;
@@ -2245,12 +2254,12 @@ const G_GunModels = (() => {
   // a few metres down the axis, masked by the stencil to the sight's window (the window mesh writes 1; hands
   // or the housing in front of the window keep it at 0).
   const RETICLE_D = 6;
-  const texCache = {};
-  function reticleTex(kind) {
+  const texCache: Record<string, THREE.CanvasTexture> = {};
+  function reticleTex(kind: string) {
     if (texCache[kind]) return texCache[kind];
     const N = kind === 'holo' || kind === 'cdot' ? 256 : 128, c = document.createElement('canvas');
     c.width = c.height = N;
-    const g = c.getContext('2d'), m = N / 2;
+    const g = c.getContext('2d')!, m = N / 2;
     if (kind === 'holo') {
       // 68 MOA ring with tick marks and a centre dot, laser-red, with the grain of a hologram
       g.shadowColor = 'rgba(255,40,25,1)'; g.shadowBlur = 7;
@@ -2282,8 +2291,8 @@ const G_GunModels = (() => {
     return (texCache[kind] = t);
   }
   // angular size (radians) of the whole reticle texture: dot core about 3.5 mrad, holo ring 50 mrad across
-  const RETICLE_RAD = { dot: 0.028, dotG: 0.028, holo: 0.064, cdot: 0.062 };
-  function reflex(k, o) {
+  const RETICLE_RAD: Record<string, number> = { dot: 0.028, dotG: 0.028, holo: 0.064, cdot: 0.062 };
+  function reflex(k: Kit, o: any) {
     const mask = new T.Mesh(o.round ? new T.CircleGeometry(o.w / 2, 28) : new T.PlaneGeometry(o.w, o.h), new T.MeshBasicMaterial({
       colorWrite: false, depthWrite: false, transparent: true, side: T.DoubleSide,
       stencilWrite: true, stencilRef: 1, stencilFunc: T.AlwaysStencilFunc, stencilZPass: T.ReplaceStencilOp,
@@ -2307,8 +2316,8 @@ const G_GunModels = (() => {
   // axis with a field of view set by the magnification, into a texture this disk shows. The reticle is drawn
   // over it, and a dark crescent creeps in when your eye is off the scope's axis (the eyebox).
   // (dot, dotG, cdot and holo: a reflex sight's own reticle, seen through a magnifier)
-  const PIP_RETICLE = { cross: 0, chevron: 1, lpvo: 2, dot: 3, dotG: 3, cdot: 4, holo: 4, ring: 5, bdc: 6 };
-  const PIP_ILLUM = { ring: 0x000000, cross: 0x000000, chevron: 0xff9a18, lpvo: 0xff2a20, dot: 0xff2a20, dotG: 0x30ff50, cdot: 0xff2a20, holo: 0xff2a20, bdc: 0xff2a20 };
+  const PIP_RETICLE: Record<string, number> = { cross: 0, chevron: 1, lpvo: 2, dot: 3, dotG: 3, cdot: 4, holo: 4, ring: 5, bdc: 6 };
+  const PIP_ILLUM: Record<string, number> = { ring: 0x000000, cross: 0x000000, chevron: 0xff9a18, lpvo: 0xff2a20, dot: 0xff2a20, dotG: 0x30ff50, cdot: 0xff2a20, holo: 0xff2a20, bdc: 0xff2a20 };
   // The crossbow's reticle (first focal plane: js/render.ts _renderPip says how big a mil is at this power, so it grows with
   // the picture and the marks are true at any power). In mils, on a canvas BDC_R either side of the centre:
   //   - a lit dot and, to pick it up at low power, a lit horseshoe; fine wires with heavy posts outside, a tick every mil near the middle
@@ -2316,13 +2325,13 @@ const G_GunModels = (() => {
   //     target at that range. Each rung's a man's shoulders wide (0.5 m) at its range. Ticks on the left: the same for a bodkin
   //   - standing on the left wire, a man 1.75 m tall at each range, nearest furthest out: stand him on the wire and match him
   const BDC_R = 170, BDC_TEX = new Map();
-  function bdcTex(def) {
-    const ball = G.ballFor(G.calOf(def)), tip = G.boreTip({ def }), hold = (am, d) => { const q = G.flight(def, am, tip, d)[d]; return q ? (-q.h / d) * 1000 : null; }, key = [10, 30, 100].map((d) => (hold(ball, d) || 0).toFixed(2)).join();
+  function bdcTex(def: any) {
+    const ball = G.ballFor(G.calOf(def)), tip = G.boreTip({ def }), hold = (am: string, d: number) => { const q = G.flight(def, am, tip, d)[d]; return q ? (-q.h / d) * 1000 : null; }, key = [10, 30, 100].map((d) => (hold(ball, d) || 0).toFixed(2)).join();
     if (BDC_TEX.has(key)) return BDC_TEX.get(key);
     const S0 = 4096, s = S0 / (2 * BDC_R), c = document.createElement('canvas');
     c.width = c.height = S0;
-    const g = c.getContext('2d'), line = (w, col, f) => { g.lineWidth = w; g.strokeStyle = col; g.beginPath(); f(); g.stroke(); }, ink = '#000', lit = '#f00';
-    const label = (txt, x, y, h, al?) => { g.fillStyle = ink; g.font = `600 ${h}px Arial, sans-serif`; g.textAlign = al || 'left'; g.textBaseline = 'middle'; g.fillText(txt, x, y); };
+    const g = c.getContext('2d')!, line = (w: number, col: string, f: () => void) => { g.lineWidth = w; g.strokeStyle = col; g.beginPath(); f(); g.stroke(); }, ink = '#000', lit = '#f00';
+    const label = (txt: string, x: number, y: number, h: number, al?: CanvasTextAlign) => { g.fillStyle = ink; g.font = `600 ${h}px Arial, sans-serif`; g.textAlign = al || 'left'; g.textBaseline = 'middle'; g.fillText(txt, x, y); };
     g.translate(S0 / 2, S0 / 2); g.scale(s, s); g.lineCap = 'butt';
     // the wires and posts
     const W = 0.14, HW = 1.5, POST = 60;
@@ -2345,7 +2354,7 @@ const G_GunModels = (() => {
       label(String(d), hw + 0.9, y, TH);
     }
     // a bodkin's
-    const heavy = G.AMMO_TYPES[(G.CALIBERS[G.calOf(def)] || {}).group].find((a) => a !== ball && G.AMMO[a].velK);
+    const heavy = (G.AMMO_TYPES as Record<string, string[]>)[((G.CALIBERS as Record<string, any>)[G.calOf(def)] || {}).group].find((a) => a !== ball && (G.AMMO as Record<string, any>)[a].velK);
     if (heavy) {
       for (const d of [20, 30, 40, 50, 60, 70, 80, 100]) {
         const y = hold(heavy, d);
@@ -2353,7 +2362,7 @@ const G_GunModels = (() => {
         line(0.16, ink, () => { g.moveTo(-1.8, y); g.lineTo(0, y); });
         if (d % 20 === 0 || d < 40 || d === 50 || d === 70) label(String(d), -2.3, y, TH * 0.72, 'right');
       }
-      label(G.AMMO[heavy].tag, -2.3, hold(heavy, 20) - TH * 0.95, TH * 0.6, 'right');
+      label((G.AMMO as Record<string, any>)[heavy].tag, -2.3, hold(heavy, 20)! - TH * 0.95, TH * 0.6, 'right');
     }
     // the men on the wire: 150 m nearest the middle, 20 m furthest out
     let x = -7.5;
@@ -2410,7 +2419,7 @@ const G_GunModels = (() => {
       glass = pow(glass, vec3(2.2)); // (sRGB, as written: to linear)
       gl_FragColor = linearToOutputTexel(vec4(mix(glass, col, live), 1.0));
     }`;
-  function pipLens(k, o, def) {
+  function pipLens(k: Kit, o: any, def: any) {
     const reticle = def.reticle || 'cross';
     const mat = new T.ShaderMaterial({
       uniforms: { map: { value: G.R.pipTexture() }, live: { value: 0 }, eye: { value: new T.Vector2() }, ret: { value: PIP_RETICLE[reticle] || 0 }, illum: { value: new T.Color(PIP_ILLUM[reticle] || 0) }, rmap: { value: reticle === 'bdc' ? bdcTex(def) : null }, pmil: { value: 1 } },
@@ -2423,7 +2432,7 @@ const G_GunModels = (() => {
   }
 
   // (skin: the gun's stickers, js/stickers.ts: on its parts as built, before the arms go on)
-  function viewmodel(def, skin) {
+  function viewmodel(def: any, skin: any) {
     const root = new T.Group();
     const guns = def.akimbo ? [-1, 1] : [1];
     let info0 = null, pip = null;
@@ -2464,16 +2473,16 @@ const G_GunModels = (() => {
 
   // ---------------------------------------------------------------- third-person world model (merged, cached)
   const worldCache = new Map();
-  function merge(group) {
+  function merge(group: THREE.Object3D) {
     group.updateMatrixWorld(true);
-    const byMat = new Map();
-    group.traverse((o) => {
+    const byMat = new Map<THREE.Material, THREE.BufferGeometry[]>();
+    group.traverse((o: any) => {
       if (!o.isMesh) return;
       const geo = (o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone());
       geo.applyMatrix4(o.matrixWorld);
       for (const name of Object.keys(geo.attributes)) if (name !== 'position' && name !== 'normal') geo.deleteAttribute(name);
       if (!byMat.has(o.material)) byMat.set(o.material, []);
-      byMat.get(o.material).push(geo);
+      byMat.get(o.material)!.push(geo);
     });
     const out = [];
     for (const [material, geos] of byMat) {
@@ -2481,20 +2490,20 @@ const G_GunModels = (() => {
       geos.forEach((gg) => (n += gg.attributes.position.count));
       const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3);
       let off = 0;
-      for (const gg of geos) { pos.set(gg.attributes.position.array, off * 3); nor.set(gg.attributes.normal.array, off * 3); off += gg.attributes.position.count; gg.dispose(); }
+      for (const gg of geos) { pos.set((gg.attributes.position as THREE.BufferAttribute).array, off * 3); nor.set((gg.attributes.normal as THREE.BufferAttribute).array, off * 3); off += gg.attributes.position.count; gg.dispose(); }
       const bg = new T.BufferGeometry();
       bg.setAttribute('position', new T.BufferAttribute(pos, 3));
       bg.setAttribute('normal', new T.BufferAttribute(nor, 3));
       bg.computeBoundingSphere();
       out.push({ geometry: bg, material });
     }
-    group.traverse((o) => o.geometry && o.geometry.dispose());
+    group.traverse((o: any) => o.geometry && o.geometry.dispose());
     return out;
   }
   // (its magazine merged on its own, centred on itself, so a rig can take it off the gun and hold it: a reload,
   // a magazine check. g.userData.mag: the magazine's group; magHome: where it sits on the gun.)
   // (skin: its stickers, js/stickers.ts, on this one: the cached model's shared)
-  function world(def, skin?) {
+  function world(def: any, skin?: any) {
     if (typeof def === 'string') def = G.Gunsmith.fromCode(def);
     let proto = worldCache.get(def.code);
     if (!proto) {
@@ -2508,7 +2517,7 @@ const G_GunModels = (() => {
         mn.parent.remove(mn);
         solo.add(mn); mw.decompose(mn.position, mn.quaternion, mn.scale);
         const meshes = merge(solo), box = new T.Box3();
-        for (const m of meshes) { m.geometry.computeBoundingBox(); box.union(m.geometry.boundingBox); }
+        for (const m of meshes) { m.geometry.computeBoundingBox(); box.union(m.geometry.boundingBox!); }
         const c = box.getCenter(new T.Vector3());
         for (const m of meshes) m.geometry.translate(-c.x, -c.y, -c.z);
         mag = { meshes, home: c };
@@ -2525,9 +2534,9 @@ const G_GunModels = (() => {
         xb[key] = merge(solo);
       }
       // (a bipod's legs, each on its own about its hinge, so they swing down: js/rig.ts)
-      const legs = (info.anim && info.anim.bipod || []).filter((l) => l.p.parent).map((l) => {
+      const legs = (info.anim && info.anim.bipod || []).filter((l: BipodLeg) => l.p.parent).map((l: BipodLeg) => {
         const home = l.p.position.clone(), solo = new T.Group();
-        l.p.parent.remove(l.p); l.p.position.set(0, 0, 0); solo.add(l.p);
+        l.p.parent!.remove(l.p); l.p.position.set(0, 0, 0); solo.add(l.p);
         return { meshes: merge(solo), home, back: l.back, side: l.side };
       });
       proto = { meshes: merge(k.g), info, mag, xb: xb.bolt ? xb : null, legs };
@@ -2551,7 +2560,7 @@ const G_GunModels = (() => {
       }
       g.userData.xb.slack.visible = false;
     }
-    if (proto.legs.length) g.userData.bipod = proto.legs.map((l) => {
+    if (proto.legs.length) g.userData.bipod = proto.legs.map((l: { meshes: THREE.Mesh[]; home: THREE.Vector3; back: boolean; side: number }) => {
       const sub = new T.Group();
       for (const m of l.meshes) sub.add(new T.Mesh(m.geometry, m.material));
       sub.position.copy(l.home); g.add(sub);
@@ -2563,7 +2572,7 @@ const G_GunModels = (() => {
   }
   // A world model's crossbow: whether its bolt's on the rail (bolt) and its string's cocked (cocked: back at the latch).
   // Other guns have no such parts. A bolt that's on the rail is always on a cocked string.
-  function setLoaded(g, bolt, cocked?) {
+  function setLoaded(g: THREE.Object3D, bolt: boolean, cocked?: boolean) {
     const x = g && g.userData.xb;
     if (!x) return;
     if (cocked == null) cocked = bolt;
@@ -2571,7 +2580,7 @@ const G_GunModels = (() => {
   }
 
   // the gunsmith's display model: every part as separate meshes (tagged by slot), stock included
-  function display(def, skin?) { const k = kit(); const info = build(k, def); if (skin && skin.length) G.Stickers.decorate(k.g, skin); return { group: k.g, info }; }
+  function display(def: any, skin?: any) { const k = kit(); const info = build(k, def); if (skin && skin.length) G.Stickers.decorate(k.g, skin); return { group: k.g, info }; }
 
   return { M, build, viewmodel, world, display, roundDims, roundShape, setLoaded, quarrel, bipodPose };
 })();

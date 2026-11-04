@@ -5,7 +5,7 @@
 // OffscreenCanvas; nothing else of the page is used.
 (self as any).window = self;
 (self as any).document = {
-  createElement: (t) => (t === 'canvas' ? new OffscreenCanvas(1, 1) : { style: {} }),
+  createElement: (t: string) => (t === 'canvas' ? new OffscreenCanvas(1, 1) : { style: {} }),
   body: { prepend() {}, append() {}, appendChild() {} },
   addEventListener() {},
 };
@@ -18,8 +18,8 @@ importScripts(...['util', 'data', 'callsigns', 'parts', 'gear', 'medical', 'mate
 G.Stickers.base = '../../'; // (the game's folder, from here (dist/js/): its pictures, js/stickers.ts; a replay's file brings its own)
 
 self.onmessage = async (e) => {
-  if (e.data && e.data.t === 'mux') { try { G.Highlights.muxHere(e.data, (m) => self.postMessage(m)); } catch (err: any) { self.postMessage({ t: 'err', err: String((err && err.stack) || err).slice(0, 2000) }); } return; }
+  if (e.data && e.data.t === 'mux') { try { G.Highlights.muxHere(e.data, (m: any) => self.postMessage(m)); } catch (err: any) { self.postMessage({ t: 'err', err: String((err && err.stack) || err).slice(0, 2000) }); } return; }
   if (!e.data || e.data.t !== 'go') return;
-  try { await G.Highlights.exportHere(e.data, (m, tr) => self.postMessage(m, tr || [])); }
+  try { await G.Highlights.exportHere(e.data, (m: any, tr?: any) => self.postMessage(m, tr || [])); }
   catch (err: any) { self.postMessage({ t: 'err', err: String((err && err.stack) || err).slice(0, 2000) }); }
 };

@@ -12,23 +12,24 @@
 // Times are inclusive (Me.update includes Me.move, which is listed too); "frame" is the time from one animation frame
 // to the next (what you feel: it includes the GPU and the browser), "cpu" is the time spent in the game's loop.
 const G_Prof = (() => {
+  interface Spike { t: number; frame: number; cpu: number; calls: number; tris: number; progs: number; heap: number; parts: Record<string, { ms: number; n: number }> }
   const CAP = 3600, MAX_SEC = 48, SPIKES = 40, MSG_TYPES = 64, SPIKE_MS = 33;
   const FIX = ['t', 'frame', 'cpu', 'calls', 'tris', 'geoms', 'texs', 'progs', 'heap', 'rounds', 'enemies'];
   const NF = FIX.length;
   const ring = new Float32Array(CAP * (NF + MAX_SEC * 2)), stride = NF + MAX_SEC * 2;
-  const names = [], idx = new Map(), acc = new Float64Array(MAX_SEC), cnt = new Uint32Array(MAX_SEC);
+  const names: string[] = [], idx = new Map<string, number>(), acc = new Float64Array(MAX_SEC), cnt = new Uint32Array(MAX_SEC);
   const tot = new Float64Array(MAX_SEC), totN = new Float64Array(MAX_SEC), max = new Float64Array(MAX_SEC);
   const hist = new Uint32Array(26), HIST_STEP = 4; // frame times by 4 ms (the last: 100 ms and over)
-  const msgs = new Map();
-  let head = 0, filled = 0, frames = 0, t0 = performance.now(), lastFrame = 0, loopStart = 0, heap = 0, spikes = [], since = new Date().toISOString(), on = true;
+  const msgs = new Map<string, { n: number; ms: number; max: number }>();
+  let head = 0, filled = 0, frames = 0, t0 = performance.now(), lastFrame = 0, loopStart = 0, heap = 0, spikes: Spike[] = [], since = new Date().toISOString(), on = true;
 
-  function sec(name) {
+  function sec(name: string) {
     let i = idx.get(name);
     if (i == null) { if (names.length >= MAX_SEC) return -1; i = names.length; names.push(name); idx.set(name, i); }
     return i;
   }
   // obj[fn] timed as `label` (each call's time added to the frame's)
-  function wrap(obj, fn, label) {
+  function wrap(obj: any, fn: string, label?: string) {
     if (!obj || typeof obj[fn] !== 'function' || obj[fn].__prof) return;
     const f = obj[fn], i = sec(label || fn);
     if (i < 0) return;
@@ -41,10 +42,10 @@ const G_Prof = (() => {
     obj[fn] = w;
   }
   // a network message handled: by its kind (t)
-  function wrapMsg(obj, fn, side) {
+  function wrapMsg(obj: any, fn: string, side: string) {
     if (!obj || typeof obj[fn] !== 'function') return;
     const f = obj[fn], i = sec(side + ': messages');
-    obj[fn] = function (m) {
+    obj[fn] = function (this: any, m: any) {
       if (!on) return f.apply(this, arguments);
       const a = performance.now();
       try { return f.apply(this, arguments); } finally {
@@ -76,7 +77,7 @@ const G_Prof = (() => {
     // the worst frames, each with what took the time in it
     if (frame > SPIKE_MS && frames > 3) { // (a level's first frames included: its shaders compiling are a hitch you feel)
       if (spikes.length < SPIKES || frame > spikes[spikes.length - 1].frame) {
-        const parts = {};
+        const parts: Spike['parts'] = {};
         for (let i = 0; i < names.length; i++) if (acc[i] > 0.05) parts[names[i]] = { ms: r2(acc[i]), n: cnt[i] };
         spikes.push({ t: r2(fix[0]), frame: r2(frame), cpu: r2(cpu), calls: fix[3], tris: fix[4], progs: fix[7], heap: r2(heap), parts });
         spikes.sort((a, b) => b.frame - a.frame);
@@ -86,18 +87,18 @@ const G_Prof = (() => {
     head = (head + 1) % CAP; if (filled < CAP) filled++;
     acc.fill(0); cnt.fill(0);
   }
-  const r2 = (v) => Math.round(v * 100) / 100;
+  const r2 = (v: number) => Math.round(v * 100) / 100;
 
   // ---------------------------------------------------------------- a summary, and the file
-  function series(k) { const out = new Float32Array(filled); for (let j = 0; j < filled; j++) out[j] = ring[((head - filled + j + CAP) % CAP) * stride + k]; return out; }
-  function stats(a) {
+  function series(k: number) { const out = new Float32Array(filled); for (let j = 0; j < filled; j++) out[j] = ring[((head - filled + j + CAP) % CAP) * stride + k]; return out; }
+  function stats(a: Float32Array) {
     if (!a.length) return { avg: 0, p50: 0, p95: 0, p99: 0, max: 0 };
-    const s = Float32Array.from(a).sort(), q = (p) => r2(s[Math.min(s.length - 1, Math.floor(p * s.length))]);
+    const s = Float32Array.from(a).sort(), q = (p: number) => r2(s[Math.min(s.length - 1, Math.floor(p * s.length))]);
     let sum = 0; for (const v of a) sum += v;
     return { avg: r2(sum / a.length), p50: q(0.5), p95: q(0.95), p99: q(0.99), max: r2(s[s.length - 1]) };
   }
   function summary() {
-    const frame = series(1), cpu = series(2), sections = {};
+    const frame = series(1), cpu = series(2), sections: Record<string, any> = {};
     names.forEach((n, i) => { const s = stats(series(NF + i * 2)), c = series(NF + i * 2 + 1); let calls = 0; for (const v of c) calls += v; sections[n] = Object.assign(s, { callsPerFrame: r2(calls / Math.max(1, filled)), sessionAvg: r2(tot[i] / Math.max(1, frames)), sessionMax: r2(max[i]) }); });
     const order = Object.keys(sections).sort((a, b) => sections[b].avg - sections[a].avg);
     return { frames: filled, seconds: filled ? r2(series(0)[filled - 1] - series(0)[0]) : 0, frame: stats(frame), cpu: stats(cpu), sections: Object.fromEntries(order.map((k) => [k, sections[k]])) };
@@ -114,12 +115,12 @@ const G_Prof = (() => {
       settings: g.settings || null,
     };
   }
-  function countObjects(o) { let n = 0; o.traverse(() => n++); return n; }
+  function countObjects(o: THREE.Object3D) { let n = 0; o.traverse(() => n++); return n; }
   function report() {
     const cols = FIX.concat(names.flatMap((n) => [n + ' ms', n + ' calls']));
-    const rows = [];
-    for (let j = 0; j < filled; j++) { const o = ((head - filled + j + CAP) % CAP) * stride, row = []; for (let k = 0; k < NF + names.length * 2; k++) row.push(r2(ring[o + k])); rows.push(row); }
-    const histo = {}; hist.forEach((n, i) => { if (n) histo[i === hist.length - 1 ? `${i * HIST_STEP}+ ms` : `${i * HIST_STEP}-${(i + 1) * HIST_STEP} ms`] = n; });
+    const rows: number[][] = [];
+    for (let j = 0; j < filled; j++) { const o = ((head - filled + j + CAP) % CAP) * stride, row: number[] = []; for (let k = 0; k < NF + names.length * 2; k++) row.push(r2(ring[o + k])); rows.push(row); }
+    const histo: Record<string, number> = {}; hist.forEach((n, i) => { if (n) histo[i === hist.length - 1 ? `${i * HIST_STEP}+ ms` : `${i * HIST_STEP}-${(i + 1) * HIST_STEP} ms`] = n; });
     const net = Object.fromEntries([...msgs].sort((a, b) => b[1].ms - a[1].ms).map(([k, q]) => [k, { n: q.n, ms: r2(q.ms), avg: r2(q.ms / q.n), max: r2(q.max) }]));
     return { about: 'Breach Protocol performance profile: summary (the last frames in the ring), the worst frames this level, the frame-time histogram and network handling since recording began, then every frame in the ring (columns, rows).', context: context(), summary: summary(), spikes, histogram: histo, network: net, columns: cols, frames: rows };
   }

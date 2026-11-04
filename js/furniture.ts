@@ -9,6 +9,33 @@
 const G_Furniture = (() => {
   // Local frame of a piece: footprint centred on the origin, back at -z (against the wall), front +z.
   // boxes: [x, z, w, d, h] in that frame (all from the floor up).
+  // The builder kit handed to every piece's build(): box/cyl/mat/pick/rnd/... (made in build() below).
+  type Mat = THREE.MeshStandardMaterial;
+  interface Kit {
+    rnd(): number; pick<T>(a: T[]): T; tint(hex: number, f: number): number;
+    mat(hex: number, rough?: number, metal?: number, extra?: Record<string, any>): Mat;
+    box(m: Mat, w: number, h: number, d: number, x: number, y: number, z: number, ry?: number, rx?: number): void;
+    cyl(m: Mat, rt: number, rb: number, h: number, x: number, y: number, z: number, seg?: number, rx?: number): void;
+    cylX(m: Mat, rt: number, rb: number, h: number, x: number, y: number, z: number, seg?: number): void;
+    sph(m: Mat, r: number, x: number, y: number, z: number): void;
+    ico(m: Mat, r: number, x: number, y: number, z: number): void;
+    side(m: Mat, pts: number[][], w: number, x?: number, b?: number): void;
+    leaf(): Mat; screen(): Mat; shade(): Mat; crate(): Mat;
+    pack(kind: string, shade?: number): Mat; label(): number;
+    boxL(m: Mat, lb: number, w: number, h: number, d: number, x: number, y: number, z: number, ry?: number, rx?: number): void;
+    cylL(m: Mat, lb: number, rt: number, rb: number, h: number, x: number, y: number, z: number, seg?: number): void;
+    tableLamp(x: number, y: number, z: number): void; plantSmall(x: number, y: number, z: number): void; fruit(x: number, y: number, z: number): void;
+  }
+  type MatArgs = [number, number, number, Record<string, any>];
+  // A room as the level lays it out (x, z, w, h in tiles) plus whatever else the layout hangs on it.
+  interface Room { x: number; z: number; w: number; h: number; type: string; [key: string]: any }
+  // A piece's recipe in R: footprint, collision boxes, optional ray boxes and build()
+  interface PieceRec { w: number; d: number; boxes: any; ray?: (v: number) => any[]; [key: string]: any }
+  interface Spot { x: number; z: number; dirs: number[][]; used?: boolean }
+  interface Rect { x0: number; x1: number; z0: number; z1: number }
+  interface Fest { strings: any[]; stage: Rect | null; gate: Rect | null; lamps: number[][]; bays: number[][]; plaza: Rect | null; lot: Rect | null }
+  interface WBox { cx: number; cz: number; hx: number; hz: number; y0: number; h: number; m: any; ray?: WBox[] }
+  interface PieceStyle { c: number; stripe?: number; [key: string]: any }
   const R: Record<string, any> = {};
   const FABRIC = [0x56677a, 0x7a4e3a, 0x4f6b4a, 0x8a7a5a, 0x6a3f4f, 0x3f4f6a, 0x9a8f7c, 0x7d3434, 0x46545c];
   const ACCENT = [0xd9a441, 0xc0504d, 0x4f81bd, 0x9bbb59, 0xe8e0d0, 0x8064a2, 0xd27b4b];
@@ -18,7 +45,7 @@ const G_Furniture = (() => {
   const CARD = [0xa8865a, 0x9c7a50, 0xb4936a, 0x8f6e47];
 
   // ---------------------------------------------------------------- living room
-  R.sofa = { w: 2.0, d: 0.92, cover: 1, boxes: [[0, 0, 2.0, 0.92, 0.85]], build(k) {
+  R.sofa = { w: 2.0, d: 0.92, cover: 1, boxes: [[0, 0, 2.0, 0.92, 0.85]], build(k: Kit) {
     const f = k.mat(k.pick(FABRIC), 0.95), f2 = k.mat(k.tint(f.color.getHex(), 1.12), 0.95), dark = k.mat(0x241c16, 0.6);
     for (const x of [-0.9, 0.9]) for (const z of [-0.38, 0.38]) k.box(dark, 0.06, 0.08, 0.06, x, 0.04, z);
     k.box(f, 2.0, 0.34, 0.92, 0, 0.25, 0);
@@ -30,7 +57,7 @@ const G_Furniture = (() => {
     if (k.rnd() < 0.6) k.box(acc, 0.4, 0.36, 0.12, 0.58, 0.72, -0.17, -0.2);
     if (k.rnd() < 0.4) k.box(k.mat(k.pick(ACCENT), 1), 0.55, 0.025, 0.6, 0.45, 0.565, 0.12, 0.1);
   } };
-  R.armchairs = { w: 1.9, d: 0.86, cover: 1, boxes: [[-0.55, 0, 0.8, 0.86, 0.85], [0.55, 0, 0.8, 0.86, 0.85], [0, 0, 0.3, 0.3, 0.56]], build(k) {
+  R.armchairs = { w: 1.9, d: 0.86, cover: 1, boxes: [[-0.55, 0, 0.8, 0.86, 0.85], [0.55, 0, 0.8, 0.86, 0.85], [0, 0, 0.3, 0.3, 0.56]], build(k: Kit) {
     const f = k.mat(k.pick(FABRIC), 0.95), f2 = k.mat(k.tint(f.color.getHex(), 1.12), 0.95), dark = k.mat(0x241c16, 0.6);
     for (const cx of [-0.55, 0.55]) {
       for (const x of [-0.34, 0.34]) for (const z of [-0.36, 0.36]) k.box(dark, 0.05, 0.08, 0.05, cx + x, 0.04, z);
@@ -43,7 +70,7 @@ const G_Furniture = (() => {
     k.cyl(w, 0.15, 0.15, 0.03, 0, 0.545, 0); k.cyl(w, 0.025, 0.025, 0.52, 0, 0.27, 0); k.cyl(w, 0.12, 0.12, 0.02, 0, 0.01, 0);
     k.cyl(k.mat(0xf0ede6, 0.4), 0.04, 0.035, 0.09, 0.05, 0.605, 0.03);
   } };
-  R.tv = { w: 1.7, d: 0.5, boxes: [[0, 0, 1.6, 0.45, 0.5], [0, -0.08, 1.24, 0.14, 1.26]], build(k) {
+  R.tv = { w: 1.7, d: 0.5, boxes: [[0, 0, 1.6, 0.45, 0.5], [0, -0.08, 1.24, 0.14, 1.26]], build(k: Kit) {
     const w = k.mat(k.pick(WOOD), 0.6), black = k.mat(0x111214, 0.4), gap = k.mat(0x1a1410, 0.9);
     for (const x of [-0.75, 0.75]) for (const z of [-0.17, 0.17]) k.box(black, 0.04, 0.06, 0.04, x, 0.03, z);
     k.box(w, 1.6, 0.42, 0.44, 0, 0.27, 0);
@@ -56,7 +83,7 @@ const G_Furniture = (() => {
     k.box(k.screen(), 1.16, 0.64, 0.006, 0, 0.99, -0.054);
     if (k.rnd() < 0.6) k.plantSmall(-0.62, 0.51, 0.04);
   } };
-  R.bookshelf = { w: 1.5, d: 0.38, boxes: [[0, 0, 1.5, 0.38, 2.0]], build(k) {
+  R.bookshelf = { w: 1.5, d: 0.38, boxes: [[0, 0, 1.5, 0.38, 2.0]], build(k: Kit) {
     const w = k.mat(k.pick(WOOD.concat([0xe9e4da, 0x2f3a40])), 0.65), back = k.mat(k.tint(w.color.getHex(), 0.7), 0.8);
     for (const x of [-0.735, 0.735]) k.box(w, 0.03, 2.0, 0.38, x, 1.0, 0);
     k.box(w, 1.5, 0.03, 0.38, 0, 1.985, 0);
@@ -81,7 +108,7 @@ const G_Furniture = (() => {
     }
   } };
   // ---------------------------------------------------------------- kitchen
-  R.counter = { w: 1.98, d: 0.64, cover: 1, boxes: [[0, 0, 1.98, 0.64, 0.92]], build(k) {
+  R.counter = { w: 1.98, d: 0.64, cover: 1, boxes: [[0, 0, 1.98, 0.64, 0.92]], build(k: Kit) {
     const cab = k.mat(k.pick(CAB), 0.6), top = k.mat(k.pick([0x2b2b2b, 0xd8d4cc, 0x4a4540, 0x6e6a62]), 0.35);
     const dark = k.mat(0x16130f, 0.9), metal = k.mat(0xb8bcc0, 0.3, 0.8);
     k.box(dark, 1.9, 0.1, 0.56, 0, 0.05, -0.04);
@@ -114,7 +141,7 @@ const G_Furniture = (() => {
       for (const x of [-0.735, -0.245, 0.245, 0.735]) k.box(metal, 0.015, 0.1, 0.02, x + (x < 0 ? 0.2 : -0.2), 1.62, 0.035);
     }
   } };
-  R.fridge = { w: 1.9, d: 0.72, boxes: [[-0.48, 0, 0.9, 0.72, 1.86], [0.5, 0, 0.9, 0.62, 2.1]], build(k) {
+  R.fridge = { w: 1.9, d: 0.72, boxes: [[-0.48, 0, 0.9, 0.72, 1.86], [0.5, 0, 0.9, 0.62, 2.1]], build(k: Kit) {
     const steel = k.mat(k.pick([0xc4c8cc, 0xe8e6e0, 0x2c2e30]), 0.35, 0.5), dark = k.mat(0x16130f, 0.9), metal = k.mat(0xb8bcc0, 0.3, 0.8);
     k.box(steel, 0.88, 1.84, 0.68, -0.48, 0.94, 0);
     k.box(dark, 0.86, 0.008, 0.005, -0.48, 1.28, 0.342);
@@ -128,7 +155,7 @@ const G_Furniture = (() => {
     k.box(dark, 0.88, 0.006, 0.005, 0.5, 1.5, 0.252);
     for (const x of [0.44, 0.56]) { k.box(metal, 0.015, 0.14, 0.02, x, 1.0, 0.265); k.box(metal, 0.015, 0.1, 0.02, x, 1.6, 0.265); }
   } };
-  R.island = { w: 1.8, d: 1.25, cover: 1, boxes: [[0, -0.17, 1.8, 0.9, 0.95], [-0.5, 0.43, 0.38, 0.38, 0.78], [0.5, 0.43, 0.38, 0.38, 0.78]], build(k) {
+  R.island = { w: 1.8, d: 1.25, cover: 1, boxes: [[0, -0.17, 1.8, 0.9, 0.95], [-0.5, 0.43, 0.38, 0.38, 0.78], [0.5, 0.43, 0.38, 0.38, 0.78]], build(k: Kit) {
     const cab = k.mat(k.pick(CAB), 0.6), top = k.mat(k.pick([0x2b2b2b, 0xd8d4cc, 0x4a4540]), 0.3), dark = k.mat(0x16130f, 0.9);
     k.box(dark, 1.62, 0.1, 0.78, 0, 0.05, -0.2);
     k.box(cab, 1.7, 0.8, 0.84, 0, 0.5, -0.2);
@@ -141,7 +168,7 @@ const G_Furniture = (() => {
     }
     k.fruit(0.1, 0.95, -0.2);
   } };
-  R.dining = { w: 1.9, d: 1.7, boxes: [[0, 0, 1.6, 0.9, 0.76], [-0.4, -0.64, 0.44, 0.42, 0.95], [0.4, -0.64, 0.44, 0.42, 0.95], [-0.4, 0.64, 0.44, 0.42, 0.95], [0.4, 0.64, 0.44, 0.42, 0.95]], build(k) {
+  R.dining = { w: 1.9, d: 1.7, boxes: [[0, 0, 1.6, 0.9, 0.76], [-0.4, -0.64, 0.44, 0.42, 0.95], [0.4, -0.64, 0.44, 0.42, 0.95], [-0.4, 0.64, 0.44, 0.42, 0.95], [0.4, 0.64, 0.44, 0.42, 0.95]], build(k: Kit) {
     const w = k.mat(k.pick(WOOD), 0.55), cw = k.rnd() < 0.5 ? w : k.mat(k.pick(WOOD.concat([0x2a2a2a, 0xe9e4da])), 0.6);
     k.box(w, 1.6, 0.04, 0.9, 0, 0.74, 0);
     for (const x of [-0.74, 0.74]) for (const z of [-0.39, 0.39]) k.box(w, 0.06, 0.72, 0.06, x, 0.36, z);
@@ -157,7 +184,7 @@ const G_Furniture = (() => {
     else for (const x of [-0.08, 0.08]) { k.cyl(k.mat(0x9a9ea2, 0.3, 0.8), 0.03, 0.04, 0.03, x, 0.775, 0); k.cyl(k.mat(0xf3eedf, 0.7), 0.012, 0.012, 0.2, x, 0.89, 0); }
   } };
   // ---------------------------------------------------------------- bedroom
-  R.bed = { w: 1.6, d: 1.95, boxes: [[0, 0.03, 1.6, 1.89, 0.6], [0, -0.94, 1.6, 0.07, 1.12]], build(k) {
+  R.bed = { w: 1.6, d: 1.95, boxes: [[0, 0.03, 1.6, 1.89, 0.6], [0, -0.94, 1.6, 0.07, 1.12]], build(k: Kit) {
     const w = k.mat(k.pick(WOOD), 0.6), sheet = k.mat(0xece8de, 0.95), blanket = k.mat(k.pick(FABRIC), 0.95);
     for (const x of [-0.76, 0.76]) for (const z of [-0.88, 0.92]) k.box(w, 0.06, 0.08, 0.06, x, 0.04, z);
     k.box(w, 1.6, 0.24, 1.88, 0, 0.2, 0.03);
@@ -170,7 +197,7 @@ const G_Furniture = (() => {
     k.box(w, 1.68, 0.05, 0.09, 0, 1.095, -0.94);
     if (k.rnd() < 0.5) k.box(k.mat(k.pick(ACCENT), 0.95), 0.4, 0.3, 0.1, 0, 0.66, -0.55, 0.1);
   } };
-  R.dresser = { w: 1.3, d: 0.5, cover: 1, boxes: [[0, 0, 1.3, 0.5, 0.95]], build(k) {
+  R.dresser = { w: 1.3, d: 0.5, cover: 1, boxes: [[0, 0, 1.3, 0.5, 0.95]], build(k: Kit) {
     const w = k.mat(k.pick(WOOD.concat([0xe9e4da])), 0.6), face = k.mat(k.tint(w.color.getHex(), 1.08), 0.55), knob = k.mat(0xb8a060, 0.3, 0.9);
     k.box(k.mat(0x1a1410, 0.8), 1.26, 0.07, 0.44, 0, 0.035, 0);
     k.box(w, 1.3, 0.86, 0.48, 0, 0.5, 0);
@@ -185,7 +212,7 @@ const G_Furniture = (() => {
     k.box(k.mat(0xe0dccf, 0.7), 0.15, 0.2, 0.004, 0.152, 1.08, -0.068, 0.2);
     if (k.rnd() < 0.6) for (let i = 0; i < 3; i++) k.box(k.mat(k.pick(BOOKS), 0.85), 0.2, 0.035, 0.27, 0.45, 0.98 + i * 0.036, 0, (k.rnd() - 0.5) * 0.3);
   } };
-  R.wardrobe = { w: 1.6, d: 0.62, boxes: [[0, 0, 1.6, 0.62, 2.1]], build(k) {
+  R.wardrobe = { w: 1.6, d: 0.62, boxes: [[0, 0, 1.6, 0.62, 2.1]], build(k: Kit) {
     const w = k.mat(k.pick(WOOD.concat([0xe9e4da, 0xcfc6b4])), 0.6), face = k.mat(k.tint(w.color.getHex(), 1.07), 0.55), metal = k.mat(0xb8bcc0, 0.3, 0.8);
     k.box(k.mat(0x1a1410, 0.8), 1.56, 0.05, 0.56, 0, 0.025, 0);
     k.box(w, 1.6, 2.0, 0.6, 0, 1.05, 0);
@@ -195,7 +222,7 @@ const G_Furniture = (() => {
     if (k.rnd() < 0.5) k.box(k.mat(k.pick([0x2a2a2a, 0x6a3f2f, 0x3f4f6a]), 0.6), 0.6, 0.22, 0.42, 0.3, 2.21, 0);
   } };
   // ---------------------------------------------------------------- office
-  R.desk = { w: 1.4, d: 1.15, boxes: [[0, -0.225, 1.4, 0.7, 0.76], [0, 0.3, 0.56, 0.52, 1.0]], build(k) {
+  R.desk = { w: 1.4, d: 1.15, boxes: [[0, -0.225, 1.4, 0.7, 0.76], [0, 0.3, 0.56, 0.52, 1.0]], build(k: Kit) {
     const w = k.mat(k.pick(WOOD.concat([0xe9e4da, 0x2f3a40])), 0.55), black = k.mat(0x18191b, 0.5);
     k.box(w, 1.4, 0.04, 0.7, 0, 0.74, -0.225);
     for (const x of [-0.68, 0.68]) k.box(w, 0.03, 0.72, 0.66, x, 0.36, -0.225);
@@ -218,7 +245,7 @@ const G_Furniture = (() => {
     k.box(seat, 0.46, 0.5, 0.06, 0, 0.82, 0.54);
     for (const x of [-0.25, 0.25]) k.box(black, 0.04, 0.03, 0.26, x, 0.68, 0.3);
   } };
-  R.files = { w: 1.0, d: 0.62, cover: 1, boxes: [[0, 0, 1.0, 0.62, 1.32]], build(k) {
+  R.files = { w: 1.0, d: 0.62, cover: 1, boxes: [[0, 0, 1.0, 0.62, 1.32]], build(k: Kit) {
     const m = k.mat(k.pick([0x7d8389, 0x5b6770, 0xb9bbb6, 0x3a4044]), 0.45, 0.5), face = k.mat(k.tint(m.color.getHex(), 1.1), 0.4, 0.5), metal = k.mat(0xc8ccd0, 0.3, 0.8);
     for (const x of [-0.25, 0.25]) {
       k.box(m, 0.48, 1.3, 0.6, x, 0.65, 0);
@@ -226,7 +253,7 @@ const G_Furniture = (() => {
     }
     if (k.rnd() < 0.5) k.plantSmall(0.25, 1.3, 0); else for (let i = 0; i < 4; i++) k.box(k.mat(k.pick(BOOKS), 0.8), 0.08, 0.3, 0.26, -0.4 + i * 0.09, 1.45, 0);
   } };
-  R.deskpair = { w: 1.6, d: 1.5, cover: 1, boxes: [[0, 0, 1.6, 1.5, 0.76], [0, 0, 1.6, 0.06, 1.25]], build(k) {
+  R.deskpair = { w: 1.6, d: 1.5, cover: 1, boxes: [[0, 0, 1.6, 1.5, 0.76], [0, 0, 1.6, 0.06, 1.25]], build(k: Kit) {
     const w = k.mat(k.pick([0xe9e4da, 0xb58d62, 0x8a8f94]), 0.55), black = k.mat(0x18191b, 0.5), leg = k.mat(0x7d8389, 0.4, 0.6);
     for (const s of [-1, 1]) {
       k.box(w, 1.6, 0.04, 0.72, 0, 0.74, s * 0.37);
@@ -246,7 +273,7 @@ const G_Furniture = (() => {
   // round or blocks a look (ray: posts, shelves, cartons, not the gaps) agree on every peer. A ray box's last figure is
   // what that part's made of (js/materials.ts PARTS).
   const RACK_Y = [0.12, 0.7, 1.3, 1.9];
-  const rackLoad = (v) => {
+  const rackLoad = (v: number) => {
     const r = G.U.rng(Math.floor(v * 4294967295)), out = [];
     for (const y of RACK_Y) {
       if (y > 1.8) continue;
@@ -261,12 +288,12 @@ const G_Furniture = (() => {
     return out;
   };
   R.rack = { w: 1.9, d: 0.6, boxes: [[0, 0, 1.9, 0.6, 2.0]],
-    ray: (v) => [
+    ray: (v: number) => [
       ...[-0.92, 0.92].flatMap((x) => [-0.27, 0.27].map((z) => [x, z, 0.04, 0.04, 2.0, 0, 'post'])),
       ...RACK_Y.map((y) => [0, 0, 1.88, 0.58, y + 0.015, y - 0.015, 'deck']),
       ...rackLoad(v).map(([x, y, bw, bh, bd]) => [x, 0, bw, bd, y + bh, y, 'carton']),
     ],
-    build(k, v) {
+    build(k: Kit, v: number) {
       const metal = k.mat(k.pick([0x3f5a7a, 0x8a8f94, 0xc06a2a]), 0.5, 0.6), shelf = k.mat(0x9a9ea2, 0.5, 0.6);
       for (const x of [-0.92, 0.92]) for (const z of [-0.27, 0.27]) k.box(metal, 0.04, 2.0, 0.04, x, 1.0, z);
       for (const y of RACK_Y) k.box(shelf, 1.88, 0.03, 0.58, 0, y, 0);
@@ -276,10 +303,10 @@ const G_Furniture = (() => {
   // standing, not crouched), stocked with packets, tins and bottles
   // (shop shelving, for rounds and eyes: the pegboard, the shelves and a band of stock on each, a shot passing over what's
   // on a shelf; the stock's packed by hand, so its band is the shelf's run of it, not each packet)
-  const shopRay = (L, D, H, ys, stock) => [[0, 0, L, D, 0.12, 0, 'plinth'], [0, 0, L, 0.05, H, 0, 'peg'], ...ys.filter((y) => y > 0.12).map((y) => [0, 0, L - 0.02, D - 0.02, y + 0.0125, y - 0.0125, 'shelf']), ...ys.flatMap(stock)];
+  const shopRay = (L: number, D: number, H: number, ys: number[], stock: (y: number) => (number | string)[][]) => [[0, 0, L, D, 0.12, 0, 'plinth'], [0, 0, L, 0.05, H, 0, 'peg'], ...ys.filter((y) => y > 0.12).map((y) => [0, 0, L - 0.02, D - 0.02, y + 0.0125, y - 0.0125, 'shelf']), ...ys.flatMap(stock)];
   R.gondola = { w: 1.9, d: 0.9, cover: 1, boxes: [[0, 0, 1.9, 0.86, 1.45]],
     ray: () => shopRay(1.9, 0.86, 1.45, [0.12, 0.42, 0.78, 1.14], (y) => [-1, 1].map((sd) => [0, sd * 0.25, 1.72, 0.26, y + 0.21, y + 0.012, 'stock'])),
-    build(k) {
+    build(k: Kit) {
     const frame = k.mat(k.pick([0xd8dcdc, 0x2f3a46, 0xb8463a]), 0.5, 0.3), shelf = k.mat(0xe8eaea, 0.4, 0.2);
     k.box(frame, 1.9, 0.12, 0.86, 0, 0.06, 0);
     k.box(frame, 1.9, 1.45, 0.05, 0, 0.725, 0);
@@ -291,7 +318,7 @@ const G_Furniture = (() => {
     }
   } };
   // The cashier's counter: a till, a card reader and a screen on it, a cigarette shelf behind
-  R.register = { w: 1.98, d: 0.64, cover: 1, boxes: [[0, 0, 1.98, 0.64, 0.92]], build(k) {
+  R.register = { w: 1.98, d: 0.64, cover: 1, boxes: [[0, 0, 1.98, 0.64, 0.92]], build(k: Kit) {
     const cab = k.mat(0x3a3f45, 0.6), top = k.mat(0xd8d4cc, 0.35), dark = k.mat(0x16181a, 0.6), screen = k.mat(0x1a2a3a, 0.2, 0, { emissive: 0x2a4a6a });
     k.box(cab, 1.96, 0.88, 0.58, 0, 0.44, -0.02);
     k.box(top, 1.98, 0.04, 0.64, 0, 0.9, 0);
@@ -303,7 +330,7 @@ const G_Furniture = (() => {
   // Stock on a shelf, the way a corner store packs it: faced up to the edge, one thing after another along it (boxes,
   // bottles, cans, bags), a price strip on the shelf's edge. (x0..x1 along the shelf at height y, its front edge at z
   // facing dir (+1 or -1), d deep, up to h tall; under: a shelf over it, its shadow on the stock.)
-  function shelfStock(k, x0, x1, y, z, dir, d, h, under) {
+  function shelfStock(k: Kit, x0: number, x1: number, y: number, z: number, dir: number, d: number, h: number, under: boolean) {
     k.box(k.mat(k.pick([0xf2efe6, 0xf5d020, 0xe8eef2]), 0.5), x1 - x0, 0.035, 0.012, (x0 + x1) / 2, y + 0.005, z + dir * 0.006); // the price strip
     for (let x = x0 + 0.01; x < x1 - 0.06;) {
       const kind = k.rnd(), lb = k.label(), n = 2 + Math.floor(k.rnd() * 3); // (a facing: a few of the same, side by side)
@@ -322,7 +349,7 @@ const G_Furniture = (() => {
   R.aisle = { w: 2.6, d: 1.2, cover: 1, boxes: [[0, 0, 2.6, 1.15, 1.6]],
     ray: () => [...shopRay(2.6, 1.15, 1.6, [0.12, 0.5, 0.88, 1.26], (y) => [-1, 1].map((sd) => [0, sd * 0.32, 2.54, 0.48, y + 0.32, y + 0.03, 'stock'])),
       ...[-1.29, 1.29].map((x) => [x, 0, 0.03, 1.15, 1.6, 0, 'peg']), [0, 0, 1.2, 0.04, 1.86, 1.64, 'peg']],
-    build(k) {
+    build(k: Kit) {
     const frame = k.mat(k.pick([0xe8eaea, 0xd8dcdc, 0x3a4048]), 0.5, 0.3), shelf = k.mat(0xdfe2e2, 0.4, 0.3);
     k.box(frame, 2.6, 1.6, 0.06, 0, 0.8, 0); k.box(frame, 2.6, 0.12, 1.15, 0, 0.06, 0);
     for (const x of [-1.29, 1.29]) k.box(frame, 0.03, 1.6, 1.15, x, 0.8, 0);
@@ -336,7 +363,7 @@ const G_Furniture = (() => {
   R.shopwall = { w: 1.98, d: 0.5, boxes: [[0, 0, 1.98, 0.5, 2.0]],
     ray: () => [[0, -0.23, 1.98, 0.04, 2.0, 0, 'peg'], [0, 0, 1.98, 0.48, 0.12, 0, 'plinth'], ...[0.48, 0.84, 1.2, 1.56].map((y) => [0, 0, 1.96, 0.46, y + 0.0125, y - 0.0125, 'shelf']),
       ...[0.12, 0.48, 0.84, 1.2, 1.56].map((y) => [0, 0.02, 1.94, 0.42, y + 0.3, y + 0.03, 'stock']), [0, -0.2, 1.98, 0.03, 2.225, 1.975, 'peg']],
-    build(k) {
+    build(k: Kit) {
     const frame = k.mat(k.pick([0xe8eaea, 0x3a4048]), 0.5, 0.3), shelf = k.mat(0xdfe2e2, 0.4, 0.3);
     k.box(frame, 1.98, 2.0, 0.04, 0, 1.0, -0.23); k.box(frame, 1.98, 0.12, 0.48, 0, 0.06, 0);
     for (const y of [0.12, 0.48, 0.84, 1.2, 1.56]) { if (y > 0.12) k.box(shelf, 1.96, 0.025, 0.46, 0, y, 0); shelfStock(k, -0.97, 0.97, y + 0.012, 0.24, 1, 0.44, 0.32, y < 1.5); }
@@ -345,35 +372,35 @@ const G_Furniture = (() => {
   // An endcap: a low display at the end of an aisle, cases of soda stacked on it and a promotion over them.
   R.endcap = { w: 1.2, d: 0.5, cover: 1, boxes: [[0, 0, 1.2, 0.5, 1.3]],
     ray: () => [[0, 0, 1.2, 0.48, 0.12, 0, 'plinth'], ...[0, 1, 2].flatMap((l) => [0, 1, 2].map((i) => [-0.4 + i * 0.4, 0, 0.38, 0.44, 0.42 + l * 0.31, 0.12 + l * 0.31, 'carton'])), [0, -0.2, 0.6, 0.02, 1.425, 1.075, 'peg']],
-    build(k) {
+    build(k: Kit) {
     const frame = k.mat(0xe8eaea, 0.5, 0.3), card = k.pack('card'), c = [k.label(), k.label()];
     k.box(frame, 1.2, 0.12, 0.48, 0, 0.06, 0);
     for (let l = 0; l < 3; l++) for (let i = 0; i < 3; i++) k.boxL(card, c[(l + i) % 2], 0.38, 0.3, 0.44, -0.4 + i * 0.4, 0.27 + l * 0.31, 0);
     k.box(k.mat(0xf5d020, 0.5), 0.6, 0.35, 0.02, 0, 1.25, -0.2); k.box(k.mat(0xd83a2a, 0.5), 0.5, 0.12, 0.022, 0, 1.25, -0.2);
   } };
   // The cigarettes behind the till: a wall cabinet of packs in rows, a lit sign over it.
-  R.tobacco = { w: 1.98, d: 0.45, boxes: [[0, 0, 1.98, 0.45, 2.2]], build(k) {
+  R.tobacco = { w: 1.98, d: 0.45, boxes: [[0, 0, 1.98, 0.45, 2.2]], build(k: Kit) {
     const body = k.mat(0x2a2c30, 0.5, 0.3), card = k.pack('card'), packs = [0, 1, 2, 3, 4, 5].map(() => k.label());
     k.box(body, 1.98, 2.0, 0.42, 0, 1.0, 0); k.box(k.mat(0xb8bcc0, 0.4, 0.3), 1.98, 0.9, 0.5, 0, 0.45, 0.02);
     for (let r = 0; r < 6; r++) for (let i = 0; i < 16; i++) k.boxL(card, k.pick(packs), 0.09, 0.13, 0.02, -0.88 + i * 0.117, 1.0 + r * 0.16, 0.215);
     k.box(k.mat(0xffffff, 0.5, 0, { emissive: 0xd83a2a, emissiveIntensity: 0.9 }), 1.6, 0.18, 0.03, 0, 2.08, 0.2);
   } };
-  R.atm = { w: 0.65, d: 0.6, cover: 1, boxes: [[0, 0, 0.6, 0.6, 1.6]], build(k) {
+  R.atm = { w: 0.65, d: 0.6, cover: 1, boxes: [[0, 0, 0.6, 0.6, 1.6]], build(k: Kit) {
     const body = k.mat(0x3a4a5a, 0.5, 0.4), dark = k.mat(0x16181a, 0.5);
     k.box(body, 0.6, 1.25, 0.58, 0, 0.625, 0); k.box(body, 0.6, 0.4, 0.3, 0, 1.4, -0.14, 0, -0.3);
     k.box(k.screen(), 0.3, 0.22, 0.01, 0, 1.38, 0.03, 0, -0.3); k.box(dark, 0.26, 0.04, 0.12, 0, 1.0, 0.33); k.box(k.mat(0x30a040, 0.5, 0, { emissive: 0x208030, emissiveIntensity: 1 }), 0.12, 0.02, 0.005, 0.15, 1.1, 0.292);
   } };
-  R.icechest = { w: 1.3, d: 0.75, cover: 1, boxes: [[0, 0, 1.3, 0.75, 1.05]], build(k) {
+  R.icechest = { w: 1.3, d: 0.75, cover: 1, boxes: [[0, 0, 1.3, 0.75, 1.05]], build(k: Kit) {
     const white = k.mat(0xeef2f4, 0.45, 0.2), blue = k.mat(0x2a6ad8, 0.5);
     k.box(white, 1.3, 0.95, 0.75, 0, 0.5, 0); k.box(white, 1.32, 0.08, 0.77, 0, 1.01, 0);
     k.box(blue, 1.0, 0.3, 0.01, 0, 0.6, 0.376); k.box(white, 0.4, 0.12, 0.012, 0, 0.6, 0.38); // ICE, in white on blue
   } };
-  R.crates = { w: 1.7, d: 1.7, cover: 1, boxes: (v) => v < 0.5 ? [[0, 0, 1.6, 1.6, 1.1], [0.25, -0.2, 0.8, 0.8, 1.75]] : [[0, 0, 1.6, 1.6, 1.1]], build(k, v) {
+  R.crates = { w: 1.7, d: 1.7, cover: 1, boxes: (v: number) => v < 0.5 ? [[0, 0, 1.6, 1.6, 1.1], [0.25, -0.2, 0.8, 0.8, 1.75]] : [[0, 0, 1.6, 1.6, 1.1]], build(k: Kit, v: number) {
     const c = k.crate();
     k.box(c, 1.6, 1.1, 1.6, 0, 0.55, 0);
     if (v < 0.5) k.box(c, 0.8, 0.65, 0.8, 0.25, 1.425, -0.2, 0.15);
   } };
-  R.pallet = { w: 1.4, d: 1.4, cover: 1, boxes: [[0, 0, 1.25, 1.25, 1.27]], build(k) {
+  R.pallet = { w: 1.4, d: 1.4, cover: 1, boxes: [[0, 0, 1.25, 1.25, 1.27]], build(k: Kit) {
     const pw = k.mat(0x9c7a50, 0.9);
     for (const x of [-0.55, 0, 0.55]) k.box(pw, 0.1, 0.1, 1.2, x, 0.05, 0);
     for (let i = 0; i < 6; i++) k.box(pw, 1.2, 0.02, 0.14, 0, 0.11, -0.52 + i * 0.208);
@@ -383,35 +410,35 @@ const G_Furniture = (() => {
     }
   } };
   // ---------------------------------------------------------------- small things in corners
-  R.plant = { small: 1, boxes: [[0, 0, 0.44, 0.44, 1.15]], build(k) {
+  R.plant = { small: 1, boxes: [[0, 0, 0.44, 0.44, 1.15]], build(k: Kit) {
     k.cyl(k.mat(k.pick([0xa0522d, 0xe8e4da, 0x2f3a40, 0x6d7b66]), 0.7), 0.2, 0.15, 0.34, 0, 0.17, 0);
     k.cyl(k.mat(0x2a1e14, 1), 0.18, 0.18, 0.02, 0, 0.33, 0);
     const n = 5 + Math.floor(k.rnd() * 3);
     for (let i = 0; i < n; i++) { const a = k.rnd() * 6.28, r = k.rnd() * 0.12; k.ico(k.leaf(), 0.14 + k.rnd() * 0.12, Math.cos(a) * r, 0.5 + k.rnd() * 0.55, Math.sin(a) * r); }
   } };
-  R.lamp = { small: 1, boxes: [[0, 0, 0.36, 0.36, 1.62]], build(k) {
+  R.lamp = { small: 1, boxes: [[0, 0, 0.36, 0.36, 1.62]], build(k: Kit) {
     const m = k.mat(k.pick([0x1c1c1e, 0xb8a060, 0x9a9ea2]), 0.3, 0.8);
     k.cyl(m, 0.16, 0.17, 0.03, 0, 0.015, 0);
     k.cyl(m, 0.012, 0.012, 1.4, 0, 0.72, 0);
     k.cyl(k.shade(), 0.13, 0.2, 0.28, 0, 1.48, 0);
   } };
-  R.sidetable = { small: 1, boxes: [[0, 0, 0.5, 0.5, 0.56]], build(k) {
+  R.sidetable = { small: 1, boxes: [[0, 0, 0.5, 0.5, 0.56]], build(k: Kit) {
     const w = k.mat(k.pick(WOOD), 0.6);
     k.box(w, 0.5, 0.03, 0.5, 0, 0.545, 0);
     for (const x of [-0.22, 0.22]) for (const z of [-0.22, 0.22]) k.box(w, 0.035, 0.53, 0.035, x, 0.265, z);
     k.box(w, 0.44, 0.02, 0.44, 0, 0.15, 0);
     if (k.rnd() < 0.6) k.tableLamp(0, 0.56, 0); else k.plantSmall(0, 0.56, 0);
   } };
-  R.bin = { small: 1, boxes: [[0, 0, 0.32, 0.32, 0.42]], build(k) {
+  R.bin = { small: 1, boxes: [[0, 0, 0.32, 0.32, 0.42]], build(k: Kit) {
     k.cyl(k.mat(k.pick([0x3a3d40, 0x6d7b66, 0xb9bbb6]), 0.5, 0.3), 0.15, 0.13, 0.42, 0, 0.21, 0);
     k.cyl(k.mat(0x111111, 0.9), 0.135, 0.135, 0.005, 0, 0.415, 0);
   } };
-  R.cooler = { small: 1, boxes: [[0, 0, 0.34, 0.34, 1.32]], build(k) {
+  R.cooler = { small: 1, boxes: [[0, 0, 0.34, 0.34, 1.32]], build(k: Kit) {
     k.box(k.mat(0xe8e6e0, 0.5), 0.32, 0.95, 0.32, 0, 0.475, 0);
     k.box(k.mat(0x2a2a2a, 0.5), 0.2, 0.08, 0.02, 0, 0.8, 0.165);
     k.cyl(k.mat(0x6aa8d8, 0.1, 0.1), 0.13, 0.13, 0.38, 0, 1.14, 0);
   } };
-  R.cardboard = { small: 1, boxes: [[0, 0, 0.62, 0.52, 0.75]], build(k) {
+  R.cardboard = { small: 1, boxes: [[0, 0, 0.62, 0.52, 0.75]], build(k: Kit) {
     k.box(k.mat(k.pick(CARD), 0.95), 0.6, 0.4, 0.5, 0, 0.2, 0);
     k.box(k.mat(k.pick(CARD), 0.95), 0.45, 0.33, 0.38, 0.05, 0.565, -0.02, 0.2);
   } };
@@ -421,7 +448,7 @@ const G_Furniture = (() => {
   // along its length and stands taller than you, so the aisles between rows are what you see down.
   const PRACK_Y = [0.12, 1.0, 1.9];
   // each level's load: [y, kind (0 empty, 1 shrink-wrapped stack, 2 cartons, 3 drums), heights]
-  const prackLoad = (v): any[][] => {
+  const prackLoad = (v: number): any[][] => {
     const r = G.U.rng(Math.floor(v * 4294967295));
     return PRACK_Y.map((y) => {
       if (r() < 0.15) return [y, 0]; // an empty bay
@@ -433,7 +460,7 @@ const G_Furniture = (() => {
   };
   const PRACK_XZ = [[-0.3, -0.24], [-0.3, 0.24], [0.3, -0.24], [0.3, 0.24]];
   R.palletrack = { w: 1.98, d: 1.15, boxes: [[0, 0, 1.98, 1.15, 2.7]],
-    ray: (v) => {
+    ray: (v: number) => {
       const o = [];
       for (const x of [-0.97, 0.97]) for (const z of [-0.54, 0.54]) o.push([x, z, 0.06, 0.06, 2.7, 0, 'upright']); // uprights
       for (const [y, kind, hs] of prackLoad(v)) {
@@ -446,7 +473,7 @@ const G_Furniture = (() => {
       }
       return o;
     },
-    build(k, v) {
+    build(k: Kit, v: number) {
       const up = k.mat(0x2f4f86, 0.5, 0.5), beam = k.mat(0xd2691e, 0.5, 0.4), pw = k.mat(0x9c7a50, 0.9);
       for (const x of [-0.97, 0.97]) for (const z of [-0.54, 0.54]) k.box(up, 0.06, 2.7, 0.06, x, 1.35, z);
       for (const x of [-0.97, 0.97]) for (let y = 0.3; y < 2.7; y += 0.45) k.box(up, 0.02, 0.02, 1.08, x, y, 0, 0, 0.6);
@@ -462,7 +489,7 @@ const G_Furniture = (() => {
   // ---------------------------------------------------------------- gardens
   // A close-boarded garden fence, 1.9 m: too tall to see over. Fills its tile along its length.
   // (one panel per 0.67 m cell)
-  R.fence = { w: 0.68, d: 0.14, boxes: [[0, 0, 0.68, 0.14, 1.9]], build(k, v) {
+  R.fence = { w: 0.68, d: 0.14, boxes: [[0, 0, 0.68, 0.14, 1.9]], build(k: Kit, v: number) {
     const wood = k.mat([0x6b5236, 0x7a5f3e, 0x5e4a33, 0x84694a][Math.floor(v * 4)], 0.95), post = k.mat(0x4a3a28, 0.95);
     if (v < 0.5) k.box(post, 0.09, 1.95, 0.09, -0.3, 0.975, 0);
     for (const y of [0.35, 1.55]) k.box(post, 0.68, 0.08, 0.04, 0, y, -0.05);
@@ -470,13 +497,13 @@ const G_Furniture = (() => {
     if (v < 0.08) k.box(k.mat(0x2a3a22, 0.9, 0, { flatShading: true }), 0.4, 0.45, 0.3, 0, 0.22, 0.2); // a weed at the foot
   } };
   // A clipped hedge, chest high: cover.
-  R.hedge = { w: 1.9, d: 0.9, cover: 1, boxes: [[0, 0, 1.9, 0.9, 1.25]], build(k) {
+  R.hedge = { w: 1.9, d: 0.9, cover: 1, boxes: [[0, 0, 1.9, 0.9, 1.25]], build(k: Kit) {
     const leaf = k.mat(k.pick([0x2f5a2c, 0x35602e, 0x2a4f28]), 0.95, 0, { flatShading: true });
     k.box(leaf, 1.86, 1.15, 0.86, 0, 0.575, 0);
     for (let i = 0; i < 10; i++) k.ico(leaf, 0.2 + k.rnd() * 0.12, (k.rnd() - 0.5) * 1.7, 0.7 + k.rnd() * 0.5, (k.rnd() - 0.5) * 0.7);
   } };
   // A timber garden shed with a felt roof: solid, taller than you.
-  R.shed = { w: 1.9, d: 1.6, boxes: [[0, 0, 1.9, 1.5, 2.3]], build(k) {
+  R.shed = { w: 1.9, d: 1.6, boxes: [[0, 0, 1.9, 1.5, 2.3]], build(k: Kit) {
     const wood = k.mat(k.pick([0x6b4f32, 0x5a6b4a, 0x7a6248, 0x4a5a62]), 0.9), roof = k.mat(0x2a2a2c, 0.95);
     k.box(wood, 1.86, 1.95, 1.46, 0, 0.975, 0);
     for (let i = 0; i < 9; i++) k.box(k.mat(0x000000, 1, 0, { transparent: true, opacity: 0.18 }), 1.87, 0.01, 1.47, 0, 0.2 + i * 0.2, 0);
@@ -485,7 +512,7 @@ const G_Furniture = (() => {
     k.box(k.mat(0x9fb0b8, 0.2, 0.3), 0.4, 0.35, 0.02, -0.5, 1.35, 0.745);
   } };
   // A kettle barbecue on legs, low cover.
-  R.bbq = { w: 0.9, d: 0.7, cover: 1, boxes: [[0, 0, 0.8, 0.6, 1.0]], build(k) {
+  R.bbq = { w: 0.9, d: 0.7, cover: 1, boxes: [[0, 0, 0.8, 0.6, 1.0]], build(k: Kit) {
     const black = k.mat(0x1c1c1e, 0.5, 0.4), steel = k.mat(0x9a9ea2, 0.4, 0.6);
     for (const x of [-0.25, 0.25]) for (const z of [-0.18, 0.18]) k.box(steel, 0.03, 0.75, 0.03, x, 0.375, z);
     k.box(steel, 0.75, 0.03, 0.5, 0, 0.35, 0);
@@ -493,7 +520,7 @@ const G_Furniture = (() => {
     k.box(steel, 0.12, 0.03, 0.03, 0, 1.12, 0.12);
   } };
   // A patio table with an umbrella and four chairs.
-  R.patio = { w: 1.9, d: 1.9, boxes: [[0, 0, 1.0, 1.0, 0.74], [0, -0.75, 0.45, 0.45, 0.9], [0, 0.75, 0.45, 0.45, 0.9], [-0.75, 0, 0.45, 0.45, 0.9], [0.75, 0, 0.45, 0.45, 0.9]], build(k) {
+  R.patio = { w: 1.9, d: 1.9, boxes: [[0, 0, 1.0, 1.0, 0.74], [0, -0.75, 0.45, 0.45, 0.9], [0, 0.75, 0.45, 0.45, 0.9], [-0.75, 0, 0.45, 0.45, 0.9], [0.75, 0, 0.45, 0.45, 0.9]], build(k: Kit) {
     const frame = k.mat(k.pick([0x2a2a2c, 0xe8e4da, 0x6b4428]), 0.5, 0.3), top = k.mat(0xe8e4da, 0.4);
     k.cyl(top, 0.5, 0.5, 0.03, 0, 0.73, 0, 24);
     k.cyl(frame, 0.03, 0.03, 0.72, 0, 0.36, 0);
@@ -506,7 +533,7 @@ const G_Furniture = (() => {
     }
   } };
   // A raised planter with flowers.
-  R.planter = { small: 1, boxes: [[0, 0, 0.6, 0.6, 0.55]], build(k) {
+  R.planter = { small: 1, boxes: [[0, 0, 0.6, 0.6, 0.55]], build(k: Kit) {
     k.box(k.mat(k.pick([0x6b4428, 0x8a7a6a, 0x5a5f62]), 0.9), 0.58, 0.4, 0.58, 0, 0.2, 0);
     k.box(k.mat(0x2a1e14, 1), 0.52, 0.02, 0.52, 0, 0.41, 0);
     for (let i = 0; i < 6; i++) k.sph(k.mat(k.pick([0xd8642a, 0xc0302a, 0xe8c040, 0xb060c0, 0xf2efe6]), 0.6), 0.05, (k.rnd() - 0.5) * 0.4, 0.5 + k.rnd() * 0.06, (k.rnd() - 0.5) * 0.4);
@@ -518,7 +545,7 @@ const G_Furniture = (() => {
   // striped awning and a lit sign. Inside, behind the counter, there's room for someone to hide.
   const STALL = [[0xc0392b, 0xf2efe6], [0x2e86c1, 0xf2efe6], [0x27ae60, 0xf7dc6f], [0x8e44ad, 0xf2efe6], [0xd35400, 0xf9e79f], [0x16a085, 0xf2efe6], [0xe84393, 0xfdf2e9], [0xf1c40f, 0x2c3e50]];
   // hw: half its width (a 2 m stall, or a 4 m one across two tiles)
-  function stallShell(k, v, hw) {
+  function stallShell(k: Kit, v: number, hw: number) {
     const [c1, c2] = STALL[Math.floor(v * STALL.length) % STALL.length], W2 = hw * 2;
     const frame = k.mat(0x2a2a2c, 0.6, 0.4), A = k.mat(c1, 0.8), B = k.mat(c2, 0.8), top = k.mat(k.pick([0xd8d4cc, 0x8a5a34, 0x3a3d40]), 0.45);
     for (const x of [-hw, hw]) for (const z of [-0.85, 0.85]) k.box(frame, 0.05, 2.45, 0.05, x, 1.225, z);
@@ -541,13 +568,13 @@ const G_Furniture = (() => {
     return { A, B, c1, c2 };
   }
   // left as they ran: a stool on its side, cups and a bag on the ground out front
-  function abandoned(k, hw) {
+  function abandoned(k: Kit, hw: number) {
     if (k.rnd() < 0.55) k.box(k.mat(k.pick([0xc0392b, 0x2a2a2a, 0xe8e4da]), 0.6), 0.34, 0.04, 0.34, (k.rnd() - 0.5) * hw * 1.3, 0.17, 1.25, k.rnd() * 3, Math.PI / 2);
     for (let i = 0; i < 2 + hw * 1.5; i++) if (k.rnd() < 0.6) k.cyl(k.mat(k.pick([0xf2efe6, 0xc0392b, 0x2e86c1]), 0.6), 0.04, 0.035, 0.12, (k.rnd() - 0.5) * hw * 1.7, 0.04, 1.1 + k.rnd() * 0.5, 8, Math.PI / 2);
     if (k.rnd() < 0.35) k.box(k.mat(k.pick([0x6b4428, 0x2a2a2a, 0x8e44ad]), 0.8), 0.32, 0.22, 0.12, (k.rnd() - 0.5) * hw * 1.5, 0.11, 1.5, k.rnd() * 3);
   }
   // A food stall: the grill (or fryer) at the back, a cooler, food on the counter, the menu board. Open at the back.
-  const stallFood = (hw) => ({ w: hw * 2 + 0.14, d: 1.8, cover: 1, boxes: [[0, 0.72, hw * 2 + 0.06, 0.36, 1.06], [-hw, 0.4, 0.06, 1.0, 2.3], [hw, 0.4, 0.06, 1.0, 2.3], [-hw + 0.37, -0.6, 0.7, 0.45, 0.92]], build(k, v) {
+  const stallFood = (hw: number) => ({ w: hw * 2 + 0.14, d: 1.8, cover: 1, boxes: [[0, 0.72, hw * 2 + 0.06, 0.36, 1.06], [-hw, 0.4, 0.06, 1.0, 2.3], [hw, 0.4, 0.06, 1.0, 2.3], [-hw + 0.37, -0.6, 0.7, 0.45, 0.92]], build(k: Kit, v: number) {
     const { c2 } = stallShell(k, v, hw), steel = k.mat(0x9a9ea2, 0.35, 0.7), black = k.mat(0x1c1c1e, 0.5, 0.4), gx = -hw + 0.37;
     k.box(steel, 0.7, 0.88, 0.45, gx, 0.44, -0.6);
     k.box(black, 0.66, 0.03, 0.41, gx, 0.9, -0.6);
@@ -564,7 +591,7 @@ const G_Furniture = (() => {
     abandoned(k, hw);
   } });
   // A merchandise stall: folded shirts and caps on the counter, a rail of shirts at the back, posters on the panels.
-  const stallMerch = (hw) => ({ w: hw * 2 + 0.14, d: 1.8, cover: 1, boxes: [[0, 0.72, hw * 2 + 0.06, 0.36, 1.06], [-hw, 0.4, 0.06, 1.0, 2.3], [hw, 0.4, 0.06, 1.0, 2.3], [hw - 0.37, -0.62, 0.7, 0.4, 1.75]], build(k, v) {
+  const stallMerch = (hw: number) => ({ w: hw * 2 + 0.14, d: 1.8, cover: 1, boxes: [[0, 0.72, hw * 2 + 0.06, 0.36, 1.06], [-hw, 0.4, 0.06, 1.0, 2.3], [hw, 0.4, 0.06, 1.0, 2.3], [hw - 0.37, -0.62, 0.7, 0.4, 1.75]], build(k: Kit, v: number) {
     stallShell(k, v, hw);
     const shirts = [0x1c1c1e, 0xf2efe6, 0xc0392b, 0x2e86c1, 0x8e44ad, 0x27ae60, 0xf1c40f], piles = Math.round(hw * 5.4);
     for (let i = 0; i < piles; i++) for (let j = 0; j < 1 + Math.floor(k.rnd() * 3); j++) k.box(k.mat(k.pick(shirts), 0.95), 0.26, 0.03, 0.22, -hw + 0.2 + i * (hw * 2 - 0.4) / Math.max(1, piles - 1), 1.07 + j * 0.032, 0.7);
@@ -579,7 +606,7 @@ const G_Furniture = (() => {
   R.stallfood = stallFood(0.92); R.stallmerch = stallMerch(0.92);
   R.bigfood = stallFood(1.92); R.bigmerch = stallMerch(1.92); // (across two tiles)
   // A row of folding chairs facing the stage (their fronts, +z, toward it).
-  R.seats = { w: 1.98, d: 0.7, cover: 1, boxes: [[0, 0, 1.98, 0.6, 0.9]], build(k, v) {
+  R.seats = { w: 1.98, d: 0.7, cover: 1, boxes: [[0, 0, 1.98, 0.6, 0.9]], build(k: Kit, v: number) {
     const p = k.mat([0x2e4a7d, 0x7d2e2e, 0x2a2a2a, 0x2e6b3f, 0x5a5f6a][Math.floor(v * 5)], 0.6), leg = k.mat(0x6a6e72, 0.4, 0.7);
     for (const x of [-0.66, 0, 0.66]) {
       k.box(p, 0.46, 0.04, 0.42, x, 0.46, 0.04);
@@ -589,13 +616,13 @@ const G_Furniture = (() => {
     k.box(leg, 1.9, 0.02, 0.02, 0, 0.12, 0.0); // the rail that ties the row together
   } };
   // The stage: decking 1.2 m up, black skirt to the ground.
-  R.stagedeck = { w: 2, d: 2, cover: 1, boxes: [[0, 0, 2, 2, 1.2]], build(k) {
+  R.stagedeck = { w: 2, d: 2, cover: 1, boxes: [[0, 0, 2, 2, 1.2]], build(k: Kit) {
     k.box(k.mat(0x0c0c0e, 0.95), 2.0, 1.14, 2.0, 0, 0.57, 0);
     k.box(k.mat(0x1c1a18, 0.7), 2.0, 0.06, 2.0, 0, 1.17, 0);
     if (k.rnd() < 0.3) k.box(k.mat(0xf2efe6, 0.6), 0.6, 0.004, 0.05, (k.rnd() - 0.5) * 1.2, 1.202, (k.rnd() - 0.5) * 1.2, k.rnd() * 3); // tape marks
     if (k.rnd() < 0.25) k.box(k.mat(0x1c1c1e, 0.5), 0.5, 0.4, 0.4, k.rnd() - 0.5, 1.4, k.rnd() - 0.5, k.rnd()); // a wedge monitor
   } };
-  R.speaker = { w: 1.3, d: 1.2, boxes: [[0, 0, 1.3, 1.1, 3.3]], build(k) {
+  R.speaker = { w: 1.3, d: 1.2, boxes: [[0, 0, 1.3, 1.1, 3.3]], build(k: Kit) {
     const box = k.mat(0x151517, 0.8), grille = k.mat(0x2a2a2c, 0.95), cone = k.mat(0x0a0a0b, 0.6);
     for (let i = 0; i < 3; i++) {
       k.box(box, 1.26, 1.04, 1.06, 0, 0.53 + i * 1.08, 0);
@@ -604,7 +631,7 @@ const G_Furniture = (() => {
     }
   } };
   // Front of house: the sound desk under a little canopy, out among the seats.
-  R.foh = { w: 1.9, d: 1.5, cover: 1, boxes: [[0, 0, 1.8, 1.0, 1.1]], build(k) {
+  R.foh = { w: 1.9, d: 1.5, cover: 1, boxes: [[0, 0, 1.8, 1.0, 1.1]], build(k: Kit) {
     const black = k.mat(0x18191b, 0.6), pole = k.mat(0x9a9ea2, 0.4, 0.6);
     k.box(black, 1.8, 0.95, 1.0, 0, 0.475, 0);
     k.box(k.mat(0x2a2a2c, 0.5), 1.4, 0.1, 0.7, 0, 1.0, 0.0, 0, -0.15); // the console
@@ -613,14 +640,14 @@ const G_Furniture = (() => {
     for (const x of [-0.9, 0.9]) for (const z of [-0.7, 0.7]) k.box(pole, 0.04, 2.4, 0.04, x, 1.2, z);
     k.box(k.mat(0xf2efe6, 0.9), 2.0, 0.04, 1.6, 0, 2.42, 0);
   } };
-  R.picnic = { w: 1.9, d: 1.6, boxes: [[0, 0, 1.8, 0.8, 0.76], [0, -0.62, 1.8, 0.28, 0.45], [0, 0.62, 1.8, 0.28, 0.45]], build(k) {
+  R.picnic = { w: 1.9, d: 1.6, boxes: [[0, 0, 1.8, 0.8, 0.76], [0, -0.62, 1.8, 0.28, 0.45], [0, 0.62, 1.8, 0.28, 0.45]], build(k: Kit) {
     const w = k.mat(k.pick(WOOD), 0.85);
     k.box(w, 1.8, 0.05, 0.8, 0, 0.74, 0);
     for (const s of [-1, 1]) { k.box(w, 1.8, 0.04, 0.28, 0, 0.44, s * 0.62); for (const x of [-0.75, 0.75]) k.box(w, 0.06, 0.74, 0.06, x, 0.37, s * 0.3, 0, s * 0.35); }
     if (k.rnd() < 0.6) for (let i = 0; i < 3; i++) k.cyl(k.mat(k.pick([0xf2efe6, 0xc0392b, 0x2e86c1]), 0.6), 0.04, 0.035, 0.12, (k.rnd() - 0.5) * 1.4, 0.82, (k.rnd() - 0.5) * 0.5);
   } };
   // A ticket booth by the gate: a little hut with a window and a lit sign.
-  R.booth = { w: 1.7, d: 1.6, boxes: [[0, 0, 1.6, 1.5, 2.5]], build(k) {
+  R.booth = { w: 1.7, d: 1.6, boxes: [[0, 0, 1.6, 1.5, 2.5]], build(k: Kit) {
     const wall = k.mat(k.pick([0xc0392b, 0x2e86c1, 0x16a085]), 0.7), trim = k.mat(0xf2efe6, 0.6);
     k.box(wall, 1.6, 2.4, 1.5, 0, 1.2, 0);
     k.box(trim, 1.7, 0.1, 1.6, 0, 2.45, 0);
@@ -628,7 +655,7 @@ const G_Furniture = (() => {
     k.box(trim, 1.2, 0.06, 0.2, 0, 1.08, 0.8);
     k.box(k.mat(0xf1c40f, 0.5, 0, { emissive: 0xf1c40f, emissiveIntensity: 0.8 }), 1.2, 0.3, 0.03, 0, 2.15, 0.77);
   } };
-  R.sinks = { w: 1.98, d: 0.6, cover: 1, boxes: [[0, 0, 1.98, 0.56, 0.9]], build(k) {
+  R.sinks = { w: 1.98, d: 0.6, cover: 1, boxes: [[0, 0, 1.98, 0.56, 0.9]], build(k: Kit) {
     const white = k.mat(0xeceae4, 0.35), steel = k.mat(0xc4c8cc, 0.25, 0.8);
     k.box(k.mat(0xb9bdc2, 0.5), 1.96, 0.86, 0.5, 0, 0.43, -0.03);
     k.box(white, 1.98, 0.05, 0.56, 0, 0.88, 0);
@@ -636,7 +663,7 @@ const G_Furniture = (() => {
     k.box(k.mat(0x8e9ea8, 0.12, 0.6), 1.8, 0.8, 0.01, 0, 1.6, -0.27); // the mirror
     k.box(k.mat(0xeceae4, 0.4), 0.28, 0.38, 0.12, 0.92, 1.3, -0.22); // a hand dryer
   } };
-  R.toilet = { small: 1, w: 0.5, d: 0.75, boxes: [[0, -0.05, 0.42, 0.7, 0.8]], build(k) {
+  R.toilet = { small: 1, w: 0.5, d: 0.75, boxes: [[0, -0.05, 0.42, 0.7, 0.8]], build(k: Kit) {
     const white = k.mat(0xf2f0ea, 0.3);
     k.cyl(white, 0.17, 0.12, 0.4, 0, 0.2, 0.08);
     k.cyl(k.mat(0x1c1c1e, 0.5), 0.19, 0.19, 0.03, 0, 0.42, 0.1);
@@ -644,7 +671,7 @@ const G_Furniture = (() => {
     k.box(k.mat(0xc4c8cc, 0.25, 0.8), 0.06, 0.02, 0.04, 0.12, 0.81, -0.27);
   } };
   // Event fencing round the site: steel mesh panels on block feet, dark scrim, now and then a sponsor's banner.
-  R.hoarding = { w: 0.68, d: 0.14, boxes: [[0, 0, 0.68, 0.14, 2.3]], build(k, v) {
+  R.hoarding = { w: 0.68, d: 0.14, boxes: [[0, 0, 0.68, 0.14, 2.3]], build(k: Kit, v: number) {
     const tube = k.mat(0x8a8f94, 0.4, 0.6), banner = v < 0.12;
     k.box(tube, 0.68, 0.04, 0.04, 0, 2.28, 0); k.box(tube, 0.68, 0.04, 0.04, 0, 0.12, 0);
     if (v < 0.5) k.box(tube, 0.04, 2.3, 0.04, -0.32, 1.15, 0);
@@ -654,7 +681,7 @@ const G_Furniture = (() => {
   } };
 
   // What shelters a helicopter's pad (js/level.ts LZ_KIT), what's there anyway. A shipping container, its sides ribbed. style: c; chill, a reefer's unit on its end
-  R.container = { w: 6.06, d: 2.44, cover: 1, boxes: [[0, 0, 6.06, 2.44, 2.6]], build(k, v, s) {
+  R.container = { w: 6.06, d: 2.44, cover: 1, boxes: [[0, 0, 6.06, 2.44, 2.6]], build(k: Kit, v: number, s: PieceStyle) {
     const c = k.mat(s.c, 0.6, 0.3), d = k.mat(k.tint(s.c, 0.8), 0.6, 0.3), dark = k.mat(0x1c1c1e, 0.7);
     k.box(c, 6.06, 2.42, 2.3, 0, 1.31, 0); k.box(dark, 6.06, 0.1, 2.44, 0, 0.05, 0);
     for (let i = 0; i < 34; i++) for (const q of [-1, 1]) k.box(d, 0.08, 2.3, 0.05, -2.9 + i * 0.176, 1.3, q * 1.18);
@@ -662,39 +689,39 @@ const G_Furniture = (() => {
     if (s.chill) { k.box(k.mat(0xc8ccd0, 0.5, 0.3), 0.3, 2.2, 2.2, 3.1, 1.25, 0); for (const y of [0.7, 1.7]) k.cyl(dark, 0.3, 0.3, 0.02, 3.26, y, 0, 14, 0); }
   } };
   // A box truck parked up. style: c, stripe
-  R.boxtruck = { w: 6.6, d: 2.3, cover: 1, boxes: [[0.9, 0, 4.7, 2.3, 2.9], [-2.3, 0, 1.9, 2.2, 2.2]], build(k, v, s) {
+  R.boxtruck = { w: 6.6, d: 2.3, cover: 1, boxes: [[0.9, 0, 4.7, 2.3, 2.9], [-2.3, 0, 1.9, 2.2, 2.2]], build(k: Kit, v: number, s: PieceStyle) {
     const c = k.mat(s.c, 0.5, 0.1), dk = k.mat(0x18181a, 0.8), m = k.mat(0xb8bcc0, 0.3, 0.8), cab = k.mat(0xe8e6e0, 0.35, 0.2), gl = k.mat(0x20303a, 0.1, 0.4);
     k.box(c, 4.7, 2.3, 2.3, 0.9, 1.75, 0); k.box(dk, 6.4, 0.2, 1.2, 0, 0.55, 0); k.box(k.mat(s.stripe || 0x884444, 0.5), 4.7, 0.3, 2.32, 0.9, 1.5, 0);
     k.box(cab, 1.8, 1.5, 2.2, -2.3, 1.45, 0); k.box(gl, 0.02, 0.6, 1.9, -3.21, 1.75, 0); for (const q of [-1, 1]) k.box(gl, 1.0, 0.5, 0.02, -2.4, 1.8, q * 1.11);
     k.box(dk, 0.2, 0.3, 2.2, -3.25, 0.65, 0); for (const x of [-2.4, 1.8]) for (const q of [-1, 1]) { k.cyl(dk, 0.48, 0.48, 0.3, x, 0.48, q * 1.0, 16, Math.PI / 2); k.cyl(m, 0.24, 0.24, 0.31, x, 0.48, q * 1.0, 12, Math.PI / 2); }
   } };
-  R.dumpster = { w: 1.9, d: 1.1, cover: 1, boxes: [[0, 0, 1.9, 1.1, 1.3]], build(k) {
+  R.dumpster = { w: 1.9, d: 1.1, cover: 1, boxes: [[0, 0, 1.9, 1.1, 1.3]], build(k: Kit) {
     const c = k.mat(k.pick([0x2f5a3a, 0x3a4a5a, 0x5a3a2a]), 0.7, 0.3); k.box(c, 1.9, 1.15, 1.1, 0, 0.67, 0); k.box(k.mat(0x18181a, 0.8), 1.96, 0.05, 1.16, 0, 1.27, 0, 0, -0.06); for (const x of [-0.8, 0.8]) for (const z of [-0.4, 0.4]) k.box(k.mat(0x18181a, 0.8), 0.1, 0.1, 0.1, x, 0.05, z);
   } };
   // Earth-filled gabions round a bunker's approach: wire mesh, a sack liner, dirt on top, three bays
-  R.hesco = { w: 3.1, d: 1.1, cover: 1, boxes: [[0, 0, 3.1, 1.1, 2.1]], build(k) {
+  R.hesco = { w: 3.1, d: 1.1, cover: 1, boxes: [[0, 0, 3.1, 1.1, 2.1]], build(k: Kit) {
     const c = k.mat(0x8a8468, 0.95), m = k.mat(0x5a5e58, 0.4, 0.6), d = k.mat(0x4a3e2c, 1);
     for (let i = 0; i < 3; i++) { const x = -1.03 + i * 1.03; k.box(c, 1.0, 2.06, 1.06, x, 1.03, 0); k.box(d, 0.96, 0.03, 1.02, x, 2.07, 0); for (const y of [0.35, 0.7, 1.05, 1.4, 1.75]) k.box(m, 1.02, 0.015, 1.08, x, y, 0); for (const a of [-0.34, 0, 0.34]) k.box(m, 0.015, 2.06, 1.08, x + a, 1.03, 0); }
   } };
-  R.portaloo = { w: 1.2, d: 1.2, boxes: [[0, 0, 1.15, 1.15, 2.3]], build(k) {
+  R.portaloo = { w: 1.2, d: 1.2, boxes: [[0, 0, 1.15, 1.15, 2.3]], build(k: Kit) {
     const c = k.mat(k.pick([0x2a6a9a, 0x3a7a4a]), 0.5), d = k.mat(0xdcdcd4, 0.6); k.box(d, 1.15, 0.1, 1.15, 0, 0.05, 0); k.box(c, 1.12, 2.0, 1.12, 0, 1.1, 0); k.box(d, 1.2, 0.14, 1.2, 0, 2.2, 0); k.box(k.mat(0x1c2c3a, 0.5), 0.8, 1.8, 0.02, 0, 1.05, 0.57);
   } };
   // On a roof: an air handler, its fan on top; the block's water tank on a steel stand
-  R.hvac = { w: 2.0, d: 1.2, cover: 1, boxes: [[0, 0, 2.0, 1.2, 1.35]], build(k) {
+  R.hvac = { w: 2.0, d: 1.2, cover: 1, boxes: [[0, 0, 2.0, 1.2, 1.35]], build(k: Kit) {
     const c = k.mat(0xa8aaa6, 0.5, 0.4), d = k.mat(0x2a2c2e, 0.6); k.box(d, 1.9, 0.1, 1.1, 0, 0.05, 0); k.box(c, 2.0, 1.15, 1.2, 0, 0.67, 0); for (let i = 0; i < 12; i++) k.box(d, 0.03, 0.9, 0.01, -0.86 + i * 0.156, 0.67, 0.605); k.cyl(d, 0.42, 0.42, 0.12, 0.4, 1.3, 0, 16); k.cyl(k.mat(0x6a6c6e, 0.4, 0.5), 0.04, 0.04, 0.14, 0.4, 1.31, 0, 8); k.box(k.mat(0x6a6c6e, 0.4, 0.5), 0.72, 0.02, 0.08, 0.4, 1.36, 0, 0.7);
   } };
-  R.watertank = { w: 2.2, d: 2.2, cover: 1, boxes: [[0, 0, 2.2, 2.2, 2.9]], build(k) {
+  R.watertank = { w: 2.2, d: 2.2, cover: 1, boxes: [[0, 0, 2.2, 2.2, 2.9]], build(k: Kit) {
     const s = k.mat(0x4a4e52, 0.5, 0.5), c = k.mat(0x8a8e8a, 0.6, 0.3); for (const x of [-0.9, 0.9]) for (const z of [-0.9, 0.9]) k.box(s, 0.1, 0.9, 0.1, x, 0.45, z); k.box(s, 2.0, 0.08, 2.0, 0, 0.92, 0); k.cyl(c, 1.05, 1.05, 1.8, 0, 1.86, 0, 20); k.cyl(k.mat(0x6a6e6a, 0.6, 0.3), 0.1, 1.08, 0.3, 0, 2.9, 0, 20);
   } };
   // A roof's parapet: a low concrete wall with a steel cap
-  R.parapet = { w: 0.68, d: 0.3, boxes: [[0, 0, 0.68, 0.3, 1.15]], build(k) {
+  R.parapet = { w: 0.68, d: 0.3, boxes: [[0, 0, 0.68, 0.3, 1.15]], build(k: Kit) {
     k.box(k.mat(0x8a857b, 0.95), 0.68, 1.1, 0.3, 0, 0.55, 0); k.box(k.mat(0x5a5e62, 0.5, 0.5), 0.68, 0.05, 0.36, 0, 1.125, 0);
   } };
 
   // ---------------------------------------------------------------- the town square and the car park
   // A parked car, nose to +z: body, cabin and glass, wheels, lights. Solid cover across two tiles.
   const CAR = [0x8a1c1c, 0x1c3a6a, 0xd8d8d4, 0x2a2a2c, 0x6a6e72, 0x2e5a3a, 0xc8a040, 0x5a2a5a, 0xe8e4da, 0x3a4a5a];
-  R.car = { w: 1.9, d: 4.3, cover: 1, boxes: [[0, 0, 1.8, 4.22, 0.93], [0, -0.2, 1.62, 2.1, 1.43, 0.93]], build(k, v) { // (the body, then the cabin on it: over the bonnet and the boot is open air)
+  R.car = { w: 1.9, d: 4.3, cover: 1, boxes: [[0, 0, 1.8, 4.22, 0.93], [0, -0.2, 1.62, 2.1, 1.43, 0.93]], build(k: Kit, v: number) { // (the body, then the cabin on it: over the bonnet and the boot is open air)
     const paint = k.mat(CAR[Math.floor(v * CAR.length) % CAR.length], 0.35, 0.5), glass = k.mat(0x0c1218, 0.1, 0.6), tyre = k.mat(0x111112, 0.9), trim = k.mat(0x1c1c1e, 0.6);
     k.box(paint, 1.8, 0.62, 4.2, 0, 0.62, 0);
     k.box(paint, 1.62, 0.5, 2.1, 0, 1.18, -0.2);
@@ -705,7 +732,7 @@ const G_Furniture = (() => {
     for (const x of [-0.66, 0.66]) { k.box(k.mat(0xf2efe6, 0.3, 0, { emissive: 0x303030 }), 0.3, 0.1, 0.02, x, 0.74, 2.105); k.box(k.mat(0x8a1010, 0.4, 0, { emissive: 0x200404 }), 0.32, 0.1, 0.02, x, 0.74, -2.105); }
   } };
   // A patrol car, nose to +z: black and white, its light bar lit (red and blue), a push bar on the front.
-  R.police = { w: 1.9, d: 4.6, cover: 1, boxes: [[0, 0, 1.84, 4.42, 0.93], [0, -0.2, 1.64, 2.15, 1.43, 0.93], [0, -0.15, 1.3, 0.36, 1.57, 1.43], [0, 2.28, 1.2, 0.14, 0.87, 0.37]], build(k) {
+  R.police = { w: 1.9, d: 4.6, cover: 1, boxes: [[0, 0, 1.84, 4.42, 0.93], [0, -0.2, 1.64, 2.15, 1.43, 0.93], [0, -0.15, 1.3, 0.36, 1.57, 1.43], [0, 2.28, 1.2, 0.14, 0.87, 0.37]], build(k: Kit) {
     const black = k.mat(0x111214, 0.35, 0.5), white = k.mat(0xeceae4, 0.35, 0.4), glass = k.mat(0x0c1218, 0.1, 0.6), tyre = k.mat(0x111112, 0.9), trim = k.mat(0x1c1c1e, 0.6);
     k.box(black, 1.82, 0.62, 4.4, 0, 0.62, 0);
     k.box(white, 1.84, 0.5, 2.0, 0, 0.66, -0.15); // the doors
@@ -720,21 +747,21 @@ const G_Furniture = (() => {
     k.box(k.mat(0x2a5aff, 0.3, 0, { emissive: 0x1030d0 }), 0.6, 0.1, 0.3, 0.33, 1.52, -0.15);
     for (const x of [-0.66, 0.66]) { k.box(k.mat(0xf2efe6, 0.3, 0, { emissive: 0x404040 }), 0.3, 0.1, 0.02, x, 0.74, 2.205); k.box(k.mat(0x8a1010, 0.4, 0, { emissive: 0x200404 }), 0.32, 0.1, 0.02, x, 0.74, -2.205); }
   } };
-  R.bench = { w: 1.8, d: 0.6, boxes: [[0, 0, 1.8, 0.55, 0.85]], build(k) {
+  R.bench = { w: 1.8, d: 0.6, boxes: [[0, 0, 1.8, 0.55, 0.85]], build(k: Kit) {
     const w = k.mat(k.pick(WOOD), 0.85), iron = k.mat(0x1c1c1e, 0.5, 0.5);
     for (let i = 0; i < 3; i++) k.box(w, 1.8, 0.04, 0.12, 0, 0.45, 0.16 - i * 0.14);
     for (let i = 0; i < 2; i++) k.box(w, 1.8, 0.1, 0.03, 0, 0.62 + i * 0.14, -0.24, 0, -0.15);
     for (const x of [-0.8, 0.8]) { k.box(iron, 0.05, 0.45, 0.5, x, 0.225, 0); k.box(iron, 0.05, 0.4, 0.05, x, 0.65, -0.24); }
   } };
   // A plane tree: a trunk you can stand behind and a canopy overhead (only the trunk stops you).
-  R.tree = { small: 1, w: 0.6, d: 0.6, boxes: [[0, 0, 0.45, 0.45, 3.2]], build(k) {
+  R.tree = { small: 1, w: 0.6, d: 0.6, boxes: [[0, 0, 0.45, 0.45, 3.2]], build(k: Kit) {
     k.cyl(k.mat(0x4a3a2a, 0.95), 0.18, 0.24, 3.2, 0, 1.6, 0, 8);
     const leaf = k.mat(k.pick([0x22401c, 0x2a4a22, 0x1e3a1a]), 0.95, 0, { flatShading: true });
     for (let i = 0; i < 9; i++) k.ico(leaf, 0.9 + k.rnd() * 0.6, (k.rnd() - 0.5) * 2.2, 3.4 + k.rnd() * 1.4, (k.rnd() - 0.5) * 2.2);
     k.box(k.mat(0x2a2622, 0.9), 1.0, 0.04, 1.0, 0, 0.02, 0); // its grate
   } };
   // The fountain in the middle of the square: a round stone basin and a column in the middle.
-  R.fountain = { w: 3.9, d: 3.9, boxes: [[0, 0, 3.7, 3.7, 0.6], [0, 0, 0.8, 0.8, 1.9]], build(k) {
+  R.fountain = { w: 3.9, d: 3.9, boxes: [[0, 0, 3.7, 3.7, 0.6], [0, 0, 0.8, 0.8, 1.9]], build(k: Kit) {
     const stone = k.mat(0x8a8478, 0.85), water = k.mat(0x2a5a7a, 0.1, 0.3, { emissive: 0x0a1a28 });
     k.cyl(stone, 1.85, 1.9, 0.6, 0, 0.3, 0, 28);
     k.cyl(water, 1.65, 1.65, 0.02, 0, 0.52, 0, 28);
@@ -746,11 +773,11 @@ const G_Furniture = (() => {
   // ---------------------------------------------------------------- a foundry (js/level.ts layFoundry)
   // fx: what a piece throws off (G.Level.buildFx: 'sparks' and 'jet' along dir, 'embers' off a molten surface r across,
   // 'smoke', 'steam'), glow: the light it gives (a lamp of its own); both in its own frame, from the floor up.
-  const MOLTEN = [0xffc060, 0.4, 0, { emissive: 0xff7010, emissiveIntensity: 2.6 }], DULL = [0x7a3010, 0.6, 0, { emissive: 0xb02a06, emissiveIntensity: 1.1 }];
+  const MOLTEN: MatArgs = [0xffc060, 0.4, 0, { emissive: 0xff7010, emissiveIntensity: 2.6 }], DULL: MatArgs = [0x7a3010, 0.6, 0, { emissive: 0xb02a06, emissiveIntensity: 1.1 }];
   // An electric arc furnace (across 2 x 2 tiles): a squat steel shell on its tilting rockers, its water-cooled panels'
   // headers round it, the refractory roof, three graphite electrodes down through it from their arms on the mast at
   // the back; the slag door glowing at the front, the tapping spout under it.
-  R.furnace = { w: 3.9, d: 3.9, cover: 1, boxes: [[0, 0, 3.4, 3.4, 3.3]], fx: [{ kind: 'sparks', y: 1.5, z: 1.75, r: 0.4, dir: [0, 0.35, 1] }, { kind: 'smoke', y: 3.6, r: 0.6, rate: 1.6 }], glow: { y: 1.8, z: 2.3, color: 0xff6a20, i: 0.55, d: 9 }, build(k) {
+  R.furnace = { w: 3.9, d: 3.9, cover: 1, boxes: [[0, 0, 3.4, 3.4, 3.3]], fx: [{ kind: 'sparks', y: 1.5, z: 1.75, r: 0.4, dir: [0, 0.35, 1] }, { kind: 'smoke', y: 3.6, r: 0.6, rate: 1.6 }], glow: { y: 1.8, z: 2.3, color: 0xff6a20, i: 0.55, d: 9 }, build(k: Kit) {
     const shell = k.mat(0x3d4246, 0.55, 0.6), rust = k.mat(0x5a4436, 0.8, 0.3), roof = k.mat(0x6a6660, 0.85), brick = k.mat(0x7a4a36, 0.9);
     const graphite = k.mat(0x2a2a2c, 0.5, 0.3), arm = k.mat(0x8a8f94, 0.45, 0.7), pipe = k.mat(0x2f5a7a, 0.5, 0.5), hot = k.mat(...MOLTEN), warm = k.mat(...DULL);
     for (const x of [-1.1, 1.1]) k.box(rust, 0.5, 0.45, 3.4, x, 0.225, 0); // the rockers
@@ -775,7 +802,7 @@ const G_Furniture = (() => {
   } };
   // A ladle of molten steel on its stand (across 2 x 2 tiles): a tapering steel shell banded round, the bail over it on
   // its trunnions, the lip lined with refractory brick and the steel in it glowing, a crust of slag on it here and there.
-  R.vat = { w: 3.9, d: 3.9, cover: 1, boxes: [[0, 0, 3.1, 3.1, 2.05]], fx: [{ kind: 'embers', y: 2.04, r: 1.1 }, { kind: 'smoke', y: 2.4, r: 1.0, rate: 2.4 }], glow: { y: 2.9, color: 0xff7a28, i: 0.7, d: 10 }, build(k) {
+  R.vat = { w: 3.9, d: 3.9, cover: 1, boxes: [[0, 0, 3.1, 3.1, 2.05]], fx: [{ kind: 'embers', y: 2.04, r: 1.1 }, { kind: 'smoke', y: 2.4, r: 1.0, rate: 2.4 }], glow: { y: 2.9, color: 0xff7a28, i: 0.7, d: 10 }, build(k: Kit) {
     const steel = k.mat(0x44484c, 0.7, 0.5), rim = k.mat(0x2e3134, 0.6, 0.6), brick = k.mat(0x6e5244, 0.9), crust = k.mat(0x2a2220, 0.95), hot = k.mat(...MOLTEN);
     for (const x of [-1.25, 1.25]) for (const z of [-1.25, 1.25]) k.box(steel, 0.3, 0.62, 0.3, x, 0.31, z); // the stand
     for (const z of [-1.25, 1.25]) k.box(steel, 3.0, 0.14, 0.3, 0, 0.62, z);
@@ -790,7 +817,7 @@ const G_Furniture = (() => {
     k.box(steel, 3.52, 0.22, 0.32, 0, 3.42, 0); k.box(rim, 0.3, 0.4, 0.12, 0, 3.72, 0); // the bail, the crane's eye
   } };
   // An ingot mould table: two rows of iron moulds on a frame, some of them full and still glowing, some cooled.
-  R.moulds = { w: 1.98, d: 1.9, cover: 1, boxes: [[0, 0, 1.9, 1.5, 0.8]], fx: [{ kind: 'embers', y: 0.78, r: 0.6, rate: 1.2 }], glow: { y: 1.3, color: 0xff7a30, i: 0.15, d: 4 }, build(k) {
+  R.moulds = { w: 1.98, d: 1.9, cover: 1, boxes: [[0, 0, 1.9, 1.5, 0.8]], fx: [{ kind: 'embers', y: 0.78, r: 0.6, rate: 1.2 }], glow: { y: 1.3, color: 0xff7a30, i: 0.15, d: 4 }, build(k: Kit) {
     const iron = k.mat(0x2c2e30, 0.75, 0.5), frame = k.mat(0x4a4e52, 0.6, 0.5), cool = k.mat(0x8a8e92, 0.4, 0.8), hot = k.mat(...MOLTEN), dull = k.mat(...DULL);
     for (const x of [-0.85, 0.85]) for (const z of [-0.65, 0.65]) k.box(frame, 0.1, 0.6, 0.1, x, 0.3, z);
     k.box(frame, 1.9, 0.08, 1.5, 0, 0.62, 0);
@@ -801,7 +828,7 @@ const G_Furniture = (() => {
     }
   } };
   // A bank of electrical cabinets against a wall: doors with their handles, lights and a screen on each, a warning sign.
-  R.panel = { w: 1.9, d: 0.6, boxes: [[0, 0, 1.9, 0.55, 2.1]], build(k) {
+  R.panel = { w: 1.9, d: 0.6, boxes: [[0, 0, 1.9, 0.55, 2.1]], build(k: Kit) {
     const grey = k.mat(k.pick([0x8a9298, 0x6d7a84, 0xb8bcb4]), 0.5, 0.3), dark = k.mat(0x1a1c1e, 0.6), yel = k.mat(0xf0c020, 0.6);
     const red = k.mat(0xff3020, 0.4, 0, { emissive: 0xff2010, emissiveIntensity: 1.5 }), green = k.mat(0x30ff60, 0.4, 0, { emissive: 0x20d040, emissiveIntensity: 1.5 });
     k.box(dark, 1.9, 0.1, 0.52, 0, 0.05, -0.02); k.box(grey, 1.9, 2.0, 0.5, 0, 1.1, -0.02);
@@ -814,7 +841,7 @@ const G_Furniture = (() => {
     }
   } };
   // A charging bucket of scrap for the furnace: an open steel bin heaped with rusted offcuts.
-  R.scrap = { w: 1.9, d: 1.9, cover: 1, boxes: [[0, 0, 1.8, 1.6, 1.15]], build(k) {
+  R.scrap = { w: 1.9, d: 1.9, cover: 1, boxes: [[0, 0, 1.8, 1.6, 1.15]], build(k: Kit) {
     const bin = k.mat(0x4a3f36, 0.85, 0.4), RUST = [0x6a4a36, 0x5a5048, 0x7a5a40, 0x4a4a4c, 0x8a6a4a, 0x3a3634];
     k.box(bin, 1.8, 0.08, 1.6, 0, 0.04, 0);
     for (const s of [-1, 1]) { k.box(bin, 1.8, 1.1, 0.06, 0, 0.55, s * 0.77); k.box(bin, 0.06, 1.1, 1.6, s * 0.87, 0.55, 0); k.box(bin, 0.12, 0.2, 0.3, s * 0.95, 0.95, 0); }
@@ -827,7 +854,7 @@ const G_Furniture = (() => {
   } };
   // A roller conveyor (one tile of a processing line, running along x): rollers between two side beams on legs, a billet
   // on it now and then, a hot one glowing.
-  R.conveyor = { w: 1.98, d: 1.2, cover: 1, boxes: [[0, 0, 1.98, 1.1, 0.92]], build(k, v) {
+  R.conveyor = { w: 1.98, d: 1.2, cover: 1, boxes: [[0, 0, 1.98, 1.1, 0.92]], build(k: Kit, v: number) {
     const frame = k.mat(k.pick([0x3f6e9a, 0xc89a20, 0x4a5a3a]), 0.5, 0.4), roller = k.mat(0x9aa0a6, 0.3, 0.8), dark = k.mat(0x2a2c2e, 0.6, 0.5);
     for (const x of [-0.85, 0.85]) for (const z of [-0.45, 0.45]) k.box(dark, 0.08, 0.8, 0.08, x, 0.4, z);
     for (const z of [-0.5, 0.5]) k.box(frame, 1.98, 0.16, 0.08, 0, 0.82, z);
@@ -836,7 +863,7 @@ const G_Furniture = (() => {
   } };
   // A rolling mill stand (one tile of the line): a housing post each side, the two work rolls across between them, the
   // screw-down on top, steam off the rolls.
-  R.mill = { w: 1.98, d: 1.9, cover: 1, boxes: [[0, 0, 1.3, 1.9, 2.7]], fx: [{ kind: 'steam', y: 1.3, r: 0.5, rate: 2.2 }], build(k) {
+  R.mill = { w: 1.98, d: 1.9, cover: 1, boxes: [[0, 0, 1.3, 1.9, 2.7]], fx: [{ kind: 'steam', y: 1.3, r: 0.5, rate: 2.2 }], build(k: Kit) {
     const housing = k.mat(k.pick([0x4d6f8f, 0x5a6a50, 0x8a4a2a]), 0.55, 0.4), roll = k.mat(0xc8ccd0, 0.2, 0.9), dark = k.mat(0x2a2c2e, 0.6, 0.5);
     k.box(dark, 1.5, 0.2, 1.98, 0, 0.1, 0);
     for (const z of [-0.78, 0.78]) { k.box(housing, 1.2, 2.5, 0.3, 0, 1.45, z); k.box(dark, 0.5, 0.9, 0.32, 0, 1.0, z); } // (the window the chocks ride in)
@@ -846,7 +873,7 @@ const G_Furniture = (() => {
     k.box(k.mat(0xf0c020, 0.6), 1.22, 0.06, 0.32, 0, 2.2, -0.78); // (a stripe of warning paint)
   } };
   // A hot saw (one tile of the line): a guard over the blade across the line, the motor behind; sparks off it while it cuts.
-  R.saw = { w: 1.98, d: 1.6, cover: 1, boxes: [[0, 0, 1.4, 1.5, 1.75]], fx: [{ kind: 'jet', y: 0.95, z: 0.45, r: 0.1, dir: [0, 0.35, 1] }], build(k) {
+  R.saw = { w: 1.98, d: 1.6, cover: 1, boxes: [[0, 0, 1.4, 1.5, 1.75]], fx: [{ kind: 'jet', y: 0.95, z: 0.45, r: 0.1, dir: [0, 0.35, 1] }], build(k: Kit) {
     const body = k.mat(k.pick([0xc8a020, 0xb84a2a, 0x4a6a8a]), 0.5, 0.4), dark = k.mat(0x2a2c2e, 0.6, 0.5), blade = k.mat(0xd0d4d8, 0.2, 0.9);
     k.box(dark, 1.4, 0.7, 1.4, 0, 0.35, 0);
     k.cylX(body, 0.66, 0.66, 0.2, 0, 1.15, -0.05, 22); k.cylX(blade, 0.6, 0.6, 0.02, 0, 1.0, 0.1, 22);
@@ -855,7 +882,7 @@ const G_Furniture = (() => {
   } };
   // A hydraulic forging press (one tile of the line): four columns between the bed and the crown, the ram on them, its
   // cylinder on top.
-  R.press = { w: 1.98, d: 1.9, cover: 1, boxes: [[0, 0, 1.8, 1.7, 3.4]], build(k) {
+  R.press = { w: 1.98, d: 1.9, cover: 1, boxes: [[0, 0, 1.8, 1.7, 3.4]], build(k: Kit) {
     const body = k.mat(k.pick([0x3a5a7a, 0x5a5f63, 0x7a3a2a]), 0.5, 0.5), chrome = k.mat(0xd8dce0, 0.15, 0.95), dark = k.mat(0x2a2c2e, 0.6, 0.5);
     k.box(body, 1.8, 0.7, 1.7, 0, 0.35, 0); k.box(body, 1.8, 0.6, 1.7, 0, 3.1, 0);
     for (const x of [-0.72, 0.72]) for (const z of [-0.62, 0.62]) k.cyl(chrome, 0.1, 0.1, 2.2, x, 1.8, z, 12);
@@ -863,7 +890,7 @@ const G_Furniture = (() => {
     k.cyl(k.mat(0x1a1a1a, 0.7), 0.03, 0.03, 2.6, 0.85, 2.0, -0.8, 6); // (a hydraulic line)
   } };
   // A quench tank at the end of the line: a steel tank of water, steam off it.
-  R.quench = { w: 1.98, d: 1.5, cover: 1, boxes: [[0, 0, 1.9, 1.4, 0.95]], fx: [{ kind: 'steam', y: 0.95, r: 0.8, rate: 3.5 }], build(k) {
+  R.quench = { w: 1.98, d: 1.5, cover: 1, boxes: [[0, 0, 1.9, 1.4, 0.95]], fx: [{ kind: 'steam', y: 0.95, r: 0.8, rate: 3.5 }], build(k: Kit) {
     const steel = k.mat(0x5a5f63, 0.55, 0.6), water = k.mat(0x2a3e48, 0.08, 0.3);
     k.box(steel, 1.9, 0.08, 1.4, 0, 0.04, 0);
     for (const s of [-1, 1]) { k.box(steel, 1.9, 0.95, 0.06, 0, 0.475, s * 0.67); k.box(steel, 0.06, 0.95, 1.4, s * 0.92, 0.475, 0); }
@@ -871,7 +898,7 @@ const G_Furniture = (() => {
   } };
   // A forklift (across two tiles, lengthwise; the forks at the front, +z): the body and its counterweight, the seat
   // under the overhead guard, the mast with the carriage and forks down.
-  R.forklift = { w: 1.4, d: 3.4, cover: 1, boxes: [[0, -0.55, 1.25, 2.3, 1.2], [0, -0.5, 1.15, 1.4, 2.2, 2.1], [0, 0.78, 1.0, 0.25, 2.3], [0, 1.28, 0.95, 0.9, 0.12]], build(k) {
+  R.forklift = { w: 1.4, d: 3.4, cover: 1, boxes: [[0, -0.55, 1.25, 2.3, 1.2], [0, -0.5, 1.15, 1.4, 2.2, 2.1], [0, 0.78, 1.0, 0.25, 2.3], [0, 1.28, 0.95, 0.9, 0.12]], build(k: Kit) {
     const paint = k.mat(k.pick([0xe0b020, 0xd86a1a, 0x3a7a3a, 0xc02a1a]), 0.5, 0.2), black = k.mat(0x1a1a1a, 0.7), cw = k.mat(0x3a3c3e, 0.6, 0.4), steel = k.mat(0x5a5e62, 0.4, 0.6), chrome = k.mat(0xd0d4d8, 0.15, 0.9);
     k.box(paint, 1.2, 0.55, 1.9, 0, 0.6, -0.4); k.box(cw, 1.25, 0.75, 0.45, 0, 0.65, -1.45); // the body, the counterweight
     k.box(black, 0.5, 0.12, 0.45, 0, 0.95, -0.75); k.box(black, 0.5, 0.45, 0.08, 0, 1.22, -0.98, 0, -0.15); // the seat
@@ -887,7 +914,7 @@ const G_Furniture = (() => {
   } };
   // Raw stock on pallets: billets (square bars in layers, sticks between, banded), ingots (stacked crosswise), coils
   // of strip steel lying on a cradle.
-  R.billets = { w: 1.9, d: 1.4, cover: 1, boxes: [[0, 0, 1.85, 1.25, 0.9]], build(k) {
+  R.billets = { w: 1.9, d: 1.4, cover: 1, boxes: [[0, 0, 1.85, 1.25, 0.9]], build(k: Kit) {
     const wood = k.mat(0x8a6a44, 0.9), band = k.mat(0x2a4a8a, 0.5, 0.4), BAR = [0x6a6e72, 0x5e5a56, 0x7a6a5a, 0x6e5444];
     for (const z of [-0.5, 0, 0.5]) k.box(wood, 1.85, 0.12, 0.12, 0, 0.06, z);
     for (let l = 0; l < 4; l++) {
@@ -897,15 +924,15 @@ const G_Furniture = (() => {
     }
     for (const x of [-0.75, 0.75]) k.box(band, 0.03, 0.72, 1.24, x, 0.48, 0);
   } };
-  R.ingots = { w: 1.5, d: 1.5, cover: 1, boxes: [[0, 0, 1.3, 1.3, 1.0]], build(k) {
-    const wood = k.mat(0x8a6a44, 0.9), m = k.pick([[0xb8bcc0, 0.35, 0.8], [0xb06a3a, 0.35, 0.8], [0x6a6e72, 0.5, 0.7]]), metal = k.mat(...m);
+  R.ingots = { w: 1.5, d: 1.5, cover: 1, boxes: [[0, 0, 1.3, 1.3, 1.0]], build(k: Kit) {
+    const wood = k.mat(0x8a6a44, 0.9), m = k.pick<[number, number, number]>([[0xb8bcc0, 0.35, 0.8], [0xb06a3a, 0.35, 0.8], [0x6a6e72, 0.5, 0.7]]), metal = k.mat(...m);
     for (const z of [-0.5, 0, 0.5]) k.box(wood, 1.3, 0.12, 0.12, 0, 0.06, z);
     for (let l = 0; l < 7; l++) for (let i = 0; i < 4; i++) {
       const y = 0.18 + l * 0.12, o = -0.45 + i * 0.3;
       if (l % 2) k.box(metal, 0.26, 0.11, 1.25, o, y, 0); else k.box(metal, 1.25, 0.11, 0.26, 0, y, o);
     }
   } };
-  R.coils = { w: 1.9, d: 1.9, cover: 1, boxes: [[0, 0, 1.8, 1.5, 1.35]], build(k) {
+  R.coils = { w: 1.9, d: 1.9, cover: 1, boxes: [[0, 0, 1.8, 1.5, 1.35]], build(k: Kit) {
     const steel = k.mat(k.pick([0x8a8e92, 0x6a6e72, 0x9a7a5a]), 0.35, 0.8), dark = k.mat(0x1c1d1e, 0.8), cradle = k.mat(0x4a3f36, 0.8, 0.4), band = k.mat(0x2a4a8a, 0.5, 0.4);
     for (const z of [-0.5, 0.5]) k.box(cradle, 1.8, 0.14, 0.3, 0, 0.07, z);
     for (const x of [-0.45, 0.45]) {
@@ -914,7 +941,7 @@ const G_Furniture = (() => {
     }
   } };
   // A control desk against the window: a sloping panel of buttons, three screens on it, a chair at it.
-  R.console = { w: 1.9, d: 0.95, cover: 1, boxes: [[0, -0.12, 1.9, 0.7, 0.95]], build(k) {
+  R.console = { w: 1.9, d: 0.95, cover: 1, boxes: [[0, -0.12, 1.9, 0.7, 0.95]], build(k: Kit) {
     const body = k.mat(k.pick([0xc8ccd0, 0x5a6068]), 0.5, 0.2), dark = k.mat(0x1a1c1e, 0.5), BTN = [0xd03020, 0x30a040, 0xe0c020, 0x2a60c0];
     k.box(body, 1.9, 0.76, 0.7, 0, 0.38, -0.12);
     k.box(dark, 1.88, 0.04, 0.42, 0, 0.82, 0.02, 0, -0.3);
@@ -923,7 +950,7 @@ const G_Furniture = (() => {
     k.cyl(dark, 0.22, 0.22, 0.08, 0.1, 0.47, 0.38, 12); k.cyl(dark, 0.03, 0.03, 0.4, 0.1, 0.24, 0.38, 6); k.box(dark, 0.42, 0.45, 0.06, 0.1, 0.78, 0.6);
   } };
   // A toilet stall against the wall: partitions either side, the door standing open inward, the toilet at the back.
-  R.stall = { w: 1.9, d: 1.6, boxes: [[-0.92, 0, 0.04, 1.5, 1.9, 0.12], [0.92, 0, 0.04, 1.5, 1.9, 0.12], [0, -0.45, 0.42, 0.66, 0.8]], build(k) {
+  R.stall = { w: 1.9, d: 1.6, boxes: [[-0.92, 0, 0.04, 1.5, 1.9, 0.12], [0.92, 0, 0.04, 1.5, 1.9, 0.12], [0, -0.45, 0.42, 0.66, 0.8]], build(k: Kit) {
     const part = k.mat(k.pick([0x8a9aa8, 0xc8c0b0, 0x5a6a5a]), 0.5, 0.1), steel = k.mat(0xb8bcc0, 0.3, 0.8), white = k.mat(0xeceae4, 0.3);
     for (const x of [-0.92, 0.92]) { k.box(part, 0.04, 1.78, 1.5, x, 1.01, 0); k.box(steel, 0.05, 0.12, 0.05, x, 0.06, 0.6); }
     k.box(steel, 1.88, 0.05, 0.05, 0, 1.92, 0.74); // the header rail
@@ -932,7 +959,7 @@ const G_Furniture = (() => {
     k.cyl(k.mat(0xf2f0ea, 0.8), 0.06, 0.06, 0.1, -0.7, 0.75, -0.2, 10, Math.PI / 2); // (the paper)
   } };
   // A row of steel lockers.
-  R.lockers = { w: 1.9, d: 0.5, boxes: [[0, 0, 1.9, 0.48, 1.9]], build(k) {
+  R.lockers = { w: 1.9, d: 0.5, boxes: [[0, 0, 1.9, 0.48, 1.9]], build(k: Kit) {
     const c = k.mat(k.pick([0x4a6a8a, 0x8a9298, 0x6a7a5a, 0x9a4a3a]), 0.5, 0.4), dark = k.mat(0x1a1c1e, 0.6);
     k.box(dark, 1.9, 0.1, 0.46, 0, 0.05, 0); k.box(c, 1.9, 1.8, 0.46, 0, 1.0, 0);
     for (let i = 0; i < 5; i++) {
@@ -946,7 +973,7 @@ const G_Furniture = (() => {
   // (js/level.ts layCrest: the outcrops are its walls; what stands about on them is here)
   const GRANITE = [0xb08478, 0xa47a6e, 0xba8e80, 0x9a7468, 0xc49a8a];
   // A granite boulder, waist high: cover. A lump and a smaller one leaning on it, lichen here and there.
-  R.boulder = { w: 1.9, d: 1.5, cover: 1, boxes: [[0, 0, 1.6, 1.25, 1.1]], build(k) {
+  R.boulder = { w: 1.9, d: 1.5, cover: 1, boxes: [[0, 0, 1.6, 1.25, 1.1]], build(k: Kit) {
     const g = k.mat(k.pick(GRANITE), 0.95, 0, { flatShading: true }), g2 = k.mat(k.tint(g.color.getHex(), 0.88), 0.95, 0, { flatShading: true });
     k.ico(g, 0.72, (k.rnd() - 0.5) * 0.2, 0.38, (k.rnd() - 0.5) * 0.15);
     k.ico(g2, 0.42 + k.rnd() * 0.12, 0.45 * (k.rnd() < 0.5 ? -1 : 1), 0.28, 0.25 * (k.rnd() - 0.5));
@@ -955,7 +982,7 @@ const G_Furniture = (() => {
     for (let i = 0; i < 3; i++) k.ico(lichen, 0.08 + k.rnd() * 0.06, (k.rnd() - 0.5) * 0.9, 0.7 + k.rnd() * 0.3, (k.rnd() - 0.5) * 0.6);
   } };
   // A one-seed juniper, a dense bush about head high, blue-green: you can hide in it, not stop a round with it.
-  R.juniper = { w: 1.6, d: 1.4, cover: 1, boxes: [[0, 0, 1.4, 1.2, 1.5]], build(k) {
+  R.juniper = { w: 1.6, d: 1.4, cover: 1, boxes: [[0, 0, 1.4, 1.2, 1.5]], build(k: Kit) {
     const leaf = k.mat(k.pick([0x4a5e48, 0x50644c, 0x44584a]), 0.95, 0, { flatShading: true });
     k.cyl(k.mat(0x5a4a3a, 0.95), 0.06, 0.1, 0.5, 0, 0.25, 0, 6);
     for (let i = 0; i < 9; i++) k.ico(leaf, 0.35 + k.rnd() * 0.2, (k.rnd() - 0.5) * 1.0, 0.45 + k.rnd() * 0.85, (k.rnd() - 0.5) * 0.8);
@@ -963,20 +990,20 @@ const G_Furniture = (() => {
     for (let i = 0; i < 8; i++) k.sph(berry, 0.03, (k.rnd() - 0.5) * 1.1, 0.5 + k.rnd() * 0.9, (k.rnd() - 0.5) * 0.9);
   } };
   // A piñon pine: a short twisted trunk you can stand behind, a round crown low over it (only the trunk stops you).
-  R.pinon = { small: 1, w: 0.6, d: 0.6, boxes: [[0, 0, 0.4, 0.4, 2.4]], build(k) {
+  R.pinon = { small: 1, w: 0.6, d: 0.6, boxes: [[0, 0, 0.4, 0.4, 2.4]], build(k: Kit) {
     const bark = k.mat(0x4e3c2e, 0.95);
     k.cyl(bark, 0.12, 0.2, 1.4, 0, 0.7, 0, 7); k.cyl(bark, 0.07, 0.1, 1.0, 0.2, 1.6, 0.05, 6, 0.4);
     const leaf = k.mat(k.pick([0x37502e, 0x3e5632, 0x324a2c]), 0.95, 0, { flatShading: true });
     for (let i = 0; i < 10; i++) k.ico(leaf, 0.55 + k.rnd() * 0.35, (k.rnd() - 0.5) * 1.8, 1.6 + k.rnd() * 1.4, (k.rnd() - 0.5) * 1.8);
   } };
   // A cholla: a cactus of jointed arms, waist high, yellow fruit on the ends.
-  R.cholla = { small: 1, boxes: [[0, 0, 0.5, 0.5, 1.1]], build(k) {
+  R.cholla = { small: 1, boxes: [[0, 0, 0.5, 0.5, 1.1]], build(k: Kit) {
     const g = k.mat(0x6a7a48, 0.9, 0, { flatShading: true }), fr = k.mat(0xd8c048, 0.8);
     k.cyl(g, 0.06, 0.08, 0.7, 0, 0.35, 0, 6);
     for (let i = 0; i < 5; i++) { const a = k.rnd() * 6.28, x = Math.cos(a) * 0.18, z = Math.sin(a) * 0.18, y = 0.55 + k.rnd() * 0.35; k.cyl(g, 0.045, 0.055, 0.4, x, y, z, 6, 0.6 * (k.rnd() - 0.5)); k.sph(fr, 0.04, x * 1.3, y + 0.22, z * 1.3); }
   } };
   // A raised bed of chile plants: a timber frame of earth, a row of bushes with green and red pods. Knee high: cover crouching.
-  R.chilebed = { w: 1.9, d: 0.9, cover: 1, boxes: [[0, 0, 1.9, 0.9, 0.55]], build(k) {
+  R.chilebed = { w: 1.9, d: 0.9, cover: 1, boxes: [[0, 0, 1.9, 0.9, 0.55]], build(k: Kit) {
     const wood = k.mat(k.pick([0x7a5a3a, 0x6b4c30, 0x8a6a48]), 0.9), soil = k.mat(0x3e2c1e, 1);
     k.box(wood, 1.9, 0.4, 0.9, 0, 0.2, 0); k.box(soil, 1.8, 0.02, 0.8, 0, 0.41, 0);
     const leaf = k.mat(k.pick([0x3e6a2e, 0x4a7a34, 0x36602a]), 0.85, 0, { flatShading: true }), red = k.mat(0xb02018, 0.5), green = k.mat(0x3a7a22, 0.5);
@@ -987,7 +1014,7 @@ const G_Furniture = (() => {
     }
   } };
   // A greenhouse's potting bench: a slatted table on legs, seedlings in pots along it, a few trays under it.
-  R.potbench = { w: 1.9, d: 0.8, cover: 1, boxes: [[0, 0, 1.9, 0.8, 0.9]], build(k) {
+  R.potbench = { w: 1.9, d: 0.8, cover: 1, boxes: [[0, 0, 1.9, 0.8, 0.9]], build(k: Kit) {
     const wood = k.mat(k.pick([0x9a7a54, 0x8a6a48]), 0.85), pot = k.mat(0xb0603a, 0.8), tray = k.mat(0x1c1c1e, 0.7);
     for (let i = 0; i < 6; i++) k.box(wood, 1.9, 0.03, 0.11, 0, 0.82, -0.33 + i * 0.132);
     for (const x of [-0.88, 0.88]) for (const z of [-0.34, 0.34]) k.box(wood, 0.06, 0.82, 0.06, x, 0.41, z);
@@ -1000,14 +1027,14 @@ const G_Furniture = (() => {
     }
   } };
   // A fruit tree in the garden, an apple: a short trunk, a round crown, fruit in it.
-  R.fruittree = { small: 1, w: 0.6, d: 0.6, boxes: [[0, 0, 0.35, 0.35, 2.4]], build(k) {
+  R.fruittree = { small: 1, w: 0.6, d: 0.6, boxes: [[0, 0, 0.35, 0.35, 2.4]], build(k: Kit) {
     k.cyl(k.mat(0x5a4632, 0.95), 0.1, 0.15, 1.6, 0, 0.8, 0, 7);
     const leaf = k.mat(k.pick([0x4a7034, 0x547a3a, 0x40662e]), 0.9, 0, { flatShading: true }), fruit = k.mat(k.pick([0xb8281e, 0xc8a030]), 0.5);
     for (let i = 0; i < 8; i++) k.ico(leaf, 0.45 + k.rnd() * 0.3, (k.rnd() - 0.5) * 1.4, 2.0 + k.rnd() * 0.9, (k.rnd() - 0.5) * 1.4);
     for (let i = 0; i < 10; i++) k.sph(fruit, 0.05, (k.rnd() - 0.5) * 1.5, 1.7 + k.rnd() * 1.1, (k.rnd() - 0.5) * 1.5);
   } };
   // Ristras drying: two long strings of red chiles hung from a timber frame.
-  R.ristra = { small: 1, boxes: [[0, 0, 0.9, 0.3, 2.0]], build(k) {
+  R.ristra = { small: 1, boxes: [[0, 0, 0.9, 0.3, 2.0]], build(k: Kit) {
     const wood = k.mat(0x6a4a2e, 0.9), red = k.mat(0x9a1a12, 0.55), stem = k.mat(0x6a6a2a, 0.8);
     for (const x of [-0.42, 0.42]) k.box(wood, 0.08, 2.0, 0.08, x, 1.0, 0);
     k.box(wood, 0.98, 0.08, 0.08, 0, 1.98, 0);
@@ -1017,7 +1044,7 @@ const G_Furniture = (() => {
     }
   } };
   // A coin-operated viewer on the overlook: a post, the binocular head on it looking out (-z: away from you).
-  R.scope = { small: 1, boxes: [[0, 0, 0.4, 0.4, 1.45]], build(k) {
+  R.scope = { small: 1, boxes: [[0, 0, 0.4, 0.4, 1.45]], build(k: Kit) {
     const paint = k.mat(0x2e5a3a, 0.5, 0.3), dark = k.mat(0x1c1c1e, 0.5, 0.4), steel = k.mat(0x9aa0a6, 0.3, 0.7);
     k.cyl(dark, 0.18, 0.2, 0.06, 0, 0.03, 0, 12); k.cyl(paint, 0.05, 0.06, 1.1, 0, 0.6, 0, 10);
     k.box(paint, 0.34, 0.24, 0.3, 0, 1.28, 0); k.box(steel, 0.1, 0.06, 0.02, 0, 1.24, 0.16);
@@ -1025,21 +1052,21 @@ const G_Furniture = (() => {
   } };
   // The low stone wall along a cliff's edge (the theme's fence): granite set in mortar, a flat coping, about hip high. You see,
   // and shoot, over it; crouch behind it.
-  R.cliffwall = { w: 0.68, d: 0.42, boxes: [[0, 0, 0.68, 0.42, 0.95]], build(k, v) {
+  R.cliffwall = { w: 0.68, d: 0.42, boxes: [[0, 0, 0.68, 0.42, 0.95]], build(k: Kit, v: number) {
     const mortar = k.mat(0x9a8a7e, 1), cap = k.mat(0x8a7468, 0.9);
     k.box(mortar, 0.68, 0.86, 0.38, 0, 0.43, 0);
     for (let i = 0; i < 3; i++) for (const s of [-1, 1]) k.box(k.mat(GRANITE[Math.floor((v * 7 + i * 3 + s + 1) * 5) % GRANITE.length], 0.95), 0.2 + k.rnd() * 0.1, 0.2 + k.rnd() * 0.06, 0.04, -0.22 + i * 0.22 + (k.rnd() - 0.5) * 0.04, 0.16 + (i % 2) * 0.26 + k.rnd() * 0.1, s * 0.19);
     k.box(cap, 0.7, 0.09, 0.44, 0, 0.905, 0);
   } };
   // A coyote fence: latillas (peeled poles) side by side, ragged along the top, wired to rails. Too tall to see over.
-  R.coyote = { w: 0.68, d: 0.14, boxes: [[0, 0, 0.68, 0.14, 1.6]], build(k, v) {
+  R.coyote = { w: 0.68, d: 0.14, boxes: [[0, 0, 0.68, 0.14, 1.6]], build(k: Kit, v: number) {
     const wire = k.mat(0x5a5a5a, 0.5, 0.6);
     for (const y of [0.3, 1.2]) k.box(wire, 0.68, 0.02, 0.02, 0, y, 0.06);
     for (let i = 0; i < 7; i++) { const h = 1.35 + k.rnd() * 0.35; k.cyl(k.mat(k.pick([0x8a7058, 0x7a6048, 0x9a8068, 0x6e5640]), 0.95), 0.035, 0.045, h, -0.29 + i * 0.097, h / 2, (k.rnd() - 0.5) * 0.03, 6); }
   } };
   // A mast on the antenna farm: its equipment hut at the foot (what stops you), a steel lattice tower up out of it, dishes and
   // panels on it, red beacons up its length.
-  R.mast = { w: 1.9, d: 1.9, cover: 1, boxes: [[0, 0, 1.8, 1.8, 2.5]], build(k, v) {
+  R.mast = { w: 1.9, d: 1.9, cover: 1, boxes: [[0, 0, 1.8, 1.8, 2.5]], build(k: Kit, v: number) {
     const hut = k.mat(0xc8c4b8, 0.7), roof = k.mat(0x5a5e62, 0.6, 0.4), steel = k.mat(0xb8bcc0, 0.4, 0.6), red = k.mat(0xff2a1a, 0.4, 0, { emissive: 0xff2010, emissiveIntensity: 1.6 }), white = k.mat(0xe8e8e4, 0.5);
     k.box(hut, 1.8, 2.4, 1.8, 0, 1.2, 0); k.box(roof, 1.9, 0.1, 1.9, 0, 2.45, 0); k.box(k.mat(0x5a5e62, 0.5, 0.4), 0.8, 1.9, 0.03, 0, 0.95, 0.91);
     const H = 14 + v * 5, a = 0.36; // (its height over the hut, a leg's offset from the middle)
@@ -1058,10 +1085,10 @@ const G_Furniture = (() => {
   // M Performance kit: black kidneys, black mirror caps, the carbon lip spoiler on the boot, the stripe along the sills with
   // its lettering; the M Sport bumpers' big intakes, blue M Sport calipers behind 19-inch double-spoke wheels (the 405M),
   // twin tailpipes, the "Air Breather" behind each front arch. Solid cover across two tiles.
-  R.bmw340 = { w: 1.85, d: 4.65, cover: 1, boxes: [[0, 0, 1.81, 4.6, 0.99], [0, -0.25, 1.48, 2.5, 1.43, 0.99]], build(k) {
+  R.bmw340 = { w: 1.85, d: 4.65, cover: 1, boxes: [[0, 0, 1.81, 4.6, 0.99], [0, -0.25, 1.48, 2.5, 1.43, 0.99]], build(k: Kit) {
     const paint = k.mat(0x8c9399, 0.3, 0.62), glass = k.mat(0x111a20, 0.06, 0.7), black = k.mat(0x0e0f10, 0.35, 0.3), trim = k.mat(0x1c1d1f, 0.55), chrome = k.mat(0xd8dcde, 0.12, 1);
     const tyre = k.mat(0x121213, 0.92), rim = k.mat(0xaab0b5, 0.3, 0.55), carbon = k.mat(0x1a1b1d, 0.2, 0.4), blue = k.mat(0x1f4fa8, 0.4, 0.3);
-    const FA = 1.557, RA = -1.253, R = 0.33, arch = (c, s) => [[c + s * 0.395, 0.17], [c + s * 0.375, 0.33], [c + s * 0.3, 0.56], [c + s * 0.16, 0.69], [c, 0.72], [c - s * 0.16, 0.69], [c - s * 0.3, 0.56], [c - s * 0.375, 0.33], [c - s * 0.395, 0.16]];
+    const FA = 1.557, RA = -1.253, R = 0.33, arch = (c: number, s: number) => [[c + s * 0.395, 0.17], [c + s * 0.375, 0.33], [c + s * 0.3, 0.56], [c + s * 0.16, 0.69], [c, 0.72], [c - s * 0.16, 0.69], [c - s * 0.3, 0.56], [c - s * 0.375, 0.33], [c - s * 0.395, 0.16]];
     // the body: the tail, up over the boot to the shoulder, along it, down the bonnet to the nose, under it and round both arches
     k.side(paint, [[-2.3, 0.24], [-2.33, 0.55], [-2.3, 0.87], [-2.21, 0.985], [-1.6, 1.0], [0.6, 0.995], [1.15, 0.985], [1.75, 0.93], [2.15, 0.85], [2.29, 0.77], [2.33, 0.62], [2.32, 0.45], [2.26, 0.23],
       ...arch(FA, 1), ...arch(RA, 1).slice(0)], 1.77, 0, 0.02);
@@ -1162,9 +1189,9 @@ const G_Furniture = (() => {
   const WORK = ['storage', 'office', 'breakroom', 'storage'];
 
   // world-space collision boxes for a piece placed at (x, z) turned q quarter-turns
-  function worldBoxes(rec, x, z, q, v) {
+  function worldBoxes(rec: PieceRec, x: number, z: number, q: number, v: number): WBox[] {
     const s = Math.round(Math.sin(q * Math.PI / 2)), c = Math.round(Math.cos(q * Math.PI / 2));
-    const at = (list) => list.map(([lx, lz, w, d, h, y0 = 0, m]) => ({
+    const at = (list: [number, number, number, number, number, number?, any?][]): WBox[] => list.map(([lx, lz, w, d, h, y0 = 0, m]) => ({
       cx: x + lx * c + lz * s, cz: z - lx * s + lz * c,
       hx: (c ? w : d) / 2, hz: (c ? d : w) / 2, y0, h, m,
     }));
@@ -1174,16 +1201,16 @@ const G_Furniture = (() => {
     return out;
   }
   // quarter-turns that put the back (-z) of a piece against the wall in direction (dx, dz)
-  const facing = (dx, dz) => ((Math.round(Math.atan2(-dx, -dz) / (Math.PI / 2)) % 4) + 4) % 4;
+  const facing = (dx: number, dz: number) => ((Math.round(Math.atan2(-dx, -dz) / (Math.PI / 2)) % 4) + 4) % 4;
 
   // Runs on the coarse (2 m) grid; G.Level.refine then lays the pieces on the fine grid. wd: the wall(s) a
   // piece is set against, so it can follow the wall when the wall is thinned.
-  function plan(map, r, spawnRoom, exitRoom, tryBlock) {
+  function plan(map: any, r: () => number, spawnRoom: Room, exitRoom: Room, tryBlock: (x: number, z: number, n: number) => boolean) {
     const U = G.U, { W, t, rooms } = map, TS = map.TS || G.Level.TS, home = map.theme.home == null ? 1 : map.theme.home;
     map.props = new Map();
     const homes = U.shuffle(r, HOME.slice());
     let hi = 0, wi = Math.floor(r() * WORK.length);
-    const put = (name, tx, tz, x, z, q, v, wd?) => {
+    const put = (name: string, tx: number, tz: number, x: number, z: number, q: number, v: number, wd?: number[][]) => {
       const rec = R[name], i = tz * W + tx;
       map.props.set(i, { name, q, x, z, v, wd, boxes: worldBoxes(rec, x, z, q, v) });
     };
@@ -1192,11 +1219,11 @@ const G_Furniture = (() => {
     // stall's counter: map.civSpots) and the strings of lights over it all (map.fest.strings: ends in metres,
     // with a pole under each end that has one) go with it.
     function festival() {
-      const F = map.fest = { strings: [], stage: null, gate: null, lamps: [], bays: [], plaza: null, lot: null }, C = (v) => (v + 0.5) * TS;
+      const F: Fest = map.fest = { strings: [], stage: null, gate: null, lamps: [], bays: [], plaza: null, lot: null }, C = (v: number) => (v + 0.5) * TS;
       map.civSpots = [];
-      const str = (a, b, kind, pa, pb) => F.strings.push({ a, b, kind, pa, pb });
+      const str = (a: number[], b: number[], kind: string, pa: boolean, pb: boolean) => F.strings.push({ a, b, kind, pa, pb });
       return {
-        stage(rm) {
+        stage(rm: Room) {
           F.stage = { x0: rm.x * TS, x1: (rm.x + rm.w) * TS, z0: rm.z * TS, z1: (rm.z + rm.h) * TS };
           for (let z = rm.z; z < rm.z + rm.h; z++) for (let x = rm.x; x < rm.x + rm.w; x++) {
             const wing = (x === rm.x || x === rm.x + rm.w - 1) && z === rm.z + rm.h - 1; // the PA stacks, at the front corners
@@ -1204,7 +1231,7 @@ const G_Furniture = (() => {
             put(wing ? 'speaker' : 'stagedeck', x, z, C(x), C(z), wing ? facing(0, -1) : 0, r());
           }
         },
-        seating(rm) {
+        seating(rm: Room) {
           const cx = rm.cx, half = Math.min(11, (rm.w >> 1) - 2);
           for (const dz of [2, 4, 6, 8]) {
             const z = rm.z + dz, v = r();
@@ -1220,13 +1247,13 @@ const G_Furniture = (() => {
           const s = F.stage;
           if (s) for (let i = 0; i < 7; i++) str([s.x0 + 0.4 + (i / 6) * (s.x1 - s.x0 - 0.8), 7.0, s.z1 - 0.3], [C(cx) + (i - 3) * 7.5 + (i === 3 ? 2.4 : 0), 5.2, (rm.z + rm.h) * TS - 0.6], 'bulb', false, true);
         },
-        court(rm) {
+        court(rm: Room) {
           // rows of stalls, two facing each other across each lane with their backs to a service alley. Most are
           // 4 m wide across two tiles (room behind the counter for two); a way through every few.
           const rows = [[1, 1], [5, -1], [8, 1], [12, -1], [15, 1], [19, -1]].map(([o, f]) => [rm.z + o, f]).filter(([z]) => z < rm.z + rm.h - 1);
-          const gap = (x) => (x - rm.x - 1) % 5 === 4;
+          const gap = (x: number) => (x - rm.x - 1) % 5 === 4;
           for (const [z, f] of rows) {
-            const q = facing(0, -f), yaw = Math.atan2(0, -f), free = (x) => t[z * W + x] === 0;
+            const q = facing(0, -f), yaw = Math.atan2(0, -f), free = (x: number) => t[z * W + x] === 0;
             for (let x = rm.x + 1; x <= rm.x + rm.w - 2;) {
               const k = (x - rm.x - 1) % 5, food = r() < 0.55;
               if (k === 4) { x++; continue; }
@@ -1253,11 +1280,11 @@ const G_Furniture = (() => {
             }
           }
         },
-        picnic(rm) {
+        picnic(rm: Room) {
           for (let z = rm.z + 1; z < rm.z + rm.h - 1; z += 3) for (let x = rm.x + 1; x < rm.x + rm.w - 1; x += 2) if (tryBlock(x, z, 4)) put('picnic', x, z, C(x), C(z), r() < 0.5 ? 0 : 2, r());
           put('bin', rm.x, rm.z + rm.h - 1, C(rm.x), C(rm.z + rm.h - 1) + 0.5, 0, r());
         },
-        gate(rm) { // inside the festival's gate: the ticket booths either side of it, lights over
+        gate(rm: Room) { // inside the festival's gate: the ticket booths either side of it, lights over
           F.gate = { x0: rm.x * TS, x1: (rm.x + rm.w) * TS, z0: rm.z * TS, z1: (rm.z + rm.h) * TS };
           const bz = rm.z + rm.h - 1;
           for (const x of [rm.cx - 4, rm.cx + 3]) if (tryBlock(x, bz, 4)) put('booth', x, bz, C(x), C(bz), facing(0, 1), r());
@@ -1266,7 +1293,7 @@ const G_Furniture = (() => {
         },
         // the town square: a fountain in the middle with benches round it, cafe tables out in front of the shops,
         // plane trees down the far side, street lamps, lanterns strung across
-        plaza(rm) {
+        plaza(rm: Room) {
           F.plaza = { x0: rm.x * TS, x1: (rm.x + rm.w) * TS, z0: rm.z * TS, z1: (rm.z + rm.h) * TS };
           const cx = rm.cx, cz = rm.cz;
           if ([[0, 0], [1, 0], [0, 1], [1, 1]].every(([a, b]) => t[(cz + b) * W + cx + a] === 0) && tryBlock(cx, cz, 4)) {
@@ -1283,7 +1310,7 @@ const G_Furniture = (() => {
           for (let i = 0; i + 1 < zs.length; i++) { const [xa, xb] = i % 2 ? [rm.x + rm.w - 2, rm.x] : [rm.x, rm.x + rm.w - 2]; str([C(xa), 4.6, C(zs[i])], [C(xb), 4.6, C(zs[i + 1])], 'lantern', true, true); }
         },
         // the car park: two rows of bays (two tiles deep, a car in most), aisles between, tall lamps down the middle
-        parking(rm) {
+        parking(rm: Room) {
           F.lot = { x0: rm.x * TS, x1: (rm.x + rm.w) * TS, z0: rm.z * TS, z1: (rm.z + rm.h) * TS };
           for (const za of [rm.z + 1, rm.z + 5]) {
             if (za + 1 >= rm.z + rm.h) continue;
@@ -1296,7 +1323,7 @@ const G_Furniture = (() => {
           }
           for (let x = rm.x + 2; x < rm.x + rm.w; x += 8) F.lamps.push([C(x), (rm.z + 4) * TS]);
         },
-        cubicle(rm) { // the toilet against the wall facing the door
+        cubicle(rm: Room) { // the toilet against the wall facing the door
           let dir = null;
           for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (t[(rm.z + dz) * W + rm.x + dx] === 3) dir = [-dx, -dz];
           if (!dir) return;
@@ -1310,25 +1337,25 @@ const G_Furniture = (() => {
     // blocks clear of the doors, two forklifts), the control room (a desk under every window not by a door), the
     // toilets (stalls along the back wall, the basins by the door) and the car park (cars along the fence).
     function foundry() {
-      const C = (v) => (v + 0.5) * TS, free = (x, z) => t[z * W + x] === 0;
-      const side = (name, x, z, dx, dz) => { // against the wall in (dx, dz)
+      const C = (v: number) => (v + 0.5) * TS, free = (x: number, z: number) => t[z * W + x] === 0;
+      const side = (name: string, x: number, z: number, dx: number, dz: number) => { // against the wall in (dx, dz)
         const rec = R[name];
         if (!free(x, z) || !tryBlock(x, z, rec.cover ? 2 : 4)) return false;
         const off = 1 - 0.02 - rec.d / 2; put(name, x, z, C(x) + dx * off, C(z) + dz * off, facing(dx, dz), r(), [[dx, dz]]); return true;
       };
-      const one = (name, x, z, q = 0) => { if (!free(x, z) || !tryBlock(x, z, R[name].cover ? 2 : 4)) return false; put(name, x, z, C(x), C(z), q, r()); return true; };
-      const big = (name, x, z, q = 0) => { // across 2 x 2 tiles, (x, z) the north-west one
+      const one = (name: string, x: number, z: number, q = 0) => { if (!free(x, z) || !tryBlock(x, z, R[name].cover ? 2 : 4)) return false; put(name, x, z, C(x), C(z), q, r()); return true; };
+      const big = (name: string, x: number, z: number, q = 0) => { // across 2 x 2 tiles, (x, z) the north-west one
         const cells = [[x, z], [x + 1, z], [x, z + 1], [x + 1, z + 1]];
         if (!cells.every(([a, b]) => free(a, b)) || !tryBlock(x, z, 2)) return false;
         for (const [a, b] of cells.slice(1)) tryBlock(a, b, 2);
         put(name, x, z, (x + 1) * TS, (z + 1) * TS, q, r()); return true;
       };
-      const long = (name, x, z, q) => { // across (x, z) and (x, z + 1), lengthwise
+      const long = (name: string, x: number, z: number, q: number) => { // across (x, z) and (x, z + 1), lengthwise
         if (!free(x, z) || !free(x, z + 1) || !tryBlock(x, z, 2)) return false;
         tryBlock(x, z + 1, 2); put(name, x, z, C(x), (z + 1) * TS, q, r()); return true;
       };
       return {
-        melt(rm) {
+        melt(rm: Room) {
           const X = rm.x, Z = rm.z;
           for (const x of [X + 3, X + 9]) big('furnace', x, Z + 1); // (their tapping spouts toward the ladles)
           for (const x of [X + 3, X + 9]) big('vat', x, Z + 6, r() < 0.5 ? 0 : 2);
@@ -1338,7 +1365,7 @@ const G_Furniture = (() => {
           for (const z of [Z + 4, Z + 5]) side('panel', X + rm.w - 1, z, 1, 0);
           for (const z of [Z + 2, Z + 4]) one('scrap', X, z, Math.floor(r() * 4));
         },
-        mill(rm) {
+        mill(rm: Room) {
           const X = rm.x, Z = rm.z, lines = [['conveyor', 'mill', 'mill', 'conveyor', 'saw', null, 'conveyor', 'press', 'conveyor', 'quench'], ['conveyor', 'conveyor', 'mill', 'conveyor', 'conveyor', null, 'saw', 'conveyor', 'conveyor', 'coils']];
           if (r() < 0.5) lines.reverse();
           lines.forEach((ln, i) => ln.forEach((name, k) => { if (name) one(name, X + 1 + k, Z + 2 + i * 5); }));
@@ -1346,23 +1373,23 @@ const G_Furniture = (() => {
           for (const x of [X + 1, X + 2]) one('billets', x, Z + 9);
           for (const x of [X + 9, X + 10]) one('coils', x, Z + 9);
         },
-        loading(rm) {
+        loading(rm: Room) {
           const X = rm.x, Z = rm.z, E = X + rm.w - 1, B = Z + rm.h - 1, stock = ['billets', 'billets', 'ingots', 'coils', 'coils', 'crates', 'pallet'];
           for (let z = Z + 1; z < B; z++) side('palletrack', E, z, 1, 0);
           let n = 2;
           for (const [x, z] of [[X + 6, Z + 2], [X + 8, Z + 4], [X + 1, Z + 5], [X + 13, Z + 2]]) if (n > 0 && long('forklift', x, z, r() < 0.5 ? 0 : 2)) n--;
           for (const z of [Z + 2, Z + 3, Z + 5]) for (const [x0, x1] of [[X + 2, X + 4], [X + 10, X + 12]]) for (let x = x0; x <= x1; x++) if (r() < 0.8) one(U.pick(r, stock), x, z, r() < 0.5 ? 0 : 2);
         },
-        control(rm) {
+        control(rm: Room) {
           for (let z = rm.z; z < rm.z + rm.h; z++) for (const [x, dx] of [[rm.x, -1], [rm.x + rm.w - 1, 1]]) if (t[z * W + x + dx] !== 3) side('console', x, z, dx, 0);
           side('panel', rm.x + 1, rm.z, 0, -1);
         },
-        restroom(rm) {
+        restroom(rm: Room) {
           const xs = [...Array(rm.w).keys()].map((i) => rm.x + i), door = xs.find((x) => t[(rm.z + rm.h) * W + x] === 3);
           for (const x of xs) if (x !== door) side('stall', x, rm.z, 0, -1);
           if (door != null) side('sinks', door, rm.z, 0, -1);
         },
-        carpark(rm) {
+        carpark(rm: Room) {
           const z = rm.z + rm.h - 2;
           for (let x = rm.x + 1; x < rm.x + rm.w - 1; x += 2) if (r() < 0.6) long('car', x, z, r() < 0.5 ? 0 : 2);
         },
@@ -1374,19 +1401,19 @@ const G_Furniture = (() => {
     // trees and the rest between; the greenhouse's potting benches; the masts on the antenna farm (map.crest.masts, where
     // they stand: buildCrest), their air handlers and huts.
     function crestPlan() {
-      const cr = map.crest, ends = new Set(cr.lines.flatMap((l) => l.keep.map(([x, z]) => z * W + x))); // (where you step on and off a zipline: kept clear)
-      const C = (v) => (v + 0.5) * TS, free = (x, z) => t[z * W + x] === 0 && !ends.has(z * W + x);
-      const byDoor = (x, z) => { for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) if (t[(z + dz) * W + x + dx] === 3) return true; return false; };
-      const lone = (x, z) => ![[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => { const v = t[(z + dz) * W + x + dx]; return v === 2 || v === 4 || map.props.has((z + dz) * W + x + dx); });
+      const cr = map.crest, ends = new Set(cr.lines.flatMap((l: any) => l.keep.map(([x, z]: number[]) => z * W + x))); // (where you step on and off a zipline: kept clear)
+      const C = (v: number) => (v + 0.5) * TS, free = (x: number, z: number) => t[z * W + x] === 0 && !ends.has(z * W + x);
+      const byDoor = (x: number, z: number) => { for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) if (t[(z + dz) * W + x + dx] === 3) return true; return false; };
+      const lone = (x: number, z: number) => ![[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => { const v = t[(z + dz) * W + x + dx]; return v === 2 || v === 4 || map.props.has((z + dz) * W + x + dx); });
       // (exact: square in its tile, else a little off it, as things lie about outdoors)
-      const one = (name, x, z, q?, exact?) => {
+      const one = (name: string, x: number, z: number, q?: number, exact?: boolean) => {
         if (!free(x, z) || byDoor(x, z) || !tryBlock(x, z, R[name].cover ? 2 : 4)) return false;
         const j = exact ? 0 : 0.3;
         put(name, x, z, C(x) + (r() - 0.5) * j, C(z) + (r() - 0.5) * j, q == null ? Math.floor(r() * 4) : q, r()); return true;
       };
-      const small = (name, x, z) => { if (!free(x, z) || byDoor(x, z) || map.props.has(z * W + x)) return false; put(name, x, z, C(x) + (r() - 0.5) * 0.6, C(z) + (r() - 0.5) * 0.6, Math.floor(r() * 4), r()); return true; };
+      const small = (name: string, x: number, z: number) => { if (!free(x, z) || byDoor(x, z) || map.props.has(z * W + x)) return false; put(name, x, z, C(x) + (r() - 0.5) * 0.6, C(z) + (r() - 0.5) * 0.6, Math.floor(r() * 4), r()); return true; };
       // about one thing every `per` tiles of the room, from mix
-      const wild = (rm, per, mix) => {
+      const wild = (rm: Room, per: number, mix: string[]) => {
         let n = Math.round(rm.w * rm.h / per);
         for (let a = 0; a < 80 && n > 0; a++) {
           const x = rm.x + Math.floor(r() * rm.w), z = rm.z + Math.floor(r() * rm.h), name = U.pick(r, mix);
@@ -1394,9 +1421,9 @@ const G_Furniture = (() => {
         }
       };
       return {
-        trail(rm) { wild(rm, rm.front ? 22 : 12, ['boulder', 'boulder', 'juniper', 'pinon', 'pinon', 'cholla']); },
-        ridge(rm) { wild(rm, 13, ['boulder', 'juniper', 'pinon', 'pinon', 'pinon', 'cholla']); },
-        saddle(rm) { wild(rm, 15, ['boulder', 'boulder', 'juniper', 'pinon']); },
+        trail(rm: Room) { wild(rm, rm.front ? 22 : 12, ['boulder', 'boulder', 'juniper', 'pinon', 'pinon', 'cholla']); },
+        ridge(rm: Room) { wild(rm, 13, ['boulder', 'juniper', 'pinon', 'pinon', 'pinon', 'cholla']); },
+        saddle(rm: Room) { wild(rm, 15, ['boulder', 'boulder', 'juniper', 'pinon']); },
         overlook() { // the viewers at the wall either end, looking out over the gorge (cr.scopes: where, and which way, for
           // js/player.ts to look through); a bench against the north wall
           const x = (cr.OX1 + 1) * TS - 0.55;
@@ -1404,8 +1431,8 @@ const G_Furniture = (() => {
           const bx = cr.CX0 + 1;
           if (tryBlock(bx, cr.OZ0, 4)) put('bench', bx, cr.OZ0, C(bx), cr.OZ0 * TS + 0.32, facing(0, -1), r());
         },
-        garden(rm) {
-          const gate = (x, z) => z >= 30 && x > cr.gh[0] && x < cr.gh[0] + 6; // (the way to the coyote fence's gate)
+        garden(rm: Room) {
+          const gate = (x: number, z: number) => z >= 30 && x > cr.gh[0] && x < cr.gh[0] + 6; // (the way to the coyote fence's gate)
           for (let x = rm.x + 1; x < rm.x + rm.w; x += 3) for (let z = rm.z + 1; z < rm.z + rm.h - 1; z++) if ((z - rm.z) % 5 && !gate(x, z)) one('chilebed', x, z, 1, true);
           for (let n = 0, a = 0; n < 2 && a < 30; a++) if (small('fruittree', rm.x + Math.floor(r() * rm.w), rm.z + Math.floor(r() * rm.h))) n++;
           for (let n = 0, a = 0, what = U.pick(r, ['ristra', 'bench', 'shed', 'watertank', 'patio']); n < 1 && a < 30; a++) {
@@ -1413,11 +1440,11 @@ const G_Furniture = (() => {
             if (!gate(x, z) && lone(x, z) && (R[what].small ? small(what, x, z) : one(what, x, z, Math.floor(r() * 4), true))) n++;
           }
         },
-        greenhouse(rm) { // two rows of potting benches lengthwise, a way across the middle between its doors; ristras by the door
+        greenhouse(rm: Room) { // two rows of potting benches lengthwise, a way across the middle between its doors; ristras by the door
           for (const x of [rm.x + 1, rm.x + 3]) for (let z = rm.z + 1; z < rm.z + rm.h - 1; z++) if (z !== rm.cz) one('potbench', x, z, 1, true);
           small('ristra', rm.x + rm.w - 1, rm.z);
         },
-        antennas(rm) {
+        antennas(rm: Room) {
           for (const [x0, z0] of [[rm.x + 3, rm.z + 3], [rm.x + 11, rm.z + 6], [rm.x + 17, rm.z + 2]]) for (let a = 0; a < 8; a++) {
             const x = x0 + U.ri(r, -1, 1), z = z0 + U.ri(r, -1, 1);
             if (!lone(x, z) || !one('mast', x, z, 0, true)) continue;
@@ -1435,9 +1462,9 @@ const G_Furniture = (() => {
       rm.type = rm.type || (r() < home ? homes[hi++ % homes.length] : WORK[wi++ % WORK.length]);
       // what the layout stands out in the open: [name, x, z (metres), quarter-turns, style] (js/level.ts _pad)
       for (const [name, x, z, q, st] of rm.cover || []) { const rec = R[name], v = r(); map.props.set(W * map.H + nFine++, { name, q, x, z, v, style: st || {}, block: rec.small ? 0 : rec.cover ? 2 : 4, boxes: worldBoxes(rec, x, z, q, v) }); }
-      if (fest && fest[rm.type]) { fest[rm.type](rm); continue; }
-      if (fdy && fdy[rm.type]) { fdy[rm.type](rm); continue; }
-      if (cst && cst[rm.type]) { cst[rm.type](rm); continue; }
+      if (fest && (fest as Record<string, any>)[rm.type]) { (fest as Record<string, any>)[rm.type](rm); continue; }
+      if (fdy && (fdy as Record<string, any>)[rm.type]) { (fdy as Record<string, any>)[rm.type](rm); continue; }
+      if (cst && (cst as Record<string, any>)[rm.type]) { (cst as Record<string, any>)[rm.type](rm); continue; }
       // patrol cars where the layout puts them: [x, z, along] (coarse tiles; along: lengthwise down the road, else across)
       for (const [x, z, along] of rm.cars || []) {
         const [x2, z2] = along ? [x + 1, z] : [x, z + 1];
@@ -1445,7 +1472,7 @@ const G_Furniture = (() => {
         tryBlock(x2, z2, 2); // (its far half: the car's own boxes are what stop you either way)
         put('police', x, z, along ? (x + 1) * TS : (x + 0.5) * TS, along ? (z + 0.5) * TS : (z + 1) * TS, along ? (r() < 0.5 ? 1 : 3) : (r() < 0.5 ? 0 : 2), r());
       }
-      const spec = ROOMS[rm.type];
+      const spec = (ROOMS as Record<string, any>)[rm.type];
       if (spec.bare) continue;
       // the warehouse floor: rows of racking with two-tile aisles between, cut by cross-aisles
       if (rm.type === 'hall') {
@@ -1459,10 +1486,10 @@ const G_Furniture = (() => {
       // them) and shelving down its west wall; the cashier's counter along the inside of its glass, the till at
       // the end by the door; racks along the back wall of the freezer and of the stockroom (the rest of the
       // stockroom's walls left for the weapon case, the attachments box and the first aid cabinet)
-      const C2 = (v) => (v + 0.5) * TS, against = (name, x, z, dx, dz) => { const off = 1 - 0.02 - R[name].d / 2; put(name, x, z, C2(x) + dx * off, C2(z) + dz * off, facing(dx, dz), r(), [[dx, dz]]); };
+      const C2 = (v: number) => (v + 0.5) * TS, against = (name: string, x: number, z: number, dx: number, dz: number) => { const off = 1 - 0.02 - R[name].d / 2; put(name, x, z, C2(x) + dx * off, C2(z) + dz * off, facing(dx, dz), r(), [[dx, dz]]); };
       // (the shop and the booth: laid on the fine grid, 2/3 m, in metres, each piece blocking what it stands on: block)
-      const lay = (name, x, z, q) => { const rec = R[name], v = r(); map.props.set(W * map.H + nFine++, { name, q, x, z, v, block: rec.small ? 0 : rec.cover ? 2 : 4, boxes: worldBoxes(rec, x, z, q, v) }); };
-      const F = 2 / 3, opn = (x, z) => x >= 0 && z >= 0 && x < W && z < map.H && t[z * W + x] !== 1; // (the room as it'll be: grown into the walls it shares, which thin)
+      const lay = (name: string, x: number, z: number, q: number) => { const rec = R[name], v = r(); map.props.set(W * map.H + nFine++, { name, q, x, z, v, block: rec.small ? 0 : rec.cover ? 2 : 4, boxes: worldBoxes(rec, x, z, q, v) }); };
+      const F = 2 / 3, opn = (x: number, z: number) => x >= 0 && z >= 0 && x < W && z < map.H && t[z * W + x] !== 1; // (the room as it'll be: grown into the walls it shares, which thin)
       const x0 = rm.x * TS - (opn(rm.x - 2, rm.cz) ? F : 0), x1 = (rm.x + rm.w) * TS + (opn(rm.x + rm.w + 1, rm.cz) ? F : 0), z0 = rm.z * TS - (opn(rm.cx, rm.z - 2) ? F : 0), z1 = (rm.z + rm.h) * TS + (opn(rm.cx, rm.z + rm.h + 1) ? F : 0);
       if (rm.type === 'mart') {
         // shelving down the west wall; three aisles of it across the floor (each 1.2 m, 1.5 m between: two cells), a
@@ -1507,20 +1534,20 @@ const G_Furniture = (() => {
         }
         continue;
       }
-      const inRoom = (x, z) => x >= rm.x && x < rm.x + rm.w && z >= rm.z && z < rm.z + rm.h;
+      const inRoom = (x: number, z: number) => x >= rm.x && x < rm.x + rm.w && z >= rm.z && z < rm.z + rm.h;
       // keep doorways and corridor mouths clear
-      const nearOpening = (x, z) => {
+      const nearOpening = (x: number, z: number) => {
         for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) if (!inRoom(x + dx, z + dz) && t[(z + dz) * W + x + dx] !== 1) return true;
         return false;
       };
-      const edges = [], corners = [];
+      const edges: Spot[] = [], corners: Spot[] = [];
       for (let z = rm.z; z < rm.z + rm.h; z++) for (let x = rm.x; x < rm.x + rm.w; x++) {
         const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => !inRoom(x + dx, z + dz) && t[(z + dz) * W + x + dx] === 1);
         if (!dirs.length || nearOpening(x, z)) continue;
         (dirs.length === 1 ? edges : corners).push({ x, z, dirs });
       }
       U.shuffle(r, edges); U.shuffle(r, corners);
-      const center = (x) => (x + 0.5) * TS;
+      const center = (x: number) => (x + 0.5) * TS;
       // against the walls
       let want = Math.max(1, Math.round((edges.length + corners.length) * (spec.dense ? 0.5 : 0.42)));
       const pool = [spec.must].concat(U.shuffle(r, spec.wall.slice()));
@@ -1571,13 +1598,13 @@ const G_Furniture = (() => {
   // of stock takes one of them over every face (k.boxL, k.cylL): it reads as a packet, a tin, a bottle with a label,
   // not a block of colour, and the light falls on card and paper, matte.
   const PACK_N = 8;
-  let packTex = null;
+  let packTex: THREE.CanvasTexture | null = null;
   function packaging() {
     if (packTex) return packTex;
     const S = 128, c = document.createElement('canvas'); c.width = c.height = S * PACK_N;
-    const g = c.getContext('2d'), rnd = G.U.rng(0x9ac4a6e);
+    const g = c.getContext('2d')!, rnd = G.U.rng(0x9ac4a6e);
     const INK = ['#b8392e', '#d8a632', '#2c5aa6', '#2f8a48', '#d0702c', '#6c3a9a', '#26262a', '#b8386e', '#3a9a9e', '#9a7238', '#e8e2d2', '#5a2a22', '#c8c03a', '#1e3a5e', '#e6d9b8', '#8a1e24'];
-    const pick = (a) => a[Math.floor(rnd() * a.length)];
+    const pick = <T,>(a: T[]): T => a[Math.floor(rnd() * a.length)];
     for (let ty = 0; ty < PACK_N; ty++) for (let tx = 0; tx < PACK_N; tx++) {
       const x0 = tx * S, y0 = ty * S, bg = pick(INK);
       let a = pick(INK); while (a === bg) a = pick(INK);
@@ -1612,17 +1639,17 @@ const G_Furniture = (() => {
     return packTex;
   }
   // a geometry's UVs (0..1 a face) squeezed onto one label of the atlas (a little in from its edges: no neighbour bleeds in)
-  function labelUV(geo, i) {
+  function labelUV(geo: THREE.BufferGeometry, i: number) {
     const uv = geo.attributes.uv as THREE.BufferAttribute, n = PACK_N, u0 = (i % n) / n, v0 = 1 - (Math.floor(i / n) + 1) / n, s = (1 - 0.06) / n, o = 0.03 / n;
     for (let j = 0; j < uv.count; j++) uv.setXY(j, u0 + o + uv.getX(j) * s, v0 + o + uv.getY(j) * s);
     return geo;
   }
 
-  function textures(rnd) {
-    const mk = (w, h, draw) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const tx = new THREE.CanvasTexture(c); tx.wrapS = tx.wrapT = THREE.RepeatWrapping; tx.anisotropy = 4; return tx; };
-    const speckle = (g, w, h, n, a) => { for (let i = 0; i < n; i++) { const v = rnd() < 0.5 ? 0 : 255; g.fillStyle = `rgba(${v},${v},${v},${rnd() * a})`; g.fillRect(rnd() * w, rnd() * h, 1 + rnd() * 3, 1 + rnd() * 3); } };
+  function textures(rnd: () => number) {
+    const mk = (w: number, h: number, draw: (g: CanvasRenderingContext2D, w: number, h: number) => void) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d')!, w, h); const tx = new THREE.CanvasTexture(c); tx.wrapS = tx.wrapT = THREE.RepeatWrapping; tx.anisotropy = 4; return tx; };
+    const speckle = (g: CanvasRenderingContext2D, w: number, h: number, n: number, a: number) => { for (let i = 0; i < n; i++) { const v = rnd() < 0.5 ? 0 : 255; g.fillStyle = `rgba(${v},${v},${v},${rnd() * a})`; g.fillRect(rnd() * w, rnd() * h, 1 + rnd() * 3, 1 + rnd() * 3); } };
     return {
-      wood: (base) => mk(256, 256, (g, w, h) => {
+      wood: (base: string) => mk(256, 256, (g, w, h) => {
         g.fillStyle = base; g.fillRect(0, 0, w, h);
         const rows = 8, rh = h / rows;
         for (let i = 0; i < rows; i++) {
@@ -1638,7 +1665,7 @@ const G_Furniture = (() => {
           g.fillStyle = 'rgba(20,10,0,0.5)'; g.fillRect(0, i * rh, w, 2);
         }
       }),
-      tile: (base, grout) => mk(128, 128, (g, w, h) => {
+      tile: (base: string, grout: string) => mk(128, 128, (g, w, h) => {
         g.fillStyle = grout; g.fillRect(0, 0, w, h);
         const n = 4, s = w / n;
         for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
@@ -1647,24 +1674,24 @@ const G_Furniture = (() => {
         }
         speckle(g, w, h, 300, 0.06);
       }),
-      carpet: (base) => mk(128, 128, (g, w, h) => { g.fillStyle = base; g.fillRect(0, 0, w, h); speckle(g, w, h, 2500, 0.12); }),
+      carpet: (base: string) => mk(128, 128, (g, w, h) => { g.fillStyle = base; g.fillRect(0, 0, w, h); speckle(g, w, h, 2500, 0.12); }),
       // bare concrete, cloudy, a few stains
-      concrete: (base) => mk(256, 256, (g, w, h) => {
+      concrete: (base: string) => mk(256, 256, (g, w, h) => {
         g.fillStyle = base; g.fillRect(0, 0, w, h);
         for (let i = 0; i < 26; i++) { g.fillStyle = `rgba(${rnd() < 0.5 ? '0,0,0' : '255,255,255'},${0.02 + rnd() * 0.05})`; g.beginPath(); g.arc(rnd() * w, rnd() * h, 14 + rnd() * 50, 0, 7); g.fill(); }
         for (let i = 0; i < 3; i++) { g.fillStyle = 'rgba(20,16,10,0.14)'; g.beginPath(); g.arc(rnd() * w, rnd() * h, 6 + rnd() * 16, 0, 7); g.fill(); }
         speckle(g, w, h, 1800, 0.08);
       }),
       // lino in a check of two colours, scuffed
-      lino: (base, other) => mk(128, 128, (g, w, h) => {
+      lino: (base: string, other: string) => mk(128, 128, (g, w, h) => {
         const s = w / 2;
         g.fillStyle = base; g.fillRect(0, 0, w, h); g.fillStyle = other; g.fillRect(0, 0, s, s); g.fillRect(s, s, s, s);
         g.strokeStyle = 'rgba(0,0,0,0.18)'; g.lineWidth = 1; g.strokeRect(0, 0, s, s); g.strokeRect(s, s, s, s);
         speckle(g, w, h, 500, 0.08);
       }),
       // parquet in a herringbone: blocks four long by one wide, laid out on a lattice that repeats every eight
-      parquet: (base) => mk(256, 256, (g, w, h) => {
-        const u = w / 8, block = (x, y, bw, bh) => { const v = (rnd() - 0.5) * 0.2; g.fillStyle = base; g.fillRect(x, y, bw, bh); g.fillStyle = v > 0 ? `rgba(255,235,200,${v})` : `rgba(0,0,0,${-v})`; g.fillRect(x, y, bw, bh); g.strokeStyle = 'rgba(30,15,0,0.55)'; g.lineWidth = 1.5; g.strokeRect(x, y, bw, bh); };
+      parquet: (base: string) => mk(256, 256, (g, w, h) => {
+        const u = w / 8, block = (x: number, y: number, bw: number, bh: number) => { const v = (rnd() - 0.5) * 0.2; g.fillStyle = base; g.fillRect(x, y, bw, bh); g.fillStyle = v > 0 ? `rgba(255,235,200,${v})` : `rgba(0,0,0,${-v})`; g.fillRect(x, y, bw, bh); g.strokeStyle = 'rgba(30,15,0,0.55)'; g.lineWidth = 1.5; g.strokeRect(x, y, bw, bh); };
         for (let i = -16; i <= 16; i++) for (let j = -6; j <= 6; j++) {
           const x = (i + 4 * j) * u, y = (i - 4 * j) * u;
           if (x < -5 * u || y < -5 * u || x > w + u || y > h + 4 * u) continue;
@@ -1678,14 +1705,14 @@ const G_Furniture = (() => {
         for (let i = 0; i < 5000; i++) { const v = rnd(); g.fillStyle = v < 0.5 ? `rgba(20,40,15,${0.3 + rnd() * 0.4})` : `rgba(${80 + rnd() * 40},${110 + rnd() * 50},${50 + rnd() * 30},${0.25 + rnd() * 0.35})`; g.fillRect(rnd() * w, rnd() * h, 1, 2 + rnd() * 4); }
       }),
       // a mountain trail: decomposed granite, tan grit and pebbles, the odd tuft (soil: a garden's dark, worked earth)
-      dirt: (base, dark?) => mk(256, 256, (g, w, h) => {
+      dirt: (base: string, dark?: boolean) => mk(256, 256, (g, w, h) => {
         g.fillStyle = base; g.fillRect(0, 0, w, h);
         for (let i = 0; i < 14; i++) { g.fillStyle = `rgba(${rnd() < 0.5 ? '40,24,12' : '255,236,210'},${0.04 + rnd() * 0.06})`; g.beginPath(); g.arc(rnd() * w, rnd() * h, 16 + rnd() * 50, 0, 7); g.fill(); }
         for (let i = 0; i < 2600; i++) { const v = rnd(); g.fillStyle = v < 0.4 ? `rgba(30,18,10,${0.2 + rnd() * 0.3})` : v < 0.8 ? `rgba(255,240,220,${0.12 + rnd() * 0.2})` : `rgba(190,120,100,${0.3 + rnd() * 0.3})`; const s = 1 + rnd() * 2.5; g.fillRect(rnd() * w, rnd() * h, s, s); }
         if (!dark) for (let i = 0; i < 40; i++) { g.fillStyle = `rgba(${90 + rnd() * 40},${100 + rnd() * 30},60,0.5)`; const x = rnd() * w, y = rnd() * h; for (let j = 0; j < 6; j++) g.fillRect(x + (rnd() - 0.5) * 6, y + (rnd() - 0.5) * 3, 1, 3 + rnd() * 3); }
       }),
       // flagstones: irregular slabs of pinkish stone in grey mortar
-      flag: (base) => mk(256, 256, (g, w, h) => {
+      flag: (base: string) => mk(256, 256, (g, w, h) => {
         g.fillStyle = '#6e645c'; g.fillRect(0, 0, w, h);
         for (let j = 0; j < 4; j++) for (let i = 0; i < 4; i++) {
           const x = i * 64 + (j % 2) * 20, y = j * 64, v = (rnd() - 0.5) * 0.18;
@@ -1694,7 +1721,7 @@ const G_Furniture = (() => {
         }
         speckle(g, w, h, 1500, 0.08);
       }),
-      rug: (a, b, c) => mk(256, 256, (g, w, h) => {
+      rug: (a: string, b: string, c: string) => mk(256, 256, (g, w, h) => {
         g.fillStyle = a; g.fillRect(0, 0, w, h);
         g.strokeStyle = b; g.lineWidth = 14; g.strokeRect(14, 14, w - 28, h - 28);
         g.strokeStyle = c; g.lineWidth = 4; g.strokeRect(30, 30, w - 60, h - 60);
@@ -1737,10 +1764,10 @@ const G_Furniture = (() => {
   // A night street behind the glass, faked in the shader. The view ray from the camera is traced from the
   // glass: first the ground outside (level with the floor), then a near layer 7 m out (trees, a fence,
   // streetlamps), then a city skyline and sky at infinity. Everything shifts with parallax as you move.
-  function outsideMaterial(rnd, drop = 0) {
+  function outsideMaterial(rnd: () => number, drop = 0) {
     // (its pictures sampled as written, sRGB, mixed with the colours below as they're written, and the result turned
     // linear at the end: js/util.ts)
-    const mk = (w, h, draw) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.encoding = THREE.LinearEncoding; t.wrapS = THREE.RepeatWrapping; t.anisotropy = 4; return t; };
+    const mk = (w: number, h: number, draw: (g: CanvasRenderingContext2D, w: number, h: number) => void) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d')!, w, h); const t = new THREE.CanvasTexture(c); t.encoding = THREE.LinearEncoding; t.wrapS = THREE.RepeatWrapping; t.anisotropy = 4; return t; };
     // sky + skyline panorama; the horizon sits at 62% down the canvas
     const sky = mk(2048, 512, (g, w, h) => {
       const hz = Math.round(h * 0.62);
@@ -1770,7 +1797,7 @@ const G_Furniture = (() => {
     // near layer, 24 m wide x 8 m tall, repeating along the street
     const near = mk(1024, 256, (g, w, h) => {
       g.clearRect(0, 0, w, h);
-      const px = w / 24, py = h / 8, Y = (m) => h - m * py;
+      const px = w / 24, py = h / 8, Y = (m: number) => h - m * py;
       for (const ux of [6, 18]) { // streetlamps, glow first
         const lx = ux * px, ly = Y(5);
         const gl = g.createRadialGradient(lx, ly, 0, lx, ly, 70); gl.addColorStop(0, 'rgba(255,200,120,0.55)'); gl.addColorStop(1, 'rgba(255,200,120,0)');
@@ -1849,7 +1876,7 @@ const G_Furniture = (() => {
     });
   }
 
-  function build(map, root, crateTex) {
+  function build(map: any, root: THREE.Object3D, crateTex: THREE.Texture) {
     const T = THREE, L = G.Level, TS = L.TS, { W, t } = map;
     // (the one stream everything's looks draw on, in turn, so a room that's built differently would change every room
     // after it. A resident's room: what it would have been is still built, into nothing (sink), and what's really there
@@ -1860,48 +1887,48 @@ const G_Furniture = (() => {
     // A piece's colour goes in its vertices: what's drawn is one material per finish (roughness, metalness, texture,
     // glow), not one per colour as well, so a houseful of furniture is a few dozen draw calls, not hundreds.
     // (mat() still hands back a material of that colour, to be read and tinted; base is what it's drawn with.)
-    const cache = new Map(), base = new Map(), finish = new Map();
-    const texIds = new Map(), texId = (t) => { if (!texIds.has(t)) texIds.set(t, texIds.size); return texIds.get(t); }; // (by the texture itself, not its uuid)
-    const mat = (hex, rough = 0.8, metal = 0, extra?) => {
+    const cache = new Map<string, Mat>(), base = new Map<THREE.Material, THREE.Material>(), finish = new Map<string, Mat>();
+    const texIds = new Map(), texId = (t: any): number => { if (!texIds.has(t)) texIds.set(t, texIds.size); return texIds.get(t); }; // (by the texture itself, not its uuid)
+    const mat = (hex: number, rough = 0.8, metal = 0, extra?: Record<string, any>): Mat => {
       const fk = rough + '|' + metal + (extra ? JSON.stringify(Object.keys(extra)) + (extra.map ? texId(extra.map) : '') + (extra.emissive || '') : ''), key = hex + '|' + fk;
       let m = cache.get(key);
       if (!m) {
         m = new T.MeshStandardMaterial(Object.assign({ color: hex, roughness: rough, metalness: metal }, extra || {})); cache.set(key, m);
         if (!finish.has(fk)) finish.set(fk, new T.MeshStandardMaterial(Object.assign({ color: 0xffffff, roughness: rough, metalness: metal, vertexColors: true }, extra || {})));
-        base.set(m, finish.get(fk));
+        base.set(m, finish.get(fk)!);
       }
       return m;
     };
-    const tint = (hex, f) => { const c = new T.Color(hex); c.r = Math.min(1, c.r * f); c.g = Math.min(1, c.g * f); c.b = Math.min(1, c.b * f); return c.getHex(); };
-    const pick = (a) => a[Math.floor(rnd() * a.length)];
+    const tint = (hex: number, f: number) => { const c = new T.Color(hex); c.r = Math.min(1, c.r * f); c.g = Math.min(1, c.g * f); c.b = Math.min(1, c.b * f); return c.getHex(); };
+    const pick = <T,>(a: T[]): T => a[Math.floor(rnd() * a.length)];
     // everything static is merged into one mesh per material
-    const byMat = new Map();
-    const add = (geo, m, matrix) => {
+    const byMat = new Map<THREE.Material, THREE.BufferGeometry[]>();
+    const add = (geo: THREE.BufferGeometry, m: THREE.Material, matrix: THREE.Matrix4) => {
       if (sink) { geo.dispose(); return; }
       const g2 = geo.index ? geo.toNonIndexed() : geo;
       g2.applyMatrix4(matrix);
       const b = base.get(m) || m;
-      if (b !== m) g2.userData.col = m.color; // (its colour, for its vertices: the merge below)
+      if (b !== m) g2.userData.col = (m as Mat).color; // (its colour, for its vertices: the merge below)
       if (!byMat.has(b)) byMat.set(b, []);
-      byMat.get(b).push(g2);
+      byMat.get(b)!.push(g2);
       if (g2 !== geo) geo.dispose();
     };
     const tmp = new T.Object3D(); tmp.rotation.order = 'YXZ'; // turn to face the room first, then tilt
     let frame = new T.Matrix4();
-    const place = (geo, m, x, y, z, ry = 0, rx = 0) => {
+    const place = (geo: THREE.BufferGeometry, m: THREE.Material, x: number, y: number, z: number, ry = 0, rx = 0) => {
       tmp.position.set(x, y, z); tmp.rotation.set(rx, ry, 0); tmp.updateMatrix();
       add(geo, m, new T.Matrix4().multiplyMatrices(frame, tmp.matrix));
     };
     const shadeMat = mat(0xf2e2c0, 0.9, 0, { emissive: 0xffc070, emissiveIntensity: 0.55 });
     const k = {
       rnd, pick, tint, mat,
-      box: (m, w, h, d, x, y, z, ry, rx) => place(new T.BoxGeometry(w, h, d), m, x, y, z, ry, rx),
-      cyl: (m, rt, rb, h, x, y, z, seg = 14, rx = 0) => place(new T.CylinderGeometry(rt, rb, h, seg), m, x, y, z, 0, rx),
-      cylX: (m, rt, rb, h, x, y, z, seg = 14) => place(new T.CylinderGeometry(rt, rb, h, seg), m, x, y, z, Math.PI / 2, Math.PI / 2), // (lying along x)
-      sph: (m, r, x, y, z) => place(new T.SphereGeometry(r, 8, 6), m, x, y, z),
-      ico: (m, r, x, y, z) => place(new T.IcosahedronGeometry(r, 0), m, x, y, z, rnd() * 6),
+      box: (m: Mat, w: number, h: number, d: number, x: number, y: number, z: number, ry?: number, rx?: number) => place(new T.BoxGeometry(w, h, d), m, x, y, z, ry, rx),
+      cyl: (m: Mat, rt: number, rb: number, h: number, x: number, y: number, z: number, seg = 14, rx = 0) => place(new T.CylinderGeometry(rt, rb, h, seg), m, x, y, z, 0, rx),
+      cylX: (m: Mat, rt: number, rb: number, h: number, x: number, y: number, z: number, seg = 14) => place(new T.CylinderGeometry(rt, rb, h, seg), m, x, y, z, Math.PI / 2, Math.PI / 2), // (lying along x)
+      sph: (m: Mat, r: number, x: number, y: number, z: number) => place(new T.SphereGeometry(r, 8, 6), m, x, y, z),
+      ico: (m: Mat, r: number, x: number, y: number, z: number) => place(new T.IcosahedronGeometry(r, 0), m, x, y, z, rnd() * 6),
       // a side profile ([z, y] points: along the piece and up) drawn across w at x, its edges rounded by b (a car's body)
-      side: (m, pts, w, x = 0, b = 0) => {
+      side: (m: Mat, pts: number[][], w: number, x = 0, b = 0) => {
         const sh = new T.Shape(pts.map(([z, y]) => new T.Vector2(z, y)));
         const g = new T.ExtrudeGeometry(sh, { depth: w - 2 * b, bevelEnabled: b > 0, bevelThickness: b, bevelSize: b, bevelSegments: 2, curveSegments: 4 });
         g.translate(0, 0, -(w - 2 * b) / 2); g.rotateY(-Math.PI / 2);
@@ -1913,13 +1940,13 @@ const G_Furniture = (() => {
       crate: () => mat(0xffffff, 0.8, 0, { map: crateTex }),
       // stock: one of the packaging atlas' labels (packaging()) over a box or a cylinder; its material by what it's made
       // of (card and paper, a tin, a plastic bottle), each a little lighter or darker (shade: in the shadow of a shelf)
-      pack: (kind, shade = 1) => mat(tint(0xffffff, (0.86 + rnd() * 0.14) * shade), kind === 'tin' ? 0.42 : kind === 'bottle' ? 0.3 : 0.82, kind === 'tin' ? 0.15 : 0, { map: packaging() }),
+      pack: (kind: string, shade = 1) => mat(tint(0xffffff, (0.86 + rnd() * 0.14) * shade), kind === 'tin' ? 0.42 : kind === 'bottle' ? 0.3 : 0.82, kind === 'tin' ? 0.15 : 0, { map: packaging() }),
       label: () => Math.floor(rnd() * PACK_N * PACK_N),
-      boxL: (m, lb, w, h, d, x, y, z, ry, rx) => place(labelUV(new T.BoxGeometry(w, h, d), lb), m, x, y, z, ry, rx),
-      cylL: (m, lb, rt, rb, h, x, y, z, seg = 14) => place(labelUV(new T.CylinderGeometry(rt, rb, h, seg), lb), m, x, y, z),
-      tableLamp(x, y, z) { k.cyl(mat(pick([0x2a2a2a, 0xb8a060, 0xe8e4da, 0x6d7b66]), 0.4, 0.3), 0.05, 0.08, 0.22, x, y + 0.11, z); k.cyl(shadeMat, 0.1, 0.16, 0.2, x, y + 0.31, z); },
-      plantSmall(x, y, z) { k.cyl(mat(pick([0xa0522d, 0xe8e4da, 0x2f3a40]), 0.7), 0.07, 0.055, 0.12, x, y + 0.06, z); for (let i = 0; i < 3; i++) k.ico(k.leaf(), 0.06 + rnd() * 0.04, x + (rnd() - 0.5) * 0.06, y + 0.16 + rnd() * 0.08, z + (rnd() - 0.5) * 0.06); },
-      fruit(x, y, z) { k.cyl(mat(pick([0xe8e4da, 0x6b4428, 0x3a5a6a]), 0.4), 0.13, 0.08, 0.06, x, y + 0.03, z); for (let i = 0; i < 4; i++) k.sph(mat(pick([0xd8642a, 0xc0302a, 0x8fb040, 0xe8c040]), 0.5), 0.04, x + (rnd() - 0.5) * 0.12, y + 0.08, z + (rnd() - 0.5) * 0.12); },
+      boxL: (m: Mat, lb: number, w: number, h: number, d: number, x: number, y: number, z: number, ry?: number, rx?: number) => place(labelUV(new T.BoxGeometry(w, h, d), lb), m, x, y, z, ry, rx),
+      cylL: (m: Mat, lb: number, rt: number, rb: number, h: number, x: number, y: number, z: number, seg = 14) => place(labelUV(new T.CylinderGeometry(rt, rb, h, seg), lb), m, x, y, z),
+      tableLamp(x: number, y: number, z: number) { k.cyl(mat(pick([0x2a2a2a, 0xb8a060, 0xe8e4da, 0x6d7b66]), 0.4, 0.3), 0.05, 0.08, 0.22, x, y + 0.11, z); k.cyl(shadeMat, 0.1, 0.16, 0.2, x, y + 0.31, z); },
+      plantSmall(x: number, y: number, z: number) { k.cyl(mat(pick([0xa0522d, 0xe8e4da, 0x2f3a40]), 0.7), 0.07, 0.055, 0.12, x, y + 0.06, z); for (let i = 0; i < 3; i++) k.ico(k.leaf(), 0.06 + rnd() * 0.04, x + (rnd() - 0.5) * 0.06, y + 0.16 + rnd() * 0.08, z + (rnd() - 0.5) * 0.06); },
+      fruit(x: number, y: number, z: number) { k.cyl(mat(pick([0xe8e4da, 0x6b4428, 0x3a5a6a]), 0.4), 0.13, 0.08, 0.06, x, y + 0.03, z); for (let i = 0; i < 4; i++) k.sph(mat(pick([0xd8642a, 0xc0302a, 0x8fb040, 0xe8c040]), 0.5), 0.04, x + (rnd() - 0.5) * 0.12, y + 0.08, z + (rnd() - 0.5) * 0.12); },
     };
 
     // furniture
@@ -1933,14 +1960,14 @@ const G_Furniture = (() => {
     frame = new T.Matrix4();
 
     // rooms: floor covering, rug, baseboards, art and windows on the walls
-    const tx = textures(rnd), inRoom = (rm, x, z) => x >= rm.x && x < rm.x + rm.w && z >= rm.z && z < rm.z + rm.h;
+    const tx = textures(rnd), inRoom = (rm: Room, x: number, z: number) => x >= rm.x && x < rm.x + rm.w && z >= rm.z && z < rm.z + rm.h;
     const arts = [0, 1, 2, 3, 4, 5].map(() => mat(0xffffff, 0.7, 0, { map: tx.art() }));
     const board = mat(map.theme.home >= 1 ? 0xe8e4da : 0x2a2826, 0.6);
     const frameMats = [mat(0x1c1c1e, 0.5), mat(0xb8a060, 0.35, 0.7), mat(0x6b4428, 0.6), mat(0xe8e4da, 0.6)];
     const glass = outsideMaterial(rnd), blind = mat(0xd8d4ca, 0.7), sill = mat(0xe8e4da, 0.5);
     // a wall facing the outside of the building: solid wall from here to the edge of the map, and not
     // impossibly thick; windows only go there
-    const exterior = (x, z, dx, dz) => {
+    const exterior = (x: number, z: number, dx: number, dz: number) => {
       let n = 0;
       for (let cx = x + dx, cz = z + dz; cx >= 0 && cz >= 0 && cx < map.W && cz < map.H; cx += dx, cz += dz) {
         if (t[cz * W + cx] !== 1 || ++n > 4 * (G.Level.K || 1)) return false;
@@ -1950,7 +1977,7 @@ const G_Furniture = (() => {
     // a wall face wide enough to hang something on: this cell and its neighbours either side along the wall
     // all face the same wall, and nothing's been hung there yet
     const hung = new Set();
-    const wide = (x, z, dx, dz) => {
+    const wide = (x: number, z: number, dx: number, dz: number) => {
       const ax = dz ? 1 : 0, az = dx ? 1 : 0;
       for (const s of [-1, 0, 1]) {
         const xx = x + ax * s, zz = z + az * s;
@@ -1961,7 +1988,7 @@ const G_Furniture = (() => {
       return true;
     };
     // a floor covering over a room (a lawn runs under the fences to the edge; inside, the floor stops at the walls)
-    const layFloor = (rm, fm, y = 0.004) => {
+    const layFloor = (rm: Room, fm: Mat, y = 0.004) => {
       const x0 = rm.x * TS, z0 = rm.z * TS, w = rm.w * TS, d = rm.h * TS;
       let drop = false;
       for (let z = rm.z; z < rm.z + rm.h && !drop; z++) for (let x = rm.x; x < rm.x + rm.w; x++) if (t[z * W + x] === 5 && !(rm.out && map.out[z * W + x])) { drop = true; break; } // (outdoors upstairs, open air's no hole in it)
@@ -1981,7 +2008,7 @@ const G_Furniture = (() => {
       }
       if (rm.out && !drop && !rm.flush) place(new T.PlaneGeometry(w + 2 * TS, d + TS), fm, x0 + w / 2, y, z0 + d / 2, 0, -Math.PI / 2); // (flush: outdoors, but up against the next room's ground, not over it)
       else if (!drop) place(new T.PlaneGeometry(w, d), fm, x0 + w / 2, y, z0 + d / 2, 0, -Math.PI / 2);
-      else for (let z = Math.max(0, rm.z - (rm.out ? 1 : 0)), x0 = Math.max(0, rm.x - (rm.out ? 1 : 0)), ze = Math.min(map.H, rm.z + rm.h + (rm.out ? 1 : 0)), xe = Math.min(W, rm.x + rm.w + (rm.out ? 1 : 0)), gap = (i) => (rm.out ? !map.out[i] : t[i] === 5); z < ze; z++) for (let x = x0; x < xe;) { // (round a drop in the floor: a strip per run of floor. A roof: round what's built on it too, out to its edge)
+      else for (let z = Math.max(0, rm.z - (rm.out ? 1 : 0)), x0 = Math.max(0, rm.x - (rm.out ? 1 : 0)), ze = Math.min(map.H, rm.z + rm.h + (rm.out ? 1 : 0)), xe = Math.min(W, rm.x + rm.w + (rm.out ? 1 : 0)), gap = (i: number) => (rm.out ? !map.out[i] : t[i] === 5); z < ze; z++) for (let x = x0; x < xe;) { // (round a drop in the floor: a strip per run of floor. A roof: round what's built on it too, out to its edge)
         if (gap(z * W + x)) { x++; continue; }
         let x1 = x; while (x1 + 1 < xe && !gap(z * W + x1 + 1)) x1++;
         const g = new T.PlaneGeometry((x1 - x + 1) * TS, TS), uv = g.attributes.uv as THREE.BufferAttribute;
@@ -1992,10 +2019,10 @@ const G_Furniture = (() => {
     };
     // A resident's room (js/homes.ts, rm.dress): its floor, its trim round the walls, what hangs on them. Its walls and
     // ceiling are G.Level.buildMesh's; its furniture went by with the rest.
-    const dressRoom = (rm) => {
+    const dressRoom = (rm: Room) => {
       const dr = rm.dress, f = dr.floor;
       cur = G.U.rng((map.seed ^ Math.imul(rm.z * W + rm.x + 1, 0x9e3779b1)) >>> 0);
-      const tex = tx[f.kind === 'laminate' ? 'wood' : f.kind](f.color, f.grout || '#7a7670');
+      const tex = (tx as Record<string, any>)[f.kind === 'laminate' ? 'wood' : f.kind](f.color, f.grout || '#7a7670');
       tex.repeat.set(rm.w, rm.h);
       const fm = mat(0xffffff, f.kind === 'tile' ? 0.45 : 0.85, 0, { map: tex }), mine = new Set(dr.cells);
       layFloor(rm, fm, rm.carved ? 0.006 : 0.004); // (a carved room's floor lies over the floor of the room it came out of)
@@ -2022,7 +2049,7 @@ const G_Furniture = (() => {
     for (const rm of map.rooms) {
       if (rm.carved) { dressRoom(rm); continue; } // (a room that wouldn't have been: nothing to go through)
       if (rm.dress) { G.Homes.swap(map, rm); sink = true; } // (the room as it would have been, for the stream's sake)
-      const spec = ROOMS[rm.type] || {};
+      const spec = (ROOMS as Record<string, any>)[rm.type] || {};
       const x0 = rm.x * TS, z0 = rm.z * TS, w = rm.w * TS, d = rm.h * TS;
       if (spec.floor) {
         let tex;
@@ -2092,8 +2119,8 @@ const G_Furniture = (() => {
       let o = 0;
       for (const g of geos) {
         const c = g.attributes.position.count;
-        pos.set(g.attributes.position.array, o * 3); nor.set(g.attributes.normal.array, o * 3);
-        if (g.attributes.uv) uv.set(g.attributes.uv.array, o * 2);
+        pos.set((g.attributes.position as THREE.BufferAttribute).array, o * 3); nor.set((g.attributes.normal as THREE.BufferAttribute).array, o * 3);
+        if (g.attributes.uv) uv.set((g.attributes.uv as THREE.BufferAttribute).array, o * 2);
         if (col) { const k = g.userData.col; for (let i = o; i < o + c; i++) { col[i * 3] = k.r; col[i * 3 + 1] = k.g; col[i * 3 + 2] = k.b; } }
         o += c; g.dispose();
       }

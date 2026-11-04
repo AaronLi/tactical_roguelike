@@ -9,7 +9,9 @@
 const G_Arsenal = (() => {
   // id, what it's reached from, which path, how far out (a: a branch off its path: its own angle and r, its distance out); and what it takes: stat, how many, of what
   // pro: mastering it, with it: what it takes, and the named build that earns you, to start with if you like (parts: on top of its own)
-  const NODES = [
+  interface ProBuild { name: string; stat: string; n: number; what: string; parts: Record<string, string>; }
+  interface ArsenalNode { id: string; from?: string; path?: string; ring: number; stat?: string; n?: number; what?: string; how?: string; a?: number; r?: number; pro?: ProBuild; }
+  const NODES: ArsenalNode[] = [
     { id: 'p9', ring: 0, pro: { name: 'Patrolman', stat: 'kills', n: 30, what: 'kills', parts: { tac: 'ptac.2', grip: 'gr.pistol.2' } } },
     { id: 'tx22', from: 'p9', path: 'auto', ring: 1, stat: 'tap', n: 15, what: 'double-tap kills', how: 'Two hits on them inside half a second, and they go down.',
       pro: { name: 'Hornet', stat: 'burst', n: 30, what: 'five-hit bursts', parts: { barrel: 'tx22.br.match', muzzle: 'mz.r22.comp', optic: 'op.pso.1' } } },
@@ -38,39 +40,39 @@ const G_Arsenal = (() => {
     { id: 'fiveseven', from: 'usp', path: 'modern', ring: 4, stat: 'far', n: 15, what: 'kills past 20 m', how: "A pistol, at a rifle's distance.",
       pro: { name: 'Long Reach', stat: 'far', n: 30, what: 'kills past 20 m', parts: { slide: 'fiveseven.sl.long', optic: 'op.pso.4', tac: 'ptac.1' } } },
   ];
-  const PATHS = { auto: { name: 'Full auto', a: -90, len: 4 }, heavy: { name: 'Heavy calibre', a: 30, len: 4 }, modern: { name: 'Modern classics', a: 150, len: 4 } };
+  const PATHS: Record<string, { name: string; a: number; len: number }> = { auto: { name: 'Full auto', a: -90, len: 4 }, heavy: { name: 'Heavy calibre', a: 30, len: 4 }, modern: { name: 'Modern classics', a: 150, len: 4 } };
   const RINGS = [0, 250, 470, 690, 910], BY = new Map(NODES.map((q) => [q.id, q])), TAP = 500, BURST = 5, BURST_MS = 1000, TRIO_MS = 350, MULTI = 3000, CLOSE = 5, MID = 10, FAR = 20;
-  let save = null;
+  let save: any = null;
   const data = () => { if (!save) { const s = G.U.store.get('arsenal', null); save = s && s.got && s.n ? s : { got: [], n: {} }; save.pro = save.pro || {}; save.on = save.on || {}; } return save; };
   const keep = () => G.U.store.set('arsenal', data());
-  const has = (id) => BY.has(id);
+  const has = (id: string) => BY.has(id);
   // pro: earned it? set to start with it? and the build itself
-  const proGot = (id) => !!data().pro[id];
-  const proOn = (id) => proGot(id) && !!data().on[id];
-  const proSet = (id, on) => { if (proGot(id)) { data().on[id] = !!on; keep(); } };
-  function build(id) { const q = BY.get(id), b = Object.assign(G.Gunsmith.defaultBuild(id), q && q.pro ? q.pro.parts : {}); G.Gunsmith.prune(id, b); return b; }
-  const partNames = (id) => Object.values(BY.get(id).pro.parts).map((p) => G.Gunsmith.PARTS[p].name);
-  const open = (id) => id === 'p9' || (has(id) && data().got.includes(id));
-  const count = (id, stat) => (data().n[id] && data().n[id][stat]) || 0;
-  const name = (id) => (G.WEAPONS[id] ? G.WEAPONS[id].name : id);
+  const proGot = (id: string) => !!data().pro[id];
+  const proOn = (id: string) => proGot(id) && !!data().on[id];
+  const proSet = (id: string, on: any) => { if (proGot(id)) { data().on[id] = !!on; keep(); } };
+  function build(id: string) { const q = BY.get(id), b = Object.assign(G.Gunsmith.defaultBuild(id), q && q.pro ? q.pro.parts : {}); G.Gunsmith.prune(id, b); return b; }
+  const partNames = (id: string) => Object.values(BY.get(id)!.pro!.parts).map((p) => G.Gunsmith.PARTS[p].name);
+  const open = (id: string) => id === 'p9' || (has(id) && data().got.includes(id));
+  const count = (id: string, stat: string) => (data().n[id] && data().n[id][stat]) || 0;
+  const name = (id: string) => (G.WEAPONS[id] ? G.WEAPONS[id].name : id);
   // where it goes on the map: [x, y] from the P9, in pixels at full size
-  const polar = (deg, r) => { const a = (deg * Math.PI) / 180; return [Math.cos(a) * r, Math.sin(a) * r]; };
-  const along = (path, r) => polar(PATHS[path].a, r);
-  const at = (q) => (q.a != null ? polar(q.a, q.r) : q.ring ? along(q.path, RINGS[q.ring]) : [0, 0]);
+  const polar = (deg: number, r: number) => { const a = (deg * Math.PI) / 180; return [Math.cos(a) * r, Math.sin(a) * r]; };
+  const along = (path: string, r: number) => polar(PATHS[path].a, r);
+  const at = (q: ArsenalNode | undefined) => (q!.a != null ? polar(q!.a, q!.r!) : q!.ring ? along(q!.path!, RINGS[q!.ring]) : [0, 0]);
   // what's next from a gun: how far along each it's got
-  const left = (q) => Math.min(q.n, count(q.from, q.stat));
+  const left = (q: ArsenalNode) => Math.min(q.n!, count(q.from!, q.stat!));
   // one more of something, with that gun: what it's for, and whatever that's earned
-  function tally(id, stat) {
+  function tally(id: string, stat: string) {
     if (!open(id)) return;
     const d = data(), ns = d.n[id] || (d.n[id] = {});
     ns[stat] = (ns[stat] || 0) + 1;
     for (const q of NODES) {
       if (q.from !== id || q.stat !== stat || open(q.id)) continue;
-      if (ns[stat] >= q.n) {
+      if (ns[stat] >= q.n!) {
         d.got.push(q.id);
         G.HUD.toast('NEW SIDEARM', `${name(q.id)}: yours from your next run`, 3.5);
         if (G.Audio.click) G.Audio.click();
-      } else G.HUD.feed(`<span class="cr">${G.U.esc(name(id))}: ${ns[stat]}/${q.n} ${G.U.esc(q.what)}</span>`);
+      } else G.HUD.feed(`<span class="cr">${G.U.esc(name(id))}: ${ns[stat]}/${q.n} ${G.U.esc(q.what!)}</span>`);
     }
     const me = BY.get(id);
     if (me && me.pro && me.pro.stat === stat && !d.pro[id]) {
@@ -83,12 +85,12 @@ const G_Arsenal = (() => {
   }
   // a kill of yours (m: the host's word of it; not a civilian or someone who'd given up: js/game.ts credit)
   let lastKill = new Map();
-  function kill(m) {
+  function kill(m: any) {
     const ev = G.Views.enemies.get(m.e), k = ev && ev.mine;
     if (!k || k.done) return;
     k.done = true;
     const id = k.wid, ts = k.ts, n = ts.length, now = performance.now();
-    const within = (hits, ms) => n >= hits && ts[n - 1] - ts[n - hits] <= ms;
+    const within = (hits: number, ms: number) => n >= hits && ts[n - 1] - ts[n - hits] <= ms;
     tally(id, 'kills');
     if (within(2, TAP)) tally(id, 'tap');
     if (within(3, TRIO_MS)) tally(id, 'trio');
@@ -103,7 +105,7 @@ const G_Arsenal = (() => {
     if (m.sur) tally(id, 'sur');
   }
   // what a round of yours did to someone, for that
-  function hit(ev, b) {
+  function hit(ev: any, b: any) {
     let k = ev.mine;
     if (!k || k.wid !== b.def.id) k = ev.mine = { wid: b.def.id, ts: [], shots: new Set(), wall: false, d: 0 };
     const f = b.shot.f, p = ev.rig && ev.rig.root.position;

@@ -26,10 +26,21 @@ const G_InvUI = (() => {
     document.documentElement.style.setProperty('--ik', (C / 34).toFixed(3));
   }
   const GG = () => G.Gear;
-  let root = null, drag = null, editMolle = false, menu = null, field = false, pressed = false; // (pressed: a pointer's held down)
-  let patient = null; // a teammate you're treating (their player id), or null: yourself
-  let ptPart = null, lastDropAt = 0; // the part of a body you've picked to treat (highlighted); when something was last dropped on one
-  let cab = null; // the first aid cabinet you're looking in (its index), or null
+  type Rec = Record<string, any>;
+  type Me = typeof G.Me;
+  // what a grid, an item in it and a gun look like here: varied by kind (a mag has rounds, a pouch has grids...), so each
+  // names what this file reads on it and lets the rest through
+  type Item = GItem; type Placed = GCell; type Grid = GGrid;
+  interface Wpn { def: any; mag: number; ammo: string; chamber?: string | null; tube?: string[]; noMag?: boolean; stickers?: any[]; [field: string]: any }
+  // where an item is: in a grid (g, p), in an equipment slot, or part of a gun (its magazine, a part fitted)
+  interface Src { it: Item; g?: Grid; p?: Placed; slot?: string; gunMag?: Wpn; gunPart?: { w: Wpn, slot: string }; theirs?: boolean }
+  // a timed job (field ammo handling, treating): see "field jobs"
+  interface Job { label: string; per: number; t: number; prog: () => string; step: (me: Me) => string; end?: (me: Me) => void; tell?: { tg: string, part: string, mt: string } | null; told?: boolean }
+  interface Drag { it: Item; rot: number; gx: number; gy: number; ghost: HTMLElement }
+  let root: HTMLElement | null = null, drag: Drag | null = null, editMolle = false, menu: HTMLElement | null = null, field = false, pressed = false; // (pressed: a pointer's held down)
+  let patient: string | null = null; // a teammate you're treating (their player id), or null: yourself
+  let ptPart: string | null = null, lastDropAt = 0; // the part of a body you've picked to treat (highlighted); when something was last dropped on one
+  let cab: number | null = null; // the first aid cabinet you're looking in (its index), or null
   // In the range your kit is frozen: everything in it is put back as it was when you leave (js/range.ts), so an
   // item moved (to the stash, the floor, a teammate) while in there would come back as well as being where it went.
   let frozenAt = 0;
@@ -41,36 +52,36 @@ const G_InvUI = (() => {
   const locked = () => (!field && G.Shop.ready) || inRange();
   // ---------------------------------------------------------------- field jobs (timed ammo handling)
   // a job: { label, per (s per step), t, step(me) -> 'more' | 'done', prog() -> text, end(me) }
-  let jobs = [];
+  let jobs: Job[] = [];
   const PER = { round: 0.7, pistol: 0.55, belt: 0.25, shell: 0.6, out: 0.25, magIn: 1.2, magOut: 0.9 };
-  function queue(j) {
-    j.t = 0;
-    jobs.push(j);
+  function queue(j: Omit<Job, 't'>) {
+    (j as Job).t = 0;
+    jobs.push(j as Job);
     if (jobs.length === 1) G.Audio.click();
     paintJob();
   }
-  const where = (me, it) => locate(me, it.uid);
-  const dropItem = (me, it) => { const s = where(me, it); if (s && s.g) GG().removeFrom(s.g, it); };
+  const where = (me: Me, it: Item) => locate(me, it.uid!);
+  const dropItem = (me: Me, it: Item) => { const s = where(me, it); if (s && s.g) GG().removeFrom(s.g, it); };
   // the boxes of a caliber (of one type if given) you can reach, fullest first... or emptiest for unloading into
-  function boxes(me, cal, am) { const o = []; GG().each(grids(me), (b) => { if (b.k === 'ammo' && b.key === cal && (!am || b.am === am)) o.push(b); }); return o; }
+  function boxes(me: Me, cal: string, am?: string | null) { const o: Item[] = []; GG().each(grids(me), (b: Item) => { if (b.k === 'ammo' && b.key === cal && (!am || b.am === am)) o.push(b); }); return o; }
   // somewhere for rounds coming out: a box of that type with room, or a new (empty) one on you
-  function outBox(me, cal, am) {
+  function outBox(me: Me, cal: string, am?: string | null) {
     const b = boxes(me, cal, am).find((q) => q.n < q.cap);
     if (b) return b;
-    const nb = GG().boxItem(cal, am, 0);
+    const nb = GG().boxItem(cal, am!, 0);
     return GG().stow(me, nb) ? nb : null;
   }
   // Counts: in the stash and the shop, between levels, you can count your rounds; in the field you can't (a
   // magazine's fill shows in its picture; check it with R held).
   const counted = () => G.Game.phase !== 'level' || G.Game.hub;
   // how far a job's got (no counts: a bar)
-  const bar = (f) => `<i class="jobbar"><b style="width:${Math.round(G.U.clamp(f || 0, 0, 1) * 100)}%"></b></i>`;
-  const magPer = (mag) => { const def = G.WEAPONS[mag.wid]; return G.beltFed(def) ? PER.belt : def.cls === 'PST' || def.cls === 'MP' ? PER.pistol : PER.round; };
+  const bar = (f: number) => `<i class="jobbar"><b style="width:${Math.round(G.U.clamp(f || 0, 0, 1) * 100)}%"></b></i>`;
+  const magPer = (mag: Item) => { const def = G.WEAPONS[mag.wid]; return G.beltFed(def) ? PER.belt : def.cls === 'PST' || def.cls === 'MP' ? PER.pistol : PER.round; };
   // rounds into a magazine, one at a time: from `box`, or from any box of its caliber (same type first)
-  function loadJob(mag, box, w?) {
+  function loadJob(mag: Item, box: Item | null, w?: Wpn) {
     const name = GG().magName(mag);
     return { label: `Loading the ${name}`, per: magPer(mag), prog: () => bar(mag.n / mag.cap),
-      step(me) {
+      step(me: Me) {
         if (mag.n >= mag.cap || !where(me, mag) && !w) return 'done';
         const cal = G.calOf(G.WEAPONS[mag.wid]);
         const b = box ? (box.n > 0 && where(me, box) ? box : null) : boxes(me, cal, null).sort((a, c) => +(c.am === mag.am) - +(a.am === mag.am))[0];
@@ -83,11 +94,11 @@ const G_InvUI = (() => {
       } };
   }
   // rounds out of a magazine (or a loose-fed gun) into a box
-  function unloadJob(name, cal, get, take, w?) {
-    let box = null;
+  function unloadJob(name: string, cal: string, get: () => number, take: (peek: boolean) => string, w?: Wpn) {
+    let box: Item | null = null;
     let n0 = 0;
     return { label: `Unloading the ${name}`, per: PER.out, prog: () => bar((n0 = Math.max(n0, get())) ? get() / n0 : 0),
-      step(me) {
+      step(me: Me) {
         if (get() <= 0) return 'done';
         const am = take(true);
         if (!box || box.am !== am || box.n >= box.cap || !where(me, box)) box = outBox(me, cal, am);
@@ -96,12 +107,12 @@ const G_InvUI = (() => {
         G.Audio.click();
         return get() > 0 ? 'more' : 'done';
       },
-      end(me) { if (box && box.n <= 0) dropItem(me, box); } };
+      end(me: Me) { if (box && box.n <= 0) dropItem(me, box); } };
   }
   // shells into a tube (or a break-action), one at a time
-  function gunLoadJob(w, box) {
+  function gunLoadJob(w: Wpn, box: Item | null) {
     return { label: `Loading the ${w.def.name}`, per: PER.shell, prog: () => bar(w.mag / G.Me.magSize(w.def)),
-      step(me) {
+      step(me: Me) {
         const cap = me.magSize(w.def);
         if (w.mag >= cap) return 'done';
         const b = box ? (box.n > 0 && where(me, box) ? box : null) : boxes(me, G.calOf(w.def), w.mag ? w.ammo : null)[0];
@@ -113,13 +124,13 @@ const G_InvUI = (() => {
       } };
   }
   // one-step jobs: a magazine into a gun, or out of it (to a spot, or anywhere on you)
-  function magInJob(mag, gunIt) {
+  function magInJob(mag: Item, gunIt: Item) {
     return { label: `Magazine into the ${gunIt.w.def.name}`, per: PER.magIn, prog: () => '',
-      step(me) { const s = where(me, mag); if (s) intoGun(me, s, gunIt); return 'done'; } };
+      step(me: Me) { const s = where(me, mag); if (s) intoGun(me, s, gunIt); return 'done'; } };
   }
-  function magOutJob(w, to?) {
+  function magOutJob(w: Wpn, to?: { g: Grid, x: number, y: number, rot: number }) {
     return { label: `Magazine out of the ${w.def.name}`, per: PER.magOut, prog: () => '',
-      step(me) {
+      step(me: Me) {
         const m = magItem(w);
         if (!m) return 'done';
         if (to && GG().fits(to.g, m, to.x, to.y, to.rot)) { detach(me, { gunMag: w }); GG().put(to.g, m, to.x, to.y, to.rot); }
@@ -130,14 +141,14 @@ const G_InvUI = (() => {
       } };
   }
   // a medical item onto a part (yours or the patient's): checked, then it takes the item's time
-  function treatOn(me, src, part) {
-    const it = src.it, I = G.Med.ITEMS[it.mt], b = bodyOf(me);
+  function treatOn(me: Me, src: Src, part: string) {
+    const it = src.it, I = (G.Med.ITEMS as Rec)[it.mt], b = bodyOf(me);
     if (!I || !b) return G.Audio.deny();
     const why = G.Med.cantTreat(b, part, it.mt);
     if (why) { G.HUD.toast('', why, 1.6); return G.Audio.deny(); }
     const who = patient, pv = patientView(), theirs = !!src.theirs;
-    queue({ label: `${I.name}${theirs ? ' (theirs)' : ''} on ${who != null && pv ? pv.name + "'s" : 'your'} ${G.Med.NAME[part].toLowerCase()}`, per: I.time, prog: () => '', tell: who != null ? { tg: who, part, mt: it.mt } : null,
-      step(me2) {
+    queue({ label: `${I.name}${theirs ? ' (theirs)' : ''} on ${who != null && pv ? pv.name + "'s" : 'your'} ${(G.Med.NAME as Rec)[part].toLowerCase()}`, per: I.time, prog: () => '', tell: who != null ? { tg: who, part, mt: it.mt } : null,
+      step(me2: Me) {
         const s = theirs ? true : where(me2, it);
         if (!s) return 'done';
         if (who == null) { if (!G.Med.treat(me2.body, part, it.mt)) return 'done'; }
@@ -147,7 +158,7 @@ const G_InvUI = (() => {
           if (theirs) { const i = Object.keys(G.Med.ITEMS).indexOf(it.mt); if (!(p.st.md && p.st.md[i] > 0)) { G.HUD.toast('', `${G.U.esc(p.name)} has none left`, 1.4); return 'done'; } } // (it comes off them where they are)
           G.Net.toHost({ t: 'treat', tg: who, part, mt: it.mt, th: theirs ? 1 : 0 });
         }
-        if (!theirs) { if ((it.n || 1) > 1) it.n--; else detach(me2, s); } // one off the stack
+        if (!theirs) { if ((it.n || 1) > 1) it.n--; else detach(me2, s as Src); } // one off the stack
         G.Audio.heal();
         return 'done';
       } });
@@ -159,8 +170,8 @@ const G_InvUI = (() => {
     if (why) { G.HUD.toast('', why, 2); return G.Audio.deny(); }
     if (warn) G.HUD.toast('', warn, 2);
     queue({ label: `Reviving ${pv.name}`, per: 4, prog: () => '',
-      step(me) {
-        const p = G.Views.players.get(who);
+      step(me: Me) {
+        const p = G.Views.players.get(who!);
         if (!p || !p.st.dn || p.st.dd || Math.hypot(p.pos.x - me.pos.x, p.pos.z - me.pos.z) > 2.6) return 'done';
         const why = G.Med.cantRevive(bodyOf(me));
         if (why) { G.HUD.toast('', why, 2); return 'done'; } // they've bled down past it meanwhile
@@ -171,7 +182,7 @@ const G_InvUI = (() => {
   }
   // A job on a teammate's body (j.tell: { tg, part, mt }): they're told when it starts (what it is and how long it
   // takes) and when it stops, so their screen can say who's doing what to which part
-  function told(j, on) {
+  function told(j: Job, on: boolean) {
     if (!j.tell || !!j.told === on) return;
     j.told = on;
     G.Net.toHost({ t: 'applying', tg: j.tell.tg, part: j.tell.part, mt: j.tell.mt, dur: j.per, off: on ? 0 : 1 });
@@ -185,7 +196,7 @@ const G_InvUI = (() => {
   }
   // the health panel redrawn, only when it's changed (now: whatever), and never while a pointer's held: swapping the
   // part under it between the press and the release would lose the click (the next tick catches up)
-  function paintHealth(now?) {
+  function paintHealth(now?: boolean) {
     if (pressed) return;
     const el: any = root && document.getElementById('invHealth'), h = el && healthHTML(G.Me); // (_h: what it last showed)
     if (el && (now || h !== el._h)) { el.innerHTML = h; el._h = h; }
@@ -195,12 +206,12 @@ const G_InvUI = (() => {
   for (const ev of ['pointerup', 'pointercancel']) window.addEventListener(ev, () => { pressed = false; }, true);
   function paintJob() { const el = root && document.getElementById('invJob'); if (el) el.innerHTML = jobHTML(); }
   // advance the job at the front (called every frame while the field screen is open)
-  function update(dt) {
+  function update(dt: number) {
     // the teammate you're treating has moved out of reach (or died, or gone): what you were doing for them stops
     // and their panel closes
     if (field && patient != null) {
       const pv = patientView(), me = G.Me;
-      if (!pv || !pv.st || pv.st.dd || Math.hypot(pv.pos.x - me.pos.x, pv.pos.z - me.pos.z) > 2.6) {
+      if (!pv || !pv.st || pv.st.dd || Math.hypot(pv.pos.x - me.pos!.x, pv.pos.z - me.pos!.z) > 2.6) {
         const name = pv ? pv.name : 'They';
         cancelJobs(); closeMenu(); patient = null; ptPart = null;
         G.Game.toggleInv(false);
@@ -210,8 +221,8 @@ const G_InvUI = (() => {
     }
     // walked away from the cabinet: it closes
     if (field && cab != null) {
-      const c = G.Game.map && G.Game.map.cabinets && G.Game.map.cabinets[cab];
-      if (!c || Math.hypot(c.x - G.Me.pos.x, c.z - G.Me.pos.z) > 2.2) { cab = null; if (!drag) render(); }
+      const c = (G.Game.map as any) && (G.Game.map as any).cabinets && (G.Game.map as any).cabinets[cab];
+      if (!c || Math.hypot(c.x - G.Me.pos!.x, c.z - G.Me.pos!.z) > 2.2) { cab = null; if (!drag) render(); }
     }
     if (!field || !jobs.length) return;
     const j = jobs[0], me = G.Me;
@@ -231,40 +242,40 @@ const G_InvUI = (() => {
     const w = G.Me.cur();
     if (w && G.R.vm && G.R.vm.userData.key !== G.R.vmKey(w.def, w.stickers)) G.R.setViewmodel(w.def);
   }
-  let opened = []; // uids of the open containers, newest first
-  const COLORS = { mag: '#3d4a33', ammo: '#4a4130', med: '#5a2a2a', frag: '#3a4237', flash: '#3d4247', carrier: '#2f3a44', plate: '#3c3f46', helmet: '#33393f', face: '#30363c', belt: '#3b3528', pack: '#3a3a2c', gun: '#262b30', pouch: '#353a2e', part: '#2c3136' };
+  let opened: number[] = []; // uids of the open containers, newest first
+  const COLORS: Record<string, string> = { mag: '#3d4a33', ammo: '#4a4130', med: '#5a2a2a', frag: '#3a4237', flash: '#3d4247', carrier: '#2f3a44', plate: '#3c3f46', helmet: '#33393f', face: '#30363c', belt: '#3b3528', pack: '#3a3a2c', gun: '#262b30', pouch: '#353a2e', part: '#2c3136' };
   const GS = () => G.Gunsmith;
   const SLOTS = [['wp', 'Primary weapon'], ['ws', 'Sidearm'], ['helmet', 'Helmet'], ['face', 'Face shield / mandible'], ['carrier', 'Body armour / rig'], ['plate', 'Plate'], ['shoulder', 'Shoulders'], ['groin', 'Pelvis'], ['belt', 'Belt'], ['legs', 'Legs'], ['ifak', 'IFAK'], ['pack', 'Backpack']];
   const GEAR_SLOTS = ['helmet', 'face', 'carrier', 'plate', 'shoulder', 'groin', 'belt', 'legs', 'ifak', 'pack'];
   // an empty mount's slot, and which gear it's missing: what it says when it can't be used
-  const NO_MOUNT = { face: 'no mount on this helmet', plate: 'no plate pocket', shoulder: 'no shoulder mounts', groin: 'no pelvis mount', legs: 'no leg hangers' };
-  const WSLOT = { wp: 'p', ws: 's' };
-  const ACCEPT = { mag: 'magazines', ammo: 'ammo', frag: 'grenade', flash: 'grenade', med: 'medkit' };
+  const NO_MOUNT: Record<string, string> = { face: 'no mount on this helmet', plate: 'no plate pocket', shoulder: 'no shoulder mounts', groin: 'no pelvis mount', legs: 'no leg hangers' };
+  const WSLOT: Record<string, string> = { wp: 'p', ws: 's' };
+  const ACCEPT: Record<string, string> = { mag: 'magazines', ammo: 'ammo', frag: 'grenade', flash: 'grenade', med: 'medkit' };
 
   // ---------------------------------------------------------------- where things are
-  function slotItem(me, s) {
+  function slotItem(me: Me, s: string) {
     if (WSLOT[s]) { const w = me.weapons[WSLOT[s]]; return w ? GG().gunItem(w) : null; }
-    if (GG().MOUNTS[s]) { const h = me.kit[GG().MOUNTS[s]]; return h ? h[s] || null : null; } // on what it's mounted on
+    if ((GG().MOUNTS as Rec)[s]) { const h = me.kit[(GG().MOUNTS as Rec)[s]]; return h ? h[s] || null : null; } // on what it's mounted on
     return me.kit[s];
   }
   // a container's grids: a pouch's or pack's own, or a carrier's or belt's MOLLE and the pouches on it
-  const isContainer = (it) => !!(it.grids || it.molle);
+  const isContainer = (it: Item) => !!(it.grids || it.molle);
   // in the team locker: the host only hears where its items sit, not what's in them (G.Game.teamSync), so nothing
   // there is opened or changed in place (or what you took out of a belt there would still be in it for everyone else)
-  const inTeam = (src) => !!(src && src.g && src.g.team);
+  const inTeam = (src: Src | null) => !!(src && src.g && src.g.team);
   const TEAM_NO = 'Take it out of the team locker first';
   // open-able: a container that isn't on you already (worn, or a pouch on what you wear)
-  const canOpen = (me, src) => !inTeam(src) && ((src.it.k === 'gun' && !src.gunPart) || (isContainer(src.it) && !src.slot && !GG().molles(me).includes(src.g)));
+  const canOpen = (me: Me, src: Src) => !inTeam(src) && ((src.it.k === 'gun' && !src.gunPart) || (isContainer(src.it) && !src.slot && !GG().molles(me).includes(src.g)));
   // the part items fitted to a gun (one per slot, kept so they keep their uid), and the magazine in it
-  const fittedItems = new WeakMap(), magItems = new WeakMap();
-  function fittedItem(w, slot, pid) {
+  const fittedItems = new WeakMap<Wpn, Record<string, Item>>(), magItems = new WeakMap<Wpn, Item>();
+  function fittedItem(w: Wpn, slot: string, pid: string) {
     let m = fittedItems.get(w);
     if (!m) fittedItems.set(w, (m = {}));
     if (!m[slot] || m[slot].pid !== pid) m[slot] = GG().partItem(pid);
     return m[slot];
   }
-  const isMagGun = (w) => GG().ammoFor(w.def).kind === 'mag';
-  function magItem(w) {
+  const isMagGun = (w: Wpn) => GG().ammoFor(w.def).kind === 'mag';
+  function magItem(w: Wpn) {
     if (!isMagGun(w) || w.noMag) return null;
     let it = magItems.get(w);
     if (!it) magItems.set(w, (it = GG().ammoItem(w.def, 0, w.ammo)));
@@ -272,10 +283,10 @@ const G_InvUI = (() => {
     return it;
   }
   // the guns whose panels are open
-  function openGuns(me, gs) { return opened.map((uid) => findIn(me, gs, uid)).filter((it) => it && it.k === 'gun').map((it) => it.w); }
-  const innerGrids = (it) => (it.molle ? [it.molle, ...GG().mounted(it)] : it.grids || []);
+  function openGuns(me: Me, gs: Grid[]) { return opened.map((uid) => findIn(me, gs, uid)).filter((it) => it && it.k === 'gun').map((it) => it.w); }
+  const innerGrids = (it: Item) => (it.molle ? [it.molle, ...GG().mounted(it)] : it.grids || []);
   // every grid you can reach in the Kit tab: what you carry, the locker, and inside any open container
-  function grids(me) {
+  function grids(me: Me) {
     const out = GG().all(me), seen = new Set();
     if (field && cab != null) out.push(G.Game.cabGrid(cab));
     if (!field && G.Game.hub) out.push(G.Game.teamGrid());
@@ -289,104 +300,104 @@ const G_InvUI = (() => {
     }
     return out;
   }
-  function findIn(me, gs, uid) {
+  function findIn(me: Me, gs: Grid[], uid: number) {
     for (const s of [...GEAR_SLOTS, 'wp', 'ws']) { const it = slotItem(me, s); if (it && it.uid === uid) return it; }
     for (const g of gs) for (const p of g.items) if (p.it.uid === uid) return p.it;
     return null;
   }
-  function locate(me, uid) {
+  function locate(me: Me, uid: number): Src | null {
     for (const s of [...GEAR_SLOTS, 'wp', 'ws']) { const it = slotItem(me, s); if (it && it.uid === uid) return { it, slot: s }; }
     const gs = grids(me);
     for (const g of gs) for (const p of g.items) if (p.it.uid === uid) return { it: p.it, g, p };
     for (const w of openGuns(me, gs)) {
       const m = magItems.get(w);
-      if (m && m.uid === uid && !w.noMag) return { it: magItem(w), gunMag: w };
+      if (m && m.uid === uid && !w.noMag) return { it: magItem(w)!, gunMag: w };
       for (const [slot, it] of Object.entries(fittedItems.get(w) || {})) if (it.uid === uid && w.def.build[slot] === it.pid) return { it, gunPart: { w, slot } };
     }
     return null;
   }
   // a part off a gun: the parts that hung off it come off too (to your locker)
-  function setBuild(me, w, build) {
+  function setBuild(me: Me, w: Wpn, build: Record<string, string>) {
     for (const r of GS().prune(w.def.id, build)) me.stash[r] = (me.stash[r] || 0) + 1;
     me.refit(w, build);
     if (G.GunAudio.available()) G.GunAudio.buildDry(w.def.soundKey);
   }
   // why it can't come off (a required part), or null
-  function cantDetach(src?: any): any;
+  function cantDetach(src?: Src): any;
   function cantDetach() { return null; }
   // taking a core part off: say so (it won't fire until one's back on)
-  function warnCore(src) {
+  function warnCore(src: Partial<Src>) {
     if (!src.gunPart) return;
-    const { w, slot } = src.gunPart, sl = GS().slotsOf(w.def.id, w.def.build).find((s) => s.slot === slot);
-    if (sl && sl.req) G.HUD.toast('', `The ${w.def.name} won't fire without a ${GS().SLOT_LABEL[slot].toLowerCase()}`, 2);
+    const { w, slot } = src.gunPart, sl = GS().slotsOf(w.def.id, w.def.build).find((s: any) => s.slot === slot);
+    if (sl && sl.req) G.HUD.toast('', `The ${w.def.name} won't fire without a ${(GS().SLOT_LABEL as Rec)[slot].toLowerCase()}`, 2);
   }
-  const gridById = (me, id) => grids(me).find((g) => g.id === id);
-  function detach(me, src) {
+  const gridById = (me: Me, id: number) => grids(me).find((g) => g.id === id);
+  function detach(me: Me, src: Partial<Src>) {
     warnCore(src);
-    if (src.g) GG().removeFrom(src.g, src.it);
+    if (src.g) GG().removeFrom(src.g, src.it!);
     else if (src.gunPart) { const { w, slot } = src.gunPart, b = Object.assign({}, w.def.build); delete b[slot]; setBuild(me, w, b); }
     else if (src.gunMag) { const w = src.gunMag; w.mag = 0; w.noMag = true; if (w.tube) w.tube = []; magItems.delete(w); }
-    else if (GG().MOUNTS[src.slot]) me.kit[GG().MOUNTS[src.slot]][src.slot] = null;
-    else if (WSLOT[src.slot]) { delete me.weapons[WSLOT[src.slot]]; if (!me.weapons[me.slot]) me.slot = Object.keys(me.weapons)[0]; }
-    else me.kit[src.slot] = null;
+    else if ((GG().MOUNTS as Rec)[src.slot!]) me.kit[(GG().MOUNTS as Rec)[src.slot!]][src.slot!] = null;
+    else if (WSLOT[src.slot!]) { delete me.weapons[WSLOT[src.slot!]]; if (!me.weapons[me.slot]) me.slot = Object.keys(me.weapons)[0]; }
+    else me.kit[src.slot!] = null;
   }
   // the last gun in your hands can't be stowed (you go in with something)
-  const lastGun = (me, src) => WSLOT[src.slot] && Object.keys(me.weapons).length <= 1;
+  const lastGun = (me: Me, src: Src) => WSLOT[src.slot!] && Object.keys(me.weapons).length <= 1;
   // can an item go in that equipment slot?
-  function slotOK(me, s, it) {
-    if (GG().MOUNTS[s]) return it.k === s && !!GG().mountOn(me, s);
+  function slotOK(me: Me, s: string, it: Item) {
+    if ((GG().MOUNTS as Rec)[s]) return it.k === s && !!GG().mountOn(me, s);
     if (WSLOT[s]) return it.k === 'gun' && it.w.def.slot === WSLOT[s];
     return it.k === s;
   }
-  const hasContents = (it) => (it.grids && it.grids.some((g) => g.items.length)) || Object.keys(GG().MOUNTS).some((m) => it[m]) || !!(it.molle && it.molle.items.some((p) => hasContents(p.it)));
+  const hasContents = (it: Item) => (it.grids && it.grids.some((g: Grid) => g.items.length)) || Object.keys(GG().MOUNTS).some((m) => it[m]) || !!(it.molle && it.molle.items.some((p: Placed) => hasContents(p.it)));
 
   // ---------------------------------------------------------------- drawing
   // rot: the item is shown turned (its icon is turned with it)
   // the quick slots (keys 3, 4, 5): a box each, showing what's on it and how many you carry. Drag a grenade or
   // a flashbang onto one to put that kind on its key (it stays where it is in your kit); × clears it.
-  function quickHTML(me) {
-    return `<div class="inv-quick"><h4>Quick slots <small>drag a grenade onto a key</small></h4><div class="qrow">${me.quick.map((kind, i) => {
+  function quickHTML(me: Me) {
+    return `<div class="inv-quick"><h4>Quick slots <small>drag a grenade onto a key</small></h4><div class="qrow">${me.quick.map((kind: string, i: number) => {
       const n = me.quickCount(kind), icon = kind ? `<img src="${G.Icons.of({ k: kind }, 1, 1)}" alt="">` : '';
       return `<div class="qbox${kind ? '' : ' empty'}" data-quick="${i}"><b>${i + 3}</b>${icon}<span>${kind ? `${me.quickName(kind)} ×${n}` : 'empty'}</span>${kind ? `<i data-unquick="${i}" title="Clear">×</i>` : ''}</div>`;
     }).join('')}</div></div>`;
   }
-  function itemHTML(it, w, h, extra = '', rot = false) {
-    const Gr = GG(), d = Gr.defOf(it), n = (a, b) => (counted() ? ` <b>${a}</b>/${b}` : ''); // (counts: only out of the field)
+  function itemHTML(it: Item, w: number, h: number, extra = '', rot = false) {
+    const Gr = GG(), d = Gr.defOf(it), n = (a: number | string, b: number) => (counted() ? ` <b>${a}</b>/${b}` : ''); // (counts: only out of the field)
     let sub = '';
-    if (it.k === 'mag') sub = it.am && it.n && G.AMMO[it.am] ? `<i class="am am-${it.am}">${G.AMMO[it.am].tag}</i>${Gr.mixed(it) ? '<i class="am mix">+MIX</i>' : ''}${n(it.n, it.cap)}` : it.n ? '' : `<i class="am">EMPTY</i>${n(0, it.cap)}`; // (how full it is: the picture shows; in the stash, the count too)
-    else if (it.k === 'ammo') sub = it.am && it.n && G.AMMO[it.am] ? `<i class="am am-${it.am}">${G.AMMO[it.am].tag}</i>${Gr.mixed(it) ? '<i class="am mix">+MIX</i>' : ''}${n(it.n, it.cap)}` : it.n ? '' : '<i class="am">EMPTY</i>'; // (how full: the rounds on top; in the stash, the count too)
+    if (it.k === 'mag') sub = it.am && it.n && (G.AMMO as Rec)[it.am] ? `<i class="am am-${it.am}">${(G.AMMO as Rec)[it.am].tag}</i>${Gr.mixed(it) ? '<i class="am mix">+MIX</i>' : ''}${n(it.n, it.cap)}` : it.n ? '' : `<i class="am">EMPTY</i>${n(0, it.cap)}`; // (how full it is: the picture shows; in the stash, the count too)
+    else if (it.k === 'ammo') sub = it.am && it.n && (G.AMMO as Rec)[it.am] ? `<i class="am am-${it.am}">${(G.AMMO as Rec)[it.am].tag}</i>${Gr.mixed(it) ? '<i class="am mix">+MIX</i>' : ''}${n(it.n, it.cap)}` : it.n ? '' : '<i class="am">EMPTY</i>'; // (how full: the rounds on top; in the stash, the count too)
     else if (it.k === 'med' && GG().medStack(it) > 1) sub = `<b>${it.n || 1}</b>/${GG().medStack(it)}`; // a stack: how many of how many fit
     else if (it.k === 'gun') { // (in the field no counts: check the magazine, or the chamber)
       const nxt = it.w.chamber || (it.w.mag > 0 ? (it.w.tube && it.w.tube.length ? it.w.tube[it.w.tube.length - 1] : it.w.ammo) : null);
-      sub = it.w.def.missing && it.w.def.missing.length ? '<i class="broken">won\'t fire</i>' : it.w.noMag && isMagGun(it.w) ? 'no mag' : nxt && G.AMMO[nxt] ? `<i class="am am-${nxt}">${G.AMMO[nxt].tag}</i>` : '<i class="am">EMPTY</i>';
+      sub = it.w.def.missing && it.w.def.missing.length ? '<i class="broken">won\'t fire</i>' : it.w.noMag && isMagGun(it.w) ? 'no mag' : nxt && (G.AMMO as Rec)[nxt] ? `<i class="am am-${nxt}">${(G.AMMO as Rec)[nxt].tag}</i>` : '<i class="am">EMPTY</i>';
       if (!(it.w.def.missing && it.w.def.missing.length) && !(it.w.noMag && isMagGun(it.w))) sub += n(`${it.w.mag}${it.w.chamber ? '+1' : ''}`, G.Me.magSize(it.w.def));
     }
     else if (d && d.dur) sub = `${Math.round(Gr.cond(it) * 100)}%`;
     else if (it.k === 'part') { const p = GS().PARTS[it.pid]; sub = p && p.factory ? 'factory' : ''; }
     const P = it.k === 'part' ? GS().PARTS[it.pid] : null;
-    const title = d ? `${d.brand} ${d.name}\n${d.desc}` : P ? `${P.brand} ${P.name}\n${GS().SLOT_LABEL[P.slot]} · ${GS().ifaceName(P.mount)}` : Gr.label(it);
+    const title = d ? `${d.brand} ${d.name}\n${d.desc}` : P ? `${P.brand} ${P.name}\n${(GS().SLOT_LABEL as Rec)[P.slot]} · ${GS().ifaceName(P.mount)}` : Gr.label(it);
     return `<div class="inv-item k-${it.k}" data-uid="${it.uid}" style="width:${w * C - 3}px;height:${h * C - 3}px;background:${COLORS[it.k] || '#333'} url(${G.Icons.of(it, w, h, rot)}) center/contain no-repeat;${extra}" title="${G.U.esc(title)}">
       <span class="inv-name">${G.U.esc(d ? d.name : Gr.label(it))}</span><span class="inv-sub">${sub}</span></div>`;
   }
   // a grid only medical gear goes in (a med pouch, the IFAK): edged in red
-  const medOnly = (g) => !!(g.accept && g.accept.length && g.accept.every((k) => k === 'med'));
-  function gridHTML(g, label?) {
-    const acc = g.accept ? g.accept.map((k) => ACCEPT[k]).filter((v, i, a) => a.indexOf(v) === i).join(' / ') : '';
+  const medOnly = (g: Grid) => !!(g.accept && g.accept.length && g.accept.every((k: string) => k === 'med'));
+  function gridHTML(g: Grid, label?: string) {
+    const acc = g.accept ? g.accept.map((k: string) => ACCEPT[k]).filter((v: string, i: number, a: string[]) => a.indexOf(v) === i).join(' / ') : '';
     let html = `<div class="inv-gwrap">${label ? `<small>${label}${acc ? ` <i>${acc}</i>` : ''}</small>` : ''}<div class="inv-grid${medOnly(g) ? ' med' : ''}" data-grid="${g.id}" style="width:${g.w * C}px;height:${g.h * C}px;background-size:${C}px ${C}px">`;
     for (const p of g.items) { const [w, h] = GG().size(p.it, p.r, g); html += itemHTML(p.it, w, h, `position:absolute;left:${p.x * C + 1}px;top:${p.y * C + 1}px`, !!p.r); }
     return html + '</div></div>';
   }
   // A carrier's or belt's MOLLE: each mounted pouch drawn where it sits, as the grid you drop things in; in
   // edit mode, the panel itself as a grid of pouches
-  function molleHTML(gear, close?) {
-    const Gr = GG(), d = Gr.defOf(gear), m = gear.molle;
+  function molleHTML(gear: Item, close?: boolean) {
+    const Gr = GG(), d = Gr.defOf(gear)!, m = gear.molle;
     const head = `<h4>${G.U.esc(d.name)} <small>MOLLE ${m.w}×${m.h}</small> <button class="btn tiny molle-btn${editMolle ? ' on' : ''}" data-molle>${editMolle ? 'Done' : 'Edit pouches'}</button>${close ? closeBtn(gear) : ''}</h4>`;
     if (editMolle) return `<div class="inv-sec">${head}<div class="inv-row">${gridHTML(m)}</div></div>`;
     // (a pouch can hold more than the MOLLE it hangs from, so they're laid out side by side, left to right
     // along the panel, each the size of what it holds)
     let html = `<div class="molle molle-flow">`;
     for (const p of [...m.items].sort((a, b) => a.x - b.x || a.y - b.y)) {
-      const P = Gr.POUCHES[p.it.pid];
+      const P = (Gr.POUCHES as Rec)[p.it.pid];
       for (const g of p.it.grids) { // (a pouch with separate pockets: each its own little grid)
         html += `<div class="inv-grid pouch${P.dump ? ' dump' : ''}${medOnly(g) ? ' med' : ''}${p.it.grids.length > 1 ? ' pocket' : ''}" data-grid="${g.id}" title="${G.U.esc(P.name)}" style="position:relative;width:${g.w * C}px;height:${g.h * C}px;background-size:${C}px ${C}px">`;
         for (const q of g.items) { const [w, h] = Gr.size(q.it, q.r); html += itemHTML(q.it, w, h, `position:absolute;left:${q.x * C + 1}px;top:${q.y * C + 1}px`, !!q.r); }
@@ -396,25 +407,25 @@ const G_InvUI = (() => {
     if (!m.items.length) html += '<em class="molle-empty">No pouches mounted</em>';
     return `<div class="inv-sec">${head}${html}</div></div>`;
   }
-  const closeBtn = (it) => `<button class="btn tiny inv-x" data-close="${it.uid}" title="Close">×</button>`;
+  const closeBtn = (it: Item) => `<button class="btn tiny inv-x" data-close="${it.uid}" title="Close">×</button>`;
   // the open containers, under the locker
-  function gunHTML(me, gunIt) {
+  function gunHTML(me: Me, gunIt: Item) {
     const Gr = GG(), w = gunIt.w, def = w.def, slots = GS().visibleSlots(def.id, def.build);
-    let rows = slots.map((s) => {
+    let rows = slots.map((s: any) => {
       const pid = def.build[s.slot], it = pid ? fittedItem(w, s.slot, pid) : null, [iw, ih] = it ? Gr.partSize(pid) : [1, 1];
       const bad = it && !GS().fitsSlot(s, GS().PARTS[pid], w.def.id);
       return `<div class="gun-slot${(!it || bad) && s.req ? ' missing' : ''}" data-wslot="${gunIt.uid}|${s.slot}"><small>${GS().slotLabel(s)}${s.req ? '' : ' <i>optional</i>'}${bad ? ' <i class="broken">doesn\'t fit: it won\'t fire</i>' : ''}</small>${it ? itemHTML(it, iw, ih, 'position:relative') : s.req ? '<em>missing: it won\'t fire</em>' : s.slot === 'loader' ? '<em>by hand</em>' : '<em>empty</em>'}</div>`;
     }).join('');
-    const mi = magItem(w), a = mi ? (([w0, h0]) => ({ w: w0, h: h0 }))(Gr.size(mi)) : null;
+    const mi = magItem(w), a = mi ? (([w0, h0]: number[]) => ({ w: w0, h: h0 }))(Gr.size(mi)) : null;
     rows += isMagGun(w)
-      ? `<div class="gun-slot mag" data-wmag="${gunIt.uid}"><small>Magazine in it</small>${mi ? itemHTML(mi, a.w, a.h, 'position:relative') : '<em>none: drop one here</em>'}</div>`
+      ? `<div class="gun-slot mag" data-wmag="${gunIt.uid}"><small>Magazine in it</small>${mi ? itemHTML(mi, a!.w, a!.h, 'position:relative') : '<em>none: drop one here</em>'}</div>`
       : `<div class="gun-slot mag" data-wmag="${gunIt.uid}"><small>Loaded</small>${(() => { const cap = me.magSize(def), pw = Math.max(1, Math.min(4, Math.ceil(cap / 3))); return `<img class="tubepic" src="${G.Icons.of({ k: 'tube', key: G.calOf(def), n: w.mag, cap, am: w.ammo }, pw, 1, false)}" style="width:${pw * 30}px;height:30px">`; })()}<em>${w.mag ? (counted() ? `${w.mag} / ${me.magSize(def)} rounds` : '') : 'empty: drop a box here'}</em></div>`;
-    if (G.chambered(def)) rows += `<div class="gun-slot mag"><small>Chamber</small><em>${w.chamber ? `<i class="am am-${w.chamber}">${G.AMMO[w.chamber] ? G.AMMO[w.chamber].tag : ''}</i> a round in it` : 'empty: racks on the next pull of the trigger, or R'}</em></div>`;
+    if (G.chambered(def)) rows += `<div class="gun-slot mag"><small>Chamber</small><em>${w.chamber ? `<i class="am am-${w.chamber}">${(G.AMMO as Rec)[w.chamber] ? (G.AMMO as Rec)[w.chamber].tag : ''}</i> a round in it` : 'empty: racks on the next pull of the trigger, or R'}</em></div>`;
     const [gw, gh] = Gr.gunSize(def);
     return `<div class="inv-open gun"><div class="inv-sec"><h4>${G.U.esc(def.name)}${def.modified ? ' <small>CUSTOM</small>' : ''}${def.missing && def.missing.length ? ' <small class="broken">WON\'T FIRE</small>' : ''}${closeBtn(gunIt)}</h4>
       <div class="gun-pic" style="background-image:url(${G.Icons.of(gunIt, gw, gh, false)})"></div><div class="gun-slots">${rows}</div></div></div>`;
   }
-  function openedHTML(me) {
+  function openedHTML(me: Me) {
     const Gr = GG();
     return opened.map((uid) => {
       const src = locate(me, uid);
@@ -422,13 +433,13 @@ const G_InvUI = (() => {
       const it = src.it;
       if (it.k === 'gun') return gunHTML(me, it);
       if (it.molle) return `<div class="inv-open">${molleHTML(it, true)}</div>`;
-      const P = it.k === 'pouch' ? Gr.POUCHES[it.pid] : null, d = Gr.defOf(it);
-      return `<div class="inv-open"><div class="inv-sec"><h4>${G.U.esc(d ? d.name : Gr.label(it))}${closeBtn(it)}</h4><div class="inv-row">${it.grids.map((g) => gridHTML(g, `${g.w}×${g.h}${P && P.dump ? ' <i>dump</i>' : ''}`)).join('')}</div></div></div>`;
+      const P = it.k === 'pouch' ? (Gr.POUCHES as Rec)[it.pid] : null, d = Gr.defOf(it);
+      return `<div class="inv-open"><div class="inv-sec"><h4>${G.U.esc(d ? d.name : Gr.label(it))}${closeBtn(it)}</h4><div class="inv-row">${it.grids.map((g: Grid) => gridHTML(g, `${g.w}×${g.h}${P && P.dump ? ' <i>dump</i>' : ''}`)).join('')}</div></div></div>`;
     }).join('');
   }
-  function slotHTML(me, s, name) {
+  function slotHTML(me: Me, s: string, name: string) {
     const it = slotItem(me, s);
-    if (GG().MOUNTS[s] && !GG().mountOn(me, s)) return `<div class="inv-slot off"><small>${name}</small><em>${me.kit[GG().MOUNTS[s]] ? NO_MOUNT[s] : '—'}</em></div>`;
+    if ((GG().MOUNTS as Rec)[s] && !GG().mountOn(me, s)) return `<div class="inv-slot off"><small>${name}</small><em>${me.kit[(GG().MOUNTS as Rec)[s]] ? NO_MOUNT[s] : '—'}</em></div>`;
     // shown at its own proportions (a plate is 2x3, a helmet 2x2), scaled down to fit 3 cells
     let [w, h] = s === 'wp' ? [4, 1.5] : s === 'ws' ? [3, 1] : it ? GG().size(it) : [3, 1];
     if (!WSLOT[s]) { const k = Math.min(1, 3 / w, 3 / h); w *= k; h *= k; }
@@ -438,10 +449,10 @@ const G_InvUI = (() => {
   // The body you're treating: yours, or the teammate's you're checking (from what they last sent)
   function patientView() { return patient != null ? G.Views.players.get(patient) : null; }
   const REACH = 2.6; // (how close you have to be to treat someone)
-  const mateFar = (pv, me) => Math.hypot(pv.pos.x - me.pos.x, pv.pos.z - me.pos.z) > REACH;
+  const mateFar = (pv: any, me: Me) => Math.hypot(pv.pos.x - me.pos.x, pv.pos.z - me.pos.z) > REACH;
   // The squad, under your own body: each teammate's blood (or the head, if that's worse) as a bar. Click one within
   // reach to treat them (their body takes the place of yours here, as when you hold F on them).
-  function squadHTML(me) {
+  function squadHTML(me: Me) {
     if (!field || !G.Views.players.size) return '';
     const rows = [...G.Views.players.entries()].map(([id, pv]) => {
       const st = pv.st, b = st && st.bd ? G.Med.decode(st.bd) : null;
@@ -455,26 +466,26 @@ const G_InvUI = (() => {
     return rows ? `<h4 class="hd">Squad <small>click to treat</small></h4><div class="sq-list">${rows}</div>` : '';
   }
   // pick a teammate to treat from the squad list
-  function checkMate(id) {
+  function checkMate(id: string) {
     const pv = G.Views.players.get(id), me = G.Me;
     if (!pv || !pv.st || pv.st.dd) return G.Audio.deny();
     if (mateFar(pv, me)) { G.HUD.toast('', `${G.U.esc(pv.name)} is too far away to treat`, 1.4); return G.Audio.deny(); }
     if (inRange()) return G.Audio.deny();
     patient = id; ptPart = null; G.Audio.click(); render();
   }
-  function bodyOf(me) {
+  function bodyOf(me: Me) {
     if (patient == null) return me.body;
     const pv = patientView();
     return pv && pv.st && pv.st.bd ? G.Med.decode(pv.st.bd) : null;
   }
   // the body: each part a drop target for medical items, with its health and what's wrong with it
-  function bodyHTML(b) {
-    const part = (k) => {
+  function bodyHTML(b: MedBody) {
+    const part = (k: string) => {
       const p = b.parts[k], f = Math.max(0, p.hp / p.max), col = p.hp <= 0 ? '#5a2020' : f > 0.6 ? '#4f7a44' : f > 0.3 ? '#8a7030' : '#8a3a30';
       const chips = [p.heavy ? '<i class="c heavy">BLEED++</i>' : '', p.light ? '<i class="c light">BLEED</i>' : '', p.frac ? '<i class="c frac">FRACTURE</i>' : '',
         p.lung ? '<i class="c organ">LUNG</i>' : '', p.gut ? '<i class="c organ">GUT</i>' : '', p.tq ? '<i class="c tq">TQ</i>' : ''].join('');
-      return `<div class="bp bp-${k}${p.heavy || p.light ? ' bleeding' : ''}${ptPart === k ? ' sel' : ''}" data-body="${k}" title="${G.U.esc(G.Med.NAME[k])}: ${Math.ceil(Math.max(0, p.hp))}/${p.max}${G.Med.describe(p).length ? ' · ' + G.Med.describe(p).join(', ') : ''}">
-        <b>${G.Med.NAME[k]}</b><div class="bp-bar"><i style="width:${Math.round(f * 100)}%;background:${col}"></i></div><small>${Math.ceil(Math.max(0, p.hp))}/${p.max}</small><div class="bp-chips">${chips}</div></div>`;
+      return `<div class="bp bp-${k}${p.heavy || p.light ? ' bleeding' : ''}${ptPart === k ? ' sel' : ''}" data-body="${k}" title="${G.U.esc((G.Med.NAME as Rec)[k])}: ${Math.ceil(Math.max(0, p.hp))}/${p.max}${G.Med.describe(p).length ? ' · ' + G.Med.describe(p).join(', ') : ''}">
+        <b>${(G.Med.NAME as Rec)[k]}</b><div class="bp-bar"><i style="width:${Math.round(f * 100)}%;background:${col}"></i></div><small>${Math.ceil(Math.max(0, p.hp))}/${p.max}</small><div class="bp-chips">${chips}</div></div>`;
     };
     const bl = Math.round(b.blood), bcol = bl > 70 ? '#7fc06a' : bl > G.Med.DOWNABLE ? '#e0b040' : '#e06060';
     // the figure (drop on the part itself), and beside it each part's numbers and what's wrong (drop there too)
@@ -484,34 +495,34 @@ const G_InvUI = (() => {
   }
   // Click a part of a body (yours, or a teammate's you're checking): a dropdown of the medical items you carry
   // that would treat what's wrong with it, one entry per kind; pick one and it's used (one off your stack).
-  function medMenu(part, x, y, only?) { // only: just the items for that (e.g. 'blood': transfusions)
+  function medMenu(part: string, x: number, y: number, only?: string) { // only: just the items for that (e.g. 'blood': transfusions)
     const me = G.Me, b = bodyOf(me);
     if (!b || !b.parts[part]) return;
     closeMenu();
-    const seen = new Set(), opts = [], mine = {}; // ({ mt, theirs, n })
+    const seen = new Set(), opts: { mt: string, theirs: boolean, n: number }[] = [], mine: Record<string, number> = {}; // ({ mt, theirs, n })
     for (const g of GG().body(me)) for (const p of g.items) if (p.it.k === 'med') mine[p.it.mt] = (mine[p.it.mt] || 0) + (p.it.n || 1);
     for (const g of GG().body(me)) for (const p of g.items) {
       const mt = p.it.k === 'med' && p.it.mt;
       if (!mt || seen.has(mt)) continue;
       seen.add(mt);
-      if (!G.Med.cantTreat(b, part, mt) && (!only || G.Med.ITEMS[mt].fixes === only)) opts.push({ mt, theirs: false, n: mine[mt] });
+      if (!G.Med.cantTreat(b, part, mt) && (!only || (G.Med.ITEMS as Rec)[mt].fixes === only)) opts.push({ mt, theirs: false, n: mine[mt] });
     }
     // on a teammate: their own medical gear is yours to use on them too (it's taken off them when it goes on)
     const pt = patientView(), md = patient != null && pt && pt.st && pt.st.md;
-    if (md) Object.keys(G.Med.ITEMS).forEach((mt, i) => { if (md[i] > 0 && !G.Med.cantTreat(b, part, mt) && (!only || G.Med.ITEMS[mt].fixes === only)) opts.push({ mt, theirs: true, n: md[i] }); });
+    if (md) Object.keys(G.Med.ITEMS).forEach((mt, i) => { if (md[i] > 0 && !G.Med.cantTreat(b, part, mt) && (!only || (G.Med.ITEMS as Rec)[mt].fixes === only)) opts.push({ mt, theirs: true, n: md[i] }); });
     const wrong = only === 'blood' ? (b.blood < 90 ? [`${Math.round(b.blood)}%`] : []) : G.Med.describe(b.parts[part]), several = opts.some((o) => o.theirs) && opts.some((o) => !o.theirs);
     menu = document.createElement('div');
     menu.className = 'inv-menu med-menu';
-    menu.innerHTML = `<b>${only === 'blood' ? 'Blood' : G.Med.NAME[part]}${wrong.length ? ` <small>${wrong.join(', ')}</small>` : ''}</b>`
+    menu.innerHTML = `<b>${only === 'blood' ? 'Blood' : (G.Med.NAME as Rec)[part]}${wrong.length ? ` <small>${wrong.join(', ')}</small>` : ''}</b>`
       + (opts.length ? opts.map((o) => {
         // with more than one owner's gear on offer, each says whose it is: their emblem and name
-        const who = o.theirs ? pt : { name: G.Game.myName, animal: G.Game.roster && G.Game.roster[G.Net.myId] && G.Game.roster[G.Net.myId].animal, color: G.Game.myColor };
+        const who = o.theirs ? pt : { name: G.Game.myName, animal: G.Game.roster && G.Game.roster[G.Net.myId!] && G.Game.roster[G.Net.myId!].animal, color: G.Game.myColor };
         const owner = several && who ? `<span class="mo" style="color:${G.U.hex(who.color)}">${G.Callsigns.html(who.animal)}${G.U.esc(who.name || '')}${o.theirs ? '' : ' <small>(you)</small>'}</span>` : '';
-        return `<button data-mt="${o.mt}" data-th="${o.theirs ? 1 : 0}"><img class="mi" src="${G.Icons.of(GG().medItem(o.mt), 1, 1, false)}" alt=""><span>${G.U.esc(G.Med.ITEMS[o.mt].name)} <small>×${o.n}</small></span>${owner}</button>`;
+        return `<button data-mt="${o.mt}" data-th="${o.theirs ? 1 : 0}"><img class="mi" src="${G.Icons.of(GG().medItem(o.mt), 1, 1, false)}" alt=""><span>${G.U.esc((G.Med.ITEMS as Rec)[o.mt].name)} <small>×${o.n}</small></span>${owner}</button>`;
       }).join('') : `<i class="none">${wrong.length ? (only === 'blood' ? (patient != null ? 'No blood bags on you or them' : 'No blood bags on you') : patient != null ? 'Nothing you or they carry treats this' : 'Nothing you carry treats this') : only === 'blood' ? 'Plenty of blood: no transfusion needed' : 'Nothing wrong with it'}</i>`);
     Object.assign(menu.style, { left: Math.min(x, innerWidth - 200) + 'px', top: Math.min(y, innerHeight - 40 - opts.length * 26) + 'px' });
     menu.addEventListener('click', (ev) => {
-      const bt = ev.target.closest('[data-mt]');
+      const bt = (ev.target as HTMLElement).closest<HTMLElement>('[data-mt]');
       if (!bt) return;
       closeMenu();
       if (bt.dataset.th === '1') { treatOn(me, { theirs: true, it: { k: 'med', mt: bt.dataset.mt, n: 1 } }, part); rerender(); return; }
@@ -522,7 +533,7 @@ const G_InvUI = (() => {
     document.body.appendChild(menu);
     setTimeout(() => window.addEventListener('pointerdown', outside, true));
   }
-  function healthHTML(me) {
+  function healthHTML(me: Me) {
     const Gr = GG();
     if (patient != null) {
       const pv = patientView(), b = bodyOf(me);
@@ -533,17 +544,17 @@ const G_InvUI = (() => {
         ${pv.st.dn ? `<button class="btn tiny" data-revive ${far || out ? 'disabled' : ''} title="${out ? 'Blood bags first: they come round over ' + G.Med.UNCON + '%' : ''}">Revive (4 s)</button>` : ''}<button class="btn tiny" data-self>Back to me</button></div>
         ${warn && !out ? `<div class="hl-status bad">${warn}</div>` : ''}${bodyHTML(b)}<p class="inv-hint">Click a part of ${G.U.esc(pv.name)}'s body to treat it with what you carry, or their blood bar for a blood bag.</p>`;
     }
-    const piece = (name, it) => { const d = Gr.defOf(it); if (!d) return ''; const c = d.dur ? Math.round(Gr.cond(it) * 100) : null; return `<div class="hl-row"><span>${name}</span><b>${G.U.esc(d.name)}</b><i>${c == null ? '' : c + '%'}</i></div>`; };
-    const status = me.dead ? `Dead: ${G.U.esc(me.deathCause || 'killed')}` : me.down ? (me.bleed == null ? 'Down, stable: a teammate can get you up' : `Down: ${Math.ceil(me.bleed)} s until you bleed out`) : G.Med.bleeding(me.body) ? 'Bleeding' : G.Med.downable(me.body) ? 'Low on blood: one more hit puts you down' : me.hp < 50 ? 'Badly hurt' : me.hp < 90 ? 'Hurt' : 'OK';
+    const piece = (name: string, it: Item) => { const d = Gr.defOf(it); if (!d) return ''; const c = d.dur ? Math.round(Gr.cond(it) * 100) : null; return `<div class="hl-row"><span>${name}</span><b>${G.U.esc(d.name)}</b><i>${c == null ? '' : c + '%'}</i></div>`; };
+    const status = me.dead ? `Dead: ${G.U.esc((me as any).deathCause || 'killed')}` : me.down ? (me.bleed == null ? 'Down, stable: a teammate can get you up' : `Down: ${Math.ceil(me.bleed)} s until you bleed out`) : G.Med.bleeding(me.body) ? 'Bleeding' : G.Med.downable(me.body) ? 'Low on blood: one more hit puts you down' : me.hp < 50 ? 'Badly hurt' : me.hp < 90 ? 'Hurt' : 'OK';
     return `<div class="hl-status ${G.Med.bleeding(me.body) ? 'bad' : ''}">${status}</div>${bodyHTML(me.body)}
       <p class="inv-hint">Click a part to treat it with what you carry, or drag a medical item onto it (it takes a few seconds). Click the blood bar for a blood bag.</p>
       ${squadHTML(me)}
       ${piece('Helmet', me.kit.helmet)}${me.kit.helmet && me.kit.helmet.face ? piece('Face', me.kit.helmet.face) : ''}${piece('Armour', me.kit.carrier)}${me.kit.carrier ? piece('Plate', me.kit.carrier.plate) + piece('Shoulders', me.kit.carrier.shoulder) + piece('Pelvis', me.kit.carrier.groin) : ''}${me.kit.belt ? piece('Legs', me.kit.belt.legs) : ''}`;
   }
-  function stats(me) {
+  function stats(me: Me) {
     // each zone: the hardest to stop of the reference rounds what's there stops head-on, new (js/ballistics.ts rating)
-    const Gr = GG(), B = G.Ballistics, AT = { head: ['helmet'], face: ['face'], chest: ['plate', 'torso'], abdomen: ['torso'], shoulder: ['shoulder'], pelvis: ['groin', 'groinplate', 'pelvis'], thigh: ['thigh', 'legwrap'], shin: ['shin'] };
-    const zone = (z) => {
+    const Gr = GG(), B = G.Ballistics, AT: Record<string, string[]> = { head: ['helmet'], face: ['face'], chest: ['plate', 'torso'], abdomen: ['torso'], shoulder: ['shoulder'], pelvis: ['groin', 'groinplate', 'pelvis'], thigh: ['thigh', 'legwrap'], shin: ['shin'] };
+    const zone = (z: string) => {
       const L = [];
       for (const a of B.kitArmour(me)) for (const pr of a.def.prot) if (AT[z].includes(pr.at) && !(z === 'face' && a.def.lower)) L.push(...pr.layers);
       if (!L.length) return '—';
@@ -556,10 +567,10 @@ const G_InvUI = (() => {
   // the cabinet's contents as you've left them, to the host: what you took out, what you put in, the layout
   function cabSync() {
     if (!field || cab == null) return;
-    const g = G.Game.cabGrid(cab), items = g.items.map((p) => [p.it.mt, p.it.n || 1, p.x, p.y, p.r ? 1 : 0]);
+    const g = G.Game.cabGrid(cab), items = g.items.map((p: Placed) => [p.it.mt, p.it.n || 1, p.x, p.y, p.r ? 1 : 0]);
     const lay = G.Game.cabLay(items);
     if (lay === g.lay) return;
-    const now = {}, was = g.counts || {}, take = {}, put = {};
+    const now: Record<string, number> = {}, was: Record<string, number> = g.counts || {}, take: Record<string, number> = {}, put: Record<string, number> = {};
     for (const [mt, n] of items) now[mt] = (now[mt] || 0) + n;
     for (const mt of new Set([...Object.keys(now), ...Object.keys(was)])) { const d = (now[mt] || 0) - (was[mt] || 0); if (d > 0) put[mt] = d; else if (d < 0) take[mt] = -d; }
     G.Net.toHost({ t: 'cabEdit', i: cab, ver: g.ver, take, put, lay: items });
@@ -574,11 +585,11 @@ const G_InvUI = (() => {
     closeMenu();
     // gone, sold, now worn (on you, or a pouch mounted on what you wear) or put in the team locker: closed
     opened = opened.filter((uid) => { const s = locate(me, uid); return s && !inTeam(s) && (s.it.k === 'gun' || (!s.slot && !GG().molles(me).includes(s.g))); });
-    let body = `<div class="inv-sec"><h4>Pockets</h4><div class="inv-row">${me.pockets.map((g) => gridHTML(g)).join('')}</div></div>`;
+    let body = `<div class="inv-sec"><h4>Pockets</h4><div class="inv-row">${me.pockets.map((g: Grid) => gridHTML(g)).join('')}</div></div>`;
     if (k.carrier && k.carrier.molle) body += molleHTML(k.carrier);
     if (k.belt && k.belt.molle) body += molleHTML(k.belt);
-    if (k.ifak) body += `<div class="inv-sec"><h4>IFAK <small>medical gear only</small></h4><div class="inv-row">${k.ifak.grids.map((g) => gridHTML(g)).join('')}</div></div>`;
-    if (k.pack) body += `<div class="inv-sec"><h4>${G.U.esc(GG().defOf(k.pack).name)}</h4><div class="inv-row">${k.pack.grids.map((g) => gridHTML(g, `${g.w}×${g.h} <i>anything, guns too</i>`)).join('')}</div></div>`;
+    if (k.ifak) body += `<div class="inv-sec"><h4>IFAK <small>medical gear only</small></h4><div class="inv-row">${k.ifak.grids.map((g: Grid) => gridHTML(g)).join('')}</div></div>`;
+    if (k.pack) body += `<div class="inv-sec"><h4>${G.U.esc(GG().defOf(k.pack)!.name)}</h4><div class="inv-row">${k.pack.grids.map((g: Grid) => gridHTML(g, `${g.w}×${g.h} <i>anything, guns too</i>`)).join('')}</div></div>`;
     // checking on a teammate: their health and nothing else (no inventory, theirs or yours). Treat a part by
     // clicking it and picking from what you carry that would help (healthHTML).
     if (field && patient != null && patientView()) {
@@ -602,25 +613,25 @@ const G_InvUI = (() => {
   }
 
   // ---------------------------------------------------------------- moving things
-  function equip(me, s, it, src) {
+  function equip(me: Me, s: string, it: Item, src: Src) {
     const old = slotItem(me, s);
     detach(me, src);
     if (old) {
       // the old one goes where the new one was, or anywhere in the locker
-      if (src.g && GG().fits(src.g, old, src.p.x, src.p.y, src.p.r)) GG().put(src.g, old, src.p.x, src.p.y, src.p.r);
+      if (src.g && GG().fits(src.g, old, src.p!.x, src.p!.y, src.p!.r)) GG().put(src.g, old, src.p!.x, src.p!.y, src.p!.r);
       else if (field || !GG().place([me.locker], old)) { // no room: undo
-        if (src.g) GG().put(src.g, it, src.p.x, src.p.y, src.p.r); else setSlot(me, src.slot, it);
+        if (src.g) GG().put(src.g, it, src.p!.x, src.p!.y, src.p!.r); else setSlot(me, src.slot!, it);
         return G.HUD.toast('', field ? 'Nowhere on you for the one it replaces' : 'No room in your locker', 1.5), false;
       }
     }
     setSlot(me, s, it);
     return true;
   }
-  function setSlot(me, s, it) {
+  function setSlot(me: Me, s: string, it: Item) {
     if (WSLOT[s]) { me.weapons[WSLOT[s]] = it.w; if (!me.weapons[me.slot]) me.slot = WSLOT[s]; }
-    else if (GG().MOUNTS[s]) GG().mountOn(me, s)[s] = it; else me.kit[s] = it;
+    else if ((GG().MOUNTS as Rec)[s]) GG().mountOn(me, s)[s] = it; else me.kit[s] = it;
   }
-  function drop(e) {
+  function drop(e: PointerEvent) {
     const me = G.Me, d = drag;
     if (!d) return;
     drag = null;
@@ -628,20 +639,20 @@ const G_InvUI = (() => {
     window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', drop); window.removeEventListener('keydown', onKey);
     const t = document.elementFromPoint(e.clientX, e.clientY);
     if (!t) return render();
-    const src = locate(me, d.it.uid);
+    const src = locate(me, d.it.uid!);
     if (!src) return render();
     const qEl = t.closest<HTMLElement>('[data-quick]');
     if (qEl) {
       const kind = G.Me.quickKind(d.it);
-      if (kind) { G.Me.setQuick(+qEl.dataset.quick, kind); G.Audio.click(); }
+      if (kind) { G.Me.setQuick(+qEl.dataset.quick!, kind); G.Audio.click(); }
       else { G.HUD.toast('', 'Only grenades and flashbangs go on a quick slot', 1.5); G.Audio.deny(); }
       return rerender();
     }
     const gEl = t.closest<HTMLElement>('.inv-grid'), sEl = t.closest<HTMLElement>('[data-slot]'), sell = t.closest('[data-sell]'), onItem = t.closest<HTMLElement>('.inv-item');
     if (field && t.closest('[data-drop]')) { dropIt(me, src); return rerender(); }
     // a box dropped on a magazine loads it
-    const target = onItem && locate(me, +onItem.dataset.uid);
-    if (inTeam(target) && target.it !== d.it && ((d.it.k === 'med' && target.it.k === 'med') || (d.it.k === 'ammo' && ['ammo', 'mag', 'gun'].includes(target.it.k)) || (['mag', 'part'].includes(d.it.k) && target.it.k === 'gun'))) {
+    const target = onItem && locate(me, +onItem.dataset.uid!);
+    if (inTeam(target) && target!.it !== d.it && ((d.it.k === 'med' && target!.it.k === 'med') || (d.it.k === 'ammo' && ['ammo', 'mag', 'gun'].includes(target!.it.k)) || (['mag', 'part'].includes(d.it.k) && target!.it.k === 'gun'))) {
       G.HUD.toast('', TEAM_NO, 1.5); G.Audio.deny(); return rerender();
     }
     if (target && target.it !== d.it && d.it.k === 'med' && target.it.k === 'med' && d.it.mt === target.it.mt && GG().medStack(d.it) > 1) {
@@ -659,16 +670,16 @@ const G_InvUI = (() => {
       return rerender();
     }
     const bodyEl = t.closest<HTMLElement>('[data-body]');
-    if (bodyEl) { lastDropAt = performance.now(); if (field && d.it.k === 'med') treatOn(me, src, bodyEl.dataset.body); else G.Audio.deny(); return rerender(); }
+    if (bodyEl) { lastDropAt = performance.now(); if (field && d.it.k === 'med') treatOn(me, src, bodyEl.dataset.body!); else G.Audio.deny(); return rerender(); }
     const wsEl = t.closest<HTMLElement>('[data-wslot]'), wmEl = t.closest<HTMLElement>('[data-wmag]');
     if (wsEl && field) { G.HUD.toast('', 'Parts are changed at the quartermaster\'s', 1.5); G.Audio.deny(); return rerender(); }
-    if (wsEl && !(onItem && +onItem.dataset.uid === d.it.uid)) { fitPart(me, src, wsEl.dataset.wslot); return rerender(); }
+    if (wsEl && !(onItem && +onItem.dataset.uid! === d.it.uid)) { fitPart(me, src, wsEl.dataset.wslot!); return rerender(); }
     if (field && (wmEl || (target && target.it.k === 'gun')) && !(target && target.it.k === 'mag' && d.it.k === 'ammo')) {
-      const gunIt = target && target.it.k === 'gun' ? target.it : findIn(me, grids(me), +wmEl.dataset.wmag), w = gunIt && gunIt.w;
+      const gunIt = target && target.it.k === 'gun' ? target.it : findIn(me, grids(me), +wmEl!.dataset.wmag!), w = gunIt && gunIt.w;
       if (w && d.it.k === 'mag' && isMagGun(w) && G.magFits(d.it.wid, w.def.id) && src.gunMag !== w) { queue(magInJob(d.it, gunIt)); return rerender(); }
       if (w && d.it.k === 'ammo' && !isMagGun(w) && d.it.key === G.calOf(w.def)) { queue(gunLoadJob(w, d.it)); return rerender(); }
     }
-    if (wmEl && !(target && target.it.k === 'mag' && d.it.k === 'ammo')) { intoGun(me, src, findIn(me, grids(me), +wmEl.dataset.wmag)); return rerender(); }
+    if (wmEl && !(target && target.it.k === 'mag' && d.it.k === 'ammo')) { intoGun(me, src, findIn(me, grids(me), +wmEl!.dataset.wmag!)); return rerender(); }
     if (target && target.it !== d.it && d.it.k === 'ammo' && target.it.k === 'gun' && !isMagGun(target.it.w)) { intoGun(me, src, target.it); return rerender(); }
     if (target && d.it.k === 'part' && target.it.k === 'gun' && field) { G.HUD.toast('', 'Parts are changed at the quartermaster\'s', 1.5); G.Audio.deny(); return rerender(); }
     if (target && d.it.k === 'part' && target.it.k === 'gun' && !src.gunPart) {
@@ -692,7 +703,7 @@ const G_InvUI = (() => {
       return rerender();
     }
     if (gEl) {
-      const g = gridById(me, +gEl.dataset.grid), r = gEl.getBoundingClientRect();
+      const g = gridById(me, +gEl.dataset.grid!), r = gEl.getBoundingClientRect();
       const x = Math.floor((e.clientX - r.left) / C) - d.gx, y = Math.floor((e.clientY - r.top) / C) - d.gy;
       // a carrier can't go into its own pouches
       const own = d.it.grids && d.it.grids.includes(g);
@@ -702,16 +713,16 @@ const G_InvUI = (() => {
       else if (g && !own && !innerGrids(d.it).includes(g) && GG().fits(g, d.it, x, y, d.rot, d.it)) { detach(me, src); GG().put(g, d.it, x, y, d.rot); G.Audio.click(); }
       else G.Audio.deny();
     } else if (sEl) {
-      const s = sEl.dataset.slot;
+      const s = sEl.dataset.slot!;
       if (slotOK(me, s, d.it) && !(src.slot === s)) { if (equip(me, s, d.it, src)) G.Audio.buy(); } else G.Audio.deny();
     } else if (sell) sellIt(me, src);
     rerender();
   }
   // a part dropped on a gun's slot: fitted (what was there goes to your locker)
-  function fitPart(me, src, key) {
+  function fitPart(me: Me, src: Src, key: string) {
     const [uid, slot] = key.split('|'), gun = findIn(me, grids(me), +uid), it = src.it;
     if (!gun || it.k !== 'part') return G.Audio.deny();
-    const w = gun.w, p = GS().PARTS[it.pid], sl = GS().visibleSlots(w.def.id, w.def.build).find((s) => s.slot === slot);
+    const w = gun.w, p = GS().PARTS[it.pid], sl = GS().visibleSlots(w.def.id, w.def.build).find((s: any) => s.slot === slot);
     if (!p || !sl || !GS().fitsSlot(sl, p, w.def.id)) return G.HUD.toast('', `It doesn't fit there (${GS().ifaceName(p ? p.mount : '')})`, 1.5), G.Audio.deny();
     if (src.gunPart && src.gunPart.w === w && src.gunPart.slot === slot) return;
     if (src.gunPart) { const o = src.gunPart, b = Object.assign({}, o.w.def.build); delete b[o.slot]; setBuild(me, o.w, b); } // off the other gun, quietly
@@ -723,7 +734,7 @@ const G_InvUI = (() => {
     G.Audio.pickup();
   }
   // a magazine into a gun (the one in it comes out to where that one was), or a box's rounds into a loose-fed gun
-  function intoGun(me, src, gun) {
+  function intoGun(me: Me, src: Src, gun: Item | null) {
     const it = src.it, w = gun && gun.w;
     if (!w) return G.Audio.deny();
     if (!isMagGun(w)) {
@@ -736,45 +747,45 @@ const G_InvUI = (() => {
       return G.Audio.click();
     }
     if (it.k !== 'mag' || !G.magFits(it.wid, w.def.id) || src.gunMag === w) return G.Audio.deny();
-    const old = magItem(w), at = src.p ? [src.g, src.p.x, src.p.y, src.p.r] : null;
+    const old = magItem(w), at: [Grid, number, number, number] | null = src.p ? [src.g!, src.p.x, src.p.y, src.p.r] : null;
     detach(me, src);
     if (old) { magItems.delete(w); if (at && GG().fits(at[0], old, at[1], at[2], at[3])) (GG().put as any)(...at.slice(0, 1), old, ...at.slice(1)); else GG().stow(me, old); }
-    GG().loadIn(me, w, it); w.noMag = false;
+    GG().loadIn(me, w, it as Item & { r: string[] }); w.noMag = false;
     magItems.set(w, it);
     G.Audio.sample('insert_magazine', 0.5) || G.Audio.click();
   }
   // put it on the ground at your feet (in the field): anything but a part on a gun, and not your last gun
-  function dropIt(me, src) {
+  function dropIt(me: Me, src: Src) {
     if (src.gunPart) return G.HUD.toast('', 'Parts come off at the quartermaster\'s', 1.5), G.Audio.deny();
     if (lastGun(me, src)) return G.HUD.toast('', 'Keep at least one weapon in hand', 1.5), G.Audio.deny();
     const it = src.gunMag ? magItem(src.gunMag) : src.it;
     detach(me, src);
-    me.dropItem(it);
+    me.dropItem(it!);
   }
-  function sellIt(me, src) {
+  function sellIt(me: Me, src: Src) {
     if (hasContents(src.it)) return G.HUD.toast('', 'Empty it first (double-click to open it)', 1.5), G.Audio.deny();
     if (cantDetach(src)) return G.HUD.toast('', cantDetach(src), 2), G.Audio.deny();
     if (lastGun(me, src)) return G.HUD.toast('', 'Keep at least one weapon in hand', 1.5), G.Audio.deny();
     detach(me, src); me.credits += GG().sale(src.it); G.Audio.buy();
     if (src.it.k === 'gun') G.Gunsmith.strip(src.it.w.def, me.stash); // its aftermarket parts stay with you
   }
-  function onMove(e) {
+  function onMove(e: PointerEvent) {
     if (!drag) return;
     drag.ghost.style.left = e.clientX - drag.gx * C - C / 2 + 'px';
     drag.ghost.style.top = e.clientY - drag.gy * C - C / 2 + 'px';
   }
-  function sizeGhost() { const [w, h] = GG().size(drag.it, drag.rot); drag.ghost.style.width = w * C - 3 + 'px'; drag.ghost.style.height = h * C - 3 + 'px'; }
-  function onKey(e) { if (drag && e.code === 'KeyR') { drag.rot ^= 1; [drag.gx, drag.gy] = [drag.gy, drag.gx]; sizeGhost(); } }
-  function onDown(e) {
-    const el = e.target.closest('.inv-item');
+  function sizeGhost() { const [w, h] = GG().size(drag!.it, drag!.rot); drag!.ghost.style.width = w * C - 3 + 'px'; drag!.ghost.style.height = h * C - 3 + 'px'; }
+  function onKey(e: KeyboardEvent) { if (drag && e.code === 'KeyR') { drag.rot ^= 1; [drag.gx, drag.gy] = [drag.gy, drag.gx]; sizeGhost(); } }
+  function onDown(e: PointerEvent) {
+    const el = (e.target as HTMLElement).closest<HTMLElement>('.inv-item');
     if (!el || e.button !== 0 || locked()) return;
-    const me = G.Me, src = locate(me, +el.dataset.uid);
+    const me = G.Me, src = locate(me, +el.dataset.uid!);
     if (!src) return;
     e.preventDefault();
     if (field && src.gunPart) return G.HUD.toast('', 'Parts are changed at the quartermaster\'s', 1.5);
     const r = el.getBoundingClientRect();
-    const rot = src.p ? src.p.r : 0;
-    drag = { it: src.it, rot, gx: Math.max(0, Math.floor((e.clientX - r.left) / C)), gy: Math.max(0, Math.floor((e.clientY - r.top) / C)), ghost: el.cloneNode(true) };
+    const rot = src.p ? src.p!.r : 0;
+    drag = { it: src.it, rot, gx: Math.max(0, Math.floor((e.clientX - r.left) / C)), gy: Math.max(0, Math.floor((e.clientY - r.top) / C)), ghost: el.cloneNode(true) as HTMLElement };
     if (src.slot) { drag.gx = 0; drag.gy = 0; }
     Object.assign(drag.ghost.style, { position: 'fixed', pointerEvents: 'none', zIndex: 50, opacity: 0.85 });
     document.body.appendChild(drag.ghost);
@@ -782,32 +793,32 @@ const G_InvUI = (() => {
     window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', drop); window.addEventListener('keydown', onKey);
   }
   // open a container (one you're wearing is already shown under "On you")
-  function open(me, src) {
+  function open(me: Me, src: Src) {
     if (inTeam(src)) return G.HUD.toast('', TEAM_NO, 1.5);
     if (src.it.k !== 'gun' && (src.slot || GG().molles(me).includes(src.g))) return G.HUD.toast('', 'You are wearing it: its contents are under On you', 1.5);
-    opened = [src.it.uid, ...opened.filter((u) => u !== src.it.uid)].slice(0, 4);
+    opened = [src.it.uid!, ...opened.filter((u) => u !== src.it.uid)].slice(0, 4);
     G.Audio.click();
     rerender();
   }
   // double-click: open a container, or move it between your body and the locker
-  function onDbl(e) {
-    const el = e.target.closest('.inv-item');
+  function onDbl(e: MouseEvent) {
+    const el = (e.target as HTMLElement).closest<HTMLElement>('.inv-item');
     if (!el || locked()) return;
-    const me = G.Me, src = locate(me, +el.dataset.uid);
+    const me = G.Me, src = locate(me, +el.dataset.uid!);
     if (!src) return;
     if (canOpen(me, src)) return open(me, src);
     if (!field) quickMove(me, src);
   }
   // what the quick move would do, for the menu
-  function quickLabel(me, src) {
+  function quickLabel(me: Me, src: Src) {
     if (src.g !== me.locker && !(src.g && src.g.team)) return lastGun(me, src) ? null : 'Send to locker';
     const it = src.it;
-    if (GG().isGear(it)) return it.k === 'plate' ? 'Fit in carrier' : GG().MOUNTS[it.k] ? `Fit to ${GG().MOUNTS[it.k]}` : 'Wear';
+    if (GG().isGear(it)) return it.k === 'plate' ? 'Fit in carrier' : (GG().MOUNTS as Rec)[it.k] ? `Fit to ${(GG().MOUNTS as Rec)[it.k]}` : 'Wear';
     if (it.k === 'gun') return me.weapons[it.w.def.slot] ? null : 'Carry';
     if (it.k === 'pouch') return 'Mount on MOLLE';
     return 'Take with you';
   }
-  function quickMove(me, src) {
+  function quickMove(me: Me, src: Src) {
     const inLocker = src.g === me.locker || !!(src.g && src.g.team);
     let ok = false;
     if (src.gunPart || src.gunMag) {
@@ -817,13 +828,13 @@ const G_InvUI = (() => {
     } else if (inLocker) {
       if (GG().isGear(src.it)) { const s = src.it.k; ok = slotOK(me, s, src.it) && equip(me, s, src.it, src); }
       else if (src.it.k === 'gun' && !me.weapons[src.it.w.def.slot]) ok = equip(me, src.it.w.def.slot === 'p' ? 'wp' : 'ws', src.it, src);
-      else if (src.it.k === 'pouch') { detach(me, src); ok = !!GG().place(GG().molles(me), src.it); if (!ok) GG().put(src.g, src.it, src.p.x, src.p.y, src.p.r); }
-      else { detach(me, src); ok = !!GG().place(GG().body(me), src.it); if (!ok) GG().put(src.g, src.it, src.p.x, src.p.y, src.p.r); }
+      else if (src.it.k === 'pouch') { detach(me, src); ok = !!GG().place(GG().molles(me), src.it); if (!ok) GG().put(src.g!, src.it, src.p!.x, src.p!.y, src.p!.r); }
+      else { detach(me, src); ok = !!GG().place(GG().body(me), src.it); if (!ok) GG().put(src.g!, src.it, src.p!.x, src.p!.y, src.p!.r); }
     } else if (lastGun(me, src)) G.HUD.toast('', 'Keep at least one weapon in hand', 1.5);
     else {
       detach(me, src);
       ok = !!GG().place([me.locker], src.it);
-      if (!ok) { if (src.g) GG().put(src.g, src.it, src.p.x, src.p.y, src.p.r); else setSlot(me, src.slot, src.it); }
+      if (!ok) { if (src.g) GG().put(src.g, src.it, src.p!.x, src.p!.y, src.p!.r); else setSlot(me, src.slot!, src.it); }
     }
     G.Audio[ok ? 'click' : 'deny']();
     rerender();
@@ -836,10 +847,10 @@ const G_InvUI = (() => {
     menu.remove(); menu = null; window.removeEventListener('pointerdown', outside, true);
     if (med) { ptPart = null; paintHealth(true); } // (the part's no longer picked)
   }
-  function outside(e) { if (menu && !menu.contains(e.target)) closeMenu(); }
+  function outside(e: Event) { if (menu && !menu.contains(e.target as Node)) closeMenu(); }
   // what you can do with this item, as [action, label, arg]
-  function itemActs(me, src) {
-    const Gr = GG(), it = src.it, out = [], boxes = (cal) => { let n = 0; Gr.each(Gr.all(me), (b) => { if (b.k === 'ammo' && b.key === cal) n += b.n; }); return n; };
+  function itemActs(me: Me, src: Src) {
+    const Gr = GG(), it = src.it, out = [], boxes = (cal: string) => { let n = 0; Gr.each(Gr.all(me), (b: Item) => { if (b.k === 'ammo' && b.key === cal) n += b.n; }); return n; };
     if (it.k === 'gun') {
       const w = it.w, cal = G.calOf(w.def);
       if (isMagGun(w)) {
@@ -856,17 +867,17 @@ const G_InvUI = (() => {
       if (!src.gunMag) Gr.guns(me).forEach((w, i) => { if (isMagGun(w) && G.magFits(it.wid, w.def.id) && w !== (src.gunMag || null)) out.push(['magto', `Put in your ${w.def.name}${w.noMag ? '' : ' (swap)'}`, i]); });
     }
     if (it.k === 'ammo') {
-      let others = 0; Gr.each(grids(me).filter((g) => !g.team), (b) => { if (b !== it && b.k === 'ammo' && b.key === it.key && b.am === it.am) others++; });
-      if (others && (it.n < it.cap || others > 1)) out.push(['combine', `Combine with your other ${G.AMMO[it.am] ? G.AMMO[it.am].tag + ' ' : ''}boxes (${others})`]);
+      let others = 0; Gr.each(grids(me).filter((g) => !g.team), (b: Item) => { if (b !== it && b.k === 'ammo' && b.key === it.key && b.am === it.am) others++; });
+      if (others && (it.n < it.cap || others > 1)) out.push(['combine', `Combine with your other ${(G.AMMO as Rec)[it.am] ? (G.AMMO as Rec)[it.am].tag + ' ' : ''}boxes (${others})`]);
     }
     if (it.k === 'ammo' && it.n) {
       let any = false;
-      Gr.each(Gr.all(me), (m) => { if (m.k === 'mag' && m.n < m.cap && G.calOf(G.WEAPONS[m.wid]) === it.key) any = true; });
+      Gr.each(Gr.all(me), (m: Item) => { if (m.k === 'mag' && m.n < m.cap && G.calOf(G.WEAPONS[m.wid]) === it.key) any = true; });
       if (any) out.push(['fillfrom', 'Load magazines from it']);
     }
     if (it.k === 'med' && field) {
-      const b = bodyOf(me), I = G.Med.ITEMS[it.mt];
-      if (b && I) for (const [k] of G.Med.PARTS) if (!G.Med.cantTreat(b, k, it.mt) && (I.fixes !== 'pain' || k === 'head')) out.push(['treat', `${I.fixes === 'pain' ? 'Take' : 'Use on ' + (patient != null ? 'their' : 'your') + ' ' + G.Med.NAME[k].toLowerCase()}`, k]);
+      const b = bodyOf(me), I = (G.Med.ITEMS as Rec)[it.mt];
+      if (b && I) for (const [k] of G.Med.PARTS) if (!G.Med.cantTreat(b, k, it.mt) && (I.fixes !== 'pain' || k === 'head')) out.push(['treat', `${I.fixes === 'pain' ? 'Take' : 'Use on ' + (patient != null ? 'their' : 'your') + ' ' + (G.Med.NAME as Rec)[k].toLowerCase()}`, k]);
     }
     if (it.k === 'part' && !src.gunPart && !field) {
       const p = GS().PARTS[it.pid];
@@ -875,53 +886,53 @@ const G_InvUI = (() => {
     return out;
   }
   // the fullest magazine you have for a gun, anywhere you can reach
-  function bestMag(me, w) { let best = null; GG().each(grids(me), (m) => { if (m.k === 'mag' && G.magFits(m.wid, w.def.id) && (!best || m.n > best.n)) best = m; }); return best; }
+  function bestMag(me: Me, w: Wpn) { let best = null as Item | null; GG().each(grids(me), (m: Item) => { if (m.k === 'mag' && G.magFits(m.wid, w.def.id) && (!best || m.n > best.n)) best = m; }); return best; }
   // in the field there's no locker to overflow into: a box needs room on you
-  function roomForRounds(me, cal, g?) {
+  function roomForRounds(me: Me, cal: string, g?: Grid) {
     if (!field) return true;
     const probe = GG().boxItem(cal, 'ball', 1);
     if ((g && GG().findSpot(g, probe)) || GG().roomFor(me, probe)) return true;
     G.HUD.toast('', 'No room on you for the loose rounds', 1.5);
     return false;
   }
-  const toast = (n, what) => G.HUD.toast('', n ? `${what} ${n}` : 'Nothing to do', 1.2);
+  const toast = (n: number, what: string) => G.HUD.toast('', n ? `${what} ${n}` : 'Nothing to do', 1.2);
   // the same, in the field: as jobs
-  const fieldAct = {
-    treat: (me, src, part) => treatOn(me, src, part),
-    magout: (me, src) => queue(magOutJob(src.it.w)),
-    magin: (me, src) => { const m = bestMag(me, src.it.w); if (m) queue(magInJob(m, src.it)); },
-    magto: (me, src, i) => { const w = GG().guns(me)[+i]; if (w) queue(magInJob(src.it, GG().gunItem(w))); },
-    unloadgun: (me, src) => { const w = src.it.w; queue(unloadJob(w.def.name, G.calOf(w.def), () => G.loaded(w), (peek) => {
+  const fieldAct: Record<string, (me: Me, src: Src, arg?: any) => void> = {
+    treat: (me: Me, src: Src, part: string) => treatOn(me, src, part),
+    magout: (me: Me, src: Src) => queue(magOutJob(src.it.w)),
+    magin: (me: Me, src: Src) => { const m = bestMag(me, src.it.w); if (m) queue(magInJob(m, src.it)); },
+    magto: (me: Me, src: Src, i: number) => { const w = GG().guns(me)[+i]; if (w) queue(magInJob(src.it, GG().gunItem(w))); },
+    unloadgun: (me: Me, src: Src) => { const w = src.it.w; queue(unloadJob(w.def.name, G.calOf(w.def), () => G.loaded(w), (peek: boolean) => {
       if (!w.mag && w.chamber) { const t = w.chamber; if (!peek) w.chamber = null; return t; } // (the magazine's empty: clear the chamber)
       const t = w.tube && w.tube.length ? w.tube[w.tube.length - 1] : w.ammo; if (!peek) { w.mag--; if (w.tube) w.tube.pop(); } return t; })); },
-    loadgun: (me, src) => queue(gunLoadJob(src.it.w, null)),
-    unloadmag: (me, src) => { const m = src.it, w = src.gunMag; queue(unloadJob(GG().magName(m), G.calOf(G.WEAPONS[m.wid]), () => m.n, (peek) => { const t = m.am; if (!peek) { m.r.pop(); if (w) w.mag = m.n; } return t; })); },
-    loadmag: (me, src) => queue(loadJob(src.it, null, src.gunMag)),
-    fillfrom: (me, src) => { GG().each(grids(me), (m) => { if (m.k === 'mag' && m.n < m.cap && G.calOf(G.WEAPONS[m.wid]) === src.it.key) queue(loadJob(m, src.it)); }); },
+    loadgun: (me: Me, src: Src) => queue(gunLoadJob(src.it.w, null)),
+    unloadmag: (me: Me, src: Src) => { const m = src.it, w = src.gunMag; queue(unloadJob(GG().magName(m), G.calOf(G.WEAPONS[m.wid]), () => m.n, (peek: boolean) => { const t = m.am; if (!peek) { m.r.pop(); if (w) w.mag = m.n; } return t; })); },
+    loadmag: (me: Me, src: Src) => queue(loadJob(src.it, null, src.gunMag)),
+    fillfrom: (me: Me, src: Src) => { GG().each(grids(me), (m: Item) => { if (m.k === 'mag' && m.n < m.cap && G.calOf(G.WEAPONS[m.wid]) === src.it.key) queue(loadJob(m, src.it)); }); },
   };
-  const doAct = {
-    combine: (me, src) => { const n = GG().combine(grids(me).filter((g) => !g.team), src.it.key, src.it.am); toast(n, 'Combined:'); G.Audio.click(); },
-    magout: (me, src) => { const m = magItem(src.it.w); if (field && !GG().roomFor(me, m)) return G.HUD.toast('', 'No room on you for the magazine', 1.5); detach(me, { gunMag: src.it.w }); GG().stow(me, m); G.Audio.click(); },
-    magin: (me, src) => { const m = bestMag(me, src.it.w); if (m) intoGun(me, locate(me, m.uid), src.it); },
-    magto: (me, src, i) => { const w = GG().guns(me)[+i]; if (w) intoGun(me, src, GG().gunItem(w)); },
-    unloadgun: (me, src) => { if (!roomForRounds(me, G.calOf(src.it.w.def))) return; toast(GG().unloadGun(me, src.it.w), 'Rounds out:'); G.Audio.click(); },
-    loadgun: (me, src) => { toast(GG().fillGun(me, src.it.w), 'Rounds in:'); G.Audio.click(); },
-    unloadmag: (me, src) => { if (!roomForRounds(me, G.calOf(G.WEAPONS[src.it.wid]), src.g)) return; const n = GG().unloadMag(me, src.it, src.g ? [src.g] : null); if (src.gunMag) src.gunMag.mag = 0; toast(n, 'Rounds out:'); G.Audio.click(); },
-    loadmag: (me, src) => { const n = GG().fillMag(me, src.it); if (src.gunMag) { src.gunMag.mag = src.it.n; src.gunMag.ammo = src.it.am; } toast(n, 'Rounds in:'); G.Audio.click(); },
-    fillfrom: (me, src) => { const n = GG().fillFrom(me, src.it); if (src.it.n <= 0 && src.g) GG().removeFrom(src.g, src.it); toast(n, 'Loaded'); G.Audio.click(); },
-    fit: (me, src, i) => {
+  const doAct: Record<string, (me: Me, src: Src, arg?: any) => void> = {
+    combine: (me: Me, src: Src) => { const n = GG().combine(grids(me).filter((g) => !g.team), src.it.key, src.it.am); toast(n, 'Combined:'); G.Audio.click(); },
+    magout: (me: Me, src: Src) => { const m = magItem(src.it.w)!; if (field && !GG().roomFor(me, m)) return G.HUD.toast('', 'No room on you for the magazine', 1.5); detach(me, { gunMag: src.it.w }); GG().stow(me, m); G.Audio.click(); },
+    magin: (me: Me, src: Src) => { const m = bestMag(me, src.it.w); if (m) intoGun(me, locate(me, m.uid!)!, src.it); },
+    magto: (me: Me, src: Src, i: number) => { const w = GG().guns(me)[+i]; if (w) intoGun(me, src, GG().gunItem(w)); },
+    unloadgun: (me: Me, src: Src) => { if (!roomForRounds(me, G.calOf(src.it.w.def))) return; toast(GG().unloadGun(me, src.it.w), 'Rounds out:'); G.Audio.click(); },
+    loadgun: (me: Me, src: Src) => { toast(GG().fillGun(me, src.it.w), 'Rounds in:'); G.Audio.click(); },
+    unloadmag: (me: Me, src: Src) => { if (!roomForRounds(me, G.calOf(G.WEAPONS[src.it.wid]), src.g)) return; const n = GG().unloadMag(me, src.it, (src.g ? [src.g] : null) as Grid[]); if (src.gunMag) src.gunMag.mag = 0; toast(n, 'Rounds out:'); G.Audio.click(); },
+    loadmag: (me: Me, src: Src) => { const n = GG().fillMag(me, src.it); if (src.gunMag) { src.gunMag.mag = src.it.n; src.gunMag.ammo = src.it.am; } toast(n, 'Rounds in:'); G.Audio.click(); },
+    fillfrom: (me: Me, src: Src) => { const n = GG().fillFrom(me, src.it); if (src.it.n <= 0 && src.g) GG().removeFrom(src.g, src.it); toast(n, 'Loaded'); G.Audio.click(); },
+    fit: (me: Me, src: Src, i: number) => {
       const w = GG().guns(me)[+i], p = GS().PARTS[src.it.pid];
       const sl = w && GS().slotFor(w.def.id, w.def.build, p);
       if (sl) fitPart(me, src, `${GG().gunItem(w).uid}|${sl.slot}`);
     },
   };
-  function onMenu(e) {
-    const el = e.target.closest('.inv-item');
+  function onMenu(e: MouseEvent) {
+    const el = (e.target as HTMLElement).closest<HTMLElement>('.inv-item');
     if (!el) return;
     e.preventDefault();
     closeMenu();
     if (locked()) return;
-    const me = G.Me, src = locate(me, +el.dataset.uid);
+    const me = G.Me, src = locate(me, +el.dataset.uid!);
     if (!src) return;
     const Gr = GG(), acts = [];
     if (canOpen(me, src)) acts.push(['open', src.it.k === 'gun' ? 'Open (parts, magazine)' : 'Open']);
@@ -934,19 +945,19 @@ const G_InvUI = (() => {
     if (!acts.length) return;
     menu = document.createElement('div');
     menu.className = 'inv-menu';
-    menu.innerHTML = `<b>${G.U.esc(Gr.defOf(src.it) ? Gr.defOf(src.it).name : Gr.label(src.it))}</b>` + acts.map(([a, n, arg]) => `<button data-act="${a}"${arg != null ? ` data-arg="${arg}"` : ''}>${n}</button>`).join('');
+    menu.innerHTML = `<b>${G.U.esc(Gr.defOf(src.it) ? Gr.defOf(src.it)!.name : Gr.label(src.it))}</b>` + acts.map(([a, n, arg]) => `<button data-act="${a}"${arg != null ? ` data-arg="${arg}"` : ''}>${n}</button>`).join('');
     Object.assign(menu.style, { left: Math.min(e.clientX, innerWidth - 180) + 'px', top: Math.min(e.clientY, innerHeight - 30 - acts.length * 26) + 'px' });
     menu.addEventListener('click', (ev) => {
-      const b = ev.target.closest('[data-act]');
+      const b = (ev.target as HTMLElement).closest<HTMLElement>('[data-act]');
       if (!b) return;
-      const now = locate(me, src.it.uid);
+      const now = locate(me, src.it.uid!);
       closeMenu();
       if (!now) return;
       if (b.dataset.act === 'open') open(me, now);
       else if (b.dataset.act === 'drop') { dropIt(me, now); rerender(); }
       else if (b.dataset.act === 'move') quickMove(me, now);
-      else if (field && fieldAct[b.dataset.act]) { fieldAct[b.dataset.act](me, now, b.dataset.arg); rerender(); }
-      else if (doAct[b.dataset.act]) { doAct[b.dataset.act](me, now, b.dataset.arg); rerender(); }
+      else if (field && fieldAct[b.dataset.act!]) { fieldAct[b.dataset.act!](me, now, b.dataset.arg); rerender(); }
+      else if (doAct[b.dataset.act!]) { doAct[b.dataset.act!](me, now, b.dataset.arg); rerender(); }
       else { sellIt(me, now); rerender(); }
     });
     document.body.appendChild(menu);
@@ -954,35 +965,35 @@ const G_InvUI = (() => {
   }
 
   return {
-    show(el, opts?) { field = !!(opts && opts.field); patient = opts && opts.patient != null ? opts.patient : null; ptPart = null; cab = opts && opts.cab != null ? opts.cab : null; root = el; el.classList.add('inv-host'); if (!el.dataset.invBound) { el.dataset.invBound = 1; el.addEventListener('pointerdown', (e) => root && onDown(e)); el.addEventListener('dblclick', (e) => root && onDbl(e)); el.addEventListener('contextmenu', (e) => root && onMenu(e));
-        el.addEventListener('click', (e) => {
+    show(el: HTMLElement, opts?: { field?: boolean, patient?: string | null, cab?: number | null }) { field = !!(opts && opts.field); patient = opts && opts.patient != null ? opts.patient : null; ptPart = null; cab = opts && opts.cab != null ? opts.cab : null; root = el; el.classList.add('inv-host'); if (!el.dataset.invBound) { el.dataset.invBound = 1 as any; el.addEventListener('pointerdown', (e: any) => root && onDown(e)); el.addEventListener('dblclick', (e: any) => root && onDbl(e)); el.addEventListener('contextmenu', (e: any) => root && onMenu(e));
+        el.addEventListener('click', (e: MouseEvent) => {
           if (!root) return;
-          if (e.target.closest('[data-molle]')) { editMolle = !editMolle; G.Audio.click(); render(); }
-          const uq = e.target.closest('[data-unquick]');
-          if (uq) { G.Me.setQuick(+uq.dataset.unquick, null); G.Audio.click(); rerender(); return; }
-          if (e.target.closest('[data-jobcancel]')) { cancelJobs(); G.Audio.click(); return; }
-          if (e.target.closest('[data-revive]')) { reviveJob(); return; }
-          if (e.target.closest('[data-self]')) { patient = null; ptPart = null; G.Audio.click(); render(); return; }
-          const bb = e.target.closest('[data-blood]');
+          if ((e.target as HTMLElement).closest<HTMLElement>('[data-molle]')) { editMolle = !editMolle; G.Audio.click(); render(); }
+          const uq = (e.target as HTMLElement).closest<HTMLElement>('[data-unquick]');
+          if (uq) { G.Me.setQuick(+uq.dataset.unquick!, null); G.Audio.click(); rerender(); return; }
+          if ((e.target as HTMLElement).closest<HTMLElement>('[data-jobcancel]')) { cancelJobs(); G.Audio.click(); return; }
+          if ((e.target as HTMLElement).closest<HTMLElement>('[data-revive]')) { reviveJob(); return; }
+          if ((e.target as HTMLElement).closest<HTMLElement>('[data-self]')) { patient = null; ptPart = null; G.Audio.click(); render(); return; }
+          const bb = (e.target as HTMLElement).closest<HTMLElement>('[data-blood]');
           if (bb && field && !inRange()) { G.Audio.click(); medMenu('thorax', e.clientX, e.clientY, 'blood'); return; } // (blood: a transfusion goes in anywhere)
-          const sq = e.target.closest('[data-mate]');
-          if (sq && field) { checkMate(sq.dataset.mate); return; } // (player ids are strings)
-          const bp = e.target.closest('[data-body]');
+          const sq = (e.target as HTMLElement).closest<HTMLElement>('[data-mate]');
+          if (sq && field) { checkMate(sq.dataset.mate!); return; } // (player ids are strings)
+          const bp = (e.target as HTMLElement).closest<HTMLElement>('[data-body]');
           if (bp && field && performance.now() - lastDropAt > 250 && !inRange()) { // (not the click that ends a drag onto it)
-            ptPart = bp.dataset.body; G.Audio.click();
+            ptPart = bp.dataset.body!; G.Audio.click();
             paintHealth(true);
             medMenu(ptPart, e.clientX, e.clientY);
             return;
           }
-          const x = e.target.closest('[data-close]');
-          if (x) { opened = opened.filter((u) => u !== +x.dataset.close); G.Audio.click(); render(); }
+          const x = (e.target as HTMLElement).closest<HTMLElement>('[data-close]');
+          if (x) { opened = opened.filter((u) => u !== +x.dataset.close!); G.Audio.click(); render(); }
         }); } render(); },
     // the stash redrawn (the team locker changed under you), unless you're mid-drag
     refresh() { if (root && !field && !drag) rerender(); },
     // something you took from the team locker that someone else had taken first: gone from wherever you put it
-    lose(tid) {
+    lose(tid: number) {
       const me = G.Me, seen = [];
-      const walk = (gs) => { for (const g of gs) for (const p of g.items) { if (p.it.tid === tid) seen.push({ it: p.it, g }); walk(innerGrids(p.it)); } };
+      const walk = (gs: Grid[]) => { for (const g of gs) for (const p of g.items) { if (p.it.tid === tid) seen.push({ it: p.it, g }); walk(innerGrids(p.it)); } };
       walk([...GG().all(me), me.locker]);
       for (const s of [...GEAR_SLOTS, 'wp', 'ws']) { const it = slotItem(me, s); if (it && it.tid === tid) seen.push({ it, slot: s }); }
       const f = seen[0];

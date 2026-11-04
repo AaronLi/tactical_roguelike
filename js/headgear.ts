@@ -14,25 +14,30 @@
 // so the brow, the ear cut-outs and the nape are each where they are on the real helmet.
 const G_Headgear = (() => {
   const T = THREE, PI = Math.PI;
-  const C0 = [0, 0.137, 0]; // the dome's centre (the cranium's is 0.13)
-  const SC = [1, 1.02, 1.1]; // a little longer front to back than it is wide, as heads are
+  type V3 = [number, number, number];
+  type Mat = (c: number, o?: any) => any; // (rig.ts's kit materials)
+  type Put = (m: THREE.Object3D) => void;
+  interface BandOpts { cols?: number; rows?: number; sc?: V3; c?: V3; top?: boolean }
+  interface Model { cut: string; r: number; t: number; col: number | null; rails?: boolean; shroud?: boolean; vents?: boolean; loop?: number; weight?: boolean; bracket?: boolean; cover?: boolean; visor?: boolean }
+  const C0: V3 = [0, 0.137, 0]; // the dome's centre (the cranium's is 0.13)
+  const SC: V3 = [1, 1.02, 1.1]; // a little longer front to back than it is wide, as heads are
 
   // A band of a dome: azimuth a from a0 to a1 (0: straight ahead, +: the wearer's left... -x is their right), polar
   // angle from th0(a) to th1(a) (0: the crown, PI/2: level with the centre), radius r, t thick (an inner face and
   // edges), scaled by SC and set at c.
-  function band(r, a0, a1, th0, th1, t = 0.006, o: any = {}) {
+  function band(r: number, a0: number, a1: number, th0: number | ((a: number) => number), th1: number | ((a: number) => number), t = 0.006, o: BandOpts = {}) {
     const J = o.cols || 36, N = o.rows || 12, sc = o.sc || SC, c = o.c || C0;
     const f0 = typeof th0 === 'function' ? th0 : () => th0, f1 = typeof th1 === 'function' ? th1 : () => th1;
-    const pos = [], idx = [];
-    const P = (rr, a, th) => [c[0] + rr * Math.sin(th) * Math.sin(a) * sc[0], c[1] + rr * Math.cos(th) * sc[1], c[2] - rr * Math.sin(th) * Math.cos(a) * sc[2]];
-    const grid = (rr) => { const base = pos.length / 3; for (let j = 0; j <= J; j++) { const a = a0 + (a1 - a0) * j / J, t0 = f0(a), t1 = f1(a); for (let i = 0; i <= N; i++) pos.push(...P(rr, a, t0 + (t1 - t0) * i / N)); } return base; };
-    const o1 = grid(r), i1 = t > 0 ? grid(r - t) : -1, V = (b, j, i) => b + j * (N + 1) + i;
+    const pos: number[] = [], idx: number[] = [];
+    const P = (rr: number, a: number, th: number) => [c[0] + rr * Math.sin(th) * Math.sin(a) * sc[0], c[1] + rr * Math.cos(th) * sc[1], c[2] - rr * Math.sin(th) * Math.cos(a) * sc[2]];
+    const grid = (rr: number) => { const base = pos.length / 3; for (let j = 0; j <= J; j++) { const a = a0 + (a1 - a0) * j / J, t0 = f0(a), t1 = f1(a); for (let i = 0; i <= N; i++) pos.push(...P(rr, a, t0 + (t1 - t0) * i / N)); } return base; };
+    const o1 = grid(r), i1 = t > 0 ? grid(r - t) : -1, V = (b: number, j: number, i: number) => b + j * (N + 1) + i;
     for (let j = 0; j < J; j++) for (let i = 0; i < N; i++) {
       idx.push(V(o1, j, i), V(o1, j + 1, i), V(o1, j, i + 1), V(o1, j + 1, i), V(o1, j + 1, i + 1), V(o1, j, i + 1));
       if (i1 >= 0) idx.push(V(i1, j, i), V(i1, j, i + 1), V(i1, j + 1, i), V(i1, j + 1, i), V(i1, j, i + 1), V(i1, j + 1, i + 1));
     }
     if (i1 >= 0) { // the edges: the rim (and the start and end, for a band that doesn't go all the way round)
-      const quad = (a, b, c2, d) => idx.push(a, b, c2, b, d, c2);
+      const quad = (a: number, b: number, c2: number, d: number) => idx.push(a, b, c2, b, d, c2);
       for (let j = 0; j < J; j++) { quad(V(o1, j, N), V(o1, j + 1, N), V(i1, j, N), V(i1, j + 1, N)); if (o.top) quad(V(i1, j, 0), V(i1, j + 1, 0), V(o1, j, 0), V(o1, j + 1, 0)); }
       if (a1 - a0 < 2 * PI - 1e-3) for (let i = 0; i < N; i++) { quad(V(i1, 0, i), V(i1, 0, i + 1), V(o1, 0, i), V(o1, 0, i + 1)); quad(V(o1, J, i), V(o1, J, i + 1), V(i1, J, i), V(i1, J, i + 1)); }
     }
@@ -43,18 +48,18 @@ const G_Headgear = (() => {
     return g;
   }
   // where a point on the dome is (for hanging things off it)
-  const at = (r, a, th) => new T.Vector3(C0[0] + r * Math.sin(th) * Math.sin(a) * SC[0], C0[1] + r * Math.cos(th) * SC[1], C0[2] - r * Math.sin(th) * Math.cos(a) * SC[2]);
+  const at = (r: number, a: number, th: number) => new T.Vector3(C0[0] + r * Math.sin(th) * Math.sin(a) * SC[0], C0[1] + r * Math.cos(th) * SC[1], C0[2] - r * Math.sin(th) * Math.cos(a) * SC[2]);
   // a smooth bump of width w round azimuth a0 (both sides)
-  const notch = (a, a0, w) => Math.exp(-(((Math.abs(a) - a0) / w) ** 2));
-  const ease = (a) => (1 - Math.cos(a)) / 2; // 0 ahead, 1 behind
+  const notch = (a: number, a0: number, w: number) => Math.exp(-(((Math.abs(a) - a0) / w) ** 2));
+  const ease = (a: number) => (1 - Math.cos(a)) / 2; // 0 ahead, 1 behind
 
   // The cuts: the shell's lower edge (polar angle) all the way round
-  const CUT = {
-    high: (a) => PI * (0.47 + 0.13 * ease(a) - 0.12 * notch(a, 1.72, 0.42)), // brow, ears cut high, nape
-    mid: (a) => PI * (0.5 + 0.13 * ease(a) - 0.045 * notch(a, 1.7, 0.36)),
-    full: (a) => PI * (0.41 + 0.27 * Math.min(1, ease(a) * 2.6) + 0.02 * ease(a)), // the brow cut away for the visor, then down over the ears
+  const CUT: Record<string, (a: number) => number> = {
+    high: (a: number) => PI * (0.47 + 0.13 * ease(a) - 0.12 * notch(a, 1.72, 0.42)), // brow, ears cut high, nape
+    mid: (a: number) => PI * (0.5 + 0.13 * ease(a) - 0.045 * notch(a, 1.7, 0.36)),
+    full: (a: number) => PI * (0.41 + 0.27 * Math.min(1, ease(a) * 2.6) + 0.02 * ease(a)), // the brow cut away for the visor, then down over the ears
   };
-  const MODELS = {
+  const MODELS: Record<string, Model> = {
     'h.bump': { cut: 'high', r: 0.121, t: 0.004, col: 0x3a3d40, rails: true, shroud: true, vents: true },
     'h.fast': { cut: 'high', r: 0.124, t: 0.007, col: 0x6a5f46, rails: true, shroud: true, loop: 0x5c5340, weight: true },
     'h.ach': { cut: 'mid', r: 0.125, t: 0.008, col: 0x4a5040, bracket: true, cover: true },
@@ -64,7 +69,7 @@ const G_Headgear = (() => {
   };
 
   // A helmet (kit id, or 'generic' in the colour given). mat(colour, opts) makes a material; put(mesh) hangs it on the head.
-  function helmet(id, mat, put, col?) {
+  function helmet(id: string, mat: Mat, put: Put, col?: number) {
     const M = MODELS[id] || MODELS.generic, cut = CUT[M.cut], c = col != null ? col : M.col != null ? M.col : 0x2a2d30;
     const dark = 0x1c1e20, shell = new T.Mesh(band(M.r, -PI, PI, 0, cut, M.t, { cols: 48, rows: 14 }), mat(c, { side: T.DoubleSide }));
     put(shell);
@@ -108,11 +113,11 @@ const G_Headgear = (() => {
     return M;
   }
   // A face piece on a helmet's rails: a mandible ('f.mandible') or a face shield ('f.shield', 'f.rifle')
-  function face(id, helmetId, mat, put) {
+  function face(id: string, helmetId: string, mat: Mat, put: Put) {
     const M = MODELS[helmetId] || MODELS.generic, cut = CUT[M.cut];
     if (id === 'f.mandible') {
       // the guard: a U round the mouth, the chin and the top of the neck, on a smaller dome round the jaw
-      const jc = [0, 0.085, -0.012], js = [1, 1, 1.05];
+      const jc: V3 = [0, 0.085, -0.012], js: V3 = [1, 1, 1.05];
       put(new T.Mesh(band(0.098, -1.6, 1.6, PI * 0.5, PI * 0.8, 0.012, { c: jc, sc: js, cols: 20, rows: 5 }), mat(0x50575e, { side: T.DoubleSide })));
       for (let i = 0; i < 4; i++) { const v = new T.Mesh(new T.BoxGeometry(0.01, 0.022, 0.004), mat(0x23262a)); v.position.set(-0.024 + i * 0.016, 0.05, -0.115); put(v); } // vents over the mouth
       for (const s of [-1, 1]) { // the arms up to the rails
@@ -129,7 +134,7 @@ const G_Headgear = (() => {
     for (const s of [-1, 1]) { const p = at(M.r + 0.012, s * 1.4, PI * 0.42), m = new T.Mesh(new T.BoxGeometry(0.014, 0.03, 0.05), mat(0x1c1e20)); m.position.copy(p); m.rotation.y = s * 0.3; put(m); }
   }
   // a baseball cap: a six-panel crown and a curved peak
-  function cap(mat, put, col) {
+  function cap(mat: Mat, put: Put, col: number) {
     const cr = band(0.106, -PI, PI, 0, PI * 0.5, 0.003, { c: [0, 0.158, 0.004], sc: [1, 0.85, 1.08], cols: 30, rows: 8 });
     put(new T.Mesh(cr, mat(col, { side: T.DoubleSide })));
     const btn = new T.Mesh(new T.SphereGeometry(0.008, 8, 6), mat(col)); btn.position.set(0, 0.248, 0.004); put(btn); // the button on top

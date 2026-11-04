@@ -4,16 +4,16 @@
 // toHost() / broadcast() short-circuit to local handlers so game code has one path.
 const G_Net = {
   PREFIX: 'breachproto-v1-',
-  peer: null,
+  peer: null as any,
   isHost: false,
   solo: false,
-  myId: null,
-  code: null,
-  conns: new Map(),
-  hostConn: null,
+  myId: null as string | null,
+  code: null as string | null,
+  conns: new Map<string, any>(),
+  hostConn: null as any,
   onServer: (() => {}) as (msg: any, from: string) => void,   // (msg, fromId)   — host only
   onClient: (() => {}) as (msg: any) => void,   // (msg)           — everyone
-  onPeerJoin: () => {}, // (id)            — host only
+  onPeerJoin: (() => {}) as (id: string) => void, // (id)            — host only
   onPeerLeave: (() => {}) as (id: string) => void,// (id)            — host only
   onHostLost: () => {}, //                 — clients only
 
@@ -35,7 +35,7 @@ const G_Net = {
   // The room code is kept for this tab (a refresh hosts under the same code, so the squad can rejoin it). Just
   // after a refresh the matchmaking server can still be holding the old connection under that code for a
   // moment: try it again a few times before giving up on it for a new one.
-  host(cb, attempt = 0) {
+  host(cb: (err: string | null, code?: string) => void, attempt = 0) {
     if (!this.available()) return cb('PeerJS failed to load (are you offline?)');
     let kept = null;
     try { kept = sessionStorage.getItem('bp_hostCode'); } catch (e) { /* storage unavailable */ }
@@ -43,21 +43,21 @@ const G_Net = {
     const peer = new Peer(this.PREFIX + code, this.opts());
     this.peer = peer;
     let opened = false;
-    peer.on('open', (id) => {
+    peer.on('open', (id: string) => {
       opened = true;
       this.myId = id; this.isHost = true; this.code = code;
       try { sessionStorage.setItem('bp_hostCode', code); } catch (e) { /* storage unavailable */ }
       cb(null, code);
     });
-    peer.on('connection', (conn) => {
+    peer.on('connection', (conn: any) => {
       conn.on('open', () => { this.conns.set(conn.peer, conn); this.onPeerJoin(conn.peer); });
-      conn.on('data', (d) => { if (d && typeof d === 'object') this.onServer(d, conn.peer); });
+      conn.on('data', (d: any) => { if (d && typeof d === 'object') this.onServer(d, conn.peer); });
       const drop = () => { if (this.conns.get(conn.peer) === conn) { this.conns.delete(conn.peer); this.onPeerLeave(conn.peer); } };
       conn.on('close', drop);
       conn.on('error', drop);
     });
     peer.on('disconnected', () => { if (this.peer === peer && !peer.destroyed) peer.reconnect(); });
-    peer.on('error', (e) => {
+    peer.on('error', (e: any) => {
       if (!opened && e.type === 'unavailable-id' && attempt < 10) { peer.destroy(); setTimeout(() => this.host(cb, attempt + 1), kept && attempt < 6 ? 1500 : 0); return; } // (our own code still held: wait; a stranger's: another)
       if (!opened) cb('Could not reach the matchmaking server (' + e.type + ')');
       else console.warn('peer error', e);
@@ -68,23 +68,23 @@ const G_Net = {
     this.solo = true; this.isHost = true; this.myId = 'solo'; this.code = null;
   },
 
-  join(code, cb) {
+  join(code: string, cb: (err: string | null) => void) {
     if (!this.available()) return cb('PeerJS failed to load (are you offline?)');
     code = code.trim().toUpperCase();
     const peer = new Peer(this.opts());
     this.peer = peer;
     let done = false;
-    const finish = (err) => { if (done) return; done = true; clearTimeout(timer); cb(err); };
+    const finish = (err: string | null) => { if (done) return; done = true; clearTimeout(timer); cb(err); };
     const timer = setTimeout(() => finish('Timed out connecting to host. Check the code, or the host\'s network may block peer-to-peer.'), 15000);
-    peer.on('open', (id) => {
+    peer.on('open', (id: string) => {
       this.myId = id;
       const conn = peer.connect(this.PREFIX + code, { reliable: true, serialization: 'json' });
       conn.on('open', () => { this.hostConn = conn; this.code = code; finish(null); });
-      conn.on('data', (d) => { if (d && typeof d === 'object') this.onClient(d); });
+      conn.on('data', (d: any) => { if (d && typeof d === 'object') this.onClient(d); });
       conn.on('close', () => { if (this.hostConn === conn) { this.hostConn = null; this.onHostLost(); } });
       conn.on('error', () => finish(this.noRoute));
     });
-    peer.on('error', (e) => {
+    peer.on('error', (e: any) => {
       if (e.type === 'peer-unavailable') finish('No game found with code ' + code + '.');
       else if (e.type === 'webrtc' || e.type === 'negotiation-failed') finish(this.noRoute);
       else if (!done) finish('Network error: ' + e.type);
@@ -99,15 +99,15 @@ const G_Net = {
   // (Still through the PeerJS broker, like every connection: it needs the internet, but no server of our own.)
   noRoute: 'Found the game, but could not open a connection to the host: neither a direct path through your networks nor the relay worked. Two different browsers on one computer cannot always reach each other; a VPN or a strict firewall can block it too.',
   LAN_SLOTS: 6,
-  lanInfo: () => null, // what a host's beacon says about its game (set by G.Game)
-  beacon: null,
+  lanInfo: (() => null) as () => any, // what a host's beacon says about its game (set by G.Game)
+  beacon: null as any,
   async lanKey() {
     if (this._lanKey !== undefined) return this._lanKey;
-    let ip = null;
+    let ip: string | null = null;
     try {
-      const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }), ips = [];
+      const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }), ips: string[] = [];
       pc.createDataChannel('x');
-      pc.onicecandidate = (e) => { const c = e.candidate && e.candidate.candidate; if (c && / typ srflx /.test(c)) ips.push(c.split(' ')[4]); };
+      pc.onicecandidate = (e: RTCPeerConnectionIceEvent) => { const c = e.candidate && e.candidate.candidate; if (c && / typ srflx /.test(c)) ips.push(c.split(' ')[4]); };
       await pc.setLocalDescription(await pc.createOffer());
       for (let i = 0; i < 30 && pc.iceGatheringState !== 'complete' && !ips.some((a) => !a.includes(':')); i++) await new Promise((r) => setTimeout(r, 100));
       pc.close();
@@ -117,13 +117,13 @@ const G_Net = {
     let h = 2166136261; for (const ch of 'bp-lan|' + ip) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; }
     return (this._lanKey = h.toString(36));
   },
-  lanId(key, k) { return this.PREFIX + 'lan-' + key + '-' + k; },
+  lanId(key: string, k: number) { return this.PREFIX + 'lan-' + key + '-' + k; },
   // host: take the first free beacon slot on this network, answer whoever knocks
   async startBeacon() {
     this.stopBeacon();
     const key = await this.lanKey();
     if (!key || !this.isHost || this.solo || !this.peer) return;
-    const tryK = (k) => {
+    const tryK = (k: number) => {
       if (k >= this.LAN_SLOTS || !this.isHost || !this.peer) return;
       const b = new Peer(this.lanId(key, k), this.opts(0));
       this.beacon = b;
@@ -131,8 +131,8 @@ const G_Net = {
       b.on('open', () => { up = true; });
       // (taken by another host on this network: the next slot. Before it's open, any error means that: Firefox
       // reports a taken id as a dropped socket rather than 'unavailable-id')
-      b.on('error', (e) => { if (this.beacon === b && (!up || e.type === 'unavailable-id')) { b.destroy(); tryK(k + 1); } });
-      b.on('connection', (conn) => {
+      b.on('error', (e: any) => { if (this.beacon === b && (!up || e.type === 'unavailable-id')) { b.destroy(); tryK(k + 1); } });
+      b.on('connection', (conn: any) => {
         conn.on('open', () => { try { conn.send(Object.assign({ t: 'lan' }, this.lanInfo() || {}, { code: this.code })); } catch (e) { /* gone */ } setTimeout(() => conn.close(), 800); });
       });
       b.on('disconnected', () => { if (this.beacon === b && !b.destroyed) b.reconnect(); });
@@ -142,7 +142,7 @@ const G_Net = {
   stopBeacon() { try { if (this.beacon) this.beacon.destroy(); } catch (e) { /* gone */ } this.beacon = null; },
   // anyone: the games hosted on this network (resolves with [{ code, name, players, phase }], or null when the
   // network can't be told: no STUN answer)
-  async lanScan(): Promise<any[]> {
+  async lanScan(): Promise<any[] | null> {
     if (!this.available()) return null;
     const key = await this.lanKey();
     if (!key) return null;
@@ -154,23 +154,23 @@ const G_Net = {
       probe.on('open', () => {
         for (let k = 0; k < this.LAN_SLOTS; k++) {
           const c = probe.connect(this.lanId(key, k), { reliable: true, serialization: 'json' });
-          c.on('data', (d) => { if (d && d.t === 'lan' && typeof d.code === 'string') found.set(d.code, { code: d.code, name: String(d.name || '?').slice(0, 16), players: +d.players || 1, phase: String(d.phase || '') }); });
+          c.on('data', (d: any) => { if (d && d.t === 'lan' && typeof d.code === 'string') found.set(d.code, { code: d.code, name: String(d.name || '?').slice(0, 16), players: +d.players || 1, phase: String(d.phase || '') }); });
         }
         setTimeout(() => { clearTimeout(timer); done(); }, 3500);
       });
     });
   },
 
-  toHost(msg) {
-    if (this.isHost) this.onServer(msg, this.myId);
+  toHost(msg: any) {
+    if (this.isHost) this.onServer(msg, this.myId!);
     else if (this.hostConn && this.hostConn.open) this.hostConn.send(msg);
   },
   // host only: send to all clients (and handle locally)
-  broadcast(msg, exceptId?) {
+  broadcast(msg: any, exceptId?: string | null) {
     for (const [id, c] of this.conns) if (id !== exceptId && c.open) { try { c.send(msg); } catch (e) { /* closing */ } }
     if (exceptId !== this.myId) this.onClient(msg);
   },
-  sendTo(id, msg) {
+  sendTo(id: string, msg: any) {
     if (id === this.myId) { this.onClient(msg); return; }
     const c = this.conns.get(id);
     if (c && c.open) { try { c.send(msg); } catch (e) { /* closing */ } }

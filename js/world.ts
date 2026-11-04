@@ -13,14 +13,17 @@
 // solids. Nothing here knows about tiles.
 const G_World = (() => {
   const CELL = 2; // the hash's cells, metres on a side (x, y and z)
-  const key = (ix, iy, iz) => ((ix + 2048) * 4096 + (iy + 2048)) * 4096 + (iz + 2048);
+  const key = (ix: number, iy: number, iz: number) => ((ix + 2048) * 4096 + (iy + 2048)) * 4096 + (iz + 2048);
 
-  function create() {
+  // a world: its solids (null where one was removed), the hash of their ids by cell, and whatever the level adds (ramps, terrain, bounds)
+  interface Solid { min: number[]; max: number[]; kind?: string; ray?: boolean; [k: string]: any } // (a collision solid: an aabb plus whatever the layout hangs on it)
+  interface WorldT { solids: (Solid | null)[]; cells: Map<number, number[]>; stamp: number; mark: Int32Array; free: number[]; [k: string]: any }
+  function create(): WorldT {
     return { solids: [], cells: new Map(), stamp: 1, mark: new Int32Array(1024), free: [] };
   }
-  const cellRange = (s) => [Math.floor(s.min[0] / CELL), Math.floor(s.min[1] / CELL), Math.floor(s.min[2] / CELL),
+  const cellRange = (s: Solid) => [Math.floor(s.min[0] / CELL), Math.floor(s.min[1] / CELL), Math.floor(s.min[2] / CELL),
     Math.floor((s.max[0] - 1e-6) / CELL), Math.floor((s.max[1] - 1e-6) / CELL), Math.floor((s.max[2] - 1e-6) / CELL)];
-  function insert(w, s) {
+  function insert(w: WorldT, s: Solid) {
     const [x0, y0, z0, x1, y1, z1] = cellRange(s);
     for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) for (let z = z0; z <= z1; z++) {
       const k = key(x, y, z);
@@ -29,7 +32,7 @@ const G_World = (() => {
       c.push(s.id);
     }
   }
-  function unlink(w, s) {
+  function unlink(w: WorldT, s: Solid) {
     const [x0, y0, z0, x1, y1, z1] = cellRange(s);
     for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) for (let z = z0; z <= z1; z++) {
       const c = w.cells.get(key(x, y, z));
@@ -39,7 +42,7 @@ const G_World = (() => {
     }
   }
   // a solid into the world (its defaults: it stops people and rays); returns it, with its id
-  function add(w, s) {
+  function add(w: WorldT, s: Solid) {
     if (s.move == null) s.move = true;
     if (s.ray == null) s.ray = true;
     s.id = w.free.length ? w.free.pop() : w.solids.length;
@@ -48,18 +51,18 @@ const G_World = (() => {
     insert(w, s);
     return s;
   }
-  function remove(w, s) {
+  function remove(w: WorldT, s: Solid) {
     if (!s || w.solids[s.id] !== s) return;
     unlink(w, s);
     w.solids[s.id] = null;
     w.free.push(s.id);
   }
   // a solid's new shape (a door swinging, say)
-  function reshape(w, s, min, max) { unlink(w, s); s.min = min; s.max = max; insert(w, s); }
-  const box = (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, o?) => Object.assign({ min: [x0, y0, z0], max: [x1, y1, z1] }, o || {});
+  function reshape(w: WorldT, s: Solid, min: number[], max: number[]) { unlink(w, s); s.min = min; s.max = max; insert(w, s); }
+  const box = (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, o?: any) => Object.assign({ min: [x0, y0, z0], max: [x1, y1, z1] }, o || {});
 
   // ray vs box: the entry distance and the face's normal, or null
-  function slab(o, d, s) {
+  function slab(o: number[], d: number[], s: Solid) {
     let tmin = -Infinity, tmax = Infinity, ax = -1, sg = 0;
     for (let a = 0; a < 3; a++) {
       const lo = s.min[a], hi = s.max[a];
@@ -81,8 +84,8 @@ const G_World = (() => {
   // bar's still only a thin strip: it's bent aside, or the round breaks round it, and it never takes more than going through it would.
   // (BAR_DEEP: as deep as the flat picture of them shows: a gap you can see is one you can shoot through.)
   const BAR_STEP = 0.003, BAR_MM = 4, BAR_DEEP = 0.012;
-  function barHit(o, d, h, s) {
-    const L = G.Level, at = (t) => L.onBar(o[0] + d[0] * t, o[2] + d[2] * t), face = (b, g) => { const n = [0, 0, 0], a = b === 1 ? 0 : 2; n[a] = g * Math.sign(d[a] || 1); return n; };
+  function barHit(o: number[], d: number[], h: any, s: Solid) {
+    const L = G.Level, at = (t: number) => L.onBar(o[0] + d[0] * t, o[2] + d[2] * t), face = (b: number, g: number) => { const n = [0, 0, 0], a = b === 1 ? 0 : 2; n[a] = g * Math.sign(d[a] || 1); return n; };
     const top = s.max[1], t1 = (top - o[1]) / d[1], t2 = (top - BAR_DEEP - o[1]) / d[1], flat = Math.abs(d[1]) < 1e-9;
     if (flat && (o[1] > top || o[1] < top - BAR_DEEP)) return false;
     const lo = flat ? h.t : Math.max(h.t, Math.min(t1, t2)), hi = flat ? h.out : Math.min(h.out, Math.max(t1, t2));
@@ -106,14 +109,14 @@ const G_World = (() => {
   // opts.skip(solid): solids to ignore; opts.move: what stops people instead of what stops rays; opts.sight: a
   // look, not a round: it goes through clear solids (a glass door), with .clear set when it did. opts.bars: a round: it
   // meets a grating's bars (.bar: see barHit), where anything else goes through it.
-  function raycast(w, ox, oy, oz, dx, dy, dz, maxT, opts?) {
+  function raycast(w: WorldT, ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, maxT: number, opts?: any) {
     const o = [ox, oy, oz], d = [dx, dy, dz], pass = !!(opts && opts.glass), skip = opts && opts.skip, mv = !!(opts && opts.move), sight = !!(opts && opts.sight), bars = !!(opts && opts.bars);
     let seenThru = false;
-    const crossed = pass ? [] : null, stamp = ++w.stamp, mark = w.mark;
-    let best = null;
+    const crossed: any[] | null = pass ? [] : null, stamp = ++w.stamp, mark = w.mark;
+    let best: any = null;
     // 3D DDA through the hash's cells
     let cx = Math.floor(ox / CELL), cy = Math.floor(oy / CELL), cz = Math.floor(oz / CELL);
-    const step = d.map((v) => (v > 0 ? 1 : -1)), tDelta = d.map((v) => (Math.abs(v) > 1e-12 ? CELL / Math.abs(v) : Infinity));
+    const step = d.map((v: number) => (v > 0 ? 1 : -1)), tDelta = d.map((v: number) => (Math.abs(v) > 1e-12 ? CELL / Math.abs(v) : Infinity));
     const tMax = [0, 1, 2].map((a) => (Math.abs(d[a]) > 1e-12 ? ((d[a] > 0 ? (Math.floor(o[a] / CELL) + 1) * CELL - o[a] : o[a] - Math.floor(o[a] / CELL) * CELL) / Math.abs(d[a])) : Infinity));
     let tEnter = 0;
     for (let guard = 0; guard < 4096 && tEnter <= maxT; guard++) {
@@ -130,7 +133,7 @@ const G_World = (() => {
         // (shot through: down a hole in it there's nothing to meet, and a blind hole's met at its floor: js/damage.ts)
         if (!mv && s.holes && s.holes.length) { const c = G.Damage.clear(s, o, d, h.t, h.out); if (c >= h.out - 1e-3) continue; h.t = c; if (c > maxT) continue; }
         if (!mv && s.door && s.door.holes && s.door.holes.length) { const q = (h.t + h.out) / 2; if (G.Damage.doorHole(s.door, [o[0] + d[0] * q, o[1] + d[1] * q, o[2] + d[2] * q])) continue; }
-        if (s.glass != null && pass && !(s.win && s.win.armor && !sight)) { if (!crossed.some((q) => q[0] === s.glass)) crossed.push([s.glass, h.t]); continue; } // (bulletproof glass: a round stops on it)
+        if (s.glass != null && pass && !(s.win && s.win.armor && !sight)) { if (!crossed!.some((q) => q[0] === s.glass)) crossed!.push([s.glass, h.t]); continue; } // (bulletproof glass: a round stops on it)
         if (s.clear && sight) { seenThru = true; continue; } // (a look through a glass door)
         if (!best || h.t < best.t) { best = h; best.solid = s; best.view = !!s.view; best.pane = s.glass != null ? s.glass : undefined; }
       }
@@ -140,19 +143,19 @@ const G_World = (() => {
       tEnter = tExit; tMax[a] += tDelta[a];
       if (a === 0) cx += step[0]; else if (a === 1) cy += step[1]; else cz += step[2];
     }
-    const out = best || { t: maxT, n: null };
+    const out: any = best || { t: maxT, n: null };
     if (seenThru) out.clear = true;
-    if (pass) out.glass = crossed.filter((q) => q[1] < out.t).sort((a, b) => a[1] - b[1]);
+    if (pass) out.glass = crossed!.filter((q) => q[1] < out.t).sort((a, b) => a[1] - b[1]);
     return out;
   }
-  function los(w, ax, ay, az, bx, by, bz) {
+  function los(w: WorldT, ax: number, ay: number, az: number, bx: number, by: number, bz: number) {
     const dx = bx - ax, dy = by - ay, dz = bz - az, d = Math.hypot(dx, dy, dz);
     if (d < 0.01) return true;
     return raycast(w, ax, ay, az, dx / d, dy / d, dz / d, d).t >= d - 0.05;
   }
   // how well a sees b: 0 (blocked), 1 (clear), or GLASS_SEE through glass that's still whole
   const GLASS_SEE = 0.4;
-  function see(w, ax, ay, az, bx, by, bz) {
+  function see(w: WorldT, ax: number, ay: number, az: number, bx: number, by: number, bz: number) {
     const dx = bx - ax, dy = by - ay, dz = bz - az, d = Math.hypot(dx, dy, dz);
     if (d < 0.01) return 1;
     const h = raycast(w, ax, ay, az, dx / d, dy / d, dz / d, d, { glass: true, sight: true });
@@ -162,15 +165,15 @@ const G_World = (() => {
 
   // Where a round going from o along unit d comes out of solid s: { t, n (the far face's normal) }. Walls that butt up to
   // each other are the one wall (the planner merges tiles into boxes, wherever it happens to), floors and ceilings too.
-  const family = (s) => (s.kind === 'wall' || s.kind === 'lintel' ? 'w' : s.kind === 'floor' || s.kind === 'ceil' || s.kind === 'step' ? 'f' : null);
-  function span(w, s, o, d) {
-    const O = [o.x, o.y, o.z], D = [d.x, d.y, d.z], fam = family(s), seen = new Set([s]);
-    const exit = (q) => { let t = Infinity, ax = 0; for (let a = 0; a < 3; a++) { if (Math.abs(D[a]) < 1e-9) continue; const tt = ((D[a] > 0 ? q.max[a] : q.min[a]) - O[a]) / D[a]; if (tt < t) { t = tt; ax = a; } } return { t, ax }; };
+  const family = (s: Solid) => (s.kind === 'wall' || s.kind === 'lintel' ? 'w' : s.kind === 'floor' || s.kind === 'ceil' || s.kind === 'step' ? 'f' : null);
+  function span(w: WorldT, s: Solid, o: { x: number, y: number, z: number }, d: { x: number, y: number, z: number }) {
+    const O = [o.x, o.y, o.z], D = [d.x, d.y, d.z], fam = family(s), seen = new Set<Solid>([s]);
+    const exit = (q: Solid) => { let t = Infinity, ax = 0; for (let a = 0; a < 3; a++) { if (Math.abs(D[a]) < 1e-9) continue; const tt = ((D[a] > 0 ? q.max[a] : q.min[a]) - O[a]) / D[a]; if (tt < t) { t = tt; ax = a; } } return { t, ax }; };
     let e = exit(s);
     for (let i = 0; fam && i < 16; i++) {
       const x = O[0] + D[0] * (e.t + 0.003), y = O[1] + D[1] * (e.t + 0.003), z = O[2] + D[2] * (e.t + 0.003);
-      let next = null;
-      query(w, [x - 0.001, y - 0.001, z - 0.001], [x + 0.001, y + 0.001, z + 0.001], (q) => { if (!next && q.ray && !seen.has(q) && family(q) === fam) next = q; });
+      let next: Solid | null = null;
+      query(w, [x - 0.001, y - 0.001, z - 0.001], [x + 0.001, y + 0.001, z + 0.001], (q: Solid) => { if (!next && q.ray && !seen.has(q) && family(q) === fam) next = q; });
       if (!next) break;
       seen.add(next); e = exit(next);
     }
@@ -179,7 +182,7 @@ const G_World = (() => {
   }
 
   // every solid whose box overlaps [min, max] (each once)
-  function query(w, min, max, fn) {
+  function query(w: WorldT, min: number[], max: number[], fn: (s: Solid) => void) {
     const stamp = ++w.stamp, mark = w.mark;
     const x0 = Math.floor(min[0] / CELL), y0 = Math.floor(min[1] / CELL), z0 = Math.floor(min[2] / CELL);
     const x1 = Math.floor(max[0] / CELL), y1 = Math.floor(max[1] / CELL), z1 = Math.floor(max[2] / CELL);
@@ -201,15 +204,15 @@ const G_World = (() => {
   // hopping from tread to tread. Everything else (rounds, bodies, grenades, things dropped) meets the steps
   // themselves. Returns the slope's height at (x, z), how far up the flight that is (u, 0 at its foot), and
   // whether (x, z) is across its width.
-  function rampAt(st, x, z) {
+  function rampAt(st: any, x: number, z: number) {
     const along = st.axis === 'z', a = along ? z : x, lat = along ? x : z, lo = along ? st.z0 : st.x0, hi = along ? st.z1 : st.x1;
     const u = st.up < 0 ? hi - a : a - lo, len = hi - lo, n = st.steps ? st.steps.length : Math.round(st.rise / 0.2), rn = st.rise / n, run = len / n;
     return { u, len, across: lat > (along ? st.x0 : st.z0) && lat < (along ? st.x1 : st.z1), h: st.y0 + G.U.clamp((u / run + 0.5 * G.U.clamp(u / run, 0, 1)) * rn, 0, st.rise) }; // (the half step eased in over the first tread: no bump onto it)
   }
   // the flights someone at p can walk onto (or is on): across one's width, at its foot, on it or at its head,
   // and level with the slope there (not standing under its high end)
-  function rampsFor(w, p, r, step) {
-    let out = null;
+  function rampsFor(w: WorldT, p: { x: number, y: number, z: number }, r: number, step: number) {
+    let out: Set<Solid> | null = null;
     for (const st of w.ramps || []) {
       const q = rampAt(st, p.x, p.z);
       if (!q.across || q.u < -r - 0.15 || q.u > q.len + r + 0.15) continue;
@@ -224,10 +227,10 @@ const G_World = (() => {
   // they could step up onto (its top within `step` of their feet) doesn't stop them: groundAt lifts them onto it.
   // smooth: they walk stairs as slopes (rampAt): the steps of a flight they're on or walking onto don't stop them.
   const STEP = 0.32, HEIGHT = 1.8;
-  function resolve(w, p, r, h = HEIGHT, step = STEP, smooth = false) {
+  function resolve(w: WorldT, p: { x: number, y: number, z: number }, r: number, h = HEIGHT, step = STEP, smooth = false) {
     const pass = smooth ? rampsFor(w, p, r, step) : null;
     for (let iter = 0; iter < 2; iter++) {
-      query(w, [p.x - r, p.y + step, p.z - r], [p.x + r, p.y + h, p.z + r], (s) => {
+      query(w, [p.x - r, p.y + step, p.z - r], [p.x + r, p.y + h, p.z + r], (s: Solid) => {
         if (!s.move || (pass && s.stair && pass.has(s.stair))) return;
         const qx = G.U.clamp(p.x, s.min[0], s.max[0]), qz = G.U.clamp(p.z, s.min[2], s.max[2]);
         const ddx = p.x - qx, ddz = p.z - qz, d = Math.hypot(ddx, ddz);
@@ -245,13 +248,13 @@ const G_World = (() => {
   // smooth: a walker's ground (stairs as their slope, not their treads: rampAt)
   // Rolling ground (a level's terrain: G.Level.crestGround): its height at (x, z), across a cell the two triangles between
   // its corners (corner 00 to 10 to 01, and 10 to 11 to 01), as it's drawn. 0 off it.
-  function terrainAt(tr, x, z) {
+  function terrainAt(tr: any, x: number, z: number) {
     const fx = x / tr.TS, fz = z / tr.TS, cx = Math.floor(fx), cz = Math.floor(fz);
     if (cx < 0 || cz < 0 || cx >= tr.VW - 1 || cz >= tr.VH - 1) return 0;
     const u = fx - cx, q = fz - cz, k = cz * tr.VW + cx, v = tr.v, a = v[k], b = v[k + 1], c = v[k + tr.VW], d = v[k + tr.VW + 1];
     return u + q <= 1 ? a + (b - a) * u + (c - a) * q : d + (c - d) * (1 - u) + (b - d) * (1 - q);
   }
-  function groundAt(w, x, z, r, y, step = STEP, smooth = false) {
+  function groundAt(w: WorldT, x: number, z: number, r: number, y: number, step = STEP, smooth = false) {
     let g = -Infinity;
     const k = r * 0.6;
     query(w, [x - k, y - 50, z - k], [x + k, y + step, z + k], (s) => { if (s.move && !(smooth && s.stair) && s.max[1] <= y + step + 1e-6 && s.max[1] > g) g = s.max[1]; });
@@ -263,7 +266,7 @@ const G_World = (() => {
     return g;
   }
   // the lowest surface over someone at (x, z) whose head is at y (Infinity: open sky)
-  function ceilingAt(w, x, z, r, y) {
+  function ceilingAt(w: WorldT, x: number, z: number, r: number, y: number) {
     let c = Infinity;
     query(w, [x - r, y - 0.2, z - r], [x + r, y + 50, z + r], (s) => { if (s.move && s.min[1] >= y - 0.2 && s.min[1] < c) c = s.min[1]; });
     return c;
@@ -279,13 +282,13 @@ const G_World = (() => {
   // opts.skirt, how far its walls reach down past its floor (over the slab under it); opts.voidAbove, where the
   // floor above has a drop (no ceiling there); opts.ground: false for an upper floor (its floor only where it
   // has one: not over a drop).
-  function fromTileMap(map, opts?) {
+  function fromTileMap(map: any, opts?: any) {
     const o = opts || {}, L = G.Level, TS = L.TS, { W, H, t } = map, WH = L.WALL_H, w = o.world || create();
     const Y = o.y || 0, SK = o.skirt || 0, va = o.voidAbove;
     w.bounds = { min: [0, 0, 0], max: [W * TS, Y + WH, H * TS] };
     // runs of tiles merged into rectangles (greedy: along x, then down z while the whole run continues)
-    const rects = (want) => {
-      const used = new Uint8Array(W * H), out = [];
+    const rects = (want: (i: number) => boolean) => {
+      const used = new Uint8Array(W * H), out: number[][] = [];
       for (let z = 0; z < H; z++) for (let x = 0; x < W; x++) {
         const i = z * W + x;
         if (used[i] || !want(i)) continue;
@@ -307,14 +310,14 @@ const G_World = (() => {
     // the floor (on the ground: everywhere, under the gardens too, and beyond the edge; upstairs, all but the drops)
     // (a mountain top's gorge, map.chasm metres deep: nothing under its open air but the gorge's floor, far down)
     if (o.ground !== false && map.chasm) {
-      for (const [x0, z0, x1, z1] of rects((i) => t[i] !== 5)) add(w, box(x0 * TS, Y - 0.5, z0 * TS, (x1 + 1) * TS, Y, (z1 + 1) * TS, { kind: 'floor' }));
+      for (const [x0, z0, x1, z1] of rects((i: number) => t[i] !== 5)) add(w, box(x0 * TS, Y - 0.5, z0 * TS, (x1 + 1) * TS, Y, (z1 + 1) * TS, { kind: 'floor' }));
       add(w, box(-TS * 4, Y - map.chasm - 0.5, -TS * 4, (W + 4) * TS, Y - map.chasm, (H + 4) * TS, { kind: 'floor' }));
     } else if (o.ground !== false) add(w, box(-TS * 4, Y - 0.5, -TS * 4, (W + 4) * TS, Y, (H + 4) * TS, { kind: 'floor' }));
     else {
       const gr = map.grate;
-      for (const [x0, z0, x1, z1] of rects((i) => t[i] !== 5 && !(gr && gr[i]))) add(w, box(x0 * TS, Y - SK, z0 * TS, (x1 + 1) * TS, Y, (z1 + 1) * TS, { kind: 'floor' }));
+      for (const [x0, z0, x1, z1] of rects((i: number) => t[i] !== 5 && !(gr && gr[i]))) add(w, box(x0 * TS, Y - SK, z0 * TS, (x1 + 1) * TS, Y, (z1 + 1) * TS, { kind: 'floor' }));
       // steel grating (a catwalk): it holds you up, and eyes go through it from above and below; a round goes between its bars, or meets one (barHit)
-      if (gr) for (const [x0, z0, x1, z1] of rects((i) => gr[i] && t[i] !== 5)) add(w, box(x0 * TS, Y - 0.05, z0 * TS, (x1 + 1) * TS, Y, (z1 + 1) * TS, { kind: 'grate', ray: false, bars: true }));
+      if (gr) for (const [x0, z0, x1, z1] of rects((i: number) => gr[i] && t[i] !== 5)) add(w, box(x0 * TS, Y - 0.05, z0 * TS, (x1 + 1) * TS, Y, (z1 + 1) * TS, { kind: 'grate', ray: false, bars: true }));
     }
     // rolling ground over it (map.terrain): for rays and sight, a block under each cell up to its corners' mean (5 cm
     // steps, merged); feet go by the slope itself (groundAt), so the blocks don't stop anyone
@@ -324,24 +327,24 @@ const G_World = (() => {
         const x = i % W, z = (i / W) | 0, k = z * tr.VW + x, m = (tr.v[k] + tr.v[k + 1] + tr.v[k + tr.VW] + tr.v[k + tr.VW + 1]) / 4;
         q[i] = Math.round(m / 0.05); if (q[i] > 0) tops.add(q[i]);
       }
-      for (const n of tops) for (const [x0, z0, x1, z1] of rects((i) => q[i] === n)) add(w, box(x0 * TS, Y - 0.5, z0 * TS, (x1 + 1) * TS, Y + n * 0.05, (z1 + 1) * TS, { kind: 'floor', terrain: true, move: false }));
+      for (const n of tops) for (const [x0, z0, x1, z1] of rects((i: number) => q[i] === n)) add(w, box(x0 * TS, Y - 0.5, z0 * TS, (x1 + 1) * TS, Y + n * 0.05, (z1 + 1) * TS, { kind: 'floor', terrain: true, move: false }));
       w.terrain = tr;
     }
     // ceilings over everything indoors (not under a drop in the floor above)
-    for (const [x0, z0, x1, z1] of rects((i) => !map.out[i] && !(va && va[i]))) add(w, box(x0 * TS, Y + WH, z0 * TS, (x1 + 1) * TS, Y + WH + 0.3, (z1 + 1) * TS, { kind: 'ceil' }));
+    for (const [x0, z0, x1, z1] of rects((i: number) => !map.out[i] && !(va && va[i]))) add(w, box(x0 * TS, Y + WH, z0 * TS, (x1 + 1) * TS, Y + WH + 0.3, (z1 + 1) * TS, { kind: 'ceil' }));
     // walls (not where a window is: its own solids below), and the solid edge round the map
-    for (const [x0, z0, x1, z1] of rects((i) => t[i] === 1 && !(map.winAt && map.winAt.has(i)))) add(w, box(x0 * TS, Y - SK, z0 * TS, (x1 + 1) * TS, Y + WH, (z1 + 1) * TS, { kind: 'wall' }));
+    for (const [x0, z0, x1, z1] of rects((i: number) => t[i] === 1 && !(map.winAt && map.winAt.has(i)))) add(w, box(x0 * TS, Y - SK, z0 * TS, (x1 + 1) * TS, Y + WH, (z1 + 1) * TS, { kind: 'wall' }));
     const E = TS * 4;
     // (on a mountain top it reaches down to the gorge's floor, and rounds fly on over it: there's only air past the wall)
     for (const b of [[-E, 0, -E, 0, WH, H * TS + E], [W * TS, 0, -E, W * TS + E, WH, H * TS + E], [0, 0, -E, W * TS, WH, 0], [0, 0, H * TS, W * TS, WH, H * TS + E]]) { b[1] = Y - SK - (map.chasm || 0); b[4] += Y; add(w, box(...(b as [number, number, number, number, number, number]), { kind: 'wall', edge: true, ray: !map.chasm })); }
     // furniture and fences: each piece's boxes (a piece hangs on every tile it covers: once each)
-    const fromB = (b, q, gy = b.gy || 0) => box(b.cx - b.hx, Y + gy + b.y0, b.cz - b.hz, b.cx + b.hx, Y + gy + b.h, b.cz + b.hz, q); // (gy: a piece on rolling ground)
-    const seen = new Set();
+    const fromB = (b: any, q: any, gy = b.gy || 0) => box(b.cx - b.hx, Y + gy + b.y0, b.cz - b.hz, b.cx + b.hx, Y + gy + b.h, b.cz + b.hz, q); // (gy: a piece on rolling ground)
+    const seen = new Set<Solid>();
     for (const [, p] of map.props || []) {
       if (seen.has(p)) continue;
       seen.add(p);
       for (const b of p.boxes) {
-        if (b.ray) { add(w, fromB(b, { kind: 'prop', prop: p, ray: false })); for (const q of b.ray) add(w, fromB(q, Object.assign({ kind: 'prop', prop: p, move: false }, q.m ? { mat: G.Materials.PARTS[q.m] } : null), b.gy || 0)); }
+        if (b.ray) { add(w, fromB(b, { kind: 'prop', prop: p, ray: false })); for (const q of b.ray) add(w, fromB(q, Object.assign({ kind: 'prop', prop: p, move: false }, q.m ? { mat: (G.Materials.PARTS as Record<string, any>)[q.m] } : null), b.gy || 0)); }
         else add(w, fromB(b, { kind: 'prop', prop: p }));
       }
     }
@@ -360,7 +363,7 @@ const G_World = (() => {
   }
   // A flight of stairs (G.Level.stack's): steps as solids, each a block from the floor at its foot up to its tread,
   // climbing st.rise over its run in about 20 cm steps (low enough to walk up: STEP)
-  function stairs(w, st) {
+  function stairs(w: WorldT, st: any) {
     const along = st.axis === 'z', len = along ? st.z1 - st.z0 : st.x1 - st.x0, n = Math.max(2, Math.round(st.rise / 0.2)), run = len / n, rise = st.rise / n;
     st.steps = [];
     (w.ramps = w.ramps || []).push(st); // (walkers take it as a slope: rampAt)
@@ -372,7 +375,7 @@ const G_World = (() => {
   }
   // a door's solids as it stands: closed, a leaf across each of its cells; open, the lintel over each cell (you
   // walk under it) and the leaf standing out from its hinge (it stops rounds and sight, not people)
-  function door(w, map, d) {
+  function door(w: WorldT, map: any, d: any) {
     const L = G.Level, TS = L.TS;
     for (const s of d.solids || []) remove(w, s);
     d.solids = [];
@@ -396,7 +399,7 @@ const G_World = (() => {
     }
   }
   // a window's solids: its wall cells' sill and head (and an outside window's view), and the pane while it's whole
-  function windowSolids(w, map, win) {
+  function windowSolids(w: WorldT, map: any, win: any) {
     if (win.door) return door(w, map, win.door); // (a glass door's pane: its door's solids)
     if (win.rail) { // a railing's glass: under its handrail, while it's whole (it never stopped anyone walking: the drop's edge does)
       for (const s of win.solids || []) remove(w, s);

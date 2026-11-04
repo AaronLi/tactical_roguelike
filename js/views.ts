@@ -1,24 +1,38 @@
 'use strict';
 // Client-side representations of networked things: remote players, enemies, grenades.
 // Characters are G.Rig skeletons; their hitboxes ride the animated bones (see js/rig.ts).
+// A remote officer, as drawn here: their rig, and the latest state the host sent (st: short keys, see js/server.ts snap)
+interface VwPlayer { id: string; name: string; color: number; animal: string; look: any; rig: Rig; tag: THREE.Object3D | null; st: any; pos: THREE.Vector3; yaw: number; pitch: number; first: boolean; dead?: boolean; deadAt?: number | null; lastAct?: string; lastAp?: number; [k: string]: any }
+// A suspect or civilian: the rig, where the host says it is (tgt) and where it's drawn (pos, eased towards it). The rest
+// (flags from the snapshot, timers for the reload, the prone shift...) are set as they happen.
+interface VwEnemy { id: number; type: string; def: any; rig: Rig; tac: number; pos: THREE.Vector3; tgt: THREE.Vector3; yaw: number; tgtYaw: number; hp: number; alive: boolean; deadT: number; lean: number; [k: string]: any }
+interface VwEvidence { mesh: THREE.Object3D; wpn: string; x: number; y: number; z: number; secured?: boolean; [k: string]: any }
+// a grenade in flight (the position and velocity are all nadeStep needs)
+interface VwNadeMotion { pos: THREE.Vector3; vel: THREE.Vector3; onGround?: boolean }
+interface VwNade extends VwNadeMotion { fuse: number; own: boolean; enemy: boolean; mesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshLambertMaterial>; kind: string }
+// the animated bits of a level (js/level.ts builds them): a first aid cabinet, and the lids of the weapon case, attachments box and sticker box
+interface VwCabView { key: string | null; open: number; slots: THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>[]; door: THREE.Object3D }
+interface VwLid { synced: boolean; open: number; lid: THREE.Object3D; g: THREE.Object3D }
+interface VwAboxView extends VwLid { key: string | null; lights: THREE.Group }
+interface VwSboxView extends VwLid { name: string | null; card: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial> }
 const G_Views = {
-  players: new Map(),
-  enemies: new Map(),
-  nades: [],
-  pings: [],
-  evidence: new Map(), // id -> { mesh, wpn, x, z }
+  players: new Map<string, VwPlayer>(),
+  enemies: new Map<number, VwEnemy>(),
+  nades: [] as VwNade[],
+  pings: [] as { x: number; z: number; t: number }[],
+  evidence: new Map<number, VwEvidence>(), // id -> { mesh, wpn, x, z }
   laserBeep: 0,
 
-  removeRig(rig) { G.R.dynRoot.remove(rig.root); rig.dispose(); },
+  removeRig(rig: Rig) { G.R.dynRoot.remove(rig.root); rig.dispose(); },
   // Could any of them be in view from the camera: a look at their middle, head, feet and both sides (where the body is
   // drawn: the hips, wherever a fall's taken them), stopped only by walls, floors and ceilings. A look that starts in
   // one (the camera pressed to a wall) starts again past it.
-  inSight(rig, at) {
+  inSight(rig: Rig, at: THREE.Vector3) {
     const map = G.Game.map, w = map && map.world, c = G.R.camera.position;
     if (!w) return true;
     const hp = rig.hips.getWorldPosition(this._sp || (this._sp = new THREE.Vector3())), y = at.y;
     if (Math.hypot(hp.x - c.x, hp.z - c.z) < 2.5) return true;
-    const skip = this._occ || (this._occ = (s) => s.kind !== 'wall' && s.kind !== 'floor' && s.kind !== 'ceil' && s.kind !== 'lintel');
+    const skip = this._occ || (this._occ = (s: { kind: string }) => s.kind !== 'wall' && s.kind !== 'floor' && s.kind !== 'ceil' && s.kind !== 'lintel');
     const sx = -(hp.z - c.z), sz = hp.x - c.x, sl = Math.hypot(sx, sz) || 1; // (across the view)
     for (const [a, h] of [[0, 0.9], [0, 1.6], [0, 0.15], [-0.45, 1.0], [0.45, 1.0], [-0.45, 1.5], [0.45, 1.5]]) {
       const tx = hp.x + (sx / sl) * a, ty = y + h, tz = hp.z + (sz / sl) * a;
@@ -28,10 +42,10 @@ const G_Views = {
       if (r.t < 0.3) r = G.World.raycast(w, c.x + dx * 0.3, c.y + dy * 0.3, c.z + dz * 0.3, dx, dy, dz, d - 0.3, { skip }), r.t += 0.3;
       if (r.t >= d - 0.05) return true;
     }
-    return G.Damage.seenThrough(map, c, hp); // (or down a hole shot through the wall)
+    return G.Damage.seenThrough(map as unknown as Parameters<typeof G.Damage.seenThrough>[0], c, hp); // (or down a hole shot through the wall)
   },
   // an officer's body: dressed as they picked, kit from their state (st.kt)
-  newPlayerRig(info, id) {
+  newPlayerRig(info: { color: number; animal: string; name: string; look: any }, id: string) {
     const rig = G.Rig.create({ style: 'tactical', color: info.color, animal: info.animal, callName: info.name, seed: id.length * 977, bare: true, look: info.look });
     rig.root.visible = false;
     G.R.dynRoot.add(rig.root);
@@ -53,7 +67,7 @@ const G_Views = {
   },
   clearSelfBody() { if (this.selfBody) { this.removeRig(this.selfBody.rig); this.selfBody = null; } },
   // a dead officer's body is a ragdoll where they fell (they come back whole next level)
-  resetPlayerRig(pv) {
+  resetPlayerRig(pv: VwPlayer) {
     this.removeRig(pv.rig);
     pv.rig = this.newPlayerRig(pv, pv.id);
     pv.dead = false; pv.first = true; pv.deadAt = null;
@@ -79,10 +93,10 @@ const G_Views = {
     this.players.clear();
   },
 
-  syncRoster(roster) {
+  syncRoster(roster: Record<string, any>) {
     for (const [id, info] of Object.entries(roster)) {
       if (id === G.Net.myId) continue;
-      let pv = this.players.get(id);
+      let pv: VwPlayer | null | undefined = this.players.get(id);
       if (pv && (pv.color !== info.color || pv.animal !== info.animal)) { this.removeRig(pv.rig); this.players.delete(id); pv = null; }
       if (!pv) {
         const rig = this.newPlayerRig(info, id); // (dressed as they picked, kit from st.kt)
@@ -95,23 +109,23 @@ const G_Views = {
     }
     for (const id of [...this.players.keys()]) if (!roster[id]) this.removePlayer(id);
   },
-  removePlayer(id) {
+  removePlayer(id: string) {
     const pv = this.players.get(id);
     if (!pv) return;
     this.removeRig(pv.rig);
     this.players.delete(id);
   },
 
-  applySnap(m) {
+  applySnap(m: any) {
     if (!this.warmed) { this.warmed = true; G.Game.veilSay('Compiling shaders'); setTimeout(() => { G.R.warmup(); G.Game.veilN = 3; }, 60); } // (compile everything once the level's full, then a few frames drawn and the veil lifts: js/game.ts veil. The wait: time to draw that line first)
-    const seen = new Set();
+    const seen = new Set<number>();
     for (const [id, type, x, z, yaw, hp, aim, alert, crouch, lean, armed, scode, surp, door, kit, fl, str, y = 0] of m.e) {
       seen.add(id);
       let ev = this.enemies.get(id);
       if (!ev) {
-        if (!G.ENEMIES[type]) continue;
+        if (!(G.ENEMIES as Record<string, any>)[type]) continue;
         // the type, with this suspect's kit (weapon | vest | helmet | face | tac | what's mounted) laid over it
-        const def = Object.create(G.ENEMIES[type]);
+        const def = Object.create((G.ENEMIES as Record<string, any>)[type]);
         if (kit) { const [wpn, vest, helmet, face, tac, ex] = kit.split('|'); def.wpn = wpn; def.vest = vest; def.helmet = helmet; def.face = face || 0; def.tac = +tac || 0; def.ex = ex ? ex.split(',') : []; }
         const rig = G.Rig.create({ style: def.style, scale: def.scale, boss: !!def.boss, seed: id * 7919 + 13, dressed: true });
         rig.powered = true; // a physically simulated body, held up by its muscles (js/rig.ts powerStep)
@@ -161,8 +175,8 @@ const G_Views = {
     G.Game.weaponsLeft = m.w || 0;
   },
   // world position of the closest living player (including you)
-  nearestPlayer(p) {
-    let best = null, bd = 1e9;
+  nearestPlayer(p: THREE.Vector3) {
+    let best: THREE.Vector3 | null = null, bd = 1e9;
     if (G.Me.pos && !G.Me.dead && !G.Me.down) { bd = G.Me.pos.distanceTo(p); best = G.Me.pos; }
     for (const pv of this.players.values()) {
       if (!pv.st || pv.st.dd || pv.st.dn) continue;
@@ -172,7 +186,7 @@ const G_Views = {
     return best;
   },
 
-  kill(m) {
+  kill(m: any) {
     const ev = this.enemies.get(m.e);
     if (!ev || !ev.alive) return;
     ev.alive = false; ev.deadT = 0;
@@ -187,7 +201,7 @@ const G_Views = {
   },
 
   // evidence is drawn from the host's record; the rig's own falling gun is discarded so there's one copy
-  addEvidence(i, wpn, x, z, y = 0) {
+  addEvidence(i: number, wpn: string, x: number, z: number, y = 0) {
     if (this.evidence.has(i)) return;
     const mesh = G.GunModels.world(wpn);
     mesh.position.set(x, y + 0.05, z);
@@ -201,7 +215,7 @@ const G_Views = {
   // by a fixed number of pixels draw only outside it: a bright line fading out in two softer bands. Each band
   // draws a pixel once (it marks the stencil as it goes), so overlapping triangles don't stack up.
   // (blue: the halo on what F would take: G.Views.setHalo)
-  outlineMats(blue) {
+  outlineMats(blue?: boolean) {
     const key = blue ? '_haloMats' : '_outline';
     if (this[key]) return this[key];
     const vs = `uniform float px; uniform vec2 res;
@@ -229,11 +243,11 @@ const G_Views = {
   },
   // the world model's merged meshes have flat (per-face) normals; the outline needs them averaged per corner
   // so the pushed-out shells stay closed
-  smoothGeo(geo) {
+  smoothGeo(geo: THREE.BufferGeometry) {
     this._smooth = this._smooth || new WeakMap();
     let out = this._smooth.get(geo);
     if (out) return out;
-    const pos = geo.attributes.position, nor = geo.attributes.normal, sum = new Map(), keys = [];
+    const pos = geo.attributes.position as THREE.BufferAttribute, nor = geo.attributes.normal as THREE.BufferAttribute, sum = new Map<string, number[]>(), keys: string[] = [];
     for (let i = 0; i < pos.count; i++) {
       const k = `${Math.round(pos.getX(i) * 1e4)},${Math.round(pos.getY(i) * 1e4)},${Math.round(pos.getZ(i) * 1e4)}`;
       keys.push(k);
@@ -242,7 +256,7 @@ const G_Views = {
       sum.set(k, s);
     }
     const n = new Float32Array(pos.count * 3);
-    keys.forEach((k, i) => { const s = sum.get(k), l = Math.hypot(s[0], s[1], s[2]) || 1; n[i * 3] = s[0] / l; n[i * 3 + 1] = s[1] / l; n[i * 3 + 2] = s[2] / l; });
+    keys.forEach((k, i) => { const s = sum.get(k)!, l = Math.hypot(s[0], s[1], s[2]) || 1; n[i * 3] = s[0] / l; n[i * 3 + 1] = s[1] / l; n[i * 3 + 2] = s[2] / l; });
     out = new THREE.BufferGeometry();
     out.setAttribute('position', pos);
     out.setAttribute('normal', new THREE.BufferAttribute(n, 3));
@@ -251,10 +265,10 @@ const G_Views = {
     this._smooth.set(geo, out);
     return out;
   },
-  addOutline(mesh, blue) {
-    const O = this.outlineMats(blue), parts = [], shells = [];
+  addOutline(mesh: THREE.Object3D, blue?: boolean) {
+    const O = this.outlineMats(blue), parts: THREE.Mesh[] = [], shells: THREE.Mesh[] = [];
     // (every mesh in it, each outlined where it sits: a gun's, its magazine's, which is a group of its own: js/gunmodels.ts world)
-    mesh.traverse((o) => { if (o.geometry && !o.layers.isEnabled(2)) parts.push(o); });
+    mesh.traverse((o) => { if ((o as THREE.Mesh).geometry && !o.layers.isEnabled(2)) parts.push(o as THREE.Mesh); });
     for (const part of parts) {
       const sil = new THREE.Mesh(part.geometry, O.silhouette);
       sil.layers.set(2); sil.frustumCulled = false;
@@ -269,10 +283,10 @@ const G_Views = {
     return shells;
   },
   // A blue halo round what you'd take if you held F (obj: its mesh; null, nothing), in place of evidence's yellow while it's on
-  setHalo(obj) {
+  setHalo(obj: THREE.Object3D | null) {
     const was = this._haloOn || null;
     if (obj === was) return;
-    const show = (o, on) => {
+    const show = (o: THREE.Object3D, on: boolean) => {
       for (const s of o.userData.halo) s.visible = on;
       for (const s of o.userData.outline || []) s.visible = !on;
     };
@@ -282,9 +296,9 @@ const G_Views = {
   },
   // First aid cabinets: what's on the shelves (a box per stack, in its item's colour), and the door
   syncCabs() {
-    const map = G.Game.map, cvs = map && map.cabViews, cabs = G.Game.cabs || [];
+    const map = G.Game.map, cvs: VwCabView[] | null = map && map.cabViews, cabs = G.Game.cabs || [];
     if (!cvs) return;
-    const COL = { bandage: 0xe8e2d0, pills: 0xe8c040, tourniquet: 0x2a2a2a, gauze: 0x4a7ab0, seal: 0xb03a3a, splint: 0xd27b4b, bloodbag: 0x7a0d12 };
+    const COL: Record<string, number> = { bandage: 0xe8e2d0, pills: 0xe8c040, tourniquet: 0x2a2a2a, gauze: 0x4a7ab0, seal: 0xb03a3a, splint: 0xd27b4b, bloodbag: 0x7a0d12 };
     cvs.forEach((cv, i) => {
       const c = cabs[i], items = c ? c[1] : [];
       if (c && c[0] && cv.key === null) cv.open = 1; // joined with it already open
@@ -294,20 +308,20 @@ const G_Views = {
   },
   // The weapon case's lid (what's in it is G.Loot's)
   syncCase() {
-    const map = G.Game.map, cv = map && map.caseView;
+    const map = G.Game.map, cv: VwLid | null = map && map.caseView;
     if (!cv || cv.synced) return;
     cv.synced = true;
     if (G.Game.caseOpen) cv.open = 1; // joined with it already open
   },
   // a body that died before we joined: lay it out where it fell
-  addBody(id, type, x, z, yaw, secured, y = 0) {
+  addBody(id: number, type: string, x: number, z: number, yaw: number, secured: number, y = 0) {
     if (this.enemies.has(id)) return;
-    const def = G.ENEMIES[type];
+    const def = (G.ENEMIES as Record<string, any>)[type];
     if (!def) return;
     const rig = G.Rig.create({ style: def.style, scale: def.scale, boss: !!def.boss, seed: id * 7919 + 13, dressed: true });
     if (!def.civ) rig.setKit(G.Rig.armourKit(def.vest, def.helmet, def.style === 'armored'));
     G.R.dynRoot.add(rig.root);
-    const ev: any = { id, type, def, rig, pos: new THREE.Vector3(x, y, z), tgt: new THREE.Vector3(x, y, z), yaw, tgtYaw: yaw, hp: 0, alive: false, deadT: 0, lean: 0 };
+    const ev = { id, type, def, rig, pos: new THREE.Vector3(x, y, z), tgt: new THREE.Vector3(x, y, z), yaw, tgtYaw: yaw, hp: 0, alive: false, deadT: 0, lean: 0 } as VwEnemy;
     rig.root.position.set(x, y, z); rig.root.rotation.y = yaw;
     rig.die(null);
     rig.settle(3);
@@ -318,7 +332,7 @@ const G_Views = {
   envelopeMesh() {
     if (!this._envMat) {
       const c = document.createElement('canvas'); c.width = 128; c.height = 176;
-      const g = c.getContext('2d');
+      const g = c.getContext('2d')!;
       g.fillStyle = '#c9a86a'; g.fillRect(0, 0, 128, 176);
       g.fillStyle = '#b3262a'; g.fillRect(0, 10, 128, 30);
       g.fillStyle = '#fff'; g.font = 'bold 22px Arial'; g.textAlign = 'center'; g.fillText('EVIDENCE', 64, 33);
@@ -330,7 +344,7 @@ const G_Views = {
     }
     return new THREE.Mesh(this._envGeo, this._envMat);
   },
-  secureEvidence(i) {
+  secureEvidence(i: number) {
     const v = this.evidence.get(i);
     if (!v || v.secured) return;
     G.R.dynRoot.remove(v.mesh);
@@ -340,7 +354,7 @@ const G_Views = {
     G.R.dynRoot.add(v.mesh);
     v.secured = true;
   },
-  removeEvidence(i) {
+  removeEvidence(i: number) {
     const v = this.evidence.get(i);
     if (!v) return;
     G.R.dynRoot.remove(v.mesh);
@@ -348,21 +362,21 @@ const G_Views = {
   },
   // where an officer's hands are on someone being restrained: between the shoulder blades while they're
   // shoved down, then at the wrists (shared by first person, teammates' rigs and the camera)
-  zipPoint(ev, t, living) { return G.Rig.zipPoint(ev.rig, t, living); },
-  discardDrop(rig) { if (rig.dropped) { if (rig.dropped.g.parent) rig.dropped.g.parent.remove(rig.dropped.g); rig.dropped = null; } },
+  zipPoint(ev: VwEnemy, t: number, living: boolean) { return G.Rig.zipPoint(ev.rig, t, living); },
+  discardDrop(rig: Rig) { if (rig.dropped) { if (rig.dropped.g.parent) rig.dropped.g.parent.remove(rig.dropped.g); rig.dropped = null; } },
   // A window breaking: the pane goes, a burst of glass falls both sides of it, and it's heard. at, dir: where
   // the round went through (optional)
   // A pane that's taken its first round: fractured right across from where it was hit (js/damage.ts crack), still up
-  crackGlass(id, at, dir?) {
+  crackGlass(id: number, at: THREE.Vector3, dir?: THREE.Vector3) {
     const map = G.Game.map, w = map && map.windows && map.windows[id];
     if (!w || w.broken || w.armor || w.cracked) return;
     w.cracked = true; map.cracked = true;
     if (G.Highlights) G.Highlights.crack(id, at);
-    G.Damage.crack(map.winMeshes && map.winMeshes[id], at);
+    G.Damage.crack(map.winMeshes && map.winMeshes[id] as THREE.Mesh, at);
     G.R.particles(at, 8, 0xd8eef5, 1.2, 0.8, 9, 0.7, dir ? [dir.x, 0, dir.z] : null);
     G.Audio.glass(Math.hypot(w.x - G.R.camera.position.x, w.z - G.R.camera.position.z) + 10); // (from the camera: on a helmet cam, what they hear)
   },
-  breakGlass(id, at?, dir?) {
+  breakGlass(id: number, at?: THREE.Vector3, dir?: THREE.Vector3) {
     const map = G.Game.map, w = map && map.windows && map.windows[id];
     if (!w || w.broken || w.armor) return; // (bulletproof glass doesn't break)
     w.broken = true;
@@ -381,7 +395,7 @@ const G_Views = {
   // A weapon light and/or laser from `from` along dir: the light shines, the laser lands on the first wall or
   // person in its way (a person as a rough column: standing up to 1.8 m, 0.25 m round). skip: whose it is.
   // (selfEv: a suspect's own: their body doesn't stop their laser.) Anyone else's light can dazzle you: js/glare.ts.
-  tacBeam(from, dir, fl, skip, drawFrom, selfEv) {
+  tacBeam(from: THREE.Vector3, dir: THREE.Vector3, fl: number, skip: string | null, drawFrom?: THREE.Vector3 | null, selfEv?: VwEnemy) {
     const map = G.Game.map;
     if (!map) return;
     const src = drawFrom || from; // (where the light and the beam visibly come from)
@@ -389,7 +403,7 @@ const G_Views = {
     if (!(fl & 2)) return;
     let t = G.Level.raycast(map, from.x, from.y, from.z, dir.x, dir.y, dir.z, 60, { glass: true }).t;
     const hz = Math.hypot(dir.x, dir.z) || 1e-6;
-    const body = (p, h) => {
+    const body = (p: THREE.Vector3, h: number) => {
       const ox = p.x - from.x, oz = p.z - from.z, along = (ox * dir.x + oz * dir.z) / hz; // (along the ground)
       if (along <= 0) return;
       const tt = along / hz, sx = from.x + dir.x * tt - p.x, sz = from.z + dir.z * tt - p.z;
@@ -405,14 +419,14 @@ const G_Views = {
     if (G.Highlights) G.Highlights.laser(selfEv ? skip : skip == null ? null : 'p' + skip, end, !!(fl & 4)); // (where it landed: the replays show it)
   },
   // the light or laser on a suspect's gun, to see: a little black housing under the barrel
-  tacOnGun(rig, tac) {
+  tacOnGun(rig: Rig, tac: number) {
     const gi = rig.gunInfo, m = gi && gi.muzzles && gi.muzzles[0];
     if (!tac || !rig.gun || !m) return;
     const box = new THREE.Mesh(this.tacGeo || (this.tacGeo = new THREE.CylinderGeometry(0.014, 0.016, 0.08, 8).rotateX(Math.PI / 2)), this.tacMat || (this.tacMat = new THREE.MeshLambertMaterial({ color: 0x17181a })));
     box.position.set(m[2], m[1] - 0.032, -m[0] * 0.72); rig.gun.add(box);
   },
   // a suspect reloading: the magazine out and in (or shells going in one by one), heard if you're close
-  enemyReload(m) {
+  enemyReload(m: any) {
     const ev = this.enemies.get(m.e);
     if (!ev || !ev.alive) return;
     if (ev.pos.distanceTo(G.R.camera.position) > 25) return;
@@ -425,7 +439,7 @@ const G_Views = {
     setTimeout(() => { if (ev.alive) A.sampleAt('insert_magazine', at(), 0.6, 1); }, dur * 0.6);
     setTimeout(() => { if (ev.alive) A.sampleAt('rack_slide', at(), 0.5, 1); }, dur * 0.88);
   },
-  enemyShot(m) {
+  enemyShot(m: any) {
     let to = new THREE.Vector3(m.to[0], m.to[1], m.to[2]);
     let f = new THREE.Vector3(m.f[0], m.f[1], m.f[2]);
     // the round leaves the barrel of the gun in their hands, as you see it (the host's own muzzle point is a
@@ -437,23 +451,23 @@ const G_Views = {
     }
     G.R.muzzleFlashAt(f);
     const me = G.R.camera.position;
-    const wdef = G.WEAPONS[m.w] || G.WEAPONS[G.ENEMIES[m.ty].wpn];
+    const wdef = G.WEAPONS[m.w] || G.WEAPONS[(G.ENEMIES as Record<string, any>)[m.ty].wpn];
     // what you see of their round (a machine gunner's belt has a tracer every fourth): what it does is the host's, flown there
     // (js/player.ts enemyRound), its marks and wounds told to you as they happen
     const ev0 = this.enemies.get(m.e), tr = wdef.cls === 'LMG' && ev0 && ((ev0.shots = (ev0.shots || 0) + 1) % 4 === 1);
-    if (G.Highlights) G.Highlights.shot('e' + m.e, f, to, wdef.code || m.w, undefined, undefined, m.sid);
+    if (G.Highlights) G.Highlights.shot('e' + m.e, f, to, wdef.code || m.w, undefined!, undefined!, m.sid);
     this.visRound(f, to, wdef, tr ? 'tracer' : G.ballFor(G.calOf(wdef)), () => {});
     G.Casings.fired(wdef, false, f, to);
-    if (!G.GunAudio.play(wdef.id, f, 'e' + m.e)) G.Audio.shot(G.CLASS_SND[wdef.cls] || G.CLASS_SND.AR, me.distanceTo(f));
+    if (!G.GunAudio.play(wdef.id, f, 'e' + m.e)) G.Audio.shot((G.CLASS_SND as Record<string, any>)[wdef.cls] || G.CLASS_SND.AR, me.distanceTo(f));
     G.Audio.flyby(f, to, wdef, G.ballFor(G.calOf(wdef)));
     this.pings.push({ x: m.f[0], z: m.f[2], t: 2.5 });
     const ev = this.enemies.get(m.e);
-    if (ev) ev.rig.recoil(G.Server.kickOf({ str: ev.str }, wdef)); // (the same kick the host gave it)
+    if (ev) ev.rig.recoil(G.Server.kickOf({ str: ev.str } as any, wdef)); // (the same kick the host gave it)
   },
   // The marks a round left (js/ballistics.ts mark: [x, y, z, normal, what it looks like, e(ntry) x (exit) r(icochet)]), on your
   // screen: skip the first (the arrival drew it). A ricochet's next leg shows as a streak.
-  roundFx(list, skip?) {
-    let last = null;
+  roundFx(list: any[][], skip?: boolean) {
+    let last: any[] | null = null;
     (list || []).forEach((f, i) => {
       const p = new THREE.Vector3(f[0], f[1], f[2]);
       if (!(skip && i === 0)) G.R.impactOn(p, f.slice(3, 6), null, f[6], f.length > 8 ? { m: f[12], k: f[7], dir: f.slice(8, 11), J: f[11], stop: !!f[13], cal: f[14], cut: f[15] || 0 } : undefined);
@@ -462,8 +476,8 @@ const G_Views = {
       last = f;
     });
   },
-  enemyThrow(id) { const ev = this.enemies.get(id); if (ev && ev.alive) ev.rig.throwNade(); },
-  remoteShot(m) {
+  enemyThrow(id: number) { const ev = this.enemies.get(id); if (ev && ev.alive) ev.rig.throwNade(); },
+  remoteShot(m: any) {
     const f = new THREE.Vector3(m.f[0], m.f[1], m.f[2]), to = new THREE.Vector3(m.to[0], m.to[1], m.to[2]);
     const def = G.Gunsmith.fromCode(m.w);
     if (!def) return;
@@ -487,14 +501,14 @@ const G_Views = {
   // ---------------------------------------------------------------- other people's rounds
   // A round someone else fired, as you see it: from f straight to `to` at its speed (G.roundSpeed, slowing with
   // drag), drawn like your own (G.R.bullet); arrive: what happens when it gets there.
-  visRound(f, to, def, am, arrive) {
+  visRound(f: THREE.Vector3, to: THREE.Vector3, def: any, am: string, arrive: () => void) {
     const len = f.distanceTo(to);
     if (len < 0.05) { arrive(); return; }
     const rail = def.cls === 'RAIL';
     (this.vRounds = this.vRounds || []).push({ f: f.clone(), dir: to.clone().sub(f).divideScalar(len), len, d: 0, def, am, arrive,
-      v: rail ? 3000 : Math.max(40, G.roundSpeed(def, am) || 400), drag: rail ? 1e9 : G.dragOf(def, am), tracer: !!(G.AMMO[am] && G.AMMO[am].tracer) });
+      v: rail ? 3000 : Math.max(40, G.roundSpeed(def, am) || 400), drag: rail ? 1e9 : G.dragOf(def, am), tracer: !!((G.AMMO as Record<string, any>)[am] && (G.AMMO as Record<string, any>)[am].tracer) });
   },
-  stepRounds(dt) {
+  stepRounds(dt: number) {
     const rs = this.vRounds;
     if (!rs || !rs.length) return;
     dt = Math.min(dt, 0.05);
@@ -513,11 +527,11 @@ const G_Views = {
   // same steps for everyone's grenades and for the throw you're lining up (predictNade), so where the arc says it
   // ends up is where it does.
   NADE_R: 0.05, NADE_G: 14,
-  nadeStep(n, dt, map) {
+  nadeStep(n: VwNadeMotion, dt: number, map: LvMap | null) {
     const R = this.NADE_R, w = map && map.world, p = n.pos, v = n.vel;
-    const hits = (x0, y0, z0, x1, y1, z1) => { if (!w) return y0 < 0; let h = false; G.World.query(w, [x0, y0, z0], [x1, y1, z1], (s) => { if (s.move || s.ray) h = true; }); return h; };
-    const side = (x, y, z) => hits(x - R, y - R + 0.03, z - R, x + R, y + R, z + R); // (clear of the floor it's on)
-    const below = (x, y, z) => hits(x - R + 0.01, y - R, z - R + 0.01, x + R - 0.01, y + R - 0.02, z + R - 0.01);
+    const hits = (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number) => { if (!w) return y0 < 0; let h = false; G.World.query(w, [x0, y0, z0], [x1, y1, z1], (s) => { if (s.move || s.ray) h = true; }); return h; };
+    const side = (x: number, y: number, z: number) => hits(x - R, y - R + 0.03, z - R, x + R, y + R, z + R); // (clear of the floor it's on)
+    const below = (x: number, y: number, z: number) => hits(x - R + 0.01, y - R, z - R + 0.01, x + R - 0.01, y + R - 0.02, z + R - 0.01);
     const N = Math.max(1, Math.ceil(dt / (1 / 120))), h = dt / N;
     for (let k = 0; k < N; k++) {
       v.y -= this.NADE_G * h;
@@ -539,12 +553,12 @@ const G_Views = {
   },
   // Where a throw goes: its path, stepped as a grenade flies (nadeStep) for as long as the fuse burns. Returns
   // the points along it (Vector3s) and where it goes off (the last).
-  predictNade(p, v, fuse, map) {
+  predictNade(p: THREE.Vector3, v: THREE.Vector3, fuse: number, map: LvMap | null) {
     const n = { pos: p.clone(), vel: v.clone() }, pts = [n.pos.clone()], h = 1 / 60;
     for (let t = 0; t < fuse; t += h) { this.nadeStep(n, h, map); pts.push(n.pos.clone()); }
     return pts;
   },
-  addNade(p, v, fuse, own, enemy, kind = 'frag') {
+  addNade(p: THREE.Vector3, v: THREE.Vector3, fuse: number, own: boolean, enemy: boolean, kind = 'frag') {
     const flash = kind === 'flash';
     const mesh = new THREE.Mesh(flash ? new THREE.CylinderGeometry(0.035, 0.035, 0.13, 10) : new THREE.SphereGeometry(0.08, 8, 6), new THREE.MeshLambertMaterial({ color: flash ? 0x7d8388 : 0x3a4a2a, emissive: 0x220000 }));
     mesh.position.copy(p);
@@ -554,7 +568,7 @@ const G_Views = {
 
   // An officer losing blood: drops where they stand or walk (more, the heavier the bleeding), and a pool
   // under them when they're down or dead. who: the owner key, pos: their feet, bl: 0 none, 1 light, 2 heavy.
-  officerBlood(who, pos, bl, down, dt) {
+  officerBlood(who: { _drip?: number }, pos: THREE.Vector3, bl: number, down: boolean, dt: number) {
     if (!bl) return;
     const k = who === G.Me ? (this._myDrip = (this._myDrip || 0) - dt) : (who._drip = (who._drip || 0) - dt);
     if (down) G.R.bloodPool(who, pos.x, pos.z, bl > 1 ? 1.0 : 0.5, bl > 1 ? 30 : 60, pos.y);
@@ -569,13 +583,13 @@ const G_Views = {
   // there), seen through walls,
   // the same size on screen however far off, gone after a few seconds. One per player: a new one replaces it.
   PING_T: 6,
-  addPing(id, p) {
+  addPing(id: string, p: number[]) {
     const me = id === G.Net.myId, r = G.Game.roster && G.Game.roster[id], name = me ? G.Game.myName : r ? r.name : '?', color = me ? G.Game.myColor : r ? r.color : 0xffffff, animal = me ? G.Game.myAnimal : r ? r.animal : null;
     this.pings2 = this.pings2 || new Map();
     const old = this.pings2.get(id);
     if (old) { G.R.dynRoot.remove(old.s); old.s.material.map.dispose(); old.s.material.dispose(); }
     const c = document.createElement('canvas'); c.width = 400; c.height = 160;
-    const g = c.getContext('2d'), col = G.U.hex(color);
+    const g = c.getContext('2d')!, col = G.U.hex(color);
     g.font = 'bold 30px Consolas, monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
     g.lineWidth = 6; g.strokeStyle = 'rgba(0,0,0,0.85)';
     const label = name;
@@ -593,7 +607,7 @@ const G_Views = {
     this.pings2.set(id, { s, t: this.PING_T });
     G.Audio.tone && G.Audio.tone(880, 0.08, 'sine', 0.08); // (a soft blip)
   },
-  updatePings(dt) {
+  updatePings(dt: number) {
     if (!this.pings2) return;
     const cam = G.R.camera.position;
     for (const [id, q] of this.pings2) {
@@ -604,7 +618,7 @@ const G_Views = {
       q.s.material.opacity = Math.min(1, q.t / 1.2);
     }
   },
-  update(dt) {
+  update(dt: number) {
     G.Casings.update(dt);
     G.Bolts.update();
     this.updatePings(dt);
@@ -623,7 +637,7 @@ const G_Views = {
       this.officerBlood(G.Me, G.Me.pos, bl, G.Me.down || G.Me.dead, dt);
       for (const pv of this.players.values()) {
         if (!pv.st || !pv.st.bd || !pv.pos) continue;
-        const b = pv.st.bd.p || [], bl2 = b.some((q) => q[1] & 2) ? 2 : b.some((q) => q[1] & 1) ? 1 : 0;
+        const b = pv.st.bd.p || [], bl2 = b.some((q: number[]) => q[1] & 2) ? 2 : b.some((q: number[]) => q[1] & 1) ? 1 : 0;
         this.officerBlood(pv, pv.pos, bl2, pv.st.dn || pv.st.dd, dt);
       }
     }
@@ -674,7 +688,7 @@ const G_Views = {
         if (ev.proneKey !== key) {
           ev.proneKey = key;
           const fx = -Math.sin(ev.yaw), fz = -Math.cos(ev.yaw), need = 1.85 * ev.def.scale;
-          const ahead = L.raycast(map, ev.pos.x, 0.3, ev.pos.z, fx, 0, fz, need + 0.2).t, behind = L.raycast(map, ev.pos.x, 0.3, ev.pos.z, -fx, 0, -fz, need).t;
+          const ahead = L.raycast(map!, ev.pos.x, 0.3, ev.pos.z, fx, 0, fz, need + 0.2).t, behind = L.raycast(map!, ev.pos.x, 0.3, ev.pos.z, -fx, 0, -fz, need).t;
           const back = Math.max(0, Math.min(need + 0.15 - ahead, behind - 0.3));
           ev.proneShift = back > 0.01 ? new THREE.Vector3(-fx * back, 0, -fz * back) : null;
         }
@@ -729,7 +743,7 @@ const G_Views = {
       pv.pitch += (st.pt - pv.pitch) * Math.min(1, dt * 14);
       pv.rig.setGun(st.w, G.Stickers.of(st.sk)); // their build code: the same parts on their gun (and its stickers, by their hash: js/stickers.ts)
       pv.rig.holster(!!st.sw); // hands busy: weapon away
-      const act: any = st.act ? { kind: { o: 'open', c: 'close', k: 'kick', z: 'zip', b: 'bag' }[st.act], t: st.ap || 0, hand: 'R' } : null;
+      const act: any = st.act ? { kind: ({ o: 'open', c: 'close', k: 'kick', z: 'zip', b: 'bag' } as Record<string, string>)[st.act], t: st.ap || 0, hand: 'R' } : null;
       if (act && act.kind === 'zip') { const tv = this.enemies.get(st.zt); if (tv) act.pt = this.zipPoint(tv, act.t, tv.alive && !tv.down); act.pull = !!st.pl; }
       // their restraining / bagging sounds, as they reach each step
       if (act && pv.lastAct === st.act) G.Audio.foley(act.kind, pv.lastAp || 0, act.t, pv.pos.distanceTo(G.R.camera.position));
@@ -787,7 +801,7 @@ const G_Views = {
       this.tacBeam(from, dir, st.tl, id);
     }
     // and suspects': the light's on with the gun out, the laser once they're alert; the nearest get what's left of the pool
-    const tac = [];
+    const tac: [number, VwEnemy, number][] = [];
     if (G.Game.phase === 'level') for (const ev of this.enemies.values()) {
       if (!ev.tac || !ev.alive || ev.down || ev.scode || !ev.rig.gun || ev.rig.slung) continue;
       const d = ev.pos.distanceToSquared(G.R.camera.position), f = ev.tac & (ev.alert ? 15 : 9);
@@ -802,15 +816,15 @@ const G_Views = {
     G.R.tacEnd(); G.Glare.end(dt);
 
     // first aid cabinet doors swinging open
-    const cabV = G.Game.map && G.Game.map.cabViews;
+    const cabV: VwCabView[] | null = G.Game.map && G.Game.map.cabViews;
     if (cabV) cabV.forEach((cv, i) => {
       const want = G.Game.cabs && G.Game.cabs[i] && G.Game.cabs[i][0] ? 1 : 0;
-      if (want && cv.open === 0) { const c = G.Game.map.cabinets[i]; G.Audio.clink(Math.hypot(c.x - G.R.camera.position.x, c.z - G.R.camera.position.z)); }
+      if (want && cv.open === 0) { const c = G.Game.map!.cabinets[i]; G.Audio.clink(Math.hypot(c.x - G.R.camera.position.x, c.z - G.R.camera.position.z)); }
       cv.open = want ? Math.min(1, cv.open + dt / 0.5) : 0;
       cv.door.rotation.y = -1.9 * (1 - Math.pow(1 - cv.open, 3));
     });
     // the sticker box: its sticker on the card (once the host's said which), the lid up and the card gone once it's taken
-    const sv = G.Game.map && G.Game.map.sboxView;
+    const sv: VwSboxView | null = G.Game.map && G.Game.map.sboxView;
     if (sv) {
       const sb = G.Game.sbox, name = sb && sb[0], taken = !!(sb && sb[1]);
       if (!sv.synced) { sv.synced = true; if (taken) sv.open = 1; } // (joined with it opened)
@@ -820,16 +834,16 @@ const G_Views = {
         if (p.bm) { sv.name = name; const k = 0.12 / Math.max(p.w, p.h); sv.card.scale.set(p.w * k, p.h * k, 1); sv.card.material.map = G.Stickers.material(name).map; sv.card.material.needsUpdate = true; }
       }
       sv.card.visible = sv.name === name && !taken;
-      if (taken && sv.open === 0) { const b = G.Game.map.sbox; G.Audio.clink(Math.hypot(b.x - G.R.camera.position.x, b.z - G.R.camera.position.z)); }
+      if (taken && sv.open === 0) { const b = G.Game.map!.sbox; G.Audio.clink(Math.hypot(b.x - G.R.camera.position.x, b.z - G.R.camera.position.z)); }
       sv.open = taken ? Math.min(1, sv.open + dt / 0.5) : 0;
       sv.lid.rotation.x = -1.8 * (1 - Math.pow(1 - sv.open, 3));
     }
     // the attachments box lid: up and back on its hinge once it's been opened
-    const av = G.Game.map && G.Game.map.aboxView;
+    const av: VwAboxView | null = G.Game.map && G.Game.map.aboxView;
     if (av) {
       const want = G.Game.abox && G.Game.abox[0] ? 1 : 0;
       if (!av.synced) { av.synced = true; if (want) av.open = 1; } // (joined with it already open)
-      if (want && av.open === 0) { const ab = G.Game.map.abox; G.Audio.clink(Math.hypot(ab.x - G.R.camera.position.x, ab.z - G.R.camera.position.z)); }
+      if (want && av.open === 0) { const ab = G.Game.map!.abox; G.Audio.clink(Math.hypot(ab.x - G.R.camera.position.x, ab.z - G.R.camera.position.z)); }
       av.open = want ? Math.min(1, av.open + dt / 0.6) : 0;
       av.lid.rotation.x = -1.9 * (1 - Math.pow(1 - av.open, 3));
       // its lights: one for each of the squad, lit in their colour till they've had their pick, then dark
@@ -837,7 +851,7 @@ const G_Views = {
       const key = ids.map((id) => `${id}:${(G.Game.roster[id] || {}).color}:${uses[id] && uses[id][1] ? 1 : 0}`).join('|');
       if (key !== av.key) {
         av.key = key;
-        for (const c of av.lights.children) { c.geometry.dispose(); c.material.dispose(); }
+        for (const c of av.lights.children as THREE.Mesh<THREE.BufferGeometry, THREE.Material>[]) { c.geometry.dispose(); c.material.dispose(); }
         av.lights.clear();
         const gap = Math.min(0.05, 0.24 / Math.max(1, ids.length));
         ids.forEach((id, i) => {
@@ -851,10 +865,10 @@ const G_Views = {
       }
     }
     // the weapon case lid: latches clack, then it swings up and back against the wall
-    const cv = G.Game.map && G.Game.map.caseView;
+    const cv: VwLid | null = G.Game.map && G.Game.map.caseView;
     if (cv) {
       const want = G.Game.caseOpen ? 1 : 0;
-      if (want && cv.open === 0) { const mc = G.Game.map.case; G.Audio.clink(Math.hypot(mc.x - G.R.camera.position.x, mc.z - G.R.camera.position.z)); }
+      if (want && cv.open === 0) { const mc = G.Game.map!.case; G.Audio.clink(Math.hypot(mc.x - G.R.camera.position.x, mc.z - G.R.camera.position.z)); }
       cv.open = want ? Math.min(1, cv.open + dt / 0.8) : 0;
       cv.lid.rotation.x = -1.78 * (1 - Math.pow(1 - cv.open, 3));
     }
@@ -873,7 +887,7 @@ const G_Views = {
     // evidence being bagged: picked up off the floor and slid into an envelope (mine is drawn in first person)
     for (const [i, v] of this.evidence) {
       if (v.secured) continue;
-      let t = -1, who = null;
+      let t = -1, who: 'me' | VwPlayer | null = null;
       const ma = G.Me.action;
       if (ma && ma.kind === 'bag' && ma.target === i) { t = ma.t / ma.dur; who = 'me'; }
       for (const pv of this.players.values()) if (pv.st && pv.st.act === 'b' && pv.st.bt === i) { t = pv.st.ap || 0; who = pv; }
@@ -914,7 +928,7 @@ const G_Views = {
     G.HUD.nadeWarn(near);
 
     for (const pg of this.pings) pg.t -= dt;
-    this.pings = this.pings.filter((pg) => pg.t > 0);
+    this.pings = this.pings.filter((pg: { t: number }) => pg.t > 0);
   },
 };
 G.Views = G_Views as typeof G_Views & ViewsFields;

@@ -1,6 +1,9 @@
 'use strict';
 const _tv = new THREE.Vector3(), _tv2 = new THREE.Vector3();
 // Three.js scene, character models, first-person viewmodels and particle effects.
+interface Trail { line: THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>; mat: THREE.LineBasicMaterial; n: number; N: number; shot: any; old: number | null; marks: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>[]; keys?: Set<any>; }
+// (the mark's own options, as js/scars.ts plan takes them)
+interface ImpactOpts { m?: string; k?: string; dir?: any; J?: number; stop?: boolean; cal?: number; cut?: number; fit?: number; }
 const G_R = {
   init() {
     const r = (this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' }));
@@ -67,7 +70,7 @@ const G_R = {
   // orange.)
   TONE: 'vec3 bpTone( vec3 c ) { float m = max( c.r, max( c.g, c.b ) ); const float k = 0.76, d = 0.24; if ( m < k ) return c; float f = 1.0 - d * d / ( m + d - k ); c *= f / m; return mix( c, vec3( f ), 1.0 - 1.0 / ( 0.15 * ( m - f ) + 1.0 ) ); }',
   // A soft studio-style environment (gradient dome + a few softboxes) baked with PMREM.
-  _envMap(r) {
+  _envMap(r: THREE.WebGLRenderer) {
     const env = new THREE.Scene();
     const geo = new THREE.SphereGeometry(10, 24, 12);
     const col = [], pos = geo.attributes.position as THREE.BufferAttribute, top = new THREE.Color(0x8b939c), bot = new THREE.Color(0x1c1a17), c = new THREE.Color();
@@ -86,15 +89,15 @@ const G_R = {
   // the blood's materials (made once: the highlights' export worker, which never runs init, asks for them too)
   bloodMaterials() {
     if (this._bloodMats) return this._bloodMats;
-    const bloodTex = (kind) => {
+    const bloodTex = (kind: string) => {
       const c = document.createElement('canvas'); c.width = c.height = 64;
-      const g = c.getContext('2d'), blob = (x, y, r, a) => { g.fillStyle = `rgba(${70 + Math.random() * 20},4,6,${a})`; g.beginPath(); g.ellipse(x, y, r, r * (0.8 + Math.random() * 0.4), Math.random() * 3, 0, 7); g.fill(); };
+      const g = c.getContext('2d') as CanvasRenderingContext2D, blob = (x: number, y: number, r: number, a: number) => { g.fillStyle = `rgba(${70 + Math.random() * 20},4,6,${a})`; g.beginPath(); g.ellipse(x, y, r, r * (0.8 + Math.random() * 0.4), Math.random() * 3, 0, 7); g.fill(); };
       if (kind === 'pool') { for (let i = 0; i < 14; i++) { const a = Math.random() * 6.28, d = Math.random() * 12; blob(32 + Math.cos(a) * d, 32 + Math.sin(a) * d, 10 + Math.random() * 9, 0.9); } }
       else if (kind === 'spatter') { blob(32, 32, 8, 0.9); for (let i = 0; i < 18; i++) { const a = Math.random() * 6.28, d = 8 + Math.random() * 22; blob(32 + Math.cos(a) * d, 32 + Math.sin(a) * d, 1 + Math.random() * 3, 0.85); } }
       else { blob(32, 32, 13, 0.92); for (let i = 0; i < 5; i++) { const a = Math.random() * 6.28, d = 15 + Math.random() * 12; blob(32 + Math.cos(a) * d, 32 + Math.sin(a) * d, 1.5 + Math.random() * 3, 0.85); } }
       const t = new THREE.CanvasTexture(c); t.anisotropy = 4; return t;
     };
-    const bmat = (kind) => new THREE.MeshStandardMaterial({ map: bloodTex(kind), transparent: true, depthWrite: false, roughness: 0.25, metalness: 0.1, polygonOffset: true, polygonOffsetFactor: -3 });
+    const bmat = (kind: string) => new THREE.MeshStandardMaterial({ map: bloodTex(kind), transparent: true, depthWrite: false, roughness: 0.25, metalness: 0.1, polygonOffset: true, polygonOffsetFactor: -3 });
     return (this._bloodMats = { drop: bmat('drop'), spatter: bmat('spatter'), pool: bmat('pool') });
   },
   resize() {
@@ -102,12 +105,12 @@ const G_R = {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
   },
-  setLevel(map) {
+  setLevel(map: LvMap) {
     this.clearLevel();
     this.levelRoot.add(G.Level.buildMesh(map));
     // what stops a weapon light: the level, bar what you can see through (glass, a grating)
-    const solid = (mt) => !mt.transparent && !mt.alphaTest;
-    this.levelRoot.traverse((o) => { if (o.isMesh) o.castShadow = Array.isArray(o.material) ? o.material.every(solid) : solid(o.material); });
+    const solid = (mt: THREE.Material) => !mt.transparent && !mt.alphaTest;
+    this.levelRoot.traverse((o: any) => { if (o.isMesh) o.castShadow = Array.isArray(o.material) ? o.material.every(solid) : solid(o.material); });
     const th = map.theme;
     this.scene.fog.color.setHex(th.fog);
     this.scene.fog.near = th.noFog ? 1e4 : th.fogNear || 8; this.scene.fog.far = th.noFog ? 2e4 : th.fogFar || 60; // (no fog: pushed out of reach, so the shaders stay the same)
@@ -137,21 +140,21 @@ const G_R = {
     this.wounds = [];
     // marks on doors back into the scene first (they're pooled: they mustn't go with the doors)
     for (const m of [...(this.decals || []), ...(this.bloodMarks || [])]) if (m.parent && m.parent !== this.scene) this.scene.add(m);
-    const dispose = (o) => {
-      o.traverse((c) => {
+    const dispose = (o: THREE.Object3D) => {
+      o.traverse((c: any) => {
         if (c.geometry) c.geometry.dispose();
-        if (c.material && !c.userData.keepMat) (Array.isArray(c.material) ? c.material : [c.material]).forEach((m) => { if (m.map) m.map.dispose(); m.dispose(); }); // (keepMat: shared, js/scars.ts's)
+        if (c.material && !c.userData.keepMat) (Array.isArray(c.material) ? c.material : [c.material]).forEach((m: THREE.Material & { map?: THREE.Texture | null }) => { if (m.map) m.map.dispose(); m.dispose(); }); // (keepMat: shared, js/scars.ts's)
       });
     };
     while (this.levelRoot.children.length) { const c = this.levelRoot.children[0]; dispose(c); this.levelRoot.remove(c); }
-    this.decals.forEach((d) => (d.visible = false));
-    if (this.bloodMarks) { this.bloodMarks.forEach((d) => (d.visible = false)); this.pools.forEach((d) => { d.visible = false; d.userData.owner = null; }); }
+    this.decals.forEach((d: THREE.Object3D) => (d.visible = false));
+    if (this.bloodMarks) { this.bloodMarks.forEach((d: THREE.Object3D) => (d.visible = false)); this.pools.forEach((d: THREE.Object3D) => { d.visible = false; d.userData.owner = null; }); }
   },
   // ------------------------------------------------------------ blood on the environment
   // the surface under (x, z) at or below height y: the floor, or the top of a piece of furniture
-  bloodFloor(x, z, y) { const map = G.Game && G.Game.map; return map ? G.Level.groundAt(map, x, z, 0.01, y) : 0; },
+  bloodFloor(x: number, z: number, y: number) { const map = G.Game && G.Game.map; return map ? G.Level.groundAt(map, x, z, 0.01, y) : 0; },
   // a drop (or a smear, if it came in fast) lying where it landed
-  bloodDrop(x, y, z, size = 0.06, kind = 'drop') {
+  bloodDrop(x: number, y: number, z: number, size = 0.06, kind = 'drop') {
     const m = this.bloodMarks[this.bloodIdx]; this.bloodIdx = (this.bloodIdx + 1) % this.bloodMarks.length;
     if (m.parent !== this.scene) this.scene.add(m); // (it may last have been on a door)
     m.material = this.bloodMats[kind] || this.bloodMats.drop;
@@ -160,7 +163,7 @@ const G_R = {
     m.visible = true;
   },
   // spatter on a wall: p the point on it, n its normal
-  bloodWall(p, n, size = 0.35) {
+  bloodWall(p: THREE.Vector3, n: number[], size = 0.35) {
     const m = this.bloodMarks[this.bloodIdx]; this.bloodIdx = (this.bloodIdx + 1) % this.bloodMarks.length;
     if (m.parent !== this.scene) this.scene.add(m);
     m.material = this.bloodMats.spatter;
@@ -172,8 +175,8 @@ const G_R = {
   },
   // A pool spreading out under someone (owner: anything, so it's started once and can keep growing as they
   // keep bleeding). max: how wide it gets (m), over grow seconds.
-  bloodPool(owner, x, z, max = 0.9, grow = 25, y = 0) { // (y: about where the floor is under them)
-    let m = this.pools.find((q) => q.visible && q.userData.owner === owner);
+  bloodPool(owner: any, x: number, z: number, max = 0.9, grow = 25, y = 0) { // (y: about where the floor is under them)
+    let m = this.pools.find((q: THREE.Object3D) => q.visible && q.userData.owner === owner);
     if (!m) {
       m = this.pools[this.poolIdx]; this.poolIdx = (this.poolIdx + 1) % this.pools.length;
       m.userData = { owner, t: 0, max, grow }; m.rotation.z = Math.random() * 6.28;
@@ -184,19 +187,19 @@ const G_R = {
 
   // ------------------------------------------------------------ viewmodels
   // (skin: its stickers, js/stickers.ts; by default the gun in your hands', if that's this build)
-  setViewmodel(def, skin?) {
+  setViewmodel(def: any, skin?: any) {
     if (skin === undefined) { const w = G.Me && G.Me.cur && G.Me.cur(); skin = w && w.def === def ? w.stickers : null; }
-    if (this.vm) { this.vmRoot.remove(this.vm); this.vm.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); }
+    if (this.vm) { this.vmRoot.remove(this.vm); this.vm.traverse((o: any) => { if (o.geometry) o.geometry.dispose(); }); }
     this.vm = def ? G.GunModels.viewmodel(def, skin) : null;
     if (this.vm) { this.vm.userData.code = def.code; this.vm.userData.key = this.vmKey(def, skin); this.vmRoot.add(this.vm); } // (code: which build it shows; key: and its stickers)
   },
-  vmKey(def, skin) { return def ? def.code + '#' + G.Stickers.key(skin) : ''; },
+  vmKey(def: any, skin: any) { return def ? def.code + '#' + G.Stickers.key(skin) : ''; },
 
   // the muzzle flash's star (made once: the highlights' export worker, which never runs init, asks for it too)
   flashTexture() {
     if (this._flashTex) return this._flashTex;
     const c = document.createElement('canvas'); c.width = c.height = 64;
-    const g = c.getContext('2d');
+    const g = c.getContext('2d') as CanvasRenderingContext2D;
     const grd = g.createRadialGradient(32, 32, 0, 32, 32, 32);
     grd.addColorStop(0, 'rgba(255,255,255,1)'); grd.addColorStop(0.3, 'rgba(255,200,100,0.8)'); grd.addColorStop(1, 'rgba(255,120,0,0)');
     g.fillStyle = grd;
@@ -230,7 +233,7 @@ const G_R = {
     // and their glow: a soft ribbon along the streak, always turned to face you (a bloom, without a bloom pass),
     // brightest at the head and fading out towards the tail
     const gc = document.createElement('canvas'); gc.width = 32; gc.height = 64;
-    const gx = gc.getContext('2d'), img = gx.createImageData(32, 64);
+    const gx = gc.getContext('2d') as CanvasRenderingContext2D, img = gx.createImageData(32, 64);
     for (let y = 0; y < 64; y++) for (let x = 0; x < 32; x++) {
       const u = (x + 0.5) / 32 * 2 - 1, v = 1 - (y + 0.5) / 64; // u across (-1..1), v along (0 tail .. 1 head: the canvas's top row)
       const a = Math.exp(-u * u * 4) * Math.pow(v, 1.2) * Math.min(1, (1 - v) * 12 + 0.25);
@@ -247,7 +250,7 @@ const G_R = {
     this.glowN = 0;
     // and a glowing point at a tracer's head (what you see of one going straight away from you)
     const fc = document.createElement('canvas'); fc.width = fc.height = 32;
-    const fx = fc.getContext('2d'), fg = fx.createRadialGradient(16, 16, 0, 16, 16, 16);
+    const fx = fc.getContext('2d') as CanvasRenderingContext2D, fg = fx.createRadialGradient(16, 16, 0, 16, 16, 16);
     fg.addColorStop(0, 'rgba(255,255,255,1)'); fg.addColorStop(0.25, 'rgba(255,255,255,0.55)'); fg.addColorStop(1, 'rgba(255,255,255,0)');
     fx.fillStyle = fg; fx.fillRect(0, 0, 32, 32);
     const ft = new THREE.CanvasTexture(fc);
@@ -278,7 +281,7 @@ const G_R = {
     // bullet hole decals
     this.decals = [];
     const dc = document.createElement('canvas'); dc.width = dc.height = 32;
-    const dg = dc.getContext('2d');
+    const dg = dc.getContext('2d') as CanvasRenderingContext2D;
     const dgr = dg.createRadialGradient(16, 16, 0, 16, 16, 16);
     dgr.addColorStop(0, 'rgba(0,0,0,0.95)'); dgr.addColorStop(0.35, 'rgba(10,10,10,0.7)'); dgr.addColorStop(1, 'rgba(0,0,0,0)');
     dg.fillStyle = dgr; dg.fillRect(0, 0, 32, 32);
@@ -338,7 +341,7 @@ const G_R = {
     for (let i = 0; i < cg.attributes.position.count; i++) { const k = (cg.attributes.position as THREE.BufferAttribute).getY(i) > -0.5 ? 1 : 0; cc.set([k, k * 0.95, k * 0.86], i * 3); } // (bright at the lamp, nothing by the far end)
     cg.setAttribute('color', new THREE.BufferAttribute(cc, 3));
     const lc = document.createElement('canvas'); lc.width = lc.height = 32;
-    const lg = lc.getContext('2d'), lgr = lg.createRadialGradient(16, 16, 0, 16, 16, 16);
+    const lg = lc.getContext('2d') as CanvasRenderingContext2D, lgr = lg.createRadialGradient(16, 16, 0, 16, 16, 16);
     lgr.addColorStop(0, 'rgba(255,255,255,1)'); lgr.addColorStop(0.25, 'rgba(255,255,255,0.8)'); lgr.addColorStop(1, 'rgba(255,255,255,0)');
     lg.fillStyle = lgr; lg.fillRect(0, 0, 32, 32);
     const laserDotTex = new THREE.CanvasTexture(lc);
@@ -364,7 +367,7 @@ const G_R = {
   },
   tacBegin() { this.spotUsed = 0; this.pLaserUsed = 0; this.coneUsed = 0; },
   // a weapon light at pos shining along dir (k: how bright; seen: someone else's, so you see the beam and the lamp)
-  tacLight(pos, dir, k = 1, seen = false) {
+  tacLight(pos: THREE.Vector3, dir: THREE.Vector3, k = 1, seen = false) {
     const s = this.spots[this.spotUsed++]; if (!s) return;
     s.position.copy(pos); s.target.position.copy(pos).add(dir); s.intensity = 0.9 * k; s.distance = 24 + 10 * k; s.shadow.needsUpdate = true;
     const C = seen && this.cones[this.coneUsed++];
@@ -374,7 +377,7 @@ const G_R = {
     C.lamp.position.copy(pos).addScaledVector(dir, 0.02); C.lamp.scale.setScalar(0.1 + 0.5 * k * Math.max(0, at) ** 3); C.lamp.visible = true;
   },
   // a laser from a to b (where it lands), red or green: a faint beam and a bright dot
-  tacLaser(a, b, green) {
+  tacLaser(a: THREE.Vector3, b: THREE.Vector3, green: boolean) {
     const L = this.pLasers[this.pLaserUsed++]; if (!L) return;
     const col = green ? 0x30ff40 : 0xff2010, arr = L.line.geometry.attributes.position.array;
     arr[0] = a.x; arr[1] = a.y; arr[2] = a.z; arr[3] = b.x; arr[4] = b.y; arr[5] = b.z;
@@ -390,7 +393,7 @@ const G_R = {
     for (let i = this.coneUsed; i < this.cones.length; i++) this.cones[i].cone.visible = this.cones[i].lamp.visible = false;
     for (let i = this.pLaserUsed; i < this.pLasers.length; i++) this.pLasers[i].line.visible = this.pLasers[i].dot.visible = false;
   },
-  tracer(from, to, color = 0xffd080, width = 0.018, life?) {
+  tracer(from: THREE.Vector3, to: THREE.Vector3, color = 0xffd080, width = 0.018, life?: number) {
     const m = this.tracers[this.tracerIdx]; this.tracerIdx = (this.tracerIdx + 1) % this.tracers.length;
     const dx = to.x - from.x, dy = to.y - from.y, dz = to.z - from.z, len = Math.hypot(dx, dy, dz);
     if (len < 0.5) return;
@@ -404,7 +407,7 @@ const G_R = {
   },
   // one frame of a round in flight, tail to head. solid: drawn as it is (a bolt, a grenade) instead of glowing.
   // minPx: never thinner than that on screen, so a tracer still shows far off.
-  streak(from, to, color, width, op = 1, solid = false, minPx = 0) {
+  streak(from: THREE.Vector3, to: THREE.Vector3, color: number, width: number, op = 1, solid = false, minPx = 0) {
     const dx = to.x - from.x, dy = to.y - from.y, dz = to.z - from.z, len = Math.hypot(dx, dy, dz);
     if (len < 0.02) return;
     const m = this.streaks[this.streakN % this.streaks.length]; this.streakN++;
@@ -428,24 +431,24 @@ const G_R = {
   // fire again; older ones fade out over the 3 s after a newer shot takes over. Drawn over everything, so a path through
   // a body shows.
   TRAIL_FADE: 3, TRAIL_VMAX: 686,
-  trailColour(v, out) { return out.setHSL(0.78 * (1 - G.U.clamp(v / this.TRAIL_VMAX, 0, 1)), 1, 0.55); },
-  trailStart(shot, p, v) {
+  trailColour(v: number, out: THREE.Color) { return out.setHSL(0.78 * (1 - G.U.clamp(v / this.TRAIL_VMAX, 0, 1)), 1, 0.55); },
+  trailStart(shot: any, p: THREE.Vector3, v: number) {
     const N = 2400, geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N * 3), 3)); geo.setDrawRange(0, 0);
     geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(N * 3), 3));
     const mat = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, depthTest: false, depthWrite: false });
     const line = new THREE.Line(geo, mat); line.frustumCulled = false; line.renderOrder = 998;
     this.scene.add(line);
-    const tr = { line, mat, n: 0, N, shot, old: null, marks: [] };
+    const tr: Trail = { line, mat, n: 0, N, shot, old: null, marks: [] };
     (this.trails = this.trails || []).push(tr);
     this.lastShot = shot;
     this.trailAdd(tr, p, false, v);
     return tr;
   },
-  trailAdd(tr, p, mark, v = 0) {
+  trailAdd(tr: Trail, p: THREE.Vector3, mark: boolean, v = 0) {
     const c = this.trailColour(v, this._tc || (this._tc = new THREE.Color()));
     if (tr.n < tr.N) {
-      const g = tr.line.geometry, a = g.attributes.position as THREE.BufferAttribute, k = g.attributes.color;
+      const g = tr.line.geometry, a = g.attributes.position as THREE.BufferAttribute, k = g.attributes.color as THREE.BufferAttribute;
       a.setXYZ(tr.n, p.x, p.y, p.z); k.setXYZ(tr.n, c.r, c.g, c.b); tr.n++;
       a.needsUpdate = k.needsUpdate = true; g.setDrawRange(0, tr.n);
     }
@@ -459,8 +462,8 @@ const G_R = {
   // (the stretch of it in each part of them, in that bone's frame, coloured by its speed as the trail is), and its dots,
   // so it goes where they go: turning, falling, carried off as a ragdoll. pts: [{ p (world), v, bone (a segment's bone
   // name, js/ballistics.ts), mark }]
-  woundTrack(rig, pts) {
-    const B = G.Ballistics, c = new THREE.Color(), objs = [];
+  woundTrack(rig: any, pts: { p: THREE.Vector3; v: number; bone: string; mark?: boolean }[]) {
+    const B = G.Ballistics, c = new THREE.Color(), objs: (THREE.Object3D & { onRig?: any })[] = [];
     rig.root.updateMatrixWorld(true);
     let i = 0;
     while (i < pts.length) {
@@ -493,10 +496,10 @@ const G_R = {
     for (const o of this.wounds || []) o.visible = !!on && !!L && o.onRig === L.who.rig; // (the tracks kept on bodies: with the hitboxes, on whoever you've picked out)
     if (!this.trails || !this.trails.length) return;
     const now = performance.now();
-    this.trails = this.trails.filter((tr) => {
+    this.trails = this.trails.filter((tr: Trail) => {
       const last = tr.shot === this.lastShot;
       if (!last && tr.old == null) tr.old = now; // (the moment a newer shot took over)
-      const k = last ? 1 : 1 - (now - tr.old) / 1000 / this.TRAIL_FADE;
+      const k = last ? 1 : 1 - (now - tr.old!) / 1000 / this.TRAIL_FADE;
       if (k <= 0 || !tr.line.parent) { this.trailDrop(tr); return false; }
       const see = on && (!tr.keys || tr.keys.has(fk)); // (a round that went into someone: only with them picked out)
       tr.line.visible = see; tr.mat.opacity = k * (last ? 1 : 0.55);
@@ -504,8 +507,8 @@ const G_R = {
       return true;
     });
   },
-  trailDrop(tr) { tr.line.removeFromParent(); tr.line.geometry.dispose(); tr.mat.dispose(); for (const m of tr.marks) { m.removeFromParent(); m.material.dispose(); } },
-  bullet(head, dir, came, def, tracer, sp, am) {
+  trailDrop(tr: Trail) { tr.line.removeFromParent(); tr.line.geometry.dispose(); tr.mat.dispose(); for (const m of tr.marks) { m.removeFromParent(); m.material.dispose(); } },
+  bullet(head: THREE.Vector3, dir: THREE.Vector3, came: number, def: any, tracer: boolean, sp: number, am: any) {
     const rail = def.cls === 'RAIL', bolt = def.cls === 'BOW', gren = !!def.explosive;
     const L = rail ? 60 : bolt ? 0.7 : gren ? 0.25 : tracer ? G.U.clamp(sp * 0.03, 3, 24) : G.U.clamp(sp * 0.008, 0.6, 5);
     const lead = bolt || gren ? 0.3 : 2; // (nothing shows in the first couple of metres: it's still in the muzzle's flash)
@@ -526,7 +529,7 @@ const G_R = {
     else this.streak(tail, head, col, 0.01, 0.4, false, 1);
   },
   // a glowing point at p: size in metres, or minPx on screen if that's bigger
-  flare(p, color, size, op, minPx) {
+  flare(p: THREE.Vector3, color: number, size: number, op: number, minPx: number) {
     const sp = this.flares[this.flareN % this.flares.length]; this.flareN++;
     const d = this.camera.position.distanceTo(p), pxRad = this.renderer.domElement.height / (this.camera.fov * Math.PI / 180);
     const sz = Math.max(size, d * minPx / pxRad);
@@ -535,7 +538,7 @@ const G_R = {
     sp.userData.f = this.frameNo; sp.visible = true;
   },
   // the glow round a streak, tail to head: width in metres, or minPx on screen if that's wider
-  glow(from, to, color, width, op, minPx) {
+  glow(from: THREE.Vector3, to: THREE.Vector3, color: number, width: number, op: number, minPx: number) {
     const axis = to.clone().sub(from), len = axis.length();
     if (len < 0.05) return;
     axis.divideScalar(len);
@@ -552,7 +555,7 @@ const G_R = {
     m.material.color.setHex(color); m.material.opacity = op;
     m.userData.f = this.frameNo; m.visible = true;
   },
-  particles(p, n, color, speed, life, grav = 9, spread = 1, dir?, blood?) {
+  particles(p: THREE.Vector3, n: number, color: number, speed: number, life: number, grav = 9, spread = 1, dir?: ArrayLike<number> | null, blood?: boolean) {
     const col = new THREE.Color(color);
     for (let k = 0; k < n; k++) {
       const i = this.pIdx; this.pIdx = (this.pIdx + 1) % this.PN;
@@ -573,11 +576,11 @@ const G_R = {
     metal: { s: [0xffc070, 12, 5, 0.22, 12], d: null }, stone: { s: [0xffc070, 3, 3, 0.15, 12], d: [0x9a958a, 8, 1.5] }, wood: { s: null, d: [0xa8824e, 9, 2.2] }, plaster: { s: null, d: [0xe8e4da, 10, 1.2] },
     soft: { s: null, d: [0xcfc8b8, 6, 1] }, glass: { s: null, d: [0xcfe6f0, 8, 2.5] }, soil: { s: null, d: [0x6a5238, 10, 2] }, plastic: { s: null, d: [0x77787a, 5, 2] }, water: { s: null, d: [0xa8c8d8, 8, 2.5] },
   },
-  impact(p, n, kind, fx?, o?) {
+  impact(p: THREE.Vector3, n: number[] | null, kind: string, fx?: string, o?: ImpactOpts) {
     if (G.Audio && G.Audio.impactAt) G.Audio.impactAt(p, kind, fx); // heard when it's close
     if (kind === 'blood') { this.particles(p, 8, 0x8a0a0a, 2.5, 1.2, 9, 0.8, n, true); return; } // (each leaves a drop where it lands)
     if (kind === 'armor') { this.particles(p, 6, 0x9fd8ff, 3, 0.25, 6, 1); return; }
-    const fxs = this.IMPACT[fx] || this.IMPACT.stone;
+    const fxs = (this.IMPACT as Record<string, any>)[fx!] || this.IMPACT.stone;
     if (fxs.s) this.particles(p, fxs.s[1], fxs.s[0], fxs.s[2], fxs.s[3], fxs.s[4], 0.8, n);
     if (fxs.d && !o) this.particles(p, fxs.d[1], fxs.d[0], fxs.d[2], 0.6, 1, 0.6, n); // (the rest of what's thrown out: js/scars.ts)
     if (kind !== 'wall' || (o && o.m === '')) return; // (o.m '': nothing there to damage)
@@ -598,20 +601,20 @@ const G_R = {
   },
   // A round's mark where it stopped in something solid (a wall, a door, or a target on the range): paper targets show
   // their holes in their own picture (no mark on top); a steel plate keeps its mark as it swings or falls.
-  impactOn(p, n, solid, fx, o) {
+  impactOn(p: THREE.Vector3, n: number[] | null, solid: any, fx?: string, o?: ImpactOpts) {
     const t = solid && solid.target, on = t && G.Range ? G.Range.markOn(t) : null;
     this.lastDecals = [];
     this.impact(p, on === 'paper' ? null : n, 'wall', fx, o);
     if (on && on !== 'paper') for (const d of this.lastDecals) on.attach(d);
   },
   // put marks stuck on something about to be thrown away back in the pool (hidden)
-  freeMarks(obj) {
-    const ms = []; obj.traverse((o) => { if (this.decals.includes(o) || (this.bloodMarks && this.bloodMarks.includes(o))) ms.push(o); });
+  freeMarks(obj: THREE.Object3D) {
+    const ms: THREE.Object3D[] = []; obj.traverse((o: THREE.Object3D) => { if (this.decals.includes(o) || (this.bloodMarks && this.bloodMarks.includes(o))) ms.push(o); });
     for (const m of ms) { m.visible = false; this.scene.add(m); }
   },
   // A mark that landed on a door's leaf becomes part of the leaf, so it swings with the door. (Marks are pooled:
   // each is put back in the scene before it's used again, and before a level's meshes are thrown away.)
-  onDoor(m) {
+  onDoor(m: THREE.Object3D) {
     const map = G.Game && G.Game.map, doors = map && map.doorMeshes;
     if (!doors) return;
     m.updateMatrixWorld(true);
@@ -625,18 +628,18 @@ const G_R = {
       if (Math.abs(l.x) <= g.width / 2 + 0.03 && Math.abs(l.y) <= g.height / 2 + 0.03 && Math.abs(l.z) <= 0.09) { leaf.attach(m); m.position.z = Math.sign(l.z || 1) * (g.depth / 2 + 0.004); return; }
     }
   },
-  explosion(p, radius) {
-    const m = this.blasts.find((b) => !b.visible) || this.blasts[0];
+  explosion(p: THREE.Vector3, radius: number) {
+    const m = this.blasts.find((b: THREE.Mesh) => !b.visible) || this.blasts[0];
     m.position.copy(p); m.visible = true;
     m.userData.life = m.userData.max = 0.45; m.userData.r = radius;
-    const l = this.blastLights.reduce((a, b) => (b.intensity < a.intensity ? b : a));
+    const l = this.blastLights.reduce((a: THREE.PointLight, b: THREE.PointLight) => (b.intensity < a.intensity ? b : a));
     l.position.copy(p); l.intensity = 6; l.userData.by = m;
     this.particles(p, 40, 0xffa040, 9, 0.6, 4, 1);
     this.particles(p, 30, 0x444038, 3, 1.4, -0.5, 1);
   },
   // The throw you're lining up: a dotted arc to where it goes off (G.Views.predictNade), and a ring there. Drawn
   // the frames it's called; cocked (pin out), brighter.
-  throwArc(pts, cocked) {
+  throwArc(pts: THREE.Vector3[], cocked: boolean) {
     if (!this._arc) {
       const N = 400, geo = new THREE.BufferGeometry();
       geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N * 3), 3));
@@ -657,17 +660,17 @@ const G_R = {
     A.dots.visible = A.ring.visible = true; A.f = this.frameNo;
   },
   // a flashbang going off: a blinding point of light and a burst of sparks
-  flashAt(p) {
+  flashAt(p: THREE.Vector3) {
     const l = this.muzzleLights[this.mlIdx = ((this.mlIdx || 0) + 1) % this.muzzleLights.length];
     if (l) { l.position.copy(p); l.color.setHex(0xffffff); l.intensity = 40; l.distance = 26; l.userData.t = 0.12; }
     this.particles(p, 30, 0xfff6d8, 5, 0.35, 2, 1.6);
   },
-  muzzleFlashAt(p, color = 0xffb060) {
+  muzzleFlashAt(p: THREE.Vector3, color = 0xffb060) {
     const l = this.muzzleLights[this.muzzleIdx]; this.muzzleIdx = (this.muzzleIdx + 1) % this.muzzleLights.length;
     l.position.copy(p); l.color.setHex(color); l.intensity = 2.5; l.userData.t = 0.05;
   },
   beginLasers() { this.laserUsed = 0; },
-  laser(a, b) {
+  laser(a: THREE.Vector3, b: THREE.Vector3) {
     const l = this.lasers[this.laserUsed++]; if (!l) return;
     const arr = l.geometry.attributes.position.array;
     arr[0] = a.x; arr[1] = a.y; arr[2] = a.z; arr[3] = b.x; arr[4] = b.y; arr[5] = b.z;
@@ -676,7 +679,7 @@ const G_R = {
   },
   endLasers() { for (let i = this.laserUsed; i < this.lasers.length; i++) this.lasers[i].visible = false; },
 
-  update(dt) {
+  update(dt: number) {
     for (const m of this.tracers) if (m.visible) {
       m.userData.life -= dt;
       if (m.userData.life <= 0) m.visible = false; else m.material.opacity = 0.9 * (m.userData.life / m.userData.max);
@@ -688,7 +691,7 @@ const G_R = {
       const k = 1 - b.userData.life / b.userData.max;
       b.scale.setScalar(0.3 + k * b.userData.r);
       b.material.opacity = (1 - k) * 0.8;
-      const l = this.blastLights.find((x) => x.userData.by === b);
+      const l = this.blastLights.find((x: THREE.PointLight) => x.userData.by === b);
       if (l) l.intensity = b.userData.life > 0 ? (1 - k) * 6 : 0;
       if (b.userData.life <= 0) { b.visible = false; if (l) l.userData.by = null; }
     }
@@ -731,7 +734,7 @@ const G_R = {
   // Render the world from the scope's ocular lens along its axis. The view is the lens's angular size (seen
   // from the eye) divided by the magnification, so things in the scope are exactly that much bigger than
   // the same things seen around it.
-  _renderPip(pip) {
+  _renderPip(pip: any) {
     const cam = this.camera, sc = this.scopeCam || (this.scopeCam = new THREE.PerspectiveCamera(10, 1, 0.05, 200));
     this.vmScene.updateMatrixWorld();
     pip.disk.matrixWorld.decompose(sc.position, sc.quaternion, this._pipScale || (this._pipScale = new THREE.Vector3()));
@@ -755,16 +758,16 @@ const G_R = {
   // (cases, a dropped magazine and box, a loot box, a wall spatter) put in for a moment.
   warmup() {
     if (!this.renderer || !this.scene || !this.camera) return 0;
-    const t0 = performance.now(), extras = [];
-    const put = (m) => { if (m) { m.position.set(0, -50, 0); this.dynRoot.add(m); extras.push(m); } };
+    const t0 = performance.now(), extras: THREE.Object3D[] = [];
+    const put = (m: THREE.Object3D) => { if (m) { m.position.set(0, -50, 0); this.dynRoot.add(m); extras.push(m); } };
     try {
       if (G.Casings.warm) for (const m of G.Casings.warm()) put(m);
       if (G.Loot.meshFor) { put(G.Loot.meshFor(G.Gear.pack(G.Gear.medItem('bandage')))); }
       put(new THREE.Mesh(new THREE.PlaneGeometry(1, 1), this.bloodMats.spatter));
-      if (G.Game.map) for (const m of G.Damage.warm(G.Game.map)) put(m);
+      if (G.Game.map) for (const m of G.Damage.warm(G.Game.map as unknown as Parameters<typeof G.Damage.warm>[0])) put(m);
     } catch (e) { console.warn('warmup', e); }
-    const hidden = [];
-    for (const sc of [this.scene, this.vmScene]) sc.traverse((o) => { if (!o.visible) { o.visible = true; hidden.push(o); } });
+    const hidden: THREE.Object3D[] = [];
+    for (const sc of [this.scene, this.vmScene]) sc.traverse((o: THREE.Object3D) => { if (!o.visible) { o.visible = true; hidden.push(o); } });
     try {
       this.renderer.compile(this.scene, this.camera); this.renderer.compile(this.vmScene, this.camera);
       // (and the scope's picture: anything drawn into a texture is a different shader from the same thing on the screen, for
@@ -772,7 +775,7 @@ const G_R = {
       this.pipTexture(); this.renderer.setRenderTarget(this.pipRT); this.renderer.compile(this.scene, this.camera); this.renderer.setRenderTarget(null);
     } catch (e) { console.warn('warmup', e); }
     for (const o of hidden) o.visible = false;
-    for (const m of extras) { m.removeFromParent(); m.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); }
+    for (const m of extras) { m.removeFromParent(); m.traverse((o: any) => { if (o.geometry) o.geometry.dispose(); }); }
     return performance.now() - t0;
   },
   render() {

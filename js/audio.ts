@@ -1,9 +1,9 @@
 'use strict';
 // Fully synthesized sound effects (no asset files needed).
 const G_Audio = {
-  ctx: null,
-  master: null,
-  noise: null,
+  ctx: null as unknown as AudioContext,
+  master: null as unknown as GainNode,
+  noise: null as unknown as AudioBuffer,
   vol: 0.6,
   muted: false,
   samples: {} as Record<string, AudioBuffer>,
@@ -33,7 +33,7 @@ const G_Audio = {
         .then((buf) => { this.samples[n] = buf; }).catch(() => {});
     }
   },
-  sample(name, vol = 0.7, rate = 1, dist = 0) {
+  sample(name: string, vol = 0.7, rate = 1, dist = 0) {
     const buf = this.ctx && this.samples[name];
     if (!buf) return false;
     vol /= 1 + dist * 0.12;
@@ -45,7 +45,7 @@ const G_Audio = {
   },
   // A recorded sound from a place in the world: panned in 3D (HRTF, against the listener that follows the
   // camera), quieter with distance, and muffled when there's a wall between you and it. pos: a Vector3.
-  sampleAt(name, pos, vol = 0.7, rate = 1) {
+  sampleAt(name: string, pos: THREE.Vector3, vol = 0.7, rate = 1) {
     const buf = this.ctx && this.samples[name], cam = G.R && G.R.camera;
     if (!buf) return false;
     if (!pos || !cam) return this.sample(name, vol, rate, 0);
@@ -60,10 +60,10 @@ const G_Audio = {
     s.connect(lp).connect(pan).connect(g); g.connect(this.master); s.start();
     return true;
   },
-  setVolume(v) { this.vol = v; if (this.master) this.master.gain.value = this.muted ? 0 : v; },
-  setMuted(m) { this.muted = m; this.setVolume(this.vol); },
+  setVolume(v: number) { this.vol = v; if (this.master) this.master.gain.value = this.muted ? 0 : v; },
+  setMuted(m: boolean) { this.muted = m; this.setVolume(this.vol); },
 
-  _noise(t, dur, f, q, gain, type = 'lowpass', fEnd) {
+  _noise(t: number, dur: number, f: number, q: number, gain: number, type: BiquadFilterType = 'lowpass', fEnd?: number) {
     const c = this.ctx;
     const src = c.createBufferSource();
     src.buffer = this.noise;
@@ -77,7 +77,7 @@ const G_Audio = {
     src.connect(flt); flt.connect(g); g.connect(this.master);
     src.start(t, Math.random() * 0.5); src.stop(t + dur + 0.05);
   },
-  tone(freq, dur, type = 'sine', gain = 0.2, freqEnd?, delay = 0) {
+  tone(freq: number, dur: number, type: OscillatorType = 'sine', gain = 0.2, freqEnd?: number | null, delay = 0) {
     if (!this.ctx) return;
     const c = this.ctx, t = c.currentTime + delay;
     const o = c.createOscillator();
@@ -91,7 +91,7 @@ const G_Audio = {
   },
 
   // dist = metres from the listener (0 for your own gun)
-  shot(snd, dist = 0) {
+  shot(snd: { vol: number; len: number; f: number; boom: number } | null | undefined, dist = 0) {
     if (!this.ctx || !snd) return;
     const now = this.ctx.currentTime;
     const att = 1 / (1 + dist * 0.07);
@@ -122,7 +122,7 @@ const G_Audio = {
     this.tone(140, 0.4, 'sine', 0.8 * att, 40);
   },
   // deafened (k 0..1): a high ringing that fades, and everything else muffled down and slowly coming back
-  deafen(k) {
+  deafen(k: number) {
     if (!this.ctx) return;
     const c = this.ctx, now = c.currentTime, dur = 1.5 + 5.5 * k;
     const o = c.createOscillator(), g = c.createGain();
@@ -145,7 +145,7 @@ const G_Audio = {
   dry() { this.tone(900, 0.04, 'square', 0.1); },
   reload() { this.tone(500, 0.05, 'square', 0.08); this.tone(320, 0.06, 'square', 0.08, null, 0.12); },
   shell() { this.tone(700, 0.04, 'square', 0.07); },
-  hit(head) {
+  hit(head: boolean) {
     if (head) { this.tone(2200, 0.12, 'sine', 0.22); this.tone(3300, 0.1, 'sine', 0.12); }
     else this.tone(1400, 0.05, 'square', 0.1);
   },
@@ -171,9 +171,9 @@ const G_Audio = {
   },
   // the iconic en-bloc clip ejecting from an empty Garand
   ping() { this.tone(2650, 0.35, 'sine', 0.14); this.tone(3980, 0.25, 'sine', 0.06); },
-  spinUp(t) { this.tone(140, t, 'sawtooth', 0.05, 520); },
+  spinUp(t: number) { this.tone(140, t, 'sawtooth', 0.05, 520); },
   // "POLICE!" — a barked, band-limited burst (no voice samples available); quieter from teammates
-  shout(from) {
+  shout(from: THREE.Vector3) {
     if (!this.ctx) return;
     const d = from && G.R ? G.R.camera.position.distanceTo(from) : 0, att = 1 / (1 + d * 0.08), t = this.ctx.currentTime;
     for (const [f, st] of [[620, 0], [480, 0.16], [700, 0.34]]) {
@@ -185,7 +185,7 @@ const G_Audio = {
     }
   },
   // a short barked command ("Turn around!"): two clipped syllables, lower than the full shout
-  order(from) {
+  order(from: THREE.Vector3) {
     if (!this.ctx) return;
     const d = from && G.R ? G.R.camera.position.distanceTo(from) : 0, att = 1 / (1 + d * 0.08), t = this.ctx.currentTime;
     for (const [f, st, len] of [[520, 0, 0.13], [430, 0.17, 0.2]]) {
@@ -211,12 +211,12 @@ const G_Audio = {
     zip: [[0.05, 'grab'], [0.38, 'thud'], [0.5, 'zipOut'], [0.84, 'zipTie']],
     bag: [[0.21, 'clink'], [0.33, 'rustle'], [0.5, 'rustle'], [0.63, 'tape'], [0.93, 'rustle']],
   },
-  foley(kind, from, to, dist = 0, living?) {
+  foley(kind: string, from: number, to: number, dist = 0, living?: any) {
     const list = this.FOLEY[kind];
     if (!list || !this.ctx || dist > 25) return;
-    for (const [at, snd] of list) if (from < at && to >= at) this[snd](dist); // bodies: the grab and the thud are the turn-over
+    for (const [at, snd] of list) if (from < at && to >= at) (this as Record<string, any>)[snd](dist); // bodies: the grab and the thud are the turn-over
   },
-  _att(dist) { return 1 / (1 + dist * 0.15); },
+  _att(dist: number) { return 1 / (1 + dist * 0.15); },
   // A spent case hitting something (js/casings.ts). Metal cases ring in a few inharmonic modes whose pitch
   // falls with the case's length (a 19 mm pistol case ~4.2 kHz, a 45 mm rifle case ~2.6 kHz, a 99 mm .50 case
   // ~1.3 kHz); steel rings lower and shorter, aluminium higher and deader. A shotgun hull is a hollow plastic
@@ -224,7 +224,7 @@ const G_Audio = {
   // little but a tap. speed: the impact speed (m/s); pan: -1 left .. 1 right of you.
   // ---------------------------------------------------------------- rounds going past and landing
   // a short filtered noise burst into a panner: the building block for cracks, zips and impacts
-  _burst(out, t, f, q, g, dur, type = 'bandpass', fEnd) {
+  _burst(out: AudioNode, t: number, f: number, q: number, g: number, dur: number, type: BiquadFilterType = 'bandpass', fEnd?: number) {
     if (!Number.isFinite(g) || !Number.isFinite(t)) return; // (a bad distance mustn't take down whatever made the sound)
     const c = this.ctx, src = c.createBufferSource(); src.buffer = this.noise; src.playbackRate.value = 0.9 + Math.random() * 0.2;
     const flt = c.createBiquadFilter(); flt.type = type; flt.frequency.setValueAtTime(f, t); flt.Q.value = q;
@@ -232,7 +232,7 @@ const G_Audio = {
     const gn = c.createGain(); gn.gain.setValueAtTime(Math.max(0.0006, g), t); gn.gain.exponentialRampToValueAtTime(0.0005, t + dur);
     src.connect(flt); flt.connect(gn); gn.connect(out); src.start(t, Math.random() * 0.5); src.stop(t + dur + 0.02);
   },
-  _out(pan) {
+  _out(pan: number) {
     const c = this.ctx, out = c.createStereoPanner ? c.createStereoPanner() : c.createGain();
     if (out.pan) out.pan.value = G.U.clamp(pan, -1, 1) * 0.85;
     out.connect(this.master);
@@ -240,7 +240,7 @@ const G_Audio = {
   },
   // A supersonic round passing: the shock wave's N-wave, a hard snap with almost no body, louder and sharper
   // the closer it passes (miss: metres). k: how big the round is (pistol ~0.55, rifle 1, .50 cal 1.5).
-  crack(miss, pan, k = 1) {
+  crack(miss: number, pan: number, k = 1) {
     if (!this.ctx) return;
     const t = this.ctx.currentTime, a = Math.min(1, 1.1 / (0.35 + miss)) * k, out = this._out(pan);
     this._burst(out, t, 4200, 0.6, 0.55 * a, 0.012, 'highpass');
@@ -248,14 +248,14 @@ const G_Audio = {
     if (k > 0.8) this._burst(out, t + 0.002, 700, 0.8, 0.22 * a * (k - 0.6), 0.05, 'lowpass'); // the heavier the round, the more it thumps
   },
   // A subsonic round passing: no crack, a quick falling zip of air
-  zip(miss, pan) {
+  zip(miss: number, pan: number) {
     if (!this.ctx) return;
     const t = this.ctx.currentTime, a = Math.min(1, 0.7 / (0.3 + miss)), out = this._out(pan);
     this._burst(out, t, 2600, 4, 0.18 * a, 0.16, 'bandpass', 700);
   },
   // A round landing near you, by what it hit: wall (plaster, concrete), wood (doors, furniture), metal, soft
   // ground (grass, earth, carpet), a body.
-  impact(mat, dist, pan) {
+  impact(mat: string, dist: number, pan: number) {
     if (!this.ctx) return;
     const t = this.ctx.currentTime, a = this._att(dist) * Math.min(1, 6 / (1 + dist)), out = this._out(Number.isFinite(pan) ? pan : 0);
     if (!(a >= 0.01)) return;
@@ -269,7 +269,7 @@ const G_Audio = {
     this._burst(out, t + 0.02, 5000, 0.5, 0.06 * a, 0.25, 'highpass');
   },
   // a round going off something, close by: the whine of it tumbling away, falling in pitch
-  ricochet(p) {
+  ricochet(p: THREE.Vector3) {
     const e = this._ear(p);
     if (!this.ctx || !e || e.d > 40) return;
     const c = this.ctx, t = c.currentTime, a = this._att(e.d) * Math.min(1, 8 / (1 + e.d)), f0 = 2200 + Math.random() * 1800, dur = 0.25 + Math.random() * 0.3;
@@ -280,7 +280,7 @@ const G_Audio = {
     o.connect(g); g.connect(this._out(e.pan)); o.start(t); o.stop(t + dur + 0.02);
   },
   // where you're listening from, and how far right of you a point is (-1 .. 1)
-  _ear(p) {
+  _ear(p: THREE.Vector3) {
     const cam = G.R && G.R.camera;
     if (!cam) return null;
     const rel = new THREE.Vector3().subVectors(p, cam.position), d = rel.length(), right = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0);
@@ -289,7 +289,7 @@ const G_Audio = {
   // A shot's path from `from` to `to`: if it passes close to you (and goes past or near you, not just
   // toward you from far behind), the crack, but only if it's still supersonic where it passes (its speed
   // from the gun, its load and how far it's come: G.roundSpeed); slower, a zip of air. am: the load.
-  flyby(from, to, def, am) {
+  flyby(from: THREE.Vector3, to: THREE.Vector3, def: any, am: string) {
     if (!this.ctx || !def || def.explosive || def.cls === 'BOW' || def.cls === 'GL') return;
     const e = this._ear(from);
     if (!e) return;
@@ -302,11 +302,11 @@ const G_Audio = {
     if (v < 60) return;
     if (v <= G.SOUND_SPEED) return this.zip(miss, pe.pan);
     // the crack: bigger rounds louder (and the heavy ones thump), barely-supersonic ones softer
-    const size = def.cls === 'RAIL' ? 1.6 : ['12.7/99', '8.6/69'].includes(cal) ? 1.5 : am !== 'slug' && def.cls === 'SG' ? 0.5 : (G.CALIBERS[cal] || {}).group === 'pistol' ? 0.6 : 1;
+    const size = def.cls === 'RAIL' ? 1.6 : ['12.7/99', '8.6/69'].includes(cal) ? 1.5 : am !== 'slug' && def.cls === 'SG' ? 0.5 : ((G.CALIBERS as Record<string, any>)[cal] || {}).group === 'pistol' ? 0.6 : 1;
     this.crack(miss, pe.pan, size * G.U.clamp((v / G.SOUND_SPEED - 1) * 3, 0.35, 1));
   },
   // a round's impact point: heard if it's close, as whatever it hit
-  impactAt(p, kind, fx) {
+  impactAt(p: THREE.Vector3, kind: string, fx?: string) {
     const e = this._ear(p);
     if (!e || e.d > 15) return;
     let mat = 'wall';
@@ -323,12 +323,12 @@ const G_Audio = {
   },
   // pos: where it landed (a Vector3): placed there in 3D (HRTF against the listener that follows the camera: left and
   // right, in front and behind, above and below), muffled if there's a wall between you and it. Without it, just a pan.
-  casing(dist, mat, len, surf, speed, pan = 0, pos = null) {
+  casing(dist: number, mat: string, len: number, surf: string, speed: number, pan = 0, pos: THREE.Vector3 | null = null) {
     if (!this.ctx) return;
     const c = this.ctx, t = c.currentTime, soft = surf === 'carpet' || surf === 'grass';
     const a = this._att(dist) * Math.min(1, speed / 2.2) * (soft ? 0.3 : 1);
     if (a < 0.004) return;
-    let out;
+    let out: any;
     const cam = pos && G.R && G.R.camera;
     if (cam) {
       const map = G.Game && G.Game.map, blocked = map && !G.Level.los(map, cam.position.x, cam.position.y, cam.position.z, pos.x, pos.y + 0.03, pos.z);
@@ -342,7 +342,7 @@ const G_Audio = {
       if (out.pan) out.pan.value = pan * 0.8;
       out.connect(this.master);
     }
-    const strike = (f, q, g, dur) => {
+    const strike = (f: number, q: number, g: number, dur: number) => {
       const src = c.createBufferSource(); src.buffer = this.noise;
       const flt = c.createBiquadFilter(); flt.type = 'bandpass'; flt.frequency.value = f; flt.Q.value = q;
       const gn = c.createGain(); gn.gain.setValueAtTime(g, t); gn.gain.exponentialRampToValueAtTime(0.0005, t + dur);

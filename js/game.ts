@@ -1,8 +1,22 @@
 'use strict';
 // Glue: menus, lobby, phase transitions, message dispatch, pointer lock, main loop.
+// a DOM event whose target is known to be an element of type T (the handlers below are bound on a container, and read what was clicked)
+type GmEvt<T extends Element = HTMLElement> = Event & { target: T };
+// the attachments box's wheels (one per part on offer): a strip of faces scrolling, a stop easing out onto one, then landed
+interface GmWheel { landed: boolean; stop: { t0: number; o0: number; o1: number; T: number } | null; off: number; strip: string[] | null }
+interface GmAboxUI { key: string; wheels: GmWheel[]; hover?: string }
+// a first aid cabinet as the host sends it: [open, [[item, count, x, y, rotated]...], version]
+type GmCabItem = [string, number, number, number, number];
+type GmCab = [number, GmCabItem[], number?];
+// a team locker item: [tid, x, y, rotated, packed item]
+type GmTeamItem = [string, number, number, number, string];
+// the host's route: its seed and act (the map is rebuilt from them), the path taken, and each player's vote
+interface GmRoute { seed: number; act: number; path?: number[]; votes?: Record<string, number> }
+// the mission report the shop shows (more fields than these; only these are read here)
+interface GmReport { civKilled: number; unauth: number; allRescued?: boolean; [k: string]: any }
 const G_Game = {
   phase: 'menu',
-  map: null,
+  map: null as LvMap | null,
   level: 0,
   roster: {} as Record<string, any>,
   extract: { active: false, votes: 0, need: 0, civDead: 0, voted: false }, // order restored; the vote to leave
@@ -43,8 +57,8 @@ const G_Game = {
   },
 
   // ------------------------------------------------------------- menu UI
-  $(id) { return document.getElementById(id); },
-  screen(id) {
+  $(id: string) { return document.getElementById(id)!; },
+  screen(id: string | null) {
     for (const s of ['menu', 'lobby', 'shop', 'route', 'gameover', 'pause']) this.$(s).classList.toggle('hidden', s !== id);
     G.HUD.show(this.phase === 'level');
   },
@@ -53,7 +67,7 @@ const G_Game = {
   // done. So the host sends the panel across first (G.Server.overBlack) and does it there, and the panel wipes on off
   // the bottom once the new place has drawn a few frames (js/views.ts applySnap).
   VEIL_MS: 350, VEIL_OUT: 650,
-  veil(on, instant) {
+  veil(on: boolean, instant?: boolean) {
     const el = this.$('veil'), was = el.classList.contains('on');
     if (!on && !was && !instant) return; // (not up, or already on its way off)
     clearTimeout(this.veilT); this.veilN = 0;
@@ -68,7 +82,7 @@ const G_Game = {
   },
   // The line under it: what's being done now, the last one turning down out of sight. It can only change between the
   // long steps: they don't let the page draw. (Called while it's down, it does nothing. No text: the last one goes, and nothing comes.)
-  veilSay(text) {
+  veilSay(text: string | null) {
     const box = this.$('veilStatus');
     if (!this.$('veil').classList.contains('on') || this.veilLine === text && box.lastElementChild) return;
     this.veilLine = text;
@@ -79,17 +93,17 @@ const G_Game = {
   // ------------------------------------------------------------- your look (top, pants, eyewear, gloves)
   // the menu's options, a preview of you, and your own arms in first person
   bindLook() {
-    const L = this.myLook, O = G.Rig.LOOKS, NAMES = { combat: 'Combat', longsleeve: 'Long-sleeve', tshirt: 'T-shirt', hoodie: 'Hoodie', cargo: 'Cargo', jeans: 'Jeans', none: 'None', glasses: 'Glasses', shooting: 'Shooting glasses', goggles: 'Goggles', tactical: 'Tactical', leather: 'Leather', fingerless: 'Fingerless' };
+    const L = this.myLook, O = G.Rig.LOOKS as Record<string, string[]>, NAMES: Record<string, string> = { combat: 'Combat', longsleeve: 'Long-sleeve', tshirt: 'T-shirt', hoodie: 'Hoodie', cargo: 'Cargo', jeans: 'Jeans', none: 'None', glasses: 'Glasses', shooting: 'Shooting glasses', goggles: 'Goggles', tactical: 'Tactical', leather: 'Leather', fingerless: 'Fingerless' };
     const TOPC = [0x3a4048, 0x4d5639, 0x5a5240, 0x26282c, 0x2e3a52, 0x6a6e70, 0x7a2e2a, 0xb8b0a0], PANTC = [0x2e3238, 0x4d5639, 0x5a5240, 0x1f2226, 0x2b3550, 0x6b5b45, 0x3a3a3c];
-    const sel = (k, label) => `<label>${label}<select data-look="${k}">${O[k].map((v) => `<option value="${v}"${L[k] === v ? ' selected' : ''}>${NAMES[v] || v}</option>`).join('')}</select></label>`;
-    const sw = (k, cols) => `<div class="color-row look-row">${cols.map((c) => `<button class="sw${L[k] === c ? ' on' : ''}" data-lookc="${k}" data-c="${c}" style="background:${G.U.hex(c)}"></button>`).join('')}</div>`;
+    const sel = (k: string, label: string) => `<label>${label}<select data-look="${k}">${O[k].map((v) => `<option value="${v}"${L[k] === v ? ' selected' : ''}>${NAMES[v] || v}</option>`).join('')}</select></label>`;
+    const sw = (k: string, cols: number[]) => `<div class="color-row look-row">${cols.map((c) => `<button class="sw${L[k] === c ? ' on' : ''}" data-lookc="${k}" data-c="${c}" style="background:${G.U.hex(c)}"></button>`).join('')}</div>`;
     this.$('lookBox').innerHTML = `<div class="look-grid"><div>${sel('top', 'Top')}${sw('topC', TOPC)}${sel('pants', 'Pants')}${sw('pantsC', PANTC)}${sel('eyes', 'Eyewear')}${sel('gloves', 'Gloves')}</div><canvas id="lookPreview" width="150" height="230"></canvas></div>`;
     const save = () => { G.U.store.set('look', this.myLook); this.lookPreview(); this.applyLook(); };
-    this.$('lookBox').addEventListener('change', (e) => { const k = e.target.dataset.look; if (k) { this.myLook[k] = e.target.value; save(); } });
-    this.$('lookBox').addEventListener('click', (e) => {
-      const b = e.target.closest('[data-lookc]'); if (!b) return;
-      this.myLook[b.dataset.lookc] = +b.dataset.c;
-      b.parentElement.querySelectorAll('.sw').forEach((x) => x.classList.toggle('on', x === b));
+    this.$('lookBox').addEventListener('change', (e: GmEvt<HTMLSelectElement>) => { const k = e.target.dataset.look; if (k) { this.myLook[k] = e.target.value; save(); } });
+    this.$('lookBox').addEventListener('click', (e: GmEvt) => {
+      const b = e.target.closest<HTMLElement>('[data-lookc]'); if (!b) return;
+      this.myLook[b.dataset.lookc!] = +b.dataset.c!;
+      b.parentElement!.querySelectorAll('.sw').forEach((x) => x.classList.toggle('on', x === b));
       save();
     });
     this.lookPreview();
@@ -109,7 +123,7 @@ const G_Game = {
       const spin = () => {
         if (!this._lp) return;
         const lp = this._lp;
-        if (lp.rig && !document.getElementById('menu').classList.contains('hidden')) {
+        if (lp.rig && !document.getElementById('menu')!.classList.contains('hidden')) {
           lp.yaw += 0.008; // (turning all the way round: the name patch on the back too)
           lp.rig.update(1 / 60, { pos: new THREE.Vector3(0, 0, 0), yaw: Math.PI + lp.yaw, pitch: 0, crouch: false, alert: false });
           lp.r.render(lp.sc, lp.cam);
@@ -125,7 +139,7 @@ const G_Game = {
     lp.sc.add(lp.rig.root);
   },
   // your callsign (picked in the menu, or the host's pick for you when yours was taken)
-  setAnimal(id, keep) {
+  setAnimal(id: string, keep?: boolean) {
     if (!G.Callsigns.valid(id) || id === this.myAnimal) return;
     this.myAnimal = id; this.myColor = G.Callsigns.of(id).color;
     if (keep) G.U.store.set('animal', id);
@@ -137,23 +151,23 @@ const G_Game = {
     if (!M) return;
     const SKIN = 0xc89a78;
     M.fabric().color.setHex(L.top === 'tshirt' ? SKIN : L.topC);
-    M.glove().color.setHex({ tactical: 0x1b1c1e, leather: 0x5e3e24, fingerless: 0x1b1c1e }[L.gloves] || SKIN);
+    M.glove().color.setHex(({ tactical: 0x1b1c1e, leather: 0x5e3e24, fingerless: 0x1b1c1e } as Record<string, number>)[L.gloves] || SKIN);
   },
   bindMenu() {
     this.bindLook();
-    this.$('routeMap').addEventListener('click', (e) => { const g = e.target.closest('[data-node]'); if (g) this.pickRoute(+g.dataset.node); });
+    this.$('routeMap').addEventListener('click', (e: GmEvt) => { const g = e.target.closest<HTMLElement>('[data-node]'); if (g) this.pickRoute(+g.dataset.node!); });
     const name = this.$('nameInput');
     name.value = this.myName;
     name.addEventListener('input', () => { this.myName = name.value.trim().slice(0, 16) || 'Operator'; G.U.store.set('name', this.myName); if (this._lp && this._lp.rig) this._lp.rig.setCallsign(this.myAnimal, this.myName); });
     const row = this.$('colorRow');
     row.innerHTML = G.Callsigns.LIST.map((a) => `<button class="sw animal${a.id === this.myAnimal ? ' on' : ''}" data-a="${a.id}" title="${a.name}">${G.Callsigns.html(a.id)}<span style="color:${G.U.hex(a.color)}">${a.name}</span></button>`).join('');
-    row.addEventListener('click', (e) => {
-      const b = e.target.closest('.sw'); if (!b) return;
-      this.setAnimal(b.dataset.a, true);
-      row.querySelectorAll('.sw').forEach((x) => x.classList.toggle('on', x === b));
+    row.addEventListener('click', (e: GmEvt) => {
+      const b = e.target.closest<HTMLElement>('.sw'); if (!b) return;
+      this.setAnimal(b.dataset.a!, true);
+      row.querySelectorAll('.sw').forEach((x: Element) => x.classList.toggle('on', x === b));
     });
 
-    const bindRange = (ids, key, fmt, apply?) => {
+    const bindRange = (ids: string[], key: string, fmt: (v: number) => string, apply?: (v: number) => void) => {
       ids.forEach((id) => {
         const el = this.$(id);
         el.value = this.settings[key];
@@ -176,12 +190,12 @@ const G_Game = {
     this.$('btnHost').onclick = () => this.host();
     this.$('btnSolo').onclick = () => this.solo();
     this.$('btnJoin').onclick = () => this.join();
-    this.$('joinCode').addEventListener('keydown', (e) => { if (e.key === 'Enter') this.join(); });
+    this.$('joinCode').addEventListener('keydown', (e: KeyboardEvent) => { if (e.key === 'Enter') this.join(); });
     this.$('joinCode').value = G.U.store.get('lastCode', ''); // (the last game you joined)
     this.$('btnLan').onclick = () => this.lanScan();
     // a highlights recording (a .zip the hangar's TVs saved) made into a video, here (js/highlights.ts renderPack)
     this.$('btnRender').onclick = () => this.$('hlFile').click();
-    this.$('hlFile').onchange = (e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) this.renderHighlights(f); };
+    this.$('hlFile').onchange = (e: GmEvt<HTMLInputElement>) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) this.renderHighlights(f); };
     this.$('btnRenderStop').onclick = () => G.Highlights.cancelRender();
     // your own relay server, if you have one (used for every connection from now on: js/net.ts opts)
     { const t = G.U.store.get('turn', {}) || {}, save = () => G.U.store.set('turn', { url: this.$('turnUrl').value.trim(), user: this.$('turnUser').value.trim(), pass: this.$('turnPass').value });
@@ -235,7 +249,7 @@ const G_Game = {
   },
   // A shop panel (the same ones a menu would show: the stock, the gunsmith, your stash and loadout, supplies), opened
   // from a point of sale in the hangar. The world carries on behind it; you stand where you are.
-  openShop(tab, title) {
+  openShop(tab?: string, title?: string) {
     if (!this.hub || this.shopOpen) return;
     this.shopOpen = true;
     G.Me.keys = {}; G.Me.mouse.l = G.Me.mouse.r = false;
@@ -256,7 +270,7 @@ const G_Game = {
     this.lock();
     setTimeout(() => { if (!this.locked && !this.shopOpen && this.phase === 'level') this.$('clickToPlay').classList.remove('hidden'); }, 300);
   },
-  setMuted(m) {
+  setMuted(m: boolean) {
     G.Audio.setMuted(m);
     G.U.store.set('muted', m);
     this.$('mute').checked = m;
@@ -278,7 +292,7 @@ const G_Game = {
   },
   // Tab in a level: your kit and health (and the scoreboard), the mouse freed to move things about. You stand
   // still while it's open; the level doesn't stop.
-  toggleInv(open, opts?) {
+  toggleInv(open: boolean, opts?: { patient?: string; cab?: number }) {
     if (!!open === !!this.invOpen) return;
     this.invOpen = !!open;
     this.$('fieldInv').classList.toggle('hidden', !open);
@@ -304,7 +318,7 @@ const G_Game = {
       if (p && p.catch) p.catch(() => { try { c.requestPointerLock(); } catch (e) { /* ignore */ } });
     } catch (e) { try { c.requestPointerLock(); } catch (e2) { /* ignore */ } }
   },
-  msg(id, text, err) { const el = this.$(id); el.textContent = text; el.classList.toggle('err', !!err); },
+  msg(id: string, text: string, err?: boolean) { const el = this.$(id); el.textContent = text; el.classList.toggle('err', !!err); },
 
   host() {
     G.Audio.init();
@@ -354,12 +368,12 @@ const G_Game = {
       btn.disabled = false; btn.textContent = 'Find LAN games';
       if (games == null) { list.innerHTML = '<small class="dim">Could not tell which network you are on (offline, or WebRTC blocked).</small>'; return; }
       if (!games.length) { list.innerHTML = '<small class="dim">No games hosted on your network.</small>'; return; }
-      const PH = { lobby: 'in the lobby', route: 'picking a route', level: 'mid-level', shop: 'in the shop' };
+      const PH: Record<string, string> = { lobby: 'in the lobby', route: 'picking a route', level: 'mid-level', shop: 'in the shop' };
       list.innerHTML = games.map((g) => `<button class="btn small lan-game" data-code="${G.U.esc(g.code)}"><b>${G.U.esc(g.name)}</b> · ${g.players} in squad${PH[g.phase] ? ' · ' + PH[g.phase] : ''} <span class="dim">${G.U.esc(g.code)}</span></button>`).join('');
-      list.querySelectorAll('[data-code]').forEach((b) => (b.onclick = () => { this.$('joinCode').value = b.dataset.code; this.join(); }));
+      list.querySelectorAll('[data-code]').forEach((b: HTMLElement) => (b.onclick = () => { this.$('joinCode').value = b.dataset.code; this.join(); }));
     });
   },
-  rejoin(code, until) {
+  rejoin(code: string | null, until: number) {
     if (!code || this.phase !== 'menu' || G.Net.peer || Date.now() > until) { if (this.phase === 'menu' && !G.Net.peer && code) this.msg('menuMsg', 'Lost connection to the host.', true); return; }
     this.$('joinCode').value = code;
     G.Net.join(code, (err) => {
@@ -368,7 +382,7 @@ const G_Game = {
       if (this.phase === 'menu') { this.msg('menuMsg', 'Lost connection to the host. Reconnecting...'); setTimeout(() => this.rejoin(code, until), 3000); }
     });
   },
-  async renderHighlights(file) {
+  async renderHighlights(file: File) {
     const msg = this.$('hlMsg'), btn = this.$('btnRender'), stop = this.$('btnRenderStop'), bar = this.$('hlBar'), prog = bar.parentElement;
     btn.disabled = true; stop.classList.remove('hidden'); prog.classList.remove('hidden'); bar.style.width = '0%'; msg.classList.remove('bad');
     try {
@@ -380,7 +394,7 @@ const G_Game = {
     }
     btn.disabled = false; stop.classList.add('hidden'); prog.classList.add('hidden');
   },
-  setBusy(b) { ['btnHost', 'btnSolo', 'btnJoin'].forEach((id) => (this.$(id).disabled = b)); },
+  setBusy(b: boolean) { ['btnHost', 'btnSolo', 'btnJoin'].forEach((id) => (this.$(id).disabled = b)); },
   afterConnect() {
     this.msg('menuMsg', '');
     if (G.Net.isHost) G.Server.reset();
@@ -389,7 +403,7 @@ const G_Game = {
     this.runStarted = false;
     G.Net.toHost({ t: 'hello', name: this.myName, animal: this.myAnimal, look: this.myLook });
   },
-  toMenu(reason) {
+  toMenu(reason?: string) {
     G.Net.leave();
     G.Server.reset();
     G.Views.clearAll();
@@ -412,22 +426,22 @@ const G_Game = {
   },
 
   // ------------------------------------------------------------- messages
-  onMsg(m) {
+  onMsg(m: any) {
     switch (m.t) {
       case 'welcome':
         G.Stickers.joined(m.skins); // (the stickers on the squad's guns: js/stickers.ts)
         this.roster = m.roster;
-        if (this.roster[G.Net.myId]) this.setAnimal(this.roster[G.Net.myId].animal);
+        if (this.roster[G.Net.myId!]) this.setAnimal(this.roster[G.Net.myId!].animal);
         G.Views.syncRoster(this.roster);
         if (m.route) this.setRoute(m.route);
         if (m.phase === 'route') this.enterRoute(m.level, m.route);
         else if (m.phase === 'level') {
           this.enterLevel(m.level, m.seed, m.th);
-          if (m.doors) m.doors.forEach((o, i) => { const d = this.map.doors[i]; if (d && d.open !== !!o) { d.open = !!o; G.World.door(this.map.world, this.map, d); } });
+          if (m.doors) m.doors.forEach((o: number, i: number) => { const d = this.map.doors[i]; if (d && d.open !== !!o) { d.open = !!o; G.World.door(this.map.world, this.map, d); } });
           if (m.holes) for (const h of m.holes) G.Damage.apply(this.map, h); // (what's been shot out of the place)
           if (m.fallen) for (const [i, ang, dir, seed] of m.fallen) G.Damage.fall(this.map, this.map.doors[i], ang, dir, seed, true);
-          if (m.evidence) m.evidence.forEach(([i, wpn, x, z, sec, y]) => { G.Views.addEvidence(i, wpn, x, z, y); if (sec) G.Views.secureEvidence(i); });
-          if (m.bodies) m.bodies.forEach(([id, type, x, z, yaw, sec, y]) => G.Views.addBody(id, type, x, z, yaw, sec, y));
+          if (m.evidence) m.evidence.forEach(([i, wpn, x, z, sec, y]: [number, string, number, number, number, number]) => { G.Views.addEvidence(i, wpn, x, z, y); if (sec) G.Views.secureEvidence(i); });
+          if (m.bodies) m.bodies.forEach(([id, type, x, z, yaw, sec, y]: [number, string, number, number, number, number, number]) => G.Views.addBody(id, type, x, z, yaw, sec, y));
           this.setCase(m.wcase); this.abox = m.abox || null; this.sbox = m.sbox || null;
           this.cabs = m.cabs || []; G.Views.syncCabs();
           G.Loot.clear(); for (const a of m.loot || []) G.Loot.add(...(a as [any, any, any, any, any, any, any]));
@@ -440,7 +454,7 @@ const G_Game = {
         // someone else just readied up: a chime and a line saying so
         const prev = this.roster || {};
         this.roster = m.roster;
-        if (this.roster[G.Net.myId]) this.setAnimal(this.roster[G.Net.myId].animal); // (yours was taken: the host's pick)
+        if (this.roster[G.Net.myId!]) this.setAnimal(this.roster[G.Net.myId!].animal); // (yours was taken: the host's pick)
         for (const [id, r] of Object.entries(this.roster)) if (id !== G.Net.myId && r.ready && prev[id] && !prev[id].ready) this.readyNote(r);
         G.Views.syncRoster(this.roster);
         if (this.phase === 'lobby') this.renderLobby();
@@ -471,7 +485,7 @@ const G_Game = {
       case 'dfall': { // (shot off its hinges)
         const d = this.map && this.phase === 'level' ? this.map.doors[m.i] : null;
         if (!d) break;
-        if (G.Highlights) G.Highlights.door(m.i, 1, 0, m.f);
+        if (G.Highlights) G.Highlights.door(m.i, 1 as unknown as boolean, 0 as unknown as boolean, m.f);
         G.Damage.fall(this.map, d, ...(m.f as [any, any, any, any]));
         break;
       }
@@ -602,7 +616,7 @@ const G_Game = {
         break;
       }
       case 'cuffed': {
-        const def = G.ENEMIES[m.ty];
+        const def = (G.ENEMIES as Record<string, any>)[m.ty];
         const ev = G.Views.enemies.get(m.e);
         if (m.body) {
           if (ev) { ev.bodySecured = true; ev.rig.zip(!m.civ); }
@@ -634,22 +648,22 @@ const G_Game = {
         break;
     }
   },
-  playerPos(id) {
+  playerPos(id: string) {
     const pv = G.Views.players.get(id);
     return pv ? pv.pos.clone().setY(1.6) : null;
   },
-  nameOf(id) { return id === G.Net.myId ? this.myName : this.roster[id] ? this.roster[id].name : '???'; },
-  readyNote(r) {
+  nameOf(id: string): string { return id === G.Net.myId ? this.myName : this.roster[id] ? this.roster[id].name : '???'; },
+  readyNote(r: { name: string }) {
     G.Audio.tone(660, 0.08, 'sine', 0.09); G.Audio.tone(990, 0.12, 'sine', 0.09, undefined, 0.09); // (a rising two-note chime)
     G.HUD.chat(null, 0, `${r.name} is ready`);
     this.lobbyChat(`${r.name} is ready`);
   },
-  lobbyChat(text) {
+  lobbyChat(text: string) {
     const el = this.phase === 'lobby' ? this.$('lobbyMsg') : this.$('vendorQuip');
     if (this.phase === 'lobby') el.textContent = text;
   },
 
-  onBoom(m) {
+  onBoom(m: any) {
     if (this.phase !== 'level') return;
     const p = new THREE.Vector3(m.p[0], m.p[1], m.p[2]);
     if (m.id !== G.Net.myId) { G.R.explosion(p, m.r); G.Audio.boom(G.R.camera.position.distanceTo(p)); }
@@ -662,7 +676,7 @@ const G_Game = {
   },
   // A flashbang went off (the host's word: everyone hears and sees it). On you: blinded by how close it was, and
   // how squarely you were looking at it (with it out of sight, not at all); deafened by how close, wall or no wall.
-  onFlash(m) {
+  onFlash(m: any) {
     if (this.phase !== 'level' || !Array.isArray(m.p)) return;
     const p = new THREE.Vector3(m.p[0], m.p[1], m.p[2]), cam = G.R.camera, eye = cam.position, d = eye.distanceTo(p);
     G.R.flashAt(p);
@@ -676,26 +690,26 @@ const G_Game = {
     if (blind > 0.03) G.HUD.flash(blind);
     if (deaf > 0.03) G.Audio.deafen(deaf);
   },
-  onKill(m) {
+  onKill(m: any) {
     if (this.phase !== 'level') return;
     G.Views.kill(m);
     if (G.Highlights) G.Highlights.kill(m);
     if (m.inc) { // (down already: counted then, js/server.ts incapacitate)
-      const def = G.ENEMIES[m.ty];
+      const def = (G.ENEMIES as Record<string, any>)[m.ty];
       if (m.bo) G.HUD.feed(`<span class="dim">${def ? def.name : 'Suspect'} bled out</span>`);
       return;
     }
     this.credit(m);
   },
   // A suspect incapacitated (down for good): counted now, the same as a kill
-  onIncap(m) {
+  onIncap(m: any) {
     if (this.phase !== 'level') return;
     if (G.Highlights) G.Highlights.incap(m);
     this.credit(m);
   },
   // the feed and, for whoever did it, the credits and their tally: a kill, or a suspect incapacitated
-  credit(m) {
-    const Me = G.Me, def = G.ENEMIES[m.ty];
+  credit(m: any) {
+    const Me = G.Me, def = (G.ENEMIES as Record<string, any>)[m.ty];
     const killer = this.nameOf(m.by);
     const kc = m.by === G.Net.myId ? '#ffd24a' : this.roster[m.by] ? G.U.hex(this.roster[m.by].color) : '#fff';
     G.HUD.feed(`<b style="color:${kc}">${G.U.esc(killer)}</b> ${m.h ? '<span class="hs">⌖</span>' : '✕'} ${def ? def.name : 'hostile'}`);
@@ -746,13 +760,13 @@ const G_Game = {
     else this.$('lobbyMsg').textContent = 'Share the code. Friends can also join between levels.';
   },
   // the guns this level's suspects could be carrying (its gear tier and one either side)
-  enemyGuns(level) {
-    const t = G.gearTier(level), out = new Set();
+  enemyGuns(level: number) {
+    const t = G.gearTier(level), out = new Set<string>();
     for (const pools of Object.values(G.ENEMY_GEAR.weapons)) for (let i = Math.max(1, t - 1); i <= Math.min(4, t + 1); i++) pools[i - 1].forEach((w) => out.add(w));
     return [...out];
   },
   // whether the level's weapon case has been opened
-  setCase(open) {
+  setCase(open: boolean) {
     this.caseOpen = !!open;
     G.Views.syncCase();
   },
@@ -762,8 +776,8 @@ const G_Game = {
   // slows and lands on what the host rolled (the result's the host's: stopping only shows it); looking again, they've
   // landed. A landed one can be fitted straight to the weapon in your hands (if it goes on it as it's built) or carried:
   // one of your three.
-  aboxMine() { return this.abox && this.abox[1] && this.abox[1][G.Net.myId] || null; },
-  aboxShow(spin) {
+  aboxMine() { return this.abox && this.abox[1] && this.abox[1][G.Net.myId!] || null; },
+  aboxShow(spin: boolean) {
     const mine = this.aboxMine();
     if (this.phase !== 'level' || !mine) return;
     const key = mine[0].join(','), ui = this.aboxUI && this.aboxUI.key === key ? this.aboxUI : null;
@@ -774,8 +788,8 @@ const G_Game = {
       while (pool.length < 6) pool.push(GS.LIST[(Math.random() * GS.LIST.length) | 0].id); // (something to spin through)
       const live = pool.filter((pid) => GS.PARTS[pid] && !GS.PARTS[pid].retired), R = this.REEL;
       // each reel: M faces (shuffled), three times over, so it can scroll down a full turn and still have faces to stop on
-      for (const wh of this.aboxUI.wheels) {
-        const one = []; for (let i = 0; i < R.M; i++) one.push(live[(Math.random() * live.length) | 0]);
+      for (const wh of this.aboxUI.wheels as GmWheel[]) {
+        const one: string[] = []; for (let i = 0; i < R.M; i++) one.push(live[(Math.random() * live.length) | 0]);
         wh.strip = one.concat(one, one); wh.off = Math.random() * R.M * R.H;
       }
     }
@@ -785,10 +799,10 @@ const G_Game = {
     if (document.pointerLockElement) document.exitPointerLock();
     const el = this.$('aboxPick');
     el.classList.remove('hidden');
-    if (!el.dataset.bound) { el.dataset.bound = 1; el.addEventListener('click', (e) => this.aboxClick(e)); el.addEventListener('mouseover', (e) => this.aboxHover(e)); }
+    if (!el.dataset.bound) { el.dataset.bound = 1; el.addEventListener('click', (e: GmEvt) => this.aboxClick(e)); el.addEventListener('mouseover', (e: GmEvt) => this.aboxHover(e)); }
     this.aboxRender();
     cancelAnimationFrame(this.aboxRaf); this.aboxT = 0;
-    if (this.aboxUI.wheels.some((wh) => !wh.landed)) this.aboxRaf = requestAnimationFrame((t) => this.aboxSpin(t));
+    if (this.aboxUI.wheels.some((wh: GmWheel) => !wh.landed)) this.aboxRaf = requestAnimationFrame((t) => this.aboxSpin(t));
     if (spin) G.Audio.click();
   },
   // a reel: faces H px tall, M to a turn, scrolling down at V px/s, the window WH tall (the faces either side peek in);
@@ -804,22 +818,22 @@ const G_Game = {
     setTimeout(() => { if (!this.locked && !this.invOpen && !this.aboxOpen && this.phase === 'level') this.$('clickToPlay').classList.remove('hidden'); }, 300);
   },
   // a part's face in a wheel: its picture, its name, the slot it goes in
-  aboxFace(pid) {
+  aboxFace(pid: string) {
     const GS = G.Gunsmith, p = GS.PARTS[pid], it = G.Gear.partItem(pid), [cw, ch] = G.Gear.size(it);
     this.aboxIcons = this.aboxIcons || {};
     const img = this.aboxIcons[pid] || (this.aboxIcons[pid] = G.Icons.of(it, cw, ch, false));
     return `<img src="${img}" alt=""><b>${G.U.esc(p ? p.name : pid)}</b><small>${G.U.esc(p ? GS.SLOT_LABEL[p.slot] || p.slot : '')}</small>`;
   },
   // which slot of the weapon in your hands a part goes straight into (as it's built), or null
-  aboxSlot(pid) {
+  aboxSlot(pid: string) {
     const GS = G.Gunsmith, p = GS.PARTS[pid], w = G.Me.cur();
-    return p && w ? GS.slotsOf(w.def.id, w.def.build).find((sl) => GS.fitsSlot(sl, p, w.def.id)) || null : null;
+    return p && w ? GS.slotsOf(w.def.id, w.def.build).find((sl: ReturnType<typeof GS.slotsOf>[number]) => GS.fitsSlot(sl, p, w.def.id)) || null : null;
   },
   aboxRender() {
-    const el = this.$('aboxPick'), mine = this.aboxMine(), ui = this.aboxUI;
+    const el = this.$('aboxPick'), mine = this.aboxMine(), ui: GmAboxUI | null = this.aboxUI;
     if (!el || !mine || !ui) return;
     const w = G.Me.cur(), taken = mine[1], spinning = ui.wheels.some((wh) => !wh.landed);
-    const card = (pid, i) => {
+    const card = (pid: string, i: number) => {
       const wh = ui.wheels[i], p = G.Gunsmith.PARTS[pid], landed = wh.landed;
       const sl = landed && this.aboxSlot(pid);
       const acts = taken ? (taken === pid ? '<small>Taken</small>' : '')
@@ -836,15 +850,15 @@ const G_Game = {
     this.aboxPlace();
   },
   // over a pick that's landed: what fitting it would do to the weapon in your hands (the gunsmith's stats, as they'd be)
-  aboxHover(e) {
-    const card = e.target.closest('[data-wheel]'), mine = this.aboxMine(), ui = this.aboxUI;
+  aboxHover(e: GmEvt) {
+    const card = e.target.closest<HTMLElement>('[data-wheel]'), mine = this.aboxMine(), ui: GmAboxUI | null = this.aboxUI;
     if (!card || !mine || !ui) return;
-    const i = +card.dataset.wheel, pid = ui.wheels[i] && ui.wheels[i].landed ? mine[0][i] : null;
+    const i = +card.dataset.wheel!, pid = ui.wheels[i] && ui.wheels[i].landed ? mine[0][i] : null;
     if (!pid || pid === ui.hover) return;
     ui.hover = pid;
     const box = this.$('aboxPick').querySelector('.abox-stats'); if (box) box.innerHTML = this.aboxStatsFor(pid); // (the box is drawn afresh as its wheels land: not a kept element)
   },
-  aboxStatsFor(pid) {
+  aboxStatsFor(pid: string | undefined) {
     const GS = G.Gunsmith, p = pid && GS.PARTS[pid], w = G.Me.cur();
     if (!p || !w) return '<p class="abox-hint">Hover over a pick to see what it does to your gun.</p>';
     const fx = G.GunsmithUI.partEffects(p), sl = this.aboxSlot(pid), name = G.U.esc(w.def.name);
@@ -858,7 +872,7 @@ const G_Game = {
   // where each spinning reel's strip is: off (0..M*H while it spins) scrolls it down; the face centred in the window
   // is the one at 2M - off/H (in the middle copy)
   aboxPlace() {
-    const R = this.REEL, el = this.$('aboxPick'), ui = this.aboxUI;
+    const R = this.REEL, el = this.$('aboxPick'), ui: GmAboxUI = this.aboxUI;
     ui.wheels.forEach((wh, i) => {
       const st = !wh.landed && el.querySelector(`[data-wheel="${i}"] .abox-strip`);
       if (st) st.style.transform = `translateY(${(wh.off - 2 * R.M * R.H + (R.WH - R.H) / 2).toFixed(1)}px)`;
@@ -866,8 +880,8 @@ const G_Game = {
   },
   // the reels, each frame: a spinning one scrolls down (wrapping a turn), a stopping one eases out onto its face, then
   // lands (a click as it settles)
-  aboxSpin(t) {
-    const ui = this.aboxUI, R = this.REEL;
+  aboxSpin(t: number) {
+    const ui: GmAboxUI | null = this.aboxUI, R = this.REEL;
     if (!ui || !this.aboxOpen) return;
     const dt = this.aboxT ? Math.min(0.05, (t - this.aboxT) / 1000) : 0;
     this.aboxT = t;
@@ -883,10 +897,10 @@ const G_Game = {
     if (changed) this.aboxRender(); else this.aboxPlace();
     if (ui.wheels.some((wh) => !wh.landed)) this.aboxRaf = requestAnimationFrame((tt) => this.aboxSpin(tt));
   },
-  aboxClick(e) {
-    const t = e.target.closest('button');
+  aboxClick(e: GmEvt) {
+    const t = e.target.closest<HTMLButtonElement>('button');
     if (!t || t.disabled) return;
-    const mine = this.aboxMine(), ui = this.aboxUI;
+    const mine = this.aboxMine(), ui: GmAboxUI = this.aboxUI;
     if (t.dataset.close != null) return this.aboxHide();
     if (!mine) return;
     if (t.dataset.stop != null) {
@@ -895,7 +909,7 @@ const G_Game = {
       // the face it lands on: far enough down the reel that easing out from full speed reaches it (an ease-out cubic
       // starts at 3x its average speed), and what the host rolled goes on that face
       const c = 2 * R.M - wh.off / R.H, k = Math.floor(c - (R.V * 1.2 / 3) / R.H), dist = (c - k) * R.H;
-      wh.strip[k] = mine[0][i];
+      wh.strip![k] = mine[0][i];
       wh.stop = { t0: performance.now(), o0: wh.off, o1: wh.off + dist, T: (3 * dist / R.V) * 1000 };
       G.Audio.click();
       return this.aboxRender();
@@ -909,13 +923,13 @@ const G_Game = {
   // ------------------------------------------------------------- first aid cabinets
   // each cabinet's grid here (3x2, medical gear only), kept as the host has it: you move things in and out of
   // it in the field inventory, and the inventory tells the host what changed (G.InvUI)
-  cabGrid(i) {
+  cabGrid(i: number) {
     this.cabGrids = this.cabGrids || [];
     if (!this.cabGrids[i]) { this.cabGrids[i] = G.Gear.grid(3, 2, ['med'], 'Cabinet'); this.cabGrids[i].cab = i; this.cabGridSet(i, this.cabs && this.cabs[i]); }
     return this.cabGrids[i];
   },
-  cabLay(items) { return items.map((e) => e.join(':')).sort().join('|'); },
-  cabGridSet(i, c) {
+  cabLay(items: GmCabItem[]) { return items.map((e) => e.join(':')).sort().join('|'); },
+  cabGridSet(i: number, c: GmCab | undefined) {
     const g = this.cabGrids && this.cabGrids[i];
     if (!g || !c) return;
     g.ver = c[2] || 0;
@@ -923,7 +937,7 @@ const G_Game = {
     if (lay === g.lay) return; // as you left it
     g.items = c[1].map(([mt, n, x, y, r]) => ({ it: G.Gear.medItem(mt, n), x, y, r }));
     g.lay = lay;
-    g.counts = G.Server.cabCounts ? G.Server.cabCounts(c[1]) : null;
+    g.counts = G.Server.cabCounts ? G.Server.cabCounts(c[1] as any) : null;
   },
   // ------------------------------------------------------------- the team locker
   // the squad's shared locker at the quartermaster's (G.Server.teamEdit), kept as the host has it. Its items
@@ -934,16 +948,16 @@ const G_Game = {
     if (!this.tGrid) Object.assign((this.tGrid = G.Gear.grid(G.Server.TEAM_W, G.Server.TEAM_H, null, 'Team locker')), { locker: true, team: true, ver: 0, lay: '', base: new Set(), gone: new Set(), sent: new Set() });
     return this.tGrid;
   },
-  teamLay(items) { return items.map((e) => e.slice(0, 4).join(':')).sort().join('|'); },
-  teamSet(m) {
+  teamLay(items: (string | number)[][]) { return items.map((e) => e.slice(0, 4).join(':')).sort().join('|'); },
+  teamSet(m: any) {
     const g = this.teamGrid(), me = G.Me;
     if (!this.teamBusy) this.teamSync(); // (anything you've moved that the host hasn't heard about yet goes first)
     g.ver = m.ver;
-    g.base = new Set(m.items.map((e) => e[0]));
+    g.base = new Set(m.items.map((e: GmTeamItem) => e[0]));
     for (const tid of g.gone) if (!g.base.has(tid)) g.gone.delete(tid);
     for (const tid of g.sent) if (g.base.has(tid)) g.sent.delete(tid);
     const lay = this.teamLay(m.items);
-    if (lay !== g.lay) { g.items = m.items.map(([tid, x, y, r, pk]) => ({ it: Object.assign(G.Gear.unpack(pk), { tid }), x, y, r })); g.lay = lay; }
+    if (lay !== g.lay) { g.items = m.items.map(([tid, x, y, r, pk]: GmTeamItem) => ({ it: Object.assign(G.Gear.unpack(pk), { tid }), x, y, r })); g.lay = lay; }
     if (m.by === G.Net.myId) {
       // taken by someone else first: it was never yours; and what didn't fit comes back to your locker
       for (const tid of m.deny || []) G.InvUI.lose(tid);
@@ -974,12 +988,12 @@ const G_Game = {
   },
   // ------------------------------------------------------------- the route map
   // the host's route: { seed, act, path, votes }, with the act's map rebuilt from its seed
-  setRoute(r) {
+  setRoute(r: GmRoute | null) {
     if (!r) return;
     if (!this.routeMap || this.routeMap.seed !== r.seed || this.routeMap.act !== r.act) this.routeMap = G.Route.gen(r.seed, r.act);
     this.routeSt = { path: r.path || [], votes: r.votes || {} };
   },
-  enterRoute(level) {
+  enterRoute(level: number) {
     this.veil(false);
     this.toggleInv(false);
     this.closeShop();
@@ -1002,27 +1016,27 @@ const G_Game = {
     if (G.Me.sidearmChosen) { el.classList.add('hidden'); return; }
     if (!this.armLook) { this.armLook = this.armSel = 'p9'; this.armView = { x: 0, y: 0, z: 0.7 }; }
     // who's taken it (the squad's own picks: told by the host)
-    const takers = (id) => Object.entries(arms).filter(([pid, a]) => a === id && roster[pid]).map(([pid]) => `<i style="color:${G.U.hex(roster[pid].color)}">${G.Callsigns.html(roster[pid].animal)}${G.U.esc(roster[pid].name)}</i>`);
+    const takers = (id: string) => Object.entries(arms).filter(([pid, a]) => a === id && roster[pid]).map(([pid]) => `<i style="color:${G.U.hex(roster[pid].color)}">${G.Callsigns.html(roster[pid].animal)}${G.U.esc(roster[pid].name)}</i>`);
     const others = Object.keys(roster).filter((pid) => pid !== G.Net.myId), waiting = others.filter((pid) => !arms[pid]).length;
-    const pic = (id) => { const it = G.Gear.gunItem(G.Me.makeWeapon(id, A.proOn(id) ? A.build(id) : undefined)), [cw, ch] = G.Gear.size(it); return G.Icons.of(it, cw, ch, false); };
+    const pic = (id: string) => { const it = G.Gear.gunItem(G.Me.makeWeapon(id, A.proOn(id) ? A.build(id) : undefined)), [cw, ch] = G.Gear.size(it); return G.Icons.of(it, cw, ch, false); };
     // the web: a ring for each step out, spokes between, and the paths on it
-    const W = 1200, spokes = [...Array(6)].map((_, i) => ((-90 + i * 60) * Math.PI) / 180), spot = (a, r) => [Math.cos(a) * r, Math.sin(a) * r], rings = A.RINGS.slice(1);
+    const W = 1200, spokes = [...Array(6)].map((_, i) => ((-90 + i * 60) * Math.PI) / 180), spot = (a: number, r: number) => [Math.cos(a) * r, Math.sin(a) * r], rings = A.RINGS.slice(1);
     const web = rings.map((r) => `<polygon points="${spokes.map((a) => spot(a, r).map((v) => v.toFixed(1)).join()).join(' ')}"/>`).join('') + spokes.map((a) => { const [x, y] = spot(a, rings[rings.length - 1]); return `<line x1="0" y1="0" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"/>`; }).join('');
     const strands = A.NODES.filter((q) => q.from).map((q) => {
-      const [x0, y0] = A.at(A.BY.get(q.from)), [x1, y1] = A.at(q), got = A.open(q.id), f = got ? 1 : A.open(q.from) ? A.left(q) / q.n : 0;
+      const [x0, y0] = A.at(A.BY.get(q.from!)!), [x1, y1] = A.at(q), got = A.open(q.id), f = got ? 1 : A.open(q.from!) ? A.left(q) / q.n! : 0;
       return `<line class="strand" x1="${x0}" y1="${y0}" x2="${x1}" y2="${y1}"/>${f > 0 ? `<line class="strand on" x1="${x0}" y1="${y0}" x2="${(x0 + (x1 - x0) * f).toFixed(1)}" y2="${(y0 + (y1 - y0) * f).toFixed(1)}"/>` : ''}`;
     }).join('');
     const nodes = A.NODES.map((q) => {
-      const [x, y] = A.at(q), st = A.open(q.id) ? 'got' : A.open(q.from) ? 'next' : 'far', tip = st === 'next' ? `<small>${A.left(q)}/${q.n} ${G.U.esc(q.what)}</small>` : st === 'far' ? '<small>Locked</small>' : A.proGot(q.id) ? `<small>${A.proOn(q.id) ? 'Pro: ' : 'Pro earned: '}${G.U.esc(q.pro.name)}</small>` : '';
+      const [x, y] = A.at(q), st = A.open(q.id) ? 'got' : A.open(q.from!) ? 'next' : 'far', tip = st === 'next' ? `<small>${A.left(q)}/${q.n} ${G.U.esc(q.what!)}</small>` : st === 'far' ? '<small>Locked</small>' : A.proGot(q.id) ? `<small>${A.proOn(q.id) ? 'Pro: ' : 'Pro earned: '}${G.U.esc(q.pro!.name)}</small>` : '';
       return `<button class="web-node ${st}${this.armLook === q.id ? ' look' : ''}${this.armSel === q.id ? ' sel' : ''}" data-arm="${q.id}" style="left:${x.toFixed(1)}px;top:${y.toFixed(1)}px"><img src="${pic(q.id)}" alt="" draggable="false"><b>${G.U.esc(A.name(q.id))}</b>${tip}</button>`;
     }).join('');
     const paths = Object.entries(A.PATHS).map(([k, p]) => { const [x, y] = A.along(k, A.RINGS[p.len] + 165); return `<span class="web-path" style="left:${x.toFixed(1)}px;top:${y.toFixed(1)}px">${p.name}</span>`; }).join('');
     // what you're looking at: the gun, and what it takes
-    const id = this.armLook, q = A.BY.get(id), d = G.WEAPONS[id], cal = G.CALIBERS[G.calOf(d)], got = A.open(id), modes = (d.modes || [d.mode]).map((m) => G.MODE_NAME[m]).join(' / ');
-    const nextOn = A.NODES.filter((c) => c.from === id && !A.open(c.id)).map((c) => `<li><b>${G.U.esc(A.name(c.id))}</b> <span>${A.left(c)}/${c.n}</span> ${G.U.esc(c.what)}<small>${G.U.esc(c.how)}</small></li>`).join('');
-    const ask = got ? '' : A.open(q.from) ? `<div class="web-ask"><b>${A.left(q)}/${q.n} ${G.U.esc(q.what)}</b> with the ${G.U.esc(A.name(q.from))}<small>${G.U.esc(q.how)}</small></div>` : `<div class="web-ask far"><b>Locked</b> Earn the ${G.U.esc(A.name(q.from))} first.</div>`;
+    const id = this.armLook, q = A.BY.get(id)!, d = G.WEAPONS[id], cal = G.CALIBERS[G.calOf(d)], got = A.open(id), modes = (d.modes || [d.mode]).map((m: string) => G.MODE_NAME[m]).join(' / ');
+    const nextOn = A.NODES.filter((c) => c.from === id && !A.open(c.id)).map((c) => `<li><b>${G.U.esc(A.name(c.id))}</b> <span>${A.left(c)}/${c.n}</span> ${G.U.esc(c.what!)}<small>${G.U.esc(c.how!)}</small></li>`).join('');
+    const ask = got ? '' : A.open(q.from!) ? `<div class="web-ask"><b>${A.left(q)}/${q.n} ${G.U.esc(q.what!)}</b> with the ${G.U.esc(A.name(q.from!))}<small>${G.U.esc(q.how!)}</small></div>` : `<div class="web-ask far"><b>Locked</b> Earn the ${G.U.esc(A.name(q.from!))} first.</div>`;
     // its pro build: what it takes, or the choice of starting with it
-    const P = q.pro, parts = A.partNames(id).map((n) => `<li>${G.U.esc(n)}</li>`).join('');
+    const P = q.pro!, parts = A.partNames(id).map((n) => `<li>${G.U.esc(n)}</li>`).join('');
     const pro = !got ? '' : `<h4>Pro build</h4><div class="web-pro${A.proGot(id) ? ' got' : ''}" tabindex="0" title=""><b>${G.U.esc(P.name)}</b><ul>${parts}</ul>${A.proGot(id) ? `<label><input type="checkbox" data-armpro ${A.proOn(id) ? 'checked' : ''}> Start in pro mode</label>` : `<span>${Math.min(P.n, A.count(id, P.stat))}/${P.n}</span> ${G.U.esc(P.what)} with this gun`}</div>`;
     const was = el.querySelector('.web-world');
     el.innerHTML = `<div class="web-full"><div class="web-view"><div class="web-world"><svg viewBox="${-W} ${-W} ${W * 2} ${W * 2}" style="left:${-W}px;top:${-W}px;width:${W * 2}px;height:${W * 2}px" aria-hidden="true"><g class="web-lines">${web}</g>${strands}</svg>${paths}${nodes}</div>
@@ -1039,19 +1053,19 @@ const G_Game = {
     if (was) was.remove();
     if (!el.dataset.bound) {
       el.dataset.bound = 1;
-      let drag = null, moved = false;
+      let drag: { x: number; y: number; vx: number; vy: number } | null = null, moved = false;
       // over the pro build: what it'd be, beside it, against the gun as it comes
-      const preview = (on) => {
+      const preview = (on: boolean) => {
         const box = el.querySelector('.web-preview');
         if (!box) return;
         if (!on) { box.classList.add('hidden'); return; }
-        const A = G.Arsenal, id = this.armLook, q = A.BY.get(id), w = G.Me.makeWeapon(id, A.build(id)), it = G.Gear.gunItem(w), [cw, ch] = G.Gear.size(it);
-        box.innerHTML = `<img src="${G.Icons.of(it, cw, ch, false)}" alt=""><h3>${G.U.esc(A.name(id))} <b>${G.U.esc(q.pro.name)}</b></h3><ul>${A.partNames(id).map((n) => `<li>${G.U.esc(n)}</li>`).join('')}</ul><h4>Against the stock gun</h4><div class="gs-stats">${G.GunsmithUI.statsHtml(G.Me.makeWeapon(id).def, w.def)}</div>`;
+        const A = G.Arsenal, id = this.armLook, q = A.BY.get(id)!, w = G.Me.makeWeapon(id, A.build(id)), it = G.Gear.gunItem(w), [cw, ch] = G.Gear.size(it);
+        box.innerHTML = `<img src="${G.Icons.of(it, cw, ch, false)}" alt=""><h3>${G.U.esc(A.name(id))} <b>${G.U.esc(q.pro!.name)}</b></h3><ul>${A.partNames(id).map((n) => `<li>${G.U.esc(n)}</li>`).join('')}</ul><h4>Against the stock gun</h4><div class="gs-stats">${G.GunsmithUI.statsHtml(G.Me.makeWeapon(id).def, w.def)}</div>`;
         box.classList.remove('hidden');
       };
-      for (const [ev, on] of [['pointerover', true], ['pointerout', false], ['focusin', true], ['focusout', false]]) el.addEventListener(ev, (e) => { if (e.target.closest && e.target.closest('.web-pro')) preview(on); });
-      const go = (x, y) => { const v = this.armView, w = el.querySelector('.web-world'); this.armFrom = w ? w.style.transform : null; v.x = x * v.z; v.y = y * v.z; };
-      el.addEventListener('pointerdown', (e) => {
+      for (const [ev, on] of [['pointerover', true], ['pointerout', false], ['focusin', true], ['focusout', false]] as [string, boolean][]) el.addEventListener(ev, (e: GmEvt) => { if (e.target.closest && e.target.closest('.web-pro')) preview(on); });
+      const go = (x: number, y: number) => { const v = this.armView, w = el.querySelector('.web-world'); this.armFrom = w ? w.style.transform : null; v.x = x * v.z; v.y = y * v.z; };
+      el.addEventListener('pointerdown', (e: GmEvt & PointerEvent) => {
         if (e.button !== 0 || !e.target.closest('.web-view') || e.target.closest('.web-home')) return;
         drag = { x: e.clientX, y: e.clientY, vx: this.armView.x, vy: this.armView.y }; moved = false;
         const w = el.querySelector('.web-world'); if (w) w.classList.remove('glide');
@@ -1063,7 +1077,7 @@ const G_Game = {
         if (moved) { const v = this.armView, R = 1050 * v.z; v.x = G.U.clamp(drag.vx + dx, -R, R); v.y = G.U.clamp(drag.vy + dy, -R, R); this.armPlace(); }
       });
       window.addEventListener('pointerup', () => { drag = null; });
-      el.addEventListener('wheel', (e) => {
+      el.addEventListener('wheel', (e: GmEvt & WheelEvent) => {
         const view = e.target.closest('.web-view');
         if (!view) return;
         e.preventDefault();
@@ -1072,16 +1086,16 @@ const G_Game = {
         const w = el.querySelector('.web-world'); if (w) w.classList.remove('glide');
         this.armPlace();
       }, { passive: false });
-      el.addEventListener('click', (e) => {
+      el.addEventListener('click', (e: GmEvt) => {
         const dragged = moved; moved = false;
         if (G.Me.sidearmChosen) return;
-        const b = e.target.closest('[data-arm]'), ok = e.target.closest('[data-armok]');
-        const tick = e.target.closest('[data-armpro]');
+        const b = e.target.closest<HTMLElement>('[data-arm]'), ok = e.target.closest<HTMLButtonElement>('[data-armok]');
+        const tick = e.target.closest<HTMLInputElement>('[data-armpro]');
         if (tick) { G.Arsenal.proSet(this.armLook, tick.checked); G.Audio.click(); return this.sidearmPick(); }
         if (e.target.closest('[data-armhome]')) { go(0, 0); G.Audio.click(); return this.sidearmPick(); }
         if (b) {
           if (dragged) return; // (it was a drag that started on it)
-          this.armLook = b.dataset.arm; if (G.Arsenal.open(this.armLook)) this.armSel = this.armLook;
+          this.armLook = b.dataset.arm!; if (G.Arsenal.open(this.armLook)) this.armSel = this.armLook;
           const [x, y] = G.Arsenal.at(G.Arsenal.BY.get(this.armLook)); go(-x, -y);
           G.Audio.click(); return this.sidearmPick(); // (chosen, not yet taken)
         }
@@ -1097,9 +1111,9 @@ const G_Game = {
   renderRoute() {
     const rm = this.routeMap, st = this.routeSt;
     if (!rm || !st) return;
-    const opts = G.Route.options(rm, st.path[st.path.length - 1]), colors = {};
+    const opts = G.Route.options(rm, st.path[st.path.length - 1]), colors: Record<string, number> = {};
     for (const [id, p] of Object.entries(this.roster || {})) colors[id] = p.color;
-    const mine = st.votes[G.Net.myId];
+    const mine = st.votes[G.Net.myId!];
     const box = this.$('routeMap'), first = !box.firstChild;
     box.innerHTML = G.Route.svg(rm, { path: st.path, opts, votes: st.votes, colors, mine });
     // the map is wider than the screen: bring where you are (and what's next) into view, and let the wheel scroll it
@@ -1109,7 +1123,7 @@ const G_Game = {
       const r = at.getBoundingClientRect(), b = box.getBoundingClientRect();
       box.scrollLeft += r.left + r.width / 2 - (b.left + b.width * 0.35);
     }
-    if (!box.dataset.wheel) { box.dataset.wheel = 1; box.addEventListener('wheel', (e) => { if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { box.scrollLeft += e.deltaY; e.preventDefault(); } }, { passive: false }); }
+    if (!box.dataset.wheel) { box.dataset.wheel = 1; box.addEventListener('wheel', (e: WheelEvent) => { if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { box.scrollLeft += e.deltaY; e.preventDefault(); } }, { passive: false }); }
     const boss = opts.length === 1 && rm.nodes.get(opts[0]).boss;
     this.$('routeTitle').innerHTML = `Act ${rm.act} <span>— level ${this.level}${boss ? ' <b class="red">(BOSS)</b>' : ''}</span>`;
     const ids = Object.keys(this.roster || {}), voted = ids.filter((id) => st.votes[id] != null).length;
@@ -1118,13 +1132,13 @@ const G_Game = {
     const arms = this.arms || {}, roster = this.roster || {};
     if (this.level === 1 && ids.length > 1 && G.Me.sidearmChosen) this.$('routeMsg').innerHTML += `<div class="arm-squad">Sidearms (each your own): ${ids.map((id) => `<i style="color:${G.U.hex(roster[id].color)}">${G.U.esc(roster[id].name)}</i> ${arms[id] ? G.U.esc(G.WEAPONS[arms[id]].name) : '<small>choosing…</small>'}`).join(' · ')}</div>`;
   },
-  pickRoute(n) {
+  pickRoute(n: number) {
     if (!G.Me.sidearmChosen) return; // (pick your sidearm first)
     if (this.phase !== 'route' || !this.routeMap || !G.Route.options(this.routeMap, this.routeSt.path[this.routeSt.path.length - 1]).includes(n)) return;
     G.Audio.click();
     G.Net.toHost({ t: 'pick', n });
   },
-  enterLevel(level, seed, th) {
+  enterLevel(level: number, seed: number, th?: number) {
     this.veil(true, true); // (already black, unless you've just joined)
     this.leaveHub();
     this.phase = 'level';
@@ -1142,7 +1156,7 @@ const G_Game = {
     const team = [...G.Views.players.values()].map((p) => p.st && p.st.w && G.Gunsmith.fromCode(p.st.w)).filter(Boolean).map((d) => d.soundKey);
     G.GunAudio.prewarm([...Object.values(G.Me.weapons).flatMap((w) => [w.def.soundKey, G.Gunsmith.roundSoundKey(w.def, w.chamber || w.ammo)]), ...this.enemyGuns(level), ...team], this.map);
     // everyone in a seat of their own in the helicopter, on the pad (the same on every machine: by the sorted roster)
-    const i = Math.max(0, Object.keys(this.roster).sort().indexOf(G.Net.myId));
+    const i = Math.max(0, Object.keys(this.roster).sort().indexOf(G.Net.myId!));
     G.Landing.enter(this.map);
     G.Me.spawn(this.map.spawn.x, this.map.spawn.z);
     G.Landing.board(G.Me, Math.min(i, G.Hangar.HELI.seats - 1));
@@ -1156,7 +1170,7 @@ const G_Game = {
   // Between levels: the hangar (js/hangar.ts). To the game it's a level with nothing in it but the shop, so you walk
   // about it, the squad is there, and rays, steps and sound are all the ordinary ones; the host just doesn't send
   // enemies. this.hub marks it (the phase is still 'level' here).
-  enterShop(level, seed, report, stock) {
+  enterShop(level: number, seed: number, report: GmReport | null, stock: any) {
     this.veil(true, true);
     this.toggleInv(false);
     this.closeShop();
@@ -1184,7 +1198,7 @@ const G_Game = {
     G.Shop.open(level, seed, stock); // (his stock this visit: the whole squad's, shared)
     G.Hangar.enter(this.map);
     // each officer a spot of their own on the pad, in front of the opening
-    const i = Math.max(0, Object.keys(this.roster).sort().indexOf(G.Net.myId)), sp = G.Hangar.spawnAt(i);
+    const i = Math.max(0, Object.keys(this.roster).sort().indexOf(G.Net.myId!)), sp = G.Hangar.spawnAt(i);
     G.Me.spawn(sp.x, sp.z);
     G.Me.yaw = 0; // (facing the hall)
     this.screen(null);
@@ -1200,7 +1214,7 @@ const G_Game = {
     this.hub = false;
     G.Hangar.leave();
   },
-  enterGameover(m) {
+  enterGameover(m: any) {
     this.veil(false);
     this.toggleInv(false);
     this.closeShop();
@@ -1260,10 +1274,10 @@ const G_Game = {
     if (this.veilN > 0 && --this.veilN === 0) this.veil(false); // (the new place has drawn: js/views.ts applySnap)
   },
   // swing door leaves toward their open/closed state
-  updateDoors(dt) {
+  updateDoors(dt: number) {
     const m = this.map;
     if (!m || !m.doorMeshes) return;
-    m.doors.forEach((d, i) => {
+    m.doors.forEach((d: LvDoor, i: number) => {
       const piv = m.doorMeshes[i], u = piv.userData;
       if (u.fallen) { G.LightGrid.setDoor(i, 1); return; } // (off its hinges: js/damage.ts has it)
       u.ang += ((d.open ? 1 : 0) - u.ang) * Math.min(1, dt * (u.rate || 7));
@@ -1280,7 +1294,7 @@ G.Game = G_Game as typeof G_Game & GameFields;
 interface GameFields {
   myName: string; myAnimal: string; myColor: number; myLook: any;
   hub: boolean; shopOpen: boolean; civsLeft: number; unitsCleared: number; bodiesLeft: number; weaponsLeft: number; veilN: number;
-  settings: { sens: number; fov: number; vol: number }; invOpen: boolean; caseOpen: boolean; abox: any; sbox: any; cabs: any[]; routeMap: any; routeSt: any;
+  settings: { sens: number; fov: number; vol: number }; invOpen: boolean; caseOpen: boolean; abox: any; sbox: any; cabs: GmCab[]; routeMap: ReturnType<typeof G.Route.gen>; routeSt: { path: number[]; votes: Record<string, number> };
 }
 interface GameModules { Game: typeof G_Game & GameFields; }
 

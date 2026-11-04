@@ -27,7 +27,7 @@
 // the way through; a fridge is thin steel with foam in it; a car is thin steel with an engine in it.
 const G_Materials = (() => {
   const CORE_E = { lead: 1, mild: 1.1, hard: 1.4, wc: 1.6 };
-  const m = (name, K, rho, sig, fx, o) => Object.assign({ name, K, rho, sig, fx, E: CORE_E, mu: 0.3, e: 0.15 }, o || {});
+  const m = (name: string, K: number, rho: number, sig: number, fx: string, o?: Record<string, any>) => Object.assign({ name, K, rho, sig, fx, E: CORE_E, mu: 0.3, e: 0.15 }, o || {});
   const MAT = {
     // armour (K, E, blunt, wearJ: the NIJ calibration, js/ballistics.ts)
     aramid: m('aramid', 72, 1440, 3e8, 'soft', { E: { lead: 1, mild: 1.25, hard: 1.45, wc: 1.5 }, blunt: 0.25, wearJ: 900, soft: true, noRic: true, damp: 0.6, weave: 0.1 }), // (weave: the share of it a spike has to get through, js/ballistics.ts vLimit)
@@ -101,13 +101,14 @@ const G_Materials = (() => {
     helmet: [[['nylon', 0.5]], [['pad', 15]]], face: [[], []],
   };
   // a piece's protection as it's really layered, outside in
-  function built(pr) {
-    const [over, under] = ARMOUR[pr.at] || [[], []], core = [];
+  function built(pr: any) {
+    const [over, under] = (ARMOUR as Record<string, any>)[pr.at] || [[], []], core: any[] = [];
     for (const l of pr.layers) { core.push(l); if (l[0] === 'steel') core.push(['polyurea', 3]); }
     return [...over, ...core, ...under];
   }
-  const C = (skin, core = null, fill = 1, stud = null) => ({ skin, core, fill, stud });
-  const SOLID = (mat) => C([], mat), ONE = (skin) => Object.assign(C(skin), { one: true }); // (ONE: a single sheet, however thick its box: a pane, a plank fence)
+  type Stud = { every: number, w: number, mat: string, mm: number };
+  const C = (skin: [string, number][], core: string | null = null, fill = 1, stud: Stud | null = null) => ({ skin, core, fill, stud });
+  const SOLID = (mat: string) => C([], mat), ONE = (skin: [string, number][]) => Object.assign(C(skin), { one: true }); // (ONE: a single sheet, however thick its box: a pane, a plank fence)
   const STUD = { every: 0.4, w: 0.038, mat: 'pine', mm: 89 }, STEELSTUD = { every: 0.6, w: 0.04, mat: 'mild', mm: 1.8 };
   const PLASTER = C([['gypsum', 13]], null, 1, STUD);
   // walls by environment: indoors, and those with the outside on one side
@@ -128,7 +129,7 @@ const G_Materials = (() => {
   const SLAB = SOLID('concrete'), JOISTS = C([['ply', 18], ['gypsum', 13]], 'wool', 0.1);
   const DECK = { Apartment: SLAB, Suburbs: JOISTS, Festival: C([['ply', 18]]), 'Cold Storage': C([['sheet', 0.7]], 'pur'), Warehouse: C([['sheet', 1.5]], 'wool', 0.1) };
   // furniture, by the piece (js/furniture.ts)
-  const CAB = C([['mdf', 18]]), SHEET = (mm, core = null, fill = 1) => C([[mm <= 1.5 ? 'sheet' : 'mild', mm]], core, fill), MACHINE = C([['mild', 12]], 'iron', 0.35);
+  const CAB = C([['mdf', 18]]), SHEET = (mm: number, core: string | null = null, fill = 1) => C([[mm <= 1.5 ? 'sheet' : 'mild', mm]], core, fill), MACHINE = C([['mild', 12]], 'iron', 0.35);
   const PROPS = {
     sofa: C([['fabric', 8]], 'foam'), armchairs: C([['fabric', 8]], 'foam'), bed: C([['fabric', 6]], 'foam'), tv: C([['hdpe', 3]], 'mdf', 0.05),
     bookshelf: C([['mdf', 18]], 'paper', 0.55), counter: C([['mdf', 18]], 'goods', 0.15), island: C([['mdf', 18]], 'goods', 0.15), dining: ONE([['hardwood', 28]]), dresser: CAB, wardrobe: CAB, desk: ONE([['mdf', 25]]),
@@ -160,15 +161,15 @@ const G_Materials = (() => {
   };
   const CRATE = PROPS.crates, RAIL = ONE([['mild', 3]]), GRATE = ONE([['mild', 4]]); // (a bar of it: what a round has to get through is js/world.ts barHit's)
   // the same construction with only what's needed changed: a void wall's stud, say
-  const wallOf = (theme, out) => { const w = WALLS[theme.name] || WALLS.Apartment; return w[out ? 1 : 0]; };
+  const wallOf = (theme: any, out: any) => { const w = (WALLS as Record<string, any>)[theme.name] || WALLS.Apartment; return w[out ? 1 : 0]; };
   // is this point outdoors (on its floor's plan)?
-  function outAt(map, p) {
-    const fl = map.floors ? map.floors.find((f) => p.y >= (f.fy || 0) - 0.02 && p.y < (f.fy || 0) + G.Level.WALL_H + 0.3) || map.floors[0] : map, TS = G.Level.TS, x = Math.floor(p.x / TS), z = Math.floor(p.z / TS);
+  function outAt(map: any, p: any) {
+    const fl = map.floors ? map.floors.find((f: any) => p.y >= (f.fy || 0) - 0.02 && p.y < (f.fy || 0) + G.Level.WALL_H + 0.3) || map.floors[0] : map, TS = G.Level.TS, x = Math.floor(p.x / TS), z = Math.floor(p.z / TS);
     if (x < 0 || z < 0 || x >= fl.W || z >= fl.H) return true;
     return !!(fl.out && fl.out[z * fl.W + x]);
   }
   // The construction of the solid s a round entered at p and left at q (null q: what its face is)
-  function of(map, s, p?, q?) {
+  function of(map: any, s: any, p?: any, q?: any): any {
     if (s.mat) return s.mat;
     const theme = map.theme || {};
     switch (s.kind) {
@@ -176,7 +177,7 @@ const G_Materials = (() => {
       case 'floor': case 'ceil': case 'step': {
         if (theme.hub) return SOLID('concrete');
         if ((s.kind === 'floor' && s.max[1] <= 0.01 && s.min[1] <= -0.4) || outAt(map, p)) return outAt(map, p) ? SOLID('soil') : SOLID('concrete'); // (the ground: earth outdoors, a slab on it in)
-        return DECK[theme.name] || SLAB;
+        return (DECK as Record<string, any>)[theme.name] || SLAB;
       }
       case 'door': case 'leaf': {
         const d = s.door || {};
@@ -191,7 +192,7 @@ const G_Materials = (() => {
       case 'view': return SOLID('soil');
       case 'target': return s.target && (s.target.kind === 'steel' || (s.target.q && s.target.q.kind === 'steel')) ? ONE([['steel', 10]]) : ONE([['paperT', 2]]);
       case 'prop': default:
-        if (s.prop) return PROPS[s.prop.name] || CAB;
+        if (s.prop) return (PROPS as Record<string, any>)[s.prop.name] || CAB;
         return theme.hub ? SOLID('concrete') : CRATE;
     }
   }

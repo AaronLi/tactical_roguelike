@@ -12,11 +12,11 @@ if (window.THREE) {
   const THREE = window.THREE;
   THREE.ColorManagement.legacyMode = false;
   const CT: any = THREE.CanvasTexture;
-  (THREE as any).CanvasTexture = class extends CT { constructor(...a) { super(...a); this.encoding = THREE.sRGBEncoding; } };
+  (THREE as any).CanvasTexture = class extends CT { constructor(...a: any[]) { super(...a); this.encoding = THREE.sRGBEncoding; } };
   const load = THREE.TextureLoader.prototype.load;
-  THREE.TextureLoader.prototype.load = function (...a) { const t = load.apply(this, a); t.encoding = THREE.sRGBEncoding; return t; };
+  THREE.TextureLoader.prototype.load = function (this: any, ...a: any[]) { const t = (load as any).apply(this, a); t.encoding = THREE.sRGBEncoding; return t; };
   const WR: any = THREE.WebGLRenderer;
-  (THREE as any).WebGLRenderer = function (...a) { const r = new WR(...a); r.outputEncoding = THREE.sRGBEncoding; return r; };
+  (THREE as any).WebGLRenderer = function (...a: any[]) { const r = new WR(...a); r.outputEncoding = THREE.sRGBEncoding; return r; };
   THREE.WebGLRenderer.prototype = WR.prototype;
 }
 
@@ -61,29 +61,29 @@ const G_U = {
   // z back (forward is -z), metres. Used by the first-person limbs and the third-person rig alike.
   smooth: (a: number, b: number, t: number) => { t = Math.min(1, Math.max(0, (t - a) / (b - a))); return t * t * (3 - 2 * t); },
   // hand on the handle: reach, turn the handle, push the door away
-  openHand(t) {
+  openHand(t: number) {
     const S = window.G.U.smooth, reach = S(0, 0.35, t), push = S(0.5, 1, t);
     return { x: 0.26 - 0.08 * reach - 0.06 * push, y: 0.98, z: -0.15 - 0.4 * reach - 0.28 * push, twist: S(0.35, 0.5, t) * (1 - push * 0.6) };
   },
   // hand on the door's edge: reach for it, then pull it shut
-  closeHand(t) {
+  closeHand(t: number) {
     const S = window.G.U.smooth, reach = S(0, 0.45, t), pull = S(0.45, 1, t);
     return { x: 0.26 + 0.06 * reach - 0.04 * pull, y: 1.0, z: -0.15 - 0.55 * reach + 0.42 * pull, twist: 0 };
   },
   // front kick: chamber the knee, drive the heel through, recover
-  kickFoot(t) {
+  kickFoot(t: number) {
     const S = window.G.U.smooth, ch = S(0, 0.35, t), th = S(0.35, 0.58, t), back = S(0.72, 1, t);
     return { y: 0.06 + (0.42 * ch + 0.08 * th) * (1 - back), z: (0.06 * ch - 0.82 * th) * (1 - back), thrust: th * (1 - back) };
   },
   // bagging evidence: reach for it, lift it, envelope up, slide it in, seal, then set it down unhurried
-  bagPhases(t) {
+  bagPhases(t: number) {
     const S = window.G.U.smooth;
     return { reach: S(0.03, 0.2, t), lift: S(0.22, 0.38, t), envUp: S(0.3, 0.42, t), insert: S(0.44, 0.6, t), seal: S(0.6, 0.7, t), down: S(0.72, 0.95, t) };
   },
-  hex: (n) => '#' + (n >>> 0).toString(16).padStart(6, '0'),
+  hex: (n: number) => '#' + (n >>> 0).toString(16).padStart(6, '0'),
   store: {
-    get(k, d) { try { const v = localStorage.getItem('bp_' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
-    set(k, v) { try { localStorage.setItem('bp_' + k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } },
+    get(k: string, d?: any) { try { const v = localStorage.getItem('bp_' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set(k: string, v: any) { try { localStorage.setItem('bp_' + k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } },
   },
 };
 G.U = G_U;

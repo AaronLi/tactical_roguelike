@@ -85,7 +85,7 @@ const G_LightGrid = (() => {
       }
     }
     #include <lights_fragment_end>`;
-  function patch(shader) {
+  function patch(shader: any) {
     if (!shader.fragmentShader.includes('#include <lights_fragment_end>') || !shader.vertexShader.includes('#include <worldpos_vertex>')) return;
     Object.assign(shader.uniforms, U);
     shader.vertexShader = VS_HEAD + shader.vertexShader.replace('#include <worldpos_vertex>', '#include <worldpos_vertex>' + VS_BODY);
@@ -105,26 +105,26 @@ const G_LightGrid = (() => {
   // doors away lights up only through what each door alone lets by.)
   //   sums per tile: light (RGB), where it comes from weighted by how bright (xyz), how bright (1), open (1)
   const K = 8;
-  let G0 = null; // { W, H, NF, N, cur (sums, K a tile), hl, hd (half floats sent), tl, td (textures), layers: [door id] -> { at, v } , k: [door id] -> how far open it counts }
-  function build(map) {
+  let G0: any = null; // { W, H, NF, N, cur (sums, K a tile), hl, hd (half floats sent), tl, td (textures), layers: [door id] -> { at, v } , k: [door id] -> how far open it counts }
+  function build(map: any) {
     const L = G.Level, TS = L.TS, floors = map.floors || [map], NF = floors.length, W = map.W, H = map.H, N = W * H;
     const col = new T.Color(), DECAY = 1.6, t0 = performance.now();
-    const cur = new Float32Array(N * NF * K), doors = map.doors || [], layers = doors.map(() => null), shutAt = [], winAt = [];
+    const cur = new Float32Array(N * NF * K), doors = map.doors || [], layers = doors.map(() => null), shutAt: any[] = [], winAt: Set<number>[] = [];
     // the sky: the theme's fill (as js/render.ts had it everywhere), on what's open to it (not the hangar's: its
     // daylight stays the flat fill)
     const th = map.theme || {}, skyI = th.hub ? 0 : (th.hemiI || 0.26) ** 2 * opts.sky, skyHex = th.hemi || th.light || 0xffffff;
-    const shutOf = (d) => d.kind !== 'stair'; // (a glass one: the light goes through it)
-    floors.forEach((fm, f) => {
+    const shutOf = (d: any) => d.kind !== 'stair'; // (a glass one: the light goes through it)
+    floors.forEach((fm: any, f: number) => {
       const t = fm.t, fy = fm.fy || 0, base = f * N;
       const doorAt = new Map(); // (this floor's shut doorway cells)
       for (const d of doors) if ((d.fl || 0) === f && shutOf(d)) for (const c of d.cells || [d.i]) doorAt.set(c, d);
       shutAt[f] = doorAt;
       // its windows' cells: glass, the light goes through (they're wall to everything else)
-      const win = new Set(); winAt[f] = win;
+      const win = new Set<number>(); winAt[f] = win;
       for (const w of map.windows || []) if ((w.fl || 0) === f) for (const c of w.cells) win.add(c);
       for (let i = 0; i < N; i++) if (t[i] !== 1 && !doorAt.has(i)) cur[(base + i) * K + 7] = 1; // (open: a doorway's open only with its door)
-      const lamps = (map.lamps || []).filter((l) => (map.floors ? (l.fl || 0) === f : true));
-      const into = (d, gi, a, dx, dy, dz, lum) => {
+      const lamps = (map.lamps || []).filter((l: any) => (map.floors ? (l.fl || 0) === f : true));
+      const into = (d: any, gi: number, a: number, dx: number, dy: number, dz: number, lum: number) => {
         let o;
         if (d) { const ly = layers[d.id] || (layers[d.id] = new Map()); o = ly.get(gi); if (!o) { o = new Float32Array(K); ly.set(gi, o); } } else o = cur.subarray(gi * K, gi * K + K);
         o[0] += col.r * a; o[1] += col.g * a; o[2] += col.b * a; o[3] += dx * lum; o[4] += dy * lum; o[5] += dz * lum; o[6] += lum;
@@ -191,7 +191,7 @@ const G_LightGrid = (() => {
       return out.map((v) => mag * (0.5 + 0.5 * v / m));
     })();
     // open: 1 a tile the light spreads over, a bw x bh box of them
-    const spread = (src, open, bw, bh) => { // src: RGB+lum a tile (4), over the box (left as it is)
+    const spread = (src: Float32Array, open: ArrayLike<number>, bw: number, bh: number) => { // src: RGB+lum a tile (4), over the box (left as it is)
       let a = Float32Array.from(src), b = new Float32Array(a.length);
       for (let pass = 0; pass < PASSES; pass++) {
         for (let z = 0, i = 0; z < bh; z++) for (let x = 0; x < bw; x++, i++) {
@@ -208,7 +208,7 @@ const G_LightGrid = (() => {
       }
       return a;
     };
-    const bounced = (src, open, bw, bh) => {
+    const bounced = (src: Float32Array, open: ArrayLike<number>, bw: number, bh: number) => {
       const acc = new Float32Array(src.length);
       let s = src;
       for (let n = 0; n < NB; n++) {
@@ -217,18 +217,18 @@ const G_LightGrid = (() => {
       }
       return acc;
     };
-    floors.forEach((fm, f) => {
+    floors.forEach((fm: any, f: number) => {
       const base = f * N, win = winAt[f], out0 = fm.out;
       // (takes light: open floor; passes it on, the doors shut: that, or glass)
       const lit = new Uint8Array(N), shut = new Uint8Array(N);
       for (let i = 0; i < N; i++) { lit[i] = cur[(base + i) * K + 7] > 0.5 ? 1 : 0; shut[i] = lit[i] || win.has(i) ? 1 : 0; }
-      const keep = (i) => (out0 && out0[i] ? OUTB : 1);
+      const keep = (i: number) => (out0 && out0[i] ? OUTB : 1);
       // the base: everything with the doors shut
       const src = new Float32Array(N * 4);
       for (let i = 0; i < N; i++) { const o = (base + i) * K; src[i * 4] = cur[o]; src[i * 4 + 1] = cur[o + 1]; src[i * 4 + 2] = cur[o + 2]; src[i * 4 + 3] = cur[o + 6]; }
       const out = bounced(src, shut, W, H);
       // each door's (worked out before the base's bounce goes in: from the light as it came off the lamps and the sky)
-      doors.forEach((d) => {
+      doors.forEach((d: any) => {
         const ly = layers[d.id];
         if (!ly || (d.fl || 0) !== f) return;
         let x0 = W, z0 = H, x1 = 0, z1 = 0;
@@ -252,17 +252,17 @@ const G_LightGrid = (() => {
       for (let i = 0; i < N; i++) { const o = (base + i) * K, k = keep(i); if (!lit[i]) continue; cur[o] += out[i * 4] * k; cur[o + 1] += out[i * 4 + 1] * k; cur[o + 2] += out[i * 4 + 2] * k; cur[o + 4] -= out[i * 4 + 3] * UP * k; cur[o + 6] += out[i * 4 + 3] * k; }
     });
     dispose();
-    const tex = (data) => {
-      const tx = new T.DataTexture(data, W, H * NF, T.RGBAFormat, T.HalfFloatType);
+    const tex = (data: Uint16Array) => {
+      const tx = new T.DataTexture(data as Uint16Array<ArrayBuffer>, W, H * NF, T.RGBAFormat, T.HalfFloatType);
       tx.magFilter = tx.minFilter = T.LinearFilter; tx.wrapS = tx.wrapT = T.ClampToEdgeWrapping; tx.generateMipmaps = false; tx.needsUpdate = true;
       return tx;
     };
     const hl = new Uint16Array(N * NF * 4), hd = new Uint16Array(N * NF * 4);
     G0 = { W, H, NF, N, cur, hl, hd, tl: tex(hl), td: tex(hd), dirty: new Set(),
-      layers: layers.map((ly) => { if (!ly) return null; const at = Int32Array.from(ly.keys()), v = new Float32Array(at.length * K); let n = 0; for (const o of ly.values()) v.set(o, K * n++); return { at, v }; }),
+      layers: layers.map((ly: any) => { if (!ly) return null; const at = Int32Array.from(ly.keys()), v = new Float32Array(at.length * K); let n = 0; for (const o of ly.values()) v.set(o, K * n++); return { at, v }; }),
       k: new Float32Array(doors.length) };
     for (let gi = 0; gi < N * NF; gi++) write(gi);
-    doors.forEach((d, i) => setDoor(i, d.open ? 1 : 0));
+    doors.forEach((d: any, i: number) => setDoor(i, d.open ? 1 : 0));
     flush();
     U.lgLight.value = G0.tl; U.lgDir.value = G0.td;
     U.lgPaint.value = G.Homes.paint(map) || blank;
@@ -278,13 +278,13 @@ const G_LightGrid = (() => {
   // a tile's sums, to what the textures hold: the light and its direction, premultiplied by how open the tile is
   // (so the texture's filtering averages only open tiles: the shader divides by it)
   const h = T.DataUtils.toHalfFloat;
-  function write(gi) {
+  function write(gi: number) {
     const c = G0.cur, o = gi * K, w = Math.max(0, Math.min(1, c[o + 7])), s = c[o + 6] > 1e-6 ? w / c[o + 6] : 0, q = gi * 4;
     G0.hl[q] = h(Math.max(0, c[o]) * w); G0.hl[q + 1] = h(Math.max(0, c[o + 1]) * w); G0.hl[q + 2] = h(Math.max(0, c[o + 2]) * w); G0.hl[q + 3] = h(w); // (a door's layer can take light away: never below none)
     G0.hd[q] = h(c[o + 3] * s); G0.hd[q + 1] = h(c[o + 4] * s); G0.hd[q + 2] = h(c[o + 5] * s); G0.hd[q + 3] = h(w);
   }
   // how far a door's open (0 shut .. 1): its layer goes in by as much (G.Game.updateDoors, each frame)
-  function setDoor(id, k) {
+  function setDoor(id: number, k: number) {
     const ly = G0 && G0.layers[id];
     if (!ly) return;
     const dk = k - G0.k[id];
@@ -301,12 +301,12 @@ const G_LightGrid = (() => {
     G0.tl.needsUpdate = G0.td.needsUpdate = true;
   }
   function dispose() {
-    for (const k of ['lgLight', 'lgDir', 'lgPaint']) if (U[k].value !== blank) { U[k].value.dispose(); U[k].value = blank; }
+    for (const k of ['lgLight', 'lgDir', 'lgPaint']) if ((U as Record<string, any>)[k].value !== blank) { (U as Record<string, any>)[k].value.dispose(); (U as Record<string, any>)[k].value = blank; }
     G0 = null; built = false;
   }
   // on while the level's drawn (G.R.render), off for anything else drawn with the same materials
-  const on = (v) => { U.lgGrid.value.w = v && built ? 1 : 0; };
-  return { build, dispose, on, setDoor: (id, k) => { if (built) setDoor(id, k); }, flush, U, opts, get built() { return built; }, get layers() { return G0 && G0.layers; } };
+  const on = (v: any) => { U.lgGrid.value.w = v && built ? 1 : 0; };
+  return { build, dispose, on, setDoor: (id: number, k: number) => { if (built) setDoor(id, k); }, flush, U, opts, get built() { return built; }, get layers() { return G0 && G0.layers; } };
 })();
 G.LightGrid = G_LightGrid;
 interface GameModules { LightGrid: typeof G_LightGrid; }

@@ -20,18 +20,18 @@ const G_Demo = (() => {
   // timed on the game's own clock, and stepped from inside its frames (G.Me.update, hooked in run()): each wait
   // ends on the frame its time comes, so a slow or throttled tab slows the reel with it rather than skipping
   let clock = 0;
-  const waiters = [];
-  const wait = (s) => new Promise((r) => waiters.push({ t: clock + s, r }));
-  const until = async (f, max = 15) => { const t0 = clock; while (!f() && clock - t0 < max) await wait(0); };
-  function tick(dt) {
+  const waiters: { t: number; r: () => void }[] = [];
+  const wait = (s: number) => new Promise<void>((r) => waiters.push({ t: clock + s, r }));
+  const until = async (f: () => unknown, max = 15) => { const t0 = clock; while (!f() && clock - t0 < max) await wait(0); };
+  function tick(dt: number) {
     clock += dt;
     for (let i = waiters.length - 1; i >= 0; i--) if (waiters[i].t <= clock) { waiters[i].r(); waiters.splice(i, 1); }
   }
   // (before the level, while there are no frames to step it: real time)
-  const sleep = (s) => new Promise((r) => setTimeout(r, s * 1000));
-  const untilReal = async (f) => { while (!f()) await sleep(0.1); };
-  let cap = null, pocket = null;
-  function caption(title, step) {
+  const sleep = (s: number) => new Promise((r) => setTimeout(r, s * 1000));
+  const untilReal = async (f: () => unknown) => { while (!f()) await sleep(0.1); };
+  let cap: HTMLDivElement | null = null, pocket: any = null;
+  function caption(title: string, step: string) {
     if (!cap) {
       cap = document.createElement('div');
       cap.style.cssText = 'position:fixed;left:50%;top:7%;transform:translateX(-50%);z-index:50;text-align:center;font:600 22px system-ui,sans-serif;color:#fff;text-shadow:0 2px 6px #000;pointer-events:none';
@@ -41,15 +41,15 @@ const G_Demo = (() => {
   }
   const me = () => G.Me;
   // the trigger: held (or let go)
-  function trigger(on) { const m = me(); m.mouse.l = on; if (on) m.pressBuf = 0.15; }
-  async function tap(n, gap) { for (let i = 0; i < n; i++) { trigger(true); await wait(0.06); trigger(false); await wait(gap); } }
-  async function fire(how, n = 3) {
+  function trigger(on: boolean) { const m = me(); m.mouse.l = on; if (on) m.pressBuf = 0.15; }
+  async function tap(n: number, gap: number) { for (let i = 0; i < n; i++) { trigger(true); await wait(0.06); trigger(false); await wait(gap); } }
+  async function fire(how: string, n = 3) {
     if (how === 'auto') { trigger(true); await wait(0.55); trigger(false); await wait(0.4); }
     else if (how === 'bolt') for (let i = 0; i < 2; i++) { trigger(true); await wait(0.7); trigger(false); /* (letting go works the bolt) */ await wait(1.3); }
     else await tap(n, 0.35);
   }
   // rounds for it: the gun's magazines (or a box of its shells) in a big pocket of its own
-  function stock(w) {
+  function stock(w: any) {
     const m = me();
     if (!pocket) { pocket = { id: 99999, w: 14, h: 14, accept: null, label: 'Demo', items: [] }; m.pockets.unshift(pocket); }
     pocket.items.length = 0;
@@ -73,15 +73,15 @@ const G_Demo = (() => {
   // stand where there's the longest clear line of sight on the ground floor (open floor the level knows of), and
   // face down it, so the rounds fly a way before they hit
   function face() {
-    const m = me(), map = G.Game.map, wd = map.world;
-    const ray = (x, z, yaw, y) => G.World.raycast(wd, x, y, z, -Math.sin(yaw), 0, -Math.cos(yaw), 60).t;
-    const spots = [[m.pos.x, m.pos.z], ...(map.enemySpots || []).filter((p) => !p[2])];
-    let best = -1, at = null;
+    const m = me(), map = G.Game.map!, wd = map.world;
+    const ray = (x: number, z: number, yaw: number, y: number) => G.World.raycast(wd, x, y, z, -Math.sin(yaw), 0, -Math.cos(yaw), 60).t;
+    const spots = [[m.pos.x, m.pos.z], ...(map.enemySpots || []).filter((p: number[]) => !p[2])];
+    let best = -1, at: number[] | null = null;
     for (const [x, z] of spots) for (let i = 0; i < 32; i++) {
       const yaw = (i / 32) * Math.PI * 2, t = Math.min(ray(x, z, yaw, 1.6), ray(x, z, yaw, 0.9)); // (clear at the eye and the chest: not up a stair)
       if (t > best) { best = t; at = [x, z, yaw]; }
     }
-    m.pos.x = at[0]; m.pos.z = at[1]; m.yaw = at[2]; m.pitch = -0.02;
+    m.pos.x = at![0]; m.pos.z = at![1]; m.yaw = at![2]; m.pitch = -0.02;
     if (m.vel) m.vel.set(0, 0, 0);
     return best;
   }

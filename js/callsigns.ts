@@ -13,19 +13,19 @@ const G_Callsigns = (() => {
     { id: 'hyrax', name: 'Hyrax', color: 0xc8946a },
   ];
   const BY = Object.fromEntries(LIST.map((a) => [a.id, a]));
-  const valid = (id) => !!BY[id];
-  const of = (id) => BY[id] || LIST[0];
+  const valid = (id: string) => !!BY[id];
+  const of = (id: string) => BY[id] || LIST[0];
   const INK = '#15171a';
 
   // the emblem, drawn into a 64 x 64 box (scaled to s): the animal in col, its features in ink
-  function draw(g, id, s, col) {
+  function draw(g: CanvasRenderingContext2D, id: string, s: number, col: number | string) {
     g.save();
     g.scale(s / 64, s / 64);
     g.lineCap = 'round'; g.lineJoin = 'round';
     const C = typeof col === 'number' ? G.U.hex(col) : col;
-    const ell = (x, y, rx, ry, c) => { g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); g.fillStyle = c; g.fill(); };
-    const poly = (pts, c) => { g.beginPath(); g.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) g.lineTo(pts[i], pts[i + 1]); g.closePath(); g.fillStyle = c; g.fill(); };
-    const line = (pts, c, w) => { g.beginPath(); g.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) g.lineTo(pts[i], pts[i + 1]); g.strokeStyle = c; g.lineWidth = w; g.stroke(); };
+    const ell = (x: number, y: number, rx: number, ry: number, c: string) => { g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); g.fillStyle = c; g.fill(); };
+    const poly = (pts: number[], c: string) => { g.beginPath(); g.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) g.lineTo(pts[i], pts[i + 1]); g.closePath(); g.fillStyle = c; g.fill(); };
+    const line = (pts: number[], c: string, w: number) => { g.beginPath(); g.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) g.lineTo(pts[i], pts[i + 1]); g.strokeStyle = c; g.lineWidth = w; g.stroke(); };
     switch (id) {
       case 'snake': { // coiled up, head raised, tongue out
         g.beginPath(); g.moveTo(10, 54); g.bezierCurveTo(2, 42, 22, 38, 34, 42); g.bezierCurveTo(48, 46, 58, 36, 50, 28); g.bezierCurveTo(44, 22, 30, 26, 28, 16);
@@ -86,41 +86,41 @@ const G_Callsigns = (() => {
     g.restore();
   }
   // the emblem as an image (for the page), in its own colour
-  const urls = new Map();
-  function url(id, px = 48) {
+  const urls = new Map<string, string>();
+  function url(id: string, px = 48) {
     const key = id + '|' + px;
     if (!urls.has(key)) {
       const c = document.createElement('canvas'); c.width = c.height = px;
-      draw(c.getContext('2d'), of(id).id, px, of(id).color);
+      draw(c.getContext('2d')!, of(id).id, px, of(id).color);
       urls.set(key, c.toDataURL());
     }
-    return urls.get(key);
+    return urls.get(key)!;
   }
-  const html = (id, cls?) => `<img class="anim${cls ? ' ' + cls : ''}" src="${url(id)}" alt="${of(id).name}" title="${of(id).name}">`;
+  const html = (id: string, cls?: string) => `<img class="anim${cls ? ' ' + cls : ''}" src="${url(id)}" alt="${of(id).name}" title="${of(id).name}">`;
 
   // the patches, as textures: on the shoulder (the emblem) and high on the back (the emblem and their name)
-  const tex = new Map();
-  function patchBase(c, g) {
+  const tex = new Map<string, THREE.CanvasTexture>();
+  function patchBase(c: HTMLCanvasElement, g: CanvasRenderingContext2D) {
     g.fillStyle = '#25282b'; g.fillRect(0, 0, c.width, c.height);
     g.strokeStyle = '#6a6e72'; g.setLineDash([5, 4]); g.lineWidth = 2; g.strokeRect(4, 4, c.width - 8, c.height - 8); g.setLineDash([]); // the stitching
   }
-  function armTex(id) {
+  function armTex(id: string) {
     const key = 'arm|' + id;
     if (!tex.has(key)) {
       const c = document.createElement('canvas'); c.width = c.height = 64;
-      const g = c.getContext('2d');
+      const g = c.getContext('2d')!;
       patchBase(c, g);
       g.translate(6, 6); draw(g, of(id).id, 52, of(id).color);
       const t = new THREE.CanvasTexture(c); t.anisotropy = 4;
       tex.set(key, t);
     }
-    return tex.get(key);
+    return tex.get(key)!;
   }
-  function backTex(id, name) {
+  function backTex(id: string, name: any) {
     const label = String(name || '').toUpperCase().slice(0, 16), key = 'back|' + id + '|' + label;
     if (!tex.has(key)) {
       const c = document.createElement('canvas'); c.width = 256; c.height = 64;
-      const g = c.getContext('2d');
+      const g = c.getContext('2d')!;
       patchBase(c, g);
       g.save(); g.translate(8, 6); draw(g, of(id).id, 52, of(id).color); g.restore();
       let fs = 34;
@@ -131,7 +131,7 @@ const G_Callsigns = (() => {
       const t = new THREE.CanvasTexture(c); t.anisotropy = 4;
       tex.set(key, t);
     }
-    return tex.get(key);
+    return tex.get(key)!;
   }
   return { LIST, valid, of, draw, url, html, armTex, backTex };
 })();

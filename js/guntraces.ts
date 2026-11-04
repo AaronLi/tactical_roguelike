@@ -6,8 +6,8 @@
 // and front sights stand. hold: the middle of the firing hand. lug: where a stock clips on. tac: the front of an accessory and the underside it hangs from: far enough on that its body clears the trigger guard.
 // parts: outlines, see js/gunmodels.ts tracedParts.
 {
-const ring = (x, y, r, n = 14) => Array.from({ length: n }, (_, i) => [x + Math.cos((i / n) * Math.PI * 2) * r, y + Math.sin((i / n) * Math.PI * 2) * r]);
-const pill = (x0, y0, x1, y1) => { const r = (y1 - y0) / 2, c = [], n = 6; for (let i = 0; i <= n; i++) { const a = -Math.PI / 2 + Math.PI * i / n; c.push([x1 - r + Math.cos(a) * r, y0 + r + Math.sin(a) * r]); } for (let i = 0; i <= n; i++) { const a = Math.PI / 2 + Math.PI * i / n; c.push([x0 + r + Math.cos(a) * r, y0 + r + Math.sin(a) * r]); } return c; }; // (a stadium: a long port)
+const ring = (x: number, y: number, r: number, n = 14) => Array.from({ length: n }, (_, i) => [x + Math.cos((i / n) * Math.PI * 2) * r, y + Math.sin((i / n) * Math.PI * 2) * r]);
+const pill = (x0: number, y0: number, x1: number, y1: number) => { const r = (y1 - y0) / 2, c = [], n = 6; for (let i = 0; i <= n; i++) { const a = -Math.PI / 2 + Math.PI * i / n; c.push([x1 - r + Math.cos(a) * r, y0 + r + Math.sin(a) * r]); } for (let i = 0; i <= n; i++) { const a = Math.PI / 2 + Math.PI * i / n; c.push([x0 + r + Math.cos(a) * r, y0 + r + Math.sin(a) * r]); } return c; }; // (a stadium: a long port)
 var G_GunTraces = {
   // Walther P99, left side: 175 mm. The slide's rear corner sweeps down in one curve; a raised grip panel, a long
   // finger-rest shelf at the heel, the trigger guard's squared front.

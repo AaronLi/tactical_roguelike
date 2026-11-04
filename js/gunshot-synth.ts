@@ -24,9 +24,39 @@
   const GRAIN_KG = 6.479891e-5;  // kilograms per grain (mass)
   const PSI = 6894.76;           // pascals per psi
 
-  const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
-  const smoothstep = (a, b, x) => { x = clamp((x - a) / (b - a), 0, 1); return x * x * (3 - 2 * x); };
-  const dbToGain = (db) => Math.pow(10, db / 20);
+  // The parameters of a shot (gun + ammo + mic + room + listener). The first five are the ballistics inputs;
+  // the rest are optional, and anything absent takes the default where it is read.
+  interface ShotParams {
+    caliber: number; barrel: number; pressure: number; grain: number; bulletWeight: number;
+    muzzleDevice?: string; suppressor?: string; boltSim?: boolean; boltMass?: number; actionType?: string;
+    lisDist?: number; lisBearing?: number;
+    micGain?: number; micHardness?: number; micAgc?: number; micSim?: boolean;
+    shotCount?: number; boltLoudness?: number; masterDb?: number;
+    env?: string; envSize?: number; envReflect?: number; envMix?: number;
+    casing?: number; caseMaterial?: string; caseLength?: number;
+  }
+  interface Device { label: string; level: number; lp: number; decay: number; tang: number; whoosh: number }
+  interface Can { label: string; db: number; vol: number; len: number; back: number; shock: number; ring: number; ported?: boolean }
+  interface Action { label: string; cycle: number; unlock: number }
+  interface CaseMaterial { label: string; freq: number; ring: number; metal: number; plastic: number }
+  interface Environment {
+    label: string; group: string; wet: number; rt60?: number; predelay?: number; damp?: number; diffuse?: number;
+    erCount?: number; erMinMs?: number; erMaxMs?: number; erGain?: number; ground?: boolean; echoes?: boolean;
+    flutter?: { ms: number; count: number; gain: number };
+  }
+  // The stage-1 result that place() takes.
+  interface ShotSource {
+    params: ShotParams; ballistics: Ballistics; schedule: Schedule; blastFc: number; hasCrack: boolean;
+    blastPeak: number; suppression: Suppression; mic: MicProfile; stems: AudioBuffer;
+  }
+  type Ballistics = ReturnType<typeof ballistics>;
+  type Schedule = ReturnType<typeof schedule>;
+  type Suppression = ReturnType<typeof suppression>;
+  type MicProfile = ReturnType<typeof micProfile>;
+
+  const clamp = (x: number, a: number, b: number) => Math.min(b, Math.max(a, x));
+  const smoothstep = (a: number, b: number, x: number) => { x = clamp((x - a) / (b - a), 0, 1); return x * x * (3 - 2 * x); };
+  const dbToGain = (db: number) => Math.pow(10, db / 20);
 
   // Muzzle-device signatures. Each redirects/contains propellant gas differently.
   //  level : broadband level offset (dB)      lp/hp : bright/dark spectral tilt
@@ -37,7 +67,7 @@
   // so a suppressor quiets the blast but leaves a supersonic bullet's crack, and
   // makes the bolt clatter relatively prominent. Those layers are gained
   // independently of `level`, below.
-  const DEVICES = {
+  const DEVICES: Record<string, Device> = {
     none:       { label: 'None (bare muzzle)', level: 0,   lp: 1.00, decay: 1.00, tang: 0.00, whoosh: 0.00 },
     flash:      { label: 'Flash hider',        level: -1,  lp: 0.95, decay: 1.00, tang: 0.05, whoosh: 0.00 },
     comp:       { label: 'Compensator',        level: 2,   lp: 1.15, decay: 0.90, tang: 0.18, whoosh: 0.00 },
@@ -66,7 +96,7 @@
   //  len   : length (m), for the gas-column ring     back : back pressure into the action (0-1)
   //  shock : how much of the initial shock front survives the baffles
   //  ring  : the tube's ring level                    ported: a ported barrel (integral), bleeding gas early
-  const SUPPRESSORS = {
+  const SUPPRESSORS: Record<string, Can> = {
     full:      { label: 'Full-length can',   db: -24, vol: 1.00, len: 0.17, back: 0.60, shock: 0.18, ring: 0.10 },
     compact:   { label: 'Compact can',       db: -21, vol: 0.55, len: 0.11, back: 0.45, shock: 0.30, ring: 0.14 },
     long:      { label: 'Long (pistol) can', db: -27, vol: 1.20, len: 0.20, back: 0.35, shock: 0.14, ring: 0.08 },
@@ -77,14 +107,14 @@
 
   // Convert a physical powder grain size (mm) to a normalized burn rate.
   // Small grains have more surface area -> faster burn -> earlier pressure peak.
-  const burnRateFromGrain = (mm) => clamp(1 - (mm - 0.2) / 1.8, 0, 1);
+  const burnRateFromGrain = (mm: number) => clamp(1 - (mm - 0.2) / 1.8, 0, 1);
 
   // Action types set two timing facts: how long after firing the breech can
   // open (unlock delay) and the full mechanical cycle time. Locked-breech/gas
   // actions must wait for pressure to drop and gas to travel back from the port;
   // blowback actions begin opening almost immediately as gas drives the case
   // head rearward. `cycle` is the base full-cycle time at nominal bolt mass (s).
-  const ACTIONS = {
+  const ACTIONS: Record<string, Action> = {
     gas:        { label: 'Gas (direct/piston)', cycle: 0.075, unlock: 0.0042 },
     longstroke: { label: 'Long-stroke gas',     cycle: 0.100, unlock: 0.0052 },
     roller:     { label: 'Roller-delayed',      cycle: 0.072, unlock: 0.0030 },
@@ -97,7 +127,7 @@
   // brass-head ring. `freq` scales modal pitch, `ring` the decay time, `metal`
   // the sinusoidal-ring level, `plastic` a hollow noise clack. The absolute
   // pitch is set from the case's physical size (length + caliber), below.
-  const CASE_MATERIALS = {
+  const CASE_MATERIALS: Record<string, CaseMaterial> = {
     brass:    { label: 'Brass',        freq: 1.00, ring: 1.00, metal: 1.00, plastic: 0.00 },
     steel:    { label: 'Steel',        freq: 1.12, ring: 1.35, metal: 1.00, plastic: 0.00 },
     aluminum: { label: 'Aluminum',     freq: 1.28, ring: 0.70, metal: 0.90, plastic: 0.00 },
@@ -105,7 +135,7 @@
   };
 
   // ---- Interior ballistics -------------------------------------------------
-  function ballistics(p) {
+  function ballistics(p: Pick<ShotParams, 'caliber' | 'barrel' | 'pressure' | 'grain' | 'bulletWeight'>) {
     const cal_m = p.caliber / 1000;
     const bore = Math.PI * Math.pow(cal_m / 2, 2);      // bore cross-section, m^2
     const bl = p.barrel * 0.0254;                        // barrel length, m
@@ -136,9 +166,9 @@
   // energy (a 9 mm pistol burns a fifth of a 5.56's charge), and how much of it is still pressure at the
   // muzzle with the residual fraction (a short barrel vents more of it; a pistol's high fraction is still
   // a fraction of very little, hence the square root).
-  const gasRaw = (p, b) => 0.5 * Math.max(p.bulletWeight, 1) * GRAIN_KG * b.v * b.v * Math.sqrt(b.muzzleFrac);
+  const gasRaw = (p: { bulletWeight: number }, b: Ballistics) => 0.5 * Math.max(p.bulletWeight, 1) * GRAIN_KG * b.v * b.v * Math.sqrt(b.muzzleFrac);
   let GAS_REF = 0;
-  function gasLoad(p, b) {
+  function gasLoad(p: ShotParams, b?: Ballistics) {
     if (!GAS_REF) GAS_REF = gasRaw({ bulletWeight: 62 }, ballistics({ barrel: 14.5, caliber: 5.56, pressure: 55000, grain: 0.7, bulletWeight: 62 }));
     return gasRaw(p, b || ballistics(p)) / GAS_REF;
   }
@@ -147,9 +177,9 @@
   // Returns null for an unsuppressed shot. The drop is in the render itself: a suppressed shot goes into the mic stage
   // that much quieter, so it doesn't overload it the way an open one does, and keeps its own shape (a soft onset, the
   // can blowing down) instead of being flattened into the same clipped plateau, only quieter.
-  function suppression(p, b) {
+  function suppression(p: ShotParams, b?: Ballistics) {
     if (p.muzzleDevice !== 'suppressor') return null;
-    const can = SUPPRESSORS[p.suppressor] || SUPPRESSORS.full;
+    const can = SUPPRESSORS[p.suppressor!] || SUPPRESSORS.full;
     const over = Math.log2(Math.max(gasLoad(p, b), 0.05) / can.vol);
     const db = clamp(can.db + 4 * clamp(over, -1, 3) * (over > 0 ? 1 : 0.5), can.db - 3, -8);
     return { can, db };
@@ -157,7 +187,7 @@
 
   // Event schedule shared by the audio renderer and the visual diagram so the
   // animation lines up exactly with what you hear. All times are seconds.
-  function schedule(p) {
+  function schedule(p: ShotParams) {
     const b = ballistics(p);
     const t0 = 0.004;
     const bl = p.barrel * 0.0254;
@@ -168,7 +198,7 @@
     let bolt = null;
     if (p.boltSim) {
       const bm = clamp(p.boltMass ?? 0.4, 0, 1);
-      const A = ACTIONS[p.actionType] || ACTIONS.gas;
+      const A = ACTIONS[p.actionType!] || ACTIONS.gas;
       const cycle = A.cycle * (0.8 + 0.5 * bm);   // heavier carrier cycles slower
       // The firing pin/hammer strike precedes ignition by a couple of ms
       // ("tk-BANG"); the action then opens after its unlock delay and the
@@ -186,7 +216,7 @@
   }
 
   // Human-readable derived stats for the UI readout.
-  function stats(p) {
+  function stats(p: ShotParams) {
     const b = ballistics(p);
     return {
       velocity_ms: Math.round(b.v),
@@ -209,7 +239,7 @@
   //    giving the classic "crack ... boom" separation that widens with range.
   //  - Distance attenuates level (~1/r) and rolls off highs (air absorption),
   //    turning a near "crack" into a far "boom/pop".
-  function listener(p, b) {
+  function listener(p: ShotParams, b: Ballistics) {
     const dist = clamp(p.lisDist ?? 3, 0.5, 400);
     const th = (clamp(p.lisBearing ?? 90, 0, 180)) * Math.PI / 180;
     const cosT = Math.cos(th);                       // +1 front .. -1 rear
@@ -238,7 +268,7 @@
     return { dist, cosT, distGain, dirDb, dirBright, crackDir, blastDelay, airLp, leadMs: lead * 1000 };
   }
 
-  function listenerInfo(p) {
+  function listenerInfo(p: ShotParams) {
     const b = ballistics(p);
     const L = listener(p, b);
     return {
@@ -251,7 +281,7 @@
   }
 
   // ---- Small Web Audio helpers --------------------------------------------
-  function noiseBuffer(ctx, seconds) {
+  function noiseBuffer(ctx: BaseAudioContext, seconds: number) {
     const n = Math.max(1, Math.floor(seconds * SR));
     const buf = ctx.createBuffer(1, n, SR);
     const d = buf.getChannelData(0);
@@ -260,7 +290,7 @@
   }
 
   // Percussive gain envelope: near-instant attack, exponential decay.
-  function percEnv(ctx, t0, peak, attack, tau) {
+  function percEnv(ctx: BaseAudioContext, t0: number, peak: number, attack: number, tau: number) {
     const g = ctx.createGain();
     g.gain.value = 0; // (silent until it starts: before its first event a gain sits at its default of 1, so a source started
     // ahead of its envelope, as the can's blowdown is, would play flat out until then)
@@ -281,7 +311,7 @@
   //   ground  : add a strong ground-bounce slap (outdoor)
   //   echoes  : add regular repeating slaps (canyon)
   //   flutter : {ms,count,gain} periodic echo between parallel walls
-  const ENVIRONMENTS = {
+  const ENVIRONMENTS: Record<string, Environment> = {
     none:      { label: 'Anechoic (dry)',      group: 'none',    wet: 0 },
     field:     { label: 'Open field',          group: 'outdoor', wet: 0.45, rt60: 0.35, predelay: 0.020, damp: 0.78, diffuse: 0.12, erCount: 3,  erMinMs: 2,  erMaxMs: 130, erGain: 0.38, ground: true },
     forest:    { label: 'Forest',              group: 'outdoor', wet: 0.65, rt60: 0.95, predelay: 0.030, damp: 0.70, diffuse: 0.30, erCount: 16, erMinMs: 8,  erMaxMs: 230, erGain: 0.28, ground: true },
@@ -294,12 +324,12 @@
   };
 
   // Scale a scenario's decay/predelay by the user's size/distance control.
-  const envRt60 = (P, size) => (P.rt60 || 0) * (0.45 + 1.6 * size);
-  const envPredelay = (P, size) => (P.predelay || 0) * (0.4 + 1.6 * size);
+  const envRt60 = (P: Environment, size: number) => (P.rt60 || 0) * (0.45 + 1.6 * size);
+  const envPredelay = (P: Environment, size: number) => (P.predelay || 0) * (0.4 + 1.6 * size);
 
   // Effective reverberation time (RT60, seconds) for a scenario at a given size
   // — the physical meaning of the "Space size" control. 0 for anechoic.
-  function roomRt60(env, size) {
+  function roomRt60(env: string, size: number) {
     const P = ENVIRONMENTS[env] || ENVIRONMENTS.none;
     return P.wet > 0 ? envRt60(P, clamp(size, 0, 1)) : 0;
   }
@@ -308,14 +338,14 @@
   // dry shot with discrete IR spikes reproduces full delayed copies (realistic
   // echoes), while the noise tail provides diffuse reverberation. A running
   // low-pass whose cutoff falls over time models progressive HF loss.
-  function buildEnvIR(ctx, P, size, reflect) {
+  function buildEnvIR(ctx: BaseAudioContext, P: Environment | null, size: number, reflect: number) {
     if (!P || P.wet <= 0) return null;
     const rt60 = envRt60(P, size);
     const predelay = envPredelay(P, size);
     const len = Math.max(1, Math.floor((predelay + rt60 + 0.05) * SR));
     const ir = ctx.createBuffer(2, len, SR);
     // Harder surfaces (high reflect) reflect more energy and lose less HF.
-    const damp = clamp(P.damp * (1.25 - 0.75 * reflect), 0, 0.985);
+    const damp = clamp(P.damp! * (1.25 - 0.75 * reflect), 0, 0.985);
     const erGain = (P.erGain || 0) * (0.55 + 0.9 * reflect);
     const decayK = 6.9078 / Math.max(rt60 * SR, 1);   // ln(1000) for -60 dB
 
@@ -336,7 +366,7 @@
 
       // Sparse/dense early reflections.
       for (let r = 0; r < (P.erCount || 0); r++) {
-        const ms = P.erMinMs + (P.erMaxMs - P.erMinMs) * Math.pow(Math.random(), 1.5) * (0.5 + size);
+        const ms = P.erMinMs! + (P.erMaxMs! - P.erMinMs!) * Math.pow(Math.random(), 1.5) * (0.5 + size);
         const idx = Math.floor((ms / 1000) * SR);
         if (idx < len) {
           const fall = 1 - (ms / 1000) / (rt60 + predelay + 0.001);
@@ -393,7 +423,7 @@
   // analog knee into a hard digital flat-top; a slight negative-side asymmetry
   // (diaphragm behaviour) injects even harmonics and a DC step that the AC
   // coupling later turns into a low-frequency recovery "thump".
-  function micCurve(hardness) {
+  function micCurve(hardness: number) {
     const N = 2048, c = new Float32Array(N);
     for (let i = 0; i < N; i++) {
       const x = (i / (N - 1)) * 2 - 1;
@@ -420,7 +450,7 @@
   // more, on top of the blast's own cut: the can counted two and a quarter times over, an integral can 35-40 dB
   // under the open gun: a whisper even in your own hands.)
   const SUP_DRIVE = 0.45;
-  function micProfile(p, sup) {
+  function micProfile(p: ShotParams, sup: Suppression) {
     const gain = clamp(p.micGain ?? 0.3, 0, 1);
     const hard = clamp(p.micHardness ?? 0.5, 0, 1);
     const agc = clamp(p.micAgc ?? 0.25, 0, 1);
@@ -428,7 +458,7 @@
     return { sim: p.micSim !== false, gain, hard, agc, driveDb, outDb: 0, curve: micCurve(hard) };
   }
 
-  function buildMicChain(ctx, input, dest, mic) {
+  function buildMicChain(ctx: BaseAudioContext, input: AudioNode, dest: AudioNode, mic: MicProfile) {
     const { gain, hard, agc } = mic;
 
     const drive = ctx.createGain();
@@ -474,9 +504,9 @@
   // muzzle device (a source-side part) IS baked in; positional gains are not.
   // Layers go to separate channels of one buffer: 0=blast(+tang) 1=bolt
   // 2=whoosh 3=crack.
-  function precompute(p) {
+  function precompute(p: ShotParams): Promise<ShotSource> {
     const b = ballistics(p);
-    const dev = DEVICES[p.muzzleDevice] || DEVICES.none;
+    const dev = DEVICES[p.muzzleDevice!] || DEVICES.none;
     const sup = suppression(p, b), can = sup && sup.can;
     const sched = schedule(p);
     const t0 = sched.tExit;
@@ -489,7 +519,7 @@
     const bus = [0, 1, 2, 3].map((i) => {
       const g = ctx.createGain(); g.connect(merger, 0, i); return g;
     });
-    const add = (node, env, ch) => { node.connect(env); env.connect(bus[ch]); };
+    const add = (node: AudioNode, env: AudioNode, ch: number) => { node.connect(env); env.connect(bus[ch]); };
 
     // Hard drive curve: nonlinear clipping a 150 dB+ shock front undergoes.
     const drive = new Float32Array(1024);
@@ -512,7 +542,7 @@
     const g0 = dbToGain(sup ? sup.db : dev.level);   // device level baked into blast + tang
     // The action and the crack aren't suppressed: they stay at their own level (the bolt a little harder, with the
     // can's back pressure driving it), so next to the quieted blast they come forward.
-    const keepBolt = sup ? 1 + 0.5 * can.back : 1;
+    const keepBolt = sup ? 1 + 0.5 * can!.back : 1;
     const keepCrack = 1;
 
     // (a) shock front
@@ -561,7 +591,7 @@
     // the can ringing: its column of hot gas (open at the muzzle, closed at the blast baffle: f = c/4L, with c
     // ~520 m/s in the hot gas) and, fainter and higher, the steel tube
     if (can && can.ring > 0) {
-      const tone = (f, amp, decay, delay) => {
+      const tone = (f: number, amp: number, decay: number, delay: number) => {
         const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = f;
         const e = percEnv(ctx, t0 + delay, amp, 0.0006, decay); add(o, e, 2);
         o.start(t0 + delay); o.stop(t0 + delay + decay * 8);
@@ -604,13 +634,13 @@
       const bm = sched.bolt.bm;
       const loud = (p.boltLoudness ?? 0.55) * keepBolt;
       const pitch = 1 - 0.4 * bm;
-      const ping = (t, freq, amp, q, decay, ch) => {
+      const ping = (t: number, freq: number, amp: number, q: number, decay: number, ch: number) => {
         const s = ctx.createBufferSource(); s.buffer = noiseBuffer(ctx, 0.03);
         const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = freq; bp.Q.value = q;
         const e = percEnv(ctx, t, amp, 0.0004, decay); s.connect(bp); add(bp, e, ch);
         s.start(t); s.stop(t + decay * 8 + 0.02);
       };
-      const thunk = (t, freq, amp) => {
+      const thunk = (t: number, freq: number, amp: number) => {
         const s = ctx.createBufferSource(); s.buffer = noiseBuffer(ctx, 0.05);
         const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = freq * 3;
         const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = freq; bp.Q.value = 3;
@@ -630,7 +660,7 @@
       // back pressure: gas the can holds in the bore spits out of the action as it opens (a hiss at the shooter's
       // face), most on direct gas and blowback guns, little on a locked short-recoil or roller action
       if (can && can.back > 0) {
-        const A = { gas: 1, longstroke: 0.6, blowback: 1, roller: 0.5, recoil: 0.3 }[p.actionType] ?? 0.7;
+        const A = ({ gas: 1, longstroke: 0.6, blowback: 1, roller: 0.5, recoil: 0.3 } as Record<string, number>)[p.actionType!] ?? 0.7;
         const h = ctx.createBufferSource(); h.buffer = noiseBuffer(ctx, 0.1);
         const hBp = ctx.createBiquadFilter(); hBp.type = 'bandpass'; hBp.frequency.value = 2400; hBp.Q.value = 0.8;
         const e = percEnv(ctx, tUnlock, 0.18 * can.back * A * loud, 0.002, 0.014);
@@ -651,12 +681,12 @@
   }
 
   // ---- Stage 2: placement (room + listener) --------------------------------
-  function place(source, p) {
+  function place(source: ShotSource, p: ShotParams) {
     const b = source.ballistics;
     const sched = source.schedule;
     const L = listener(p, b);
 
-    const envP = ENVIRONMENTS[p.env] || ENVIRONMENTS.none;
+    const envP = ENVIRONMENTS[p.env!] || ENVIRONMENTS.none;
     const envSize = p.envSize ?? 0.5;
     const envReflect = p.envReflect ?? 0.5;
     const envMix = p.envMix ?? 0.6;
@@ -665,14 +695,14 @@
     const casingOn = (p.casing ?? 0) > 0.01 && sched.bolt;
     const casHard = clamp(envReflect, 0, 1);              // ground surface hardness
     const casIndoor = envP.group === 'indoor';
-    const casMat = CASE_MATERIALS[p.caseMaterial] || CASE_MATERIALS.brass;
+    const casMat = CASE_MATERIALS[p.caseMaterial!] || CASE_MATERIALS.brass;
     const casRing = (0.05 + 0.5 * casHard) * (casIndoor ? 1.4 : 1) * casMat.ring;   // ring time (s)
     // Bounce-train settle time: drop from ~shoulder height + a geometric sum of
     // ballistic rebound arcs (a hard floor bounces far longer than soft ground).
     const casRest = 0.25 + 0.45 * casHard;
     const casSettle = Math.sqrt(2 * 1.45 / 9.81) + 0.34
       + (2 * Math.sqrt(2 * 9.81 * 1.45) * casRest / 9.81) / (1 - casRest);
-    const casingEnd = casingOn ? sched.bolt.tEject + casSettle + casRing + 0.1 : 0;
+    const casingEnd = casingOn ? sched.bolt!.tEject + casSettle + casRing + 0.1 : 0;
     const dur = L.blastDelay + Math.max(source.stems.duration, casingEnd) + envTail + 0.05;
     const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
     const ctx = new OAC(2, Math.ceil(dur * SR), SR);
@@ -730,7 +760,7 @@
       const modes = [1, 2.30, 4.05, 6.10];
       const modeGain = [1, 0.55, 0.35, 0.20];
 
-      const ringBody = (t, amp, ring) => {   // the thin case body ringing
+      const ringBody = (t: number, amp: number, ring: number) => {   // the thin case body ringing
         if (casMat.metal > 0.01) {
           for (let m = 0; m < modes.length; m++) {
             const f = base * modes[m] * (0.97 + 0.06 * Math.random());
@@ -752,7 +782,7 @@
         }
       };
 
-      const caseImpact = (t, amp, ring) => {
+      const caseImpact = (t: number, amp: number, ring: number) => {
         // (1) heavy base landing — a low, short "clunk" (the mass at the head)
         const th = ctx.createBufferSource(); th.buffer = noiseBuffer(ctx, 0.02);
         const thBp = ctx.createBiquadFilter(); thBp.type = 'bandpass'; thBp.frequency.value = thudF; thBp.Q.value = 2.2;
@@ -779,7 +809,7 @@
       const rest = casRest;                              // restitution: dirt→concrete
       const v0 = Math.sqrt(2 * G * dropH);               // first-impact speed
       const ampScale = casingAmt * overall * source.blastPeak * 0.025 / v0;
-      let t = L.blastDelay + sched.bolt.tEject + Math.sqrt(2 * dropH / G) + (0.12 + 0.22 * Math.random());
+      let t = L.blastDelay + sched.bolt!.tEject + Math.sqrt(2 * dropH / G) + (0.12 + 0.22 * Math.random());
       let v = v0;
       let ring = casRing;
       for (let k = 0; k < 16 && v > v0 * 0.05; k++) {
@@ -819,7 +849,7 @@
   }
 
   // Convenience: full render = source then placement (no external caching).
-  function render(p) {
+  function render(p: ShotParams) {
     return precompute(p).then((source) => place(source, p));
   }
 
@@ -829,7 +859,7 @@
   // parameter object. Parameter-independent data tables (device/environment/
   // action definitions) hang off it as static properties, since the UI needs
   // them to build controls before any shot exists.
-  function GunshotSynth(params) {
+  function GunshotSynth(params: ShotParams) {
     return {
       params,
       ballistics: ballistics(params),

@@ -1,6 +1,13 @@
 'use strict';
 // where a door stops being a kick and starts being a push: aim below this (m) to kick, above to open
 const KICK_H = 1.3;
+type PBuild = Record<string, string>;
+// what a shot's rounds share (the friendly fire to send, together, and where they end); the rest is set as it goes
+interface PShot { sid: number; ff: Map<any, any>; to?: THREE.Vector3; tos: THREE.Vector3[] | null; ghosts?: Map<string, ShotGhost>; n?: number; paths?: any[]; [k: string]: any }
+// a round in flight (Me.fly): its state, and what the stepping adds as it goes
+type PWeapon = GWeapon & { def: WeaponDef };
+type PTrack = { t: number; v: number; bone: string }[] & { frags?: any[] };
+interface PRound { p: THREE.Vector3; v: THREE.Vector3; def: WeaponDef; am: string; drag: number; hit: Set<any>; shot: PShot; path: { p: number[][]; ev: any[]; hit: any[] }; enemy?: number; [k: string]: any }
 // The local player: input, movement, weapons, damage, revive/down state.
 const G_Me = {
   keys: {} as Record<string, boolean>,
@@ -10,8 +17,8 @@ const G_Me = {
   PRONE_T: 0.8, // getting down onto your front, or back up (s): no shooting meanwhile
   LEAN: 0.38, // metres the head moves sideways at full lean
   mouse: { l: false, r: false },
-  pos: null,
-  vel: null,
+  pos: null as unknown as THREE.Vector3,
+  vel: null as unknown as THREE.Vector3,
   yaw: 0,
   pitch: 0,
 
@@ -27,7 +34,7 @@ const G_Me = {
   },
   // the sidearm you start a run with (js/arsenal.ts), loaded with tracers, and two spare loads of them in the small
   // pockets (in place of the last one's)
-  setSidearm(id, build) {
+  setSidearm(id: string, build?: PBuild) {
     const w = this.makeWeapon(id, build), am = G.ammoOk(G.calOf(w.def), 'tracer');
     w.ammo = am; w.tube = w.tube.map(() => am); if (w.chamber) w.chamber = am;
     this.weapons.s = w; this.slot = 's';
@@ -48,11 +55,11 @@ const G_Me = {
   helmCond() { return G.Gear.cond(this.kit.helmet); },
   maxHp() { return 100; },
   maxNades() { return 3; },
-  magSize(def) { return def.mag; },
-  reserveMax(def) { return def.reserve; },
+  magSize(def: WeaponDef) { return def.mag; },
+  reserveMax(def: WeaponDef) { return def.reserve; },
   // a weapon as built: def is the compiled build (stats changed by its parts), see js/parts.ts
-  makeWeapon(id, build?) {
-    const def = G.Gunsmith.compile(id, build);
+  makeWeapon(id: string, build?: PBuild) {
+    const def = G.Gunsmith.compile(id, build!);
     // ammo: the type of round in it (a magazine holds one type); a gun loaded a round at a time keeps the
     // order in its tube (the last one in is the next one fired)
     const w: any = { def, sup: def.sup, mag: def.mag, ammo: G.ballFor(G.calOf(def)), fm: (def.modes || [def.mode])[0] }; // fm: where its selector is
@@ -63,7 +70,7 @@ const G_Me = {
     return w;
   },
   // something you picked up, from the host: onto you (no room after all: put back down, where it lay)
-  lootGot(packed, x, z, at) {
+  lootGot(packed: any, x: number, z: number, at: number) {
     const Gr = G.Gear, it = Gr.unpack(packed), name = G.Loot.name(packed);
     let ok = false;
     if (it.k === 'gun') { // into your hands; the one you had there into your backpack if there's room, or down where this one lay
@@ -81,14 +88,14 @@ const G_Me = {
     else { G.HUD.toast('', `No room on you for the ${name}`, 1.6); G.Net.toHost({ t: 'drop', item: packed, x, z, at }); }
   },
   // put something down at your feet (from the inventory): it's the host's to hand out now
-  dropItem(it) {
+  dropItem(it: GItem) {
     const a = this.yaw + (Math.random() - 0.5) * 0.8, d = 0.45 + Math.random() * 0.25;
     G.Net.toHost({ t: 'drop', item: G.Gear.pack(it), x: this.pos.x - Math.sin(a) * d, z: this.pos.z - Math.cos(a) * d });
     G.Audio.click();
   },
   // the host's answer to a cabinet edit: what you took that someone else had already (it comes off you again),
   // and what you put in that didn't fit after all (it comes back)
-  cabSettle(deny, ret) {
+  cabSettle(deny: Record<string, number> | null, ret: any) {
     const Gr = G.Gear, lost = [];
     for (const [mt, n0] of Object.entries(deny || {})) {
       let n = n0;
@@ -102,11 +109,11 @@ const G_Me = {
   // an attachment the host gave you from the attachments box: fitted to the weapon in your hands if you said so and
   // it still goes straight on (what it replaces, and anything that no longer has a place, into your inventory, or
   // at your feet if there's no room), else carried (at your feet if there's no room)
-  takeAttachment(pid, fit) {
+  takeAttachment(pid: string, fit: boolean) {
     const GS = G.Gunsmith, Gr = G.Gear, p = GS.PARTS[pid], w = this.cur();
     if (!p) return;
-    const keep = (q) => { const it = Gr.partItem(q); if (Gr.stow(this, it)) return true; this.dropItem(it); return false; };
-    const sl = fit && w && GS.slotsOf(w.def.id, w.def.build).find((s) => GS.fitsSlot(s, p, w.def.id));
+    const keep = (q: string) => { const it = Gr.partItem(q); if (Gr.stow(this, it)) return true; this.dropItem(it); return false; };
+    const sl = fit && w && GS.slotsOf(w.def.id, w.def.build).find((s: any) => GS.fitsSlot(s, p, w.def.id));
     if (sl) {
       const build = Object.assign({}, w.def.build), off = build[sl.slot] ? [build[sl.slot]] : [];
       build[sl.slot] = pid;
@@ -119,7 +126,7 @@ const G_Me = {
     if (G.InvUI.field) G.InvUI.render();
   },
   // a different gun in that slot now: it's the one in your hands, drawn
-  inHand(slot, msg) {
+  inHand(slot: string, msg: string) {
     const w = this.weapons[slot];
     this.slot = slot; this.reloading = false; this.inspectT = 0; this.burstQ = 0;
     G.R.setViewmodel(w.def);
@@ -129,14 +136,14 @@ const G_Me = {
     G.HUD.toast('', msg, 2);
   },
   // is there room in your backpack for a gun (with another one taken out of it first)?
-  packRoom(gunIt, out) {
+  packRoom(gunIt: GItem, out: GItem | null) {
     const pack = this.kit.pack;
     if (!pack) return false;
     const where = out && G.Gear.packGuns(this).find(([it]) => it === out);
-    const p = where && where[1].items.find((q) => q.it === out);
+    const p = where && where[1].items.find((q: GCell) => q.it === out);
     if (where) G.Gear.removeFrom(where[1], out);
-    const ok = pack.grids.some((g) => G.Gear.findSpot(g, gunIt));
-    if (where) G.Gear.put(where[1], out, p.x, p.y, p.r);
+    const ok = pack.grids.some((g: GGrid) => G.Gear.findSpot(g, gunIt));
+    if (where) G.Gear.put(where[1], out, p!.x, p!.y, p!.r);
     return ok;
   },
   // B: swap the gun in your hands of that kind for the next one in your backpack (yours goes in its place).
@@ -161,7 +168,7 @@ const G_Me = {
     this.action.key = 'KeyB';
   },
   // refit a weapon after the gunsmith changed its build (ammo carried over, mag clamped to the new size)
-  refit(w, build) {
+  refit(w: GWeapon, build: PBuild) {
     const conv = G.Gunsmith.convert(w.def.id, build);
     if (conv) return this.convert(w, conv);
     const def = G.Gunsmith.compile(w.def.id, build);
@@ -175,7 +182,7 @@ const G_Me = {
   // your locker (the old gun's own barrel and such go with its kit); what was loaded stays only if the new gun
   // takes the same rounds from the same magazines, otherwise the magazine comes out with its rounds (or the
   // loose rounds go back in boxes).
-  convert(w, { id, build, off }) {
+  convert(w: GWeapon, { id, build, off }: { id: string; build: PBuild; off: string[] }) {
     const Gr = G.Gear, GS = G.Gunsmith, old = w.def, def = GS.compile(id, build), a0 = Gr.ammoFor(old), a1 = Gr.ammoFor(def);
     for (const pid of off) { const p = GS.PARTS[pid]; if (p && !p.variant) this.stash[pid] = (this.stash[pid] || 0) + 1; } // (parts with nowhere to go on it)
     const keep = G.calOf(old) === G.calOf(def) && a0.kind === a1.kind && (a1.kind !== 'mag' || G.magFits(old.id, id));
@@ -193,13 +200,13 @@ const G_Me = {
     if (keep) { w.mag = Math.min(w.mag, this.magSize(def)); if (w.tube) w.tube.length = Math.min(w.tube.length, w.mag); }
     if (!G.chambered(def)) { if (w.chamber) { w.tube.push(w.chamber); w.mag++; } w.chamber = null; } // (no chamber of its own: into the magazine)
     if (this.cur && this.cur() === w && G.R && G.R.vm && G.Game.phase === 'level') G.R.setViewmodel(def);
-    const misfit = (def.misfit || []).map((s) => GS.PARTS[def.build[s]].name);
+    const misfit = (def.misfit || []).map((s: string) => GS.PARTS[def.build[s]].name);
     if (G.HUD) G.HUD.toast('', `Your ${old.name} is now a ${def.name}${keep ? '' : a0.kind === 'mag' && a1.kind === 'mag' ? ', its magazine out' : ''}${misfit.length ? `. It won't fire until you replace: ${misfit.join(', ')}` : ''}`, 3.5);
   },
   cur() { return this.weapons[this.slot]; },
   // The sight as it's set now: its power (a variable scope's step, or a magnifier in or out), whether you're
   // looking through a magnified picture, and the aiming sensitivity / view tightening (zoom).
-  sight(w) {
+  sight(w: GWeapon) {
     const d = w.def, L = d.magLevels;
     if (!L) return { i: 0, mag: d.magnif || 1, scoped: d.scoped, zoom: d.zoom };
     const i = G.U.clamp(w.magI != null ? w.magI : d.magDef || 0, 0, L.length - 1), mag = L[i];
@@ -214,7 +221,7 @@ const G_Me = {
   // side buttons used to work the light and laser, but a browser's back and forward can't be reliably kept off them.)
   WHEEL_HOLD: 0.22,
   wheelItems() {
-    const w = this.cur(), d = w && w.def, on = (k) => (w && w[k] ? 'on' : 'off');
+    const w = this.cur(), d = w && w.def, on = (k: string) => (w && w[k] ? 'on' : 'off');
     const L = d && d.magLevels, mi = w && L ? this.sight(w).i : 0;
     return [
       { id: 'light', label: 'Light', sub: d && d.light ? on('light') : 'none fitted', off: !(d && d.light), act: () => this.toggleTac('light') },
@@ -233,12 +240,12 @@ const G_Me = {
     let el = document.getElementById('commWheel');
     if (!el) { el = document.createElement('div'); el.id = 'commWheel'; document.body.appendChild(el); }
     const N = this.wheel.items.length;
-    el.innerHTML = this.wheel.items.map((it, i) => { const a = (i / N) * Math.PI * 2 - Math.PI / 2; return `<div class="cw-it${it.off ? ' off' : ''}" style="left:calc(50% + ${(Math.cos(a) * 118).toFixed(1)}px);top:calc(50% + ${(Math.sin(a) * 118).toFixed(1)}px)"><b>${it.label}</b><small>${it.sub}</small></div>`; }).join('') + '<i class="cw-ptr"></i>';
+    el.innerHTML = this.wheel.items.map((it: { off?: boolean; label: string; sub: string }, i: number) => { const a = (i / N) * Math.PI * 2 - Math.PI / 2; return `<div class="cw-it${it.off ? ' off' : ''}" style="left:calc(50% + ${(Math.cos(a) * 118).toFixed(1)}px);top:calc(50% + ${(Math.sin(a) * 118).toFixed(1)}px)"><b>${it.label}</b><small>${it.sub}</small></div>`; }).join('') + '<i class="cw-ptr"></i>';
     el.classList.add('on');
     G.Audio.click();
   },
-  wheelMove(dx, dy) {
-    const W = this.wheel, el = document.getElementById('commWheel');
+  wheelMove(dx: number, dy: number) {
+    const W = this.wheel, el = document.getElementById('commWheel')!;
     W.x += dx; W.y += dy;
     const r = Math.hypot(W.x, W.y);
     if (r > 90) { W.x *= 90 / r; W.y *= 90 / r; }
@@ -247,7 +254,7 @@ const G_Me = {
     if (sel !== W.sel) { W.sel = sel; el.querySelectorAll('.cw-it').forEach((e, i) => e.classList.toggle('sel', i === sel)); if (sel >= 0) G.Audio.click(); }
     const p = el.querySelector<HTMLElement>('.cw-ptr'); if (p) p.style.transform = `translate(${W.x.toFixed(1)}px, ${W.y.toFixed(1)}px)`;
   },
-  wheelClose(pick) {
+  wheelClose(pick?: boolean) {
     const W = this.wheel, el = document.getElementById('commWheel');
     this.wheel = null;
     if (el) el.classList.remove('on');
@@ -257,7 +264,7 @@ const G_Me = {
     it.act();
   },
   // a call to the squad (the chat, under your name)
-  say(m) {
+  say(m: string) {
     const now = performance.now();
     if (now - (this.sayAt || 0) < 700) return;
     this.sayAt = now;
@@ -267,7 +274,7 @@ const G_Me = {
   injuryReport() {
     const b = this.body;
     if (!b) return 'I\'m good.';
-    const parts = Object.entries(b.parts).map(([k, p]) => [G.Med.NAME[k].toLowerCase(), G.Med.describe(p).filter((s) => s !== 'tourniquet on'), p]).filter(([, d, p]) => d.length || p.hp < p.max * 0.9);
+    const parts = Object.entries(b.parts).map(([k, p]) => [G.Med.NAME[k].toLowerCase(), G.Med.describe(p).filter((s) => s !== 'tourniquet on'), p] as [string, string[], any]).filter(([, d, p]) => d.length || p.hp < p.max * 0.9);
     const blood = Math.round(b.blood);
     if (!parts.length) return blood < 95 ? `Not hit, but I've lost blood: ${blood}%.` : 'I\'m not hit. Good to go.';
     const bleeding = parts.some(([, d]) => d.some((s) => /bleeding/.test(s)));
@@ -282,7 +289,7 @@ const G_Me = {
   },
 
   // switch the gun's light or laser (it remembers: each gun has its own switches)
-  toggleTac(kind) {
+  toggleTac(kind: string) {
     const w = this.cur();
     if (!w || this.dead) return;
     if (kind === 'light' ? !w.def.light : !w.def.laser) { G.HUD.toast('', `No ${kind} on the ${w.def.name}`, 1); G.Audio.deny(); return; }
@@ -291,7 +298,7 @@ const G_Me = {
     G.HUD.toast('', `${kind === 'light' ? 'Light' : 'Laser'} ${w[kind] ? 'on' : 'off'}`, 0.7);
   },
   // what's lit on this gun (as sent to the squad): 1 light, 2 laser, 4 green laser, 8 bright light
-  tacFlags(w) {
+  tacFlags(w: GWeapon) {
     if (!w || this.stowed) return 0;
     const d = w.def;
     return (w.light && d.light ? 1 | (d.light > 1.2 ? 8 : 0) : 0) | (w.laser && d.laser ? 2 | (d.laser === 'g' ? 4 : 0) : 0);
@@ -303,7 +310,7 @@ const G_Me = {
     if (now - (this.pingAt || 0) < 400) return;
     this.pingAt = now;
     const cam = G.R.camera, o = cam.position, f = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
-    const h = G.Level.raycast(G.Game.map, o.x, o.y, o.z, f.x, f.y, f.z, 200);
+    const h = G.Level.raycast(G.Game.map!, o.x, o.y, o.z, f.x, f.y, f.z, 200);
     let t = h.t;
     const rc = new THREE.Raycaster(o.clone(), f.clone(), 0, t);
     for (const ev of G.Views.enemies.values()) { // (on whoever's in the way: just the spot)
@@ -322,7 +329,7 @@ const G_Me = {
 
   // ------------------------------------------------------------- input
   bindInput() {
-    const isGameKey = (c) => ['Tab', 'Space', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE'].includes(c);
+    const isGameKey = (c: string) => ['Tab', 'Space', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE'].includes(c);
     window.addEventListener('keydown', (e) => {
       if (G.Game.chatOpen || G.Game.phase !== 'level') return;
       if (isGameKey(e.code)) e.preventDefault();
@@ -401,7 +408,7 @@ const G_Me = {
   },
 
   // ------------------------------------------------------------- lifecycle
-  spawn(x, z) {
+  spawn(x: number, z: number) {
     this.pos = new THREE.Vector3(x, 0, z);
     this.vel = new THREE.Vector3();
     this.yaw = 0; this.pitch = 0;
@@ -427,7 +434,7 @@ const G_Me = {
     if (!this.weapons[this.slot]) this.slot = Object.keys(this.weapons)[0];
     G.R.setViewmodel(this.cur().def);
     // face away from the nearest wall
-    const m = G.Game.map;
+    const m = G.Game.map!;
     let best = -1;
     for (let a = 0; a < 8; a++) {
       const yaw = (a / 8) * Math.PI * 2;
@@ -440,8 +447,8 @@ const G_Me = {
     return this.cur().def.speed * G.Gear.speed(this) * (this.body ? G.Med.speedMult(this.body) : 1);
   },
 
-  update(dt) {
-    const map = G.Game.map;
+  update(dt: number) {
+    const map = G.Game.map!;
     if (!map || !this.pos) return;
     this.stepRounds(dt);
     G.R.fisheye = 0; // (spectating turns it on: js/player.ts spectate)
@@ -471,7 +478,7 @@ const G_Me = {
     this.fEdge = false;
   },
 
-  move(dt, map) {
+  move(dt: number, map: LvMap) {
     // belted into a seat in the helicopter (the hangar's, or the one that's brought you in): nowhere to go, the view turned
     // no further than a head turns
     if (this.seat != null) {
@@ -545,14 +552,14 @@ const G_Me = {
   // F again, or a step, and you're off it. REACH: how close you have to be; EYE: the eyepieces' height; AHEAD: how far in front
   // of the viewer's middle the view starts (just past its lenses, so its own head isn't in the way)
   VIEWER: { MAG: 15, REACH: 1.3, EYE: 1.36, AHEAD: 0.24, YAW: 1.2, UP: 0.25, DOWN: 0.45 },
-  viewerNear(map) {
+  viewerNear(map: LvMap) {
     const sc = map && map.crest && map.crest.scopes;
-    return (sc && Math.abs(this.pos.y) < 0.5 && sc.find((v) => Math.hypot(v.x - this.pos.x, v.z - this.pos.z) < this.VIEWER.REACH)) || null;
+    return (sc && Math.abs(this.pos.y) < 0.5 && sc.find((v: any) => Math.hypot(v.x - this.pos.x, v.z - this.pos.z) < this.VIEWER.REACH)) || null;
   },
-  viewerOn(v) { this.viewer = { v, was: !!this.stowed, yaw: this.yaw, pitch: this.pitch }; this.yaw = v.yaw; this.pitch = 0; this.stowed = true; this.lowToggle = false; this.mouse.r = false; G.Audio.click(); },
+  viewerOn(v: any) { this.viewer = { v, was: !!this.stowed, yaw: this.yaw, pitch: this.pitch }; this.yaw = v.yaw; this.pitch = 0; this.stowed = true; this.lowToggle = false; this.mouse.r = false; G.Audio.click(); },
   viewerOff() { const w = this.viewer; if (!w) return; this.viewer = null; this.viewerMask(false); if (G.R.vmRoot) G.R.vmRoot.visible = true; this.stowed = w.was; this.yaw = w.v.yaw + G.U.clamp(G.U.angDiff(w.v.yaw, this.yaw), -this.VIEWER.YAW, this.VIEWER.YAW); G.Audio.click(); },
   // the binoculars' two round fields, soft at their edges, the rest black (an overlay over the view, while you're at one)
-  viewerMask(on) {
+  viewerMask(on: boolean) {
     let el = document.getElementById('viewerMask');
     if (!el && !on) return;
     if (!el) {
@@ -570,12 +577,12 @@ const G_Me = {
   // at the ends and fastest down the middle of it (V0 + V1 m/s), and let down onto the far side (DOWN s), hanging HANG m under
   // it. The weapon's away the whole way; you can look round. The host takes where you are as it does any time.
   ZIP: { UP: 0.7, DOWN: 0.5, HANG: G.Level.ZIP_HANG, V0: 7, V1: 17, REACH: 1.6, HOLD: 0.4 }, // (HANG: hanging by the bar, js/level.ts zipKit)
-  zipNear(map) {
+  zipNear(map: LvMap) {
     const ls = map && map.crest && map.crest.lines;
-    return (ls && Math.abs(this.pos.y) < 0.5 && ls.find((l) => Math.hypot(l.on[0] - this.pos.x, l.on[1] - this.pos.z) < this.ZIP.REACH)) || null;
+    return (ls && Math.abs(this.pos.y) < 0.5 && ls.find((l: any) => Math.hypot(l.on[0] - this.pos.x, l.on[1] - this.pos.z) < this.ZIP.REACH)) || null;
   },
-  zipStep(dt) {
-    const z = this.zipRide, l = z.l, Z = this.ZIP, under = (s) => { const p = G.Level.zipPoint(l, s); return new THREE.Vector3(p[0], p[1] - Z.HANG, p[2]); };
+  zipStep(dt: number) {
+    const z = this.zipRide, l = z.l, Z = this.ZIP, under = (s: number) => { const p = G.Level.zipPoint(l, s); return new THREE.Vector3(p[0], p[1] - Z.HANG, p[2]); };
     z.t += dt;
     let p;
     if (z.ph === 'up') { p = z.from.clone().lerp(under(0), G.U.smooth(0, 1, z.t / Z.UP)); if (z.t >= Z.UP) { z.ph = 'ride'; z.t = 0; } }
@@ -596,15 +603,15 @@ const G_Me = {
   // head on the roof to climb down. Onto it (ON s), carried up or down it (CLIMB m/s), off it onto the roof or the ground (OFF
   // s); the weapon's away till you're off, and you can look round. REACH: how close to an end you have to be.
   LADDER: { CLIMB: 1.3, ON: 0.35, OFF: 0.45, REACH: 1.1, HOLD: 0.3, OUT: 0.42 },
-  ladderNear(map) {
+  ladderNear(map: LvMap) {
     const l = map && map.crest && map.crest.ladder, R = this.LADDER.REACH;
     if (!l) return null;
     if (Math.abs(this.pos.y) < 0.5 && Math.hypot(l.foot[0] - this.pos.x, l.foot[1] - this.pos.z) < R) return { l, up: true };
     if (Math.abs(this.pos.y - l.top) < 0.5 && Math.hypot(l.head[0] - this.pos.x, l.head[1] - this.pos.z) < R) return { l, up: false };
     return null;
   },
-  climbStep(dt) {
-    const c = this.climb, l = c.l, C = this.LADDER, on = (y) => new THREE.Vector3(l.x + C.OUT, y, l.z); // (on it: just out from the wall)
+  climbStep(dt: number) {
+    const c = this.climb, l = c.l, C = this.LADDER, on = (y: number) => new THREE.Vector3(l.x + C.OUT, y, l.z); // (on it: just out from the wall)
     c.t += dt;
     let p;
     if (c.ph === 'on') { p = c.from.clone().lerp(on(c.from.y), G.U.smooth(0, 1, c.t / C.ON)); if (c.t >= C.ON) { c.ph = 'climb'; c.t = 0; c.y = c.from.y; } }
@@ -626,7 +633,7 @@ const G_Me = {
   // in front of your shoulder to where the hand is. On the ladder, where G.Level.ladderGrip has it on a rung (each one holding
   // as you rise past it, then reaching up two); on a zipline, on the grab bar over your head, the trolley above it on the
   // cable (G.Level.zipKit). Everyone else sees the whole of you (js/rig.ts).
-  holdArms(cam) {
+  holdArms(cam: THREE.Camera) {
     let A = this._climbArms;
     const z = this.zipRide;
     if (this._zipKit) this._zipKit.visible = !!z;
@@ -681,7 +688,7 @@ const G_Me = {
     SHOVE: { K: 300, D: 26, J: 0.55, STIFF: 30, HIP: 0.12, SIDE: 0.9, UP: 0.5 } },
   SWAY_GAIN: 1.6, // how big the aim wobble is (breathing, twitch, walking); 1 = the old, subtler sway
   // per-build handling, from the build's recoil (degrees/shot), class, weight and handling
-  recoilModel(def) {
+  recoilModel(def: WeaponDef) {
     this._rm = this._rm || new WeakMap();
     let m = this._rm.get(def);
     if (m) return m;
@@ -700,7 +707,7 @@ const G_Me = {
   },
   // how badly injuries throw your aim (0..1): pain, a punctured lung, blood loss (js/medical.ts)
   lowHealth() { return this.down ? 1 : this.body ? G.Med.aimPenalty(this.body) : 0; },
-  recoilStep(dt, def) {
+  recoilStep(dt: number, def: WeaponDef) {
     const R = this.RECOIL, rc = this.rc, m = this.recoilModel(def);
     // bleeding out saps the strength to muscle the muzzle back down
     const g = m.rec * (1 - 0.8 * this.lowHealth()), kd = R.KD * Math.sqrt(g);
@@ -724,7 +731,7 @@ const G_Me = {
   // aiming (update: it's in with the recoil's punch).
   // (K: the kick for a bare head. INERTIA: what a kg on your head adds to moving it. W: how fast a bare head comes back. NOSE: the tip for each kg m out in front.)
   HEAD_KICK: { K: 7, INERTIA: 0.3, W: 15, NOSE: 1.5 },
-  headHit(hd) {
+  headHit(hd: number[][]) {
     const H = this.HEAD_KICK, load = G.Gear.headLoad(this), I = 1 + load.kg * H.INERTIA, hk = this.hk, inv = new THREE.Quaternion().setFromEuler(new THREE.Euler(this.pitch, this.yaw, 0, 'YXZ')).invert(), k = H.K / I;
     hk.w = H.W / Math.sqrt(I);
     for (const [x, y, z, ux, uy, uz, mv] of hd) {
@@ -738,7 +745,7 @@ const G_Me = {
     return G.U.lerp(this.RECOIL.SHOVE.HIP, give, this.adsT || 0);
   },
   // lone: a pair's first round, whose second never came: its own kick, as it was held
-  recoilKick(def, lone) {
+  recoilKick(def: WeaponDef, lone?: boolean) {
     const R = this.RECOIL, rc = this.rc, m = this.recoilModel(def);
     // A hyper-burst pair (AN-94) leaves before the recoil reaches you: the first round's kick waits for the second, so the
     // second leaves on the same line, and then you take the two as one. The rounds after them kick for themselves.
@@ -766,7 +773,7 @@ const G_Me = {
   // a counter), 30 to 80 cm out, nothing in the way over it. Held still and not aimed steeply. bipodT: how far down it is (the legs: js/vmanim.ts; what it
   // does to the sway and kick: swayStep, recoilKick). BIPOD: what's left of the sway and the twitch, and of the kick.
   BIPOD: { SWAY: 0.12, ERRATIC: 0.1, KICK: 0.55, RATE: 4 },
-  bipodStep(dt) {
+  bipodStep(dt: number) {
     const a = G.R.vm && G.R.vm.userData.vma, has = !!(a && a.hs[0].an.bipod);
     let on = false;
     if (has && !this.stowed && !this.held && this.onGround && (this.hspeed || 0) < 0.4 && Math.abs(this.pitch) < 0.35) {
@@ -784,7 +791,7 @@ const G_Me = {
   },
   // Breathing (two slow frequencies), the erratic twitch, walking and the low-health tremor. Looser from the
   // hip, tighter crouched or holding your breath (Shift); on a bipod, hardly any.
-  swayStep(dt, def) {
+  swayStep(dt: number, def: WeaponDef) {
     const m = this.recoilModel(def), a = this.adsT || 0, low = this.lowHealth();
     this.swayT += dt;
     this.walkAmp += ((this.onGround ? Math.min((this.hspeed || 0) / this.SPEED.walk, 1.4) : 0) - this.walkAmp) * Math.min(1, dt * 4);
@@ -792,7 +799,7 @@ const G_Me = {
     // prone, the gun rests on your elbows and the ground: the least sway there is (breathing barely moves it)
     const bp = this.bipodT || 0, amp = m.sway * G.U.lerp(1.6, 1, a) * (lying ? 0.25 : this.crouch ? 0.75 : 1) * hold * atro * G.U.lerp(1, this.BIPOD.SWAY, bp);
     const er = m.erratic * atro * hold * (lying ? 0.3 : 1) * G.U.lerp(1, this.BIPOD.ERRATIC, bp), wa = this.walkAmp * (1 - a * 0.5);
-    const tremor = (s) => low * (0.004 * Math.sin(t * 11.3 + s) + 0.0035 * Math.sin(t * 17.7 + s * 2) + 0.003 * Math.sin(t * 24.9 + s * 3));
+    const tremor = (s: number) => low * (0.004 * Math.sin(t * 11.3 + s) + 0.0035 * Math.sin(t * 17.7 + s * 2) + 0.003 * Math.sin(t * 24.9 + s * 3));
     // breathing traces a slow, lopsided figure eight (pitch at twice the yaw rate), with a drift and a faster
     // wander on top; SWAY_GAIN scales the lot
     const k = this.SWAY_GAIN;
@@ -813,7 +820,7 @@ const G_Me = {
   },
 
   // ------------------------------------------------------------- weapons
-  swap(slot) {
+  swap(slot: string) {
     if (this.held) { this.unequip(); if (slot === this.slot) return; }
     if (slot === this.slot || this.down || this.dead || !this.weapons[slot]) return;
     this.slot = slot;
@@ -879,11 +886,11 @@ const G_Me = {
     this.ejected = w.spent; this.ejecting = (w.spent || []).length; this.ejectT = this.handCase ? this.reloadTotal * 0.3 : 0.25; w.spent = []; // (still in it till they do: js/vmanim.ts)
     if (this.loose(w.def) || !G.Audio.sample('pull_magazine')) G.Audio.reload();
   },
-  reloadTime(def) { return this.byHand && def.handReload ? def.handReload : def.reload; },
+  reloadTime(def: WeaponDef) { return this.byHand && def.handReload ? def.handReload : def.reload; },
   // loaded a round (or a push of shells) at a time, this reload: a shell-fed gun, or a revolver topped up by hand
-  loose(def) { return def.shell || (!!this.byHand && G.revolver(def)); },
+  loose(def: WeaponDef) { return def.shell || (!!this.byHand && G.revolver(def)); },
   // a revolver loaded a round at a time: it stays open till it's shut, which takes a moment
-  revHand(def) { return G.revolver(def) && this.loose(def); },
+  revHand(def: WeaponDef) { return G.revolver(def) && this.loose(def); },
   revShut() { this.revClose = true; this.reloadT = this.reloadTotal = G.REV.close; },
   ACT_T: { release: 0.4, rack: 0.6 },
   // how far through its motions a magazine change goes before the action, from empty: it stops as the magazine
@@ -891,7 +898,7 @@ const G_Me = {
   SEAT: { retain: 0.78, pouch: 0.78, floor: 0.7, plain: 0.7 },
   // the reload's length: the magazine change (how depends on where the old one goes; run dry, up to its seating:
   // reloadSeat). The action after it is its own (workAction).
-  reloadTimes(def, done = 0) {
+  reloadTimes(def: WeaponDef, done = 0) {
     const seat = this.reloadAct && G.VMAnim.kinds(def).reload === 'mag' ? this.SEAT[this.reloadMode] || 0.7 : 1;
     this.reloadSeat = seat;
     this.reloadTotal = this.reloadTime(def) * this.RELOAD_K[this.reloadMode] * this.reloadPackK * seat;
@@ -917,7 +924,7 @@ const G_Me = {
     G.Audio.click();
     G.HUD.toast('', G.MODE_NAME[w.fm], 0.9);
   },
-  fireMode(w) { const modes = w.def.modes || [w.def.mode]; return modes.includes(w.fm) ? w.fm : modes[0]; },
+  fireMode(w: GWeapon) { const modes = w.def.modes || [w.def.mode]; return modes.includes(w.fm) ? w.fm : modes[0]; },
   inspect() {
     if (this.reloading || this.act || this.magChk || this.rChk || this.stowed || this.swapT > 0 || this.adsT > 0.2 || this.down || this.inspectT > 0) return;
     this.inspYaw = this.inspPitch = 0;
@@ -925,7 +932,7 @@ const G_Me = {
     this.inspectT = this.inspectDur;
   },
 
-  weaponUpdate(dt) {
+  weaponUpdate(dt: number) {
     const w = this.cur(), def = w.def, mag = this.magSize(def);
     this.fireCd = Math.max(-0.05, this.fireCd - dt); // (a little below zero: what's left of a frame carries into the next shot)
     this.sinceShot = (this.sinceShot || 0) + dt;
@@ -1047,8 +1054,8 @@ const G_Me = {
     if (def.missing && def.missing.length) { // a core part off: the trigger does nothing
       if (pressed || this.pressBuf > 0) {
         G.Audio.dry();
-        const mis = def.misfit || [], none = def.missing.filter((s) => !mis.includes(s));
-        G.HUD.toast('', `It won't fire: ${[...none.map((s) => 'no ' + G.Gunsmith.SLOT_LABEL[s].toLowerCase()), ...mis.map((s) => `the ${G.Gunsmith.PARTS[def.build[s]].name} doesn't fit the ${def.name}`)].join(', ')}`, 1.6);
+        const mis = def.misfit || [], none = def.missing.filter((s: string) => !mis.includes(s));
+        G.HUD.toast('', `It won't fire: ${[...none.map((s: string) => 'no ' + G.Gunsmith.SLOT_LABEL[s].toLowerCase()), ...mis.map((s: string) => `the ${G.Gunsmith.PARTS[def.build[s]].name} doesn't fit the ${def.name}`)].join(', ')}`, 1.6);
       }
       this.burstQ = 0; this.pressBuf = 0;
       return;
@@ -1089,7 +1096,7 @@ const G_Me = {
     if (mode === 'burst') { this.burstQ--; if (this.burstQ <= 0 || !G.loaded(w)) { this.burstQ = 0; this.fireCd += 0.24; } }
   },
   // the next round from the magazine (or tube) into an empty chamber
-  feed(w) {
+  feed(w: GWeapon) {
     if (!G.chambered(w.def) || w.chamber || w.mag <= 0) return false;
     w.chamber = w.tube && w.tube.length ? w.tube.pop() : w.ammo;
     w.mag--;
@@ -1099,25 +1106,25 @@ const G_Me = {
   // working the action by hand: a round from the magazine into the chamber (a moment, both hands; a bolt gun's
   // bolt, the right hand, throwing the case it last fired if that's still in there)
   BOLT_T: 0.7,
-  rack(w) {
+  rack(w: GWeapon) {
     if (!(G.chambered(w.def) && !w.chamber && w.mag > 0) && !w.spentCh) return;
     this.workAction(w, 'rack');
   },
   // The action worked by hand, its own animation (js/vmanim.ts): kind 'rack' (pulled through and let go) or
   // 'release' (locked open: the catch hit). After a magazine change run dry it follows on from the seating (seat:
   // how far through its motions that went); a partial reload has none. The rounds move as the action does (above).
-  workAction(w, kind, seat = null) {
+  workAction(w: GWeapon, kind: string, seat: number | null = null) {
     const ev = G.VMAnim.actEvents(kind, G.VMAnim.kinds(w.def).action);
     const dur = kind === 'release' ? this.ACT_T.release : this.boltGun(w.def) ? this.BOLT_T : seat ? this.ACT_T.rack : 0.45;
     this.act = { kind, seat, t: 0, dur, back: ev.back, home: ev.home };
     this.fireCd = Math.max(this.fireCd, dur);
   },
   // a bolt-action: its bolt's worked by hand after every shot
-  boltGun(def) { const P = G.Gunsmith.PLATFORMS[def.id]; return !!(P && P.spec && P.spec.bolt); },
+  boltGun(def: WeaponDef) { const P = G.Gunsmith.PLATFORMS[def.id]; return !!(P && P.spec && P.spec.bolt); },
   // the fired case out of the port (at: how long from now)
-  ejectSpent(w, at) { G.Casings.fired(w.def, true, null, null, w.spentCh, at); w.spentCh = null; },
+  ejectSpent(w: GWeapon, at: number) { G.Casings.fired(w.def, true, null, null, w.spentCh, at); w.spentCh = null; },
 
-  shoot(w) {
+  shoot(w: PWeapon) {
     // the round being fired, and the gun as that round sees it (G.roundDef: hollow points, AP, slugs...)
     const round = G.chambered(w.def) && w.chamber ? w.chamber : w.tube && w.tube.length ? w.tube.pop() : w.ammo; // (the chambered one, if it has a chamber)
     if (!G.chambered(w.def)) { w.spent = w.spent || []; w.spent.unshift(round); w.spent.length = Math.min(w.spent.length, 8); } // (the empties a revolver or break-action keeps till it's opened)
@@ -1178,9 +1185,9 @@ const G_Me = {
     this.recoilKick(def);
     this.kick = Math.min(1, this.kick + 0.35 + def.recoil * 0.06);
 
-    const r2 = (v) => Math.round(v * 100) / 100;
+    const r2 = (v: number) => Math.round(v * 100) / 100;
     // (a shotgun's: every pellet's end, so the squad's highlights show the pattern)
-    const tos = shot.tos ? shot.tos.slice(0, 24).map((p) => [r2(p.x), r2(p.y), r2(p.z)]) : undefined;
+    const tos = shot.tos ? shot.tos.slice(0, 24).map((p: THREE.Vector3) => [r2(p.x), r2(p.y), r2(p.z)]) : undefined;
     if (G.Highlights) G.Highlights.shot('p' + G.Net.myId, muzzle, firstEnd, def.code, round, tos, shot.sid);
     G.Net.toHost({ t: 'shot', f: [r2(muzzle.x), r2(muzzle.y), r2(muzzle.z)], to: [r2(firstEnd.x), r2(firstEnd.y), r2(firstEnd.z)], tos, sid: shot.sid, w: def.code, am: round, sil: def.cls === 'BOW' ? 2 : w.sup ? (def.quiet ? 2 : 1) : 0 });
   },
@@ -1194,7 +1201,7 @@ const G_Me = {
   // onto the round's true path (from your eye) over its first few metres: a faint one for ordinary rounds, a long
   // bright one for tracers.
   // shot: what the shot's rounds share (the friendly-fire hits to send, together); sup: through a suppressor
-  fly(origin, dir, muzzle, def, am, show, shot, sup, tip = null) {
+  fly(origin: THREE.Vector3, dir: THREE.Vector3, muzzle: THREE.Vector3, def: WeaponDef, am: string, show: boolean, shot: PShot, sup: boolean, tip: number | null = null) {
     const rail = def.cls === 'RAIL', v0 = rail ? 3000 : Math.max(40, G.roundSpeed(def, am) || 400);
     const d = dir.clone(), start = origin.clone(), drag = rail ? 1e9 : G.dragOf(def, am);
     const upP = new THREE.Vector3(0, 1, 0).addScaledVector(d, -d.y);
@@ -1216,7 +1223,7 @@ const G_Me = {
   },
   // A suspect's round (the host's, from js/server.ts fire): as any other, flown here where the shooter's run. It goes by
   // suspects and civilians, and what it does to an officer is worked out here, as your rounds' are.
-  enemyRound(id, from, dir, def, am, shot) {
+  enemyRound(id: number, from: THREE.Vector3, dir: THREE.Vector3, def: WeaponDef, am: string, shot: PShot) {
     const drag = G.dragOf(def, am), v0 = Math.max(40, G.roundSpeed(def, am) || 400);
     (this.rounds = this.rounds || []).push({ p: from.clone(), v: dir.clone().multiplyScalar(v0), def, am, drag, drag0: drag, grav: G.GRAVITY, n: 0, dist: 0, t: 0, off: new THREE.Vector3(), muzzle: from.clone(), show: false, tracer: false, shot, hit: new Set(), proj: G.Ballistics.projectile(def, am), enemy: id, i: this.roundIndex(shot), path: this.newPath(from, v0),
       trail: G.Rig.debug ? G.R.trailStart(shot, from, v0) : null });
@@ -1225,16 +1232,16 @@ const G_Me = {
   // and every so often in the air); ev, what it did to things ([point, e(ntry) x (exit) r(icochet), what it looks like, the
   // surface's normal, what it was]); hit, who it went into ([point, their key, its speed, its state then, its direction,
   // whether it came out, what it did in their armour: js/ballistics.ts armourLog, how far in it got and what it was in last]).
-  roundIndex(shot) { shot.n = (shot.n || 0) + 1; return shot.n - 1; },
-  newPath(p, v) { return { p: [[+p.x.toFixed(2), +p.y.toFixed(2), +p.z.toFixed(2), Math.round(v)]], ev: [], hit: [] }; },
-  pathPt(b, p, v) {
+  roundIndex(shot: PShot) { shot.n = (shot.n || 0) + 1; return shot.n - 1; },
+  newPath(p: THREE.Vector3, v: number) { return { p: [[+p.x.toFixed(2), +p.y.toFixed(2), +p.z.toFixed(2), Math.round(v)]], ev: [], hit: [] }; },
+  pathPt(b: PRound, p: THREE.Vector3, v: number) {
     const P = b.path.p, q = [+p.x.toFixed(2), +p.y.toFixed(2), +p.z.toFixed(2), Math.round(v)], l = P[P.length - 1];
     if (l[0] === q[0] && l[1] === q[1] && l[2] === q[2]) { l[3] = q[3]; return P.length - 1; } // (the same spot: not a leg of its own)
     P.push(q);
     return P.length - 1;
   },
   // it's finished: its path to the replays, here and on the squad's machines
-  roundDone(b) {
+  roundDone(b: PRound) {
     const key = b.enemy ? 'e' + b.enemy : 'p' + G.Net.myId, sh = b.shot;
     if (G.Highlights) G.Highlights.roundPath(key, sh.sid, b.i, b.path);
     (sh.paths = sh.paths || []).push([b.i, b.path]);
@@ -1242,8 +1249,8 @@ const G_Me = {
   },
   // where a round would end up if nobody's in the way: its arc, stepped against the walls only (what the squad
   // is told, to draw it going there)
-  predictEnd(p0, v0, drag, grav) {
-    const map = G.Game.map, p = p0.clone(), v = v0.clone(), dt = 1 / 60;
+  predictEnd(p0: THREE.Vector3, v0: THREE.Vector3, drag: number, grav: number) {
+    const map = G.Game.map!, p = p0.clone(), v = v0.clone(), dt = 1 / 60;
     for (let i = 0, dist = 0; i < 240 && dist < G.ROUND_LIFE.dist; i++) {
       const p1 = p.clone().addScaledVector(v, dt); p1.y -= 0.5 * grav * dt * dt;
       const seg = p1.clone().sub(p), len = seg.length();
@@ -1257,7 +1264,7 @@ const G_Me = {
     return p;
   },
   // every round in flight, one frame on (and the friendly fire they did, sent)
-  stepRounds(dt) {
+  stepRounds(dt: number) {
     const rs = this.rounds;
     if (!rs || !rs.length) return;
     dt = Math.min(dt, 0.05);
@@ -1275,7 +1282,7 @@ const G_Me = {
     }
   },
   // one round, one frame: true when it's done (stopped in something, spent, out of range)
-  stepRound(b, dt) {
+  stepRound(b: PRound, dt: number) {
     const sp = b.v.length();
     // where it gets to this frame: drag takes speed by the metre (G.dragOf), gravity pulls it down
     const p1 = b.p.clone().addScaledVector(b.v, dt); p1.y -= 0.5 * b.grav * dt * dt;
@@ -1308,8 +1315,8 @@ const G_Me = {
   // or let it through, slower, off line and changed (b.proj, the round as it now is: its drag goes with it), and it goes
   // on from there with what's left of the step. Returns where it stopped ({ p, t }), or null if it flies on (b.at, if it
   // was turned: where it's got to, and b.v what it's doing now).
-  roundSegment(b, a, dir, len) {
-    const map = G.Game.map, L = G.Level, def = b.def, B = G.Ballistics;
+  roundSegment(b: PRound, a: THREE.Vector3, dir: THREE.Vector3, len: number) {
+    const map = G.Game.map!, L = G.Level, def = b.def, B = G.Ballistics;
     if (def.explosive && !b.enemy) {
       const wall = L.raycast(map, a.x, a.y, a.z, dir.x, dir.y, dir.z, len, { glass: true }), hitWall = wall.t < len - 1e-4, wallT = Math.min(wall.t, len), hits = this.roundHits(b, a, dir, wallT), t = hits.length ? hits[0].t : hitWall ? wallT : null;
       if (t == null) { this.roundGlass(a, dir, wall, len); return null; }
@@ -1319,14 +1326,14 @@ const G_Me = {
     }
     const o = a.clone(), v0 = b.v.length();
     let d = dir.clone(), rest = len, v = v0, done = 0, turned = false;
-    const on = (t) => { o.addScaledVector(d, t); rest -= t; done += t; }; // (along this leg)
-    const turn = (nd, nv) => { d = nd; v = nv; turned = true; b.events = (b.events || 0) + 1; };
-    const stopped = (p, t, body, vs) => ({ p, t, body, v: vs });
+    const on = (t: number) => { o.addScaledVector(d, t); rest -= t; done += t; }; // (along this leg)
+    const turn = (nd: THREE.Vector3, nv: number) => { d = nd; v = nv; turned = true; b.events = (b.events || 0) + 1; };
+    const stopped = (p: THREE.Vector3, t: number, body: boolean, vs: number) => ({ p, t, body, v: vs });
     legs: for (let leg = 0; leg < 12 && rest > 1e-4 && v > G.ROUND_LIFE.v; leg++) {
       const wall = L.raycast(map, o.x, o.y, o.z, d.x, d.y, d.z, rest, { bars: true }), hitWall = !!wall.solid && wall.t < rest - 1e-4, wallT = Math.min(wall.t, rest);
       const look = hitWall ? wallT : rest + 0.8; // (a body that straddles the end of this step: all of it, now)
       for (const h of this.roundHits(b, o, d, wallT)) {
-        const tr = [], ev = h.ev, mate = h.mate; // (F9: the track through them, a step at a time, for the trail, and its fragments)
+        const tr = [] as PTrack, ev = h.ev, mate = h.mate; // (F9: the track through them, a step at a time, for the trail, and its fragments)
         // Whoever fired it decides what it did, on what they can see: the body as it stands on this screen, and what it's wearing
         const rig = ev ? ev.rig : mate ? mate.rig : h.rig, armour = ev ? B.suspectArmour(ev) : mate ? B.stateArmour(mate.st) : B.kitArmour(this), arrived = B.snap(b.proj);
         const r = B.through(rig, o, d, v, b.proj, armour, look, tr);
@@ -1347,18 +1354,18 @@ const G_Me = {
         } else {
           const out = B.outcome(r, armour);
           if (h.self) {
-            if (b.enemy && G.Highlights) G.Highlights.hitBy(G.Net.myId, b.enemy);
+            if (b.enemy && G.Highlights) G.Highlights.hitBy(G.Net.myId!, b.enemy);
             this.applyWounds(out, o.clone(), !b.enemy);
           } else { // (theirs to take, as it was here: told to them at the end of the frame)
-            const q = b.shot.ff.get(mate.id) || { ws: [], rang: 0, stopped: 0, wear: {}, at: hp.toArray().map((x) => Math.round(x * 100) / 100) };
+            const q = b.shot.ff.get(mate.id) || { ws: [], rang: 0, stopped: 0, wear: {}, at: hp.toArray().map((x: number) => Math.round(x * 100) / 100) };
             q.ws.push(...out.ws); q.rang |= out.rang; q.stopped += out.stopped; if (out.fc) q.fc = (q.fc || []).concat(out.fc); if (out.hd) q.hd = (q.hd || []).concat(out.hd);
             for (const [k, j] of Object.entries(out.wear)) q.wear[k] = (q.wear[k] || 0) + j;
             b.shot.ff.set(mate.id, q);
             mate.rig.hit(d, b.proj.m * v);
           }
         }
-        if (r.hits.some((x) => x.armour.some((q) => !q.through))) { G.R.impact(hp, null, 'armor'); if (G.Audio.armorHit) G.Audio.armorHit(); }
-        if (r.hits.some((x) => x.E > 1)) {
+        if (r.hits.some((x: any) => x.armour.some((q: any) => !q.through))) { G.R.impact(hp, null, 'armor'); if (G.Audio.armorHit) G.Audio.armorHit(); }
+        if (r.hits.some((x: any) => x.E > 1)) {
           G.R.impact(hp, null, 'blood');
           // out the far side onto a wall close behind them
           if (r.exitV) { const back = L.raycast(map, hp.x, hp.y, hp.z, d.x, d.y, d.z, 1.6); if (back.n && back.t < 1.6) G.R.bloodWall(hp.clone().addScaledVector(d, back.t), back.n, 0.25 + 0.25 * (1 - back.t / 1.6)); }
@@ -1380,7 +1387,7 @@ const G_Me = {
       if (!hitWall) { on(rest); break; }
       // the solid it's met: a target if it's that, and then what it's made of
       const s = wall.solid, at = o.clone().addScaledVector(d, wall.t), vIn = v, r = B.crossSolid(map, b.proj, v, wall, o, d), Jin = 0.5 * b.proj.m * vIn * vIn;
-      const cut = G.Damage.hit(map, s, at, d, wall.n, r, o, Jin, b.proj.d * 1000); // (what it takes out of a wall or a door)
+      const cut = G.Damage.hit(map as unknown as Parameters<typeof G.Damage.hit>[0], s, at, d, wall.n, r, o, Jin, b.proj.d * 1000); // (what it takes out of a wall or a door)
       if (s.door && !r.ric) { const pt = G.Damage.partAt(s.door, at.toArray()); if (pt != null) G.Net.toHost({ t: 'dhit', i: s.door.id, pt, J: Math.round(Jin), dir: [+d.x.toFixed(2), +d.z.toFixed(2)] }); } // (its handle, a hinge: the host keeps the score)
       if (s.target) G.Range.hit(s, at, d, b.proj.m * vIn);
       const pane0 = wall.pane != null && !(s.win && s.win.armor) && !r.ric; // (glass shows what it took across the whole pane: no mark on it)
@@ -1394,7 +1401,7 @@ const G_Me = {
         if (G.Audio.ricochet) G.Audio.ricochet(at);
         continue;
       }
-      if (cut && G.Damage.apply(map, cut.rec)) (b.shot.holes = b.shot.holes || []).push(cut.rec);
+      if (cut && G.Damage.apply(map as unknown as Parameters<typeof G.Damage.apply>[0], cut.rec)) (b.shot.holes = b.shot.holes || []).push(cut.rec);
       if (!r.v) { if (b.def.cls === 'BOW' && !s.door && !wall.view && G.Bolts.holds(r.fx)) this.boltStuck(at.clone().addScaledVector(d, Math.min(r.depth || 0, 0.08)), d, b.am); return stopped(at, done + wall.t, false, vIn); } // (v: how fast it struck)
       if (wall.pane == null && !wall.view) b.walled = true; // (through something a person could hide behind)
       const n0 = wall.n;
@@ -1414,21 +1421,21 @@ const G_Me = {
   },
   // A bolt that didn't come out stays in them, where it stopped, on the bone it's in: unless it's met a hard plate, which
   // it breaks or skates off, or it's gone in so far there's nothing left to see
-  boltIn(ev, r, o, d, am) {
-    const armourStop = r.stopped && (r.log || []).filter((q) => q.k).pop(), B = G.Ballistics, depth = (r.exitT || 0) - r.entryT;
-    if (r.glance || (armourStop && !G.Materials.MAT[armourStop.k].soft) || depth > G.Bolts.LEN - 0.08) return;
-    const seg = B.segs().find((s) => s.id === (r.hits[r.hits.length - 1] || {}).seg) || B.segs().find((s) => s.id === 'chest'), bone = seg && B.boneOf(ev.rig, seg.bone);
+  boltIn(ev: VwEnemy, r: any, o: THREE.Vector3, d: THREE.Vector3, am: string) {
+    const armourStop = r.stopped && (r.log || []).filter((q: any) => q.k).pop(), B = G.Ballistics, depth = (r.exitT || 0) - r.entryT;
+    if (r.glance || (armourStop && !(G.Materials.MAT as Record<string, any>)[armourStop.k].soft) || depth > G.Bolts.LEN - 0.08) return;
+    const seg = B.segs().find((s: any) => s.id === (r.hits[r.hits.length - 1] || {}).seg) || B.segs().find((s: any) => s.id === 'chest'), bone = seg && B.boneOf(ev.rig, seg.bone);
     if (!bone) return;
     const l = G.Bolts.onBone(ev.rig, bone, o.clone().addScaledVector(d, r.stopped ? r.entryT + 0.02 : r.exitT), d, am);
     G.Net.toHost({ t: 'bstk', e: ev.id, b: seg.bone, l, am });
   },
   // into a wall, a target, a beam
-  boltStuck(at, d, am) {
+  boltStuck(at: THREE.Vector3, d: THREE.Vector3, am: string) {
     G.Bolts.inWorld(at, d, am);
-    G.Net.toHost({ t: 'bstk', at: at.toArray().map((x) => Math.round(x * 1000) / 1000), u: d.toArray().map((x) => Math.round(x * 1000) / 1000), am });
+    G.Net.toHost({ t: 'bstk', at: at.toArray().map((x: number) => Math.round(x * 1000) / 1000), u: d.toArray().map((x: number) => Math.round(x * 1000) / 1000), am });
   },
   // who's on the line from a along dir, out to t, nearest first
-  roundHits(b, a, dir, wallT) {
+  roundHits(b: PRound, a: THREE.Vector3, dir: THREE.Vector3, wallT: number) {
     const hits = [];
     if (!b.enemy) for (const ev of G.Views.enemies.values()) { // (a suspect's round looks for officers: it goes by anyone else)
       if (!ev.alive || b.hit.has(ev) || !ev.rig) continue;
@@ -1462,7 +1469,7 @@ const G_Me = {
   },
   // where a round struck or left something: its mark here (s: a target's own, its picture), on its trail, and for the squad
   // how: { m (what it's made of: '' nothing to damage), dir (the way it was going), stop (it stopped in it) }
-  roundMark(b, p, n, fx, kind, v, s, name, how: any = {}) {
+  roundMark(b: PRound, p: THREE.Vector3, n: number[], fx: string, kind: string, v: number, s: any, name: string, how: any = {}) {
     const o = { m: how.m, fx, k: kind, n, dir: how.dir, J: 0.5 * b.proj.m * v * v, stop: !!how.stop, cal: b.proj.d * 1000, cut: how.cut || 0 };
     b.path.ev.push([this.pathPt(b, p, v), kind, fx, n[0], n[1], n[2], name || '', how.m, Math.round(o.J), o.stop ? 1 : 0, +(how.depth || 0).toFixed(3), +o.cal.toFixed(1)]);
     G.R.impactOn(p, n, s, fx, o);
@@ -1471,16 +1478,16 @@ const G_Me = {
   },
   // a pane a round went through breaks (here at once, and for everyone through the host)
   // The first round fractures it, and it stays up; the next one, or a blast (all), or someone walking into it, brings it down.
-  roundPane(id, at, dir, all) {
-    const win = G.Game.map.windows[id];
+  roundPane(id: number, at: THREE.Vector3, dir: THREE.Vector3, all: boolean) {
+    const win = G.Game.map!.windows[id];
     if (!win || win.broken) return;
     if (!win.cracked && !all) { G.Views.crackGlass(id, at, dir); G.Net.toHost({ t: 'crack', id, p: [+at.x.toFixed(3), +at.y.toFixed(3), +at.z.toFixed(3)] }); return; }
     G.Views.breakGlass(id, at, dir);
     G.Net.toHost({ t: 'glass', ids: [id] });
   },
   // the fragments of a round in someone, for its path: [x0, y0, z0, x1, y1, z1 (where it broke off, where it ended), speed there, speed out of them (0: stopped in them), grams, a splinter of bone?]
-  pathFrags(a, dir, tr) {
-    return (tr.frags || []).map((f) => {
+  pathFrags(a: THREE.Vector3, dir: THREE.Vector3, tr: PTrack) {
+    return (tr.frags || []).map((f: any) => {
       const q = a.clone().addScaledVector(dir, f.t), e = q.clone().addScaledVector(f.dir, f.len);
       return [q.x, q.y, q.z, e.x, e.y, e.z].map((x) => +x.toFixed(3)).concat(Math.round(f.v0), Math.round(f.v), +(f.m * 1000).toFixed(2), f.sp ? 1 : 0);
     });
@@ -1488,8 +1495,8 @@ const G_Me = {
   // F9: a round's track through someone on its trail: in at the speed it arrived (marked), each step inside at its speed
   // as it slowed (js/ballistics.ts through, traced), and where it stopped, if it did (marked)
   // (and the same track kept on them: their bones carry it as they move and fall, js/render.ts woundTrack)
-  trailTrack(b, a, dir, r, vIn, tr, rig) {
-    const at = (t) => a.clone().addScaledVector(dir, t), pts = [];
+  trailTrack(b: PRound, a: THREE.Vector3, dir: THREE.Vector3, r: any, vIn: number, tr: PTrack, rig: Rig | null) {
+    const at = (t: number) => a.clone().addScaledVector(dir, t), pts = [];
     G.R.trailAdd(b.trail, at(r.entryT), true, vIn);
     if (tr.length) pts.push({ p: at(r.entryT), v: vIn, bone: tr[0].bone, mark: true });
     for (const s of tr) { G.R.trailAdd(b.trail, at(s.t), false, s.v); pts.push({ p: at(s.t), v: s.v, bone: s.bone }); }
@@ -1497,14 +1504,14 @@ const G_Me = {
     if (rig && pts.length > 1) G.R.woundTrack(rig, pts);
   },
   // the windows a blast round went through on the way break
-  roundGlass(a, dir, wall, upTo) {
+  roundGlass(a: THREE.Vector3, dir: THREE.Vector3, wall: any, upTo: number) {
     for (const [id, gt] of wall.glass || []) if (gt < upTo) this.roundPane(id, a.clone().addScaledVector(dir, gt), dir, true);
   },
   // A round's wounds on a suspect, from its track through them (js/ballistics.ts): each part's damage (a share of a
   // standard person's life) and what it did there (bleeding, a broken bone, a collapsed lung, the organs it went
   // through), for the host to apply (js/server.ts applyHit, injure). A round through the brain, brainstem or the
   // spine in the neck is the end of them.
-  hitEnemy(ev, r, b) {
+  hitEnemy(ev: VwEnemy, r: any, b: PRound) {
     let f = 0, kill = false, head = false, ap = false;
     this.hitQ = this.hitQ || new Map();
     const q = this.hitQ.get(ev.id) || { d: 0, f: 0, h: false, k: false };
@@ -1514,7 +1521,7 @@ const G_Me = {
       f += w.dmg / 100;
       if (w.effects.includes('dead')) kill = true;
       if (h.seg === 'cranium' || h.seg === 'jaw' || h.seg === 'neck') head = true;
-      if (h.armour.some((a) => a.through)) ap = true; // (through their armour, and it still did harm: for the highlights)
+      if (h.armour.some((a: any) => a.through)) ap = true; // (through their armour, and it still did harm: for the highlights)
       (q.w = q.w || []).push([w.part, w.effects.join(','), w.side || '', w.organs.map(([id, d, hp]) => `${id}:${Math.round(Math.min(1, d / hp) * 100)}`).join(',')]);
     }
     q.f += f; q.h = q.h || head; q.k = q.k || kill; q.ap = q.ap || ap;
@@ -1522,7 +1529,7 @@ const G_Me = {
     if (b && f > 0 && G.Arsenal) G.Arsenal.hit(ev, b);
   },
   // d: plain damage (blasts); f: wounds, as a share of a standard person's life; k: a killing headshot
-  queueHit(eid, dmg, head, f = 0, kill = false) {
+  queueHit(eid: number, dmg: number, head: boolean, f = 0, kill = false) {
     const q = this.hitQ.get(eid) || { d: 0, f: 0, h: false, k: false };
     q.d += dmg; q.f += f; q.h = q.h || head; q.k = q.k || kill;
     this.hitQ.set(eid, q);
@@ -1536,10 +1543,10 @@ const G_Me = {
     this.hitQ.clear();
   },
 
-  explode(p, r, dmg, isNade) {
+  explode(p: THREE.Vector3, r: number, dmg: number, isNade?: boolean) {
     G.R.explosion(p, r);
     G.Audio.boom(G.R.camera.position.distanceTo(p));
-    const map = G.Game.map;
+    const map = G.Game.map!;
     for (const ev of G.Views.enemies.values()) {
       if (!ev.alive) continue;
       const cy = (ev.pos.y || 0) + 1.0 * ev.def.scale; // (their middle, on whatever floor they stand on)
@@ -1549,13 +1556,13 @@ const G_Me = {
       this.queueHit(ev.id, dmg * (1 - Math.min(1, d / r) * 0.6), false);
       ev.selfHit = true;
     }
-    const r2 = (v) => Math.round(v * 100) / 100;
+    const r2 = (v: number) => Math.round(v * 100) / 100;
     G.Net.toHost({ t: 'boom', p: [r2(p.x), r2(p.y), r2(p.z)], r: r2(r), d: Math.round(dmg) });
   },
 
   // a flashbang of yours went off: the host works out who it blinds (and tells everyone, you too)
-  flashBang(p) {
-    const r2 = (v) => Math.round(v * 100) / 100;
+  flashBang(p: THREE.Vector3) {
+    const r2 = (v: number) => Math.round(v * 100) / 100;
     G.Net.toHost({ t: 'flash', p: [r2(p.x), r2(p.y), r2(p.z)] });
   },
   // ------------------------------------------------------------- quick slots: 3, 4 and 5
@@ -1566,7 +1573,7 @@ const G_Me = {
     if (!this._quick) { const q = G.U.store.get('quick', null); this._quick = Array.isArray(q) && q.length === 3 ? q.slice() : this.QUICK_DEFAULT.slice(); }
     return this._quick;
   },
-  setQuick(i, kind) {
+  setQuick(i: number, kind: string | null) {
     const q = this.quick, was = kind ? q.indexOf(kind) : -1;
     if (was >= 0 && was !== i) q[was] = q[i]; // (it was on another key: they swap)
     q[i] = kind || null;
@@ -1575,17 +1582,17 @@ const G_Me = {
   },
   // the kind of quick-slot gear an item is (null: not one)
   // the kind of quick-slot gear an item is: a throwable (null: not one; medical gear isn't)
-  quickKind(it) { return it && (it.k === 'frag' || it.k === 'flash') ? it.k : null; },
-  quickName(kind) { return kind === 'frag' ? 'Frag' : kind === 'flash' ? 'Flashbang' : '—'; },
+  quickKind(it: GItem | null) { return it && (it.k === 'frag' || it.k === 'flash') ? it.k : null; },
+  quickName(kind: string | null) { return kind === 'frag' ? 'Frag' : kind === 'flash' ? 'Flashbang' : '—'; },
   // how many of that kind you carry
-  quickCount(kind) { return this.kit && kind ? G.Gear.count(this, kind) : 0; },
+  quickCount(kind: string | null) { return this.kit && kind ? G.Gear.count(this, kind) : 0; },
   // ------------------------------------------------------------- gear in hand (keys 3, 4, 5)
   // The key brings that grenade into your hand (the weapon goes down; the key again, or 1 / 2, brings it back).
   // Left click pulls the pin and draws back, letting go throws it; right click picks the throw: underhand (a lob
   // that rolls on along the floor), weak, or strong. While it's in your hand, its arc shows where it'll go off.
   // Out of them, the weapon comes back up. held: { kind, cock, str, readyT (bringing it up), throwT (the throw) }.
   THROWS: [['Underhand', 6.5, 2.4], ['Weak', 10, 3], ['Strong', 15.5, 3.2]] as [string, number, number][],
-  equip(i) {
+  equip(i: number) {
     const kind = this.quick[i];
     if (this.dead || this.down || this.action || G.Game.hub || this.seat != null) return; // (no throwing in the hangar)
     if (!kind) { G.HUD.toast('', `Nothing on key ${i + 3}: drag a grenade onto its box in the inventory`, 1.6); return; }
@@ -1600,19 +1607,19 @@ const G_Me = {
     this.held = null;
     this.raiseT = this.raiseMax = this.drawTime(); // (the weapon comes back up)
   },
-  fuseOf(kind) { return kind === 'flash' ? 1.5 : 2.2; },
+  fuseOf(kind: string) { return kind === 'flash' ? 1.5 : 2.2; },
   // where a throw of this strength leaves your hand, and how fast (underhand: from the hip, a lob)
-  throwLaunch(str) {
+  throwLaunch(str: number) {
     const cam = G.R.camera, fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion), [, sp, up] = this.THROWS[str];
     const from = cam.position.clone(), p = from.clone().addScaledVector(fwd, 0.45);
     if (str === 0) p.y -= 0.65;
     // (never from inside a wall you're standing against)
-    const d = p.clone().sub(from), len = d.length(), h = G.Level.raycast(G.Game.map, from.x, from.y, from.z, d.x / len, d.y / len, d.z / len, len);
+    const d = p.clone().sub(from), len = d.length(), h = G.Level.raycast(G.Game.map!, from.x, from.y, from.z, d.x / len, d.y / len, d.z / len, len);
     if (h.t < len) p.copy(from).addScaledVector(d, Math.max(0, h.t - 0.12) / len);
     const v = fwd.multiplyScalar(sp).add(new THREE.Vector3(this.vel.x * 0.5, up, this.vel.z * 0.5));
     return { p, v };
   },
-  heldStep(dt) {
+  heldStep(dt: number) {
     const h = this.held, ok = G.Game.locked && !G.Game.chatOpen, l = this.mouse.l && ok, r = this.mouse.r && ok;
     const pressL = l && !h.lastL, pressR = r && !h.lastR;
     h.lastL = l; h.lastR = r;
@@ -1637,13 +1644,13 @@ const G_Me = {
     const { p, v } = this.throwLaunch(h.str), fuse = this.fuseOf(kind);
     G.Views.addNade(p, v, fuse, true, false, kind);
     h.throwT = 0;
-    const r2 = (x) => Math.round(x * 100) / 100;
+    const r2 = (x: number) => Math.round(x * 100) / 100;
     G.Net.toHost({ t: 'nade', p: [p.x, p.y, p.z].map(r2), v: [v.x, v.y, v.z].map(r2), fuse, k: kind, s: h.str });
   },
   shout() {
     if (this.dead || (this.shoutT || 0) > performance.now()) return;
     this.shoutT = performance.now() + 1500;
-    G.Audio.shout(null);
+    G.Audio.shout(null!);
     G.HUD.toast('', G.U.pick(Math.random, ['POLICE! SHOW ME YOUR HANDS!', 'POLICE! DROP THE WEAPON!', 'GET ON THE GROUND! NOW!', 'POLICE! HANDS WHERE I CAN SEE THEM!']), 1.4);
     G.Net.toHost({ t: 'shout' });
   },
@@ -1651,7 +1658,7 @@ const G_Me = {
   useMed() { if (!this.dead && !this.out) G.Game.toggleInv(true); },
   // A teammate has started putting something on you (or stopped, or finished): who, what, which part, how long. The
   // HUD says so while it lasts, with the part lit on your body.
-  beingTreated(by, name, part, mt, dur, off) {
+  beingTreated(by: number, name: string, part: string, mt: string, dur: number, off: boolean) {
     this.treating = this.treating || new Map();
     if (off) { this.treating.delete(by); return; }
     if (this.dead || !G.Med.ITEMS[mt]) return;
@@ -1664,7 +1671,7 @@ const G_Me = {
     return out;
   },
   // one of your medical items, used (by a teammate, on you): off its stack, or out of its pouch
-  takeMed(mt) {
+  takeMed(mt: string) {
     for (const g of G.Gear.body(this)) for (const p of g.items) if (p.it.k === 'med' && p.it.mt === mt) {
       if ((p.it.n || 1) > 1) p.it.n--; else G.Gear.removeFrom(g, p.it);
       return true;
@@ -1674,7 +1681,7 @@ const G_Me = {
   treatingParts() { return this.treating && this.treating.size ? [...this.treating.values()].map((q) => q.part) : null; },
   // a teammate treated you (they used their item; it lands here)
   // theirs: it's your own item they used (it comes off you here); nothing of it left, or no longer needed: it isn't used
-  treated(part, mt, by, byId, theirs) {
+  treated(part: string, mt: string, by: string, byId: number, theirs: boolean) {
     if (byId != null && this.treating) this.treating.delete(byId); // (done)
     if (this.dead) return;
     if (theirs && (G.Med.cantTreat(this.body, part, mt) || !this.takeMed(mt))) return;
@@ -1689,7 +1696,7 @@ const G_Me = {
   // already happened, e.g. the boot has landed). After finishing, F must be released before the next one.
   drawTime() { const d = this.cur().def; return (d.slot === 's' ? 0.65 : 1.0) / (d.handling || 1); },
   // kind drives the animation; events fire part-way through (e.g. the door moves when the push lands)
-  startAction(label, dur, onDone, kind = null, events = []) { if (this.held && !this.held.cock) this.held = null; this.action = { label, dur, t: 0, onDone, kind, events }; },
+  startAction(label: string, dur: number, onDone: (() => void) | null | undefined, kind = null, events = []) { if (this.held && !this.held.cock) this.held = null; this.action = { label, dur, t: 0, onDone, kind, events }; },
   // where you're looking: the camera and the direction through the crosshair
   aimRay() { const cam = G.R.camera; return { o: cam.position.clone(), d: new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion) }; },
   // the person (or body) under the crosshair, within reach: their hitboxes, or within 7 deg of their torso.
@@ -1713,7 +1720,7 @@ const G_Me = {
     }
     return best;
   },
-  aimedPerson(ok, reach = 2.2) {
+  aimedPerson(ok: (ev: VwEnemy) => boolean, reach = 2.2) {
     const { o, d } = this.aimRay(), _v = new THREE.Vector3();
     let best = null, bt = Infinity;
     for (const ev of G.Views.enemies.values()) {
@@ -1734,10 +1741,10 @@ const G_Me = {
   // The first aid cabinet under the crosshair (its index), within arm's reach and with nothing in between: the ray from
   // your eye against its box on the wall (js/level.ts cabViews: 0.44 x 0.52 m, 0.15 deep, its middle 1.32 m up, a couple
   // of centimetres' grace round it), or -1.
-  aimedCabinet(map, reach = 1.7) {
+  aimedCabinet(map: LvMap, reach = 1.7) {
     const { o, d } = this.aimRay(), HW = 0.24, HH = 0.28, HD = 0.11, Y = 1.32;
     let best = -1, bt = reach;
-    map.cabinets.forEach((c, i) => {
+    map.cabinets.forEach((c: any, i: number) => {
       const cy = (c.fy || 0) + Y, px = o.x - c.x, py = o.y - cy, pz = o.z - c.z;
       if (px * px + pz * pz > (reach + 0.4) ** 2) return;
       // into the cabinet's frame (turned by its yaw)
@@ -1756,7 +1763,7 @@ const G_Me = {
     return best;
   },
   // how far off the crosshair a point is (radians)
-  offAim(x, y, z) { const { o, d } = this.aimRay(), to = new THREE.Vector3(x - o.x, y - o.y, z - o.z).normalize(); return Math.acos(G.U.clamp(to.dot(d), -1, 1)); },
+  offAim(x: number, y: number, z: number) { const { o, d } = this.aimRay(), to = new THREE.Vector3(x - o.x, y - o.y, z - o.z).normalize(); return Math.acos(G.U.clamp(to.dot(d), -1, 1)); },
   // the dropped weapon under the crosshair, within reach
   aimedEvidence(reach = 2.2) {
     const { o, d } = this.aimRay();
@@ -1769,7 +1776,7 @@ const G_Me = {
     return best;
   },
   // the closed door under the crosshair, and how high on it you're looking
-  aimedDoor(map) {
+  aimedDoor(map: LvMap) {
     const cam = G.R.camera, L = G.Level, REACH = 1.9;
     const f = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
     const h = L.raycast(map, cam.position.x, cam.position.y, cam.position.z, f.x, f.y, f.z, REACH, { move: true }); // (what you'd walk into: a door with its glass shot out is still there)
@@ -1783,9 +1790,9 @@ const G_Me = {
     if (!d || d.open || y > L.DOOR_H) return null; // the lintel isn't the door
     return { d, y };
   },
-  interact(dt) {
+  interact(dt: number) {
     let prompt = '', prog = -1, label = '', busy = false, halo = null; // (halo: the thing lying about that F would take)
-    const map = G.Game.map, held = this.keys.KeyF && !G.Game.chatOpen;
+    const map = G.Game.map!, held = this.keys.KeyF && !G.Game.chatOpen;
     if (!held) this.fLatch = false;
     const F = held && !this.fLatch;
     // the hangar: look at what's for sale or what to use (js/hangar.ts)
@@ -1831,7 +1838,7 @@ const G_Me = {
     if (this.action) {
       // a timed action in progress: weapon away until it's done
       const a = this.action;
-      const committed = !a.onDone && a.events.length && a.events.every((ev) => ev.done);
+      const committed = !a.onDone && a.events.length && a.events.every((ev: any) => ev.done);
       const tgt = a.kind === 'zip' ? G.Views.enemies.get(a.target) : null;
       const evd = a.kind === 'bag' ? G.Views.evidence.get(a.target) : null;
       const lost = (a.kind === 'zip' && (!tgt || (a.living && !tgt.alive) || Math.hypot(tgt.pos.x - this.pos.x, tgt.pos.z - this.pos.z) > 2.8)) ||
@@ -1891,10 +1898,10 @@ const G_Me = {
       // restrain the living / secure the dead (hold)
       // (the one under your crosshair: look at who you mean). A weapon dropped by a body: whichever of the
       // two is nearer the middle of the crosshair is what you mean
-      let cuffTgt = tgt ? null : this.aimedPerson((ev) => (ev.alive ? ev.scode === 1 || ev.down || (ev.def.civ && ev.scode === 3) : !ev.bodySecured && ev.deadT > 1));
+      let cuffTgt = tgt ? null : this.aimedPerson((ev: VwEnemy) => (ev.alive ? ev.scode === 1 || ev.down || (ev.def.civ && ev.scode === 3) : !ev.bodySecured && ev.deadT > 1));
       const evAim = tgt ? null : this.aimedEvidence();
       if (cuffTgt && evAim !== null) {
-        const v = G.Views.evidence.get(evAim), c = new THREE.Vector3();
+        const v = G.Views.evidence.get(evAim)!, c = new THREE.Vector3();
         (cuffTgt.alive && !cuffTgt.down ? cuffTgt.rig.chest : cuffTgt.rig.hips).getWorldPosition(c);
         if (this.offAim(v.x, (v.y || 0) + 0.04, v.z) < this.offAim(c.x, c.y, c.z)) cuffTgt = null;
       }
@@ -1911,7 +1918,7 @@ const G_Me = {
           const id = ev.id;
           this.startAction('Ordering to turn around', 0.45, () => G.Net.toHost({ t: 'turn', e: id }), 'order');
           this.action.target = id;
-          G.Audio.order(null);
+          G.Audio.order(null!);
         } else if (F && behind) {
           const id = ev.id;
           const wr = G.Views.zipPoint(ev, 0, !lying); // a body (or someone down): kneel by its shoulder, where the ragdoll lies (not where they dropped)
@@ -1930,11 +1937,11 @@ const G_Me = {
       // (the weapon you're looking at)
       const evTgt = !tgt && !cuffTgt ? evAim : null;
       if (evTgt !== null) {
-        const w = G.WEAPONS[G.Views.evidence.get(evTgt).wpn];
+        const w = G.WEAPONS[G.Views.evidence.get(evTgt)!.wpn];
         prompt = 'Hold <b>F</b> to bag evidence' + (w ? ' (' + G.U.esc(w.name) + ')' : '');
-        halo = G.Views.evidence.get(evTgt).mesh;
+        halo = G.Views.evidence.get(evTgt)!.mesh;
         if (F) {
-          const i = evTgt, ev = G.Views.evidence.get(i);
+          const i = evTgt, ev = G.Views.evidence.get(i)!;
           this.startAction('Bagging evidence', 2.3, () => G.Net.toHost({ t: 'secure', i }), 'bag');
           // kneel down just short of it, on the side you came from
           Object.assign(this.action, { target: i, approach: this.standOff(ev.x, ev.z, 0.75), face: { x: ev.x, z: ev.z } });
@@ -2051,7 +2058,7 @@ const G_Me = {
   // A round's wounds on you, whole, as whoever fired it worked them out (js/ballistics.ts outcome: a teammate's or a suspect's
   // through the host, your own off a ricochet here): the wounds on your body, the wear on what you're wearing. from:
   // where it came from; friendly: it wasn't a suspect's (you aren't told whose).
-  applyWounds(o, from, friendly) {
+  applyWounds(o: any, from: any, friendly?: boolean) {
     if (o.fc) G.HUD.maskHit(o.fc); // (what your face shield caught, on your view of it)
     if (o.ws && o.ws.length && G.R.particles) G.R.particles(new THREE.Vector3(this.pos.x, 1.2, this.pos.z), 4 + 2 * o.ws.length, 0x8a0a0a, 1.5, 1.2, 9, 0.6, null, true); // some of it lands at your feet
     if (this.down || this.dead || G.Game.phase !== 'level' || !from) return;
@@ -2072,14 +2079,14 @@ const G_Me = {
     this.hurt(f, from, fate);
   },
   // a round to the head you weren't wearing a helmet for: no bleeding out, no revive
-  killed(from, how) {
+  killed(from: any, how?: any) {
     G.HUD.damage(from, 100);
     G.Audio.hurt();
     this.stats.downs++;
     this.die(how || 'Killed outright');
   },
   // Blasts and other plain damage. Body armour takes some of the fragments.
-  takeDamage(d, from) {
+  takeDamage(d: number, from: any) {
     if (this.down || this.dead || G.Game.phase !== 'level' || !(d > 0)) return;
     // what's on your torso against a fragment (a ragged 0.3 g steel chip at ~900 m/s, js/ballistics.ts): stopped, the
     // torso's share of them stays in the armour
@@ -2099,17 +2106,17 @@ const G_Me = {
   },
   // Prone (Z): down onto your front, or back up (to a crouch). It takes a moment either way (no shooting meanwhile);
   // lying there you crawl, can't lean, and hold the gun as still as it gets.
-  setProne(on) {
+  setProne(on: boolean) {
     if (on === !!this.prone || this.down || this.dead || this.seat != null || this.action) return;
     this.prone = on; this.crouch = !on; this.stanceT = this.PRONE_T;
     this.lowToggle = false; this.burstQ = 0;
     G.Audio.foley && G.Audio.foley('prone', 0, 1, 0);
   },
   // the worse of two fates from G.Med.hit (null, 'down', 'out', 'dead')
-  worse(a, b) { const R = [null, 'down', 'out', 'dead']; return R.indexOf(b) > R.indexOf(a) ? b : a; },
+  worse(a: string | null, b: string | null) { const R = [null, 'down', 'out', 'dead']; return R.indexOf(b) > R.indexOf(a) ? b : a; },
   // the effect of being hit (the injuries are already on the body): flinch, the HUD, going down (fate: 'down', or
   // 'out' for blacking out)
-  hurt(d, from, fate) {
+  hurt(d: number, from: any, fate?: string) {
     if (!(d > 0)) return;
     this.hp = G.Med.overall(this.body);
     this.sinceHurt = 0;
@@ -2134,7 +2141,7 @@ const G_Me = {
     G.Net.toHost({ t: 'chat', m: '[is down and needs a revive!]' });
     if (G.Game.invOpen) G.Game.toggleInv(false);
   },
-  revived(hp) {
+  revived(hp: number) {
     if (!this.down || this.out || G.Med.cantRevive(this.body)) return; // (unconscious: blood first)
     this.down = false;
     this.hp = G.Med.overall(this.body);
@@ -2148,7 +2155,7 @@ const G_Me = {
     if (b.parts.thorax.lung) return 'Bled out from a chest wound (a punctured lung)';
     return 'Bled out: nobody stopped it in time';
   },
-  die(how) {
+  die(how?: any) {
     G.Views.spawnSelfBody(); // (before anything else changes: as you were, then down)
     this.down = false; this.out = false;
     this.dead = true;
@@ -2157,7 +2164,7 @@ const G_Me = {
     G.R.setViewmodel(null);
     G.HUD.toast('KIA', this.deathCause, 3);
   },
-  spectate(dt) {
+  spectate(dt: number) {
     const alive = [...G.Views.players.values()].filter((p) => p.st && !p.st.dd);
     const cam = G.R.camera;
     if (!alive.length) { cam.position.set(this.pos.x, 3.5, this.pos.z); cam.rotation.set(-1.2, this.yaw, 0); return; }
@@ -2195,7 +2202,7 @@ const G_Me = {
   HELMCAM: { x: 0.142, y: 0.2, z: -0.035, pitch: -0.2, yaw: 0.1, smooth: 7, level: 0.7, crop: 0.1 },
 
   // ------------------------------------------------------------- camera + viewmodel
-  updateCamera(dt) {
+  updateCamera(dt: number) {
     this._dtCam = dt;
     const cam = G.R.camera;
     // at a viewer: your eyes at its eyepieces, the view narrowed to its power, the gun out of sight
@@ -2216,7 +2223,7 @@ const G_Me = {
     const sideX = Math.cos(this.yaw), sideZ = -Math.sin(this.yaw), eye = this.pos.y + this.eyeH;
     let room = 1;
     if (want) {
-      const t = G.Level.raycast(G.Game.map, this.pos.x, eye, this.pos.z, sideX * want, 0, sideZ * want, this.LEAN + 0.4).t;
+      const t = G.Level.raycast(G.Game.map!, this.pos.x, eye, this.pos.z, sideX * want, 0, sideZ * want, this.LEAN + 0.4).t;
       room = G.U.clamp((t - 0.22) / this.LEAN, 0, 1);
     }
     this.lean = (this.lean || 0) + (want * room - (this.lean || 0)) * Math.min(1, dt * 9);
@@ -2285,7 +2292,7 @@ const G_Me = {
     vm.rotation.x += (rx - vm.rotation.x) * lp;
     vm.rotation.y += (ry - vm.rotation.y) * lp * 0.6;
     vm.rotation.z += (rz - vm.rotation.z) * lp * 0.6;
-    u.flashes.forEach((fl, i) => {
+    u.flashes.forEach((fl: any, i: number) => {
       fl.visible = this.flashT > 0 && (u.flashes.length < 2 || i === this.flashIdx);
       if (fl.visible) { fl.rotation.z = Math.random() * 6; fl.scale.setScalar(0.8 + Math.random() * 0.6); }
     });
@@ -2342,12 +2349,12 @@ const G_Me = {
   },
   // Before laying someone face down: is there room in front of them? Their body will reach ~1.85 m from the
   // knees. If a wall or furniture is in the way, drag them back (toward you) far enough, and step back with them.
-  planPull(a, ev) {
-    const L = G.Level, map = G.Game.map, s = ev.def.scale || 1, need = 1.85 * s;
+  planPull(a: any, ev: VwEnemy) {
+    const L = G.Level, map = G.Game.map!, s = ev.def.scale || 1, need = 1.85 * s;
     const fx = -Math.sin(ev.yaw), fz = -Math.cos(ev.yaw);
-    const solid = (x, z, r = 0.12) => {
+    const solid = (x: number, z: number, r = 0.12) => {
       const tx = Math.floor(x / L.TS), tz = Math.floor(z / L.TS);
-      for (let oz = -1; oz <= 1; oz++) for (let ox = -1; ox <= 1; ox++) if (L.boxesAt(map, tx + ox, tz + oz).some((b) => b.y0 < 0.5 && b.h > 0.15 && Math.abs(x - b.cx) < b.hx + r && Math.abs(z - b.cz) < b.hz + r)) return true;
+      for (let oz = -1; oz <= 1; oz++) for (let ox = -1; ox <= 1; ox++) if (L.boxesAt(map, tx + ox, tz + oz).some((b: any) => b.y0 < 0.5 && b.h > 0.15 && Math.abs(x - b.cx) < b.hx + r && Math.abs(z - b.cz) < b.hz + r)) return true;
       return false;
     };
     let room = need;
@@ -2365,11 +2372,11 @@ const G_Me = {
     a.pull = { t: 0, dur: Math.max(0.45, back / 1.3), me: this.pos.clone(), dx: -fx * back, dz: -fz * back, to, fx, fz };
   },
   // a spot `dist` short of (x, z), on the side you're standing on
-  standOff(x, z, dist) {
+  standOff(x: number, z: number, dist: number) {
     const dx = this.pos.x - x, dz = this.pos.z - z, d = Math.hypot(dx, dz) || 1;
     return d <= dist + 0.05 ? null : { x: x + (dx / d) * dist, z: z + (dz / d) * dist };
   },
-  lookTarget(ac) {
+  lookTarget(ac: any) {
     if (!ac || ac.approach || ac.kind === 'order') return null;
     const t = ac.t / ac.dur;
     if (ac.kind === 'zip') { const ev = G.Views.enemies.get(ac.target); return ev ? { p: G.Views.zipPoint(ev, t, ac.living), w: 1 } : null; }
@@ -2378,11 +2385,11 @@ const G_Me = {
   },
   // a grenade in your hand: brought up, held, drawn back (high for an overhand throw, low for underhand),
   // thrown and followed through. Eased toward each pose so it moves like an arm. Returns whether it drew.
-  animateHeld(L, dt) {
+  animateHeld(L: any, dt: number) {
     const h = this.held;
     for (const [k, m] of Object.entries(L.nade)) m.visible = !!h && h.kind === k && h.throwT < 0;
     if (!h) { this._hp = null; return false; }
-    const under = h.str === 0, P = (x, y, z, rx, rz = 0) => [x, y, z, rx, rz];
+    const under = h.str === 0, P = (x: number, y: number, z: number, rx: number, rz = 0) => [x, y, z, rx, rz];
     let want, wantL = null;
     if (h.throwT >= 0) { const t = h.throwT / 0.5; want = t < 0.35 ? (under ? P(0.14, -0.22, -0.62, -0.2) : P(0.12, -0.08, -0.68, -0.5)) : P(0.22, -0.5, -0.38, -0.4); }
     else if (h.readyT > 0) want = P(0.3, -0.7, -0.3, -0.6);
@@ -2390,14 +2397,14 @@ const G_Me = {
     else want = P(0.2, -0.24, -0.42, -0.25);
     if (!this._hp) this._hp = P(0.3, -0.7, -0.3, -0.6);
     const k = Math.min(1, (dt || 0.016) * (h.throwT >= 0 ? 22 : 12));
-    this._hp = this._hp.map((v, i) => v + (want[i] - v) * k);
+    this._hp = this._hp.map((v: number, i: number) => v + (want[i] - v) * k);
     const [x, y, z, rx, rz] = this._hp;
     L.arm.visible = true; L.arm.position.set(x, y, z); L.arm.rotation.set(rx, 0.1, rz);
-    if (wantL) { this._hpL = (this._hpL || wantL).map((v, i) => v + (wantL[i] - v) * k); L.armL.visible = true; L.armL.position.set(...this._hpL.slice(0, 3)); L.armL.rotation.set(this._hpL[3], -0.1, 0); }
+    if (wantL) { this._hpL = (this._hpL || wantL).map((v: number, i: number) => v + (wantL[i] - v) * k); L.armL.visible = true; L.armL.position.set(...this._hpL.slice(0, 3)); L.armL.rotation.set(this._hpL[3], -0.1, 0); }
     else this._hpL = null;
     return true;
   },
-  animateLimbs(cam) {
+  animateLimbs(cam: THREE.Camera) {
     const L = this.fpLimbs(), a = this.action, kind = a && a.kind, S = G.U.smooth;
     if (!a && this.animateHeld(L, this._dtCam)) { L.armL.visible = !!this._hpL; L.tie.visible = L.held.visible = L.env.visible = L.leg.visible = false; return; }
     if (this.held === null || !this.held) for (const m of Object.values(L.nade)) m.visible = false;
@@ -2408,11 +2415,11 @@ const G_Me = {
     if (kind !== 'bag') L.held.visible = L.env.visible = false;
     L.leg.visible = kind === 'kick';
     // Camera-space keyframes (x right, y up, -z forward), so the hand and boot land in frame at any pitch.
-    const path = (keys) => { // keys: [[t, x, y, z, rx, rz], ...] - eased between neighbours
+    const path = (keys: number[][]) => { // keys: [[t, x, y, z, rx, rz], ...] - eased between neighbours
       let k = 0;
       while (k < keys.length - 2 && t > keys[k + 1][0]) k++;
       const A = keys[k], B = keys[k + 1], u = S(A[0], B[0], t);
-      return A.slice(1).map((v, n) => v + (B[n + 1] - v) * u);
+      return A.slice(1).map((v: number, n: number) => v + (B[n + 1] - v) * u);
     };
     if (kind === 'open') {
       // reach for the handle, turn it, push the door away
@@ -2424,12 +2431,12 @@ const G_Me = {
       L.arm.position.set(x, y, z); L.arm.rotation.set(rx, -0.2, rz);
     }
     // point a first-person hand at a camera-space position, reaching from a shoulder just below the view
-    const hand = (arm, pos, sd) => {
+    const hand = (arm: any, pos: THREE.Vector3, sd: number) => {
       arm.position.copy(pos);
       const dir = new THREE.Vector3(sd * 0.22, -0.38, 0.12).sub(pos).negate().normalize();
       arm.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), dir);
     };
-    const rest = (sd) => new THREE.Vector3(sd * 0.24, -0.55, -0.15);
+    const rest = (sd: number) => new THREE.Vector3(sd * 0.24, -0.55, -0.15);
     if (kind === 'zip') {
       // hands stay on the person: between the shoulder blades as they're shoved down, then at the wrists
       const ev = G.Views.enemies.get(a.target);
@@ -2463,7 +2470,7 @@ const G_Me = {
       }
       L.held.visible = !!v && t > 0.22 && t < 0.6;
       if (L.held.visible) {
-        if (!a.qFloor) a.qFloor = cam.quaternion.clone().invert().multiply(v.mesh.quaternion);
+        if (!a.qFloor) a.qFloor = cam.quaternion.clone().invert().multiply(v!.mesh.quaternion);
         const qHold = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.15, Math.PI / 2 + 0.5, 0.1));
         L.held.position.copy(floor).lerp(H, lift).lerp(E, insert);
         L.held.quaternion.copy(a.qFloor).slerp(qHold, lift);
@@ -2500,7 +2507,7 @@ const G_Me = {
   },
 
 
-  sendState(dt) {
+  sendState(dt: number) {
     this.stateT -= dt;
     if (this.stateT > 0) return;
     this.stateT = 0.05;
@@ -2508,11 +2515,11 @@ const G_Me = {
   },
   // what you're wearing, as others see it (js/rig.ts setKit)
   kitLook() {
-    const k = this.kit || {}, g = (it) => (it ? it.gid : 0), n = (it) => (it && it.molle ? it.molle.items.length : 0);
+    const k = this.kit || {}, g = (it: GItem | null) => (it ? it.gid : 0), n = (it: GItem | null) => (it && it.molle ? it.molle.items.length : 0);
     return { helmet: g(k.helmet), face: k.helmet && k.helmet.face ? k.helmet.face.gid : 0, carrier: g(k.carrier), plate: k.carrier && k.carrier.plate ? 1 : 0, sh: k.carrier && k.carrier.shoulder ? k.carrier.shoulder.gid : 0, gr: k.carrier && k.carrier.groin ? k.carrier.groin.gid : 0, cp: n(k.carrier), belt: g(k.belt), lg: k.belt && k.belt.legs ? k.belt.legs.gid : 0, bp: n(k.belt), pack: g(k.pack), ifak: k.ifak ? 1 : 0 };
   },
   state() {
-    const r2 = (v) => Math.round(v * 100) / 100;
+    const r2 = (v: number) => Math.round(v * 100) / 100;
     return {
       p: [r2(this.pos.x), r2(this.pos.y), r2(this.pos.z)], yw: r2(this.yaw), pt: r2(this.pitch),
       hp: Math.ceil(this.hp), mhp: this.maxHp(), ar: Math.round(this.vestCond() * 100), amx: G.Gear.piece(this, 'chest') ? 100 : 0,
@@ -2535,6 +2542,7 @@ interface MeFields {
   dead: boolean; down: boolean; out: boolean; hp: number; body: any; bleed: number | null; spectating: any; treating: Map<any, any>;
   crouch: boolean; prone: boolean; lean: number; onGround: boolean; hspeed: number; lowReady: boolean; seat: any; zipRide: any; climb: any;
   slot: any; reloading: boolean; reloadT: number; reloadTotal: number; reloadMode: string; adsT: number; aimScreen: { y: number; p: number };
+  deathCause: string; dumped: GItem | null; burstQ: number; stowed: boolean; fLatch: boolean;
   inspectT: number; inspectDur: number; magChk: any; act: any; action: any; held: any; pressBuf: number; rHeldAt: number; navRearm: any;
 }
 interface GameModules { Me: typeof G_Me & MeFields; }

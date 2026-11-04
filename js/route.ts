@@ -6,28 +6,31 @@
 const G_Route = (() => {
   const COLS = 10, ROWS = 7, WALKS = 4;
   // which column a level is in, and which act; the last level of each act is the boss
-  const colOf = (level) => (level - 1) % COLS;
-  const actOf = (level) => Math.floor((level - 1) / COLS) + 1;
-  const isBoss = (level) => level % COLS === 0;
+  interface RNode { id: number; c: number; r: number; th: number; next: number[]; prev: number[]; boss: boolean }
+  interface RMap { seed: number; act: number; cols: RNode[][]; nodes: Map<number, RNode> }
+  interface RState { path: number[]; opts: number[]; votes?: Record<string, number>; colors?: Record<string, number>; mine?: number }
+  const colOf = (level: number) => (level - 1) % COLS;
+  const actOf = (level: number) => Math.floor((level - 1) / COLS) + 1;
+  const isBoss = (level: number) => level % COLS === 0;
 
   // { seed, act, cols: [[node]], nodes: Map id -> node }; node { id, c, r, th, next: [ids], boss }
-  function gen(seed, act) {
-    const r = G.U.rng(seed ^ (act * 0x9e3779b1)), nodes = new Map(), edges = [];
-    const id = (c, row) => c * 10 + row;
-    const node = (c, row) => {
+  function gen(seed: number, act: number): RMap {
+    const r = G.U.rng(seed ^ (act * 0x9e3779b1)), nodes = new Map<number, RNode>(), edges: number[][] = [];
+    const id = (c: number, row: number) => c * 10 + row;
+    const node = (c: number, row: number): RNode => {
       const k = id(c, row);
       if (!nodes.has(k)) nodes.set(k, { id: k, c, r: row, th: 0, next: [], prev: [], boss: c === COLS - 1 });
-      return nodes.get(k);
+      return nodes.get(k)!;
     };
     // would a link (c, a) -> (c + 1, b) cross one already drawn?
-    const crosses = (c, a, b) => edges.some(([c2, a2, b2]) => c2 === c && ((a2 < a && b2 > b) || (a2 > a && b2 < b)));
+    const crosses = (c: number, a: number, b: number) => edges.some(([c2, a2, b2]) => c2 === c && ((a2 < a && b2 > b) || (a2 > a && b2 < b)));
     // one way in (the middle of the first column), fanning out to several rows, wandering on (now and then
     // meeting another path), and all of them coming together at the boss in the middle of the last
     const mid = (ROWS - 1) / 2, start = node(0, mid);
     // where each path goes first: one high, one low, the rest anywhere, all different
     const firsts = [Math.floor(r() * mid), mid + 1 + Math.floor(r() * mid)];
     const rest = G.U.shuffle(r, [...Array(ROWS).keys()].filter((x) => !firsts.includes(x)));
-    while (firsts.length < WALKS) firsts.push(rest.pop());
+    while (firsts.length < WALKS) firsts.push(rest.pop()!);
     for (const first of firsts) {
       edges.push([0, start.r, first]);
       node(1, first);
@@ -44,15 +47,15 @@ const G_Route = (() => {
     // every last-column node leads to the boss
     const boss = node(COLS - 1, mid);
     for (const n of nodes.values()) if (n.c === COLS - 2) edges.push([COLS - 2, n.r, boss.r]);
-    for (const [c, a, b] of edges) { const f = nodes.get(id(c, a)), t = nodes.get(id(c + 1, b)); if (!f.next.includes(t.id)) { f.next.push(t.id); t.prev.push(f.id); } }
+    for (const [c, a, b] of edges) { const f = nodes.get(id(c, a))!, t = nodes.get(id(c + 1, b))!; if (!f.next.includes(t.id)) { f.next.push(t.id); t.prev.push(f.id); } }
     // environments: no two in a row along a link where it can be helped, and each column a mix. (The starter, the
     // convenience store, is the first act's way in and nowhere else: the rest are drawn from the others, each from its
     // theme's `from`, the first level it can come up at: the Sandia Crest's after the third.)
     const all = G.THEMES.map((T, i) => i).filter((i) => !G.THEMES[i].starter), starter = G.THEMES.findIndex((T) => T.starter);
     const order = [...nodes.values()].sort((a, b) => a.c - b.c || a.r - b.r);
     for (const n of order) {
-      const level = (act - 1) * COLS + n.c + 1, pool = all.filter((i) => !(G.THEMES[i].from > level)), nT = pool.length;
-      const avoid = new Set(n.prev.map((p) => nodes.get(p).th));
+      const level = (act - 1) * COLS + n.c + 1, pool = all.filter((i) => !(G.THEMES[i].from! > level)), nT = pool.length;
+      const avoid = new Set(n.prev.map((p) => nodes.get(p)!.th));
       for (const o of order) if (o.c === n.c && o !== n && o.r < n.r) avoid.add(o.th);
       let k0 = Math.floor(r() * nT);
       for (let k = 0; k < nT && avoid.has(pool[k0]); k++) k0 = (k0 + 1) % nT;
@@ -63,13 +66,13 @@ const G_Route = (() => {
     return { seed, act, cols, nodes };
   }
   // where the squad can go next: from the node they're on, or the act's way in at its start
-  function options(route, at) {
+  function options(route: RMap, at: number | null | undefined) {
     if (at == null || !route.nodes.has(at)) return route.cols[0].map((n) => n.id);
-    return route.nodes.get(at).next.slice();
+    return route.nodes.get(at)!.next.slice();
   }
 
   // ------------------------------------------------------------------ the map screen
-  const ICON = { // a glyph per environment
+  const ICON: Record<string, string> = { // a glyph per environment
     Apartment: 'M-6 6V-2L0-7 6-2V6Z M-2 6V1H2V6', Warehouse: 'M-7 6V-3L0-7 7-3V6Z M-4 6V0H4V6 M-4 3H4',
     Bunker: 'M-7 5Q0-9 7 5Z M-3 5V1H3V5', Suburbs: 'M-7 6V0L-3.5-4 0 0V6Z M1 6V-2L4-5 7-2V6',
     'Research Lab': 'M-2-7H2 M-1-7V-2L-6 6H6L1-2V-7', Foundry: 'M-7 6V-1L-3-4V-1L1-4V-1L5-4V6Z M4-4V-8H6V-3',
@@ -78,15 +81,15 @@ const G_Route = (() => {
   };
   // wider than the screen: the map scrolls sideways (js/game.ts keeps where you are in view)
   const STEP = 150, PADX = 80, PADY = 56, W = 2 * PADX + (COLS - 1) * STEP, H = 600;
-  const pos = (n) => [PADX + n.c * STEP, PADY + n.r * (H - 2 * PADY) / (ROWS - 1)];
+  const pos = (n: RNode) => [PADX + n.c * STEP, PADY + n.r * (H - 2 * PADY) / (ROWS - 1)];
   // the map as SVG. st: { path: [ids visited this act], opts: [ids], votes: { playerId: nodeId }, colors: { playerId: color }, mine }
-  function svg(route, st) {
+  function svg(route: RMap, st: RState) {
     const esc = G.U.esc, visited = new Set(st.path), last = st.path[st.path.length - 1];
     let lines = '', dots = '';
     for (const n of route.nodes.values()) {
       const [x1, y1] = pos(n);
       for (const t of n.next) {
-        const m = route.nodes.get(t), [x2, y2] = pos(m);
+        const m = route.nodes.get(t)!, [x2, y2] = pos(m);
         const walked = visited.has(n.id) && visited.has(m.id) && st.path.indexOf(m.id) === st.path.indexOf(n.id) + 1;
         const open = n.id === last && st.opts.includes(m.id);
         lines += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="rl${walked ? ' walked' : open ? ' open' : ''}"/>`;

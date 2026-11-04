@@ -24,11 +24,11 @@ const G_GunAudio = {
   MAX_VOICES: 28,
   CEIL_M: G.Level.WALL_H,
 
-  sources: new Map(),  // weapon id -> Promise<source>
-  bufs: new Map(),     // weapon|room key -> AudioBuffer
-  dry: new Map(),      // weapon id -> AudioBuffer
+  sources: new Map<string, Promise<unknown>>(),  // weapon id -> Promise<source>
+  bufs: new Map<string, AudioBuffer>(),     // weapon|room key -> AudioBuffer
+  dry: new Map<string, AudioBuffer>(),      // weapon id -> AudioBuffer
   pending: new Set(),
-  queue: [],
+  queue: [] as { key: string; job: () => Promise<any> }[],
   busy: false,
   voices: 0,
 
@@ -38,7 +38,7 @@ const G_GunAudio = {
   // Ring of rays from the shooter to the nearest walls -> area, perimeter, corridor-ness,
   // openness -> synth environment preset + Sabine RT60. Memoised per tile per map.
   // fy: the floor it's on (a building of several floors: the room upstairs, not the one below it)
-  acousticsAt(map, x, z, fy = 0) {
+  acousticsAt(map: any, x: number, z: number, fy = 0) {
     const L = G.Level, tx = Math.floor(x / L.TS), tz = Math.floor(z / L.TS), key = tz * map.W + tx + '|' + fy.toFixed(1);
     map._acoustics = map._acoustics || new Map();
     const memo = map._acoustics.get(key);
@@ -80,21 +80,21 @@ const G_GunAudio = {
     return out;
   },
   // the height of the floor something at p (a muzzle, your eyes) is over
-  floorY(map, p) { return map.floors ? G.Level.floorMap(map, G.Level.floorAt(map, p.x, p.y - 1.4, p.z)).fy || 0 : 0; },
+  floorY(map: any, p: THREE.Vector3) { return map.floors ? G.Level.floorMap(map, G.Level.floorAt(map, p.x, p.y - 1.4, p.z)).fy || 0 : 0; },
   // Invert the synth's "space size" control (RT60 = base * (0.45 + 1.6 * size)).
-  sizeForRt60(env, rt60) {
+  sizeForRt60(env: string, rt60: number) {
     const base = window.GunshotSynth.ENVIRONMENTS[env].rt60 || 0;
     return base > 0 ? G.U.clamp((rt60 / base - 0.45) / 1.6, 0, 1) : 0.5;
   },
-  roomSig(map, x, z, fy = 0) {
-    const a = this.acousticsAt(map, x, z, fy), q = (v, s) => +(Math.round(v / s) * s).toFixed(2);
+  roomSig(map: any, x: number, z: number, fy = 0) {
+    const a = this.acousticsAt(map, x, z, fy), q = (v: number, s: number) => +(Math.round(v / s) * s).toFixed(2);
     return { env: a.env, envSize: q(this.sizeForRt60(a.env, a.rt60), 0.2), envReflect: q(a.envReflect, 0.25), envMix: q(a.envMix, 0.2) };
   },
-  sigKey(sig) { return `${sig.env}|${sig.envSize}|${sig.envReflect}|${sig.envMix}`; },
+  sigKey(sig: any) { return `${sig.env}|${sig.envSize}|${sig.envReflect}|${sig.envMix}`; },
 
   // ------------------------------------------------------------ rendering (serial queue)
   // One render at a time keeps the main thread smooth while a level is being prewarmed.
-  enqueue(key, job, urgent?) {
+  enqueue(key: string, job: () => Promise<any>, urgent?: boolean) {
     if (this.pending.has(key)) return;
     this.pending.add(key);
     const item = { key, job };
@@ -105,15 +105,15 @@ const G_GunAudio = {
     if (this.busy || !this.queue.length) return;
     this.busy = true;
     const { key, job } = this.queue.shift();
-    job().catch((e) => console.warn('gunshot render failed', key, e)).finally(() => {
+    job().catch((e: any) => console.warn('gunshot render failed', key, e)).finally(() => {
       this.pending.delete(key);
       this.busy = false;
       setTimeout(() => this.pump(), 0);
     });
   },
   // sound keys: "weaponId:barrelInches:muzzleDevice" from a build (js/parts.ts), or a plain weapon id
-  spec(vid) { return vid ? G.Gunsmith.soundSpec(vid) : null; },
-  sourceParams(id) {
+  spec(vid: string) { return vid ? G.Gunsmith.soundSpec(vid) : null; },
+  sourceParams(id: string) {
     const g = this.spec(id);
     return Object.assign({
       barrel: g.barrel, caliber: g.caliber, muzzleDevice: g.muzzleDevice, pressure: g.pressure, grain: g.grain,
@@ -121,33 +121,33 @@ const G_GunAudio = {
       actionType: g.actionType, shotCount: g.shotCount, caseMaterial: g.caseMaterial, caseLength: g.caseLength, suppressor: g.suppressor,
     }, this.MIC);
   },
-  placeParams(id, sig) {
+  placeParams(id: string, sig: any) {
     const g = this.spec(id);
     return Object.assign({}, sig, this.REF, { masterDb: 0, casing: this.CASING, caseMaterial: g.caseMaterial, caseLength: g.caseLength, boltSim: true });
   },
-  getSource(id) {
+  getSource(id: string) {
     let s = this.sources.get(id);
     if (!s) { s = window.GunshotSynth.precompute(this.sourceParams(id)); this.sources.set(id, s); }
     return s;
   },
-  buildDry(id, urgent?) {
+  buildDry(id: string, urgent?: boolean) {
     if (this.dry.has(id)) return;
     const dryPlace = { env: 'none', envSize: 0, envReflect: 0, envMix: 0 };
     this.enqueue('dry:' + id, () => this.getSource(id)
-      .then((src) => window.GunshotSynth.place(src, this.placeParams(id, dryPlace)))
-      .then((buf) => { this.dry.set(id, buf); }), urgent);
+      .then((src: unknown) => window.GunshotSynth.place(src, this.placeParams(id, dryPlace)))
+      .then((buf: AudioBuffer) => { this.dry.set(id, buf); }), urgent);
   },
-  build(id, sig, urgent?) {
+  build(id: string, sig: any, urgent?: boolean) {
     const key = id + '|' + this.sigKey(sig);
     if (this.bufs.has(key)) return;
     this.enqueue(key, () => this.getSource(id)
-      .then((src) => window.GunshotSynth.place(src, this.placeParams(id, sig)))
-      .then((buf) => { this.bufs.set(key, buf); }), urgent);
+      .then((src: unknown) => window.GunshotSynth.place(src, this.placeParams(id, sig)))
+      .then((buf: AudioBuffer) => { this.bufs.set(key, buf); }), urgent);
   },
 
   // Pre-render every distinct acoustic space in the level for the given weapons, so shots
   // rarely need the dry fallback. Room signatures collapse to a handful per level.
-  prewarm(ids, map?) {
+  prewarm(ids: any[], map?: any) {
     if (!this.available()) return;
     ids = [...new Set(ids)].filter((id) => this.spec(id));
     ids.forEach((id) => this.buildDry(id));
@@ -172,7 +172,7 @@ const G_GunAudio = {
   echoCache: new Map(),
   debugEchoes: (() => { try { return new URLSearchParams(location.search).has('echoes'); } catch (e) { return false; } })(),
 
-  echoTaps(map, src, lis) {
+  echoTaps(map: any, src: any, lis: any) {
     const key = `${Math.round(src.x)},${Math.round(src.y)},${Math.round(src.z)}|${Math.round(lis.x)},${Math.round(lis.y)},${Math.round(lis.z)}|${map.doorVer || 0}`;
     const cached = this.echoCache.get(key);
     if (cached && cached.map === map) return cached.taps;
@@ -182,7 +182,7 @@ const G_GunAudio = {
     const direct = Math.hypot(lis.x - src.x, ly - y, lis.z - src.z);
     const rayNorm = Math.sqrt(8 / K); // each ray stands for a slice of the wavefront
     const bins = new Map();
-    const add = (pos, path, amp, order, hops) => {
+    const add = (pos: any, path: number, amp: number, order: number, hops: any[]) => {
       const delay = (path - direct) / this.SOUND;
       // < 20 ms fuses with the direct sound (the room reverb already covers it); > 0.6 s is negligible here
       if (delay < 0.02 || delay > 0.6 || amp < 0.008) return;
@@ -222,8 +222,8 @@ const G_GunAudio = {
     this.echoCache.set(key, { map, taps });
     return taps;
   },
-  drawEchoes(taps, lis) {
-    const V = (p) => new THREE.Vector3(p.x, p.y, p.z);
+  drawEchoes(taps: any[], lis: THREE.Vector3) {
+    const V = (p: { x: number; y: number; z: number }) => new THREE.Vector3(p.x, p.y, p.z);
     for (const tp of taps) {
       const col = tp.order === 1 ? 0x40c0ff : 0xb070ff;
       for (let i = 0; i < tp.hops.length - 1; i++) G.R.tracer(V(tp.hops[i]), V(tp.hops[i + 1]), col, 0.012, 0.8);
@@ -233,7 +233,7 @@ const G_GunAudio = {
 
   // ------------------------------------------------------------ playback
   // a suppressed gun's first shot after a pause (by shooter: two of them with the same gun are two cans)
-  firstRound(id, who, now) {
+  firstRound(id: string, who: string, now: number) {
     if (this.spec(id).muzzleDevice !== 'suppressor') return 1;
     const k = id + '|' + who, t = this.lastShot.get(k);
     this.lastShot.set(k, now);
@@ -242,7 +242,7 @@ const G_GunAudio = {
   },
   // pos = world position of the muzzle, or null for the local player's own gun. who: the shooter (for a can's first-round pop).
   // Returns false when no synth buffer exists yet so the caller can play a fallback.
-  play(id, pos, who?) {
+  play(id: string, pos: THREE.Vector3 | null, who?: string) {
     const A = G.Audio, ctx = A.ctx, map = G.Game.map;
     if (!ctx || !map || !this.spec(id) || !this.available()) return false;
     const cam = G.R.camera.position;
@@ -257,7 +257,7 @@ const G_GunAudio = {
     }
 
     const base = this.GAIN * this.firstRound(id, who || (pos ? 'x' : 'me'), ctx.currentTime);
-    let gain = base, occluded = false, d = 0, panPos = pos, portal = null;
+    let gain = base, occluded = false, d = 0, panPos = pos as THREE.Vector3, portal = null; // (panPos is only read inside `if (pos)`)
     const taps = this.echoTaps(map, src, cam);
     if (this.debugEchoes) this.drawEchoes(taps, cam);
     if (pos) {
@@ -266,7 +266,7 @@ const G_GunAudio = {
       occluded = !G.Level.los(map, cam.x, cam.y, cam.z, pos.x, pos.y, pos.z);
       // Heard round a corner: if an echo path exists, the shot seems to come from that opening and is
       // much less muffled than sound going through a wall.
-      if (occluded) portal = taps.reduce((b, t) => (!b || t.amp > b.amp ? t : b), null);
+      if (occluded) portal = taps.reduce((b: any, t: any) => (!b || t.amp > b.amp ? t : b), null);
       if (portal) panPos = portal.pos;
       if (occluded) gain *= portal ? 0.75 : 0.55;
       if (this.voices >= this.MAX_VOICES && gain < 0.3) return true; // drop distant shots under load
@@ -323,7 +323,7 @@ const G_GunAudio = {
   },
 
   // Keep the Web Audio listener glued to the camera so HRTF panning tracks where you look.
-  updateListener(cam) {
+  updateListener(cam: THREE.Camera) {
     const ctx = G.Audio.ctx;
     if (!ctx) return;
     const l = ctx.listener, p = cam.position;

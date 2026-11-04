@@ -5,19 +5,19 @@ const G_HUD = {
   cache: {},
   vigT: 0,
   toastT: 0,
-  dirs: [],
+  dirs: [] as { el: HTMLElement; from: THREE.Vector3; t: number }[],
 
   init() {
     for (const n of document.querySelectorAll('#hud [id]')) this.el[n.id] = n;
   },
-  set(id, html) {
+  set(id: string, html: string) {
     if (this.cache[id] === html) return;
     this.cache[id] = html;
     this.el[id].innerHTML = html;
   },
-  show(v) { document.getElementById('hud').classList.toggle('hidden', !v); },
+  show(v: boolean) { document.getElementById('hud')!.classList.toggle('hidden', !v); },
 
-  damage(from, amt) {
+  damage(from: THREE.Vector3 | null | undefined, amt: number) {
     this.vigT = Math.min(1, this.vigT + amt / 40);
     if (!from) return;
     const d = document.createElement('div');
@@ -25,12 +25,12 @@ const G_HUD = {
     this.el.dmgDirs.appendChild(d);
     this.dirs.push({ el: d, from: from.clone ? from.clone() : from, t: 1.2 });
   },
-  toast(title, sub, dur = 2.5) {
+  toast(title: string, sub: string, dur = 2.5) {
     this.el.toast.innerHTML = (title ? `<div class="tt">${title}</div>` : '') + (sub ? `<div class="ts">${sub}</div>` : '');
     this.el.toast.style.opacity = 1;
     this.toastT = dur;
   },
-  feed(html) {
+  feed(html: string) {
     const d = document.createElement('div');
     d.innerHTML = html;
     this.el.killfeed.prepend(d);
@@ -38,7 +38,7 @@ const G_HUD = {
     setTimeout(() => d.remove(), 5000);
     while (this.el.killfeed.children.length > 6) this.el.killfeed.lastChild.remove();
   },
-  chat(name, color, text) {
+  chat(name: string | null, color: number, text: string) {
     const d = document.createElement('div');
     d.innerHTML = name ? `<b style="color:${G.U.hex(color)}">${G.U.esc(name)}:</b> ${G.U.esc(text)}` : `<i>${G.U.esc(text)}</i>`;
     this.el.chatLog.appendChild(d);
@@ -46,20 +46,20 @@ const G_HUD = {
     setTimeout(() => d.remove(), 10000);
     while (this.el.chatLog.children.length > 8) this.el.chatLog.firstChild.remove();
   },
-  setPrompt(html) { this.set('prompt', html); },
-  setProgress(f, label) {
+  setPrompt(html: string) { this.set('prompt', html); },
+  setProgress(f: number, label: string) {
     const show = f >= 0;
     this.el.progress.classList.toggle('hidden', !show);
     if (show) { this.el.progressBar.style.width = Math.min(100, f * 100) + '%'; this.set('progressText', label); }
   },
   // blinded by a flashbang (k 0..1): the screen white, held a moment, then fading back over a few seconds
-  flash(k) {
+  flash(k: number) {
     this.flashK = Math.max(this.flashK || 0, k);
     this.flashHold = Math.max(this.flashHold || 0, 0.4 + 1.8 * k);
   },
   // Your face shield catching a round: where it struck, on your view through it, and it stays that way (list: [x, y, what it did: 0
   // stopped, 1 through, 2 glanced], in the head's frame: js/ballistics.ts). Kept on the shield, so it goes where the shield goes.
-  maskHit(list) {
+  maskHit(list: [number, number, number][]) {
     const k = G.Me.kit, it = k && k.helmet && (k.helmet.face || k.helmet);
     if (!it) return;
     const cr = it.cracks || (it.cracks = []);
@@ -68,7 +68,7 @@ const G_HUD = {
     this.maskPop = 1;
   },
   // what's on the shield you're wearing, drawn when it changes
-  maskDraw(dt) {
+  maskDraw(dt: number) {
     const k = G.Me.kit, it = k && k.helmet && (k.helmet.face || k.helmet), cr = (it && it.cracks) || [], cv = this.el.maskFx, W = window.innerWidth, H = window.innerHeight, key = `${cr.length}|${cr.length ? cr[cr.length - 1][3] : 0}|${W}x${H}`;
     if (this.maskPop > 0) { this.maskPop = Math.max(0, this.maskPop - dt * 3.5); cv.style.filter = `brightness(${(1 + this.maskPop * 1.6).toFixed(2)})`; } else if (cv.style.filter) cv.style.filter = '';
     cv.classList.toggle('hidden', !cr.length || G.Me.dead); // (not while you're watching someone else)
@@ -78,14 +78,14 @@ const G_HUD = {
     const g = cv.getContext('2d'), R0 = Math.min(W, H);
     for (const [u, v, st, seed] of cr) {
       let s = seed; const rnd = () => { s = (Math.imul(s, 1597334677) + 12345) | 0; return ((s ^ (s >>> 15)) >>> 0) / 4294967296; };
-      const x = u * W, y = v * H, big = st === 1 ? 0.42 : st === 2 ? 0.2 : 0.3, n = st === 2 ? 7 : 12 + Math.floor(rnd() * 5), rays = [];
+      const x = u * W, y = v * H, big = st === 1 ? 0.42 : st === 2 ? 0.2 : 0.3, n = st === 2 ? 7 : 12 + Math.floor(rnd() * 5), rays: number[][][] = [];
       g.lineCap = 'round';
       for (let i = 0; i < n; i++) {
-        let a = (st === 2 ? 0.7 : 1) * (i / n * Math.PI * 2 + rnd() * 0.4) + (st === 2 ? rnd() : 0), q = R0 * 0.012, px = x + Math.cos(a) * q, py = y + Math.sin(a) * q; const end = R0 * big * (0.35 + rnd() * 0.65), pts = [[px, py]];
+        let a = (st === 2 ? 0.7 : 1) * (i / n * Math.PI * 2 + rnd() * 0.4) + (st === 2 ? rnd() : 0), q = R0 * 0.012, px = x + Math.cos(a) * q, py = y + Math.sin(a) * q; const end = R0 * big * (0.35 + rnd() * 0.65), pts: number[][] = [[px, py]];
         while (q < end) { const d = R0 * (0.014 + rnd() * 0.03); q += d; a += (rnd() - 0.5) * 0.5; px += Math.cos(a) * d; py += Math.sin(a) * d; pts.push([px, py]); }
         rays.push(pts);
       }
-      const stroke = (col, w) => { g.strokeStyle = col; g.lineWidth = w; for (const pts of rays) { g.beginPath(); pts.forEach((p, i) => g[i ? 'lineTo' : 'moveTo'](p[0], p[1])); g.stroke(); } };
+      const stroke = (col: string, w: number) => { g.strokeStyle = col; g.lineWidth = w; for (const pts of rays) { g.beginPath(); pts.forEach((p, i) => g[i ? 'lineTo' : 'moveTo'](p[0], p[1])); g.stroke(); } };
       stroke('rgba(0,0,0,0.3)', 3); stroke('rgba(228,240,246,0.72)', 1.4);
       // (the web between the rays, and the pulverised patch where it struck)
       g.strokeStyle = 'rgba(226,238,244,0.38)'; g.lineWidth = 1;
@@ -95,14 +95,14 @@ const G_HUD = {
       g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill();
     }
   },
-  nadeWarn(n) {
+  nadeWarn(n: { pos: THREE.Vector3 } | null) {
     const el = this.el.nadeWarn;
     el.classList.toggle('hidden', !n);
     if (!n) return;
     const Me = G.Me, ang = Math.atan2(-(n.pos.x - Me.pos.x), -(n.pos.z - Me.pos.z));
     el.firstChild.style.transform = `rotate(${-G.U.angDiff(Me.yaw, ang)}rad)`;
   },
-  sniperWarn(on) { this.el.vignette.classList.toggle('sniper', on); },
+  sniperWarn(on: boolean) { this.el.vignette.classList.toggle('sniper', on); },
 
   // ---------------------------------------------------------------- F9: the hitboxes, and who you're looking at
   // While the hitboxes are shown, everything about whoever's under the crosshair (a suspect, a civilian, a body, a
@@ -113,7 +113,7 @@ const G_HUD = {
   HB_ORGANS: [['Head', ['brain', 'brainstem']], ['Neck', ['spineC', 'trachea', 'carotidL', 'carotidR']], ['Chest', ['heart', 'aorta', 'lungL', 'lungR', 'spineT']],
     ['Abdomen', ['liver', 'stomach', 'spleen', 'bowel', 'kidneyL', 'kidneyR']], ['Pelvis', ['pelvisL', 'pelvisR', 'iliacL', 'iliacR']],
     ['Arms', ['humerusL', 'humerusR', 'forearmL', 'forearmR', 'brachialL', 'brachialR']], ['Legs', ['femurL', 'femurR', 'femoralL', 'femoralR', 'tibiaL', 'tibiaR']]],
-  debugTarget(dt) {
+  debugTarget(dt: number) {
     const el = this.el.hbInfo, on = G.Rig.debug;
     el.classList.toggle('hidden', !on);
     if (!on) { if (this.xrOn) this.xray(null); return; }
@@ -121,26 +121,26 @@ const G_HUD = {
     this.hbT = 0.1;
     const cam = G.R.camera, o = cam.position.clone(), d = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion), map = G.Game.map;
     const wall = map ? G.Level.raycast(map, o.x, o.y, o.z, d.x, d.y, d.z, 300) : null, maxT = wall && wall.t != null ? wall.t + 0.05 : 300;
-    let best = null;
-    const test = (who, kind) => { if (!who.rig || !who.rig.root.visible) return; const h = G.Rig.raycast(who.rig, o, d, maxT); if (h && (!best || h.t < best.h.t)) best = { who, kind, h }; };
+    let best = null as { who: any; kind: string; h: any } | null;
+    const test = (who: any, kind: string) => { if (!who.rig || !who.rig.root.visible) return; const h = G.Rig.raycast(who.rig, o, d, maxT); if (h && (!best || h.t < best.h.t)) best = { who, kind, h }; };
     for (const ev of G.Views.enemies.values()) test(ev, 'e');
     for (const pv of G.Views.players.values()) if (pv.st) test(pv, 'p');
-    const esc = G.U.esc, B = G.Ballistics, pct = (v) => Math.round(v * 100) + '%';
-    const SEG = { cranium: 'Skull', jaw: 'Jaw', neck: 'Neck', chest: 'Chest', abdomen: 'Abdomen', pelvis: 'Pelvis', uarm: 'Upper arm', farm: 'Forearm', thigh: 'Thigh', shin: 'Shin' };
-    const sideOf = (s) => (s === 'L' ? ' (L)' : s === 'R' ? ' (R)' : '');
+    const esc = G.U.esc, B = G.Ballistics, pct = (v: number) => Math.round(v * 100) + '%';
+    const SEG: Record<string, string> = { cranium: 'Skull', jaw: 'Jaw', neck: 'Neck', chest: 'Chest', abdomen: 'Abdomen', pelvis: 'Pelvis', uarm: 'Upper arm', farm: 'Forearm', thigh: 'Thigh', shin: 'Shin' };
+    const sideOf = (s: string) => (s === 'L' ? ' (L)' : s === 'R' ? ' (R)' : '');
     // sticky: looking away (or at nothing), it stays on the last one you looked at, still live, with the line through
     // them as it was when you last had them in your sights (while they're still in the level)
     const L = this.hbLast, still = L && (L.kind === 'e' ? G.Views.enemies.get(L.who.id) === L.who : G.Views.players.get(L.id) === L.who && L.who.st);
     if (!best && !still) { this.hbLast = null; this.xray(null, true); this.set('hbInfo', `<h4>Nothing in line <small>${wall && wall.t != null ? `wall at ${wall.t.toFixed(1)} m` : ''}</small></h4>`.replace('<h4>', this.trailLegend() + '<h4>')); return; }
-    let who, kind, line, hit, dist;
+    let who: any, kind: string, line: string, hit: string, dist: number;
     if (best) {
       ({ who, kind } = best); const h = best.h;
       // the line through them, from just in front
       const back = Math.max(0, h.t - 0.6), pr = B.probe(who.rig, o.clone().addScaledVector(d, back), d, 3);
-      line = pr ? pr.path.map((p) => `<div class="hb-line"><b>${SEG[p.seg] || p.seg}${sideOf(p.side)}</b> ${p.organs.length ? p.organs.map((id) => esc(B.ORG[id].label)).join(' → ') : '<span class="hb-k">flesh</span>'}</div>`).join('') : '<div class="hb-k">only the hitbox: the body itself is missed</div>';
+      line = pr ? pr.path.map((p: BMat) => `<div class="hb-line"><b>${SEG[p.seg] || p.seg}${sideOf(p.side)}</b> ${p.organs.length ? p.organs.map((id: string) => esc(B.ORG[id].label)).join(' → ') : '<span class="hb-k">flesh</span>'}</div>`).join('') : '<div class="hb-k">only the hitbox: the body itself is missed</div>';
       hit = `hitbox: ${h.zone}${sideOf(h.side)}${kind === 'e' ? ` · ${h.c < 0.4 ? 'centre' : h.c < 0.8 ? 'off-centre' : 'edge'}` : ''}`;
       dist = h.t;
-      let id = null; if (kind === 'p') for (const [k, v] of G.Views.players) if (v === who) id = k;
+      let id: string | null = null; if (kind === 'p') for (const [k, v] of G.Views.players) if (v === who) id = k;
       this.hbLast = { who, kind, id, line, hit };
     } else {
       ({ who, kind } = L); line = `<div class="hb-old">${L.line}</div>`; hit = `last in line · ${L.hit}`;
@@ -159,12 +159,12 @@ const G_HUD = {
       if (e) {
         const rate = dead ? 0 : ((e.bleedH || 0) + (e.bleedL || 0)) * G.Server.BLEED_K, left = rate > 0 ? Math.max(0, e.hp) / rate : null;
         c.push(`<div class="hb-row"><span>Health ${Math.max(0, Math.round(e.hp))}/${Math.round(e.maxHp)} (${pct(Math.max(0, e.hp) / e.maxHp)})</span><span>Strength ${dead ? '—' : pct(e.str == null ? 1 : e.str)}</span></div>`);
-        if (rate > 0) c.push(`<div class="bad">Bleeding ${(rate / e.maxHp * 100).toFixed(1)}%/s${e.bleedH ? ' (heavy)' : ''}${e.bleedL ? ` (light, clots in ${Math.max(0, 30 - (e.clotT || 0)).toFixed(0)} s)` : ''} · gone in ${left.toFixed(1)} s</div>`);
+        if (rate > 0) c.push(`<div class="bad">Bleeding ${(rate / e.maxHp * 100).toFixed(1)}%/s${e.bleedH ? ' (heavy)' : ''}${e.bleedL ? ` (light, clots in ${Math.max(0, 30 - (e.clotT || 0)).toFixed(0)} s)` : ''} · gone in ${left!.toFixed(1)} s</div>`);
         const f = [e.cardiac && 'heart wrecked', e.out && 'unconscious', e.spine && 'spine: paralysed', e.lung && 'collapsed lung', ...Object.keys(e.broke || {}).map((k) => `broken ${k.endsWith('L') ? 'left' : 'right'} ${k.startsWith('arm') ? 'arm' : 'leg'}`), e.collapsed && 'collapsed', e.down && 'down for good'].filter(Boolean);
         if (f.length) c.push(`<div class="warn">${f.join(' · ')}</div>`);
         // every organ, by region, and how much of it's gone (none: intact)
         const org = Object.entries(e.organs || {}), O = e.organs || {};
-        orgHtml = (`<div class="hb-sec hb-org">${this.HB_ORGANS.map(([reg, ids]) => `<div class="hb-reg">${reg}</div>${ids.map((id) => { const v = O[id] || 0; return `<div class="hb-row"><span>${esc(B.ORG[id].label)}</span><span class="${v >= 100 ? 'bad' : v > 0 ? 'warn' : 'ok'}">${v >= 100 ? 'destroyed' : v > 0 ? v + '%' : 'intact'}</span></div>`; }).join('')}`).join('')}</div>`);
+        orgHtml = (`<div class="hb-sec hb-org">${this.HB_ORGANS.map(([reg, ids]: [string, string[]]) => `<div class="hb-reg">${reg}</div>${ids.map((id: string) => { const v = O[id] || 0; return `<div class="hb-row"><span>${esc(B.ORG[id].label)}</span><span class="${v >= 100 ? 'bad' : v > 0 ? 'warn' : 'ok'}">${v >= 100 ? 'destroyed' : v > 0 ? v + '%' : 'intact'}</span></div>`; }).join('')}`).join('')}</div>`);
         if (!rate && !f.length && !org.length && e.hp >= e.maxHp) c.push('<div class="ok">Unhurt</div>');
         if (!def.civ) c.push(`<div class="hb-k">nerve ${pct(Math.max(0, e.morale || 0))}${e.broken ? ' (broken)' : ''} · ${e.alert ? 'alert' : 'unaware'}${e.canSee ? ', sees a target' : ''}${e.surprisedT > 0 ? ', surprised' : ''}${e.suppressT > 0 ? ', suppressed' : ''}${def.comply != null ? ` · complies ${pct(def.comply)}` : ''}</div>`);
       } else {
@@ -194,7 +194,7 @@ const G_HUD = {
     // every shot that's hit them: what it was going at each stage (its trail, ghost and markers in the world: js/shotlog.ts)
     const shots = G.ShotLog.of(kind === 'e' ? 'e' + who.id : 'p' + (this.hbLast || {}).id);
     if (shots.length) out.splice(2, 0, `<div class="hb-sec"><span class="hb-k">Shots that hit them: ${shots.length}</span>${shots.slice(-5).reverse().map((h) => `<div class="hb-shot"><b>#${h.n}</b> ${esc(h.name)} <span class="hb-k">· ${h.range} m · ${G.U.fmt(h.J)} J</span><br>${[`muzzle ${h.muzzle}`, `in ${h.vIn}`, h.post != null ? `past armour ${h.post}` : null, h.out != null ? `out ${h.out}` : null].filter(Boolean).join(' › ')}${h.stop ? ` <span class="warn">stopped: ${esc(h.stop)}</span>` : ''}${h.frags ? ` <span class="hb-k">· ${h.frags}</span>` : ''}</div>`).join('')}</div>`);
-    if (this.hbPath) out.push(`<div class="hb-sec"><span class="hb-k">Last round through them</span><div class="hb-path">${this.hbPath.map((q) => `${esc(q.m)} <b>${q.v}</b>`).join(' › ')}</div></div>`);
+    if (this.hbPath) out.push(`<div class="hb-sec"><span class="hb-k">Last round through them</span><div class="hb-path">${this.hbPath.map((q: { m: string; v: string | number }) => `${esc(q.m)} <b>${q.v}</b>`).join(' › ')}</div></div>`);
     this.set('hbInfo', this.trailLegend() + out.join(''));
     this.xray(who, true);
   },
@@ -214,8 +214,8 @@ const G_HUD = {
   // client knows a suspect's only as intact: the host keeps the record). The one the readout's on (the target) is
   // turned to glass, its organs bright; the others' are fainter. Off (F9 again): bodies as they were, organs gone.
   XR_RANGE: 30,
-  xray(target, on) {
-    const rigs = [];
+  xray(target: any, on?: boolean) {
+    const rigs: [Rig, VwEnemy | VwPlayer, string][] = [];
     if (on) {
       for (const ev of G.Views.enemies.values()) if (ev.rig) rigs.push([ev.rig, ev, 'e']);
       for (const pv of G.Views.players.values()) if (pv.rig && pv.st) rigs.push([pv.rig, pv, 'p']);
@@ -245,16 +245,16 @@ const G_HUD = {
     this.xrRigs = keep; this.xrOn = !!on;
   },
   // the organ meshes in a rig's bones (hidden till shown), each its own material (its colour changes)
-  xrayOrgans(rig) {
+  xrayOrgans(rig: Rig) {
     const B = G.Ballistics, out = [];
-    const bone = (n) => (n.startsWith('up') || n.startsWith('lo') ? (n.endsWith('L') ? rig.armL : rig.armR)[n.slice(0, 2)] : n.startsWith('th') || n.startsWith('sh') ? (n.endsWith('L') ? rig.legL : rig.legR)[n.slice(0, 2)] : rig[n]);
+    const bone = (n: string) => (n.startsWith('up') || n.startsWith('lo') ? (n.endsWith('L') ? rig.armL : rig.armR)[n.slice(0, 2)] : n.startsWith('th') || n.startsWith('sh') ? (n.endsWith('L') ? rig.legL : rig.legR)[n.slice(0, 2)] : rig[n]);
     const sph = this.xrSph || (this.xrSph = new THREE.SphereGeometry(1, 14, 10)), cyl = this.xrCyl || (this.xrCyl = new THREE.CylinderGeometry(1, 1, 1, 8));
     for (const sg of B.segs()) {
       const b = bone(sg.bone); if (!b) continue;
       for (const [id, sh] of sg.organs || []) {
         const m = new THREE.MeshBasicMaterial({ transparent: true, depthTest: false, depthWrite: false });
         let mesh;
-        if (sh[0] === 'ell') { mesh = new THREE.Mesh(sph, m); mesh.scale.set(...sh[2]); mesh.position.set(...sh[1]); }
+        if (sh[0] === 'ell') { mesh = new THREE.Mesh(sph, m); mesh.scale.set(...(sh[2] as [number, number, number])); mesh.position.set(...(sh[1] as [number, number, number])); }
         else {
           const a = new THREE.Vector3(...sh[1]), c = new THREE.Vector3(...sh[2]);
           mesh = new THREE.Mesh(cyl, m); mesh.scale.set(sh[3], Math.max(0.001, a.distanceTo(c)), sh[3]); mesh.position.copy(a).add(c).multiplyScalar(0.5);
@@ -268,19 +268,19 @@ const G_HUD = {
   },
   // what's been done to each organ (id -> % of it gone): the host's record of a suspect (or of the body they left), a
   // teammate's body as they send it (by part: the worst of each organ)
-  organState(who, kind) {
+  organState(who: any, kind: string) {
     if (kind === 'e') { const SV = G.Server, bd = SV && SV.bodies && SV.bodies.get(who.id), e = (SV && SV.enemies && SV.enemies.get(who.id)) || (bd && bd.rec); return (e && e.organs) || {}; }
     const b = who.st && who.st.bd ? G.Med.decode(who.st.bd) : null, O: Record<string, number> = {};
     if (b) for (const p of Object.values(b.parts) as any[]) for (const [id, f] of Object.entries(p.org || {}) as [string, number][]) O[id] = Math.max(O[id] || 0, Math.round(f * 100));
     return O;
   },
   // a body turned to glass (as the killcam's), or back
-  glass(rig, on) {
-    rig.root.traverse((o) => {
+  glass(rig: Rig, on: boolean) {
+    rig.root.traverse((o: any) => {
       if (!o.isMesh || o.userData.xr) return;
       if (on && !o.userData.mat0) {
         o.userData.mat0 = o.material;
-        const ms = (Array.isArray(o.material) ? o.material : [o.material]).map((m) => { const g = m.clone(); g.transparent = true; g.opacity = 0.28; g.depthWrite = false; return g; });
+        const ms = (Array.isArray(o.material) ? o.material : [o.material]).map((m: THREE.Material) => { const g = m.clone(); g.transparent = true; g.opacity = 0.28; g.depthWrite = false; return g; });
         o.material = Array.isArray(o.material) ? ms : ms[0];
       } else if (!on && o.userData.mat0) {
         for (const m of Array.isArray(o.material) ? o.material : [o.material]) m.dispose();
@@ -289,7 +289,7 @@ const G_HUD = {
     });
   },
 
-  update(dt) {
+  update(dt: number) {
     const Me = G.Me, Gm = G.Game;
     if (Gm.phase !== 'level' || !Me.pos) return;
     const w = Me.cur(), def = w.def, maxHp = Me.maxHp(), chest = G.Gear.piece(Me, 'chest');
@@ -309,7 +309,7 @@ const G_HUD = {
     this.el.armorFill.style.width = cd && cd.dur ? Me.vestCond() * 100 + '%' : '0%';
     this.set('armorText', (cd && cd.dur ? Math.round(Me.vestCond() * 100) + '%' : '—') + (hd && hd.dur ? ` <small>HELM ${Math.round(Me.helmCond() * 100)}%</small>` : ''));
     // the quick slots (3, 4, 5): what's on each and how many you carry
-    this.set('items', Me.quick.map((kind, i) => { const n = Me.quickCount(kind); return `<span class="qs${n ? '' : ' none'}" title="Key ${i + 3}: ${G.U.esc(Me.quickName(kind))} (drag a grenade onto its box in the inventory to change it)"><b>${i + 3}</b> ${G.U.esc(Me.quickName(kind))}${kind ? ' ' + n : ''}</span>`; }).join(''));
+    this.set('items', Me.quick.map((kind: string, i: number) => { const n = Me.quickCount(kind); return `<span class="qs${n ? '' : ' none'}" title="Key ${i + 3}: ${G.U.esc(Me.quickName(kind))} (drag a grenade onto its box in the inventory to change it)"><b>${i + 3}</b> ${G.U.esc(Me.quickName(kind))}${kind ? ' ' + n : ''}</span>`; }).join(''));
     this.maskDraw(dt);
     // a flashbang's white-out
     if (this.flashK > 0) {
@@ -342,7 +342,7 @@ const G_HUD = {
     this.set('weapAlt', (other ? `${Me.slot === 'p' ? '2' : '1'} · ${other.def.name}` : '') + (packed.length ? `${other ? ' &nbsp; ' : ''}B · ${packed.join(', ')}` : ''));
     }
     this.set('credits', '¢ ' + G.U.fmt(Me.credits));
-    this.set('levelInfo', Gm.hub ? `HANGAR <span>· level ${Gm.level} cleared</span>` : `LEVEL ${Gm.level} <span>· ${Gm.map.theme.name}</span>`);
+    this.set('levelInfo', Gm.hub ? `HANGAR <span>· level ${Gm.level} cleared</span>` : `LEVEL ${Gm.level} <span>· ${Gm.map!.theme.name}</span>`);
 
     // objectives: order (required), the civilians (optional), then the vote to leave. No counts: how many
     // suspects, civilians, bodies or weapons there are is for you to find out.
@@ -354,7 +354,7 @@ const G_HUD = {
       : 'Rescue All of the Civilians <span style="opacity:0.6">(optional)</span>';
     let obj = o1;
     // an apartment block: each apartment cleared in turn
-    const nu = Gm.map.units;
+    const nu = Gm.map!.units;
     if (nu) obj += `<br>${(Gm.unitsCleared || 0) >= nu ? '<b class="go">✔ Clear every apartment</b>' : 'Clear every apartment'}`; // (no count: how many there are is for you to find)
     obj += `<br>${o2}`;
     // (green only once every other objective's done, order restored, apartments cleared, civilians rescued, and
@@ -402,7 +402,7 @@ const G_HUD = {
       d.el.style.opacity = Math.min(1, d.t);
       if (d.t <= 0) d.el.remove();
     }
-    this.dirs = this.dirs.filter((d) => d.t > 0);
+    this.dirs = this.dirs.filter((d: { t: number }) => d.t > 0);
 
     // a teammate putting something on you: who, what, where, and how far along
     {
@@ -448,7 +448,7 @@ const G_HUD = {
     this.set('team', html);
   },
 
-  scoreboard(show) {
+  scoreboard(show: boolean) {
     const el = this.el.scoreboard;
     el.classList.toggle('hidden', !show);
     if (show) el.innerHTML = this.scoreboardHTML();

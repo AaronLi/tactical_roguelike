@@ -1,4 +1,39 @@
 'use strict';
+// The builder kit js/furniture.ts hands to a piece's build() (the same as its Kit), a piece's style, and a floor spec.
+type HomeMat = THREE.MeshStandardMaterial;
+interface HomeKit {
+  rnd(): number; pick<T>(a: T[]): T; tint(hex: number, f: number): number;
+  mat(hex: number, rough?: number, metal?: number, extra?: Record<string, any>): HomeMat;
+  box(m: HomeMat, w: number, h: number, d: number, x: number, y: number, z: number, ry?: number, rx?: number): void;
+  cyl(m: HomeMat, rt: number, rb: number, h: number, x: number, y: number, z: number, seg?: number, rx?: number): void;
+  cylX(m: HomeMat, rt: number, rb: number, h: number, x: number, y: number, z: number, seg?: number): void;
+  sph(m: HomeMat, r: number, x: number, y: number, z: number): void;
+  ico(m: HomeMat, r: number, x: number, y: number, z: number): void;
+  side(m: HomeMat, pts: number[][], w: number, x?: number, b?: number): void;
+  leaf(): HomeMat; screen(): HomeMat; shade(): HomeMat; crate(): HomeMat;
+  pack(kind: string, shade?: number): HomeMat; label(): number;
+  boxL(m: HomeMat, lb: number, w: number, h: number, d: number, x: number, y: number, z: number, ry?: number, rx?: number): void;
+  cylL(m: HomeMat, lb: number, rt: number, rb: number, h: number, x: number, y: number, z: number, seg?: number): void;
+  tableLamp(x: number, y: number, z: number): void; plantSmall(x: number, y: number, z: number): void; fruit(x: number, y: number, z: number): void;
+}
+type HomeStyle = Record<string, any>; // (a piece's style: whatever its build reads)
+interface HomeFloor { kind: string; color: string; grout?: string; sound?: string }
+// A resident's data: see the notes below.
+interface HomeSwap { piece: string; style?: HomeStyle; at?: string }
+interface HomeItem extends HomeSwap { id: string; at: string; hang?: number; need?: number; must?: number; pull?: number; swap?: HomeSwap[] }
+interface HomeCarve { from: string[]; size: number[] }
+interface HomeRest { wall: string; ceil: string; trim: string; floor: HomeFloor; paper?: number }
+interface HomeRoomSpec extends HomeRest { spare?: number; carve?: HomeCarve; tight?: number; up?: number; items: HomeItem[] }
+interface HomeResident { id: string; name: string; home: string; rate: number; rest?: HomeRest; rooms: Record<string, HomeRoomSpec> }
+// cast()/castUp(): [room, its spec, its type] for each room the resident has a list for, and .rest: the rooms they've none for
+type HomePlan = [LvRoom, HomeRoomSpec, string][] & { rest?: LvRoom[] };
+// a level's residents so far (start), and one home as it's being done (dressHome)
+interface HomeLevel { seed: number; r: LvRng; left: HomeResident[]; lofts: Map<number, { who: HomeResident; had: Set<string> }> }
+interface HomeState { who: HomeResident; seed: number; taken: Set<number>; off: Set<number>; bath: LvRoom | null }
+// dress(): a wall of the room (n: the way out through it; A0..A1: along it; B: where it is), and what's been put in
+interface HomeSide { n: number[]; A0: number; A1: number; B: number }
+interface HomePlaced { id: string; at?: string; side: HomeSide | null; x: number; z: number; boxes: LvBox[] }
+interface HomeHung { name: string; x: number; z: number; q: number; v: number; style: HomeStyle }
 // Who lives in the apartments (docs/apartment-personas/). The block's layout knows nothing of them: its walls, doors,
 // lofts and stairs, its rooms' types and everything planned on them come first (js/level.ts layApartments, plan, finish).
 // Then, floor by floor, fill() goes through the homes and now and then one gets a resident, from the level's seed alone
@@ -41,7 +76,7 @@
 const G_Homes = (() => {
   const U = G.U, F = G.Furniture, R = F.R;
   const CREAM = '#d9d0b0'; // (smoke-stained, every ceiling of his but the bathroom's)
-  const RESIDENTS: any[] = [
+  const RESIDENTS: HomeResident[] = [
     { id: 'harold', name: 'Harold Pruitt', home: 'flat', rate: 0.08,
       rest: { wall: '#d6c68c', paper: 1, ceil: CREAM, trim: '#7a4e2d', floor: { kind: 'carpet', color: '#6b4a3a' } },
       rooms: {
@@ -88,7 +123,7 @@ const G_Homes = (() => {
   // ---------------------------------------------------------------- pieces
   // As js/furniture.ts R: back at -z, against the wall. Their colours and what makes them theirs come in `style`.
   // A deep old sofa, a crocheted throw of squares over its back and down onto the seat
-  R.couch = { w: 2.0, d: 0.92, cover: 1, boxes: [[0, 0, 2.0, 0.92, 0.88]], build(k, v, s) {
+  R.couch = { w: 2.0, d: 0.92, cover: 1, boxes: [[0, 0, 2.0, 0.92, 0.88]], build(k: HomeKit, v: number, s: HomeStyle) {
     const f = k.mat(s.fabric, 0.95), f2 = k.mat(k.tint(s.fabric, 1.14), 0.95), dark = k.mat(0x3a2414, 0.5);
     for (const x of [-0.88, 0.88]) for (const z of [-0.38, 0.38]) k.box(dark, 0.07, 0.1, 0.07, x, 0.05, z); // (style: fabric; plain, no throw)
     k.box(f, 2.0, 0.32, 0.92, 0, 0.26, 0);
@@ -104,7 +139,7 @@ const G_Homes = (() => {
     }
   } };
   // A wing chair. style: fabric; worn: the bald patches on its seat, back and arms; vinyl: shiny and hardly sat in; slippers
-  R.easy = { w: 0.84, d: 0.86, cover: 1, boxes: [[0, 0, 0.84, 0.86, 1.02]], build(k, v, s) {
+  R.easy = { w: 0.84, d: 0.86, cover: 1, boxes: [[0, 0, 0.84, 0.86, 1.02]], build(k: HomeKit, v: number, s: HomeStyle) {
     const rough = s.vinyl ? 0.3 : 0.95, f = k.mat(s.fabric, rough), f2 = k.mat(k.tint(s.fabric, s.vinyl ? 1.08 : 1.12), rough), dark = k.mat(0x2e1d10, 0.5);
     for (const x of [-0.34, 0.34]) for (const z of [-0.36, 0.36]) k.box(dark, 0.06, 0.1, 0.06, x, 0.05, z);
     k.box(f, 0.84, 0.3, 0.86, 0, 0.25, 0);
@@ -123,7 +158,7 @@ const G_Homes = (() => {
     }
   } };
   // A small boxy television on a little table, its aerial up
-  R.crt = { w: 0.72, d: 0.52, boxes: [[0, 0, 0.72, 0.52, 0.56], [0, 0, 0.56, 0.46, 1.06]], build(k) {
+  R.crt = { w: 0.72, d: 0.52, boxes: [[0, 0, 0.72, 0.52, 0.56], [0, 0, 0.56, 0.46, 1.06]], build(k: HomeKit) {
     const w = k.mat(0x6b4428, 0.55), case_ = k.mat(0x4a3320, 0.5), black = k.mat(0x151515, 0.4), metal = k.mat(0xb0b0a8, 0.3, 0.8);
     k.box(w, 0.72, 0.03, 0.52, 0, 0.545, 0);
     for (const x of [-0.32, 0.32]) for (const z of [-0.22, 0.22]) k.box(w, 0.04, 0.53, 0.04, x, 0.265, z);
@@ -137,7 +172,7 @@ const G_Homes = (() => {
     k.box(k.mat(0xe0d8c0, 0.8), 0.46, 0.012, 0.3, 0, 0.56, 0.0); // (a lace runner under it)
   } };
   // A glass-fronted china cabinet: a cupboard under, shelves of white plates behind the glass
-  R.china = { w: 1.2, d: 0.42, cover: 1, boxes: [[0, 0, 1.2, 0.42, 1.86]], build(k) {
+  R.china = { w: 1.2, d: 0.42, cover: 1, boxes: [[0, 0, 1.2, 0.42, 1.86]], build(k: HomeKit) {
     const w = k.mat(0x4d2f1c, 0.45), face = k.mat(0x5e3a22, 0.45), back = k.mat(0x2a1a10, 0.8), brass = k.mat(0xb8a060, 0.3, 0.9);
     const plate = k.mat(0xf0ece0, 0.3), rim = k.mat(0x3a5a8a, 0.4), glass = k.mat(0xc4d6dc, 0.08, 0.2, { transparent: true, opacity: 0.16, depthWrite: false });
     k.box(w, 1.2, 0.74, 0.42, 0, 0.37, 0);
@@ -158,7 +193,7 @@ const G_Homes = (() => {
     k.box(glass, 1.14, 1.02, 0.008, 0, 1.28, 0.198);
   } };
   // Margaret's sewing machine, black and gold, on its treadle table with the cast-iron legs
-  R.treadle = { w: 0.92, d: 0.46, boxes: [[0, 0, 0.92, 0.46, 0.76], [-0.02, 0, 0.5, 0.2, 1.1]], build(k) {
+  R.treadle = { w: 0.92, d: 0.46, boxes: [[0, 0, 0.92, 0.46, 0.76], [-0.02, 0, 0.5, 0.2, 1.1]], build(k: HomeKit) {
     const iron = k.mat(0x17171a, 0.5, 0.6), wood = k.mat(0x5e3a22, 0.45), black = k.mat(0x0e0e10, 0.25, 0.3), gold = k.mat(0xc8a040, 0.3, 0.8);
     k.box(wood, 0.92, 0.03, 0.46, 0, 0.745, 0);
     k.box(wood, 0.2, 0.09, 0.4, 0.34, 0.685, 0);
@@ -179,7 +214,7 @@ const G_Homes = (() => {
     k.box(gold, 0.3, 0.008, 0.004, -0.02, 0.79, 0.092);
   } };
   // A rubber plant gone leggy: a long bare stem, the last few big dark leaves near the top
-  R.tallplant = { small: 1, w: 0.5, d: 0.5, boxes: [[0, 0, 0.44, 0.44, 1.62]], build(k) {
+  R.tallplant = { small: 1, w: 0.5, d: 0.5, boxes: [[0, 0, 0.44, 0.44, 1.62]], build(k: HomeKit) {
     k.cyl(k.mat(0x8a4a2a, 0.8), 0.17, 0.13, 0.3, 0, 0.15, 0);
     k.cyl(k.mat(0x2a1e14, 1), 0.155, 0.155, 0.02, 0, 0.29, 0);
     const stem = k.mat(0x4a3a24, 0.8), leaf = k.mat(0x1c3e24, 0.35), leaf2 = k.mat(0x28502e, 0.35);
@@ -190,11 +225,11 @@ const G_Homes = (() => {
     }
   } };
   // A stack of TV Guides, kept
-  R.guides = { small: 1, w: 0.3, d: 0.24, boxes: [[0, 0, 0.27, 0.21, 0.3]], build(k) {
+  R.guides = { small: 1, w: 0.3, d: 0.24, boxes: [[0, 0, 0.27, 0.21, 0.3]], build(k: HomeKit) {
     for (let i = 0; i < 12; i++) k.box(k.mat(k.pick([0xe6c326, 0xd8b420, 0xf0d040]), 0.25), 0.26, 0.024, 0.2, (k.rnd() - 0.5) * 0.015, 0.012 + i * 0.025, (k.rnd() - 0.5) * 0.015, (k.rnd() - 0.5) * 0.14);
   } };
   // His side table: rings in the varnish, and today's cup
-  R.cuptable = { small: 1, w: 0.5, d: 0.5, boxes: [[0, 0, 0.5, 0.5, 0.62]], build(k) {
+  R.cuptable = { small: 1, w: 0.5, d: 0.5, boxes: [[0, 0, 0.5, 0.5, 0.62]], build(k: HomeKit) {
     const w = k.mat(0x6b4428, 0.45), ring = k.mat(0x3e2412, 0.8), cup = k.mat(0xece6d6, 0.3), tea = k.mat(0x3a2010, 0.3);
     k.box(w, 0.5, 0.03, 0.5, 0, 0.545, 0);
     for (const x of [-0.21, 0.21]) for (const z of [-0.21, 0.21]) k.box(w, 0.035, 0.53, 0.035, x, 0.265, z);
@@ -207,7 +242,7 @@ const G_Homes = (() => {
   } };
   // hung on a wall (h: the height it's hung at, from `hang`): no collision, as a picture
   // The bus company's enamel sign, red and white
-  R.enamel = { hung: 1, w: 0.42, build(k, v, s) {
+  R.enamel = { hung: 1, w: 0.42, build(k: HomeKit, v: number, s: HomeStyle) {
     const red = k.mat(0xb02020, 0.25), white = k.mat(0xf0ece0, 0.25), y = s.h;
     k.box(red, 0.42, 0.28, 0.012, 0, y, 0.008);
     k.box(white, 0.38, 0.09, 0.004, 0, y + 0.02, 0.016); k.box(white, 0.4, 0.008, 0.003, 0, y - 0.125, 0.015); k.box(white, 0.4, 0.008, 0.003, 0, y + 0.125, 0.015);
@@ -215,7 +250,7 @@ const G_Homes = (() => {
     k.box(white, 0.2, 0.03, 0.003, 0, y - 0.075, 0.015);
   } };
   // The mantel clock, tall and brown, on a shelf of its own (the flat has no mantel)
-  R.clockshelf = { hung: 1, w: 0.62, build(k, v, s) {
+  R.clockshelf = { hung: 1, w: 0.62, build(k: HomeKit, v: number, s: HomeStyle) {
     const w = k.mat(0x6b4428, 0.45), body = k.mat(0x4a2c18, 0.4), y = s.h;
     k.box(w, 0.62, 0.03, 0.17, 0, y, 0.085);
     for (const x of [-0.22, 0.22]) k.box(w, 0.025, 0.12, 0.1, x, y - 0.075, 0.05);
@@ -227,7 +262,7 @@ const G_Homes = (() => {
     k.box(k.mat(0x2a1a10, 0.7), 0.16, 0.1, 0.004, 0, y + 0.09, 0.137);
   } };
   // The calendar, still on October 2019: a picture over a page of days, one month's
-  R.calendar = { hung: 1, w: 0.3, build(k, v, s) {
+  R.calendar = { hung: 1, w: 0.3, build(k: HomeKit, v: number, s: HomeStyle) {
     const y = s.h, ink = k.mat(0x3a3a3a, 0.7), red = k.mat(0xa82424, 0.6);
     k.box(k.mat(0xece6d6, 0.8), 0.3, 0.44, 0.006, 0, y, 0.004);
     k.box(k.mat(0x5a7a8a, 0.7), 0.27, 0.17, 0.003, 0, y + 0.115, 0.008);
@@ -235,7 +270,7 @@ const G_Homes = (() => {
     for (let r = 0; r < 5; r++) for (let c = 0; c < 7; c++) if (r * 7 + c >= 1 && r * 7 + c < 32) k.box(c > 4 ? red : ink, 0.018, 0.014, 0.002, -0.114 + c * 0.038, y - 0.03 - r * 0.036, 0.008);
   } };
   // Margaret, framed
-  R.photo = { hung: 1, w: 0.34, build(k, v, s) {
+  R.photo = { hung: 1, w: 0.34, build(k: HomeKit, v: number, s: HomeStyle) {
     const y = s.h;
     k.box(k.mat(0x4a2c18, 0.45), 0.34, 0.42, 0.024, 0, y, 0.012);
     k.box(k.mat(0xe6dcc0, 0.8), 0.27, 0.35, 0.004, 0, y, 0.025);
@@ -244,7 +279,7 @@ const G_Homes = (() => {
   } };
 
   // The kitchen. A run of old cupboards, a sink, canisters in a row and his two cups set out, one for her
-  R.canisters = { w: 1.98, d: 0.64, cover: 1, boxes: [[0, 0, 1.98, 0.64, 0.92]], build(k, v, s) {
+  R.canisters = { w: 1.98, d: 0.64, cover: 1, boxes: [[0, 0, 1.98, 0.64, 0.92]], build(k: HomeKit, v: number, s: HomeStyle) {
     const cab = k.mat(s.cab, 0.55), top = k.mat(s.top, 0.4), dark = k.mat(0x2a2016, 0.9), metal = k.mat(0xb0b4b4, 0.3, 0.8), cup = k.mat(0xece6d6, 0.3);
     k.box(dark, 1.9, 0.1, 0.56, 0, 0.05, -0.04);
     k.box(cab, 1.96, 0.78, 0.58, 0, 0.49, -0.02);
@@ -261,7 +296,7 @@ const G_Homes = (() => {
     for (const x of [0.25, 0.5]) { k.cyl(cup, 0.065, 0.06, 0.01, x, 0.926, 0.14, 14); k.cyl(cup, 0.042, 0.032, 0.06, x, 0.96, 0.14, 12); k.box(cup, 0.008, 0.035, 0.016, x + 0.048, 0.962, 0.14); }
   } };
   // An almond fridge with a rounded top, older than the flat's wiring
-  R.almond = { w: 0.86, d: 0.72, boxes: [[0, 0, 0.84, 0.7, 1.72]], build(k) {
+  R.almond = { w: 0.86, d: 0.72, boxes: [[0, 0, 0.84, 0.7, 1.72]], build(k: HomeKit) {
     const m = k.mat(0xdccfae, 0.35, 0.1), dark = k.mat(0x2a2016, 0.8), metal = k.mat(0xb8bcc0, 0.3, 0.8);
     k.box(dark, 0.78, 0.08, 0.6, 0, 0.04, 0);
     k.box(m, 0.84, 1.58, 0.68, 0, 0.87, 0);
@@ -271,7 +306,7 @@ const G_Homes = (() => {
     k.box(metal, 0.3, 0.05, 0.006, 0.12, 1.5, 0.342);
   } };
   // The dining table under its lace, laid for two and never sat at: her photograph between the candles
-  R.lacetable = { w: 1.9, d: 1.7, boxes: [[0, 0, 1.6, 0.9, 0.76], [-0.4, -0.64, 0.44, 0.42, 0.95], [0.4, -0.64, 0.44, 0.42, 0.95], [-0.4, 0.64, 0.44, 0.42, 0.95], [0.4, 0.64, 0.44, 0.42, 0.95]], build(k) {
+  R.lacetable = { w: 1.9, d: 1.7, boxes: [[0, 0, 1.6, 0.9, 0.76], [-0.4, -0.64, 0.44, 0.42, 0.95], [0.4, -0.64, 0.44, 0.42, 0.95], [-0.4, 0.64, 0.44, 0.42, 0.95], [0.4, 0.64, 0.44, 0.42, 0.95]], build(k: HomeKit) {
     const w = k.mat(0x4a2c18, 0.4), lace = k.mat(0xeee8da, 0.9), lace2 = k.mat(0xdcd4c2, 0.9), plate = k.mat(0xf2efe8, 0.3), brass = k.mat(0xb8a060, 0.3, 0.8), wax = k.mat(0xece4d0, 0.7);
     for (const x of [-0.74, 0.74]) for (const z of [-0.39, 0.39]) k.box(w, 0.07, 0.72, 0.07, x, 0.36, z);
     k.box(w, 1.6, 0.04, 0.9, 0, 0.74, 0);
@@ -297,7 +332,7 @@ const G_Homes = (() => {
     k.box(k.mat(0x9a8468, 0.8), 0.13, 0.18, 0.003, 0, 0.93, 0.016, 0, -0.12);
   } };
   // Her side: a sideboard of photographs behind a lace runner, a candle at each end
-  R.shrine = { w: 1.5, d: 0.46, cover: 1, boxes: [[0, 0, 1.5, 0.46, 0.92]], build(k) {
+  R.shrine = { w: 1.5, d: 0.46, cover: 1, boxes: [[0, 0, 1.5, 0.46, 0.92]], build(k: HomeKit) {
     const w = k.mat(0x4a2c18, 0.42), f = k.mat(0x5a3a22, 0.42), brass = k.mat(0xb8a060, 0.3, 0.8), wax = k.mat(0xece4d0, 0.7);
     k.box(k.mat(0x1c120a, 0.8), 1.44, 0.08, 0.38, 0, 0.04, 0);
     k.box(w, 1.5, 0.82, 0.44, 0, 0.49, 0);
@@ -311,7 +346,7 @@ const G_Homes = (() => {
     for (const x of [-0.65, 0.65]) { k.cyl(brass, 0.04, 0.05, 0.02, x, 0.945, 0, 10); k.cyl(wax, 0.012, 0.012, 0.2, x, 1.05, 0, 8); }
   } };
   // The bed, a double, made on one side only: hers tucked and square, his thrown back and slept in
-  R.halfbed = { w: 1.6, d: 1.95, boxes: [[0, 0.03, 1.6, 1.89, 0.6], [0, -0.94, 1.6, 0.07, 1.12]], build(k, v, s) {
+  R.halfbed = { w: 1.6, d: 1.95, boxes: [[0, 0.03, 1.6, 1.89, 0.6], [0, -0.94, 1.6, 0.07, 1.12]], build(k: HomeKit, v: number, s: HomeStyle) {
     const w = k.mat(0x4a2c18, 0.45), sheet = k.mat(0xece8de, 0.95), cover = k.mat(s.cover, 0.95), turn = k.mat(k.tint(s.cover, 1.25), 0.95);
     for (const x of [-0.76, 0.76]) for (const z of [-0.88, 0.92]) k.box(w, 0.06, 0.08, 0.06, x, 0.04, z);
     k.box(w, 1.6, 0.24, 1.88, 0, 0.2, 0.03);
@@ -323,7 +358,7 @@ const G_Homes = (() => {
     k.box(w, 1.64, 0.95, 0.07, 0, 0.6, -0.94); k.box(w, 1.68, 0.05, 0.09, 0, 1.095, -0.94);
   } };
   // The bedside table: his radio, a glass of water, the hearing aids where he can find them
-  R.nightstand = { small: 1, w: 0.5, d: 0.44, boxes: [[0, 0, 0.5, 0.42, 0.62]], build(k) {
+  R.nightstand = { small: 1, w: 0.5, d: 0.44, boxes: [[0, 0, 0.5, 0.42, 0.62]], build(k: HomeKit) {
     const w = k.mat(0x4a2c18, 0.45), f = k.mat(0x5a3a22, 0.45), radio = k.mat(0x7a4e2d, 0.45), aid = k.mat(0xc8a888, 0.4);
     k.box(w, 0.5, 0.56, 0.42, 0, 0.29, 0);
     k.box(f, 0.44, 0.22, 0.012, 0, 0.4, 0.214); k.sph(k.mat(0xb8a060, 0.3, 0.9), 0.014, 0, 0.4, 0.225);
@@ -334,7 +369,7 @@ const G_Homes = (() => {
     for (const x of [0.1, 0.17]) { k.box(aid, 0.018, 0.012, 0.042, x, 0.598, 0.09, 0.3); k.cyl(aid, 0.009, 0.009, 0.012, x + 0.012, 0.598, 0.118, 8); }
   } };
   // A dresser you can hardly see for photographs, mostly of one person
-  R.photodresser = { w: 1.3, d: 0.5, cover: 1, boxes: [[0, 0, 1.3, 0.5, 0.95]], build(k) {
+  R.photodresser = { w: 1.3, d: 0.5, cover: 1, boxes: [[0, 0, 1.3, 0.5, 0.95]], build(k: HomeKit) {
     const w = k.mat(0x4a2c18, 0.45), face = k.mat(0x5a3a22, 0.45), knob = k.mat(0xb8a060, 0.3, 0.9);
     k.box(k.mat(0x1c120a, 0.8), 1.26, 0.07, 0.44, 0, 0.035, 0);
     k.box(w, 1.3, 0.86, 0.48, 0, 0.5, 0); k.box(w, 1.34, 0.03, 0.52, 0, 0.945, 0);
@@ -348,15 +383,15 @@ const G_Homes = (() => {
 
   // ---------------------------------------------------------------- who lives where
   // the level's: a random stream from its seed and nothing else, and who's still to find a home
-  const start = (seed) => { const r = U.rng((seed ^ 0x48a401d) >>> 0); return { seed, r, left: U.shuffle(r, RESIDENTS.slice()), lofts: new Map() }; };
+  const start = (seed: number): HomeLevel => { const r = U.rng((seed ^ 0x48a401d) >>> 0); return { seed, r, left: U.shuffle(r, RESIDENTS.slice()), lofts: new Map() }; };
 
   // Which of a home's rooms is which for this resident: [[room, its spec, its type]], or null if the home can't be theirs.
   // A spare room type goes to a room of that type, else to one the home can spare (no walls move). Left over: the
   // rooms the resident has no list for (.rest).
   const SPARE = ['office', 'dining', 'bedroom'];
-  function cast(p, mine) {
-    const left = mine.slice(), out: any = [], big = (a, b) => b.w * b.h - a.w * a.h, take = (q) => { left.splice(left.indexOf(q), 1); return q; };
-    const rooms = Object.entries<any>(p.rooms).filter(([, spec]) => !spec.carve);
+  function cast(p: HomeResident, mine: LvRoom[]): HomePlan | null {
+    const left = mine.slice(), out: HomePlan = [], big = (a: LvRoom, b: LvRoom) => b.w * b.h - a.w * a.h, take = (q: LvRoom) => { left.splice(left.indexOf(q), 1); return q; };
+    const rooms = Object.entries(p.rooms).filter(([, spec]) => !spec.carve);
     for (const [ty, spec] of rooms) {
       if (spec.spare) continue;
       const q = left.filter((o) => o.type === ty).sort(big)[0]; // (the biggest of them, if there are two)
@@ -374,9 +409,9 @@ const G_Homes = (() => {
   }
   // A loft's upper floor, for the resident of the home under it: the rooms they've a list for and haven't yet had, in the order
   // they're listed, each taking a room of its type or the biggest going.
-  function castUp(p, mine, had) {
-    const left = mine.slice(), out: any = [], big = (a, b) => b.w * b.h - a.w * a.h;
-    for (const [ty, spec] of Object.entries<any>(p.rooms)) {
+  function castUp(p: HomeResident, mine: LvRoom[], had: Set<string>): HomePlan {
+    const left = mine.slice(), out: HomePlan = [], big = (a: LvRoom, b: LvRoom) => b.w * b.h - a.w * a.h;
+    for (const [ty, spec] of Object.entries(p.rooms)) {
       if (spec.carve || !spec.up || had.has(ty) || !left.length) continue;
       const q = left.filter((o) => o.type === ty).sort(big)[0] || left.slice().sort(big)[0];
       left.splice(left.indexOf(q), 1);
@@ -386,7 +421,7 @@ const G_Homes = (() => {
     return out;
   }
   // One floor's homes, each roll from the level's stream. A loft's rooms all carry `loft` or live under one that does.
-  function fill(map, ctx) {
+  function fill(map: LvMap, ctx: HomeLevel) {
     const units = [...new Set<number>(map.rooms.filter((q) => q.unit != null).map((q) => q.unit))].sort((a, b) => a - b);
     for (const id of units) {
       const mine = map.rooms.filter((q) => q.unit === id), loft = mine.some((q) => q.loft), roll = ctx.r();
@@ -395,55 +430,55 @@ const G_Homes = (() => {
         if (up) dressHome(map, up.who, castUp(up.who, mine, up.had), ctx.seed);
         continue;
       }
-      let sum = 0, who = null, plan = null;
+      let sum = 0, who: HomeResident | null = null, plan: HomePlan | null = null;
       for (const p of ctx.left) {
         if ((p.home === 'loft') !== loft || !(plan = cast(p, mine))) continue;
         sum += p.rate;
         if (roll < sum) { who = p; break; }
       }
       if (!who) continue;
-      if (!dressHome(map, who, plan, ctx.seed)) continue;
+      if (!dressHome(map, who, plan!, ctx.seed)) continue;
       ctx.left.splice(ctx.left.indexOf(who), 1);
-      if (loft) ctx.lofts.set(id, { who, had: new Set(plan.map((e) => e[2])) });
+      if (loft) ctx.lofts.set(id, { who, had: new Set(plan!.map((e) => e[2])) });
     }
   }
   // A whole home, room by room, or none of it: the rooms first, the carved room with the room it comes out of, then
   // whatever's left painted and floored to match with its furniture left in it.
-  function dressHome(map, who, plan, seed) {
-    const home = { who, seed, taken: new Set(), off: new Set(), bath: null }, done = [], bathSpec = Object.values<any>(who.rooms).find((s) => s.carve);
+  function dressHome(map: LvMap, who: HomeResident, plan: HomePlan, seed: number) {
+    const home: HomeState = { who, seed, taken: new Set(), off: new Set(), bath: null }, done: LvRoom[] = [], bathSpec = Object.values(who.rooms).find((s) => s.carve);
     // (the rooms a carved room can come out of first, in the order it'd rather: before their own furniture goes in)
-    const from = bathSpec ? bathSpec.carve.from : [], rank = (e) => { const i = from.indexOf(e[2]); return i < 0 ? from.length : i; };
+    const from = bathSpec ? bathSpec.carve!.from : [], rank = (e: [LvRoom, HomeRoomSpec, string]) => { const i = from.indexOf(e[2]); return i < 0 ? from.length : i; };
     for (const e of plan.slice().sort((a, b) => rank(a) - rank(b))) {
       const [rm, spec, ty] = e, host = from.includes(ty) && !home.bath;
       done.push(rm);
-      const ok = dress(map, rm, spec, ty, home, host ? bathSpec.carve : null);
-      if (host && home.bath) { done.push(home.bath); dress(map, home.bath, bathSpec, 'bathroom', home); }
+      const ok = dress(map, rm, spec, ty, home, host ? bathSpec!.carve : null);
+      if (host && home.bath) { done.push(home.bath); dress(map, home.bath, bathSpec!, 'bathroom', home); }
       if (!ok) { for (const q of done.reverse()) if (q.dress) undress(map, q); return false; }
     }
-    for (const rm of plan.rest) if (who.rest) { rm.dress = Object.assign({}, who.rest, { who: who.id, type0: rm.type, cells: cellsOf(map, rm, home), hung: [], was: new Map(), gone: [], own: [] }); }
+    for (const rm of plan.rest!) if (who.rest) { rm.dress = Object.assign({}, who.rest, { who: who.id, type0: rm.type, cells: cellsOf(map, rm, home), hung: [], was: new Map(), gone: [], own: [] }); }
     for (const rm of done) G.Level.respot(map, rm);
     return true;
   }
 
   // Everything in the room out. was: every cell touched, as it stood (rm.dress: js/furniture.ts still builds the room as
   // it would have been, into nothing, for the sake of the looks of every room after it).
-  function clear(map, rm) {
-    const { W, t, props } = map, TS = G.Level.TS, was = new Map(), x0 = rm.x * TS, x1 = (rm.x + rm.w) * TS, z0 = rm.z * TS, z1 = (rm.z + rm.h) * TS;
-    const note = (i) => { if (!was.has(i)) was.set(i, [t[i], props.get(i)]); };
+  function clear(map: LvMap, rm: LvRoom) {
+    const { W, t, props } = map, TS = G.Level.TS, was = new Map<number, [number, LvProp | undefined]>(), x0 = rm.x * TS, x1 = (rm.x + rm.w) * TS, z0 = rm.z * TS, z1 = (rm.z + rm.h) * TS;
+    const note = (i: number) => { if (!was.has(i)) was.set(i, [t[i], props.get(i)]); };
     for (let z = rm.z; z < rm.z + rm.h; z++) for (let x = rm.x; x < rm.x + rm.w; x++) note(z * W + x);
-    const gone = map.propList.filter((p) => !p.own && !p.gone && p.x >= x0 && p.x < x1 && p.z >= z0 && p.z < z1), dead = new Set();
+    const gone = map.propList.filter((p: LvProp) => !p.own && !p.gone && p.x >= x0 && p.x < x1 && p.z >= z0 && p.z < z1), dead = new Set<LvBox>();
     for (const p of gone) { p.gone = true; for (const b of p.boxes) dead.add(b); }
     for (const [i, q] of [...props]) {
-      if (!q.boxes.some((b) => dead.has(b))) continue;
+      if (!q.boxes.some((b: LvBox) => dead.has(b))) continue;
       note(i);
-      const rest = q.boxes.filter((b) => !dead.has(b)), mx = ((i % W) + 0.5) * TS, mz = (((i / W) | 0) + 0.5) * TS;
+      const rest = q.boxes.filter((b: LvBox) => !dead.has(b)), mx = ((i % W) + 0.5) * TS, mz = (((i / W) | 0) + 0.5) * TS;
       if (rest.length) props.set(i, { name: q.name, boxes: rest }); else props.delete(i);
-      if ((t[i] === 2 || t[i] === 4) && !rest.some((b) => Math.abs(mx - b.cx) <= b.hx + 0.05 && Math.abs(mz - b.cz) <= b.hz + 0.05)) t[i] = 0;
+      if ((t[i] === 2 || t[i] === 4) && !rest.some((b: LvBox) => Math.abs(mx - b.cx) <= b.hx + 0.05 && Math.abs(mz - b.cz) <= b.hz + 0.05)) t[i] = 0;
     }
     return { was, gone };
   }
   // the room as it was and as it is, swapped (js/furniture.ts: to build what it would have been; undress: to go back)
-  function swap(map, rm) {
+  function swap(map: LvMap, rm: LvRoom) {
     const d = rm.dress, { t, props } = map, ty = rm.type;
     rm.type = d.type0; d.type0 = ty;
     for (const [i, e] of d.was) {
@@ -453,15 +488,15 @@ const G_Homes = (() => {
       e[0] = a; e[1] = b;
     }
   }
-  function undress(map, rm) {
+  function undress(map: LvMap, rm: LvRoom) {
     const d = rm.dress;
     swap(map, rm);
     for (const p of d.gone) p.gone = false;
-    map.propList = map.propList.filter((p) => !d.own.includes(p));
+    map.propList = map.propList.filter((p: LvProp) => !d.own.includes(p));
     if (rm.carved) {
       map.rooms.splice(map.rooms.indexOf(rm), 1); map.lights.splice(map.lights.indexOf(rm.lamp), 1); map.doors.splice(map.doors.indexOf(rm.door), 1);
       for (const c of rm.door.cells) map.doorAt.delete(c);
-      for (const [i, ds] of [...map.leafAt]) { const n = ds.filter((o) => o !== rm.door); if (n.length) map.leafAt.set(i, n); else map.leafAt.delete(i); }
+      for (const [i, ds] of [...map.leafAt]) { const n = ds.filter((o: LvDoor) => o !== rm.door); if (n.length) map.leafAt.set(i, n); else map.leafAt.delete(i); }
     }
     rm.dress = null;
   }
@@ -469,15 +504,15 @@ const G_Homes = (() => {
   // The cells a room's walls, ceiling and floor cover: its rectangle, and any strip of floor off the side of it that's in no
   // room's rectangle (where a thinned wall opened up beside a wall that didn't: js/level.ts refine). They'd keep the theme's
   // colours otherwise, a grey slot down the side of a papered room. home.taken: a strip belongs to one room only.
-  function cellsOf(map, rm, home) {
-    const { W, t } = map, inRect = (q, x, z) => x >= q.x && x < q.x + q.w && z >= q.z && z < q.z + q.h, seen = new Set(), todo = [];
+  function cellsOf(map: LvMap, rm: LvRoom, home: HomeState) {
+    const { W, t } = map, inRect = (q: LvRoom, x: number, z: number) => x >= q.x && x < q.x + q.w && z >= q.z && z < q.z + q.h, seen = new Set<number>(), todo: number[] = [];
     for (let z = rm.z; z < rm.z + rm.h; z++) for (let x = rm.x; x < rm.x + rm.w; x++) {
       const i = z * W + x;
       if (!rm.carved && home.off.has(i)) continue;
       seen.add(i); if (t[i] !== 1) todo.push(i);
     }
     while (todo.length) {
-      const i = todo.pop(), x = i % W, z = (i / W) | 0;
+      const i = todo.pop()!, x = i % W, z = (i / W) | 0;
       for (const [nx, nz] of [[x + 1, z], [x - 1, z], [x, z + 1], [x, z - 1]]) {
         const j = nz * W + nx, v = t[j];
         if (seen.has(j) || home.taken.has(j) || (v !== 0 && v !== 2 && v !== 4) || map.rooms.some((q) => inRect(q, nx, nz))) continue;
@@ -491,9 +526,9 @@ const G_Homes = (() => {
   // What the room won't take: where the doors swing and you walk through them, the weapon case and the first aid cabinets
   // and the like and the way to them, and the extraction point. Cells. tight: only the doorway itself, for the room's main
   // piece when it won't go anywhere else (and the rooms too small to have it any other way).
-  function kept(map, rm, tight?) {
-    const { W, t } = map, TS = G.Level.TS, keep = new Set(), inRoom = (x, z) => x >= rm.x && x < rm.x + rm.w && z >= rm.z && z < rm.z + rm.h;
-    const mark = (x, z) => { if (inRoom(x, z)) keep.add(z * W + x); };
+  function kept(map: LvMap, rm: LvRoom, tight?: boolean) {
+    const { W, t } = map, TS = G.Level.TS, keep = new Set<number>(), inRoom = (x: number, z: number) => x >= rm.x && x < rm.x + rm.w && z >= rm.z && z < rm.z + rm.h;
+    const mark = (x: number, z: number) => { if (inRoom(x, z)) keep.add(z * W + x); };
     for (let z = rm.z; z < rm.z + rm.h; z++) for (let x = rm.x; x < rm.x + rm.w; x++) {
       for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
         const nx = x + dx, nz = z + dz;
@@ -513,10 +548,10 @@ const G_Homes = (() => {
     if (rm === map.exitRoom) for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) mark(rm.cx + dx, rm.cz + dz);
     return keep;
   }
-  const sources = (map) => [[map.spawnRoom.cx, map.spawnRoom.cz]].concat(map.entries || []);
+  const sources = (map: LvMap) => [[map.spawnRoom.cx, map.spawnRoom.cz]].concat(map.entries || []);
   // does every cell that could be walked to (reach) still have a way, on this plan (t)?
-  const reachable = (map, t, reach) => {
-    const f = G.Level.flow({ W: map.W, H: map.H, t }, sources(map));
+  const reachable = (map: LvMap, t: Uint8Array, reach: ArrayLike<number>) => {
+    const f = G.Level.flow({ W: map.W, H: map.H, t } as LvMap, sources(map));
     for (let i = 0; i < f.length; i++) if (reach[i] >= 0 && f[i] < 0 && (t[i] === 0 || t[i] === 3)) return false;
     return true;
   };
@@ -527,8 +562,8 @@ const G_Homes = (() => {
   // the ids of the doors stay the same on every peer (they're numbered as the floors are stacked). It keeps off doors,
   // windows, the case and cabinets, and it's only cut if every cell around stays reachable. c: { size: [short, long], in cells,
   // from }. Returns the room, or null if no corner will take it.
-  function cut(map, rm, c, r, home) {
-    const L = G.Level, TS = L.TS, { W, t } = map, keep = kept(map, rm), reach = L.flow(map, sources(map)), tries = [];
+  function cut(map: LvMap, rm: LvRoom, c: HomeCarve, r: LvRng, home: HomeState) {
+    const L = G.Level, TS = L.TS, { W, t } = map, keep = kept(map, rm), reach = L.flow(map, sources(map)), tries: number[][] = [];
     for (const [ix, iz] of [c.size, [c.size[1], c.size[0]]]) for (const sx of [-1, 1]) for (const sz of [-1, 1]) tries.push([r(), ix, iz, sx, sz]);
     tries.sort((a, b) => a[0] - b[0]);
     for (const [, ix, iz, sx, sz] of tries) {
@@ -537,7 +572,7 @@ const G_Homes = (() => {
       const xa = Math.min(x0, wx), xb = Math.max(x0 + ix - 1, wx), za = Math.min(z0, wz), zb = Math.max(z0 + iz - 1, wz), region = [];
       let ok = true;
       for (let z = za; z <= zb; z++) for (let x = xa; x <= xb; x++) { const i = z * W + x; region.push(i); if (t[i] !== 0 || map.props.has(i) || keep.has(i)) ok = false; }
-      const outer = (x, z) => L.tile(map, x, z) === 1 && !(map.winAt && map.winAt.has(z * W + x));
+      const outer = (x: number, z: number) => L.tile(map, x, z) === 1 && !(map.winAt && map.winAt.has(z * W + x));
       for (let z = za; z <= zb; z++) if (!outer(sx < 0 ? rm.x - 1 : rm.x + rm.w, z)) ok = false;
       for (let x = xa; x <= xb; x++) if (!outer(x, sz < 0 ? rm.z - 1 : rm.z + rm.h)) ok = false;
       if (!ok) continue;
@@ -549,7 +584,7 @@ const G_Homes = (() => {
         for (const [x, z] of d.cells) q[z * W + x] = 3;
         if (!reachable(map, q, reach)) continue;
         for (const i of region) { t[i] = q[i]; home.off.add(i); }
-        const room = L._room(x0, z0, ix, iz, { type: 'bathroom', unit: rm.unit, carved: true });
+        const room = L._room(x0, z0, ix, iz, { type: 'bathroom', unit: rm.unit, carved: true }) as LvRoom;
         room.door = L.layDoor(map, d.cells, d.axis);
         room.lamp = { x: (x0 + ix / 2) * TS, z: (z0 + iz / 2) * TS };
         map.lights.push(room.lamp); map.rooms.push(room);
@@ -560,9 +595,9 @@ const G_Homes = (() => {
   }
 
   // A room done over for a resident. false: it can't be (the home's left as it was: dressHome).
-  function dress(map, rm, spec, type, home, carve?) {
+  function dress(map: LvMap, rm: LvRoom, spec: HomeRoomSpec, type: string, home: HomeState, carve?: HomeCarve | null) {
     const L = G.Level, TS = L.TS, { W, t } = map, r = U.rng((home.seed ^ Math.imul(rm.z * W + rm.x + 1, 0x2545f491)) >>> 0);
-    const { was, gone } = clear(map, rm), own = [], hung = [];
+    const { was, gone } = clear(map, rm), own: LvProp[] = [], hung: HomeHung[] = [];
     rm.dress = { who: home.who.id, type0: rm.type, wall: spec.wall, paper: spec.paper, ceil: spec.ceil, trim: spec.trim, floor: spec.floor, cells: null, hung, was, gone, own };
     rm.type = type;
     if (carve) home.bath = cut(map, rm, carve, r, home);
@@ -572,42 +607,42 @@ const G_Homes = (() => {
     let keep = tiers[0];
     const X0 = rm.x * TS, X1 = (rm.x + rm.w) * TS, Z0 = rm.z * TS, Z1 = (rm.z + rm.h) * TS;
     // the four sides, n pointing out through the wall; a: along it, b: into the room
-    const sides = [{ n: [0, -1], A0: X0, A1: X1, B: Z0 }, { n: [0, 1], A0: X0, A1: X1, B: Z1 }, { n: [-1, 0], A0: Z0, A1: Z1, B: X0 }, { n: [1, 0], A0: Z0, A1: Z1, B: X1 }];
-    const at = (s, a, b) => (s.n[0] ? [s.B - s.n[0] * b, a] : [a, s.B - s.n[1] * b]);
-    const depth = (s) => (s.n[0] ? X1 - X0 : Z1 - Z0);
+    const sides: HomeSide[] = [{ n: [0, -1], A0: X0, A1: X1, B: Z0 }, { n: [0, 1], A0: X0, A1: X1, B: Z1 }, { n: [-1, 0], A0: Z0, A1: Z1, B: X0 }, { n: [1, 0], A0: Z0, A1: Z1, B: X1 }];
+    const at = (s: HomeSide, a: number, b: number): [number, number] => (s.n[0] ? [s.B - s.n[0] * b, a] : [a, s.B - s.n[1] * b]);
+    const depth = (s: HomeSide) => (s.n[0] ? X1 - X0 : Z1 - Z0);
     // the wall cells behind a span of a side
-    const behind = (s, a0, a1) => {
-      const out = [];
+    const behind = (s: HomeSide, a0: number, a1: number) => {
+      const out: number[][] = [];
       for (let c = Math.floor((a0 + 0.01) / TS); c <= Math.floor((a1 - 0.01) / TS); c++) {
         const wx = s.n[0] ? (s.n[0] < 0 ? rm.x - 1 : rm.x + rm.w) : c, wz = s.n[0] ? c : (s.n[1] < 0 ? rm.z - 1 : rm.z + rm.h);
         out.push([wx, wz]);
       }
       return out;
     };
-    const wallOk = (cells, high) => cells.every(([x, z]) => L.tile(map, x, z) === 1 && !(high && map.winAt && map.winAt.has(z * W + x)));
+    const wallOk = (cells: number[][], high?: boolean) => cells.every(([x, z]) => L.tile(map, x, z) === 1 && !(high && map.winAt && map.winAt.has(z * W + x)));
     // what's in the room so far (tight: a cell any of it touches counts as blocked, so a way through it's a real one)
-    const placed = [], tight = t.slice();
-    const under = (b, f) => {
+    const placed: HomePlaced[] = [], tight = t.slice();
+    const under = (b: LvBox, f: (x: number, z: number) => boolean) => {
       for (let z = Math.floor((b.cz - b.hz + 0.03) / TS); z <= Math.floor((b.cz + b.hz - 0.03) / TS); z++) for (let x = Math.floor((b.cx - b.hx + 0.03) / TS); x <= Math.floor((b.cx + b.hx - 0.03) / TS); x++) if (!f(x, z)) return false;
       return true;
     };
-    const mineOnly = (i) => rm.carved || !home.off.has(i);
-    const free = (boxes) => boxes.every((b) => under(b, (x, z) => x >= rm.x && x < rm.x + rm.w && z >= rm.z && z < rm.z + rm.h && t[z * W + x] === 0 && !map.props.has(z * W + x) && !keep.has(z * W + x) && mineOnly(z * W + x))
+    const mineOnly = (i: number) => rm.carved || !home.off.has(i);
+    const free = (boxes: LvBox[]) => boxes.every((b) => under(b, (x, z) => x >= rm.x && x < rm.x + rm.w && z >= rm.z && z < rm.z + rm.h && t[z * W + x] === 0 && !map.props.has(z * W + x) && !keep.has(z * W + x) && mineOnly(z * W + x))
       && !placed.some((e) => e.boxes.some((q) => Math.abs(q.cx - b.cx) < q.hx + b.hx + 0.06 && Math.abs(q.cz - b.cz) < q.hz + b.hz + 0.06)));
     // does everything that could be walked to still can be, past this as well?
     const reach0 = L.flow(map, sources(map));
-    const passes = (boxes) => {
+    const passes = (boxes: LvBox[]) => {
       const q = tight.slice();
       for (const b of boxes) under(b, (x, z) => { q[z * W + x] = 4; return true; });
       return reachable(map, q, reach0);
     };
-    const find = (id) => placed.find((e) => e.id === id);
-    const span = (s, e) => { const b = e.boxes[0]; return s.n[0] ? b.cz : b.cx; }; // (where an item is along side s)
+    const find = (id: string) => placed.find((e) => e.id === id);
+    const span = (s: HomeSide, e: HomePlaced) => { const b = e.boxes[0]; return s.n[0] ? b.cz : b.cx; }; // (where an item is along side s)
     // Where a rule would have it, best first: [side, a along it, score (low is good)]
-    const candidates = (rule, w) => {
-      const [how, id] = rule.split(':'), ref = id ? find(id) : null, out = [];
+    const candidates = (rule: string, w: number): [HomeSide, number, number][] => {
+      const [how, id] = rule.split(':'), ref = (id ? find(id) : null) as HomePlaced, out: [HomeSide, number, number][] = [];
       if (id && !ref) return candidates('wall', w); // (what it goes with wasn't placed)
-      const longest = (s) => { // the most free wall on a side
+      const longest = (s: HomeSide) => { // the most free wall on a side
         let best = 0, run = 0;
         for (let a = s.A0 + TS / 2; a < s.A1; a += TS) { const c = behind(s, a - 0.1, a + 0.1)[0], [x, z] = at(s, a, 0.3), ci = Math.floor(z / TS) * W + Math.floor(x / TS); run = L.tile(map, c[0], c[1]) === 1 && !keep.has(ci) ? run + 1 : 0; if (run > best) best = run; }
         return best * TS;
@@ -620,8 +655,8 @@ const G_Homes = (() => {
           let score = r() * 0.3;
           if (how === 'long') score += -clear * 3 + Math.abs(a - mid) * 0.4;
           else if (how === 'corner') { if (ends > 0.12) continue; score += placed.some((e) => e.at === 'corner' && Math.hypot(e.x - px, e.z - pz) < 1.5) ? 5 : 0; }
-          else if (how === 'facing') { const opp = s.n[0] === -ref.side.n[0] && s.n[1] === -ref.side.n[1]; score += (opp ? 0 : 6) + (opp ? Math.abs(a - span(s, ref)) : Math.hypot(ref.x - px, ref.z - pz) * -0.3); }
-          else if (how === 'cross') { const perp = !!s.n[0] !== !!ref.side.n[0]; score += (perp ? 0 : 8) + Math.hypot(ref.x - px, ref.z - pz) * 0.35; }
+          else if (how === 'facing') { const opp = s.n[0] === -ref.side!.n[0] && s.n[1] === -ref.side!.n[1]; score += (opp ? 0 : 6) + (opp ? Math.abs(a - span(s, ref)) : Math.hypot(ref.x - px, ref.z - pz) * -0.3); }
+          else if (how === 'cross') { const perp = !!s.n[0] !== !!ref.side!.n[0]; score += (perp ? 0 : 8) + Math.hypot(ref.x - px, ref.z - pz) * 0.35; }
           else if (how === 'beside') score += Math.hypot(ref.x - px, ref.z - pz);
           else if (how === 'away') score -= Math.hypot(ref.x - px, ref.z - pz);
           else score += r() * 2 + placed.filter((e) => e.side === s).length * 0.8; // (spread round the room)
@@ -630,7 +665,7 @@ const G_Homes = (() => {
       }
       return out.sort((p, q) => p[2] - q[2]);
     };
-    const lay = (item, o, side, x, z, q, v, boxes) => {
+    const lay = (item: HomeItem, o: HomeSwap, side: HomeSide | null, x: number, z: number, q: number, v: number, boxes: LvBox[]) => {
       const rec = R[o.piece];
       for (const b of boxes) under(b, (cx, cz) => { tight[cz * W + cx] = 4; return true; });
       const p = { name: o.piece, q, x, z, v, style: o.style || {}, boxes, own: true };
@@ -642,8 +677,8 @@ const G_Homes = (() => {
       return true;
     };
     // Out on the floor, as near the middle of the room as it'll go, along its length
-    const middle = (item, o) => {
-      const rec = R[o.piece], v = r(), cx = (X0 + X1) / 2, cz = (Z0 + Z1) / 2, along = X1 - X0 >= Z1 - Z0 ? 0 : 1, spots = [];
+    const middle = (item: HomeItem, o: HomeSwap) => {
+      const rec = R[o.piece], v = r(), cx = (X0 + X1) / 2, cz = (Z0 + Z1) / 2, along = X1 - X0 >= Z1 - Z0 ? 0 : 1, spots: number[][] = [];
       for (let dz = -2; dz <= 2; dz += TS / 4) for (let dx = -2; dx <= 2; dx += TS / 4) spots.push([Math.hypot(dx, dz), cx + dx, cz + dz]);
       spots.sort((a, b) => a[0] - b[0]);
       for (const q of [along, along ? 0 : 1]) for (const [, x, z] of spots) {
@@ -653,10 +688,10 @@ const G_Homes = (() => {
       return false;
     };
     // A piece on the floor, by its rule. Returns whether it went in.
-    const stand = (item, o) => {
+    const stand = (item: HomeItem, o: HomeSwap) => {
       const rule = o.at || item.at;
       if (rule === 'middle') return middle(item, o);
-      const rec = R[o.piece], tall = Math.max(...rec.boxes.map((b) => b[4])) > L.SILL - 0.02, v = r(), pulls = item.pull ? [item.pull, 0] : [0];
+      const rec = R[o.piece], tall = Math.max(...rec.boxes.map((b: number[]) => b[4])) > L.SILL - 0.02, v = r(), pulls = item.pull ? [item.pull, 0] : [0];
       for (const pull of pulls) for (const [s, a] of candidates(rule, rec.w)) {
         if (pull && depth(s) < pull + rec.d + 4.2) continue; // (room behind it, and to the far wall)
         const q = F.facing(s.n[0], s.n[1]), [x, z] = at(s, a, 0.02 + pull + rec.d / 2), boxes = F.worldBoxes(rec, x, z, q, v);
@@ -666,8 +701,8 @@ const G_Homes = (() => {
       return false;
     };
     // Hung on a wall: not over a window or a door, nor behind anything that reaches up to it, nor beside what else is hung.
-    const hang = (item) => {
-      const rec = R[item.piece], y = item.hang;
+    const hang = (item: HomeItem) => {
+      const rec = R[item.piece], y = item.hang!;
       for (const [s, a] of candidates(item.at, rec.w)) {
         const a0 = a - rec.w / 2, a1 = a + rec.w / 2, cells = behind(s, a0 - TS * 0.8, a1 + TS * 0.8), [x, z] = at(s, a, 0);
         if (!wallOk(cells, true)) continue;
@@ -682,7 +717,7 @@ const G_Homes = (() => {
     for (const item of spec.items) {
       let ok = false;
       if (item.hang) ok = hang(item);
-      else for (const k of item.must ? tiers : tiers.slice(0, 1)) { keep = k; if ((ok = [item].concat(item.swap || []).some((o) => stand(item, o)))) break; }
+      else for (const k of item.must ? tiers : tiers.slice(0, 1)) { keep = k; if ((ok = ([item] as HomeSwap[]).concat(item.swap || []).some((o) => stand(item, o)))) break; }
       keep = tiers[0];
       if (!ok && item.need) return false;
     }
@@ -691,10 +726,10 @@ const G_Homes = (() => {
 
   // ---------------------------------------------------------------- their colours, for js/level.ts and js/lightgrid.ts
   // A surface's colour over the theme's: what to multiply it by, in linear light, as a Color
-  const over = (hex, base) => { const c = new THREE.Color(hex), b = new THREE.Color(base); return new THREE.Color(c.r / b.r, c.g / b.g, c.b / b.b); };
+  const over = (hex: THREE.ColorRepresentation, base: THREE.ColorRepresentation) => { const c = new THREE.Color(hex), b = new THREE.Color(base); return new THREE.Color(c.r / b.r, c.g / b.g, c.b / b.b); };
   // this floor's ceiling tints, by cell (null: no resident on it)
-  function ceilings(map) {
-    let out = null;
+  function ceilings(map: LvMap) {
+    let out: Map<number, THREE.Color> | null = null;
     for (const rm of map.rooms) {
       if (!rm.dress) continue;
       const c = over(rm.dress.ceil, map.theme.ceil);
@@ -704,11 +739,11 @@ const G_Homes = (() => {
     return out;
   }
   // The walls' colour by the cell they face, every floor (js/lightgrid.ts FS_PAINT). null: there's nobody in this level.
-  function paint(map) {
+  function paint(map: LvMap) {
     const floors = map.floors || [map];
-    if (!floors.some((m) => m.rooms.some((rm) => rm.dress))) return null;
+    if (!floors.some((m: LvMap) => m.rooms.some((rm: LvRoom) => rm.dress))) return null;
     const { W, H } = map, NF = floors.length, data = new Uint8Array(W * H * NF * 4);
-    floors.forEach((m, f) => {
+    floors.forEach((m: LvMap, f: number) => {
       for (const rm of m.rooms) {
         if (!rm.dress) continue;
         const c = over(rm.dress.wall, map.theme.wall), v = [c.r, c.g, c.b].map((q) => Math.min(255, Math.round(q * 127.5)));

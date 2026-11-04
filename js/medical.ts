@@ -32,16 +32,19 @@
 //   blood bag (40% blood back: on yourself, or on a teammate; an unconscious one comes round with it).
 // Bandages and painkiller doses stack 4 to a slot, tourniquets and gauze 3; the rest are one each.
 // A gut wound can't be fixed in the field. Everything heals at the quartermaster's.
+interface MedPart { hp: number; max: number; light: boolean; heavy: boolean; massive: boolean; frac: boolean; tq: boolean; lung: boolean; gut: boolean; spine: boolean; org: Record<string, number>; clot?: number | null; [flag: string]: any; }
+interface MedBody { parts: Record<string, MedPart>; blood: number; pk: number; }
+interface MedItem { name: string; fixes: string; where: string | string[]; time: number; size: number[]; price: number; stack?: number; desc: string; light?: boolean; }
 const G_Med = (() => {
   const PARTS: [string, string, number][] = [
     ['head', 'Head', 35], ['thorax', 'Thorax', 85], ['stomach', 'Stomach', 70],
     ['armL', 'Left arm', 60], ['armR', 'Right arm', 60], ['legL', 'Left leg', 65], ['legR', 'Right leg', 65],
   ];
-  const NAME = Object.fromEntries(PARTS.map(([k, n]) => [k, n]));
+  const NAME: Record<string, string> = Object.fromEntries(PARTS.map(([k, n]) => [k, n]));
   const LIMBS = ['armL', 'armR', 'legL', 'legR'];
-  const isLimb = (p) => LIMBS.includes(p);
+  const isLimb = (p: string) => LIMBS.includes(p);
   // medical items: what each fixes, where, how long it takes (s), its footprint and price
-  const ITEMS = {
+  const ITEMS: Record<string, MedItem> = {
     bandage: { name: 'Bandage', fixes: 'light', where: 'any', time: 3, size: [1, 1], price: 40, stack: 4, desc: 'Stops light bleeding, anywhere.' },
     tourniquet: { name: 'Tourniquet', fixes: 'heavy', where: 'limb', time: 3, size: [1, 1], price: 80, stack: 3, desc: 'Stops heavy bleeding from an arm or a leg.' },
     gauze: { name: 'Hemostatic gauze', fixes: 'heavy', light: true, where: 'any', time: 5, size: [1, 1], price: 120, stack: 3, desc: 'Packed into the wound: stops heavy bleeding anywhere, the torso too. Works as a bandage on lighter bleeding too.' },
@@ -58,15 +61,15 @@ const G_Med = (() => {
   const UNCON = 15; // this much or less: unconscious (blood bags bring you round)
   const DOWN_K = 0.06; // down: bleeding this much slower (you're still, your pressure's low)
   // blood lost at once to a wound, per point of damage (the torso bleeds most; the head's a different matter)
-  const HIT_BLOOD = { head: 0, thorax: 0.55, stomach: 0.55, limb: 0.35, frag: 0.3 };
+  const HIT_BLOOD: Record<string, number> = { head: 0, thorax: 0.55, stomach: 0.55, limb: 0.35, frag: 0.3 };
 
   function newBody() {
-    const parts = {};
+    const parts: Record<string, MedPart> = {};
     for (const [k, , max] of PARTS) parts[k] = { hp: max, max, light: false, heavy: false, massive: false, frac: false, tq: false, lung: false, gut: false, spine: false, org: {} }; // org: organ id -> share of it gone (0..1)
-    return { parts, blood: 100, pk: 0 };
+    return { parts, blood: 100, pk: 0 } as MedBody;
   }
   // the part a zone hit lands on (arms and legs: a side, or the one given)
-  function partOf(zone, side) {
+  function partOf(zone: string, side?: string) {
     const s = side || (Math.random() < 0.5 ? 'L' : 'R');
     if (zone === 'head' || zone === 'face') return 'head';
     if (zone === 'chest') return 'thorax';
@@ -77,7 +80,7 @@ const G_Med = (() => {
   // Damage to a part (points of a 100-point person, as js/data.ts wounds), with the chance of injuries, and the
   // blood it costs. through: how much of the round got through armour (0..1); central: through the middle of the part.
   // Returns what happened to you: null, 'down', 'out' (unconscious) or 'dead'.
-  function hit(b, part, dmg, central, through = 1, bullet = true) {
+  function hit(b: MedBody, part: string, dmg: number, central: boolean, through = 1, bullet = true) {
     const p = b.parts[part], downable = b.blood <= DOWNABLE; // (low already: this is the hit that puts you down)
     p.hp = Math.max(0, p.hp - dmg); // (a part at zero only stops working: js/medical.ts aimPenalty, speedMult)
     // (a wound alone never empties you: at worst it knocks you out, and the bleeding finishes it unless someone stops it)
@@ -96,7 +99,7 @@ const G_Med = (() => {
   }
   // A round's track through one part (js/ballistics.ts effects): its damage (points of a 100-point person), what it
   // did (effects), and the organs it went through ([id, damage, hp]). Returns your fate, as hit() does.
-  function wound(b, part, dmg, effects, organs) {
+  function wound(b: MedBody, part: string, dmg: number, effects: string[], organs: [string, number, number][]) {
     const p = b.parts[part], downable = b.blood <= DOWNABLE, E = new Set(effects || []);
     if (!p) return null;
     p.hp = Math.max(0, p.hp - dmg);
@@ -106,7 +109,7 @@ const G_Med = (() => {
     // if (E.has('massive')) p.massive = true;
     if (E.has('heavy')) { p.heavy = true; if (isLimb(part)) p.tq = false; } // (a new wound past the tourniquet)
     if (E.has('light') && !p.heavy) bleed(p);
-    if (E.has('frac')) { if (isLimb(part)) p.frac = true; else { const pl = (organs || []).find(([id]) => id === 'pelvisL' || id === 'pelvisR'); b.parts[pl ? 'leg' + pl[0].slice(-1) : Math.random() < 0.5 ? 'legL' : 'legR'].frac = true; } } // (the pelvis: the leg on its side won't take your weight)
+    if (E.has('frac')) { if (isLimb(part)) p.frac = true; else { const pl = (organs || []).find(([id]: [string, number, number]) => id === 'pelvisL' || id === 'pelvisR'); b.parts[pl ? 'leg' + pl[0].slice(-1) : Math.random() < 0.5 ? 'legL' : 'legR'].frac = true; } } // (the pelvis: the leg on its side won't take your weight)
     if (E.has('lung')) b.parts.thorax.lung = true;
     // if (E.has('gut')) p.gut = true;
     // (a spinal hit lower than the neck doesn't paralyse an officer: it's its damage and bleeding, like any other. The
@@ -114,38 +117,38 @@ const G_Med = (() => {
     if (E.has('out')) b.blood = Math.min(b.blood, UNCON); // (the heart wrecked: you black out where you stand)
     return fateOf(b, downable && dmg > 0);
   }
-  const paralysed = (b) => Object.values(b.parts).some((p) => p.spine);
+  const paralysed = (b: MedBody) => Object.values(b.parts).some((p) => p.spine);
   // where your blood (and your head) leave you: dead, unconscious, down (hit: you were just hit, or your spine's
   // gone), or up (null)
-  function fateOf(b, hit) {
+  function fateOf(b: MedBody, hit: boolean) {
     if (b.parts.head.hp <= 0 || b.blood <= 0) return 'dead';
     if (b.blood <= UNCON) return 'out';
     return hit || paralysed(b) ? 'down' : null;
   }
   // a light bleed starting (or a fresh one on top): it clots by itself in 30-60 s
-  function bleed(p) { p.light = true; p.clot = 30 + Math.random() * 30; }
+  function bleed(p: MedPart) { p.light = true; p.clot = 30 + Math.random() * 30; }
   // blood lost per second (down: slower, see DOWN_K)
-  function drainOf(b, down) {
+  function drainOf(b: MedBody, down: boolean) {
     let d = 0;
     for (const p of Object.values(b.parts)) d += (p.light ? DRAIN.light : 0) + (p.heavy ? DRAIN.heavy : 0) + (p.massive ? DRAIN.massive : 0) + (p.gut ? DRAIN.gut : 0);
     d *= BLEED_K;
     return down ? d * DOWN_K : d;
   }
   // down: seconds until you've bled out, or null when nothing's bleeding (stable)
-  function bleedOut(b) { const d = drainOf(b, true); return d > 0 ? b.blood / d : null; }
+  function bleedOut(b: MedBody) { const d = drainOf(b, true); return d > 0 ? b.blood / d : null; }
   // bleeding, light bleeds clotting (not once you're down), painkillers wearing off. Returns 'out' / 'dead' when the
   // blood runs very low / out (low blood alone doesn't put you down: the next hit does).
-  function tick(b, dt, down) {
+  function tick(b: MedBody, dt: number, down: boolean) {
     if (!down) for (const p of Object.values(b.parts)) if (p.light && (p.clot = (p.clot == null ? 45 : p.clot) - dt) <= 0) { p.light = false; p.clot = null; }
     b.blood = Math.max(0, b.blood - drainOf(b, down) * dt);
     b.pk = Math.max(0, b.pk - dt);
     return fateOf(b, false);
   }
-  const downable = (b) => b.blood <= DOWNABLE;
-  const unconscious = (b) => b.blood <= UNCON;
-  const bleeding = (b) => Object.values(b.parts).some((p) => p.light || p.heavy || p.massive);
+  const downable = (b: MedBody) => b.blood <= DOWNABLE;
+  const unconscious = (b: MedBody) => b.blood <= UNCON;
+  const bleeding = (b: MedBody) => Object.values(b.parts).some((p) => p.light || p.heavy || p.massive);
   // how badly your aim is thrown (0..1): pain (unless painkillers), a punctured lung, blood loss
-  function aimPenalty(b) {
+  function aimPenalty(b: MedBody) {
     let pain = 0;
     for (const [k, p] of Object.entries(b.parts)) {
       if (p.frac) pain += k.startsWith('arm') ? 0.3 : 0.1;
@@ -158,7 +161,7 @@ const G_Med = (() => {
     return G.U.clamp(pain + lung + blood, 0, 1);
   }
   // how fast you can move (x walk speed)
-  function speedMult(b) {
+  function speedMult(b: MedBody) {
     let k = 1;
     for (const s of ['legL', 'legR']) { const p = b.parts[s]; if (p.hp <= 0) k *= 0.6; else if (p.frac) k *= 0.72; }
     if (b.parts.thorax.lung || b.parts.thorax.hp <= 0) k *= 0.88; // (a wrecked chest: short of breath)
@@ -167,11 +170,11 @@ const G_Med = (() => {
     return k;
   }
   // can this item treat this part now? null (yes) or why not
-  function cantTreat(b, part, mt) {
+  function cantTreat(b: MedBody, part: string, mt: string) {
     const I = ITEMS[mt], p = b.parts[part];
     if (!I || !p) return 'That isn\'t a medical item';
     if (I.where === 'limb' && !isLimb(part)) return `${I.name}: arms and legs only`;
-    if (Array.isArray(I.where) && !I.where.includes(part)) return `${I.name}: ${I.where.map((x) => NAME[x].toLowerCase()).join(', ')} only`;
+    if (Array.isArray(I.where) && !I.where.includes(part)) return `${I.name}: ${I.where.map((x: string) => NAME[x].toLowerCase()).join(', ')} only`;
     if (I.fixes === 'pain') return null;
     if (I.fixes === 'blood') return b.blood >= 90 ? 'Plenty of blood: a transfusion isn\'t needed' : null;
     if (I.fixes === 'light' && !p.light) return p.heavy ? 'A bandage won\'t stop that: it needs a tourniquet or gauze' : `No light bleeding on the ${NAME[part].toLowerCase()}`;
@@ -181,7 +184,7 @@ const G_Med = (() => {
     if (I.fixes === 'lung' && !p.lung) return 'No punctured lung';
     return null;
   }
-  function treat(b, part, mt) {
+  function treat(b: MedBody, part: string, mt: string) {
     if (cantTreat(b, part, mt)) return false;
     const I = ITEMS[mt], p = b.parts[part];
     if (I.fixes === 'pain') b.pk = PK;
@@ -193,28 +196,28 @@ const G_Med = (() => {
     return true;
   }
   // A downed officer gets up with a teammate's help; an unconscious one has to come round first (blood bags)
-  function cantRevive(b) {
+  function cantRevive(b: MedBody | null) {
     if (!b) return null;
     if (paralysed(b)) return 'A spinal injury: they can\'t stand, whatever you do here';
     if (unconscious(b)) return `Unconscious: blood bags first (${Math.round(b.blood)}% blood, they come round over ${UNCON}%)`;
     return null;
   }
   // what's worth saying before a revive: what'll put them straight back down
-  function reviveWarn(b) {
+  function reviveWarn(b: MedBody | null) {
     if (!b) return null;
     if (bleeding(b)) return 'Still bleeding: they\'ll keep losing blood once up';
     if (downable(b)) return `Low blood (${Math.round(b.blood)}%): the next hit puts them down again`;
     return null;
   }
   // overall, for the team display (0..100): blood, unless the head's worse
-  const overall = (b) => Math.max(0, Math.min(b.blood, b.parts.head.hp / b.parts.head.max * 100));
+  const overall = (b: MedBody) => Math.max(0, Math.min(b.blood, b.parts.head.hp / b.parts.head.max * 100));
 
   // over the network: [hp %, flags] per part, blood, painkillers on
   const FLAGS = ['light', 'heavy', 'frac', 'tq', 'lung', 'gut', 'massive', 'spine'];
-  function encode(b) {
+  function encode(b: MedBody) {
     return { p: PARTS.map(([k]) => { const q = b.parts[k], o = Object.entries(q.org || {}).map(([id, f]) => id + ':' + Math.round(f * 100)).join(','); return o ? [Math.round(q.hp / q.max * 100), FLAGS.reduce((a, f, i) => a | (q[f] ? 1 << i : 0), 0), o] : [Math.round(q.hp / q.max * 100), FLAGS.reduce((a, f, i) => a | (q[f] ? 1 << i : 0), 0)]; }), bl: Math.round(b.blood), pk: b.pk > 0 ? 1 : 0 };
   }
-  function decode(e) {
+  function decode(e: any) {
     const b = newBody();
     if (!e || !e.p) return b;
     PARTS.forEach(([k], i) => { const q = b.parts[k], [hp, fl, o] = e.p[i] || [100, 0]; q.hp = q.max * hp / 100; FLAGS.forEach((f, j) => (q[f] = !!(fl & (1 << j)))); if (o) for (const s of String(o).split(',')) { const [id, pc] = s.split(':'); if (id) q.org[id] = (+pc || 0) / 100; } });
@@ -222,8 +225,8 @@ const G_Med = (() => {
     return b;
   }
   // a part's state in words (for tooltips and the inspection panel)
-  function describe(p) {
-    const out = [];
+  function describe(p: MedPart) {
+    const out: string[] = [];
     if (p.hp <= 0) out.push('destroyed');
     if (p.massive) out.push('internal bleeding');
     if (p.heavy) out.push('heavy bleeding');
@@ -234,7 +237,7 @@ const G_Med = (() => {
     if (p.spine) out.push('spinal injury');
     if (p.tq) out.push('tourniquet on');
     // the organs it went through: grazed, or wrecked
-    for (const [id, f] of Object.entries(p.org || {})) { const O = G.Ballistics && G.Ballistics.ORG[id]; if (O && f > 0.02) out.push(`${O.label.toLowerCase()} ${f >= 1 ? 'destroyed' : f >= 0.5 ? 'badly hurt' : 'hit'}`); }
+    for (const [id, f] of Object.entries(p.org || {})) { const O = G.Ballistics && (G.Ballistics.ORG as Record<string, any>)[id]; if (O && f > 0.02) out.push(`${O.label.toLowerCase()} ${f >= 1 ? 'destroyed' : f >= 0.5 ? 'badly hurt' : 'hit'}`); }
     return out;
   }
   // ---------------------------------------------------------------- the body, drawn
@@ -243,7 +246,7 @@ const G_Med = (() => {
   // the top of the helmet. Each part is filled by its health, outlined red (pulsing) while it bleeds, dashed
   // yellow when it's broken; a tourniquet shows as a strap. Every part carries data-body, so it's a drop
   // target for medical items in the Tab screen.
-  const SHAPES = {
+  const SHAPES: Record<string, string> = {
     head: 'M39 22 Q39 6 50 5 Q61 6 61 22 Q61 30 56 32 L44 32 Q39 30 39 22 Z',
     thorax: 'M29 41 Q31 36 44 34 L56 34 Q69 36 71 41 L69 68 L31 68 Z',
     stomach: 'M31 70 L69 70 L67 91 Q50 95 33 91 Z',
@@ -253,9 +256,9 @@ const G_Med = (() => {
     legR: 'M67 93 Q59 96 51 95 L52 135 L54 176 L53 184 L66 185 L65 176 L66 135 Z',
   };
   // where a tourniquet goes on each limb (high on it), [x1, y1, x2, y2]
-  const TQ = { armL: [19, 52, 29, 54], armR: [71, 54, 81, 52], legL: [33, 104, 49, 104], legR: [51, 104, 67, 104] };
-  function figure(b, opts: any = {}) {
-    const part = (k) => {
+  const TQ: Record<string, number[]> = { armL: [19, 52, 29, 54], armR: [71, 54, 81, 52], legL: [33, 104, 49, 104], legR: [51, 104, 67, 104] };
+  function figure(b: MedBody, opts: any = {}) {
+    const part = (k: string) => {
       const p = b.parts[k], f = Math.max(0, p.hp / p.max);
       const fill = p.hp <= 0 ? '#2a1010' : `hsl(${Math.round(f * 105)}, 42%, ${24 + f * 16}%)`;
       const cls = `fp${p.heavy || p.light || p.massive ? ' bleed' : ''}${p.heavy || p.massive ? ' heavy' : ''}${p.frac ? ' frac' : ''}${p.lung || p.gut ? ' organ' : ''}${opts.glow && opts.glow.includes(k) ? ' treating' : ''}`; // (glow: parts a teammate is working on)
