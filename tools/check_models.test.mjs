@@ -1,0 +1,41 @@
+// Negative tests for the model validator (js/glb.ts): each broken model must produce the expected message.  node tools/check_models.test.mjs
+// (npm run test:models runs the contract self-test first; this one checks the validator really catches what the contract forbids.)
+import { loadModels } from './model_env.mjs';
+const M = loadModels();
+const mesh = (name, slot, mat = 'black', extra = {}) => ({ name, extras: { slot, ...extra }, mesh: true, uv: false, materials: [mat], children: [] });
+const info = () => ({ sy: 0.07, fSight: 0.02, relief: 0.1, muzzles: [[0.5, 0, 0]], grip: [0.05, -0.07, 0], support: [0.2, -0.03, 0], anim: {} });
+const gun = (children, over = {}, rootExtras = {}) => ({ roots: [{ name: 'x', extras: { gun: 'x', info: { ...info(), ...over }, ...rootExtras }, mesh: false, uv: false, materials: [], children }] });
+const part = (key, kids = [], extras = {}) => ({ name: 'part_' + key, extras: { part: key, ...extras }, mesh: false, uv: false, materials: [], children: kids });
+let bad = 0;
+const expect = (label, desc, re) => {
+  const r = M.validate(desc, 'x'), all = [...r.errors, ...r.warnings].join('\n');
+  const ok = re === null ? r.errors.length === 0 : re.test(all);
+  if (!ok) { bad++; console.error(`FAIL ${label}: expected ${re}, got:\n  ${all || '(nothing)'}`); } else console.log('ok   ' + label);
+};
+const disp = (extra) => ({ ...mesh('display_ammo', 'barrel', 'screen', extra), uv: true });
+const B = () => mesh('base_1', 'base');
+expect('minimal gun is valid', gun([B()]), null);
+expect('no base mesh', gun([mesh('grip_1', 'grip')]), /no mesh in slot "base"/);
+expect('unknown material', gun([mesh('base_1', 'base', 'foo')]), /material 'foo' is not in the catalogue/);
+expect('anonymous material ok', gun([mesh('base_1', 'base', 'm_a0b1c2')]), null);
+expect('bad slot', gun([mesh('base_1', 'bogus')]), /slot "bogus"/);
+expect('mesh name must match slot', gun([B(), mesh('zzz', 'grip')]), /must be named "grip_<n>"/);
+expect('magAt without part_mag', gun([B()], { magAt: [0.1, -0.04] }), /no node part_mag but info\.magAt/);
+expect('part_mag without magAt', gun([B(), part('mag', [mesh('mag_2', 'mag')])], { anim: { mag: 'part_mag' } }), /part_mag exists but info\.magAt is missing/);
+expect('part not listed in anim', gun([B(), part('bolt', [mesh('base_3', 'base')])]), /info\.anim\.bolt does not list it/);
+expect('anim lists a missing node', gun([B()], { anim: { bolt: 'part_bolt' } }), /no node part_bolt/);
+expect('missing muzzles', gun([B()], { muzzles: undefined }), /info\.muzzles: missing/);
+expect('empty muzzles', gun([B()], { muzzles: [] }), /at least 1 entry/);
+expect('two muzzles ok', gun([B()], { muzzles: [[0.5, 0, -0.01], [0.5, 0, 0.01]] }), null);
+expect('wrong vec', gun([B()], { grip: [1, 2] }), /info\.grip: expected 3 numbers/);
+expect('unknown info field', gun([B()], { speling: 1 }), /info\.speling: unknown field/);
+expect('display without uvs', gun([B(), { ...disp({ display: { width: 128, height: 32 } }), uv: false }]), /display "display_ammo": has no UVs/);
+expect('display without size', gun([B(), disp({})]), /extras\.display must be \{ width, height \}/);
+expect('display ok (any material name)', gun([B(), disp({ display: { width: 128, height: 32 } })]), null);
+const barrel = (anchors) => gun([B(), part('barrel', [mesh('barrel_2', 'barrel')], { anchors })], { anim: { barrel: 'part_barrel' } });
+expect('part anchors ok (muzzles list + mount)', barrel({ muzzles: [[0.4, 0, -0.01], [0.4, 0, 0.01]], mount_muzzle: [0.4, 0, 0] }), null);
+expect('anchor of an unknown kind', barrel({ bogus: [0, 0, 0] }), /not an anchor a part can provide/);
+expect('mount of an unknown slot', barrel({ mount_nowhere: [0, 0, 0] }), /"nowhere" is not a slot/);
+expect('anchor with a bad shape', barrel({ muzzles: [[1, 2]] }), /muzzles\[0\]: expected 3 numbers/);
+expect('two roots', { roots: [gun([]).roots[0], gun([]).roots[0]] }, /2 root nodes/);
+process.exit(bad ? 1 : 0);
