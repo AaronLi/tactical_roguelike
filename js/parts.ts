@@ -21,7 +21,7 @@ type SlotKind = 'receiver' | 'slide' | 'barrel' | 'limbs' | 'muzzle' | 'handguar
 type SlotName = SlotKind | 'buttstock' | 'riserdot' | 'tacL' | `${SlotKind | 'buttstock' | 'riserdot' | 'tacL'}${number}`;
 /** What a part sets outright (absolutes, where its st are deltas). */
 interface PartSet {
-  cap?: number; zoom?: number; scoped?: boolean; reticle?: string; magnif?: any; levels?: number[] | null; barrelIn?: number; device?: string; sup?: boolean; can?: string;
+  cap?: number; zoom?: number; scoped?: boolean; reticle?: string; magnif?: any; levels?: number[] | null; barrelIn?: number; barrelAdd?: number; device?: string; sup?: boolean; can?: string;
   ported?: boolean; shell?: number; reload?: number; magnifier?: number; full?: boolean; perLoad?: number; laser?: string; light?: number;
 }
 /** What a part changes in the model spec (a patch: a nested spec only has the keys it changes). */
@@ -31,6 +31,7 @@ interface Part { // a part as the catalog holds it
   brand: string; name: string; desc: string; price: number; model?: PartModel; provides?: Record<string, string | { mount: string; bare?: boolean; brace?: Record<string, number> }> | null;
   chassis?: Record<string, string | { mount: string; bare?: boolean; brace?: Record<string, number> }>; not?: string[]; alsoMounts?: string[]; factory?: boolean; oem?: boolean; fam?: string; plat?: string;
   stype?: string; variant?: boolean; retired?: boolean; becomes: string /* (a receiver kit: the gun it makes) */;
+  len?: number; /* (a shared long-gun barrel: its length in inches, what fits is each gun's factory length's 0.6x-1.6x) */
 }
 interface MagFam {
   name: string; brand: string; clear?: string; std: number; straightShort?: boolean; model: Record<string, any>; desc: string;
@@ -39,7 +40,7 @@ interface MagFam {
 interface Slot { // a slot on a weapon platform (a nested one also has the parent slot it opens from)
   slot: SlotName; mount: string; req: boolean; bare?: boolean; parent?: string | null; brace?: Record<string, number>;
 }
-interface Platform { id: string; arch: ArchKind; spec: ModelSpec; slots: Slot[]; defaults: Record<string, string>; offset?: Record<string, number>; magVariants?: boolean; kg?: number; ergo?: number; }
+interface Platform { id: string; arch: ArchKind; spec: ModelSpec; slots: Slot[]; defaults: Record<string, string>; offset?: Record<string, number>; magVariants?: boolean; kg?: number; ergo?: number; barrelModel?: Record<string, any>; /* (its own barrel's shape, what a shared barrel of any length is scaled from) */ }
 type RcvKit = [string, string, number, number, string]; // brand, name, price, tier, description
 const G_Gunsmith = (() => {
   const PARTS: Record<string, Part> = {}, LIST: Part[] = [], PLATFORMS: Record<string, Platform> = {}, BY_MOUNT = new Map<string, Part[]>();
@@ -115,7 +116,36 @@ const G_Gunsmith = (() => {
   const kindOf = (sl: string) => sl.replace(/\d+$/, '');
   const slotRank = (sl: string) => ORDER.indexOf(kindOf(sl)) + (parseInt((sl.match(/\d+$/) || [])[0]!, 10) || 0) * 0.01; // (the display order, each level of a nest after the last)
   // whether part p goes in slot s (its interface, and its kind or the kind the slot takes)
-  const fitsSlot = (s: Slot, p: Part, id: string) => !!(s && p) && (s.mount === p.mount || (p.alsoMounts || []).includes(s.mount)) && (s.slot === p.slot || ALIAS[kindOf(s.slot)] === p.slot) && !(id && p.not && p.not.includes(id)); // (p.not: guns on that mount it still doesn't go on)
+  const fitsSlot = (s: Slot, p: Part, id: string) => !!(s && p) && (s.mount === p.mount || (p.alsoMounts || []).includes(s.mount)) && (s.slot === p.slot || ALIAS[kindOf(s.slot)] === p.slot) && !(id && p.not && p.not.includes(id)) && fitsLen(p, id); // (p.not: guns on that mount it still doesn't go on)
+  // A shared long-gun barrel (a cartridge's: br:<cartridge>) fits a gun whose factory barrel it's within 0.6x-1.6x the length of
+  // (the MCX down to 0.45x: its Rattler barrel)
+  const LEN_LO: Record<string, number> = { mcx: 0.45 };
+  function fitsLen(p: Part, id: string) {
+    if (p.len == null || !id) return true;
+    const f = (G.GUN_SPECS[id] || {}).barrel;
+    if (!f) return true;
+    const k = p.len / f;
+    return k >= (LEN_LO[id] ?? 0.6) - 1e-9 && k <= 1.6 + 1e-9;
+  }
+  // What a barrel's length does to the gun's handling, from its length against the gun's factory one: k = length / factory. A curve
+  // through nothing at k = 1 and what every gun's own short (k = 0.74) and long (k = 1.25) barrel did before they were shared, in
+  // ln k (f = a u + b u^2: smooth, and the same either side of the points). Velocity isn't here: it follows the length itself (compile).
+  const LEN_PTS: Record<string, [number, number]> = { acc: [12, -12], ergo: [6, -6], weight: [-0.35, 0.4], recoil: [5, -3] };
+  const LEN_U1 = Math.log(0.74), LEN_U2 = Math.log(1.25), LEN_DET = LEN_U1 * LEN_U2 * (LEN_U2 - LEN_U1);
+  const LEN_C = Object.entries(LEN_PTS).map(([k, [f1, f2]]) => [k, (f1 * LEN_U2 * LEN_U2 - f2 * LEN_U1 * LEN_U1) / LEN_DET, (LEN_U1 * f2 - LEN_U2 * f1) / LEN_DET] as [string, number, number]);
+  const lenSt = (k: number): Record<string, number> => {
+    if (k === 1) return {};
+    const u = Math.log(Math.min(1.7, Math.max(0.45, k))), o: Record<string, number> = {};
+    for (const [n, a, b] of LEN_C) o[n] = Math.round((a * u + b * u * u) * 1000) / 1000;
+    return o;
+  };
+  // a part's stats on this gun (a shared barrel's depend on the gun's own length)
+  const partSt = (p: Part, id?: string | null): Record<string, number> => (p.len != null && id && (G.GUN_SPECS[id] || {}).barrel ? lenSt(p.len / G.GUN_SPECS[id].barrel) : p.st);
+  // a barrel part's length on this gun, inches (a pistol's: the gun's own, and what it adds)
+  const barrelOf = (p: Part, id?: string | null): number | null => {
+    const f = id && (G.GUN_SPECS[id] || {}).barrel;
+    return p.slot !== 'barrel' ? null : p.len != null ? p.len : p.set.barrelAdd != null ? (f ? f + p.set.barrelAdd : null) : p.set.barrelIn != null ? p.set.barrelIn : null;
+  };
   // what a part's provides (or chassis) gives a slot: a mount, or the slot itself ({ mount, bare, brace })
   const slotMount = (v: string | { mount: string }) => (typeof v === 'string' ? v : v.mount);
   // display order
@@ -358,6 +388,7 @@ const G_Gunsmith = (() => {
     const [kind, rest] = mount.split(':');
     if (kind === 'mz') return `${THREAD[rest] || rest} muzzle thread`;
     if (kind === 'rcv') return RCV[rest] ? RCV[rest].name : mount;
+    if ((kind === 'br' || kind === 'pbr') && (G.CALIBERS as Record<string, any>)[rest]) return `${(G.CALIBERS as Record<string, any>)[rest].name} ${kind === 'br' ? 'rifle barrel' : 'pistol barrel'}`;
     const w = G.WEAPONS[rest];
     const what = { br: 'barrel extension', pbr: 'barrel', mag: 'magazine well', sl: 'slide rails', tube: 'magazine tube', motor: 'drive housing', cap: 'capacitor bay', limbs: 'limb pockets' }[kind] || kind;
     return w ? `${w.name} ${what}` : mount;
@@ -374,6 +405,19 @@ const G_Gunsmith = (() => {
   const CLS_KG: Record<string, number> = { AR: 3.3, BR: 4.1, SMG: 2.6, SG: 3.4, LMG: 8.5, DMR: 4.6, SNP: 5.5, GL: 5.2, RAIL: 7.5, PST: 0.9, MP: 1.6, BOW: 3.4 };
   const pick = (i: number) => BR[BRAND_KEYS[i % BRAND_KEYS.length]];
   let pi = 0;
+
+  // Barrels are shared by cartridge. A long gun's: one set of absolute lengths for the cartridge (br:<cartridge>), each gun's own factory length
+  // among them, and a gun takes the lengths within 0.6x-1.6x of its own (fitsLen). A pistol's: one plain, one threaded and one match barrel
+  // for the cartridge (pbr:<cartridge>), the length the gun's own (the threaded and match ones add a little: set.barrelAdd). Not shared:
+  // integrally suppressed barrels, break-actions and oddities, revolvers, shotguns, and the TX22's threaded one.
+  const NOT_SHARED = new Set(['dbl', 'sawn', 'derringer', 'thor', 'm32', 'pocketgl', 'shredder', 'rail', 'crossbow']);
+  const calKey = (cal: string) => cal.replace('/', 'x');
+  const lenId = (cal: string, len: number) => `br.${calKey(cal)}.${len}`;
+  const sharedCal = (id: string, arch: string, s: any): string | null => {
+    const cal = G.calOf(G.WEAPONS[id]), c = (G.CALIBERS as Record<string, any>)[cal];
+    return (arch === 'rifle' || arch === 'p90') && !s.integral && !NOT_SHARED.has(id) && c && c.group !== 'shotgun' ? cal : null;
+  };
+  const LONG_GUNS: { id: string; cal: string; inch: number; arch: string; thread: string | null }[] = [], PISTOL_CALS = new Set<string>();
 
   // P(id, arch, base model spec, slot setup). Slot setup keys:
   //   barrel: model barrel spec, thread: muzzle thread family, muzzle: factory muzzle type
@@ -406,7 +450,15 @@ const G_Gunsmith = (() => {
     };
 
     // barrel: factory + short + long (archetype decides what "length" means)
-    if (s.barrel) {
+    const shareCal = sharedCal(id, arch, s);
+    if (s.barrel && shareCal) { // a long gun's barrel is its cartridge's: one set of lengths (made after the last gun: makeSharedBarrels), its factory length the one it comes with
+      const inch = gs.barrel || 16;
+      slot('barrel', 'br:' + shareCal, true);
+      plat.defaults.barrel = lenId(shareCal, inch);
+      plat.barrelModel = s.barrel;
+      LONG_GUNS.push({ id, cal: shareCal, inch, arch, thread: s.thread ? 'mz:' + s.thread : null });
+      if (s.thread) std('muzzle', 'mz:' + s.thread, { muzzle: s.muzzle || 'crown' }, { name: NAMES.muzzle[s.muzzle || 'crown'] || 'muzzle device', set: { device: !gs.muzzleDevice || gs.muzzleDevice === 'suppressor' ? DEV[s.muzzle] || 'none' : gs.muzzleDevice } });
+    } else if (s.barrel) {
       const mount = 'br:' + id;
       slot('barrel', mount, true);
       const B = s.barrel, inch = gs.barrel || 16;
@@ -550,12 +602,11 @@ const G_Gunsmith = (() => {
       own({ id: `${id}.br.match`, slot: 'barrel', mount, brand: brandB, name: `${brandB.split(' ')[0]} threaded match barrel`, price: 240, tier: 1, model: { thread: true, match: true }, provides: th, st: { acc: -15, vel: 3, weight: 0.03 }, set: { barrelIn: inch + 0.4 }, desc: 'Tighter tolerances, still threaded.' });
       own({ id: `${id}.br.light`, slot: 'barrel', mount, brand: brandA, name: `${brandA.split(' ')[0]} fluted light barrel`, price: 180, model: { thread: true }, provides: th, st: { ergo: 4, weight: -0.04, recoil: 4 }, set: { barrelIn: inch }, desc: 'Fluted and lighter: quicker in the hand, a touch more bounce.' });
       std('muzzle', 'mz:' + s.pbarrel, { muzzle: 'crown' }, { name: 'thread protector', set: { device: 'none' } });
-    } else if (s.pbarrel) { // pistols: plain, threaded (takes a muzzle device), match
-      const mount = 'pbr:' + id;
-      slot('barrel', mount, true);
-      factory('barrel', mount, { model: {}, set: { barrelIn: gs.barrel || 4.5 } });
-      own({ id: `${id}.br.thr`, slot: 'barrel', mount, brand: brandA, name: `${brandA.split(' ')[0]} threaded barrel`, price: 220, model: { thread: true }, provides: { muzzle: 'mz:rp' }, st: { weight: 0.02 }, set: { barrelIn: (gs.barrel || 4.5) + 0.5 }, desc: 'Threaded: takes a compensator or suppressor.' });
-      own({ id: `${id}.br.match`, slot: 'barrel', mount, brand: brandB, name: `${brandB.split(' ')[0]} match barrel`, price: 300, tier: 2, model: { match: true }, st: { acc: -15, vel: 4, weight: 0.03 }, set: { barrelIn: (gs.barrel || 4.5) + 0.3 }, desc: 'Tighter tolerances.' });
+    } else if (s.pbarrel) { // pistols: plain, threaded (takes a muzzle device), match: one of each for the cartridge (makeSharedBarrels), the length each gun's own
+      const cal = G.calOf(def);
+      slot('barrel', 'pbr:' + cal, true);
+      plat.defaults.barrel = `pbr.${calKey(cal)}.plain`;
+      PISTOL_CALS.add(cal);
     }
     if (s.ptac) { slot('tac', 'ptac'); }
     if (s.tac) slot('tac', 'tac'); // (one side rail on the receiver: the minigun's)
@@ -787,10 +838,27 @@ const G_Gunsmith = (() => {
     const carried = Object.entries(build).filter(([sl]) => sl !== 'receiver' && sl !== 'mag').sort((a, b) => slotRank(a[0]) - slotRank(b[0]));
     for (const [sl, pid] of carried) {
       const p = PARTS[pid], s = p && slotsOf(to, nb).find((x: Slot) => x.slot === sl);
+      if (sl === 'barrel' && p && s) { // (the kit brings the new gun's barrel with it: its own, or what's nearest in length to the one on it)
+        const bp = convBarrel(id, to, pid, s);
+        nb.barrel = bp;
+        if (bp !== pid && PLATFORMS[id].defaults.barrel !== pid) off.push(pid);
+        continue;
+      }
       if (s && (s.mount === p.mount || s.req)) nb[sl] = pid; else if (p) off.push(pid);
     }
     for (const pid of prune(to, nb)) if (carried.some(([, q]) => q === pid)) off.push(pid);
     return { id: to, build: nb, off };
+  }
+  // The barrel a gun has after its receiver kit: the one it had if it fits the new gun (and wasn't the old gun's own: that one's
+  // the old gun's, and the new one's own comes in its place), else the new gun's own, or the nearest in length of those it takes
+  function convBarrel(from: string, to: string, pid: string, s: Slot) {
+    const p = PARTS[pid], dflt = PLATFORMS[to].defaults.barrel, own = PLATFORMS[from].defaults.barrel === pid;
+    if (!own && fitsSlot(s, p, to)) return pid;
+    if (p.len != null && !own) {
+      const near = compatible(s.mount).filter((q: Part) => q.len != null && fitsSlot(s, q, to)).sort((a: Part, b: Part) => Math.abs(a.len! - p.len!) - Math.abs(b.len! - p.len!))[0];
+      if (near) return near.id;
+    }
+    return dflt || pid;
   }
   // the kits that would make this gun something else
   const kitsFor = (id: string) => { const rg = RCV_OF[id]; return rg ? Object.keys(RCV[rg].kits).filter((k) => k !== id).map((k) => `rcv.${k}`) : []; };
@@ -806,6 +874,10 @@ const G_Gunsmith = (() => {
   // so stripping one for its parts and trading in the rest never comes to more than it cost.
   const sellPrice = (p: Part) => {
     const half = Math.floor(buyPrice(p) * 0.5), gun = p.factory && !p.price && G.WEAPONS[p.plat!];
+    if (p.slot === 'barrel' && p.oem) { // (a shared barrel some gun comes with: the same, by the cheapest that does)
+      const ships = Object.values(PLATFORMS).filter((q) => q.defaults.barrel === p.id).map((q) => (G.WEAPONS[q.id].price || 0));
+      if (ships.length) return Math.min(half, Math.max(5, Math.floor(Math.min(...ships) * 0.1)));
+    }
     return gun ? Math.min(half, Math.max(5, Math.floor((gun.price || 0) * 0.1))) : half;
   };
   // A standard grip with nothing to it (js/parts.ts std): the stock one on the guns that come with it, so it stays in
@@ -833,11 +905,12 @@ const G_Gunsmith = (() => {
     let perLoad = 1, levels = null, magnifier = 0, light = 0, laser = null, laserHip = 0, laserHipSum = 0, cap = base.mag, zoom = base.zoom, barrelIn = gs.barrel, device = gs.muzzleDevice || 'none', can = gs.suppressor || null, sup = false, hasMuzzleSlot = false, shell = base.shell, reload = base.reload, fullSt = null, scoped = base.zoom <= 0.5, reticle = 'cross', magnif = scoped ? scopeMag({}, base.zoom) : 1;
     const parts = Object.values(build).map((p) => PARTS[p]).filter(Boolean);
     for (const p of parts) {
-      for (const k in s) s[k] += p.st[k] || 0;
+      for (const [k, v] of Object.entries(partSt(p, id))) s[k] += v || 0; // (a shared barrel's: from its length against this gun's)
       if (p.set.cap != null) cap = p.set.cap;
       if (p.set.zoom != null) zoom = p.set.zoom;
       if (p.set.scoped != null) { scoped = p.set.scoped; reticle = p.set.reticle || 'cross'; magnif = p.set.magnif || 1; }
       if (p.set.barrelIn != null) barrelIn = p.set.barrelIn;
+      if (p.set.barrelAdd != null && gs.barrel) barrelIn = gs.barrel + p.set.barrelAdd; // (a pistol's: its own length and a little more)
       if (p.set.shell != null) shell = p.set.shell;
       if (p.set.full) { shell = false; reload = base.loadFull; fullSt = p.st.reload || 0; } // (a revolver filled all at once: js/data.ts)
       if (p.set.reload != null) reload = p.set.reload;
@@ -855,7 +928,7 @@ const G_Gunsmith = (() => {
     // Velocity: the barrel's length sets it (js/data.ts roundSpeed: a fifth power of the length); what changes it without
     // changing the barrel (a suppressor's longer gas column, a long slide) adds its share on top (velK). s.vel is then the
     // build's real change from the factory gun's, what its damage and reach follow and what the cards show.
-    const velX = parts.reduce((a, p) => a + (p.set.barrelIn == null ? p.st.vel || 0 : 0), 0) + ((plat.offset && plat.offset.vel) || 0);
+    const velX = parts.reduce((a, p) => a + (p.set.barrelIn == null && p.set.barrelAdd == null ? p.st.vel || 0 : 0), 0) + ((plat.offset && plat.offset.vel) || 0);
     d.velK = 1 + velX / 100;
     if (parts.some((p) => p.set.ported)) d.integral = true; // (a ported integral barrel: subsonic, as the MP5SD's: js/data.ts roundSpeed)
     if (gs.barrel && barrelIn) s.vel = (Math.pow(barrelIn / gs.barrel, 0.2) * d.velK - 1) * 100;
@@ -938,6 +1011,11 @@ const G_Gunsmith = (() => {
     if (!LOAD_SOUND[am] || window.GunshotSynth) specs.set(key, s); // (a subsonic load's needs the synth to work out)
     return s;
   }
+  // A shared barrel on this gun: its own barrel's shape, scaled by the length against its factory one's
+  function lenModel(id: string, p: Part): Record<string, any> {
+    const plat = PLATFORMS[id], B = plat.barrelModel || {}, k = p.len! / (G.GUN_SPECS[id].barrel || p.len!);
+    return plat.arch === 'rifle' ? { barrel: Object.assign({}, B, { len: B.len * k }) } : { blen: (B.len || 0.1) * k };
+  }
   // The model spec for a build: the platform's receiver spec with every installed part's patch applied.
   function modelSpec(def: any) {
     const plat = PLATFORMS[def.id];
@@ -945,7 +1023,7 @@ const G_Gunsmith = (() => {
     // (in slot order, by the slot each is in: what's on an adapter goes over the adapter)
     const fitted = Object.entries(def.build || defaultBuild(def.id)).filter(([, p]) => PARTS[p])
       .sort((a, b) => slotRank(a[0]) - slotRank(b[0]));
-    for (const [sl, pid] of fitted) for (let [k, v] of Object.entries(PARTS[pid].model || {})) {
+    for (const [sl, pid] of fitted) for (let [k, v] of Object.entries(PARTS[pid].len != null ? lenModel(def.id, PARTS[pid]) : PARTS[pid].model || {})) {
       if (k === 'tac' && sl === 'tacL') k = 'tacL'; // (the left rail's)
       if (k === 'pumpPatch') { spec.pump = Object.assign({}, spec.pump || {}, v); continue; }
       if (v && typeof v === 'object' && !Array.isArray(v) && spec[k] && typeof spec[k] === 'object') spec[k] = Object.assign({}, spec[k], v);
@@ -991,12 +1069,40 @@ const G_Gunsmith = (() => {
     mag: { t: 'curved', len: 0.19, d: 0.064, c: 0.03, well: 'black' }, optic: ['pic', { optic: 'irons' }], charging: 'ar' });
   // the MCX as its variants: a Rattler's barrel and handguard, the Virtus's longer ones, a Gen 1's KeyMod, a Spear LT's
   // lightened FDE handguard and padded stock (the QBZ-192 takes the same folding stocks: the same hinge)
-  const thr = { muzzle: 'mz:r556' };
-  [['mcx.br.rattler', 'kestrel', 'Kestrel 5.5" Rattler barrel', 0.125, 5.5, { vel: -22, acc: 16, ergo: 9, weight: -0.5, recoil: 8 }, 380, 2, 'The Rattler\'s: as short as a 5.56 barrel goes. Handy, loud, much less reach.'],
-    ['mcx.br.16', 'meridian', 'Meridian 16" Patrol barrel', 0.365, 16, { vel: 12, acc: -14, ergo: -8, weight: 0.5, recoil: -4 }, 480, 2, 'The Patrol rifle\'s full-length barrel: the most velocity and the most reach.']]
-    .forEach(([id, b, n, len, inch, st, price, tier, desc]: any[]) => add({ id, slot: 'barrel', mount: 'br:mcx', plat: 'mcx', brand: BR[b], name: n, price, tier, st, model: { barrel: { len } }, provides: thr, set: { barrelIn: inch }, desc }));
-  add({ id: 'qbz192.br.191', slot: 'barrel', mount: 'br:qbz192', plat: 'qbz192', brand: BR.north, name: 'Northmark 14.5" QBZ-191 rifle barrel', price: 460, tier: 2, model: { barrel: { len: 0.33 } }, provides: { muzzle: 'mz:r58' },
-    st: { vel: 10, acc: -12, ergo: -6, weight: 0.4, recoil: -3 }, set: { barrelIn: 14.5 }, desc: 'The full rifle\'s barrel: a QBZ-191 again.' });
+  // ------------------------------------------------------------------ shared barrels (once every gun is made)
+  // The lengths of each long-gun cartridge's barrels, besides its guns' own factory ones (inches): a short end and a long end (and what
+  // the Rattler, the G36K and the QBZ-191 had: 5.5, 12.5, 14.5). One within half an inch of a gun's own is left out. A cartridge with one gun:
+  // its factory length, and a short and a long one.
+  const EXTRA_LEN: Record<string, number[]> = {
+    '5.56/45': [5.5, 8, 12.5, 24], '7.62/39': [10.5, 12.5, 20], '7/43': [12, 20], '7.62/51': [10.5, 13, 26], '7.62/54': [15, 20, 32], '7.62/63': [18, 30],
+    '11.6/53': [13.5, 23], '8.6/69': [20, 34], '12.7/99': [18, 22, 36], '9/19': [3, 5.5, 12.5, 20], '11.43/23': [3.5, 8, 14], '7.62/25': [8, 13],
+    '7.65/17': [3.5, 5.5], '4.6/30': [5.5, 9], '5.6/39': [5, 10.5, 12.5, 20], '5.8/42': [6.5, 14.5, 22], '5.7/29': [7.5, 13],
+  };
+  function makeSharedBarrels() {
+    let n = 0;
+    const brand = () => BR[BRAND_KEYS[(n++ * 7 + 3) % BRAND_KEYS.length]];
+    const cals = [...new Set(LONG_GUNS.map((g) => g.cal))];
+    for (const cal of cals) {
+      const guns = LONG_GUNS.filter((g) => g.cal === cal), mount = 'br:' + cal, cn = (G.CALIBERS as Record<string, any>)[cal].name;
+      const lens = new Set(guns.map((g) => g.inch)), fam = [...lens];
+      for (const e of EXTRA_LEN[cal] || []) if (![...lens].some((l) => Math.abs(l - e) < 0.5)) lens.add(e);
+      const threads = guns.map((g) => g.thread), thread = [...new Set(threads)].sort((a, b) => threads.filter((t) => t === b).length - threads.filter((t) => t === a).length)[0]; // (the family's own: they all agree)
+      const sorted = [...lens].sort((a, b) => a - b), top = Math.max(...fam);
+      for (const len of sorted) {
+        const b = brand(), own = fam.includes(len);
+        add({ id: lenId(cal, len), slot: 'barrel', mount, brand: b, name: `${b.split(' ')[0]} ${len.toFixed(1)}" ${cn} barrel`, price: Math.round((200 + len * 14) / 10) * 10, tier: len > top ? 2 : 1, len, set: { barrelIn: len }, provides: thread ? { muzzle: thread } : null,
+          oem: own || undefined, desc: `${len.toFixed(1)}" barrel for ${cn}: a shorter barrel is handier and quicker to bring up, a longer one has more velocity and accuracy. Fits a gun within 0.6 to 1.6 times its own barrel's length.` });
+      }
+    }
+    for (const cal of PISTOL_CALS) {
+      const mount = 'pbr:' + cal, k = calKey(cal), cn = (G.CALIBERS as Record<string, any>)[cal].name;
+      add({ id: `pbr.${k}.plain`, slot: 'barrel', mount, brand: 'Factory', oem: true, name: `Standard ${cn} pistol barrel`, desc: 'The pistol\'s own barrel.', price: 80, model: {}, set: { barrelAdd: 0 } });
+      const bt = brand(), bm = brand();
+      add({ id: `pbr.${k}.thr`, slot: 'barrel', mount, brand: bt, name: `${bt.split(' ')[0]} threaded ${cn} barrel`, price: 220, model: { thread: true }, provides: { muzzle: 'mz:rp' }, st: { weight: 0.02 }, set: { barrelAdd: 0.5 }, desc: 'Threaded: takes a compensator or suppressor. Half an inch longer than the pistol\'s own.' });
+      add({ id: `pbr.${k}.match`, slot: 'barrel', mount, brand: bm, name: `${bm.split(' ')[0]} match ${cn} barrel`, price: 300, tier: 2, model: { match: true }, st: { acc: -15, vel: 4, weight: 0.03 }, set: { barrelAdd: 0.3 }, desc: 'Tighter tolerances.' });
+    }
+  }
+  makeSharedBarrels();
   // (the MCX's and MPX's handguards: their own, flat-topped, the upper's rail running on flush along them; nothing AR fits)
   [['hg.mcx.keymod', 'mcx', 'kestrel', 'Kestrel Gen 1 KeyMod handguard', { t: 'sig', len: 0.28, slots: 'keymod' }, { ergo: 1, weight: 0.2 }, 1],
     ['hg.mcx.lt', 'mcx', 'vantage', 'Vantage LT lightened handguard (FDE)', { t: 'sig', len: 0.28, slots: 'lite', m: 'tan' }, { ergo: 5, weight: 0.1 }, 2],
@@ -1032,8 +1138,6 @@ const G_Gunsmith = (() => {
     ['hg.g36.ris', BR.ironvale, 'Ironvale G36 rail handguard', { t: 'g36', len: 0.315, rails: true }, { ergo: -2, weight: 0.3 }, 320, 2, { fg: 'fg', tac: 'tac', tacL: 'tac' }]]
     .forEach(([id, brand, name, hg, st, price, tier, provides]: any[]) => add({ id, slot: 'handguard', mount: 'hg:g36', brand, name, price, tier, st, oem: brand === 'Factory' || undefined, provides,
       desc: provides ? 'Railed: takes a foregrip, and a light or laser each side.' : 'No rails.', model: { hg } }));
-  add({ id: 'g36.br.k', slot: 'barrel', mount: 'br:g36', plat: 'g36', brand: BR.lynx, name: 'Lynx 12.5" G36K barrel', price: 340, tier: 2, model: { barrel: { len: 0.311, r: 0.0068 } }, provides: thr,
-    st: { vel: -12, acc: 10, ergo: 6, weight: -0.35, recoil: 5 }, set: { barrelIn: 12.5 }, desc: 'The G36K\'s: with its short handguard, the carbine. Handier, a little less reach.' });
   add({ id: 'stk.heavy.g36', slot: 'stock', mount: 'stk:heavy', brand: 'Factory', oem: true, name: 'G36 folding stock', price: 230, tier: 1, stype: 'g36', st: STK_ST.g36,
     desc: 'A skeleton stock that folds to the right; the rifle still fires folded.', model: { stock: 'g36', sm: null } });
   { const plat = PLATFORMS.g36; plat.slots.find((sl: Slot) => sl.slot === 'handguard')!.mount = 'hg:g36'; plat.defaults.handguard = 'oem.hg.g36.0'; plat.defaults.stock = 'stk.heavy.g36'; LATE.add('g36'); }
@@ -1128,7 +1232,7 @@ const G_Gunsmith = (() => {
   }
   const fits = (mount: string) => FITS.get(mount) || [];
   // every weapon a part fits, through any interface it takes (a 9 mm can on a ½-28 .22)
-  const fitsPart = (p: Part) => [...new Set([p.mount, ...(p.alsoMounts || [])].flatMap((m) => fits(m)))].filter((id) => !(p.not || []).includes(id));
+  const fitsPart = (p: Part) => [...new Set([p.mount, ...(p.alsoMounts || [])].flatMap((m) => fits(m)))].filter((id) => !(p.not || []).includes(id) && fitsLen(p, id));
 
   // ------------------------------------------------------------------ the gunsmith's stock this visit
   // Six parts at a time (on pedestals in the hangar), the same for the whole squad. Parts that fit more weapons turn up more often;
@@ -1159,14 +1263,15 @@ const G_Gunsmith = (() => {
     const magnified = LIST.filter((p) => p.slot === 'optic' && p.model && (['scope', 'lpvo', 'acog'] as (string | undefined)[]).includes(p.model.optic));
     const scopes = take(magnified.filter((p) => !p.oem), 3); // (the named glass first; the plain rifle scopes the guns ship with if it's short)
     if (scopes.length < 3) scopes.push(...take(magnified.filter((p) => p.oem), 3 - scopes.length));
-    const long = (cls: any) => LIST.filter((p) => p.slot === 'barrel' && p.id.endsWith('.br.long') && G.WEAPONS[p.plat!] && cls.includes(G.WEAPONS[p.plat!].cls));
+    // (a barrel longer than a gun of those classes comes with: a long one of a shared set, or its match barrel)
+    const long = (cls: any) => LIST.filter((p) => p.slot === 'barrel' && (p.len != null ? fitsPart(p).some((id) => cls.includes(G.WEAPONS[id].cls) && p.len! > G.GUN_SPECS[id].barrel * 1.05) : p.id.endsWith('.br.long') && G.WEAPONS[p.plat!] && cls.includes(G.WEAPONS[p.plat!].cls)));
     const barrels = take(long(['SNP', 'DMR']), 4);
     if (barrels.length < 4) barrels.push(...take(long(['BR', 'AR', 'LMG']), 4 - barrels.length));
     return [...scopes, ...(ok(PARTS['fg.4']) ? ['fg.4'] : []), ...barrels].slice(0, n);
   }
   // Take the aftermarket parts off a weapon (traded in or replaced) and put them in a stash.
   function strip(def: any, stash: any) {
-    for (const pid of Object.values(def.build || {})) { const p = PARTS[pid]; if (p && !p.factory && !p.variant && p.becomes !== def.id) stash[pid] = (stash[pid] || 0) + 1; } // (a magazine isn't a part; its own receiver kit is the gun)
+    for (const pid of Object.values(def.build || {})) { const p = PARTS[pid]; if (p && !p.factory && !p.variant && p.becomes !== def.id && !(p.len != null && PLATFORMS[def.id].defaults.barrel === pid)) stash[pid] = (stash[pid] || 0) + 1; } // (a magazine isn't a part; its own receiver kit is the gun)
   }
 
   // what an attachments box offers for a weapon: parts that go straight onto it as it's built (a slot it has now, not
@@ -1181,7 +1286,7 @@ const G_Gunsmith = (() => {
     return out;
   }
   return {
-    PARTS, LIST, PLATFORMS, attachOptions, SLOT_LABEL, BRANDS: BR, ifaceName, fits, fitsPart, fitsSlot, ALIAS, kindOf,
+    PARTS, LIST, PLATFORMS, attachOptions, SLOT_LABEL, BRANDS: BR, ifaceName, fits, fitsPart, fitsSlot, fitsLen, partSt, barrelOf, ALIAS, kindOf,
     defaultBuild, slotsOf, slotFor, slotLabel, visibleSlots, magCap, prune, encode, decode, compile, fromCode, soundSpec, roundSoundKey, modelSpec, rollStock, rollPrecision, compatible, strip, convert, kitsFor, convParts, buyPrice, sellPrice, plainGrip, plainHere, skins, RCV,
     defaultCode: (id: string) => encode(id, defaultBuild(id)),
   };
