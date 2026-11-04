@@ -306,9 +306,15 @@ rib = []
 for px in (936, 972, 1021):
     for s in (-1, 1): rib.append(box(s * 0.0128, s * 0.03, F(px) - 0.0016, F(px) + 0.0016, U(492), U(318)))
 cut(mg, rib); finish(mg.data)
-rd = obj(lathe([(MAG_F + 0.034, 0.0012), (MAG_F + 0.026, 0.0035), (MAG_F + 0.012, 0.0045), (MAG_F + 0.004, 0.0059),
-                (MAG_F - 0.036, 0.0059)], 14), 'mag', 'brass', pm)
-rd.data.transform(Matrix.Translation((0, 0, MAG_U - 0.003))); finish(rd.data)
+# its top half rides up inside the well (hidden while seated; seen when it drops out on a reload): the body to the feed
+# lips 9 mm under the bore, the top round held in the lips where the bolt strips it, the next one staggered under it
+LIPS = -0.009
+up = obj(box(-0.014, 0.014, F(907), F(1049), MAG_U + 0.0005, LIPS - 0.003), 'mag', 'park', pm); bevel(up, 0.0012, 1); finish(up.data)
+for sx in (-1, 1):   # the feed lips: two inturned edges, the round showing between them
+    lp = obj(box(sx * 0.0045, sx * 0.014, F(912), F(1046), LIPS - 0.0035, LIPS), 'mag', 'park', pm); bevel(lp, 0.0008, 1); finish(lp.data)
+for k, (x, z) in enumerate(((0.0, LIPS - 0.0035), (0.0052, LIPS - 0.0035 - 0.0085))):
+    rd = obj(lathe([(0.071, 0.0012), (0.062, 0.0035), (0.048, 0.0045), (0.040, 0.0059), (0.0, 0.0059), (0.0, 0.0055)], 12), 'mag', 'brass', pm)
+    rd.data.transform(Matrix.Translation((x, F(906) + 0.002, z))); finish(rd.data)   # (case head at the back of the mag, bullet forward)
 
 # HANDGUARD: polymer, rounded, three vent slots a side, a long groove and vent holes along the bottom
 hg = obj(slab(loops_of('handguard'), 0.050, 0.019, 5), 'handguard', 'polymer')   # an oval in section (its front end's view)
