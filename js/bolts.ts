@@ -2,12 +2,15 @@
 // Crossbow bolts that stayed where they hit: in a suspect (it follows the bone it's in), in a soft vest, or
 // in timber and plasterboard. Whoever fired it decides (js/player.ts roundSegment) and tells the squad; each machine draws
 // its own. The lit nock stays on, in the load's colour (G.AMMO glow), so you can see from across a room where one went.
+interface BoltParts { shaft: THREE.BufferGeometry; vane: THREE.BufferGeometry; heads: Record<string, THREE.BufferGeometry>; nock: THREE.BufferGeometry; carbon: THREE.Material; steel: THREE.Material; }
+interface BoltOn { rig: Rig; bone: THREE.Object3D; p: THREE.Vector3; q: THREE.Quaternion; }
+interface BoltNet { am: string; at?: number[]; u?: number[]; e?: number; b?: string; l?: number[]; }
 const G_Bolts = (() => {
   const T = THREE, LEN = 0.4, MAX = 40, list: THREE.Group[] = [];
   // what won't hold a bolt: it glances or breaks on these, and drops
   const HARD = new Set(['metal', 'stone', 'glass', 'concrete', 'brick']);
   const FWD = new T.Vector3(0, 0, -1);
-  let parts: Record<string, any> | null = null, glowTex: THREE.CanvasTexture | null = null;
+  let parts: BoltParts | null = null, glowTex: THREE.CanvasTexture | null = null;
   const nockMats = new Map<number, { lit: THREE.MeshStandardMaterial; halo: THREE.SpriteMaterial }>();
   function build() {
     const shaft = new T.CylinderGeometry(0.0045, 0.0045, LEN, 8); shaft.rotateX(Math.PI / 2); shaft.translate(0, 0, LEN / 2);
@@ -25,7 +28,7 @@ const G_Bolts = (() => {
     g.fillStyle = r; g.fillRect(0, 0, 64, 64);
     glowTex = new T.CanvasTexture(c);
   }
-  const colour = (am: string): number => ((G.AMMO as Record<string, any>)[am] && (G.AMMO as Record<string, any>)[am].glow) || 0x39ff5a;
+  const colour = (am: string): number => (G.AMMO[am] && G.AMMO[am].glow) || 0x39ff5a;
   function nockMat(am: string) {
     const col = colour(am);
     if (!nockMats.has(col)) nockMats.set(col, { lit: new T.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 1.2, roughness: 0.4 }),
@@ -46,9 +49,9 @@ const G_Bolts = (() => {
   function keep(g: THREE.Group) { list.push(g); if (list.length > MAX) { const old = list.shift()!; if (old.parent) old.parent.remove(old); } }
   // Following a bone by hand, not as its child: the rig's bones are scaled unevenly, which would shear a bolt
   const _p = new T.Vector3(), _q = new T.Quaternion(), _s = new T.Vector3();
-  function follow(g: THREE.Group, rig: any, bone: THREE.Object3D, l: number[]) { g.userData.on = { rig, bone, p: new T.Vector3(l[0], l[1], l[2]), q: new T.Quaternion(l[3], l[4], l[5], l[6]) }; G.R.dynRoot.add(g); keep(g); place(g); }
+  function follow(g: THREE.Group, rig: Rig, bone: THREE.Object3D, l: number[]) { g.userData.on = { rig, bone, p: new T.Vector3(l[0], l[1], l[2]), q: new T.Quaternion(l[3], l[4], l[5], l[6]) }; G.R.dynRoot.add(g); keep(g); place(g); }
   function place(g: THREE.Group) {
-    const on = g.userData.on;
+    const on = g.userData.on as BoltOn;
     on.bone.updateWorldMatrix(true, false);
     on.bone.matrixWorld.decompose(_p, _q, _s);
     g.quaternion.copy(_q).multiply(on.q);
@@ -71,7 +74,7 @@ const G_Bolts = (() => {
     G.R.dynRoot.add(g); keep(g);
   }
   // into someone, where it is now in the world: returns where that is on the bone, for the squad
-  function onBone(rig: any, bone: THREE.Object3D, at: THREE.Vector3, dir: THREE.Vector3, am: string) {
+  function onBone(rig: Rig, bone: THREE.Object3D, at: THREE.Vector3, dir: THREE.Vector3, am: string) {
     bone.updateWorldMatrix(true, false);
     bone.matrixWorld.decompose(_p, _q, _s);
     const q = new T.Quaternion().setFromUnitVectors(FWD, dir).premultiply(_q.clone().invert()), p = at.clone().applyMatrix4(new T.Matrix4().copy(bone.matrixWorld).invert());
@@ -80,10 +83,10 @@ const G_Bolts = (() => {
     return l;
   }
   // the squad's: what the shooter's machine decided (e, the suspect; b, the bone; l, where on it; or at, u: in the world)
-  function fromNet(m: any) {
-    if (!m || !(G.AMMO as Record<string, any>)[m.am]) return;
-    if (m.at) { inWorld(new T.Vector3(...m.at), new T.Vector3(...m.u).normalize(), m.am); return; }
-    const ev = G.Views.enemies.get(m.e), bone = ev && ev.rig && G.Ballistics.boneOf(ev.rig, m.b);
+  function fromNet(m: BoltNet | null) {
+    if (!m || !G.AMMO[m.am]) return;
+    if (m.at) { inWorld(new T.Vector3(...(m.at as [number, number, number])), new T.Vector3(...(m.u as [number, number, number])).normalize(), m.am); return; }
+    const ev = G.Views.enemies.get(m.e!), bone = ev && ev.rig && G.Ballistics.boneOf(ev.rig, m.b!);
     if (bone && Array.isArray(m.l)) follow(mesh(m.am), ev.rig, bone, m.l);
   }
   function clear() { for (const g of list) if (g.parent) g.parent.remove(g); list.length = 0; }

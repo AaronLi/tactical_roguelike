@@ -7,9 +7,14 @@
 
 // The weapon table's rows. Only the fields every gun has are declared (the rest, which only some guns set, are the
 // index signature: pellets, mode, hyper, choke, explosive, akimbo, integral, velK, weight...).
+// a gun's class (its sound profile, CLASS_SND), which slot it's carried in (primary or sidearm) and a fire selector position
+type WeaponClass = 'AR' | 'BR' | 'SMG' | 'SG' | 'LMG' | 'DMR' | 'SNP' | 'GL' | 'RAIL' | 'PST' | 'MP' | 'BOW';
+type WeaponSlot = 'p' | 's';
+type FireMode = 'semi' | 'auto' | 'burst' | 'hyper';
 interface WeaponDef {
-  id: string; slot: string; cls: string; tier: number; price: number; name: string; rpm: number; mag: number; reserve: number;
+  id: string; slot: WeaponSlot; cls: WeaponClass; tier: number; price: number; name: string; rpm: number; mag: number; reserve: number;
   reload: number; spread: number; ads: number; range: number; desc: string;
+  mode: FireMode; modes?: FireMode[];
   [field: string]: any;
 }
 interface GunSpec {
@@ -20,7 +25,9 @@ interface ArmorDef {
   id: string; kind: string; name: string; tier: number; prot: { at: string; layers: [string, number][] }[]; dur: number; speed: number; price: number; desc: string;
   [field: string]: any;
 }
-interface EnemyDef { name: string; style: string; hp: number; speed: number; scale: number; headMult: number; cr: number; [field: string]: any; }
+// how an enemy looks and acts: a suspect, an armoured one (heavy, boss) or a civilian
+type EnemyStyle = 'suspect' | 'armored' | 'civ';
+interface EnemyDef { name: string; style: EnemyStyle; hp: number; speed: number; scale: number; headMult: number; cr: number; [field: string]: any; }
 interface ThemeDef { name: string; home: number; reflect: number; floor: string; wall: string; crate: string; fog: number; light: number; ceil: string; [field: string]: any; }
 interface CaliberDef { name: string; group: string; box: number; per: number; rimfire?: boolean; }
 interface AmmoDef {
@@ -34,7 +41,7 @@ const G_TIER_COLORS = ['#9aa0a6', '#7bc96f', '#4fa3ff', '#b77cff', '#ffb02e'];
 G.TIER_COLORS = G_TIER_COLORS;
 
 // Sound profiles by weapon class: f = filter cutoff, len = tail seconds, boom = bass punch, vol
-const G_CLASS_SND: Record<string, { f: number; len: number; boom: number; vol: number }> = {
+const G_CLASS_SND: Record<WeaponClass, { f: number; len: number; boom: number; vol: number }> = {
   AR: { f: 2600, len: 0.16, boom: 0.6, vol: 0.55 },
   BR: { f: 2000, len: 0.22, boom: 0.8, vol: 0.65 },
   SMG: { f: 3600, len: 0.1, boom: 0.35, vol: 0.45 },
@@ -171,7 +178,7 @@ G.obtainable = G_obtainable;
 // side kick, a steady pull one way as a share of the usual, where every other gun's flips at random: js/player.ts recoilKick).
 const G_AUTO_ONLY = ['mac10', 'uzi', 'aa12', 'm249', 'pkm', 'm60', 'shredder'];
 G.AUTO_ONLY = G_AUTO_ONLY;
-const G_FIRE_MODES: Record<string, string[]> = { br3: ['semi', 'burst'], an94: ['semi', 'hyper'], auto9: ['semi', 'burst'], b92: ['burst', 'semi'], tx22: ['auto', 'semi'] }; // (the TX22: made full auto, it comes set to it)
+const G_FIRE_MODES: Record<string, FireMode[]> = { br3: ['semi', 'burst'], an94: ['semi', 'hyper'], auto9: ['semi', 'burst'], b92: ['burst', 'semi'], tx22: ['auto', 'semi'] }; // (the TX22: made full auto, it comes set to it)
 G.FIRE_MODES = G_FIRE_MODES;
 G.WEAPON_LIST.forEach((w) => { w.modes = G.FIRE_MODES[w.id] || (w.mode === 'semi' ? ['semi'] : G.AUTO_ONLY.includes(w.id) ? [w.mode] : ['semi', w.mode]); });
 const G_MODE_NAME: Record<string, string> = { semi: 'SEMI', auto: 'AUTO', burst: 'BURST', hyper: 'HYPER' };

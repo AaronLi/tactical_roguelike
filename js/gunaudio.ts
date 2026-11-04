@@ -10,6 +10,12 @@
 // The placed buffer is then positioned in 3D (HRTF panner, distance gain, air absorption,
 // wall occlusion), so moving around never re-renders anything. Until a room render is ready
 // the dry render plays; until that exists, the old procedural shot (G.Audio.shot) plays.
+type AcousticEnv = 'hall' | 'room' | 'concrete' | 'warehouse'; // a room's kind, from its shape (acousticsAt): the synth's own presets of that name
+interface RoomAcoustics { env: AcousticEnv; rt60: number; envReflect: number; envMix: number }
+interface RoomSig { env: SynthEnv; envSize: number; envReflect: number; envMix: number } // a room, rounded off (what a render is cached by)
+interface EchoPt { x: number; y: number; z: number }
+interface EchoTap { delay: number; amp: number; pos: EchoPt; order: number; hops: EchoPt[] } // an echo path: its extra delay, its level, the wall it comes from, the bounces
+type AcMap = LvMap & { _acoustics?: Map<string, RoomAcoustics> };
 const G_GunAudio = {
   // Fixed reference listener baked into every placed buffer: right at the shooter.
   REF: { lisBearing: 105, lisDist: 1.2 },
@@ -20,14 +26,14 @@ const G_GunAudio = {
   // than a long can on a 9 mm). First-round pop: a can that's gone quiet for a while fills back up with air, and the
   // oxygen burns with the next shot's gas: that shot is a few dB louder than the string that follows.
   FRP_GAIN: 1.6, FRP_COLD: 8,
-  lastShot: new Map(), // sound key + shooter -> when (s) they last fired it: the can's still full of gas
+  lastShot: new Map<string, number>(), // sound key + shooter -> when (s) they last fired it: the can's still full of gas
   MAX_VOICES: 28,
   CEIL_M: G.Level.WALL_H,
 
   sources: new Map<string, Promise<unknown>>(),  // weapon id -> Promise<source>
   bufs: new Map<string, AudioBuffer>(),     // weapon|room key -> AudioBuffer
   dry: new Map<string, AudioBuffer>(),      // weapon id -> AudioBuffer
-  pending: new Set(),
+  pending: new Set<string>(),
   queue: [] as { key: string; job: () => Promise<any> }[],
   busy: false,
   voices: 0,
@@ -38,14 +44,14 @@ const G_GunAudio = {
   // Ring of rays from the shooter to the nearest walls -> area, perimeter, corridor-ness,
   // openness -> synth environment preset + Sabine RT60. Memoised per tile per map.
   // fy: the floor it's on (a building of several floors: the room upstairs, not the one below it)
-  acousticsAt(map: any, x: number, z: number, fy = 0) {
+  acousticsAt(map: AcMap, x: number, z: number, fy = 0): RoomAcoustics {
     const L = G.Level, tx = Math.floor(x / L.TS), tz = Math.floor(z / L.TS), key = tz * map.W + tx + '|' + fy.toFixed(1);
     map._acoustics = map._acoustics || new Map();
     const memo = map._acoustics.get(key);
     if (memo) return memo;
     const cx = (tx + 0.5) * L.TS, cz = (tz + 0.5) * L.TS;
     const RAYS = 24, FAR = 80, OPEN_M = 26, clamp = G.U.clamp;
-    const dist = [];
+    const dist: number[] = [];
     for (let i = 0; i < RAYS; i++) {
       const a = (i / RAYS) * Math.PI * 2;
       dist.push(L.raycast(map, cx, fy + 1.5, cz, Math.cos(a), 0, Math.sin(a), FAR).t);
@@ -64,7 +70,7 @@ const G_GunAudio = {
     }
     const openFrac = dist.filter((d) => d > OPEN_M).length / RAYS;
     const aspect = longM / Math.max(shortM, 0.5);
-    let env;
+    let env: AcousticEnv;
     if (aspect >= 2.4 && shortM <= 6) env = 'hall';
     else if (area <= 250) env = 'room';
     else if (area <= 800) env = 'concrete';
@@ -80,17 +86,17 @@ const G_GunAudio = {
     return out;
   },
   // the height of the floor something at p (a muzzle, your eyes) is over
-  floorY(map: any, p: THREE.Vector3) { return map.floors ? G.Level.floorMap(map, G.Level.floorAt(map, p.x, p.y - 1.4, p.z)).fy || 0 : 0; },
+  floorY(map: AcMap, p: EchoPt) { return map.floors ? G.Level.floorMap(map, G.Level.floorAt(map, p.x, p.y - 1.4, p.z)!).fy || 0 : 0; },
   // Invert the synth's "space size" control (RT60 = base * (0.45 + 1.6 * size)).
-  sizeForRt60(env: string, rt60: number) {
+  sizeForRt60(env: SynthEnv, rt60: number) {
     const base = window.GunshotSynth.ENVIRONMENTS[env].rt60 || 0;
     return base > 0 ? G.U.clamp((rt60 / base - 0.45) / 1.6, 0, 1) : 0.5;
   },
-  roomSig(map: any, x: number, z: number, fy = 0) {
+  roomSig(map: AcMap, x: number, z: number, fy = 0): RoomSig {
     const a = this.acousticsAt(map, x, z, fy), q = (v: number, s: number) => +(Math.round(v / s) * s).toFixed(2);
     return { env: a.env, envSize: q(this.sizeForRt60(a.env, a.rt60), 0.2), envReflect: q(a.envReflect, 0.25), envMix: q(a.envMix, 0.2) };
   },
-  sigKey(sig: any) { return `${sig.env}|${sig.envSize}|${sig.envReflect}|${sig.envMix}`; },
+  sigKey(sig: RoomSig) { return `${sig.env}|${sig.envSize}|${sig.envReflect}|${sig.envMix}`; },
 
   // ------------------------------------------------------------ rendering (serial queue)
   // One render at a time keeps the main thread smooth while a level is being prewarmed.
@@ -104,7 +110,7 @@ const G_GunAudio = {
   pump() {
     if (this.busy || !this.queue.length) return;
     this.busy = true;
-    const { key, job } = this.queue.shift();
+    const { key, job } = this.queue.shift()!;
     job().catch((e: any) => console.warn('gunshot render failed', key, e)).finally(() => {
       this.pending.delete(key);
       this.busy = false;
@@ -121,23 +127,23 @@ const G_GunAudio = {
       actionType: g.actionType, shotCount: g.shotCount, caseMaterial: g.caseMaterial, caseLength: g.caseLength, suppressor: g.suppressor,
     }, this.MIC);
   },
-  placeParams(id: string, sig: any) {
+  placeParams(id: string, sig: RoomSig) {
     const g = this.spec(id);
     return Object.assign({}, sig, this.REF, { masterDb: 0, casing: this.CASING, caseMaterial: g.caseMaterial, caseLength: g.caseLength, boltSim: true });
   },
   getSource(id: string) {
     let s = this.sources.get(id);
-    if (!s) { s = window.GunshotSynth.precompute(this.sourceParams(id)); this.sources.set(id, s); }
+    if (!s) { s = window.GunshotSynth.precompute(this.sourceParams(id)) as Promise<unknown>; this.sources.set(id, s); }
     return s;
   },
   buildDry(id: string, urgent?: boolean) {
     if (this.dry.has(id)) return;
-    const dryPlace = { env: 'none', envSize: 0, envReflect: 0, envMix: 0 };
+    const dryPlace: RoomSig = { env: 'none', envSize: 0, envReflect: 0, envMix: 0 };
     this.enqueue('dry:' + id, () => this.getSource(id)
       .then((src: unknown) => window.GunshotSynth.place(src, this.placeParams(id, dryPlace)))
       .then((buf: AudioBuffer) => { this.dry.set(id, buf); }), urgent);
   },
-  build(id: string, sig: any, urgent?: boolean) {
+  build(id: string, sig: RoomSig, urgent?: boolean) {
     const key = id + '|' + this.sigKey(sig);
     if (this.bufs.has(key)) return;
     this.enqueue(key, () => this.getSource(id)
@@ -147,15 +153,15 @@ const G_GunAudio = {
 
   // Pre-render every distinct acoustic space in the level for the given weapons, so shots
   // rarely need the dry fallback. Room signatures collapse to a handful per level.
-  prewarm(ids: any[], map?: any) {
+  prewarm(ids: string[], map?: AcMap) {
     if (!this.available()) return;
     ids = [...new Set(ids)].filter((id) => this.spec(id));
     ids.forEach((id) => this.buildDry(id));
-    const sigs = new Map();
+    const sigs = new Map<string, RoomSig>();
     const step = Math.max(1, Math.round(4 / G.Level.TS)); // a sample every ~4 m
-    for (const fm of map.floors || [map]) for (let tz = 1; tz < map.H - 1; tz += step) for (let tx = 1; tx < map.W - 1; tx += step) {
-      if (fm.t[tz * map.W + tx] !== 0) continue;
-      const sig = this.roomSig(map, (tx + 0.5) * G.Level.TS, (tz + 0.5) * G.Level.TS, fm.fy || 0);
+    for (const fm of map!.floors || [map!]) for (let tz = 1; tz < map!.H - 1; tz += step) for (let tx = 1; tx < map!.W - 1; tx += step) {
+      if (fm.t[tz * map!.W + tx] !== 0) continue;
+      const sig = this.roomSig(map!, (tx + 0.5) * G.Level.TS, (tz + 0.5) * G.Level.TS, fm.fy || 0);
       sigs.set(this.sigKey(sig), sig);
     }
     for (const id of ids) for (const sig of sigs.values()) this.build(id, sig);
@@ -169,10 +175,10 @@ const G_GunAudio = {
   // echo is played from that wall. Closed doors block rays, so opening one changes what you hear.
   SOUND: 343,
   ECHO_RAYS: 48,
-  echoCache: new Map(),
+  echoCache: new Map<string, { map: AcMap; taps: EchoTap[] }>(),
   debugEchoes: (() => { try { return new URLSearchParams(location.search).has('echoes'); } catch (e) { return false; } })(),
 
-  echoTaps(map: any, src: any, lis: any) {
+  echoTaps(map: AcMap, src: EchoPt, lis: EchoPt): EchoTap[] {
     const key = `${Math.round(src.x)},${Math.round(src.y)},${Math.round(src.z)}|${Math.round(lis.x)},${Math.round(lis.y)},${Math.round(lis.z)}|${map.doorVer || 0}`;
     const cached = this.echoCache.get(key);
     if (cached && cached.map === map) return cached.taps;
@@ -181,8 +187,8 @@ const G_GunAudio = {
     const fy = this.floorY(map, src), y = G.U.clamp(src.y, fy + 0.5, fy + 3.5), ly = lis.y; // (between the floor and ceiling of the shooter's own floor)
     const direct = Math.hypot(lis.x - src.x, ly - y, lis.z - src.z);
     const rayNorm = Math.sqrt(8 / K); // each ray stands for a slice of the wavefront
-    const bins = new Map();
-    const add = (pos: any, path: number, amp: number, order: number, hops: any[]) => {
+    const bins = new Map<number, EchoTap>();
+    const add = (pos: EchoPt, path: number, amp: number, order: number, hops: EchoPt[]) => {
       const delay = (path - direct) / this.SOUND;
       // < 20 ms fuses with the direct sound (the room reverb already covers it); > 0.6 s is negligible here
       if (delay < 0.02 || delay > 0.6 || amp < 0.008) return;
@@ -197,7 +203,7 @@ const G_GunAudio = {
     for (let i = 0; i < K; i++) {
       const a = ((i + 0.5) / K) * Math.PI * 2;
       let dx = Math.cos(a), dz = Math.sin(a), ox = src.x, oz = src.z, travelled = 0, energy = 1;
-      const hops = [{ x: src.x, y, z: src.z }];
+      const hops: EchoPt[] = [{ x: src.x, y, z: src.z }];
       for (let order = 1; order <= 2; order++) {
         const h = L.raycast(map, ox, y, oz, dx, 0, dz, 60);
         if (!h.n || h.n[1] !== 0) break;
@@ -222,7 +228,7 @@ const G_GunAudio = {
     this.echoCache.set(key, { map, taps });
     return taps;
   },
-  drawEchoes(taps: any[], lis: THREE.Vector3) {
+  drawEchoes(taps: EchoTap[], lis: THREE.Vector3) {
     const V = (p: { x: number; y: number; z: number }) => new THREE.Vector3(p.x, p.y, p.z);
     for (const tp of taps) {
       const col = tp.order === 1 ? 0x40c0ff : 0xb070ff;
@@ -257,7 +263,7 @@ const G_GunAudio = {
     }
 
     const base = this.GAIN * this.firstRound(id, who || (pos ? 'x' : 'me'), ctx.currentTime);
-    let gain = base, occluded = false, d = 0, panPos = pos as THREE.Vector3, portal = null; // (panPos is only read inside `if (pos)`)
+    let gain = base, occluded = false, d = 0, panPos = pos as EchoPt, portal: EchoTap | null = null; // (panPos is only read inside `if (pos)`)
     const taps = this.echoTaps(map, src, cam);
     if (this.debugEchoes) this.drawEchoes(taps, cam);
     if (pos) {
@@ -266,7 +272,7 @@ const G_GunAudio = {
       occluded = !G.Level.los(map, cam.x, cam.y, cam.z, pos.x, pos.y, pos.z);
       // Heard round a corner: if an echo path exists, the shot seems to come from that opening and is
       // much less muffled than sound going through a wall.
-      if (occluded) portal = taps.reduce((b: any, t: any) => (!b || t.amp > b.amp ? t : b), null);
+      if (occluded) portal = taps.reduce<EchoTap | null>((b, t) => (!b || t.amp > b.amp ? t : b), null);
       if (portal) panPos = portal.pos;
       if (occluded) gain *= portal ? 0.75 : 0.55;
       if (this.voices >= this.MAX_VOICES && gain < 0.3) return true; // drop distant shots under load

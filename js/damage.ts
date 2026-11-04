@@ -42,7 +42,7 @@ const G_Damage = (() => {
   interface DState { holes: Hole[]; bites: Bite[]; seen: Set<number>; faces: Map<string, Face[]>; tiles: Map<string, Tile>; mats: Map<number | string, THREE.Material>; falls: Fall[] }
   // a hole in a door's leaf
   interface DoorHole extends Shape { lining: number; m: string; J: number; c0: number; R0: number; dirL: V3 }
-  interface Door { id: number; x: number; z: number; w?: number; fy?: number; axis: string; mirror?: boolean; open?: boolean; kind?: string; holes: DoorHole[] | null; gone: Record<string, number> | null; fallen?: boolean; rest?: number[] | null }
+  interface Door { id: number; x: number; z: number; w?: number; fy?: number; axis: 'x' | 'z'; mirror?: boolean; open?: boolean; kind?: string; holes: DoorHole[] | null; gone: Record<string, number> | null; fallen?: boolean; rest?: number[] | null }
   interface Solid { kind?: string; edge?: boolean; win?: boolean; glass?: any; door?: Door; move?: boolean; min: number[]; max: number[]; holes?: Hole[] | null }
   type WorldT = Parameters<typeof G.World.query>[0];
   // a floor of the level (or the level, when it has one floor)
@@ -54,7 +54,7 @@ const G_Damage = (() => {
   interface Cross { ric?: boolean; mat: string; v?: number | boolean; depth?: number; t: number; nOut?: number[]; matOut?: string }
   interface XYZ { x: number; y: number; z: number }
   // a round's entry (k 'e') or exit event in a replay
-  interface HitEvent { k: string; m: string; p: XYZ; dir?: XYZ; n: number[]; J: number; cal?: number; stop?: boolean; depth?: number }
+  interface HitEvent { k: MarkSide; m: string; p: XYZ; dir?: XYZ; n: number[]; J: number; cal?: number; stop?: boolean; depth?: number }
   interface Edge { A: number[]; B: number[]; lo: number; hi: number }
   const CRACK = (o: Partial<Look>): Look => Object.assign({ jag: 0.22, sy: 1, spikes: 5, reach: 5, r: 0.026, pit: 1.9, lining: 0x6c6a64 }, o);
   // what a hole is like in each material: r its radius (m) for a rifle round, how rough, how long up the grain, cracks or splinters, and pit: how many times that its
@@ -265,7 +265,7 @@ const G_Damage = (() => {
     return { pos, col };
   }
   // the marks round a hole's edge (a face's, on its side of the wall): js/scars.ts's, less anything it'd stand up: rimFlaps has that
-  function marksOf(F: Face, H: Hole, k: string, D: DState) {
+  function marksOf(F: Face, H: Hole, k: MarkSide, D: DState) {
     const h = HOLE[F.m] || H.look, dir = new T.Vector3(...H.u), n = new T.Vector3(...F.n), o = { m: F.m, k, n: F.n, dir, J: H.J, stop: k === 'e' && !H.fb, cal: H.c, fit: fitOf(F) }, ua = F.ax === 0 ? 2 : 0, sd = (F.v * 31 + Math.round(F.a[1] * 500)) | 0;
     F.marks = (G.Scars.plan(o) as Mark[]).filter((c) => c.mat.map); F.clip = null;
     F.flip = [Math.sign(dir.getComponent(ua)) || 1, sd & 1 ? 1 : -1];
@@ -557,7 +557,7 @@ const G_Damage = (() => {
     const by = new Map<THREE.Material, MarkBuf>(), faces: { flap: FlapGeo }[] = [], rect = [x0, x0 + w, 0, h];
     for (const q of d.holes!) {
       const look = HOLE[q.m], dir = q.dirL, mid = new T.Vector3(q.c[0] - cx, q.c[1] - cy, 0), sg = dir.z > 0 ? -1 : 1, flip = [Math.sign(dir.x) || 1, 1]; // (sg: the side it came in by)
-      for (const [side, k] of [[sg, 'e'], [-sg, 'x']] as [number, string][]) {
+      for (const [side, k] of [[sg, 'e'], [-sg, 'x']] as [number, MarkSide][]) {
         const n = [0, 0, side], put = (u: number, v: number) => [u - cx, v - cy, side * (t + 0.003)];
         for (const c of (G.Scars.plan({ m: q.m, k, n, dir, J: q.J, cal: q.c0, fit: fitOf(q) }) as Mark[]).filter((c) => c.mat.map)) clipInto(by, c, q.c[0], q.c[1], rect, polys, flip, put, n, side > 0 ? [0, 2, 4] : [0, 4, 2]);
         if (look.flap && (k === 'x' || look.flap.in)) { const rim = q.core.map((r, i) => { const a = (i / N) * Math.PI * 2; return new T.Vector3(mid.x + Math.cos(a) * r, mid.y + Math.sin(a) * r, side * t); }); faces.push({ flap: { h: look.flap, geo: rimFlaps(rim, mid.clone().setZ(side * t), new T.Vector3(0, 0, k === 'x' ? side : -side), dir, q.R0 * look.flap.l, q.R0 * look.flap.h, (q.v * 31 + i0(q)) | 0, q.rad, q.core, (p: V3) => d.holes!.some((o) => o !== q && inOutline(o, [p.x + cx, p.y + cy], 0.95))) } }); }
@@ -818,7 +818,7 @@ const G_Damage = (() => {
   function warm(map: DmgMap) {
     const m = lined([0, 0, 0, 1, 0, 0, 0, 1, 0], [1, 1, 1, 1, 1, 1, 1, 1, 1], liningMat(map, HOLE.concrete.lining)), n = [0, 0, 1], out: THREE.Mesh[] = [m];
     // (and the marks, the first time anything's cut)
-    for (const [mm, k] of [['concrete', 'e'], ['pine', 'x'], ['mild', 'x']]) { const by = new Map<THREE.Material, MarkBuf>(); for (const c of (G.Scars.plan({ m: mm, k, n, dir: new T.Vector3(0, 0, 1), J: 800, cal: 8, fit: 0.03 }) as Mark[]).filter((c) => c.mat.map)) clipInto(by, c, 0, 0, [-1, 1, -1, 1], [], [1, 1], (u: number, v: number) => [u, v, 0], n, [0, 2, 4]); out.push(...markMeshes(by)); const f = HOLE[mm].flap; if (f) out.push(lined([0, 0, 0, 1, 0, 0, 0, 1, 0], [1, 1, 1, 1, 1, 1, 1, 1, 1], G.Scars.flapMat(f.c, !!f.m))); }
+    for (const [mm, k] of [['concrete', 'e'], ['pine', 'x'], ['mild', 'x']] as [string, MarkSide][]) { const by = new Map<THREE.Material, MarkBuf>(); for (const c of (G.Scars.plan({ m: mm, k, n, dir: new T.Vector3(0, 0, 1), J: 800, cal: 8, fit: 0.03 }) as Mark[]).filter((c) => c.mat.map)) clipInto(by, c, 0, 0, [-1, 1, -1, 1], [], [1, 1], (u: number, v: number) => [u, v, 0], n, [0, 2, 4]); out.push(...markMeshes(by)); const f = HOLE[mm].flap; if (f) out.push(lined([0, 0, 0, 1, 0, 0, 0, 1, 0], [1, 1, 1, 1, 1, 1, 1, 1, 1], G.Scars.flapMat(f.c, !!f.m))); }
     return out;
   }
   // ---------------------------------------------------------------- glass

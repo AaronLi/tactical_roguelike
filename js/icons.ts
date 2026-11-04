@@ -6,7 +6,7 @@
 // kind (a soft vest, a plate carrier with its pouches, a chest rig, a plate, a helmet, a belt, a backpack).
 // Guns are the weapon's own 3D model (as built, parts and all), rendered side-on once and kept.
 const G_Icons = (() => {
-  const CELL = 64, cache = new Map<string, any>();
+  const CELL = 64, cache = new Map<string, string>();
   // What a round looks like, everywhere it's drawn (these icons, and the rounds in the viewmodel: js/vmanim.ts, the
   // spent hulls: js/casings.ts): a shotgun shell's hull is colour-coded by its load; a bullet's tip shows its type.
   const shellCol = (am: string) => ({ slug: '#d8c040', flechette: '#3a6ab0', birdshot: '#3a8a3a', he: '#e07a1a' } as Record<string, string>)[am] || '#b02a22'; // (buckshot red)
@@ -22,7 +22,7 @@ const G_Icons = (() => {
   }
 
   // ---------------------------------------------------------------- magazines
-  function magStyle(def: any) {
+  function magStyle(def: WeaponDef) {
     const cal = G.calOf(def);
     if (G.beltFed(def)) return 'box';
     if (def.enbloc) return 'clip';
@@ -34,11 +34,11 @@ const G_Icons = (() => {
     return def.mag > 20 ? 'curved' : 'straight';
   }
   // How full a container is (0..1), and how many of k slots that fills (at least one if there's any in it)
-  const fillOf = (it: any) => (it.cap ? G.U.clamp(it.n / it.cap, 0, 1) : it.n > 0 ? 1 : 0);
-  const slotsOf = (it: any, k: number) => (it.n > 0 ? Math.max(1, Math.round(fillOf(it) * k)) : 0);
+  const fillOf = (it: GItem) => (it.cap ? G.U.clamp(it.n / it.cap, 0, 1) : it.n > 0 ? 1 : 0);
+  const slotsOf = (it: GItem, k: number) => (it.n > 0 ? Math.max(1, Math.round(fillOf(it) * k)) : 0);
   // Every container is drawn as full as it is: a box magazine's rounds from the feed lips down, then the
   // follower and the spring; a drum's round its ring; a belt box's belt; a clip's rounds.
-  function drawMag(g: CanvasRenderingContext2D, W: number, H: number, it: any) {
+  function drawMag(g: CanvasRenderingContext2D, W: number, H: number, it: GItem) {
     const def = G.WEAPONS[it.wid] || {}, full = it.n > 0, am = TYPE_COL[it.am] || TYPE_COL.ball, frac = fillOf(it);
     // the variant's own shape: a drum for a drum, a box for a stick magazine on a drum gun
     const vp = it.vid && G.Gunsmith.PARTS[it.vid], vt = vp && vp.model && vp.model.mag && vp.model.mag.t;
@@ -107,8 +107,8 @@ const G_Icons = (() => {
 
   // A gun loaded a round at a time (a shotgun's tube, a lever or bolt action's magazine, a break action's
   // barrels, a crossbow, a launcher's cylinder): a row of what it holds, the empty places dim.
-  function drawTube(g: CanvasRenderingContext2D, W: number, H: number, it: any) {
-    const C = (G.CALIBERS as Record<string, any>)[it.key] || { group: 'rifle' }, col = TYPE_COL[it.am] || TYPE_COL.ball, n = Math.max(1, it.cap || 1), k = Math.min(n, it.n);
+  function drawTube(g: CanvasRenderingContext2D, W: number, H: number, it: GItem) {
+    const C = (G.CALIBERS as Record<string, CaliberDef>)[it.key] || { group: 'rifle' }, col = TYPE_COL[it.am] || TYPE_COL.ball, n = Math.max(1, it.cap || 1), k = Math.min(n, it.n);
     const rows = n > 8 ? 2 : 1, per = Math.ceil(n / rows), cw = W * 0.9 / per, ch = H * 0.86 / rows;
     for (let i = 0; i < n; i++) {
       const x = W * 0.05 + (i % per) * cw, y = H * 0.07 + Math.floor(i / per) * ch, on = i < k;
@@ -137,9 +137,9 @@ const G_Icons = (() => {
   }
 
   // ---------------------------------------------------------------- ammo boxes
-  function drawAmmo(g: CanvasRenderingContext2D, W: number, H: number, it: any) {
+  function drawAmmo(g: CanvasRenderingContext2D, W: number, H: number, it: GItem) {
     // (no count: how full it is shows in how many stand on top of it)
-    const C = (G.CALIBERS as Record<string, any>)[it.key] || { name: '?', group: 'rifle' }, col = TYPE_COL[it.am] || '#c9a14a', frac = fillOf(it);
+    const C = (G.CALIBERS as Record<string, CaliberDef>)[it.key] || { name: '?', group: 'rifle' }, col = TYPE_COL[it.am] || '#c9a14a', frac = fillOf(it);
     if (C.group === 'shotgun') { // shells
       const k = Math.ceil(frac * 4);
       for (let i = 0; i < k; i++) { const x = W * 0.08 + i * W * 0.22; g.fillStyle = shellCol(it.am); rr(g, x, H * 0.18, W * 0.18, H * 0.52, 3); g.fill(); g.fillStyle = '#c9a14a'; g.fillRect(x, H * 0.62, W * 0.18, H * 0.16); }
@@ -197,8 +197,8 @@ const G_Icons = (() => {
     g.strokeStyle = '#8a8f94'; g.lineWidth = 3; g.beginPath(); g.moveTo(W * 0.56, H * 0.22); g.lineTo(W * 0.72, H * 0.52); g.stroke();
     g.beginPath(); g.arc(W * 0.36, H * 0.22, W * 0.07, 0, 7); g.stroke();
   }
-  const GEAR_COL = (d: any) => (d.brand && /Sable|Paragon/.test(d.brand) ? '#5a5240' : /Kestrel|Vantage/.test(d.brand || '') ? '#4d5639' : '#2e3236');
-  function drawCarrier(g: CanvasRenderingContext2D, W: number, H: number, d: any) {
+  const GEAR_COL = (d: GearDef) => (d.brand && /Sable|Paragon/.test(d.brand) ? '#5a5240' : /Kestrel|Vantage/.test(d.brand || '') ? '#4d5639' : '#2e3236');
+  function drawCarrier(g: CanvasRenderingContext2D, W: number, H: number, d: GearDef) {
     const col = d.id === 'c.lite' ? '#5c5a50' : d.id === 'c.ghost' ? '#3a3d40' : GEAR_COL(d);
     // vest silhouette: shoulders, neck cut-out, body
     g.beginPath();
@@ -210,7 +210,7 @@ const G_Icons = (() => {
     if (d.molle) molle(g, d, W * 0.2, H * 0.48, W * 0.6, H * 0.36);
     if (d.plate) { g.strokeStyle = 'rgba(255,255,255,0.15)'; g.lineWidth = 2; rr(g, W * 0.32, H * 0.2, W * 0.36, H * 0.24, 4); g.stroke(); }
   }
-  function drawPlate(g: CanvasRenderingContext2D, W: number, H: number, d: any) {
+  function drawPlate(g: CanvasRenderingContext2D, W: number, H: number, d: GearDef) {
     g.beginPath(); g.moveTo(W * 0.22, H * 0.22); g.lineTo(W * 0.36, H * 0.1); g.lineTo(W * 0.64, H * 0.1); g.lineTo(W * 0.78, H * 0.22); g.lineTo(W * 0.78, H * 0.9); g.lineTo(W * 0.22, H * 0.9); g.closePath();
     g.fillStyle = d.id === 'p.steel' ? '#6a6f74' : d.id === 'p.soft' ? '#3a3d40' : d.id === 'p.pe' ? '#c8c8c0' : '#2e3236'; g.fill(); shade(g, W * 0.22, H * 0.1, W * 0.56, H * 0.8);
     g.fillStyle = 'rgba(255,255,255,0.7)'; g.font = `bold ${Math.round(W * 0.13)}px Consolas, monospace`; g.textAlign = 'center';
@@ -218,7 +218,7 @@ const G_Icons = (() => {
     g.fillText(lvl ? lvl[1] : '', W / 2, H * 0.6);
   }
   // what's mounted on a carrier or belt: a pair of shoulder caps, a pelvis panel, a pair of leg guards
-  function drawAddon(g: CanvasRenderingContext2D, W: number, H: number, d: any) {
+  function drawAddon(g: CanvasRenderingContext2D, W: number, H: number, d: GearDef) {
     const col = d.id.startsWith('g.plate') ? '#6a6f74' : GEAR_COL(d) === '#2e3236' ? '#4a4f55' : GEAR_COL(d);
     g.fillStyle = col;
     if (d.kind === 'shoulder') {
@@ -231,17 +231,17 @@ const G_Icons = (() => {
     }
     shade(g, W * 0.12, H * 0.08, W * 0.76, H * 0.84);
   }
-  function drawHelmet(g: CanvasRenderingContext2D, W: number, H: number, d: any) {
+  function drawHelmet(g: CanvasRenderingContext2D, W: number, H: number, d: GearDef) {
     g.fillStyle = d.id === 'h.bump' ? '#3a3d40' : d.id === 'h.fast' ? '#5a5240' : '#3d4232';
     g.beginPath(); g.moveTo(W * 0.12, H * 0.72); g.quadraticCurveTo(W * 0.14, H * 0.12, W * 0.55, H * 0.14); g.quadraticCurveTo(W * 0.9, H * 0.18, W * 0.88, H * 0.66); g.lineTo(W * 0.66, H * 0.62); g.lineTo(W * 0.62, H * 0.72); g.closePath(); g.fill(); shade(g, W * 0.12, H * 0.12, W * 0.78, H * 0.6);
     g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(W * 0.22, H * 0.5, W * 0.14, H * 0.1); // rail / ear cut
-    if (d.prot && d.prot.some((p: any) => p.at === 'face')) { g.fillStyle = 'rgba(120,150,170,0.55)'; g.beginPath(); g.moveTo(W * 0.6, H * 0.4); g.lineTo(W * 0.92, H * 0.42); g.lineTo(W * 0.88, H * 0.92); g.lineTo(W * 0.62, H * 0.86); g.closePath(); g.fill(); }
+    if (d.prot && d.prot.some((p) => p.at === 'face')) { g.fillStyle = 'rgba(120,150,170,0.55)'; g.beginPath(); g.moveTo(W * 0.6, H * 0.4); g.lineTo(W * 0.92, H * 0.42); g.lineTo(W * 0.88, H * 0.92); g.lineTo(W * 0.62, H * 0.86); g.closePath(); g.fill(); }
   }
   // a face shield (a tinted polycarbonate shield with its mounting arms) or a mandible (a curved guard
   // round the jaw); on: drawn onto a helmet's icon
-  function drawFace(g: CanvasRenderingContext2D, W: number, H: number, d: any, on?: boolean) {
+  function drawFace(g: CanvasRenderingContext2D, W: number, H: number, d: GearDef, on?: boolean) {
     const ox = on ? W * 0.18 : 0, s = on ? 0.8 : 1, X = (v: number) => ox + v * W * s, Y = (v: number) => (on ? H * 0.18 : 0) + v * H * s;
-    if (d.cover < 0.9) {
+    if (d.cover! < 0.9) {
       g.fillStyle = '#5a6168'; g.beginPath(); g.moveTo(X(0.18), Y(0.42)); g.quadraticCurveTo(X(0.2), Y(0.88), X(0.5), Y(0.9)); g.quadraticCurveTo(X(0.8), Y(0.88), X(0.82), Y(0.42));
       g.lineTo(X(0.7), Y(0.46)); g.quadraticCurveTo(X(0.68), Y(0.76), X(0.5), Y(0.76)); g.quadraticCurveTo(X(0.32), Y(0.76), X(0.3), Y(0.46)); g.closePath(); g.fill();
       g.fillStyle = 'rgba(0,0,0,0.4)'; for (let i = 0; i < 4; i++) g.fillRect(X(0.36 + i * 0.08), Y(0.8), W * 0.03 * s, H * 0.04 * s); // vents
@@ -253,15 +253,15 @@ const G_Icons = (() => {
     g.fillStyle = 'rgba(255,255,255,0.25)'; g.fillRect(X(0.3), Y(0.26), W * 0.12 * s, H * 0.3 * s); // glare
     g.fillStyle = '#1e2124'; g.fillRect(X(0.12), Y(0.18), W * 0.08 * s, H * 0.14 * s); g.fillRect(X(0.8), Y(0.18), W * 0.08 * s, H * 0.14 * s); // the arms
   }
-  function drawBelt(g: CanvasRenderingContext2D, W: number, H: number, d: any) {
+  function drawBelt(g: CanvasRenderingContext2D, W: number, H: number, d: GearDef) {
     g.fillStyle = '#2a2c2e'; g.fillRect(W * 0.04, H * 0.42, W * 0.92, H * 0.18);
     if (d.molle) molle(g, d, W * 0.08, H * (d.molle[1] > 1 ? 0.18 : 0.3), W * 0.84, H * (d.molle[1] > 1 ? 0.7 : 0.45), GEAR_COL(d));
     g.fillStyle = '#8a8f94'; g.fillRect(W * 0.46, H * 0.4, W * 0.08, H * 0.22);
   }
 
   // MOLLE rows in a box, with the issued pouches on them
-  function molle(g: CanvasRenderingContext2D, d: any, x: number, y: number, w: number, h: number, col?: string) {
-    const [cols, rows] = d.molle, cw = w / cols, ch = h / rows;
+  function molle(g: CanvasRenderingContext2D, d: GearDef, x: number, y: number, w: number, h: number, col?: string) {
+    const [cols, rows] = d.molle!, cw = w / cols, ch = h / rows;
     g.fillStyle = 'rgba(160,170,130,0.18)';
     for (let r = 0; r < rows * 3; r++) g.fillRect(x, y + (r + 0.5) * h / (rows * 3), w, 1.5);
     for (const [pid, px, py] of d.pouches || []) {
@@ -273,7 +273,7 @@ const G_Icons = (() => {
     }
   }
   // a pouch on its own: the body, a flap, and what it's for
-  function drawPouch(g: CanvasRenderingContext2D, W: number, H: number, it: any) {
+  function drawPouch(g: CanvasRenderingContext2D, W: number, H: number, it: GItem) {
     const P = G.Gear.POUCHES[it.pid], col = P.dump ? '#5a5240' : P.acc && P.acc[0] === 'med' ? '#4a3a32' : '#4d5639';
     if (P.dump) { // a wide bag with a drawstring top
       g.fillStyle = col; g.beginPath(); g.moveTo(W * 0.12, H * 0.22); g.lineTo(W * 0.88, H * 0.22); g.lineTo(W * 0.82, H * 0.9); g.lineTo(W * 0.18, H * 0.9); g.closePath(); g.fill(); shade(g, W * 0.12, H * 0.22, W * 0.76, H * 0.68);
@@ -292,8 +292,8 @@ const G_Icons = (() => {
     if (P.acc && P.acc[0] === 'med') { g.fillStyle = '#c0302a'; g.fillRect(W * 0.44, H * 0.4, W * 0.12, H * 0.36); g.fillRect(W * 0.32, H * 0.52, W * 0.36, H * 0.12); }
     if (P.acc && P.acc[0] === 'frag') { g.fillStyle = '#8a8f94'; g.fillRect(W * 0.42, H * 0.1, W * 0.16, H * 0.14); }
   }
-  function drawPack(g: CanvasRenderingContext2D, W: number, H: number, d: any) {
-    const col = GEAR_COL(d), big = d.grids[0][0] * d.grids[0][1];
+  function drawPack(g: CanvasRenderingContext2D, W: number, H: number, d: GearDef) {
+    const col = GEAR_COL(d), big = d.grids![0][0] * d.grids![0][1];
     const bw = W * (0.5 + Math.min(0.3, big / 100)), x = W / 2 - bw / 2;
     rr(g, x, H * 0.14, bw, H * 0.78, W * 0.1); g.fillStyle = col; g.fill(); shade(g, x, H * 0.14, bw, H * 0.78);
     g.strokeStyle = 'rgba(0,0,0,0.4)'; g.lineWidth = 2; g.beginPath(); g.moveTo(x + bw * 0.12, H * 0.34); g.lineTo(x + bw * 0.88, H * 0.34); g.stroke(); // lid
@@ -303,7 +303,7 @@ const G_Icons = (() => {
   }
 
   // ---------------------------------------------------------------- weapon parts: a side-on shape by what it is
-  function drawPart(g: CanvasRenderingContext2D, W: number, H: number, p: any) {
+  function drawPart(g: CanvasRenderingContext2D, W: number, H: number, p: Part) {
     if (!p) return;
     const wood = /wood|walnut|birch/i.test(p.name), col = wood ? '#7a4a28' : p.factory ? '#2a2c2e' : /FDE|tan|desert/i.test(p.name) ? '#8a7650' : '#34383c';
     const fill = (c?: string) => { g.fillStyle = c || col; g.fill(); }, cy = H / 2;
@@ -361,7 +361,7 @@ const G_Icons = (() => {
 
   // ---------------------------------------------------------------- guns: the model, side-on
   let gR: THREE.WebGLRenderer | null = null, gScene: THREE.Scene | null = null, gCam: THREE.OrthographicCamera | null = null;
-  function gunImage(def: any, W: number, H: number) {
+  function gunImage(def: WeaponDef, W: number, H: number) {
     const T = THREE;
     if (!gR) {
       gR = new T.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
@@ -386,23 +386,23 @@ const G_Icons = (() => {
     return gR.domElement;
   }
 
-  function draw(it: any, W: number, H: number) {
+  function draw(it: GItem, W: number, H: number) {
     const c = document.createElement('canvas'); c.width = W; c.height = H;
     const g = c.getContext('2d')!;
     const d = it.gid ? G.Gear.DEFS[it.gid] : null;
     if (it.k === 'mag') drawMag(g, W, H, it);
-    else if (it.k === 'tube') drawTube(g, W, H, it);
+    else if ((it.k as string) === 'tube') drawTube(g, W, H, it);
     else if (it.k === 'ammo') drawAmmo(g, W, H, it);
     else if (it.k === 'med') drawMedItem(g, W, H, it.mt);
     else if (it.k === 'frag') drawFrag(g, W, H);
     else if (it.k === 'flash') drawFlash(g, W, H);
-    else if (it.k === 'carrier') drawCarrier(g, W, H, d);
-    else if (it.k === 'plate') drawPlate(g, W, H, d);
-    else if (it.k === 'helmet') { drawHelmet(g, W, H, d); if (it.face) drawFace(g, W, H, G.Gear.defOf(it.face), true); }
-    else if (it.k === 'face') drawFace(g, W, H, d);
-    else if (it.k === 'shoulder' || it.k === 'groin' || it.k === 'legs') drawAddon(g, W, H, d);
-    else if (it.k === 'belt') drawBelt(g, W, H, d);
-    else if (it.k === 'pack') drawPack(g, W, H, d);
+    else if (it.k === 'carrier') drawCarrier(g, W, H, d!);
+    else if (it.k === 'plate') drawPlate(g, W, H, d!);
+    else if (it.k === 'helmet') { drawHelmet(g, W, H, d!); if (it.face) drawFace(g, W, H, G.Gear.defOf(it.face) as GearDef, true); }
+    else if (it.k === 'face') drawFace(g, W, H, d!);
+    else if (it.k === 'shoulder' || it.k === 'groin' || it.k === 'legs') drawAddon(g, W, H, d!);
+    else if (it.k === 'belt') drawBelt(g, W, H, d!);
+    else if (it.k === 'pack') drawPack(g, W, H, d!);
     else if (it.k === 'pouch') drawPouch(g, W, H, it);
     else if (it.k === 'ifak') { // a red zip pouch with a white cross
       rr(g, W * 0.12, H * 0.08, W * 0.76, H * 0.84, 6); g.fillStyle = '#7a2420'; g.fill(); shade(g, W * 0.12, H * 0.08, W * 0.76, H * 0.84);
@@ -414,9 +414,9 @@ const G_Icons = (() => {
     return c;
   }
   // an item drawn in its natural orientation (w x h cells), turned if it's shown turned
-  function of(it: any, w: number, h: number, rot?: boolean) {
+  function of(it: GItem, w: number, h: number, rot?: boolean) {
     // (a magazine or tube is drawn as full as it is: that's part of the key, to a round on small ones)
-    const fill = it.k === 'mag' || it.k === 'tube' ? (it.cap ? Math.round(G.U.clamp(it.n / it.cap, 0, 1) * Math.min(it.cap, 40)) : it.n > 0 ? 1 : 0) + '/' + (it.cap || 0) : it.k === 'ammo' ? Math.ceil(fillOf(it) * 20) : it.n > 0 ? 1 : 0;
+    const fill = it.k === 'mag' || (it.k as string) === 'tube' ? (it.cap ? Math.round(G.U.clamp(it.n / it.cap, 0, 1) * Math.min(it.cap, 40)) : it.n > 0 ? 1 : 0) + '/' + (it.cap || 0) : it.k === 'ammo' ? Math.ceil(fillOf(it) * 20) : it.n > 0 ? 1 : 0;
     const key = [it.k, it.k === 'gun' ? it.w.def.code : it.wid || it.key || it.gid || it.pid || it.mt || '', it.vid || '', it.am || '', fill, w, h, rot ? 1 : 0, it.face ? it.face.gid : ''].join('|');
     let url = cache.get(key);
     if (url) return url;
@@ -431,7 +431,7 @@ const G_Icons = (() => {
   // Plain white symbols, like a phone's battery: the outline of what the gun feeds from, filled as far as it's
   // loaded (a box magazine from the bottom up, a drum round its ring, a tube or a cylinder slot by slot), and the
   // round in the chamber, solid when there's one in it. kind: styleFor(def); n of cap; W x H in CSS pixels.
-  function styleFor(def: any, vid?: string) {
+  function styleFor(def: WeaponDef, vid?: string) {
     const af = G.Gear.ammoFor(def);
     if (af.kind !== 'mag') return 'tube';
     const vp = vid && G.Gunsmith.PARTS[vid], vt = vp && vp.model && vp.model.mag && vp.model.mag.t;

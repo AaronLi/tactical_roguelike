@@ -30,7 +30,7 @@ const G_Demo = (() => {
   // (before the level, while there are no frames to step it: real time)
   const sleep = (s: number) => new Promise((r) => setTimeout(r, s * 1000));
   const untilReal = async (f: () => unknown) => { while (!f()) await sleep(0.1); };
-  let cap: HTMLDivElement | null = null, pocket: any = null;
+  let cap: HTMLDivElement | null = null, pocket: GGrid | null = null;
   function caption(title: string, step: string) {
     if (!cap) {
       cap = document.createElement('div');
@@ -49,7 +49,7 @@ const G_Demo = (() => {
     else await tap(n, 0.35);
   }
   // rounds for it: the gun's magazines (or a box of its shells) in a big pocket of its own
-  function stock(w: any) {
+  function stock(w: GWeapon) {
     const m = me();
     if (!pocket) { pocket = { id: 99999, w: 14, h: 14, accept: null, label: 'Demo', items: [] }; m.pockets.unshift(pocket); }
     pocket.items.length = 0;
@@ -58,7 +58,7 @@ const G_Demo = (() => {
   async function reload() { const m = me(); m.startReload(); await wait(0.1); await until(() => !m.reloading && !m.act); await wait(0.4); }
   async function show([id, title, how]: string[]) {
     const m = me();
-    m.weapons.p = m.makeWeapon(id); m.slot = null; m.swap('p');
+    m.weapons.p = m.makeWeapon(id); m.slot = null as unknown as string; m.swap('p');
     const w = m.weapons.p;
     if ((w.def.modes || [w.def.mode]).includes('auto')) w.fm = 'auto';
     stock(w);
@@ -90,7 +90,7 @@ const G_Demo = (() => {
     G.Game.solo(); await sleep(0.8);
     G.Server.startRun();
     await untilReal(() => G.Game.phase === 'route' && G.Game.routeMap);
-    const g0 = G.Game; g0.pickRoute(G.Route.options(g0.routeMap, g0.routeSt.path[g0.routeSt.path.length - 1])[0]);
+    const g0 = G.Game; g0.pickRoute(G.Route.options(g0.routeMap!, g0.routeSt!.path[g0.routeSt!.path.length - 1])[0]);
     await untilReal(() => G.Game.phase === 'level' && G.Me.kit);
     await wait(1.0);
     // nobody else in it, and the game playing as if the mouse were captured

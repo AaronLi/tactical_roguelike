@@ -13,19 +13,22 @@
 //   - plasterboard takes a neat hole in, a torn paper-edged blowout out, and hangs in the air as dust
 //   - cardboard, paper, cloth, foam, wool and stock tear and let go of what's in them, which drifts
 //   - glass and tile star; plastic whitens and stars; earth and sand crater; water splashes; leaves fall
+// what a round does to a surface (js/damage.ts and js/render.ts pass these; dir is a vector or an [x, y, z]). k: e in, x out, r off (a skid)
+type MarkSide = 'e' | 'x' | 'r';
+interface MarkOpts { m?: string; fx?: string; k?: string; n?: number[] | null; dir?: any; J?: number; stop?: boolean; cal?: number; cut?: number; fit?: number; }
 const G_Scars = (() => {
   const T = THREE, CELLS = 4, PX = 256;
   type Rnd = () => number;
-  interface Chip { n: number; size: number; v: number; g: number; shape: string; cols: number[]; drag: number; life: number; }
-  interface Look { look: string; soft?: boolean; tint?: number; dark?: boolean; chips: Chip; dust?: number; }
-  // what a round does here (js/damage.ts and js/render.ts pass these; dir is a vector or an [x, y, z])
-  interface MarkOpts { m?: string; fx?: string; k?: string; n?: number[] | null; dir?: any; J?: number; stop?: boolean; cal?: number; fit?: number; }
+  type ChipShape = 'chunk' | 'sliver' | 'flake';
+  type MarkLook = 'metal' | 'tile' | 'stone' | 'brick' | 'wood' | 'chipboard' | 'plaster' | 'paper' | 'fluff' | 'glass' | 'plastic' | 'soil' | 'none'; // how a material takes a round: which of the sheet's marks it gets
+  interface Chip { n: number; size: number; v: number; g: number; shape: ChipShape; cols: number[]; drag: number; life: number; }
+  interface Look { look: MarkLook; soft?: boolean; tint?: number; dark?: boolean; chips: Chip; dust?: number; }
   interface Piece { geo: THREE.BufferGeometry; mat: THREE.Material; s: number[]; q: THREE.Quaternion; off: number; }
   // chips: n, size (m), speed (m/s), gravity, shape (chunk, sliver, flake), colours, drag (flakes drift), how long they lie
   const CHIP = {
-    chunk: (cols: number[], n = 8, size = 0.012, v = 3.2) => ({ n, size, v, g: 9.8, shape: 'chunk', cols, drag: 0, life: 40 }),
-    sliver: (cols: number[], n = 9, size = 0.03, v = 3) => ({ n, size, v, g: 9.8, shape: 'sliver', cols, drag: 0.4, life: 40 }),
-    flake: (cols: number[], n = 10, size = 0.012, v = 1.8, g = 2.2, drag = 2.4) => ({ n, size, v, g, shape: 'flake', cols, drag, life: 14 }),
+    chunk: (cols: number[], n = 8, size = 0.012, v = 3.2) => ({ n, size, v, g: 9.8, shape: 'chunk' as const, cols, drag: 0, life: 40 }),
+    sliver: (cols: number[], n = 9, size = 0.03, v = 3) => ({ n, size, v, g: 9.8, shape: 'sliver' as const, cols, drag: 0.4, life: 40 }),
+    flake: (cols: number[], n = 10, size = 0.012, v = 1.8, g = 2.2, drag = 2.4) => ({ n, size, v, g, shape: 'flake' as const, cols, drag, life: 14 }),
   };
   const CONC = [0x8f8d86, 0x77756f, 0xa4a198], CMU = [0x8a8780, 0x9d9a90, 0x6f6c66], BRICK = [0xa85a3e, 0x8f4a32, 0xbf7350], PINE = [0xd8bb82, 0xc4a266, 0xe6d2a4], HARD = [0x9a6a3a, 0x7e5430, 0xb6865a], STEEL = [0xc8d0d8, 0x9aa4ae];
   const LOOK: Record<string, Look> = {

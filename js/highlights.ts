@@ -20,15 +20,95 @@ const G_Highlights = (() => {
   const T = THREE, HZ = 10, PRE = 5, POST = 3, MAX = 36, NEAR = 34, W = 960, H = 540, KEEP = 7; // (KEEP: what the ring holds, s)
 
   // (shapes used throughout: records are kept loose, with the fields that matter named)
-  interface Rec { [k: string]: any }
+  interface Rec { [k: string]: any } // (wire data and option bags, which are honestly dynamic)
   interface XYZ { x: number; y: number; z: number }
-  interface Frame { t: number; a: Record<string, any[]> }
-  interface Shot extends Rec { t: number; a: string; f: number[]; to: number[]; code: string; am: string; sid: number }
-  interface Clip extends Rec { kind: string; t: number; a: string; v: string; fl: Rec; keys: Set<string>; frames: Frame[]; shots: Shot[]; doors: Rec[]; end: number; kills: Clip[] }
-  interface Seg extends Rec { kind: string; dur: number }
-  interface Actor extends Rec { kind: string; id: any; name?: string }
-  interface RState { t: number; acc: number; ring: Frame[]; shots: Shot[]; doors: Rec[]; glass: Rec[]; clips: Clip[]; open: Clip[]; surs: Map<string, any>; actors: Map<string, Actor>; downs: Map<string, any>; lastHit: Map<string, string>; stats: Map<string, Rec>; fired: Map<string, any>; kgun: Map<string, any>; streaks: Map<string, any>; killN: number; level: number; theme?: string; [k: string]: any }
-  interface PState { map: any; level: any; tvs: any[]; seg: number; st: number; prog: Seg[]; rigs: Map<string, Rec>; fx: Rec[]; drops: Rec[]; marks: any[]; clips: Clip[]; actors: Map<string, Actor>; stats: Map<string, Rec>; [k: string]: any }
+  interface Frame { t: number; a: Record<string, any[]> } // (a: each actor's row: numbers, and [11] their laser: an array)
+  type HlClipKind = 'kill' | 'down' | 'arrest' | 'saved' | 'seq';
+  type HlSegKind = 'open' | 'quiet' | 'ad' | 'sponsor' | 'clip' | 'armour' | 'xray' | 'table' | 'gear' | 'card';
+  type HlActorKind = 'p' | 'e';
+  // a door's event (js/game.ts door): fall, when it was shot off its hinges
+  interface HlDoor { t: number; i: number; open: boolean; kicked: boolean; fall?: boolean | number }
+  interface HlGlass { t: number; id: number; p?: number[] }
+  // a kill message from the host (js/server.ts), as far as the highlights read it
+  interface HlKillMsg { by: number | string; e: number; h?: boolean | number; why?: string | null; sur?: boolean | number; ws?: boolean | number; br?: boolean | number; o?: Record<string, any> | null; ty?: string; d?: number; bo?: boolean | number; bt?: number; hd?: number; ap?: boolean | number; inc?: boolean; dn?: boolean }
+  // what a clip is about (kill, down, arrest, saved...)
+  interface HlFlags {
+    hs?: boolean; why?: string | null; sur?: boolean; ws?: boolean; br?: boolean; o?: Record<string, any> | null; ty?: string; d?: number; bo?: boolean; bt?: number; hd?: boolean; ap?: boolean;
+    n?: number; multi?: number; wb?: string[]; ric?: string[]; long?: number; spray?: number; sprayT?: number;
+  }
+  interface HlStat { kills: number; hs: number; fouls: number; downs: number; breach: number; arrests: number }
+  // a round in flight: its recorded way, speeds and what it went through (flightOf)
+  interface HlFlightPt { x: number; t: number; v: number; drop: number }
+  interface HlFlightEv { done?: boolean; i: number; x: number; p: THREE.Vector3; k: string; fx: string; n: number[]; name: string; m: string; J: number; stop: boolean; depth: number; cal: number; dir: THREE.Vector3; then?: HlFlightEv; cutBy?: number }
+  interface HlFlight {
+    f: THREE.Vector3; to: THREE.Vector3; len: number; dir: THREE.Vector3; dirEnd: THREE.Vector3; dirAt: (x: number) => THREE.Vector3; pos: (x: number) => THREE.Vector3; verts: THREE.Vector3[]; xs: number[];
+    events: HlFlightEv[]; def: ReturnType<typeof defOf>; am: string; m: number; pts: HlFlightPt[]; tof: number; v0: number; vEnd: number;
+    at: (t: number) => HlFlightPt; atX: (x: number) => HlFlightPt; xAt: (t: number) => number;
+  }
+  // a round fired (shot()); its pellets (pelletsOf) are shots too, with `of`
+  interface Shot { t: number; a: string; f: number[]; to: number[]; code: string; am: string; sid?: number; tos?: number[][]; paths?: (ShotPath | undefined)[]; path?: ShotPath | null; _pel?: Shot[]; of?: Shot; fl?: HlFlight; cut?: Shot }
+  interface HlKillEntry { v: string; t: number; fl: HlFlags; clip: Clip }
+  interface Clip {
+    kind: HlClipKind; t: number; a: string; v: string; fl: HlFlags; keys: Set<string>; frames: Frame[]; shots: Shot[]; doors: HlDoor[]; end: number; at: THREE.Vector3; n: number; score: number;
+    doorInit: Record<string, any>; guns: Record<string, string | null | undefined>; kits: Record<string, any>; kills: HlKillEntry[];
+    gun?: string | null; am?: string | null; killShot?: Shot | null; done?: boolean; inSeq?: Clip; sur?: Clip; hands?: boolean; _byDoor?: Map<number, HlDoor[]>;
+  }
+  type HlCam = 'wide' | 'helmet' | 'gun' | 'ots' | 'cuff' | 'bullet' | 'xr' | 'event';
+  type HlArmourRound = NonNullable<ReturnType<typeof armourRound>>;
+  // A stretch of the broadcast (program()). Its kind decides which fields it has: the clip's camera plan fields (clip..label, and
+  // the play state next() sets) are for kind 'clip' (and the xray and armour ones, which carry their clip), the gear room's for 'gear';
+  // each is declared as it's read, since nothing reads one off a segment of another kind.
+  interface Seg {
+    kind: HlSegKind; dur: number; seed: number; clip: Clip; cam: HlCam; who: string; at: string; t0: number; t1: number; rate: number; rates?: [number, number][]; label: string;
+    slow?: boolean; seq?: boolean; xr?: boolean; thru?: boolean; trail?: number; ev?: number; tau: number; ar: HlArmourRound; gap?: number; sp?: any; tone?: string; store?: HlProduct; ad?: HlAdvert;
+    react: any; fired: boolean; kn: number; mSt: number | null; snapDoors: boolean; prevTau: number | null; xp: THREE.Vector3 | null; frz: { p: THREE.Vector3; q: THREE.Quaternion } | null; frzCand: { p: THREE.Vector3; q: THREE.Quaternion } | null;
+    look: THREE.Vector3 | null; lookT: number | null; fq: THREE.Quaternion | null; fp: THREE.Vector3 | null; pos: THREE.Vector3 | null; shot: number | null; cp: THREE.Vector3 | null; cmid?: THREE.Vector3; fov?: number; imp: number; xc: THREE.Vector3; wideScore?: number;
+    k: string; code: string; def: any; rounds: number; kills: number; hs: number; far: number; others: any; parts: any; kit: any; verdicts: any; am: any; shoulder?: any;
+  }
+  // someone in the recording: an officer (kind 'p') or a suspect ('e')
+  interface Actor {
+    kind: HlActorKind; id: any; name?: string; animal?: string; color?: number; look?: ReturnType<typeof G.Rig.cleanLook>; kt?: ReturnType<typeof G.Me.kitLook> | null; gun?: string | null;
+    sk?: ReturnType<typeof G.Stickers.clean> | null; skins?: Record<string, ReturnType<typeof G.Stickers.clean>>; type?: string; wpn?: EnemyDef['wpn']; vest?: EnemyDef['vest']; helmet?: EnemyDef['helmet']; face?: number; ex?: any[]; civ?: boolean; scale?: number; boss?: boolean; style?: EnemyStyle;
+  }
+  // a thing for sale on the ad breaks (storeProducts), and the made-up adverts (ADS)
+  interface HlProduct { kind: string; name: string; brand: string; price: number; pic: any; left: () => number; slot?: string; unit?: string }
+  interface HlAdvert { brand: string; line: string; sub: string; col: string[]; art: string }
+  // an encoded chunk of the video or the sound (chunkOf)
+  interface HlChunk { t: number; key?: boolean; b: Uint8Array; tr: number }
+  // one round's way through the body in the x-ray cam (xrayTracks); m: its meshes (xrayTrackMeshes)
+  interface HlXtrackMeshes { grp: THREE.Group; parts: { obj: THREE.Object3D & { material?: any }; t: number; kind: string; r?: number; at?: number | null }[]; b: THREE.Mesh; glow: THREE.Mesh; end: number }
+  interface HlXtrack { sh: Shot; g: number; n: number; vIn: number; before: string[]; o: THREE.Vector3; u: THREE.Vector3; r: any; trace: any; frags: any[]; p: any; fl: HlFlight; entryT: number; endT: number; m: HlXtrackMeshes }
+  type HlXtracks = HlXtrack[] & { groups?: (number[] | null)[]; gt?: number[] };
+  // who a round passes through (hitsOf, bodiesOn): how far along, where, who, the way it went, and whether it came out
+  interface HlHit { x: number; p: THREE.Vector3; k: string; dir: THREE.Vector3; through: boolean; done?: boolean }
+  interface HlStreak { kills: Clip[]; last: number; seq: Clip | null }
+  interface RState {
+    t: number; acc: number; ring: Frame[]; shots: Shot[]; doors: HlDoor[]; glass: HlGlass[]; clips: Clip[]; open: Clip[]; surs: Map<string, Clip>; actors: Map<string, Actor>; downs: Map<string, boolean>;
+    lastHit: Map<string, string>; stats: Map<string, HlStat>; fired: Map<string, Map<string, { n: number; am: Record<string, number> }>>; kgun: Map<string, Map<string, { kills: number; hs: number; d: number }>>;
+    streaks: Map<string, HlStreak>; killN: number; level: number; theme?: string;
+  }
+  // the kept level, as the TVs show it (mount() makes the studio: P.scene.. and the rest are for as long as it's up)
+  interface HlTv { g: THREE.Group; brk: THREE.Mesh; scr: THREE.Mesh; w: number; h: number; led: THREE.Mesh; cab: boolean; los?: boolean | number }
+  // (a rig as the replay uses it: some of its methods are called with fewer arguments than the rig's own signatures list)
+  interface HlRig extends Rig { setGun: (code: any, skin?: any) => void; recoil: (deg?: number) => void; zip: (on: boolean, instant?: boolean) => void; xkey?: string | null }
+  interface HlRigRec { rig: HlRig; died: boolean; k: string; zipping?: boolean; climbing?: boolean; pool?: THREE.Mesh; poolT?: number; gunBox?: THREE.Box3 }
+  interface HlFx { obj: THREE.Object3D & { geometry?: THREE.BufferGeometry; material?: any }; life: number; max: number; op?: number; mist?: boolean; noGeo?: boolean }
+  interface HlBullet { hit?: boolean; sh: Shot; fl: HlFlight; mesh: THREE.Mesh; glow: THREE.Mesh; trail: THREE.Line<THREE.BufferGeometry, any>; ext: number; extT: number; prev: THREE.Vector3; done: boolean; hits: HlHit[]; evs: HlFlightEv[] }
+  interface HlLaser { line: THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>; dot: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial> }
+  interface HlOrgan { mesh: THREE.Mesh<any, any>; pct: number; id: string; col: number; base: THREE.Vector3; lit: boolean; pop: number }
+  interface HlXo { all: THREE.Mesh<any, any>[]; hit: HlOrgan[]; lit: { o: HlOrgan; t: number }[] }
+  interface HlAudio { out: GainNode; mix: GainNode; bed: AudioBufferSourceNode | null; buf: AudioBuffer }
+  interface HlAc { scene: THREE.Scene; cam: THREE.PerspectiveCamera; round: THREE.Group; slug: THREE.Mesh; glow: THREE.Mesh; stack: THREE.Group | null; body: THREE.Group | null; rig: HlRig | null; plan: ReturnType<typeof acPlan> | null; ar?: HlArmourRound; at?: THREE.Vector3; u?: THREE.Vector3; ring?: THREE.Mesh }
+  interface HlXtl { c: Clip; kst: number[]; tk: number; keys: number[][]; holder: THREE.Group; holders: THREE.Group[]; place: (st: number[]) => THREE.Vector3; lastSt: number | null; fallP?: number[]; lastTau?: number | null }
+  interface HlExport { p: number; cancel: boolean; audioErr?: unknown; stage?: string; abort?: (() => void) | null; worker?: Worker | null }
+  interface PState {
+    map: LvMap; level: THREE.Group | null; tvs: HlTv[]; seg: number; st: number; prog: Seg[]; rigs: Map<string, HlRigRec>; fx: HlFx[]; drops: { m: THREE.Mesh; v: THREE.Vector3; life: number }[]; marks: THREE.Mesh[]; clips: Clip[]; actors: Map<string, Actor>; stats: Map<string, HlStat>;
+    ac: HlAc; au: HlAudio | null; bullets: HlBullet[]; cam: THREE.PerspectiveCamera; cv: HTMLCanvasElement; debris: ReturnType<typeof G.Scars.debris>; esc: THREE.Vector3; exporting: HlExport | null; fired: RState['fired']; frameT: number; fxRoot: THREE.Group;
+    g: CanvasRenderingContext2D; gcam: THREE.PerspectiveCamera; gen: { seed: number; level: number; th: number }; glass: HlGlass[]; gpiv: THREE.Group; gs: THREE.Scene; hide: THREE.Object3D[]; holeMat: THREE.MeshBasicMaterial; kgun: RState['kgun'];
+    las: { root: THREE.Group; pool: HlLaser[] }; lastVideo: { name: string; size: number; dur: number; ms: number; audio: boolean; frames: number } | null; levelN: number; losT: number; mat: THREE.ShaderMaterial; outVideo: HlChunk[] | null; ov: THREE.CanvasTexture;
+    packing: boolean; ready: boolean; rnd: ReturnType<typeof G.U.rng>; rt: THREE.WebGLRenderTarget | null; scene: THREE.Scene; theme: string | undefined; thruMat: THREE.MeshBasicMaterial; time: number; tvShots: number; vol: number; xcam: THREE.PerspectiveCamera;
+    xlook: THREE.Vector3; xo: HlXo | null; xorg: HlOrgan[]; xrig: HlRig | null; xs: THREE.Scene; xtl: HlXtl | null; xtracks: HlXtracks; xview: { mid: THREE.Vector3; r: number } | null;
+  }
 
   // ================================================================ recording
   // (paths: each round's real way, its speed, what it went through or off, who it hit: js/player.ts newPath. glass: the panes
@@ -38,7 +118,7 @@ const G_Highlights = (() => {
   const R: RState = { t: 0, acc: 0, ring: [], shots: [], doors: [], glass: [], clips: [], open: [], surs: new Map(), actors: new Map(), downs: new Map(), lastHit: new Map(), stats: new Map(), fired: new Map(), kgun: new Map(), streaks: new Map(), killN: 0, level: 0 };
   function reset() {
     R.t = 0; R.acc = 0; R.ring = []; R.shots = []; R.doors = []; R.glass = []; R.clips = []; R.open = []; R.surs.clear(); R.actors.clear(); R.downs.clear(); R.lastHit.clear(); R.stats.clear(); R.fired.clear(); R.kgun.clear(); R.streaks.clear(); R.killN = 0;
-    R.level = G.Game.level || 0; R.theme = G.Game.map && (G.Game.map as Rec).theme ? (G.Game.map as Rec).theme.name : '';
+    R.level = G.Game.level || 0; R.theme = G.Game.map && G.Game.map.theme ? G.Game.map.theme.name : '';
   }
   const myKey = () => 'p' + G.Net.myId;
   const stat = (k: string) => { let s = R.stats.get(k); if (!s) R.stats.set(k, (s = { kills: 0, hs: 0, fouls: 0, downs: 0, breach: 0, arrests: 0 })); return s; };
@@ -60,7 +140,7 @@ const G_Highlights = (() => {
   // -1 not) and then whether they've still a gun in hand (0 dropped, 1 slung, 2 in hand); for an officer how far
   // through zip-tying someone (-1 not), then whose ('e' id) and whether pulling them up. [10]: how far through a
   // reload (-1 not), everyone's. [11]: their laser, if it's on: where it landed and whether it's green ([x, y, z, green])
-  const zipOf = (a: Rec | null) => (a && a.kind === 'zip' ? [Math.min(1, a.t / a.dur), a.target, a.pull ? 1 : 0] : [-1, -1, 0]);
+  const zipOf = (a: typeof G.Me.action) => (a && a.kind === 'zip' ? [Math.min(1, a.t / a.dur), a.target, a.pull ? 1 : 0] : [-1, -1, 0]);
   function frame() {
     const a: Record<string, any[]> = {};
     for (const ev of G.Views.enemies.values()) {
@@ -70,7 +150,7 @@ const G_Highlights = (() => {
       // from a wall lying prone, js/views.ts; and crouched as drawn, weakened ones too)
       const at = ev.rig && ev.rig.root ? ev.rig.root.position : ev.pos, cr = ev.crouch || (ev.str != null && ev.str < 0.4);
       const fl = (cr ? 1 : 0) | (ev.alert ? 4 : 0) | (ev.down ? 8 : 0) | (ev.alive ? 0 : 16) | (ev.scode === 1 ? 32 : 0) | (ev.scode === 2 || ev.arrested ? 64 : 0) | (ev.scode === 3 ? 128 : 0);
-      const rl = ev.reloadAt && ev.reloading && ev.alive ? (performance.now() - ev.reloadAt) / ev.reloadDur : -1; // (as js/views.ts has it)
+      const rl = ev.reloadAt && ev.reloading && ev.alive ? (performance.now() - ev.reloadAt) / ev.reloadDur! : -1; // (as js/views.ts has it)
       a[k] = [at.x, at.y, at.z, ev.yaw, ev.recPitch || 0, fl, ev.lean || 0, ev.recTk == null ? -1 : ev.recTk, ev.armed == null ? 2 : ev.armed, 0, rl >= 0 && rl < 1 ? rl : -1];
     }
     for (const pv of G.Views.players.values()) {
@@ -166,13 +246,13 @@ const G_Highlights = (() => {
     }
     // through something on the way to them, or off it: a wallbang, a ricochet (from its path; a pane of glass isn't a wall)
     if (known && !c.fl.why) {
-      const ev = c.killShot.path.ev, names = (l: any[][]) => [...new Set(l.map((e) => e[6]).filter(Boolean))];
+      const ev = c.killShot!.path!.ev, names = (l: any[][]) => [...new Set(l.map((e) => e[6]).filter(Boolean))];
       const wb = ev.filter((e: any[]) => e[1] === 'e' && e[2] !== 'glass'), ric = ev.filter((e: any[]) => e[1] === 'r');
       if (wb.length) { c.fl.wb = names(wb); c.score += 1.4; }
       if (ric.length) { c.fl.ric = names(ric); c.score += 1.8; }
     }
     // a long shot: LONG m or more (the host's measure, killer to victim, on the ground)
-    if ((c.fl.d || 0) >= LONG && !c.fl.why && !c.fl.bo) { c.fl.long = 1; c.score += 0.6 + c.fl.d / 40; }
+    if ((c.fl.d || 0) >= LONG && !c.fl.why && !c.fl.bo) { c.fl.long = 1; c.score += 0.6 + c.fl.d! / 40; }
     if (c.gun && c.a[0] === 'p' && !c.fl.why) {
       let m = R.kgun.get(c.a); if (!m) R.kgun.set(c.a, (m = new Map()));
       const e = m.get(c.gun) || { kills: 0, hs: 0, d: 0 }; e.kills++; if (c.fl.hs) e.hs++; e.d = Math.max(e.d, c.fl.d || 0); m.set(c.gun, e);
@@ -189,7 +269,7 @@ const G_Highlights = (() => {
   // (a 0..1 tiebreak from a string: the same on every machine, unlike Math.random)
   const jitter = (str: string) => { let h = 2166136261; for (const ch of String(str)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return (h >>> 0) / 4294967296; };
   // something worth showing: the seconds before it (and the next few) of everyone near it become a clip
-  function clip(kind: string, a: string | null, v: string, fl: Rec) {
+  function clip(kind: HlClipKind, a: string | null, v: string, fl: HlFlags) {
     const g = G.Game;
     if (g.phase !== 'level' || g.hub) return;
     const c0 = posOf(v) || posOf(a!) || new T.Vector3();
@@ -198,7 +278,7 @@ const G_Highlights = (() => {
     if (last) for (const [k, p] of Object.entries(last.a)) if (Math.hypot(p[0] - c0.x, p[2] - c0.z) < NEAR) keys.add(k);
     // (the 5 s before; a breach, from just before the door went in: up to 5 s before the kill, and its kick)
     const kick = fl.br ? R.doors.filter((d) => d.kicked && d.t <= R.t).pop() : null, from = Math.min(R.t - PRE, kick ? kick.t - 1.5 : Infinity) - 0.3;
-    const c: any = { kind, t: R.t, a, v, fl, keys, frames: R.ring.filter((f) => f.t >= from).map((f) => keep(f, keys)), shots: R.shots.filter((s) => s.t >= from && near(s, c0)), doors: R.doors.filter((d) => d.t >= from), end: R.t + POST, at: c0, n: 0 };
+    const c = { kind, t: R.t, a: a as string, v, fl, keys, frames: R.ring.filter((f) => f.t >= from).map((f) => keep(f, keys)), shots: R.shots.filter((s) => s.t >= from && near(s, c0)), doors: R.doors.filter((d) => d.t >= from), end: R.t + POST, at: c0, n: 0 } as Clip;
     c.doorInit = doorsThen(c.frames.length ? c.frames[0].t : R.t);
     // the officers' guns and kit as they are now (a replay shows what they had then, not what they carry later)
     c.guns = {}; c.kits = {};
@@ -231,17 +311,17 @@ const G_Highlights = (() => {
     // and the rounds and doors it hasn't got
     const lastT = q.frames.length ? q.frames[q.frames.length - 1].t : -1;
     for (const f of R.ring) if (f.t > lastT) q.frames.push(keep(f, q.keys));
-    const has = new Set(q.shots); for (const x of c.shots) if (!has.has(x)) q.shots.push(x); q.shots.sort((x: Rec, y: Rec) => x.t - y.t);
-    const hd = new Set(q.doors); for (const x of c.doors) if (!hd.has(x)) q.doors.push(x); q.doors.sort((x: Rec, y: Rec) => x.t - y.t);
+    const has = new Set(q.shots); for (const x of c.shots) if (!has.has(x)) q.shots.push(x); q.shots.sort((x, y) => x.t - y.t);
+    const hd = new Set(q.doors); for (const x of c.doors) if (!hd.has(x)) q.doors.push(x); q.doors.sort((x, y) => x.t - y.t);
     q.fl.multi = q.kills.length; q.at = c.at; q.end = R.t + POST; q.v = c.v; q.score = 3 + q.kills.length;
     if (!R.open.includes(q)) R.open.push(q);
   }
   // every door's state at clip time t0: as they are now, with the door events since then undone (a door's first event
   // after t0 says what it became, so before it, it was the other way)
   function doorsThen(t0: number) {
-    const map = G.Game.map as Rec | null, out: Record<string, any> = {};
+    const map = G.Game.map, out: Record<string, any> = {};
     if (!map || !map.doors) return out;
-    map.doors.forEach((d: Rec, i: number) => { out[i] = !!d.open; });
+    map.doors.forEach((d, i: number) => { out[i] = !!d.open; });
     for (let j = R.doors.length - 1; j >= 0 && R.doors[j].t >= t0; j--) out[R.doors[j].i] = !R.doors[j].open;
     for (const q of R.doors) if (q.fall && q.t < t0) out['f' + q.i] = q.fall; // (already down)
     return out;
@@ -263,7 +343,7 @@ const G_Highlights = (() => {
   }
   // Where a round really went, now it's done (its shooter's machine worked it out: js/player.ts roundDone), on to its shot: i, which
   // of the shot's rounds (a shotgun's pellets).
-  function roundPath(a: string, sid: number, i: number, path: Rec): Shot | void {
+  function roundPath(a: string, sid: number, i: number, path: ShotPath): Shot | void {
     for (let j = R.shots.length - 1; j >= 0; j--) {
       const s = R.shots[j];
       if (s.a !== a || s.sid !== sid) continue;
@@ -274,7 +354,7 @@ const G_Highlights = (() => {
   }
   const pathOf = (sh: Shot) => sh.path || (sh.paths && sh.paths[0]) || null;
   // the shot as far as it went into someone (hit h of its path q), and a few centimetres in
-  function pathTo(sh: Shot, q: Rec, h: number[]) {
+  function pathTo(sh: Shot, q: ShotPath, h: number[]) {
     const P0 = q.p.slice(0, h[0] + 1), a = P0[h[0]], into = [a[0] + h[4] * 0.05, a[1] + h[5] * 0.05, a[2] + h[6] * 0.05, a[3]];
     P0.push(into);
     return Object.assign({}, sh, { path: { p: P0, ev: q.ev.filter((e: any[]) => e[0] <= h[0]), hit: [h] }, to: into.slice(0, 3), tos: undefined, paths: undefined, fl: undefined, _pel: undefined });
@@ -324,43 +404,43 @@ const G_Highlights = (() => {
   // then: down for good, the round that put them down; down from the blood loss, long after the last round (bo), the
   // bleed-out camera, on them going down. Whatever comes after (dying, finished off, cuffed where they lie) is neither
   // counted again nor shown. A suspect who bleeds to death on their feet is incapacitated by it: the bleed-out camera.
-  const tally = (by: string, m: Rec) => { if (!by || G.Game.phase !== 'level' || G.Game.hub) return; const s = stat(by); if (m.why) s.fouls++; else { s.kills++; if (m.h) s.hs++; if (m.br) s.breach++; } };
+  const tally = (by: string, m: HlKillMsg) => { if (!by || G.Game.phase !== 'level' || G.Game.hub) return; const s = stat(by); if (m.why) s.fouls++; else { s.kills++; if (m.h) s.hs++; if (m.br) s.breach++; } };
   const clipOf = (e: number | string) => R.clips.find((x) => x.kind === 'kill' && x.v === 'e' + e);
-  function suspectDown(m: Rec) {
-    const c = clip('kill', 'p' + m.by, 'e' + m.e, { hs: !!m.h, why: m.why || null, sur: !!m.sur, ws: !!m.ws, br: !!m.br, o: m.o || null, ty: m.ty, d: m.d || 0, bo: !!m.bo, bt: m.bt || 0, hd: m.hd > 0, ap: !!m.ap });
-    if (c && m.hd > 0) c.t -= Math.min(4, m.hd);
+  function suspectDown(m: HlKillMsg) {
+    const c = clip('kill', 'p' + m.by, 'e' + m.e, { hs: !!m.h, why: m.why || null, sur: !!m.sur, ws: !!m.ws, br: !!m.br, o: m.o || null, ty: m.ty, d: m.d || 0, bo: !!m.bo, bt: m.bt || 0, hd: m.hd! > 0, ap: !!m.ap });
+    if (c && m.hd! > 0) c.t -= Math.min(4, m.hd!);
     if (c && !c.fl.why && !c.fl.bo) streak(c);
   }
   // An officer's armour stopped rounds and they stayed up (js/player.ts applyWounds, through the host): a clip of the save,
   // the suspect who fired it to them; rounds in quick succession are the one save (n: how many it stopped). Their
   // going down a moment later takes it back (tick).
-  function saved(m: Rec) {
+  function saved(m: { id: string; n: number }) {
     const k = 'p' + m.id, n = Math.max(1, m.n | 0), c = R.open.find((x) => x.kind === 'saved' && x.v === k && R.t - x.t < 3);
-    if (c) { c.fl.n += n; c.score += 0.3 * n; c.end = R.t + POST; c.t = R.t; return; }
+    if (c) { c.fl.n! += n; c.score += 0.3 * n; c.end = R.t + POST; c.t = R.t; return; }
     clip('saved', R.lastHit.get(m.id) || null, k, { n });
   }
   // (incapacitated with no round to show, more than 4 s after the last hit: the tally only)
-  function incap(m: Rec) { if (!clipOf(m.e)) tally(m.by && 'p' + m.by, m); }
-  function kill(m: Rec) {
+  function incap(m: HlKillMsg) { if (!clipOf(m.e)) tally((m.by && 'p' + m.by) as string, m); }
+  function kill(m: HlKillMsg) {
     if (m.inc) return; // (down already: counted, and shown, then)
     const c = clip('kill', 'p' + m.by, 'e' + m.e, { hs: !!m.h, why: m.why || null, sur: !!m.sur, ws: !!m.ws, br: !!m.br, o: m.o || null, ty: m.ty, d: m.d || 0, bo: !!m.bo, bt: m.bt || 0, hd: !!m.hd, ap: !!m.ap });
-    if (c && m.hd > 0) c.t -= Math.min(4, m.hd); // (through the heart: down at the round, dead a moment later)
+    if (c && m.hd! > 0) c.t -= Math.min(4, m.hd!); // (through the heart: down at the round, dead a moment later)
     if (c && !c.fl.why && !c.fl.bo) streak(c);
   }
   // an officer cuffed a suspect, alive: a clip of it (the feel-good segment). (Cuffed where they lay, down: already
   // counted, incapacitated, with the round that put them down: nothing more.)
-  function arrest(m: Rec) {
+  function arrest(m: HlKillMsg) {
     if (m.dn) return;
     const c = clip('arrest', 'p' + m.by, 'e' + m.e, { ty: m.ty }), s = R.surs.get('e' + m.e);
     if (c && s && c.t - s.t > 4) { s.a = c.a; s.n = c.n; c.sur = s; } // (their hands went up a while before: that first)
   }
   // a weapon's definition from its code (a build's code, or a plain weapon id), or null
-  function defOf(code: string) { if (!code) return null; try { return G.WEAPONS[code] || G.Gunsmith.fromCode(code); } catch (e) { return null; } }
+  function defOf(code: string | null | undefined) { if (!code) return null; try { return G.WEAPONS[code] || G.Gunsmith.fromCode(code); } catch (e) { return null; } }
 
   // ================================================================ the kept level
   const P: PState = { map: null, level: null, tvs: [], seg: -1, st: 0, prog: [], rigs: new Map(), fx: [], drops: [], marks: [], rt: null, cv: null, g: null, ov: null, scene: null, cam: null, xs: null, frameT: 0, ready: false, au: null } as unknown as PState;
   // the level just left: its map (for sight lines) and its meshes, taken out of the scene before the hangar's go in
-  function take(map: Rec, nodes: THREE.Object3D[]) {
+  function take(map: LvMap, nodes: THREE.Object3D[]) {
     drop();
     for (const c of R.open) closed(c); R.open = []; // (clips cut short by the level ending)
     if (!map || !nodes || !nodes.length || !R.clips.length && !R.stats.size) { disposeNodes(nodes); return; }
@@ -372,7 +452,7 @@ const G_Highlights = (() => {
   function disposeNodes(nodes: THREE.Object3D[]) { for (const n of nodes || []) n.traverse((c: any) => { if (c.geometry) c.geometry.dispose(); if (c.material) (Array.isArray(c.material) ? c.material : [c.material]).forEach((m: any) => { if (m.map) m.map.dispose(); m.dispose(); }); }); }
   function drop() {
     if (P.level) { disposeNodes(P.level.children.slice()); P.level = null; }
-    P.map = null; P.clips = []; clearRigs();
+    P.map = null as unknown as LvMap; P.clips = []; clearRigs();
   }
 
   // ================================================================ the TVs
@@ -387,12 +467,12 @@ const G_Highlights = (() => {
   // and a small one in the helicopter, hung from the cabin roof and tipped down to the bench, to watch while the squad's getting in: muted
   // ([eyes' height, how far off they are], the roof it hangs from; js/hangar.ts helicopter)
   const cabinTv = (H: { x: number; z: number }) => [H.x - 0.05, 2.02, H.z - 0.55, 0, 0.72, { eye: [1.55, 1.4], roof: 2.45 }];
-  function mount(root: THREE.Object3D, helpers: Rec) {
+  function mount(root: THREE.Object3D, helpers: { addTarget?: (t: HangarTarget) => HangarTarget } | null) {
     unmount();
     if (!P.level) return;
     
     P.rt = new T.WebGLRenderTarget(640, 360, { samples: 2 });
-    P.cv = document.createElement('canvas'); P.cv.width = W; P.cv.height = H; P.g = P.cv.getContext('2d');
+    P.cv = document.createElement('canvas'); P.cv.width = W; P.cv.height = H; P.g = P.cv.getContext('2d')!;
     P.ov = new T.CanvasTexture(P.cv); P.ov.minFilter = T.LinearFilter;
     const mat = new T.ShaderMaterial({ toneMapped: false, uniforms: { sc: { value: P.rt.texture }, ov: { value: P.ov }, live: { value: 0 }, time: { value: 0 } },
       vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
@@ -432,7 +512,7 @@ const G_Highlights = (() => {
   // the replay set: the old level, lit like a TV studio would (its own lamps' light grid is the hangar's now)
   function stage() {
     P.scene = new T.Scene(); P.scene.background = new T.Color(0x1a2028);
-    P.scene.add(P.level);
+    P.scene.add(P.level!);
     P.scene.add(new T.HemisphereLight(0xe8f0ff, 0x4a4038, 1.05));
     const dl = new T.DirectionalLight(0xffffff, 0.55); dl.position.set(0.4, 1, 0.3); P.scene.add(dl);
     P.cam = new T.PerspectiveCamera(60, 16 / 9, 0.05, 200);
@@ -609,7 +689,7 @@ const G_Highlights = (() => {
   const chunkOf = (ch: EncodedVideoChunk) => { const b = new Uint8Array(ch.byteLength); ch.copyTo(b); return { t: ch.timestamp / 1000, key: ch.type === 'key', b, tr: 1 }; };
   // In a worker: everything it needs as plain data (structured clone), the chunks kept there, the sounds' events back
   // at the end; then mux() gives it the mixed sound and gets back the file
-  function viaWorker(X: Rec, vc: Rec, data: Rec, stickers: Rec) {
+  function viaWorker(X: HlExport, vc: { id: string; cfg: VideoEncoderConfig }, data: Rec, stickers: Record<string, ImageBitmap>) {
     return new Promise<any>((ok, fail) => {
       const w = new Worker('dist/js/exportworker.js');
       let file: any = null;
@@ -617,9 +697,9 @@ const G_Highlights = (() => {
       const end = () => { w.terminate(); X.abort = null; X.worker = null; };
       const bad = (e: unknown) => { end(); if (file) file.fail(e); else fail(e); };
       X.abort = () => bad(new Error('cancelled'));
-      const mux = (au: Rec, dur: number, codec: string) => new Promise((ok2, fail2) => {
+      const mux = (au: { audio: HlChunk[]; head: any }, dur: number, codec: string) => new Promise((ok2, fail2) => {
         file = { ok: ok2, fail: fail2 };
-        w.postMessage({ t: 'mux', audio: au.audio, head: au.head, dur, codec }, au.audio.map((a: Rec) => a.b.buffer));
+        w.postMessage({ t: 'mux', audio: au.audio, head: au.head, dur, codec }, au.audio.map((a) => a.b.buffer));
       });
       w.onmessage = (e) => {
         const m = e.data;
@@ -670,14 +750,14 @@ const G_Highlights = (() => {
     Object.assign(P, { clips: d.clips, stats: d.stats, actors: d.actors, fired: d.fired, kgun: d.kgun, glass: d.glass, levelN: d.levelN, theme: d.theme });
     P.prog = [];
     for (const s of d.prog) {
-      if (s.kind === 'gear') { const gs = gearFor(s.k); if (gs) P.prog.push(gs); continue; }
+      if (s.kind === 'gear') { const gs = gearFor(s.k); if (gs) P.prog.push(gs as Seg); continue; }
       if (s.kind === 'ad' && s.store && typeof s.store.left === 'number') { const n = s.store.left; s.store.left = () => n; }
       P.prog.push(s);
     }
     const cv = new OffscreenCanvas(W, H), R2 = new T.WebGLRenderer({ canvas: cv, antialias: false, preserveDrawingBuffer: false });
     G.R.renderer = R2;
     P.rt = new T.WebGLRenderTarget(W, H, { samples: 2 });
-    P.cv = new OffscreenCanvas(W, H); P.g = P.cv.getContext('2d');
+    P.cv = new OffscreenCanvas(W, H) as unknown as HTMLCanvasElement; P.g = P.cv.getContext('2d')!;
     P.ov = new T.CanvasTexture(P.cv); P.ov.minFilter = T.LinearFilter;
     P.mat = new T.ShaderMaterial({ toneMapped: false, depthTest: false, uniforms: { sc: { value: P.rt.texture }, ov: { value: P.ov }, live: { value: 0 }, time: { value: 0 } },
       vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
@@ -686,7 +766,7 @@ const G_Highlights = (() => {
     stage();
     P.ready = true; P.vol = 1;
     let err = null;
-    const out: Rec[] = P.outVideo = [];
+    const out: HlChunk[] = P.outVideo = [];
     const enc = new VideoEncoder({ output: (ch) => out.push(chunkOf(ch)), error: (e) => { err = e; } });
     enc.configure(m.cfg);
     const total = P.prog.reduce((a, s) => a + s.dur, 0), nF = Math.ceil(total * FPS);
@@ -717,8 +797,8 @@ const G_Highlights = (() => {
   // The audience, offline: the murmur under it all, and every sound the broadcast made (its events: [time, 's' a sound
   // effect and its arguments | 'g' a round's report]) at its moment; then into Opus in 20 ms packets (if this browser
   // can: otherwise the video goes without)
-  async function mixAudio(events: any[][], dur: number, X: Rec = {}) {
-    const audio: Rec[] = []; let head: any = null;
+  async function mixAudio(events: any[][], dur: number, X: Partial<HlExport> = {}) {
+    const audio: HlChunk[] = []; let head: any = null;
     if (!P.au || !G.Audio.ctx || !window.OfflineAudioContext || !window.AudioEncoder) return { audio, head };
     try {
       const off = new OfflineAudioContext(2, Math.ceil(48000 * (dur + 0.5)), 48000);
@@ -756,7 +836,7 @@ const G_Highlights = (() => {
   }
   // A WebM (Matroska) file: the EBML header, then a segment of its info, its tracks (the video; the Opus audio) and
   // clusters of blocks in time order, a new cluster at each video key frame (every 2 s). Times in milliseconds.
-  function writeWebm(o: Rec) {
+  function writeWebm(o: { codec: string; video: HlChunk[]; audio: HlChunk[]; head: any; dur: number }) {
     const te = new TextEncoder();
     const cat = (parts: Uint8Array[]) => { let len = 0; for (const p of parts) len += p.length; const out = new Uint8Array(len); let i = 0; for (const p of parts) { out.set(p, i); i += p.length; } return out; };
     const bytes = (v: number) => { const b = []; do { b.unshift(v % 256); v = Math.floor(v / 256); } while (v > 0); return new Uint8Array(b); };
@@ -771,7 +851,7 @@ const G_Highlights = (() => {
       const skip = o.head[10] | (o.head[11] << 8); // (the pre-skip, in samples at 48 kHz: the codec delay)
       tracks.push(m(0xAE, uint(0xD7, 2), uint(0x73C5, 2), uint(0x83, 2), str(0x86, 'A_OPUS'), el(0x63A2, o.head), uint(0x56AA, Math.round(skip / 48000 * 1e9)), uint(0x56BB, 80000000), m(0xE1, flt(0xB5, 48000), uint(0x9F, 2))));
     }
-    const blocks = o.video.concat(o.audio).sort((a: Rec, b: Rec) => a.t - b.t || a.tr - b.tr), clusters = [];
+    const blocks = o.video.concat(o.audio).sort((a, b) => a.t - b.t || a.tr - b.tr), clusters = [];
     let cur = null, ct = 0;
     for (const k of blocks) {
       if (!cur || (k.tr === 1 && k.key) || k.t - ct > 30000) { if (cur) clusters.push(m(0x1F43B675, ...cur)); ct = Math.floor(k.t); cur = [uint(0xE7, ct)]; }
@@ -783,7 +863,7 @@ const G_Highlights = (() => {
   }
 
   // ================================================================ the running order
-  const ADS = [
+  const ADS: HlAdvert[] = [
     { brand: 'CRUNCH-O\'S', line: 'The cereal that crunches back.', sub: 'Part of a balanced breach.', col: ['#ffcf2e', '#e2381c'], art: 'box' },
     { brand: 'BRUH! ENERGY', line: '400 mg of caffeine. Doctors hate it.', sub: 'Not for children, pets or officers on probation.', col: ['#1aff8c', '#101418'], art: 'can' },
     { brand: 'SUNSET ACRES', line: 'Retire somewhere nobody\'s kicking doors in.', sub: 'Gated. Very gated.', col: ['#ffb27a', '#5a3a8a'], art: 'house' },
@@ -809,13 +889,13 @@ const G_Highlights = (() => {
     ammo: 'Loaded with bad news.', part: 'Bolt it on. Feel better instantly.', mag: 'More rounds between awkward pauses.', pouch: 'A place for everything. Everything in its place.',
   };
   function storeProducts() {
-    const S = G.Shop, O = (S && (S as Rec).offers) as Rec, out: Rec[] = [];
+    const S = G.Shop, O = S && S.offers, out: HlProduct[] = [];
     if (!O) return out;
     const pic = (it: Parameters<typeof G.Gear.size>[0]) => { try { const [w, h] = G.Gear.size(it), im = new Image(); im.src = G.Icons.of(it, w, h, false); return { im, w, h }; } catch (e) { return null; } };
-    const add = (o: Rec) => { try { out.push(o); } catch (e) { /* skip it */ } };
+    const add = (o: HlProduct) => { try { out.push(o); } catch (e) { /* skip it */ } };
     for (const id of O.gear || []) { const d = G.Gear.DEFS[id]; if (d) add({ kind: d.kind, name: d.name, brand: d.brand, price: S.gearPrice(id), pic: pic(G.Gear.gearItem(id)), left: () => S.count('gear:' + id) }); }
     for (const o of O.ammo || []) { const A = (G.AMMO as Record<string, any>)[o.am], C = (G.CALIBERS as Record<string, any>)[o.cal], it = G.Gear.boxItem(o.cal, o.am, o.n); if (A && C) add({ kind: 'ammo', name: `${C.name} ${A.name}`, brand: 'VEX\'S AMMO BIN', price: G.Gear.price(it), pic: pic(it), left: () => S.count('ammo:' + o.cal) * o.n, unit: 'rounds' }); }
-    for (const id of S.partStock || []) { const p = G.Gunsmith.PARTS[id]; if (p) add({ kind: 'part', name: p.name, brand: p.brand || 'VEX', price: p.price, pic: null, slot: ((G.Gunsmith.SLOT_LABEL as Record<string, any>)[p.slot] || p.slot || '').toUpperCase(), left: () => S.count('part:' + id) }); }
+    for (const id of (S.partStock || []) as Iterable<string>) { const p = G.Gunsmith.PARTS[id]; if (p) add({ kind: 'part', name: p.name, brand: p.brand || 'VEX', price: p.price, pic: null, slot: ((G.Gunsmith.SLOT_LABEL as Record<string, any>)[p.slot] || p.slot || '').toUpperCase(), left: () => S.count('part:' + id) }); }
     for (const o of O.mags || []) { const [wid, vid] = o.id.split('|'), def = G.WEAPONS[wid]; if (!def) continue; const it = G.Gear.ammoItem(def, 0, null!, vid); add({ kind: 'mag', name: G.Gear.magName(it), brand: def.name.toUpperCase() + ' FAMILY', price: G.Gear.price(it), pic: pic(it), left: () => S.count('mag:' + o.id) }); }
     for (const o of O.pouches || []) { const P0 = G.Gear.POUCHES[o.id], it = G.Gear.pouchItem(o.id); if (P0) add({ kind: 'pouch', name: P0.name, brand: P0.brand, price: G.Gear.price(it), pic: pic(it), left: () => S.count('pouch:' + o.id) }); }
     return G.U.shuffle(P.rnd, out);
@@ -828,8 +908,8 @@ const G_Highlights = (() => {
     const guns = [...m.entries()].sort((a, b) => b[1].n - a[1].n), [code, e] = guns[0], def = defOf(code);
     if (!def) return null;
     const kg = P.kgun.get(k) || new Map(), kx = kg.get(code) || { kills: 0, hs: 0, d: 0 }, am = Object.entries(e.am).sort((a, b) => b[1] - a[1])[0];
-    const A = (P.actors.get(k) || {}) as Actor, kt = A.kt || {};
-    const parts = Object.entries(def.build || {}).map(([slot, id]) => [slot, G.Gunsmith.PARTS[id]]).filter(([slot, p]) => p && !p.factory && ['optic', 'riserdot', 'magnifier', 'muzzle', 'barrel', 'stock', 'buttstock', 'handguard', 'fg', 'tac', 'tacL', 'mag', 'grip'].includes(G.Gunsmith.kindOf(slot)))
+    const A = (P.actors.get(k) || {}) as Actor, kt = (A.kt || {}) as NonNullable<Actor['kt']>;
+    const parts = Object.entries(def.build || {}).map(([slot, id]): [string, Part] => [slot, G.Gunsmith.PARTS[id as string]]).filter(([slot, p]) => p && !p.factory && ['optic', 'riserdot', 'magnifier', 'muzzle', 'barrel', 'stock', 'buttstock', 'handguard', 'fg', 'tac', 'tacL', 'mag', 'grip'].includes(G.Gunsmith.kindOf(slot)))
       .map(([slot, p]) => [((G.Gunsmith.SLOT_LABEL as Record<string, any>)[G.Gunsmith.kindOf(slot)] || slot).replace(/ \(.*\)/, '').toUpperCase(), p.name]);
     const kit = [['HELMET', kt.helmet], ['FACE', kt.face], ['CARRIER', kt.carrier], ['SHOULDERS', kt.sh], ['PELVIS', kt.gr], ['BELT', kt.belt], ['LEGS', kt.lg], ['PACK', kt.pack]].filter(([, id]) => id && G.Gear.DEFS[id]).map(([n, id]) => [n, G.Gear.DEFS[id].name + (n === 'CARRIER' && kt.plate ? ' + plate' : '')]);
     // the verdicts: what the numbers say about them (two of them, the strongest first)
@@ -844,7 +924,7 @@ const G_Highlights = (() => {
     if (!kx.kills) v.push(['ALL BARK', `${e.n} rounds fired. Zero kills. Suppressive fire, we're told.`]);
     if (kx.d >= 25) v.push(['LONG ARM OF THE LAW', `A kill at ${kx.d} m.`]);
     if (!v.length) v.push(['SOLID PICK', 'Nothing fancy. Gets it done.']);
-    return { kind: 'gear', k, code, def, rounds: e.n, kills: kx.kills, hs: kx.hs, far: kx.d, am: am ? am[0] : null, parts, kit, verdicts: v.slice(0, 2),
+    return { kind: 'gear' as const, k, code, def, rounds: e.n, kills: kx.kills, hs: kx.hs, far: kx.d, am: am ? am[0] : null, parts, kit, verdicts: v.slice(0, 2),
       others: guns.slice(1, 3).map(([c, x]) => ({ def: defOf(c), n: x.n, kills: (kg.get(c) || {}).kills || 0 })).filter((o) => o.def), dur: 9 };
   }
   function program() {
@@ -877,7 +957,7 @@ const G_Highlights = (() => {
     return segs;
   }
   // the camera plan for a clip: wide in real time, then the shooter's angle in super slow motion, then the other side's
-  function shotsFor(c: Clip, xr: boolean) {
+  function shotsFor(c: Clip, xr: unknown) {
     const t = c.t, start = c.frames.length ? c.frames[0].t : t - PRE;
     // a kill sequence: the whole run live (from just before the first, a little after the last), then over the shooter's
     // shoulder or from their helmet at half speed
@@ -906,16 +986,16 @@ const G_Highlights = (() => {
     let t0 = Math.max(start, t - 3.4);
     const brk = c.fl.br ? c.doors.filter((d) => d.kicked && d.t < t).pop() : null;
     if (brk) t0 = Math.max(start, brk.t - 1.2);
-    if (c.fl.spray) t0 = Math.max(start, Math.min(t0, c.fl.sprayT - 0.8));
+    if (c.fl.spray) t0 = Math.max(start, Math.min(t0, c.fl.sprayT! - 0.8));
     const officerShoots = c.kind === 'kill', A = officerShoots ? c.a : c.a, V = c.v;
     const shooterCams = ['helmet', 'gun', 'ots'], pick = (l: string[]) => l[Math.floor(P.rnd() * l.length)];
-    const ks = c.kind === 'kill' && c.killShot, imp = ks ? ks.t + flightOf(ks).tof : t; // (when the killing round arrives)
+    const ks = (c.kind === 'kill' && c.killShot) as Shot | null | undefined, imp = ks ? ks.t + flightOf(ks).tof : t; // (when the killing round arrives)
     const out: any[] = [{ cam: 'wide', who: A, at: V, t0, t1: Math.max(t, imp) + 2.0, rate: 1, label: 'LIVE' }]; // (2 s after: them going down, then the tagline)
     // the slow motion: from the first round of a spray-down (a little quicker, it's longer), else the last second
-    const s0 = c.fl.spray ? Math.max(start, t - 2.4, c.fl.sprayT - 0.3) : t - 1.1, sr = c.fl.spray ? 0.4 : 0.28;
+    const s0 = c.fl.spray ? Math.max(start, t - 2.4, c.fl.sprayT! - 0.3) : t - 1.1, sr = c.fl.spray ? 0.4 : 0.28;
     // (an angle that slows right down for the killing round's flight, `fly` seconds of it on screen, then lets the body
     // fall at a third of real time: rates, each until a clip time)
-    const flying = (fly: number, after: number) => [[ks.t - 0.03, sr], [imp + 0.02, (imp + 0.05 - ks.t) / fly], [imp + after, 0.32]];
+    const flying = (fly: number, after: number) => [[ks!.t - 0.03, sr], [imp + 0.02, (imp + 0.05 - ks!.t) / fly], [imp + after, 0.32]];
     // (the door going in: through the kicker's eyes at half speed, from the boot to the room opening up, then on to the
     // kill, up to 5 s later: real time across the gap, slowing again for the killing round)
     if (A && brk) {
@@ -925,11 +1005,11 @@ const G_Highlights = (() => {
     }
     // (a wallbang or a ricochet: its whole way from behind the round, then from beside where it went through or off, its line left
     // hanging in the air; them lit through the wall until it gets there)
-    const bank = ks && (c.fl.wb || c.fl.ric) ? flightOf(ks).events : null, evI = bank ? (c.fl.ric ? bank.findIndex((e: Rec) => e.k === 'r') : bank.map((e: Rec) => e.k).lastIndexOf('x')) : -1;
+    const bank = ks && (c.fl.wb || c.fl.ric) ? flightOf(ks).events : null, evI = bank ? (c.fl.ric ? bank.findIndex((e) => e.k === 'r') : bank.map((e) => e.k).lastIndexOf('x')) : -1;
     if (A && ks && (c.fl.long || bank)) out.push({ cam: 'bullet', who: A, at: V, t0: Math.max(start, ks.t - 0.35), t1: imp + 1.4, rates: flying(3.0, 1.4), label: 'BULLET CAM', slow: true, thru: !!bank, trail: bank ? 1e9 : 0 });
     else if (A && xr && ks) out.push({ cam: 'xr', who: V, at: A, t0: Math.max(start, c.fl.spray ? s0 : ks.t - 0.5), t1: imp + 1.5, rates: flying(1.8, 1.5), label: 'X-RAY CAM', slow: true, xr: true });
     else if (A) out.push({ cam: pick(shooterCams), who: A, at: V, t0: s0, t1: t + 0.6, rate: sr, label: 'SUPER SLO-MO', slow: true });
-    if (A && bank && evI >= 0) out.push({ cam: 'event', who: A, at: V, t0: Math.max(start, ks.t - 0.05), t1: imp + 1.3, rates: flying(2.6, 1.3), label: bank[evI].k === 'r' ? 'RICOCHET CAM' : 'WALL CAM', slow: true, thru: true, trail: 1e9, ev: evI });
+    if (A && bank && evI >= 0) out.push({ cam: 'event', who: A, at: V, t0: Math.max(start, ks!.t - 0.05), t1: imp + 1.3, rates: flying(2.6, 1.3), label: bank[evI].k === 'r' ? 'RICOCHET CAM' : 'WALL CAM', slow: true, thru: true, trail: 1e9, ev: evI });
     if (V && A && !bank) out.push({ cam: pick(['helmet', 'ots']), who: V, at: A, t0: t - 1.0, t1: Math.max(t, imp) + 0.5, rate: 0.4, label: officerShoots ? 'SUSPECT CAM' : 'OFFICER CAM', slow: true });
     for (const s of out) s.dur = durOf(s);
     return out;
@@ -973,7 +1053,7 @@ const G_Highlights = (() => {
         if (!a || !(saved ? a.e === 'armour' : a.e === 'out' || a.e === 'in') || !a.r[0].k) continue;
         const m = h[3] ? h[3][0] : 0.008, J = 0.5 * m * h[2] * h[2], fl = flightOf(sh), ks = c.killShot;
         const rank = J + (ks && (ks === sh || (ks.t === sh.t && ks.a === sh.a)) ? 1e6 : 0);
-        if (!best || rank > best.rank) best = { rank, J: Math.round(J), v: h[2], snap: h[3], a, code: sh.code, am: sh.am, t: sh.t + fl.tof * Math.min(1, fl.xs[h[0]] / Math.max(0.1, fl.len)), p: q.p[h[0]].slice(0, 3), d: [h[4], h[5], h[6]] };
+        if (!best || rank > best.rank) best = { rank, J: Math.round(J), v: h[2], snap: h[3], a, code: sh.code, am: sh.am, t: sh.t + fl.tof * Math.min(1, fl.xs[h[0]] / Math.max(0.1, fl.len)), p: q!.p[h[0]].slice(0, 3), d: [h[4], h[5], h[6]] };
       }
     }
     return best;
@@ -999,14 +1079,14 @@ const G_Highlights = (() => {
     if (!A0) return null;
     // (an officer as they were in this clip: the gun they fired in it, else held when it began; their kit then)
     const sh = c && c.shots.find((s) => s.a === k && s.code), A = A0.kind === 'p' && c ? Object.assign({}, A0, { gun: (sh && sh.code) || (c.guns && c.guns[k]) || A0.gun, kt: (c.kits && c.kits[k]) || A0.kt }) : A0;
-    let rig;
+    let rig: HlRig;
     if (A.kind === 'e') {
-      const def = (G.ENEMIES as Record<string, any>)[A.type] || {};
-      rig = G.Rig.create({ style: A.style || def.style, scale: A.scale, boss: A.boss, seed: A.id * 7919 + 13, dressed: true });
+      const def = G.ENEMIES[A.type!] || {};
+      rig = G.Rig.create({ style: A.style || def.style, scale: A.scale, boss: A.boss, seed: A.id * 7919 + 13, dressed: true }) as HlRig;
       if (!A.civ) rig.setKit(G.Rig.armourKit(A.vest, A.helmet, (A.style || def.style) === 'armored', A.face, A.ex));
       if (A.wpn && !A.civ) rig.setGun(A.wpn);
     } else {
-      rig = G.Rig.create({ style: 'tactical', color: A.color, animal: A.animal, callName: A.name, seed: String(A.id).length * 977, bare: true, look: A.look });
+      rig = G.Rig.create({ style: 'tactical', color: A.color, animal: A.animal, callName: A.name, seed: String(A.id).length * 977, bare: true, look: A.look }) as HlRig;
       if (A.kt) rig.setKit(A.kt);
       if (A.gun) rig.setGun(A.gun, (A0.skins || {})[A.gun]); // (its stickers, as it had them)
     }
@@ -1119,7 +1199,7 @@ const G_Highlights = (() => {
         q = pool[n] = { line: new T.Line(geo, new T.LineBasicMaterial({ transparent: true, opacity: 0.6, blending: T.AdditiveBlending, depthWrite: false })), dot: new T.Mesh(glowGeo, new T.MeshBasicMaterial({ transparent: true, blending: T.AdditiveBlending, depthWrite: false })) };
         q.line.frustumCulled = false; P.fxRoot.add(q.line, q.dot);
       }
-      const pa = q.line.geometry.attributes.position; pa.setXYZ(0, a.x, a.y, a.z); pa.setXYZ(1, b.x, b.y, b.z); pa.needsUpdate = true;
+      const pa = q.line.geometry.attributes.position as THREE.BufferAttribute; pa.setXYZ(0, a.x, a.y, a.z); pa.setXYZ(1, b.x, b.y, b.z); pa.needsUpdate = true;
       q.line.material.color.setHex(col); q.dot.material.color.setHex(col);
       q.dot.position.copy(b); q.dot.scale.setScalar(1.6 + P.cam.position.distanceTo(b) * 0.12);
       q.line.visible = q.dot.visible = true; n++;
@@ -1150,8 +1230,8 @@ const G_Highlights = (() => {
     let m = 0; try { m = def ? G.Ballistics.projectile(def, am || 'ball').m : 0; } catch (e) { /* no projectile */ }
     const q = pathOf(sh);
     if (q && q.p.length > 1) { // (its real way, as it was recorded: legs, the speed it had at each point of them)
-      const verts = q.p.map((a: Rec) => new T.Vector3(a[0], a[1], a[2])), xs = [0], pts = [{ x: 0, t: 0, v: Math.max(30, q.p[0][3]), drop: 0 }];
-      verts[0].set(...sh.f);
+      const verts = q.p.map((a: number[]) => new T.Vector3(a[0], a[1], a[2])), xs = [0], pts = [{ x: 0, t: 0, v: Math.max(30, q.p[0][3]), drop: 0 }];
+      verts[0].set(...(sh.f as [number, number, number]));
       for (let i = 1; i < verts.length; i++) {
         const d = verts[i].distanceTo(verts[i - 1]); xs.push(xs[i - 1] + d);
         const v = Math.max(30, q.p[i][3]), t = pts[i - 1].t + d / ((v + pts[i - 1].v) / 2);
@@ -1162,7 +1242,7 @@ const G_Highlights = (() => {
       const pos = (x: number) => { const i = leg(x); return verts[i].clone().addScaledVector(dirs[i], x - xs[i]); };
       const along = (k: 'x' | 't' | 'v' | 'drop', v: number) => { for (let i = 1; i <= N; i++) if (pts[i][k] >= v) { const a = pts[i - 1], b = pts[i], u = (v - a[k]) / Math.max(1e-9, b[k] - a[k]); return { x: a.x + (b.x - a.x) * u, t: a.t + (b.t - a.t) * u, v: a.v + (b.v - a.v) * u, drop: a.drop + (b.drop - a.drop) * u }; } return pts[N]; };
       return (sh.fl = { f: verts[0], to: verts[N], len, dir: dirs[0], dirEnd: dirs[N - 1], dirAt, pos, verts, xs, def, am, m, pts, tof: pts[N].t, v0: pts[0].v, vEnd: pts[N].v,
-        events: linked(q.ev.map((e: any[]) => ({ i: e[0], x: xs[e[0]], p: verts[e[0]], k: e[1], fx: e[2], n: [e[3], e[4], e[5]], name: e[6], m: e[7], J: e[8], stop: !!e[9], depth: e[10] || 0, cal: e[11] || 8, dir: dirs[Math.max(0, Math.min(N - 1, e[0] - 1))] }))), at: (t: any) => along('t', t), atX: (x: any) => along('x', x), xAt: (t: any) => along('t', Math.min(t, pts[N].t)).x });
+        events: linked(q.ev.map((e: any[]): HlFlightEv => ({ i: e[0], x: xs[e[0]], p: verts[e[0]], k: e[1], fx: e[2], n: [e[3], e[4], e[5]], name: e[6], m: e[7], J: e[8], stop: !!e[9], depth: e[10] || 0, cal: e[11] || 8, dir: dirs[Math.max(0, Math.min(N - 1, e[0] - 1))] }))), at: (t: any) => along('t', t), atX: (x: any) => along('x', x), xAt: (t: any) => along('t', Math.min(t, pts[N].t)).x });
     }
     const f = new T.Vector3(...sh.f), to = new T.Vector3(...sh.to), len = Math.max(0.1, f.distanceTo(to));
     const vAt = (x: number) => { let v = 0; try { v = def ? G.roundSpeed(def, am || 'ball', x) : 0; } catch (e) { /* no speed */ } return v > 30 ? v : 380; };
@@ -1183,20 +1263,20 @@ const G_Highlights = (() => {
     const trail = new T.Line(tg, tracerMat(0xffe0a0));
     P.fxRoot.add(mesh, glow, trail);
     const ext = s && s.xr && sh.a === s.clip.a ? 0.45 : 0;
-    P.bullets.push({ sh, fl, mesh, glow, trail, ext, extT: ext / fl.vEnd, prev: fl.f.clone(), done: false, hits: hitsOf(sh), evs: fl.events.map((e: Rec) => Object.assign({}, e)) });
+    P.bullets.push({ sh, fl, mesh, glow, trail, ext, extT: ext / fl.vEnd, prev: fl.f.clone(), done: false, hits: hitsOf(sh), evs: fl.events.map((e: HlFlightEv) => Object.assign({}, e)) });
   }
   const _yUp = new T.Vector3(0, 1, 0), holeGeo = new T.CircleGeometry(0.5, 12);
   // A round reaches something it went through or off (flightOf events): the damage it did (js/scars.ts, as in the game), what it
   // threw out of it, and a flash
   // (each way in with the way out of the same thing, if it came out: e.then)
-  function linked(evs: Rec[]) { evs.forEach((e, i) => { if (e.k === 'e' && evs[i + 1] && evs[i + 1].k === 'x') e.then = evs[i + 1]; }); return evs; }
+  function linked(evs: HlFlightEv[]) { evs.forEach((e, i) => { if (e.k === 'e' && evs[i + 1] && evs[i + 1].k === 'x') e.then = evs[i + 1]; }); return evs; }
   function struck(e: any) {
     const fxs = (G.R.IMPACT as Record<string, any>)[e.fx] || G.R.IMPACT.stone, col = e.k === 'r' ? 0xfff0c0 : (fxs.s || fxs.d)[0];
     if (e.m !== '' && e.name !== 'armour') {
       const rec = e.k === 'e' && P.map ? G.Damage.ofEvent(e, e.then) : null, cut = rec && G.Damage.apply(P.map, rec) ? G.Damage.radius(e.m, e.J, e.cal) : e.k === 'x' && e.cutBy ? e.cutBy : 0; // (what it took out of the wall, as it did in the game)
       if (e.then && e.k === 'e') e.then.cutBy = cut * 1.25;
       const o = { m: e.m, fx: e.fx, k: e.k, n: e.n, dir: e.dir, J: e.J, stop: e.stop, cut };
-      if (!cut && e.m !== 'glass') for (const m of G.Scars.meshes(o, e.p, P.fxRoot)) { P.marks.push(m); if (P.marks.length > 160) { const q = P.marks.shift(); if (q.parent) q.parent.remove(q); } }
+      if (!cut && e.m !== 'glass') for (const m of G.Scars.meshes(o, e.p, P.fxRoot)) { P.marks.push(m); if (P.marks.length > 160) { const q = P.marks.shift()!; if (q.parent) q.parent.remove(q); } }
       if (P.debris) P.debris.burst(e.p, o);
     }
     const sp = new T.Mesh(new T.SphereGeometry(e.k === 'r' ? 0.09 : 0.06, 8, 6), new T.MeshBasicMaterial({ color: col, transparent: true, blending: T.AdditiveBlending, depthWrite: false })); sp.position.copy(e.p); P.fxRoot.add(sp);
@@ -1204,7 +1284,7 @@ const G_Highlights = (() => {
   }
   function flyBullets(s: Seg) {
     const c = s.clip, w = new T.Vector3(), q = new T.Vector3(), seg = new T.Line3();
-    P.bullets = P.bullets.filter((b: Rec) => {
+    P.bullets = P.bullets.filter((b) => {
       const el = s.tau - b.sh.t, fl = b.fl, end = fl.tof + b.extT;
       if (el > end + (s.trail ? 9 : 0.35)) { for (const o of [b.mesh, b.glow, b.trail]) if (o.parent) o.parent.remove(o); b.trail.geometry.dispose(); b.trail.material.dispose(); return false; }
       const x = el <= fl.tof ? fl.xAt(Math.max(0, el)) : fl.len + Math.min(b.ext, (el - fl.tof) * fl.vEnd), p = fl.pos(x), gone = el >= end;
@@ -1213,7 +1293,7 @@ const G_Highlights = (() => {
       for (const h of b.hits) if (!h.done && x >= h.x) { h.done = true; bleed(h.p, h.dir, h.through); } // (as it gets to them)
       for (const e of b.evs) if (!e.done && x >= e.x) { e.done = true; struck(e); } // (and to what it went through or off)
       // its trail: the way behind it, round any turn (a metre and a half at most, unless the camera wants it all), fading once it's done
-      const from = Math.max(0, x - (s.trail || 1.5)), pa = b.trail.geometry.attributes.position;
+      const from = Math.max(0, x - (s.trail || 1.5)), pa = b.trail.geometry.attributes.position as THREE.BufferAttribute;
       let tn = 0; const put = (q: XYZ) => pa.setXYZ(tn++, q.x, q.y, q.z);
       put(fl.pos(from)); for (let i = 0; i < fl.verts.length; i++) if (fl.xs[i] > from && fl.xs[i] < x) put(fl.verts[i]); put(p);
       b.trail.geometry.setDrawRange(0, tn); pa.needsUpdate = true; b.trail.geometry.computeBoundingSphere();
@@ -1282,11 +1362,11 @@ const G_Highlights = (() => {
     else { m.position.set(p.x, p.y + 0.004, p.z); m.rotation.set(-Math.PI / 2, 0, Math.random() * 6.28); }
     m.scale.set(size * (0.8 + Math.random() * 0.5), size * (0.8 + Math.random() * 0.5), 1);
     P.fxRoot.add(m); P.marks.push(m);
-    if (P.marks.length > 160) { const o = P.marks.shift(); if (o.parent) o.parent.remove(o); }
+    if (P.marks.length > 160) { const o = P.marks.shift()!; if (o.parent) o.parent.remove(o); }
     return m;
   }
   const floorAt = (x: number, z: number, y: number) => G.Level.groundAt(P.map, x, z, 0.01, y);
-  function bleed(p: THREE.Vector3, dir: THREE.Vector3, through: Rec[]) {
+  function bleed(p: THREE.Vector3, dir: THREE.Vector3, through: boolean) {
     const rnd = (a: number) => (Math.random() - 0.5) * a;
     const n = through ? 18 : 7;
     for (let i = 0; i < n; i++) {
@@ -1317,15 +1397,15 @@ const G_Highlights = (() => {
       return false;
     });
     for (const r of P.rigs.values()) if (r.pool) {
-      r.poolT += h;
+      r.poolT! += h;
       const c = r.rig.hips ? r.rig.hips.getWorldPosition(new T.Vector3()) : r.rig.root.position;
-      if (r.poolT < 1.5) r.pool.position.set(c.x, floorAt(c.x, c.z, c.y + 0.3) + 0.003, c.z); // (under them as they settle)
-      const s = Math.min(0.75, 0.06 + 0.14 * r.poolT); r.pool.scale.set(s, s, 1);
+      if (r.poolT! < 1.5) r.pool.position.set(c.x, floorAt(c.x, c.z, c.y + 0.3) + 0.003, c.z); // (under them as they settle)
+      const s = Math.min(0.75, 0.06 + 0.14 * r.poolT!); r.pool.scale.set(s, s, 1);
     }
   }
-  function pool(r: Rec) { if (r.pool) return; r.poolT = 0; r.pool = mark('pool', r.rig.root.position.clone(), 0.06); r.pool.scale.set(0.06, 0.06, 1); }
+  function pool(r: HlRigRec) { if (r.pool) return; r.poolT = 0; r.pool = mark('pool', r.rig.root.position.clone(), 0.06); r.pool.scale.set(0.06, 0.06, 1); }
   // a round fired in the replay: whoever's in its way bleeds (after `delay` clip seconds, scaled by how far along they are)
-  function hitsOf(sh: Shot) {
+  function hitsOf(sh: Shot): HlHit[] {
     const q = pathOf(sh);
     if (q && q.p.length > 1) { const fl = flightOf(sh); return q.hit.filter((h: any[]) => P.rigs.has(h[1])).map((h: any[]) => ({ x: fl.xs[h[0]], p: fl.verts[h[0]], k: h[1], dir: new T.Vector3(h[4], h[5], h[6]), through: !!h[7] })); } // (who it really went into)
     const f = new T.Vector3(...sh.f), to = new T.Vector3(...sh.to), len = f.distanceTo(to);
@@ -1337,7 +1417,7 @@ const G_Highlights = (() => {
   // door events have them, swinging (snapped at a segment's first frame, not swung over from the last clip's). The
   // replayed level's door solids follow (js/world.ts door), so the cameras' sight lines and the falling bodies see them.
   // the panes as they were: whole till they were shot out
-  function glassAt(tau: number) { for (const g of P.glass || []) { const pane = P.map && P.map.winMeshes && P.map.winMeshes[g.id]; if (!pane) continue; if (g.p) { const m = G.Damage.crack(pane, new T.Vector3(...g.p)); if (m) m.visible = tau >= g.t; } else pane.visible = tau < g.t; } }
+  function glassAt(tau: number) { for (const g of P.glass || []) { const pane = P.map && P.map.winMeshes && P.map.winMeshes[g.id]; if (!pane) continue; if (g.p) { const m = G.Damage.crack(pane as THREE.Mesh, new T.Vector3(...(g.p as [number, number, number]))); if (m) m.visible = tau >= g.t; } else pane.visible = tau < g.t; } }
   function doorsAt(c: Clip, tau: number, snap: boolean) {
     const map = P.map, dm = map && map.doorMeshes;
     if (!dm) return;
@@ -1347,7 +1427,7 @@ const G_Highlights = (() => {
       const piv = dm[i], l = c._byDoor.get(i);
       if (!piv || (init[i] == null && !l)) continue;
       // (shot off its hinges: where its fall's got to, or lying where it fell)
-      const fell = init['f' + i] ? { t: -1e3, fall: init['f' + i] } : l && l.find((d: Rec) => d.fall && d.t <= tau);
+      const fell = init['f' + i] ? { t: -1e3, fall: init['f' + i] } : l && l.find((d) => d.fall && d.t <= tau);
       if (fell) {
         const dd = map.doors[i], u = piv.userData;
         u.track = u.track && u.trackOf === fell ? u.track : G.Damage.fallTrack(map, dd, fell.fall[0], fell.fall[1], fell.fall[2]); u.trackOf = fell; u.centre = u.track.centre;
@@ -1356,7 +1436,7 @@ const G_Highlights = (() => {
       }
       if (piv.userData.track) { const u = piv.userData; u.track = null; piv.quaternion.identity(); piv.rotation.y = u.base; piv.position.copy(u.p0); }
       let before = null; if (l) for (const d of l) if (d.t <= tau) before = d;
-      const open = before ? before.open : init[i] != null ? init[i] : !l[0].open, kicked = before && before.kicked && tau - before.t < 0.3;
+      const open = before ? before.open : init[i] != null ? init[i] : !l![0].open, kicked = before && before.kicked && tau - before.t < 0.3;
       const u = piv.userData, tgt = open ? 1 : 0;
       u.rAng = snap || u.rAng == null ? tgt : u.rAng + (tgt - u.rAng) * Math.min(1, (kicked ? 0.6 : 0.12));
       piv.rotation.y = u.base + u.rAng * Math.PI / 2 * 0.95 * (u.sign || 1);
@@ -1370,7 +1450,7 @@ const G_Highlights = (() => {
   // a mesh the lens is inside (or within the near plane of): its box in its own frame, grown by 6 cm
   const _inv = new T.Matrix4(), _lp = new T.Vector3(), _bx = new T.Box3(), _sc = new T.Vector3();
   function blocking(p: THREE.Vector3) {
-    const out: Rec[] = [];
+    const out: THREE.Object3D[] = [];
     for (const r of P.rigs.values()) {
       if (!r.rig.root.visible) continue;
       r.rig.root.updateMatrixWorld(true);
@@ -1421,7 +1501,7 @@ const G_Highlights = (() => {
     const line = pts[0][1].clone().sub(pts[0][0]).setY(0); if (line.lengthSq() < 1e-4) line.set(1, 0, 0); line.normalize();
     // how much of someone the camera sees: knees to head and either side of the chest (lower crouched, along the floor
     // prone), the share of those with a clear line (a rack's gaps let one line through where its cartons hide the rest)
-    const seen = (p: THREE.Vector3, st: Rec) => {
+    const seen = (p: THREE.Vector3, st: number[]) => {
       if (!st) return 1;
       const fl = st[5] || 0, k = fl & 2 ? 0.2 : fl & 1 ? 0.7 : 1, f = new T.Vector3(st[0], st[1], st[2]), sd = _b.set(p.z - f.z, 0, f.x - p.x).normalize().multiplyScalar(0.18);
       const q = [0.45, 0.85, 1.2, 1.55].map((y) => f.clone().setY(f.y + Math.max(0.15, y * k)));
@@ -1486,7 +1566,7 @@ const G_Highlights = (() => {
   function camFor(s: Seg) {
     const c = s.clip, cam = P.cam;
     // (a kill sequence: looking at whoever's next, the fixed camera picked again when that changes)
-    if (c.kind === 'seq') { const nx = (c.kills.find((q: Clip) => q.t >= s.tau - 0.4) || c.kills[c.kills.length - 1]).v; if (nx !== s.at) { s.at = nx; s.pos = null; s.shot = null; } }
+    if (c.kind === 'seq') { const nx = (c.kills.find((q: HlKillEntry) => q.t >= s.tau - 0.4) || c.kills[c.kills.length - 1]).v; if (nx !== s.at) { s.at = nx; s.pos = null; s.shot = null; } }
     const who = s.who && stateAt(c, s.who, s.tau), at = s.at && stateAt(c, s.at, s.tau);
     P.hide = []; P.esc = P.esc || new T.Vector3(); P.esc.set(0, 1, 0);
     const W0 = who ? new T.Vector3(who[0], who[1] + 1.5, who[2]) : c.at.clone().setY(1.5), A0 = at ? new T.Vector3(at[0], at[1] + 1.2, at[2]) : c.at.clone().setY(1.2);
@@ -1498,7 +1578,7 @@ const G_Highlights = (() => {
     } else if (s.cam === 'wide') {
       // a fixed camera in the room that keeps them both in the picture (picked once: js/highlights.ts pickWide)
       if (!s.pos) pickWide(s, c, W0, A0);
-      cam.position.copy(s.pos); cam.lookAt(W0.clone().add(A0).multiplyScalar(0.5)); fov = s.fov || 58;
+      cam.position.copy(s.pos!); cam.lookAt(W0.clone().add(A0).multiplyScalar(0.5)); fov = s.fov || 58;
     } else if (s.cam === 'helmet') {
       // at the brow, a little to the side, looking where they look: their own head (and helmet) left out of the picture,
       // so what shows is their gun and hands, and what they're shooting at
@@ -1532,12 +1612,12 @@ const G_Highlights = (() => {
       }
       let tgt = s.xc;
       if (P.xo && P.xo.hit.length) { const m = new T.Vector3(); for (const o of P.xo.hit) m.add(o.mesh.getWorldPosition(_b)); tgt = m.divideScalar(P.xo.hit.length); }
-      s.look.lerp(tgt, ease2(s)); cam.position.copy(s.xp); cam.lookAt(s.look); fov = 50;
+      s.look!.lerp(tgt, ease2(s)); cam.position.copy(s.xp); cam.lookAt(s.look!); fov = 50;
       P.hide = blocking(cam.position);
     } else if (s.cam === 'bullet') {
       // the bullet cam: behind the muzzle until it fires, then just behind the round all the way (a hair to the side and
       // above, so it's in the picture), then held back along its line watching them go down
-      const fl = flightOf(c.killShot), el = s.tau - c.killShot.t, up = new T.Vector3(0, 1, 0), side = new T.Vector3(-fl.dir.z, 0, fl.dir.x).normalize();
+      const fl = flightOf(c.killShot!), el = s.tau - c.killShot!.t, up = new T.Vector3(0, 1, 0), side = new T.Vector3(-fl.dir.z, 0, fl.dir.x).normalize();
       let safe;
       if (el < 0) { cam.position.copy(fl.f).addScaledVector(fl.dir, -0.55).addScaledVector(side, 0.2).addScaledVector(up, 0.07); cam.lookAt(fl.f.clone().addScaledVector(fl.dir, 4)); safe = fl.f; fov = 55; }
       else if (el < fl.tof) {
@@ -1554,7 +1634,7 @@ const G_Highlights = (() => {
       // picture and goes out the other (a floor's from off to the side); a wall from the far side of it, looking back along it at
       // the hole and on past to them. Set once, on the side with the room, watching the spot until the round's there, then
       // following it to them and them down
-      const ks = c.killShot, fl = flightOf(ks), e = fl.events[s.ev] || fl.events[0], el = s.tau - ks.t;
+      const ks = c.killShot!, fl = flightOf(ks), e = fl.events[s.ev!] || fl.events[0], el = s.tau - ks.t;
       if (!s.cp) {
         const a = fl.dirAt(Math.max(0, e.x - 0.05)), b = fl.dirAt(e.x + 0.05), bounce = e.k === 'r', n = new T.Vector3(...e.n), side = new T.Vector3(-a.z, 0, a.x).normalize();
         const safe = bounce ? e.p.clone().addScaledVector(n, 0.15) : e.p.clone().addScaledVector(b, 0.35), V3 = (x: number, y: number) => n.clone().multiplyScalar(x).addScaledVector(side, y);
@@ -1563,7 +1643,7 @@ const G_Highlights = (() => {
         s.cp = safe.clone().addScaledVector(best.q, Math.max(0.35, best.t)); s.look = e.p.clone(); P.esc.copy(best.q);
       }
       const tgt = el < fl.pts[e.i].t ? e.p : el < fl.tof ? fl.pos(fl.xAt(el)) : hipsOf(c.v) || fl.to;
-      s.look.lerp(tgt, ease2(s)); cam.position.copy(s.cp); cam.lookAt(s.look); fov = 64;
+      s.look!.lerp(tgt, ease2(s)); cam.position.copy(s.cp!); cam.lookAt(s.look!); fov = 64;
       P.hide = blocking(cam.position);
     } else if (s.cam === 'cuff') {
       // the arrest close-up: low beside them, square to the suspect (who goes down face first, along where they faced,
@@ -1576,8 +1656,8 @@ const G_Highlights = (() => {
         s.cp = mid.clone().addScaledVector(best.v, Math.max(0.6, best.t)); s.cmid = mid; s.look = mid.clone();
         P.esc.copy(best.v);
       }
-      const r = P.rigs.get(s.at), tgt = r && r.rig.armL && r.rig.armL.tie ? r.rig.armL.tie.getWorldPosition(new T.Vector3()).lerp(s.cmid, 0.35) : s.cmid;
-      s.look.lerp(tgt, ease2(s)); cam.position.copy(s.cp); cam.lookAt(s.look.x, s.look.y + 0.15, s.look.z); fov = 60; // (a little above the wrists: the officer's in it too)
+      const r = P.rigs.get(s.at), tgt = r && r.rig.armL && r.rig.armL.tie ? r.rig.armL.tie.getWorldPosition(new T.Vector3()).lerp(s.cmid!, 0.35) : s.cmid!;
+      s.look!.lerp(tgt, ease2(s)); cam.position.copy(s.cp); cam.lookAt(s.look!.x, s.look!.y + 0.15, s.look!.z); fov = 60; // (a little above the wrists: the officer's in it too)
       P.hide = blocking(cam.position);
     } else { // over the shoulder
       // (the right shoulder, or the left if a wall's in the way of the right: picked once a shot, so it doesn't jump)
@@ -1599,7 +1679,7 @@ const G_Highlights = (() => {
         const q = hd.getWorldQuaternion(new T.Quaternion()), hp = hd.getWorldPosition(new T.Vector3()), fwd = new T.Vector3(0, 0, -1).applyQuaternion(q);
         const k = ease2(s), tp = hp.clone().addScaledVector(fwd, 0.08).add(new T.Vector3(0, 0.04, 0));
         if (!s.fq) { s.fq = cam.quaternion.clone(); s.fp = cam.position.clone(); }
-        s.fq.slerp(q, k); s.fp.lerp(tp, k); cam.position.copy(s.fp); cam.quaternion.copy(s.fq);
+        s.fq!.slerp(q, k); s.fp!.lerp(tp, k); cam.position.copy(s.fp!); cam.quaternion.copy(s.fq!);
         P.hide = [hd]; if (r.rig.hairMesh) P.hide.push(r.rig.hairMesh); P.esc.copy(fwd); clearance(s, hp);
       }
       else if (r && r.died && s.frzCand) { if (!s.frz) s.frz = s.frzCand; cam.position.copy(s.frz.p); cam.quaternion.copy(s.frz.q); P.hide = blocking(cam.position); }
@@ -1642,7 +1722,7 @@ const G_Highlights = (() => {
   // kept: the line in, the crushed channel, the temporary cavity's reach around it, its fragments, where it came out or
   // stopped. (A round that misses the body as it's posed here, standing, they having been crouched or turning, goes
   // through the middle of the chest the same way instead.)
-  function xrayTracks(c: Clip, rig: ReturnType<typeof G.Rig.create>, A: Rec) {
+  function xrayTracks(c: Clip, rig: HlRig, A: Actor | undefined) {
     const B = G.Ballistics, out: any = [], up = new T.Vector3(0, 1, 0), dT = deathT(c, c.v)! + 0.05;
     rig.root.updateMatrixWorld(true);
     let g = -1;
@@ -1663,7 +1743,7 @@ const G_Highlights = (() => {
       let p0; try { p0 = B.projectile(fl.def || {}, fl.am || 'ball'); } catch (e) { continue; }
       if (had) B.unsnap(p0, had[3]); // (as it was when it got there: whatever it had been through had changed it)
       const vIn = had ? had[2] : fl.atX(Math.min(nb.x, fl.len)).v; // (its speed where it met them)
-      const before = had ? fl.events.filter((e: Rec) => e.x < nb.x && e.k !== 'x').map((e: Rec) => (e.k === 'r' ? 'off ' : '') + e.name) : [];
+      const before = had ? fl.events.filter((e) => e.x < nb.x && e.k !== 'x').map((e) => (e.k === 'r' ? 'off ' : '') + e.name) : [];
       const armour = () => (A && A.kind === 'e' && !A.civ ? B.suspectArmour({ def: { vest: A.vest, helmet: A.helmet, face: A.face, ex: A.ex } }) : []);
       let trace: any = [], r = B.through(rig, o, u, vIn, Object.assign({}, p0), armour(), 3, trace);
       if (!r || (!trace.length && !r.stopped)) {
@@ -1678,7 +1758,7 @@ const G_Highlights = (() => {
   }
   // its pieces in the x-ray scene, each with where along the round's way it appears (t) so they show as it goes in
   const trackMat = (col: number, op: number, add: boolean) => new T.MeshBasicMaterial({ color: col, transparent: true, opacity: op, depthWrite: false, blending: add ? T.AdditiveBlending : T.NormalBlending });
-  function xrayTrackMeshes(k: Rec) {
+  function xrayTrackMeshes(k: HlXtrack) {
     const grp = new T.Group(), parts = [], at = (t: number) => k.o.clone().addScaledVector(k.u, t), Y = new T.Vector3(0, 1, 0);
     const seg = (a: THREE.Vector3, b: THREE.Vector3, r: number, mat: THREE.Material) => { const len = a.distanceTo(b); if (len < 1e-4) return null; const m = new T.Mesh(new T.CylinderGeometry(r, r, len, 8), mat); m.position.copy(a).add(b).multiplyScalar(0.5); m.quaternion.setFromUnitVectors(Y, b.clone().sub(a).normalize()); grp.add(m); return m; };
     const line = (a: THREE.Vector3, b: THREE.Vector3, col: number, op: number) => { const l = new T.Line(new T.BufferGeometry().setFromPoints([a, b]), new T.LineBasicMaterial({ color: col, transparent: true, opacity: op, depthWrite: false })); grp.add(l); return l; };
@@ -1709,7 +1789,7 @@ const G_Highlights = (() => {
   const XT0 = 1.0, XT = 1.5;
   function xrayPlay(st: number) {
     xrayBody(st);
-    (P.xtracks || []).forEach((k: Rec) => {
+    (P.xtracks || []).forEach((k) => {
       const m = k.m, u = G.U.clamp((st - XT0 - k.g * XT) / 1.0, 0, 1), t = m.end * u, live = u > 0 && u < 1;
       m.b.visible = m.glow.visible = live; m.b.position.copy(k.o).addScaledVector(k.u, t); m.glow.position.copy(m.b.position);
       for (const p of m.parts) {
@@ -1717,14 +1797,14 @@ const G_Highlights = (() => {
         if (p.kind === 'cav' && p.obj.visible) { // (it flares as the round passes, and falls back to a ghost of itself)
           if (p.at == null) p.at = st;
           const a = st - p.at, f = a < 0.12 ? 0.3 + 0.7 * a / 0.12 : Math.max(0.35, 1 - (a - 0.12) * 1.6);
-          p.obj.scale.setScalar(p.r * f); p.obj.material.opacity = 0.2 + 0.3 * (f - 0.35) / 0.65;
+          p.obj.scale.setScalar(p.r! * f); p.obj.material.opacity = 0.2 + 0.3 * (f - 0.35) / 0.65;
         } else if (p.kind === 'cav') p.at = null;
       }
     });
   }
   // the x-ray body posed as someone was in a frame (st: [x, y, z, yaw, pitch, flags, lean]), at the origin facing
   // its own way (the rounds are taken into that frame), settled (a crouch takes a moment to get down into)
-  function xrayPose(rig: Rec, st: number[]) {
+  function xrayPose(rig: HlRig, st: number[]) {
     const fl = st[5] || 0, key = [fl & (1 | 2 | 4 | 32 | 64 | 128), (+st[4] || 0).toFixed(2), (+st[6] || 0).toFixed(2)].join();
     if (rig.xkey === key) return;
     rig.xkey = key;
@@ -1774,7 +1854,7 @@ const G_Highlights = (() => {
     for (const k of P.xtracks || []) { if (k.m.grp.parent) k.m.grp.parent.remove(k.m.grp); k.m.grp.traverse((o: any) => { if (o.geometry && o.geometry !== bulletGeo && o.geometry !== glowGeo) o.geometry.dispose(); if (o.material && o.material !== bulletMat && o.material !== glowMat) o.material.dispose(); }); }
     P.xtracks = [];
     const A = P.actors.get(c.v); if (!A) return;
-    const rig = G.Rig.create({ style: A.style || ((G.ENEMIES as Record<string, any>)[A.type] || {}).style, scale: A.scale, boss: A.boss, seed: A.id * 7919 + 13, dressed: true });
+    const rig = G.Rig.create({ style: A.style || (G.ENEMIES[A.type!] || {}).style, scale: A.scale, boss: A.boss, seed: A.id * 7919 + 13, dressed: true });
     const ghost = new T.MeshBasicMaterial({ color: 0x5ab8ff, transparent: true, opacity: 0.14, depthWrite: false, blending: T.AdditiveBlending });
     rig.root.traverse((o: any) => { if (o.isMesh) o.material = ghost; });
     // (posed as they were at the killing round: crouched, hands up, cowering...)
@@ -1794,7 +1874,7 @@ const G_Highlights = (() => {
     for (const k of P.xtracks) { k.m = xrayTrackMeshes(k); (holders[k.g] || P.xs).add(k.m.grp); }
     const holder = new T.Group(); holder.add(rig.root); P.xs.add(holder);
     // (when each round meets the body on screen: its second of flight, as far in as its track reaches the skin)
-    const keys = (P.xtracks.gt || []).map((t: any, g: number) => { const k = P.xtracks.find((q: Rec) => q.g === g); return [XT0 + g * XT + (k ? G.U.clamp(k.entryT / Math.max(1e-3, k.m.end), 0, 1) : 0.5), t]; }).filter(([, t]: any[]) => t != null);
+    const keys = (P.xtracks.gt || []).map((t: any, g: number) => { const k = P.xtracks.find((q) => q.g === g); return [XT0 + g * XT + (k ? G.U.clamp(k.entryT / Math.max(1e-3, k.m.end), 0, 1) : 0.5), t]; }).filter(([, t]: any[]) => t != null);
     P.xtl = { c, kst, tk: c.killShot ? c.killShot.t + flightOf(c.killShot).tof : c.t, keys, holder, holders, place, lastSt: null };
     if (keys.length) { const p0 = stateAt(c, c.v, keys[0][1] - 0.5) || kst; xrayPose(rig, p0); }
     xrayBody(0);
@@ -1816,7 +1896,7 @@ const G_Highlights = (() => {
   const acHex = (c: number) => '#' + c.toString(16).padStart(6, '0');
   // the plan: each layer's place and moment, the end of it. Rows the round never reached stay in the picture, unlit; a round
   // stopped in armour has the body it was protecting behind it. Not all of a body: six layers of it.
-  function acPlan(ar: Rec) {
+  function acPlan(ar: HlArmourRound) {
     const a = ar.a, rows = [], MAT = G.Materials.MAT;
     let x = 0, t = AC_INTRO + AC_IN, tis = 0, cut = false, d = ar.snap ? ar.snap[1] * 1000 : 7.8, l = ar.snap ? ar.snap[2] * 1000 : 28, g = ar.snap ? ar.snap[0] * 1000 : 8, ang = ar.snap ? ar.snap[3] : 0;
     const list = a.r.slice();
@@ -1840,7 +1920,7 @@ const G_Highlights = (() => {
     return { rows, hit, held, cut, out: !held && (a.e === 'out' || cut), end: t, dur: t + AC_END + (last && last.vo && !held ? 0.6 : 0), w: x, v0: ar.v, m: ar.snap ? ar.snap[0] : 0.008, blunt: a.b };
   }
   // where the round is at segment time st, and what it's like: { x, v, d, l, g, a, r (the layer it's in), i }
-  function acRound(pl: Rec, st: number) {
+  function acRound(pl: ReturnType<typeof acPlan>, st: number) {
     const H0 = pl.hit, f = H0[0], t0 = AC_INTRO, u0 = (st - t0) / AC_IN;
     if (st < f.t0) return { x: -1.9 + (f.x0 + 1.9) * Math.max(0, u0), v: pl.v0, d: f.d0, l: f.l0, g: f.g0, a: f.a0, r: null, i: -1 };
     for (let i = 0; i < H0.length; i++) {
@@ -1930,13 +2010,13 @@ const G_Highlights = (() => {
     A.scene.add(grp);
   }
   function acPlay(st: number) {
-    const A = P.ac, pl = A.plan, cam = A.cam, intro = st < AC_INTRO;
-    A.body.visible = intro; A.stack.visible = !intro; A.round.visible = !intro;
+    const A = P.ac, pl = A.plan!, cam = A.cam, intro = st < AC_INTRO;
+    A.body!.visible = intro; A.stack!.visible = !intro; A.round.visible = !intro;
     if (intro) {
-      const k = ease(st / AC_INTRO), d = 2.3 - 1.25 * k, side = new T.Vector3(-A.u.z, 0, A.u.x);
+      const k = ease(st / AC_INTRO), d = 2.3 - 1.25 * k, side = new T.Vector3(-A.u!.z, 0, A.u!.x);
       cam.clearViewOffset(); cam.fov = 38; cam.updateProjectionMatrix();
-      cam.position.copy(A.at).addScaledVector(A.u, -d).addScaledVector(side, d * 0.45).add(new T.Vector3(0, 0.12, 0)); cam.lookAt(A.at);
-      const p = 1 + 0.35 * Math.sin(st * 9); A.ring.scale.set(p, p, 1);
+      cam.position.copy(A.at!).addScaledVector(A.u!, -d).addScaledVector(side, d * 0.45).add(new T.Vector3(0, 0.12, 0)); cam.lookAt(A.at!);
+      const p = 1 + 0.35 * Math.sin(st * 9); A.ring!.scale.set(p, p, 1);
       return;
     }
     const b = acRound(pl, st), xs = (acRound(pl, st - 0.3).x + acRound(pl, st - 0.15).x + b.x) / 3, cx = G.U.clamp(xs, 0.1, Math.max(0.1, pl.w - 0.3));
@@ -1984,7 +2064,7 @@ const G_Highlights = (() => {
     }
   }
   function armourGraphics(g: CanvasRenderingContext2D, s: Seg, t: number) {
-    const A = P.ac, pl = A && A.plan, c = s.clip, ar = s.ar, a = ar.a;
+    const A = P.ac, pl = (A && A.plan)!, c = s.clip, ar = s.ar, a = ar.a;
     if (!pl) return;
     bug(g); slowmo(g);
     g.fillStyle = 'rgba(20,90,140,0.8)'; g.fillRect(18, 104, 200, 24); text(g, 'ARMOUR CAM', 28, 116, 12, '#fff', 'left', '800');
@@ -2003,10 +2083,10 @@ const G_Highlights = (() => {
     fit(g, `${G.U.fmt(Math.round(J))} J LEFT OF ${G.U.fmt(ar.J)} J`, px + 10, py + 66, pw - 20, 11, '#9fdcff', 'left', '800');
     fit(g, `WIDTH ${d0.toFixed(1)} → ${b.d.toFixed(1)} MM · MASS ${g0.toFixed(1)} → ${b.g.toFixed(1)} G`, px + 10, py + 86, pw - 20, 11, b.d > d0 * 1.06 || b.g < g0 * 0.95 ? '#ffb02a' : '#c8d8e4', 'left', '800');
     // the layers, as it reaches them
-    const rows = pl.rows.filter((r: Rec) => !r.body), H0 = 26, n = rows.length, show = Math.min(n, 11), now = b.r ? rows.indexOf(b.r) : b.i < 0 ? 0 : rows.indexOf(pl.hit[pl.hit.length - 1]), top = Math.max(0, Math.min(n - show, now - show + 2)), x0 = 24, y0 = 138, w0 = 322;
+    const rows = pl.rows.filter((r) => !r.body), H0 = 26, n = rows.length, show = Math.min(n, 11), now = b.r ? rows.indexOf(b.r) : b.i < 0 ? 0 : rows.indexOf(pl.hit[pl.hit.length - 1]), top = Math.max(0, Math.min(n - show, now - show + 2)), x0 = 24, y0 = 138, w0 = 322;
     g.fillStyle = 'rgba(4,16,30,0.86)'; g.fillRect(x0, y0 - 6, w0, 34 + show * H0 + 36);
     fit(g, piece.toUpperCase(), x0 + 12, y0 + 10, w0 - 24, 14, '#5ad8ff', 'left', '900');
-    rows.slice(top, top + show).forEach((r: Rec, i: number) => {
+    rows.slice(top, top + show).forEach((r, i: number) => {
       const y = y0 + 34 + i * H0, cur = r === b.r, past = !r.un && t >= r.t1, kk = r.un ? 0.5 : ease((t - r.t0) * 4), on = r.un || t >= r.t0;
       g.save(); g.globalAlpha = on ? (r.un ? 0.5 : 0.35 + 0.65 * kk) : 0.28;
       if (cur) { g.fillStyle = 'rgba(255,210,70,0.16)'; g.fillRect(x0 + 4, y - 12, w0 - 8, 24); }
@@ -2045,9 +2125,9 @@ const G_Highlights = (() => {
   }
   // the organs, in the bones of a body (js/ballistics.ts), coloured by what was done to them; over a replay (overlay)
   // they're drawn through the body, the hit ones dim until the round that hit them arrives (js/highlights.ts lightOrgan)
-  function organsOn(rig: Rec, O: Rec, overlay: boolean) {
+  function organsOn(rig: HlRig, O: Record<string, number>, overlay: boolean) {
     const B = G.Ballistics, ORG = B.ORG, all = [], hit = [];
-    const bone = (n: string) => n.startsWith('up') || n.startsWith('lo') ? (n.endsWith('L') ? rig.armL : rig.armR)[n.slice(0, 2)] : n.startsWith('th') || n.startsWith('sh') ? (n.endsWith('L') ? rig.legL : rig.legR)[n.slice(0, 2)] : rig[n];
+    const bone = (n: string) => n.startsWith('up') || n.startsWith('lo') ? ((n.endsWith('L') ? rig.armL : rig.armR) as unknown as Record<string, THREE.Object3D>)[n.slice(0, 2)] : n.startsWith('th') || n.startsWith('sh') ? ((n.endsWith('L') ? rig.legL : rig.legR) as unknown as Record<string, THREE.Object3D>)[n.slice(0, 2)] : rig[n];
     for (const s of B.segs()) {
       const b = bone(s.bone); if (!b) continue;
       for (const [id, sh] of s.organs || []) {
@@ -2080,10 +2160,10 @@ const G_Highlights = (() => {
     P.xo = { all, hit, lit: [] };
   }
   // a round reached an organ: it flares, takes its wound's colour, and joins the read-out
-  function lightOrgan(o: Rec) {
+  function lightOrgan(o: HlOrgan) {
     if (o.lit) return;
     o.lit = true; o.pop = 1; o.mesh.material.color.setHex(o.col); o.mesh.material.opacity = 1;
-    if (!P.xo.lit.some((l: Rec) => l.o.id === o.id)) P.xo.lit.push({ o, t: P.st }); // (an organ in several pieces: listed once)
+    if (!P.xo!.lit.some((l) => l.o.id === o.id)) P.xo!.lit.push({ o, t: P.st }); // (an organ in several pieces: listed once)
     if (P.vol > 0.02) sfx('ding');
   }
 
@@ -2186,7 +2266,7 @@ const G_Highlights = (() => {
 
   // ================================================================ motion graphics
   const ease = (x: number) => 1 - Math.pow(1 - G.U.clamp(x, 0, 1), 3);
-  const nameOf = (k: string | null) => { const A = k && P.actors.get(k); return !A ? 'UNKNOWN' : A.kind === 'p' ? (A.name || 'OFFICER') : ((G.ENEMIES as Record<string, any>)[A.type] || {}).name || 'SUSPECT'; };
+  const nameOf = (k: string | null) => { const A = k && P.actors.get(k); return !A ? 'UNKNOWN' : A.kind === 'p' ? (A.name || 'OFFICER') : (G.ENEMIES[A.type!] || {}).name || 'SUSPECT'; };
   const colOf = (k: string | null) => { const A = k && P.actors.get(k); return A && A.kind === 'p' && A.color != null ? G.U.hex(A.color) : '#ff4a3a'; };
   const HYPE = ['THE DOOR-KICKING', 'THE UNSTOPPABLE', 'THE MAGNIFICENT', 'THE BUTCHER OF BLOCK C', 'THE HALLWAY HURRICANE', 'THE CERTIFIED', 'THE STAIRWELL STALLION', 'THE LEGAL', 'THE ABSOLUTELY JUSTIFIED'];
   const hype = (k: string) => { const A = P.actors.get(k), n = (A && A.name) || ''; let h = 0; for (const ch of n) h = (h * 31 + ch.charCodeAt(0)) >>> 0; const an = A && A.animal ? G.Callsigns.of(A.animal).name.toUpperCase() : 'OFFICER'; return `${HYPE[h % HYPE.length]} ${an}`; };
@@ -2233,7 +2313,7 @@ const G_Highlights = (() => {
     g.fillStyle = col || colOf(k); g.fillRect(x, H - 150, 500, 8);
     g.fillStyle = 'rgba(8,12,20,0.88)'; g.fillRect(x, H - 142, 500, 84);
     const A = P.actors.get(k);
-    if (A && A.kind === 'p' && A.animal) { g.save(); g.translate(x + 14, H - 134); G.Callsigns.draw(g, A.animal, 68, A.color); g.restore(); }
+    if (A && A.kind === 'p' && A.animal) { g.save(); g.translate(x + 14, H - 134); G.Callsigns.draw(g, A.animal, 68, A.color!); g.restore(); }
     fit(g, title, x + 94, H - 118, 396, 26, '#fff'); fit(g, sub, x + 94, H - 84, 396, 15, '#cfe2ff', 'left', '700');
   }
   // the presenters, in their box: two hosts, reacting like a game show's
@@ -2290,10 +2370,10 @@ const G_Highlights = (() => {
       offs.forEach(([k, A], i) => {
         const n = offs.length, cw = Math.min(210, (W - 80) / Math.max(1, n)), x = W / 2 - (n * cw) / 2 + i * cw + cw / 2, y = 340 + (1 - ease(t * 2 - i * 0.25)) * 300;
         g.fillStyle = 'rgba(8,12,24,0.85)'; g.fillRect(x - cw / 2 + 8, y - 90, cw - 16, 190); g.fillStyle = colOf(k); g.fillRect(x - cw / 2 + 8, y - 90, cw - 16, 8);
-        if (A.animal) { g.save(); g.translate(x - 40, y - 74); G.Callsigns.draw(g, A.animal, 80, A.color); g.restore(); }
+        if (A.animal) { g.save(); g.translate(x - 40, y - 74); G.Callsigns.draw(g, A.animal, 80, A.color!); g.restore(); }
         text(g, (A.name || '').toUpperCase(), x, y + 26, 20, '#fff', 'center');
         text(g, hype(k), x, y + 50, 10, '#ffd24a', 'center', '800');
-        const st = P.stats.get(k) || {}; text(g, `${st.kills || 0} KILLS · ${st.hs || 0} HS`, x, y + 76, 13, '#9fdcff', 'center', '800');
+        const st = (P.stats.get(k) || {}) as Partial<HlStat>; text(g, `${st.kills || 0} KILLS · ${st.hs || 0} HS`, x, y + 76, 13, '#9fdcff', 'center', '800');
       });
       ticker(g, 'HEROES OF THE CITY · ALL FORCE USED TONIGHT WAS, IN OUR OPINION, COMPLETELY FINE · STAY TUNED FOR HIGHLIGHTS · ');
       return;
@@ -2303,11 +2383,11 @@ const G_Highlights = (() => {
       const gr = g.createLinearGradient(0, 0, W, H); gr.addColorStop(0, '#ff9ad2'); gr.addColorStop(1, '#9a7aff');
       g.save(); g.translate(x, 0); g.fillStyle = gr; g.fillRect(0, 0, W, H); hearts(g, t, 8);
       text(g, 'MOMENTS LATER...', W / 2, H / 2 - 16, 58, '#fff', 'center', '900', '#3a1030');
-      text(g, `${Math.round(s.gap)} SECONDS OF COMPLIANCE`, W / 2, H / 2 + 40, 20, '#3a1030', 'center', '800');
+      text(g, `${Math.round(s.gap!)} SECONDS OF COMPLIANCE`, W / 2, H / 2 + 40, 20, '#3a1030', 'center', '800');
       g.restore(); return;
     }
     if (s.kind === 'quiet') { g.fillStyle = '#0a1420'; g.fillRect(0, 0, W, H); text(g, 'A QUIET NIGHT IN THE CITY', W / 2, H / 2, 40, '#fff', 'center'); text(g, 'Nobody died. Ratings are down 94%.', W / 2, H / 2 + 46, 18, '#9fb6cc', 'center', '700'); bug(g); return; }
-    if (s.kind === 'ad') { if (s.store) storeAd(g, s.store, t, s.dur); else advert(g, s.ad, t, s.dur); return; }
+    if (s.kind === 'ad') { if (s.store) storeAd(g, s.store, t, s.dur); else advert(g, s.ad!, t, s.dur); return; }
     if (s.kind === 'gear') { gearRoom(g, s, t); return; }
     if (s.kind === 'sponsor') {
       const love = s.tone === 'love', gr = g.createLinearGradient(0, 0, W, 0); gr.addColorStop(0, s.tone === 'sad' ? '#1a2a4a' : love ? '#ff9ad2' : '#ffb21a'); gr.addColorStop(1, s.tone === 'sad' ? '#3a4a6a' : love ? '#9a7aff' : '#e8202a'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
@@ -2321,13 +2401,13 @@ const G_Highlights = (() => {
     if (s.kind === 'table') {
       g.fillStyle = '#0a1426'; g.fillRect(0, 0, W, H);
       text(g, 'FINAL STANDINGS', W / 2, 70, 44, '#fff', 'center', '900', '#e8202a');
-      const rank = (st: Rec) => st.kills + (st.arrests || 0) - st.fouls * 2, rows = [...P.stats.entries()].filter(([k]) => k[0] === 'p').sort((a, b) => rank(b[1]) - rank(a[1]));
+      const rank = (st: HlStat) => st.kills + (st.arrests || 0) - st.fouls * 2, rows = [...P.stats.entries()].filter(([k]) => k[0] === 'p').sort((a, b) => rank(b[1]) - rank(a[1]));
       text(g, 'OFFICER', 150, 130, 14, '#9fb6cc'); for (const [x, h] of [[470, 'KILLS'], [550, 'HS'], [630, 'BREACH'], [710, 'CUFFS'], [790, 'FOULS'], [870, 'DOWNED']] as [number, string][]) text(g, h, x, 130, 14, '#9fb6cc', 'center');
       rows.forEach(([k, st], i) => {
         const y = 175 + i * 64, x0 = -900 + ease(t * 2 - i * 0.2) * 900;
         g.save(); g.translate(x0, 0);
         g.fillStyle = i === 0 ? 'rgba(255,210,40,0.25)' : 'rgba(255,255,255,0.06)'; g.fillRect(90, y - 26, 820, 54); g.fillStyle = colOf(k); g.fillRect(90, y - 26, 8, 54);
-        const A = P.actors.get(k); if (A && A.animal) { g.save(); g.translate(108, y - 22); G.Callsigns.draw(g, A.animal, 44, A.color); g.restore(); }
+        const A = P.actors.get(k); if (A && A.animal) { g.save(); g.translate(108, y - 22); G.Callsigns.draw(g, A.animal, 44, A.color!); g.restore(); }
         text(g, (nameOf(k)).toUpperCase() + (i === 0 ? '  ★ MVP' : ''), 160, y, 22, '#fff');
         for (const [x, v] of [[470, st.kills], [550, st.hs], [630, st.breach], [710, st.arrests], [790, st.fouls], [870, st.downs]]) text(g, String(v || 0), x, y, 24, '#fff', 'center');
         g.restore();
@@ -2350,15 +2430,15 @@ const G_Highlights = (() => {
       });
       // and the rounds: what each did, as it goes in
       const ry = 170 + list.length * 34 + 6;
-      const groups: Rec[][] = []; for (const k of P.xtracks || []) (groups[k.g] = groups[k.g] || []).push(k);
+      const groups: HlXtrack[][] = []; for (const k of P.xtracks || []) (groups[k.g] = groups[k.g] || []).push(k);
       groups.slice(0, 4).forEach((ks, i) => {
         const shown = t >= XT0 + i * XT + 0.5; if (!shown || !ks) return;
-        const k = ks[0], r = k.r, tr = ks.flatMap((q: Rec) => q.trace), yawed = tr.some((q: Rec) => q.yawed), exp = tr.some((q: Rec) => q.expanded), am = k.fl.am && (G.AMMO as Record<string, any>)[k.fl.am] ? (G.AMMO as Record<string, any>)[k.fl.am].name : 'round', frags = ks.reduce((a: number, q: Rec) => a + q.frags.length, 0);
-        const thru = ks.filter((q: Rec) => q.r.exitV > 0).length, armd = ks.filter((q: Rec) => q.r.stopped && !q.trace.length).length;
+        const k = ks[0], r = k.r, tr = ks.flatMap((q) => q.trace), yawed = tr.some((q: any) => q.yawed), exp = tr.some((q: any) => q.expanded), am = k.fl.am && (G.AMMO as Record<string, any>)[k.fl.am] ? (G.AMMO as Record<string, any>)[k.fl.am].name : 'round', frags = ks.reduce((a: number, q: Rec) => a + q.frags.length, 0);
+        const thru = ks.filter((q) => q.r.exitV > 0).length, armd = ks.filter((q) => q.r.stopped && !q.trace.length).length;
         const what = k.n > 1 ? `${k.n} PELLETS · ${ks.length} IN THEM · ${thru} THROUGH${armd ? ` · ${armd} ON ARMOUR` : ''}`
           : r.stopped && !k.trace.length ? 'STOPPED BY ARMOUR' : r.exitV > 0 ? `THROUGH, ${Math.round(r.exitV)} m/s out` : `STOPPED ${Math.round((k.endT - k.entryT) * 100)} cm in`;
         const how = [exp ? 'EXPANDED' : null, yawed ? 'TUMBLED' : null, frags ? `${frags} FRAGMENTS` : null].filter(Boolean).join(' · ');
-        const via = [...(k.before || []), ...(r.log || []).map((q: Rec) => q.m)].slice(0, 9).join(' › '); // (what it really went through, layer by layer)
+        const via = [...(k.before || []), ...(r.log || []).map((q: any) => q.m)].slice(0, 9).join(' › '); // (what it really went through, layer by layer)
         g.fillStyle = 'rgba(4,16,30,0.85)'; g.fillRect(24, ry + i * 50 - 4, 330, 48);
         fit(g, `ROUND ${i + 1} · ${am} · ${Math.round(k.vIn)} m/s in`, 40, ry + i * 50 + 8, 300, 14, '#fff', 'left', '900');
         fit(g, what + (how ? ' · ' + how : ''), 40, ry + i * 50 + 24, 300, 12, how ? '#ffb02a' : '#9fdcff', 'left', '800');
@@ -2384,7 +2464,7 @@ const G_Highlights = (() => {
     if (s.xr && P.xo && P.xo.lit.length) {
       const ORG = G.Ballistics.ORG, rows = P.xo.lit.slice(0, 4), more = P.xo.lit.length - rows.length;
       if (more > 0) { g.fillStyle = 'rgba(4,16,30,0.85)'; g.fillRect(W - 268, 118 + 4 * 30, 250, 20); text(g, `+${more} MORE`, W - 28, 128 + 4 * 30, 12, '#ffd27a', 'right', '900'); }
-      rows.forEach(({ o, t: lt }: { o: Rec; t: number }, i: number) => {
+      rows.forEach(({ o, t: lt }, i: number) => {
         const y = 118 + i * 30, k = ease((P.st - lt) * 4), x = W - 18 - 250 * k;
         g.fillStyle = 'rgba(4,16,30,0.85)'; g.fillRect(x, y, 250, 26); g.fillStyle = o.pct >= 100 ? '#ff2a2a' : '#ffb02a'; g.fillRect(x, y, 6, 26);
         text(g, ORG[o.id] ? ORG[o.id].label.toUpperCase() : o.id, x + 16, y + 13, 14, '#fff', 'left', '800');
@@ -2396,10 +2476,10 @@ const G_Highlights = (() => {
     if (moment && s.mSt == null) s.mSt = P.st;
     if (kills) {
       lowerThird(g, k0, foul ? `${nameOf(k0).toUpperCase()}` : `${nameOf(k0).toUpperCase()} · KILL #${c.n}`, c.fl.bo ? `${hype(k0)} · BLED OUT${c.fl.bt ? ' ' + c.fl.bt + ' S LATER' : ''}` : `${hype(k0)}${w ? ' · ' + w.name : ''}${c.fl.d ? ' · ' + c.fl.d + ' M' : ''}${c.fl.ric ? ' · OFF ' + c.fl.ric[0].toUpperCase() : c.fl.wb ? ' · THROUGH ' + c.fl.wb[0].toUpperCase() : ''}`, P.st);
-      if (moment && c.fl.bo && !foul) { const tt = P.st - s.mSt; flatline(g, tt, c.fl.bt); presenters(g, 'shock', tt, LINES.bleed[(c.n + P.seg) % LINES.bleed.length]); }
+      if (moment && c.fl.bo && !foul) { const tt = P.st - s.mSt!; flatline(g, tt, c.fl.bt!); presenters(g, 'shock', tt, LINES.bleed[(c.n + P.seg) % LINES.bleed.length]); }
       else if (moment) {
         const tags = foul ? [c.fl.why === 'civ' ? 'FOUL! CIVILIAN!' : 'FOUL! HE SURRENDERED!'] : [c.fl.br ? 'BREACH & CLEAR!' : null, c.fl.hs ? 'HEADSHOT!!' : null, c.fl.ric ? 'RICOCHET KILL!' : null, c.fl.wb ? 'WALLBANG!' : null, c.fl.ap ? 'STRAIGHT THROUGH THE ARMOUR!' : null, c.fl.long ? `LONG SHOT! ${c.fl.d} M` : null, c.fl.spray ? `${c.fl.spray}-ROUND HOSE-DOWN!` : null, c.fl.sur ? 'SURPRISE PARTY!' : null, c.fl.ws ? 'TAP-OUT DENIED!' : null].filter(Boolean);
-        const tt = P.st - s.mSt, tg = tt - tagWait(s); // (the tagline once they've been seen to go down)
+        const tt = P.st - s.mSt!, tg = tt - tagWait(s); // (the tagline once they've been seen to go down)
         // (smaller and to the left on the x-ray cam, off the body)
         if (tags.length && tg >= 0) bigText(g, tags[Math.min(tags.length - 1, Math.floor(tg / 1.1))]!, foul ? '#ffe23a' : '#fff', tg % 1.1, s.xr ? H * 0.62 : H * 0.42, s.xr ? W * 0.27 : W / 2, s.xr ? 40 : 74);
         const mood = foul ? 'sad' : c.fl.spray ? 'up' : c.fl.sur ? 'laugh' : c.fl.hs || c.fl.br || c.fl.long || c.fl.ap || c.fl.wb || c.fl.ric ? 'shock' : 'up', lines = foul ? LINES[mood] : c.fl.ric ? LINES.ric : c.fl.wb ? LINES.wall : c.fl.spray ? LINES.spray : LINES[mood];
@@ -2408,7 +2488,7 @@ const G_Highlights = (() => {
     } else if (c.kind === 'arrest' && c.hands) { // the surrender before an arrest: hands up
       lowerThird(g, k0, `${nameOf(k0).toUpperCase()} · TALKED DOWN`, `${hype(k0)} · NOT A SHOT FIRED`, P.st, '#ff7ac8');
       if (moment) {
-        const tt = P.st - s.mSt;
+        const tt = P.st - s.mSt!;
         bigText(g, tt < 1.2 ? 'HANDS UP!' : 'DON\'T MOVE!', '#fff', tt % 1.2, H * 0.42, W / 2, 66);
         presenters(g, 'shock', tt, LINES.shock[(c.n + P.seg) % LINES.shock.length]);
       }
@@ -2416,7 +2496,7 @@ const G_Highlights = (() => {
     } else if (c.kind === 'arrest') { // an arrest: hearts, peace and love
       lowerThird(g, k0, `${nameOf(k0).toUpperCase()} · ARREST`, `${hype(k0)} · NOBODY GOT HURT`, P.st, '#ff7ac8');
       if (moment) {
-        const tt = P.st - s.mSt;
+        const tt = P.st - s.mSt!;
         hearts(g, tt, 18);
         bigText(g, tt < 1.6 ? 'CUFFED, NOT STUFFED!' : 'PEACE & LOVE!', '#ff5ab4', tt % 1.6, H * 0.42, W / 2, 62);
         if (tt > 0.6) text(g, '♥  PEACE · LOVE · DUE PROCESS  ♥', W / 2, H * 0.42 + 78, 20, '#fff', 'center', '900', 'rgba(120,20,80,0.6)');
@@ -2428,13 +2508,13 @@ const G_Highlights = (() => {
     } else if (c.kind === 'saved') { // an officer's armour stopping rounds: they're still up
       const n = c.fl.n || 1;
       lowerThird(g, c.v, `${nameOf(c.v).toUpperCase()} · SAVED BY THE ARMOUR`, `${n > 1 ? n + ' rounds' : 'a round'} from a ${nameOf(c.a).toLowerCase()} · stopped cold`, P.st, '#58b8ff');
-      if (moment) { const tt = P.st - s.mSt; bigText(g, tt < 1.3 ? (n > 1 ? `${n} ROUNDS STOPPED!` : 'STOPPED COLD!') : 'NOT TODAY!', '#9fe8ff', tt % 1.3); presenters(g, 'shock', tt, LINES.shock[(P.seg + n) % LINES.shock.length]); }
+      if (moment) { const tt = P.st - s.mSt!; bigText(g, tt < 1.3 ? (n > 1 ? `${n} ROUNDS STOPPED!` : 'STOPPED COLD!') : 'NOT TODAY!', '#9fe8ff', tt % 1.3); presenters(g, 'shock', tt, LINES.shock[(P.seg + n) % LINES.shock.length]); }
       ticker(g, 'BROUGHT TO YOU BY MERIDIAN ARMOR: STOPS WHAT YOUR FEELINGS CAN\'T · LEVEL III. LEVEL HEADS. · ');
       wipe(g, P.st / 0.45, '#58b8ff');
       return;
     } else { // an officer down
       lowerThird(g, c.v, `${nameOf(c.v).toUpperCase()} IS DOWN`, `taken out by a ${nameOf(c.a).toLowerCase()} · the crowd falls silent`, P.st, '#5a8aff');
-      if (moment) { const tt = P.st - s.mSt; bigText(g, 'MAN DOWN!', '#bcd6ff', tt); presenters(g, 'sad', tt, LINES.sad[P.seg % 4]); }
+      if (moment) { const tt = P.st - s.mSt!; bigText(g, 'MAN DOWN!', '#bcd6ff', tt); presenters(g, 'sad', tt, LINES.sad[P.seg % 4]); }
     }
     ticker(g, kills ? (foul ? 'THE LEAGUE WILL REVIEW THIS INCIDENT · THE LEAGUE HAS REVIEWED THIS INCIDENT · NO FURTHER ACTION · ' : c.fl.ric ? 'THE LEAGUE CONFIRMS THE ANGLE WAS LEGAL · PHYSICS: UNDEFEATED · ' : c.fl.wb ? 'COVER IS NOT CONCEALMENT · CONCEALMENT IS NOT COVER · THE WALL HAS BEEN NOTIFIED · ' : `${nameOf(k0).toUpperCase()} IS ON FIRE · ${(P.stats.get(k0) || {}).kills || 0} TONIGHT · `) : 'OUR THOUGHTS ARE WITH THE OFFICER\'S KNEECAPS · ');
     wipe(g, P.st / 0.45, colOf(k0));
@@ -2479,7 +2559,7 @@ const G_Highlights = (() => {
   }
   // a kill sequence's graphics: the count so far in a badge, and at each kill its name (and what made it special)
   const MULTI = ['', 'FIRST BLOOD!', 'DOUBLE KILL!', 'TRIPLE KILL!', 'QUAD KILL!', 'RAMPAGE!!', 'UNSTOPPABLE!!', 'GODLIKE!!!'];
-  function seqGraphics(g: CanvasRenderingContext2D, s: Seg, c: Clip, w: Rec | null) {
+  function seqGraphics(g: CanvasRenderingContext2D, s: Seg, c: Clip, w: ReturnType<typeof defOf>) {
     const k0 = c.a, n = c.kills.filter((q) => q.t <= s.tau).length, lastK = c.kills[n - 1];
     if (s.slow) slowmo(g); else { g.fillStyle = 'rgba(232,32,42,0.9)'; g.fillRect(18, 72, 90, 26); text(g, s.label, 63, 85, 14, '#fff', 'center'); }
     if (s.cam !== 'wide') { g.fillStyle = 'rgba(0,0,0,0.6)'; g.fillRect(18, 104, 200, 24); text(g, (({ helmet: 'HELMET CAM', gun: 'GUN CAM', ots: 'OVER THE SHOULDER', cuff: 'CUFF CAM' }) as Record<string, any>)[s.cam], 28, 116, 12, '#fff', 'left', '800'); }
@@ -2506,7 +2586,7 @@ const G_Highlights = (() => {
   // top, and the trajectory, drawn: its drop below the bore line (gravity, over its time of flight) and its speed bleeding
   // off, the whole way to where it hit, a dot moving along it; under it what it was carrying when it got there
   function bulletGraphics(g: CanvasRenderingContext2D, s: Seg, c: Clip) {
-    const fl = flightOf(c.killShot), el = G.U.clamp(s.tau - c.killShot.t, 0, fl.tof), now = fl.at(el), x = el >= fl.tof ? fl.len : now.x;
+    const fl = flightOf(c.killShot!), el = G.U.clamp(s.tau - c.killShot!.t, 0, fl.tof), now = fl.at(el), x = el >= fl.tof ? fl.len : now.x;
     // (top right, under the slow-motion tag, compact enough to end above the presenters' speech bubble: the left and the
     // middle are the bullet's)
     const bx = W - 300, by = 112, bw = 282, bh = 156;
@@ -2520,8 +2600,8 @@ const G_Highlights = (() => {
     text(g, `${fl.len.toFixed(0)} m`, px0 + pw, py0 + ph + 9, 9, '#9fb6cc', 'right', '700');
     g.setLineDash([4, 4]); g.strokeStyle = 'rgba(255,255,255,0.35)'; g.beginPath(); g.moveTo(px0, py0); g.lineTo(px0 + pw, py0); g.stroke(); g.setLineDash([]);
     const X = (d: number) => px0 + pw * d / fl.len, Yd = (dr: number) => py0 + ph * Math.min(1, dr * 100 / maxDrop), Yv = (v: number) => py0 + ph * (1 - v / vTop);
-    g.strokeStyle = 'rgba(90,184,255,0.8)'; g.lineWidth = 2; g.beginPath(); fl.pts.forEach((p: Rec, i: number) => (i ? g.lineTo(X(p.x), Yv(p.v)) : g.moveTo(X(p.x), Yv(p.v)))); g.stroke();
-    g.strokeStyle = '#ffd24a'; g.lineWidth = 3; g.beginPath(); fl.pts.forEach((p: Rec, i: number) => (i ? g.lineTo(X(p.x), Yd(p.drop)) : g.moveTo(X(p.x), Yd(p.drop)))); g.stroke();
+    g.strokeStyle = 'rgba(90,184,255,0.8)'; g.lineWidth = 2; g.beginPath(); fl.pts.forEach((p, i: number) => (i ? g.lineTo(X(p.x), Yv(p.v)) : g.moveTo(X(p.x), Yv(p.v)))); g.stroke();
+    g.strokeStyle = '#ffd24a'; g.lineWidth = 3; g.beginPath(); fl.pts.forEach((p, i: number) => (i ? g.lineTo(X(p.x), Yd(p.drop)) : g.moveTo(X(p.x), Yd(p.drop)))); g.stroke();
     g.fillStyle = '#fff'; g.beginPath(); g.arc(X(x), Yd(now.drop), 4, 0, 7); g.fill();
     if (el >= fl.tof) { g.fillStyle = '#ff3a3a'; g.beginPath(); g.arc(X(fl.len), Yd(fl.pts[fl.pts.length - 1].drop), 6, 0, 7); g.fill(); }
     text(g, 'DROP', px0 + 4, py0 + ph - 7, 8, '#ffd24a', 'left', '900'); text(g, 'SPEED', px0 + pw - 4, Yv(fl.v0) + 9, 8, '#5ab8ff', 'right', '900');
@@ -2530,10 +2610,10 @@ const G_Highlights = (() => {
     fit(g, `${fl.def ? fl.def.name : ''}${am ? ' · ' + am : ''}${J > 0 ? ' · ' + G.U.fmt(Math.round(J)) + ' J on arrival' : ''}`, bx + 10, by + bh - 28, bw - 20, 11, '#ffd24a', 'left', '800');
     fit(g, `${Math.round(fl.v0)} → ${Math.round(end.v)} m/s · ${(fl.tof * 1000).toFixed(0)} ms · drop ${(end.drop * 100).toFixed(1)} cm`, bx + 10, by + bh - 11, bw - 20, 11, '#fff', 'left', '800');
     // what it went through and off on the way
-    const met = fl.events.filter((e: Rec) => e.k !== 'x' && e.x <= x + 0.01).map((e: Rec) => (e.k === 'r' ? 'OFF ' : 'THROUGH ') + e.name.toUpperCase());
+    const met = fl.events.filter((e) => e.k !== 'x' && e.x <= x + 0.01).map((e) => (e.k === 'r' ? 'OFF ' : 'THROUGH ') + e.name.toUpperCase());
     if (met.length) { g.fillStyle = 'rgba(4,12,24,0.86)'; g.fillRect(bx, by + bh, bw, 20); fit(g, met.slice(-3).join(' · '), bx + 10, by + bh + 14, bw - 20, 11, '#9fdcff', 'left', '800'); }
     // where it is, big
-    if (s.tau >= c.killShot.t - 0.02) {
+    if (s.tau >= c.killShot!.t - 0.02) {
       const live = el >= fl.tof ? 'IMPACT' : `${x.toFixed(1)} M  ·  ${Math.round(now.v)} M/S  ·  +${(el * 1000).toFixed(1)} MS`;
       g.fillStyle = 'rgba(0,0,0,0.55)'; g.fillRect(W / 2 - 230, 72, 460, 40);
       text(g, live, W / 2, 92, el >= fl.tof ? 26 : 22, el >= fl.tof ? '#ff3a3a' : '#fff', 'center', '900');
@@ -2542,12 +2622,12 @@ const G_Highlights = (() => {
   // What the round went through or off, tagged where it happened on screen as it gets there: how fast in and out; how shallow
   // it came in and what it had left
   function eventTags(g: CanvasRenderingContext2D, s: Seg, c: Clip) {
-    const fl = flightOf(c.killShot), el = s.tau - c.killShot.t, x = el >= fl.tof ? fl.len : fl.xAt(Math.max(0, el)), v = new T.Vector3();
-    fl.events.forEach((e: Rec, i: number) => {
+    const fl = flightOf(c.killShot!), el = s.tau - c.killShot!.t, x = el >= fl.tof ? fl.len : fl.xAt(Math.max(0, el)), v = new T.Vector3();
+    fl.events.forEach((e, i: number) => {
       if (e.k === 'x' || e.x > x + 0.01 || !e.name) return;
       v.copy(e.p).project(P.cam);
       if (v.z > 1) return;
-      const out = fl.events.slice(i + 1).find((q: Rec) => q.k === 'x'), vIn = fl.pts[e.i].v, vOut = e.k === 'r' ? (fl.pts[e.i + 1] || fl.pts[e.i]).v : out ? fl.pts[out.i].v : vIn;
+      const out = fl.events.slice(i + 1).find((q) => q.k === 'x'), vIn = fl.pts[e.i].v, vOut = e.k === 'r' ? (fl.pts[e.i + 1] || fl.pts[e.i]).v : out ? fl.pts[out.i].v : vIn;
       const px = G.U.clamp((v.x + 1) / 2 * W, 150, W - 150), py = G.U.clamp((1 - v.y) / 2 * H - 44, 130, H - 130), ice = e.k === 'r';
       const inc = ice ? Math.round(Math.asin(Math.min(1, Math.abs(fl.dirAt(Math.max(0, e.x - 0.05)).dot(new T.Vector3(...e.n))))) * 180 / Math.PI) : 0;
       g.strokeStyle = ice ? '#ffd24a' : '#9fdcff'; g.lineWidth = 2; g.beginPath(); g.moveTo(px, py + 20); g.lineTo((v.x + 1) / 2 * W, (1 - v.y) / 2 * H); g.stroke();
@@ -2569,7 +2649,7 @@ const G_Highlights = (() => {
     text(g, 'presented by IRONVALE ARMS', 22, 112, 11, '#ffd24a', 'left', '800');
     g.save(); g.translate(slide, 0);
     g.fillStyle = 'rgba(6,10,18,0.88)'; g.fillRect(x0, 70, W - x0 - 18, H - 140); g.fillStyle = colOf(k); g.fillRect(x0, 70, W - x0 - 18, 6);
-    if (A.animal) { g.save(); g.translate(x0 + 12, 86); G.Callsigns.draw(g, A.animal, 44, A.color); g.restore(); }
+    if (A.animal) { g.save(); g.translate(x0 + 12, 86); G.Callsigns.draw(g, A.animal, 44, A.color!); g.restore(); }
     fit(g, nameOf(k).toUpperCase() + '\'S LOADOUT', x0 + 64, 108, W - x0 - 100, 20, '#fff');
     fit(g, def.name.toUpperCase(), x0 + 16, 150, W - x0 - 50, 28, '#ffd24a', 'left', '900', '#14080a');
     const cal = G.calOf(def), amN = s.am && (G.AMMO as Record<string, any>)[s.am] ? (G.AMMO as Record<string, any>)[s.am].name : null;
@@ -2597,7 +2677,7 @@ const G_Highlights = (() => {
     ticker(g, `THE GEAR ROOM · ${def.name.toUpperCase()} · ${s.rounds} ROUNDS DOWNRANGE TONIGHT · ALL THIS AND MORE AT VEX'S · `);
   }
   // an ad for something Vex is selling this visit: its icon big, what it is and costs, a line, how many are left
-  function storeAd(g: CanvasRenderingContext2D, p: Rec, t: number, dur: number) {
+  function storeAd(g: CanvasRenderingContext2D, p: HlProduct, t: number, dur: number) {
     const gr = g.createRadialGradient(W * 0.3, H / 2, 40, W / 2, H / 2, W * 0.75); gr.addColorStop(0, '#ff9a2e'); gr.addColorStop(1, '#1d1c18'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
     burst(g, W * 0.27, H * 0.52, 250, 'rgba(255,255,255,0.13)', P.time * 0.4);
     // the product
@@ -2632,7 +2712,7 @@ const G_Highlights = (() => {
     text(g, 'ADVERTISEMENT', W - 16, 18, 10, 'rgba(255,255,255,0.6)', 'right', '700');
   }
   // a fake advert: its colours, its product drawn big and turning, its line, small print
-  function advert(g: CanvasRenderingContext2D, a: Rec, t: number, dur: number) {
+  function advert(g: CanvasRenderingContext2D, a: HlAdvert, t: number, dur: number) {
     const gr = g.createRadialGradient(W / 2, H / 2, 40, W / 2, H / 2, W * 0.7); gr.addColorStop(0, a.col[0]); gr.addColorStop(1, a.col[1]); g.fillStyle = gr; g.fillRect(0, 0, W, H);
     burst(g, W * 0.3, H * 0.5, 260, 'rgba(255,255,255,0.12)', P.time * 0.5);
     g.save(); g.translate(W * 0.3, H * 0.52 + Math.sin(t * 3) * 10); g.rotate(Math.sin(t * 1.4) * 0.12); g.scale(ease(t * 2), ease(t * 2));
@@ -2643,7 +2723,7 @@ const G_Highlights = (() => {
     text(g, a.sub, W / 2, H - 20, 11, 'rgba(255,255,255,0.75)', 'center', '700');
     text(g, 'ADVERTISEMENT', W - 16, 18, 10, 'rgba(255,255,255,0.6)', 'right', '700');
   }
-  function product(g: CanvasRenderingContext2D, art: string, col: string) {
+  function product(g: CanvasRenderingContext2D, art: string, col: string[]) {
     g.lineWidth = 5; g.strokeStyle = '#14080a';
     const rr = (x: number, y: number, w: number, h: number, c: string) => { g.fillStyle = c; g.fillRect(x, y, w, h); g.strokeRect(x, y, w, h); };
     if (art === 'box') { rr(-70, -110, 140, 200, col[1]); rr(-60, -90, 120, 60, '#fff'); text(g, 'CRUNCH', 0, -60, 24, col[1], 'center'); for (let i = 0; i < 6; i++) { g.fillStyle = col[0]; g.beginPath(); g.arc(-30 + (i % 3) * 30, 20 + Math.floor(i / 3) * 30, 11, 0, 7); g.fill(); } }
@@ -2660,7 +2740,7 @@ const G_Highlights = (() => {
   // ================================================================ sound: the crowd, the stingers, the presenters
   function audio(on: boolean) {
     const A = G.Audio, c = A.ctx;
-    if (!on) { if (P.au) { try { P.au.bed.stop(); } catch (e) { /* stopped */ } P.au.out.disconnect(); P.au.mix.disconnect(); P.au = null; } return; }
+    if (!on) { if (P.au) { try { P.au.bed!.stop(); } catch (e) { /* stopped */ } P.au.out.disconnect(); P.au.mix.disconnect(); P.au = null; } return; }
     if (!c || P.au) return;
     const out = c.createGain(); out.gain.value = 0; out.connect(A.master);
     const len = c.sampleRate * 2, buf = c.createBuffer(1, len, c.sampleRate), d = buf.getChannelData(0);
@@ -2682,7 +2762,7 @@ const G_Highlights = (() => {
   // Where a sound goes: live, into the TVs' mix now; or, while a video's being made, into its offline context at the
   // export's clock (AT.t; AT.d: how far ahead, for the reactions that come a moment later)
   const AT: any = { ctx: null, dest: null, t: 0, d: 0 };
-  const actx = () => AT.ctx || G.Audio.ctx, anow = () => (AT.ctx ? AT.t : G.Audio.ctx.currentTime) + AT.d, adest = () => AT.dest || P.au.mix;
+  const actx = () => AT.ctx || G.Audio.ctx, anow = () => (AT.ctx ? AT.t : G.Audio.ctx.currentTime) + AT.d, adest = () => AT.dest || P.au!.mix;
   function later(d: number, f: () => void) { if (AT.ctx || AT.rec) { AT.d += d; try { f(); } finally { AT.d -= d; } } else setTimeout(f, d * 1000); }
   // a recorded crowd sound (js/audio.ts samples), into the TVs' sound; rate glides to rateEnd over the clip if given.
   // False when it isn't loaded (the synthesised one stands in)
@@ -2701,7 +2781,7 @@ const G_Highlights = (() => {
   }
   function noiseBurst(t: number, dur: number, f: number, q: number, gain: number, type: BiquadFilterType = 'bandpass', fEnd?: number | null) {
     dur = Math.min(dur, SHORT); gain *= QUIET;
-    const c = actx(), s = c.createBufferSource(); s.buffer = P.au.buf;
+    const c = actx(), s = c.createBufferSource(); s.buffer = P.au!.buf;
     const fl = c.createBiquadFilter(); fl.type = type; fl.frequency.setValueAtTime(f, t); if (fEnd) fl.frequency.exponentialRampToValueAtTime(fEnd, t + dur); fl.Q.value = q;
     const gn = c.createGain(); gn.gain.setValueAtTime(0.0001, t); gn.gain.exponentialRampToValueAtTime(gain, t + Math.min(0.25, dur * 0.3)); gn.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     s.connect(fl); fl.connect(gn); gn.connect(adest()); s.start(t, Math.random()); s.stop(t + dur + 0.05);

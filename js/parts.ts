@@ -15,20 +15,34 @@
 // weight (kg). Absolutes in `set`: cap (rounds), zoom (ADS FOV multiplier), barrelIn (inches, for the
 // gunshot synth), device (muzzle device, ditto), sup (suppressed).
 // ---------------------------------------------------------------------------
-interface Part { // a part as the catalog holds it (the rest of its fields vary by slot: model, set, provides, chassis, not, alsoMounts, ...)
-  [field: string]: any; id: string; idx: number; slot: string; mount: string; st: Record<string, number>; set: Record<string, any>; tier: number;
+/** The kind of a slot on a weapon platform (a part's own slot is always one of these). */
+type SlotKind = 'receiver' | 'slide' | 'barrel' | 'limbs' | 'muzzle' | 'handguard' | 'railmount' | 'pump' | 'fg' | 'tac' | 'optic' | 'magnifier' | 'charging' | 'grip' | 'stock' | 'mag' | 'tube' | 'loader' | 'cap' | 'motor';
+/** A slot's name: its kind, an adapter's slot (buttstock, riserdot, the left tactical rail), or one of those again, numbered, where adapters nest. */
+type SlotName = SlotKind | 'buttstock' | 'riserdot' | 'tacL' | `${SlotKind | 'buttstock' | 'riserdot' | 'tacL'}${number}`;
+/** What a part sets outright (absolutes, where its st are deltas). */
+interface PartSet {
+  cap?: number; zoom?: number; scoped?: boolean; reticle?: string; magnif?: any; levels?: number[] | null; barrelIn?: number; device?: string; sup?: boolean; can?: string;
+  ported?: boolean; shell?: number; reload?: number; magnifier?: number; full?: boolean; perLoad?: number; laser?: string; light?: number;
+}
+/** What a part changes in the model spec (a patch: a nested spec only has the keys it changes). */
+type PartModel = Omit<RecipeSpec<string | null>, 'mag' | 'hg' | 'pump'> & { mag?: Partial<MagSpec<string | null>>; hg?: Partial<HgSpec<string | null>>; pump?: Record<string, any>; pumpPatch?: Record<string, any> };
+interface Part { // a part as the catalog holds it
+  id: string; idx: number; slot: SlotKind; mount: string; st: Record<string, number>; set: PartSet; tier: number;
+  brand: string; name: string; desc: string; price: number; model?: PartModel; provides?: Record<string, string | { mount: string; bare?: boolean; brace?: Record<string, number> }> | null;
+  chassis?: Record<string, string | { mount: string; bare?: boolean; brace?: Record<string, number> }>; not?: string[]; alsoMounts?: string[]; factory?: boolean; oem?: boolean; fam?: string; plat?: string;
+  stype?: string; variant?: boolean; retired?: boolean; becomes: string /* (a receiver kit: the gun it makes) */;
 }
 interface MagFam {
   name: string; brand: string; clear?: string; std: number; straightShort?: boolean; model: Record<string, any>; desc: string;
   caps: [number, boolean, number, Record<string, number>, number][];
 }
 interface Slot { // a slot on a weapon platform (a nested one also has the parent slot it opens from)
-  [field: string]: any; slot: string; mount: string; req: boolean; bare?: boolean; parent?: string | null;
+  slot: SlotName; mount: string; req: boolean; bare?: boolean; parent?: string | null; brace?: Record<string, number>;
 }
-interface Platform { [field: string]: any; id: string; slots: Slot[]; defaults: Record<string, string>; }
+interface Platform { id: string; arch: ArchKind; spec: ModelSpec; slots: Slot[]; defaults: Record<string, string>; offset?: Record<string, number>; magVariants?: boolean; kg?: number; ergo?: number; }
 type RcvKit = [string, string, number, number, string]; // brand, name, price, tier, description
 const G_Gunsmith = (() => {
-  const PARTS: Record<string, any> = {}, LIST: Part[] = [], PLATFORMS: Record<string, any> = {}, BY_MOUNT = new Map<string, Part[]>();
+  const PARTS: Record<string, Part> = {}, LIST: Part[] = [], PLATFORMS: Record<string, Platform> = {}, BY_MOUNT = new Map<string, Part[]>();
   // Shared magazines (G.MAG_FAMILY): [capacity, drum?, price, stats, tier] for each, std the standard one
   const MAG_FAMS: Record<string, MagFam> = {
     stanag: { name: 'STANAG 5.56', brand: 'Graywater Arms', clear: 'Meridian Armor', std: 30, straightShort: true, model: { t: 'curved', len: 0.19, d: 0.066, c: 0.026, st: 0.28, ribs: 2, w: 0.024, well: 'black' }, desc: 'The NATO pattern: fits the M4, HK416, F2000, Tavor, SCAR-L, M27, MCX, G36 and AUG.',
@@ -272,7 +286,7 @@ const G_Gunsmith = (() => {
   // rifle's sight line. (In place of the old reflex-on-a-riser: same id.) Every pistol dot fits it.
   Object.assign(PARTS['op.pic.12'], { name: 'Halcyon pistol optic riser', price: 120, tier: 1, st: { weight: 0.05 }, set: {}, model: { optic: 'riser', riser: 0.022 }, provides: { riserdot: 'op:rmr' },
     desc: 'Lifts a pistol red dot to rifle height on a rail. Mount one on it.' });
-  for (const p of BY_MOUNT.get('op:pso')!) if (p.model.optic === 'minidot') { p.alsoMounts = ['op:rmr']; if (!BY_MOUNT.has('op:rmr')) BY_MOUNT.set('op:rmr', []); BY_MOUNT.get('op:rmr')!.push(p); }
+  for (const p of BY_MOUNT.get('op:pso')!) if (p.model!.optic === 'minidot') { p.alsoMounts = ['op:rmr']; if (!BY_MOUNT.has('op:rmr')) BY_MOUNT.set('op:rmr', []); BY_MOUNT.get('op:rmr')!.push(p); }
   // Magnifiers: behind a red dot or holographic sight, flipped in or out of the way (scroll while aiming)
   [['bright', 'Brightline 2× micro magnifier', 2, 0.07, 300, { ergo: -2, weight: 0.2 }, 1], ['strix', 'Strix FTS 3× flip magnifier', 3, 0.085, 420, { ergo: -4, weight: 0.3 }, 2],
     ['meridian', 'Meridian 5× flip magnifier', 5, 0.1, 640, { ergo: -6, weight: 0.38 }, 3]]
@@ -373,7 +387,7 @@ const G_Gunsmith = (() => {
     PLATFORMS[id] = plat;
     const brandA = pick(pi), brandB = pick(pi + 7), brandC = pick(pi + 13);
     pi++;
-    const slot = (name: string, mount: string, req?: boolean, bare?: boolean) => plat.slots.push({ slot: name, mount, req: !!req, bare: !!bare }); // bare: nothing fitted from the factory
+    const slot = (name: string, mount: string, req?: boolean, bare?: boolean) => plat.slots.push({ slot: name as SlotName, mount, req: !!req, bare: !!bare }); // bare: nothing fitted from the factory
     const factory = (slotName: string, mount: string, o: any) => {
       const p = add(Object.assign({ id: `${id}.${slotName}`, slot: slotName, mount, brand: 'Factory', name: `${def.name} ${SLOT_LABEL[slotName].toLowerCase()}`, desc: 'Factory part.', price: 0, factory: true, plat: id }, o));
       plat.defaults[slotName] = p.id;
@@ -791,7 +805,7 @@ const G_Gunsmith = (() => {
   // What it sells back for: half that. A gun's own parts, with no price of their own, go for a tenth of the gun at most,
   // so stripping one for its parts and trading in the rest never comes to more than it cost.
   const sellPrice = (p: Part) => {
-    const half = Math.floor(buyPrice(p) * 0.5), gun = p.factory && !p.price && G.WEAPONS[p.plat];
+    const half = Math.floor(buyPrice(p) * 0.5), gun = p.factory && !p.price && G.WEAPONS[p.plat!];
     return gun ? Math.min(half, Math.max(5, Math.floor((gun.price || 0) * 0.1))) : half;
   };
   // A standard grip with nothing to it (js/parts.ts std): the stock one on the guns that come with it, so it stays in
@@ -815,7 +829,7 @@ const G_Gunsmith = (() => {
     for (const sl of slotsOf(id, build)) if (!build[sl.slot] && EMPTY[kindOf(sl.slot)] && !sl.bare) for (const [k, v] of Object.entries(EMPTY[kindOf(sl.slot)])) s[k] += v; // e.g. no stock
     // a stock on a slot a handgun's given one by (sl.brace: a chassis's, an SMG stock mount's): what bracing it on your
     // shoulder does, on top of the stock's own figures (they're for a stock on an SMG, against another stock)
-    for (const sl of slotsOf(id, build)) { const sp = sl.brace && PARTS[build[sl.slot]]; if (sp && sp.stype !== 'folded' && !isAdapter(sp)) for (const [k, v] of Object.entries(sl.brace)) s[k] += v; }
+    for (const sl of slotsOf(id, build)) { const sp = sl.brace && PARTS[build[sl.slot]]; if (sp && sp.stype !== 'folded' && !isAdapter(sp)) for (const [k, v] of Object.entries(sl.brace!)) s[k] += v; }
     let perLoad = 1, levels = null, magnifier = 0, light = 0, laser = null, laserHip = 0, laserHipSum = 0, cap = base.mag, zoom = base.zoom, barrelIn = gs.barrel, device = gs.muzzleDevice || 'none', can = gs.suppressor || null, sup = false, hasMuzzleSlot = false, shell = base.shell, reload = base.reload, fullSt = null, scoped = base.zoom <= 0.5, reticle = 'cross', magnif = scoped ? scopeMag({}, base.zoom) : 1;
     const parts = Object.values(build).map((p) => PARTS[p]).filter(Boolean);
     for (const p of parts) {
@@ -881,9 +895,9 @@ const G_Gunsmith = (() => {
     // a light and a laser (switched on in the field); the laser's hip-fire help only counts while it's on
     d.light = light; d.laser = laser;
     d.spreadNoLaser = laserHip ? base.spread * clamp(1 + (s.hip - laserHip + s.acc * 0.35) / 100, 0.3, 2) : null;
-    d.ergo = Math.round(plat.ergo + s.ergo);
+    d.ergo = Math.round(plat.ergo! + s.ergo);
     d.handling = clamp(1 + s.ergo / 100, 0.55, 1.45);
-    d.weight = Math.max(0.3, plat.kg + s.weight);
+    d.weight = Math.max(0.3, plat.kg! + s.weight);
     d.sup = sup;
     d.device = device;
     d.can = device === 'suppressor' ? can || 'full' : null; // which suppressor (the synth's)
@@ -1141,11 +1155,11 @@ const G_Gunsmith = (() => {
   function rollPrecision(level: number, seed: number, n = 8) {
     const r = G.U.rng((seed ^ 0x5c09e) >>> 0), maxTier = Math.min(3, 2 + Math.floor(level / 2)), his = rollStock(level, seed);
     const ok = (p: Part) => !p.factory && !p.retired && !his.has(p.id) && (p.tier || 1) <= maxTier;
-    const take = (list: any, k: any) => G.U.shuffle(r, list.filter(ok)).slice(0, k).map((p) => p.id);
-    const magnified = LIST.filter((p) => p.slot === 'optic' && p.model && ['scope', 'lpvo', 'acog'].includes(p.model.optic));
+    const take = (list: Part[], k: number) => G.U.shuffle(r, list.filter(ok)).slice(0, k).map((p) => p.id);
+    const magnified = LIST.filter((p) => p.slot === 'optic' && p.model && (['scope', 'lpvo', 'acog'] as (string | undefined)[]).includes(p.model.optic));
     const scopes = take(magnified.filter((p) => !p.oem), 3); // (the named glass first; the plain rifle scopes the guns ship with if it's short)
     if (scopes.length < 3) scopes.push(...take(magnified.filter((p) => p.oem), 3 - scopes.length));
-    const long = (cls: any) => LIST.filter((p) => p.slot === 'barrel' && p.id.endsWith('.br.long') && G.WEAPONS[p.plat] && cls.includes(G.WEAPONS[p.plat].cls));
+    const long = (cls: any) => LIST.filter((p) => p.slot === 'barrel' && p.id.endsWith('.br.long') && G.WEAPONS[p.plat!] && cls.includes(G.WEAPONS[p.plat!].cls));
     const barrels = take(long(['SNP', 'DMR']), 4);
     if (barrels.length < 4) barrels.push(...take(long(['BR', 'AR', 'LMG']), 4 - barrels.length));
     return [...scopes, ...(ok(PARTS['fg.4']) ? ['fg.4'] : []), ...barrels].slice(0, n);

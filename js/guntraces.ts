@@ -5,10 +5,14 @@
 // photo's left. top, bot: the slide's edges, rear to front. port: the ejection port's ends, along x. sights: where the rear
 // and front sights stand. hold: the middle of the firing hand. lug: where a stock clips on. tac: the front of an accessory and the underside it hangs from: far enough on that its body clears the trigger guard.
 // parts: outlines, see js/gunmodels.ts tracedParts.
+/** One outline of a traced gun (js/gunmodels.ts tracedParts): the outline in photo pixels (pts, or strips of them), its width w, bevel b, material name m, offset x, the part it rides on, and holes cut in it. */
+interface TracePart { on?: string; [field: string]: any }
+/** A gun traced from a photograph (the header says what each field is; the odd ones, each recipe's own, are left open). */
+interface GunTrace { ref?: string; parts: TracePart[]; [field: string]: any }
 {
 const ring = (x: number, y: number, r: number, n = 14) => Array.from({ length: n }, (_, i) => [x + Math.cos((i / n) * Math.PI * 2) * r, y + Math.sin((i / n) * Math.PI * 2) * r]);
 const pill = (x0: number, y0: number, x1: number, y1: number) => { const r = (y1 - y0) / 2, c = [], n = 6; for (let i = 0; i <= n; i++) { const a = -Math.PI / 2 + Math.PI * i / n; c.push([x1 - r + Math.cos(a) * r, y0 + r + Math.sin(a) * r]); } for (let i = 0; i <= n; i++) { const a = Math.PI / 2 + Math.PI * i / n; c.push([x0 + r + Math.cos(a) * r, y0 + r + Math.sin(a) * r]); } return c; }; // (a stadium: a long port)
-var G_GunTraces = {
+var G_GunTraces: Record<string, GunTrace> = {
   // Walther P99, left side: 175 mm. The slide's rear corner sweeps down in one curve; a raised grip panel, a long
   // finger-rest shelf at the heel, the trigger guard's squared front.
   p9: {

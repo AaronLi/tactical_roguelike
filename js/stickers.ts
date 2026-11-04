@@ -18,15 +18,16 @@
 const G_Stickers = (() => {
   const DIR = 'assets/stickers/', EXT = /\.(png|webp|jpe?g|gif|avif)$/i;
   interface Skin { s: string; p: number[]; n: number[]; r: number; k: number; f: number | boolean }
-  interface Pic { bm: any; w: number; h: number; bad: boolean; tex: any; mat: any; ghost: any; ready: Promise<any>; [k: string]: any }
+  interface Pic { bm: ImageBitmap | null; w: number; h: number; bad: boolean; tex: THREE.Texture | null; mat: THREE.MeshStandardMaterial | null; ghost: THREE.MeshStandardMaterial | null; ready: Promise<Pic> }
+  type StkMesh = THREE.Mesh<THREE.BufferGeometry, THREE.Material | THREE.Material[]>;
   interface Poly { p: THREE.Vector3; q: THREE.Vector3; n: THREE.Vector3 }
   interface Tri { si: number; v: THREE.Vector3[]; q: THREE.Vector3[]; ln: THREE.Vector3[]; n: THREE.Vector3; T: THREE.Matrix4 | null; seed: boolean; c: number[] }
-  interface Surf { mesh: any; rel: THREE.Matrix4 }
+  interface Surf { mesh: StkMesh; rel: THREE.Matrix4 }
   const S = { base: '', names: [] as string[], MAX: 12, MIN_K: 0.012, MAX_K: 0.07 }; // (MAX on a gun; k's range, m. base: the game's folder, from a worker's: js/exportworker.ts)
-  const ok = (n: any) => typeof n === 'string' && n.length < 100 && EXT.test(n) && !/[\\/]|^\./.test(n);
+  const ok = (n: unknown): n is string => typeof n === 'string' && n.length < 100 && EXT.test(n) && !/[\\/]|^\./.test(n);
 
   // ---------------------------------------------------------------- which there are
-  let loading: any = null;
+  let loading: Promise<string[]> | null = null;
   function load() {
     if (loading) return loading;
     const names = (a: any[]) => [...new Set(a.map((n: any) => { try { return decodeURIComponent(String(n)).split('/').pop(); } catch (e) { return ''; } }).filter(ok))].sort();
@@ -55,14 +56,14 @@ const G_Stickers = (() => {
     }
     return p;
   }
-  function set(p: Pic, bm: any) {
+  function set(p: Pic, bm: ImageBitmap) {
     p.bm = bm; p.w = bm.width || 1; p.h = bm.height || 1; p.bad = false;
     if (p.tex) { p.tex.image = bm; p.tex.needsUpdate = true; }
     return p;
   }
   // a picture handed over (a replay's file brought its own: js/highlights.ts renderPack, in the worker)
-  function provide(name: string, bm: any) { const p = pics.get(name) || pic(name); set(p, bm); p.ready = Promise.resolve(p); }
-  function material(name: string, ghost?: any) {
+  function provide(name: string, bm: ImageBitmap) { const p = pics.get(name) || pic(name); set(p, bm); p.ready = Promise.resolve(p); }
+  function material(name: string, ghost?: boolean | Skin | null) {
     const p = pic(name);
     if (!p.tex) {
       // (an ImageBitmap isn't turned over on upload: its top row is v = 0, as the decals' UVs have it)
@@ -106,14 +107,14 @@ const G_Stickers = (() => {
   }
   // the meshes under a gun's root a sticker can go on (its own parts: not a sight's glass, a glow, a sticker), each with
   // its place in the root's frame, as they are now
-  function surfaces(root: any): Surf[] {
+  function surfaces(root: THREE.Object3D): Surf[] {
     root.updateMatrixWorld(true);
     const inv = root.matrixWorld.clone().invert(), out: Surf[] = [];
-    root.traverse((o: any) => {
+    root.traverse((o: THREE.Object3D & Record<string, any>) => {
       if (!o.isMesh || o.userData.sticker || o.userData.noSticker || !o.geometry || !o.geometry.attributes.position) return;
       const m = Array.isArray(o.material) ? o.material[0] : o.material;
       if (!m || m.transparent || m.isMeshBasicMaterial || m.isShaderMaterial) return;
-      out.push({ mesh: o, rel: inv.clone().multiply(o.matrixWorld) });
+      out.push({ mesh: o as StkMesh, rel: inv.clone().multiply(o.matrixWorld) });
     });
     return out;
   }
@@ -132,30 +133,30 @@ const G_Stickers = (() => {
   // turned about the edge it shares with the last (every turn added to the last), so the surface comes flat into the
   // sticker's plane however it bends, over a corner, round a tube, down the far side. What ends up outside the picture
   // stops it there. Each mesh's share of it is a mesh of its own, a child of that one (so it moves with it).
-  function place(sfs: Surf[], s: Skin, ghost?: any): any[] {
+  function place(sfs: Surf[], s: Skin, ghost?: boolean | Skin | null): THREE.Mesh[] {
     const pc = pic(s.s);
     if (!pc.bm) return [];
     const { M: F, w, h, d } = frame(s, pc.w / pc.h), Fi = F.clone().invert(), W = Math.abs(w), reach = Math.hypot(W, h) / 2 + 0.003;
-    const tris: Tri[] = [], edges = new Map<string, any[]>(), ids = new Map<string, number>();
+    const tris: Tri[] = [], edges = new Map<string, [Tri, THREE.Vector3, THREE.Vector3][]>(), ids = new Map<string, number>();
     const idOf = (v: THREE.Vector3) => { const k = `${Math.round(v.x * 2e4)},${Math.round(v.y * 2e4)},${Math.round(v.z * 2e4)}`; let i = ids.get(k); if (i == null) ids.set(k, (i = ids.size)); return i; };
     const e1 = new THREE.Vector3(), e2 = new THREE.Vector3();
     sfs.forEach((sf: Surf, si: number) => {
       const geo = sf.mesh.geometry, M = Fi.clone().multiply(sf.rel);
       if (!geo.boundingBox) geo.computeBoundingBox();
-      const bb = geo.boundingBox.clone().applyMatrix4(M);
+      const bb = geo.boundingBox!.clone().applyMatrix4(M);
       if (bb.min.x > reach || bb.max.x < -reach || bb.min.y > reach || bb.max.y < -reach || bb.min.z > reach || bb.max.z < -reach) return;
       const pos = geo.attributes.position, nor = geo.attributes.normal, idx = geo.index, cnt = idx ? idx.count : pos.count;
       const lo = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
       for (let i = 0; i + 2 < cnt; i += 3) {
         const iv = [0, 1, 2].map((j) => (idx ? idx.getX(i + j) : i + j));
-        for (let j = 0; j < 3; j++) lo[j].fromBufferAttribute(pos, iv[j]);
+        for (let j = 0; j < 3; j++) lo[j].fromBufferAttribute(pos as THREE.BufferAttribute, iv[j]);
         const v = lo.map((q) => q.clone().applyMatrix4(M));
         if (Math.min(v[0].x, v[1].x, v[2].x) > reach || Math.max(v[0].x, v[1].x, v[2].x) < -reach || Math.min(v[0].y, v[1].y, v[2].y) > reach || Math.max(v[0].y, v[1].y, v[2].y) < -reach || Math.min(v[0].z, v[1].z, v[2].z) > reach || Math.max(v[0].z, v[1].z, v[2].z) < -reach) continue;
         const fn = new THREE.Vector3().crossVectors(e1.subVectors(v[1], v[0]), e2.subVectors(v[2], v[0]));
         if (fn.lengthSq() < 1e-16) continue;
         fn.normalize();
         const lf = new THREE.Vector3().crossVectors(e1.subVectors(lo[1], lo[0]), e2.subVectors(lo[2], lo[0])).normalize();
-        const t = { si, v, q: lo.map((q) => q.clone()), ln: iv.map((k) => (nor ? new THREE.Vector3().fromBufferAttribute(nor, k) : lf.clone())), n: fn, T: null, seed: false } as Tri; // (its c: set below)
+        const t = { si, v, q: lo.map((q) => q.clone()), ln: iv.map((k) => (nor ? new THREE.Vector3().fromBufferAttribute(nor as THREE.BufferAttribute, k) : lf.clone())), n: fn, T: null, seed: false } as Tri; // (its c: set below)
         const c = v.map(idOf);
         for (let j = 0; j < 3; j++) { const a = c[j], b = c[(j + 1) % 3], k = a < b ? `${a}|${b}` : `${b}|${a}`; let l = edges.get(k); if (!l) edges.set(k, (l = [])); l.push([t, v[j], v[(j + 1) % 3]]); }
         t.c = c; tris.push(t);
@@ -204,14 +205,14 @@ const G_Stickers = (() => {
     }
     return out;
   }
-  function strip(root: any, kind?: any) {
-    const gone: any[] = [];
-    root.traverse((o: any) => { if (o.userData.sticker && (kind == null || o.userData.sticker === kind)) gone.push(o); });
+  function strip(root: THREE.Object3D, kind?: number | string) {
+    const gone: StkMesh[] = [];
+    root.traverse((o: THREE.Object3D & Record<string, any>) => { if (o.userData.sticker && (kind == null || o.userData.sticker === kind)) gone.push(o as StkMesh); });
     for (const o of gone) { o.removeFromParent(); o.geometry.dispose(); }
   }
   // A gun's stickers on its model (root: the model's root, the gun's own frame): any it had come off first. The meshes
   // are taken as they are now; a picture still loading goes on when it's in (if the model hasn't been given others since).
-  function decorate(root: any, skin: any) {
+  function decorate(root: (THREE.Object3D & Record<string, any>) | null | undefined, skin: any) {
     if (!root) return;
     strip(root, 1);
     const list = clean(skin);
@@ -222,7 +223,7 @@ const G_Stickers = (() => {
     if (wait.length) Promise.all(wait.map((p) => p.ready)).then(go); else go();
   }
   // a placement being tried (the gunsmith's sticker tool): shown faint, any other tried one gone; null clears it
-  function ghost(root: any, s: any) {
+  function ghost(root: (THREE.Object3D & Record<string, any>) | null | undefined, s: Skin | null) {
     if (!root) return;
     strip(root, 'ghost');
     root.userData.stkGhost = s;
@@ -233,7 +234,7 @@ const G_Stickers = (() => {
   }
 
   // ---------------------------------------------------------------- the squad: a list's hash, and the lists by hash
-  const hashes = new WeakMap(), reg = new Map(), sent = new Set(), asked = new Map();
+  const hashes = new WeakMap<object, string>(), reg = new Map<string, Skin[]>(), sent = new Set<string>(), asked = new Map<string, number>();
   function key(skin: any) {
     if (!skin || !skin.length) return '';
     let h = hashes.get(skin);
@@ -252,15 +253,15 @@ const G_Stickers = (() => {
     return h;
   }
   // someone's, by its hash (null till it's known: asked for, now and then)
-  function of(h: any) {
+  function of(h: unknown) {
     if (!h || typeof h !== 'string') return null;
     const l = reg.get(h);
     if (l) return l;
     const t = performance.now();
-    if (!(asked.get(h) > t - 3000) && G.Net && G.Net.myId) { asked.set(h, t); G.Net.toHost({ t: 'skinReq', h }); }
+    if (!((asked.get(h) || 0) > t - 3000) && G.Net && G.Net.myId) { asked.set(h, t); G.Net.toHost({ t: 'skinReq', h }); }
     return null;
   }
-  function learn(h: any, l: any) { if (typeof h === 'string' && h.length < 24) reg.set(h, clean(l)); }
+  function learn(h: unknown, l: any) { if (typeof h === 'string' && h.length < 24) reg.set(h, clean(l)); }
   // joined a game: what this host has heard of, and ours to tell it again
   function joined(list: any) { sent.clear(); for (const [h, l] of Array.isArray(list) ? list : []) learn(h, l); }
 

@@ -15,7 +15,7 @@
     "strictFunctionTypes": true,
     "strictBindCallApply": true,
     "alwaysStrict": true,
-    "noImplicitThis": false,
+    "noImplicitThis": true,
     "useUnknownInCatchVariables": true,
     "noImplicitReturns": true,
     "noUnusedLocals": true,

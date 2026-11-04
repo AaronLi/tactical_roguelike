@@ -2,35 +2,112 @@
 // Host-authoritative simulation: lobby/phase flow, suspect + civilian AI, doors, compliance and arrests,
 // damage resolution, objectives and the vote to leave.
 // Only runs on the hosting peer. Talks to clients exclusively through G.Net.
-const STATE_CODE: Record<string, number> = { normal: 0, flee: 0, surrender: 1, cuffed: 2, cower: 3 };
+const STATE_CODE: Partial<Record<EnemyState, number>> = { normal: 0, flee: 0, surrender: 1, cuffed: 2, cower: 3 };
 type Tbl = Record<string, any>;
 interface Loose { [k: string]: any }
-interface Door extends Loose { id: number; open: boolean }
-interface Evidence extends Loose { i: number }
+// The kinds of message the host's handle() switches on (what an officer's game sends it with G.Net.toHost: the `t` field)
+type NetMsgKind = 'hello' | 'st' | 'rfx' | 'bstk' | 'hole' | 'dhit' | 'rpath' | 'skin' | 'skinReq' | 'hit' | 'saved' | 'shot' | 'nade' | 'flash' | 'glass' | 'crack' | 'boom' | 'revive' | 'course' | 'crun' | 'treat' | 'applying' | 'vote' | 'ready' | 'arm' | 'pick' | 'chat' | 'ff' | 'ping' | 'drop' | 'take' | 'useDoor' | 'kickDoor' | 'shout' | 'openCase' | 'openAbox' | 'takeAbox' | 'openSbox' | 'teamEdit' | 'openCab' | 'cabEdit' | 'turn' | 'drag' | 'cuff' | 'stake' | 'sgive' | 'secure';
+// A message off the wire: its kind, and whatever else that kind carries (dynamic: checked where it's read)
+interface NetMsg { t: NetMsgKind; [k: string]: any }
+type DamageMap = Parameters<typeof G.Damage.apply>[0]; // (what js/damage.ts takes for a map)
+type FlPt = LvPt & { fl?: number }; // (a cover or wall spot, and the floor it's on)
+type CabLayout = any[][] & { left?: [string, number][] }; // (a cabinet's items, and what didn't fit)
+type MapCivSpots = LvMap & { civSpots?: { x: number; z: number; yaw: number }[] | null };
+type SvWin = LvWin & { cracked?: boolean; fy?: number }; // (a window, and whether it's fractured, and the floor's height)
+type SvRoom = LvRoom & { out?: boolean };
+type EnemyKind = 'suspect' | 'grunt' | 'rusher' | 'marksman' | 'heavy' | 'warden' | 'civ'; // (G.ENEMIES' keys)
+type ArmourKind = 'vest' | 'helmet' | 'face' | 'shoulder' | 'groin' | 'legs'; // (G.ENEMY_GEAR.odds' keys)
+type ServerPhase = 'lobby' | 'route' | 'level' | 'shop' | 'gameover';
+// What a suspect or civilian is doing ('hide': a civilian behind cover; 'dead' is only ever tested for)
+type EnemyState = 'normal' | 'flee' | 'surrender' | 'cuffed' | 'cower' | 'hide' | 'dead';
+interface Door extends LvDoor { fy?: number; fallen?: boolean; hp?: Tbl }
+interface Evidence { i: number; wpn: string; x: number; y: number; z: number; owner: number; secured: boolean; taken: boolean }
 interface Loot { id: number; x: number; y: number; z: number; item: any; yaw: number; fit?: number }
 interface Cab { open: boolean; ver: number; items: any[][] }
-interface PState { [k: string]: any; p: number[] } // a player's last state (position p: [x, y, z])
-interface Player { [k: string]: any; id: string; name: string; ready: boolean; st: PState }
-interface Enemy { [k: string]: any; id: number; type: string; def: any; x: number; y: number; z: number; yaw: number; hp: number; state: string }
+interface EnemyBody { id: number; type: EnemyKind; def: EnemyDef; x: number; y: number; z: number; yaw: number; civ: boolean; secured: boolean; rec: Enemy } // (the dead, until secured)
+interface ServerReport { incap: number; bleedouts: number; bleedBy: Record<string, number>; arrests: number; rescued: number; civKilled: number; unauth: number; evidence: number; bodies: number; allRescued?: boolean }
+interface ServerRoute { seed: number; act: number; path: number[]; votes: Record<string, number> }
+interface TeamLocker { ver: number; items: any[][] }
+interface WeaponCase { code: string; mag: number; reserve: number; am: any }
+interface AttachBox { open: boolean; uses: Record<string, { items: string[]; taken: string | null }> }
+interface StickerBox { s: string; by: string | null }
+interface SoundCache { map: LvMap; cache: Map<string, Float32Array> }
+// A player's last state (position p: [x, y, z]); the rest is the client's short-keyed state (js/player.ts state())
+interface PState { [k: string]: any; p: number[]; dd: number; dn: number; pr: number; cr: number; sx: any; yw: number; mv: any; tl: number; ln: number; sd: number; se: number; lr: number }
+interface Player { id: string; name: string; color: any; animal: any; look: any; ready: boolean; st: PState | null }
+type LivePlayer = Player & { st: PState }
+// A suspect or civilian (addEnemy makes them; think() and the hit/injury code grow the optional fields)
+interface EnemyCover { x: number; y: number; z: number; lean: number; px?: number; pz?: number; fl?: number; cx?: number; cz?: number }
+interface HideSpot { x: number; z: number; y?: number; lean: number; fl?: number; flow?: ReturnType<typeof G.Level.flow>; stuck?: number; [k: string]: any }
+interface Enemy {
+  id: number; type: EnemyKind; def: EnemyDef; x: number; y: number; z: number; yaw: number; hp: number; maxHp: number;
+  alert: boolean; spot: number; tgt: string | null; tgtD: number; canSee: boolean; percT: number; cool: number; burstLeft: number; aiming: boolean; aimT: number;
+  strafe: number; strafeT: number; idleT: number; idleYaw: number; pendingAlert: number; lostT: number; lastHit: string | null;
+  cover: EnemyCover | null; inCover: boolean; peek: boolean; peekT: number; coverT: number; coverStuck: number; crouch: boolean; nadeT: number;
+  lastSeen: { x: number; y: number; z: number } | null; morale: number; broken: boolean; noise: { x: number; z: number } | null; holding: boolean; bold: boolean;
+  mag: number; magMax: number; reloadT: number; bleedH: number; bleedL: number; clotT: number; legs: number; arms: number; lung: boolean;
+  drawn: boolean; drawT: number; surprisedT: number; suspicious: boolean; calmT: number; state: EnemyState; armed: boolean; shouts: number; complyCd: number;
+  suppressT: number; doorWait: number; leanOut: number; runner: boolean; home: { x: number; y: number; z: number }; walkTo: { x: number; z: number } | null;
+  fleeT: number; fake: boolean; fakeT: number;
+  // grown as they go (think() and the hit and injury code set these)
+  lurk?: boolean; hide?: HideSpot | null; peeking?: boolean; relocate?: boolean; turnYaw?: number | null; ordered?: boolean; dragTo?: { x: number; z: number } | null;
+  guard?: boolean; dp?: DoorPeekSpot | null; dpT?: number; dpOk?: number; heard?: { x: number; y: number; z: number; at: number };
+  threat?: { x: number; z: number; y?: number; d?: number } | null; str?: number; collapsed?: boolean; down?: boolean; sup?: number; supAt?: number; supQ?: number[][];
+  flinchT?: number; flinchOk?: number; flashT?: number; peekDone?: boolean; peekOut?: number; organs?: Record<string, number>; broke?: Record<string, number>;
+  spine?: boolean; cardiac?: boolean; out?: boolean; incap?: { by: string | null; t: number }; lastHitAt?: number; lastH?: boolean; lastAp?: boolean;
+  hitState?: EnemyState; hitUnaware?: boolean; hitYield?: boolean; hitAt?: number; shock?: number; kick?: number; headDelay?: number; engAt?: number; engTgt?: string;
+  firedAt?: number; sawAt?: number; engagedAt?: number; allyT?: number; allyN?: number; proof?: boolean; seeK?: number; blind?: boolean; onWait?: number;
+  coverFlow?: ReturnType<typeof G.Level.flow> | null; coverCheckT?: number; emboldened?: boolean; fl?: number;
+}
+interface DoorPeekSpot { d: LvDoor; x: number; y: number; z: number; px: number; pz: number; lean: number; yaw: number; fl: number; phase: string; t: number; n: number; flow?: ReturnType<typeof G.Level.flow> }
 
 const G_Server = {
-  players: new Map(),
-  phase: 'lobby',
+  players: new Map<string, Player>(),
+  phase: 'lobby' as ServerPhase,
   level: 0,
   seed: 0,
   shopSeed: 0,
-  map: null,
-  enemies: new Map(),
+  map: null as LvMap | null,
+  enemies: new Map<number | string, Enemy>(), // (by id: a number; js/hud.ts looks them up by an id that may be a string)
   nextEid: 1,
-  extract: { active: false, votes: new Set() }, // active: order restored (the required objective); votes: who's voted to leave
-  flow: null,
+  extract: { active: false, votes: new Set<string>() }, // active: order restored (the required objective); votes: who's voted to leave
+  flow: null as ReturnType<typeof G.Level.flow> | null,
   flowT: 0,
   snapT: 0,
   wipeT: 0,
   summons: 0,
   accMult: 1,
   dmgMult: 1,
-  skins: new Map(), // the squad's guns' sticker lists by hash (js/stickers.ts share): kept for whoever joins
+  skins: new Map<string, any>(), // the squad's guns' sticker lists by hash (js/stickers.ts share): kept for whoever joins
+  // made as the run and the level go on (undefined until then)
+  clock: undefined as unknown as number, // the level's time, in seconds (set by the level's first tick)
+  route: undefined as ServerRoute | null | undefined,
+  routeMap: undefined as ReturnType<typeof G.Route.gen> | null | undefined,
+  theme: undefined as number | null | undefined,
+  leaving: undefined as object | null | undefined, // (set while the screens go black for the next place: overBlack)
+  arms: undefined as Record<string, string> | undefined,
+  stock: undefined as unknown as ShopStock,
+  liftT: undefined as number | null | undefined, // the helicopter's spin-up countdown
+  report: undefined as unknown as ServerReport,
+  evidence: undefined as unknown as Evidence[],
+  loot: undefined as unknown as Map<number, Loot>,
+  lootId: undefined as number | undefined,
+  bodies: undefined as unknown as Map<number | string, EnemyBody>,
+  glassBroken: undefined as unknown as Set<number>,
+  glassCracked: undefined as unknown as [number, number[]][],
+  holes: undefined as any[] | undefined,
+  fallen: undefined as any[] | undefined,
+  wcase: undefined as WeaponCase | null | undefined,
+  caseOpen: undefined as boolean | undefined,
+  cabs: undefined as Cab[] | undefined,
+  abox: undefined as AttachBox | null | undefined,
+  sbox: undefined as StickerBox | null | undefined,
+  unitsSeen: undefined as unknown as Set<number>, // apartments an officer has been inside
+  kickAt: undefined as Record<string, number> | undefined, // when each officer last kicked a door in
+  nadeT: undefined as unknown as number, // the next time a suspect may throw one (the level's)
+  noiseT: undefined as number | undefined,
+  eSid: undefined as number | undefined, // the suspects' shots' ids
+  _sound: undefined as SoundCache | undefined,
 
   reset() {
     this.players.clear(); this.enemies.clear();
@@ -43,7 +120,7 @@ const G_Server = {
   },
   sendRoster() { G.Net.broadcast({ t: 'roster', roster: this.roster() }); },
 
-  handle(m: any, from: string) {
+  handle(m: NetMsg, from: string) {
     const p = this.players.get(from);
     switch (m.t) {
       case 'hello': {
@@ -77,7 +154,7 @@ const G_Server = {
       case 'hole': // (what it took out of them, js/damage.ts: kept for whoever joins, and here for the suspects' eyes and rounds)
         if (p && Array.isArray(m.a) && this.map && this.phase === 'level') {
           const a = m.a.slice(0, 32); (this.holes = this.holes || []).push(...a);
-          for (const h of a) G.Damage.apply(this.map, h);
+          for (const h of a) G.Damage.apply(this.map as unknown as DamageMap, h);
           G.Net.broadcast({ t: 'hole', a }, from);
         }
         break;
@@ -106,7 +183,7 @@ const G_Server = {
       // an officer's round went through these windows
       case 'glass': if (this.phase === 'level' && Array.isArray(m.ids)) this.breakGlass(m.ids, m.p); break;
       case 'crack': { // (a first round through a pane: it's fractured, and it's heard)
-        const w = this.phase === 'level' && this.map && this.map.windows && this.map.windows[m.id];
+        const w = this.phase === 'level' && this.map && this.map.windows && (this.map.windows as SvWin[])[m.id];
         if (!w || w.broken || w.armor || w.cracked || !Array.isArray(m.p)) break;
         w.cracked = true; this.glassCracked.push([m.id, m.p]); this.hear(w.x, w.z, 10, w.fy || 0);
         G.Net.broadcast({ t: 'crack', id: m.id, p: m.p }, from);
@@ -115,7 +192,7 @@ const G_Server = {
       case 'boom':
         this.hear(m.p[0], m.p[2], 35, m.p[1] || 0);
         // the blast takes out the windows round it
-        if (this.map && this.map.windows && Array.isArray(m.p)) this.breakGlass(this.map.windows.filter((w: Loose) => !w.broken && Math.hypot(w.x - m.p[0], w.z - m.p[2]) < (+m.r || 4) * 1.3 && Math.abs((w.fy || 0) + 1.3 - (m.p[1] || 0)) < 2.5).map((w: Loose) => w.id), m.p);
+        if (this.map && this.map.windows && Array.isArray(m.p)) this.breakGlass(this.map.windows.filter((w: SvWin) => !w.broken && Math.hypot(w.x - m.p[0], w.z - m.p[2]) < (+m.r || 4) * 1.3 && Math.abs((w.fy || 0) + 1.3 - (m.p[1] || 0)) < 2.5).map((w: SvWin) => w.id), m.p);
         G.Net.broadcast({ t: 'boom', id: from, p: m.p, r: m.r, d: m.d });
         break;
       case 'revive': G.Net.broadcast({ t: 'revive', tg: m.tg, by: from, hp: m.hp }); break;
@@ -138,9 +215,9 @@ const G_Server = {
         if (p && G.Arsenal.has(m.id)) { this.arms = this.arms || {}; this.arms[from] = m.id; G.Net.broadcast({ t: 'arms', a: this.arms }); }
         break;
       case 'pick':
-        if (p && this.phase === 'route' && G.Route.options(this.routeMap, this.route.path[this.route.path.length - 1]).includes(m.n)) {
-          this.route.votes[from] = m.n;
-          G.Net.broadcast({ t: 'rvotes', v: this.route.votes });
+        if (p && this.phase === 'route' && G.Route.options(this.routeMap!, this.route!.path[this.route!.path.length - 1]).includes(m.n)) {
+          this.route!.votes[from] = m.n;
+          G.Net.broadcast({ t: 'rvotes', v: this.route!.votes });
           this.checkPicks();
         }
         break;
@@ -158,7 +235,7 @@ const G_Server = {
         if (p.st && Math.hypot(x - p.st.p[0], z - p.st.p[2]) > 2.5) { x = p.st.p[0]; z = p.st.p[2]; }
         // (at: back where something else lay, a gun swapped for one in the weapon case, or what you'd no room for: its height, yaw and fit)
         const back = Array.isArray(m.at) && x === +m.x && z === +m.z ? m.at : null;
-        const l = this.lootAdd(x, back ? +back[0] || 0 : G.Level.groundAt(this.map, x, z, 0.05, ((p.st && p.st.p[1]) || 0) + 1.2), z, m.item, back ? +back[1] || 0 : Math.random() * Math.PI * 2, back ? back[2] : undefined);
+        const l = this.lootAdd(x, back ? +back[0] || 0 : G.Level.groundAt(this.map!, x, z, 0.05, ((p.st && p.st.p[1]) || 0) + 1.2), z, m.item, back ? +back[1] || 0 : Math.random() * Math.PI * 2, back ? back[2] : undefined);
         G.Net.broadcast({ t: 'loot', a: [this.lootMsg(l)], by: from });
         break;
       }
@@ -175,7 +252,7 @@ const G_Server = {
         if (d && p && p.st && Math.hypot(p.st.p[0] - d.x, p.st.p[2] - d.z) < 2.8 && Math.abs(p.st.p[1] - (d.fy || 0)) < 2) {
           this.setDoor(d.id, !d.open);
           if (d.kind === 'vault') { // both leaves together
-            const partner = d.mirror ? this.map.doors[d.id - 1] : this.map.doors[d.id + 1] && this.map.doors[d.id + 1].mirror ? this.map.doors[d.id + 1] : null;
+            const partner = d.mirror ? this.map!.doors[d.id - 1] : this.map!.doors[d.id + 1] && this.map!.doors[d.id + 1].mirror ? this.map!.doors[d.id + 1] : null;
             if (partner) this.setDoor(partner.id, d.open);
           }
           const field = this.soundField(d.x, d.z, d.fy || 0);
@@ -189,7 +266,7 @@ const G_Server = {
         if (d && !d.open && d.kind !== 'vault' && p && p.st && Math.hypot(p.st.p[0] - d.x, p.st.p[2] - d.z) < 2.8 && Math.abs(p.st.p[1] - (d.fy || 0)) < 2) this.kickDoor(d);
         break;
       }
-      case 'shout': if (p && p.st && this.phase === 'level') this.shout(p, from); break;
+      case 'shout': if (p && p.st && this.phase === 'level') this.shout(p as LivePlayer, from); break;
       // open the weapon case (once, for everyone)
       case 'openCase': {
         const c = this.map && this.map.case;
@@ -258,7 +335,7 @@ const G_Server = {
         e.dragTo = { x: m.x, z: m.z };
         break;
       }
-      case 'cuff': if (p && p.st && this.phase === 'level') this.cuff(m.e, p, from, m.at); break;
+      case 'cuff': if (p && p.st && this.phase === 'level') this.cuff(m.e, p as LivePlayer, from, m.at); break;
       // the store's shared stock (js/shop.ts take): one off the shelf if there's one left; put back if it couldn't be paid for
       case 'stake': {
         const ok = p && this.phase === 'shop' && this.stock && this.stock[m.k] > 0;
@@ -267,7 +344,7 @@ const G_Server = {
         break;
       }
       case 'sgive': if (p && this.phase === 'shop' && this.stock && m.k in this.stock) { this.stock[m.k]++; G.Net.broadcast({ t: 'stock', s: this.stock }); } break;
-      case 'secure': if (p && p.st && this.phase === 'level') this.secure(m.i, p, from); break;
+      case 'secure': if (p && p.st && this.phase === 'level') this.secure(m.i, p as LivePlayer, from); break;
     }
   },
   onLeave(id: string) {
@@ -307,13 +384,13 @@ const G_Server = {
   routeMsg() { return this.route ? { seed: this.route.seed, act: this.route.act, path: this.route.path, votes: this.route.votes } : null; },
   checkPicks() {
     if (this.phase !== 'route' || !this.players.size || this.leaving) return;
-    for (const id of this.players.keys()) if (this.route.votes[id] == null) return;
+    for (const id of this.players.keys()) if (this.route!.votes[id] == null) return;
     const tally: Record<string, number> = {};
-    for (const n of Object.values(this.route.votes)) tally[n] = (tally[n] || 0) + 1;
+    for (const n of Object.values(this.route!.votes)) tally[n] = (tally[n] || 0) + 1;
     const top = Math.max(...Object.values(tally)), best = Object.keys(tally).filter((n) => tally[n] === top);
     const n = +best[Math.floor(Math.random() * best.length)];
-    this.route.path.push(n);
-    this.theme = this.routeMap.nodes.get(n).th;
+    this.route!.path.push(n);
+    this.theme = this.routeMap!.nodes.get(n)!.th;
     this.overBlack(() => this.startLevel());
   },
   // Building the next place stalls the host, and it's built before anyone's told: so everyone's screen goes black first
@@ -331,7 +408,7 @@ const G_Server = {
   startLevel() {
     this.phase = 'level';
     this.seed = (Math.random() * 2 ** 31) | 0;
-    this.map = G.Level.generate(this.seed, this.level, this.theme);
+    this.map = G.Level.generate(this.seed, this.level, this.theme as number);
     this.enemies.clear();
     this.extract = { active: false, votes: new Set() };
     this.flow = null; this.flowT = 0; this.wipeT = 0; this.summons = 0; this.nadeT = 8;
@@ -356,11 +433,11 @@ const G_Server = {
   // share (CASE_RARITY), split evenly between that tier's weapons so a tier with many weapons isn't more
   // likely; deeper levels shift the odds toward rarer tiers, and legendaries only turn up from level 3.
   // Three in four are long guns. (Tier 0, the starter pistol, turns up too: less often the deeper you go.)
-  CASE_RARITY: { 0: 15, 1: 60, 2: 28, 3: 10, 4: 2 },
+  CASE_RARITY: { 0: 15, 1: 60, 2: 28, 3: 10, 4: 2 } as Record<string, number>,
   caseOdds(level: number, slot: string) {
     const byTier: Record<string, any[]> = {};
     for (const w of G.WEAPON_LIST) if (w.slot === slot && G.obtainable(w) && this.CASE_RARITY[w.tier] && !(w.tier === 4 && level < 3)) (byTier[w.tier] = byTier[w.tier] || []).push(w);
-    const out = [];
+    const out: [any, number][] = [];
     for (const [tier, list] of Object.entries(byTier)) {
       const share = this.CASE_RARITY[tier] * Math.pow(1 + 0.25 * (level - 1), +tier - 1);
       for (const w of list) out.push([w, share / list.length]);
@@ -391,7 +468,7 @@ const G_Server = {
   // The case, opened: what's in it is loose in the foam, to be picked up like anything else lying about. The gun along
   // the back with its grip to the front, and its spares in a row along the front, by the muzzle.
   casePut() {
-    const c = this.map.case, got = this.wcase, def = got && G.Gunsmith.fromCode(got.code);
+    const c = this.map!.case, got = this.wcase, def = got && G.Gunsmith.fromCode(got.code);
     if (!def) return;
     this.wcase = null;
     const Gr = G.Gear, w = G.Me.makeWeapon(def.id, def.build), ch = G.chambered(def) && got.mag > 0; // (the count is everything in it: one of them's in the chamber)
@@ -405,7 +482,7 @@ const G_Server = {
   },
   // A first aid cabinet's contents: one to three things, mostly bandages and painkillers, now and then a
   // tourniquet, gauze, a chest seal or a splint. [[mt, n], ...], like kinds stacked together.
-  CAB_ODDS: [['bandage', 30], ['pills', 16], ['tourniquet', 18], ['gauze', 14], ['seal', 12], ['splint', 10], ['bloodbag', 5]],
+  CAB_ODDS: [['bandage', 30], ['pills', 16], ['tourniquet', 18], ['gauze', 14], ['seal', 12], ['splint', 10], ['bloodbag', 5]] as [string, number][],
   rollCab() {
     const n = Math.random() < 0.45 ? 1 : Math.random() < 0.73 ? 2 : 3, out: [string, number][] = [], total = this.CAB_ODDS.reduce((a: number, [, w]: [string, number]) => a + w, 0);
     for (let i = 0; i < n; i++) {
@@ -427,24 +504,24 @@ const G_Server = {
   cabItems(g: { items: Loose[] }) { return g.items.map((p: Loose) => [p.it.mt, p.it.n || 1, p.x, p.y, p.r ? 1 : 0]); },
   // [[mt, n]] laid into the grid (stacks first); returns the items, and what didn't fit in .left
   layCab(list: [string, number][], items: any[][] = []) {
-    const Gr = G.Gear, g = this.cabGrid(items), left = [];
+    const Gr = G.Gear, g = this.cabGrid(items), left: [string, number][] = [];
     for (const [mt, n] of list) {
       const it = Gr.medItem(mt, n);
       for (const p of g.items) if (it.n > 0) Gr.mergeMed(it, p.it);
       if (it.n > 0) { const s = Gr.findSpot(g, it); if (s) Gr.put(g, it, s.x, s.y, s.rot); else left.push([mt, it.n]); }
     }
-    const out = this.cabItems(g);
+    const out: CabLayout = this.cabItems(g);
     out.left = left;
     return out;
   },
-  cabCounts(items: [string, number][]) { const c: Record<string, number> = {}; for (const [mt, n] of items) c[mt] = (c[mt] || 0) + n; return c; },
+  cabCounts(items: any[][]) { const c: Record<string, number> = {}; for (const [mt, n] of items) c[mt] = (c[mt] || 0) + n; return c; },
   // an officer's edit: what they took out and put in, and how they left it laid out
   cabEdit(cab: Cab, m: any) {
     const Gr = G.Gear, clean = (o: any): Record<string, number> => { const r: Record<string, number> = {}; for (const [k, v] of Object.entries(o || {})) if ((G.Med.ITEMS as Tbl)[k] && v > 0) r[k] = Math.min(20, Math.floor(+v) || 0); return r; };
     const take = clean(m.take), put = clean(m.put), have = this.cabCounts(cab.items), took: Record<string, number> = {}, deny: Record<string, number> = {};
     for (const [mt, n] of Object.entries(take)) { took[mt] = Math.min(n, have[mt] || 0); if (took[mt] < n) deny[mt] = n - took[mt]; }
     // the layout as they left it, if nothing changed under them and it adds up
-    let lay = null;
+    let lay: CabLayout | null = null;
     if (m.ver === cab.ver && !Object.keys(deny).length && Array.isArray(m.lay) && m.lay.length <= this.CAB_W * this.CAB_H) {
       const g = Gr.grid(this.CAB_W, this.CAB_H, ['med']), want = Object.assign({}, have);
       for (const [mt, n] of Object.entries(took)) want[mt] -= n;
@@ -458,12 +535,12 @@ const G_Server = {
       }
       if (ok && Object.values(want).every((v) => v === 0)) lay = this.cabItems(g);
     }
-    let ret = [];
+    let ret: [string, number][] = [];
     if (!lay) { // re-laid here: what they took comes off the stacks, what they put in goes on (what doesn't fit goes back)
       const items = cab.items.map((e: any[]) => e.slice());
       for (const [mt, n0] of Object.entries(took)) { let n = n0; for (const e of items) if (e[0] === mt && n > 0) { const k = Math.min(n, e[1]); e[1] -= k; n -= k; } }
       lay = this.layCab(Object.entries(put), items.filter((e: any[]) => e[1] > 0));
-      ret = lay.left;
+      ret = lay.left!;
     }
     cab.items = lay; cab.ver++;
     return { took, deny, ret };
@@ -475,7 +552,7 @@ const G_Server = {
   // the state as it is, it's taken as it is; against an older one, their takes and puts are merged into
   // what's there now (taking something already gone is denied, a put with no room left comes back).
   TEAM_W: 7, TEAM_H: 5,
-  team: null,
+  team: null as TeamLocker | null,
   teamMsg() { const t = this.team || { ver: 0, items: [] }; return { t: 'team', ver: t.ver, items: t.items }; },
   teamGrid() { const g = G.Gear.grid(this.TEAM_W, this.TEAM_H, null, 'Team locker'); g.locker = true; return g; },
   teamEdit(m: any) {
@@ -567,45 +644,45 @@ const G_Server = {
   // --------------------------------------------------------------- enemies
   spawnEnemies() {
     const L = this.level, np = Math.max(1, this.players.size), U = G.U;
-    const big = this.map.theme.big || 1, count = Math.min(Math.round((4 + Math.floor(L * 1.5) + (np - 1) * 2) * (this.map.theme.foes || 1)), 32 * big); // (a bigger map: more of them, and room for more)
+    const big = this.map!.theme.big || 1, count = Math.min(Math.round((4 + Math.floor(L * 1.5) + (np - 1) * 2) * (this.map!.theme.foes || 1)), 32 * big); // (a bigger map: more of them, and room for more)
     const hpMult = 1 + 0.04 * (L - 1) + 0.1 * (np - 1);
     this.accMult = Math.min(1 + 0.03 * (L - 1), 1.5);
     this.dmgMult = 1 + 0.07 * (L - 1);
-    const weights: [string, number][] = [['suspect', 4], ['grunt', 2.5 + L * 0.2], ['rusher', 1 + L * 0.2], ['marksman', L >= 2 ? (0.8 + L * 0.15) * (this.map.theme.lookouts || 1) : this.map.theme.lookouts ? 0.6 : 0], ['heavy', L >= 3 ? 0.4 + L * 0.2 : 0]];
+    const weights: [EnemyKind, number][] = [['suspect', 4], ['grunt', 2.5 + L * 0.2], ['rusher', 1 + L * 0.2], ['marksman', L >= 2 ? (0.8 + L * 0.15) * (this.map!.theme.lookouts || 1) : this.map!.theme.lookouts ? 0.6 : 0], ['heavy', L >= 3 ? 0.4 + L * 0.2 : 0]];
     const total = weights.reduce((a, w) => a + w[1], 0);
     // (a spot: [tx, tz] on the fine grid, and in a building of several floors its floor)
-    let spots = U.shuffle(Math.random, this.map.enemySpots.slice());
-    const W = this.map.W, unitOf = (sp: number[]) => { const ua = G.Level.floorMap(this.map, sp[2] || 0).unitAt; return ua ? ua[sp[1] * W + sp[0]] : -1; };
-    if (this.map.unitAt) { // apartments: a spot in each one goes to the front of the list
+    let spots = U.shuffle(Math.random, this.map!.enemySpots.slice());
+    const W = this.map!.W, unitOf = (sp: number[]) => { const ua = G.Level.floorMap(this.map!, sp[2] || 0).unitAt; return ua ? ua[sp[1] * W + sp[0]] : -1; };
+    if (this.map!.unitAt) { // apartments: a spot in each one goes to the front of the list
       const first: number[][] = [], seen = new Set();
       for (const sp of spots) { const u = unitOf(sp); if (u >= 0 && !seen.has(u)) { seen.add(u); first.push(sp); } }
       spots = first.concat(spots.filter((sp) => !first.includes(sp)));
-    } else if (this.map.NF > 1 || this.map.theme.starter) { // houses (and the corner store): a spot in every room indoors, on every floor (the basements and upstairs too), first
-      const OUT = new Set(['yard', 'alley', 'lawn', 'road', 'lot', 'carpark']), rooms = this.map.rooms;
-      const roomOf = (sp: number[]) => rooms.findIndex((r: Loose) => (r.fl || 0) === (sp[2] || 0) && sp[0] >= r.x && sp[0] < r.x + r.w && sp[1] >= r.z && sp[1] < r.z + r.h);
+    } else if (this.map!.NF > 1 || this.map!.theme.starter) { // houses (and the corner store): a spot in every room indoors, on every floor (the basements and upstairs too), first
+      const OUT = new Set(['yard', 'alley', 'lawn', 'road', 'lot', 'carpark']), rooms = this.map!.rooms;
+      const roomOf = (sp: number[]) => rooms.findIndex((r: LvRoom) => (r.fl || 0) === (sp[2] || 0) && sp[0] >= r.x && sp[0] < r.x + r.w && sp[1] >= r.z && sp[1] < r.z + r.h);
       const first: number[][] = [], seen = new Set();
       for (const sp of spots) { const ri = roomOf(sp); if (ri >= 0 && !OUT.has(rooms[ri].type) && !seen.has(ri)) { seen.add(ri); first.push(sp); } }
       spots = first.concat(spots.filter((sp) => !first.includes(sp)));
     }
     this.unitsSeen = new Set(); // apartments an officer has been inside
-    const used: number[][] = [], fy = (f?: number) => G.Level.floorMap(this.map, f || 0).fy || 0;
+    const used: number[][] = [], fy = (f?: number) => G.Level.floorMap(this.map!, f || 0).fy || 0;
     const close = (tx: number, tz: number, f?: number) => used.some(([ux, uz, uf]) => (uf || 0) === (f || 0) && Math.abs(ux - tx) + Math.abs(uz - tz) < 2 * G.Level.K);
     for (const [tx, tz, tf] of spots) {
       if (used.length >= count) break;
       if (close(tx, tz, tf)) continue;
       used.push([tx, tz, tf]);
-      let roll = Math.random() * total, type = 'grunt';
+      let roll = Math.random() * total, type: EnemyKind = 'grunt';
       for (const [ty, w] of weights) { if (roll < w) { type = ty; break; } roll -= w; }
       this.addEnemy(type, (tx + 0.5) * G.Level.TS, (tz + 0.5) * G.Level.TS, hpMult, fy(tf));
     }
     // civilians caught up in it (more at a festival: some of them hiding behind the stalls' counters; the other
     // stalls were left as they ran)
-    const crowd = this.map.theme.crowd || 1, civs = Math.min(Math.round((2 + Math.floor(L / 2)) * crowd), 8 * big), TS = G.Level.TS;
+    const crowd = this.map!.theme.crowd || 1, civs = Math.min(Math.round((2 + Math.floor(L / 2)) * crowd), 8 * big), TS = G.Level.TS;
     let placed = 0;
-    for (const s of U.shuffle(Math.random, (this.map.civSpots || []).slice())) {
+    for (const s of U.shuffle(Math.random, ((this.map as MapCivSpots).civSpots || []).slice())) {
       if (placed >= Math.ceil(civs * 0.6)) break;
       const tx = Math.floor(s.x / TS), tz = Math.floor(s.z / TS);
-      if (this.map.t[tz * this.map.W + tx] !== 0 || close(tx, tz, 0)) continue;
+      if (this.map!.t[tz * this.map!.W + tx] !== 0 || close(tx, tz, 0)) continue;
       used.push([tx, tz]);
       const c = this.addEnemy('civ', s.x, s.z, 1);
       c.state = 'hide'; c.hide = { x: s.x, z: s.z, lean: 0 }; c.crouch = true; c.yaw = s.yaw; c.peekT = 1 + Math.random() * 3;
@@ -613,12 +690,12 @@ const G_Server = {
     }
     // the rest anywhere a suspect could be or in sight of the pad (js/level.ts landing), one in each room indoors first:
     // wherever it is, there's someone caught up in it
-    let civAt = U.shuffle(Math.random, spots.concat(this.map.lzSpots || []));
-    if (this.map.rooms) {
-      const OUT = new Set(['yard', 'alley', 'lawn', 'road', 'lot', 'carpark']), rooms = this.map.rooms;
-      const roomOf = (sp: number[]) => rooms.findIndex((r: Loose) => (r.fl || 0) === (sp[2] || 0) && sp[0] >= r.x && sp[0] < r.x + r.w && sp[1] >= r.z && sp[1] < r.z + r.h);
+    let civAt = U.shuffle(Math.random, spots.concat(this.map!.lzSpots || []));
+    if (this.map!.rooms) {
+      const OUT = new Set(['yard', 'alley', 'lawn', 'road', 'lot', 'carpark']), rooms = this.map!.rooms;
+      const roomOf = (sp: number[]) => rooms.findIndex((r: LvRoom) => (r.fl || 0) === (sp[2] || 0) && sp[0] >= r.x && sp[0] < r.x + r.w && sp[1] >= r.z && sp[1] < r.z + r.h);
       const first: number[][] = [], seen = new Set();
-      for (const sp of civAt) { const ri = roomOf(sp); if (ri >= 0 && !rooms[ri].out && !OUT.has(rooms[ri].type) && !seen.has(ri)) { seen.add(ri); first.push(sp); } }
+      for (const sp of civAt) { const ri = roomOf(sp); if (ri >= 0 && !(rooms[ri] as SvRoom).out && !OUT.has(rooms[ri].type) && !seen.has(ri)) { seen.add(ri); first.push(sp); } }
       civAt = first.concat(civAt.filter((sp) => !first.includes(sp)));
     }
     for (const [tx, tz, tf] of civAt) {
@@ -629,13 +706,13 @@ const G_Server = {
       placed++;
     }
     if (G.Route.isBoss(L)) {
-      const ex = this.map.extract;
+      const ex = this.map!.extract;
       const b = this.addEnemy('warden', ex.x, ex.z, (1 + 0.5 * (G.Route.actOf(L) - 1)) * (1 + 0.35 * (np - 1)));
       b.guard = true;
     }
   },
   // The chance of each of a kind of armour (G.ENEMY_GEAR.odds) on someone dressed for level L, and one of them rolled (0: none)
-  armourRoll(kind: string, L: number) {
+  armourRoll(kind: ArmourKind, L: number) {
     const G2 = G.ENEMY_GEAR, at = G2.at, o = (G2.odds as Tbl)[kind];
     let i = 0; while (i < at.length - 2 && L >= at[i + 1]) i++;
     const f = G.U.clamp((L - at[i]) / (at[i + 1] - at[i]), 0, 1);
@@ -645,7 +722,7 @@ const G_Server = {
   },
   // A suspect's kit for this level: a weapon from its type's pool and armour, at a gear tier around the level's.
   // The def is the type's, with the kit laid over it (weapon, its damage, pellets and rate of fire, armour).
-  equip(type: string) {
+  equip(type: EnemyKind) {
     const base = (G.ENEMIES as Tbl)[type], G2 = G.ENEMY_GEAR;
     if (base.civ || !(G2.weapons as Tbl)[type]) return base;
     const r = Math.random(), tier = base.boss ? G.gearTier(this.level) : G.U.clamp(G.gearTier(this.level) + (r < 0.2 ? -1 : r > 0.88 ? 1 : 0), 1, 4);
@@ -659,7 +736,7 @@ const G_Server = {
     // a mandible or a face shield on the helmet's mount (a helmet with a visor has its own; no helmet, nowhere to put one)
     d.face = d.helmet === 'ach' || d.helmet === 'riflehelm' ? (fixed && fixed.face ? fixed.face[tier - 1] || 0 : this.armourRoll('face', kitL)) : 0;
     // shoulder, pelvis and leg armour, on what a plate carrier can take
-    d.ex = fixed ? (fixed.ex || [])[tier - 1] || [] : d.vest === 'steel' || d.vest === 'ceramic' ? ['shoulder', 'groin', 'legs'].map((k) => this.armourRoll(k, kitL)).filter(Boolean) : [];
+    d.ex = fixed ? (fixed.ex || [])[tier - 1] || [] : d.vest === 'steel' || d.vest === 'ceramic' ? (['shoulder', 'groin', 'legs'] as ArmourKind[]).map((k) => this.armourRoll(k, kitL)).filter(Boolean) : [];
     // a light and a laser on the gun, more often the better equipped they are (flags as an officer's: js/player.ts tacFlags)
     const tl = G2.tac, light = this.level >= tl.lightFrom && (base.boss || Math.random() < tl.light[tier - 1]), laser = this.level >= tl.laserFrom && (base.boss || Math.random() < tl.laser[tier - 1]);
     d.tac = (light ? 1 | (tier >= 4 ? 8 : 0) : 0) | (laser ? 2 | (Math.random() < 0.35 ? 4 : 0) : 0);
@@ -670,7 +747,7 @@ const G_Server = {
     }
     return d;
   },
-  addEnemy(type: string, x: number, z: number, hpMult: number, y = 0) {
+  addEnemy(type: EnemyKind, x: number, z: number, hpMult: number, y = 0) {
     if (this.map) y = Math.max(y, G.Level.groundHeight(this.map, x, z)); // (on the ground where it rolls: the Sandia Crest's)
     const def = this.equip(type);
     const e: Enemy = {
@@ -753,7 +830,7 @@ const G_Server = {
   // through a floor, heavily muffled (another 15 m: a shot overhead is heard, footsteps aren't). Cached per
   // source cell (and floor) + door state. y: the source's height.
   soundField(x: number, z: number, y = 0) {
-    const map = this.map, L = G.Level, TS = L.TS, W = map.W, H = map.H, WH = W * H, floors = map.floors || [map], NF = floors.length;
+    const map = this.map!, L = G.Level, TS = L.TS, W = map.W, H = map.H, WH = W * H, floors = map.floors || [map], NF = floors.length;
     const sx = G.U.clamp(Math.floor(x / TS), 0, W - 1), sz = G.U.clamp(Math.floor(z / TS), 0, H - 1), f0 = L.floorAt(map, x, y, z);
     const key = f0 * WH + sz * W + sx + '|' + (map.doorVer || 0);
     if (!this._sound || this._sound.map !== map) this._sound = { map, cache: new Map() };
@@ -792,7 +869,7 @@ const G_Server = {
   },
   // how far (metres, through the building) a sound is from (x, y, z), from its field
   heardAt(field: Float32Array, x: number, z: number, y = 0) {
-    const L = G.Level, TS = L.TS, map = this.map, f = map.floors ? L.floorAt(map, x, y, z) : 0;
+    const L = G.Level, TS = L.TS, map = this.map!, f = map.floors ? L.floorAt(map, x, y, z) : 0;
     return field[f * map.W * map.H + G.U.clamp(Math.floor(z / TS), 0, map.H - 1) * map.W + G.U.clamp(Math.floor(x / TS), 0, map.W - 1)] * TS;
   },
   hear(x: number, z: number, radius: number, y = 0) {
@@ -854,7 +931,7 @@ const G_Server = {
   },
   // Footsteps: louder the faster you move (lowered weapon > walk > steadied), quieter crouched; they
   // carry along the building (around corners, muffled by shut doors) rather than through walls. Unaware suspects who hear you get suspicious instead of being caught off guard.
-  footsteps(alive: Player[]) {
+  footsteps(alive: LivePlayer[]) {
     for (const p of alive) {
       const mv = p.st.mv || 0;
       // by how you're moving, not raw speed (kit weight changes speed, not how carefully you place your feet)
@@ -894,11 +971,11 @@ const G_Server = {
   // A spot out of sight of the danger: crouched behind furniture, or standing round a wall edge where
   // leaning out gives a look. Nobody shares a spot.
   findHide(e: Enemy, from: { x: number; y?: number; z: number }) {
-    const L = G.Level, map = this.map, TS = L.TS;
-    let best = null, bs = 1e9;
+    const L = G.Level, map = this.map!, TS = L.TS;
+    let best: HideSpot | null = null, bs = 1e9;
     const taken = (x: number, z: number) => { for (const o of this.enemies.values()) if (o !== e && ((o.hide && Math.hypot(o.hide.x - x, o.hide.z - z) < 1.1) || (o.cover && Math.hypot(o.cover.x - x, o.cover.z - z) < 1.1))) return true; return false; };
     const ey = e.y || 0, fy = from.y || 0, here = (q: { y?: number }) => Math.abs((q.y || 0) - ey) < 1.5; // (a spot on their own floor)
-    for (const c of map.cover) {
+    for (const c of map.cover as FlPt[]) {
       const d = Math.hypot(c.x - e.x, c.z - e.z);
       if (d > 14 || !here(c)) continue;
       const score = d - Math.hypot(c.x - from.x, c.z - from.z) * 0.35, cy = c.y || 0;
@@ -906,7 +983,7 @@ const G_Server = {
       best = { x: c.x, y: cy, z: c.z, lean: 0, fl: c.fl || 0 }; bs = score;
     }
     let tried = 0;
-    for (const w of map.wallSpots) {
+    for (const w of map.wallSpots as FlPt[]) {
       const d = Math.hypot(w.x - e.x, w.z - e.z);
       if (d > 12 || tried > 40 || !here(w)) continue;
       const fd = Math.hypot(w.x - from.x, w.z - from.z) || 1, score = d - fd * 0.35 + 1, wy = w.y || 0;
@@ -933,11 +1010,11 @@ const G_Server = {
   // Run to the spot; once there, stay down and every few seconds pop up (or lean out round the edge) to
   // look toward the danger, now and then moving somewhere else. Returns false if they can't get there.
   hideStep(e: Enemy, dt: number, speed: number) {
-    const h = e.hide, U = G.U, L = G.Level;
+    const h = e.hide!, U = G.U, L = G.Level;
     const d = Math.hypot(h.x - e.x, h.z - e.z);
     if (d > 0.3) {
-      if (!h.flow) h.flow = L.flow(this.map, [L.src(this.map, h.x, h.y, h.z)]);
-      const step = d > 1.6 ? L.flowStep(this.map, h.flow, e.x, e.z, e.y) : null;
+      if (!h.flow) h.flow = L.flow(this.map!, [L.src(this.map!, h.x, h.y!, h.z)]);
+      const step = d > 1.6 ? L.flowStep(this.map!, h.flow, e.x, e.z, e.y) : null;
       const tx = step ? step.x : h.x, tz = step ? step.z : h.z, dx = tx - e.x, dz = tz - e.z, dd = Math.hypot(dx, dz) || 1;
       e.yaw += U.angDiff(e.yaw, Math.atan2(-dx, -dz)) * Math.min(1, dt * 8);
       e.crouch = d < 2.5; e.leanOut = 0; // ducks as they get there
@@ -972,7 +1049,7 @@ const G_Server = {
     if (hp[0] <= 0 && hp[1] <= 0 && hp[2] <= 0) {
       const fall: [number, number[], number] = [d.open ? 1 : 0, [dir[0], dir[1]], (Math.random() * 1e9) | 0];
       (this.fallen = this.fallen || []).push([d.id, ...fall]);
-      G.Damage.fall(this.map, d as any, ...fall); // (server's door record: the same object damage.ts types as its Door)
+      G.Damage.fall(this.map as unknown as DamageMap, d as any, ...fall); // (server's door record: the same object damage.ts types as its Door)
       G.Net.broadcast({ t: 'dfall', i: d.id, f: fall });
     }
   },
@@ -980,8 +1057,8 @@ const G_Server = {
     const d = this.map && this.map.doors[id];
     if (!d || d.open === open || d.fallen) return;
     d.open = open;
-    G.World.door(this.map.world, this.map, d);
-    this.map.doorVer = (this.map.doorVer || 0) + 1; // sound paths change
+    G.World.door(this.map!.world, this.map, d);
+    this.map!.doorVer = (this.map!.doorVer || 0) + 1; // sound paths change
     G.Net.broadcast({ t: 'door', i: id, o: open ? 1 : 0, k: kicked ? 1 : 0 });
   },
   // the level clears when every living person — suspect or civilian — is restrained (the dead count as resolved)
@@ -990,7 +1067,7 @@ const G_Server = {
   kickDoor(d: Door) {
     this.setDoor(d.id, true, true);
     // a double door: both leaves go (the second leaf is the one flagged mirror, right after its partner)
-    const partner = d.mirror ? this.map.doors[d.id - 1] : this.map.doors[d.id + 1] && this.map.doors[d.id + 1].mirror ? this.map.doors[d.id + 1] : null;
+    const partner = d.mirror ? this.map!.doors[d.id - 1] : this.map!.doors[d.id + 1] && this.map!.doors[d.id + 1].mirror ? this.map!.doors[d.id + 1] : null;
     if (partner) this.setDoor(partner.id, true, true);
     const field = this.soundField(d.x, d.z, d.fy || 0);
     for (const e of this.enemies.values()) {
@@ -1005,7 +1082,7 @@ const G_Server = {
     }
   },
   // (a suspect down and bleeding out is dealt with: they never get up again. A civilian down still needs rescuing.)
-  remaining(civ = null) { let n = 0; for (const e of this.enemies.values()) if (e.state !== 'cuffed' && !(e.down && !e.def.civ) && (civ === null || !!e.def.civ === civ)) n++; return n; },
+  remaining(civ: boolean | null = null) { let n = 0; for (const e of this.enemies.values()) if (e.state !== 'cuffed' && !(e.down && !e.def.civ) && (civ === null || !!e.def.civ === civ)) n++; return n; },
   openBodies() { let n = 0; for (const b of this.bodies.values()) if (!b.secured) n++; return n; },
   openEvidence() { let n = 0; for (const v of this.evidence) if (!v.secured && !v.taken) n++; return n; },
   // Objectives. "Bring Order to Chaos" (required): every suspect zip-tied, down or dead. "Rescue All of the
@@ -1019,9 +1096,9 @@ const G_Server = {
   allRescued() { return this.remaining(true) === 0 && !this.report.civKilled; },
 
   // "POLICE! SHOW ME YOUR HANDS!" Everyone in earshot and sight rolls to comply.
-  shout(p: Player, from: string) {
-    const [px, py, pz] = p.st.p, ey = py + (p.st.pr ? 0.36 : p.st.cr ? 1.0 : 1.6), map = this.map, L = G.Level;
-    const officers = [...this.players.values()].filter((q: Player) => q.st && !q.st.dn && !q.st.dd);
+  shout(p: LivePlayer, from: string) {
+    const [px, py, pz] = p.st.p, ey = py + (p.st.pr ? 0.36 : p.st.cr ? 1.0 : 1.6), map = this.map!, L = G.Level;
+    const officers = [...this.players.values()].filter((q: Player) => q.st && !q.st.dn && !q.st.dd) as LivePlayer[];
     let complied = 0;
     for (const e of this.enemies.values()) {
       if (!(e.state === 'normal' || e.state === 'cower' || e.state === 'flee' || e.state === 'hide')) continue;
@@ -1034,13 +1111,13 @@ const G_Server = {
       else {
         // Caught off guard with the weapon still holstered: very likely to give up. Gun already up and
         // feeling brave: unlikely. Hurt, pinned down, outnumbered, broken or yelled at repeatedly all help.
-        const seen = officers.filter((q) => L.los(map, q.st.p[0], q.st.p[1] + 1.5, q.st.p[2], e.x, eh, e.z)).length;
+        const seen = officers.filter((q: LivePlayer) => L.los(map, q.st.p[0], q.st.p[1] + 1.5, q.st.p[2], e.x, eh, e.z)).length;
         const surprised = e.surprisedT > 0 || !e.alert;
         chance = e.def.comply
           + (surprised ? 0.4 : 0)
           + (!e.drawn ? 0.3 : e.drawT > 0 ? 0.05 : -0.15) // holstered / still drawing / gun up
           + 0.5 * (1 - (e.str == null ? 1 : e.str)) + (e.collapsed ? 0.3 : 0) + (e.suppressT > 0 ? 0.15 : 0) + (e.broken ? 0.3 : 0) // weakened: losing the will to fight
-          + 0.08 * Math.min(3, e.shouts) + 0.08 * Math.max(0, seen - 1) - (d > 10 ? 0.1 : 0) + (e.flashT > 0 ? 0.35 : 0) // (dazed by a flashbang: in no state to argue)
+          + 0.08 * Math.min(3, e.shouts) + 0.08 * Math.max(0, seen - 1) - (d > 10 ? 0.1 : 0) + (e.flashT! > 0 ? 0.35 : 0) // (dazed by a flashbang: in no state to argue)
           - Math.max(0, e.morale - 0.5) * 0.8 - (e.def.hunt && e.drawn ? 0.15 : 0);
         chance = e.def.comply ? G.U.clamp(chance, 0, e.collapsed ? 0.97 : 0.92) : 0; // never a sure thing
         // Braver together: with armed friends around who can see them, almost nobody gives up. And anyone
@@ -1049,7 +1126,7 @@ const G_Server = {
         // count for little.
         const weak = e.collapsed ? 1 : G.U.clamp(1 - (e.str == null ? 1 : e.str) / 0.6, 0, 1);
         chance *= G.U.lerp([1, 0.3, 0.08, 0.03][Math.min(3, this.allies(e))], 1, weak * 0.85);
-        const shaken = e.broken || e.collapsed || (e.str != null && e.str < 0.5) || e.flashT > 0;
+        const shaken = e.broken || e.collapsed || (e.str != null && e.str < 0.5) || e.flashT! > 0;
         if (!shaken && (this.clock - (e.firedAt || -99) < 30 || e.emboldened)) chance *= 0.1;
         e.shouts++;
       }
@@ -1067,11 +1144,11 @@ const G_Server = {
   },
   // windows broken (by a round or a blast): for everyone, and heard round about
   breakGlass(ids: number[], p: number[]) {
-    const ws = this.map && this.map.windows;
+    const ws = this.map && (this.map.windows as SvWin[]);
     if (!ws) return;
     const fresh = ids.filter((id: number) => Number.isInteger(id) && ws[id] && !ws[id].broken && !ws[id].armor).slice(0, 20); // (bulletproof glass doesn't break)
     if (!fresh.length) return;
-    for (const id of fresh) { ws[id].broken = true; G.World.windowSolids(this.map.world, this.map, ws[id]); this.glassBroken.add(id); this.hear(ws[id].x, ws[id].z, 16, ws[id].fy || 0); }
+    for (const id of fresh) { ws[id].broken = true; G.World.windowSolids(this.map!.world, this.map, ws[id]); this.glassBroken.add(id); this.hear(ws[id].x, ws[id].z, 16, ws[id].fy || 0); }
     G.Net.broadcast({ t: 'glass', ids: fresh });
   },
   // A weapon light in their eyes (the player they're shooting at has one on and pointed at them, close enough):
@@ -1089,7 +1166,7 @@ const G_Server = {
     const eh = (e.y || 0) + 1.4 * e.def.scale;
     for (const o of this.enemies.values()) {
       if (o === e || o.def.civ || !o.armed || o.state !== 'normal' || Math.hypot(o.x - e.x, o.z - e.z) > 9) continue;
-      if (G.Level.los(this.map, o.x, (o.y || 0) + 1.4 * o.def.scale, o.z, e.x, eh, e.z)) n++;
+      if (G.Level.los(this.map!, o.x, (o.y || 0) + 1.4 * o.def.scale, o.z, e.x, eh, e.z)) n++;
     }
     return n;
   },
@@ -1107,15 +1184,15 @@ const G_Server = {
     if (e.def.civ || !e.armed || !e.def.wpn) return;
     const a = Math.random() * Math.PI * 2;
     const v = { i: this.evidence.length, wpn: e.def.wpn, x: e.x + Math.cos(a) * 0.5, y: e.y || 0, z: e.z + Math.sin(a) * 0.5, owner: e.id, secured: false, taken: false };
-    G.Level.resolve(this.map, v, 0.15, v.y, G.World.STEP);
-    v.y = G.Level.groundAt(this.map, v.x, v.z, 0.05, v.y + 0.3, 0.05); // (on the floor where they were: upstairs or down)
+    G.Level.resolve(this.map!, v, 0.15, v.y, G.World.STEP);
+    v.y = G.Level.groundAt(this.map!, v.x, v.z, 0.05, v.y + 0.3, 0.05); // (on the floor where they were: upstairs or down)
     this.evidence.push(v);
     G.Net.broadcast({ t: 'evid', i: v.i, wpn: v.wpn, x: Math.round(v.x * 100) / 100, z: Math.round(v.z * 100) / 100, y: Math.round(v.y * 100) / 100 });
   },
   evidenceValue(wpn: string) { return 60 + Math.round((G.WEAPONS[wpn] ? G.WEAPONS[wpn].price : 500) * 0.04) + 10 * this.level; },
   // A weapon's worth is split: half for bagging it, half for securing whoever carried it (arrest or body).
   carrierShare(def: any) { return def && !def.civ && def.wpn ? Math.round(this.evidenceValue(def.wpn) / 2) : 0; },
-  secure(i: number, p: Player, from: string) {
+  secure(i: number, p: LivePlayer, from: string) {
     const v = this.evidence[i];
     if (!v || v.secured || v.taken || Math.hypot(v.x - p.st.p[0], v.z - p.st.p[2]) > 2.4) return;
     v.secured = true;
@@ -1128,7 +1205,7 @@ const G_Server = {
   },
   // at: where the officer saw the body lying, its ragdoll (it can slide or fall a way from where they went down):
   // in reach of that is in reach, if it's within 4 m of where the host has them
-  cuff(eid: number, p: Player, from: string, at: any) {
+  cuff(eid: number, p: LivePlayer, from: string, at: any) {
     const e = this.enemies.get(eid);
     const reach = (x: number, z: number) => {
       const ok = Array.isArray(at) && Number.isFinite(+at[0]) && Number.isFinite(+at[1]) && Math.hypot(at[0] - x, at[1] - z) < 4;
@@ -1258,7 +1335,7 @@ const G_Server = {
       }
     } else if (e.alert && !e.canSee && e.mag < e.magMax * 0.5) this.startReload(e);
   },
-  applyHit(m: any, from: string) {
+  applyHit(m: any, from: string | null) {
     if (this.phase !== 'level') return;
     const e = this.enemies.get(m.e);
     if (!e) return;
@@ -1305,7 +1382,7 @@ const G_Server = {
       let cr = 0, why = null;
       const inc = !e.def.civ && !!e.incap; // (counted already: incapacitated when they went down)
       if (e.def.civ) { cr = -(400 + 50 * this.level); why = 'civ'; this.report.civKilled++; }
-      else if (inc) { if (m.bo) { this.report.bleedouts++; const by = e.incap.by; if (by) this.report.bleedBy[by] = (this.report.bleedBy[by] || 0) + 1; } } // (bled out: kept, by who put them down)
+      else if (inc) { if (m.bo) { this.report.bleedouts++; const by = e.incap!.by; if (by) this.report.bleedBy[by] = (this.report.bleedBy[by] || 0) + 1; } } // (bled out: kept, by who put them down)
       else ({ cr, why } = this.incapacitate(e, from, m.bo ? e.hitState || e.state : e.state));
       // and what makes it one for the highlights (js/highlights.ts): taken by surprise, would have given up if told to,
       // just after the killer kicked a door in, how far, what the rounds did inside
@@ -1328,7 +1405,7 @@ const G_Server = {
   // there, the same as a kill: the officer's credit and tally, and whether it was authorised (st: what they were
   // doing when shot). Lethal force pays least. If they bleed out afterwards, that's kept (report.bleedouts, and
   // bleedBy: by the officer who put them down), not counted again.
-  incapacitate(e: Enemy, by: string, st: string) {
+  incapacitate(e: Enemy, by: string | null, st: string) {
     e.incap = { by: by || null, t: this.clock || 0 };
     if (st !== 'normal') { this.report.unauth++; return { cr: -Math.round(e.def.cr * 2), why: 'unauth' }; }
     this.report.incap++;
@@ -1349,7 +1426,7 @@ const G_Server = {
     const bo = since == null || since > 4;
     const kp = this.players.get(from), kpos = kp && kp.st && kp.st.p, kick = this.kickAt && this.kickAt[from];
     G.Net.broadcast({ t: 'edown', e: e.id, by: from, h: !!e.lastH, ty: e.type, why: (e.hitState || e.state) !== 'normal' ? 'unauth' : null,
-      sur: e.hitUnaware ? 1 : 0, ws: e.hitYield ? 1 : 0, br: kick != null && e.lastHitAt - kick < 5 ? 1 : 0,
+      sur: e.hitUnaware ? 1 : 0, ws: e.hitYield ? 1 : 0, br: kick != null && e.lastHitAt! - kick < 5 ? 1 : 0,
       d: kpos ? Math.round(Math.hypot(kpos[0] - e.x, kpos[2] - e.z)) : 0, o: e.organs || undefined, hd: bo ? 0 : Math.round(since * 100) / 100, bo: bo ? 1 : 0, bt: bo && since != null ? Math.round(since) : 0,
       ap: e.lastAp && !bo ? 1 : undefined });
   },
@@ -1358,7 +1435,7 @@ const G_Server = {
   unitsCleared() {
     const ua = this.map && this.map.unitAt;
     if (!ua) return 0;
-    const L = G.Level, TS = L.TS, W = this.map.W, at = (x: number, y: number, z: number) => { const a = L.floorMap(this.map, L.floorAt(this.map, x, y, z)).unitAt; return a ? a[Math.floor(z / TS) * W + Math.floor(x / TS)] : -1; };
+    const L = G.Level, TS = L.TS, W = this.map!.W, at = (x: number, y: number, z: number) => { const a = L.floorMap(this.map!, L.floorAt(this.map!, x, y, z)).unitAt; return a ? a[Math.floor(z / TS) * W + Math.floor(x / TS)] : -1; };
     for (const p of this.players.values()) if (p.st && !p.st.dd) { const u = at(p.st.p[0], p.st.p[1], p.st.p[2]); if (u >= 0) this.unitsSeen.add(u); }
     const hot = new Set();
     for (const e of this.enemies.values()) if (!e.def.civ && e.state !== 'cuffed' && e.state !== 'surrender' && !e.down) { const u = at(e.x, e.y || 0, e.z); if (u >= 0) hot.add(u); }
@@ -1370,8 +1447,8 @@ const G_Server = {
     if (this.phase === 'shop') return this.updateHub(dt);
     if (this.phase !== 'level' || !this.map) return;
     this.clock = (this.clock || 0) + dt;
-    const map = this.map, L = G.Level;
-    const all = [...this.players.values()].filter((p) => p.st);
+    const map = this.map!, L = G.Level;
+    const all = [...this.players.values()].filter((p) => p.st) as LivePlayer[];
     const alive = all.filter((p) => !p.st.dn && !p.st.dd);
 
     this.flowT -= dt;
@@ -1438,9 +1515,9 @@ const G_Server = {
     if (this.liftT != null && (this.liftT -= dt) <= 0) { this.liftT = null; this.checkReady(true); }
   },
 
-  think(e: Enemy, dt: number, alive: Player[]) {
-    const def = e.def, map = this.map, L = G.Level, U = G.U, s = def.scale;
-    if (e.flashT > 0) e.flashT -= dt;
+  think(e: Enemy, dt: number, alive: LivePlayer[]) {
+    const def = e.def, map = this.map!, L = G.Level, U = G.U, s = def.scale;
+    if (e.flashT! > 0) e.flashT! -= dt;
     e.complyCd = Math.max(0, e.complyCd - dt);
     e.suppressT = Math.max(0, e.suppressT - dt);
     e.flinchT = Math.max(0, (e.flinchT || 0) - dt);
@@ -1484,14 +1561,14 @@ const G_Server = {
       e.percT = 0.12 + Math.random() * 0.1;
       let best = null, bs = 1e9, bvis = false, bd = 99;
       e.proof = false;
-      if (e.flashT > 0) alive = []; // (blinded by a flashbang: sees nobody)
+      if (e.flashT! > 0) alive = []; // (blinded by a flashbang: sees nobody)
       const ey = (e.y || 0) + Math.min(1.6 * s, 2.4);
       for (const p of alive) {
         const [px, py, pz] = p.st.p;
         const d = Math.hypot(px - e.x, pz - e.z);
         // (outdoors at night they can't pick you out past `night` metres, unless your light or laser gives you away)
         if (d > (map.theme.night && !(p.st.tl & 3) ? map.theme.night : 75)) continue;
-        const lp = e.dp ? (e.leanOut ? e.dp : null) : e.cover && e.cover.lean ? e.cover : null, lx = lp ? lp.px : e.x, lz = lp ? lp.pz : e.z;
+        const lp = e.dp ? (e.leanOut ? e.dp : null) : e.cover && e.cover.lean ? e.cover : null, lx = lp ? lp.px! : e.x, lz = lp ? lp.pz! : e.z;
         const [hx, hz] = this.headXZ(p.st);
         const hy = py + (p.st.pr ? 0.35 : p.st.cr ? 0.95 : 1.5), k = L.see(map, lx, ey, lz, hx, hy, hz);
         // (through a window: k < 1; through bulletproof glass, seen but not to be shot: no round gets through it)
@@ -1508,7 +1585,7 @@ const G_Server = {
     const st = p && p.st && !p.st.dn && !p.st.dd ? p.st : null;
     if (!st) { e.canSee = false; e.aiming = false; }
 
-    if (e.broken) return this.thinkBroken(e, dt, p, st);
+    if (e.broken) return this.thinkBroken(e, dt, p as LivePlayer, st as PState);
 
     // --- unaware: idle and try to spot
     if (!e.alert) {
@@ -1639,11 +1716,11 @@ const G_Server = {
             if (e.aiming) {
               sp = 0;
               e.aimT -= dt;
-              if (e.aimT <= 0 && this.onTarget(e, st, dt)) { this.fire(e, p); e.aiming = false; e.peekDone = true; e.cool = U.rf(def.pause[0], def.pause[1]); }
+              if (e.aimT <= 0 && this.onTarget(e, st, dt)) { this.fire(e, p as LivePlayer); e.aiming = false; e.peekDone = true; e.cool = U.rf(def.pause[0], def.pause[1]); }
             }
           } else if (e.cool <= 0 && this.onTarget(e, st, dt)) {
             if (e.burstLeft <= 0) e.burstLeft = def.burst[0] + Math.floor(Math.random() * (def.burst[1] - def.burst[0] + 1));
-            this.fire(e, p);
+            this.fire(e, p as LivePlayer);
             e.burstLeft--;
             if (e.burstLeft > 0) e.cool = def.rof;
             else { e.cool = U.rf(def.pause[0], def.pause[1]); e.peekDone = true; }
@@ -1660,7 +1737,7 @@ const G_Server = {
       e.lostT += dt;
       if (e.blind && !e.flinchT && st && e.drawn && e.lastSeen && e.lostT < 1.1 && e.tgtD < def.range) {
         e.cool -= dt;
-        if (e.cool <= 0) { this.fire(e, p, true); e.cool = U.rf(0.15, 0.4); }
+        if (e.cool <= 0) { this.fire(e, p as LivePlayer, true); e.cool = U.rf(0.15, 0.4); }
       } else e.cool = Math.max(e.cool, 0.6);
       // lost sight: lob a grenade where they were last seen
       if (e.lastSeen && e.lostT > 2 && e.lostT < 12 && !e.proof) { // (not at someone behind bulletproof glass: it'd come back at them)
@@ -1679,11 +1756,11 @@ const G_Server = {
       }
       if (mx || mz) e.yaw += U.angDiff(e.yaw, Math.atan2(-mx, -mz)) * Math.min(1, dt * 6);
     }
-    if (e.peek) { e.peekOut -= dt; if (e.peekDone && e.peekOut <= 0) e.peek = false; }
+    if (e.peek) { e.peekOut! -= dt; if (e.peekDone && e.peekOut! <= 0) e.peek = false; }
     const corner = e.cover && e.cover.lean;
     if (st && e.canSee) e.holding = false;
     e.crouch = e.flinchT > 0 || (e.inCover && !e.peek && !corner) || (e.holding && !mx && !mz && !e.inCover) || (e.reloadT > 0 && e.inCover && !corner);
-    e.leanOut = e.inCover && e.peek && corner ? e.cover.lean : 0;
+    e.leanOut = e.inCover && e.peek && corner ? e.cover!.lean : 0;
 
     if ((mx || mz) && !e.flinchT) this.moveEntity(e, mx, mz, def.speed * sp, dt);
   },
@@ -1706,8 +1783,8 @@ const G_Server = {
   noted(e: Enemy, x: number, y: number, z: number) { if (e.bold) e.heard = { x: x + (Math.random() - 0.5) * 1.5, y, z: z + (Math.random() - 0.5) * 1.5, at: this.clock }; },
   // the door with what they heard behind it, and the spot beside it to look from
   doorFor(e: Enemy) {
-    const L = G.Level, map = this.map, P = this.DOORPEEK, h = e.heard, field = this.soundField(h.x, h.z, h.y || 0), ey = 1.6 * e.def.scale;
-    let best: Loose | null = null, bs = 1e9;
+    const L = G.Level, map = this.map!, P = this.DOORPEEK, h = e.heard!, field = this.soundField(h.x, h.z, h.y || 0), ey = 1.6 * e.def.scale;
+    let best: DoorPeekSpot | null = null, bs = 1e9;
     for (const d of map.doors) {
       const y = d.fy || 0, dist = Math.hypot(d.x - e.x, d.z - e.z);
       if (d.kind === 'vault' || d.fallen || dist > P.REACH || Math.abs(y - (e.y || 0)) > 1.5) continue;
@@ -1740,7 +1817,7 @@ const G_Server = {
   // Returns true while it's what they're doing.
   doorPeek(e: Enemy, dt: number) {
     const U = G.U, L = G.Level, P = this.DOORPEEK, def = e.def;
-    const rattled = e.flinchT > 0 || e.suppressT > 0 || e.flashT > 0 || e.morale < def.morale * 0.7 || (e.str != null && e.str < 0.6);
+    const rattled = e.flinchT! > 0 || e.suppressT > 0 || e.flashT! > 0 || e.morale < def.morale * 0.7 || (e.str != null && e.str < 0.6);
     const stop = () => { e.dp = null; e.leanOut = 0; e.crouch = false; e.dpOk = this.clock + 10 + Math.random() * 8; return false; };
     if (e.dp && rattled) return stop();
     if (!e.dp) {
@@ -1760,7 +1837,7 @@ const G_Server = {
       const d = Math.hypot(q.x - e.x, q.z - e.z);
       if (d > 0.3) {
         if (q.t <= 0) return stop();
-        const step = d > 1.6 ? L.flowStep(this.map, q.flow, e.x, e.z, e.y) : null, tx = step ? step.x : q.x, tz = step ? step.z : q.z, dx = tx - e.x, dz = tz - e.z, dd = Math.hypot(dx, dz) || 1;
+        const step = d > 1.6 ? L.flowStep(this.map!, q.flow!, e.x, e.z, e.y) : null, tx = step ? step.x : q.x, tz = step ? step.z : q.z, dx = tx - e.x, dz = tz - e.z, dd = Math.hypot(dx, dz) || 1;
         turn(Math.atan2(-dx, -dz), 8);
         e.crouch = false; e.leanOut = 0;
         this.moveEntity(e, dx / dd, dz / dd, def.speed * (d < 3 ? 0.55 : 0.8), dt); // (slowing as they get there)
@@ -1793,7 +1870,7 @@ const G_Server = {
   // They've seen someone from beside the door: it's a corner, and they're at it with the gun up, and quick about it (already out
   // for a look, quicker still). Off their spot, or with the door's line open on you, it's no corner, and coverValid drops it.
   doorShot(e: Enemy) {
-    const q = e.dp, out = !!e.leanOut, there = Math.hypot(q.x - e.x, q.z - e.z) < 0.3;
+    const q = e.dp!, out = !!e.leanOut, there = Math.hypot(q.x - e.x, q.z - e.z) < 0.3;
     e.dp = null; e.dpOk = this.clock + 10 + Math.random() * 8;
     e.cool = Math.min(e.cool, 0.3);
     if (!there) { e.leanOut = 0; return; }
@@ -1803,13 +1880,13 @@ const G_Server = {
 
   // Broken: run from the police, then hide. Panicked, inaccurate shots only; a cornered suspect with
   // nothing left may give up without being told. Nerve comes back slowly.
-  thinkBroken(e: Enemy, dt: number, p: Player, st: PState) {
+  thinkBroken(e: Enemy, dt: number, p: LivePlayer, st: PState) {
     const L = G.Level, U = G.U;
     e.aiming = false; e.peek = false; e.leanOut = 0; e.cover = null; e.inCover = false; e.dp = null;
     if (e.fleeT > 0) {
       e.fleeT -= dt;
       e.crouch = false;
-      const step = this.flow ? L.flowAway(this.map, this.flow, e.x, e.z, e.y) : null;
+      const step = this.flow ? L.flowAway(this.map!, this.flow, e.x, e.z, e.y) : null;
       if (step) {
         const dx = step.x - e.x, dz = step.z - e.z, d = Math.hypot(dx, dz) || 1;
         e.yaw += U.angDiff(e.yaw, Math.atan2(-dx, -dz)) * Math.min(1, dt * 8);
@@ -1829,7 +1906,7 @@ const G_Server = {
 
   // Walk, opening any closed door in the way first (which costs a moment and makes noise).
   moveEntity(e: Enemy, mx: number, mz: number, speed: number, dt: number) {
-    const map = this.map;
+    const map = this.map!;
     if (e.doorWait > 0) { e.doorWait -= dt; return; }
     const ahead = map.world && G.World.raycast(map.world, e.x, (e.y || 0) + 1.0, e.z, mx, 0, mz, 0.9, { move: true }); // (what they'd walk into)
     const d = ahead && ahead.solid && ahead.solid.kind === 'door' ? ahead.solid.door : null;
@@ -1842,7 +1919,7 @@ const G_Server = {
   // someone who's moved: out of what they walked into (stepping up onto anything low), and onto the floor or step
   // under them
   settle(e: Enemy, r: number) {
-    const L = G.Level, map = this.map, y = e.y || 0;
+    const L = G.Level, map = this.map!, y = e.y || 0;
     L.resolve(map, e, r, y, G.World.STEP, true);
     e.y = L.groundAt(map, e.x, e.z, r, y, G.World.STEP, true); // (stairs as slopes: no hopping from tread to tread)
   },
@@ -1867,8 +1944,8 @@ const G_Server = {
   },
   // Surrendered suspects kneel with hands up until cuffed. A few are faking and go for a hidden
   // weapon when nobody is standing over them.
-  thinkSurrendered(e: Enemy, dt: number, alive: Player[]) {
-    const near = alive.reduce((b: { d: number; p: Player | null }, p: Player) => { const d = Math.hypot(p.st.p[0] - e.x, p.st.p[2] - e.z); return d < b.d ? { d, p } : b; }, { d: 1e9, p: null } as { d: number; p: Player | null });
+  thinkSurrendered(e: Enemy, dt: number, alive: LivePlayer[]) {
+    const near = alive.reduce((b: { d: number; p: LivePlayer | null }, p: LivePlayer) => { const d = Math.hypot(p.st.p[0] - e.x, p.st.p[2] - e.z); return d < b.d ? { d, p } : b; }, { d: 1e9, p: null } as { d: number; p: LivePlayer | null });
     // they watch the police approach, then hold still as ordered once an officer is on top of them
     // (so you can walk round behind to restrain them)
     if (near.p && near.d > 3 && !e.ordered) e.yaw += G.U.angDiff(e.yaw, Math.atan2(-(near.p.st.p[0] - e.x), -(near.p.st.p[2] - e.z))) * Math.min(1, dt * 3);
@@ -1902,7 +1979,7 @@ const G_Server = {
     }
     if (e.state === 'flee') {
       e.fleeT -= dt;
-      const step = this.flow ? L.flowAway(this.map, this.flow, e.x, e.z) : null;
+      const step = this.flow ? L.flowAway(this.map!, this.flow, e.x, e.z) : null;
       if (step) {
         const dx = step.x - e.x, dz = step.z - e.z, d = Math.hypot(dx, dz) || 1;
         e.yaw += U.angDiff(e.yaw, Math.atan2(-dx, -dz)) * Math.min(1, dt * 8);
@@ -1924,33 +2001,33 @@ const G_Server = {
   },
 
   // A crate at cover spot c shields it from the target if it lies roughly toward them.
-  coverProtects(c: Loose, st: PState) {
+  coverProtects(c: EnemyCover, st: PState) {
     const tx = st.p[0] - c.x, tz = st.p[2] - c.z, td = Math.hypot(tx, tz);
     if (td < 3) return false;
-    const kx = c.cx - c.x, kz = c.cz - c.z, kd = Math.hypot(kx, kz);
+    const kx = c.cx! - c.x, kz = c.cz! - c.z, kd = Math.hypot(kx, kz);
     return (tx * kx + tz * kz) / (td * kd) > 0.55;
   },
   findCover(e: Enemy, st: PState) {
-    const L = G.Level, map = this.map, def = e.def;
-    let best = null, bs = 1e9;
+    const L = G.Level, map = this.map!, def = e.def;
+    let best: EnemyCover | null = null, bs = 1e9;
     const here = (q: { y?: number }) => Math.abs((q.y || 0) - (e.y || 0)) < 1.5; // (on their own floor)
-    for (const c of map.cover) {
+    for (const c of map.cover as FlPt[]) {
       const d = Math.hypot(c.x - e.x, c.z - e.z);
       if (d > 12 || !here(c)) continue;
       const dt = Math.hypot(c.x - st.p[0], c.z - st.p[2]);
       if (dt < 4 || dt > def.range * 0.9) continue;
       const score = d + Math.abs(dt - def.pref) * 0.4;
-      if (score >= bs || !this.coverProtects(c, st)) continue;
+      if (score >= bs || !this.coverProtects(c as EnemyCover, st)) continue;
       let claimed = false;
       for (const o of this.enemies.values()) if (o !== e && o.cover && Math.hypot(o.cover.x - c.x, o.cover.z - c.z) < 1.2) { claimed = true; break; }
       if (claimed) continue;
       if (!L.los(map, c.x, (c.y || 0) + 1.6 * def.scale, c.z, st.p[0], st.p[1] + 1.2, st.p[2])) continue; // can shoot when peeking
-      best = c; bs = score;
+      best = c as EnemyCover; bs = score;
     }
     // Corners: stand hidden beside a wall edge, lean out sideways to shoot.
     const ty = st.p[1] + 1.4;
     let tried = 0;
-    for (const w of map.wallSpots) {
+    for (const w of map.wallSpots as FlPt[]) {
       const d = Math.hypot(w.x - e.x, w.z - e.z), ey = (w.y || 0) + 1.6 * def.scale;
       if (d > 10 || tried > 30 || !here(w)) continue;
       const dt = Math.hypot(w.x - st.p[0], w.z - st.p[2]);
@@ -1974,16 +2051,16 @@ const G_Server = {
     }
     return best;
   },
-  coverValid(c: Loose, st: PState, def: any) {
+  coverValid(c: EnemyCover, st: PState, def: EnemyDef) {
     if (!c.lean) return this.coverProtects(c, st);
-    const L = G.Level, map = this.map, ey = (c.y || 0) + 1.6 * def.scale, ty = st.p[1] + 1.4;
-    return !L.los(map, c.x, ey, c.z, st.p[0], ty, st.p[2]) && this.leanClear(c.x, c.z, c.px, c.pz, ey, c.y || 0) && L.los(map, c.px, ey, c.pz, st.p[0], ty, st.p[2]);
+    const L = G.Level, map = this.map!, ey = (c.y || 0) + 1.6 * def.scale, ty = st.p[1] + 1.4;
+    return !L.los(map, c.x, ey, c.z, st.p[0], ty, st.p[2]) && this.leanClear(c.x, c.z, c.px!, c.pz!, ey, c.y || 0) && L.los(map, c.px!, ey, c.pz!, st.p[0], ty, st.p[2]);
   },
   // Can someone standing at (x, z) actually lean out to (px, pz)? Nothing solid between: a corner's edge, not a
   // door jamb, a door leaf or a thin wall to the next room (at chest and at eye height; and the way the head
   // goes, a little further out still)
   leanClear(x: number, z: number, px: number, pz: number, ey: number, y = 0) { // (ey: their eyes' height; y: the floor they stand on)
-    const L = G.Level, map = this.map, ox = px + (px - x) * 0.3, oz = pz + (pz - z) * 0.3;
+    const L = G.Level, map = this.map!, ox = px + (px - x) * 0.3, oz = pz + (pz - z) * 0.3;
     return L.los(map, x, y + 1.1, z, px, y + 1.1, pz) && L.los(map, x, ey, z, px, ey, pz) && L.los(map, x, ey, z, ox, ey, oz);
   },
 
@@ -2002,7 +2079,7 @@ const G_Server = {
   // for a few seconds, longer the closer and the more squarely they were facing it. Blinded, a suspect can't
   // see to fight and stands frozen, and is far easier to talk down; civilians panic.
   flashbang(p: number[]) {
-    const L = G.Level, map = this.map, [x, y, z] = p;
+    const L = G.Level, map = this.map!, [x, y, z] = p;
     this.hear(x, z, 30, y);
     for (const e of this.enemies.values()) {
       if (e.state === 'cuffed' || e.state === 'dead') continue;
@@ -2024,7 +2101,7 @@ const G_Server = {
   },
 
   // blind: firing at where the target was last seen, not at them
-  fire(e: Enemy, p: Player, blind?: boolean) {
+  fire(e: Enemy, p: LivePlayer, blind?: boolean) {
     // no shooting with the gun still holstered or slung, or while it's coming up: they start drawing instead
     if (!e.armed) return;
     if (!e.drawn) { this.draw(e); return; }
@@ -2038,21 +2115,21 @@ const G_Server = {
     // A string of fire: centre mass first, then, 0.3-0.5 s in, they walk their aim up to the head (over half a
     // second). A pause of over a second, or a new target, starts again from the body.
     if (blind || e.engTgt !== p.id || !(this.clock - (e.firedAt || -9) < 1.0)) { e.engAt = this.clock; e.engTgt = p.id; e.headDelay = 0.3 + Math.random() * 0.2; }
-    const up = blind ? 0 : G.U.clamp((this.clock - e.engAt - e.headDelay) / 0.5, 0, 1); // 0 body .. 1 head
+    const up = blind ? 0 : G.U.clamp((this.clock - e.engAt! - e.headDelay!) / 0.5, 0, 1); // 0 body .. 1 head
     e.firedAt = this.clock;
     const kickNow = e.kick || 0; // (still coming back from the last one: a snap shot)
     e.kick = kickNow + this.kickOf(e, G.WEAPONS[e.def.wpn] || { recoil: 1 });
-    const def = e.def, s = def.scale, st = p.st, L = G.Level, map = this.map;
+    const def = e.def, s = def.scale, st = p.st, L = G.Level, map = this.map!;
     const fx = -Math.sin(e.yaw), fz = -Math.cos(e.yaw);
     const lc = e.leanOut && e.cover && e.cover.lean ? e.cover : null; // cover can be dropped earlier in the same tick
-    const bx = lc ? lc.px : e.x, bz = lc ? lc.pz : e.z;
+    const bx = lc ? lc.px! : e.x, bz = lc ? lc.pz! : e.z;
     let from = [bx + fx * 0.5 * s, (e.y || 0) + (e.collapsed ? 0.45 : 1.35) * s, bz + fz * 0.5 * s]; // (down on the floor, shooting up)
     // standing against a door or wall: the muzzle must not poke through it
     if (!L.los(map, bx, from[1], bz, from[0], from[1], from[2])) from = [bx, from[1], bz];
     // aim at the exposed part: a leaning player shows head and shoulder, not centre mass
     const [hx, hz] = this.headXZ(st), leaning = Math.abs(st.ln || 0) > 0.3;
     let tx = hx, ty = st.p[1] + (st.pr ? 0.25 : st.cr ? 0.75 : 1.2) + (leaning ? 0.3 : 0) + (leaning ? 0 : up * (st.pr ? 0.08 : st.cr ? 0.25 : 0.38)), tz = hz; // (prone: low, a small target)
-    if (blind) { tx = e.lastSeen.x + (Math.random() - 0.5) * 1.4; tz = e.lastSeen.z + (Math.random() - 0.5) * 1.4; ty = (e.lastSeen.y || 0) + 0.8 + Math.random() * 0.9; }
+    if (blind) { tx = e.lastSeen!.x + (Math.random() - 0.5) * 1.4; tz = e.lastSeen!.z + (Math.random() - 0.5) * 1.4; ty = (e.lastSeen!.y || 0) + 0.8 + Math.random() * 0.9; }
     const dx = tx - from[0], dy = ty - from[1], dz = tz - from[2], d = Math.hypot(dx, dy, dz);
     // a bit worse up close, much worse at range: at their weapon's range they hit about a sixth as often
     const distF = 0.9 * G.U.clamp(0.95 - 0.8 * Math.pow(d / def.range, 1.2), 0.12, 0.95);
@@ -2080,6 +2157,5 @@ const G_Server = {
   BODY_R: 0.24,
 };
 // (what it gets as it runs: the dead, until secured)
-interface ServerFields { bodies: Map<any, any>; }
-G.Server = G_Server as typeof G_Server & ServerFields;
-interface GameModules { Server: typeof G_Server & ServerFields; }
+G.Server = G_Server;
+interface GameModules { Server: typeof G_Server; }

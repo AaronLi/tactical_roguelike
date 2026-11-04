@@ -31,9 +31,15 @@ const G_InvUI = (() => {
   // what a grid, an item in it and a gun look like here: varied by kind (a mag has rounds, a pouch has grids...), so each
   // names what this file reads on it and lets the rest through
   type Item = GItem; type Placed = GCell; type Grid = GGrid;
-  interface Wpn { def: any; mag: number; ammo: string; chamber?: string | null; tube?: string[]; noMag?: boolean; stickers?: any[]; [field: string]: any }
+  type Wpn = GWeapon;
   // where an item is: in a grid (g, p), in an equipment slot, or part of a gun (its magazine, a part fitted)
-  interface Src { it: Item; g?: Grid; p?: Placed; slot?: string; gunMag?: Wpn; gunPart?: { w: Wpn, slot: string }; theirs?: boolean }
+  // (a union by which of g / slot / gunMag / gunPart it has; theirs: an item that's a teammate's, to treat them with)
+  interface SrcGrid { it: Item; g: Grid; p: Placed; slot?: undefined; gunMag?: undefined; gunPart?: undefined; theirs?: boolean }
+  interface SrcSlot { it: Item; slot: string; g?: undefined; p?: undefined; gunMag?: undefined; gunPart?: undefined; theirs?: boolean }
+  interface SrcGunMag { it: Item; gunMag: Wpn; g?: undefined; p?: undefined; slot?: undefined; gunPart?: undefined; theirs?: boolean }
+  interface SrcGunPart { it: Item; gunPart: { w: Wpn, slot: string }; g?: undefined; p?: undefined; slot?: undefined; gunMag?: undefined; theirs?: boolean }
+  interface SrcLoose { it: Item; theirs?: boolean; g?: undefined; p?: undefined; slot?: undefined; gunMag?: undefined; gunPart?: undefined }
+  type Src = SrcGrid | SrcSlot | SrcGunMag | SrcGunPart | SrcLoose;
   // a timed job (field ammo handling, treating): see "field jobs"
   interface Job { label: string; per: number; t: number; prog: () => string; step: (me: Me) => string; end?: (me: Me) => void; tell?: { tg: string, part: string, mt: string } | null; told?: boolean }
   interface Drag { it: Item; rot: number; gx: number; gy: number; ghost: HTMLElement }
@@ -349,7 +355,7 @@ const G_InvUI = (() => {
     if (WSLOT[s]) return it.k === 'gun' && it.w.def.slot === WSLOT[s];
     return it.k === s;
   }
-  const hasContents = (it: Item) => (it.grids && it.grids.some((g: Grid) => g.items.length)) || Object.keys(GG().MOUNTS).some((m) => it[m]) || !!(it.molle && it.molle.items.some((p: Placed) => hasContents(p.it)));
+  const hasContents = (it: Item): unknown => (it.grids && it.grids.some((g: Grid) => g.items.length)) || Object.keys(GG().MOUNTS).some((m) => (it as Rec)[m]) || !!(it.molle && it.molle.items.some((p: Placed) => hasContents(p.it)));
 
   // ---------------------------------------------------------------- drawing
   // rot: the item is shown turned (its icon is turned with it)
@@ -357,7 +363,7 @@ const G_InvUI = (() => {
   // a flashbang onto one to put that kind on its key (it stays where it is in your kit); × clears it.
   function quickHTML(me: Me) {
     return `<div class="inv-quick"><h4>Quick slots <small>drag a grenade onto a key</small></h4><div class="qrow">${me.quick.map((kind: string, i: number) => {
-      const n = me.quickCount(kind), icon = kind ? `<img src="${G.Icons.of({ k: kind }, 1, 1)}" alt="">` : '';
+      const n = me.quickCount(kind), icon = kind ? `<img src="${G.Icons.of({ k: kind } as GItem, 1, 1)}" alt="">` : '';
       return `<div class="qbox${kind ? '' : ' empty'}" data-quick="${i}"><b>${i + 3}</b>${icon}<span>${kind ? `${me.quickName(kind)} ×${n}` : 'empty'}</span>${kind ? `<i data-unquick="${i}" title="Clear">×</i>` : ''}</div>`;
     }).join('')}</div></div>`;
   }
@@ -390,7 +396,7 @@ const G_InvUI = (() => {
   // A carrier's or belt's MOLLE: each mounted pouch drawn where it sits, as the grid you drop things in; in
   // edit mode, the panel itself as a grid of pouches
   function molleHTML(gear: Item, close?: boolean) {
-    const Gr = GG(), d = Gr.defOf(gear)!, m = gear.molle;
+    const Gr = GG(), d = Gr.defOf(gear)!, m = gear.molle!;
     const head = `<h4>${G.U.esc(d.name)} <small>MOLLE ${m.w}×${m.h}</small> <button class="btn tiny molle-btn${editMolle ? ' on' : ''}" data-molle>${editMolle ? 'Done' : 'Edit pouches'}</button>${close ? closeBtn(gear) : ''}</h4>`;
     if (editMolle) return `<div class="inv-sec">${head}<div class="inv-row">${gridHTML(m)}</div></div>`;
     // (a pouch can hold more than the MOLLE it hangs from, so they're laid out side by side, left to right
@@ -398,8 +404,8 @@ const G_InvUI = (() => {
     let html = `<div class="molle molle-flow">`;
     for (const p of [...m.items].sort((a, b) => a.x - b.x || a.y - b.y)) {
       const P = (Gr.POUCHES as Rec)[p.it.pid];
-      for (const g of p.it.grids) { // (a pouch with separate pockets: each its own little grid)
-        html += `<div class="inv-grid pouch${P.dump ? ' dump' : ''}${medOnly(g) ? ' med' : ''}${p.it.grids.length > 1 ? ' pocket' : ''}" data-grid="${g.id}" title="${G.U.esc(P.name)}" style="position:relative;width:${g.w * C}px;height:${g.h * C}px;background-size:${C}px ${C}px">`;
+      for (const g of p.it.grids!) { // (a pouch with separate pockets: each its own little grid)
+        html += `<div class="inv-grid pouch${P.dump ? ' dump' : ''}${medOnly(g) ? ' med' : ''}${p.it.grids!.length > 1 ? ' pocket' : ''}" data-grid="${g.id}" title="${G.U.esc(P.name)}" style="position:relative;width:${g.w * C}px;height:${g.h * C}px;background-size:${C}px ${C}px">`;
         for (const q of g.items) { const [w, h] = Gr.size(q.it, q.r); html += itemHTML(q.it, w, h, `position:absolute;left:${q.x * C + 1}px;top:${q.y * C + 1}px`, !!q.r); }
         html += '</div>';
       }
@@ -419,7 +425,7 @@ const G_InvUI = (() => {
     const mi = magItem(w), a = mi ? (([w0, h0]: number[]) => ({ w: w0, h: h0 }))(Gr.size(mi)) : null;
     rows += isMagGun(w)
       ? `<div class="gun-slot mag" data-wmag="${gunIt.uid}"><small>Magazine in it</small>${mi ? itemHTML(mi, a!.w, a!.h, 'position:relative') : '<em>none: drop one here</em>'}</div>`
-      : `<div class="gun-slot mag" data-wmag="${gunIt.uid}"><small>Loaded</small>${(() => { const cap = me.magSize(def), pw = Math.max(1, Math.min(4, Math.ceil(cap / 3))); return `<img class="tubepic" src="${G.Icons.of({ k: 'tube', key: G.calOf(def), n: w.mag, cap, am: w.ammo }, pw, 1, false)}" style="width:${pw * 30}px;height:30px">`; })()}<em>${w.mag ? (counted() ? `${w.mag} / ${me.magSize(def)} rounds` : '') : 'empty: drop a box here'}</em></div>`;
+      : `<div class="gun-slot mag" data-wmag="${gunIt.uid}"><small>Loaded</small>${(() => { const cap = me.magSize(def), pw = Math.max(1, Math.min(4, Math.ceil(cap / 3))); return `<img class="tubepic" src="${G.Icons.of({ k: 'tube', key: G.calOf(def), n: w.mag, cap, am: w.ammo } as GItem, pw, 1, false)}" style="width:${pw * 30}px;height:30px">`; })()}<em>${w.mag ? (counted() ? `${w.mag} / ${me.magSize(def)} rounds` : '') : 'empty: drop a box here'}</em></div>`;
     if (G.chambered(def)) rows += `<div class="gun-slot mag"><small>Chamber</small><em>${w.chamber ? `<i class="am am-${w.chamber}">${(G.AMMO as Rec)[w.chamber] ? (G.AMMO as Rec)[w.chamber].tag : ''}</i> a round in it` : 'empty: racks on the next pull of the trigger, or R'}</em></div>`;
     const [gw, gh] = Gr.gunSize(def);
     return `<div class="inv-open gun"><div class="inv-sec"><h4>${G.U.esc(def.name)}${def.modified ? ' <small>CUSTOM</small>' : ''}${def.missing && def.missing.length ? ' <small class="broken">WON\'T FIRE</small>' : ''}${closeBtn(gunIt)}</h4>
@@ -434,7 +440,7 @@ const G_InvUI = (() => {
       if (it.k === 'gun') return gunHTML(me, it);
       if (it.molle) return `<div class="inv-open">${molleHTML(it, true)}</div>`;
       const P = it.k === 'pouch' ? (Gr.POUCHES as Rec)[it.pid] : null, d = Gr.defOf(it);
-      return `<div class="inv-open"><div class="inv-sec"><h4>${G.U.esc(d ? d.name : Gr.label(it))}${closeBtn(it)}</h4><div class="inv-row">${it.grids.map((g: Grid) => gridHTML(g, `${g.w}×${g.h}${P && P.dump ? ' <i>dump</i>' : ''}`)).join('')}</div></div></div>`;
+      return `<div class="inv-open"><div class="inv-sec"><h4>${G.U.esc(d ? d.name : Gr.label(it))}${closeBtn(it)}</h4><div class="inv-row">${it.grids!.map((g: Grid) => gridHTML(g, `${g.w}×${g.h}${P && P.dump ? ' <i>dump</i>' : ''}`)).join('')}</div></div></div>`;
     }).join('');
   }
   function slotHTML(me: Me, s: string, name: string) {
@@ -525,7 +531,7 @@ const G_InvUI = (() => {
       const bt = (ev.target as HTMLElement).closest<HTMLElement>('[data-mt]');
       if (!bt) return;
       closeMenu();
-      if (bt.dataset.th === '1') { treatOn(me, { theirs: true, it: { k: 'med', mt: bt.dataset.mt, n: 1 } }, part); rerender(); return; }
+      if (bt.dataset.th === '1') { treatOn(me, { theirs: true, it: { k: 'med', mt: bt.dataset.mt, n: 1 } as Item }, part); rerender(); return; }
       const it = GG().body(me).flatMap((g) => g.items).map((p) => p.it).find((q) => q.k === 'med' && q.mt === bt.dataset.mt), src = it && where(me, it);
       if (src) treatOn(me, src, part); else G.Audio.deny();
       rerender();
@@ -571,7 +577,7 @@ const G_InvUI = (() => {
     const lay = G.Game.cabLay(items);
     if (lay === g.lay) return;
     const now: Record<string, number> = {}, was: Record<string, number> = g.counts || {}, take: Record<string, number> = {}, put: Record<string, number> = {};
-    for (const [mt, n] of items) now[mt] = (now[mt] || 0) + n;
+    for (const [mt, n] of items as [string, number][]) now[mt] = (now[mt] || 0) + n;
     for (const mt of new Set([...Object.keys(now), ...Object.keys(was)])) { const d = (now[mt] || 0) - (was[mt] || 0); if (d > 0) put[mt] = d; else if (d < 0) take[mt] = -d; }
     G.Net.toHost({ t: 'cabEdit', i: cab, ver: g.ver, take, put, lay: items });
     g.lay = lay; g.counts = now;

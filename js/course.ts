@@ -16,17 +16,19 @@
 // Coordinates are the hall's, as in js/range.ts (z negative past the hall's north wall; the yard's north edge, the
 // range's firing line, is at FL).
 // A target of the course: paper(q) or popper(q) give it its meshes and solid, resetTargets() its hits (and for a popper, whether it's down).
+type CourseKind = 'paper' | 'steel' | 'noshoot';
 interface CourseTarget {
-  kind: string; x: number; z: number; box: number; n: number; hits: IpscHit[]; yaw: number; w: number; h: number; y0: number;
-  c: HTMLCanvasElement; tex: THREE.CanvasTexture; grp: THREE.Group; solid: any; hinge: THREE.Group; mat: THREE.MeshStandardMaterial; down: boolean; fall: number; vel: number;
+  kind: CourseKind; x: number; z: number; box: number; n: number; hits: IpscHit[]; yaw: number; w: number; h: number; y0: number;
+  c: HTMLCanvasElement; tex: THREE.CanvasTexture; grp: THREE.Group; solid: RangeSolid | null; hinge: THREE.Group; mat: THREE.MeshStandardMaterial; down: boolean; fall: number; vel: number;
 }
 // A run (sent to the squad as it happens, G.Net 'crun'): hits are [target n, zone, seconds].
+type CourseRunState = 'standby' | 'running' | 'done';
 interface CourseRun {
-  who: string | null; name: string | null; seed: number; state: string; t0: number; shots: number[]; hits: [number, string, number][]; end: number; dq?: string | null; el?: number;
+  who: string | null; name: string | null; seed: number; state: CourseRunState; t0: number; shots: number[]; hits: [number, string, number][]; end: number; dq?: string | null; el?: number;
 }
 interface CoursePanel { mesh: THREE.Mesh<any, any>; c: HTMLCanvasElement; tx: THREE.CanvasTexture; }
 interface CourseState {
-  root: THREE.Object3D; grp: THREE.Group; H: RangeHelpers; world: any; RZ: number; seed: number; tg: CourseTarget[]; solids: any[]; run: CourseRun | null; last: any;
+  root: THREE.Object3D; grp: THREE.Group; H: RangeHelpers; world: Parameters<typeof G_World.add>[0]; RZ: number; seed: number; tg: CourseTarget[]; solids: RangeSolid[]; run: CourseRun | null; last: unknown;
   board: CoursePanel | null; screens: CoursePanel[]; cams: THREE.PerspectiveCamera[]; rts: THREE.WebGLRenderTarget[]; on: boolean; frame: number; boxes?: { x: number; z: number }[];
 }
 const G_Course = (() => {
@@ -34,7 +36,7 @@ const G_Course = (() => {
   const A = { x0: 2, x1: 12, z0: -6, z1: -34 }; // the course: x0..x1, from its open end on the yard (z0) to its backstop (z1)
   const BOXES = [-8.5, -14.5, -20.5]; // the shooting boxes (their middles, z)
   const POINTS: Record<string, number> = { A: 5, B: 3, C: 3, D: 1 };
-  const S: CourseState = { root: null!, grp: null!, H: null!, world: null, RZ: 0, seed: 0, tg: [], solids: [], run: null, last: null, board: null, screens: [], cams: [], rts: [], on: false, frame: 0 };
+  const S: CourseState = { root: null!, grp: null!, H: null!, world: null!, RZ: 0, seed: 0, tg: [], solids: [], run: null, last: null, board: null, screens: [], cams: [], rts: [], on: false, frame: 0 };
 
   const inside = (x: number, z: number) => x > A.x0 && x < A.x1 && z < A.z0 && z > A.z1; // (hall coordinates)
   function anyoneIn() {
@@ -51,9 +53,9 @@ const G_Course = (() => {
   }
 
   // ---------------------------------------------------------------- building
-  function build(root: THREE.Object3D, hangar: any, H: RangeHelpers) {
+  function build(root: THREE.Object3D, hangar: HangarState, H: RangeHelpers) {
     S.root = root; S.H = H; S.world = hangar.map.world; S.RZ = G.HANGAR_ROWS * 2;
-    const M = (c: number, o?: Record<string, any>) => new T.MeshStandardMaterial(Object.assign({ color: c, roughness: 0.85, metalness: 0.05 }, o || {}));
+    const M = (c: number, o?: THREE.MeshStandardMaterialParameters) => new T.MeshStandardMaterial(Object.assign({ color: c, roughness: 0.85, metalness: 0.05 }, o || {}));
     // the backstop, its sign, the course's name over the entrance
     H.box(root, A.x0, 0, A.z1 + 0.9, A.x1, 2.4, A.z1 - 0.001, M(0x8a7a58, { roughness: 1 }));
     // the buttons: START in the first box (on a post to its right), REGENERATE in the yard beside the entrance
@@ -97,10 +99,10 @@ const G_Course = (() => {
   function clear() {
     for (const s of S.solids) G.World.remove(S.world, s);
     S.solids = []; S.tg = [];
-    if (S.grp) { G.R.freeMarks(S.grp); S.root.remove(S.grp); S.grp.traverse((o: any) => { if (o.geometry) o.geometry.dispose(); if (o.material && o.material.map) o.material.map.dispose(); }); }
+    if (S.grp) { G.R.freeMarks(S.grp); S.root.remove(S.grp); S.grp.traverse((o: THREE.Object3D & Record<string, any>) => { if (o.geometry) o.geometry.dispose(); if (o.material && o.material.map) o.material.map.dispose(); }); }
     S.grp = new T.Group(); S.root.add(S.grp);
   }
-  const solid = (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, o?: Record<string, any>) => { const s = G.World.add(S.world, G.World.box(Math.min(x0, x1), y0, Math.min(z0, z1) + S.RZ, Math.max(x0, x1), y1, Math.max(z0, z1) + S.RZ, Object.assign({ kind: 'prop', move: false }, o || {}))); S.solids.push(s); return s; };
+  const solid = (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, o?: Record<string, unknown>) => { const s = G.World.add(S.world, G.World.box(Math.min(x0, x1), y0, Math.min(z0, z1) + S.RZ, Math.max(x0, x1), y1, Math.max(z0, z1) + S.RZ, Object.assign({ kind: 'prop', move: false }, o || {}))); S.solids.push(s); return s; };
   function lay(seed: number) {
     S.seed = seed; clear();
     const r = G.U.rng(seed >>> 0), g = S.grp, wood = new T.MeshStandardMaterial({ color: 0x8a6a44, roughness: 0.9 }), white = new T.MeshBasicMaterial({ color: 0xe8e4d4 });

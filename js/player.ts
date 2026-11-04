@@ -5,7 +5,47 @@ type PBuild = Record<string, string>;
 // what a shot's rounds share (the friendly fire to send, together, and where they end); the rest is set as it goes
 interface PShot { sid: number; ff: Map<any, any>; to?: THREE.Vector3; tos: THREE.Vector3[] | null; ghosts?: Map<string, ShotGhost>; n?: number; paths?: any[]; [k: string]: any }
 // a round in flight (Me.fly): its state, and what the stepping adds as it goes
-type PWeapon = GWeapon & { def: WeaponDef };
+// the fire selector's positions, a reload's way of dealing with the old magazine, the action worked by hand, the throwable in your hand,
+// what a timed F action is (it drives the animation), the zipline's and the ladder's phases, and how a hit leaves you
+type PReloadMode = 'retain' | 'pouch' | 'floor' | 'plain';
+type PActKind = 'rack' | 'release';
+type PHeldKind = 'frag' | 'flash';
+type PActionKind = 'order' | 'zip' | 'bag' | 'open' | 'kick' | 'close' | 'case';
+type PZipPhase = 'up' | 'ride' | 'down';
+type PLadderPhase = 'on' | 'climb' | 'off';
+type PFate = 'down' | 'out' | 'dead';
+type PXZ = { x: number; z: number };
+type PYP = { y: number; p: number };
+// a weapon as carried (Me.makeWeapon): what's in it; the rest (a light, a laser, its stickers...) comes with the build
+interface PWeapon { def: WeaponDef; sup: boolean; mag: number; ammo: string; fm: FireMode; tube: string[]; chamber: string | null; spent?: string[]; spentCh?: string | null; noMag?: boolean; magI?: number; light?: boolean; laser?: boolean; stickers?: any; [k: string]: any }
+interface PStats { kills: number; dmg: number; hs: number; downs: number; revives: number; arrests: number }
+// recoil's aim offset and its momentum; a head hit's throw (and how quickly the neck brings it back)
+interface PRecoil { y: number; p: number; vy: number; vp: number }
+interface PHeadKick { y: number; p: number; r: number; vy: number; vp: number; vr: number; w: number }
+interface PRecoilModel { up: number; side: number; rec: number; capUp: number; capSide: number; sway: number; erratic: number }
+// a timed action (F): its progress, what it does when it's done, and what happens part-way through (events, each once)
+interface PActionEvent { at: number; fn: () => void; done?: boolean }
+interface PPull { t: number; dur: number; me: THREE.Vector3; dx: number; dz: number; to: PXZ; fx: number; fz: number }
+interface PAction {
+  label: string; dur: number; t: number; onDone: (() => void) | null | undefined; kind: PActionKind | null; events: PActionEvent[]; key?: string; free?: boolean;
+  target?: number; living?: boolean; civBody?: boolean; approach?: PXZ | null; spot?: PXZ | null; face?: PXZ; stuck?: number; start?: THREE.Vector3; pull?: PPull | null; qFloor?: THREE.Quaternion;
+}
+// the action worked by hand (rack / release), the magazine pulled to look at, the chamber check, the comms wheel, a viewer, a zipline, a ladder
+interface PAct { kind: PActKind; seat: number | null; t: number; dur: number; back: number; home: number; b?: boolean; h?: boolean }
+interface PMagChk { k: number; back: number; yaw: number; pitch: number; rel?: boolean; seated?: boolean }
+interface PRChk { k: number; rel: boolean }
+interface PWheelItem { id: string; label: string; sub: string; off?: boolean; act: () => void }
+interface PWheel { x: number; y: number; sel: number; items: PWheelItem[] }
+interface PViewer { v: any; was: boolean; yaw: number; pitch: number }
+interface PZip { l: any; ph: PZipPhase; t: number; s: number; from: THREE.Vector3; was: boolean; L?: number }
+interface PClimb { l: any; up: boolean; ph: PLadderPhase; t: number; from: THREE.Vector3; was: boolean; y: number }
+// a throwable in your hand (keys 3, 4, 5): its kind, whether the pin's out, the strength picked, and the throw's timers
+interface PHeld { kind: PHeldKind; cock: boolean; str: number; readyT: number; throwT: number; lastL: boolean; lastR: boolean; queued?: boolean }
+interface PTreat { name: string; part: string; mt: string; t0: number; dur: number }
+// what's owed the host for one suspect this frame: plain damage, wounds (as a share of a life), a headshot, a kill, armour got through, the wounds' detail
+interface PHitQ { d: number; f: number; h: boolean; k: boolean; ap?: boolean; w?: any[] }
+// your own limbs in the viewmodel pass (fpLimbs)
+interface PLimbs { arm: THREE.Group; leg: THREE.Group; armL: THREE.Group; tie: THREE.Mesh; held: THREE.Group; env: THREE.Group; nade: { frag: THREE.Mesh; flash: THREE.Mesh } }
 type PTrack = { t: number; v: number; bone: string }[] & { frags?: any[] };
 interface PRound { p: THREE.Vector3; v: THREE.Vector3; def: WeaponDef; am: string; drag: number; hit: Set<any>; shot: PShot; path: { p: number[][]; ev: any[]; hit: any[] }; enemy?: number; [k: string]: any }
 // The local player: input, movement, weapons, damage, revive/down state.
@@ -22,6 +62,66 @@ const G_Me = {
   yaw: 0,
   pitch: 0,
 
+  // ------------------------------------------------------------- what a run and a spawn set (undefined till they do)
+  credits: undefined as unknown as number,
+  stk: undefined as any, // (the stickers you've found)
+  weapons: undefined as unknown as Record<string, GWeapon>, // (cur() is the one in your hands, as a PWeapon)
+  stash: undefined as any, // (G.Gear.stashProxy: weapon parts owned but not fitted)
+  stats: undefined as unknown as PStats,
+  rounds: undefined as unknown as PRound[],
+  sidearmChosen: undefined as unknown as boolean,
+  kit: undefined as any, pockets: undefined as any, locker: undefined as any, // (js/gear.ts)
+  body: undefined as unknown as MedBody,
+  hp: undefined as unknown as number,
+  bleed: undefined as unknown as number | null, // (seconds left when down, or null: stable)
+  dead: undefined as unknown as boolean, down: undefined as unknown as boolean, out: undefined as unknown as boolean,
+  deathCause: undefined as unknown as string,
+  spectating: undefined as unknown as VwPlayer | null,
+  treating: undefined as unknown as Map<number, PTreat>,
+  // stance and movement
+  crouch: undefined as unknown as boolean, prone: undefined as unknown as boolean, stanceT: undefined as unknown as number,
+  lean: undefined as unknown as number, onGround: undefined as unknown as boolean, hspeed: undefined as unknown as number, eyeH: undefined as unknown as number,
+  lowReady: undefined as unknown as boolean, lowToggle: undefined as unknown as boolean, steadying: undefined as unknown as boolean,
+  seat: undefined as unknown as number | null, zipRide: undefined as unknown as PZip | null, climb: undefined as unknown as PClimb | null, viewer: undefined as unknown as PViewer | null,
+  zipHold: undefined as unknown as number, ladderHold: undefined as unknown as number, zipW: undefined as unknown as number,
+  // the weapon in hand
+  slot: undefined as unknown as string,
+  reloading: undefined as unknown as boolean, reloadT: undefined as unknown as number, reloadTotal: undefined as unknown as number, reloadMode: undefined as unknown as PReloadMode,
+  reloadSeat: undefined as unknown as number, reloadPackK: undefined as unknown as number, reloadN: undefined as unknown as number, reloadEv: undefined as unknown as number,
+  reloadEmpty: undefined as unknown as boolean, reloadAct: undefined as unknown as PActKind | null,
+  byHand: undefined as unknown as boolean, revOpen: undefined as unknown as boolean, revClose: undefined as unknown as boolean,
+  magDropped: undefined as any, dumpDest: undefined as unknown as GGrid | null, dumped: undefined as unknown as GItem | null,
+  handCase: undefined as any, handOut: undefined as unknown as boolean, ejected: undefined as unknown as string[] | undefined, ejecting: undefined as unknown as number, ejectT: undefined as unknown as number,
+  adsT: undefined as unknown as number, ads: undefined as unknown as boolean,
+  fireCd: undefined as unknown as number, swapT: undefined as unknown as number, swapMax: undefined as unknown as number, raiseT: undefined as unknown as number, raiseMax: undefined as unknown as number,
+  burstQ: undefined as unknown as number, hyperQ: undefined as unknown as number, cylShots: undefined as unknown as number, cycleMax: undefined as unknown as number,
+  spin: undefined as unknown as number, flashIdx: undefined as unknown as number, flashT: undefined as unknown as number, kick: undefined as unknown as number,
+  sinceShot: undefined as unknown as number, sinceHurt: undefined as unknown as number, sinceFire: undefined as unknown as number,
+  lastTrigger: undefined as unknown as boolean, pressBuf: undefined as unknown as number, rHeldAt: undefined as unknown as number, fLatch: undefined as unknown as boolean, fEdge: undefined as unknown as boolean,
+  pairHeld: undefined as unknown as WeaponDef | null, pairAim: undefined as unknown as [number, number] | null,
+  stowed: undefined as unknown as boolean, stowW: undefined as unknown as number,
+  act: undefined as unknown as PAct | null, magChk: undefined as unknown as PMagChk | null, rChk: undefined as unknown as PRChk | null,
+  action: undefined as unknown as PAction | null, held: undefined as unknown as PHeld | null, throwStr: undefined as unknown as number | undefined,
+  inspectT: undefined as unknown as number, inspectDur: undefined as unknown as number, inspHold: undefined as unknown as boolean, inspYaw: undefined as unknown as number, inspPitch: undefined as unknown as number,
+  // recoil, sway and the camera
+  rc: undefined as unknown as PRecoil, hk: undefined as unknown as PHeadKick, flinch: undefined as unknown as PYP, swayOff: undefined as unknown as PYP, aimScreen: undefined as unknown as PYP,
+  shove: undefined as unknown as number, shoveV: undefined as unknown as number, swayT: undefined as unknown as number, walkAmp: undefined as unknown as number,
+  swayX: undefined as unknown as number, swayY: undefined as unknown as number, bobT: undefined as unknown as number, shakeT: undefined as unknown as number,
+  bipodT: undefined as unknown as number, bipodOn: undefined as unknown as boolean,
+  // timers and the rest of what a frame leaves
+  healLeft: undefined as unknown as number, reviveT: undefined as unknown as number, stateT: undefined as unknown as number, specIdx: undefined as unknown as number,
+  noAmmoT: undefined as unknown as number | undefined, dryT: undefined as unknown as number | undefined, shoutT: undefined as unknown as number | undefined,
+  sayAt: undefined as unknown as number | undefined, pingAt: undefined as unknown as number | undefined, lastR: undefined as unknown as number | undefined, midAt: undefined as unknown as number,
+  sidN: undefined as unknown as number | undefined, packIdx: undefined as unknown as number | undefined,
+  hitQ: undefined as unknown as Map<number, PHitQ>, wheel: undefined as unknown as PWheel | null,
+  navRearm: undefined as (() => void) | undefined,
+  // caches (made the first time they're wanted)
+  _quick: undefined as (PHeldKind | null)[] | undefined, _rm: undefined as WeakMap<WeaponDef, PRecoilModel> | undefined,
+  _climbArms: undefined as { g: THREE.Group; arms: { s: THREE.Mesh; h: THREE.Mesh }[] } | undefined, _zipKit: undefined as THREE.Object3D | undefined,
+  _specQ: undefined as THREE.Quaternion | null | undefined, _look: undefined as THREE.Vector3 | undefined, _lookW: undefined as unknown as number,
+  _lyaw: undefined as number | undefined, _lpitch: undefined as number | undefined, _dtCam: undefined as unknown as number,
+  _hp: undefined as number[] | null | undefined, _hpL: undefined as number[] | null | undefined, _limbs: undefined as PLimbs | undefined,
+
   // ------------------------------------------------------------- run state
   newRun() {
     this.credits = 500;
@@ -30,7 +130,7 @@ const G_Me = {
     this.weapons = {}; this.setSidearm('p9'); // just a sidearm: the first primary comes from the shop (G.Game's picker: what you've earned of js/arsenal.ts)
     this.sidearmChosen = false;
     this.stash = G.Gear.stashProxy(this); // weapon parts owned but not fitted: items, read as { partId: count }
-    this.stats = { kills: 0, dmg: 0, hs: 0, downs: 0, revives: 0 };
+    this.stats = { kills: 0, dmg: 0, hs: 0, downs: 0, revives: 0 } as PStats;
   },
   // the sidearm you start a run with (js/arsenal.ts), loaded with tracers, and two spare loads of them in the small
   // pockets (in place of the last one's)
@@ -58,7 +158,7 @@ const G_Me = {
   magSize(def: WeaponDef) { return def.mag; },
   reserveMax(def: WeaponDef) { return def.reserve; },
   // a weapon as built: def is the compiled build (stats changed by its parts), see js/parts.ts
-  makeWeapon(id: string, build?: PBuild) {
+  makeWeapon(id: string, build?: PBuild): PWeapon {
     const def = G.Gunsmith.compile(id, build!);
     // ammo: the type of round in it (a magazine holds one type); a gun loaded a round at a time keeps the
     // order in its tube (the last one in is the next one fired)
@@ -77,7 +177,7 @@ const G_Me = {
       const slot = it.w.def.slot, old = this.weapons[slot], stow = old && this.packRoom(Gr.gunItem(old));
       if (stow) Gr.place(this.kit.pack.grids, Gr.gunItem(old));
       else if (old) G.Net.toHost({ t: 'drop', item: Gr.pack(Gr.gunItem(old)), x, z, at });
-      this.weapons[slot] = it.w;
+      this.weapons[slot] = it.w as PWeapon;
       return this.inHand(slot, `${name}${!old ? '' : stow ? ` — your ${old.def.name} is in your backpack` : ` — your ${old.def.name} is left in its place`}`);
     }
     if (Gr.isGear(it) && !Gr.MOUNTS[it.k] && !this.kit[it.k]) { this.kit[it.k] = it; ok = true; } // worn, if that's free
@@ -136,7 +236,7 @@ const G_Me = {
     G.HUD.toast('', msg, 2);
   },
   // is there room in your backpack for a gun (with another one taken out of it first)?
-  packRoom(gunIt: GItem, out: GItem | null) {
+  packRoom(gunIt: GItem, out?: GItem | null) {
     const pack = this.kit.pack;
     if (!pack) return false;
     const where = out && G.Gear.packGuns(this).find(([it]) => it === out);
@@ -162,10 +262,10 @@ const G_Me = {
       if (cur && !this.packRoom(G.Gear.gunItem(cur), it)) return;
       G.Gear.removeFrom(at[1], it);
       if (cur) G.Gear.place(this.kit.pack.grids, G.Gear.gunItem(cur));
-      this.weapons[slot] = it.w;
+      this.weapons[slot] = it.w as PWeapon;
       this.inHand(slot, `${it.w.def.name} out of your backpack${cur ? ', your ' + cur.def.name + ' in' : ''}`);
     }, 'case');
-    this.action.key = 'KeyB';
+    (this.action as PAction | null)!.key = 'KeyB';
   },
   // refit a weapon after the gunsmith changed its build (ammo carried over, mag clamped to the new size)
   refit(w: GWeapon, build: PBuild) {
@@ -203,7 +303,7 @@ const G_Me = {
     const misfit = (def.misfit || []).map((s: string) => GS.PARTS[def.build[s]].name);
     if (G.HUD) G.HUD.toast('', `Your ${old.name} is now a ${def.name}${keep ? '' : a0.kind === 'mag' && a1.kind === 'mag' ? ', its magazine out' : ''}${misfit.length ? `. It won't fire until you replace: ${misfit.join(', ')}` : ''}`, 3.5);
   },
-  cur() { return this.weapons[this.slot]; },
+  cur(): PWeapon { return this.weapons[this.slot] as PWeapon; },
   // The sight as it's set now: its power (a variable scope's step, or a magnifier in or out), whether you're
   // looking through a magnified picture, and the aiming sensitivity / view tightening (zoom).
   sight(w: GWeapon) {
@@ -220,7 +320,7 @@ const G_Me = {
   // your injuries; contact, with a ping where you're looking; clear; ammo, with what you've got; hold). (The mouse's
   // side buttons used to work the light and laser, but a browser's back and forward can't be reliably kept off them.)
   WHEEL_HOLD: 0.22,
-  wheelItems() {
+  wheelItems(): PWheelItem[] {
     const w = this.cur(), d = w && w.def, on = (k: string) => (w && w[k] ? 'on' : 'off');
     const L = d && d.magLevels, mi = w && L ? this.sight(w).i : 0;
     return [
@@ -231,7 +331,7 @@ const G_Me = {
       { id: 'ammo', label: 'Ammo', sub: 'report it', act: () => this.say(this.ammoReport()) },
       { id: 'hold', label: 'Hold', sub: 'hold position', act: () => this.say('Holding here.') },
       { id: 'clear', label: 'Clear', sub: 'room clear', act: () => this.say('Clear!') },
-      { id: 'contact', label: 'Contact', sub: 'and ping it', act: () => { this.ping(true); this.say('Contact! Where I\'ve marked.'); } },
+      { id: 'contact', label: 'Contact', sub: 'and ping it', act: () => { (this as { ping(strong: boolean): void }).ping(true); this.say('Contact! Where I\'ve marked.'); } },
     ];
   },
   wheelOpen() {
@@ -245,7 +345,7 @@ const G_Me = {
     G.Audio.click();
   },
   wheelMove(dx: number, dy: number) {
-    const W = this.wheel, el = document.getElementById('commWheel')!;
+    const W = this.wheel!, el = document.getElementById('commWheel')!;
     W.x += dx; W.y += dy;
     const r = Math.hypot(W.x, W.y);
     if (r > 90) { W.x *= 90 / r; W.y *= 90 / r; }
@@ -289,7 +389,7 @@ const G_Me = {
   },
 
   // switch the gun's light or laser (it remembers: each gun has its own switches)
-  toggleTac(kind: string) {
+  toggleTac(kind: 'light' | 'laser') {
     const w = this.cur();
     if (!w || this.dead) return;
     if (kind === 'light' ? !w.def.light : !w.def.laser) { G.HUD.toast('', `No ${kind} on the ${w.def.name}`, 1); G.Audio.deny(); return; }
@@ -582,7 +682,7 @@ const G_Me = {
     return (ls && Math.abs(this.pos.y) < 0.5 && ls.find((l: any) => Math.hypot(l.on[0] - this.pos.x, l.on[1] - this.pos.z) < this.ZIP.REACH)) || null;
   },
   zipStep(dt: number) {
-    const z = this.zipRide, l = z.l, Z = this.ZIP, under = (s: number) => { const p = G.Level.zipPoint(l, s); return new THREE.Vector3(p[0], p[1] - Z.HANG, p[2]); };
+    const z = this.zipRide!, l = z.l, Z = this.ZIP, under = (s: number) => { const p = G.Level.zipPoint(l, s); return new THREE.Vector3(p[0], p[1] - Z.HANG, p[2]); };
     z.t += dt;
     let p;
     if (z.ph === 'up') { p = z.from.clone().lerp(under(0), G.U.smooth(0, 1, z.t / Z.UP)); if (z.t >= Z.UP) { z.ph = 'ride'; z.t = 0; } }
@@ -611,7 +711,7 @@ const G_Me = {
     return null;
   },
   climbStep(dt: number) {
-    const c = this.climb, l = c.l, C = this.LADDER, on = (y: number) => new THREE.Vector3(l.x + C.OUT, y, l.z); // (on it: just out from the wall)
+    const c = this.climb!, l = c.l, C = this.LADDER, on = (y: number) => new THREE.Vector3(l.x + C.OUT, y, l.z); // (on it: just out from the wall)
     c.t += dt;
     let p;
     if (c.ph === 'on') { p = c.from.clone().lerp(on(c.from.y), G.U.smooth(0, 1, c.t / C.ON)); if (c.t >= C.ON) { c.ph = 'climb'; c.t = 0; c.y = c.from.y; } }
@@ -645,7 +745,7 @@ const G_Me = {
       if (!k.parent) G.R.scene.add(k);
       k.visible = true; k.position.set(this.pos.x, this.pos.y + L.ZIP_HANG, this.pos.z); k.rotation.y = Math.atan2(dx, dz); // (along the cable; the bar across it)
       hands = [-1, 1].map((sd) => new T.Vector3(this.pos.x - sd * 0.17 * dz / n, bar, this.pos.z + sd * 0.17 * dx / n)); // (left, right: facing along the cable, its right is (-dz, dx))
-    } else hands = ['hL', 'hR'].map((k) => new T.Vector3(...L.ladderGrip(this.climb.l, this.pos.y, k)));
+    } else hands = ['hL', 'hR'].map((k) => new T.Vector3(...L.ladderGrip(this.climb!.l, this.pos.y, k)));
     if (!A) {
       const sleeve = new T.MeshStandardMaterial({ color: 0x3a3f36, roughness: 0.9 }), glove = new T.MeshStandardMaterial({ color: 0x1e1f1c, roughness: 0.8 }), g = new T.Group(), arms = [];
       for (let i = 0; i < 2; i++) { const s = new T.Mesh(new T.CylinderGeometry(0.042, 0.048, 1, 10), sleeve), h = new T.Mesh(new T.BoxGeometry(0.1, 0.11, 0.05), glove); g.add(s, h); arms.push({ s, h }); }
@@ -690,11 +790,11 @@ const G_Me = {
   // per-build handling, from the build's recoil (degrees/shot), class, weight and handling
   recoilModel(def: WeaponDef) {
     this._rm = this._rm || new WeakMap();
-    let m = this._rm.get(def);
+    let m: PRecoilModel | undefined = this._rm.get(def);
     if (m) return m;
     const deg = Math.PI / 180, cls = def.cls, onehand = cls === 'PST' || cls === 'MP';
     const up = def.recoil * 2.3 * deg;
-    const sideK = { PST: 0.8, MP: 0.9, SMG: 0.75, SG: 0.7, LMG: 0.8, SNP: 0.4, DMR: 0.55, BR: 0.7, RAIL: 0.4, BOW: 0.4, GL: 0.55 }[cls] || 0.65;
+    const sideK = ({ PST: 0.8, MP: 0.9, SMG: 0.75, SG: 0.7, LMG: 0.8, SNP: 0.4, DMR: 0.55, BR: 0.7, RAIL: 0.4, BOW: 0.4, GL: 0.55 } as Partial<Record<WeaponClass, number>>)[cls] || 0.65;
     const aim = G.aimSway(def);
     m = {
       up, side: up * sideK,
@@ -924,7 +1024,7 @@ const G_Me = {
     G.Audio.click();
     G.HUD.toast('', G.MODE_NAME[w.fm], 0.9);
   },
-  fireMode(w: GWeapon) { const modes = w.def.modes || [w.def.mode]; return modes.includes(w.fm) ? w.fm : modes[0]; },
+  fireMode(w: PWeapon): FireMode { const modes = w.def.modes || [w.def.mode]; return modes.includes(w.fm) ? w.fm : modes[0]; },
   inspect() {
     if (this.reloading || this.act || this.magChk || this.rChk || this.stowed || this.swapT > 0 || this.adsT > 0.2 || this.down || this.inspectT > 0) return;
     this.inspYaw = this.inspPitch = 0;
@@ -1018,7 +1118,7 @@ const G_Me = {
           // a fresh magazine in (the old one goes back in its pouch), or loose rounds into a break-action
           if (this.reloadMode === 'pouch' || this.reloadMode === 'floor') {
             this.dumped = null;
-            const went = G.Gear.dumpMag(this, w, mag, this.dumpDest);
+            const went = G.Gear.dumpMag(this, w, mag, this.dumpDest as GGrid);
             // the magazine on the floor is that one (it can be picked up again)
             if (went === 'floor') { const c = this.magDropped && this.magDropped !== true ? this.magDropped : G.Casings.dropMag(def); if (c && this.dumped) c.item = this.dumped; }
           } else if (G.Gear.ammoFor(def).kind === 'mag') G.Gear.swapMag(this, w, mag);
@@ -1074,7 +1174,7 @@ const G_Me = {
     const bolt = ch && this.boltGun(def), round = w.chamber;
     this.shoot(w);
     if (bolt) { w.chamber = null; w.spentCh = round || w.ammo; } // (the case stays in: js/player.ts rack)
-    else if (ch) { w.chamber = null; this.feed(w, true); } else w.mag--; // (the action strips the next round into the chamber)
+    else if (ch) { w.chamber = null; (this as { feed(w: GWeapon, quiet: boolean): boolean }).feed(w, true); } else w.mag--; // (the action strips the next round into the chamber)
     // AN-94 style hyper-burst: the first rounds of each pull leave at a much higher rate. The wait after this
     // round is set by the next one: still part of the pair (hyper rate), or the gun's own cyclic rate after it.
     if (this.hyperQ > 0) this.hyperQ--;
@@ -1098,7 +1198,7 @@ const G_Me = {
   // the next round from the magazine (or tube) into an empty chamber
   feed(w: GWeapon) {
     if (!G.chambered(w.def) || w.chamber || w.mag <= 0) return false;
-    w.chamber = w.tube && w.tube.length ? w.tube.pop() : w.ammo;
+    w.chamber = w.tube && w.tube.length ? w.tube.pop()! : w.ammo;
     w.mag--;
     if (G.GunAudio.available()) G.GunAudio.buildDry(G.Gunsmith.roundSoundKey(w.def, w.chamber)); // (its report ready for the shot: a no-op once it is)
     return true;
@@ -1113,7 +1213,7 @@ const G_Me = {
   // The action worked by hand, its own animation (js/vmanim.ts): kind 'rack' (pulled through and let go) or
   // 'release' (locked open: the catch hit). After a magazine change run dry it follows on from the seating (seat:
   // how far through its motions that went); a partial reload has none. The rounds move as the action does (above).
-  workAction(w: GWeapon, kind: string, seat: number | null = null) {
+  workAction(w: GWeapon, kind: PActKind, seat: number | null = null) {
     const ev = G.VMAnim.actEvents(kind, G.VMAnim.kinds(w.def).action);
     const dur = kind === 'release' ? this.ACT_T.release : this.boltGun(w.def) ? this.BOLT_T : seat ? this.ACT_T.rack : 0.45;
     this.act = { kind, seat, t: 0, dur, back: ev.back, home: ev.home };
@@ -1126,7 +1226,7 @@ const G_Me = {
 
   shoot(w: PWeapon) {
     // the round being fired, and the gun as that round sees it (G.roundDef: hollow points, AP, slugs...)
-    const round = G.chambered(w.def) && w.chamber ? w.chamber : w.tube && w.tube.length ? w.tube.pop() : w.ammo; // (the chambered one, if it has a chamber)
+    const round = G.chambered(w.def) && w.chamber ? w.chamber : w.tube && w.tube.length ? w.tube.pop()! : w.ammo; // (the chambered one, if it has a chamber)
     if (!G.chambered(w.def)) { w.spent = w.spent || []; w.spent.unshift(round); w.spent.length = Math.min(w.spent.length, 8); } // (the empties a revolver or break-action keeps till it's opened)
     const def = G.roundDef(w.def, round), cam = G.R.camera;
     this.sinceFire = 0;
@@ -1153,7 +1253,7 @@ const G_Me = {
     // around it: the choke's cone, denser in the middle (roughly normal, clipped at 1.6x)
     // (a hyper pair's second round: the same error as the first's, near enough: the gun hasn't moved)
     const pair2 = this.hyperQ === 1 && this.pairAim && this.fireMode(w) === 'hyper';
-    const a0 = pair2 ? this.pairAim[0] : Math.random() * Math.PI * 2, r0 = pair2 ? this.pairAim[1] : Math.sqrt(Math.random()) * Math.tan(sr);
+    const a0 = pair2 ? this.pairAim![0] : Math.random() * Math.PI * 2, r0 = pair2 ? this.pairAim![1] : Math.sqrt(Math.random()) * Math.tan(sr);
     this.pairAim = this.hyperQ === 2 ? [a0, r0] : null;
     const aim = fwd.clone().addScaledVector(right, Math.cos(a0) * r0).addScaledVector(up, Math.sin(a0) * r0).normalize();
     const pr = Math.tan(((def.choke || 0) * Math.PI) / 180);
@@ -1294,14 +1394,14 @@ const G_Me = {
     b.v.multiplyScalar(k); b.v.y -= b.grav * dt;
     b.t += dt;
     const head = end ? end.p : b.turned ? b.at : p1, way = b.turned ? b.v.clone().normalize() : dir;
-    if (b.trail && !(end && end.body)) G.R.trailAdd(b.trail, head, !!end, end ? end.v : b.v.length()); // (stopped in someone: its track through them ends the trail)
+    if (b.trail && !(end && end.body)) G.R.trailAdd(b.trail, head, !!end, end ? end.v! : b.v.length()); // (stopped in someone: its track through them ends the trail)
     // the streak you see: from the muzzle side, closing onto the true path over the first 12 m
     if (b.show || b.tracer) {
       const came = b.dist + (end ? end.t : len), near = Math.max(0, 1 - came / 12);
       G.R.bullet(head.clone().addScaledVector(b.off, near), way, came - (b.came0 || 0), b.def, b.tracer, sp, b.am);
     }
     if (end) {
-      this.pathPt(b, end.p, end.v);
+      this.pathPt(b, end.p, end.v!);
       if (b.def.cls === 'RAIL') G.R.tracer(b.muzzle, end.p, b.def.tracer || 0x55ddff, 0.06); // (a railgun leaves its line hanging)
       return true;
     }
@@ -1315,7 +1415,7 @@ const G_Me = {
   // or let it through, slower, off line and changed (b.proj, the round as it now is: its drag goes with it), and it goes
   // on from there with what's left of the step. Returns where it stopped ({ p, t }), or null if it flies on (b.at, if it
   // was turned: where it's got to, and b.v what it's doing now).
-  roundSegment(b: PRound, a: THREE.Vector3, dir: THREE.Vector3, len: number) {
+  roundSegment(b: PRound, a: THREE.Vector3, dir: THREE.Vector3, len: number): { p: THREE.Vector3; t: number; body?: boolean; v?: number } | null {
     const map = G.Game.map!, L = G.Level, def = b.def, B = G.Ballistics;
     if (def.explosive && !b.enemy) {
       const wall = L.raycast(map, a.x, a.y, a.z, dir.x, dir.y, dir.z, len, { glass: true }), hitWall = wall.t < len - 1e-4, wallT = Math.min(wall.t, len), hits = this.roundHits(b, a, dir, wallT), t = hits.length ? hits[0].t : hitWall ? wallT : null;
@@ -1335,15 +1435,15 @@ const G_Me = {
       for (const h of this.roundHits(b, o, d, wallT)) {
         const tr = [] as PTrack, ev = h.ev, mate = h.mate; // (F9: the track through them, a step at a time, for the trail, and its fragments)
         // Whoever fired it decides what it did, on what they can see: the body as it stands on this screen, and what it's wearing
-        const rig = ev ? ev.rig : mate ? mate.rig : h.rig, armour = ev ? B.suspectArmour(ev) : mate ? B.stateArmour(mate.st) : B.kitArmour(this), arrived = B.snap(b.proj);
+        const rig = ev ? ev.rig : mate ? mate.rig : h.rig as Rig, armour = ev ? B.suspectArmour(ev) : mate ? B.stateArmour(mate.st) : B.kitArmour(this), arrived = B.snap(b.proj);
         const r = B.through(rig, o, d, v, b.proj, armour, look, tr);
         if (!r || r.entryT == null) continue; // (inside the hitbox, outside the body: a near miss)
         b.hit.add(ev || mate || this);
         const hp = o.clone().addScaledVector(d, r.entryT);
-        b.path.hit.push([this.pathPt(b, hp, v), ev ? 'e' + ev.id : 'p' + (mate ? mate.id : G.Net.myId), Math.round(v), arrived, +d.x.toFixed(4), +d.y.toFixed(4), +d.z.toFixed(4), r.exitV ? 1 : 0, B.armourLog(r), [+(r.exitT - r.entryT).toFixed(3), r.log.length ? r.log[r.log.length - 1].m : ''], this.pathFrags(o, d, tr)]);
+        b.path.hit.push([this.pathPt(b, hp, v), ev ? 'e' + ev.id : 'p' + (mate ? mate.id : G.Net.myId), Math.round(v), arrived, +d.x.toFixed(4), +d.y.toFixed(4), +d.z.toFixed(4), r.exitV ? 1 : 0, B.armourLog(r), [+(r.exitT - r.entryT).toFixed(3), r.log!.length ? r.log![r.log!.length - 1].m : ''], this.pathFrags(o, d, tr)]);
         const hk = b.path.hit[b.path.hit.length - 1][1];
         if (!h.self && G.ShotLog) G.ShotLog.pose(b.shot, hk, rig); // (F9: them as they stood)
-        if (b.trail) { (b.trail.keys = b.trail.keys || new Set()).add(hk); this.trailTrack(b, o, d, r, v, tr, h.self ? null : rig); G.HUD.hbPath = r.log.concat({ m: r.exitV ? 'out' : 'stopped', v: Math.round(r.exitV) }); } // (F9: what it went through)
+        if (b.trail) { (b.trail.keys = b.trail.keys || new Set()).add(hk); this.trailTrack(b, o, d, r, v, tr, h.self ? null : rig); G.HUD.hbPath = (r.log as { m: string; v: string | number }[]).concat({ m: r.exitV ? 'out' : 'stopped', v: Math.round(r.exitV) }); } // (F9: what it went through)
         if (ev) {
           B.wearOut(armour);
           this.hitEnemy(ev, r, b);
@@ -1357,11 +1457,11 @@ const G_Me = {
             if (b.enemy && G.Highlights) G.Highlights.hitBy(G.Net.myId!, b.enemy);
             this.applyWounds(out, o.clone(), !b.enemy);
           } else { // (theirs to take, as it was here: told to them at the end of the frame)
-            const q = b.shot.ff.get(mate.id) || { ws: [], rang: 0, stopped: 0, wear: {}, at: hp.toArray().map((x: number) => Math.round(x * 100) / 100) };
+            const q = b.shot.ff.get(mate!.id) || { ws: [], rang: 0, stopped: 0, wear: {}, at: hp.toArray().map((x: number) => Math.round(x * 100) / 100) };
             q.ws.push(...out.ws); q.rang |= out.rang; q.stopped += out.stopped; if (out.fc) q.fc = (q.fc || []).concat(out.fc); if (out.hd) q.hd = (q.hd || []).concat(out.hd);
             for (const [k, j] of Object.entries(out.wear)) q.wear[k] = (q.wear[k] || 0) + j;
-            b.shot.ff.set(mate.id, q);
-            mate.rig.hit(d, b.proj.m * v);
+            b.shot.ff.set(mate!.id, q);
+            mate!.rig.hit(d, b.proj.m * v);
           }
         }
         if (r.hits.some((x: any) => x.armour.some((q: any) => !q.through))) { G.R.impact(hp, null, 'armor'); if (G.Audio.armorHit) G.Audio.armorHit(); }
@@ -1469,7 +1569,7 @@ const G_Me = {
   },
   // where a round struck or left something: its mark here (s: a target's own, its picture), on its trail, and for the squad
   // how: { m (what it's made of: '' nothing to damage), dir (the way it was going), stop (it stopped in it) }
-  roundMark(b: PRound, p: THREE.Vector3, n: number[], fx: string, kind: string, v: number, s: any, name: string, how: any = {}) {
+  roundMark(b: PRound, p: THREE.Vector3, n: number[], fx: ImpactFx, kind: string, v: number, s: any, name: string, how: any = {}) {
     const o = { m: how.m, fx, k: kind, n, dir: how.dir, J: 0.5 * b.proj.m * v * v, stop: !!how.stop, cal: b.proj.d * 1000, cut: how.cut || 0 };
     b.path.ev.push([this.pathPt(b, p, v), kind, fx, n[0], n[1], n[2], name || '', how.m, Math.round(o.J), o.stop ? 1 : 0, +(how.depth || 0).toFixed(3), +o.cal.toFixed(1)]);
     G.R.impactOn(p, n, s, fx, o);
@@ -1478,7 +1578,7 @@ const G_Me = {
   },
   // a pane a round went through breaks (here at once, and for everyone through the host)
   // The first round fractures it, and it stays up; the next one, or a blast (all), or someone walking into it, brings it down.
-  roundPane(id: number, at: THREE.Vector3, dir: THREE.Vector3, all: boolean) {
+  roundPane(id: number, at: THREE.Vector3, dir: THREE.Vector3, all?: boolean) {
     const win = G.Game.map!.windows[id];
     if (!win || win.broken) return;
     if (!win.cracked && !all) { G.Views.crackGlass(id, at, dir); G.Net.toHost({ t: 'crack', id, p: [+at.x.toFixed(3), +at.y.toFixed(3), +at.z.toFixed(3)] }); return; }
@@ -1514,7 +1614,7 @@ const G_Me = {
   hitEnemy(ev: VwEnemy, r: any, b: PRound) {
     let f = 0, kill = false, head = false, ap = false;
     this.hitQ = this.hitQ || new Map();
-    const q = this.hitQ.get(ev.id) || { d: 0, f: 0, h: false, k: false };
+    const q: PHitQ = this.hitQ.get(ev.id) || { d: 0, f: 0, h: false, k: false };
     for (const h of r.hits) {
       const w = G.Ballistics.effects(h);
       if (w.dmg < 0.05 && !w.effects.length) continue;
@@ -1568,12 +1668,12 @@ const G_Me = {
   // ------------------------------------------------------------- quick slots: 3, 4 and 5
   // Each holds a kind of throwable: 'frag' or 'flash' (or nothing). The key throws one from your kit. Bound by
   // dragging a grenade onto the slot's box in the inventory (G.InvUI); kept between sessions.
-  QUICK_DEFAULT: ['frag', 'flash', null],
-  get quick() {
+  QUICK_DEFAULT: ['frag', 'flash', null] as (PHeldKind | null)[],
+  get quick(): any[] { // (the slots' kinds, PHeldKind | null; wider for the HUD's and the inventory's callbacks)
     if (!this._quick) { const q = G.U.store.get('quick', null); this._quick = Array.isArray(q) && q.length === 3 ? q.slice() : this.QUICK_DEFAULT.slice(); }
     return this._quick;
   },
-  setQuick(i: number, kind: string | null) {
+  setQuick(i: number, kind: PHeldKind | null) {
     const q = this.quick, was = kind ? q.indexOf(kind) : -1;
     if (was >= 0 && was !== i) q[was] = q[i]; // (it was on another key: they swap)
     q[i] = kind || null;
@@ -1607,7 +1707,7 @@ const G_Me = {
     this.held = null;
     this.raiseT = this.raiseMax = this.drawTime(); // (the weapon comes back up)
   },
-  fuseOf(kind: string) { return kind === 'flash' ? 1.5 : 2.2; },
+  fuseOf(kind: PHeldKind) { return kind === 'flash' ? 1.5 : 2.2; },
   // where a throw of this strength leaves your hand, and how fast (underhand: from the hip, a lob)
   throwLaunch(str: number) {
     const cam = G.R.camera, fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion), [, sp, up] = this.THROWS[str];
@@ -1620,7 +1720,7 @@ const G_Me = {
     return { p, v };
   },
   heldStep(dt: number) {
-    const h = this.held, ok = G.Game.locked && !G.Game.chatOpen, l = this.mouse.l && ok, r = this.mouse.r && ok;
+    const h = this.held!, ok = G.Game.locked && !G.Game.chatOpen, l = this.mouse.l && ok, r = this.mouse.r && ok;
     const pressL = l && !h.lastL, pressR = r && !h.lastR;
     h.lastL = l; h.lastR = r;
     if (pressR) { h.str = this.throwStr = (h.str + 1) % 3; G.Audio.click(); G.HUD.toast('', `${this.THROWS[h.str][0]} throw`, 0.8); }
@@ -1639,7 +1739,7 @@ const G_Me = {
     else if (h.cock) { const { p, v } = this.throwLaunch(h.str); G.R.throwArc(G.Views.predictNade(p, v, this.fuseOf(h.kind), G.Game.map), true); }
   },
   throwHeld() {
-    const h = this.held, kind = h.kind;
+    const h = this.held!, kind = h.kind;
     if (!G.Gear.take(this, kind)) { this.unequip(); return; }
     const { p, v } = this.throwLaunch(h.str), fuse = this.fuseOf(kind);
     G.Views.addNade(p, v, fuse, true, false, kind);
@@ -1696,7 +1796,7 @@ const G_Me = {
   // already happened, e.g. the boot has landed). After finishing, F must be released before the next one.
   drawTime() { const d = this.cur().def; return (d.slot === 's' ? 0.65 : 1.0) / (d.handling || 1); },
   // kind drives the animation; events fire part-way through (e.g. the door moves when the push lands)
-  startAction(label: string, dur: number, onDone: (() => void) | null | undefined, kind = null, events = []) { if (this.held && !this.held.cock) this.held = null; this.action = { label, dur, t: 0, onDone, kind, events }; },
+  startAction(label: string, dur: number, onDone: (() => void) | null | undefined, kind: PActionKind | null = null, events: PActionEvent[] = []) { if (this.held && !this.held.cock) this.held = null; this.action = { label, dur, t: 0, onDone, kind, events }; },
   // where you're looking: the camera and the direction through the crosshair
   aimRay() { const cam = G.R.camera; return { o: cam.position.clone(), d: new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion) }; },
   // the person (or body) under the crosshair, within reach: their hitboxes, or within 7 deg of their torso.
@@ -1831,7 +1931,7 @@ const G_Me = {
       this.ladderHold = F ? (this.ladderHold || 0) + dt : 0;
       G.HUD.setPrompt(ld.up ? 'Hold <b>F</b> to climb the ladder to the roof' : 'Hold <b>F</b> to climb down the ladder');
       G.HUD.setProgress(this.ladderHold > 0 ? this.ladderHold / this.LADDER.HOLD : -1, this.ladderHold > 0 ? 'Climbing on' : '');
-      if (this.ladderHold >= this.LADDER.HOLD) { this.ladderHold = 0; this.fLatch = true; this.climb = { l: ld.l, up: ld.up, ph: 'on', t: 0, from: this.pos.clone(), was: !!this.stowed }; G.Audio.click(); }
+      if (this.ladderHold >= this.LADDER.HOLD) { this.ladderHold = 0; this.fLatch = true; this.climb = { l: ld.l, up: ld.up, ph: 'on', t: 0, from: this.pos.clone(), was: !!this.stowed } as PClimb; G.Audio.click(); }
       return;
     }
 
@@ -1839,8 +1939,8 @@ const G_Me = {
       // a timed action in progress: weapon away until it's done
       const a = this.action;
       const committed = !a.onDone && a.events.length && a.events.every((ev: any) => ev.done);
-      const tgt = a.kind === 'zip' ? G.Views.enemies.get(a.target) : null;
-      const evd = a.kind === 'bag' ? G.Views.evidence.get(a.target) : null;
+      const tgt = a.kind === 'zip' ? G.Views.enemies.get(a.target!) : null;
+      const evd = a.kind === 'bag' ? G.Views.evidence.get(a.target!) : null;
       const lost = (a.kind === 'zip' && (!tgt || (a.living && !tgt.alive) || Math.hypot(tgt.pos.x - this.pos.x, tgt.pos.z - this.pos.z) > 2.8)) ||
         (a.kind === 'bag' && (!evd || evd.secured));
       const kept = a.free || (a.key ? this.keys[a.key] && !G.Game.chatOpen : held); // most are F; a backpack swap is B; one from a menu just runs
@@ -1872,13 +1972,13 @@ const G_Me = {
       }
       else if (a.spot) { // follow them down: step in over their legs as they fall
         const k = G.U.smooth(0.1, 0.5, a.t / a.dur);
-        this.pos.x = a.start.x + (a.spot.x - a.start.x) * k; this.pos.z = a.start.z + (a.spot.z - a.start.z) * k;
+        this.pos.x = a.start!.x + (a.spot.x - a.start!.x) * k; this.pos.z = a.start!.z + (a.spot.z - a.start!.z) * k;
         G.Level.resolve(map, this.pos, 0.35, this.pos.y);
       }
       if (this.action && !a.approach && !a.pull) {
         const was = a.t / a.dur;
         a.t += dt; busy = a.kind !== 'order'; prog = a.t / a.dur; label = a.label;
-        if (!a.civBody) G.Audio.foley(a.kind, was, prog, 0, a.living);
+        if (!a.civBody) G.Audio.foley(a.kind!, was, prog, 0, a.living);
         for (const ev of a.events) if (!ev.done && prog >= ev.at) { ev.done = true; ev.fn(); }
         if (a.t >= a.dur) { this.action = null; this.fLatch = true; if (a.onDone) a.onDone(); }
       }
@@ -1917,14 +2017,14 @@ const G_Me = {
         if (F && !behind && !lying) { // "Turn around!" - weapon stays on them
           const id = ev.id;
           this.startAction('Ordering to turn around', 0.45, () => G.Net.toHost({ t: 'turn', e: id }), 'order');
-          this.action.target = id;
+          (this.action as PAction | null)!.target = id;
           G.Audio.order(null!);
         } else if (F && behind) {
           const id = ev.id;
           const wr = G.Views.zipPoint(ev, 0, !lying); // a body (or someone down): kneel by its shoulder, where the ragdoll lies (not where they dropped)
           const at = lying ? [Math.round(wr.x * 100) / 100, Math.round(wr.z * 100) / 100] : undefined; // (and tell the host where that is)
           this.startAction(ev.alive ? 'Zip-tying' : ev.def.civ ? 'Reporting' : 'Zip-tying', !lying ? 2.2 : ev.def.civ && !ev.alive ? 1.6 : 2.6, () => G.Net.toHost({ t: 'cuff', e: id, at }), 'zip');
-          Object.assign(this.action, { target: id, living: !lying, civBody: !ev.alive && !!ev.def.civ, // a casualty is reported, not tied
+          Object.assign(this.action!, { target: id, living: !lying, civBody: !ev.alive && !!ev.def.civ, // a casualty is reported, not tied
             // living: walked in to just behind them, then they're shoved forward and you kneel astride their thighs
             approach: !lying ? { x: ev.pos.x - fx * 0.7, z: ev.pos.z - fz * 0.7 } : this.standOff(wr.x, wr.z, 0.65),
             spot: !lying ? { x: ev.pos.x + fx * 0.75, z: ev.pos.z + fz * 0.75 } : null,
@@ -1944,14 +2044,14 @@ const G_Me = {
           const i = evTgt, ev = G.Views.evidence.get(i)!;
           this.startAction('Bagging evidence', 2.3, () => G.Net.toHost({ t: 'secure', i }), 'bag');
           // kneel down just short of it, on the side you came from
-          Object.assign(this.action, { target: i, approach: this.standOff(ev.x, ev.z, 0.75), face: { x: ev.x, z: ev.z } });
+          Object.assign(this.action!, { target: i, approach: this.standOff(ev.x, ev.z, 0.75), face: { x: ev.x, z: ev.z } });
           busy = true;
         }
       }
 
       // something lying about, under your crosshair (dropped from someone's inventory, or in the weapon case): before
       // the door behind it. Or a magazine you dropped
-      const free = !tgt && !cuffTgt && evTgt === null, ray = free && this.aimRay();
+      const free = !tgt && !cuffTgt && evTgt === null, ray = (free && this.aimRay()) as { o: THREE.Vector3; d: THREE.Vector3 };
       const lt = free ? G.Loot.aimed(ray.o, ray.d) : null, dm = free && !lt ? G.Casings.aimedMag(ray.o, ray.d) : null;
 
       // doors: look at the door above its middle to open it quietly, lower to kick it (the line is at 1.3 m
@@ -2113,10 +2213,10 @@ const G_Me = {
     G.Audio.foley && G.Audio.foley('prone', 0, 1, 0);
   },
   // the worse of two fates from G.Med.hit (null, 'down', 'out', 'dead')
-  worse(a: string | null, b: string | null) { const R = [null, 'down', 'out', 'dead']; return R.indexOf(b) > R.indexOf(a) ? b : a; },
+  worse(a: PFate | null, b: PFate | null) { const R: (PFate | null)[] = [null, 'down', 'out', 'dead']; return R.indexOf(b) > R.indexOf(a) ? b : a; },
   // the effect of being hit (the injuries are already on the body): flinch, the HUD, going down (fate: 'down', or
   // 'out' for blacking out)
-  hurt(d: number, from: any, fate?: string) {
+  hurt(d: number, from: any, fate?: PFate | null) {
     if (!(d > 0)) return;
     this.hp = G.Med.overall(this.body);
     this.sinceHurt = 0;
@@ -2439,16 +2539,16 @@ const G_Me = {
     const rest = (sd: number) => new THREE.Vector3(sd * 0.24, -0.55, -0.15);
     if (kind === 'zip') {
       // hands stay on the person: between the shoulder blades as they're shoved down, then at the wrists
-      const ev = G.Views.enemies.get(a.target);
+      const ev = G.Views.enemies.get(a!.target!);
       if (ev) {
         cam.updateMatrixWorld();
         const u = t;
-        const c = cam.worldToLocal(G.Views.zipPoint(ev, u, a.living));
+        const c = cam.worldToLocal(G.Views.zipPoint(ev, u, a!.living!));
         c.multiplyScalar(1 - 0.06 / Math.max(0.1, c.length())); // gloves sit on the surface, not inside it
-        const reach = a.pull ? 1 : S(0, 0.14, t), cinch = S(0.82, 0.9, u) * (1 - S(0.92, 1, u)); // hands on their back while dragging them
+        const reach = a!.pull ? 1 : S(0, 0.14, t), cinch = S(0.82, 0.9, u) * (1 - S(0.92, 1, u)); // hands on their back while dragging them
         const spread = u < 0.45 ? 0.12 : 0.055 + cinch * 0.05;
-        for (const [arm, sd] of [[L.arm, 1], [L.armL, -1]]) hand(arm, rest(sd).lerp(c.clone().add(new THREE.Vector3(sd * spread, 0, 0)), reach), sd);
-        if (u > (a.living ? 0.5 : 0.62) && !a.civBody) {
+        for (const [arm, sd] of [[L.arm, 1], [L.armL, -1]] as [THREE.Group, number][]) hand(arm, rest(sd).lerp(c.clone().add(new THREE.Vector3(sd * spread, 0, 0)), reach), sd);
+        if (u > (a!.living ? 0.5 : 0.62) && !a!.civBody) {
           const k = 1 - S(0.82, 0.92, u) * 0.45;
           L.tie.visible = true;
           L.tie.position.copy(c).add(new THREE.Vector3(0, 0.01, 0));
@@ -2459,7 +2559,7 @@ const G_Me = {
     }
     if (kind === 'bag') {
       // kneel, pick the weapon up off the floor, slide it into an envelope, seal it, put it down
-      const v = G.Views.evidence.get(a.target);
+      const v = G.Views.evidence.get(a!.target!);
       cam.updateMatrixWorld();
       const floor = v ? cam.worldToLocal(new THREE.Vector3(v.x, (v.y || 0) + 0.06, v.z)) : new THREE.Vector3(0.05, -0.5, -0.6);
       const H = new THREE.Vector3(0.05, -0.12, -0.42), E = new THREE.Vector3(-0.07, -0.16, -0.4);
@@ -2470,10 +2570,10 @@ const G_Me = {
       }
       L.held.visible = !!v && t > 0.22 && t < 0.6;
       if (L.held.visible) {
-        if (!a.qFloor) a.qFloor = cam.quaternion.clone().invert().multiply(v!.mesh.quaternion);
+        if (!a!.qFloor) a!.qFloor = cam.quaternion.clone().invert().multiply(v!.mesh.quaternion);
         const qHold = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.15, Math.PI / 2 + 0.5, 0.1));
         L.held.position.copy(floor).lerp(H, lift).lerp(E, insert);
-        L.held.quaternion.copy(a.qFloor).slerp(qHold, lift);
+        L.held.quaternion.copy(a!.qFloor!).slerp(qHold, lift);
         L.held.scale.setScalar(1 - 0.85 * insert);
       }
       L.env.visible = t > 0.3;
@@ -2534,15 +2634,6 @@ const G_Me = {
     };
   },
 };
-G.Me = G_Me as typeof G_Me & MeFields;
+G.Me = G_Me;
 
-interface MeFields {
-  credits: number; weapons: Record<string, any>; stash: any; stats: { kills: number; dmg: number; hs: number; downs: number; revives: number; arrests: number }; rounds: any[]; stk: any;
-  sidearmChosen: boolean; kit: any; pockets: any; locker: any;
-  dead: boolean; down: boolean; out: boolean; hp: number; body: any; bleed: number | null; spectating: any; treating: Map<any, any>;
-  crouch: boolean; prone: boolean; lean: number; onGround: boolean; hspeed: number; lowReady: boolean; seat: any; zipRide: any; climb: any;
-  slot: any; reloading: boolean; reloadT: number; reloadTotal: number; reloadMode: string; adsT: number; aimScreen: { y: number; p: number };
-  deathCause: string; dumped: GItem | null; burstQ: number; stowed: boolean; fLatch: boolean;
-  inspectT: number; inspectDur: number; magChk: any; act: any; action: any; held: any; pressBuf: number; rHeldAt: number; navRearm: any;
-}
-interface GameModules { Me: typeof G_Me & MeFields; }
+interface GameModules { Me: typeof G_Me; }

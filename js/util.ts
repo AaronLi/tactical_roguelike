@@ -35,8 +35,8 @@ const G_U = {
   lerp: (a: number, b: number, t: number) => a + (b - a) * t,
   ri: (r: () => number, a: number, b: number) => a + Math.floor(r() * (b - a + 1)),
   rf: (a: number, b: number) => a + Math.random() * (b - a),
-  pick: (r: () => number, arr: Array<any>) => arr[Math.floor(r() * arr.length)],
-  shuffle(r: () => number, arr: Array<any>) {
+  pick: <T>(r: () => number, arr: T[]) => arr[Math.floor(r() * arr.length)],
+  shuffle<T>(r: () => number, arr: T[]) {
     for (let i = arr.length - 1; i > 0; i--) {
       const j = Math.floor(r() * (i + 1));
       [arr[i], arr[j]] = [arr[j], arr[i]];

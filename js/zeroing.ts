@@ -10,9 +10,9 @@ const G_ZeroUI = (() => {
   const st = { wslot: 'p', am: null as string | null };
   interface Pt { d: number; h: number; v: number; t: number }
   const weapon = () => G.Me.weapons[st.wslot] || G.Me.weapons.p || G.Me.weapons.s;
-  const loads = (w: any): string[] => (G.AMMO_TYPES as Record<string, string[]>)[((G.CALIBERS as Record<string, any>)[G.calOf(w.def)] || { group: 'cell' }).group] || [];
+  const loads = (w: GWeapon): string[] => (G.AMMO_TYPES as Record<string, string[]>)[((G.CALIBERS as Record<string, any>)[G.calOf(w.def)] || { group: 'cell' }).group] || [];
   // the path of `am` from this gun with its sights as set (or with `clicks` of elevation instead)
-  const path = (w: any, am: string, clicks = w.clicks || 0): Pt[] => G.flight(w.def, am, G.boreTip(Object.assign({}, w, { clicks })), MAXD);
+  const path = (w: GWeapon, am: string, clicks = w.clicks || 0): Pt[] => G.flight(w.def, am, G.boreTip(Object.assign({}, w, { clicks })), MAXD);
   // where a path crosses the line of sight (metres)
   function crossings(p: Pt[]) {
     const out: number[] = [];

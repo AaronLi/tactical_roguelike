@@ -28,7 +28,7 @@ const G_Furniture = (() => {
   }
   type MatArgs = [number, number, number, Record<string, any>];
   // A room as the level lays it out (x, z, w, h in tiles) plus whatever else the layout hangs on it.
-  interface Room { x: number; z: number; w: number; h: number; type: string; [key: string]: any }
+  interface Room { x: number; z: number; w: number; h: number; type: RoomType; [key: string]: any }
   // A piece's recipe in R: footprint, collision boxes, optional ray boxes and build()
   interface PieceRec { w: number; d: number; boxes: any; ray?: (v: number) => any[]; [key: string]: any }
   interface Spot { x: number; z: number; dirs: number[][]; used?: boolean }
@@ -1205,7 +1205,7 @@ const G_Furniture = (() => {
 
   // Runs on the coarse (2 m) grid; G.Level.refine then lays the pieces on the fine grid. wd: the wall(s) a
   // piece is set against, so it can follow the wall when the wall is thinned.
-  function plan(map: any, r: () => number, spawnRoom: Room, exitRoom: Room, tryBlock: (x: number, z: number, n: number) => boolean) {
+  function plan(map: LvMap, r: () => number, spawnRoom: Room, exitRoom: Room, tryBlock: (x: number, z: number, n: number) => boolean) {
     const U = G.U, { W, t, rooms } = map, TS = map.TS || G.Level.TS, home = map.theme.home == null ? 1 : map.theme.home;
     map.props = new Map();
     const homes = U.shuffle(r, HOME.slice());
@@ -1260,12 +1260,12 @@ const G_Furniture = (() => {
               if ((k === 0 || k === 2) && x + 1 <= rm.x + rm.w - 2 && free(x) && free(x + 1) && tryBlock(x, z, 2)) {
                 if (tryBlock(x + 1, z, 2)) {
                   put(food ? 'bigfood' : 'bigmerch', x, z, (x + 1) * TS, C(z), q, r());
-                  for (const o of [-0.95, 0.95]) map.civSpots.push({ x: (x + 1) * TS + o, z: C(z), yaw }); // behind the counter
+                  for (const o of [-0.95, 0.95]) map.civSpots!.push({ x: (x + 1) * TS + o, z: C(z), yaw }); // behind the counter
                   x += 2; continue;
                 }
-                put(food ? 'stallfood' : 'stallmerch', x, z, C(x), C(z), q, r()); map.civSpots.push({ x: C(x), z: C(z), yaw }); x++; continue;
+                put(food ? 'stallfood' : 'stallmerch', x, z, C(x), C(z), q, r()); map.civSpots!.push({ x: C(x), z: C(z), yaw }); x++; continue;
               }
-              if (tryBlock(x, z, 2)) { put(food ? 'stallfood' : 'stallmerch', x, z, C(x), C(z), q, r()); map.civSpots.push({ x: C(x), z: C(z), yaw }); }
+              if (tryBlock(x, z, 2)) { put(food ? 'stallfood' : 'stallmerch', x, z, C(x), C(z), q, r()); map.civSpots!.push({ x: C(x), z: C(z), yaw }); }
               x++;
             }
           }
@@ -1505,7 +1505,7 @@ const G_Furniture = (() => {
       }
       if (rm.type === 'cashier') {
         // the counter along the inside of the glass (the till nearest the door), the cigarettes on the back wall
-        const door = [...Array(rm.h).keys()].map((i) => rm.z + i).find((z) => t[z * W + rm.x - 1] === 3), dz0 = door * TS - 0.3, dz1 = (door + 1) * TS + 0.3;
+        const door = [...Array(rm.h).keys()].map((i) => rm.z + i).find((z) => t[z * W + rm.x - 1] === 3), dz0 = door! * TS - 0.3, dz1 = (door! + 1) * TS + 0.3;
         let first = true;
         for (let z = z0 + 1; z + 1 <= z1; z += 2) { if (z + 1 > dz0 && z - 1 < dz1) continue; lay(first ? 'register' : 'counter', x0 + 0.33, z, facing(-1, 0)); first = false; }
         for (let z = z0 + 2; z + 1 <= z1; z += 2) lay('tobacco', x1 - 0.23, z, facing(1, 0));
@@ -1570,7 +1570,7 @@ const G_Furniture = (() => {
           if (n <= 0) break;
           if (rm === exitRoom && Math.abs(x - rm.cx) <= 1 && Math.abs(z - rm.cz) <= 1) continue;
           if (t[z * W + x] !== 0 || [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => t[(z + b) * W + x + a] === 2 || t[(z + b) * W + x + a] === 4) && !spec.dense) continue;
-          const name = U.pick(r, spec.center), rec = R[name];
+          const name = U.pick(r, spec.center as string[]), rec = R[name];
           if (!tryBlock(x, z, rec.cover ? 2 : 4)) continue;
           put(name, x, z, center(x), center(z), Math.floor(r() * 4), r());
           n--;

@@ -15,7 +15,7 @@
 const G_Headgear = (() => {
   const T = THREE, PI = Math.PI;
   type V3 = [number, number, number];
-  type Mat = (c: number, o?: any) => any; // (rig.ts's kit materials)
+  type Mat = (c: number, o?: Record<string, any>) => THREE.Material; // (rig.ts's kit materials)
   type Put = (m: THREE.Object3D) => void;
   interface BandOpts { cols?: number; rows?: number; sc?: V3; c?: V3; top?: boolean }
   interface Model { cut: string; r: number; t: number; col: number | null; rails?: boolean; shroud?: boolean; vents?: boolean; loop?: number; weight?: boolean; bracket?: boolean; cover?: boolean; visor?: boolean }

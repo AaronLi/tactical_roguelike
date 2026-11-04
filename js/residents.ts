@@ -203,7 +203,7 @@
   // ---------------------------------------------------------------- who they are
   const carpet = (color: string) => ({ kind: 'carpet', color }), wood = (color: string) => ({ kind: 'wood', color }), tile = (color: string, grout = '#6a6660') => ({ kind: 'tile', color, grout });
   const lino = (color: string, grout?: string) => ({ kind: 'lino', color, grout: grout || color, sound: 'tile' }), slab = (color: string) => ({ kind: 'concrete', color, sound: 'concrete' }), lam = (color: string) => ({ kind: 'laminate', color, sound: 'wood' }), parquet = (color: string) => ({ kind: 'parquet', color, sound: 'wood' });
-  const bath = (wall: string, ceil: string, trim: string, floor: HomeFloor) => ({ carve: { from: ['bedroom', 'dining', 'office', 'kitchen'], size: [3, 4] }, tight: 1, wall, ceil, trim, floor, items: [{ id: 'basin', piece: 'basin', at: 'wall' }, { id: 'toilet', piece: 'toilet', at: 'corner', swap: [{ piece: 'toilet', at: 'wall' }] }, { id: 'shower', piece: 'shower', at: 'corner', swap: [{ piece: 'basin', at: 'wall' }] }] });
+  const bath = (wall: string, ceil: string, trim: string, floor: HomeFloor) => ({ carve: { from: ['bedroom', 'dining', 'office', 'kitchen'] as RoomType[], size: [3, 4] }, tight: 1, wall, ceil, trim, floor, items: [{ id: 'basin', piece: 'basin', at: 'wall' }, { id: 'toilet', piece: 'toilet', at: 'corner', swap: [{ piece: 'toilet', at: 'wall' }] }, { id: 'shower', piece: 'shower', at: 'corner', swap: [{ piece: 'basin', at: 'wall' }] }] });
   const FLAT = 0.055, LOFT = 0.15; // (the chance of each: a loft's rarer, and has fewer who'd take it)
   G.Homes.RESIDENTS.push(
     { id: 'stash', name: 'Dario Vance and Kell Adeyemi', home: 'flat', rate: FLAT,

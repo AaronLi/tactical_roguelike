@@ -25,10 +25,26 @@
 // the void, every so many metres }. of(map, solid, p, q) gives the construction of the solid a round met at p and left
 // at q. A partition is two sheets of plasterboard and a void, with a stud every 40 cm; a bunker's wall is concrete all
 // the way through; a fridge is thin steel with foam in it; a car is thin steel with an engine in it.
+/** Every material a round can meet (js/materials.ts MAT's keys). */
+type MatKey = 'aramid' | 'pe' | 'steel' | 'ceramic' | 'pc' | 'abs' | 'nylon' | 'polyurea' | 'pad' | 'bone' | 'mild' | 'sheet' | 'iron' | 'alu' | 'concrete' | 'cmu' | 'brick' | 'ceram' | 'hardwood' | 'pine' | 'ply' | 'mdf' | 'gypsum' | 'card' | 'paper' | 'fabric' | 'foam' | 'pur' | 'wool' | 'goods' | 'foliage' | 'rubber' | 'hdpe' | 'soil' | 'sand' | 'granite' | 'water' | 'glass' | 'bpglass' | 'paperT';
+/** What a body is made of (TISSUE's keys), for a round going through it. */
+type TissueKey = 'skin' | 'fat' | 'muscle' | 'viscera' | 'liver' | 'heart' | 'brain' | 'lung' | 'airway' | 'vessel' | 'cortical' | 'cancellous' | 'marrow' | 'rib' | 'diploe';
+/** A round's core, which a material's E is keyed by. */
+type MatCore = 'lead' | 'mild' | 'hard' | 'wc';
+/** What a hit on a material looks and sounds like (js/render.ts IMPACT). */
+type MatFx = 'soft' | 'metal' | 'stone' | 'glass' | 'plastic' | 'wood' | 'plaster' | 'soil' | 'water';
+/** One material's numbers (the header comment says what each is). */
+interface MatDef {
+  name: string; K: number; rho: number; sig: number; fx: MatFx; E: Record<MatCore, number>; mu: number; e: number;
+  noRic?: boolean; clog?: boolean; blunt?: number; wearJ?: number; soft?: boolean; hard?: boolean; spall?: number; damp?: number; weave?: number;
+}
+/** What a solid is built of: skin on each face (outside in), the core between (null: a void), the share of it that's core, the framing in a void. */
+interface MatBuild { skin: [MatKey, number][]; core: MatKey | null; fill: number; stud: MatStud | null; one?: boolean }
+interface MatStud { every: number; w: number; mat: MatKey; mm: number }
 const G_Materials = (() => {
-  const CORE_E = { lead: 1, mild: 1.1, hard: 1.4, wc: 1.6 };
-  const m = (name: string, K: number, rho: number, sig: number, fx: string, o?: Record<string, any>) => Object.assign({ name, K, rho, sig, fx, E: CORE_E, mu: 0.3, e: 0.15 }, o || {});
-  const MAT = {
+  const CORE_E: Record<MatCore, number> = { lead: 1, mild: 1.1, hard: 1.4, wc: 1.6 };
+  const m = (name: string, K: number, rho: number, sig: number, fx: MatFx, o?: Partial<MatDef>): MatDef => Object.assign({ name, K, rho, sig, fx, E: CORE_E, mu: 0.3, e: 0.15 }, o || {});
+  const MAT: Record<MatKey, MatDef> = {
     // armour (K, E, blunt, wearJ: the NIJ calibration, js/ballistics.ts)
     aramid: m('aramid', 72, 1440, 3e8, 'soft', { E: { lead: 1, mild: 1.25, hard: 1.45, wc: 1.5 }, blunt: 0.25, wearJ: 900, soft: true, noRic: true, damp: 0.6, weave: 0.1 }), // (weave: the share of it a spike has to get through, js/ballistics.ts vLimit)
     pe: m('UHMWPE', 77, 970, 2.5e8, 'soft', { E: { lead: 1, mild: 1.35, hard: 1.75, wc: 2 }, blunt: 0.15, wearJ: 2200, noRic: true, damp: 0.7 }),
@@ -84,7 +100,7 @@ const G_Materials = (() => {
   // stands up to, which is what a round has to pay per unit of its track whatever its speed. Skin is tough (about 10 J for a
   // 9 mm to break through it, why a spent round stops under the skin on its way out); bone is hard and dense in its cortex
   // and light inside; lung is mostly air. bone: it deforms and turns a round, and breaks into fragments of its own.
-  const TISSUE = {
+  const TISSUE: Record<TissueKey, { name: string; rho: number; sig: number; bone?: boolean }> = {
     skin: { name: 'skin', rho: 1100, sig: 8e7 }, fat: { name: 'fat', rho: 920, sig: 2e5 }, muscle: { name: 'muscle', rho: 1060, sig: 4e5 },
     viscera: { name: 'viscera', rho: 1040, sig: 2.5e5 }, liver: { name: 'liver', rho: 1060, sig: 2.5e5 }, heart: { name: 'heart', rho: 1060, sig: 4e5 },
     brain: { name: 'brain', rho: 1040, sig: 1.5e5 }, lung: { name: 'lung', rho: 400, sig: 1.5e5 }, airway: { name: 'airway', rho: 600, sig: 2e5 }, vessel: { name: 'blood vessel', rho: 1060, sig: 2e5 },
@@ -106,10 +122,9 @@ const G_Materials = (() => {
     for (const l of pr.layers) { core.push(l); if (l[0] === 'steel') core.push(['polyurea', 3]); }
     return [...over, ...core, ...under];
   }
-  type Stud = { every: number, w: number, mat: string, mm: number };
-  const C = (skin: [string, number][], core: string | null = null, fill = 1, stud: Stud | null = null) => ({ skin, core, fill, stud });
-  const SOLID = (mat: string) => C([], mat), ONE = (skin: [string, number][]) => Object.assign(C(skin), { one: true }); // (ONE: a single sheet, however thick its box: a pane, a plank fence)
-  const STUD = { every: 0.4, w: 0.038, mat: 'pine', mm: 89 }, STEELSTUD = { every: 0.6, w: 0.04, mat: 'mild', mm: 1.8 };
+  const C = (skin: [MatKey, number][], core: MatKey | null = null, fill = 1, stud: MatStud | null = null): MatBuild => ({ skin, core, fill, stud });
+  const SOLID = (mat: MatKey) => C([], mat), ONE = (skin: [MatKey, number][]) => Object.assign(C(skin), { one: true }); // (ONE: a single sheet, however thick its box: a pane, a plank fence)
+  const STUD: MatStud = { every: 0.4, w: 0.038, mat: 'pine', mm: 89 }, STEELSTUD: MatStud = { every: 0.6, w: 0.04, mat: 'mild', mm: 1.8 };
   const PLASTER = C([['gypsum', 13]], null, 1, STUD);
   // walls by environment: indoors, and those with the outside on one side
   const WALLS = {
@@ -129,7 +144,7 @@ const G_Materials = (() => {
   const SLAB = SOLID('concrete'), JOISTS = C([['ply', 18], ['gypsum', 13]], 'wool', 0.1);
   const DECK = { Apartment: SLAB, Suburbs: JOISTS, Festival: C([['ply', 18]]), 'Cold Storage': C([['sheet', 0.7]], 'pur'), Warehouse: C([['sheet', 1.5]], 'wool', 0.1) };
   // furniture, by the piece (js/furniture.ts)
-  const CAB = C([['mdf', 18]]), SHEET = (mm: number, core: string | null = null, fill = 1) => C([[mm <= 1.5 ? 'sheet' : 'mild', mm]], core, fill), MACHINE = C([['mild', 12]], 'iron', 0.35);
+  const CAB = C([['mdf', 18]]), SHEET = (mm: number, core: MatKey | null = null, fill = 1) => C([[mm <= 1.5 ? 'sheet' : 'mild', mm]], core, fill), MACHINE = C([['mild', 12]], 'iron', 0.35);
   const PROPS = {
     sofa: C([['fabric', 8]], 'foam'), armchairs: C([['fabric', 8]], 'foam'), bed: C([['fabric', 6]], 'foam'), tv: C([['hdpe', 3]], 'mdf', 0.05),
     bookshelf: C([['mdf', 18]], 'paper', 0.55), counter: C([['mdf', 18]], 'goods', 0.15), island: C([['mdf', 18]], 'goods', 0.15), dining: ONE([['hardwood', 28]]), dresser: CAB, wardrobe: CAB, desk: ONE([['mdf', 25]]),

@@ -15,16 +15,39 @@
 // Between levels everything you aren't carrying sits in your locker (a big grid) at the quartermaster's.
 type GMe = typeof G.Me;
 type GTbl = Record<string, any>; // a data table indexed by key (js/data.ts CALIBERS, AMMO)
-type GDef = Record<string, any>; // a gun's definition (js/data.ts WEAPONS) or a gear definition
-type GWeapon = Record<string, any>; // a weapon as carried (Me.makeWeapon)
-interface GItem { k: string; uid?: number; [field: string]: any; } // an item: what k says it is decides which other fields it has
+type GDef = Record<string, any>; // a gun's definition (js/data.ts WEAPONS) or a gear definition (GearDef)
+// what the quartermaster's gear is (the kinds of item that go on you), and every kind of item there is
+type GearKind = 'carrier' | 'plate' | 'helmet' | 'face' | 'shoulder' | 'groin' | 'legs' | 'belt' | 'pack' | 'ifak';
+type ItemKind = 'gun' | 'mag' | 'ammo' | 'med' | 'frag' | 'flash' | 'part' | 'pouch' | 'tube' | GearKind; // ('tube': a shotgun's magazine tube, drawn as an icon only)
+// a piece of gear's definition (LIST, DEFS): the fields that only some kinds have are optional
+interface GearDef {
+  id: string; kind: GearKind; brand: string; name: string; tier: number; price: number; speed: number; desc: string;
+  dur?: number; plate?: boolean; shoulder?: boolean; groin?: boolean; legs?: boolean; face?: boolean; thin?: boolean; col?: number;
+  prot?: { at: string; layers: [string, number][] }[]; molle?: [number, number]; pouches?: [string, number, number][];
+  kg?: number; fwd?: number; cut?: string; cover?: number; lower?: boolean; sz?: [number, number]; grids?: [number, number, string[] | null][];
+}
+// a pouch's definition (POUCHES): w x h what it holds, mw x mh the MOLLE it takes, acc what it accepts (null: anything small)
+interface PouchDef { name: string; brand: string; w: number; h: number; mw: number; mh: number; acc: string[] | null; price: number; desc: string; split?: number; dump?: boolean; }
+// a weapon as carried (Me.makeWeapon): its definition, the rounds in it and the state of its action; other files add the rest
+interface GWeapon { def: WeaponDef; mag: number; ammo: string; tube: string[]; chamber?: string | null; fm?: string; sup?: unknown; noMag?: boolean; spent?: string[]; item?: GItem; stickers?: any[]; [field: string]: any; }
+// An item: what k says it is decides which other fields it has. A magazine or a box: its gun (wid) or caliber (key), n rounds of
+// type am, cap the most it holds (a magazine's rounds are r, bottom first); a medical item: mt, n; a part: pid; a pouch: pid, its
+// grids; a gun: w; gear: gid, dur, grids, molle and what's fitted (plate, face, shoulder, groin, legs). The fields a kind doesn't have
+// aren't there (the kind-specific ones are typed as present: check k first).
+interface GItem {
+  k: ItemKind; uid?: number;
+  w: GWeapon; key: string; wid: string; cap: number; n: number; am: string; vid?: string | null; mt: string; pid: string; gid: string; dur: number;
+  r: string[]; base?: string; grids?: GGrid[]; molle?: GGrid;
+  plate?: GItem | null; face?: GItem | null; shoulder?: GItem | null; groin?: GItem | null; legs?: GItem | null;
+  tid?: number;
+}
 interface GCell { it: GItem; x: number; y: number; r: number; }
 interface GGrid { id: number; w: number; h: number; accept: string[] | null; label: string; items: GCell[]; locker?: boolean; pack?: boolean; molle?: boolean; dump?: boolean; [field: string]: any; }
 const G_Gear = (() => {
   const B = { north: 'Northmark Defense', kest: 'Kestrel Tactical', iron: 'Ironvale Arms', mer: 'Meridian Armor', sable: 'Sable Ridge', para: 'Paragon Systems', halc: 'Halcyon Labs', gray: 'Graywater Supply', vant: 'Vantage Industries' };
   // pouch grids: [w, h, accepts] (accepts: null = anything small, or a list of item kinds)
   const MAG = ['mag', 'ammo'], MED = ['med'];
-  const LIST = [
+  const LIST: GearDef[] = [
     // ---------------------------------------------------------------- carriers and vests: soft armour + plate slot + pouches
     { id: 'c.lite', kind: 'carrier', brand: B.gray, name: 'Lightline concealable vest (II)', tier: 1, price: 220, speed: 1, dur: 4, plate: false, thin: true, col: 0x5c5a50,
       prot: [{ at: 'torso', layers: [['aramid', 6]] }], desc: 'Thin soft Level II panels: stops 9 mm, .45 and buckshot, not a magnum, and wears through sooner. No plate pocket, no MOLLE.' },
@@ -83,14 +106,14 @@ const G_Gear = (() => {
     { id: 'k.assault', kind: 'pack', brand: B.kest, name: '3-day assault pack', tier: 2, price: 650, speed: 0.99, sz: [3, 4], grids: [[5, 3, null]], desc: 'Takes a carbine or shotgun, with a row to spare.' },
     { id: 'k.ruck', kind: 'pack', brand: B.sable, name: 'Large rucksack', tier: 3, price: 1200, speed: 0.97, sz: [4, 4], grids: [[6, 5, null]], desc: 'Any long gun, even a sniper rifle or an LMG, and plenty besides. Heavy.' },
   ];
-  const DEFS: Record<string, GDef> = {};
+  const DEFS: Record<string, GearDef> = {};
   LIST.forEach((d) => (DEFS[d.id] = d));
   // What's fitted to something you wear: its kind, and the kind of gear it goes on, which has to say so (d.plate, d.face...).
   // On it, it's it.plate, it.face...: it comes off with it, and goes wherever it goes.
   const MOUNTS: Record<string, string> = { plate: 'carrier', face: 'helmet', shoulder: 'carrier', groin: 'carrier', legs: 'belt' };
   // pouches: w x h is what they hold (their grid inside, and their size stowed); mw x mh is the MOLLE they
   // take mounted (the same unless said: a rifle mag pouch or a med pouch hangs from one 1x1 slot)
-  const POUCHES: Record<string, GDef> = {
+  const POUCHES: Record<string, PouchDef> = {
     'q.pistol': { name: 'Pistol mag pouch', brand: B.gray, w: 2, h: 1, mw: 1, mh: 1, split: 2, acc: MAG, price: 45, desc: 'Two pockets, a pistol magazine or box of shells in each, from a single MOLLE slot.' },
     'q.rifle': { name: 'Rifle mag pouch', brand: B.kest, w: 1, h: 2, mw: 1, mh: 1, acc: MAG, price: 90, desc: 'One rifle magazine, from a single MOLLE slot.' },
     'q.rifle2': { name: 'Double rifle mag pouch', brand: B.iron, w: 2, h: 2, mw: 1, mh: 2, acc: MAG, price: 150, desc: 'Two rifle magazines side by side (or four pistol ones).' },
@@ -144,7 +167,7 @@ const G_Gear = (() => {
     const o: any = {};
     for (const k of Object.keys(it)) {
       if (k === 'uid' || (it.r && (k === 'n' || k === 'am'))) continue;
-      const v = it[k];
+      const v = (it as GTbl)[k];
       if (k === 'w') o.w = { id: v.def.id, build: Object.assign({}, v.def.build), mag: v.mag, ammo: v.ammo, tube: (v.tube || []).slice(), spent: v.spent && v.spent.length ? v.spent.slice() : undefined, noMag: !!v.noMag, fm: v.fm, chamber: v.chamber || null, sk: v.stickers && v.stickers.length ? v.stickers.slice() : undefined }; // (sk: its stickers, js/stickers.ts)
       else if (k === 'grids') o.grids = v.map(packGrid);
       else if (k === 'molle') o.molle = packGrid(v);
@@ -176,7 +199,7 @@ const G_Gear = (() => {
     if (o.r) it.base = o.am0 || o.r[o.r.length - 1];
     if (o.grids) it.grids = o.grids.map(unpackGrid);
     if (o.molle) it.molle = unpackGrid(o.molle);
-    for (const m of Object.keys(MOUNTS)) if (m in o) it[m] = o[m] ? unpack(o[m]) : null;
+    for (const m of Object.keys(MOUNTS)) if (m in o) (it as GTbl)[m] = o[m] ? unpack(o[m]) : null;
     return it;
   }
   function unpackGrid(o: any) {
@@ -197,7 +220,7 @@ const G_Gear = (() => {
     return it;
   }
   // a magazine's shape in the grid, by what it holds
-  function magShape(def: GDef, cap: number, vid: string) {
+  function magShape(def: GDef, cap: number, vid?: string | null) {
     const a = ammoFor(def), drum = vid && G.Gunsmith.PARTS[vid] && G.Gunsmith.PARTS[vid].model && G.Gunsmith.PARTS[vid].model.mag && G.Gunsmith.PARTS[vid].model.mag.t === 'drum';
     if (G.beltFed(def)) return cap > def.mag * 1.2 ? [2, 3] : cap < def.mag * 0.8 ? [2, 1] : [2, 2];
     if (a.label !== 'MAG') return [1, 1]; // clips
@@ -245,11 +268,11 @@ const G_Gear = (() => {
     if (d.grids) it.grids = d.grids.map(([w, h, acc]: [number, number, string[] | null]) => Object.assign(grid(w, h, acc), d.kind === 'pack' ? { pack: true } : {}));
     if (d.molle) { it.molle = Object.assign(grid(d.molle[0], d.molle[1], ['pouch'], 'MOLLE'), { molle: true }); for (const [pid, x, y] of d.pouches || []) put(it.molle, pouchItem(pid), x, y, 0); }
     if (d.kind === 'carrier') it.plate = null;
-    for (const m of Object.keys(MOUNTS)) if (MOUNTS[m] === d.kind && d[m]) it[m] = null; // the mounts it has
+    for (const m of Object.keys(MOUNTS)) if (MOUNTS[m] === d.kind && (d as GDef)[m]) (it as GTbl)[m] = null; // the mounts it has
     return it;
   }
   // a weapon's item (made once and kept on it, so it's the same item wherever it goes)
-  function gunItem(w: GWeapon) { if (!w.item) Object.defineProperty(w, 'item', { value: item({ k: 'gun', w }), enumerable: false }); return w.item; }
+  function gunItem(w: GWeapon) { if (!w.item) Object.defineProperty(w, 'item', { value: item({ k: 'gun', w }), enumerable: false }); return w.item!; }
   // (split: that many separate 1x1 pockets side by side, instead of one w x h grid)
   function pouchItem(pid: string) { const P = POUCHES[pid]; return item({ k: 'pouch', pid, grids: P.split ? Array.from({ length: P.split }, () => grid(1, 1, P.acc)) : [Object.assign(grid(P.w, P.h, P.acc), P.dump ? { dump: true } : {})] }); }
   // a weapon part (off the gun): its footprint by what it is
@@ -292,7 +315,7 @@ const G_Gear = (() => {
     else if (it.k === 'pouch') { const P = POUCHES[it.pid], m = g && g.molle; w = m ? P.mw || P.w : P.w; h = m ? P.mh || P.h : P.h; }
     else if (it.k === 'part') [w, h] = partSize(it.pid);
     else if (it.k === 'med') [w, h] = (G.Med.ITEMS[it.mt] || G.Med.ITEMS.bandage).size;
-    else if (it.gid && DEFS[it.gid].sz) [w, h] = DEFS[it.gid].sz;
+    else if (it.gid && DEFS[it.gid].sz) [w, h] = DEFS[it.gid].sz!;
     else if (GEAR_SIZE[it.k]) [w, h] = GEAR_SIZE[it.k];
     return rot ? [h, w] : [w, h];
   }
@@ -341,7 +364,7 @@ const G_Gear = (() => {
   }
   // the grids of the pouches mounted on a carrier's or belt's MOLLE
   // (left to right across the panel, top to bottom in a column: the order you'd reach for them)
-  function mounted(gear: GItem) { return gear && gear.molle ? [...gear.molle.items].sort((a, b) => a.x - b.x || a.y - b.y).flatMap((p) => p.it.grids) : []; }
+  function mounted(gear: GItem) { return gear && gear.molle ? [...gear.molle.items].sort((a, b) => a.x - b.x || a.y - b.y).flatMap((p) => p.it.grids!) : []; }
   // the MOLLE panels you wear
   function molles(me: GMe) { return [me.kit.carrier, me.kit.belt].filter((g) => g && g.molle).map((g) => g.molle); }
   // the guns you have: in your hands, then any stowed in your backpack or locker
@@ -405,7 +428,7 @@ const G_Gear = (() => {
   }
   function setLoad(w: GWeapon, rounds: string[]) { w.tube = rounds; w.mag = rounds.length; if (rounds.length) w.ammo = rounds[rounds.length - 1]; }
   // a magazine goes in: its rounds are the gun's, and its variant is the gun's magazine (capacity, reload)
-  function loadIn(me: GMe, w: GWeapon, mag: GItem | { r: string[]; vid?: string; cap?: number }) {
+  function loadIn(me: GMe, w: GWeapon, mag: GItem | { r: string[]; vid?: string | null; cap?: number }) {
     setLoad(w, mag.r);
     if (mag.vid && w.def.build && w.def.build.mag !== mag.vid && me.refit) me.refit(w, Object.assign({}, w.def.build, { mag: mag.vid }));
   }
@@ -603,8 +626,8 @@ const G_Gear = (() => {
     // two spare magazines of tracers (you see every round go), in the small pockets: the tall ones are left for rifle magazines
     put(me.pockets[2], ammoItem(p9, null, 'tracer'), 0, 0, 0); put(me.pockets[3], ammoItem(p9, null, 'tracer'), 0, 0, 0);
     // second-hand protection: a bump helmet and a concealable vest, both already half worn out
-    me.kit.helmet = gearItem('h.bump'); me.kit.helmet.dur = DEFS['h.bump'].dur * 0.5;
-    me.kit.carrier = gearItem('c.ghost'); me.kit.carrier.dur = DEFS['c.ghost'].dur * 0.5;
+    me.kit.helmet = gearItem('h.bump'); me.kit.helmet.dur = DEFS['h.bump'].dur! * 0.5;
+    me.kit.carrier = gearItem('c.ghost'); me.kit.carrier.dur = DEFS['c.ghost'].dur! * 0.5;
     me.kit.ifak = gearItem('m.ifak');
     const g = me.kit.ifak.grids[0];
     put(g, medItem('splint'), 0, 0, 0); // 1x2 down the left

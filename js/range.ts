@@ -7,12 +7,13 @@
 // reload as you like, and every round you use is given back when you walk out (the magazines, boxes and chambers as they
 // were when you came in). Nobody else is hurt by it: friendly fire is off in the hangar.
 // What the hangar hands the range to build with (js/hangar.ts: its box, its materials, its signs, its use targets).
+type RangeSolid = ReturnType<typeof G_World.add>;
 interface RangeHelpers {
   box: (parent: THREE.Object3D, x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, mat: THREE.Material) => unknown;
-  M: (c: number, o?: Record<string, any>) => THREE.Material;
+  M: (c: number, o?: THREE.MeshStandardMaterialParameters) => THREE.Material;
+  canvasTex: (w: number, h: number, draw: (g: CanvasRenderingContext2D, w: number, h: number) => void) => THREE.CanvasTexture;
   signMat: (lines: string[], w: number, h: number, bg: string, fg: string, sub?: string) => THREE.Material;
-  addTarget: (t: any) => any;
-  [helper: string]: any;
+  addTarget: (t: HangarTarget) => HangarTarget;
 }
 interface RangeSpec { x0: number; x1: number; lanes: number[]; len: number; marks: number[]; big?: number[]; steel?: number[]; }
 interface RifleSpec extends RangeSpec { big: number[]; steel: number[]; }
@@ -24,23 +25,24 @@ interface RangeLane {
 interface IpscHit { x: number; y: number; z: string; }
 interface IpscTarget {
   kind: 'ipsc'; lane: RangeLane; d: number; hits: IpscHit[]; w: number; h: number; x: number; y0: number; z: number;
-  tex: THREE.CanvasTexture; group: THREE.Group; solid?: any;
+  tex: THREE.CanvasTexture; group: THREE.Group; solid?: RangeSolid | null;
 }
 interface SteelTarget {
   kind: 'steel'; d: number; lane: RangeLane; hits: number; size: number; x: number; z: number; swing: number; vel: number; flash: number;
-  mat: THREE.MeshStandardMaterial; pivot: THREE.Group; solid: any;
+  mat: THREE.MeshStandardMaterial; pivot: THREE.Group; solid: RangeSolid | null;
 }
-interface PaperTarget { kind: 'paper'; d: number; lane: RangeLane; hits: number; w: number; h: number; x: number; y: number; z: number; tex: THREE.CanvasTexture; solid: any; }
+interface PaperTarget { kind: 'paper'; d: number; lane: RangeLane; hits: number; w: number; h: number; x: number; y: number; z: number; tex: THREE.CanvasTexture; solid: RangeSolid | null; }
 type RangeTarget = IpscTarget | SteelTarget | PaperTarget;
+type RangeHitTarget = RangeTarget | { kind: 'course'; q: CourseTarget }; // (what a round's solid says it hit: js/range.ts hit, markOn)
 // your ammunition as you walked in (snapshot() makes it, restore() puts it back)
 interface RangeSnap {
-  guns: { w: GWeapon; mag: any; chamber: any; ammo: any; tube: any; spent: any; spentCh: any }[];
+  guns: { w: GWeapon; mag: GWeapon['mag']; chamber: GWeapon['chamber']; ammo: GWeapon['ammo']; tube: GWeapon['tube'] | undefined; spent: GWeapon['spent']; spentCh: GWeapon['spentCh'] }[];
   layout: { g: GGrid; ps: { p: GCell; x: number; y: number; r: number; it: GItem }[] }[];
-  items: Map<GItem, { r?: any[]; n?: number }>; slot: any;
+  items: Map<GItem, { r?: string[]; n?: number }>; slot: typeof G.Me.slot;
 }
 interface RangeState {
-  root: THREE.Object3D | null; tg: RangeTarget[]; lanes: RangeLane[]; inside: boolean; snap: RangeSnap | null; ring: any[];
-  laneList?: RangeLane[] | null; hangar?: any;
+  root: THREE.Object3D | null; tg: RangeTarget[]; lanes: RangeLane[]; inside: boolean; snap: RangeSnap | null; ring: unknown[];
+  laneList?: RangeLane[] | null; hangar?: HangarState;
 }
 const G_Range = (() => {
   const T = THREE;
@@ -64,7 +66,7 @@ const G_Range = (() => {
   const HOLE_PX = 4;
 
   // ---------------------------------------------------------------- the world: what stops rounds and people
-  function decorate(map: LvMap, add: (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, o?: Record<string, any>) => unknown) {
+  function decorate(map: LvMap, add: (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, o?: Record<string, unknown>) => unknown) {
     for (const L of lanes()) add(L.cx - 0.55, 0, FL + 0.15 - 0.3, L.cx - 0.15, 1.1, FL + 0.15 + 0.3, { kind: 'prop' }); // (the lane's console, at the line)
   }
   // every lane: { range, n, cx, x0, x1 }
@@ -77,8 +79,8 @@ const G_Range = (() => {
 
   // ---------------------------------------------------------------- drawing
   const mats: Record<string, THREE.MeshStandardMaterial> = {};
-  const M = (c: number, o?: Record<string, any>) => { const k = c + JSON.stringify(o || {}); return mats[k] || (mats[k] = new T.MeshStandardMaterial(Object.assign({ color: c, roughness: 0.8, metalness: 0.1 }, o || {}))); };
-  const basic = (c: number, o?: Record<string, any>) => new T.MeshBasicMaterial(Object.assign({ color: c }, o || {}));
+  const M = (c: number, o?: THREE.MeshStandardMaterialParameters) => { const k = c + JSON.stringify(o || {}); return mats[k] || (mats[k] = new T.MeshStandardMaterial(Object.assign({ color: c, roughness: 0.8, metalness: 0.1 }, o || {}))); };
+  const basic = (c: number, o?: THREE.MeshBasicMaterialParameters) => new T.MeshBasicMaterial(Object.assign({ color: c }, o || {}));
   function tex(w: number, h: number, draw: (g: CanvasRenderingContext2D, w: number, h: number) => void) { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d')!, w, h); const t = new T.CanvasTexture(c); t.anisotropy = 4; t.userData = { canvas: c }; return t; }
   const labelTex: Record<string, THREE.MeshBasicMaterial> = {};
   function label(text: string, fg = '#f4f4f0', bg: string | null = null) {
@@ -98,7 +100,7 @@ const G_Range = (() => {
   let H: RangeHelpers = null!; // (build() gives it)
 
   // ---------------------------------------------------------------- the scene
-  function build(root: THREE.Object3D, hangarS: any, helpers: RangeHelpers) {
+  function build(root: THREE.Object3D, hangarS: HangarState, helpers: RangeHelpers) {
     H = helpers; S.root = root; S.tg = []; S.hangar = hangarS; S.lanes = []; S.laneList = null;
     const white = basic(0xeceae4), yellow = basic(0xe8c030);
     // the yard's own sign, over the garage door inside the hall
@@ -232,8 +234,8 @@ const G_Range = (() => {
   function place(q: IpscTarget, d: number) {
     q.d = d; q.z = FL - d;
     q.group.position.set(q.x, 0, q.z);
-    if (q.solid) G.World.remove(S.hangar.map.world, q.solid);
-    q.solid = G.World.add(S.hangar.map.world, G.World.box(q.x - q.w / 2, q.y0, q.z - 0.012 + RZ, q.x + q.w / 2, q.y0 + q.h, q.z + 0.012 + RZ, { kind: 'target', move: false, target: q }));
+    if (q.solid) G.World.remove(S.hangar!.map.world, q.solid);
+    q.solid = G.World.add(S.hangar!.map.world, G.World.box(q.x - q.w / 2, q.y0, q.z - 0.012 + RZ, q.x + q.w / 2, q.y0 + q.h, q.z + 0.012 + RZ, { kind: 'target', move: false, target: q }));
     for (const b of q.lane.btns || []) { b.mat.emissive.setHex(b.d === d ? 0x2a7a3a : 0x000000); b.mat.color.setHex(b.d === d ? 0x3a8a4a : 0x3a4a56); }
   }
   // a button pressed: the carrier runs it out (or in) to there, a fresh target on it
@@ -254,7 +256,7 @@ const G_Range = (() => {
     const plate = new T.Mesh(new T.BoxGeometry(size, size, 0.04), tg.mat); plate.position.set(0, -size / 2 - 0.05, 0.0); pivot.add(plate);
     const num = new T.Mesh(new T.PlaneGeometry(size * 0.8, size * 0.4), label(d + '', '#f4f4f0')); num.position.set(0, -size / 2 - 0.05, 0.022); pivot.add(num);
     tg.pivot = pivot;
-    const sol = G.World.add(S.hangar.map.world, G.World.box(x - size / 2, top - size - 0.05, z - 0.03 + RZ, x + size / 2, top - 0.05, z + 0.03 + RZ, { kind: 'target', move: false, target: tg }));
+    const sol = G.World.add(S.hangar!.map.world, G.World.box(x - size / 2, top - size - 0.05, z - 0.03 + RZ, x + size / 2, top - 0.05, z + 0.03 + RZ, { kind: 'target', move: false, target: tg }));
     tg.solid = sol; S.tg.push(tg); return tg;
   }
   function paper(root: THREE.Object3D, L: RangeLane, d: number) {
@@ -269,7 +271,7 @@ const G_Range = (() => {
       g.font = 'bold 30px sans-serif'; g.fillText(d + ' m', W / 2, Hh - 22);
     });
     const m = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshBasicMaterial({ map: tg.tex })); m.position.set(x, y, z - 0.025); root.add(m); // (its face is toward the line)
-    const sol = G.World.add(S.hangar.map.world, G.World.box(x - w / 2, y - h / 2, z - 0.04 + RZ, x + w / 2, y + h / 2, z - 0.02 + RZ, { kind: 'target', move: false, target: tg }));
+    const sol = G.World.add(S.hangar!.map.world, G.World.box(x - w / 2, y - h / 2, z - 0.04 + RZ, x + w / 2, y + h / 2, z - 0.02 + RZ, { kind: 'target', move: false, target: tg }));
     tg.solid = sol; S.tg.push(tg); return tg;
   }
   function targets(root: THREE.Object3D) {
@@ -291,7 +293,7 @@ const G_Range = (() => {
 
   // ---------------------------------------------------------------- a round meets a target (js/player.ts roundSegment)
   // (mv: the round's momentum, kg m/s: what swings a steel plate)
-  function hit(solid: any, p: THREE.Vector3, dir: THREE.Vector3, mv = 4) {
+  function hit(solid: RangeSolid | null, p: THREE.Vector3, dir: THREE.Vector3, mv = 4) {
     const t = solid && solid.target;
     if (!t || !S.root) return;
     if (t.kind === 'course') return G.Course.hit(t, p, dir); // (the IPSC course: js/course.ts)
@@ -345,7 +347,7 @@ const G_Range = (() => {
     return list;
   }
   function snapshot(me: typeof G.Me): RangeSnap {
-    const gs = grids(me), items = new Map<GItem, { r?: any[]; n?: number }>(), guns = G.Gear.guns(me).map((w) => ({ w, mag: w.mag, chamber: w.chamber, ammo: w.ammo, tube: w.tube && w.tube.slice(), spent: w.spent && w.spent.slice(), spentCh: w.spentCh }));
+    const gs = grids(me), items = new Map<GItem, { r?: string[]; n?: number }>(), guns = G.Gear.guns(me).map((w) => ({ w, mag: w.mag, chamber: w.chamber, ammo: w.ammo, tube: w.tube && w.tube.slice(), spent: w.spent && w.spent.slice(), spentCh: w.spentCh }));
     const layout = gs.map((g) => ({ g, ps: g.items.map((p) => ({ p, x: p.x, y: p.y, r: p.r, it: p.it })) }));
     for (const L of layout) for (const q of L.ps) { const it = q.it; if (it.k === 'mag') items.set(it, { r: it.r.slice() }); else if (typeof it.n === 'number') items.set(it, { n: it.n }); } // (boxes, and any other stack: bandages...)
     return { guns, layout, items, slot: me.slot };
@@ -353,7 +355,7 @@ const G_Range = (() => {
   function restore(me: typeof G.Me, s: RangeSnap) {
     for (const q of s.guns) { const w = q.w; w.mag = q.mag; w.chamber = q.chamber; w.ammo = q.ammo; if (q.tube) w.tube = q.tube.slice(); if (q.spent) w.spent = q.spent.slice(); else delete w.spent; w.spentCh = q.spentCh; }
     for (const L of s.layout) { L.g.items.length = 0; for (const q of L.ps) { q.p.x = q.x; q.p.y = q.y; q.p.r = q.r; q.p.it = q.it; L.g.items.push(q.p); } }
-    for (const [it, v] of s.items) { if (v.r) { it.r.length = 0; it.r.push(...v.r); } else it.n = v.n; }
+    for (const [it, v] of s.items) { if (v.r) { it.r.length = 0; it.r.push(...v.r); } else it.n = v.n!; }
     me.reloading = false; me.act = null; (me as Record<string, any>).burstQ = 0; me.pressBuf = 0; // (whatever was half done with a magazine isn't any more)
   }
 
@@ -408,7 +410,7 @@ const G_Range = (() => {
   }
   function leave() {
     if (S.snap && G.Me && G.Me.kit) { try { restore(G.Me, S.snap); } catch (e) { /* the kit changed under it */ } }
-    if (S.hangar && S.hangar.map) for (const t of S.tg) G.World.remove(S.hangar.map.world, t.solid);
+    if (S.hangar && S.hangar.map) for (const t of S.tg) G.World.remove(S.hangar!.map.world, t.solid!);
     S.snap = null; S.inside = false; S.root = null; S.tg = []; S.lanes = []; S.laneList = null;
     if (spot) { spot.remove(); spot = null; spotKey = ''; }
     G.Course.leave();
@@ -416,7 +418,7 @@ const G_Range = (() => {
 
   // what a mark from a round that hit target t should do: 'paper' (none: the target shows its own holes), or the
   // object it goes on to move with (a steel plate's pivot, a popper's hinge)
-  function markOn(t: any) {
+  function markOn(t: RangeHitTarget) {
     if (t.kind === 'course') return t.q.kind === 'steel' ? t.q.hinge : 'paper';
     return t.kind === 'steel' ? t.pivot : 'paper';
   }

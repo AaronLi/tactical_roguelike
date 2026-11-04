@@ -1,10 +1,94 @@
 'use strict';
 const _tv = new THREE.Vector3(), _tv2 = new THREE.Vector3();
 // Three.js scene, character models, first-person viewmodels and particle effects.
-interface Trail { line: THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>; mat: THREE.LineBasicMaterial; n: number; N: number; shot: any; old: number | null; marks: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>[]; keys?: Set<any>; }
-// (the mark's own options, as js/scars.ts plan takes them)
-interface ImpactOpts { m?: string; k?: string; dir?: any; J?: number; stop?: boolean; cal?: number; cut?: number; fit?: number; }
+interface Trail { line: THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>; mat: THREE.LineBasicMaterial; n: number; N: number; shot: PShot; old: number | null; marks: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>[]; keys?: Set<any>; }
+type ImpactKind = 'wall' | 'blood' | 'armor'; // what a round hit (impact)
+type ImpactFx = 'metal' | 'stone' | 'wood' | 'plaster' | 'soft' | 'glass' | 'soil' | 'plastic' | 'water'; // what it threw up (IMPACT), js/materials.ts fx
+type BloodKind = 'drop' | 'spatter' | 'pool';
+interface RBloodMats { [kind: string]: THREE.MeshStandardMaterial; drop: THREE.MeshStandardMaterial; spatter: THREE.MeshStandardMaterial; pool: THREE.MeshStandardMaterial; }
+type RMark = THREE.Mesh<THREE.BufferGeometry, THREE.Material>; // a pooled decal or blood mark
+type RWound = (THREE.Mesh<THREE.BufferGeometry, THREE.Material> | THREE.Line<THREE.BufferGeometry, THREE.Material>) & { onRig?: any }; // a track kept on a body
+interface RArc { dots: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial>; ring: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>; N: number; f?: number; }
 const G_R = {
+  // (set in init / _initFx before anything uses them: they hold undefined till then, as before)
+  renderer: undefined as unknown as THREE.WebGLRenderer,
+  scene: undefined as unknown as THREE.Scene,
+  camera: undefined as unknown as THREE.PerspectiveCamera,
+  hemi: undefined as unknown as THREE.HemisphereLight,
+  ambient: undefined as unknown as THREE.AmbientLight,
+  muzzleLights: undefined as unknown as THREE.PointLight[],
+  muzzleIdx: undefined as unknown as number,
+  vmScene: undefined as unknown as THREE.Scene,
+  vmHolder: undefined as unknown as THREE.Group,
+  vmRoot: undefined as unknown as THREE.Group,
+  vmMuzzle: undefined as unknown as THREE.PointLight,
+  levelRoot: undefined as unknown as THREE.Group,
+  dynRoot: undefined as unknown as THREE.Group,
+  flashTex: undefined as unknown as THREE.CanvasTexture,
+  tracers: undefined as unknown as THREE.Mesh<THREE.BoxGeometry, THREE.MeshBasicMaterial>[],
+  tracerIdx: undefined as unknown as number,
+  streaks: undefined as unknown as THREE.Mesh<THREE.BoxGeometry, THREE.MeshBasicMaterial>[],
+  streakN: undefined as unknown as number,
+  frameNo: undefined as unknown as number,
+  glows: undefined as unknown as THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>[],
+  glowN: undefined as unknown as number,
+  flares: undefined as unknown as THREE.Sprite[],
+  flareN: undefined as unknown as number,
+  PN: undefined as unknown as number,
+  pPos: undefined as unknown as Float32Array,
+  pCol: undefined as unknown as Float32Array,
+  pVel: undefined as unknown as Float32Array,
+  pLife: undefined as unknown as Float32Array,
+  pBase: undefined as unknown as Float32Array,
+  pGrav: undefined as unknown as Float32Array,
+  pBlood: undefined as unknown as Uint8Array,
+  pIdx: undefined as unknown as number,
+  points: undefined as unknown as THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial>,
+  decals: undefined as unknown as RMark[],
+  decalIdx: undefined as unknown as number,
+  bloodMats: undefined as unknown as RBloodMats,
+  bloodMarks: undefined as unknown as RMark[],
+  bloodIdx: undefined as unknown as number,
+  pools: undefined as unknown as RMark[],
+  poolIdx: undefined as unknown as number,
+  blasts: undefined as unknown as THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>[],
+  blastLights: undefined as unknown as THREE.PointLight[],
+  lasers: undefined as unknown as THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>[],
+  laserUsed: undefined as unknown as number,
+  spots: undefined as unknown as THREE.SpotLight[],
+  cones: undefined as unknown as { cone: THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>; lamp: THREE.Sprite }[],
+  pLasers: undefined as unknown as { line: THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>; dot: THREE.Sprite }[],
+  spotUsed: undefined as unknown as number,
+  pLaserUsed: undefined as unknown as number,
+  coneUsed: undefined as unknown as number,
+  // (set from outside: js/player.ts, js/views.ts)
+  fisheye: undefined as unknown as number,
+  hasGlow: undefined as unknown as boolean,
+  pipLive: undefined as unknown as number,
+  // (made when first needed)
+  vm: undefined as THREE.Object3D | null | undefined,
+  trails: undefined as Trail[] | undefined,
+  lastShot: undefined as PShot | null | undefined,
+  wounds: undefined as RWound[] | undefined,
+  debris: undefined as ReturnType<typeof G_Scars.debris> | undefined,
+  debrisT: undefined as number | undefined,
+  trailDot: undefined as THREE.SphereGeometry | undefined,
+  lastDecals: undefined as RMark[] | undefined,
+  mlIdx: undefined as number | undefined,
+  _bloodMats: undefined as RBloodMats | undefined,
+  _flashTex: undefined as THREE.CanvasTexture | undefined,
+  _tc: undefined as THREE.Color | undefined,
+  _arc: undefined as RArc | undefined,
+  scopeCam: undefined as THREE.PerspectiveCamera | undefined,
+  _pipScale: undefined as THREE.Vector3 | undefined,
+  pipRT: undefined as THREE.WebGLRenderTarget | undefined,
+  fk: undefined as number | undefined,
+  _fsz: undefined as THREE.Vector2 | undefined,
+  fishRT: undefined as THREE.WebGLRenderTarget | undefined,
+  fishQuad: undefined as THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial> | undefined,
+  fishScene: undefined as THREE.Scene | undefined,
+  fishCam: undefined as THREE.OrthographicCamera | undefined,
+  depthOnly: undefined as THREE.MeshBasicMaterial | undefined,
   init() {
     const r = (this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' }));
     r.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
@@ -87,9 +171,9 @@ const G_R = {
     return tex;
   },
   // the blood's materials (made once: the highlights' export worker, which never runs init, asks for them too)
-  bloodMaterials() {
+  bloodMaterials(): RBloodMats {
     if (this._bloodMats) return this._bloodMats;
-    const bloodTex = (kind: string) => {
+    const bloodTex = (kind: BloodKind) => {
       const c = document.createElement('canvas'); c.width = c.height = 64;
       const g = c.getContext('2d') as CanvasRenderingContext2D, blob = (x: number, y: number, r: number, a: number) => { g.fillStyle = `rgba(${70 + Math.random() * 20},4,6,${a})`; g.beginPath(); g.ellipse(x, y, r, r * (0.8 + Math.random() * 0.4), Math.random() * 3, 0, 7); g.fill(); };
       if (kind === 'pool') { for (let i = 0; i < 14; i++) { const a = Math.random() * 6.28, d = Math.random() * 12; blob(32 + Math.cos(a) * d, 32 + Math.sin(a) * d, 10 + Math.random() * 9, 0.9); } }
@@ -97,7 +181,7 @@ const G_R = {
       else { blob(32, 32, 13, 0.92); for (let i = 0; i < 5; i++) { const a = Math.random() * 6.28, d = 15 + Math.random() * 12; blob(32 + Math.cos(a) * d, 32 + Math.sin(a) * d, 1.5 + Math.random() * 3, 0.85); } }
       const t = new THREE.CanvasTexture(c); t.anisotropy = 4; return t;
     };
-    const bmat = (kind: string) => new THREE.MeshStandardMaterial({ map: bloodTex(kind), transparent: true, depthWrite: false, roughness: 0.25, metalness: 0.1, polygonOffset: true, polygonOffsetFactor: -3 });
+    const bmat = (kind: BloodKind) => new THREE.MeshStandardMaterial({ map: bloodTex(kind), transparent: true, depthWrite: false, roughness: 0.25, metalness: 0.1, polygonOffset: true, polygonOffsetFactor: -3 });
     return (this._bloodMats = { drop: bmat('drop'), spatter: bmat('spatter'), pool: bmat('pool') });
   },
   resize() {
@@ -112,9 +196,9 @@ const G_R = {
     const solid = (mt: THREE.Material) => !mt.transparent && !mt.alphaTest;
     this.levelRoot.traverse((o: any) => { if (o.isMesh) o.castShadow = Array.isArray(o.material) ? o.material.every(solid) : solid(o.material); });
     const th = map.theme;
-    this.scene.fog.color.setHex(th.fog);
-    this.scene.fog.near = th.noFog ? 1e4 : th.fogNear || 8; this.scene.fog.far = th.noFog ? 2e4 : th.fogFar || 60; // (no fog: pushed out of reach, so the shaders stay the same)
-    this.scene.background.setHex(th.fog);
+    (this.scene.fog as THREE.Fog).color.setHex(th.fog);
+    const fog = this.scene.fog as THREE.Fog; fog.near = th.noFog ? 1e4 : th.fogNear || 8; fog.far = th.noFog ? 2e4 : th.fogFar || 60; // (no fog: pushed out of reach, so the shaders stay the same)
+    (this.scene.background as THREE.Color).setHex(th.fog);
     this.camera.far = th.far || (th.hub ? 420 : 280); this.camera.updateProjectionMatrix(); // (the hangar's range runs out to 300 m; a mountain top sees further)
     // (outdoors at night: moonlight. Its colour a tint as written, as the lamps' are: js/lightgrid.ts. The themes' figures were set when light was added up in sRGB; in linear, the same
     // fill reads far brighter in the dark, so it's squared: about as dark where no lamp reaches as it was)
@@ -125,7 +209,7 @@ const G_R = {
   },
   // The level's meshes, taken out of the scene without being thrown away (js/highlights.ts replays the level in them on
   // the hangar's TVs, and disposes of them when it's done)
-  detachLevel() {
+  detachLevel(): THREE.Object3D[] {
     for (const m of [...(this.decals || []), ...(this.bloodMarks || [])]) if (m.parent && m.parent !== this.scene) this.scene.add(m);
     const out = [...this.levelRoot.children];
     for (const c of out) this.levelRoot.remove(c);
@@ -154,7 +238,7 @@ const G_R = {
   // the surface under (x, z) at or below height y: the floor, or the top of a piece of furniture
   bloodFloor(x: number, z: number, y: number) { const map = G.Game && G.Game.map; return map ? G.Level.groundAt(map, x, z, 0.01, y) : 0; },
   // a drop (or a smear, if it came in fast) lying where it landed
-  bloodDrop(x: number, y: number, z: number, size = 0.06, kind = 'drop') {
+  bloodDrop(x: number, y: number, z: number, size = 0.06, kind: BloodKind = 'drop') {
     const m = this.bloodMarks[this.bloodIdx]; this.bloodIdx = (this.bloodIdx + 1) % this.bloodMarks.length;
     if (m.parent !== this.scene) this.scene.add(m); // (it may last have been on a door)
     m.material = this.bloodMats[kind] || this.bloodMats.drop;
@@ -196,7 +280,7 @@ const G_R = {
   vmKey(def: any, skin: any) { return def ? def.code + '#' + G.Stickers.key(skin) : ''; },
 
   // the muzzle flash's star (made once: the highlights' export worker, which never runs init, asks for it too)
-  flashTexture() {
+  flashTexture(): THREE.CanvasTexture {
     if (this._flashTex) return this._flashTex;
     const c = document.createElement('canvas'); c.width = c.height = 64;
     const g = c.getContext('2d') as CanvasRenderingContext2D;
@@ -379,7 +463,7 @@ const G_R = {
   // a laser from a to b (where it lands), red or green: a faint beam and a bright dot
   tacLaser(a: THREE.Vector3, b: THREE.Vector3, green: boolean) {
     const L = this.pLasers[this.pLaserUsed++]; if (!L) return;
-    const col = green ? 0x30ff40 : 0xff2010, arr = L.line.geometry.attributes.position.array;
+    const col = green ? 0x30ff40 : 0xff2010, arr = (L.line.geometry.attributes.position as THREE.BufferAttribute).array as Float32Array;
     arr[0] = a.x; arr[1] = a.y; arr[2] = a.z; arr[3] = b.x; arr[4] = b.y; arr[5] = b.z;
     L.line.geometry.attributes.position.needsUpdate = true;
     L.line.material.color.setHex(col); L.dot.material.color.setHex(col);
@@ -432,7 +516,7 @@ const G_R = {
   // a body shows.
   TRAIL_FADE: 3, TRAIL_VMAX: 686,
   trailColour(v: number, out: THREE.Color) { return out.setHSL(0.78 * (1 - G.U.clamp(v / this.TRAIL_VMAX, 0, 1)), 1, 0.55); },
-  trailStart(shot: any, p: THREE.Vector3, v: number) {
+  trailStart(shot: PShot, p: THREE.Vector3, v: number) {
     const N = 2400, geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N * 3), 3)); geo.setDrawRange(0, 0);
     geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(N * 3), 3));
@@ -463,7 +547,7 @@ const G_R = {
   // so it goes where they go: turning, falling, carried off as a ragdoll. pts: [{ p (world), v, bone (a segment's bone
   // name, js/ballistics.ts), mark }]
   woundTrack(rig: any, pts: { p: THREE.Vector3; v: number; bone: string; mark?: boolean }[]) {
-    const B = G.Ballistics, c = new THREE.Color(), objs: (THREE.Object3D & { onRig?: any })[] = [];
+    const B = G.Ballistics, c = new THREE.Color(), objs: RWound[] = [];
     rig.root.updateMatrixWorld(true);
     let i = 0;
     while (i < pts.length) {
@@ -572,11 +656,11 @@ const G_R = {
     }
   },
   // what a round throws up, by what it hit (js/materials.ts fx): sparks [colour, how many, speed, life, gravity], and the puff of it
-  IMPACT: {
+  IMPACT: <Record<ImpactFx, { s: number[] | null; d: number[] | null }>>{
     metal: { s: [0xffc070, 12, 5, 0.22, 12], d: null }, stone: { s: [0xffc070, 3, 3, 0.15, 12], d: [0x9a958a, 8, 1.5] }, wood: { s: null, d: [0xa8824e, 9, 2.2] }, plaster: { s: null, d: [0xe8e4da, 10, 1.2] },
     soft: { s: null, d: [0xcfc8b8, 6, 1] }, glass: { s: null, d: [0xcfe6f0, 8, 2.5] }, soil: { s: null, d: [0x6a5238, 10, 2] }, plastic: { s: null, d: [0x77787a, 5, 2] }, water: { s: null, d: [0xa8c8d8, 8, 2.5] },
   },
-  impact(p: THREE.Vector3, n: number[] | null, kind: string, fx?: string, o?: ImpactOpts) {
+  impact(p: THREE.Vector3, n: number[] | null, kind: ImpactKind, fx?: ImpactFx, o?: MarkOpts) {
     if (G.Audio && G.Audio.impactAt) G.Audio.impactAt(p, kind, fx); // heard when it's close
     if (kind === 'blood') { this.particles(p, 8, 0x8a0a0a, 2.5, 1.2, 9, 0.8, n, true); return; } // (each leaves a drop where it lands)
     if (kind === 'armor') { this.particles(p, 6, 0x9fd8ff, 3, 0.25, 6, 1); return; }
@@ -601,15 +685,15 @@ const G_R = {
   },
   // A round's mark where it stopped in something solid (a wall, a door, or a target on the range): paper targets show
   // their holes in their own picture (no mark on top); a steel plate keeps its mark as it swings or falls.
-  impactOn(p: THREE.Vector3, n: number[] | null, solid: any, fx?: string, o?: ImpactOpts) {
+  impactOn(p: THREE.Vector3, n: number[] | null, solid: any, fx?: string, o?: MarkOpts) {
     const t = solid && solid.target, on = t && G.Range ? G.Range.markOn(t) : null;
     this.lastDecals = [];
-    this.impact(p, on === 'paper' ? null : n, 'wall', fx, o);
+    this.impact(p, on === 'paper' ? null : n, 'wall', fx as ImpactFx | undefined, o);
     if (on && on !== 'paper') for (const d of this.lastDecals) on.attach(d);
   },
   // put marks stuck on something about to be thrown away back in the pool (hidden)
   freeMarks(obj: THREE.Object3D) {
-    const ms: THREE.Object3D[] = []; obj.traverse((o: THREE.Object3D) => { if (this.decals.includes(o) || (this.bloodMarks && this.bloodMarks.includes(o))) ms.push(o); });
+    const ms: THREE.Object3D[] = []; obj.traverse((o: THREE.Object3D) => { if (this.decals.includes(o as RMark) || (this.bloodMarks && this.bloodMarks.includes(o as RMark))) ms.push(o); });
     for (const m of ms) { m.visible = false; this.scene.add(m); }
   },
   // A mark that landed on a door's leaf becomes part of the leaf, so it swings with the door. (Marks are pooled:
@@ -672,7 +756,7 @@ const G_R = {
   beginLasers() { this.laserUsed = 0; },
   laser(a: THREE.Vector3, b: THREE.Vector3) {
     const l = this.lasers[this.laserUsed++]; if (!l) return;
-    const arr = l.geometry.attributes.position.array;
+    const arr = (l.geometry.attributes.position as THREE.BufferAttribute).array as Float32Array;
     arr[0] = a.x; arr[1] = a.y; arr[2] = a.z; arr[3] = b.x; arr[4] = b.y; arr[5] = b.z;
     l.geometry.attributes.position.needsUpdate = true;
     l.visible = true;
@@ -746,7 +830,7 @@ const G_R = {
     const eye = pip.disk.worldToLocal(cam.position.clone());
     pip.mat.uniforms.eye.value.set((eye.x / pip.r) * 0.8, (eye.y / pip.r) * 0.8);
     const r = this.renderer;
-    r.setRenderTarget(this.pipRT);
+    r.setRenderTarget(this.pipRT!);
     r.clear();
     r.render(this.scene, sc);
     r.setRenderTarget(null);
@@ -772,7 +856,7 @@ const G_R = {
       this.renderer.compile(this.scene, this.camera); this.renderer.compile(this.vmScene, this.camera);
       // (and the scope's picture: anything drawn into a texture is a different shader from the same thing on the screen, for
       // all of the scene's materials, whatever gun you've got now: you can pick one up)
-      this.pipTexture(); this.renderer.setRenderTarget(this.pipRT); this.renderer.compile(this.scene, this.camera); this.renderer.setRenderTarget(null);
+      this.pipTexture(); this.renderer.setRenderTarget(this.pipRT!); this.renderer.compile(this.scene, this.camera); this.renderer.setRenderTarget(null);
     } catch (e) { console.warn('warmup', e); }
     for (const o of hidden) o.visible = false;
     for (const m of extras) { m.removeFromParent(); m.traverse((o: any) => { if (o.geometry) o.geometry.dispose(); }); }
@@ -836,9 +920,9 @@ const G_R = {
         this.fishCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
       }
       const u = this.fishQuad.material.uniforms;
-      u.map.value = this.fishRT.texture; u.k.value = 0.3 * this.fk; u.ax.value = this.fishRT.width / this.fishRT.height;
+      u.map.value = this.fishRT!.texture; u.k.value = 0.3 * this.fk!; u.ax.value = this.fishRT!.width / this.fishRT!.height;
       r.clear();
-      r.render(this.fishScene, this.fishCam);
+      r.render(this.fishScene!, this.fishCam!);
     }
     r.clearDepth();
     r.clearStencil(); // reflex sight windows mark the stencil for their reticles
@@ -847,6 +931,5 @@ const G_R = {
     r.info.autoReset = true;
   },
 };
-G.R = G_R as typeof G_R & RFields;
-interface RFields { camera: any; scene: any; renderer: any; dynRoot: any; levelRoot: any; vm: any; vmRoot: any; vmHolder: any; vmMuzzle: any; debris: any; fisheye: number; hasGlow: boolean; pipLive: number; }
-interface GameModules { R: typeof G_R & RFields; }
+G.R = G_R;
+interface GameModules { R: typeof G_R; }

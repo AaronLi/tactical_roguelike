@@ -8,12 +8,28 @@
 // a box of special rounds on the shelf: caliber, load, how many
 interface ShopAmmo { cal: string; am: string; n: number; }
 type ShopStock = Record<string, number>;
+// this visit's shelves (genOffers): gear ids, weapon ids by slot, special ammo, pouches and magazines, and the plate / face shield each carrier / helmet comes with
+interface ShopOffers { p: string[]; s: string[]; gear: string[]; ammo: ShopAmmo[]; pouches: { id: string; n: number }[]; mags: { id: string; n: number }[]; plates?: Record<string, string>; faces?: Record<string, string>; }
+// a purchase waiting on the host's say-so (take / took)
+interface ShopPending { key: string; buy: () => boolean | void; }
+// the level's report (js/game.ts shop)
+interface ShopReport { arrests?: number; incap?: number; bleedouts?: number; rescued?: number; evidence?: number; bodies?: number; civKilled?: number; unauth?: number; allRescued?: boolean; }
 // a thing on the Supplies tab (services())
 interface ShopService { id: string; name: string; desc: string; price: number; disabled: boolean; apply: () => unknown; sel?: string; }
 const G_Shop = {
   tab: 'stock',
-  offers: null,
+  offers: null as ShopOffers | null,
   ready: false,
+  // (what it gets as it runs: this visit's level, stock and the gunsmith's parts; the screen's title and the level's report, js/game.ts)
+  level: undefined as unknown as number,
+  stock: undefined as unknown as ShopStock,
+  partStock: undefined as unknown as ReturnType<typeof G.Gunsmith.rollStock>,
+  precStock: undefined as unknown as ReturnType<typeof G.Gunsmith.rollPrecision>,
+  loadSel: undefined as unknown as Record<string, string>,
+  title: undefined as unknown as string | null,
+  report: undefined as unknown as ShopReport | null,
+  pend: undefined as unknown as Map<number, ShopPending>,
+  qn: undefined as unknown as number,
 
   open(level: number, seed: number, stock?: ShopStock | null) {
     this.level = level;
@@ -161,9 +177,9 @@ const G_Shop = {
       Me.weapons[slot] = Me.makeWeapon(id);
       if (G.GunAudio.available()) G.GunAudio.buildDry(Me.weapons[slot].def.soundKey);
     } else if (kind === 'gear') {
-      const d = G.Gear.DEFS[id], it = G.Gear.gearItem(id), pl = this.offers.plates && this.offers.plates[id];
+      const d = G.Gear.DEFS[id], it = G.Gear.gearItem(id), pl = this.offers!.plates && this.offers!.plates[id];
       if (pl) it.plate = G.Gear.gearItem(pl); // fitted with its plate
-      const fc = this.offers.faces && this.offers.faces[id];
+      const fc = this.offers!.faces && this.offers!.faces[id];
       if (fc) it.face = G.Gear.gearItem(fc); // and a helmet with its face shield
       if (!this.inStock('gear:' + id)) { G.Audio.deny(); return; }
       // straight on if the slot's free, else into the locker
@@ -178,7 +194,7 @@ const G_Shop = {
       });
       return;
     } else if (kind === 'ammo') {
-      const o = this.offers.ammo.find((q: ShopAmmo) => q.cal === id), it = o && G.Gear.boxItem(o.cal, o.am, o.n);
+      const o = this.offers!.ammo.find((q: ShopAmmo) => q.cal === id), it = (o && G.Gear.boxItem(o.cal, o.am, o.n)) as GItem;
       if (!o || !this.inStock('ammo:' + o.cal) || !this.room(it)) { G.Audio.deny(); return; }
       if (!this.afford(G.Gear.price(it))) return;
       this.take('ammo:' + o.cal, () => { if (!this.room(it) || !this.spend(G.Gear.price(it))) return false; this.stow(it); return undefined; });
@@ -403,7 +419,7 @@ const G_Shop = {
     let html = '';
     const O = this.offers;
     if (this.tab === 'stock') html = O.ammo.map((o: ShopAmmo) => this.ammoCard(o)).join('') + O.gear.map((id: string) => this.gearCard(G.Gear.DEFS[id])).join('') +
-      [...(this.partStock || [])].map((id) => this.partCard(G.Gunsmith.PARTS[id])).join('') +
+      [...(this.partStock || [])].map((id) => this.partCard(G.Gunsmith.PARTS[id as string])).join('') +
       `<h3 class="shop-sub">Pouches and magazines</h3>` + O.pouches.map((o: { id: string }) => this.pouchCard(o.id)).join('') + O.mags.map((o: { id: string }) => this.magCard(o.id)).join('');
     else if (this.tab === 'svc') html = this.services().map((s: ShopService) => `<div class="card">
         <div class="ch"><span class="cn">${s.name}</span></div>${s.sel || ''}<div class="cd">${s.desc}</div>
@@ -437,7 +453,7 @@ const G_Shop = {
   bind() {
     document.getElementById('shopTabs')!.addEventListener('click', (e) => {
       const t = (e.target as Element).closest<HTMLElement>('[data-tab]');
-      if (t) { this.tab = t.dataset.tab; G.Audio.click(); this.render(); }
+      if (t) { this.tab = t.dataset.tab!; G.Audio.click(); this.render(); }
     });
     const items = document.getElementById('shopItems')!;
     items.addEventListener('click', (e) => {
@@ -471,7 +487,5 @@ const G_Shop = {
     </svg>`;
   },
 };
-// (what it gets as it runs: this visit's level, stock and the gunsmith's parts; the screen's title and the level's report, js/game.ts)
-interface ShopFields { level: number; stock: Record<string, any>; partStock: any; precStock: any; loadSel: Record<string, string>; title: string | null; report: any; }
-G.Shop = G_Shop as typeof G_Shop & ShopFields;
-interface GameModules { Shop: typeof G_Shop & ShopFields; }
+G.Shop = G_Shop;
+interface GameModules { Shop: typeof G_Shop; }

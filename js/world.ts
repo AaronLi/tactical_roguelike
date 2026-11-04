@@ -109,7 +109,7 @@ const G_World = (() => {
   // opts.skip(solid): solids to ignore; opts.move: what stops people instead of what stops rays; opts.sight: a
   // look, not a round: it goes through clear solids (a glass door), with .clear set when it did. opts.bars: a round: it
   // meets a grating's bars (.bar: see barHit), where anything else goes through it.
-  function raycast(w: WorldT, ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, maxT: number, opts?: any) {
+  function raycast(w: WorldT, ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, maxT: number, opts?: LvRayOpts) {
     const o = [ox, oy, oz], d = [dx, dy, dz], pass = !!(opts && opts.glass), skip = opts && opts.skip, mv = !!(opts && opts.move), sight = !!(opts && opts.sight), bars = !!(opts && opts.bars);
     let seenThru = false;
     const crossed: any[] | null = pass ? [] : null, stamp = ++w.stamp, mark = w.mark;
@@ -339,7 +339,7 @@ const G_World = (() => {
     for (const b of [[-E, 0, -E, 0, WH, H * TS + E], [W * TS, 0, -E, W * TS + E, WH, H * TS + E], [0, 0, -E, W * TS, WH, 0], [0, 0, H * TS, W * TS, WH, H * TS + E]]) { b[1] = Y - SK - (map.chasm || 0); b[4] += Y; add(w, box(...(b as [number, number, number, number, number, number]), { kind: 'wall', edge: true, ray: !map.chasm })); }
     // furniture and fences: each piece's boxes (a piece hangs on every tile it covers: once each)
     const fromB = (b: any, q: any, gy = b.gy || 0) => box(b.cx - b.hx, Y + gy + b.y0, b.cz - b.hz, b.cx + b.hx, Y + gy + b.h, b.cz + b.hz, q); // (gy: a piece on rolling ground)
-    const seen = new Set<Solid>();
+    const seen = new Set<LvProp>();
     for (const [, p] of map.props || []) {
       if (seen.has(p)) continue;
       seen.add(p);
@@ -363,14 +363,14 @@ const G_World = (() => {
   }
   // A flight of stairs (G.Level.stack's): steps as solids, each a block from the floor at its foot up to its tread,
   // climbing st.rise over its run in about 20 cm steps (low enough to walk up: STEP)
-  function stairs(w: WorldT, st: any) {
-    const along = st.axis === 'z', len = along ? st.z1 - st.z0 : st.x1 - st.x0, n = Math.max(2, Math.round(st.rise / 0.2)), run = len / n, rise = st.rise / n;
+  function stairs(w: WorldT, st: LvStair) {
+    const along = st.axis === 'z', len = along ? st.z1 - st.z0 : st.x1 - st.x0, n = Math.max(2, Math.round(st.rise! / 0.2)), run = len / n, rise = st.rise! / n;
     st.steps = [];
     (w.ramps = w.ramps || []).push(st); // (walkers take it as a slope: rampAt)
     for (let k = 0; k < n; k++) {
       // from the foot: climbing toward -axis (up < 0) the foot is at the far end
-      const a = st.up < 0 ? (along ? st.z1 : st.x1) - (k + 1) * run : (along ? st.z0 : st.x0) + k * run, b = a + run, top = st.y0 + (k + 1) * rise;
-      st.steps.push(add(w, along ? box(st.x0, st.y0, a, st.x1, top, b, { kind: 'step', stair: st }) : box(a, st.y0, st.z0, b, top, st.z1, { kind: 'step', stair: st })));
+      const a = st.up < 0 ? (along ? st.z1 : st.x1) - (k + 1) * run : (along ? st.z0 : st.x0) + k * run, b = a + run, top = st.y0! + (k + 1) * rise;
+      st.steps.push(add(w, along ? box(st.x0, st.y0!, a, st.x1, top, b, { kind: 'step', stair: st }) : box(a, st.y0!, st.z0, b, top, st.z1, { kind: 'step', stair: st })));
     }
   }
   // a door's solids as it stands: closed, a leaf across each of its cells; open, the lintel over each cell (you

@@ -1,5 +1,8 @@
 'use strict';
 // Fully synthesized sound effects (no asset files needed).
+type FoleyKind = 'zip' | 'bag'; // a hands-on action (FOLEY)
+type FoleySound = 'grab' | 'thud' | 'zipOut' | 'zipTie' | 'clink' | 'rustle' | 'tape'; // its sounds, by name
+type ImpactMat = 'body' | 'metal' | 'wood' | 'soft' | 'wall'; // what a round heard landing hit (impact)
 const G_Audio = {
   ctx: null as unknown as AudioContext,
   master: null as unknown as GainNode,
@@ -207,14 +210,14 @@ const G_Audio = {
   },
   // Foley for hands-on actions, keyed by action kind: [progress, sound]. Each plays as the action passes its
   // mark: for my own actions, and for teammates' (from their state, attenuated by distance).
-  FOLEY: {
+  FOLEY: <Record<FoleyKind, [number, FoleySound][]>>{
     zip: [[0.05, 'grab'], [0.38, 'thud'], [0.5, 'zipOut'], [0.84, 'zipTie']],
     bag: [[0.21, 'clink'], [0.33, 'rustle'], [0.5, 'rustle'], [0.63, 'tape'], [0.93, 'rustle']],
   },
   foley(kind: string, from: number, to: number, dist = 0, living?: any) {
-    const list = this.FOLEY[kind];
+    const list = this.FOLEY[kind as FoleyKind];
     if (!list || !this.ctx || dist > 25) return;
-    for (const [at, snd] of list) if (from < at && to >= at) (this as Record<string, any>)[snd](dist); // bodies: the grab and the thud are the turn-over
+    for (const [at, snd] of list) if (from < at && to >= at) this[snd](dist); // bodies: the grab and the thud are the turn-over
   },
   _att(dist: number) { return 1 / (1 + dist * 0.15); },
   // A spent case hitting something (js/casings.ts). Metal cases ring in a few inharmonic modes whose pitch
@@ -233,8 +236,8 @@ const G_Audio = {
     src.connect(flt); flt.connect(gn); gn.connect(out); src.start(t, Math.random() * 0.5); src.stop(t + dur + 0.02);
   },
   _out(pan: number) {
-    const c = this.ctx, out = c.createStereoPanner ? c.createStereoPanner() : c.createGain();
-    if (out.pan) out.pan.value = G.U.clamp(pan, -1, 1) * 0.85;
+    const c = this.ctx, out: GainNode | StereoPannerNode = c.createStereoPanner ? c.createStereoPanner() : c.createGain();
+    if ((out as StereoPannerNode).pan) (out as StereoPannerNode).pan.value = G.U.clamp(pan, -1, 1) * 0.85;
     out.connect(this.master);
     return out;
   },
@@ -255,7 +258,7 @@ const G_Audio = {
   },
   // A round landing near you, by what it hit: wall (plaster, concrete), wood (doors, furniture), metal, soft
   // ground (grass, earth, carpet), a body.
-  impact(mat: string, dist: number, pan: number) {
+  impact(mat: ImpactMat, dist: number, pan: number) {
     if (!this.ctx) return;
     const t = this.ctx.currentTime, a = this._att(dist) * Math.min(1, 6 / (1 + dist)), out = this._out(Number.isFinite(pan) ? pan : 0);
     if (!(a >= 0.01)) return;
@@ -289,7 +292,7 @@ const G_Audio = {
   // A shot's path from `from` to `to`: if it passes close to you (and goes past or near you, not just
   // toward you from far behind), the crack, but only if it's still supersonic where it passes (its speed
   // from the gun, its load and how far it's come: G.roundSpeed); slower, a zip of air. am: the load.
-  flyby(from: THREE.Vector3, to: THREE.Vector3, def: any, am: string) {
+  flyby(from: THREE.Vector3, to: THREE.Vector3, def: WeaponDef, am: string) {
     if (!this.ctx || !def || def.explosive || def.cls === 'BOW' || def.cls === 'GL') return;
     const e = this._ear(from);
     if (!e) return;
@@ -300,21 +303,21 @@ const G_Audio = {
     if (s <= 0.02 || miss > 5 || near.distanceTo(from) < 2) return; // not past you, too wide, or it's your own muzzle
     const pe = this._ear(near), cal = G.calOf(def), v = G.roundSpeed(def, am, near.distanceTo(from));
     if (v < 60) return;
-    if (v <= G.SOUND_SPEED) return this.zip(miss, pe.pan);
+    if (v <= G.SOUND_SPEED) return this.zip(miss, pe!.pan);
     // the crack: bigger rounds louder (and the heavy ones thump), barely-supersonic ones softer
     const size = def.cls === 'RAIL' ? 1.6 : ['12.7/99', '8.6/69'].includes(cal) ? 1.5 : am !== 'slug' && def.cls === 'SG' ? 0.5 : ((G.CALIBERS as Record<string, any>)[cal] || {}).group === 'pistol' ? 0.6 : 1;
-    this.crack(miss, pe.pan, size * G.U.clamp((v / G.SOUND_SPEED - 1) * 3, 0.35, 1));
+    this.crack(miss, pe!.pan, size * G.U.clamp((v / G.SOUND_SPEED - 1) * 3, 0.35, 1));
   },
   // a round's impact point: heard if it's close, as whatever it hit
-  impactAt(p: THREE.Vector3, kind: string, fx?: string) {
+  impactAt(p: THREE.Vector3, kind: ImpactKind, fx?: ImpactFx) {
     const e = this._ear(p);
     if (!e || e.d > 15) return;
-    let mat = 'wall';
+    let mat: ImpactMat = 'wall';
     if (kind === 'blood') mat = 'body';
     else if (kind === 'armor') mat = 'metal';
     else if (fx) mat = fx === 'metal' || fx === 'glass' ? 'metal' : fx === 'wood' ? 'wood' : fx === 'soft' || fx === 'soil' || fx === 'water' ? 'soft' : 'wall'; // (what it really hit: js/materials.ts)
     else if (G.Game && G.Game.map) {
-      const map = G.Game.map, L = G.Level, tx = Math.floor(p.x / L.TS), tz = Math.floor(p.z / L.TS), fm = L.floorMap(map, L.floorAt(map, p.x, p.y, p.z)), tile = L.tile(fm, tx, tz);
+      const map = G.Game.map, L = G.Level, tx = Math.floor(p.x / L.TS), tz = Math.floor(p.z / L.TS), fm = L.floorMap(map, L.floorAt(map, p.x, p.y, p.z)!), tile = L.tile(fm, tx, tz);
       if (p.y - (fm.fy || 0) < 0.06) { const s = G.Casings.surface(map, p.x, p.z, fm.fy || 0); mat = s === 'grass' || s === 'carpet' ? 'soft' : s === 'wood' ? 'wood' : 'wall'; } // (on the floor of whichever floor it's on)
       else if (tile === 3) mat = 'wood'; // a door
       else if (tile === 2 || tile === 4) mat = 'wood'; // furniture, fences
@@ -323,12 +326,12 @@ const G_Audio = {
   },
   // pos: where it landed (a Vector3): placed there in 3D (HRTF against the listener that follows the camera: left and
   // right, in front and behind, above and below), muffled if there's a wall between you and it. Without it, just a pan.
-  casing(dist: number, mat: string, len: number, surf: string, speed: number, pan = 0, pos: THREE.Vector3 | null = null) {
+  casing(dist: number, mat: CaseMat, len: number, surf: string, speed: number, pan = 0, pos: THREE.Vector3 | null = null) {
     if (!this.ctx) return;
     const c = this.ctx, t = c.currentTime, soft = surf === 'carpet' || surf === 'grass';
     const a = this._att(dist) * Math.min(1, speed / 2.2) * (soft ? 0.3 : 1);
     if (a < 0.004) return;
-    let out: any;
+    let out: AudioNode;
     const cam = pos && G.R && G.R.camera;
     if (cam) {
       const map = G.Game && G.Game.map, blocked = map && !G.Level.los(map, cam.position.x, cam.position.y, cam.position.z, pos.x, pos.y + 0.03, pos.z);
@@ -339,7 +342,7 @@ const G_Audio = {
       out = c.createGain(); out.connect(lp); lp.connect(pn); pn.connect(g); g.connect(this.master);
     } else {
       out = c.createStereoPanner ? c.createStereoPanner() : c.createGain();
-      if (out.pan) out.pan.value = pan * 0.8;
+      if ((out as StereoPannerNode).pan) (out as StereoPannerNode).pan.value = pan * 0.8;
       out.connect(this.master);
     }
     const strike = (f: number, q: number, g: number, dur: number) => {

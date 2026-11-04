@@ -32,9 +32,15 @@
 //   blood bag (40% blood back: on yourself, or on a teammate; an unconscious one comes round with it).
 // Bandages and painkiller doses stack 4 to a slot, tourniquets and gauze 3; the rest are one each.
 // A gut wound can't be fixed in the field. Everything heals at the quartermaster's.
-interface MedPart { hp: number; max: number; light: boolean; heavy: boolean; massive: boolean; frac: boolean; tq: boolean; lung: boolean; gut: boolean; spine: boolean; org: Record<string, number>; clot?: number | null; [flag: string]: any; }
+interface MedPart { hp: number; max: number; light: boolean; heavy: boolean; massive: boolean; frac: boolean; tq: boolean; lung: boolean; gut: boolean; spine: boolean; org: Record<string, number>; clot?: number | null; }
 interface MedBody { parts: Record<string, MedPart>; blood: number; pk: number; }
-interface MedItem { name: string; fixes: string; where: string | string[]; time: number; size: number[]; price: number; stack?: number; desc: string; light?: boolean; }
+// the yes/no injuries a part can have (MedPart), in the order they're packed into the saved flags
+type MedFlag = 'light' | 'heavy' | 'frac' | 'tq' | 'lung' | 'gut' | 'massive' | 'spine';
+// what a medical item treats: light / heavy bleeding, a punctured lung, a fracture, blood loss, pain
+type MedFix = 'light' | 'heavy' | 'lung' | 'frac' | 'blood' | 'pain';
+// where it works: anywhere, on an arm or a leg, or on the listed parts
+type MedWhere = 'any' | 'limb' | string[];
+interface MedItem { name: string; fixes: MedFix; where: MedWhere; time: number; size: number[]; price: number; stack?: number; desc: string; light?: boolean; }
 const G_Med = (() => {
   const PARTS: [string, string, number][] = [
     ['head', 'Head', 35], ['thorax', 'Thorax', 85], ['stomach', 'Stomach', 70],
@@ -213,7 +219,7 @@ const G_Med = (() => {
   const overall = (b: MedBody) => Math.max(0, Math.min(b.blood, b.parts.head.hp / b.parts.head.max * 100));
 
   // over the network: [hp %, flags] per part, blood, painkillers on
-  const FLAGS = ['light', 'heavy', 'frac', 'tq', 'lung', 'gut', 'massive', 'spine'];
+  const FLAGS: MedFlag[] = ['light', 'heavy', 'frac', 'tq', 'lung', 'gut', 'massive', 'spine'];
   function encode(b: MedBody) {
     return { p: PARTS.map(([k]) => { const q = b.parts[k], o = Object.entries(q.org || {}).map(([id, f]) => id + ':' + Math.round(f * 100)).join(','); return o ? [Math.round(q.hp / q.max * 100), FLAGS.reduce((a, f, i) => a | (q[f] ? 1 << i : 0), 0), o] : [Math.round(q.hp / q.max * 100), FLAGS.reduce((a, f, i) => a | (q[f] ? 1 << i : 0), 0)]; }), bl: Math.round(b.blood), pk: b.pk > 0 ? 1 : 0 };
   }

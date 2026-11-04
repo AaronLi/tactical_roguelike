@@ -7,7 +7,7 @@ const G_Zip = (() => {
   for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; CRC[n] = c >>> 0; }
   function crc32(b: Uint8Array) { let c = 0xffffffff; for (let i = 0; i < b.length; i++) c = CRC[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; }
   const te = new TextEncoder(), td = new TextDecoder();
-  const piped = async (b: Uint8Array, stream: any) => new Uint8Array(await new Response(new Blob([b as BlobPart]).stream().pipeThrough(stream)).arrayBuffer());
+  const piped = async (b: Uint8Array, stream: GenericTransformStream) => new Uint8Array(await new Response(new Blob([b as BlobPart]).stream().pipeThrough(stream)).arrayBuffer());
   const deflate = (b: Uint8Array): Promise<Uint8Array | null> => (typeof CompressionStream === 'function' ? piped(b, new CompressionStream('deflate-raw')).catch(() => null) : Promise.resolve(null));
   const inflate = (b: Uint8Array) => piped(b, new DecompressionStream('deflate-raw'));
   // files: [{ name, data: Uint8Array | string }] -> a Blob

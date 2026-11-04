@@ -8,14 +8,17 @@
 // hbLast): nobody else's shows, and with nobody picked out it's the shots that hit you.
 // A round's finished path (js/player.ts newPath): p the points [x, y, z, speed], ev the events [point, 'e' | 'x' | 'r', ...],
 // hit the hits (each a row of numbers and sub-arrays, indexed as the readout below does).
-interface ShotPath { p: number[][]; ev: any[][]; hit: any[][]; }
+type ShotEv = any[]; // [point, 'e' | 'x' | 'r', fx, nx, ny, nz, material name, ...]: a row of mixed numbers and strings
+type ShotHit = any[]; // [point, key, speed in, [kg], dx, dy, dz, passed through, armour (ShotArmour), [depth, what] it stopped in, fragments]
+interface ShotPath { p: number[][]; ev: ShotEv[]; hit: ShotHit[]; }
+interface ShotRow { key: string; n: number; name: string; range: number; muzzle: number; vIn: number; J: number; frags?: string; stop?: string; post?: number; out?: number; }
 interface ShotGhost extends THREE.Group { mat: THREE.Material; uses: number; }
 interface ShotHolder { ghosts?: Map<string, ShotGhost>; }
 interface ShotInfo { holder: ShotHolder; name: string; }
 interface ShotLabel { p: THREE.Vector3; t: string; c: string; pri: number; key?: string; }
 interface ShotVert { p: THREE.Vector3; v: number; }
-interface ShotRec { keys: Set<string>; hits: any[]; line: THREE.Line; frags: THREE.LineSegments | null; labels: ShotLabel[]; ghosts: Map<string, ShotGhost>; }
-interface ShotArmour { e: string; b: number; r: { k: string; o: number; un?: boolean }[]; }
+interface ShotRec { keys: Set<string>; hits: ShotRow[]; line: THREE.Line; frags: THREE.LineSegments | null; labels: ShotLabel[]; ghosts: Map<string, ShotGhost>; }
+interface ShotArmour { e: string; b: number; r: { k: MatKey; o: number; un?: boolean }[]; }
 type ShotMark = (p: THREE.Vector3, t: string, c: string, pri: number, key?: string) => void;
 const G_ShotLog = (() => {
   const T = THREE, MAX = 32, MACHS = [3, 2.5, 2, 1.5, 1, 0.5], RANGE = 90, LH = 15; // (RANGE: markers further than this aren't labelled)
@@ -26,10 +29,10 @@ const G_ShotLog = (() => {
   // who it hit, as they stand now: a copy of their meshes where they are this moment (the geometry's theirs: nothing of it to free).
   // (Out of your sight their body's hidden, js/views.ts: someone shot through a wall is, and still has to show.)
   function ghostOf(rig: Rig): ShotGhost {
-    const grp: any = new T.Group(), mat = new T.MeshBasicMaterial({ color: 0x66ccff, transparent: true, opacity: 0.34, depthTest: false, depthWrite: false, blending: T.AdditiveBlending });
+    const grp = new T.Group() as ShotGhost, mat = new T.MeshBasicMaterial({ color: 0x66ccff, transparent: true, opacity: 0.34, depthTest: false, depthWrite: false, blending: T.AdditiveBlending });
     const shownBody = rig.body.visible; rig.body.visible = true; // (the F9 view shows it: frame())
     rig.root.updateMatrixWorld(true);
-    rig.root.traverseVisible((o: any) => {
+    rig.root.traverseVisible((o: THREE.Object3D & Record<string, any>) => {
       if (!o.isMesh || !o.geometry || o.material.depthTest === false) return; // (their x-ray's organs, the dots of a wound track)
       const m = new T.Mesh(o.geometry, mat); m.matrixAutoUpdate = false; m.matrix.copy(o.matrixWorld); m.renderOrder = 996; m.frustumCulled = false; grp.add(m);
     });
@@ -100,7 +103,7 @@ const G_ShotLog = (() => {
   function fragLines(path: ShotPath, mark: ShotMark) {
     const pos: number[] = [], col: number[] = [], c = new T.Color();
     for (const h of path.hit) {
-      const breaks = new Map<string, { f: any[]; n: number; deep: number }>();
+      const breaks = new Map<string, { f: number[]; n: number; deep: number }>();
       for (const f of h[10] || []) {
         pos.push(...f.slice(0, 6));
         col.push(...G.R.trailColour(f[6], c).toArray(), ...G.R.trailColour(f[7], c).toArray());
@@ -120,14 +123,14 @@ const G_ShotLog = (() => {
   // a hit's markers (in, past the armour, out) and its row in the readout
   function hitRows(path: ShotPath, P: ShotVert[], xs: number[], after: Map<number, number>, mark: ShotMark, info: ShotInfo) {
     return path.hit.map((h) => {
-      const q = P[h[0]], v = h[2], key = h[1], n = (count.get(key) || 0) + 1, kg = h[3] ? h[3][0] : 0, a: ShotArmour | undefined = h[8], rows = a ? a.r.filter((r) => !r.un) : [], row: any = { key, n, name: info.name, range: Math.round(xs[h[0]]), muzzle: P[0].v, vIn: v, J: Math.round(0.5 * kg * v * v) };
+      const q = P[h[0]], v = h[2], key = h[1], n = (count.get(key) || 0) + 1, kg = h[3] ? h[3][0] : 0, a: ShotArmour | undefined = h[8], rows = a ? a.r.filter((r) => !r.un) : [], row: ShotRow = { key, n, name: info.name, range: Math.round(xs[h[0]]), muzzle: P[0].v, vIn: v, J: Math.round(0.5 * kg * v * v) };
       count.set(key, n);
-      const fr: any[][] = h[10] || [], ns = fr.filter((f) => f[9]).length;
+      const fr: number[][] = h[10] || [], ns = fr.filter((f) => f[9]).length;
       row.frags = [fr.length > ns && `${fr.length - ns} fragments`, ns && `${ns} bone splinters`].filter(Boolean).join(', ');
       mark(q.p, `Entry ${v} m/s · M${mach(v)} · ${G.U.fmt(row.J)} J`, css(v), 5, key);
       if (a) { // (what armour was hit before the body, and what it left)
         const front = rows.slice(0, rows.findIndex((r) => !r.k) < 0 ? rows.length : rows.findIndex((r) => !r.k)), last = front[front.length - 1];
-        if (a.e === 'armour') { row.stop = `${last ? (G.Materials.MAT as Record<string, any>)[last.k].name : 'armour'}, ${a.b} J to the body`; mark(q.p, `Stopped by ${row.stop}`, '#9fe8ff', 5, key); } else if (a.e === 'glance') { row.stop = 'glanced off their armour'; mark(q.p, 'Glanced off their armour', '#9fe8ff', 5, key); } else if (last) {
+        if (a.e === 'armour') { row.stop = `${last ? G.Materials.MAT[last.k].name : 'armour'}, ${a.b} J to the body`; mark(q.p, `Stopped by ${row.stop}`, '#9fe8ff', 5, key); } else if (a.e === 'glance') { row.stop = 'glanced off their armour'; mark(q.p, 'Glanced off their armour', '#9fe8ff', 5, key); } else if (last) {
           row.post = last.o; after.set(h[0], last.o);
           mark(q.p, `Past armour ${last.o} m/s · ${Math.round((1 - (last.o * last.o) / (v * v)) * 100)}% of its energy gone`, css(last.o), 5, key);
         }

@@ -45,9 +45,15 @@ and to `js/exportworker.ts`'s list if the highlights' replay needs it.
 ## Status
 
 `tsconfig.json` has `strict` off but turns on its parts one by one. On: `strictNullChecks`, `noImplicitAny`,
-`strictFunctionTypes`, `strictBindCallApply`, `useUnknownInCatchVariables`, `alwaysStrict`, plus `noImplicitReturns`
-and `noUnusedLocals`. Off: `noImplicitThis` (the module literals' `this` lacks the fields added at runtime) and
-`noFallthroughCasesInSwitch`.
+`noImplicitThis`, `strictFunctionTypes`, `strictBindCallApply`, `useUnknownInCatchVariables`, `alwaysStrict`, plus
+`noImplicitReturns` and `noUnusedLocals`. Off: `noFallthroughCasesInSwitch`.
+
+**Shapes are declared.** A module's fields live in its literal from the start, even those only set later
+(`hp: undefined as unknown as number`, `_cache: undefined as Foo | undefined`), so `this` is fully typed. Don't add a
+field with `this.foo = ...` without declaring it there. Records passed around (enemies, items, clips, rounds, parts,
+rigs...) have interfaces, and string kinds are unions (`ItemKind`, `FireMode`, `NetMsgKind`, `GmMsgKind`,
+`EnemyState`, `RoomType`, `MatKey`...): a misspelt kind is a type error. Every script's top-level types are global,
+so new type names are specific (prefixed by module: `Hl...`, `Lv...`, `Gm...`).
 
 All 53 files pass, with no `@ts-nocheck`, `@ts-ignore` or `@ts-expect-error`. Getting there was type-only: each
 step's compiled JavaScript was compared with the step before and came out the same (exceptions, on purpose: the
@@ -59,8 +65,8 @@ Real bugs found so far: a `ReferenceError` waiting in the minimap's drawing (nev
 and the snapshot each officer sends the host carrying `sd` twice (the helicopter seat, then steadying, which won):
 the seat is `se` now.
 
-**Left:** `noImplicitThis`; the weapon/part tables (`G.WEAPONS`, `GUN_SPECS`, `PARTS`, `PLATFORMS`) are still
-`Record<string, any>`; `npm run typecheck:strict` (full `--strict`) shows what remains.
+**Left:** `G.WEAPONS`/`GUN_SPECS` are still `Record<string, any>` (readers do `(G.WEAPONS[x] || {}).field`); items
+aren't a union per kind yet; `npm run typecheck:strict` (full `--strict`) shows what remains.
 
 ## The Rust port
 

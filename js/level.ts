@@ -1,4 +1,19 @@
-'use strict'; interface LvMap { W: number; H: number; t: Uint8Array; out: Uint8Array; rooms: LvRoom[]; doors: LvDoor[]; cover: LvPt[]; wallSpots: LvPt[]; lights: LvLight[]; lamps: LvLight[]; stairs: LvStair[]; windows: LvWin[]; cabinets: LvCab[]; fx: Record<string, any>[]; winMeshes: THREE.Object3D[]; lightPool: THREE.PointLight[]; enemySpots: number[][]; [k: string]: any } interface LvLight { x: number; z: number; y?: number; kind?: string; color?: number; i?: number; d?: number; up?: number; porch?: number; fl?: number; [k: string]: any } interface LvWin { id: number; cells: number[]; nx: number; nz: number; ext: boolean; broken: boolean; x: number; z: number; len: number; armor?: boolean; cooler?: boolean; sill?: number; top?: number; [k: string]: any } interface LvCab { x: number; z: number; yaw: number; [k: string]: any } interface LvRoom { type: string; x: number; z: number; w: number; h: number; cx: number; cz: number; [k: string]: any } interface LvLz { x: number; z: number; f?: number; lamps?: number[][]; [k: string]: any } type LvFence = [number, number, string, string?]; type LvRng = () => number; type LvObj = THREE.Object3D & Record<string, any>; interface LvBox { cx: number; cz: number; hx: number; hz: number; y0: number; h: number; [k: string]: any } interface LvDoor { id: number; i: number; tx: number; tz: number; x: number; z: number; axis: string; open: boolean; mirror: boolean; kind: any; cells?: number[]; w?: number; leaf?: LvBox; [k: string]: any } interface LvProp { name: string; x: number; z: number; q: number; v: number; boxes: LvBox[]; [k: string]: any } interface LvLay { W: number; H: number; t: Uint8Array; rooms: LvRoom[]; [k: string]: any } interface LvPt { x: number; z: number; y?: number; cx?: number; cz?: number } interface LvFl { t: Uint8Array; out: Uint8Array; rooms: LvRoom[]; doors: any[]; fences?: LvFence[]; ids?: Int16Array; glass?: any[]; [k: string]: any } type LvDoorSpec = [number, number, string, boolean?, boolean?, any?]; type LvTheme = Record<string, any>; interface LvUnit { x: number; w: number; z0: number; h: number; wallZ: number; loft: boolean; [k: string]: any } interface LvStair { axis: string; up: number; x0: number; x1: number; z0: number; z1: number; [k: string]: any } interface LvNav { stairOf: number[]; foot: Set<string>; WH: number; [k: string]: any }
+'use strict'; interface LvMap { W: number; H: number; t: Uint8Array; out: Uint8Array; rooms: LvRoom[]; doors: LvDoor[]; cover: LvPt[]; wallSpots: LvPt[]; lights: LvLight[]; lamps: LvLight[]; stairs: LvStair[]; windows: LvWin[]; cabinets: LvCab[]; fx: Record<string, any>[]; winMeshes: THREE.Object3D[]; lightPool: THREE.PointLight[]; enemySpots: number[][];
+  seed: number; level: number; theme: ThemeDef; TS?: number; world: ReturnType<typeof G_World.create>; crest?: any; chasm: number; floors: LvMap[]; props: Map<number, LvProp>; propList: LvProp[];
+  case?: any; abox?: any; sbox?: any; winAt?: any; leafAt: Map<number, any>; unitAt?: Int8Array | null; doorAt?: any; doorMeshes?: any; fy: number; fl?: number; spawn: any; spawnRoom: LvRoom; exitRoom: LvRoom; extract?: any;
+  grate?: any; railSteel?: boolean; fest?: any; base?: number; NF: number; minY?: number; rails: any[]; lz?: any; lzSpots?: number[][]; terrain?: any; skirt: number; entries?: number[][]; caseView?: any; cabViews?: any; aboxView?: any; sboxView?: any;
+  above?: LvMap | null; voidAbove?: ArrayLike<number> | null; units?: number; navG?: any; lightT?: number; underground?: boolean; rollers?: number[][]; hub?: boolean; glassRuns?: any; fences: LvFence[]; doorVer?: number; cracked?: any; dmg?: any;
+  wallMesh?: any; wallIdx?: Map<number, number>; wallBase?: Float32Array; homes?: any; civSpots?: { x: number; z: number; yaw: number }[] | null } interface LvLight { x: number; z: number; y?: number; kind?: LvLightKind; color?: number; i?: number; d?: number; up?: number; porch?: number; fl?: number } interface LvWin { solids?: any[]; id: number; cells: number[]; nx: number; nz: number; ext: boolean; broken: boolean; x: number; z: number; len: number; armor?: boolean; cooler?: boolean; sill?: number; top?: number; door?: LvDoor; cracked?: any; fy?: number; rail?: any; fl?: number } interface LvCab { x: number; z: number; yaw: number } interface LvRoom { cars?: any; type: RoomType; x: number; z: number; w: number; h: number; cx: number; cz: number; dress?: LvDress | null; unit?: number; lid?: any; door?: any; out?: boolean; loft?: boolean; lamp?: any; cover?: any[][]; carved?: boolean; front?: any; tall?: any; house?: any; fl?: number; flush?: boolean } interface LvLz { x: number; z: number; f?: number; lamps?: number[][]; y?: number } type LvFence = [number, number, string, string?]; type LvRng = () => number; type LvObj = THREE.Object3D & Record<string, any>; interface LvBox { m?: any; cx: number; cz: number; hx: number; hz: number; y0: number; h: number; ray?: LvBox[]; gy?: number } interface LvDoor { id: number; i: number; tx: number; tz: number; x: number; z: number; axis: LvAxis; open: boolean; mirror: boolean; kind: any; cells?: number[]; w?: number; leaf?: LvBox; solids?: any[]; holes: any; gone: any; fallen?: boolean; rest?: any; pane?: any; fy?: number; fl?: number } interface LvProp { style?: Record<string, any>; name: string; x: number; z: number; q: number; v: number; boxes: LvBox[]; gy?: number; gone?: any; wd?: any; own?: boolean; block?: number } // a room's purpose (what furniture.ts fits it out as; homes.ts re-types a room to a resident's)
+type RoomType = 'living' | 'kitchen' | 'dining' | 'bedroom' | 'office' | 'storage' | 'breakroom' | 'yard' | 'hall' | 'hangar' | 'lz' | 'street' | 'road' | 'lot' | 'corridor' | 'bathroom' | 'alley' | 'stage' | 'washroom' | 'plaza' | 'cafe' | 'store' | 'mart' | 'bar' | 'melt' | 'control' | 'mcc' | 'locker' | 'kitchenette' | 'lobby' | 'observe' | 'boss' | 'meeting' | 'trail' | 'garden' | 'giftshop' | 'storeroom' | 'stockroom' | 'freezer' | 'cashier' | 'dock' | 'lawn' | 'landing' | 'range' | 'seating' | 'roof' | 'picnic' | 'parking' | 'pad' | 'gate' | 'cubicle' | 'court' | 'aisle' | 'overlook' | 'catwalk' | 'ridge' | 'saddle' | 'greenhouse' | 'antennas' | 'carpark' | 'mill' | 'loading' | 'restroom';
+type LvAxis = 'x' | 'z'; // (which way a door, stair or fence runs)
+type LvDoorKind = 'stair' | 'fire' | 'vault'; // (a door that isn't the plain wooden one)
+type LvLightKind = 'string' | 'highbay' | 'panel';
+type LvFxKind = 'sparks' | 'jet' | 'embers' | 'steam' | 'smoke';
+interface LvDress { who: string; type0: RoomType; wall: string; paper?: number; ceil: string; trim: string; floor: HomeFloor; cells: number[] | null; hung: any[]; was: Map<any, any>; gone: any[]; own: any[] }
+// what a ray is asked to do (G.World.raycast, G.Level.raycast): through glass, a look not a round, bars, what stops people, solids to skip
+interface LvRayOpts { glass?: boolean; sight?: boolean; bars?: boolean; move?: boolean; skip?: (s: any) => boolean }
+interface LvBuilding { floors: LvLay[]; stairs: any; rail?: string; base?: number; units?: number; lz?: LvLz | null }
+interface LvLay { W: number; H: number; t: Uint8Array; rooms: LvRoom[]; out?: Uint8Array; doors?: LvDoorSpec[]; fences?: LvFence[]; grate?: any; crest?: any; glass?: any[]; spawn?: any; lz?: LvLz | null; entries?: number[][] | null; units?: number; underground?: boolean; chasm?: number; rollers?: number[][]; ids?: Int16Array; homes?: any; ringDoors?: boolean } interface LvPt { x: number; z: number; y?: number; cx?: number; cz?: number; fl?: number; lean?: any } interface LvFl { t: Uint8Array; out: Uint8Array; rooms: LvRoom[]; doors: any[]; fences?: LvFence[]; ids?: Int16Array; glass?: any[] } type LvDoorSpec = [number, number, LvAxis, boolean?, boolean?, any?]; type LvTheme = Record<string, any>; interface LvUnit { x: number; w: number; z0: number; h: number; wallZ: number; loft: boolean; unit?: number; head?: number[]; drop?: number[] } interface LvStair { axis: LvAxis; up: number; x0: number; x1: number; z0: number; z1: number; f: number; y0?: number; steps?: any; rise?: number } interface LvNav { stairOf: number[]; foot: Set<string>; WH: number }
 // Procedural level generation, collision, raycasting and path flow-fields.
 // The map is a tile grid (TS metres per tile, after refinement: see TS/CTS/K below). 0 = floor, 1 = wall, 2 = furniture you can take cover behind,
 // 3 = door, 4 = other furniture (garden fences are furniture too). map.out marks tiles open to the sky. Furniture collision boxes live in map.props (see js/furniture.ts).
@@ -25,10 +40,10 @@ const G_Level = {
     const theme = G.THEMES[th != null && G.THEMES[th] ? th : (level - 1) % G.THEMES.length];
     // the layout: an apartment block, a warehouse, two houses back to back with their gardens between, or a
     // building of rooms and corridors. Every one starts outside it (or, for the apartments, on the stairs).
-    const lay = theme.layout === 'apartments' ? this.layApartments(r, level) : theme.layout === 'warehouse' ? this.layWarehouse(r, level)
+    const lay = (theme.layout === 'apartments' ? this.layApartments(r, level) : theme.layout === 'warehouse' ? this.layWarehouse(r, level)
       : theme.layout === 'houses' ? this.layHouses(r, level) : theme.layout === 'festival' ? this.layFestival(r, level) : theme.layout === 'mart' ? this.layMart(r, level)
       : theme.layout === 'foundry' ? this.layFoundry(r, level) : theme.layout === 'crest' ? this.layCrest(r, level)
-      : this.approach(this.layRooms(r, level), r, theme);
+      : this.approach(this.layRooms(r, level), r, theme)) as LvLay & Partial<LvBuilding>;
     // a building of several floors: each one planned as a storey, then stacked (stack: the stairs between them)
     if (lay.floors) {
       // (who lives where: nothing to do with the layout, and from the seed alone: js/homes.ts)
@@ -45,7 +60,7 @@ const G_Level = {
   // start in view of it, or close by on its level: a suspect's spot with a line to the pad is dropped (what's parked round it
   // does most of that), and any within LZ_NEAR of it. LZ_FAR: further than anyone's rifle reaches, no need to look.
   LZ_W: 7, LZ_H: 5, LZ_NEAR: 22, LZ_FAR: 70,
-  landing(map: LvMap, lz: LvLz) {
+  landing(map: LvMap, lz?: LvLz | null) {
     if (!lz) return map;
     const cs = this.CTS, m = this.floorMap(map, lz.f || 0), y = m.fy || 0, x = lz.x * cs + 3.8, z = (lz.z + this.LZ_H / 2) * cs;
     map.lz = { x, y, z, f: lz.f || 0 };
@@ -83,16 +98,16 @@ const G_Level = {
 
     // Doors (tile value 3). `axis` is the direction you walk through the door. The rooms layout puts single and
     // double doors on the ring just outside each room where a corridor arrives; the others say where theirs go.
-    const doors: any[] = [], doorAt = new Map<number, any>();
+    const doors: LvDoor[] = [], doorAt = new Map<number, LvDoor>();
     const isWall = (x: number, z: number) => x < 0 || z < 0 || x >= W || z >= H || t[z * W + x] === 1;
-    const addDoor = (x: number, z: number, axis: string, open: boolean, mirror: boolean, kind?: any) => {
+    const addDoor = (x: number, z: number, axis: LvAxis, open?: boolean, mirror?: boolean, kind?: LvDoorKind | null) => {
       const i = z * W + x;
       t[i] = 3;
-      const d = { id: doors.length, i, tx: x, tz: z, x: (x + 0.5) * this.CTS, z: (z + 0.5) * this.CTS, axis, open: !!open, mirror: !!mirror, kind: kind || null };
+      const d = { id: doors.length, i, tx: x, tz: z, x: (x + 0.5) * this.CTS, z: (z + 0.5) * this.CTS, axis, open: !!open, mirror: !!mirror, kind: kind || null } as LvDoor;
       doors.push(d); doorAt.set(i, d);
     };
     if (lay.ringDoors) rooms.forEach((rm) => {
-      const ring: [number, number, string][] = [];
+      const ring: [number, number, LvAxis][] = [];
       for (let x = rm.x; x < rm.x + rm.w; x++) { ring.push([x, rm.z - 1, 'z']); ring.push([x, rm.z + rm.h, 'z']); }
       for (let z = rm.z; z < rm.z + rm.h; z++) { ring.push([rm.x - 1, z, 'x']); ring.push([rm.x + rm.w, z, 'x']); }
       for (const [x, z, axis] of ring) {
@@ -143,7 +158,7 @@ const G_Level = {
     map.glassRuns = lay.glass || null; // (glass the layout puts in walls between rooms: placeWindows)
     // roller doors (rolled up): [x from, x to, z of the wall] in metres
     map.rollers = (lay.rollers || []).map(([x0, z, w]: number[]) => [x0 * this.CTS, (x0 + w) * this.CTS, (z + 0.5) * this.CTS]);
-    (map as any).fest = (c as any).fest || null; (map as any).civSpots = (c as any).civSpots || null; // (a festival: its light strings, where civilians hide)
+    map.fest = c.fest || null; map.civSpots = c.civSpots || null; // (a festival: its light strings, where civilians hide)
     map.crest = c.crest; map.chasm = lay.chasm || 0; // (the Sandia Crest: which walls are rock, where the masts stand; how far down the gorge's floor is)
     map.spawnRoom = map.rooms[rooms.indexOf(spawnRoom)];
     map.exitRoom = map.rooms[rooms.indexOf(exitRoom)];
@@ -228,12 +243,12 @@ const G_Level = {
       }
     }
     // doors: one record for both cells of each opening
-    const doors: any[] = [], doorAt = new Map<number, any>();
+    const doors: LvDoor[] = [], doorAt = new Map<number, LvDoor>();
     for (const d0 of c.doors) {
       const ax = d0.tx * K, az = d0.tz * K, cells = (d0.mirror ? [0, 1] : [1, 2]).map((a) => (d0.axis === 'z' ? [ax + a, az + 1] : [ax + 1, az + a]));
       const ids = cells.map(([x, z]) => z * W + x);
       const d = { id: doors.length, i: ids[0], cells: ids, tx: cells[0][0], tz: cells[0][1], axis: d0.axis, open: d0.open, mirror: d0.mirror, kind: d0.kind, w: 2 * cs,
-        x: ((cells[0][0] + cells[1][0] + 1) / 2) * cs, z: ((cells[0][1] + cells[1][1] + 1) / 2) * cs };
+        x: ((cells[0][0] + cells[1][0] + 1) / 2) * cs, z: ((cells[0][1] + cells[1][1] + 1) / 2) * cs } as LvDoor;
       doors.push(d); ids.forEach((i) => doorAt.set(i, d));
     }
     // rooms: the coarse rectangle, grown into any side the thinned walls opened up
@@ -252,7 +267,7 @@ const G_Level = {
       return q;
     });
     // furniture: slid out to its wall's new face, then laid on the cells it covers
-    const R = G.Furniture.R, wb = G.Furniture.worldBoxes, props = new Map<number, any>(), propList: any[] = [];
+    const R = G.Furniture.R, wb = G.Furniture.worldBoxes, props = new Map<number, LvProp>(), propList: LvProp[] = [];
     for (const [ci, p0] of c.props) {
       if (fenceC.has(ci)) continue;
       const cx = ci % c.W, cz = (ci / c.W) | 0;
@@ -269,16 +284,16 @@ const G_Level = {
       if (t[i] !== 4 || props.has(i)) continue;
       const x = i % W, z = (i / W) | 0;
       const name = fenceName.get(((z / K) | 0) * c.W + ((x / K) | 0)) || c.theme.fence || 'fence'; // (a festival's site fencing)
-      const p: any = { name, q: fenceAx.get(i) === 'z' ? 1 : 0, x: (x + 0.5) * cs, z: (z + 0.5) * cs, v: ((x * 7 + z * 13) % 17) / 17 };
+      const p = { name, q: fenceAx.get(i) === 'z' ? 1 : 0, x: (x + 0.5) * cs, z: (z + 0.5) * cs, v: ((x * 7 + z * 13) % 17) / 17 } as LvProp;
       p.boxes = wb(R[name], p.x, p.z, p.q, p.v);
       props.set(i, p); propList.push(p);
     }
     return { W, H, t, out, grate, rooms, seed: c.seed, level: c.level, doors, doorAt, props, propList, theme: c.theme } as unknown as LvMap;
   },
   // A piece on the fine grid: hung on every cell it covers, those it stands on blocked (bv: 2 or 4; 0: it blocks nothing).
-  layProp(m: LvMap, p: LvProp, bv: number) {
+  layProp(m: Pick<LvMap, 'W' | 'H' | 't' | 'props' | 'propList'>, p: LvProp, bv: number) {
     const { W, H, t, props } = m, cs = this.TS, blocks = !!bv;
-    const hang = (i: number) => { const q = props.get(i); props.set(i, q ? { name: q.name, boxes: q.boxes.concat(p.boxes).sort((a: LvBox, b: LvBox) => b.h - a.h) } : p); };
+    const hang = (i: number) => { const q = props.get(i); props.set(i, q ? { name: q.name, boxes: q.boxes.concat(p.boxes).sort((a: LvBox, b: LvBox) => b.h - a.h) } as LvProp : p); };
     m.propList.push(p);
     let any = false;
     for (const b of p.boxes) {
@@ -496,10 +511,10 @@ const G_Level = {
   },
   // A door added once the floor's planned (js/homes.ts cut): two wall cells on the fine grid, [x, z] each, shut. A record as
   // refine makes them. (id: numbered through as the floors stack.)
-  layDoor(map: LvMap, cells: number[][], axis: string) {
+  layDoor(map: LvMap, cells: number[][], axis: LvAxis) {
     const cs = this.TS, ids = cells.map(([x, z]) => z * map.W + x);
     const d = { id: map.doors.length, i: ids[0], cells: ids, tx: cells[0][0], tz: cells[0][1], axis, open: false, mirror: false, kind: null, w: 2 * cs,
-      x: ((cells[0][0] + cells[1][0] + 1) / 2) * cs, z: ((cells[0][1] + cells[1][1] + 1) / 2) * cs };
+      x: ((cells[0][0] + cells[1][0] + 1) / 2) * cs, z: ((cells[0][1] + cells[1][1] + 1) / 2) * cs } as LvDoor;
     map.doors.push(d); ids.forEach((i) => { map.t[i] = 3; map.doorAt.set(i, d); });
     this.hangLeaf(map, d);
     return d;
@@ -588,7 +603,7 @@ const G_Level = {
       if (!kind && (near(map.case) || near(map.abox) || near(map.sbox) || (map.cabinets || []).some(near))) return; // (not through the wall a cabinet or the weapon case is against)
       const id = map.windows.length;
       // the opening's middle, on the wall's centre line (thru) or the room-side cell's middle (ext)
-      const w: any = { id, cells, nx, nz, ext, broken: false, x: ((a[0] + b[0]) / 2 + 0.5) * TS, z: ((a[1] + b[1]) / 2 + 0.5) * TS, len: 2 * TS };
+      const w: LvWin = { id, cells, nx, nz, ext, broken: false, x: ((a[0] + b[0]) / 2 + 0.5) * TS, z: ((a[1] + b[1]) / 2 + 0.5) * TS, len: 2 * TS };
       if (kind && kind.armor) w.armor = true; // (wired, bulletproof: it stops rounds, never breaks; you see through it)
       if (kind && kind.cooler) w.cooler = true; // (a cooler's glass doors)
       // (its own sill and top: a cooler's doors nearly to the floor, a cashier's glass from the counter up)
@@ -668,7 +683,7 @@ const G_Level = {
   rayBoxesAt(map: LvMap, tx: number, tz: number) {
     const wa = map.winAt && map.winAt.get(tz * map.W + tx);
     if (wa) return wa.win.broken ? wa.open : wa.shut;
-    let bs = this.boxesAt(map, tx, tz);
+    let bs: LvBox[] & { _ray?: LvBox[] } = this.boxesAt(map, tx, tz);
     if (bs._ray || bs.some((b: LvBox) => b.ray)) bs =bs._ray || (bs._ray = bs.flatMap((b: LvBox) => b.ray || [b]));
     const ds = map.leafAt && map.leafAt.get(tz * map.W + tx);
     if (!ds) return bs;
@@ -688,7 +703,7 @@ const G_Level = {
   //  - The car park along the south, where you come in: rows of parked cars, the festival's gate under its arch
   //    and the street into the square opening off it.
   // (What goes where: G.Furniture.plan's festival(); the lights, sky and stage rig: buildFestival.)
-  layFestival(r: LvRng, level: number) {
+  layFestival(r: LvRng, level: number): LvLay {
     const U = G.U, W = 58 + Math.min(level, 4) * 2, H = 61, TX = 17, PZ = 42; // the town west of TX; the car park south of PZ, the overflow beyond it where the helicopter lands
     const t = new Uint8Array(W * H).fill(1), out = new Uint8Array(W * H).fill(1), rooms: LvRoom[] = [], doors: LvDoorSpec[] = [], fences: LvFence[] = [];
     const fill = (x0: number, z0: number, w: number, h: number) => { for (let z = z0; z < z0 + h; z++) for (let x = x0; x < x0 + w; x++) t[z * W + x] = 0; };
@@ -844,7 +859,7 @@ const G_Level = {
   },
   // the ground's height at (x, z) on a level with it (0 elsewhere, and off it)
   groundHeight(map: LvMap, x: number, z: number) { return map.terrain ? G.World.terrainAt(map.terrain, x, z) : 0; },
-  layCrest(r: LvRng, level: number) {
+  layCrest(r: LvRng, level: number): LvLay {
     const U = G.U, CX0 = 24, CX1 = 142, W = CX1 + 25, H = 46, SZ = 6; // the gorge from x CX0 to CX1 (236 m across), south of the saddle's wall (row SZ)
     const OZ0 = 12, OZ1 = 17, OX1 = CX0 + 3; // the overlook: its rows, its east side
     const HX = 13, HZ = 23, GX = CX1 + 9, GZ = 13; // the Crest House's and the greenhouse's north-west corners (walls and all)
@@ -855,7 +870,7 @@ const G_Level = {
     const at = (x: number, z: number) => z * W + x;
     const fill = (x0: number, z0: number, w: number, h: number, v: number) => { for (let z = z0; z < z0 + h; z++) for (let x = x0; x < x0 + w; x++) t[at(x, z)] = v; };
     const fence = (x: number, z: number, axis: string, name?: string) => { t[at(x, z)] = 4; fences.push(name ? [x, z, axis, name] : [x, z, axis]); };
-    const room = (x: number, z: number, w: number, h: number, type: string, o?: Record<string, any>) => { const q = this._room(x, z, w, h, Object.assign({ type, out: true, flush: true }, o)); rooms.push(q); return q; };
+    const room = (x: number, z: number, w: number, h: number, type: RoomType, o?: Record<string, any>) => { const q = this._room(x, z, w, h, Object.assign({ type, out: true, flush: true }, o)); rooms.push(q); return q; };
     // the gorge, the overlook out over it
     fill(CX0, SZ + 1, CX1 - CX0 + 1, H - SZ - 1, 5);
     fill(CX0, OZ0, OX1 - CX0 + 1, OZ1 - OZ0 + 1, 0);
@@ -934,7 +949,7 @@ const G_Level = {
     // there), the approach to the overlook, the overlook, the ridge, the saddle; the garden round the greenhouse in four,
     // the greenhouse, the antenna farm
     const lot = room(1, 37, CX0 - 2, 8, 'lz'), lz = this._pad(lot, W, 3, 39, this.LZ_KIT.crest);
-    lot.cover.push(['bmw340', 40, 84, 1, {}]); // (someone's up here for the sunset: a silver 340i nosed in toward the rim at the lot's east end)
+    lot.cover!.push(['bmw340', 40, 84, 1, {}]); // (someone's up here for the sunset: a silver 340i nosed in toward the rim at the lot's east end)
     room(1, 32, CX0 - 2, 5, 'trail', { front: true }); room(1, 21, HX - 1, 11, 'trail', { front: true }); room(HX, 21, CX0 - 1 - HX, 2, 'trail');
     room(1, 11, CX0 - 2, 10, 'trail'); room(1, 1, CX0 - 2, 10, 'ridge');
     room(CX0 - 1, OZ0, OX1 - CX0 + 2, OZ1 - OZ0 + 1, 'overlook', { front: true }); // (yours: nobody starts on it)
@@ -955,7 +970,7 @@ const G_Level = {
   },
   // Each returns { W, H, t, rooms, doors?, ringDoors?, out?, fences?, spawn? } on the coarse grid. t starts as all wall
   // (1); rooms are carved to floor (0).
-  _room(x: number, z: number, w: number, h: number, o: Record<string, any>) { return Object.assign({ x, z, w, h, cx: x + (w >> 1), cz: z + (h >> 1) }, o || {}); },
+  _room(x: number, z: number, w: number, h: number, o?: Record<string, any>) { return Object.assign({ x, z, w, h, cx: x + (w >> 1), cz: z + (h >> 1) }, o || {}) as LvRoom; },
   // A landing pad on open ground, the building to the north, and what's parked or stacked there that shelters it, what you'd
   // find in that kind of place (LZ_KIT): a row of the long thing along the pad's north side with room to walk between, the
   // short thing turned at each end of it. (east: the threat's east, not north: across that end of the pad instead.)
@@ -971,7 +986,7 @@ const G_Level = {
     suburbs: { long: 'boxtruck', short: 'hedge', style: { c: 0xe0d8c8, stripe: 0x2f7a4a } },
     crest: { long: 'boxtruck', short: 'boulder', style: { c: 0xe6e2d6, stripe: 0x2f6a44 } }, // (the Forest Service's)
   },
-  _pad(rm: LvRoom, W: number, x: number, z: number, kit: Record<string, any>, east: boolean) {
+  _pad(rm: LvRoom, W: number, x: number, z: number, kit: Record<string, any>, east?: boolean) {
     const c: any[][] = rm.cover = [], cs = this.CTS, GAP = 1.6, put = (name: string, px: number, pz: number, q: number) => c.push([name, px, pz, q, kit.style]);
     if (east) { const px = (x + this.LZ_W) * cs + 1; put(kit.long, px, (z + 2.5) * cs, 1); put(kit.short, px, (z + 0.6) * cs, 1); return { x, z }; }
     const x0 = Math.max(3, (x - 1) * cs), x1 = Math.min(W * cs - 3, (x + this.LZ_W + 1) * cs), L = G.Furniture.R[kit.long].w, n = Math.max(1, Math.floor((x1 - x0 + GAP) / (L + GAP))), run = n * L + (n - 1) * GAP, a0 = (x0 + x1 - run) / 2, pz = (z - 0.5) * cs - 0.5;
@@ -996,9 +1011,9 @@ const G_Level = {
   //     it and the helicopter's pad behind them, where you come in.
   // The shelving is laid on the fine grid (js/furniture.ts plan, mart), not tile by tile: that's what makes the aisles narrow.
   // Its weapon case, attachments box and first aid cabinet are always in the stockroom (G.THEMES starter).
-  layMart(r: LvRng, level: number) {
+  layMart(r: LvRng, level: number): LvLay {
     const W = 10, B = 9, D = 10, H = B + D, U = G.U;
-    const t = new Uint8Array(W * H).fill(1), out = new Uint8Array(W * H), fences = [], doors = [];
+    const t = new Uint8Array(W * H).fill(1), out = new Uint8Array(W * H), fences: LvFence[] = [], doors: LvDoorSpec[] = [];
     const fill = (x0: number, z0: number, w: number, h: number) => { for (let z = z0; z < z0 + h; z++) for (let x = x0; x < x0 + w; x++) t[z * W + x] = 0; };
     fill(1, 1, 3, 2); fill(5, 1, 4, 2); // the freezer, the stockroom
     fill(1, 4, 5, 4); fill(7, 4, 2, 4); // the shop floor, the cashier's booth
@@ -1042,12 +1057,12 @@ const G_Level = {
   //     racking; a roller door up into the processing hall, two out onto the car park and a door between them.
   //   the car park along the front, fenced; past it, behind a row of containers, the helicopter's pad, where you come in.
   // Floors: 0 the ground, 1 upstairs (tile 5 the drop, open to the floor below; grate: the catwalks).
-  layFoundry(r: LvRng, level: number) {
+  layFoundry(r: LvRng, level: number): LvBuilding {
     const W = 34, H = 35, LZ = 22; // the car park from row LZ; past it, behind the containers along row 27, the pad
     const mk = (): LvFl & { glass: any[] } => ({ t: new Uint8Array(W * H).fill(1), out: new Uint8Array(W * H), rooms: [], doors: [], glass: [] });
     const F0 = mk(), F1 = mk(), grate = new Uint8Array(W * H), fences: LvFence[] = [], stairs: LvStair[] = [];
     const fill = (F: LvFl, x0: number, z0: number, w: number, h: number, v = 0) => { for (let z = z0; z < z0 + h; z++) for (let x = x0; x < x0 + w; x++) F.t[z * W + x] = v; };
-    const room = (F: LvFl, x: number, z: number, w: number, h: number, type: string, o?: Record<string, any>) => { const q = this._room(x, z, w, h, Object.assign({ type }, o)); F.rooms.push(q); return q; };
+    const room = (F: LvFl, x: number, z: number, w: number, h: number, type: RoomType, o?: Record<string, any>) => { const q = this._room(x, z, w, h, Object.assign({ type }, o)); F.rooms.push(q); return q; };
     const door = (F: LvFl, x: number, z: number, axis: string, mirror?: boolean) => F.doors.push([x, z, axis, false, !!mirror]);
     // ---- the car park: open to the sky on both floors, fenced
     for (let z = LZ; z < H; z++) for (let x = 0; x < W; x++) { F0.out[z * W + x] = 1; F1.out[z * W + x] = 1; F1.t[z * W + x] = 5; }
@@ -1100,7 +1115,7 @@ const G_Level = {
   },
 
   // Rooms joined by corridors (apartments, bunkers, labs...).
-  layRooms(r: LvRng, level: number) {
+  layRooms(r: LvRng, level: number): LvLay {
     const U = G.U;
     // compact: ~38 m across on level 1, never more than 60 m
     const W = Math.min(18 + level, 30), H = W;
@@ -1142,14 +1157,14 @@ const G_Level = {
   // what's parked there (LZ_KIT), and the way in, a corridor from the nearest room out to a double door in the front wall (a vault door
   // into a bunker).
   approach(lay: LvLay, r: LvRng, theme: LvTheme) {
-    const D = 10, { W, H } = lay, H2 = H + D, t = new Uint8Array(W * H2).fill(1), out = new Uint8Array(W * H2), fences = [], doors = lay.doors ? lay.doors.slice() : [];
+    const D = 10, { W, H } = lay, H2 = H + D, t = new Uint8Array(W * H2).fill(1), out = new Uint8Array(W * H2), fences: LvFence[] = [], doors = lay.doors ? lay.doors.slice() : [];
     t.set(lay.t);
     for (let z = H; z < H2; z++) for (let x = 0; x < W; x++) out[z * W + x] = 1;
     for (let z = H; z < H2 - 1; z++) for (let x = 1; x < W - 1; x++) t[z * W + x] = 0;
     for (let x = 0; x < W; x++) { t[(H2 - 1) * W + x] = 4; fences.push([x, H2 - 1, 'x']); }
     for (let z = H; z < H2 - 1; z++) for (const x of [0, W - 1]) { t[z * W + x] = 4; fences.push([x, z, 'z']); }
     const lot = this._room(1, H, W - 2, 2, { type: 'lot', out: true, front: true }), pad = this._room(1, H + 3, W - 2, 6, { type: 'lz', out: true });
-    const lz = this._pad(pad, W, (W - this.LZ_W) >> 1, H + 3, this.LZ_KIT[theme.name] || this.LZ_KIT.store);
+    const lz = this._pad(pad, W, (W - this.LZ_W) >> 1, H + 3, (this.LZ_KIT as Record<string, any>)[theme.name] || this.LZ_KIT.store);
     // the room nearest the front, and a two-wide corridor from it to the front wall
     const rm = lay.rooms.reduce((a, b) => (b.z + b.h > a.z + a.h ? b : a));
     const x0 = G.U.clamp(rm.cx, 2, W - 4);
@@ -1205,7 +1220,7 @@ const G_Level = {
   // goes up two floors with a stair up its wall, to an open upper floor over the rest of the home (railed where
   // it looks down into the living room). Upstairs are single-floor apartments and the lofts' upper floors. Each
   // apartment has to be cleared. Tile values on the plan: 5 a drop (no floor), 6 a flight of stairs.
-  layApartments(r: LvRng, level: number) {
+  layApartments(r: LvRng, level: number): LvBuilding {
     const U = G.U, per = 2 + Math.min(level >> 1, 2); // apartments each side of the hallway
     const ud = U.ri(r, 5, 6), ud2 = U.ri(r, 5, 6);
     const W = 10 + per * 8, hz = ud + 2, H = hz + 2 + ud2 + 1, xa0 = 5, xa1 = W - 6; // (the homes between the stairwells)
@@ -1257,11 +1272,11 @@ const G_Level = {
         } else {
           // a loft's upper floor: the drop over its living room, and a room over the rest of the home
           fill(u.x, u.z0, u.w, u.h);
-          const [vx, vz, vw, vh] = u.drop;
+          const [vx, vz, vw, vh] = u.drop!;
           fill(vx, vz, vw, vh, 5);
           const pieces = [[u.x, u.z0, u.w, vz - u.z0], [u.x, vz + vh, u.w, u.z0 + u.h - vz - vh], [u.x, vz, vx - u.x, vh], [vx + vw, vz, u.x + u.w - vx - vw, vh]];
           for (const [x, z, w, h] of pieces) if (w > 0 && h > 0) rooms.push(this._room(x, z, w, h, { type: U.pick(r, ['bedroom', 'bedroom', 'office']), unit: u.unit, loft: true }));
-          entries.push(u.head);
+          entries.push(u.head!);
         }
       }
       floors.push({ W, H, t, rooms, doors, spawn: rooms[0], entries: f ? entries : null, units: 0 });
@@ -1304,7 +1319,7 @@ const G_Level = {
     const U = G.U, size = (q: LvRoom) => q.w * q.h, big = (a: LvRoom, b: LvRoom) => size(b) - size(a), next = this._through(fr, mine, doors);
     const living = mine.find((q) => q.type === 'living') || (back(fr) ? null : next.filter(back).sort(big)[0]) || fr;
     const near = this._through(living, mine, doors);
-    const kitchen = living !== fr && near.includes(fr) ? fr : near.concat(mine.filter((q) => q !== living)).sort((a: LvRoom, b: LvRoom) => (near.includes(b) - near.includes(a)) || big(b, a))[0];
+    const kitchen = living !== fr && near.includes(fr) ? fr : near.concat(mine.filter((q) => q !== living)).sort((a: LvRoom, b: LvRoom) => ((near.includes(b) as unknown as number) - (near.includes(a) as unknown as number)) || big(b, a))[0];
     living.type = 'living';
     if (kitchen) kitchen.type = 'kitchen';
     mine.filter((q) => q !== living && q !== kitchen).sort(big).forEach((q, i) => { q.type = i ? U.pick(r, ['bedroom', 'dining', 'office']) : 'bedroom'; });
@@ -1349,7 +1364,7 @@ const G_Level = {
   // the floor above has a hole over the top of this wall (the edge of a stairwell): the wall stops short of that floor by the
   // thickness of the slab, and the slab's what fills it, or there's a ledge down there and the wall above's underside in the dark
   _capped(m: LvMap, up: LvMap, i: number) { return m.t[i] === 1 && up.t[i] === 5 && !(up.out && up.out[i]); },
-  stack(fms: LvMap[], lay: LvLay) {
+  stack(fms: LvMap[], lay: Partial<LvBuilding>) {
     const FH = this.FLOOR_H, TS = this.TS, CTS = this.CTS, base = lay.base || 0;
     fms.forEach((m, f) => { m.fl = f; m.fy = (f - base) * FH; m.skirt = f ? FH - this.WALL_H : 0; });
     fms.forEach((m, f) => { const up = fms[f + 1]; m.voidAbove = up ? up.t.map((v, i) => (v === 5 || (up.grate && up.grate[i]) ? 1 : 0)) : null; m.above = up || null; }); // (over a drop or a grating: no ceiling)
@@ -1427,7 +1442,7 @@ const G_Level = {
   // stairs, the floor at its foot)
   floorAt(map: LvMap, x: number, y: number, z: number) {
     if (!map.floors) return 0;
-    for (const st of map.stairs) if (x > st.x0 && x < st.x1 && z > st.z0 && z < st.z1 && y < st.y0 + st.rise + 0.3 && y > st.y0 - 0.5) return st.f; // (on its top tread too: the floor above has a drop there)
+    for (const st of map.stairs) if (x > st.x0 && x < st.x1 && z > st.z0 && z < st.z1 && y < st.y0! + st.rise! + 0.3 && y > st.y0! - 0.5) return st.f; // (on its top tread too: the floor above has a drop there)
     return G.U.clamp(Math.floor((y + 0.6) / this.FLOOR_H) + (map.base || 0), 0, map.NF - 1);
   },
   floorMap(map: LvMap, f: number) { return map.floors ? map.floors[f] : map; },
@@ -1437,9 +1452,9 @@ const G_Level = {
   // A warehouse: a row of offices along the back wall, then the warehouse floor (rows of pallet racks with
   // aisles between and cross-aisles through them), open at the front onto the loading dock, the yard past it, where you
   // come in: the helicopter's pad behind a row of containers.
-  layWarehouse(r: LvRng, level: number) {
+  layWarehouse(r: LvRng, level: number): LvLay {
     const U = G.U, W = 26 + Math.min(level, 4), lzH = 7, H = 22 + Math.min(level, 3) + lzH; // (the last rows: the blast walls and the helicopter's pad past the dock)
-    const t = new Uint8Array(W * H).fill(1), rooms = [], doors = [];
+    const t = new Uint8Array(W * H).fill(1), rooms: LvRoom[] = [], doors: LvDoorSpec[] = [];
     const fill = (x0: number, z0: number, w: number, h: number) => { for (let z = z0; z < z0 + h; z++) for (let x = x0; x < x0 + w; x++) t[z * W + x] = 0; };
     // offices, 4 tiles deep, side by side with a wall between each
     const od = 4, offices = [];
@@ -1454,7 +1469,7 @@ const G_Level = {
     }
     // the floor inside, then the front wall, then the loading dock outside (where you come in): two roller doors
     // (rolled up: wide openings) and a door between them
-    const hz = od + 2, dockH = 4, hallH = H - 2 - hz - dockH - lzH, fz = hz + hallH, out = new Uint8Array(W * H), fences = [];
+    const hz = od + 2, dockH = 4, hallH = H - 2 - hz - dockH - lzH, fz = hz + hallH, out = new Uint8Array(W * H), fences: LvFence[] = [];
     fill(1, hz, W - 2, hallH);
     fill(1, fz + 1, W - 2, dockH + lzH);
     for (let z = fz + 1; z < H; z++) for (let x = 0; x < W; x++) out[z * W + x] = 1;
@@ -1475,9 +1490,9 @@ const G_Level = {
   // Behind its north wall (a garage door in it) is the shooting range, in the first G.HANGAR_ROWS rows: a yard to stand in
   // at the firing line, an IPSC course on the left, a pistol range (16 m) and a rifle range (300 m), walled between and open
   // to the sky, a backstop at the far end of each.
-  layHangar() {
+  layHangar(_r?: LvRng, _level?: number): LvLay {
     const R = G.HANGAR_ROWS, W = 26, H = 21 + R, hallH = 12, hz = R + 1, fz = hz + hallH, padH = 6, ox = 9, ow = 8;
-    const t = new Uint8Array(W * H).fill(1), out = new Uint8Array(W * H), fences = [];
+    const t = new Uint8Array(W * H).fill(1), out = new Uint8Array(W * H), fences: LvFence[] = [];
     const fill = (x0: number, z0: number, w: number, h: number) => { for (let z = z0; z < z0 + h; z++) for (let x = x0; x < x0 + w; x++) t[z * W + x] = 0; };
     fill(1, hz, W - 2, hallH);
     fill(1, fz + 1, W - 2, padH);
@@ -1513,7 +1528,7 @@ const G_Level = {
   // and dining room on the ground floor, bedrooms and a study upstairs, storage and a den in the basement).
   // Floors: 0 the basement, 1 the ground floor (base), 2 upstairs. Upstairs, everything outside the houses is open
   // air (tile 5, open to the sky): nothing to stand on, no ceiling, and a roof over the top.
-  layHouses(r: LvRng, level: number) {
+  layHouses(r: LvRng, level: number): LvBuilding {
     const U = G.U, S = 4, SP = 21, TC = 8; // the street, S tiles deep; its west end, SP tiles, before the houses; the first TC of them the turning circle
     const grow = Math.min(level >> 1, 2);
     const hwA = U.ri(r, 9, 10) + (grow >> 1), hwB = U.ri(r, 9, 10) + (grow >> 1), hh = U.ri(r, 6, 7), yd = U.ri(r, 5, 6);
@@ -1541,7 +1556,7 @@ const G_Level = {
     for (let z = S + 1; z < H - 1; z++) { fence(SP, z, 'z'); fence(W - 1, z, 'z'); } // (the neighbour's side, and the east edge)
     for (let z = zb + 2; z <= zb + yd; z++) if (z !== zb + 3) fence(xl, z, 'z'); // between the gardens, a gap near the house
     // ---- the houses, floor by floor
-    const stairs: LvStair[] = [], entries: Record<number, number[][]> = { 0: [], 2: [] }, HOME: Record<number, string[] | null> = { 0: ['storage', 'living', 'storage', 'office'], 1: null, 2: ['bedroom', 'bedroom', 'office', 'bedroom', 'bedroom'] };
+    const stairs: LvStair[] = [], entries: Record<number, number[][]> = { 0: [], 2: [] }, HOME: Record<number, RoomType[] | null> = { 0: ['storage', 'living', 'storage', 'office'], 1: null, 2: ['bedroom', 'bedroom', 'office', 'bedroom', 'bedroom'] };
     for (const hs of houses) {
       const a = hs.x, bL = hs.x + 1, wc = hs.x + 2, rx = hs.x + 3, rw = hs.w - 3, sz = z0 + 2; // the hall's two lanes, its wall, the rooms beside it; the stairs' first row
       for (const [f, F] of [[0, B], [1, Gf], [2, Up]] as [number, any][]) {
@@ -1631,7 +1646,7 @@ const G_Level = {
   // Returns {t, n:[nx,ny,nz]} — distance along the (unit) direction to the first solid surface
   // opts.glass: go through glass (listing the panes crossed, nearest first, in .glass) instead of stopping at it.
   // A hit on the view behind an outside window comes back with .view (no mark to leave there).
-  raycast(map: LvMap, ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, maxD: number, opts?: { glass?: boolean; [k: string]: any }) {
+  raycast(map: LvMap, ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, maxD: number, opts?: LvRayOpts) {
     if (map.world) return G.World.raycast(map.world, ox, oy, oz, dx, dy, dz, maxD, opts);
     const pass = !!(opts && opts.glass), crossed: number[][] | null = pass ? [] : null;
     const TS = this.TS;
@@ -1656,7 +1671,7 @@ const G_Level = {
     for (let guard = 0; guard < 400 && t <= limit; guard++) {
       const bs = this.rayBoxesAt(map, tx, tz);
       if (bs.length) {
-        let best = null; // boxes never leave their tile, so the nearest hit in this tile is the nearest overall
+        let best: { t: number; n: number[]; view?: boolean; pane?: any; glass?: any } | null = null; // boxes never leave their tile, so the nearest hit in this tile is the nearest overall
         for (const b of bs) {
           const hit = this._slab(ox, oy, oz, dx, dy, dz, b);
           if (!hit || hit.t > limit) continue;
@@ -2120,6 +2135,7 @@ const G_Level = {
   // line's start (buildCrest); a rider takes one across (js/rig.ts, js/player.ts zipArms), hanging by the bar, their feet
   // ZIP_HANG under the cable.
   ZIP_BAR: 0.65, ZIP_HANG: 2.65,
+  _zipMats: undefined as { steel: THREE.MeshStandardMaterial; yel: THREE.MeshStandardMaterial } | undefined,
   zipKit() {
     const T = THREE, M = this._zipMats || (this._zipMats = { steel: new T.MeshStandardMaterial({ color: 0x4a4e52, roughness: 0.5, metalness: 0.6 }), yel: new T.MeshStandardMaterial({ color: 0xe0b020, roughness: 0.5 }) });
     const g = new T.Group(), B = this.ZIP_BAR;
@@ -2335,7 +2351,7 @@ const G_Level = {
         stay.position.copy(top).add(foot).multiplyScalar(0.5); stay.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), top.clone().sub(foot).normalize()); root.add(stay);
         const pulley = new T.Mesh(new T.CylinderGeometry(0.13, 0.13, 0.06, 14), yel); pulley.rotation.x = Math.PI / 2; pulley.position.set(p[0], p[1] + 0.02, p[2]); root.add(pulley);
       }
-      const kit = this.zipKit(); kit.position.set(...l.a); kit.rotation.y = Math.atan2(l.b[0] - l.a[0], l.b[2] - l.a[2]); root.add(kit); // (the next one, waiting)
+      const kit = this.zipKit(); kit.position.set(...(l.a as [number, number, number])); kit.rotation.y = Math.atan2(l.b[0] - l.a[0], l.b[2] - l.a[2]); root.add(kit); // (the next one, waiting)
     }
     // ---- the Crest House's roof (crest.roof): a flat deck of grey pavers over the slab, its edge flush with the walls (no
     // parapet: nothing between you and the far summit); the ladder up to it on the east wall (crest.ladder), steel, its rails
@@ -2554,7 +2570,7 @@ const G_Level = {
       root.add(g);
       map.doorMeshes.push(...m.doorMeshes);
       (m.winMeshes || []).forEach((p: THREE.Object3D, i: number) => { if (p) map.winMeshes[i] = p; });
-      for (const l of m.lamps) map.lamps.push(Object.assign({}, l, { y: l.y + m.fy, fl: m.fl }));
+      for (const l of m.lamps) map.lamps.push(Object.assign({}, l, { y: l.y! + m.fy, fl: m.fl }));
     }
     map.caseView = map.floors[map.base || 0].caseView; map.aboxView = map.floors[map.base || 0].aboxView; map.sboxView = map.floors[map.base || 0].sboxView; map.cabViews = map.floors[map.base || 0].cabViews;
     for (const d of map.doors) if (d.pane) map.winMeshes[d.pane.id] = map.doorMeshes[d.id].userData.leaf; // (a glass door's pane: its leaf)
@@ -2713,8 +2729,8 @@ const G_Level = {
     const capUp = map.above, caps = [];
     if (capUp) for (let i = 0; i < W * H; i++) if (this._capped(map, capUp, i)) caps.push(i);
     if (caps.length) {
-      const cap = new THREE.InstancedMesh(new THREE.BoxGeometry(TS, capUp.skirt, TS), new THREE.MeshStandardMaterial({ color: 0xbdb6aa, roughness: 0.9 }), caps.length), cm4 = new THREE.Matrix4();
-      caps.forEach((i, n) => { cm4.makeTranslation(((i % W) + 0.5) * TS, this.WALL_H + capUp.skirt / 2, (Math.floor(i / W) + 0.5) * TS); cap.setMatrixAt(n, cm4); });
+      const cap = new THREE.InstancedMesh(new THREE.BoxGeometry(TS, capUp!.skirt, TS), new THREE.MeshStandardMaterial({ color: 0xbdb6aa, roughness: 0.9 }), caps.length), cm4 = new THREE.Matrix4();
+      caps.forEach((i, n) => { cm4.makeTranslation(((i % W) + 0.5) * TS, this.WALL_H + capUp!.skirt / 2, (Math.floor(i / W) + 0.5) * TS); cap.setMatrixAt(n, cm4); });
       cap.layers.enable(1);
       root.add(cap);
     }
@@ -2853,7 +2869,7 @@ const G_Level = {
       }
       if (l.kind === 'highbay') { // a hall's: a dome on a rod down from the roof (the floor above's ceiling)
         const roof = this.FLOOR_H + this.WALL_H, rod = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, roof - l.y!), bayMat);
-        rod.position.set(l.x, (roof + l.y) / 2, l.z); root.add(rod);
+        rod.position.set(l.x, (roof + l.y!) / 2, l.z); root.add(rod);
         const dome = new THREE.Mesh(bayGeo, bayMat); dome.position.set(l.x, l.y! - 0.1, l.z); root.add(dome);
         const glow = new THREE.Mesh(bayLens, lampMat); glow.position.set(l.x, l.y! - 0.26, l.z); root.add(glow);
         map.lamps.push({ x: l.x, y: l.y! - 0.4, z: l.z, color: l.color, i: l.i, d: l.d });

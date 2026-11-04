@@ -16,6 +16,12 @@
  * turn drive the synthesis parameters. Everything is rendered offline into an
  * AudioBuffer so it can be replayed instantly and visualized.
  */
+// what the synth is told about a shot: the muzzle device, the can on it, the action, the case, the room (the tables below are keyed by them; js/parts.ts soundSpec and js/gunaudio.ts pass them)
+type MuzzleDevice = 'none' | 'flash' | 'comp' | 'brake' | 'suppressor';
+type SuppressorKind = 'full' | 'compact' | 'long' | 'box' | 'integral' | 'integralX';
+type ActionKind = 'gas' | 'longstroke' | 'roller' | 'blowback' | 'recoil';
+type CaseMat = 'brass' | 'steel' | 'aluminum' | 'plastic';
+type SynthEnv = 'none' | 'field' | 'forest' | 'urban' | 'canyon' | 'room' | 'hall' | 'concrete' | 'warehouse';
 (function () {
   'use strict';
 
@@ -28,12 +34,12 @@
   // the rest are optional, and anything absent takes the default where it is read.
   interface ShotParams {
     caliber: number; barrel: number; pressure: number; grain: number; bulletWeight: number;
-    muzzleDevice?: string; suppressor?: string; boltSim?: boolean; boltMass?: number; actionType?: string;
+    muzzleDevice?: MuzzleDevice; suppressor?: SuppressorKind; boltSim?: boolean; boltMass?: number; actionType?: ActionKind;
     lisDist?: number; lisBearing?: number;
     micGain?: number; micHardness?: number; micAgc?: number; micSim?: boolean;
     shotCount?: number; boltLoudness?: number; masterDb?: number;
-    env?: string; envSize?: number; envReflect?: number; envMix?: number;
-    casing?: number; caseMaterial?: string; caseLength?: number;
+    env?: SynthEnv; envSize?: number; envReflect?: number; envMix?: number;
+    casing?: number; caseMaterial?: CaseMat; caseLength?: number;
   }
   interface Device { label: string; level: number; lp: number; decay: number; tang: number; whoosh: number }
   interface Can { label: string; db: number; vol: number; len: number; back: number; shock: number; ring: number; ported?: boolean }
@@ -67,7 +73,7 @@
   // so a suppressor quiets the blast but leaves a supersonic bullet's crack, and
   // makes the bolt clatter relatively prominent. Those layers are gained
   // independently of `level`, below.
-  const DEVICES: Record<string, Device> = {
+  const DEVICES: Record<MuzzleDevice, Device> = {
     none:       { label: 'None (bare muzzle)', level: 0,   lp: 1.00, decay: 1.00, tang: 0.00, whoosh: 0.00 },
     flash:      { label: 'Flash hider',        level: -1,  lp: 0.95, decay: 1.00, tang: 0.05, whoosh: 0.00 },
     comp:       { label: 'Compensator',        level: 2,   lp: 1.15, decay: 0.90, tang: 0.18, whoosh: 0.00 },
@@ -96,7 +102,7 @@
   //  len   : length (m), for the gas-column ring     back : back pressure into the action (0-1)
   //  shock : how much of the initial shock front survives the baffles
   //  ring  : the tube's ring level                    ported: a ported barrel (integral), bleeding gas early
-  const SUPPRESSORS: Record<string, Can> = {
+  const SUPPRESSORS: Record<SuppressorKind, Can> = {
     full:      { label: 'Full-length can',   db: -24, vol: 1.00, len: 0.17, back: 0.60, shock: 0.18, ring: 0.10 },
     compact:   { label: 'Compact can',       db: -21, vol: 0.55, len: 0.11, back: 0.45, shock: 0.30, ring: 0.14 },
     long:      { label: 'Long (pistol) can', db: -27, vol: 1.20, len: 0.20, back: 0.35, shock: 0.14, ring: 0.08 },
@@ -114,7 +120,7 @@
   // actions must wait for pressure to drop and gas to travel back from the port;
   // blowback actions begin opening almost immediately as gas drives the case
   // head rearward. `cycle` is the base full-cycle time at nominal bolt mass (s).
-  const ACTIONS: Record<string, Action> = {
+  const ACTIONS: Record<ActionKind, Action> = {
     gas:        { label: 'Gas (direct/piston)', cycle: 0.075, unlock: 0.0042 },
     longstroke: { label: 'Long-stroke gas',     cycle: 0.100, unlock: 0.0052 },
     roller:     { label: 'Roller-delayed',      cycle: 0.072, unlock: 0.0030 },
@@ -127,7 +133,7 @@
   // brass-head ring. `freq` scales modal pitch, `ring` the decay time, `metal`
   // the sinusoidal-ring level, `plastic` a hollow noise clack. The absolute
   // pitch is set from the case's physical size (length + caliber), below.
-  const CASE_MATERIALS: Record<string, CaseMaterial> = {
+  const CASE_MATERIALS: Record<CaseMat, CaseMaterial> = {
     brass:    { label: 'Brass',        freq: 1.00, ring: 1.00, metal: 1.00, plastic: 0.00 },
     steel:    { label: 'Steel',        freq: 1.12, ring: 1.35, metal: 1.00, plastic: 0.00 },
     aluminum: { label: 'Aluminum',     freq: 1.28, ring: 0.70, metal: 0.90, plastic: 0.00 },
@@ -311,7 +317,7 @@
   //   ground  : add a strong ground-bounce slap (outdoor)
   //   echoes  : add regular repeating slaps (canyon)
   //   flutter : {ms,count,gain} periodic echo between parallel walls
-  const ENVIRONMENTS: Record<string, Environment> = {
+  const ENVIRONMENTS: Record<SynthEnv, Environment> = {
     none:      { label: 'Anechoic (dry)',      group: 'none',    wet: 0 },
     field:     { label: 'Open field',          group: 'outdoor', wet: 0.45, rt60: 0.35, predelay: 0.020, damp: 0.78, diffuse: 0.12, erCount: 3,  erMinMs: 2,  erMaxMs: 130, erGain: 0.38, ground: true },
     forest:    { label: 'Forest',              group: 'outdoor', wet: 0.65, rt60: 0.95, predelay: 0.030, damp: 0.70, diffuse: 0.30, erCount: 16, erMinMs: 8,  erMaxMs: 230, erGain: 0.28, ground: true },
@@ -329,7 +335,7 @@
 
   // Effective reverberation time (RT60, seconds) for a scenario at a given size
   // — the physical meaning of the "Space size" control. 0 for anechoic.
-  function roomRt60(env: string, size: number) {
+  function roomRt60(env: SynthEnv, size: number) {
     const P = ENVIRONMENTS[env] || ENVIRONMENTS.none;
     return P.wet > 0 ? envRt60(P, clamp(size, 0, 1)) : 0;
   }
@@ -660,7 +666,7 @@
       // back pressure: gas the can holds in the bore spits out of the action as it opens (a hiss at the shooter's
       // face), most on direct gas and blowback guns, little on a locked short-recoil or roller action
       if (can && can.back > 0) {
-        const A = ({ gas: 1, longstroke: 0.6, blowback: 1, roller: 0.5, recoil: 0.3 } as Record<string, number>)[p.actionType!] ?? 0.7;
+        const A = ({ gas: 1, longstroke: 0.6, blowback: 1, roller: 0.5, recoil: 0.3 } as Record<ActionKind, number>)[p.actionType!] ?? 0.7;
         const h = ctx.createBufferSource(); h.buffer = noiseBuffer(ctx, 0.1);
         const hBp = ctx.createBiquadFilter(); hBp.type = 'bandpass'; hBp.frequency.value = 2400; hBp.Q.value = 0.8;
         const e = percEnv(ctx, tUnlock, 0.18 * can.back * A * loud, 0.002, 0.014);

@@ -21,14 +21,14 @@ interface HomeFloor { kind: string; color: string; grout?: string; sound?: strin
 // A resident's data: see the notes below.
 interface HomeSwap { piece: string; style?: HomeStyle; at?: string }
 interface HomeItem extends HomeSwap { id: string; at: string; hang?: number; need?: number; must?: number; pull?: number; swap?: HomeSwap[] }
-interface HomeCarve { from: string[]; size: number[] }
+interface HomeCarve { from: RoomType[]; size: number[] }
 interface HomeRest { wall: string; ceil: string; trim: string; floor: HomeFloor; paper?: number }
 interface HomeRoomSpec extends HomeRest { spare?: number; carve?: HomeCarve; tight?: number; up?: number; items: HomeItem[] }
-interface HomeResident { id: string; name: string; home: string; rate: number; rest?: HomeRest; rooms: Record<string, HomeRoomSpec> }
+interface HomeResident { id: string; name: string; home: string; rate: number; rest?: HomeRest; rooms: Partial<Record<RoomType, HomeRoomSpec>> }
 // cast()/castUp(): [room, its spec, its type] for each room the resident has a list for, and .rest: the rooms they've none for
-type HomePlan = [LvRoom, HomeRoomSpec, string][] & { rest?: LvRoom[] };
+type HomePlan = [LvRoom, HomeRoomSpec, RoomType][] & { rest?: LvRoom[] };
 // a level's residents so far (start), and one home as it's being done (dressHome)
-interface HomeLevel { seed: number; r: LvRng; left: HomeResident[]; lofts: Map<number, { who: HomeResident; had: Set<string> }> }
+interface HomeLevel { seed: number; r: LvRng; left: HomeResident[]; lofts: Map<number, { who: HomeResident; had: Set<RoomType> }> }
 interface HomeState { who: HomeResident; seed: number; taken: Set<number>; off: Set<number>; bath: LvRoom | null }
 // dress(): a wall of the room (n: the way out through it; A0..A1: along it; B: where it is), and what's been put in
 interface HomeSide { n: number[]; A0: number; A1: number; B: number }
@@ -388,10 +388,10 @@ const G_Homes = (() => {
   // Which of a home's rooms is which for this resident: [[room, its spec, its type]], or null if the home can't be theirs.
   // A spare room type goes to a room of that type, else to one the home can spare (no walls move). Left over: the
   // rooms the resident has no list for (.rest).
-  const SPARE = ['office', 'dining', 'bedroom'];
+  const SPARE: RoomType[] = ['office', 'dining', 'bedroom'];
   function cast(p: HomeResident, mine: LvRoom[]): HomePlan | null {
     const left = mine.slice(), out: HomePlan = [], big = (a: LvRoom, b: LvRoom) => b.w * b.h - a.w * a.h, take = (q: LvRoom) => { left.splice(left.indexOf(q), 1); return q; };
-    const rooms = Object.entries(p.rooms).filter(([, spec]) => !spec.carve);
+    const rooms = (Object.entries(p.rooms) as [RoomType, HomeRoomSpec][]).filter(([, spec]) => !spec.carve);
     for (const [ty, spec] of rooms) {
       if (spec.spare) continue;
       const q = left.filter((o) => o.type === ty).sort(big)[0]; // (the biggest of them, if there are two)
@@ -409,9 +409,9 @@ const G_Homes = (() => {
   }
   // A loft's upper floor, for the resident of the home under it: the rooms they've a list for and haven't yet had, in the order
   // they're listed, each taking a room of its type or the biggest going.
-  function castUp(p: HomeResident, mine: LvRoom[], had: Set<string>): HomePlan {
+  function castUp(p: HomeResident, mine: LvRoom[], had: Set<RoomType>): HomePlan {
     const left = mine.slice(), out: HomePlan = [], big = (a: LvRoom, b: LvRoom) => b.w * b.h - a.w * a.h;
-    for (const [ty, spec] of Object.entries(p.rooms)) {
+    for (const [ty, spec] of (Object.entries(p.rooms) as [RoomType, HomeRoomSpec][])) {
       if (spec.carve || !spec.up || had.has(ty) || !left.length) continue;
       const q = left.filter((o) => o.type === ty).sort(big)[0] || left.slice().sort(big)[0];
       left.splice(left.indexOf(q), 1);
@@ -422,7 +422,7 @@ const G_Homes = (() => {
   }
   // One floor's homes, each roll from the level's stream. A loft's rooms all carry `loft` or live under one that does.
   function fill(map: LvMap, ctx: HomeLevel) {
-    const units = [...new Set<number>(map.rooms.filter((q) => q.unit != null).map((q) => q.unit))].sort((a, b) => a - b);
+    const units = [...new Set<number>(map.rooms.filter((q) => q.unit != null).map((q) => q.unit!))].sort((a, b) => a - b);
     for (const id of units) {
       const mine = map.rooms.filter((q) => q.unit === id), loft = mine.some((q) => q.loft), roll = ctx.r();
       if (mine.every((q) => q.loft)) { // (a loft's upper floor: the home under it's)
@@ -447,7 +447,7 @@ const G_Homes = (() => {
   function dressHome(map: LvMap, who: HomeResident, plan: HomePlan, seed: number) {
     const home: HomeState = { who, seed, taken: new Set(), off: new Set(), bath: null }, done: LvRoom[] = [], bathSpec = Object.values(who.rooms).find((s) => s.carve);
     // (the rooms a carved room can come out of first, in the order it'd rather: before their own furniture goes in)
-    const from = bathSpec ? bathSpec.carve!.from : [], rank = (e: [LvRoom, HomeRoomSpec, string]) => { const i = from.indexOf(e[2]); return i < 0 ? from.length : i; };
+    const from = bathSpec ? bathSpec.carve!.from : [], rank = (e: [LvRoom, HomeRoomSpec, RoomType]) => { const i = from.indexOf(e[2]); return i < 0 ? from.length : i; };
     for (const e of plan.slice().sort((a, b) => rank(a) - rank(b))) {
       const [rm, spec, ty] = e, host = from.includes(ty) && !home.bath;
       done.push(rm);
@@ -472,14 +472,14 @@ const G_Homes = (() => {
       if (!q.boxes.some((b: LvBox) => dead.has(b))) continue;
       note(i);
       const rest = q.boxes.filter((b: LvBox) => !dead.has(b)), mx = ((i % W) + 0.5) * TS, mz = (((i / W) | 0) + 0.5) * TS;
-      if (rest.length) props.set(i, { name: q.name, boxes: rest }); else props.delete(i);
+      if (rest.length) props.set(i, { name: q.name, boxes: rest } as LvProp); else props.delete(i);
       if ((t[i] === 2 || t[i] === 4) && !rest.some((b: LvBox) => Math.abs(mx - b.cx) <= b.hx + 0.05 && Math.abs(mz - b.cz) <= b.hz + 0.05)) t[i] = 0;
     }
     return { was, gone };
   }
   // the room as it was and as it is, swapped (js/furniture.ts: to build what it would have been; undress: to go back)
   function swap(map: LvMap, rm: LvRoom) {
-    const d = rm.dress, { t, props } = map, ty = rm.type;
+    const d = rm.dress!, { t, props } = map, ty = rm.type;
     rm.type = d.type0; d.type0 = ty;
     for (const [i, e] of d.was) {
       const a = t[i], b = props.get(i);
@@ -489,7 +489,7 @@ const G_Homes = (() => {
     }
   }
   function undress(map: LvMap, rm: LvRoom) {
-    const d = rm.dress;
+    const d = rm.dress!;
     swap(map, rm);
     for (const p of d.gone) p.gone = false;
     map.propList = map.propList.filter((p: LvProp) => !d.own.includes(p));
@@ -577,7 +577,7 @@ const G_Homes = (() => {
       for (let x = xa; x <= xb; x++) if (!outer(x, sz < 0 ? rm.z - 1 : rm.z + rm.h)) ok = false;
       if (!ok) continue;
       // the door, in the wall that lets its leaf swing out into the room (js/level.ts leafBox: +x, or -z), if there is one
-      const dz = sz < 0 ? z0 + iz - 2 : z0, dx = sx < 0 ? x0 + ix - 2 : x0, doors = [{ axis: 'x', cells: [[wx, dz], [wx, dz + 1]], out: sx < 0 }, { axis: 'z', cells: [[dx, wz], [dx + 1, wz]], out: sz > 0 }];
+      const dz = sz < 0 ? z0 + iz - 2 : z0, dx = sx < 0 ? x0 + ix - 2 : x0, doors: { axis: LvAxis; cells: number[][]; out: boolean }[] = [{ axis: 'x', cells: [[wx, dz], [wx, dz + 1]], out: sx < 0 }, { axis: 'z', cells: [[dx, wz], [dx + 1, wz]], out: sz > 0 }];
       for (const d of doors.sort((a, b) => +b.out - +a.out)) {
         const q = t.slice();
         for (const i of region) { const x = i % W, z = (i / W) | 0; if (x === wx || z === wz) q[i] = 1; }
@@ -595,7 +595,7 @@ const G_Homes = (() => {
   }
 
   // A room done over for a resident. false: it can't be (the home's left as it was: dressHome).
-  function dress(map: LvMap, rm: LvRoom, spec: HomeRoomSpec, type: string, home: HomeState, carve?: HomeCarve | null) {
+  function dress(map: LvMap, rm: LvRoom, spec: HomeRoomSpec, type: RoomType, home: HomeState, carve?: HomeCarve | null) {
     const L = G.Level, TS = L.TS, { W, t } = map, r = U.rng((home.seed ^ Math.imul(rm.z * W + rm.x + 1, 0x2545f491)) >>> 0);
     const { was, gone } = clear(map, rm), own: LvProp[] = [], hung: HomeHung[] = [];
     rm.dress = { who: home.who.id, type0: rm.type, wall: spec.wall, paper: spec.paper, ceil: spec.ceil, trim: spec.trim, floor: spec.floor, cells: null, hung, was, gone, own };
@@ -734,7 +734,7 @@ const G_Homes = (() => {
       if (!rm.dress) continue;
       const c = over(rm.dress.ceil, map.theme.ceil);
       out = out || new Map();
-      for (const i of rm.dress.cells) out.set(i, c);
+      for (const i of rm.dress!.cells!) out.set(i, c);
     }
     return out;
   }
@@ -747,7 +747,7 @@ const G_Homes = (() => {
       for (const rm of m.rooms) {
         if (!rm.dress) continue;
         const c = over(rm.dress.wall, map.theme.wall), v = [c.r, c.g, c.b].map((q) => Math.min(255, Math.round(q * 127.5)));
-        for (const i of rm.dress.cells) { const o = (f * W * H + i) * 4; data[o] = v[0]; data[o + 1] = v[1]; data[o + 2] = v[2]; data[o + 3] = rm.dress.paper ? 255 : 128; }
+        for (const i of rm.dress!.cells!) { const o = (f * W * H + i) * 4; data[o] = v[0]; data[o + 1] = v[1]; data[o + 2] = v[2]; data[o + 3] = rm.dress!.paper ? 255 : 128; }
       }
     });
     const tx = new THREE.DataTexture(data, W, H * NF, THREE.RGBAFormat);

@@ -101,6 +101,7 @@ const G_Net = {
   LAN_SLOTS: 6,
   lanInfo: (() => null) as () => any, // what a host's beacon says about its game (set by G.Game)
   beacon: null as any,
+  _lanKey: undefined as string | null | undefined, // (this network's key, once worked out)
   async lanKey() {
     if (this._lanKey !== undefined) return this._lanKey;
     let ip: string | null = null;

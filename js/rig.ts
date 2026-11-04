@@ -11,11 +11,31 @@
 // Dead characters go to a Verlet ragdoll (see ragdollInit). Living suspects and civilians are the same ragdoll,
 // powered: muscles pull each joint toward the animation, as strong as the person is (see powerStep).
 interface Ragdoll { // the Verlet ragdoll a dead (or powered, living) rig carries: particles 0 pelvis ... 15 right foot
-  [field: string]: any; P: THREE.Vector3[]; prev: THREE.Vector3[]; r: number[];
+  P: THREE.Vector3[]; prev: THREE.Vector3[]; r: number[]; still: number; asleep: boolean; roll: RagRoll | null; on: Uint8Array; sp: Float32Array; rigid: number[][]; topple: THREE.Vector3; min: number[][];
+  // (what the solver and the handling add as they go)
+  handled?: { t: number } | null; calm?: number; push?: THREE.Vector3 | null; keepPin?: number; drive?: { T: THREE.Vector3[]; Tv: THREE.Vector3[]; [field: string]: any } | null;
+  Pold?: THREE.Vector3[]; acc?: number; pinT?: number; Tprev?: THREE.Vector3[]; R?: THREE.Vector3[]; armL?: number;
 }
-interface Rig { // a character's skeleton and its meshes (the rest of its fields are set by create/update: pose state, kit, gun, timers...)
-  [field: string]: any; root: THREE.Object3D; hips: THREE.Object3D; chest: THREE.Object3D; head: THREE.Object3D; scale: number;
-  kitParts: THREE.Object3D[]; rd: Ragdoll; callsign?: { id: string; name: string } | null;
+interface RagRoll { t: number; driven?: boolean; [field: string]: any } // a body being rolled onto its front (planRoll)
+interface RigArm { sh: THREE.Object3D; up: THREE.Object3D; lo: THREE.Object3D; tie: THREE.Mesh }
+interface RigLeg { th: THREE.Object3D; sh: THREE.Object3D }
+type RigState = 'alive' | 'down' | 'dead';
+interface Rig { // a character's skeleton and its meshes (what create makes, and what update, the hit and the zip tie add as they go)
+  hairMesh: THREE.Mesh | null; look: Record<string, any>; pantsM: THREE.Material; seat: THREE.Mesh[] | null; kitParts: THREE.Object3D[]; kitKey: string | null; kit: Record<string, any> | null;
+  callsign: { id: string; name: string } | null; root: THREE.Object3D; body: THREE.Object3D; hips: THREE.Object3D; spine: THREE.Object3D; chest: THREE.Object3D; neck: THREE.Object3D; head: THREE.Object3D;
+  armL: RigArm; armR: RigArm; legL: RigLeg; legR: RigLeg; gunMount: THREE.Object3D; slingMount: THREE.Object3D; hipMount: THREE.Object3D; slung: boolean; mats: any[]; scale: number; style: string;
+  gun: THREE.Object3D | null; gunInfo: Record<string, any> | null; gunKey: string | null; phase: number; vel: THREE.Vector3; lastPos: THREE.Vector3 | null;
+  crouchW: number; aimW: number; lean: number; kick: number; flinch: THREE.Vector3; throwT: number; state: string; deadT: number; fallX: number; fallZ: number; downW: number;
+  hb: any[] | null; dbg: THREE.Mesh[] | null; rd: Ragdoll;
+  // (set by create)
+  setGun(code: any, skin?: any): void; update(dt: number, p: any): void; hitboxes(): any[]; recoil(deg?: number): void; hit(dir: any, mv?: number): void; dropGun(): void; goLimp(): void;
+  die(dir: any): void; throwNade(str?: number): void; setKit(k: any): void; setCallsign(id: string, name: string): void; holster(on: boolean): void; zip(on: boolean, instant?: boolean): void;
+  secure(t: number): void; settle(sec?: number): void; startle(): void; dispose(): void;
+  // (what the animation keeps from frame to frame)
+  powered?: boolean; limp?: boolean; zipped?: boolean; zipKit?: THREE.Object3D; zipT?: number; zipYaw?: number | null; proneW?: number; proneS?: number; effPh?: number; effT?: number; braceW?: number; gunAimW?: number; gunKick?: number;
+  gunBase?: { p: THREE.Vector3; q: THREE.Quaternion; s: THREE.Vector3 }; gunBaseOf?: THREE.Object3D; gunSupport?: THREE.Vector3 | null; bipodK?: number; hitDir?: THREE.Vector3; xbLoaded?: any;
+  handNade?: any; throwHand?: boolean; throwStr?: any; dropped?: { g: THREE.Object3D; vy: number; spin: number; floor?: number; [field: string]: any } | null;
+  [bone: string]: any; // (a bone looked up by name: js/ballistics.ts boneOf, the hitbox readouts of js/hud.ts and js/highlights.ts; and what js/hud.ts keeps on a rig)
 }
 const G_Rig = (() => {
   const T = THREE;
@@ -441,7 +461,7 @@ const G_Rig = (() => {
     };
     // a throw: an enemy's (the gun still in the other hand), or an officer's from the grenade they're holding
     // (str 0 underhand, 1-2 overhand)
-    rig.throwNade = (str: any) => { rig.throwT = 0; rig.throwHand = str != null; rig.throwStr = str; };
+    rig.throwNade = (str?: number) => { rig.throwT = 0; rig.throwHand = str != null; rig.throwStr = str; };
     rig.setKit = (k: any) => setKit(rig, k);
     rig.setCallsign = (id: string, name: string) => { rig.callsign = id ? { id, name: name || '' } : null; setKit(rig, rig.kit); setSeat(rig); };
     setKit(rig, null); // (the back patch, before any kit)
@@ -521,8 +541,8 @@ const G_Rig = (() => {
     const root = rig.root;
     // velocity in the rig's local frame (for stepping)
     if (!rig.lastPos) rig.lastPos = p.pos.clone();
-    const dv = _a.subVectors(p.pos, rig.lastPos);
-    rig.lastPos.copy(p.pos);
+    const dv = _a.subVectors(p.pos, rig.lastPos!);
+    rig.lastPos!.copy(p.pos);
     if (dt > 0) rig.vel.lerp(dv.multiplyScalar(1 / dt), Math.min(1, dt * 10));
     root.position.copy(p.pos);
     // (on a zipline: facing the way they're carried, as they've been moving; lifted straight up onto it, the way they faced)
@@ -606,7 +626,7 @@ const G_Rig = (() => {
     const dirLen = Math.hypot(localRight, localFwd) || 1;
     const dX = localRight / dirLen, dZ = -localFwd / dirLen;    // rig-local travel direction (z = back)
     const stepLen = Math.min(stride * 0.27, 0.42) * moving;
-    for (const [leg, side] of [[rig.legL, -1], [rig.legR, 1]]) {
+    for (const [leg, side] of [[rig.legL, -1], [rig.legR, 1]] as [RigLeg, number][]) {
       const ph = rig.phase + (side > 0 ? Math.PI : 0);
       const swing = Math.sin(ph), lift = Math.max(0, Math.cos(ph)) * 0.13 * moving * (1 - rig.crouchW * 0.5);
       let fx = side * U.lerp(0.11, 0.16, rig.crouchW) + dX * swing * stepLen + rig.lean * 0.05;
@@ -631,7 +651,7 @@ const G_Rig = (() => {
     shL.position.copy(shHome); // (the left shoulder, unless it's reaching: below)
     if (posed) {
       // hands up / hands behind the back / hands over the head
-      for (const [arm, side] of [[rig.armL, -1], [rig.armR, 1]]) {
+      for (const [arm, side] of [[rig.armL, -1], [rig.armR, 1]] as [RigArm, number][]) {
         let tgt, pole;
         const behind = p.pose === 'cuffed' || (p.pose === 'takedown' && tk > 0.5);
         if (p.pose === 'takedown' && tk < 0.42) { // shoved forward: hands come down to break the fall
@@ -655,7 +675,7 @@ const G_Rig = (() => {
         // first the shoulder rolls forward toward it (as reaching does), up to 7 cm; then the gun comes back
         const far = D.length() - R;
         if (far > 0) {
-          P.addScaledVector(D, Math.min(0.07 * s, far) / D.length()); shL.position.copy(shL.parent.worldToLocal(_e.copy(P)));
+          P.addScaledVector(D, Math.min(0.07 * s, far) / D.length()); shL.position.copy(shL.parent!.worldToLocal(_e.copy(P)));
           D.subVectors(S, P);
         }
         const df = D.dot(f), over = D.lengthSq() - R * R;
@@ -682,7 +702,7 @@ const G_Rig = (() => {
         sp = rl < 0.15 ? L2(supp, well, rl / 0.15) : rl < 0.35 ? L2(well, pouch, (rl - 0.15) / 0.2) : rl < 0.6 ? L2(pouch, well, (rl - 0.35) / 0.25) : rl < 0.82 ? well : L2(well, supp, (rl - 0.82) / 0.18);
       } else if (p.magChk != null && p.magChk >= 0) sp = well.clone().lerp(rig.chest.localToWorld(new T.Vector3(-0.04, 0.32, -0.4)), U.smooth(0.25, 1, p.magChk));
       // the elbows: out and down beside you standing; prone, planted on the ground ahead of the shoulders
-      const elbow = (side: any, stand: any) => { const q = rig.chest.localToWorld(stand); if (rig.proneS > 0.01) q.lerp(rig.root.localToWorld(new T.Vector3(side * PRONE.elbowX, PRONE.elbowY, PRONE.elbowZ)), rig.proneS); return q; };
+      const elbow = (side: any, stand: any) => { const q = rig.chest.localToWorld(stand); if (rig.proneS! > 0.01) q.lerp(rig.root.localToWorld(new T.Vector3(side * PRONE.elbowX, PRONE.elbowY, PRONE.elbowZ)), rig.proneS!); return q; };
       ik(rig.armR.up, rig.armR.lo, UARM * s, FARM * s, rTarget, elbow(1, new T.Vector3(0.6, -0.2, 0.4)));
       ik(rig.armL.up, rig.armL.lo, UARM * s, FARM * s, sp, elbow(-1, new T.Vector3(-0.6, -0.3, 0.2)));
       // the magazine: in the support hand from when it comes out to when the new one's seated (or while it's
@@ -699,7 +719,7 @@ const G_Rig = (() => {
       if (rig.gun.userData.bipod) { rig.bipodK = U.clamp((rig.bipodK || 0) + (p.bipod ? 1 : -1) * dt * 4, 0, 1); G.GunModels.bipodPose(rig.gun.userData.bipod, rig.bipodK); }
     } else {
       // unarmed: arms swing opposite the legs
-      for (const [arm, side] of [[rig.armL, -1], [rig.armR, 1]]) {
+      for (const [arm, side] of [[rig.armL, -1], [rig.armR, 1]] as [RigArm, number][]) {
         arm.up.quaternion.identity(); arm.lo.quaternion.identity();
         arm.up.rotation.set(Math.sin(rig.phase + (side > 0 ? 0 : Math.PI)) * 0.55 * moving, 0, side * 0.1);
         arm.lo.rotation.set(0.25 + 0.35 * moving, 0, 0); // elbows bend forward (the rig faces -z)
@@ -738,7 +758,7 @@ const G_Rig = (() => {
     // zip-tying: kneel over them, shove them down, then both hands at their wrists
     if (p.act && p.act.kind === 'zip') {
       const t = p.act.t, S = U.smooth, reach = p.act.pull ? 1 : S(0, 0.14, t), spread = t < 0.45 ? 0.12 : 0.06;
-      for (const [arm, side] of [[rig.armL, -1], [rig.armR, 1]]) {
+      for (const [arm, side] of [[rig.armL, -1], [rig.armR, 1]] as [RigArm, number][]) {
         // on the person (their back, then their wrists) when we know where they are
         const on = p.act.pt ? rig.body.worldToLocal(p.act.pt.clone()).add(new T.Vector3(side * spread, 0.03, 0)) : new T.Vector3(side * 0.08, 0.32, -0.58);
         const local = new T.Vector3(side * 0.25, 0.85, -0.15).lerp(on, reach);
@@ -760,8 +780,8 @@ const G_Rig = (() => {
       const l = p.climb, y = p.pos.y, at = (k: any) => new T.Vector3(...G.Level.ladderGrip(l, y, k));
       rig.hips.position.z += 0.06; rig.hips.position.y -= 0.17; rig.spine.rotation.x -= 0.08;
       root.updateMatrixWorld(true);
-      for (const [leg, side, k] of [[rig.legL, -1, 'fL'], [rig.legR, 1, 'fR']]) ik(leg.th, leg.sh, THIGH * s, SHIN * s, at(k), new T.Vector3(l.x - 0.6, y + 0.7, l.z - side * 0.25));
-      for (const [arm, side, k] of [[rig.armL, -1, 'hL'], [rig.armR, 1, 'hR']]) ik(arm.up, arm.lo, UARM * s, FARM * s, at(k), new T.Vector3(l.x + 0.5, y + 1.0, l.z - side * 0.7));
+      for (const [leg, side, k] of [[rig.legL, -1, 'fL'], [rig.legR, 1, 'fR']] as [RigLeg, number, string][]) ik(leg.th, leg.sh, THIGH * s, SHIN * s, at(k), new T.Vector3(l.x - 0.6, y + 0.7, l.z - side * 0.25));
+      for (const [arm, side, k] of [[rig.armL, -1, 'hL'], [rig.armR, 1, 'hR']] as [RigArm, number, string][]) ik(arm.up, arm.lo, UARM * s, FARM * s, at(k), new T.Vector3(l.x + 0.5, y + 1.0, l.z - side * 0.7));
     }
     // on a zipline (p.zip): hanging by both hands from the grab bar over their head, a trolley and its bar going with them
     // (G.Level.zipKit, the cable ZIP_HANG over their feet); the body hanging under it, the legs a little bent and swinging
@@ -774,8 +794,8 @@ const G_Rig = (() => {
       rig.hips.position.z -= sw * 0.3; rig.spine.rotation.x += sw * 0.3; rig.chest.rotation.x -= 0.1;
       root.updateMatrixWorld(true);
       const R = (x: number, y: number, z: number) => root.localToWorld(new T.Vector3(x, y, z));
-      for (const [arm, side] of [[rig.armL, -1], [rig.armR, 1]]) ik(arm.up, arm.lo, UARM * s, FARM * s, R(side * 0.17, bar, 0), R(side * 0.9, 1.3, 0.1));
-      for (const [leg, side] of [[rig.legL, -1], [rig.legR, 1]]) ik(leg.th, leg.sh, THIGH * s, SHIN * s, rig.body.localToWorld(new T.Vector3(side * 0.12, 0.12 + Math.max(0, sw) * 0.3, -0.12 - sw * (side > 0 ? 1.2 : 0.8))), R(side * 0.15, 0.7, -1.2));
+      for (const [arm, side] of [[rig.armL, -1], [rig.armR, 1]] as [RigArm, number][]) ik(arm.up, arm.lo, UARM * s, FARM * s, R(side * 0.17, bar, 0), R(side * 0.9, 1.3, 0.1));
+      for (const [leg, side] of [[rig.legL, -1], [rig.legR, 1]] as [RigLeg, number][]) ik(leg.th, leg.sh, THIGH * s, SHIN * s, rig.body.localToWorld(new T.Vector3(side * 0.12, 0.12 + Math.max(0, sw) * 0.3, -0.12 - sw * (side > 0 ? 1.2 : 0.8))), R(side * 0.15, 0.7, -1.2));
     } else if (rig.zipKit) { rig.zipKit.visible = false; rig.zipT = 0; }
     if (rig.powered && p.str != null) powerStep(rig, dt, p.str, p.aimAt);
     else if (rig.powered) rig.rd = null!; // (far off: animated only; the body starts again from the pose when near)
@@ -809,7 +829,7 @@ const G_Rig = (() => {
     const g = rig.gun;
     if (!g) return;
     if (rig.gunBaseOf !== g) { rig.gunBaseOf = g; rig.gunBase = { p: g.position.clone(), q: g.quaternion.clone(), s: g.scale.clone() }; }
-    g.position.copy(rig.gunBase.p); g.quaternion.copy(rig.gunBase.q); g.scale.copy(rig.gunBase.s);
+    g.position.copy(rig.gunBase!.p); g.quaternion.copy(rig.gunBase!.q); g.scale.copy(rig.gunBase!.s);
   }
   function powerStep(rig: Rig, dt: number, str: number, aimAt: THREE.Vector3 | null) {
     // the gun in their hands goes where the (simulated) right hand goes, not where the chest mount is: its pose
@@ -832,7 +852,7 @@ const G_Rig = (() => {
       if (_gb.distanceTo(sh) > reach * 0.98) _gb.set(kn.x + fx * 0.03, kn.y + 0.07 * rig.scale, kn.z + fz * 0.03);
       Tg[10].lerp(_gb, rig.braceW);
     }
-    else if (g && rig.gunSupport && rig.gunAimW > 0.05) Tg[10].lerp(rig.gunSupport, rig.gunAimW);
+    else if (g && rig.gunSupport && rig.gunAimW! > 0.05) Tg[10].lerp(rig.gunSupport, rig.gunAimW!);
     let rd = rig.rd;
     if (!rd || rd.P[0].distanceTo(Tg[0]) > 1.2 * rig.scale) { // first time near, or they've jumped (a snap): start at the pose, still
       ragdollInit(rig, null); rd = rig.rd;
@@ -840,7 +860,7 @@ const G_Rig = (() => {
       rd.rigid = RIGID.map(([a, b]) => [a, b, Tg[a].distanceTo(Tg[b])]); rd.min = MIN.map(([a, b, f]) => [a, b, Tg[a].distanceTo(Tg[b]) * f]);
     }
     if (rig.effPh == null) rig.effPh = Math.random() * 6.3;
-    if (rd.armL == null) { const len = (a: number, b: number) => rd.rigid.find((r: number[]) => r[0] === a && r[1] === b)[2]; rd.armL = len(4, 8) + len(8, 10); } // (the left arm, straight)
+    if (rd.armL == null) { const len = (a: number, b: number) => rd.rigid.find((r: number[]) => r[0] === a && r[1] === b)![2]; rd.armL = len(4, 8) + len(8, 10); } // (the left arm, straight)
     rig.effT = (rig.effT || 0) + dt;
     // weak, the legs strain: efforts to stand that come and go (and fade with the strength behind them)
     const m = str >= 0.6 ? str : str * (0.7 + 0.7 * Math.max(0, Math.sin(rig.effT * 2.4 + rig.effPh)));
@@ -856,12 +876,12 @@ const G_Rig = (() => {
     for (let s = 0; s < steps; s++) {
       const f = (s + 1) / steps;
       rd.drive = {
-        T: Tg.map((t, i) => rd.Tprev[i].clone().lerp(t, f)), Tv: Tg.map((t, i) => t.clone().sub(rd.Tprev[i]).multiplyScalar(1 / steps)),
+        T: Tg.map((t, i) => rd.Tprev![i].clone().lerp(t, f)), Tv: Tg.map((t, i) => t.clone().sub(rd.Tprev![i]).multiplyScalar(1 / steps)),
         kp: 0.4 * Math.pow(m, 1.6), kv: Math.min(0.9, 0.9 * Math.pow(m, 1.6)), // spring to the pose, damper to its motion
         trem: str < 0.5 ? (0.5 - str) * 0.006 : 0, // trembling legs
         fall: str < COLLAPSE ? fwd : null, // going down: folding forward over the knees
         // the bracing arm: held straight and firm (it takes little strength to lean on a locked arm)
-        kpI: rig.braceW > 0.02 ? KPI_BRACE.map((k) => 1 + (k - 1) * rig.braceW) : null,
+        kpI: rig.braceW > 0.02 ? KPI_BRACE.map((k) => 1 + (k - 1) * rig.braceW!) : null,
         brace: rig.braceW > 0.3 ? rd.armL * 0.93 : 0,
         self: m < 0.45, // (strong, the muscles keep the limbs apart; weak, they can tangle, so check)
       };
@@ -874,8 +894,8 @@ const G_Rig = (() => {
     // the gun moves with the right forearm: by exactly what the forearm moved from its animated pose (none at
     // full strength; weak, it sags and swings with the hand; down, it hangs from it)
     if (g) {
-      _gm.copy(rig.armR.lo.matrixWorld).multiply(_gl.copy(loAnim).invert()).multiply(gunAnim); // the gun's world pose now
-      _gl.copy(g.parent.matrixWorld).invert().multiply(_gm).decompose(_gp, _gq, _gs);
+      _gm.copy(rig.armR.lo.matrixWorld).multiply(_gl.copy(loAnim!).invert()).multiply(gunAnim!); // the gun's world pose now
+      _gl.copy(g.parent!.matrixWorld).invert().multiply(_gm).decompose(_gp, _gq, _gs);
       g.position.copy(_gp); g.quaternion.copy(_gq); g.scale.copy(_gs);
       g.updateMatrixWorld(true);
       // Aiming: the arms hold the gun on what they're shooting at, as hard as they still can. Strong, it's
@@ -890,20 +910,20 @@ const G_Rig = (() => {
       const sag = (1 - G.U.clamp(str / 0.6, 0, 1)) * 45 * D2R; // how far off it's left: as much as the arms can't hold
       rig.gunAimW = (rig.gunAimW || 0) + (aw - (rig.gunAimW || 0)) * Math.min(1, dt * 6);
       if (rig.gunAimW > 0.01 && aimAt) {
-        const gi = rig.gunInfo, grip = g.localToWorld(_ga.set(gi.grip[2], gi.grip[1], -gi.grip[0]));
+        const gi = rig.gunInfo, grip = g.localToWorld(_ga.set(gi!.grip[2], gi!.grip[1], -gi!.grip[0]));
         const f = _gf.set(0, 0, -1).transformDirection(g.matrixWorld), want = _gw.subVectors(aimAt, grip).normalize();
         const off = Math.acos(G.U.clamp(f.dot(want), -1, 1)), turn = Math.max(0, off - sag) * rig.gunAimW;
         _gq.setFromUnitVectors(f, want); if (off > 1e-4) _gq.slerp(_gI, 1 - turn / off);
         // turn the gun about the grip: its world pose = T(grip) R T(-grip) pose
         _gm.makeTranslation(-grip.x, -grip.y, -grip.z).premultiply(_gl.makeRotationFromQuaternion(_gq)).premultiply(_gr.makeTranslation(grip.x, grip.y, grip.z)).multiply(g.matrixWorld);
-        _gl.copy(g.parent.matrixWorld).invert().multiply(_gm).decompose(_gp, _gq, _gs);
+        _gl.copy(g.parent!.matrixWorld).invert().multiply(_gm).decompose(_gp, _gq, _gs);
         g.position.copy(_gp); g.quaternion.copy(_gq); g.scale.copy(_gs);
         g.updateMatrixWorld(true);
       }
       // Held in a hand, the right way up: it can roll at most 25 degrees off level about its bore (a forearm
       // twisting in the simulation doesn't turn it over)
       {
-        const gi = rig.gunInfo, grip = g.localToWorld(_ga.set(gi.grip[2], gi.grip[1], -gi.grip[0]));
+        const gi = rig.gunInfo, grip = g.localToWorld(_ga.set(gi!.grip[2], gi!.grip[1], -gi!.grip[0]));
         const b = _gf.set(0, 0, -1).transformDirection(g.matrixWorld), up = _gw.set(0, 1, 0).transformDirection(g.matrixWorld);
         const lv = _gb.set(0, 1, 0).addScaledVector(b, -b.y);
         if (lv.lengthSq() > 0.01) {
@@ -912,28 +932,28 @@ const G_Rig = (() => {
           if (Math.abs(roll) > lim) {
             _gq.setFromAxisAngle(b, roll - Math.sign(roll) * lim);
             _gm.makeTranslation(-grip.x, -grip.y, -grip.z).premultiply(_gl.makeRotationFromQuaternion(_gq)).premultiply(_gr.makeTranslation(grip.x, grip.y, grip.z)).multiply(g.matrixWorld);
-            _gl.copy(g.parent.matrixWorld).invert().multiply(_gm).decompose(_gp, _gq, _gs);
+            _gl.copy(g.parent!.matrixWorld).invert().multiply(_gm).decompose(_gp, _gq, _gs);
             g.position.copy(_gp); g.quaternion.copy(_gq); g.scale.copy(_gs);
             g.updateMatrixWorld(true);
           }
         }
       }
       // the last shots' kick: the muzzle up, about the grip, coming back as fast as the arms can bring it
-      if (rig.gunKick > 1e-4) {
-        const gi = rig.gunInfo, grip = g.localToWorld(_ga.set(gi.grip[2], gi.grip[1], -gi.grip[0]));
+      if (rig.gunKick! > 1e-4) {
+        const gi = rig.gunInfo, grip = g.localToWorld(_ga.set(gi!.grip[2], gi!.grip[1], -gi!.grip[0]));
         const ax = _gf.set(1, 0, 0).transformDirection(g.matrixWorld);
-        _gq.setFromAxisAngle(ax, rig.gunKick);
+        _gq.setFromAxisAngle(ax, rig.gunKick!);
         _gm.makeTranslation(-grip.x, -grip.y, -grip.z).premultiply(_gl.makeRotationFromQuaternion(_gq)).premultiply(_gr.makeTranslation(grip.x, grip.y, grip.z)).multiply(g.matrixWorld);
-        _gl.copy(g.parent.matrixWorld).invert().multiply(_gm).decompose(_gp, _gq, _gs);
+        _gl.copy(g.parent!.matrixWorld).invert().multiply(_gm).decompose(_gp, _gq, _gs);
         g.position.copy(_gp); g.quaternion.copy(_gq); g.scale.copy(_gs);
         g.updateMatrixWorld(true);
-        rig.gunKick *= Math.exp(-(str >= TWO_HAND ? 7 : 4) * (0.4 + 0.6 * G.U.clamp(str / 0.6, 0, 1)) * dt); // (as js/server.ts kickBack)
+        rig.gunKick! *= Math.exp(-(str >= TWO_HAND ? 7 : 4) * (0.4 + 0.6 * G.U.clamp(str / 0.6, 0, 1)) * dt); // (as js/server.ts kickBack)
       }
       // and never through the floor (down on the ground, the hand rests on it instead)
       if (str < 0.4) {
         const low = _gbox.setFromObject(g).min.y;
         const fl = rig.root.position.y + 0.01; // (the floor they're on)
-        if (low < fl) { _gp.set(0, fl - low, 0); g.parent.getWorldQuaternion(_gq).invert(); g.position.add(_gp.applyQuaternion(_gq).divideScalar(g.parent.getWorldScale(_gs).x)); g.updateMatrixWorld(true); }
+        if (low < fl) { _gp.set(0, fl - low, 0); g.parent!.getWorldQuaternion(_gq).invert(); g.position.add(_gp.applyQuaternion(_gq).divideScalar(g.parent!.getWorldScale(_gs).x)); g.updateMatrixWorld(true); }
       }
       // where the support hand should be on it (next frame, the left hand reaches for it there)
       const gi = rig.gunInfo;
@@ -1143,7 +1163,7 @@ const G_Rig = (() => {
     const down = upright < 0.5; // lying, more or less
     for (let i = 0; i < P.length; i++) {
       const p = P[i], q = prev[i];
-      let k = rd.calm > 0 ? 0.85 : rig.deadT > 2.5 ? 0.8 : 0.975; // damping (heavier while settling after being moved, and once it's been down a while)
+      let k = rd.calm! > 0 ? 0.85 : rig.deadT > 2.5 ? 0.8 : 0.975; // damping (heavier while settling after being moved, and once it's been down a while)
       if (down && rd.on[i]) k = Math.min(k, 0.88); // down on the floor: it stops, it doesn't bounce about
       const vx = (p.x - q.x) * k, vy = (p.y - q.y) * k, vz = (p.z - q.z) * k;
       q.copy(p);
@@ -1174,7 +1194,7 @@ const G_Rig = (() => {
     rd.on.fill(0);
     // secured: wrists pulled together at the small of the back
     let wrist = null;
-    if (rd.calm > 0) rd.calm -= h;
+    if (rd.calm! > 0) rd.calm! -= h;
     rd.pinT = (rd.pinT || 0) + h;
     rd.keepPin = Math.max(0, (rd.keepPin || 0) - h);
     let pin = 0; // wrists drawn together over a moment, not snapped
@@ -1248,7 +1268,7 @@ const G_Rig = (() => {
       moved = Math.max(moved, p.distanceToSquared(q));
     }
     rd.still = moved < 4e-6 && (down || rig.deadT > 3) ? rd.still + 1 : 0;
-    if (rd.still > 30 || (rig.deadT > (down ? 4.5 : 8) && !(rd.calm > 0) && !rd.handled && !rd.keepPin && !rig.zipped)) rd.asleep = true; // a body that's been down a while lies still
+    if (rd.still > 30 || (rig.deadT > (down ? 4.5 : 8) && !(rd.calm! > 0) && !rd.handled && !rd.keepPin && !rig.zipped)) rd.asleep = true; // a body that's been down a while lies still
   }
   function setWorldQ(bone: THREE.Object3D, q: THREE.Quaternion) { bone.parent!.getWorldQuaternion(_q2).invert(); bone.quaternion.copy(_q2.multiply(q)); bone.updateMatrixWorld(true); }
   function frameQ(xv: THREE.Vector3, yv: THREE.Vector3) {
@@ -1258,7 +1278,7 @@ const G_Rig = (() => {
   function ragdollPose(rig: Rig) {
     const rd = rig.rd, f = (rd.acc || 0) / STEP, { root, body, hips, spine, chest, neck, head } = rig;
     let P = rd.P;
-    if (rd.Pold) { P = rd.R || (rd.R = rd.P.map((p) => p.clone())); P.forEach((p, i) => p.copy(rd.Pold[i]).lerp(rd.P[i], f)); } // (between the last two steps)
+    if (rd.Pold) { P = rd.R || (rd.R = rd.P.map((p) => p.clone())); P.forEach((p, i) => p.copy(rd.Pold![i]).lerp(rd.P[i], f)); } // (between the last two steps)
     root.updateMatrixWorld(true);
     hips.position.copy(body.worldToLocal(P[0].clone()));
     hips.updateMatrixWorld(true);
@@ -1320,7 +1340,7 @@ const G_Rig = (() => {
   }
   function rollFaceDown(rig: Rig, instant: boolean) {
     const rd = rig.rd; if (!rd) return;
-    const handled = !!rd.handled || rd.keepPin > 0; // an officer already turned it over and held the wrists
+    const handled = !!rd.handled || rd.keepPin! > 0; // an officer already turned it over and held the wrists
     rd.handled = null; rd.keepPin = 0;
     rd.asleep = false; rd.still = 0; rd.calm = 0.8; rd.pinT = handled ? 1 : 0;
     if (rd.roll && rd.roll.driven) { rd.roll.driven = false; return; } // finish the turn that's under way
@@ -1331,13 +1351,13 @@ const G_Rig = (() => {
     if (instant) ragdollStep(rig, 0);
   }
   function dropGun(rig: Rig, dt: number) {
-    const d = rig.dropped, g = d.g, map = G.Game && G.Game.map;
-    if (d.floor == null) d.floor = (map ? G.Level.groundAt(map, g.position.x, g.position.z, 0.05, g.position.y, 0.05) : 0) + 0.05; // (the floor it falls to: upstairs or down)
-    if (g.position.y <= d.floor) return;
-    d.vy -= 12 * dt;
-    g.position.y = Math.max(d.floor, g.position.y + d.vy * dt);
-    g.rotation.z += d.spin * dt;
-    if (g.position.y <= d.floor) g.rotation.z = Math.PI / 2;
+    const d = rig.dropped, g = d!.g, map = G.Game && G.Game.map;
+    if (d!.floor == null) d!.floor = (map ? G.Level.groundAt(map, g.position.x, g.position.z, 0.05, g.position.y, 0.05) : 0) + 0.05; // (the floor it falls to: upstairs or down)
+    if (g.position.y <= d!.floor) return;
+    d!.vy -= 12 * dt;
+    g.position.y = Math.max(d!.floor, g.position.y + d!.vy * dt);
+    g.rotation.z += d!.spin * dt;
+    if (g.position.y <= d!.floor) g.rotation.z = Math.PI / 2;
   }
 
   // ---------------------------------------------------------------- hitboxes
@@ -1435,7 +1455,7 @@ const G_Rig = (() => {
     // bones are rigid, so each capsule is built once at its exact radius and length
     if (!rig.dbg) rig.dbg = h.map((b: any) => { const m = new T.Mesh(new T.CapsuleGeometry(b.rs, Math.max(0.001, b.a.distanceTo(b.b)), 3, 8), dbgMat[b.zone]); parent.add(m); return m; });
     h.forEach((b: any, i: any) => {
-      const m = rig.dbg[i];
+      const m = rig.dbg![i];
       m.visible = rig.state !== 'dead';
       m.position.addVectors(b.a, b.b).multiplyScalar(0.5);
       if (b.a.distanceToSquared(b.b) > 1e-8) m.quaternion.setFromUnitVectors(UP, _a.subVectors(b.b, b.a).normalize());

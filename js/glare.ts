@@ -5,18 +5,19 @@
 // be dazzled and longer to come back: look away and it fades, leaving an after-image where the lamp was, going from
 // white through green to nothing. js/views.ts adds each light each frame (id: whose), then end() works it out and draws it,
 // small, on a canvas blended over the picture.
-interface GlareLight { id: any; p: THREE.Vector3; dir: THREE.Vector3; k: number; }
+interface GlareLight { id: GlareId; p: THREE.Vector3; dir: THREE.Vector3; k: number; }
+type GlareId = string | number; // whose light (the shooter)
 interface GlareState { g: number; peak: number; x: number; y: number; t: number; seen: boolean; }
 const G_Glare = (() => {
   const T = THREE, RISE = 5, FALL = 1.1, W = 384, H = 216, RANGE = 40;
-  const lit = new Map<any, GlareState>(), now: GlareLight[] = [], fwd = new T.Vector3(), to = new T.Vector3(), v = new T.Vector3();
+  const lit = new Map<GlareId, GlareState>(), now: GlareLight[] = [], fwd = new T.Vector3(), to = new T.Vector3(), v = new T.Vector3();
   let cv: HTMLCanvasElement | null = null, g = null as unknown as CanvasRenderingContext2D, shown = false, level = 0;
   const sm = (a: number, b: number, x: number) => { const t = G.U.clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
   function begin() { now.length = 0; }
-  function add(id: any, p: THREE.Vector3, dir: THREE.Vector3, k: number) { now.push({ id, p: p.clone(), dir: dir.clone(), k }); }
+  function add(id: GlareId, p: THREE.Vector3, dir: THREE.Vector3, k: number) { now.push({ id, p: p.clone(), dir: dir.clone(), k }); }
   // how much of this light is getting to your eye: pointing at you (well within its beam), you looking toward it (at it most,
   // the edge of your view a little, behind you not at all), how near, nothing in the way
-  function taken(q: GlareLight, cam: THREE.Camera, map: any) {
+  function taken(q: GlareLight, cam: THREE.Camera, map: LvMap | null) {
     to.copy(q.p).sub(cam.position);
     const d = to.length();
     if (d > RANGE || d < 0.2) return 0;

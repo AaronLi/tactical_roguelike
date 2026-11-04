@@ -5,14 +5,31 @@
 interface VwPlayer { id: string; name: string; color: number; animal: string; look: any; rig: Rig; tag: THREE.Object3D | null; st: any; pos: THREE.Vector3; yaw: number; pitch: number; first: boolean; dead?: boolean; deadAt?: number | null; lastAct?: string; lastAp?: number; [k: string]: any }
 // A suspect or civilian: the rig, where the host says it is (tgt) and where it's drawn (pos, eased towards it). The rest
 // (flags from the snapshot, timers for the reload, the prone shift...) are set as they happen.
-interface VwEnemy { id: number; type: string; def: any; rig: Rig; tac: number; pos: THREE.Vector3; tgt: THREE.Vector3; yaw: number; tgtYaw: number; hp: number; alive: boolean; deadT: number; lean: number; [k: string]: any }
+interface VwEnemy {
+  id: number; type: string; def: any; rig: Rig; tac: number; pos: THREE.Vector3; tgt: THREE.Vector3; yaw: number; tgtYaw: number; hp: number; alive: boolean; deadT: number; lean: number;
+  // set as it goes: from the snapshots (bleed, limp, reloading, down: its flags), by the kill and the cuffing, and by the frame's own bookkeeping
+  scode?: number; str?: number; bleed?: boolean; limp?: boolean; reloading?: boolean; down?: boolean; surp?: boolean; doorOn?: boolean; doorT?: number; arrested?: boolean; bodySecured?: boolean;
+  pooled?: boolean; leanS?: number; dripT?: number; proneKey?: string; proneShift?: THREE.Vector3 | null; recPitch?: number; recTk?: number;
+  [k: string]: any;
+}
 interface VwEvidence { mesh: THREE.Object3D; wpn: string; x: number; y: number; z: number; secured?: boolean; [k: string]: any }
 // a grenade in flight (the position and velocity are all nadeStep needs)
 interface VwNadeMotion { pos: THREE.Vector3; vel: THREE.Vector3; onGround?: boolean }
-interface VwNade extends VwNadeMotion { fuse: number; own: boolean; enemy: boolean; mesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshLambertMaterial>; kind: string }
+interface VwNade extends VwNadeMotion { fuse: number; own: boolean; enemy: boolean; mesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshLambertMaterial>; kind: VwNadeKind }
 // the animated bits of a level (js/level.ts builds them): a first aid cabinet, and the lids of the weapon case, attachments box and sticker box
 interface VwCabView { key: string | null; open: number; slots: THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>[]; door: THREE.Object3D }
 interface VwLid { synced: boolean; open: number; lid: THREE.Object3D; g: THREE.Object3D }
+// a round in flight that someone else fired (visRound, stepRounds)
+interface VwRound { f: THREE.Vector3; dir: THREE.Vector3; len: number; d: number; def: any; am: string; arrive: () => void; v: number; drag: number; tracer: boolean }
+// the evidence outline's (or the halo's) materials: the stencil-marking silhouette, then the bands pushed out round it
+interface VwOutline { silhouette: THREE.MeshBasicMaterial; bands: THREE.ShaderMaterial[]; res: { value: THREE.Vector2 } }
+// what a suspect does with their body for a moment, and how a posed one is held (rig.update)
+type VwPose = 'handsup' | 'cuffed' | 'cower' | 'takedown';
+type VwActKind = 'open' | 'close' | 'kick' | 'zip' | 'bag';
+// an officer's action as drawn: how far along it is (0..1), the hand that opens a door, where the hands are on someone being tied (zip), whether they pull
+interface VwAct { kind: VwActKind; t: number; hand: 'L' | 'R'; pt?: THREE.Vector3; pull?: boolean }
+// a grenade: 'frag' (a sphere) or 'flash' (a grey can)
+type VwNadeKind = 'frag' | 'flash';
 interface VwAboxView extends VwLid { key: string | null; lights: THREE.Group }
 interface VwSboxView extends VwLid { name: string | null; card: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial> }
 const G_Views = {
@@ -22,6 +39,25 @@ const G_Views = {
   pings: [] as { x: number; z: number; t: number }[],
   evidence: new Map<number, VwEvidence>(), // id -> { mesh, wpn, x, z }
   laserBeep: 0,
+  // made as it goes: the shaders compiled for the level (js/game.ts), the occlusion test's scratch vector and filter, your own body when you're dead,
+  // the rounds in flight, the pings by player, the evidence outline's and the halo's materials (and their shared resolution, and smoothed geometry),
+  // the evidence envelope's, the suspects' light housing, the drip timer
+  warmed: undefined as boolean | undefined,
+  _sp: undefined as THREE.Vector3 | undefined,
+  _occ: undefined as ((s: { kind: string }) => boolean) | undefined,
+  selfBody: undefined as { rig: Rig; pos: THREE.Vector3; yaw: number } | null | undefined,
+  vRounds: undefined as VwRound[] | undefined,
+  pings2: undefined as Map<string, { s: THREE.Sprite; t: number }> | undefined,
+  _outline: undefined as VwOutline | undefined,
+  _haloMats: undefined as VwOutline | undefined,
+  _outRes: undefined as { value: THREE.Vector2 } | undefined,
+  _smooth: undefined as WeakMap<THREE.BufferGeometry, THREE.BufferGeometry> | undefined,
+  _haloOn: undefined as THREE.Object3D | null | undefined,
+  _envMat: undefined as THREE.MeshLambertMaterial | undefined,
+  _envGeo: undefined as THREE.BoxGeometry | undefined,
+  tacGeo: undefined as THREE.BufferGeometry | undefined,
+  tacMat: undefined as THREE.MeshLambertMaterial | undefined,
+  _myDrip: undefined as number | undefined,
 
   removeRig(rig: Rig) { G.R.dynRoot.remove(rig.root); rig.dispose(); },
   // Could any of them be in view from the camera: a look at their middle, head, feet and both sides (where the body is
@@ -76,7 +112,7 @@ const G_Views = {
     this.vRounds = [];
     G.Casings.clear();
     G.Bolts.clear();
-    if (this.pings2) { for (const q of this.pings2.values()) { G.R.dynRoot.remove(q.s); q.s.material.map.dispose(); q.s.material.dispose(); } this.pings2.clear(); }
+    if (this.pings2) { for (const q of this.pings2.values()) { G.R.dynRoot.remove(q.s); q.s.material.map!.dispose(); q.s.material.dispose(); } this.pings2.clear(); }
     for (const ev of this.enemies.values()) this.removeRig(ev.rig);
     this.enemies.clear();
     for (const n of this.nades) G.R.dynRoot.remove(n.mesh);
@@ -192,7 +228,7 @@ const G_Views = {
     ev.alive = false; ev.deadT = 0;
     let dir = ev.lastHitDir;
     if (!dir) {
-      const killer = m.by && m.by !== G.Net.myId && this.players.get(m.by) ? this.players.get(m.by).pos : this.nearestPlayer(ev.pos);
+      const killer = m.by && m.by !== G.Net.myId && this.players.get(m.by) ? this.players.get(m.by)!.pos : this.nearestPlayer(ev.pos);
       if (killer) dir = ev.pos.clone().sub(killer).setY(0).normalize();
     }
     ev.rig.die(dir);
@@ -446,8 +482,8 @@ const G_Views = {
     // stand-in: it doesn't know how their body is lying)
     const sh = this.enemies.get(m.e), gi = sh && sh.rig.gun && sh.rig.gunInfo;
     if (gi && gi.muzzles && gi.muzzles[0]) {
-      sh.rig.gun.updateMatrixWorld(true);
-      f = sh.rig.gun.localToWorld(new THREE.Vector3(gi.muzzles[0][2], gi.muzzles[0][1], -gi.muzzles[0][0]));
+      sh!.rig.gun!.updateMatrixWorld(true);
+      f = sh!.rig.gun!.localToWorld(new THREE.Vector3(gi.muzzles[0][2], gi.muzzles[0][1], -gi.muzzles[0][0]));
     }
     G.R.muzzleFlashAt(f);
     const me = G.R.camera.position;
@@ -558,7 +594,7 @@ const G_Views = {
     for (let t = 0; t < fuse; t += h) { this.nadeStep(n, h, map); pts.push(n.pos.clone()); }
     return pts;
   },
-  addNade(p: THREE.Vector3, v: THREE.Vector3, fuse: number, own: boolean, enemy: boolean, kind = 'frag') {
+  addNade(p: THREE.Vector3, v: THREE.Vector3, fuse: number, own: boolean, enemy: boolean, kind: VwNadeKind = 'frag') {
     const flash = kind === 'flash';
     const mesh = new THREE.Mesh(flash ? new THREE.CylinderGeometry(0.035, 0.035, 0.13, 10) : new THREE.SphereGeometry(0.08, 8, 6), new THREE.MeshLambertMaterial({ color: flash ? 0x7d8388 : 0x3a4a2a, emissive: 0x220000 }));
     mesh.position.copy(p);
@@ -568,7 +604,7 @@ const G_Views = {
 
   // An officer losing blood: drops where they stand or walk (more, the heavier the bleeding), and a pool
   // under them when they're down or dead. who: the owner key, pos: their feet, bl: 0 none, 1 light, 2 heavy.
-  officerBlood(who: { _drip?: number }, pos: THREE.Vector3, bl: number, down: boolean, dt: number) {
+  officerBlood(who: { _drip?: number; [k: string]: any }, pos: THREE.Vector3, bl: number, down: boolean, dt: number) {
     if (!bl) return;
     const k = who === G.Me ? (this._myDrip = (this._myDrip || 0) - dt) : (who._drip = (who._drip || 0) - dt);
     if (down) G.R.bloodPool(who, pos.x, pos.z, bl > 1 ? 1.0 : 0.5, bl > 1 ? 30 : 60, pos.y);
@@ -587,7 +623,7 @@ const G_Views = {
     const me = id === G.Net.myId, r = G.Game.roster && G.Game.roster[id], name = me ? G.Game.myName : r ? r.name : '?', color = me ? G.Game.myColor : r ? r.color : 0xffffff, animal = me ? G.Game.myAnimal : r ? r.animal : null;
     this.pings2 = this.pings2 || new Map();
     const old = this.pings2.get(id);
-    if (old) { G.R.dynRoot.remove(old.s); old.s.material.map.dispose(); old.s.material.dispose(); }
+    if (old) { G.R.dynRoot.remove(old.s); old.s.material.map!.dispose(); old.s.material.dispose(); }
     const c = document.createElement('canvas'); c.width = 400; c.height = 160;
     const g = c.getContext('2d')!, col = G.U.hex(color);
     g.font = 'bold 30px Consolas, monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
@@ -612,7 +648,7 @@ const G_Views = {
     const cam = G.R.camera.position;
     for (const [id, q] of this.pings2) {
       q.t -= dt;
-      if (q.t <= 0) { G.R.dynRoot.remove(q.s); q.s.material.map.dispose(); q.s.material.dispose(); this.pings2.delete(id); continue; }
+      if (q.t <= 0) { G.R.dynRoot.remove(q.s); q.s.material.map!.dispose(); q.s.material.dispose(); this.pings2.delete(id); continue; }
       const d = q.s.position.distanceTo(cam), sc = Math.max(0.9, d * 0.085); // (about the same size on screen at any range)
       q.s.scale.set(sc * 1.56, sc * 0.625, 1);
       q.s.material.opacity = Math.min(1, q.t / 1.2);
@@ -654,11 +690,11 @@ const G_Views = {
       }
       // aim pitch toward whoever they're engaging
       let pitch = 0;
-      const aimed = ev.aim === G.Net.myId ? G.Me.pos : ev.aim && this.players.get(ev.aim) ? this.players.get(ev.aim).pos : null;
+      const aimed = ev.aim === G.Net.myId ? G.Me.pos : ev.aim && this.players.get(ev.aim) ? this.players.get(ev.aim)!.pos : null;
       const tgt = aimed || (ev.alert ? this.nearestPlayer(ev.pos) : null);
       if (tgt) pitch = Math.atan2(tgt.y + 1.2 - (ev.pos.y + 1.4 * ev.def.scale), Math.max(1, Math.hypot(tgt.x - ev.pos.x, tgt.z - ev.pos.z))); // (from their own height: upstairs, level)
       ev.recPitch = pitch; // (for the highlights: js/highlights.ts)
-      let pose = ev.scode === 1 ? 'handsup' : ev.scode === 2 ? 'cuffed' : ev.scode === 3 ? 'cower' : null;
+      let pose: VwPose | null = ev.scode === 1 ? 'handsup' : ev.scode === 2 ? 'cuffed' : ev.scode === 3 ? 'cower' : null;
       // being taken down and zip-tied by an officer (me or a teammate)
       let tk = -1;
       const ma = G.Me.action;
@@ -670,9 +706,9 @@ const G_Views = {
       const limp = !ev.alive || ev.down;
       if (limp && !ev.bodySecured && (!ev.def.civ || ev.alive)) ev.rig.secure(tk); // turned over and wrists behind the back
       if (ev.alive && !limp && !tied && tk >= 0) { pose = 'takedown'; ev.rig.zip(tk > 0.8); }
-      else if (ev.alive && ev.rig.zipped !== tied) ev.rig.zip(tied); // let go before the tie was done (or tied, limp)
+      else if (ev.alive && ev.rig.zipped !== tied) ev.rig.zip(tied as boolean); // let go before the tie was done (or tied, limp)
       if (ev.arrested && ev.scode !== 2) pose = 'cuffed'; // the arrest message can beat the next snapshot
-      let act = null;
+      let act: VwAct | null = null;
       if (ev.alive && ev.doorT != null && ev.doorT < 0.6) { ev.doorT += dt; act = { kind: 'open', t: Math.min(1, ev.doorT / 0.5), hand: ev.rig.gun && !ev.rig.slung ? 'L' : 'R' }; }
       // Lying prone (restrained, or being taken down), a body stretches about 1.85 m ahead of the feet: with a
       // wall closer than that, it's drawn slid back from it (as far as the room behind allows) instead of
@@ -712,7 +748,7 @@ const G_Views = {
       const fog = G.R.scene.fog, cam = G.R.camera;
       if (fog) {
         const e = cam.matrixWorld.elements, depth = -((at.x - e[12]) * e[8] + (at.y - e[13]) * e[9] + (at.z - e[14]) * e[10]); // (along the view, as the fog's reckoned)
-        ev.rig.body.visible = depth < fog.far + 2.5 && this.inSight(ev.rig, at);
+        ev.rig.body.visible = depth < (fog as THREE.Fog).far + 2.5 && this.inSight(ev.rig, at);
       }
       // bleeding: drips falling from them as they go; down for good, from the body where it lies (its ragdoll's hips,
       // not where they last stood)
@@ -743,7 +779,7 @@ const G_Views = {
       pv.pitch += (st.pt - pv.pitch) * Math.min(1, dt * 14);
       pv.rig.setGun(st.w, G.Stickers.of(st.sk)); // their build code: the same parts on their gun (and its stickers, by their hash: js/stickers.ts)
       pv.rig.holster(!!st.sw); // hands busy: weapon away
-      const act: any = st.act ? { kind: ({ o: 'open', c: 'close', k: 'kick', z: 'zip', b: 'bag' } as Record<string, string>)[st.act], t: st.ap || 0, hand: 'R' } : null;
+      const act: VwAct | null = st.act ? { kind: ({ o: 'open', c: 'close', k: 'kick', z: 'zip', b: 'bag' } as Record<string, VwActKind>)[st.act], t: st.ap || 0, hand: 'R' } : null;
       if (act && act.kind === 'zip') { const tv = this.enemies.get(st.zt); if (tv) act.pt = this.zipPoint(tv, act.t, tv.alive && !tv.down); act.pull = !!st.pl; }
       // their restraining / bagging sounds, as they reach each step
       if (act && pv.lastAct === st.act) G.Audio.foley(act.kind, pv.lastAp || 0, act.t, pv.pos.distanceTo(G.R.camera.position));
@@ -809,7 +845,7 @@ const G_Views = {
     }
     tac.sort((a, b) => a[0] - b[0]);
     for (const [, ev, f] of tac) {
-      const gun = ev.rig.gun, gi = ev.rig.gunInfo; gun.updateMatrixWorld(true);
+      const gun = ev.rig.gun!, gi = ev.rig.gunInfo!; gun.updateMatrixWorld(true);
       const from = gun.localToWorld(new THREE.Vector3(gi.muzzles[0][2], gi.muzzles[0][1], -gi.muzzles[0][0])), dir = ev.aimP ? ev.aimP.clone().sub(from).normalize() : new THREE.Vector3(0, 0, -1).transformDirection(gun.matrixWorld);
       this.tacBeam(from, dir, f, 'e' + ev.id, null, ev);
     }
@@ -878,7 +914,7 @@ const G_Views = {
     for (const v of this.evidence.values()) if (!v.secured && v.mesh.visible) { glowing = true; break; }
     G.R.hasGlow = glowing || !!this._haloOn;
     if (this._haloMats) for (const m of this._haloMats.bands) m.uniforms.opacity.value = m.userData.base;
-    if (G.R.hasGlow) this._outRes.value.set(window.innerWidth, window.innerHeight);
+    if (G.R.hasGlow) this._outRes!.value.set(window.innerWidth, window.innerHeight);
     if (glowing && this._outline) {
       const p = 0.5 + 0.5 * Math.sin(performance.now() / 300);
       for (const m of this._outline.bands) m.uniforms.opacity.value = m.userData.base * (0.7 + 0.3 * p);
@@ -931,7 +967,5 @@ const G_Views = {
     this.pings = this.pings.filter((pg: { t: number }) => pg.t > 0);
   },
 };
-G.Views = G_Views as typeof G_Views & ViewsFields;
-
-interface ViewsFields { warmed: boolean; }
-interface GameModules { Views: typeof G_Views & ViewsFields; }
+G.Views = G_Views;
+interface GameModules { Views: typeof G_Views; }
