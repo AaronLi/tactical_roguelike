@@ -5,12 +5,13 @@ const root = __dirname, port = +process.env.PORT || 8080, host = process.env.HOS
 const types = {
   '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml',
   '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.ico': 'image/x-icon', '.ogg': 'audio/ogg', '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.md': 'text/markdown',
+  '.map': 'application/json', '.ts': 'text/plain', // (the source maps, and the TypeScript they point back to: the browser's devtools show js/*.ts)
 };
 const server = http.createServer((req, res) => {
   const url = decodeURIComponent(req.url.split('?')[0]);
   const file = path.normalize(path.join(root, url === '/' ? 'index.html' : url));
   if (!file.startsWith(root)) { res.writeHead(403); return res.end(); }
-  // a folder: a listing of its files (how the game finds what's in assets/stickers/, js/stickers.js)
+  // a folder: a listing of its files (how the game finds what's in assets/stickers/, js/stickers.ts)
   if (url !== '/' && url.endsWith('/')) {
     return fs.readdir(file, { withFileTypes: true }, (err, list) => {
       if (err) { res.writeHead(404); return res.end('Not found'); }

@@ -1,17 +1,21 @@
 # Breach Protocol
 
-Peer-to-peer co-op roguelike tactical FPS that runs in the browser. Three.js for rendering,
-WebRTC (via PeerJS) for networking. No build step, no install.
+Peer-to-peer co-op roguelike tactical FPS that runs in the browser. Written in TypeScript (`js/*.ts`), Three.js
+for rendering, WebRTC (via PeerJS) for networking.
 
 ## Running it
 
 ```bash
-node serve.js
+npm install
+npm run dev
 ```
 
-Then open http://localhost:8080. (Any static file server works, e.g. `python -m http.server 8080`.)
+Then open http://localhost:8080. `npm run dev` compiles the TypeScript into `dist/js/` and keeps recompiling as you
+save, and serves the game. To build once and serve the folder some other way: `npm run build`, then `node serve.js`
+(or any static file server, e.g. `python -m http.server 8080`). The page loads `dist/js/`, so it needs a build first.
+See [docs/typescript.md](docs/typescript.md) for how the code is organised and the type-checking status.
 
-**Weapon demo reel:** http://localhost:8080/?demo plays itself (`js/demo.js`). It starts a solo level with
+**Weapon demo reel:** http://localhost:8080/?demo plays itself (`js/demo.ts`). It starts a solo level with
 nobody else in it, stands you at the longest clear line of sight on the ground floor, and loops through the main
 weapon archetypes:
 - **Rifles and SMGs:** AR-15, AK, MP5, AUG, Thompson.
@@ -38,7 +42,8 @@ Every player needs to load the game page, and the host shares a 5-letter room co
 
 1. Put the folder somewhere your friends can reach. The easiest free options are GitHub Pages,
    Netlify Drop (drag the folder onto app.netlify.com/drop) or itch.io (upload as an HTML game).
-   It's all static files, so any of these work. Friends can also run `node serve.js` on their own copy.
+   It's all static files once built (`npm run build`: include `dist/`), so any of these work. Friends can also run
+   `npm run dev` on their own copy. The repo's GitHub Pages workflow builds it on every push to main.
 2. Host: click **Host Game**. A room code appears in the lobby.
 3. Friends: type the code and click **Join**. They connect straight to you, peer-to-peer.
 4. Host clicks **Deploy**. Friends can also drop in between levels or mid-level.
@@ -52,8 +57,8 @@ squad size, what they're doing, code): click one to join. No server of our own: 
 a public address, which WebRTC's public STUN server reports; a host takes one of a few beacon ids on the PeerJS
 broker derived from it, and the search knocks on each. It still goes through the PeerJS broker like every
 connection (so it needs the internet), and it finds games behind the same router, which is what a LAN party
-is. The game itself is a static page: `serve.js` is only a convenience, and any static host will do (not
-`file://`, where the browser blocks the sound files).
+is. The game itself is a static page once built: `serve.js` is only a convenience, and any static host will do
+(not `file://`, where the browser blocks the sound files).
 **Reconnecting.** A host keeps its room code through a refresh (in that tab), so the squad can get back in:
 anyone who loses the host keeps trying that code for a minute and rejoins as soon as it's hosting again. The
 join box remembers the last code you joined. In the lobby the host can take a **New code** (anyone already
@@ -84,7 +89,7 @@ says the same), but not whose: the shooter's name isn't shown.
   head over half a second, until by about a second in, roughly 40% of their hits are head or face. A pause of
   over a second, or switching target, starts them over from the body. A leaning officer already shows mostly
   head and shoulder.
-- **Suspects' bodies are physically simulated** (`js/rig.js` `powerStep`). A living suspect or civilian is
+- **Suspects' bodies are physically simulated** (`js/rig.ts` `powerStep`). A living suspect or civilian is
   the same ragdoll their body becomes when they die: particles at the joints, held together by the bones and
   joint limits, colliding with the floor and furniture. Muscles pull each joint toward the walking, aiming or
   surrendering animation, and they're as strong as the person is: their strength, from the host, is what
@@ -143,7 +148,7 @@ says the same), but not whose: the shooter's name isn't shown.
   part-loaded tube if you're in sight. With nobody in sight and the magazine half spent, they top up. They
   duck in cover and lower the gun while reloading. That's your window, and you can hear the magazine change
   within about 25 m.
-- **Blood stays where it lands** (`js/render.js` `bloodDrop`, `bloodWall`, `bloodPool`).
+- **Blood stays where it lands** (`js/render.ts` `bloodDrop`, `bloodWall`, `bloodPool`).
   - **Drops:** every drop from a hit, a wound or a drip falls and leaves a mark where it comes down: on the
     floor, or on a table or counter if that's where it lands. Fast ones smear.
   - **Spatter:** a round through someone onto a wall just behind them leaves spatter on the wall.
@@ -170,7 +175,7 @@ says the same), but not whose: the shooter's name isn't shown.
       not counted as an arrest.
     - **Bleeding out on their feet:** a suspect who never went down is credited to whoever shot them,
       judged the same way.
-- **Thin walls** (`js/level.js`: `refine`). Levels are planned on a 2 m grid (rooms, corridors, doors,
+- **Thin walls** (`js/level.ts`: `refine`). Levels are planned on a 2 m grid (rooms, corridors, doors,
   furniture), then refined to a 0.67 m grid that everything plays on.
   - **Walls between spaces:** a wall between two rooms, or between a house and its garden, is one 0.67 m cell
     thick instead of a whole 2 m tile. Where walls meet at a corner or a T, they meet as thin walls, and rooms
@@ -189,7 +194,7 @@ says the same), but not whose: the shooter's name isn't shown.
   piece (a desk and its chair are separate). Waist-high solid pieces (sofas, counters, dressers, crates) are cover
   that suspects use. Doorways are always left clear and every room stays reachable.
 - **Dark.** Rooms are lit by their ceiling lamps, and corridors are dim. **Every lamp lights its
-  surroundings** (`js/lightgrid.js`): when a level is built, each lamp's light is worked out over the floor plan
+  surroundings** (`js/lightgrid.ts`): when a level is built, each lamp's light is worked out over the floor plan
   tile by tile, stopped by walls, falling off as a point light's does, with where it comes from, into a texture
   (a layer per floor) that every lit material reads. One texture lookup a pixel, however many lamps: the
   festival's 115 lamps all light, nothing switches on and off as you move, and the far end of a corridor is as
@@ -197,7 +202,7 @@ says the same), but not whose: the shooter's name isn't shown.
   their number changes: measured on the festival, 12 put 40% on a frame, 48 160%, 96 320%. The old pool of 12
   that followed you is gone; the grid draws a frame 20-27% faster than it did.) Muzzle flashes, weapon lights
   and blasts are still real lights.
-  - **Colour is handled physically** (`js/util.js`): every colour written down (a hex, a canvas, a loaded picture)
+  - **Colour is handled physically** (`js/util.ts`): every colour written down (a hex, a canvas, a loaded picture)
     is sRGB, decoded to linear before it's lit, lit in linear (light adds up as light does), and encoded back to sRGB
     on the way to the screen (three's colour management, `outputEncoding` sRGB on every renderer). Before, three's
     legacy mode lit the sRGB numbers as they were: a saturated colour under a bright lamp went fluorescent, and the
@@ -205,7 +210,7 @@ says the same), but not whose: the shooter's name isn't shown.
     (decoded, a warm white's blue drops by a third and every room goes amber); the hemisphere fill is squared, so
     where no lamp reaches is as dark as it was. Custom shaders end in `linearToOutputTexel`; the window backdrop
     works in its pictures' sRGB and converts at the end; particle colours are converted as they're emitted.
-  - **Over-bright light is rolled off, not clipped** (`G.R.TONE`, a custom tone mapping in `js/render.js`, on linear
+  - **Over-bright light is rolled off, not clipped** (`G.R.TONE`, a custom tone mapping in `js/render.ts`, on linear
     light): the shoulder of Khronos' PBR Neutral. Under about 76% of full nothing changes; above, the whole colour is
     eased toward full together, keeping its hue, and toward white by how far it was pushed, as film does (not its
     toe: taking the same off every channel near black saturates the dark, and most of a level is dark). The death
@@ -238,7 +243,7 @@ says the same), but not whose: the shooter's name isn't shown.
     `bounce`, `bounces`, `sky`, `fill`).
 - Themes: Apartment, Warehouse, Bunker, Suburbs, Research Lab, Foundry, Cold Storage, Festival, Sandia Crest (the route map picks
   which), and the Convenience Store, the first deployment of every run and nowhere else. **Every level starts outside
-  the target** (`js/level.js`), and you breach in:
+  the target** (`js/level.ts`), and you breach in:
   - **The convenience store** (`layout: 'mart'`, `layMart`): small and crowded, 20 x 26 m with its lot (from photos of
     real ones: tall shelving packed close, narrow aisles, a wall of cooler doors, the till behind its glass). You
     start on the fenced lot out front (an ice chest against the wall); a double door between shop windows into the
@@ -248,7 +253,7 @@ says the same), but not whose: the shooter's name isn't shown.
     (boxes, bottles, cans, bags) over price strips, each in printed packaging: a label from an atlas of 64 (a
     colour, a band or a mark, lines of type, a printed edge, in print's colours, not pure ones) over every face, on
     matte card and paper (tins and bottles a little glossier), the stock under a shelf in its shadow; the endcaps'
-    cases and the cigarette wall too (`packaging()`, `k.boxL`/`k.cylL` in `js/furniture.js`). The shop and the booth are laid on the fine grid (`block` on a
+    cases and the cigarette wall too (`packaging()`, `k.boxL`/`k.cylL` in `js/furniture.ts`). The shop and the booth are laid on the fine grid (`block` on a
     piece: what it stands on is blocked, cell by cell), which is what makes the aisles narrower than a tile. Behind the shop, the walk-in freezer and the stockroom (a door between them, a
     door from the shop up into the stockroom); the freezer's front wall is the coolers, glass doors from near the
     floor onto the shop (they break like any window). The cashier's booth is behind a wall of wired, bulletproof
@@ -269,7 +274,7 @@ says the same), but not whose: the shooter's name isn't shown.
     - **Catwalks** run round both halls upstairs and across them (a bridge over the ladles, a spine between the
       furnaces, a walkway between the lines), with a steel stair up to them in each hall. Their floor is **steel
       grating** (`grate` on the layout, carried to the fine grid by `refine`): it holds you up, and sight goes through
-      it from above and below. Rounds meet the bars where they're drawn (`G.Level.onBar`, `barHit` in `js/world.js`):
+      it from above and below. Rounds meet the bars where they're drawn (`G.Level.onBar`, `barHit` in `js/world.ts`):
       between them a round flies on untouched, on one it throws sparks and is slowed, turned, stopped or glanced off
       by up to 4 mm of mild steel. Pistol rounds mostly stop on a bar and rifle rounds punch through, and the lower the
       angle the more of it is bar, and the more rounds glance off. Steel railings (a top rail, a knee rail, a toe board, no
@@ -286,7 +291,7 @@ says the same), but not whose: the shooter's name isn't shown.
     - You start in the car park, in front of either the offices or the loading bay.
     - Particles (`buildFx`): sparks off the furnaces' slag doors and the hot saws, embers rising off the molten
       steel (now and then a spatter of bright drops), smoke over them, steam off the mills and quench tanks. A
-      piece of machinery names what it throws off and the light it gives (`fx`, `glow` in `js/furniture.js`); the
+      piece of machinery names what it throws off and the light it gives (`fx`, `glow` in `js/furniture.ts`); the
       halls' high-bay lamps and that glow light the catwalks above too (`up`, copied up by `stack`).
   - **Rooms and corridors** (Bunker, Research Lab, Cold Storage). You start on a fenced, paved lot
     in front of the building, among bins, pallets and crates. A double door under a lamp leads in. The
@@ -323,7 +328,7 @@ says the same), but not whose: the shooter's name isn't shown.
       objective "Clear every apartment" is ticked once they all are, with no running count. An apartment
       counts once an officer has been inside it and no free, armed suspect is left in it, so an empty one
       still has to be checked.
-    - **Residents:** some homes belong to someone (`js/homes.js`, `js/residents.js`, from `docs/apartment-personas/`: all
+    - **Residents:** some homes belong to someone (`js/homes.ts`, `js/residents.ts`, from `docs/apartment-personas/`: all
       twelve of them, six in flats and six in lofts, a loft's resident dressing both its floors). The block is generated first, knowing nothing of them, walls, doors, furniture, windows
       and all. Then, from the level's seed alone, each home in turn may turn out to be a resident's (a flat's: 5.5-8% each,
       at most once a level, so each is in about half of Apartment levels; a loft's: 15% each, and nearly every loft
@@ -413,11 +418,11 @@ says the same), but not whose: the shooter's name isn't shown.
       round it. There are more civilians about than elsewhere.
     - **Night:** outdoors in the dark, suspects can't pick you out past 35 m (the lights, the stalls, the size of it) unless your light or laser is on,
       while a scope still finds them across the field.
-    - Built in `js/level.js` (`layFestival`, `buildFestival`) and `js/furniture.js` (the pieces and `plan`'s
+    - Built in `js/level.ts` (`layFestival`, `buildFestival`) and `js/furniture.ts` (the pieces and `plan`'s
       `festival()`).
   - **Sandia Crest** (`layout: 'crest'`, `layCrest`): the top of the Sandia Mountains over Albuquerque at sundown,
     about 334 × 92 m, all of it open to the sky. Locked till after level 3: the route map only offers it from level 4 on
-    (the theme's `from`, `js/route.js`). It's built for long-range sniping: two summits of pink granite with a
+    (the theme's `from`, `js/route.ts`). It's built for long-range sniping: two summits of pink granite with a
     236 m gorge between them; across it on foot is the saddle at the north end (the way the suspects come), or a zipline
     each way over the gorge. A low stone wall runs round every edge,
     hip high, so you see and shoot over it and crouch behind it. More suspects (×1.4), and more of them are
@@ -432,7 +437,7 @@ says the same), but not whose: the shooter's name isn't shown.
       flagstone terrace out over the gorge with two coin-op viewers and a bench. Nobody starts on it. The viewers work:
       press F at one to put your eyes to it (a 15× view through two round fields, swinging 70° either side of straight out,
       the mouse slowed to match, the weapon away) and spot who's where in the garden before you shoot; F again, or a step,
-      and you're off it (`crest.scopes`; `js/player.js` `VIEWER`). From it the
+      and you're off it (`crest.scopes`; `js/player.ts` `VIEWER`). From it the
       greenhouse is 254 m off and the garden 232–278 m (255 m in the middle): standing, you see 83% of it over the wall.
       That's past where a suspect can pick anyone out (75 m), so from the overlook you're unseen until you start shooting
       and they come for you over the saddle.
@@ -442,9 +447,9 @@ says the same), but not whose: the shooter's name isn't shown.
       west and one on the east. South of the garden, behind a coyote fence with a gate, the **antenna farm**: lattice
       masts with red beacons on their equipment huts, and air handlers.
     - **The gorge:** 45 m of open air between the summits (`lay.chasm`; tile 5 on the ground floor, with no floor
-      under it in `js/world.js`, only the gorge's own floor down there), its cliffs ragged and lit pink by the low sun.
+      under it in `js/world.ts`, only the gorge's own floor down there), its cliffs ragged and lit pink by the low sun.
       Rounds fly on past the map's edge (`ray: false` on its edge walls) instead of stopping in the air.
-    - **The ziplines** (`crest.lines`; `js/player.js` `zipStep`): one from the ridge just north of the overlook down to the
+    - **The ziplines** (`crest.lines`; `js/player.ts` `zipStep`): one from the ridge just north of the overlook down to the
       garden's west edge, one back from the garden's south-west to the strip beside the Crest House. Stand at the foot of a
       start pole and hold F (0.4 s) to clip on: you're lifted onto the bar, carried 236 m in about 14 s under a cable sagging
       7 m in the middle (slow at the ends, about 24 m/s down its middle, the gorge's floor 50 m under your feet), and set
@@ -457,7 +462,7 @@ says the same), but not whose: the shooter's name isn't shown.
       city's lights coming on in the valley below with the interstates and the river, and the tramway's cables
       dropping down the face to it. The far parts are lit into their colours on unlit materials, from the low sun in the
       west. The theme's `far` lets the camera see 1400 m, and the ride in skips the usual town of lit windows.
-    - Built in `js/level.js` (`layCrest`, `buildCrest`) and `js/furniture.js` (the pieces and `plan`'s `crestPlan()`).
+    - Built in `js/level.ts` (`layCrest`, `buildCrest`) and `js/furniture.ts` (the pieces and `plan`'s `crestPlan()`).
 - **Clear the level** by arresting (zip-tying) or killing every suspect.
   - **Arresting:** get behind them first. A
     surrendered suspect watches you approach but holds still once you're close, so walk round, or from the front
@@ -483,7 +488,7 @@ says the same), but not whose: the shooter's name isn't shown.
   weapons into evidence envelopes pay too. All of it can still be done after order is restored.
 
   **Arrival.** Every level has a helicopter pad, and you ride in belted into the dropship you boarded at the hangar
-  (`js/landing.js`): in from the distance, once round the site, spiralling in, a hover and a turn onto the pad's heading,
+  (`js/landing.ts`): in from the distance, once round the site, spiralling in, a hover and a turn onto the pad's heading,
   down, over a town of lit windows and under clouds (drawn for the ride, not in the world). Hold **F** in the air to skip
   it, on the ground to get out. Its attitude comes from how it moves (leaning into
   what the rotors have to do: nose down at speed, over in the turns, up in the flare); you're safe in it, officers staying
@@ -503,7 +508,7 @@ says the same), but not whose: the shooter's name isn't shown.
   (securing bodies, bagging dropped weapons) turns green with a tick only once every other objective is
   complete (order restored, every apartment cleared, all the civilians rescued) and nothing's left lying about:
   every body secured and every dropped weapon bagged. With a civilian lost it stays grey.
-- **Windows are real** (`js/level.js` `placeWindows`):
+- **Windows are real** (`js/level.ts` `placeWindows`):
   - **The opening:** a gap two cells wide in a wall, with a sill to 0.95 m, a pane of glass up to 2.25 m and a
     frame. You can't climb through: to movement and pathing it's still wall.
   - **Seeing and shooting through:** you see through it, and your rounds go through it and shatter the
@@ -615,13 +620,13 @@ says the same), but not whose: the shooter's name isn't shown.
     with stippled panels and a flared base; its magazines: an 11-round compact, a 24-round extended, a 40-round drum,
     and translucent 16- and 24-rounders that show the rounds left), the **P9** (9 mm, 15 rounds, semi) or the **derringer** (two shots of .44 Magnum). It comes loaded with
     tracers, with two spare loads in your small pockets (two magazines, or for the derringer two boxes of 12).
-  - **The sidearm web** (`js/arsenal.js`): what you can start with, a map you drag about and zoom, the P9 in the middle and three paths out of it. Each gun's earned with the one before it, by
+  - **The sidearm web** (`js/arsenal.ts`): what you can start with, a map you drag about and zoom, the P9 in the middle and three paths out of it. Each gun's earned with the one before it, by
     doing what its path is about, and it's yours for good on this machine. Full auto: TX22 (15 double-tap kills with the P9), 92FS Burst (15 five-hit bursts: five hits on one suspect inside a second, once a suspect, down or not), G18 (15 burst kills: three hits inside 0.35 s), MAC-10 (10 double kills: two inside 3 s). Heavy calibre: derringer (15 kills within 5 m), .357 Revolver (16 one-round kills), Desert Eagle (15 kills on armoured suspects), Thor .50 (15 wall-bang kills), and a branch off the revolver, The Judge (15 kills within 5 m with the revolver; its pro build, Hanging Judge, takes 20 double kills). Modern classics: Walther PPK (15 kills on unaware suspects: down before they react, and not once they've seen you or heard gunfire), M1911 (15 headshot kills), USP (15 headshot kills past 10 m), Five-seveN (15 kills past 20 m). Each gun has a pro build too, a named set of parts earned by mastering that gun (more of what it's best at), and once it's yours you choose whether the gun starts in pro mode. Civilians and those who've given up don't count, and a gun only counts once it's yours.
   - **What's inside:** a weapon in its standard build, fully loaded. It's a long gun three times in four,
     picked by rarity. Each tier has a share of the odds, split evenly between its weapons, and deeper
     levels shift the odds toward rarer tiers. Legendaries only appear from level 3. Every weapon can turn up,
     the starter P9 too (tier 0, a sidearm now and then, rarer the deeper you go), except the grenade
-    launchers, which are switched off for now (`G.EXPLOSIVES_OFF` in `js/data.js`: no case, shop or kit
+    launchers, which are switched off for now (`G.EXPLOSIVES_OFF` in `js/data.ts`: no case, shop or kit
     hands one out). The table is for long guns:
 
     | Level | Common | Uncommon | Rare | Legendary |
@@ -640,7 +645,7 @@ says the same), but not whose: the shooter's name isn't shown.
   - **Co-op:** one case for the whole squad. Whatever's left in it, or left in place of what was taken, is there for
     the next player.
 - **The attachments box** (`map.abox`, most levels: `G.Level.ABOX_CHANCE`): a small black hard case with a yellow band,
-  on the floor against a wall in a room away from the spawn (yellow on your minimap till you've had your pick).
+  on the floor against a wall in a room away from the spawn.
   - **One use each:** a light on its front for each of the squad, in their colour, lit till they've had their pick.
   - **Your turn:** hold F at it. The host rolls your three: attachments for the weapon in your hands as it's built
     (`G.Gunsmith.attachOptions`: a slot it has now, not what's in it already; no magazines, factory parts or
@@ -655,10 +660,10 @@ says the same), but not whose: the shooter's name isn't shown.
   - **What it does:** hover over a pick and the panel under them shows the weapon in your hands with it fitted, the
     gunsmith's stats with what changes marked (and what it'd replace), each load's muzzle velocity and energy too.
 - **The sticker box** (`map.sbox`, one level in ten: `G.Level.SBOX_CHANCE`): a little hot-pink display box on the
-  floor against a wall in a room indoors (pink on your minimap till it's opened), one sticker lying in it under a
+  floor against a wall in a room indoors, one sticker lying in it under a
   clear lid. The host picks which, from the stickers it has. Hold F at it, facing it: the sticker goes into your
   collection (the first to open it gets it; the squad sees who) and the lid stays up.
-- **Stickers** (`js/stickers.js`, `G.Stickers`): the pictures in `assets/stickers/` (PNG, WebP, JPEG, GIF or AVIF).
+- **Stickers** (`js/stickers.ts`, `G.Stickers`): the pictures in `assets/stickers/` (PNG, WebP, JPEG, GIF or AVIF).
   The game reads the folder's listing (`serve.js` lists a folder; so do most static servers), or `index.json` in it
   (a list of the file names) where the host doesn't list folders (GitHub Pages: add one). What you find is yours for
   the run.
@@ -689,7 +694,7 @@ says the same), but not whose: the shooter's name isn't shown.
   (ball, hollow point, AP, tracer, subsonic; buck, slug, birdshot, flechette), each priced by what it does (`G.AMMO`
   `k`: birdshot 0.7× ball, tracer 1.3×, subsonic 1.6×, a slug 1.7×, hollow points 1.8×, AP 2.4×, flechettes
   2.6×), with what the load is under it.
-- **The hangar** (`js/hangar.js`) is where the squad spends the time between levels: a real place you walk
+- **The hangar** (`js/hangar.ts`) is where the squad spends the time between levels: a real place you walk
   about, on the same map machinery as a level (`G.Level.generateHub`: walls, lights, collision, rays, sound).
   The squad is there together; the host sends no enemies, and you can't fire or throw in it. It's a 48 × 25 m
   hall (a 16 m opening in its front wall) with a 48 × 12 m helipad outside it, open to the sky.
@@ -733,7 +738,7 @@ says the same), but not whose: the shooter's name isn't shown.
     same one for everyone: by place in the squad, with a view out of the open side); hold F again to get out
     and take your readiness back. When everyone's in it the rotor spins up and, after three seconds, it takes
     off for the route map; anyone getting out stops it.
-  - **The shooting range** (`js/range.js`) is through the garage door in the hall's north wall (where the
+  - **The shooting range** (`js/range.ts`) is through the garage door in the hall's north wall (where the
     gunsmith's parts wall used to be; that wall slid east, toward Vex). Off the yard, from the left: the IPSC course,
     a pistol range (three lanes, paper at 5, 7 and 10 m and steel at 12 and 15 m) and a rifle range to the east (four lanes, 300 m
     deep, steel at 25, 50, 75 and 100 m off to either side), each lane marked in metres on the floor. Every rifle
@@ -744,7 +749,7 @@ says the same), but not whose: the shooter's name isn't shown.
     every round, magazine and box you use is put back as it was when you walk out (`snapshot`/`restore`). So the
     rest of your kit is **frozen** in there: nothing can be moved, dropped, sold or used from the Tab screen until
     you're back in the hall (otherwise the restore would hand back what you'd moved out).
-    - **The IPSC course** (`js/course.js`), on the left: a random stage in a 10 x 28 m strip. Three shooting boxes
+    - **The IPSC course** (`js/course.ts`), on the left: a random stage in a 10 x 28 m strip. Three shooting boxes
       one behind the other, barriers beside them and knee-high walls between with a gap to go through, and eight
       to twelve targets downrange: IPSC cardboard (two hits each, the best two count), up to two white no-shoots
       beside them, and steel poppers that fall when hit. **NEW** (a button in the yard by the entrance) lays a new
@@ -760,11 +765,11 @@ says the same), but not whose: the shooter's name isn't shown.
     hit targets (`G.Range.hit` from `roundSegment`): paper takes holes, steel swings and rings (a beat later, for
     the distance), and each lane's console counts its hits (F resets its targets). There is no friendly fire in
     the hangar, and your shots are heard by the others. The map has the range's 156 rows first (`G.HANGAR_ROWS`), so the
-    hall sits 312 m along (the camera sees 420 m in the hangar, 280 elsewhere): `js/hangar.js` keeps to the hall's own coordinates and adds `RZ` where it meets the world.
+    hall sits 312 m along (the camera sees 420 m in the hangar, 280 elsewhere): `js/hangar.ts` keeps to the hall's own coordinates and adds `RZ` where it meets the world.
   - **Under it** it's an ordinary level with a flag (`G.Game.hub`; the phase is still `'level'`, which is why
     movement, other players, collision and sound all work). The host's phase stays `'shop'` and only carries
     the squad about (`G.Server.updateHub`) and times the helicopter. What's on the shelves is the same
-    stock `js/shop.js` always had, drawn from it (`G.Hangar.refresh`), and a purchase is `G.Shop.buy`.
+    stock `js/shop.ts` always had, drawn from it (`G.Hangar.refresh`), and a purchase is `G.Shop.buy`.
 - **Shared magazines.** Guns built round the same magazine take each other's (`G.MAG_FAMILY` in `data.js`,
   the magazines in `parts.js` `MAG_FAMS`):
 
@@ -807,7 +812,7 @@ says the same), but not whose: the shooter's name isn't shown.
   cases. A convertible gun rolled for a weapon case comes built on one of its alternate receiver
   groups 35% of the time (an M4 as an AR-9, an AK as an RPK), fitted and working. The gunsmith stocks receiver groups now and then.
 - **The crossbow's scope.** It comes with a Meridian LV-12 1-12× (scroll while aiming), its marks in the first focal plane:
-  they're fixed in angle and grow with the picture, so they're true at any power (`js/gunmodels.js` `bdcTex`, in mils, drawn
+  they're fixed in angle and grow with the picture, so they're true at any power (`js/gunmodels.ts` `bdcTex`, in mils, drawn
   from the same sums that fly the bolts, as the gun comes from the factory: clicks at the zeroing table move the shots, not the marks). Down the post, a rung for each range to
   150 m for a broadhead or mechanical (hold it on the target), each as wide as a man's shoulders (0.5 m) at that range;
   ticks on the left of the post for a bodkin, which drops much further. On the left wire stand men 1.75 m tall at
@@ -824,7 +829,7 @@ says the same), but not whose: the shooter's name isn't shown.
   stock is drawn in first person too (its tube and rails along the bottom of the view; not its pad, which would fill
   the screen aiming), as well as on the gun in the gunsmith and in other players' hands. An SMG stock on a handgun's
   mount (that one, the chassis's, the derringer's lug grip) is a brace a stock on an SMG isn't: on top of the stock's
-  own figures, recoil −25 and ergonomics −8 (a slot's `brace`, js/parts.js; an empty one costs nothing).
+  own figures, recoil −25 and ergonomics −8 (a slot's `brace`, js/parts.ts; an empty one costs nothing).
 - **Pistol carbine chassis** (the Ironvale PCC-1, a grip-slot part for every single pistol, not the akimbo pair): the
   pistol drops into a polymer chassis in place of its grip, its frame rail and stock lug shut inside. Its own slots
   replace them (a part's `chassis`: its slots, taking over the gun's of the same name or added): a full-length rail
@@ -839,7 +844,7 @@ says the same), but not whose: the shooter's name isn't shown.
   the blood's gone you're KIA until the next level, watching through a camera on the right side of a teammate's helmet, up
   by the crown, tilted a little in and down so you see their arms, hands and weapon. It's a wide, fisheye-ish
   lens: the field of view is 20% wider than yours and the edges curve in (a barrel distortion drawn by a small
-  render-to-texture pass in `js/render.js`, only while spectating). It follows where they look;
+  render-to-texture pass in `js/render.ts`, only while spectating). It follows where they look;
   click to switch to another; your own gun isn't drawn in it. You hear from the camera too: every sound's distance,
   direction and wall muffling, and a flashbang's blinding and deafening, are theirs, not where you fell. **Your body stays where you fell**, a ragdoll
   with its kit on, for everyone to see, you included (you have no body in first person, so one is made when you
@@ -856,7 +861,7 @@ says the same), but not whose: the shooter's name isn't shown.
   over 15% with blood bags first, and you come round (still down). Get the bleeding stopped before that, or it
   carries on, and with your blood still at 40% or less the next hit puts you straight back down. If the whole
   squad is down, the run ends.
-- **Injuries** (`js/medical.js`). There's no health bar and no medkit; your body is seven parts with their
+- **Injuries** (`js/medical.ts`). There's no health bar and no medkit; your body is seven parts with their
   own health: head 35, thorax 85, stomach 70, each arm 60, each leg 65.
   - **Hits:** a hit takes health from the part it lands on, and can leave an injury there:
     - bleeding, light or heavy
@@ -921,7 +926,7 @@ says the same), but not whose: the shooter's name isn't shown.
   - **Stacking:** bandages and painkiller doses stack 4 to a slot, tourniquets and gauze 3. Drag one onto another to combine;
     buying tops up the stacks you have first; treating uses one off the stack.
 - Every 10th level has a boss, **The Kingpin**, who calls in reinforcements.
-- **The route map** (`js/route.js`). A run is a series of acts of ten levels (nine, then the boss), each with its
+- **The route map** (`js/route.ts`). A run is a series of acts of ten levels (nine, then the boss), each with its
   own map running left to right. The map is wider than the screen: it scrolls sideways (the mouse wheel
   works too) and opens on where the squad is. Before every level the squad votes on where to go next, and the most votes wins (a tie is a
   coin toss).
@@ -1001,7 +1006,7 @@ says the same), but not whose: the shooter's name isn't shown.
   - **Integral suppressors**: the MP5SD and VSS fire subsonic and quiet.
   - **Crossbow**: nearly silent; enemies only hear it from 2 m.
   - **Akimbo**: two guns that alternate shots and can't aim down sights.
-- **Kit** (`js/gear.js`): named products from brands, like the weapon parts. Suspects wear the same kinds of
+- **Kit** (`js/gear.ts`): named products from brands, like the weapon parts. Suspects wear the same kinds of
   protection.
   - **Carriers and vests** give soft armour where they cover. Most have a pocket for a plate and a MOLLE
     panel for pouches. The chest rig has no armour at all, and it and the assaulter carrier have the most
@@ -1025,7 +1030,7 @@ says the same), but not whose: the shooter's name isn't shown.
     - **Suspects wear them too**, deeper in a run: on a full-cut or rifle-rated helmet (a visor has its own), a
       mandible / IIIA shield / rifle shield at 6/2/0% on level 3, 20/16/6% on level 8 and 20/25/15% by level 18;
       the Enforcer always, from tier 3 (a mandible, then a IIIA shield). It's on their helmet as it is on yours and
-      in the way of your rounds the same (`ENEMY_GEAR.odds.face`, js/data.js; sent with their kit, the fourth field).
+      in the way of your rounds the same (`ENEMY_GEAR.odds.face`, js/data.ts; sent with their kit, the fourth field).
     - Without one, a face hit on an open-faced helmet is still a kill.
   - **Bodies.** Everyone has the same build:
     - a rounded head with a jaw, nose, ears, eyes, brows and mouth; hair as a cap, hidden under a helmet (the
@@ -1045,7 +1050,7 @@ says the same), but not whose: the shooter's name isn't shown.
     colour, which marks your name in the team list, the scoreboard, chat and pings. Your own arms in
     first person match your sleeves and gloves. Suspects and civilians are dressed for who they are: hoodies,
     balaclavas and the odd cap; T-shirts, jeans and glasses.
-  - **You look like what you wear.** Teammates see each officer's actual kit (`js/rig.js` `setKit`), and it
+  - **You look like what you wear.** Teammates see each officer's actual kit (`js/rig.ts` `setKit`), and it
     updates as you change gear or drop it:
     - **Helmet:** its cut and colour. The modern ones have side rails and a night-vision mount.
     - **On the helmet:** a mandible (arms down from the helmet's sides into a guard curving round over the
@@ -1123,7 +1128,7 @@ says the same), but not whose: the shooter's name isn't shown.
     a pistol is 2×1, a compact SMG 3×2, a Thompson or PPSh 4×2, a carbine, rifle or shotgun 5×2, and a
     sniper rifle, LMG or long battle rifle 6×2. Guns only go in a backpack or the locker.
 
-  | Kind | Products (brand) | Made of (where), and what it stops head-on new (worked out: js/ballistics.js) |
+  | Kind | Products (brand) | Made of (where), and what it stops head-on new (worked out: js/ballistics.ts) |
   | --- | --- | --- |
   | Vest / carrier | Lightline concealable vest (Graywater: Level II, 6 mm aramid: 9 mm, .45 and buckshot, not .44 Magnum), Ghost concealable vest (Northmark), PC-1 slick carrier (Kestrel), Patrol carrier (Ironvale), Recon chest rig (Vantage), Assaulter carrier (Paragon), Heavy assault armour (Sable Ridge) | Soft aramid round the chest and stomach, 6–8 mm: 8 mm stops 9 mm, .45 ACP, .44 Magnum and buckshot, not 5.7x28 or any rifle (6 mm not the .44). The heavy armour adds 5 mm steel side plates (stops 7.62x39 and 7.62x51, not 5.56) and aramid over the groin, shoulders and thighs. The slick carrier and chest rig have none |
   | Plate (front and back of the chest, 25 x 32 cm) | IIIA soft insert (12 mm aramid), AR550 steel (6.35 mm), UHMWPE (20 mm), ceramic (9 mm on 6 mm PE), multi-hit ceramic (9.5 on 8) | Soft insert: handguns and 5.7x28. Steel: 7.62x39, 5.56 and 7.62x51 ball, not armour-piercing. UHMWPE: 7.62x39 and 7.62x51, not 5.56. Ceramic: armour-piercing 5.56 and 7.62x39, .338 Lapua; not .50 BMG |
@@ -1135,7 +1140,7 @@ says the same), but not whose: the shooter's name isn't shown.
   | Belt | Duty (Graywater), battle (Kestrel: leg hangers), war belt with dump pouch (Paragon: leg hangers) | — |
   | Backpack | Sling pack 4×3 (Graywater: pistols, compact SMGs), 3-day assault pack 5×3 (Kestrel: up to rifles and shotguns), large rucksack 6×5 (Sable Ridge: any gun, 3% slower) | — |
 
-  - **Rounds against armour** are worked out physically (`js/ballistics.js`, `G.Ballistics`). Each layer has a
+  - **Rounds against armour** are worked out physically (`js/ballistics.ts`, `G.Ballistics`). Each layer has a
     ballistic limit for each round, de Marre's, from its thickness and the round's diameter and mass, met by the
     round's speed when it arrives times how well its core works on that material. Fabric catches soft lead pistol
     rounds and lets narrow hard ones through; hard plate flattens lead and breaks mild steel, and a hardened steel
@@ -1154,7 +1159,7 @@ says the same), but not whose: the shooter's name isn't shown.
     than the MOLLE it takes: med pouches are 2×2 on one slot, rifle pouches 1×2 on one, dump pouches 2×2 on a 2×1 strip.
   - **Item sizes:** a rifle or SMG magazine is 1×2, a pistol magazine, en-bloc clip or box of
     shells is 1×1, an LMG belt box is 2×2, and medkits and grenades are 1×1. Items turn (1×2 to 2×1).
-  - **Icons:** every item has a picture, drawn in code (`js/icons.js`). Magazines look like their gun's
+  - **Icons:** every item has a picture, drawn in code (`js/icons.ts`). Magazines look like their gun's
     (curved, AK banana, straight pistol, drum, P90 top magazine, ammo can, en-bloc clip) and
     show a round on top when loaded. Ammo boxes show the caliber with a stripe in the ammo type's colour.
     Gear is drawn by kind and tint. Guns are their own 3D model as built, rendered side-on. Icons turn
@@ -1212,7 +1217,7 @@ says the same), but not whose: the shooter's name isn't shown.
     - A reload puts the fullest magazine in and the one that was in goes back in its pouch, so you can run
       out with partly empty magazines still on you.
     - Round-by-round guns (pump guns, the lever action, the Mosin, the M32) load from boxes.
-  - **Ammo types** (`G.AMMO`, `G.CALIBERS` in `js/data.js`): loose rounds come in boxes by caliber (24 of
+  - **Ammo types** (`G.AMMO`, `G.CALIBERS` in `js/data.ts`): loose rounds come in boxes by caliber (24 of
     them, from 9×19 to .50 BMG), and a box holds one type of round. Any gun of that caliber takes them;
     magazines still belong to one gun.
 
@@ -1361,7 +1366,7 @@ says the same), but not whose: the shooter's name isn't shown.
   - Enforcers (belt-fed guns, always armoured), the only ones who throw grenades.
   - The Kingpin boss every 10th level, in assault armour.
   - **Their kit progresses at its own pace with the level**, the way the squad's does (`G.ENEMY_GEAR` in
-    `js/data.js`). Each suspect rolls a gear tier around the level's, sometimes one lower or higher:
+    `js/data.ts`). Each suspect rolls a gear tier around the level's, sometimes one lower or higher:
 
     | Levels | Tier | Typical kit |
     | --- | --- | --- |
@@ -1406,7 +1411,7 @@ says the same), but not whose: the shooter's name isn't shown.
 
 ## Characters, hitboxes and gun models
 
-- **Rig** (`js/rig.js`): every character is a jointed skeleton animated procedurally.
+- **Rig** (`js/rig.ts`): every character is a jointed skeleton animated procedurally.
   - Legs use two-bone IK onto stepping feet, so there's no foot sliding, and strafing and backpedalling step correctly.
   - Arms use IK onto the carried gun's grip and support points.
   - It covers low-ready versus shouldered aim, crouch (a kneel), corner leans, recoil, hit flinches,
@@ -1432,7 +1437,7 @@ says the same), but not whose: the shooter's name isn't shown.
     it onto its front, draw the wrists together behind its back, then tie them. Teammates see the body move with it.
 - **Hitboxes** ride the animated bones: head, chest, abdomen, upper arms, forearms, thighs and shins.
   The zones are head, chest, abdomen, upper arm, forearm, thigh and shin.
-- **Rounds are simulated through everything they meet** (`js/ballistics.js`, `js/materials.js`). A round is stepped a
+- **Rounds are simulated through everything they meet** (`js/ballistics.ts`, `js/materials.ts`). A round is stepped a
   frame at a time as a changing thing (mass, diameter, length, yaw), and everything it hits is made of something.
   - **Materials** (`G.Materials.MAT`): armour, steel, cast iron, aluminium, concrete, block, brick, sanitaryware,
     hardwood, softwood, plywood, particle board, plasterboard, cardboard, packed paper, upholstery, foams, stock, plastic,
@@ -1469,7 +1474,7 @@ says the same), but not whose: the shooter's name isn't shown.
     finished wounds go to whoever was hit, who takes them as they are (`applyWounds`), wear on their armour included.
     So what you saw land is what landed.
   - **The squad** sees the holes, exits and ricochets of a round as they happened (`rfx`).
-- **Armour and bodies are layers** (`js/materials.js` TISSUE, ARMOUR; `js/ballistics.js` through), met in order and each worked out
+- **Armour and bodies are layers** (`js/materials.ts` TISSUE, ARMOUR; `js/ballistics.ts` through), met in order and each worked out
   as itself. Armour as worn: the carrier's cover, the strike face, the backer, a steel plate's spall liner, the trauma pad;
   the other way round leaving through a back plate. A stopped round's back-face energy is damped by each layer behind
   what stopped it. A body: skin (about 10 J for a 9 mm to break through, why a spent round stops under it on the way out),
@@ -1478,13 +1483,13 @@ says the same), but not whose: the shooter's name isn't shown.
   round cancellous bone or marrow. A bone deforms a round, turns it, tips it over, and shatters: its splinters tear
   tracks of their own. With the hitboxes on (F9) the readout lists the last round's path through its target, layer by
   layer, with its speed into each.
-- **The highlights replay rounds as they really flew** (`js/highlights.js`): each round's path is kept (`js/player.js` newPath: every
+- **The highlights replay rounds as they really flew** (`js/highlights.ts`): each round's path is kept (`js/player.ts` newPath: every
   point, its speed, what it went through or off, who it went into, and the state it reached them in) and shared with the squad,
   suspects' rounds and every shotgun pellet too (`rpath`). Tracers and the bullet cam follow it round ricochets, the holes,
   exits and ricochet flashes appear as it gets to them, only those it really hit bleed, windows break when they
   did, and the x-ray re-runs the actual round as it arrived, listing what it went through, walls and armour and tissue,
   layer by layer. All of it goes in the recording .zip; older recordings still play, with straight lines.
-- **F9 keeps every shot that hit someone** (`js/shotlog.js`): for the level (the last 32), whether or not the hitboxes were on when it
+- **F9 keeps every shot that hit someone** (`js/shotlog.ts`): for the level (the last 32), whether or not the hitboxes were on when it
   was fired, the round's whole trail stays, coloured by speed, with a ghost of whoever it hit as they stood when it struck, and the
   track of every fragment and bone splinter it threw off inside them. It's shown one body at a time: put the crosshair on someone (they
   stay picked out when you look away) and the trails and ghosts of the shots that hit them appear, along with the tracks kept on their
@@ -1492,7 +1497,7 @@ says the same), but not whose: the shooter's name isn't shown.
   muzzle, where it fell through each Mach number (from 3 to 0.5, and how far out), what it went through or off, its entry speed and energy,
   its speed past their armour and the energy that cost, its exit speed or where it stopped and in what, where it broke up, and how far
   each piece went and what it weighed. The readout lists the same for each shot.
-- **Rounds cut real holes in walls and doors** (`js/damage.js`): the wall's geometry is rebuilt with the hole left out of it and a bore lined down the
+- **Rounds cut real holes in walls and doors** (`js/damage.ts`): the wall's geometry is rebuilt with the hole left out of it and a bore lined down the
   way the round went, so an angled shot leaves an angled hole. A round into a flat face leaves a crater, its mouth wider than the bullet and its sides broken in to the bore (not sheet metal: that tears, nor doors); a round into a crater starts its own from that depth, wider the deeper it is, so fire into one place digs a funnel till it comes out of the back of the wall. Every round leaves its own hole, overlapping whatever's there, with each lining stopping where it
   comes out into the next. What's between a round and the nearest holes chips away from both sides, further the bigger the hole, and close enough it breaks
   through; a round landing mostly in what's already gone only chews the edge of it. So a burst tears a ragged gap with every round still to be seen in its outline. Marks are cut against
@@ -1503,17 +1508,17 @@ says the same), but not whose: the shooter's name isn't shown.
   wall leaves a blind hole, and the next one into it starts from the bottom, so a wall too thick to go through is shot through by hitting
   the same place (67 cm of concrete takes a rifle about 28 rounds). Everyone sees the same holes, whoever joins later included, and the
   replays cut them as the rounds get there. Furniture, floors, ceilings, lintels and the wall round a window keep their marks instead.
-- **Glass fractures before it falls** (`js/damage.js` crack): a round through a pane cracks all of it, from where it struck out to the frame, and it stays up. A second round
+- **Glass fractures before it falls** (`js/damage.ts` crack): a round through a pane cracks all of it, from where it struck out to the frame, and it stays up. A second round
   brings it down, or a blast, or walking into it. Bulletproof glass still just stars.
-- **A round to the head throws it** (`js/player.js` headHit): the round's momentum is a blow about your neck, from where it struck and the way it was going, so the
+- **A round to the head throws it** (`js/player.ts` headHit): the round's momentum is a blow about your neck, from where it struck and the way it was going, so the
   forehead tips your head back, the side rolls it away, a cheek turns it, and a helmet that stops the round doesn't stop that. What's on your head is more for the blow to
-  move and for your neck to bring back, so it goes a little less far and takes longer about it, and what hangs out in front of your neck (`kg` and `fwd` in `js/gear.js`: a face shield) tips it
+  move and for your neck to bring back, so it goes a little less far and takes longer about it, and what hangs out in front of your neck (`kg` and `fwd` in `js/gear.ts`: a face shield) tips it
   further. Only your view goes: the gun stays where you were aiming.
-- **Doors can be shot apart** (`js/damage.js`, `js/server.js` doorHit): a door's handle and each of its three hinges take a certain amount of energy (400 J the
+- **Doors can be shot apart** (`js/damage.ts`, `js/server.ts` doorHit): a door's handle and each of its three hinges take a certain amount of energy (400 J the
   handle, 600 J a hinge: a rifle round or two pistol rounds). Shoot out the handle and the latch lets go and it swings open. Shoot out all
   its hinges and nothing's holding it: it falls, a rigid body on what's round it, tipped the way the last round was going. Its fall's worked out
   once, so everyone and every replay sees the same one, and it lies where it lands, walked over and stopping rounds. Vault doors don't do this.
-- **Rounds damage what they hit, by what it is** (`js/scars.js`): a mark and what's thrown out, from the material, whether the round went
+- **Rounds damage what they hit, by what it is** (`js/scars.ts`): a mark and what's thrown out, from the material, whether the round went
   in, came out, skidded or stopped, which way it was going and how much energy it had. Metal dimples toward the hole, dragged along
   the round's line, and comes out of the far side in petals bent the way it was going; a round it stops leaves a dent with lead in it, and
   a ricochet a bright gouge. Concrete, block and brick crater and crack and throw chips and dust, spalling wider out of the back than the
@@ -1521,7 +1526,7 @@ says the same), but not whose: the shooter's name isn't shown.
   paper-edged blowout out, and hangs in the air as dust. Tile, cast iron, glass and plastic star and crack; paper, cloth, foam and wool
   tear and shed what drifts; earth craters, water splashes, leaves fall. Chips land on the floor and lie there a while. Marks stay on
   doors as they swing, every player sees the same damage, and the replays show it too.
-- **A face shield shows what it caught** (`js/hud.js` maskHit): where a round strikes a shield or mandible guard shows on your view through
+- **A face shield shows what it caught** (`js/hud.ts` maskHit): where a round strikes a shield or mandible guard shows on your view through
   it: a star of cracks and a pulverised patch where it stopped one, a hole and a wide web where one came through, a short crack where one
   skipped off. They stay on that shield, wherever it goes, and don't show once you're dead.
 - **Better-equipped suspects carry lights and lasers** (`G.ENEMY_GEAR.tac`): none in the first half of the game, lights from level 5 and lasers from
@@ -1530,28 +1535,28 @@ says the same), but not whose: the shooter's name isn't shown.
   The light's on with the gun out, the laser once they're alert, both on whoever they're aiming at, and they use the same lights, beams and
   dots as the squad's.
 - **Lasers show in the replays**: where each laser landed is recorded with everyone's position, and the replay (and the video) draws it from the gun in their hands to that spot, red or green, as long as it was on.
-- **Lights dazzle** (`js/glare.js`): looking into anyone's weapon light, a suspect's or your squad's, blooms round the lamp with streaks across
+- **Lights dazzle** (`js/glare.ts`): looking into anyone's weapon light, a suspect's or your squad's, blooms round the lamp with streaks across
   your view, washing out the picture when it's bad. It takes a light pointing near you, you looking near it, and nothing in between, and it's
   worse the closer and brighter it is. It comes on quickly and goes slowly: look away and it fades over a few seconds, leaving a greenish after-image.
-- **Wallbangs and ricochets are highlights** (`js/highlights.js`): a kill whose round went through something (not a pane of glass)
+- **Wallbangs and ricochets are highlights** (`js/highlights.ts`): a kill whose round went through something (not a pane of glass)
   or off something on its way there is called out from its recorded path. It gets the bullet cam, round every turn the round
   took, then a wall cam from the far side of the hole or a ricochet cam out in front of the surface, the round's line left hanging in
   the air, each thing it met tagged where it happened (how fast in and out, the energy it cost, the angle it skipped at), and whoever it's
   going for lit through the walls until it gets there. A kill like that keeps its own segment even inside a kill streak.
-- **The armour cam** (`js/highlights.js`, `acPlan`): after a kill through armour, an officer going down through it, or a plate saving
+- **The armour cam** (`js/highlights.ts`, `acPlan`): after a kill through armour, an officer going down through it, or a plate saving
   an officer, the replay shows that round's way through the armour as a cross-section. Their ghost first, with where it struck; then the
   layers cut in half in the order it met them (cover, plate, liner, pad, soft armour, then skin, fat, muscle, bone...), the round
   running through the cut, slowing as it did and changing shape as it did. Ceramic cones and cracks, plies part, the back face bulges by the
   joules that got through, and what it never reached stays untouched. Beside it a table of each layer's speed in and out, and a bar of
   where its energy went. It's all what the round recorded when it was fired (`G.Ballistics.armourLog`, on its path: the layers, its
   speed and shape after each, how far into the last one it got), so it's in the .zip and plays the same for everyone.
-- **Damage is the energy a round leaves** (`js/ballistics.js` effects): what it deposited in a part, plus what reached the
+- **Damage is the energy a round leaves** (`js/ballistics.ts` effects): what it deposited in a part, plus what reached the
   body through armour as blunt trauma, as a share of what a person can take (`PERSON_J`, 1600 J). Nothing else: no
   multipliers, no curve. Square on an unarmoured torso that's about 10% for a .22, 20% for 9 mm, 29% for a hollow point,
   70% for 5.56 or 7.62x39, 100% for 7.62x51, and 12% a pellet for 00 buck. A limb counts for only so much (`PART_J`), the rest
   going into tissue already wrecked. What a track does to an organ on the way (below) is on top of that. Armour wears by
   the joules it soaks, and a steel target on the range swings by the round's momentum.
-- **Wounds are simulated** (`js/ballistics.js`), not multiplied: the damage and health model from tactical_game
+- **Wounds are simulated** (`js/ballistics.ts`), not multiplied: the damage and health model from tactical_game
   (its 3D anatomy and wound tracks, `src/preview3d.ts`), refitted to these bodies and made physical.
   - **The body is the rig's own shape:** each part a tapered elliptical cylinder or an ellipsoid in its bone's
     frame, the same sizes as the meshes (the chest 40 cm across and 25 deep, the head its cranium and jaw), with the
@@ -1615,7 +1620,7 @@ says the same), but not whose: the shooter's name isn't shown.
     0.3 g chip at about 900 m/s, through the same layer sums).
 
   One round at 10 m into an unarmoured body, through the middle of the part (averaged over a dozen tracks with
-  `js/ballistics.js`): the points of a 100-point person it costs at once, and what it usually leaves (in brackets:
+  `js/ballistics.ts`): the points of a 100-point person it costs at once, and what it usually leaves (in brackets:
   sometimes). Bleeding then does the rest: heavy bleeding takes a person in under a minute, massive in seconds.
 
   | Round | Head | Chest | Abdomen | Thigh | Upper arm |
@@ -1655,9 +1660,9 @@ says the same), but not whose: the shooter's name isn't shown.
   The stretch of it inside someone is also kept on them for the rest of the level (`G.R.woundTrack`): a line on each
   bone it crossed, in that bone's frame, coloured the same, with its entry and stop dots, so it turns, falls and ragdolls
   with them. Shown whenever the hitboxes are.
-- **Gun models** (`js/gunmodels.js`) are built from parametric parts at real-world scale: receivers, stocks,
+- **Gun models** (`js/gunmodels.ts`) are built from parametric parts at real-world scale: receivers, stocks,
   curved, straight and drum mags, handguards, muzzle devices, rails, optics, foregrips and lasers. Each
-  weapon's build (`js/parts.js`) patches its receiver's model spec part by part. The same build makes the
+  weapon's build (`js/parts.ts`) patches its receiver's model spec part by part. The same build makes the
   first-person viewmodel, with moving parts (pump forends, bolts, slides that lock back on empty, revolver
   cylinders, minigun barrels), and the merged third-person model that characters carry. Each recipe reports
   its sight height, so aiming down sights lines the optic up with screen centre.
@@ -1717,7 +1722,7 @@ says the same), but not whose: the shooter's name isn't shown.
   are the weapons' Wikipedia spec boxes). The model barrel length is the part that shows forward of the
   receiver, since the chamber end sits inside it. It's visual only: ballistics come from the barrel length in
   `G.GUN_SPECS`. Larger gaps are deliberate: revolvers and the derringer run up to 9% short.
-- **The sidearm web, traced from photographs** (`js/guntraces.js`, drawn by `pistol()`, `tracedRevolver()` and the
+- **The sidearm web, traced from photographs** (`js/guntraces.ts`, drawn by `pistol()`, `tracedRevolver()` and the
   `look` receivers in `rifle()`). Every gun on the web is read off a side-on photo, checked by laying the rendered model
   over it. A slide is swept along the bore, not extruded: its traced top and bottom edges with chamfered or rounded
   top corners, the ejection port cut from the right, and a long slide stretching its front half. So the 92FS has its
@@ -1727,14 +1732,14 @@ says the same), but not whose: the shooter's name isn't shown.
   Thor** is the EAA/Tanfoglio Thor (Raptor): a 1911 frame, a hinged breech sleeve with a full-length Weaver rail, a long
   thin barrel, a filler block where the magazine would be. It breaks open on the pin under the barrel, and its sights and
   rail mount tip with it. Nothing throws the empty out: the left hand takes it by the rim, draws it back up the barrel's line and
-  lets it fall, then fetches the next round (`js/vmanim.js` breakClip). The Kodiak Longshot 30" barrel (`thor.br.30`) brings an AR barrel
+  lets it fall, then fetches the next round (`js/vmanim.ts` breakClip). The Kodiak Longshot 30" barrel (`thor.br.30`) brings an AR barrel
   nut: it takes an M4 handguard, which tips open with it, and the grips, lights and lasers on that. Its irons sit on a riser and a tall front base, to see over the rail. The Bastion stock-lug grip (`thor.gr.lug`) has a steel lug on its back for any SMG stock. Its listed chamberings stop well short of .50 BMG; the game's doesn't.
-- **Crossbow bolts** kill by cutting, not by energy: about 170 J, a .22's, on a head that opens a wound. In `js/ballistics.js` a
+- **Crossbow bolts** kill by cutting, not by energy: about 170 J, a .22's, on a head that opens a wound. In `js/ballistics.ts` a
   broadhead's blades are thin (`blade`, what they shove through tissue with) and open what they pass beside (`cut`, either side of
   the track). Into bone it's the pointed ferrule between them that bears, so a skull's no bar to one at the range you'd shoot, and
   the blades cut nothing behind a skull until the head's through it. Three loads: the **broadhead** (deep, bleeds them, often right through), the **mechanical** (blades that swing open:
   the worst wound, but it stays in them) and the **bodkin** (a heavy needle: `spike` parts a soft vest's weave, a material's `weave`,
-  where a bullet is caught; a hard plate still stops it). A bolt that doesn't come out stays where it stopped (`js/bolts.js`):
+  where a bullet is caught; a hard plate still stops it). A bolt that doesn't come out stays where it stopped (`js/bolts.ts`):
   following the bone it's in, or in timber and plasterboard, not in metal, stone or a hard plate, which it breaks on. Its lit nock
   stays on in the load's colour (`glow`), in flight and where it sticks. Whoever fired it decides, and tells the squad (`bstk`).
 - **Traced from references.** Some guns' outlines are traced from a side photo or drawing rather than built from
@@ -1866,7 +1871,7 @@ says the same), but not whose: the shooter's name isn't shown.
 
 ## Weapon handling
 
-- **Rounds are projectiles** (`js/player.js` `fly`). Every round and pellet leaves at its caliber's muzzle
+- **Rounds are projectiles** (`js/player.ts` `fly`). Every round and pellet leaves at its caliber's muzzle
   velocity (`G.MUZZLE_V`, adjusted for barrel length and load: subsonic rounds stay under 310 m/s), slows with
   drag and falls with gravity. It's stepped a frame at a time against the walls, windows and everyone's
   hitboxes as they stand that frame, so a running target can step out of a slow pistol round's way at range.
@@ -1890,7 +1895,7 @@ says the same), but not whose: the shooter's name isn't shown.
 
     A 40 mm grenade (76 m/s) arcs visibly, and a crossbow bolt is half a metre low at 50 m. A round's spent
     after 4 s in the air, 550 m, or below 30 m/s.
-  - **The zeroing table** (in the workshop, or the shop's Zeroing tab; `js/zeroing.js`): turn a gun's
+  - **The zeroing table** (in the workshop, or the shop's Zeroing tab; `js/zeroing.ts`): turn a gun's
     elevation a click at a time. A click is 0.1 mil (a centimetre at 100 m, 5 at 500), up to 15 mil either
     way, from the standard zero above (`w.clicks`, `G.boreTip`): up raises where it strikes. A graph draws the
     round's path against the line of sight out to 500 m (the standard zero's path faintly behind it), marks
@@ -1914,11 +1919,11 @@ says the same), but not whose: the shooter's name isn't shown.
   as 30+1/30), and so does your loadout.
   Magazines in the inventory are drawn in colour, as full as they are (rounds from the feed lips down to the
   follower and spring), with their ammo type and no count; "EMPTY" when there's nothing in one.
-- **Chambers** (`G.chambered`, `js/data.js`). A closed-bolt gun holds a round in its chamber as well as its
+- **Chambers** (`G.chambered`, `js/data.ts`). A closed-bolt gun holds a round in its chamber as well as its
   magazine or tube; a chamber check shows it (brass in the open port, or nothing). It fires the chambered
   round and the action feeds the next, so a full M4 fires 31. A reload with a round chambered keeps it (30+1);
   run dry, the reload ends by sending a round home (29+1).
-- **The action is its own animation, apart from the reload** (`Me.workAction`, `js/vmanim.js actionPose`). A
+- **The action is its own animation, apart from the reload** (`Me.workAction`, `js/vmanim.ts actionPose`). A
   reload is only the magazine change (or the shells, the belt); run dry, the action follows it, and a partial
   reload has none. The rounds move with the action: the case it held is thrown as it comes back, and a round is
   fed as it goes home. One pose of each action (slide, charging handle, cocking handle, bolt, pump, lever) at
@@ -1944,20 +1949,20 @@ says the same), but not whose: the shooter's name isn't shown.
   the hit) or clicking. That's the same rack as a dry chamber: the right hand on the knob, up, back (the case
   flies), forward, down, 0.7 s. The time between shots is the same as before.
 
-`js/vmanim.js` animates the first-person weapon.
+`js/vmanim.ts` animates the first-person weapon.
 
 - **Arms:** both run from fixed shoulders to wherever the hands need to be, so a hand can leave the gun,
   fetch a magazine from the pouch on your hip and come back.
 - **Moving parts** on the gun models: magazine, cocking handle, pistol slide, pump, bolt, lever, belt-feed
   cover, break-open barrels and revolver cylinder.
-- **Every cocking handle is where the real one is** (`js/gunmodels.js cockHandle`, the platform's `cock` in
-  `js/parts.js`):
+- **Every cocking handle is where the real one is** (`js/gunmodels.ts cockHandle`, the platform's `cock` in
+  `js/parts.ts`):
   - **AR-15 T-handle** at the back of the upper: M4, HK416, M27, SR-25, MPX, AR-9 (and the Mk14, built on an
     AR upper here).
   - **Right-side knob:** the AK family, Galil, SVD, VSS, Saiga, Vepr and RPK; the op rods of the Garand and M14;
     the Benelli's and PPSh's bolt handles; the belt-feds; the Barrett's big one; the GM6 Lynx's, over its grip.
-- **The GM6 Lynx's barrel recoils** (a platform's `recoilBarrel` in `js/parts.js`: how far; `js/gunmodels.js` puts the
-  barrel, its collar and whatever's on its muzzle on a part of their own, and `js/vmanim.js` moves it): the Hungarian
+- **The GM6 Lynx's barrel recoils** (a platform's `recoilBarrel` in `js/parts.ts`: how far; `js/gunmodels.ts` puts the
+  barrel, its collar and whatever's on its muzzle on a part of their own, and `js/vmanim.ts` moves it): the Hungarian
   bullpup .50 is a long-recoil gun, so each shot slams the whole barrel 15 cm back into the tube in front of the grip
   in 25 ms, holds it there while the bolt unlocks, and runs it home over the next 0.15 s, a suppressor or brake riding
   with it (a short barrel's stroke stops short of the bipod's clamp). Traced from the maker's side-on studio shot (IMFDB,
@@ -2018,7 +2023,7 @@ says the same), but not whose: the shooter's name isn't shown.
     - a break-action low, barrels dropped, the shell heads in the breech; a revolver's cylinder swung out, a
       brass case head on its back for each round in it.
     - whatever's chambered is what you see.
-- **Every round shows its load**, the same everywhere (`js/icons.js` `shellCol` / `tipCol`): a shotgun shell's
+- **Every round shows its load**, the same everywhere (`js/icons.ts` `shellCol` / `tipCol`): a shotgun shell's
   hull is colour-coded (buckshot red, slug yellow, birdshot green, flechette blue) and a bullet's tip shows its
   type (ball copper, hollow point lead, AP black, tracer red, subsonic olive). That's each round as it really is
   in the gun: the chambered one, the top of the magazine, each round down a clear magazine and behind each
@@ -2047,7 +2052,7 @@ says the same), but not whose: the shooter's name isn't shown.
 
 ## Audio
 
-- **Spent cases** (`js/casings.js`) are simulated on each player's own machine.
+- **Spent cases** (`js/casings.ts`) are simulated on each player's own machine.
   - **When cases come out:**
     - Semi and full autos throw a case out of the ejection port as they fire: flicked right and up,
       tumbling, carried along with the shooter's movement.
@@ -2068,7 +2073,7 @@ says the same), but not whose: the shooter's name isn't shown.
     - Shotgun hulls make a hollow plastic tock with a click from the brass head.
     - The surface matters: tile and concrete let a case ring, wood shortens it, and carpet and grass
       leave little more than a tap. Harder impacts are louder, so each bounce is quieter than the last.
-- **Rounds going past and landing** (`js/audio.js`):
+- **Rounds going past and landing** (`js/audio.ts`):
   - **Cracks are for supersonic rounds only.** A round that passes within 5 m of you cracks only if it's
     still faster than sound (343 m/s) where it passes. Its speed comes from:
     - its caliber's real muzzle velocity, scaled by the build's barrel length (a fifth power of the length: a 25%
@@ -2091,9 +2096,9 @@ says the same), but not whose: the shooter's name isn't shown.
     or carpet, a wet hit on a body, or a ring off armour.
 
 Gunshots come from the physics-based gunshot synthesizer from `tactical_game/synth`, copied
-into `js/gunshot-synth.js` (since extended with suppressors, below). Each weapon has interior-ballistics inputs in `G.GUN_SPECS` (`js/data.js`):
+into `js/gunshot-synth.ts` (since extended with suppressors, below). Each weapon has interior-ballistics inputs in `G.GUN_SPECS` (`js/data.ts`):
 barrel length, caliber, chamber pressure, powder grain, bullet weight, action type, muzzle device and case.
-`js/gunaudio.js` (a port of tactical_game's `gunAudio.ts` + `acoustics.ts`) ray-casts the room
+`js/gunaudio.ts` (a port of tactical_game's `gunAudio.ts` + `acoustics.ts`) ray-casts the room
 around each shooter to choose a reverb environment. It renders and caches one buffer per weapon and room
 type in the background when a level loads, then plays shots with 3D HRTF panning, distance falloff, air
 absorption, and muffling through walls. Each build has a sound key (`weapon:barrelInches:muzzleDevice`), so
@@ -2211,7 +2216,7 @@ Two checklists cover what a new piece of content touches and how to check it:
 ## Level geometry (in progress: 3D levels)
 
 Levels are moving from a 2D tile grid to real 3D shapes. Every solid thing in a level (floor, ceilings,
-walls, furniture, fences, doors, windows) is a 3D solid in `G.World` (`js/world.js`), indexed in a 3D spatial
+walls, furniture, fences, doors, windows) is a 3D solid in `G.World` (`js/world.ts`), indexed in a 3D spatial
 hash, and every ray (rounds, sight, the AI's line of sight), collision and ground query is answered from those
 solids at any height. Doors and windows are dynamic: their solids change as they open, close and break.
 
@@ -2248,7 +2253,7 @@ solids at any height. Doors and windows are dynamic: their solids change as they
 
 ## Code layout
 
-- **The profiler** (`js/profiler.js`, `G.Prof`) is always on. It times the game's main pieces of work (the loop's
+- **The profiler** (`js/profiler.ts`, `G.Prof`) is always on. It times the game's main pieces of work (the loop's
   steps, `Me.update` and its parts, `Views.update`, the host's server tick and enemy AI, pathfinding, the world's
   ray casts and collision queries, `R.render`, the HUD, the network handlers by message kind), adds each one up per
   frame, and keeps the last 3600 frames in typed arrays set aside at load (about 1.5 MB, the same after an hour as
@@ -2268,7 +2273,7 @@ solids at any height. Doors and windows are dynamic: their solids change as they
   out of the scene frees its geometry (`rig.dispose`). The two blast lights are shared by the six fireballs: every
   light in the scene costs every lit pixel, lit or not.
 
-- **After-action highlights** (`js/highlights.js`, `G.Highlights`): while you play, a level is recorded at 10 Hz
+- **After-action highlights** (`js/highlights.ts`, `G.Highlights`): while you play, a level is recorded at 10 Hz
   (everyone's position, facing, pose, shots, doors) in a bounded ring (each machine records its own; the edit's choices,
   ads, sponsors, x-ray or breakdown, camera angles, clip tiebreaks, are drawn from the level's seed, so the host and
   every client cut the same broadcast), with each officer's rounds by gun and load,
@@ -2328,7 +2333,7 @@ solids at any height. Doors and windows are dynamic: their solids change as they
   The drops fall in clip time and land as marks on the floor, with spatter on a wall close behind. A pool spreads
   under anyone who dies or goes down. All of it is cleared at each angle's start.
   After a suspect's kill, either an x-ray breakdown (the organs and what the rounds did to them, and each round that
-  hit them run through the body again, traced (js/ballistics.js through: taken into their frame as they were when it
+  hit them run through the body again, traced (js/ballistics.ts through: taken into their frame as they were when it
   hit, the body posed as they were then, crouched, hands up or cowering, against their armour) and shown going in at
   them as they were (the body moves through the sequence as they did in the replay, stepping, turning, crouching,
   and is where they were for each round as that round goes in, the clip's time between rounds taken at the pace that
@@ -2361,7 +2366,7 @@ solids at any height. Doors and windows are dynamic: their solids change as they
   Sets and shared objects kept as such, `toJSON` / `fromJSON`). Nothing is rendered in the hangar, so the game keeps
   its memory. **Render highlights video** on the main menu takes one and makes the video (WebM, 960×540, 30 frames
   a second, with the audience): every frame rendered off screen in a worker as fast as the machine goes
-  (js/exportworker.js: the game's own code loaded there, the level built again from its seed, its own renderer on an
+  (js/exportworker.ts: the game's own code loaded there, the level built again from its seed, its own renderer on an
   OffscreenCanvas, each frame encoded straight from it with WebCodecs, VP8 at 2.5 Mbit/s), the sounds coming back as
   events and mixed on the page in an OfflineAudioContext (Web Audio isn't in workers), encoded as Opus, then put into a
   WebM in the worker by a small muxer (the video never comes to the page), and saved: about 30 s for a 50 s broadcast.
@@ -2373,47 +2378,47 @@ solids at any height. Doors and windows are dynamic: their solids change as they
   laughter, an impressed "OOOH!" (rising) for headshots, long shots and a third kill in a row, a warm "awww" for
   arrests (the sad "aww", for fouls and officers down, is an "ohhh" pitched down and sliding), with synthesised
   stingers (ding, horn, boing, sad trombone, jingle), and the replays' gunfire: each round's report the game's own
-  synthesised gunshot for that gun and load (its dry render, js/gunaudio.js), kept quiet, through the TV's speaker
+  synthesised gunshot for that gun and load (its dry render, js/gunaudio.ts), kept quiet, through the TV's speaker
   (a low-pass), slower and deeper in slow motion, quieter suppressed; in a video too. The replay renders at 640×360,
   20 times a second.
 
 | File | Purpose |
 | --- | --- |
-| `js/data.js` | All weapons, armour, enemies and their kit, wounds and themes. Tune the game here. |
-| `js/callsigns.js` | Squad animals: the emblems, and the shoulder and back name patches |
-| `js/level.js` | Level generator (layouts planned on grids), BFS flow fields; its ray and collision queries hand over to `js/world.js` |
-| `js/world.js` | The level as 3D solids in a 3D spatial hash: raycasts (through glass), sight lines, standing collision, ground and ceiling heights; doors and windows as dynamic solids |
-| `js/furniture.js` | Room types, furniture layout and collision boxes, furniture/decor meshes |
-| `js/server.js` | Host-only authority: phases, enemy AI, damage, objectives and the vote to leave |
-| `js/net.js` | PeerJS star-topology transport (the host is also its own client) |
-| `js/player.js` | Local player: movement, gunplay, recoil, damage, revive |
-| `js/views.js` | Rendering of remote players, enemies and grenades from snapshots |
-| `js/render.js` | Three.js scene, effects, viewmodel render pass |
-| `js/rig.js` | Character skeleton, procedural animation, bone hitboxes |
-| `js/parts.js` | Weapon platforms, parts catalogue, builds and how they change stats |
-| `js/gunmodels.js` | Procedural gun models built from parts (first person, third person, gunsmith) |
-| `js/guntraces.js` | The sidearms' outlines, traced from photographs |
-| `js/gunsmith.js` | The gunsmith: 3D weapon view, part fitting and the sticker tool |
-| `js/stickers.js` | Stickers: which there are, your collection, decals on guns, the squad's lists by hash |
-| `js/zip.js` | Writing and reading .zip files (the highlights' recordings) |
-| `js/hud.js`, `js/shop.js` | UI; the shop's stock and its buying |
-| `js/hangar.js` | The hangar between levels: workshop, store, warehouse, lounge, helicopter, and looking-to-buy |
-| `js/profiler.js` | The profiler: frame timings by piece of work, saved from the pause menu |
-| `js/damage.js` | What a round takes out of walls and doors: holes cut in their geometry, bores rays go down, doors shot off their hinges and falling |
-| `js/scars.js` | What a round does to a surface, by its material: the marks, what stands proud of them, and the chips and dust thrown out |
-| `js/glare.js` | Being dazzled by someone's weapon light |
-| `js/shotlog.js` | F9's record of the shots that hit someone: ghosts of them, the trails, and speed markers in the world |
-| `js/highlights.js` | Recording a level and replaying its highlights on the hangar's TVs, as a sports broadcast; saving it as a .zip and rendering the video from one |
-| `js/exportworker.js` | The highlights video made off the main thread: the game's code in a worker, rendering and encoding there |
-| `js/ballistics.js` | Terminal ballistics: the rounds as they change, penetration, deformation and ricochet in any material, armour layers, the body's anatomy (fitted to the rigs) and wound tracks |
-| `js/materials.js` | What everything's made of: every material's numbers, and each solid's construction |
-| `js/range.js` | The shooting range behind the hangar: lanes, targets, and giving your ammunition back |
-| `js/gear.js` | Carriers, plates, helmets, belts; the grid inventory, ammo items and protection |
-| `js/casings.js` | Ejected cases: client-side physics, rendering, and their impact sounds |
-| `js/invui.js` | The Kit tab: equipment slots, pouches, locker, drag and drop |
-| `js/icons.js` | Item icons drawn on a canvas and cached (magazines, ammo, gear, medical items, grenades) |
-| `js/medical.js` | Officers' injuries: body parts, bleeding, fractures, organs, blood, treatment |
-| `js/game.js` | Menus, message dispatch, main loop |
+| `js/data.ts` | All weapons, armour, enemies and their kit, wounds and themes. Tune the game here. |
+| `js/callsigns.ts` | Squad animals: the emblems, and the shoulder and back name patches |
+| `js/level.ts` | Level generator (layouts planned on grids), BFS flow fields; its ray and collision queries hand over to `js/world.ts` |
+| `js/world.ts` | The level as 3D solids in a 3D spatial hash: raycasts (through glass), sight lines, standing collision, ground and ceiling heights; doors and windows as dynamic solids |
+| `js/furniture.ts` | Room types, furniture layout and collision boxes, furniture/decor meshes |
+| `js/server.ts` | Host-only authority: phases, enemy AI, damage, objectives and the vote to leave |
+| `js/net.ts` | PeerJS star-topology transport (the host is also its own client) |
+| `js/player.ts` | Local player: movement, gunplay, recoil, damage, revive |
+| `js/views.ts` | Rendering of remote players, enemies and grenades from snapshots |
+| `js/render.ts` | Three.js scene, effects, viewmodel render pass |
+| `js/rig.ts` | Character skeleton, procedural animation, bone hitboxes |
+| `js/parts.ts` | Weapon platforms, parts catalogue, builds and how they change stats |
+| `js/gunmodels.ts` | Procedural gun models built from parts (first person, third person, gunsmith) |
+| `js/guntraces.ts` | The sidearms' outlines, traced from photographs |
+| `js/gunsmith.ts` | The gunsmith: 3D weapon view, part fitting and the sticker tool |
+| `js/stickers.ts` | Stickers: which there are, your collection, decals on guns, the squad's lists by hash |
+| `js/zip.ts` | Writing and reading .zip files (the highlights' recordings) |
+| `js/hud.ts`, `js/shop.ts` | UI; the shop's stock and its buying |
+| `js/hangar.ts` | The hangar between levels: workshop, store, warehouse, lounge, helicopter, and looking-to-buy |
+| `js/profiler.ts` | The profiler: frame timings by piece of work, saved from the pause menu |
+| `js/damage.ts` | What a round takes out of walls and doors: holes cut in their geometry, bores rays go down, doors shot off their hinges and falling |
+| `js/scars.ts` | What a round does to a surface, by its material: the marks, what stands proud of them, and the chips and dust thrown out |
+| `js/glare.ts` | Being dazzled by someone's weapon light |
+| `js/shotlog.ts` | F9's record of the shots that hit someone: ghosts of them, the trails, and speed markers in the world |
+| `js/highlights.ts` | Recording a level and replaying its highlights on the hangar's TVs, as a sports broadcast; saving it as a .zip and rendering the video from one |
+| `js/exportworker.ts` | The highlights video made off the main thread: the game's code in a worker, rendering and encoding there |
+| `js/ballistics.ts` | Terminal ballistics: the rounds as they change, penetration, deformation and ricochet in any material, armour layers, the body's anatomy (fitted to the rigs) and wound tracks |
+| `js/materials.ts` | What everything's made of: every material's numbers, and each solid's construction |
+| `js/range.ts` | The shooting range behind the hangar: lanes, targets, and giving your ammunition back |
+| `js/gear.ts` | Carriers, plates, helmets, belts; the grid inventory, ammo items and protection |
+| `js/casings.ts` | Ejected cases: client-side physics, rendering, and their impact sounds |
+| `js/invui.ts` | The Kit tab: equipment slots, pouches, locker, drag and drop |
+| `js/icons.ts` | Item icons drawn on a canvas and cached (magazines, ammo, gear, medical items, grenades) |
+| `js/medical.ts` | Officers' injuries: body parts, bleeding, fractures, organs, blood, treatment |
+| `js/game.ts` | Menus, message dispatch, main loop |
 
 ## Audio credits
 

@@ -1,0 +1,18 @@
+{
+  // The game's TypeScript: every js/*.ts compiles to dist/js/*.js (same name), loaded by index.html with plain <script>
+  // tags in order. They're scripts, not modules: no import/export, everything shared through the global G
+  // (js/types/globals.d.ts).
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023", "DOM", "DOM.Iterable", "WebWorker.ImportScripts"],
+    "moduleDetection": "legacy",
+    "rootDir": ".",
+    "outDir": "./dist",
+    "sourceMap": true,
+    "strict": false,
+    "noEmitOnError": false,
+    "skipLibCheck": true
+  },
+  "include": ["js/**/*.ts"],
+  "exclude": ["node_modules", "dist", ".git"]
+}

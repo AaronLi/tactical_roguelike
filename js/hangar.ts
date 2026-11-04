@@ -1,0 +1,932 @@
+'use strict';
+// The hangar: where the squad spends the time between levels. A real place on the same map machinery as a level
+// (G.Level.generateHub: walls, floor, lights, collision, rays), dressed by hand here:
+//   the workshop (west): a bench for each officer, with a computer that opens the gunsmith, and a rack of the
+//     gunsmith's parts for sale;
+//   the store (middle): Vex at his counter (his till opens the whole stock), the kit for sale on pedestals,
+//     a shelf of pouches, and two vending machines (ammunition; medical gear and grenades);
+//   the warehouse (east, at the back): a robotic crane over the stash, and a console that opens your stash and loadout;
+//   the lounge (east, at the front, by the hangar door): sofas in front of a big screen showing the highlights of the
+//     level just played (js/highlights.ts);
+//   the helipad (out the front): hold F on the helicopter to climb in and ready up; hold F again to get out.
+// Everything for sale can be bought by looking at it (F); the till, the bench computers, the console and the
+// machines' screens open the same shop panels (js/shop.ts) a menu would. Nothing here is on the host: the hangar
+// is the same on every machine, bought stock is a matter for each player, and where everyone stands is what
+// they already tell the host.
+G.Hangar = (() => {
+  const T = THREE;
+  // ------------------------------------------------------------------------ the plan (metres)
+  // Everything below is in the hall's own coordinates (its north wall at z 0..2, the range beyond it at negative z). The
+  // map has the range's rows first: RZ is how far the hall sits from the map's origin. The scene hangs from a group set
+  // RZ in (so meshes just use the hall's), and what's in the world (solids, targets, where you stand) adds it.
+  const RZ = G.HANGAR_ROWS * 2;
+  const HELI = { x: 26, z: 36.2, floor: 0.55, seats: 6 };
+  const BENCH = (i) => ({ x: 2.1, x1: 3.25, z: 4 + i * 4 });
+  const COUNTER = { x0: 22, x1: 28, z0: 4, z1: 5, h: 1.05 }, VEX = { x: 25, z: 2.9 };
+  const STAND = { z: 12.5, xs: [20.5, 23, 25.5, 28, 30.5], top: 0.95 };
+  const POUCH = { x0: 17.2, x1: 18.0, z0: 8.7, step: 1.12, n: 5 };
+  const ZERO = { x0: 6.3, x1: 8.1, z0: 13.1, z1: 14.9, h: 0.9 }; // the zeroing table, in the middle of the workshop floor
+  const PARTS = { x0: 12.9, z: 3.5, step: 1.15, n: 7, top: 0.9 }; // the gunsmith's parts, on pedestals along the north wall (east of the range's garage door)
+  const VEND = [{ id: 'ammo', title: 'AMMUNITION', x: 35.0, z: 10.0, cols: 2, rows: 3, tab: 'svc' }, { id: 'supply', title: 'FIELD SUPPLIES', x: 35.0, z: 12.2, cols: 3, rows: 3, tab: 'svc' }];
+  const CONSOLE = { x0: 38.2, x1: 39.1, z0: 7.6, z1: 10.4 };
+  const STACK = { x: 44.5, z: 6.4 }, BAY_Z = 11.2; // (the stash, and the loadout pallet in front of it)
+  const WARE = { z0: 3, z1: 13 }; // the warehouse's reach (the crane's rails, the racking)
+  // the lounge: the front of the east side, walled off from the warehouse (a gap by the store to walk through), a big
+  // screen on the east wall (js/highlights.ts TVS) and two rows of sofas facing it
+  const LOUNGE = { x0: 36, x1: 50, z0: 14.2, z1: 26, wall: 38, sofas: [{ x: 43.4, z0: 17.6, z1: 22.4 }, { x: 40.4, z0: 17.2, z1: 22.8 }], table: [45.0, 19.3, 46.0, 20.7, 0.42], bar: [37.0, 23.4, 38.0, 25.8, 1.0] };
+  // the precision showcase: the front of the workshop side, by the hangar door, done up as a hunting superstore (Timberline
+  // Outfitters): a plank floor inside log rails (a way in off the hall, and one from the workshop), eight tree stumps with the
+  // scopes, the bipod and the match barrels for sale turning on them (G.Gunsmith.rollPrecision), fibreglass rockwork along the
+  // front wall with a waterfall into a pond, a stuffed grizzly reared up on a boulder, pines, a canoe hung from the roof
+  const OUT = { x0: 5.4, x1: 16.6, z0: 16.4, z1: 26, rows: [18.6, 21.6], xs: [7.6, 9.8, 12.0, 14.2], top: 0.9, size: 0.9, rocks: 24.9, pond: [10.0, 23.0, 14.8, 25.4], bear: [7.0, 24.0], pines: [[15.9, 25.0], [6.1, 17.2]], door: [19.0, 21.2], back: 8.4 };
+  const REACH = 3.2, HELI_REACH = 4.2, HOLD = 1.1;
+
+  const S: any = { root: null, map: null, targets: [], items: [], stands: [], rigs: [], crane: null, heli: null, vend: [], hover: null, hold: 0, hl: null, t: 0, vexQuip: 0, key: '' };
+
+  // ------------------------------------------------------------------------ the solids (every machine's map has them)
+  function decorate(map) {
+    const w = map.world, add = (x0, y0, z0, x1, y1, z1, o?) => G.World.add(w, G.World.box(x0, y0, z0 + RZ, x1, y1, z1 + RZ, Object.assign({ kind: 'prop' }, o || {})));
+    for (let i = 0; i < 6; i++) { const b = BENCH(i); add(b.x, 0, b.z - 1.1, b.x1, 0.9, b.z + 1.1); }
+    for (let i = 0; i < PARTS.n; i++) { const x = PARTS.x0 + i * PARTS.step; add(x - 0.36, 0, PARTS.z - 0.34, x + 0.36, 1.5, PARTS.z + 0.34); } // (a parts pedestal, and the air its part turns in)
+    add(ZERO.x0, 0, ZERO.z0, ZERO.x1, ZERO.h + 0.05, ZERO.z1); // (the zeroing table)
+    // the precision showcase: its stumps (and the air their pieces turn in), the rockwork, the pond, the bear on its boulder,
+    // the pines, the log rails (gaps to walk in by: off the hall, and from the workshop)
+    for (const z of OUT.rows) for (const x of OUT.xs) add(x - 0.44, 0, z - 0.44, x + 0.44, 1.5, z + 0.44);
+    add(OUT.x0, 0, OUT.rocks, OUT.x1, 2.8, OUT.z1);
+    add(OUT.pond[0], 0, OUT.pond[1], OUT.pond[2], 0.5, OUT.pond[3]);
+    add(OUT.bear[0] - 1.0, 0, OUT.bear[1] - 1.0, OUT.bear[0] + 1.0, 2.8, OUT.bear[1] + 1.0);
+    for (const [x, z] of OUT.pines) add(x - 0.35, 0, z - 0.35, x + 0.35, 3.2, z + 0.35);
+    add(OUT.back, 0, OUT.z0 - 0.1, OUT.x1, 0.95, OUT.z0 + 0.1);
+    add(OUT.x1 - 0.1, 0, OUT.z0, OUT.x1 + 0.1, 0.95, OUT.door[0]); add(OUT.x1 - 0.1, 0, OUT.door[1], OUT.x1 + 0.1, 0.95, OUT.rocks);
+    add(COUNTER.x0, 0, COUNTER.z0, COUNTER.x1, COUNTER.h, COUNTER.z1);
+    add(COUNTER.x0 - 0.1, 0, 2, COUNTER.x0 + 0.1, 2.2, COUNTER.z1); add(COUNTER.x1 - 0.1, 0, 2, COUNTER.x1 + 0.1, 2.2, COUNTER.z1);
+    add(COUNTER.x0, 0, 2, COUNTER.x1, 2.2, 2.45);
+    if (G.Range) G.Range.decorate(map, add);
+    for (const x of STAND.xs) add(x - 0.5, 0, STAND.z - 0.45, x + 0.5, 2.0, STAND.z + 0.45); // (a pedestal, and the air its piece hangs in)
+    add(POUCH.x0, 0, POUCH.z0 - 0.2, POUCH.x1, 1.9, POUCH.z0 + POUCH.n * POUCH.step);
+    for (const v of VEND) add(v.x, 0, v.z - 0.55, v.x + 1.1, 1.95, v.z + 0.55);
+    add(CONSOLE.x0, 0, CONSOLE.z0, CONSOLE.x1, 1.2, CONSOLE.z1);
+    add(STACK.x - 1.2, 0, STACK.z - 1.2, STACK.x + 1.2, 1.7, STACK.z + 1.2);
+    for (const x of [38.2, 49.6]) for (const z of [WARE.z0 + 0.3, WARE.z1 - 0.3]) add(x - 0.2, 0, z - 0.2, x + 0.2, 3.5, z + 0.2); // (the crane's rail posts)
+    add(49.0, 0, WARE.z0, 50, 2.4, WARE.z1); // (racking against the east wall)
+    // the lounge: its wall, the sofas (seat and back), the coffee table, the snack bar
+    const L = LOUNGE;
+    add(L.wall, 0, L.z0 - 0.2, L.x1, 2.8, L.z0);
+    for (const s of L.sofas) add(s.x - 0.45, 0, s.z0, s.x + 0.45, 0.9, s.z1);
+    add(L.table[0], 0, L.table[1], L.table[2], L.table[4], L.table[3]);
+    add(L.bar[0], 0, L.bar[1], L.bar[2], L.bar[4], L.bar[3]);
+    // the helicopter: the cabin and nose, and the tail boom (above head height at its end, but there's no walking through it)
+    add(HELI.x - 3.4, 0, HELI.z - 1.35, HELI.x + 2.4, 2.8, HELI.z + 1.35);
+    add(HELI.x + 2.4, 1.5, HELI.z - 0.3, HELI.x + 8.3, 2.5, HELI.z + 0.3);
+  }
+
+  // ------------------------------------------------------------------------ drawing helpers
+  const mats = {};
+  const M = (c, o?) => { const k = c + JSON.stringify(o || {}); return mats[k] || (mats[k] = new T.MeshStandardMaterial(Object.assign({ color: c, roughness: 0.75, metalness: 0.15 }, o || {}))); };
+  const box = (parent, x0, y0, z0, x1, y1, z1, mat) => {
+    const m = new T.Mesh(new T.BoxGeometry(x1 - x0, y1 - y0, z1 - z0), mat);
+    m.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); parent.add(m); return m;
+  };
+  const cyl = (parent, r, h, mat, x, y, z, seg = 14) => { const m = new T.Mesh(new T.CylinderGeometry(r, r, h, seg), mat); m.position.set(x, y, z); parent.add(m); return m; };
+  function canvasTex(w, h, draw) {
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    draw(c.getContext('2d'), w, h);
+    const t = new T.CanvasTexture(c); t.anisotropy = 4; return t;
+  }
+  const fit = (g, text, max) => { let s = 1; while (s < 60 && g.measureText(text).width > max) { s++; g.font = g.font.replace(/\d+px/, (n) => (parseInt(n) - 1) + 'px'); } };
+  // a sign: lines of text on a coloured board (a line starting with ! is a warning, in orange). The name and the price
+  // are as big as fit; the lines under them share one size, the smallest any of them needs.
+  function signMat(lines, w, h, bg, fg, sub?) {
+    return new T.MeshBasicMaterial({ map: canvasTex(w, h, (g) => {
+      g.fillStyle = bg; g.fillRect(0, 0, w, h); g.strokeStyle = fg; g.lineWidth = 3; g.strokeRect(4, 4, w - 8, h - 8);
+      g.textAlign = 'center'; g.textBaseline = 'middle';
+      const n = lines.length, lh = h / n, text = (l) => (l[0] === '!' ? l.slice(1) : l);
+      const ys = n === 1 ? [0.5] : n === 2 ? [0.33, 0.72] : lines.map((_, i) => (i + 0.5) / n);
+      const want = n === 1 ? [0.5 * h] : n === 2 ? [0.42 * h, 0.28 * h] : lines.map((_, i) => (i < 2 ? 0.6 : 0.44) * lh);
+      const size = (t, px, bold) => { g.font = `${bold ? 'bold ' : ''}${Math.round(px)}px sans-serif`; const m = g.measureText(t).width; return m > w - 24 ? Math.max(8, Math.floor(px * (w - 24) / m)) : Math.round(px); };
+      const detail = lines.length > 2 ? Math.min(...lines.slice(2).map((l) => size(text(l), want[2], false))) : 0;
+      lines.forEach((l, i) => {
+        const warn = l[0] === '!', px = i >= 2 ? detail : size(text(l), want[i], i === 0);
+        g.font = `${i === 0 ? 'bold ' : ''}${px}px sans-serif`; g.fillStyle = warn ? '#ff9a5a' : i && sub ? sub : fg;
+        g.fillText(text(l), w / 2, h * ys[i]);
+      });
+    }) });
+  }
+  // a screen: a title, and a few lines
+  function screenMat(title, lines, w = 256, h = 160, color = '#7fe0ff') {
+    return new T.MeshBasicMaterial({ map: canvasTex(w, h, (g) => {
+      g.fillStyle = '#05121a'; g.fillRect(0, 0, w, h);
+      g.fillStyle = 'rgba(80,200,255,0.06)'; for (let y = 0; y < h; y += 4) g.fillRect(0, y, w, 1);
+      g.fillStyle = color; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = `bold ${Math.round(h * 0.2)}px monospace`; fit(g, title, w - 20); g.fillText(title, w / 2, h * 0.28);
+      g.font = `${Math.round(h * 0.12)}px monospace`; g.fillStyle = '#a8e8ff';
+      lines.forEach((ln, i) => g.fillText(ln, w / 2, h * (0.55 + i * 0.17)));
+    }) });
+  }
+  const texCache = new Map();
+  function iconMat(url) {
+    if (!texCache.has(url)) { const t = new T.TextureLoader().load(url); t.anisotropy = 4; const m = new T.MeshBasicMaterial({ map: t, transparent: true }); m.userData.keep = true; texCache.set(url, m); }
+    return texCache.get(url);
+  }
+  // take everything out of a group, signs' textures and all (the shared icon materials stay)
+  function clear(g) {
+    while (g.children.length) {
+      const c = g.children[0]; g.remove(c);
+      c.traverse((o) => { if (o.geometry) o.geometry.dispose(); const m = o.material; if (m && !m.userData.keep) { if (m.map) m.map.dispose(); m.dispose(); } });
+    }
+  }
+  const money = (n) => '¢' + G.U.fmt(n);
+
+  // a product on display: a card with the item's icon, `s` metres per cell of it, and a tag under it
+  function product(parent, item, x, y, z, yaw, tag, s = 0.13, tagMat = null) {
+    const [cw, ch] = G.Gear.size(item), w = Math.max(0.22, cw * s), h = Math.max(0.22, ch * s), g = new T.Group();
+    g.position.set(x, y, z); g.rotation.y = yaw;
+    const back = new T.Mesh(new T.BoxGeometry(w + 0.04, h + 0.04, 0.03), M(0x1b1e22)); back.position.z = 0; g.add(back);
+    const ic = new T.Mesh(new T.PlaneGeometry(w, h), iconMat(G.Icons.of(item, cw, ch, false))); ic.position.z = 0.0165; g.add(ic);
+    parent.add(g);
+    if (tag) { const t = new T.Mesh(new T.PlaneGeometry(0.46, 0.17), tag); t.position.set(0, -h / 2 - 0.14, 0.02); g.add(t); }
+    return g;
+  }
+  const tagMat = (name, price, extra) => signMat([name, price + (extra ? ' · ' + extra : '')], 288, 96, '#101418', '#ffd24a', '#ffffff');
+
+  // ------------------------------------------------------------------------ what's for sale: one row per thing
+  // A thing for sale or to use: its box (what you look at), what it says, and what F does.
+  function addTarget(t) { t.box = [t.box[0], t.box[1], t.box[2] + RZ, t.box[3], t.box[4], t.box[5] + RZ]; S.targets.push(t); return t; } // (boxes are said in the hall's coordinates, kept in the world's)
+  const gearOf = (id) => G.Gear.DEFS[id];
+  // what a piece of gear fits on that isn't part of the sale (a plate goes in a carrier, a face guard on a helmet)
+  const needs = (d) => (d.kind === 'plate' || d.kind === 'shoulder' || d.kind === 'groin' ? 'carrier not included' : d.kind === 'face' ? 'helmet not included' : d.kind === 'legs' ? 'belt not included' : null);
+  // The piece on show, on its own. The same models the squad wears (js/rig.ts setKit makes them in the frames of a body):
+  // built on a body that's thrown away, each part lifted out by what it is (helmet, face guard, carrier, belt, pack) and
+  // set down where it hung. A plate isn't part of a carrier's model: it's drawn here, to stand beside it.
+  const PLATE_COL = { 'p.soft': 0x5a6a78, 'p.steel': 0x3d4044, 'p.pe': 0xcfd2d6, 'p.ceramic': 0xb8a888, 'p.ceramic2': 0xd6cdb4 };
+  function plateMesh(id, k = 1) {
+    const g = new T.Group(), c = PLATE_COL[id] || 0x4a4f55;
+    box(g, -0.14 * k, 0, -0.012 * k, 0.14 * k, 0.36 * k, 0.012 * k, M(c, { roughness: 0.5, metalness: 0.4 }));
+    box(g, -0.115 * k, 0.02 * k, 0.012 * k, 0.115 * k, 0.34 * k, 0.017 * k, M(c, { roughness: 0.9 })); // (its face: a raised panel)
+    return g;
+  }
+  const SHOW = { carrier: ['carrier'], helmet: ['helmet', 'face'], face: ['face'], shoulder: ['shoulder'], groin: ['groin'], legs: ['legs'], belt: ['belt'], pack: ['pack'] }, SCALE = { carrier: 1.45, helmet: 1.9, face: 2.1, shoulder: 1.5, groin: 2, legs: 1.1, belt: 1.7, pack: 1.5 };
+  function showPiece(id) {
+    const d = gearOf(id), O = G.Shop.offers || {}, np = (d.pouches || []).length, root = new T.Group();
+    if (d.kind === 'plate') { const p = plateMesh(id, 2.3); p.position.y = STAND.top + 0.14; p.rotation.x = -0.14; root.add(p); return { root, spin: null }; }
+    const kit = d.kind === 'carrier' ? { carrier: id, plate: 0, cp: np } : d.kind === 'helmet' ? { helmet: id, face: O.faces && O.faces[id] || 0 }
+      : d.kind === 'face' ? { helmet: 'h.fast', face: id } : d.kind === 'shoulder' ? { sh: id } : d.kind === 'groin' ? { gr: id } : d.kind === 'legs' ? { lg: id } : d.kind === 'belt' ? { belt: id, bp: np } : { pack: id };
+    const rig = G.Rig.create({ style: 'tactical', bare: true, mannequin: true, look: { top: 'tshirt', topC: 0xb4bac0, pants: 'jeans', pantsC: 0x9aa1a8, eyes: 'none', gloves: 'none' }, seed: 5 });
+    rig.setKit(kit); rig.root.updateMatrixWorld(true);
+    const g = new T.Group();
+    for (const m of rig.kitParts) {
+      if (!SHOW[d.kind].includes(m.userData.part)) continue;
+      const c = new T.Mesh(m.geometry, m.material); m.updateWorldMatrix(true, false); m.matrixWorld.decompose(c.position, c.quaternion, c.scale); g.add(c);
+    }
+    // a plate that comes with a carrier stands beside it, in the same turning group (so they turn together)
+    const pl = d.kind === 'carrier' && O.plates && O.plates[id];
+    if (pl) {
+      const b0 = new T.Box3().setFromObject(g), p = plateMesh(pl, 1);
+      p.rotation.set(-0.12, Math.PI + 0.35, 0); // (its face to the front, leaning a little)
+      p.position.set(b0.max.x + 0.2, b0.min.y, (b0.min.z + b0.max.z) / 2);
+      g.add(p);
+    }
+    const bb = new T.Box3().setFromObject(g), ctr = bb.getCenter(new T.Vector3());
+    g.position.set(-ctr.x, -bb.min.y, -ctr.z);
+    const pivot = new T.Group(); pivot.add(g); pivot.scale.setScalar(SCALE[d.kind] || 1.5); pivot.position.y = STAND.top + 0.12; pivot.rotation.y = Math.PI; // (worn, its front's -z: turned to face the aisle)
+    root.add(pivot);
+    return { root, spin: pivot };
+  }
+  // A gunsmith's part on show, on its own: built on a gun it fits (in a slot it takes there), all but the part left
+  // out. If it can't be (a receiver kit, a dot that sits on a riser), its card instead.
+  // (size: how long it's drawn, its longest side; top: what it stands over. The showcase's are bigger: OUT)
+  function partPiece(id, size = 0.5, top = PARTS.top) {
+    const GS = G.Gunsmith, p = GS.PARTS[id], root = new T.Group();
+    let g = null;
+    for (const gid of GS.fits(p.mount)) {
+      const b = GS.defaultBuild(gid), sl = GS.slotFor(gid, b, p);
+      if (!sl) continue;
+      b[sl.slot] = id; GS.prune(gid, b);
+      if (b[sl.slot] !== id) continue;
+      const { group } = G.GunModels.display(GS.compile(gid, b)), keep = [];
+      group.updateMatrixWorld(true);
+      group.traverse((o) => { if (o.isMesh && o.userData.slot === sl.slot) keep.push(o); });
+      if (keep.length) {
+        g = new T.Group();
+        for (const m of keep) { const c = new T.Mesh(m.geometry, m.material); m.matrixWorld.decompose(c.position, c.quaternion, c.scale); m.material.userData.keep = true; g.add(c); } // (the guns' own materials: shared, kept)
+      }
+      group.traverse((o) => { if (o.isMesh && !keep.includes(o)) o.geometry.dispose(); });
+      if (g) break;
+    }
+    if (!g) { product(root, G.Gear.partItem(id), 0, top + 0.24, 0, 0, null, 0.1); return { root, spin: null }; }
+    const bb = new T.Box3().setFromObject(g), ctr = bb.getCenter(new T.Vector3()), sz = bb.getSize(new T.Vector3());
+    g.position.copy(ctr).negate();
+    const k = Math.min(4.5 * size / 0.5, size / Math.max(sz.x, sz.y, sz.z, 0.02)), pivot = new T.Group();
+    pivot.add(g); pivot.scale.setScalar(k); pivot.position.y = top + 0.08 + Math.min(Math.max(sz.y, sz.x, sz.z) * k / 2, size === 0.5 ? 1 : 0.3); // (the showcase's: lying long, not stood up on end)
+    pivot.rotation.x = 0; pivot.rotation.y = Math.PI / 2; // (side on to the aisle to start)
+    root.add(pivot);
+    return { root, spin: pivot };
+  }
+  // what's on the sign: the name, the price, and everything that comes with it (or doesn't)
+  function signFor(id, sold) {
+    const d = gearOf(id), Sh = G.Shop, O = Sh.offers, L = [d.name, sold ? 'SOLD' : money(Sh.gearPrice(id))];
+    if (sold) return L;
+    const pl = O.plates && O.plates[id] && gearOf(O.plates[id]), fc = O.faces && O.faces[id] && gearOf(O.faces[id]);
+    if (d.kind === 'carrier') {
+      if (d.molle) L.push('comes with: ' + Sh.issued(d));
+      if (pl) L.push('plate included: ' + pl.name); else if (d.plate) L.push('!plate pocket: plate not included');
+    } else if (d.kind === 'helmet') {
+      if (fc) L.push('face guard included: ' + fc.name); else if (d.face) L.push('!face guard not included');
+    } else if (d.kind === 'belt') L.push('comes with: ' + Sh.issued(d));
+    else if (d.kind === 'pack') { const [w, h] = d.grids[0]; L.push(`holds ${w}×${h}`); }
+    else if (needs(d)) L.push('!' + needs(d));
+    return L;
+  }
+
+  // ------------------------------------------------------------------------ building the scene
+  function enter(map) {
+    leave();
+    S.map = map; S.root = new T.Group(); S.targets = []; S.items = []; S.stands = []; S.rigs = []; S.vend = []; S.t = 0; S.hold = 0; S.vexQuip = 3; S.key = ''; S.rosterKey = rosterKey();
+    S.root.position.z = RZ;
+    G.R.levelRoot.add(S.root);
+    zones(); workshop(); outfitters(); store(); warehouse(); lounge(); helicopter(); if (G.Range) G.Range.build(S.root, S, { box, M, signMat, canvasTex, addTarget }); outline();
+    if (G.Highlights) G.Highlights.mount(S.root, { addTarget }); // (the TVs, showing the level just played, F to record it: js/highlights.ts)
+    refresh(true);
+  }
+  function leave() {
+    if (G.Range) G.Range.leave();
+    if (G.Highlights) G.Highlights.unmount();
+    if (S.root && S.root.parent) S.root.parent.remove(S.root);
+    S.root = null; S.map = null; S.targets = []; S.items = []; S.rigs = []; S.crane = null; S.heli = null; S.hover = null;
+  }
+  const rosterKey = () => Object.keys(G.Game.roster || {}).sort().join(',');
+
+  // floor markings and the signs hung over each part of the hall
+  function zones() {
+    const r = S.root;
+    const stripe = (x0, z0, x1, z1, c) => { const m = new T.Mesh(new T.PlaneGeometry(x1 - x0, z1 - z0), new T.MeshBasicMaterial({ color: c })); m.rotation.x = -Math.PI / 2; m.position.set((x0 + x1) / 2, 0.012, (z0 + z1) / 2); r.add(m); };
+    for (const x of [16, 36]) for (let z = 3; z < 26; z += 1.2) stripe(x - 0.06, z, x + 0.06, z + 0.6, 0xe8c030); // (dashed yellow between the three parts)
+    for (let x = 18; x < 34; x += 1.2) stripe(x, 26.7, x + 0.6, 26.86, 0x303438);
+    const hang = (text, sub, x, z, color) => {
+      const m = new T.Mesh(new T.PlaneGeometry(4.2, 0.95), signMat([text, sub], 512, 128, '#0f1215', color, '#cfd6dc'));
+      m.position.set(x, 3.15, z); r.add(m);
+      const b = m.clone(); b.rotation.y = Math.PI; b.position.z = z - 0.02; r.add(b);
+      for (const dx of [-1.9, 1.9]) box(r, x + dx - 0.015, 3.5, z - 0.01, x + dx + 0.015, 4, z + 0.01, M(0x30343a));
+    };
+    hang('WORKSHOP', 'a bench for each of you', 9, 7.5, '#ffb43a');
+    hang('STORE', 'look at it, press F', 26, 8.2, '#58b8ff');
+    hang('WAREHOUSE', 'stash and loadout', 44, 2.6, '#ff7a4a');
+    hang('LOUNGE', 'the highlights, on the big screen', 43, 14.6, '#ff7ac8');
+    // light fittings over the hall (the real lights are in the map: these are what they hang from)
+    for (const L of S.map.lights || []) { if (L.porch || L.kind) continue; box(r, L.x - 0.45, 3.82, L.z - RZ - 0.12, L.x + 0.45, 3.96, L.z - RZ + 0.12, new T.MeshBasicMaterial({ color: 0xfff6e0 })); }
+  }
+
+  // ---- the workshop: six benches, a computer on each, and the gunsmith's parts on the wall
+  function workshop() {
+    const r = S.root, ids = Object.keys(G.Game.roster || {}).sort();
+    for (let i = 0; i < 6; i++) {
+      const b = BENCH(i), owner = ids[i] ? G.Game.roster[ids[i]] : null, mine = ids[i] === G.Net.myId;
+      box(r, b.x, 0, b.z - 1.1, b.x1, 0.84, b.z + 1.1, M(0x4a4f55));                  // the cabinet
+      box(r, b.x - 0.02, 0.84, b.z - 1.15, b.x1 + 0.1, 0.9, b.z + 1.15, M(0x9a7a50, { roughness: 0.6 })); // the top
+      box(r, b.x, 0.9, b.z - 1.1, b.x + 0.1, 1.45, b.z + 1.1, M(0x3b3f44));           // the splashback
+      for (const dz of [-0.7, 0, 0.7]) box(r, b.x + 0.12, 0.2, b.z + dz - 0.3, b.x1 + 0.01, 0.78, b.z + dz + 0.3, M(0x363a3f)); // drawers
+      // the computer: a monitor on the top, turned to whoever stands at the bench
+      box(r, b.x + 0.2, 0.9, b.z - 0.12, b.x + 0.5, 0.98, b.z + 0.12, M(0x25282c));
+      box(r, b.x + 0.34, 0.98, b.z - 0.03, b.x + 0.4, 1.12, b.z + 0.03, M(0x25282c));
+      box(r, b.x + 0.3, 1.1, b.z - 0.34, b.x + 0.38, 1.42, b.z + 0.34, M(0x16181a));
+      const scr = new T.Mesh(new T.PlaneGeometry(0.62, 0.3), screenMat('GUNSMITH', [owner ? owner.name.toUpperCase() : 'FREE BENCH', mine ? 'F: work on your guns' : owner ? 'their bench' : ''], 256, 124));
+      scr.rotation.y = Math.PI / 2; scr.position.set(b.x + 0.385, 1.26, b.z); r.add(scr);
+      // a vice, a lamp and a few parts about
+      box(r, b.x + 0.65, 0.9, b.z + 0.55, b.x + 0.95, 1.0, b.z + 0.85, M(0x6b7076, { metalness: 0.6 }));
+      box(r, b.x + 0.7, 1.0, b.z + 0.62, b.x + 0.9, 1.08, b.z + 0.78, M(0x6b7076, { metalness: 0.6 }));
+      box(r, b.x + 0.5, 0.9, b.z - 0.85, b.x + 1.0, 0.94, b.z - 0.45, M(0x2a3a2a));
+      const lamp = new T.Mesh(new T.ConeGeometry(0.1, 0.12, 12, 1, true), M(0xcfa030, { side: T.DoubleSide })); lamp.position.set(b.x + 0.45, 1.72, b.z + 0.9); lamp.rotation.z = Math.PI; r.add(lamp);
+      box(r, b.x + 0.44, 0.95, b.z + 0.89, b.x + 0.46, 1.65, b.z + 0.91, M(0x303438));
+      // the nameplate on the front edge
+      const np = new T.Mesh(new T.PlaneGeometry(0.7, 0.16), signMat([owner ? owner.name : 'free bench'], 256, 64, mine ? '#17331f' : '#16181c', mine ? '#7dff9a' : '#c8d0d8'));
+      np.rotation.y = Math.PI / 2; np.position.set(b.x1 + 0.012, 0.74, b.z); r.add(np);
+      // a pegboard of tools above it
+      box(r, 2.02, 1.5, b.z - 1.0, 2.1, 2.5, b.z + 1.0, M(0x5a4a38));
+      for (let k = 0; k < 6; k++) box(r, 2.1, 1.7 + (k % 3) * 0.25, b.z - 0.8 + k * 0.3, 2.14, 1.9 + (k % 3) * 0.25, b.z - 0.76 + k * 0.3, M(k % 2 ? 0x9aa0a6 : 0xb04a2a));
+      addTarget({ id: 'bench' + i, kind: 'pos', box: [b.x, 0.9, b.z - 0.55, b.x1, 1.5, b.z + 0.55], label: owner ? (mine ? 'your bench' : owner.name + "'s bench") : 'a free bench', who: ids[i], tab: 'gunsmith', title: 'the gunsmith', mine });
+    }
+    // the zeroing table: a shooting bench with a rest on it and a screen drawing a round's path against the line of sight
+    {
+      const Z = ZERO, cx = (Z.x0 + Z.x1) / 2, cz = (Z.z0 + Z.z1) / 2;
+      box(r, Z.x0, Z.h - 0.06, Z.z0, Z.x1, Z.h, Z.z1, M(0x6a5a44, { roughness: 0.6 }));
+      for (const [x, z] of [[Z.x0 + 0.08, Z.z0 + 0.08], [Z.x1 - 0.08, Z.z0 + 0.08], [Z.x0 + 0.08, Z.z1 - 0.08], [Z.x1 - 0.08, Z.z1 - 0.08]]) box(r, x - 0.04, 0, z - 0.04, x + 0.04, Z.h - 0.06, z + 0.04, M(0x3b3f44));
+      box(r, cx - 0.12, Z.h, Z.z1 - 0.55, cx + 0.12, Z.h + 0.12, Z.z1 - 0.25, M(0x6b6a4a, { roughness: 1 })); // (a sandbag rest)
+      box(r, cx - 0.1, Z.h, Z.z0 + 0.25, cx + 0.1, Z.h + 0.1, Z.z0 + 0.5, M(0x6b6a4a, { roughness: 1 }));
+      box(r, Z.x0 + 0.15, Z.h, cz - 0.05, Z.x0 + 0.3, Z.h + 0.35, cz + 0.05, M(0x25282c)); // (the screen's stand)
+      const scr = new T.Mesh(new T.PlaneGeometry(0.9, 0.5), new T.MeshBasicMaterial({ map: canvasTex(360, 200, (g) => {
+        g.fillStyle = '#05121a'; g.fillRect(0, 0, 360, 200);
+        g.fillStyle = '#ffb43a'; g.font = 'bold 22px monospace'; g.textAlign = 'center'; g.fillText('ZEROING', 180, 28);
+        g.strokeStyle = '#3a5060'; g.setLineDash([6, 4]); g.beginPath(); g.moveTo(20, 110); g.lineTo(340, 110); g.stroke(); g.setLineDash([]);
+        g.strokeStyle = '#ffb43a'; g.lineWidth = 3; g.beginPath();
+        for (let x = 0; x <= 320; x += 4) { const d = x / 320, y = 128 - 70 * d * 1.9 + 120 * d * d * 1.9; x ? g.lineTo(20 + x, y) : g.moveTo(20, y); }
+        g.stroke(); g.fillStyle = '#a8e8ff'; g.font = '15px monospace'; g.fillText('F: zero your sights', 180, 182);
+      }) }));
+      scr.position.set(Z.x0 + 0.24, Z.h + 0.55, cz); scr.rotation.y = Math.PI / 2; r.add(scr);
+      const back = new T.Mesh(new T.BoxGeometry(0.03, 0.54, 0.94), M(0x16181a)); back.position.set(Z.x0 + 0.22, Z.h + 0.55, cz); r.add(back);
+      addTarget({ id: 'zero', kind: 'pos', box: [Z.x0, Z.h, Z.z0, Z.x1, Z.h + 0.9, Z.z1], label: 'the zeroing table', tab: 'zero', title: 'the zeroing table' });
+    }
+    // the gunsmith's parts this visit: a pedestal for each, the part turning on top, its sign on the front (the name
+    // over them on the wall behind)
+    const ps = new T.Mesh(new T.PlaneGeometry(2.6, 0.5), signMat(['GUNSMITH PARTS', 'bought into your stash'], 512, 100, '#101418', '#ffb43a', '#cfd6dc'));
+    ps.position.set(PARTS.x0 + (PARTS.n - 1) * PARTS.step / 2, 2.6, 2.02); r.add(ps);
+    S.partStands = [];
+    for (let i = 0; i < PARTS.n; i++) {
+      const x = PARTS.x0 + i * PARTS.step, z = PARTS.z, top = PARTS.top;
+      box(r, x - 0.48, 0, z - 0.46, x + 0.48, 0.08, z + 0.46, M(0x30353b));
+      box(r, x - 0.46, 0.08, z - 0.44, x + 0.46, 0.092, z + 0.44, M(0xe8c030, { emissive: 0x302400 }));
+      box(r, x - 0.32, 0.08, z - 0.3, x + 0.32, top - 0.03, z + 0.3, M(0x3a3f45, { roughness: 0.5 }));
+      box(r, x - 0.35, top - 0.03, z - 0.33, x + 0.35, top, z + 0.33, M(0xe8c030, { emissive: 0x302400 }));
+      const sign = new T.Mesh(new T.PlaneGeometry(0.6, 0.4), new T.MeshBasicMaterial({ color: 0x000000 })); sign.position.set(x, 0.5, z + 0.302); r.add(sign);
+      const disp = new T.Group(); disp.position.set(x, 0, z); r.add(disp);
+      const tg = addTarget({ id: 'part' + i, kind: 'buy', box: [x - 0.4, 0.1, z - 0.36, x + 0.4, 1.6, z + 0.36], what: 'part', key: null, sign, disp, spin: null });
+      S.partStands.push(tg); S.items.push(tg);
+    }
+  }
+
+  // ---- the precision showcase (OUT): a hunting superstore's corner. What's for sale is on the stumps (refresh: S.precStands).
+  function outfitters() {
+    const r = S.root, O = OUT, rnd = G.U.rng(0x7b3a5e);
+    // a log from (x0, y0, z0) to (x1, y1, z1), bark on it
+    const bark = M(0x5a3f28, { roughness: 1 }), barkD = M(0x46301e, { roughness: 1 }), up = new T.Vector3(0, 1, 0);
+    const log = (a, b, rad, mat = bark) => {
+      const A = new T.Vector3(...a), B = new T.Vector3(...b), m = new T.Mesh(new T.CylinderGeometry(rad, rad, A.distanceTo(B), 10), mat);
+      m.position.copy(A).add(B).multiplyScalar(0.5); m.quaternion.setFromUnitVectors(up, B.clone().sub(A).normalize()); r.add(m); return m;
+    };
+    // the plank floor
+    const planks = canvasTex(512, 512, (g, w, h) => {
+      for (let i = 0; i < 8; i++) { const v = 0.85 + rnd() * 0.3; g.fillStyle = `rgb(${Math.round(150 * v)},${Math.round(104 * v)},${Math.round(62 * v)})`; g.fillRect(0, i * 64, w, 64); g.fillStyle = 'rgba(40,20,5,0.55)'; g.fillRect(0, i * 64, w, 3); for (let k = 0; k < 4; k++) { g.fillStyle = `rgba(60,30,10,${0.08 + rnd() * 0.1})`; g.fillRect(0, i * 64 + 6 + rnd() * 50, w, 1.5); } g.fillStyle = 'rgba(40,20,5,0.5)'; g.fillRect(rnd() * w, i * 64, 3, 64); }
+    });
+    planks.wrapS = planks.wrapT = T.RepeatWrapping; planks.repeat.set((O.x1 - O.x0) / 3, (O.z1 - O.z0) / 3);
+    const fl = new T.Mesh(new T.PlaneGeometry(O.x1 - O.x0, O.z1 - O.z0), new T.MeshStandardMaterial({ map: planks, roughness: 0.8 }));
+    fl.rotation.x = -Math.PI / 2; fl.position.set((O.x0 + O.x1) / 2, 0.014, (O.z0 + O.z1) / 2); r.add(fl);
+    // the log rails: posts, two rails between each, along the north side (from the gap by the workshop) and the east (a gap to walk in)
+    const rail = (x0, z0, x1, z1) => {
+      const n = Math.max(1, Math.round(Math.hypot(x1 - x0, z1 - z0) / 1.6));
+      for (let i = 0; i <= n; i++) { const x = x0 + (x1 - x0) * i / n, z = z0 + (z1 - z0) * i / n; log([x, 0, z], [x, 1.05, z], 0.07, barkD); }
+      for (const y of [0.45, 0.88]) log([x0, y, z0], [x1, y, z1], 0.055);
+    };
+    rail(O.back, O.z0, O.x1, O.z0); rail(O.x1, O.z0, O.x1, O.door[0]); rail(O.x1, O.door[1], O.x1, O.rocks);
+    // the rockwork along the front wall: fibreglass boulders stacked to above head height, sandstone and grey, a pine each end
+    const rockG = new T.IcosahedronGeometry(1, 1), cols = [0x9a8468, 0x8a7a66, 0xa89276, 0x7a7064, 0xb09a7c], rocks = [];
+    for (let x = O.x0 + 0.3; x < O.x1; x += 0.9) for (let k = 0; k < 3; k++) rocks.push([x + (rnd() - 0.5) * 0.5, 0.35 + k * 0.85 + rnd() * 0.2, O.rocks + 0.55 + (rnd() - 0.5) * 0.3, 0.75 - k * 0.12 + rnd() * 0.25]);
+    for (let i = 0; i < 9; i++) { const a = rnd() * 6.28, d = rnd() * 0.7; rocks.push([O.bear[0] + Math.cos(a) * d, 0.2 + rnd() * 0.15, O.bear[1] + Math.sin(a) * d, 0.55 + rnd() * 0.25]); } // (the bear's boulder)
+    for (let x = O.pond[0]; x <= O.pond[2]; x += 0.6) rocks.push([x, 0.15, O.pond[1] + 0.15, 0.32 + rnd() * 0.12]); // (the pond's rim)
+    for (let z = O.pond[1]; z <= O.rocks; z += 0.6) for (const x of [O.pond[0], O.pond[2]]) rocks.push([x, 0.15, z, 0.32 + rnd() * 0.12]);
+    const rk = new T.InstancedMesh(rockG, new T.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, flatShading: true }), rocks.length), m4 = new T.Matrix4(), q = new T.Quaternion(), e = new T.Euler(), col = new T.Color();
+    rocks.forEach(([x, y, z, s], i) => { m4.compose(new T.Vector3(x, y, z), q.setFromEuler(e.set(rnd() * 3, rnd() * 3, rnd() * 3)), new T.Vector3(s * (0.9 + rnd() * 0.4), s * (0.7 + rnd() * 0.3), s * (0.8 + rnd() * 0.3))); rk.setMatrixAt(i, m4); rk.setColorAt(i, col.setHex(cols[Math.floor(rnd() * cols.length)])); });
+    r.add(rk);
+    // the waterfall down the rocks into the pond, the pond, a lily pad or two
+    const fx = (O.pond[0] + O.pond[2]) / 2 + 0.4;
+    const fall = new T.Mesh(new T.PlaneGeometry(0.8, 2.3), new T.MeshStandardMaterial({ color: 0xcfe8f0, emissive: 0x4a6a78, transparent: true, opacity: 0.7, roughness: 0.1 })); fall.position.set(fx, 1.5, O.rocks + 0.05); r.add(fall);
+    const pond = new T.Mesh(new T.PlaneGeometry(O.pond[2] - O.pond[0] - 0.4, O.rocks - O.pond[1] - 0.2), new T.MeshStandardMaterial({ color: 0x2a5a6a, roughness: 0.05, metalness: 0.3 })); pond.rotation.x = -Math.PI / 2; pond.position.set((O.pond[0] + O.pond[2]) / 2, 0.32, (O.pond[1] + O.rocks) / 2 + 0.1); r.add(pond);
+    const foam = new T.Mesh(new T.CircleGeometry(0.5, 16), new T.MeshBasicMaterial({ color: 0xe8f4f8, transparent: true, opacity: 0.6 })); foam.rotation.x = -Math.PI / 2; foam.position.set(fx, 0.33, O.rocks - 0.2); r.add(foam);
+    for (const [x, z] of [[O.pond[0] + 0.9, O.pond[1] + 0.8], [O.pond[0] + 1.6, O.pond[1] + 1.3]]) { const lp = new T.Mesh(new T.CircleGeometry(0.16, 10), M(0x3a6a2a)); lp.rotation.x = -Math.PI / 2; lp.position.set(x, 0.335, z); r.add(lp); }
+    // the pines: stacked cones on a short trunk
+    for (const [x, z] of O.pines) {
+      log([x, 0, z], [x, 0.7, z], 0.1, barkD);
+      for (let k = 0; k < 4; k++) { const c = new T.Mesh(new T.ConeGeometry(0.75 - k * 0.15, 1.1, 9), M([0x2e4a2a, 0x355432, 0x2a4426][k % 3], { roughness: 1, flatShading: true })); c.position.set(x, 0.95 + k * 0.6, z); r.add(c); }
+    }
+    // the bear: a stuffed grizzly reared up on its hind legs on its boulder, arms up, claws out, turned to the way in
+    {
+      const b = new T.Group(), fur = M(0x5a3a22, { roughness: 1 }), furL = M(0x7a5434, { roughness: 1 }), dark = M(0x1a1410, { roughness: 0.4 }), claw = M(0xd8ceb4, { roughness: 0.5 });
+      const part = (geo, mat, x, y, z, sx = 1, sy = 1, sz = 1) => { const m = new T.Mesh(geo, mat); m.position.set(x, y, z); m.scale.set(sx, sy, sz); b.add(m); return m; };
+      const limb = (a, c, rad, mat = fur) => { const A = new T.Vector3(...a), B = new T.Vector3(...c), m = new T.Mesh(new T.CylinderGeometry(rad, rad * 1.1, A.distanceTo(B), 10), mat); m.position.copy(A).add(B).multiplyScalar(0.5); m.quaternion.setFromUnitVectors(up, B.clone().sub(A).normalize()); b.add(m); };
+      const sph = (rad) => new T.SphereGeometry(rad, 14, 10);
+      for (const s of [-1, 1]) { limb([s * 0.22, 0.05, 0.05], [s * 0.22, 0.75, 0], 0.17); part(new T.BoxGeometry(0.26, 0.1, 0.36), fur, s * 0.22, 0.05, 0.12); }
+      part(sph(0.44), fur, 0, 0.85, 0, 1, 0.85, 0.85); // the haunches
+      part(sph(0.46), fur, 0, 1.45, 0.02, 1, 1.45, 0.85); // the body
+      part(sph(0.34), furL, 0, 1.4, 0.2, 0.85, 1.1, 0.5); // the lighter chest
+      part(sph(0.32), fur, 0, 1.98, -0.1, 1.2, 0.8, 1); // the shoulder hump
+      part(sph(0.27), fur, 0, 2.18, 0.12); // the head
+      part(new T.CylinderGeometry(0.09, 0.12, 0.24, 10), furL, 0, 2.12, 0.36).rotation.x = Math.PI / 2; // the muzzle
+      part(sph(0.045), dark, 0, 2.15, 0.48); // the nose
+      for (const s of [-1, 1]) { part(sph(0.07), fur, s * 0.18, 2.4, 0.06); part(sph(0.028), dark, s * 0.1, 2.25, 0.33); } // ears, eyes
+      part(new T.BoxGeometry(0.16, 0.05, 0.12), M(0x7a2a2a), 0, 2.03, 0.4); // the open mouth
+      for (const s of [-1, 1]) { // the arms up and out, a paw on each with its claws
+        limb([s * 0.4, 1.85, 0.05], [s * 0.62, 2.25, 0.3], 0.13);
+        part(sph(0.14), fur, s * 0.66, 2.33, 0.36, 1, 0.8, 1);
+        for (let k = 0; k < 4; k++) { const c = part(new T.ConeGeometry(0.018, 0.1, 6), claw, s * (0.6 + k * 0.04), 2.42, 0.44); c.rotation.x = 0.9; }
+      }
+      b.position.set(O.bear[0], 0.42, O.bear[1]); b.rotation.y = Math.atan2(0.85, -0.55); r.add(b);
+    }
+    // the canoe hung from the roof over the aisle: a red hull, its gunwales and thwarts, on two ropes
+    {
+      const c = new T.Group(), hull = new T.Mesh(new T.SphereGeometry(1, 24, 10, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), M(0xa8302a, { roughness: 0.5, side: T.DoubleSide }));
+      hull.scale.set(2.5, 0.34, 0.42); c.add(hull);
+      const gw = new T.Mesh(new T.TorusGeometry(1, 0.025, 6, 32), M(0x6a4a2a)); gw.rotation.x = Math.PI / 2; gw.scale.set(2.5, 0.42, 1); c.add(gw);
+      for (const x of [-0.8, 0, 0.8]) { const t = new T.Mesh(new T.BoxGeometry(0.06, 0.03, 0.78 * Math.sqrt(1 - (x / 2.5) ** 2)), M(0x8a6a44)); t.position.set(x, -0.02, 0); c.add(t); }
+      c.position.set(11.0, 3.2, 20.1); c.rotation.z = 0.04; r.add(c);
+      for (const x of [9.6, 12.4]) log([x, 3.2, 20.1], [x, 4.0, 20.1], 0.012, M(0xd8c8a0));
+    }
+    // the sign over the way in: a plank on two log posts, the name carved and the lines under it
+    {
+      const sx = O.x1, sz = (O.door[0] + O.door[1]) / 2;
+      for (const z of [O.door[0] - 0.1, O.door[1] + 0.1]) log([sx, 0, z], [sx, 2.95, z], 0.09);
+      log([sx, 2.9, O.door[0] - 0.3], [sx, 2.9, O.door[1] + 0.3], 0.07);
+      const tex = canvasTex(768, 220, (g, w, h) => {
+        g.fillStyle = '#6a4a2c'; g.fillRect(0, 0, w, h);
+        for (let i = 0; i < 40; i++) { g.fillStyle = `rgba(40,22,8,${0.1 + rnd() * 0.15})`; g.fillRect(0, rnd() * h, w, 1 + rnd() * 2); }
+        g.strokeStyle = '#3a2614'; g.lineWidth = 10; g.strokeRect(5, 5, w - 10, h - 10);
+        g.textAlign = 'center'; g.fillStyle = '#f0c870'; g.font = 'bold 74px Georgia, serif'; g.fillText('TIMBERLINE', w / 2, 92);
+        g.font = 'bold 40px Georgia, serif'; g.fillText('OUTFITTERS', w / 2, 140);
+        g.fillStyle = '#e8dcc0'; g.font = '24px Georgia, serif'; g.fillText('precision shooting · optics · bipods · match barrels', w / 2, 188);
+      });
+      for (const s of [1, -1]) { const p = new T.Mesh(new T.PlaneGeometry(2.6, 0.75), new T.MeshStandardMaterial({ map: tex, roughness: 0.8 })); p.rotation.y = s * Math.PI / 2; p.position.set(sx + s * 0.04, 2.45, sz); r.add(p); }
+      box(r, sx - 0.035, 2.07, sz - 1.32, sx + 0.035, 2.83, sz + 1.32, M(0x4a3220));
+    }
+    // the stumps: what's for sale turns on top, its card on the face to the aisle between the rows
+    S.precStands = [];
+    O.rows.forEach((z, row) => O.xs.forEach((x, i) => {
+      const face = row ? -1 : 1, top = O.top;
+      const st = new T.Mesh(new T.CylinderGeometry(0.4, 0.46, top - 0.04, 14), bark); st.position.set(x, (top - 0.04) / 2, z); r.add(st);
+      const ring = new T.Mesh(new T.CylinderGeometry(0.4, 0.4, 0.04, 14), M(0xc8a070, { roughness: 0.8 })); ring.position.set(x, top - 0.02, z); r.add(ring);
+      const core = new T.Mesh(new T.CylinderGeometry(0.22, 0.22, 0.042, 14), M(0xa8804e, { roughness: 0.8 })); core.position.set(x, top - 0.02, z); r.add(core);
+      for (let k = 0; k < 3; k++) { const a = rnd() * 6.28; log([x + Math.cos(a) * 0.4, 0.02, z + Math.sin(a) * 0.4], [x + Math.cos(a) * 0.62, 0.0, z + Math.sin(a) * 0.62], 0.06, barkD); } // (its roots)
+      const sign = new T.Mesh(new T.PlaneGeometry(0.6, 0.4), new T.MeshBasicMaterial({ color: 0x000000 })); sign.position.set(x, 0.5, z + face * 0.47); if (face < 0) sign.rotation.y = Math.PI; r.add(sign);
+      const disp = new T.Group(); disp.position.set(x, 0, z); r.add(disp);
+      const tg = addTarget({ id: 'prec' + (row * O.xs.length + i), kind: 'buy', box: [x - 0.42, 0.1, z - 0.42, x + 0.42, 1.6, z + 0.42], what: 'part', key: null, sign, disp, spin: null, signTop: top });
+      S.precStands.push(tg); S.items.push(tg);
+    }));
+  }
+
+  // ---- the store: Vex, the pedestals, the pouch shelf, the machines
+  function store() {
+    const r = S.root;
+    // the counter and the booth
+    box(r, COUNTER.x0, 0, COUNTER.z0, COUNTER.x1, COUNTER.h - 0.06, COUNTER.z1, M(0x3c4046));
+    box(r, COUNTER.x0 - 0.05, COUNTER.h - 0.06, COUNTER.z0 - 0.05, COUNTER.x1 + 0.05, COUNTER.h, COUNTER.z1 + 0.05, M(0x8a6b45, { roughness: 0.55 }));
+    box(r, COUNTER.x0 - 0.1, 0, 2, COUNTER.x0 + 0.1, 2.2, COUNTER.z1, M(0x2e3236)); box(r, COUNTER.x1 - 0.1, 0, 2, COUNTER.x1 + 0.1, 2.2, COUNTER.z1, M(0x2e3236));
+    box(r, COUNTER.x0, 0, 2, COUNTER.x1, 2.2, 2.45, M(0x2a2d31));
+    for (let k = 0; k < 4; k++) { box(r, COUNTER.x0 + 0.1, 0.5 + k * 0.5, 2.45, COUNTER.x1 - 0.1, 0.53 + k * 0.5, 2.9, M(0x5a5f66)); for (let j = 0; j < 9; j++) box(r, COUNTER.x0 + 0.25 + j * 0.62, 0.53 + k * 0.5, 2.5, COUNTER.x0 + 0.65 + j * 0.62, 0.7 + k * 0.5 + (j % 3) * 0.05, 2.8, M([0x4a5639, 0x7a2e2a, 0x3a4048, 0x8a6a3a][(j + k) % 4])); } // shelves of stock behind him
+    const sign = new T.Mesh(new T.PlaneGeometry(2.8, 0.7), signMat(['VEX', 'quartermaster · no weapons, no refunds'], 512, 128, '#14171a', '#ff9a2e', '#d0d6dc')); sign.position.set(25, 2.7, 2.48); r.add(sign);
+    // the till
+    box(r, 24.2, COUNTER.h, 4.1, 25.8, COUNTER.h + 0.06, 4.7, M(0x2a2d31));
+    box(r, 24.85, COUNTER.h + 0.06, 4.3, 25.15, COUNTER.h + 0.2, 4.5, M(0x2a2d31));
+    const till = new T.Mesh(new T.PlaneGeometry(0.8, 0.3), screenMat('VEX // STOCK', ['F: everything in stock', 'gear · parts · pouches · ammo'], 288, 108, '#ffb43a'));
+    till.position.set(25, COUNTER.h + 0.3, 4.37); till.rotation.x = -0.3; r.add(till);
+    addTarget({ id: 'vex', kind: 'pos', box: [COUNTER.x0, 0.0, 2.2, COUNTER.x1, 2.1, 5.0], label: 'Vex', tab: 'stock', title: 'Vex: the whole stock' });
+    // Vex himself
+    const vex = G.Rig.create({ style: 'tactical', bare: true, vex: true, skinColor: 0x8a6e55, look: { top: 'hoodie', topC: 0x2b2a24, pants: 'cargo', pantsC: 0x23221c, eyes: 'none', gloves: 'leather' }, seed: 77, scale: 1.04 });
+    vex.setKit({ carrier: 'c.recon', cp: 3, belt: 'b.battle', bp: 2, ifak: 1 });
+    vex.root.position.set(VEX.x, 0, VEX.z); r.add(vex.root); S.rigs.push({ rig: vex, x: VEX.x, z: VEX.z, yaw: Math.PI, vex: true });
+
+    // pedestals: one for each of the five pieces of gear for sale, the piece turning slowly on top, its sign on the front
+    S.stands = [];
+    STAND.xs.forEach((x, i) => {
+      box(r, x - 0.8, 0, STAND.z - 0.8, x + 0.8, 0.1, STAND.z + 0.8, M(0x30353b));
+      box(r, x - 0.78, 0.1, STAND.z - 0.78, x + 0.78, 0.115, STAND.z + 0.78, M(0xe8c030, { emissive: 0x302400 }));
+      box(r, x - 0.5, 0.1, STAND.z - 0.45, x + 0.5, STAND.top - 0.04, STAND.z + 0.45, M(0x3a3f45, { roughness: 0.5 }));
+      box(r, x - 0.54, STAND.top - 0.04, STAND.z - 0.49, x + 0.54, STAND.top, STAND.z + 0.49, M(0xe8c030, { emissive: 0x302400 }));
+      const sign = new T.Mesh(new T.PlaneGeometry(0.94, 0.5), new T.MeshBasicMaterial({ color: 0x000000 })); sign.position.set(x, 0.5, STAND.z + 0.452); r.add(sign);
+      const disp = new T.Group(); disp.position.set(x, 0, STAND.z); r.add(disp);
+      const tg = addTarget({ id: 'stand' + i, kind: 'buy', box: [x - 0.55, 0.1, STAND.z - 0.5, x + 0.55, 2.1, STAND.z + 0.5], what: 'gear', key: null, sign, disp, spin: null, idx: i });
+      S.stands.push(tg); S.items.push(tg);
+    });
+    // the pouch shelf (a unit with a row of cards at eye height on its east face)
+    box(r, POUCH.x0, 0, POUCH.z0 - 0.2, POUCH.x1, 1.9, POUCH.z0 + POUCH.n * POUCH.step, M(0x3b4046));
+    for (const y of [0.45, 0.95, 1.45]) box(r, POUCH.x1, y, POUCH.z0 - 0.2, POUCH.x1 + 0.26, y + 0.04, POUCH.z0 + POUCH.n * POUCH.step, M(0x6a7076));
+    const psign = new T.Mesh(new T.PlaneGeometry(1.5, 0.4), signMat(['POUCHES', 'MOLLE · one at a time'], 384, 100, '#101418', '#58b8ff', '#cfd6dc')); psign.position.set(POUCH.x1 + 0.012, 2.05, POUCH.z0 + 2.4); psign.rotation.y = Math.PI / 2; r.add(psign);
+    S.pouchSlots = [];
+    for (let i = 0; i < POUCH.n; i++) {
+      const z = POUCH.z0 + i * POUCH.step + 0.5, slot = new T.Group(); slot.position.set(0, 0, z); r.add(slot); S.pouchSlots.push(slot);
+      const tg = addTarget({ id: 'pouch' + i, kind: 'buy', box: [POUCH.x1 - 0.1, 0.5, z - 0.5, POUCH.x1 + 0.45, 1.7, z + 0.5], slot, what: 'pouch', key: null });
+      S.items.push(tg);
+    }
+    // the machines
+    VEND.forEach((v) => machine(v));
+    // a few crates and a barrel or two to make it a place
+    for (const [x, z] of [[18.6, 18.5], [19.8, 18.7], [33.2, 19]]) box(r, x - 0.4, 0, z - 0.4, x + 0.4, 0.8, z + 0.4, M(0x8a6a3a, { roughness: 0.9 }));
+  }
+  // a vending machine: a cabinet with a screen across the top and a window of slots
+  function machine(v) {
+    const r = S.root, x1 = v.x + 1.1;
+    box(r, v.x, 0, v.z - 0.55, x1, 1.95, v.z + 0.55, M(0x2d3237));
+    box(r, v.x - 0.02, 1.6, v.z - 0.55, v.x + 0.02, 1.95, v.z + 0.55, M(0x15181b));
+    const ttl = new T.Mesh(new T.PlaneGeometry(1.0, 0.3), screenMat(v.title, ['F: the full list'], 256, 76, v.id === 'ammo' ? '#ffd24a' : '#7dff9a'));
+    ttl.rotation.y = -Math.PI / 2; ttl.position.set(v.x - 0.025, 1.78, v.z); r.add(ttl);
+    const glass = new T.Mesh(new T.PlaneGeometry(0.98, 1.36), new T.MeshBasicMaterial({ color: 0x0b1620, transparent: true, opacity: 0.55 })); glass.rotation.y = -Math.PI / 2; glass.position.set(v.x - 0.02, 0.88, v.z); r.add(glass);
+    box(r, v.x - 0.04, 0.12, v.z - 0.5, v.x + 0.02, 0.26, v.z + 0.5, M(0x0e0f10)); // the delivery flap
+    const g = new T.Group(); r.add(g);
+    const m = { v, group: g, key: '', slots: [] };
+    S.vend.push(m);
+    addTarget({ id: 'vend-' + v.id, kind: 'pos', box: [v.x - 0.5, 1.55, v.z - 0.55, v.x + 0.3, 2.0, v.z + 0.55], label: v.title.toLowerCase() + ' machine', tab: v.tab, title: v.title.toLowerCase() });
+  }
+
+  // ---- the warehouse: the crane over the stash, a console, racking
+  function warehouse() {
+    const r = S.root;
+    // racking and stock against the east wall
+    for (const [z0, z1] of [[WARE.z0, WARE.z1]]) {
+      for (const y of [0.35, 1.05, 1.75]) box(r, 49.0, y, z0, 50, y + 0.05, z1, M(0x4a6a8a));
+      for (let z = z0; z <= z1; z += 2) box(r, 49.0, 0, z - 0.03, 49.05, 2.4, z + 0.03, M(0xd8602a));
+      for (let k = 0; k * 1.25 + 1.2 <= z1 - z0; k++) for (const y of [0.4, 1.1, 1.8]) box(r, 49.1, y, z0 + 0.3 + k * 1.25, 49.9, y + 0.5, z0 + 1.2 + k * 1.25, M([0x8a6a3a, 0x6f8a52, 0x7c8a96, 0x8a6a3a][(k + (y > 1 ? 1 : 0)) % 4], { roughness: 0.9 }));
+    }
+    // the console: two screens on a desk-high pedestal, turned to the store
+    box(r, CONSOLE.x0, 0, CONSOLE.z0, CONSOLE.x1, 0.95, CONSOLE.z1, M(0x363b41));
+    box(r, CONSOLE.x0 - 0.02, 0.95, CONSOLE.z0 - 0.05, CONSOLE.x1, 1.0, CONSOLE.z1 + 0.05, M(0x1c1f22));
+    const cz = (CONSOLE.z0 + CONSOLE.z1) / 2;
+    for (const [z, a, b] of [[cz - 0.45, 'STASH', 'your lockers'], [cz + 0.45, 'LOADOUT', 'what you carry']] as [number, string, string][]) {
+      box(r, CONSOLE.x0 + 0.05, 1.0, z - 0.4, CONSOLE.x0 + 0.13, 1.5, z + 0.4, M(0x16181a));
+      const s = new T.Mesh(new T.PlaneGeometry(0.76, 0.46), screenMat(a, [b, 'F: open'], 256, 152, '#ff9a5a')); s.rotation.y = -Math.PI / 2; s.position.set(CONSOLE.x0 + 0.045, 1.25, z); r.add(s);
+    }
+    addTarget({ id: 'console', kind: 'pos', box: [CONSOLE.x0 - 0.1, 0.9, CONSOLE.z0, CONSOLE.x1, 1.6, CONSOLE.z1], label: 'the warehouse console', tab: 'kit', title: 'your stash and loadout', crane: true });
+    // the stash: crates stacked in a cage the crane works over
+    const stack = new T.Group(); stack.position.set(STACK.x, 0, STACK.z); r.add(stack);
+    const crateCols = [0x8a6a3a, 0x6f8a52, 0x5a6a7a, 0x9a5a3a];
+    for (let i = 0; i < 4; i++) for (let k = 0; k < 2; k++) box(stack, (i % 2 ? 0.02 : -1.12), k * 0.8, (i < 2 ? -1.12 : 0.02), (i % 2 ? 1.12 : -0.02), k * 0.8 + 0.78, (i < 2 ? -0.02 : 1.12), M(crateCols[(i + k) % 4], { roughness: 0.9 }));
+    for (const [dx, dz] of [[-1.3, -1.3], [1.3, -1.3], [-1.3, 1.3], [1.3, 1.3]]) box(stack, dx - 0.04, 0, dz - 0.04, dx + 0.04, 1.75, dz + 0.04, M(0xf0c030)); // the cage's corner posts
+    const sg = new T.Mesh(new T.PlaneGeometry(1.8, 0.4), signMat(['STASH', 'the crane keeps it'], 384, 96, '#101418', '#ff9a5a', '#cfd6dc')); sg.position.set(STACK.x, 2.05, STACK.z - 1.36); r.add(sg);
+    // the loadout bay: a pallet where the crane sets down what you've asked for
+    box(r, STACK.x - 1.2, 0, BAY_Z - 1.0, STACK.x + 1.2, 0.14, BAY_Z + 1.0, M(0x9a7a4a));
+    // the crane: a bridge between two rails, a trolley on the bridge, a hoist with a grab
+    const rail = M(0xf0c030), steel = M(0x6e7479, { metalness: 0.6 });
+    box(r, 38.0, 3.5, WARE.z0 - 0.1, 38.4, 3.7, WARE.z1 + 0.1, rail); box(r, 49.4, 3.5, WARE.z0 - 0.1, 49.8, 3.7, WARE.z1 + 0.1, rail);
+    for (const x of [38.2, 49.6]) for (const z of [WARE.z0 + 0.3, WARE.z1 - 0.3]) box(r, x - 0.12, 0, z - 0.12, x + 0.12, 3.5, z + 0.12, steel); // (the rails' posts)
+    const bridge = new T.Group(); r.add(bridge);
+    box(bridge, -5.8, 3.62, -0.25, 5.8, 3.88, 0.25, rail);
+    box(bridge, -5.9, 3.5, -0.4, -5.7, 3.9, 0.4, steel); box(bridge, 5.7, 3.5, -0.4, 5.9, 3.9, 0.4, steel);
+    const trolley = new T.Group(); bridge.add(trolley);
+    box(trolley, -0.4, 3.35, -0.45, 0.4, 3.62, 0.45, steel);
+    const cable = new T.Mesh(new T.BoxGeometry(0.04, 1, 0.04), M(0x202326)); cable.geometry.translate(0, -0.5, 0); cable.position.y = 3.35; trolley.add(cable);
+    const grab = new T.Group(); trolley.add(grab);
+    box(grab, -0.35, 0.0, -0.35, 0.35, 0.2, 0.35, M(0xd8602a));
+    for (const sd of [-1, 1]) { box(grab, sd * 0.4 - 0.03, -0.42, -0.3, sd * 0.4 + 0.03, 0.0, 0.3, steel); box(grab, sd * 0.32, -0.44, -0.3, sd * 0.4, -0.38, 0.3, steel); }
+    const carried = new T.Mesh(new T.BoxGeometry(0.76, 0.78, 0.76), M(0x8a6a3a, { roughness: 0.9 })); carried.position.y = -0.43 - 0.39; carried.visible = false; grab.add(carried);
+    S.crane = { bridge, trolley, grab, cable, carried, cx: STACK.x, cz: STACK.z, gy: 2.9, state: 'idle', t: 0, queue: 0 };
+  }
+
+  // ---- the lounge: carpet, a wall to the warehouse, two rows of sofas facing the big screen, a coffee table, a snack bar
+  function lounge() {
+    const r = S.root, L = LOUNGE;
+    const carpet = new T.Mesh(new T.PlaneGeometry(L.x1 - L.x0 - 0.1, L.z1 - L.z0 - 0.1), M(0x2a2f3a, { roughness: 1 })); carpet.rotation.x = -Math.PI / 2; carpet.position.set((L.x0 + L.x1) / 2, 0.008, (L.z0 + L.z1) / 2); r.add(carpet);
+    const rug = new T.Mesh(new T.PlaneGeometry(8.6, 7.4), new T.MeshStandardMaterial({ roughness: 1, map: canvasTex(256, 220, (g, w, h) => { g.fillStyle = '#5a2a3a'; g.fillRect(0, 0, w, h); g.strokeStyle = '#d8a84a'; g.lineWidth = 5; g.strokeRect(12, 12, w - 24, h - 24); g.strokeStyle = '#8a4a5a'; g.lineWidth = 3; g.strokeRect(26, 26, w - 52, h - 52); }) }));
+    rug.rotation.x = -Math.PI / 2; rug.position.set(44.4, 0.012, 20); r.add(rug);
+    // the wall to the warehouse: plasterboard on a steel frame, a window strip along its top
+    box(r, L.wall, 0, L.z0 - 0.2, L.x1, 2.0, L.z0, M(0x5a6068));
+    box(r, L.wall, 2.0, L.z0 - 0.2, L.x1, 2.08, L.z0, M(0x30343a));
+    const pane = new T.Mesh(new T.BoxGeometry(L.x1 - L.wall, 0.64, 0.04), new T.MeshStandardMaterial({ color: 0x8ab0c8, transparent: true, opacity: 0.25, roughness: 0.1 })); pane.position.set((L.wall + L.x1) / 2, 2.42, L.z0 - 0.1); r.add(pane);
+    box(r, L.wall, 2.74, L.z0 - 0.2, L.x1, 2.8, L.z0, M(0x30343a));
+    box(r, L.wall - 0.08, 0, L.z0 - 0.24, L.wall, 2.8, L.z0 + 0.04, M(0x30343a)); // (its end post)
+    // the sofas: the seat, the cushions, the back on the side away from the screen (west), the arms
+    const fab = [M(0x3a4a6a, { roughness: 0.95 }), M(0x6a3a3a, { roughness: 0.95 })], cush = [M(0x4a5a7c, { roughness: 0.95 }), M(0x7c4a4a, { roughness: 0.95 })];
+    L.sofas.forEach((s, i) => {
+      box(r, s.x - 0.45, 0, s.z0, s.x + 0.45, 0.42, s.z1, fab[i]);
+      const n = Math.round((s.z1 - s.z0 - 0.4) / 0.95), cw = (s.z1 - s.z0 - 0.4) / n;
+      for (let k = 0; k < n; k++) box(r, s.x - 0.3, 0.42, s.z0 + 0.2 + k * cw + 0.02, s.x + 0.43, 0.52, s.z0 + 0.2 + (k + 1) * cw - 0.02, cush[i]);
+      box(r, s.x - 0.45, 0.42, s.z0, s.x - 0.25, 0.9, s.z1, fab[i]);
+      for (const z of [s.z0, s.z1 - 0.2]) box(r, s.x - 0.45, 0.42, z, s.x + 0.45, 0.66, z + 0.2, fab[i]);
+    });
+    // the coffee table: a top on four legs, a bowl of popcorn
+    const [tx0, tz0, tx1, tz1, th] = L.table;
+    box(r, tx0, th - 0.05, tz0, tx1, th, tz1, M(0x6b4428, { roughness: 0.6 }));
+    for (const x of [tx0 + 0.06, tx1 - 0.06]) for (const z of [tz0 + 0.06, tz1 - 0.06]) box(r, x - 0.03, 0, z - 0.03, x + 0.03, th - 0.05, z + 0.03, M(0x2a2a2a));
+    cyl(r, 0.16, 0.1, M(0xd84a3a), (tx0 + tx1) / 2, th + 0.05, (tz0 + tz1) / 2);
+    for (let k = 0; k < 9; k++) { const a = k * 2.4; cyl(r, 0.035, 0.05, M(0xfff0c0, { roughness: 1 }), (tx0 + tx1) / 2 + Math.cos(a) * 0.08 * (k % 3) / 2, th + 0.12, (tz0 + tz1) / 2 + Math.sin(a) * 0.08 * (k % 3) / 2, 6); }
+    // the snack bar by the front wall: a counter, a popcorn machine (glowing), a drinks fridge
+    const [bx0, bz0, bx1, bz1, bh] = L.bar;
+    box(r, bx0, 0, bz0, bx1, bh - 0.05, bz1, M(0x3b3f44)); box(r, bx0 - 0.03, bh - 0.05, bz0 - 0.03, bx1 + 0.03, bh, bz1 + 0.03, M(0x9a7a50, { roughness: 0.6 }));
+    const pz = bz0 + 0.55;
+    box(r, bx0 + 0.15, bh, pz - 0.3, bx1 - 0.15, bh + 0.06, pz + 0.3, M(0xc0302a));
+    const glass = new T.Mesh(new T.BoxGeometry(bx1 - bx0 - 0.34, 0.5, 0.56), new T.MeshStandardMaterial({ color: 0xffe0a0, emissive: 0x6a4a10, transparent: true, opacity: 0.55 })); glass.position.set((bx0 + bx1) / 2, bh + 0.31, pz); r.add(glass);
+    box(r, bx0 + 0.15, bh + 0.06, pz - 0.26, bx1 - 0.15, bh + 0.22, pz + 0.26, M(0xfff0c0, { roughness: 1 }));
+    box(r, bx0 + 0.15, bh + 0.56, pz - 0.3, bx1 - 0.15, bh + 0.66, pz + 0.3, M(0xc0302a));
+    const fz = bz1 - 0.6;
+    box(r, bx0 + 0.1, bh, fz - 0.4, bx1 - 0.1, bh + 0.9, fz + 0.4, M(0x2d3237));
+    const fg = new T.Mesh(new T.PlaneGeometry(0.66, 0.7), new T.MeshStandardMaterial({ color: 0x9adfff, emissive: 0x1a4a6a, transparent: true, opacity: 0.7 })); fg.rotation.y = Math.PI / 2; fg.position.set(bx1 - 0.08, bh + 0.45, fz); r.add(fg);
+  }
+
+  // ---- the helicopter: an armoured tiltrotor dropship, nose to the west, with ducted fans on stub wings
+  function helicopter() {
+    const r = S.root, P = HELI, sh = ship(), h = sh.group;
+    h.position.set(P.x, 0, P.z); r.add(h);
+    const pad = padMesh(true); pad.position.set(P.x + 0.4, 0.014, P.z); r.add(pad);
+    const hs = new T.Mesh(new T.PlaneGeometry(2.4, 0.5), signMat(['READY ROOM', 'hold F to board'], 384, 80, '#101418', '#7dff9a', '#cfd6dc')); hs.rotation.y = Math.PI; hs.position.set(P.x - 0.5, 2.98, P.z - 1.36); r.add(hs);
+    S.heli = Object.assign(sh, { rotor: sh.rotors[0], speed: 3, spin: 0 });
+    addTarget({ id: 'heli', kind: 'heli', box: [P.x - 3.5, 0.2, P.z - 1.4, P.x + 2.5, 2.9, P.z + 1.4], label: 'the helicopter' });
+  }
+  // helipad: a painted H on the paving (lit: the hangar's own daylight; in a level, what's there)
+  function padMesh(lit) {
+    const mat = { map: canvasTex(256, 220, (g, w, hh) => { g.fillStyle = '#34383d'; g.fillRect(0, 0, w, hh); g.strokeStyle = '#e8c030'; g.lineWidth = 6; g.strokeRect(10, 10, w - 20, hh - 20); g.fillStyle = '#e8c030'; g.fillRect(w / 2 - 38, hh / 2 - 50, 14, 100); g.fillRect(w / 2 + 24, hh / 2 - 50, 14, 100); g.fillRect(w / 2 - 38, hh / 2 - 7, 76, 14); }) };
+    const pad = new T.Mesh(new T.PlaneGeometry(13, 11), lit ? new T.MeshBasicMaterial(mat) : new T.MeshStandardMaterial(Object.assign(mat, { roughness: 0.9 })));
+    pad.rotation.x = -Math.PI / 2;
+    return pad;
+  }
+  // the machine itself, on the ground at the group's origin (the hangar's, and the one that brings you in: js/landing.ts)
+  function ship() {
+    const h = new T.Group(), P = HELI;
+    const body = M(0x9aa7b3, { roughness: 0.5, metalness: 0.3, emissive: 0x20262c }), armor = M(0x56626e, { roughness: 0.55, metalness: 0.4, emissive: 0x12161a }), dark = M(0x2a3036), inside = M(0x6b7279, { emissive: 0x2a3036 });
+    const accent = M(0xd9922a, { emissive: 0x3a2308 }), duct = M(0x56626e, { roughness: 0.55, metalness: 0.4, emissive: 0x12161a, side: T.DoubleSide });
+    const glass = new T.MeshStandardMaterial({ color: 0x78a8c8, transparent: true, opacity: 0.4, roughness: 0.1, metalness: 0.3 });
+    const glow = new T.MeshBasicMaterial({ color: 0x1a6a40 }); // status strips: red to green as the squad gets in
+    const thrust = new T.MeshBasicMaterial({ color: 0x5ad0ff, transparent: true, opacity: 0.2, side: T.DoubleSide, depthWrite: false, blending: T.AdditiveBlending });
+    const part = (g, mesh, x, y, z) => { mesh.position.set(x, y, z); g.add(mesh); return mesh; };
+    // cabin: the floor, the roof, the back (south), the bulkheads; the north side is open (a door's length), with
+    // a bench along the south wall facing out of it
+    box(h, -3.2, P.floor - 0.1, -1.3, 2.4, P.floor, 1.3, inside);
+    box(h, -2.4, 2.45, -1.3, 2.4, 2.65, 1.3, M(0x8a929a, { emissive: 0x555d66 }));
+    box(h, -2.4, P.floor, 1.2, 2.4, 2.45, 1.32, body);
+    box(h, 2.28, P.floor, -1.3, 2.4, 2.45, 1.3, body);
+    box(h, -2.4, P.floor, -1.32, -1.5, 2.45, -1.2, body); box(h, 2.0, P.floor, -1.32, 2.4, 2.45, -1.2, body); // the door posts
+    box(h, -2.5, P.floor, -1.3, -2.4, 2.45, 1.3, body);
+    box(h, -2.4, 2.4, -1.3, 2.4, 2.45, -1.2, accent); // the door's lintel, with a light strip under it and one along the cabin roof
+    box(h, -1.5, 2.37, -1.26, 2.0, 2.4, -1.22, glow); box(h, -2.2, 2.43, 0.42, 2.2, 2.45, 0.5, glow);
+    // armour: plates over the door posts and along the flanks, a spine along the roof with a sensor dome and a mast
+    for (const [x0, x1] of [[-2.45, -1.5], [2.0, 2.45]]) { box(h, x0, 0.9, -1.5, x1, 2.4, -1.32, armor); box(h, x0, 0.7, -1.4, x1, 0.9, -1.32, armor); box(h, x0 + 0.1, 1.2, -1.53, x1 - 0.1, 1.26, -1.5, accent); }
+    for (const [x0, x1] of [[-2.2, -0.6], [-0.4, 1.2]]) { box(h, x0, 0.8, 1.32, x1, 2.3, 1.46, armor); box(h, x0 + 0.1, 1.7, 1.46, x1 - 0.1, 1.76, 1.5, glow); }
+    box(h, -1.9, 2.65, -0.5, 2.3, 2.85, 0.5, armor); box(h, -2.4, 2.65, -0.7, -1.9, 2.75, 0.7, accent);
+    part(h, new T.Mesh(new T.SphereGeometry(0.22, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), dark), -1.5, 2.85, 0);
+    box(h, -1.0, 2.85, -0.02, -0.96, 3.5, 0.02, dark);
+    // the nose: a faceted cockpit wedge, a visor, and a sensor ball under the chin
+    const wedge = new T.CylinderGeometry(0.4, 1.7, 1.0, 4); wedge.rotateY(Math.PI / 4); wedge.rotateZ(Math.PI / 2);
+    const nose = part(h, new T.Mesh(wedge, body), -2.95, 1.4, 0); nose.scale.set(1, 0.58, 0.97);
+    const visor = part(h, new T.Mesh(new T.BoxGeometry(0.05, 0.55, 1.5), glass), -3.12, 1.92, 0); visor.rotation.z = -0.55;
+    box(h, -3.3, 0.55, -0.45, -2.45, 0.85, 0.45, armor);
+    part(h, new T.Mesh(new T.SphereGeometry(0.2, 12, 8), dark), -2.95, 0.55, 0);
+    box(h, -3.12, 0.5, -0.08, -3.1, 0.6, 0.08, glow);
+    // tail boom, a ducted fan on its end, and a canted pair of fins
+    box(h, 2.4, 1.7, -0.22, 7.8, 2.3, 0.22, body); box(h, 2.4, 2.3, -0.16, 7.6, 2.4, 0.16, armor); box(h, 3.0, 1.9, 0.22, 6.8, 1.96, 0.25, glow);
+    const cowl = part(h, new T.Mesh(new T.CylinderGeometry(0.55, 0.55, 0.5, 14, 1, true), duct), 8.0, 2.05, 0); cowl.rotation.x = Math.PI / 2;
+    for (const s of [-1, 1]) { const fin = part(h, new T.Mesh(new T.BoxGeometry(0.7, 0.9, 0.04), armor), 7.4, 2.7, s * 0.28); fin.rotation.x = s * 0.5; }
+    const tail = new T.Group(); tail.position.set(8.0, 2.05, 0); h.add(tail);
+    for (let b = 0; b < 3; b++) { const bl = new T.Mesh(new T.BoxGeometry(0.05, 0.5, 0.12), dark); bl.rotation.x = b * Math.PI / 3; tail.add(bl); }
+    // stub wings, swept back, each with a ducted rotor at its tip, a missile pod underneath and a nav light (all above head height)
+    const rotors = [];
+    for (const s of [-1, 1]) {
+      const wing = part(h, new T.Mesh(new T.BoxGeometry(1.3, 0.16, 3.5), armor), 1.45, 2.6, s * 1.75); wing.rotation.y = -s * 0.2;
+      const pod = part(h, new T.Mesh(new T.BoxGeometry(0.9, 0.22, 0.28), dark), 1.5, 2.36, s * 2.3);
+      pod.rotation.y = -s * 0.2;
+      const ring = part(h, new T.Mesh(new T.CylinderGeometry(0.98, 0.98, 0.6, 20, 1, true), duct), 1.8, 2.8, s * 3.4);
+      const lip = part(h, new T.Mesh(new T.TorusGeometry(0.98, 0.05, 6, 24), glow), 1.8, 3.1, s * 3.4); lip.rotation.x = Math.PI / 2;
+      part(h, new T.Mesh(new T.CircleGeometry(0.9, 20), thrust), 1.8, 2.5, s * 3.4).rotation.x = Math.PI / 2;
+      const rot = new T.Group(); rot.position.set(1.8, 2.85, s * 3.4); h.add(rot); rotors.push(rot);
+      for (let b = 0; b < 3; b++) { const arm = new T.Group(); arm.rotation.y = b * Math.PI * 2 / 3; rot.add(arm); part(arm, new T.Mesh(new T.BoxGeometry(0.88, 0.03, 0.2), dark), 0.46, 0, 0); }
+      part(rot, new T.Mesh(new T.CylinderGeometry(0.14, 0.14, 0.14, 10), accent), 0, 0, 0);
+      box(h, 1.7, 2.58, s * 3.4 + s * 0.98, 1.9, 2.66, s * 3.4 + s * 1.04, s < 0 ? M(0xff3030, { emissive: 0xc01010 }) : M(0x30ff60, { emissive: 0x10c030 }));
+    }
+    // skids
+    for (const z of [-1.0, 1.0]) { box(h, -2.9, 0.08, z - 0.05, 2.6, 0.16, z + 0.05, dark); for (const x of [-1.8, 1.4]) box(h, x - 0.04, 0.16, z - 0.04, x + 0.04, P.floor - 0.1, z + 0.04, dark); }
+    // the bench and its six seats along the south wall, facing the open side
+    const seat = M(0x6a7076, { emissive: 0x202328 }), bench = M(0x3a3e43, { emissive: 0x15171a });
+    box(h, -1.6, P.floor, 0.55, 1.75, P.floor + 0.42, 1.18, bench);
+    box(h, -1.6, P.floor + 0.42, 1.12, 1.75, P.floor + 1.3, 1.2, bench);
+    for (let i = 0; i < P.seats; i++) { const x = -1.3 + i * 0.5; box(h, x - 0.2, P.floor + 0.42, 0.6, x + 0.2, P.floor + 0.48, 1.1, seat); }
+    for (let i = 0; i < P.seats; i++) { const x = -1.3 + i * 0.5; box(h, x - 0.2, P.floor + 0.55, 1.05, x + 0.2, P.floor + 1.0, 1.12, seat); } // seat backs
+    return { group: h, rotors, tail, glow, thrust };
+  }
+  const seatPos = (i) => ({ x: HELI.x - 1.3 + i * 0.5, y: HELI.floor, z: RZ + HELI.z + 0.85, yaw: 0 });
+  const exitPos = (i) => ({ x: HELI.x - 1.3 + i * 0.5, y: 0, z: RZ + HELI.z - 2.6 });
+
+  // the outline shown round what you're looking at
+  function outline() {
+    const hl = new T.LineSegments(new T.EdgesGeometry(new T.BoxGeometry(1, 1, 1)), new T.LineBasicMaterial({ color: 0xffd24a, depthTest: false, transparent: true, opacity: 0.9 }));
+    hl.renderOrder = 10; hl.visible = false; S.root.add(hl); S.hl = hl;
+  }
+
+  // ------------------------------------------------------------------------ what's on display, from the shop's stock
+  // Called when the stock changes (and once on entering): puts each thing for sale in its place, taking away what's sold.
+  function refresh(force?) {
+    if (!S.root || !G.Shop.offers) return;
+    const Sh = G.Shop, O = Sh.offers;
+    if (S.rosterKey !== rosterKey()) { enter(S.map); return; } // (someone joined or left: the benches are theirs)
+    // only when something's changed (each change draws new signs)
+    const parts0 = [...(Sh.partStock || [])], prec0 = [...(Sh.precStock || [])], key = JSON.stringify([O.gear, parts0, prec0, Sh.stock]);
+    if (!force && key === S.key) { vending(false); return; }
+    S.key = key;
+    // the pedestals: the five pieces of gear
+    S.stands.forEach((tg, i) => {
+      const id = O.gear[i];
+      tg.key = id || null;
+      tg.sold = !id || !Sh.inStock('gear:' + id);
+      clear(tg.disp); tg.spin = null;
+      if (id && !tg.sold) { const sh = showPiece(id); tg.disp.add(sh.root); tg.spin = sh.spin; }
+      const lines = id ? signFor(id, tg.sold) : ['—'], n = lines.length, SH = Math.min(0.78, 0.3 + 0.17 * n); // (as tall as its lines need)
+      if (tg.sign.material.map) tg.sign.material.map.dispose(); tg.sign.material.dispose();
+      tg.sign.material = signMat(lines, 512, Math.round(512 * SH / 0.94), '#101418', tg.sold ? '#ff6a5a' : '#ffd24a', '#ffffff');
+      tg.sign.scale.set(1, SH / 0.5, 1);
+      tg.sign.position.y = 0.1 + (STAND.top - 0.14) / 2;
+    });
+    // the parts pedestals, and the precision showcase's stumps
+    const onShow = (S.partStands || []).map((tg, i) => [tg, parts0[i]]).concat((S.precStands || []).map((tg, i) => [tg, prec0[i]]));
+    onShow.forEach(([tg, id]) => {
+      const p = id && G.Gunsmith.PARTS[id];
+      const left = p ? Sh.count('part:' + id) : 0;
+      tg.key = id || null; tg.sold = !p || !left;
+      clear(tg.disp); tg.spin = null;
+      if (p && left) { const sh = tg.signTop ? partPiece(id, OUT.size, tg.signTop) : partPiece(id); tg.disp.add(sh.root); tg.spin = sh.spin; }
+      const n = p ? G.Gunsmith.fitsPart(p).length : 0;
+      const lines = !p ? ['—'] : !left ? [p.name, 'SOLD'] : [p.name, money(p.price) + (left > 1 ? ' · ' + left + ' left' : ''), `${G.Gunsmith.SLOT_LABEL[p.slot]}${n ? ' · fits ' + n + (n > 1 ? ' weapons' : ' weapon') : ''}`];
+      const SH = Math.min(0.62, 0.22 + 0.12 * lines.length);
+      if (tg.sign.material.map) tg.sign.material.map.dispose(); tg.sign.material.dispose();
+      tg.sign.material = signMat(lines, 384, Math.round(384 * SH / 0.6), '#101418', left ? '#ffd24a' : '#ff6a5a', '#ffffff');
+      tg.sign.scale.set(1, SH / 0.4, 1);
+      tg.sign.position.y = 0.08 + ((tg.signTop || PARTS.top) - 0.11) / 2;
+    });
+    // the pouch shelf
+    S.pouchSlots.forEach((slot, i) => {
+      clear(slot);
+      const tg = S.items.find((q) => q.id === 'pouch' + i), o = O.pouches[i], P = o && G.Gear.POUCHES[o.id];
+      tg.key = o ? o.id : null; tg.sold = !o || !Sh.inStock('pouch:' + o.id);
+      if (!P) return;
+      const it = G.Gear.pouchItem(o.id), left = Sh.count('pouch:' + o.id);
+      product(slot, it, POUCH.x1 + 0.16, 1.0, 0, Math.PI / 2, signMat([P.name, left ? money(P.price) + ' · ' + left + ' left' : 'SOLD'], 400, 100, '#101418', left ? '#ffd24a' : '#ff6a5a', '#ffffff'), 0.16);
+    });
+    vending(force);
+    // the gear and magazines Vex lists in his stock, that don't have a place on a shelf, are at his till
+  }
+
+  // the vending machines' contents: ammunition (the special loads, and ball for every caliber you carry a gun in), and
+  // field supplies (medical items, flashbangs and frags)
+  function vendList(id) {
+    const Sh = G.Shop, Gr = G.Gear, out = [], sv = Sh.services();
+    if (id === 'ammo') {
+      for (const o of Sh.offers.ammo) { const A = G.AMMO[o.am], C = G.CALIBERS[o.cal], it = Gr.boxItem(o.cal, o.am, o.n); out.push({ k: 'ammo', key: o.cal, item: it, name: `${C.name} ${A.name} ×${o.n}`, price: Gr.price(it), sold: !Sh.inStock('ammo:' + o.cal) }); }
+      for (const s of sv) if (s.id.startsWith('ball.')) { const cal = s.id.slice(5), C = G.CALIBERS[cal], am = G.ballFor(cal); out.push({ k: 'svc', key: s.id, item: Gr.boxItem(cal, am, C.box), name: s.name, price: s.price, sold: false }); }
+    } else {
+      for (const s of sv) {
+        if (s.id.startsWith('med.')) out.push({ k: 'svc', key: s.id, item: Gr.medItem(s.id.slice(4)), name: s.name, price: s.price, sold: false });
+        else if (s.id === 'flash') out.push({ k: 'svc', key: s.id, item: Gr.flashItem(), name: s.name, price: s.price, sold: false });
+        else if (s.id === 'nade') out.push({ k: 'svc', key: s.id, item: Gr.fragItem(), name: s.name, price: s.price, sold: false });
+      }
+    }
+    return out;
+  }
+  function vending(force) {
+    for (const m of S.vend) {
+      const list = vendList(m.v.id), key = list.map((q) => q.k + q.key + (q.sold ? 's' : '')).join('|');
+      if (!force && key === m.key) continue;
+      m.key = key;
+      clear(m.group);
+      S.targets = S.targets.filter((t) => t.vendOf !== m);
+      S.items = S.items.filter((t) => t.vendOf !== m);
+      const { v } = m, cols = v.cols, rows = v.rows, cw = 0.9 / cols, ch = 1.3 / rows;
+      list.slice(0, cols * rows).forEach((q, i) => {
+        const c = i % cols, rw = Math.floor(i / cols), z = v.z - 0.45 + cw * (c + 0.5), y = 1.5 - ch * (rw + 0.5) + 0.05;
+        const it = q.item, [iw, ih] = G.Gear.size(it), s = Math.min(cw * 0.7 / iw, ch * 0.55 / ih, 0.12);
+        const g = new T.Group(); g.position.set(v.x - 0.06, y, z); g.rotation.y = -Math.PI / 2;
+        if (!q.sold) {
+          const ic = new T.Mesh(new T.PlaneGeometry(iw * s, ih * s), iconMat(G.Icons.of(it, iw, ih, false))); ic.position.z = 0.0; g.add(ic);
+        }
+        const tag = new T.Mesh(new T.PlaneGeometry(cw * 0.92, 0.1), signMat([q.sold ? 'SOLD' : money(q.price)], 160, 44, '#05121a', q.sold ? '#ff6a5a' : '#7dff9a')); tag.position.set(0, -ch * 0.42, 0.001); g.add(tag);
+        m.group.add(g);
+        const tg = addTarget({ id: `v-${v.id}-${i}`, kind: 'buy', box: [v.x - 0.3, y - ch / 2, z - cw / 2, v.x + 0.1, y + ch / 2, z + cw / 2], what: q.k, key: q.key, vendOf: m, name: q.name, price: q.price, sold: q.sold, item: it });
+        S.items.push(tg);
+      });
+    }
+  }
+
+  // ------------------------------------------------------------------------ every frame
+  function update(dt) {
+    if (!S.root) return;
+    S.t += dt;
+    const me = G.Me;
+    // the kit on show, turning
+    for (const tg of S.stands) if (tg.spin) tg.spin.rotation.y += dt * 0.5;
+    for (const tg of (S.partStands || []).concat(S.precStands || [])) if (tg.spin) tg.spin.rotation.y += dt * 0.6;
+    // Vex, standing about
+    for (const o of S.rigs) {
+      const idle = o.vex ? { yaw: o.yaw + Math.sin(S.t * 0.35) * 0.18 } : { yaw: o.yaw };
+      o.rig.update(dt, { pos: new T.Vector3(o.x, o.y || 0, o.z), yaw: idle.yaw, pitch: 0, crouch: false, alert: false, lean: 0, state: 'alive' });
+    }
+    // the helicopter's rotor: slow at rest, faster the more of the squad are in their seats
+    const H = S.heli;
+    if (H) {
+      const ids = Object.keys(G.Game.roster || {}), ready = ids.filter((id) => G.Game.roster[id].ready).length;
+      const target = ids.length && ready === ids.length ? 38 : 2 + 14 * (ids.length ? ready / ids.length : 0);
+      H.spin += (target - H.spin) * Math.min(1, dt * 0.8);
+      H.rotors.forEach((o, i) => { o.rotation.y += (i ? -1 : 1) * H.spin * dt; }); H.tail.rotation.z += H.spin * 1.6 * dt;
+      const k = ids.length ? ready / ids.length : 0; H.glow.color.setRGB(0.9 - 0.8 * k, 0.15 + 0.75 * k, 0.1 + 0.2 * k); H.thrust.opacity = 0.08 + 0.4 * Math.min(1, H.spin / 38); // (status strips: red to green as the squad gets in)
+      H.rotor.rotation.x = Math.sin(S.t * 0.7) * 0.004 * (1 + H.spin * 0.05);
+    }
+    craneStep(dt);
+    if (G.Range) G.Range.update(dt);
+    if (G.Highlights) G.Highlights.update(dt);
+    // a word from Vex now and then, when you're in the store
+    if (me.pos && me.pos.x > 16 && me.pos.x < 36 && me.pos.z - RZ < 26 && me.pos.z - RZ > 0 && (S.vexQuip -= dt) <= 0) { S.vexQuip = 40 + Math.random() * 30; if (!G.Game.shopOpen && Math.hypot(me.pos.x - VEX.x, me.pos.z - RZ - VEX.z) < 9) G.HUD.toast('VEX', G.VENDOR_QUIPS.hello[Math.floor(Math.random() * G.VENDOR_QUIPS.hello.length)], 2.4); }
+  }
+  // the crane: drifts about the stash; when sent, picks a crate off the stack and sets it on the loadout pallet (and back)
+  function craneStep(dt) {
+    const c = S.crane;
+    if (!c) return;
+    const go = (tx, tz, sp) => { const dx = tx - c.cx, dz = tz - c.cz, d = Math.hypot(dx, dz); if (d < 0.02) return true; const k = Math.min(d, sp * dt); c.cx += dx / d * k; c.cz += dz / d * k; return false; };
+    const hoist = (to, sp) => { const d = to - c.gy; c.gy += Math.sign(d) * Math.min(Math.abs(d), sp * dt); return Math.abs(to - c.gy) < 0.01; };
+    c.t += dt;
+    if (c.state === 'idle') {
+      if (c.queue > 0) { c.queue--; c.state = 'toStack'; }
+      else { go(STACK.x + Math.sin(c.t * 0.21) * 3.2, (WARE.z0 + WARE.z1) / 2 + Math.sin(c.t * 0.15 + 1) * 3.5, 0.6); hoist(2.9, 0.5); }
+    } else if (c.state === 'toStack') { if (go(STACK.x, STACK.z, 3.2) && hoist(2.9, 1.5)) c.state = 'down'; }
+    else if (c.state === 'down') { if (hoist(2.45, 1.2)) { c.state = 'lift'; c.carried.visible = true; } }          // (onto the top crate)
+    else if (c.state === 'lift') { if (hoist(2.95, 1.2)) c.state = 'toBay'; }
+    else if (c.state === 'toBay') { if (go(STACK.x, BAY_Z, 3.2)) c.state = 'set'; }
+    else if (c.state === 'set') { if (hoist(1.45, 1.2)) { c.carried.visible = false; c.state = 'rise'; } }          // (down to the pallet, let go)
+    else if (c.state === 'rise') { if (hoist(2.9, 1.5)) c.state = 'return'; }
+    else if (c.state === 'return') { if (go(STACK.x, STACK.z, 3.2)) c.state = 'idle'; }
+    c.bridge.position.set(43.9, 0, c.cz); c.trolley.position.x = c.cx - 43.9;
+    c.grab.position.y = c.gy; c.cable.scale.y = Math.max(0.05, 3.35 - (c.gy + 0.2));
+  }
+
+  // ------------------------------------------------------------------------ looking and pressing F
+  const _o = new T.Vector3(), _d = new T.Vector3();
+  function slab(b, o, d) {
+    let t0 = 0, t1 = 1e9;
+    for (let a = 0; a < 3; a++) {
+      const lo = b[a], hi = b[a + 3], oo = a === 0 ? o.x : a === 1 ? o.y : o.z, dd = a === 0 ? d.x : a === 1 ? d.y : d.z;
+      if (Math.abs(dd) < 1e-9) { if (oo < lo || oo > hi) return -1; continue; }
+      let a1 = (lo - oo) / dd, a2 = (hi - oo) / dd; if (a1 > a2) { const q = a1; a1 = a2; a2 = q; }
+      t0 = Math.max(t0, a1); t1 = Math.min(t1, a2);
+      if (t0 > t1) return -1;
+    }
+    return t0;
+  }
+  // what's under the crosshair, in reach
+  function aim() {
+    const cam = G.R.camera;
+    _o.copy(cam.position); _d.set(0, 0, -1).applyQuaternion(cam.quaternion);
+    let best = null, bt = 1e9;
+    for (const t of S.targets) {
+      const reach = t.reach || (t.kind === 'heli' ? HELI_REACH : REACH), d = slab(t.box, _o, _d); // (t.reach: further, a TV on the wall)
+      if (d >= 0 && d < reach && d < bt) { bt = d; best = t; }
+    }
+    return best;
+  }
+  const afford = (price) => G.Me.credits >= price;
+  // what a thing says when you look at it, and what F does
+  function describe(t) {
+    const Sh = G.Shop;
+    if (t.kind === 'heli') return { html: '' };
+    if (t.kind === 'pos') {
+      if (t.id.startsWith('bench') && !t.mine) return { html: `${G.U.esc(t.label)} <small>(you work at your own)</small>` };
+      if (t.run) return { html: `Press <b>F</b> to ${G.U.esc(t.runText || 'use ' + t.label)}`, act: t.run };
+      return { html: `Press <b>F</b> to use ${G.U.esc(t.label)} <small>· ${G.U.esc(t.title)}</small>`, act: () => open(t) };
+    }
+    // something for sale
+    let name, price, sold = !!t.sold, extra = '', buy = null;
+    if (t.what === 'gear') { if (!t.key) return { html: '' }; const d = gearOf(t.key); name = d.name; price = Sh.gearPrice(t.key); sold = !Sh.inStock('gear:' + t.key); extra = d.plate && Sh.offers.plates[t.key] ? ' (plate fitted)' : needs(d) ? ` <small>(${needs(d)})</small>` : ''; buy = ['gear', t.key]; }
+    else if (t.what === 'part') { if (!t.key) return { html: '' }; const p = G.Gunsmith.PARTS[t.key]; name = p.name; price = p.price; sold = !Sh.inStock('part:' + t.key); extra = ' <small>(to your stash)</small>'; buy = ['part', t.key]; }
+    else if (t.what === 'pouch') { if (!t.key) return { html: '' }; const P = G.Gear.POUCHES[t.key]; name = P.name; price = P.price; sold = !Sh.inStock('pouch:' + t.key); buy = ['pouch', t.key]; }
+    else if (t.what === 'ammo') { name = t.name; price = t.price; sold = !Sh.inStock('ammo:' + t.key); buy = ['ammo', t.key]; }
+    else if (t.what === 'svc') { const s = Sh.services().find((q) => q.id === t.key); if (!s) return { html: '' }; name = s.name; price = s.price; sold = !!s.disabled; extra = s.disabled ? ' <small>(no room, or nothing to do)</small>' : ''; buy = ['svc', t.key]; }
+    if (!buy) return { html: '' };
+    if (sold) return { html: `<b>${G.U.esc(name)}</b> <small>sold out${t.what === 'gear' ? '' : extra}</small>` };
+    return { html: `Press <b>F</b> to buy <b>${G.U.esc(name)}</b>${extra} — <b${afford(price) ? '' : ' style="color:#ff6a5a"'}>${money(price)}</b>`, act: () => purchase(buy[0], buy[1], name) };
+  }
+  function purchase(kind, key, name) {
+    const Me = G.Me, before = Me.credits;
+    G.Shop.buy(kind, key);
+    if (Me.credits < before) G.HUD.toast('', `Bought ${G.U.esc(name)} <small>−${money(before - Me.credits)}</small>`, 1.4);
+    refresh();
+  }
+  function open(t) {
+    if (t.crane && S.crane) S.crane.queue = Math.min(2, S.crane.queue + 1);
+    G.Game.openShop(t.tab, t.title);
+  }
+  // seated: which seat is mine (the same on every machine: by position in the sorted roster)
+  function mySeat() { const ids = Object.keys(G.Game.roster || {}).sort(); return Math.max(0, Math.min(HELI.seats - 1, ids.indexOf(G.Net.myId))); }
+  // F, from the player's interact(): returns { prompt, prog, label }; walking up to a thing and pressing F
+  function interact(me, dt, held, edge) {
+    const out = { prompt: '', prog: -1, label: '' };
+    if (G.Game.shopOpen) return out;
+    // seated in the helicopter: hold F to get out
+    if (me.seat != null) {
+      out.prompt = 'Hold <b>F</b> to leave your seat <small>(you\'re ready: the helicopter goes when everyone is)</small>';
+      if (held && !me.fLatch) { S.hold += dt; out.prog = S.hold / HOLD; out.label = 'Getting out'; if (S.hold >= HOLD) { S.hold = 0; me.fLatch = true; unseat(me); } } else S.hold = 0;
+      return out;
+    }
+    const t = aim();
+    S.hover = t;
+    if (!t) { S.hold = 0; return out; }
+    if (t.kind === 'heli') {
+      out.prompt = 'Hold <b>F</b> to climb in and ready up';
+      if (held && !me.fLatch) { S.hold += dt; out.prog = S.hold / HOLD; out.label = 'Climbing in'; if (S.hold >= HOLD) { S.hold = 0; me.fLatch = true; seat(me); } } else S.hold = 0;
+      return out;
+    }
+    S.hold = 0;
+    const d = describe(t);
+    out.prompt = d.html;
+    if (edge && d.act) { me.fLatch = true; d.act(); }
+    return out;
+  }
+  function seat(me) {
+    const i = mySeat(), p = seatPos(i);
+    me.seat = i; me.pos.set(p.x, p.y, p.z); me.vel.set(0, 0, 0); me.yaw = p.yaw; me.pitch = 0; me.crouch = true; me.stowed = true; me.mouse.l = me.mouse.r = false;
+    G.Shop.setReady(true);
+    G.Audio.click();
+  }
+  function unseat(me) {
+    const p = exitPos(me.seat);
+    me.seat = null; me.pos.set(p.x, p.y, p.z); me.vel.set(0, 0, 0); me.crouch = false; me.stowed = false; me.yaw = Math.PI;
+    G.Shop.setReady(false);
+    G.Audio.click();
+  }
+  // the highlight round what you're looking at (called once a frame from the player's camera update)
+  function mark() {
+    const hl = S.hl;
+    if (!hl) return;
+    const t = G.Game.shopOpen || (G.Me && G.Me.seat != null) ? null : S.hover;
+    if (!t || t.kind === 'heli' || (t.kind === 'buy' && !describe(t).act)) { hl.visible = false; return; }
+    const b = t.box;
+    hl.visible = true; hl.position.set((b[0] + b[3]) / 2, (b[1] + b[4]) / 2, (b[2] + b[5]) / 2 - RZ); hl.scale.set(b[3] - b[0], b[4] - b[1], b[5] - b[2]);
+  }
+  // where you stand when you come in: on the pad, in front of the opening
+  function spawnAt(i) { const x = 26 + (i % 3 - 1) * 1.6, z = RZ + 30.4 + Math.floor(i / 3) * 1.4; return { x, z }; }
+
+  return { decorate, enter, leave, update, refresh, aim, interact, mark, seatPos, exitPos, spawnAt, ship, padMesh, S, HELI, HOLD, RZ };
+})();

@@ -3,7 +3,7 @@
 Work through it top to bottom. Every box is something that has broken before or is easy to forget. Test with
 the game muted (`G.Game.setMuted(true)`) unless you're checking sound.
 
-## 1. Stats: `js/data.js`
+## 1. Stats: `js/data.ts`
 
 - [ ] **`W({...})` entry in `G.WEAPON_LIST`**, with these fields:
   - `id`: short, unique, used everywhere
@@ -27,7 +27,7 @@ the game muted (`G.Game.setMuted(true)`) unless you're checking sound.
   order, give it an entry in `G.FIRE_MODES`. Check X cycles it and the HUD shows the mode.
 - [ ] **`GS(...)` entry in `G.GUN_SPECS`** (barrel inches, caliber, muzzle device, pressure, grain, bullet
   weight, bolt mass/loudness, action, case material/length, shot count). This drives:
-  - the synthesized gunshot (`js/gunshot-synth.js`)
+  - the synthesized gunshot (`js/gunshot-synth.ts`)
   - the caliber (`G.calOf`)
   - the casings
   - the muzzle velocity (supersonic crack or subsonic zip)
@@ -38,10 +38,10 @@ the game muted (`G.Game.setMuted(true)`) unless you're checking sound.
 - [ ] **Supersonic or not:** `G.roundSpeed(def, 'ball', 5)` above 343 m/s cracks past you, below zips.
   Subsonic loads and `integral` guns are capped at 310.
 - [ ] **Enemy use (optional):** add the id to a pool in `G.ENEMY_GEAR.weapons` (type → tier 1–4 lists).
-  Enemies then carry its real magazine and reload time (`js/server.js` `startReload`), so check `mag` and
+  Enemies then carry its real magazine and reload time (`js/server.ts` `startReload`), so check `mag` and
   `reload` are sensible for an AI.
 
-## 2. Platform, parts and attachments: `js/parts.js`
+## 2. Platform, parts and attachments: `js/parts.ts`
 
 - [ ] **`P(id, archetype, spec, slots)` platform**, or `pst(...)` for pistols:
   - **Archetype:** `rifle`, `revolver`, `derringer`, `launcher`, `minigun`, `railgun`, `crossbow`, …
@@ -63,7 +63,7 @@ the game muted (`G.Game.setMuted(true)`) unless you're checking sound.
 - [ ] **Magazine variants** (compact/extended/drum) show in the Magazines section, not as attachments: the
   platform's `magVariants` is set automatically for detachable magazines. Check `visibleSlots` hides `mag`.
 - [ ] **Shared magazines:** if the real gun takes a common pattern's magazines (STANAG, MP5, AK), add it to
-  `G.MAG_FAMILY` (`js/data.js`). Its platform then uses the pattern's magazines (`parts.js` `MAG_FAMS`)
+  `G.MAG_FAMILY` (`js/data.ts`). Its platform then uses the pattern's magazines (`parts.js` `MAG_FAMS`)
   instead of making its own, and its default is the one matching `def.mag`. Check `G.magFits` both ways
   with another gun of the pattern, and that its magazine still sits in the well (the pattern's model
   is used, not the gun's `mag`). A new pattern needs an entry in `MAG_FAMS` (capacities, model, brand).
@@ -79,7 +79,7 @@ the game muted (`G.Game.setMuted(true)`) unless you're checking sound.
 - [ ] **Compile check:** `G.Gunsmith.compile(id, G.Gunsmith.defaultBuild(id))` returns a def with
   `soundKey`, `code`, a magazine capacity, and no NaN stats.
 
-## 3. Model and sights: `js/gunmodels.js`
+## 3. Model and sights: `js/gunmodels.ts`
 
 To rebuild a gun from photographs, use the `rework-gun` skill (`.claude/skills/rework-gun/SKILL.md`); `docs/gun-reworks.md` logs what's been done.
 
@@ -136,7 +136,7 @@ To rebuild a gun from photographs, use the `rework-gun` skill (`.claude/skills/r
   - magazine guns use the samples (`pull_magazine`, `insert_magazine`, `rack_slide`/`drop_slide`)
   - shell-fed guns play one insert per round
   - en-bloc guns ping when empty
-- [ ] **Casings:** `js/casings.js` `mode(def)`:
+- [ ] **Casings:** `js/casings.ts` `mode(def)`:
   - `shot`: ejected per shot
   - `cycle`: on the pump, bolt or lever stroke
   - `reload`: dumped on reload (revolvers, break-actions)
@@ -148,7 +148,7 @@ To rebuild a gun from photographs, use the `rework-gun` skill (`.claude/skills/r
 ## 5. Ammo, magazines and inventory
 
 - [ ] **Magazine item:**
-  - draws an icon (`js/icons.js`: style by gun or variant; drums detected)
+  - draws an icon (`js/icons.ts`: style by gun or variant; drums detected)
   - its size fits a rifle pouch (1×2) or pistol slot (1×1) as intended
   - loads from boxes of its caliber
 - [ ] **Shell-fed guns:** load from boxes round by round (field job timing in `invui.js` `PER`). A

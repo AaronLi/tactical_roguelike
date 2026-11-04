@@ -1,0 +1,44 @@
+# The game on GitHub Pages: its TypeScript compiled (npm run build: js/*.ts -> dist/js/), then the site published as
+# it is in the repo with dist/ added. Pull requests and other branches build only (a check that it compiles).
+# One-time setup: Settings -> Pages -> Source: GitHub Actions.
+name: pages
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - name: The site
+        run: |
+          mkdir -p _site
+          rsync -a --exclude node_modules --exclude _site --exclude .git --exclude .github ./ _site/
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
