@@ -978,7 +978,7 @@ const G_GunModels = (() => {
     const L = o.L || 0.26, rm = o.rm || M.black(), fm = o.fm || M.polymer(), bull = o.rcv === 'bullpup' || o.rcv === 'qbz95';
     const gf = o.grip != null ? o.grip : bull ? L * 0.62 : 0.045;
     const anim: any = {};
-    let top!: number;
+    let top!: number, rcvTop: number | null = null; // (rcvTop: the receiver's own top, under an optic's rail: what a carry handle or feed cover sits on)
     const rcv = o.rcv || 'ar', tr = (o.look && (G.GunTraces as Record<string, Trace>)[o.look]) as Trace | undefined, VT = (tr ? tracer(tr) : null) as Tracer, mats = { frame: o.rm || fm, grip: o.gm || fm, slide: rm, stock: o.sm || fm, forend: (o.pump && o.pump.m) || fm }; // (traced: js/guntraces.ts)
     k.tag('base');
     if (rcv === 'ar') {
@@ -999,7 +999,7 @@ const G_GunModels = (() => {
       if (tr) { tracedParts(k, tr, VT, 'base', mats); top = VT([0, tr.topY])[1]; }
       else { k.prof([[0, -H * 0.55], [0, H * 0.45], [L, H * 0.45], [L, -H * 0.55]], Wd, rm); top = H * 0.45; }
       if (o.siderails) for (const x of [-1, 1]) sideRail(k, L * 0.58, L * 0.38, -0.004, x * (Wd / 2 + 0.0035)); // (a short rail each side of the front: an MP7's)
-      if (o.optic && !(['irons', 'notch', 'bead', 'none'] as (string | undefined)[]).includes(o.optic)) top = k.under('optic', () => S.rail(k, L * 0.15, L * 0.7, top, rm)); // (the optic's rail: it is there only with one)
+      if (o.optic && !(['irons', 'notch', 'bead', 'none'] as (string | undefined)[]).includes(o.optic)) { rcvTop = top; top = k.under('optic', () => S.rail(k, L * 0.15, L * 0.7, top, rm)); } // (the optic's rail: it is there only with one)
     } else if (rcv === 'round') {
       if (tr) { tracedParts(k, tr, VT, 'base', mats); top = VT([0, tr.topY])[1]; } // (the 870's: traced)
       else {
@@ -1327,12 +1327,13 @@ const G_GunModels = (() => {
     if (o.extra === 'ksgTubes') for (const x of [-0.013, 0.013]) k.cyl(0.011, 0.3, M.black(), 0.1, -0.03, x);
     // a carry handle: low enough to keep clear of the line of sight (the irons sit 34 mm over the top), or,
     // like the FAL's, folded down along the left side of the receiver
-    if (o.carry && o.carrySide) { const cf = o.carry, x = -((o.W || 0.045) / 2 + 0.004); k.prof([[cf - 0.06, top - 0.004], [cf - 0.05, top - 0.03], [cf + 0.05, top - 0.03], [cf + 0.06, top - 0.004]], 0.006, M.black(), x, [[[cf - 0.035, top - 0.008], [cf + 0.035, top - 0.008], [cf + 0.035, top - 0.022], [cf - 0.035, top - 0.022]]]); }
-    else if (o.carry) { const cf = o.carry; k.prof([[cf - 0.06, top], [cf - 0.05, top + 0.026], [cf + 0.05, top + 0.026], [cf + 0.06, top]], 0.016, M.black(), 0, [[[cf - 0.035, top + 0.004], [cf + 0.035, top + 0.004], [cf + 0.035, top + 0.018], [cf - 0.035, top + 0.018]]]); }
+    const ct = rcvTop ?? top; // (on the receiver, not on an optic's rail: the same with or without one)
+    if (o.carry && o.carrySide) { const cf = o.carry, x = -((o.W || 0.045) / 2 + 0.004); k.prof([[cf - 0.06, ct - 0.004], [cf - 0.05, ct - 0.03], [cf + 0.05, ct - 0.03], [cf + 0.06, ct - 0.004]], 0.006, M.black(), x, [[[cf - 0.035, ct - 0.008], [cf + 0.035, ct - 0.008], [cf + 0.035, ct - 0.022], [cf - 0.035, ct - 0.022]]]); }
+    else if (o.carry) { const cf = o.carry; k.prof([[cf - 0.06, ct], [cf - 0.05, ct + 0.026], [cf + 0.05, ct + 0.026], [cf + 0.06, ct]], 0.016, M.black(), 0, [[[cf - 0.035, ct + 0.004], [cf + 0.035, ct + 0.004], [cf + 0.035, ct + 0.018], [cf - 0.035, ct + 0.018]]]); }
     if (o.feed) { // belt feed cover: hinges at the front and lifts at the back
-      const p = k.part(0.02 + L * 0.55, top + 0.02);
-      k.into(p, 0.02 + L * 0.55, top + 0.02);
-      k.box(0.05, 0.022, L * 0.55, rm, 0.02, top + 0.01);
+      const p = k.part(0.02 + L * 0.55, ct + 0.02);
+      k.into(p, 0.02 + L * 0.55, ct + 0.02);
+      k.box(0.05, 0.022, L * 0.55, rm, 0.02, ct + 0.01);
       k.into(null);
       anim.cover = p;
       top += 0.022;
