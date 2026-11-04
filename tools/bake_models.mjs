@@ -71,6 +71,7 @@ function prepare(id, group, info) {
   for (const [k, v] of Object.entries(info.anim || {})) if (v && v.isObject3D) animNames.set(v, k);
   const h = crypto.createHash('sha1');
   let n = 0, tris = 0, meshes = 0;
+  G.GunRig.describe(group); // (the magazine check's mesh references written down as data on the nodes: js/gunrig.ts, docs/models.md)
   group.name = id; group.updateMatrixWorld(true);
   // UVs are kept only where something uses them: a bump map (rebuilt at load, needs them to tile) or a display surface
   const needUv = new Set();

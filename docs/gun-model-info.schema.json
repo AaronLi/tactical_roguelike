@@ -637,6 +637,130 @@
         }
       ],
       "description": "Mount points where a swappable part sits, `mount_<slot>` -> [forward, up, right] metres of the part's origin (e.g. mount_muzzle: where a muzzle device screws on). Normally assembled from the parts' anchors (see GUN_MODEL_CONTRACT.anchors); a whole-gun bake may list them directly."
+    },
+    "reflex": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "f": {
+              "type": "number",
+              "description": "Forward position of the window, metres."
+            },
+            "y": {
+              "type": "number",
+              "description": "Height of the window, metres."
+            },
+            "w": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Width, metres."
+            },
+            "h": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Height, metres."
+            },
+            "round": {
+              "oneOf": [
+                {
+                  "type": "boolean",
+                  "description": "True: a disc of diameter w."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "True: a disc of diameter w."
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "dot",
+                "dotG",
+                "cdot",
+                "holo"
+              ],
+              "description": "The reticle: dot, dotG (green dot), cdot (circle-dot) or holo (a ring)."
+            }
+          },
+          "required": [
+            "f",
+            "y",
+            "w",
+            "h",
+            "kind"
+          ],
+          "additionalProperties": false,
+          "description": "A reflex or holographic sight's window (js/viewmodel.ts): the game draws a collimated reticle behind it, masked to it. f, y: the window's centre, [forward, up] metres; w, h: its size, metres (round: a disc of diameter w); kind: the reticle drawn: dot, dotG, cdot or holo."
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "A reflex or holographic sight's window (js/viewmodel.ts): the game draws a collimated reticle behind it, masked to it. f, y: the window's centre, [forward, up] metres; w, h: its size, metres (round: a disc of diameter w); kind: the reticle drawn: dot, dotG, cdot or holo."
+    },
+    "pip": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "f": {
+              "type": "number",
+              "description": "Forward position of the lens, metres."
+            },
+            "y": {
+              "type": "number",
+              "description": "Height of the lens centre, metres."
+            },
+            "r": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Lens radius, metres."
+            },
+            "parent": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "description": "Node name the lens hangs on."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Node name the lens hangs on."
+            },
+            "pos": {
+              "oneOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "minItems": 3,
+                  "maxItems": 3,
+                  "description": "Place in the parent, [x, y, z] metres in its own frame."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Place in the parent, [x, y, z] metres in its own frame."
+            }
+          },
+          "required": [
+            "f",
+            "y",
+            "r"
+          ],
+          "additionalProperties": false,
+          "description": "A scope's ocular lens (js/viewmodel.ts): the game draws the world through the scope on a disc there (picture-in-picture) with the reticle over it. f, y: its centre, [forward, up] metres; r: its radius. parent + pos: a lens that swings on a hinge (a magnifier's): the NAME of the node it hangs on and its place in that node, [x, y, z] metres in the node's own frame."
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "A scope's ocular lens (js/viewmodel.ts): the game draws the world through the scope on a disc there (picture-in-picture) with the reticle over it. f, y: its centre, [forward, up] metres; r: its radius. parent + pos: a lens that swings on a hinge (a magnifier's): the NAME of the node it hangs on and its place in that node, [x, y, z] metres in the node's own frame."
     }
   },
   "required": [

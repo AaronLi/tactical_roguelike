@@ -11,7 +11,7 @@
 };
 importScripts('https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js');
 importScripts(...['util', 'data', 'callsigns', 'parts', 'gear', 'medical', 'materials', 'ballistics', 'damage', 'level', 'world', 'furniture', 'homes', 'residents', 'lightgrid', 'render',
-  'stickers', 'gunmodels', 'vmanim', 'headgear', 'rig', 'scars', 'highlights'].map((f) => f + '.js'));
+  'stickers', 'gunmodels', 'gunrig', 'viewmodel', 'vmanim', 'headgear', 'rig', 'scars', 'highlights'].map((f) => f + '.js'));
 // (the game the replay borrows from: the map the bodies fall on, and nobody's id)
 (G as any).Game = { map: null, phase: 'level' };
 (G as any).Net = { myId: '' };

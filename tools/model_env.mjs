@@ -26,6 +26,6 @@ export function loadGame() {
   const ctx = { console, Math, JSON, Set, Map, WeakMap, Object, Array, Number, String, Boolean, Uint8Array, Int8Array, Int16Array, Int32Array, Uint16Array, Uint32Array, Float32Array, Float64Array, Infinity, NaN, isFinite, parseInt, parseFloat, Error, Symbol, Date, Proxy, Reflect, THREE, document, performance };
   ctx.window = ctx; ctx.self = ctx; ctx.G = { R: { flashTexture: () => null, _envMap: () => null } };
   vm.createContext(ctx);
-  for (const f of ['util', 'data', 'callsigns', 'arsenal', 'parts', 'gear', 'medical', 'materials', 'stickers', 'guntraces', 'gunmodels']) vm.runInContext(readDist(f), ctx, { filename: f + '.js' });
+  for (const f of ['util', 'data', 'callsigns', 'arsenal', 'parts', 'gear', 'medical', 'materials', 'stickers', 'guntraces', 'gunmodels', 'gunrig']) vm.runInContext(readDist(f), ctx, { filename: f + '.js' });
   return ctx.G;
 }

@@ -76,6 +76,9 @@ interface GunModelInfo {
   breech?: { at: Vec2; pitch: number; long: string | null } | null; ch?: Vec3 | null; bolt?: Vec3 | null; cheek?: number | null; recoilBarrel?: number | null;
   pistol?: boolean | null; slide?: Vec3 | null; cylAt?: Vec3 | null; load?: { at: Vec2[]; pitch: number } | null; cup?: Vec3 | null; magTop?: boolean | null;
   quarrelMats?: Record<string, unknown> | null; mounts?: Record<string, Vec3> | null;
+  // first-person extras (js/viewmodel.ts), written by whoever makes the model:
+  reflex?: { f: number; y: number; w: number; h: number; round?: boolean | null; kind: string } | null;
+  pip?: { f: number; y: number; r: number; parent?: string | null; pos?: Vec3 | null } | null;
 }
 
 // ---- the shape language the info fields are written in (the validator and the JSON Schema both walk it) --------------
@@ -158,8 +161,8 @@ const CONTRACT_CORE = {
   /** extras keys. */
   extras: {
     root: { info: 'The GunModelInfo object (INFO_FIELDS).', gun: 'The gun id, equal to the root node\'s name.' },
-    mesh: { slot: 'A SLOTS value.', display: 'Display surfaces only: { width, height } canvas pixels.' },
-    part: { part: 'The PARTS key of this part_ node.', anchors: 'Anchors this part provides, in its own frame (GUN_MODEL_CONTRACT.anchors).' },
+    mesh: { slot: 'A SLOTS value.', display: 'Display surfaces only: { width, height } canvas pixels.', chk: 'A magazine-check mesh (under part_mag): { role, i, t? } (GUN_MODEL_CONTRACT.magCheck).' },
+    part: { part: 'The PARTS key of this part_ node.', anchors: 'Anchors this part provides, in its own frame (GUN_MODEL_CONTRACT.anchors).', check: 'part_mag only: { w }, the magazine-check data (GUN_MODEL_CONTRACT.magCheck).' },
   },
 };
 
@@ -197,6 +200,9 @@ const INFO_FIELDS: { [K in keyof GunModelInfo]-?: Field } = {
   magTop: F('True when the hand takes the magazine from its top instead of its base.', { t: 'bool' }, true),
   quarrelMats: F('A crossbow\'s bolt materials as three.js Material JSON (free-form; viewmodel only).', { t: 'map', of: { t: 'free' } }, true),
   mounts: F('Mount points where a swappable part sits, `mount_<slot>` -> [forward, up, right] metres of the part\'s origin (e.g. mount_muzzle: where a muzzle device screws on). Normally assembled from the parts\' anchors (see GUN_MODEL_CONTRACT.anchors); a whole-gun bake may list them directly.', { t: 'map', of: { t: 'vec', n: 3 } }, true),
+  // first-person extras (js/viewmodel.ts applies them; the third person ignores them)
+  reflex: F('A reflex or holographic sight\'s window (js/viewmodel.ts): the game draws a collimated reticle behind it, masked to it. f, y: the window\'s centre, [forward, up] metres; w, h: its size, metres (round: a disc of diameter w); kind: the reticle drawn: dot, dotG, cdot or holo.', { t: 'obj', props: { f: num('Forward position of the window, metres.'), y: num('Height of the window, metres.'), w: num('Width, metres.', false, { min: 0 }), h: num('Height, metres.', false, { min: 0 }), round: F('True: a disc of diameter w.', { t: 'bool' }, true), kind: F('The reticle: dot, dotG (green dot), cdot (circle-dot) or holo (a ring).', { t: 'str', enum: ['dot', 'dotG', 'cdot', 'holo'] }) } }, true),
+  pip: F('A scope\'s ocular lens (js/viewmodel.ts): the game draws the world through the scope on a disc there (picture-in-picture) with the reticle over it. f, y: its centre, [forward, up] metres; r: its radius. parent + pos: a lens that swings on a hinge (a magnifier\'s): the NAME of the node it hangs on and its place in that node, [x, y, z] metres in the node\'s own frame.', { t: 'obj', props: { f: num('Forward position of the lens, metres.'), y: num('Height of the lens centre, metres.'), r: num('Lens radius, metres.', false, { min: 0 }), parent: F('Node name the lens hangs on.', { t: 'str' }, true), pos: F('Place in the parent, [x, y, z] metres in its own frame.', { t: 'vec', n: 3 }, true) } }, true),
 };
 
 /** Info fields a part may provide as anchors (the rest of info is the whole gun's). */
@@ -209,6 +215,11 @@ const GUN_MODEL_CONTRACT = { ...CONTRACT_CORE, displays: {
   size: 'extras.display = { width, height } in pixels: the canvas resolution the game should draw at (a hint, powers of two preferred); width / height is the intended aspect ratio of the surface, so author the UVs un-stretched for it. Required.',
   material: 'The loader does NOT swap its material for a catalogue one (any material name is accepted, `display` suggested): the game replaces it with the canvas texture\'s material. Everything the loader does to other meshes (catalogue materials, bump maps) is skipped for it.',
   example: { name: 'display_ammo', extras: { slot: 'barrel', display: { width: 128, height: 32 } } },
+}, magCheck: {
+  what: 'The magazine check (hold R: the magazine is pulled out and looked at) shows what is in it on the magazine\'s own body: the top round, witness holes stamped with a count, or the rounds themselves through a clear body. The model says which of its meshes are those (js/gunrig.ts reads it; a gun without it simply shows nothing).',
+  part: '`part_mag` has extras.check = { w }: the magazine\'s width in metres (the width of a hole\'s stamped count).',
+  meshes: 'Meshes under `part_mag` carry extras.chk = { role, i, t? }: role "top" (the round on top: i 0 its case, i 1 its tip; the game colours them for the load), "hole" (a witness hole, i = its order from the top, t = 0..1 how far down the stack it reads), "round" (the i-th round drawn through a clear magazine, t = how far down) and "tip" (the bullet tip of round i). Every mesh keeps a slot and a catalogue material like any other; the game replaces their materials as the rounds change. A gun with a magazine check has both top meshes.',
+  example: { name: 'part_mag', extras: { part: 'mag', check: { w: 0.024 } }, child: { name: 'mag_91', extras: { slot: 'mag', chk: { role: 'hole', i: 0, t: 0.1567 } } } },
 }, anchors: {
   where: 'A node may carry `extras.anchors`: positions it PROVIDES, in the node\'s OWN frame (the same [forward, up, right] metres, measured from the node\'s origin along its axes; a part\'s mesh positions are in that same frame). Allowed on `part_<key>` and `group_<n>` nodes, and on the root of a per-part pack (a .glb holding one swappable part). Keys are the info anchors a part can provide (' + ANCHOR_KEYS.join(', ') + ') or a mount point `mount_<slot>` (a [forward, up, right] vec3; e.g. mount_muzzle on a frame says where a muzzle device sits).',
   assembly: [
@@ -426,6 +437,7 @@ function contractMarkdown(): string {
   for (const [k, m] of Object.entries(C.materials.names)) L.push(`| \`${k}\` | ${esc(m.doc)} | ${m.bump ? 'rebuilt at load (' + m.bump + ')' : ''} |`);
   L.push('', '**Display surfaces** (`display_<name>`):', '', `- naming: ${C.displays.naming}`, `- UVs: ${C.displays.uvs}`, `- size: ${C.displays.size}`, `- material: ${C.displays.material}`, '- example: `' + JSON.stringify(C.displays.example) + '`');
   L.push('', '**Anchors a part provides** (`extras.anchors`):', '', `- where: ${C.anchors.where}`, ...C.anchors.assembly.map((a) => `- ${a}`), `- muzzles: ${C.anchors.muzzles}`, '- example: `' + JSON.stringify(C.anchors.example) + '`');
+  L.push('', '**Magazine check** (`part_mag.extras.check`, meshes\' `extras.chk`):', '', `- what: ${C.magCheck.what}`, `- part: ${C.magCheck.part}`, `- meshes: ${C.magCheck.meshes}`, '- example: `' + JSON.stringify(C.magCheck.example) + '`');
   L.push('', C.materials.anonymous, '', '**Extras keys:** ' + Object.entries(C.extras).map(([where, o]) => `${where}: ${Object.keys(o).map((k) => '`' + k + '`').join(', ')}`).join('; ') + '.');
   return L.join('\n');
 }
