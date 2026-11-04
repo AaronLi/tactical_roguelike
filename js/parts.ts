@@ -138,7 +138,7 @@ const G_Gunsmith = (() => {
     const u0 = Math.log(Math.min(1.7, Math.max(0.45, k))), o: Record<string, number> = {};
     for (const [n, a, b] of LEN_C) {
       const v = b ? -a / (2 * b) : 0, u = v < 0 ? Math.max(u0, v) : v > 0 ? Math.min(u0, v) : u0; // (flat past the curve's turning point, so no figure ever reverses with length)
-      o[n] = Math.round((a * u + b * u * u) * 1000) / 1000;
+      o[n] = Math.round((a * u + b * u * u) * (n === 'weight' ? 1000 : 10)) / (n === 'weight' ? 1000 : 10);
     }
     return o;
   };
