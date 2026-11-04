@@ -14,7 +14,7 @@
 // When a gun ejects: semi and full autos as they fire; pump, lever and bolt guns when they're worked (a beat
 // after the shot); revolvers and break-actions when they're reloaded (the empties dumped out); launchers, the
 // crossbow and the railgun not at all.
-G.Casings = (() => {
+const G_Casings = (() => {
   const T = THREE, MAX = 180, GRAV = 9.8;
   const COLORS = { brass: 0xc9a14a, steel: 0x5c5444, aluminum: 0xb9bdc2, plastic: 0x9c2a22 };
   let metal = null, hull = null, live = [], queue = [], free = [], sounds = 0;
@@ -310,3 +310,5 @@ G.Casings = (() => {
     },
   };
 })();
+G.Casings = G_Casings;
+interface GameModules { Casings: typeof G_Casings; }

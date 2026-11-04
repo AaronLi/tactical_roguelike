@@ -5,7 +5,7 @@
 // en-bloc clip), ammo boxes carry their caliber and a stripe in the ammo type's colour, and gear is drawn by
 // kind (a soft vest, a plate carrier with its pouches, a chest rig, a plate, a helmet, a belt, a backpack).
 // Guns are the weapon's own 3D model (as built, parts and all), rendered side-on once and kept.
-G.Icons = (() => {
+const G_Icons = (() => {
   const CELL = 64, cache = new Map();
   // What a round looks like, everywhere it's drawn (these icons, and the rounds in the viewmodel: js/vmanim.ts, the
   // spent hulls: js/casings.ts): a shotgun shell's hull is colour-coded by its load; a bullet's tip shows its type.
@@ -495,3 +495,5 @@ G.Icons = (() => {
   }
   return { of, chamberPic, styleFor, gauge, chamberGauge, TYPE_COL, shellCol, tipCol };
 })();
+G.Icons = G_Icons;
+interface GameModules { Icons: typeof G_Icons; }

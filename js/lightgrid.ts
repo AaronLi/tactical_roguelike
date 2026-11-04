@@ -22,7 +22,7 @@
 //   - It's on only while the level itself is drawn (G.R.render): the gunsmith's and the icons' renderers share the
 //     materials, and don't want the level's lamps.
 // Dynamic lights (muzzle flashes, weapon lights, explosions) are still real lights.
-G.LightGrid = (() => {
+const G_LightGrid = (() => {
   const T = THREE;
   const blank = new T.DataTexture(new Uint16Array(4), 1, 1, T.RGBAFormat, T.HalfFloatType); blank.needsUpdate = true;
   // the uniforms every patched material shares (one object: changing a value changes it everywhere)
@@ -308,3 +308,5 @@ G.LightGrid = (() => {
   const on = (v) => { U.lgGrid.value.w = v && built ? 1 : 0; };
   return { build, dispose, on, setDoor: (id, k) => { if (built) setDoor(id, k); }, flush, U, opts, get built() { return built; }, get layers() { return G0 && G0.layers; } };
 })();
+G.LightGrid = G_LightGrid;
+interface GameModules { LightGrid: typeof G_LightGrid; }

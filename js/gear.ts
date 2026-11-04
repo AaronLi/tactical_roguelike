@@ -13,7 +13,7 @@
 // an LMG belt box 2x2. Items can be turned (1x2 <-> 2x1). Ammo isn't a number any more: it's the magazines
 // and boxes you carry for each gun, and a reload takes one of them. Medkits and grenades are items too.
 // Between levels everything you aren't carrying sits in your locker (a big grid) at the quartermaster's.
-G.Gear = (() => {
+const G_Gear = (() => {
   const B = { north: 'Northmark Defense', kest: 'Kestrel Tactical', iron: 'Ironvale Arms', mer: 'Meridian Armor', sable: 'Sable Ridge', para: 'Paragon Systems', halc: 'Halcyon Labs', gray: 'Graywater Supply', vant: 'Vantage Industries' };
   // pouch grids: [w, h, accepts] (accepts: null = anything small, or a list of item kinds)
   const MAG = ['mag', 'ammo'], MED = ['med'];
@@ -643,3 +643,5 @@ G.Gear = (() => {
     defOf, cond, piece, speed, label, price, sale,
   };
 })();
+G.Gear = G_Gear;
+interface GameModules { Gear: typeof G_Gear; }

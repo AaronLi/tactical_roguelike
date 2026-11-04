@@ -12,7 +12,7 @@
 // and the face pieces hung on a helmet's rails (a mandible round the jaw; a polycarbonate or laminated face shield),
 // and a suspect's baseball cap. Every shell is a dome whose lower edge follows a profile round the head (band),
 // so the brow, the ear cut-outs and the nape are each where they are on the real helmet.
-G.Headgear = (() => {
+const G_Headgear = (() => {
   const T = THREE, PI = Math.PI;
   const C0 = [0, 0.137, 0]; // the dome's centre (the cranium's is 0.13)
   const SC = [1, 1.02, 1.1]; // a little longer front to back than it is wide, as heads are
@@ -139,3 +139,5 @@ G.Headgear = (() => {
   }
   return { band, helmet, face, cap, MODELS, CUT };
 })();
+G.Headgear = G_Headgear;
+interface GameModules { Headgear: typeof G_Headgear; }

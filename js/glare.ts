@@ -5,7 +5,7 @@
 // be dazzled and longer to come back: look away and it fades, leaving an after-image where the lamp was, going from
 // white through green to nothing. js/views.ts adds each light each frame (id: whose), then end() works it out and draws it,
 // small, on a canvas blended over the picture.
-G.Glare = (() => {
+const G_Glare = (() => {
   const T = THREE, RISE = 5, FALL = 1.1, W = 384, H = 216, RANGE = 40;
   const lit = new Map(), now = [], fwd = new T.Vector3(), to = new T.Vector3(), v = new T.Vector3();
   let cv = null, g = null, shown = false, level = 0;
@@ -68,3 +68,5 @@ G.Glare = (() => {
   }
   return { begin, add, end, get level() { return level; } };
 })();
+G.Glare = G_Glare;
+interface GameModules { Glare: typeof G_Glare; }

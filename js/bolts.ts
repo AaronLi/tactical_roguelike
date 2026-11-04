@@ -2,7 +2,7 @@
 // Crossbow bolts that stayed where they hit: in a suspect (it follows the bone it's in), in a soft vest, or
 // in timber and plasterboard. Whoever fired it decides (js/player.ts roundSegment) and tells the squad; each machine draws
 // its own. The lit nock stays on, in the load's colour (G.AMMO glow), so you can see from across a room where one went.
-G.Bolts = (() => {
+const G_Bolts = (() => {
   const T = THREE, LEN = 0.4, MAX = 40, list = [];
   // what won't hold a bolt: it glances or breaks on these, and drops
   const HARD = new Set(['metal', 'stone', 'glass', 'concrete', 'brick']);
@@ -90,3 +90,5 @@ G.Bolts = (() => {
   const holds = (fx) => !HARD.has(fx);
   return { LEN, HARD, colour, inWorld, onBone, fromNet, update, clear, holds, get count() { return list.length; } };
 })();
+G.Bolts = G_Bolts;
+interface GameModules { Bolts: typeof G_Bolts; }

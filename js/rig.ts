@@ -10,7 +10,7 @@
 // Upper body handles aim pitch, low-ready, corner leans, recoil, flinches and grenade throws.
 // Dead characters go to a Verlet ragdoll (see ragdollInit). Living suspects and civilians are the same ragdoll,
 // powered: muscles pull each joint toward the animation, as strong as the person is (see powerStep).
-G.Rig = (() => {
+const G_Rig = (() => {
   const T = THREE;
   const UP = new T.Vector3(0, 1, 0);
   const _a = new T.Vector3(), _b = new T.Vector3(), _c = new T.Vector3(), _d = new T.Vector3(), _e = new T.Vector3();
@@ -1451,3 +1451,5 @@ G.Rig = (() => {
     toggleDebug() { debug = !debug; return debug; },
   };
 })();
+G.Rig = G_Rig;
+interface GameModules { Rig: typeof G_Rig; }

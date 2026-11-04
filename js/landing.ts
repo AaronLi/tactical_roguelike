@@ -9,7 +9,7 @@
 // The flight is worked out once, as a real thing's would be: a path, the speed along it limited by how hard it can brake and
 // bank, and from how that moves, the attitude: the rotors' thrust has to hold it up (g), push it where it's accelerating and
 // overcome the drag, so the ship leans that way: nose down at speed, over in a turn, nose up in the flare.
-G.Landing = (() => {
+const G_Landing = (() => {
   const T = THREE, STAY = 14, // the longest it sits on the pad, in seconds
     AFTER = 2.5, // (flying alone: how soon after you're out it goes)
     HOLD = 0.45, GONE = 9;
@@ -223,3 +223,5 @@ G.Landing = (() => {
   }
   return { enter, board, interact, update, seatPos, exitPos, S };
 })();
+G.Landing = G_Landing;
+interface GameModules { Landing: typeof G_Landing; }

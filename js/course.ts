@@ -15,7 +15,7 @@
 //     back at them from the far end.
 // Coordinates are the hall's, as in js/range.ts (z negative past the hall's north wall; the yard's north edge, the
 // range's firing line, is at FL).
-G.Course = (() => {
+const G_Course = (() => {
   const T = THREE;
   const A = { x0: 2, x1: 12, z0: -6, z1: -34 }; // the course: x0..x1, from its open end on the yard (z0) to its backstop (z1)
   const BOXES = [-8.5, -14.5, -20.5]; // the shooting boxes (their middles, z)
@@ -337,3 +337,5 @@ G.Course = (() => {
   }
   return { build, update, leave, hit, shot, remoteRun, setCourse, regenerate, start, inside, anyoneIn, score, A, S };
 })();
+G.Course = G_Course;
+interface GameModules { Course: typeof G_Course; }

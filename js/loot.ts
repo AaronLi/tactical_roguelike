@@ -3,7 +3,7 @@
 // bandage, a backpack with everything in it, a gun). The host keeps the list (G.Server.loot) and says who gets
 // what; this draws them and finds the one under your crosshair. Each is { id, x, y, z, item (packed: G.Gear.pack), mesh, box },
 // box its own shape in its own frame: you have to aim at the thing itself to take it.
-G.Loot = (() => {
+const G_Loot = (() => {
   const list = new Map();
   const T = THREE;
   const texCache = new Map();
@@ -103,3 +103,6 @@ G.Loot = (() => {
   }
   return { add, remove, clear, aimed, boxOf, rayHit, name, meshFor, get list() { return list; } };
 })();
+G.Loot = G_Loot;
+
+interface GameModules { Loot: typeof G_Loot; }

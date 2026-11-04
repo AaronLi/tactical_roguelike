@@ -2,7 +2,7 @@
 // .zip files, written and read (the highlights' recordings: js/highlights.ts). Each file deflated by the browser's own
 // compressor (CompressionStream 'deflate-raw') when it has one and that makes it smaller, else stored as it is; a
 // CRC-32 for each, the central directory at the end. No ZIP64: a file and the whole of it under 4 GB.
-G.Zip = (() => {
+const G_Zip = (() => {
   const CRC = new Uint32Array(256);
   for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; CRC[n] = c >>> 0; }
   function crc32(b) { let c = 0xffffffff; for (let i = 0; i < b.length; i++) c = CRC[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; }
@@ -52,3 +52,5 @@ G.Zip = (() => {
   }
   return { write, read, crc32 };
 })();
+G.Zip = G_Zip;
+interface GameModules { Zip: typeof G_Zip; }

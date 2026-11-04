@@ -3,7 +3,7 @@
 // colour. The emblem goes on their left shoulder and, with their name, on a patch high on the back (js/rig.ts);
 // the menu, the lobby, the team list, the scoreboards and pings show it too. One of each animal to a squad: the
 // host gives anyone whose pick is taken the first one free (G.Server 'hello').
-G.Callsigns = (() => {
+const G_Callsigns = (() => {
   const LIST = [
     { id: 'snake', name: 'Snake', color: 0xf2e94e },
     { id: 'seal', name: 'Seal', color: 0x3fa9f5 },
@@ -135,3 +135,5 @@ G.Callsigns = (() => {
   }
   return { LIST, valid, of, draw, url, html, armTex, backTex };
 })();
+G.Callsigns = G_Callsigns;
+interface GameModules { Callsigns: typeof G_Callsigns; }

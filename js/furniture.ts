@@ -6,7 +6,7 @@
 // Furniture tiles: 2 = furniture you can take cover behind (sofa, counter, dresser, crates), 4 = other
 // furniture (beds, tables, shelves, wardrobes). Small things in corners (plants, lamps) leave the tile as
 // floor (0) but still carry a collision box. map.props: tile index -> { name, q, x, z, v, boxes }.
-G.Furniture = (() => {
+const G_Furniture = (() => {
   // Local frame of a piece: footprint centred on the origin, back at -z (against the wall), front +z.
   // boxes: [x, z, w, d, h] in that frame (all from the floor up).
   const R: Record<string, any> = {};
@@ -2109,3 +2109,6 @@ G.Furniture = (() => {
 
   return { plan, build, R, ROOMS, worldBoxes, facing, outsideMaterial, textures };
 })();
+G.Furniture = G_Furniture;
+
+interface GameModules { Furniture: typeof G_Furniture; }

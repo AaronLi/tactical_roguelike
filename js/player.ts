@@ -2,7 +2,7 @@
 // where a door stops being a kick and starts being a push: aim below this (m) to kick, above to open
 const KICK_H = 1.3;
 // The local player: input, movement, weapons, damage, revive/down state.
-G.Me = {
+const G_Me = {
   keys: {},
   // CQB pace (m/s): normal walk; weapon lowered (Space) to move quicker; steadied (Shift) to creep and
   // hold the gun still; crouch-walk
@@ -2527,3 +2527,6 @@ G.Me = {
     };
   },
 };
+G.Me = G_Me;
+
+interface GameModules { Me: typeof G_Me; }

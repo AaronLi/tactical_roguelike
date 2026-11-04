@@ -15,7 +15,7 @@
 // weight (kg). Absolutes in `set`: cap (rounds), zoom (ADS FOV multiplier), barrelIn (inches, for the
 // gunshot synth), device (muzzle device, ditto), sup (suppressed).
 // ---------------------------------------------------------------------------
-G.Gunsmith = (() => {
+const G_Gunsmith = (() => {
   const PARTS: any = {}, LIST = [], PLATFORMS: any = {}, BY_MOUNT = new Map<string, any>();
   // Shared magazines (G.MAG_FAMILY): [capacity, drum?, price, stats, tier] for each, std the standard one
   const MAG_FAMS = {
@@ -1160,3 +1160,5 @@ G.Gunsmith = (() => {
     defaultCode: (id) => encode(id, defaultBuild(id)),
   };
 })();
+G.Gunsmith = G_Gunsmith;
+interface GameModules { Gunsmith: typeof G_Gunsmith; }

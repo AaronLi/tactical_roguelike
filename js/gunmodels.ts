@@ -7,7 +7,7 @@
 // and the third-person world model (merged into one mesh per material and shared by every actor).
 // Every recipe returns where the sights, muzzle(s) and hands are, so the viewmodel can line up
 // aim-down-sights and the character rig can put its hands on the gun.
-G.GunModels = (() => {
+const G_GunModels = (() => {
   const T = THREE;
   const cache: any = {};
   const std = (key, color, roughness, metalness, extra?) =>
@@ -2575,3 +2575,5 @@ G.GunModels = (() => {
 
   return { M, build, viewmodel, world, display, roundDims, roundShape, setLoaded, quarrel, bipodPose };
 })();
+G.GunModels = G_GunModels;
+interface GameModules { GunModels: typeof G_GunModels; }

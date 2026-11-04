@@ -17,7 +17,7 @@
 // In the field, handling ammo takes the time it really does (a job queue, a round at a time, shown at the
 // top): thumbing rounds into a magazine, unloading, magazines in and out, shells into a tube. Closing the
 // screen (or Cancel) stops it where it is.
-G.InvUI = (() => {
+const G_InvUI = (() => {
   // cell size, px: from the window (40 px at 1080p up to 72 on a big 4K screen); everything else in the
   // inventory scales with it (--ik, css/style.css)
   let C = 34;
@@ -999,3 +999,5 @@ G.InvUI = (() => {
     render,
   };
 })();
+G.InvUI = G_InvUI;
+interface GameModules { InvUI: typeof G_InvUI; }

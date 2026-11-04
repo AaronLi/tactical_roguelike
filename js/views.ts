@@ -1,7 +1,7 @@
 'use strict';
 // Client-side representations of networked things: remote players, enemies, grenades.
 // Characters are G.Rig skeletons; their hitboxes ride the animated bones (see js/rig.ts).
-G.Views = {
+const G_Views = {
   players: new Map(),
   enemies: new Map(),
   nades: [],
@@ -917,3 +917,6 @@ G.Views = {
     this.pings = this.pings.filter((pg) => pg.t > 0);
   },
 };
+G.Views = G_Views;
+
+interface GameModules { Views: typeof G_Views; }

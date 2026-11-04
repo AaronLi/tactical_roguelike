@@ -3,7 +3,7 @@
 // node is an environment (one of G.THEMES); paths split and rejoin on the way and never cross. Picking the
 // next node picks where you fight next. Generated from a seed, so every peer draws the same map; the host
 // keeps where the squad is (route.path) and the votes.
-G.Route = (() => {
+const G_Route = (() => {
   const COLS = 10, ROWS = 7, WALKS = 4;
   // which column a level is in, and which act; the last level of each act is the boss
   const colOf = (level) => (level - 1) % COLS;
@@ -112,3 +112,6 @@ G.Route = (() => {
   }
   return { COLS, gen, options, colOf, actOf, isBoss, svg };
 })();
+G.Route = G_Route;
+
+interface GameModules { Route: typeof G_Route; }

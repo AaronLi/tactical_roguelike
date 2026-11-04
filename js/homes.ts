@@ -38,7 +38,7 @@
 // A home needs the room types its resident lists (bar spare, up and carved ones): a room type left out is painted by `rest`.
 // A loft is one home on two floors: its resident's chosen on the ground floor and dresses the upper floor too (lofts).
 // More residents: js/residents.ts.
-G.Homes = (() => {
+const G_Homes = (() => {
   const U = G.U, F = G.Furniture, R = F.R;
   const CREAM = '#d9d0b0'; // (smoke-stained, every ceiling of his but the bathroom's)
   const RESIDENTS = [
@@ -721,3 +721,6 @@ G.Homes = (() => {
   }
   return { RESIDENTS, start, fill, swap, ceilings, paint };
 })();
+G.Homes = G_Homes;
+
+interface GameModules { Homes: typeof G_Homes; }

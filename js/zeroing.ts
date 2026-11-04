@@ -5,7 +5,7 @@
 // comes zeroed for its class's distance with ball; each click (0.1 mil: a centimetre at 100 m) tips the bore that
 // much more (up: it strikes higher). Every load fires from the same tip, so a slower one drops more: pick one here
 // to see where it goes. The same sums fly every round (G.flight, G.boreTip, js/player.ts fly).
-G.ZeroUI = (() => {
+const G_ZeroUI = (() => {
   const MAXD = 500, ROWS = [25, 50, 100, 150, 200, 250, 300, 400, 500], MAXC = 150; // (±15 mil)
   const st = { wslot: 'p', am: null };
   const weapon = () => G.Me.weapons[st.wslot] || G.Me.weapons.p || G.Me.weapons.s;
@@ -101,3 +101,6 @@ G.ZeroUI = (() => {
   window.addEventListener('resize', () => { if (document.getElementById('zrCanvas')) draw(); });
   return { show, onClick, refresh, path, state: st };
 })();
+G.ZeroUI = G_ZeroUI;
+
+interface GameModules { ZeroUI: typeof G_ZeroUI; }

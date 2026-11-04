@@ -2,7 +2,7 @@
 // Peer-to-peer transport (WebRTC via PeerJS). Star topology: the host is the authority,
 // clients talk only to the host and the host relays. The host is also a client of itself:
 // toHost() / broadcast() short-circuit to local handlers so game code has one path.
-G.Net = {
+const G_Net = {
   PREFIX: 'breachproto-v1-',
   peer: null,
   isHost: false,
@@ -184,3 +184,6 @@ G.Net = {
     this.isHost = false; this.solo = false; this.myId = null; this.code = null;
   },
 };
+G.Net = G_Net;
+
+interface GameModules { Net: typeof G_Net; }

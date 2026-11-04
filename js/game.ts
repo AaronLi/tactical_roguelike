@@ -1,6 +1,6 @@
 'use strict';
 // Glue: menus, lobby, phase transitions, message dispatch, pointer lock, main loop.
-G.Game = {
+const G_Game = {
   phase: 'menu',
   map: null,
   level: 0,
@@ -1276,5 +1276,7 @@ G.Game = {
   },
   updateZone() { /* no exit zone: the squad votes to leave (Y) once order's restored */ },
 };
+G.Game = G_Game;
+interface GameModules { Game: typeof G_Game; }
 
 window.addEventListener('load', () => G.Game.init());

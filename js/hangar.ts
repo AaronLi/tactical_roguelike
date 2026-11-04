@@ -13,7 +13,7 @@
 // machines' screens open the same shop panels (js/shop.ts) a menu would. Nothing here is on the host: the hangar
 // is the same on every machine, bought stock is a matter for each player, and where everyone stands is what
 // they already tell the host.
-G.Hangar = (() => {
+const G_Hangar = (() => {
   const T = THREE;
   // ------------------------------------------------------------------------ the plan (metres)
   // Everything below is in the hall's own coordinates (its north wall at z 0..2, the range beyond it at negative z). The
@@ -929,3 +929,5 @@ G.Hangar = (() => {
 
   return { decorate, enter, leave, update, refresh, aim, interact, mark, seatPos, exitPos, spawnAt, ship, padMesh, S, HELI, HOLD, RZ };
 })();
+G.Hangar = G_Hangar;
+interface GameModules { Hangar: typeof G_Hangar; }

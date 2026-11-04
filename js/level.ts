@@ -2,7 +2,7 @@
 // Procedural level generation, collision, raycasting and path flow-fields.
 // The map is a tile grid (TS metres per tile, after refinement: see TS/CTS/K below). 0 = floor, 1 = wall, 2 = furniture you can take cover behind,
 // 3 = door, 4 = other furniture (garden fences are furniture too). map.out marks tiles open to the sky. Furniture collision boxes live in map.props (see js/furniture.ts).
-G.Level = {
+const G_Level = {
   // The grid: levels are laid out on 2 m cells (CTS), then refined 3x (K) to 0.67 m cells (TS) so walls between
   // spaces are a single 0.67 m cell thick instead of a whole 2 m tile. Everything that plays on the map
   // (collision, rays, paths, AI, rendering) works on the fine grid.
@@ -3047,3 +3047,5 @@ G.Level = {
     return root;
   },
 };
+G.Level = G_Level;
+interface GameModules { Level: typeof G_Level; }

@@ -6,7 +6,7 @@
 // A kill's what it was as your rounds did it: js/player.ts hitEnemy keeps what they did to someone on them (ev.mine) and the host's word
 // that they're down (js/game.ts credit) brings it here. Only a gun you've earned counts: one that turned up in a case has its own path to come.
 // Each asks for more than a level has suspects (8 to 13, the act's last aside), so every gun takes several levels of play.
-G.Arsenal = (() => {
+const G_Arsenal = (() => {
   // id, what it's reached from, which path, how far out (a: a branch off its path: its own angle and r, its distance out); and what it takes: stat, how many, of what
   // pro: mastering it, with it: what it takes, and the named build that earns you, to start with if you like (parts: on top of its own)
   const NODES = [
@@ -113,3 +113,6 @@ G.Arsenal = (() => {
   }
   return { NODES, PATHS, RINGS, BY, along, has, proGot, proOn, proSet, build, partNames, open, count, name, at, left, tally, hit, kill, get all() { return data(); } };
 })();
+G.Arsenal = G_Arsenal;
+
+interface GameModules { Arsenal: typeof G_Arsenal; }

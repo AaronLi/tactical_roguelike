@@ -16,7 +16,7 @@
 // rounds did to them. Between them: a cold open with the squad's starting line-up, sponsored segments, fake adverts,
 // presenters reacting like a game show's, motion graphics everywhere and a scoreboard at the end. Near a TV you hear it:
 // the crowd (cheers, a laugh track, a sad "aww"), stingers, the presenters' excited babble, the gunfire.
-G.Highlights = (() => {
+const G_Highlights = (() => {
   const T = THREE, HZ = 10, PRE = 5, POST = 3, MAX = 36, NEAR = 34, W = 960, H = 540, KEEP = 7; // (KEEP: what the ring holds, s)
 
   // ================================================================ recording
@@ -2764,3 +2764,5 @@ G.Highlights = (() => {
 
   return { tick, shot, roundPath, glass, crack, door, laser, hitBy, kill, suspectDown, saved, incap, arrest, take, drop, mount, unmount, update, reset, exportPack, renderPack, cancelRender, exportHere, muxHere, toJSON, fromJSON, R, P };
 })();
+G.Highlights = G_Highlights;
+interface GameModules { Highlights: typeof G_Highlights; }

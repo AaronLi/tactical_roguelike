@@ -5,11 +5,13 @@
 // range is the distance (m) where damage falloff starts, falloff is the min multiplier.
 // ---------------------------------------------------------------------------
 
-G.TIER_NAMES = ['Standard', 'Common', 'Uncommon', 'Rare', 'Legendary'];
-G.TIER_COLORS = ['#9aa0a6', '#7bc96f', '#4fa3ff', '#b77cff', '#ffb02e'];
+const G_TIER_NAMES = ['Standard', 'Common', 'Uncommon', 'Rare', 'Legendary'];
+G.TIER_NAMES = G_TIER_NAMES;
+const G_TIER_COLORS = ['#9aa0a6', '#7bc96f', '#4fa3ff', '#b77cff', '#ffb02e'];
+G.TIER_COLORS = G_TIER_COLORS;
 
 // Sound profiles by weapon class: f = filter cutoff, len = tail seconds, boom = bass punch, vol
-G.CLASS_SND = {
+const G_CLASS_SND = {
   AR: { f: 2600, len: 0.16, boom: 0.6, vol: 0.55 },
   BR: { f: 2000, len: 0.22, boom: 0.8, vol: 0.65 },
   SMG: { f: 3600, len: 0.1, boom: 0.35, vol: 0.45 },
@@ -23,6 +25,7 @@ G.CLASS_SND = {
   MP: { f: 3800, len: 0.09, boom: 0.3, vol: 0.42 },
   BOW: { f: 900, len: 0.12, boom: 0, vol: 0.2 },
 };
+G.CLASS_SND = G_CLASS_SND;
 
 // spread / ads: the cone (degrees, its half-angle) a round leaves in around where the gun points, from the hip and
 // aimed. ads is the gun's own mechanical accuracy: a cone ads degrees round makes a group 120 x ads MOA across, set
@@ -32,7 +35,7 @@ G.CLASS_SND = {
 // without a cartridge (the railgun, the crossbow) set their own.
 const W = (o) => Object.assign({ pellets: 1, mode: 'auto', pen: 0, zoom: 0.8, speed: 1, falloff: 0.6, shell: false, burst: 0 }, o);
 
-G.WEAPON_LIST = [
+const G_WEAPON_LIST = [
   // ----- PRIMARY: assault / battle rifles -----
   W({ id: 'm4', slot: 'p', cls: 'AR', tier: 1, price: 900, name: 'M4 Carbine', rpm: 780, mag: 30, reserve: 180, reload: 2.2, spread: 2.8, ads: 0.025, range: 35, speed: 0.95, desc: 'Reliable all-rounder. Never lets you down.' }),
   W({ id: 'ak', slot: 'p', cls: 'AR', tier: 1, price: 1000, name: 'KV-47', rpm: 600, mag: 30, reserve: 180, reload: 2.5, spread: 3.2, ads: 0.04167, range: 35, speed: 0.94, pen: 1, desc: 'Hits like a truck, kicks like a mule. Punches through one target.' }),
@@ -128,21 +131,28 @@ G.WEAPON_LIST = [
   W({ id: 'fiveseven', slot: 's', cls: 'PST', tier: 2, price: 1100, name: 'Five-seveN', rpm: 450, mode: 'semi', mag: 20, reserve: 100, reload: 1.6, spread: 1.8, ads: 0.06667, range: 28, pen: 1, desc: 'Twenty rounds of 5.7 mm, flat and fast. A rifle round\'s manners in a pistol.' }),
   W({ id: 'thor', slot: 's', cls: 'PST', tier: 4, price: 4500, name: 'Thor .50', rpm: 40, mode: 'semi', mag: 1, reserve: 10, reload: 3.2, spread: 3, ads: 0.03, range: 60, pen: 3, desc: 'One round of .50 BMG, in a pistol, because someone asked if it could be done. It can. Hold on.' }),
 ];
-G.WEAPONS = {};
+G.WEAPON_LIST = G_WEAPON_LIST;
+const G_WEAPONS = {};
+G.WEAPONS = G_WEAPONS;
 G.WEAPON_LIST.forEach((w) => { w.snd = G.CLASS_SND[w.cls]; G.WEAPONS[w.id] = w; });
 // Explosive weapons (the grenade launchers) are switched off for now: no case, shop or kit turns one up.
-G.EXPLOSIVES_OFF = true;
-G.obtainable = (w) => !!w && !(G.EXPLOSIVES_OFF && w.explosive);
+const G_EXPLOSIVES_OFF: boolean = true;
+G.EXPLOSIVES_OFF = G_EXPLOSIVES_OFF;
+const G_obtainable = (w) => !!w && !(G.EXPLOSIVES_OFF && w.explosive);
+G.obtainable = G_obtainable;
 // Fire selectors (X): the positions a gun has, the first its default. Most select-fire guns come set to semi
 // with full auto a click away. Cheap open-bolt guns and belt-fed machine guns have no semi: full auto only.
 // The burst guns have semi and their burst (burstRpm: a burst faster than the gun's cyclic rate); the AN-94
 // semi and its two-round hyper burst (hyperKick: what the pair's kick comes to, both landing together after the second
 // round's gone; autoKick: each round's after that, the gun's works slamming home with nothing to hide it; pull: its
 // side kick, a steady pull one way as a share of the usual, where every other gun's flips at random: js/player.ts recoilKick).
-G.AUTO_ONLY = ['mac10', 'uzi', 'aa12', 'm249', 'pkm', 'm60', 'shredder'];
-G.FIRE_MODES = { br3: ['semi', 'burst'], an94: ['semi', 'hyper'], auto9: ['semi', 'burst'], b92: ['burst', 'semi'], tx22: ['auto', 'semi'] }; // (the TX22: made full auto, it comes set to it)
+const G_AUTO_ONLY = ['mac10', 'uzi', 'aa12', 'm249', 'pkm', 'm60', 'shredder'];
+G.AUTO_ONLY = G_AUTO_ONLY;
+const G_FIRE_MODES = { br3: ['semi', 'burst'], an94: ['semi', 'hyper'], auto9: ['semi', 'burst'], b92: ['burst', 'semi'], tx22: ['auto', 'semi'] }; // (the TX22: made full auto, it comes set to it)
+G.FIRE_MODES = G_FIRE_MODES;
 G.WEAPON_LIST.forEach((w) => { w.modes = G.FIRE_MODES[w.id] || (w.mode === 'semi' ? ['semi'] : G.AUTO_ONLY.includes(w.id) ? [w.mode] : ['semi', w.mode]); });
-G.MODE_NAME = { semi: 'SEMI', auto: 'AUTO', burst: 'BURST', hyper: 'HYPER' };
+const G_MODE_NAME = { semi: 'SEMI', auto: 'AUTO', burst: 'BURST', hyper: 'HYPER' };
+G.MODE_NAME = G_MODE_NAME;
 // Chambers. A closed-bolt gun (most of them) holds a round in its chamber as well as the ones in its magazine or
 // tube (w.chamber: its type, or null): it fires that one, and the action feeds the next from the magazine. A
 // reload with one chambered keeps it (30+1); run dry, the chamber's empty too and the reload ends by working the
@@ -150,28 +160,36 @@ G.MODE_NAME = { semi: 'SEMI', auto: 'AUTO', burst: 'BURST', hyper: 'HYPER' };
 // Open-bolt guns fire as the bolt closes on a round from the magazine (nothing waits in the chamber), and some
 // guns' chambers are their magazine: revolvers, break actions, the Garand's clip, launchers, the crossbow and the
 // railgun (and the akimbo pair, counted as one).
-G.OPEN_BOLT = ['uzi', 'mac10', 'ppsh', 'thompson', 'aa12', 'm249', 'pkm', 'm60', 'shredder'];
-G.chambered = (def) => {
+const G_OPEN_BOLT = ['uzi', 'mac10', 'ppsh', 'thompson', 'aa12', 'm249', 'pkm', 'm60', 'shredder'];
+G.OPEN_BOLT = G_OPEN_BOLT;
+const G_chambered = (def) => {
   if (!def || G.OPEN_BOLT.includes(def.id) || def.enbloc || def.akimbo || ['GL', 'BOW', 'RAIL'].includes(def.cls)) return false;
   const P = G.Gunsmith && G.Gunsmith.PLATFORMS[def.id];
   return !(P && (P.arch === 'revolver' || P.arch === 'derringer' || (P.spec && P.spec.rcv === 'break')));
 };
+G.chambered = G_chambered;
 // A revolver takes loose rounds, a round at a time (its reload figure's a round's), with the cylinder swung out first
 // and shut after; a speed loader or moon clips fill it all at once (loadFull, before the part's own figure: js/parts.ts).
-G.revolver = (def) => { const P = def && G.Gunsmith && G.Gunsmith.PLATFORMS[def.id]; return !!P && P.arch === 'revolver'; };
-G.REV = { open: 0.55, close: 0.35 };
+const G_revolver = (def) => { const P = def && G.Gunsmith && G.Gunsmith.PLATFORMS[def.id]; return !!P && P.arch === 'revolver'; };
+G.revolver = G_revolver;
+const G_REV = { open: 0.55, close: 0.35 };
+G.REV = G_REV;
 // a whole reload from empty, as the stat cards show it (a revolver loaded by hand; a tube's stays its figure a shell)
-G.fullReload = (d) => (G.revolver(d) && d.shell ? G.REV.open + d.reload * d.mag + G.REV.close : d.reload);
+const G_fullReload = (d) => (G.revolver(d) && d.shell ? G.REV.open + d.reload * d.mag + G.REV.close : d.reload);
+G.fullReload = G_fullReload;
 // Bolt hold-open: the action locks back on the last round, so a reload from empty is a magazine change and a
 // thumb on the bolt catch (or the slide stop), not a full rack. Every pistol with a slide, the AR-15 family and the
 // rifles and SMGs built the same way; not the AK family, the MP5's roller bolt, the open-bolt guns or a bolt-action.
-G.BOLT_HOLD = new Set(['scar', 'scarl', 'g36', 'aug', 'aug9', 'tavor', 'fal', 'm14', 'mk14', 'sr25', 'barrett', 'gm6', 'mpx', 'mp7', 'vector', 'skorp', 'svd', 'ar9', 'm27', 'hk416', 'br3', 'qbz192']);
-G.boltHold = (def) => {
+const G_BOLT_HOLD = new Set(['scar', 'scarl', 'g36', 'aug', 'aug9', 'tavor', 'fal', 'm14', 'mk14', 'sr25', 'barrett', 'gm6', 'mpx', 'mp7', 'vector', 'skorp', 'svd', 'ar9', 'm27', 'hk416', 'br3', 'qbz192']);
+G.BOLT_HOLD = G_BOLT_HOLD;
+const G_boltHold = (def) => {
   const P = def && G.Gunsmith && G.Gunsmith.PLATFORMS[def.id];
   return !!P && (P.arch === 'pistol' || G.BOLT_HOLD.has(def.id) || (P.arch === 'rifle' && (P.spec.rcv || 'ar') === 'ar')); // (the AR-15 pattern: a bolt catch over the well)
 };
+G.boltHold = G_boltHold;
 // what's in the gun, all told: the magazine (or tube) and the chamber
-G.loaded = (w) => (w ? w.mag + (w.chamber ? 1 : 0) : 0);
+const G_loaded = (w) => (w ? w.mag + (w.chamber ? 1 : 0) : 0);
+G.loaded = G_loaded;
 // Magazine families: guns that take the same magazines (one set of magazine parts, js/parts.ts MAG_FAMS).
 //   stanag: NATO 5.56 (AR-15 pattern): the M4, HK416, F2000, Tavor, SCAR-L and M27
 //   mp5: the MP5 and the MP5SD
@@ -182,25 +200,30 @@ G.loaded = (w) => (w ? w.mag + (w.chamber ? 1 : 0) : 0);
 //   saiga12: the Saiga-12 and the Vepr-12
 //   qbz: 5.8x42: the QBZ-95 and QBZ-192
 // (The G36 and AUG are their NATO versions, on STANAG magazines; the other 7.62x51 rifles, and the .45s, each have their own.)
-G.MAG_FAMILY = {
+const G_MAG_FAMILY = {
   m4: 'stanag', hk416: 'stanag', f2: 'stanag', tavor: 'stanag', scarl: 'stanag', m27: 'stanag', mcx: 'stanag', g36: 'stanag', aug: 'stanag', qbz95: 'qbz', qbz192: 'qbz', mp5: 'mp5', mp5sd: 'mp5', ak: 'akm', galil: 'akm', rpk: 'akm',
   ak74: 'ak74', aks74u: 'ak74', an94: 'ak74', p9: 'glock', g18: 'glock', g19: 'glock', ar9: 'glock', aug9: 'glock', m14: 'm14', mk14: 'm14', saiga: 'saiga12', vepr: 'saiga12',
 };
+G.MAG_FAMILY = G_MAG_FAMILY;
 // Belt boxes shared the same way: the linked 5.56 of the M249 and the Shredder. (Not in G.MAG_FAMILY: they're still
 // belt-fed, and each keeps its own box parts, which also fit the other: js/parts.ts.)
-G.BELT_FAMILY = { m249: 'link556', shredder: 'link556' };
-G.magFam = (wid) => G.MAG_FAMILY[wid] || G.BELT_FAMILY[wid] || wid;
+const G_BELT_FAMILY = { m249: 'link556', shredder: 'link556' };
+G.BELT_FAMILY = G_BELT_FAMILY;
+const G_magFam = (wid) => G.MAG_FAMILY[wid] || G.BELT_FAMILY[wid] || wid;
+G.magFam = G_magFam;
 // does a magazine made for gun mw go in gun gid?
-G.magFits = (mw, gid) => G.magFam(mw) === G.magFam(gid);
+const G_magFits = (mw, gid) => G.magFam(mw) === G.magFam(gid);
+G.magFits = G_magFits;
 // fed from a belt box (the machine guns), rather than a magazine (an LMG like the RPK that takes rifle magazines)
-G.beltFed = (def) => def.cls === 'LMG' && !G.MAG_FAMILY[def.id];
+const G_beltFed = (def) => def.cls === 'LMG' && !G.MAG_FAMILY[def.id];
+G.beltFed = G_beltFed;
 
 // Interior-ballistics inputs for the gunshot synthesizer (js/gunshot-synth.ts), one per weapon.
 // Same fields as tactical_game's weapon specs. shotCount > 1 = buckshot (diffuse crack).
 // Weapons without an entry (the railgun) keep their procedural sound.
 const GS = (barrel, caliber, muzzleDevice, pressure, grain, bulletWeight, boltMass, boltLoudness, actionType, caseMaterial, caseLength, shotCount = 1) =>
   ({ barrel, caliber, muzzleDevice, pressure, grain, bulletWeight, boltMass, boltLoudness, actionType, caseMaterial, caseLength, shotCount });
-G.GUN_SPECS = {
+const G_GUN_SPECS = {
   m4:       GS(14.5, 5.56, 'flash', 55000, 0.70, 62, 0.35, 0.50, 'gas', 'brass', 45),
   ak:       GS(16.3, 7.62, 'none', 45000, 1.00, 123, 0.72, 0.70, 'longstroke', 'steel', 39),
   f2:       GS(19.2, 5.56, 'flash', 55000, 0.70, 62, 0.30, 0.55, 'roller', 'brass', 45),
@@ -279,11 +302,13 @@ G.GUN_SPECS = {
   qbz192:   GS(10.5, 5.80, 'flash', 52000, 0.70, 64, 0.40, 0.55, 'gas', 'brass', 42),
   mcx:      GS(11.5, 5.56, 'flash', 55000, 0.70, 62, 0.35, 0.50, 'gas', 'brass', 45),
 };
+G.GUN_SPECS = G_GUN_SPECS;
 // (the integrally suppressed guns: which of the synth's suppressors theirs is, GunshotSynth.SUPPRESSORS)
 G.GUN_SPECS.vss.suppressor = G.GUN_SPECS.mp5sd.suppressor = 'integral';
 
 // Suppressed fire (suppressors are muzzle parts, see js/parts.ts): damage factor and the fallback sound.
-G.SUPPRESSOR = { snd: { f: 900, len: 0.12, boom: 0.15, vol: 0.25 } };
+const G_SUPPRESSOR = { snd: { f: 900, len: 0.12, boom: 0.15, vol: 0.25 } };
+G.SUPPRESSOR = G_SUPPRESSOR;
 
 // Body armour and helmets that suspects wear (the squad's kit, carriers, plates, helmets and belts, is in
 // js/gear.ts, and works the same way). Armour is material, so thick, where it is on the body (js/ballistics.ts):
@@ -291,7 +316,7 @@ G.SUPPRESSOR = { snd: { f: 900, len: 0.12, boom: 0.15, vol: 0.25 } };
 // (soft armour, chest and stomach), 'groin', 'shoulder', 'thigh', 'helmet' (above its brim: cut 'high' or 'full'),
 // 'face' (the rest of them: js/ballistics.ts covers). Whether a round gets through is worked out from the round and the layers; armour wears by the energy it
 // soaks up (dur: how much it takes), and a worn layer is thinner.
-G.ARMOR_LIST = [
+const G_ARMOR_LIST = [
   { id: 'none', kind: 'vest', name: 'No Armour', tier: 0, prot: [], dur: 0, speed: 1, price: 0, desc: 'Just your shirt.' },
   { id: 'soft2', kind: 'vest', name: 'Soft Vest (II)', tier: 1, prot: [{ at: 'torso', layers: [['aramid', 6]] }], dur: 4, speed: 1, price: 300,
     desc: 'Thin Kevlar panels. Stops 9 mm, .45 and buckshot, not a magnum, and it soon wears through.' },
@@ -311,7 +336,9 @@ G.ARMOR_LIST = [
   { id: 'visor', kind: 'helmet', name: 'Helmet with Ballistic Visor', tier: 4, cut: 'high', prot: [{ at: 'helmet', layers: [['pe', 18]] }, { at: 'face', layers: [['pc', 10]] }], dur: 4, speed: 0.97, price: 2800,
     desc: 'Rifle-rated, with a visor that stops handgun rounds to the face.' },
 ];
-G.ARMORS = {};
+G.ARMOR_LIST = G_ARMOR_LIST;
+const G_ARMORS = {};
+G.ARMORS = G_ARMORS;
 G.ARMOR_LIST.forEach((a) => (G.ARMORS[a.id] = a));
 
 
@@ -323,7 +350,7 @@ G.ARMOR_LIST.forEach((a) => (G.ARMORS[a.id] = a));
 // morale = starting nerve (0..1): it drains under fire and when friends go down; at 0.3 they break and run.
 // Only `hunt` types press an attack, and only while their nerve holds; everyone else holds their ground.
 // steady scales how much fear costs them (professionals shrug off more).
-G.ENEMIES = {
+const G_ENEMIES = {
   suspect: { draw: 0.55, morale: 0.4, style: 'suspect', wpn: 'p9', name: 'Armed Suspect', hp: 100, speed: 2.2, range: 22, pref: 6, pellets: 1, burst: [1, 3], rof: 0.28, pause: [0.7, 1.4], acc: 0.36, cr: 50, scale: 1, headMult: 2, comply: 0.45, fake: 0.15, snd: 'PST' },
   grunt: { draw: 1.0, morale: 0.55, style: 'suspect', wpn: 'ak', name: 'Gunman', hp: 100, speed: 2.1, range: 28, pref: 9, pellets: 1, burst: [3, 6], rof: 0.11, pause: [0.9, 1.7], acc: 0.36, cr: 65, scale: 1, headMult: 2, comply: 0.3, fake: 0.12, snd: 'AR' },
   rusher: { draw: 0.9, morale: 0.65, hunt: true, style: 'suspect', wpn: 'saiga', name: 'Shotgunner', hp: 100, speed: 2.9, range: 9, pref: 2.5, pellets: 6, burst: [1, 1], rof: 0.9, pause: [0.9, 1.3], acc: 0.5, cr: 70, scale: 1, headMult: 2, comply: 0.35, fake: 0.1, snd: 'SG' },
@@ -332,11 +359,12 @@ G.ENEMIES = {
   warden: { ready: true, morale: 1.0, style: 'armored', boss: true, nades: true, wpn: 'scar', name: 'The Kingpin', hp: 600, armor: 'boss', speed: 2.0, range: 40, pref: 8, pellets: 1, burst: [3, 6], rof: 0.1, pause: [0.8, 1.4], acc: 0.45, cr: 1500, scale: 1.06, headMult: 1.6, comply: 0, fake: 0, snd: 'BR' },
   civ: { style: 'civ', civ: true, name: 'Civilian', hp: 100, speed: 1.1, run: 3.2, scale: 1, headMult: 2, cr: 0 },
 };
+G.ENEMIES = G_ENEMIES;
 
 // home: share of rooms furnished as a home (the rest are storage, offices and break rooms)
 // layout: 'rooms' (rooms and corridors, the default), 'warehouse', 'houses', 'foundry'... (js/level.ts)
 // noFog: a clear view to the far end (the fog colour is still the backdrop)
-G.THEMES = [
+const G_THEMES = [
   { name: 'Apartment', layout: 'apartments', residents: 1, winRate: 0.3, foes: 2, crowd: 2, big: 2, home: 1, reflect: 0.3, floor: '#4a443d', wall: '#b8ab95', crate: '#8a6a3a', fog: 0x0e0c0a, light: 0xffd8a8, ceil: '#cfc8ba' },
   { name: 'Warehouse', layout: 'warehouse', noFog: true, home: 0, reflect: 0.3, floor: '#57504a', wall: '#7c6e5b', crate: '#8a6a3a', fog: 0x16130f, light: 0xffd49a, ceil: '#2a2622' },
   { name: 'Bunker', entry: 'vault', home: 0.45, reflect: 0.4, floor: '#3a4042', wall: '#5a6160', crate: '#4d5a3c', fog: 0x0b0f11, light: 0xa8c8ff, ceil: '#1d2224' },
@@ -355,14 +383,18 @@ G.THEMES = [
   // from: the first level it can come up at on the route map (js/route.ts): not till after the third
   { name: 'Sandia Crest', layout: 'crest', from: 4, rock: 1, fence: 'cliffwall', home: 0, reflect: 0.1, floor: '#8c7660', wall: '#e2d6cc', crate: '#8a6a3a', fog: 0xd99a7c, light: 0xffe4c0, ceil: '#d6cfc4', fogNear: 280, fogFar: 1100, far: 1600, hemi: 0xffd6b8, hemiI: 0.85, cloud: 0xb98c8a, crowd: 0.8, foes: 1.4, big: 1.5, lookouts: 2.5 },
 ];
+G.THEMES = G_THEMES;
 
 // the hangar between levels (js/hangar.ts): a daylit hall with a helipad outside it
-G.HANGAR_ROWS = 156; // the shooting range (300 m of rifle lanes) north of the hangar: tile rows (js/level.ts layHangar; js/hangar.ts shifts the hall by two metres a row)
-G.HANGAR_THEME = { name: 'Hangar', layout: 'hangar', hub: true, noFog: true, home: 0, reflect: 0.35, floor: '#6c7075', wall: '#98a0a8', crate: '#8a6a3a', fog: 0x86a6c8, light: 0xfff2dc, ceil: '#c9cdd0', hemi: 0xe4ecf6, hemiI: 0.85 };
+const G_HANGAR_ROWS: number = 156; // the shooting range (300 m of rifle lanes) north of the hangar: tile rows (js/level.ts layHangar; js/hangar.ts shifts the hall by two metres a row)
+G.HANGAR_ROWS = G_HANGAR_ROWS;
+const G_HANGAR_THEME = { name: 'Hangar', layout: 'hangar', hub: true, noFog: true, home: 0, reflect: 0.35, floor: '#6c7075', wall: '#98a0a8', crate: '#8a6a3a', fog: 0x86a6c8, light: 0xfff2dc, ceil: '#c9cdd0', hemi: 0xe4ecf6, hemiI: 0.85 };
+G.HANGAR_THEME = G_HANGAR_THEME;
 
-G.PLAYER_COLORS = [0x3fa9f5, 0x7bd34a, 0xf5a623, 0xd94fd9, 0x2fd6c4, 0xf2e94e, 0xff6b6b, 0xffffff];
+const G_PLAYER_COLORS = [0x3fa9f5, 0x7bd34a, 0xf5a623, 0xd94fd9, 0x2fd6c4, 0xf2e94e, 0xff6b6b, 0xffffff];
+G.PLAYER_COLORS = G_PLAYER_COLORS;
 
-G.VENDOR_QUIPS = {
+const G_VENDOR_QUIPS = {
   hello: [
     'Back already? Good. Dead customers don\'t pay.',
     'Fresh stock, no questions, no refunds.',
@@ -388,6 +420,7 @@ G.VENDOR_QUIPS = {
     'I\'ll keep the lights on for you.',
   ],
 };
+G.VENDOR_QUIPS = G_VENDOR_QUIPS;
 
 // ---------------------------------------------------------------- wounds
 // Rounds are worked out physically, through armour and through bodies (js/ballistics.ts): what a round does depends
@@ -397,7 +430,7 @@ G.VENDOR_QUIPS = {
 // ---------------------------------------------------------------- ammunition
 // Calibers (from each gun's G.GUN_SPECS bore and case) and the boxes their loose rounds come in. group decides
 // which ammo types exist for it; box: rounds in a box of ball from the quartermaster; per: price per round.
-G.CALIBERS = {
+const G_CALIBERS = {
   '5.56/45': { name: '5.56×45', group: 'rifle', box: 30, per: 1.2 }, '7.62/39': { name: '7.62×39', group: 'rifle', box: 30, per: 1.1 },
   '7/43': { name: '.277 Fury', group: 'rifle', box: 30, per: 1.8 }, '7.62/51': { name: '7.62×51', group: 'rifle', box: 20, per: 1.8 },
   '9/19': { name: '9×19', group: 'pistol', box: 50, per: 0.6 }, '5.7/29': { name: '5.7×28', group: 'pistol', box: 50, per: 1.1 },
@@ -413,24 +446,27 @@ G.CALIBERS = {
   '5.6/15': { name: '.22 LR', group: 'pistol', box: 100, per: 0.15, rimfire: true },
   bolt: { name: 'crossbow bolts', group: 'bolt', box: 6, per: 12 }, cell: { name: 'rail slugs', group: 'cell', box: 8, per: 15 },
 };
-G.calOf = (def) => {
+G.CALIBERS = G_CALIBERS;
+const G_calOf = (def) => {
   if (def.cls === 'BOW') return 'bolt';
   if (def.cls === 'RAIL') return 'cell';
   const g = G.GUN_SPECS[def.id];
   return g ? g.caliber + '/' + g.caseLength : 'cell';
 };
+G.calOf = G_calOf;
 // a caliber's standard magazine (rounds): the middle one of the guns that take it, belts aside (a shotgun's tube)
-G.stdMag = (cal) => {
+const G_stdMag = (cal) => {
   const n = [];
   for (const id in G.WEAPONS) { const d = G.WEAPONS[id]; if (G.calOf(d) === cal && d.mag > 2 && !(d.cls === 'LMG' && d.mag >= 100)) n.push(d.mag); }
   n.sort((a, b) => a - b);
   return n.length ? n[(n.length - 1) >> 1] : (G.CALIBERS[cal] || {}).box || 10;
 };
+G.stdMag = G_stdMag;
 // Ammo types. What each is physically (its bullet: js/ballistics.ts projectile) decides what it does to armour and
 // to people; here, what it does in flight: velK (faster), massK (lighter, for recoil), dragK (blunter: it slows
 // sooner), rangeK, spreadK, pelletsK, slug, tracer (colour), quiet (with a suppressor, heard no further than a
 // crossbow). k: price per round relative to ball.
-G.AMMO = {
+const G_AMMO = {
   ball: { name: 'FMJ ball', tag: 'FMJ', k: 1, desc: 'Full metal jacket. The standard round.' },
   hp: { name: 'Hollow point', tag: 'HP', k: 1.8, dragK: 0.8, desc: 'Opens to as much as 1.37× its width in flesh, the faster the wider: a wide track, all its energy spent inside, rarely out the far side. Its soft lead nose flattens on armour. It drags more in the air: it slows and drops sooner than ball.' },
   ap: { name: 'Armour-piercing', tag: 'AP', k: 2.4, velK: 1.08, massK: 0.85, desc: 'A hardened steel (pistol) or tungsten carbide (rifle) core, lighter and 8% faster: goes through plate that flattens lead, and through people, nose-first and late to tumble: a narrow track.' },
@@ -448,11 +484,13 @@ G.AMMO = {
   bodkin: { name: 'Bodkin bolt', tag: 'BDKN', k: 2.2, velK: 0.79, massK: 1.6, glow: 0xff3ad0, desc: 'A heavy hardened needle, the old answer to mail: it parts a soft vest\'s weave where a bullet would be caught, and leaves a narrow wound. A hard plate still stops it.' },
   railslug: { name: 'Tungsten slug', tag: 'SLUG', k: 1, desc: 'Magnetically launched.' },
 };
-G.AMMO_TYPES = { rifle: ['ball', 'hp', 'ap', 'tracer', 'subsonic'], pistol: ['ball', 'hp', 'ap', 'tracer', 'subsonic'], shotgun: ['buck', 'slug', 'birdshot', 'flechette'], grenade: ['he'], bolt: ['broadhead', 'mechanical', 'bodkin'], cell: ['railslug'] };
+G.AMMO = G_AMMO;
+const G_AMMO_TYPES = { rifle: ['ball', 'hp', 'ap', 'tracer', 'subsonic'], pistol: ['ball', 'hp', 'ap', 'tracer', 'subsonic'], shotgun: ['buck', 'slug', 'birdshot', 'flechette'], grenade: ['he'], bolt: ['broadhead', 'mechanical', 'bodkin'], cell: ['railslug'] };
+G.AMMO_TYPES = G_AMMO_TYPES;
 // How fast a round leaves the muzzle (m/s), for whether it cracks going past (only above the speed of sound,
 // 343 m/s). Reference velocities by caliber at a reference barrel length (inches), scaled gently by the
 // build's barrel; how far it carries before drag takes 63% of its speed (m: pellets slow fast).
-G.MUZZLE_V = {
+const G_MUZZLE_V = {
   // (the drag lengths from real retained velocities: 5.56 keeps about 73% of its speed at 300 m, 7.62×51 76%,
   // .338 86%, .50 BMG 91%; 9 mm about 87% at 100 m, .45 ACP 94%; heavy subsonic 9×39 barely slows)
   '5.56/45': [940, 20, 950], '7.62/39': [715, 16.3, 1000], '7/43': [920, 16, 1050], '7.62/51': [840, 22, 1100],
@@ -464,12 +502,15 @@ G.MUZZLE_V = {
   '5.6/15': [370, 4.1, 560], // (.22 LR: a 40-grain round from a pistol, about 85% of its speed left at 100 m)
   bolt: [120, 20, 300], cell: [2000, 20, 3000],
 };
-G.SOUND_SPEED = 343;
+G.MUZZLE_V = G_MUZZLE_V;
+const G_SOUND_SPEED: number = 343;
+G.SOUND_SPEED = G_SOUND_SPEED;
 // how far a round goes before drag takes 63% of its speed (m), from this build, with this load
 // (a load's dragK: a hollow point's open, blunt nose sheds speed sooner than ball's)
-G.dragOf = (def, am) => { const ref = G.MUZZLE_V[G.calOf(def)]; return am === 'slug' ? 350 : (ref ? ref[2] : 600) * ((G.AMMO[am] || {}).dragK || 1); };
+const G_dragOf = (def, am) => { const ref = G.MUZZLE_V[G.calOf(def)]; return am === 'slug' ? 350 : (ref ? ref[2] : 600) * ((G.AMMO[am] || {}).dragK || 1); };
+G.dragOf = G_dragOf;
 // a round's speed (m/s) d metres from the muzzle, from this build, with this load
-G.roundSpeed = (def, am, d = 0) => {
+const G_roundSpeed = (def, am, d = 0) => {
   const cal = G.calOf(def), ref = G.MUZZLE_V[cal];
   if (!ref) return 0;
   const barrel = def.barrelIn || (G.GUN_SPECS[def.id] || {}).barrel || ref[1];
@@ -480,6 +521,7 @@ G.roundSpeed = (def, am, d = 0) => {
   if (am === 'subsonic' || def.integral) v = Math.min(v, 310);
   return v * Math.exp(-d / G.dragOf(def, am)); // (a slug carries its speed; pellets shed it)
 };
+G.roundSpeed = G_roundSpeed;
 // Recoil comes from the round and the gun. The round pushes back with its momentum: the bullet's, plus the powder
 // gas leaving behind it (about 1.75 times the bullet's speed). The gun's mass soaks that up: the same push moves a
 // heavy gun less. A shot climbs K * impulse^B / mass^A degrees (B > 1: big rounds hurt more than in proportion, and
@@ -488,12 +530,13 @@ G.roundSpeed = (def, am, d = 0) => {
 // pump, lever, break, revolver) has nothing to soften it, so the whole kick lands at once; and a few guns built
 // against recoil. The muzzle device and the rest of the build are parts (js/parts.ts compile, which also uses the
 // build's own weight and barrel). K puts an M4 at 1.1 degrees.
-G.CHARGE_GR = { // powder charge (grains)
+const G_CHARGE_GR = { // powder charge (grains)
   '5.56/45': 25, '7.62/39': 25, '7/43': 30, '7.62/51': 46, '9/19': 6, '5.7/29': 6.5, '11.43/23': 5.5, '18.5/70': 27,
   '7.62/54': 50, '12.7/99': 235, '40/46': 5, '7.65/17': 2.5, '12.7/33': 25, '9.07/33': 14, '12.7/41': 40, '4.6/30': 6,
   '5.6/39': 23, '5.8/42': 26, '7.62/63': 50, '9/39': 15, '11.6/53': 55, '8.6/69': 90, '7.62/25': 8, '10.4/63': 14, '11.43/33': 9, '10.9/33': 22, '5.6/15': 2,
 };
-G.GUN_KG = { // each gun as it comes (kg)
+G.CHARGE_GR = G_CHARGE_GR;
+const G_GUN_KG = { // each gun as it comes (kg)
   m4: 2.9, ak: 3.5, f2: 3.6, g36: 3.6, br3: 3.4, scar: 3.6, tavor: 3.3, hk416: 3.5, aug: 3.6, galil: 3.4, an94: 3.85,
   ak74: 3.4, aks74u: 2.7, scarl: 3.3, m27: 3.6, fal: 4.3, m14: 4.5, mk14: 5.1, garand: 4.3, svd: 4.3, vss: 2.6, lever: 3.3,
   sr25: 4.9, uzi: 1.5, mp5: 2.5, p90: 2.6, vector: 2.7, thompson: 4.9, ppsh: 3.6, mp5sd: 2.9, mpx: 2.7, ar9: 2.9, aug9: 3.3, qbz95: 3.3, qbz192: 3.0, mcx: 2.7,
@@ -502,7 +545,8 @@ G.GUN_KG = { // each gun as it comes (kg)
   p9: 0.75, g19: 0.7, m1911: 1.1, usp: 0.75, fiveseven: 0.75, thor: 5.4, b92: 0.97, ppk: 0.59, auto9: 1.1, deagle: 2.0, rev: 1.1, hc500: 2.0, akimbo: 0.95, derringer: 0.4,
   g18: 0.9, skorp: 1.3, mp7: 1.9, mac10: 2.8, tx22: 0.6, sawn: 2.0, judge: 0.85, pocketgl: 1.8,
 };
-G.RECOIL_K = (() => {
+G.GUN_KG = G_GUN_KG;
+const G_RECOIL_K = (() => {
   const k = {}, set = (ids, f) => ids.split(' ').forEach((id) => { k[id] = (k[id] || 1) * f; });
   set('ak ak74 aks74u an94 galil rpk svd saiga vepr garand thompson ppsh mosin pump dbl', 1.25); // (the stock drops below the bore)
   set('m14', 1.15);
@@ -514,20 +558,23 @@ G.RECOIL_K = (() => {
   set('gm6', 0.6); // (all of its barrel and bolt run back together, a long stroke: the impulse spread out, and the brake)
   return k;
 })();
-G.RECOIL = { K: 0.2045, B: 1.35, A: 0.7, HAND: 1.3, GAS: 1.75 };
+G.RECOIL_K = G_RECOIL_K;
+const G_RECOIL = { K: 0.2045, B: 1.35, A: 0.7, HAND: 1.3, GAS: 1.75 };
+G.RECOIL = G_RECOIL;
 // How much the aim wanders (js/player.ts swayStep): sway, the slow breathing drift (heavier guns droop more), and
 // erratic, the quick twitch. A stock to your shoulder is what steadies a gun: a handgun with one (a derringer on a
 // stock-lug grip, a pistol with a shoulder stock) settles almost to a carbine's; a long gun with its stock taken off
 // (or folded away) is held out in the hands like a pistol, and heavier, and wanders worse than one. braced: the
 // build's (js/parts.ts compile); a gun as it comes, by its class. score: the two together, an M4's about 1.
-G.aimSway = (def) => {
+const G_aimSway = (def) => {
   const hand = def.cls === 'PST' || def.cls === 'MP', braced = def.braced != null ? def.braced : !hand, kg = def.weight || G.GUN_KG[def.id] || 3;
   const sway = braced ? G.U.clamp(0.75 + kg * 0.07, 0.8, 1.6) * (hand ? 0.9 : 1) : hand ? 1.25 : G.U.clamp(1.7 + kg * 0.12, 1.9, 2.8);
   const erratic = braced ? (def.cls === 'SMG' ? 0.12 : hand ? 0.07 : 0.03) : hand ? 0.35 : 0.42;
   return { sway, erratic, score: (sway + erratic * 2.5) / 1.05 };
 };
+G.aimSway = G_aimSway;
 // the push back of one shot (N·s) from this build with this load, or 0 (a bolt, a rail slug)
-G.recoilImpulse = (def, am) => {
+const G_recoilImpulse = (def, am) => {
   const g = G.GUN_SPECS[def.id], cal = G.calOf(def), ch = G.CHARGE_GR[cal];
   if (!g || !ch) return 0;
   const v = G.roundSpeed(def, am), v0 = am === 'subsonic' ? G.roundSpeed(def) : v;
@@ -535,12 +582,14 @@ G.recoilImpulse = (def, am) => {
   const A = G.AMMO[am] || {}, bw = g.bulletWeight * (am === 'subsonic' ? 1.4 : A.massK || 1), cw = ch * (am === 'subsonic' ? 1.4 * (v / v0) * (v / v0) : 1);
   return (bw * v + cw * G.RECOIL.GAS * v) * 6.479891e-5;
 };
+G.recoilImpulse = G_recoilImpulse;
 // a shot's climb (degrees) from this build weighing kg, with this load; null when it isn't a gun with a round
-G.physRecoil = (def, kg = G.GUN_KG[def.id], am) => {
+const G_physRecoil = (def, kg = G.GUN_KG[def.id], am) => {
   const I = G.recoilImpulse(def, am), R = G.RECOIL;
   if (!I || !kg) return null;
   return R.K * Math.pow(I, R.B) / Math.pow(kg, R.A) * (def.cls === 'PST' || def.cls === 'MP' ? R.HAND : 1) * (G.RECOIL_K[def.id] || 1);
 };
+G.physRecoil = G_physRecoil;
 for (const id in G.WEAPONS) { const r = G.physRecoil(G.WEAPONS[id]); if (r) G.WEAPONS[id].recoil = Math.round(r * 100) / 100; }
 // Rounds are projectiles (js/player.ts fly): they slow with drag over dragOf metres (to 37% of their speed) and
 // fall with gravity, so every gun's sights are zeroed: the round leaves a hair above the line of sight, crosses
@@ -548,15 +597,20 @@ for (const id in G.WEAPONS) { const r = G.physRecoil(G.WEAPONS[id]); if (r) G.WE
 // guns at 50, marksman and sniper rifles at 100, a launcher's leaf sight at 40. The sights sit sightH metres
 // above the bore, so the round starts that far under your eye and climbs to the line: that's what gives a
 // carbine zeroed at 50 m its second zero out near 200 (and puts a round low on something very close).
-G.GRAVITY = 9.81;
-G.zeroOf = (def) => ({ PST: 25, MP: 25, SMG: 25, SG: 25, BOW: 20, GL: 40, DMR: 100, SNP: 100, RAIL: 0 })[def.cls] ?? 50;
-G.sightH = (def) => ({ PST: 0.02, MP: 0.025, SMG: 0.05, SG: 0.035, BOW: 0.05, GL: 0.06, RAIL: 0 })[def.cls] ?? 0.065;
+const G_GRAVITY: number = 9.81;
+G.GRAVITY = G_GRAVITY;
+const G_zeroOf = (def) => ({ PST: 25, MP: 25, SMG: 25, SG: 25, BOW: 20, GL: 40, DMR: 100, SNP: 100, RAIL: 0 })[def.cls] ?? 50;
+G.zeroOf = G_zeroOf;
+const G_sightH = (def) => ({ PST: 0.02, MP: 0.025, SMG: 0.05, SG: 0.035, BOW: 0.05, GL: 0.06, RAIL: 0 })[def.cls] ?? 0.065;
+G.sightH = G_sightH;
 // What a round does once it leaves (js/player.ts fly, stepRound: the same sums): from sightH under the line of sight,
 // the bore tipped up `slope` (rise over run), out to maxD metres. Samples a metre apart: h (metres above the line of
 // sight; level ground, the line of sight level), v (m/s), t (s). Stops where a round's spent (ROUND_LIFE).
-G.ROUND_LIFE = { t: 4, dist: 550, v: 30 }; // (in the air past any of these, it's gone)
-G.ballistics = (def, am) => { const rail = def.cls === 'RAIL'; return { v0: rail ? 3000 : Math.max(40, G.roundSpeed(def, am) || 400), drag: rail ? 1e9 : G.dragOf(def, am), g: rail ? 0 : G.GRAVITY, sh: G.sightH(def) }; };
-G.flight = (def, am, slope, maxD = 500) => {
+const G_ROUND_LIFE = { t: 4, dist: 550, v: 30 }; // (in the air past any of these, it's gone)
+G.ROUND_LIFE = G_ROUND_LIFE;
+const G_ballistics = (def, am) => { const rail = def.cls === 'RAIL'; return { v0: rail ? 3000 : Math.max(40, G.roundSpeed(def, am) || 400), drag: rail ? 1e9 : G.dragOf(def, am), g: rail ? 0 : G.GRAVITY, sh: G.sightH(def) }; };
+G.ballistics = G_ballistics;
+const G_flight = (def, am, slope, maxD = 500) => {
   const { v0, drag, g, sh } = G.ballistics(def, am), L = G.ROUND_LIFE, dt = 1 / 120, n = Math.hypot(1, slope);
   let x = 0, y = -sh, vx = v0 / n, vy = v0 * slope / n, t = 0, dist = 0;
   const out = [{ d: 0, h: y, v: v0, t: 0 }];
@@ -567,10 +621,11 @@ G.flight = (def, am, slope, maxD = 500) => {
   }
   return out;
 };
+G.flight = G_flight;
 // The tip of the bore that puts the round back on the line of sight at `zero` metres (found by halving: higher
 // is always higher there). null if it can't get there (spent first). Kept, by gun, load and zero.
 const _zeroK = new Map();
-G.zeroSlope = (def, am, zero) => {
+const G_zeroSlope = (def, am, zero) => {
   const key = `${def.code || def.id}|${am}|${zero}`;
   if (_zeroK.has(key)) return _zeroK.get(key);
   let lo = -0.02, hi = 0.25, k = null;
@@ -581,24 +636,31 @@ G.zeroSlope = (def, am, zero) => {
   _zeroK.set(key, k);
   return k;
 };
+G.zeroSlope = G_zeroSlope;
 // A gun's sights: zeroed for its class's distance with ball (G.zeroOf), then turned at the zeroing table a click at
 // a time (w.clicks: 0.1 mil each, a centimetre at 100 m; up is +, the round strikes higher). The bore's tip over the
 // line of sight, rise over run: every load fires from it (a slower one drops more, so it hits lower).
-G.CLICK = 0.0001;
-G.boreTip = (w) => { const d = w.def; if (d.cls === 'RAIL') return 0; const k = G.zeroSlope(d, G.ballFor(G.calOf(d)), G.zeroOf(d)); return (k == null ? 0 : k) + (w.clicks || 0) * G.CLICK; };
-G.ballFor = (cal) => G.AMMO_TYPES[(G.CALIBERS[cal] || { group: 'cell' }).group][0];
+const G_CLICK: number = 0.0001;
+G.CLICK = G_CLICK;
+const G_boreTip = (w) => { const d = w.def; if (d.cls === 'RAIL') return 0; const k = G.zeroSlope(d, G.ballFor(G.calOf(d)), G.zeroOf(d)); return (k == null ? 0 : k) + (w.clicks || 0) * G.CLICK; };
+G.boreTip = G_boreTip;
+const G_ballFor = (cal) => G.AMMO_TYPES[(G.CALIBERS[cal] || { group: 'cell' }).group][0];
+G.ballFor = G_ballFor;
 // how often each type turns up loaded in a found gun (relative): ball and buckshot mostly, AP and flechette rarely
-G.AMMO_RARITY = { ball: 10, hp: 3, tracer: 3, subsonic: 2, ap: 1, buck: 10, slug: 4, birdshot: 3, flechette: 1, he: 1, broadhead: 3, mechanical: 2, bodkin: 1, railslug: 1 };
-G.rollAmmo = (cal, rnd = Math.random) => {
+const G_AMMO_RARITY = { ball: 10, hp: 3, tracer: 3, subsonic: 2, ap: 1, buck: 10, slug: 4, birdshot: 3, flechette: 1, he: 1, broadhead: 3, mechanical: 2, bodkin: 1, railslug: 1 };
+G.AMMO_RARITY = G_AMMO_RARITY;
+const G_rollAmmo = (cal, rnd = Math.random) => {
   const types = G.AMMO_TYPES[(G.CALIBERS[cal] || { group: 'cell' }).group];
   let x = rnd() * types.reduce((a, t) => a + (G.AMMO_RARITY[t] || 1), 0);
   for (const t of types) { x -= G.AMMO_RARITY[t] || 1; if (x <= 0) return t; }
   return types[0];
 };
+G.rollAmmo = G_rollAmmo;
 // a type for that caliber, or its ball
-G.ammoOk = (cal, am) => (G.AMMO_TYPES[(G.CALIBERS[cal] || { group: 'cell' }).group].includes(am) ? am : G.ballFor(cal));
+const G_ammoOk = (cal, am) => (G.AMMO_TYPES[(G.CALIBERS[cal] || { group: 'cell' }).group].includes(am) ? am : G.ballFor(cal));
+G.ammoOk = G_ammoOk;
 // a gun firing a round of this type: its stats as that round sees them
-G.roundDef = (def, am) => {
+const G_roundDef = (def, am) => {
   const A = G.AMMO[am];
   if (!A || A.k === 1 && !A.tracer && !A.slug) return def;
   const d = Object.create(def);
@@ -611,13 +673,15 @@ G.roundDef = (def, am) => {
   if (A.slug || A.velK || am === 'subsonic') { const I0 = G.recoilImpulse(def), I = G.recoilImpulse(def, am); if (I0 && I) d.recoil = def.recoil * Math.pow(I / I0, G.RECOIL.B); } // (a load that pushes harder or softer)
   return d;
 };
+G.roundDef = G_roundDef;
 
 // ---------------------------------------------------------------- enemy kit
 // What suspects carry moves up through gear tiers at its own pace with the level, the way the squad's own
 // kit does: early levels are cheap handguns, sawn-offs and street SMGs, in a thin soft vest if anything; later ones bring
 // rifles, plate carriers and helmets. Each suspect rolls its own tier around the level's (a few a tier lower or higher).
-G.gearTier = (level) => (level <= 2 ? 1 : level <= 4 ? 2 : level <= 7 ? 3 : 4);
-G.ENEMY_GEAR = {
+const G_gearTier = (level) => (level <= 2 ? 1 : level <= 4 ? 2 : level <= 7 ? 3 : 4);
+G.gearTier = G_gearTier;
+const G_ENEMY_GEAR = {
   // weapon pools by type, tiers 1-4
   weapons: {
     suspect: [['p9', 'rev', 'derringer', 'tx22'], ['p9', 'm1911', 'usp', 'rev', 'g19'], ['usp', 'm1911', 'g18', 'deagle', 'g19'], ['g18', 'deagle', 'usp']],
@@ -651,3 +715,6 @@ G.ENEMY_GEAR = {
     boss: { vest: ['assault', 'assault', 'assault', 'assault'], helmet: ['riflehelm', 'visor', 'visor', 'visor'], ex: [[], ['l.shin'], ['l.shin'], ['l.shin']] },
   },
 };
+G.ENEMY_GEAR = G_ENEMY_GEAR;
+
+interface GameModules { TIER_NAMES: typeof G_TIER_NAMES; TIER_COLORS: typeof G_TIER_COLORS; CLASS_SND: typeof G_CLASS_SND; WEAPON_LIST: typeof G_WEAPON_LIST; WEAPONS: typeof G_WEAPONS; EXPLOSIVES_OFF: typeof G_EXPLOSIVES_OFF; obtainable: typeof G_obtainable; AUTO_ONLY: typeof G_AUTO_ONLY; FIRE_MODES: typeof G_FIRE_MODES; MODE_NAME: typeof G_MODE_NAME; OPEN_BOLT: typeof G_OPEN_BOLT; chambered: typeof G_chambered; revolver: typeof G_revolver; REV: typeof G_REV; fullReload: typeof G_fullReload; BOLT_HOLD: typeof G_BOLT_HOLD; boltHold: typeof G_boltHold; loaded: typeof G_loaded; MAG_FAMILY: typeof G_MAG_FAMILY; BELT_FAMILY: typeof G_BELT_FAMILY; magFam: typeof G_magFam; magFits: typeof G_magFits; beltFed: typeof G_beltFed; GUN_SPECS: typeof G_GUN_SPECS; SUPPRESSOR: typeof G_SUPPRESSOR; ARMOR_LIST: typeof G_ARMOR_LIST; ARMORS: typeof G_ARMORS; ENEMIES: typeof G_ENEMIES; THEMES: typeof G_THEMES; HANGAR_ROWS: typeof G_HANGAR_ROWS; HANGAR_THEME: typeof G_HANGAR_THEME; PLAYER_COLORS: typeof G_PLAYER_COLORS; VENDOR_QUIPS: typeof G_VENDOR_QUIPS; CALIBERS: typeof G_CALIBERS; calOf: typeof G_calOf; stdMag: typeof G_stdMag; AMMO: typeof G_AMMO; AMMO_TYPES: typeof G_AMMO_TYPES; MUZZLE_V: typeof G_MUZZLE_V; SOUND_SPEED: typeof G_SOUND_SPEED; dragOf: typeof G_dragOf; roundSpeed: typeof G_roundSpeed; CHARGE_GR: typeof G_CHARGE_GR; GUN_KG: typeof G_GUN_KG; RECOIL_K: typeof G_RECOIL_K; RECOIL: typeof G_RECOIL; aimSway: typeof G_aimSway; recoilImpulse: typeof G_recoilImpulse; physRecoil: typeof G_physRecoil; GRAVITY: typeof G_GRAVITY; zeroOf: typeof G_zeroOf; sightH: typeof G_sightH; ROUND_LIFE: typeof G_ROUND_LIFE; ballistics: typeof G_ballistics; flight: typeof G_flight; zeroSlope: typeof G_zeroSlope; CLICK: typeof G_CLICK; boreTip: typeof G_boreTip; ballFor: typeof G_ballFor; AMMO_RARITY: typeof G_AMMO_RARITY; rollAmmo: typeof G_rollAmmo; ammoOk: typeof G_ammoOk; roundDef: typeof G_roundDef; gearTier: typeof G_gearTier; ENEMY_GEAR: typeof G_ENEMY_GEAR; }

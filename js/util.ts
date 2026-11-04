@@ -20,7 +20,7 @@ if (window.THREE) {
   THREE.WebGLRenderer.prototype = WR.prototype;
 }
 
-G.U = {
+const G_U = {
   // mulberry32 — small deterministic PRNG so every peer generates the same level from a seed
   rng(seed: number) {
     let a = seed >>> 0;
@@ -86,3 +86,5 @@ G.U = {
     set(k, v) { try { localStorage.setItem('bp_' + k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } },
   },
 };
+G.U = G_U;
+interface GameModules { U: typeof G_U; }

@@ -6,7 +6,7 @@
 // their armour, how fast it came out or where it stopped, and the track of each fragment and splinter it threw off inside them.
 // All of it's only for whoever you've picked out with the crosshair, who stays picked when you look away (js/hud.ts debugTarget:
 // hbLast): nobody else's shows, and with nobody picked out it's the shots that hit you.
-G.ShotLog = (() => {
+const G_ShotLog = (() => {
   const T = THREE, MAX = 32, MACHS = [3, 2.5, 2, 1.5, 1, 0.5], RANGE = 90, LH = 15; // (RANGE: markers further than this aren't labelled)
   let recs = [], count = new Map(), far = new Map(), shown = false, cv = null, g = null;
   const css = (v) => '#' + G.R.trailColour(v, new T.Color()).getHexString(), mach = (v) => (v / G.SOUND_SPEED).toFixed(2);
@@ -182,3 +182,6 @@ G.ShotLog = (() => {
   }
   return { pose, remote, keep, clear, of, focus, frame };
 })();
+G.ShotLog = G_ShotLog;
+
+interface GameModules { ShotLog: typeof G_ShotLog; }

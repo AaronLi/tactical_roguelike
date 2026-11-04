@@ -8,6 +8,12 @@ interface GameNamespace {
   [module: string]: any;
 }
 
+/**
+ * What each file puts on G, by name, as it's made. A file declares its own: `const G_Level = { ... }; G.Level = G_Level;`
+ * and `interface GameModules { Level: typeof G_Level }` (interfaces merge across the scripts).
+ */
+interface GameModules {}
+
 interface Window {
   G: GameNamespace;
   /** three.js r149, from the CDN (index.html, js/exportworker.ts). Untyped: @types/three for r149 isn't installed. */

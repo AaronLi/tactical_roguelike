@@ -15,7 +15,7 @@
 //
 // THE SQUAD: a gun's list is sent once (to the host, who passes it on and keeps it for anyone joining later: share),
 // then only its hash, in your state (st.sk: js/player.ts state), which everyone looks up (of).
-G.Stickers = (() => {
+const G_Stickers = (() => {
   const DIR = 'assets/stickers/', EXT = /\.(png|webp|jpe?g|gif|avif)$/i;
   const S = { base: '', names: [], MAX: 12, MIN_K: 0.012, MAX_K: 0.07 }; // (MAX on a gun; k's range, m. base: the game's folder, from a worker's: js/exportworker.ts)
   const ok = (n) => typeof n === 'string' && n.length < 100 && EXT.test(n) && !/[\\/]|^\./.test(n);
@@ -261,3 +261,5 @@ G.Stickers = (() => {
 
   return Object.assign(S, { load, url, owned, give, use, pic, provide, material, clean, decorate, ghost, key, share, of, learn, joined });
 })();
+G.Stickers = G_Stickers;
+interface GameModules { Stickers: typeof G_Stickers; }

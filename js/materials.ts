@@ -25,7 +25,7 @@
 // the void, every so many metres }. of(map, solid, p, q) gives the construction of the solid a round met at p and left
 // at q. A partition is two sheets of plasterboard and a void, with a stud every 40 cm; a bunker's wall is concrete all
 // the way through; a fridge is thin steel with foam in it; a car is thin steel with an engine in it.
-G.Materials = (() => {
+const G_Materials = (() => {
   const CORE_E = { lead: 1, mild: 1.1, hard: 1.4, wc: 1.6 };
   const m = (name, K, rho, sig, fx, o) => Object.assign({ name, K, rho, sig, fx, E: CORE_E, mu: 0.3, e: 0.15 }, o || {});
   const MAT = {
@@ -197,3 +197,6 @@ G.Materials = (() => {
   }
   return { MAT, TISSUE, CORE_E, PROPS, PARTS, WALLS, of, outAt, built };
 })();
+G.Materials = G_Materials;
+
+interface GameModules { Materials: typeof G_Materials; }

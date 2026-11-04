@@ -7,7 +7,7 @@
 // playing for the current state (reloading, racking after the last shell, inspecting) and poses the parts
 // and both hands. The arms run from fixed shoulders just off-screen to wherever the hands are, so a hand
 // can leave the gun, go to a pouch for a magazine and come back.
-G.VMAnim = (() => {
+const G_VMAnim = (() => {
   const T = THREE;
   const S = (a, b, t) => G.U.smooth(a, b, t);
   const lerpV = (a, b, k) => a.clone().lerp(b, k);
@@ -732,3 +732,6 @@ G.VMAnim = (() => {
 
   return { prepare, sample, apply, kinds, canMagCheck, actEvents, INSPECT_HOLD };
 })();
+G.VMAnim = G_VMAnim;
+
+interface GameModules { VMAnim: typeof G_VMAnim; }

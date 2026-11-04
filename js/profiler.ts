@@ -11,7 +11,7 @@
 //
 // Times are inclusive (Me.update includes Me.move, which is listed too); "frame" is the time from one animation frame
 // to the next (what you feel: it includes the GPU and the browser), "cpu" is the time spent in the game's loop.
-G.Prof = (() => {
+const G_Prof = (() => {
   const CAP = 3600, MAX_SEC = 48, SPIKES = 40, MSG_TYPES = 64, SPIKE_MS = 33;
   const FIX = ['t', 'frame', 'cpu', 'calls', 'tris', 'geoms', 'texs', 'progs', 'heap', 'rounds', 'enemies'];
   const NF = FIX.length;
@@ -165,3 +165,5 @@ G.Prof = (() => {
 
   return { save, report, summary, line, reset, wrap, sec, get on() { return on; }, set on(v) { on = !!v; } };
 })();
+G.Prof = G_Prof;
+interface GameModules { Prof: typeof G_Prof; }

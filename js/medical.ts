@@ -32,7 +32,7 @@
 //   blood bag (40% blood back: on yourself, or on a teammate; an unconscious one comes round with it).
 // Bandages and painkiller doses stack 4 to a slot, tourniquets and gauze 3; the rest are one each.
 // A gut wound can't be fixed in the field. Everything heals at the quartermaster's.
-G.Med = (() => {
+const G_Med = (() => {
   const PARTS: [string, string, number][] = [
     ['head', 'Head', 35], ['thorax', 'Thorax', 85], ['stomach', 'Stomach', 70],
     ['armL', 'Left arm', 60], ['armR', 'Right arm', 60], ['legL', 'Left leg', 65], ['legR', 'Right leg', 65],
@@ -271,3 +271,5 @@ G.Med = (() => {
   }
   return { PARTS, NAME, ITEMS, LIMBS, figure, isLimb, newBody, partOf, hit, wound, paralysed, tick, bleedOut, bleeding, aimPenalty, speedMult, cantTreat, treat, cantRevive, reviveWarn, downable, unconscious, DOWNABLE, UNCON, overall, encode, decode, describe };
 })();
+G.Med = G_Med;
+interface GameModules { Med: typeof G_Med; }

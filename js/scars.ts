@@ -13,7 +13,7 @@
 //   - plasterboard takes a neat hole in, a torn paper-edged blowout out, and hangs in the air as dust
 //   - cardboard, paper, cloth, foam, wool and stock tear and let go of what's in them, which drifts
 //   - glass and tile star; plastic whitens and stars; earth and sand crater; water splashes; leaves fall
-G.Scars = (() => {
+const G_Scars = (() => {
   const T = THREE, CELLS = 4, PX = 256;
   // chips: n, size (m), speed (m/s), gravity, shape (chunk, sliver, flake), colours, drag (flakes drift), how long they lie
   const CHIP = {
@@ -256,3 +256,5 @@ G.Scars = (() => {
   }
   return { plan, meshes, debris, flapMat };
 })();
+G.Scars = G_Scars;
+interface GameModules { Scars: typeof G_Scars; }

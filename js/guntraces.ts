@@ -8,7 +8,7 @@
 {
 const ring = (x, y, r, n = 14) => Array.from({ length: n }, (_, i) => [x + Math.cos((i / n) * Math.PI * 2) * r, y + Math.sin((i / n) * Math.PI * 2) * r]);
 const pill = (x0, y0, x1, y1) => { const r = (y1 - y0) / 2, c = [], n = 6; for (let i = 0; i <= n; i++) { const a = -Math.PI / 2 + Math.PI * i / n; c.push([x1 - r + Math.cos(a) * r, y0 + r + Math.sin(a) * r]); } for (let i = 0; i <= n; i++) { const a = Math.PI / 2 + Math.PI * i / n; c.push([x0 + r + Math.cos(a) * r, y0 + r + Math.sin(a) * r]); } return c; }; // (a stadium: a long port)
-G.GunTraces = {
+var G_GunTraces = {
   // Walther P99, left side: 175 mm. The slide's rear corner sweeps down in one curve; a raised grip panel, a long
   // finger-rest shelf at the heel, the trigger guard's squared front.
   p9: {
@@ -385,4 +385,6 @@ G.GunTraces = {
     ],
   },
 };
+G.GunTraces = G_GunTraces;
 }
+interface GameModules { GunTraces: typeof G_GunTraces; }

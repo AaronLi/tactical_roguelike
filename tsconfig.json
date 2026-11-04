@@ -13,7 +13,7 @@
     "strictFunctionTypes": true,
     "strictBindCallApply": true,
     "alwaysStrict": true,
-    "noImplicitThis": true,
+    "noImplicitThis": false,
     "useUnknownInCatchVariables": true,
     "noImplicitReturns": true,
     "noUnusedLocals": true,

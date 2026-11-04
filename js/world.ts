@@ -11,7 +11,7 @@
 // their solids change as they open, close and break.
 // Levels are still planned on grids by the generators (js/level.ts); fromTileMap turns a planned level into
 // solids. Nothing here knows about tiles.
-G.World = (() => {
+const G_World = (() => {
   const CELL = 2; // the hash's cells, metres on a side (x, y and z)
   const key = (ix, iy, iz) => ((ix + 2048) * 4096 + (iy + 2048)) * 4096 + (iz + 2048);
 
@@ -415,3 +415,6 @@ G.World = (() => {
 
   return { CELL, STEP, HEIGHT, GLASS_SEE, create, add, remove, reshape, box, raycast, span, los, see, query, resolve, groundAt, terrainAt, rampAt, ceilingAt, fromTileMap, stairs, door, windowSolids };
 })();
+G.World = G_World;
+
+interface GameModules { World: typeof G_World; }

@@ -2,7 +2,7 @@
 // A demo reel: open the game with ?demo and it plays itself. A solo level with nobody else in it, and the main
 // weapon archetypes one after another: drawn, fired (and cycled), a partial reload, run dry, a reload from
 // empty (the action after it), the magazine checked and a chamber check held. Captions say what's showing.
-G.Demo = (() => {
+const G_Demo = (() => {
   // the archetypes: [weapon, what it is, how it fires]
   const REEL = [
     ['m4', 'AR-15 carbine: charging handle, bolt catch', 'auto'],
@@ -103,3 +103,6 @@ G.Demo = (() => {
   if (new URLSearchParams(location.search).has('demo')) window.addEventListener('load', () => setTimeout(run, 300));
   return { REEL, run };
 })();
+G.Demo = G_Demo;
+
+interface GameModules { Demo: typeof G_Demo; }

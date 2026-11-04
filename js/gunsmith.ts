@@ -6,7 +6,7 @@
 // Stickers (its Stickers tab): pick one you own, click the gun where it goes (it shows there, faint), size it, turn it,
 // mirror it, and stick it on: it's on that gun for good (js/stickers.ts).
 
-G.GunsmithUI = (() => {
+const G_GunsmithUI = (() => {
   const T = THREE, GS = G.Gunsmith;
   let renderer = null, scene, camera, model = null, modelKey = '', canvas, raf = 0, active = false;
   const view: any = { yaw: Math.PI / 2 - 0.3, pitch: 0.15, dist: 1.4, center: new T.Vector3(), auto: true }; // right side, muzzle to the right
@@ -529,3 +529,5 @@ G.GunsmithUI = (() => {
 
   return { show, hide, onClick, onChange, onHover, refresh, state: st, partEffects, statsHtml, deltaHtml, fitsLine, _setModel: (d) => setModel(d), _view: view, _canvas: () => canvas, _model: () => model };
 })();
+G.GunsmithUI = G_GunsmithUI;
+interface GameModules { GunsmithUI: typeof G_GunsmithUI; }

@@ -65,7 +65,7 @@
 // the round left in it, as a share of what a person can take (PERSON_J). Calibrated against bare ballistic gelatin (10%, the usual published tests): .22 LR
 // about 33 cm, .32 ACP 45, 9 mm FMJ 65 and hollow point 35, .45 ACP FMJ 65 and hollow point 33, a 00 buck pellet 30, a
 // 12 gauge slug 35, 5.56 about 35, 7.62x39 55, 7.62x51 50.
-G.Ballistics = (() => {
+const G_Ballistics = (() => {
   const T = THREE;
   // ---------------------------------------------------------------- the rounds
   // By caliber: [mass g, diameter mm, length mm, core, tissue yaw depth cm (0: stays nose-first), fragmentation speed m/s
@@ -876,3 +876,6 @@ G.Ballistics = (() => {
 
   return { CAL, MAT, ORG, EFFECT, PERSON_J, energy, flightDrag, snap, unsnap, strike, crossSolid, deflect, mark, armourState, stateArmour, outcome, armourLog, loadNotes, mainLayers, AT_NAME, layersText, projectile, layer, stack, through, probe, boneOf, effects, segs, covers, brim, kitArmour, suspectArmour, wearOut, self, rating, THREATS };
 })();
+G.Ballistics = G_Ballistics;
+
+interface GameModules { Ballistics: typeof G_Ballistics; }

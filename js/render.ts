@@ -1,7 +1,7 @@
 'use strict';
 const _tv = new THREE.Vector3(), _tv2 = new THREE.Vector3();
 // Three.js scene, character models, first-person viewmodels and particle effects.
-G.R = {
+const G_R = {
   init() {
     const r = (this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' }));
     r.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
@@ -844,3 +844,5 @@ G.R = {
     r.info.autoReset = true;
   },
 };
+G.R = G_R;
+interface GameModules { R: typeof G_R; }

@@ -1,6 +1,6 @@
 'use strict';
 // In-game heads-up display (a DOM overlay).
-G.HUD = {
+const G_HUD = {
   el: {},
   cache: {},
   vigT: 0,
@@ -468,3 +468,5 @@ G.HUD = {
     return html;
   },
 };
+G.HUD = G_HUD;
+interface GameModules { HUD: typeof G_HUD; }

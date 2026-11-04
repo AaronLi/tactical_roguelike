@@ -4,7 +4,7 @@
 // Only runs on the hosting peer. Talks to clients exclusively through G.Net.
 const STATE_CODE = { normal: 0, flee: 0, surrender: 1, cuffed: 2, cower: 3 };
 
-G.Server = {
+const G_Server = {
   players: new Map(),
   phase: 'lobby',
   level: 0,
@@ -2070,3 +2070,5 @@ G.Server = {
   },
   BODY_R: 0.24,
 };
+G.Server = G_Server;
+interface GameModules { Server: typeof G_Server; }

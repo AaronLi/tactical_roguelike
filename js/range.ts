@@ -6,7 +6,7 @@
 // screen while you stand at that lane) shows the target with every hit on it, the last one picked out. The guns work here: you can load, fire and
 // reload as you like, and every round you use is given back when you walk out (the magazines, boxes and chambers as they
 // were when you came in). Nobody else is hurt by it: friendly fire is off in the hangar.
-G.Range = (() => {
+const G_Range = (() => {
   const T = THREE;
   const RZ = G.HANGAR_ROWS * 2;
   const FL = -6; // the firing line (z)
@@ -386,3 +386,5 @@ G.Range = (() => {
   }
   return { decorate, build, update, leave, hit, markOn, on, reset, drawIpsc, zoneAt, S, FL, PIS, RIF };
 })();
+G.Range = G_Range;
+interface GameModules { Range: typeof G_Range; }

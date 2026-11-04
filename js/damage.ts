@@ -16,7 +16,7 @@
 //   the latch lets go and it swings open; shoot out all the hinges and nothing's holding it, and it falls (fallTrack: worked out once, in
 //   full, so everyone and every replay sees the same fall). The host keeps the score (js/server.ts doorHit).
 //   Furniture, floors, ceilings, lintels and the wall round a window aren't cut: they keep their marks.
-G.Damage = (() => {
+const G_Damage = (() => {
   const T = THREE, N = 36, MAX = 900, BORE = 0.85, REACH = 0.17, THIN = 0.012; // (N: the points round a hole. MAX: holes in a level; after that, marks only. BORE: how wide it is past its mouth, as a share of its radius. REACH: how near a wall's end a hit breaks a piece off it. THIN: narrower than this, what's left between two holes has crumbled)
   const CRACK = (o) => Object.assign({ jag: 0.22, sy: 1, spikes: 5, reach: 5, r: 0.026, pit: 1.9, lining: 0x6c6a64 }, o);
   // what a hole is like in each material: r its radius (m) for a rifle round, how rough, how long up the grain, cracks or splinters, and pit: how many times that its
@@ -828,3 +828,6 @@ G.Damage = (() => {
   }
   return { crack, HOLE, PARTS, HINGES, radius, hit, ofEvent, apply, clear, doorHole, onLeaf, partAt, fall, fallTrack, leafPose, setPose, partGone, update, reset, seenThrough, warm };
 })();
+G.Damage = G_Damage;
+
+interface GameModules { Damage: typeof G_Damage; }
