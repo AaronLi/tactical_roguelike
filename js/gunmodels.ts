@@ -2632,7 +2632,7 @@ const G_GunModels = (() => {
   }
 
   // the gunsmith's display model: every part as separate meshes (tagged by slot), stock included
-  function display(def: any, skin?: any) { const k = kit(); const info = build(k, def); if (skin && skin.length) G.Stickers.decorate(k.g, skin); return { group: k.g, info }; }
+  function display(def: any, skin?: any) { const baked = G.Models && G.Models.displayBaked(def, skin); if (baked) return baked; /* ?bakedGuns: js/glb.ts */ const k = kit(); const info = build(k, def); if (skin && skin.length) G.Stickers.decorate(k.g, skin); return { group: k.g, info }; }
 
   return { M, build, viewmodel, world, display, roundDims, roundShape, setLoaded, quarrel, bipodPose };
 })();
