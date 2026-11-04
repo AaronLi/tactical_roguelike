@@ -56,7 +56,7 @@ const G_GunsmithUI = (() => {
     if (model) { scene.remove(model); model.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); if (!o.userData.sticker) o.material.dispose(); } }); } // (a sticker's material is the picture's, shared)
     const { group } = G.GunModels.display(def);
     // own materials, so a part can glow when picked
-    group.traverse((o) => { if (o.isMesh) o.material = o.material.clone(); });
+    group.traverse((o: any) => { if (o.isMesh) o.material = o.material.clone(); });
     G.Stickers.decorate(group, skin);
     model = group; modelKey = key; st.stkDirty = true;
     scene.add(model);
@@ -339,7 +339,7 @@ const G_GunsmithUI = (() => {
     if (!model) return null;
     const r = canvas.getBoundingClientRect();
     ray.setFromCamera(new T.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera);
-    const h = ray.intersectObject(model, true).find((q) => !q.object.userData.sticker && q.face && !(q.object.material && q.object.material.transparent));
+    const h = ray.intersectObject(model, true).find((q) => !q.object.userData.sticker && q.face && !((q.object as any).material && (q.object as any).material.transparent));
     if (!h) return null;
     model.updateMatrixWorld(true);
     const inv = model.matrixWorld.clone().invert(), n = h.face.normal.clone().applyMatrix3(new T.Matrix3().getNormalMatrix(h.object.matrixWorld)).normalize();

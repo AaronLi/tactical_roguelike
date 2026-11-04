@@ -15,7 +15,7 @@ const G_ShotLog = (() => {
   // who it hit, as they stand now: a copy of their meshes where they are this moment (the geometry's theirs: nothing of it to free).
   // (Out of your sight their body's hidden, js/views.ts: someone shot through a wall is, and still has to show.)
   function ghostOf(rig) {
-    const grp = new T.Group(), mat = new T.MeshBasicMaterial({ color: 0x66ccff, transparent: true, opacity: 0.34, depthTest: false, depthWrite: false, blending: T.AdditiveBlending });
+    const grp: any = new T.Group(), mat = new T.MeshBasicMaterial({ color: 0x66ccff, transparent: true, opacity: 0.34, depthTest: false, depthWrite: false, blending: T.AdditiveBlending });
     const shownBody = rig.body.visible; rig.body.visible = true; // (the F9 view shows it: frame())
     rig.root.updateMatrixWorld(true);
     rig.root.traverseVisible((o) => {

@@ -2164,10 +2164,10 @@ const G_Level = {
       return h;
     };
     const SIZE = 3000, N = 240, ground = new T.PlaneGeometry(SIZE, SIZE, N, N); ground.rotateX(-Math.PI / 2);
-    const gp = ground.attributes.position;
+    const gp = ground.attributes.position as THREE.BufferAttribute;
     for (let i = 0; i < gp.count; i++) { const x = gp.getX(i) + cx, z = gp.getZ(i) + cz; gp.setXYZ(i, x, height(x, z), z); }
     ground.computeVertexNormals();
-    const gn = ground.attributes.normal, gc = new Float32Array(gp.count * 3);
+    const gn = ground.attributes.normal as THREE.BufferAttribute, gc = new Float32Array(gp.count * 3);
     for (let i = 0; i < gp.count; i++) {
       const x = gp.getX(i), y = gp.getY(i), z = gp.getZ(i), ny = gn.getY(i), steep = 1 - ny, v = 0.86 + hash(x * 0.37, z * 0.37) * 0.24, f = fbm(x * 0.02, z * 0.02);
       let c;
@@ -2256,7 +2256,7 @@ const G_Level = {
     // the haze's colour (the fog's) at the horizon and under it
     const fogC = new T.Color(map.theme.fog).convertLinearToSRGB(), mix = (a, b, k) => a.map((v, i) => v + (b[i] - v) * k);
     const haze = [fogC.r, fogC.g, fogC.b], gold = [1.0, 0.76, 0.5], belt = [0.85, 0.6, 0.62], shadow = [0.55, 0.53, 0.66], upper = [0.5, 0.58, 0.78], zenith = [0.2, 0.32, 0.56];
-    const sky = new T.SphereGeometry(1300, 64, 32), sp2 = sky.attributes.position, skc = new Float32Array(sp2.count * 3), dv = new T.Vector3();
+    const sky = new T.SphereGeometry(1300, 64, 32), sp2 = sky.attributes.position as THREE.BufferAttribute, skc = new Float32Array(sp2.count * 3), dv = new T.Vector3();
     for (let i = 0; i < sp2.count; i++) {
       dv.set(sp2.getX(i), sp2.getY(i), sp2.getZ(i)).normalize();
       const e = Math.asin(dv.y), hl = Math.hypot(dv.x, dv.z) || 1, toward = (dv.x * sun.x + dv.z * sun.z) / hl / Math.hypot(sun.x, sun.z), sunK = Math.max(0, toward) ** 2, anti = Math.max(0, -toward);
@@ -2777,7 +2777,7 @@ const G_Level = {
     const paintWalls = map.rooms.some((rm) => rm.dress);
     if (paintWalls) wm.material.defines.LG_PAINT = 1; // (a resident's wallpaper: js/homes.ts paint)
     // (which of them's which tile, and how they stood: a round takes cubes out of it, js/damage.ts)
-    map.wallMesh = wm; map.wallIdx = new Map(walls.map(([x, z], i) => [z * W + x, i])); map.wallBase = wm.instanceMatrix.array.slice();
+    map.wallMesh = wm; map.wallIdx = new Map(walls.map(([x, z], i) => [z * W + x, i])); map.wallBase = (wm.instanceMatrix.array as Float32Array).slice();
 
     // Houses seen from the garden: a pitched roof with eaves along every wall that faces it, and lit windows
     // behind drawn curtains (just the look: the wall is still solid).

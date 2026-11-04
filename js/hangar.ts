@@ -203,12 +203,12 @@ const G_Hangar = (() => {
       if (b[sl.slot] !== id) continue;
       const { group } = G.GunModels.display(GS.compile(gid, b)), keep = [];
       group.updateMatrixWorld(true);
-      group.traverse((o) => { if (o.isMesh && o.userData.slot === sl.slot) keep.push(o); });
+      group.traverse((o: any) => { if (o.isMesh && o.userData.slot === sl.slot) keep.push(o); });
       if (keep.length) {
         g = new T.Group();
         for (const m of keep) { const c = new T.Mesh(m.geometry, m.material); m.matrixWorld.decompose(c.position, c.quaternion, c.scale); m.material.userData.keep = true; g.add(c); } // (the guns' own materials: shared, kept)
       }
-      group.traverse((o) => { if (o.isMesh && !keep.includes(o)) o.geometry.dispose(); });
+      group.traverse((o: any) => { if (o.isMesh && !keep.includes(o)) o.geometry.dispose(); });
       if (g) break;
     }
     if (!g) { product(root, G.Gear.partItem(id), 0, top + 0.24, 0, 0, null, 0.1); return { root, spin: null }; }

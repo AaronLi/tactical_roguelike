@@ -382,7 +382,7 @@ const G_Icons = (() => {
     gCam.position.set(c.x + 5, c.y, c.z); gCam.lookAt(c); gCam.updateProjectionMatrix();
     gR.render(gScene, gCam);
     gScene.remove(group);
-    group.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); } });
+    group.traverse((o: any) => { if (o.isMesh) { o.geometry.dispose(); } });
     return gR.domElement;
   }
 

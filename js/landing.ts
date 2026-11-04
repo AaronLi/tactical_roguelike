@@ -121,7 +121,7 @@ const G_Landing = (() => {
     // A mountain top has none: what's round it is the mountain, js/level.ts buildCrest)
     const gm = new T.MeshBasicMaterial({ map: ground }), RIM = 1, wild = !!map.crest;
     if (!wild) for (const [x0, z0, x1, z1] of [[-R, -R, Wm + R, RIM], [-R, Hm - RIM, Wm + R, Hm + R], [-R, RIM, RIM, Hm - RIM], [Wm - RIM, RIM, Wm + R, Hm - RIM]]) {
-      const g = new T.PlaneGeometry(x1 - x0, z1 - z0), p = g.attributes.position, uv = g.attributes.uv;
+      const g = new T.PlaneGeometry(x1 - x0, z1 - z0), p = g.attributes.position as THREE.BufferAttribute, uv = g.attributes.uv as THREE.BufferAttribute;
       g.rotateX(-Math.PI / 2); g.translate((x0 + x1) / 2, -0.4, (z0 + z1) / 2);
       for (let i = 0; i < p.count; i++) uv.setXY(i, p.getX(i) / CELL, p.getZ(i) / CELL); // (the streets run on from one side to the next)
       root.add(new T.Mesh(g, gm));

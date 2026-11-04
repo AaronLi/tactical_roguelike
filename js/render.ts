@@ -70,7 +70,7 @@ const G_R = {
   _envMap(r) {
     const env = new THREE.Scene();
     const geo = new THREE.SphereGeometry(10, 24, 12);
-    const col = [], pos = geo.attributes.position, top = new THREE.Color(0x8b939c), bot = new THREE.Color(0x1c1a17), c = new THREE.Color();
+    const col = [], pos = geo.attributes.position as THREE.BufferAttribute, top = new THREE.Color(0x8b939c), bot = new THREE.Color(0x1c1a17), c = new THREE.Color();
     for (let i = 0; i < pos.count; i++) { c.copy(bot).lerp(top, THREE.MathUtils.clamp(pos.getY(i) / 10 * 0.5 + 0.5, 0, 1)); col.push(c.r, c.g, c.b); }
     geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
     env.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ side: THREE.BackSide, vertexColors: true })));
@@ -335,7 +335,7 @@ const G_R = {
     // what you see of someone else's light: its beam in the air, and the lamp itself
     this.cones = [];
     const cg = new THREE.ConeGeometry(1, 1, 18, 1, true).translate(0, -0.5, 0), cc = new Float32Array(cg.attributes.position.count * 3);
-    for (let i = 0; i < cg.attributes.position.count; i++) { const k = cg.attributes.position.getY(i) > -0.5 ? 1 : 0; cc.set([k, k * 0.95, k * 0.86], i * 3); } // (bright at the lamp, nothing by the far end)
+    for (let i = 0; i < cg.attributes.position.count; i++) { const k = (cg.attributes.position as THREE.BufferAttribute).getY(i) > -0.5 ? 1 : 0; cc.set([k, k * 0.95, k * 0.86], i * 3); } // (bright at the lamp, nothing by the far end)
     cg.setAttribute('color', new THREE.BufferAttribute(cc, 3));
     const lc = document.createElement('canvas'); lc.width = lc.height = 32;
     const lg = lc.getContext('2d'), lgr = lg.createRadialGradient(16, 16, 0, 16, 16, 16);
@@ -445,7 +445,7 @@ const G_R = {
   trailAdd(tr, p, mark, v = 0) {
     const c = this.trailColour(v, this._tc || (this._tc = new THREE.Color()));
     if (tr.n < tr.N) {
-      const g = tr.line.geometry, a = g.attributes.position, k = g.attributes.color;
+      const g = tr.line.geometry, a = g.attributes.position as THREE.BufferAttribute, k = g.attributes.color;
       a.setXYZ(tr.n, p.x, p.y, p.z); k.setXYZ(tr.n, c.r, c.g, c.b); tr.n++;
       a.needsUpdate = k.needsUpdate = true; g.setDrawRange(0, tr.n);
     }
@@ -647,7 +647,7 @@ const G_R = {
       this.scene.add(dots, ring);
       this._arc = { dots, ring, N };
     }
-    const A = this._arc, pos = A.dots.geometry.attributes.position;
+    const A = this._arc, pos = A.dots.geometry.attributes.position as THREE.BufferAttribute;
     let n = 0, last = null;
     for (let i = 0; i < pts.length && n < A.N; i += 2) { const q = pts[i]; pos.setXYZ(n++, q.x, q.y, q.z); last = q; }
     last = pts[pts.length - 1] || last;

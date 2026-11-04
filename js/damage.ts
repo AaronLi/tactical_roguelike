@@ -237,7 +237,7 @@ const G_Damage = (() => {
   // (rect [u0, u1, v0, v1]), so it never lies across an opening or hangs in the air past an edge. c: a mark (js/scars.ts plan), at (cu, cv) on the face;
   // flip: which way round its picture is; put(u, v): the point in the world; order: the winding that faces out.
   function clipInto(by, c, cu, cv, rect, polys, flip, put, n, order) {
-    const w = c.s[0] / 2, h = c.s[1] / 2, tris = [], b = by.get(c.mat) || { pos: [], nor: [], uv: [] }, ua = c.geo.attributes.uv;
+    const w = c.s[0] / 2, h = c.s[1] / 2, tris = [], b = by.get(c.mat) || { pos: [], nor: [], uv: [] }, ua = c.geo.attributes.uv as THREE.BufferAttribute;
     let u0 = 1, u1 = 0, v0 = 1, v1 = 0;
     for (let i = 0; i < ua.count; i++) { u0 = Math.min(u0, ua.getX(i)); u1 = Math.max(u1, ua.getX(i)); v0 = Math.min(v0, ua.getY(i)); v1 = Math.max(v1, ua.getY(i)); }
     by.set(c.mat, b);
@@ -505,11 +505,11 @@ const G_Damage = (() => {
     const pos = [], nor = [], uvs = [];
     for (let n = 0; n < tris.length; n += 2) { pos.push(tris[n] - cx, tris[n + 1] - cy, t); nor.push(0, 0, 1); uvs.push(0, 0); }
     for (let n = 0; n < tris.length; n += 6) for (const m of [0, 4, 2]) { pos.push(tris[n + m] - cx, tris[n + m + 1] - cy, -t); nor.push(0, 0, -1); uvs.push(0, 0); }
-    const box = new T.BoxGeometry(w, h, P.depth).toNonIndexed(), bp = box.attributes.position, bn = box.attributes.normal;
+    const box = new T.BoxGeometry(w, h, P.depth).toNonIndexed(), bp = box.attributes.position as THREE.BufferAttribute, bn = box.attributes.normal as THREE.BufferAttribute;
     for (let i = 0; i < bp.count; i++) if (Math.abs(bn.getZ(i)) < 0.5) { pos.push(bp.getX(i), bp.getY(i), bp.getZ(i)); nor.push(bn.getX(i), bn.getY(i), bn.getZ(i)); uvs.push(0, 0); }
     box.dispose();
     const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new T.Float32BufferAttribute(nor, 3)); g.setAttribute('uv', new T.Float32BufferAttribute(uvs, 2));
-    g.parameters = P; leaf.geometry.dispose(); leaf.geometry = g;
+    (g as any).parameters = P; leaf.geometry.dispose(); leaf.geometry = g;
     if (leaf.userData.lining) { leaf.userData.lining.removeFromParent(); leaf.userData.lining.geometry.dispose(); }
     const lp = [], lc = [];
     for (const q of d.holes) { const rim = (z) => q.pts.map((p) => new T.Vector3(p[0] - cx, p[1] - cy, z)); strip(rim(t), rim(-t), 0.75, 0.55, lp, lc, (p) => !d.holes.some((o) => o !== q && inOutline(o, [p.x + cx, p.y + cy], 0.92))); }

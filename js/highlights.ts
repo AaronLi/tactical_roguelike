@@ -1891,7 +1891,7 @@ const G_Highlights = (() => {
       const seg = (pts, col, op) => { const l = new T.Line(new T.BufferGeometry().setFromPoints(pts), new T.LineBasicMaterial({ color: col, transparent: true, opacity: op })); l.position.z = 0.004; grp.add(l); return l; };
       // (a textile's plies, on the cut)
       if (r.key === 'pe' || r.key === 'aramid') { const n = Math.max(3, Math.round(w / 0.035)); for (let j = 1; j < n; j++) { const x = r.x0 + w * j / n; seg([new T.Vector3(x, -0.58, 0), new T.Vector3(x, 0.58, 0)], 0x000000, 0.16); } }
-      r.mesh = mesh; r.base = geo.attributes.position.array.slice(); r.fx = [];
+      r.mesh = mesh; r.base = ((geo.attributes.position as THREE.BufferAttribute).array as Float32Array).slice(); r.fx = [];
       if (r.un) return;
       // the channel it leaves
       const h = Math.max(0.05, r.d1 * 0.001 * AC_K * (tissue ? 2.2 : 1.25)), ch = new T.Mesh(new T.PlaneGeometry(1, h), new T.MeshBasicMaterial({ color: tissue ? 0x400808 : 0x05070a })); ch.position.set(r.x0, 0, 0.005); ch.visible = false; grp.add(ch); r.ch = ch;

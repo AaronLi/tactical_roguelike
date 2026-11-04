@@ -14,8 +14,8 @@ interface GameModules {}
 
 interface Window {
   G: GameNamespace;
-  /** three.js r149, from the CDN (index.html, js/exportworker.ts). Untyped: @types/three for r149 isn't installed. */
-  THREE: any;
+  /** three.js r149, from the CDN (index.html, js/exportworker.ts), typed by @types/three 0.149.0. */
+  THREE: typeof import('three');
   /** The gunshot synthesiser (js/gunshot-synth.ts), on window so the export worker's copy finds it too. */
   GunshotSynth: any;
   /** Old Safari's names for the audio contexts. */
@@ -39,6 +39,6 @@ interface Performance {
 }
 
 declare var G: GameNamespace;
-declare var THREE: any;
+// (THREE itself, value and types: @types/three's `export as namespace THREE`)
 /** PeerJS, from the CDN (index.html). */
 declare var Peer: any;

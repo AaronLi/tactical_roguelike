@@ -11,12 +11,12 @@ self.G = self.G || ({} as GameNamespace); // (the page, or the highlights' expor
 if (window.THREE) {
   const THREE = window.THREE;
   THREE.ColorManagement.legacyMode = false;
-  const CT = THREE.CanvasTexture;
-  THREE.CanvasTexture = class extends CT { constructor(...a) { super(...a); this.encoding = THREE.sRGBEncoding; } };
+  const CT: any = THREE.CanvasTexture;
+  (THREE as any).CanvasTexture = class extends CT { constructor(...a) { super(...a); this.encoding = THREE.sRGBEncoding; } };
   const load = THREE.TextureLoader.prototype.load;
   THREE.TextureLoader.prototype.load = function (...a) { const t = load.apply(this, a); t.encoding = THREE.sRGBEncoding; return t; };
-  const WR = THREE.WebGLRenderer;
-  THREE.WebGLRenderer = function (...a) { const r = new WR(...a); r.outputEncoding = THREE.sRGBEncoding; return r; };
+  const WR: any = THREE.WebGLRenderer;
+  (THREE as any).WebGLRenderer = function (...a) { const r = new WR(...a); r.outputEncoding = THREE.sRGBEncoding; return r; };
   THREE.WebGLRenderer.prototype = WR.prototype;
 }
 

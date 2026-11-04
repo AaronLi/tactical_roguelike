@@ -100,7 +100,7 @@ const G_Scars = (() => {
     });
     at(CELL.plastic, (rnd) => { g.fillStyle = radial(84, [[0, 'rgba(250,250,250,0.85)'], [0.6, 'rgba(236,236,236,0.5)'], [1, 'rgba(230,230,230,0)']]); g.fillRect(-100, -100, 200, 200); cracks(7, 14, 84, 'rgba(20,20,22,0.8)', 3, rnd); hole(18, rnd, 0.42); });
     at(CELL.soil, (rnd) => { blob(100, rnd, 0.24); g.fillStyle = radial(100, [[0, '#2c2014'], [0.55, '#54412c'], [1, 'rgba(92,72,50,0)']]); g.fill(); for (let i = 0; i < 40; i++) { const a = rnd() * 7, q = 40 + rnd() * 80; g.fillStyle = 'rgba(60,44,28,0.75)'; g.fillRect(Math.cos(a) * q, Math.sin(a) * q, 3 + rnd() * 6, 3 + rnd() * 6); } });
-    const tex = new T.CanvasTexture(cv); tex.colorSpace = T.SRGBColorSpace || tex.colorSpace; if (T.sRGBEncoding) tex.encoding = T.sRGBEncoding; tex.anisotropy = 4;
+    const tex = new T.CanvasTexture(cv); (tex as any).colorSpace = T.SRGBColorSpace || (tex as any).colorSpace; if (T.sRGBEncoding) tex.encoding = T.sRGBEncoding; tex.anisotropy = 4;
     return tex;
   }
   let matD = null; const geos = new Map(), mats = new Map();
@@ -111,7 +111,7 @@ const G_Scars = (() => {
   };
   function cellGeo(i) {
     if (geos.has(i)) return geos.get(i);
-    const g = new T.PlaneGeometry(1, 1), uv = g.attributes.uv, u0 = (i % CELLS) / CELLS, v1 = 1 - Math.floor(i / CELLS) / ROWS;
+    const g = new T.PlaneGeometry(1, 1), uv = g.attributes.uv as THREE.BufferAttribute, u0 = (i % CELLS) / CELLS, v1 = 1 - Math.floor(i / CELLS) / ROWS;
     for (let k = 0; k < uv.count; k++) uv.setXY(k, u0 + uv.getX(k) / CELLS, v1 - (1 - uv.getY(k)) / ROWS);
     geos.set(i, g);
     return g;
@@ -188,7 +188,7 @@ const G_Scars = (() => {
   }
   // a mark's pieces as meshes of their own (the replays': js/highlights.ts)
   function meshes(o, p, parent) {
-    return plan(o).map((c) => { const m = new T.Mesh(c.geo, c.mat); m.quaternion.copy(c.q); m.scale.set(...c.s); m.position.set(p.x + o.n[0] * c.off, p.y + o.n[1] * c.off, p.z + o.n[2] * c.off); m.renderOrder = 1; parent.add(m); return m; });
+    return plan(o).map((c) => { const m = new T.Mesh(c.geo, c.mat); m.quaternion.copy(c.q); m.scale.set(...(c.s as [number, number, number])); m.position.set(p.x + o.n[0] * c.off, p.y + o.n[1] * c.off, p.z + o.n[2] * c.off); m.renderOrder = 1; parent.add(m); return m; });
   }
 
   // ---------------------------------------------------------------- what's thrown out of it

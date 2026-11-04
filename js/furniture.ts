@@ -1613,7 +1613,7 @@ const G_Furniture = (() => {
   }
   // a geometry's UVs (0..1 a face) squeezed onto one label of the atlas (a little in from its edges: no neighbour bleeds in)
   function labelUV(geo, i) {
-    const uv = geo.attributes.uv, n = PACK_N, u0 = (i % n) / n, v0 = 1 - (Math.floor(i / n) + 1) / n, s = (1 - 0.06) / n, o = 0.03 / n;
+    const uv = geo.attributes.uv as THREE.BufferAttribute, n = PACK_N, u0 = (i % n) / n, v0 = 1 - (Math.floor(i / n) + 1) / n, s = (1 - 0.06) / n, o = 0.03 / n;
     for (let j = 0; j < uv.count; j++) uv.setXY(j, u0 + o + uv.getX(j) * s, v0 + o + uv.getY(j) * s);
     return geo;
   }
@@ -1972,7 +1972,7 @@ const G_Furniture = (() => {
         let hilly = false;
         for (let z = rm.z; z <= rm.z + rm.h && !hilly; z++) for (let x = rm.x; x <= rm.x + rm.w; x++) if (tr.v[z * tr.VW + x] > 1e-3) { hilly = true; break; }
         if (hilly) {
-          const g = new T.PlaneGeometry(w, d, rm.w, rm.h), p = g.attributes.position;
+          const g = new T.PlaneGeometry(w, d, rm.w, rm.h), p = g.attributes.position as THREE.BufferAttribute;
           for (let k = 0; k < p.count; k++) p.setZ(k, G.World.terrainAt(tr, x0 + w / 2 + p.getX(k), z0 + d / 2 - p.getY(k))); // (the plane's z is up once it's laid flat)
           g.computeVertexNormals();
           place(g, fm, x0 + w / 2, y, z0 + d / 2, 0, -Math.PI / 2);
@@ -1984,7 +1984,7 @@ const G_Furniture = (() => {
       else for (let z = Math.max(0, rm.z - (rm.out ? 1 : 0)), x0 = Math.max(0, rm.x - (rm.out ? 1 : 0)), ze = Math.min(map.H, rm.z + rm.h + (rm.out ? 1 : 0)), xe = Math.min(W, rm.x + rm.w + (rm.out ? 1 : 0)), gap = (i) => (rm.out ? !map.out[i] : t[i] === 5); z < ze; z++) for (let x = x0; x < xe;) { // (round a drop in the floor: a strip per run of floor. A roof: round what's built on it too, out to its edge)
         if (gap(z * W + x)) { x++; continue; }
         let x1 = x; while (x1 + 1 < xe && !gap(z * W + x1 + 1)) x1++;
-        const g = new T.PlaneGeometry((x1 - x + 1) * TS, TS), uv = g.attributes.uv;
+        const g = new T.PlaneGeometry((x1 - x + 1) * TS, TS), uv = g.attributes.uv as THREE.BufferAttribute;
         for (let k = 0; k < uv.count; k++) uv.setXY(k, (x - rm.x + uv.getX(k) * (x1 - x + 1)) / rm.w, (rm.z + rm.h - 1 - z + uv.getY(k)) / rm.h); // (the room's texture, continuous across strips)
         place(g, fm, (x + x1 + 1) / 2 * TS, y, (z + 0.5) * TS, 0, -Math.PI / 2);
         x = x1 + 1;
@@ -2004,7 +2004,7 @@ const G_Furniture = (() => {
         const x = i % W, z = (i / W) | 0;
         if (t[i] === 1 || t[i] === 5) continue;
         if (!inRoom(rm, x, z)) { // (a strip off the side of the room: the room's floor carried on over it)
-          const g = new T.PlaneGeometry(TS, TS), uv = g.attributes.uv;
+          const g = new T.PlaneGeometry(TS, TS), uv = g.attributes.uv as THREE.BufferAttribute;
           for (let n = 0; n < uv.count; n++) uv.setXY(n, (x - rm.x + uv.getX(n)) / rm.w, (rm.z + rm.h - 1 - z + uv.getY(n)) / rm.h);
           place(g, fm, (x + 0.5) * TS, 0.004, (z + 0.5) * TS, 0, -Math.PI / 2);
         }
