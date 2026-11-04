@@ -280,6 +280,9 @@ const G_Game = {
 
     document.addEventListener('pointerlockchange', () => {
       this.locked = document.pointerLockElement === G.R.renderer.domElement;
+      // a lock asked for a moment ago (closing a menu, a click) can land after another menu has opened (Tab, Tab):
+      // a menu keeps the mouse, so let it straight go again
+      if (this.locked && this.menuOpen()) { document.exitPointerLock(); return; }
       if (this.phase !== 'level') return;
       if (this.locked) { this.$('pause').classList.add('hidden'); this.$('clickToPlay').classList.add('hidden'); }
       else if (!this.chatOpen && !this.invOpen && !this.shopOpen && !this.aboxOpen) { this.$('pause').classList.remove('hidden'); this.$('pauseCode').textContent = G.Net.code ? 'Room code: ' + G.Net.code : ''; if (G.Prof) this.$('profLine').textContent = G.Prof.line(); }
@@ -355,6 +358,8 @@ const G_Game = {
   },
   // Tab in a level: your kit and health (and the scoreboard), the mouse freed to move things about. You stand
   // still while it's open; the level doesn't stop.
+  // a panel that takes the mouse is open: the field kit (Tab), the hangar's shop, the chat, the attachments box (no firing)
+  menuOpen(): boolean { return !!(this.invOpen || this.shopOpen || this.chatOpen || this.aboxOpen); },
   toggleInv(open: boolean, opts?: { patient?: string; cab?: number }) {
     if (!!open === !!this.invOpen) return;
     this.invOpen = !!open;

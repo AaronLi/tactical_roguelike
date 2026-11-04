@@ -460,7 +460,7 @@ const G_Me = {
     window.addEventListener('keyup', (e) => { this.keys[e.code] = false; if (e.code === 'KeyR') this.rRelease(); });
     window.addEventListener('blur', () => { this.keys = {}; this.mouse.l = this.mouse.r = false; this.midAt = 0; if (this.wheel) this.wheelClose(false); });
     window.addEventListener('mousedown', (e) => {
-      if (!G.Game.locked) return;
+      if (!G.Game.locked || G.Game.menuOpen()) return;
       if (e.button === 0) { this.mouse.l = true; this.pressBuf = 0.15; if (this.dead) this.specIdx++; }
       if (e.button === 2) this.mouse.r = true;
       if (e.button === 1) { // the middle button: a tap pings, held it opens the comms wheel (wheelOpen)
@@ -1131,7 +1131,7 @@ const G_Me = {
       }
     }
 
-    const trigger = this.mouse.l && !G.Game.chatOpen && G.Game.locked;
+    const trigger = this.mouse.l && G.Game.locked && !G.Game.menuOpen();
     const pressed = trigger && !this.lastTrigger;
     this.lastTrigger = trigger;
     // miniguns spin up before they fire and wind down when you let go
