@@ -10,6 +10,13 @@
     "outDir": "./dist",
     "sourceMap": true,
     "strict": false,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "alwaysStrict": true,
+    "noImplicitThis": true,
+    "useUnknownInCatchVariables": true,
+    "noImplicitReturns": true,
+    "noUnusedLocals": true,
     "noEmitOnError": false,
     "skipLibCheck": true
   },

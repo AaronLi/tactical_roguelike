@@ -846,7 +846,6 @@ G.Server = {
   // Footsteps: louder the faster you move (lowered weapon > walk > steadied), quieter crouched; they
   // carry along the building (around corners, muffled by shut doors) rather than through walls. Unaware suspects who hear you get suspicious instead of being caught off guard.
   footsteps(alive) {
-    const L = G.Level, map = this.map;
     for (const p of alive) {
       const mv = p.st.mv || 0;
       // by how you're moving, not raw speed (kit weight changes speed, not how carefully you place your feet)
@@ -1821,7 +1820,7 @@ G.Server = {
 
   // Walk, opening any closed door in the way first (which costs a moment and makes noise).
   moveEntity(e, mx, mz, speed, dt) {
-    const L = G.Level, map = this.map;
+    const map = this.map;
     if (e.doorWait > 0) { e.doorWait -= dt; return; }
     const ahead = map.world && G.World.raycast(map.world, e.x, (e.y || 0) + 1.0, e.z, mx, 0, mz, 0.9, { move: true }); // (what they'd walk into)
     const d = ahead && ahead.solid && ahead.solid.kind === 'door' ? ahead.solid.door : null;

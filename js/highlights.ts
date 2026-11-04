@@ -379,7 +379,7 @@ G.Highlights = (() => {
   function mount(root, helpers) {
     unmount();
     if (!P.level) return;
-    const R2 = G.R.renderer;
+    
     P.rt = new T.WebGLRenderTarget(640, 360, { samples: 2 });
     P.cv = document.createElement('canvas'); P.cv.width = W; P.cv.height = H; P.g = P.cv.getContext('2d');
     P.ov = new T.CanvasTexture(P.cv); P.ov.minFilter = T.LinearFilter;
@@ -1543,7 +1543,7 @@ G.Highlights = (() => {
       // picture and goes out the other (a floor's from off to the side); a wall from the far side of it, looking back along it at
       // the hole and on past to them. Set once, on the side with the room, watching the spot until the round's there, then
       // following it to them and them down
-      const ks = c.killShot, fl = flightOf(ks), e = fl.events[s.ev] || fl.events[0], el = s.tau - ks.t, up = new T.Vector3(0, 1, 0);
+      const ks = c.killShot, fl = flightOf(ks), e = fl.events[s.ev] || fl.events[0], el = s.tau - ks.t;
       if (!s.cp) {
         const a = fl.dirAt(Math.max(0, e.x - 0.05)), b = fl.dirAt(e.x + 0.05), bounce = e.k === 'r', n = new T.Vector3(...e.n), side = new T.Vector3(-a.z, 0, a.x).normalize();
         const safe = bounce ? e.p.clone().addScaledVector(n, 0.15) : e.p.clone().addScaledVector(b, 0.35), V3 = (x, y) => n.clone().multiplyScalar(x).addScaledVector(side, y);
@@ -1595,7 +1595,6 @@ G.Highlights = (() => {
       else s.frzCand = { p: cam.position.clone(), q: cam.quaternion.clone() };
     }
     // a little handheld drift, more for the action cameras
-    const sh = (s.cam === 'wide' ? 0.004 : s.cam === 'bullet' || s.cam === 'event' ? 0 : 0.012) * Math.min(1, fov / 40); // (less through a long lens, where it'd be a lurch) cam.rotation.x += Math.sin(P.time * 1.7) * sh; cam.rotation.y += Math.sin(P.time * 1.3 + 1) * sh;
     if (Math.abs(cam.fov - fov) > 0.1) { cam.fov = fov; cam.updateProjectionMatrix(); }
   }
 
@@ -1889,7 +1888,7 @@ G.Highlights = (() => {
       const tissue = !r.key, mat = new T.MeshStandardMaterial({ color: r.col, roughness: tissue ? 0.55 : r.key === 'steel' ? 0.35 : 0.75, metalness: r.key === 'steel' ? 0.55 : 0, emissive: r.col, emissiveIntensity: 0 });
       if (r.un && !r.body) mat.color.multiplyScalar(0.8);
       const mesh = new T.Mesh(geo, mat); grp.add(mesh);
-      const lines = []; const seg = (pts, col, op) => { const l = new T.Line(new T.BufferGeometry().setFromPoints(pts), new T.LineBasicMaterial({ color: col, transparent: true, opacity: op })); l.position.z = 0.004; grp.add(l); return l; };
+      const seg = (pts, col, op) => { const l = new T.Line(new T.BufferGeometry().setFromPoints(pts), new T.LineBasicMaterial({ color: col, transparent: true, opacity: op })); l.position.z = 0.004; grp.add(l); return l; };
       // (a textile's plies, on the cut)
       if (r.key === 'pe' || r.key === 'aramid') { const n = Math.max(3, Math.round(w / 0.035)); for (let j = 1; j < n; j++) { const x = r.x0 + w * j / n; seg([new T.Vector3(x, -0.58, 0), new T.Vector3(x, 0.58, 0)], 0x000000, 0.16); } }
       r.mesh = mesh; r.base = geo.attributes.position.array.slice(); r.fx = [];
@@ -2328,7 +2327,7 @@ G.Highlights = (() => {
     const c = s.clip;
     if (s.kind === 'armour') { armourGraphics(g, s, t); return; }
     if (s.kind === 'xray') {
-      const A = P.actors.get(c.v), O = c.fl.o || {}, ORG = G.Ballistics.ORG, list = Object.entries(O).sort((a, b) => b[1] - a[1]);
+      const O = c.fl.o || {}, ORG = G.Ballistics.ORG, list = Object.entries(O).sort((a, b) => b[1] - a[1]);
       g.fillStyle = 'rgba(0,0,0,0)'; bug(g);
       g.fillStyle = 'rgba(4,16,30,0.85)'; g.fillRect(24, 90, 330, 60 + list.length * 34);
       text(g, 'KILL BREAKDOWN', 40, 112, 22, '#5ad8ff'); text(g, `${nameOf(c.v).toUpperCase()} · ${c.fl.d ? c.fl.d + ' M' : ''}`, 40, 136, 13, '#cfe2ff', 'left', '700');

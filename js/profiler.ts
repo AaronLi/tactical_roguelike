@@ -32,7 +32,7 @@ G.Prof = (() => {
     if (!obj || typeof obj[fn] !== 'function' || obj[fn].__prof) return;
     const f = obj[fn], i = sec(label || fn);
     if (i < 0) return;
-    const w = function () {
+    const w = function (this: any) {
       if (!on) return f.apply(this, arguments);
       const a = performance.now();
       try { return f.apply(this, arguments); } finally { acc[i] += performance.now() - a; cnt[i]++; }

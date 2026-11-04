@@ -2239,18 +2239,6 @@ G.GunModels = (() => {
   }
 
   // ---------------------------------------------------------------- first-person viewmodel
-  // Arms: a sleeve from just off-screen to each hand anchor, ending in a glove.
-  function arm(g, hand, dir, len) {
-    const d = new T.Vector3(...dir).normalize();
-    const sleeve = new T.Mesh(new T.CylinderGeometry(0.026, 0.034, len, 10), M.fabric());
-    sleeve.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), d);
-    sleeve.position.set(hand[0] + d.x * (len / 2 + 0.03), hand[1] + d.y * (len / 2 + 0.03), hand[2] + d.z * (len / 2 + 0.03));
-    g.add(sleeve);
-    const glove = new T.Mesh(new T.BoxGeometry(0.042, 0.045, 0.08), M.glove());
-    glove.position.set(hand[0], hand[1], hand[2]);
-    glove.quaternion.copy(sleeve.quaternion).multiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(1, 0, 0), Math.PI / 2));
-    g.add(glove);
-  }
   // ---------------------------------------------------------------- reflex reticles
   // A reflex sight's reticle is collimated: it sits at infinity along the sight's axis, so it points where the
   // gun points, not where the glass is, and you only see it through the window. It's drawn as a glowing plane

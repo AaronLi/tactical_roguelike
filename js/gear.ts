@@ -546,7 +546,7 @@ G.Gear = (() => {
         for (; have > v; have--) { let done = false; for (const g of [me.locker, ...body(me)]) { const p = !done && g.items.find((q) => q.it.k === 'part' && q.it.pid === pid); if (p) { removeFrom(g, p.it); done = true; } } if (!done) break; }
         return true;
       },
-      deleteProperty(_, pid) { this.set(_, pid, 0); return true; },
+      deleteProperty(_, pid) { (this as any).set(_, pid, 0); return true; },
       has(_, pid) { return partCount(me, pid) > 0; },
     });
   }

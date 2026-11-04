@@ -18,8 +18,8 @@ G.Net = { myId: '' };
 G.Stickers.base = '../../'; // (the game's folder, from here (dist/js/): its pictures, js/stickers.ts; a replay's file brings its own)
 
 self.onmessage = async (e) => {
-  if (e.data && e.data.t === 'mux') { try { G.Highlights.muxHere(e.data, (m) => self.postMessage(m)); } catch (err) { self.postMessage({ t: 'err', err: String((err && err.stack) || err).slice(0, 2000) }); } return; }
+  if (e.data && e.data.t === 'mux') { try { G.Highlights.muxHere(e.data, (m) => self.postMessage(m)); } catch (err: any) { self.postMessage({ t: 'err', err: String((err && err.stack) || err).slice(0, 2000) }); } return; }
   if (!e.data || e.data.t !== 'go') return;
   try { await G.Highlights.exportHere(e.data, (m, tr) => self.postMessage(m, tr || [])); }
-  catch (err) { self.postMessage({ t: 'err', err: String((err && err.stack) || err).slice(0, 2000) }); }
+  catch (err: any) { self.postMessage({ t: 'err', err: String((err && err.stack) || err).slice(0, 2000) }); }
 };

@@ -373,7 +373,7 @@ G.Game = {
     btn.disabled = true; stop.classList.remove('hidden'); prog.classList.remove('hidden'); bar.style.width = '0%'; msg.classList.remove('bad');
     try {
       await G.Highlights.renderPack(file, (t, p) => { msg.textContent = t; if (p != null) bar.style.width = Math.round(p * 100) + '%'; });
-    } catch (e) {
+    } catch (e: any) {
       const why = (e && e.message) || String(e);
       msg.textContent = why === 'cancelled' ? 'Cancelled' : 'The video couldn\'t be made: ' + why; msg.classList.toggle('bad', why !== 'cancelled');
       if (why !== 'cancelled') console.warn('highlights: rendering failed', e);

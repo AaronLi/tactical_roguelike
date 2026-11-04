@@ -337,7 +337,7 @@ G.World = (() => {
     // furniture and fences: each piece's boxes (a piece hangs on every tile it covers: once each)
     const fromB = (b, q, gy = b.gy || 0) => box(b.cx - b.hx, Y + gy + b.y0, b.cz - b.hz, b.cx + b.hx, Y + gy + b.h, b.cz + b.hz, q); // (gy: a piece on rolling ground)
     const seen = new Set();
-    for (const [i, p] of map.props || []) {
+    for (const [, p] of map.props || []) {
       if (seen.has(p)) continue;
       seen.add(p);
       for (const b of p.boxes) {

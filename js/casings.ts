@@ -130,7 +130,7 @@ G.Casings = (() => {
   }
   function dropMag(def) {
     const vm = G.R.vm, a = vm && vm.userData.vma, h = vm && vm.userData.holders && vm.userData.holders[0];
-    if (!h || !G.R.dynRoot) return;
+    if (!h || !G.R.dynRoot) return undefined;
     const { mesh, r } = magMesh(def, null);
     h.holder.updateMatrixWorld(true);
     const home = a && a.hs[0] && a.hs[0].A.magHome ? a.hs[0].A.magHome.clone() : V().set(0, -0.06, -0.12);

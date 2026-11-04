@@ -193,7 +193,7 @@ G.Level = {
       for (let j = 0; j < K; j++) for (let i = 0; i < K; i++) {
         const fi = (z * K + j) * W + x * K + i;
         // the coarse neighbour a side cell faces (a thinned cell takes its garden-ness)
-        const face = i === 0 ? [x - 1, z] : i === K - 1 ? [x + 1, z] : j === 0 ? [x, z - 1] : j === K - 1 ? [x, z + 1] : [x, z];
+        
         if (fenceC.has(ci)) { const ax = fenceC.get(ci), line = ax === 'x' ? j === 1 : i === 1; t[fi] = line ? 4 : 0; out[fi] = 1; if (line) fenceAx.set(fi, ax); continue; }
         if (v === 1) {
           if (!thinned || (i === 1 && j === 1)) continue;
@@ -1054,7 +1054,7 @@ G.Level = {
     fill(F0, 1, LZ, W - 2, H - LZ - 1);
     for (let x = 0; x < W; x++) { F0.t[(H - 1) * W + x] = 4; fences.push([x, H - 1, 'x']); }
     for (let z = LZ; z < H - 1; z++) for (const x of [0, W - 1]) { F0.t[z * W + x] = 4; fences.push([x, z, 'z']); }
-    const lotW = room(F0, 1, LZ, 16, 5, 'carpark', { out: true, front: true }), lotE = room(F0, 17, LZ, W - 18, 5, 'carpark', { out: true, front: true });
+    room(F0, 1, LZ, 16, 5, 'carpark', { out: true, front: true }); room(F0, 17, LZ, W - 18, 5, 'carpark', { out: true, front: true });
     const pad = room(F0, 1, 28, W - 2, 6, 'lz', { out: true }), lz = this._pad(pad, W, 13, 28, this.LZ_KIT.foundry);
     // ---- the ground floor
     fill(F0, 1, 1, 14, 11); fill(F0, 3, 10, 3, 1, 6); room(F0, 1, 1, 14, 11, 'melt', { tall: true }); // the melt shop, its stair up the south wall
@@ -1961,7 +1961,7 @@ G.Level = {
     const steelFrame = new THREE.MeshStandardMaterial({ color: 0x6a7076, roughness: 0.45, metalness: 0.6 }), whiteFrame = new THREE.MeshStandardMaterial({ color: 0xf0f2f2, roughness: 0.4 });
     for (const w of map.windows) {
       const SL = w.sill != null ? w.sill : this.SILL, TP = w.top != null ? w.top : this.TOP, opening = TP - SL; // (its own, or the usual)
-      const along = w.nx ? 'z' : 'x', ry = Math.atan2(-w.nx, -w.nz);
+      const ry = Math.atan2(-w.nx, -w.nz);
       const g = new THREE.Group(); g.position.set(w.x, 0, w.z); g.rotation.y = ry; // local: x along the wall, z out of it (toward -n... see below)
       // wall below and above (the full depth of the cell)
       const SK = map.skirt || 0, below = new THREE.Mesh(new THREE.BoxGeometry(w.len, SL + SK, TS), wallMat); below.position.y = (SL - SK) / 2; g.add(below);
@@ -2483,7 +2483,7 @@ G.Level = {
     // stage and the front rows, a backdrop with the festival's name lit up
     const st = f.stage;
     if (st) {
-      const geos = [], add = (geo, x, y, z, rx = 0, ry = 0, rz = 0) => { geo.applyMatrix4(new T.Matrix4().makeRotationFromEuler(new T.Euler(rx, ry, rz))); geo.translate(x, y, z); geos.push(geo.index ? geo.toNonIndexed() : geo); };
+      const geos = [];
       const H = 7.2, x0 = st.x0 + 0.4, x1 = st.x1 - 0.4, zF = st.z1 - 0.5, zB = st.z0 + 0.5;
       const chord = (ax, ay, az, bx, by, bz) => { const d = new T.Vector3(bx - ax, by - ay, bz - az), l = d.length(), g = new T.CylinderGeometry(0.025, 0.025, l, 6); g.applyMatrix4(new T.Matrix4().makeRotationFromQuaternion(new T.Quaternion().setFromUnitVectors(new T.Vector3(0, 1, 0), d.normalize()))); g.translate((ax + bx) / 2, (ay + by) / 2, (az + bz) / 2); geos.push(g.toNonIndexed()); };
       const truss = (a, b) => { // a box truss 0.3 m square from a to b, with zig-zag bracing
@@ -2546,7 +2546,7 @@ G.Level = {
   // the level shares gathered from them: the door leaves and window panes (numbered through), the lamps, one
   // pool of real lights, the stairs' steps and the railings.
   buildStack(map) {
-    const root = new THREE.Group(), th = map.theme;
+    const root = new THREE.Group();
     map.doorMeshes = []; map.winMeshes = []; map.lamps = [];
     for (const m of map.floors) {
       const g = this.buildMesh(m, { pool: false });
@@ -2783,10 +2783,6 @@ G.Level = {
     // behind drawn curtains (just the look: the wall is still solid).
     if (map.out.some((v) => v)) {
       const roofMat = new THREE.MeshStandardMaterial({ color: 0x3a2f2c, roughness: 0.9 }), fascia = new THREE.MeshStandardMaterial({ color: 0xe8e4da, roughness: 0.7 });
-      const frameMat = new THREE.MeshStandardMaterial({ color: 0xece8de, roughness: 0.6 });
-      const lit = [0xffcf8a, 0xffe2b0, 0xf2c070, 0x9ab8d8].map((c) => new THREE.MeshBasicMaterial({ color: c }));
-      const dark = new THREE.MeshStandardMaterial({ color: 0x15181c, roughness: 0.2, metalness: 0.3 });
-      const rnd = G.U.rng((map.seed ^ 0x700f) >>> 0);
       const seg = new THREE.Group();
       // A home's roof: over each part of the house with the sky above it on this floor (the whole top storey, or
       // a lower part nothing's built on), a gable roof: its ridge along the long side, the two slopes down to

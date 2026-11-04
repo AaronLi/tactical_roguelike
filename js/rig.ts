@@ -52,10 +52,6 @@ G.Rig = (() => {
     aimBone(lower, elbow, end, side);
   }
 
-  function capsule(r, len, m) {
-    const geo = new T.CapsuleGeometry(r, Math.max(0.001, len), 4, 10);
-    return new T.Mesh(geo, m);
-  }
   function joint(parent, x, y, z) { const j = new T.Group(); j.position.set(x, y, z); parent.add(j); return j; }
 
   // Clothing palettes. Suspects wear street clothes (a share in balaclavas); civilians wear brighter,

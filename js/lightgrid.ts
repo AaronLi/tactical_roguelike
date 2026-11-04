@@ -218,7 +218,7 @@ G.LightGrid = (() => {
       return acc;
     };
     floors.forEach((fm, f) => {
-      const base = f * N, doorAt = shutAt[f], win = winAt[f], out0 = fm.out;
+      const base = f * N, win = winAt[f], out0 = fm.out;
       // (takes light: open floor; passes it on, the doors shut: that, or glass)
       const lit = new Uint8Array(N), shut = new Uint8Array(N);
       for (let i = 0; i < N; i++) { lit[i] = cur[(base + i) * K + 7] > 0.5 ? 1 : 0; shut[i] = lit[i] || win.has(i) ? 1 : 0; }

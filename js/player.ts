@@ -449,7 +449,7 @@ G.Me = {
 
     this.sinceHurt += dt; this.sinceFire += dt;
     this.pressBuf = Math.max(0, this.pressBuf - dt);
-    const maxHp = this.maxHp();
+    
 
     // bleeding (down: slowly, and nothing clots: you're dead when it's all gone, unless someone stops it). Very low,
     // you black out; blood bags from a teammate bring you round (still down: they get you up)
@@ -688,7 +688,7 @@ G.Me = {
     const deg = Math.PI / 180, cls = def.cls, onehand = cls === 'PST' || cls === 'MP';
     const up = def.recoil * 2.3 * deg;
     const sideK = { PST: 0.8, MP: 0.9, SMG: 0.75, SG: 0.7, LMG: 0.8, SNP: 0.4, DMR: 0.55, BR: 0.7, RAIL: 0.4, BOW: 0.4, GL: 0.55 }[cls] || 0.65;
-    const kg = def.weight || 3, aim = G.aimSway(def);
+    const aim = G.aimSway(def);
     m = {
       up, side: up * sideK,
       rec: G.U.clamp((def.handling || 1) * (onehand ? 1.15 : 1), 0.55, 1.6), // spring strength: how fast it comes back
@@ -2197,7 +2197,7 @@ G.Me = {
   // ------------------------------------------------------------- camera + viewmodel
   updateCamera(dt) {
     this._dtCam = dt;
-    const cam = G.R.camera, def = this.cur().def;
+    const cam = G.R.camera;
     // at a viewer: your eyes at its eyepieces, the view narrowed to its power, the gun out of sight
     this.viewerMask(!!this.viewer);
     if (G.R.vmRoot) G.R.vmRoot.visible = !this.viewer && !this.climb && !this.zipRide; // (on a ladder or a zipline: your hands are on it, holdArms)

@@ -169,13 +169,14 @@ G.Shop = {
       this.take('gear:' + id, () => {
         if (!fits() || !this.spend(this.gearPrice(id))) return false;
         if (free()) { if (G.Gear.MOUNTS[d.kind]) G.Gear.mountOn(Me, d.kind)[d.kind] = it; else Me.kit[d.kind] = it; } else G.Gear.place([Me.locker], it);
+        return undefined;
       });
       return;
     } else if (kind === 'ammo') {
       const o = this.offers.ammo.find((q) => q.cal === id), it = o && G.Gear.boxItem(o.cal, o.am, o.n);
       if (!o || !this.inStock('ammo:' + o.cal) || !this.room(it)) { G.Audio.deny(); return; }
       if (!this.afford(G.Gear.price(it))) return;
-      this.take('ammo:' + o.cal, () => { if (!this.room(it) || !this.spend(G.Gear.price(it))) return false; this.stow(it); });
+      this.take('ammo:' + o.cal, () => { if (!this.room(it) || !this.spend(G.Gear.price(it))) return false; this.stow(it); return undefined; });
       return;
     } else if (kind === 'pouch') {
       // straight onto your rig or belt if there's room, else your locker
@@ -188,6 +189,7 @@ G.Shop = {
         const on = G.Gear.place(G.Gear.molles(Me), it);
         if (!on) G.Gear.place([Me.locker], it);
         G.HUD.toast('', on ? `${P.name} mounted on your MOLLE` : `${P.name} is in your locker`, 1.5);
+        return undefined;
       });
       return;
     } else if (kind === 'mag') {
@@ -195,13 +197,13 @@ G.Shop = {
       if (!def || !this.inStock('mag:' + id)) { G.Audio.deny(); return; }
       if (!this.room(it)) { G.HUD.toast('', 'No room for it', 1.5); G.Audio.deny(); return; }
       if (!this.afford(G.Gear.price(it))) return;
-      this.take('mag:' + id, () => { if (!this.room(it) || !this.spend(G.Gear.price(it))) return false; this.stow(it); });
+      this.take('mag:' + id, () => { if (!this.room(it) || !this.spend(G.Gear.price(it))) return false; this.stow(it); return undefined; });
       return;
     } else if (kind === 'part') {
       const p = G.Gunsmith.PARTS[id];
       if (!p || !this.inStock('part:' + id)) { G.Audio.deny(); return; }
       if (!this.afford(p.price)) return;
-      this.take('part:' + id, () => { if (!this.spend(p.price)) return false; Me.stash[id] = (Me.stash[id] || 0) + 1; });
+      this.take('part:' + id, () => { if (!this.spend(p.price)) return false; Me.stash[id] = (Me.stash[id] || 0) + 1; return undefined; });
       return;
     } else if (kind === 'svc') {
       const s = this.services().find((x) => x.id === id);
@@ -221,7 +223,7 @@ G.Shop = {
   },
   room(it) { const Gr = G.Gear; return Gr.all(G.Me).some((g) => Gr.findSpot(g, it)); },
   services() {
-    const Me = G.Me, L = this.level, Gr = G.Gear, out = [];
+    const Me = G.Me, Gr = G.Gear, out = [];
     // load every magazine (and the guns) from the loose rounds you own: free, it's just your time
     let empty = 0, loose = 0;
     Gr.each(Gr.all(Me), (it) => { if (it.k === 'mag') empty += it.cap - it.n; if (it.k === 'ammo') loose += it.n; });
@@ -354,7 +356,7 @@ G.Shop = {
   },
   gearCard(d) {
     const sold = !this.inStock('gear:' + d.id), pl = this.offers && this.offers.plates && G.Gear.DEFS[this.offers.plates[d.id]], price = this.gearPrice(d.id);
-    const Me = G.Me, ZN = { chest: 'chest', abdomen: 'stomach', uarm: 'shoulders', thigh: 'thighs', head: 'top of head', face: 'face' };
+    const Me = G.Me;
     const KN = { carrier: d.dur ? (d.plate ? 'PLATE CARRIER' : 'SOFT VEST') : 'CHEST RIG', plate: 'PLATE', helmet: 'HELMET', face: d.cover < 0.9 ? 'MANDIBLE' : 'FACE SHIELD', shoulder: 'SHOULDER ARMOUR', groin: 'PELVIS ARMOUR', legs: 'LEG ARMOUR', belt: 'BELT', pack: 'BACKPACK' };
     const fc = this.offers && this.offers.faces && G.Gear.DEFS[this.offers.faces[d.id]];
     const cardIt = G.Gear.gearItem(d.id); if (fc) cardIt.face = G.Gear.gearItem(fc.id); // (its icon shows what's fitted)

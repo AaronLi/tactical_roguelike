@@ -146,7 +146,6 @@ G.Hangar = (() => {
     if (tag) { const t = new T.Mesh(new T.PlaneGeometry(0.46, 0.17), tag); t.position.set(0, -h / 2 - 0.14, 0.02); g.add(t); }
     return g;
   }
-  const tagMat = (name, price, extra) => signMat([name, price + (extra ? ' · ' + extra : '')], 288, 96, '#101418', '#ffd24a', '#ffffff');
 
   // ------------------------------------------------------------------------ what's for sale: one row per thing
   // A thing for sale or to use: its box (what you look at), what it says, and what F does.
@@ -654,7 +653,7 @@ G.Hangar = (() => {
       const wing = part(h, new T.Mesh(new T.BoxGeometry(1.3, 0.16, 3.5), armor), 1.45, 2.6, s * 1.75); wing.rotation.y = -s * 0.2;
       const pod = part(h, new T.Mesh(new T.BoxGeometry(0.9, 0.22, 0.28), dark), 1.5, 2.36, s * 2.3);
       pod.rotation.y = -s * 0.2;
-      const ring = part(h, new T.Mesh(new T.CylinderGeometry(0.98, 0.98, 0.6, 20, 1, true), duct), 1.8, 2.8, s * 3.4);
+      part(h, new T.Mesh(new T.CylinderGeometry(0.98, 0.98, 0.6, 20, 1, true), duct), 1.8, 2.8, s * 3.4);
       const lip = part(h, new T.Mesh(new T.TorusGeometry(0.98, 0.05, 6, 24), glow), 1.8, 3.1, s * 3.4); lip.rotation.x = Math.PI / 2;
       part(h, new T.Mesh(new T.CircleGeometry(0.9, 20), thrust), 1.8, 2.5, s * 3.4).rotation.x = Math.PI / 2;
       const rot = new T.Group(); rot.position.set(1.8, 2.85, s * 3.4); h.add(rot); rotors.push(rot);

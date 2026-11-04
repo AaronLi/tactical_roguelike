@@ -212,7 +212,7 @@ G.Damage = (() => {
   // splinter every other point, out from the edge and up off the surface (n), leaning the way the round was going (dir).
   // (Not at a crack: an edge that's there all the way along it.)
   function rimFlaps(rim, mid, n, dir, L, Hh, seed, rad, core, skip) {
-    const rnd = rngOf(seed), pos = [], col = [], tang = dir.clone().addScaledVector(n, -dir.dot(n)), a = new T.Vector3(), b = new T.Vector3(), o = new T.Vector3();
+    const rnd = rngOf(seed), pos = [], col = [], tang = dir.clone().addScaledVector(n, -dir.dot(n)), a = new T.Vector3(), o = new T.Vector3();
     const tri = (p, q, r, k) => { for (const v of [p, q, r]) { pos.push(v.x, v.y, v.z); col.push(k, k, k); } };
     for (let i = 0; i < N; i += 3) {
       const j = (i + 3) % N;

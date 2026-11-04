@@ -296,7 +296,7 @@ G.GunsmithUI = (() => {
     if (!fromStash(pid)) {
       if (!forSale(p) || !G.Shop.afford(GS.buyPrice(p))) return;
       // from his stock (the squad's: the host's count, js/shop.ts take), unless it's the core part the gun needs
-      if (!needed(p)) { G.Shop.take('part:' + pid, () => { if (weapon() !== w || !G.Shop.spend(GS.buyPrice(p))) return false; toStash(pid); install(slot, pid); }); return; }
+      if (!needed(p)) { G.Shop.take('part:' + pid, () => { if (weapon() !== w || !G.Shop.spend(GS.buyPrice(p))) return false; toStash(pid); install(slot, pid); return undefined; }); return; }
       if (!G.Shop.spend(GS.buyPrice(p))) return;
     } else G.Audio.pickup();
     if (build[slot]) toStash(build[slot]);

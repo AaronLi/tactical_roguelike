@@ -182,10 +182,6 @@ G.Icons = (() => {
     g.fillStyle = '#c8c2b4'; g.beginPath(); g.ellipse(W / 2, H / 2, W * 0.1, H * 0.1, 0, 0, 7); g.fill();
     g.fillStyle = '#e8e4da'; g.fillRect(W * 0.5, H * 0.72, W * 0.36, H * 0.08);
   }
-  function drawMed(g, W, H) {
-    rr(g, W * 0.14, H * 0.2, W * 0.72, H * 0.62, 7); g.fillStyle = '#e8e4da'; g.fill(); shade(g, W * 0.14, H * 0.2, W * 0.72, H * 0.62);
-    g.fillStyle = '#c0302a'; g.fillRect(W * 0.43, H * 0.32, W * 0.14, H * 0.38); g.fillRect(W * 0.31, H * 0.44, W * 0.38, H * 0.14);
-  }
   function drawFrag(g, W, H) {
     g.fillStyle = '#4a5a32'; g.beginPath(); g.ellipse(W / 2, H * 0.58, W * 0.26, H * 0.3, 0, 0, 7); g.fill(); shade(g, W * 0.24, H * 0.28, W * 0.52, H * 0.6);
     g.fillStyle = '#8a8f94'; g.fillRect(W * 0.42, H * 0.18, W * 0.16, H * 0.14);

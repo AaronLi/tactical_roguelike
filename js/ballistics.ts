@@ -445,7 +445,7 @@ G.Ballistics = (() => {
   const CD = { fmj: 0.66, ball: 0.75, yaw: 0.62, open: 0.66 }, EXPAND = 1.37;
   // one step of a tissue: the speed after it, through drag then the tissue's strength (0 when that stops it)
   const slow = (v, m, A, Cd, M, ds) => { const v1 = v * Math.exp(-M.rho * Cd * A / (2 * m) * ds), e = 0.5 * m * v1 * v1 - M.sig * A * ds; return e > 0 ? Math.sqrt(2 * e / m) : 0; };
-  const _o = new T.Vector3(), _u = new T.Vector3(), _q = new T.Vector3(), _w = new T.Vector3(), _n = new T.Vector3(), _ud = new T.Vector3();
+  const _o = new T.Vector3(), _q = new T.Vector3(), _w = new T.Vector3(), _n = new T.Vector3(), _ud = new T.Vector3();
   // armour pieces on that body: [{ piece (its def), cond (0..1), wear(J) (to record what it soaked) }]
   // Returns { hits: [ { part, side, seg, E, crush, organs: { id: dmg }, blunt, armour: [...] } ], exitV, stopped, entryT }
   // o, u: the round's world origin and unit direction; v: its speed (m/s) arriving; tMax: how far to look.
@@ -800,7 +800,7 @@ G.Ballistics = (() => {
   // your teammates see), from where the shooter was to the part the host says it hit.
   let selfRig = null;
   function self() {
-    const me = G.Me, g = G.Game;
+    const me = G.Me;
     if (!selfRig) { selfRig = G.Rig.create({ style: 'tactical', bare: true, seed: 1 }); selfRig.root.visible = false; }
     const st = { pos: me.pos.clone(), yaw: me.yaw, pitch: me.pitch, crouch: !!me.crouch, alert: true, lean: me.lean || 0, state: me.down ? 'down' : 'alive', prone: !!me.prone };
     for (let i = 0; i < 8; i++) selfRig.update(0.05, st);
