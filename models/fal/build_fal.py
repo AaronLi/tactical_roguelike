@@ -295,8 +295,8 @@ o = obj(box(-0.022, -0.015, F(1050), F(1078), U(182), U(166)), 'base', 'park'); 
 # CHARGING HANDLE (part_handle): a flat lever along the left side with its tab folded out; it runs back 100 mm
 HF, HY, HX = 0.235, 0.004, -0.0165
 ph = part('handle', (0, HF, HY))
-lv = obj(box(HX - 0.004, HX, HF - 0.032, HF, HY - 0.006, HY + 0.006), 'charging', 'black', ph); bevel(lv, 0.0012, 2); finish(lv.data)
-tb = obj(box(HX - 0.022, HX - 0.002, HF - 0.008, HF, HY - 0.005, HY + 0.005), 'charging', 'black', ph); bevel(tb, 0.002, 2); finish(tb.data)
+lv = obj(box(HX - 0.004, HX, HF - 0.032, HF, HY - 0.006, HY + 0.006), 'base', 'black', ph); bevel(lv, 0.0012, 2); finish(lv.data)
+tb = obj(box(HX - 0.022, HX - 0.002, HF - 0.008, HF, HY - 0.005, HY + 0.005), 'base', 'black', ph); bevel(tb, 0.002, 2); finish(tb.data)
 
 # MAGAZINE (part_mag): steel, 20 rounds, ribbed sides, a round on top
 MAG_F, MAG_U = (F(903) + F(1053)) / 2, U(298)
@@ -334,20 +334,23 @@ for px in range(1096, 1882, 3):
     r = col_run(px, PY0) if px >= 1606 else None
     rr = (r[1] - r[0] + 1) / 2 * S if r and (r[1] - r[0]) < 40 else 0.0095
     prof.append((F(px), min(rr, 0.0105)))
-br = obj(lathe(prof, 16), 'barrel', 'park'); finish(br.data)
+GAS_F = F(1607)                                                    # the gas block's front: the barrel's own length starts showing here
+br = obj(lathe([q for q in prof if q[0] <= GAS_F + 1e-6] + [(GAS_F, prof[0][1])], 16), 'barrel', 'park'); finish(br.data)
+fr = obj(lathe([(GAS_F - 0.002, 0.0085)] + [q for q in prof if q[0] > GAS_F], 16), 'barrel', 'park'); finish(fr.data)
+fr['role'] = 'tube'                                                # (the game sets its length: everything else is fixed)
 gb = obj(slab(loops_of('barrel'), 0.032, 0.004, 2), 'barrel', 'park')
 clip(gb, [((0, F(1607), 0), (0, 1, 0))]); finish(gb.data)
 lug = obj(slab(loops_of('barrel'), 0.012, 0.001, 1), 'barrel', 'park')
 clip(lug, [((0, F(1607), 0), (0, -1, 0)), ((0, F(1670), 0), (0, 1, 0)), ((0, 0, -0.008), (0, 0, 1))]); finish(lug.data)
 o = obj(tube([(F(1598), 0.0058), (F(1614), 0.0058), (F(1616), 0.0045)], 18, 'y', (0, 0, U(178))), 'barrel', 'park'); finish(o.data)
 
-# FRONT SIGHT (optic): two protective ears and the post between them, its tip on the line of sight
+# FRONT SIGHT (on the gas block, so the barrel's: it stays whatever optic is fitted): two protective ears and the post between them, its tip on the line of sight
 for s in (-1, 1):
-    e = obj(slab(loops_of('fsight'), 0.003, 0.0006, 1), 'optic', 'park')
+    e = obj(slab(loops_of('fsight'), 0.003, 0.0006, 1), 'barrel', 'park')
     e.data.transform(Matrix.Translation((s * 0.0062, 0, 0))); finish(e.data)
 FPF = F(1575)
-o = obj(box(-0.0013, 0.0013, FPF - 0.0015, FPF + 0.0015, U(168), SY), 'optic', 'park'); finish(o.data)
-o = obj(box(-0.0075, 0.0075, F(1550), F(1600), U(172), U(165)), 'optic', 'park'); bevel(o, 0.001, 1); finish(o.data)
+o = obj(box(-0.0013, 0.0013, FPF - 0.0015, FPF + 0.0015, U(168), SY), 'barrel', 'park'); finish(o.data)
+o = obj(box(-0.0075, 0.0075, F(1550), F(1600), U(172), U(165)), 'barrel', 'park'); bevel(o, 0.001, 1); finish(o.data)
 
 # FLASH HIDER (muzzle): turned, bored, six slots
 mp = []
@@ -377,6 +380,17 @@ info = {
     'mounts': {'mount_muzzle': [round(F(1880), 4), 0, 0]},
 }
 ROOT['info_json'] = json.dumps(info)
+rig = {
+    'top': round(U(181), 4),                                       # the receiver's top: where an optic's rail goes
+    'rail': [round(F(608), 4), round(F(900), 4)],                  # ... from, to (forward): along the dust cover
+    'hgF': round(F(1116), 4),                                      # where a handguard starts (the barrel nut's front)
+    'gasRear': round(F(1531), 4), 'gasFront': round(GAS_F, 4),     # the gas block: a handguard ends before it
+    'tubeFrom': round(F(1672), 4),                                 # the bare tube from here (ahead of the bayonet lug's collar) to the end:
+    'end': round(F(1880), 4), 'endR': round(prof[-1][1], 4),       # what a longer or shorter barrel lengthens; the 21" barrel's end and radius there
+    'stockTop': round(U(219), 4), 'stockBot': round(U(290), 4),    # the stock's wrist at the receiver's back
+    'gripTop': round(U(302), 4), 'grip': [round(F(700), 4), round(U(302), 4)],   # the grip's top: the receiver's underside
+}
+ROOT['rig_json'] = json.dumps(rig)
 
 # ---- save and export ----
 tris = sum(len(p.vertices) - 2 for o in coll.all_objects if o.type == 'MESH' for p in o.data.polygons)

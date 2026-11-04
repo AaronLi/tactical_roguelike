@@ -18,10 +18,9 @@
 //                                   sources the geometry comes from; `--check` rebuilds and compares hashes to find stale bakes.
 // It also writes assets/vendor/three-global.js, the importmap shim that re-exports the global THREE (see below).
 //
-// AUTHORED MODELS. A gun with models/<id>/<id>.glb (made in Blender: models/<id>/ holds its build script and sources)
-// is baked from that file instead of the recipe, for its default build: its root's extras.info_json (a string: Blender
-// custom properties can't hold nested lists) becomes extras.info, it is compressed the same way and must pass the same
-// contract. Other builds of that gun still come from the recipe until per-part packs exist.
+// AUTHORED MODELS (made in Blender: models/<id>/) reach the bake through the recipe: tools/authored_pack.mjs packs them into
+// js/authored.ts and the gun's recipe builds its factory parts from them (js/gunmodels.ts rifle(), rcv 'fal'), so the whole
+// gun, the packs and their checks treat it like any other.
 //
 // WHY A SHIM. The game has ONE three: the r149 UMD global from the CDN. GLTFLoader is an ES module that does
 // `import ... from 'three'`; index.html's importmap maps 'three' to assets/vendor/three-global.js, which re-exports
@@ -60,7 +59,7 @@ globalThis.FileReader = class { // (GLTFExporter wants a browser's FileReader on
 };
 const G = loadGame(), GM = G.GunModels, GS = G.Gunsmith, Models = loadModels();
 const sha = (s) => crypto.createHash('sha1').update(s).digest('hex').slice(0, 16);
-const src = sha(['gunmodels', 'guntraces', 'parts', 'materials'].map((f) => fs.readFileSync(path.join(ROOT, 'js', f + '.ts'), 'utf8')).join('\0'));
+const src = sha(['gunmodels', 'guntraces', 'authored', 'parts', 'materials'].map((f) => fs.readFileSync(path.join(ROOT, 'js', f + '.ts'), 'utf8')).join('\0'));
 
 // material -> its catalogue name
 const matName = new Map();
@@ -109,22 +108,6 @@ function prepare(id, group, info) {
   return { ex, tris, meshes, hash: h.digest('hex').slice(0, 16) };
 }
 
-/** An authored .glb's mesh and triangle counts. */
-function authoredStats(buf) {
-  const j = Models.glbJson(buf); let tris = 0, meshes = 0;
-  for (const n of j.nodes || []) if (n.mesh != null) { meshes++; for (const pr of j.meshes[n.mesh].primitives) tris += j.accessors[pr.indices != null ? pr.indices : pr.attributes.POSITION].count / 3; }
-  return { meshes, tris };
-}
-/** An authored file into the baked form: root extras.info from info_json; no extras on mesh data (Blender's custom props). */
-function fromAuthored(doc, id) {
-  const roots = doc.getRoot().listScenes()[0].listChildren();
-  if (roots.length !== 1 || roots[0].getName() !== id) throw new Error(`models/${id}/${id}.glb: the scene needs one root node named "${id}"`);
-  const ex = { ...roots[0].getExtras() };
-  if (typeof ex.info_json === 'string') { ex.info = JSON.parse(ex.info_json); delete ex.info_json; }
-  ex.gun = id; roots[0].setExtras(ex);
-  for (const m of doc.getRoot().listMeshes()) m.setExtras({});
-}
-
 const platIds = Object.keys(GS.PLATFORMS || {}).filter((id) => G.WEAPONS[id]);
 const ids2 = only.length ? only : platIds.length ? platIds : G.WEAPON_LIST.map((w) => w.id);
 fs.mkdirSync(OUT, { recursive: true });
@@ -135,19 +118,11 @@ let fails = 0, rawTotal = 0, gzTotal = 0, stale = 0;
 for (const id of doGuns ? ids2 : []) {
   try {
     const def = GS.compile(id, GS.defaultBuild(id));
-    const authored = path.join(ROOT, 'models', id, id + '.glb');
-    let p, raw;
-    if (fs.existsSync(authored)) {
-      raw = fs.readFileSync(authored);
-      p = { hash: 'a' + sha(raw), ...authoredStats(raw) };
-    } else {
-      const { group, info } = GM.display(def);
-      p = prepare(id, group, info);
-      raw = await new GLTFExporter().parseAsync(group, { binary: true, onlyVisible: false, includeCustomExtensions: false });
-    }
+    const { group, info } = GM.display(def);
+    const p = prepare(id, group, info);
     if (check) { const was = old.guns[id]; if (!was || was.hash !== p.hash) { stale++; console.log('STALE', id); } continue; }
+    const raw = await new GLTFExporter().parseAsync(group, { binary: true, onlyVisible: false, includeCustomExtensions: false });
     const doc = await io.readBinary(new Uint8Array(raw));
-    if (fs.existsSync(authored)) fromAuthored(doc, id);
     await doc.transform(dedup(), weld({ tolerance: 1e-7, toleranceNormal: 0.01 }), prune({ keepLeaves: true, keepAttributes: true }),
       quantize({ quantizePosition: 14, quantizeNormal: 10, quantizeTexcoord: 12 }), meshopt({ encoder: MeshoptEncoder, level: 'medium' }));
     const buf = Buffer.from(await io.writeBinary(doc)), gz = zlib.gzipSync(buf, { level: 9 }).length;
@@ -155,7 +130,7 @@ for (const id of doGuns ? ids2 : []) {
     for (const w of rep.warnings) console.warn(`${id}: warning ${w}`);
     if (rep.errors.length) throw new Error(`${id}.glb breaks the model contract:\n  ` + rep.errors.join('\n  '));
     fs.writeFileSync(OUT + id + '.glb', buf);
-    index.guns[id] = { file: id + '.glb', code: def.code, hash: p.hash, bytes: buf.length, gz, raw: raw.byteLength, meshes: p.meshes, tris: p.tris, ...(fs.existsSync(authored) ? { authored: `models/${id}/${id}.glb` } : {}) };
+    index.guns[id] = { file: id + '.glb', code: def.code, hash: p.hash, bytes: buf.length, gz, raw: raw.byteLength, meshes: p.meshes, tris: p.tris };
     rawTotal += buf.length; gzTotal += gz;
     console.log(id.padEnd(14), String(p.meshes).padStart(4), 'meshes', String(p.tris).padStart(7), 'tris', String(buf.length).padStart(7), 'B', String(gz).padStart(7), 'gz');
   } catch (e) { fails++; console.error('FAIL', id, (e && e.stack) || e); }
