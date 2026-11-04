@@ -242,15 +242,18 @@ const G_GunsmithUI = (() => {
     if (v0 && v1 && Math.round(v0) !== Math.round(v1)) out.push(`<span class="${v1 > v0 ? 'g' : 'b'}">Muzzle ${Math.round(v0)} → ${Math.round(v1)} m/s</span>`);
     return out.length ? out.join('') : '<span>No change to the numbers</span>';
   }
-  function partEffects(p: Part) {
-    const s = p.st || {}, out: string[] = [];
+  // (gid: the gun it's for: a shared barrel's figures are from its length against that gun's own)
+  function partEffects(p: Part, gid?: string | null) {
+    const s = GS.partSt(p, gid) || {}, out: string[] = [];
     const add = (txt: string, good: boolean) => out.push(`<span class="${good ? 'g' : 'b'}">${txt}</span>`);
     if (s.ergo) add(`Ergo ${s.ergo > 0 ? '+' : ''}${s.ergo}`, s.ergo > 0);
     if (s.recoil) add(`Recoil ${pct(s.recoil)}`, s.recoil < 0);
     if (s.acc) add(`Spread ${pct(s.acc)}`, s.acc < 0);
     if (s.hip) add(`Hip ${pct(s.hip)}`, s.hip < 0);
     // (a barrel's: from its length against the factory one's, as it flies: js/data.ts roundSpeed)
-    const gb = p.set && p.set.barrelIn != null && p.plat && (G.GUN_SPECS[p.plat] || {}).barrel, vel = gb ? Math.round((Math.pow(p.set.barrelIn! / gb, 0.2) - 1) * 100) : s.vel;
+    const gun = gid || p.plat, gb = (G.GUN_SPECS[gun!] || {}).barrel, bi = gb && GS.barrelOf(p, gun), vel = bi ? Math.round((Math.pow(bi / gb, 0.2) - 1) * 100) : p.len != null ? 0 : s.vel;
+    if (bi && p.slot === 'barrel') out.push(`<span>Barrel ${bi.toFixed(1)}"${Math.abs(bi - gb) > 0.04 ? ` (${bi > gb ? '+' : '−'}${Math.abs(bi - gb).toFixed(1)}")` : ''}</span>`);
+    else if (p.len != null) out.push(`<span>Barrel ${p.len.toFixed(1)}"</span>`);
     if (p.set && (p.set.ported || (p.set.sup && p.slot === 'barrel' && (G.WEAPONS[p.plat!] || {}).integral))) add('Subsonic (ported)', false); // (an integral barrel: it leaves under 310 m/s whatever its length)
     else if (vel) add(`Velocity ${pct(vel)}`, vel > 0);
     if (s.rpm) add(`Rate ${pct(s.rpm)}`, s.rpm > 0);
@@ -291,7 +294,7 @@ const G_GunsmithUI = (() => {
   // Its dot on the model and its row in the list get a "!".
   function buyable(slot: string) {
     const w = weapon(), s = w && GS.visibleSlots(w.def.id, w.def.build).find((q: Slot) => q.slot === slot);
-    return !!s && GS.compatible(s.mount).some((p: Part) => p.id !== w.def.build[slot] && forSale(p));
+    return !!s && GS.compatible(s.mount).some((p: Part) => p.id !== w.def.build[slot] && GS.fitsLen(p, w.def.id) && forSale(p));
   }
   function apply(w: any, build: any) {
     G.Me.refit(w, build);
@@ -447,9 +450,9 @@ const G_GunsmithUI = (() => {
       // (of the plain grips, just the one on it, or the gun's own: the rest are finishes of it, in the picker on that row)
       const fitted = GS.PARTS[build[cur.slot]], skins = cur.slot === 'grip' ? GS.skins(def.id) : [], skinned = skins.includes(fitted);
       const plainOut = (p: Part) => (skinned ? GS.plainGrip(p) : GS.plainHere(p, def.id));
-      const parts = GS.compatible(cur.mount).filter((p: Part) => (!p.factory || p.plat === def.id || (Me.stash || {})[p.id] || build[cur.slot] === p.id) && !(p.not || []).includes(def.id) && (!plainOut(p) || (Me.stash || {})[p.id] || build[cur.slot] === p.id));
+      const parts = GS.compatible(cur.mount).filter((p: Part) => GS.fitsLen(p, def.id) && (!p.factory || p.plat === def.id || (Me.stash || {})[p.id] || build[cur.slot] === p.id) && !(p.not || []).includes(def.id) && (!plainOut(p) || (Me.stash || {})[p.id] || build[cur.slot] === p.id));
       const rank = (p: Part) => (build[cur.slot] === p.id ? 0 : (Me.stash || {})[p.id] ? 1 : atShowcase(p) && !needed(p) ? 3 : forSale(p) ? 2 : 4);
-      parts.sort((a: Part, b: Part) => rank(a) - rank(b) || a.price - b.price);
+      parts.sort((a: Part, b: Part) => rank(a) - rank(b) || (a.len != null && b.len != null ? a.len - b.len : 0) || a.price - b.price); // (barrels: by length)
       let head = false;
       for (const p of parts) {
         const r = rank(p), n = (Me.stash || {})[p.id] || 0, factoryHere = p.factory && p.plat === def.id;
@@ -462,7 +465,7 @@ const G_GunsmithUI = (() => {
         else action = `<span class="tag">${factoryHere ? 'Comes with the gun' : p.tier > Math.min(3, 1 + Math.floor((G.Shop.level || 1) / 2)) ? 'Available later' : 'Out of stock'}</span>`;
         list += `<div class="gs-part${r === 0 ? ' fitted' : ''}${r === 4 ? ' na' : ''}" data-gpart="${p.id}">
           <div class="gs-pn"><small>${G.U.esc(p.brand)}</small>${G.U.esc(p.name)}${fitsLine(p, def.id)}</div>
-          <div class="gs-pe">${partEffects(p) || '<span>—</span>'}</div>
+          <div class="gs-pe">${partEffects(p, def.id) || '<span>—</span>'}</div>
           <div class="gs-pa">${action}</div></div>`;
       }
     }

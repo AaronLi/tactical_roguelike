@@ -924,7 +924,7 @@ const G_Game = {
   aboxStatsFor(pid: string | undefined) {
     const GS = G.Gunsmith, p = pid && GS.PARTS[pid], w = G.Me.cur();
     if (!p || !w) return '<p class="abox-hint">Hover over a pick to see what it does to your gun.</p>';
-    const fx = G.GunsmithUI.partEffects(p), sl = this.aboxSlot(pid), name = G.U.esc(w.def.name);
+    const fx = G.GunsmithUI.partEffects(p, w.def.id), sl = this.aboxSlot(pid), name = G.U.esc(w.def.name);
     if (!sl) return `<h4>${G.U.esc(p.name!)}</h4><div class="gs-pe">${fx || ''}</div><p class="abox-hint">Doesn't fit your ${name} as it's built: it goes in your inventory.</p>`;
     const build = Object.assign({}, w.def.build), off = build[sl.slot];
     build[sl.slot] = pid; GS.prune(w.def.id, build);

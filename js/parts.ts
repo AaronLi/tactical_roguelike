@@ -135,8 +135,11 @@ const G_Gunsmith = (() => {
   const LEN_C = Object.entries(LEN_PTS).map(([k, [f1, f2]]) => [k, (f1 * LEN_U2 * LEN_U2 - f2 * LEN_U1 * LEN_U1) / LEN_DET, (LEN_U1 * f2 - LEN_U2 * f1) / LEN_DET] as [string, number, number]);
   const lenSt = (k: number): Record<string, number> => {
     if (k === 1) return {};
-    const u = Math.log(Math.min(1.7, Math.max(0.45, k))), o: Record<string, number> = {};
-    for (const [n, a, b] of LEN_C) o[n] = Math.round((a * u + b * u * u) * 1000) / 1000;
+    const u0 = Math.log(Math.min(1.7, Math.max(0.45, k))), o: Record<string, number> = {};
+    for (const [n, a, b] of LEN_C) {
+      const v = b ? -a / (2 * b) : 0, u = v < 0 ? Math.max(u0, v) : v > 0 ? Math.min(u0, v) : u0; // (flat past the curve's turning point, so no figure ever reverses with length)
+      o[n] = Math.round((a * u + b * u * u) * 1000) / 1000;
+    }
     return o;
   };
   // a part's stats on this gun (a shared barrel's depend on the gun's own length)
@@ -1074,8 +1077,8 @@ const G_Gunsmith = (() => {
   // the Rattler, the G36K and the QBZ-191 had: 5.5, 12.5, 14.5). One within half an inch of a gun's own is left out. A cartridge with one gun:
   // its factory length, and a short and a long one.
   const EXTRA_LEN: Record<string, number[]> = {
-    '5.56/45': [5.5, 8, 12.5, 24], '7.62/39': [10.5, 12.5, 20], '7/43': [12, 20], '7.62/51': [10.5, 13, 26], '7.62/54': [15, 20, 32], '7.62/63': [18, 30],
-    '11.6/53': [13.5, 23], '8.6/69': [20, 34], '12.7/99': [18, 22, 36], '9/19': [3, 5.5, 12.5, 20], '11.43/23': [3.5, 8, 14], '7.62/25': [8, 13],
+    '5.56/45': [5.5, 12.5, 24], '7.62/39': [10.5, 12.5, 20], '7/43': [12, 20], '7.62/51': [10.5, 26], '7.62/54': [15, 20, 32], '7.62/63': [18, 30],
+    '11.6/53': [13.5, 23], '8.6/69': [20, 34], '12.7/99': [18, 22, 36], '9/19': [3, 5.5, 12.5], '11.43/23': [3.5, 8, 14], '7.62/25': [8, 13],
     '7.65/17': [3.5, 5.5], '4.6/30': [5.5, 9], '5.6/39': [5, 10.5, 12.5, 20], '5.8/42': [6.5, 14.5, 22], '5.7/29': [7.5, 13],
   };
   function makeSharedBarrels() {

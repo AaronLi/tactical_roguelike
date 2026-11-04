@@ -305,13 +305,13 @@ const G_Shop = {
   // a weapon part from the gunsmith: bought into your stash, fitted in the Gunsmith tab
   partCard(p: Part | null | undefined) {
     if (!p) return '';
-    const Me = G.Me, GS = G.Gunsmith, ids = GS.fits(p.mount);
+    const Me = G.Me, GS = G.Gunsmith, ids = GS.fitsPart(p);
     const yours = ['p', 's'].map((k) => Me.weapons[k]).filter(Boolean)
       .map((w) => `<span class="${ids.includes(w.def.id) ? 'fit-y' : 'fit-n'}">${ids.includes(w.def.id) ? '✓' : '✗'} ${w.def.name}</span>`).join(' ');
     return `<div class="card part">
       <div class="ch"><span class="cn">${G.U.esc(p.name)}</span><span class="tier">${GS.SLOT_LABEL[p.slot]}</span></div>
       <div class="cd"><small class="brand">${G.U.esc(p.brand)}</small> ${G.U.esc(p.desc || '')}</div>
-      <div class="gs-pe">${G.GunsmithUI.partEffects(p) || ''}</div>
+      <div class="gs-pe">${G.GunsmithUI.partEffects(p, (['p', 's'].map((k) => Me.weapons[k]).filter(Boolean).find((w) => ids.includes(w.def.id)) || { def: { id: null } }).def.id) || ''}</div>
       <div class="fits">Fits: ${G.U.esc(GS.ifaceName(p.mount))} (${ids.length} weapon${ids.length === 1 ? '' : 's'})<br>${yours}</div>
       <div class="cfoot"><span>${(Me.stash || {})[p.id] ? `In stash ×${Me.stash[p.id]}` : 'Goes to your stash'}${this.count('part:' + p.id) > 1 ? ` · ${this.count('part:' + p.id)} in stock` : ''}</span>
       <button class="btn small buy" data-k="part" data-id="${p.id}" ${!this.inStock('part:' + p.id) || Me.credits < p.price ? 'disabled' : ''}>${this.inStock('part:' + p.id) ? '¢' + G.U.fmt(p.price) : 'Sold'}</button></div>
