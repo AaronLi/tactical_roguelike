@@ -72,6 +72,10 @@ function prepare(id, group, info) {
   const h = crypto.createHash('sha1');
   let n = 0, tris = 0, meshes = 0;
   group.name = id; group.updateMatrixWorld(true);
+  // UVs are kept only where something uses them: a bump map (rebuilt at load, needs them to tile) or a display surface
+  const needUv = new Set();
+  group.traverse((o) => { if (o.isMesh && (o.material.bumpMap || o.material.map || (o.userData.display) || (o.name || '').startsWith('display_'))) needUv.add(o.geometry); });
+  group.traverse((o) => { if (o.isMesh && !needUv.has(o.geometry) && o.geometry.attributes.uv) o.geometry.deleteAttribute('uv'); });
   group.traverse((o) => {
     if (o === group) return;
     if (o.isMesh) {
@@ -112,7 +116,7 @@ for (const id of ids2) {
     if (check) { const was = old.guns[id]; if (!was || was.hash !== p.hash) { stale++; console.log('STALE', id); } continue; }
     const raw = await new GLTFExporter().parseAsync(group, { binary: true, onlyVisible: false, includeCustomExtensions: false });
     const doc = await io.readBinary(new Uint8Array(raw));
-    await doc.transform(dedup(), weld({ tolerance: 1e-7, toleranceNormal: 0.01 }), prune({ keepLeaves: true, keepAttributes: false }),
+    await doc.transform(dedup(), weld({ tolerance: 1e-7, toleranceNormal: 0.01 }), prune({ keepLeaves: true, keepAttributes: true }),
       quantize({ quantizePosition: 14, quantizeNormal: 10, quantizeTexcoord: 12 }), meshopt({ encoder: MeshoptEncoder, level: 'medium' }));
     const buf = Buffer.from(await io.writeBinary(doc)), gz = zlib.gzipSync(buf, { level: 9 }).length;
     const rep = Models.validate(Models.describeGltfJson(Models.glbJson(buf)), id); // (the contract, js/glb.ts: a bake that breaks it fails loudly)

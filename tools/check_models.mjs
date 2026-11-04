@@ -27,8 +27,9 @@ if (args.includes('--write')) {
   console.log('wrote docs/gun-model-info.schema.json and the contract section of docs/models.md');
 } else if (args.includes('--selftest')) {
   let bad = 0; const fail = (m) => { bad++; console.error('FAIL ' + m); };
-  if (!fs.existsSync(SCHEMA) || fs.readFileSync(SCHEMA, 'utf8') !== schemaText()) fail('docs/gun-model-info.schema.json differs from js/glb.ts INFO_FIELDS: run npm run check:models -- --write');
-  if (!fs.existsSync(DOC) || fs.readFileSync(DOC, 'utf8') !== docWith(fs.readFileSync(DOC, 'utf8'))) fail('the contract tables in docs/models.md differ from js/glb.ts: run npm run check:models -- --write');
+  const lf = (p) => fs.readFileSync(p, 'utf8').replace(/\r\n/g, '\n'); // (a checkout may have CRLF)
+  if (!fs.existsSync(SCHEMA) || lf(SCHEMA) !== schemaText()) fail('docs/gun-model-info.schema.json differs from js/glb.ts INFO_FIELDS: run npm run check:models -- --write');
+  if (!fs.existsSync(DOC) || lf(DOC) !== docWith(lf(DOC))) fail('the contract tables in docs/models.md differ from js/glb.ts: run npm run check:models -- --write');
   const G = loadGame(), cat = Object.keys(G.GunModels.M).sort(), named = Object.keys(Models.contract.materials.names).sort();
   for (const k of cat) if (!named.includes(k)) fail(`material '${k}' is in G.GunModels.M but not in the contract's materials`);
   for (const k of named) if (!cat.includes(k)) fail(`material '${k}' is in the contract but not in G.GunModels.M`);
