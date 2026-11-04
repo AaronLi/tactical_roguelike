@@ -181,7 +181,7 @@ const G_Gear = (() => {
   // A full magazine (or box) for a gun, of ball unless said otherwise. vid: which magazine (a variant part:
   // compact, extended, drum...), by default the kind that's in that gun now, or its standard one.
   const magVid = (def, vid) => vid || (def.build && def.build.mag) || G.Gunsmith.defaultBuild(def.id).mag || null;
-  function ammoItem(def, n, am?, vid?) {
+  function ammoItem(def, n?, am?, vid?) {
     const a = ammoFor(def), type = am || G.ballFor(G.calOf(def));
     if (a.kind !== 'mag') { const count = n == null ? a.cap : n; return item({ k: a.kind, key: a.key, wid: def.id, cap: Math.max(count, boxCap(a.key)), n: count, am: type }); }
     const v = magVid(def, vid), cap = G.Gunsmith.magCap(def.id, v), count = Math.min(cap, n == null ? cap : n);
@@ -274,10 +274,10 @@ const G_Gear = (() => {
 
   // ---------------------------------------------------------------- grids
   let gid = 1;
-  function grid(w, h, accept, label?) { return { id: gid++, w, h, accept: accept || null, label: label || '', items: [] }; }
+  function grid(w, h, accept, label?) { return { id: gid++, w, h, accept: accept || null, label: label || '', items: [] as any[] } as { id: number; w: any; h: any; accept: any; label: any; items: any[]; locker: boolean }; }
   // an item's footprint [w, h], turned or not
   // (g: the grid it's in or going into: a pouch on MOLLE takes its mounted size)
-  function size(it, rot, g) {
+  function size(it, rot?, g?) {
     let w = 1, h = 1;
     if (it.k === 'mag') [w, h] = magShape(G.WEAPONS[it.wid], it.cap, it.vid);
     else if (it.k === 'ammo') h = bigBox(it.key) ? 2 : 1;
@@ -472,7 +472,7 @@ const G_Gear = (() => {
   }
   // somewhere for a new item: near `pref` if given, else on you, else the locker (which grows if it's full)
   // (in a level: only on you, unless the locker's asked for by name; false if there's no room)
-  function stow(me, it, pref) {
+  function stow(me, it, pref?) {
     const gs = [...(pref || []), ...body(me), ...(inField() ? [] : [me.locker])];
     const some = (it.k === 'ammo' || it.k === 'med') && it.n > 0; // (an empty box has nothing to pour away: it's a box, wanted for rounds to come)
     absorb(it, gs); // loose rounds top up the boxes you have first (and bandages their stacks)
@@ -560,7 +560,7 @@ const G_Gear = (() => {
     return out;
   }
   // the gunsmith changed a gun's magazine size: its magazines follow
-  function refitMags() { /* magazines keep their own capacity: it's theirs, not the gun's */ }
+  function refitMags(_me?, _def?) { /* magazines keep their own capacity: it's theirs, not the gun's */ }
 
   // ---------------------------------------------------------------- protection
   const defOf = (it) => (it ? DEFS[it.gid] : null);
@@ -573,7 +573,7 @@ const G_Gear = (() => {
   const headLoad = (me) => { const h = me.kit.helmet, ds = h ? [defOf(h), h.face && defOf(h.face)].filter(Boolean) : []; return { kg: ds.reduce((s, d) => s + (d.kg || 0), 0), nose: ds.reduce((s, d) => s + (d.kg || 0) * (d.fwd || 0), 0) }; };
   // which piece of kit a round to that zone meets: the helmet for the head and face, the plate over the chest
   // (if there is one), the carrier's soft armour anywhere else it covers
-  function piece(me, zone, roll) {
+  function piece(me, zone, roll?) {
     const k = me.kit;
     if (zone === 'face' && k.helmet && k.helmet.face) {
       const c = defOf(k.helmet.face).cover || 1;

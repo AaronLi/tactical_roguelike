@@ -5,7 +5,7 @@
 // The stock is the squad's, shared: each thing he lists, as many of it as there are of you (baseStock), counted by
 // the host (js/server.ts take/give). Buying asks the host for one first (take); you pay once it's yours, and if you
 // can't (no room by then, say) it goes back on the shelf. Guns and the machines' supplies don't run out.
-G.Shop = {
+const G_Shop = {
   tab: 'stock',
   offers: null,
   ready: false,
@@ -111,7 +111,7 @@ G.Shop = {
     for (const id of this.offers.gear) {
       const d = G.Gear.DEFS[id];
       if (d.kind !== 'carrier' || !d.plate) continue;
-      const odds = G.Gear.LIST.filter((p) => p.kind === 'plate' && p.tier <= maxTier).map((p) => [p, ({ 1: 55, 2: 30, 3: 12, 4: 3 })[p.tier] || 1]);
+      const odds = G.Gear.LIST.filter((p) => p.kind === 'plate' && p.tier <= maxTier).map((p): [any, number] => [p, ({ 1: 55, 2: 30, 3: 12, 4: 3 })[p.tier] || 1]);
       let x = r() * odds.reduce((s, [, w]) => s + w, 0), pick = odds[0][0];
       for (const [p, w] of odds) { x -= w; if (x <= 0) { pick = p; break; } }
       this.offers.plates[id] = pick.id;
@@ -121,7 +121,7 @@ G.Shop = {
     for (const id of this.offers.gear) {
       const d = G.Gear.DEFS[id];
       if (d.kind !== 'helmet' || !d.face || r() >= 0.35) continue;
-      const odds = G.Gear.LIST.filter((p) => p.kind === 'face' && p.tier <= maxTier).map((p) => [p, ({ 1: 60, 2: 30, 3: 10 })[p.tier] || 1]);
+      const odds = G.Gear.LIST.filter((p) => p.kind === 'face' && p.tier <= maxTier).map((p): [any, number] => [p, ({ 1: 60, 2: 30, 3: 10 })[p.tier] || 1]);
       if (!odds.length) continue;
       let x = r() * odds.reduce((s, [, w]) => s + w, 0), pick = odds[0][0];
       for (const [p, w] of odds) { x -= w; if (x <= 0) { pick = p; break; } }
@@ -242,7 +242,7 @@ G.Shop = {
     }
     // (no armour repair: worn armour stays worn, replace it)
     // field medical gear (js/medical.ts): each treats one injury on one part
-    for (const [mt, I] of Object.entries(G.Med.ITEMS)) {
+    for (const [mt, I] of Object.entries<any>(G.Med.ITEMS)) {
       let have = 0; Gr.each(Gr.all(Me), (it) => { if (it.k === 'med' && it.mt === mt) have += it.n || 1; });
       out.push({ id: 'med.' + mt, name: I.name, desc: `${I.desc} ${I.time} s to apply. ${I.size.join('×')}${I.stack ? `, ${I.stack} to a stack` : ''}. You have ${have}.`, price: I.price, disabled: !this.room(Gr.medItem(mt)), apply: () => this.stow(Gr.medItem(mt)) });
     }
@@ -328,7 +328,7 @@ G.Shop = {
     const gdef = Object.values(G.WEAPONS).find((d) => G.calOf(d) === o.cal);
     const fx = [...(gdef ? G.Ballistics.loadNotes(gdef, o.am) : []), A.rangeK ? `range ×${A.rangeK}` : '', A.quiet ? 'near-silent suppressed' : '', A.tracer ? 'visible tracer' : '', A.slug ? 'single slug' : '', A.pelletsK ? `pellets ×${A.pelletsK}` : ''].filter(Boolean).join(' · ');
     return `<div class="card ammo">
-      <div class="ch"><img class="ci" src="${G.Icons.of(it, ...G.Gear.size(it))}"><span class="cn">${C.name} ${A.name}</span><span class="tier">AMMO ×${o.n}</span></div>
+      <div class="ch"><img class="ci" src="${G.Icons.of(it, ...(G.Gear.size(it) as [number, number]))}"><span class="cn">${C.name} ${A.name}</span><span class="tier">AMMO ×${o.n}</span></div>
       <div class="cd">${G.U.esc(A.desc)}</div>
       <div class="gs-pe">${fx}</div>
       <div class="fits">${guns.length ? 'Fits your ' + guns.join(', ') : '<span class="fit-n">None of your guns take ' + C.name + '</span>'}</div>
@@ -375,7 +375,7 @@ G.Shop = {
       d.kind === 'shoulder' || d.kind === 'groin' ? '<b>Carrier not included</b>: it fits a plate carrier\'s mounts' : '', d.kind === 'legs' ? '<b>Belt not included</b>: it hangs from a battle belt or war belt' : '',
       d.kind === 'carrier' && (d.shoulder || d.groin) ? 'Mounts for shoulder and pelvis armour' : '', d.kind === 'belt' && d.legs ? 'Hangers for leg armour' : ''].filter(Boolean).join(' · ');
     return `<div class="card gear">
-      <div class="ch"><img class="ci" src="${G.Icons.of(cardIt, ...G.Gear.size(cardIt))}"><span class="cn">${G.U.esc(d.name)}</span><span class="tier" style="color:${G.TIER_COLORS[d.tier]}">${G.TIER_NAMES[d.tier]} ${KN[d.kind]}</span></div>
+      <div class="ch"><img class="ci" src="${G.Icons.of(cardIt, ...(G.Gear.size(cardIt) as [number, number]))}"><span class="cn">${G.U.esc(d.name)}</span><span class="tier" style="color:${G.TIER_COLORS[d.tier]}">${G.TIER_NAMES[d.tier]} ${KN[d.kind]}</span></div>
       <div class="cd"><small class="brand">${G.U.esc(d.brand)}</small> ${G.U.esc(d.desc)}</div>
       ${body}
       <div class="fits">${foot}</div>
@@ -466,3 +466,7 @@ G.Shop = {
     </svg>`;
   },
 };
+// (what it gets as it runs: this visit's level, stock and the gunsmith's parts; the screen's title and the level's report, js/game.ts)
+interface ShopFields { level: number; stock: Record<string, any>; partStock: any; precStock: any; loadSel: Record<string, string>; title: string | null; report: any; }
+G.Shop = G_Shop as typeof G_Shop & ShopFields;
+interface GameModules { Shop: typeof G_Shop & ShopFields; }

@@ -57,7 +57,7 @@ const G_Stickers = (() => {
   }
   // a picture handed over (a replay's file brought its own: js/highlights.ts renderPack, in the worker)
   function provide(name, bm) { const p = pics.get(name) || pic(name); set(p, bm); p.ready = Promise.resolve(p); }
-  function material(name, ghost) {
+  function material(name, ghost?) {
     const p = pic(name);
     if (!p.tex) {
       // (an ImageBitmap isn't turned over on upload: its top row is v = 0, as the decals' UVs have it)

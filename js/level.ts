@@ -20,7 +20,7 @@ const G_Level = {
   DOOR_H: 2.3,
 
   // th: the environment (index into G.THEMES) picked on the route map; by default they come round in turn
-  generate(seed, level, th) {
+  generate(seed, level, th?) {
     const U = G.U, r = U.rng(seed);
     const theme = G.THEMES[th != null && G.THEMES[th] ? th : (level - 1) % G.THEMES.length];
     // the layout: an apartment block, a warehouse, two houses back to back with their gardens between, or a
@@ -1631,7 +1631,7 @@ const G_Level = {
   // Returns {t, n:[nx,ny,nz]} — distance along the (unit) direction to the first solid surface
   // opts.glass: go through glass (listing the panes crossed, nearest first, in .glass) instead of stopping at it.
   // A hit on the view behind an outside window comes back with .view (no mark to leave there).
-  raycast(map, ox, oy, oz, dx, dy, dz, maxD, opts) {
+  raycast(map, ox, oy, oz, dx, dy, dz, maxD, opts?) {
     if (map.world) return G.World.raycast(map.world, ox, oy, oz, dx, dy, dz, maxD, opts);
     const pass = !!(opts && opts.glass), crossed = pass ? [] : null;
     const TS = this.TS;
@@ -2654,7 +2654,7 @@ const G_Level = {
     for (const b of bins.values()) for (const e of b.list) e.g.dispose();
     return merged.size;
   },
-  buildMesh(map, opts) {
+  buildMesh(map, opts?) {
     if (!opts || opts.pool !== false) { map.dmg = null; for (const d of map.doors || []) { d.holes = null; d.gone = null; d.fallen = false; d.rest = null; } } // (a fresh start: js/damage.ts)
     if (map.floors) return this.buildStack(map);
     const TS = this.TS, th = map.theme, root = new THREE.Group(), pool = !opts || opts.pool !== false;

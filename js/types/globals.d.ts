@@ -4,7 +4,7 @@
 // itself (interfaces merge); anything not described yet is still reachable, untyped, through the index signature.
 
 /** The game's namespace: each file's module, hung off one global. */
-interface GameNamespace {
+interface GameNamespace extends GameModules {
   [module: string]: any;
 }
 

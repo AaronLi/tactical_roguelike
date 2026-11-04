@@ -730,7 +730,7 @@ const G_Damage = (() => {
   function setPose(piv, u, f, Y) { if (!u.p0) u.p0 = piv.position.clone(); piv.quaternion.set(f[4], f[5], f[6], f[7]); piv.position.set(f[1], f[2] - Y, f[3]).sub(_p.copy(u.centre).applyQuaternion(piv.quaternion)); }
   const _p = new T.Vector3();
   // The door's down: nothing holds it now. Solids at once, its fall on the screen (ang, dir, seed: as the host gave them). snap: it fell before you got here.
-  function fall(map, d, ang, dir, seed, snap) {
+  function fall(map, d, ang, dir, seed, snap?) {
     if (d.fallen) return;
     d.fallen = true; d.open = true;
     const tr = fallTrack(map, d, ang, dir, seed);

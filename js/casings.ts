@@ -92,7 +92,7 @@ const G_Casings = (() => {
   // when the gun's action throws the case: now, after it's worked, or not at all
   // am: the round's type (a spent shotgun hull keeps its load's colour)
   // (at: when, if the caller knows: a bolt worked by hand)
-  function fired(def, local, from, to, am, at) {
+  function fired(def, local, from, to, am?, at?) {
     const md = mode(def);
     if (md === 'shot' || md === 'cycle') queue.push({ t: at != null ? at : md === 'cycle' ? Math.min(0.55, (60 / def.rpm) * 0.45) : 0.015, def, local, from: from && from.clone(), to: to && to.clone(), am });
   }

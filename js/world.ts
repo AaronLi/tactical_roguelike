@@ -279,7 +279,7 @@ const G_World = (() => {
   // opts.skirt, how far its walls reach down past its floor (over the slab under it); opts.voidAbove, where the
   // floor above has a drop (no ceiling there); opts.ground: false for an upper floor (its floor only where it
   // has one: not over a drop).
-  function fromTileMap(map, opts) {
+  function fromTileMap(map, opts?) {
     const o = opts || {}, L = G.Level, TS = L.TS, { W, H, t } = map, WH = L.WALL_H, w = o.world || create();
     const Y = o.y || 0, SK = o.skirt || 0, va = o.voidAbove;
     w.bounds = { min: [0, 0, 0], max: [W * TS, Y + WH, H * TS] };

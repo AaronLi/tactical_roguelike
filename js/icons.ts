@@ -414,7 +414,7 @@ const G_Icons = (() => {
     return c;
   }
   // an item drawn in its natural orientation (w x h cells), turned if it's shown turned
-  function of(it, w, h, rot) {
+  function of(it, w, h, rot?) {
     // (a magazine or tube is drawn as full as it is: that's part of the key, to a round on small ones)
     const fill = it.k === 'mag' || it.k === 'tube' ? (it.cap ? Math.round(G.U.clamp(it.n / it.cap, 0, 1) * Math.min(it.cap, 40)) : it.n > 0 ? 1 : 0) + '/' + (it.cap || 0) : it.k === 'ammo' ? Math.ceil(fillOf(it) * 20) : it.n > 0 ? 1 : 0;
     const key = [it.k, it.k === 'gun' ? it.w.def.code : it.wid || it.key || it.gid || it.pid || it.mt || '', it.vid || '', it.am || '', fill, w, h, rot ? 1 : 0, it.face ? it.face.gid : ''].join('|');

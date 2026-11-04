@@ -184,7 +184,7 @@ const G_R = {
 
   // ------------------------------------------------------------ viewmodels
   // (skin: its stickers, js/stickers.ts; by default the gun in your hands', if that's this build)
-  setViewmodel(def, skin) {
+  setViewmodel(def, skin?) {
     if (skin === undefined) { const w = G.Me && G.Me.cur && G.Me.cur(); skin = w && w.def === def ? w.stickers : null; }
     if (this.vm) { this.vmRoot.remove(this.vm); this.vm.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); }
     this.vm = def ? G.GunModels.viewmodel(def, skin) : null;
@@ -390,7 +390,7 @@ const G_R = {
     for (let i = this.coneUsed; i < this.cones.length; i++) this.cones[i].cone.visible = this.cones[i].lamp.visible = false;
     for (let i = this.pLaserUsed; i < this.pLasers.length; i++) this.pLasers[i].line.visible = this.pLasers[i].dot.visible = false;
   },
-  tracer(from, to, color = 0xffd080, width = 0.018, life) {
+  tracer(from, to, color = 0xffd080, width = 0.018, life?) {
     const m = this.tracers[this.tracerIdx]; this.tracerIdx = (this.tracerIdx + 1) % this.tracers.length;
     const dx = to.x - from.x, dy = to.y - from.y, dz = to.z - from.z, len = Math.hypot(dx, dy, dz);
     if (len < 0.5) return;
@@ -552,7 +552,7 @@ const G_R = {
     m.material.color.setHex(color); m.material.opacity = op;
     m.userData.f = this.frameNo; m.visible = true;
   },
-  particles(p, n, color, speed, life, grav = 9, spread = 1, dir, blood) {
+  particles(p, n, color, speed, life, grav = 9, spread = 1, dir?, blood?) {
     const col = new THREE.Color(color);
     for (let k = 0; k < n; k++) {
       const i = this.pIdx; this.pIdx = (this.pIdx + 1) % this.PN;
@@ -573,7 +573,7 @@ const G_R = {
     metal: { s: [0xffc070, 12, 5, 0.22, 12], d: null }, stone: { s: [0xffc070, 3, 3, 0.15, 12], d: [0x9a958a, 8, 1.5] }, wood: { s: null, d: [0xa8824e, 9, 2.2] }, plaster: { s: null, d: [0xe8e4da, 10, 1.2] },
     soft: { s: null, d: [0xcfc8b8, 6, 1] }, glass: { s: null, d: [0xcfe6f0, 8, 2.5] }, soil: { s: null, d: [0x6a5238, 10, 2] }, plastic: { s: null, d: [0x77787a, 5, 2] }, water: { s: null, d: [0xa8c8d8, 8, 2.5] },
   },
-  impact(p, n, kind, fx, o) {
+  impact(p, n, kind, fx?, o?) {
     if (G.Audio && G.Audio.impactAt) G.Audio.impactAt(p, kind, fx); // heard when it's close
     if (kind === 'blood') { this.particles(p, 8, 0x8a0a0a, 2.5, 1.2, 9, 0.8, n, true); return; } // (each leaves a drop where it lands)
     if (kind === 'armor') { this.particles(p, 6, 0x9fd8ff, 3, 0.25, 6, 1); return; }
@@ -844,5 +844,6 @@ const G_R = {
     r.info.autoReset = true;
   },
 };
-G.R = G_R;
-interface GameModules { R: typeof G_R; }
+G.R = G_R as typeof G_R & RFields;
+interface RFields { camera: any; scene: any; renderer: any; dynRoot: any; levelRoot: any; vm: any; vmRoot: any; vmHolder: any; vmMuzzle: any; debris: any; fisheye: number; hasGlow: boolean; pipLive: number; }
+interface GameModules { R: typeof G_R & RFields; }

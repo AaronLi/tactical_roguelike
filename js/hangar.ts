@@ -603,7 +603,7 @@ const G_Hangar = (() => {
     addTarget({ id: 'heli', kind: 'heli', box: [P.x - 3.5, 0.2, P.z - 1.4, P.x + 2.5, 2.9, P.z + 1.4], label: 'the helicopter' });
   }
   // helipad: a painted H on the paving (lit: the hangar's own daylight; in a level, what's there)
-  function padMesh(lit) {
+  function padMesh(lit?) {
     const mat = { map: canvasTex(256, 220, (g, w, hh) => { g.fillStyle = '#34383d'; g.fillRect(0, 0, w, hh); g.strokeStyle = '#e8c030'; g.lineWidth = 6; g.strokeRect(10, 10, w - 20, hh - 20); g.fillStyle = '#e8c030'; g.fillRect(w / 2 - 38, hh / 2 - 50, 14, 100); g.fillRect(w / 2 + 24, hh / 2 - 50, 14, 100); g.fillRect(w / 2 - 38, hh / 2 - 7, 76, 14); }) };
     const pad = new T.Mesh(new T.PlaneGeometry(13, 11), lit ? new T.MeshBasicMaterial(mat) : new T.MeshStandardMaterial(Object.assign(mat, { roughness: 0.9 })));
     pad.rotation.x = -Math.PI / 2;

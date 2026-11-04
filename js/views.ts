@@ -353,7 +353,7 @@ const G_Views = {
   // A window breaking: the pane goes, a burst of glass falls both sides of it, and it's heard. at, dir: where
   // the round went through (optional)
   // A pane that's taken its first round: fractured right across from where it was hit (js/damage.ts crack), still up
-  crackGlass(id, at, dir) {
+  crackGlass(id, at, dir?) {
     const map = G.Game.map, w = map && map.windows && map.windows[id];
     if (!w || w.broken || w.armor || w.cracked) return;
     w.cracked = true; map.cracked = true;
@@ -362,7 +362,7 @@ const G_Views = {
     G.R.particles(at, 8, 0xd8eef5, 1.2, 0.8, 9, 0.7, dir ? [dir.x, 0, dir.z] : null);
     G.Audio.glass(Math.hypot(w.x - G.R.camera.position.x, w.z - G.R.camera.position.z) + 10); // (from the camera: on a helmet cam, what they hear)
   },
-  breakGlass(id, at, dir) {
+  breakGlass(id, at?, dir?) {
     const map = G.Game.map, w = map && map.windows && map.windows[id];
     if (!w || w.broken || w.armor) return; // (bulletproof glass doesn't break)
     w.broken = true;
@@ -452,7 +452,7 @@ const G_Views = {
   },
   // The marks a round left (js/ballistics.ts mark: [x, y, z, normal, what it looks like, e(ntry) x (exit) r(icochet)]), on your
   // screen: skip the first (the arrival drew it). A ricochet's next leg shows as a streak.
-  roundFx(list, skip) {
+  roundFx(list, skip?) {
     let last = null;
     (list || []).forEach((f, i) => {
       const p = new THREE.Vector3(f[0], f[1], f[2]);
@@ -917,6 +917,7 @@ const G_Views = {
     this.pings = this.pings.filter((pg) => pg.t > 0);
   },
 };
-G.Views = G_Views;
+G.Views = G_Views as typeof G_Views & ViewsFields;
 
-interface GameModules { Views: typeof G_Views; }
+interface ViewsFields { warmed: boolean; }
+interface GameModules { Views: typeof G_Views & ViewsFields; }

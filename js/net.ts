@@ -11,10 +11,10 @@ const G_Net = {
   code: null,
   conns: new Map(),
   hostConn: null,
-  onServer: () => {},   // (msg, fromId)   — host only
-  onClient: () => {},   // (msg)           — everyone
+  onServer: (() => {}) as (msg: any, from: string) => void,   // (msg, fromId)   — host only
+  onClient: (() => {}) as (msg: any) => void,   // (msg)           — everyone
   onPeerJoin: () => {}, // (id)            — host only
-  onPeerLeave: () => {},// (id)            — host only
+  onPeerLeave: (() => {}) as (id: string) => void,// (id)            — host only
   onHostLost: () => {}, //                 — clients only
 
   available() { return typeof window.Peer === 'function'; },
@@ -142,7 +142,7 @@ const G_Net = {
   stopBeacon() { try { if (this.beacon) this.beacon.destroy(); } catch (e) { /* gone */ } this.beacon = null; },
   // anyone: the games hosted on this network (resolves with [{ code, name, players, phase }], or null when the
   // network can't be told: no STUN answer)
-  async lanScan() {
+  async lanScan(): Promise<any[]> {
     if (!this.available()) return null;
     const key = await this.lanKey();
     if (!key) return null;
@@ -166,7 +166,7 @@ const G_Net = {
     else if (this.hostConn && this.hostConn.open) this.hostConn.send(msg);
   },
   // host only: send to all clients (and handle locally)
-  broadcast(msg, exceptId) {
+  broadcast(msg, exceptId?) {
     for (const [id, c] of this.conns) if (id !== exceptId && c.open) { try { c.send(msg); } catch (e) { /* closing */ } }
     if (exceptId !== this.myId) this.onClient(msg);
   },

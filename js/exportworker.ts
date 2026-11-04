@@ -13,8 +13,8 @@ importScripts('https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js');
 importScripts(...['util', 'data', 'callsigns', 'parts', 'gear', 'medical', 'materials', 'ballistics', 'damage', 'level', 'world', 'furniture', 'homes', 'residents', 'lightgrid', 'render',
   'stickers', 'gunmodels', 'vmanim', 'headgear', 'rig', 'scars', 'highlights'].map((f) => f + '.js'));
 // (the game the replay borrows from: the map the bodies fall on, and nobody's id)
-G.Game = { map: null, phase: 'level' };
-G.Net = { myId: '' };
+(G as any).Game = { map: null, phase: 'level' };
+(G as any).Net = { myId: '' };
 G.Stickers.base = '../../'; // (the game's folder, from here (dist/js/): its pictures, js/stickers.ts; a replay's file brings its own)
 
 self.onmessage = async (e) => {

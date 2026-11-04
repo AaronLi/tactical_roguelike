@@ -103,7 +103,7 @@ const G_Prof = (() => {
     return { frames: filled, seconds: filled ? r2(series(0)[filled - 1] - series(0)[0]) : 0, frame: stats(frame), cpu: stats(cpu), sections: Object.fromEntries(order.map((k) => [k, sections[k]])) };
   }
   function context() {
-    const g = G.Game || {}, m = g.map, info = G.R && G.R.renderer && G.R.renderer.info;
+    const g: any = G.Game || {}, m = g.map, info = G.R && G.R.renderer && G.R.renderer.info;
     return {
       saved: new Date().toISOString(), recordingSince: since, userAgent: navigator.userAgent, screen: [innerWidth, innerHeight, devicePixelRatio],
       level: g.level, phase: g.phase, hub: !!g.hub, host: !!(G.Net && G.Net.isHost), players: g.roster ? Object.keys(g.roster).length : 1,
@@ -142,7 +142,7 @@ const G_Prof = (() => {
   function install() {
     const Gm = G.Game;
     const loop = Gm.loop;
-    Gm.loop = function () { frameBegin(); try { return loop.apply(this, arguments); } finally { frameEnd(); } };
+    Gm.loop = function () { frameBegin(); try { return loop.apply(this, arguments as any); } finally { frameEnd(); } };
     wrap(Gm, 'serverTick', 'host: server tick');
     wrap(Gm, 'updateDoors', 'doors');
     wrap(G.Me, 'update', 'Me.update'); wrap(G.Me, 'move', 'Me.move'); wrap(G.Me, 'weaponUpdate', 'Me.weapon'); wrap(G.Me, 'interact', 'Me.interact');

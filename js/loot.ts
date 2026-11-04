@@ -43,7 +43,7 @@ const G_Loot = (() => {
   const COL = { mag: 0x2a2c2e, ammo: 0xb0915e, med: 0xd8d2c4, frag: 0x4a5a32, carrier: 0x3a4148, plate: 0x4a4d52, helmet: 0x33393f, belt: 0x3b3528, pack: 0x4a4a38, pouch: 0x404636, ifak: 0x7a2420, part: 0x2c3136 };
   // A gun lies on its side (fit: shrunk to that length if it's longer, to lie in the weapon case), a magazine on
   // its flat as it would fall; anything else is a small box the size of its footprint (10 cm a cell), its icon on top.
-  function meshFor(packed, fit) {
+  function meshFor(packed, fit?) {
     if (packed.k === 'gun' && packed.w) {
       const code = G.Gunsmith.encode(packed.w.id, packed.w.build), gun = G.GunModels.world(code, packed.w.sk), wrap = new T.Group(), tmp = new T.Group();
       G.GunModels.setLoaded(gun, G.loaded(packed.w) > 0); // (a crossbow lying there with its bolt on the rail or not)

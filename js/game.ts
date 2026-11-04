@@ -4,7 +4,7 @@ const G_Game = {
   phase: 'menu',
   map: null,
   level: 0,
-  roster: {},
+  roster: {} as Record<string, any>,
   extract: { active: false, votes: 0, need: 0, civDead: 0, voted: false }, // order restored; the vote to leave
   enemiesLeft: 0,
   chatOpen: false,
@@ -278,7 +278,7 @@ const G_Game = {
   },
   // Tab in a level: your kit and health (and the scoreboard), the mouse freed to move things about. You stand
   // still while it's open; the level doesn't stop.
-  toggleInv(open, opts) {
+  toggleInv(open, opts?) {
     if (!!open === !!this.invOpen) return;
     this.invOpen = !!open;
     this.$('fieldInv').classList.toggle('hidden', !open);
@@ -430,7 +430,7 @@ const G_Game = {
           if (m.bodies) m.bodies.forEach(([id, type, x, z, yaw, sec, y]) => G.Views.addBody(id, type, x, z, yaw, sec, y));
           this.setCase(m.wcase); this.abox = m.abox || null; this.sbox = m.sbox || null;
           this.cabs = m.cabs || []; G.Views.syncCabs();
-          G.Loot.clear(); for (const a of m.loot || []) G.Loot.add(...a);
+          G.Loot.clear(); for (const a of m.loot || []) G.Loot.add(...(a as [any, any, any, any, any, any, any]));
           for (const id of m.glass || []) G.Views.breakGlass(id); // windows already broken when we joined
           for (const [id, p] of m.cracked || []) G.Views.crackGlass(id, new THREE.Vector3(...p));
         } else if (m.phase === 'shop') this.enterShop(m.level, m.shopSeed, null, m.stock);
@@ -472,14 +472,14 @@ const G_Game = {
         const d = this.map && this.phase === 'level' ? this.map.doors[m.i] : null;
         if (!d) break;
         if (G.Highlights) G.Highlights.door(m.i, 1, 0, m.f);
-        G.Damage.fall(this.map, d, ...m.f);
+        G.Damage.fall(this.map, d, ...(m.f as [any, any, any, any]));
         break;
       }
       case 'rpath': for (const [i, path] of m.ps || []) { const s = G.Highlights && G.Highlights.roundPath(m.k, m.sid, i, path), def = s && (G.WEAPONS[s.code] || G.Gunsmith.fromCode(s.code)); if (G.ShotLog) G.ShotLog.keep(path, { holder: G.ShotLog.remote(m.k, m.sid), name: def ? def.name : '' }); } break;
       case 'skin': G.Stickers.learn(m.h, m.l); break; // (a gun's stickers, by their hash: js/stickers.ts)
       // a first aid cabinet opened, emptied a bit, or put back into
       // things lying about: put down, picked up, and what you picked up
-      case 'loot': if (this.phase === 'level') for (const a of m.a || []) G.Loot.add(...a); break;
+      case 'loot': if (this.phase === 'level') for (const a of m.a || []) G.Loot.add(...(a as [any, any, any, any, any, any, any])); break;
       case 'lootRm': G.Loot.remove(m.id); break;
       case 'glass': if (this.phase === 'level') for (const id of m.ids || []) G.Views.breakGlass(id); break;
       case 'crack': if (this.phase === 'level') G.Views.crackGlass(m.id, new THREE.Vector3(...m.p)); break;
@@ -1276,7 +1276,12 @@ const G_Game = {
   },
   updateZone() { /* no exit zone: the squad votes to leave (Y) once order's restored */ },
 };
-G.Game = G_Game;
-interface GameModules { Game: typeof G_Game; }
+G.Game = G_Game as typeof G_Game & GameFields;
+interface GameFields {
+  myName: string; myAnimal: string; myColor: number; myLook: any;
+  hub: boolean; shopOpen: boolean; civsLeft: number; unitsCleared: number; bodiesLeft: number; weaponsLeft: number; veilN: number;
+  settings: { sens: number; fov: number; vol: number }; invOpen: boolean; caseOpen: boolean; abox: any; sbox: any; cabs: any[]; routeMap: any; routeSt: any;
+}
+interface GameModules { Game: typeof G_Game & GameFields; }
 
 window.addEventListener('load', () => G.Game.init());

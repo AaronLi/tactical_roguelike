@@ -299,7 +299,7 @@ const G_Highlights = (() => {
     return sh._pel;
   }
   // (fall: shot off its hinges, as js/damage.ts fall takes it)
-  function door(i, open, kicked, fall) {
+  function door(i, open, kicked, fall?) {
     if (G.Game.phase !== 'level' || G.Game.hub) return;
     const d = { t: R.t, i, open: !!open, kicked: !!kicked, fall };
     R.doors.push(d);

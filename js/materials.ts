@@ -168,7 +168,7 @@ const G_Materials = (() => {
     return !!(fl.out && fl.out[z * fl.W + x]);
   }
   // The construction of the solid s a round entered at p and left at q (null q: what its face is)
-  function of(map, s, p, q) {
+  function of(map, s, p?, q?) {
     if (s.mat) return s.mat;
     const theme = map.theme || {};
     switch (s.kind) {

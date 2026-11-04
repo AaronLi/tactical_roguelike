@@ -738,7 +738,7 @@ const G_InvUI = (() => {
     if (it.k !== 'mag' || !G.magFits(it.wid, w.def.id) || src.gunMag === w) return G.Audio.deny();
     const old = magItem(w), at = src.p ? [src.g, src.p.x, src.p.y, src.p.r] : null;
     detach(me, src);
-    if (old) { magItems.delete(w); if (at && GG().fits(at[0], old, at[1], at[2], at[3])) GG().put(...at.slice(0, 1), old, ...at.slice(1)); else GG().stow(me, old); }
+    if (old) { magItems.delete(w); if (at && GG().fits(at[0], old, at[1], at[2], at[3])) (GG().put as any)(...at.slice(0, 1), old, ...at.slice(1)); else GG().stow(me, old); }
     GG().loadIn(me, w, it); w.noMag = false;
     magItems.set(w, it);
     G.Audio.sample('insert_magazine', 0.5) || G.Audio.click();
@@ -954,7 +954,7 @@ const G_InvUI = (() => {
   }
 
   return {
-    show(el, opts) { field = !!(opts && opts.field); patient = opts && opts.patient != null ? opts.patient : null; ptPart = null; cab = opts && opts.cab != null ? opts.cab : null; root = el; el.classList.add('inv-host'); if (!el.dataset.invBound) { el.dataset.invBound = 1; el.addEventListener('pointerdown', (e) => root && onDown(e)); el.addEventListener('dblclick', (e) => root && onDbl(e)); el.addEventListener('contextmenu', (e) => root && onMenu(e));
+    show(el, opts?) { field = !!(opts && opts.field); patient = opts && opts.patient != null ? opts.patient : null; ptPart = null; cab = opts && opts.cab != null ? opts.cab : null; root = el; el.classList.add('inv-host'); if (!el.dataset.invBound) { el.dataset.invBound = 1; el.addEventListener('pointerdown', (e) => root && onDown(e)); el.addEventListener('dblclick', (e) => root && onDbl(e)); el.addEventListener('contextmenu', (e) => root && onMenu(e));
         el.addEventListener('click', (e) => {
           if (!root) return;
           if (e.target.closest('[data-molle]')) { editMolle = !editMolle; G.Audio.click(); render(); }

@@ -468,5 +468,6 @@ const G_HUD = {
     return html;
   },
 };
-G.HUD = G_HUD;
-interface GameModules { HUD: typeof G_HUD; }
+G.HUD = G_HUD as typeof G_HUD & HUDFields;
+interface HUDFields { hbLast: any; hbPath: any; }
+interface GameModules { HUD: typeof G_HUD & HUDFields; }

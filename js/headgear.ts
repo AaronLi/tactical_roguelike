@@ -64,7 +64,7 @@ const G_Headgear = (() => {
   };
 
   // A helmet (kit id, or 'generic' in the colour given). mat(colour, opts) makes a material; put(mesh) hangs it on the head.
-  function helmet(id, mat, put, col) {
+  function helmet(id, mat, put, col?) {
     const M = MODELS[id] || MODELS.generic, cut = CUT[M.cut], c = col != null ? col : M.col != null ? M.col : 0x2a2d30;
     const dark = 0x1c1e20, shell = new T.Mesh(band(M.r, -PI, PI, 0, cut, M.t, { cols: 48, rows: 14 }), mat(c, { side: T.DoubleSide }));
     put(shell);

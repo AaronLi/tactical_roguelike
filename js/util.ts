@@ -1,6 +1,6 @@
 'use strict';
 
-self.G = self.G || {}; // (the page, or the highlights' export worker)
+self.G = self.G || ({} as GameNamespace); // (the page, or the highlights' export worker)
 
 // Colour, physically: every colour written down (a hex, a canvas, a picture) is sRGB, as a screen shows it; it's
 // turned linear before it's lit (light adds up in linear: twice the lamps, twice the light), and back to sRGB on its

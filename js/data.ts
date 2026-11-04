@@ -35,7 +35,7 @@ G.CLASS_SND = G_CLASS_SND;
 // without a cartridge (the railgun, the crossbow) set their own.
 const W = (o) => Object.assign({ pellets: 1, mode: 'auto', pen: 0, zoom: 0.8, speed: 1, falloff: 0.6, shell: false, burst: 0 }, o);
 
-const G_WEAPON_LIST = [
+const G_WEAPON_LIST: Record<string, any>[] = [
   // ----- PRIMARY: assault / battle rifles -----
   W({ id: 'm4', slot: 'p', cls: 'AR', tier: 1, price: 900, name: 'M4 Carbine', rpm: 780, mag: 30, reserve: 180, reload: 2.2, spread: 2.8, ads: 0.025, range: 35, speed: 0.95, desc: 'Reliable all-rounder. Never lets you down.' }),
   W({ id: 'ak', slot: 'p', cls: 'AR', tier: 1, price: 1000, name: 'KV-47', rpm: 600, mag: 30, reserve: 180, reload: 2.5, spread: 3.2, ads: 0.04167, range: 35, speed: 0.94, pen: 1, desc: 'Hits like a truck, kicks like a mule. Punches through one target.' }),
@@ -132,7 +132,7 @@ const G_WEAPON_LIST = [
   W({ id: 'thor', slot: 's', cls: 'PST', tier: 4, price: 4500, name: 'Thor .50', rpm: 40, mode: 'semi', mag: 1, reserve: 10, reload: 3.2, spread: 3, ads: 0.03, range: 60, pen: 3, desc: 'One round of .50 BMG, in a pistol, because someone asked if it could be done. It can. Hold on.' }),
 ];
 G.WEAPON_LIST = G_WEAPON_LIST;
-const G_WEAPONS = {};
+const G_WEAPONS: Record<string, any> = {};
 G.WEAPONS = G_WEAPONS;
 G.WEAPON_LIST.forEach((w) => { w.snd = G.CLASS_SND[w.cls]; G.WEAPONS[w.id] = w; });
 // Explosive weapons (the grenade launchers) are switched off for now: no case, shop or kit turns one up.
@@ -223,7 +223,7 @@ G.beltFed = G_beltFed;
 // Weapons without an entry (the railgun) keep their procedural sound.
 const GS = (barrel, caliber, muzzleDevice, pressure, grain, bulletWeight, boltMass, boltLoudness, actionType, caseMaterial, caseLength, shotCount = 1) =>
   ({ barrel, caliber, muzzleDevice, pressure, grain, bulletWeight, boltMass, boltLoudness, actionType, caseMaterial, caseLength, shotCount });
-const G_GUN_SPECS = {
+const G_GUN_SPECS: Record<string, any> = {
   m4:       GS(14.5, 5.56, 'flash', 55000, 0.70, 62, 0.35, 0.50, 'gas', 'brass', 45),
   ak:       GS(16.3, 7.62, 'none', 45000, 1.00, 123, 0.72, 0.70, 'longstroke', 'steel', 39),
   f2:       GS(19.2, 5.56, 'flash', 55000, 0.70, 62, 0.30, 0.55, 'roller', 'brass', 45),
@@ -316,7 +316,7 @@ G.SUPPRESSOR = G_SUPPRESSOR;
 // (soft armour, chest and stomach), 'groin', 'shoulder', 'thigh', 'helmet' (above its brim: cut 'high' or 'full'),
 // 'face' (the rest of them: js/ballistics.ts covers). Whether a round gets through is worked out from the round and the layers; armour wears by the energy it
 // soaks up (dur: how much it takes), and a worn layer is thinner.
-const G_ARMOR_LIST = [
+const G_ARMOR_LIST: Record<string, any>[] = [
   { id: 'none', kind: 'vest', name: 'No Armour', tier: 0, prot: [], dur: 0, speed: 1, price: 0, desc: 'Just your shirt.' },
   { id: 'soft2', kind: 'vest', name: 'Soft Vest (II)', tier: 1, prot: [{ at: 'torso', layers: [['aramid', 6]] }], dur: 4, speed: 1, price: 300,
     desc: 'Thin Kevlar panels. Stops 9 mm, .45 and buckshot, not a magnum, and it soon wears through.' },
@@ -510,7 +510,7 @@ G.SOUND_SPEED = G_SOUND_SPEED;
 const G_dragOf = (def, am) => { const ref = G.MUZZLE_V[G.calOf(def)]; return am === 'slug' ? 350 : (ref ? ref[2] : 600) * ((G.AMMO[am] || {}).dragK || 1); };
 G.dragOf = G_dragOf;
 // a round's speed (m/s) d metres from the muzzle, from this build, with this load
-const G_roundSpeed = (def, am, d = 0) => {
+const G_roundSpeed = (def, am?, d = 0) => {
   const cal = G.calOf(def), ref = G.MUZZLE_V[cal];
   if (!ref) return 0;
   const barrel = def.barrelIn || (G.GUN_SPECS[def.id] || {}).barrel || ref[1];
@@ -574,7 +574,7 @@ const G_aimSway = (def) => {
 };
 G.aimSway = G_aimSway;
 // the push back of one shot (N·s) from this build with this load, or 0 (a bolt, a rail slug)
-const G_recoilImpulse = (def, am) => {
+const G_recoilImpulse = (def, am?) => {
   const g = G.GUN_SPECS[def.id], cal = G.calOf(def), ch = G.CHARGE_GR[cal];
   if (!g || !ch) return 0;
   const v = G.roundSpeed(def, am), v0 = am === 'subsonic' ? G.roundSpeed(def) : v;
@@ -584,7 +584,7 @@ const G_recoilImpulse = (def, am) => {
 };
 G.recoilImpulse = G_recoilImpulse;
 // a shot's climb (degrees) from this build weighing kg, with this load; null when it isn't a gun with a round
-const G_physRecoil = (def, kg = G.GUN_KG[def.id], am) => {
+const G_physRecoil = (def, kg = G.GUN_KG[def.id], am?) => {
   const I = G.recoilImpulse(def, am), R = G.RECOIL;
   if (!I || !kg) return null;
   return R.K * Math.pow(I, R.B) / Math.pow(kg, R.A) * (def.cls === 'PST' || def.cls === 'MP' ? R.HAND : 1) * (G.RECOIL_K[def.id] || 1);
@@ -717,4 +717,4 @@ const G_ENEMY_GEAR = {
 };
 G.ENEMY_GEAR = G_ENEMY_GEAR;
 
-interface GameModules { TIER_NAMES: typeof G_TIER_NAMES; TIER_COLORS: typeof G_TIER_COLORS; CLASS_SND: typeof G_CLASS_SND; WEAPON_LIST: typeof G_WEAPON_LIST; WEAPONS: typeof G_WEAPONS; EXPLOSIVES_OFF: typeof G_EXPLOSIVES_OFF; obtainable: typeof G_obtainable; AUTO_ONLY: typeof G_AUTO_ONLY; FIRE_MODES: typeof G_FIRE_MODES; MODE_NAME: typeof G_MODE_NAME; OPEN_BOLT: typeof G_OPEN_BOLT; chambered: typeof G_chambered; revolver: typeof G_revolver; REV: typeof G_REV; fullReload: typeof G_fullReload; BOLT_HOLD: typeof G_BOLT_HOLD; boltHold: typeof G_boltHold; loaded: typeof G_loaded; MAG_FAMILY: typeof G_MAG_FAMILY; BELT_FAMILY: typeof G_BELT_FAMILY; magFam: typeof G_magFam; magFits: typeof G_magFits; beltFed: typeof G_beltFed; GUN_SPECS: typeof G_GUN_SPECS; SUPPRESSOR: typeof G_SUPPRESSOR; ARMOR_LIST: typeof G_ARMOR_LIST; ARMORS: typeof G_ARMORS; ENEMIES: typeof G_ENEMIES; THEMES: typeof G_THEMES; HANGAR_ROWS: typeof G_HANGAR_ROWS; HANGAR_THEME: typeof G_HANGAR_THEME; PLAYER_COLORS: typeof G_PLAYER_COLORS; VENDOR_QUIPS: typeof G_VENDOR_QUIPS; CALIBERS: typeof G_CALIBERS; calOf: typeof G_calOf; stdMag: typeof G_stdMag; AMMO: typeof G_AMMO; AMMO_TYPES: typeof G_AMMO_TYPES; MUZZLE_V: typeof G_MUZZLE_V; SOUND_SPEED: typeof G_SOUND_SPEED; dragOf: typeof G_dragOf; roundSpeed: typeof G_roundSpeed; CHARGE_GR: typeof G_CHARGE_GR; GUN_KG: typeof G_GUN_KG; RECOIL_K: typeof G_RECOIL_K; RECOIL: typeof G_RECOIL; aimSway: typeof G_aimSway; recoilImpulse: typeof G_recoilImpulse; physRecoil: typeof G_physRecoil; GRAVITY: typeof G_GRAVITY; zeroOf: typeof G_zeroOf; sightH: typeof G_sightH; ROUND_LIFE: typeof G_ROUND_LIFE; ballistics: typeof G_ballistics; flight: typeof G_flight; zeroSlope: typeof G_zeroSlope; CLICK: typeof G_CLICK; boreTip: typeof G_boreTip; ballFor: typeof G_ballFor; AMMO_RARITY: typeof G_AMMO_RARITY; rollAmmo: typeof G_rollAmmo; ammoOk: typeof G_ammoOk; roundDef: typeof G_roundDef; gearTier: typeof G_gearTier; ENEMY_GEAR: typeof G_ENEMY_GEAR; }
+interface GameModules { TIER_NAMES: typeof G_TIER_NAMES; TIER_COLORS: typeof G_TIER_COLORS; CLASS_SND: typeof G_CLASS_SND; WEAPON_LIST: Record<string, any>[]; WEAPONS: typeof G_WEAPONS; EXPLOSIVES_OFF: typeof G_EXPLOSIVES_OFF; obtainable: typeof G_obtainable; AUTO_ONLY: typeof G_AUTO_ONLY; FIRE_MODES: typeof G_FIRE_MODES; MODE_NAME: typeof G_MODE_NAME; OPEN_BOLT: typeof G_OPEN_BOLT; chambered: typeof G_chambered; revolver: typeof G_revolver; REV: typeof G_REV; fullReload: typeof G_fullReload; BOLT_HOLD: typeof G_BOLT_HOLD; boltHold: typeof G_boltHold; loaded: typeof G_loaded; MAG_FAMILY: typeof G_MAG_FAMILY; BELT_FAMILY: typeof G_BELT_FAMILY; magFam: typeof G_magFam; magFits: typeof G_magFits; beltFed: typeof G_beltFed; GUN_SPECS: typeof G_GUN_SPECS; SUPPRESSOR: typeof G_SUPPRESSOR; ARMOR_LIST: Record<string, any>[]; ARMORS: typeof G_ARMORS; ENEMIES: typeof G_ENEMIES; THEMES: typeof G_THEMES; HANGAR_ROWS: typeof G_HANGAR_ROWS; HANGAR_THEME: typeof G_HANGAR_THEME; PLAYER_COLORS: typeof G_PLAYER_COLORS; VENDOR_QUIPS: typeof G_VENDOR_QUIPS; CALIBERS: typeof G_CALIBERS; calOf: typeof G_calOf; stdMag: typeof G_stdMag; AMMO: typeof G_AMMO; AMMO_TYPES: typeof G_AMMO_TYPES; MUZZLE_V: typeof G_MUZZLE_V; SOUND_SPEED: typeof G_SOUND_SPEED; dragOf: typeof G_dragOf; roundSpeed: typeof G_roundSpeed; CHARGE_GR: typeof G_CHARGE_GR; GUN_KG: typeof G_GUN_KG; RECOIL_K: typeof G_RECOIL_K; RECOIL: typeof G_RECOIL; aimSway: typeof G_aimSway; recoilImpulse: typeof G_recoilImpulse; physRecoil: typeof G_physRecoil; GRAVITY: typeof G_GRAVITY; zeroOf: typeof G_zeroOf; sightH: typeof G_sightH; ROUND_LIFE: typeof G_ROUND_LIFE; ballistics: typeof G_ballistics; flight: typeof G_flight; zeroSlope: typeof G_zeroSlope; CLICK: typeof G_CLICK; boreTip: typeof G_boreTip; ballFor: typeof G_ballFor; AMMO_RARITY: typeof G_AMMO_RARITY; rollAmmo: typeof G_rollAmmo; ammoOk: typeof G_ammoOk; roundDef: typeof G_roundDef; gearTier: typeof G_gearTier; ENEMY_GEAR: typeof G_ENEMY_GEAR; }

@@ -197,7 +197,7 @@ const G_Ballistics = (() => {
   }
   // A stack of layers, outside in: what's left of the round (ric: it glanced off the first), and spray: what flew on from it
   // that got out the back, what came off the round if it went on through, the chips off a hard plate it holed or nearly did
-  function stack(p, v, layers, cond, cosT, log) {
+  function stack(p, v, layers, cond, cosT, log?) {
     let absorbed = 0, blunt = 0, first = true;
     const spray = [];
     for (let i = 0; i < layers.length; i++) {
@@ -226,7 +226,7 @@ const G_Ballistics = (() => {
   // { v (0: stopped in it), ric (it glanced: along, off), t (where the round left it, or stopped), n, nOut (the far
   // face's normal), dev, bend, absorbed (joules left in it), fx }.
   const VOID_MAX = 0.9; // (thicker than that, a "void" wall's a mass of building, not a partition)
-  function crossSolid(map, p, v, h, o, u) {
+  function crossSolid(map, p, v, h, o, u): any {
     const sp = h.bar || G.World.span(map.world, h.solid, o, u), a = o.clone().addScaledVector(u, h.t), q = o.clone().addScaledVector(u, sp.t), path = Math.max(0, sp.t - h.t);
     const c = G.Materials.of(map, h.solid, a, q), inside = h.t <= 1e-6, cosT = inside ? 1 : Math.max(0.03, Math.abs(u.x * h.n[0] + u.y * h.n[1] + u.z * h.n[2]));
     const skinM = c.skin.reduce((n, l) => n + l[1], 0) / 1000 / cosT, seq = h.bar ? [['mild', h.bar.mm, 1]] : c.skin.map(([m, mm]) => [m, mm, cosT]), inner = path - skinM * (c.one ? 1 : 2);
@@ -845,7 +845,7 @@ const G_Ballistics = (() => {
 
   // ---------------------------------------------------------------- for the shop and the gunsmith
   // a gun's round's energy (J, all its pellets) d metres out, with this load (ball by default)
-  function energy(def, am, d = 10) {
+  function energy(def, am?, d = 10) {
     if (def.explosive || def.cls === 'BOW' && !CAL.bolt) return 0;
     const load = am || G.ballFor(G.calOf(def)), p = projectile(def, load), v = def.cls === 'RAIL' ? 2000 : G.roundSpeed(def, load, d) || 0;
     return 0.5 * p.m * v * v * (load !== 'slug' ? G.roundDef(def, load).pellets || 1 : 1); // (a load has its own count: twenty darts)

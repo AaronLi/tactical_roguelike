@@ -2494,7 +2494,7 @@ const G_GunModels = (() => {
   // (its magazine merged on its own, centred on itself, so a rig can take it off the gun and hold it: a reload,
   // a magazine check. g.userData.mag: the magazine's group; magHome: where it sits on the gun.)
   // (skin: its stickers, js/stickers.ts, on this one: the cached model's shared)
-  function world(def, skin) {
+  function world(def, skin?) {
     if (typeof def === 'string') def = G.Gunsmith.fromCode(def);
     let proto = worldCache.get(def.code);
     if (!proto) {
@@ -2563,7 +2563,7 @@ const G_GunModels = (() => {
   }
   // A world model's crossbow: whether its bolt's on the rail (bolt) and its string's cocked (cocked: back at the latch).
   // Other guns have no such parts. A bolt that's on the rail is always on a cocked string.
-  function setLoaded(g, bolt, cocked) {
+  function setLoaded(g, bolt, cocked?) {
     const x = g && g.userData.xb;
     if (!x) return;
     if (cocked == null) cocked = bolt;
@@ -2571,7 +2571,7 @@ const G_GunModels = (() => {
   }
 
   // the gunsmith's display model: every part as separate meshes (tagged by slot), stock included
-  function display(def, skin) { const k = kit(); const info = build(k, def); if (skin && skin.length) G.Stickers.decorate(k.g, skin); return { group: k.g, info }; }
+  function display(def, skin?) { const k = kit(); const info = build(k, def); if (skin && skin.length) G.Stickers.decorate(k.g, skin); return { group: k.g, info }; }
 
   return { M, build, viewmodel, world, display, roundDims, roundShape, setLoaded, quarrel, bipodPose };
 })();

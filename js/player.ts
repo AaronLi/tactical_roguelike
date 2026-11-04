@@ -3,7 +3,7 @@
 const KICK_H = 1.3;
 // The local player: input, movement, weapons, damage, revive/down state.
 const G_Me = {
-  keys: {},
+  keys: {} as Record<string, boolean>,
   // CQB pace (m/s): normal walk; weapon lowered (Space) to move quicker; steadied (Shift) to creep and
   // hold the gun still; crouch-walk
   SPEED: { walk: 1.9, low: 3.0, steady: 1.4, crouch: 1.3, prone: 0.55 },
@@ -51,7 +51,7 @@ const G_Me = {
   magSize(def) { return def.mag; },
   reserveMax(def) { return def.reserve; },
   // a weapon as built: def is the compiled build (stats changed by its parts), see js/parts.ts
-  makeWeapon(id, build) {
+  makeWeapon(id, build?) {
     const def = G.Gunsmith.compile(id, build);
     // ammo: the type of round in it (a magazine holds one type); a gun loaded a round at a time keeps the
     // order in its tube (the last one in is the next one fired)
@@ -1584,7 +1584,7 @@ const G_Me = {
   // Left click pulls the pin and draws back, letting go throws it; right click picks the throw: underhand (a lob
   // that rolls on along the floor), weak, or strong. While it's in your hand, its arc shows where it'll go off.
   // Out of them, the weapon comes back up. held: { kind, cock, str, readyT (bringing it up), throwT (the throw) }.
-  THROWS: [['Underhand', 6.5, 2.4], ['Weak', 10, 3], ['Strong', 15.5, 3.2]],
+  THROWS: [['Underhand', 6.5, 2.4], ['Weak', 10, 3], ['Strong', 15.5, 3.2]] as [string, number, number][],
   equip(i) {
     const kind = this.quick[i];
     if (this.dead || this.down || this.action || G.Game.hub || this.seat != null) return; // (no throwing in the hangar)
@@ -2527,6 +2527,14 @@ const G_Me = {
     };
   },
 };
-G.Me = G_Me;
+G.Me = G_Me as typeof G_Me & MeFields;
 
-interface GameModules { Me: typeof G_Me; }
+interface MeFields {
+  credits: number; weapons: Record<string, any>; stash: any; stats: { kills: number; dmg: number; hs: number; downs: number; revives: number; arrests: number }; rounds: any[]; stk: any;
+  sidearmChosen: boolean; kit: any; pockets: any; locker: any;
+  dead: boolean; down: boolean; out: boolean; hp: number; body: any; bleed: number | null; spectating: any; treating: Map<any, any>;
+  crouch: boolean; prone: boolean; lean: number; onGround: boolean; hspeed: number; lowReady: boolean; seat: any; zipRide: any; climb: any;
+  slot: any; reloading: boolean; reloadT: number; reloadTotal: number; reloadMode: string; adsT: number; aimScreen: { y: number; p: number };
+  inspectT: number; inspectDur: number; magChk: any; act: any; action: any; held: any; pressBuf: number; rHeldAt: number; navRearm: any;
+}
+interface GameModules { Me: typeof G_Me & MeFields; }

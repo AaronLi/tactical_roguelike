@@ -41,7 +41,7 @@
 const G_Homes = (() => {
   const U = G.U, F = G.Furniture, R = F.R;
   const CREAM = '#d9d0b0'; // (smoke-stained, every ceiling of his but the bathroom's)
-  const RESIDENTS = [
+  const RESIDENTS: any[] = [
     { id: 'harold', name: 'Harold Pruitt', home: 'flat', rate: 0.08,
       rest: { wall: '#d6c68c', paper: 1, ceil: CREAM, trim: '#7a4e2d', floor: { kind: 'carpet', color: '#6b4a3a' } },
       rooms: {

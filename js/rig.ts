@@ -202,7 +202,7 @@ const G_Rig = (() => {
     }
   }
   // A suspect's armour (G.ARMORS ids) as the gear an officer would wear: the same models for the same kit
-  function armourKit(vest, helmet, armored, face, ex) {
+  function armourKit(vest, helmet, armored, face?, ex?) {
     const V = { soft2: ['c.lite', 0, 0], soft: ['c.ghost', 0, 0], steel: ['c.patrol', 1, 2], ceramic: ['c.assault', 1, 3], assault: ['c.heavy', 1, 2] }[vest] || (armored ? ['c.heavy', 1, 2] : null);
     const H = { ach: 'h.ach', riflehelm: 'h.rifle', visor: 'h.visor' }[helmet] || (armored ? 'h.rifle' : 0);
     const X = (kind) => (ex || []).find((id) => G.Gear.DEFS[id] && G.Gear.DEFS[id].kind === kind) || 0;

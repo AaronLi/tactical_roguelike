@@ -96,7 +96,7 @@ const G_Callsigns = (() => {
     }
     return urls.get(key);
   }
-  const html = (id, cls) => `<img class="anim${cls ? ' ' + cls : ''}" src="${url(id)}" alt="${of(id).name}" title="${of(id).name}">`;
+  const html = (id, cls?) => `<img class="anim${cls ? ' ' + cls : ''}" src="${url(id)}" alt="${of(id).name}" title="${of(id).name}">`;
 
   // the patches, as textures: on the shoulder (the emblem) and high on the back (the emblem and their name)
   const tex = new Map();

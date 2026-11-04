@@ -961,7 +961,7 @@ const G_Server = {
     G.Net.broadcast({ t: 'dpart', i: d.id, pt });
     if (pt === 'h' && !d.open) this.setDoor(d.id, true, true);
     if (hp[0] <= 0 && hp[1] <= 0 && hp[2] <= 0) {
-      const fall = [d.open ? 1 : 0, [dir[0], dir[1]], (Math.random() * 1e9) | 0];
+      const fall: [number, number[], number] = [d.open ? 1 : 0, [dir[0], dir[1]], (Math.random() * 1e9) | 0];
       (this.fallen = this.fallen || []).push([d.id, ...fall]);
       G.Damage.fall(this.map, d, ...fall);
       G.Net.broadcast({ t: 'dfall', i: d.id, f: fall });
@@ -2070,5 +2070,7 @@ const G_Server = {
   },
   BODY_R: 0.24,
 };
-G.Server = G_Server;
-interface GameModules { Server: typeof G_Server; }
+// (what it gets as it runs: the dead, until secured)
+interface ServerFields { bodies: Map<any, any>; }
+G.Server = G_Server as typeof G_Server & ServerFields;
+interface GameModules { Server: typeof G_Server & ServerFields; }
