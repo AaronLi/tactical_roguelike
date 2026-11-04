@@ -2317,7 +2317,9 @@ const G_GunModels = (() => {
 
   // the third-person geometry: the baked model when ?bakedGuns has it loaded (js/glb.ts, a default build), else the recipe's
   function worldModel(def: any): { group: THREE.Object3D; info: any } {
-    const baked = G.Models && G.Models.displayBaked(def);
+    // (a bipod's legs swing down about their hinges (js/rig.ts), and a baked model doesn't have them as parts yet (the contract's part_bipod
+    // is reserved): a gun with a bipod (an option, or the GM6's own) is built from the recipe)
+    const sp: any = G.Gunsmith.modelSpec(def), baked = !(sp && (sp.bipod || sp.fg === 'bipod' || sp.rcv === 'gm6')) && G.Models && G.Models.displayBaked(def);
     if (baked) return baked;
     const k = kit();
     return { group: k.g, info: build(k, def) };

@@ -286,6 +286,14 @@ const G_Viewmodel = (() => {
     group.traverse((o: any) => {
       if (!o.isMesh) return;
       const geo = (o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone());
+      // (a model read from a file may have its positions and normals quantised: 16-bit and 8-bit integers, normalised; the merge is in floats)
+      for (const name of ['position', 'normal']) {
+        const a = geo.attributes[name] as THREE.BufferAttribute;
+        if (a.array instanceof Float32Array && !a.normalized) continue;
+        const f = new Float32Array(a.count * a.itemSize);
+        for (let i = 0; i < a.count; i++) { f[i * 3] = a.getX(i); f[i * 3 + 1] = a.getY(i); f[i * 3 + 2] = a.getZ(i); }
+        geo.setAttribute(name, new T.BufferAttribute(f, 3));
+      }
       geo.applyMatrix4(o.matrixWorld);
       for (const name of Object.keys(geo.attributes)) if (name !== 'position' && name !== 'normal') geo.deleteAttribute(name);
       if (!byMat.has(o.material)) byMat.set(o.material, []);
