@@ -197,6 +197,12 @@ A one-off colour that isn't in the catalogue is named `m_<rrggbb>` (hex colour) 
 **Extras keys:** root: `info`, `gun`; mesh: `slot`, `display`; part: `part`, `anchors`.
 <!-- contract:end -->
 
+## Authored models (Blender)
+
+A gun with `models/<id>/<id>.glb` is baked from that file instead of its recipe (for its **default build**; other builds still come from the recipe until per-part packs exist). The baker turns the root's `extras.info_json` (a string: Blender custom properties can't hold nested lists) into `extras.info`, drops extras on mesh data, compresses it like the others and validates it against the same contract; `index.json` marks it `authored`.
+
+`models/fal/` is the first: `build_fal.py` builds the gun in Blender from `trace.json` (outlines and column profiles traced off a side-on photo, source and licence inside), then saves `fal.blend` and exports `fal.glb`. Run it in Blender (`exec(open(r'<repo>/models/fal/build_fal.py').read(), {'FAL_DIR': r'<repo>/models/fal'})`, or `blender -b -P models/fal/build_fal.py`), then `node tools/bake_models.mjs fal`. In Blender: X = right, Y = forward, Z = up, metres; objects carry the contract's extras as custom properties (`slot` on meshes, `part` on `part_<key>` empties, `gun` and `info_json` on the root empty named after the gun); material names are the catalogue's.
+
 ## Baked files
 
 ```
