@@ -79,6 +79,7 @@ interface GunModelInfo {
   breech?: { at: Vec2; pitch: number; long: string | null } | null; ch?: Vec3 | null; bolt?: Vec3 | null; cheek?: number | null; recoilBarrel?: number | null;
   pistol?: boolean | null; slide?: Vec3 | null; cylAt?: Vec3 | null; load?: { at: Vec2[]; pitch: number } | null; cup?: Vec3 | null; magTop?: boolean | null;
   quarrelMats?: Record<string, unknown> | null; mounts?: Record<string, Vec3> | null;
+  reflex?: { f: number; y: number; w: number; h: number; round?: boolean; kind: string } | null; pip?: { f: number; y: number; r: number; parent?: string; pos?: Vec3 } | null;
 }
 
 // ---- the shape language the info fields are written in (the validator and the JSON Schema both walk it) --------------
@@ -203,6 +204,8 @@ const INFO_FIELDS: { [K in keyof GunModelInfo]-?: Field } = {
   magTop: F('True when the hand takes the magazine from its top instead of its base.', { t: 'bool' }, true),
   quarrelMats: F('A crossbow\'s bolt materials as three.js Material JSON (free-form; viewmodel only).', { t: 'map', of: { t: 'free' } }, true),
   mounts: F('Mount points where a swappable part sits, `mount_<slot>` -> [forward, up, right] metres of the part\'s origin (e.g. mount_muzzle: where a muzzle device screws on). Normally assembled from the parts\' anchors (see GUN_MODEL_CONTRACT.anchors); a whole-gun bake may list them directly.', { t: 'map', of: { t: 'vec', n: 3 } }, true),
+  reflex: F('A reflex sight\'s window, where the viewmodel puts the collimated reticle.', { t: 'obj', props: { f: num('Forward of the window, metres.'), y: num('Height of the window centre, metres.'), w: num('Window width, metres.'), h: num('Window height, metres.'), round: F('True: a round window.', { t: 'bool' }, true), kind: F('Reticle kind (dot, dotG, holo, cdot...).', { t: 'str' }) } }, true),
+  pip: F('A scope\'s picture-in-picture lens: where it sits and how big (the viewmodel draws the world through it).', { t: 'obj', props: { f: num('Forward of the lens, metres.'), y: num('Height of the lens centre, metres.'), r: num('Lens radius, metres.'), parent: F('The animated part the lens rides on (e.g. magn).', { t: 'str' }, true), pos: vec3('The lens position in the parent part\'s frame.', true) } }, true),
 };
 
 /** Info fields a part may provide as anchors (the rest of info is the whole gun's). */

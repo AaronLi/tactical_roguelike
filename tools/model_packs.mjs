@@ -86,68 +86,124 @@ function devOf(norm, rigid, F, st, actual) {
   return m;
 }
 
-/** Which slots shape which tags, and the offsets: the closed model of one platform. See the file comment. */
+/**
+ * Which slots shape which tags, and the offsets: the closed model of one platform. See the file comment.
+ * Two kinds of offset: RIGID (a part moves another slot's unit: delta[t][s][part], measured off the reference build and filled out from the other bases)
+ * and STRETCH (a provider slot s, normally the barrel, lengthens a unit, e.g. a handguard or a front sight: the provider's intrinsic front displacement
+ * A[s][part], measured on the tag that stretches with gain 1, times each PACK's own gain and region, measured on the pack with a probe build).
+ */
 export function analyze(C) {
   const { id, sw, bases, builds } = C, Rb = bases[R].build, Rp = (s) => Rb[s] || '';
   const tagsAll = new Set(); for (const B of builds) for (const t of Object.keys(B.tags)) tagsAll.add(t);
   const slotsAll = new Set(); for (const B of builds) for (const s of Object.keys(B.build)) slotsAll.add(s);
   const depShape = {}, depMove = {}, obs = {}, delta = {};
   for (const t of tagsAll) { depShape[t] = new Set(); depMove[t] = new Set(); obs[t] = []; delta[t] = {}; }
+  const kinds = {}; // t|s -> { move, warp }
   for (const e of sw.all) {
     if (e.slot == null) continue;
     const base = bases[e.base];
     for (const t of tagsAll) {
       const d = diffUnits(base.tags[t], e.B.tags[t]);
-      if (d.kind === 'same') { if (e.base === R) (delta[t][e.slot] = delta[t][e.slot] || {})[e.part] = { kind: 'move', d: [0, 0, 0] }; continue; }
       obs[t].push({ e, d });
-      if (d.kind === 'shape') depShape[t].add(e.slot); else { depMove[t].add(e.slot); if (e.base === R) (delta[t][e.slot] = delta[t][e.slot] || {})[e.part] = d; }
+      if (d.kind === 'shape') depShape[t].add(e.slot);
+      else if (d.kind !== 'same') { depMove[t].add(e.slot); const k = kinds[t + '|' + e.slot] = kinds[t + '|' + e.slot] || {}; k[d.kind] = (k[d.kind] || 0) + 1; }
     }
   }
+  // the provider's own stretch, measured on the tag that follows it with gain 1: the one with the most warps off the reference build
+  const A = {}, canon = {};
+  { const wc = {};
+    for (const t of tagsAll) for (const { e, d } of obs[t]) if (d.kind === 'warp' && e.base === R) { const w = (wc[e.slot] = wc[e.slot] || {}); w[t] = (w[t] || 0) + 1; }
+    for (const [s, w] of Object.entries(wc)) {
+      const t = Object.keys(w).sort((a, b) => w[b] - w[a])[0]; canon[s] = t; const m = (A[s] = new Map([[Rp(s), 0]]));
+      for (const { e, d } of obs[t]) if (e.slot === s && e.base === R) m.set(e.part, d.kind === 'warp' ? d.front[0] : 0);
+    } }
+  const stretchSlot = {};
+  for (const t of tagsAll) {
+    const cands = {};
+    for (const { e, d } of obs[t]) if (d.kind === 'warp') cands[e.slot] = (cands[e.slot] || 0) + 1;
+    const ss = Object.keys(cands).sort((a, b) => cands[b] - cands[a]);
+    for (const s of ss) if (!A[s] || s !== ss[0]) depShape[t].add(s);
+    if (ss.length && A[ss[0]] && !depShape[t].has(ss[0])) stretchSlot[t] = ss[0];
+  }
   for (const t of tagsAll) for (const s of depShape[t]) depMove[t].delete(s);
-  const offsetOf = (t, b) => {
-    const rigid = [0, 0, 0]; let F = 0;
+  // rigid offsets: off the reference build, then filled out through the other bases (a unit absent or inert at the reference)
+  for (const t of tagsAll) {
     for (const s of depMove[t]) {
-      const p = b[s] || ''; if (p === Rp(s)) continue;
-      const d = delta[t][s] && delta[t][s][p]; if (!d) return { ok: false, slot: s };
-      if (d.kind === 'move') { rigid[0] += d.d[0]; rigid[1] += d.d[1]; rigid[2] += d.d[2]; } else F += d.front[0];
+      if (s === stretchSlot[t]) continue;
+      const m = (delta[t][s] = new Map([[Rp(s), [0, 0, 0]]])), list = obs[t].filter(({ e, d }) => e.slot === s && (d.kind === 'move' || d.kind === 'same'));
+      const vec = (d) => (d.kind === 'move' ? d.d : [0, 0, 0]);
+      for (const { e, d } of list) if (e.base === R) m.set(e.part, vec(d));
+      for (let changed = true; changed;) {
+        changed = false;
+        for (const { e, d } of list) {
+          const p0 = bases[e.base].build[s] || '', v = vec(d), a = m.get(p0), b = m.get(e.part);
+          if (a && !b) { m.set(e.part, [a[0] + v[0], a[1] + v[1], a[2] + v[2]]); changed = true; } else if (b && !a) { m.set(p0, [b[0] - v[0], b[1] - v[1], b[2] - v[2]]); changed = true; }
+        }
+      }
     }
-    return { ok: true, rigid, F };
+  }
+  const rigidOf = (t, b) => {
+    const rigid = [0, 0, 0];
+    for (const s of depMove[t]) {
+      if (s === stretchSlot[t]) continue;
+      const p = b[s] || ''; if (p === Rp(s)) continue;
+      const d = delta[t][s] && delta[t][s].get(p); if (!d) return { ok: false, slot: s };
+      rigid[0] += d[0]; rigid[1] += d[1]; rigid[2] += d[2];
+    }
+    return { ok: true, rigid };
   };
   const state = {};
   let iter = 0;
   for (; iter < 16; iter++) {
     let changed = false;
     for (const t of tagsAll) {
-      const dep = [...depShape[t]].sort(), dm = [...depMove[t]];
-      // stretch regions, by pack key: from the warps observed against a base's pack
-      const region = new Map();
-      for (const { e, d } of obs[t]) if (d.kind === 'warp' && depMove[t].has(e.slot)) region.set(keyStr(bases[e.base].build, dep), { from: d.from, to: d.to });
-      const dev = (b) => dm.filter((s) => (b[s] || '') !== Rp(s)).length;
+      const dep = [...depShape[t]].sort(), ss = stretchSlot[t] && !depShape[t].has(stretchSlot[t]) ? stretchSlot[t] : null;
+      const mv = [...depMove[t]].filter((s) => s !== ss).concat(ss ? [ss] : []);
+      const dev = (b) => mv.filter((s) => (b[s] || '') !== Rp(s)).length;
       const caps = new Map();
       for (const B of builds) { const k = keyStr(B.build, dep), c = caps.get(k); if (!c || dev(B.build) < dev(c.build)) caps.set(k, B); }
-      const norms = new Map(); // pack key -> { norm unit, off, st }
+      const norms = new Map(); // pack key -> { norm, off: { rigid, F }, st: { from, to } | null, g }
       const add = new Set();
+      const Aof = (B) => (ss ? A[ss].get(B.build[ss] || '') : 0);
       for (const [k, c] of caps) {
-        const off = offsetOf(t, c.build), st = region.get(k) || null;
-        if (!off.ok) { add.add(off.slot); norms.set(k, null); continue; }
-        if (off.F && !st) { for (const s of dm) if ((c.build[s] || '') !== Rp(s) && delta[t][s] && delta[t][s][c.build[s] || ''] && delta[t][s][c.build[s] || ''].kind === 'warp') add.add(s); norms.set(k, null); continue; }
-        norms.set(k, { norm: moveUnit(c.tags[t], off.rigid, off.F, st, -1), off, st });
+        const r = rigidOf(t, c.build); if (!r.ok) { add.add(r.slot); norms.set(k, null); continue; }
+        let g = 0, st = null;
+        const Ac = Aof(c);
+        if (ss && c.tags[t]) {
+          if (Ac === undefined) { if (process.env.DBG === t) console.error('NOAC', ss, c.build[ss], [...A[ss].keys()].join()); add.add(ss); norms.set(k, null); continue; }
+          // probe: the capture with the provider's part with the most different stretch; how does this pack follow it?
+          const alts = [...A[ss]].filter(([, a]) => Math.abs(a - Ac) > 1e-3).sort((x, y) => Math.abs(y[1] - Ac) - Math.abs(x[1] - Ac));
+          let X = null, aq = 0;
+          for (const [q, a] of alts.slice(0, 4)) { const nb = { ...c.build }; if (q) nb[ss] = q; else delete nb[ss]; C.GS.prune(id, nb); if ((nb[ss] || '') === q) { X = C.getB(nb); aq = a; break; } }
+          if (X) {
+            const d = diffUnits(c.tags[t], X.tags[t]);
+            if (d.kind === 'same') g = 0;
+            else if (d.kind === 'warp') { g = d.front[0] / (aq - Ac); st = { from: d.from, to: d.to - g * Ac }; }
+            else { if (process.env.DBG === t) console.error('PROBE', d.kind, c.k.slice(0,60), 'q', aq); add.add(ss); norms.set(k, null); continue; }
+          }
+        }
+        const F = g * (Ac || 0);
+        norms.set(k, { norm: moveUnit(c.tags[t], r.rigid, F, st, -1), off: { rigid: r.rigid, F }, st: g ? st : null, g });
       }
       for (const B of builds) {
         const k = keyStr(B.build, dep), p = norms.get(k), c = caps.get(k);
         let ok = !!p;
         if (ok) {
-          const off = offsetOf(t, B.build);
-          if (!off.ok) { add.add(off.slot); continue; }
-          if (off.F && !p.st) ok = false;
-          else ok = devOf(p.norm, off.rigid, off.F, p.st, B.tags[t]) <= (off.F ? STRETCH_TOL : GEO_TOL);
+          const r = rigidOf(t, B.build); if (!r.ok) { add.add(r.slot); continue; }
+          const Ab = Aof(B); if (ss && Ab === undefined) { add.add(ss); continue; }
+          const F = p.g * (Ab || 0);
+          ok = devOf(p.norm, r.rigid, F, p.st, B.tags[t]) <= (F ? STRETCH_TOL : GEO_TOL);
         }
-        if (!ok) {
+        if (!ok) { if (process.env.DBG && t === process.env.DBG && iter === 0) { const r2 = rigidOf(t, B.build); console.error('MISMATCH', t, B.k.slice(0, 80), 'cap', c.k.slice(0,80), 'p', !!p, p && p.g, p && p.st, r2.ok, p && r2.ok && devOf(p.norm, r2.rigid, p.g * (Aof(B) || 0), p.st, B.tags[t])); }
           const cand = [...new Set([...Object.keys(B.build), ...Object.keys(c.build)])].filter((s) => (B.build[s] || '') !== (c.build[s] || '') && !depShape[t].has(s)), pref = cand.filter((s) => depMove[t].has(s));
           if (pref.length) { for (const s of pref) add.add(s); continue; }
           // which of the slots that differ is to blame? change them one at a time, then two at a time, from the capture
           const step = (slots) => { const nb = { ...c.build }; for (const s of slots) { if (B.build[s]) nb[s] = B.build[s]; else delete nb[s]; } C.GS.prune(id, nb); return C.getB(nb); };
-          const good = (X) => { const kx = keyStr(X.build, dep), px = norms.get(kx); if (!caps.has(kx)) return true; if (!px) return false; const o = offsetOf(t, X.build); return o.ok && !(o.F && !px.st) && devOf(px.norm, o.rigid, o.F, px.st, X.tags[t]) <= (o.F ? STRETCH_TOL : GEO_TOL); };
+          const good = (X) => {
+            const kx = keyStr(X.build, dep), px = norms.get(kx); if (!caps.has(kx)) return true; if (!px) return false;
+            const r = rigidOf(t, X.build); if (!r.ok) return false; const Ax = Aof(X); if (ss && Ax === undefined) return false; const F = px.g * (Ax || 0);
+            return devOf(px.norm, r.rigid, F, px.st, X.tags[t]) <= (F ? STRETCH_TOL : GEO_TOL);
+          };
           const culprits = cand.filter((s) => !good(step([s])));
           if (culprits.length) { for (const s of culprits) add.add(s); continue; }
           let found = false;
@@ -157,40 +213,38 @@ export function analyze(C) {
       }
       for (const s of add) if (s) { depShape[t].add(s); depMove[t].delete(s); changed = true; }
       const sweepKeys = new Set(); for (const B of builds) if (!B.extra) sweepKeys.add(keyStr(B.build, dep));
-      state[t] = { dep, caps, norms, region, sweepKeys };
+      state[t] = { dep, caps, norms, sweepKeys, ss };
     }
     if (!changed) break;
   }
   if (iter >= 16) throw new Error(id + ': the coupling analysis did not converge');
-  return { C, tagsAll, slotsAll, depShape, depMove, delta, state, iter };
+  return { C, tagsAll, slotsAll, depShape, depMove, delta, A, canon, state, iter };
 }
 
 /** The platform index (the contract's PartsIndex, without file names) and the in-memory packs, from an analysis. */
 export function indexOf(A, Models, src) {
-  const { C, tagsAll, slotsAll, depShape, depMove, delta, state } = A, { bases, builds, sw } = C, Rb = bases[R].build;
-  const tags = {}, packs = [];
+  const { C, tagsAll, slotsAll, depShape, depMove, delta, A: Aprov, state } = A, { bases, builds, sw } = C, Rb = bases[R].build;
+  const tags = {}, packs = [], stretchTags = [];
   for (const t of [...tagsAll].sort()) {
-    const { dep, caps, norms, region, sweepKeys } = state[t], entries = [];
+    const { dep, caps, norms, sweepKeys, ss } = state[t], entries = []; let stretches = false;
     for (const [k, c] of caps) {
       if (!sweepKeys.has(k)) continue; // (a combination only the random builds showed: no pack; the game falls back to the recipe there)
       const unit = c.tags[t], p = norms.get(k);
       const e = { key: k === '' && !dep.length ? [] : k.split('|'), dep, file: null, capture: c, unit: !!unit };
       if (dep.length === 1 && k === '') e.key = [''];
       if (unit) {
-        const st = region.get(k), anyStretch = [...depMove[t]].some((s) => Object.values(delta[t][s] || {}).some((d) => d.kind === 'warp'));
-        e.stretch = st && anyStretch ? { from: st.from, to: st.to, gain: 1 } : null;
+        e.stretch = p.st && p.g ? { from: p.st.from, to: p.st.to, gain: p.g } : null; if (e.stretch) stretches = true;
         e.norm = p.norm; e.off = p.off; e.id = packs.length; packs.push({ tag: t, entry: e });
       }
       entries.push(e);
     }
-    tags[t] = { dep, packs: entries };
+    tags[t] = { dep, packs: entries }; if (ss && stretches) stretchTags.push([t, ss]);
   }
   // anchors: what a part does to the slots it only moves, from the swaps off the reference build
   const anchors = {};
-  for (const t of tagsAll) for (const s of depMove[t]) for (const [part, d] of Object.entries(delta[t][s] || {})) {
-    const a = (anchors[Models.slotKey(s, part)] = anchors[Models.slotKey(s, part)] || {});
-    if (d.kind === 'move') a['mount_' + t] = d.d.map(r6); else a['stretch_' + t] = d.front.map(r6);
-  }
+  const put = (s, part, k, v) => { if (v.every((x) => Math.abs(x) < 1e-9)) return; const a = (anchors[Models.slotKey(s, part)] = anchors[Models.slotKey(s, part)] || {}); a[k] = v.map(r6); };
+  for (const t of tagsAll) for (const s of depMove[t]) if (s !== state[t].ss) for (const [part, d] of delta[t][s] || []) put(s, part, 'mount_' + t, d);
+  for (const [t, s] of stretchTags) for (const [part, a] of Aprov[s]) put(s, part, 'stretch_' + t, [a, 0, 0]);
   // info: the reference builds' leaves and each swap's deltas from its base
   const ixBases = bases.map((B) => ({ build: { ...B.build }, info: B.leaves }));
   const deltas = {};

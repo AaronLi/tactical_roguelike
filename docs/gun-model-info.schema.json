@@ -637,6 +637,121 @@
         }
       ],
       "description": "Mount points where a swappable part sits, `mount_<slot>` -> [forward, up, right] metres of the part's origin (e.g. mount_muzzle: where a muzzle device screws on). Normally assembled from the parts' anchors (see GUN_MODEL_CONTRACT.anchors); a whole-gun bake may list them directly."
+    },
+    "reflex": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "f": {
+              "type": "number",
+              "description": "Forward of the window, metres."
+            },
+            "y": {
+              "type": "number",
+              "description": "Height of the window centre, metres."
+            },
+            "w": {
+              "type": "number",
+              "description": "Window width, metres."
+            },
+            "h": {
+              "type": "number",
+              "description": "Window height, metres."
+            },
+            "round": {
+              "oneOf": [
+                {
+                  "type": "boolean",
+                  "description": "True: a round window."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "True: a round window."
+            },
+            "kind": {
+              "type": "string",
+              "description": "Reticle kind (dot, dotG, holo, cdot...)."
+            }
+          },
+          "required": [
+            "f",
+            "y",
+            "w",
+            "h",
+            "kind"
+          ],
+          "additionalProperties": false,
+          "description": "A reflex sight's window, where the viewmodel puts the collimated reticle."
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "A reflex sight's window, where the viewmodel puts the collimated reticle."
+    },
+    "pip": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "f": {
+              "type": "number",
+              "description": "Forward of the lens, metres."
+            },
+            "y": {
+              "type": "number",
+              "description": "Height of the lens centre, metres."
+            },
+            "r": {
+              "type": "number",
+              "description": "Lens radius, metres."
+            },
+            "parent": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "description": "The animated part the lens rides on (e.g. magn)."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The animated part the lens rides on (e.g. magn)."
+            },
+            "pos": {
+              "oneOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "minItems": 3,
+                  "maxItems": 3,
+                  "description": "The lens position in the parent part's frame."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The lens position in the parent part's frame."
+            }
+          },
+          "required": [
+            "f",
+            "y",
+            "r"
+          ],
+          "additionalProperties": false,
+          "description": "A scope's picture-in-picture lens: where it sits and how big (the viewmodel draws the world through it)."
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "A scope's picture-in-picture lens: where it sits and how big (the viewmodel draws the world through it)."
     }
   },
   "required": [

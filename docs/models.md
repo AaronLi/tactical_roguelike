@@ -1,23 +1,23 @@
 # glTF gun models
 
-The guns are built procedurally (`js/gunmodels.ts`). This pipeline bakes them to `.glb` files and loads those back, behind a flag, so that (later) models can be made in Blender or assembled from per-part packs. First milestone: whole default guns, `display()` only.
+The guns are built procedurally (`js/gunmodels.ts`). This pipeline bakes them to `.glb` files and loads those back, behind a flag, so that (later) models can be made in Blender or assembled from per-part packs. Milestone 1: whole default guns. Milestone 2: per-part packs and runtime assembly of any build (below).
 
 ## Commands
 
 | | |
 | --- | --- |
 | `npm install` | installs three@0.149.0 (exporter, node only), gltf-transform and meshoptimizer (dev dependencies) |
-| `npm run bake:models` | `tsc`, then bakes every platform's default build to `assets/models/guns/<id>.glb` + `index.json`, validates each against the contract, and writes `assets/vendor/three-global.js` |
+| `npm run bake:models` | `tsc`, then bakes every platform's default build to `assets/models/guns/<id>.glb` + `index.json` and every platform's per-part packs to `assets/models/parts/<id>/` (verifying that every build of the sweep assembles from them), validates each against the contract, and writes `assets/vendor/three-global.js`. `--guns` / `--parts` for one half, ids restrict both, `--check` lists stale ones |
 | `node tools/bake_models.mjs m4 g19` | bakes just those guns; `--check` lists the bakes that are stale against the current code |
 | `npm run check:models -- <file.glb ...>` | validates hand-made or edited models and prints what is missing or wrong |
 | `npm run check:models -- --write` | regenerates `docs/gun-model-info.schema.json` and the contract tables below |
-| `npm run test:models` | `tsc` + `check:models --selftest`: schema and docs are current, the material names are the game's catalogue, every baked gun passes |
+| `npm run test:models` | `tsc` + `check:models --selftest` (schemas and docs current, material names are the catalogue, every baked gun, platform index and pack file passes) + `check_models.test.mjs` (negative tests) + `check_models_assembly.mjs` (assembles every sweep build from the real pack files and compares with the recipe: below) |
 
 `assets/models/` is git-ignored for now: bake locally.
 
 ## The flags
 
-- `?bakedGuns`: `G.Models.displayBaked(def, skin)` (js/glb.ts, called first thing in `G.GunModels.display`) returns the baked model for a gun's **default build**, else `null` and the procedural one is built. Clones the cached glTF scene, puts the catalogue's material back by name (so the shared materials and the stipple/chequer bump maps are the game's own), rebuilds `info.anim` node references from node names and applies stickers. All 79 are preloaded in the background once the loader is up (`G.Models.preload(ids)`; `G.Models.loaded(id)`).
+- `?bakedGuns`: `G.Models.displayBaked(def, skin)` (js/glb.ts, called first thing in `G.GunModels.display`) returns the baked whole gun for a **default build**, else the model **assembled from the platform's packs** (`G.Models.assemble`) when they are loaded, else `null` and the procedural one is built (and the platform's packs are fetched in the background so the next one is). Whole guns: the cached glTF scene is cloned, the catalogue's material put back by name (so the shared materials and the stipple/chequer bump maps are the game's own), `info.anim` rebuilt from node names, stickers applied. All 79 whole guns are preloaded once the loader is up (`G.Models.preload(ids)`; `G.Models.loaded(id)`). Packs: `G.Models.ensure(def)` loads one build's, `G.Models.preloadPlatform(id)` all of a platform's.
 - `?checkModels`: validates each model in the browser as it loads (console errors and warnings).
 - `index.html` has an importmap mapping `three` to `assets/vendor/three-global.js`, a generated shim re-exporting the page's global `THREE` (the CDN's r149), so the ES-module `GLTFLoader` builds the game's own classes (two copies of three break `instanceof`). A module script loads `GLTFLoader` and the meshopt decoder from jsDelivr and exposes `G.GLB = { ready, load(url) }` (cached). Classic scripts never need it at parse time.
 
@@ -80,6 +80,11 @@ A mesh `display_ammo` (extras `{ slot, display: { width: 128, height: 32 } }`, *
 | `pump` | A pump's forend. |
 | `cap` | A cap on the tube or barrel end. |
 | `motor` | A rotary gun's motor housing. |
+| `tac` | A light or laser on the right-hand rail. |
+| `tacL` | A light or laser on the left-hand rail. |
+| `magnifier` | A magnifier behind a reflex sight (the node part_magn flips it aside). |
+| `railmount` | A clamp-on rail mount (a collar round the barrel with a short rail). |
+| `loader` | A shotgun's side-saddle or loader fittings. |
 
 **Animated parts** (`part_<key>`, listed in `info.anim`):
 
@@ -96,6 +101,7 @@ A mesh `display_ammo` (extras `{ slot, display: { width: 128, height: 32 } }`, *
 | `part_brk` | A break-action barrel group that tips open on its hinge. |  |
 | `part_barrel` | A long-recoil barrel (runs back by info.recoilBarrel). |  |
 | `part_cover` | A belt-fed gun's feed cover. |  |
+| `part_magn` | A magnifier that flips aside. |  |
 | `part_spin` | A rotary barrel group that spins. |  |
 | `part_bipod` | Reserved: a bipod's legs. |  |
 | `part_quarrel` | A crossbow bolt, the whole assembly. |  |
@@ -132,6 +138,8 @@ A mesh `display_ammo` (extras `{ slot, display: { width: 128, height: 32 } }`, *
 | `magTop` | no | boolean | True when the hand takes the magazine from its top instead of its base. |
 | `quarrelMats` | no | object | A crossbow's bolt materials as three.js Material JSON (free-form; viewmodel only). |
 | `mounts` | no | object | Mount points where a swappable part sits, `mount_<slot>` -> [forward, up, right] metres of the part's origin (e.g. mount_muzzle: where a muzzle device screws on). Normally assembled from the parts' anchors (see GUN_MODEL_CONTRACT.anchors); a whole-gun bake may list them directly. |
+| `reflex` | no | object | A reflex sight's window, where the viewmodel puts the collimated reticle. |
+| `pip` | no | object | A scope's picture-in-picture lens: where it sits and how big (the viewmodel draws the world through it). |
 
 **Materials** (the mesh's material NAME): The material NAME is what counts: at load the catalogue's material of that name replaces whatever the file carries (its colours, roughness, emissive, transparency and bump map come from the game), so the game keeps its shared materials and its look. Give meshes the catalogue name; colours in the file only matter for anonymous materials and for viewing the file elsewhere.
 
@@ -187,37 +195,61 @@ A mesh `display_ammo` (extras `{ slot, display: { width: 128, height: 32 } }`, *
 - Assembly (runtime assembly of per-part packs, milestone 2; the same rule applies to the node tree of a whole-gun file) starts from the receiver's `info` and visits the parts in the gunsmith's slot order.
 - Every provided position is first moved into the gun's frame: the providing node's transform in the assembled gun applied to the position (the part's placement), then re-expressed as [forward, up, right] = [-z, y, x].
 - `muzzles` is a LIST built from whichever parts provide it: if any part provides `muzzles`, the gun's `info.muzzles` is the concatenation of those parts' lists (tree order) and the receiver's own default is dropped; if none does, the receiver's is kept. A barrel block with 6 barrels provides 6 muzzles.
-- `mount_<slot>` anchors are collected into `info.mounts` (key `mount_<slot>`); a part that sits in <slot> has its origin placed at that mount. A later provider of the same mount overrides the earlier.
+- `mount_<slot>` anchors are OFFSETS: the displacement [forward, up, right] metres of the part in <slot> from where its pack stores it (a pack stores a part where it sits when every other part is the platform's reference one). Every provider's offsets for a slot ADD UP (a barrel and a handguard may both move a light); the sum is `info.mounts.mount_<slot>` and the whole part moves by it. `stretch_<slot>` anchors are likewise additive: see packs.stretch.
 - Every other anchor (grip, support, magAt, port, ch, bolt, slide, cylAt, cup, cheek, chamberAt) is single-valued: a part's value overrides the receiver's and an earlier part's (the last provider in slot order wins; the validator warns when two parts of one gun both provide it).
 - muzzles: A gun can have MORE THAN ONE muzzle (an over/under, a Metal Storm-style barrel block): `info.muzzles` is always a list of at least one [forward, up, right]; consumers must iterate it and never assume entry [0] is the only one.
 - example: `{"name":"part_barrel","extras":{"part":"barrel","anchors":{"muzzles":[[0.4,0.012,-0.012],[0.4,0.012,0.012]],"mount_muzzle":[0.4,0,0]}}}`
 
+**Per-part packs** (assets/models/parts, milestone 2):
+
+- layout: assets/models/parts/<platform>/index.json and assets/models/parts/<platform>/<slot>/<file>.glb. One pack per (platform, slot) and combination of the parts that shape it; the platform's whole-gun files (assets/models/guns/<id>.glb) stay the fast path for the default build. One file per pack and not one per platform: a swap costs one small request, and a platform's packs together are many times what any one build needs.
+- pack: A pack is a glTF binary holding ONE slot's meshes (every mesh extras.slot = that slot) as the slot looks on that platform with the parts named in its key fitted, in the gun's frame (mesh positions as in a whole-gun file). The slot "base" is the receiver and everything fixed (it also carries the animated parts nothing else owns: part_handle, part_bolt, ...). A pack may hold no meshes at all only if the index says its file is null (the slot is empty then).
+- root: The pack's one root node is named `<platform>.<slot>.<n>` and has extras.pack = { platform, tag (the slot), key: { <slotOfBuild>: <partId> } }. No transform, no info. Its children are meshes (`<slot>_<n>`), part_ nodes and group_ nodes, all flat directly under it.
+- nodes: part_ and group_ nodes sit directly under the root with their position = the pivot in the GUN'S frame (not relative to a parent); extras.parent names the node they nest under in the assembled gun (absent: the gun's root). extras.owner = false means the pivot belongs to another pack (e.g. an optic's meshes inside the slide's part_slide: the slide pack owns the node, the optic pack repeats it so the meshes know where it is); the assembler takes the node from its owner (default: owner) and re-expresses every other pack's meshes against it. Group nodes are named `group_<slot>_<n>` so they are unique across packs.
+- index: The platform index.json is { version, platform, src, tags: { <slot>: { dep: [<build slot>...], packs: [{ key: [<partId or "*">...], file: <file or null>, stretch?, tris, bytes }] } }, anchors: { "<buildSlot>=<partId>": { mount_<slot>: [f,u,r], stretch_<slot>: [f,u,r] } }, bases: [3 reference builds with their info], deltas: { "<buildSlot>=<partId>": [per base: { <info leaf path>: number (add) | { set } | { del } } | null] }, exact: { <build key>: { <leaf path>: value } } }. `dep` lists the build slots whose parts shape the tag; a pack's `key` lists those parts in the same order ("*" = any, the pack stretches or moves to fit; the most specific matching pack is used); file null = the slot is empty for that key. A build slot is the gunsmith's slot id (barrel, handguard, optic, tac...) which is not always the mesh slot (a laser in `tac` is mesh slot tac).
+- joint: COUPLED SLOTS. Where changing one part reshapes another slot's geometry (a pistol's grip changes its frame, magazine well and optic cut, a handguard changes the rail a light clamps to), the baker finds it by sweeping and the slot's pack is a JOINT pack: its key names every part that shapes it, one pack per combination seen, e.g. optic on a P9 = (optic, slide, grip). A coupling that is only a translation is NOT joint: it becomes an anchor (below).
+- anchors: TRANSLATIONS. Where a part only MOVES another slot's geometry (a muzzle device follows its barrel's length, a light follows its handguard) the provider's part has `mount_<slot>` in the index's `anchors` table, an offset to add to that slot's whole pack. The reference part of each slot (the one in the platform's fullest reference build) has none.
+- stretch: STRETCH. Where a slot's geometry at different lengths of the part it follows (a handguard following the barrel) is a pure 1-D stretch along the forward axis, the pack is stored once with a `stretch` { from, to, gain } (forward positions in the pack's own frame, metres): points behind `from` stay, points ahead of `to` move by the provider's `stretch_<slot>` anchor (forward component) times `gain`, points between are stretched linearly. The rest of the pack's offsets (mount_<slot>) apply on top, to the whole.
+- info: INFO. The assembled info is the nearest of the index's three reference builds (fewest differing slots) with each differing slot's `deltas` applied to its leaves (numbers add; others are replaced), then `info.anim` from the nodes and `info.mounts` from the anchors. `exact` holds the few builds the sums get wrong, as leaf corrections.
+- assembly: ASSEMBLY (G.Models.assemble(def) in js/glb.ts, synchronous: the packs must be loaded, G.Models.ensure(def) / preloadPlatform(id) load them; it returns null otherwise or for a build the packs do not cover, and the procedural model is built). For each tag: pick the most specific pack for the build's parts; add up the anchors of every part in the build; take the owner nodes from the packs, and place every pack's meshes (translated, and stretched where it says so) against them. The result is the whole-gun structure of docs/models.md: slot-tagged meshes, part_ nodes with their pivots, info.
+- verify: VERIFICATION. The baker assembles every build of its sweep (each platform's default, two "loaded" builds and every single-part swap from each: ~9,000 builds) from the packs in memory and compares the triangles with the procedural model (the baker fails otherwise); `npm run test:models` does the same through the real files (glb, decoder, assembler) with a tolerance for compression and stretch rounding.
+
 A one-off colour that isn't in the catalogue is named `m_<rrggbb>` (hex colour) and is kept as exported: a standard PBR material, no bump.
 
-**Extras keys:** root: `info`, `gun`; mesh: `slot`, `display`; part: `part`, `anchors`.
+**Extras keys:** root: `info`, `gun`; mesh: `slot`, `display`; part: `part`, `anchors`, `owner`, `parent`; pack: `pack`.
 <!-- contract:end -->
 
 ## Baked files
 
 ```
-assets/models/guns/<id>.glb     a whole default gun (compressed: weld, quantize, meshopt; parts stay separate nodes)
-assets/models/guns/index.json   { version, three, src, guns: { <id>: { file, code, hash, bytes, gz, meshes, tris } }, totals }
-assets/vendor/three-global.js   the importmap shim (generated)
+assets/models/guns/<id>.glb                      a whole default gun (compressed: weld, quantize, meshopt; parts stay separate nodes)
+assets/models/guns/index.json                    { version, three, src, guns: { <id>: { file, code, hash, bytes, gz, meshes, tris } }, totals }
+assets/models/parts/<platform>/index.json        the platform index (docs/gun-parts-index.schema.json)
+assets/models/parts/<platform>/<slot>/<key>.glb  one pack
+assets/models/parts/index.json                   { version, src, platforms: { <id>: totals }, totals }
+assets/vendor/three-global.js                    the importmap shim (generated)
 ```
 
-`code` is the default build's code: the browser serves the bake only for a gun whose build is that, and not when the game's default build has since moved on. `hash` is a hash of the baked triangles (slot, material, positions) and `src` of the sources they come from; `node tools/bake_models.mjs --check` rebuilds and lists stale bakes. Lost in the round trip, rebuilt at load: bump maps (by material name), the shared material cache, `userData.chk` (viewmodel-only; the viewmodel is not baked).
+`code` is the default build's code: the browser serves the whole bake only for a gun whose build is that. `hash` is a hash of the baked triangles and `src` of the sources they come from; `node tools/bake_models.mjs --check` lists stale bakes (guns and packs). Lost in the round trip, rebuilt at load: bump maps (by material name), the shared material cache, `userData.chk`. The stipple/chequer meshes keep their UVs (the bump map tiles on them).
 
-## Layout plan: per-part packs (milestone 2)
+## Per-part packs and assembly (milestone 2)
 
-```
-assets/models/parts/<platform>/base.glb                 the receiver and fixed furniture, every slot empty (+ its anchors)
-assets/models/parts/<platform>/<slot>/<partId>.glb      one part as it sits on that platform in that slot: meshes in the
-                                                        gun's own frame (assembly is just adding the groups); root extras
-                                                        { part: partId, platform, slot, anchors }
-assets/models/parts/<platform>/index.json               slot -> partId -> { file, hash }, and which slots depend on which
-                                                        (a handguard length moves the muzzle, a magwell moves the mag)
-```
+Code: `js/glb.ts` (contract, validator, planner, assembler), `tools/model_sweep.mjs` (the build set), `model_diff.mjs`, `model_packs.mjs` (coupling analysis), `model_emit.mjs` / `bake_parts.mjs` (writing), `check_models_assembly.mjs` (test). The contract text is above (**Per-part packs**); this is how it was decided and what it gives.
 
-`guns/<id>.glb` stays as the default-build fast path and the reference the packs are verified against: an assembled default gun's triangles must hash-equal the whole bake. Assembly merges the parts' `extras.anchors` into `info` by the rules above.
+**Layout: one file per pack.** A swap in the gunsmith costs one small request and a platform's packs together are many times what one build needs (a platform: 24 to 372 KB gzipped for ALL its packs, about 9 packs / 35 KB for one build). The index is one request per platform (3 KB gzipped). Packs are per mesh slot, not per part: a slot's geometry sometimes depends on other slots (below), so "the muzzle device" is not always one file. The whole-gun files stay the fast path for the 79 default builds.
 
-**What runtime assembly needs from the recipe side** (`js/gunmodels.ts` / `js/parts.ts`): each part's meshes tagged with their slot (already) *and* buildable on its own given the dependencies (the barrel's length from the handguard, the magwell's position), the anchors a part derives (muzzles from barrel + muzzle device, `magAt` from the mag part, `mount_muzzle` from the barrel end) returned per part instead of for the whole gun, and a stable per-(platform, slot, part) key to hash.
+**The build set.** For each platform: the default build, "loaded A" (every empty slot filled with its first part, no sights) and "loaded B" (with a red dot and a magnifier), and from each every single swap (every slot to every part that fits it, every optional slot emptied, then pruned): 9,031 distinct builds. Plus, for learning only, 240 random builds per platform with two or three parts changed at once.
+
+**Coupling detection** (the baker, `model_packs.mjs`; no recipe knowledge). Each swap is compared with its base slot by slot (mesh slot = tag), in world space: *same*, a *rigid move*, a *1-D stretch* along the forward axis between two planes, or a *different shape*. A slot whose swap reshapes a tag is in that tag's `dep`: the tag's packs are keyed by its part, and by every other dep slot's (a **joint pack**: e.g. a P9's optic is keyed by (optic, slide, grip)). A slot that only moves a tag gives its parts an **anchor** (`mount_<tag>`, an offset, summed over providers; measured off the reference build "loaded B" and filled out through the others). A provider that lengthens a tag (the barrel stretching a handguard, a front sight, the barrel itself) gives each of its parts one intrinsic `stretch_<tag>`, and each pack gets its own `stretch` { from, to, gain } measured with a probe build (the pack with the barrel swapped): gain 0 = the pack does not follow it. Then the model is closed over every build we have: each pack is captured from one build, its offsets undone, and every other build predicted from it; wherever that fails (offsets that do not add up, interactions between two parts changed at once, a stretch that is not one) the slots that differ join `dep` (blame is found by changing them one at a time, then two) and everything repeats until all builds, sweep and random, are reproduced. Packs for combinations only a random build showed are not written: the game builds those from the recipe. Where one pack file serves every part of a dep slot the key says `*`.
+
+**The info** is not geometry and is not a function of one slot: `sy`, `fSight`, `relief`, the muzzles, `support`, the magazine well... change with the barrel, the optic, the grip. It is modelled as the nearest of three reference builds' flat leaves plus the leaf deltas of every differing slot's part (additive for numbers), with the few builds that sum wrongly listed as exact corrections. `info.anim` and the pivots come from the assembled nodes.
+
+**Assembly API** (js/glb.ts, `G.Models`): `assemble(def, skin?)` -> `{ group, info }` (the structure display() gives: slot-tagged meshes, `part_<key>` nodes with their pivots, `info` with the muzzles list, `info.mounts`, `info.anim`), synchronous, or `null` if the platform or a pack is not loaded or the build is a combination the packs do not cover; `ensure(def)` / `preloadPlatform(id)` load; `planBuild(index, build)`, `pickPack`, `infoLeaves`, `leafDelta` are the pure planner (no three.js) the baker verifies with. `display()` goes through `displayBaked` and so uses it with `?bakedGuns`.
+
+**Verification.** The baker assembles all 9,031 sweep builds in memory with the same planner and refuses to write unless every triangle and every info leaf matches (`bake:models` fails otherwise). `tools/check_models_assembly.mjs` then does it for real (GLTFLoader, meshopt decoder, `G.Models.assemble`) against the recipe: a build is **exact** when an order-independent hash of every triangle (world position to 0.1 mm, corners rotated to start at the least, material) is equal; **within tolerance** when the triangles match one to one within 0.05 mm (the files keep positions as float32, so only the recipe's own float rounding at different positions and the stretches, which are not bit-exact, show up); a vertex further off, a missing slot, other info, other part pivots is a **FAIL** and fails `test:models`. It also builds 30 random multi-part builds per platform with a seed the baker did not learn from, as a held-out measure.
+
+**Results** (current recipe, merged with the decoupling work): 9,031 sweep builds: **4,739 exact, 4,292 within tolerance (largest deviation 0.0081 mm), 0 fail.** Held-out: 2,370 random builds with two or three parts changed: 574 (24%) are combinations the packs do not cover (built from the recipe), 1,779 assemble within tolerance and 17 (about 0.7% of the covered) come out wrong: interactions between two simultaneous changes the learning set did not show (an index cannot know which; this is the price of accepting builds nobody baked).
+
+**Sizes.** 4,265 pack files from 6,881 index entries (identical packs are one file): 49.8 MB raw, **16.6 MB gzipped** for all 79 platforms (indexes +0.24 MB gz) against 1.2 MB gz for the 79 whole guns; per platform 24 KB (judge) to 372 KB (f2) gz, median 215 KB; a build needs about 9 packs. By slot (gz): optic 8.8 MB, grip 1.4, mag 1.2, stock 0.9, handguard 0.76, muzzle 0.6, magnifier 0.6, base 0.6, tac/tacL 0.8. Optics are over half and the lever is not coupling but duplication: the same optic part is written once per platform (and per barrel/slide/grip where the iron sights follow those). Storing parts that do not depend on the platform once, in their own frame, with a per-platform mount offset (an anchor), would cut that to a small fraction: not done.
+
+**What is left coupled** (from the sweep, after the recipe work): pistols, as planned (grip x slide x optic, mag, stock, tac: joint packs); the optic keyed by barrel/muzzle on the shotguns and AKs (iron front sights where the stretch is not clean); tac/fg/tacL x handguard on the rail guns (the handguard decides what a light clamps to); railmount x barrel (vss, mp5sd); magnifier x optic everywhere (the magnifier is built from the optic). The recipe notes `userData.bake`, `mesh.userData.at` and `info.reflex`/`info.pip` are accepted (`reflex` and `pip` are in the contract; `bake` and `at` are not consumed yet: the baker derives anchors and stretch regions from the geometry).
