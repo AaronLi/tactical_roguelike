@@ -213,7 +213,7 @@ const G_Me = {
     const GS = G.Gunsmith, Gr = G.Gear, p = GS.PARTS[pid], w = this.cur();
     if (!p) return;
     const keep = (q: string) => { const it = Gr.partItem(q); if (Gr.stow(this, it)) return true; this.dropItem(it); return false; };
-    const sl = fit && w && GS.slotsOf(w.def.id, w.def.build).find((s: any) => GS.fitsSlot(s, p, w.def.id));
+    const sl = fit && w && GS.slotsOf(w.def.id, w.def.build).find((s: any) => GS.fitsSlot(s, p, w.def.id, w.def.build));
     if (sl) {
       const build = Object.assign({}, w.def.build), off = build[sl.slot] ? [build[sl.slot]] : [];
       build[sl.slot] = pid;

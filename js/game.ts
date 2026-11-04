@@ -890,7 +890,7 @@ const G_Game = {
   // which slot of the weapon in your hands a part goes straight into (as it's built), or null
   aboxSlot(pid: string) {
     const GS = G.Gunsmith, p = GS.PARTS[pid], w = G.Me.cur();
-    return p && w ? GS.slotsOf(w.def.id, w.def.build).find((sl: ReturnType<typeof GS.slotsOf>[number]) => GS.fitsSlot(sl, p, w.def.id)) || null : null;
+    return p && w ? GS.slotsOf(w.def.id, w.def.build).find((sl: ReturnType<typeof GS.slotsOf>[number]) => GS.fitsSlot(sl, p, w.def.id, w.def.build)) || null : null;
   },
   aboxRender() {
     const el = this.$('aboxPick'), mine = this.aboxMine(), ui: GmAboxUI | undefined = this.aboxUI;

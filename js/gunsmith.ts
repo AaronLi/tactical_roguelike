@@ -259,9 +259,7 @@ const G_GunsmithUI = (() => {
     if (s.rpm) add(`Rate ${pct(s.rpm)}`, s.rpm > 0);
     if (s.spin) add(`Spin-up ${pct(s.spin)}`, s.spin < 0);
     if (s.reload) add(`Reload ${pct(s.reload)}`, s.reload < 0);
-    if (p.slot === 'handguard' && p.model && p.model.hg) { // (no rails: it runs as far as the barrel does; rails: its length)
-      if (p.fit) out.push('<span>Fits the barrel</span>'); else if (p.hgScale) out.push(`<span>${(p.model.hg.len! * 39.37).toFixed(1)}"</span>`);
-    }
+    if (p.slot === 'handguard' && p.model && p.model.hg && p.hgScale) out.push(`<span>${(p.model.hg.len! * 39.37).toFixed(1)}"</span>`); // (its length: it fits a barrel that leaves it that much)
     if (s.weight) add(`${s.weight > 0 ? '+' : ''}${s.weight.toFixed(2)} kg`, s.weight < 0);
     if (p.becomes) out.push(`<span class="g">Becomes the ${G.U.esc(G.WEAPONS[p.becomes].name)} (${(G.CALIBERS as Record<string, CaliberDef>)[G.calOf(G.WEAPONS[p.becomes])].name})</span>`);
     if (p.set && p.set.perLoad) out.push(`<span>${p.set.perLoad} shells a push</span>`);
@@ -297,7 +295,7 @@ const G_GunsmithUI = (() => {
   // Its dot on the model and its row in the list get a "!".
   function buyable(slot: string) {
     const w = weapon(), s = w && GS.visibleSlots(w.def.id, w.def.build).find((q: Slot) => q.slot === slot);
-    return !!s && GS.compatible(s.mount).some((p: Part) => p.id !== w.def.build[slot] && !GS.sameFamily(p, GS.PARTS[w.def.build[slot]]) && GS.fitsLen(p, w.def.id) && forSale(p));
+    return !!s && GS.compatible(s.mount).some((p: Part) => p.id !== w.def.build[slot] && !GS.sameFamily(p, GS.PARTS[w.def.build[slot]]) && GS.fitsLen(p, w.def.id, w.def.build) && forSale(p));
   }
   function apply(w: any, build: any) {
     G.Me.refit(w, build);
@@ -451,7 +449,7 @@ const G_GunsmithUI = (() => {
     let slotRows = '';
     for (const s of slots) {
       const p = build[s.slot] && GS.PARTS[build[s.slot]];
-      const bad = p && !GS.fitsSlot(s, p, def.id);
+      const bad = p && !GS.fitsSlot(s, p, def.id, build);
       slotRows += `<div class="gs-slot${s.slot === st.slot ? ' on' : ''}${s.parent ? ' sub' : ''}${bad || (!p && s.req) ? ' misfit' : ''}" data-gslot="${s.slot}"><span>${GS.slotLabel(s)}${s.req ? '' : ' <small>opt.</small>'}${buyable(s.slot) ? ' <i class="gs-bang" title="Parts for it in the store">!</i>' : ''}</span><b>${p ? G.U.esc(p.name) : s.slot === 'loader' ? '<em>by hand</em>' : '<em>empty</em>'}<i>${bad ? `doesn't fit the ${G.U.esc(GS.ifaceName(s.mount))}: it won't fire` : G.U.esc(GS.ifaceName(s.mount))}</i></b></div>`;
     }
     // parts that fit the picked slot: fitted, in your stash, for sale (his, then Timberline's), then the rest (out of stock / later)
@@ -464,7 +462,7 @@ const G_GunsmithUI = (() => {
       const own = (p: Part) => (Me.stash || {})[p.id] || build[cur.slot] === p.id;
       const famStashed = (p: Part) => !!p.skin && Object.keys(Me.stash || {}).some((q) => GS.PARTS[q] && GS.PARTS[q].skin === p.skin);
       const plainOut = (p: Part) => (cur.slot === 'grip' ? (skinned ? GS.plainGrip(p) : GS.plainHere(p, def.id)) : !!p.skin && (p.alt || GS.sameFamily(fitted, p) || famStashed(p)));
-      const parts = GS.compatible(cur.mount).filter((p: Part) => GS.fitsLen(p, def.id) && (!p.factory || p.plat === def.id || (Me.stash || {})[p.id] || build[cur.slot] === p.id) && !(p.not || []).includes(def.id) && (!plainOut(p) || own(p)));
+      const parts = GS.compatible(cur.mount).filter((p: Part) => GS.fitsLen(p, def.id, build) && (!p.factory || p.plat === def.id || (Me.stash || {})[p.id] || build[cur.slot] === p.id) && !(p.not || []).includes(def.id) && (!plainOut(p) || own(p)));
       const rank = (p: Part) => (build[cur.slot] === p.id ? 0 : (Me.stash || {})[p.id] ? 1 : atShowcase(p) && !needed(p) ? 3 : forSale(p) ? 2 : 4);
       parts.sort((a: Part, b: Part) => rank(a) - rank(b) || (a.len != null && b.len != null ? a.len - b.len : 0) || a.price - b.price); // (barrels: by length)
       let head = false;
