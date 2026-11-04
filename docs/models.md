@@ -21,6 +21,20 @@ The guns are built procedurally (`js/gunmodels.ts`). This pipeline bakes them to
 - `?checkModels`: validates each model in the browser as it loads (console errors and warnings).
 - `index.html` has an importmap mapping `three` to `assets/vendor/three-global.js`, a generated shim re-exporting the page's global `THREE` (the CDN's r149), so the ES-module `GLTFLoader` builds the game's own classes (two copies of three break `instanceof`). A module script loads `GLTFLoader` and the meshopt decoder from jsDelivr and exposes `G.GLB = { ready, load(url) }` (cached). Classic scripts never need it at parse time.
 
+## Layers: geometry, rig, first-person extras
+
+A gun model is three separate things, each working on the model (nodes + extras), not on how it was made:
+
+| layer | where | what it does |
+| --- | --- | --- |
+| geometry | `js/gunmodels.ts` recipes, or a `.glb` (`js/glb.ts`) | slot-tagged meshes, `part_<key>` nodes with their pivots, `info` |
+| rig | `js/gunrig.ts` | `G.GunRig.bind(group, info, { def, side })`: finds the moving parts (`info.anim`: nodes, or the node names of a loaded file), the hand anchors in the gun's space, where the parts rest, the magazine-check data. `js/vmanim.ts` (the clips) reads nothing else off the gun |
+| first-person extras | `js/viewmodel.ts` | `G.Viewmodel.assemble(def, models)`: a reflex sight's reticle (`info.reflex`), a scope's lens (`info.pip`), muzzle flashes (one per `info.muzzles`), `display_<name>` surfaces (a CanvasTexture each: `G.Viewmodel.surfaces(group)`), then the rig and arms. And `worldProto` / `worldInstance`: the third-person model, merged one mesh per material, with the magazine, a crossbow's bolt and strings and a bipod's legs pulled out |
+
+`G.GunModels.viewmodel(def)` / `world(def)` only fetch geometry and hand it over. `world()` takes the baked model with `?bakedGuns` (a default build, loaded, no bipod: the bipod's legs are not parts of a baked model yet), else the recipe's. `viewmodel()` is built from the recipes in both cases: the first-person build leaves the stock off, which the baked (display) model doesn't, and a baked model doesn't carry `info.reflex` / `info.pip` yet. A model that has them goes straight to `G.Viewmodel.assemble`.
+
+`bake_models.mjs` calls `G.GunRig.describe(group)` first: a recipe's magazine-check data is meshes held by reference, which a file can't carry, so it is written down as tags on the nodes (see "Magazine check" in the contract).
+
 ## The contract
 
 **The contract is code**: `GUN_MODEL_CONTRACT` and `INFO_FIELDS` in `js/glb.ts`. Everything else is generated from it, or checked against it:
@@ -132,6 +146,8 @@ A mesh `display_ammo` (extras `{ slot, display: { width: 128, height: 32 } }`, *
 | `magTop` | no | boolean | True when the hand takes the magazine from its top instead of its base. |
 | `quarrelMats` | no | object | A crossbow's bolt materials as three.js Material JSON (free-form; viewmodel only). |
 | `mounts` | no | object | Mount points where a swappable part sits, `mount_<slot>` -> [forward, up, right] metres of the part's origin (e.g. mount_muzzle: where a muzzle device screws on). Normally assembled from the parts' anchors (see GUN_MODEL_CONTRACT.anchors); a whole-gun bake may list them directly. |
+| `reflex` | no | object | A reflex or holographic sight's window (js/viewmodel.ts): the game draws a collimated reticle behind it, masked to it. f, y: the window's centre, [forward, up] metres; w, h: its size, metres (round: a disc of diameter w); kind: the reticle drawn: dot, dotG, cdot or holo. |
+| `pip` | no | object | A scope's ocular lens (js/viewmodel.ts): the game draws the world through the scope on a disc there (picture-in-picture) with the reticle over it. f, y: its centre, [forward, up] metres; r: its radius. parent + pos: a lens that swings on a hinge (a magnifier's): the NAME of the node it hangs on and its place in that node, [x, y, z] metres in the node's own frame. |
 
 **Materials** (the mesh's material NAME): The material NAME is what counts: at load the catalogue's material of that name replaces whatever the file carries (its colours, roughness, emissive, transparency and bump map come from the game), so the game keeps its shared materials and its look. Give meshes the catalogue name; colours in the file only matter for anonymous materials and for viewing the file elsewhere.
 
@@ -192,9 +208,16 @@ A mesh `display_ammo` (extras `{ slot, display: { width: 128, height: 32 } }`, *
 - muzzles: A gun can have MORE THAN ONE muzzle (an over/under, a Metal Storm-style barrel block): `info.muzzles` is always a list of at least one [forward, up, right]; consumers must iterate it and never assume entry [0] is the only one.
 - example: `{"name":"part_barrel","extras":{"part":"barrel","anchors":{"muzzles":[[0.4,0.012,-0.012],[0.4,0.012,0.012]],"mount_muzzle":[0.4,0,0]}}}`
 
+**Magazine check** (`part_mag.extras.check`, meshes' `extras.chk`):
+
+- what: The magazine check (hold R: the magazine is pulled out and looked at) shows what is in it on the magazine's own body: the top round, witness holes stamped with a count, or the rounds themselves through a clear body. The model says which of its meshes are those (js/gunrig.ts reads it; a gun without it simply shows nothing).
+- part: `part_mag` has extras.check = { w }: the magazine's width in metres (the width of a hole's stamped count).
+- meshes: Meshes under `part_mag` carry extras.chk = { role, i, t? }: role "top" (the round on top: i 0 its case, i 1 its tip; the game colours them for the load), "hole" (a witness hole, i = its order from the top, t = 0..1 how far down the stack it reads), "round" (the i-th round drawn through a clear magazine, t = how far down) and "tip" (the bullet tip of round i). Every mesh keeps a slot and a catalogue material like any other; the game replaces their materials as the rounds change. A gun with a magazine check has both top meshes.
+- example: `{"name":"part_mag","extras":{"part":"mag","check":{"w":0.024}},"child":{"name":"mag_91","extras":{"slot":"mag","chk":{"role":"hole","i":0,"t":0.1567}}}}`
+
 A one-off colour that isn't in the catalogue is named `m_<rrggbb>` (hex colour) and is kept as exported: a standard PBR material, no bump.
 
-**Extras keys:** root: `info`, `gun`; mesh: `slot`, `display`; part: `part`, `anchors`.
+**Extras keys:** root: `info`, `gun`; mesh: `slot`, `display`, `chk`; part: `part`, `anchors`, `check`.
 <!-- contract:end -->
 
 ## Authored models (Blender)

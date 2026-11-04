@@ -2292,333 +2292,50 @@ const G_GunModels = (() => {
     return info;
   }
 
-  // ---------------------------------------------------------------- muzzle flash sprite
-  function flashMesh(color: number) {
-    const m = new T.Mesh(new T.PlaneGeometry(0.2, 0.2), new T.MeshBasicMaterial({ map: G.R.flashTexture(), transparent: true, blending: T.AdditiveBlending, depthWrite: false, color }));
-    m.visible = false;
-    return m;
-  }
+  // ---------------------------------------------------------------- first-person and third-person models
+  // Three layers: the GEOMETRY of a gun (here: the recipes build it; with ?bakedGuns, js/glb.ts's loaded glTF), the binding of
+  // its ANIMATION (js/gunrig.ts: its moving parts, anchors, magazine-check data) and what only the first person (js/viewmodel.ts:
+  // reticles, scope lenses, muzzle flashes, display surfaces) or the far-off view (the merged model) adds. These two functions
+  // only fetch the geometry and hand it over.
 
-  // ---------------------------------------------------------------- first-person viewmodel
-  // ---------------------------------------------------------------- reflex reticles
-  // A reflex sight's reticle is collimated: it sits at infinity along the sight's axis, so it points where the
-  // gun points, not where the glass is, and you only see it through the window. It's drawn as a glowing plane
-  // a few metres down the axis, masked by the stencil to the sight's window (the window mesh writes 1; hands
-  // or the housing in front of the window keep it at 0).
-  const RETICLE_D = 6;
-  const texCache: Record<string, THREE.CanvasTexture> = {};
-  function reticleTex(kind: string) {
-    if (texCache[kind]) return texCache[kind];
-    const N = kind === 'holo' || kind === 'cdot' ? 256 : 128, c = document.createElement('canvas');
-    c.width = c.height = N;
-    const g = c.getContext('2d')!, m = N / 2;
-    if (kind === 'holo') {
-      // 68 MOA ring with tick marks and a centre dot, laser-red, with the grain of a hologram
-      g.shadowColor = 'rgba(255,40,25,1)'; g.shadowBlur = 7;
-      g.strokeStyle = 'rgba(255,95,75,1)'; g.lineWidth = 4;
-      g.beginPath(); g.arc(m, m, 100, 0, Math.PI * 2); g.stroke();
-      g.lineWidth = 5;
-      for (let i = 0; i < 4; i++) { const a = (i * Math.PI) / 2; g.beginPath(); g.moveTo(m + Math.cos(a) * 100, m + Math.sin(a) * 100); g.lineTo(m + Math.cos(a) * 84, m + Math.sin(a) * 84); g.stroke(); }
-      g.fillStyle = 'rgba(255,225,215,1)'; g.beginPath(); g.arc(m, m, 8, 0, Math.PI * 2); g.fill();
-      const img = g.getImageData(0, 0, N, N), d = img.data;
-      for (let i = 3; i < d.length; i += 4) d[i] *= 0.62 + Math.random() * 0.38;
-      g.putImageData(img, 0, 0);
-    } else if (kind === 'cdot') {
-      // a 65 MOA circle round a 2 MOA dot: a clean LED ring
-      g.shadowColor = 'rgba(255,40,25,1)'; g.shadowBlur = 6;
-      g.strokeStyle = 'rgba(255,90,70,1)'; g.lineWidth = 4;
-      g.beginPath(); g.arc(m, m, 98, 0, Math.PI * 2); g.stroke();
-      g.fillStyle = 'rgba(255,225,215,1)'; g.beginPath(); g.arc(m, m, 7, 0, Math.PI * 2); g.fill();
-    } else {
-      // an LED dot: a hot near-white core bleeding to red (or green), with a soft halo
-      const grn = kind === 'dotG', c1 = grn ? 'rgba(235,255,235,1)' : 'rgba(255,245,240,1)', c2 = grn ? 'rgba(110,255,120,1)' : 'rgba(255,120,100,1)';
-      const c3 = grn ? 'rgba(40,255,60,0.75)' : 'rgba(255,45,30,0.75)', c4 = grn ? 'rgba(20,255,40,0.16)' : 'rgba(255,25,15,0.16)';
-      const grd = g.createRadialGradient(m, m, 0, m, m, m);
-      grd.addColorStop(0, c1); grd.addColorStop(0.16, c2); grd.addColorStop(0.26, c3);
-      grd.addColorStop(0.45, c4); grd.addColorStop(1, 'rgba(0,0,0,0)');
-      g.fillStyle = grd; g.fillRect(0, 0, N, N);
-    }
-    const t = new T.CanvasTexture(c);
-    t.minFilter = T.LinearMipmapLinearFilter;
-    return (texCache[kind] = t);
+  // the first-person geometry of a gun: the recipe's, built for the viewmodel (no stock behind the eye), its stickers on, with the
+  // sight windows (reflex, scope) the kit recorded, for js/viewmodel.ts to put the reticle and the lens in. (skin: the gun's
+  // stickers, js/stickers.ts: on its parts as built, before the arms go on.) No baked model has the first-person build yet (the
+  // viewmodel leaves the stock off, the baked display model keeps it) nor info.reflex / info.pip (docs/models.md); a model that
+  // has them goes straight to G.Viewmodel.assemble.
+  function vmModel(def: any, skin: any): VmModel {
+    const k: any = kit();
+    buildingVM = true;
+    let info;
+    try { info = build(k, def); } finally { buildingVM = false; }
+    if (skin && skin.length) G.Stickers.decorate(k.g, skin);
+    return { group: k.g, info, reflex: k.reflex, pip: k.pip };
   }
-  // angular size (radians) of the whole reticle texture: dot core about 3.5 mrad, holo ring 50 mrad across
-  const RETICLE_RAD: Record<string, number> = { dot: 0.028, dotG: 0.028, holo: 0.064, cdot: 0.062 };
-  function reflex(k: Kit, o: any) {
-    const mask = new T.Mesh(o.round ? new T.CircleGeometry(o.w / 2, 28) : new T.PlaneGeometry(o.w, o.h), new T.MeshBasicMaterial({
-      colorWrite: false, depthWrite: false, transparent: true, side: T.DoubleSide,
-      stencilWrite: true, stencilRef: 1, stencilFunc: T.AlwaysStencilFunc, stencilZPass: T.ReplaceStencilOp,
-    }));
-    mask.position.set(0, o.y, -o.f);
-    mask.renderOrder = 20;
-    k.g.add(mask);
-    const size = RETICLE_D * RETICLE_RAD[o.kind];
-    const ret = new T.Mesh(new T.PlaneGeometry(size, size), new T.MeshBasicMaterial({
-      map: reticleTex(o.kind), transparent: true, blending: T.AdditiveBlending, depthTest: false, depthWrite: false,
-      stencilWrite: true, stencilRef: 1, stencilFunc: T.EqualStencilFunc, stencilFail: T.KeepStencilOp, stencilZFail: T.KeepStencilOp, stencilZPass: T.KeepStencilOp,
-    }));
-    ret.position.set(0, o.y, -(o.f + RETICLE_D));
-    ret.renderOrder = 21;
-    ret.frustumCulled = false;
-    k.g.add(ret);
-  }
-
-  // ---------------------------------------------------------------- picture-in-picture scopes
-  // The ocular lens shows the world through the scope: G.R renders the scene from the lens along the scope's
-  // axis with a field of view set by the magnification, into a texture this disk shows. The reticle is drawn
-  // over it, and a dark crescent creeps in when your eye is off the scope's axis (the eyebox).
-  // (dot, dotG, cdot and holo: a reflex sight's own reticle, seen through a magnifier)
-  const PIP_RETICLE: Record<string, number> = { cross: 0, chevron: 1, lpvo: 2, dot: 3, dotG: 3, cdot: 4, holo: 4, ring: 5, bdc: 6 };
-  const PIP_ILLUM: Record<string, number> = { ring: 0x000000, cross: 0x000000, chevron: 0xff9a18, lpvo: 0xff2a20, dot: 0xff2a20, dotG: 0x30ff50, cdot: 0xff2a20, holo: 0xff2a20, bdc: 0xff2a20 };
-  // The crossbow's reticle (first focal plane: js/render.ts _renderPip says how big a mil is at this power, so it grows with
-  // the picture and the marks are true at any power). In mils, on a canvas BDC_R either side of the centre:
-  //   - a lit dot and, to pick it up at low power, a lit horseshoe; fine wires with heavy posts outside, a tick every mil near the middle
-  //   - down the post, a rung for each distance, for a broadhead (the shots' own sums, G.flight, zeroed as it comes): hold it on the
-  //     target at that range. Each rung's a man's shoulders wide (0.5 m) at its range. Ticks on the left: the same for a bodkin
-  //   - standing on the left wire, a man 1.75 m tall at each range, nearest furthest out: stand him on the wire and match him
-  const BDC_R = 170, BDC_TEX = new Map();
-  function bdcTex(def: any) {
-    const ball = G.ballFor(G.calOf(def)), tip = G.boreTip({ def }), hold = (am: string, d: number) => { const q = G.flight(def, am, tip, d)[d]; return q ? (-q.h / d) * 1000 : null; }, key = [10, 30, 100].map((d) => (hold(ball, d) || 0).toFixed(2)).join();
-    if (BDC_TEX.has(key)) return BDC_TEX.get(key);
-    const S0 = 4096, s = S0 / (2 * BDC_R), c = document.createElement('canvas');
-    c.width = c.height = S0;
-    const g = c.getContext('2d')!, line = (w: number, col: string, f: () => void) => { g.lineWidth = w; g.strokeStyle = col; g.beginPath(); f(); g.stroke(); }, ink = '#000', lit = '#f00';
-    const label = (txt: string, x: number, y: number, h: number, al?: CanvasTextAlign) => { g.fillStyle = ink; g.font = `600 ${h}px Arial, sans-serif`; g.textAlign = al || 'left'; g.textBaseline = 'middle'; g.fillText(txt, x, y); };
-    g.translate(S0 / 2, S0 / 2); g.scale(s, s); g.lineCap = 'butt';
-    // the wires and posts
-    const W = 0.14, HW = 1.5, POST = 60;
-    line(W, ink, () => { g.moveTo(-POST, 0); g.lineTo(POST, 0); g.moveTo(0, -POST); g.lineTo(0, POST * 1.35); });
-    line(HW, ink, () => { g.moveTo(-BDC_R, 0); g.lineTo(-POST, 0); g.moveTo(POST, 0); g.lineTo(BDC_R, 0); g.moveTo(0, -BDC_R); g.lineTo(0, -POST); });
-    for (let i = 1; i <= 10; i++) {
-      const h = i % 5 ? 0.45 : 0.9;
-      line(W, ink, () => { g.moveTo(i, -h); g.lineTo(i, h); g.moveTo(-i, 0); g.lineTo(-i, h); g.moveTo(-h, -i); g.lineTo(h, -i); });
-    }
-    // lit: the dot, and the horseshoe, open at the bottom for the rungs
-    g.fillStyle = lit; g.beginPath(); g.arc(0, 0, 0.32, 0, 7); g.fill();
-    line(0.95, lit, () => { g.arc(0, 0, 15, Math.PI * 0.62, Math.PI * 2.38); });
-    // the rungs (20 m: the middle itself)
-    const TH = 2.3;
-    label('20', 1.2, -TH * 0.72, TH);
-    for (const d of [30, 40, 50, 60, 70, 80, 100, 120, 150]) {
-      const y = hold(ball, d), hw = 250 / d;
-      if (y == null) continue;
-      line(0.2, ink, () => { g.moveTo(-hw, y); g.lineTo(hw, y); });
-      label(String(d), hw + 0.9, y, TH);
-    }
-    // a bodkin's
-    const heavy = (G.AMMO_TYPES as Record<string, string[]>)[((G.CALIBERS as Record<string, any>)[G.calOf(def)] || {}).group].find((a) => a !== ball && (G.AMMO as Record<string, any>)[a].velK);
-    if (heavy) {
-      for (const d of [20, 30, 40, 50, 60, 70, 80, 100]) {
-        const y = hold(heavy, d);
-        if (y == null) continue;
-        line(0.16, ink, () => { g.moveTo(-1.8, y); g.lineTo(0, y); });
-        if (d % 20 === 0 || d < 40 || d === 50 || d === 70) label(String(d), -2.3, y, TH * 0.72, 'right');
-      }
-      label((G.AMMO as Record<string, any>)[heavy].tag, -2.3, hold(heavy, 20)! - TH * 0.95, TH * 0.6, 'right');
-    }
-    // the men on the wire: 150 m nearest the middle, 20 m furthest out
-    let x = -7.5;
-    for (const d of [150, 100, 75, 50, 40, 30, 20]) {
-      const h = 1750 / d, bw = h * 0.26, cx = x - bw / 2, lw = 0.15 + h * 0.004, hr = h * 0.085;
-      line(lw, ink, () => {
-        g.moveTo(cx + hr, -h + hr); g.arc(cx, -h + hr, hr, 0, 7); // the head
-        g.moveTo(cx - bw * 0.16, 0); g.lineTo(cx - bw * 0.2, -h * 0.46); g.lineTo(cx - bw * 0.5, -h * 0.4); g.lineTo(cx - bw * 0.46, -h * 0.76); g.lineTo(cx - bw * 0.14, -h * 0.82); // the left of him, from the foot
-        g.lineTo(cx + bw * 0.14, -h * 0.82); g.lineTo(cx + bw * 0.46, -h * 0.76); g.lineTo(cx + bw * 0.5, -h * 0.4); g.lineTo(cx + bw * 0.2, -h * 0.46); g.lineTo(cx + bw * 0.16, 0);
-      });
-      label(String(d), cx, 1.8 + Math.min(1.2, h * 0.02), TH * 0.86, 'center');
-      x -= bw + Math.max(2.2, h * 0.09);
-    }
-    const t = new T.CanvasTexture(c);
-    t.generateMipmaps = true; t.minFilter = T.LinearMipmapLinearFilter; t.anisotropy = 8;
-    BDC_TEX.set(key, t);
-    return t;
-  }
-  const PIP_VS = 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
-  const PIP_FS = G.R.TONE + `
-    uniform sampler2D map; uniform float live; uniform vec2 eye; uniform int ret; uniform vec3 illum;
-    uniform sampler2D rmap; uniform float pmil; // (a first-focal-plane reticle: its picture, and how much of the lens's radius a mil is at this power)
-    varying vec2 vUv;
-    float seg(vec2 p, vec2 a, vec2 b) { vec2 pa = p - a, ba = b - a; float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0); return length(pa - ba * h); }
-    float ink(float d, float w) { float aa = fwidth(d) * 0.75; return 1.0 - smoothstep(w - aa, w + aa, d); }
-    void main() {
-      vec2 p = vUv * 2.0 - 1.0; float r = length(p);
-      vec3 img = bpTone(texture2D(map, vUv).rgb); // (the scene through it, rolled off as the screen's is: js/render.ts)
-      float black = 0.0, glow = 0.0;
-      if (ret == 0) { // duplex crosshair: fine wires in the middle, heavy posts outside
-        float tw = abs(p.x) > 0.42 ? 0.026 : 0.0045, th = abs(p.y) > 0.42 ? 0.026 : 0.0045;
-        black = max(ink(abs(p.y), tw), ink(abs(p.x), th));
-      } else if (ret == 1) { // illuminated chevron over a bullet-drop post
-        glow = max(ink(seg(p, vec2(0.0), vec2(-0.085, -0.1)), 0.011), ink(seg(p, vec2(0.0), vec2(0.085, -0.1)), 0.011));
-        black = ink(seg(p, vec2(0.0, -0.15), vec2(0.0, -0.78)), 0.005);
-        for (int i = 1; i < 5; i++) { float y = -0.15 - float(i) * 0.13, w = 0.075 - float(i) * 0.012; black = max(black, ink(seg(p, vec2(-w, y), vec2(w, y)), 0.0045)); }
-      } else if (ret == 3) { // a red dot, magnified
-        glow = ink(r, 0.035);
-      } else if (ret == 4) { // a holographic or circle-dot ring, magnified
-        glow = max(ink(abs(r - 0.42), 0.012), ink(r, 0.03));
-      } else if (ret == 5) { // the AUG's: a black ring, the target in it (its size: a man at 300 m)
-        black = ink(abs(r - 0.13), 0.012);
-      } else if (ret == 6) { // drawn in mils, looked up in mils: it grows with the picture
-        vec2 uv = 0.5 + p / pmil / (2.0 * ${BDC_R.toFixed(1)});
-        if (uv.x > 0.0 && uv.y > 0.0 && uv.x < 1.0 && uv.y < 1.0) { vec4 t = texture2D(rmap, uv); black = t.a * (1.0 - t.r); glow = t.a * mix(0.3, 1.0, t.r); } // (red: lit; the rest etched, and faintly lit, to be read in the dark)
-      } else { // illuminated circle-dot with a gapped crosshair
-        glow = max(ink(abs(r - 0.2), 0.006), ink(r, 0.018));
-        float tw = abs(p.x) > 0.55 ? 0.022 : 0.0035, th = abs(p.y) > 0.55 ? 0.022 : 0.0035;
-        black = max(ink(abs(p.y), tw), ink(abs(p.x), th)) * step(0.3, max(abs(p.x), abs(p.y)));
-      }
-      vec3 col = img * (1.0 - black * 0.94) + illum * glow * 1.5;
-      col *= (1.0 - smoothstep(0.7, 1.0, length(p - eye))) * smoothstep(1.0, 0.9, r);
-      vec3 glass = vec3(0.025, 0.04, 0.055) + vec3(0.1, 0.12, 0.18) * pow(max(0.0, 1.0 - length(p - vec2(-0.35, 0.4))), 3.0);
-      glass = pow(glass, vec3(2.2)); // (sRGB, as written: to linear)
-      gl_FragColor = linearToOutputTexel(vec4(mix(glass, col, live), 1.0));
-    }`;
-  function pipLens(k: Kit, o: any, def: any) {
-    const reticle = def.reticle || 'cross';
-    const mat = new T.ShaderMaterial({
-      uniforms: { map: { value: G.R.pipTexture() }, live: { value: 0 }, eye: { value: new T.Vector2() }, ret: { value: PIP_RETICLE[reticle] || 0 }, illum: { value: new T.Color(PIP_ILLUM[reticle] || 0) }, rmap: { value: reticle === 'bdc' ? bdcTex(def) : null }, pmil: { value: 1 } },
-      vertexShader: PIP_VS, fragmentShader: PIP_FS, extensions: { derivatives: true }, toneMapped: false, // (it rolls off the picture itself: bpTone)
-    });
-    const disk = new T.Mesh(new T.CircleGeometry(o.r, 48), mat);
-    if (o.parent) { disk.position.copy(o.pos); o.parent.add(disk); } // (a magnifier's lens swings with it)
-    else { disk.position.set(0, o.y, -o.f); k.g.add(disk); }
-    return { disk, r: o.r, mat, mag: def.magnif || 4 };
-  }
-
-  // (skin: the gun's stickers, js/stickers.ts: on its parts as built, before the arms go on)
   function viewmodel(def: any, skin: any) {
-    const root = new T.Group();
-    const guns = def.akimbo ? [-1, 1] : [1];
-    let info0 = null, pip = null;
-    const flashes = [], holders = [];
-    for (const side of guns) {
-      const k: any = kit();
-      buildingVM = true;
-      let info;
-      try { info = build(k, def); } finally { buildingVM = false; }
-      if (skin && skin.length) G.Stickers.decorate(k.g, skin);
-      if (k.reflex) reflex(k, k.reflex);
-      if (k.pip && !pip) pip = pipLens(k, k.pip, def);
-      if (!info0) info0 = info;
-      const holder = new T.Group();
-      holder.add(k.g);
-      if (def.akimbo) holder.position.x = side * 0.13;
-      holders.push({ holder, info, side });
-      for (const [f, y, x] of info.muzzles) {
-        const fl = flashMesh(def.tracer || 0xffc070);
-        fl.position.set(x, y, -f - 0.04);
-        holder.add(fl);
-        flashes.push(fl);
-      }
-      root.add(holder);
-    }
-    const info = info0;
-    // Aim-down-sights puts the sight's rear at eye-relief distance straight ahead of the camera.
-    // where your eye is along the gun when you aim: the sight's eye relief behind it, or (a bullpup, info.cheek) your
-    // cheek on the stock's comb, the sight wherever it is on the rail in front of it
-    const adsZ = info.cheek != null && info.cheek <= info.fSight - 0.03 ? info.cheek : info.fSight - info.relief;
-    const ads = def.akimbo ? new T.Vector3(0, -0.12, -0.36) : new T.Vector3(0, -info.sy, adsZ);
-    // hip: lower-right and well forward of the eye, so the optic doesn't fill the screen
-    const hip = def.akimbo ? new T.Vector3(0, -0.15, -0.34) : info.pistol ? new T.Vector3(0.1, -0.1 - info.sy, -0.32) : new T.Vector3(0.1, -0.1 - info.sy * 0.6, adsZ - 0.1);
-    root.userData = { flash: flashes[0], flashes, sightY: info.sy, hip, ads, anim: info.anim, info, holders, pip };
-    G.VMAnim.prepare(root, def); // arms, reload and inspect animation (js/vmanim.ts)
-    return root;
+    return G.Viewmodel.assemble(def, (def.akimbo ? [-1, 1] : [1]).map(() => vmModel(def, skin)));
   }
 
-  // ---------------------------------------------------------------- third-person world model (merged, cached)
-  const worldCache = new Map();
-  function merge(group: THREE.Object3D) {
-    group.updateMatrixWorld(true);
-    const byMat = new Map<THREE.Material, THREE.BufferGeometry[]>();
-    group.traverse((o: any) => {
-      if (!o.isMesh) return;
-      const geo = (o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone());
-      geo.applyMatrix4(o.matrixWorld);
-      for (const name of Object.keys(geo.attributes)) if (name !== 'position' && name !== 'normal') geo.deleteAttribute(name);
-      if (!byMat.has(o.material)) byMat.set(o.material, []);
-      byMat.get(o.material)!.push(geo);
-    });
-    const out = [];
-    for (const [material, geos] of byMat) {
-      let n = 0;
-      geos.forEach((gg) => (n += gg.attributes.position.count));
-      const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3);
-      let off = 0;
-      for (const gg of geos) { pos.set((gg.attributes.position as THREE.BufferAttribute).array, off * 3); nor.set((gg.attributes.normal as THREE.BufferAttribute).array, off * 3); off += gg.attributes.position.count; gg.dispose(); }
-      const bg = new T.BufferGeometry();
-      bg.setAttribute('position', new T.BufferAttribute(pos, 3));
-      bg.setAttribute('normal', new T.BufferAttribute(nor, 3));
-      bg.computeBoundingSphere();
-      out.push({ geometry: bg, material });
-    }
-    group.traverse((o: any) => o.geometry && o.geometry.dispose());
-    return out;
+  // the third-person geometry: the baked model when ?bakedGuns has it loaded (js/glb.ts, a default build), else the recipe's
+  function worldModel(def: any): { group: THREE.Object3D; info: any } {
+    // (a bipod's legs swing down about their hinges (js/rig.ts), and a baked model doesn't have them as parts yet (the contract's part_bipod
+    // is reserved): a gun with a bipod (an option, or the GM6's own) is built from the recipe)
+    const sp: any = G.Gunsmith.modelSpec(def), baked = !(sp && (sp.bipod || sp.fg === 'bipod' || sp.rcv === 'gm6')) && G.Models && G.Models.displayBaked(def);
+    if (baked) return baked;
+    const k = kit();
+    return { group: k.g, info: build(k, def) };
   }
-  // (its magazine merged on its own, centred on itself, so a rig can take it off the gun and hold it: a reload,
-  // a magazine check. g.userData.mag: the magazine's group; magHome: where it sits on the gun.)
-  // (skin: its stickers, js/stickers.ts, on this one: the cached model's shared)
+  // (merged, cached per build: js/viewmodel.ts worldProto makes it, one mesh per material; skin: its stickers on this one, the cached model's shared)
+  const worldCache = new Map<string, any>();
   function world(def: any, skin?: any) {
     if (typeof def === 'string') def = G.Gunsmith.fromCode(def);
-    let proto = worldCache.get(def.code);
+    const key = def.code + (G.Models && G.Models.on && G.Models.loaded(def.id) ? '|baked' : ''); // (a gun asked for before its bake was loaded is built from the recipe, and stays so)
+    let proto = worldCache.get(key);
     if (!proto) {
-      const k = kit();
-      const info = build(k, def);
-      let mag = null;
-      const mn = info.anim && info.anim.mag;
-      if (mn && mn.parent && !info.magTop) {
-        k.g.updateMatrixWorld(true);
-        const mw = mn.matrixWorld.clone(), solo = new T.Group();
-        mn.parent.remove(mn);
-        solo.add(mn); mw.decompose(mn.position, mn.quaternion, mn.scale);
-        const meshes = merge(solo), box = new T.Box3();
-        for (const m of meshes) { m.geometry.computeBoundingBox(); box.union(m.geometry.boundingBox!); }
-        const c = box.getCenter(new T.Vector3());
-        for (const m of meshes) m.geometry.translate(-c.x, -c.y, -c.z);
-        mag = { meshes, home: c };
-      }
-      // (a crossbow's bolt and its two strings, kept as groups of their own: the bolt's gone once it's shot, the string's
-      // forward until it's cocked. Merged on their own, each in place; setLoaded)
-      const xb: any = {};
-      k.g.updateMatrixWorld(true);
-      for (const [key, name] of [['bolt', 'quarrel'], ['cocked', 'stringCocked'], ['slack', 'stringSlack']]) {
-        const n = info.anim && info.anim[name];
-        if (!n || !n.parent) continue;
-        const solo = new T.Group();
-        n.parent.remove(n); solo.add(n); n.visible = true;
-        xb[key] = merge(solo);
-      }
-      // (a bipod's legs, each on its own about its hinge, so they swing down: js/rig.ts)
-      const legs = (info.anim && info.anim.bipod || []).filter((l: BipodLeg) => l.p.parent).map((l: BipodLeg) => {
-        const home = l.p.position.clone(), solo = new T.Group();
-        l.p.parent!.remove(l.p); l.p.position.set(0, 0, 0); solo.add(l.p);
-        return { meshes: merge(solo), home, back: l.back, side: l.side };
-      });
-      proto = { meshes: merge(k.g), info, mag, xb: xb.bolt ? xb : null, legs };
-      worldCache.set(def.code, proto);
+      const m = worldModel(def);
+      proto = G.Viewmodel.worldProto(m.group, m.info);
+      worldCache.set(key, proto);
     }
-    const g = new T.Group();
-    for (const m of proto.meshes) g.add(new T.Mesh(m.geometry, m.material));
-    if (proto.mag) {
-      const mg = new T.Group();
-      for (const m of proto.mag.meshes) mg.add(new T.Mesh(m.geometry, m.material));
-      mg.position.copy(proto.mag.home);
-      g.add(mg);
-      g.userData.mag = mg; g.userData.magHome = proto.mag.home;
-    }
-    if (proto.xb) {
-      g.userData.xb = {};
-      for (const [key, list] of Object.entries(proto.xb)) {
-        const sub = new T.Group();
-        for (const m of list) sub.add(new T.Mesh(m.geometry, m.material));
-        g.add(sub); g.userData.xb[key] = sub;
-      }
-      g.userData.xb.slack.visible = false;
-    }
-    if (proto.legs.length) g.userData.bipod = proto.legs.map((l: { meshes: THREE.Mesh[]; home: THREE.Vector3; back: boolean; side: number }) => {
-      const sub = new T.Group();
-      for (const m of l.meshes) sub.add(new T.Mesh(m.geometry, m.material));
-      sub.position.copy(l.home); g.add(sub);
-      return { sub, back: l.back, side: l.side };
-    });
-    g.userData.info = proto.info;
+    const g = G.Viewmodel.worldInstance(proto);
     if (skin && skin.length) G.Stickers.decorate(g, skin);
     return g;
   }
