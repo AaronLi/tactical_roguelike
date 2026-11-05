@@ -243,9 +243,10 @@ function arForward(t, withChargingHandle) {
         // The buffer spring is inside the buffer tube, behind the receiver, inside the stock:
         // heard only as a faint, muffled sproing under the carrier.
         // The buffer spring unloading: tension let go, coils surging along it inside the buffer
-        // tube. The round trip lengthens as it extends (zing falling), so two stages.
+        // tube. It's preloaded, so it never gets near free length: it pushes hard the whole way
+        // and its surge pitch (set by stiffness and mass, not length) stays the same.
         hit('buffer spring lets go', t, -8, V(3), arBufferSpring, arBufferTube, { scatter: 0.2, radius: 1, click: 0.1, sharp: 0.5 }, { coil: { level: 0.7, length: 9, dispersion: 0.5, decay: 0.12, brightness: 3000 }, housing: BUFFER_TUBE_HOUSING }),
-        rub('buffer spring extending in its tube', t + T(0.004), -16, { force: 3 * BUFFER_SPRING, duration: T(0.05), speed: V(3), profile: 'accelerate', roughness: 6, grain: 0.6, periodicity: 0, contactWidth: 0.2 }, arBufferSpring, arBufferTube, { coil: { level: 0.6, length: 14, dispersion: 0.5, decay: 0.15, brightness: 2600 }, housing: BUFFER_TUBE_HOUSING }),
+        rub('buffer spring extending in its tube', t + T(0.004), -16, { force: 3 * BUFFER_SPRING, duration: T(0.05), speed: V(3), profile: 'accelerate', roughness: 6, grain: 0.6, periodicity: 0, contactWidth: 0.2 }, arBufferSpring, arBufferTube, { coil: { level: 0.6, length: 11, dispersion: 0.5, decay: 0.12, brightness: 2800 }, housing: BUFFER_TUBE_HOUSING }),
         // What you actually hear: the steel carrier grinding along the aluminium upper.
         rub('carrier rails in the upper', t + T(0.002), -18, { force: 6, duration: T(0.05), speed: V(4), profile: 'accelerate', roughness: 3, grain: 0.15, periodicity: 0, contactWidth: 0.08 }, arCarrier, arUpper),
         hit('buffer weights shift', t + T(0.004), -20, V(1.2), steelBlock(1.5, 12), arBuffer, { scatter: 0.9, radius: 2 }),
@@ -280,11 +281,12 @@ function arForward(t, withChargingHandle) {
         // The fire-control group is jolted: hammer and trigger shift on their pins and their
         // springs ting.
         hit('hammer and trigger jolt on their pins', t + T(0.0584), -3, V(1.0), arHammer, arLower, { scatter: 0.7, radius: 1.5, click: 0.5 }, { coil: { level: 0.5, length: 2, dispersion: 0.35, decay: 0.12, brightness: 6000 }, flex: { amount: 0.3, freq: 180, decay: 0.04, rattle: 0.5, wobble: 0, tone: 0 }, housing: LOWER_HOUSING }),
-        // The buffer spring, now at full length, rings in its tube after the carrier stops, and the
-        // buffer's sliding weights slam forward a few ms later (their anti-bounce job).
-        hit('buffer spring rings out', t + T(0.0585), -3, V(1.5), arBufferSpring, arBufferTube, { scatter: 0.2, radius: 1, click: 0.05, sharp: 0.4 }, { coil: { level: 0.8, length: 16, dispersion: 0.45, decay: 0.35, brightness: 2500 }, housing: BUFFER_TUBE_HOUSING }),
-        // The carrier rebounds a hair off the bolt and is caught again (what the buffer's weights are for).
-        hit('carrier rebounds and is caught', t + T(0.0598), -7, V(0.9), arCarrier, arBolt, { scatter: 0.4, radius: 3, click: 0.6 }),
+        // In battery the buffer spring is still well compressed (preload), pressing the buffer
+        // against the carrier. Jolted by the stop, it rings tight and damped in its tube: a short,
+        // tense zing, not a loose sproing. The buffer's sliding weights slam forward a few ms later.
+        hit('buffer spring jolts, still loaded', t + T(0.0585), -5, V(1.5), arBufferSpring, arBufferTube, { scatter: 0.2, radius: 1, click: 0.05, sharp: 0.4 }, { coil: { level: 0.6, length: 11, dispersion: 0.45, decay: 0.12, brightness: 3000 }, housing: BUFFER_TUBE_HOUSING }),
+        // The preloaded spring pins the carrier into battery: only a tiny rebound.
+        hit('carrier rebounds and is caught', t + T(0.0592), -16, V(0.4), arCarrier, arBolt, { scatter: 0.4, radius: 3, click: 0.6 }),
         hit('buffer weights slam forward', t + T(0.0615), -7, V(1.6), steelBlock(1.5, 12), arBuffer, { scatter: 0.6, radius: 3, click: 0.6 }, { housing: BUFFER_TUBE_HOUSING }),
         snap('extractor snaps over the rim', t + T(0.056), -3, { strength: 0.8, preload: 0, seat: 0.3, seatDelay: 1 }, arExtractor, arCase),
     ];
@@ -398,13 +400,15 @@ export const AR15_CHARGE = {
         },
         {
             name: 'buffer-spring-compress',
-            description: 'Buffer spring loading inside the buffer tube (inside the stock): tension building, its coil zing rising as it stiffens, singing in the tube. The buffer weights lag at the start and settle at the stop.',
+            description: 'Preloaded buffer spring loading further inside the buffer tube (inside the stock): pushing back hard from the start, tension climbing to the rear, singing in the tube. The buffer weights lag at the start and settle at the stop.',
             elements: [
-                // Tension building: as the spring compresses it gets stiffer and its coils' round trip
-                // shortens, so its "zing" rises, in three stages. Smooth: coils slide, they don't tick.
-                travelRub('buffer spring loading (first third)', 2, 32, -8 + 10 * Math.log10(BUFFER_SPRING), { force: 2 * BUFFER_SPRING, roughness: 6, grain: 0.6, periodicity: 0, contactWidth: 0.2 }, arBufferSpring, arBufferTube, { coil: { level: 0.45, length: 16, dispersion: 0.5, decay: 0.12, brightness: 2400 }, housing: BUFFER_TUBE_HOUSING }),
-                travelRub('buffer spring loading (second third)', 32, 62, -7 + 10 * Math.log10(BUFFER_SPRING), { force: 3 * BUFFER_SPRING, roughness: 6, grain: 0.6, periodicity: 0, contactWidth: 0.2 }, arBufferSpring, arBufferTube, { coil: { level: 0.5, length: 12, dispersion: 0.5, decay: 0.12, brightness: 2800 }, housing: BUFFER_TUBE_HOUSING }),
-                travelRub('buffer spring loading (last third)', 62, 90, -6 + 10 * Math.log10(BUFFER_SPRING), { force: 4 * BUFFER_SPRING, roughness: 6, grain: 0.6, periodicity: 0, contactWidth: 0.2 }, arBufferSpring, arBufferTube, { coil: { level: 0.55, length: 9, dispersion: 0.5, decay: 0.15, brightness: 3200 }, housing: BUFFER_TUBE_HOUSING }),
+                // Tension building from an already-preloaded spring: it pushes back hard from the first
+                // millimetre and the force climbs ~1.5x by the rear (louder, more pressure on the coils).
+                // Its surge pitch stays put (a linear spring's surge depends on stiffness and mass, not
+                // length). Smooth: coils slide, they don't tick.
+                travelRub('buffer spring loading (first third)', 2, 32, -7 + 10 * Math.log10(BUFFER_SPRING), { force: 2.7 * BUFFER_SPRING, roughness: 6, grain: 0.6, periodicity: 0, contactWidth: 0.2 }, arBufferSpring, arBufferTube, { coil: { level: 0.5, length: 11, dispersion: 0.5, decay: 0.12, brightness: 2800 }, housing: BUFFER_TUBE_HOUSING }),
+                travelRub('buffer spring loading (second third)', 32, 62, -6.5 + 10 * Math.log10(BUFFER_SPRING), { force: 3.4 * BUFFER_SPRING, roughness: 6, grain: 0.6, periodicity: 0, contactWidth: 0.2 }, arBufferSpring, arBufferTube, { coil: { level: 0.52, length: 11, dispersion: 0.5, decay: 0.12, brightness: 2900 }, housing: BUFFER_TUBE_HOUSING }),
+                travelRub('buffer spring loading (last third)', 62, 90, -6 + 10 * Math.log10(BUFFER_SPRING), { force: 4.1 * BUFFER_SPRING, roughness: 6, grain: 0.6, periodicity: 0, contactWidth: 0.2 }, arBufferSpring, arBufferTube, { coil: { level: 0.55, length: 11, dispersion: 0.5, decay: 0.12, brightness: 3000 }, housing: BUFFER_TUBE_HOUSING }),
                 hit('buffer weights lag', tAt(3), -22, 0.6, steelBlock(1.5, 12), arBuffer, { scatter: 0.9, radius: 2 }),
                 hit('buffer weights settle', CH_END + 0.004, -12, 0.8, steelBlock(1.5, 12), arBuffer, { scatter: 0.9, radius: 2 }, { housing: BUFFER_TUBE_HOUSING }),
             ],
