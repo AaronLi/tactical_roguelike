@@ -2,7 +2,7 @@
 // the expected message, and the real parts must pass.   node tools/check_authored_parts.test.mjs
 import fs from 'fs'; import path from 'path';
 import { loadModels, ROOT } from './model_env.mjs';
-import { authoredPartKeys, checkAuthoredPart, checkGeometry, boundsOf, readAuthoredPart, entryOf, partsTsWithBlock, PARTS_TS } from './authored_parts.mjs';
+import { authoredPartKeys, checkAuthoredPart, checkGeometry, checkPipClear, boundsOf, readAuthoredPart, entryOf, partsTsWithBlock, PARTS_TS } from './authored_parts.mjs';
 const M = loadModels(); let bad = 0, n = 0;
 const run = (label, msgs, re) => {
   n++; const all = msgs.join('\n'), ok = re === null ? msgs.length === 0 : re.test(all);
@@ -69,6 +69,10 @@ G('the window above the model', () => {}, /the reflex window .* is outside the m
 G('the window wider than the model', () => {}, /the reflex window is 120\.0 mm wide, wider than the model/, (c) => { c.optic.reflex.w = 0.12; });
 G('the window outside the model forward', () => {}, /the reflex window is at forward 200\.0 mm, outside the model/, (c) => { c.optic.reflex.f = 0.2; });
 G('fSight forward of the window', () => {}, /fSight is the rear\/eye side/, (c) => { c.optic.fSight = 0.02; });
+// the pip disk on the eye side of the glass (a prism's picture drawn under its own eye lens shows solid glass)
+{ const p1 = readAuthoredPart('optic/meridian_p1'), c = JSON.parse(JSON.stringify(p1.cfg));
+  run('pip clear: the P1 as authored is valid', checkPipClear(c, p1.meshes), null);
+  c.optic.pip.f += 0.001; run('pip clear: the disk inside the eye lens', checkPipClear(c, p1.meshes), /is not on the eye side of the lens mesh/); }
 // the catalogue entry and the generated block
 const entry = entryOf('optic/falcon', cfg0());
 run('the catalogue id is derived', entry.id === 'op.auth.falcon' && entry.model.apart === 'optic/falcon' && entry.model.optic === 'authored' && entry.model.ret === 'dot' && entry.magnifier === true ? [] : ['entry ' + JSON.stringify(entry)], null);
