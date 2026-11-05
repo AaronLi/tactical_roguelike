@@ -153,7 +153,7 @@ const G_Views = {
   },
 
   applySnap(m: any) {
-    if (!this.warmed) { this.warmed = true; G.Game.veilSay('Compiling shaders'); setTimeout(() => { G.R.warmup(); G.Game.veilN = 3; }, 60); } // (compile everything once the level's full, then a few frames drawn and the veil lifts: js/game.ts veil. The wait: time to draw that line first)
+    if (!this.warmed) { this.warmed = true; G.Game.veilSay('Compiling shaders'); setTimeout(() => { G.R.warmup(); G.Game.veilN = G.Game.VEIL_SMOOTH; G.Game.veilWait = 0; }, 60); } // (compile everything once the level's full, then a few frames drawn and the veil lifts: js/game.ts veil. The wait: time to draw that line first)
     const seen = new Set<number>();
     for (const [id, type, x, z, yaw, hp, aim, alert, crouch, lean, armed, scode, surp, door, kit, fl, str, y = 0] of m.e) {
       seen.add(id);

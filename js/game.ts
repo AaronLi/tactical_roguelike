@@ -53,6 +53,7 @@ const G_Game = {
   last: undefined as unknown as number, // (init: the clock of the last frame, and of the last host tick)
   serverLast: undefined as unknown as number,
   veilT: undefined as ReturnType<typeof setTimeout> | undefined,
+  veilWait: 0,
   veilN: undefined as unknown as number, // (frames to draw before the veil lifts: set by veil, and by js/views.ts applySnap)
   veilLine: undefined as string | null | undefined,
   _lp: undefined as GmPreview | undefined,
@@ -132,7 +133,7 @@ const G_Game = {
   // level's built, and its shaders compiled, in one go on the main thread, and the picture stands still while that's
   // done. So the host sends the panel across first (G.Server.overBlack) and does it there, and the panel wipes on off
   // the bottom once the new place has drawn a few frames (js/views.ts applySnap).
-  VEIL_MS: 350, VEIL_OUT: 650,
+  VEIL_MS: 820, VEIL_OUT: 650, VEIL_SMOOTH: 6, // (VEIL_MS: the wipe on, css/style.css veilIn 0.8 s, and a frame: the work waits until it's all the way down, or it freezes the wipe halfway)
   veil(on: boolean, instant?: boolean) {
     const el = this.$('veil'), was = el.classList.contains('on');
     if (!on && !was && !instant) return; // (not up, or already on its way off)
@@ -1135,10 +1136,11 @@ const G_Game = {
       const veil = this.$('veil'), up = veil.classList.contains('on') && !veil.classList.contains('out');
       if (!up) this.veil(true);
       const at = this.routeWait = (this.routeWait || 0) + 1;
-      Promise.all([this.armLoad(), new Promise((r) => setTimeout(r, up ? 0 : 850))]).then(() => { if (this.routeWait === at) this.enterRoute(level); });
+      Promise.all([this.armLoad(), new Promise((r) => setTimeout(r, up ? 0 : this.VEIL_MS + 30))]).then(() => { if (this.routeWait === at) this.enterRoute(level); });
       return;
     }
-    this.veil(false);
+    // the veil (if it's up) lifts once the route and the web below have drawn a few smooth frames (the game loop: veilN), not while they're being built
+    if (this.$('veil').classList.contains('on')) { this.veilN = this.VEIL_SMOOTH; this.veilWait = 0; } else this.veil(false);
     this.toggleInv(false);
     this.closeShop();
     this.hub = false; // (the hangar stays up behind the map: G.Hangar.leave when the level replaces it)
@@ -1394,7 +1396,7 @@ const G_Game = {
   loop() {
     requestAnimationFrame(() => this.loop());
     const now = performance.now();
-    const dt = Math.min((now - this.last) / 1000, 0.05);
+    const raw = now - this.last, dt = Math.min(raw / 1000, 0.05);
     this.last = now;
     this.serverTick();
     if (this.phase === 'level') {
@@ -1421,7 +1423,13 @@ const G_Game = {
     G.R.update(dt);
     G.HUD.update(dt);
     G.R.render();
-    if (this.veilN > 0 && --this.veilN === 0) this.veil(false); // (the new place has drawn: js/views.ts applySnap)
+    // the veil lifts once the new place has drawn veilN SMOOTH frames in a row (the first ones after a build upload textures and collect garbage: lifting
+    // on those makes the wipe stutter off), or after 90 frames whatever they took (a slow machine still gets in)
+    if (this.veilN > 0) {
+      this.veilWait = (this.veilWait || 0) + 1;
+      if (raw < 34) this.veilN--; else this.veilN = Math.max(this.veilN, this.VEIL_SMOOTH);
+      if (this.veilN === 0 || this.veilWait >= 90) { this.veilN = 0; this.veilWait = 0; this.veil(false); }
+    }
   },
   // swing door leaves toward their open/closed state
   updateDoors(dt: number) {
