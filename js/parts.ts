@@ -51,7 +51,7 @@ const G_Gunsmith = (() => {
   const PARTS: Record<string, Part> = {}, LIST: Part[] = [], PLATFORMS: Record<string, Platform> = {}, BY_MOUNT = new Map<string, Part[]>();
   // Shared magazines (G.MAG_FAMILY): [capacity, drum?, price, stats, tier] for each, std the standard one
   const MAG_FAMS: Record<string, MagFam> = {
-    stanag: { name: 'STANAG 5.56', brand: 'Graywater Arms', clear: 'Meridian Armor', std: 30, straightShort: true, model: { t: 'curved', len: 0.19, d: 0.066, c: 0.026, st: 0.28, ribs: 2, w: 0.024, well: 'black' }, desc: 'The NATO pattern: fits the M4, HK416, F2000, Tavor, SCAR-L, M27, MCX, G36 and AUG.',
+    stanag: { name: 'STANAG 5.56', brand: 'Graywater Arms', clear: 'Meridian Armor', std: 30, straightShort: true, model: { t: 'curved', len: 0.19, d: 0.066, c: 0.026, st: 0.28, ribs: 2, w: 0.024, well: 'black' }, desc: 'The NATO pattern: fits the Mk18, HK416, F2000, Tavor, SCAR-L, M27, MCX, G36 and AUG.',
       caps: [[20, false, 90, { reload: -12, ergo: 3, weight: -0.12 }, 1], [30, false, 60, {}, 1], [40, false, 220, { reload: 8, ergo: -2, weight: 0.15 }, 2], [100, true, 620, { reload: 45, ergo: -9, weight: 0.9 }, 3]] },
     mp5: { name: 'MP5 9mm', brand: 'Kestrel Tactical', clear: 'Vantage Industries', std: 30, model: { t: 'curved', len: 0.15, d: 0.04, c: 0.04, w: 0.022 }, desc: 'Fits the MP5 and MP5SD.',
       caps: [[15, false, 70, { reload: -12, ergo: 3, weight: -0.08 }, 1], [30, false, 50, {}, 1], [40, false, 200, { reload: 8, ergo: -2, weight: 0.1 }, 2], [50, true, 480, { reload: 35, ergo: -7, weight: 0.6 }, 3]] },
@@ -74,8 +74,8 @@ const G_Gunsmith = (() => {
   //   kits: { gun: [brand, name, price, tier, description] }
   const RCV: Record<string, { name: string; kits: Record<string, RcvKit> }> = {
     ar15: { name: 'AR-15 lower receiver', kits: {
-      m4: ['kestrel', 'M4 5.56 upper receiver group', 520, 1, 'Upper, bolt, gas system and barrel for 5.56: an M4 again.'],
-      ar9: ['redline', 'AR-9 9mm conversion kit', 640, 2, 'A blowback 9mm upper and a magazine-well block for Glock magazines. Turns an M4 into a 9mm carbine.'] } },
+      m4: ['kestrel', 'Mk18 5.56 upper receiver group', 520, 1, 'Upper, bolt, gas system and barrel for 5.56: an Mk18 again.'],
+      ar9: ['redline', 'AR-9 9mm conversion kit', 640, 2, 'A blowback 9mm upper and a magazine-well block for Glock magazines. Turns an Mk18 into a 9mm carbine.'] } },
     ak: { name: 'AK receiver and trunnion', kits: {
       ak: ['north', 'AKM 7.62×39 barrel and bolt group', 560, 1, 'Front trunnion, bolt and barrel for 7.62×39: a KV-47.'],
       ak74: ['north', 'AK-74 5.45×39 conversion group', 620, 2, 'Trunnion, bolt and barrel for 5.45×39: an AK-74M, on AK-74 magazines.'],
@@ -749,7 +749,7 @@ const G_Gunsmith = (() => {
   // they were (a part's id in a code is its place in the list), then retired at the end and the slot moved to STANAG.
   const NATO_LATE = new Set(['g36', 'aug']);
   // Rifles (archetype: rifle). Receivers keep what isn't a part (bullpup shell, carry handles, bolts, levers, bipods on fixed forends).
-  P('m4', 'rifle', { L: 0.21 }, { barrel: { len: 0.33 }, thread: 'r556', muzzle: 'flash', handguard: ['ar', { t: 'rail', len: 0.24 }], stock: ['tube', 'm4'], grip: ['ar', 'ar'], mag: { t: 'curved', len: 0.19, d: 0.064, c: 0.03, well: 'black' }, optic: ['pic', { optic: 'reddot' }], charging: 'ar' });
+  P('m4', 'rifle', { L: 0.21 }, { barrel: { len: 0.256 }, thread: 'r556', muzzle: 'flash', handguard: ['ar', { t: 'rail', len: 0.24 }], /* (an Mk18: a 10.3" barrel under a quad rail; 0.24 m is about the longest that leaves the 15 mm of barrel a muzzle device needs, hgRoom) */ stock: ['tube', 'm4'], grip: ['ar', 'ar'], mag: { t: 'curved', len: 0.19, d: 0.064, c: 0.03, well: 'black' }, optic: ['pic', { optic: 'reddot' }], charging: 'ar' });
   P('ak', 'rifle', { rcv: 'ak', L: 0.28, rm: 'blued', fm: 'wood' }, { barrel: { len: 0.32 }, thread: 'rak', muzzle: 'slant', handguard: ['ak', { t: 'wood', len: 0.2 }], stock: ['ak', 'akwood'], grip: ['ak', 'wood'], mag: { t: 'curved', len: 0.23, d: 0.072, c: 0.08, w: 0.028, m: 'park' }, optic: ['pic', { optic: 'notch' }] });
   // the F2, traced from a photo (js/gunmodels.ts rifle(), rcv 'f2'): a FAMAS G2's shell, its carrying handle over the receiver, the guard round the whole hand, a STANAG behind it
   P('f2', 'rifle', { rcv: 'f2', siderails: true, L: 0.637, fm: 'polymer', grip: 0.33, support: 0.53, optF: 0.43, chY: -0.008, magFit: { len: 0.59, c: 0.46, d: 0.066 }, mag: { f: 0.2, y: -0.079 }, cock: { f: 0.46, y: 0.026, stem: 0.008, x: 0, travel: 0.055, style: 'top', recip: false } }, { barrel: { len: 0.068, r: 0.0068 }, thread: 'r556', muzzle: 'flash', grip: ['ar', 'ar'], mag: { t: 'straight', len: 0.13, d: 0.06 }, optic: ['pic', { optic: 'irons' }] });
@@ -1329,12 +1329,12 @@ const G_Gunsmith = (() => {
     for (const p of BY_MOUNT.get(sl.mount) || []) p.retired = true;
     sl.mount = 'mag:stanag'; plat.defaults.mag = 'stanag.mag.30'; plat.magVariants = true; LATE.add(id);
   }
-  // The Thor with 30 inches of barrel, an AR barrel nut on it: it takes an M4's handguard, and whatever goes on that. (Measured from
+  // The Thor with 30 inches of barrel, an AR barrel nut on it: it takes an AR handguard, and whatever goes on that. (Measured from
   // the chamber, 44 mm behind the pin the model's barrel starts from; hgGap: the sleeve's carried on past the frame's nose, or the
   // handguard would swing down through it as the barrel tips open, and the handguard starts there; sightRise: its irons on a riser and a tall front base, 15 mm clear of the tallest rail: js/gunmodels.ts.)
   add({ id: 'thor.br.30', slot: 'barrel', mount: 'br:thor', plat: 'thor', brand: BR.kodiak, name: 'Kodiak Longshot 30" barrel', price: 2400, tier: 3,
     model: { barrel: { len: 0.718, r: 0.0118, taper: 0.72 }, hgGap: 0.066, sightRise: 0.019 }, provides: { handguard: 'hg:ar' }, st: { acc: -25, ergo: -32, weight: 3.2, recoil: -10 }, set: { barrelIn: 30 },
-    desc: 'Thirty inches on a break-action pistol. Far more velocity, and an AR barrel nut: it takes an M4 handguard, and the grips, lights and lasers that go on one.' });
+    desc: 'Thirty inches on a break-action pistol. Far more velocity, and an AR barrel nut: it takes an AR handguard, and the grips, lights and lasers that go on one.' });
   // Its grip with a stock lug on the back of it, as the derringer's: any SMG stock, braced as a handgun's is. (On the AK grip mount, which it
   // shares with every AK: not.)
   add({ id: 'thor.gr.lug', slot: 'grip', mount: 'gr:ak', plat: 'thor', brand: BR.bastion, name: 'Bastion stock-lug grip', price: 340, tier: 2, st: { weight: 0.12, ergo: -1 },

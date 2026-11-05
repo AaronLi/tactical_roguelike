@@ -69,7 +69,7 @@ const W = (o: Record<string, any>): WeaponDef => Object.assign({ pellets: 1, mod
 
 const G_WEAPON_LIST: WeaponDef[] = [
   // ----- PRIMARY: assault / battle rifles -----
-  W({ id: 'm4', slot: 'p', cls: 'AR', tier: 1, price: 900, name: 'M4 Carbine', rpm: 780, mag: 30, reserve: 180, reload: 2.2, spread: 2.8, ads: 0.025, range: 35, speed: 0.95, desc: 'Reliable all-rounder. Never lets you down.' }),
+  W({ id: 'm4', slot: 'p', cls: 'AR', tier: 1, price: 900, name: 'Mk18 CQBR', rpm: 780, mag: 30, reserve: 180, reload: 2.2, spread: 2.8, ads: 0.025, range: 35, speed: 0.95, desc: 'A short-barrelled carbine for close quarters: quick through a doorway, a little less reach.' }),
   W({ id: 'ak', slot: 'p', cls: 'AR', tier: 1, price: 1000, name: 'KV-47', rpm: 600, mag: 30, reserve: 180, reload: 2.5, spread: 3.2, ads: 0.04167, range: 35, speed: 0.94, pen: 1, desc: 'Hits like a truck, kicks like a mule. Punches through one target.' }),
   W({ id: 'f2', slot: 'p', cls: 'AR', tier: 2, price: 1500, name: 'F2 Bullpup', rpm: 950, mag: 30, reserve: 210, reload: 2.4, spread: 2.6, ads: 0.02917, range: 32, speed: 0.97, desc: 'Compact bullpup with a blistering cyclic rate.' }),
   W({ id: 'g36', slot: 'p', cls: 'AR', tier: 2, price: 1600, name: 'G36 Ranger', rpm: 720, mag: 30, reserve: 210, reload: 2.3, spread: 2.2, ads: 0.02083, range: 45, zoom: 0.62, speed: 0.95, desc: 'Laser-flat recoil. Rail on top for whatever optic you like.' }),
@@ -132,7 +132,7 @@ const G_WEAPON_LIST: WeaponDef[] = [
   W({ id: 'mpx', slot: 'p', cls: 'SMG', tier: 2, price: 1500, name: 'MPX', rpm: 850, mag: 30, reserve: 210, reload: 2.0, spread: 2.4, ads: 0.025, range: 22, falloff: 0.5, speed: 1.04, desc: 'A 9mm SMG that handles like an AR: buffer tube, AR grip, AR rail.' }),
   W({ id: 'benelli', slot: 'p', cls: 'SG', tier: 2, price: 1800, name: 'Benelli M4', pellets: 8, rpm: 240, mode: 'semi', mag: 7, reserve: 42, reload: 0.5, shell: true, choke: 0.8, spread: 4.5, ads: 0.04167, range: 16, falloff: 0.25, speed: 0.98, desc: 'Semi-auto, tube-fed, AR stock and grip. Fast follow-ups, slow to top up (fit a speed loader).' }),
   W({ id: 'vepr', slot: 'p', cls: 'SG', tier: 2, price: 1700, name: 'Vepr-12', pellets: 8, rpm: 280, mode: 'semi', mag: 8, reserve: 48, reload: 2.5, choke: 0.8, spread: 4.5, ads: 0.05, range: 16, falloff: 0.25, speed: 0.98, desc: 'The better-mannered Saiga: same magazines, softer recoil.' }),
-  W({ id: 'ar9', slot: 'p', cls: 'SMG', tier: 1, price: 900, name: 'AR-9', rpm: 900, mag: 33, reserve: 198, reload: 2.1, spread: 2.6, ads: 0.03333, range: 20, falloff: 0.5, speed: 1.03, desc: 'An M4 lower with a 9mm blowback kit in it: Glock magazines, every AR part. Fit an M4 upper and it\'s a rifle again.' }),
+  W({ id: 'ar9', slot: 'p', cls: 'SMG', tier: 1, price: 900, name: 'AR-9', rpm: 900, mag: 33, reserve: 198, reload: 2.1, spread: 2.6, ads: 0.03333, range: 20, falloff: 0.5, speed: 1.03, desc: 'An AR lower with a 9mm blowback kit in it: Glock magazines, every AR part. Fit an Mk18 upper and it\'s a rifle again.' }),
   W({ id: 'aug9', slot: 'p', cls: 'SMG', tier: 2, price: 1500, name: 'AUG 9mm', rpm: 750, mag: 33, reserve: 198, reload: 2.2, spread: 2.2, ads: 0.03333, range: 24, zoom: 0.62, falloff: 0.5, speed: 1.03, desc: 'The AUG with its 9mm conversion: a long, quiet-handling bullpup SMG on Glock magazines.' }),
   W({ id: 'qbz95', slot: 'p', cls: 'AR', tier: 2, price: 1600, name: 'QBZ-95', rpm: 650, mag: 30, reserve: 210, reload: 2.4, spread: 2.4, ads: 0.025, range: 44, zoom: 0.72, speed: 0.97, desc: 'The PLA\'s bullpup: 5.8×42, a long barrel in a short gun, its sights in the carrying handle. Shares its magazines with the QBZ-192.' }),
   W({ id: 'qbz192', slot: 'p', cls: 'AR', tier: 2, price: 1800, name: 'QBZ-192', rpm: 750, mag: 30, reserve: 210, reload: 2.2, spread: 2.5, ads: 0.025, range: 36, zoom: 0.72, speed: 0.97, desc: 'The QBZ-95\'s conventional successor, cut down to a carbine: a full-length rail, a side-folding stock, the same 5.8×42 magazines.' }),
@@ -355,7 +355,7 @@ G.beltFed = G_beltFed;
 const GS = (barrel: number, caliber: number, muzzleDevice: string, pressure: number, grain: number, bulletWeight: number, boltMass: number, boltLoudness: number, actionType: string, caseMaterial: string, caseLength: number, shotCount = 1): GunSpec =>
   ({ barrel, caliber, muzzleDevice, pressure, grain, bulletWeight, boltMass, boltLoudness, actionType, caseMaterial, caseLength, shotCount });
 const G_GUN_SPECS: Record<string, any> = { // (any, not GunSpec, for the same reason: (G.GUN_SPECS[x] || {}).barrel in gunsmith.ts, parts.ts; each row is a GS(), a GunSpec)
-  m4:       GS(14.5, 5.56, 'flash', 55000, 0.70, 62, 0.35, 0.50, 'gas', 'brass', 45),
+  m4:       GS(10.3, 5.56, 'flash', 55000, 0.70, 62, 0.35, 0.50, 'gas', 'brass', 45),
   ak:       GS(16.3, 7.62, 'none', 45000, 1.00, 123, 0.72, 0.70, 'longstroke', 'steel', 39),
   f2:       GS(19.2, 5.56, 'flash', 55000, 0.70, 62, 0.30, 0.55, 'roller', 'brass', 45),
   g36:      GS(18.9, 5.56, 'flash', 55000, 0.70, 62, 0.40, 0.50, 'gas', 'brass', 45),
