@@ -37,7 +37,7 @@ export const PRESETS = [
         patch: {
             impact: { velocity: 3.5, restitution: 0.35, scatter: 0.85, contactRadius: 2, click: 0.35 },
             bodyA: { ...mat('steel'), shape: 'bar', size: 22, thickness: 6, modes: 24, irregularity: 0.5, damping: 0, level: 0 },
-            bodyB: { ...mat('concrete'), shape: 'block', size: 100, thickness: 100, modes: 12, irregularity: 0.5, damping: 1, level: -10 },
+            bodyB: { ...mat('concrete'), shape: 'block', size: 50, thickness: 50, modes: 12, irregularity: 0.5, damping: 1, level: -10 },
             out: { length: 3 },
         },
     },
@@ -45,7 +45,7 @@ export const PRESETS = [
         id: 'bolt-bench', label: 'Bolt bouncing on a steel bench', group: 'Impacts',
         patch: {
             impact: { velocity: 2.5, restitution: 0.55, scatter: 0.7, contactRadius: 1.5, click: 0.3 },
-            bodyA: { ...mat('steel'), shape: 'plate', size: 60, thickness: 4, modes: 40, irregularity: 0.4, damping: 0.4, level: -6 },
+            bodyA: { ...mat('steel'), shape: 'plate', size: 50, thickness: 4, modes: 40, irregularity: 0.4, damping: 0.4, level: -6 },
             bodyB: { ...mat('steel'), shape: 'bar', size: 5, thickness: 8, modes: 12, irregularity: 0.3, damping: 0, level: 0 },
         },
     },
@@ -62,7 +62,7 @@ export const PRESETS = [
         id: 'pipe-chime', label: 'Steel pipe struck (chime)', group: 'Impacts',
         patch: {
             impact: { velocity: 1.5, restitution: 0.1, scatter: 0, contactRadius: 5, click: 0.1 },
-            bodyA: { ...mat('steel'), shape: 'bar', size: 60, thickness: 14, modes: 12, irregularity: 0.1, damping: 0, level: 0 },
+            bodyA: { ...mat('steel'), shape: 'bar', size: 50, thickness: 14, modes: 12, irregularity: 0.1, damping: 0, level: 0 },
             bodyB: { ...mat('nylon'), shape: 'block', size: 4, thickness: 3, modes: 6, irregularity: 0, damping: 1, level: -20 },
             out: { length: 6, room: 0.25, roomSize: 0.7 },
         },
@@ -72,7 +72,7 @@ export const PRESETS = [
         patch: {
             impact: { velocity: 3, restitution: 0.3, scatter: 0.8, contactRadius: 8, click: 0.4 },
             bodyA: { ...mat('abs'), shape: 'shell', size: 30, thickness: 3, modes: 32, irregularity: 0.5, damping: 0, level: 0 },
-            bodyB: { ...mat('concrete'), shape: 'block', size: 100, thickness: 100, modes: 12, irregularity: 0.5, damping: 1, level: -10 },
+            bodyB: { ...mat('concrete'), shape: 'block', size: 50, thickness: 50, modes: 12, irregularity: 0.5, damping: 1, level: -10 },
             out: { length: 1.5 },
         },
     },
@@ -81,7 +81,7 @@ export const PRESETS = [
         patch: {
             impact: { velocity: 1.8, restitution: 0.45, scatter: 0.9, contactRadius: 2, click: 0.5 },
             bodyA: { ...mat('polystyrene'), shape: 'bar', size: 14, thickness: 7, modes: 16, irregularity: 0.4, damping: 0, level: 0 },
-            bodyB: { ...mat('wood'), shape: 'plate', size: 80, thickness: 25, modes: 24, irregularity: 0.3, damping: 0.6, level: -6 },
+            bodyB: { ...mat('wood'), shape: 'plate', size: 50, thickness: 25, modes: 24, irregularity: 0.3, damping: 0.6, level: -6 },
             out: { length: 1.5 },
         },
     },
@@ -131,7 +131,7 @@ export const PRESETS = [
             impact: { velocity: 0.6, restitution: 0.1, scatter: 0.6, contactRadius: 3, click: 0.3 },
             friction: { force: 25, duration: 1.6, speed: 0.5, profile: 'steady', roughness: 200, grain: 2, periodicity: 0.1, stickSlip: 0.25, stickPitch: 120, contactWidth: 0.2 },
             bodyA: { ...mat('castiron'), shape: 'block', size: 15, thickness: 8, modes: 16, irregularity: 0.6, damping: 0.3, level: 0 },
-            bodyB: { ...mat('concrete'), shape: 'block', size: 100, thickness: 100, modes: 12, irregularity: 0.5, damping: 1, level: -6 },
+            bodyB: { ...mat('concrete'), shape: 'block', size: 50, thickness: 50, modes: 12, irregularity: 0.5, damping: 1, level: -6 },
         },
     },
     {
@@ -140,7 +140,7 @@ export const PRESETS = [
             impact: NO_IMPACT,
             friction: { force: 6, duration: 0.9, speed: 0.5, profile: 'swell', roughness: 4, grain: 0.2, periodicity: 0, stickSlip: 0.05, contactWidth: 0.08 },
             bodyA: { ...mat('pp'), shape: 'plate', size: 35, thickness: 2, modes: 32, irregularity: 0.3, damping: 0.2, level: 0 },
-            bodyB: { ...mat('wood'), shape: 'plate', size: 80, thickness: 25, modes: 24, irregularity: 0.3, damping: 0.6, level: -6 },
+            bodyB: { ...mat('wood'), shape: 'plate', size: 50, thickness: 25, modes: 24, irregularity: 0.3, damping: 0.6, level: -6 },
             out: { length: 1.4 },
         },
     },
@@ -150,7 +150,7 @@ export const PRESETS = [
             impact: { velocity: 0.4, restitution: 0, scatter: 0.3, contactRadius: 10, click: 0.2 },
             friction: { force: 30, duration: 1.5, speed: 0.4, profile: 'steady', roughness: 120, grain: 1.2, periodicity: 0.1, stickSlip: 0.35, stickPitch: 90, contactWidth: 0.3 },
             bodyA: { ...mat('hdpe'), shape: 'shell', size: 45, thickness: 4, modes: 32, irregularity: 0.5, damping: 0.1, level: 0 },
-            bodyB: { ...mat('concrete'), shape: 'block', size: 100, thickness: 100, modes: 12, irregularity: 0.5, damping: 1, level: -8 },
+            bodyB: { ...mat('concrete'), shape: 'block', size: 50, thickness: 50, modes: 12, irregularity: 0.5, damping: 1, level: -8 },
         },
     },
     {
@@ -301,7 +301,7 @@ export const PRESETS = [
             impact: NO_IMPACT,
             snap: { count: 1, strength: 0.5, preload: 0, creak: 0, seat: 0, seatDelay: 5 },
             bodyA: { ...mat('springsteel'), shape: 'bar', size: 30, thickness: 0.8, modes: 32, irregularity: 0.2, damping: 0.4, level: 0 },
-            bodyB: { ...mat('wood'), shape: 'plate', size: 80, thickness: 25, modes: 24, irregularity: 0.3, damping: 0.6, level: -2 },
+            bodyB: { ...mat('wood'), shape: 'plate', size: 50, thickness: 25, modes: 24, irregularity: 0.3, damping: 0.6, level: -2 },
             flex: { amount: 1, freq: 28, decay: 1.6, rattle: 0.9, wobble: 0.5, tone: 0.3 },
             out: { length: 2.5 },
         },
@@ -312,7 +312,7 @@ export const PRESETS = [
             impact: NO_IMPACT,
             snap: { count: 1, strength: 0.5, preload: 0, creak: 0, seat: 0, seatDelay: 5 },
             bodyA: { ...mat('acrylic'), shape: 'bar', size: 30, thickness: 2.5, modes: 24, irregularity: 0.2, damping: 0.3, level: 0 },
-            bodyB: { ...mat('wood'), shape: 'plate', size: 80, thickness: 25, modes: 24, irregularity: 0.3, damping: 0.6, level: -2 },
+            bodyB: { ...mat('wood'), shape: 'plate', size: 50, thickness: 25, modes: 24, irregularity: 0.3, damping: 0.6, level: -2 },
             flex: { amount: 1, freq: 18, decay: 0.7, rattle: 0.8, wobble: 0.3, tone: 0.4 },
             out: { length: 1.5 },
         },
@@ -321,7 +321,7 @@ export const PRESETS = [
         id: 'sheet-wobble', label: 'Thin steel sheet wobbled (thunder sheet)', group: 'Springs',
         patch: {
             impact: { velocity: 0.8, restitution: 0, scatter: 0, contactRadius: 30, click: 0 },
-            bodyA: { ...mat('steel'), shape: 'plate', size: 70, thickness: 0.5, modes: 64, irregularity: 0.5, damping: 0.05, level: 0 },
+            bodyA: { ...mat('steel'), shape: 'plate', size: 50, thickness: 0.5, modes: 64, irregularity: 0.5, damping: 0.05, level: 0 },
             bodyB: { ...mat('rubber'), shape: 'block', size: 8, thickness: 4, modes: 4, irregularity: 0, damping: 1, level: -30 },
             flex: { amount: 1, freq: 4.5, decay: 2.5, rattle: 0, wobble: 1, tone: 0.1 },
             out: { length: 4, room: 0.25, roomSize: 0.6 },

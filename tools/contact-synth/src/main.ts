@@ -6,6 +6,7 @@ import { PRESETS } from './presets.js';
 import { SECTIONS, type Control, type RangeControl } from './schema.js';
 import { render, type RenderInfo } from './render.js';
 import { encodeWav } from './wav.js';
+import { MAX_SIZE_CM } from './body.js';
 import { drawViz, type VizLayout } from './viz.js';
 
 const SR = 48000;
@@ -39,7 +40,9 @@ function loadFromHash(): Params | null {
   if (!m) return null;
   try {
     const json = decodeURIComponent(escape(atob(m[1].replace(/-/g, '+').replace(/_/g, '/'))));
-    return withPatch(JSON.parse(json));
+    const p = withPatch(JSON.parse(json));
+    for (const b of [p.bodyA, p.bodyB]) b.size = Math.min(b.size, MAX_SIZE_CM);
+    return p;
   } catch {
     return null;
   }
@@ -329,7 +332,7 @@ function randomBody(b: Params['bodyA'], allowOther: boolean): void {
   const m = pick(mats);
   Object.assign(b, { material: m.id, stiffness: m.stiffness, density: m.density, loss: m.loss });
   b.shape = pick(['bar', 'plate', 'shell', 'block'] as const);
-  b.size = r3(rndLog(1.5, 80));
+  b.size = r3(rndLog(1.5, 50));
   b.thickness = r3(Math.min(b.size * 5, rndLog(0.2, 12)));
   b.damping = r3(rnd(0, 0.6));
   b.irregularity = r3(rnd(0, 0.7));

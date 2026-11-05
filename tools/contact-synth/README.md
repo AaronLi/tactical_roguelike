@@ -28,7 +28,7 @@ npm run check          # renders every preset in Node and checks the output
 | **Impact** | speed, bounciness (restitution), tumble/clatter, contact curvature, click | taps, drops, bounces, clatter |
 | **Friction** | pressing force, duration, speed and motion profile, roughness (µm), grain/ridge spacing (mm), periodicity, stick-slip and its rate, contact softness | smooth slides, gritty scrapes, files, ratchets, zip ties, squeaks, creaks |
 | **Snap** | count, strength, spacing, load time, creak, seat hit and seat delay | latches, buckles, battery covers, switches, pen clicks, detents |
-| **Body A / Body B** | material (stiffness E, density ρ, loss η), shape (bar / plate / shell / block), size, thickness, how firmly it's held, irregularity | every metal and plastic, at any thickness |
+| **Body A / Body B** | material (stiffness E, density ρ, loss η), shape (bar / plate / shell / block), size (up to 50 cm), thickness, how firmly it's held, irregularity | every metal and plastic, at any thickness |
 | **Flex** | swing amount, rate and decay; rattle against support; pitch wobble; swing tone | ruler twang, thunder sheet, saw blade, latch arm, door-stop spring |
 | **Coil** | level, spring length (round-trip ms), dispersion, decay, brightness | spring "boing / zing / pew", spring-loaded mechanisms |
 

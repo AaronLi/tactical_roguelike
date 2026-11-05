@@ -44,7 +44,7 @@ function bodyControls(prefix: 'bodyA' | 'bodyB'): Control[] {
     { kind: 'range', path: `${prefix}.density`, label: 'Density', min: 500, max: 12000, log: true, unit: 'kg/m³', digits: 0, hint: 'Heavier lowers pitch and makes the body harder to set ringing.' },
     { kind: 'range', path: `${prefix}.loss`, label: 'Internal loss (η)', min: 0.00005, max: 0.3, log: true, digits: 5, hint: 'How fast vibration turns to heat. Metals ring (1e-4), plastics thud (2e-2), rubber dies instantly.' },
     { kind: 'select', path: `${prefix}.shape`, label: 'Shape', options: shapeOptions, hint: 'Sets the overtone pattern: bars are sparse and clangy, plates dense and washy, shells beat, blocks barely ring.' },
-    { kind: 'range', path: `${prefix}.size`, label: 'Size', min: 0.5, max: 150, log: true, unit: 'cm', digits: 1, hint: 'Longest dimension. Pitch falls with the square of size.' },
+    { kind: 'range', path: `${prefix}.size`, label: 'Size', min: 0.5, max: 50, log: true, unit: 'cm', digits: 1, hint: 'Longest dimension, up to 50 cm. Pitch falls with the square of size.' },
     { kind: 'range', path: `${prefix}.thickness`, label: 'Thickness', min: 0.05, max: 100, log: true, unit: 'mm', digits: 2, hint: 'Wall / sheet / bar thickness. Pitch rises in proportion. Thin = low, wobbly and loud; thick = high and solid.' },
     { kind: 'range', path: `${prefix}.damping`, label: 'Held / damped', min: 0, max: 1, step: 0.01, digits: 2, hint: '0 = hanging free, 1 = clamped, gripped or sitting on something soft.' },
     { kind: 'range', path: `${prefix}.irregularity`, label: 'Irregularity', min: 0, max: 1, step: 0.01, digits: 2, hint: 'Dents, holes, ribs: detunes and splits modes (more clangy, less pure).' },

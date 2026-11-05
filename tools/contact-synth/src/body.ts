@@ -37,6 +37,9 @@ export interface BodyModel {
   modes: Mode[];
 }
 
+/** Largest object simulated, cm. */
+export const MAX_SIZE_CM = 50;
+
 const BAR_BETA = [4.73004, 7.85320, 10.99561, 14.13717, 17.27876];
 
 /** Every overtone ratio (sorted, first = 1) of a shape up to maxRatio. */
@@ -129,7 +132,7 @@ export function deriveBody(bp: BodyParams, sr: number, rng: () => number): BodyM
   const E = Math.max(1e6, bp.stiffness * 1e9);
   const rho = Math.max(100, bp.density);
   const c = Math.sqrt(E / rho);
-  const L = Math.max(0.002, bp.size / 100);
+  const L = clamp(bp.size, 0.2, MAX_SIZE_CM) / 100;
   const h = Math.min(Math.max(0.00002, bp.thickness / 1000), L);
 
   let f1: number;
