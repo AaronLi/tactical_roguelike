@@ -1,5 +1,6 @@
 'use strict';
 const _tv = new THREE.Vector3(), _tv2 = new THREE.Vector3();
+const _fq = new THREE.Quaternion(), _fq2 = new THREE.Quaternion(), _fz = new THREE.Vector3(0, 0, 1), _fn = new THREE.Vector3(), _fp = new THREE.Vector3(), _fs = new THREE.Vector3(), _fm = new THREE.Matrix4(), _fc = new THREE.Color();
 const _bjc = new THREE.Color();
 // Three.js scene, character models, first-person viewmodels and particle effects.
 interface Trail { line: THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>; mat: THREE.LineBasicMaterial; n: number; N: number; shot: PShot; old: number | null; marks: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>[]; keys?: Set<any>; }
@@ -49,6 +50,7 @@ const G_R = {
   points: undefined as unknown as THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial>,
   decals: undefined as unknown as RMark[],
   decalIdx: undefined as unknown as number,
+  FRAG_MARKS: 3000, fragMarks: undefined as unknown as THREE.InstancedMesh, fragN: 0, fragDirty: false, scorches: [] as THREE.Mesh[], scorchIdx: 0,
   bloodMats: undefined as unknown as RBloodMats,
   bloodMarks: undefined as unknown as RMark[],
   bloodIdx: undefined as unknown as number,
@@ -235,6 +237,7 @@ const G_R = {
     };
     while (this.levelRoot.children.length) { const c = this.levelRoot.children[0]; dispose(c); this.levelRoot.remove(c); }
     this.decals.forEach((d: THREE.Object3D) => (d.visible = false));
+    this.fragMarks.count = 0; this.fragN = 0; this.scorches.forEach((m) => (m.visible = false));
     if (this.bloodMarks) { this.bloodMarks.forEach((d: THREE.Object3D) => (d.visible = false)); this.pools.forEach((d: THREE.Object3D) => { d.visible = false; d.userData.owner = null; }); }
   },
   // ------------------------------------------------------------ blood on the environment
@@ -392,6 +395,28 @@ const G_R = {
     const dgeo = new THREE.PlaneGeometry(0.14, 0.14);
     for (let i = 0; i < 260; i++) { const d = new THREE.Mesh(dgeo, decalMat); d.visible = false; this.scene.add(d); this.decals.push(d); }
     this.decalIdx = 0;
+
+    // Frag grenade marks, kept apart from the bullet holes above (one grenade would push every one of them out): the pocks
+    // its chips leave are one InstancedMesh of FRAG_MARKS tiny quads, the oldest written over; and a few soot scorches
+    // where grenades went off. A mark is a write into the instance buffer, uploaded once a frame (fragMarkFlush).
+    {
+      const pc = document.createElement('canvas'); pc.width = pc.height = 32;
+      const pg = pc.getContext('2d') as CanvasRenderingContext2D, pgr = pg.createRadialGradient(16, 16, 0, 16, 16, 16);
+      pgr.addColorStop(0, 'rgba(12,12,12,1)'); pgr.addColorStop(0.3, 'rgba(18,18,18,0.95)'); pgr.addColorStop(0.45, 'rgba(215,210,198,0.55)'); pgr.addColorStop(0.7, 'rgba(215,210,198,0.15)'); pgr.addColorStop(1, 'rgba(215,210,198,0)'); // (a dark pit in a lighter chipped rim: the instance's colour tints both)
+      pg.fillStyle = pgr; pg.fillRect(0, 0, 32, 32);
+      const pm = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(pc), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3 });
+      const im = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), pm, this.FRAG_MARKS);
+      im.count = 0; im.frustumCulled = false; im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      im.setColorAt(0, new THREE.Color(1, 1, 1)); (im.instanceColor as THREE.InstancedBufferAttribute).setUsage(THREE.DynamicDrawUsage);
+      this.scene.add(im); this.fragMarks = im; this.fragN = 0;
+      const sc = this.scorchTexture();
+      this.scorches = [];
+      for (let i = 0; i < 16; i++) {
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: sc, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
+        m.rotation.x = -Math.PI / 2; m.visible = false; this.scene.add(m); this.scorches.push(m);
+      }
+      this.scorchIdx = 0;
+    }
 
     // Blood where it lands: droplets (a drop with a few satellites) and smears on the floor or a tabletop,
     // spatter on walls, and pools that spread under the dead and the badly bleeding. Fixed pools of meshes,
@@ -751,6 +776,51 @@ const G_R = {
       // (a door's solid is thicker than its leaf: on the leaf's own face, not in the air in front of it)
       if (Math.abs(l.x) <= g.width / 2 + 0.03 && Math.abs(l.y) <= g.height / 2 + 0.03 && Math.abs(l.z) <= 0.09) { leaf.attach(m); m.position.z = Math.sign(l.z || 1) * (g.depth / 2 + 0.004); return; }
     }
+  },
+  // ------------------------------------------------------------ frag grenade marks
+  // A chip's pock where it struck a surface: at p, flat on it (n: its normal, facing the chip), by what it hit. A dark pit
+  // a few mm across, in a lighter chipped rim on plaster and stone, a dark speck on wood; metal, glass, soft stuff and
+  // water show nothing. k scales it with the chip's speed; r1, r2: two random numbers (a size and a turn).
+  fragMark(p: THREE.Vector3, n: number[], fx: string, k: number, r1: number, r2: number) {
+    const L: Record<string, [number, number, number, number]> = { plaster: [0.032, 0.9, 0.88, 0.82], stone: [0.026, 0.8, 0.78, 0.74], wood: [0.011, 0.4, 0.3, 0.2], soil: [0.014, 0.35, 0.3, 0.25], plastic: [0.012, 0.5, 0.5, 0.5] };
+    const l = L[fx]; if (!l) return;
+    const im = this.fragMarks, i = this.fragN % this.FRAG_MARKS, sz = l[0] * k * (0.75 + 0.5 * r1);
+    _fq.setFromUnitVectors(_fz, _fn.set(n[0], n[1], n[2])); _fq2.setFromAxisAngle(_fz, r2 * 6.283); _fq.multiply(_fq2);
+    _fm.compose(_fp.set(p.x + n[0] * 0.003, p.y + n[1] * 0.003, p.z + n[2] * 0.003), _fq, _fs.set(sz, sz, 1));
+    im.setMatrixAt(i, _fm); im.setColorAt(i, _fc.setRGB(l[1], l[2], l[3]));
+    this.fragN++; im.count = Math.min(this.fragN, this.FRAG_MARKS); this.fragDirty = true;
+  },
+  // the frame's marks go up to the GPU (once)
+  fragMarkFlush() {
+    if (!this.fragDirty) return;
+    this.fragDirty = false; this.fragMarks.instanceMatrix.needsUpdate = true; if (this.fragMarks.instanceColor) this.fragMarks.instanceColor.needsUpdate = true;
+  },
+  // the soot of a blast on the floor under it, drawn once: a dark core fading to a streaky grey edge, with ragged radial
+  // streaks reaching out further in places
+  scorchTexture() {
+    const S = 256, c = document.createElement('canvas'); c.width = c.height = S;
+    const g = c.getContext('2d') as CanvasRenderingContext2D, rnd = G.U.rng(7741);
+    g.translate(S / 2, S / 2);
+    const gr = g.createRadialGradient(0, 0, 0, 0, 0, S * 0.36);
+    gr.addColorStop(0, 'rgba(8,7,6,0.92)'); gr.addColorStop(0.35, 'rgba(14,13,12,0.8)'); gr.addColorStop(0.7, 'rgba(40,38,35,0.35)'); gr.addColorStop(1, 'rgba(60,58,55,0)');
+    g.fillStyle = gr; g.beginPath();
+    for (let i = 0; i <= 48; i++) { const a = (i / 48) * 6.283, r = S * 0.36 * (0.82 + 0.3 * rnd()); g.lineTo(Math.cos(a) * r, Math.sin(a) * r); }
+    g.fill();
+    g.lineCap = 'round';
+    for (let i = 0; i < 70; i++) { // (the streaks: long and faint, a few reaching out to the edge)
+      const a = rnd() * 6.283, r0 = S * (0.08 + 0.12 * rnd()), r1 = Math.min(S * 0.49, S * (0.22 + 0.5 * rnd() * rnd())), a1 = a + (rnd() - 0.5) * 0.12;
+      g.strokeStyle = `rgba(${28 + rnd() * 24 | 0},${27 + rnd() * 22 | 0},${25 + rnd() * 20 | 0},${0.1 + 0.3 * rnd()})`; g.lineWidth = 1 + rnd() * 3;
+      g.beginPath(); g.moveTo(Math.cos(a) * r0, Math.sin(a) * r0); g.lineTo(Math.cos(a1) * r1, Math.sin(a1) * r1); g.stroke();
+    }
+    for (let i = 0; i < 40; i++) { const a = rnd() * 6.283, r = S * (0.2 + 0.25 * rnd()); g.fillStyle = `rgba(35,33,30,${0.08 + 0.15 * rnd()})`; g.beginPath(); g.arc(Math.cos(a) * r, Math.sin(a) * r, 1 + rnd() * 4, 0, 6.283); g.fill(); } // (flecks of it)
+    return new THREE.CanvasTexture(c);
+  },
+  // A scorch on the surface a grenade went off over (y: that surface's height): d across, k how strong (a grenade that
+  // went off in the air leaves a faint one), rot: its turn. Pooled: the oldest is reused.
+  scorch(x: number, y: number, z: number, d: number, k: number, rot: number) {
+    const m = this.scorches[this.scorchIdx]; this.scorchIdx = (this.scorchIdx + 1) % this.scorches.length;
+    m.position.set(x, y + 0.006 + 0.0005 * this.scorchIdx, z); m.rotation.z = rot; m.scale.set(d, d, 1);
+    (m.material as THREE.MeshBasicMaterial).opacity = k; m.visible = true;
   },
   explosion(p: THREE.Vector3, radius: number) {
     const m = this.blasts.find((b: THREE.Mesh) => !b.visible) || this.blasts[0];

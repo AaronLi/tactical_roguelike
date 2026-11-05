@@ -798,8 +798,12 @@ const G_Game = {
     const p = new THREE.Vector3(m.p[0], m.p[1], m.p[2]);
     if (m.id !== G.Net.myId) { G.R.explosion(p, m.r); G.Audio.boom(G.R.camera.position.distanceTo(p)); }
     const Me = G.Me;
+    if (m.fr && m.id !== G.Net.myId && Me.pos && Math.hypot(Me.pos.x - p.x, Me.pos.z - p.z) < Me.FRAG.RANGE) {
+      // A frag grenade: a suspect's, its chips flown here for you alone (if you're up); anyone else's (a teammate's: its
+      // wounds are theirs to work out), flown against the walls only, from its seed, to leave the same pocks and scorch.
+      if (m.en && !Me.down && !Me.dead) Me.fragBurst(p, 1, m.s); else Me.fragBurst(p, undefined, m.s, true);
+    }
     if (!Me.pos || Me.down || Me.dead) return;
-    if (m.fr && m.en && Math.hypot(Me.pos.x - p.x, Me.pos.z - p.z) < Me.FRAG.RANGE) Me.fragBurst(p, 1); // (a suspect's grenade: its chips, flown here for you alone)
     const cy = Me.pos.y + 1.0, d = Math.hypot(Me.pos.x - p.x, cy - p.y, Me.pos.z - p.z);
     if (d < m.r && G.Level.los(this.map!, p.x, p.y + 0.2, p.z, Me.pos.x, cy, Me.pos.z)) {
       Me.takeDamage(m.d * (1 - (d / m.r) * 0.6) * (m.en ? 1 : 0.4), p); // friendly blasts do 40%
