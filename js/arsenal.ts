@@ -17,7 +17,7 @@ const G_Arsenal = (() => {
       pro: { name: 'Hornet', stat: 'burst', n: 30, what: 'five-hit bursts', parts: { barrel: 'tx22.br.match', muzzle: 'mz.r22.comp', optic: 'op.pso.1' } } },
     { id: 'b92', from: 'tx22', path: 'auto', ring: 2, stat: 'burst', n: 15, what: 'five-hit bursts', how: "Five hits on one suspect inside a second, once a suspect. They needn't go down.",
       pro: { name: 'Tre Colpi', stat: 'trio', n: 25, what: 'burst kills', parts: { slide: 'b92.sl.comp', tac: 'ptac.1', grip: 'gr.pistol.0' } } },
-    { id: 'g18', from: 'b92', path: 'auto', ring: 3, stat: 'trio', n: 15, what: 'burst kills', how: 'Three hits on them inside 0.35 s, and they go down.',
+    { id: 'g18', from: 'b92', path: 'auto', ring: 3, stat: 'trio', n: 15, what: 'burst kills', how: 'Two or more rounds of one burst hit them, and they go down.',
       pro: { name: 'Buzzsaw', stat: 'multi', n: 20, what: 'double kills', parts: { slide: 'g18.sl.comp', tac: 'ptac.1', stock: 'stk.pistol.0' } } },
     { id: 'mac10', from: 'g18', path: 'auto', ring: 4, stat: 'multi', n: 10, what: 'double kills', how: 'Two suspects down inside three seconds.',
       pro: { name: 'Street Sweeper', stat: 'kills', n: 50, what: 'kills', parts: { muzzle: 'mz.r45.can', stock: 'stk.smg.0', optic: 'op.pic.1' } } },
@@ -45,7 +45,7 @@ const G_Arsenal = (() => {
       pro: { name: 'Long Reach', stat: 'far', n: 30, what: 'kills past 20 m', parts: { slide: 'fiveseven.sl.long', optic: 'op.pso.4', tac: 'ptac.1' } } },
   ];
   const PATHS: Record<string, { name: string; a: number; len: number }> = { auto: { name: 'Full auto', a: -90, len: 4 }, heavy: { name: 'Heavy calibre', a: 30, len: 4 }, modern: { name: 'Modern classics', a: 150, len: 4 } };
-  const RINGS = [0, 250, 470, 690, 910], BY = new Map(NODES.map((q) => [q.id, q])), TAP = 500, BURST = 5, BURST_MS = 1000, TRIO_MS = 350, MULTI = 3000, CLOSE = 5, MID = 10, FAR = 20;
+  const RINGS = [0, 250, 470, 690, 910], BY = new Map(NODES.map((q) => [q.id, q])), TAP = 500, BURST = 5, BURST_MS = 1000, MULTI = 3000, CLOSE = 5, MID = 10, FAR = 20;
   let save: any = null;
   const data = () => { if (!save) { const s = G.U.store.get('arsenal', null); save = s && s.got && s.n ? s : { got: [], n: {} }; save.pro = save.pro || {}; save.on = save.on || {}; } return save; };
   const keep = () => G.U.store.set('arsenal', data());
@@ -87,6 +87,13 @@ const G_Arsenal = (() => {
     }
     keep();
   }
+  // a burst kill: the one who went down was hit by two or more rounds of the same pull of a burst selector (js/player.ts shot.bst).
+  // Not a window on the clock: the killing round is often the first or second of the three, the host's word of it comes back before the rest
+  // have landed, and a pistol burst at point blank is over in 0.1 s. So it's asked at the kill, and again by each round of that burst after.
+  function trio(id: string, k: any) {
+    if (k.trio || !k.bst || k.bn < 2 || !k.done) return;
+    k.trio = true; tally(id, 'trio');
+  }
   // a kill of yours (m: the host's word of it; not a civilian or someone who'd given up: js/game.ts credit)
   let lastKill = new Map();
   function kill(m: any) {
@@ -97,7 +104,7 @@ const G_Arsenal = (() => {
     const within = (hits: number, ms: number) => n >= hits && ts[n - 1] - ts[n - hits] <= ms;
     tally(id, 'kills');
     if (within(2, TAP)) tally(id, 'tap');
-    if (within(3, TRIO_MS)) tally(id, 'trio');
+    trio(id, k);
     if (lastKill.has(id) && now - lastKill.get(id) <= MULTI) { tally(id, 'multi'); lastKill.delete(id); } else lastKill.set(id, now); // (a pair's a pair: the next is the first of another)
     if (k.d <= CLOSE) tally(id, 'close');
     if (k.d >= FAR) tally(id, 'far');
@@ -113,10 +120,12 @@ const G_Arsenal = (() => {
   // what a round of yours did to someone, for that
   function hit(ev: any, b: any) {
     let k = ev.mine;
-    if (!k || k.wid !== b.def.id) k = ev.mine = { wid: b.def.id, ts: [], shots: new Set(), wall: false, d: 0 };
+    if (!k || k.wid !== b.def.id) k = ev.mine = { wid: b.def.id, ts: [], shots: new Set(), wall: false, d: 0, bst: 0, bn: 0, trio: false };
     const f = b.shot.f, p = ev.rig && ev.rig.root.position;
+    if (b.shot.bst && b.shot.bst === k.bst) k.bn++; else { k.bst = b.shot.bst || 0; k.bn = k.bst ? 1 : 0; } // (the rounds of this pull that have hit them)
     k.ts.push(performance.now()); k.shots.add(b.shot.sid); k.wall = !!b.walled;
     if (!k.burst && k.ts.length >= BURST && k.ts[k.ts.length - 1] - k.ts[k.ts.length - BURST] <= BURST_MS) { k.burst = true; tally(k.wid, 'burst'); } // (the hits are the thing: down or not)
+    trio(k.wid, k); // (a round of the burst that put them down, landing after the word of it)
     k.d = p && f ? Math.hypot(p.x - f[0], p.z - f[2]) : 0;
     // from behind: the shooter on the far side of the line through their shoulders (facing -sin/-cos of their yaw), well round the back
     k.holster = ev.armed === 1; // (their weapon away, holstered or slung, when the round hit: js/views.ts)

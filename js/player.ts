@@ -115,7 +115,7 @@ const G_Me = {
   healLeft: undefined as unknown as number, reviveT: undefined as unknown as number, stateT: undefined as unknown as number, specIdx: undefined as unknown as number,
   noAmmoT: undefined as unknown as number | undefined, dryT: undefined as unknown as number | undefined, shoutT: undefined as unknown as number | undefined,
   sayAt: undefined as unknown as number | undefined, pingAt: undefined as unknown as number | undefined, lastR: undefined as unknown as number | undefined, midAt: undefined as unknown as number,
-  sidN: undefined as unknown as number | undefined, packIdx: undefined as unknown as number | undefined,
+  sidN: undefined as unknown as number | undefined, burstId: undefined as unknown as number | undefined, packIdx: undefined as unknown as number | undefined,
   hitQ: undefined as unknown as Map<number, PHitQ>, wheel: undefined as unknown as PWheel | null,
   navRearm: undefined as (() => void) | undefined,
   // caches (made the first time they're wanted)
@@ -1181,7 +1181,7 @@ const G_Me = {
     // it to stay on the sight and watch where it went)
     if (w.spentCh && !trigger && this.fireCd <= 0 && !this.act && !this.reloading) { this.rack(w); return; }
     const mode = this.fireMode(w); // where the selector is
-    if (mode === 'burst' && this.pressBuf > 0 && this.burstQ === 0 && this.fireCd <= 0) { this.burstQ = def.burst || 3; this.pressBuf = 0; }
+    if (mode === 'burst' && this.pressBuf > 0 && this.burstQ === 0 && this.fireCd <= 0) { this.burstQ = def.burst || 3; this.pressBuf = 0; this.burstId = (this.burstId || 0) + 1; }
     if (mode === 'hyper' && pressed) this.hyperQ = def.hyper;
     if (mode === 'hyper' && !trigger && this.hyperQ !== 1) this.hyperQ = 0; // (a pair once begun finishes: it's too quick to let go of)
     const mi = G.MODE_INFO[mode]; // (a gun of several barrels: its modes, js/data.ts)
@@ -1305,7 +1305,7 @@ const G_Me = {
       const pr = Math.tan(((def.choke || 0) * Math.PI) / 180);
       // each round (or pellet) leaves as a projectile (fly); the squad is told where it's headed, as far as the
       // walls go (to draw it and hear it go by)
-      const shot: any = { sid: (this.sidN = (this.sidN || 0) + 1), ff: new Map(), w: w.def.code, am: round, f: [origin.x, origin.y, origin.z].map((v) => Math.round(v * 100) / 100), tos: def.pellets > 1 ? [] : null }; // (tos: each pellet's end, for the highlights)
+      const shot: any = { sid: (this.sidN = (this.sidN || 0) + 1), bst: this.fireMode(w) === 'burst' ? this.burstId : 0, ff: new Map(), w: w.def.code, am: round, f: [origin.x, origin.y, origin.z].map((v) => Math.round(v * 100) / 100), tos: def.pellets > 1 ? [] : null }; // (tos: each pellet's end, for the highlights)
       for (let i = 0; i < def.pellets; i++) {
         let dir = aim;
         if (def.pellets > 1 && pr > 0) {
