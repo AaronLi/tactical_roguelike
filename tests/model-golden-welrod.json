@@ -4,37 +4,37 @@
  "builds": {
   "barrel=welrod.barrel,mag=welrod.mag": {
    "label": "default",
-   "geometry": "f76e07f6db02e464",
+   "geometry": "4e46e896d1e67bfc",
    "info": "143a0e5c2007dc85"
   },
   "barrel=welrod.br.bare_long,mag=welrod.mag": {
    "label": "longest barrel welrod.br.bare_long",
-   "geometry": "0618913ef75378b9",
+   "geometry": "a8a22747dc118243",
    "info": "e303278fdd206c58"
   },
   "barrel=welrod.br.short,mag=welrod.mag": {
    "label": "barrel=welrod.br.short",
-   "geometry": "2a3b5224839c74ec",
+   "geometry": "0a280e3effd2181e",
    "info": "41dd1c61fb3ded99"
   },
   "barrel=welrod.br.optic,mag=welrod.mag": {
    "label": "barrel=welrod.br.optic",
-   "geometry": "262e4710f1e4d686",
+   "geometry": "eb78f63dac74d054",
    "info": "143a0e5c2007dc85"
   },
   "barrel=welrod.br.short_optic,mag=welrod.mag": {
    "label": "barrel=welrod.br.short_optic",
-   "geometry": "40373f67a6d3060c",
+   "geometry": "ebc9a4d37de73867",
    "info": "41dd1c61fb3ded99"
   },
   "barrel=welrod.br.bare,mag=welrod.mag": {
    "label": "barrel=welrod.br.bare",
-   "geometry": "db5df4810dfcccf6",
+   "geometry": "3c579afc1bafa2c3",
    "info": "12efe6f5b50f122f"
   },
   "barrel=welrod.barrel,mag=welrod.mag.ext": {
    "label": "mag=welrod.mag.ext",
-   "geometry": "95117cbf58276fbe",
+   "geometry": "05de9e574a8f3902",
    "info": "143a0e5c2007dc85"
   }
  }

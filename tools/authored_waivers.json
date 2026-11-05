@@ -1,15 +1,3 @@
 {
-  "_comment": "Model-check waivers (tools/authored_checks.mjs, docs/models.md 'Model checks'): { gun: { rule letter: why, and what fixes it } }. A waived gun+rule failure prints as a warning with this note instead of failing the bake; any other rule, and every new gun, stays an error. Only for the models that failed when the rules came in (2026-11-05): fix the model, then remove its entry (a waiver whose rule passes warns 'no longer needed').",
-  "fal": {
-    "a": "the rear aperture (optic_13) is 0.58 degrees in radius from the eye (about 1.3 mm at 128 mm): open it to about 2.4 degrees (and bring info.relief, 0.12 m, into 0.06-0.09)",
-    "b": "no magazine check: give part_mag extras.check.w, the top round's chk top i 0 (case) and i 1 (tip), and witness holes on both faces (or clear-body rounds)",
-    "d": "the factory handguard is 234.5 mm long, over hgMax 231.5 mm (it runs right to mount_handguard_end; the catalogue part says 220 mm): shorten the modelled handguard to hgMax or less"
-  },
-  "maxim9": {
-    "b": "no magazine check: give part_mag extras.check.w, the top round's chk top i 0 and i 1, and witness holes on both faces (or clear-body rounds)"
-  },
-  "welrod": {
-    "a": "the rear notch is only 1.24 times the front blade's width as seen from the eye (0.17 against 0.14 degrees to each side): widen the notch (or thin the blade) to 1.5 times or more",
-    "b": "the magazine has check.w and the top round but no witness holes on both faces and no clear-body rounds: add one or the other"
-  }
+  "_comment": "Model-check waivers (tools/authored_checks.mjs, docs/models.md 'Model checks'): { gun: { rule letter: why, and what fixes it } }. A waived gun+rule failure prints as a warning with this note instead of failing the bake; any other rule, and every new gun, stays an error. Only for the models that failed when the rules came in (2026-11-05): fix the model, then remove its entry (a waiver whose rule passes warns 'no longer needed')."
 }

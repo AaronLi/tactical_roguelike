@@ -335,8 +335,8 @@ sel = obj(box(-0.0195, -0.0168, F(840), F(890), U(268), U(258)), 'base', 'black'
 
 # REAR SIGHT (optic): an aperture block between protective ears
 rs = obj(slab(loops_of('rsight'), 0.018, 0.0009, 1), 'optic', 'park')
-cut(rs, [tube([(-0.02, 0.0013), (0.02, 0.0013)], 16, 'y', (0, F(587), SY)),
-         box(-0.004, 0.004, F(560), F(610), SY + 0.0015, 0.08)])     # the notch over the aperture keeps the line clear
+cut(rs, [tube([(-0.02, 0.0036), (0.02, 0.0036)], 24, 'y', (0, F(587), SY)),          # (the aperture: 7.2 mm, a ghost ring)
+         box(-0.004, 0.004, F(560), F(610), SY + 0.0034, 0.08)])     # the notch over the aperture keeps the line clear
 finish(rs.data)
 
 # CARRY HANDLE: wire frame with a rubber-gripped bar; traced raised, then folded down on its hinge along the left side
@@ -363,12 +363,37 @@ tb = obj(box(HX - 0.022, HX - 0.002, HF - 0.008, HF, HY - 0.005, HY + 0.005), 'b
 
 # MAGAZINE (part_mag): steel, 20 rounds, ribbed sides, a round on top
 MAG_F, MAG_U = (F(903) + F(1053)) / 2, U(298)
-pm = part('mag', (0, MAG_F, MAG_U))
+pm = part('mag', (0, MAG_F, MAG_U)); pm['check'] = {'w': 0.028}
 mg = obj(slab(loops_of('mag'), 0.028, 0.0017, 2), 'mag', 'park', pm)
 rib = []
 for px in (936, 972, 1021):
     for s in (-1, 1): rib.append(box(s * 0.0128, s * 0.03, F(px) - 0.0016, F(px) + 0.0016, U(492), U(318)))
+# the witness windows (the game's magazine check): four down the back face (toward the shooter) and four down the front, slots with
+# the stack's brass showing, each window its own mesh at the face's tilt there (the faces read off the magazine's own outline)
+def face_at(z, back):
+    ys = []
+    for e in mg.data.edges:
+        a_, b_ = mg.data.vertices[e.vertices[0]].co, mg.data.vertices[e.vertices[1]].co
+        if (a_.z - z) * (b_.z - z) < 0: ys.append(a_.y + (b_.y - a_.y) * (z - a_.z) / (b_.z - a_.z))
+    return min(ys) if back else max(ys)
+WZ0, WZ1 = U(330), U(480)
+wins = []
+for side in (1, -1):
+    for i in range(1, 5):
+        t = i / 5 * 0.94; z = WZ0 + (WZ1 - WZ0) * (0.05 + 0.85 * i / 5)
+        y = face_at(z, side == 1); ya, yb = face_at(z + 0.008, side == 1), face_at(z - 0.008, side == 1)
+        ang = math.atan2(-(ya - yb), 0.016)                         # (about X: Z up the face)
+        nF, nU = math.cos(ang), math.sin(ang)
+        x = -side * 0.004
+        g = box(x - 0.0026, x + 0.0026, -0.0016, 0.0016, -0.0028, 0.0028); g.transform(Matrix.Translation((0, y, z)) @ Matrix.Rotation(ang, 4, 'X'))
+        rib.append(g); wins.append((i - 1, t, side, (y, z), ang, nF, nU))
 cut(mg, rib); finish(mg.data)
+for i, t, side, (y, z), ang, nF, nU in wins:
+    x = -side * 0.004
+    o = obj(box(x - 0.0024, x + 0.0024, -0.0003, 0.0003, -0.0026, 0.0026), 'mag', 'brass', pm)
+    d = side * 0.0011                                                  # (the slot's floor, in from its face)
+    o.matrix_world = Matrix.Translation((0, y + d * nF, z + d * nU)) @ Matrix.Rotation(ang, 4, 'X'); finish(o.data)
+    o['chk'] = {'role': 'hole', 'i': i, 't': round(t, 4), 'side': side}
 # its top half rides up inside the well (hidden while seated; seen when it drops out on a reload): the body to the feed
 # lips 9 mm under the bore, the top round held in the lips where the bolt strips it, the next one staggered under it
 LIPS = -0.009
@@ -376,8 +401,12 @@ up = obj(box(-0.014, 0.014, F(907), F(1049), MAG_U + 0.0005, LIPS - 0.003), 'mag
 for sx in (-1, 1):   # the feed lips: two inturned edges, the round showing between them
     lp = obj(box(sx * 0.0045, sx * 0.014, F(912), F(1046), LIPS - 0.0035, LIPS), 'mag', 'park', pm); bevel(lp, 0.0008, 1); finish(lp.data)
 for k, (x, z) in enumerate(((0.0, LIPS - 0.0035), (0.0052, LIPS - 0.0035 - 0.0085))):
-    rd = obj(lathe([(0.071, 0.0012), (0.062, 0.0035), (0.048, 0.0045), (0.040, 0.0059), (0.0, 0.0059), (0.0, 0.0055)], 12), 'mag', 'brass', pm)
-    rd.data.transform(Matrix.Translation((x, F(906) + 0.002, z))); finish(rd.data)   # (case head at the back of the mag, bullet forward)
+    # (7.62x51: the case 51 mm, the bullet to 71 mm; the top one's case and tip are the magazine check's)
+    cs = obj(lathe([(0.0, 0.0055), (0.0, 0.0059), (0.040, 0.0059), (0.044, 0.0045), (0.051, 0.0045), (0.051, 0.0005)], 12, eps=0), 'mag', 'brass', pm)
+    cs.data.transform(Matrix.Translation((x, F(906) + 0.002, z))); finish(cs.data)   # (case head at the back of the mag, bullet forward)
+    tp = obj(lathe([(0.051, 0.0005), (0.051, 0.0039), (0.062, 0.0035), (0.071, 0.0012)], 12, eps=0), 'mag', 'brass', pm)
+    tp.data.transform(Matrix.Translation((x, F(906) + 0.002, z))); finish(tp.data)
+    if k == 0: cs['chk'] = {'role': 'top', 'i': 0}; tp['chk'] = {'role': 'top', 'i': 1}
 
 # HANDGUARD: polymer, rounded, three vent slots a side, a long groove and vent holes along the bottom
 hg = obj(slab(loops_of('handguard'), 0.050, 0.019, 5), 'handguard', 'polymer')   # an oval in section (its front end's view)
@@ -390,6 +419,9 @@ for px in (1180, 1370, 1430, 1495):
 cut(hg, hc); finish(hg.data)
 # the front sling swivel
 o = obj(box(-0.0015, 0.0015, F(1505), F(1520), U(268), U(258)), 'handguard', 'black'); finish(o.data)
+# (the traced handguard runs 234.5 mm to the gas block; the longest the platform takes is 231.5 (hgMax): scaled to 230.5 mm from its rear)
+HG_K = 0.2305 / 0.2345
+for o_ in (hg, o): o_.data.transform(Matrix.Translation((0, F(1116), 0)) @ Matrix.Scale(HG_K, 4, (0, 1, 0)) @ Matrix.Translation((0, -F(1116), 0)))
 
 # BARREL: turned from the photo's profile (round, on the bore), with the gas block, gas plug and bayonet lug
 prof = []
@@ -441,7 +473,7 @@ cut(mz, sl); finish(mz.data)
 # =====================================================================================================================
 # the anchors the game needs (docs/models.md), in its [forward, up, right] metres
 info = {
-    'sy': SY, 'fSight': F(587), 'relief': 0.12,
+    'sy': SY, 'fSight': F(587), 'relief': 0.075,
     'muzzles': [[round(MZ, 4), 0, 0]],
     'grip': [0.05, -0.078, 0], 'support': [0.37, -0.024, 0],
     'anim': {'handle': 'part_handle', 'mag': 'part_mag'},

@@ -126,8 +126,40 @@ MAG_SLOPE = (778 - 712) / (486 - 192)                       # the magazine's lea
 def magazine(Kx, ext=0):
     # part_mag: the body (ext px longer down the slope) and its base pad (a deeper one, and a sleeve over the extension, when extended)
     dx = ext * MAG_SLOPE
-    pm = Kx.part('mag', (0, MAG_TOP[0], MAG_TOP[1]))
-    o = Kx.obj(prism(PL([(605, 192), (712, 192), (778 + dx, 486 + ext), (664 + dx, 486 + ext)]), 'x', -10 * mm, 10 * mm), 'mag', 'black', pm); bevel(o, 0.8 * mm, 1); smooth(o)
+    pm = Kx.part('mag', (0, MAG_TOP[0], MAG_TOP[1])); pm['check'] = {'w': 0.020}
+    # the body: open at the top between its feed lips (the top round sits in it), a witness window cut down each face (the game's
+    # magazine check: four down its back, four down its front, the stack's brass showing; each window its own mesh at the face's tilt)
+    body = Kx.tmp(prism(PL([(605, 192), (712, 192), (778 + dx, 486 + ext), (664 + dx, 486 + ext)]), 'x', -10 * mm, 10 * mm))
+    cut(body, prism(PL([(610, 186), (707, 186), (707, 201), (610, 201)]), 'x', -9.0 * mm, 9.0 * mm))
+    bevel(body, 0.8 * mm, 1)
+    wins = []
+    for side, (a0, a1) in ((1, ((712, 192), (778 + dx, 486 + ext))), (-1, ((605, 192), (664 + dx, 486 + ext)))):
+        q0, q1 = PL([a0])[0], PL([a1])[0]
+        uF, uU = q0[0] - q1[0], q0[1] - q1[1]; n_ = math.hypot(uF, uU); uF, uU = uF / n_, uU / n_      # (up the face)
+        ang = math.atan2(-uF, uU); nF, nU = math.cos(ang), math.sin(ang)                             # (about X: Z up the face; the face's forward normal)
+        for i in range(1, 5):
+            t = i / 5 * 0.94; k = 0.12 + 0.8 * i / 5
+            q = (q0[0] + (q1[0] - q0[0]) * k, q0[1] + (q1[1] - q0[1]) * k)
+            x = -side * 2.6 * mm
+            g = box(x - 2.4 * mm, x + 2.4 * mm, -1.4 * mm, 1.4 * mm, -2.6 * mm, 2.6 * mm)
+            g.transform(Matrix.Translation((0, q[0], q[1])) @ Matrix.Rotation(ang, 4, 'X')); cut(body, g)
+            wins.append((i - 1, t, side, q, ang, nF, nU))
+    smooth(body); Kx.adopt(body, 'mag', 'black', pm)
+    for i, t, side, q, ang, nF, nU in wins:
+        x = -side * 2.6 * mm
+        o = Kx.obj(box(x - 2.2 * mm, x + 2.2 * mm, -0.3 * mm, 0.3 * mm, -2.4 * mm, 2.4 * mm), 'mag', 'brass', pm)
+        d = side * 1.0 * mm         # (the slot's floor, inward from its face)
+        o.matrix_world = Matrix.Translation((0, q[0] + d * nF, q[1] + d * nU)) @ Matrix.Rotation(ang, 4, 'X')
+        o['chk'] = {'role': 'hole', 'i': i, 't': round(t, 4), 'side': side}
+    for sd in (-1, 1):   # the feed lips
+        o = Kx.obj(box(min(sd * 9.8 * mm, sd * 7.2 * mm), max(sd * 9.8 * mm, sd * 7.2 * mm), P(700, 0)[0], P(640, 0)[0], MAG_TOP[1] - 1.0 * mm, MAG_TOP[1] + 0.6 * mm), 'mag', 'black', pm)
+        bevel(o, 0.3 * mm, 1); smooth(o)
+    # the top round (9x19: the case 19.15 mm, a round nose to 29.7 mm), its case head at the body's back wall; the check's case and tip
+    h, zc = P(706, 0)[0], MAG_TOP[1] - 2.5 * mm
+    o = Kx.obj(lathe([(h, 0.0005), (h, 4.9 * mm), (h + 0.9 * mm, 4.9 * mm), (h + 1.2 * mm, 4.3 * mm), (h + 2.0 * mm, 4.3 * mm), (h + 2.3 * mm, 4.95 * mm),
+                      (h + 19.15 * mm, 4.8 * mm), (h + 19.15 * mm, 0.0005)], 18, (0, 0, zc)), 'mag', 'brass', pm); smooth(o); o['chk'] = {'role': 'top', 'i': 0}
+    o = Kx.obj(lathe([(h + 19.15 * mm, 0.0005), (h + 19.15 * mm, 4.5 * mm), (h + 23.5 * mm, 4.5 * mm), (h + 27.0 * mm, 3.9 * mm), (h + 29.2 * mm, 2.2 * mm), (h + 29.7 * mm, 0.0005)],
+                   16, (0, 0, zc)), 'mag', 'brass', pm); smooth(o); o['chk'] = {'role': 'top', 'i': 1}
     pad = [(660, 484), (792, 484), (796, 498), (788, 506), (664, 506)] if not ext else [(660, 484), (792, 484), (798, 500), (794, 512), (780, 518), (668, 518)]
     o = Kx.obj(prism(PL([(x + dx, y + ext) for x, y in pad]), 'x', -15.5 * mm, 15.5 * mm), 'mag', 'polymer', pm); bevel(o, 1.5 * mm, 2); smooth(o)
     if ext:

@@ -88,7 +88,7 @@ def bare_barrel(Kx, fx):
 
 # ---- SIGHTS (optic): the notched blade on the receiver (the front blade is on the suppressor) ----
 rs = K.tmp(prism(PL([(650, 226), (675, 226), (672, 207), (655, 207)]), 'x', -4 * mm, 4 * mm))
-cut(rs, box(-1.1 * mm, 1.1 * mm, F(690), F(640), U(211), U(200)))
+cut(rs, box(-1.8 * mm, 1.8 * mm, F(690), F(640), U(211), U(200)))      # (the notch: 3.6 mm, wide enough to see light either side of the blade)
 bevel(rs, 0.3 * mm, 1); smooth(rs); K.adopt(rs, 'optic', 'park')
 
 # ---- BOLT KNOB (part_bolt): the knurled cap (chequered), turned and pulled back to work the bolt ----
@@ -121,7 +121,28 @@ def magazine(Kx, ext=0):
     dx = ext * G_SLOPE
     low = [(646 + dx, 462 + ext), (644 + dx, 482 + ext), (634 + dx, 492 + ext), (580 + dx, 494 + ext), (566 + dx, 486 + ext)]
     gr = Kx.tmp(prism(PL([(538, 340), (622, 340)] + low), 'x', -13.5 * mm, 13.5 * mm))
-    bevel(gr, 4 * mm, 3, 30); smooth(gr); Kx.adopt(gr, 'mag', 'rubber', pm)
+    bevel(gr, 4 * mm, 3, 30)
+    # the witness windows (the game's magazine check): four down the grip's back and four down its front, slots in the rubber with the
+    # brass of the stack showing; each window its own mesh, its node turned to the face's tilt there
+    wins = []
+    for side, (a0, a1) in ((1, ((538, 340), (566 + dx, 486 + ext))), (-1, ((622, 340), (646 + dx, 462 + ext)))):
+        q0, q1 = PL([a0])[0], PL([a1])[0]
+        uF, uU = q0[0] - q1[0], q0[1] - q1[1]; n_ = math.hypot(uF, uU); uF, uU = uF / n_, uU / n_      # (up the face)
+        ang = math.atan2(-uF, uU); nF, nU = math.cos(ang), math.sin(ang)                             # (rotation about X standing Z up the face; the face's normal forward)
+        for i in range(1, 5):
+            t = i / 5 * 0.94; k = 0.1 + 0.8 * i / 5
+            q = (q0[0] + (q1[0] - q0[0]) * k, q0[1] + (q1[1] - q0[1]) * k)
+            x = -side * 3.0 * mm
+            g = box(x - 3 * mm, x + 3 * mm, -2.2 * mm, 2.2 * mm, -3.2 * mm, 3.2 * mm)
+            g.transform(Matrix.Translation((0, q[0], q[1])) @ Matrix.Rotation(ang, 4, 'X')); cut(gr, g)
+            wins.append((i - 1, t, side, q, ang, nF, nU))
+    smooth(gr); Kx.adopt(gr, 'mag', 'rubber', pm)
+    for i, t, side, q, ang, nF, nU in wins:
+        x = -side * 3.0 * mm
+        o = Kx.obj(box(x - 2.8 * mm, x + 2.8 * mm, -0.3 * mm, 0.3 * mm, -3.0 * mm, 3.0 * mm), 'mag', 'brass', pm)
+        d = side * 1.6 * mm         # (the slot's floor, inward from its face)
+        o.matrix_world = Matrix.Translation((0, q[0] + d * nF, q[1] + d * nU)) @ Matrix.Rotation(ang, 4, 'X')
+        o['chk'] = {'role': 'hole', 'i': i, 't': round(t, 4), 'side': side}
 magazine(K)
 
 # ---- the gun's info and the authored-pistol anchors (TASK 15's names) ----
