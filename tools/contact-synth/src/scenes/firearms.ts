@@ -83,7 +83,10 @@ const sgChamber: Body = { ...mat('steel'), shape: 'shell', size: 9, thickness: 4
 // The bolt carrier is a hollow steel tube (~18 cm, ~3.5 mm wall, gas key on top); the bolt is
 // a separate solid part (~6 cm) riding inside it, turned by the cam pin in the carrier's cam
 // track. They move and hit separately: that's what gives the AR its two-part "ch-chunk".
-const arCarrier: Body = { ...mat('steel'), shape: 'shell', size: 18, thickness: 3.5, modes: 2, irregularity: 0.6, damping: 0.5, level: 0 };
+// Modelled as rods (bar shape, thickness ≈ effective section): the synth's 'shell' is a pot
+// whose diameter is its size, which made an 18 cm carrier a 2.8 kg pot and gave every slam a
+// soft, rubbery contact. As a rod: ~0.3 kg, bright steel ring from ~1.9 kHz.
+const arCarrier: Body = { ...mat('steel'), shape: 'bar', size: 18, thickness: 12, modes: 2, irregularity: 0.6, damping: 0.5, level: 0 };
 const arBolt: Body = { ...mat('steel'), shape: 'bar', size: 6, thickness: 15, modes: 1, irregularity: 0.5, damping: 0.5, level: 0 };
 const arCamPin = steelBar(1.5, 5);
 const arBarrelExt = steelBlock(3, 20);
@@ -94,20 +97,28 @@ const arBufferTube: Body = { ...alu('shell', 18, 2.5, 0.5), modes: 1 }; // the b
 const arBufferSpring = springWire(25, 1.4);
 const arBuffer = steelBlock(6, 18); // buffer with sliding weights
 const arCase: Body = { ...mat('brass'), shape: 'shell', size: 4.5, thickness: 0.4, modes: 1, irregularity: 0.5, damping: 0.6, level: 0 }; // held by the magazine / chamber
-const arFeedLips = steelBar(4, 0.8, 0.4);
+// Spring-steel feed lips on the magazine body: they ring briefly (the magazine "ping").
+const arFeedLips: Body = { ...mat('springsteel'), shape: 'bar', size: 4, thickness: 0.8, modes: 2, irregularity: 0.5, damping: 0.3, level: 0 };
 const arChamber: Body = { ...mat('steel'), shape: 'shell', size: 5, thickness: 4, modes: 2, irregularity: 0.6, damping: 0.7, level: 0 };
 const arBoltCatch = steelBar(4, 3);
 // Fire control group in the lower: the hammer (spring-loaded, under the carrier) and the
 // trigger, whose front hook is the sear that catches the hammer's notch.
-const arHammer = steelBar(4, 6);
-const arTriggerSear = steelBar(3, 5);
+// Hardened tool-steel parts: their engagement is a crisp metallic tick that rings for a few
+// milliseconds through the lower receiver, so they keep a couple of short pitched partials.
+const arHammer: Body = { ...mat('steel'), shape: 'bar', size: 4, thickness: 6, modes: 2, irregularity: 0.5, damping: 0.3, level: 0 };
+const arTriggerSear: Body = { ...mat('steel'), shape: 'bar', size: 3, thickness: 5, modes: 2, irregularity: 0.5, damping: 0.3, level: 0 };
+const arLower: Body = { ...alu('shell', 20, 4, 0.55), modes: 0 };
 // The forward-assist pawl is spring-loaded against the serrations on the carrier's right
 // side (~2.5 mm pitch): it clicks over them whenever the carrier moves past.
 const arFaPawl = steelBar(1.5, 3);
 const gasKey = steelBar(3, 6);
 // What finally stops the carrier: the barrel extension, barrel and receiver. A thick steel
 // tube (~40 cm, ~6 mm wall) in the handguard: the low, heavy body of the slam.
-const arBarrel: Body = { ...mat('steel'), shape: 'shell', size: 40, thickness: 6, modes: 3, irregularity: 0.6, damping: 0.6, level: 0 };
+// Barrel (~16 mm steel rod, 40 cm) with the extension and upper: bends at ~500 Hz and up.
+const arBarrel: Body = { ...mat('steel'), shape: 'bar', size: 40, thickness: 16, modes: 3, irregularity: 0.5, damping: 0.55, level: 0 };
+// The whole rifle (barrel, upper, lower, stock) flexing as one beam: its first bending modes
+// (~200 Hz and up) are the weight under a slam. Capped at the synth's 50 cm.
+const arRifleBody: Body = { ...mat('aluminum'), shape: 'bar', size: 50, thickness: 10, modes: 3, irregularity: 0.5, damping: 0.8, level: 0 }; // held: highs die fast, the low bend carries
 const arBullet: Body = { ...mat('copper'), shape: 'block', size: 2.3, thickness: 5.7, modes: 0, irregularity: 0.4, damping: 0.5, level: 0 };
 const arFeedRamp = steelBar(2, 4);
 const arGasTube: Body = { ...mat('stainless'), shape: 'bar', size: 25, thickness: 4.7, modes: 0, irregularity: 0.5, damping: 0.6, level: 0 };
@@ -224,9 +235,9 @@ function arForward(t: number, withChargingHandle: boolean): SceneElement[] {
     rub('forward-assist pawl over the serrations', t + 0.01, -8, { force: 4, duration: 0.012, speed: 3, profile: 'steady', roughness: 200, grain: 2.5, periodicity: 1, contactWidth: 0.02 }, arFaPawl, arCarrier),
     rub('case dragged over the feed lips', t + 0.02, -14, { force: 6, duration: 0.02, speed: 3, roughness: 15, grain: 0.3 }, arCase, arFeedLips),
     // The rim snaps free of the lips; the nose ticks up the feed ramp; the next round snaps up.
-    snap('case rim snaps free of the feed lips', t + 0.03, -3, { strength: 0.7, preload: 0, seat: 0.3, seatDelay: 1 }, arCase, arFeedLips),
+    snap('case rim snaps free of the feed lips', t + 0.03, 3, { strength: 0.7, preload: 0, seat: 0.3, seatDelay: 1 }, arCase, arFeedLips),
     hit('bullet nose rides up the feed ramp', t + 0.032, -7, 1.5, arBullet, arFeedRamp, { scatter: 0.3, radius: 1.5 }),
-    snap('next round snaps up into the lips', t + 0.034, -5, { strength: 0.5, preload: 0, seat: 0.3, seatDelay: 1.5 }, arNextRound, arFeedLips),
+    snap('next round snaps up into the lips', t + 0.034, 0, { strength: 0.5, preload: 0, seat: 0.3, seatDelay: 1.5 }, arNextRound, arFeedLips),
     hit('gas tube slides into the carrier key', t + 0.046, -9, 0.8, arGasTube, gasKey, { scatter: 0.3, radius: 1.5 }),
     rub('round into the chamber', t + 0.04, -15, { force: 5, duration: 0.015, speed: 3, profile: 'decelerate', roughness: 6, grain: 0.3 }, arCase, arChamber),
     // Lock-up in two parts. The bolt (out front of the carrier) hits the barrel extension
@@ -236,13 +247,15 @@ function arForward(t: number, withChargingHandle: boolean): SceneElement[] {
     hit('bolt face hits the barrel extension', t + 0.055, -4, 4.5, arBolt, arBarrelExt, { scatter: 0.3, radius: 3, click: 0.7 }),
     rub('cam pin turns the bolt', t + 0.054, -12, { force: 10, duration: 0.011, speed: 1.2, profile: 'decelerate', roughness: 10, grain: 0.2, contactWidth: 0.02 }, arCamPin, arCarrier),
     hit('bolt lugs rotate home', t + 0.057, -9, 1.5, arBolt, arBarrelExt, { scatter: 0.3, radius: 1.5 }),
-    hit('carrier slams onto the bolt', t + 0.0578, 0, 3.8, arCarrier, arBolt, { scatter: 0.5, radius: 5, click: 0.8 },
-      { flex: { amount: 0.25, freq: 90, decay: 0.06, rattle: 0.4, wobble: 0, tone: 0 } }),
-    // The thud: the carrier's momentum goes into the barrel extension, barrel and receiver
-    // through broad, flat, oily faces (longer contact, little edge crack). The thick barrel
-    // gives a low, heavy body and the whole rifle jolts (a short low thump).
-    hit('barrel and receiver take the blow', t + 0.0579, -1, 3.8, arBarrel, arCarrier, { scatter: 0.2, radius: 15, click: 0.3, sharp: 0.25 },
-      { flex: { amount: 0.6, freq: 120, decay: 0.05, rattle: 0, wobble: 0, tone: 0.7 } }),
+    hit('carrier slams onto the bolt', t + 0.0578, 0, 3.8, arCarrier, arBolt, { scatter: 0.5, radius: 4, click: 0.8 }),
+    // Seating into the breech: the lugs bottom in the barrel extension and the carrier's
+    // momentum goes into the barrel and receiver through hard steel faces: a metallic "chunk"
+    // from the barrel's own bending modes (~500 Hz up), not a soft low thump.
+    hit('lugs seat in the barrel extension', t + 0.0579, -2, 3.8, arBarrel, arCarrier, { scatter: 0.3, radius: 3, click: 0.6, sharp: 0.85 },
+      // The whole receiver takes this blow, so it comes through the housing much more than a slide does.
+      { housing: { amount: 0.95 } }),
+    // ...and the rifle as a whole flexes from it: a hard-edged, low metallic "chunk" (not a sine thump).
+    hit('rifle body takes the blow', t + 0.058, 2, 3.8, arRifleBody, arCarrier, { scatter: 0.2, radius: 3, click: 0.3, sharp: 0.85 }),
     snap('extractor snaps over the rim', t + 0.056, -3, { strength: 0.8, preload: 0, seat: 0.3, seatDelay: 1 }, arExtractor, arCase),
   ];
   if (withChargingHandle) {
@@ -340,7 +353,12 @@ export const AR15_CHARGE: Scene = {
         hit('carrier meets the hammer', tAt(35), -10, 0.6, arCarrier, arHammer, { scatter: 0.3, radius: 2 }),
         travelRub('carrier pushes the hammer down', 35, 60, -12, { force: 12, roughness: 4, grain: 0.15, contactWidth: 0.05 }, arHammer, arCarrier,
           { coil: { level: 0.15, length: 3, dispersion: 0.3, decay: 0.05, brightness: 4000 } }),
-        snap('trigger sear catches the hammer', tAt(60), -3, { strength: 0.9, preload: 0, seat: 0.5, seatDelay: 1.5 }, arTriggerSear, arHammer),
+        // Two clicks: the trigger's sear nose snaps into the hammer notch as the hammer is
+        // pushed past it, then the hammer rises back onto the sear once the carrier's tail
+        // stops pressing it down.
+        snap('sear snaps into the hammer notch', tAt(60), 0, { strength: 1, preload: 0, seat: 0.6, seatDelay: 1.2 }, arTriggerSear, arHammer,
+          { coil: { level: 0.15, length: 1.5, dispersion: 0.3, decay: 0.03, brightness: 7000 } }),
+        snap('hammer settles onto the sear', tAt(70), -4, { strength: 0.7, preload: 0, seat: 0.3, seatDelay: 1 }, arHammer, arLower),
         travelRub('carrier riding over the cocked hammer', 60, 90, -20, { force: 3, ...OIL_STEEL }, arHammer, arCarrier),
       ],
     },
@@ -349,7 +367,7 @@ export const AR15_CHARGE: Scene = {
       description: '45-72 mm: the bolt rides over the top round in the magazine; once it clears, the magazine spring pops the round up against the feed lips.',
       elements: [
         travelRub('bolt riding over the top round', 45, 72, -16, { force: 5, roughness: 2, grain: 0.2, contactWidth: 0.05 }, arCase, arBolt),
-        hit('round pops up against the feed lips', tAt(72) + 0.002, -11, 0.8, arNextRound, arFeedLips, { scatter: 0.3, radius: 2 }),
+        hit('round pops up against the feed lips', tAt(72) + 0.002, -4, 0.8, arNextRound, arFeedLips, { scatter: 0.3, radius: 2 }),
       ],
     },
     {
