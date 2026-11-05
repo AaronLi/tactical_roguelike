@@ -100,23 +100,24 @@ def smooth(o, deg=35):
 W = 12 * mm                      # half the footprint's width
 R0, F0 = -32 * mm, 0.0           # the footprint's rear and front (forward)
 SY = 16 * mm                     # the sight line over the mount surface
-LEDGE = 6.5 * mm                 # the base's top in front of the housing (the lens and hood stand on it)
-HF, HT = -21 * mm, 14 * mm       # the emitter housing's front face and top
+LEDGE = 5.0 * mm                 # the base's top in front of the housing (the lens and hood stand on it)
+HF, HT = -21 * mm, 7.8 * mm      # the emitter housing's front face and top: LOW, under the window's clear opening (8 mm): it hides none of the sight picture
 WIN_W, WIN_H = 20 * mm, 16 * mm  # the window (the lens's clear opening), centred on the sight line
 
 # ---- base + emitter housing: one side profile (forward, up), across the full width, its edges rounded ----
 prof = [(R0, 0), (F0, 0), (F0, 3.2 * mm), (F0 - 1.2 * mm, LEDGE - 0.6 * mm), (F0 - 2.5 * mm, LEDGE),
-        (HF + 1.5 * mm, LEDGE), (HF, 9 * mm), (HF - 1.2 * mm, HT), (R0 + 3.5 * mm, HT), (R0 + 0.8 * mm, HT - 2.2 * mm), (R0, 7 * mm)]
+        (HF + 1.2 * mm, LEDGE), (HF, LEDGE + 0.8 * mm), (HF - 0.8 * mm, HT), (R0 + 3.5 * mm, HT), (R0 + 0.8 * mm, HT - 1.6 * mm), (R0, HT - 2.4 * mm)]
 body = obj(prism(prof, 'x', -W, W), 'black')
 # the housing is 0.8 mm narrower than the base (a step along each side, where the buttons sit), and the rear sight notch on its top
-cut(body, box(-W - 1 * mm, -W + 0.8 * mm, R0 - 1 * mm, HF + 0.3 * mm, 9.6 * mm, HT + 1 * mm))
-cut(body, box(W - 0.8 * mm, W + 1 * mm, R0 - 1 * mm, HF + 0.3 * mm, 9.6 * mm, HT + 1 * mm))
-cut(body, box(-1.2 * mm, 1.2 * mm, R0 - 1 * mm, R0 + 4.5 * mm, HT - 1.4 * mm, HT + 1 * mm))
+cut(body, box(-W - 1 * mm, -W + 0.8 * mm, R0 - 1 * mm, HF + 0.3 * mm, 4.0 * mm, HT + 1 * mm))
+cut(body, box(W - 0.8 * mm, W + 1 * mm, R0 - 1 * mm, HF + 0.3 * mm, 4.0 * mm, HT + 1 * mm))
+cut(body, box(-1.2 * mm, 1.2 * mm, R0 - 1 * mm, R0 + 4.5 * mm, HT - 1.0 * mm, HT + 1 * mm))
 # the emitter's port: a shallow round recess in the housing's front face, on the centreline, below the sight line
-cut(body, cyl(2.0 * mm, HF - 1.5 * mm, HF + 0.8 * mm, 'y', (0, 10.6 * mm), 20))
+EMU = LEDGE + 1.5 * mm               # the emitter: low on the housing's front face, under the window, aimed up at the lens
+cut(body, cyl(1.2 * mm, HF - 1.2 * mm, HF + 0.8 * mm, 'y', (0, EMU), 16))
 bevel(body, 0.6 * mm, 2); smooth(body)
 # the LED's window in it
-o = obj(cyl(1.3 * mm, HF - 1.0 * mm, HF - 0.6 * mm, 'y', (0, 10.6 * mm), 16), 'glass'); smooth(o)
+o = obj(cyl(0.8 * mm, HF - 0.9 * mm, HF - 0.5 * mm, 'y', (0, EMU), 12), 'glass'); smooth(o)
 
 # ---- the hood: a loop round the lens, sloped shoulders, a flat top, leaning back 12 degrees; on the ledge ----
 HD = 9 * mm                      # its depth (forward) at the foot; the faces lean back by different amounts, so it tapers to 4.5 mm at the top
@@ -140,15 +141,15 @@ lens = obj(ln, 'reflexLens')
 for v in lens.data.vertices: v.co.y -= max(0.0, v.co.z - LEDGE) * math.tan(LEAN)
 
 # ---- the adjusters: windage on the housing's right side, elevation on its top; slotted steel screw heads in a recess ----
-AF, WF, WU = -26.5 * mm, -29.0 * mm, 11.8 * mm   # the elevation screw's forward position; the windage screw's forward position and height
-el = obj(cyl(2.4 * mm, HT - 0.9 * mm, HT + 0.25 * mm, 'z', (0, AF), 24), 'steel')
+AF, WF, WU = -26.5 * mm, -29.0 * mm, 5.9 * mm   # the elevation screw's forward position; the windage screw's forward position and height
+el = obj(cyl(2.2 * mm, HT - 0.9 * mm, HT + 0.25 * mm, 'z', (0, AF), 24), 'steel')
 cut(el, box(-2.8 * mm, 2.8 * mm, AF - 0.35 * mm, AF + 0.35 * mm, HT - 0.3 * mm, HT + 1 * mm)); smooth(el)
-wd = obj(cyl(1.9 * mm, W - 1.6 * mm, W - 0.3 * mm, 'x', (WF, WU), 24), 'steel')               # (on the step: the housing's side is at W - 0.8 mm)
-cut(wd, box(W - 0.6 * mm, W, WF - 2.3 * mm, WF + 2.3 * mm, WU - 0.3 * mm, WU + 0.3 * mm)); smooth(wd)
+wd = obj(cyl(1.6 * mm, W - 1.6 * mm, W - 0.3 * mm, 'x', (WF, WU), 24), 'steel')               # (on the step: the housing's side is at W - 0.8 mm)
+cut(wd, box(W - 0.6 * mm, W, WF - 2.0 * mm, WF + 2.0 * mm, WU - 0.3 * mm, WU + 0.3 * mm)); smooth(wd)
 
 # ---- brightness buttons, one each side of the housing, on the step ahead of the windage screw ----
 for s in (-1, 1):
-    b = obj(prism(rounded(-24.0 * mm, WU, 1.7 * mm, 1.5 * mm, 0.8 * mm, 3), 'x', s * (W - 1.2 * mm), s * (W - 0.15 * mm)), 'rubber')
+    b = obj(prism(rounded(-24.0 * mm, WU, 1.7 * mm, 1.4 * mm, 0.8 * mm, 3), 'x', s * (W - 1.2 * mm), s * (W - 0.15 * mm)), 'rubber')
     bevel(b, 0.25 * mm, 1); smooth(b)
 
 # ---- the two mounting screws on the ledge between the hood and the housing ----

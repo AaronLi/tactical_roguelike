@@ -8,9 +8,17 @@
     "fSight": -0.016,
     "relief": 0.3,
     "reliefOnRiser": 0.12,
-    "reflex": { "f": 0.009, "y": 0.016, "w": 0.02, "h": 0.016, "kind": "dot" },
+    "reflex": {
+      "f": 0.009,
+      "y": 0.016,
+      "w": 0.02,
+      "h": 0.016,
+      "kind": "dotP"
+    },
     "magnifier": true,
     "height": "low"
   },
-  "replaces": ["Halcyon Ember pistol dot"]
+  "replaces": [
+    "Halcyon Ember pistol dot"
+  ]
 }
