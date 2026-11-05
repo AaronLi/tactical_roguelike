@@ -30,7 +30,8 @@ interface ArmorDef {
 type EnemyStyle = 'suspect' | 'armored' | 'civ';
 interface EnemyDef { name: string; style: EnemyStyle; hp: number; speed: number; scale: number; headMult: number; cr: number; [field: string]: any; }
 interface ThemeDef { name: string; home: number; reflect: number; floor: string; wall: string; crate: string; fog: number; light: number; ceil: string; [field: string]: any; }
-interface CaliberDef { name: string; group: string; box: number; per: number; rimfire?: boolean; }
+interface LoadDef { g: number; lg?: number; v: number; n?: number; d?: number; len?: number; choke?: number; rangeK?: number; drag?: number } // a load's figures in a caliber that has its own: g: grams (a bullet; a pellet), v: m/s at the longest effective length, n: pellets, d/len: mm of the projectile, choke: degrees, rangeK
+interface CaliberDef { name: string; group: string; box: number; per: number; rimfire?: boolean; types?: string[]; loads?: Record<string, LoadDef>; }
 interface AmmoDef {
   name: string; tag: string; k: number; desc: string; dragK?: number; velK?: number; massK?: number; rangeK?: number; spreadK?: number;
   pelletsK?: number; tracer?: number; glow?: number; quiet?: boolean; slug?: boolean;
@@ -164,11 +165,12 @@ const G_WEAPON_LIST: WeaponDef[] = [
   W({ id: 'welrod', slot: 's', cls: 'PST', tier: 1, price: 700, name: 'Welrod Mk II', rpm: 80, mode: 'semi', manual: true, mag: 8, reserve: 48, reload: 1.5, spread: 1.6, ads: 0.075, range: 16, speed: 0.97, integral: true, desc: 'The wartime assassin\'s pistol: .32 ACP, an integral suppressor and a bolt you work by hand after every shot. Slow, silent, and it does not miss much.' }),
   W({ id: 'maxim9', slot: 's', cls: 'PST', tier: 2, price: 1200, name: 'Maxim 9', rpm: 450, mode: 'semi', mag: 17, reserve: 102, reload: 1.5, spread: 2.0, ads: 0.075, range: 20, speed: 0.95, integral: true, desc: 'A 9mm pistol with its suppressor built in: seventeen rounds, a long sight radius and a report you barely hear. Its front block comes off for a shorter, louder, handier gun.' }),
   W({ id: 'thor', slot: 's', cls: 'PST', tier: 4, price: 4500, name: 'Thor .50', rpm: 40, mode: 'semi', mag: 1, reserve: 10, reload: 3.2, spread: 3, ads: 0.03, range: 60, pen: 3, desc: 'One round of .50 BMG, in a pistol, because someone asked if it could be done. It can. Hold on.' }),
-  // The Tempest (models/tempest, TASK 18): a stacked-round rifle, six barrels with seven telescoped rounds each (def.barrels: js/player.ts shoot, docs/models.md "Multi-barrel guns"). Found only in weapon cases
+  // The Tempest (models/tempest, TASK 18): a stacked-round rifle, six barrels of telescoped rounds (def.barrels: js/player.ts shoot, docs/models.md "Multi-barrel guns"). Found only in weapon cases
   // (caseOnly: no shop, no kit). The figures are the user's starting values (to tune): burst specialist, class AR; tier 4 because that is how the cases rank a legendary.
-  W({ id: 'tempest', slot: 'p', cls: 'AR', tier: 4, price: 6000, caseOnly: true, name: 'Tempest', rpm: 600, mode: 'semi', mag: 48, reserve: 240, reload: 4.5, spread: 2.6, ads: 0.02, range: 45, zoom: 0.75, speed: 0.9, pen: 1, caseless: true,
-    barrels: { n: 6, per: 8, mm0: 238, mm1: 508, groups: { top: [0, 1, 2], bottom: [3, 4, 5], all: [0, 1, 2, 3, 4, 5] }, full: 0.8 },
-    desc: 'Six barrels of stacked 10 mm caseless rounds, eight to a barrel, fired electrically. Semi, two automatic rates, or two, three or all six barrels at once. A barrel shoots harder the fewer rounds it has left in it. Legendary.' }),
+  W({ id: 'tempest', slot: 'p', cls: 'AR', tier: 4, price: 6000, caseOnly: true, name: 'Tempest', rpm: 600, mode: 'semi', mag: 60, reserve: 240, reload: 4.5, spread: 2.6, ads: 0.02, range: 45, zoom: 0.75, speed: 0.9, pen: 1, caseless: true,
+    barrels: { n: 6, mm0: 229, mm1: 508, groups: { top: [0, 1, 2], bottom: [3, 4, 5], all: [0, 1, 2, 3, 4, 5] }, full: 0.8, default: 'standard',
+      rounds: { standard: { per: 10, mm0: 229, cal: '10/31', spec: 'tempest' }, rifle: { per: 5, mm0: 296, cal: '10/53', spec: 'tempest.rifle' } } },
+    desc: 'Six barrels of stacked 10 mm caseless rounds, fired electrically: the short round, ten to a barrel, or the long rifle round, five, and the block holds whichever it was loaded with. Semi, two automatic rates, or two, three or all six barrels at once. A barrel shoots harder the fewer rounds it has left in it. Legendary.' }),
 ];
 G.WEAPON_LIST = G_WEAPON_LIST;
 const G_WEAPONS: Record<string, any> = {}; // (any, not WeaponDef: icons.ts, gunsmith.ts and parts.ts index it as (G.WEAPONS[x] || {}).field)
@@ -198,13 +200,40 @@ const G_MODE_INFO: Record<string, { take: number; auto?: boolean; rpm?: number; 
   low: { take: 1, auto: true, rpm: 500 }, high: { take: 1, auto: true, rpm: 1200 }, double: { take: 2 }, triple: { take: 3, group: true }, sextuple: { take: 6 },
 };
 G.MODE_INFO = G_MODE_INFO;
-// ---- a gun of several barrels (def.barrels: n barrels of per rounds each, fired electrically nose to tail; the model says the same, info.barrels, and the baker checks they agree)
+// ---- a gun of several barrels (def.barrels: n barrels of rounds fired electrically nose to tail; the model says the same, info.barrels, and the baker checks they agree)
+// The ROUND LENGTH loaded decides how many rounds a barrel holds: def.barrels.rounds is a table of round types (the Tempest's: standard, 10 x 31 mm, ten a barrel; rifle, 10 x 53 mm, five),
+// each with the rounds a barrel holds of it (per), its caliber (cal: CALIBERS, with its own loads) and the sound spec it fires with (spec: GUN_SPECS). One block is one type: a weapon
+// (w.rl) and a block item (it.rl) say which, and its capacity, bookkeeping, boxes and loads all follow it.
+// The round type a weapon or block has loaded (its rl, or the gun's default) and what the gun's table says of it.
+const G_roundOf = (def: Record<string, any>, rl?: string | null): { rl: string; per: number; cal: string; spec: string } | null => {
+  const b = def.barrels;
+  if (!b) return null;
+  const k = rl && b.rounds[rl] ? rl : b.default;
+  return Object.assign({ rl: k }, b.rounds[k]);
+};
+G.roundOf = G_roundOf;
+// the rounds one barrel of this weapon / block holds (a weapon with .def and .rl, or a def: its default type's)
+const G_perOf = (x: Record<string, any>): number => { const r = G.roundOf(x.def || x, x.def ? x.rl : null); return r ? r.per : 0; };
+G.perOf = G_perOf;
+// the caliber a gun's, a block's or a magazine item's rounds are (a weapon with .def, an item with .wid, or a def): the loaded round type's for a gun of several barrels, else the gun's own
+const G_cartOf = (x: Record<string, any>): string => { const d = x.def || (x.wid && G.WEAPONS[x.wid]) || x, r = G.roundOf(d, x.def || x.wid ? x.rl : null); return r ? r.cal : G.calOf(d); };
+G.cartOf = G_cartOf;
+// every caliber a gun can be loaded with (a gun of several barrels takes each of its round types')
+const G_calsOf = (d: Record<string, any>): string[] => (d.barrels ? Object.values(d.barrels.rounds).map((r: any) => r.cal) : [G.calOf(d)]);
+G.calsOf = G_calsOf;
+// a gun's stats as that one of its calibers' round sees them (a gun of several barrels with a round type's caliber; any other gun: itself)
+const G_asCal = (d: Record<string, any>, cal: string) => (G.calOf(d) === cal ? d : Object.assign(Object.create(d), { rcal: cal }));
+G.asCal = G_asCal;
+// the capacity of a gun's magazine as it is loaded: a weapon (a gun of several barrels: n barrels of what its block's round type holds) or a def
+const G_capOf = (x: Record<string, any>): number => { const d = x.def || x; return d.barrels ? d.barrels.n * G.perOf(x) : d.mag; };
+G.capOf = G_capOf;
 // Each barrel's rounds are bookkept in w.bl (rounds left per barrel; w.mag is their sum and stays the one number everything else reads). A magazine put in, or a gun
 // picked up with no bookkeeping, spreads its rounds evenly, the lowest barrels the emptier (the way fullest-first would have left them: see pickBarrels).
-const G_barrelsOf = (w: { def: Record<string, any>; mag: number; bl?: number[] | null }): number[] | null => {
+const G_barrelsOf = (w: { def: Record<string, any>; mag: number; rl?: string | null; bl?: number[] | null }): number[] | null => {
   const b = w.def.barrels;
   if (!b) return null;
-  if (!w.bl || w.bl.length !== b.n || w.bl.reduce((a: number, x: number) => a + x, 0) !== w.mag) { const n = Math.max(0, Math.min(w.mag, b.n * b.per)); w.bl = Array.from({ length: b.n }, (_, i) => Math.min(b.per, Math.floor(n / b.n) + (i >= b.n - (n % b.n) ? 1 : 0))); }
+  const per = G.perOf(w);
+  if (!w.bl || w.bl.length !== b.n || w.bl.reduce((a: number, x: number) => a + x, 0) !== w.mag) { const n = Math.max(0, Math.min(w.mag, b.n * per)); w.bl = Array.from({ length: b.n }, (_, i) => Math.min(per, Math.floor(n / b.n) + (i >= b.n - (n % b.n) ? 1 : 0))); }
   return w.bl;
 };
 G.barrelsOf = G_barrelsOf;
@@ -219,25 +248,31 @@ const G_pickBarrels = (w: { def: Record<string, any>; mag: number; bl?: number[]
   return pool.filter((i) => bl[i] > 0).sort((p, q) => bl[q] - bl[p] || p - q).slice(0, mi.take);
 };
 G.pickBarrels = G_pickBarrels;
-// A shot from barrel i as the gun sees it: the barrel's effective length (def.barrels.mm, indexed by the rounds already fired from it) sets the muzzle velocity, and with it the
-// damage (energy) and the range, from def.barrels.full (x0.8) at the shortest to x1.0 at the longest. The velocity is the build's own at its longest, times the square root of that
-// factor (energy goes with its square). eff: that effective length in mm, k: the factor.
-// The effective barrel lengths (mm) of a gun of several barrels, one per round of a barrel, shortest first: the model's own (info.barrels.effective_mm, as soon as the gun's platform index is loaded:
-// the game reads it there and nowhere else) or, until then, the same count spread evenly from def.barrels.mm0 to mm1 (a stand-in with the same ends: the baker checks them against the model).
-const G_barrelMm = (def: Record<string, any>): number[] => {
-  const b = def.barrels, info = G.Models && G.Models.infoOf ? G.Models.infoOf(def) : null, list = info && info.barrels && info.barrels.effective_mm;
-  if (list && list.length === b.per) return list;
-  return Array.from({ length: b.per }, (_, i) => b.mm0 + ((b.mm1 - b.mm0) * i) / (b.per - 1));
+// A shot from barrel i as the gun sees it: the barrel's effective length (the loaded round type's list: G.barrelMm, indexed by the rounds already fired from it) sets the muzzle velocity, and with it the
+// damage (energy) and the range, from def.barrels.full (x0.8) at the shortest length of any round type (mm0) to x1.0 at the longest (mm1: the same last shot for every type). The velocity is the build's
+// own at its longest, times the square root of that factor (energy goes with its square). eff: that effective length in mm, k: the factor.
+// The effective barrel lengths (mm) of a round type of a gun of several barrels, one per round of a barrel, shortest first: the model's own (info.barrels.rounds[type].effective_mm, as soon as the gun's
+// platform index is loaded: the game reads it there and nowhere else) or, until then, the same count spread evenly from the table's mm0 (the default type) or the type's own first length (rounds.<type>.mm0) to mm1, evenly (a stand-in with the same ends: the baker checks them against the model).
+const G_barrelMm = (def: Record<string, any>, rl?: string | null): number[] => {
+  const b = def.barrels, r = G.roundOf(def, rl)!, info = G.Models && G.Models.infoOf ? G.Models.infoOf(def) : null, list = info && info.barrels && info.barrels.rounds && info.barrels.rounds[r.rl] && info.barrels.rounds[r.rl].effective_mm;
+  if (list && list.length === r.per) return list;
+  const lo = b.rounds[r.rl].mm0;
+  return Array.from({ length: r.per }, (_, i) => lo + ((b.mm1 - lo) * i) / Math.max(1, r.per - 1));
 };
 G.barrelMm = G_barrelMm;
-// the factor (0.8 .. 1) a shot of this effective length has: damage (energy) and range, and the report's gain squared
-const G_shotK = (def: Record<string, any>, eff: number) => { const mm = G.barrelMm(def), full = def.barrels.full; return full + (1 - full) * (eff - mm[0]) / (mm[mm.length - 1] - mm[0]); };
+// the factor (0.8 .. 1) a shot of this effective length has: damage (energy) and range, and the report's gain squared. One scale for every round type (mm0 .. mm1), so a given length of bore gives the same share of the
+// full figures whatever the round: the rifle round's first shot (296 mm) is already fuller than the standard's (229 mm).
+const G_shotK = (def: Record<string, any>, eff: number) => { const b = def.barrels; return b.full + (1 - b.full) * G.U.clamp((eff - b.mm0) / (b.mm1 - b.mm0), 0, 1); };
 G.shotK = G_shotK;
-const G_shotDef = (def: Record<string, any>, w: { def: Record<string, any>; bl?: number[] | null; mag: number }, i: number) => {
-  const b = w.def.barrels, bl = G.barrelsOf(w)!, mm: number[] = G.barrelMm(w.def), gone = Math.max(0, Math.min(mm.length - 1, b.per - bl[i])), eff = mm[gone];
-  const k = G.shotK(w.def, eff), ref = (G.GUN_SPECS[w.def.id] || {}).barrel || 20;
-  const d = Object.create(def);
+// a gun's stats as its round type sees them (no length yet): that type's caliber and sound spec
+const G_roundSpec = (def: Record<string, any>, rl?: string | null) => { const r = G.roundOf(def, rl); if (!r) return def; const d = Object.create(def); d.rcal = r.cal; d.rspec = r.spec; d.soundKey = r.spec + def.soundKey.slice(def.id.length); return d; };
+G.roundSpec = G_roundSpec;
+const G_shotDef = (def: Record<string, any>, w: { def: Record<string, any>; bl?: number[] | null; mag: number; rl?: string | null }, i: number) => {
+  const bl = G.barrelsOf(w)!, r = G.roundOf(w.def, w.rl)!, mm: number[] = G.barrelMm(w.def, r.rl), gone = Math.max(0, Math.min(mm.length - 1, r.per - bl[i])), eff = mm[gone];
+  const k = G.shotK(w.def, eff), ref = (G.GUN_SPECS[r.spec] || {}).barrel || 20;
+  const d = Object.create(G.roundSpec(def, r.rl));
   d.barrelIn = eff / 25.4; d.velK = (def.velK || 1) * Math.sqrt(k) * Math.pow(ref / (eff / 25.4), 0.2); d.range = def.range * k;
+  if (r.rl !== w.def.barrels.default && def.recoil) { const I0 = G.recoilImpulse(G.roundSpec(def, w.def.barrels.default), 'ball'), I = G.recoilImpulse(G.roundSpec(def, r.rl), 'ball'); if (I0 && I) d.recoil = def.recoil * Math.pow(I / I0, G.RECOIL.B); } // (a longer round pushes harder)
   return { def: d, eff, k };
 };
 G.shotDef = G_shotDef;
@@ -382,8 +417,11 @@ const G_GUN_SPECS: Record<string, any> = { // (any, not GunSpec, for the same re
   welrod:   GS(4.0, 7.65, 'suppressor', 22000, 0.20, 71, 0.05, 0.10, 'recoil', 'brass', 17),
   // (the Maxim 9: the MP5SD's integral-can 9x19 load (35000 psi, 147 gr, 19 mm case, loudness 0.55) in the P9's slide (boltMass 0.45); barrel 4.38 in, the published figure)
   maxim9:   GS(4.38, 9.00, 'suppressor', 35000, 0.35, 147, 0.45, 0.55, 'recoil', 'brass', 19),
-  // (the Tempest: 10x38.5 caseless, a 20 in (508 mm) barrel at its fullest: the figures for a barrel are the effective lengths, G.barrelMm(def); an electric ignition has no bolt to hear)
-  tempest:  GS(20.0, 10.0, 'none', 58000, 0.80, 94.5, 0.02, 0.02, 'recoil', 'plastic', 38.5), // (a 108 grain bullet x 38.5/44 in the first 44 mm design)
+  // (the Tempest: 10 mm caseless, a 20 in (508 mm) barrel at its fullest: the figures for a barrel are the effective lengths, G.barrelMm(def); an electric ignition has no bolt to hear.
+  // Two lengths of round fit its bores, the block holding whichever it was loaded with (def.barrels.rounds): the standard 10 x 31, 8 g (123 grains), about 5.56 / 7.62x39 in energy,
+  // and the rifle 10 x 53, 9.8 g (151 grains), about .30-06's. The loads of each: CALIBERS)
+  tempest:  GS(20.0, 10.0, 'none', 55000, 0.80, 123.5, 0.02, 0.02, 'recoil', 'plastic', 31),
+  'tempest.rifle': GS(20.0, 10.0, 'none', 60000, 0.90, 151, 0.02, 0.02, 'recoil', 'plastic', 53),
   thor:     GS(15.0, 12.7, 'brake', 55000, 1.60, 660, 0.05, 0.05, 'recoil', 'brass', 99),
   derringer:GS(3.0, 10.9, 'none', 36000, 0.60, 240, 0.05, 0.05, 'recoil', 'brass', 33), // (.44 Magnum: one of the American Derringer Model 1's)
   tx22:     GS(4.1, 5.60, 'none', 24000, 0.10, 40, 0.15, 0.40, 'blowback', 'brass', 15),
@@ -534,7 +572,9 @@ G.VENDOR_QUIPS = G_VENDOR_QUIPS;
 // which ammo types exist for it; box: rounds in a box of ball from the quartermaster; per: price per round.
 const G_CALIBERS: Record<string, CaliberDef> = {
   '5.56/45': { name: '5.56×45', group: 'rifle', box: 30, per: 1.2 }, '7.62/39': { name: '7.62×39', group: 'rifle', box: 30, per: 1.1 },
-  '7/43': { name: '.277 Fury', group: 'rifle', box: 30, per: 1.8 }, '10/38.5': { name: '10×38.5 caseless', group: 'rifle', box: 42, per: 2.2 }, '7.62/51': { name: '7.62×51', group: 'rifle', box: 20, per: 1.8 },
+  '7/43': { name: '.277 Fury', group: 'rifle', box: 30, per: 1.8 }, '10/31': { name: '10×31 caseless', group: 'rifle', box: 30, per: 1.6, types: ['ball', 'hp', 'tracer'], loads: { ball: { g: 8, v: 650 }, hp: { g: 7, v: 700 }, tracer: { g: 7.6, v: 665 } } }, // (the Tempest's standard round: loads at its longest effective length, 508 mm)
+  '10/53': { name: '10×53 caseless', group: 'rifle', box: 15, per: 2.6, types: ['ball', 'hp', 'tracer', 'sabot', 'buck'], loads: { ball: { g: 9.8, v: 850 }, hp: { g: 8.6, v: 900 }, tracer: { g: 9.4, v: 865 }, sabot: { g: 6.7, lg: 7.8, v: 945, d: 4.5, len: 24 }, buck: { g: 3.5, v: 430, n: 5, d: 8.4, choke: 1.0, rangeK: 0.55, drag: 65 } } }, // (the Tempest's rifle round: sabot: a 4.5 x 24 mm tungsten rod of 6.7 g, 7.8 g launched; buck: five 00 pellets a round)
+  '7.62/51': { name: '7.62×51', group: 'rifle', box: 20, per: 1.8 },
   '9/19': { name: '9×19', group: 'pistol', box: 50, per: 0.6 }, '5.7/29': { name: '5.7×28', group: 'pistol', box: 50, per: 1.1 },
   '11.43/23': { name: '.45 ACP', group: 'pistol', box: 50, per: 0.9 }, '18.5/70': { name: '12 gauge', group: 'shotgun', box: 12, per: 2 },
   '7.62/54': { name: '7.62×54R', group: 'rifle', box: 20, per: 1.8 }, '12.7/99': { name: '.50 BMG', group: 'rifle', box: 10, per: 8 },
@@ -550,6 +590,7 @@ const G_CALIBERS: Record<string, CaliberDef> = {
 };
 G.CALIBERS = G_CALIBERS;
 const G_calOf = (def: Record<string, any>): string => {
+  if (def.rcal) return def.rcal; // (one shot of a gun of several barrels: the round type it was loaded with, G.shotDef)
   if (def.cls === 'BOW') return 'bolt';
   if (def.cls === 'RAIL') return 'cell';
   const g = G.GUN_SPECS[def.id];
@@ -572,6 +613,7 @@ const G_AMMO: Record<string, AmmoDef> = {
   ball: { name: 'FMJ ball', tag: 'FMJ', k: 1, desc: 'Full metal jacket. The standard round.' },
   hp: { name: 'Hollow point', tag: 'HP', k: 1.8, dragK: 0.8, desc: 'Opens to as much as 1.37× its width in flesh, the faster the wider: a wide track, all its energy spent inside, rarely out the far side. Its soft lead nose flattens on armour. It drags more in the air: it slows and drops sooner than ball.' },
   ap: { name: 'Armour-piercing', tag: 'AP', k: 2.4, velK: 1.08, massK: 0.85, desc: 'A hardened steel (pistol) or tungsten carbide (rifle) core, lighter and 8% faster: goes through plate that flattens lead, and through people, nose-first and late to tumble: a narrow track.' },
+  sabot: { name: 'Sabot AP', tag: 'SABOT', k: 3.2, desc: 'A slim tungsten rod in a sabot that falls away at the muzzle: a narrow, fast, hard penetrator that holds its line through plate that stops a full-width bullet, and leaves a narrow track in a body.' },
   tracer: { name: 'Tracer', tag: 'TR', k: 1.3, tracer: 0xff4a2a, desc: 'Burns red all the way out: you see exactly where it goes (so do they).' },
   subsonic: { name: 'Subsonic', tag: 'SUB', k: 1.6, rangeK: 0.7, quiet: true, desc: 'A heavier bullet under the speed of sound: no crack, so through a suppressor it is barely heard. Slow: less energy, and it drops sooner.' },
   buck: { name: '00 buckshot', tag: 'BUCK', k: 1, desc: 'Nine pellets. The standard shotgun load.' },
@@ -589,13 +631,19 @@ const G_AMMO: Record<string, AmmoDef> = {
 G.AMMO = G_AMMO;
 const G_AMMO_TYPES: Record<string, string[]> = { rifle: ['ball', 'hp', 'ap', 'tracer', 'subsonic'], pistol: ['ball', 'hp', 'ap', 'tracer', 'subsonic'], shotgun: ['buck', 'slug', 'birdshot', 'flechette'], grenade: ['he'], bolt: ['broadhead', 'mechanical', 'bodkin'], cell: ['railslug'] };
 G.AMMO_TYPES = G_AMMO_TYPES;
+// the loads a caliber takes: its own list (the Tempest's two rounds), else its group's
+const G_ammoTypes = (cal: string): string[] => { const C = G.CALIBERS[cal] || { group: 'cell' } as Partial<CaliberDef>; return C.types || G.AMMO_TYPES[C.group!]; };
+G.ammoTypes = G_ammoTypes;
+// a load's own figures in a caliber that lists them (CALIBERS loads: grams, speed at the longest effective length, pellets...), or null
+const G_loadOf = (cal: string, am?: string | null): LoadDef | null => { const C = G.CALIBERS[cal]; return (C && C.loads && am && C.loads[am]) || null; };
+G.loadOf = G_loadOf;
 // How fast a round leaves the muzzle (m/s), for whether it cracks going past (only above the speed of sound,
 // 343 m/s). Reference velocities by caliber at a reference barrel length (inches), scaled gently by the
 // build's barrel; how far it carries before drag takes 63% of its speed (m: pellets slow fast).
 const G_MUZZLE_V: Record<string, number[]> = {
   // (the drag lengths from real retained velocities: 5.56 keeps about 73% of its speed at 300 m, 7.62×51 76%,
   // .338 86%, .50 BMG 91%; 9 mm about 87% at 100 m, .45 ACP 94%; heavy subsonic 9×39 barely slows)
-  '5.56/45': [940, 20, 950], '7.62/39': [715, 16.3, 1000], '7/43': [920, 16, 1050], '10/38.5': [817, 20, 1000], // (.95 of the 44 mm round's 860: a shorter round, less propellant)
+  '5.56/45': [940, 20, 950], '7.62/39': [715, 16.3, 1000], '7/43': [920, 16, 1050], '10/31': [650, 20, 1000], '10/53': [850, 20, 1100], // (the Tempest's ball at its longest effective length, 20 in / 508 mm: a 8 g and a 9.8 g bullet; their other loads' speeds are in CALIBERS loads)
   '7.62/51': [840, 22, 1100],
   '9/19': [370, 4.5, 700], '5.7/29': [715, 10.4, 550], '11.43/23': [260, 5, 1600], '18.5/70': [400, 18, 70],
   '7.62/54': [830, 28, 1100], '12.7/99': [880, 29, 3000], '40/46': [76, 12, 2000], '7.65/17': [300, 4, 500],
@@ -610,7 +658,7 @@ const G_SOUND_SPEED: number = 343;
 G.SOUND_SPEED = G_SOUND_SPEED;
 // how far a round goes before drag takes 63% of its speed (m), from this build, with this load
 // (a load's dragK: a hollow point's open, blunt nose sheds speed sooner than ball's)
-const G_dragOf = (def: Record<string, any>, am?: string | null): number => { const ref = G.MUZZLE_V[G.calOf(def)]; return am === 'slug' ? 350 : (ref ? ref[2] : 600) * ((G.AMMO[am!] || {} as AmmoDef).dragK || 1); };
+const G_dragOf = (def: Record<string, any>, am?: string | null): number => { const L = G.loadOf(G.calOf(def), am); if (L && L.drag) return L.drag; const ref = G.MUZZLE_V[G.calOf(def)]; return am === 'slug' ? 350 : (ref ? ref[2] : 600) * ((G.AMMO[am!] || {} as AmmoDef).dragK || 1); };
 G.dragOf = G_dragOf;
 // a round's speed (m/s) d metres from the muzzle, from this build, with this load
 const G_roundSpeed = (def: Record<string, any>, am?: string | null, d = 0): number => {
@@ -619,7 +667,9 @@ const G_roundSpeed = (def: Record<string, any>, am?: string | null, d = 0): numb
   const barrel = def.barrelIn || (G.GUN_SPECS[def.id] || {}).barrel || ref[1];
   let v = ref[0] * Math.pow(Math.max(1, barrel) / ref[1], 0.2) * (def.velK || 1); // (velK: what the build adds besides its barrel's length)
   if (am === 'slug') v = Math.max(v, 470);
-  if (G.AMMO[am!] && G.AMMO[am!].velK) v *= G.AMMO[am!].velK!; // (AP: a lighter, hard-cored bullet leaves faster)
+  const L = G.loadOf(cal, am); // (a caliber with loads of its own: the load's speed against the ball's, and not the generic multiplier)
+  if (L) v *= L.v / ref[0];
+  else if (G.AMMO[am!] && G.AMMO[am!].velK) v *= G.AMMO[am!].velK!; // (AP: a lighter, hard-cored bullet leaves faster)
   // subsonic loads, and guns built to be (the integrally suppressed MP5SD and VSS), stay under Mach 1
   if (am === 'subsonic' || def.integral) v = Math.min(v, 310);
   return v * Math.exp(-d / G.dragOf(def, am)); // (a slug carries its speed; pellets shed it)
@@ -634,7 +684,7 @@ G.roundSpeed = G_roundSpeed;
 // against recoil. The muzzle device and the rest of the build are parts (js/parts.ts compile, which also uses the
 // build's own weight and barrel). K puts an M4 at 1.1 degrees.
 const G_CHARGE_GR: Record<string, number> = { // powder charge (grains)
-  '5.56/45': 25, '7.62/39': 25, '7/43': 30, '10/38.5': 30, // (the 44 mm round's 34 grains x 38.5/44)
+  '5.56/45': 25, '7.62/39': 25, '7/43': 30, '10/31': 26, '10/53': 52, // (the Tempest's 1.7 g and 3.4 g of propellant)
   '7.62/51': 46, '9/19': 6, '5.7/29': 6.5, '11.43/23': 5.5, '18.5/70': 27,
   '7.62/54': 50, '12.7/99': 235, '40/46': 5, '7.65/17': 2.5, '12.7/33': 25, '9.07/33': 14, '12.7/41': 40, '4.6/30': 6,
   '5.6/39': 23, '5.8/42': 26, '7.62/63': 50, '9/39': 15, '11.6/53': 55, '8.6/69': 90, '7.62/25': 8, '10.4/63': 14, '11.43/33': 9, '10.9/33': 22, '5.6/15': 2,
@@ -680,11 +730,11 @@ const G_aimSway = (def: Record<string, any>) => {
 G.aimSway = G_aimSway;
 // the push back of one shot (N·s) from this build with this load, or 0 (a bolt, a rail slug)
 const G_recoilImpulse = (def: Record<string, any>, am?: string | null) => {
-  const g = G.GUN_SPECS[def.id], cal = G.calOf(def), ch = G.CHARGE_GR[cal];
+  const g = G.GUN_SPECS[def.rspec || def.id], cal = G.calOf(def), ch = G.CHARGE_GR[cal]; // (rspec: the round type's own spec, a shot of a gun of several barrels: G.shotDef)
   if (!g || !ch) return 0;
   const v = G.roundSpeed(def, am), v0 = am === 'subsonic' ? G.roundSpeed(def) : v;
   // a subsonic load: a heavier bullet on a smaller charge (the energy it's loaded to)
-  const A = G.AMMO[am!] || {} as AmmoDef, bw = g.bulletWeight * (am === 'subsonic' ? 1.4 : A.massK || 1), cw = ch * (am === 'subsonic' ? 1.4 * (v / v0) * (v / v0) : 1);
+  const A = G.AMMO[am!] || {} as AmmoDef, L = G.loadOf(cal, am), bw = L ? (L.lg || L.g) * (L.n || 1) / 0.0647989 : g.bulletWeight * (am === 'subsonic' ? 1.4 : A.massK || 1), cw = ch * (am === 'subsonic' ? 1.4 * (v / v0) * (v / v0) : 1);
   return (bw * v + cw * G.RECOIL.GAS * v) * 6.479891e-5;
 };
 G.recoilImpulse = G_recoilImpulse;
@@ -749,33 +799,35 @@ const G_CLICK: number = 0.0001;
 G.CLICK = G_CLICK;
 const G_boreTip = (w: { def: Record<string, any>; clicks?: number }) => { const d = w.def; if (d.cls === 'RAIL') return 0; const k = G.zeroSlope(d, G.ballFor(G.calOf(d)), G.zeroOf(d)); return (k == null ? 0 : k) + (w.clicks || 0) * G.CLICK; };
 G.boreTip = G_boreTip;
-const G_ballFor = (cal: string): string => G.AMMO_TYPES[(G.CALIBERS[cal] || { group: 'cell' }).group][0];
+const G_ballFor = (cal: string): string => G.ammoTypes(cal)[0];
 G.ballFor = G_ballFor;
 // how often each type turns up loaded in a found gun (relative): ball and buckshot mostly, AP and flechette rarely
-const G_AMMO_RARITY: Record<string, number> = { ball: 10, hp: 3, tracer: 3, subsonic: 2, ap: 1, buck: 10, slug: 4, birdshot: 3, flechette: 1, he: 1, broadhead: 3, mechanical: 2, bodkin: 1, railslug: 1 };
+const G_AMMO_RARITY: Record<string, number> = { ball: 10, hp: 3, tracer: 3, subsonic: 2, ap: 1, buck: 10, slug: 4, birdshot: 3, flechette: 1, sabot: 1, he: 1, broadhead: 3, mechanical: 2, bodkin: 1, railslug: 1 };
 G.AMMO_RARITY = G_AMMO_RARITY;
 const G_rollAmmo = (cal: string, rnd = Math.random): string => {
-  const types = G.AMMO_TYPES[(G.CALIBERS[cal] || { group: 'cell' }).group];
+  const types = G.ammoTypes(cal);
   let x = rnd() * types.reduce((a, t) => a + (G.AMMO_RARITY[t] || 1), 0);
   for (const t of types) { x -= G.AMMO_RARITY[t] || 1; if (x <= 0) return t; }
   return types[0];
 };
 G.rollAmmo = G_rollAmmo;
 // a type for that caliber, or its ball
-const G_ammoOk = (cal: string, am: string): string => (G.AMMO_TYPES[(G.CALIBERS[cal] || { group: 'cell' }).group].includes(am) ? am : G.ballFor(cal));
+const G_ammoOk = (cal: string, am: string): string => (G.ammoTypes(cal).includes(am) ? am : G.ballFor(cal));
 G.ammoOk = G_ammoOk;
 // a gun firing a round of this type: its stats as that round sees them
 const G_roundDef = (def: Record<string, any>, am?: string | null) => {
-  const A = G.AMMO[am!];
-  if (!A || A.k === 1 && !A.tracer && !A.slug) return def;
+  const A = G.AMMO[am!], L = G.loadOf(G.calOf(def), am);
+  if (!A || A.k === 1 && !A.tracer && !A.slug && !L) return def;
   const d = Object.create(def);
+  if (L && L.n) { d.pellets = L.n; d.choke = L.choke || 1; } // (a caliber's own buckshot: a round of several pellets, in a cone)
+  if (L && L.rangeK) d.range = def.range * L.rangeK;
   if (A.rangeK) d.range = def.range * A.rangeK;
   if (A.spreadK) { if (def.choke) d.choke = def.choke * A.spreadK; else { d.spread = def.spread * A.spreadK; d.ads = def.ads * A.spreadK; } } // a shot load opens (or tightens) the pattern
   if (A.pelletsK) d.pellets = Math.max(1, Math.round(def.pellets * A.pelletsK));
   if (A.slug) { d.pellets = 1; d.choke = 0; d.range = def.range * 2; }
   if (A.tracer) d.tracer = A.tracer;
   if (A.quiet) d.quiet = true;
-  if (A.slug || A.velK || am === 'subsonic') { const I0 = G.recoilImpulse(def), I = G.recoilImpulse(def, am); if (I0 && I) d.recoil = def.recoil * Math.pow(I / I0, G.RECOIL.B); } // (a load that pushes harder or softer)
+  if (A.slug || A.velK || L || am === 'subsonic') { const I0 = G.recoilImpulse(def), I = G.recoilImpulse(def, am); if (I0 && I) d.recoil = def.recoil * Math.pow(I / I0, G.RECOIL.B); } // (a load that pushes harder or softer)
   return d;
 };
 G.roundDef = G_roundDef;
@@ -822,4 +874,4 @@ const G_ENEMY_GEAR = {
 };
 G.ENEMY_GEAR = G_ENEMY_GEAR;
 
-interface GameModules { TIER_NAMES: typeof G_TIER_NAMES; TIER_COLORS: typeof G_TIER_COLORS; CLASS_SND: typeof G_CLASS_SND; WEAPON_LIST: WeaponDef[]; WEAPONS: typeof G_WEAPONS; EXPLOSIVES_OFF: typeof G_EXPLOSIVES_OFF; obtainable: typeof G_obtainable; AUTO_ONLY: typeof G_AUTO_ONLY; FIRE_MODES: typeof G_FIRE_MODES; MODE_NAME: typeof G_MODE_NAME; MODE_INFO: typeof G_MODE_INFO; barrelsOf: typeof G_barrelsOf; pickBarrels: typeof G_pickBarrels; shotDef: typeof G_shotDef; shotK: typeof G_shotK; barrelMm: typeof G_barrelMm; shotSoundKey: typeof G_shotSoundKey; OPEN_BOLT: typeof G_OPEN_BOLT; chambered: typeof G_chambered; revolver: typeof G_revolver; REV: typeof G_REV; fullReload: typeof G_fullReload; BOLT_HOLD: typeof G_BOLT_HOLD; boltHold: typeof G_boltHold; loaded: typeof G_loaded; MAG_FAMILY: typeof G_MAG_FAMILY; BELT_FAMILY: typeof G_BELT_FAMILY; magFam: typeof G_magFam; magFits: typeof G_magFits; beltFed: typeof G_beltFed; GUN_SPECS: typeof G_GUN_SPECS; SUPPRESSOR: typeof G_SUPPRESSOR; ARMOR_LIST: ArmorDef[]; ARMORS: typeof G_ARMORS; ENEMIES: typeof G_ENEMIES; THEMES: typeof G_THEMES; HANGAR_ROWS: typeof G_HANGAR_ROWS; HANGAR_THEME: typeof G_HANGAR_THEME; PLAYER_COLORS: typeof G_PLAYER_COLORS; VENDOR_QUIPS: typeof G_VENDOR_QUIPS; CALIBERS: typeof G_CALIBERS; calOf: typeof G_calOf; stdMag: typeof G_stdMag; AMMO: typeof G_AMMO; AMMO_TYPES: typeof G_AMMO_TYPES; MUZZLE_V: typeof G_MUZZLE_V; SOUND_SPEED: typeof G_SOUND_SPEED; dragOf: typeof G_dragOf; roundSpeed: typeof G_roundSpeed; CHARGE_GR: typeof G_CHARGE_GR; GUN_KG: typeof G_GUN_KG; RECOIL_K: typeof G_RECOIL_K; RECOIL: typeof G_RECOIL; aimSway: typeof G_aimSway; recoilImpulse: typeof G_recoilImpulse; physRecoil: typeof G_physRecoil; GRAVITY: typeof G_GRAVITY; zeroOf: typeof G_zeroOf; sightH: typeof G_sightH; ROUND_LIFE: typeof G_ROUND_LIFE; ballistics: typeof G_ballistics; flight: typeof G_flight; zeroSlope: typeof G_zeroSlope; CLICK: typeof G_CLICK; boreTip: typeof G_boreTip; ballFor: typeof G_ballFor; AMMO_RARITY: typeof G_AMMO_RARITY; rollAmmo: typeof G_rollAmmo; ammoOk: typeof G_ammoOk; roundDef: typeof G_roundDef; gearTier: typeof G_gearTier; ENEMY_GEAR: typeof G_ENEMY_GEAR; }
+interface GameModules { TIER_NAMES: typeof G_TIER_NAMES; TIER_COLORS: typeof G_TIER_COLORS; CLASS_SND: typeof G_CLASS_SND; WEAPON_LIST: WeaponDef[]; WEAPONS: typeof G_WEAPONS; EXPLOSIVES_OFF: typeof G_EXPLOSIVES_OFF; obtainable: typeof G_obtainable; AUTO_ONLY: typeof G_AUTO_ONLY; FIRE_MODES: typeof G_FIRE_MODES; MODE_NAME: typeof G_MODE_NAME; MODE_INFO: typeof G_MODE_INFO; barrelsOf: typeof G_barrelsOf; roundOf: typeof G_roundOf; perOf: typeof G_perOf; cartOf: typeof G_cartOf; calsOf: typeof G_calsOf; asCal: typeof G_asCal; roundSpec: typeof G_roundSpec; capOf: typeof G_capOf; ammoTypes: typeof G_ammoTypes; loadOf: typeof G_loadOf; pickBarrels: typeof G_pickBarrels; shotDef: typeof G_shotDef; shotK: typeof G_shotK; barrelMm: typeof G_barrelMm; shotSoundKey: typeof G_shotSoundKey; OPEN_BOLT: typeof G_OPEN_BOLT; chambered: typeof G_chambered; revolver: typeof G_revolver; REV: typeof G_REV; fullReload: typeof G_fullReload; BOLT_HOLD: typeof G_BOLT_HOLD; boltHold: typeof G_boltHold; loaded: typeof G_loaded; MAG_FAMILY: typeof G_MAG_FAMILY; BELT_FAMILY: typeof G_BELT_FAMILY; magFam: typeof G_magFam; magFits: typeof G_magFits; beltFed: typeof G_beltFed; GUN_SPECS: typeof G_GUN_SPECS; SUPPRESSOR: typeof G_SUPPRESSOR; ARMOR_LIST: ArmorDef[]; ARMORS: typeof G_ARMORS; ENEMIES: typeof G_ENEMIES; THEMES: typeof G_THEMES; HANGAR_ROWS: typeof G_HANGAR_ROWS; HANGAR_THEME: typeof G_HANGAR_THEME; PLAYER_COLORS: typeof G_PLAYER_COLORS; VENDOR_QUIPS: typeof G_VENDOR_QUIPS; CALIBERS: typeof G_CALIBERS; calOf: typeof G_calOf; stdMag: typeof G_stdMag; AMMO: typeof G_AMMO; AMMO_TYPES: typeof G_AMMO_TYPES; MUZZLE_V: typeof G_MUZZLE_V; SOUND_SPEED: typeof G_SOUND_SPEED; dragOf: typeof G_dragOf; roundSpeed: typeof G_roundSpeed; CHARGE_GR: typeof G_CHARGE_GR; GUN_KG: typeof G_GUN_KG; RECOIL_K: typeof G_RECOIL_K; RECOIL: typeof G_RECOIL; aimSway: typeof G_aimSway; recoilImpulse: typeof G_recoilImpulse; physRecoil: typeof G_physRecoil; GRAVITY: typeof G_GRAVITY; zeroOf: typeof G_zeroOf; sightH: typeof G_sightH; ROUND_LIFE: typeof G_ROUND_LIFE; ballistics: typeof G_ballistics; flight: typeof G_flight; zeroSlope: typeof G_zeroSlope; CLICK: typeof G_CLICK; boreTip: typeof G_boreTip; ballFor: typeof G_ballFor; AMMO_RARITY: typeof G_AMMO_RARITY; rollAmmo: typeof G_rollAmmo; ammoOk: typeof G_ammoOk; roundDef: typeof G_roundDef; gearTier: typeof G_gearTier; ENEMY_GEAR: typeof G_ENEMY_GEAR; }

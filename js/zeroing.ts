@@ -10,9 +10,9 @@ const G_ZeroUI = (() => {
   const st = { wslot: 'p', am: null as string | null };
   interface Pt { d: number; h: number; v: number; t: number }
   const weapon = () => G.Me.weapons[st.wslot] || G.Me.weapons.p || G.Me.weapons.s;
-  const loads = (w: GWeapon): string[] => (G.AMMO_TYPES as Record<string, string[]>)[((G.CALIBERS as Record<string, any>)[G.calOf(w.def)] || { group: 'cell' }).group] || [];
+  const loads = (w: GWeapon): string[] => G.ammoTypes(G.cartOf(w)) || [];
   // the path of `am` from this gun with its sights as set (or with `clicks` of elevation instead)
-  const path = (w: GWeapon, am: string, clicks = w.clicks || 0): Pt[] => G.flight(w.def, am, G.boreTip(Object.assign({}, w, { clicks })), MAXD);
+  const path = (w: GWeapon, am: string, clicks = w.clicks || 0): Pt[] => G.flight(G.asCal(w.def, G.cartOf(w)), am, G.boreTip(Object.assign({}, w, { clicks })), MAXD);
   // where a path crosses the line of sight (metres)
   function crossings(p: Pt[]) {
     const out: number[] = [];
@@ -25,7 +25,7 @@ const G_ZeroUI = (() => {
   function html() {
     const Me = G.Me, w = weapon();
     if (!w) return '<div class="gs-empty">No weapon to zero.</div>';
-    const def = w.def, clicks = w.clicks || 0, std = G.zeroOf(def), ball = G.ballFor(G.calOf(def))!;
+    const def = w.def, clicks = w.clicks || 0, std = G.zeroOf(def), ball = G.ballFor(G.cartOf(w))!;
     if (!st.am || !loads(w).includes(st.am)) st.am = w.ammo && loads(w).includes(w.ammo) ? w.ammo : ball!;
     const tabs = ['p', 's'].map((k) => { const ww = Me.weapons[k]; return `<button class="tab${st.wslot === k ? ' on' : ''}" data-zw="${k}" ${ww ? '' : 'disabled'}>${k === 'p' ? 'Primary' : 'Sidearm'}: ${ww ? ww.def.name : '—'}</button>`; }).join('');
     if (def.cls === 'RAIL') return `<div class="gs-wrap zr"><div class="gs-tabs">${tabs}</div><div class="zr-note">A railgun's slug flies flat: there's nothing to zero.</div></div>`;

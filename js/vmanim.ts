@@ -582,7 +582,7 @@ const G_VMAnim = (() => {
         const mg: MagState = pose ? pose.mag : { mode: 'in' };
         an.mag.visible = mg.mode !== 'gone' && !(w.noMag && mg.mode === 'in' && !pl.reloading); // (a gun with its magazine out has none on it)
         if (mg.mode !== 'chk') an.mag.quaternion.copy(A.magQ);
-        if (idx === 0 && !pl.reloading) magFill(a, h.chk, w, pl.magSize(w.def));
+        if (idx === 0 && !pl.reloading) magFill(a, h.chk, w, pl.magSize(w));
         if (mg.mode === 'in') an.mag.position.copy(A.magHome);
         else if (mg.mode === 'peek') an.mag.position.copy(A.magHome).y -= mg.d!;
         else if (mg.mode === 'rise') { an.mag.position.copy(A.magHome); an.mag.position.y -= 0.15 * (1 - mg.k!); }

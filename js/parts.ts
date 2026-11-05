@@ -1133,7 +1133,7 @@ const G_Gunsmith = (() => {
     if (!g) return null;
     let s = inch === undefined ? g : Object.assign({}, g, { barrel: +inch, muzzleDevice: dev, suppressor: can || g.suppressor });
     { // a gun of several barrels: a barrel's report is fuller the longer its effective length (the key's inches, js/data.ts G.shotSoundKey): more of the charge burnt and more pressure at the muzzle
-      const bd = (G.WEAPONS[id] || {}).barrels;
+      const bd = (G.WEAPONS[id] || G.WEAPONS[id.split('.')[0]] || {}).barrels; // (id: the gun's, or a round type's own spec of it: tempest.rifle)
       if (bd && inch !== undefined) { const t = G.U.clamp((+inch * 25.4 - bd.mm0) / (bd.mm1 - bd.mm0), 0, 1); s = Object.assign({}, s, { pressure: s.pressure * (0.55 + 0.45 * t), grain: s.grain * (0.6 + 0.4 * t) }); }
     }
     if (LOAD_SOUND[am]) s = Object.assign({}, s, LOAD_SOUND[am](s));
@@ -1549,7 +1549,7 @@ const G_Gunsmith = (() => {
   P('maxim9', 'pistol', { rcv: 'authored', authored: 'maxim9', mag: { f: 0.0615, y: -0.0167 }, len0: 0.1166 }, { optic: ['pso', { optic: 'notch' }], ptac: true, authoredPistol: authoredPistol({
     barrel: { short: { name: 'Maxim 9 short suppressor (242 mm)', price: 320, tier: 2, can: 'compact', st: { ergo: 16, weight: -0.2, recoil: 4 }, desc: 'The front block off at the main seam: 94 mm shorter and far handier, a good deal louder with more flash. The long suppressor is the quiet one.' } },
     mag: { ext: { cap: 22, price: 90, tier: 1, st: { reload: 4, ergo: -2, weight: 0.05 }, desc: 'The magazine 25 mm longer down the grip: five more rounds. A little slower to swap.' } } }) });
-  // The Tempest (models/tempest, docs/models.md "Multi-barrel guns"): a rifle modelled in Blender whose barrels are the magazine (a block of six bores with seven stacked rounds each) and whose handguard, muzzle
+  // The Tempest (models/tempest, docs/models.md "Multi-barrel guns"): a rifle modelled in Blender whose barrels are the magazine (a block of six bores with stacked rounds, ten of the short round or five of the long one each) and whose handguard, muzzle
   // block and reload are the model's own. It has no barrel slot. Its handguard (M-LOK arms: lights and lasers; an I-beam with a Picatinny bottom flange: foregrips and bipods), grip and stock are the factory parts
   // of the model, on the shared mounts; the muzzle takes only its own variants (the per-gun parts beside the model, models/tempest/muzzle_*.glb: avMuzzle). The figures of the variants are PROPOSED here.
   const MUZZLE_VARIANTS: Record<string, { name: string; price: number; tier: number; set: Record<string, any>; st: Record<string, number>; desc: string }> = {
@@ -1566,7 +1566,7 @@ const G_Gunsmith = (() => {
     // the barrel block is the magazine: one per gun, a case-found rifle's whole barrel set, swapped on a reload
     { const mount = 'mag:' + id, cap = def.mag as number;
       slot('mag', mount, true);
-      factory('mag', mount, { name: `${def.name} ${cap}-round barrel block`, model: {}, set: { cap } });
+      factory('mag', mount, { name: `${def.name} ${cap}-round barrel block`, model: {}, set: { cap } }); // (cap: the standard round's; a block loaded with the rifle round holds fewer: G.capOf)
       for (const p of BY_MOUNT.get(mount) || []) p.variant = true;
       plat.magVariants = true; }
     // the muzzle: the model's muzzle block (its front sight fin on it) or one of its own variants

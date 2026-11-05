@@ -89,7 +89,7 @@ const G_InvUI = (() => {
     return { label: `Loading the ${name}`, per: magPer(mag), prog: () => bar(mag.n / mag.cap),
       step(me: Me) {
         if (mag.n >= mag.cap || !where(me, mag) && !w) return 'done';
-        const cal = G.calOf(G.WEAPONS[mag.wid]);
+        const cal = G.cartOf(mag);
         const b = box ? (box.n > 0 && where(me, box) ? box : null) : boxes(me, cal, null).sort((a, c) => +(c.am === mag.am) - +(a.am === mag.am))[0];
         if (!b) return 'done';
         mag.r.push(b.am); b.n--; // on top of whatever's in it
@@ -117,11 +117,11 @@ const G_InvUI = (() => {
   }
   // shells into a tube (or a break-action), one at a time
   function gunLoadJob(w: Wpn, box: Item | null) {
-    return { label: `Loading the ${w.def.name}`, per: PER.shell, prog: () => bar(w.mag / G.Me.magSize(w.def)),
+    return { label: `Loading the ${w.def.name}`, per: PER.shell, prog: () => bar(w.mag / G.Me.magSize(w)),
       step(me: Me) {
-        const cap = me.magSize(w.def);
+        const cap = me.magSize(w);
         if (w.mag >= cap) return 'done';
-        const b = box ? (box.n > 0 && where(me, box) ? box : null) : boxes(me, G.calOf(w.def), w.mag ? w.ammo : null)[0];
+        const b = box ? (box.n > 0 && where(me, box) ? box : null) : boxes(me, G.cartOf(w), w.mag ? w.ammo : null)[0];
         if (!b) return 'done';
         b.n--; GG().chamberIn(w, [b.am]);
         if (b.n <= 0) dropItem(me, b);
@@ -285,7 +285,7 @@ const G_InvUI = (() => {
     if (!isMagGun(w) || w.noMag) return null;
     let it = magItems.get(w);
     if (!it) magItems.set(w, (it = GG().ammoItem(w.def, 0, w.ammo)));
-    it.r = w.tube; it.cap = G.Me.magSize(w.def); it.vid = w.def.build && w.def.build.mag; it.wid = it.key = w.def.id; // (a gun can change what it is: a conversion) // the gun's rounds (and magazine) are this one's
+    it.r = w.tube; it.cap = G.Me.magSize(w); it.vid = w.def.build && w.def.build.mag; it.wid = it.key = w.def.id; if (w.def.barrels) { (it as any).rl = G.roundOf(w.def, w.rl)!.rl; (it as any).bl = G.barrelsOf(w)!.slice(); } // (a gun can change what it is: a conversion; a block says its round type and what is left in each barrel) // the gun's rounds (and magazine) are this one's
     return it;
   }
   // the guns whose panels are open
@@ -376,7 +376,7 @@ const G_InvUI = (() => {
     else if (it.k === 'gun') { // (in the field no counts: check the magazine, or the chamber)
       const nxt = it.w.chamber || (it.w.mag > 0 ? (it.w.tube && it.w.tube.length ? it.w.tube[it.w.tube.length - 1] : it.w.ammo) : null);
       sub = it.w.def.missing && it.w.def.missing.length ? '<i class="broken">won\'t fire</i>' : it.w.noMag && isMagGun(it.w) ? 'no mag' : nxt && (G.AMMO as Rec)[nxt] ? `<i class="am am-${nxt}">${(G.AMMO as Rec)[nxt].tag}</i>` : '<i class="am">EMPTY</i>';
-      if (!(it.w.def.missing && it.w.def.missing.length) && !(it.w.noMag && isMagGun(it.w))) sub += n(`${it.w.mag}${it.w.chamber ? '+1' : ''}`, G.Me.magSize(it.w.def));
+      if (!(it.w.def.missing && it.w.def.missing.length) && !(it.w.noMag && isMagGun(it.w))) sub += n(`${it.w.mag}${it.w.chamber ? '+1' : ''}`, G.Me.magSize(it.w));
     }
     else if (d && d.dur) sub = `${Math.round(Gr.cond(it) * 100)}%`;
     else if (it.k === 'part') { const p = GS().PARTS[it.pid]; sub = p && p.factory ? 'factory' : ''; }
@@ -425,7 +425,7 @@ const G_InvUI = (() => {
     const mi = magItem(w), a = mi ? (([w0, h0]: number[]) => ({ w: w0, h: h0 }))(Gr.size(mi)) : null;
     rows += isMagGun(w)
       ? `<div class="gun-slot mag" data-wmag="${gunIt.uid}"><small>Magazine in it</small>${mi ? itemHTML(mi, a!.w, a!.h, 'position:relative') : '<em>none: drop one here</em>'}</div>`
-      : `<div class="gun-slot mag" data-wmag="${gunIt.uid}"><small>Loaded</small>${(() => { const cap = me.magSize(def), pw = Math.max(1, Math.min(4, Math.ceil(cap / 3))); return `<img class="tubepic" src="${G.Icons.of({ k: 'tube', key: G.calOf(def), n: w.mag, cap, am: w.ammo } as GItem, pw, 1, false)}" style="width:${pw * 30}px;height:30px">`; })()}<em>${w.mag ? (counted() ? `${w.mag} / ${me.magSize(def)} rounds` : '') : 'empty: drop a box here'}</em></div>`;
+      : `<div class="gun-slot mag" data-wmag="${gunIt.uid}"><small>Loaded</small>${(() => { const cap = me.magSize(w), pw = Math.max(1, Math.min(4, Math.ceil(cap / 3))); return `<img class="tubepic" src="${G.Icons.of({ k: 'tube', key: G.calOf(def), n: w.mag, cap, am: w.ammo } as GItem, pw, 1, false)}" style="width:${pw * 30}px;height:30px">`; })()}<em>${w.mag ? (counted() ? `${w.mag} / ${me.magSize(def)} rounds` : '') : 'empty: drop a box here'}</em></div>`;
     if (G.chambered(def)) rows += `<div class="gun-slot mag"><small>Chamber</small><em>${w.chamber ? `<i class="am am-${w.chamber}">${(G.AMMO as Rec)[w.chamber] ? (G.AMMO as Rec)[w.chamber].tag : ''}</i> a round in it` : 'empty: racks on the next pull of the trigger, or R'}</em></div>`;
     const [gw, gh] = Gr.gunSize(def);
     return `<div class="inv-open gun"><div class="inv-sec"><h4>${G.U.esc(def.name)}${def.modified ? ' <small>CUSTOM</small>' : ''}${def.missing && def.missing.length ? ' <small class="broken">WON\'T FIRE</small>' : ''}${closeBtn(gunIt)}</h4>
@@ -699,7 +699,7 @@ const G_InvUI = (() => {
       return rerender();
     }
     if (field && target && target.it !== d.it && d.it.k === 'ammo' && target.it.k === 'mag') {
-      if (G.calOf(G.WEAPONS[target.it.wid]) !== d.it.key) { G.Audio.deny(); return rerender(); }
+      if (G.cartOf(target.it) !== d.it.key) { G.Audio.deny(); return rerender(); }
       queue(loadJob(target.it, d.it, target.gunMag)); return rerender();
     }
     if (target && target.it !== d.it && d.it.k === 'ammo' && target.it.k === 'mag') {
@@ -745,7 +745,7 @@ const G_InvUI = (() => {
     if (!w) return G.Audio.deny();
     if (!isMagGun(w)) {
       if (it.k !== 'ammo' || it.key !== G.calOf(w.def)) return G.Audio.deny();
-      const t = Math.min(me.magSize(w.def) - w.mag, it.n);
+      const t = Math.min(me.magSize(w) - w.mag, it.n);
       if (!t) return G.Audio.deny();
       w.mag += t; it.n -= t; w.ammo = it.am;
       for (let i = 0; i < t; i++) w.tube.push(it.am);
@@ -858,18 +858,18 @@ const G_InvUI = (() => {
   function itemActs(me: Me, src: Src) {
     const Gr = GG(), it = src.it, out = [], boxes = (cal: string) => { let n = 0; Gr.each(Gr.all(me), (b: Item) => { if (b.k === 'ammo' && b.key === cal) n += b.n; }); return n; };
     if (it.k === 'gun') {
-      const w = it.w, cal = G.calOf(w.def);
+      const w = it.w, cal = G.cartOf(w);
       if (isMagGun(w)) {
         if (!w.noMag) out.push(['magout', 'Remove magazine']);
         else { const m = bestMag(me, w); if (m) out.push(['magin', `Load a magazine${counted() ? ` (${m.n}/${m.cap})` : ''}`]); }
       } else {
         if (G.loaded(w)) out.push(['unloadgun', `Unload${w.chamber ? ' (the chambered one last)' : ''}`]);
-        if (w.mag < me.magSize(w.def) && boxes(cal)) out.push(['loadgun', 'Load from your boxes']);
+        if (w.mag < me.magSize(w) && boxes(cal)) out.push(['loadgun', 'Load from your boxes']);
       }
     }
     if (it.k === 'mag') {
       if (it.n) out.push(['unloadmag', 'Unload']);
-      if (it.n < it.cap && boxes(G.calOf(G.WEAPONS[it.wid]))) out.push(['loadmag', 'Load from your boxes']);
+      if (it.n < it.cap && boxes(G.cartOf(it))) out.push(['loadmag', 'Load from your boxes']);
       if (!src.gunMag) Gr.guns(me).forEach((w, i) => { if (isMagGun(w) && G.magFits(it.wid, w.def.id) && w !== (src.gunMag || null)) out.push(['magto', `Put in your ${w.def.name}${w.noMag ? '' : ' (swap)'}`, i]); });
     }
     if (it.k === 'ammo') {
@@ -878,7 +878,7 @@ const G_InvUI = (() => {
     }
     if (it.k === 'ammo' && it.n) {
       let any = false;
-      Gr.each(Gr.all(me), (m: Item) => { if (m.k === 'mag' && m.n < m.cap && G.calOf(G.WEAPONS[m.wid]) === it.key) any = true; });
+      Gr.each(Gr.all(me), (m: Item) => { if (m.k === 'mag' && m.n < m.cap && G.cartOf(m) === it.key) any = true; });
       if (any) out.push(['fillfrom', 'Load magazines from it']);
     }
     if (it.k === 'med' && field) {
@@ -908,22 +908,22 @@ const G_InvUI = (() => {
     magout: (me: Me, src: Src) => queue(magOutJob(src.it.w)),
     magin: (me: Me, src: Src) => { const m = bestMag(me, src.it.w); if (m) queue(magInJob(m, src.it)); },
     magto: (me: Me, src: Src, i: number) => { const w = GG().guns(me)[+i]; if (w) queue(magInJob(src.it, GG().gunItem(w))); },
-    unloadgun: (me: Me, src: Src) => { const w = src.it.w; queue(unloadJob(w.def.name, G.calOf(w.def), () => G.loaded(w), (peek: boolean) => {
+    unloadgun: (me: Me, src: Src) => { const w = src.it.w; queue(unloadJob(w.def.name, G.cartOf(w), () => G.loaded(w), (peek: boolean) => {
       if (!w.mag && w.chamber) { const t = w.chamber; if (!peek) w.chamber = null; return t; } // (the magazine's empty: clear the chamber)
       const t = w.tube && w.tube.length ? w.tube[w.tube.length - 1] : w.ammo; if (!peek) { w.mag--; if (w.tube) w.tube.pop(); } return t; })); },
     loadgun: (me: Me, src: Src) => queue(gunLoadJob(src.it.w, null)),
-    unloadmag: (me: Me, src: Src) => { const m = src.it, w = src.gunMag; queue(unloadJob(GG().magName(m), G.calOf(G.WEAPONS[m.wid]), () => m.n, (peek: boolean) => { const t = m.am; if (!peek) { m.r.pop(); if (w) w.mag = m.n; } return t; })); },
+    unloadmag: (me: Me, src: Src) => { const m = src.it, w = src.gunMag; queue(unloadJob(GG().magName(m), G.cartOf(m), () => m.n, (peek: boolean) => { const t = m.am; if (!peek) { m.r.pop(); if (w) w.mag = m.n; } return t; })); },
     loadmag: (me: Me, src: Src) => queue(loadJob(src.it, null, src.gunMag)),
-    fillfrom: (me: Me, src: Src) => { GG().each(grids(me), (m: Item) => { if (m.k === 'mag' && m.n < m.cap && G.calOf(G.WEAPONS[m.wid]) === src.it.key) queue(loadJob(m, src.it)); }); },
+    fillfrom: (me: Me, src: Src) => { GG().each(grids(me), (m: Item) => { if (m.k === 'mag' && m.n < m.cap && G.cartOf(m) === src.it.key) queue(loadJob(m, src.it)); }); },
   };
   const doAct: Record<string, (me: Me, src: Src, arg?: any) => void> = {
     combine: (me: Me, src: Src) => { const n = GG().combine(grids(me).filter((g) => !g.team), src.it.key, src.it.am); toast(n, 'Combined:'); G.Audio.click(); },
     magout: (me: Me, src: Src) => { const m = magItem(src.it.w)!; if (field && !GG().roomFor(me, m)) return G.HUD.toast('', 'No room on you for the magazine', 1.5); detach(me, { gunMag: src.it.w }); GG().stow(me, m); G.Audio.click(); },
     magin: (me: Me, src: Src) => { const m = bestMag(me, src.it.w); if (m) intoGun(me, locate(me, m.uid!)!, src.it); },
     magto: (me: Me, src: Src, i: number) => { const w = GG().guns(me)[+i]; if (w) intoGun(me, src, GG().gunItem(w)); },
-    unloadgun: (me: Me, src: Src) => { if (!roomForRounds(me, G.calOf(src.it.w.def))) return; toast(GG().unloadGun(me, src.it.w), 'Rounds out:'); G.Audio.click(); },
+    unloadgun: (me: Me, src: Src) => { if (!roomForRounds(me, G.cartOf(src.it.w))) return; toast(GG().unloadGun(me, src.it.w), 'Rounds out:'); G.Audio.click(); },
     loadgun: (me: Me, src: Src) => { toast(GG().fillGun(me, src.it.w), 'Rounds in:'); G.Audio.click(); },
-    unloadmag: (me: Me, src: Src) => { if (!roomForRounds(me, G.calOf(G.WEAPONS[src.it.wid]), src.g)) return; const n = GG().unloadMag(me, src.it, (src.g ? [src.g] : null) as Grid[]); if (src.gunMag) src.gunMag.mag = 0; toast(n, 'Rounds out:'); G.Audio.click(); },
+    unloadmag: (me: Me, src: Src) => { if (!roomForRounds(me, G.cartOf(src.it), src.g)) return; const n = GG().unloadMag(me, src.it, (src.g ? [src.g] : null) as Grid[]); if (src.gunMag) src.gunMag.mag = 0; toast(n, 'Rounds out:'); G.Audio.click(); },
     loadmag: (me: Me, src: Src) => { const n = GG().fillMag(me, src.it); if (src.gunMag) { src.gunMag.mag = src.it.n; src.gunMag.ammo = src.it.am; } toast(n, 'Rounds in:'); G.Audio.click(); },
     fillfrom: (me: Me, src: Src) => { const n = GG().fillFrom(me, src.it); if (src.it.n <= 0 && src.g) GG().removeFrom(src.g, src.it); toast(n, 'Loaded'); G.Audio.click(); },
     fit: (me: Me, src: Src, i: number) => {

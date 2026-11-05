@@ -146,7 +146,7 @@ const G_Viewmodel = (() => {
       label(String(d), hw + 0.9, y, TH);
     }
     // a bodkin's
-    const heavy = (G.AMMO_TYPES as Record<string, string[]>)[((G.CALIBERS as Record<string, any>)[G.calOf(def)] || {}).group].find((a) => a !== ball && (G.AMMO as Record<string, any>)[a].velK);
+    const heavy = G.ammoTypes(G.calOf(def)).find((a) => a !== ball && (G.AMMO as Record<string, any>)[a].velK);
     if (heavy) {
       for (const d of [20, 30, 40, 50, 60, 70, 80, 100]) {
         const y = hold(heavy, d);

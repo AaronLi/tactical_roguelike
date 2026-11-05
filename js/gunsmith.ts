@@ -215,15 +215,18 @@ const G_GunsmithUI = (() => {
     if (c1) h += `<div class="gs-stat${c0 !== c1 ? ' up' : ''}"><span>Caliber</span><div></div><b>${c1.name}${prev && prev.id !== cur.id ? ` <em>${G.U.esc(prev.name)}</em>` : ''}</b></div>`;
     h += `<div class="gs-stat"><span>Report</span><div></div><b>${(prev || cur).sup ? 'Suppressed' : (prev || cur).device === 'none' ? 'Bare muzzle' : (prev || cur).device}</b></div>`;
     // each load through this build's barrel: how fast it leaves, and the energy it leaves with (all its pellets)
-    const d = prev || cur, cal = G.calOf(d), grp = (G.CALIBERS as Record<string, CaliberDef>)[cal] && (G.AMMO_TYPES as Record<string, any>)[(G.CALIBERS as Record<string, CaliberDef>)[cal].group];
-    if (grp && (G.MUZZLE_V as Record<string, any>)[cal] && !d.explosive && d.cls !== 'RAIL') {
-      h += `<div class="gs-loads"><span>Load</span><span>Muzzle</span><span>Energy</span>`;
-      for (const am of grp) {
-        const v = G.roundSpeed(d, am), v0 = G.roundSpeed(cur, am), e = G.Ballistics.energy(d, am, 0), ch = Math.round(v) - Math.round(v0);
-        const cls = ch ? (ch > 0 ? ' class="up"' : ' class="down"') : '';
-        h += `<span>${(G.AMMO as Record<string, any>)[am].name}</span><b${cls}>${Math.round(v)} m/s${ch ? ` <em>${ch > 0 ? '+' : ''}${ch}</em>` : ''}</b><b${cls}>${G.U.fmt(Math.round(e))} J</b>`;
+    const d0 = prev || cur, cur0 = cur;
+    for (const cal of G.calsOf(d0)) { // (a gun of several barrels: each round type it takes, in its own caliber)
+      const d = G.asCal(d0, cal), cur = G.asCal(cur0, cal), grp = (G.CALIBERS as Record<string, CaliberDef>)[cal] && G.ammoTypes(cal);
+      if (grp && (G.MUZZLE_V as Record<string, any>)[cal] && !d.explosive && d.cls !== 'RAIL') {
+        h += `<div class="gs-loads"><span>${d0.barrels ? (G.CALIBERS as Record<string, CaliberDef>)[cal].name : 'Load'}</span><span>Muzzle</span><span>Energy</span>`;
+        for (const am of grp) {
+          const v = G.roundSpeed(d, am), v0 = G.roundSpeed(cur, am), e = G.Ballistics.energy(d, am, 0), ch = Math.round(v) - Math.round(v0);
+          const cls = ch ? (ch > 0 ? ' class="up"' : ' class="down"') : '';
+          h += `<span>${(G.AMMO as Record<string, any>)[am].name}</span><b${cls}>${Math.round(v)} m/s${ch ? ` <em>${ch > 0 ? '+' : ''}${ch}</em>` : ''}</b><b${cls}>${G.U.fmt(Math.round(e))} J</b>`;
+        }
+        h += '</div>';
       }
-      h += '</div>';
     }
     return h;
   }

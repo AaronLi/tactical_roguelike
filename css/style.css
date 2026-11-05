@@ -603,7 +603,7 @@ i.c.heavy { background: #a02828; } i.c.light { background: #7a3a30; } i.c.frac {
 .inv-item i.am { font-style: normal; font-weight: 700; padding: 0 2px; border-radius: 2px; background: rgba(255,255,255,0.12); }
 .inv-item i.am.mix { margin-left: 2px; background: rgba(240,150,40,0.35); }
 .am-hp { color: #ff8a7a; } .am-ap { color: #8ac4ff; } .am-tracer { color: #ff6a3a; } .am-subsonic { color: #b8c0c8; }
-.am-slug { color: #ffd27a; } .am-birdshot { color: #c8e08a; } .am-flechette { color: #8ac4ff; }
+.am-slug { color: #ffd27a; } .am-birdshot { color: #c8e08a; } .am-flechette { color: #8ac4ff; } .am-sabot { color: #7ad0ff; }
 .amtag { font-size: calc(11px * var(--ik, 1)); letter-spacing: 1px; color: var(--accent); margin-left: calc(4px * var(--ik, 1)); }
 .card.ammo .gs-pe { font: calc(11px * var(--ik, 1)) var(--mono); color: #9fb48a; margin: calc(6px * var(--ik, 1)) 0; }
 .card.ammo .fits { font: calc(10px * var(--ik, 1)) var(--mono); color: var(--dim); }
