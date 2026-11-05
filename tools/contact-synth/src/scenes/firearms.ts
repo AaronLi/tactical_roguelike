@@ -80,8 +80,12 @@ const brassHead: Body = { ...mat('brass'), shape: 'block', size: 2.2, thickness:
 const sgChamber: Body = { ...mat('steel'), shape: 'shell', size: 9, thickness: 4, modes: 2, irregularity: 0.6, damping: 0.7, level: 0 };
 
 // AR-15
-const arCarrier = steelBlock(18, 22); // bolt carrier group, ~300 g
-const arBolt = steelBlock(6, 10);
+// The bolt carrier is a hollow steel tube (~18 cm, ~3.5 mm wall, gas key on top); the bolt is
+// a separate solid part (~6 cm) riding inside it, turned by the cam pin in the carrier's cam
+// track. They move and hit separately: that's what gives the AR its two-part "ch-chunk".
+const arCarrier: Body = { ...mat('steel'), shape: 'shell', size: 18, thickness: 3.5, modes: 2, irregularity: 0.6, damping: 0.5, level: 0 };
+const arBolt: Body = { ...mat('steel'), shape: 'bar', size: 6, thickness: 15, modes: 1, irregularity: 0.5, damping: 0.5, level: 0 };
+const arCamPin = steelBar(1.5, 5);
 const arBarrelExt = steelBlock(3, 20);
 const arUpper: Body = { ...alu('shell', 25, 3, 0.7), modes: 0 }; // receiver: thick, bolted to everything, no free ring
 const arChargingHandle = alu('bar', 18, 5, 0.7); // in the hand
@@ -186,7 +190,9 @@ export const PUMP_SHOTGUN: Scene = {
 
 // ---------- AR-15 ----------
 // Receiver housing: 7075 aluminium upper and lower, barrel and buffer tube hung off them.
-const AR_HOUSING: Scene['housing'] = { amount: 0.5, cavity: 0.15, ...mat('aluminum'), shape: 'shell', size: 30, thickness: 3, modes: 0, irregularity: 0.8, damping: 0.7 };
+// The carrier slides inside the upper's long bore, which continues into the buffer tube: a
+// narrow air space (~2.6 cm) that gives the pipe-like hollow "shk" of the slides.
+const AR_HOUSING: Scene['housing'] = { amount: 0.55, cavity: 0.5, cavityWidth: 2.6, ...mat('aluminum'), shape: 'shell', size: 30, thickness: 3, modes: 0, irregularity: 0.8, damping: 0.6 };
 
 /** The carrier running home under the buffer spring, starting at t (round in the magazine). */
 function arForward(t: number, withChargingHandle: boolean): SceneElement[] {
@@ -197,16 +203,21 @@ function arForward(t: number, withChargingHandle: boolean): SceneElement[] {
     hit('buffer spring drives the carrier', t, -18, 3, arBufferSpring, arBufferTube, { scatter: 0.2, radius: 1, click: 0.1, sharp: 0.5 },
       { coil: { level: 0.3, length: 14, dispersion: 0.4, decay: 0.2, brightness: 1800 } }),
     // What you actually hear: the steel carrier grinding along the aluminium upper.
-    rub('carrier rails in the upper', t + 0.002, -5, { force: 14, duration: 0.05, speed: 4, profile: 'accelerate', roughness: 22, grain: 0.25, periodicity: 0.2 }, arCarrier, arUpper),
+    rub('carrier rails in the upper', t + 0.002, -5, { force: 14, duration: 0.05, speed: 4, profile: 'accelerate', roughness: 8, grain: 0.15, periodicity: 0, contactWidth: 0.02 }, arCarrier, arUpper),
     hit('buffer weights shift', t + 0.004, -20, 1.2, steelBlock(1.5, 12), arBuffer, { scatter: 0.9, radius: 2 }),
     // Bolt strips the top round over the steel feed lips.
     rub('case dragged over the feed lips', t + 0.02, -14, { force: 6, duration: 0.02, speed: 3, roughness: 15, grain: 0.3 }, arCase, arFeedLips),
     hit('next round pops up', t + 0.03, -16, 0.8, arNextRound, arFeedLips, { scatter: 0.3, radius: 2 }),
     rub('round into the chamber', t + 0.04, -15, { force: 5, duration: 0.015, speed: 3, profile: 'decelerate', roughness: 6, grain: 0.3 }, arCase, arChamber),
-    // Bolt face hits the barrel extension, cam pin rotates the bolt, lugs lock: the "chunk".
-    hit('bolt slams into the barrel extension', t + 0.055, 0, 4.5, arCarrier, arBarrelExt, { scatter: 0.6, radius: 4, click: 0.7 },
+    // Lock-up in two parts. The bolt (out front of the carrier) hits the barrel extension
+    // first: a sharp, light hit. The carrier keeps going for its 9.5 mm of cam travel, the
+    // cam pin turns the bolt into its lugs, and then the heavy hollow carrier lands on the
+    // bolt: the "chunk", about 2.5 ms later.
+    hit('bolt face hits the barrel extension', t + 0.055, -4, 4.5, arBolt, arBarrelExt, { scatter: 0.3, radius: 3, click: 0.7 }),
+    rub('cam pin turns the bolt', t + 0.054, -12, { force: 10, duration: 0.011, speed: 1.2, profile: 'decelerate', roughness: 10, grain: 0.2, contactWidth: 0.02 }, arCamPin, arCarrier),
+    hit('bolt lugs rotate home', t + 0.057, -9, 1.5, arBolt, arBarrelExt, { scatter: 0.3, radius: 1.5 }),
+    hit('carrier slams onto the bolt', t + 0.0578, 0, 3.8, arCarrier, arBolt, { scatter: 0.5, radius: 5, click: 0.8 },
       { flex: { amount: 0.25, freq: 90, decay: 0.06, rattle: 0.4, wobble: 0, tone: 0 } }),
-    hit('bolt rotates and locks', t + 0.058, -6, 1.5, arBolt, arBarrelExt, { scatter: 0.4, radius: 1.5 }),
     snap('extractor snaps over the rim', t + 0.056, -12, { strength: 0.6, preload: 0, seat: 0.2 }, arExtractor, arCase),
   ];
   if (withChargingHandle) {
@@ -233,18 +244,24 @@ export const AR15_CHARGE: Scene = {
     },
     {
       name: 'unlock',
-      description: 'Carrier moves back; the cam pin rotates the bolt out of the barrel extension.',
-      elements: [hit('bolt unlocks', CH_BACK + 0.01, -7, 1.0, arBolt, arBarrelExt, { scatter: 0.4, radius: 1.5 })],
+      description: 'Carrier moves back alone for its cam travel, the cam pin turns the bolt out of its lugs, then the carrier catches the bolt and drags it along.',
+      elements: [
+        rub('cam pin turns the bolt', CH_BACK + 0.004, -12, { force: 8, duration: 0.012, speed: 0.6, profile: 'steady', roughness: 10, grain: 0.2, contactWidth: 0.02 }, arCamPin, arCarrier),
+        hit('bolt lugs rotate free', CH_BACK + 0.012, -10, 0.6, arBolt, arBarrelExt, { scatter: 0.3, radius: 1.5 }),
+        hit('carrier picks up the bolt', CH_BACK + 0.017, -6, 0.9, arCarrier, arBolt, { scatter: 0.4, radius: 3, click: 0.7 }),
+      ],
     },
     {
       name: 'pull-back',
       description: 'Charging handle and bolt carrier grinding back along the upper, with the gas key riding in the handle slot: the main sound of the pull.',
       elements: [
-        // Hard-anodised aluminium on aluminium, and phosphated/nitrided steel on aluminium:
-        // fine machining marks give a gritty, slightly regular grind.
-        rub('charging handle in its channel', CH_BACK, -5, { force: 8, duration: CH_END - CH_BACK, speed: 0.7, roughness: 18, grain: 0.25, periodicity: 0.2 }, arChargingHandle, arUpper),
-        rub('carrier on the upper rails', CH_BACK + 0.01, -4, { force: 14, duration: CH_END - CH_BACK - 0.01, speed: 0.7, roughness: 22, grain: 0.25, periodicity: 0.2 }, arCarrier, arUpper),
-        rub('gas key riding in the handle slot', CH_BACK + 0.01, -10, { force: 5, duration: CH_END - CH_BACK - 0.01, speed: 0.7, roughness: 15, grain: 0.3 }, steelBar(3, 6), arChargingHandle),
+        // Hard-anodised aluminium on aluminium, and phosphated/nitrided steel on aluminium,
+        // lightly oiled: a smooth, bright, hard "shhk" (fine random texture, sharp
+        // micro-contacts), not a periodic creak. The hollow tone comes from the bore.
+        rub('charging handle in its channel', CH_BACK, -5, { force: 8, duration: CH_END - CH_BACK, speed: 0.7, roughness: 8, grain: 0.15, periodicity: 0, contactWidth: 0.02 }, arChargingHandle, arUpper),
+        rub('carrier on the upper rails', CH_BACK + 0.017, -4, { force: 14, duration: CH_END - CH_BACK - 0.017, speed: 0.7, roughness: 8, grain: 0.15, periodicity: 0, contactWidth: 0.02 }, arCarrier, arUpper),
+        rub('bolt tail riding in the carrier bore', CH_BACK + 0.017, -14, { force: 3, duration: CH_END - CH_BACK - 0.017, speed: 0.7, roughness: 6, grain: 0.15, contactWidth: 0.02 }, arBolt, arCarrier),
+        rub('gas key riding in the handle slot', CH_BACK + 0.017, -10, { force: 5, duration: CH_END - CH_BACK - 0.017, speed: 0.7, roughness: 8, grain: 0.15, contactWidth: 0.02 }, steelBar(3, 6), arChargingHandle),
       ],
     },
     {
@@ -260,8 +277,11 @@ export const AR15_CHARGE: Scene = {
     },
     {
       name: 'rear-stop',
-      description: 'Charging handle reaches the end of its travel.',
-      elements: [hit('handle bottoms out', CH_END, -6, 1.0, arChargingHandle, arUpper, { scatter: 0.4, radius: 3 })],
+      description: 'Charging handle reaches the end of its travel; the bolt shifts inside the carrier.',
+      elements: [
+        hit('handle bottoms out', CH_END, -6, 1.0, arChargingHandle, arUpper, { scatter: 0.4, radius: 3 }),
+        hit('bolt shifts in the carrier', CH_END + 0.003, -14, 0.5, arBolt, arCarrier, { scatter: 0.4, radius: 2 }),
+      ],
     },
     {
       name: 'release-forward',

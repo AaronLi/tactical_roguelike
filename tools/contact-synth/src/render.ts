@@ -106,9 +106,10 @@ function renderHousing(p: Params, events: ContactEvent[], cont: Float32Array, mi
 
   if (hp.cavity > 0) {
     const L = clamp(hp.size, 0.2, 50) / 100;
-    const dims = [L, 0.45 * L, 0.2 * L];
+    const cw = (hp.cavityWidth ?? 0) / 100;
+    const dims = cw > 0 ? [L, Math.min(cw, L), Math.min(cw, L) * 0.85] : [L, 0.45 * L, 0.2 * L];
     const freqs: number[] = [];
-    for (let l = 0; l <= 3; l++)
+    for (let l = 0; l <= 10; l++)
       for (let m = 0; m <= 2; m++)
         for (let n = 0; n <= 1; n++) {
           if (l + m + n === 0) continue;

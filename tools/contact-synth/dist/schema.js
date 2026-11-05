@@ -94,6 +94,7 @@ export const SECTIONS = [
         blurb: 'The shell the contact happens inside: every contact rings it through its mounts, and the air box inside resonates. Makes parts sound like they are inside something hollow.',
         controls: [
             { kind: 'range', path: 'housing.amount', label: 'Housing amount', min: 0, max: 1, step: 0.01, digits: 2, hint: '0 = no housing. How much of the sound comes through the enclosure.' },
+            { kind: 'range', path: 'housing.cavityWidth', label: 'Air space width', min: 0, max: 20, step: 0.1, unit: 'cm', digits: 1, hint: '0 = a box in proportion to the housing. Small = a long narrow bore (rifle receiver, tube): pipe-like hollow resonances.' },
             { kind: 'range', path: 'housing.cavity', label: 'Hollow air box', min: 0, max: 1, step: 0.01, digits: 2, hint: 'Resonance of the air inside the housing, from its size: the boxy, hollow tone.' },
             ...bodyControls('housing').filter((c) => c.path !== 'housing.level'),
         ],

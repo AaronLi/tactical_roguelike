@@ -143,6 +143,13 @@ export interface HousingParams extends BodyParams {
   amount: number;
   /** 0..1 air-cavity resonance inside the housing (the "hollow box" tone). */
   cavity: number;
+  /**
+   * Width of the air space inside, cm. 0 = a box in proportion to the size
+   * (L × 0.45L × 0.2L). A small width makes it a long narrow bore (a rifle's upper
+   * receiver, a tube): a series of pipe-like resonances, the "hollow" sound of
+   * parts sliding inside a tube.
+   */
+  cavityWidth?: number;
 }
 
 export interface OutputParams {
@@ -184,7 +191,7 @@ export function defaultParams(): Params {
     coil: { level: 0, length: 30, dispersion: 0.6, decay: 1.2, brightness: 6000 },
     flex: { amount: 0, freq: 20, decay: 1, rattle: 0, wobble: 0, tone: 0 },
     housing: {
-      amount: 0, cavity: 0.5, material: 'abs', stiffness: 2.3, density: 1050, loss: 0.02, shape: 'shell', size: 25, thickness: 2,
+      amount: 0, cavity: 0.5, cavityWidth: 0, material: 'abs', stiffness: 2.3, density: 1050, loss: 0.02, shape: 'shell', size: 25, thickness: 2,
       modes: 16, irregularity: 0.6, damping: 0.3, level: 0,
     },
     out: { room: 0.15, roomSize: 0.4, length: 3, seed: 1 },

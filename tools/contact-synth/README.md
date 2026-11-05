@@ -31,7 +31,7 @@ npm run check          # renders every preset in Node and checks the output
 | **Body A / Body B** | material (stiffness E, density ρ, loss η), shape (bar / plate / shell / block), size (up to 50 cm), thickness, how firmly it's held, irregularity | every metal and plastic, at any thickness |
 | **Flex** | swing amount, rate and decay; rattle against support; pitch wobble; swing tone | ruler twang, thunder sheet, saw blade, latch arm, door-stop spring |
 | **Coil** | level, spring length (round-trip ms), dispersion, decay, brightness | spring "boing / zing / pew", spring-loaded mechanisms |
-| **Housing** | amount, hollow air box, and the enclosure's own material, shape, size, thickness, hold | parts inside a blaster shell, case or housing: every contact rings the enclosure through its mounts, and the air inside resonates |
+| **Housing** | amount, hollow air box, air space width (narrow = a pipe-like bore), and the enclosure's own material, shape, size, thickness, hold | parts inside a blaster shell, case or housing: every contact rings the enclosure through its mounts, and the air inside resonates |
 
 The physics behind it:
 
