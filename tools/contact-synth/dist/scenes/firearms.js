@@ -169,8 +169,9 @@ const arBuffer = steelBlock(6, 18); // buffer with sliding weights
 // the lead core soak up vibration, so it barely rings: a short, solid "tock", with a crisp click
 // where its hard brass head and rim meet steel. (As a 4.5 cm x 6 mm brass bar: ~13 g.)
 const arCase = { ...mat('brass'), shape: 'bar', size: 4.5, thickness: 6, modes: 1, irregularity: 0.6, damping: 0.8, level: 0 };
-// Spring-steel feed lips on the magazine body: they ring briefly (the magazine "ping").
-const arFeedLips = { ...mat('springsteel'), shape: 'bar', size: 4, thickness: 0.8, modes: 2, irregularity: 0.5, damping: 0.3, level: 0 };
+// Spring-steel feed lips: with a round pressed up into them by the whole stack they're clamped,
+// so their contacts are crisp and dead rather than a free ring.
+const arFeedLips = { ...mat('springsteel'), shape: 'bar', size: 4, thickness: 0.8, modes: 1, irregularity: 0.5, damping: 0.75, level: 0 };
 const arChamber = { ...mat('steel'), shape: 'shell', size: 5, thickness: 4, modes: 2, irregularity: 0.6, damping: 0.7, level: 0 };
 const arBoltCatch = steelBar(4, 3);
 // Fire control group in the lower: the hammer (spring-loaded, under the carrier) and the
@@ -219,24 +220,30 @@ const arNextRound = { ...arCase, level: -2 };
 // walls ring bright and tinny and its air space resonates: the "mag ping" every feeding event
 // sounds through. Seated in the mag well, so lightly damped.
 const arMagBody = { ...mat('aluminum'), shape: 'plate', size: 18, thickness: 0.9, modes: 4, irregularity: 0.6, damping: 0.35, level: 0 };
+// A loaded magazine: the column of cartridges pressed against the walls damps them hard.
+const arMagBodyLoaded = { ...arMagBody, modes: 2, damping: 0.7 };
 const arMagSpring = springWire(8, 1);
 const MAG_HOUSING = {
     amount: 0.7, cavity: 0.5, ...mat('aluminum'), shape: 'plate', size: 18, thickness: 0.9, modes: 2, irregularity: 0.6, damping: 0.35,
     cavities: [{ length: 18, width: 6, depth: 2.2, q: 8, level: 1 }],
 };
+// The loaded magazine's walls and air space are damped by the stack inside.
+const MAG_HOUSING_LOADED = { ...MAG_HOUSING, amount: 0.5, cavity: 0.25, damping: 0.7 };
+const IN_LOADED_MAG = { housing: MAG_HOUSING_LOADED };
 const IN_MAG = { housing: MAG_HOUSING };
 /**
- * The stack reacting when the top round leaves: the compressed magazine spring shoves the whole
- * stack up a few mm (a coil zing inside the box), the cases clack against each other in a quick
- * staggered burst, and the top round hits whatever is above it (feed lips or the bolt).
+ * The stack reacting when the bolt makes room: the compressed magazine spring presses the whole
+ * column up as one unit, but the top round only rises a millimetre or so before the feed lips
+ * (or the bolt above it) catch it. So it's one firm, tight tick, not a rattle: the stack shifts as a
+ * unit, the top round is caught crisply with no bounce, the spring gives a short, quiet zing, and
+ * the magazine, damped by the rounds inside, barely rings.
  */
 function magazineReaction(at, gainDb, topHits, topWhat) {
     return [
-        hit('magazine spring shoves the stack up', at, gainDb - 6, 1.2, arMagSpring, arMagBody, { scatter: 0.3, radius: 2, click: 0.3, sharp: 0.7 }, { coil: { level: 0.6, length: 4, dispersion: 0.45, decay: 0.08, brightness: 5000 }, ...IN_MAG }),
-        hit('cases clack against each other', at + 0.0004, gainDb - 4, 0.9, arCase, arNextRound, { scatter: 1, radius: 2, click: 0.8, sharp: 0.9 }, IN_MAG),
-        hit('cases settle in the stack', at + 0.0014, gainDb - 9, 0.6, arCase, arNextRound, { scatter: 1, radius: 2, click: 0.7, sharp: 0.9 }, IN_MAG),
-        snap(topWhat, at + 0.0008, gainDb, { strength: 0.6, preload: 0, seat: 0.3, seatDelay: 1 }, arNextRound, topHits, IN_MAG),
-        hit('magazine body rings', at + 0.0006, gainDb - 3, 1.0, arMagBody, arCase, { scatter: 0.5, radius: 3, click: 0.2, sharp: 0.7 }, IN_MAG),
+        hit('stack shifts up as one', at, gainDb - 7, 0.4, arCase, arNextRound, { scatter: 0.1, radius: 3, click: 0.6, sharp: 0.9 }, IN_LOADED_MAG),
+        snap(topWhat, at + 0.0003, gainDb, { strength: 0.75, preload: 0, seat: 0, seatDelay: 1 }, arNextRound, topHits, IN_LOADED_MAG),
+        hit('magazine spring takes up the load', at + 0.0002, gainDb - 12, 0.5, arMagSpring, arMagBodyLoaded, { scatter: 0.2, radius: 2, click: 0.2, sharp: 0.6 }, { coil: { level: 0.35, length: 3, dispersion: 0.4, decay: 0.035, brightness: 4500 }, ...IN_LOADED_MAG }),
+        hit('magazine body rings', at + 0.0004, gainDb - 10, 0.6, arMagBodyLoaded, arCase, { scatter: 0.3, radius: 3, click: 0.1, sharp: 0.7 }, IN_LOADED_MAG),
     ];
 }
 // ---------- pump-action shotgun ----------
@@ -335,8 +342,8 @@ const AR_HOUSING = {
 /** Elements that only exist when a round is fed and chambered. */
 const FEED_ONLY = new Set([
     'bolt face catches the case head', 'case dragged over the feed lips', 'stripped case slides off the next case',
-    'case rim snaps free of the feed lips', 'magazine spring shoves the stack up', 'cases clack against each other',
-    'cases settle in the stack', 'next round snaps up against the bolt', 'magazine body rings',
+    'case rim snaps free of the feed lips', 'stack shifts up as one', 'magazine spring takes up the load',
+    'next round snaps up against the bolt', 'magazine body rings',
     'next round rides along the carrier underside', 'bullet nose hits the feed ramp',
     'bullet slides up the feed ramp into the chamber', 'case slides into the chamber',
     'case shoulder seats in the chamber', 'extractor snaps over the rim',
@@ -390,14 +397,14 @@ function arForward(t, withChargingHandle, mag = 'loaded') {
         // chamber (45 to battery).
         // The steel bolt face catches the cartridge's brass head: a crisp click, solid behind it.
         hit('bolt face catches the case head', fwdAt(86), -2, vAt(86) * 0.5, arCase, arBolt, { scatter: 0.3, radius: 1.5, click: 0.8, sharp: 0.95 }),
-        fwdRub('case dragged over the feed lips', 86, 55, -10, { force: 6, roughness: 15, grain: 0.3 }, arCase, arFeedLips, IN_MAG),
+        fwdRub('case dragged over the feed lips', 86, 55, -10, { force: 6, roughness: 15, grain: 0.3 }, arCase, arFeedLips, IN_LOADED_MAG),
         // The stripped case slides forward off the case beneath it: brass on brass.
-        fwdRub('stripped case slides off the next case', 86, 58, -6, { force: 5, roughness: 4, grain: 0.2, contactWidth: 0.05 }, arCase, arNextRound, IN_MAG),
+        fwdRub('stripped case slides off the next case', 86, 58, -6, { force: 5, roughness: 4, grain: 0.2, contactWidth: 0.05 }, arCase, arNextRound, IN_LOADED_MAG),
         snap('case rim snaps free of the feed lips', fwdAt(55), -1, { strength: 0.7, preload: 0, seat: 0.3, seatDelay: 1 }, arCase, arFeedLips),
         // The stack jumps: the next round snaps up into the underside of the passing bolt/carrier,
         // then rides along it, held by the feed lips, until the carrier is home.
         ...magazineReaction(fwdAt(52), -2, arCarrier, 'next round snaps up against the bolt'),
-        fwdRub('next round rides along the carrier underside', 50, 0, -10, { force: 3, roughness: 3, grain: 0.2, contactWidth: 0.05 }, arNextRound, arCarrier, IN_MAG),
+        fwdRub('next round rides along the carrier underside', 50, 0, -10, { force: 3, roughness: 3, grain: 0.2, contactWidth: 0.05 }, arNextRound, arCarrier, IN_LOADED_MAG),
         // Guided into the breech: the nose hits the feed ramp, the bullet slides up it into the
         // chamber (copper on steel), the case body slides along the chamber walls, and the case
         // seats just before the bolt face arrives.
@@ -501,7 +508,7 @@ const MAG_TITLE = { loaded: ' (loaded magazine)', empty: ' (empty magazine)', no
 function pullMagazine(mag) {
     if (mag === 'loaded') {
         return [
-            travelRub('bolt riding over the top round', 30, 86, -16, { force: 5, roughness: 2, grain: 0.2, contactWidth: 0.05 }, arCase, arBolt, IN_MAG),
+            travelRub('bolt riding over the top round', 30, 86, -16, { force: 5, roughness: 2, grain: 0.2, contactWidth: 0.05 }, arCase, arBolt, IN_LOADED_MAG),
             // The bolt clears the rim: the stack jumps up against the feed lips.
             ...magazineReaction(tAt(88) + 0.002, -4, arFeedLips, 'top round snaps up against the feed lips'),
         ];
