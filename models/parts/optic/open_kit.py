@@ -5,7 +5,8 @@
 # Frame (docs/models.md "Authored parts"): Blender X = right, Y = forward, Z = up, metres; ORIGIN = the rail's top at the mount point, centred.
 # CFG: sy (the sight line, metres), win (w, h: the window, metres), ret (dot, dotG, cdot), replaces, and the look:
 #   top 'square' or 'round' (the hoop's top corners); lean (the hoop's lean back, degrees); solar: a panel on the hood's (deeper) top bar;
-#   wings: protective plates flaring forward outside the hood's sides; battery 'aaa' (a tube along the right side), 'coin_top' (a CR2032
+#   part: the catalogue block of a part of its own (in place of replaces);
+#   wings: protective plates flaring forward outside the hood's sides; battery 'aaa' (a tube along the right side; bat_side -1: the left), 'coin_top' (a CR2032
 #   under a cap in the housing's top) or 'tray' (a CR2032 side tray on the right); qd: a throw lever on the clamp; open_top: no bar over the glass (two side posts,
 #   the lens's top edge free: nothing at all above the window).
 import bpy, json, math, os
@@ -56,7 +57,7 @@ else:
 # ---- the BATTERY ----
 BAT = C.get('battery', 'aaa')
 if BAT == 'aaa':     # an AAA in a tube along the housing's right side (half let into it), a knurled cap at the back
-    BX, BZ, BR = DW - 0.5 * mm, MID - 1.5 * mm, 6.2 * mm
+    BX, BZ, BR = C.get('bat_side', 1) * (DW - 0.5 * mm), MID - 1.5 * mm, 6.2 * mm   # (bat_side: 1 right, -1 left)
     o = K.tmp(cyl(BR, F0 + 2.0 * mm, HF - 1.0 * mm, 'y', (BX, BZ), 20)); bevel(o, 0.6 * mm, 1, 30); smooth(o); K.adopt(o, 'optic', 'black')
     o = K.tmp(cyl(BR + 0.3 * mm, F0 - 4.0 * mm, F0 + 2.2 * mm, 'y', (BX, BZ), 20))
     for i in range(12):
@@ -79,12 +80,14 @@ elif BAT == 'tray':   # a CR2032 in a side tray on the right: a round-ended plat
 AF = HF - 5.5 * mm if BAT == 'coin_top' else F0 + 9 * mm
 el = K.obj(cyl(2.4 * mm, HT - 0.8 * mm, HT + 0.2 * mm, 'z', (4.5 * mm if BAT != 'coin_top' else 0.0, AF), 16), 'optic', 'steel')
 cut(el, box((4.5 * mm if BAT != 'coin_top' else 0.0) - 3 * mm, (4.5 * mm if BAT != 'coin_top' else 0.0) + 3 * mm, AF - 0.35 * mm, AF + 0.35 * mm, HT - 0.3 * mm, HT + 1 * mm)); smooth(el)
-WS = -1 if BAT == 'aaa' else 1                    # the windage screw's side
+WS = -C.get('bat_side', 1) if BAT == 'aaa' else 1   # the windage screw's side (away from an AAA tube)
+BS_ = -C.get('bat_side', 1) if BAT == 'aaa' else -1  # the buttons' side
 WF_ = HF - 6 * mm
 x0, x1 = sorted((WS * (DW - 0.6 * mm), WS * (DW + 0.3 * mm)))
 wd = K.obj(cyl(2.0 * mm, x0, x1, 'x', (WF_, MID + 1 * mm), 16), 'optic', 'steel'); smooth(wd)
 for f in (F0 + 7 * mm, F0 + 13 * mm):
-    o = K.tmp(prism(rounded(f, MID + 1 * mm, 2.4 * mm, 1.8 * mm, 0.8 * mm, 2), 'x', -DW - 0.8 * mm, -DW + 0.4 * mm)); smooth(o); K.adopt(o, 'optic', 'rubber')
+    x0, x1 = sorted((BS_ * (DW + 0.8 * mm), BS_ * (DW - 0.4 * mm)))
+    o = K.tmp(prism(rounded(f, MID + 1 * mm, 2.4 * mm, 1.8 * mm, 0.8 * mm, 2), 'x', x0, x1)); smooth(o); K.adopt(o, 'optic', 'rubber')
 
 # ---- the hoop: a thin loop round the window, standing on the deck's front, leaning back; the lens in it ----
 HD = 4.5 * mm                          # its depth
@@ -123,7 +126,7 @@ cfg = {'source': 'authored', 'kind': 'part', 'slot': 'optic', 'frame': 'rail-top
        'optic': {'sy': round(SY, 4), 'fSight': round(F0, 4), 'relief': C.get('relief', 0.09),
                  'reflex': {'f': round(WF, 4), 'y': round(SY, 4), 'w': round(WW, 4), 'h': round(WH, 4), 'kind': C.get('ret', 'dot')},
                  'magnifier': True, 'height': 'low' if SY < 0.03 else 'mid'},
-       'replaces': C['replaces']}
+       **({'part': C['part']} if 'part' in C else {'replaces': C['replaces']})}   # (a catalogue part of its own, or replacing existing entries' models)
 if EXPORT:
     with open(os.path.join(HERE, 'model.json'), 'w', encoding='utf-8') as fh: fh.write(json.dumps(cfg, indent=2, ensure_ascii=False) + '\n')
 meshes = [o for o in coll.all_objects if o.type == 'MESH']

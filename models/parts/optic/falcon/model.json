@@ -5,9 +5,15 @@
   "frame": "rail-top",
   "optic": {
     "sy": 0.0285,
-    "fSight": -0.026,
+    "fSight": -0.044,
     "relief": 0.09,
-    "reflex": { "f": 0.0135, "y": 0.0285, "w": 0.026, "h": 0.026, "kind": "dot" },
+    "reflex": {
+      "f": 0.013,
+      "y": 0.0285,
+      "w": 0.026,
+      "h": 0.026,
+      "kind": "dot"
+    },
     "magnifier": true,
     "height": "low"
   },
@@ -18,6 +24,10 @@
     "price": 340,
     "tier": 1,
     "zoom": 0.8,
-    "st": { "ergo": -1, "acc": -2, "hip": 2 }
+    "st": {
+      "ergo": -1,
+      "acc": -2,
+      "hip": 2
+    }
   }
 }
