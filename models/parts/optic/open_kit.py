@@ -4,7 +4,7 @@
 # with a hairline round it. The body is one casting from the rail clamp up (a rifle sight's mount, not a pistol dot on a riser).
 # Frame (docs/models.md "Authored parts"): Blender X = right, Y = forward, Z = up, metres; ORIGIN = the rail's top at the mount point, centred.
 # CFG: sy (the sight line, metres), win (w, h: the window, metres), ret (dot, dotG, cdot), replaces, and the look:
-#   top 'square' or 'round' (the hoop's top corners); lean (the hoop's lean back, degrees); solar: a panel on the hood's (deeper) top bar;
+#   top 'square', 'round' (the hoop's top corners) or 'circle' (a round lens, w its diameter); lean (the hoop's lean back, degrees); solar: a panel on the hood's (deeper) top bar;
 #   part: the catalogue block of a part of its own (in place of replaces);
 #   wings: protective plates flaring forward outside the hood's sides; battery 'aaa' (a tube along the right side; bat_side -1: the left), 'coin_top' (a CR2032
 #   under a cap in the housing's top) or 'tray' (a CR2032 side tray on the right); qd: a throw lever on the clamp; open_top: no bar over the glass (two side posts,
@@ -98,9 +98,11 @@ outer = rounded(0, (DT - 0.5 * mm + top) / 2, DW, (top - DT + 0.5 * mm) / 2, RT,
 cy_ = (DT - 0.5 * mm + top) / 2
 outer = [((DW if x > 0 else -DW) if y < cy_ else x, max(y, DT - 0.5 * mm)) for x, y in outer]   # (only the top corners round: the foot square)
 outer = [p for i, p in enumerate(outer) if p != outer[i - 1]]
+if C.get('top') == 'circle':   # a round lens: the hoop a ring round it, its sides running straight down to a square foot
+    outer = hull2([(( WW / 2 + 1.6 * mm) * math.cos(2 * math.pi * i / 40), SY + (WW / 2 + 1.6 * mm) * math.sin(2 * math.pi * i / 40)) for i in range(40)] + [(-DW, DT - 0.5 * mm), (DW, DT - 0.5 * mm)])
 hp = K.tmp(prism(outer, 'y', HFR - HD, HFR))
 WR = RT - 1.6 * mm if C.get('top') == 'round' else 1.6 * mm
-cut(hp, prism(rounded(0, SY, WW / 2, WH / 2, max(1.2 * mm, WR), 5), 'y', HFR - HD - 0.01, HFR + 0.01))
+cut(hp, cyl(WW / 2, HFR - HD - 0.01, HFR + 0.01, 'y', (0, SY), 40) if C.get('top') == 'circle' else prism(rounded(0, SY, WW / 2, WH / 2, max(1.2 * mm, WR), 5), 'y', HFR - HD - 0.01, HFR + 0.01))
 if C.get('open_top'):   # no bar over the top: the hoop cut down to two side posts (their tips just over the glass) and the foot
     cut(hp, box(-WW / 2 - 0.05 * mm, WW / 2 + 0.05 * mm, HFR - HD - 0.01, HFR + 0.01, SY, top + 0.01))
     for sx in (-1, 1): cut(hp, box(sx * (DW + 0.1 * mm) if sx < 0 else WW / 2, DW + 0.1 * mm if sx > 0 else -WW / 2, HFR - HD - 0.01, HFR + 0.01, SY + WH / 2 + 1.0 * mm, top + 0.01))
@@ -118,13 +120,13 @@ if C.get('wings'):   # protective wings: a plate outside each side of the hood, 
             v.co.y -= max(0.0, v.co.z - DT) * math.tan(LEAN)
         bevel(o, 0.5 * mm, 1, 30); smooth(o); K.adopt(o, 'optic', 'black')
 LF = HFR - HD / 2                      # the lens: in the hoop's middle, leaning with it
-ln = K.obj(prism(rounded(0, SY, WW / 2 + 0.4 * mm, WH / 2 + 0.4 * mm, (4.0 * mm if C.get('open_top') else max(1.2 * mm, WR)) + 0.4 * mm, 5), 'y', LF - 0.6 * mm, LF + 0.6 * mm), 'optic', 'reflexLens')
+ln = K.obj(cyl(WW / 2 + 0.4 * mm, LF - 0.6 * mm, LF + 0.6 * mm, 'y', (0, SY), 40) if C.get('top') == 'circle' else prism(rounded(0, SY, WW / 2 + 0.4 * mm, WH / 2 + 0.4 * mm, (4.0 * mm if C.get('open_top') else max(1.2 * mm, WR)) + 0.4 * mm, 5), 'y', LF - 0.6 * mm, LF + 0.6 * mm), 'optic', 'reflexLens')
 for v in ln.data.vertices: v.co.y -= max(0.0, v.co.z - DT) * math.tan(LEAN)
 WF = LF - (SY - DT) * math.tan(LEAN)   # the lens at the sight line (the window)
 
 cfg = {'source': 'authored', 'kind': 'part', 'slot': 'optic', 'frame': 'rail-top',
        'optic': {'sy': round(SY, 4), 'fSight': round(F0, 4), 'relief': C.get('relief', 0.09),
-                 'reflex': {'f': round(WF, 4), 'y': round(SY, 4), 'w': round(WW, 4), 'h': round(WH, 4), 'kind': C.get('ret', 'dot')},
+                 'reflex': {'f': round(WF, 4), 'y': round(SY, 4), 'w': round(WW, 4), 'h': round(WH, 4), 'kind': C.get('ret', 'dot'), **({'round': True} if C.get('top') == 'circle' else {})},
                  'magnifier': True, 'height': 'low' if SY < 0.03 else 'mid'},
        **({'part': C['part']} if 'part' in C else {'replaces': C['replaces']})}   # (a catalogue part of its own, or replacing existing entries' models)
 if EXPORT:

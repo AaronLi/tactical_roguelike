@@ -12,7 +12,8 @@
       "y": 0.0285,
       "w": 0.026,
       "h": 0.026,
-      "kind": "dot"
+      "kind": "dot",
+      "round": true
     },
     "magnifier": true,
     "height": "low"
