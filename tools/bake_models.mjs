@@ -154,6 +154,7 @@ if (doParts) {
     fs.writeFileSync(PARTS_DIR + 'index.json', JSON.stringify({ version: 2, src, platforms: plats, totals }, null, 1));
     // what each platform's coverage was made of (the joint packs and info tables, with their combination counts): for docs/models.md and review
     fs.writeFileSync(PARTS_DIR + 'coverage.json', JSON.stringify(Object.fromEntries(r.states.map((st) => [st.id, { builds: st.builds, coverBuilds: st.cover, rounds: st.rounds, combinations: st.stats, joint: st.joint, info: st.infoDeps }])), null, 1));
+    fs.writeFileSync(PARTS_DIR + 'couplings.json', JSON.stringify(r.couplings, null, 1)); // (slot pairs where one slot's part reshapes another's geometry: tools/model_policy.mjs)
     const gzAll = totals.gz + totals.sharedGz;
     console.log(`\nbaked packs for ${vals.length} platforms: ${totals.packs} index entries; ${totals.files} platform files (${totals.bytes} B, ${totals.gz} B gzipped) + ${totals.sharedFiles} shared files (${totals.sharedBytes} B, ${totals.sharedGz} B gzipped) = ${gzAll} B gzipped (+ indexes ${totals.index} B, ${totals.indexGz} gzipped); ${totals.builds} builds (of which ${totals.coverBuilds} made to cover every combination) assemble from them`);
   }
