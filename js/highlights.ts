@@ -75,7 +75,7 @@ const G_Highlights = (() => {
     react: any; fired: boolean; kn: number; mSt: number | null; snapDoors: boolean; prevTau: number | null; xp: THREE.Vector3 | null; frz: { p: THREE.Vector3; q: THREE.Quaternion } | null; frzCand: { p: THREE.Vector3; q: THREE.Quaternion } | null;
     look: THREE.Vector3 | null; lookT: number | null; fq: THREE.Quaternion | null; fp: THREE.Vector3 | null; pos: THREE.Vector3 | null; shot: number | null; cp: THREE.Vector3 | null; cmid?: THREE.Vector3; fov?: number; imp: number; xc: THREE.Vector3; wideScore?: number;
     k: string; code: string; def: any; rounds: number; kills: number; hs: number; far: number; others: any; parts: any; kit: any; verdicts: any; am: any; shoulder?: any;
-    tour?: GearStop[]; // (the gear room's tour of the gun's fitted parts: gearTour)
+    tour?: GearStop[]; // (the gear room's tour: its shots of the gun, gearTour)
     vs?: string[]; // (a grenade's or a flashbang's camera: everyone it has to have in the picture)
   }
   // someone in the recording: an officer (kind 'p') or a suspect ('e')
@@ -84,7 +84,8 @@ const G_Highlights = (() => {
     sk?: ReturnType<typeof G.Stickers.clean> | null; skins?: Record<string, ReturnType<typeof G.Stickers.clean>>; type?: string; wpn?: EnemyDef['wpn']; vest?: EnemyDef['vest']; helmet?: EnemyDef['helmet']; face?: number; ex?: any[]; civ?: boolean; scale?: number; boss?: boolean; style?: EnemyStyle;
   }
   // a stop on the gear room's tour: a fitted part, the slot it's in, and the mesh slot its model's meshes are tagged with
-  interface GearStop { slot: string; kind: string; ms: string; p: Part }
+  interface GearShot { at: [number, number]; dir: [number, number, number]; d: number; roll: number } // (a camera pose of the gear room's tour, as fractions of the gun: GT_MOVES)
+  interface GearStop { name: string; tempo: 'fast' | 'slow'; zone: string; dur: number; a: GearShot; keys?: GearShot[]; t0?: number } // (a: a fast move's held shot, and where a slow one starts; keys: a slow move's path, a then on) // (a move of the tour: from a to b over dur, or held at a; t0: when it starts)
   // a thing for sale on the ad breaks (storeProducts), and the made-up adverts (ADS)
   interface HlProduct { kind: string; name: string; brand: string; price: number; pic: any; left: () => number; slot?: string; unit?: string }
   interface HlAdvert { brand: string; line: string; sub: string; col: string[]; art: string }
@@ -1042,20 +1043,62 @@ const G_Highlights = (() => {
     if (!v.length) v.push(['SOLID PICK', 'Nothing fancy. Gets it done.']);
     const tour = gearTour(def);
     return { kind: 'gear' as const, k, code, def, tour, rounds: e.n, kills: kx.kills, hs: kx.hs, far: kx.d, am: am ? am[0] : null, parts, kit, verdicts: v.slice(0, 2),
-      others: guns.slice(1, 3).map(([c, x]) => ({ def: defOf(c), n: x.n, kills: (kg.get(c) || {}).kills || 0 })).filter((o) => o.def), dur: GT0 + (tour.length ? tour.length * GT + GT_BACK : 0) };
+      others: guns.slice(1, 3).map(([c, x]) => ({ def: defOf(c), n: x.n, kills: (kg.get(c) || {}).kills || 0 })).filter((o) => o.def), dur: Math.max(GT0, tour.length ? GT_IN + tour.reduce((a, m) => a + m.dur, 0) + GT_BACK : 0) };
   }
-  // The gear room's tour (after the overview, GT0 s in): the gun's fitted parts that matter, up to six, the camera going close to each in turn
-  // (GT s each) and reading out what it does, then back out to the whole gun (GT_BACK s). Worked out from the build alone (the length of the
-  // segment is fixed before any model is in, and the video export's the same): the factory receiver bits are left out. A mesh slot is what the
-  // model's meshes of that part are tagged with (docs/models.md); two slots of one kind (an optic and its riser) are the one stop.
-  const GT0 = 9, GT = 2.5, GT_BACK = 1.8, GT_KINDS = ['optic', 'muzzle', 'handguard', 'fg', 'tac', 'tacL', 'stock', 'buttstock', 'mag', 'grip'], GT_MESH: Record<string, string> = { buttstock: 'stock' };
+  // The gear room's tour (from the segment's first frame, flying in to its first shot (GT_LEAD s), under the loadout card, which stays): the camera round the still gun through a few
+  // moves picked from a pool (GT_MOVES), then back out to the whole gun (GT_BACK s); the segment the overview's GT0 s at the least. The gun holds one
+  // three-quarter view (GEAR_YAW): only the camera moves. Two tempos: a fast move is a held shot cut to with a snap (GT_SNAP s to get there, a
+  // little drift while it holds); a slow one glides in from where the last left off (GT_GLIDE s) and keeps moving, steadily, from its a to its b
+  // (each a path through a few shots: travelling, turning round the gun, rising or falling and re-aiming at once: gearPath). Picked from the gun's code (gearTour), so the broadcast and the video export cut the same.
+  // A shot: at: what it looks at, as fractions of the gun's box (along it from the butt, 0, to the muzzle, 1; up it from the bottom, 0, to the
+  // top, 1); dir: where the camera is from there, [forward (towards the muzzle), up, out to the side the overview's camera is on]; d: how far, in
+  // gun lengths; roll: the camera tilted (radians, a dutch angle).
+  const GT0 = 9, GT_IN = 0, GT_LEAD = 1.4, GT_BACK = 1.0, GT_SNAP = 0.35, GT_GLIDE = 0.9, GEAR_YAW = Math.PI / 2 + 0.45, GT_FLOOR = -0.235; // (GT_FLOOR: a little over the turntable's top, gearStage)
+  // zone: the part of the gun a move is about (muzzle, barrel, optic, receiver, under (grip and magazine), stock, whole): a run has each once at most
+  const slow = (name: string, zone: string, dur: number, keys: GearShot[]): GearStop[] => [{ name, tempo: 'slow', zone, dur, a: keys[0], keys }];
+  const GT_MOVES: GearStop[] = [
+    // fast: held, cut to
+    { name: 'hero, from low', tempo: 'fast', zone: 'whole', dur: 2.0, a: { at: [0.5, 0.45], dir: [0.5, -0.22, 1], d: 1.0, roll: -0.08 } },
+    { name: 'down the barrel', tempo: 'fast', zone: 'muzzle', dur: 1.8, a: { at: [0.97, 0.55], dir: [1, 0.12, -0.35], d: 0.42, roll: 0.05 } },
+    { name: 'along the top', tempo: 'fast', zone: 'optic', dur: 1.8, a: { at: [0.62, 0.95], dir: [-1, 0.18, 0.14], d: 0.55, roll: 0 } },
+    { name: 'over the shoulder', tempo: 'fast', zone: 'stock', dur: 2.0, a: { at: [0.16, 0.42], dir: [-0.9, 0.3, 0.55], d: 0.48, roll: 0.06 } },
+    { name: 'dutch profile', tempo: 'fast', zone: 'barrel', dur: 1.8, a: { at: [0.76, 0.55], dir: [0.1, 0.06, 1], d: 0.5, roll: 0.24 } },
+    { name: 'from below', tempo: 'fast', zone: 'under', dur: 2.0, a: { at: [0.36, 0.2], dir: [0.2, -0.6, 0.8], d: 0.5, roll: -0.14 } },
+    { name: 'butt, close', tempo: 'fast', zone: 'stock', dur: 1.8, a: { at: [0.05, 0.4], dir: [-0.45, 0.1, 1], d: 0.38, roll: -0.1 } },
+    // slow: steady moves, each a path through a few shots (travelling, turning round the gun, rising or falling and re-aiming at once)
+    ...slow('up the barrel, rising', 'barrel', 4.8, [
+      { at: [0.35, 0.4], dir: [0, -0.2, 1], d: 0.5, roll: -0.04 }, { at: [0.66, 0.6], dir: [0.4, 0.35, 0.9], d: 0.45, roll: 0 }, { at: [0.96, 0.6], dir: [0.95, 0.55, 0.25], d: 0.45, roll: 0.1 }]),
+    ...slow('orbit and rise', 'whole', 4.6, [
+      { at: [0.5, 0.45], dir: [0.8, -0.15, 1], d: 0.95, roll: -0.06 }, { at: [0.5, 0.5], dir: [0, 0.25, 1], d: 0.85, roll: 0 }, { at: [0.52, 0.55], dir: [-0.8, 0.75, 0.55], d: 0.9, roll: 0.08 }]),
+    ...slow('over the optic, turning', 'optic', 4.4, [
+      { at: [0.55, 0.7], dir: [0.6, 0.1, 1], d: 0.55, roll: 0 }, { at: [0.6, 0.9], dir: [0.05, 1, 0.3], d: 0.45, roll: 0 }, { at: [0.64, 0.85], dir: [-0.85, 0.5, 0.25], d: 0.5, roll: -0.06 }]),
+    ...slow('under and up', 'under', 4.6, [
+      { at: [0.1, 0.25], dir: [-0.4, -0.5, 0.8], d: 0.5, roll: 0 }, { at: [0.45, 0.2], dir: [0.1, -0.7, 0.6], d: 0.45, roll: 0.06 }, { at: [0.75, 0.42], dir: [0.6, -0.08, 0.9], d: 0.5, roll: 0 }]),
+    ...slow('butt to muzzle, swinging round', 'barrel', 5.2, [
+      { at: [0.04, 0.55], dir: [-0.5, 0.1, 1], d: 0.4, roll: 0 }, { at: [0.45, 0.6], dir: [0, 0.35, 1], d: 0.5, roll: 0.03 }, { at: [0.99, 0.55], dir: [0.85, 0.12, 0.55], d: 0.45, roll: 0.07 }]),
+    ...slow('barrel reveal', 'muzzle', 4.4, [
+      { at: [0.97, 0.55], dir: [1, 0.02, 0.1], d: 0.4, roll: 0 }, { at: [0.85, 0.55], dir: [0.8, 0.3, 0.8], d: 0.55, roll: 0.05 }, { at: [0.6, 0.5], dir: [0.2, 0.15, 1], d: 0.9, roll: -0.05 }]),
+    ...slow('pull back from the stock', 'stock', 4.2, [
+      { at: [0.08, 0.42], dir: [-0.6, 0.12, 1], d: 0.32, roll: 0.05 }, { at: [0.2, 0.42], dir: [-0.9, 0.3, 0.45], d: 0.6, roll: 0 }, { at: [0.4, 0.45], dir: [-0.5, 0.2, 1], d: 1.1, roll: -0.04 }]),
+  ];
+  // A gun's run of moves: opening slow, then the tempos mixed (fast, fast, slow...), until about GT_LEN s; never two about the same part of the
+  // gun (zone); the dice from its code
+  const GT_LEN = 14.5, GT_ORDER: ('fast' | 'slow')[] = ['slow', 'fast', 'fast', 'slow', 'fast', 'fast', 'slow'];
   function gearTour(def: any): GearStop[] {
-    const out: GearStop[] = [], seen = new Set<string>();
-    const all = Object.entries(def.build || {}).map(([slot, id]) => ({ slot, kind: G.Gunsmith.kindOf(slot), ms: '', p: G.Gunsmith.PARTS[id as string] as Part }))
-      .filter((x) => x.p && !x.p.factory && GT_KINDS.includes(x.kind)).sort((a, b) => GT_KINDS.indexOf(a.kind) - GT_KINDS.indexOf(b.kind));
-    for (const x of all) { x.ms = GT_MESH[x.kind] || x.kind; if (seen.has(x.ms)) continue; seen.add(x.ms); out.push(x); }
-    return out.slice(0, 6);
+    let h = 2166136261; for (const ch of String((def && (def.code || def.id)) || '')) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+    const rnd = G.U.rng(h >>> 0), pool = { fast: GT_MOVES.filter((m) => m.tempo === 'fast'), slow: GT_MOVES.filter((m) => m.tempo === 'slow') };
+    for (const k of ['fast', 'slow'] as const) G.U.shuffle(rnd, pool[k]);
+    const out: GearStop[] = [], zones = new Set<string>(); let t = 0;
+    for (const tempo of GT_ORDER) {
+      const at = pool[tempo].findIndex((m) => !zones.has(m.zone)); if (at < 0) continue;
+      const m = pool[tempo].splice(at, 1)[0];
+      if (out.length && t + m.dur > GT_LEN + 1) break;
+      out.push(Object.assign({}, m, { t0: t })); t += m.dur; zones.add(m.zone);
+      if (t >= GT_LEN) break;
+    }
+    return out;
   }
+
   function program() {
     // (the edit's dice: seeded from the level, so the host and every client cut the same broadcast)
     P.rnd = G.U.rng(((P.gen ? P.gen.seed : 0) ^ 0xb40adca5 ^ (P.levelN | 0) * 2654435761) >>> 0);
@@ -2040,85 +2083,78 @@ const G_Highlights = (() => {
       gt.meshes = []; gt.stops = [];
       dg!.traverse((o: any) => {
         if (!o.isMesh) return;
-        o.material = Array.isArray(o.material) ? o.material.map((m: THREE.Material) => m.clone()) : o.material.clone(); // (a copy for each mesh: one lit, its neighbours dimmed)
-        const m0: any = Array.isArray(o.material) ? o.material[0] : o.material;
-        gt.meshes.push({ o, stop: -1, col: m0.color ? m0.color.clone() : null, em: m0.emissive ? m0.emissive.clone() : null });
+        gt.meshes.push({ o });
       });
       const gb = new T.Box3().setFromObject(dg!);
-      s.tour!.forEach((st: GearStop, i: number) => {
-        const box = new T.Box3(); let n = 0;
-        for (const m of gt.meshes) if (m.o.userData.slot === st.ms) { box.expandByObject(m.o); m.stop = i; n++; }
-        gt.stops.push(n ? { st, box, c: box.getCenter(new T.Vector3()), n } : { st, box: gb.clone(), c: gb.getCenter(new T.Vector3()), n: 0 }); // (no meshes found for it: the whole gun, a little closer)
-      });
+      gt.stops = s.tour!.slice();
       gt.gb = gb; gt.built = true;
     };
     if (dg.userData.pending) G.GunModels.whenReady(dg, (ok) => { if (ok && P.gt === gt) build(); }); else build();
   }
-  // Where the camera stands for each stop (worked out once, with the turntable stopped at the angle the overview ended on): at the part's box centre,
-  // from a three-quarter view on the side it's mounted on (an optic or anything on the centre line: the side the overview's camera was on), a
-  // little ahead of it for a muzzle device and behind it for a stock, and as far back as puts the part's box at 60% of the picture's left part
-  // (where the gun is: the read-out takes the right), found by halving the distance. Poses are in the world: a centre, a unit direction to the camera, a distance.
-  const GT_DIR: Record<string, [number, number]> = { muzzle: [0.6, 0.3], stock: [-0.6, 0.3], buttstock: [-0.6, 0.3], optic: [-0.3, 0.5], mag: [0.25, 0.1], handguard: [0.2, 0.35], fg: [0.35, 0.3], tac: [0.35, 0.3], tacL: [0.35, 0.3], grip: [0.2, 0.2] };
+  // Where the camera stands for each shot (worked out once, the gun still at R0): the point it looks at from the shot's fractions of the gun's box
+  // (glTF axes: the muzzle towards -z, up y, the gun's right +x), the direction to the camera from its [forward, up, side] (side: the side the
+  // overview's camera is on), its distance in lengths of the gun. In the world: a centre, a unit direction to the camera, a distance, a roll.
   function gearTourPoses(gt: any, R0: number) {
-    const ry = new T.Matrix4().makeRotationY(R0), ryi = new T.Matrix4().makeRotationY(-R0), tc = P.gcam.clone() as THREE.PerspectiveCamera;
-    const gc = gt.gb.getCenter(new T.Vector3()); // (the model is in glTF axes: the muzzle is towards -z, up is y, the gun's right is +x)
-    const home = Math.sign(gt.ov.pos.clone().applyMatrix4(ryi).x - gc.x) || 1;
-    const poseOf = (tw: THREE.Vector3, dir: THREE.Vector3, pts: THREE.Vector3[]) => {
-      const fill = (d: number) => {
-        tc.position.copy(tw).addScaledVector(dir, d); tc.lookAt(tw); tc.updateMatrixWorld(true);
-        let x0 = 9, x1 = -9, y0 = 9, y1 = -9;
-        for (const p of pts) { const v = p.clone().project(tc); x0 = Math.min(x0, v.x); x1 = Math.max(x1, v.x); y0 = Math.min(y0, v.y); y1 = Math.max(y1, v.y); }
-        return Math.max((x1 - x0) / 1.1, (y1 - y0) / 2);
-      };
-      let lo = 0.06, hi = 4; for (let i = 0; i < 28; i++) { const m = (lo + hi) / 2; if (fill(m) > 0.6) lo = m; else hi = m; }
-      return { tw, dir, dist: hi };
-    };
-    const corners = (b: THREE.Box3) => { const o: THREE.Vector3[] = []; for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z]) o.push(new T.Vector3(x, y, z).applyMatrix4(ry)); return o; };
-    const poses = gt.stops.map((sp: any) => {
-      const off = sp.c.x - gc.x, side = sp.n && Math.abs(off) > 0.015 ? Math.sign(off) : home, k = GT_DIR[sp.st.kind] || [0.2, 0.35];
-      const dir = new T.Vector3(side * 0.85, k[1], -k[0]).normalize().applyMatrix4(ry);
-      return poseOf(sp.c.clone().applyMatrix4(ry), dir, corners(sp.n ? sp.box : sp.box.clone().expandByScalar(-0.12 * sp.box.getSize(new T.Vector3()).length())));
-    });
+    const ry = new T.Matrix4().makeRotationY(R0), ryi = new T.Matrix4().makeRotationY(-R0), b = gt.gb, sz = b.getSize(new T.Vector3()), gc = b.getCenter(new T.Vector3());
+    const home = Math.sign(gt.ov.pos.clone().applyMatrix4(ryi).x - gc.x) || 1, len = Math.max(sz.z, sz.y, 0.2);
+    const pose = (sh: GearShot) => ({
+      tw: new T.Vector3(gc.x, b.min.y + sz.y * sh.at[1], b.max.z - sz.z * sh.at[0]).applyMatrix4(ry),
+      dir: new T.Vector3(home * sh.dir[2], sh.dir[1], -sh.dir[0]).normalize().applyMatrix4(ry), dist: sh.d * len, roll: sh.roll });
+    const poses = gt.stops.map((m: GearStop) => ({ a: pose(m.a), keys: (m.keys || [m.a]).map(pose) }));
     const look = gt.ov.look, v = gt.ov.pos.clone().sub(look);
-    return { stops: poses, ov: { tw: look.clone(), dir: v.clone().normalize(), dist: v.length() } };
+    return { stops: poses, ov: { tw: look.clone(), dir: v.clone().normalize(), dist: v.length(), roll: 0 } };
   }
-  const _gq = new T.Vector3(), _gc = new T.Color();
+  const _gq = new T.Vector3();
   // the camera between two poses: the centre slid across, the direction swung round (the distance swelling a little on the way, so it goes round the gun, not through it)
-  function gearMix(a: any, b: any, k: number, ad: number, bd: number) {
+  function gearMix(a: any, b: any, k: number, ad: number, bd: number, swell = 0.45) {
     const rot = (d: THREE.Vector3, ang: number) => d.clone().applyAxisAngle(_gq.set(0, 1, 0), ang);
     const da = rot(a.dir, ad), db = rot(b.dir, bd), dot = G.U.clamp(da.dot(db), -1, 1), an = Math.acos(dot), sn = Math.sin(an);
     const dir = sn < 1e-3 ? db.clone() : da.clone().multiplyScalar(Math.sin((1 - k) * an) / sn).addScaledVector(db, Math.sin(k * an) / sn);
-    const tw = a.tw.clone().lerp(b.tw, k), dist = (a.dist + (b.dist - a.dist) * k) * (1 + 0.45 * Math.sin(Math.PI * k) * an / Math.PI);
+    const tw = a.tw.clone().lerp(b.tw, k), dist = (a.dist + (b.dist - a.dist) * k) * (1 + swell * Math.sin(Math.PI * k) * an / Math.PI);
     return { tw, pos: tw.clone().addScaledVector(dir.normalize(), dist) };
   }
-  // The tour's frame: the camera eased from stop to stop (a stop's first 0.9 s to get there, then a slow drift round it), the stopped turntable, the
-  // part lit and the rest dimmed, the outline of its box round it; then back out to the overview's view
-  const gsm = (x: number) => { x = G.U.clamp(x, 0, 1); return x * x * (3 - 2 * x); };
+  // A smooth path through a slow move's keys at k (0 to 1): Catmull-Rom through each key's look point, its way to the camera (kept a unit
+  // vector), its distance and its tilt, so the camera travels, turns round the gun and re-aims all at once rather than sliding along one line
+  function gearPath(keys: any[], k: number) {
+    const n = keys.length;
+    if (n < 2) return { tw: keys[0].tw.clone(), pos: keys[0].tw.clone().addScaledVector(keys[0].dir, keys[0].dist), roll: keys[0].roll };
+    const f = G.U.clamp(k, 0, 1) * (n - 1), i = Math.min(n - 2, Math.floor(f)), u = f - i;
+    const K = (j: number) => keys[G.U.clamp(j, 0, n - 1)], cr = (a: number, b: number, c: number, d: number) => 0.5 * (2 * b + (c - a) * u + (2 * a - 5 * b + 4 * c - d) * u * u + (3 * b - a - 3 * c + d) * u * u * u);
+    const v3 = (get: (q: any) => THREE.Vector3) => { const [a, b, c, d] = [K(i - 1), K(i), K(i + 1), K(i + 2)].map(get); return new T.Vector3(cr(a.x, b.x, c.x, d.x), cr(a.y, b.y, c.y, d.y), cr(a.z, b.z, c.z, d.z)); };
+    const sc = (get: (q: any) => number) => cr(get(K(i - 1)), get(K(i)), get(K(i + 1)), get(K(i + 2)));
+    const tw = v3((q) => q.tw), dir = v3((q) => q.dir).normalize(), dist = sc((q) => q.dist), roll = sc((q) => q.roll);
+    return { tw, pos: tw.clone().addScaledVector(dir, dist), roll };
+  }
+  // The tour's frame. A move's own path at p (0 to 1 through it): a slow one eased from a to b along it (no swelling out: a steady move), a fast one
+  // held at a with a little drift round it; on the way in, from where the last move left off: a snap (fast) or a glide (slow). Then back out
+  // to the overview's view.
   function gearTourView(s: Seg, gt: any) {
-    const t = P.st, n = gt.stops.length, tEnd = GT0 + n * GT, R0 = Math.PI / 2 + Math.sin(GT0 * 0.55) * 0.75;
+    const t = P.st - GT_IN, n = gt.stops.length, R0 = GEAR_YAW, last = gt.stops[n - 1], tEnd = last.t0 + last.dur;
     P.gpiv.rotation.y = R0; P.gpiv.updateMatrixWorld(true);
     gt.world.visible = false; gt.dg.visible = true;
     if (!gt.poses) gt.poses = gearTourPoses(gt, R0);
-    const ps = gt.poses.stops, ov = gt.poses.ov, drift = (u: number) => (u / GT - 0.5) * 0.22;
-    let cam;
-    if (t >= tEnd) cam = gearMix(ps[n - 1], ov, gsm((t - tEnd) / GT_BACK), 0.11, 0);
+    const ps = gt.poses.stops, ov = gt.poses.ov, snap = (x: number) => 1 - Math.pow(1 - G.U.clamp(x, 0, 1), 3), glide = (x: number) => { x = G.U.clamp(x, 0, 1); return x * x * (3 - 2 * x); };
+    const along = (i: number, p: number) => { // (where move i's camera is at p through it)
+      const m = gt.stops[i], q = ps[i];
+      if (m.tempo === 'slow') return gearPath(q.keys, 0.5 - 0.5 * Math.cos(Math.PI * G.U.clamp(p, 0, 1)));
+      return Object.assign(gearMix(q.a, q.a, 0, (p - 0.5) * 0.12, (p - 0.5) * 0.12, 0), { roll: q.a.roll });
+    };
+    const asPose = (c: any) => ({ tw: c.tw, dir: c.pos.clone().sub(c.tw).normalize(), dist: c.pos.distanceTo(c.tw), roll: c.roll });
+    let cam: any, i = -1;
+    if (t >= tEnd) { const e = asPose(along(n - 1, 1)), k = snap((t - tEnd) / GT_BACK); cam = gearMix(e, ov, k, 0, 0); cam.roll = e.roll * (1 - k); }
     else {
-      const i = Math.min(n - 1, Math.floor((t - GT0) / GT)), u = t - GT0 - i * GT;
-      cam = gearMix(i ? ps[i - 1] : ov, ps[i], gsm(u / 0.9), i ? 0.11 : 0, drift(u));
+      i = 0; while (i < n - 1 && t >= gt.stops[i + 1].t0) i++;
+      const m = gt.stops[i], u = t - m.t0, here = along(i, u / m.dur), inT = !i ? GT_LEAD : m.tempo === 'slow' ? GT_GLIDE : GT_SNAP;
+      if (u < inT) { // (coming in, from where the last one left off; the first, flying in from well back towards its shot: the segment opens on the move)
+        const s0 = asPose(along(0, 0)), lead = { tw: s0.tw, dir: s0.dir.clone().applyAxisAngle(_gq.set(0, 1, 0), 0.5).add(_gq.set(0, 0.25, 0)).normalize(), dist: s0.dist * 2.2, roll: s0.roll - 0.1 };
+        const from = i ? asPose(along(i - 1, 1)) : lead, k = (!i ? snap : m.tempo === 'slow' ? glide : snap)(u / inT);
+        cam = gearMix(from, asPose(here), k, 0, 0, m.tempo === 'slow' ? 0.15 : 0.45); cam.roll = from.roll + (here.roll - from.roll) * k;
+      } else cam = here;
     }
-    P.gcam.position.copy(cam.pos); P.gcam.lookAt(cam.tw);
-    // (lit and dimmed)
-    const dim = gsm((t - GT0) / 0.6) * (1 - gsm((t - tEnd) / (GT_BACK * 0.7))), pulse = 0.1 + 0.06 * Math.sin(P.time * 7);
-    const h: number[] = gt.stops.map((_: any, i: number) => gsm((t - (GT0 + i * GT)) / 0.5) * (1 - gsm((t - (GT0 + (i + 1) * GT)) / 0.4)));
-    for (const m of gt.meshes) {
-      const hw = m.stop >= 0 ? h[m.stop] : 0, mt: any = Array.isArray(m.o.material) ? m.o.material[0] : m.o.material;
-      if (m.col && mt.color) mt.color.copy(m.col).multiplyScalar(1 - 0.5 * dim * (1 - hw));
-      if (m.em && mt.emissive) mt.emissive.copy(m.em).add(_gc.setRGB(1, 0.7, 0.1).multiplyScalar(hw * pulse * dim));
-    }
-    let bi = 0; for (let i = 1; i < n; i++) if (h[i] > h[bi]) bi = i;
-    const bx = gt.stops[bi], bm = gt.box.material as THREE.LineBasicMaterial;
-    gt.box.box.copy(bx.box).expandByScalar(0.005); bm.transparent = true; bm.opacity = h[bi] * 0.9; gt.box.visible = h[bi] > 0.02 && bx.n > 0;
-    gt.last = { cam: cam.pos.clone(), look: cam.tw.clone(), stop: bi, h: h[bi], box: gt.box.box.clone() };
+    cam.pos.y = Math.max(cam.pos.y, GT_FLOOR); // (never under the turntable's top: a low shot sits on it, looking up)
+    P.gcam.position.copy(cam.pos); P.gcam.lookAt(cam.tw); P.gcam.rotateZ(cam.roll || 0); // (a dutch angle: the camera tilted on its own axis)
+    gt.box.visible = false;
+    gt.last = { cam: cam.pos.clone(), look: cam.tw.clone(), stop: i };
   }
   // The rounds that hit them, run through the x-ray body again (js/ballistics.ts through, traced): each one taken into
   // their frame as they were when it hit (where they were, which way they faced, crouched or not, hands up...: the body
@@ -2635,9 +2671,9 @@ const G_Highlights = (() => {
       if (U) U.lgGrid.value.w = gridW;
       live = 1;
     } else if (s.kind === 'gear' && P.gpiv && P.gpiv.children.length) {
-      if (P.gt && P.gt.built && P.st >= GT0) gearTourView(s, P.gt);
+      if (P.gt && P.gt.built && P.st >= GT_IN) gearTourView(s, P.gt);
       else {
-        P.gpiv.rotation.y = Math.PI / 2 + Math.sin(P.st * 0.55) * 0.75; // (swinging through its three-quarter views, never end-on)
+        P.gpiv.rotation.y = GEAR_YAW; // (still, at a three-quarter view: the tour's camera does the moving)
         if (P.gt && P.gt.world) { P.gt.world.visible = true; P.gt.dg.visible = false; P.gt.box.visible = false; P.gcam.position.copy(P.gt.ov.pos); P.gcam.lookAt(P.gt.ov.look); }
       }
       if (U) U.lgGrid.value.w = 0;
@@ -3088,7 +3124,7 @@ const G_Highlights = (() => {
   }
   // the gear room: the gun turning on the left (the picture), its file on the right
   function gearRoom(g: CanvasRenderingContext2D, s: Seg, t: number) {
-    const k = s.k, def = s.def, A = (P.actors.get(k) || {}) as Actor, x0 = W * 0.55, tn = s.tour ? s.tour.length : 0, tEnd = GT0 + tn * GT, away = tn && P.gt && P.gt.built ? (t < GT0 ? 0 : t < tEnd ? ease((t - GT0) * 2.5) : 1 - ease((t - tEnd) * 2.5)) : 0, slide = (1 - ease(t * 2)) * 460 + away * 460; // (the file slides in, and out for the tour of the parts)
+    const k = s.k, def = s.def, A = (P.actors.get(k) || {}) as Actor, x0 = W * 0.55, slide = (1 - ease(t * 2)) * 460; // (the file slides in, and stays while the camera tours the parts)
     bug(g);
     g.fillStyle = 'rgba(232,32,42,0.92)'; g.fillRect(18, 72, 210, 28); text(g, 'THE GEAR ROOM', 123, 86, 15, '#fff', 'center');
     text(g, 'presented by IRONVALE ARMS', 22, 112, 11, '#ffd24a', 'left', '800');
@@ -3112,47 +3148,14 @@ const G_Highlights = (() => {
     g.restore();
     // the verdict stamps, one after the other
     const vi = Math.min(s.verdicts.length - 1, Math.floor(Math.max(0, t - 2.5) / 3)), vt = t - 2.5 - vi * 3;
-    if (t > 2.5 && !away) {
+    if (t > 2.5) {
       const [head, line] = s.verdicts[vi], k2 = ease(vt * 3);
       g.save(); g.translate(W * 0.27, H * 0.73); g.rotate(-0.08); g.scale(0.6 + 0.4 * k2, 0.6 + 0.4 * k2);
       g.fillStyle = '#ffd24a'; g.fillRect(-200, -34, 400, 68); g.strokeStyle = '#14080a'; g.lineWidth = 5; g.strokeRect(-200, -34, 400, 68);
       fit(g, head, 0, 2, 370, 38, '#e8202a', 'center'); g.restore();
       text(g, line, W * 0.27, H * 0.73 + 56, 15, '#fff', 'center', '800', 'rgba(0,0,0,0.6)');
     }
-    if (tn && t >= GT0 && t < tEnd + 0.3) gearCaption(g, s, t);
     ticker(g, `THE GEAR ROOM · ${def.name.toUpperCase()} · ${s.rounds} ROUNDS DOWNRANGE TONIGHT · ALL THIS AND MORE AT VEX'S · `);
-  }
-  // The tour's caption card, on the right where the file was: which slot and which stop of how many, the part's name and maker, what it does in a
-  // few sentences (the start of its catalogue description), and the figures the gunsmith lists for it (green better, red worse)
-  function gearCaption(g: CanvasRenderingContext2D, s: Seg, t: number) {
-    const tour = s.tour!, n = tour.length, i = Math.min(n - 1, Math.floor((t - GT0) / GT)), u = t - GT0 - i * GT, st = tour[i], p = st.p;
-    const x0 = W * 0.55, y0 = 120, w = W - x0 - 18, k = ease((u - 0.2) * 3.5), out = i === n - 1 ? 1 - G.U.clamp((t - GT0 - n * GT) / 0.3, 0, 1) : 1;
-    if (k <= 0 || out <= 0) return;
-    const label = ((G.Gunsmith.SLOT_LABEL as Record<string, any>)[st.kind] || st.slot).replace(/ \(.*\)/, '').toUpperCase();
-    const sents = (p.desc || '').split(/(?<=[.!?])\s/); let blurb = sents[0] || ''; // (as many whole sentences as fit four lines)
-    for (let j = 1; j < sents.length && (blurb + ' ' + sents[j]).length <= 170; j++) blurb += ' ' + sents[j];
-    if (blurb.length > 170) blurb = blurb.slice(0, 167).replace(/[\s,;:–-]+\S*$/, '') + '…';
-    const stats = G.Gunsmith.partEffects(p, s.def.id).split('</span>').map((x: string) => x.replace(/<[^>]*>/g, '').trim() ? [x.replace(/<[^>]*>/g, '').trim(), /class="g"/.test(x) ? 1 : /class="b"/.test(x) ? -1 : 0] : null).filter(Boolean) as [string, number][];
-    g.save(); g.globalAlpha = out; g.translate((1 - k) * 420, 0);
-    g.fillStyle = 'rgba(6,10,18,0.9)'; g.fillRect(x0, y0, w, 250); g.fillStyle = '#ffb21a'; g.fillRect(x0, y0, w, 6);
-    text(g, `${label}  ·  ${i + 1} / ${n}`, x0 + 16, y0 + 26, 13, '#ffb21a', 'left', '800');
-    fit(g, p.name.toUpperCase(), x0 + 16, y0 + 58, w - 32, 22, '#fff', 'left', '900', '#14080a');
-    text(g, (p.brand || '').toUpperCase(), x0 + 16, y0 + 84, 12, '#9fdcff', 'left', '800');
-    // (the sentence, wrapped to the card)
-    g.font = '800 14px "Arial Black", Impact, sans-serif';
-    const words = blurb.split(' '), lines: string[] = []; let cur = '';
-    for (const wd of words) { const tr = cur ? cur + ' ' + wd : wd; if (g.measureText(tr).width > w - 32 && cur) { lines.push(cur); cur = wd; } else cur = tr; }
-    if (cur) lines.push(cur);
-    lines.slice(0, 4).forEach((l, j) => text(g, l, x0 + 16, y0 + 112 + j * 19, 14, '#e8f0f8', 'left', '800'));
-    // (the figures, as chips along the foot)
-    let cx = x0 + 16, cy = y0 + 214;
-    for (const [lab, good] of stats.slice(0, 8)) {
-      g.font = '800 12px "Arial Black", Impact, sans-serif'; const cw = g.measureText(lab).width + 16;
-      if (cx + cw > x0 + w - 12) { cx = x0 + 16; cy += 26; }
-      g.fillStyle = good > 0 ? 'rgba(125,255,154,0.18)' : good < 0 ? 'rgba(255,106,74,0.2)' : 'rgba(159,220,255,0.15)'; g.fillRect(cx, cy - 11, cw, 22);
-      text(g, lab, cx + 8, cy, 12, good > 0 ? '#7dff9a' : good < 0 ? '#ff6a4a' : '#9fdcff', 'left', '800'); cx += cw + 6;
-    }
-    g.restore();
   }
   // an ad for something Vex is selling this visit: its icon big, what it is and costs, a line, how many are left
   function storeAd(g: CanvasRenderingContext2D, p: HlProduct, t: number, dur: number) {
