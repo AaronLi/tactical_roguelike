@@ -619,6 +619,7 @@ const G_Rig = (() => {
     // a reload: the gun canted toward the support hand; inspecting it: rolled over and turned to look along it
     const rl = p.reload != null && p.reload >= 0 ? p.reload : -1, ins = p.inspect != null && p.inspect >= 0 ? p.inspect : -1;
     if (rl >= 0) { const k = Math.sin(Math.PI * Math.min(1, rl)); mount.rotation.z += 0.5 * k; mount.rotation.x += 0.12 * k; mount.position.y -= 0.03 * k; }
+    if (p.rack != null && p.rack >= 0) { const k = Math.sin(Math.PI * Math.min(1, p.rack)); mount.rotation.z += 0.3 * k; mount.rotation.x += 0.08 * k; mount.position.z += 0.03 * k; } // (a manual action worked by hand: bolt, pump, lever: the gun canted to the hand on it and drawn back a little)
     if (ins >= 0) { const k = U.smooth(0, 0.15, ins) * (1 - U.smooth(0.85, 1, ins)); mount.rotation.z -= 1.0 * k; mount.rotation.y += 0.55 * k; mount.position.y += 0.05 * k; mount.position.z += 0.06 * k; }
     root.updateMatrixWorld(true);
 

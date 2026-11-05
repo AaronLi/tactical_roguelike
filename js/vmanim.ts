@@ -77,7 +77,7 @@ const G_VMAnim = (() => {
     else if (def.cls === 'BOW') reload = 'bow';
     else if (def.shell) reload = 'shell';
     else if (o.feed) reload = 'belt';
-    if (arch === 'pistol') action = 'pistol';
+    if (arch === 'pistol') action = def.action === 'bolt' ? 'bolt' : 'pistol'; // (a bolt-action pistol, the Welrod: its model's part_bolt)
     else if (o.bolt) action = 'bolt';
     else if (o.pump) action = 'pump';
     else if (o.lever) action = 'lever';

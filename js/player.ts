@@ -1123,7 +1123,7 @@ const G_Me = {
       ac.t += dt / ac.dur;
       this.fireCd = Math.max(this.fireCd, (1 - ac.t) * ac.dur);
       const pistol = def.cls === 'PST' || def.cls === 'MP';
-      if (!ac.b && ac.t >= ac.back) { ac.b = true; if (w.spentCh) this.ejectSpent(w, 0); if (ac.kind === 'rack') G.Audio.sample(pistol ? 'drop_slide' : 'rack_slide', 0.8, this.boltGun(def) ? 0.85 : 1); }
+      if (!ac.b && ac.t >= ac.back) { ac.b = true; if (w.spentCh) this.ejectSpent(w, 0); if (ac.kind === 'rack') G.Audio.sample(pistol && !def.action ? 'drop_slide' : 'rack_slide', 0.8, this.RACK_SND[def.action as string] || 1); }
       if (!ac.h && ac.t >= ac.home) { ac.h = true; this.feed(w); if (ac.kind === 'release') G.Audio.sample('drop_slide', 0.9, pistol ? 1 : 0.85); }
       if (ac.t >= 1) this.act = null;
     }
@@ -1175,7 +1175,7 @@ const G_Me = {
     }
     if (this.pairHeld && (this.hyperQ !== 1 || this.sinceShot > 0.25)) { const d = this.pairHeld; this.pairHeld = null; this.hyperQ = 0; this.recoilKick(d, true); } // (the pair's second round never came: the first's kick lands anyway)
     if (this.out || this.stanceT > 0 || this.swapT > 0 || this.lowReady || this.stowed || this.held || this.raiseT > 0 || (G.Game.hub && !G.Range.on())) { this.burstQ = 0; return; } // (the hangar's no place for it: the range is)
-    // a bolt gun: the shot's case stays in till you work the bolt, which you do as you let go of the trigger (hold
+    // a manual action (def.action: bolt, pump, lever): the shot's case stays in till the action is worked, which happens as you let go of the trigger (hold
     // it to stay on the sight and watch where it went)
     if (w.spentCh && !trigger && this.fireCd <= 0 && !this.act && !this.reloading) { this.rack(w); return; }
     const mode = this.fireMode(w); // where the selector is
@@ -1204,7 +1204,7 @@ const G_Me = {
       if (this.revHand(def)) { if (!this.revClose) { this.revShut(); this.pressBuf = G.REV.close + 0.05; } return; } // (the cylinder shut first, on what's in it: the shot goes as it does)
       if (this.loose(def)) this.reloading = false; else return;
     }
-    const bolt = ch && this.boltGun(def), round = w.chamber;
+    const bolt = ch && !!def.action, round = w.chamber;
     this.shoot(w);
     if (bolt) { w.chamber = null; w.spentCh = round || w.ammo; } // (the case stays in: js/player.ts rack)
     else if (ch) { w.chamber = null; (this as { feed(w: GWeapon, quiet: boolean): boolean }).feed(w, true); } else w.mag--; // (the action strips the next round into the chamber)
@@ -1216,7 +1216,7 @@ const G_Me = {
     // carries over (the first shot of a pull starts the clock fresh)
     this.fireCd = (this.sinceShot > 60 / rate + 0.034 ? 0 : Math.max(this.fireCd, -0.034)) + 60 / rate;
     this.sinceShot = 0;
-    if (bolt) this.fireCd = Math.max(0.25, this.fireCd - this.BOLT_T); // (the rest of the gun's rate is the bolt, worked by hand)
+    if (bolt) this.fireCd = Math.max(0.25, this.fireCd - this.MANUAL_T[def.action as string]); // (the rest of the gun's rate is the bolt, worked by hand)
     this.cycleMax = this.fireCd;
     this.cylShots++; // (the cylinder turns one chamber: js/player.ts moving parts)
     if (def.enbloc && w.mag === 0) { // the clip flies out with the last round's case ("ping"): it goes back in your kit, empty
@@ -1238,7 +1238,8 @@ const G_Me = {
   },
   // working the action by hand: a round from the magazine into the chamber (a moment, both hands; a bolt gun's
   // bolt, the right hand, throwing the case it last fired if that's still in there)
-  BOLT_T: 0.7,
+  MANUAL_T: { bolt: 0.7, pump: 0.5, lever: 0.55 } as Record<string, number>, // (how long each manual action takes to work; the sound's pitch below)
+  RACK_SND: { bolt: 0.85, pump: 0.7, lever: 0.95 } as Record<string, number>,
   rack(w: GWeapon) {
     if (!(G.chambered(w.def) && !w.chamber && w.mag > 0) && !w.spentCh) return;
     this.workAction(w, 'rack');
@@ -1248,12 +1249,10 @@ const G_Me = {
   // how far through its motions that went); a partial reload has none. The rounds move as the action does (above).
   workAction(w: GWeapon, kind: PActKind, seat: number | null = null) {
     const ev = G.VMAnim.actEvents(kind, G.VMAnim.kinds(w.def).action);
-    const dur = kind === 'release' ? this.ACT_T.release : this.boltGun(w.def) ? this.BOLT_T : seat ? this.ACT_T.rack : 0.45;
+    const dur = kind === 'release' ? this.ACT_T.release : w.def.action ? this.MANUAL_T[w.def.action] : seat ? this.ACT_T.rack : 0.45;
     this.act = { kind, seat, t: 0, dur, back: ev.back, home: ev.home };
     this.fireCd = Math.max(this.fireCd, dur);
   },
-  // a bolt-action: its bolt's worked by hand after every shot
-  boltGun(def: WeaponDef) { const P = G.Gunsmith.PLATFORMS[def.id]; return !!(P && P.spec && P.spec.bolt); },
   // the fired case out of the port (at: how long from now)
   ejectSpent(w: GWeapon, at: number) { G.Casings.fired(w.def, true, null, null, w.spentCh, at); w.spentCh = null; },
 
@@ -1313,7 +1312,7 @@ const G_Me = {
     }
 
     if (G.Game.hub && G.Range.on()) G.Course.shot(); // (on the clock in the IPSC course: a split)
-    if (!this.boltGun(w.def)) G.Casings.fired(def, true, null, null, round); // the spent case, out of the port (a bolt gun's when the bolt's worked)
+    if (!w.def.action) G.Casings.fired(def, true, null, null, round); // the spent case, out of the port (a bolt gun's when the bolt's worked)
     // the kick only throws the muzzle for the next shot: this one already left where you were aiming
     this.recoilKick(def);
     this.kick = Math.min(1, this.kick + 0.35 + def.recoil * 0.06);
@@ -2436,7 +2435,7 @@ const G_Me = {
     // moving parts: slides cycle (and lock back on empty), pumps and bolts work between shots,
     // revolver cylinders index, minigun barrels spin
     const an = u.anim, w = this.cur();
-    const cyc = this.cycleMax > 0.2 && this.fireCd > 0 ? Math.sin(Math.PI * Math.min(1, (1 - this.fireCd / this.cycleMax) * 1.25)) : 0;
+    const cyc = !w.def.action && this.cycleMax > 0.2 && this.fireCd > 0 ? Math.sin(Math.PI * Math.min(1, (1 - this.fireCd / this.cycleMax) * 1.25)) : 0;
     if (an.slide) an.slide.position.z = Math.min(0.035, this.kick * 0.04 + (!G.loaded(w) ? 0.035 : 0)); // (locked back: nothing left, chamber included)
     if (an.pump) an.pump.position.z = cyc * 0.085;
     if (an.cyl) an.cyl.rotation.z += (this.cylShots * (Math.PI * 2) / u.info.chamberAt.n - an.cyl.rotation.z) * Math.min(1, dt * 18);
@@ -2663,7 +2662,7 @@ const G_Me = {
       pr: this.prone ? 1 : 0, bp: this.bipodT > 0.5 ? 1 : 0, cl: this.climb ? 1 : 0, zp: this.zipRide ? 1 : 0, se: this.seat != null ? 1 : 0, dn: this.down ? 1 : 0, uc: this.out ? 1 : 0, dd: this.dead ? 1 : 0, bl: this.down ? (this.bleed == null ? -1 : Math.ceil(this.bleed)) : 0, bd: this.body ? G.Med.encode(this.body) : null,
       w: this.cur().def.code, ac: G.Ballistics.armourState(this), sk: G.Stickers.share(this.cur().stickers) || undefined, tl: this.tacFlags(this.cur()), cr: this.crouch || this.down || this.prone ? 1 : 0, ln: r2(this.lean || 0), lr: this.lowReady ? 1 : 0, sd: this.steadying ? 1 : 0, sw: this.stowed || this.held ? 1 : 0,
       hk: this.held ? (this.held.kind === 'flash' ? 2 : 1) : 0, hc: this.held && this.held.cock ? 1 : 0, hs: this.held ? this.held.str : 0,
-      ld: G.loaded(this.cur()) > 0 ? 1 : 0, rl: this.reloading && this.reloadTotal ? r2(G.U.clamp(1 - this.reloadT / this.reloadTotal, 0, 1)) : -1, in: this.inspectT > 0 && this.inspectDur ? r2(1 - this.inspectT / this.inspectDur) : this.rChk ? r2(0.58 + (G.VMAnim.INSPECT_HOLD - 0.58) * this.rChk.k) : -1,
+      ra: this.act && this.cur().def.action ? r2(Math.min(1, this.act.t)) : -1, ld: G.loaded(this.cur()) > 0 ? 1 : 0, rl: this.reloading && this.reloadTotal ? r2(G.U.clamp(1 - this.reloadT / this.reloadTotal, 0, 1)) : -1, in: this.inspectT > 0 && this.inspectDur ? r2(1 - this.inspectT / this.inspectDur) : this.rChk ? r2(0.58 + (G.VMAnim.INSPECT_HOLD - 0.58) * this.rChk.k) : -1,
       mc: this.magChk ? r2(this.magChk.back > 0 ? Math.max(0, 1 - this.magChk.back) : this.magChk.k) : -1,
       act: this.action && this.action.kind ? this.action.kind[0] : 0, ap: this.action ? r2(Math.min(1, this.action.t / this.action.dur)) : 0, zt: this.action && this.action.kind === 'zip' ? this.action.target : -1, bt: this.action && this.action.kind === 'bag' ? this.action.target : -1, pl: this.action && this.action.pull ? 1 : 0, mv: r2(this.hspeed || 0),
       cred: Math.round(this.credits), sx: [this.stats.kills, Math.round(this.stats.dmg), this.stats.hs, this.stats.downs, this.stats.revives],
