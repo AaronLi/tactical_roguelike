@@ -374,7 +374,8 @@ function arForward(t, withChargingHandle, mag = 'loaded') {
         const duration = Math.max(0.003, fwdAt(x1) - at);
         return rub(what, at, gainDb, { duration, speed: ((x0 - x1) / 1000 / duration) * 1.15, profile: 'accelerate', ...fr }, A, B, extra);
     };
-    const OILY = { roughness: 3, grain: 0.15, periodicity: 0, contactWidth: 0.08 };
+    // Well greased: a wet film smooths the micro-contacts (softer, duller, less grit).
+    const OILY = { roughness: 1.5, grain: 0.15, periodicity: 0, contactWidth: 0.15 };
     const els = [
         // The buffer spring unloading: tension let go, coils surging along it inside the buffer
         // tube. It's preloaded, so it never gets near free length: it pushes hard the whole way
@@ -424,15 +425,18 @@ function arForward(t, withChargingHandle, mag = 'loaded') {
         //     the locking lugs slide round across the extension lug faces under load,
         //  4. the lugs bottom at the end of the turn,
         //  5. the carrier lands on the bolt when its cam travel runs out.
-        rub('bolt lugs slide into the extension', fwdAt(12), -4, { force: 12, duration: Math.max(0.0022, TF - fwdAt(12)), speed: vAt(11), profile: 'steady', roughness: 15, grain: 0.1, periodicity: 0.2, contactWidth: 0.005 }, arBolt, arBreech, { housing: { amount: 0.3, cavity: 0.25 } }),
-        hit('bolt face hits the barrel extension', TF, 0, V(4.5), arBolt, arBreech, { scatter: 0.3, radius: 2, click: 0.9, sharp: 0.95 }, { housing: { amount: 0.3, cavity: 0.25 } }),
-        rub('cam pin rides the cam track', TF + 0.0002, -4, { force: 18, duration: ROT, speed: 1.2, profile: 'steady', roughness: 18, grain: 0.1, periodicity: 0.2, contactWidth: 0.005 }, arCamPin, arCarrier, { housing: { amount: 0.3, cavity: 0.25 } }),
+        rub('bolt lugs slide into the extension', fwdAt(12), -4, { force: 12, duration: Math.max(0.0022, TF - fwdAt(12)), speed: vAt(11), profile: 'steady', roughness: 8, grain: 0.1, periodicity: 0.2, contactWidth: 0.005 }, arBolt, arBreech, { housing: { amount: 0.3, cavity: 0.25 } }),
+        hit('bolt face hits the barrel extension', TF, 0, V(4.5), arBolt, arBreech, { scatter: 0.3, radius: 4, click: 0.8, sharp: 0.8 }, { housing: { amount: 0.3, cavity: 0.25 } }),
+        rub('cam pin rides the cam track', TF + 0.0002, -4, { force: 18, duration: ROT, speed: 1.2, profile: 'steady', roughness: 10, grain: 0.1, periodicity: 0.2, contactWidth: 0.02 }, arCamPin, arCarrier, { housing: { amount: 0.3, cavity: 0.25 } }),
         // The lugs turning across the extension's lug faces: steel on steel under the spring's load,
         // a fine machined texture read out as they slide round (~3.7 mm of arc).
-        rub('locking lugs rotate across the extension lugs', TF + 0.0003, 2, { force: 30, duration: ROT, speed: 0.9, profile: 'steady', roughness: 25, grain: 0.05, periodicity: 0.5, contactWidth: 0.004 }, arBolt, arBreech, { housing: { amount: 0.3, cavity: 0.25 } }),
-        hit('bolt lugs rotate home', TF + ROT + 0.0002, -3, V(1.5), arBolt, arBreech, { scatter: 0.3, radius: 1.5, click: 0.8, sharp: 0.95 }, { housing: { amount: 0.3, cavity: 0.25 } }),
-        hit('carrier slams onto the bolt', TL, 8, V(3.8), arCarrierGroup, arBarrel, { scatter: 0.5, radius: 3, click: 1, sharp: 0.95 }, { housing: { amount: 0.3, cavity: 0.25 } }),
-        hit('lugs seat in the barrel extension', post(0.0579), 6, V(3.8), arBarrel, arCarrier, { scatter: 0.3, radius: 2, click: 0.8, sharp: 0.95 }, 
+        rub('locking lugs rotate across the extension lugs', TF + 0.0003, 2, { force: 30, duration: ROT, speed: 0.9, profile: 'steady', roughness: 12, grain: 0.05, periodicity: 0.3, contactWidth: 0.015 }, arBolt, arBreech, { housing: { amount: 0.3, cavity: 0.25 } }),
+        hit('bolt lugs rotate home', TF + ROT + 0.0002, -3, V(1.5), arBolt, arBreech, { scatter: 0.3, radius: 3, click: 0.8, sharp: 0.8 }, { housing: { amount: 0.3, cavity: 0.25 } }),
+        // Grease squeezed out from between the faces as they meet: a short, wet smack.
+        { what: 'grease squeezed out of the lug faces', at: TF, gainDb: -12, sound: { kind: 'air', freq: 1800, q: 0.9, attackMs: 0.15, decayMs: 2.5 } },
+        { what: 'grease squeezed out as the carrier lands', at: TL, gainDb: -5, sound: { kind: 'air', freq: 1300, q: 0.8, attackMs: 0.15, decayMs: 3.5 } },
+        hit('carrier slams onto the bolt', TL, 8, V(3.8), arCarrierGroup, arBarrel, { scatter: 0.5, radius: 6, click: 0.9, sharp: 0.8 }, { housing: { amount: 0.3, cavity: 0.25 } }),
+        hit('lugs seat in the barrel extension', post(0.0579), 6, V(3.8), arBarrel, arCarrier, { scatter: 0.3, radius: 4, click: 0.8, sharp: 0.8 }, 
         // The receiver takes this blow too, but the lock-up is metal on metal: keep the receiver's
         // air-space "pop" small so it doesn't turn the clank into a plunger in a tube.
         { housing: { amount: 0.5, cavity: 0.25 } }),
@@ -476,13 +480,17 @@ const CH_BACK = 0.0;
 // so position along the stroke is x(t) = STROKE/2 · (1 − cos(π t / T)). Each part comes in
 // and out at its own point of travel, at the speed the stroke has there.
 const PULL_MM = STROKE_MM;
-const PULL_T = 0.48; // a deliberate pull (3x the original brisk 0.16 s)
+const PULL_T = 0.26; // an aggressive yank
+// The hand snatches the handle and is still moving fast when it hits the rear stop: position
+// x(u) = S·(1 − cos(Kπu)) / (1 − cos(Kπ)), K = 0.75, peaks in speed at 2/3 of the stroke and
+// arrives at ~70% of that.
+const PULL_K = 0.75;
 // Hits driven by the hand's speed soften on a slower pull (impact speed ∝ hand speed; level ∝ √
 // is a gentler, more natural-sounding scaling than linear). Spring-driven snaps don't change.
 const HAND = Math.sqrt(0.16 / PULL_T);
 const CH_END = CH_BACK + PULL_T;
 const LET_GO = CH_END + 0.08; // let go ~80 ms after the handle bottoms out
-const tAt = (mm) => CH_BACK + (PULL_T * Math.acos(1 - (2 * Math.min(mm, PULL_MM)) / PULL_MM)) / Math.PI;
+const tAt = (mm) => CH_BACK + (PULL_T * Math.acos(1 - (Math.min(mm, PULL_MM) / PULL_MM) * (1 - Math.cos(PULL_K * Math.PI)))) / (PULL_K * Math.PI);
 const SLIDE_BED_DB = 10;
 /** A rubbing contact that exists only between two points of the pull's travel. */
 function travelRub(what, mm0, mm1, gainDb, f, A, B, extra = {}) {
@@ -490,7 +498,7 @@ function travelRub(what, mm0, mm1, gainDb, f, A, B, extra = {}) {
     const duration = Math.max(0.012, tAt(mm1) - at);
     const speed = ((mm1 - mm0) / 1000 / duration) * 1.2;
     const mid = (mm0 + mm1) / 2;
-    const profile = mid < 25 ? 'accelerate' : mid > 65 ? 'decelerate' : 'steady';
+    const profile = mid < 30 ? 'accelerate' : 'steady'; // a yank: no easing into the rear stop
     // Every element is normalised to the same peak before its gain; a continuous slide at the
     // same gain as a click carries far more energy and would bury it. Slides sit 10 dB down so
     // the events at each point of travel read on top of them.
@@ -498,7 +506,7 @@ function travelRub(what, mm0, mm1, gainDb, f, A, B, extra = {}) {
 }
 // Oiled contact textures, each pair its own: anodised aluminium, phosphated steel, brass.
 const OIL_ALU = { roughness: 3, grain: 0.2, periodicity: 0, contactWidth: 0.08 };
-const OIL_STEEL = { roughness: 3, grain: 0.12, periodicity: 0, contactWidth: 0.06 };
+const OIL_STEEL = { roughness: 2, grain: 0.12, periodicity: 0, contactWidth: 0.1 }; // greased
 const OIL_TUBE = { roughness: 2, grain: 0.3, periodicity: 0, contactWidth: 0.1 };
 // Ejection-port dust cover: a thin spring-loaded steel flap that snaps open and slaps the upper.
 const arDustCover = { ...mat('steel'), shape: 'plate', size: 9, thickness: 0.8, modes: 2, irregularity: 0.6, damping: 0.35, level: 0 };
@@ -630,7 +638,7 @@ function makeArCharge(mag) {
                 name: 'rear-stop',
                 description: 'Full travel (3.7" ≈ 94 mm): the charging handle bottoms out; the bolt shifts inside the carrier.',
                 elements: [
-                    hit('handle bottoms out', CH_END, -6, 1.0 * HAND, arChargingHandle, arUpper, { scatter: 0.4, radius: 3 }),
+                    hit('handle bottoms out', CH_END, -3, 2.0 * HAND, arChargingHandle, arUpper, { scatter: 0.4, radius: 3 }),
                     hit('bolt shifts in the carrier', CH_END + 0.003, -14, 0.5 * HAND, arBolt, arCarrier, { scatter: 0.4, radius: 2 }),
                 ],
             },
