@@ -35,7 +35,7 @@ interface Rig { // a character's skeleton and its meshes (what create makes, and
   // (what the animation keeps from frame to frame)
   powered?: boolean; limp?: boolean; zipped?: boolean; zipKit?: THREE.Object3D; zipT?: number; zipYaw?: number | null; proneW?: number; proneS?: number; effPh?: number; effT?: number; braceW?: number; gunAimW?: number; gunKick?: number;
   gunBase?: { p: THREE.Vector3; q: THREE.Quaternion; s: THREE.Vector3 }; gunBaseOf?: THREE.Object3D; gunSupport?: THREE.Vector3 | null; bipodK?: number; hitDir?: THREE.Vector3; xbLoaded?: any;
-  handNade?: any; throwHand?: boolean; throwStr?: any; dropped?: { g: THREE.Object3D; vy: number; spin: number; floor?: number; [field: string]: any } | null;
+  atakW?: number; atak?: THREE.Group; handNade?: any; throwHand?: boolean; throwStr?: any; dropped?: { g: THREE.Object3D; vy: number; spin: number; floor?: number; [field: string]: any } | null;
   [bone: string]: any; // (a bone looked up by name: js/ballistics.ts boneOf, the hitbox readouts of js/hud.ts and js/highlights.ts; and what js/hud.ts keeps on a rig)
 }
 const G_Rig = (() => {
@@ -537,6 +537,38 @@ const G_Rig = (() => {
   const PRONE = { prop: 0.2, neck: 1.05, turn: 0, roll: 0, gunX: 0.07, gunUp: 0.09, gunFwd: 0.22,
     footR: [0.42, 0.42, 0.08], footL: [-0.26, 0.04, 0.04], elbowX: 0.32, elbowY: -0.4, elbowZ: -2.05 };
   // p: { pos (Vector3 ground position), yaw, pitch, crouch, alert, lean, state: 'alive'|'down', moving override }
+  // The ATAK: a phone in a rugged case on a fold-down chest mount. A mount plate sits on the front of the carrier; the
+  // case is hinged at its bottom edge and lies flat on the chest (screen in) when stowed, folding out and down until the
+  // screen faces up at the face. Built in code (a dark case, a bright map screen, a small glow so it reads at a distance).
+  // Returns the hinge (rotation.x: 0 stowed, ATAK_OPEN open); the phone is userData.phone, the glow userData.glow.
+  const ATAK_OPEN = -1.3;
+  function makeAtak(rig: Rig): THREE.Group {
+    const W = 0.16, H = 0.08, D = 0.016; // (landscape: the hinge runs along a long edge)
+    const mount = new T.Group();
+    mount.position.set(0, 0.17, -0.19); // mid-chest, on the front of the carrier
+    const plate = new T.Mesh(new T.BoxGeometry(W + 0.02, 0.05, 0.008), new T.MeshLambertMaterial({ color: 0x2b2e2a }));
+    plate.position.set(0, -0.015, 0.006);
+    const hinge = new T.Group(); // (its x axis is the hinge line, along the phone's bottom edge)
+    const knuckle = new T.Mesh(new T.CylinderGeometry(0.007, 0.007, W + 0.012, 8), new T.MeshLambertMaterial({ color: 0x1a1c1e }));
+    knuckle.rotation.z = Math.PI / 2;
+    const phone = new T.Group(); phone.position.set(0, H / 2 + 0.004, -D / 2); // stowed: upright on the chest, its back outward
+    const caseM = new T.MeshLambertMaterial({ color: 0x1d2024 });
+    const body = new T.Mesh(new T.BoxGeometry(W, H, D), caseM);
+    const bump = new T.Mesh(new T.BoxGeometry(0.012, H + 0.006, D + 0.004), caseM); // the case's bumpers, at either end
+    const bump2 = bump.clone(); bump.position.x = W / 2 - 0.006; bump2.position.x = -W / 2 + 0.006;
+    // the screen faces +z: into the chest when stowed, up at the face when open
+    const scr = new T.Mesh(new T.PlaneGeometry(W - 0.024, H - 0.01), new T.MeshBasicMaterial({ color: 0x66e6c8 }));
+    scr.position.z = D / 2 + 0.0005;
+    const grid = new T.Mesh(new T.PlaneGeometry(W - 0.04, H - 0.025), new T.MeshBasicMaterial({ color: 0xd8fff2, wireframe: true, transparent: true, opacity: 0.35 }));
+    grid.position.z = D / 2 + 0.0012;
+    const glow = new T.Mesh(new T.PlaneGeometry(W * 1.35, H * 1.7), new T.MeshBasicMaterial({ color: 0x66e6c8, transparent: true, opacity: 0.3, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide }));
+    glow.position.z = D / 2 + 0.02;
+    phone.add(body, bump, bump2, scr, grid, glow);
+    hinge.add(knuckle, phone); mount.add(plate, hinge);
+    hinge.userData.glow = glow; hinge.userData.phone = phone; hinge.userData.mount = mount; hinge.userData.H = H; hinge.userData.W = W;
+    rig.chest.add(mount); mount.visible = false;
+    return hinge;
+  }
   function update(rig: Rig, dt: number, p: any) {
     const U = G.U, s = rig.scale;
     const root = rig.root;
@@ -750,6 +782,27 @@ const G_Rig = (() => {
       }
       for (const [k, m] of Object.entries(rig.handNade)) m.visible = !!p.hold && p.hold.kind === k && !handThrow && !posed;
     }
+    // looking at the ATAK (a menu is open: p.atak): the left hand pulls the phone down off its chest mount (it folds out on
+    // its hinge until the screen faces up at the face); both hands hold its ends, a thumb working the screen; the head tips
+    // down to it. The weapon is already slung (the caller holsters it). Eased in and out; the fold follows the left hand.
+    rig.atakW = (rig.atakW || 0) + ((p.atak && !posed && !p.act && p.state === 'alive' ? 1 : 0) - (rig.atakW || 0)) * Math.min(1, dt * 5);
+    if (rig.atakW > 0.01) {
+      if (!rig.atak) rig.atak = makeAtak(rig);
+      const k = U.smooth(0, 1, rig.atakW), hg = rig.atak, ph = hg.userData.phone as THREE.Object3D, H = hg.userData.H as number, W = hg.userData.W as number;
+      (hg.userData.mount as THREE.Object3D).visible = true;
+      hg.rotation.x = ATAK_OPEN * U.smooth(0.15, 0.85, k); // (the hand reaches it first, then folds it out)
+      rig.neck.rotation.x -= 0.55 * k; // head down to the screen
+      const gl = hg.userData.glow as THREE.Mesh; if (gl) (gl.material as THREE.MeshBasicMaterial).opacity = (0.22 + 0.06 * Math.sin(performance.now() / 400)) * U.smooth(0.5, 1, k);
+      rig.chest.updateMatrixWorld(true);
+      const tap = Math.max(0, Math.sin(performance.now() / 170)) * 0.008 * k; // (a thumb taps at the map)
+      const hand = (arm: RigArm, on: THREE.Vector3, pole: THREE.Vector3, w: number) => {
+        const cur = arm.lo.localToWorld(new T.Vector3(0, -FARM, 0));
+        ik(arm.up, arm.lo, UARM * s, FARM * s, cur.lerp(on, w), pole);
+      };
+      // landscape, held by its two ends like a phone (the left pulls it down; the right comes in a beat later, its thumb tapping)
+      hand(rig.armL, ph.localToWorld(new T.Vector3(-W / 2 - 0.04, H * 0.45, -0.025)), rig.chest.localToWorld(new T.Vector3(-0.62, -0.25, -0.1)), k);
+      hand(rig.armR, ph.localToWorld(new T.Vector3(W / 2 + 0.04, H * 0.45, -0.025 + tap)), rig.chest.localToWorld(new T.Vector3(0.62, -0.25, -0.1)), U.smooth(0.3, 1, k));
+    } else if (rig.atak) (rig.atak.userData.mount as THREE.Object3D).visible = false;
     // door actions: one hand reaches for the handle / door edge (players use the right hand with the
     // weapon put away; an enemy with a gun in hand uses his free left hand)
     if (p.act && (p.act.kind === 'open' || p.act.kind === 'close')) {
