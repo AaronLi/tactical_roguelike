@@ -29,6 +29,16 @@ conf('a mount nothing provides', (c) => { c.part.mount = 'br:556'; }, /part\.mou
 conf('a zoom outside 0.2-1', (c) => { c.part.zoom = 1.4; }, /part\.zoom: expected the ADS FOV multiplier/);
 conf('a stat that is not a number', (c) => { c.part.st = { ergo: 'a lot' }; }, /part\.st: expected an object of stat deltas/);
 conf('an unknown part field', (c) => { c.part.colour = 'red'; }, /part: unknown field "colour"/);
+// the pistol optic cut (op:pso) and the replace-only form
+conf('a pistol optic cut is a mount', (c) => { c.part.mount = 'op:pso'; }, null);
+conf('a relief on a riser out of range', (c) => { c.optic.reliefOnRiser = 1.2; }, /optic\.reliefOnRiser: 1\.2 is out of range/);
+const rep = (c) => { delete c.part; c.replaces = ['Halcyon Ember pistol dot']; };
+conf('a replace-only part is valid', rep, null);
+conf('replaces and part together', (c) => { c.replaces = ['x']; }, /"replaces" and "part" are exclusive/);
+conf('replaces nothing', (c) => { rep(c); c.replaces = []; }, /"replaces": expected a non-empty list of catalogue entry names/);
+conf('replaces something that is not a name', (c) => { rep(c); c.replaces = [7]; }, /"replaces": expected a non-empty list/);
+conf('replaces the same entry twice', (c) => { rep(c); c.replaces = ['a', 'a']; }, /an entry is named twice/);
+conf('neither part nor replaces', (c) => { delete c.part; }, /"part" is missing [^]*or "replaces"/);
 conf('a folder name that is not an id', (c) => { run('', [], null); n--; const r = M.validateAuthoredPartConfig(c, 'Bad-Name'); if (!/folder name "Bad-Name"/.test(r.join())) { bad++; console.error('FAIL part config: a folder name that is not an id'); } else console.log('ok   part config: a folder name that is not an id'); }, null);
 // the node tree
 const mesh = (name, slot = 'optic', mat = 'black', extra = {}, uv = false) => ({ name, extras: { slot, ...extra }, mesh: true, uv, materials: [mat], children: [] });

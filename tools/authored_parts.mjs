@@ -9,7 +9,7 @@
 //   checkAuthoredPart(Models, key)   the config, the node tree and the GEOMETRY (bounds, window inside the model, nothing under the rail) -> { errors, warnings }
 //   loadAuthoredPartsInto(G)    reads every part into G.AuthoredParts.store (tools/models/authoredparts.ts), which the recipes place like the S.* optics
 //   authoredPartsSrc()          the sources' text, for the bake's staleness hash
-//   catalogue() / catalogueBlock()   the parts' js/parts.ts entries (one per part) and the generated block that carries them into js/parts.ts
+//   catalogue() / replacements() / catalogueBlock()   the parts' js/parts.ts entries (one per part that adds one; a replace-only part gives existing entries its model) and the generated block that carries them into js/parts.ts
 import fs from 'fs'; import path from 'path'; import { fileURLToPath } from 'url';
 import { parseGlb, readAccessor, mul, local } from './bake_authored.mjs';
 
@@ -107,6 +107,7 @@ export function checkAuthoredPart(Models, key) {
 }
 
 // ---- the catalogue (js/parts.ts) ----
+export const isReplaceOnly = (key) => !!cfgAt(key).replaces;
 export const partIdOf = (key) => 'op.auth.' + key.split('/')[1]; // (optic is the only slot so far: its prefix)
 /** The js/parts.ts entry of a part: what `add()` takes (brand a key of BR), the sight's `set` as the other optics have it, the model patch the recipe reads. */
 export function entryOf(key, cfg) {
@@ -116,9 +117,13 @@ export function entryOf(key, cfg) {
   const desc = p.desc || (p.levels ? `${p.levels[0]}–${p.levels[p.levels.length - 1]}× variable: scroll while aiming to change power` : scoped ? `${p.px}× magnified` : o.magnifier ? 'Unmagnified. Takes a magnifier behind it.' : 'Unmagnified');
   return { id: partIdOf(key), slot: cfg.slot, mount: p.mount, brand: p.brand, name: p.name, price: p.price, tier: p.tier, st: p.st, set, desc, model, magnifier: !!o.magnifier, height: o.height, src: `models/parts/${key}` };
 }
-export function catalogue() { return authoredPartKeys().map((k) => entryOf(k, JSON.parse(fs.readFileSync(cfgOf(k), 'utf8')))); }
+const cfgAt = (k) => JSON.parse(fs.readFileSync(cfgOf(k), 'utf8'));
+/** Every authored part that ADDS a catalogue entry (a model.json with "part"), as js/parts.ts entries. */
+export function catalogue() { return authoredPartKeys().map((k) => [k, cfgAt(k)]).filter(([, c]) => !c.replaces).map(([k, c]) => entryOf(k, c)); }
+/** Every REPLACE-ONLY part (a model.json with "replaces": [entry names]): { apart, names }. The entries keep everything but their model. */
+export function replacements() { return authoredPartKeys().map((k) => [k, cfgAt(k)]).filter(([, c]) => c.replaces).map(([k, c]) => ({ apart: k, names: c.replaces })); }
 /** The generated block for js/parts.ts. */
-export function catalogueBlock() { return ['  ' + BLOCK_BEGIN,'  const AUTHORED_PARTS: any[] = [', ...catalogue().map((e) => '    ' + JSON.stringify(e) + ','), '  ];', '  ' + BLOCK_END].join('\n'); }
+export function catalogueBlock() { return ['  ' + BLOCK_BEGIN,'  const AUTHORED_PARTS: any[] = [', ...catalogue().map((e) => '    ' + JSON.stringify(e) + ','), '  ];', '  const AUTHORED_REPLACES: any[] = [', ...replacements().map((e) => '    ' + JSON.stringify(e) + ','), '  ];', '  ' + BLOCK_END].join('\n'); }
 /** js/parts.ts's text with its generated block current (throws if the markers are missing). */
 export function partsTsWithBlock(text) {
   const a = text.indexOf(BLOCK_BEGIN), b = text.indexOf(BLOCK_END);

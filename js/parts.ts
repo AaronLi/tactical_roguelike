@@ -1475,8 +1475,18 @@ const G_Gunsmith = (() => {
   const AUTHORED_PARTS: any[] = [
     {"id":"op.auth.falcon","slot":"optic","mount":"op:pic","brand":"strix","name":"Strix Falcon open reflex","price":340,"tier":1,"st":{"ergo":-1,"acc":-2,"hip":2},"set":{"zoom":0.8,"scoped":false},"desc":"Unmagnified. Takes a magnifier behind it.","model":{"optic":"authored","apart":"optic/falcon","ret":"dot"},"magnifier":true,"height":"low","src":"models/parts/optic/falcon"},
   ];
+  const AUTHORED_REPLACES: any[] = [
+    {"apart":"optic/ember","names":["Halcyon Ember pistol dot"]},
+  ];
   // authored-parts:end
   for (const a of AUTHORED_PARTS) add({ id: a.id, slot: a.slot, mount: a.mount, brand: BR[a.brand], name: a.name, price: a.price, tier: a.tier, st: a.st, set: a.set, desc: a.desc, model: a.model, authored: { height: a.height }, provides: a.magnifier ? { magnifier: 'magn' } : null });
+  // A REPLACE-ONLY authored part (model.json "replaces") gives existing entries its model: the id, stats, price, tier, mount, what it opens and its build code stay; `was` keeps the
+  // old model's optic kind for what ranks or groups sights by kind (tools/model_cases.mjs), and a riser the entry stands on stays the gun's mount piece (model.riser).
+  for (const r of AUTHORED_REPLACES) for (const n of r.names) {
+    const p = Object.values(PARTS).find((q) => q.name === n);
+    if (!p || !p.model) throw new Error(`models/parts/${r.apart}/model.json replaces "${n}", which is not in the catalogue`);
+    const m = p.model as any; m.was = m.was || m.optic; m.optic = 'authored'; m.apart = r.apart; delete m.ret;
+  }
   const compatible = (mount: string) => BY_MOUNT.get(mount) || [];
   const FITS = new Map(); // interface -> weapon ids that have (or can get) a slot for it
   for (const plat of Object.values(PLATFORMS)) {
