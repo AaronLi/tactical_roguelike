@@ -216,30 +216,40 @@ const G_Hangar = (() => {
   // out. If it can't be (a receiver kit, a dot that sits on a riser), its card instead.
   // (size: how long it's drawn, its longest side; top: what it stands over. The showcase's are bigger: OUT)
   function partPiece(id: string, size = 0.5, top = PARTS.top) {
-    const GS = G.Gunsmith, p = GS.PARTS[id], root = new T.Group();
-    let g = null;
+    const GS = G.Gunsmith, p = GS.PARTS[id], root = new T.Group(), pivot = new T.Group();
+    root.add(pivot);
+    // the guns it fits, and the build with it on each (the first that shows it is used: the models are baked glTF that may still be coming in, so this goes one gun at a time)
+    const cands: { gid: string; b: Record<string, string>; slot: string }[] = [];
     for (const gid of GS.fits(p.mount)) {
       const b = GS.defaultBuild(gid), sl = GS.slotFor(gid, b, p);
       if (!sl) continue;
       b[sl.slot] = id; GS.prune(gid, b);
       if (b[sl.slot] !== id) continue;
-      const { group } = G.GunModels.display(GS.compile(gid, b)), keep: THREE.Mesh<any, any>[] = [];
-      group.updateMatrixWorld(true);
-      group.traverse((o: any) => { if (o.isMesh && o.userData.slot === sl.slot) keep.push(o); });
-      if (keep.length) {
-        g = new T.Group();
-        for (const m of keep) { const c = new T.Mesh(m.geometry, m.material); m.matrixWorld.decompose(c.position, c.quaternion, c.scale); m.material.userData.keep = true; g.add(c); } // (the guns' own materials: shared, kept)
-      }
-      group.traverse((o: any) => { if (o.isMesh && !keep.includes(o)) o.geometry.dispose(); });
-      if (g) break;
+      cands.push({ gid, b, slot: sl.slot });
     }
-    if (!g) { product(root, G.Gear.partItem(id), 0, top + 0.24, 0, 0, null, 0.1); return { root, spin: null }; }
-    const bb = new T.Box3().setFromObject(g), ctr = bb.getCenter(new T.Vector3()), sz = bb.getSize(new T.Vector3());
-    g.position.copy(ctr).negate();
-    const k = Math.min(4.5 * size / 0.5, size / Math.max(sz.x, sz.y, sz.z, 0.02)), pivot = new T.Group();
-    pivot.add(g); pivot.scale.setScalar(k); pivot.position.y = top + 0.08 + Math.min(Math.max(sz.y, sz.x, sz.z) * k / 2, size === 0.5 ? 1 : 0.3); // (the showcase's: lying long, not stood up on end)
-    pivot.rotation.x = 0; pivot.rotation.y = Math.PI / 2; // (side on to the aisle to start)
-    root.add(pivot);
+    const card = () => { product(root, G.Gear.partItem(id), 0, top + 0.24, 0, 0, null, 0.1); };
+    const attempt = (i: number) => {
+      if (i >= cands.length) return card();
+      const c = cands[i], { group } = G.GunModels.display(GS.compile(c.gid, c.b)), keep: THREE.Mesh<any, any>[] = [];
+      G.GunModels.whenReady(group, (ok) => {
+        if (!ok) return attempt(i + 1);
+        group.updateMatrixWorld(true);
+        group.traverse((o: any) => { if (o.isMesh && o.userData.slot === c.slot) keep.push(o); });
+        let g: THREE.Group | null = null;
+        if (keep.length) {
+          g = new T.Group();
+          for (const m of keep) { const q = new T.Mesh(m.geometry, m.material); m.matrixWorld.decompose(q.position, q.quaternion, q.scale); m.material.userData.keep = true; g.add(q); } // (the guns' own materials: shared, kept)
+        }
+        group.traverse((o: any) => { if (o.isMesh && !keep.includes(o)) o.geometry.dispose(); });
+        if (!g) return attempt(i + 1);
+        const bb = new T.Box3().setFromObject(g), ctr = bb.getCenter(new T.Vector3()), sz = bb.getSize(new T.Vector3());
+        g.position.copy(ctr).negate();
+        const k = Math.min(4.5 * size / 0.5, size / Math.max(sz.x, sz.y, sz.z, 0.02));
+        pivot.add(g); pivot.scale.setScalar(k); pivot.position.y = top + 0.08 + Math.min(Math.max(sz.y, sz.x, sz.z) * k / 2, size === 0.5 ? 1 : 0.3); // (the showcase's: lying long, not stood up on end)
+        pivot.rotation.x = 0; pivot.rotation.y = Math.PI / 2; // (side on to the aisle to start)
+      });
+    };
+    attempt(0);
     return { root, spin: pivot };
   }
   // what's on the sign: the name, the price, and everything that comes with it (or doesn't)
@@ -261,6 +271,7 @@ const G_Hangar = (() => {
   // ------------------------------------------------------------------------ building the scene
   function enter(map: LvMap) {
     leave();
+    G.GunModels.preloadAll(); // (every gun the hangar and the gunsmith can show, fetched in the background: js/gunmodels.ts)
     S.map = map; S.root = new T.Group(); S.targets = []; S.items = []; S.stands = []; S.rigs = []; S.vend = []; S.t = 0; S.hold = 0; S.vexQuip = 3; S.key = ''; S.rosterKey = rosterKey();
     S.root.position.z = RZ;
     G.R.levelRoot.add(S.root);
@@ -952,4 +963,5 @@ const G_Hangar = (() => {
   return { decorate, enter, leave, update, refresh, aim, interact, mark, seatPos, exitPos, spawnAt, ship, padMesh, S, HELI, HOLD, RZ };
 })();
 G.Hangar = G_Hangar;
+window.addEventListener('gunicons', () => { if (G_Hangar.S.root) G_Hangar.refresh(true); }); // (a gun's picture came in after its sign was drawn: js/icons.ts)
 interface GameModules { Hangar: typeof G_Hangar; }

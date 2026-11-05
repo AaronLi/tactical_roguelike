@@ -302,7 +302,14 @@ const G_Views = {
     return out;
   },
   addOutline(mesh: THREE.Object3D, blue?: boolean) {
-    const O = this.outlineMats(blue), parts: THREE.Mesh[] = [], shells: THREE.Mesh[] = [];
+    const shells: THREE.Mesh[] = [];
+    // (a gun whose packs are not in yet has no meshes to outline: they are when they come in, into the same list, shown or not as the halo is: js/gunmodels.ts)
+    if (mesh.userData.pending) G.GunModels.whenReady(mesh, () => { const n = shells.length; this.outlineInto(mesh, shells, blue); for (let i = n; i < shells.length; i++) shells[i].visible = blue ? this._haloOn === mesh : this._haloOn !== mesh; });
+    else this.outlineInto(mesh, shells, blue);
+    return shells;
+  },
+  outlineInto(mesh: THREE.Object3D, shells: THREE.Mesh[], blue?: boolean) {
+    const O = this.outlineMats(blue), parts: THREE.Mesh[] = [];
     // (every mesh in it, each outlined where it sits: a gun's, its magazine's, which is a group of its own: js/gunmodels.ts world)
     mesh.traverse((o) => { if ((o as THREE.Mesh).geometry && !o.layers.isEnabled(2)) parts.push(o as THREE.Mesh); });
     for (const part of parts) {
@@ -316,7 +323,6 @@ const G_Views = {
         part.add(b); shells.push(b);
       }
     }
-    return shells;
   },
   // A blue halo round what you'd take if you held F (obj: its mesh; null, nothing), in place of evidence's yellow while it's on
   setHalo(obj: THREE.Object3D | null) {

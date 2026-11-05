@@ -1,12 +1,14 @@
 'use strict';
 // Binding animation to a gun model: what js/vmanim.ts needs to move a gun's parts and put hands on it, found on a MODEL
 // (a group of slot-tagged meshes, `part_<key>` nodes with their pivots, and `info`: docs/models.md), whether the recipes
-// (js/gunmodels.ts) just built it or it came out of a .glb (js/glb.ts).
+// (tools/models/recipes.ts, at bake time) built it or it came out of a .glb (js/glb.ts, js/gunmodels.ts: what the game does).
 //
 //   G.GunRig.bind(group, info, { def, side })   -> a GunRig: the live moving parts (an), the hand anchors in the gun's space (A),
 //                                                  where the parts sit at rest, the magazine-check data (chk)
 //   G.GunRig.magCheck(mag)                      -> the magazine-check data off a magazine part (the model's tags, or the recipe's refs)
 //   G.GunRig.describe(group)                    -> the recipe's refs written down as data on the nodes, for the baker (see below)
+//   G.GunRig.setLoaded(world, bolt, cocked)     -> a crossbow's bolt on the rail or not, its string cocked or not (a world model's)
+//   G.GunRig.bipodPose(legs, k)                 -> a bipod's legs swung down by k (0 folded .. 1 standing the gun up)
 //
 // Nothing here knows how a gun was built: the parts are found by name (info.anim, whose values are the nodes themselves
 // for a recipe's model, or the node NAMES for one read from a file) and the anchors are info's numbers.
@@ -108,12 +110,33 @@ const G_GunRig = (() => {
     return { holder: group, info, side: o.side || 1, an, A, chk: magCheck(an.mag), travel: info.handle ? info.handle.travel : 0.07, recip: !!(info.handle && info.handle.recip), open: G.OPEN_BOLT.includes(def.id) };
   }
 
-  return { bind, parts, magCheck, describe, v };
+  /**
+   * A world model's crossbow: whether its bolt's on the rail (bolt) and its string's cocked (cocked: back at the latch). Other guns have no
+   * such parts (userData.xb is only on a crossbow's, js/viewmodel.ts worldInstance). A bolt that's on the rail is always on a cocked string.
+   */
+  function setLoaded(g: THREE.Object3D, bolt: boolean, cocked?: boolean) {
+    const x = g && g.userData.xb;
+    if (!x) return;
+    if (cocked == null) cocked = bolt;
+    x.bolt.visible = !!bolt; x.cocked.visible = !!cocked; x.slack.visible = !cocked;
+  }
+  /**
+   * The bipod's legs down by k (0 folded, 1 standing the gun up): about their hinges to point at the ground, splayed a little.
+   * legs: an.bipod (the viewmodel's, a bound rig's), or a world model's userData.bipod (js/rig.ts).
+   */
+  const BIPOD_SPLAY = 0.2;
+  function bipodPose(legs: VmLeg[] | null | undefined, k: number) {
+    if (!legs) return;
+    const e = k * k * (3 - 2 * k);
+    for (const l of legs) (l.sub || l.p).rotation.set(e * (l.back ? 1 : -1) * Math.PI / 2, e * l.side * BIPOD_SPLAY * (l.back ? 1 : -1), 0);
+  }
+
+  return { bind, parts, magCheck, describe, setLoaded, bipodPose, v };
 })();
 G.GunRig = G_GunRig;
 
 /** The moving parts of a gun (js/gunrig.ts): by info.anim key, the live nodes. */
-type GunRigParts = { mag?: THREE.Object3D; handle?: THREE.Object3D; ch?: THREE.Object3D; cyl?: THREE.Object3D; bolt?: THREE.Object3D; barrel?: THREE.Object3D; slide?: THREE.Object3D; brk?: THREE.Object3D; cover?: THREE.Object3D; bipod?: Parameters<typeof G.GunModels.bipodPose>[0]; pump?: THREE.Object3D; lever?: THREE.Object3D; quarrel?: THREE.Object3D; stringCocked?: THREE.Object3D; stringSlack?: THREE.Object3D };
+type GunRigParts = { mag?: THREE.Object3D; handle?: THREE.Object3D; ch?: THREE.Object3D; cyl?: THREE.Object3D; bolt?: THREE.Object3D; barrel?: THREE.Object3D; slide?: THREE.Object3D; brk?: THREE.Object3D; cover?: THREE.Object3D; bipod?: VmLeg[] | null; pump?: THREE.Object3D; lever?: THREE.Object3D; quarrel?: THREE.Object3D; stringCocked?: THREE.Object3D; stringSlack?: THREE.Object3D };
 /** Where a gun's round shows when it is checked (docs/models.md info.chamberAt). */
 interface GunRigChamberAt { side: VmChamberSide; n: number; r: number; R: number; z: number; bore?: boolean; heads: number[][]; x: number; y: number; f: number; w: number }
 /** What a model says about its moving parts and anchor points (docs/models.md `info`): [forward, up, right] each. */

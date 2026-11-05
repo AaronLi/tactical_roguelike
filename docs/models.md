@@ -1,6 +1,6 @@
 # glTF gun models
 
-The guns are built procedurally (`js/gunmodels.ts`). This pipeline bakes them to `.glb` files and loads those back, behind a flag, so that (later) models can be made in Blender or assembled from per-part packs. Milestone 1: whole default guns. Milestone 2: per-part packs and runtime assembly of any build (below).
+Every gun the game shows (first person, third person, the gunsmith, the hangar, icons, loot) is a baked glTF: per-part packs, assembled for any build at run time (`js/glb.ts`), behind the synchronous facade `js/gunmodels.ts`. The procedural **recipes** that make them are bake-time code only (`tools/models/*.ts`, compiled by `tsconfig.tools.json`); the game loads none of them and has no fallback to them: a build the packs do not cover just stays empty (a baker bug, not something to patch at run time). Milestone 1: whole default guns (no longer used by the game). Milestone 2: per-part packs and runtime assembly of any build (below).
 
 ## Commands
 
@@ -15,11 +15,20 @@ The guns are built procedurally (`js/gunmodels.ts`). This pipeline bakes them to
 
 `assets/models/` is git-ignored for now: bake locally.
 
-## The flags
+## Loading (no flags)
 
-- `?bakedGuns`: `G.Models.displayBaked(def, skin)` (js/glb.ts, called first thing in `G.GunModels.display`) returns the baked whole gun for a **default build**, else the model **assembled from the platform's packs** (`G.Models.assemble`) when they are loaded, else `null` and the procedural one is built (and the platform's packs are fetched in the background so the next one is). Whole guns: the cached glTF scene is cloned, the catalogue's material put back by name (so the shared materials and the stipple/chequer bump maps are the game's own), `info.anim` rebuilt from node names, stickers applied. All 79 whole guns are preloaded once the loader is up (`G.Models.preload(ids)`; `G.Models.loaded(id)`). Packs: `G.Models.ensure(def)` loads one build's, `G.Models.preloadPlatform(id)` all of a platform's.
+- **Classic GLTF loader.** `assets/vendor/gltf-classic.js` (committed, built by `npm run build:vendor` = `tools/build_gltf_classic.mjs`, esbuild) is three r149's `GLTFLoader` and the meshopt decoder bundled as ONE classic script on the page's global `THREE` (it does not contain three: `import 'three'` is mapped to `globalThis.THREE`). It sets `GLTFClassic`; js/glb.ts makes `G.GLB = { ready, load(url) }` from it. No importmap, no module script, no `three-global.js`. The highlights export worker `importScripts` the same file; `G.Models.setRoot('../../')` tells it where the game's folder is from `dist/js/`.
+- **Boot** (`G.GunModels.boot()`, js/game.ts `init`): every platform's `assets/models/parts/<id>/index.json` (~0.24 MB gzipped for all 79) and the props (below). With the index a gun's `info` (anchors, muzzles, sight windows, mounts) is known without any pack: `G.Models.infoFromIndex(def)`.
+- **Preload.** The hangar entry starts a background preload of every pack of every platform (`G.GunModels.preloadAll()`); the gunsmith opens a gun's whole platform; a level's start (`js/game.ts`) loads the squad's builds, the level's enemy weapon pool (`G.Game.enemyGuns`), the weapon case's gun; anything else (a dropped gun, a picked-up one, a part swap) is fetched when it is first asked for (`G.Models.ensure(def)`). A missing pack never throws.
 - `?checkModels`: validates each model in the browser as it loads (console errors and warnings).
-- `index.html` has an importmap mapping `three` to `assets/vendor/three-global.js`, a generated shim re-exporting the page's global `THREE` (the CDN's r149), so the ES-module `GLTFLoader` builds the game's own classes (two copies of three break `instanceof`). A module script loads `GLTFLoader` and the meshopt decoder from jsDelivr and exposes `G.GLB = { ready, load(url) }` (cached). Classic scripts never need it at parse time.
+
+### The facade: synchronous, filling in
+
+`G.GunModels.display(def, skin)` / `world(def, skin)` / `viewmodel(def, skin)` (js/gunmodels.ts) are synchronous for their callers. If the build's packs are loaded the model is whole. If not, `display` and `world` return an EMPTY group with `userData.pending = true` and the right `info` (from the platform's index), and the meshes arrive in it when the packs do (`world`'s merged meshes, magazine, a crossbow's bolt and strings, a bipod's legs too). `G.GunModels.whenReady(group, fn)` calls `fn(ok)` then (at once if it is not pending): icons (the `gunicons` window event redraws the screens that showed an empty cell), the gunsmith's framing, the hangar's part stands, loot's resting place, a highlight's gear stage and the evidence outline all use it. `viewmodel()` cannot be empty (the hands are bound to the gun's parts): it returns `null` until the build is loaded (and asks for it); `js/player.ts` sets the view model each frame it is not the right one, so it appears the frame it can.
+
+### Props: cartridges and the crossbow bolt
+
+`npm run bake:props` (`tools/bake_props.mjs`, also run by `bake:models`) writes `assets/models/props/round_<caliber>x<case>.glb` (a cartridge: `body`, `rim`, `bullet`, or `case`, `bullet` for the .50 BMG's real profile), `round_shotshell.glb` (`hull`, `base`), `quarrel.glb` (the crossbow bolt, centred: `nock`, `shaft`, `vanes`, `head`) and `index.json` (`rounds`: gun id -> round key; `keys`: file, `dims` (head, case length, bullet length/diameter, shell, pistol) and, for the BMG, `shape`). The game reads them: `G.GunModels.roundDims(def)`, `roundShape(def)`, `roundProp(def, 'shell' | 'case')`, `quarrel()`.
 
 ## Layers: geometry, rig, first-person extras
 
@@ -27,11 +36,11 @@ A gun model is three separate things, each working on the model (nodes + extras)
 
 | layer | where | what it does |
 | --- | --- | --- |
-| geometry | `js/gunmodels.ts` recipes, or a `.glb` (`js/glb.ts`) | slot-tagged meshes, `part_<key>` nodes with their pivots, `info` |
+| geometry | a `.glb` (`js/glb.ts`; the recipes in `tools/models/recipes.ts` make them, at bake time) | slot-tagged meshes, `part_<key>` nodes with their pivots, `info` |
 | rig | `js/gunrig.ts` | `G.GunRig.bind(group, info, { def, side })`: finds the moving parts (`info.anim`: nodes, or the node names of a loaded file), the hand anchors in the gun's space, where the parts rest, the magazine-check data. `js/vmanim.ts` (the clips) reads nothing else off the gun |
 | first-person extras | `js/viewmodel.ts` | `G.Viewmodel.assemble(def, models)`: a reflex sight's reticle (`info.reflex`), a scope's lens (`info.pip`), muzzle flashes (one per `info.muzzles`), `display_<name>` surfaces (a CanvasTexture each: `G.Viewmodel.surfaces(group)`), then the rig and arms. And `worldProto` / `worldInstance`: the third-person model, merged one mesh per material, with the magazine, a crossbow's bolt and strings and a bipod's legs pulled out |
 
-`G.GunModels.viewmodel(def)` / `world(def)` only fetch geometry and hand it over. `world()` takes the baked model with `?bakedGuns` (a default build, loaded, no bipod: the bipod's legs are not parts of a baked model yet), else the recipe's. `viewmodel()` is built from the recipes in both cases: the first-person build leaves the stock off, which the baked (display) model doesn't, and a baked model doesn't carry `info.reflex` / `info.pip` yet. A model that has them goes straight to `G.Viewmodel.assemble`.
+`G.GunModels.viewmodel(def)` / `world(def)` / `display(def)` only fetch geometry (assembled from the packs) and hand it over; the first person's stock is clipped near the eye at render time (js/render.ts). A bipod's legs are not parts of a baked model yet (the contract's `part_bipod` is reserved), so a bipod gun has none. The first person's reflex and scope windows are `info.reflex` / `info.pip`; a magnifier's lens hangs on its `part_magn` node and a crossbow's lit nock gets a material of its own, both done by `viewmodel()`.
 
 `bake_models.mjs` calls `G.GunRig.describe(group)` first: a recipe's magazine-check data is meshes held by reference, which a file can't carry, so it is written down as tags on the nodes (see "Magazine check" in the contract).
 
@@ -42,7 +51,7 @@ A gun model is three separate things, each working on the model (nodes + extras)
 - `validate()` (the same function in node and the browser; it works on a plain description of the node tree, `describeGltfJson` for a `.glb`'s JSON, `describeScene` for a loaded scene) is used by the baker, by `check:models`, and by `?checkModels`;
 - `docs/gun-model-info.schema.json` is the JSON Schema (draft 2020-12) of the root `extras.info`, for a loader or exporter written in anything else (a Rust/Bevy loader can read this plus the tables below without reading TypeScript). It is generated, and `test:models` fails when it differs from `INFO_FIELDS`;
 - the tables below are generated between the markers (`check:models -- --write`), and `test:models` fails when they drift;
-- the TypeScript interface `GunModelInfo` and `INFO_FIELDS` are tied by a mapped type: a field in one and not the other does not compile; the material list is compared with `G.GunModels.M` by `test:models`.
+- the TypeScript interface `GunModelInfo` and `INFO_FIELDS` are tied by a mapped type: a field in one and not the other does not compile; the material list is compared with `G.GunMaterials.M` (js/gunmaterials.ts) by `test:models`.
 
 ### An example node tree (an M4, abridged)
 
@@ -244,7 +253,7 @@ A one-off colour that isn't in the catalogue is named `m_<rrggbb>` (hex colour) 
 A gun made in Blender takes part in the attachment system like any other: **its recipe builds from the model**. `models/<id>/<id>.glb` holds its factory parts, one mesh per piece tagged with its slot; `node tools/authored_pack.mjs` packs every such file into `js/authored.ts` (generated: positions int16 at 0.03 mm, normals int8, indices uint16, base64; loaded as a script like `js/guntraces.ts`, so the recipe stays synchronous in the browser and in the baker), and the gun's recipe (js/gunmodels.ts `rifle()`, `rcv: 'fal'`) uses them:
 
 - **its factory parts are the model's** while they are fitted (a slot whose part is the platform's default: `own(slot)`): the receiver (always), stock, grip, handguard, magazine (`part_mag`), muzzle device, iron sights, the charging handle (`part_handle`) and the barrel with its gas block and front sight;
-- **every other part is the recipe's own**, built against the model's frame: the root's `extras.rig_json` (`rig` in js/authored.ts) says where the optic rail goes (`top`, `rail`), where a handguard starts and ends (`hgF`, up to the gas block `gasRear`), the stock's and the grip's seats (`stockTop`/`stockBot`, `gripTop`), and the barrel (`end`, `endR`, `tubeFrom`); the platform's spec in js/parts.ts adds the magazine well (`mag.f`/`y`, and `magFit` so other magazines fit it), the grip point and the optic's place on the rail;
+- **every other part is the recipe's own**, built against the model's frame: the root's `extras.rig_json` (`rig` in tools/models/authored.ts) says where the optic rail goes (`top`, `rail`), where a handguard starts and ends (`hgF`, up to the gas block `gasRear`), the stock's and the grip's seats (`stockTop`/`stockBot`, `gripTop`), and the barrel (`end`, `endR`, `tubeFrom`); the platform's spec in js/parts.ts adds the magazine well (`mag.f`/`y`, and `magFit` so other magazines fit it), the grip point and the optic's place on the rail;
 - **barrel length**: the model's barrel is the factory one; another barrel moves only the bare tube ahead of the bayonet lug's collar (`role: 'tube'`) to its length. The gas block, front sight and handguard stay put (no stretch), so nothing else follows the barrel but the muzzle device (an anchor);
 - **iron sights**: any iron-type optic (another gun's notch, a bead, a riser) is the FAL's own aperture and gas-block post, so no optic depends on the barrel.
 
@@ -260,7 +269,8 @@ assets/models/guns/index.json                    { version, three, src, guns: { 
 assets/models/parts/<platform>/index.json        the platform index (docs/gun-parts-index.schema.json)
 assets/models/parts/<platform>/<slot>/<key>.glb  one pack
 assets/models/parts/index.json                   { version, src, platforms: { <id>: totals }, totals }
-assets/vendor/three-global.js                    the importmap shim (generated)
+assets/models/props/*.glb, index.json              the cartridges and the crossbow bolt (tools/bake_props.mjs)
+assets/vendor/gltf-classic.js                    three's GLTFLoader + meshopt decoder, one classic script (npm run build:vendor; committed)
 ```
 
 `code` is the default build's code: the browser serves the whole bake only for a gun whose build is that. `hash` is a hash of the baked triangles and `src` of the sources they come from; `node tools/bake_models.mjs --check` lists stale bakes (guns and packs). Lost in the round trip, rebuilt at load: bump maps (by material name), the shared material cache, `userData.chk`. The stipple/chequer meshes keep their UVs (the bump map tiles on them).

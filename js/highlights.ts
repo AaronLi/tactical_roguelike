@@ -741,6 +741,16 @@ const G_Highlights = (() => {
   // In the worker (js/exportworker.ts): the level built again, the broadcast acted out from the top on this renderer, each
   // frame the picture and its graphics put together on the canvas (as the TVs do, less the screen's lines) and encoded
   // straight from it. post(message, transfer) talks to the page.
+  // The guns of the recording (everyone's, the kill shots', the gear stages'), loaded before a frame is drawn: the models are baked glTF that arrive
+  // when asked for (js/gunmodels.ts), and the export draws its frames in one go, not waiting for them
+  async function loadGuns() {
+    const codes = new Set<string>();
+    for (const A of P.actors.values()) { if (A.gun) codes.add(A.gun); if (A.wpn) codes.add(G.Gunsmith.defaultCode(A.wpn)); }
+    for (const c of (P.clips || []) as any[]) { for (const s of c.shots || []) if (s.code) codes.add(s.code); for (const v of Object.values(c.guns || {})) if (v) codes.add(v as string); }
+    for (const s of P.prog as any[]) if (s.code) codes.add(s.code);
+    await G.GunModels.boot();
+    await Promise.all([...codes].map((code) => { try { const def = G.Gunsmith.fromCode(code); return def ? G.Models.ensure(def) : null; } catch (e) { return null; } }));
+  }
   async function exportHere(m: Rec, post: (...a: any[]) => void) {
     const d = revive(m.data);
     for (const [n, bm] of Object.entries(m.stickers || {})) G.Stickers.provide(n, bm); // (the stickers' pictures, from the file)
@@ -763,6 +773,7 @@ const G_Highlights = (() => {
       vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
       fragmentShader: G.R.TONE + ' uniform sampler2D sc; uniform sampler2D ov; uniform float live; varying vec2 vUv; void main(){ vec3 c = bpTone(texture2D(sc, vUv).rgb) * live; vec4 o = texture2D(ov, vUv); gl_FragColor = linearToOutputTexel(vec4(mix(c, o.rgb, o.a), 1.0)); }' });
     const quad = new T.Mesh(new T.PlaneGeometry(2, 2), P.mat), qs = new T.Scene(), qc = new T.Camera(); quad.frustumCulled = false; qs.add(quad);
+    await loadGuns();
     stage();
     P.ready = true; P.vol = 1;
     let err = null;
@@ -1711,10 +1722,16 @@ const G_Highlights = (() => {
     while (P.gpiv.children.length) P.gpiv.remove(P.gpiv.children[0]);
     let g = null; try { g = G.GunModels.world(s.code, (((P.actors.get(s.k) || {}) as Actor).skins || {})[s.code]); } catch (e) { /* no model */ }
     if (!g) return;
-    const b = new T.Box3().setFromObject(g), c = b.getCenter(new T.Vector3()), len = Math.max(0.2, b.getSize(new T.Vector3()).length());
-    g.position.sub(c); P.gpiv.add(g);
-    P.gcam.position.set(0, len * 0.3, len * 2.5); P.gcam.lookAt(0, -0.03, 0);
-    P.gcam.setViewOffset(W, H, W * 0.26, -H * 0.04, W, H); // (the gun on the left: the read-out's on the right)
+    const gun = g, pivot = P.gpiv;
+    const put = () => { // (centred, the camera back by its size; again when a gun whose packs were still loading comes in: js/gunmodels.ts)
+      gun.position.set(0, 0, 0);
+      const b = new T.Box3().setFromObject(gun), c = b.getCenter(new T.Vector3()), len = Math.max(0.2, b.getSize(new T.Vector3()).length());
+      gun.position.sub(c); pivot.add(gun);
+      P.gcam.position.set(0, len * 0.3, len * 2.5); P.gcam.lookAt(0, -0.03, 0);
+      P.gcam.setViewOffset(W, H, W * 0.26, -H * 0.04, W, H); // (the gun on the left: the read-out's on the right)
+    };
+    put();
+    if (gun.userData.pending) G.GunModels.whenReady(gun, (ok) => { if (ok && pivot.children.includes(gun)) put(); });
   }
   // The rounds that hit them, run through the x-ray body again (js/ballistics.ts through, traced): each one taken into
   // their frame as they were when it hit (where they were, which way they faced, crouched or not, hands up...: the body

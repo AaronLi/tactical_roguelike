@@ -554,7 +554,7 @@ const G_Rig = (() => {
     if (rig.gun && rig.gun.userData.xb) {
       const ld = p.loaded == null ? rig.xbLoaded !== false : !!p.loaded, rl = p.reload == null ? -1 : p.reload;
       rig.xbLoaded = ld;
-      G.GunModels.setLoaded(rig.gun, ld || rl >= 0.72, ld || rl >= 0.3);
+      G.GunRig.setLoaded(rig.gun, ld || rl >= 0.72, ld || rl >= 0.3);
     }
 
 
@@ -716,7 +716,7 @@ const G_Rig = (() => {
         } else mg.position.copy(rig.gun.userData.magHome);
       }
       // the bipod's legs: down when they've put it down (a quarter of a second either way)
-      if (rig.gun.userData.bipod) { rig.bipodK = U.clamp((rig.bipodK || 0) + (p.bipod ? 1 : -1) * dt * 4, 0, 1); G.GunModels.bipodPose(rig.gun.userData.bipod, rig.bipodK); }
+      if (rig.gun.userData.bipod) { rig.bipodK = U.clamp((rig.bipodK || 0) + (p.bipod ? 1 : -1) * dt * 4, 0, 1); G.GunRig.bipodPose(rig.gun.userData.bipod, rig.bipodK); }
     } else {
       // unarmed: arms swing opposite the legs
       for (const [arm, side] of [[rig.armL, -1], [rig.armR, 1]] as [RigArm, number][]) {

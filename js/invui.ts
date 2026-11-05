@@ -970,6 +970,8 @@ const G_InvUI = (() => {
     setTimeout(() => window.addEventListener('pointerdown', outside, true));
   }
 
+  // a gun's picture came in after the screen was drawn (js/icons.ts): draw it again
+  window.addEventListener('gunicons', () => { if (root && !drag && !menu) rerender(); });
   return {
     show(el: HTMLElement, opts?: { field?: boolean, patient?: string | null, cab?: number | null }) { field = !!(opts && opts.field); patient = opts && opts.patient != null ? opts.patient : null; ptPart = null; cab = opts && opts.cab != null ? opts.cab : null; root = el; el.classList.add('inv-host'); if (!el.dataset.invBound) { el.dataset.invBound = 1 as any; el.addEventListener('pointerdown', (e: any) => root && onDown(e)); el.addEventListener('dblclick', (e: any) => root && onDbl(e)); el.addEventListener('contextmenu', (e: any) => root && onMenu(e));
         el.addEventListener('click', (e: MouseEvent) => {

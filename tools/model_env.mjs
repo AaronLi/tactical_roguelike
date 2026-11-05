@@ -1,13 +1,14 @@
 // Shared by tools/bake_models.mjs and tools/check_models.mjs: the compiled game (dist/js) in a node vm, and the model contract.
+// The gun recipes are bake-time code (tools/models/*.ts, tsconfig.tools.json -> dist/tools/tools/models): this file is what loads them, next to the game's data.
 import fs from 'fs'; import vm from 'vm'; import path from 'path'; import { fileURLToPath } from 'url';
 import * as THREE_NS from 'three';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-export const DIST = path.join(ROOT, 'dist/js/');
+export const DIST = path.join(ROOT, 'dist/js/'), DIST_RECIPES = path.join(ROOT, 'dist/tools/tools/models/');
 
-function readDist(f) {
-  if (!fs.existsSync(DIST + f + '.js')) { console.error(`dist/js/${f}.js missing: run tsc first (npm run bake:models / check:models do)`); process.exit(1); }
-  return fs.readFileSync(DIST + f + '.js', 'utf8');
+function readDist(f, dir = DIST) {
+  if (!fs.existsSync(dir + f + '.js')) { console.error(`${path.relative(ROOT, dir + f)}.js missing: run tsc first (npm run bake:models / check:models do: tsc -p . and tsc -p tsconfig.tools.json)`); process.exit(1); }
+  return fs.readFileSync(dir + f + '.js', 'utf8');
 }
 
 /** js/glb.ts on its own (it needs nothing from the game to describe and check a model): { G.Models: contract, validate, ... }. */
@@ -26,7 +27,10 @@ export function loadGame(withModels = false, extra = {}) {
   const ctx = { console, Math, JSON, Set, Map, WeakMap, Object, Array, Number, String, Boolean, Uint8Array, Int8Array, Int16Array, Int32Array, Uint16Array, Uint32Array, Float32Array, Float64Array, Infinity, NaN, isFinite, parseInt, parseFloat, Error, Symbol, Date, Proxy, Reflect, THREE, document, performance };
   Object.assign(ctx, extra); ctx.window = ctx; ctx.self = ctx; ctx.G = { R: { flashTexture: () => null, _envMap: () => null } };
   vm.createContext(ctx);
-  for (const f of ['util', 'data', 'callsigns', 'arsenal', 'parts', 'gear', 'medical', 'materials', 'stickers', 'guntraces', 'authored', 'gunmodels', 'gunrig']) vm.runInContext(readDist(f), ctx, { filename: f + '.js' });
+  for (const f of ['util', 'data', 'callsigns', 'arsenal', 'parts', 'gear', 'medical', 'materials', 'stickers', 'gunmaterials']) vm.runInContext(readDist(f), ctx, { filename: f + '.js' });
+  for (const f of ['guntraces', 'authored', 'recipes']) vm.runInContext(readDist(f, DIST_RECIPES), ctx, { filename: f + '.js' }); // (the recipes: G.GunRecipes, the bake's only; the game's runtime has none)
+  vm.runInContext(readDist('gunrig'), ctx, { filename: 'gunrig.js' });
+  ctx.G.GunModels = ctx.G.GunRecipes; // (the baker's name for them: .display(def), .M, .build; the game's G.GunModels is the facade over the baked files, js/gunmodels.ts, not loaded here)
   if (withModels) vm.runInContext(readDist("glb"), ctx, { filename: "glb.js" });
   return ctx.G;
 }
@@ -42,7 +46,7 @@ export async function loadGameWithModels() {
   const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder), cache = new Map();
   const file = (url) => path.join(ROOT, url);
   const G = loadGame(true, {
-    location: { search: '?bakedGuns' }, URLSearchParams, TextDecoder, addEventListener() {},
+    location: { search: '' }, URLSearchParams, TextDecoder, addEventListener() {},
     fetch: async (url) => { const f = file(url); if (!fs.existsSync(f) || /guns\/index\.json$/.test(url)) return { ok: false }; return { ok: true, json: async () => JSON.parse(fs.readFileSync(f, 'utf8')) }; },
   });
   G.GLB = {

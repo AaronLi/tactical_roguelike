@@ -10,11 +10,13 @@
   addEventListener() {},
 };
 importScripts('https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js');
+importScripts('../../assets/vendor/gltf-classic.js'); // (three's GLTFLoader + the meshopt decoder, as a classic script: the guns are baked glTF, js/gunmodels.ts)
 importScripts(...['util', 'data', 'callsigns', 'parts', 'gear', 'medical', 'materials', 'ballistics', 'damage', 'level', 'world', 'furniture', 'homes', 'residents', 'lightgrid', 'render',
-  'stickers', 'gunmodels', 'gunrig', 'viewmodel', 'vmanim', 'headgear', 'rig', 'scars', 'highlights'].map((f) => f + '.js'));
+  'stickers', 'gunmaterials', 'gunmodels', 'glb', 'gunrig', 'viewmodel', 'vmanim', 'headgear', 'rig', 'scars', 'highlights'].map((f) => f + '.js'));
 // (the game the replay borrows from: the map the bodies fall on, and nobody's id)
 (G as any).Game = { map: null, phase: 'level' };
 (G as any).Net = { myId: '' };
+G.Models.setRoot('../../'); // (the game's folder, from here: assets/models, where the guns are)
 G.Stickers.base = '../../'; // (the game's folder, from here (dist/js/): its pictures, js/stickers.ts; a replay's file brings its own)
 
 self.onmessage = async (e) => {

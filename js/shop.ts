@@ -488,4 +488,5 @@ const G_Shop = {
   },
 };
 G.Shop = G_Shop;
+window.addEventListener('gunicons', () => { const el = document.getElementById('shop'); if (el && !el.classList.contains('hidden') && G_Shop.offers) G_Shop.render(); }); // (a gun's picture came in after the screen was drawn: js/icons.ts)
 interface GameModules { Shop: typeof G_Shop; }

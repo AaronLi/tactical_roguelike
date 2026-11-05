@@ -1,7 +1,7 @@
 // Assembles guns from the per-part packs (the real files, the real decoder, js/glb.js assemble()) and checks them against the recipe.
 //   node tools/check_models_assembly.mjs [id ...] [--rand N] [--tol metres] [--quiet]        (needs `npm run bake:models` first)
 // For every platform: every build of the sweep (the default, two "loaded" builds and every single-part swap from each: ~9,000 builds in all) is
-// built twice, by the recipe (js/gunmodels.ts) and by G.Models.assemble(def) from the packs, and compared:
+// built twice, by the recipe (tools/models/recipes.ts) and by G.Models.assemble(def) from the packs, and compared:
 //   exact      the same triangles: an order-independent hash of every triangle's world position to 0.1 mm and its material (as the sweep fingerprints do)
 //   tolerance  not hash-equal, but the same meshes (per slot) and no vertex further than --tol (default 0.05 mm = half the hash step: the 14-bit
 //              position quantisation of the files)

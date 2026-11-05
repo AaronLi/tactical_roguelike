@@ -46,13 +46,20 @@ const G_Loot = (() => {
   function meshFor(packed: any, fit?: number) {
     if (packed.k === 'gun' && packed.w) {
       const code = G.Gunsmith.encode(packed.w.id, packed.w.build), gun = G.GunModels.world(code, packed.w.sk), wrap = new T.Group(), tmp = new T.Group();
-      G.GunModels.setLoaded(gun, G.loaded(packed.w) > 0); // (a crossbow lying there with its bolt on the rail or not)
-      if (fit) { const b0 = new T.Box3().setFromObject(gun); gun.scale.setScalar(Math.min(1, fit / (b0.max.z - b0.min.z))); }
-      gun.rotation.z = Math.PI / 2;
-      wrap.add(gun); tmp.add(wrap); tmp.updateMatrixWorld(true);
-      const b = new T.Box3().setFromObject(wrap);
-      wrap.position.set(-(b.min.x + b.max.x) / 2, -b.min.y, -(b.min.z + b.max.z) / 2);
-      tmp.remove(wrap);
+      G.GunRig.setLoaded(gun, G.loaded(packed.w) > 0); // (a crossbow lying there with its bolt on the rail or not)
+      // (its place: lying on its side, shrunk to fit its case, its underside on the floor; done again when a gun that was still loading has come in: js/gunmodels.ts)
+      const lay = () => {
+        if (fit) { gun.scale.setScalar(1); const b0 = new T.Box3().setFromObject(gun); gun.scale.setScalar(Math.min(1, fit / (b0.max.z - b0.min.z))); }
+        gun.rotation.z = Math.PI / 2;
+        wrap.position.set(0, 0, 0);
+        wrap.add(gun); tmp.add(wrap); tmp.updateMatrixWorld(true);
+        const b = new T.Box3().setFromObject(wrap);
+        wrap.position.set(-(b.min.x + b.max.x) / 2, -b.min.y, -(b.min.z + b.max.z) / 2);
+        tmp.remove(wrap);
+      };
+      const loading = !!gun.userData.pending;
+      lay();
+      if (loading) G.GunModels.whenReady(gun, (ok) => { if (ok) lay(); });
       const g = new T.Group(); g.add(wrap);
       return g;
     }

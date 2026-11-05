@@ -4,13 +4,16 @@
   "private": true,
   "description": "Peer-to-peer co-op roguelike tactical FPS that runs in the browser. TypeScript (js/*.ts, compiled to dist/js/), Three.js for rendering, WebRTC (via PeerJS) for networking.",
   "scripts": {
-    "build": "tsc -p .",
+    "build": "tsc -p . && tsc -p tsconfig.tools.json",
     "dev": "node tools/dev.js",
-    "typecheck": "tsc -p . --noEmit",
+    "typecheck": "tsc -p . --noEmit && tsc -p tsconfig.tools.json --noEmit",
     "typecheck:strict": "tsc -p . --noEmit --strict",
-    "bake:models": "tsc -p . && node tools/bake_models.mjs",
-    "check:models": "tsc -p . && node tools/check_models.mjs",
-    "test:models": "tsc -p . && node tools/check_models.mjs --selftest && node tools/check_models.test.mjs && node tools/check_models_assembly.mjs --quiet"
+    "build:vendor": "node tools/build_gltf_classic.mjs",
+    "bake:models": "tsc -p . && tsc -p tsconfig.tools.json && node tools/bake_models.mjs && node tools/bake_props.mjs",
+    "bake:props": "tsc -p . && tsc -p tsconfig.tools.json && node tools/bake_props.mjs",
+    "check:models": "tsc -p . && tsc -p tsconfig.tools.json && node tools/check_models.mjs",
+    "test:models": "tsc -p . && tsc -p tsconfig.tools.json && node tools/check_models.mjs --selftest && node tools/check_models.test.mjs && node tools/check_models_assembly.mjs --quiet",
+    "pack:authored": "node tools/models/authored_pack.mjs"
   },
   "license": "ISC",
   "devDependencies": {
@@ -18,6 +21,7 @@
     "@gltf-transform/extensions": "^4.5.1",
     "@gltf-transform/functions": "^4.5.1",
     "@types/three": "0.149.0",
+    "esbuild": "^0.25.0",
     "meshoptimizer": "^1.3.0",
     "three": "^0.149.0",
     "typescript": "^7.0.2"

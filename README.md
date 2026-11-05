@@ -2396,8 +2396,9 @@ solids at any height. Doors and windows are dynamic: their solids change as they
 | `js/render.ts` | Three.js scene, effects, viewmodel render pass |
 | `js/rig.ts` | Character skeleton, procedural animation, bone hitboxes |
 | `js/parts.ts` | Weapon platforms, parts catalogue, builds and how they change stats |
-| `js/gunmodels.ts` | Procedural gun models built from parts (first person, third person, gunsmith) |
-| `js/guntraces.ts` | The sidearms' outlines, traced from photographs |
+| `js/gunmodels.ts` | The gun models the game shows, from baked glTF (first person, third person, gunsmith): the synchronous facade over `js/glb.ts`; the procedural recipes that make them are bake-time code in `tools/models/` |
+| `js/gunmaterials.ts` | The gun material catalogue (G.GunMaterials.M) |
+| `tools/models/guntraces.ts` | The sidearms' outlines, traced from photographs (bake-time) |
 | `js/gunsmith.ts` | The gunsmith: 3D weapon view, part fitting and the sticker tool |
 | `js/stickers.ts` | Stickers: which there are, your collection, decals on guns, the squad's lists by hash |
 | `js/zip.ts` | Writing and reading .zip files (the highlights' recordings) |
