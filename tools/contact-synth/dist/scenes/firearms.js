@@ -91,6 +91,16 @@ const arBoltCatch = steelBar(4, 3);
 // trigger, whose front hook is the sear that catches the hammer's notch.
 const arHammer = steelBar(4, 6);
 const arTriggerSear = steelBar(3, 5);
+// The forward-assist pawl is spring-loaded against the serrations on the carrier's right
+// side (~2.5 mm pitch): it clicks over them whenever the carrier moves past.
+const arFaPawl = steelBar(1.5, 3);
+const gasKey = steelBar(3, 6);
+// What finally stops the carrier: the barrel extension, barrel and receiver. A thick steel
+// tube (~40 cm, ~6 mm wall) in the handguard: the low, heavy body of the slam.
+const arBarrel = { ...mat('steel'), shape: 'shell', size: 40, thickness: 6, modes: 3, irregularity: 0.6, damping: 0.6, level: 0 };
+const arBullet = { ...mat('copper'), shape: 'block', size: 2.3, thickness: 5.7, modes: 0, irregularity: 0.4, damping: 0.5, level: 0 };
+const arFeedRamp = steelBar(2, 4);
+const arGasTube = { ...mat('stainless'), shape: 'bar', size: 25, thickness: 4.7, modes: 0, irregularity: 0.5, damping: 0.6, level: 0 };
 const arExtractor = steelBar(2, 3);
 const arNextRound = { ...arCase, level: -2 };
 // ---------- pump-action shotgun ----------
@@ -190,11 +200,17 @@ function arForward(t, withChargingHandle) {
         // heard only as a faint, muffled sproing under the carrier.
         hit('buffer spring drives the carrier', t, -18, 3, arBufferSpring, arBufferTube, { scatter: 0.2, radius: 1, click: 0.1, sharp: 0.5 }, { coil: { level: 0.3, length: 14, dispersion: 0.4, decay: 0.2, brightness: 1800 } }),
         // What you actually hear: the steel carrier grinding along the aluminium upper.
-        rub('carrier rails in the upper', t + 0.002, -8, { force: 6, duration: 0.05, speed: 4, profile: 'accelerate', roughness: 3, grain: 0.15, periodicity: 0, contactWidth: 0.08 }, arCarrier, arUpper),
+        rub('carrier rails in the upper', t + 0.002, -14, { force: 6, duration: 0.05, speed: 4, profile: 'accelerate', roughness: 3, grain: 0.15, periodicity: 0, contactWidth: 0.08 }, arCarrier, arUpper),
         hit('buffer weights shift', t + 0.004, -20, 1.2, steelBlock(1.5, 12), arBuffer, { scatter: 0.9, radius: 2 }),
         // Bolt strips the top round over the steel feed lips.
+        // Forward-assist pawl rattles over the carrier serrations as it flies past.
+        rub('forward-assist pawl over the serrations', t + 0.01, -8, { force: 4, duration: 0.012, speed: 3, profile: 'steady', roughness: 200, grain: 2.5, periodicity: 1, contactWidth: 0.02 }, arFaPawl, arCarrier),
         rub('case dragged over the feed lips', t + 0.02, -14, { force: 6, duration: 0.02, speed: 3, roughness: 15, grain: 0.3 }, arCase, arFeedLips),
-        hit('next round pops up', t + 0.03, -16, 0.8, arNextRound, arFeedLips, { scatter: 0.3, radius: 2 }),
+        // The rim snaps free of the lips; the nose ticks up the feed ramp; the next round snaps up.
+        snap('case rim snaps free of the feed lips', t + 0.03, -3, { strength: 0.7, preload: 0, seat: 0.3, seatDelay: 1 }, arCase, arFeedLips),
+        hit('bullet nose rides up the feed ramp', t + 0.032, -7, 1.5, arBullet, arFeedRamp, { scatter: 0.3, radius: 1.5 }),
+        snap('next round snaps up into the lips', t + 0.034, -5, { strength: 0.5, preload: 0, seat: 0.3, seatDelay: 1.5 }, arNextRound, arFeedLips),
+        hit('gas tube slides into the carrier key', t + 0.046, -9, 0.8, arGasTube, gasKey, { scatter: 0.3, radius: 1.5 }),
         rub('round into the chamber', t + 0.04, -15, { force: 5, duration: 0.015, speed: 3, profile: 'decelerate', roughness: 6, grain: 0.3 }, arCase, arChamber),
         // Lock-up in two parts. The bolt (out front of the carrier) hits the barrel extension
         // first: a sharp, light hit. The carrier keeps going for its 9.5 mm of cam travel, the
@@ -204,7 +220,11 @@ function arForward(t, withChargingHandle) {
         rub('cam pin turns the bolt', t + 0.054, -12, { force: 10, duration: 0.011, speed: 1.2, profile: 'decelerate', roughness: 10, grain: 0.2, contactWidth: 0.02 }, arCamPin, arCarrier),
         hit('bolt lugs rotate home', t + 0.057, -9, 1.5, arBolt, arBarrelExt, { scatter: 0.3, radius: 1.5 }),
         hit('carrier slams onto the bolt', t + 0.0578, 0, 3.8, arCarrier, arBolt, { scatter: 0.5, radius: 5, click: 0.8 }, { flex: { amount: 0.25, freq: 90, decay: 0.06, rattle: 0.4, wobble: 0, tone: 0 } }),
-        snap('extractor snaps over the rim', t + 0.056, -12, { strength: 0.6, preload: 0, seat: 0.2 }, arExtractor, arCase),
+        // The thud: the carrier's momentum goes into the barrel extension, barrel and receiver
+        // through broad, flat, oily faces (longer contact, little edge crack). The thick barrel
+        // gives a low, heavy body and the whole rifle jolts (a short low thump).
+        hit('barrel and receiver take the blow', t + 0.0579, -1, 3.8, arBarrel, arCarrier, { scatter: 0.2, radius: 15, click: 0.3, sharp: 0.25 }, { flex: { amount: 0.6, freq: 120, decay: 0.05, rattle: 0, wobble: 0, tone: 0.7 } }),
+        snap('extractor snaps over the rim', t + 0.056, -3, { strength: 0.8, preload: 0, seat: 0.3, seatDelay: 1 }, arExtractor, arCase),
     ];
     if (withChargingHandle) {
         els.push(snap('charging handle latch catches', t + 0.06, -9, { strength: 0.7, preload: 0, seat: 0.4, seatDelay: 2 }, arChLatch, arUpper));
@@ -237,7 +257,6 @@ function travelRub(what, mm0, mm1, gainDb, f, A, B, extra = {}) {
 const OIL_ALU = { roughness: 3, grain: 0.2, periodicity: 0, contactWidth: 0.08 };
 const OIL_STEEL = { roughness: 3, grain: 0.12, periodicity: 0, contactWidth: 0.06 };
 const OIL_TUBE = { roughness: 2, grain: 0.3, periodicity: 0, contactWidth: 0.1 };
-const gasKey = steelBar(3, 6);
 // Ejection-port dust cover: a thin spring-loaded steel flap that snaps open and slaps the upper.
 const arDustCover = { ...mat('steel'), shape: 'plate', size: 9, thickness: 0.8, modes: 2, irregularity: 0.6, damping: 0.35, level: 0 };
 export const AR15_CHARGE = {
@@ -270,6 +289,7 @@ export const AR15_CHARGE = {
             elements: [
                 travelRub('cam pin turns the bolt', 2, 11.5, -12, { force: 8, roughness: 10, grain: 0.2, contactWidth: 0.02 }, arCamPin, arCarrier),
                 hit('bolt lugs rotate free', tAt(10), -10, 0.6, arBolt, arBarrelExt, { scatter: 0.3, radius: 1.5 }),
+                snap('bolt rotation stops on the cam pin', tAt(10.5), -9, { strength: 0.5, preload: 0, seat: 0.2, seatDelay: 1 }, arBolt, arCamPin),
                 hit('carrier picks up the bolt', tAt(11.5), -6, 0.9, arCarrier, arBolt, { scatter: 0.4, radius: 3, click: 0.7 }),
             ],
         },
@@ -283,12 +303,16 @@ export const AR15_CHARGE = {
                 hit('carrier tail enters the buffer tube', tAt(40), -16, 0.5, arCarrier, arBufferTube, { scatter: 0.3, radius: 4 }),
                 travelRub('carrier tail running in the buffer tube', 40, 90, -11, { force: 4, ...OIL_TUBE }, arCarrier, arBufferTube),
                 travelRub('bolt tail riding in the carrier bore', 11.5, 90, -20, { force: 2, ...OIL_STEEL }, arBolt, arCarrier),
+                // The serrated stretch of the carrier passes the spring-loaded forward-assist pawl:
+                // a run of small ratchet clicks. (The slide bed offset doesn't apply to clicks.)
+                travelRub('forward-assist pawl over the serrations', 8, 38, 2, { force: 4, roughness: 200, grain: 2.5, periodicity: 1, contactWidth: 0.02 }, arFaPawl, arCarrier),
             ],
         },
         {
             name: 'hammer-cock',
             description: '35-60 mm: with the hammer down, the carrier rides it down against its spring; at 60 mm the trigger sear snaps into the hammer notch; the carrier then rides over the cocked hammer. (Leave this track out if the hammer was already cocked.)',
             elements: [
+                hit('carrier meets the hammer', tAt(35), -10, 0.6, arCarrier, arHammer, { scatter: 0.3, radius: 2 }),
                 travelRub('carrier pushes the hammer down', 35, 60, -12, { force: 12, roughness: 4, grain: 0.15, contactWidth: 0.05 }, arHammer, arCarrier, { coil: { level: 0.15, length: 3, dispersion: 0.3, decay: 0.05, brightness: 4000 } }),
                 snap('trigger sear catches the hammer', tAt(60), -3, { strength: 0.9, preload: 0, seat: 0.5, seatDelay: 1.5 }, arTriggerSear, arHammer),
                 travelRub('carrier riding over the cocked hammer', 60, 90, -20, { force: 3, ...OIL_STEEL }, arHammer, arCarrier),
