@@ -4958,6 +4958,10 @@
    "build": { "barrel": "maxim9.barrel", "mag": "maxim9.mag", "optic": "op.pso.5", "tac": "ptac.0" }
   },
   { "platform": "maxim9",
+   "why": "authored optic (op.pso.2)",
+   "build": { "barrel": "maxim9.barrel", "mag": "maxim9.mag", "optic": "op.pso.2" }
+  },
+  { "platform": "maxim9",
    "why": "authored variant (maxim9.br.short)",
    "build": { "barrel": "maxim9.br.short", "mag": "maxim9.mag", "optic": "maxim9.optic" }
   },
