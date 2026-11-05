@@ -6030,6 +6030,22 @@
    "build": { "grip": "oem.gr.ar.4", "handguard": "tempest.handguard", "mag": "tempest.mag", "muzzle": "tempest.muzzle", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "stk.smg.2" }
   },
   { "platform": "tempest",
+   "why": "authored optic (op.pic.5)",
+   "build": { "grip": "oem.gr.ar.4", "handguard": "tempest.handguard", "mag": "tempest.mag", "muzzle": "tempest.muzzle", "optic": "op.pic.5", "stock": "stk.smg.2" }
+  },
+  { "platform": "tempest",
+   "why": "authored optic (op.pic.14)",
+   "build": { "grip": "oem.gr.ar.4", "handguard": "tempest.handguard", "mag": "tempest.mag", "muzzle": "tempest.muzzle", "optic": "op.pic.14", "stock": "stk.smg.2" }
+  },
+  { "platform": "tempest",
+   "why": "authored optic (op.pic.15)",
+   "build": { "grip": "oem.gr.ar.4", "handguard": "tempest.handguard", "mag": "tempest.mag", "muzzle": "tempest.muzzle", "optic": "op.pic.15", "stock": "stk.smg.2" }
+  },
+  { "platform": "tempest",
+   "why": "authored optic (op.pic.16)",
+   "build": { "grip": "oem.gr.ar.4", "handguard": "tempest.handguard", "mag": "tempest.mag", "muzzle": "tempest.muzzle", "optic": "op.pic.16", "stock": "stk.smg.2" }
+  },
+  { "platform": "tempest",
    "why": "authored optic (op.auth.falcon)",
    "build": { "grip": "oem.gr.ar.4", "handguard": "tempest.handguard", "mag": "tempest.mag", "muzzle": "tempest.muzzle", "optic": "op.auth.falcon", "stock": "stk.smg.2" }
   },
