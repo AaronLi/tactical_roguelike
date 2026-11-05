@@ -33,9 +33,9 @@ const G_Arsenal = (() => {
       pro: { name: 'Mjolnir', stat: 'wall', n: 25, what: 'wall-bang kills', parts: { barrel: 'thor.br.long', optic: 'op.pic.1', grip: 'gr.ak.1' } } },
     { id: 'ppk', from: 'p9', path: 'modern', ring: 1, stat: 'sur', n: 15, what: 'kills on unaware suspects', how: 'Down a suspect before they react. If they have seen you or heard gunfire, it does not count.',
       pro: { name: 'Diplomat', stat: 'sur', n: 30, what: 'kills on unaware suspects', parts: { barrel: 'pbr.7.65x17.thr', muzzle: 'mz.rp.can', grip: 'gr.pistol.1' } } },
-    { id: 'welrod', from: 'ppk', path: 'modern', ring: 2, a: 124, r: 470, stat: 'hsback', n: 15, what: 'kills to the back of the head', how: 'Come up behind a suspect and put the PPK to the back of their head. A shot from the front or the side does not count.',
+    { id: 'welrod', from: 'ppk', path: 'modern', ring: 2, a: 124, r: 470, stat: 'holster', n: 15, what: 'kills on suspects with their weapon holstered', how: 'Down a suspect with the PPK while their weapon is still holstered or slung. Once it is in their hands, it does not count.',
       pro: { name: 'Night Work', stat: 'sur', n: 30, what: 'kills on unaware suspects', parts: { mag: 'welrod.mag.ext' } } },
-    { id: 'maxim9', from: 'welrod', path: 'modern', ring: 3, a: 124, r: 690, stat: 'one', n: 15, what: 'one-round kills', how: "One round fired at them with the Welrod, and they're done.",
+    { id: 'maxim9', from: 'welrod', path: 'modern', ring: 3, a: 124, r: 690, stat: 'hsback', n: 15, what: 'kills to the back of the head', how: 'Come up behind a suspect and put the Welrod to the back of their head. A shot from the front or the side does not count.',
       pro: { name: 'Quiet Room', stat: 'one', n: 30, what: 'one-round kills', parts: { barrel: 'maxim9.br.short', optic: 'op.pso.2', tac: 'ptac.1' } } },
     { id: 'm1911', from: 'ppk', path: 'modern', ring: 2, stat: 'hs', n: 15, what: 'headshot kills', how: 'Put it where it counts.',
       pro: { name: 'Old Faithful', stat: 'hs', n: 30, what: 'headshot kills', parts: { barrel: 'pbr.11.43x23.match', optic: 'op.pso.0', grip: 'gr.pistol.1' } } },
@@ -107,6 +107,7 @@ const G_Arsenal = (() => {
     if (m.h) tally(id, 'hs');
     if (m.h && k.d >= MID) tally(id, 'hsfar');
     if (m.h && k.back) tally(id, 'hsback');
+    if (k.holster) tally(id, 'holster');
     if (m.sur) tally(id, 'sur');
   }
   // what a round of yours did to someone, for that
@@ -118,6 +119,7 @@ const G_Arsenal = (() => {
     if (!k.burst && k.ts.length >= BURST && k.ts[k.ts.length - 1] - k.ts[k.ts.length - BURST] <= BURST_MS) { k.burst = true; tally(k.wid, 'burst'); } // (the hits are the thing: down or not)
     k.d = p && f ? Math.hypot(p.x - f[0], p.z - f[2]) : 0;
     // from behind: the shooter on the far side of the line through their shoulders (facing -sin/-cos of their yaw), well round the back
+    k.holster = ev.armed === 1; // (their weapon away, holstered or slung, when the round hit: js/views.ts)
     k.back = !!(p && f && k.d > 0 && (-Math.sin(ev.yaw || 0) * (f[0] - p.x) + -Math.cos(ev.yaw || 0) * (f[2] - p.z)) / k.d < -0.25);
   }
   return { NODES, PATHS, RINGS, BY, along, has, proGot, proOn, proSet, build, partNames, open, count, name, at, left, tally, hit, kill, get all() { return data(); } };
