@@ -59,8 +59,8 @@ K = Kit(coll, root)
 BP1 = 0.085                    # the back panel's front: it holds only the battery, the control board and the LCD
 BR0, BR1 = BP1 + 0.002, 0.558  # barrels: breech face to muzzles (471 mm, 18.5 in: they run back to the panel)
 BB1 = BR0 + 0.040              # the breech block's front
-ROUND_L, FREE = 0.044, 0.120   # a round's length; the free bore ahead of the front round
-ROUNDS = int((0.558 - BB1 - FREE) / ROUND_L)   # rounds in each barrel (7: 42 in the block)
+ROUND_L, FREE = 0.0385, 0.120  # a round's length (10 x 38.5 mm); the free bore ahead of the front round
+ROUNDS = int((0.558 - BB1 - FREE) / ROUND_L)   # rounds in each barrel (8: 48 in the block)
 MZ0, MZ1 = 0.560, 0.628        # the barrel extension's rear (the barrels' muzzles seat in its collar there); (the factory device's length: MZ1 - MZ0)
 # the BARREL EXTENSION: six steel tubes carrying the bores on from the barrels' muzzles to the muzzle device, so the LAST round in each
 # barrel gets a 20 in (508 mm) barrel: the bore from the breech block's front to the device's rear face
@@ -163,7 +163,7 @@ def _on_wedge(me, lift):   # a flat thing lying on the wedge's slope (made flat 
 bz = K.tmp(_on_wedge(box(SCR_X0 + 0.5 * mm, SCR_X1 - 0.5 * mm, SCR_F0 + 0.004, SCR_F1 - 0.002, 0, 1.2 * mm), 0.0))
 cut(bz, _on_wedge(box(SCR_X0 + 1.6 * mm, SCR_X1 - 1.6 * mm, SCR_F0 + 0.007, SCR_F1 - 0.005, 0.4 * mm, 0.004), 0.0)); smooth(bz); K.adopt(bz, 'base', 'rubber')
 # the glass under it (a dark plate), and the DISPLAY SURFACE on it: one quad with UVs (u across, left to right; v along, from the shooter's
-# end away), extras.display the canvas size (64 x 256: the screen's 1:4 shape; six rows of seven pips, a row a barrel)
+# end away), extras.display the canvas size (64 x 256: the screen's 1:4 shape; six rows of eight pips, a row a barrel)
 o = K.obj(_on_wedge(box(SCR_X0 + 1.6 * mm, SCR_X1 - 1.6 * mm, SCR_F0 + 0.007, SCR_F1 - 0.005, 0, 0.5 * mm), 0.0), 'base', 'glass')
 import bmesh as _bmd
 _b = _bmd.new(); _uv = _b.loops.layers.uv.new('UVMap')

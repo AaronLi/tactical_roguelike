@@ -723,6 +723,11 @@ i.c.heavy { background: #a02828; } i.c.light { background: #7a3a30; } i.c.frac {
 .web-path { position: absolute; transform: translate(-50%, -50%); font: 700 15px var(--mono); letter-spacing: 3px; text-transform: uppercase; color: #8b98a4; white-space: nowrap; pointer-events: none; }
 .web-node { position: absolute; transform: translate(-50%, -50%); width: 176px; padding: 10px 8px; display: flex; flex-direction: column; align-items: center; gap: 4px; background: #14181d; border: 1px solid var(--line); border-radius: 6px; color: #dfe5ea; cursor: pointer; }
 .web-node img { height: 72px; max-width: 100%; object-fit: contain; pointer-events: none; }
+/* a gun picture still loading (js/icons.ts pending) */
+.spin { width: 22px; height: 22px; border: 3px solid rgba(255,255,255,0.15); border-top-color: var(--accent, #f5a524); border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.web-node .icon-wait { height: 72px; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+
 .web-node b { font: 700 15px var(--mono); line-height: 1.15; text-align: center; color: inherit; }
 .web-node small { font: 11.5px var(--mono); color: var(--accent); text-align: center; line-height: 1.25; }
 .web-node:hover { border-color: var(--accent); }

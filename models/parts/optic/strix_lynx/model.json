@@ -1,0 +1,21 @@
+{
+  "source": "authored",
+  "kind": "part",
+  "slot": "optic",
+  "frame": "rail-top",
+  "optic": {
+    "sy": 0.03,
+    "fSight": -0.034,
+    "relief": 0.07,
+    "pip": {
+      "f": -0.0285,
+      "y": 0.03,
+      "r": 0.0112
+    },
+    "magnifier": false,
+    "height": "mid"
+  },
+  "replaces": [
+    "Strix Lynx 1.5× prism"
+  ]
+}

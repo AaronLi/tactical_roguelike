@@ -1484,6 +1484,10 @@ const G_Gunsmith = (() => {
   ];
   const AUTHORED_REPLACES: any[] = [
     {"apart":"optic/ember","names":["Halcyon Ember pistol dot"]},
+    {"apart":"optic/halcyon_ta3","names":["Halcyon TA-3 3× prism"]},
+    {"apart":"optic/meridian_p1","names":["Meridian P1 1× prism"]},
+    {"apart":"optic/meridian_p2","names":["Meridian P2 prism 2×"]},
+    {"apart":"optic/strix_lynx","names":["Strix Lynx 1.5× prism"]},
   ];
   // authored-parts:end
   for (const a of AUTHORED_PARTS) add({ id: a.id, slot: a.slot, mount: a.mount, brand: BR[a.brand], name: a.name, price: a.price, tier: a.tier, st: a.st, set: a.set, desc: a.desc, model: a.model, authored: { height: a.height }, provides: a.magnifier ? { magnifier: 'magn' } : null });

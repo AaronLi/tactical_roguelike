@@ -46,6 +46,22 @@
    "build": { "barrel": "br.5.56x45.14.5", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.12", "receiver": "rcv.m4", "riserdot": "op.pso.2", "stock": "stk.tube.0" }
   },
   { "platform": "m4",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.5.56x45.14.5", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.5", "receiver": "rcv.m4", "stock": "stk.tube.0" }
+  },
+  { "platform": "m4",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.5.56x45.14.5", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.14", "receiver": "rcv.m4", "stock": "stk.tube.0" }
+  },
+  { "platform": "m4",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.5.56x45.14.5", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.15", "receiver": "rcv.m4", "stock": "stk.tube.0" }
+  },
+  { "platform": "m4",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.5.56x45.14.5", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.16", "receiver": "rcv.m4", "stock": "stk.tube.0" }
+  },
+  { "platform": "m4",
    "why": "authored optic (op.auth.falcon)",
    "build": { "barrel": "br.5.56x45.14.5", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "receiver": "rcv.m4", "stock": "stk.tube.0" }
   },
@@ -126,6 +142,22 @@
    "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "op.pic.12", "receiver": "rcv.ak", "riserdot": "op.pso.2", "stock": "oem.stk.ak.4" }
   },
   { "platform": "ak",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "op.pic.5", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+  },
+  { "platform": "ak",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "op.pic.14", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+  },
+  { "platform": "ak",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "op.pic.15", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+  },
+  { "platform": "ak",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "op.pic.16", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+  },
+  { "platform": "ak",
    "why": "authored optic (op.auth.falcon)",
    "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "op.auth.falcon", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
   },
@@ -168,6 +200,22 @@
   { "platform": "f2",
    "why": "replaced optic (op.pso.2) on the riser",
    "build": { "barrel": "br.5.56x45.19.2.light", "grip": "oem.gr.ar.4", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.12", "riserdot": "op.pso.2" }
+  },
+  { "platform": "f2",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.5.56x45.19.2.light", "grip": "oem.gr.ar.4", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.5" }
+  },
+  { "platform": "f2",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.5.56x45.19.2.light", "grip": "oem.gr.ar.4", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.14" }
+  },
+  { "platform": "f2",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.5.56x45.19.2.light", "grip": "oem.gr.ar.4", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.15" }
+  },
+  { "platform": "f2",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.5.56x45.19.2.light", "grip": "oem.gr.ar.4", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.16" }
   },
   { "platform": "f2",
    "why": "authored optic (op.auth.falcon)",
@@ -230,6 +278,22 @@
    "build": { "barrel": "br.5.56x45.18.9.light", "grip": "oem.gr.ar.4", "handguard": "oem.hg.g36.0", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "stk.heavy.g36" }
   },
   { "platform": "g36",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.5.56x45.18.9.light", "grip": "oem.gr.ar.4", "handguard": "oem.hg.g36.0", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.5", "stock": "stk.heavy.g36" }
+  },
+  { "platform": "g36",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.5.56x45.18.9.light", "grip": "oem.gr.ar.4", "handguard": "oem.hg.g36.0", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.14", "stock": "stk.heavy.g36" }
+  },
+  { "platform": "g36",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.5.56x45.18.9.light", "grip": "oem.gr.ar.4", "handguard": "oem.hg.g36.0", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.15", "stock": "stk.heavy.g36" }
+  },
+  { "platform": "g36",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.5.56x45.18.9.light", "grip": "oem.gr.ar.4", "handguard": "oem.hg.g36.0", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.16", "stock": "stk.heavy.g36" }
+  },
+  { "platform": "g36",
    "why": "authored optic (op.auth.falcon)",
    "build": { "barrel": "br.5.56x45.18.9.light", "grip": "oem.gr.ar.4", "handguard": "oem.hg.g36.0", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "stock": "stk.heavy.g36" }
   },
@@ -280,6 +344,22 @@
   { "platform": "br3",
    "why": "replaced optic (op.pso.2) on the riser",
    "build": { "barrel": "br.7x43.16", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.6", "mag": "br3.mag", "muzzle": "mz.r762.comp", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "br3",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.7x43.16", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.6", "mag": "br3.mag", "muzzle": "mz.r762.comp", "optic": "op.pic.5", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "br3",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.7x43.16", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.6", "mag": "br3.mag", "muzzle": "mz.r762.comp", "optic": "op.pic.14", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "br3",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.7x43.16", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.6", "mag": "br3.mag", "muzzle": "mz.r762.comp", "optic": "op.pic.15", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "br3",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.7x43.16", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.6", "mag": "br3.mag", "muzzle": "mz.r762.comp", "optic": "op.pic.16", "stock": "oem.stk.tube.5" }
   },
   { "platform": "br3",
    "why": "authored optic (op.auth.falcon)",
@@ -338,6 +418,22 @@
    "build": { "barrel": "br.7.62x51.16.light", "grip": "oem.gr.ar.4", "mag": "scar.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "stk.heavy.scar" }
   },
   { "platform": "scar",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.7.62x51.16.light", "grip": "oem.gr.ar.4", "mag": "scar.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.5", "stock": "stk.heavy.scar" }
+  },
+  { "platform": "scar",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.7.62x51.16.light", "grip": "oem.gr.ar.4", "mag": "scar.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.14", "stock": "stk.heavy.scar" }
+  },
+  { "platform": "scar",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.7.62x51.16.light", "grip": "oem.gr.ar.4", "mag": "scar.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.15", "stock": "stk.heavy.scar" }
+  },
+  { "platform": "scar",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.7.62x51.16.light", "grip": "oem.gr.ar.4", "mag": "scar.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.16", "stock": "stk.heavy.scar" }
+  },
+  { "platform": "scar",
    "why": "authored optic (op.auth.falcon)",
    "build": { "barrel": "br.7.62x51.16.light", "grip": "oem.gr.ar.4", "mag": "scar.mag", "muzzle": "mz.r762.a2", "optic": "op.auth.falcon", "stock": "stk.heavy.scar" }
   },
@@ -388,6 +484,22 @@
   { "platform": "tavor",
    "why": "replaced optic (op.pso.2) on the riser",
    "build": { "barrel": "br.5.56x45.16.5", "grip": "oem.gr.ar.4", "mag": "stanag.mag.40", "muzzle": "mz.r556.a2", "optic": "op.pic.12", "riserdot": "op.pso.2" }
+  },
+  { "platform": "tavor",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.5.56x45.16.5", "grip": "oem.gr.ar.4", "mag": "stanag.mag.40", "muzzle": "mz.r556.a2", "optic": "op.pic.5" }
+  },
+  { "platform": "tavor",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.5.56x45.16.5", "grip": "oem.gr.ar.4", "mag": "stanag.mag.40", "muzzle": "mz.r556.a2", "optic": "op.pic.14" }
+  },
+  { "platform": "tavor",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.5.56x45.16.5", "grip": "oem.gr.ar.4", "mag": "stanag.mag.40", "muzzle": "mz.r556.a2", "optic": "op.pic.15" }
+  },
+  { "platform": "tavor",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.5.56x45.16.5", "grip": "oem.gr.ar.4", "mag": "stanag.mag.40", "muzzle": "mz.r556.a2", "optic": "op.pic.16" }
   },
   { "platform": "tavor",
    "why": "authored optic (op.auth.falcon)",
@@ -446,6 +558,22 @@
    "build": { "barrel": "br.5.56x45.14.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "hg.ar.2", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "oem.stk.tube.5" }
   },
   { "platform": "hk416",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.5.56x45.14.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "hg.ar.2", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.5", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "hk416",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.5.56x45.14.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "hg.ar.2", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.14", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "hk416",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.5.56x45.14.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "hg.ar.2", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.15", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "hk416",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.5.56x45.14.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "hg.ar.2", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.16", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "hk416",
    "why": "authored optic (op.auth.falcon)",
    "build": { "barrel": "br.5.56x45.14.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "hg.ar.2", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "stock": "oem.stk.tube.5" }
   },
@@ -500,6 +628,22 @@
   { "platform": "aug",
    "why": "replaced optic (op.pso.2) on the riser",
    "build": { "barrel": "br.5.56x45.20", "grip": "oem.gr.ar.4", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.12", "receiver": "rcv.aug", "riserdot": "op.pso.2" }
+  },
+  { "platform": "aug",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.5.56x45.20", "grip": "oem.gr.ar.4", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.5", "receiver": "rcv.aug" }
+  },
+  { "platform": "aug",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.5.56x45.20", "grip": "oem.gr.ar.4", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.14", "receiver": "rcv.aug" }
+  },
+  { "platform": "aug",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.5.56x45.20", "grip": "oem.gr.ar.4", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.15", "receiver": "rcv.aug" }
+  },
+  { "platform": "aug",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.5.56x45.20", "grip": "oem.gr.ar.4", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.16", "receiver": "rcv.aug" }
   },
   { "platform": "aug",
    "why": "authored optic (op.auth.falcon)",
@@ -560,6 +704,22 @@
   { "platform": "galil",
    "why": "replaced optic (op.pso.2) on the riser",
    "build": { "barrel": "br.7.62x39.16", "grip": "oem.gr.ak.3", "handguard": "hg.ak.1", "mag": "akm.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "oem.stk.ak.5" }
+  },
+  { "platform": "galil",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.7.62x39.16", "grip": "oem.gr.ak.3", "handguard": "hg.ak.1", "mag": "akm.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.5", "stock": "oem.stk.ak.5" }
+  },
+  { "platform": "galil",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.7.62x39.16", "grip": "oem.gr.ak.3", "handguard": "hg.ak.1", "mag": "akm.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.14", "stock": "oem.stk.ak.5" }
+  },
+  { "platform": "galil",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.7.62x39.16", "grip": "oem.gr.ak.3", "handguard": "hg.ak.1", "mag": "akm.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.15", "stock": "oem.stk.ak.5" }
+  },
+  { "platform": "galil",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.7.62x39.16", "grip": "oem.gr.ak.3", "handguard": "hg.ak.1", "mag": "akm.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.16", "stock": "oem.stk.ak.5" }
   },
   { "platform": "galil",
    "why": "authored optic (op.auth.falcon)",
@@ -642,6 +802,22 @@
    "build": { "barrel": "br.5.6x39.15.9", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.6", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "oem.stk.ak.5" }
   },
   { "platform": "an94",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.5.6x39.15.9", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.6", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.5", "stock": "oem.stk.ak.5" }
+  },
+  { "platform": "an94",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.5.6x39.15.9", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.6", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.14", "stock": "oem.stk.ak.5" }
+  },
+  { "platform": "an94",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.5.6x39.15.9", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.6", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.15", "stock": "oem.stk.ak.5" }
+  },
+  { "platform": "an94",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.5.6x39.15.9", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.6", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.16", "stock": "oem.stk.ak.5" }
+  },
+  { "platform": "an94",
    "why": "authored optic (op.auth.falcon)",
    "build": { "barrel": "br.5.6x39.15.9", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.6", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "op.auth.falcon", "stock": "oem.stk.ak.5" }
   },
@@ -698,6 +874,22 @@
    "build": { "barrel": "fal.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.4", "mag": "fal.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "stk.heavy.0" }
   },
   { "platform": "fal",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "fal.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.4", "mag": "fal.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.5", "stock": "stk.heavy.0" }
+  },
+  { "platform": "fal",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "fal.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.4", "mag": "fal.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.14", "stock": "stk.heavy.0" }
+  },
+  { "platform": "fal",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "fal.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.4", "mag": "fal.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.15", "stock": "stk.heavy.0" }
+  },
+  { "platform": "fal",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "fal.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.4", "mag": "fal.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.16", "stock": "stk.heavy.0" }
+  },
+  { "platform": "fal",
    "why": "authored optic (op.auth.falcon)",
    "build": { "barrel": "fal.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.4", "mag": "fal.mag", "muzzle": "mz.r762.a2", "optic": "op.auth.falcon", "stock": "stk.heavy.0" }
   },
@@ -744,6 +936,22 @@
   { "platform": "mk14",
    "why": "replaced optic (op.pso.2) on the riser",
    "build": { "barrel": "br.7.62x51.18", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "hg.ar.2", "mag": "m14.mag.20", "muzzle": "mz.r762.a2", "optic": "op.pic.12", "receiver": "rcv.mk14", "riserdot": "op.pso.2", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "mk14",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.7.62x51.18", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "hg.ar.2", "mag": "m14.mag.20", "muzzle": "mz.r762.a2", "optic": "op.pic.5", "receiver": "rcv.mk14", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "mk14",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.7.62x51.18", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "hg.ar.2", "mag": "m14.mag.20", "muzzle": "mz.r762.a2", "optic": "op.pic.14", "receiver": "rcv.mk14", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "mk14",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.7.62x51.18", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "hg.ar.2", "mag": "m14.mag.20", "muzzle": "mz.r762.a2", "optic": "op.pic.15", "receiver": "rcv.mk14", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "mk14",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.7.62x51.18", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "hg.ar.2", "mag": "m14.mag.20", "muzzle": "mz.r762.a2", "optic": "op.pic.16", "receiver": "rcv.mk14", "stock": "oem.stk.tube.5" }
   },
   { "platform": "mk14",
    "why": "authored optic (op.auth.falcon)",
@@ -804,6 +1012,22 @@
   { "platform": "garand",
    "why": "replaced optic (op.pso.2) on the riser",
    "build": { "barrel": "br.7.62x63.24", "handguard": "oem.hg.classic.3", "muzzle": "mz.r762.cap", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "oem.stk.classic.4" }
+  },
+  { "platform": "garand",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.7.62x63.24", "handguard": "oem.hg.classic.3", "muzzle": "mz.r762.cap", "optic": "op.pic.5", "stock": "oem.stk.classic.4" }
+  },
+  { "platform": "garand",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.7.62x63.24", "handguard": "oem.hg.classic.3", "muzzle": "mz.r762.cap", "optic": "op.pic.14", "stock": "oem.stk.classic.4" }
+  },
+  { "platform": "garand",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.7.62x63.24", "handguard": "oem.hg.classic.3", "muzzle": "mz.r762.cap", "optic": "op.pic.15", "stock": "oem.stk.classic.4" }
+  },
+  { "platform": "garand",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.7.62x63.24", "handguard": "oem.hg.classic.3", "muzzle": "mz.r762.cap", "optic": "op.pic.16", "stock": "oem.stk.classic.4" }
   },
   { "platform": "garand",
    "why": "authored optic (op.auth.falcon)",
@@ -870,6 +1094,22 @@
    "build": { "barrel": "br.7.62x54.24.4", "handguard": "oem.hg.ak.7", "mag": "svd.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "oem.stk.precision.4" }
   },
   { "platform": "svd",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.7.62x54.24.4", "handguard": "oem.hg.ak.7", "mag": "svd.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.5", "stock": "oem.stk.precision.4" }
+  },
+  { "platform": "svd",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.7.62x54.24.4", "handguard": "oem.hg.ak.7", "mag": "svd.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.14", "stock": "oem.stk.precision.4" }
+  },
+  { "platform": "svd",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.7.62x54.24.4", "handguard": "oem.hg.ak.7", "mag": "svd.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.15", "stock": "oem.stk.precision.4" }
+  },
+  { "platform": "svd",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.7.62x54.24.4", "handguard": "oem.hg.ak.7", "mag": "svd.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.16", "stock": "oem.stk.precision.4" }
+  },
+  { "platform": "svd",
    "why": "authored optic (op.auth.falcon)",
    "build": { "barrel": "br.7.62x54.24.4", "handguard": "oem.hg.ak.7", "mag": "svd.mag", "muzzle": "mz.r762.a2", "optic": "op.auth.falcon", "stock": "oem.stk.precision.4" }
   },
@@ -920,6 +1160,22 @@
   { "platform": "vss",
    "why": "replaced optic (op.pso.2) on the riser",
    "build": { "barrel": "vss.barrel", "mag": "vss.mag", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "oem.stk.precision.4" }
+  },
+  { "platform": "vss",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "vss.barrel", "mag": "vss.mag", "optic": "op.pic.5", "stock": "oem.stk.precision.4" }
+  },
+  { "platform": "vss",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "vss.barrel", "mag": "vss.mag", "optic": "op.pic.14", "stock": "oem.stk.precision.4" }
+  },
+  { "platform": "vss",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "vss.barrel", "mag": "vss.mag", "optic": "op.pic.15", "stock": "oem.stk.precision.4" }
+  },
+  { "platform": "vss",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "vss.barrel", "mag": "vss.mag", "optic": "op.pic.16", "stock": "oem.stk.precision.4" }
   },
   { "platform": "vss",
    "why": "authored optic (op.auth.falcon)",
@@ -976,6 +1232,22 @@
   { "platform": "lever",
    "why": "replaced optic (op.pso.2) on the riser",
    "build": { "barrel": "br.11.6x53.18.5.tapered", "handguard": "oem.hg.classic.4", "muzzle": "mz.r762.cap", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "oem.stk.classic.5", "tube": "lever.tube" }
+  },
+  { "platform": "lever",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.11.6x53.18.5.tapered", "handguard": "oem.hg.classic.4", "muzzle": "mz.r762.cap", "optic": "op.pic.5", "stock": "oem.stk.classic.5", "tube": "lever.tube" }
+  },
+  { "platform": "lever",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.11.6x53.18.5.tapered", "handguard": "oem.hg.classic.4", "muzzle": "mz.r762.cap", "optic": "op.pic.14", "stock": "oem.stk.classic.5", "tube": "lever.tube" }
+  },
+  { "platform": "lever",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.11.6x53.18.5.tapered", "handguard": "oem.hg.classic.4", "muzzle": "mz.r762.cap", "optic": "op.pic.15", "stock": "oem.stk.classic.5", "tube": "lever.tube" }
+  },
+  { "platform": "lever",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.11.6x53.18.5.tapered", "handguard": "oem.hg.classic.4", "muzzle": "mz.r762.cap", "optic": "op.pic.16", "stock": "oem.stk.classic.5", "tube": "lever.tube" }
   },
   { "platform": "lever",
    "why": "authored optic (op.auth.falcon)",
@@ -1050,6 +1322,22 @@
    "build": { "barrel": "br.7.62x51.24.tapered", "handguard": "oem.hg.classic.5", "mag": "r700.mag", "muzzle": "mz.r762.cap", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "oem.stk.precision.5" }
   },
   { "platform": "r700",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.7.62x51.24.tapered", "handguard": "oem.hg.classic.5", "mag": "r700.mag", "muzzle": "mz.r762.cap", "optic": "op.pic.5", "stock": "oem.stk.precision.5" }
+  },
+  { "platform": "r700",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.7.62x51.24.tapered", "handguard": "oem.hg.classic.5", "mag": "r700.mag", "muzzle": "mz.r762.cap", "optic": "op.pic.14", "stock": "oem.stk.precision.5" }
+  },
+  { "platform": "r700",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.7.62x51.24.tapered", "handguard": "oem.hg.classic.5", "mag": "r700.mag", "muzzle": "mz.r762.cap", "optic": "op.pic.15", "stock": "oem.stk.precision.5" }
+  },
+  { "platform": "r700",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.7.62x51.24.tapered", "handguard": "oem.hg.classic.5", "mag": "r700.mag", "muzzle": "mz.r762.cap", "optic": "op.pic.16", "stock": "oem.stk.precision.5" }
+  },
+  { "platform": "r700",
    "why": "authored optic (op.auth.falcon)",
    "build": { "barrel": "br.7.62x51.24.tapered", "handguard": "oem.hg.classic.5", "mag": "r700.mag", "muzzle": "mz.r762.cap", "optic": "op.auth.falcon", "stock": "oem.stk.precision.5" }
   },
@@ -1100,6 +1388,22 @@
   { "platform": "mosin",
    "why": "replaced optic (op.pso.2) on the riser",
    "build": { "barrel": "br.7.62x54.28.7.tapered", "handguard": "oem.hg.classic.6", "mag": "mosin.mag", "muzzle": "mz.r762.cap", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "oem.stk.classic.4" }
+  },
+  { "platform": "mosin",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.7.62x54.28.7.tapered", "handguard": "oem.hg.classic.6", "mag": "mosin.mag", "muzzle": "mz.r762.cap", "optic": "op.pic.5", "stock": "oem.stk.classic.4" }
+  },
+  { "platform": "mosin",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.7.62x54.28.7.tapered", "handguard": "oem.hg.classic.6", "mag": "mosin.mag", "muzzle": "mz.r762.cap", "optic": "op.pic.14", "stock": "oem.stk.classic.4" }
+  },
+  { "platform": "mosin",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.7.62x54.28.7.tapered", "handguard": "oem.hg.classic.6", "mag": "mosin.mag", "muzzle": "mz.r762.cap", "optic": "op.pic.15", "stock": "oem.stk.classic.4" }
+  },
+  { "platform": "mosin",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.7.62x54.28.7.tapered", "handguard": "oem.hg.classic.6", "mag": "mosin.mag", "muzzle": "mz.r762.cap", "optic": "op.pic.16", "stock": "oem.stk.classic.4" }
   },
   { "platform": "mosin",
    "why": "authored optic (op.auth.falcon)",
@@ -1166,6 +1470,22 @@
    "build": { "barrel": "br.8.6x69.27", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.5", "mag": "awm.mag", "muzzle": "mz.r762.brake", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "oem.stk.precision.6" }
   },
   { "platform": "awm",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.8.6x69.27", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.5", "mag": "awm.mag", "muzzle": "mz.r762.brake", "optic": "op.pic.5", "stock": "oem.stk.precision.6" }
+  },
+  { "platform": "awm",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.8.6x69.27", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.5", "mag": "awm.mag", "muzzle": "mz.r762.brake", "optic": "op.pic.14", "stock": "oem.stk.precision.6" }
+  },
+  { "platform": "awm",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.8.6x69.27", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.5", "mag": "awm.mag", "muzzle": "mz.r762.brake", "optic": "op.pic.15", "stock": "oem.stk.precision.6" }
+  },
+  { "platform": "awm",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.8.6x69.27", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.5", "mag": "awm.mag", "muzzle": "mz.r762.brake", "optic": "op.pic.16", "stock": "oem.stk.precision.6" }
+  },
+  { "platform": "awm",
    "why": "authored optic (op.auth.falcon)",
    "build": { "barrel": "br.8.6x69.27", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.5", "mag": "awm.mag", "muzzle": "mz.r762.brake", "optic": "op.auth.falcon", "stock": "oem.stk.precision.6" }
   },
@@ -1222,6 +1542,22 @@
    "build": { "barrel": "br.12.7x99.29.heavy", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.6", "mag": "barrett.mag", "muzzle": "mz.r50.big", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "oem.stk.precision.7" }
   },
   { "platform": "barrett",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.12.7x99.29.heavy", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.6", "mag": "barrett.mag", "muzzle": "mz.r50.big", "optic": "op.pic.5", "stock": "oem.stk.precision.7" }
+  },
+  { "platform": "barrett",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.12.7x99.29.heavy", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.6", "mag": "barrett.mag", "muzzle": "mz.r50.big", "optic": "op.pic.14", "stock": "oem.stk.precision.7" }
+  },
+  { "platform": "barrett",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.12.7x99.29.heavy", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.6", "mag": "barrett.mag", "muzzle": "mz.r50.big", "optic": "op.pic.15", "stock": "oem.stk.precision.7" }
+  },
+  { "platform": "barrett",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.12.7x99.29.heavy", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.6", "mag": "barrett.mag", "muzzle": "mz.r50.big", "optic": "op.pic.16", "stock": "oem.stk.precision.7" }
+  },
+  { "platform": "barrett",
    "why": "authored optic (op.auth.falcon)",
    "build": { "barrel": "br.12.7x99.29.heavy", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.6", "mag": "barrett.mag", "muzzle": "mz.r50.big", "optic": "op.auth.falcon", "stock": "oem.stk.precision.7" }
   },
@@ -1268,6 +1604,22 @@
   { "platform": "gm6",
    "why": "replaced optic (op.pso.2) on the riser",
    "build": { "barrel": "br.12.7x99.28.7", "grip": "oem.gr.ar.4", "mag": "gm6.mag", "muzzle": "oem.mz.r50.7", "optic": "op.pic.12", "riserdot": "op.pso.2" }
+  },
+  { "platform": "gm6",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.12.7x99.28.7", "grip": "oem.gr.ar.4", "mag": "gm6.mag", "muzzle": "oem.mz.r50.7", "optic": "op.pic.5" }
+  },
+  { "platform": "gm6",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.12.7x99.28.7", "grip": "oem.gr.ar.4", "mag": "gm6.mag", "muzzle": "oem.mz.r50.7", "optic": "op.pic.14" }
+  },
+  { "platform": "gm6",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.12.7x99.28.7", "grip": "oem.gr.ar.4", "mag": "gm6.mag", "muzzle": "oem.mz.r50.7", "optic": "op.pic.15" }
+  },
+  { "platform": "gm6",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.12.7x99.28.7", "grip": "oem.gr.ar.4", "mag": "gm6.mag", "muzzle": "oem.mz.r50.7", "optic": "op.pic.16" }
   },
   { "platform": "gm6",
    "why": "authored optic (op.auth.falcon)",
@@ -1328,6 +1680,22 @@
   { "platform": "uzi",
    "why": "replaced optic (op.pso.2) on the riser",
    "build": { "barrel": "br.9x19.4", "grip": "oem.gr.smg.3", "mag": "uzi.mag", "muzzle": "mz.r9.cap", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "stk.smg.0" }
+  },
+  { "platform": "uzi",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.9x19.4", "grip": "oem.gr.smg.3", "mag": "uzi.mag", "muzzle": "mz.r9.cap", "optic": "op.pic.5", "stock": "stk.smg.0" }
+  },
+  { "platform": "uzi",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.9x19.4", "grip": "oem.gr.smg.3", "mag": "uzi.mag", "muzzle": "mz.r9.cap", "optic": "op.pic.14", "stock": "stk.smg.0" }
+  },
+  { "platform": "uzi",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.9x19.4", "grip": "oem.gr.smg.3", "mag": "uzi.mag", "muzzle": "mz.r9.cap", "optic": "op.pic.15", "stock": "stk.smg.0" }
+  },
+  { "platform": "uzi",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.9x19.4", "grip": "oem.gr.smg.3", "mag": "uzi.mag", "muzzle": "mz.r9.cap", "optic": "op.pic.16", "stock": "stk.smg.0" }
   },
   { "platform": "uzi",
    "why": "authored optic (op.auth.falcon)",
@@ -1394,6 +1762,22 @@
    "build": { "barrel": "br.9x19.8.9", "grip": "oem.gr.ar.4", "handguard": "oem.hg.smg.3", "mag": "mp5.mag.30", "muzzle": "mz.r9.tri", "optic": "op.pic.12", "receiver": "rcv.mp5", "riserdot": "op.pso.2", "stock": "stk.smg.1" }
   },
   { "platform": "mp5",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.9x19.8.9", "grip": "oem.gr.ar.4", "handguard": "oem.hg.smg.3", "mag": "mp5.mag.30", "muzzle": "mz.r9.tri", "optic": "op.pic.5", "receiver": "rcv.mp5", "stock": "stk.smg.1" }
+  },
+  { "platform": "mp5",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.9x19.8.9", "grip": "oem.gr.ar.4", "handguard": "oem.hg.smg.3", "mag": "mp5.mag.30", "muzzle": "mz.r9.tri", "optic": "op.pic.14", "receiver": "rcv.mp5", "stock": "stk.smg.1" }
+  },
+  { "platform": "mp5",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.9x19.8.9", "grip": "oem.gr.ar.4", "handguard": "oem.hg.smg.3", "mag": "mp5.mag.30", "muzzle": "mz.r9.tri", "optic": "op.pic.15", "receiver": "rcv.mp5", "stock": "stk.smg.1" }
+  },
+  { "platform": "mp5",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.9x19.8.9", "grip": "oem.gr.ar.4", "handguard": "oem.hg.smg.3", "mag": "mp5.mag.30", "muzzle": "mz.r9.tri", "optic": "op.pic.16", "receiver": "rcv.mp5", "stock": "stk.smg.1" }
+  },
+  { "platform": "mp5",
    "why": "authored optic (op.auth.falcon)",
    "build": { "barrel": "br.9x19.8.9", "grip": "oem.gr.ar.4", "handguard": "oem.hg.smg.3", "mag": "mp5.mag.30", "muzzle": "mz.r9.tri", "optic": "op.auth.falcon", "receiver": "rcv.mp5", "stock": "stk.smg.1" }
   },
@@ -1450,6 +1834,22 @@
    "build": { "barrel": "mp5sd.barrel", "grip": "oem.gr.ar.4", "mag": "mp5.mag.30", "optic": "op.pic.12", "receiver": "rcv.mp5sd", "riserdot": "op.pso.2", "stock": "stk.smg.1" }
   },
   { "platform": "mp5sd",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "mp5sd.barrel", "grip": "oem.gr.ar.4", "mag": "mp5.mag.30", "optic": "op.pic.5", "receiver": "rcv.mp5sd", "stock": "stk.smg.1" }
+  },
+  { "platform": "mp5sd",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "mp5sd.barrel", "grip": "oem.gr.ar.4", "mag": "mp5.mag.30", "optic": "op.pic.14", "receiver": "rcv.mp5sd", "stock": "stk.smg.1" }
+  },
+  { "platform": "mp5sd",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "mp5sd.barrel", "grip": "oem.gr.ar.4", "mag": "mp5.mag.30", "optic": "op.pic.15", "receiver": "rcv.mp5sd", "stock": "stk.smg.1" }
+  },
+  { "platform": "mp5sd",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "mp5sd.barrel", "grip": "oem.gr.ar.4", "mag": "mp5.mag.30", "optic": "op.pic.16", "receiver": "rcv.mp5sd", "stock": "stk.smg.1" }
+  },
+  { "platform": "mp5sd",
    "why": "authored optic (op.auth.falcon)",
    "build": { "barrel": "mp5sd.barrel", "grip": "oem.gr.ar.4", "mag": "mp5.mag.30", "optic": "op.auth.falcon", "receiver": "rcv.mp5sd", "stock": "stk.smg.1" }
   },
@@ -1504,6 +1904,22 @@
   { "platform": "vector",
    "why": "replaced optic (op.pso.2) on the riser",
    "build": { "barrel": "br.11.43x23.5.5.light", "grip": "oem.gr.ar.4", "handguard": "oem.hg.smg.4", "mag": "vector.mag", "muzzle": "mz.r45.a2", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "vector",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.11.43x23.5.5.light", "grip": "oem.gr.ar.4", "handguard": "oem.hg.smg.4", "mag": "vector.mag", "muzzle": "mz.r45.a2", "optic": "op.pic.5", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "vector",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.11.43x23.5.5.light", "grip": "oem.gr.ar.4", "handguard": "oem.hg.smg.4", "mag": "vector.mag", "muzzle": "mz.r45.a2", "optic": "op.pic.14", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "vector",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.11.43x23.5.5.light", "grip": "oem.gr.ar.4", "handguard": "oem.hg.smg.4", "mag": "vector.mag", "muzzle": "mz.r45.a2", "optic": "op.pic.15", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "vector",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.11.43x23.5.5.light", "grip": "oem.gr.ar.4", "handguard": "oem.hg.smg.4", "mag": "vector.mag", "muzzle": "mz.r45.a2", "optic": "op.pic.16", "stock": "oem.stk.tube.5" }
   },
   { "platform": "vector",
    "why": "authored optic (op.auth.falcon)",
@@ -1570,6 +1986,22 @@
    "build": { "barrel": "br.11.43x23.10.5", "grip": "oem.gr.ak.3", "handguard": "oem.hg.shroud.3", "mag": "thompson.mag", "muzzle": "mz.r45.cutts", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "oem.stk.classic.4" }
   },
   { "platform": "thompson",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.11.43x23.10.5", "grip": "oem.gr.ak.3", "handguard": "oem.hg.shroud.3", "mag": "thompson.mag", "muzzle": "mz.r45.cutts", "optic": "op.pic.5", "stock": "oem.stk.classic.4" }
+  },
+  { "platform": "thompson",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.11.43x23.10.5", "grip": "oem.gr.ak.3", "handguard": "oem.hg.shroud.3", "mag": "thompson.mag", "muzzle": "mz.r45.cutts", "optic": "op.pic.14", "stock": "oem.stk.classic.4" }
+  },
+  { "platform": "thompson",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.11.43x23.10.5", "grip": "oem.gr.ak.3", "handguard": "oem.hg.shroud.3", "mag": "thompson.mag", "muzzle": "mz.r45.cutts", "optic": "op.pic.15", "stock": "oem.stk.classic.4" }
+  },
+  { "platform": "thompson",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.11.43x23.10.5", "grip": "oem.gr.ak.3", "handguard": "oem.hg.shroud.3", "mag": "thompson.mag", "muzzle": "mz.r45.cutts", "optic": "op.pic.16", "stock": "oem.stk.classic.4" }
+  },
+  { "platform": "thompson",
    "why": "authored optic (op.auth.falcon)",
    "build": { "barrel": "br.11.43x23.10.5", "grip": "oem.gr.ak.3", "handguard": "oem.hg.shroud.3", "mag": "thompson.mag", "muzzle": "mz.r45.cutts", "optic": "op.auth.falcon", "stock": "oem.stk.classic.4" }
   },
@@ -1634,6 +2066,22 @@
    "build": { "barrel": "br.7.62x25.10.5", "handguard": "oem.hg.shroud.4", "mag": "ppsh.mag", "muzzle": "mz.r9.comp", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "oem.stk.classic.4" }
   },
   { "platform": "ppsh",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.7.62x25.10.5", "handguard": "oem.hg.shroud.4", "mag": "ppsh.mag", "muzzle": "mz.r9.comp", "optic": "op.pic.5", "stock": "oem.stk.classic.4" }
+  },
+  { "platform": "ppsh",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.7.62x25.10.5", "handguard": "oem.hg.shroud.4", "mag": "ppsh.mag", "muzzle": "mz.r9.comp", "optic": "op.pic.14", "stock": "oem.stk.classic.4" }
+  },
+  { "platform": "ppsh",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.7.62x25.10.5", "handguard": "oem.hg.shroud.4", "mag": "ppsh.mag", "muzzle": "mz.r9.comp", "optic": "op.pic.15", "stock": "oem.stk.classic.4" }
+  },
+  { "platform": "ppsh",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.7.62x25.10.5", "handguard": "oem.hg.shroud.4", "mag": "ppsh.mag", "muzzle": "mz.r9.comp", "optic": "op.pic.16", "stock": "oem.stk.classic.4" }
+  },
+  { "platform": "ppsh",
    "why": "authored optic (op.auth.falcon)",
    "build": { "barrel": "br.7.62x25.10.5", "handguard": "oem.hg.shroud.4", "mag": "ppsh.mag", "muzzle": "mz.r9.comp", "optic": "op.auth.falcon", "stock": "oem.stk.classic.4" }
   },
@@ -1688,6 +2136,22 @@
   { "platform": "pump",
    "why": "replaced optic (op.pso.2) on the riser",
    "build": { "barrel": "pump.barrel", "muzzle": "mz.sg.cyl", "optic": "op.pic.12", "pump": "pump.pump", "riserdot": "op.pso.2", "stock": "oem.stk.classic.5", "tube": "pump.tube" }
+  },
+  { "platform": "pump",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "pump.barrel", "muzzle": "mz.sg.cyl", "optic": "op.pic.5", "pump": "pump.pump", "stock": "oem.stk.classic.5", "tube": "pump.tube" }
+  },
+  { "platform": "pump",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "pump.barrel", "muzzle": "mz.sg.cyl", "optic": "op.pic.14", "pump": "pump.pump", "stock": "oem.stk.classic.5", "tube": "pump.tube" }
+  },
+  { "platform": "pump",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "pump.barrel", "muzzle": "mz.sg.cyl", "optic": "op.pic.15", "pump": "pump.pump", "stock": "oem.stk.classic.5", "tube": "pump.tube" }
+  },
+  { "platform": "pump",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "pump.barrel", "muzzle": "mz.sg.cyl", "optic": "op.pic.16", "pump": "pump.pump", "stock": "oem.stk.classic.5", "tube": "pump.tube" }
   },
   { "platform": "pump",
    "why": "authored optic (op.auth.falcon)",
@@ -1748,6 +2212,22 @@
   { "platform": "dbl",
    "why": "replaced optic (op.pso.2) on the riser",
    "build": { "barrel": "dbl.barrel", "handguard": "oem.hg.classic.7", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "oem.stk.classic.4" }
+  },
+  { "platform": "dbl",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "dbl.barrel", "handguard": "oem.hg.classic.7", "optic": "op.pic.5", "stock": "oem.stk.classic.4" }
+  },
+  { "platform": "dbl",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "dbl.barrel", "handguard": "oem.hg.classic.7", "optic": "op.pic.14", "stock": "oem.stk.classic.4" }
+  },
+  { "platform": "dbl",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "dbl.barrel", "handguard": "oem.hg.classic.7", "optic": "op.pic.15", "stock": "oem.stk.classic.4" }
+  },
+  { "platform": "dbl",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "dbl.barrel", "handguard": "oem.hg.classic.7", "optic": "op.pic.16", "stock": "oem.stk.classic.4" }
   },
   { "platform": "dbl",
    "why": "authored optic (op.auth.falcon)",
@@ -1818,6 +2298,22 @@
    "build": { "barrel": "saiga.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "saiga12.mag.8", "muzzle": "mz.sg.cyl", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "oem.stk.ak.5" }
   },
   { "platform": "saiga",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "saiga.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "saiga12.mag.8", "muzzle": "mz.sg.cyl", "optic": "op.pic.5", "stock": "oem.stk.ak.5" }
+  },
+  { "platform": "saiga",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "saiga.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "saiga12.mag.8", "muzzle": "mz.sg.cyl", "optic": "op.pic.14", "stock": "oem.stk.ak.5" }
+  },
+  { "platform": "saiga",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "saiga.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "saiga12.mag.8", "muzzle": "mz.sg.cyl", "optic": "op.pic.15", "stock": "oem.stk.ak.5" }
+  },
+  { "platform": "saiga",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "saiga.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "saiga12.mag.8", "muzzle": "mz.sg.cyl", "optic": "op.pic.16", "stock": "oem.stk.ak.5" }
+  },
+  { "platform": "saiga",
    "why": "authored optic (op.auth.falcon)",
    "build": { "barrel": "saiga.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "saiga12.mag.8", "muzzle": "mz.sg.cyl", "optic": "op.auth.falcon", "stock": "oem.stk.ak.5" }
   },
@@ -1878,6 +2374,22 @@
    "build": { "barrel": "aa12.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.7", "mag": "aa12.mag", "muzzle": "mz.sg.flash", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "stk.heavy.0" }
   },
   { "platform": "aa12",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "aa12.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.7", "mag": "aa12.mag", "muzzle": "mz.sg.flash", "optic": "op.pic.5", "stock": "stk.heavy.0" }
+  },
+  { "platform": "aa12",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "aa12.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.7", "mag": "aa12.mag", "muzzle": "mz.sg.flash", "optic": "op.pic.14", "stock": "stk.heavy.0" }
+  },
+  { "platform": "aa12",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "aa12.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.7", "mag": "aa12.mag", "muzzle": "mz.sg.flash", "optic": "op.pic.15", "stock": "stk.heavy.0" }
+  },
+  { "platform": "aa12",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "aa12.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.7", "mag": "aa12.mag", "muzzle": "mz.sg.flash", "optic": "op.pic.16", "stock": "stk.heavy.0" }
+  },
+  { "platform": "aa12",
    "why": "authored optic (op.auth.falcon)",
    "build": { "barrel": "aa12.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.7", "mag": "aa12.mag", "muzzle": "mz.sg.flash", "optic": "op.auth.falcon", "stock": "stk.heavy.0" }
   },
@@ -1924,6 +2436,22 @@
   { "platform": "ksg",
    "why": "replaced optic (op.pso.2) on the riser",
    "build": { "barrel": "ksg.barrel", "grip": "oem.gr.ar.4", "muzzle": "mz.sg.cyl", "optic": "op.pic.12", "pump": "ksg.pump", "riserdot": "op.pso.2" }
+  },
+  { "platform": "ksg",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "ksg.barrel", "grip": "oem.gr.ar.4", "muzzle": "mz.sg.cyl", "optic": "op.pic.5", "pump": "ksg.pump" }
+  },
+  { "platform": "ksg",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "ksg.barrel", "grip": "oem.gr.ar.4", "muzzle": "mz.sg.cyl", "optic": "op.pic.14", "pump": "ksg.pump" }
+  },
+  { "platform": "ksg",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "ksg.barrel", "grip": "oem.gr.ar.4", "muzzle": "mz.sg.cyl", "optic": "op.pic.15", "pump": "ksg.pump" }
+  },
+  { "platform": "ksg",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "ksg.barrel", "grip": "oem.gr.ar.4", "muzzle": "mz.sg.cyl", "optic": "op.pic.16", "pump": "ksg.pump" }
   },
   { "platform": "ksg",
    "why": "authored optic (op.auth.falcon)",
@@ -1990,6 +2518,22 @@
    "build": { "barrel": "slug.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.classic.8", "muzzle": "mz.sg.cyl", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "stk.tube.0", "tube": "slug.tube" }
   },
   { "platform": "slug",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "slug.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.classic.8", "muzzle": "mz.sg.cyl", "optic": "op.pic.5", "stock": "stk.tube.0", "tube": "slug.tube" }
+  },
+  { "platform": "slug",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "slug.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.classic.8", "muzzle": "mz.sg.cyl", "optic": "op.pic.14", "stock": "stk.tube.0", "tube": "slug.tube" }
+  },
+  { "platform": "slug",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "slug.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.classic.8", "muzzle": "mz.sg.cyl", "optic": "op.pic.15", "stock": "stk.tube.0", "tube": "slug.tube" }
+  },
+  { "platform": "slug",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "slug.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.classic.8", "muzzle": "mz.sg.cyl", "optic": "op.pic.16", "stock": "stk.tube.0", "tube": "slug.tube" }
+  },
+  { "platform": "slug",
    "why": "authored optic (op.auth.falcon)",
    "build": { "barrel": "slug.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.classic.8", "muzzle": "mz.sg.cyl", "optic": "op.auth.falcon", "stock": "stk.tube.0", "tube": "slug.tube" }
   },
@@ -2048,6 +2592,22 @@
   { "platform": "m249",
    "why": "replaced optic (op.pso.2) on the riser",
    "build": { "barrel": "br.5.56x45.20.5", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.8", "mag": "m249.mag", "muzzle": "mz.r556.a2", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "stk.heavy.0" }
+  },
+  { "platform": "m249",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.5.56x45.20.5", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.8", "mag": "m249.mag", "muzzle": "mz.r556.a2", "optic": "op.pic.5", "stock": "stk.heavy.0" }
+  },
+  { "platform": "m249",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.5.56x45.20.5", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.8", "mag": "m249.mag", "muzzle": "mz.r556.a2", "optic": "op.pic.14", "stock": "stk.heavy.0" }
+  },
+  { "platform": "m249",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.5.56x45.20.5", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.8", "mag": "m249.mag", "muzzle": "mz.r556.a2", "optic": "op.pic.15", "stock": "stk.heavy.0" }
+  },
+  { "platform": "m249",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.5.56x45.20.5", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.8", "mag": "m249.mag", "muzzle": "mz.r556.a2", "optic": "op.pic.16", "stock": "stk.heavy.0" }
   },
   { "platform": "m249",
    "why": "authored optic (op.auth.falcon)",
@@ -2114,6 +2674,22 @@
    "build": { "barrel": "br.7.62x54.25.4.tapered", "grip": "oem.gr.ak.3", "mag": "pkm.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "oem.stk.heavy.4" }
   },
   { "platform": "pkm",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.7.62x54.25.4.tapered", "grip": "oem.gr.ak.3", "mag": "pkm.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.5", "stock": "oem.stk.heavy.4" }
+  },
+  { "platform": "pkm",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.7.62x54.25.4.tapered", "grip": "oem.gr.ak.3", "mag": "pkm.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.14", "stock": "oem.stk.heavy.4" }
+  },
+  { "platform": "pkm",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.7.62x54.25.4.tapered", "grip": "oem.gr.ak.3", "mag": "pkm.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.15", "stock": "oem.stk.heavy.4" }
+  },
+  { "platform": "pkm",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.7.62x54.25.4.tapered", "grip": "oem.gr.ak.3", "mag": "pkm.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.16", "stock": "oem.stk.heavy.4" }
+  },
+  { "platform": "pkm",
    "why": "authored optic (op.auth.falcon)",
    "build": { "barrel": "br.7.62x54.25.4.tapered", "grip": "oem.gr.ak.3", "mag": "pkm.mag", "muzzle": "mz.r762.a2", "optic": "op.auth.falcon", "stock": "oem.stk.heavy.4" }
   },
@@ -2178,6 +2754,22 @@
    "build": { "barrel": "br.7.62x51.22", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.3", "mag": "m60.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "stk.heavy.0" }
   },
   { "platform": "m60",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.7.62x51.22", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.3", "mag": "m60.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.5", "stock": "stk.heavy.0" }
+  },
+  { "platform": "m60",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.7.62x51.22", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.3", "mag": "m60.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.14", "stock": "stk.heavy.0" }
+  },
+  { "platform": "m60",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.7.62x51.22", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.3", "mag": "m60.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.15", "stock": "stk.heavy.0" }
+  },
+  { "platform": "m60",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.7.62x51.22", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.3", "mag": "m60.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.16", "stock": "stk.heavy.0" }
+  },
+  { "platform": "m60",
    "why": "authored optic (op.auth.falcon)",
    "build": { "barrel": "br.7.62x51.22", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.3", "mag": "m60.mag", "muzzle": "mz.r762.a2", "optic": "op.auth.falcon", "stock": "stk.heavy.0" }
   },
@@ -2232,6 +2824,22 @@
   { "platform": "skorp",
    "why": "replaced optic (op.pso.2) on the riser",
    "build": { "barrel": "br.7.65x17.4.5.light", "grip": "gr.ak.0", "mag": "skorp.mag", "muzzle": "mz.r9.cap", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "stk.smg.2" }
+  },
+  { "platform": "skorp",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.7.65x17.4.5.light", "grip": "gr.ak.0", "mag": "skorp.mag", "muzzle": "mz.r9.cap", "optic": "op.pic.5", "stock": "stk.smg.2" }
+  },
+  { "platform": "skorp",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.7.65x17.4.5.light", "grip": "gr.ak.0", "mag": "skorp.mag", "muzzle": "mz.r9.cap", "optic": "op.pic.14", "stock": "stk.smg.2" }
+  },
+  { "platform": "skorp",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.7.65x17.4.5.light", "grip": "gr.ak.0", "mag": "skorp.mag", "muzzle": "mz.r9.cap", "optic": "op.pic.15", "stock": "stk.smg.2" }
+  },
+  { "platform": "skorp",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.7.65x17.4.5.light", "grip": "gr.ak.0", "mag": "skorp.mag", "muzzle": "mz.r9.cap", "optic": "op.pic.16", "stock": "stk.smg.2" }
   },
   { "platform": "skorp",
    "why": "authored optic (op.auth.falcon)",
@@ -2294,6 +2902,22 @@
    "build": { "barrel": "br.11.43x23.5.75.light", "grip": "oem.gr.smg.3", "mag": "mac10.mag", "muzzle": "mz.r45.cap", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "stk.smg.2" }
   },
   { "platform": "mac10",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.11.43x23.5.75.light", "grip": "oem.gr.smg.3", "mag": "mac10.mag", "muzzle": "mz.r45.cap", "optic": "op.pic.5", "stock": "stk.smg.2" }
+  },
+  { "platform": "mac10",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.11.43x23.5.75.light", "grip": "oem.gr.smg.3", "mag": "mac10.mag", "muzzle": "mz.r45.cap", "optic": "op.pic.14", "stock": "stk.smg.2" }
+  },
+  { "platform": "mac10",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.11.43x23.5.75.light", "grip": "oem.gr.smg.3", "mag": "mac10.mag", "muzzle": "mz.r45.cap", "optic": "op.pic.15", "stock": "stk.smg.2" }
+  },
+  { "platform": "mac10",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.11.43x23.5.75.light", "grip": "oem.gr.smg.3", "mag": "mac10.mag", "muzzle": "mz.r45.cap", "optic": "op.pic.16", "stock": "stk.smg.2" }
+  },
+  { "platform": "mac10",
    "why": "authored optic (op.auth.falcon)",
    "build": { "barrel": "br.11.43x23.5.75.light", "grip": "oem.gr.smg.3", "mag": "mac10.mag", "muzzle": "mz.r45.cap", "optic": "op.auth.falcon", "stock": "stk.smg.2" }
   },
@@ -2340,6 +2964,22 @@
   { "platform": "mp7",
    "why": "replaced optic (op.pso.2) on the riser",
    "build": { "barrel": "br.4.6x30.7.1.light", "grip": "oem.gr.smg.3", "mag": "mp7.mag", "muzzle": "mz.r57.a2", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "stk.tube.0" }
+  },
+  { "platform": "mp7",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.4.6x30.7.1.light", "grip": "oem.gr.smg.3", "mag": "mp7.mag", "muzzle": "mz.r57.a2", "optic": "op.pic.5", "stock": "stk.tube.0" }
+  },
+  { "platform": "mp7",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.4.6x30.7.1.light", "grip": "oem.gr.smg.3", "mag": "mp7.mag", "muzzle": "mz.r57.a2", "optic": "op.pic.14", "stock": "stk.tube.0" }
+  },
+  { "platform": "mp7",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.4.6x30.7.1.light", "grip": "oem.gr.smg.3", "mag": "mp7.mag", "muzzle": "mz.r57.a2", "optic": "op.pic.15", "stock": "stk.tube.0" }
+  },
+  { "platform": "mp7",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.4.6x30.7.1.light", "grip": "oem.gr.smg.3", "mag": "mp7.mag", "muzzle": "mz.r57.a2", "optic": "op.pic.16", "stock": "stk.tube.0" }
   },
   { "platform": "mp7",
    "why": "authored optic (op.auth.falcon)",
@@ -2418,6 +3058,22 @@
    "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.3", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.12", "receiver": "rcv.ak74", "riserdot": "op.pso.2", "stock": "stk.ak.1" }
   },
   { "platform": "ak74",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.3", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.5", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+  },
+  { "platform": "ak74",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.3", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.14", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+  },
+  { "platform": "ak74",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.3", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.15", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+  },
+  { "platform": "ak74",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.3", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.16", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+  },
+  { "platform": "ak74",
    "why": "authored optic (op.auth.falcon)",
    "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.3", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "op.auth.falcon", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
   },
@@ -2476,6 +3132,22 @@
   { "platform": "aks74u",
    "why": "replaced optic (op.pso.2) on the riser",
    "build": { "barrel": "br.5.6x39.8.1", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.8", "mag": "ak74.mag.30", "muzzle": "mz.rak.boost", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "oem.stk.ak.5" }
+  },
+  { "platform": "aks74u",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.5.6x39.8.1", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.8", "mag": "ak74.mag.30", "muzzle": "mz.rak.boost", "optic": "op.pic.5", "stock": "oem.stk.ak.5" }
+  },
+  { "platform": "aks74u",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.5.6x39.8.1", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.8", "mag": "ak74.mag.30", "muzzle": "mz.rak.boost", "optic": "op.pic.14", "stock": "oem.stk.ak.5" }
+  },
+  { "platform": "aks74u",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.5.6x39.8.1", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.8", "mag": "ak74.mag.30", "muzzle": "mz.rak.boost", "optic": "op.pic.15", "stock": "oem.stk.ak.5" }
+  },
+  { "platform": "aks74u",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.5.6x39.8.1", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.8", "mag": "ak74.mag.30", "muzzle": "mz.rak.boost", "optic": "op.pic.16", "stock": "oem.stk.ak.5" }
   },
   { "platform": "aks74u",
    "why": "authored optic (op.auth.falcon)",
@@ -2550,6 +3222,22 @@
    "build": { "barrel": "br.7.62x39.23.2.tapered", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "op.pic.12", "receiver": "rcv.rpk", "riserdot": "op.pso.2", "stock": "oem.stk.ak.4" }
   },
   { "platform": "rpk",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.7.62x39.23.2.tapered", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "op.pic.5", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+  },
+  { "platform": "rpk",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.7.62x39.23.2.tapered", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "op.pic.14", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+  },
+  { "platform": "rpk",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.7.62x39.23.2.tapered", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "op.pic.15", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+  },
+  { "platform": "rpk",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.7.62x39.23.2.tapered", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "op.pic.16", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+  },
+  { "platform": "rpk",
    "why": "authored optic (op.auth.falcon)",
    "build": { "barrel": "br.7.62x39.23.2.tapered", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "op.auth.falcon", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
   },
@@ -2596,6 +3284,22 @@
   { "platform": "scarl",
    "why": "replaced optic (op.pso.2) on the riser",
    "build": { "barrel": "br.5.56x45.14.5.light", "grip": "oem.gr.ar.4", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "stk.heavy.scar" }
+  },
+  { "platform": "scarl",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.5.56x45.14.5.light", "grip": "oem.gr.ar.4", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.5", "stock": "stk.heavy.scar" }
+  },
+  { "platform": "scarl",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.5.56x45.14.5.light", "grip": "oem.gr.ar.4", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.14", "stock": "stk.heavy.scar" }
+  },
+  { "platform": "scarl",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.5.56x45.14.5.light", "grip": "oem.gr.ar.4", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.15", "stock": "stk.heavy.scar" }
+  },
+  { "platform": "scarl",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.5.56x45.14.5.light", "grip": "oem.gr.ar.4", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.16", "stock": "stk.heavy.scar" }
   },
   { "platform": "scarl",
    "why": "authored optic (op.auth.falcon)",
@@ -2656,6 +3360,22 @@
   { "platform": "m27",
    "why": "replaced optic (op.pso.2) on the riser",
    "build": { "barrel": "br.5.56x45.16.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.9", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "m27",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.5.56x45.16.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.9", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.5", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "m27",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.5.56x45.16.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.9", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.14", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "m27",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.5.56x45.16.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.9", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.15", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "m27",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.5.56x45.16.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.9", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.16", "stock": "oem.stk.tube.5" }
   },
   { "platform": "m27",
    "why": "authored optic (op.auth.falcon)",
@@ -2746,6 +3466,22 @@
    "build": { "barrel": "br.7.62x51.22", "handguard": "oem.hg.classic.9", "mag": "m14.mag.20", "muzzle": "mz.r762.a2", "optic": "op.pic.12", "receiver": "rcv.m14", "riserdot": "op.pso.2", "stock": "oem.stk.classic.4" }
   },
   { "platform": "m14",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.7.62x51.22", "handguard": "oem.hg.classic.9", "mag": "m14.mag.20", "muzzle": "mz.r762.a2", "optic": "op.pic.5", "receiver": "rcv.m14", "stock": "oem.stk.classic.4" }
+  },
+  { "platform": "m14",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.7.62x51.22", "handguard": "oem.hg.classic.9", "mag": "m14.mag.20", "muzzle": "mz.r762.a2", "optic": "op.pic.14", "receiver": "rcv.m14", "stock": "oem.stk.classic.4" }
+  },
+  { "platform": "m14",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.7.62x51.22", "handguard": "oem.hg.classic.9", "mag": "m14.mag.20", "muzzle": "mz.r762.a2", "optic": "op.pic.15", "receiver": "rcv.m14", "stock": "oem.stk.classic.4" }
+  },
+  { "platform": "m14",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.7.62x51.22", "handguard": "oem.hg.classic.9", "mag": "m14.mag.20", "muzzle": "mz.r762.a2", "optic": "op.pic.16", "receiver": "rcv.m14", "stock": "oem.stk.classic.4" }
+  },
+  { "platform": "m14",
    "why": "authored optic (op.auth.falcon)",
    "build": { "barrel": "br.7.62x51.22", "handguard": "oem.hg.classic.9", "mag": "m14.mag.20", "muzzle": "mz.r762.a2", "optic": "op.auth.falcon", "receiver": "rcv.m14", "stock": "oem.stk.classic.4" }
   },
@@ -2796,6 +3532,22 @@
   { "platform": "sr25",
    "why": "replaced optic (op.pso.2) on the riser",
    "build": { "barrel": "br.7.62x51.20", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.10", "mag": "sr25.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "sr25",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.7.62x51.20", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.10", "mag": "sr25.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.5", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "sr25",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.7.62x51.20", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.10", "mag": "sr25.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.14", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "sr25",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.7.62x51.20", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.10", "mag": "sr25.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.15", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "sr25",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.7.62x51.20", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.10", "mag": "sr25.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.16", "stock": "oem.stk.tube.5" }
   },
   { "platform": "sr25",
    "why": "authored optic (op.auth.falcon)",
@@ -2852,6 +3604,22 @@
   { "platform": "mpx",
    "why": "replaced optic (op.pso.2) on the riser",
    "build": { "barrel": "br.9x19.8", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.mpx.0", "mag": "mpx.mag", "muzzle": "mz.r9.a2", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "stk.tube.2" }
+  },
+  { "platform": "mpx",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.9x19.8", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.mpx.0", "mag": "mpx.mag", "muzzle": "mz.r9.a2", "optic": "op.pic.5", "stock": "stk.tube.2" }
+  },
+  { "platform": "mpx",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.9x19.8", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.mpx.0", "mag": "mpx.mag", "muzzle": "mz.r9.a2", "optic": "op.pic.14", "stock": "stk.tube.2" }
+  },
+  { "platform": "mpx",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.9x19.8", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.mpx.0", "mag": "mpx.mag", "muzzle": "mz.r9.a2", "optic": "op.pic.15", "stock": "stk.tube.2" }
+  },
+  { "platform": "mpx",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.9x19.8", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.mpx.0", "mag": "mpx.mag", "muzzle": "mz.r9.a2", "optic": "op.pic.16", "stock": "stk.tube.2" }
   },
   { "platform": "mpx",
    "why": "authored optic (op.auth.falcon)",
@@ -2922,6 +3690,22 @@
    "build": { "barrel": "benelli.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.classic.10", "muzzle": "mz.sg.cyl", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "stk.tube.0", "tube": "benelli.tube" }
   },
   { "platform": "benelli",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "benelli.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.classic.10", "muzzle": "mz.sg.cyl", "optic": "op.pic.5", "stock": "stk.tube.0", "tube": "benelli.tube" }
+  },
+  { "platform": "benelli",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "benelli.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.classic.10", "muzzle": "mz.sg.cyl", "optic": "op.pic.14", "stock": "stk.tube.0", "tube": "benelli.tube" }
+  },
+  { "platform": "benelli",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "benelli.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.classic.10", "muzzle": "mz.sg.cyl", "optic": "op.pic.15", "stock": "stk.tube.0", "tube": "benelli.tube" }
+  },
+  { "platform": "benelli",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "benelli.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.classic.10", "muzzle": "mz.sg.cyl", "optic": "op.pic.16", "stock": "stk.tube.0", "tube": "benelli.tube" }
+  },
+  { "platform": "benelli",
    "why": "authored optic (op.auth.falcon)",
    "build": { "barrel": "benelli.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.classic.10", "muzzle": "mz.sg.cyl", "optic": "op.auth.falcon", "stock": "stk.tube.0", "tube": "benelli.tube" }
   },
@@ -2980,6 +3764,22 @@
   { "platform": "vepr",
    "why": "replaced optic (op.pso.2) on the riser",
    "build": { "barrel": "vepr.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.9", "mag": "saiga12.mag.8", "muzzle": "mz.sg.cyl", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "oem.stk.ak.5" }
+  },
+  { "platform": "vepr",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "vepr.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.9", "mag": "saiga12.mag.8", "muzzle": "mz.sg.cyl", "optic": "op.pic.5", "stock": "oem.stk.ak.5" }
+  },
+  { "platform": "vepr",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "vepr.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.9", "mag": "saiga12.mag.8", "muzzle": "mz.sg.cyl", "optic": "op.pic.14", "stock": "oem.stk.ak.5" }
+  },
+  { "platform": "vepr",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "vepr.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.9", "mag": "saiga12.mag.8", "muzzle": "mz.sg.cyl", "optic": "op.pic.15", "stock": "oem.stk.ak.5" }
+  },
+  { "platform": "vepr",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "vepr.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.9", "mag": "saiga12.mag.8", "muzzle": "mz.sg.cyl", "optic": "op.pic.16", "stock": "oem.stk.ak.5" }
   },
   { "platform": "vepr",
    "why": "authored optic (op.auth.falcon)",
@@ -3042,6 +3842,22 @@
    "build": { "barrel": "br.9x19.10.5", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "hg.ar.3", "mag": "glock.mag.33", "muzzle": "mz.r9.a2", "optic": "op.pic.12", "receiver": "rcv.ar9", "riserdot": "op.pso.2", "stock": "stk.tube.0" }
   },
   { "platform": "ar9",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.9x19.10.5", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "hg.ar.3", "mag": "glock.mag.33", "muzzle": "mz.r9.a2", "optic": "op.pic.5", "receiver": "rcv.ar9", "stock": "stk.tube.0" }
+  },
+  { "platform": "ar9",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.9x19.10.5", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "hg.ar.3", "mag": "glock.mag.33", "muzzle": "mz.r9.a2", "optic": "op.pic.14", "receiver": "rcv.ar9", "stock": "stk.tube.0" }
+  },
+  { "platform": "ar9",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.9x19.10.5", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "hg.ar.3", "mag": "glock.mag.33", "muzzle": "mz.r9.a2", "optic": "op.pic.15", "receiver": "rcv.ar9", "stock": "stk.tube.0" }
+  },
+  { "platform": "ar9",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.9x19.10.5", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "hg.ar.3", "mag": "glock.mag.33", "muzzle": "mz.r9.a2", "optic": "op.pic.16", "receiver": "rcv.ar9", "stock": "stk.tube.0" }
+  },
+  { "platform": "ar9",
    "why": "authored optic (op.auth.falcon)",
    "build": { "barrel": "br.9x19.10.5", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "hg.ar.3", "mag": "glock.mag.33", "muzzle": "mz.r9.a2", "optic": "op.auth.falcon", "receiver": "rcv.ar9", "stock": "stk.tube.0" }
   },
@@ -3088,6 +3904,22 @@
   { "platform": "aug9",
    "why": "replaced optic (op.pso.2) on the riser",
    "build": { "barrel": "br.9x19.16", "grip": "oem.gr.ar.4", "mag": "glock.mag.33", "muzzle": "mz.r9.cap", "optic": "op.pic.12", "receiver": "rcv.aug9", "riserdot": "op.pso.2" }
+  },
+  { "platform": "aug9",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.9x19.16", "grip": "oem.gr.ar.4", "mag": "glock.mag.33", "muzzle": "mz.r9.cap", "optic": "op.pic.5", "receiver": "rcv.aug9" }
+  },
+  { "platform": "aug9",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.9x19.16", "grip": "oem.gr.ar.4", "mag": "glock.mag.33", "muzzle": "mz.r9.cap", "optic": "op.pic.14", "receiver": "rcv.aug9" }
+  },
+  { "platform": "aug9",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.9x19.16", "grip": "oem.gr.ar.4", "mag": "glock.mag.33", "muzzle": "mz.r9.cap", "optic": "op.pic.15", "receiver": "rcv.aug9" }
+  },
+  { "platform": "aug9",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.9x19.16", "grip": "oem.gr.ar.4", "mag": "glock.mag.33", "muzzle": "mz.r9.cap", "optic": "op.pic.16", "receiver": "rcv.aug9" }
   },
   { "platform": "aug9",
    "why": "authored optic (op.auth.falcon)",
@@ -3144,6 +3976,22 @@
   { "platform": "sawn",
    "why": "replaced optic (op.pso.2) on the riser",
    "build": { "barrel": "sawn.barrel", "grip": "oem.gr.ak.4", "handguard": "oem.hg.classic.11", "optic": "op.pic.12", "riserdot": "op.pso.2" }
+  },
+  { "platform": "sawn",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "sawn.barrel", "grip": "oem.gr.ak.4", "handguard": "oem.hg.classic.11", "optic": "op.pic.5" }
+  },
+  { "platform": "sawn",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "sawn.barrel", "grip": "oem.gr.ak.4", "handguard": "oem.hg.classic.11", "optic": "op.pic.14" }
+  },
+  { "platform": "sawn",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "sawn.barrel", "grip": "oem.gr.ak.4", "handguard": "oem.hg.classic.11", "optic": "op.pic.15" }
+  },
+  { "platform": "sawn",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "sawn.barrel", "grip": "oem.gr.ak.4", "handguard": "oem.hg.classic.11", "optic": "op.pic.16" }
   },
   { "platform": "sawn",
    "why": "authored optic (op.auth.falcon)",
@@ -4394,6 +5242,22 @@
    "build": { "barrel": "thor.barrel", "grip": "oem.gr.ak.5", "optic": "op.pic.12", "riserdot": "op.pso.2" }
   },
   { "platform": "thor",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "thor.barrel", "grip": "oem.gr.ak.5", "optic": "op.pic.5" }
+  },
+  { "platform": "thor",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "thor.barrel", "grip": "oem.gr.ak.5", "optic": "op.pic.14" }
+  },
+  { "platform": "thor",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "thor.barrel", "grip": "oem.gr.ak.5", "optic": "op.pic.15" }
+  },
+  { "platform": "thor",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "thor.barrel", "grip": "oem.gr.ak.5", "optic": "op.pic.16" }
+  },
+  { "platform": "thor",
    "why": "authored optic (op.auth.falcon)",
    "build": { "barrel": "thor.barrel", "grip": "oem.gr.ak.5", "optic": "op.auth.falcon" }
   },
@@ -4432,6 +5296,22 @@
   { "platform": "p90",
    "why": "replaced optic (op.pso.2) on the riser",
    "build": { "barrel": "br.5.7x29.10.4", "mag": "p90.mag", "muzzle": "mz.r57.a2", "optic": "op.pic.12", "riserdot": "op.pso.2" }
+  },
+  { "platform": "p90",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.5.7x29.10.4", "mag": "p90.mag", "muzzle": "mz.r57.a2", "optic": "op.pic.5" }
+  },
+  { "platform": "p90",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.5.7x29.10.4", "mag": "p90.mag", "muzzle": "mz.r57.a2", "optic": "op.pic.14" }
+  },
+  { "platform": "p90",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.5.7x29.10.4", "mag": "p90.mag", "muzzle": "mz.r57.a2", "optic": "op.pic.15" }
+  },
+  { "platform": "p90",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.5.7x29.10.4", "mag": "p90.mag", "muzzle": "mz.r57.a2", "optic": "op.pic.16" }
   },
   { "platform": "p90",
    "why": "authored optic (op.auth.falcon)",
@@ -4482,6 +5362,22 @@
    "build": { "barrel": "shredder.barrel", "mag": "shredder.mag", "motor": "shredder.motor", "optic": "op.pic.12", "riserdot": "op.pso.2" }
   },
   { "platform": "shredder",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "shredder.barrel", "mag": "shredder.mag", "motor": "shredder.motor", "optic": "op.pic.5" }
+  },
+  { "platform": "shredder",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "shredder.barrel", "mag": "shredder.mag", "motor": "shredder.motor", "optic": "op.pic.14" }
+  },
+  { "platform": "shredder",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "shredder.barrel", "mag": "shredder.mag", "motor": "shredder.motor", "optic": "op.pic.15" }
+  },
+  { "platform": "shredder",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "shredder.barrel", "mag": "shredder.mag", "motor": "shredder.motor", "optic": "op.pic.16" }
+  },
+  { "platform": "shredder",
    "why": "authored optic (op.auth.falcon)",
    "build": { "barrel": "shredder.barrel", "mag": "shredder.mag", "motor": "shredder.motor", "optic": "op.auth.falcon" }
   },
@@ -4516,6 +5412,22 @@
   { "platform": "m32",
    "why": "replaced optic (op.pso.2) on the riser",
    "build": { "barrel": "m32.barrel", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "stk.tube.0" }
+  },
+  { "platform": "m32",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "m32.barrel", "optic": "op.pic.5", "stock": "stk.tube.0" }
+  },
+  { "platform": "m32",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "m32.barrel", "optic": "op.pic.14", "stock": "stk.tube.0" }
+  },
+  { "platform": "m32",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "m32.barrel", "optic": "op.pic.15", "stock": "stk.tube.0" }
+  },
+  { "platform": "m32",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "m32.barrel", "optic": "op.pic.16", "stock": "stk.tube.0" }
   },
   { "platform": "m32",
    "why": "authored optic (op.auth.falcon)",
@@ -4558,6 +5470,22 @@
    "build": { "barrel": "pocketgl.barrel", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "stk.smg.0" }
   },
   { "platform": "pocketgl",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "pocketgl.barrel", "optic": "op.pic.5", "stock": "stk.smg.0" }
+  },
+  { "platform": "pocketgl",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "pocketgl.barrel", "optic": "op.pic.14", "stock": "stk.smg.0" }
+  },
+  { "platform": "pocketgl",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "pocketgl.barrel", "optic": "op.pic.15", "stock": "stk.smg.0" }
+  },
+  { "platform": "pocketgl",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "pocketgl.barrel", "optic": "op.pic.16", "stock": "stk.smg.0" }
+  },
+  { "platform": "pocketgl",
    "why": "authored optic (op.auth.falcon)",
    "build": { "barrel": "pocketgl.barrel", "optic": "op.auth.falcon", "stock": "stk.smg.0" }
   },
@@ -4594,6 +5522,22 @@
    "build": { "barrel": "rail.barrel", "cap": "rail.cap", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "oem.stk.precision.6" }
   },
   { "platform": "rail",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "rail.barrel", "cap": "rail.cap", "optic": "op.pic.5", "stock": "oem.stk.precision.6" }
+  },
+  { "platform": "rail",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "rail.barrel", "cap": "rail.cap", "optic": "op.pic.14", "stock": "oem.stk.precision.6" }
+  },
+  { "platform": "rail",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "rail.barrel", "cap": "rail.cap", "optic": "op.pic.15", "stock": "oem.stk.precision.6" }
+  },
+  { "platform": "rail",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "rail.barrel", "cap": "rail.cap", "optic": "op.pic.16", "stock": "oem.stk.precision.6" }
+  },
+  { "platform": "rail",
    "why": "authored optic (op.auth.falcon)",
    "build": { "barrel": "rail.barrel", "cap": "rail.cap", "optic": "op.auth.falcon", "stock": "oem.stk.precision.6" }
   },
@@ -4628,6 +5572,22 @@
   { "platform": "crossbow",
    "why": "replaced optic (op.pso.2) on the riser",
    "build": { "limbs": "crossbow.limbs", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "oem.stk.precision.5" }
+  },
+  { "platform": "crossbow",
+   "why": "authored optic (op.pic.5)",
+   "build": { "limbs": "crossbow.limbs", "optic": "op.pic.5", "stock": "oem.stk.precision.5" }
+  },
+  { "platform": "crossbow",
+   "why": "authored optic (op.pic.14)",
+   "build": { "limbs": "crossbow.limbs", "optic": "op.pic.14", "stock": "oem.stk.precision.5" }
+  },
+  { "platform": "crossbow",
+   "why": "authored optic (op.pic.15)",
+   "build": { "limbs": "crossbow.limbs", "optic": "op.pic.15", "stock": "oem.stk.precision.5" }
+  },
+  { "platform": "crossbow",
+   "why": "authored optic (op.pic.16)",
+   "build": { "limbs": "crossbow.limbs", "optic": "op.pic.16", "stock": "oem.stk.precision.5" }
   },
   { "platform": "crossbow",
    "why": "authored optic (op.auth.falcon)",
@@ -4782,6 +5742,22 @@
    "build": { "barrel": "br.5.8x42.18.2.light", "mag": "qbz.mag.30", "muzzle": "mz.r58.a2", "optic": "op.pic.12", "riserdot": "op.pso.2" }
   },
   { "platform": "qbz95",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.5.8x42.18.2.light", "mag": "qbz.mag.30", "muzzle": "mz.r58.a2", "optic": "op.pic.5" }
+  },
+  { "platform": "qbz95",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.5.8x42.18.2.light", "mag": "qbz.mag.30", "muzzle": "mz.r58.a2", "optic": "op.pic.14" }
+  },
+  { "platform": "qbz95",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.5.8x42.18.2.light", "mag": "qbz.mag.30", "muzzle": "mz.r58.a2", "optic": "op.pic.15" }
+  },
+  { "platform": "qbz95",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.5.8x42.18.2.light", "mag": "qbz.mag.30", "muzzle": "mz.r58.a2", "optic": "op.pic.16" }
+  },
+  { "platform": "qbz95",
    "why": "authored optic (op.auth.falcon)",
    "build": { "barrel": "br.5.8x42.18.2.light", "mag": "qbz.mag.30", "muzzle": "mz.r58.a2", "optic": "op.auth.falcon" }
   },
@@ -4842,6 +5818,22 @@
    "build": { "barrel": "br.5.8x42.10.5", "grip": "oem.gr.ar.4", "handguard": "oem.hg.qbz.0", "mag": "qbz.mag.30", "muzzle": "mz.r58.a2", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "oem.stk.fold.0" }
   },
   { "platform": "qbz192",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.5.8x42.10.5", "grip": "oem.gr.ar.4", "handguard": "oem.hg.qbz.0", "mag": "qbz.mag.30", "muzzle": "mz.r58.a2", "optic": "op.pic.5", "stock": "oem.stk.fold.0" }
+  },
+  { "platform": "qbz192",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.5.8x42.10.5", "grip": "oem.gr.ar.4", "handguard": "oem.hg.qbz.0", "mag": "qbz.mag.30", "muzzle": "mz.r58.a2", "optic": "op.pic.14", "stock": "oem.stk.fold.0" }
+  },
+  { "platform": "qbz192",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.5.8x42.10.5", "grip": "oem.gr.ar.4", "handguard": "oem.hg.qbz.0", "mag": "qbz.mag.30", "muzzle": "mz.r58.a2", "optic": "op.pic.15", "stock": "oem.stk.fold.0" }
+  },
+  { "platform": "qbz192",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.5.8x42.10.5", "grip": "oem.gr.ar.4", "handguard": "oem.hg.qbz.0", "mag": "qbz.mag.30", "muzzle": "mz.r58.a2", "optic": "op.pic.16", "stock": "oem.stk.fold.0" }
+  },
+  { "platform": "qbz192",
    "why": "authored optic (op.auth.falcon)",
    "build": { "barrel": "br.5.8x42.10.5", "grip": "oem.gr.ar.4", "handguard": "oem.hg.qbz.0", "mag": "qbz.mag.30", "muzzle": "mz.r58.a2", "optic": "op.auth.falcon", "stock": "oem.stk.fold.0" }
   },
@@ -4900,6 +5892,22 @@
   { "platform": "mcx",
    "why": "replaced optic (op.pso.2) on the riser",
    "build": { "barrel": "br.5.56x45.11.5", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.mcx.0", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "oem.stk.fold.1" }
+  },
+  { "platform": "mcx",
+   "why": "authored optic (op.pic.5)",
+   "build": { "barrel": "br.5.56x45.11.5", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.mcx.0", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.5", "stock": "oem.stk.fold.1" }
+  },
+  { "platform": "mcx",
+   "why": "authored optic (op.pic.14)",
+   "build": { "barrel": "br.5.56x45.11.5", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.mcx.0", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.14", "stock": "oem.stk.fold.1" }
+  },
+  { "platform": "mcx",
+   "why": "authored optic (op.pic.15)",
+   "build": { "barrel": "br.5.56x45.11.5", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.mcx.0", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.15", "stock": "oem.stk.fold.1" }
+  },
+  { "platform": "mcx",
+   "why": "authored optic (op.pic.16)",
+   "build": { "barrel": "br.5.56x45.11.5", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.mcx.0", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.16", "stock": "oem.stk.fold.1" }
   },
   { "platform": "mcx",
    "why": "authored optic (op.auth.falcon)",
