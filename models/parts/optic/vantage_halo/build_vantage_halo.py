@@ -1,10 +1,10 @@
-# Vantage Halo circle-dot sight: an open-emitter rifle reflex, one-piece body, the widest window, a solar panel on the hood's top bar, a side battery tray (models/parts/optic/vantage_halo).
+# Vantage Halo circle-dot sight: an open-emitter rifle reflex, a long one-piece body (a CR2032 side tray), a solar panel on the hood, a QD clamp (models/parts/optic/vantage_halo).
 #   Blender: exec(open(r'<repo>/models/parts/optic/vantage_halo/build_vantage_halo.py').read(), {'PART_DIR': r'<repo>/models/parts/optic/vantage_halo'})
 #   or:      blender -b -P models/parts/optic/vantage_halo/build_vantage_halo.py
 # It sets CFG and runs the shared open-emitter builder (models/parts/optic/open_kit.py), which writes vantage_halo.glb, vantage_halo.blend and model.json.
 import os
 HERE = globals().get('PART_DIR') or os.path.dirname(os.path.abspath(__file__))
-CFG = {'sy': 0.034, 'win': (0.034, 0.024), 'top': 'square', 'solar': True, 'tray': True, 'qd': True, 'ret': 'cdot', 'replaces': ['Vantage Halo circle-dot sight']}
+CFG = {'sy': 0.034, 'win': (0.034, 0.024), 'top': 'square', 'solar': True, 'battery': 'tray', 'qd': True, 'ret': 'cdot', 'replaces': ['Vantage Halo circle-dot sight']}
 g = {'PART_DIR': HERE, 'CFG': CFG}
 exec(open(os.path.join(os.path.dirname(HERE), 'open_kit.py'), encoding='utf-8').read(), g)
 result = g['result']
