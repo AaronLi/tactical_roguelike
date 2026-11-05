@@ -93,7 +93,7 @@ function contactNoise(events: ReturnType<typeof buildExcitation>['events'], cont
  * resonances from the box's dimensions (L × 0.45L × 0.2L), leaky because the walls
  * are thin and full of gaps.
  */
-function renderHousing(p: Params, events: ContactEvent[], cont: Float32Array, mix: Float32Array, ref: number, sr: number, N: number): void {
+function renderHousing(p: Params, events: ContactEvent[], cont: Float32Array, direct: Float32Array | null, mix: Float32Array, ref: number, sr: number, N: number): void {
   const hp = p.housing;
   const rng = makeRng(p.out.seed * 7 + 3);
   const H = deriveBody(hp, sr, rng);
@@ -105,36 +105,54 @@ function renderHousing(p: Params, events: ContactEvent[], cont: Float32Array, mi
   mixInto(mix, walls, (amount * ref * 1.1) / wpk);
 
   if (hp.cavity > 0) {
+    // The air is driven by the walls and, directly, by the contact's own pressure pulse (a
+    // snap inside a pocket pushes the pocket's air itself, with all its high-frequency detail).
+    const drive = Float32Array.from(walls);
+    if (direct) {
+      const dpk = peak(direct);
+      if (dpk > 0) for (let i = 0; i < N; i++) drive[i] = drive[i] / wpk + direct[i] / dpk;
+    }
+    // Air spaces: either the listed cavities, or one from the housing's size.
     const L = clamp(hp.size, 0.2, 50) / 100;
     const cw = (hp.cavityWidth ?? 0) / 100;
-    const dims = cw > 0 ? [L, Math.min(cw, L), Math.min(cw, L) * 0.85] : [L, 0.45 * L, 0.2 * L];
-    const freqs: number[] = [];
-    for (let l = 0; l <= 10; l++)
-      for (let m = 0; m <= 2; m++)
-        for (let n = 0; n <= 1; n++) {
-          if (l + m + n === 0) continue;
-          const f = (343 / 2) * Math.sqrt((l / dims[0]) ** 2 + (m / dims[1]) ** 2 + (n / dims[2]) ** 2);
-          if (f < sr * 0.4) freqs.push(f);
-        }
-    freqs.sort((a, b) => a - b);
+    const spaces = hp.cavities?.length
+      ? hp.cavities.map((c) => ({ dims: [c.length / 100, c.width / 100, c.depth / 100], q: c.q ?? 9, level: c.level ?? 1, count: 6 }))
+      : [{ dims: cw > 0 ? [L, Math.min(cw, L), Math.min(cw, L) * 0.85] : [L, 0.45 * L, 0.2 * L], q: 9, level: 1, count: 8 }];
     const air = new Float32Array(N);
-    for (const f of freqs.slice(0, 8)) {
-      const w0 = (2 * Math.PI * f) / sr;
-      const al = Math.sin(w0) / (2 * 9);
-      const a0 = 1 + al;
-      const b0 = al / a0, b2 = -al / a0, a1 = (-2 * Math.cos(w0)) / a0, a2 = (1 - al) / a0;
-      let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
-      const g = Math.pow(freqs[0] / f, 0.5);
-      for (let i = 0; i < N; i++) {
-        const x = walls[i];
-        const y = b0 * x + b2 * x2 - a1 * y1 - a2 * y2;
-        x2 = x1; x1 = x; y2 = y1; y1 = y;
-        air[i] += y * g;
+    const one = new Float32Array(N);
+    for (const sp of spaces) {
+      const [dx, dy, dz] = sp.dims.map((d) => Math.max(0.005, d));
+      const freqs: number[] = [];
+      for (let l = 0; l <= 10; l++)
+        for (let m = 0; m <= 3; m++)
+          for (let n = 0; n <= 3; n++) {
+            if (l + m + n === 0) continue;
+            const f = (343 / 2) * Math.sqrt((l / dx) ** 2 + (m / dy) ** 2 + (n / dz) ** 2);
+            if (f < sr * 0.4) freqs.push(f);
+          }
+      freqs.sort((x, y) => x - y);
+      one.fill(0);
+      for (const f of freqs.slice(0, sp.count)) {
+        const w0 = (2 * Math.PI * f) / sr;
+        const al = Math.sin(w0) / (2 * sp.q);
+        const a0 = 1 + al;
+        const b0 = al / a0, b2 = -al / a0, a1 = (-2 * Math.cos(w0)) / a0, a2 = (1 - al) / a0;
+        let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+        const g = Math.pow(freqs[0] / f, 0.5);
+        for (let i = 0; i < N; i++) {
+          const x = drive[i];
+          const y = b0 * x + b2 * x2 - a1 * y1 - a2 * y2;
+          x2 = x1; x1 = x; y2 = y1; y1 = y;
+          one[i] += y * g;
+        }
       }
+      const opk = peak(one);
+      if (opk > 0) for (let i = 0; i < N; i++) air[i] += (one[i] / opk) * sp.level;
     }
     const apk = peak(air);
     if (apk > 0) mixInto(mix, air, (clamp(hp.cavity, 0, 1) * amount * ref * 0.9) / apk);
   }
+
 }
 
 export function render(p: Params, sampleRate = 48000): RenderResult {
@@ -172,8 +190,10 @@ export function render(p: Params, sampleRate = 48000): RenderResult {
     for (let i = 0; i < data.length; i++) if (start + i < N) force[start + i] += data[i];
   }
 
-  if (p.impact.click > 0) {
-    const click = contactNoise(events, ex.cont, sr, N, rng);
+  // The contact's own sound: radiated as the click, and pushing the air of any housing cavity.
+  const contactSound = p.impact.click > 0 || (p.housing && p.housing.amount > 0 && p.housing.cavity > 0) ? contactNoise(events, ex.cont, sr, N, rng) : null;
+  if (p.impact.click > 0 && contactSound) {
+    const click = Float32Array.from(contactSound);
     // A light part radiates its contact as a thin tick; a heavy one (a 300 g bolt carrier)
     // stopping short also pushes air at low frequencies: the weight of the "chunk".
     const clickHp = clamp(400 * Math.pow(0.02 / Math.max(1e-4, contact.mEff), 0.3), 90, 400);
@@ -197,7 +217,7 @@ export function render(p: Params, sampleRate = 48000): RenderResult {
     if (pk > 0) mixInto(mix, tone, (p.flex.tone * ref * 0.8) / pk);
   }
 
-  if (p.housing && p.housing.amount > 0) renderHousing(p, events, ex.cont, mix, ref, sr, N);
+  if (p.housing && p.housing.amount > 0) renderHousing(p, events, ex.cont, contactSound, mix, ref, sr, N);
 
   highpassInPlace(mix, 20, sr);
   let out = applyRoom(mix, p.out.room, p.out.roomSize, sr);

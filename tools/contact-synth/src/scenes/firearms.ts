@@ -121,7 +121,16 @@ const arTriggerSear: Body = { ...mat('steel'), shape: 'bar', size: 3, thickness:
 // ribbed body with its own dense ring (from ~300 Hz), separate from the upper.
 const arLower: Body = { ...mat('aluminum'), shape: 'plate', size: 20, thickness: 4, modes: 4, irregularity: 0.8, damping: 0.45, level: 0 };
 const arHammerSpring = springWire(4, 1.2);
-const LOWER_HOUSING: Scene['housing'] = { amount: 0.7, cavity: 0.3, cavityWidth: 4, ...mat('aluminum'), shape: 'shell', size: 20, thickness: 4, modes: 0, irregularity: 0.8, damping: 0.5 };
+// The receiver's connected air spaces: the upper's bore, the lower's fire-control pocket (open
+// at the top into the bore, stiff aluminium walls, so it rings sharper) and the magazine well.
+// Every slide in the upper expands into the pocket and the well, too.
+const FCG_POCKET = { length: 6, width: 2, depth: 4, q: 16, level: 1 };
+const MAG_WELL = { length: 8, width: 2.5, depth: 6, q: 11, level: 0.6 };
+// Parts in the lower (trigger group) sound mostly in the fire-control pocket.
+const LOWER_HOUSING: Scene['housing'] = {
+  amount: 0.85, cavity: 1, ...mat('aluminum'), shape: 'shell', size: 20, thickness: 4, modes: 0, irregularity: 0.8, damping: 0.5,
+  cavities: [{ ...FCG_POCKET, level: 1 }, { ...MAG_WELL, level: 0.5 }, { length: 30, width: 2.6, depth: 2.2, q: 9, level: 0.3 }],
+};
 // The forward-assist pawl is spring-loaded against the serrations on the carrier's right
 // side (~2.5 mm pitch): it clicks over them whenever the carrier moves past.
 const arFaPawl = steelBar(1.5, 3);
@@ -231,7 +240,10 @@ export const PUMP_SHOTGUN: Scene = {
 // Receiver housing: 7075 aluminium upper and lower, barrel and buffer tube hung off them.
 // The carrier slides inside the upper's long bore, which continues into the buffer tube: a
 // narrow air space (~2.6 cm) that gives the pipe-like hollow "shk" of the slides.
-const AR_HOUSING: Scene['housing'] = { amount: 0.55, cavity: 0.5, cavityWidth: 2.6, ...mat('aluminum'), shape: 'shell', size: 30, thickness: 3, modes: 0, irregularity: 0.8, damping: 0.6 };
+const AR_HOUSING: Scene['housing'] = {
+  amount: 0.65, cavity: 1, ...mat('aluminum'), shape: 'shell', size: 30, thickness: 3, modes: 0, irregularity: 0.8, damping: 0.6,
+  cavities: [{ length: 30, width: 2.6, depth: 2.2, q: 9, level: 0.8 }, FCG_POCKET, MAG_WELL],
+};
 
 /** The carrier running home under the buffer spring, starting at t (round in the magazine). */
 function arForward(t: number, withChargingHandle: boolean): SceneElement[] {

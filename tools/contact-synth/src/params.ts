@@ -150,6 +150,20 @@ export interface HousingParams extends BodyParams {
    * parts sliding inside a tube.
    */
   cavityWidth?: number;
+  /**
+   * Several connected air spaces instead of the single one above, each with its own size (cm),
+   * sharpness (Q: stiff metal walls ring sharper) and level. E.g. a rifle receiver: the
+   * upper's bore, the fire-control pocket and the magazine well. Scene-level; no sliders.
+   */
+  cavities?: Cavity[];
+}
+
+export interface Cavity {
+  length: number;
+  width: number;
+  depth: number;
+  q?: number;
+  level?: number;
 }
 
 export interface OutputParams {
