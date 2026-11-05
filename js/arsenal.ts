@@ -36,7 +36,7 @@ const G_Arsenal = (() => {
     { id: 'welrod', from: 'ppk', path: 'modern', ring: 2, a: 124, r: 470, stat: 'sur', n: 15, what: 'kills on unaware suspects', how: 'Down a suspect before they react, with the PPK. If they have seen you or heard gunfire, it does not count.',
       pro: { name: 'Night Work', stat: 'sur', n: 30, what: 'kills on unaware suspects', parts: { mag: 'welrod.mag.ext' } } },
     { id: 'maxim9', from: 'welrod', path: 'modern', ring: 3, a: 124, r: 690, stat: 'one', n: 15, what: 'one-round kills', how: "One round fired at them with the Welrod, and they're done.",
-      pro: { name: 'Quiet Room', stat: 'one', n: 30, what: 'one-round kills', parts: { barrel: 'maxim9.br.short', optic: 'op.pso.0', tac: 'ptac.1' } } },
+      pro: { name: 'Quiet Room', stat: 'one', n: 30, what: 'one-round kills', parts: { barrel: 'maxim9.br.short', optic: 'op.pso.2', tac: 'ptac.1' } } },
     { id: 'm1911', from: 'ppk', path: 'modern', ring: 2, stat: 'hs', n: 15, what: 'headshot kills', how: 'Put it where it counts.',
       pro: { name: 'Old Faithful', stat: 'hs', n: 30, what: 'headshot kills', parts: { barrel: 'pbr.11.43x23.match', optic: 'op.pso.0', grip: 'gr.pistol.1' } } },
     { id: 'usp', from: 'm1911', path: 'modern', ring: 3, stat: 'hsfar', n: 15, what: 'headshot kills past 10 m', how: 'A headshot, from further off than a pistol wants to be.',
