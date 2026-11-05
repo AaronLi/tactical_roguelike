@@ -710,7 +710,7 @@ const G_VMAnim = (() => {
   const NUMS = new Map<number, THREE.Material>(), SHELLS = new Map<string, THREE.Material>(), TIPS = new Map<string, THREE.Material>(), LICKS = new Map<string, THREE.Material>();
   // the colour code (js/icons.ts): a shell's hull for its load, a bullet's tip for its type
   function shellMat(am: string) { if (!SHELLS.has(am)) SHELLS.set(am, new T.MeshStandardMaterial({ color: G.Icons.shellCol(am), roughness: 0.55 })); return SHELLS.get(am)!; }
-  function lickMat(am: string) { if (!LICKS.has(am)) LICKS.set(am, new T.MeshStandardMaterial({ color: am === 'hp' ? 0xf2efe6 : G.Icons.tipCol(am), roughness: 0.75 })); return LICKS.get(am)!; } // (hollow point's own tan is lost on brass)
+  function lickMat(am: string) { if (!LICKS.has(am)) LICKS.set(am, new T.MeshStandardMaterial({ color: G.baseAm(am) === 'hp' ? 0xf2efe6 : G.Icons.tipCol(am), roughness: 0.75 })); return LICKS.get(am)!; } // (hollow point's own tan is lost on brass)
   function tipMat(am: string) { if (!TIPS.has(am)) TIPS.set(am, new T.MeshStandardMaterial({ color: G.Icons.tipCol(am), roughness: 0.4, metalness: 0.6 })); return TIPS.get(am)!; }
   function numMat(n: number) { // a count stamped beside a witness hole, white on the polymer
     if (NUMS.has(n)) return NUMS.get(n)!;

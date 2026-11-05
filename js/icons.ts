@@ -9,9 +9,12 @@ const G_Icons = (() => {
   const CELL = 64, cache = new Map<string, string>();
   // What a round looks like, everywhere it's drawn (these icons, and the rounds in the viewmodel: js/vmanim.ts, the
   // spent hulls: js/casings.ts): a shotgun shell's hull is colour-coded by its load; a bullet's tip shows its type.
-  const shellCol = (am: string) => ({ slug: '#d8c040', flechette: '#3a6ab0', birdshot: '#3a8a3a', he: '#e07a1a' } as Record<string, string>)[am] || '#b02a22'; // (buckshot red)
-  const tipCol = (am: string) => ({ ap: '#2a2a2a', tracer: '#c03020', hp: '#d8b070', subsonic: '#5a6a3a' } as Record<string, string>)[am] || '#b87333'; // (ball: copper)
-  const TYPE_COL: Record<string, string> = { ball: '#c9a14a', hp: '#e0604a', ap: '#4a90e0', sabot: '#7ad0ff', tracer: '#ff6a2a', subsonic: '#9aa4ac', buck: '#c03a2a', slug: '#e8c050', birdshot: '#8ab040', flechette: '#4a90e0', he: '#c8b040', broadhead: '#39c060', mechanical: '#e09020', bodkin: '#d040b0', railslug: '#40c8e0' };
+  const shellCol = (am: string) => ({ slug: '#d8c040', flechette: '#3a6ab0', birdshot: '#3a8a3a', he: '#e07a1a' } as Record<string, string>)[G.baseAm(am)] || '#b02a22'; // (buckshot red)
+  const tipCol = (am: string) => ({ ap: '#2a2a2a', tracer: '#c03020', hp: '#d8b070', subsonic: '#5a6a3a' } as Record<string, string>)[G.baseAm(am)] || '#b87333'; // (ball: copper)
+  const TYPE_COL: Record<string, string> = { // (a +P load's box is its base colour, lifted to a hot gold-orange below)
+    ball: '#c9a14a', hp: '#e0604a', ap: '#4a90e0', sabot: '#7ad0ff', tracer: '#ff6a2a', subsonic: '#9aa4ac', buck: '#c03a2a', slug: '#e8c050', birdshot: '#8ab040', flechette: '#4a90e0', he: '#c8b040', broadhead: '#39c060', mechanical: '#e09020', bodkin: '#d040b0', railslug: '#40c8e0' };
+  // +P: its base colour pushed hot, half way to a bright amber, so a +P box is told from its base load at a glance
+  for (const id of Object.keys(G.AMMO)) if (G.AMMO[id].plus && TYPE_COL[G.AMMO[id].base!]) { const c = parseInt(TYPE_COL[G.AMMO[id].base!].slice(1), 16), h = [16, 8, 0].map((sh, i) => Math.round((((c >> sh) & 255) + [255, 190, 20][i]) / 2)); TYPE_COL[id] = '#' + h.map((x) => x.toString(16).padStart(2, '0')).join(''); }
 
   function rr(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
   function shade(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) { const gr = g.createLinearGradient(x, y, x + w, y); gr.addColorStop(0, 'rgba(255,255,255,0.18)'); gr.addColorStop(0.5, 'rgba(255,255,255,0)'); gr.addColorStop(1, 'rgba(0,0,0,0.25)'); g.fillStyle = gr; g.fill(); }

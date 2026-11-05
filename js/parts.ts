@@ -1122,7 +1122,7 @@ const G_Gunsmith = (() => {
     flechette: (g: any) => ({ shotCount: 20, bulletWeight: g.bulletWeight * 0.7 }),
   };
   // the sound key for this gun firing a round of this type ("<soundKey>@<type>" when the load changes the report)
-  const roundSoundKey = (def: Record<string, any>, am: string) => (LOAD_SOUND[am] && G.GUN_SPECS[def.id] ? `${def.soundKey}@${am}` : def.soundKey);
+  const roundSoundKey = (def: Record<string, any>, am: string) => ((LOAD_SOUND[G.baseAm(am)] || (G.AMMO[am] && G.AMMO[am].plus)) && G.GUN_SPECS[def.id] ? `${def.soundKey}@${am}` : def.soundKey); // (a +P load's report: hotter, so louder: its own key)
   // gunshot synth inputs for a sound key ("id:barrelInches:device" or a plain id, either with "@type" for the load)
   const specs = new Map();
   function soundSpec(key: any) {
@@ -1136,8 +1136,10 @@ const G_Gunsmith = (() => {
       const bd = (G.WEAPONS[id] || G.WEAPONS[id.split('.')[0]] || {}).barrels; // (id: the gun's, or a round type's own spec of it: tempest.rifle)
       if (bd && inch !== undefined) { const t = G.U.clamp((+inch * 25.4 - bd.mm0) / (bd.mm1 - bd.mm0), 0, 1); s = Object.assign({}, s, { pressure: s.pressure * (0.55 + 0.45 * t), grain: s.grain * (0.6 + 0.4 * t) }); }
     }
-    if (LOAD_SOUND[am]) s = Object.assign({}, s, LOAD_SOUND[am](s));
-    if (!LOAD_SOUND[am] || window.GunshotSynth) specs.set(key, s); // (a subsonic load's needs the synth to work out)
+    const ba = G.baseAm(am), wd = G.WEAPONS[id] || G.WEAPONS[id.split('.')[0]], P = G.plusOf(wd ? G.calOf(wd) : 'rifle', am);
+    if (LOAD_SOUND[ba]) s = Object.assign({}, s, LOAD_SOUND[ba](s));
+    if (P) s = Object.assign({}, s, { pressure: s.pressure * P.p }); // (+P: more chamber pressure at the muzzle, a sharper, louder report)
+    if (!LOAD_SOUND[ba] || window.GunshotSynth) specs.set(key, s); // (a subsonic load's needs the synth to work out)
     return s;
   }
   // A shared barrel on this gun: the same object on every gun (a tube as long as the barrel and its profile, a few mm behind its chamber end).

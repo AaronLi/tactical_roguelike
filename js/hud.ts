@@ -359,7 +359,7 @@ const G_HUD = {
     const spare = Gr.feeds(Me, def).length, isMag = af.kind === 'mag';
     const sk = isMag ? G.Icons.styleFor(def, def.build && def.build.mag) : 'box', [iw, ih] = !isMag || sk === 'box' ? [16, 13] : sk === 'drum' ? [16, 16] : sk === 'p90' ? [22, 9] : [9, sk === 'pistol' ? 16 : 20];
     const icon = G.Icons.gauge(sk === 'tube' ? 'box' : sk, 1, 1, iw, ih), shown = Math.min(spare, 12);
-    this.set('ammoRes', ` <span class="spare" title="${isMag ? 'Loaded magazines' : 'Boxes of rounds'} on you">${Array.from({ length: shown }, () => `<img src="${icon}" style="width:${iw}px;height:${ih}px">`).join('')}${spare > shown ? '<i>+</i>' : ''}${spare ? '' : '<i class="none">none</i>'}</span>` + (am ? ` <small class="amtag">${am.tag}</small>` : ''));
+    this.set('ammoRes', ` <span class="spare" title="${isMag ? 'Loaded magazines' : 'Boxes of rounds'} on you">${Array.from({ length: shown }, () => `<img src="${icon}" style="width:${iw}px;height:${ih}px">`).join('')}${spare > shown ? '<i>+</i>' : ''}${spare ? '' : '<i class="none">none</i>'}</span>` + (am ? ` <small class="amtag${am.plus ? ' plus' : ''}">${am.tag}</small>` : ''));
     const other = Me.weapons[Me.slot === 'p' ? 's' : 'p'];
     const packed = G.Gear.packGuns(Me).map(([it]) => it.w.def.name);
     this.set('weapAlt', (other ? `${Me.slot === 'p' ? '2' : '1'} · ${other.def.name}` : '') + (packed.length ? `${other ? ' &nbsp; ' : ''}B · ${packed.join(', ')}` : ''));

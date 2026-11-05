@@ -34,7 +34,7 @@ interface LoadDef { g: number; lg?: number; v: number; n?: number; d?: number; l
 interface CaliberDef { name: string; group: string; box: number; per: number; rimfire?: boolean; types?: string[]; loads?: Record<string, LoadDef>; }
 interface AmmoDef {
   name: string; tag: string; k: number; desc: string; dragK?: number; velK?: number; massK?: number; rangeK?: number; spreadK?: number;
-  pelletsK?: number; tracer?: number; glow?: number; quiet?: boolean; slug?: boolean;
+  pelletsK?: number; tracer?: number; glow?: number; quiet?: boolean; slug?: boolean; plus?: boolean; base?: string;
 }
 
 const G_TIER_NAMES = ['Standard', 'Common', 'Uncommon', 'Rare', 'Legendary'];
@@ -628,14 +628,33 @@ const G_AMMO: Record<string, AmmoDef> = {
   bodkin: { name: 'Bodkin bolt', tag: 'BDKN', k: 2.2, velK: 0.79, massK: 1.6, glow: 0xff3ad0, desc: 'A heavy hardened needle, the old answer to mail: it parts a soft vest\'s weave where a bullet would be caught, and leaves a narrow wound. A hard plate still stops it.' },
   railslug: { name: 'Tungsten slug', tag: 'SLUG', k: 1, desc: 'Magnetically launched.' },
 };
+// +P loads (issue #19): every load but subsonic (and the grenade, bolts and rail) has a hotter twin, id '<load>_p': the same bullet on a higher-pressure
+// charge. PLUSP is the rule, by caliber group: v the muzzle speed it adds (pistol +7%, a rifle round +4%, a shotgun +6%), c the powder charge it adds (the
+// push back, G.recoilImpulse, follows the speed and the gas) and p the pressure the report is synthesised at (a louder crack, js/parts.ts LOAD_SOUND).
+// Priced 1.5x the base load; found 1 in 5 as often.
+const G_PLUSP: Record<string, { v: number; c: number; p: number }> = { pistol: { v: 1.07, c: 1.12, p: 1.14 }, rifle: { v: 1.04, c: 1.07, p: 1.08 }, shotgun: { v: 1.06, c: 1.10, p: 1.12 } };
+G.PLUSP = G_PLUSP;
+const G_PLUSP_K = 1.5;
+for (const id of Object.keys(G_AMMO)) {
+  if (['subsonic', 'he', 'broadhead', 'mechanical', 'bodkin', 'railslug'].includes(id)) continue;
+  const A = G_AMMO[id];
+  G_AMMO[id + '_p'] = Object.assign({}, A, { name: '+P ' + A.name, tag: A.tag + '+P', k: A.k * G_PLUSP_K, plus: true, base: id, desc: A.desc + ' Loaded +P: more powder at a higher chamber pressure, so it leaves faster and carries more energy, with a sharper kick and a louder report. Costs half as much again.' } as AmmoDef);
+}
 G.AMMO = G_AMMO;
+// the load a +P load is the hot version of (itself for any other)
+const G_baseAm = (am?: string | null): string => (am && G_AMMO[am] && G_AMMO[am].base) || am || '';
+G.baseAm = G_baseAm;
+// a +P load's factors in that caliber (see PLUSP), or null for any other load
+const G_plusOf = (cal: string, am?: string | null) => (am && G_AMMO[am] && G_AMMO[am].plus ? G_PLUSP[((G.CALIBERS[cal] || {}) as Partial<CaliberDef>).group || 'rifle'] || G_PLUSP.rifle : null);
+G.plusOf = G_plusOf;
 const G_AMMO_TYPES: Record<string, string[]> = { rifle: ['ball', 'hp', 'ap', 'tracer', 'subsonic'], pistol: ['ball', 'hp', 'ap', 'tracer', 'subsonic'], shotgun: ['buck', 'slug', 'birdshot', 'flechette'], grenade: ['he'], bolt: ['broadhead', 'mechanical', 'bodkin'], cell: ['railslug'] };
+for (const g of ['rifle', 'pistol', 'shotgun']) G_AMMO_TYPES[g] = G_AMMO_TYPES[g].concat(G_AMMO_TYPES[g].filter((t) => G_AMMO[t + '_p']).map((t) => t + '_p'));
 G.AMMO_TYPES = G_AMMO_TYPES;
 // the loads a caliber takes: its own list (the Tempest's two rounds), else its group's
-const G_ammoTypes = (cal: string): string[] => { const C = G.CALIBERS[cal] || { group: 'cell' } as Partial<CaliberDef>; return C.types || G.AMMO_TYPES[C.group!]; };
+const G_ammoTypes = (cal: string): string[] => { const C = G.CALIBERS[cal] || { group: 'cell' } as Partial<CaliberDef>; return C.types ? C.types.concat(C.types.filter((t) => G.AMMO[t + '_p']).map((t) => t + '_p')) : G.AMMO_TYPES[C.group!]; }; // (a caliber's own list: its +P loads follow)
 G.ammoTypes = G_ammoTypes;
 // a load's own figures in a caliber that lists them (CALIBERS loads: grams, speed at the longest effective length, pellets...), or null
-const G_loadOf = (cal: string, am?: string | null): LoadDef | null => { const C = G.CALIBERS[cal]; return (C && C.loads && am && C.loads[am]) || null; };
+const G_loadOf = (cal: string, am?: string | null): LoadDef | null => { const C = G.CALIBERS[cal]; return (C && C.loads && am && C.loads[G.baseAm(am)]) || null; }; // (a +P load has its base load's bullet)
 G.loadOf = G_loadOf;
 // How fast a round leaves the muzzle (m/s), for whether it cracks going past (only above the speed of sound,
 // 343 m/s). Reference velocities by caliber at a reference barrel length (inches), scaled gently by the
@@ -658,7 +677,7 @@ const G_SOUND_SPEED: number = 343;
 G.SOUND_SPEED = G_SOUND_SPEED;
 // how far a round goes before drag takes 63% of its speed (m), from this build, with this load
 // (a load's dragK: a hollow point's open, blunt nose sheds speed sooner than ball's)
-const G_dragOf = (def: Record<string, any>, am?: string | null): number => { const L = G.loadOf(G.calOf(def), am); if (L && L.drag) return L.drag; const ref = G.MUZZLE_V[G.calOf(def)]; return am === 'slug' ? 350 : (ref ? ref[2] : 600) * ((G.AMMO[am!] || {} as AmmoDef).dragK || 1); };
+const G_dragOf = (def: Record<string, any>, am?: string | null): number => { const L = G.loadOf(G.calOf(def), am); if (L && L.drag) return L.drag; const ref = G.MUZZLE_V[G.calOf(def)]; return G.baseAm(am) === 'slug' ? 350 : (ref ? ref[2] : 600) * ((G.AMMO[am!] || {} as AmmoDef).dragK || 1); };
 G.dragOf = G_dragOf;
 // a round's speed (m/s) d metres from the muzzle, from this build, with this load
 const G_roundSpeed = (def: Record<string, any>, am?: string | null, d = 0): number => {
@@ -666,11 +685,12 @@ const G_roundSpeed = (def: Record<string, any>, am?: string | null, d = 0): numb
   if (!ref) return 0;
   const barrel = def.barrelIn || (G.GUN_SPECS[def.id] || {}).barrel || ref[1];
   let v = ref[0] * Math.pow(Math.max(1, barrel) / ref[1], 0.2) * (def.velK || 1); // (velK: what the build adds besides its barrel's length)
-  if (am === 'slug') v = Math.max(v, 470);
+  if (G.baseAm(am) === 'slug') v = Math.max(v, 470);
   const L = G.loadOf(cal, am); // (a caliber with loads of its own: the load's speed against the ball's, and not the generic multiplier)
   if (L) v *= L.v / ref[0];
   else if (G.AMMO[am!] && G.AMMO[am!].velK) v *= G.AMMO[am!].velK!; // (AP: a lighter, hard-cored bullet leaves faster)
   // subsonic loads, and guns built to be (the integrally suppressed MP5SD and VSS), stay under Mach 1
+  { const P = G.plusOf(cal, am); if (P) v *= P.v; } // (+P: the hotter charge)
   if (am === 'subsonic' || def.integral) v = Math.min(v, 310);
   return v * Math.exp(-d / G.dragOf(def, am)); // (a slug carries its speed; pellets shed it)
 };
@@ -734,7 +754,7 @@ const G_recoilImpulse = (def: Record<string, any>, am?: string | null) => {
   if (!g || !ch) return 0;
   const v = G.roundSpeed(def, am), v0 = am === 'subsonic' ? G.roundSpeed(def) : v;
   // a subsonic load: a heavier bullet on a smaller charge (the energy it's loaded to)
-  const A = G.AMMO[am!] || {} as AmmoDef, L = G.loadOf(cal, am), bw = L ? (L.lg || L.g) * (L.n || 1) / 0.0647989 : g.bulletWeight * (am === 'subsonic' ? 1.4 : A.massK || 1), cw = ch * (am === 'subsonic' ? 1.4 * (v / v0) * (v / v0) : 1);
+  const A = G.AMMO[am!] || {} as AmmoDef, L = G.loadOf(cal, am), bw = L ? (L.lg || L.g) * (L.n || 1) / 0.0647989 : g.bulletWeight * (am === 'subsonic' ? 1.4 : A.massK || 1), cw = ch * (am === 'subsonic' ? 1.4 * (v / v0) * (v / v0) : 1) * ((G.plusOf(cal, am) || { c: 1 }).c);
   return (bw * v + cw * G.RECOIL.GAS * v) * 6.479891e-5;
 };
 G.recoilImpulse = G_recoilImpulse;
@@ -803,6 +823,7 @@ const G_ballFor = (cal: string): string => G.ammoTypes(cal)[0];
 G.ballFor = G_ballFor;
 // how often each type turns up loaded in a found gun (relative): ball and buckshot mostly, AP and flechette rarely
 const G_AMMO_RARITY: Record<string, number> = { ball: 10, hp: 3, tracer: 3, subsonic: 2, ap: 1, buck: 10, slug: 4, birdshot: 3, flechette: 1, sabot: 1, he: 1, broadhead: 3, mechanical: 2, bodkin: 1, railslug: 1 };
+for (const id of Object.keys(G.AMMO)) if (G.AMMO[id].plus) G_AMMO_RARITY[id] = Math.max(0.3, (G_AMMO_RARITY[G.AMMO[id].base!] || 1) * 0.2); // (+P: a fifth as often as its base load)
 G.AMMO_RARITY = G_AMMO_RARITY;
 const G_rollAmmo = (cal: string, rnd = Math.random): string => {
   const types = G.ammoTypes(cal);
@@ -827,7 +848,7 @@ const G_roundDef = (def: Record<string, any>, am?: string | null) => {
   if (A.slug) { d.pellets = 1; d.choke = 0; d.range = def.range * 2; }
   if (A.tracer) d.tracer = A.tracer;
   if (A.quiet) d.quiet = true;
-  if (A.slug || A.velK || L || am === 'subsonic') { const I0 = G.recoilImpulse(def), I = G.recoilImpulse(def, am); if (I0 && I) d.recoil = def.recoil * Math.pow(I / I0, G.RECOIL.B); } // (a load that pushes harder or softer)
+  if (A.slug || A.velK || A.plus || L || am === 'subsonic') { const I0 = G.recoilImpulse(def), I = G.recoilImpulse(def, am); if (I0 && I) d.recoil = def.recoil * Math.pow(I / I0, G.RECOIL.B); } // (a load that pushes harder or softer)
   return d;
 };
 G.roundDef = G_roundDef;
@@ -874,4 +895,4 @@ const G_ENEMY_GEAR = {
 };
 G.ENEMY_GEAR = G_ENEMY_GEAR;
 
-interface GameModules { TIER_NAMES: typeof G_TIER_NAMES; TIER_COLORS: typeof G_TIER_COLORS; CLASS_SND: typeof G_CLASS_SND; WEAPON_LIST: WeaponDef[]; WEAPONS: typeof G_WEAPONS; EXPLOSIVES_OFF: typeof G_EXPLOSIVES_OFF; obtainable: typeof G_obtainable; AUTO_ONLY: typeof G_AUTO_ONLY; FIRE_MODES: typeof G_FIRE_MODES; MODE_NAME: typeof G_MODE_NAME; MODE_INFO: typeof G_MODE_INFO; barrelsOf: typeof G_barrelsOf; roundOf: typeof G_roundOf; perOf: typeof G_perOf; cartOf: typeof G_cartOf; calsOf: typeof G_calsOf; asCal: typeof G_asCal; roundSpec: typeof G_roundSpec; capOf: typeof G_capOf; ammoTypes: typeof G_ammoTypes; loadOf: typeof G_loadOf; pickBarrels: typeof G_pickBarrels; shotDef: typeof G_shotDef; shotK: typeof G_shotK; barrelMm: typeof G_barrelMm; shotSoundKey: typeof G_shotSoundKey; OPEN_BOLT: typeof G_OPEN_BOLT; chambered: typeof G_chambered; revolver: typeof G_revolver; REV: typeof G_REV; fullReload: typeof G_fullReload; BOLT_HOLD: typeof G_BOLT_HOLD; boltHold: typeof G_boltHold; loaded: typeof G_loaded; MAG_FAMILY: typeof G_MAG_FAMILY; BELT_FAMILY: typeof G_BELT_FAMILY; magFam: typeof G_magFam; magFits: typeof G_magFits; beltFed: typeof G_beltFed; GUN_SPECS: typeof G_GUN_SPECS; SUPPRESSOR: typeof G_SUPPRESSOR; ARMOR_LIST: ArmorDef[]; ARMORS: typeof G_ARMORS; ENEMIES: typeof G_ENEMIES; THEMES: typeof G_THEMES; HANGAR_ROWS: typeof G_HANGAR_ROWS; HANGAR_THEME: typeof G_HANGAR_THEME; PLAYER_COLORS: typeof G_PLAYER_COLORS; VENDOR_QUIPS: typeof G_VENDOR_QUIPS; CALIBERS: typeof G_CALIBERS; calOf: typeof G_calOf; stdMag: typeof G_stdMag; AMMO: typeof G_AMMO; AMMO_TYPES: typeof G_AMMO_TYPES; MUZZLE_V: typeof G_MUZZLE_V; SOUND_SPEED: typeof G_SOUND_SPEED; dragOf: typeof G_dragOf; roundSpeed: typeof G_roundSpeed; CHARGE_GR: typeof G_CHARGE_GR; GUN_KG: typeof G_GUN_KG; RECOIL_K: typeof G_RECOIL_K; RECOIL: typeof G_RECOIL; aimSway: typeof G_aimSway; recoilImpulse: typeof G_recoilImpulse; physRecoil: typeof G_physRecoil; GRAVITY: typeof G_GRAVITY; zeroOf: typeof G_zeroOf; sightH: typeof G_sightH; ROUND_LIFE: typeof G_ROUND_LIFE; ballistics: typeof G_ballistics; flight: typeof G_flight; zeroSlope: typeof G_zeroSlope; CLICK: typeof G_CLICK; boreTip: typeof G_boreTip; ballFor: typeof G_ballFor; AMMO_RARITY: typeof G_AMMO_RARITY; rollAmmo: typeof G_rollAmmo; ammoOk: typeof G_ammoOk; roundDef: typeof G_roundDef; gearTier: typeof G_gearTier; ENEMY_GEAR: typeof G_ENEMY_GEAR; }
+interface GameModules { PLUSP: typeof G_PLUSP; baseAm: typeof G_baseAm; plusOf: typeof G_plusOf; TIER_NAMES: typeof G_TIER_NAMES; TIER_COLORS: typeof G_TIER_COLORS; CLASS_SND: typeof G_CLASS_SND; WEAPON_LIST: WeaponDef[]; WEAPONS: typeof G_WEAPONS; EXPLOSIVES_OFF: typeof G_EXPLOSIVES_OFF; obtainable: typeof G_obtainable; AUTO_ONLY: typeof G_AUTO_ONLY; FIRE_MODES: typeof G_FIRE_MODES; MODE_NAME: typeof G_MODE_NAME; MODE_INFO: typeof G_MODE_INFO; barrelsOf: typeof G_barrelsOf; roundOf: typeof G_roundOf; perOf: typeof G_perOf; cartOf: typeof G_cartOf; calsOf: typeof G_calsOf; asCal: typeof G_asCal; roundSpec: typeof G_roundSpec; capOf: typeof G_capOf; ammoTypes: typeof G_ammoTypes; loadOf: typeof G_loadOf; pickBarrels: typeof G_pickBarrels; shotDef: typeof G_shotDef; shotK: typeof G_shotK; barrelMm: typeof G_barrelMm; shotSoundKey: typeof G_shotSoundKey; OPEN_BOLT: typeof G_OPEN_BOLT; chambered: typeof G_chambered; revolver: typeof G_revolver; REV: typeof G_REV; fullReload: typeof G_fullReload; BOLT_HOLD: typeof G_BOLT_HOLD; boltHold: typeof G_boltHold; loaded: typeof G_loaded; MAG_FAMILY: typeof G_MAG_FAMILY; BELT_FAMILY: typeof G_BELT_FAMILY; magFam: typeof G_magFam; magFits: typeof G_magFits; beltFed: typeof G_beltFed; GUN_SPECS: typeof G_GUN_SPECS; SUPPRESSOR: typeof G_SUPPRESSOR; ARMOR_LIST: ArmorDef[]; ARMORS: typeof G_ARMORS; ENEMIES: typeof G_ENEMIES; THEMES: typeof G_THEMES; HANGAR_ROWS: typeof G_HANGAR_ROWS; HANGAR_THEME: typeof G_HANGAR_THEME; PLAYER_COLORS: typeof G_PLAYER_COLORS; VENDOR_QUIPS: typeof G_VENDOR_QUIPS; CALIBERS: typeof G_CALIBERS; calOf: typeof G_calOf; stdMag: typeof G_stdMag; AMMO: typeof G_AMMO; AMMO_TYPES: typeof G_AMMO_TYPES; MUZZLE_V: typeof G_MUZZLE_V; SOUND_SPEED: typeof G_SOUND_SPEED; dragOf: typeof G_dragOf; roundSpeed: typeof G_roundSpeed; CHARGE_GR: typeof G_CHARGE_GR; GUN_KG: typeof G_GUN_KG; RECOIL_K: typeof G_RECOIL_K; RECOIL: typeof G_RECOIL; aimSway: typeof G_aimSway; recoilImpulse: typeof G_recoilImpulse; physRecoil: typeof G_physRecoil; GRAVITY: typeof G_GRAVITY; zeroOf: typeof G_zeroOf; sightH: typeof G_sightH; ROUND_LIFE: typeof G_ROUND_LIFE; ballistics: typeof G_ballistics; flight: typeof G_flight; zeroSlope: typeof G_zeroSlope; CLICK: typeof G_CLICK; boreTip: typeof G_boreTip; ballFor: typeof G_ballFor; AMMO_RARITY: typeof G_AMMO_RARITY; rollAmmo: typeof G_rollAmmo; ammoOk: typeof G_ammoOk; roundDef: typeof G_roundDef; gearTier: typeof G_gearTier; ENEMY_GEAR: typeof G_ENEMY_GEAR; }

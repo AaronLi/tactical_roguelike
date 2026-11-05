@@ -22,10 +22,10 @@ eq('both calibers are loadable', G.calsOf(def), ['10/31', '10/53']);
 for (const [k, r] of Object.entries(b.rounds)) {
   const C = G.CALIBERS[r.cal], S = G.GUN_SPECS[r.spec];
   ok(`${k}: caliber ${r.cal} exists, with a box, loads and a sound spec`, C && S && C.loads && G.MUZZLE_V[r.cal] && G.CHARGE_GR[r.cal] && S.caliber + '/' + S.caseLength === r.cal);
-  ok(`${k}: every load has figures`, G.ammoTypes(r.cal).every((am) => G.AMMO[am] && C.loads[am]), JSON.stringify(G.ammoTypes(r.cal)));
+  ok(`${k}: every load has figures`, G.ammoTypes(r.cal).every((am) => G.AMMO[am] && C.loads[G.baseAm(am)]), JSON.stringify(G.ammoTypes(r.cal)));
 }
-eq('standard loads', G.ammoTypes('10/31'), ['ball', 'hp', 'tracer']);
-eq('rifle loads', G.ammoTypes('10/53'), ['ball', 'hp', 'tracer', 'sabot', 'buck']);
+eq('standard loads', G.ammoTypes('10/31'), ['ball', 'hp', 'tracer', 'ball_p', 'hp_p', 'tracer_p']); // (+P: each load but subsonic has a hot twin, js/data.ts PLUSP)
+eq('rifle loads', G.ammoTypes('10/53'), ['ball', 'hp', 'tracer', 'sabot', 'buck', 'ball_p', 'hp_p', 'tracer_p', 'sabot_p', 'buck_p']);
 eq('factory load is ball', [G.ballFor('10/31'), G.ballFor('10/53')], ['ball', 'ball']);
 ok('a sabot is not a standard load', G.ammoOk('10/31', 'sabot') === 'ball' && G.ammoOk('10/53', 'sabot') === 'sabot');
 // speeds at the longest effective length (the last shot of a barrel): the user's figures

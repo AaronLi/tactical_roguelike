@@ -103,10 +103,11 @@ const G_Ballistics = (() => {
     bolt: [25, 9, 400, 'hard', 0, 0], cell: [30, 10, 40, 'wc', 0, 0],
   };
   // what each load changes (physically): core, mass, nose, yaw, fragmentation, pellets
-  function projectile(def: Record<string, any>, am: string) {
+  function projectile(def: Record<string, any>, am0: string) {
+    const am = G.baseAm(am0); // (a +P load is its base load's bullet, at a higher speed)
     const cal = G.calOf(def), c = CAL[cal] || CAL['9/19'], pistol = ((G.CALIBERS as Record<string, any>)[cal] || {}).group !== 'rifle';
-    const p: BRound = { m: c[0] / 1000, d: c[1] / 1000, len: c[2] / 1000, core: c[3], yaw: c[4], frag: c[5], nose: 'fmj', n: c[6] || def.pellets || 1, cal, am };
-    let v0 = 0; try { v0 = G.roundSpeed(def, am) || 0; } catch (e) { /* no speed */ }
+    const p: BRound = { m: c[0] / 1000, d: c[1] / 1000, len: c[2] / 1000, core: c[3], yaw: c[4], frag: c[5], nose: 'fmj', n: c[6] || def.pellets || 1, cal, am: am0 };
+    let v0 = 0; try { v0 = G.roundSpeed(def, am0) || 0; } catch (e) { /* no speed */ }
     const opens = (vx: number) => (v0 ? Math.min(vx, v0 * 0.7) : vx); // (a hollow point opens at 70% of its own muzzle speed, at most vx)
     if (cal === '5.6/15' && am !== 'hp') p.soft = 1.3; // (bare soft lead: it flattens a couple of centimetres in)
     if (am === 'hp') { p.nose = 'hp'; p.core = 'lead'; p.frag = 0; p.vExp = opens(pistol ? 260 : 480); }
@@ -871,13 +872,13 @@ const G_Ballistics = (() => {
   function energy(def: Record<string, any>, am?: string, d = 10) {
     if (def.explosive || def.cls === 'BOW' && !CAL.bolt) return 0;
     const load = am || G.ballFor(G.calOf(def)), p = projectile(def, load), v = def.cls === 'RAIL' ? 2000 : G.roundSpeed(def, load, d) || 0;
-    return 0.5 * p.m * v * v * (load !== 'slug' ? G.roundDef(def, load).pellets || 1 : 1); // (a load has its own count: twenty darts)
+    return 0.5 * p.m * v * v * (G.baseAm(load) !== 'slug' ? G.roundDef(def, load).pellets || 1 : 1); // (a load has its own count: twenty darts)
   }
   const CORE: Record<string, string> = { lead: 'lead core', mild: 'mild-steel core', hard: 'hardened steel core', wc: 'tungsten carbide core' };
   // what a load is, physically, in a few words (for that caliber)
   function loadNotes(def: Record<string, any>, am: string) {
     const p = projectile(G.roundDef(def, am), am), out = [];
-    out.push(p.n! > 1 && am !== 'slug' ? `${p.n} × ${Math.round(p.m * 10000) / 10} g` : `${Math.round(p.m * 10000) / 10} g, ${Math.round(p.d * 10000) / 10} mm`);
+    out.push(p.n! > 1 && G.baseAm(am) !== 'slug' ? `${p.n} × ${Math.round(p.m * 10000) / 10} g` : `${Math.round(p.m * 10000) / 10} g, ${Math.round(p.d * 10000) / 10} mm`);
     out.push(CORE[p.core] || p.core);
     if (p.nose === 'hp') out.push(`opens from ${Math.round(p.vExp! * 0.75)} m/s, to ${EXPAND}× by ${Math.round(p.vExp! * 1.25)}`);
     if (p.jkt) out.push('a hard plate strips its jacket');
@@ -885,6 +886,7 @@ const G_Ballistics = (() => {
     if (p.frag) out.push(`fragments above ${p.frag} m/s`);
     if (p.yaw) out.push(`tumbles at ${Math.round(p.yaw)} cm`);
     const v = G.roundSpeed(def, am, 0); if (v) out.push(`${Math.round(v)} m/s`);
+    { const P = G.plusOf(G.calOf(def), am); if (P) out.push(`+P: ${Math.round((P.v - 1) * 100)}% faster, ${Math.round((P.v * P.v - 1) * 100)}% more energy`); }
     return out;
   }
   // a piece of armour's main protection (what a card shows): the layers where it matters most

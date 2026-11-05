@@ -305,7 +305,7 @@ const G_Audio = {
     if (v < 60) return;
     if (v <= G.SOUND_SPEED) return this.zip(miss, pe!.pan);
     // the crack: bigger rounds louder (and the heavy ones thump), barely-supersonic ones softer
-    const size = def.cls === 'RAIL' ? 1.6 : ['12.7/99', '8.6/69'].includes(cal) ? 1.5 : am !== 'slug' && def.cls === 'SG' ? 0.5 : ((G.CALIBERS as Record<string, any>)[cal] || {}).group === 'pistol' ? 0.6 : 1;
+    const size = def.cls === 'RAIL' ? 1.6 : ['12.7/99', '8.6/69'].includes(cal) ? 1.5 : G.baseAm(am) !== 'slug' && def.cls === 'SG' ? 0.5 : ((G.CALIBERS as Record<string, any>)[cal] || {}).group === 'pistol' ? 0.6 : 1;
     this.crack(miss, pe!.pan, size * G.U.clamp((v / G.SOUND_SPEED - 1) * 3, 0.35, 1));
   },
   // a round's impact point: heard if it's close, as whatever it hit
