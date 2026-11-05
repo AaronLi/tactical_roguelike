@@ -18,9 +18,10 @@ const PART_OWNER = { mag: 'mag', slide: 'slide', ch: 'charging', magn: 'magnifie
 const POSITION_BITS = +(process.env.MODELS_POSITION_BITS || 0);
 export const ownerTag = (node) => (node.startsWith('part_') ? PART_OWNER[node.slice(5)] || 'base' : node.startsWith('group_') ? node.split('_')[1] : 'base');
 
-export async function makeEmitter({ G, GM, Models }) {
+export async function makeEmitter({ G, GM, Models, logger }) {
   await MeshoptEncoder.ready; await MeshoptDecoder.ready;
   const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.encoder': MeshoptEncoder, 'meshopt.decoder': MeshoptDecoder });
+  if (logger) io.setLogger(logger); // (the baker passes a quiet one: gltf-transform's "prune: Removed types..." lines are noise unless --verbose)
   const matName = new Map();
   for (const [k, f] of Object.entries(GM.M)) { try { const m = f(); if (m && m.isMaterial && !matName.has(m)) matName.set(m, k); } catch (e) { /* not a material */ } }
   const copies = new Map(); // (the game's materials are shared: the export gets copies without the canvas bump map, named by catalogue key)
