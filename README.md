@@ -870,7 +870,20 @@ says the same), but not whose: the shooter's name isn't shown.
     - a gut wound (stomach)
 
     A round through the middle of a part is likelier to do damage than a graze, and armour that stops part
-    of a round also cuts the odds. Grenade fragments spread over the legs and lower body.
+    of a round also cuts the odds.
+  - **Grenades.**
+    - A **frag** is a short, close blast and 800 steel fragments thrown over the whole sphere, each flown as a round of
+      its own (about 0.4 g, 1,350 m/s, slowed by its own drag): through armour and bodies by the same sums as a bullet,
+      through walls and cover by what they are made of. It kills out to about 3 m, wounds badly to 5 and is a hazard to
+      9 or more; plasterboard and wood let them through, concrete stops them, and a corridor throws them back. They are
+      worked off over a few frames, so a detonation costs no frame more than about 3 ms.
+    - A **flashbang** blinds whoever has it in sight (falling off to 16 m, and by how squarely they face it; half
+      behind cover) and shakes anyone in the same room by the way sound goes. A suspect is **stunned** (up to 8 s: hands
+      to their eyes, weapon lowered, stumbling about, unable to fire; they give up almost every time they are shouted
+      at, and can be cuffed where they stand) and then **groggy** (a few more seconds: they see about 5 m, shoot at a
+      quarter of their aim, come round slowly). A star over their head says so: solid while stunned, fading while
+      groggy. Civilians curl up. Going in straight away beats looking round the door, which meets a suspect no
+      different from before; going in late meets them recovering.
   - **Blood is what puts you down.** Every hit costs blood at once (about half a point per point of damage
     to the torso, a third to a limb; none to the head), and then for as long as it bleeds:
     - over 40%: you're up, however hurt

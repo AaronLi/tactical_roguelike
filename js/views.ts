@@ -156,7 +156,7 @@ const G_Views = {
   applySnap(m: any) {
     if (!this.warmed) { this.warmed = true; G.Game.veilSay('Compiling shaders'); setTimeout(() => { G.R.warmup(); G.Game.veilN = G.Game.VEIL_SMOOTH; G.Game.veilWait = 0; }, 60); } // (compile everything once the level's full, then a few frames drawn and the veil lifts: js/game.ts veil. The wait: time to draw that line first)
     const seen = new Set<number>();
-    for (const [id, type, x, z, yaw, hp, aim, alert, crouch, lean, armed, scode, surp, door, kit, fl, str, y = 0, wd] of m.e) {
+    for (const [id, type, x, z, yaw, hp, aim, alert, crouch, lean, armed, scode, surp, door, kit, fl, str, y = 0, wd, fc = 0] of m.e) {
       seen.add(id);
       let ev = this.enemies.get(id);
       if (!ev) {
@@ -180,7 +180,7 @@ const G_Views = {
       }
       ev.selfHit = false;
       ev.tgt.set(x, y, z); ev.tgtYaw = yaw; ev.hp = hp; ev.aim = aim; ev.alert = alert; ev.crouch = !!crouch; ev.lean = lean || 0;
-      ev.scode = scode || 0;
+      ev.scode = scode || 0; ev.fc = fc || 0; // (fc: a flashbang's: 1 blinded and deaf, 2 coming round)
       ev.bleed = !!(fl & 1); ev.limp = !!(fl & 2); ev.reloading = !!(fl & 4); ev.down = !!(fl & 8); // wounds, reloads, down for good: from the host
       ev.wnd = Array.isArray(wd) ? wd : null; // the moderate-or-worse wounds (js/views.ts woundStreams); none once treated
       ev.str = str == null ? 1 : str / 100; // what blood loss leaves them to stand with (js/rig.ts powered body)
@@ -211,6 +211,25 @@ const G_Views = {
     G.Game.civsLeft = m.c || 0;
     G.Game.bodiesLeft = m.b || 0;
     G.Game.weaponsLeft = m.w || 0;
+  },
+  // A flashbanged suspect's status, over their head for the whole of it: a ringed star, solid while they are blind and deaf,
+  // fading as they come round (and a pulse in the colour of the outline, a hot white-yellow), seen through walls and at any range
+  flashMark(ev: VwEnemy, dt: number) {
+    let sp = ev.flashSp as THREE.Sprite | undefined;
+    if (!ev.alive || !ev.fc || ev.scode === 1 || ev.scode === 2 || ev.down) { if (sp) sp.visible = false; return; } // (hands up or cuffed: they've given in)
+    if (!sp) {
+      const c = document.createElement('canvas'); c.width = c.height = 128;
+      const g = c.getContext('2d')!;
+      g.translate(64, 64); g.strokeStyle = 'rgba(0,0,0,0.85)'; g.fillStyle = '#ffe97a'; g.lineWidth = 7; g.lineJoin = 'round';
+      g.beginPath(); for (let i = 0; i < 16; i++) { const a = i * Math.PI / 8 - Math.PI / 2, r = i % 2 ? 20 : 54; g.lineTo(Math.cos(a) * r, Math.sin(a) * r); } g.closePath(); g.stroke(); g.fill();
+      g.beginPath(); g.arc(0, 0, 11, 0, Math.PI * 2); g.fillStyle = '#fff'; g.fill();
+      sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false, transparent: true }));
+      sp.renderOrder = 19; G.R.dynRoot.add(sp); ev.flashSp = sp;
+    }
+    ev.flashPh = (ev.flashPh || 0) + dt;
+    const d = sp.position.distanceTo(G.R.camera.position), sc = Math.max(0.35, d * 0.045) * (1 + 0.12 * Math.sin(ev.flashPh * (ev.fc === 1 ? 14 : 6)));
+    sp.visible = true; sp.position.set(ev.pos.x, ev.pos.y + 2.15 * (ev.def.scale || 1), ev.pos.z);
+    sp.scale.set(sc, sc, 1); sp.material.opacity = ev.fc === 1 ? 1 : 0.45; sp.material.rotation = ev.flashPh * (ev.fc === 1 ? 2.5 : 0.8);
   },
   // world position of the closest living player (including you)
   nearestPlayer(p: THREE.Vector3) {
@@ -776,7 +795,8 @@ const G_Views = {
       const tgt = aimed || (ev.alert ? this.nearestPlayer(ev.pos) : null);
       if (tgt) pitch = Math.atan2(tgt.y + 1.2 - (ev.pos.y + 1.4 * ev.def.scale), Math.max(1, Math.hypot(tgt.x - ev.pos.x, tgt.z - ev.pos.z))); // (from their own height: upstairs, level)
       ev.recPitch = pitch; // (for the highlights: js/highlights.ts)
-      let pose: VwPose | null = ev.scode === 1 ? 'handsup' : ev.scode === 2 ? 'cuffed' : ev.scode === 3 ? 'cower' : null;
+      let pose: VwPose | null = ev.scode === 1 ? 'handsup' : ev.scode === 2 ? 'cuffed' : ev.scode === 3 || (ev.fc === 1 && !ev.scode) ? 'cower' : null; // (blinded by a flashbang: crouched, hands to the eyes)
+      this.flashMark(ev, dt);
       // being taken down and zip-tied by an officer (me or a teammate)
       let tk = -1;
       const ma = G.Me.action;
@@ -1042,7 +1062,7 @@ const G_Views = {
         G.R.dynRoot.remove(n.mesh);
         this.nades.splice(this.nades.indexOf(n), 1);
         if (n.own && n.kind === 'flash') G.Me.flashBang(p.clone().add(new THREE.Vector3(0, 0.1, 0)));
-        else if (n.own) G.Me.explode(p.clone().add(new THREE.Vector3(0, 0.25, 0)), 5, 160, true); // (just off the floor it's on, any floor)
+        else if (n.own) G.Me.explode(p.clone().add(new THREE.Vector3(0, 0.25, 0)), G.Me.BLAST.r, G.Me.BLAST.dmg, true); // (just off the floor it's on, any floor)
         else if (n.enemy && G.Net.isHost) G.Server.enemyBoom(p.clone().add(new THREE.Vector3(0, 0.25, 0)));
       }
     }

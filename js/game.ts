@@ -799,6 +799,7 @@ const G_Game = {
     if (m.id !== G.Net.myId) { G.R.explosion(p, m.r); G.Audio.boom(G.R.camera.position.distanceTo(p)); }
     const Me = G.Me;
     if (!Me.pos || Me.down || Me.dead) return;
+    if (m.fr && m.en && Math.hypot(Me.pos.x - p.x, Me.pos.z - p.z) < Me.FRAG.RANGE) Me.fragBurst(p, 1); // (a suspect's grenade: its chips, flown here for you alone)
     const cy = Me.pos.y + 1.0, d = Math.hypot(Me.pos.x - p.x, cy - p.y, Me.pos.z - p.z);
     if (d < m.r && G.Level.los(this.map!, p.x, p.y + 0.2, p.z, Me.pos.x, cy, Me.pos.z)) {
       Me.takeDamage(m.d * (1 - (d / m.r) * 0.6) * (m.en ? 1 : 0.4), p); // friendly blasts do 40%

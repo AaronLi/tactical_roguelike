@@ -555,6 +555,7 @@ const G_Me = {
     const map = G.Game.map!;
     if (!map || !this.pos) return;
     this.stepRounds(dt);
+    this.stepFrags(dt);
     G.R.fisheye = 0; // (spectating turns it on: js/player.ts spectate)
     if (this.dead) { if (G.R.vm) G.R.vm.visible = false; this.sendState(dt); return; } // (no gun of yours in the view of someone else's helmet; the camera's placed once their rigs are posed: G.Game.loop, spectate)
 
@@ -1707,7 +1708,140 @@ const G_Me = {
       ev.selfHit = true;
     }
     const r2 = (v: number) => Math.round(v * 100) / 100;
-    G.Net.toHost({ t: 'boom', p: [r2(p.x), r2(p.y), r2(p.z)], r: r2(r), d: Math.round(dmg) });
+    if (isNade) this.fragBurst(p);
+    G.Net.toHost({ t: 'boom', p: [r2(p.x), r2(p.y), r2(p.z)], r: r2(r), d: Math.round(dmg), fr: isNade ? 1 : undefined });
+  },
+
+  // ---------------------------------------------------------------- fragmentation
+  // A frag grenade's body is a steel casing that comes apart into FRAG.N chips, thrown out over the whole sphere
+  // (a ragged 0.4 g chip on average, some a third of that, a few four times, at about 1,350 m/s). Each is a round of
+  // its own (js/ballistics.ts: a mild-steel ball of that mass and size): it slows in the air by its own drag, goes into
+  // whoever is in its way through their armour and body (through), through walls and cover by what they are made of
+  // (crossSolid), or stops in them. So how many reach someone is how much of the sphere they fill (a body at 3 m
+  // fills about 1/200th of it), and the lethal radius, a few metres, is where that is enough to wound a few times
+  // over; further out they go on thinning (and slowing) as a hazard; walls and a table in the way stop most.
+  // Spread over frames: the work is a ray per chip (a wall and a body test), so a burst is queued and worked off by
+  // a time budget a frame (FRAG.BUDGET_MS, at least FRAG.MIN_PER_FRAME chips): a few frames at most. A chip that has
+  // flown is flown at once (at a kilometre a second the air time is nothing). A body takes at most FRAG.CAP of them
+  // through the full wound sums (the rest pass it by) so a crowd of chips on one man costs no more than that.
+  BLAST: { r: 3.2, dmg: 70 }, // (the burst's own push of air, close in: the chips are the rest)
+  FRAG: { N: 800, V0: 1350, VMIN: 70, RANGE: 70, CAP: 28, BUDGET_MS: 2.5, MIN_PER_FRAME: 40, M_MED: 0.0004, CD: 1.5, SHOW: 26, PUFFS: 14, BLOOD: 24 },
+  fragQ: null as null | any[],
+  fragLogs: [] as any[],
+  // p: where it went off. enemy: a suspect's (id): it is you it is meant for, and no one else it hurts here
+  fragBurst(p: THREE.Vector3, enemy?: number) {
+    const F = this.FRAG, n = F.N, dir = new Float32Array(n * 3), m = new Float32Array(n), v = new Float32Array(n);
+    // points over the sphere (the golden angle), the whole lot turned at random, each nudged a little off its place
+    const gold = Math.PI * (3 - Math.sqrt(5)), a0 = Math.random() * 6.283, tilt = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.random() * 6.283, Math.random() * 6.283, Math.random() * 6.283));
+    const u = new THREE.Vector3(), norm = () => Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(Math.PI * 2 * Math.random());
+    for (let i = 0; i < n; i++) {
+      const y = 1 - (2 * (i + 0.5)) / n, r = Math.sqrt(1 - y * y), a = a0 + i * gold;
+      u.set(Math.cos(a) * r + (Math.random() - 0.5) * 0.04, y + (Math.random() - 0.5) * 0.04, Math.sin(a) * r + (Math.random() - 0.5) * 0.04).normalize().applyQuaternion(tilt);
+      dir[i * 3] = u.x; dir[i * 3 + 1] = u.y; dir[i * 3 + 2] = u.z;
+      m[i] = G.U.clamp(F.M_MED * Math.exp(0.65 * norm()), 0.0001, 0.0016);
+      v[i] = F.V0 * (0.85 + 0.3 * Math.random()) * Math.pow(F.M_MED / m[i], 0.12);
+    }
+    const pos = new Float32Array(n * 6), geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const line = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0xffd9a0, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }));
+    line.frustumCulled = false; G.R.dynRoot.add(line);
+    const q = { p: p.clone(), enemy, n, i: 0, dir, m, v, pos, line, geo, shot: { sid: 0, ff: new Map(), f: 0, enemy: enemy || undefined } as any, per: new Map<string, any>(),
+      ms: 0, maxMs: 0, frames: 0, walls: 0, mats: {} as Record<string, number[]>, escaped: 0, puffs: 0, blood: 0, fade: -1 };
+    (this.fragQ = this.fragQ || []).push(q);
+  },
+  stepFrags(dt: number) {
+    const Q = this.fragQ;
+    if (!Q || !Q.length) return;
+    const F = this.FRAG, q = Q[0];
+    if (q.i < q.n) {
+      const t0 = performance.now();
+      let k = 0;
+      while (q.i < q.n && (k < F.MIN_PER_FRAME || performance.now() - t0 < F.BUDGET_MS)) { this.fragOne(q, q.i++); k++; }
+      const ms = performance.now() - t0;
+      q.ms += ms; q.maxMs = Math.max(q.maxMs, ms); q.frames++;
+      q.geo.attributes.position.needsUpdate = true;
+      if (q.i >= q.n) this.fragDone(q);
+    } else {
+      q.fade -= dt;
+      (q.line.material as THREE.LineBasicMaterial).opacity = Math.max(0, q.fade / 0.25) * 0.9;
+      if (q.fade <= 0) { G.R.dynRoot.remove(q.line); q.geo.dispose(); (q.line.material as THREE.Material).dispose(); Q.shift(); }
+    }
+  },
+  fragDone(q: any) {
+    q.fade = 0.25;
+    for (const [tg, f] of q.shot.ff) G.Net.toHost(Object.assign({ t: 'ff', tg, f: 0, e: q.shot.enemy }, f)); // (what they did to a teammate)
+    q.shot.ff.clear();
+    const per: Record<string, any> = {};
+    for (const [k, v] of q.per) per[k] = v;
+    this.fragLogs.push({ at: q.p.toArray().map((x: number) => +x.toFixed(2)), n: q.n, frames: q.frames, ms: +q.ms.toFixed(2), maxFrameMs: +q.maxMs.toFixed(2), walls: q.walls, mats: q.mats, escaped: q.escaped, per });
+    if (this.fragLogs.length > 20) this.fragLogs.shift();
+  },
+  // one chip, flown from the burst to wherever it ends
+  fragOne(q: any, i: number) {
+    const F = this.FRAG, B = G.Ballistics, L = G.Level, map = G.Game.map!, m = q.m[i];
+    const d = new THREE.Vector3(q.dir[i * 3], q.dir[i * 3 + 1], q.dir[i * 3 + 2]), o = q.p.clone(), dia = Math.cbrt(m / 7850) * 1.24;
+    const proj: any = { m, d: dia, len: dia, core: 'mild', nose: 'ball', d0: dia, m0: m, ang: 0 };
+    const drag0 = (2 * m) / (F.CD * 1.2 * Math.PI / 4 * dia * dia); // (metres to lose a factor e of its speed in the air)
+    let drag = drag0, v = q.v[i], rest = F.RANGE, hitSomething = false;
+    const b: any = { hit: new Set(), enemy: q.enemy, events: 1 };
+    const adv = (t: number) => { o.addScaledVector(d, t); rest -= t; v *= Math.exp(-t / drag); };
+    const key = (h: any) => (h.ev ? 'e' + h.ev.id : h.mate ? 'p' + h.mate.id : 'me');
+    legs: for (let leg = 0; leg < 10 && rest > 1e-3 && v > F.VMIN; leg++) {
+      const wall = L.raycast(map, o.x, o.y, o.z, d.x, d.y, d.z, rest, { bars: true }), hitWall = !!wall.solid && wall.t < rest - 1e-4, wallT = Math.min(wall.t, rest);
+      for (const h of this.roundHits(b, o, d, wallT)) {
+        const k = key(h), rec = q.per.get(k) || { tests: 0, hits: 0, stopped: 0, through: 0, armourStopped: 0, capped: 0 };
+        q.per.set(k, rec);
+        if (rec.tests >= F.CAP) { rec.capped++; continue; } // (a body's full: the rest of the burst passes it by)
+        rec.tests++;
+        const vh = v * Math.exp(-h.t / drag), ev = h.ev, mate = h.mate;
+        const rig = ev ? ev.rig : mate ? mate.rig : h.rig, armour = ev ? B.suspectArmour(ev) : mate ? B.stateArmour(mate.st) : B.kitArmour(this);
+        const r = B.through(rig, o, d, vh, proj, armour, Math.min(wallT + 0.8, h.t + 2.5), null);
+        if (!r || r.entryT == null) continue;
+        b.hit.add(ev || mate || this); rec.hits++; hitSomething = true;
+        const hp = o.clone().addScaledVector(d, r.entryT);
+        if (ev) {
+          B.wearOut(armour);
+          this.hitEnemy(ev, r, null as any); // (not a gun's: no weapon path counts it)
+          if (rec.hits <= 6) ev.rig.hit(d, proj.m * vh);
+          ev.selfHit = true; ev.engagedT = performance.now(); ev.lastHitDir = d.clone().setY(0).normalize();
+        } else {
+          const out = B.outcome(r, armour);
+          if (h.self) this.applyWounds(out, q.p.clone(), !q.enemy);
+          else {
+            const ff = q.shot.ff.get(mate!.id) || { ws: [], rang: 0, stopped: 0, wear: {}, at: hp.toArray().map((x: number) => Math.round(x * 100) / 100) };
+            ff.ws.push(...out.ws); ff.rang |= out.rang; ff.stopped += out.stopped; if (out.fc) ff.fc = (ff.fc || []).concat(out.fc); if (out.hd) ff.hd = (ff.hd || []).concat(out.hd);
+            for (const [kk, j] of Object.entries(out.wear)) ff.wear[kk] = (ff.wear[kk] || 0) + (j as number);
+            q.shot.ff.set(mate!.id, ff);
+            if (rec.hits <= 6) mate!.rig.hit(d, proj.m * vh);
+          }
+        }
+        if (r.hits.some((x: any) => x.armour.some((a: any) => !a.through))) rec.armourStopped++;
+        if (q.blood < F.BLOOD && r.hits.some((x: any) => x.E > 1)) { q.blood++; G.R.impact(hp, null, 'blood'); }
+        proj.m = r.p ? r.p.m : proj.m;
+        if (!r.exitV) { rec.stopped++; adv(r.entryT); this.fragShow(q, i, o); return; }
+        rec.through++;
+        adv(r.exitT); v = r.exitV;
+        d.copy(B.deflect(d, { dev: r.dev, bend: 0 }, null));
+        drag = B.flightDrag(proj, drag0);
+        continue legs;
+      }
+      if (!hitWall) { adv(rest); break; }
+      adv(wall.t);
+      q.walls++;
+      const r = B.crossSolid(map, proj, v, wall, o, d);
+      { const mm = q.mats[r.name || "?"] = q.mats[r.name || "?"] || [0, 0, 0]; if (r.ric) mm[2]++; else if (!r.v) mm[0]++; else mm[1]++; } // (what the walls did: stopped, let through, glanced)
+      if (q.puffs < F.PUFFS && !hitSomething && Math.random() < 0.05) { q.puffs++; G.R.particles(o.clone(), 3, 0xb4aa98, 2.5, 0.35, 2, 0.5); }
+      if (r.ric) { o.addScaledVector(new THREE.Vector3(...wall.n), 0.004); d.copy(B.deflect(d, r, wall.n)); v = r.v; continue; }
+      if (!r.v) { this.fragShow(q, i, o); return; }
+      adv(r.t); v = r.v; d.copy(B.deflect(d, r, wall.n)); o.addScaledVector(d, 0.004);
+    }
+    if (v > F.VMIN) q.escaped++;
+    this.fragShow(q, i, o);
+  },
+  // a chip's streak, from the burst to where it ended (the first FRAG.SHOW metres of it)
+  fragShow(q: any, i: number, end: THREE.Vector3) {
+    const a = q.p, dx = end.x - a.x, dy = end.y - a.y, dz = end.z - a.z, len = Math.hypot(dx, dy, dz) || 1, k = Math.min(1, this.FRAG.SHOW / len), P = q.pos;
+    P[i * 6] = a.x; P[i * 6 + 1] = a.y; P[i * 6 + 2] = a.z; P[i * 6 + 3] = a.x + dx * k; P[i * 6 + 4] = a.y + dy * k; P[i * 6 + 5] = a.z + dz * k;
   },
 
   // a flashbang of yours went off: the host works out who it blinds (and tells everyone, you too)
@@ -2048,7 +2182,7 @@ const G_Me = {
       // restrain the living / secure the dead (hold)
       // (the one under your crosshair: look at who you mean). A weapon dropped by a body: whichever of the
       // two is nearer the middle of the crosshair is what you mean
-      let cuffTgt = tgt ? null : this.aimedPerson((ev: VwEnemy) => (ev.alive ? ev.scode === 1 || ev.down || (ev.def.civ && ev.scode === 3) : !ev.bodySecured && ev.deadT > 1));
+      let cuffTgt = tgt ? null : this.aimedPerson((ev: VwEnemy) => (ev.alive ? ev.scode === 1 || ev.down || ev.fc === 1 || (ev.def.civ && ev.scode === 3) : !ev.bodySecured && ev.deadT > 1));
       const evAim = tgt ? null : this.aimedEvidence();
       if (cuffTgt && evAim !== null) {
         const v = G.Views.evidence.get(evAim)!, c = new THREE.Vector3();

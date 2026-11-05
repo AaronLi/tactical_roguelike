@@ -53,7 +53,7 @@ interface Enemy {
   lurk?: boolean; hide?: HideSpot | null; peeking?: boolean; relocate?: boolean; turnYaw?: number | null; ordered?: boolean; dragTo?: { x: number; z: number } | null;
   guard?: boolean; dp?: DoorPeekSpot | null; dpT?: number; dpOk?: number; heard?: { x: number; y: number; z: number; at: number };
   threat?: { x: number; z: number; y?: number; d?: number } | null; str?: number; collapsed?: boolean; down?: boolean; sup?: number; supAt?: number; supQ?: number[][];
-  flinchT?: number; flinchOk?: number; flashT?: number; peekDone?: boolean; peekOut?: number; organs?: Record<string, number>; broke?: Record<string, number>;
+  flinchT?: number; flinchOk?: number; flashT?: number; flashRec?: number; flashRecLen?: number; flashK?: number; flashOn?: boolean; flashBy?: { x: number; y: number; z: number } | null; stumbleT?: number; stumbleYaw?: number; stumbleV?: number; peekDone?: boolean; peekOut?: number; organs?: Record<string, number>; broke?: Record<string, number>;
   spine?: boolean; cardiac?: boolean; out?: boolean; incap?: { by: string | null; t: number }; lastHitAt?: number; lastH?: boolean; lastAp?: boolean;
   hitState?: EnemyState; hitUnaware?: boolean; hitYield?: boolean; hitAt?: number; shock?: number; kick?: number; headDelay?: number; engAt?: number; engTgt?: string;
   firedAt?: number; sawAt?: number; engagedAt?: number; allyT?: number; allyN?: number; proof?: boolean; seeK?: number; blind?: boolean; onWait?: number;
@@ -179,7 +179,7 @@ const G_Server = {
           tos: Array.isArray(m.tos) && m.tos.length <= 24 && m.tos.every((p: unknown) => Array.isArray(p) && p.length === 3 && p.every(Number.isFinite)) ? m.tos : undefined }, from); // (a shotgun's pellets: for the highlights)
         break;
       case 'nade': G.Net.broadcast({ t: 'nade', id: from, p: m.p, v: m.v, fuse: m.fuse, k: m.k === 'flash' ? 'flash' : 'frag', s: [0, 1, 2].includes(m.s) ? m.s : 2 }, from); break;
-      case 'flash': if (this.phase === 'level' && Array.isArray(m.p) && m.p.length === 3 && m.p.every(Number.isFinite)) this.flashbang(m.p); break;
+      case 'flash': if (this.phase === 'level' && Array.isArray(m.p) && m.p.length === 3 && m.p.every(Number.isFinite)) this.flashbang(m.p, p && p.st ? p.st.p : null); break;
       // an officer's round went through these windows
       case 'glass': if (this.phase === 'level' && Array.isArray(m.ids)) this.breakGlass(m.ids, m.p); break;
       case 'crack': { // (a first round through a pane: it's fractured, and it's heard)
@@ -1122,7 +1122,7 @@ const G_Server = {
           + (surprised ? 0.4 : 0)
           + (!e.drawn ? 0.3 : e.drawT > 0 ? 0.05 : -0.15) // holstered / still drawing / gun up
           + 0.5 * (1 - (e.str == null ? 1 : e.str)) + (e.collapsed ? 0.3 : 0) + (e.suppressT > 0 ? 0.15 : 0) + (e.broken ? 0.3 : 0) // weakened: losing the will to fight
-          + 0.08 * Math.min(3, e.shouts) + 0.08 * Math.max(0, seen - 1) - (d > 10 ? 0.1 : 0) + (e.flashT! > 0 ? 0.35 : 0) // (dazed by a flashbang: in no state to argue)
+          + 0.08 * Math.min(3, e.shouts) + 0.08 * Math.max(0, seen - 1) - (d > 10 ? 0.1 : 0) + (e.flashT! > 0 ? 0.35 : e.flashRec! > 0 ? 0.2 : 0) // (dazed by a flashbang: in no state to argue)
           - Math.max(0, e.morale - 0.5) * 0.8 - (e.def.hunt && e.drawn ? 0.15 : 0);
         chance = e.def.comply ? G.U.clamp(chance, 0, e.collapsed ? 0.97 : 0.92) : 0; // never a sure thing
         // Braver together: with armed friends around who can see them, almost nobody gives up. And anyone
@@ -1131,17 +1131,18 @@ const G_Server = {
         // count for little.
         const weak = e.collapsed ? 1 : G.U.clamp(1 - (e.str == null ? 1 : e.str) / 0.6, 0, 1);
         chance *= G.U.lerp([1, 0.3, 0.08, 0.03][Math.min(3, this.allies(e))], 1, weak * 0.85);
-        const shaken = e.broken || e.collapsed || (e.str != null && e.str < 0.5) || e.flashT! > 0;
+        const shaken = e.broken || e.collapsed || (e.str != null && e.str < 0.5) || e.flashT! > 0 || e.flashRec! > 0;
         if (!shaken && (this.clock - (e.firedAt || -99) < 30 || e.emboldened)) chance *= 0.1;
         e.shouts++;
       }
+      if (!e.def.civ && e.flashT! > 0 && e.def.comply != null && !e.def.boss) chance = Math.max(chance, this.FLASH.SHOUT); // (blind and deaf, and told to put their hands up: they do)
       if (Math.random() < chance) { this.surrender(e); complied++; }
       else if (!e.def.civ) {
         // refuses: snaps out of it, gets the weapon up and fights
         e.morale -= 0.08 * (e.def.steady || 1);
         e.surprisedT = 0;
-        this.alertEnemy(e, false);
-        e.cool = Math.min(e.cool, e.broken ? 1 : 0.5);
+        if (e.flashT! > 0) e.alert = true; // (blind and deaf there's nothing they can do about it: the gun comes up when they can see)
+        else { this.alertEnemy(e, false); e.cool = Math.min(e.cool, e.broken ? 1 : 0.5); }
       }
     }
     this.hear(px, pz, 14, py); // anyone else nearby now knows police are inside
@@ -1225,7 +1226,7 @@ const G_Server = {
       this.checkClear();
       return;
     }
-    if (!e || !(e.state === 'surrender' || e.collapsed || (e.def.civ && (e.state === 'cower' || e.state === 'flee')))) return; // (down: no giving up, just cuffed where they lie)
+    if (!e || !(e.state === 'surrender' || e.collapsed || (!e.def.civ && e.flashT! > 0) || (e.def.civ && (e.state === 'cower' || e.state === 'flee')))) return; // (down: no giving up, just cuffed where they lie)
     if ((e.collapsed ? reach(e.x, e.z) : Math.hypot(e.x - p.st.p[0], e.z - p.st.p[2])) > 2.6) return;
     const dn = !!e.collapsed; // (cuffed where they lay, bleeding: a living arrest, but no arrest to show in the highlights)
     e.state = 'cuffed'; e.armed = false; e.fake = false;
@@ -1505,7 +1506,7 @@ const G_Server = {
       const r2 = (v: number) => Math.round(v * 100) / 100;
       const e = [];
       for (const en of this.enemies.values()) {
-        e.push([en.id, en.type, r2(en.x), r2(en.z), r2(en.yaw), Math.max(1, Math.round((en.hp / en.maxHp) * 100)), en.aiming ? en.tgt : 0, en.alert ? 1 : 0, en.crouch ? 1 : 0, en.leanOut || 0, en.armed ? (en.drawn ? 2 : 1) : 0, STATE_CODE[en.state] || 0, en.surprisedT > 0 ? 1 : 0, en.doorWait > 0 ? 1 : 0, en.def.civ ? 0 : `${en.def.wpn}|${en.def.vest}|${en.def.helmet}|${en.def.face || ''}|${en.def.tac || 0}|${(en.def.ex || []).join(',')}`, ((en.bleedH || en.bleedL) ? 1 : 0) | (en.legs ? 2 : 0) | (en.reloadT > 0 ? 4 : 0) | (en.down ? 8 : 0), Math.round(Math.min(en.down ? 0.25 : 1, en.str == null ? 1 : en.str) * 100), r2(en.y || 0), en.wnd && en.wnd.length ? en.wnd : 0]);
+        e.push([en.id, en.type, r2(en.x), r2(en.z), r2(en.yaw), Math.max(1, Math.round((en.hp / en.maxHp) * 100)), en.aiming ? en.tgt : 0, en.alert ? 1 : 0, en.crouch ? 1 : 0, en.leanOut || 0, en.armed ? (en.drawn ? 2 : 1) : 0, STATE_CODE[en.state] || 0, en.surprisedT > 0 ? 1 : 0, en.doorWait > 0 ? 1 : 0, en.def.civ ? 0 : `${en.def.wpn}|${en.def.vest}|${en.def.helmet}|${en.def.face || ''}|${en.def.tac || 0}|${(en.def.ex || []).join(',')}`, ((en.bleedH || en.bleedL) ? 1 : 0) | (en.legs ? 2 : 0) | (en.reloadT > 0 ? 4 : 0) | (en.down ? 8 : 0), Math.round(Math.min(en.down ? 0.25 : 1, en.str == null ? 1 : en.str) * 100), r2(en.y || 0), en.wnd && en.wnd.length ? en.wnd : 0, en.flashT! > 0 ? 1 : en.flashRec! > 0 ? 2 : 0]); // (wounds for the bleeding streams, then the flash state)
       }
       const p: Record<string, any> = {};
       for (const pl of all) p[pl.id] = pl.st;
@@ -1528,7 +1529,7 @@ const G_Server = {
 
   think(e: Enemy, dt: number, alive: LivePlayer[]) {
     const def = e.def, map = this.map!, L = G.Level, U = G.U, s = def.scale;
-    if (e.flashT! > 0) e.flashT! -= dt;
+    if (e.flashT! > 0) { e.flashT! -= dt; if (e.flashT! <= 0) { e.flashT = 0; this.flashEnd(e); } } else if (e.flashRec! > 0) e.flashRec! -= dt;
     e.complyCd = Math.max(0, e.complyCd - dt);
     e.suppressT = Math.max(0, e.suppressT - dt);
     e.flinchT = Math.max(0, (e.flinchT || 0) - dt);
@@ -1545,6 +1546,7 @@ const G_Server = {
     if (def.civ) return this.thinkCiv(e, dt);
     if (e.state === 'cuffed') return;
     if (e.state === 'surrender') return this.thinkSurrendered(e, dt, alive);
+    if (e.flashT! > 0) { this.thinkFlashed(e, dt); return; } // (blind and deaf: out of the fight)
     this.reloadTick(e, dt);
     if (e.pendingAlert >= 0) { e.pendingAlert -= dt; if (e.pendingAlert < 0) this.alertEnemy(e, false, true); }
     if (e.supQ && e.supQ.length) e.supQ = e.supQ.filter((q: number[]) => { if (q[0] > this.clock) return true; if (e.state === 'normal') this.nearMiss(e, q[1]); return false; });
@@ -1572,7 +1574,7 @@ const G_Server = {
       e.percT = 0.12 + Math.random() * 0.1;
       let best = null, bs = 1e9, bvis = false, bd = 99;
       e.proof = false;
-      if (e.flashT! > 0) alive = []; // (blinded by a flashbang: sees nobody)
+      if (e.flashRec! > 0) alive = alive.filter((q: LivePlayer) => Math.hypot(q.st.p[0] - e.x, q.st.p[2] - e.z) < this.FLASH.SEE_R); // (coming round from a flashbang: sees a few metres)
       const ey = (e.y || 0) + Math.min(1.6 * s, 2.4);
       for (const p of alive) {
         const [px, py, pz] = p.st.p;
@@ -1828,7 +1830,7 @@ const G_Server = {
   // Returns true while it's what they're doing.
   doorPeek(e: Enemy, dt: number) {
     const U = G.U, L = G.Level, P = this.DOORPEEK, def = e.def;
-    const rattled = e.flinchT! > 0 || e.suppressT > 0 || e.flashT! > 0 || e.morale < def.morale * 0.7 || (e.str != null && e.str < 0.6);
+    const rattled = e.flinchT! > 0 || e.suppressT > 0 || e.flashT! > 0 || e.flashRec! > 0 || e.morale < def.morale * 0.7 || (e.str != null && e.str < 0.6);
     const stop = () => { e.dp = null; e.leanOut = 0; e.crouch = false; e.dpOk = this.clock + 10 + Math.random() * 8; return false; };
     if (e.dp && rattled) return stop();
     if (!e.dp) {
@@ -2086,29 +2088,97 @@ const G_Server = {
     const r2 = (x: number) => Math.round(x * 100) / 100;
     G.Net.broadcast({ t: 'nade', id: 'enemy', e: e.id, p: p.map(r2), v: v.map(r2), fuse: 2.6, en: 1 });
   },
-  // A flashbang: everyone hears it; anyone with an eye on it (in sight of the blast, close enough) is blinded
-  // for a few seconds, longer the closer and the more squarely they were facing it. Blinded, a suspect can't
-  // see to fight and stands frozen, and is far easier to talk down; civilians panic.
-  flashbang(p: number[]) {
-    const L = G.Level, map = this.map!, [x, y, z] = p;
+  // ---------------------------------------------------------------- flashbangs
+  // A flashbang is a flash and a bang, and each does its own work. Anyone with the blast in sight (or half in sight: a
+  // crouch behind cover shows the head or the legs but not both) is blinded, by how close (falling off over FLASH.RANGE)
+  // and how squarely they face it (turned away, the lids and the back of the head take most of it); anyone in the same
+  // room, by the way sound goes (a closed door adds ten metres: soundField), is deafened and shaken even with no sight of
+  // it, less. The sum, k (0..1), sets two times: STUN, in which a suspect is out of the fight (eyes covered, weapon
+  // lowered, seeing nothing, stumbling about; they can be cuffed where they stand, and shouted down almost every time),
+  // then REC, in which they see only a few metres, shoot badly (FLASH.AIM) and are slow to come round. Somebody who
+  // goes in at once has the whole of the stun to take them; somebody who peeks round a doorway meets a suspect who is
+  // as unaware as before, and a blast that has done nothing. The steadier types (steady, bosses) shake it off sooner.
+  // Civilians curl up where they are.
+  FLASH: { RANGE: 16, ROOM: 12, DEAF: 0.4, STUN: [0.5, 8], REC: [1.5, 5.5], FACE: [1, 0.65, 0.4], PARTIAL: 0.6, SEE_R: 5, AIM: 0.25, SHOUT: 0.85, GIVE_UP_R: 6 },
+  flashLog: [] as Record<string, any>[],
+  // how hard a flash at (x, y, z) hits e: { k (0..1), see (1 full, 0.6 partial, 0 none), face, d, path }
+  flashDose(e: Enemy, x: number, y: number, z: number, field: Float32Array, yaw = e.yaw) {
+    const L = G.Level, map = this.map!, F = this.FLASH, s = e.def.scale, base = e.y || 0;
+    const d = Math.hypot(e.x - x, base + 1.55 * s - y, e.z - z);
+    let see = 0;
+    if (d <= F.RANGE) {
+      const head = L.los(map, x, y, z, e.x, base + 1.55 * s, e.z), low = L.los(map, x, y, z, e.x, base + 0.6 * s, e.z);
+      see = head && low ? 1 : head || low ? F.PARTIAL : 0;
+    }
+    const flat = Math.hypot(x - e.x, z - e.z) || 1, look = (-Math.sin(yaw) * (x - e.x) + -Math.cos(yaw) * (z - e.z)) / flat;
+    const face = d < 1 ? 1 : look > 0.3 ? F.FACE[0] : look > -0.3 ? F.FACE[1] : F.FACE[2];
+    const kv = see ? Math.pow(Math.max(0, 1 - d / F.RANGE), 0.6) * face * see : 0;
+    const path = this.heardAt(field, e.x, e.z, e.y), kd = path <= F.ROOM ? F.DEAF * (1 - path / F.ROOM) : 0;
+    return { k: Math.min(1, Math.max(kv, kd)), see, face, d, path };
+  },
+  // by: where the thrower stood (what the suspects know of where it came from)
+  flashbang(p: number[], by?: number[] | null) {
+    const [x, y, z] = p, F = this.FLASH, U = G.U;
+    const field = this.soundField(x, z, y), yaws = new Map<Enemy, number>();
+    for (const e of this.enemies.values()) yaws.set(e, e.yaw); // (which way they were facing as the flash went off: the bang's what turns them)
     this.hear(x, z, 30, y);
+    this.flashLog = [];
     for (const e of this.enemies.values()) {
       if (e.state === 'cuffed' || e.state === 'dead') continue;
-      const s = e.def.scale, ey = (e.y || 0) + 1.55 * s, d = Math.hypot(e.x - x, ey - y, e.z - z);
-      if (d > 14 || !L.los(map, x, y, z, e.x, ey, e.z)) continue;
-      const look = (-Math.sin(e.yaw) * (x - e.x) + -Math.cos(e.yaw) * (z - e.z)) / (Math.hypot(x - e.x, z - e.z) || 1);
-      const k = (1 - d / 14) * (look > 0.3 ? 1 : 0.55);
-      if (e.def.civ) { this.panic(e, { x, z }); continue; }
-      e.flashT = Math.max(e.flashT || 0, 1.5 + 4.5 * k);
+      const q = this.flashDose(e, x, y, z, field, yaws.get(e));
+      if (q.k < 0.04) continue;
+      let k = q.k;
+      if (e.def.boss) k *= 0.5; else k *= U.lerp(1, Math.min(1, e.def.steady == null ? 1 : e.def.steady + 0.35), 0.8);
+      const stun = U.lerp(F.STUN[0], F.STUN[1], k), rec = U.lerp(F.REC[0], F.REC[1], k);
+      this.flashLog.push({ id: e.id, type: e.type, civ: !!e.def.civ, d: +q.d.toFixed(1), see: q.see, face: q.face, path: +q.path.toFixed(1), k: +k.toFixed(2), stun: +stun.toFixed(1), rec: +rec.toFixed(1), state: e.state });
+      if (e.def.civ) { // curled up where they are
+        e.state = 'cower'; e.hide = null; e.crouch = false; e.leanOut = 0; e.walkTo = null;
+        e.flashT = Math.max(e.flashT || 0, stun); e.flashRecLen = Math.max(e.flashRecLen || 0, rec); e.flashK = Math.max(e.flashK || 0, k); e.flashOn = true;
+        continue;
+      }
+      if (e.state === 'surrender' || e.collapsed) continue;
+      // a suspect: out of the fight. Weapon lowered, no cover, no door, nothing aimed
+      const fresh = !(e.flashT! > 0);
+      e.flashT = Math.max(e.flashT || 0, stun); e.flashRecLen = Math.max(e.flashRecLen || 0, rec); e.flashK = Math.max(e.flashK || 0, k); e.flashOn = true;
       e.morale -= 0.25 * k * (e.def.steady || 1);
-      if (e.state === 'normal') { this.alertEnemy(e, false); e.surprisedT = Math.max(e.surprisedT || 0, e.flashT * 0.8); }
+      e.aiming = false; e.cover = null; e.inCover = false; e.peek = false; e.leanOut = 0; e.dp = null; e.lurk = false; e.hide = null; e.walkTo = null; e.holding = false;
+      e.surprisedT = 0; e.pendingAlert = -1; e.burstLeft = 0;
+      if (e.armed && e.drawn) { e.drawn = false; e.drawT = 0; } // (the gun comes down)
+      if (fresh) { e.stumbleT = 0; e.flashBy = by ? { x: by[0], y: by[1], z: by[2] } : null; }
     }
     G.Net.broadcast({ t: 'flash', p });
+  },
+  // the stun is over: unless they give it up they come round, alert, the gun coming back up
+  flashEnd(e: Enemy) {
+    e.flashOn = false; e.flashRec = e.flashRecLen || 0; e.flashRecLen = 0;
+    if (e.def.civ || e.state !== 'normal') return;
+    const k = e.flashK || 0, near = this.nearestOfficer(e), eh = (e.y || 0) + 1.4 * e.def.scale;
+    // eyes open on an officer a few metres off with a gun on them: most give up (nobody there, they only come round angry)
+    if (near && near.d < this.FLASH.GIVE_UP_R && !e.def.boss && e.def.comply != null && this.officerSees(e, eh) && Math.random() < G.U.clamp(e.def.comply * 0.8 + 0.4 * k + 0.15, 0, 0.92)) {
+      this.surrender(e); e.flashRec = 0; this.flashLog.push({ id: e.id, gaveUp: 1 }); return;
+    }
+    e.alert = true;
+    this.draw(e);
+    e.cool = Math.max(e.cool, 0.9 + Math.random() * 0.8);
+    if (e.flashBy) { e.lastSeen = e.flashBy; e.lostT = 0.01; e.blind = false; }
+  },
+  // is any officer who isn't down in sight of this suspect (their head's height)?
+  officerSees(e: Enemy, eh: number) {
+    for (const p of this.players.values()) if (p.st && !p.st.dn && !p.st.dd && G.Level.los(this.map!, p.st.p[0], p.st.p[1] + 1.5, p.st.p[2], e.x, eh, e.z)) return true;
+    return false;
+  },
+  // the stun: they can't see, aim or fire; they cover their eyes and stagger about a step at a time
+  thinkFlashed(e: Enemy, dt: number) {
+    e.aiming = false; e.cover = null; e.inCover = false; e.peek = false; e.leanOut = 0; e.dp = null; e.crouch = false; e.canSee = false; e.tgt = null;
+    e.stumbleT = (e.stumbleT || 0) - dt;
+    if (e.stumbleT <= 0) { e.stumbleT = 0.5 + Math.random() * 0.9; e.stumbleYaw = Math.random() * Math.PI * 2; e.stumbleV = Math.random() < 0.35 ? 0 : 0.25 + 0.5 * Math.random(); }
+    if (e.stumbleV) this.moveEntity(e, Math.cos(e.stumbleYaw!), Math.sin(e.stumbleYaw!), e.stumbleV * (0.4 + (e.flashK || 0)), dt);
+    e.yaw += Math.sin(this.clock * 2.3 + e.id) * dt * 1.6 + (Math.random() - 0.5) * dt * 2;
   },
   enemyBoom(p: { x: number; y: number; z: number }) {
     const r2 = (x: number) => Math.round(x * 100) / 100;
     this.hear(p.x, p.z, 20, p.y || 0);
-    G.Net.broadcast({ t: 'boom', id: 'enemy', p: [p.x, p.y, p.z].map(r2), r: 5, d: Math.round(95 * this.dmgMult), en: 1 });
+    G.Net.broadcast({ t: 'boom', id: 'enemy', p: [p.x, p.y, p.z].map(r2), r: G.Me.BLAST.r, d: Math.round(G.Me.BLAST.dmg * this.dmgMult), en: 1, fr: 1 });
   },
 
   // blind: firing at where the target was last seen, not at them
@@ -2145,7 +2215,7 @@ const G_Server = {
     // a bit worse up close, much worse at range: at their weapon's range they hit about a sixth as often
     const distF = 0.9 * G.U.clamp(0.95 - 0.8 * Math.pow(d / def.range, 1.2), 0.12, 0.95);
     const moveF = st.mv > 3 ? 0.72 : st.mv > 0.5 ? 0.88 : 1;
-    const chance = (blind ? 0.15 : 1) * (1 - 0.2 * up) * this.injAim(e) * def.acc * distF * moveF * this.accMult * (1 - 0.6 * (e.sup || 0)) * (1 - 0.5 * Math.min(1, e.shock || 0)) * (e.collapsed ? 0.4 : 1) * (e.str != null && e.str < this.TWO_HAND ? 0.7 : 1) * (1 - Math.min(0.5, kickNow / 16)) * (e.broken ? (e.fleeT > 0 ? 0.4 : 0.8) : 1) * this.dazzle(e, st);
+    const chance = (blind ? 0.15 : 1) * (1 - 0.2 * up) * this.injAim(e) * def.acc * distF * moveF * this.accMult * (1 - 0.6 * (e.sup || 0)) * (1 - 0.5 * Math.min(1, e.shock || 0)) * (e.collapsed ? 0.4 : 1) * (e.str != null && e.str < this.TWO_HAND ? 0.7 : 1) * (1 - Math.min(0.5, kickNow / 16)) * (e.broken ? (e.fleeT > 0 ? 0.4 : 0.8) : 1) * this.dazzle(e, st) * (e.flashRec! > 0 ? this.FLASH.AIM : 1);
     // Their round is a round, flown from here as yours are (js/player.ts enemyRound) to whatever it meets. All that's rolled is
     // how well it's aimed: chance is the share that would land on a body a BODY_R across at that distance, so the aim's
     // error at the target is the spread that gives that (a two-dimensional normal: 1 - exp(-R²/2σ²)). The rest is what's
