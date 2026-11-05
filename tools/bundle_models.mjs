@@ -1,5 +1,5 @@
 // Bundles the baked models for the game (docs/models.md "Bundles"): reads the finished tree assets/models/{parts,props} and writes
-// assets/models/bundles/<name>.rtb (one per platform: its packs; _shared; _boot: every platform's index and the props) + bundles/index.json.
+// assets/models/bundles/<name>.rtb (one per platform: its packs; _shared; _boot: every platform's index and the props) + bundles/index.json.  + bundles/manifest.json (the hashes the game keys its local store by).
 // The last step of `npm run bake:models`; independent of how the tree was baked (it only reads files), deterministic (same files -> same bytes).
 //   node tools/bundle_models.mjs           write the bundles
 //   node tools/bundle_models.mjs --check   check them against the loose files and the indexes (npm run test:models does); exit 1 on a problem
