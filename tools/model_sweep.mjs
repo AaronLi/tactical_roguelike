@@ -53,11 +53,11 @@ export function sweepOf(GS, id) {
  * pruned. Deterministic for a seed. The baker feeds some to its coupling analysis (so interactions between two parts changed at once are learnt);
  * the test uses other seeds as a held-out check.
  */
-export function randomBuilds(GS, id, bases, n, seed, exclude = new Set()) {
+export function randomBuilds(GS, id, bases, n, seed, exclude = new Set(), kmin = 2, kmax = 3) {
   let s = seed >>> 0; const rnd = () => (s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 4294967296;
   const out = [], seen = new Set(exclude);
   for (let tries = 0; out.length < n && tries < n * 8; tries++) {
-    const b = { ...bases[Math.floor(rnd() * bases.length)] }, k = 2 + Math.floor(rnd() * 2);
+    const b = { ...bases[Math.floor(rnd() * bases.length)] }, k = kmin + Math.floor(rnd() * (kmax - kmin + 1));
     for (let j = 0; j < k; j++) {
       const slots = GS.slotsOf(id, b); if (!slots.length) break; const sl = slots[Math.floor(rnd() * slots.length)];
       const opts = GS.compatible(sl.mount).filter((p) => GS.fitsSlot(sl, p, id)).map((p) => p.id); if (!sl.req) opts.push('');
