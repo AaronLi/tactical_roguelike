@@ -40,7 +40,7 @@ A gun model is three separate things, each working on the model (nodes + extras)
 | rig | `js/gunrig.ts` | `G.GunRig.bind(group, info, { def, side })`: finds the moving parts (`info.anim`: nodes, or the node names of a loaded file), the hand anchors in the gun's space, where the parts rest, the magazine-check data. `js/vmanim.ts` (the clips) reads nothing else off the gun |
 | first-person extras | `js/viewmodel.ts` | `G.Viewmodel.assemble(def, models)`: a reflex sight's reticle (`info.reflex`), a scope's lens (`info.pip`), muzzle flashes (one per `info.muzzles`), `display_<name>` surfaces (a CanvasTexture each: `G.Viewmodel.surfaces(group)`), then the rig and arms. And `worldProto` / `worldInstance`: the third-person model, merged one mesh per material, with the magazine, a crossbow's bolt and strings and a bipod's legs pulled out |
 
-`G.GunModels.viewmodel(def)` / `world(def)` / `display(def)` only fetch geometry (assembled from the packs) and hand it over; the first person's stock is clipped near the eye at render time (js/render.ts). A bipod's legs are not parts of a baked model yet (the contract's `part_bipod` is reserved), so a bipod gun has none. The first person's reflex and scope windows are `info.reflex` / `info.pip`; a magnifier's lens hangs on its `part_magn` node and a crossbow's lit nock gets a material of its own, both done by `viewmodel()`.
+`G.GunModels.viewmodel(def)` / `world(def)` / `display(def)` only fetch geometry (assembled from the packs) and hand it over; the first person's stock is clipped near the eye at render time (js/render.ts). A bipod is a `part_bipod` node whose child groups are its legs, with the folded and the deployed pose as data (`extras.leg.deploy`; the contract's "Bipods"): `G.GunRig.bipodPose(node, k)` turns them, for the first person (the live node, `an.bipod`) and the third (`worldProto` pulls each leg out; `worldInstance` gives a node `userData.bipod` of the legs). The first person's reflex and scope windows are `info.reflex` / `info.pip`; a magnifier's lens hangs on its `part_magn` node and a crossbow's lit nock gets a material of its own, both done by `viewmodel()`.
 
 `bake_models.mjs` calls `G.GunRig.describe(group)` first: a recipe's magazine-check data is meshes held by reference, which a file can't carry, so it is written down as tags on the nodes (see "Magazine check" in the contract).
 
@@ -126,7 +126,7 @@ A mesh `display_ammo` (extras `{ slot, display: { width: 128, height: 32 } }`, *
 | `part_cover` | A belt-fed gun's feed cover. |  |
 | `part_magn` | A magnifier that flips aside. |  |
 | `part_spin` | A rotary barrel group that spins. |  |
-| `part_bipod` | Reserved: a bipod's legs. |  |
+| `part_bipod` | A bipod: its node holds the legs, each a child group with extras.leg (see "Bipods" below). |  |
 | `part_quarrel` | A crossbow bolt, the whole assembly. |  |
 | `part_quarrelHead` | The crossbow bolt's head. |  |
 | `part_quarrelNock` | The crossbow bolt's nock. |  |
@@ -256,6 +256,14 @@ A mesh `display_ammo` (extras `{ slot, display: { width: 128, height: 32 } }`, *
 - meshes: Meshes under `part_mag` carry extras.chk = { role, i, t? }: role "top" (the round on top: i 0 its case, i 1 its tip; the game colours them for the load), "hole" (a witness hole, i = its order from the top, t = 0..1 how far down the stack it reads), "round" (the i-th round drawn through a clear magazine, t = how far down) and "tip" (the bullet tip of round i). Every mesh keeps a slot and a catalogue material like any other; the game replaces their materials as the rounds change. A gun with a magazine check has both top meshes.
 - example: `{"name":"part_mag","extras":{"part":"mag","check":{"w":0.024}},"child":{"name":"mag_91","extras":{"slot":"mag","chk":{"role":"hole","i":0,"t":0.1567}}}}`
 
+**Bipods** (`part_bipod`, its legs' `extras.leg`):
+
+- what: A BIPOD is one node, `part_bipod` (PARTS key bipod, listed in info.anim.bipod), whose children are its LEGS: each leg is a `group_<n>` node with extras.leg = { deploy: [rx, ry, rz] } holding that leg's meshes. A leg's pivot (its node origin) is its hinge. The model is drawn FOLDED: every leg at rotation 0. part_bipod's own origin is only a reference point (the first hinge) and nothing turns it. The legs' meshes are slot fg when the bipod is a foregrip option (the Kodiak) or slot base when it is part of the gun (a machine gun's, a sniper rifle's); one gun may have both, in the one part_bipod node.
+- pose: extras.leg.deploy is the leg's rotation when the bipod is DOWN: three numbers, radians, an XYZ Euler rotation about the leg's pivot in the gun's frame (x right, y up, z back), the legs pointing at the ground and splayed a little. A leg folded back along the gun (its foot behind the hinge) turns by +PI/2 about x, one folded forward by -PI/2. Folded is rotation 0 (how the meshes are drawn): the folded and the deployed pose are both data of the model.
+- drive: The game drives every leg with the same rule: rotation = deploy * smoothstep(k), k from 0 (folded) to 1 (down) over a quarter of a second, set by the player's stance and what is in front of the gun (js/player.ts bipodStep for the first person, a remote player's state in js/rig.ts for the third) and posed by G.GunRig.bipodPose(part_bipod node, k). The first-person model poses the live part_bipod node; the third-person (merged) model pulls each leg out on its own so it can turn.
+- packs: In a pack the part_bipod node holds no mesh itself (the base pack owns it); each leg is a group_<slot>_<n> node with extras.parent = "part_bipod" and extras.leg, directly under the pack root like every node.
+- example: `{"name":"part_bipod","child":{"name":"group_7","extras":{"leg":{"deploy":[1.5708,0.2,0]}}}}`
+
 **Per-part packs** (assets/models/parts, milestone 2):
 
 - layout: assets/models/parts/<platform>/index.json and assets/models/parts/<platform>/<slot>/<file>.glb; parts that do not depend on the platform are stored once, in assets/models/parts/_shared/<slot>/<file>.glb (see "shared"). One pack per (platform, slot) and combination of the parts that shape it; the platform's whole-gun files (assets/models/guns/<id>.glb) stay the fast path for the default build. One file per pack and not one per platform: a swap costs one small request, and a platform's packs together are many times what any one build needs.
@@ -272,7 +280,7 @@ A mesh `display_ammo` (extras `{ slot, display: { width: 128, height: 32 } }`, *
 
 A one-off colour that isn't in the catalogue is named `m_<rrggbb>` (hex colour) and is kept as exported: a standard PBR material, no bump.
 
-**Extras keys:** root: `info`, `gun`, `anchors`, `seat`; mesh: `slot`, `display`, `chk`; part: `part`, `anchors`, `owner`, `parent`, `check`; pack: `pack`.
+**Extras keys:** root: `info`, `gun`, `anchors`, `seat`; mesh: `slot`, `display`, `chk`; part: `part`, `anchors`, `owner`, `parent`, `leg`, `check`; pack: `pack`.
 <!-- contract:end -->
 
 ## Authored models (Blender)

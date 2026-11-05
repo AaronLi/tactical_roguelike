@@ -38,7 +38,7 @@ const NAMES = {
   /** A plain grouping node with no animation (a hinge frame, say): `group_<n>`. */
   groupPrefix: 'group_',
   /** Extras key of a mesh node: its SLOTS value. Extras key of a `part_` node: its PARTS key. Root extras: `info` and `gun`. */
-  extras: { slot: 'slot', part: 'part', info: 'info', gun: 'gun', anchors: 'anchors', display: 'display', pack: 'pack', owner: 'owner', parent: 'parent' },
+  extras: { slot: 'slot', part: 'part', info: 'info', gun: 'gun', anchors: 'anchors', display: 'display', pack: 'pack', owner: 'owner', parent: 'parent', leg: 'leg' },
   /** A display surface: a mesh named `display_<name>` (e.g. display_ammo). */
   displayPrefix: 'display_',
   /** An anchor that is a mount point for a slot's part: `mount_<slot>` (e.g. mount_muzzle), in `extras.anchors` and `info.mounts`. */
@@ -142,7 +142,7 @@ const CONTRACT_CORE = {
     handle: { doc: 'A cocking handle that reciprocates or is worked by the hand.', pairedWith: 'handle' }, pump: { doc: 'A pump-action forend.', pairedWith: null },
     lever: { doc: 'A lever-action lever.', pairedWith: null }, cyl: { doc: 'A revolver cylinder: it rotates (z) by 1/n per shot.', pairedWith: null },
     brk: { doc: 'A break-action barrel group that tips open on its hinge.', pairedWith: null }, barrel: { doc: 'A long-recoil barrel (runs back by info.recoilBarrel).', pairedWith: null },
-    cover: { doc: 'A belt-fed gun\'s feed cover.', pairedWith: null }, magn: { doc: 'A magnifier that flips aside.', pairedWith: null }, spin: { doc: 'A rotary barrel group that spins.', pairedWith: null }, bipod: { doc: 'Reserved: a bipod\'s legs.', pairedWith: null },
+    cover: { doc: 'A belt-fed gun\'s feed cover.', pairedWith: null }, magn: { doc: 'A magnifier that flips aside.', pairedWith: null }, spin: { doc: 'A rotary barrel group that spins.', pairedWith: null }, bipod: { doc: 'A bipod: its node holds the legs, each a child group with extras.leg (see "Bipods" below).', pairedWith: null },
     quarrel: { doc: 'A crossbow bolt, the whole assembly.', pairedWith: null }, quarrelHead: { doc: 'The crossbow bolt\'s head.', pairedWith: null }, quarrelNock: { doc: 'The crossbow bolt\'s nock.', pairedWith: null },
     stringCocked: { doc: 'The crossbow string, drawn.', pairedWith: null }, stringSlack: { doc: 'The crossbow string, released.', pairedWith: null },
   } as Record<PartKey, PartSpec>,
@@ -165,7 +165,7 @@ const CONTRACT_CORE = {
   extras: {
     root: { info: 'The GunModelInfo object (INFO_FIELDS).', gun: 'The gun id, equal to the root node\'s name.', anchors: 'An AUTHORED SOURCE only (GUN_MODEL_CONTRACT.authored): the mount anchors, { mount_<slot>: [forward, up, right] } in the gun\'s frame. (Also written as the JSON text `anchors_json`, and `info` as `info_json`, for a tool that stores only flat custom properties: Blender.)', seat: 'An AUTHORED SOURCE only: { barrelR } scalars of the seats (GUN_MODEL_CONTRACT.authored.seat). (Also `seat_json`.)' },
     mesh: { slot: 'A SLOTS value.', display: 'Display surfaces only: { width, height } canvas pixels.', chk: 'A magazine-check mesh (under part_mag): { role, i, t? } (GUN_MODEL_CONTRACT.magCheck).' },
-    part: { part: 'The PARTS key of this part_ node.', anchors: 'Anchors this part provides, in its own frame (GUN_MODEL_CONTRACT.anchors).', owner: 'Pack files only: false when this node\'s pivot belongs to another pack (GUN_MODEL_CONTRACT.packs.nodes).', parent: 'Pack files only: the name of the node this one nests under.', check: 'part_mag only: { w }, the magazine-check data (GUN_MODEL_CONTRACT.magCheck).' },
+    part: { part: 'The PARTS key of this part_ node.', anchors: 'Anchors this part provides, in its own frame (GUN_MODEL_CONTRACT.anchors).', owner: 'Pack files only: false when this node\'s pivot belongs to another pack (GUN_MODEL_CONTRACT.packs.nodes).', parent: 'Pack files only: the name of the node this one nests under.', leg: 'A leg of the bipod (a group_ child of part_bipod): { deploy: [rx, ry, rz] } (GUN_MODEL_CONTRACT.bipod).', check: 'part_mag only: { w }, the magazine-check data (GUN_MODEL_CONTRACT.magCheck).' },
     pack: { pack: 'Pack files only, on the root: { platform, tag, key } (GUN_MODEL_CONTRACT.packs.root).' },
   },
 };
@@ -224,6 +224,12 @@ const GUN_MODEL_CONTRACT = { ...CONTRACT_CORE, displays: {
   part: '`part_mag` has extras.check = { w }: the magazine\'s width in metres (the width of a hole\'s stamped count).',
   meshes: 'Meshes under `part_mag` carry extras.chk = { role, i, t? }: role "top" (the round on top: i 0 its case, i 1 its tip; the game colours them for the load), "hole" (a witness hole, i = its order from the top, t = 0..1 how far down the stack it reads), "round" (the i-th round drawn through a clear magazine, t = how far down) and "tip" (the bullet tip of round i). Every mesh keeps a slot and a catalogue material like any other; the game replaces their materials as the rounds change. A gun with a magazine check has both top meshes.',
   example: { name: 'part_mag', extras: { part: 'mag', check: { w: 0.024 } }, child: { name: 'mag_91', extras: { slot: 'mag', chk: { role: 'hole', i: 0, t: 0.1567 } } } },
+}, bipod: {
+  what: 'A BIPOD is one node, `part_bipod` (PARTS key bipod, listed in info.anim.bipod), whose children are its LEGS: each leg is a `group_<n>` node with extras.leg = { deploy: [rx, ry, rz] } holding that leg\'s meshes. A leg\'s pivot (its node origin) is its hinge. The model is drawn FOLDED: every leg at rotation 0. part_bipod\'s own origin is only a reference point (the first hinge) and nothing turns it. The legs\' meshes are slot fg when the bipod is a foregrip option (the Kodiak) or slot base when it is part of the gun (a machine gun\'s, a sniper rifle\'s); one gun may have both, in the one part_bipod node.',
+  pose: 'extras.leg.deploy is the leg\'s rotation when the bipod is DOWN: three numbers, radians, an XYZ Euler rotation about the leg\'s pivot in the gun\'s frame (x right, y up, z back), the legs pointing at the ground and splayed a little. A leg folded back along the gun (its foot behind the hinge) turns by +PI/2 about x, one folded forward by -PI/2. Folded is rotation 0 (how the meshes are drawn): the folded and the deployed pose are both data of the model.',
+  drive: 'The game drives every leg with the same rule: rotation = deploy * smoothstep(k), k from 0 (folded) to 1 (down) over a quarter of a second, set by the player\'s stance and what is in front of the gun (js/player.ts bipodStep for the first person, a remote player\'s state in js/rig.ts for the third) and posed by G.GunRig.bipodPose(part_bipod node, k). The first-person model poses the live part_bipod node; the third-person (merged) model pulls each leg out on its own so it can turn.',
+  packs: 'In a pack the part_bipod node holds no mesh itself (the base pack owns it); each leg is a group_<slot>_<n> node with extras.parent = "part_bipod" and extras.leg, directly under the pack root like every node.',
+  example: { name: 'part_bipod', child: { name: 'group_7', extras: { leg: { deploy: [1.5708, 0.2, 0] } } } },
 }, anchors: {
   where: 'A node may carry `extras.anchors`: positions it PROVIDES, in the node\'s OWN frame (the same [forward, up, right] metres, measured from the node\'s origin along its axes; a part\'s mesh positions are in that same frame). Allowed on `part_<key>` and `group_<n>` nodes, and on the root of a per-part pack (a .glb holding one swappable part). Keys are the info anchors a part can provide (' + ANCHOR_KEYS.join(', ') + ') or a mount point `mount_<slot>` (a [forward, up, right] vec3; e.g. mount_muzzle on a frame says where a muzzle device sits).',
   assembly: [
@@ -283,6 +289,14 @@ interface ModelReport { errors: string[]; warnings: string[] }
 
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 const isObj = (v: unknown): v is Record<string, any> => !!v && typeof v === 'object' && !Array.isArray(v);
+/** A bipod leg's extras.leg: { deploy: [rx, ry, rz] } (GUN_MODEL_CONTRACT.bipod); the problems, if any. */
+function legProblem(leg: unknown): string | null {
+  if (!isObj(leg)) return `extras.leg must be { deploy: [rx, ry, rz] }, got ${JSON.stringify(leg)}`;
+  const d = leg.deploy;
+  if (!Array.isArray(d) || d.length !== 3 || !d.every(isNum)) return `extras.leg.deploy must be three numbers (radians, XYZ euler), got ${JSON.stringify(d)}`;
+  if (d.some((x: number) => Math.abs(x) > Math.PI)) return `extras.leg.deploy ${JSON.stringify(d)}: an angle beyond +-PI radians (degrees?)`;
+  return null;
+}
 
 /** Checks one value against a shape; pushes a message per problem, each starting with the path. */
 function checkShape(v: any, s: Shape, path: string, out: string[]) {
@@ -343,6 +357,11 @@ function validate(model: ModelDesc, id?: string): ModelReport {
     for (const c of n.children) {
       if (names.has(c.name)) E(`two nodes are named "${c.name}"; names must be unique`);
       names.set(c.name, c);
+      { // (a bipod's legs: the non-mesh children of part_bipod, each with extras.leg; nowhere else)
+        const leg = c.extras[NAMES.extras.leg], under = n.name === NAMES.partPrefix + PARTS.bipod;
+        if (leg !== undefined) { const pr = legProblem(leg); if (pr) E(`node "${c.name}": ${pr}`); if (c.mesh || !under) E(`node "${c.name}": extras.leg is only for the group_ children of ${NAMES.partPrefix}${PARTS.bipod} (GUN_MODEL_CONTRACT.bipod)`); }
+        else if (under && !c.mesh) E(`node "${c.name}": a child of ${NAMES.partPrefix}${PARTS.bipod} that is not a mesh is a leg and needs extras.leg = { deploy: [rx, ry, rz] } (GUN_MODEL_CONTRACT.bipod)`);
+      }
       if (c.extras[NAMES.extras.anchors] !== undefined) {
         if (c.mesh) E(`mesh "${c.name}": extras.anchors is for part_/group_ nodes, not meshes`);
         else checkAnchors(c.extras[NAMES.extras.anchors], `node "${c.name}" extras.anchors`, providers, c.name);
@@ -389,6 +408,7 @@ function validate(model: ModelDesc, id?: string): ModelReport {
     else if (node.name !== nm) E(`info.anim.${k} names "${nm}" but the node is "${node.name}"`);
   }
   for (const k of partNodes.keys()) if (!(k in anim)) E(`node ${NAMES.partPrefix}${k} exists but info.anim.${k} does not list it`);
+  { const bp = partNodes.get(PARTS.bipod); if (bp && !bp.children.some((c) => !c.mesh && c.extras[NAMES.extras.leg] !== undefined)) warnings.push(`${bp.name} has no legs (group_ children with extras.leg)`); }
   // the part <-> info pairings: "no node part_mag but the gun has a magazine"
   for (const [k, spec] of Object.entries(C.parts) as [PartKey, PartSpec][]) {
     if (!spec.pairedWith) continue;
@@ -637,6 +657,11 @@ function validatePack(model: ModelDesc, tag?: string): ModelReport {
       if (!c.name.startsWith(NAMES.partPrefix) && !c.name.startsWith(NAMES.groupPrefix)) E(`node "${c.name}": a non-mesh node in a pack must be part_<key> or group_<name>`);
       if (c.name.startsWith(NAMES.partPrefix) && !(c.name.slice(NAMES.partPrefix.length) in C.parts)) E(`node "${c.name}": not a known part`);
       if (own !== undefined && typeof own !== 'string') E(`node "${c.name}": extras.parent must be a node name`);
+      { // (a bipod's legs nest in part_bipod)
+        const leg = c.extras[NAMES.extras.leg], bp = NAMES.partPrefix + PARTS.bipod;
+        if (leg !== undefined) { const pr = legProblem(leg); if (pr) E(`node "${c.name}": ${pr}`); if (own !== bp) E(`node "${c.name}": extras.leg needs extras.parent "${bp}"`); }
+        else if (own === bp) E(`node "${c.name}": a node nested in ${bp} is a leg and needs extras.leg`);
+      }
       if (c.extras[NAMES.extras.owner] !== undefined && typeof c.extras[NAMES.extras.owner] !== 'boolean') E(`node "${c.name}": extras.owner must be true/false`);
       for (const m of c.children) { meshes++; if (!m.mesh) E(`node "${c.name}" holds "${m.name}", which is not a mesh`); else if (m.extras[NAMES.extras.slot] !== t) E(`mesh "${m.name}": extras.slot is ${JSON.stringify(m.extras[NAMES.extras.slot])}, expected "${t}"`); }
     }
@@ -732,6 +757,7 @@ function contractMarkdown(): string {
   for (const [k, v] of Object.entries(C.authored.required)) L.push(`| \`${k}\` (required) | ${esc(v as string)} |`);
   L.push('', `- seat: ${C.authored.seat}`, `- mesh: ${C.authored.mesh}`, ...C.authored.rules.map((r) => `- ${r}`), '- example: \`' + JSON.stringify(C.authored.example) + '\`');
   L.push('', '**Magazine check** (`part_mag.extras.check`, meshes\' `extras.chk`):', '', `- what: ${C.magCheck.what}`, `- part: ${C.magCheck.part}`, `- meshes: ${C.magCheck.meshes}`, '- example: `' + JSON.stringify(C.magCheck.example) + '`');
+  L.push('', '**Bipods** (`part_bipod`, its legs\' `extras.leg`):', '', `- what: ${C.bipod.what}`, `- pose: ${C.bipod.pose}`, `- drive: ${C.bipod.drive}`, `- packs: ${C.bipod.packs}`, '- example: `' + JSON.stringify(C.bipod.example) + '`');
   L.push('', '**Per-part packs** (assets/models/parts, milestone 2):', '', ...Object.entries(C.packs).map(([k, v]) => `- ${k}: ${v}`));
   L.push('', C.materials.anonymous, '', '**Extras keys:** ' + Object.entries(C.extras).map(([where, o]) => `${where}: ${Object.keys(o).map((k) => '`' + k + '`').join(', ')}`).join('; ') + '.');
   return L.join('\n');
