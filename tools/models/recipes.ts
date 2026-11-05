@@ -1810,7 +1810,7 @@ const G_GunRecipes = (() => {
     if (tr) k.at('block', () => tracedParts(k, tr, ([x, y]) => { const [f, u] = V([x, y]); return [reach0(f), u]; }, 'barrel', mats)); // (the fixed barrel block: a piece of its own, the frame's, whatever barrel or slide is fitted)
     k.at('slide', () => k.cyl(tr ? tr.bore : 0.0065, 0.01, M.rubber(), len - 0.009, 0.009));
     k.ringZ((tr ? tr.bore : 0.0065) + 0.0008, 0.0008, M.gunmetal(), front + 0.0004, 0.009); // (the barrel's lip, where it comes out of the slide: the barrel part's own, so every barrel has a mesh and a slide only moves it)
-    if (tr && tr.tube) k.cyl(tr.tube.r, len0 + tr.tube.out - tr.tube.from, Mk[tr.tube.m] ? Mk[tr.tube.m]() : M.gunmetal(), tr.tube.from, 0.009, 0, tr.tube.r, 20); // (an open-topped slide's: it shows, and it stays put)
+    if (tr && tr.tube) k.at('block', () => k.cyl(tr.tube.r, len0 + tr.tube.out - tr.tube.from, Mk[tr.tube.m] ? Mk[tr.tube.m]() : M.gunmetal(), tr.tube.from, 0.009, 0, tr.tube.r, 20)); // (an open-topped slide's: it shows, and it stays put)
     if (o.match) { k.cyl(0.0068, 0.012, M.steel(), front, 0.009); front += 0.012; }
     if (o.thread) { k.cyl(0.0058, 0.012, M.steel(), front, 0.009); front += 0.012; }
     if (o.muzzle && o.thread) { k.tag('muzzle'); front += muzzle(k, o.muzzle, front, 0.0065, 0.009); }
@@ -1830,7 +1830,8 @@ const G_GunRecipes = (() => {
       const fR = tr ? V([tr.sights[0], 0])[0] : 0.012, fF0 = tr ? reach0(V([tr.sights[1], 0])[0]) : len0 - 0.01, fF = tr ? ts!.reach(V([tr.sights[1], 0])[0]) : len - 0.01;
       const base = tr && tr.frontY ? V([0, tr.frontY])[1] : topAt0(fF0), rb = topAt0(fR), sy1 = Math.max(base, rb) + (tr && tr.sh || 0.0075), night = o.optic === 'night';
       k.into(slide);
-      sight = S.pistolSights(k, fR, null, sy1, base, night, rb, tr && tr.sw);
+      // (hidden in a chassis's shell: a piece of its own, so that the rail sight above it is the same shared part on any pistol)
+      sight = railSight ? k.at('irons', () => S.pistolSights(k, fR, null, sy1, base, night, rb, tr && tr.sw)) : S.pistolSights(k, fR, null, sy1, base, night, rb, tr && tr.sw);
       if (!(tr && tr.frontY)) k.at('slide', () => S.pistolFront(k, fF, sy1, base, night));
       k.into(null);
       if (tr && tr.frontY) S.pistolFront(k, fF0, sy1, base, night); // (on the fixed barrel: the slide runs back under it)

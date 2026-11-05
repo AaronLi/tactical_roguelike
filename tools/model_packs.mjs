@@ -99,6 +99,7 @@ export function devOf(norm, rigid, actual) {
  * One kind of offset: RIGID (a part moves another slot's unit: delta[t][s][part], measured off the reference build and filled out from the other bases).
  */
 export function analyze(C) {
+  const isPistol = !!(C.GS.PLATFORMS[C.id] && C.GS.PLATFORMS[C.id].arch === 'pistol');
   const { id, sw, bases } = C, builds = C.all(), Rb = bases[R].build, Rp = (s) => Rb[s] || '';
   const tagsAll = new Set(); for (const B of builds) for (const t of Object.keys(B.tags)) tagsAll.add(t);
   const slotsAll = new Set(); for (const B of builds) for (const s of Object.keys(B.build)) slotsAll.add(s);
@@ -108,7 +109,7 @@ export function analyze(C) {
     if (e.slot == null) continue;
     const base = bases[e.base], casc = cascadeOf(e, base);
     for (const t of tagsAll) {
-      if (casc.has(t)) continue; // (the slot of this tag was changed by pruning, not by the swap: its own part is why it differs)
+      if (casc.has(t) || (isPistol && t.split('@').some((x) => casc.has(x)))) continue; // (the slot of this tag was changed by pruning, not by the swap: its own part is why it differs)
       const d = diffUnits(base.tags[t], e.B.tags[t]);
       obs[t].push({ e, d });
       if (d.kind === 'shape') depShape[t].add(e.slot);
