@@ -122,14 +122,14 @@ bz = K.tmp(_on_wedge(box(SCR_X0 + 0.5 * mm, SCR_X1 - 0.5 * mm, SCR_F0 + 0.004, S
 cut(bz, _on_wedge(box(SCR_X0 + 1.6 * mm, SCR_X1 - 1.6 * mm, SCR_F0 + 0.007, SCR_F1 - 0.005, 0.4 * mm, 0.004), 0.0)); smooth(bz); K.adopt(bz, 'base', 'rubber')
 scr = K.obj(_on_wedge(box(SCR_X0 + 1.6 * mm, SCR_X1 - 1.6 * mm, SCR_F0 + 0.007, SCR_F1 - 0.005, 0, 0.6 * mm), 0.0), 'base', 'glass'); scr.name = 'display_ammo'
 # the fire-mode dial (left side, over the grip): semi, low, high, double, sextuple
-o = K.obj(cyl(7 * mm, -27.5 * mm, -24.5 * mm, 'x', (0.030, 0.012), 24), 'base', 'black'); smooth(o)
-o = K.obj(box(-28.2 * mm, -27 * mm, 0.0285, 0.0315, 0.012, 0.0185), 'base', TI)
+o = K.obj(cyl(7 * mm, -27.5 * mm, -24.5 * mm, 'x', (0.058, 0.012), 24), 'base', 'black'); smooth(o)
+o = K.obj(box(-28.2 * mm, -27 * mm, 0.0565, 0.0595, 0.012, 0.0185), 'base', TI)
 # the grip's seat and the trigger housing under the panel, the trigger and its guard
-# (the grip group sits high: straight under the panel's floor; the guard is glove-sized: a 60 x 32 mm opening)
-o = K.obj(prism([(0.000, -0.0535), (0.066, -0.0535), (0.066, -0.0565), (0.004, -0.0595)], 'x', -12 * mm, 12 * mm), 'base', TI); bevel(o, 0.8 * mm, 2); smooth(o)
-o = K.obj(prism([(0.048, -0.052), (0.054, -0.052), (0.057, -0.071), (0.052, -0.076), (0.045, -0.064)], 'x', -2.5 * mm, 2.5 * mm), 'base', 'black'); bevel(o, 0.5 * mm, 1); smooth(o)
-tg = K.tmp(prism([(0.012, -0.054), (0.094, -0.054), (0.094, -0.060), (0.082, -0.089), (0.020, -0.089)], 'x', -6 * mm, 6 * mm))
-cut(tg, prism([(0.020, -0.050), (0.086, -0.050), (0.076, -0.083), (0.024, -0.083)], 'x', -0.01, 0.01))
+# (the grip group sits forward and high: under the panel's floor and the chassis's rear; the guard is glove-sized: 60 x 32 mm)
+o = K.obj(prism([(0.030, -0.0535), (0.096, -0.0535), (0.096, -0.0565), (0.034, -0.0595)], 'x', -12 * mm, 12 * mm), 'base', TI); bevel(o, 0.8 * mm, 2); smooth(o)
+o = K.obj(prism([(0.078, -0.052), (0.084, -0.052), (0.087, -0.071), (0.082, -0.076), (0.075, -0.064)], 'x', -2.5 * mm, 2.5 * mm), 'base', 'black'); bevel(o, 0.5 * mm, 1); smooth(o)
+tg = K.tmp(prism([(0.042, -0.054), (0.124, -0.054), (0.124, -0.060), (0.112, -0.089), (0.050, -0.089)], 'x', -6 * mm, 6 * mm))
+cut(tg, prism([(0.050, -0.050), (0.116, -0.050), (0.106, -0.083), (0.054, -0.083)], 'x', -0.01, 0.01))
 bevel(tg, 1 * mm, 2); smooth(tg); K.adopt(tg, 'base', TI)
 
 # ================================================== SIGHT RAIL (base): a short beam ==================================================
@@ -174,9 +174,9 @@ pad = K.tmp(prism([(-0.264, 0.036), (-0.278, 0.036), (-0.280, 0.030), (-0.280, -
 bevel(pad, 3 * mm, 3, 30)
 for i in range(7): cut(pad, box(-0.03, 0.03, -0.283, -0.277, -0.084 + i * 0.018, -0.080 + i * 0.018))   # its ribs
 smooth(pad); K.adopt(pad, 'stock', 'rubber')
-GRIP_SEAT = (0.006, -0.054)
-gp = K.tmp(prism([(0.006, -0.052), (0.040, -0.052), (0.030, -0.075), (0.022, -0.085), (0.018, -0.100), (0.002, -0.153), (-0.030, -0.153),
-                  (-0.036, -0.145), (-0.028, -0.100), (-0.020, -0.060)], 'x', -15.5 * mm, 15.5 * mm))
+GRIP_SEAT = (0.036, -0.054)
+gp = K.tmp(prism([(0.036, -0.052), (0.070, -0.052), (0.060, -0.075), (0.052, -0.085), (0.048, -0.100), (0.032, -0.153), (0.000, -0.153),
+                  (-0.006, -0.145), (0.002, -0.100), (0.010, -0.060)], 'x', -15.5 * mm, 15.5 * mm))
 bevel(gp, 3 * mm, 3, 30); smooth(gp); K.adopt(gp, 'grip', 'stipple')
 
 # ================================================== FRONT (part_brk): lower support body + muzzle device ==================================================
@@ -259,23 +259,29 @@ def warren(f0, f1, lo, hi, chord=None):
             ws.append(TW if is_end(pa, pb) else (chord if (chord and on_chord) else TW / 2))
         holes.append(fillet_poly(inset_poly(c, ws), TFIL, 2))
     return out, holes
-# the CENTRE BEAM: narrow (21 mm across): two vertical Warren plates 3.5 mm thick, a top and a bottom chord bar across them, level under
-# the lowest barrel, from the hinge base to the rod housing
-BX0, BX1, BLO, BHI = 7 * mm, 10.5 * mm, -0.064, -0.042
-out_b, holes_b = warren(CH1 + 0.012, HS0 + 0.008, BLO, BHI, chord=3 * mm)
+# the CENTRE BEAM: an I-beam (flanges 21 mm wide and 3 mm thick, a 4 mm web between them with Warren lightening holes), level under the
+# lowest barrel, from the hinge base to the rod housing
+BX, BLO, BHI, BFL = 10.5 * mm, -0.064, -0.042, 3 * mm
+out_b, holes_b = warren(CH1 + 0.012, HS0 + 0.008, BLO + BFL, BHI - BFL, chord=2 * mm)
+f_b0, f_b1 = min(p[0] for p in out_b) - 0.002, max(p[0] for p in out_b) + 0.002
+web = K.tmp(prism([(f_b0, BLO + BFL - 0.0005), (f_b1, BLO + BFL - 0.0005), (f_b1, BHI - BFL + 0.0005), (f_b0, BHI - BFL + 0.0005)], 'x', -2 * mm, 2 * mm))
+for h in holes_b: cut(web, prism(h, 'x', -0.01, 0.01))
+smooth(web); K.adopt(web, 'handguard', TI, pbrk)
+for ua, ub in ((BLO, BLO + BFL), (BHI - BFL, BHI)):
+    o = K.tmp(box(-BX, BX, f_b0, f_b1, ua, ub)); bevel(o, 0.8 * mm, 2, 30); smooth(o); K.adopt(o, 'handguard', TI, pbrk)
+# the SIDE WEBS: sloping up and out, from the I-beam's top flange edges to the underside of the arms' runs (a V cradle under the
+# barrels), Warren trusses laid out in their sloped planes
+XB, UB, XT, UT = BX - 1 * mm, BHI, AX0 + 2 * mm, WU + 0.001      # (the slope's foot and head, in (right, up))
+Ls = math.hypot(XT - XB, UT - UB); dx, du = (XT - XB) / Ls, (UT - UB) / Ls
+out_w, holes_w = warren(CH1 + 0.040, HS0 - 0.012, 0.0, Ls, chord=TW)
 for s_ in (-1, 1):
-    bp_ = K.tmp(prism(out_b, 'x', s_ * BX0, s_ * BX1)); bevel(bp_, 0.6 * mm, 1, 30)       # (rounded first: the holes cut crisp)
-    for h in holes_b: cut(bp_, prism(h, 'x', -0.04, 0.04))
-    smooth(bp_); K.adopt(bp_, 'handguard', TI, pbrk)
-for (fa, fb), (ua, ub) in (((out_b[0][0], out_b[1][0]), (BLO, BLO + 2.5 * mm)), ((out_b[3][0], out_b[2][0]), (BHI - 2.5 * mm, BHI))):
-    o = K.tmp(box(-BX1, BX1, fa, fb, ua, ub)); bevel(o, 0.6 * mm, 2, 30); smooth(o); K.adopt(o, 'handguard', TI, pbrk)
-# the side webs: from their own bottom chord up to each arm's run, in the arms' plane, sloped ends
-FT = -0.051
-out_w, holes_w = warren(CH1 + 0.040, HS0 - 0.012, FT, WU, chord=TW)
-for s_ in (-1, 1):
-    wb = K.tmp(prism(out_w, 'x', s_ * AX0, s_ * (AX0 + 4 * mm))); bevel(wb, 0.8 * mm, 1, 30)
+    wb = K.tmp(prism(out_w, 'x', 0.0, 3.5 * mm)); bevel(wb, 0.8 * mm, 1, 30)          # built flat: x = thickness, y = forward, z = up the slope
     for h in holes_w:
-        cut(wb, prism(h, 'x', -0.04, 0.04))
+        cut(wb, prism(h, 'x', -0.01, 0.01))
+    # into place: z -> along the slope (outwards for this side), x -> its normal
+    M = Matrix(((s_ * du, 0, s_ * dx, s_ * XB), (0, 1, 0, 0), (-dx, 0, du, UB), (0, 0, 0, 1)))
+    wb.data.transform(M)
+    if s_ < 0: wb.data.flip_normals()
     smooth(wb); K.adopt(wb, 'handguard', TI, pbrk)
 # ---- the SLIDING FRONT (part_pump, inside the forend): the muzzle device on its two truss arms, a yoke under it, and two steel guide
 # rods running back into the forend's floor; it runs forward SLIDE for the reload, drawing the barrel block ----
@@ -350,7 +356,7 @@ info = {
     'sy': round(SY, 4), 'fSight': 0.017, 'relief': 0.10,
     'barrels': {'n': 6, 'rounds_each': ROUNDS, 'round_mm': [10, ROUND_L * 1000], 'free_bore_mm': round(FREE * 1000)},
     'muzzles': [[MZ1, round(z, 4), round(x, 4)] for x, z in BORES],
-    'grip': [0.000, -0.097, 0], 'support': [0.330, -0.095, 0],
+    'grip': [0.030, -0.097, 0], 'support': [0.330, -0.095, 0],
     'anim': {'front': 'part_pump', 'brk': 'part_brk', 'mag': 'part_mag'},
     'magAt': [MAG_AT[0], MAG_AT[1]],
 }
