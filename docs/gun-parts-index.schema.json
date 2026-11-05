@@ -7,7 +7,7 @@
   "properties": {
     "version": {
       "type": "number",
-      "description": "Index format version (1)."
+      "description": "Index format version (2)."
     },
     "platform": {
       "type": "string",
@@ -22,7 +22,7 @@
       "items": {
         "type": "string"
       },
-      "description": "Every build slot seen in the platform's sweep: the ones `anchors` and `deltas` are keyed by."
+      "description": "Every build slot seen in the platform's builds: the ones `anchors` is keyed by."
     },
     "tags": {
       "type": "object",
@@ -52,13 +52,45 @@
                   "oneOf": [
                     {
                       "type": "string",
-                      "description": "The pack's file under the platform folder; null when the tag is empty for this key."
+                      "description": "The pack's file under the platform folder (or `_shared/<slot>/<file>.glb` under the parts folder: stored once for every platform); null when the tag is empty for this key."
                     },
                     {
                       "type": "null"
                     }
                   ],
-                  "description": "The pack's file under the platform folder; null when the tag is empty for this key."
+                  "description": "The pack's file under the platform folder (or `_shared/<slot>/<file>.glb` under the parts folder: stored once for every platform); null when the tag is empty for this key."
+                },
+                "at": {
+                  "oneOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      },
+                      "minItems": 3,
+                      "maxItems": 3,
+                      "description": "A shared pack: the move [forward, up, right] metres that places its stored geometry on this platform."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A shared pack: the move [forward, up, right] metres that places its stored geometry on this platform."
+                },
+                "nodes": {
+                  "oneOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The part_ nodes the pack has meshes in (info.anim keys, before the meshes are loaded)."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The part_ nodes the pack has meshes in (info.anim keys, before the meshes are loaded)."
                 },
                 "tris": {
                   "oneOf": [
@@ -116,42 +148,60 @@
       },
       "description": "Offsets parts give other slots: \"<buildSlot>=<partId>\" -> { mount_<tag>: [forward, up, right] } (metres, added up over the build)."
     },
-    "bases": {
+    "info": {
       "type": "array",
       "items": {
         "type": "object",
         "properties": {
-          "build": {
-            "type": "object",
-            "additionalProperties": {
+          "dep": {
+            "type": "array",
+            "items": {
               "type": "string"
             },
-            "description": "slot -> part id."
+            "description": "The build slots whose parts the table's leaves depend on: a row's `key` lists a part for each, in this order."
           },
-          "info": {
-            "description": "Leaf path (a/b/0) -> value."
+          "leaves": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The info leaf paths (a/b/0: segments joined by \"/\", array indices as numbers) the rows give."
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "A part id per `dep` slot (\"\" = the slot is empty; \"*\" = any part)."
+                },
+                "v": {
+                  "type": "array",
+                  "items": {},
+                  "description": "The value of each leaf, in the order of `leaves` ({ \"del\": 1 }: the leaf is absent)."
+                }
+              },
+              "required": [
+                "key",
+                "v"
+              ],
+              "additionalProperties": false
+            },
+            "description": "One row per combination of parts: the most specific matching key is used."
           }
         },
         "required": [
-          "build",
-          "info"
+          "dep",
+          "leaves",
+          "rows"
         ],
         "additionalProperties": false
       },
-      "description": "The three reference builds (default, loaded, loaded with sights) and their `info` as flat leaves (path -> value)."
-    },
-    "deltas": {
-      "type": "object",
-      "additionalProperties": {
-        "type": "array",
-        "items": {}
-      },
-      "description": "\"<buildSlot>=<partId>\" -> per reference build: the info leaves that change (number: add; { set: v }; { del: 1 }), or null where not observed."
-    },
-    "exact": {
-      "type": "object",
-      "additionalProperties": {},
-      "description": "Builds the delta sums get wrong: build key -> leaf -> value."
+      "description": "The `info` leaves as tables: each leaf is a function of the parts in some slots, and leaves with the same slots are one table."
     },
     "totals": {
       "oneOf": [
@@ -172,9 +222,7 @@
     "slots",
     "tags",
     "anchors",
-    "bases",
-    "deltas",
-    "exact"
+    "info"
   ],
   "additionalProperties": false
 }

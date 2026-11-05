@@ -42,7 +42,7 @@ export function maxDev(a, b) {
  * each assembled triangle is matched to a not yet matched recipe triangle near it. Returns the largest vertex deviation of the matches, or Infinity.
  */
 export function matchTriangles(a, p, tol) {
-  const CELL = 0.004, key = (x, y, z) => ((Math.floor(x / CELL) + 512) * 1024 + (Math.floor(y / CELL) + 512)) * 1024 + (Math.floor(z / CELL) + 512);
+  const CELL = 0.004, ikey = (a, b, c) => ((a + 512) * 1024 + (b + 512)) * 1024 + (c + 512), key = (x, y, z) => ikey(Math.floor(x / CELL), Math.floor(y / CELL), Math.floor(z / CELL));
   const flat = (ms) => { const out = []; for (const m of ms) for (let i = 0; i < m.v.length; i += 9) out.push({ m: m.mat, v: m.v, i }); return out; };
   const ta = flat(a), tp = flat(p); if (ta.length !== tp.length) return Infinity;
   const cells = new Map();
@@ -51,8 +51,9 @@ export function matchTriangles(a, p, tol) {
   for (const t of ta) {
     const v = t.v, i = t.i, cx = (v[i] + v[i + 3] + v[i + 6]) / 3, cy = (v[i + 1] + v[i + 4] + v[i + 7]) / 3, cz = (v[i + 2] + v[i + 5] + v[i + 8]) / 3;
     let best = -1, bd = Infinity;
-    for (let dx = -CELL; dx <= CELL; dx += CELL) for (let dy = -CELL; dy <= CELL; dy += CELL) for (let dz = -CELL; dz <= CELL; dz += CELL) {
-      const l = cells.get(key(cx + dx, cy + dy, cz + dz)); if (!l) continue;
+    const ax = Math.floor(cx / CELL), ay = Math.floor(cy / CELL), az = Math.floor(cz / CELL); // (whole cells: a centroid on a cell boundary must find a neighbour that rounded the other way)
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (let dz = -1; dz <= 1; dz++) {
+      const l = cells.get(ikey(ax + dx, ay + dy, az + dz)); if (!l) continue;
       for (const n of l) {
         if (used[n] || tp[n].m !== t.m) continue;
         const w = tp[n].v, j = tp[n].i;
