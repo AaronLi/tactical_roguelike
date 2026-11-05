@@ -392,9 +392,9 @@ function arForward(t: number, withChargingHandle: boolean, mag: MagState = 'load
       { coil: { level: 0.6, length: 11, dispersion: 0.5, decay: 0.12, brightness: 2800 }, housing: BUFFER_TUBE_HOUSING }),
     hit('buffer weights shift', fwdAt(STROKE_MM - 2), -20, vAt(STROKE_MM - 2) + 1, steelBlock(1.5, 12), arBuffer, { scatter: 0.9, radius: 2 }),
     // The carrier's tail runs out of the buffer tube, then the carrier runs on the upper's rails.
-    fwdRub('carrier tail running out of the buffer tube', STROKE_MM, 40, -9, { force: 4, roughness: 2, grain: 0.3, periodicity: 0, contactWidth: 0.1 }, arCarrier, arBufferTube),
+    fwdRub('carrier tail running out of the buffer tube', STROKE_MM, 40, -4, { force: 4, roughness: 2, grain: 0.3, periodicity: 0, contactWidth: 0.1 }, arCarrier, arBufferTube),
     hit('carrier tail leaves the buffer tube', fwdAt(40), -14, vAt(40) * 0.15, arCarrier, arBufferTube, { scatter: 0.3, radius: 4 }),
-    fwdRub('carrier rails in the upper', 40, 0, -9, { force: 6, ...OILY }, arCarrier, arUpper),
+    fwdRub('carrier rails in the upper', 40, 0, -4, { force: 6, ...OILY }, arCarrier, arUpper),
     // It runs over the cocked hammer until ~35 mm (light: the hammer is held down by the sear).
     fwdRub('carrier running over the cocked hammer', STROKE_MM, 35, -16, { force: 3, ...OILY }, arHammer, arCarrier, { housing: LOWER_HOUSING }),
     // The serrated stretch passes the spring-loaded forward-assist pawl: a ratchet run that
@@ -412,17 +412,17 @@ function arForward(t: number, withChargingHandle: boolean, mag: MagState = 'load
     snap('case rim snaps free of the feed lips', fwdAt(55), -1, { strength: 0.7, preload: 0, seat: 0.3, seatDelay: 1 }, arCase, arFeedLips),
     // The stack jumps: the next round snaps up into the underside of the passing bolt/carrier,
     // then rides along it, held by the feed lips, until the carrier is home.
-    ...magazineReaction(fwdAt(52), 4, arCarrier, 'next round snaps up against the bolt'),
+    ...magazineReaction(fwdAt(52), -2, arCarrier, 'next round snaps up against the bolt'),
     fwdRub('next round rides along the carrier underside', 50, 0, -10, { force: 3, roughness: 3, grain: 0.2, contactWidth: 0.05 }, arNextRound, arCarrier, IN_MAG),
     // Guided into the breech: the nose hits the feed ramp, the bullet slides up it into the
     // chamber (copper on steel), the case body slides along the chamber walls, and the case
     // seats just before the bolt face arrives.
-    hit('bullet nose hits the feed ramp', fwdAt(50), 0, vAt(50) * 0.4, arBullet, arFeedRamp, { scatter: 0.3, radius: 1.5, click: 0.6 }),
-    fwdRub('bullet slides up the feed ramp into the chamber', 50, 40, -5, { force: 6, roughness: 5, grain: 0.15, contactWidth: 0.03 }, arBullet, arFeedRamp),
+    hit('bullet nose hits the feed ramp', fwdAt(50), -4, vAt(50) * 0.4, arBullet, arFeedRamp, { scatter: 0.3, radius: 1.5, click: 0.6 }),
+    fwdRub('bullet slides up the feed ramp into the chamber', 50, 40, -8, { force: 6, roughness: 5, grain: 0.15, contactWidth: 0.03 }, arBullet, arFeedRamp),
     // The bolt drives the loaded round into the steel chamber: brass sliding on steel, rising as
     // it goes deeper, then the shoulder seats with a solid, short tock just as the bolt arrives.
-    fwdRub('case slides into the chamber', 45, 3, 10, { force: 8, roughness: 5, grain: 0.15, contactWidth: 0.02 }, arCase, arChamber),
-    hit('case shoulder seats in the chamber', TF - 0.0006, 12, vAt(10) * 0.35, arCase, arChamber, { scatter: 0.2, radius: 2, click: 0.8, sharp: 0.95 }),
+    fwdRub('case slides into the chamber', 45, 3, -2, { force: 8, roughness: 5, grain: 0.15, contactWidth: 0.02 }, arCase, arChamber),
+    hit('case shoulder seats in the chamber', TF - 0.0006, 1, vAt(10) * 0.35, arCase, arChamber, { scatter: 0.2, radius: 2, click: 0.8, sharp: 0.95 }),
     // The gas tube enters the carrier key over the last ~20 mm.
     hit('gas tube slides into the carrier key', fwdAt(18), -9, vAt(18) * 0.2, arGasTube, gasKey, { scatter: 0.3, radius: 1.5 }),
     // Lock-up, staged as the mechanism does it (stretched to ~4 ms so the turn is heard as its own
@@ -466,7 +466,7 @@ function arForward(t: number, withChargingHandle: boolean, mag: MagState = 'load
   if (withChargingHandle) {
     // Let go, the charging handle rides the whole stroke home with the carrier in its channel,
     // the gas key in its slot, and slams into its own front stop.
-    els.push(fwdRub('charging handle running home in its channel', STROKE_MM, 0, -9, { force: 3, ...OILY }, arChargingHandle, arUpper));
+    els.push(fwdRub('charging handle running home in its channel', STROKE_MM, 0, -6, { force: 3, ...OILY }, arChargingHandle, arUpper));
     els.push(fwdRub('gas key riding in the handle slot', STROKE_MM, 0, -13, { force: 2, ...OILY }, gasKey, arChargingHandle));
     // Let go, the charging handle rides home with the carrier and slams into its own front stop.
     els.push(hit('charging handle slams into its front stop', post(0.0581), 0, V(3.8), arChargingHandle, arUpper, { scatter: 0.4, radius: 3, click: 0.7 }));
