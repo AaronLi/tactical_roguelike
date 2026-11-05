@@ -84,4 +84,6 @@ for (const id of Object.keys(G.GUN_SPECS)) {
 // the .50's real outline travels in the index whole (the profiles are the lathe's points: a few dozen numbers)
 for (const id of Object.keys(index.rounds)) { const s = R.roundShape({ id }); if (s) index.keys[index.rounds[id]].shape = s; }
 fs.writeFileSync(OUT + 'index.json', JSON.stringify(index));
+// a prop no longer made (a caliber renamed or gone) goes: the bundle takes every file here (tools/bundle_models.mjs --check fails on an orphan)
+for (const f of fs.readdirSync(OUT)) if (f.endsWith('.glb') && f !== 'quarrel.glb' && !written.has(f)) { fs.unlinkSync(OUT + f); console.log('props: removed ' + f + ' (no longer made)'); }
 console.log(`props: ${Object.keys(index.keys).length} rounds for ${Object.keys(index.rounds).length} guns, the quarrel: ${bytes} B in ${fs.readdirSync(OUT).length - 1} files (${OUT})`);
