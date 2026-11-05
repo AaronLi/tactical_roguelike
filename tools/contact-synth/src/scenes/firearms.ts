@@ -169,9 +169,11 @@ function simulateRun(mass: number, mag: MagState = 'loaded'): { timeAt: (x: numb
   return { timeAt: (xq) => (xq >= STROKE_MM ? 0 : look(ts, xq)), speedAt: (xq) => look(vs, xq), total: tt, arrive: v };
 }
 const arBuffer = steelBlock(6, 18); // buffer with sliding weights
-// A 5.56 case: a thin brass tube ~45 mm long, 9.6 mm across. As a tube it rings bright (several
-// kHz, the brass "tink") and briefly; held in the magazine or chamber, so damped quickly.
-const arCase: Body = { ...mat('brass'), shape: 'bar', size: 4.5, thickness: 4, modes: 3, irregularity: 0.5, damping: 0.35, level: 0 };
+// A loaded 5.56 cartridge, not an empty case: a brass case (~6 g) packed nearly full of powder
+// (~1.6 g) with a ~4 g copper-jacketed lead bullet crimped in, ~12 g in all. The powder fill and
+// the lead core soak up vibration, so it barely rings: a short, solid "tock", with a crisp click
+// where its hard brass head and rim meet steel. (As a 4.5 cm x 6 mm brass bar: ~13 g.)
+const arCase: Body = { ...mat('brass'), shape: 'bar', size: 4.5, thickness: 6, modes: 1, irregularity: 0.6, damping: 0.8, level: 0 };
 // Spring-steel feed lips on the magazine body: they ring briefly (the magazine "ping").
 const arFeedLips: Body = { ...mat('springsteel'), shape: 'bar', size: 4, thickness: 0.8, modes: 2, irregularity: 0.5, damping: 0.3, level: 0 };
 const arChamber: Body = { ...mat('steel'), shape: 'shell', size: 5, thickness: 4, modes: 2, irregularity: 0.6, damping: 0.7, level: 0 };
@@ -212,7 +214,8 @@ const arBreech: Body = { ...mat('steel'), shape: 'bar', size: 20, thickness: 16,
 // The whole rifle (barrel, upper, lower, stock) flexing as one beam: its first bending modes
 // (~200 Hz and up) are the weight under a slam. Capped at the synth's 50 cm.
 const arRifleBody: Body = { ...mat('aluminum'), shape: 'bar', size: 50, thickness: 10, modes: 3, irregularity: 0.5, damping: 0.8, level: 0 }; // held: highs die fast, the low bend carries
-const arBullet: Body = { ...mat('copper'), shape: 'block', size: 2.3, thickness: 5.7, modes: 0, irregularity: 0.4, damping: 0.5, level: 0 };
+// Copper jacket over a lead core: dense and dead.
+const arBullet: Body = { ...mat('copper'), loss: 0.02, shape: 'block', size: 2.3, thickness: 5.7, modes: 0, irregularity: 0.4, damping: 0.8, level: 0 };
 const arFeedRamp = steelBar(2, 4);
 const arGasTube: Body = { ...mat('stainless'), shape: 'bar', size: 25, thickness: 4.7, modes: 0, irregularity: 0.5, damping: 0.6, level: 0 };
 const arExtractor = steelBar(2, 3);
@@ -401,7 +404,7 @@ function arForward(t: number, withChargingHandle: boolean, mag: MagState = 'load
     // top round's rim (86 mm), drags it over the feed lips, the rim snaps free (~55), the next
     // round snaps up (~52), the nose rides up the feed ramp (~50) and the case slides into the
     // chamber (45 to battery).
-    // The steel bolt face catches the brass case head: a bright brass click.
+    // The steel bolt face catches the cartridge's brass head: a crisp click, solid behind it.
     hit('bolt face catches the case head', fwdAt(86), -2, vAt(86) * 0.5, arCase, arBolt, { scatter: 0.3, radius: 1.5, click: 0.8, sharp: 0.95 }),
     fwdRub('case dragged over the feed lips', 86, 55, -10, { force: 6, roughness: 15, grain: 0.3 }, arCase, arFeedLips, IN_MAG),
     // The stripped case slides forward off the case beneath it: brass on brass.
@@ -416,10 +419,10 @@ function arForward(t: number, withChargingHandle: boolean, mag: MagState = 'load
     // seats just before the bolt face arrives.
     hit('bullet nose hits the feed ramp', fwdAt(50), 0, vAt(50) * 0.4, arBullet, arFeedRamp, { scatter: 0.3, radius: 1.5, click: 0.6 }),
     fwdRub('bullet slides up the feed ramp into the chamber', 50, 40, -5, { force: 6, roughness: 5, grain: 0.15, contactWidth: 0.03 }, arBullet, arFeedRamp),
-    // The bolt drives the brass tube into the steel chamber: a hollow, bright brass "shhk" that
-    // rises as it goes deeper, then the shoulder seats with a brass tink just as the bolt arrives.
-    fwdRub('case slides into the chamber', 45, 3, 4, { force: 8, roughness: 5, grain: 0.15, contactWidth: 0.02 }, arCase, arChamber),
-    hit('case shoulder seats in the chamber', TF - 0.0006, 9, vAt(10) * 0.35, arCase, arChamber, { scatter: 0.2, radius: 2, click: 0.8, sharp: 0.95 }),
+    // The bolt drives the loaded round into the steel chamber: brass sliding on steel, rising as
+    // it goes deeper, then the shoulder seats with a solid, short tock just as the bolt arrives.
+    fwdRub('case slides into the chamber', 45, 3, 10, { force: 8, roughness: 5, grain: 0.15, contactWidth: 0.02 }, arCase, arChamber),
+    hit('case shoulder seats in the chamber', TF - 0.0006, 12, vAt(10) * 0.35, arCase, arChamber, { scatter: 0.2, radius: 2, click: 0.8, sharp: 0.95 }),
     // The gas tube enters the carrier key over the last ~20 mm.
     hit('gas tube slides into the carrier key', fwdAt(18), -9, vAt(18) * 0.2, arGasTube, gasKey, { scatter: 0.3, radius: 1.5 }),
     // Lock-up, staged as the mechanism does it (stretched to ~4 ms so the turn is heard as its own
