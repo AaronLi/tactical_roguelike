@@ -245,12 +245,10 @@ const G_Shop = {
   room(it: GItem) { const Gr = G.Gear; return Gr.all(G.Me).some((g) => Gr.findSpot(g, it)); },
   services() {
     const Me = G.Me, Gr = G.Gear, out = [];
-    // load every magazine (and the guns) from the loose rounds you own: free, it's just your time
-    let empty = 0, loose = 0;
-    Gr.each(Gr.all(Me), (it) => { if (it.k === 'mag') empty += it.cap - it.n; if (it.k === 'ammo') loose += it.n; });
-    for (const w of Object.values(Me.weapons)) empty += Me.magSize(w) - w.mag + (G.chambered(w.def) && !w.chamber ? 1 : 0);
-    out.push({ id: 'load', name: 'Load Magazines', desc: `Top up every magazine you own (and your guns) from your loose rounds, same type first. ${loose} loose rounds, ${empty} empty places.`, price: 0, disabled: !empty || !loose,
-      apply: () => Gr.loadAll(Me) });
+    // load magazines from the loose rounds you own: free, it's just your time. Which ones: the setting (Settings & controls)
+    const kitOnly = !!G.Game.settings.loadKit, { empty, loose } = Gr.loadNeed(Me, kitOnly);
+    out.push({ id: 'load', name: 'Load Magazines', desc: `${kitOnly ? 'Top up the magazines for your equipped guns, then those on your kit, and the equipped guns' : 'Top up every magazine you own (and your guns)'} from your loose rounds, same type first. ${loose} loose rounds, ${empty} empty places. <small>(${kitOnly ? 'Equipped and carried only' : 'Everything'}: change it in Settings &amp; controls.)</small>`, price: 0, disabled: !empty || !loose,
+      apply: () => Gr.loadAll(Me, kitOnly) });
     // a box of any load for every caliber you own a gun in: the load picked on the card (loadSel), each priced by what
     // it does (G.AMMO k: birdshot under buck, ball, tracer, subsonic, a slug, hollow points, AP, flechettes)
     const cals = [...new Set<string>(Gr.guns(Me).flatMap((w) => G.calsOf(w.def)))];

@@ -478,21 +478,43 @@ const G_Gear = (() => {
     if (box.n <= 0) each(all(me), (it: GItem, g: GGrid) => { if (it === box) removeFrom(g, it); });
     return n;
   }
-  // Every magazine you own topped up from your boxes (same type first; an empty one takes any), and the guns
-  // themselves. Returns the rounds loaded.
-  function loadAll(me: GMe) {
+  // What "load magazines" tops up. kitOnly (the setting, js/game.ts settings.loadKit): the magazines that fit the guns you
+  // have equipped (wherever they sit, the locker too), then the ones on you (pockets, rig, belt, pack), and the equipped
+  // guns themselves (the guns first); other magazines and guns are left as they are. Otherwise everything you own, in the order found.
+  function loadTargets(me: GMe, kitOnly: boolean) {
+    const mags: GItem[] = [], seen = new Set<GItem>(), eq = Object.values(me.weapons).filter(Boolean);
+    const add = (it: GItem) => { if (it.k === 'mag' && !seen.has(it)) { seen.add(it); mags.push(it); } };
+    if (!kitOnly) { each(all(me), add); return { mags, guns: guns(me), lead: mags.length }; }
+    each(all(me), (it: GItem) => { if (it.k === 'mag' && eq.some((w) => G.magFits(it.wid, w.def.id))) add(it); }); // (the equipped guns' magazines first)
+    const lead = mags.length;
+    each(body(me), add); // (then the kit's)
+    return { mags, guns: eq, lead };
+  }
+  // The places left to fill and the loose rounds there are for them (the Supplies card's numbers).
+  function loadNeed(me: GMe, kitOnly: boolean) {
+    const tg = loadTargets(me, kitOnly);
+    let empty = 0, loose = 0;
+    for (const m of tg.mags) empty += m.cap - m.n;
+    for (const w of tg.guns) if (!w.noMag) empty += me.magSize(w) - w.mag + (G.chambered(w.def) && !w.chamber ? 1 : 0);
+    each(all(me), (it: GItem) => { if (it.k === 'ammo') loose += it.n; });
+    return { empty, loose };
+  }
+  // The magazines (and guns) loadTargets picks topped up from your boxes (same type first; an empty one takes any), each
+  // from boxes of its own caliber (a barrel block: only its own round type). Returns the rounds loaded.
+  function loadAll(me: GMe, kitOnly = false) {
     let n = 0;
     const boxes = () => { const o: GItem[] = []; each(all(me), (it: GItem) => { if (it.k === 'ammo' && it.n > 0) o.push(it); }); return o; };
-    each(all(me), (mag: GItem) => {
-      if (mag.k !== 'mag' || mag.n >= mag.cap) return;
+    const tg = loadTargets(me, kitOnly);
+    const fillMags = (mags: GItem[]) => { for (const mag of mags) {
+      if (mag.n >= mag.cap) continue;
       const cal = G.cartOf(mag);
       const list = boxes().filter((q) => q.key === cal).sort((a, c) => (c.am === mag.am ? 1 : 0) - (a.am === mag.am ? 1 : 0));
       for (const b of list) {
         n += loadMag(me, mag, b);
         if (mag.n >= mag.cap) break;
       }
-    });
-    for (const w of guns(me)) {
+    } };
+    const fillGuns = () => { for (const w of tg.guns) {
       if (w.noMag) continue; // no magazine in it to load
       const cap = me.magSize(w), cal = G.cartOf(w);
       if (G.chambered(w.def) && !w.chamber) { const b = boxes().find((q) => q.key === cal); if (b) { w.chamber = b.am; b.n--; n++; if (b.n <= 0) each(all(me), (it: GItem, g: GGrid) => { if (it === b) removeFrom(g, it); }); } }
@@ -503,7 +525,9 @@ const G_Gear = (() => {
         if (w.tube) for (let i = 0; i < t; i++) w.tube.push(b.am);
         if (b.n <= 0) each(all(me), (it: GItem, g: GGrid) => { if (it === b) removeFrom(g, it); });
       }
-    }
+    } };
+    // the setting's order: the equipped guns, their magazines, then the kit's; everything: every magazine, then the guns
+    if (kitOnly) { fillGuns(); fillMags(tg.mags.slice(0, tg.lead)); fillMags(tg.mags.slice(tg.lead)); } else { fillMags(tg.mags); fillGuns(); }
     return n;
   }
   // somewhere for a new item: near `pref` if given, else on you, else the locker (which grows if it's full)
@@ -675,7 +699,7 @@ const G_Gear = (() => {
   }
   return {
     LIST, DEFS, POUCHES, MOUNTS, mountOn, mountFree, headLoad, mixed, pack, unpack, mergeBox, mergeMed, medStack, medCount, absorb, combine, setLoad, loadIn, magShape, magName, magVid, BRANDS: B, ammoFor, ammoItem, gearItem, gunItem, pouchItem, mounted, molles, pickMag, dumpGrid, dumpMag, partItem, partSize, flashItem, stow, inField, roomFor, unloadMag, unloadGun, fillMag, fillFrom, fillGun, partCount, stashProxy, gunSize, guns, packGuns, medItem, fragItem, grid, size, isGear, fits, put, findSpot, place, removeFrom,
-    newKit, starter, body, all, each, feeds, rounds, count, take, swapMag, exchange, takeRounds, chamberIn, spares, refitMags, boxItem, boxCap, loadMag, loadAll, roundPrice,
+    newKit, starter, body, all, each, feeds, rounds, count, take, swapMag, exchange, takeRounds, chamberIn, spares, refitMags, boxItem, boxCap, loadMag, loadAll, loadTargets, loadNeed, roundPrice,
     defOf, cond, piece, speed, label, price, sale,
   };
 })();

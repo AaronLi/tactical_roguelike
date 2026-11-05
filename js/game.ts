@@ -20,7 +20,7 @@ type GmPhase = 'menu' | 'lobby' | 'route' | 'level' | 'shop' | 'gameover';
 // the full-screen panels this.screen shows one of (index.html)
 type GmScreen = 'menu' | 'lobby' | 'shop' | 'route' | 'gameover' | 'pause';
 // the sliders in the menu, and the keys they keep in storage
-type GmSetting = 'sens' | 'fov' | 'vol';
+type GmSetting = 'sens' | 'fov' | 'vol' | 'loadKit';
 // what the host tells the clients (js/server.ts), by t: onMsg dispatches on it
 type GmMsgKind = 'welcome' | 'roster' | 'arms' | 'rvotes' | 'newrun' | 'veil' | 'phase' | 'snap' | 'rfx' | 'bstk' | 'hole' | 'dpart' | 'dfall' | 'rpath' | 'skin' | 'loot' | 'lootRm' | 'glass' | 'crack' | 'lootGot' | 'team' | 'cab' | 'sbox' | 'abox' | 'wcase' | 'eshot' | 'shot' | 'nade' | 'boom' | 'course' | 'crun' | 'flash' | 'kill' | 'incap' | 'edown' | 'saved' | 'stock' | 'took' | 'ereload' | 'clear' | 'treat' | 'applying' | 'revive' | 'chat' | 'ping' | 'ffhit' | 'left' | 'door' | 'order' | 'shout' | 'evid' | 'evtake' | 'evsec' | 'cuffed' | 'refund';
 // the map as js/damage.ts takes it (its own cut-down shape of a level's)
@@ -94,7 +94,7 @@ const G_Game = {
   init() {
     G.Stickers.load(); // (which stickers there are: js/stickers.ts)
     G.GunModels.boot(); // (every platform's model index and the props; the packs themselves as they are needed: js/gunmodels.ts)
-    this.settings = { sens: G.U.store.get('sens', 1), fov: G.U.store.get('fov', 80), vol: G.U.store.get('vol', 0.6) };
+    this.settings = { sens: G.U.store.get('sens', 1), fov: G.U.store.get('fov', 80), vol: G.U.store.get('vol', 0.6), loadKit: G.U.store.get('loadKit', 1) }; // (loadKit: the hangar's Load Magazines tops up the equipped guns' and the kit's magazines only (1), or everything (0))
     this.myName = G.U.store.get('name', 'Operator' + Math.floor(Math.random() * 90 + 10));
     G.U.store.set('name', this.myName); // (kept: the same name after a refresh, so the squad knows who's back)
     // your callsign: an animal (its emblem and colour mark you out to the squad; js/callsigns.ts)
@@ -250,6 +250,10 @@ const G_Game = {
     bindRange(['sens', 'sens2'], 'sens', (v) => v.toFixed(2));
     bindRange(['fov', 'fov2'], 'fov', (v) => v + '°');
     bindRange(['vol', 'vol2'], 'vol', (v) => Math.round(v * 100) + '%', (v) => G.Audio.setVolume(v));
+
+    const loadKit = this.$<HTMLSelectElement>('loadKit');
+    loadKit.value = String(this.settings.loadKit);
+    loadKit.addEventListener('change', () => { this.settings.loadKit = +loadKit.value; G.U.store.set('loadKit', +loadKit.value); if (G.Shop.tab === 'svc') G.Shop.render(); });
 
     const mute = this.$<HTMLInputElement>('mute');
     mute.checked = G.Audio.muted;
