@@ -507,7 +507,9 @@ const G_Icons = (() => {
     url = c.toDataURL(); cache.set(key, url);
     return url;
   }
-  return { of, chamberPic, styleFor, gauge, chamberGauge, TYPE_COL, shellCol, tipCol };
+  /** Whether the last of() drew a gun whose model is still loading (its cell is a placeholder: show a spinner; 'gunicons' follows when it's in). */
+  const pending = () => gunWaits;
+  return { of, pending, chamberPic, styleFor, gauge, chamberGauge, TYPE_COL, shellCol, tipCol };
 })();
 G.Icons = G_Icons;
 interface GameModules { Icons: typeof G_Icons; }
