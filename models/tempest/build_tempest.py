@@ -60,8 +60,8 @@ LOW = ZB - RB                                     # the lowest barrel's undersid
 CH1 = 0.200                                       # the FIXED chassis's front: it runs on from the panel under the barrels to the hinge
 HINGE = (CH1 - 0.002, -0.062)                     # (forward, up) of the hinge pin
 OPEN = 25.0                                       # the front's drop for the reload, degrees
-SLIDE = 0.090                                     # the muzzle device's run forward (it draws the barrel block with it) before the drop
-UNSEAT = 0.012                                    # then the block slides back this far in its cradle, off the muzzle device's seats
+SLIDE = 0.120                                     # the muzzle device's run forward (it draws the barrel block with it) before the drop
+UNSEAT = 0.040                                    # then the block slides back this far in its cradle, off the muzzle device's seats
 # the reload: the MUZZLE DEVICE runs forward SLIDE on two guide rods in the forend (part_pump), drawing the barrel block (its muzzles
 # are seated in the device) until the block's rear is out from under the rail; the forend drops OPEN degrees on the fixed hinge; the
 # block slides back UNSEAT off the seats and lifts out. So the rail stays low, just over the block (checked below: RAIL_CLEAR)
@@ -186,6 +186,15 @@ pbrk = K.part('brk', (0, HINGE[0], HINGE[1]))
 # to the barrels' height, run along beside them (a rail on each's outside), and descend at the front to the ROD HOUSING: a cross member
 # under the barrels that carries the muzzle device's guide rods (and a short rail under it for a foregrip)
 ROD_X, ROD_U, ROD_R, ROD0 = 16 * mm, -0.0445, 4 * mm, HG1 - 0.150
+# the muzzle device slides on two RECTANGULAR guide rails (6 x 10 mm), their sections tilted to the device's lower facets (the line from a
+# lower corner barrel to the single lower barrel, ~47 degrees), where the round rods were
+RL_T, RL_D = 6 * mm, 10 * mm                                      # a rail's thickness (across the facet) and depth (along it)
+_ta = (BORES[4][0] - BORES[5][0], BORES[4][1] - BORES[5][1])
+TILT = math.atan2(_ta[0], _ta[1])                                 # (the rotation about forward that lays a section's up along the facet)
+def rail_section(s_, w, h, f0, f1):
+    # a box w (across) x h (along the facet) from f0 to f1, its section tilted, centred on side s_'s rail line
+    me = box(-w / 2, w / 2, f0, f1, -h / 2, h / 2)
+    me.transform(Matrix.Translation((s_ * ROD_X, 0, ROD_U)) @ Matrix.Rotation(s_ * TILT, 4, 'Y')); return me
 AX0, AX1, AW = 19 * mm, 25 * mm, 0.014                            # the arms' inner and outer faces; their depth on the run
 RUN_U = -0.026                                                    # the run's centre height: beside the single lower barrel, under the corner ones
 HS0 = HG1 - 0.072                                                 # the rod housing's rear (long enough under it for a vertical grip)
@@ -240,7 +249,7 @@ for s_ in (-1, 1):
 # the rod housing: a cross member under the barrels between the arms' feet, bored for the two guide rods, a pocket between them
 hs = K.tmp(prism([(HS0, FLOOR), (HG1, FLOOR), (HG1, LOW - 2 * mm), (HS0, LOW - 2 * mm)], 'x', -AX1, AX1))
 bevel(hs, 1.5 * mm, 2, 30)
-for s_ in (-1, 1): cut(hs, cyl(ROD_R + 0.3 * mm, HS0 - 0.01, HG1 + 0.01, 'y', (s_ * ROD_X, ROD_U), 16))
+for s_ in (-1, 1): cut(hs, rail_section(s_, RL_T + 0.6 * mm, RL_D + 0.6 * mm, HS0 - 0.01, HG1 + 0.01))      # the rails' slots
 cut(hs, prism(rounded((HS0 + HG1) / 2, (FLOOR + LOW) / 2 - 0.001, 0.014, 0.0035, 2 * mm, 2), 'x', -0.009, 0.009))
 smooth(hs); K.adopt(hs, 'handguard', TI, pbrk)
 picatinny(K, FG0, FG1, FLOOR, 'handguard', RAIL_M, pbrk, 'bottom')
@@ -320,9 +329,9 @@ for s_ in (-1, 1):
     for tri, ws in (([TA, TM, TC], [WEB, WEB / 2, WEB]), ([TM, TB, TC], [WEB, WEB, WEB / 2])):
         cut(a, prism(fillet_poly(inset_poly(tri, ws), FIL, 3), 'x', -0.03, 0.03))
     smooth(a); K.adopt(a, 'muzzle', TI, ppump)
-    # the guide rod, and the sleeve round it that the strut's foot stands on: from the forend's mouth to under the device, chamfered
-    o = K.obj(lathe([(ROD0, ROD_R - 0.6 * mm), (ROD0 + 0.002, ROD_R), (MZ0 + 0.008, ROD_R)], 16, (s_ * ROD_X, 0, ROD_U)), 'muzzle', 'steel', ppump); smooth(o)
-    sv = K.tmp(lathe([(HG1 + 0.003, 5.2 * mm), (HG1 + 0.005, 6.5 * mm), (MZ0 + 0.008, 6.5 * mm), (MZ0 + 0.010, 5.2 * mm)], 20, (s_ * ROD_X, 0, ROD_U)))
+    # the guide rail, and the rectangular sleeve round it that the strut's foot stands on: from the forend's mouth to under the device
+    o = K.tmp(rail_section(s_, RL_T, RL_D, ROD0, MZ0 + 0.008)); bevel(o, 0.6 * mm, 2, 30); smooth(o); K.adopt(o, 'muzzle', 'steel', ppump)
+    sv = K.tmp(rail_section(s_, RL_T + 5 * mm, RL_D + 5 * mm, HG1 + 0.003, MZ0 + 0.010)); bevel(sv, 1.2 * mm, 2, 30)
     smooth(sv); K.adopt(sv, 'muzzle', TI, ppump)
     # a boss from the sleeve's front up into the device's underside
     o = K.tmp(box(s_ * (ROD_X - 5 * mm), s_ * (ROD_X + 5 * mm), MZ0 - 0.002, MZ0 + 0.010, ROD_U, ZB - RB - 4 * mm)); bevel(o, 1 * mm, 2, 30); smooth(o)
@@ -339,6 +348,17 @@ for z in (D, 0.0, -D, ZB):
         f = MZ0 + 0.024 + i * 0.016
         cut(mzd, box(-0.05, 0.05, f, f + 0.007, z - 3.2 * mm, z + 3.2 * mm))                 # side ports, through (petals and gas out)
 smooth(mzd); K.adopt(mzd, 'muzzle', TI, ppump)
+# the HEAT SHIELD: a short perforated titanium shell on the muzzle device's rear face, over the upper barrels (it slides with the device;
+# the barrel block slides back from under it, and off the seats, before it lifts out)
+HS_L, HS_R, HS_TH = 0.032, math.hypot(D, D) + RB + 1.5 * mm, 1.2 * mm
+arc = lambda r, a0, a1, n: [(r * math.cos(math.radians(a0 + (a1 - a0) * i / n)), r * math.sin(math.radians(a0 + (a1 - a0) * i / n))) for i in range(n + 1)]
+sh = K.tmp(prism(arc(HS_R + HS_TH, 22, 158, 20) + list(reversed(arc(HS_R, 22, 158, 20))), 'y', MZ0 - HS_L, MZ0 + 0.004))
+for a in (40, 65, 90, 115, 140):                                   # its perforation: round holes through it, radially, staggered
+    for i in range(2):
+        f = MZ0 - HS_L + 0.009 + i * 0.012 + (0.006 if a in (65, 115) else 0)
+        h = cyl(2.4 * mm, HS_R - 0.004, HS_R + 0.004, 'z', (0, f), 12)
+        h.transform(Matrix.Rotation(math.radians(90 - a), 4, 'Y')); cut(sh, h)
+bevel(sh, 0.4 * mm, 1, 30); smooth(sh); K.adopt(sh, 'muzzle', TI, ppump)
 fin = K.tmp(prism([(MZ0 + 0.026, D + RB + 6 * mm), (MZ1 - 0.008, D + RB + 6 * mm), (MZ1 - 0.012, SY + 3.5 * mm), (MZ0 + 0.032, SY + 3.5 * mm)], 'x', -3 * mm, 3 * mm))
 bevel(fin, 0.6 * mm, 2, 30); cut(fin, box(-1.0 * mm, 1.0 * mm, MZ0, MZ1 + 0.01, SY, SY + 0.01))       # the front sight: a fin with a notch
 smooth(fin); K.adopt(fin, 'muzzle', TI, ppump)
@@ -364,6 +384,7 @@ for f0, rim in ((BR1 - 0.024, 1.2 * mm), ):   # clamp plates: titanium, pocketed
     for x, z in (((0, D + 9 * mm), (-D - 9 * mm, 0), (D + 9 * mm, 0), (-D * 0.95, ZB + 3 * mm), (D * 0.95, ZB + 3 * mm)) if rim > 3 * mm else ()):
         cut(cp, cyl(2.4 * mm, f0 - 0.01, f0 + 0.022, 'y', (x, z), 12))
     smooth(cp); K.adopt(cp, 'mag', TI, pm)
+
 
 # ================================================== info and anchors ==================================================
 info = {
