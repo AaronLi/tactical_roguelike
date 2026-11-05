@@ -204,11 +204,15 @@ def band(path, w):
         L.append((p[0] + nx * w / 2 * k, p[1] + ny * w / 2 * k)); R.append((p[0] - nx * w / 2 * k, p[1] - ny * w / 2 * k))
     return L + list(reversed(R))
 ARM = [(CH1 + 0.006, HINGE[1] - 0.002), (CH1 + 0.042, RUN_U), (HS0 - 0.022, RUN_U), (HS0 + 0.006, ROD_U), (HG1, ROD_U)]
+_run0, _run1 = CH1 + 0.042 + 0.012, HS0 - 0.022 - 0.012
+MLOK = [(_run0 + _run1) / 2 + k * 0.040 for k in range(-3, 4) if abs(k * 0.040) + 0.016 <= (_run1 - _run0) / 2]   # (centred, 40 mm apart)
+TAC0, TAC1 = MLOK[0] - 0.016, MLOK[-1] + 0.016
 for s_ in (-1, 1):
     a = K.tmp(prism(band(ARM, AW), 'x', s_ * AX0, s_ * AX1))
     bevel(a, 1.5 * mm, 2, 30)
+    for f in MLOK:   # M-LOK slots through the run (32 x 7 mm, 40 mm apart): a light or a laser bolts on
+        cut(a, prism(rounded(f, RUN_U, 0.016, 0.0035, 1.2 * mm, 2), 'x', s_ * (AX0 - 0.001), s_ * (AX1 + 0.001)))
     smooth(a); K.adopt(a, 'handguard', TI, pbrk)
-    picatinny(K, TAC0, TAC1, RUN_U, 'handguard', RAIL_M, pbrk, 'right' if s_ > 0 else 'left', s_ * AX1)
 # the hinge base: the centre knuckle (between the chassis's two), and a cross plate to both arms' feet
 hb = K.tmp(prism([(CH1 - 0.004, -0.058), (CH1 + 0.030, -0.058), (CH1 + 0.030, -0.072), (CH1 - 0.004, -0.072)], 'x', -AX1, AX1))
 boolean(hb, cyl(KN_R, -10.6 * mm, 10.6 * mm, 'x', HINGE, 28), 'UNION')
@@ -225,18 +229,38 @@ for s_ in (-1, 1): cut(hs, cyl(ROD_R + 0.3 * mm, HS0 - 0.01, HG1 + 0.01, 'y', (s
 cut(hs, prism(rounded((HS0 + HG1) / 2, (FLOOR + LOW) / 2 - 0.001, 0.014, 0.0035, 2 * mm, 2), 'x', -0.009, 0.009))
 smooth(hs); K.adopt(hs, 'handguard', TI, pbrk)
 picatinny(K, FG0, FG1, FLOOR, 'handguard', RAIL_M, pbrk, 'bottom')
-# the CENTRE ARM: a third titanium member under the barrels, from the hinge base forward and up to the rod housing (the junction of
-# the side arms, the centre arm and the guide rods, and where a vertical grip mounts); three filleted lightening slots along it
-CA0, CA1, CAW = (CH1 + 0.024, -0.066), (HS0 + 0.006, FLOOR + 0.004), 0.011
-ca = K.tmp(prism(band([CA0, CA1], CAW), 'x', -5 * mm, 5 * mm))
-boolean(ca, prism(band([CA0, (CA0[0] + 0.004, CA0[1])], CAW + 0.004), 'x', -5 * mm, 5 * mm), 'UNION')
-bevel(ca, 1.2 * mm, 2, 30)
-ang = math.atan2(CA1[1] - CA0[1], CA1[0] - CA0[0]); Lc = math.hypot(CA1[0] - CA0[0], CA1[1] - CA0[1])
-for i in range(3):
-    t = (i + 0.5) / 3; cx, cy = CA0[0] + (CA1[0] - CA0[0]) * t, CA0[1] + (CA1[1] - CA0[1]) * t
-    sl = [(cx + x * math.cos(ang) - y * math.sin(ang), cy + x * math.sin(ang) + y * math.cos(ang)) for x, y in rounded(0, 0, Lc / 3 / 2 - 0.006, CAW / 2 - 0.0028, 2 * mm, 3)]
-    cut(ca, prism(sl, 'x', -0.01, 0.01))
-smooth(ca); K.adopt(ca, 'handguard', TI, pbrk)
+# the CENTRE MEMBER: a titanium trough under the barrels from the hinge base forward and up to the rod housing (the junction of the
+# side arms, the trough and the guide rods, and where a vertical grip mounts): a floor plate, and side webs that wrap up to the arms'
+# runs; floor and webs are trusses: triangular lightening holes, the members between them a constant 4 mm, every corner filleted 2 mm
+TW, TFIL, TPL = 4 * mm, 2 * mm, 4 * mm                             # truss member width, fillet, plate thickness
+CA0, CA1 = (CH1 + 0.022, -0.068), (HS0 + 0.004, FLOOR + 0.002)    # the floor's line (its underside), from the hinge base to the housing
+slope = (CA1[1] - CA0[1]) / (CA1[0] - CA0[0])
+u_floor = lambda f: CA0[1] + (f - CA0[0]) * slope
+def truss_holes(b0, b1, t0, t1, n):
+    # a strip's quad (bottom edge b0 -> b1, top edge t0 -> t1) split into n panels with alternating diagonals: the holes' outlines
+    holes = []
+    B = [(b0[0] + (b1[0] - b0[0]) * i / n, b0[1] + (b1[1] - b0[1]) * i / n) for i in range(n + 1)]
+    T = [(t0[0] + (t1[0] - t0[0]) * i / n, t0[1] + (t1[1] - t0[1]) * i / n) for i in range(n + 1)]
+    for i in range(n):
+        tris = ([B[i], B[i + 1], T[i + 1]], [B[i], T[i + 1], T[i]]) if i % 2 == 0 else ([B[i], B[i + 1], T[i]], [B[i + 1], T[i + 1], T[i]])
+        for tri in tris:
+            c = ccw(tri)
+            holes.append(fillet_poly(inset_poly(c, TW / 2 + 0.0004), TFIL, 3))
+    return holes
+F0, F1 = CA0[0] + 0.006, CA1[0] - 0.002                           # (the trough's length)
+# the floor plate: along the floor's line, 46 mm wide, holes in plan (a strip across its width)
+fl = K.tmp(prism([(F0, u_floor(F0)), (F1, u_floor(F1)), (F1, u_floor(F1) + TPL), (F0, u_floor(F0) + TPL)], 'x', -AX0, AX0))
+for h in truss_holes((F0 + TW, -AX0 + TW), (F1 - TW, -AX0 + TW), (F0 + TW, AX0 - TW), (F1 - TW, AX0 - TW), 5):
+    cut(fl, prism(h, 'z', -0.2, 0.2))                               # (cut straight down through it: the plate's tilt is slight)
+bevel(fl, 1 * mm, 2, 30); smooth(fl); K.adopt(fl, 'handguard', TI, pbrk)
+# the side webs: from the floor's edge up to the underside of each arm's run, inside the arms' plane
+WU = RUN_U - AW / 2                                                 # (the arms' runs' underside)
+W0, W1 = CH1 + 0.048, HS0 - 0.016
+for s_ in (-1, 1):
+    wb = K.tmp(prism([(W0, u_floor(W0)), (W1, u_floor(W1)), (W1, WU + 0.001), (W0, WU + 0.001)], 'x', s_ * AX0, s_ * (AX0 + TPL)))
+    for h in truss_holes((W0, u_floor(W0) + TPL), (W1, u_floor(W1) + TPL), (W0, WU), (W1, WU), 4):
+        cut(wb, prism(h, 'x', -0.04, 0.04))
+    bevel(wb, 0.8 * mm, 2, 30); smooth(wb); K.adopt(wb, 'handguard', TI, pbrk)
 # ---- the SLIDING FRONT (part_pump, inside the forend): the muzzle device on its two truss arms, a yoke under it, and two steel guide
 # rods running back into the forend's floor; it runs forward SLIDE for the reload, drawing the barrel block ----
 ppump = K.part('pump', (0, MZ0, 0))
@@ -319,7 +343,7 @@ anchors = {
     'mount_handguard': [CH1, 0, 0], 'mount_handguard_end': [HG1, 0, 0],
     'mount_barrel': [BR0, 0, 0], 'mount_muzzle': [MZ0, 0, 0],
     'mount_stock': [0, round((SR0 + SR1) / 2, 4), 0], 'mount_grip': [GRIP_SEAT[0], GRIP_SEAT[1], 0], 'mount_mag': [MAG_AT[0], MAG_AT[1], 0],
-    'mount_tac': [round((TAC0 + TAC1) / 2, 4), -0.034, 0.027 + 0.0056], 'mount_tacL': [round((TAC0 + TAC1) / 2, 4), -0.034, -0.027 - 0.0056],
+    'mount_tac': [round((TAC0 + TAC1) / 2, 4), RUN_U, AX1], 'mount_tacL': [round((TAC0 + TAC1) / 2, 4), RUN_U, -AX1],      # (M-LOK on the arms)
     'mount_fg': [round((FG0 + FG1) / 2, 4), round(FLOOR - 0.0056, 4), 0],
 }
 root['gun'] = ID; root['info_json'] = json.dumps(info); root['anchors_json'] = json.dumps(anchors)
