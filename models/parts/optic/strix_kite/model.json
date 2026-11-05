@@ -1,0 +1,24 @@
+{
+  "source": "authored",
+  "kind": "part",
+  "slot": "optic",
+  "frame": "rail-top",
+  "optic": {
+    "sy": 0.016,
+    "fSight": -0.016,
+    "relief": 0.3,
+    "reliefOnRiser": 0.12,
+    "reflex": {
+      "f": 0.0098,
+      "y": 0.016,
+      "w": 0.02,
+      "h": 0.016,
+      "kind": "dot"
+    },
+    "magnifier": true,
+    "height": "low"
+  },
+  "replaces": [
+    "Strix Kite pistol red dot"
+  ]
+}

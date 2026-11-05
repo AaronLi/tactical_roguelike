@@ -1,0 +1,23 @@
+{
+  "source": "authored",
+  "kind": "part",
+  "slot": "optic",
+  "frame": "rail-top",
+  "optic": {
+    "sy": 0.034,
+    "fSight": -0.026,
+    "relief": 0.09,
+    "reflex": {
+      "f": 0.0112,
+      "y": 0.034,
+      "w": 0.03,
+      "h": 0.018,
+      "kind": "dot"
+    },
+    "magnifier": true,
+    "height": "mid"
+  },
+  "replaces": [
+    "Brightline Pip red dot"
+  ]
+}
