@@ -130,18 +130,30 @@ def xform(me, M):
 def tris_of(objs):
     return sum(sum(len(p.vertices) - 2 for p in o.data.polygons) for o in objs if o.type == 'MESH')
 
-def save_and_export(coll, root, here, name, export=True):
-    """<name>.blend (the model only: the whole file when the session holds nothing else, else just its collection, kept by a fake user;
-    never bpy.data.libraries.write a SCENE: Blender 5.2.3 crashes) and <name>.glb (the root and its children, extras on)."""
-    if not export: return None
-    others = [c.name for c in bpy.data.collections if c != coll and (c.objects or c.children)] + [s.name for s in bpy.data.scenes if s != bpy.context.scene]
-    if not others: bpy.ops.wm.save_as_mainfile(filepath=os.path.join(here, name + '.blend'), copy=True)
-    else:
-        bpy.data.libraries.write(os.path.join(here, name + '.blend'), {coll}, fake_user=True, compress=True)
-        print(name + '.blend: the collection only (the session also holds %s)' % ', '.join(others))
+def kit_variant(gun, name, slot, meta):
+    """A variant part of a gun (another barrel, magazine...): its own collection and root `<gun>_<name>` (extras.variant_json), same frame."""
+    import json
+    coll, root = kit_collection(gun + '_' + name)
+    root['variant_json'] = json.dumps(dict({'gun': gun, 'slot': slot, 'of': 'factory'}, **meta))
+    return coll, root, Kit(coll, root)
+
+def export_glb(coll, path):
+    """One collection (its root and children, extras on) to a .glb; returns its size."""
     bpy.ops.object.select_all(action='DESELECT')
     for o in coll.all_objects: o.select_set(True)
-    bpy.ops.export_scene.gltf(filepath=os.path.join(here, name + '.glb'), export_format='GLB', use_selection=True, export_extras=True, export_yup=True,
+    bpy.ops.export_scene.gltf(filepath=path, export_format='GLB', use_selection=True, export_extras=True, export_yup=True,
                               export_apply=True, export_texcoords=False, export_normals=True, export_materials='EXPORT', export_cameras=False,
                               export_lights=False, export_animations=False)
-    return os.path.getsize(os.path.join(here, name + '.glb'))
+    return os.path.getsize(path)
+
+def save_and_export(coll, root, here, name, export=True, also=()):
+    """<name>.blend (the model only, with the collections in `also` (its variants): the whole file when the session holds nothing else, else
+    just those collections, kept by a fake user; never bpy.data.libraries.write a SCENE: Blender 5.2.3 crashes) and <name>.glb (coll only)."""
+    if not export: return None
+    own = {coll, *also}
+    others = [c.name for c in bpy.data.collections if c not in own and (c.objects or c.children)] + [s.name for s in bpy.data.scenes if s != bpy.context.scene]
+    if not others: bpy.ops.wm.save_as_mainfile(filepath=os.path.join(here, name + '.blend'), copy=True)
+    else:
+        bpy.data.libraries.write(os.path.join(here, name + '.blend'), own, fake_user=True, compress=True)
+        print(name + '.blend: its own collections only (the session also holds %s)' % ', '.join(others))
+    return export_glb(coll, os.path.join(here, name + '.glb'))
