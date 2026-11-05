@@ -175,8 +175,10 @@ _me = bpy.data.meshes.new('tmp'); _b.to_mesh(_me); _b.free()
 scr = K.obj(_on_wedge(_me, 0.55 * mm), 'base', 'display'); scr.name = 'display_ammo'
 scr['display'] = {'width': 64, 'height': 256}
 # the fire-mode dial (left side, over the grip): semi, low, high, double, sextuple
-o = K.obj(cyl(7 * mm, -27.5 * mm, -24.5 * mm, 'x', (0.058, 0.012), 24), 'base', 'black'); smooth(o)
-o = K.obj(box(-28.2 * mm, -27 * mm, 0.0565, 0.0595, 0.012, 0.0185), 'base', TI)
+# (part_dial: its pivot on the dial's axis, at its outer face (info.modeDial.at); the game turns it modeDial.stepDeg a mode)
+pdl = K.part('dial', (-27.5 * mm, 0.058, 0.012))
+o = K.obj(cyl(7 * mm, -27.5 * mm, -24.5 * mm, 'x', (0.058, 0.012), 24), 'base', 'black', pdl); smooth(o)
+o = K.obj(box(-28.2 * mm, -27 * mm, 0.0565, 0.0595, 0.012, 0.0185), 'base', TI, pdl)
 # the grip's seat and the trigger housing under the panel, the trigger and its guard
 # (the grip group sits forward and high: under the panel's floor and the chassis's rear; the guard is glove-sized: 60 x 32 mm)
 o = K.obj(prism([(0.030, -0.0535), (0.096, -0.0535), (0.096, -0.0565), (0.034, -0.0595)], 'x', -12 * mm, 12 * mm), 'base', TI); bevel(o, 0.8 * mm, 2); smooth(o)
@@ -536,7 +538,7 @@ info = {
     # the fire-mode dial (left side of the back panel): its centre and axis, and its six detents (semi, low, high, double, triple, sextuple)
     'modeDial': {'at': [0.058, 0.012, -0.0275], 'axis': [0, 0, -1], 'modes': ['semi', 'low', 'high', 'double', 'triple', 'sextuple'], 'stepDeg': 45},
     'grip': [0.030, -0.097, 0], 'support': [0.330, -0.095, 0],
-    'anim': {'front': 'part_pump', 'brk': 'part_brk', 'mag': 'part_mag', 'latch': 'part_lever', 'carry': 'part_carry'},
+    'anim': {'pump': 'part_pump', 'brk': 'part_brk', 'mag': 'part_mag', 'lever': 'part_lever', 'carry': 'part_carry', 'dial': 'part_dial'},
     'magAt': [MAG_AT[0], MAG_AT[1]],
 }
 anchors = {
