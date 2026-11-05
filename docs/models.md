@@ -340,6 +340,24 @@ Code: `js/glb.ts` (contract, validator, planner, assembler), `tools/model_sweep.
 
 **Bake time** is about 35 minutes for everything (a pistol platform takes about a minute: its optic is keyed by grip, slide, magnifier and riser dot, 67,000 combinations of which a few hundred are builds), `node tools/bake_models.mjs --parts <ids>` for some (sharing then only sees those platforms).
 
+## Pistols (the reform)
+
+A pistol is built from independent parts with fixed interfaces, so the baker finds no joint packs on any pistol platform (each tag keyed by its own slot's part, other slots only move it as anchors). The recipe (`pistol()` in `tools/models/recipes.ts`; `len0` in the platform spec, `js/parts.ts` `pst()`) follows these rules:
+
+| part | slot / tag | interface |
+| --- | --- | --- |
+| frame | `base` | slide rails, magazine well (`magAt`), light rail, grip seat: the same under every grip and slide (a chassis is built round it) |
+| slide | `slide` (`part_slide`) | its own geometry (length, vent, compensator). Provides two anchors: its REAR (everything on it that does not reach the front sits at a fixed distance from there: rear sight, port, the optic cut at `0.32 x factory length`) and its FRONT (front sight, barrel exit). A longer slide extends forward only. |
+| barrel | `barrel` (+ `barrel@slide`, the bore at the slide's mouth) | placed by the slide's front anchor; what shows (thread, match ring, crown) follows the barrel part, not the slide |
+| muzzle device | `muzzle` | on the barrel's thread, moves with the slide's front |
+| irons / dot | `optic` (rear sight, dot), `optic@slide` (front sight) | the rear sight and the dot are fixed distances from the slide's rear; the front sight is the slide's front anchor. Heights come from the FACTORY slide, so they never depend on the slide fitted |
+| magazine | `mag` | the frame's well |
+| grip | `grip` | the grip panels, or the chassis |
+| chassis (`gr.pistol.chassis`) | `grip` (+ `fg`, `tac`, `tacL`, `optic`) | a frame-level part with an OPEN FRONT: built for the factory slide, so a longer slide comes out of the shroud; its grip is built round the frame's magazine well; it provides the rail (rifle optics), the side and under rails (lights, foregrip) and the SMG stock mount. With no rail sight fitted the slide's irons stay inside it |
+| stock | `stock` (+ `stock@buttstock`, `stock@buttstock2`) | on the frame's lug; each part of an adapter chain draws its own piece, keyed by its own slot |
+
+`tools/model_sweep.mjs`: a pistol's loaded builds use a threaded barrel (so the muzzle device and thread are in the reference builds and a slide change is seen to MOVE them). `tools/model_packs.mjs`: a slot that only ENABLES a tag's own slot (a chassis opens the foregrip slot) is not blamed for the tag (the tag is keyed by its own slot's part alone, which holds wherever that part can be fitted).
+
 ## Testing
 
 Two separate steps, so CI can bake once and test separately, and a failed test never throws away a bake.

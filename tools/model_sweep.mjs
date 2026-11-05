@@ -9,6 +9,11 @@
 /** The "loaded" build of a platform (see the sweep set): mode 'A' no optic/magnifier, 'B' with them. */
 export function loadedBuild(GS, id, mode) {
   let b = GS.defaultBuild(id);
+  // (a pistol's own barrel opens no muzzle slot: its loaded builds use a threaded one, so that the muzzle device and the thread are in the reference builds and the analysis can see them MOVE with the slide instead of blaming it)
+  if (GS.PLATFORMS[id] && GS.PLATFORMS[id].arch === 'pistol') {
+    const s = GS.slotsOf(id, b).find((x) => x.slot === 'barrel'), th = s && GS.compatible(s.mount).find((p) => p.provides && p.provides.muzzle && GS.fitsSlot(s, p, id));
+    if (th) b.barrel = th.id;
+  }
   for (let pass = 0; pass < 3; pass++) for (const s of GS.slotsOf(id, b)) {
     if (b[s.slot]) continue;
     const k = s.slot.replace(/\d+$/, '');
@@ -16,6 +21,10 @@ export function loadedBuild(GS, id, mode) {
     let c = GS.compatible(s.mount).filter((p) => GS.fitsSlot(s, p, id) && !p.retired && !p.variant);
     if (k === 'optic' || k === 'magnifier') { if (mode === 'A') continue; if (k === 'optic') { const r = c.find((p) => p.model && p.model.optic === 'reddot'); c = r ? [r] : c; } }
     if (c[0]) b = Object.assign({}, b, { [s.slot]: c[0].id });
+  }
+  if (GS.PLATFORMS[id] && GS.PLATFORMS[id].arch === 'pistol') { // (a muzzle device that is drawn: a thread protector is no mesh at all)
+    const s = GS.slotsOf(id, b).find((x) => x.slot === 'muzzle'), p = s && GS.PARTS[b.muzzle];
+    if (s && p && p.set && p.set.device === 'none') { const q = GS.compatible(s.mount).find((x) => x.set && x.set.device && x.set.device !== 'none' && GS.fitsSlot(s, x, id, b)); if (q) b.muzzle = q.id; }
   }
   if (mode === 'B') {
     for (const s of GS.slotsOf(id, b)) if (s.slot === 'optic' && GS.PARTS[b.optic] && GS.PARTS[b.optic].factory) { const r = GS.compatible(s.mount).find((p) => p.model && p.model.optic === 'reddot' && GS.fitsSlot(s, p, id)); if (r) b.optic = r.id; }

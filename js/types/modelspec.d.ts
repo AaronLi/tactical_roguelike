@@ -46,7 +46,7 @@ interface RecipeSpec<M = THREE.Material | null> {
   // the magazine and where things sit
   mag?: MagSpec<M>; magFit?: { len: number; c: number; d: number }; support?: number; chY?: number; chF?: number; slotOf?: Record<string, string>;
   // the odd ones
-  ext?: number; cr?: number; cl?: number; chambers?: number; limb?: string; motor?: string; cap?: string; drum?: boolean | Record<string, any>; slide?: Record<string, any>;
+  ext?: number; len0?: number; cr?: number; cl?: number; chambers?: number; limb?: string; motor?: string; cap?: string; drum?: boolean | Record<string, any>; slide?: Record<string, any>;
 }
 /** A recipe's spec as the catalog holds it, its materials still names ('tan', 'woodDark'). */
 type ModelSpec = RecipeSpec<string | null>;
