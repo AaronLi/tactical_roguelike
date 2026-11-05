@@ -109,12 +109,12 @@
   },
   "grip=oem.gr.ar.4,handguard=tempest.handguard,mag=tempest.mag,muzzle=tempest.muzzle,optic=op.pic.1,stock=stk.smg.2": {
    "label": "optic=op.pic.1",
-   "geometry": "0337e449ef13ff36",
-   "info": "a9f547494fd243be"
+   "geometry": "40008ab8c0fce5c5",
+   "info": "7ba86984959187b2"
   },
   "grip=oem.gr.ar.4,handguard=tempest.handguard,mag=tempest.mag,muzzle=tempest.muzzle,optic=op.pic.2,stock=stk.smg.2": {
    "label": "optic=op.pic.2",
-   "geometry": "3be75931b1f859c1",
+   "geometry": "530286d5b260cc97",
    "info": "f9a8b4f2300577bd"
   },
   "grip=oem.gr.ar.4,handguard=tempest.handguard,mag=tempest.mag,muzzle=tempest.muzzle,optic=op.pic.3,stock=stk.smg.2": {
@@ -154,12 +154,12 @@
   },
   "grip=oem.gr.ar.4,handguard=tempest.handguard,mag=tempest.mag,muzzle=tempest.muzzle,optic=op.pic.10,stock=stk.smg.2": {
    "label": "optic=op.pic.10",
-   "geometry": "3c8492c9f58e572a",
-   "info": "a139347f41f4330b"
+   "geometry": "95c6185681dd61ad",
+   "info": "9cb4c26c5a3e4eb0"
   },
   "grip=oem.gr.ar.4,handguard=tempest.handguard,mag=tempest.mag,muzzle=tempest.muzzle,optic=op.pic.11,stock=stk.smg.2": {
    "label": "optic=op.pic.11",
-   "geometry": "580e6da3eee04884",
+   "geometry": "229e06cec8ce20d2",
    "info": "197a595109924855"
   },
   "grip=oem.gr.ar.4,handguard=tempest.handguard,mag=tempest.mag,muzzle=tempest.muzzle,optic=op.pic.12,stock=stk.smg.2": {
@@ -169,8 +169,8 @@
   },
   "grip=oem.gr.ar.4,handguard=tempest.handguard,mag=tempest.mag,muzzle=tempest.muzzle,optic=op.pic.13,stock=stk.smg.2": {
    "label": "optic=op.pic.13",
-   "geometry": "bbf2a844524ddc21",
-   "info": "f4707f7287022ce9"
+   "geometry": "804448846b78d1f6",
+   "info": "6f279c6c973dba02"
   },
   "grip=oem.gr.ar.4,handguard=tempest.handguard,mag=tempest.mag,muzzle=tempest.muzzle,optic=op.pic.14,stock=stk.smg.2": {
    "label": "optic=op.pic.14",
@@ -469,12 +469,12 @@
   },
   "fg=fg.0,grip=oem.gr.ar.4,handguard=tempest.handguard,mag=tempest.mag,muzzle=tempest.muzzle,optic=op.pic.1,stock=stk.smg.2,tac=tac.0,tacL=tac.0": {
    "label": "optic=op.pic.1 from loaded A",
-   "geometry": "6a4708e4edfb4dca",
-   "info": "155f9bfb58d226da"
+   "geometry": "65ce538726678270",
+   "info": "58e2f968c77b1920"
   },
   "fg=fg.0,grip=oem.gr.ar.4,handguard=tempest.handguard,mag=tempest.mag,muzzle=tempest.muzzle,optic=op.pic.2,stock=stk.smg.2,tac=tac.0,tacL=tac.0": {
    "label": "optic=op.pic.2 from loaded A",
-   "geometry": "bc52132797f2585c",
+   "geometry": "c16c5262dc95ba24",
    "info": "abc8602b19eba093"
   },
   "fg=fg.0,grip=oem.gr.ar.4,handguard=tempest.handguard,mag=tempest.mag,muzzle=tempest.muzzle,optic=op.pic.3,stock=stk.smg.2,tac=tac.0,tacL=tac.0": {
@@ -514,12 +514,12 @@
   },
   "fg=fg.0,grip=oem.gr.ar.4,handguard=tempest.handguard,mag=tempest.mag,muzzle=tempest.muzzle,optic=op.pic.10,stock=stk.smg.2,tac=tac.0,tacL=tac.0": {
    "label": "optic=op.pic.10 from loaded A",
-   "geometry": "7c3d20538d2f1f2b",
-   "info": "74a68894cc9e2354"
+   "geometry": "87ff3cb3531d7c01",
+   "info": "732d5c8668a12dd9"
   },
   "fg=fg.0,grip=oem.gr.ar.4,handguard=tempest.handguard,mag=tempest.mag,muzzle=tempest.muzzle,optic=op.pic.11,stock=stk.smg.2,tac=tac.0,tacL=tac.0": {
    "label": "optic=op.pic.11 from loaded A",
-   "geometry": "4b02f78aa91e6952",
+   "geometry": "afd46831f6164aac",
    "info": "f102d4e2dfbd7fc8"
   },
   "fg=fg.0,grip=oem.gr.ar.4,handguard=tempest.handguard,mag=tempest.mag,muzzle=tempest.muzzle,optic=op.pic.12,stock=stk.smg.2,tac=tac.0,tacL=tac.0": {
@@ -529,8 +529,8 @@
   },
   "fg=fg.0,grip=oem.gr.ar.4,handguard=tempest.handguard,mag=tempest.mag,muzzle=tempest.muzzle,optic=op.pic.13,stock=stk.smg.2,tac=tac.0,tacL=tac.0": {
    "label": "optic=op.pic.13 from loaded A",
-   "geometry": "808f349712f93ec7",
-   "info": "54318d853b664a4d"
+   "geometry": "e5694b9abeaa7d3e",
+   "info": "dd97a91f9b799352"
   },
   "fg=fg.0,grip=oem.gr.ar.4,handguard=tempest.handguard,mag=tempest.mag,muzzle=tempest.muzzle,optic=op.pic.14,stock=stk.smg.2,tac=tac.0,tacL=tac.0": {
    "label": "optic=op.pic.14 from loaded A",
