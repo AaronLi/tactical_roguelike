@@ -16,12 +16,22 @@
  *
  * Narrow (tonal) components give a pitched but slightly unsteady ring; wide
  * ones give the noisy "clank / wash" that dense-mode objects actually make.
+ *
+ * Coherent onset: at the instant of contact every resonance of a struck body
+ * starts in phase (at the drive point they all push the same way), so together
+ * they make one sharp spike: the click or snap. Only afterwards do they drift
+ * apart into the noisy ring. So each kick also drives a wide band-pass per
+ * component with the actual impulse: a ~1 ms burst that starts in phase across
+ * all components, coloured by the body's spectrum. The noise path carries the
+ * ring after it.
  */
 import { contactSpectrum } from './excitation.js';
 import { clamp } from './dsp.js';
 const BLOCK = 32;
 /** Scales the rubbed path against the struck path. */
-const FRICTION_GAIN = 1100;
+const FRICTION_GAIN = 2200;
+/** Peak of the coherent onset burst relative to the noise ring's starting level. */
+const COHERENT = 2.5;
 function bandpass(f, bw, sr) {
     const w0 = (2 * Math.PI * clamp(f, 10, sr * 0.49)) / sr;
     const Q = clamp(f / Math.max(0.05, bw), 0.3, 20000);
@@ -81,6 +91,9 @@ export function renderBody(comps, input, sr, N) {
         // A narrow resonance builds up more from continuous rubbing (gain ~ sqrt(Q)).
         const fricGain = FRICTION_GAIN * c.amp * clamp(Math.sqrt(c.f / c.bw / 8), 1, 40);
         let bq = bandpass(c.f, c.bw, sr);
+        // Wide band for the in-phase onset, so it lasts only ~1/(π·bwC): a millisecond or two.
+        const bwC = Math.max(c.bw, c.f * 0.35, 150);
+        let bqC = bandpass(c.f, bwC, sr);
         // Range to process.
         const lastEv = anyKick ? Math.max(...evSamples) : -1;
         const startEv = anyKick ? Math.min(...evSamples) : N;
@@ -93,6 +106,9 @@ export function renderBody(comps, input, sr, N) {
             continue;
         let env = 0;
         let nx1 = 0, nx2 = 0, ny1 = 0, ny2 = 0; // noise filter state
+        let cx1 = 0, cx2 = 0, cy1 = 0, cy2 = 0; // coherent-onset filter state
+        let cohLive = 0; // samples left in which the onset burst is still audible
+        const cohLen = Math.ceil((8 / (Math.PI * bwC)) * sr);
         let fx1 = 0, fx2 = 0, fy1 = 0, fy2 = 0; // friction filter state
         // Start the noise filter in its steady state (a narrow band-pass would otherwise take
         // ~1/bw seconds to build up and the ring would fade in).
@@ -109,16 +125,32 @@ export function renderBody(comps, input, sr, N) {
             nextEv++;
         let wf = Math.sin(Math.PI * c.k * input.contPos + c.theta);
         for (let b = start; b < end; b += BLOCK) {
-            if (pitch)
+            if (pitch) {
                 bq = bandpass(c.f * pitch[b], c.bw, sr);
+                bqC = bandpass(c.f * pitch[b], bwC, sr);
+            }
             if (posTrace)
                 wf = Math.sin(Math.PI * c.k * posTrace[b] + c.theta);
             const blockEnd = Math.min(end, b + BLOCK);
             const doFric = lastCont >= 0 && b <= fricEnd && b + BLOCK >= firstCont;
             for (let n = b; n < blockEnd; n++) {
-                while (nextEv < events.length && evSamples[nextEv] === n)
-                    env += kicks[nextEv++];
+                let imp = 0;
+                while (nextEv < events.length && evSamples[nextEv] === n) {
+                    env += kicks[nextEv];
+                    imp += kicks[nextEv++];
+                }
                 let y = 0;
+                if (imp !== 0 || cohLive > 0) {
+                    // First output sample of a band-pass is b0·x: scale so the burst peaks at COHERENT·kick.
+                    const x = imp !== 0 ? (imp * COHERENT) / bqC.b0 : 0;
+                    const cy = bqC.b0 * x + bqC.b2 * cx2 - bqC.a1 * cy1 - bqC.a2 * cy2;
+                    cx2 = cx1;
+                    cx1 = x;
+                    cy2 = cy1;
+                    cy1 = cy;
+                    y += cy;
+                    cohLive = imp !== 0 ? cohLen : cohLive - 1;
+                }
                 if (env > 1e-12) {
                     const x = noise();
                     const ny = bq.b0 * x + bq.b2 * nx2 - bq.a1 * ny1 - bq.a2 * ny2;
