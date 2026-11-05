@@ -314,8 +314,8 @@
   },
   "grip=oem.gr.ar.4,handguard=tempest.handguard,mag=tempest.mag,muzzle=tempest.muzzle,optic=op.auth.falcon,stock=stk.smg.2": {
    "label": "optic=op.auth.falcon",
-   "geometry": "44a3af439ab8c031",
-   "info": "10c6809755274b4d"
+   "geometry": "b098063e5d0f6b87",
+   "info": "5e25245de262d889"
   },
   "grip=oem.gr.ar.4,handguard=tempest.handguard,mag=tempest.mag,muzzle=tempest.muzzle,stock=stk.smg.2": {
    "label": "optic=(none)",
@@ -674,8 +674,8 @@
   },
   "fg=fg.0,grip=oem.gr.ar.4,handguard=tempest.handguard,mag=tempest.mag,muzzle=tempest.muzzle,optic=op.auth.falcon,stock=stk.smg.2,tac=tac.0,tacL=tac.0": {
    "label": "optic=op.auth.falcon from loaded A",
-   "geometry": "88d2ebdf7a51e0e5",
-   "info": "3919f818df317cdc"
+   "geometry": "027d51aad7c8a1df",
+   "info": "1d2253a845e3b6bc"
   },
   "fg=fg.0,grip=oem.gr.ar.4,handguard=tempest.handguard,mag=tempest.mag,muzzle=tempest.muzzle,stock=stk.smg.2,tac=tac.0,tacL=tac.0": {
    "label": "optic=(none) from loaded A",

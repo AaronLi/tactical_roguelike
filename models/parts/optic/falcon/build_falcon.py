@@ -3,7 +3,6 @@
 #   Blender: exec(open(r'<repo>/models/parts/optic/falcon/build_falcon.py').read(), {'PART_DIR': r'<repo>/models/parts/optic/falcon'})
 #   or:      blender -b -P models/parts/optic/falcon/build_falcon.py
 # It sets CFG and runs the shared open-emitter builder (models/parts/optic/open_kit.py), which writes falcon.glb, falcon.blend and model.json.
-# (shapes.json and tools/build_authored_optic.mjs are the first, box-built Falcon: running that tool puts the old model back.)
 import os
 HERE = globals().get('PART_DIR') or os.path.dirname(os.path.abspath(__file__))
 CFG = {'sy': 0.0285, 'win': (0.026, 0.026), 'top': 'square', 'lean': 8, 'battery': 'aaa', 'bat_side': -1, 'relief': 0.09,
