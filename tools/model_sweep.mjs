@@ -22,7 +22,8 @@ export function loadedBuild(GS, id, mode) {
     const k = s.slot.replace(/\d+$/, '');
     if (['mag', 'receiver', 'charging', 'loader', 'pump', 'tube', 'limbs', 'motor', 'cap'].includes(k)) continue;
     let c = GS.compatible(s.mount).filter((p) => GS.fitsSlot(s, p, id) && !p.retired && !p.variant);
-    if (k === 'optic' || k === 'magnifier') { if (mode === 'A') continue; if (k === 'optic') { const r = c.find((p) => p.model && p.model.optic === 'reddot'); c = r ? [r] : c; } }
+    if (mode === 'C') { if (k === 'optic' || k === 'magnifier') continue; const rich = (p) => Object.keys(p.provides || {}).length; const best = c.reduce((a, p) => (a && rich(a) >= rich(p) ? a : p), null); c = best ? [best] : []; } // ('C': each slot's part that opens the most slots, so that a twin railmount's left rail is in a base and what moves it, the barrel, is swapped around it)
+    else if (k === 'optic' || k === 'magnifier') { if (mode === 'A') continue; if (k === 'optic') { const r = c.find((p) => p.model && p.model.optic === 'reddot'); c = r ? [r] : c; } }
     if (c[0]) b = Object.assign({}, b, { [s.slot]: c[0].id });
   }
   if (GS.PLATFORMS[id] && GS.PLATFORMS[id].arch === 'pistol') { // (a muzzle device that is drawn: a thread protector is no mesh at all)
@@ -44,6 +45,7 @@ export function sweepOf(GS, id) {
   const out = [], seen = new Set(), all = [];
   const add = (e) => { const k = buildKey(e.build); all.push(e); if (seen.has(k)) return false; seen.add(k); out.push(e); return true; };
   const bases = [GS.defaultBuild(id), loadedBuild(GS, id, 'A'), loadedBuild(GS, id, 'B')];
+  { const C = loadedBuild(GS, id, 'C'), k = buildKey(C); if (!bases.some((b) => buildKey(b) === k)) bases.push(C); } // (a fourth base, only where it differs)
   bases.forEach((b, i) => add({ base: i, slot: null, part: null, build: b }));
   bases.forEach((base, i) => {
     for (const s of GS.slotsOf(id, base)) {

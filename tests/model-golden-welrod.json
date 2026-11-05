@@ -1,0 +1,21 @@
+{
+ "gun": "welrod",
+ "note": "node tools/check_authored_golden.mjs --update welrod",
+ "builds": {
+  "barrel=welrod.barrel,mag=welrod.mag": {
+   "label": "default",
+   "geometry": "193a712927f6eff3",
+   "info": "c507310a264d2f2b"
+  },
+  "barrel=welrod.br.short,mag=welrod.mag": {
+   "label": "longest barrel welrod.br.short",
+   "geometry": "6a91225e7c7fc3bf",
+   "info": "eb1d1065c18f204c"
+  },
+  "barrel=welrod.barrel,mag=welrod.mag.ext": {
+   "label": "mag=welrod.mag.ext",
+   "geometry": "29f14e0c57cf600f",
+   "info": "c507310a264d2f2b"
+  }
+ }
+}

@@ -120,7 +120,7 @@ export function analyze(C) {
   // rigid offsets: off the reference build, then filled out through the other bases (a unit absent or inert at the reference)
   for (const t of tagsAll) {
     for (const s of depMove[t]) {
-      const m = (delta[t][s] = new Map([[Rp(s), [0, 0, 0]]])), list = obs[t].filter(({ e, d }) => e.slot === s && (d.kind === 'move' || d.kind === 'same'));
+      const m = (delta[t][s] = new Map([[Rp(s), [0, 0, 0]]])), list = obs[t].filter(({ e, d }) => e.slot === s && (d.kind === 'move' || (d.kind === 'same' && bases[e.base].tags[t])));
       const vec = (d) => (d.kind === 'move' ? d.d : [0, 0, 0]);
       for (const { e, d } of list) if (e.base === R) m.set(e.part, vec(d));
       for (let changed = true; changed;) {

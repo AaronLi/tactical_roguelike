@@ -15,6 +15,7 @@
 //   openers        every part that OPENS slots (railmounts, buttstock adapters, riser dots, chassis, barrels that give a handguard mount ...), fitted, with the slots it opens filled
 //   sight stack    the lowest and the tallest optic alone; a magnifier behind the lowest and behind the tallest optic that takes one
 //   pistols        each slide x each grip (the pistol chassis among them), each with a red dot
+//   variants       an authored gun's per-gun barrel and magazine files (models/<id>/<name>.glb), each alone, loaded, and all together
 //   specials       integral suppressors (barrels with the can built in), the biggest magazine and a drum, a bipod, a suppressor on the muzzle
 // Dedupe by build; a build two rules give carries both labels.
 import fs from 'fs'; import path from 'path'; import { pathToFileURL } from 'url';
@@ -28,7 +29,7 @@ export const keyOf = (b) => Object.keys(b).sort().map((s) => s + '=' + b[s]).joi
 
 /** Optic height, roughly: the order the sight stack's extremes are picked by (lowest = irons, tallest = a long variable scope on a riser). */
 const OPTIC_H = { none: 0, irons: 0, notch: 0, bead: 0, night: 0.5, qbzirons: 1, augscope: 3, minidot: 1, reddot: 2, holo: 2.5, riser: 2, prism: 3, acog: 4, lpvo: 5, scope: 6 };
-const opticHeight = (p) => { const m = (p.model || {}), o = m.optic; if (p.authored) return { low: 1.5, mid: 2.8, high: 4.5 }[p.authored.height] ?? 3; return (OPTIC_H[o] ?? 3) + (m.riser || 0) * 20 + (m.dotR || 0) * 10 + (m.scopeObj || 0) * 10; };
+const opticHeight = (p) => { const m = (p.model || {}), o = m.was || m.optic; if (p.authored) return { low: 1.5, mid: 2.8, high: 4.5 }[p.authored.height] ?? 3; return (OPTIC_H[o] ?? 3) + (m.riser || 0) * 20 + (m.dotR || 0) * 10 + (m.scopeObj || 0) * 10; };
 
 export function generate(G, id) {
   const GS = G.Gunsmith, PARTS = GS.PARTS, out = [], index = new Map();
@@ -113,7 +114,7 @@ export function generate(G, id) {
   if (ss) {
     const gs = slotOf(def, 'grip');
     const slides = options(ss, def), grips = gs ? options(gs, def) : [null];
-    const dotOn = (b) => { const s = slotOf(b, 'optic'); if (!s) return b; const c = options(s, b), d = c.find((p) => p.model && ['minidot', 'reddot'].includes(p.model.optic)) || c[0]; return d ? { ...b, optic: d.id } : b; };
+    const dotOn = (b) => { const s = slotOf(b, 'optic'); if (!s) return b; const c = options(s, b), d = c.find((p) => p.model && ['minidot', 'reddot'].includes(p.model.was || p.model.optic)) || c[0]; return d ? { ...b, optic: d.id } : b; };
     // (not the full cross, which is ~50 builds a gun: each slide on the gun's own grip and on the pistol chassis, each grip under the gun's own slide)
     const chassis = grips.filter((g) => g && g.chassis), own = def.grip ? PARTS[def.grip] : null;
     const pairs = [...slides.flatMap((sl) => [[sl, own], ...chassis.map((g) => [sl, g])]), ...grips.map((g) => [PARTS[def.slide] || slides[0], g])];
@@ -124,11 +125,20 @@ export function generate(G, id) {
     }
   }
 
+  // the entries an authored part replaces the model of, on a riser (the riser is the gun's mount piece, the part the same file as on a pistol's slide)
+  { const os = slotOf(def, 'optic'); const rz = os && options(os, def).find((p) => p.model && p.model.optic === 'riser'); if (rz) {
+    const b = { ...def, optic: rz.id }; delete b.magnifier; GS.prune(id, b); const rs = slotOf(b, 'riserdot'), q = rs && options(rs, b).find((p) => p.model && p.model.was);
+    if (q) { add(`replaced optic (${q.id}) on the riser`, { ...b, riserdot: q.id }); const ms = slotOf({ ...b, riserdot: q.id }, 'magnifier'), m = ms && options(ms, { ...b, riserdot: q.id })[0]; if (m) add(`magnifier behind the replaced optic (${q.id}) on the riser`, { ...b, riserdot: q.id, magnifier: m.id }); }
+  } }
   // authored parts (models/parts): each one fitted alone where it fits, and a magnifier behind it where it takes one
-  { const os = slotOf(def, 'optic'); if (os) for (const p of options(os, def)) if (p.id.startsWith('op.auth.')) {
+  { const os = slotOf(def, 'optic'); if (os) for (const p of options(os, def)) if (p.id.startsWith('op.auth.') || (p.model && p.model.was)) { // (and the entries an authored part REPLACES the model of)
     const b = { ...def, optic: p.id }; delete b.magnifier; GS.prune(id, b); add(`authored optic (${p.id})`, b);
     if (p.provides && p.provides.magnifier) { const ms = slotOf(b, 'magnifier'); const m = ms && options(ms, b)[0]; if (m) add(`magnifier behind the authored optic (${p.id})`, { ...b, magnifier: m.id }); }
   } }
+  // authored variants (models/<id>/<name>.glb: a per-gun barrel or magazine): each fitted alone, with the loaded build, and all of them together
+  { const vs = Object.values(PARTS).filter((p) => p.plat === id && p.model && (p.model.avBarrel || p.model.avMag) && !p.retired);
+    for (const p of vs) { add(`authored variant (${p.id})`, { ...def, [p.slot]: p.id }); add(`authored variant, loaded (${p.id})`, { ...loaded, [p.slot]: p.id }); }
+    if (vs.length > 1) add('authored variants together', vs.reduce((b, p) => ({ ...b, [p.slot]: p.id }), { ...loaded })); }
   // specials
   const brs = slotOf(def, 'barrel');
   if (brs) for (const p of options(brs, def)) if (p.model && p.model.integral) add(`integral suppressor (${p.id})`, { ...loaded, barrel: p.id });

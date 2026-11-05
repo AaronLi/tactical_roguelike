@@ -9,7 +9,7 @@
 import fs from 'fs'; import path from 'path';
 import { ROOT, loadModels, loadGame } from './model_env.mjs';
 import { authoredIds, checkAuthored } from './bake_authored.mjs';
-import { authoredPartKeys, checkAuthoredPart, partsTsWithBlock, PARTS_TS } from './authored_parts.mjs';
+import { authoredPartKeys, checkAuthoredPart, partsTsWithBlock, PARTS_TS, isReplaceOnly, replacements } from './authored_parts.mjs';
 
 const args = process.argv.slice(2), Models = loadModels();
 const SCHEMA = path.join(ROOT, 'docs/gun-model-info.schema.json'), SCHEMA2 = path.join(ROOT, 'docs/gun-parts-index.schema.json'), DOC = path.join(ROOT, 'docs/models.md');
@@ -61,7 +61,10 @@ if (args.includes('--write')) {
   for (const id of authoredIds()) { const n = checkAuthoredFile(`models/${id}/${id}.glb`, id); if (n) bad++; }
   if (lf(PARTS_TS) !== partsTsWithBlock(lf(PARTS_TS))) fail('the authored-parts block of js/parts.ts differs from models/parts/*/*/model.json: run npm run check:models -- --write');
   for (const k of authoredPartKeys()) { const n = checkAuthoredPartFile(`models/parts/${k}`, k); if (n) bad++; }
-  for (const k of authoredPartKeys()) { const pid = 'op.auth.' + k.split('/')[1], pt = G.Gunsmith.PARTS[pid]; if (!pt) fail(`${k}: the catalogue (js/parts.ts) has no part ${pid}`); else if (!G.Gunsmith.fits(pt.mount).length) fail(`${pid}: fits no gun`); }
+  for (const k of authoredPartKeys()) {
+    if (isReplaceOnly(k)) { for (const r of replacements().filter((r) => r.apart === k)) for (const nm of r.names) { const pt = Object.values(G.Gunsmith.PARTS).find((q) => q.name === nm); if (!pt) fail(`${k}: replaces "${nm}", which is not in the catalogue`); else if (!pt.model || pt.model.apart !== k) fail(`${k}: "${nm}" does not use the model after the replace`); } continue; }
+    const pid = 'op.auth.' + k.split('/')[1], pt = G.Gunsmith.PARTS[pid]; if (!pt) fail(`${k}: the catalogue (js/parts.ts) has no part ${pid}`); else if (!G.Gunsmith.fits(pt.mount).length) fail(`${pid}: fits no gun`);
+  }
   const dir = path.join(ROOT, 'assets/models/guns'); let n = 0;
   if (fs.existsSync(dir)) for (const f of fs.readdirSync(dir).filter((f) => f.endsWith('.glb'))) { n++; if (checkBuffer(f, fs.readFileSync(path.join(dir, f)), f.replace(/\.glb$/, ''))) bad++; }
   // the per-part packs: every platform's index against the index contract, every pack file against the pack contract, every file the index names there

@@ -99,6 +99,35 @@ expectA('authored: a factory slot with no meshes', aGun(), /the platform's defau
 expectA('authored: info is still the contract', aGun({ info: { speling: 1 } }), /info\.speling: unknown field/);
 { const r = M.validateAuthoredConfig({ source: 'authored', sights: { builtin: ['irons'], rail: ['riser'] } }); if (r.some((e) => /not in sights\.builtin/.test(e))) console.log('ok   authored: model.json rail kinds must be builtin'); else { bad++; console.error('FAIL model.json rail check: ' + r); } }
 { const r = M.validateAuthoredConfig({ source: 'recipe' }); if (r.length >= 2) console.log('ok   authored: model.json needs source and sights'); else { bad++; console.error('FAIL model.json: ' + r); } }
+// authored PISTOLS (info.pistol): the pistol anchor set (GUN_MODEL_CONTRACT.authored.pistol), not the rifle's
+const PA = (over = {}) => ({ mount_barrel: [0.1, 0, 0], mount_mag: [0.22, -0.043, 0], ...over });
+const pGun = (anch = PA(), infoOver = {}) => aGun({ info: { pistol: true, muzzles: [[0.3, 0, 0]], ...infoOver } }, undefined, { anchors: anch });
+expectA('authored pistol: a complete source needs only mount_barrel and mount_mag', pGun(), null);
+{ const a = PA(); delete a.mount_mag; expectA('authored pistol: a missing mount_mag is named', pGun(a), /anchors\.mount_mag is missing/); }
+{ const a = PA(); delete a.mount_barrel; expectA('authored pistol: a missing mount_barrel is named', pGun(a), /anchors\.mount_barrel is missing/); }
+expectA('authored pistol: the optic cut is a point', pGun(PA({ mount_optic: [0.04, 0.01, 0], mount_optic_end: [0.05, 0.01, 0] })), /a pistol's optic cut is a point/);
+expectA('authored pistol: mount_optic_end goes with mount_optic', pGun(PA({ mount_optic: [0.04, 0.01, 0] })), /mount_optic_end is missing/);
+expectA('authored pistol: the barrel starts behind the muzzle', pGun(PA({ mount_barrel: [0.35, 0, 0] })), /mount_barrel must be behind the muzzle/);
+expectA('authored pistol: a slide needs mount_slide', pGun(PA(), { anim: { slide: 'part_slide', mag: 'part_mag' } }), /anchors\.mount_slide is missing|part_slide/);
+expectA('authored pistol: tac and grip anchors are allowed', pGun(PA({ mount_tac: [0.15, -0.06, 0], mount_grip: [0.07, -0.04, 0], mount_stock: [0, -0.02, 0] })), null);
+expectA('a rifle still needs its handguard anchors', aGun({}, undefined, { anchors: PA() }), /anchors\.mount_optic is missing/);
+// authored VARIANTS (models/<id>/<name>.glb: M.validateAuthoredVariant)
+const vDesc = (v, name = 'x_barrel_short', kids = [mesh('barrel_1', 'barrel', 'black')]) => ({ roots: [{ name, extras: v === undefined ? {} : { variant: v }, mesh: false, uv: false, materials: [], children: kids }] });
+const expectV = (label, desc, re) => {
+  const r = M.validateAuthoredVariant(desc, 'x', 'barrel_short'), all = [...r.errors, ...r.warnings].join('\n'), ok = re === null ? r.errors.length === 0 : re.test(all);
+  if (!ok) { bad++; console.error(`FAIL ${label}: expected ${re}, got:\n  ${all || '(nothing)'}`); } else console.log('ok   ' + label);
+};
+const VB = () => ({ gun: 'x', slot: 'barrel', of: 'factory', info: { muzzles: [[0.2, 0, 0]] }, note: 'short' });
+expectV('variant: a complete barrel variant is valid', vDesc(VB()), null);
+expectV('variant: no variant_json', vDesc(undefined), /variant_json is missing/);
+expectV('variant: another gun\'s folder', vDesc({ ...VB(), gun: 'y' }), /variant\.gun is "y", expected "x"/);
+expectV('variant: a slot that is not barrel or mag', vDesc({ ...VB(), slot: 'grip' }), /variant\.slot is "grip"/);
+expectV('variant: a barrel without its muzzle', vDesc({ ...VB(), info: {} }), /needs variant\.info\.muzzles/);
+expectV('variant: a magazine without its capacity', vDesc({ gun: 'x', slot: 'mag', of: 'factory' }, 'x_barrel_short', [part('mag', [mesh('mag_1', 'mag', 'black')])]), /needs variant\.cap/);
+expectV('variant: an unknown field', vDesc({ ...VB(), extra: 1 }), /variant\.extra: not a field/);
+expectV('variant: a mesh of another slot', vDesc(VB(), 'x_barrel_short', [mesh('grip_1', 'grip', 'black')]), /extras\.slot is "grip", expected "barrel"/);
+expectV('variant: the root is named <gun>_<name>', vDesc(VB(), 'barrel_short'), /expected "x_barrel_short"/);
+expectV('variant: no meshes', vDesc(VB(), 'x_barrel_short', []), /no meshes/);
 // the info as leaves, and the planner
 const canon = (v) => JSON.stringify(v, (k, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.keys(x).sort().map((q) => [q, x[q]])) : x));
 const leavesBack = (v) => canon(M.infoFromLeaves(M.infoLeaves(v)));
