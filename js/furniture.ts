@@ -18,7 +18,7 @@ const G_Furniture = (() => {
     cyl(m: Mat, rt: number, rb: number, h: number, x: number, y: number, z: number, seg?: number, rx?: number): void;
     cylX(m: Mat, rt: number, rb: number, h: number, x: number, y: number, z: number, seg?: number): void;
     sph(m: Mat, r: number, x: number, y: number, z: number): void;
-    ico(m: Mat, r: number, x: number, y: number, z: number): void;
+    ico(m: Mat, r: number, x: number, y: number, z: number, ry?: number): void;
     side(m: Mat, pts: number[][], w: number, x?: number, b?: number): void;
     leaf(): Mat; screen(): Mat; shade(): Mat; crate(): Mat;
     pack(kind: string, shade?: number): Mat; label(): number;
@@ -972,12 +972,59 @@ const G_Furniture = (() => {
   // ---------------------------------------------------------------- the Sandia Crest
   // (js/level.ts layCrest: the outcrops are its walls; what stands about on them is here)
   const GRANITE = [0xb08478, 0xa47a6e, 0xba8e80, 0x9a7468, 0xc49a8a];
-  // A granite boulder, waist high: cover. A lump and a smaller one leaning on it, lichen here and there.
-  R.boulder = { w: 1.9, d: 1.5, cover: 1, boxes: [[0, 0, 1.6, 1.25, 1.1]], build(k: Kit) {
+  // A granite boulder, waist high: cover. A lump and a smaller one leaning on it, a third at its foot, lichen here and there.
+  // Its shape comes from the piece's own seed (v), the same for the meshes and the collision boxes (boulderLumps): each lump
+  // is an icosahedron turned about y, and what stops a round or you is a handful of boxes filling it out (lumpBoxes: its
+  // volume in 20 cm cells, runs of cells merged into boxes), so a round passes where there's no rock and meets it where there is.
+  const ICO_T = (1 + Math.sqrt(5)) / 2;
+  const ICO_V = ([[-1, ICO_T, 0], [1, ICO_T, 0], [-1, -ICO_T, 0], [1, -ICO_T, 0], [0, -1, ICO_T], [0, 1, ICO_T], [0, -1, -ICO_T], [0, 1, -ICO_T], [ICO_T, 0, -1], [ICO_T, 0, 1], [-ICO_T, 0, -1], [-ICO_T, 0, 1]] as number[][]).map((p) => { const l = Math.hypot(p[0], p[1], p[2]); return p.map((c) => c / l); });
+  // its 20 faces' unit normals (a point is inside when it's within 0.7947 of the radius along every one)
+  const ICO_N = [[0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11], [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8], [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9], [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1]].map(([i, j, k]) => { const n = [0, 1, 2].map((c) => ICO_V[i][c] + ICO_V[j][c] + ICO_V[k][c]), l = Math.hypot(n[0], n[1], n[2]); return n.map((c) => c / l); });
+  interface Lump { r: number; x: number; y: number; z: number; ry: number }
+  const boulderLumps = (v: number): Lump[] => {
+    const r = G.U.rng(Math.floor(v * 4294967295)), s = r() < 0.5 ? -1 : 1;
+    return [
+      { r: 0.72, x: (r() - 0.5) * 0.2, y: 0.38, z: (r() - 0.5) * 0.15, ry: r() * 6 },
+      { r: 0.42 + r() * 0.12, x: 0.45 * s, y: 0.28, z: 0.25 * (r() - 0.5), ry: r() * 6 },
+      { r: 0.3, x: (r() - 0.5) * 0.8, y: 0.12, z: 0.4, ry: r() * 6 },
+    ];
+  };
+  // the boxes filling a lump, [x, z, w, d, top, bottom] (from the floor up: the part below it is under the ground)
+  const lumpBoxes = (l: Lump) => {
+    const CELL = 0.2, c = Math.cos(l.ry), sn = Math.sin(l.ry), R0 = l.r * 0.7947 + 0.03; // (a cell counts if its middle is inside, or just outside)
+    const top = l.y + l.r * 0.9511, nx = Math.ceil(l.r * 2 / CELL), x0 = l.x - nx * CELL / 2, z0 = l.z - nx * CELL / 2;
+    // the slabs' edges: the first one taller than a step (js/world.ts STEP, 0.32: you can't walk up onto it, nor up the rock like stairs), the rest about a cell each
+    const base = Math.min(top, 0.36), up = top - base > 0.08 ? Math.max(1, Math.round((top - base) / CELL)) : 0, edges = [0, up ? base : top];
+    for (let i = 1; i <= up; i++) edges.push(base + (top - base) * i / up);
+    const inside = (x: number, y: number, z: number) => { // (in the lump's own frame: undo the turn)
+      const px = (x - l.x) * c - (z - l.z) * sn, py = y - l.y, pz = (x - l.x) * sn + (z - l.z) * c;
+      for (const n of ICO_N) if (px * n[0] + py * n[1] + pz * n[2] > R0) return false;
+      return true;
+    };
+    const out: number[][] = [], open = new Map<string, number[]>(); // (open: the boxes still growing upward, by their footprint)
+    for (let iy = 0; iy + 1 < edges.length; iy++) {
+      const y = iy ? (edges[iy] + edges[iy + 1]) / 2 : Math.min(Math.max(l.y, 0), edges[1]), here = new Set<string>(), rects: number[][] = [], rows: (number[] | null)[] = [];
+      for (let iz = 0; iz < nx; iz++) { // a row of runs along x, merged with the same run in the row before it
+        const next: (number[] | null)[] = [];
+        for (let ix = 0, run = -1; ix <= nx; ix++) {
+          const on = ix < nx && inside(x0 + (ix + 0.5) * CELL, y, z0 + (iz + 0.5) * CELL);
+          if (on && run < 0) run = ix;
+          if (!on && run >= 0) { const prev = rows.find((q) => q && q[0] === run && q[1] === ix && q[3] === iz); if (prev) { prev[3] = iz + 1; next.push(prev); } else { const q = [run, ix, iz, iz + 1]; rects.push(q); next.push(q); } run = -1; }
+        }
+        rows.length = 0; rows.push(...next);
+      }
+      for (const q of rects) {
+        const key = q.join(','), grown = open.get(key);
+        here.add(key);
+        if (grown) grown[4] = edges[iy + 1]; else { const bx = [(x0 + (q[0] + q[1]) * CELL / 2), (z0 + (q[2] + q[3]) * CELL / 2), (q[1] - q[0]) * CELL, (q[3] - q[2]) * CELL, edges[iy + 1], edges[iy]]; out.push(bx); open.set(key, bx); }
+      }
+      for (const key of [...open.keys()]) if (!here.has(key)) open.delete(key);
+    }
+    return out;
+  };
+  R.boulder = { w: 1.9, d: 1.5, cover: 1, boxes: (v: number) => boulderLumps(v).flatMap(lumpBoxes), build(k: Kit, v: number) {
     const g = k.mat(k.pick(GRANITE), 0.95, 0, { flatShading: true }), g2 = k.mat(k.tint(g.color.getHex(), 0.88), 0.95, 0, { flatShading: true });
-    k.ico(g, 0.72, (k.rnd() - 0.5) * 0.2, 0.38, (k.rnd() - 0.5) * 0.15);
-    k.ico(g2, 0.42 + k.rnd() * 0.12, 0.45 * (k.rnd() < 0.5 ? -1 : 1), 0.28, 0.25 * (k.rnd() - 0.5));
-    k.ico(g2, 0.3, (k.rnd() - 0.5) * 0.8, 0.12, 0.4);
+    boulderLumps(v).forEach((l, i) => k.ico(i ? g2 : g, l.r, l.x, l.y, l.z, l.ry));
     const lichen = k.mat(k.pick([0x8a9a6a, 0xb4b080, 0x6a7a5a]), 1, 0, { flatShading: true });
     for (let i = 0; i < 3; i++) k.ico(lichen, 0.08 + k.rnd() * 0.06, (k.rnd() - 0.5) * 0.9, 0.7 + k.rnd() * 0.3, (k.rnd() - 0.5) * 0.6);
   } };
@@ -1926,7 +1973,7 @@ const G_Furniture = (() => {
       cyl: (m: Mat, rt: number, rb: number, h: number, x: number, y: number, z: number, seg = 14, rx = 0) => place(new T.CylinderGeometry(rt, rb, h, seg), m, x, y, z, 0, rx),
       cylX: (m: Mat, rt: number, rb: number, h: number, x: number, y: number, z: number, seg = 14) => place(new T.CylinderGeometry(rt, rb, h, seg), m, x, y, z, Math.PI / 2, Math.PI / 2), // (lying along x)
       sph: (m: Mat, r: number, x: number, y: number, z: number) => place(new T.SphereGeometry(r, 8, 6), m, x, y, z),
-      ico: (m: Mat, r: number, x: number, y: number, z: number) => place(new T.IcosahedronGeometry(r, 0), m, x, y, z, rnd() * 6),
+      ico: (m: Mat, r: number, x: number, y: number, z: number, ry?: number) => { const a = rnd() * 6; place(new T.IcosahedronGeometry(r, 0), m, x, y, z, ry ?? a); },
       // a side profile ([z, y] points: along the piece and up) drawn across w at x, its edges rounded by b (a car's body)
       side: (m: Mat, pts: number[][], w: number, x = 0, b = 0) => {
         const sh = new T.Shape(pts.map(([z, y]) => new T.Vector2(z, y)));
