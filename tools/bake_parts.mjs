@@ -9,15 +9,15 @@
 // at several places), files and indexes written.
 import fs from 'fs'; import path from 'path'; import zlib from 'zlib'; import crypto from 'crypto';
 import { ROOT } from './model_env.mjs';
-import { collect, analyze, analyzeInfo, cover, indexOf, verify, depSig, addRandom } from './model_packs.mjs';
+import { collect, analyze, analyzeInfo, cover, indexOf, verify } from './model_packs.mjs';
 import { makeEmitter, packFileName, canonOf, sameCanon } from './model_emit.mjs';
+import { generate } from './model_cases.mjs';
+import { COUPLING_IS_ERROR, isException } from './model_policy.mjs';
 
 export const PARTS_DIR = path.join(ROOT, 'assets/models/parts/');
 export const SHARED = '_shared/';
 /** Random builds (beyond the sweep) the analysis learns interactions from, 2 to 6 parts changed at once. */
 export const LEARN_BUILDS = +(process.env.MODELS_LEARN || 600);
-/** Random builds tried per round once the analysis has settled (two clean rounds in a row end it). */
-export const VALIDATE_BUILDS = +(process.env.MODELS_VALIDATE || 700);
 
 /** The platforms whose packs are older than the recipe sources: returns their ids. */
 export function staleParts(ids, src) {
@@ -105,17 +105,15 @@ function register(reg, canon, scene, tag) {
 /** Analyses, covers, indexes and verifies one platform; returns its state for writeAll. */
 export async function bakePlatform(env, Models, em, reg, id, src, log) {
   const t0 = Date.now();
-  const C = collect(env, Models, id, { learn: LEARN_BUILDS });
-  let A, I, rounds = 0, clean = 0, rand = 0; const stats = {};
-  // analyse, cover every combination of the dep slots, then try new random builds: if the analysis predicts them (learns no new dependency, needs no new
-  // combination) twice running, it is done; any it gets wrong teach it the dependency and the loop goes on
+  // GENERATION ONLY: the sweep (collect: the default and loaded builds x every single swap, the invariance sweep) plus a set of random builds for interactions
+  // of two parts; analyse, cover every combination of the dep slots, repeat to a fixed point. Nothing is validated here: tests/check is a separate step
+  // (npm run test:models: edge cases, regressions, golden fingerprints, held-out set).
+  // (the rule-generated edge-case builds are SEEDS for the analysis, not checked here: they cover the stacks random builds rarely reach, e.g. a magnifier on a chassis)
+  const C = collect(env, Models, id, { learn: LEARN_BUILDS, extra: generate(env.G, id).map((c) => c.build) });
+  let A, I, rounds = 0; const stats = {};
   for (; rounds < 24; rounds++) {
     A = analyze(C); I = analyzeInfo(C);
-    const sig = depSig(A, I);
-    if (cover(C, A, I, stats)) { clean = 0; continue; }
-    addRandom(C, VALIDATE_BUILDS, 5000 + 31 * rounds); rand += VALIDATE_BUILDS;
-    const A2 = analyze(C), I2 = analyzeInfo(C);
-    if (depSig(A2, I2) === sig) { if (++clean >= 2) { A = A2; I = I2; if (cover(C, A, I, stats)) { clean = 0; continue; } break; } } else clean = 0;
+    if (!cover(C, A, I, stats)) break;
   }
   if (rounds >= 24) throw new Error(`${id}: the analysis did not settle`);
   const { ix, packs } = indexOf(A, I, Models, src);
@@ -140,9 +138,11 @@ export async function bakePlatform(env, Models, em, reg, id, src, log) {
   let final = packs2;
   if (res2.bad.length || res2.infoBad.length) { for (const [t, l] of Object.entries(savedTags)) ix.tags[t].packs = l; final = packs; log(`  ${id}: collapsing keys broke ${res2.bad.length} builds (first: ${JSON.stringify(res2.bad[0])}) and ${res2.infoBad.length} leaves; kept the full keys`); }
   for (const e of final) e.entry.rep.users.push({ id, entry: e.entry });
+  // couplings: the slots (other than its own) whose part shapes a pack
+  const couplings = Object.entries(A.state).flatMap(([t, st]) => st.dep.filter((x) => x !== t.split('@')[0]).map((x) => `${t}<-${x}`));
   const joint = Object.entries(ix.tags).filter(([, t]) => t.dep.length > 1).map(([t, ti]) => `${t}(${ti.dep.join('+')}):${ti.packs.length}`);
   log(id.padEnd(10), String(C.memo.size).padStart(6), 'builds', String(C.all().filter((B) => B.cover).length).padStart(6), 'cover', String(rounds + 1), 'rounds', String(final.length).padStart(5), 'packs', String(ix.info.reduce((a, t) => a + t.rows.length, 0)).padStart(5), 'rows', `${((Date.now() - t0) / 1000).toFixed(1)}s`);
-  return { id, ix, final, res, stats, builds: C.memo.size, cover: C.all().filter((B) => B.cover).length, rounds: rounds + 1, joint, infoDeps: ix.info.map((t) => `${t.dep.join('+') || '-'}:${t.rows.length}x${t.leaves.length}`) };
+  return { id, ix, final, res, stats, couplings, builds: C.memo.size, cover: C.all().filter((B) => B.cover).length, rounds: rounds + 1, joint, infoDeps: ix.info.map((t) => `${t.dep.join('+') || '-'}:${t.rows.length}x${t.leaves.length}`) };
 }
 
 /** Writes every pack file and index of the platforms baked: packs that are the same up to a move are one file. */
@@ -207,6 +207,25 @@ export async function writeAll(em, Models, states, reg, partial, log) {
   return { summary, shared: { files: sharedFiles, ...sharedTotals }, files };
 }
 
+/**
+ * Every coupling found (a slot whose part reshapes another slot's pack, 'pack<-slot'), with the platforms: logged as a warning each, or an error each when
+ * tools/model_policy.mjs says so (COUPLING_IS_ERROR, minus COUPLING_EXCEPTIONS). Returns { list: [{ coupling, platforms }], errors }.
+ */
+export function reportCouplings(states, log) {
+  const by = new Map();
+  for (const st of states) for (const c of st.couplings) { if (!by.has(c)) by.set(c, []); by.get(c).push(st.id); }
+  const list = [...by].map(([coupling, platforms]) => ({ coupling, platforms })).sort((a, b) => b.platforms.length - a.platforms.length || a.coupling.localeCompare(b.coupling));
+  let errors = 0;
+  log(`\n${list.length} couplings (a slot's part reshapes another slot's geometry; each is a joint pack):`);
+  for (const { coupling, platforms } of list) {
+    const bad = COUPLING_IS_ERROR && platforms.filter((p) => !isException(coupling, p));
+    if (bad && bad.length) errors += bad.length;
+    log(`  ${bad && bad.length ? 'ERROR  ' : 'warning'} ${coupling.padEnd(28)} ${platforms.length} platforms: ${platforms.join(' ')}`);
+  }
+  if (errors) console.error(`${errors} couplings are errors (tools/model_policy.mjs)`);
+  return { list, errors };
+}
+
 /** Bakes the packs of these platforms. Returns { fails, summary, shared, stats }. */
 export async function bakeParts(env, Models, ids, src, log = console.log, partial = false) {
   const em = await makeEmitter({ G: env.G, GM: env.GM, Models });
@@ -217,5 +236,6 @@ export async function bakeParts(env, Models, ids, src, log = console.log, partia
   }
   if (fails) return { fails, summary: {}, shared: {}, states };
   const w = await writeAll(em, Models, states, reg, partial, log);
-  return { fails, summary: w.summary, shared: w.shared, states };
+  const couplings = reportCouplings(states, log);
+  return { fails: fails + (couplings.errors ? 1 : 0), summary: w.summary, shared: w.shared, states, couplings: couplings.list };
 }

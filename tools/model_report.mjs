@@ -66,3 +66,22 @@ export async function sideBySide(file, w, asm, proc) {
   cross(buf, W, pw, ph, 2 * (pw + gap), f0, y0, s, proc.info.support[0], proc.info.support[1], [200, 120, 0], true); cross(buf, W, pw, ph, 2 * (pw + gap), f0, y0, s, proc.info.fSight, proc.info.sy, [200, 120, 0], false);
   writePng(file, W, ph, buf);
 }
+
+/**
+ * Side views of several guns of one platform on a COMMON frame and scale (so lengths and heights compare across the sheet): writes files[i] for asms[i]
+ * (the gun assembled, one colour per slot, w pixels wide); returns the slot legend [{ tag, rgb }].
+ */
+export function sideViews(files, asms, w = 760) {
+  const all = asms.map((a) => meshesOf(a.group, a.info));
+  let fmin = 1e9, fmax = -1e9, ymin = 1e9, ymax = -1e9;
+  for (const ms of all) for (const m of ms) for (let i = 0; i < m.v.length; i += 3) { const f = -m.v[i + 2], y = m.v[i + 1]; if (f < fmin) fmin = f; if (f > fmax) fmax = f; if (y < ymin) ymin = y; if (y > ymax) ymax = y; }
+  const s = w / (fmax - fmin + 0.04), f0 = fmin - 0.02, y0 = ymin - 0.02, pw = Math.ceil((fmax - fmin + 0.04) * s), ph = Math.ceil((ymax - ymin + 0.04) * s);
+  const tags = [...new Set(all.flatMap((ms) => ms.map((m) => m.tag)))].sort(), cols = tags.map(slotColour);
+  all.forEach((ms, k) => {
+    const R = raster(ms, pw, ph, f0, y0, s, tags), buf = Buffer.alloc(pw * ph * 3, 245);
+    for (let o = 0; o < pw * ph; o++) { const i = R.id[o]; if (i < 0) continue; const sh = R.shade[o] / 255; for (let c = 0; c < 3; c++) buf[o * 3 + c] = Math.round(cols[i][c] * sh); }
+    cross(buf, pw, pw, ph, 0, f0, y0, s, asms[k].info.support[0], asms[k].info.support[1], [0, 120, 0], true); cross(buf, pw, pw, ph, 0, f0, y0, s, asms[k].info.fSight, asms[k].info.sy, [0, 60, 220], false);
+    writePng(files[k], pw, ph, buf);
+  });
+  return tags.map((tag, i) => ({ tag, rgb: cols[i] }));
+}

@@ -39,7 +39,7 @@ export function cleanInfo(info) {
  * `learn` random builds (2 to 6 parts changed at once) are added beyond the sweep: the analysis learns the interactions they show.
  * Builds are added as the analysis needs them (getB): all() is every build built so far.
  */
-export function collect(env, Models, id, { learn = 0, seed = 7001 } = {}) {
+export function collect(env, Models, id, { learn = 0, seed = 7001, extra = [] } = {}) {
   const { G, GS, GM } = env, sw = sweepOf(GS, id), memo = new Map();
   const getB = (build) => {
     const k = buildKey(build); let x = memo.get(k); if (x) return x;
@@ -52,6 +52,7 @@ export function collect(env, Models, id, { learn = 0, seed = 7001 } = {}) {
   for (const e of sw.all) e.B = getB(e.build);
   const nSweep = memo.size;
   for (const b of providerBuilds(GS, id, sw.bases, seed + 17, new Set(memo.keys()))) getB(b);
+  for (const b of extra) getB(b); // (the edge cases and regressions, tools/model_cases.mjs: the analysis learns from them and they are verified with the rest)
   if (learn) for (const b of randomBuilds(GS, id, sw.bases, learn, seed, new Set(memo.keys()), 2, 6)) getB(b);
   return { id, sw, memo, getB, bases, all: () => [...memo.values()], nSweep, GS, Models, noBuild: new Set() };
 }
