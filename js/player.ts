@@ -1708,8 +1708,12 @@ const G_Me = {
       ev.selfHit = true;
     }
     const r2 = (v: number) => Math.round(v * 100) / 100;
-    if (isNade) this.fragBurst(p);
-    G.Net.toHost({ t: 'boom', p: [r2(p.x), r2(p.y), r2(p.z)], r: r2(r), d: Math.round(dmg), fr: isNade ? 1 : undefined });
+    // The burst's seed goes out with the boom (a number, not 800 positions): every screen flies the same chips off the same
+    // walls from it (fragBurst), so the pocks and the clean shadows behind cover are the same for everyone. What the chips
+    // do to bodies, and what the walls' own dice do to a chip after its first strike, is each screen's own.
+    const seed = isNade ? (Math.random() * 4294967296) >>> 0 : 0;
+    if (isNade) this.fragBurst(p, undefined, seed);
+    G.Net.toHost({ t: 'boom', p: [r2(p.x), r2(p.y), r2(p.z)], r: r2(r), d: Math.round(dmg), fr: isNade ? 1 : undefined, s: isNade ? seed : undefined });
   },
 
   // ---------------------------------------------------------------- fragmentation
@@ -1728,24 +1732,31 @@ const G_Me = {
   FRAG: { N: 800, V0: 1350, VMIN: 70, RANGE: 70, CAP: 28, BUDGET_MS: 2.5, MIN_PER_FRAME: 40, M_MED: 0.0004, CD: 1.5, SHOW: 26, PUFFS: 14, BLOOD: 24 },
   fragQ: null as null | any[],
   fragLogs: [] as any[],
-  // p: where it went off. enemy: a suspect's (id): it is you it is meant for, and no one else it hurts here
-  fragBurst(p: THREE.Vector3, enemy?: number) {
+  // p: where it went off. enemy: a suspect's (id): it is you it is meant for, and no one else it hurts here. seed: the
+  // burst's (the same on every screen: the chips' directions, masses and speeds all come from it). marksOnly: someone
+  // else's grenade, flown only against the walls, to leave the same pocks (no bodies, no streaks, no wounds)
+  fragBurst(p: THREE.Vector3, enemy?: number, seed?: number, marksOnly?: boolean) {
     const F = this.FRAG, n = F.N, dir = new Float32Array(n * 3), m = new Float32Array(n), v = new Float32Array(n);
+    const rnd = seed ? G.U.rng(seed) : Math.random;
+    this.scorchAt(p, rnd);
     // points over the sphere (the golden angle), the whole lot turned at random, each nudged a little off its place
-    const gold = Math.PI * (3 - Math.sqrt(5)), a0 = Math.random() * 6.283, tilt = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.random() * 6.283, Math.random() * 6.283, Math.random() * 6.283));
-    const u = new THREE.Vector3(), norm = () => Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(Math.PI * 2 * Math.random());
+    const gold = Math.PI * (3 - Math.sqrt(5)), a0 = rnd() * 6.283, tilt = new THREE.Quaternion().setFromEuler(new THREE.Euler(rnd() * 6.283, rnd() * 6.283, rnd() * 6.283));
+    const u = new THREE.Vector3(), norm = () => Math.sqrt(-2 * Math.log(1 - rnd())) * Math.cos(Math.PI * 2 * rnd());
     for (let i = 0; i < n; i++) {
       const y = 1 - (2 * (i + 0.5)) / n, r = Math.sqrt(1 - y * y), a = a0 + i * gold;
-      u.set(Math.cos(a) * r + (Math.random() - 0.5) * 0.04, y + (Math.random() - 0.5) * 0.04, Math.sin(a) * r + (Math.random() - 0.5) * 0.04).normalize().applyQuaternion(tilt);
+      u.set(Math.cos(a) * r + (rnd() - 0.5) * 0.04, y + (rnd() - 0.5) * 0.04, Math.sin(a) * r + (rnd() - 0.5) * 0.04).normalize().applyQuaternion(tilt);
       dir[i * 3] = u.x; dir[i * 3 + 1] = u.y; dir[i * 3 + 2] = u.z;
       m[i] = G.U.clamp(F.M_MED * Math.exp(0.65 * norm()), 0.0001, 0.0016);
-      v[i] = F.V0 * (0.85 + 0.3 * Math.random()) * Math.pow(F.M_MED / m[i], 0.12);
+      v[i] = F.V0 * (0.85 + 0.3 * rnd()) * Math.pow(F.M_MED / m[i], 0.12);
     }
-    const pos = new Float32Array(n * 6), geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    const line = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0xffd9a0, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }));
-    line.frustumCulled = false; G.R.dynRoot.add(line);
-    const q = { p: p.clone(), enemy, n, i: 0, dir, m, v, pos, line, geo, shot: { sid: 0, ff: new Map(), f: 0, enemy: enemy || undefined } as any, per: new Map<string, any>(),
+    const pos = marksOnly ? null : new Float32Array(n * 6), geo = new THREE.BufferGeometry();
+    let line: THREE.LineSegments | null = null;
+    if (pos) {
+      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      line = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0xffd9a0, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }));
+      line.frustumCulled = false; G.R.dynRoot.add(line);
+    }
+    const q = { p: p.clone(), enemy, marksOnly: !!marksOnly, n, i: 0, dir, m, v, pos, line, geo, shot: { sid: 0, ff: new Map(), f: 0, enemy: enemy || undefined } as any, per: new Map<string, any>(),
       ms: 0, maxMs: 0, frames: 0, walls: 0, mats: {} as Record<string, number[]>, escaped: 0, puffs: 0, blood: 0, fade: -1 };
     (this.fragQ = this.fragQ || []).push(q);
   },
@@ -1759,12 +1770,13 @@ const G_Me = {
       while (q.i < q.n && (k < F.MIN_PER_FRAME || performance.now() - t0 < F.BUDGET_MS)) { this.fragOne(q, q.i++); k++; }
       const ms = performance.now() - t0;
       q.ms += ms; q.maxMs = Math.max(q.maxMs, ms); q.frames++;
-      q.geo.attributes.position.needsUpdate = true;
+      if (q.line) q.geo.attributes.position.needsUpdate = true;
+      G.R.fragMarkFlush(); // (this frame's pocks go up to the GPU in one go)
       if (q.i >= q.n) this.fragDone(q);
     } else {
       q.fade -= dt;
-      (q.line.material as THREE.LineBasicMaterial).opacity = Math.max(0, q.fade / 0.25) * 0.9;
-      if (q.fade <= 0) { G.R.dynRoot.remove(q.line); q.geo.dispose(); (q.line.material as THREE.Material).dispose(); Q.shift(); }
+      if (q.line) (q.line.material as THREE.LineBasicMaterial).opacity = Math.max(0, q.fade / 0.25) * 0.9;
+      if (q.fade <= 0) { if (q.line) { G.R.dynRoot.remove(q.line); q.geo.dispose(); (q.line.material as THREE.Material).dispose(); } Q.shift(); }
     }
   },
   fragDone(q: any) {
@@ -1793,7 +1805,7 @@ const G_Me = {
     const key = (h: any) => (h.ev ? 'e' + h.ev.id : h.mate ? 'p' + h.mate.id : 'me');
     legs: for (let leg = 0; leg < 10 && rest > 1e-3 && v > F.VMIN; leg++) {
       const wall = L.raycast(map, o.x, o.y, o.z, d.x, d.y, d.z, rest, { bars: true }), hitWall = !!wall.solid && wall.t < rest - 1e-4, wallT = Math.min(wall.t, rest);
-      for (const h of this.roundHits(b, o, d, wallT)) {
+      if (!q.marksOnly) for (const h of this.roundHits(b, o, d, wallT)) {
         const k = key(h), rec = q.per.get(k) || { tests: 0, hits: 0, stopped: 0, through: 0, armourStopped: 0, capped: 0 };
         q.per.set(k, rec);
         if (rec.tests >= F.CAP) { rec.capped++; continue; } // (a body's full: the rest of the burst passes it by)
@@ -1836,7 +1848,9 @@ const G_Me = {
       if (!hitWall) { adv(rest); break; }
       adv(wall.t);
       q.walls++;
-      const r = B.crossSolid(map, proj, v, wall, o, d);
+      const vIn = v, r = B.crossSolid(map, proj, v, wall, o, d);
+      // its pock on the face it struck (whether it stopped, went through or glanced off), turned to face the way it came
+      { const f = d.x * wall.n[0] + d.y * wall.n[1] + d.z * wall.n[2] > 0 ? -1 : 1; G.R.fragMark(o, [wall.n[0] * f, wall.n[1] * f, wall.n[2] * f], r.fx, G.U.clamp(Math.sqrt(vIn / 600), 0.5, 1.3) * (r.ric ? 0.6 : 1), (i * 0.6180339) % 1, (i * 0.7548777) % 1); }
       wallEv(r.ric ? 'r' : 'e', wall.n, r.name);
       { const mm = q.mats[r.name || "?"] = q.mats[r.name || "?"] || [0, 0, 0]; if (r.ric) mm[2]++; else if (!r.v) mm[0]++; else mm[1]++; } // (what the walls did: stopped, let through, glanced)
       if (q.puffs < F.PUFFS && !hitSomething && Math.random() < 0.05) { q.puffs++; G.R.particles(o.clone(), 3, 0xb4aa98, 2.5, 0.35, 2, 0.5); }
@@ -1847,8 +1861,18 @@ const G_Me = {
     if (v > F.VMIN) q.escaped++;
     end();
   },
+  // The soot where a grenade went off, on the floor (or table) under it: faint if it went off in the air, none if high. The
+  // same on every screen: it is worked out from the burst's point and seed alone. (Flashbangs leave none: they are all
+  // light and noise.)
+  scorchAt(p: THREE.Vector3, rnd: () => number) {
+    const map = G.Game.map; if (!map) return;
+    const g = G.Level.groundAt(map, p.x, p.z, 0.01, p.y + 0.05), h = p.y - g, d = 0.6 + 0.9 * rnd(), rot = rnd() * 6.283;
+    if (h > 0.6 || h < -0.5) return;
+    G.R.scorch(p.x, g, p.z, d, 0.9 * (h < 0.25 ? 1 : 1 - (h - 0.25) / 0.35 * 0.65), rot);
+  },
   // a chip's streak, from the burst to where it ended (the first FRAG.SHOW metres of it)
   fragShow(q: any, i: number, end: THREE.Vector3) {
+    if (!q.pos) return;
     const a = q.p, dx = end.x - a.x, dy = end.y - a.y, dz = end.z - a.z, len = Math.hypot(dx, dy, dz) || 1, k = Math.min(1, this.FRAG.SHOW / len), P = q.pos;
     P[i * 6] = a.x; P[i * 6 + 1] = a.y; P[i * 6 + 2] = a.z; P[i * 6 + 3] = a.x + dx * k; P[i * 6 + 4] = a.y + dy * k; P[i * 6 + 5] = a.z + dz * k;
   },

@@ -193,7 +193,7 @@ const G_Server = {
         this.hear(m.p[0], m.p[2], 35, m.p[1] || 0);
         // the blast takes out the windows round it
         if (this.map && this.map.windows && Array.isArray(m.p)) this.breakGlass(this.map.windows.filter((w: SvWin) => !w.broken && Math.hypot(w.x - m.p[0], w.z - m.p[2]) < (+m.r || 4) * 1.3 && Math.abs((w.fy || 0) + 1.3 - (m.p[1] || 0)) < 2.5).map((w: SvWin) => w.id), m.p);
-        G.Net.broadcast({ t: 'boom', id: from, p: m.p, r: m.r, d: m.d });
+        G.Net.broadcast({ t: 'boom', id: from, p: m.p, r: m.r, d: m.d, fr: m.fr ? 1 : undefined, s: m.fr ? m.s : undefined }); // (fr, s: a frag grenade, and its burst's seed: the pocks it leaves are the same on every screen)
         break;
       case 'revive': G.Net.broadcast({ t: 'revive', tg: m.tg, by: from, hp: m.hp }); break;
       // the range's IPSC course: a new stage laid (its seed), and a run as it happens (passed on to the others)
@@ -2178,7 +2178,7 @@ const G_Server = {
   enemyBoom(p: { x: number; y: number; z: number }) {
     const r2 = (x: number) => Math.round(x * 100) / 100;
     this.hear(p.x, p.z, 20, p.y || 0);
-    G.Net.broadcast({ t: 'boom', id: 'enemy', p: [p.x, p.y, p.z].map(r2), r: G.Me.BLAST.r, d: Math.round(G.Me.BLAST.dmg * this.dmgMult), en: 1, fr: 1 });
+    G.Net.broadcast({ t: 'boom', id: 'enemy', p: [p.x, p.y, p.z].map(r2), r: G.Me.BLAST.r, d: Math.round(G.Me.BLAST.dmg * this.dmgMult), en: 1, fr: 1, s: (Math.random() * 4294967296) >>> 0 });
   },
 
   // blind: firing at where the target was last seen, not at them
