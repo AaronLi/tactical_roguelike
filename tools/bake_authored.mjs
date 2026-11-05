@@ -62,10 +62,19 @@ export function local(n) {
 }
 const jsonExtra = (ex, k) => { if (ex[k] !== undefined) return ex[k]; if (typeof ex[k + '_json'] === 'string') return JSON.parse(ex[k + '_json']); return undefined; };
 
+/** A node's world matrix (column-major, unscaled) as a place and a rotation: { p: [x, y, z], q: [x, y, z, w] }. */
+function xfOf(W) {
+  const [m00, m10, m20, , m01, m11, m21, , m02, m12, m22] = W, tr = m00 + m11 + m22; let x, y, z, w;
+  if (tr > 0) { const s = 0.5 / Math.sqrt(tr + 1); w = 0.25 / s; x = (m21 - m12) * s; y = (m02 - m20) * s; z = (m10 - m01) * s; }
+  else if (m00 > m11 && m00 > m22) { const s = 2 * Math.sqrt(1 + m00 - m11 - m22); w = (m21 - m12) / s; x = 0.25 * s; y = (m01 + m10) / s; z = (m02 + m20) / s; }
+  else if (m11 > m22) { const s = 2 * Math.sqrt(1 + m11 - m00 - m22); w = (m02 - m20) / s; x = (m01 + m10) / s; y = 0.25 * s; z = (m12 + m21) / s; }
+  else { const s = 2 * Math.sqrt(1 + m22 - m00 - m11); w = (m10 - m01) / s; x = (m02 + m20) / s; y = (m12 + m21) / s; z = 0.25 * s; }
+  return { p: [W[12], W[13], W[14]], q: [x, y, z, w] };
+}
 /** One authored source, read: { cfg, root extras, meshes in the gun's frame, rig, sights, info }. Throws on a malformed file (checkAuthored reports the contract). */
 export function readAuthored(id) {
   const cfg = JSON.parse(fs.readFileSync(cfgPath(id), 'utf8')), r = readScene(fs.readFileSync(glbPath(id)), id, `models/${id}/${id}.glb`), variants = {};
-  for (const name of variantNames(id)) { const v = readScene(fs.readFileSync(variantPath(id, name)), id + '_' + name, `models/${id}/${name}.glb`); variants[name] = { meta: jsonExtra(v.rootExtras, 'variant'), meshes: v.meshes }; }
+  for (const name of variantNames(id)) { const v = readScene(fs.readFileSync(variantPath(id, name)), id + '_' + name, `models/${id}/${name}.glb`); variants[name] = { meta: jsonExtra(v.rootExtras, 'variant'), meshes: v.meshes, parts: v.parts }; }
   return { id, cfg, json: r.json, rootExtras: r.rootExtras, info: r.info, anchors: r.anchors, meshes: r.meshes, variants, parts: r.parts, hinge: jsonExtra(r.rootExtras, 'hinge') || null };
 }
 /** A .glb scene read for the recipes: its one root node (named rootName), root extras, info and anchors, and every mesh's geometry in the root's frame. */
@@ -77,7 +86,7 @@ function readScene(buf, rootName, label) {
   const parts = {};
   const walk = (ni, parentW, part) => {
     const n = j.nodes[ni], W = mul(parentW, local(n)), ex = n.extras || {};
-    if ((n.name || '').startsWith('part_')) { const key = ex.part || n.name.slice(5); part = { key, at: [W[12], W[13], W[14]], chain: (part ? part.chain : []).concat(key) }; parts[key] = { at: part.at.map((c) => +c.toFixed(5)), parent: part.chain.length > 1 ? part.chain[part.chain.length - 2] : null }; }
+    if ((n.name || '').startsWith('part_')) { const key = ex.part || n.name.slice(5); part = { key, at: [W[12], W[13], W[14]], chain: (part ? part.chain : []).concat(key) }; parts[key] = { at: part.at.map((c) => +c.toFixed(5)), parent: part.chain.length > 1 ? part.chain[part.chain.length - 2] : null, ...(ex.check ? { check: ex.check } : {}) }; } // (check: a magazine's check data, { w }: docs/models.md "Magazine check")
     if (n.mesh != null) {
       for (const prim of j.meshes[n.mesh].primitives) {
         const P = readAccessor(g, prim.attributes.POSITION), Nm = prim.attributes.NORMAL != null ? readAccessor(g, prim.attributes.NORMAL) : null, cnt = P.length / 3;
@@ -91,6 +100,10 @@ function readScene(buf, rootName, label) {
         const e = { slot: ex.slot || 'base', mat: (prim.material != null && j.materials[prim.material].name) || 'black', pos, nrm, idx: idx instanceof Uint16Array || idx instanceof Uint32Array ? idx : Uint32Array.from(idx) };
         if ((n.name || '').startsWith('display_')) { e.name = n.name; e.display = ex.display; const U = prim.attributes.TEXCOORD_0 != null ? readAccessor(g, prim.attributes.TEXCOORD_0) : null; if (U) e.uv = Float32Array.from(U); } // (a display surface: the game paints it, so its name, size and UVs go on)
         if (part) { e.part = part.key; e.at = part.at.map((c) => +c.toFixed(5)); e.chain = part.chain.slice(); }
+        // a magazine-check mesh (extras.chk: the top round, a witness hole...) stays a mesh of its own with its node's transform, as the game reads them off the
+        // model (js/gunrig.ts magCheck: a hole's rotation is the face's tilt there): its geometry in its node's own frame too (local), and that node's place and
+        // rotation in the gun's (xf: p [x, y, z], q [x, y, z, w], three's axes)
+        if (ex.chk) { e.chk = ex.chk; e.local = { pos: Float32Array.from(P), nrm: Nm ? Float32Array.from(Nm) : nrm.slice() }; e.xf = xfOf(W); }
         if (ex.role === 'tube') e.legacyTube = true; // (an older export: see below)
         meshes.push(e);
       }
@@ -116,7 +129,7 @@ export function toAuthoredGun(src) {
     info.bolt = [+(-bb[5]).toFixed(4), +((bb[1] + bb[4]) / 2).toFixed(4), +((bb[0] + bb[3]) / 2).toFixed(4)]; // (its rear, its middle height, its middle across)
   }
   const variants = {};
-  for (const [name, v] of Object.entries(src.variants || {})) variants[name] = { slot: v.meta.slot, of: v.meta.of, info: v.meta.info || null, cap: v.meta.cap || null, note: v.meta.note || '', meshes: v.meshes };
+  for (const [name, v] of Object.entries(src.variants || {})) variants[name] = { slot: v.meta.slot, of: v.meta.of, info: v.meta.info || null, cap: v.meta.cap || null, note: v.meta.note || '', meshes: v.meshes, check: (Object.values(v.parts || {}).find((q) => q.check) || {}).check || null };
   return {
     src: `models/${src.id}/${src.id}.glb`, info, meshes: src.meshes, parts: src.parts || {}, hinge: src.hinge || null, sights: { builtin: src.cfg.sights.builtin.slice(), rail: src.cfg.sights.rail.slice(), meshless: !!src.cfg.sights.meshless, railed: !!src.cfg.sights.railed }, pistol, anchors: a, variants,
     rig: pistol ? { top: y('mount_optic'), rail: [f('mount_optic'), f('mount_optic_end')], hgF: 0, hgEnd: 0, end: info.muzzles[0][0], barrel: f('mount_barrel'), stockY: y('mount_stock'), gripY: y('mount_grip'), mag: [a.mount_mag[0], a.mount_mag[1]] }

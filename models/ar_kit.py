@@ -307,38 +307,94 @@ def muzzle_a2(mz0, sc=1.0):
 # ===================================================================================== SIGHTS (factory: optic, the gun's own irons)
 SY = RAIL_TOP + 34.5 * mm                                 # an absolute co-witness sight line
 def rear_flip(f):
-    """A flip-up rear sight standing on the receiver's rail at f: a clamp base, a tower with its protective ears and the aperture."""
-    o = K.tmp(prism([(f - 13 * mm, RAIL_TOP), (f + 13 * mm, RAIL_TOP), (f + 11 * mm, RAIL_TOP + 7 * mm), (f - 11 * mm, RAIL_TOP + 7 * mm)], 'x', -11 * mm, 11 * mm))
+    """The Mk 18's folding rear sight (a KAC-pattern micro sight; the reference photo has it folded: its base on the rail at photo x
+    586-632, its round leaf laid flat), stood up at f: a low clamp base with the windage knob on its right, a thin leaf standing on it,
+    round-topped round its large close-quarters aperture, slim shoulders either side of its neck."""
+    o = K.tmp(prism([(f - 11 * mm, RAIL_TOP), (f + 10 * mm, RAIL_TOP), (f + 9 * mm, RAIL_TOP + 8 * mm), (f - 10 * mm, RAIL_TOP + 8 * mm)], 'x', -9.5 * mm, 9.5 * mm))
     bevel(o, 0.8 * mm, 1); smooth(o); K.adopt(o, 'optic', RCV)
-    tw = K.tmp(prism([(f - 5 * mm, RAIL_TOP + 6 * mm), (f + 4 * mm, RAIL_TOP + 6 * mm), (f + 3 * mm, SY + 9 * mm), (f - 4 * mm, SY + 9 * mm)], 'x', -10 * mm, 10 * mm))
-    cut(tw, box(-6.5 * mm, 6.5 * mm, f - 0.01, f + 0.01, SY + 5 * mm, SY + 10 * mm))                              # (the ears)
-    cut(tw, cyl(1.0 * mm, f - 0.01, f + 0.01, 'y', (0, SY), 12))                                          # (the aperture)
-    bevel(tw, 0.6 * mm, 1); smooth(tw); K.adopt(tw, 'optic', RCV)
-    o = K.obj(cyl(4.0 * mm, 10 * mm, 12.5 * mm, 'x', (f - 2 * mm, RAIL_TOP + 9 * mm), 14), 'optic', RCV); smooth(o)   # the windage knob
+    o = K.obj(cyl(4.2 * mm, 9.5 * mm, 12.0 * mm, 'x', (f + 2 * mm, RAIL_TOP + 4.5 * mm), 16), 'optic', RCV); smooth(o)   # the windage knob
+    # the leaf: 2.6 mm thick, a neck rising from the base to the disc round the aperture
+    lf = K.tmp(prism([(-4.5 * mm, RAIL_TOP + 7 * mm), (4.5 * mm, RAIL_TOP + 7 * mm), (4.5 * mm, SY - 5 * mm), (-4.5 * mm, SY - 5 * mm)], 'y', f - 1.3 * mm, f + 1.3 * mm))
+    boolean(lf, cyl(6.2 * mm, f - 1.3 * mm, f + 1.3 * mm, 'y', (0, SY), 28), 'UNION')
+    cut(lf, cyl(3.2 * mm, f - 0.01, f + 0.01, 'y', (0, SY), 24))                                            # (the aperture: 6.4 mm, the close-quarters one)
+    cut(lf, lathe([(f - 1.4 * mm, 4.4 * mm), (f + 0.2 * mm, 3.2 * mm)], 24, (0, 0, SY)))                    # (countersunk toward the eye)
+    bevel(lf, 0.4 * mm, 1); smooth(lf); K.adopt(lf, 'optic', RCV)
+    for sg in (-1, 1):   # the shoulders: low guards either side of the leaf's neck, well below the sight line
+        o = K.tmp(prism([(f - 6 * mm, RAIL_TOP + 7 * mm), (f + 5 * mm, RAIL_TOP + 7 * mm), (f + 2 * mm, SY - 9 * mm), (f - 3 * mm, SY - 9 * mm)], 'x', *xs(sg * 7.0 * mm, sg * 9.0 * mm)))
+        bevel(o, 0.5 * mm, 1); smooth(o); K.adopt(o, 'optic', RCV)
 
 def front_flip(f, base):
-    """A flip-up front sight standing on a rail top at `base`: its block, the ears round the post, the post."""
-    o = K.tmp(prism([(f - 12 * mm, base), (f + 6 * mm, base), (f + 5 * mm, base + 8 * mm), (f - 11 * mm, base + 8 * mm)], 'x', -11 * mm, 11 * mm))
+    """The Mk 18's folding front sight (KAC pattern; folded in the photo: a low block on the rail's top at photo x 1412-1520), stood up
+    at f on a rail top at `base`: its clamp block, two slim ears round the post, the post."""
+    o = K.tmp(prism([(f - 24 * mm, base), (f + 8 * mm, base), (f + 7 * mm, base + 7 * mm), (f - 22 * mm, base + 8 * mm)], 'x', -9.5 * mm, 9.5 * mm))
     bevel(o, 0.8 * mm, 1); smooth(o); K.adopt(o, 'optic', RCV)
-    ea = K.tmp(prism([(f - 4 * mm, base + 7 * mm), (f + 2 * mm, base + 7 * mm), (f + 1 * mm, SY + 7 * mm), (f - 3 * mm, SY + 7 * mm)], 'x', -8 * mm, 8 * mm))
-    cut(ea, box(-6 * mm, 6 * mm, f - 0.01, f + 0.01, SY - 9 * mm, SY + 8 * mm))
+    o = K.obj(cyl(3.0 * mm, 9.5 * mm, 11.5 * mm, 'x', (f - 16 * mm, base + 4 * mm), 14), 'optic', 'steel'); smooth(o)     # the latch button
+    ea = K.tmp(prism([(f - 4 * mm, base + 6 * mm), (f + 2 * mm, base + 6 * mm), (f + 1 * mm, SY + 5 * mm), (f - 3 * mm, SY + 5 * mm)], 'x', -9.0 * mm, 9.0 * mm))
+    cut(ea, box(-7.2 * mm, 7.2 * mm, f - 0.01, f + 0.01, SY - 12 * mm, SY + 6 * mm))                         # (two slim ears, open between)
     bevel(ea, 0.5 * mm, 1); smooth(ea); K.adopt(ea, 'optic', RCV)
-    o = K.obj(box(-0.9 * mm, 0.9 * mm, f - 1.6 * mm, f + 0.2 * mm, SY - 10 * mm, SY), 'optic', 'steel')
+    o = K.obj(box(-0.75 * mm, 0.75 * mm, f - 1.6 * mm, f + 0.2 * mm, SY - 12.5 * mm, SY), 'optic', 'steel')
 
 # ===================================================================================== MAGAZINES (part_mag)
 def mag_stanag(top):
-    """A curved 30-round STANAG magazine, its top (the photo point 866, 232) at `top`: its pressed ribs, its floorplate."""
-    pm = K.part('mag', (0, top[0], top[1]))
+    """A curved 30-round STANAG magazine, its top (the photo point 866, 232) at `top`: open at the top between its feed lips, the top
+    two rounds in it (the top one is the magazine check's: its case, its tip), its pressed ribs, its floorplate, and the game's
+    witness windows (five down its back, five down its front: brass showing through, each its own mesh at the face's tilt)."""
+    pm = K.part('mag', (0, top[0], top[1])); pm['check'] = {'w': 0.0228}
     R = lambda pts: RL(pts, 866, 232, top)
-    mg = K.tmp(prism(R([(795, 232), (940, 232), (946, 280), (946, 400), (960, 459), (975, 506), (975, 515), (960, 522), (940, 524), (900, 536), (860, 548),
-                        (838, 553), (832, 548), (820, 516), (810, 481), (800, 445), (790, 395), (786, 363), (785, 316), (788, 250)]), 'x', -11.4 * mm, 11.4 * mm))
+    HWm = 11.4 * mm
+    back = [(788, 250), (785, 316), (786, 363), (790, 395), (800, 445), (810, 481), (820, 516), (832, 548)]
+    front = [(937, 284), (946, 310), (946, 400), (960, 459), (975, 506)]   # (inside the well its front stays behind the well's front wall: x 937, 1 mm clear)
+    mg = K.tmp(prism(R([(795, 232), (937, 232), (937, 284), (946, 310), (946, 400), (960, 459), (975, 506), (975, 515), (960, 522), (940, 524), (900, 536), (860, 548),
+                        (838, 553), (832, 548), (820, 516), (810, 481), (800, 445), (790, 395), (786, 363), (785, 316), (788, 250)]), 'x', -HWm, HWm))
+    cut(mg, prism(R([(800, 226), (936, 226), (936, 246), (800, 246)]), 'x', -HWm + 1.0 * mm, HWm - 1.0 * mm))      # (open at the top: the follower's well)
+
+    def along(poly, y):    # the face's point at photo height y, and its direction there (downward)
+        for (x0, y0), (x1, y1) in zip(poly, poly[1:]):
+            if y0 <= y <= y1:
+                t = (y - y0) / (y1 - y0); return (x0 + t * (x1 - x0), y), (x1 - x0, y1 - y0)
+        (x0, y0), (x1, y1) = poly[-2], poly[-1]; return (x1, y1), (x1 - x0, y1 - y0)
+    wins = []
+    for i in range(1, 6):
+        t = i / 6 * 0.94; y = 250 + t * (520 - 250)
+        for side, poly in ((1, back), (-1, front)):
+            (px, py), (dx_, dy_) = along(poly, y)
+            q = R([(px, py)])[0]
+            uF, uU = -dx_ * S, dy_ * S; n_ = math.hypot(uF, uU); uF, uU = uF / n_, uU / n_      # (up the face, forward/up in the gun's frame)
+            ang = math.atan2(-uF, uU)                                                              # (rotation about X that stands Z up the face)
+            nF, nU = math.cos(ang), math.sin(ang)                                                  # (the face's normal toward the front)
+            x = -side * 2.6 * mm
+            g = box(x - 2.6 * mm, x + 2.6 * mm, -1.4 * mm, 1.4 * mm, -2.8 * mm, 2.8 * mm)
+            g.transform(Matrix.Translation((0, q[0], q[1])) @ Matrix.Rotation(ang, 4, 'X')); cut(mg, g)
+            wins.append((i - 1, t, side, q, ang, nF, nU))
     bevel(mg, 1.0 * mm, 1, 30); smooth(mg); K.adopt(mg, 'mag', 'park', pm)
+    for i, t, side, q, ang, nF, nU in wins:
+        x = -side * 2.6 * mm
+        o = K.obj(box(x - 2.4 * mm, x + 2.4 * mm, -0.3 * mm, 0.3 * mm, -2.6 * mm, 2.6 * mm), 'mag', 'brass', pm)
+        d = side * 1.0 * mm         # (the slot's floor: 1 mm into the face, inward from the back face is forward, from the front face back)
+        o.matrix_world = Matrix.Translation((0, q[0] + d * nF, q[1] + d * nU)) @ Matrix.Rotation(ang, 4, 'X')
+        o['chk'] = {'role': 'hole', 'i': i, 't': round(t, 4), 'side': side}
     for line in ([(814, 290), (818, 400), (832, 470), (856, 532)], [(868, 290), (872, 400), (888, 466), (910, 524)]):
         for sd in (-1, 1):
             for p0, p1 in zip(line, line[1:]):
                 o = K.tmp(prism(R([(p0[0] - 5, p0[1]), (p0[0] + 5, p0[1]), (p1[0] + 5, p1[1] + 1), (p1[0] - 5, p1[1] + 1)]), 'x', *xs(sd * 11.2 * mm, sd * 12.0 * mm)))
                 bevel(o, 0.3 * mm, 1); smooth(o); K.adopt(o, 'mag', 'park', pm)
     o = K.tmp(prism(R([(836, 546), (978, 508), (980, 518), (838, 558)]), 'x', -12.6 * mm, 12.6 * mm)); bevel(o, 0.8 * mm, 1); smooth(o); K.adopt(o, 'mag', 'polymer', pm)
+    # the feed lips: each wall's top turned in over the rounds
+    for sd in (-1, 1):
+        o = K.tmp(prism(R([(800, 229), (900, 229), (900, 234), (800, 234)]), 'x', *xs(sd * (HWm - 0.2 * mm), sd * (HWm - 3.0 * mm))))
+        bevel(o, 0.4 * mm, 1); smooth(o); K.adopt(o, 'mag', 'park', pm)
+    # the top two rounds (5.56 x 45: the case 44.7 mm, the bullet to 57.4 mm), staggered either side; the top one is the check's
+    h = top[0] + (801 - 866) * S
+    def rnd(x, z, chk):
+        c = K.obj(lathe([(h, 0.0005), (h, 4.7 * mm), (h + 1.2 * mm, 4.7 * mm), (h + 1.5 * mm, 4.1 * mm), (h + 2.6 * mm, 4.1 * mm), (h + 3.0 * mm, 4.8 * mm),
+                         (h + 36.5 * mm, 4.5 * mm), (h + 39.5 * mm, 3.2 * mm), (h + 44.7 * mm, 3.2 * mm), (h + 44.7 * mm, 0.0005)], 18, (x, 0, z)), 'mag', 'brass', pm)
+        smooth(c)
+        b = K.obj(lathe([(h + 44.7 * mm, 0.0005), (h + 44.7 * mm, 2.85 * mm), (h + 49 * mm, 2.85 * mm), (h + 54 * mm, 1.9 * mm), (h + 57.4 * mm, 0.4 * mm),
+                         (h + 57.4 * mm, 0.0005)], 14, (x, 0, z)), 'mag', 'brass', pm)
+        smooth(b)
+        if chk: c['chk'] = {'role': 'top', 'i': 0}; b['chk'] = {'role': 'top', 'i': 1}
+    rnd(2.5 * mm, top[1] - 2.6 * mm, True)
+    rnd(-2.5 * mm, top[1] - 6.8 * mm, False)
     return pm
 
 # ===================================================================================== ASSEMBLY (the gun CFG describes)
@@ -354,7 +410,7 @@ MZ0 = UP_F1 + C.get('barrel', 0.2557)                      # the factory barrel'
 HG_END = MZ0 - 0.012                    # the furthest a handguard reaches (hgMax = this - mount_handguard - 3 mm: the 0.240 m rail; the game keeps 15 mm of barrel bare)
 barrel(UP_F1, MZ0, gas_f=C.get('gas_f', UP_F1 + 0.186), fb=HG_END + 1 * mm)
 MUZ = muzzle_a2(MZ0)
-RS = F(560)
+RS = F(609)                                # (the rear sight's leaf: its base on the rail at photo x 586-632)
 rear_flip(RS)
 FS = HG1 - 0.016
 front_flip(FS, HB_T + 5.6 * mm)
@@ -362,7 +418,7 @@ mag_stanag(la['mag'])
 
 # ===================================================================================== info and anchors
 info = {
-    'sy': round(SY, 4), 'fSight': round(RS, 4), 'relief': 0.12,
+    'sy': round(SY, 4), 'fSight': round(RS, 4), 'relief': 0.075,
     'muzzles': [[round(MUZ, 4), 0, 0]],
     'grip': [round(la['grip'][0] - 0.040, 4), round(la['grip'][1] - 0.040, 4), 0], 'support': [round((HG0 + HG1) / 2 + 0.03, 4), round(HB_B - 6 * mm, 4), 0],
     'anim': {'ch': 'part_ch', 'mag': 'part_mag'},

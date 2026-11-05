@@ -13,7 +13,7 @@
     "bake:props": "tsc -p . && tsc -p tsconfig.tools.json && node tools/bake_props.mjs && node tools/bundle_models.mjs",
     "bundle:models": "tsc -p . && node tools/bundle_models.mjs",
     "check:models": "tsc -p . && tsc -p tsconfig.tools.json && node tools/check_models.mjs",
-    "test:models": "tsc -p . && tsc -p tsconfig.tools.json && node tools/check_models.mjs --selftest && node tools/check_models.test.mjs && node tools/check_authored_parts.test.mjs && node tools/check_tempest_rounds.test.mjs && node tools/bundle_models.mjs --check && node tools/bundle_models.test.mjs && node tools/check_authored_golden.mjs && node tools/check_model_cases.mjs --quiet",
+    "test:models": "tsc -p . && tsc -p tsconfig.tools.json && node tools/check_models.mjs --selftest && node tools/check_models.test.mjs && node tools/check_authored_parts.test.mjs && node tools/check_tempest_rounds.test.mjs && node tools/bundle_models.mjs --check && node tools/check_authored_magcheck.test.mjs && node tools/bundle_models.test.mjs && node tools/check_authored_golden.mjs && node tools/check_model_cases.mjs --quiet",
     "test:models:full": "tsc -p . && tsc -p tsconfig.tools.json && node tools/check_model_cases.mjs --quiet --sweep --held 10000",
     "cases:models": "tsc -p . && tsc -p tsconfig.tools.json && node tools/model_cases.mjs"
   },

@@ -2,6 +2,7 @@
   "source": "authored",
   "sights": {
     "builtin": ["irons"],
-    "rail": []
+    "rail": [],
+    "railed": true
   }
 }

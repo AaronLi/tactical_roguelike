@@ -1760,13 +1760,22 @@ const G_GunRecipes = (() => {
     let g = authoredGeo.get(e);
     if (!g) {
       g = new T.BufferGeometry();
-      g.setAttribute('position', new T.BufferAttribute(e.pos, 3)); g.setAttribute('normal', new T.BufferAttribute(e.nrm, 3));
+      const src = e.local || e; // (a magazine-check mesh: in its own node's frame, placed with that node's transform: placeAuthored)
+      g.setAttribute('position', new T.BufferAttribute(src.pos, 3)); g.setAttribute('normal', new T.BufferAttribute(src.nrm, 3));
       g.setIndex(new T.BufferAttribute(e.idx, 1));
       if (e.uv) g.setAttribute('uv', new T.BufferAttribute(e.uv, 2)); // (a display surface's)
       g.computeBoundingSphere(); g.computeBoundingBox();
       authoredGeo.set(e, g);
     }
     return g;
+  }
+  // One authored mesh on the kit where it was made: a magazine-check mesh (e.chk) at its own node's place and rotation, tagged (js/gunrig.ts magCheck reads the
+  // tags; a hole's rotation is the face's tilt), each its own mesh through the packs; any other with its geometry already in the gun's frame.
+  function placeAuthored(k: Kit, e: AuthoredMesh, g: THREE.BufferGeometry, mat: THREE.Material) {
+    if (!e.xf) return k.place(g, mat, 0, 0, 0);
+    const m = k.place(g, mat, e.xf.p[0], e.xf.p[1], -e.xf.p[2]);
+    m.quaternion.set(e.xf.q[0], e.xf.q[1], e.xf.q[2], e.xf.q[3]); m.userData.chk = Object.assign({}, e.chk);
+    return m;
   }
   // The part_ nodes of a gun with a reload sequence (A.hinge), made as nested groups the first time something is drawn in them: a part's meshes are placed
   // against its own pivot and its pivot against its parent's, so moving a node moves everything inside it (the docs: "Multi-barrel guns")
@@ -1776,6 +1785,7 @@ const G_GunRecipes = (() => {
     let p = m.get(key); if (p) return p;
     const pt = A.parts[key], f = -pt.at[2], y = pt.at[1];
     p = k.part(f, y); m.set(key, p);
+    if (pt.check) p.userData.check = Object.assign({}, pt.check); // (a magazine's check data: js/gunrig.ts magCheck)
     if (pt.parent) { const par = partNode(k, A, pt.parent), pa = A.parts[pt.parent].at; par.add(p); p.position.set(0, y - pa[1], pt.at[2] - pa[2]); }
     return p;
   }
@@ -1791,8 +1801,8 @@ const G_GunRecipes = (() => {
       if (!which(e)) continue;
       const g = bend ? bend(e, geoOf(e)) : geoOf(e), mat = e.display ? Object.assign(M.black().clone(), { name: 'black' }) : ((M as any)[e.mat] || M.black)(); // (a display surface: the game paints it, whatever material the file names)
       let m: THREE.Mesh;
-      if (A.hinge && e.part) { const at = A.parts[e.part].at; k.into(partNode(k, A, e.part), -at[2], at[1]); m = k.place(g, mat, 0, 0, 0); k.into(null); }
-      else m = k.place(g, mat, 0, 0, 0);
+      if (A.hinge && e.part) { const at = A.parts[e.part].at; k.into(partNode(k, A, e.part), -at[2], at[1]); m = placeAuthored(k, e, g, mat); k.into(null); }
+      else m = placeAuthored(k, e, g, mat);
       if (e.display) { m.name = e.name!; m.userData.display = e.display; } // (a display surface: painted at run time)
     }
   }
@@ -1800,7 +1810,7 @@ const G_GunRecipes = (() => {
   function authoredVariant(k: Kit, A: AuthoredGun, v: AuthoredVariant) {
     const host = A.hinge ? A.meshes.find((q) => q.slot === v.slot && q.part) : null;
     if (host) { const at = A.parts[host.part!].at; k.into(partNode(k, A, host.part!), -at[2], at[1]); }
-    for (const e of v.meshes) k.place(geoOf(e), ((M as any)[e.mat] || M.black)(), 0, 0, 0);
+    for (const e of v.meshes) placeAuthored(k, e, geoOf(e), ((M as any)[e.mat] || M.black)());
     if (host) k.into(null);
   }
   // an authored animated part (part_<key>): its pivot and its meshes
@@ -1808,6 +1818,7 @@ const G_GunRecipes = (() => {
     const first = A.meshes.find((e) => e.part === key);
     if (!first) return null;
     const [x, y, z] = first.at!, p = k.part(-z, y);
+    const ck = A.parts[key] && A.parts[key].check; if (ck) p.userData.check = Object.assign({}, ck); // (a magazine's check data: js/gunrig.ts magCheck)
     k.into(p, -z, y);
     authored(k, A, (e) => e.part === key);
     k.into(null);
@@ -1977,12 +1988,14 @@ const G_GunRecipes = (() => {
     const ownIrons = !o.optic || o.optic === 'notch' || A.sights.builtin.includes(o.optic);
     // (a variant barrel: its meshes replace the factory barrel's; it may carry a pistol optic cut of its own, info.mounts.mount_optic, which the dot is seated in)
     const vb = o.avBarrel ? A.variants[o.avBarrel] : null, mountOptic: number[] = (vb && vb.info && vb.info.mounts && vb.info.mounts.mount_optic) || a.mount_optic;
-    const draw = (list: AuthoredMesh[]) => { for (const e of list) k.place(geoOf(e), ((M as any)[e.mat] || M.black)(), 0, 0, 0); };
+    const draw = (list: AuthoredMesh[]) => { for (const e of list) placeAuthored(k, e, geoOf(e), ((M as any)[e.mat] || M.black)()); }; // (a magazine-check mesh at its own node's place and tilt)
     // (an animated part: its pivot and the meshes that pass `which`; the pivot is where the model put the part_ node)
     const partOf = (list: AuthoredMesh[], key: string, which: (e: AuthoredMesh) => boolean = () => true) => {
       const first = list.find((e) => e.part === key); if (!first) return null;
       const [, y, z] = first.at!, p = k.part(-z, y);
       k.into(p, -z, y); draw(list.filter((e) => e.part === key && which(e))); k.into(null);
+      const ck = list === A.meshes ? A.parts[key] && A.parts[key].check : (Object.values(A.variants).find((v) => v.meshes === list) || { check: null }).check; // (a magazine's check data: the model's part_mag's, or the variant's)
+      if (ck) p.userData.check = Object.assign({}, ck);
       return p;
     };
     // THE FRAME (everything of slot base that is not a moving part), then its bolt (a manually cycled pistol's knob: part_bolt)
