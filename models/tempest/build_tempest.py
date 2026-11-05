@@ -162,7 +162,18 @@ def _on_wedge(me, lift):   # a flat thing lying on the wedge's slope (made flat 
     me.transform(Matrix.Translation((0, SCR_F0, 0.030 + lift)) @ Matrix.Rotation(tilt, 4, 'X') @ Matrix.Translation((0, -SCR_F0, 0))); return me
 bz = K.tmp(_on_wedge(box(SCR_X0 + 0.5 * mm, SCR_X1 - 0.5 * mm, SCR_F0 + 0.004, SCR_F1 - 0.002, 0, 1.2 * mm), 0.0))
 cut(bz, _on_wedge(box(SCR_X0 + 1.6 * mm, SCR_X1 - 1.6 * mm, SCR_F0 + 0.007, SCR_F1 - 0.005, 0.4 * mm, 0.004), 0.0)); smooth(bz); K.adopt(bz, 'base', 'rubber')
-scr = K.obj(_on_wedge(box(SCR_X0 + 1.6 * mm, SCR_X1 - 1.6 * mm, SCR_F0 + 0.007, SCR_F1 - 0.005, 0, 0.6 * mm), 0.0), 'base', 'glass'); scr.name = 'display_ammo'
+# the glass under it (a dark plate), and the DISPLAY SURFACE on it: one quad with UVs (u across, left to right; v along, from the shooter's
+# end away), extras.display the canvas size (64 x 256: the screen's 1:4 shape; six rows of seven pips, a row a barrel)
+o = K.obj(_on_wedge(box(SCR_X0 + 1.6 * mm, SCR_X1 - 1.6 * mm, SCR_F0 + 0.007, SCR_F1 - 0.005, 0, 0.5 * mm), 0.0), 'base', 'glass')
+import bmesh as _bmd
+_b = _bmd.new(); _uv = _b.loops.layers.uv.new('UVMap')
+_q = [(SCR_X0 + 1.8 * mm, SCR_F0 + 0.0072), (SCR_X1 - 1.8 * mm, SCR_F0 + 0.0072), (SCR_X1 - 1.8 * mm, SCR_F1 - 0.0052), (SCR_X0 + 1.8 * mm, SCR_F1 - 0.0052)]
+_v = [_b.verts.new((x, f, 0.0)) for x, f in _q]
+_fc = _b.faces.new(_v)
+for lp, (u, v) in zip(_fc.loops, ((0, 0), (1, 0), (1, 1), (0, 1))): lp[_uv].uv = (u, v)
+_me = bpy.data.meshes.new('tmp'); _b.to_mesh(_me); _b.free()
+scr = K.obj(_on_wedge(_me, 0.55 * mm), 'base', 'display'); scr.name = 'display_ammo'
+scr['display'] = {'width': 64, 'height': 256}
 # the fire-mode dial (left side, over the grip): semi, low, high, double, sextuple
 o = K.obj(cyl(7 * mm, -27.5 * mm, -24.5 * mm, 'x', (0.058, 0.012), 24), 'base', 'black'); smooth(o)
 o = K.obj(box(-28.2 * mm, -27 * mm, 0.0565, 0.0595, 0.012, 0.0185), 'base', TI)
@@ -519,6 +530,11 @@ info = {
     'barrels': {'n': 6, 'rounds_each': ROUNDS, 'round_mm': [10, ROUND_L * 1000], 'free_bore_mm': round(FREE * 1000),
                 'effective_mm': [round((MD0 - (BB1 + (ROUNDS - 1 - k) * ROUND_L)) * 1000) for k in range(ROUNDS)]},   # (shot 1 .. ROUNDS of a barrel)
     'muzzles': [[round(MZ_END, 4), round(z, 4), round(x, 4)] for x, z in BORES],
+    # the barrels, in info.muzzles' order: 0 upper left, 1 upper right, 2 centre, 3 lower left, 4 lower right, 5 the single bottom one;
+    # the triple mode fires a group (top: the upper pair and the centre; bottom: the lower pair and the bottom one)
+    'barrelGroups': {'top': [0, 1, 2], 'bottom': [3, 4, 5], 'all': [0, 1, 2, 3, 4, 5]},
+    # the fire-mode dial (left side of the back panel): its centre and axis, and its six detents (semi, low, high, double, triple, sextuple)
+    'modeDial': {'at': [0.058, 0.012, -0.0275], 'axis': [0, 0, -1], 'modes': ['semi', 'low', 'high', 'double', 'triple', 'sextuple'], 'stepDeg': 45},
     'grip': [0.030, -0.097, 0], 'support': [0.330, -0.095, 0],
     'anim': {'front': 'part_pump', 'brk': 'part_brk', 'mag': 'part_mag', 'latch': 'part_lever', 'carry': 'part_carry'},
     'magAt': [MAG_AT[0], MAG_AT[1]],
@@ -526,7 +542,7 @@ info = {
 anchors = {
     'mount_optic': [0.012, round(RAIL_TOP, 4), 0], 'mount_optic_end': [round(RAIL_F1 - 0.002, 4), round(RAIL_TOP, 4), 0],
     'mount_handguard': [CH1, 0, 0], 'mount_handguard_end': [HG1, 0, 0],
-    'mount_barrel': [BR0, 0, 0], 'mount_muzzle': [MZ0, 0, 0],
+    'mount_barrel': [BR0, 0, 0], 'mount_muzzle': [round(MD0, 4), 0, 0],          # (the muzzle device's rear face: the barrel extension's front)
     'mount_stock': [0, round((SR0 + SR1) / 2, 4), 0], 'mount_grip': [GRIP_SEAT[0], GRIP_SEAT[1], 0], 'mount_mag': [MAG_AT[0], MAG_AT[1], 0],
     'mount_tac': [round((TAC0 + TAC1) / 2, 4), RUN_U, AX1], 'mount_tacL': [round((TAC0 + TAC1) / 2, 4), RUN_U, -AX1],      # (M-LOK on the arms)
     'mount_fg': [round((FG0 + FG1) / 2, 4), round(BLO - 0.0056, 4), 0],

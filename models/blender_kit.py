@@ -245,7 +245,7 @@ def export_glb(coll, path):
     bpy.ops.object.select_all(action='DESELECT')
     for o in coll.all_objects: o.select_set(True)
     bpy.ops.export_scene.gltf(filepath=path, export_format='GLB', use_selection=True, export_extras=True, export_yup=True,
-                              export_apply=True, export_texcoords=False, export_normals=True, export_materials='EXPORT', export_cameras=False,
+                              export_apply=True, export_texcoords=True, export_normals=True, export_materials='EXPORT', export_cameras=False,
                               export_lights=False, export_animations=False)
     return os.path.getsize(path)
 
