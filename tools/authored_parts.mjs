@@ -3,10 +3,13 @@
 //
 //   models/parts/<slot>/<id>/<id>.glb     the model, in the part's own frame (an optic: the origin is the top of the rail at its mount point)
 //   models/parts/<slot>/<id>/model.json   { source: 'authored', kind: 'part', slot, frame, optic: { sy, fSight, relief, reflex?, pip?, ... }, part: { catalogue data } }
+//                                         or, FURNITURE (stock, grip, muzzle, handguard): { ..., frame: '<slot>-mount', anchors: { ... }, part: { its own data }, replaces: [names or matches] }
+//                                         (the origin is the gun's mount_<slot>: GUN_MODEL_CONTRACT.authoredParts.furniture)
 //
 // What this file does (tools/bake_models.mjs, tools/model_env.mjs, tools/check_models.mjs; nothing here is about one part):
 //   authoredPartKeys()          the parts that exist: ['optic/falcon', ...]
-//   checkAuthoredPart(Models, key)   the config, the node tree and the GEOMETRY (bounds, window inside the model, nothing under the rail) -> { errors, warnings }
+//   checkAuthoredPart(Models, key)   the config, the node tree and the GEOMETRY (an optic: bounds, window inside the model, nothing under the rail; furniture:
+//                                    checkFurniture, the origin at the mount and the part reaching the right way from it) -> { errors, warnings }
 //   loadAuthoredPartsInto(G)    reads every part into G.AuthoredParts.store (tools/models/authoredparts.ts), which the recipes place like the S.* optics
 //   authoredPartsSrc()          the sources' text, for the bake's staleness hash
 //   catalogue() / replacements() / catalogueBlock()   the parts' js/parts.ts entries (one per part that adds one; a replace-only part gives existing entries its model) and the generated block that carries them into js/parts.ts
@@ -57,11 +60,49 @@ export function readAuthoredPart(key) {
 }
 /** Fills G.AuthoredParts.store (tools/models/authoredparts.ts) from every part. Call after the recipes are loaded. */
 export function loadAuthoredPartsInto(G) {
-  for (const k of authoredPartKeys()) { const p = readAuthoredPart(k); G.AuthoredParts.store[k] = { id: p.id, slot: p.slot, optic: p.cfg.optic, meshes: p.meshes }; }
+  for (const k of authoredPartKeys()) { const p = readAuthoredPart(k); G.AuthoredParts.store[k] = { id: p.id, slot: p.slot, optic: p.cfg.optic, anchors: p.cfg.anchors || null, part: p.cfg.optic ? null : p.cfg.part, finish: FINISH[p.slot] || null, meshes: p.meshes }; }
 }
+
+/** The material a piece of furniture's catalogue finish goes on (js/glb.ts AUTHORED_PART_SLOTS finish: the test checks they agree): those meshes take the
+ *  entry's finish (a tan rail, an OD stock), the rest keep their own materials. A muzzle device has none. */
+export const FINISH = { stock: 'polymer', grip: 'polymer', handguard: 'black' };
 
 // ---- checks ----
 export const LIMITS = { optic: { fMin: -0.12, fMax: 0.12, xMax: 0.04, yMax: 0.15 } };
+/** A piece of furniture's bounds against its frame (GUN_MODEL_CONTRACT.authoredParts.furniture: forward = -z): the origin at the mount, the part reaching the
+ *  way it should from it, centred, its anchors where they belong. Returns messages; a made-up config and bounds can be fed in (the test does). */
+export function checkFurniture(slot, cfg, b) {
+  const out = [], mm = (x) => (x * 1000).toFixed(1) + ' mm', E = (m) => out.push(m), a = cfg.anchors || {}, p = cfg.part || {};
+  if (!isFinite(b.min[0])) return ['the part has no geometry to check'];
+  const fMin = -b.max[2], fMax = -b.min[2], halfW = Math.max(-b.min[0], b.max[0]), cx = (b.min[0] + b.max[0]) / 2;
+  if (Math.abs(cx) > 0.004) E(`the ${slot} is not centred (right = ${mm(cx)} off): the origin is on the gun's centre line, right = 0`);
+  if (halfW > 0.05) E(`half-width ${mm(halfW)} is over 50.0 mm: wrong units?`);
+  const at = (k) => (Array.isArray(a[k]) && a[k].length === 3 ? a[k] : null);
+  if (slot === 'stock') {
+    if (fMax > 0.01) E(`the stock reaches ${mm(fMax)} forward of the origin: its origin is the buffer tube's axis at the receiver's rear (mount_stock), the stock behind it`);
+    if (fMin > -0.05) E(`the stock reaches only ${mm(-fMin)} back from the origin: wrong units, or the origin is not at the receiver's rear`);
+    if (fMin < -0.5 || b.min[1] < -0.25 || b.max[1] > 0.08) E(`the stock's bounds (forward ${mm(fMin)} to ${mm(fMax)}, up ${mm(b.min[1])} to ${mm(b.max[1])}) are not a stock's: wrong units?`);
+    for (const k of ['butt', 'cheek']) { const v = at(k); if (v && (v[0] > 0 || v[0] < fMin - 0.005 || v[1] < b.min[1] - 0.005 || v[1] > b.max[1] + 0.005)) E(`anchors.${k} [${v}] is outside the stock (forward ${mm(fMin)} to ${mm(fMax)}, up ${mm(b.min[1])} to ${mm(b.max[1])})`); }
+  } else if (slot === 'grip') {
+    if (fMax > 0.02) E(`the grip reaches ${mm(fMax)} forward of the origin: its origin is the grip's front top (mount_grip), the grip behind and below it`);
+    if (b.max[1] > 0.03) E(`the grip reaches ${mm(b.max[1])} above the origin: its origin is where it meets the receiver's underside (up to 30 mm of it may sit inside)`);
+    if (b.min[1] > -0.05) E(`the grip hangs only ${mm(-b.min[1])} below the origin: wrong units, or the origin is not the grip's top`);
+    if (fMin < -0.15 || b.min[1] < -0.2) E(`the grip's bounds (forward ${mm(fMin)} to ${mm(fMax)}, up ${mm(b.min[1])}) are not a grip's: wrong units?`);
+    const v = at('grip'); if (v && (v[0] < fMin - 0.005 || v[0] > fMax + 0.005 || v[1] < b.min[1] - 0.005 || v[1] > b.max[1] + 0.005)) E(`anchors.grip [${v}] is outside the grip`);
+  } else if (slot === 'muzzle') {
+    if (fMin < -0.01) E(`the muzzle device reaches ${mm(-fMin)} back from the origin: its origin is the barrel's end, where the thread ends (mount_muzzle); at most 10 mm of it may sit over the thread`);
+    if (fMax < 0.01 || fMax > 0.35) E(`the muzzle device reaches ${mm(fMax)} forward of the origin: wrong units, or the origin is not the barrel's end`);
+    const cy = (b.min[1] + b.max[1]) / 2; if (Math.abs(cy) > 0.002) E(`the muzzle device is not centred on the bore (up = ${mm(cy)} off): the origin is on the bore axis`);
+    for (const v of Array.isArray(a.muzzles) ? a.muzzles : []) if (Array.isArray(v) && Math.abs(v[0] - fMax) > 0.005) E(`anchors.muzzles [${v}] is not at the device's front (forward ${mm(fMax)}): it is where the bullet leaves it`);
+  } else if (slot === 'handguard') {
+    const L = p.len;
+    if (Math.abs(fMin) > 0.003) E(`the handguard starts ${mm(fMin)} from the origin: its origin is its rear, against the receiver's front (mount_handguard)`);
+    if (typeof L === 'number' && Math.abs(fMax - L) > 0.003) E(`the handguard ends at forward ${mm(fMax)}, not at part.len (${mm(L)}): the length the catalogue fits by must be the model's`);
+    const cy = (b.min[1] + b.max[1]) / 2; if (Math.abs(cy) > 0.02) E(`the handguard is not round the bore (its middle is ${mm(cy)} up): the origin is on the bore axis`);
+    const v = at('support'); if (v && (v[0] < fMin || v[0] > fMax)) E(`anchors.support [${v}] is off the handguard (forward ${mm(fMin)} to ${mm(fMax)})`);
+  }
+  return out;
+}
 /** The bounds of a read part's non-display meshes: { min: [x, y, z], max } in the part's frame (glTF axes). */
 export function boundsOf(meshes) {
   const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
@@ -116,13 +157,20 @@ export function checkAuthoredPart(Models, key) {
   if (cfg.slot !== slot) errors.push(`model.json: "slot" is ${JSON.stringify(cfg.slot)} but the folder is models/parts/${slot}/`);
   let rep; try { rep = Models.validateAuthoredPart(Models.describeGltfJson(Models.glbJson(fs.readFileSync(glbOf(key)))), id, slot); } catch (e) { return { errors: [...errors, `${id}.glb: ${e.message}`], warnings }; }
   errors.push(...rep.errors); warnings.push(...rep.warnings);
-  if (!errors.length) { const p = readAuthoredPart(key); errors.push(...checkGeometry(slot, cfg, boundsOf(p.meshes)), ...checkPipClear(cfg, p.meshes)); }
+  const j = Models.glbJson(fs.readFileSync(glbOf(key)));
+  if ((j.cameras || []).length || (j.nodes || []).some((n) => n.camera != null || (n.extensions && n.extensions.KHR_lights_punctual))) errors.push(`${id}.glb: has a camera or a light: a part is meshes only (export without them)`);
+  if (!errors.length && slot !== 'optic') { // furniture: the anchors on the file's root (extras.anchors_json, when it carries them) are model.json's
+    let ra = null; try { const ex = (j.nodes[j.scenes[j.scene || 0].nodes[0]] || {}).extras || {}; ra = typeof ex.anchors_json === 'string' ? JSON.parse(ex.anchors_json) : null; } catch (e) { errors.push(`${id}.glb: root extras.anchors_json is not valid JSON: ${e.message}`); }
+    if (ra && JSON.stringify(ra) !== JSON.stringify(cfg.anchors)) errors.push(`${id}.glb: root extras.anchors_json ${JSON.stringify(ra)} differs from model.json's anchors ${JSON.stringify(cfg.anchors)}: export them together`);
+  }
+  if (!errors.length) { const p = readAuthoredPart(key); errors.push(...(slot === 'optic' ? [...checkGeometry(slot, cfg, boundsOf(p.meshes)), ...checkPipClear(cfg, p.meshes)] : checkFurniture(slot, cfg, boundsOf(p.meshes)))); }
+  if (!errors.length && slot !== 'optic' && FINISH[slot] && !readAuthoredPart(key).meshes.some((m) => m.mat === FINISH[slot])) warnings.push(`no mesh is in the ${slot}'s finish material (${FINISH[slot]}): no catalogue finish will show on it`);
   return { errors, warnings };
 }
 
 // ---- the catalogue (js/parts.ts) ----
 export const isReplaceOnly = (key) => !!cfgAt(key).replaces;
-export const partIdOf = (key) => 'op.auth.' + key.split('/')[1]; // (optic is the only slot so far: its prefix)
+export const partIdOf = (key) => 'op.auth.' + key.split('/')[1]; // (only an optic adds an entry: furniture is always replace-only)
 /** The js/parts.ts entry of a part: what `add()` takes (brand a key of BR), the sight's `set` as the other optics have it, the model patch the recipe reads. */
 export function entryOf(key, cfg) {
   const p = cfg.part, o = cfg.optic, scoped = !!o.pip;
@@ -134,8 +182,9 @@ export function entryOf(key, cfg) {
 const cfgAt = (k) => JSON.parse(fs.readFileSync(cfgOf(k), 'utf8'));
 /** Every authored part that ADDS a catalogue entry (a model.json with "part"), as js/parts.ts entries. */
 export function catalogue() { return authoredPartKeys().map((k) => [k, cfgAt(k)]).filter(([, c]) => !c.replaces).map(([k, c]) => entryOf(k, c)); }
-/** Every REPLACE-ONLY part (a model.json with "replaces": [entry names]): { apart, names }. The entries keep everything but their model. */
-export function replacements() { return authoredPartKeys().map((k) => [k, cfgAt(k)]).filter(([, c]) => c.replaces).map(([k, c]) => ({ apart: k, names: c.replaces })); }
+/** Every REPLACE-ONLY part (a model.json with "replaces": [entry names, or (furniture) matches { mount?, model }]): { apart, names }, and a handguard's len (the
+ *  entries it takes must be that long, to 1.5 mm: js/parts.ts). The entries keep everything but their model. */
+export function replacements() { return authoredPartKeys().map((k) => [k, cfgAt(k)]).filter(([, c]) => c.replaces).map(([k, c]) => Object.assign({ apart: k, names: c.replaces }, c.slot === 'handguard' ? { len: c.part.len } : {})); }
 /** The generated block for js/parts.ts. */
 export function catalogueBlock() { return ['  ' + BLOCK_BEGIN,'  const AUTHORED_PARTS: any[] = [', ...catalogue().map((e) => '    ' + JSON.stringify(e) + ','), '  ];', '  const AUTHORED_REPLACES: any[] = [', ...replacements().map((e) => '    ' + JSON.stringify(e) + ','), '  ];', '  ' + BLOCK_END].join('\n'); }
 /** js/parts.ts's text with its generated block current (throws if the markers are missing). */

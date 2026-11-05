@@ -1,0 +1,46 @@
+{
+  "source": "authored",
+  "kind": "part",
+  "slot": "handguard",
+  "frame": "handguard-mount",
+  "anchors": {
+    "support": [
+      0.1497,
+      -0.0274,
+      0
+    ]
+  },
+  "part": {
+    "t": "rail",
+    "len": 0.2395,
+    "rails": {
+      "top": [
+        0,
+        0.2375
+      ],
+      "bottom": [
+        0.01,
+        0.2375
+      ],
+      "left": [
+        0.012,
+        0.2375
+      ],
+      "right": [
+        0.012,
+        0.2375
+      ]
+    }
+  },
+  "replaces": [
+    {
+      "mount": "hg:ar",
+      "model": {
+        "hg": {
+          "t": "rail",
+          "len": 0.24
+        }
+      }
+    }
+  ]
+}

@@ -300,10 +300,10 @@ const GUN_MODEL_CONTRACT = { ...CONTRACT_CORE, displays: {
   ],
   example: { name: 'fal', extras: { gun: 'fal', info_json: '{"sy":0.04,...}', anchors_json: '{"mount_optic":[0.0141,0.0232,0],"mount_optic_end":[0.1791,0.0232,0],"mount_handguard":[0.3012,0,0],"mount_handguard_end":[0.5357,0,0],"mount_muzzle":[0.7329,0,0],"mount_barrel":[0.6153,0,0],"mount_stock":[0,-0.01835,0],"mount_grip":[0.0661,-0.0452,0],"mount_mag":[0.2232,-0.0429,0]}' } },
 }, authoredParts: {
-  what: 'AUTHORED PART. A shared attachment modelled in Blender (a sight, a prism, a scope; other slots are reserved) is baked straight from its .glb: models/parts/<slot>/<id>/<id>.glb plus models/parts/<slot>/<id>/model.json. It is ONE object, the same file on every gun whose mount takes it; everything gun-specific under it (the rail section, a riser) is the gun\'s mount piece (tag `optic@mount`), never part of the model. `npm run check:models -- models/parts/<slot>/<id>/<id>.glb` validates one; `npm run check:models -- --write` regenerates its catalogue entry.',
-  frame: 'THE PART\'S OWN FRAME. Metres, the glTF axes (x right, y up, z = -forward); anchors are written [forward, up, right] = [-z, y, x] like everywhere in the contract. For an optic (the only slot defined) the ORIGIN is on the top of the rail, at the optic\'s mount point, centred (right = 0): the plane the optic\'s foot rests on, so no vertex is below y = 0 (the rail, riser or adapter is the mount piece\'s). The recipe places it at the gun\'s rail top and the platform\'s optic position (spec optF) and the baker finds that it only translates.',
-  model: 'The .glb has ONE root node named after the part (the folder name), no extras.info and no part_ nodes; its children are meshes "<slot>_<n>" (the slot\'s name: optic) with extras.slot and a catalogue material name (or display surfaces, as in the contract). Triangles outside the sight: none. Geometry limits for an optic: within 0.12 m either side of the origin forward and 0.04 m left/right, up to 0.15 m high.',
-  config: 'model.json: { "source": "authored", "kind": "part", "slot": "optic", "frame": "rail-top", "optic": { sy, fSight, relief, reflex?, pip?, magnifier?, height }, "part": { mount, brand, name, price, tier, zoom, st, desc?, scoped?, reticle?, px?, levels? } }. The catalogue id is derived: `op.auth.<id>`. A REPLACE-ONLY part has "replaces": [entry names] instead of "part" (see rules).',
+  what: 'AUTHORED PART. A shared attachment modelled in Blender (a sight, a prism, a scope; or a piece of FURNITURE: a stock, a grip, a muzzle device, a handguard) is baked straight from its .glb: models/parts/<slot>/<id>/<id>.glb plus models/parts/<slot>/<id>/model.json. It is ONE object, the same file on every gun whose mount takes it; everything gun-specific under it (the rail section, a riser) is the gun\'s mount piece (tag `optic@mount`), never part of the model. `npm run check:models -- models/parts/<slot>/<id>/<id>.glb` validates one; `npm run check:models -- --write` regenerates its catalogue entry.',
+  frame: 'THE PART\'S OWN FRAME. Metres, the glTF axes (x right, y up, z = -forward); anchors are written [forward, up, right] = [-z, y, x] like everywhere in the contract. Each slot has its own frame name and origin (furniture below); for an optic ("rail-top") the ORIGIN is on the top of the rail, at the optic\'s mount point, centred (right = 0): the plane the optic\'s foot rests on, so no vertex is below y = 0 (the rail, riser or adapter is the mount piece\'s). The recipe places it at the gun\'s rail top and the platform\'s optic position (spec optF) and the baker finds that it only translates.',
+  model: 'The .glb has ONE root node named after the part (the folder name), no extras.info and no part_ nodes; its children are meshes "<slot>_<n>" (the slot\'s name: optic, stock, grip, muzzle, handguard) with extras.slot and a catalogue material name (or display surfaces, as in the contract). Triangles outside the sight: none. Geometry limits for an optic: within 0.12 m either side of the origin forward and 0.04 m left/right, up to 0.15 m high.',
+  config: 'model.json: { "source": "authored", "kind": "part", "slot": "optic", "frame": "rail-top", "optic": { sy, fSight, relief, reflex?, pip?, magnifier?, height }, "part": { mount, brand, name, price, tier, zoom, st, desc?, scoped?, reticle?, px?, levels? } }. The catalogue id is derived: `op.auth.<id>`. A REPLACE-ONLY part has "replaces": [entry names] instead of "part" (see rules). FURNITURE (stock, grip, muzzle, handguard): { "source": "authored", "kind": "part", "slot", "frame": "<slot>-mount", "anchors": { ... }, "part": { the slot\'s data }, "replaces": [entry names or matches] }: always replace-only, "part" is the model\'s own data (not a catalogue entry) and the anchors are the slot\'s (furniture below).',
   optic: {
     sy: 'Height of the line of sight above the origin, metres (info.sy = the rail top + this). A reflex window\'s centre height must equal it.',
     fSight: 'Forward position of the sight\'s rear/eye reference, metres from the origin (info.fSight = the mount point + this); with relief it places the aiming eye.',
@@ -321,7 +321,16 @@ const GUN_MODEL_CONTRACT = { ...CONTRACT_CORE, displays: {
     'MOUNTS. op:pic: the origin is the top of the rail at the optic\'s mount point. op:pso (the pistol optic cut): the origin is the top of the slide at the optic\'s mount point, the plane the foot rests on, so the same file also sits on a riser (the pistol optic riser, or a riser dot on a rifle: the riser is the gun\'s mount piece `optic@mount`, the part sits on its top). A pistol takes the part at 0.32 x the factory slide length from the slide\'s rear on the factory slide\'s top, whatever slide is fitted.',
     'REPLACE-ONLY (`"replaces": ["<entry name>", ...]` instead of `"part"`): the file becomes the model of existing catalogue entries (matched by their exact name in js/parts.ts); ids, stats, prices, tiers, mounts, build codes and what they open stay as they are, the generated block adds no part. An entry that uses a riser keeps its riser as the mount piece. Entries that are not listed (another pistol dot that shares the old model) keep the old model.',
     'On a gun with TASK-3 mount pieces the rail under the part is `optic@mount`; the part\'s own meshes are the `optic` pack and are shared across guns by content.',
+    'FURNITURE REPLACES BY NAME OR BY MATCH. A "replaces" item is an entry name, or a match { "mount"?: "<mount>", "model": { ... } } that takes every entry of the slot (on that mount) whose catalogue model has those values (nested objects compared key by key, null meaning absent, numbers to 1e-6; keys not given are free: a finish). That is how a factory or standard-issue part that is the same product as a named one gets the model (the 9.4" factory quad rail, in black or FDE). A match that takes nothing, or a name not in the catalogue, fails js/parts.ts. A handguard\'s replaced entries must have a length within 1.5 mm of part.len (the catalogue\'s length decides the fit, hgRoom; the model is drawn at its own).',
+    'FURNITURE FINISH. The meshes in the slot\'s finish material (stock and grip: polymer; handguard: black; a muzzle device has none) take the catalogue entry\'s finish as the procedural part would have (a stock\'s sm or the gun\'s furniture, a grip\'s gm, a handguard\'s hg.m or the receiver\'s colour); the other meshes keep their own materials.',
+    'FURNITURE IN THE GUN. The recipe seats the part\'s origin at the gun\'s mount_<slot> (an authored gun\'s anchor; on a recipe gun the point its procedural part hangs from), with no rotation and no scaling, and the part\'s anchors replace what the procedural part gave info: muzzles (the device\'s front), grip, support (when no foregrip or other hold decides it). On an authored gun the factory part is still the model\'s own meshes while fitted.',
   ],
+  furniture: {
+    stock: 'frame "stock-mount": the ORIGIN on the buffer tube\'s axis at the receiver\'s rear (the gun\'s mount_stock), the stock reaching back from it (nothing more than 10 mm ahead of the origin, at least 50 mm behind); the buffer tube itself is the gun\'s mount piece (the recipe draws it), not the model. anchors butt (the butt plate\'s centre) and cheek (the top of the comb under the eye), both behind the origin. part { mount (the stock interface: tube), position? (how far it is drawn out, free text) }. Finish material: polymer.',
+    grip: 'frame "grip-mount": the ORIGIN at the grip\'s front top, where it meets the receiver\'s underside (the gun\'s mount_grip); the grip hangs below and behind it (up to 30 mm above the origin, inside the receiver; at least 50 mm below; nothing more than 20 mm ahead). anchor grip (where the palm sits). part { mount (the grip interface: ar) }. Finish material: polymer.',
+    muzzle: 'frame "muzzle-mount": the ORIGIN on the bore axis at the barrel\'s end, where the thread ends (the gun\'s mount_muzzle); the device reaches forward from it (at most 10 mm back over the thread, at least 10 mm forward), centred on the bore. anchor muzzles: [[forward, up, right], ...] where the bullet leaves it, at the device\'s front (within 5 mm). part { thread (the thread family, e.g. r556), kind (the device kind, e.g. flash) }. No finish.',
+    handguard: 'frame "handguard-mount": the ORIGIN on the bore axis at the handguard\'s rear, against the receiver\'s front face (the gun\'s mount_handguard); the handguard runs forward from 0 to part.len (both ends within 3 mm), centred on the bore. anchor support (where the support hand holds it, between its ends). part { t (the handguard kind: rail), len (metres), rails? { top, bottom, left, right: [from, to] forward of the origin } }. Finish material: black.',
+  },
   example: { name: 'falcon', extras: {}, child: { name: 'optic_1', extras: { slot: 'optic' }, material: 'black' }, model_json: { source: 'authored', kind: 'part', slot: 'optic', frame: 'rail-top', optic: { sy: 0.0285, fSight: -0.026, relief: 0.09, reflex: { f: 0.0135, y: 0.0285, w: 0.026, h: 0.026, kind: 'dot' }, magnifier: true, height: 'low' } } },
 } };
 
@@ -734,8 +743,52 @@ function validateAuthored(model: ModelDesc, id?: string, opts: { factory?: strin
 }
 
 // ---- authored parts (GUN_MODEL_CONTRACT.authoredParts): a shared attachment modelled in Blender
-const AUTHORED_PART_SLOTS: Record<string, { mounts: string[] }> = { optic: { mounts: ['op:pic', 'op:pso'] } };
+// (each slot: its frame's name; an optic's rail mounts; a piece of furniture's anchors (in model.json "anchors" and the root's extras.anchors_json), the material
+// its catalogue finish goes on (GUN_MODEL_CONTRACT.authoredParts.furniture), and the fields of its "part")
+const AUTHORED_PART_SLOTS: Record<string, { frame: string; mounts?: string[]; anchors?: string[]; finish?: string | null; part?: Record<string, 'str' | 'str?' | 'num' | 'rails?'> }> = {
+  optic: { frame: 'rail-top', mounts: ['op:pic', 'op:pso'] },
+  stock: { frame: 'stock-mount', anchors: ['butt', 'cheek'], finish: 'polymer', part: { mount: 'str', position: 'str?' } },
+  grip: { frame: 'grip-mount', anchors: ['grip'], finish: 'polymer', part: { mount: 'str' } },
+  muzzle: { frame: 'muzzle-mount', anchors: ['muzzles'], finish: null, part: { thread: 'str', kind: 'str' } },
+  handguard: { frame: 'handguard-mount', anchors: ['support'], finish: 'black', part: { t: 'str', len: 'num', rails: 'rails?' } },
+};
 const RETICLES = ['dot', 'dotG', 'dotP', 'cdot', 'holo'], SCOPE_RETICLES = ['cross', 'chevron', 'lpvo', 'ring'];
+const isPt = (v: any) => Array.isArray(v) && v.length === 3 && v.every(isNum);
+/** model.json of a piece of authored FURNITURE (a stock, grip, muzzle device, handguard): its anchors, its own data ("part") and what it replaces (names or matches). */
+function validateFurnitureConfig(cfg: any, spec: NonNullable<typeof AUTHORED_PART_SLOTS[string]>, E: (m: string) => void) {
+  for (const k of Object.keys(cfg)) if (!['source', 'kind', 'slot', 'frame', 'anchors', 'part', 'replaces'].includes(k)) E(`unknown field "${k}"${k === 'optic' ? ' (a ' + cfg.slot + ' has no sight data)' : ''}`);
+  const a = cfg.anchors, p = cfg.part, rep = cfg.replaces;
+  if (!isObj(a)) E(`"anchors" is missing: { ${spec.anchors!.join(', ')} } as [forward, up, right] metres from the origin`);
+  else {
+    for (const k of spec.anchors!) {
+      if (a[k] === undefined) E(`anchors.${k} is missing (a ${cfg.slot} has ${spec.anchors!.join(', ')})`);
+      else if (k === 'muzzles' ? !(Array.isArray(a[k]) && a[k].length && a[k].every(isPt)) : !isPt(a[k])) E(`anchors.${k}: expected ${k === 'muzzles' ? '[[forward, up, right], ...]' : '[forward, up, right]'} (finite numbers, metres), got ${JSON.stringify(a[k])}`);
+    }
+    for (const k of Object.keys(a)) if (!spec.anchors!.includes(k)) E(`anchors.${k}: not an anchor of a ${cfg.slot} (${spec.anchors!.join(', ')})`);
+  }
+  if (!isObj(p)) E(`"part" is missing: the ${cfg.slot}'s own data { ${Object.keys(spec.part!).join(', ')} }`);
+  else {
+    for (const [k, t] of Object.entries(spec.part!)) {
+      const v = p[k];
+      if (v === undefined) { if (!t.endsWith('?')) E(`part.${k} is missing`); continue; }
+      if (t.startsWith('str') && (typeof v !== 'string' || !v.trim())) E(`part.${k}: expected a non-empty string, got ${JSON.stringify(v)}`);
+      if (t === 'num' && (!isNum(v) || v <= 0 || v > 1)) E(`part.${k}: expected a length in metres (0 to 1), got ${JSON.stringify(v)}`);
+      if (t === 'rails?') {
+        if (!isObj(v)) { E('part.rails: expected { top?, bottom?, left?, right?: [from, to] }'); continue; }
+        for (const [s, r] of Object.entries(v)) {
+          if (!['top', 'bottom', 'left', 'right'].includes(s)) E(`part.rails.${s}: not a side (top, bottom, left, right)`);
+          else if (!(Array.isArray(r) && r.length === 2 && r.every(isNum) && r[0] < r[1])) E(`part.rails.${s}: expected [from, to] metres forward of the origin, from < to, got ${JSON.stringify(r)}`);
+          else if (isNum(p.len) && (r[0] < -0.003 || r[1] > p.len + 0.003)) E(`part.rails.${s}: [${r}] runs off the handguard (0 to part.len ${p.len})`);
+        }
+      }
+    }
+    for (const k of Object.keys(p)) if (!(k in spec.part!)) E(`part: unknown field "${k}" (a ${cfg.slot}'s are ${Object.keys(spec.part!).join(', ')})`);
+  }
+  // what it replaces: a piece of furniture is always replace-only (it gives existing catalogue entries its model)
+  const item = (r: any) => (typeof r === 'string' && !!r.trim()) || (isObj(r) && isObj(r.model) && (r.mount === undefined || typeof r.mount === 'string') && Object.keys(r).every((k) => k === 'mount' || k === 'model'));
+  if (!Array.isArray(rep) || !rep.length || !rep.every(item)) E('"replaces": expected a non-empty list of catalogue entry names, or matches { "mount"?: "<mount>", "model": { ... } } (furniture is always replace-only)');
+  else { const names = rep.filter((r: any) => typeof r === 'string'); if (new Set(names).size !== names.length) E('"replaces": an entry is named twice'); }
+}
 /** model.json of an authored part, checked: the shape, the ranges, and that the sight data agrees with itself (window on the sight line...). id: the folder name. */
 function validateAuthoredPartConfig(cfg: any, id?: string): string[] {
   const out: string[] = [], E = (m: string) => out.push('model.json: ' + m);
@@ -743,8 +796,14 @@ function validateAuthoredPartConfig(cfg: any, id?: string): string[] {
   if (cfg.source !== 'authored') E(`"source" is ${JSON.stringify(cfg.source)}, expected "authored"`);
   if (cfg.kind !== 'part') E(`"kind" is ${JSON.stringify(cfg.kind)}, expected "part" (a gun is "sights" instead)`);
   if (!(cfg.slot in AUTHORED_PART_SLOTS)) E(`"slot" is ${JSON.stringify(cfg.slot)}, expected one of ${Object.keys(AUTHORED_PART_SLOTS).join(', ')}`);
-  if (cfg.frame !== 'rail-top') E(`"frame" is ${JSON.stringify(cfg.frame)}, expected "rail-top" (the origin is the top of the rail at the optic's mount point)`);
   if (id !== undefined && !/^[a-z][a-z0-9_]*$/.test(id)) E(`the folder name "${id}" must be lower-case letters, digits and underscores (it makes the part id op.auth.${id})`);
+  const fs0 = AUTHORED_PART_SLOTS[cfg.slot];
+  if (fs0 && cfg.slot !== 'optic') { // furniture: its own frame, anchors and data
+    if (cfg.frame !== fs0.frame) E(`"frame" is ${JSON.stringify(cfg.frame)}, expected "${fs0.frame}" (the origin is the gun's mount_${cfg.slot}: GUN_MODEL_CONTRACT.authoredParts.furniture)`);
+    validateFurnitureConfig(cfg, fs0, E);
+    return out;
+  }
+  if (cfg.frame !== 'rail-top') E(`"frame" is ${JSON.stringify(cfg.frame)}, expected "rail-top" (the origin is the top of the rail at the optic's mount point)`);
   for (const k of Object.keys(cfg)) if (!['source', 'kind', 'slot', 'frame', 'optic', 'part', 'replaces'].includes(k)) E(`unknown field "${k}"`);
   const o = cfg.optic, p = cfg.part, rep = cfg.replaces;
   if (rep !== undefined) { // a REPLACE-ONLY part: it gives existing catalogue entries a new model and adds no part of its own
@@ -789,7 +848,7 @@ function validateAuthoredPartConfig(cfg: any, id?: string): string[] {
   else if (!isObj(p)) E('"part" is missing ({ mount, brand, name, price, tier, zoom, st }) (or "replaces": [entry names] to give existing entries this model)');
   else {
     const spec = AUTHORED_PART_SLOTS[cfg.slot];
-    if (spec && !spec.mounts.includes(p.mount)) E(`part.mount: ${JSON.stringify(p.mount)} must be one of ${spec.mounts.join(', ')}`);
+    if (spec && spec.mounts && !spec.mounts.includes(p.mount)) E(`part.mount: ${JSON.stringify(p.mount)} must be one of ${spec.mounts.join(', ')}`);
     for (const k of ['brand', 'name']) if (typeof p[k] !== 'string' || !p[k].trim()) E(`part.${k}: expected a non-empty string`);
     if (!isNum(p.price) || p.price < 0) E('part.price: expected a number >= 0'); if (!Number.isInteger(p.tier) || p.tier < 1 || p.tier > 3) E('part.tier: expected 1, 2 or 3');
     if (!isNum(p.zoom) || p.zoom < 0.2 || p.zoom > 1) E(`part.zoom: expected the ADS FOV multiplier, 0.2 to 1, got ${JSON.stringify(p.zoom)}`);
@@ -1006,7 +1065,7 @@ function contractMarkdown(): string {
   for (const [k, v] of Object.entries(C.authored.required)) L.push(`| \`${k}\` (required) | ${esc(v as string)} |`);
   L.push('', `- pistol: ${C.authored.pistol}`, `- variants: ${C.authored.variants}`, `- seat: ${C.authored.seat}`, `- mesh: ${C.authored.mesh}`, ...C.authored.rules.map((r) => `- ${r}`), '- example: \`' + JSON.stringify(C.authored.example) + '\`');
   const AP = C.authoredParts;
-  L.push('', '**Authored parts** (a shared attachment modelled in Blender: sights, prisms, scopes):', '', `- what: ${AP.what}`, `- frame: ${AP.frame}`, `- model: ${AP.model}`, `- config: ${AP.config}`, ...Object.entries(AP.optic).map(([k, v]) => `- optic.${k}: ${v}`), `- part: ${AP.part}`, ...AP.rules.map((r) => `- ${r}`), '- example: \`' + JSON.stringify(AP.example) + '\`');
+  L.push('', '**Authored parts** (a shared attachment modelled in Blender: sights, prisms, scopes, and furniture: stocks, grips, muzzle devices, handguards):', '', `- what: ${AP.what}`, `- frame: ${AP.frame}`, `- model: ${AP.model}`, `- config: ${AP.config}`, ...Object.entries(AP.optic).map(([k, v]) => `- optic.${k}: ${v}`), `- part: ${AP.part}`, ...AP.rules.map((r) => `- ${r}`), ...Object.entries(AP.furniture).map(([k, v]) => `- furniture ${k}: ${v}`), '- example: \`' + JSON.stringify(AP.example) + '\`');
   L.push('', '**Magazine check** (`part_mag.extras.check`, meshes\' `extras.chk`):', '', `- what: ${C.magCheck.what}`, `- part: ${C.magCheck.part}`, `- meshes: ${C.magCheck.meshes}`, '- example: `' + JSON.stringify(C.magCheck.example) + '`');
   L.push('', '**Multi-barrel guns and reload sequences** (`info.barrels`, `info.hinge`):', '', `- what: ${C.multi.what}`, `- speed: ${C.multi.speed}`, `- display: ${C.multi.display}`, `- dial: ${C.multi.dial}`, `- hinge: ${C.multi.hinge}`, '- example: `' + JSON.stringify(C.multi.example) + '`');
   L.push('', '**Bipods** (`part_bipod`, its legs\' `extras.leg`):', '', `- what: ${C.bipod.what}`, `- pose: ${C.bipod.pose}`, `- drive: ${C.bipod.drive}`, `- packs: ${C.bipod.packs}`, '- example: `' + JSON.stringify(C.bipod.example) + '`');
@@ -1258,7 +1317,7 @@ interface BakedIndex { version: number; three: string; src: string; guns: Record
     return plan.tags.every((t) => !t.entry || packRoots.has(packUrl(def.id, t.entry.file!)));
   }
   return {
-    boot, ready, infoFromIndex, setRoot, loadFile, fetchJson, on, checking, preload, preloadPlatform, ensure, assemble, infoOf, loadIndex: async (id: string) => !!(await platformIndex(id)), displayBaked, contract: GUN_MODEL_CONTRACT, infoFields: INFO_FIELDS, partsIndexFields: PARTS_INDEX_FIELDS, validate, validateAuthored, validateAuthoredConfig, validateAuthoredVariant, validateAuthoredPart, validateAuthoredPartConfig, validatePack, validatePartsIndex, describeGltfJson, describeScene, glbJson,
+    boot, ready, infoFromIndex, setRoot, loadFile, fetchJson, on, checking, preload, preloadPlatform, ensure, assemble, infoOf, loadIndex: async (id: string) => !!(await platformIndex(id)), displayBaked, contract: GUN_MODEL_CONTRACT, infoFields: INFO_FIELDS, partsIndexFields: PARTS_INDEX_FIELDS, validate, validateAuthored, validateAuthoredConfig, validateAuthoredVariant, validateAuthoredPart, validateAuthoredPartConfig, authoredPartSlots: AUTHORED_PART_SLOTS, validatePack, validatePartsIndex, describeGltfJson, describeScene, glbJson,
     infoSchema, partsIndexSchema, contractMarkdown, loaded: (id: string) => loaded.has(id), platformLoaded: (id: string) => platIx.has(id), SLOTS, PARTS, NAMES,
     // the pure side of the packs (no three.js): the baker and the tests check the packs with the same code the game plans with
     planBuild, pickPack, infoLeaves, infoFromLeaves, buildKeyOf, slotKey, PARTS_INDEX_VERSION,

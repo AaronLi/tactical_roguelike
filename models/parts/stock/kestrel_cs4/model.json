@@ -1,0 +1,25 @@
+{
+  "source": "authored",
+  "kind": "part",
+  "slot": "stock",
+  "frame": "stock-mount",
+  "anchors": {
+    "butt": [
+      -0.2276,
+      -0.0603,
+      0
+    ],
+    "cheek": [
+      -0.1852,
+      0.0198,
+      0
+    ]
+  },
+  "part": {
+    "mount": "tube",
+    "position": "one out from collapsed"
+  },
+  "replaces": [
+    "Kestrel CS-4 carbine stock"
+  ]
+}
