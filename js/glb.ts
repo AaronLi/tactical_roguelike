@@ -74,7 +74,7 @@ interface HandleInfo { f: number; y: number; x: number; travel: number; grab?: V
 interface GunModelInfo {
   sy: number; fSight: number; relief: number; muzzles: Vec3[]; grip: Vec3; support: Vec3; anim: Record<string, string>;
   magAt?: Vec2 | null; handle?: HandleInfo | null; port?: Vec3 | null; chamberAt?: ChamberAt | null;
-  breech?: { at: Vec2; pitch: number; long: string | null } | null; ch?: Vec3 | null; bolt?: Vec3 | null; cheek?: number | null; recoilBarrel?: number | null;
+  breech?: { at: Vec2; pitch: number; long: string | null } | null; ch?: Vec3 | null; bolt?: Vec3 | null; boltTravel?: number | null; cheek?: number | null; recoilBarrel?: number | null;
   pistol?: boolean | null; slide?: Vec3 | null; cylAt?: Vec3 | null; load?: { at: Vec2[]; pitch: number } | null; cup?: Vec3 | null; magTop?: boolean | null;
   quarrelMats?: Record<string, unknown> | null; mounts?: Record<string, Vec3> | null;
   // first-person extras (js/viewmodel.ts), written by whoever makes the model:
@@ -194,6 +194,7 @@ const INFO_FIELDS: { [K in keyof GunModelInfo]-?: Field } = {
   breech: F('A tipping breech (the Thor): where it sits once open.', { t: 'obj', props: { at: vec2('[forward, up] metres of the open breech from the hinge pin.'), pitch: num('Opening angle, radians.'), long: F('Which long handguard it carries, "irons" or "rail", or null.', { t: 'str' }, true) } }, true),
   ch: vec3('The charging handle\'s grab point, [forward, up, right] metres.', true),
   bolt: vec3('The bolt\'s rear, where the hand pulls it, [forward, up, right] metres.', true),
+  boltTravel: num('A bolt worked by hand (the pistol with part_bolt): how far the bolt comes back, metres (absent: 0.12).', true, { min: 0.005, max: 0.3 }),
   cheek: num('A bullpup: the forward position (metres) the eye rests at when aiming, whatever sight is on the rail.', true),
   recoilBarrel: num('A long-recoil barrel: how far it runs back each shot, metres (0 or absent: none).', true, { min: 0 }),
   pistol: F('True for a handgun: the hands, the ADS and the holster use the pistol pose.', { t: 'bool' }, true),
@@ -271,7 +272,7 @@ const GUN_MODEL_CONTRACT = { ...CONTRACT_CORE, displays: {
     mount_mag: 'the magazine well: [forward, up, 0] of the top of a magazine seated in it (equal to info.magAt).',
   },
   pistol: 'AUTHORED PISTOLS. A pistol (root extras.info.pistol = true) uses the pistol anchor set instead of the rifle one: REQUIRED mount_barrel (where the factory barrel/suppressor begins) and mount_mag (= info.magAt); mount_slide ([the slide\'s rear, the frame\'s slide seat height, 0]) when the pistol has a slide (info.anim.slide = part_slide); and, for each thing the platform lets you fit, the anchor the part is seated on: mount_optic (+ mount_optic_end, equal: the optic cut\'s centre on the slide\'s top, [forward of the slide\'s rear, the cut\'s floor, 0]; a pistol sight sits there), mount_tac (a light or laser under the frame: [forward, the underside, 0]), mount_grip, mount_stock (optional). The muzzle is info.muzzles[0]. The slots are the same as a rifle\'s: the frame is slot base (a slide, an action knob or a control that moves is a part_ node), the slide is slot slide in part_slide, the barrel slot holds the whole barrel/suppressor with its front sight, the grip slot (when the grip is a part), mag in part_mag, optic the rear sight and the optic cut\'s cover plate. A slideless pistol (a manually cycled one) moves its bolt in part_bolt (info.anim.bolt) and the model carries info.bolt, the knob the hand takes. The same rules as a rifle\'s otherwise: the platform in js/parts.ts says which of those anchors it uses and the baker checks they agree (mount_optic against the pistol\'s optic cut, mount_mag against its spec).',
-  variants: 'AUTHORED VARIANTS. A per-gun part modelled beside the gun: models/<id>/<name>.glb (any other .glb in the gun\'s folder than <id>.glb), offered on that gun only. ONE root node named <id>_<name> whose extras.variant_json is { gun: <id>, slot: "barrel" | "mag", of: "factory", info?: { muzzles }, cap?: <rounds>, note }: gun is the folder, slot the slot it replaces, of the part it replaces (the factory one); info.muzzles is the new muzzle position (a barrel), cap the new capacity (a magazine). The meshes are in the gun\'s own frame, all of slot <slot> with catalogue materials (a magazine is one part_mag node with the pivot of the factory one); nothing else. The platform in js/parts.ts adds the part (id <id>.br.<name> / <id>.mag.<name>, its figures proposed there) and the recipe draws these meshes while it is fitted; nothing is scaled.',
+  variants: 'AUTHORED VARIANTS. A per-gun part modelled beside the gun: models/<id>/<name>.glb (any other .glb in the gun\'s folder than <id>.glb), offered on that gun only. ONE root node named <id>_<name> whose extras.variant_json is { gun: <id>, slot: "barrel" | "mag", of: "factory", info?: { muzzles, mounts? }, cap?: <rounds>, note }: gun is the folder, slot the slot it replaces, of the part it replaces (the factory one); info.muzzles is the new muzzle position (a barrel), info.mounts.mount_optic ([forward, up, right] metres: the centre and floor of a pistol optic cut the barrel carries, where a pistol dot is seated; the platform variant part then PROVIDES the optic slot, which only this barrel opens), cap the new capacity (a magazine). Whether the barrel is suppressed is the platform data on the part (js/parts.ts set.sup / device), not the model. The meshes are in the gun\'s own frame, all of slot <slot> with catalogue materials (a magazine is one part_mag node with the pivot of the factory one); nothing else. The platform in js/parts.ts adds the part (id <id>.br.<name> / <id>.mag.<name>, its figures proposed there) and the recipe draws these meshes while it is fitted; nothing is scaled.',
   seat: 'There is no seat: another barrel is drawn from its own part (a standard radius and profile). Root extras.seat and a mesh extras.role are no longer defined and are ignored if a file still has them.',
   mesh: 'Every mesh of slot barrel is the factory barrel, drawn only while the platform\'s own barrel is fitted; a fixed fitting on the barrel is a mesh of slot base.',
   rules: [
@@ -757,6 +758,20 @@ function validateAuthoredVariant(model: ModelDesc, id: string, name: string): Mo
   if (v.of !== 'factory') E(`variant.of is ${JSON.stringify(v.of)}: "factory" (the part it replaces)`);
   if (v.slot === 'barrel' && !(isObj(v.info) && Array.isArray(v.info.muzzles) && v.info.muzzles.length && v.info.muzzles.every((m: any) => Array.isArray(m) && m.length === 3 && m.every(isNum)))) E('a barrel variant needs variant.info.muzzles: [[forward, up, right], ...]');
   if (v.slot === 'mag' && !(Number.isInteger(v.cap) && v.cap > 0)) E('a magazine variant needs variant.cap, its capacity in rounds');
+  if (v.info !== undefined) {
+    if (!isObj(v.info)) E('variant.info is not an object');
+    else {
+      for (const k of Object.keys(v.info)) if (!['muzzles', 'mounts'].includes(k)) E(`variant.info.${k}: not a field (muzzles, mounts)`);
+      if (v.slot !== 'barrel' && v.info.mounts !== undefined) E('only a barrel variant has variant.info.mounts');
+      if (v.info.mounts !== undefined) {
+        if (!isObj(v.info.mounts)) E('variant.info.mounts is not an object ({ mount_optic: [forward, up, right] })');
+        else for (const [k, m] of Object.entries(v.info.mounts)) {
+          if (k !== 'mount_optic') E(`variant.info.mounts.${k}: not a mount a variant provides (mount_optic)`);
+          else if (!(Array.isArray(m) && m.length === 3 && m.every(isNum))) E(`variant.info.mounts.${k}: expected [forward, up, right] metres`);
+        }
+      }
+    }
+  }
   for (const k of Object.keys(v)) if (!['gun', 'slot', 'of', 'info', 'cap', 'note'].includes(k)) E(`variant.${k}: not a field (gun, slot, of, info, cap, note)`);
   let meshes = 0;
   const visit = (n: ModelNode, inPart: boolean) => {
