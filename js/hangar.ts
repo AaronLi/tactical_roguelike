@@ -675,10 +675,15 @@ const G_Hangar = (() => {
     box(h, -3.12, 0.5, -0.08, -3.1, 0.6, 0.08, glow);
     // tail boom, a ducted fan on its end, and a canted pair of fins
     box(h, 2.4, 1.7, -0.22, 7.8, 2.3, 0.22, body); box(h, 2.4, 2.3, -0.16, 7.6, 2.4, 0.16, armor); box(h, 3.0, 1.9, 0.22, 6.8, 1.96, 0.25, glow);
-    const cowl = part(h, new T.Mesh(new T.CylinderGeometry(0.55, 0.55, 0.5, 14, 1, true), duct), 8.0, 2.05, 0); cowl.rotation.x = Math.PI / 2;
-    for (const s of [-1, 1]) { const fin = part(h, new T.Mesh(new T.BoxGeometry(0.7, 0.9, 0.04), armor), 7.4, 2.7, s * 0.28); fin.rotation.x = s * 0.5; }
-    const tail = new T.Group(); tail.position.set(8.0, 2.05, 0); h.add(tail);
-    for (let b = 0; b < 3; b++) { const bl = new T.Mesh(new T.BoxGeometry(0.05, 0.5, 0.12), dark); bl.rotation.x = b * Math.PI / 3; tail.add(bl); }
+    // the tail rotor: a vertical disc on the boom's right (south) side, in a plane parallel to the fuselage's side, spinning about
+    // a sideways (z) axis. A gearbox stub carries its hub out clear of the boom, and a ring cowl rings the blades
+    const TR = { x: 7.5, y: 1.95, z: 0.5 };
+    box(h, TR.x - 0.12, TR.y - 0.12, 0.2, TR.x + 0.12, TR.y + 0.12, TR.z - 0.05, armor);
+    part(h, new T.Mesh(new T.TorusGeometry(0.52, 0.04, 6, 20), duct), TR.x, TR.y, TR.z);
+    for (const s of [-1, 1]) { const fin = part(h, new T.Mesh(new T.BoxGeometry(0.7, 0.9, 0.04), armor), 7.4, 2.9, s * 0.28); fin.rotation.x = s * 0.5; }
+    const tail = new T.Group(); tail.position.set(TR.x, TR.y, TR.z); h.add(tail);
+    for (let b = 0; b < 3; b++) { const arm = new T.Group(); arm.rotation.z = b * Math.PI / 3; tail.add(arm); part(arm, new T.Mesh(new T.BoxGeometry(0.12, 1.0, 0.03), dark), 0, 0, 0); }
+    part(tail, new T.Mesh(new T.CylinderGeometry(0.1, 0.1, 0.12, 10), accent), 0, 0, 0).rotation.x = Math.PI / 2;
     // stub wings, swept back, each with a ducted rotor at its tip, a missile pod underneath and a nav light (all above head height)
     const rotors = [];
     for (const s of [-1, 1]) {
