@@ -9,6 +9,7 @@
 import fs from 'fs'; import path from 'path';
 import { ROOT, loadModels, loadGame } from './model_env.mjs';
 import { authoredIds, checkAuthored } from './bake_authored.mjs';
+import { authoredPartKeys, checkAuthoredPart, partsTsWithBlock, PARTS_TS } from './authored_parts.mjs';
 
 const args = process.argv.slice(2), Models = loadModels();
 const SCHEMA = path.join(ROOT, 'docs/gun-model-info.schema.json'), SCHEMA2 = path.join(ROOT, 'docs/gun-parts-index.schema.json'), DOC = path.join(ROOT, 'docs/models.md');
@@ -32,11 +33,20 @@ export function checkAuthoredFile(label, id) {
   for (const w of r.warnings) console.warn(`${label}: warning ${w}`);
   return r.errors.length;
 }
+/** An authored part (models/parts/<slot>/<id>): the contract's part rules and its geometry; prints and returns the number of errors. */
+export function checkAuthoredPartFile(label, key) {
+  const r = checkAuthoredPart(Models, key);
+  for (const e of r.errors) console.error(`${label}: ERROR ${e}`);
+  for (const w of r.warnings) console.warn(`${label}: warning ${w}`);
+  return r.errors.length;
+}
+const authoredPartKeyOf = (file) => { const d = path.dirname(path.resolve(file)), id = path.basename(d), slot = path.basename(path.dirname(d)); return path.basename(file) === id + '.glb' && path.basename(path.dirname(path.dirname(d))) === 'parts' && fs.existsSync(path.join(d, 'model.json')) ? slot + '/' + id : null; };
 const authoredIdOf = (file) => { const d = path.dirname(path.resolve(file)), id = path.basename(d); return path.basename(file) === id + '.glb' && path.basename(path.dirname(d)) === 'models' && fs.existsSync(path.join(d, 'model.json')) ? id : null; };
 
 if (args.includes('--write')) {
   fs.writeFileSync(SCHEMA, schemaText()); fs.writeFileSync(SCHEMA2, schema2Text()); fs.writeFileSync(DOC, docWith(fs.readFileSync(DOC, 'utf8')));
-  console.log('wrote docs/gun-model-info.schema.json, docs/gun-parts-index.schema.json and the contract section of docs/models.md');
+  fs.writeFileSync(PARTS_TS, partsTsWithBlock(fs.readFileSync(PARTS_TS, 'utf8')));
+  console.log('wrote docs/gun-model-info.schema.json, docs/gun-parts-index.schema.json, the contract section of docs/models.md and the authored-parts block of js/parts.ts');
 } else if (args.includes('--selftest')) {
   let bad = 0; const fail = (m) => { bad++; console.error('FAIL ' + m); };
   const lf = (p) => fs.readFileSync(p, 'utf8').replace(/\r\n/g, '\n'); // (a checkout may have CRLF)
@@ -49,6 +59,9 @@ if (args.includes('--write')) {
   for (const [k, m] of Object.entries(Models.contract.materials.names)) { const has = !!(G.GunMaterials.M[k] && G.GunMaterials.M[k]().bumpMap); if (has !== !!m.bump) fail(`material '${k}': the contract says bump=${m.bump || 'none'} but the catalogue ${has ? 'has' : 'has no'} a bump map`); }
   for (const sl of ['base', 'grip', 'stock', 'mag', 'barrel', 'handguard', 'muzzle', 'optic', 'slide']) if (!Models.contract.slots[sl]) fail(`slot '${sl}' missing from the contract`);
   for (const id of authoredIds()) { const n = checkAuthoredFile(`models/${id}/${id}.glb`, id); if (n) bad++; }
+  if (lf(PARTS_TS) !== partsTsWithBlock(lf(PARTS_TS))) fail('the authored-parts block of js/parts.ts differs from models/parts/*/*/model.json: run npm run check:models -- --write');
+  for (const k of authoredPartKeys()) { const n = checkAuthoredPartFile(`models/parts/${k}`, k); if (n) bad++; }
+  for (const k of authoredPartKeys()) { const pid = 'op.auth.' + k.split('/')[1], pt = G.Gunsmith.PARTS[pid]; if (!pt) fail(`${k}: the catalogue (js/parts.ts) has no part ${pid}`); else if (!G.Gunsmith.fits(pt.mount).length) fail(`${pid}: fits no gun`); }
   const dir = path.join(ROOT, 'assets/models/guns'); let n = 0;
   if (fs.existsSync(dir)) for (const f of fs.readdirSync(dir).filter((f) => f.endsWith('.glb'))) { n++; if (checkBuffer(f, fs.readFileSync(path.join(dir, f)), f.replace(/\.glb$/, ''))) bad++; }
   // the per-part packs: every platform's index against the index contract, every pack file against the pack contract, every file the index names there
@@ -69,6 +82,6 @@ if (args.includes('--write')) {
   const files = args.filter((a) => !a.startsWith('--'));
   if (!files.length) { console.error('usage: npm run check:models <file.glb ...> | -- --write | -- --selftest'); process.exit(2); }
   let bad = 0;
-  for (const f of files) { const aid = authoredIdOf(f), n = aid ? checkAuthoredFile(path.basename(f), aid) : checkBuffer(path.basename(f), fs.readFileSync(f)); console.log(`${path.basename(f)}: ${n ? n + ' error(s)' : 'ok'}`); bad += n; }
+  for (const f of files) { const aid = authoredIdOf(f), pk = authoredPartKeyOf(f), n = pk ? checkAuthoredPartFile(path.basename(f), pk) : aid ? checkAuthoredFile(path.basename(f), aid) : checkBuffer(path.basename(f), fs.readFileSync(f)); console.log(`${path.basename(f)}: ${n ? n + ' error(s)' : 'ok'}`); bad += n; }
   process.exit(bad ? 1 : 0);
 }

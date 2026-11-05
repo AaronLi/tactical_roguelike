@@ -307,6 +307,11 @@
    "geometry": "95a91a566657ec6f",
    "info": "7f69a15b1515a1d9"
   },
+  "barrel=br.7.62x51.21,grip=oem.gr.ar.4,handguard=oem.hg.box.4,mag=fal.mag,muzzle=mz.r762.a2,optic=op.auth.falcon,stock=stk.heavy.0": {
+   "label": "optic=op.auth.falcon",
+   "geometry": "79f63ac56dff322a",
+   "info": "5aceedd080ddb03f"
+  },
   "barrel=br.7.62x51.21,grip=oem.gr.ar.4,handguard=oem.hg.box.4,mag=fal.mag,muzzle=mz.r762.a2,stock=stk.heavy.0": {
    "label": "optic=(none)",
    "geometry": "3b83d209d74d24f2",
