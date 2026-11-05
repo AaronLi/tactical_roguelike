@@ -851,7 +851,7 @@ const G_GunRecipes = (() => {
   function sightOf(k: Kit, o: RecipeSpec, top: number, L: number, bl: number, br: number, front: number, ofs: number, onBarrel = false, by = 0) {
     const frontF = frontSightF(L, bl);
     if (onBarrel) k.anchor('barrel', 'mount_frontsight', [(o.optic || 'irons') === 'bead' ? front - 0.008 : frontF, by, 0]);
-    if (o.optic === 'riser') k.box(0.024, o.riser || 0.022, 0.034, M.black(), ofs - 0.017, top + (o.riser || 0.022) / 2); // a pistol optic riser with nothing on it (the irons still work)
+    if (o.optic === 'riser') k.at('mount', () => k.box(0.024, o.riser || 0.022, 0.034, M.black(), ofs - 0.017, top + (o.riser || 0.022) / 2)); // a pistol optic riser with nothing on it (the irons still work)
     switch (o.optic || 'irons') {
       case 'reddot': return S.reddot(k, ofs, top, o);
       case 'minidot': return S.minidot(k, ofs, top, o);
@@ -1273,7 +1273,7 @@ const G_GunRecipes = (() => {
       k.box(0.05, V([0, 92])[1] - V([0, 128])[1], 0.01, B, -0.01, V([0, 110])[1]);
       top = S.rail(k, V([322, 0])[0], V([735, 0])[0] - V([322, 0])[0], V([0, 90])[1], up);
       // the flip-up sights folded flat at the rail's two ends when there's an optic on it (up, they're the irons below)
-      if (o.optic && !(['irons', 'notch'] as (string | undefined)[]).includes(o.optic)) k.under('optic', () => { k.box(0.024, 0.009, 0.026, B, V([346, 0])[0], top + 0.0045); k.box(0.022, 0.009, 0.022, B, V([690, 0])[0], top + 0.0045); }); // (the sights' own: they're the optic's, as the raised irons are)
+      if (o.optic && !(['irons', 'notch'] as (string | undefined)[]).includes(o.optic)) k.under('optic', () => k.at('mount', () => { k.box(0.024, 0.009, 0.026, B, V([346, 0])[0], top + 0.0045); k.box(0.022, 0.009, 0.022, B, V([690, 0])[0], top + 0.0045); })); // (the gun's own folded sights: a mount piece of the optic)
     } else if (rcv === 'break') {
       // the action: the barrels hinge at its front (L), so it's as long as the receiver
       if (tr) { tracedParts(k, tr, VT, 'base', mats); top = VT([0, tr.topY])[1]; }
@@ -1531,7 +1531,7 @@ const G_GunRecipes = (() => {
         // The A3 M2's: no handle and no hump, a flat-top receiver with its Picatinny rail the whole length of it, from the
         // barrel lock back over the front of the shell (25 slots, about 26 cm), on a low base moulded into the top
         const [ra] = V([900, 0]), [rb] = V([440, 0]);
-        k.box(0.03, V([0, 322])[1] - top, rb - ra, rm, ra, (top + V([0, 322])[1]) / 2);
+        k.at('mount', () => k.box(0.03, V([0, 322])[1] - top, rb - ra, rm, ra, (top + V([0, 322])[1]) / 2));
         top = S.rail(k, ra, rb - ra, V([0, 322])[1], rm);
         sight = (['irons', 'notch'] as (string | undefined)[]).includes(o.optic) ? S.irons(k, V([905, 0])[0], V([482, 0])[0], top + 0.034, top, top, 'ar') : sightOf(k, o, top, L, o.integral ? o.integral.len : bl, br, bEnd, ofs, true, by);
       }
@@ -1539,11 +1539,13 @@ const G_GunRecipes = (() => {
       // its own sights stay whatever's fitted: the rear aperture standing in the handle's opening, the front post
       // between its ears
       const V = qbzTrace, sy = V([0, 150])[1], [fR] = V([845, 0]), [fF] = V([1127, 0]), B = M.black();
-      k.box(0.012, sy - 0.0055 - top, 0.01, B, fR - 0.005, (top + sy - 0.0055) / 2);
-      k.annulus(0.0022, 0.0052, 0.003, B, fR - 0.0015, sy);
-      k.box(0.003, sy - V([0, 166])[1], 0.003, B, fF - 0.0015, (sy + V([0, 166])[1]) / 2);
-      for (const x of [-0.012, 0.012]) k.box(0.004, V([0, 95])[1] - V([0, 166])[1], V([1148, 0])[0] - V([1106, 0])[0], fm, V([1106, 0])[0], (V([0, 95])[1] + V([0, 166])[1]) / 2, x);
-      k.box(0.028, V([0, 95])[1] - V([0, 108])[1], V([1148, 0])[0] - V([1106, 0])[0], fm, V([1106, 0])[0], (V([0, 95])[1] + V([0, 108])[1]) / 2);
+      k.at('mount', () => { // (the gun's own sight fixtures, there whatever sight is fitted: a mount piece)
+        k.box(0.012, sy - 0.0055 - top, 0.01, B, fR - 0.005, (top + sy - 0.0055) / 2);
+        k.annulus(0.0022, 0.0052, 0.003, B, fR - 0.0015, sy);
+        k.box(0.003, sy - V([0, 166])[1], 0.003, B, fF - 0.0015, (sy + V([0, 166])[1]) / 2);
+        for (const x of [-0.012, 0.012]) k.box(0.004, V([0, 95])[1] - V([0, 166])[1], V([1148, 0])[0] - V([1106, 0])[0], fm, V([1106, 0])[0], (V([0, 95])[1] + V([0, 166])[1]) / 2, x);
+        k.box(0.028, V([0, 95])[1] - V([0, 108])[1], V([1148, 0])[0] - V([1106, 0])[0], fm, V([1106, 0])[0], (V([0, 95])[1] + V([0, 108])[1]) / 2);
+      });
       if (!o.optic || (['irons', 'notch', 'qbzirons'] as (string | undefined)[]).includes(o.optic)) sight = { sy, fSight: fR - 0.0015, relief: 0.12 };
       else {
         // anything else sits on a rail clamped along the top of the handle: very high over the bore, as on the real one
@@ -1553,7 +1555,7 @@ const G_GunRecipes = (() => {
     } else if (rcv === 'f2') {
       // its own sights stay whatever's fitted: the aperture in the handle's rear leg, the post in its front, the line between
       // them down the tunnel; anything else goes on a rail along the top of the handle, as high over the bore as the real handle
-      const V = f2Trace, own = S.irons(k, 0.3, 0.6, V([0, 798])[1], top, top, 'ar');
+      const V = f2Trace, own = k.at('mount', () => S.irons(k, 0.3, 0.6, V([0, 798])[1], top, top, 'ar')); // (its own sights are there whatever is fitted: a mount piece)
       if (!o.optic || (['irons', 'notch'] as (string | undefined)[]).includes(o.optic)) sight = Object.assign(own, { relief: 0.14 }); // (the eye well back from the handle's rear leg)
       else { const [ra] = V([1050, 0]), [rb] = V([1783, 0]); sight = sightOf(k, o, S.rail(k, ra, rb - ra, V([0, 692])[1], rm), L, bl, br, bEnd, ofs, true, by); }
     } else if (rcv === 'aksu' && (!o.optic || o.optic === 'notch')) {
