@@ -37,7 +37,7 @@ interface PRChk { k: number; rel: boolean }
 interface PWheelItem { id: string; label: string; sub: string; off?: boolean; act: () => void }
 interface PWheel { x: number; y: number; sel: number; items: PWheelItem[] }
 interface PViewer { v: any; was: boolean; yaw: number; pitch: number }
-interface PZip { l: any; ph: PZipPhase; t: number; s: number; from: THREE.Vector3; was: boolean; L?: number }
+interface PZip { l: any; ph: PZipPhase; t: number; s: number; from: THREE.Vector3; was: boolean; L?: number; sw: { th: number; w: number; v: number; a: number } }
 interface PClimb { l: any; up: boolean; ph: PLadderPhase; t: number; from: THREE.Vector3; was: boolean; y: number }
 // a throwable in your hand (keys 3, 4, 5): its kind, whether the pin's out, the strength picked, and the throw's timers
 interface PHeld { kind: PHeldKind; cock: boolean; str: number; readyT: number; throwT: number; lastL: boolean; lastR: boolean; queued?: boolean }
@@ -107,7 +107,7 @@ const G_Me = {
   // recoil, sway and the camera
   rc: undefined as unknown as PRecoil, hk: undefined as unknown as PHeadKick, flinch: undefined as unknown as PYP, swayOff: undefined as unknown as PYP, aimScreen: undefined as unknown as PYP,
   shove: undefined as unknown as number, shoveV: undefined as unknown as number, swayT: undefined as unknown as number, walkAmp: undefined as unknown as number,
-  swayX: undefined as unknown as number, swayY: undefined as unknown as number, bobT: undefined as unknown as number, shakeT: undefined as unknown as number,
+  zipVm: undefined as unknown as number, swayX: undefined as unknown as number, swayY: undefined as unknown as number, bobT: undefined as unknown as number, shakeT: undefined as unknown as number,
   bipodT: undefined as unknown as number, bipodOn: undefined as unknown as boolean,
   // loose carry: where the arms point (they trail the head at the hip unless Shift brings the gun up), and how loose they are now
   armYaw: undefined as unknown as number, armPitch: undefined as unknown as number, looseT: 0,
@@ -680,8 +680,12 @@ const G_Me = {
   },
   // A zipline (the Sandia Crest's: js/level.ts crest.lines): lifted onto its bar (UP s), carried along under the cable, slowest
   // at the ends and fastest down the middle of it (V0 + V1 m/s), and let down onto the far side (DOWN s), hanging HANG m under
-  // it. The weapon's away the whole way; you can look round. The host takes where you are as it does any time.
-  ZIP: { UP: 0.7, DOWN: 0.5, HANG: G.Level.ZIP_HANG, V0: 7, V1: 17, REACH: 1.6, HOLD: 0.4 }, // (HANG: hanging by the bar, js/level.ts zipKit)
+  // it. You hang by the left hand from the trolley's handle and the weapon stays in the right: you can look round and fire it, one-
+  // handed (ONE_HAND, below: it's much harder to hold on target, and a magnified scope can't be used). The host takes where you
+  // are as it does any time.
+  // ONE_HAND: SPREAD, how much wider the rounds go (and the crosshair); KICK, how much harder each shot throws the gun; SWAY, how
+  // much the aim wanders; GRIP, how much weaker the pull of the muzzle back down to the line (1 = as when standing)
+  ZIP: { UP: 0.7, DOWN: 0.5, HANG: G.Level.ZIP_HANG, V0: 7, V1: 17, REACH: 1.6, HOLD: 0.4, ONE_HAND: { SPREAD: 2.2, KICK: 1.5, SWAY: 2.2, GRIP: 0.7 } }, // (HANG: hanging by the handle, js/level.ts zipKit)
   zipNear(map: LvMap) {
     const ls = map && map.crest && map.crest.lines;
     return (ls && Math.abs(this.pos.y) < 0.5 && ls.find((l: any) => Math.hypot(l.on[0] - this.pos.x, l.on[1] - this.pos.z) < this.ZIP.REACH)) || null;
@@ -689,6 +693,7 @@ const G_Me = {
   zipStep(dt: number) {
     const z = this.zipRide!, l = z.l, Z = this.ZIP, under = (s: number) => { const p = G.Level.zipPoint(l, s); return new THREE.Vector3(p[0], p[1] - Z.HANG, p[2]); };
     z.t += dt;
+    const was = this.pos.clone();
     let p;
     if (z.ph === 'up') { p = z.from.clone().lerp(under(0), G.U.smooth(0, 1, z.t / Z.UP)); if (z.t >= Z.UP) { z.ph = 'ride'; z.t = 0; } }
     else if (z.ph === 'ride') {
@@ -701,7 +706,9 @@ const G_Me = {
       if (z.t >= Z.DOWN) this.zipRide = null;
     }
     this.pos.copy(p); this.vel.set(0, 0, 0); this.onGround = true; this.hspeed = 0; this.crouch = false; this.prone = false;
-    this.stowed = this.zipRide ? true : z.was; this.lowToggle = false;
+    this.stowed = z.was; this.lowToggle = false; // (the weapon stays in hand)
+    const dx = l.b[0] - l.a[0], dz = l.b[2] - l.a[2], n = Math.hypot(dx, dz) || 1;
+    G.Rig.zipSwing(z.sw, ((this.pos.x - was.x) * dx + (this.pos.z - was.z) * dz) / n / Math.max(dt, 1e-3), dt); // (the swing of your own body, for the view: the same as others see)
     this.eyeH += (1.62 - this.eyeH) * Math.min(1, dt * 12);
   },
   // The ladder up the Crest House (crest.ladder: js/level.ts crestLadder): hold F at its foot to climb onto the roof, or at its
@@ -736,21 +743,23 @@ const G_Me = {
   },
   // Your own arms while your hands are on something (the gun's away): a sleeved forearm and a glove each, in the world, from
   // in front of your shoulder to where the hand is. On the ladder, where G.Level.ladderGrip has it on a rung (each one holding
-  // as you rise past it, then reaching up two); on a zipline, on the grab bar over your head, the trolley above it on the
-  // cable (G.Level.zipKit). Everyone else sees the whole of you (js/rig.ts).
+  // as you rise past it, then reaching up two); on a zipline there are no arms to draw (the left hand's up on the trolley's
+  // handle, out of view, the right has the gun) but the trolley itself, on the cable over your head (G.Level.zipKit). Everyone
+  // else sees the whole of you (js/rig.ts).
   holdArms(cam: THREE.Camera) {
     let A = this._climbArms;
     const z = this.zipRide;
     if (this._zipKit) this._zipKit.visible = !!z;
     if (!this.climb && !z) { if (A) A.g.visible = false; return; }
-    const T = THREE, L = G.Level;
-    let hands;
-    if (z) {
-      const k = this._zipKit || (this._zipKit = L.zipKit()), dx = z.l.b[0] - z.l.a[0], dz = z.l.b[2] - z.l.a[2], n = Math.hypot(dx, dz), bar = this.pos.y + L.ZIP_HANG - L.ZIP_BAR;
+    if (z) { // (the trolley, over your head: the cable ZIP_HANG over your feet)
+      if (A) A.g.visible = false;
+      const k = this._zipKit || (this._zipKit = G.Level.zipKit());
       if (!k.parent) G.R.scene.add(k);
-      k.visible = true; k.position.set(this.pos.x, this.pos.y + L.ZIP_HANG, this.pos.z); k.rotation.y = Math.atan2(dx, dz); // (along the cable; the bar across it)
-      hands = [-1, 1].map((sd) => new T.Vector3(this.pos.x - sd * 0.17 * dz / n, bar, this.pos.z + sd * 0.17 * dx / n)); // (left, right: facing along the cable, its right is (-dz, dx))
-    } else hands = ['hL', 'hR'].map((k) => new T.Vector3(...L.ladderGrip(this.climb!.l, this.pos.y, k)));
+      k.visible = true; k.position.set(this.pos.x, this.pos.y + G.Level.ZIP_HANG, this.pos.z); k.rotation.y = Math.atan2(z.l.b[0] - z.l.a[0], z.l.b[2] - z.l.a[2]);
+      return;
+    }
+    const T = THREE, L = G.Level;
+    const hands = ['hL', 'hR'].map((k) => new T.Vector3(...L.ladderGrip(this.climb!.l, this.pos.y, k)));
     if (!A) {
       const sleeve = new T.MeshStandardMaterial({ color: 0x3a3f36, roughness: 0.9 }), glove = new T.MeshStandardMaterial({ color: 0x1e1f1c, roughness: 0.8 }), g = new T.Group(), arms = [];
       for (let i = 0; i < 2; i++) { const s = new T.Mesh(new T.CylinderGeometry(0.042, 0.048, 1, 10), sleeve), h = new T.Mesh(new T.BoxGeometry(0.1, 0.11, 0.05), glove); g.add(s, h); arms.push({ s, h }); }
@@ -769,8 +778,8 @@ const G_Me = {
       h.position.copy(hand).addScaledVector(dir, 0.03); h.quaternion.copy(s.quaternion);
     });
   },
-  // Spread/recoil multiplier from steadiness: holding Shift tightens it.
-  steadiness() { return this.steadying ? 0.65 : 1; },
+  // Spread/recoil multiplier from steadiness: holding Shift tightens it; hanging from a zipline by one hand loosens it a lot.
+  steadiness() { return (this.steadying ? 0.65 : 1) * (this.zipRide ? this.ZIP.ONE_HAND.SPREAD : 1); }, // (on a zipline: one-handed)
 
   // ------------------------------------------------------------- recoil and sway
   // Recoil doesn't move your view: it throws the GUN off your aim point, and the gun's bore is where the round
@@ -815,7 +824,7 @@ const G_Me = {
   recoilStep(dt: number, def: WeaponDef) {
     const R = this.RECOIL, rc = this.rc, m = this.recoilModel(def);
     // bleeding out saps the strength to muscle the muzzle back down
-    const g = m.rec * (1 - 0.8 * this.lowHealth()), kd = R.KD * Math.sqrt(g);
+    const g = m.rec * (1 - 0.8 * this.lowHealth()) * (this.zipRide ? this.ZIP.ONE_HAND.GRIP : 1), kd = R.KD * Math.sqrt(g);
     for (let left = dt; left > 1e-6; left -= 1 / 120) { // fixed small steps keep the spring stable at low fps
       const h = Math.min(left, 1 / 120);
       rc.vy = G.U.clamp(rc.vy + (-R.KP * g * rc.y - kd * rc.vy) * h, -R.VMAX, R.VMAX); rc.y += rc.vy * h;
@@ -859,7 +868,7 @@ const G_Me = {
     const paired = hyper && this.hyperQ === 1 && this.pairHeld;
     this.pairHeld = null;
     const kind = paired ? def.hyperKick || 1 : hyper ? def.autoKick || 1 : 1;
-    const k = this.steadiness() * (this.prone ? 0.6 : this.crouch ? 0.8 : 1) * (this.adsT > 0.5 ? 0.85 : 1) * G.U.lerp(1, this.BIPOD.KICK, this.bipodT || 0) * kind; // (prone: the ground takes it; a bipod, more of it)
+    const k = this.steadiness() * (this.prone ? 0.6 : this.crouch ? 0.8 : 1) * (this.adsT > 0.5 ? 0.85 : 1) * G.U.lerp(1, this.BIPOD.KICK, this.bipodT || 0) * kind * (this.zipRide ? this.ZIP.ONE_HAND.KICK / this.ZIP.ONE_HAND.SPREAD : 1); // (prone: the ground takes it; a bipod, more of it; one-handed on a zipline: steadiness has the spread's share, this the rest to make it KICK)
     // (a gun with a pull kicks the same way every time, so you can hold against it: a little to the right, a steady climb)
     const up0 = m.up * (def.pull ? 0.95 + Math.random() * 0.1 : 0.85 + Math.random() * 0.3) * k, dir = def.pull || Math.random() < 0.5 ? -1 : 1;
     // driven back near the limit: what's left of the kick comes out sideways and up
@@ -903,8 +912,8 @@ const G_Me = {
     this.walkAmp += ((this.onGround ? Math.min((this.hspeed || 0) / this.SPEED.walk, 1.4) : 0) - this.walkAmp) * Math.min(1, dt * 4);
     const t = this.swayT, atro = 1 + low * 1.4, hold = this.steadying ? 0.4 : 1, lying = this.prone && this.stanceT <= 0;
     // prone, the gun rests on your elbows and the ground: the least sway there is (breathing barely moves it)
-    const bp = this.bipodT || 0, amp = m.sway * G.U.lerp(1.6, 1, a) * (lying ? 0.25 : this.crouch ? 0.75 : 1) * hold * atro * G.U.lerp(1, this.BIPOD.SWAY, bp);
-    const er = m.erratic * atro * hold * (lying ? 0.3 : 1) * G.U.lerp(1, this.BIPOD.ERRATIC, bp), wa = this.walkAmp * (1 - a * 0.5);
+    const bp = this.bipodT || 0, amp = m.sway * G.U.lerp(1.6, 1, a) * (lying ? 0.25 : this.crouch ? 0.75 : 1) * hold * atro * G.U.lerp(1, this.BIPOD.SWAY, bp) * (this.zipRide ? this.ZIP.ONE_HAND.SWAY : 1);
+    const er = m.erratic * atro * hold * (lying ? 0.3 : 1) * G.U.lerp(1, this.BIPOD.ERRATIC, bp) * (this.zipRide ? this.ZIP.ONE_HAND.SWAY : 1), wa = this.walkAmp * (1 - a * 0.5);
     const tremor = (s: number) => low * (0.004 * Math.sin(t * 11.3 + s) + 0.0035 * Math.sin(t * 17.7 + s * 2) + 0.003 * Math.sin(t * 24.9 + s * 3));
     // breathing traces a slow, lopsided figure eight (pitch at twice the yaw rate), with a drift and a faster
     // wander on top; SWAY_GAIN scales the lot
@@ -994,6 +1003,7 @@ const G_Me = {
   RELOAD_K: { retain: 1.35, pouch: 1.0, floor: 0.82, plain: 1 },
   startReload() {
     const w = this.cur(), mag = this.magSize(w);
+    if (this.zipRide) { if (!this.noAmmoT || this.noAmmoT < performance.now()) { G.HUD.toast('', "Can't reload hanging from the zipline", 1.2); this.noAmmoT = performance.now() + 1500; } return; } // (the left hand's on the trolley)
     if (!this.reloading && this.swapT <= 0 && G.chambered(w.def) && !w.chamber && w.mag > 0 && w.mag >= mag) { this.rack(w); return; } // (full, nothing chambered: just work the action)
     if (this.reloading || w.mag >= mag || this.swapT > 0) return;
     // something to reload from: a fuller magazine, or rounds
@@ -1062,7 +1072,7 @@ const G_Me = {
   },
   fireMode(w: PWeapon): FireMode { const modes = w.def.modes || [w.def.mode]; return modes.includes(w.fm) ? w.fm : modes[0]; },
   inspect() {
-    if (this.reloading || this.act || this.magChk || this.rChk || this.stowed || this.swapT > 0 || this.adsT > 0.2 || this.down || this.inspectT > 0) return;
+    if (this.reloading || this.act || this.magChk || this.rChk || this.stowed || this.swapT > 0 || this.adsT > 0.2 || this.down || this.inspectT > 0 || this.zipRide) return;
     this.inspYaw = this.inspPitch = 0;
     this.inspectDur = this.cur().def.slot === 's' ? 2.0 : 2.6;
     this.inspectT = this.inspectDur;
@@ -1081,7 +1091,7 @@ const G_Me = {
 
     this.raiseT = Math.max(0, (this.raiseT || 0) - dt);
     if (this.held) this.heldStep(dt);
-    this.ads = this.mouse.r && !this.held && !this.magChk && !this.lowReady && !this.stowed && !(this.stanceT > 0) && this.raiseT <= 0 && this.swapT <= 0 && !(this.reloading && (!this.loose(def) || this.revHand(def))) && G.Game.locked && !def.akimbo;
+    this.ads = this.mouse.r && !this.held && !this.magChk && !this.lowReady && !this.stowed && !(this.stanceT > 0) && this.raiseT <= 0 && this.swapT <= 0 && !(this.reloading && (!this.loose(def) || this.revHand(def))) && G.Game.locked && !def.akimbo && !(this.zipRide && this.sight(w).scoped); // (no looking down a magnified scope one-handed on a zipline)
     this.adsT += ((this.ads ? 1 : 0) - this.adsT) * Math.min(1, dt * 9 * (this.cur().def.handling || 1)); // ergonomics: aim speed
 
     // inspecting stops the moment you do anything with the gun; racking after the last shell takes a beat
@@ -2144,7 +2154,7 @@ const G_Me = {
       this.zipHold = F ? (this.zipHold || 0) + dt : 0;
       G.HUD.setPrompt('Hold <b>F</b> to ride the zipline across the gorge');
       G.HUD.setProgress(this.zipHold > 0 ? this.zipHold / this.ZIP.HOLD : -1, this.zipHold > 0 ? 'Clipping on' : '');
-      if (this.zipHold >= this.ZIP.HOLD) { this.zipHold = 0; this.fLatch = true; this.zipRide = { l: zl, ph: 'up', t: 0, s: 0, from: this.pos.clone(), was: !!this.stowed }; G.Audio.click(); }
+      if (this.zipHold >= this.ZIP.HOLD) { this.zipHold = 0; this.fLatch = true; this.zipRide = { l: zl, ph: 'up', t: 0, s: 0, from: this.pos.clone(), was: !!this.stowed, sw: { th: 0, w: 0, v: 0, a: 0 } }; G.Audio.click(); }
       return;
     }
     // at the foot of the Crest House's ladder, or at its head on the roof: hold F to climb (climbStep)
@@ -2529,7 +2539,7 @@ const G_Me = {
     const cam = G.R.camera;
     // at a viewer: your eyes at its eyepieces, the view narrowed to its power, the gun out of sight
     this.viewerMask(!!this.viewer);
-    if (G.R.vmRoot) G.R.vmRoot.visible = !this.viewer && !this.climb && !this.zipRide; // (on a ladder or a zipline: your hands are on it, holdArms)
+    if (G.R.vmRoot) G.R.vmRoot.visible = !this.viewer && !this.climb; // (on a ladder your hands are on it, holdArms; on a zipline only the left is, up out of view)
     if (this.viewer) {
       const v = this.viewer.v, V = this.VIEWER;
       this.yaw = v.yaw + G.U.clamp(G.U.angDiff(v.yaw, this.yaw), -V.YAW, V.YAW); this.pitch = G.U.clamp(this.pitch, -V.DOWN, V.UP);
@@ -2541,7 +2551,7 @@ const G_Me = {
       return;
     }
     // lean: Q left, E right. Never lean the head into a wall.
-    const want = this.down || this.dead || this.lowReady || this.prone || G.Game.chatOpen || !G.Game.locked ? 0 : (this.keys.KeyE ? 1 : 0) - (this.keys.KeyQ ? 1 : 0);
+    const want = this.down || this.dead || this.lowReady || this.prone || this.zipRide || G.Game.chatOpen || !G.Game.locked ? 0 : (this.keys.KeyE ? 1 : 0) - (this.keys.KeyQ ? 1 : 0);
     const sideX = Math.cos(this.yaw), sideZ = -Math.sin(this.yaw), eye = this.pos.y + this.eyeH;
     let room = 1;
     if (want) {
@@ -2607,6 +2617,13 @@ const G_Me = {
     const strafe = this.vel.x * Math.cos(this.yaw) - this.vel.z * Math.sin(this.yaw);
     x -= this.swayX * 0.2 * sc; y -= this.swayY * 0.15 * sc; rz -= strafe * 0.025 * sc; // (the turn lag itself is in aimOffset)
     if (this.down) { y -= 0.05; rz += 0.3; }
+    // on a zipline: the gun held out in the right hand alone, lower and canted a little, and swinging with you under the trolley
+    this.zipVm = (this.zipVm || 0) + ((this.zipRide ? 1 : 0) - (this.zipVm || 0)) * Math.min(1, dt * 8);
+    if (this.zipVm > 0.001) {
+      const zv = this.zipVm * (1 - a * 0.6), th = this.zipRide ? this.zipRide.sw.th : 0;
+      y -= 0.045 * zv; x += 0.03 * zv + th * 0.1 * zv; rz -= (0.16 + th * 0.5) * zv; rx -= (0.05 + th * 0.3) * zv;
+      cam.rotation.z += th * 0.08 * this.zipVm; // (and your view rolls with it, a little)
+    }
     { // (the trailing arms swing about the eye, so the whole gun comes round, not just its nose)
       const lag = this.armLag();
       if (lag.y || lag.p) { const v = new THREE.Vector3(x, y, z).applyEuler(new THREE.Euler(lag.p, lag.y, 0, 'YXZ')); x = v.x; y = v.y; z = v.z; }
@@ -2856,7 +2873,7 @@ const G_Me = {
       p: [r2(this.pos.x), r2(this.pos.y), r2(this.pos.z)], yw: r2(this.yaw), pt: r2(this.pitch),
       hp: Math.ceil(this.hp), mhp: this.maxHp(), ar: Math.round(this.vestCond() * 100), amx: G.Gear.piece(this, 'chest') ? 100 : 0,
       pr: this.prone ? 1 : 0, bp: this.bipodT > 0.5 ? 1 : 0, cl: this.climb ? 1 : 0, zp: this.zipRide ? 1 : 0, se: this.seat != null ? 1 : 0, dn: this.down ? 1 : 0, uc: this.out ? 1 : 0, dd: this.dead ? 1 : 0, bl: this.down ? (this.bleed == null ? -1 : Math.ceil(this.bleed)) : 0, bd: this.body ? G.Med.encode(this.body) : null,
-      w: this.cur().def.code, ac: G.Ballistics.armourState(this), sk: G.Stickers.share(this.cur().stickers) || undefined, tl: this.tacFlags(this.cur()), cr: this.crouch || this.down || this.prone ? 1 : 0, ln: r2(this.lean || 0), lr: this.lowReady ? 1 : 0, sd: this.steadying ? 1 : 0, sw: this.stowed || this.held || this.menuLook() ? 1 : 0, mn: this.menuLook() ? 1 : 0,
+      w: this.cur().def.code, ac: G.Ballistics.armourState(this), sk: G.Stickers.share(this.cur().stickers) || undefined, tl: this.tacFlags(this.cur()), cr: this.crouch || this.down || this.prone ? 1 : 0, ln: r2(this.lean || 0), lr: this.lowReady ? 1 : 0, ad: this.zipRide && (this.ads || this.sinceShot < 0.9) ? 1 : 0, sd: this.steadying ? 1 : 0, sw: this.stowed || this.held || this.menuLook() ? 1 : 0, mn: this.menuLook() ? 1 : 0,
       hk: this.held ? (this.held.kind === 'flash' ? 2 : 1) : 0, hc: this.held && this.held.cock ? 1 : 0, hs: this.held ? this.held.str : 0,
       ra: this.act && this.cur().def.manual ? r2(Math.min(1, this.act.t)) : -1, ld: G.loaded(this.cur()) > 0 ? 1 : 0, nm: this.cur().noMag ? 1 : 0, rl: this.reloading && this.reloadTotal ? r2(G.U.clamp(1 - this.reloadT / this.reloadTotal, 0, 1)) : -1, in: this.inspectT > 0 && this.inspectDur ? r2(1 - this.inspectT / this.inspectDur) : this.rChk ? r2(0.58 + (G.VMAnim.INSPECT_HOLD - 0.58) * this.rChk.k) : -1,
       mc: this.magChk ? r2(this.magChk.back > 0 ? Math.max(0, 1 - this.magChk.back) : this.magChk.k) : -1,
