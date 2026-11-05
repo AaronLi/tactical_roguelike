@@ -9,8 +9,10 @@
 # grip = the grip (stippled); slide = part_slide (its optic cut with a cover plate and the rear sight, slot optic); barrel = the factory
 # barrel, which on this gun IS the integral suppressor: the hood in the port, the barrel, the housing and its front sight (no muzzle
 # thread: suppressor 'integral'); mag = part_mag (body up the grip, base plate).
-# VARIANT: the short configuration (the real gun's front section comes off at the seam: 242 mm overall) is a second barrel, built by the
-# same code with its front 87 px (31 mm) further back, in its own collection and file barrel_short.glb (same frame).
+# VARIANTS (each its own collection in maxim9.blend and its own file, same frame, root extras.variant_json):
+#   barrel_short.glb  the suppressor with its front block off: the big block ahead of the main seam (x 275, 94 mm), where the photo's
+#                     top steps up to the raised strip; the muzzle comes back from 273 to 179 mm, 62 mm ahead of the slide;
+#   mag_ext.glb       an extended magazine: the body and base pad 25 mm longer down the grip's slope (+5 rounds).
 import bpy, json, math, os
 HERE = globals().get('GUN_DIR') or os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
@@ -62,6 +64,7 @@ for df in (-11 * mm, 11 * mm):
 # fx: the front face's pixel (10 long; 97 short: the front section off) ----
 HW = 19.5 * mm
 UW, top, bot = 17.2 * mm, U(103), U(312)
+MAIN_SEAM = 275                                                          # (pixel) the front block's joint
 def suppressor(Kx, fx):
     hp = PL([(fx, 103), (450, 103), (450, 186), (365, 186), (365, 262), (325, 305), (fx + 30, 312), (fx, 300)])
     hs = Kx.tmp(prism(hp, 'x', -HW, HW))
@@ -69,20 +72,23 @@ def suppressor(Kx, fx):
     sec = [(-HW, bot - 0.01), (HW, bot - 0.01), (HW, U(186)), (UW, U(186) + 5 * mm), (UW, top - 5.5 * mm), (UW - 5.5 * mm, top + 0.0005),
            (-UW + 5.5 * mm, top + 0.0005), (-UW, top - 5.5 * mm), (-UW, U(186) + 5 * mm), (-HW, U(186))]
     boolean(hs, prism(sec, 'y', F(460), F(fx) + 0.01), 'INTERSECT')
-    pa = PL([(fx + 12, 198), (fx + 98, 198), (fx + 108, 268), (fx + 20, 276)])
-    pb = PL([(max(122, fx + 112), 198), (330, 198), (392, 228), (395, 258), (345, 288), (max(130, fx + 120), 282)])
+    bevel(hs, 2.2 * mm, 3, 30)                                              # (rounded first: the panels, seams and holes are cut crisp into it)
+    # the recessed side panels: the small one on the front block, the long one behind it (on the short, what is left of it)
+    pans = [PL([(fx + 12, 198), (fx + 98, 198), (fx + 108, 268), (fx + 20, 276)])] if fx < 100 else []
+    pans.append(PL([(max(122, fx + 12), 198), (330, 198), (392, 228), (395, 258), (345, 288), (max(130, fx + 20), 282)]))
     for s_ in (-1, 1):
-        for pts in (pa, pb):
+        for pts in pans:
             cut(hs, prism(pts, 'x', s_ * (HW - 0.8 * mm), s_ * (HW + 0.01)))
-    # the section seams (where the front section comes off, and the joint behind it): grooves round the sides and over the top
-    for sx in [x for x in (97, 143) if x > fx + 20]:
-        g0, g1 = F(sx) - 0.35 * mm, F(sx) + 0.35 * mm
-        for s_ in (-1, 1): cut(hs, box(s_ * (HW - 0.5 * mm), s_ * (HW + 0.01), g0, g1, bot - 0.01, top + 0.01))
-        cut(hs, box(-0.03, 0.03, g0, g1, top - 0.5 * mm, top + 0.01))
+    # the seams: the main one (x 275: the front block comes off here) deep, the baffle segments' (x 55, 97, 143) fine; round the sides and top
+    for sx, dp, wd in ((55, 0.3, 0.25), (97, 0.3, 0.25), (143, 0.3, 0.25), (MAIN_SEAM, 0.7, 0.45)):
+        if sx < fx + 20: continue
+        g0, g1 = F(sx) - wd * mm, F(sx) + wd * mm
+        for s_ in (-1, 1): cut(hs, box(s_ * (HW - dp * mm), s_ * (HW + 0.01), g0, g1, bot - 0.01, top + 0.01))
+        cut(hs, box(-0.03, 0.03, g0, g1, top - dp * mm, top + 0.01))
     cut(hs, cyl(5.2 * mm, F(fx + 20), F(fx) + 0.002, 'y', (0, 0), 24))       # the bore's exit
     for x in (-5.5 * mm, 5.5 * mm):                                          # two small holes in the face under it (the take-down pins' ends)
         cut(hs, cyl(1.5 * mm, F(fx + 8), F(fx) + 0.002, 'y', (x, U(185)), 12))
-    bevel(hs, 2.2 * mm, 3, 30); smooth(hs)
+    smooth(hs)
     Kx.adopt(hs, 'barrel', 'black')
     # the front sight on the housing's top, near its front
     o = Kx.obj(prism(PL([(fx + 40, 103), (fx + 15, 103), (fx + 17, 92), (fx + 37, 92)]), 'x', -1.6 * mm, 1.6 * mm), 'barrel', 'black'); bevel(o, 0.3 * mm, 1); smooth(o)
@@ -116,9 +122,20 @@ K.adopt(g, 'grip', 'stipple')
 
 # ---- MAGAZINE (part_mag): the body up the well to just under the slide, the base plate; the pivot at its top front (magAt) ----
 MAG_TOP = P(605, 192)
-pmag = K.part('mag', (0, MAG_TOP[0], MAG_TOP[1]))
-o = K.obj(prism(PL([(605, 192), (712, 192), (778, 486), (664, 486)]), 'x', -10 * mm, 10 * mm), 'mag', 'black', pmag); bevel(o, 0.8 * mm, 1); smooth(o)
-o = K.obj(prism(PL([(660, 484), (792, 484), (796, 498), (788, 506), (664, 506)]), 'x', -15.5 * mm, 15.5 * mm), 'mag', 'polymer', pmag); bevel(o, 1.5 * mm, 2); smooth(o)
+MAG_SLOPE = (778 - 712) / (486 - 192)                       # the magazine's lean (pixels back per pixel down), the grip's
+def magazine(Kx, ext=0):
+    # part_mag: the body (ext px longer down the slope) and its base pad (a deeper one, and a sleeve over the extension, when extended)
+    dx = ext * MAG_SLOPE
+    pm = Kx.part('mag', (0, MAG_TOP[0], MAG_TOP[1]))
+    o = Kx.obj(prism(PL([(605, 192), (712, 192), (778 + dx, 486 + ext), (664 + dx, 486 + ext)]), 'x', -10 * mm, 10 * mm), 'mag', 'black', pm); bevel(o, 0.8 * mm, 1); smooth(o)
+    pad = [(660, 484), (792, 484), (796, 498), (788, 506), (664, 506)] if not ext else [(660, 484), (792, 484), (798, 500), (794, 512), (780, 518), (668, 518)]
+    o = Kx.obj(prism(PL([(x + dx, y + ext) for x, y in pad]), 'x', -15.5 * mm, 15.5 * mm), 'mag', 'polymer', pm); bevel(o, 1.5 * mm, 2); smooth(o)
+    if ext:
+        o = Kx.tmp(prism(PL([(664, 482), (782, 482), (780 + dx, 486 + ext), (664 + dx, 486 + ext)]), 'x', -11.5 * mm, 11.5 * mm))
+        for s_ in (-1, 1):   # a witness window each side
+            cut(o, box(s_ * 10.8 * mm, s_ * 12 * mm, F(710 + dx * 0.5), F(700 + dx * 0.5), U(486 + ext * 0.75), U(486 + ext * 0.25)))
+        bevel(o, 0.8 * mm, 1); smooth(o); Kx.adopt(o, 'mag', 'polymer', pm)
+magazine(K)
 
 # ---- the gun's info and the authored-pistol anchors (TASK 15's names) ----
 SY = U(91)                                                  # the sight line: the rear notch's floor and the front post's top
@@ -138,21 +155,25 @@ anchors = {
     'mount_barrel': [round(F(450), 4), 0, 0],                                   # the slide's mouth: the barrel (here the suppressor) begins
     'mount_mag': [round(MAG_TOP[0], 4), round(MAG_TOP[1], 4), 0],
     'mount_grip': [round(F(588), 4), round(U(258), 4), 0],                      # the grip seat: its front, the frame's underside
-    'mount_tac': [round(F(300), 4), round(bot, 4), 0],                          # the rail under the housing (on the long and the short alike)
+    'mount_tac': [round(F(335), 4), round(bot, 4), 0],                          # the rail under the housing (on the long and the short alike)
 }
 root['gun'] = ID; root['info_json'] = json.dumps(info); root['anchors_json'] = json.dumps(anchors)
 
-# ---- VARIANT: the short barrel (the suppressor with its front section off: 31 mm shorter), its own collection and file ----
-coll2, root2 = kit_collection(ID + '_barrel_short')
-K2 = Kit(coll2, root2)
-MUZ2 = suppressor(K2, 97)
-root2['variant_json'] = json.dumps({'gun': ID, 'slot': 'barrel', 'of': 'factory', 'info': {'muzzles': [[round(MUZ2, 4), 0, 0]]},
-                                    'note': 'the front section off: 31 mm shorter, much handier, less quiet'})
+# ---- VARIANTS: their own collections and files ----
+VARS = []
+c_, r_, K2 = kit_variant(ID, 'barrel_short', 'barrel', {})
+MUZ2 = suppressor(K2, MAIN_SEAM)
+r_['variant_json'] = json.dumps({'gun': ID, 'slot': 'barrel', 'of': 'factory', 'info': {'muzzles': [[round(MUZ2, 4), 0, 0]]},
+                                 'note': 'the front block off at the main seam: 94 mm shorter (muzzle 179 mm), far handier, less quiet'})
+VARS.append(('barrel_short', c_))
+MAG_EXT = 70                                                # (pixels: 25 mm)
+c_, r_, K3 = kit_variant(ID, 'mag_ext', 'mag', {'note': 'extended magazine: 25 mm longer, +5 rounds (22)', 'cap': 22})
+magazine(K3, MAG_EXT)
+VARS.append(('mag_ext', c_))
 
 meshes = [o for o in coll.all_objects if o.type == 'MESH']
-glb2 = export_glb(coll2, os.path.join(HERE, 'barrel_short.glb')) if EXPORT else None
+vglb = {n: (export_glb(c, os.path.join(HERE, n + '.glb')) if EXPORT else None, tris_of(c.all_objects)) for n, c in VARS}
 bb = [[min((o.matrix_world @ v.co)[a] for o in meshes for v in o.data.vertices) for a in range(3)],
       [max((o.matrix_world @ v.co)[a] for o in meshes for v in o.data.vertices) for a in range(3)]]
 result = {'meshes': len(meshes), 'tris': tris_of(meshes), 'bounds_mm': [[round(x * 1000, 1) for x in b] for b in bb], 'info': info,
-          'glb': save_and_export(coll, root, HERE, ID, EXPORT, also=(coll2,)),
-          'short': {'muzzle_mm': round(MUZ2 * 1000, 1), 'tris': tris_of(coll2.all_objects), 'glb': glb2}}
+          'glb': save_and_export(coll, root, HERE, ID, EXPORT, also=tuple(c for _, c in VARS)), 'variants': vglb, 'short_muzzle_mm': round(MUZ2 * 1000, 1)}

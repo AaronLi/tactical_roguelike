@@ -130,6 +130,13 @@ def xform(me, M):
 def tris_of(objs):
     return sum(sum(len(p.vertices) - 2 for p in o.data.polygons) for o in objs if o.type == 'MESH')
 
+def kit_variant(gun, name, slot, meta):
+    """A variant part of a gun (another barrel, magazine...): its own collection and root `<gun>_<name>` (extras.variant_json), same frame."""
+    import json
+    coll, root = kit_collection(gun + '_' + name)
+    root['variant_json'] = json.dumps(dict({'gun': gun, 'slot': slot, 'of': 'factory'}, **meta))
+    return coll, root, Kit(coll, root)
+
 def export_glb(coll, path):
     """One collection (its root and children, extras on) to a .glb; returns its size."""
     bpy.ops.object.select_all(action='DESELECT')
