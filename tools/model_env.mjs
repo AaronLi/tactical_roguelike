@@ -3,6 +3,7 @@
 import fs from 'fs'; import vm from 'vm'; import path from 'path'; import { fileURLToPath } from 'url';
 import * as THREE_NS from 'three';
 import { loadAuthoredInto } from './bake_authored.mjs';
+import { loadAuthoredPartsInto } from './authored_parts.mjs';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const DIST = path.join(ROOT, 'dist/js/'), DIST_RECIPES = path.join(ROOT, 'dist/tools/tools/models/');
@@ -29,7 +30,8 @@ export function loadGame(withModels = false, extra = {}) {
   Object.assign(ctx, extra); ctx.window = ctx; ctx.self = ctx; ctx.G = { R: { flashTexture: () => null, _envMap: () => null } };
   vm.createContext(ctx);
   for (const f of ['util', 'data', 'callsigns', 'arsenal', 'parts', 'gear', 'medical', 'materials', 'stickers', 'gunmaterials']) vm.runInContext(readDist(f), ctx, { filename: f + '.js' });
-  for (const f of ['guntraces', 'authored', 'recipes']) vm.runInContext(readDist(f, DIST_RECIPES), ctx, { filename: f + '.js' }); // (the recipes: G.GunRecipes, the bake's only; the game's runtime has none)
+  for (const f of ['guntraces', 'authored', 'authoredparts', 'recipes']) vm.runInContext(readDist(f, DIST_RECIPES), ctx, { filename: f + '.js' }); // (the recipes: G.GunRecipes, the bake's only; the game's runtime has none)
+  loadAuthoredPartsInto(ctx.G); // (the sights etc. modelled in Blender: models/parts/<slot>/<id>/, tools/authored_parts.mjs)
   loadAuthoredInto(ctx.G); // (the guns modelled in Blender: models/<id>/, tools/bake_authored.mjs)
   vm.runInContext(readDist('gunrig'), ctx, { filename: 'gunrig.js' });
   ctx.G.GunModels = ctx.G.GunRecipes; // (the baker's name for them: .display(def), .M, .build; the game's G.GunModels is the facade over the baked files, js/gunmodels.ts, not loaded here)

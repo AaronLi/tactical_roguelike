@@ -38,6 +38,7 @@ import { dedup, weld, quantize, meshopt, prune } from '@gltf-transform/functions
 import { MeshoptEncoder, MeshoptDecoder } from 'meshoptimizer';
 import { bakeParts, staleParts, PARTS_DIR } from './bake_parts.mjs';
 import { authoredIds, authoredSrc, checkAuthored } from './bake_authored.mjs';
+import { authoredPartKeys, authoredPartsSrc, checkAuthoredPart } from './authored_parts.mjs';
 
 const OUT = path.join(ROOT, 'assets/models/guns/');
 const args = process.argv.slice(2), check = args.includes('--check'), only = args.filter((a) => !a.startsWith('--'));
@@ -50,7 +51,7 @@ globalThis.FileReader = class { // (GLTFExporter wants a browser's FileReader on
 };
 const G = loadGame(), GM = G.GunRecipes, GS = G.Gunsmith, Models = loadModels();
 const sha = (s) => crypto.createHash('sha1').update(s).digest('hex').slice(0, 16);
-const src = sha(['tools/models/recipes', 'tools/models/guntraces', 'tools/models/authored', 'js/parts', 'js/materials', 'js/gunmaterials'].map((f) => fs.readFileSync(path.join(ROOT, f + '.ts'), 'utf8')).join('\0') + '\0' + authoredSrc());
+const src = sha(['tools/models/recipes', 'tools/models/guntraces', 'tools/models/authored', 'tools/models/authoredparts', 'js/parts', 'js/materials', 'js/gunmaterials'].map((f) => fs.readFileSync(path.join(ROOT, f + '.ts'), 'utf8')).join('\0') + '\0' + authoredSrc() + '\0' + authoredPartsSrc());
 
 // material -> its catalogue name
 const matName = new Map();
@@ -102,6 +103,10 @@ function prepare(id, group, info) {
 for (const id of authoredIds()) { // (the authored sources: the contract and the platform's spec first)
   const r = checkAuthored(Models, id, G); for (const w of r.warnings) console.warn(id + ': warning ' + w);
   if (r.errors.length) { console.error('authored source ' + id + ' is not valid:\n  ' + r.errors.join('\n  ')); process.exit(1); }
+}
+for (const k of authoredPartKeys()) { // (the authored parts: sights etc. made in Blender, checked before anything is baked with them)
+  const r = checkAuthoredPart(Models, k); for (const w of r.warnings) console.warn(k + ': warning ' + w);
+  if (r.errors.length) { console.error('authored part ' + k + ' is not valid:\n  ' + r.errors.join('\n  ')); process.exit(1); }
 }
 const platIds = Object.keys(GS.PLATFORMS || {}).filter((id) => G.WEAPONS[id]);
 const ids2 = only.length ? only : platIds.length ? platIds : G.WEAPON_LIST.map((w) => w.id);

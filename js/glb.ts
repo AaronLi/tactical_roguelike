@@ -272,6 +272,27 @@ const GUN_MODEL_CONTRACT = { ...CONTRACT_CORE, displays: {
     'Fit is data, not geometry: whether a part fits the gun is decided by js/parts.ts (fitsSlot, hgRoom with hgMax) from the platform\'s spec; the baker checks the platform\'s spec (L, hgMax, mag) against the anchors and fails when they disagree.',
   ],
   example: { name: 'fal', extras: { gun: 'fal', info_json: '{"sy":0.04,...}', anchors_json: '{"mount_optic":[0.0141,0.0232,0],"mount_optic_end":[0.1791,0.0232,0],"mount_handguard":[0.3012,0,0],"mount_handguard_end":[0.5357,0,0],"mount_muzzle":[0.7329,0,0],"mount_barrel":[0.6153,0,0],"mount_stock":[0,-0.01835,0],"mount_grip":[0.0661,-0.0452,0],"mount_mag":[0.2232,-0.0429,0]}', seat_json: '{"barrelR":0.0071}' } },
+}, authoredParts: {
+  what: 'AUTHORED PART. A shared attachment modelled in Blender (a sight, a prism, a scope; other slots are reserved) is baked straight from its .glb: models/parts/<slot>/<id>/<id>.glb plus models/parts/<slot>/<id>/model.json. It is ONE object, the same file on every gun whose mount takes it; everything gun-specific under it (the rail section, a riser) is the gun\'s mount piece (tag `optic@mount`), never part of the model. `npm run check:models -- models/parts/<slot>/<id>/<id>.glb` validates one; `npm run check:models -- --write` regenerates its catalogue entry.',
+  frame: 'THE PART\'S OWN FRAME. Metres, the glTF axes (x right, y up, z = -forward); anchors are written [forward, up, right] = [-z, y, x] like everywhere in the contract. For an optic (the only slot defined) the ORIGIN is on the top of the rail, at the optic\'s mount point, centred (right = 0): the plane the optic\'s foot rests on, so no vertex is below y = 0 (the rail, riser or adapter is the mount piece\'s). The recipe places it at the gun\'s rail top and the platform\'s optic position (spec optF) and the baker finds that it only translates.',
+  model: 'The .glb has ONE root node named after the part (the folder name), no extras.info and no part_ nodes; its children are meshes "<slot>_<n>" (the slot\'s name: optic) with extras.slot and a catalogue material name (or display surfaces, as in the contract). Triangles outside the sight: none. Geometry limits for an optic: within 0.12 m either side of the origin forward and 0.04 m left/right, up to 0.15 m high.',
+  config: 'model.json: { "source": "authored", "kind": "part", "slot": "optic", "frame": "rail-top", "optic": { sy, fSight, relief, reflex?, pip?, magnifier?, height }, "part": { mount, brand, name, price, tier, zoom, st, desc?, scoped?, reticle?, px?, levels? } }. The catalogue id is derived: `op.auth.<id>`.',
+  optic: {
+    sy: 'Height of the line of sight above the origin, metres (info.sy = the rail top + this). A reflex window\'s centre height must equal it.',
+    fSight: 'Forward position of the sight\'s rear/eye reference, metres from the origin (info.fSight = the mount point + this); with relief it places the aiming eye.',
+    relief: 'Eye relief, metres (0.03 to 0.4).',
+    reflex: 'A reflex or holographic sight\'s window { f, y, w, h, round?, kind: dot|dotG|cdot|holo }, centre [forward, up] and size, in the part\'s frame (becomes info.reflex shifted to the gun). The game draws a collimated reticle behind it; it lies inside the model\'s bounds and y equals sy.',
+    pip: 'A scope\'s ocular lens { f, y, r } in the part\'s frame (becomes info.pip): a magnified sight needs it and the part\'s zoom/reticle/px (set.scoped). y equals sy.',
+    magnifier: 'true when a magnifier goes behind it (a reflex sight with a window); the gun gets the anchor mount_magnifier [fSight, sy, 0].',
+    height: 'low, mid or high: how tall the sight stands, for ordering and tests.',
+  },
+  part: 'The catalogue entry (js/parts.ts takes it from a generated block, `check:models -- --write` rewrites it): mount (the rail interface: op:pic, a Picatinny top rail), brand (a key of the brands), name, price, tier, zoom (the ADS FOV multiplier), st (stat deltas), and for a magnified sight scoped: true with reticle (cross|chevron|lpvo|ring), px (magnification) and optionally levels. The part is fittable and buyable on every gun that has that mount, with no per-gun data.',
+  rules: [
+    'The same part is the same file on every gun: the model never depends on a gun. Nothing is stretched.',
+    'Bounds, origin and window are checked on the file (tools/authored_parts.mjs): a vertex below the rail top, a window outside the model, a window not on the sight line and an unknown material are errors that name the mesh and the number.',
+    'On a gun with TASK-3 mount pieces the rail under the part is `optic@mount`; the part\'s own meshes are the `optic` pack and are shared across guns by content.',
+  ],
+  example: { name: 'falcon', extras: {}, child: { name: 'optic_1', extras: { slot: 'optic' }, material: 'black' }, model_json: { source: 'authored', kind: 'part', slot: 'optic', frame: 'rail-top', optic: { sy: 0.0285, fSight: -0.026, relief: 0.09, reflex: { f: 0.0135, y: 0.0285, w: 0.026, h: 0.026, kind: 'dot' }, magnifier: true, height: 'low' } } },
 } };
 
 // ---- the validator ------------------------------------------------------------------------------------------------------
@@ -611,6 +632,98 @@ function validateAuthored(model: ModelDesc, id?: string, opts: { factory?: strin
   return { errors, warnings };
 }
 
+// ---- authored parts (GUN_MODEL_CONTRACT.authoredParts): a shared attachment modelled in Blender
+const AUTHORED_PART_SLOTS: Record<string, { mounts: string[] }> = { optic: { mounts: ['op:pic'] } };
+const RETICLES = ['dot', 'dotG', 'cdot', 'holo'], SCOPE_RETICLES = ['cross', 'chevron', 'lpvo', 'ring'];
+/** model.json of an authored part, checked: the shape, the ranges, and that the sight data agrees with itself (window on the sight line...). id: the folder name. */
+function validateAuthoredPartConfig(cfg: any, id?: string): string[] {
+  const out: string[] = [], E = (m: string) => out.push('model.json: ' + m);
+  if (!isObj(cfg)) return ['model.json: expected an object { source, kind, slot, frame, optic, part }'];
+  if (cfg.source !== 'authored') E(`"source" is ${JSON.stringify(cfg.source)}, expected "authored"`);
+  if (cfg.kind !== 'part') E(`"kind" is ${JSON.stringify(cfg.kind)}, expected "part" (a gun is "sights" instead)`);
+  if (!(cfg.slot in AUTHORED_PART_SLOTS)) E(`"slot" is ${JSON.stringify(cfg.slot)}, expected one of ${Object.keys(AUTHORED_PART_SLOTS).join(', ')}`);
+  if (cfg.frame !== 'rail-top') E(`"frame" is ${JSON.stringify(cfg.frame)}, expected "rail-top" (the origin is the top of the rail at the optic's mount point)`);
+  if (id !== undefined && !/^[a-z][a-z0-9_]*$/.test(id)) E(`the folder name "${id}" must be lower-case letters, digits and underscores (it makes the part id op.auth.${id})`);
+  for (const k of Object.keys(cfg)) if (!['source', 'kind', 'slot', 'frame', 'optic', 'part'].includes(k)) E(`unknown field "${k}"`);
+  const o = cfg.optic, p = cfg.part;
+  if (!isObj(o)) E('"optic" is missing ({ sy, fSight, relief, reflex?, pip?, magnifier?, height })');
+  else {
+    const num = (k: string, lo: number, hi: number) => { if (!isNum(o[k])) E(`optic.${k}: expected a number (metres), got ${JSON.stringify(o[k])}`); else if (o[k] < lo || o[k] > hi) E(`optic.${k}: ${o[k]} is out of range (${lo} to ${hi} m)`); };
+    num('sy', 0.005, 0.12); num('fSight', -0.2, 0.2); num('relief', 0.03, 0.4);
+    if (!['low', 'mid', 'high'].includes(o.height)) E(`optic.height: ${JSON.stringify(o.height)} must be low, mid or high`);
+    if (o.magnifier !== undefined && typeof o.magnifier !== 'boolean') E('optic.magnifier: expected true/false');
+    if (o.reflex === undefined && o.pip === undefined) E('optic needs a reflex window or a pip lens (it is the picture the sight shows)');
+    if (o.reflex !== undefined) {
+      const r = o.reflex;
+      if (!isObj(r)) E('optic.reflex: expected { f, y, w, h, kind }');
+      else {
+        for (const k of ['f', 'y', 'w', 'h']) if (!isNum(r[k])) E(`optic.reflex.${k}: expected a number, got ${JSON.stringify(r[k])}`);
+        if (isNum(r.w) && (r.w <= 0.004 || r.w > 0.08)) E(`optic.reflex.w: ${r.w} m is not a sight window`); if (isNum(r.h) && (r.h <= 0.004 || r.h > 0.08)) E(`optic.reflex.h: ${r.h} m is not a sight window`);
+        if (!RETICLES.includes(r.kind)) E(`optic.reflex.kind: ${JSON.stringify(r.kind)} must be one of ${RETICLES.join(', ')}`);
+        if (isNum(r.y) && isNum(o.sy) && Math.abs(r.y - o.sy) > 1e-4) E(`optic.reflex.y (${r.y}) is not optic.sy (${o.sy}): the window's centre is on the line of sight, or the reticle will not line up`);
+        if (r.round !== undefined && typeof r.round !== 'boolean') E('optic.reflex.round: expected true/false');
+        for (const k of Object.keys(r)) if (!['f', 'y', 'w', 'h', 'kind', 'round'].includes(k)) E(`optic.reflex: unknown field "${k}"`);
+      }
+    }
+    if (o.pip !== undefined) {
+      const q = o.pip;
+      if (!isObj(q)) E('optic.pip: expected { f, y, r }');
+      else {
+        for (const k of ['f', 'y', 'r']) if (!isNum(q[k])) E(`optic.pip.${k}: expected a number, got ${JSON.stringify(q[k])}`);
+        if (isNum(q.y) && isNum(o.sy) && Math.abs(q.y - o.sy) > 1e-4) E(`optic.pip.y (${q.y}) is not optic.sy (${o.sy}): the lens is on the line of sight`);
+        if (isNum(q.r) && (q.r < 0.004 || q.r > 0.04)) E(`optic.pip.r: ${q.r} m is not a sight lens`);
+        for (const k of Object.keys(q)) if (!['f', 'y', 'r'].includes(k)) E(`optic.pip: unknown field "${k}"`);
+      }
+    }
+    if (o.magnifier === true && o.reflex === undefined) E('optic.magnifier is true but there is no reflex window: a magnifier goes behind a reflex sight');
+    for (const k of Object.keys(o)) if (!['sy', 'fSight', 'relief', 'reflex', 'pip', 'magnifier', 'height'].includes(k)) E(`optic: unknown field "${k}"`);
+  }
+  if (!isObj(p)) E('"part" is missing ({ mount, brand, name, price, tier, zoom, st })');
+  else {
+    const spec = AUTHORED_PART_SLOTS[cfg.slot];
+    if (spec && !spec.mounts.includes(p.mount)) E(`part.mount: ${JSON.stringify(p.mount)} must be one of ${spec.mounts.join(', ')}`);
+    for (const k of ['brand', 'name']) if (typeof p[k] !== 'string' || !p[k].trim()) E(`part.${k}: expected a non-empty string`);
+    if (!isNum(p.price) || p.price < 0) E('part.price: expected a number >= 0'); if (!Number.isInteger(p.tier) || p.tier < 1 || p.tier > 3) E('part.tier: expected 1, 2 or 3');
+    if (!isNum(p.zoom) || p.zoom < 0.2 || p.zoom > 1) E(`part.zoom: expected the ADS FOV multiplier, 0.2 to 1, got ${JSON.stringify(p.zoom)}`);
+    if (!isObj(p.st) || !Object.values(p.st).every(isNum)) E('part.st: expected an object of stat deltas (numbers)');
+    if (p.desc !== undefined && typeof p.desc !== 'string') E('part.desc: expected text');
+    if (isObj(o) && o.pip !== undefined) {
+      if (p.scoped !== true) E('part.scoped must be true for a sight with a pip lens'); if (!SCOPE_RETICLES.includes(p.reticle)) E(`part.reticle: ${JSON.stringify(p.reticle)} must be one of ${SCOPE_RETICLES.join(', ')}`);
+      if (!isNum(p.px) || p.px < 1.2) E('part.px: the magnification, a number of at least 1.2'); if (p.levels !== undefined && !(Array.isArray(p.levels) && p.levels.every(isNum))) E('part.levels: expected a list of powers');
+    } else for (const k of ['scoped', 'reticle', 'px', 'levels']) if (p[k] !== undefined) E(`part.${k} is for a magnified sight (optic.pip); this one has none`);
+    for (const k of Object.keys(p)) if (!['mount', 'brand', 'name', 'price', 'tier', 'zoom', 'st', 'desc', 'scoped', 'reticle', 'px', 'levels'].includes(k)) E(`part: unknown field "${k}"`);
+  }
+  return out;
+}
+/** Checks an authored part's .glb (as a ModelDesc): one root named after the part, only meshes of the part's slot (and display surfaces) with catalogue materials. */
+function validateAuthoredPart(model: ModelDesc, id: string, slot = 'optic'): ModelReport {
+  const errors: string[] = [], warnings: string[] = [], C = GUN_MODEL_CONTRACT, E = (m: string) => errors.push(m), matOk = new RegExp(C.materials.anonymousPattern);
+  if (model.roots.length !== 1) { E(`the scene has ${model.roots.length} root nodes; it needs exactly one, named after the part ("${id}")`); return { errors, warnings }; }
+  const root = model.roots[0];
+  if (root.name !== id) E(`the root node is named "${root.name}", expected "${id}" (the folder name)`);
+  if (root.extras[NAMES.extras.info] !== undefined || root.extras[NAMES.extras.anchors] !== undefined) E('an authored part has no extras.info or extras.anchors on its root (its sight data is in model.json)');
+  let meshes = 0; const names = new Set<string>();
+  for (const c of root.children) {
+    if (names.has(c.name)) E(`two nodes are named "${c.name}"`); names.add(c.name);
+    if (!c.mesh) { E(`node "${c.name}": an authored part is flat meshes under the root (no ${NAMES.partPrefix}/${NAMES.groupPrefix} nodes)`); continue; }
+    const display = c.name.startsWith(NAMES.displayPrefix);
+    if (c.extras[NAMES.extras.slot] !== slot) E(`mesh "${c.name}": extras.slot is ${JSON.stringify(c.extras[NAMES.extras.slot])}, expected "${slot}"`);
+    if (display) {
+      if (!c.uv) E(`display "${c.name}": has no UVs (TEXCOORD_0)`);
+      const d = c.extras[NAMES.extras.display];
+      if (!isObj(d) || !(Number.isInteger(d.width) && d.width > 0 && Number.isInteger(d.height) && d.height > 0)) E(`display "${c.name}": extras.display must be { width, height } in whole pixels`);
+    } else {
+      meshes++;
+      if (!new RegExp('^' + slot + '_\\d+$').test(c.name)) E(`mesh "${c.name}": must be named "${slot}_<n>" (or "${NAMES.displayPrefix}<name>" for a display surface)`);
+      if (!c.materials.length) E(`mesh "${c.name}": has no material`);
+      for (const m of c.materials) if (!m) E(`mesh "${c.name}": its material has no name (use a catalogue name)`); else if (!(m in C.materials.names) && !matOk.test(m)) E(`mesh "${c.name}": material '${m}' is not in the catalogue (${Object.keys(C.materials.names).join(', ')}) and is not an anonymous colour (m_<rrggbb>)`);
+    }
+    if (c.children.length) E(`mesh "${c.name}" has child nodes`);
+  }
+  if (!meshes) E('the part has no meshes');
+  return { errors, warnings };
+}
+
 /** Checks one pack file (a ModelDesc) against the pack rules: one root, flat part_/group_ nodes with a pivot, meshes of one slot, known materials. */
 function validatePack(model: ModelDesc, tag?: string): ModelReport {
   const errors: string[] = [], warnings: string[] = [], C = GUN_MODEL_CONTRACT, E = (m: string) => errors.push(m);
@@ -732,6 +845,8 @@ function contractMarkdown(): string {
   L.push('', '**Authored sources** (a gun modelled in Blender, baked with no recipe):', '', `- what: ${C.authored.what}`, `- nodes: ${C.authored.nodes}`, `- info: ${C.authored.info}`, `- anchors: ${C.authored.anchors}`, '', '| anchor (extras.anchors) | meaning |', '| --- | --- |');
   for (const [k, v] of Object.entries(C.authored.required)) L.push(`| \`${k}\` (required) | ${esc(v as string)} |`);
   L.push('', `- seat: ${C.authored.seat}`, `- mesh: ${C.authored.mesh}`, ...C.authored.rules.map((r) => `- ${r}`), '- example: \`' + JSON.stringify(C.authored.example) + '\`');
+  const AP = C.authoredParts;
+  L.push('', '**Authored parts** (a shared attachment modelled in Blender: sights, prisms, scopes):', '', `- what: ${AP.what}`, `- frame: ${AP.frame}`, `- model: ${AP.model}`, `- config: ${AP.config}`, ...Object.entries(AP.optic).map(([k, v]) => `- optic.${k}: ${v}`), `- part: ${AP.part}`, ...AP.rules.map((r) => `- ${r}`), '- example: \`' + JSON.stringify(AP.example) + '\`');
   L.push('', '**Magazine check** (`part_mag.extras.check`, meshes\' `extras.chk`):', '', `- what: ${C.magCheck.what}`, `- part: ${C.magCheck.part}`, `- meshes: ${C.magCheck.meshes}`, '- example: `' + JSON.stringify(C.magCheck.example) + '`');
   L.push('', '**Per-part packs** (assets/models/parts, milestone 2):', '', ...Object.entries(C.packs).map(([k, v]) => `- ${k}: ${v}`));
   L.push('', C.materials.anonymous, '', '**Extras keys:** ' + Object.entries(C.extras).map(([where, o]) => `${where}: ${Object.keys(o).map((k) => '`' + k + '`').join(', ')}`).join('; ') + '.');
@@ -968,7 +1083,7 @@ interface BakedIndex { version: number; three: string; src: string; guns: Record
   }
 
   return {
-    boot, preloadAll, ready, infoFromIndex, setRoot, loadFile, fetchJson, on, checking, preload, preloadPlatform, ensure, assemble, infoOf, loadIndex: async (id: string) => !!(await platformIndex(id)), displayBaked, contract: GUN_MODEL_CONTRACT, infoFields: INFO_FIELDS, partsIndexFields: PARTS_INDEX_FIELDS, validate, validateAuthored, validateAuthoredConfig, validatePack, validatePartsIndex, describeGltfJson, describeScene, glbJson,
+    boot, preloadAll, ready, infoFromIndex, setRoot, loadFile, fetchJson, on, checking, preload, preloadPlatform, ensure, assemble, infoOf, loadIndex: async (id: string) => !!(await platformIndex(id)), displayBaked, contract: GUN_MODEL_CONTRACT, infoFields: INFO_FIELDS, partsIndexFields: PARTS_INDEX_FIELDS, validate, validateAuthored, validateAuthoredConfig, validateAuthoredPart, validateAuthoredPartConfig, validatePack, validatePartsIndex, describeGltfJson, describeScene, glbJson,
     infoSchema, partsIndexSchema, contractMarkdown, loaded: (id: string) => loaded.has(id), platformLoaded: (id: string) => platIx.has(id), SLOTS, PARTS, NAMES,
     // the pure side of the packs (no three.js): the baker and the tests check the packs with the same code the game plans with
     planBuild, pickPack, infoLeaves, infoFromLeaves, buildKeyOf, slotKey, PARTS_INDEX_VERSION,
