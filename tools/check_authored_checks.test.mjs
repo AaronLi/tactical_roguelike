@@ -83,5 +83,17 @@ T('furniture: a factory handguard no authored part replaces (a warning)', {}, /t
 run('furniture: one that is replaced is quiet', authoredChecks(gun(), ctx({ factory: fac, replaced: { handguard: new Map([['X handguard', 'handguard/x']]) } })), /^$/, true);
 run('furniture: a part only this gun takes is quiet', authoredChecks(gun(), ctx({ factory: [{ ...fac[0], shared: false }] })), /^$/, true);
 
+// waivers (tools/authored_waivers.json): exactly the waived gun + rule turns into a warning carrying its note
+{
+  const w = (o) => ({ x: o }), broken = { hole: 0.0015, noW: true };
+  const r1 = authoredChecks(gun(broken), ctx({ waivers: w({ a: 'open the aperture' }) }));
+  run('waiver: a waived rule is a warning with its note', r1, /WAIVED \(tools\/authored_waivers\.json x\.a: open the aperture\): models\/x: the iron sights .*rear aperture/, true);
+  run('waiver: another rule of the same gun stays an error', r1, /no extras\.check\.w/);
+  n++; if (r1.errors.some((e) => /rear aperture/.test(e))) { bad++; console.error('FAIL waiver: the waived error is not also an error'); } else console.log('ok   waiver: the waived error is not also an error');
+  run('waiver: a waiver whose rule passes warns', authoredChecks(gun(), ctx({ waivers: w({ e: 'x' }) })), /the waiver x\.e is no longer needed \(rule e passes\): remove it/, true);
+  run('waiver: another gun\'s waiver does not apply', authoredChecks(gun(broken), ctx({ waivers: { y: { a: 'x', b: 'x' } } })), /rear aperture[^]*check\.w|check\.w[^]*rear aperture/);
+  run('waiver: a letter that is not a rule', authoredChecks(gun(), ctx({ waivers: w({ f: 'x' }) })), /x\.f is not a rule that can fail/);
+}
+
 console.log(bad ? `${bad} of ${n} FAILED` : `all ${n} authored-check tests passed`);
 process.exit(bad ? 1 : 0);

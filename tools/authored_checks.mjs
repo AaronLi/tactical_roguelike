@@ -299,18 +299,38 @@ export function factoryCtx(G, id) {
     hgPart: (() => { const p = G.Gunsmith.PARTS[build.handguard]; return p && p.model && p.model.hg && p.model.hg.len != null ? { id: build.handguard, len: p.model.hg.len } : null; })(),
   };
 }
-/** Every rule on one model. ctx: { hgMax?, magKind?, factory?, hgPart?, replaced? } (factoryCtx(G, id), replacedNames()). */
+/**
+ * Every rule on one model. ctx: { hgMax?, magKind?, factory?, hgPart?, swap?, replaced?, waivers? } (factoryCtx(G, id), replacedNames(), readWaivers()).
+ * A rule the gun's waiver names (tools/authored_waivers.json) turns that rule's errors into warnings carrying the waiver's note; a waiver whose rule passes
+ * is a warning too (remove it). Errors of any other rule, and of every gun without a waiver, stay errors.
+ */
 export function authoredChecks(M, ctx = {}) {
-  const errors = [], warnings = [], E = (m) => errors.push(m), W = (m) => warnings.push(m);
-  checkIrons(M, E, W);
+  const byRule = {}, warnings = [], W = (m) => warnings.push(m), E = (rule) => (m) => (byRule[rule] = byRule[rule] || []).push(m);
+  checkIrons(M, E('a'), W);
   const kind = M.info.barrels ? 'block' : ctx.magKind || 'box';
-  checkMagCheck(M, E, kind);
-  if (kind === 'box') checkTopRound(M, E);
-  checkHandguard(M, E, ctx.hgMax, ctx.swap);
-  if (ctx.hgPart && ctx.hgMax != null && (!ctx.swap || ctx.swap.handguard) && ctx.hgPart.len > ctx.hgMax + 1e-6) E(`js/parts.ts: ${M.id}'s default handguard ${ctx.hgPart.id} is ${mm(ctx.hgPart.len)} mm long, over the platform's hgMax ${mm(ctx.hgMax)} mm: the default build does not fit (hgRoom)`);
-  if (kind !== 'block') checkMagWell(M, E, W);
+  checkMagCheck(M, E('b'), kind);
+  if (kind === 'box') checkTopRound(M, E('c'));
+  checkHandguard(M, E('d'), ctx.hgMax, ctx.swap);
+  if (ctx.hgPart && ctx.hgMax != null && (!ctx.swap || ctx.swap.handguard) && ctx.hgPart.len > ctx.hgMax + 1e-6) E('d')(`js/parts.ts: ${M.id}'s default handguard ${ctx.hgPart.id} is ${mm(ctx.hgPart.len)} mm long, over the platform's hgMax ${mm(ctx.hgMax)} mm: the default build does not fit (hgRoom)`);
+  if (kind !== 'block') checkMagWell(M, E('e'), W);
   checkFurniture(M, W, ctx.factory, ctx.replaced || replacedNames());
+  const errors = [], waived = (ctx.waivers || readWaivers())[M.id] || {};
+  for (const r of RULES) {
+    const es = byRule[r] || [];
+    if (waived[r] == null) { errors.push(...es); continue; }
+    if (es.length) for (const e of es) W(`WAIVED (tools/authored_waivers.json ${M.id}.${r}: ${waived[r]}): ${e}`);
+    else W(`tools/authored_waivers.json: the waiver ${M.id}.${r} is no longer needed (rule ${r} passes): remove it`);
+  }
+  for (const r of Object.keys(waived)) if (!RULES.includes(r)) errors.push(`tools/authored_waivers.json: ${M.id}.${r} is not a rule that can fail (${RULES.join(', ')}; f only warns)`);
   return { errors, warnings };
 }
+export const RULES = ['a', 'b', 'c', 'd', 'e']; // (the rules that give errors; f only warns)
+/**
+ * The waivers: tools/authored_waivers.json, { "<gun>": { "<rule letter>": "why, and what fixes it" } } (a "_comment" key is ignored). A gun's failure of a
+ * waived rule is reported as a warning with the note until the model is fixed, and its entry removed: for the models that were in when the rules came in
+ * (2026-11-05), never for a new gun.
+ */
+export const WAIVERS = path.join(ROOT, 'tools/authored_waivers.json');
+export function readWaivers(file = WAIVERS) { if (!fs.existsSync(file)) return {}; const j = JSON.parse(fs.readFileSync(file, 'utf8')); delete j._comment; return j; }
 /** (for debugging the rules: the crossings of a ray with some meshes) */
 export const _hits = (meshes, o, d, tmax = 1) => hits(scene(meshes), o, norm(d), tmax);

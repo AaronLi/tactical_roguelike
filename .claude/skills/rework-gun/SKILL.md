@@ -95,6 +95,8 @@ const mem = {}; G.U.store = { get: (k, d) => (k in mem ? mem[k] : d), set: (k, v
   - e. magazine well: modelled as a hollow shell round `magAt`, and the magazine stays inside it (0.5 mm).
   - f. furniture (warning): each factory stock, grip, handguard and muzzle has a `models/parts/<slot>/<id>/` whose `replaces`
     names its catalogue part.
+  - `tools/authored_waivers.json` waives the failures the older guns had when the checks came in (printed as WAIVED warnings).
+    When you fix one, remove that gun's rule from it (the check warns "no longer needed" until you do); never add a new gun there.
 
 Browser traps: pass your tabId on every call and check `location.href` first, because a call without one lands on whatever tab is in front, which has put agents' scripts on the user's port. A tab that isn't in front stops ticking: the game loop freezes, so `adsT` stays 0 and reloads never end, and `tabs_select` is what fixes it. Some levels are blackouts: a black first-person view may be the level, so raise the AmbientLight's intensity in the test before suspecting the gun. `G.R.render()` called directly gives a frame even so. Don't leave `M.reloading` forced off and read the magazine: wait for it to finish.
 
