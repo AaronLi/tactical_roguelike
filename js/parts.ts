@@ -1693,8 +1693,44 @@ const G_Gunsmith = (() => {
     }
     return out;
   }
+  // A part's figures, as the chips the gunsmith shows (and the highlights' tour of a gun reads out): what it changes against the
+  // gun's own (gid: the gun it's for: a shared barrel's figures are from its length against that gun's own). HTML spans: class g
+  // better, b worse. Here, not in the gunsmith screen, so the video worker (no screens) words them the same.
+  function partEffects(p: Part, gid?: string | null) {
+    const GS = { partSt, barrelOf, SLOT_LABEL }, pct = (v: number) => `${v > 0 ? '+' : ''}${Math.round(v) === 0 && v !== 0 ? v.toFixed(1) : Math.round(v)}%`; // (a fraction of a percent, as a handguard's length makes: not "0%")
+    const s = GS.partSt(p, gid) || {}, out: string[] = [];
+    const add = (txt: string, good: boolean) => out.push(`<span class="${good ? 'g' : 'b'}">${txt}</span>`);
+    if (s.ergo) add(`Ergo ${s.ergo > 0 ? '+' : ''}${s.ergo}`, s.ergo > 0);
+    if (s.recoil) add(`Recoil ${pct(s.recoil)}`, s.recoil < 0);
+    if (s.acc) add(`Spread ${pct(s.acc)}`, s.acc < 0);
+    if (s.hip) add(`Hip ${pct(s.hip)}`, s.hip < 0);
+    // (a barrel's: from its length against the factory one's, as it flies: js/data.ts roundSpeed)
+    const gun = gid || p.plat, gb = (G.GUN_SPECS[gun!] || {}).barrel, bi = gb && GS.barrelOf(p, gun), vel = bi ? Math.round((Math.pow(bi / gb, 0.2) - 1) * 100) : p.len != null ? 0 : s.vel;
+    if (bi && p.slot === 'barrel') out.push(`<span>Barrel ${bi.toFixed(1)}"${Math.abs(bi - gb) > 0.04 ? ` (${bi > gb ? '+' : '−'}${Math.abs(bi - gb).toFixed(1)}")` : ''}</span>`);
+    else if (p.len != null) out.push(`<span>Barrel ${p.len.toFixed(1)}"</span>`);
+    if (p.set && (p.set.ported || (p.set.sup && p.slot === 'barrel' && (G.WEAPONS[p.plat!] || {}).integral))) add('Subsonic (ported)', false); // (an integral barrel: it leaves under 310 m/s whatever its length)
+    else if (vel) add(`Velocity ${pct(vel)}`, vel > 0);
+    if (s.rpm) add(`Rate ${pct(s.rpm)}`, s.rpm > 0);
+    if (s.spin) add(`Spin-up ${pct(s.spin)}`, s.spin < 0);
+    if (s.reload) add(`Reload ${pct(s.reload)}`, s.reload < 0);
+    if (p.slot === 'handguard' && p.model && p.model.hg && p.hgScale) out.push(`<span>${(p.model.hg.len! * 39.37).toFixed(1)}"</span>`); // (its length: it fits a barrel that leaves it that much)
+    if (s.weight) add(`${s.weight > 0 ? '+' : ''}${s.weight.toFixed(2)} kg`, s.weight < 0);
+    if (p.becomes) out.push(`<span class="g">Becomes the ${G.U.esc(G.WEAPONS[p.becomes].name)} (${(G.CALIBERS as Record<string, CaliberDef>)[G.calOf(G.WEAPONS[p.becomes])].name})</span>`);
+    if (p.set && p.set.perLoad) out.push(`<span>${p.set.perLoad} shells a push</span>`);
+    if (p.set && p.set.cap) out.push(`<span>${p.set.cap} rds</span>`);
+    if (p.set && p.set.levels) out.push(`<span>${p.set.levels[0]}–${p.set.levels[p.set.levels.length - 1]}×</span>`);
+    else if (p.set && p.set.magnif) out.push(`<span>${p.set.magnif}×</span>`);
+    if (p.set && p.set.magnifier) out.push(`<span>1× / ${p.set.magnifier}×</span>`);
+    if (p.set && p.set.light) out.push('<span>Light</span>');
+    if (p.set && p.set.laser) out.push(`<span>${p.set.laser === 'g' ? 'Green' : 'Red'} laser</span>`);
+    if (p.set && p.set.sup) out.push('<span class="g">Suppressed</span>');
+    if (p.provides) out.push(`<span>+ ${Object.keys(p.provides).map((k) => (GS.SLOT_LABEL as Record<string, string>)[k]).join(', ')}</span>`);
+    if (p.chassis) out.push(`<span>Its own ${Object.keys(p.chassis).map((k) => (GS.SLOT_LABEL as Record<string, string>)[k]).join(', ')}</span>`);
+    return out.join(' ');
+  }
+
   return {
-    PARTS, LIST, PLATFORMS, attachOptions, SLOT_LABEL, BRANDS: BR, ifaceName, fits, fitsPart, fitsSlot, fitsLen, partSt, barrelOf, ALIAS, kindOf,
+    PARTS, LIST, PLATFORMS, attachOptions, partEffects, SLOT_LABEL, BRANDS: BR, ifaceName, fits, fitsPart, fitsSlot, fitsLen, partSt, barrelOf, ALIAS, kindOf,
     defaultBuild, slotsOf, slotFor, slotLabel, visibleSlots, magCap, prune, encode, decode, compile, fromCode, soundSpec, roundSoundKey, modelSpec, rollStock, rollPrecision, compatible, strip, convert, kitsFor, convParts, buyPrice, sellPrice, plainGrip, plainHere, skins, skinsOf, sameFamily, RCV,
     defaultCode: (id: string) => encode(id, defaultBuild(id)),
   };

@@ -3132,7 +3132,7 @@ const G_Highlights = (() => {
     const sents = (p.desc || '').split(/(?<=[.!?])\s/); let blurb = sents[0] || ''; // (as many whole sentences as fit four lines)
     for (let j = 1; j < sents.length && (blurb + ' ' + sents[j]).length <= 170; j++) blurb += ' ' + sents[j];
     if (blurb.length > 170) blurb = blurb.slice(0, 167).replace(/[\s,;:–-]+\S*$/, '') + '…';
-    const stats = G.GunsmithUI.partEffects(p, s.def.id).split('</span>').map((x: string) => x.replace(/<[^>]*>/g, '').trim() ? [x.replace(/<[^>]*>/g, '').trim(), /class="g"/.test(x) ? 1 : /class="b"/.test(x) ? -1 : 0] : null).filter(Boolean) as [string, number][];
+    const stats = G.Gunsmith.partEffects(p, s.def.id).split('</span>').map((x: string) => x.replace(/<[^>]*>/g, '').trim() ? [x.replace(/<[^>]*>/g, '').trim(), /class="g"/.test(x) ? 1 : /class="b"/.test(x) ? -1 : 0] : null).filter(Boolean) as [string, number][];
     g.save(); g.globalAlpha = out; g.translate((1 - k) * 420, 0);
     g.fillStyle = 'rgba(6,10,18,0.9)'; g.fillRect(x0, y0, w, 250); g.fillStyle = '#ffb21a'; g.fillRect(x0, y0, w, 6);
     text(g, `${label}  ·  ${i + 1} / ${n}`, x0 + 16, y0 + 26, 13, '#ffb21a', 'left', '800');
