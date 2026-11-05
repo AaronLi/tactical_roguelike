@@ -80,6 +80,27 @@ expectIx('an anchor with two numbers', (o) => { o.anchors['barrel=b2'].mount_muz
 expectIx('an info row with too few values', (o) => { o.info[0].rows[0].v.pop(); }, /rows\[0\]\.v has 1 values for 2 leaves/);
 expectIx('an info row key that does not line up', (o) => { o.info[0].rows[0].key = ['b1', 'h1']; }, /rows\[0\]\.key has 2 parts for 1 dep slots/);
 expectIx('the old reference builds are gone', (o) => { o.bases = []; }, /index\.bases: unknown field/);
+// authored sources (a gun modelled in Blender: M.validateAuthored, GUN_MODEL_CONTRACT.authored)
+const ANCH = () => ({ mount_optic: [0.01, 0.023, 0], mount_optic_end: [0.18, 0.023, 0], mount_handguard: [0.3, 0, 0], mount_handguard_end: [0.53, 0, 0], mount_barrel: [0.6, 0, 0], mount_muzzle: [0.73, 0, 0], mount_stock: [0, -0.018, 0], mount_grip: [0.066, -0.045, 0], mount_mag: [0.22, -0.043, 0] });
+const aGun = (over = {}, kids = [B(), mesh('barrel_2', 'barrel', 'black', { role: 'tube' })], rootOver = {}) => ({ roots: [{ name: 'x', extras: { gun: 'x', info: { ...info(), magAt: [0.22, -0.043], anim: { mag: 'part_mag' }, ...over.info }, anchors: ANCH(), seat: { barrelR: 0.007 }, ...rootOver }, mesh: false, uv: false, materials: [], children: [...kids, part('mag', [mesh('mag_3', 'mag')])] }] });
+const expectA = (label, desc, re, opts) => {
+  const r = M.validateAuthored(desc, 'x', opts), all = [...r.errors, ...r.warnings].join('\n'), ok = re === null ? r.errors.length === 0 : re.test(all);
+  if (!ok) { bad++; console.error(`FAIL ${label}: expected ${re}, got:\n  ${all || '(nothing)'}`); } else console.log('ok   ' + label);
+};
+expectA('authored: a complete source is valid', aGun(), null);
+expectA('authored: json-text extras are read (Blender)', (() => { const g = aGun(); const e = g.roots[0].extras; g.roots[0].extras = { gun: 'x', info_json: JSON.stringify(e.info), anchors_json: JSON.stringify(e.anchors), seat_json: JSON.stringify(e.seat) }; return g; })(), null);
+{ const g = aGun(); delete g.roots[0].extras.anchors.mount_handguard_end; expectA('authored: a missing anchor is named', g, /anchors\.mount_handguard_end is missing/); }
+{ const g = aGun(); delete g.roots[0].extras.anchors; expectA('authored: no anchors at all', g, /root extras\.anchors .* is missing/); }
+{ const g = aGun(); g.roots[0].extras.anchors.mount_bogus = [0, 0, 0]; expectA('authored: an unknown anchor', g, /anchors\.mount_bogus: not an anchor/); }
+{ const g = aGun(); g.roots[0].extras.anchors.mount_optic = [0.01, 0.023]; expectA('authored: an anchor of the wrong shape', g, /anchors\.mount_optic: expected 3 numbers/); }
+{ const g = aGun(); g.roots[0].extras.anchors.mount_handguard = [0.6, 0, 0]; expectA('authored: anchors out of order', g, /mount_handguard \(0\.6\) must be behind mount_handguard_end/); }
+{ const g = aGun(); g.roots[0].extras.anchors.mount_mag = [0.3, -0.04, 0]; expectA('authored: mount_mag must be info.magAt', g, /mount_mag .* is not info\.magAt/); }
+{ const g = aGun(); delete g.roots[0].extras.seat; expectA('authored: seat is required', g, /extras\.seat .* is missing/); }
+expectA('authored: a factory slot with no meshes', aGun(), /the platform's default build fits a handguard, but the model has no mesh in slot "handguard"/, { factory: ['barrel', 'handguard'] });
+expectA('authored: no barrel tube', aGun({}, [B(), mesh('barrel_2', 'barrel')]), /0 meshes with extras\.role "tube"/);
+expectA('authored: info is still the contract', aGun({ info: { speling: 1 } }), /info\.speling: unknown field/);
+{ const r = M.validateAuthoredConfig({ source: 'authored', sights: { builtin: ['irons'], rail: ['riser'] } }); if (r.some((e) => /not in sights\.builtin/.test(e))) console.log('ok   authored: model.json rail kinds must be builtin'); else { bad++; console.error('FAIL model.json rail check: ' + r); } }
+{ const r = M.validateAuthoredConfig({ source: 'recipe' }); if (r.length >= 2) console.log('ok   authored: model.json needs source and sights'); else { bad++; console.error('FAIL model.json: ' + r); } }
 // the info as leaves, and the planner
 const canon = (v) => JSON.stringify(v, (k, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.keys(x).sort().map((q) => [q, x[q]])) : x));
 const leavesBack = (v) => canon(M.infoFromLeaves(M.infoLeaves(v)));

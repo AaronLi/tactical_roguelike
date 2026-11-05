@@ -1,5 +1,6 @@
 // Checks glTF gun models against the model contract (js/glb.ts GUN_MODEL_CONTRACT, docs/models.md).
 //   npm run check:models <file.glb ...>     lists what is missing or wrong in each model (exit 1 if any has errors)
+//                                           (a models/<id>/<id>.glb with a model.json next to it is an AUTHORED SOURCE: checked against the authored-source contract and the platform's spec)
 //   npm run check:models -- --write         regenerates docs/gun-model-info.schema.json, docs/gun-parts-index.schema.json and the contract tables in docs/models.md
 //   npm run check:models -- --selftest      the contract against everything derived from it: the committed schema and doc are
 //                                           current, the contract's material names are the game's catalogue, the baked guns and the per-part
@@ -7,6 +8,7 @@
 // Run after `tsc` (the npm script does): it reads the compiled dist/js/glb.js, so it is the very validator the game uses.
 import fs from 'fs'; import path from 'path';
 import { ROOT, loadModels, loadGame } from './model_env.mjs';
+import { authoredIds, checkAuthored } from './bake_authored.mjs';
 
 const args = process.argv.slice(2), Models = loadModels();
 const SCHEMA = path.join(ROOT, 'docs/gun-model-info.schema.json'), SCHEMA2 = path.join(ROOT, 'docs/gun-parts-index.schema.json'), DOC = path.join(ROOT, 'docs/models.md');
@@ -23,6 +25,15 @@ export function checkBuffer(label, buf, id) {
   return rep.errors.length;
 }
 
+/** An authored source (models/<id>/<id>.glb beside a model.json): the contract's authored rules and the platform's spec; prints and returns the number of errors. */
+export function checkAuthoredFile(label, id) {
+  const r = checkAuthored(Models, id, loadGame());
+  for (const e of r.errors) console.error(`${label}: ERROR ${e}`);
+  for (const w of r.warnings) console.warn(`${label}: warning ${w}`);
+  return r.errors.length;
+}
+const authoredIdOf = (file) => { const d = path.dirname(path.resolve(file)), id = path.basename(d); return path.basename(file) === id + '.glb' && path.basename(path.dirname(d)) === 'models' && fs.existsSync(path.join(d, 'model.json')) ? id : null; };
+
 if (args.includes('--write')) {
   fs.writeFileSync(SCHEMA, schemaText()); fs.writeFileSync(SCHEMA2, schema2Text()); fs.writeFileSync(DOC, docWith(fs.readFileSync(DOC, 'utf8')));
   console.log('wrote docs/gun-model-info.schema.json, docs/gun-parts-index.schema.json and the contract section of docs/models.md');
@@ -37,6 +48,7 @@ if (args.includes('--write')) {
   for (const k of named) if (!cat.includes(k)) fail(`material '${k}' is in the contract but not in G.GunMaterials.M`);
   for (const [k, m] of Object.entries(Models.contract.materials.names)) { const has = !!(G.GunMaterials.M[k] && G.GunMaterials.M[k]().bumpMap); if (has !== !!m.bump) fail(`material '${k}': the contract says bump=${m.bump || 'none'} but the catalogue ${has ? 'has' : 'has no'} a bump map`); }
   for (const sl of ['base', 'grip', 'stock', 'mag', 'barrel', 'handguard', 'muzzle', 'optic', 'slide']) if (!Models.contract.slots[sl]) fail(`slot '${sl}' missing from the contract`);
+  for (const id of authoredIds()) { const n = checkAuthoredFile(`models/${id}/${id}.glb`, id); if (n) bad++; }
   const dir = path.join(ROOT, 'assets/models/guns'); let n = 0;
   if (fs.existsSync(dir)) for (const f of fs.readdirSync(dir).filter((f) => f.endsWith('.glb'))) { n++; if (checkBuffer(f, fs.readFileSync(path.join(dir, f)), f.replace(/\.glb$/, ''))) bad++; }
   // the per-part packs: every platform's index against the index contract, every pack file against the pack contract, every file the index names there
@@ -57,6 +69,6 @@ if (args.includes('--write')) {
   const files = args.filter((a) => !a.startsWith('--'));
   if (!files.length) { console.error('usage: npm run check:models <file.glb ...> | -- --write | -- --selftest'); process.exit(2); }
   let bad = 0;
-  for (const f of files) { const n = checkBuffer(path.basename(f), fs.readFileSync(f)); console.log(`${path.basename(f)}: ${n ? n + ' error(s)' : 'ok'}`); bad += n; }
+  for (const f of files) { const aid = authoredIdOf(f), n = aid ? checkAuthoredFile(path.basename(f), aid) : checkBuffer(path.basename(f), fs.readFileSync(f)); console.log(`${path.basename(f)}: ${n ? n + ' error(s)' : 'ok'}`); bad += n; }
   process.exit(bad ? 1 : 0);
 }
