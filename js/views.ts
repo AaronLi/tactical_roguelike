@@ -212,25 +212,6 @@ const G_Views = {
     G.Game.bodiesLeft = m.b || 0;
     G.Game.weaponsLeft = m.w || 0;
   },
-  // A flashbanged suspect's status, over their head for the whole of it: a ringed star, solid while they are blind and deaf,
-  // fading as they come round (and a pulse in the colour of the outline, a hot white-yellow), seen through walls and at any range
-  flashMark(ev: VwEnemy, dt: number) {
-    let sp = ev.flashSp as THREE.Sprite | undefined;
-    if (!ev.alive || !ev.fc || ev.scode === 1 || ev.scode === 2 || ev.down) { if (sp) sp.visible = false; return; } // (hands up or cuffed: they've given in)
-    if (!sp) {
-      const c = document.createElement('canvas'); c.width = c.height = 128;
-      const g = c.getContext('2d')!;
-      g.translate(64, 64); g.strokeStyle = 'rgba(0,0,0,0.85)'; g.fillStyle = '#ffe97a'; g.lineWidth = 7; g.lineJoin = 'round';
-      g.beginPath(); for (let i = 0; i < 16; i++) { const a = i * Math.PI / 8 - Math.PI / 2, r = i % 2 ? 20 : 54; g.lineTo(Math.cos(a) * r, Math.sin(a) * r); } g.closePath(); g.stroke(); g.fill();
-      g.beginPath(); g.arc(0, 0, 11, 0, Math.PI * 2); g.fillStyle = '#fff'; g.fill();
-      sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false, transparent: true }));
-      sp.renderOrder = 19; G.R.dynRoot.add(sp); ev.flashSp = sp;
-    }
-    ev.flashPh = (ev.flashPh || 0) + dt;
-    const d = sp.position.distanceTo(G.R.camera.position), sc = Math.max(0.35, d * 0.045) * (1 + 0.12 * Math.sin(ev.flashPh * (ev.fc === 1 ? 14 : 6)));
-    sp.visible = true; sp.position.set(ev.pos.x, ev.pos.y + 2.15 * (ev.def.scale || 1), ev.pos.z);
-    sp.scale.set(sc, sc, 1); sp.material.opacity = ev.fc === 1 ? 1 : 0.45; sp.material.rotation = ev.flashPh * (ev.fc === 1 ? 2.5 : 0.8);
-  },
   // world position of the closest living player (including you)
   nearestPlayer(p: THREE.Vector3) {
     let best: THREE.Vector3 | null = null, bd = 1e9;
@@ -795,8 +776,7 @@ const G_Views = {
       const tgt = aimed || (ev.alert ? this.nearestPlayer(ev.pos) : null);
       if (tgt) pitch = Math.atan2(tgt.y + 1.2 - (ev.pos.y + 1.4 * ev.def.scale), Math.max(1, Math.hypot(tgt.x - ev.pos.x, tgt.z - ev.pos.z))); // (from their own height: upstairs, level)
       ev.recPitch = pitch; // (for the highlights: js/highlights.ts)
-      let pose: VwPose | null = ev.scode === 1 ? 'handsup' : ev.scode === 2 ? 'cuffed' : ev.scode === 3 || (ev.fc === 1 && !ev.scode) ? 'cower' : null; // (blinded by a flashbang: crouched, hands to the eyes)
-      this.flashMark(ev, dt);
+      let pose: VwPose | null = ev.scode === 1 ? 'handsup' : ev.scode === 2 ? 'cuffed' : ev.scode === 3 ? 'cower' : null;
       // being taken down and zip-tied by an officer (me or a teammate)
       let tk = -1;
       const ma = G.Me.action;
@@ -845,7 +825,7 @@ const G_Views = {
       const aimAt = tgt && ev.armed === 2 && ev.alert && !ev.surp && !ev.reloading && !pose && !ev.down ? new THREE.Vector3(tgt.x, tgt.y + 1.2, tgt.z) : null;
       const rlP = ev.reloadAt && ev.reloading ? (performance.now() - ev.reloadAt) / ev.reloadDur : -1; // (how far into a magazine change)
       ev.aimP = aimed ? aimAt : null; // (who they're on: where their light and laser go)
-      ev.rig.update(dt, { pos: at, yaw: ev.yaw, pitch, crouch: ev.crouch || (ev.str != null && ev.str < 0.4), rise: 3.5, alert: !!ev.alert && ev.armed === 2 && !ev.surp && !ev.reloading, lean: ev.leanS, pose, tk, act, str: near ? (ev.str == null ? 1 : ev.str) : null, aimAt,
+      ev.rig.update(dt, { pos: at, yaw: ev.yaw, pitch, crouch: ev.crouch || (ev.str != null && ev.str < 0.4), rise: 3.5, alert: !!ev.alert && ev.armed === 2 && !ev.surp && !ev.reloading, lean: ev.leanS, pose, blind: ev.alive && !ev.down && ev.scode !== 1 && ev.scode !== 2 && !ev.arrested ? ev.fc || 0 : 0, tk, act, str: near ? (ev.str == null ? 1 : ev.str) : null, aimAt,
         reload: rlP >= 0 && rlP < 1 ? rlP : -1 });
       // past the fog (it's the background's colour out there: nothing to see) they aren't drawn, each one's forty-odd
       // pieces a draw call. The body, not the root: the root's what a shot checks for (js/player.ts), and it still hits.

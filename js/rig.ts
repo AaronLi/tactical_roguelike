@@ -35,7 +35,7 @@ interface Rig { // a character's skeleton and its meshes (what create makes, and
   // (what the animation keeps from frame to frame)
   powered?: boolean; limp?: boolean; zipped?: boolean; zipKit?: THREE.Object3D; zipT?: number; zipYaw?: number | null; proneW?: number; proneS?: number; effPh?: number; effT?: number; braceW?: number; gunAimW?: number; gunKick?: number;
   gunBase?: { p: THREE.Vector3; q: THREE.Quaternion; s: THREE.Vector3 }; gunBaseOf?: THREE.Object3D; gunSupport?: THREE.Vector3 | null; bipodK?: number; hitDir?: THREE.Vector3; xbLoaded?: any;
-  atakW?: number; atak?: THREE.Group; handNade?: any; throwHand?: boolean; throwStr?: any; dropped?: { g: THREE.Object3D; vy: number; spin: number; floor?: number; [field: string]: any } | null;
+  blindW?: number; dazeW?: number; blindT?: number; atakW?: number; atak?: THREE.Group; handNade?: any; throwHand?: boolean; throwStr?: any; dropped?: { g: THREE.Object3D; vy: number; spin: number; floor?: number; [field: string]: any } | null;
   [bone: string]: any; // (a bone looked up by name: js/ballistics.ts boneOf, the hitbox readouts of js/hud.ts and js/highlights.ts; and what js/hud.ts keeps on a rig)
 }
 const G_Rig = (() => {
@@ -610,10 +610,18 @@ const G_Rig = (() => {
     rig.proneS = (rig.proneS || 0) + ((p.prone && !posed && p.state !== 'down' ? 1 : 0) - (rig.proneS || 0)) * Math.min(1, dt * 4);
     const lie = Math.max(rig.proneW, rig.proneS);
     if (rig.proneS > 0.001) { root.position.x += Math.sin(p.yaw) * 1.45 * s * rig.proneS; root.position.z += Math.cos(p.yaw) * 1.45 * s * rig.proneS; }
-    const crouchTo = p.crouch || posed ? 1 - lie : 0;
+    // a flashbang's dazzle (p.blind: 1 blind and deaf, 2 coming round): dazeW is any of it (the sway, the weapon hanging),
+    // blindW only the blind part (hands to the eyes, head down and away); each eased, so it comes on and goes off smoothly
+    rig.blindT = (rig.blindT || 0) + dt;
+    rig.dazeW = (rig.dazeW || 0) + ((p.blind && !posed ? 1 : 0) - (rig.dazeW || 0)) * Math.min(1, dt * (p.blind ? 7 : 3));
+    rig.blindW = (rig.blindW || 0) + ((p.blind === 1 && !posed ? 1 : 0) - (rig.blindW || 0)) * Math.min(1, dt * (p.blind === 1 ? 9 : 3));
+    const dz = rig.dazeW, bw = rig.blindW, bt = rig.blindT, ph = rig.phase; // (rig.phase: this one's own start, so two stagger out of step)
+    const sway = dz * (0.4 + 0.6 * bw);
+    if (dz > 0.002) root.rotation.y += Math.sin(bt * 0.55 + ph) * 0.3 * sway; // (turning on the spot, not facing anyone)
+    const crouchTo = p.crouch || posed ? 1 - lie : Math.max(0, Math.min(1, 0.42 * bw + 0.14 * dz)); // (hunched over, knees soft)
     rig.crouchW += (crouchTo - rig.crouchW) * Math.min(1, dt * (crouchTo < rig.crouchW && p.rise || 9)); // (rise: a suspect comes up out of cover slower than they duck)
     rig.downW += ((p.state === 'down' ? 1 : 0) - rig.downW) * Math.min(1, dt * 5);
-    rig.aimW += ((p.alert && !posed && !rig.slung ? 1 : 0) - rig.aimW) * Math.min(1, dt * 6);
+    rig.aimW += ((p.alert && !posed && !p.blind && !rig.slung ? 1 : 0) - rig.aimW) * Math.min(1, dt * 6);
     rig.lean += ((p.lean || 0) - rig.lean) * Math.min(1, dt * 8);
     rig.kick = Math.max(0, rig.kick - dt * 7);
     rig.flinch.z = Math.max(0, rig.flinch.z - dt * 5);
@@ -636,6 +644,20 @@ const G_Rig = (() => {
     rig.chest.rotation.set(pitch * 0.75 + rig.crouchW * 0.32 - rig.downW * 0.25 + rig.kick * 0.08 + rig.proneS * PRONE.prop, 0, -rig.lean * 0.25); // (prone: up on the elbows, a little)
     rig.neck.rotation.set(pitch * 0.25 - fl * rig.flinch.x * 0.3 - rig.proneW * 0.5 + rig.proneS * PRONE.neck, rig.proneW * 0.9 + rig.proneS * PRONE.turn, rig.lean * 0.3 + rig.proneS * PRONE.roll); // cheek to the floor (cuffed); head up, cheek down on the stock (prone)
     rig.head.rotation.set(0, 0, 0);
+    if (dz > 0.002) {
+      // staggering: the weight rocking from side to side and back and forth, the torso following it a beat behind
+      const sx = Math.sin(bt * 2.1 + ph) + 0.5 * Math.sin(bt * 3.7 + ph * 2);
+      rig.hips.position.x += sx * 0.045 * sway; rig.hips.position.z += Math.sin(bt * 1.6 + ph * 3) * 0.03 * sway;
+      rig.spine.rotation.z += -sx * 0.1 * sway; rig.spine.rotation.x += (0.12 * bw + 0.03 * Math.sin(bt * 1.3 + ph)) * dz;
+      // the head: down and turned away from the light while blind, rolling round slowly and never settling on anything
+      rig.neck.rotation.x += 0.4 * bw; rig.neck.rotation.y += 0.22 * bw + 0.3 * Math.sin(bt * 0.8 + ph) * sway;
+      rig.head.rotation.y += 0.4 * Math.sin(bt * 1.9 + ph * 2) * sway;
+      rig.head.rotation.x += 0.22 * Math.sin(bt * 1.4 + ph * 4) * sway;
+      rig.head.rotation.z += 0.12 * Math.sin(bt * 1.1 + ph) * sway;
+      // coming round: blinking and shaking the head clear in quick bursts every second or two
+      const burst = Math.pow(Math.max(0, Math.sin(bt * 3.3 + ph)), 6), shk = burst * (1 - bw) * dz;
+      rig.head.rotation.y += Math.sin(bt * 24) * 0.17 * shk; rig.head.rotation.x += Math.sin(bt * 19 + 1) * 0.07 * shk;
+    }
 
     // gun: shouldered when alert, low-ready otherwise; pistols held out in front
     const gi = rig.gunInfo;
@@ -648,6 +670,7 @@ const G_Rig = (() => {
     const pup = gi && !pistol ? Math.max(0, gi.grip[0] - 0.05) : 0;
     if (pup) { mount.position.z += pup * (1 - rig.proneS); mount.position.y -= pup * rig.proneS; }
     if (rig.proneS > 0.001) { mount.position.x += (PRONE.gunX - mount.position.x) * rig.proneS; mount.position.z += PRONE.gunUp * rig.proneS; mount.position.y += PRONE.gunFwd * rig.proneS; } // (in under the cheek, up off the ground)
+    if (dz > 0.002) { mount.rotation.x -= 0.75 * dz; mount.position.y -= 0.1 * dz; mount.position.z += 0.06 * dz; } // (the weapon lowered, hanging from the hand: it can't be aimed)
     if (rig.throwT >= 0 && !rig.throwHand) mount.rotation.x -= 0.6 * Math.sin(Math.PI * Math.min(1, rig.throwT / 0.9));
     // a reload: the gun canted toward the support hand; inspecting it: rolled over and turned to look along it
     const rl = p.reload != null && p.reload >= 0 ? p.reload : -1, ins = p.inspect != null && p.inspect >= 0 ? p.inspect : -1;
@@ -667,6 +690,7 @@ const G_Rig = (() => {
       let fz = dZ * swing * stepLen + rig.crouchW * (side > 0 ? 0.42 : -0.32);
       if (rig.downW > 0.5) { fz = -0.75; fx = side * 0.16; }
       let fy = 0.06 + lift;
+      if (dz > 0.002) { const w = bt * 2.1 + (side > 0 ? Math.PI : 0); fz += Math.sin(w) * 0.07 * sway; fx += Math.sin(w * 0.5) * 0.03 * sway; fy += Math.max(0, Math.cos(w)) * 0.035 * sway; } // (shuffling, feet barely leaving the floor)
       let legPole = null;
       if (rig.proneS > 0.01) { // prone: legs spread, toes down; the right knee drawn up and out to the side
         const k = rig.proneS, [px, py, pz] = side > 0 ? PRONE.footR : PRONE.footL;
@@ -803,6 +827,18 @@ const G_Rig = (() => {
       hand(rig.armL, ph.localToWorld(new T.Vector3(-W / 2 - 0.04, H * 0.45, -0.025)), rig.chest.localToWorld(new T.Vector3(-0.62, -0.25, -0.1)), k);
       hand(rig.armR, ph.localToWorld(new T.Vector3(W / 2 + 0.04, H * 0.45, -0.025 + tap)), rig.chest.localToWorld(new T.Vector3(0.62, -0.25, -0.1)), U.smooth(0.3, 1, k));
     } else if (rig.atak) (rig.atak.userData.mount as THREE.Object3D).visible = false;
+    // blinded (p.blind 1): a hand pressed over the eyes, the forearm across the face; with a weapon the other hand keeps it hanging
+    // low, with none both hands go to the eyes
+    if (bw > 0.01) {
+      rig.chest.updateMatrixWorld(true); rig.head.updateMatrixWorld(true);
+      const hand = (arm: RigArm, on: THREE.Vector3, pole: THREE.Vector3, w: number) => {
+        const cur = arm.lo.localToWorld(new T.Vector3(0, -FARM, 0));
+        ik(arm.up, arm.lo, UARM * s, FARM * s, cur.lerp(on, w), pole);
+      };
+      const k = U.smooth(0, 1, bw), gw = Math.sin(bt * 2.6 + ph);
+      hand(rig.armL, rig.head.localToWorld(new T.Vector3(-0.05, 0.13, -0.14)), rig.chest.localToWorld(new T.Vector3(-0.55, 0.1, -0.7)), k);
+      if (!(rig.gun && rig.gunInfo && !rig.slung)) hand(rig.armR, rig.head.localToWorld(new T.Vector3(0.05, 0.11 + 0.01 * gw, -0.15)), rig.chest.localToWorld(new T.Vector3(0.55, 0.1, -0.7)), k);
+    }
     // door actions: one hand reaches for the handle / door edge (players use the right hand with the
     // weapon put away; an enemy with a gun in hand uses his free left hand)
     if (p.act && (p.act.kind === 'open' || p.act.kind === 'close')) {
