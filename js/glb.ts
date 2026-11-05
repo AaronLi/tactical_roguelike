@@ -27,7 +27,7 @@ type SlotName = (typeof SLOTS)[keyof typeof SLOTS];
 /** The key of an animated sub-assembly: its node is named `part_<key>` and is listed under `info.anim.<key>`. */
 const PARTS = {
   mag: 'mag', slide: 'slide', bolt: 'bolt', ch: 'ch', handle: 'handle', pump: 'pump', lever: 'lever', cyl: 'cyl', brk: 'brk', barrel: 'barrel', cover: 'cover', magn: 'magn',
-  spin: 'spin', bipod: 'bipod', quarrel: 'quarrel', quarrelHead: 'quarrelHead', quarrelNock: 'quarrelNock', stringCocked: 'stringCocked', stringSlack: 'stringSlack',
+  spin: 'spin', carry: 'carry', bipod: 'bipod', quarrel: 'quarrel', quarrelHead: 'quarrelHead', quarrelNock: 'quarrelNock', stringCocked: 'stringCocked', stringSlack: 'stringSlack',
 } as const;
 type PartKey = (typeof PARTS)[keyof typeof PARTS];
 
@@ -80,6 +80,11 @@ interface GunModelInfo {
   // first-person extras (js/viewmodel.ts), written by whoever makes the model:
   reflex?: { f: number; y: number; w: number; h: number; round?: boolean | null; kind: string } | null;
   pip?: { f: number; y: number; r: number; parent?: string | null; pos?: Vec3 | null } | null;
+  // a gun with several barrels (GUN_MODEL_CONTRACT.multi)
+  barrels?: { n: number; rounds_each: number; round_mm?: number[] | null; free_bore_mm?: number | null; effective_mm: number[] } | null;
+  barrelGroups?: Record<string, number[]> | null;
+  modeDial?: { at: Vec3; axis: Vec3; modes: string[]; stepDeg: number } | null;
+  hinge?: { sequence: { part: string; axis?: string | null; at?: Vec3 | null; rotate_deg?: number | null; move?: Vec3 | null; frame?: string | null; note?: string | null }[] } | null;
 }
 
 // ---- the shape language the info fields are written in (the validator and the JSON Schema both walk it) --------------
@@ -142,7 +147,7 @@ const CONTRACT_CORE = {
     handle: { doc: 'A cocking handle that reciprocates or is worked by the hand.', pairedWith: 'handle' }, pump: { doc: 'A pump-action forend.', pairedWith: null },
     lever: { doc: 'A lever-action lever.', pairedWith: null }, cyl: { doc: 'A revolver cylinder: it rotates (z) by 1/n per shot.', pairedWith: null },
     brk: { doc: 'A break-action barrel group that tips open on its hinge.', pairedWith: null }, barrel: { doc: 'A long-recoil barrel (runs back by info.recoilBarrel).', pairedWith: null },
-    cover: { doc: 'A belt-fed gun\'s feed cover.', pairedWith: null }, magn: { doc: 'A magnifier that flips aside.', pairedWith: null }, spin: { doc: 'A rotary barrel group that spins.', pairedWith: null }, bipod: { doc: 'A bipod: its node holds the legs, each a child group with extras.leg (see "Bipods" below).', pairedWith: null },
+    cover: { doc: 'A belt-fed gun\'s feed cover.', pairedWith: null }, magn: { doc: 'A magnifier that flips aside.', pairedWith: null }, spin: { doc: 'A rotary barrel group that spins.', pairedWith: null }, carry: { doc: 'A carry handle that flips up when a barrel block is changed (one step of info.hinge).', pairedWith: null }, bipod: { doc: 'A bipod: its node holds the legs, each a child group with extras.leg (see "Bipods" below).', pairedWith: null },
     quarrel: { doc: 'A crossbow bolt, the whole assembly.', pairedWith: null }, quarrelHead: { doc: 'The crossbow bolt\'s head.', pairedWith: null }, quarrelNock: { doc: 'The crossbow bolt\'s nock.', pairedWith: null },
     stringCocked: { doc: 'The crossbow string, drawn.', pairedWith: null }, stringSlack: { doc: 'The crossbow string, released.', pairedWith: null },
   } as Record<PartKey, PartSpec>,
@@ -207,6 +212,11 @@ const INFO_FIELDS: { [K in keyof GunModelInfo]-?: Field } = {
   // first-person extras (js/viewmodel.ts applies them; the third person ignores them)
   reflex: F('A reflex or holographic sight\'s window (js/viewmodel.ts): the game draws a collimated reticle behind it, masked to it. f, y: the window\'s centre, [forward, up] metres; w, h: its size, metres (round: a disc of diameter w); kind: the reticle drawn: dot, dotG, dotP (a small precision dot), cdot or holo.', { t: 'obj', props: { f: num('Forward position of the window, metres.'), y: num('Height of the window, metres.'), w: num('Width, metres.', false, { min: 0 }), h: num('Height, metres.', false, { min: 0 }), round: F('True: a disc of diameter w.', { t: 'bool' }, true), kind: F('The reticle: dot, dotG (green dot), cdot (circle-dot) or holo (a ring).', { t: 'str', enum: ['dot', 'dotG', 'cdot', 'holo'] }) } }, true),
   pip: F('A scope\'s ocular lens (js/viewmodel.ts): the game draws the world through the scope on a disc there (picture-in-picture) with the reticle over it. f, y: its centre, [forward, up] metres; r: its radius. parent + pos: a lens that swings on a hinge (a magnifier\'s): the NAME of the node it hangs on and its place in that node, [x, y, z] metres in the node\'s own frame.', { t: 'obj', props: { f: num('Forward position of the lens, metres.'), y: num('Height of the lens centre, metres.'), r: num('Lens radius, metres.', false, { min: 0 }), parent: F('Node name the lens hangs on.', { t: 'str' }, true), pos: F('Place in the parent, [x, y, z] metres in its own frame.', { t: 'vec', n: 3 }, true) } }, true),
+  // a gun with several barrels (a barrel block: the Tempest)
+  barrels: F('A gun with several barrels, each holding a stack of rounds fired nose to tail: n barrels (info.muzzles has one entry each, in the same order), rounds_each the rounds a barrel holds, effective_mm the length the bullet has run down the bore for the 1st, 2nd... last round of a barrel (rounds_each + 1 entries, longest last: the more rounds are gone, the longer the run), round_mm [diameter, length] of one round and free_bore_mm the part of the bore a fresh barrel has before its first round (both informational). The game takes the speed of a shot from the effective length (GUN_MODEL_CONTRACT.multi).', { t: 'obj', props: { n: num('How many barrels.', false, { min: 2 }), rounds_each: num('Rounds a full barrel holds.', false, { min: 1 }), round_mm: F('One round: [diameter, length], millimetres.', { t: 'list', of: { t: 'num' } }, true), free_bore_mm: num('The bore a fresh barrel has before its first round, millimetres.', true), effective_mm: F('The effective barrel length for each round of a barrel in turn, millimetres: shortest first.', { t: 'list', of: { t: 'num' }, min: 1 }) } }, true),
+  barrelGroups: F('Named groups of barrels (indices into info.muzzles): the game fires the "top" or "bottom" group for a three-barrel pull and "all" for every barrel.', { t: 'map', of: { t: 'list', of: { t: 'num' } } }, true),
+  modeDial: F('A fire-mode dial on the model, turned with the selected mode: at its centre [forward, up, right] metres, axis the way it turns, modes the positions in order (the game\'s fire modes), stepDeg the angle between two positions. The mesh that turns is part of the model; the game only reports the angle.', { t: 'obj', props: { at: vec3('The dial\'s centre.'), axis: vec3('The axis it turns about (a unit vector).'), modes: F('The fire modes, in dial order.', { t: 'list', of: { t: 'str' }, min: 1 }), stepDeg: num('Degrees between two positions.') } }, true),
+  hinge: F('A sequence of moves that takes the gun apart for a reload (the Tempest changes its whole barrel block): each step moves one part_ node, in order; the reload animation plays them forward (the old block comes out) and back (the new one goes in). part: the node (its key, "lever", or its name "part_lever"); rotate_deg turns it about axis x, y or z (three.js rotation, degrees) at its pivot; move slides it [forward, up, right] metres, in the frame of the part_ node named by frame (default: its own parent\'s). GUN_MODEL_CONTRACT.multi.', { t: 'obj', props: { sequence: F('The steps, in order.', { t: 'list', of: { t: 'obj', props: { part: F('The part_ node this step moves.', { t: 'str' }), axis: F('The axis a rotation turns about: x, y or z.', { t: 'str' }, true), at: vec3('Where the axis is (informational: the node\'s own pivot is used).', true), rotate_deg: num('Degrees about the axis.', true), move: vec3('A slide, [forward, up, right] metres.', true), frame: F('A part_ node whose frame the move is in.', { t: 'str' }, true), note: F('What it is (free text).', { t: 'str' }, true) } }, min: 1 }) } }, true),
 };
 
 /** Info fields a part may provide as anchors (the rest of info is the whole gun's). */
@@ -224,6 +234,13 @@ const GUN_MODEL_CONTRACT = { ...CONTRACT_CORE, displays: {
   part: '`part_mag` has extras.check = { w }: the magazine\'s width in metres (the width of a hole\'s stamped count).',
   meshes: 'Meshes under `part_mag` carry extras.chk = { role, i, t?, side? }: role "top" (the round on top: i 0 its case, i 1 its tip; the game colours them for the load), "hole" (a witness hole, i = its order from the top, t = 0..1 how far down the stack it reads, side = 1 on the back face of the magazine (toward the shooter) or -1 on its front: a magazine has the same holes, same i and t, on BOTH faces, each its own mesh, and the game stamps the count beside each reading from its own side. The rotation of the mesh node is the tilt of the face there: on a curved magazine each hole, and the count beside it, follows the curve; a round of a clear magazine leans with it the same way), "round" (the i-th round drawn through a clear magazine, t = how far down) and "tip" (the bullet tip of round i). Every mesh keeps a slot and a catalogue material like any other; the game replaces their materials as the rounds change. A gun with a magazine check has both top meshes.',
   example: { name: 'part_mag', extras: { part: 'mag', check: { w: 0.024 } }, child: { name: 'mag_91', extras: { slot: 'mag', chk: { role: 'hole', i: 0, t: 0.1567, side: 1 } } } },
+}, multi: {
+  what: 'MULTI-BARREL GUNS AND RELOAD SEQUENCES (any gun; the first is the Tempest). A gun with several barrels says so in info.barrels = { n, rounds_each, effective_mm: [...] } (info.muzzles has n entries, barrel i at muzzles[i]); the game keeps rounds_each rounds per barrel and fires from the barrels the fire mode asks for. info.barrelGroups names sets of barrels by index (top, bottom, all).',
+  speed: 'effective_mm[k] is the effective barrel length of the (k+1)-th round fired from a fresh barrel: the more of a barrel\'s stack is gone, the longer the bore the next round runs down. The game sets the shot\'s muzzle velocity from it (js/data.ts G.shotDef), scales damage and range between a fraction (def.barrels.full, 0.8) of the figures at the shortest length and 1.0 at the longest, and gives the report the same length (the synth\'s barrel length), so a barrel sounds fuller as it empties. A shot from several barrels plays one report per barrel.',
+  display: 'A display surface named display_ammo (the contract\'s Display surfaces) is painted with the rounds left: one row per barrel in info.muzzles order, one pip per round (lit while the round remains); u runs left to right and v away from the shooter\'s end (js/viewmodel.ts).',
+  dial: 'info.modeDial = { at, axis, modes, stepDeg }: the fire-mode dial. The model holds its mesh in a part_ node named by info.anim (key dial, not yet a PARTS key: the dial is turned from info.modeDial.at about axis by stepDeg per position of modes, js/viewmodel.ts).',
+  hinge: 'info.hinge (root extras.hinge_json) = { sequence: [...] }: the steps of a reload that takes the gun apart, in order, each moving ONE part_ node by rotate_deg about axis x, y or z (three.js rotation about the node\'s own pivot) or by move [forward, up, right] metres in the frame of the part_ node named by frame (default: its parent\'s). Parts may nest (part_brk > part_pump > part_mag > part_carry): a pack stores each node under its parent (extras.parent) and the assembled gun nests them, so a step moves everything inside the node. The viewmodel plays the steps one after another over the first half of the reload (the old block comes out), then back (the new one goes in): js/vmanim.ts hingeClip. The sequence is data, not a gun: any model with a hinge_json gets the animation. Part keys used: lever, carry, pump, brk and mag keep their ordinary names but are driven only by the sequence on a gun that has one.',
+  example: { barrels: { n: 6, rounds_each: 7, effective_mm: [244, 288, 332, 376, 420, 464, 508] }, barrelGroups: { top: [0, 1, 2], bottom: [3, 4, 5], all: [0, 1, 2, 3, 4, 5] }, hinge: { sequence: [{ part: 'part_lever', axis: 'x', rotate_deg: 40 }, { part: 'part_mag', move: [0, 0.1, 0], frame: 'part_brk' }] } },
 }, bipod: {
   what: 'A BIPOD is one node, `part_bipod` (PARTS key bipod, listed in info.anim.bipod), whose children are its LEGS: each leg is a `group_<n>` node with extras.leg = { deploy: [rx, ry, rz] } holding that leg\'s meshes. A leg\'s pivot (its node origin) is its hinge. The model is drawn FOLDED: every leg at rotation 0. part_bipod\'s own origin is only a reference point (the first hinge) and nothing turns it. The legs\' meshes are slot fg when the bipod is a foregrip option (the Kodiak) or slot base when it is part of the gun (a machine gun\'s, a sniper rifle\'s); one gun may have both, in the one part_bipod node.',
   pose: 'extras.leg.deploy is the leg\'s rotation when the bipod is DOWN: three numbers, radians, an XYZ Euler rotation about the leg\'s pivot in the gun\'s frame (x right, y up, z back), the legs pointing at the ground and splayed a little. A leg folded back along the gun (its foot behind the hinge) turns by +PI/2 about x, one folded forward by -PI/2. Folded is rotation 0 (how the meshes are drawn): the folded and the deployed pose are both data of the model.',
@@ -599,14 +616,14 @@ function validatePartsIndex(ix: any): ModelReport {
 }
 
 /** The three JSON-valued root extras of an authored source (info, anchors, seat): the object, or the text `<name>_json` (Blender stores only flat custom properties). */
-function authoredRoot(ex: Record<string, any>, errors: string[]): { info: any; anchors: any; seat: any } {
+function authoredRoot(ex: Record<string, any>, errors: string[]): { info: any; anchors: any; seat: any; hinge: any } {
   const get = (k: string) => {
     if (ex[k] !== undefined) return ex[k];
     const t = ex[k + '_json']; if (t === undefined) return undefined;
     if (typeof t !== 'string') { errors.push(`root extras.${k}_json: expected JSON text, got ${JSON.stringify(t)}`); return undefined; }
     try { return JSON.parse(t); } catch (e) { errors.push(`root extras.${k}_json is not valid JSON: ${(e as Error).message}`); return undefined; }
   };
-  return { info: get('info'), anchors: get('anchors'), seat: get('seat') };
+  return { info: get('info'), anchors: get('anchors'), seat: get('seat'), hinge: get('hinge') };
 }
 /** model.json of an authored gun: { source: 'authored', sights: { builtin: [...], rail: [...] } }. */
 function validateAuthoredConfig(cfg: any): string[] {
@@ -618,6 +635,8 @@ function validateAuthoredConfig(cfg: any): string[] {
   else {
     for (const k of ['builtin', 'rail']) if (!Array.isArray(sg[k]) || !sg[k].every((x: any) => typeof x === 'string')) out.push(`model.json: sights.${k} must be a list of optic kind names`);
     if (Array.isArray(sg.builtin) && Array.isArray(sg.rail)) for (const x of sg.rail) if (!sg.builtin.includes(x)) out.push(`model.json: sights.rail has "${x}", which is not in sights.builtin`);
+    for (const k of ['meshless', 'railed']) if (sg[k] !== undefined && typeof sg[k] !== 'boolean') out.push(`model.json: sights.${k} must be true or false`);
+    for (const k of Object.keys(sg)) if (!['builtin', 'rail', 'meshless', 'railed'].includes(k)) out.push(`model.json: unknown field "sights.${k}"`);
   }
   for (const k of Object.keys(cfg)) if (k !== 'source' && k !== 'sights') out.push(`model.json: unknown field "${k}"`);
   return out;
@@ -632,8 +651,36 @@ function validateAuthored(model: ModelDesc, id?: string, opts: { factory?: strin
   if (model.roots.length !== 1) { E(`the scene has ${model.roots.length} root nodes; it needs exactly one, named after the gun`); return { errors, warnings }; }
   const root = model.roots[0], a = authoredRoot(root.extras, errors);
   if (a.info === undefined) E('root extras.info (or info_json) is missing: the factory build\'s info (sy, fSight, relief, muzzles, grip, support, anim, magAt, ...)');
-  const base = validate({ roots: [{ ...root, extras: { gun: root.extras.gun, info: a.info } }] }, id);
+  // (the part_ nodes by key, wherever they nest; an authored source may name its info.anim entries as it likes: what counts is the node each names, and the node's own key)
+  const partNodes = new Map<string, ModelNode>();
+  { const find = (n: ModelNode) => { for (const c of n.children) { if (!c.mesh && c.name.startsWith(NAMES.partPrefix)) partNodes.set(c.name.slice(NAMES.partPrefix.length), c); find(c); } }; find(root); }
+  let info0 = a.info;
+  if (isObj(info0)) {
+    info0 = { ...info0 };
+    if (isObj(info0.anim)) { const an: Record<string, any> = {}; for (const [k, nm] of Object.entries(info0.anim)) { const hit = [...partNodes].find(([, nd]) => nd.name === nm); an[k in C.parts || !hit ? k : hit[0]] = nm; } info0.anim = an; }
+    if (a.hinge !== undefined) info0.hinge = a.hinge; // (root extras.hinge / hinge_json is info.hinge)
+  }
+  const base = validate({ roots: [{ ...root, extras: { gun: root.extras.gun, info: info0 } }] }, id);
   errors.push(...base.errors.filter((e) => !e.startsWith('root extras.info is missing'))); warnings.push(...base.warnings);
+  if (isObj(info0)) { // a gun with several barrels (GUN_MODEL_CONTRACT.multi) and a reload sequence
+    const b = info0.barrels, mz = info0.muzzles;
+    if (isObj(b)) {
+      if (Array.isArray(mz) && b.n !== mz.length) E(`info.barrels.n is ${b.n} but info.muzzles has ${mz.length} entries: one muzzle per barrel, in the same order`);
+      if (Array.isArray(b.effective_mm) && b.effective_mm.length !== b.rounds_each) E(`info.barrels.effective_mm has ${b.effective_mm.length} entries, rounds_each is ${b.rounds_each}: one effective length for each round of a barrel`);
+      if (Array.isArray(b.effective_mm) && b.effective_mm.some((x: any, i: number) => !(isNum(x) && x > 0 && (i === 0 || x > b.effective_mm[i - 1])))) E('info.barrels.effective_mm must be positive and increase: each round fired from a barrel runs down a longer bore');
+      if (isObj(info0.barrelGroups)) for (const [g, list] of Object.entries(info0.barrelGroups)) if (Array.isArray(list) && list.some((i: any) => !Number.isInteger(i) || i < 0 || i >= b.n)) E(`info.barrelGroups.${g}: indices into info.muzzles (0..${b.n - 1})`);
+    } else if (info0.barrelGroups !== undefined || info0.modeDial !== undefined) E('info.barrelGroups / info.modeDial are for a gun with info.barrels');
+    const h = info0.hinge;
+    if (isObj(h) && Array.isArray(h.sequence)) h.sequence.forEach((st: any, i: number) => {
+      if (!isObj(st)) return;
+      const key = (x: any) => (typeof x === 'string' ? x.replace(/^part_/, '') : '');
+      if (!partNodes.has(key(st.part))) E(`info.hinge.sequence[${i}].part: ${JSON.stringify(st.part)} is not a part_ node of the model`);
+      if (st.frame != null && !partNodes.has(key(st.frame))) E(`info.hinge.sequence[${i}].frame: ${JSON.stringify(st.frame)} is not a part_ node of the model`);
+      if (st.rotate_deg == null && st.move == null) E(`info.hinge.sequence[${i}]: a step turns (axis + rotate_deg) or slides (move) its part`);
+      if (st.rotate_deg != null && !['x', 'y', 'z'].includes(st.axis)) E(`info.hinge.sequence[${i}].axis: x, y or z (a rotation needs one)`);
+    });
+    if (isObj(info0.modeDial) && isObj(b) === false) E('info.modeDial needs info.barrels');
+  }
   // the mount anchors
   const pistol = isObj(a.info) && a.info.pistol === true;
   const R = (pistol ? Object.fromEntries(Object.entries(C.authored.required as Record<string, string>).filter(([k]) => k === 'mount_barrel' || k === 'mount_mag').concat(isObj(a.info.anim) && a.info.anim.slide ? [['mount_slide', 'the slide\'s rear: [forward, the frame\'s slide seat height, 0]']] : [])) : C.authored.required) as Record<string, string>, anchors = a.anchors;
@@ -652,8 +699,10 @@ function validateAuthored(model: ModelDesc, id?: string, opts: { factory?: strin
     if (!pistol) {
       order('mount_optic', 'mount_optic_end', 'the rail runs forward');
       order('mount_handguard', 'mount_handguard_end', 'a handguard has room');
-      order('mount_handguard_end', 'mount_barrel', 'the handguard ends before the bare tube');
-      order('mount_barrel', 'mount_muzzle', 'the tube runs to the barrel\'s end');
+      if (!(isObj(a.info) && isObj(a.info.barrels))) { // (a barrel block has no bare tube: its mount_barrel is where the block seats)
+        order('mount_handguard_end', 'mount_barrel', 'the handguard ends before the bare tube');
+        order('mount_barrel', 'mount_muzzle', 'the tube runs to the barrel\'s end');
+      }
     } else {
       if (f('mount_optic') != null && f('mount_optic_end') != null && f('mount_optic') !== f('mount_optic_end')) E(`anchors: a pistol's optic cut is a point: mount_optic (${f('mount_optic')}) and mount_optic_end (${f('mount_optic_end')}) are the same`);
       if (f('mount_optic') != null && f('mount_optic_end') == null) E('anchors: mount_optic_end is missing (equal to mount_optic on a pistol)');
@@ -753,9 +802,9 @@ function validateAuthoredVariant(model: ModelDesc, id: string, name: string): Mo
   if (v === undefined && typeof root.extras.variant_json === 'string') { try { v = JSON.parse(root.extras.variant_json); } catch (e) { E(`root extras.variant_json is not valid JSON: ${(e as Error).message}`); } }
   if (!isObj(v)) { E('root extras.variant_json is missing: { gun, slot, of: "factory", info?, cap?, note }'); return { errors, warnings }; }
   if (v.gun !== id) E(`variant.gun is ${JSON.stringify(v.gun)}, expected "${id}" (the folder)`);
-  if (v.slot !== 'barrel' && v.slot !== 'mag') E(`variant.slot is ${JSON.stringify(v.slot)}: "barrel" or "mag"`);
+  if (v.slot !== 'barrel' && v.slot !== 'mag' && v.slot !== 'muzzle') E(`variant.slot is ${JSON.stringify(v.slot)}: "barrel", "muzzle" or "mag"`);
   if (v.of !== 'factory') E(`variant.of is ${JSON.stringify(v.of)}: "factory" (the part it replaces)`);
-  if (v.slot === 'barrel' && !(isObj(v.info) && Array.isArray(v.info.muzzles) && v.info.muzzles.length && v.info.muzzles.every((m: any) => Array.isArray(m) && m.length === 3 && m.every(isNum)))) E('a barrel variant needs variant.info.muzzles: [[forward, up, right], ...]');
+  if ((v.slot === 'barrel' || v.slot === 'muzzle') && !(isObj(v.info) && Array.isArray(v.info.muzzles) && v.info.muzzles.length && v.info.muzzles.every((m: any) => Array.isArray(m) && m.length === 3 && m.every(isNum)))) E('a barrel or muzzle variant needs variant.info.muzzles: [[forward, up, right], ...]');
   if (v.slot === 'mag' && !(Number.isInteger(v.cap) && v.cap > 0)) E('a magazine variant needs variant.cap, its capacity in rounds');
   for (const k of Object.keys(v)) if (!['gun', 'slot', 'of', 'info', 'cap', 'note'].includes(k)) E(`variant.${k}: not a field (gun, slot, of, info, cap, note)`);
   let meshes = 0;
@@ -933,6 +982,7 @@ function contractMarkdown(): string {
   const AP = C.authoredParts;
   L.push('', '**Authored parts** (a shared attachment modelled in Blender: sights, prisms, scopes):', '', `- what: ${AP.what}`, `- frame: ${AP.frame}`, `- model: ${AP.model}`, `- config: ${AP.config}`, ...Object.entries(AP.optic).map(([k, v]) => `- optic.${k}: ${v}`), `- part: ${AP.part}`, ...AP.rules.map((r) => `- ${r}`), '- example: \`' + JSON.stringify(AP.example) + '\`');
   L.push('', '**Magazine check** (`part_mag.extras.check`, meshes\' `extras.chk`):', '', `- what: ${C.magCheck.what}`, `- part: ${C.magCheck.part}`, `- meshes: ${C.magCheck.meshes}`, '- example: `' + JSON.stringify(C.magCheck.example) + '`');
+  L.push('', '**Multi-barrel guns and reload sequences** (`info.barrels`, `info.hinge`):', '', `- what: ${C.multi.what}`, `- speed: ${C.multi.speed}`, `- display: ${C.multi.display}`, `- dial: ${C.multi.dial}`, `- hinge: ${C.multi.hinge}`, '- example: `' + JSON.stringify(C.multi.example) + '`');
   L.push('', '**Bipods** (`part_bipod`, its legs\' `extras.leg`):', '', `- what: ${C.bipod.what}`, `- pose: ${C.bipod.pose}`, `- drive: ${C.bipod.drive}`, `- packs: ${C.bipod.packs}`, '- example: `' + JSON.stringify(C.bipod.example) + '`');
   L.push('', '**Per-part packs** (assets/models/parts, milestone 2):', '', ...Object.entries(C.packs).map(([k, v]) => `- ${k}: ${v}`));
   L.push('', C.materials.anonymous, '', '**Extras keys:** ' + Object.entries(C.extras).map(([where, o]) => `${where}: ${Object.keys(o).map((k) => '`' + k + '`').join(', ')}`).join('; ') + '.');

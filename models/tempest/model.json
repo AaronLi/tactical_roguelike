@@ -1,0 +1,9 @@
+{
+  "source": "authored",
+  "sights": {
+    "builtin": ["irons", "notch", "bead", "none"],
+    "rail": [],
+    "meshless": true,
+    "railed": true
+  }
+}

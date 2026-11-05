@@ -10,7 +10,7 @@
 // a gun's class (its sound profile, CLASS_SND), which slot it's carried in (primary or sidearm) and a fire selector position
 type WeaponClass = 'AR' | 'BR' | 'SMG' | 'SG' | 'LMG' | 'DMR' | 'SNP' | 'GL' | 'RAIL' | 'PST' | 'MP' | 'BOW';
 type WeaponSlot = 'p' | 's';
-type FireMode = 'semi' | 'auto' | 'burst' | 'hyper';
+type FireMode = 'semi' | 'auto' | 'burst' | 'hyper' | 'low' | 'high' | 'double' | 'triple' | 'sextuple';
 interface WeaponDef {
   id: string; slot: WeaponSlot; cls: WeaponClass; tier: number; price: number; name: string; rpm: number; mag: number; reserve: number;
   reload: number; spread: number; ads: number; range: number; desc: string;
@@ -164,6 +164,11 @@ const G_WEAPON_LIST: WeaponDef[] = [
   W({ id: 'welrod', slot: 's', cls: 'PST', tier: 1, price: 700, name: 'Welrod Mk II', rpm: 80, mode: 'semi', manual: true, mag: 8, reserve: 48, reload: 1.5, spread: 1.6, ads: 0.075, range: 16, speed: 0.97, integral: true, desc: 'The wartime assassin\'s pistol: .32 ACP, an integral suppressor and a bolt you work by hand after every shot. Slow, silent, and it does not miss much.' }),
   W({ id: 'maxim9', slot: 's', cls: 'PST', tier: 2, price: 1200, name: 'Maxim 9', rpm: 450, mode: 'semi', mag: 17, reserve: 102, reload: 1.5, spread: 2.0, ads: 0.075, range: 20, speed: 0.95, integral: true, desc: 'A 9mm pistol with its suppressor built in: seventeen rounds, a long sight radius and a report you barely hear. Its front block comes off for a shorter, louder, handier gun.' }),
   W({ id: 'thor', slot: 's', cls: 'PST', tier: 4, price: 4500, name: 'Thor .50', rpm: 40, mode: 'semi', mag: 1, reserve: 10, reload: 3.2, spread: 3, ads: 0.03, range: 60, pen: 3, desc: 'One round of .50 BMG, in a pistol, because someone asked if it could be done. It can. Hold on.' }),
+  // The Tempest (models/tempest, TASK 18): a stacked-round rifle, six barrels with seven telescoped rounds each (def.barrels: js/player.ts shoot, docs/models.md "Multi-barrel guns"). Found only in weapon cases
+  // (caseOnly: no shop, no kit). The figures are the user's starting values (to tune): burst specialist, class AR; tier 4 because that is how the cases rank a legendary.
+  W({ id: 'tempest', slot: 'p', cls: 'AR', tier: 4, price: 6000, caseOnly: true, name: 'Tempest', rpm: 600, mode: 'semi', mag: 42, reserve: 210, reload: 4.5, spread: 2.6, ads: 0.02, range: 45, zoom: 0.75, speed: 0.9, pen: 1, caseless: true,
+    barrels: { n: 6, per: 7, mm: [244, 288, 332, 376, 420, 464, 508], groups: { top: [0, 1, 2], bottom: [3, 4, 5], all: [0, 1, 2, 3, 4, 5] }, full: 0.8 },
+    desc: 'Six barrels of stacked 10 mm caseless rounds, seven to a barrel, fired electrically. Semi, two automatic rates, or two, three or all six barrels at once. A barrel shoots harder the fewer rounds it has left in it. Legendary.' }),
 ];
 G.WEAPON_LIST = G_WEAPON_LIST;
 const G_WEAPONS: Record<string, any> = {}; // (any, not WeaponDef: icons.ts, gunsmith.ts and parts.ts index it as (G.WEAPONS[x] || {}).field)
@@ -182,11 +187,17 @@ G.obtainable = G_obtainable;
 // side kick, a steady pull one way as a share of the usual, where every other gun's flips at random: js/player.ts recoilKick).
 const G_AUTO_ONLY = ['mac10', 'uzi', 'aa12', 'm249', 'pkm', 'm60', 'shredder'];
 G.AUTO_ONLY = G_AUTO_ONLY;
-const G_FIRE_MODES: Record<string, FireMode[]> = { br3: ['semi', 'burst'], an94: ['semi', 'hyper'], auto9: ['semi', 'burst'], b92: ['burst', 'semi'], tx22: ['auto', 'semi'] }; // (the TX22: made full auto, it comes set to it)
+const G_FIRE_MODES: Record<string, FireMode[]> = { tempest: ['semi', 'low', 'high', 'double', 'triple', 'sextuple'], br3: ['semi', 'burst'], an94: ['semi', 'hyper'], auto9: ['semi', 'burst'], b92: ['burst', 'semi'], tx22: ['auto', 'semi'] }; // (the TX22: made full auto, it comes set to it)
 G.FIRE_MODES = G_FIRE_MODES;
 G.WEAPON_LIST.forEach((w) => { w.modes = G.FIRE_MODES[w.id] || (w.mode === 'semi' ? ['semi'] : G.AUTO_ONLY.includes(w.id) ? [w.mode] : ['semi', w.mode]); });
-const G_MODE_NAME: Record<string, string> = { semi: 'SEMI', auto: 'AUTO', burst: 'BURST', hyper: 'HYPER' };
+const G_MODE_NAME: Record<string, string> = { semi: 'SEMI', auto: 'AUTO', burst: 'BURST', hyper: 'HYPER', low: 'LOW AUTO', high: 'HIGH AUTO', double: 'DOUBLE', triple: 'TRIPLE', sextuple: 'SEXTUPLE' };
 G.MODE_NAME = G_MODE_NAME;
+// What the multi-barrel positions do (a gun with def.barrels): take = how many barrels one pull fires (group: of the top or the bottom group in def.barrels.groups, whichever has more rounds left),
+// auto = the trigger repeats, rpm = its own rate (the gun's def.rpm otherwise). A mode not listed here is an ordinary one (semi, auto, burst, hyper).
+const G_MODE_INFO: Record<string, { take: number; auto?: boolean; rpm?: number; group?: boolean }> = {
+  low: { take: 1, auto: true, rpm: 500 }, high: { take: 1, auto: true, rpm: 1200 }, double: { take: 2 }, triple: { take: 3, group: true }, sextuple: { take: 6 },
+};
+G.MODE_INFO = G_MODE_INFO;
 // Chambers. A closed-bolt gun (most of them) holds a round in its chamber as well as the ones in its magazine or
 // tube (w.chamber: its type, or null): it fires that one, and the action feeds the next from the magazine. A
 // reload with one chambered keeps it (30+1); run dry, the chamber's empty too and the reload ends by working the
@@ -197,7 +208,7 @@ G.MODE_NAME = G_MODE_NAME;
 const G_OPEN_BOLT = ['uzi', 'mac10', 'ppsh', 'thompson', 'aa12', 'm249', 'pkm', 'm60', 'shredder'];
 G.OPEN_BOLT = G_OPEN_BOLT;
 const G_chambered = (def: Record<string, any> | null | undefined) => {
-  if (!def || G.OPEN_BOLT.includes(def.id) || def.enbloc || def.akimbo || ['GL', 'BOW', 'RAIL'].includes(def.cls)) return false;
+  if (!def || G.OPEN_BOLT.includes(def.id) || def.enbloc || def.akimbo || def.barrels || ['GL', 'BOW', 'RAIL'].includes(def.cls)) return false;
   const P = G.Gunsmith && G.Gunsmith.PLATFORMS[def.id];
   return !(P && (P.arch === 'revolver' || P.arch === 'derringer' || (P.spec && P.spec.rcv === 'break')));
 };
@@ -320,6 +331,8 @@ const G_GUN_SPECS: Record<string, any> = { // (any, not GunSpec, for the same re
   welrod:   GS(4.0, 7.65, 'suppressor', 22000, 0.20, 71, 0.05, 0.10, 'recoil', 'brass', 17),
   // (the Maxim 9: the MP5SD's integral-can 9x19 load (35000 psi, 147 gr, 19 mm case, loudness 0.55) in the P9's slide (boltMass 0.45); barrel 4.38 in, the published figure)
   maxim9:   GS(4.38, 9.00, 'suppressor', 35000, 0.35, 147, 0.45, 0.55, 'recoil', 'brass', 19),
+  // (the Tempest: 10x44 caseless, a 20 in (508 mm) barrel at its fullest: the figures for a barrel are the effective lengths, def.barrels.mm; an electric ignition has no bolt to hear)
+  tempest:  GS(20.0, 10.0, 'none', 58000, 0.80, 108, 0.02, 0.02, 'recoil', 'plastic', 44),
   thor:     GS(15.0, 12.7, 'brake', 55000, 1.60, 660, 0.05, 0.05, 'recoil', 'brass', 99),
   derringer:GS(3.0, 10.9, 'none', 36000, 0.60, 240, 0.05, 0.05, 'recoil', 'brass', 33), // (.44 Magnum: one of the American Derringer Model 1's)
   tx22:     GS(4.1, 5.60, 'none', 24000, 0.10, 40, 0.15, 0.40, 'blowback', 'brass', 15),
@@ -470,7 +483,7 @@ G.VENDOR_QUIPS = G_VENDOR_QUIPS;
 // which ammo types exist for it; box: rounds in a box of ball from the quartermaster; per: price per round.
 const G_CALIBERS: Record<string, CaliberDef> = {
   '5.56/45': { name: '5.56×45', group: 'rifle', box: 30, per: 1.2 }, '7.62/39': { name: '7.62×39', group: 'rifle', box: 30, per: 1.1 },
-  '7/43': { name: '.277 Fury', group: 'rifle', box: 30, per: 1.8 }, '7.62/51': { name: '7.62×51', group: 'rifle', box: 20, per: 1.8 },
+  '7/43': { name: '.277 Fury', group: 'rifle', box: 30, per: 1.8 }, '10/44': { name: '10×44 caseless', group: 'rifle', box: 42, per: 2.2 }, '7.62/51': { name: '7.62×51', group: 'rifle', box: 20, per: 1.8 },
   '9/19': { name: '9×19', group: 'pistol', box: 50, per: 0.6 }, '5.7/29': { name: '5.7×28', group: 'pistol', box: 50, per: 1.1 },
   '11.43/23': { name: '.45 ACP', group: 'pistol', box: 50, per: 0.9 }, '18.5/70': { name: '12 gauge', group: 'shotgun', box: 12, per: 2 },
   '7.62/54': { name: '7.62×54R', group: 'rifle', box: 20, per: 1.8 }, '12.7/99': { name: '.50 BMG', group: 'rifle', box: 10, per: 8 },
@@ -531,7 +544,7 @@ G.AMMO_TYPES = G_AMMO_TYPES;
 const G_MUZZLE_V: Record<string, number[]> = {
   // (the drag lengths from real retained velocities: 5.56 keeps about 73% of its speed at 300 m, 7.62×51 76%,
   // .338 86%, .50 BMG 91%; 9 mm about 87% at 100 m, .45 ACP 94%; heavy subsonic 9×39 barely slows)
-  '5.56/45': [940, 20, 950], '7.62/39': [715, 16.3, 1000], '7/43': [920, 16, 1050], '7.62/51': [840, 22, 1100],
+  '5.56/45': [940, 20, 950], '7.62/39': [715, 16.3, 1000], '7/43': [920, 16, 1050], '10/44': [860, 20, 1000], '7.62/51': [840, 22, 1100],
   '9/19': [370, 4.5, 700], '5.7/29': [715, 10.4, 550], '11.43/23': [260, 5, 1600], '18.5/70': [400, 18, 70],
   '7.62/54': [830, 28, 1100], '12.7/99': [880, 29, 3000], '40/46': [76, 12, 2000], '7.65/17': [300, 4, 500],
   '12.7/33': [450, 6, 850], '9.07/33': [440, 4, 500], '12.7/41': [550, 8, 600], '4.6/30': [720, 7, 550],
@@ -569,7 +582,7 @@ G.roundSpeed = G_roundSpeed;
 // against recoil. The muzzle device and the rest of the build are parts (js/parts.ts compile, which also uses the
 // build's own weight and barrel). K puts an M4 at 1.1 degrees.
 const G_CHARGE_GR: Record<string, number> = { // powder charge (grains)
-  '5.56/45': 25, '7.62/39': 25, '7/43': 30, '7.62/51': 46, '9/19': 6, '5.7/29': 6.5, '11.43/23': 5.5, '18.5/70': 27,
+  '5.56/45': 25, '7.62/39': 25, '7/43': 30, '10/44': 34, '7.62/51': 46, '9/19': 6, '5.7/29': 6.5, '11.43/23': 5.5, '18.5/70': 27,
   '7.62/54': 50, '12.7/99': 235, '40/46': 5, '7.65/17': 2.5, '12.7/33': 25, '9.07/33': 14, '12.7/41': 40, '4.6/30': 6,
   '5.6/39': 23, '5.8/42': 26, '7.62/63': 50, '9/39': 15, '11.6/53': 55, '8.6/69': 90, '7.62/25': 8, '10.4/63': 14, '11.43/33': 9, '10.9/33': 22, '5.6/15': 2,
 };
@@ -580,7 +593,7 @@ const G_GUN_KG: Record<string, number> = { // each gun as it comes (kg)
   sr25: 4.9, uzi: 1.5, mp5: 2.5, p90: 2.6, vector: 2.7, thompson: 4.9, ppsh: 3.6, mp5sd: 2.9, mpx: 2.7, ar9: 2.9, aug9: 3.3, qbz95: 3.3, qbz192: 3.0, mcx: 2.7,
   pump: 3.6, dbl: 3.2, saiga: 3.6, aa12: 4.8, ksg: 3.6, slug: 3.6, benelli: 3.8, vepr: 4.0, m249: 7.5, pkm: 7.5, m60: 10.5,
   rpk: 4.8, shredder: 16, r700: 4.1, barrett: 14, gm6: 11.5, mosin: 4.0, awm: 6.5, m32: 5.3, rail: 7.5, crossbow: 3.5,
-  p9: 0.75, g19: 0.7, m1911: 1.1, usp: 0.75, fiveseven: 0.75, thor: 5.4, b92: 0.97, ppk: 0.59, auto9: 1.1, deagle: 2.0, rev: 1.1, hc500: 2.0, akimbo: 0.95, derringer: 0.4,
+  tempest: 4.6, p9: 0.75, g19: 0.7, m1911: 1.1, usp: 0.75, fiveseven: 0.75, thor: 5.4, b92: 0.97, ppk: 0.59, auto9: 1.1, deagle: 2.0, rev: 1.1, hc500: 2.0, akimbo: 0.95, derringer: 0.4,
   welrod: 1.0, maxim9: 1.2, // (estimates: a little over a kilo for the Welrod with its tube, about 1.2 kg for the Maxim 9 with its suppressor; the P9 is 0.75)
   g18: 0.9, skorp: 1.3, mp7: 1.9, mac10: 2.8, tx22: 0.6, sawn: 2.0, judge: 0.85, pocketgl: 1.8,
 };
@@ -756,4 +769,4 @@ const G_ENEMY_GEAR = {
 };
 G.ENEMY_GEAR = G_ENEMY_GEAR;
 
-interface GameModules { TIER_NAMES: typeof G_TIER_NAMES; TIER_COLORS: typeof G_TIER_COLORS; CLASS_SND: typeof G_CLASS_SND; WEAPON_LIST: WeaponDef[]; WEAPONS: typeof G_WEAPONS; EXPLOSIVES_OFF: typeof G_EXPLOSIVES_OFF; obtainable: typeof G_obtainable; AUTO_ONLY: typeof G_AUTO_ONLY; FIRE_MODES: typeof G_FIRE_MODES; MODE_NAME: typeof G_MODE_NAME; OPEN_BOLT: typeof G_OPEN_BOLT; chambered: typeof G_chambered; revolver: typeof G_revolver; REV: typeof G_REV; fullReload: typeof G_fullReload; BOLT_HOLD: typeof G_BOLT_HOLD; boltHold: typeof G_boltHold; loaded: typeof G_loaded; MAG_FAMILY: typeof G_MAG_FAMILY; BELT_FAMILY: typeof G_BELT_FAMILY; magFam: typeof G_magFam; magFits: typeof G_magFits; beltFed: typeof G_beltFed; GUN_SPECS: typeof G_GUN_SPECS; SUPPRESSOR: typeof G_SUPPRESSOR; ARMOR_LIST: ArmorDef[]; ARMORS: typeof G_ARMORS; ENEMIES: typeof G_ENEMIES; THEMES: typeof G_THEMES; HANGAR_ROWS: typeof G_HANGAR_ROWS; HANGAR_THEME: typeof G_HANGAR_THEME; PLAYER_COLORS: typeof G_PLAYER_COLORS; VENDOR_QUIPS: typeof G_VENDOR_QUIPS; CALIBERS: typeof G_CALIBERS; calOf: typeof G_calOf; stdMag: typeof G_stdMag; AMMO: typeof G_AMMO; AMMO_TYPES: typeof G_AMMO_TYPES; MUZZLE_V: typeof G_MUZZLE_V; SOUND_SPEED: typeof G_SOUND_SPEED; dragOf: typeof G_dragOf; roundSpeed: typeof G_roundSpeed; CHARGE_GR: typeof G_CHARGE_GR; GUN_KG: typeof G_GUN_KG; RECOIL_K: typeof G_RECOIL_K; RECOIL: typeof G_RECOIL; aimSway: typeof G_aimSway; recoilImpulse: typeof G_recoilImpulse; physRecoil: typeof G_physRecoil; GRAVITY: typeof G_GRAVITY; zeroOf: typeof G_zeroOf; sightH: typeof G_sightH; ROUND_LIFE: typeof G_ROUND_LIFE; ballistics: typeof G_ballistics; flight: typeof G_flight; zeroSlope: typeof G_zeroSlope; CLICK: typeof G_CLICK; boreTip: typeof G_boreTip; ballFor: typeof G_ballFor; AMMO_RARITY: typeof G_AMMO_RARITY; rollAmmo: typeof G_rollAmmo; ammoOk: typeof G_ammoOk; roundDef: typeof G_roundDef; gearTier: typeof G_gearTier; ENEMY_GEAR: typeof G_ENEMY_GEAR; }
+interface GameModules { TIER_NAMES: typeof G_TIER_NAMES; TIER_COLORS: typeof G_TIER_COLORS; CLASS_SND: typeof G_CLASS_SND; WEAPON_LIST: WeaponDef[]; WEAPONS: typeof G_WEAPONS; EXPLOSIVES_OFF: typeof G_EXPLOSIVES_OFF; obtainable: typeof G_obtainable; AUTO_ONLY: typeof G_AUTO_ONLY; FIRE_MODES: typeof G_FIRE_MODES; MODE_NAME: typeof G_MODE_NAME; MODE_INFO: typeof G_MODE_INFO; OPEN_BOLT: typeof G_OPEN_BOLT; chambered: typeof G_chambered; revolver: typeof G_revolver; REV: typeof G_REV; fullReload: typeof G_fullReload; BOLT_HOLD: typeof G_BOLT_HOLD; boltHold: typeof G_boltHold; loaded: typeof G_loaded; MAG_FAMILY: typeof G_MAG_FAMILY; BELT_FAMILY: typeof G_BELT_FAMILY; magFam: typeof G_magFam; magFits: typeof G_magFits; beltFed: typeof G_beltFed; GUN_SPECS: typeof G_GUN_SPECS; SUPPRESSOR: typeof G_SUPPRESSOR; ARMOR_LIST: ArmorDef[]; ARMORS: typeof G_ARMORS; ENEMIES: typeof G_ENEMIES; THEMES: typeof G_THEMES; HANGAR_ROWS: typeof G_HANGAR_ROWS; HANGAR_THEME: typeof G_HANGAR_THEME; PLAYER_COLORS: typeof G_PLAYER_COLORS; VENDOR_QUIPS: typeof G_VENDOR_QUIPS; CALIBERS: typeof G_CALIBERS; calOf: typeof G_calOf; stdMag: typeof G_stdMag; AMMO: typeof G_AMMO; AMMO_TYPES: typeof G_AMMO_TYPES; MUZZLE_V: typeof G_MUZZLE_V; SOUND_SPEED: typeof G_SOUND_SPEED; dragOf: typeof G_dragOf; roundSpeed: typeof G_roundSpeed; CHARGE_GR: typeof G_CHARGE_GR; GUN_KG: typeof G_GUN_KG; RECOIL_K: typeof G_RECOIL_K; RECOIL: typeof G_RECOIL; aimSway: typeof G_aimSway; recoilImpulse: typeof G_recoilImpulse; physRecoil: typeof G_physRecoil; GRAVITY: typeof G_GRAVITY; zeroOf: typeof G_zeroOf; sightH: typeof G_sightH; ROUND_LIFE: typeof G_ROUND_LIFE; ballistics: typeof G_ballistics; flight: typeof G_flight; zeroSlope: typeof G_zeroSlope; CLICK: typeof G_CLICK; boreTip: typeof G_boreTip; ballFor: typeof G_ballFor; AMMO_RARITY: typeof G_AMMO_RARITY; rollAmmo: typeof G_rollAmmo; ammoOk: typeof G_ammoOk; roundDef: typeof G_roundDef; gearTier: typeof G_gearTier; ENEMY_GEAR: typeof G_ENEMY_GEAR; }
