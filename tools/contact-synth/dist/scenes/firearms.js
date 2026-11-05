@@ -74,7 +74,7 @@ const arCarrier = steelBlock(18, 22); // bolt carrier group, ~300 g
 const arBolt = steelBlock(6, 10);
 const arBarrelExt = steelBlock(3, 20);
 const arUpper = { ...alu('shell', 25, 3, 0.7), modes: 0 }; // receiver: thick, bolted to everything, no free ring
-const arChargingHandle = alu('bar', 18, 5, 0.4);
+const arChargingHandle = alu('bar', 18, 5, 0.7); // in the hand
 const arChLatch = steelBar(2.5, 2);
 const arBufferTube = { ...alu('shell', 18, 2.5, 0.5), modes: 1 }; // the buffer tube's own short ring is part of the AR's sound
 const arBufferSpring = springWire(25, 1.4);
@@ -176,9 +176,12 @@ const AR_HOUSING = { amount: 0.5, cavity: 0.15, ...mat('aluminum'), shape: 'shel
 function arForward(t, withChargingHandle) {
     const els = [
         // Buffer spring decompressing: the classic AR "sproing", echoing in the buffer tube.
-        hit('buffer spring drives the carrier', t, -6, 3, arBufferSpring, arBufferTube, { scatter: 0.2, radius: 1, click: 0.3, sharp: 0.7 }, { coil: { level: 0.6, length: 14, dispersion: 0.45, decay: 0.35, brightness: 3500 } }),
-        rub('carrier rails in the upper', t + 0.002, -12, { force: 8, duration: 0.05, speed: 4, profile: 'accelerate', roughness: 10, grain: 0.4 }, arCarrier, arUpper),
-        hit('buffer weights shift', t + 0.004, -16, 1.2, steelBlock(1.5, 12), arBuffer, { scatter: 0.9, radius: 2 }),
+        // The buffer spring is inside the buffer tube, behind the receiver, inside the stock:
+        // heard only as a faint, muffled sproing under the carrier.
+        hit('buffer spring drives the carrier', t, -18, 3, arBufferSpring, arBufferTube, { scatter: 0.2, radius: 1, click: 0.1, sharp: 0.5 }, { coil: { level: 0.3, length: 14, dispersion: 0.4, decay: 0.2, brightness: 1800 } }),
+        // What you actually hear: the steel carrier grinding along the aluminium upper.
+        rub('carrier rails in the upper', t + 0.002, -5, { force: 14, duration: 0.05, speed: 4, profile: 'accelerate', roughness: 22, grain: 0.25, periodicity: 0.2 }, arCarrier, arUpper),
+        hit('buffer weights shift', t + 0.004, -20, 1.2, steelBlock(1.5, 12), arBuffer, { scatter: 0.9, radius: 2 }),
         // Bolt strips the top round over the steel feed lips.
         rub('case dragged over the feed lips', t + 0.02, -14, { force: 6, duration: 0.02, speed: 3, roughness: 15, grain: 0.3 }, arCase, arFeedLips),
         hit('next round pops up', t + 0.03, -16, 0.8, arNextRound, arFeedLips, { scatter: 0.3, radius: 2 }),
@@ -215,18 +218,23 @@ export const AR15_CHARGE = {
         },
         {
             name: 'pull-back',
-            description: 'Charging handle and carrier sliding back through the upper.',
+            description: 'Charging handle and bolt carrier grinding back along the upper, with the gas key riding in the handle slot: the main sound of the pull.',
             elements: [
-                rub('charging handle in its channel', CH_BACK, -12, { force: 5, duration: CH_END - CH_BACK, speed: 0.7, roughness: 8, grain: 0.3, stickSlip: 0.1, stickPitch: 220 }, arChargingHandle, arUpper),
-                rub('carrier on the upper rails', CH_BACK + 0.01, -12, { force: 6, duration: CH_END - CH_BACK - 0.01, speed: 0.7, roughness: 12, grain: 0.4 }, arCarrier, arUpper),
+                // Hard-anodised aluminium on aluminium, and phosphated/nitrided steel on aluminium:
+                // fine machining marks give a gritty, slightly regular grind.
+                rub('charging handle in its channel', CH_BACK, -5, { force: 8, duration: CH_END - CH_BACK, speed: 0.7, roughness: 18, grain: 0.25, periodicity: 0.2 }, arChargingHandle, arUpper),
+                rub('carrier on the upper rails', CH_BACK + 0.01, -4, { force: 14, duration: CH_END - CH_BACK - 0.01, speed: 0.7, roughness: 22, grain: 0.25, periodicity: 0.2 }, arCarrier, arUpper),
+                rub('gas key riding in the handle slot', CH_BACK + 0.01, -10, { force: 5, duration: CH_END - CH_BACK - 0.01, speed: 0.7, roughness: 15, grain: 0.3 }, steelBar(3, 6), arChargingHandle),
             ],
         },
         {
             name: 'buffer-spring-compress',
-            description: 'Buffer spring compressing in the buffer tube: coils scraping the tube walls, the spring twanging.',
+            description: 'Buffer spring compressing inside the buffer tube (inside the stock): a faint, muffled scrape and sproing.',
             elements: [
-                rub('coils scraping the buffer tube', CH_BACK + 0.02, -9, { force: 3, duration: CH_END - CH_BACK - 0.02, speed: 0.7, roughness: 120, grain: 4, periodicity: 0.85 }, arBufferSpring, arBufferTube, { coil: { level: 0.55, length: 14, dispersion: 0.45, decay: 0.25, brightness: 3500 }, flex: { amount: 0.4, freq: 110, decay: 0.15, rattle: 0.3, wobble: 0.1, tone: 0.15 } }),
-                hit('buffer weights shift', CH_BACK + 0.03, -16, 0.6, steelBlock(1.5, 12), arBuffer, { scatter: 0.9, radius: 2 }),
+                // Inside the buffer tube, inside the stock: a faint, muffled scrape. The coils
+                // slide smoothly along the tube; they don't tick or clash.
+                rub('coils scraping the buffer tube', CH_BACK + 0.02, -22, { force: 3, duration: CH_END - CH_BACK - 0.02, speed: 0.7, roughness: 12, grain: 0.5, periodicity: 0.1, contactWidth: 0.2 }, arBufferSpring, arBufferTube, { coil: { level: 0.2, length: 14, dispersion: 0.4, decay: 0.15, brightness: 1800 } }),
+                hit('buffer weights shift', CH_BACK + 0.03, -22, 0.6, steelBlock(1.5, 12), arBuffer, { scatter: 0.9, radius: 2 }),
             ],
         },
         {
