@@ -1773,18 +1773,22 @@ const G_GunRecipes = (() => {
     if (sl.vent) for (let i = 0; i < 4; i++) { const vf = len0 * 0.45 + i * 0.022; if (vf + 0.012 > p0 - 0.002 && vf < p1 + 0.002) continue; k.box(w + 0.002, 0.006, 0.012, M.rubber(), vf, topAt(vf) - 0.002); } // (none over the port)
     k.into(null);
     anim.slide = slide;
-    k.box(w / 2 - 0.002, 0.0015, p1 - p0, M.rubber(), p0, sy + 0.0008, w / 4); // (the barrel hood under it: the barrel's, so it stays put)
     let front = len; // (the slide's front anchor: where the barrel comes out; a compensator's box pushes it on)
     if (sl.comp) { const fb = len - 0.014, y1 = tr && tr.noseTop ? V([0, tr.noseTop])[1] : topAt(fb), y0 = ts ? along(ts.lo, fb) : 0.001; k.box(w, y1 - y0, 0.03, sm, len, (y1 + y0) / 2); front += 0.03; }
-    // THE FRAME (base): the same under every grip (a chassis is built round it) and every slide
+    // THE FRAME: the same under every slide. A chassis REPLACES it (the whole pistol lower: frame, frame grip, trigger guard, rails): the frame is a piece of its
+    // own, `base@frame`, absent on a chassis, which carries the frame's interfaces (slide seat, magazine well, trigger, stock lug, light rail) at the same places.
+    // What stays in `base` is the barrel hood under the slide's port (the barrel's, it stays put).
     k.tag('base');
-    if (tr) tracedParts(k, tr, V, 'base', mats);
-    else {
-      k.prof([[0.004, 0.002], [len0 * 0.92, 0.002], [len0 * 0.92, -0.014], [0.07, -0.016], [0.05, -0.012], [0.004, -0.012]], w - 0.002, fm);
-      k.ringX(0.016, 0.0025, fm, 0.055, -0.016, 0, Math.PI, Math.PI);
-    }
-    if (!tr) k.box(0.004, 0.016, 0.005, M.black(), 0.05, -0.016);
-    if (o.hammer && !tr) k.box(0.008, 0.014, 0.008, M.blued(), -0.008, 0.022);
+    k.box(w / 2 - 0.002, 0.0015, p1 - p0, M.rubber(), p0, sy + 0.0008, w / 4);
+    if (!o.chassis) k.at('frame', () => {
+      if (tr) tracedParts(k, tr, V, 'base', mats);
+      else {
+        k.prof([[0.004, 0.002], [len0 * 0.92, 0.002], [len0 * 0.92, -0.014], [0.07, -0.016], [0.05, -0.012], [0.004, -0.012]], w - 0.002, fm);
+        k.ringX(0.016, 0.0025, fm, 0.055, -0.016, 0, Math.PI, Math.PI);
+        k.box(0.004, 0.016, 0.005, M.black(), 0.05, -0.016);
+        if (o.hammer) k.box(0.008, 0.014, 0.008, M.blued(), -0.008, 0.022);
+      }
+    });
     // the magazine well (the frame's, whatever grip is fitted: a chassis is built round it): traced, its top back corner, its bottom back corner, how deep it is
     const tm = tr ? tr.mag : null, [mf, my] = tm ? V(tm.top) : [0, -0.006], [bf, by] = tm ? V(tm.bot) : [-0.012, -0.102], mD = tm ? tm.D : 0.03, mW = tm ? tm.w : 0.02;
     k.tag('grip');
@@ -1901,6 +1905,7 @@ const G_GunRecipes = (() => {
     k.prof([[mf - 0.008, gy0], [mf + mD + 0.014, gy0], [bf + mD + 0.014, by - 0.016], [bf - 0.01, by - 0.01]], mW + 0.014, C, 0, null, 0.003);
     for (let i = 0; i < 4; i++) k.box(mW + 0.0152, 0.004, 0.02, M.rubber(), edgeF(my - 0.034 - i * 0.018) + 0.0075, my - 0.034 - i * 0.018); // (finger grooves' texture)
     k.ringX(0.019, 0.003, C, 0.057, -0.022, 0, Math.PI, Math.PI);
+    k.box(0.004, 0.016, 0.005, B, 0.05, -0.016); // (the trigger, in the guard)
     // the stock mount at the back: a block, its steel dovetail
     k.box(0.026, 0.034, 0.016, C, f0 - 0.014, -0.004);
     k.box(0.016, 0.012, 0.006, M.steel(), f0 - 0.018, -0.004);
