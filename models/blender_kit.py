@@ -61,6 +61,46 @@ def circles_hull(cs, r, seg=24):
     """The convex outline round circles of radius r at the centres cs (2D), anticlockwise."""
     return hull2([(cx + r * math.cos(2 * math.pi * i / seg), cy + r * math.sin(2 * math.pi * i / seg)) for cx, cy in cs for i in range(seg)])
 
+def _isect(p, d, q, e):
+    """The intersection of the lines p + t d and q + s e (2D)."""
+    den = d[0] * e[1] - d[1] * e[0]
+    t = ((q[0] - p[0]) * e[1] - (q[1] - p[1]) * e[0]) / den
+    return (p[0] + t * d[0], p[1] + t * d[1])
+
+def inset_poly(poly, ws):
+    """A convex polygon (anticlockwise) with each edge i moved inward by ws[i] (a number: all the same): a machined pocket's outline
+    inside its frame members (the members are then exactly ws wide)."""
+    n = len(poly); ws = ws if isinstance(ws, (list, tuple)) else [ws] * n
+    lines = []
+    for i in range(n):
+        a, b = poly[i], poly[(i + 1) % n]; d = (b[0] - a[0], b[1] - a[1]); L = math.hypot(*d)
+        nx, ny = -d[1] / L, d[0] / L                                   # (inward for anticlockwise)
+        lines.append(((a[0] + nx * ws[i], a[1] + ny * ws[i]), d))
+    return [_isect(lines[i - 1][0], lines[i - 1][1], lines[i][0], lines[i][1]) for i in range(n)]
+
+def fillet_poly(poly, r, seg=4):
+    """A convex polygon (anticlockwise) with every corner rounded to radius r (a milled pocket's corners: the cutter's radius)."""
+    out, n = [], len(poly)
+    for i in range(n):
+        p0, p1, p2 = poly[i - 1], poly[i], poly[(i + 1) % n]
+        u = (p0[0] - p1[0], p0[1] - p1[1]); v = (p2[0] - p1[0], p2[1] - p1[1])
+        lu, lv = math.hypot(*u), math.hypot(*v); u = (u[0] / lu, u[1] / lu); v = (v[0] / lv, v[1] / lv)
+        th = math.acos(max(-1, min(1, u[0] * v[0] + u[1] * v[1])))
+        t = min(r / math.tan(th / 2), 0.45 * min(lu, lv)); rr = t * math.tan(th / 2)
+        a = (p1[0] + u[0] * t, p1[1] + u[1] * t); b = (p1[0] + v[0] * t, p1[1] + v[1] * t)
+        bis = (u[0] + v[0], u[1] + v[1]); lb = math.hypot(*bis); c = (p1[0] + bis[0] / lb * rr / math.sin(th / 2), p1[1] + bis[1] / lb * rr / math.sin(th / 2))
+        a0, a1 = math.atan2(a[1] - c[1], a[0] - c[0]), math.atan2(b[1] - c[1], b[0] - c[0])
+        while a1 - a0 > math.pi: a1 -= 2 * math.pi
+        while a0 - a1 > math.pi: a1 += 2 * math.pi
+        for j in range(seg + 1):
+            ang = a0 + (a1 - a0) * j / seg; out.append((c[0] + rr * math.cos(ang), c[1] + rr * math.sin(ang)))
+    return out
+
+def ccw(poly):
+    """The polygon anticlockwise."""
+    s = sum(poly[i][0] * poly[(i + 1) % len(poly)][1] - poly[(i + 1) % len(poly)][0] * poly[i][1] for i in range(len(poly)))
+    return poly if s > 0 else list(reversed(poly))
+
 def picatinny(Kx, f0, f1, u0, slot, mat, parent=None, axis='top', x0=0.0):
     """A Picatinny rail from f0 to f1 standing on u0 (axis 'top'), or on a side face at x0 facing out (axis 'right'/'left'), or under u0
     (axis 'bottom'). 21.2 mm across, 5.6 mm tall, a slot every 10 mm: built as its section intersected with its toothed side profile
