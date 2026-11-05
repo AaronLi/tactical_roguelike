@@ -6,26 +6,50 @@
  *                 │            │
  *                 │            └─► flex swing ──► rattle events, pitch wobble, tone
  *                 ▼
- *   body A modes + body B modes + coil-spring waveguide + contact click
+ *   body A + body B (noise bands gated by decaying envelopes) + coil + contact noise
  *                 ▼
  *              room ──► normalise ──► trim
  */
 import { deriveBody, t60 } from './body.js';
 import { buildExcitation, eventPulse, makeContact, T0 } from './excitation.js';
-import { runModes } from './modal.js';
+import { renderBody } from './bank.js';
 import { runCoil, runFlex, wobbleTrack } from './elastic.js';
 import { applyRoom } from './room.js';
 import { clamp, dbToGain, highpassInPlace, makeRng, mixInto, peak } from './dsp.js';
 function bodyInfo(m) {
-    const lowest = m.modes.length ? Math.min(...m.modes.map((x) => x.f)) : 0;
     let best = 0;
     let bestAmp = -1;
-    for (const md of m.modes)
-        if (md.amp > bestAmp) {
-            bestAmp = md.amp;
-            best = t60(md.alpha);
+    for (const c of m.components)
+        if (c.amp > bestAmp) {
+            bestAmp = c.amp;
+            best = t60(c.alpha);
         }
-    return { f1: m.f1, audibleModes: m.modes.length, lowestHz: lowest, mass: m.mass, ringT60: best };
+    return { f1: m.f1, audibleModes: m.modeCount, lowestHz: m.lowestHz, mass: m.mass, ringT60: best };
+}
+/**
+ * The sound of the contact itself: a short noise burst per event (plus the friction
+ * force). Brightness comes from the contact time: a hard 30 µs touch is a sharp
+ * tick, a soft 1 ms one a dull tap.
+ */
+function contactNoise(events, cont, sr, N, rng) {
+    const out = Float32Array.from(cont);
+    for (const ev of events) {
+        const start = Math.round(ev.t * sr);
+        const decay = Math.max(0.00015, ev.tau * 1.5);
+        const len = Math.min(N - start, Math.ceil(decay * 6 * sr));
+        const fc = clamp(0.45 / ev.tau, 300, sr * 0.45);
+        const a = 1 - Math.exp((-2 * Math.PI * fc) / sr);
+        const amp = ev.J / Math.sqrt(ev.tau);
+        let l1 = 0;
+        let l2 = 0;
+        for (let i = 0; i < len; i++) {
+            const x = (rng() * 2 - 1) * Math.exp(-i / (decay * sr));
+            l1 += a * (x - l1);
+            l2 += a * (l1 - l2);
+            out[start + i] += l2 * amp;
+        }
+    }
+    return out;
 }
 export function render(p, sampleRate = 48000) {
     const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
@@ -39,8 +63,9 @@ export function render(p, sampleRate = 48000) {
     const flex = runFlex(p.flex, ex.events, contact, sr, N, rng);
     const events = ex.events.concat(flex.rattle).sort((a, b) => a.t - b.t);
     const pitch = flex.y && p.flex.wobble > 0 ? wobbleTrack(flex.y, p.flex.wobble) : null;
-    const outA = runModes(A.modes, { events, cont: ex.cont, posTrace: ex.posA, contPos: 0.5, which: 'A', pitch }, sr, N);
-    const outB = runModes(B.modes, { events, cont: ex.cont, posTrace: null, contPos: 0.37, which: 'B', pitch: null }, sr, N);
+    const seed = p.out.seed;
+    const outA = renderBody(A.components, { events, cont: ex.cont, posTrace: ex.posA, contPos: 0.5, which: 'A', pitch, seed: seed * 2 + 1 }, sr, N);
+    const outB = renderBody(B.components, { events, cont: ex.cont, posTrace: null, contPos: 0.37, which: 'B', pitch: null, seed: seed * 2 + 2 }, sr, N);
     const mix = new Float32Array(N);
     mixInto(mix, outA, A.gain * dbToGain(p.bodyA.level));
     mixInto(mix, outB, B.gain * dbToGain(p.bodyB.level));
@@ -57,7 +82,7 @@ export function render(p, sampleRate = 48000) {
                 force[start + i] += data[i];
     }
     if (p.impact.click > 0) {
-        const click = Float32Array.from(force);
+        const click = contactNoise(events, ex.cont, sr, N, rng);
         highpassInPlace(click, 400, sr);
         highpassInPlace(click, 400, sr);
         const pk = peak(click);

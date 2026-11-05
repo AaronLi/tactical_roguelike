@@ -35,7 +35,7 @@ export interface BodyParams {
   size: number;
   /** Wall / sheet / bar thickness, mm (for a block: its smallest dimension). */
   thickness: number;
-  /** Number of resonant modes simulated. */
+  /** Max isolated resonances rendered as distinct (narrow-band) pitches; the rest are noise bands. */
   modes: number;
   /** 0 = ideal geometry, 1 = dented / irregular (detuned, split modes). */
   irregularity: number;

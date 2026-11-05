@@ -48,7 +48,7 @@ function bodyControls(prefix: 'bodyA' | 'bodyB'): Control[] {
     { kind: 'range', path: `${prefix}.thickness`, label: 'Thickness', min: 0.05, max: 100, log: true, unit: 'mm', digits: 2, hint: 'Wall / sheet / bar thickness. Pitch rises in proportion. Thin = low, wobbly and loud; thick = high and solid.' },
     { kind: 'range', path: `${prefix}.damping`, label: 'Held / damped', min: 0, max: 1, step: 0.01, digits: 2, hint: '0 = hanging free, 1 = clamped, gripped or sitting on something soft.' },
     { kind: 'range', path: `${prefix}.irregularity`, label: 'Irregularity', min: 0, max: 1, step: 0.01, digits: 2, hint: 'Dents, holes, ribs: detunes and splits modes (more clangy, less pure).' },
-    { kind: 'range', path: `${prefix}.modes`, label: 'Mode budget', min: 1, max: 128, step: 1, digits: 0, hint: 'How many resonances to simulate. More = richer and slower.' },
+    { kind: 'range', path: `${prefix}.modes`, label: 'Pitched partials', min: 0, max: 128, step: 1, digits: 0, hint: 'How many isolated resonances may ring as distinct pitches. 0 = everything is rendered as noise bands.' },
     { kind: 'range', path: `${prefix}.level`, label: 'Level', min: -40, max: 12, step: 0.5, unit: 'dB', digits: 1, hint: 'Trim on top of the physical balance between the two bodies.' },
   ];
 }

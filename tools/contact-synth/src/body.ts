@@ -1,5 +1,6 @@
 /*
- * A body = material + geometry + mounting → a set of damped modes.
+ * A body = material + geometry + mounting → where it resonates, how densely,
+ * and how fast each region of the spectrum dies away.
  *
  * Fundamental frequency comes from thin-structure bending theory:
  *   bar   f1 = 1.03 · c · h / L²      (free-free beam, c = sqrt(E/ρ))
@@ -10,18 +11,33 @@
  * Each shape has its own overtone pattern (bar: sparse and stretched, plate: dense,
  * shell: paired "beating" ring modes, block: few, high).
  *
- * Each mode decays at  α = π·f·η  (internal loss)  + air/radiation loss  + mounting loss.
+ * The modes are then grouped into 1/6-octave bands. Isolated modes are kept as
+ * narrow noise bands (an audible but slightly unsteady pitch); bands crowded with
+ * modes become one wide noise band (the clank / wash of a sheet, case or pot).
+ * The bank (bank.ts) renders these from noise.
+ *
+ * Each region decays at  α = π·f·η  (internal loss)  + air/radiation loss  + mounting loss.
  */
 
 import type { BodyParams, Shape } from './params.js';
 import { clamp } from './dsp.js';
 
-export interface Mode {
-  f: number; // Hz
-  amp: number; // relative output amplitude
-  alpha: number; // amplitude decay rate, 1/s
-  k: number; // spatial wavenumber for excitation-position weighting
-  theta: number; // spatial phase
+/**
+ * One component of a body's sound: noise filtered to a band and gated by a
+ * decaying envelope. A "tonal" component is one isolated resonance (a narrow
+ * band, heard as a slightly unsteady pitch); a band component stands for a
+ * whole cluster of resonances too dense to hear apart (heard as coloured noise).
+ */
+export interface Component {
+  f: number; // centre, Hz
+  bw: number; // bandwidth, Hz
+  amp: number; // relative level
+  alpha: number; // envelope decay rate, 1/s
+  k: number; // spatial wavenumber for contact-position weighting
+  theta: number;
+  tonal: boolean;
+  /** Number of physical modes this component stands for. */
+  count: number;
 }
 
 export interface BodyModel {
@@ -34,7 +50,10 @@ export interface BodyModel {
   mass: number; // kg
   area: number; // m² radiating surface
   gain: number; // output gain from mobility / radiating area
-  modes: Mode[];
+  components: Component[];
+  /** Physical modes in the audible range. */
+  modeCount: number;
+  lowestHz: number;
 }
 
 /** Largest object simulated, cm. */
@@ -100,34 +119,6 @@ function shapeRatios(shape: Shape, aspect: number, maxRatio: number): number[] {
   return list;
 }
 
-/**
- * Pick which modes to simulate. If the body has more audible modes than the budget,
- * keep the lowest third exactly (they define the pitch) and represent the rest with
- * one mode per logarithmic band, scaled up to stand in for the modes it replaces.
- */
-function selectModes(ratios: number[], f1: number, fmin: number, fmax: number, budget: number, rng: () => number): { rank: number; ratio: number; weight: number }[] {
-  const aud: { rank: number; ratio: number }[] = [];
-  for (let i = 0; i < ratios.length; i++) {
-    const f = f1 * ratios[i];
-    if (f >= fmin && f <= fmax) aud.push({ rank: i, ratio: ratios[i] });
-  }
-  if (aud.length <= budget) return aud.map((a) => ({ ...a, weight: 1 }));
-  const keep = Math.max(1, Math.floor(budget / 3));
-  const out = aud.slice(0, keep).map((a) => ({ ...a, weight: 1 }));
-  const rest = aud.slice(keep);
-  const bins = budget - keep;
-  const lo = Math.log(rest[0].ratio);
-  const hi = Math.log(rest[rest.length - 1].ratio) + 1e-9;
-  let j = 0;
-  for (let b = 0; b < bins; b++) {
-    const top = lo + ((hi - lo) * (b + 1)) / bins;
-    const inBin: { rank: number; ratio: number }[] = [];
-    while (j < rest.length && Math.log(rest[j].ratio) <= top) inBin.push(rest[j++]);
-    if (inBin.length) out.push({ ...inBin[Math.floor(rng() * inBin.length)], weight: Math.sqrt(inBin.length) });
-  }
-  return out;
-}
-
 export function deriveBody(bp: BodyParams, sr: number, rng: () => number): BodyModel {
   const E = Math.max(1e6, bp.stiffness * 1e9);
   const rho = Math.max(100, bp.density);
@@ -174,35 +165,66 @@ export function deriveBody(bp: BodyParams, sr: number, rng: () => number): BodyM
     return x / Math.sqrt(1 + x * x);
   };
 
-  const budget = clamp(Math.round(bp.modes), 1, 128);
+  const budget = clamp(Math.round(bp.modes), 0, 128);
   const irr = clamp(bp.irregularity, 0, 1);
   const nyq = sr * 0.45;
   const fmin = 20;
+  const decay = (f: number) =>
+    Math.PI * f * bp.loss + 0.6 + 2.5e-4 * f + bp.damping * bp.damping * 60 + bp.damping * f * 0.004;
+  const level = (f: number) => radW(f) * Math.pow(Math.min(1, f1 / f), 0.35);
+
+  // Every audible mode, detuned by irregularity.
   const ratios = shapeRatios(bp.shape, aspect, Math.max(1, (nyq * 1.1) / f1));
-  const picked = selectModes(ratios, f1, fmin, nyq, budget, rng);
-  const modes: Mode[] = [];
-  const pushMode = (f: number, rank: number, ampScale: number) => {
-    if (f < fmin || f > nyq) return;
-    const alpha = Math.PI * f * bp.loss + 0.6 + 2.5e-4 * f + bp.damping * bp.damping * 60 + bp.damping * f * 0.004;
-    const amp = radW(f) * Math.pow(f1 / f, 0.35) * (0.55 + 0.45 * rng()) * ampScale;
-    modes.push({ f, amp, alpha, k: 0.7 * (rank + 1) + 0.3 * rng(), theta: rng() * Math.PI * 2 });
-  };
-  for (const pm of picked) {
-    const detune = pm.rank === 0 ? 0 : irr * 0.07 * (rng() * 2 - 1);
-    const f = f1 * pm.ratio * (1 + detune);
-    // Shells and irregular bodies split degenerate modes into close pairs → beating.
-    const split = bp.shape === 'shell' ? 0.0015 + irr * 0.02 : irr * 0.012;
-    if (split > 0.002 && (bp.shape === 'shell' || rng() < irr)) {
-      pushMode(f * (1 - split / 2), pm.rank, 0.75 * pm.weight);
-      pushMode(f * (1 + split / 2), pm.rank, 0.6 * pm.weight);
+  const freqs: number[] = [];
+  for (let i = 0; i < ratios.length; i++) {
+    const f = f1 * ratios[i] * (1 + (i === 0 ? 0 : irr * 0.07 * (rng() * 2 - 1)));
+    if (f >= fmin && f <= nyq) freqs.push(f);
+  }
+  freqs.sort((x, y) => x - y);
+
+  // Group into 1/6-octave bands. A band holding one or two modes (and within the
+  // partial budget) keeps them as separate partials; anything denser becomes noise.
+  const components: Component[] = [];
+  const bandsPerOct = 6;
+  const step = Math.pow(2, 1 / bandsPerOct);
+  let partials = 0;
+  let j = 0;
+  for (let lo = fmin; lo < nyq && j < freqs.length; lo *= step) {
+    const hi = lo * step;
+    const inBand: number[] = [];
+    while (j < freqs.length && freqs[j] < hi) inBand.push(freqs[j++]);
+    if (!inBand.length) continue;
+    const isolated = inBand.length <= 2 && partials + inBand.length <= budget;
+    if (isolated) {
+      for (const f of inBand) {
+        partials++;
+        const a = decay(f);
+        // Even a lone resonance wobbles a little: real parts aren't perfectly uniform.
+        const bw = Math.max(a / Math.PI, f * (0.00015 + 0.0012 * irr));
+        const amp = level(f) * (0.55 + 0.45 * rng());
+        const split = bp.shape === 'shell' ? 0.0015 + irr * 0.02 : irr * 0.012;
+        const k = 0.7 * partials + 0.3 * rng();
+        const theta = rng() * Math.PI * 2;
+        if (split > 0.002 && (bp.shape === 'shell' || rng() < irr)) {
+          components.push({ f: f * (1 - split / 2), bw, amp: amp * 0.75, alpha: a, k, theta, tonal: true, count: 1 });
+          components.push({ f: f * (1 + split / 2), bw, amp: amp * 0.6, alpha: a * 1.1, k, theta: theta + 1, tonal: true, count: 1 });
+        } else {
+          components.push({ f, bw, amp, alpha: a, k, theta, tonal: true, count: 1 });
+        }
+      } 
     } else {
-      pushMode(f, pm.rank, pm.weight);
+      // Centre on the band's modes; the band is as wide as the spread they cover.
+      const fc = Math.sqrt(inBand[0] * inBand[inBand.length - 1]);
+      const bw = Math.max(fc * 0.06, (inBand[inBand.length - 1] - inBand[0]) * 1.1, decay(fc) / Math.PI);
+      components.push({
+        f: fc, bw, amp: level(fc) * Math.sqrt(inBand.length) * (0.7 + 0.3 * rng()), alpha: decay(fc),
+        k: 3 + 40 * rng(), theta: rng() * Math.PI * 2, tonal: false, count: inBand.length,
+      });
     }
   }
 
   const gain = Math.sqrt(area) / Math.pow(mass, 0.6);
-  return { c, L, h, E, f1, mass, area, gain, modes };
+  return { c, L, h, E, f1, mass, area, gain, components, modeCount: freqs.length, lowestHz: freqs[0] ?? 0 };
 }
-
 /** T60 (s) of a mode given its decay rate. */
 export const t60 = (alpha: number): number => 6.91 / alpha;

@@ -204,6 +204,23 @@ export function buildExcitation(p, A, contact, sr, N, rng) {
             }
         }
     }
+    // Micro-contacts: a real collision is rarely one clean touch. Edges, burrs and the
+    // body's own vibration make it touch again within a few ms ("clack", not "ping").
+    const chatter = [];
+    const sc = clamp(p.impact.scatter, 0, 1);
+    for (const ev of events) {
+        if (ev.kind === 'snap')
+            continue;
+        const n = Math.floor(rng() * (1.5 + 3.5 * sc) + 0.6);
+        let t = ev.t;
+        let J = ev.J;
+        for (let k = 0; k < n; k++) {
+            t += 0.0002 + 0.0035 * rng() * (0.3 + sc);
+            J *= 0.2 + 0.4 * rng();
+            chatter.push({ t, J, tau: ev.tau * (0.6 + 0.8 * rng()), posA: nearby(ev.posA, 0.2), posB: nearby(ev.posB, 0.2), kind: 'chatter', flex: 0 });
+        }
+    }
+    events.push(...chatter);
     events.sort((a, b) => a.t - b.t);
     return { events, cont, posA };
 }
