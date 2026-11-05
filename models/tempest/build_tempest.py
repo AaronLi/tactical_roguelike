@@ -252,7 +252,6 @@ bevel(hs, 1.5 * mm, 2, 30)
 for s_ in (-1, 1): cut(hs, rail_section(s_, RL_T + 0.6 * mm, RL_D + 0.6 * mm, HS0 - 0.01, HG1 + 0.01))      # the rails' slots
 cut(hs, prism(rounded((HS0 + HG1) / 2, (FLOOR + LOW) / 2 - 0.001, 0.014, 0.0035, 2 * mm, 2), 'x', -0.009, 0.009))
 smooth(hs); K.adopt(hs, 'handguard', TI, pbrk)
-picatinny(K, FG0, FG1, FLOOR, 'handguard', RAIL_M, pbrk, 'bottom')
 # the CENTRE MEMBER: a titanium trough under the barrels from the hinge base to the rod housing (the junction of the side arms, the
 # trough and the guide rods, and where a vertical grip mounts): a narrow centre beam, and side webs that wrap up to the arms' runs.
 # Floor and webs are WARREN TRUSSES: equilateral triangles, pointing up and down alternately, their ends sloped at 60 degrees; the
@@ -290,6 +289,9 @@ f_b0, f_b1 = min(p[0] for p in out_b) - 0.002, max(p[0] for p in out_b) + 0.002
 web = K.tmp(prism([(f_b0, BLO + BFL - 0.0005), (f_b1, BLO + BFL - 0.0005), (f_b1, BHI - BFL + 0.0005), (f_b0, BHI - BFL + 0.0005)], 'x', -2 * mm, 2 * mm))
 for h in holes_b: cut(web, prism(h, 'x', -0.01, 0.01))
 smooth(web); K.adopt(web, 'handguard', TI, pbrk)
+# the I-beam's bottom flange carries a Picatinny its whole length: where a vertical grip or a bipod mounts (mount_fg)
+FG0, FG1 = f_b0 + 0.004, f_b1 - 0.004
+picatinny(K, FG0, FG1, BLO, 'handguard', RAIL_M, pbrk, 'bottom')
 for ua, ub in ((BLO, BLO + BFL), (BHI - BFL, BHI)):
     o = K.tmp(box(-BX, BX, f_b0, f_b1, ua, ub)); bevel(o, 0.8 * mm, 2, 30); smooth(o); K.adopt(o, 'handguard', TI, pbrk)
 # the SIDE WEBS: sloping up and out, from the I-beam's top flange edges to the underside of the arms' runs (a V cradle under the
@@ -401,7 +403,7 @@ anchors = {
     'mount_barrel': [BR0, 0, 0], 'mount_muzzle': [MZ0, 0, 0],
     'mount_stock': [0, round((SR0 + SR1) / 2, 4), 0], 'mount_grip': [GRIP_SEAT[0], GRIP_SEAT[1], 0], 'mount_mag': [MAG_AT[0], MAG_AT[1], 0],
     'mount_tac': [round((TAC0 + TAC1) / 2, 4), RUN_U, AX1], 'mount_tacL': [round((TAC0 + TAC1) / 2, 4), RUN_U, -AX1],      # (M-LOK on the arms)
-    'mount_fg': [round((FG0 + FG1) / 2, 4), round(FLOOR - 0.0056, 4), 0],
+    'mount_fg': [round((FG0 + FG1) / 2, 4), round(BLO - 0.0056, 4), 0],
 }
 root['gun'] = ID; root['info_json'] = json.dumps(info); root['anchors_json'] = json.dumps(anchors)
 # ---- the reload's clearance: the block's top (its breech end's top edge and the barrels' tops) swept as the front drops OPEN degrees,
