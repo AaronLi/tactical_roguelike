@@ -13,6 +13,9 @@ export function loadedBuild(GS, id, mode) {
   if (GS.PLATFORMS[id] && GS.PLATFORMS[id].arch === 'pistol') {
     const s = GS.slotsOf(id, b).find((x) => x.slot === 'barrel'), th = s && GS.compatible(s.mount).find((p) => p.provides && p.provides.muzzle && GS.fitsSlot(s, p, id));
     if (th) b.barrel = th.id;
+    // (and the pistol chassis, a part that opens the rail slots: the foregrip, both side rails, the SMG stock and the magnifier are in the reference builds too)
+    const g = GS.slotsOf(id, b).find((x) => x.slot === 'grip'), ch = g && GS.compatible(g.mount).find((p) => p.chassis && GS.fitsSlot(g, p, id));
+    if (ch) { b.grip = ch.id; GS.prune(id, b); }
   }
   for (let pass = 0; pass < 3; pass++) for (const s of GS.slotsOf(id, b)) {
     if (b[s.slot]) continue;

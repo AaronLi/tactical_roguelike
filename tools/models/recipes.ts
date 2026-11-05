@@ -1813,28 +1813,29 @@ const G_GunRecipes = (() => {
     if (o.match) { k.cyl(0.0068, 0.012, M.steel(), front, 0.009); front += 0.012; }
     if (o.thread) { k.cyl(0.0058, 0.012, M.steel(), front, 0.009); front += 0.012; }
     if (o.muzzle && o.thread) { k.tag('muzzle'); front += muzzle(k, o.muzzle, front, 0.0065, 0.009); }
-    let sight;
     k.tag('tac');
     if (!ch) {
       const [tf, ty] = tr ? V(tr.tac).map((n, i) => (i ? n - 0.0115 : n)) : [len0 * 0.86, -0.026]; // (traced: its top, r 11 mm, on the frame's underside)
       tactical(k, o.tac, tf, ty, -0.01); // (hung under the dust cover's rail)
     }
-    if (ch && o.optic && o.optic !== 'notch' && o.optic !== 'night') sight = ch.sights(anim);
+    // THE SIGHTS. The slide's own irons are on the slide whatever grip is fitted (inside a chassis's shell they are hidden: the optic is the same part on any grip):
+    // the rear sight at a fixed distance from the slide's rear, the front sight (a piece of its own) at the slide's front; their heights are the factory slide's. A
+    // pistol dot replaces them (the optic cut, a fixed distance from the rear); on a chassis's rail a rifle's sight does.
+    k.tag('optic');
+    const railSight = ch && o.optic && o.optic !== 'notch' && o.optic !== 'night', onSlide = !railSight && o.optic === 'minidot';
+    let sight;
+    if (onSlide) { const fO = len0 * 0.32; sight = S.minidot(k, fO, topAt0(fO), o); }
     else {
-      k.tag('optic');
-      if (o.optic === 'minidot') { const fO = len0 * 0.32; sight = S.minidot(k, fO, topAt0(fO), o); } // (the optic cut: a fixed distance from the slide's rear)
-      else {
-        // the irons: the rear sight on the slide at a fixed distance from its rear, the front sight (a piece of its own) at the slide's front; their heights are the factory slide's
-        const fR = tr ? V([tr.sights[0], 0])[0] : 0.012, fF0 = tr ? reach0(V([tr.sights[1], 0])[0]) : len0 - 0.01, fF = tr ? ts!.reach(V([tr.sights[1], 0])[0]) : len - 0.01;
-        const base = tr && tr.frontY ? V([0, tr.frontY])[1] : topAt0(fF0), rb = topAt0(fR), sy1 = Math.max(base, rb) + (tr && tr.sh || 0.0075), night = o.optic === 'night';
-        k.into(slide);
-        sight = S.pistolSights(k, fR, null, sy1, base, night, rb, tr && tr.sw);
-        if (!(tr && tr.frontY)) k.at('slide', () => S.pistolFront(k, fF, sy1, base, night));
-        k.into(null);
-        if (tr && tr.frontY) S.pistolFront(k, fF0, sy1, base, night); // (on the fixed barrel: the slide runs back under it)
-      }
-      if (ch) sight = ch.bare(); // (the slide's irons are inside the shell: the sight line is the rail's)
+      const fR = tr ? V([tr.sights[0], 0])[0] : 0.012, fF0 = tr ? reach0(V([tr.sights[1], 0])[0]) : len0 - 0.01, fF = tr ? ts!.reach(V([tr.sights[1], 0])[0]) : len - 0.01;
+      const base = tr && tr.frontY ? V([0, tr.frontY])[1] : topAt0(fF0), rb = topAt0(fR), sy1 = Math.max(base, rb) + (tr && tr.sh || 0.0075), night = o.optic === 'night';
+      k.into(slide);
+      sight = S.pistolSights(k, fR, null, sy1, base, night, rb, tr && tr.sw);
+      if (!(tr && tr.frontY)) k.at('slide', () => S.pistolFront(k, fF, sy1, base, night));
+      k.into(null);
+      if (tr && tr.frontY) S.pistolFront(k, fF0, sy1, base, night); // (on the fixed barrel: the slide runs back under it)
     }
+    if (railSight) sight = ch!.sights(anim);
+    else if (ch) sight = ch.bare(); // (no rail sight: the sight line is the rail's)
     k.tag('base');
     const hold = tr && !ch ? V(tr.hold) : [0.012, -0.06];
     return {
@@ -1882,6 +1883,7 @@ const G_GunRecipes = (() => {
     if (o.tac) { k.tag('tac'); tactical(k, o.tac, rf + RL - 0.004, -0.006, W / 2 + 0.006); }
     if (o.tacL) { k.tag('tacL'); tactical(k, o.tacL, rf + RL - 0.004, -0.006, -(W / 2 + 0.006), -1); }
     k.tag('base');
+    const ch_bare = () => ({ sy: top + 0.026, fSight: f0 + 0.012 - 0.0042, relief: 0.17 }); // (the sight line of the flip-up irons a rifle sight would have there)
     return {
       front: fN, support: fgF != null && o.fg !== 'bipod' ? [fgF, -0.07, 0] : [len * 0.72, -0.034, -0.004],
       // a rifle's sight on the rail (with a magnifier behind a red dot, the sight forward so the magnifier's mount is on
@@ -1891,17 +1893,18 @@ const G_GunRecipes = (() => {
         let sight;
         const ofs = f0 + rl * 0.5; // (the rail's middle, whatever else is fitted: the sight is the same part, a magnifier only goes behind it)
         if (o.optic && !(['irons', 'notch', 'bead', 'none', 'night', 'riser'] as (string | undefined)[]).includes(o.optic)) { // (a pistol dot's here on a riser: the slide's own sight isn't drawn in a chassis)
-          sight = sightOf(k, o, top, f0, rl, 0.01, fN, ofs);
+          // (a dot on a riser is the riser dot's own piece, keyed by that part alone: the riser under it is the mount's)
+          sight = o.riser ? k.at('riserdot', () => sightOf(k, o, top, f0, rl, 0.01, fN, ofs)) : sightOf(k, o, top, f0, rl, 0.01, fN, ofs);
           if (o.magnifier && k.reflex) { k.tag('magnifier'); sight = S.magnifier(k, sight, o.magnifier, anim); }
         } else {
-          if (o.optic === 'riser') k.box(0.024, o.riser || 0.022, 0.034, B, ofs - 0.017, top + (o.riser || 0.022) / 2); // (with nothing on it: the irons still work)
-          sight = S.irons(k, f0 + 0.012, fN - 0.014, top + 0.026, top, top, 'ar');
+          if (o.optic === 'riser') k.at('mount', () => k.box(0.024, o.riser || 0.022, 0.034, B, ofs - 0.017, top + (o.riser || 0.022) / 2)); // (with nothing on it: the irons still work)
+          sight = o.optic === 'riser' ? ch_bare() : S.irons(k, f0 + 0.012, fN - 0.014, top + 0.026, top, top, 'ar'); // (a riser with nothing on it draws only its mount: the same optic piece with or without a dot on it)
         }
         return sight;
       },
       // with no sight of the rail's fitted (the pistol's own sights, or none): the slide's irons are drawn as ever, inside the shell (so that the optic is the same part
       // on any grip), and the sight line is the flip-up irons' a rifle sight would have there (they are a part to fit: the rifle sight 'irons')
-      bare() { return { sy: top + 0.026, fSight: f0 + 0.012 - 0.0042, relief: 0.17 }; },
+      bare: ch_bare,
     };
   }
 

@@ -174,9 +174,9 @@ export function analyze(C) {
           };
           // A slot that only ENABLES the tag's own slot (a pistol chassis opens the foregrip slot: no foregrip can be set without it) is not blamed the first time: the
           // tag is keyed by its own slot's part alone, which holds wherever that part can be fitted at all. (If the closure fails again with it, it stays blamed.)
-          const own = t.includes('@') ? t.split('@')[1] : t;
+          const own = t.includes('@') && slotsAll.has(t.split('@')[1]) ? t.split('@')[1] : t.split('@')[0];
           const dropEnablers = (set) => {
-            if (set.length < 2 || !set.includes(own)) return set;
+            if (set.length < 2 || !set.includes(own) || !(C.GS.PLATFORMS[id] && C.GS.PLATFORMS[id].arch === 'pistol')) return set; // (pistols only so far: on the rifles it broke the ppsh's tacL, whose rail does depend on the handguard that opens it)
             const full = step(set);
             return set.filter((s) => {
               if (s === own || droppedEn.has(t + '|' + s)) return true;
