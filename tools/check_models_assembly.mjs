@@ -1,7 +1,7 @@
 // Assembles guns from the per-part packs (the real files, the real decoder, js/glb.js assemble()) and checks them against the recipe.
 //   node tools/check_models_assembly.mjs [id ...] [--held N] [--seed S] [--tol metres] [--report dir] [--quiet] [--no-sweep]   (needs `npm run bake:models` first)
 // (a) THE SWEEP: every platform's default, two "loaded" builds and every single-part swap from each (~9,100 builds) is built twice, by the recipe
-//     (js/gunmodels.ts) and by G.Models.assemble(def) from the packs, and compared;
+//     (tools/models/recipes.ts) and by G.Models.assemble(def) from the packs, and compared;
 // (b) THE HELD-OUT SET: N (default 10,000) random builds across all platforms, 3 to 6 parts changed at once from a random base (magnifiers,
 //     riser dots, adapters, pistol slides and grips are slots like any other), with a seed the baker never saw. Not in the sweep, not in the
 //     baker's learning set (it uses other seeds).

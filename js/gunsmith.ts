@@ -59,9 +59,15 @@ const G_GunsmithUI = (() => {
   // (skin: the stickers shown on it, the gun's own by default)
   function setModel(def: WeaponDef, skin = (weapon() || {} as any).stickers) {
     const key = def.code + '#' + G.Stickers.key(skin);
-    if (model && modelKey === key) return;
-    if (model) { scene.remove(model); model.traverse((o: any) => { if (o.isMesh) { o.geometry.dispose(); if (!o.userData.sticker) o.material.dispose(); } }); } // (a sticker's material is the picture's, shared)
+    if ((model && modelKey === key) || wantKey === key) return;
+    wantKey = key;
     const { group } = G.GunModels.display(def);
+    // (a build whose packs are not in yet is an empty group that fills in: the old model stays up till it has, and only the last one asked for is shown)
+    G.GunModels.whenReady(group, (ok) => { if (wantKey === key && ok) showModel(def, group, key, skin); else if (wantKey !== key) group.traverse((o: any) => { if (o.isMesh) o.geometry.dispose(); }); });
+  }
+  let wantKey = '';
+  function showModel(def: WeaponDef, group: THREE.Object3D, key: string, skin: any) {
+    if (model) { scene.remove(model); model.traverse((o: any) => { if (o.isMesh) { o.geometry.dispose(); if (!o.userData.sticker) o.material.dispose(); } }); } // (a sticker's material is the picture's, shared)
     // own materials, so a part can glow when picked
     group.traverse((o: any) => { if (o.isMesh) o.material = o.material.clone(); });
     G.Stickers.decorate(group, skin);
@@ -173,7 +179,7 @@ const G_GunsmithUI = (() => {
     const c = view.center, d = view.dist;
     camera.position.set(c.x + Math.sin(view.yaw) * Math.cos(view.pitch) * d, c.y + Math.sin(view.pitch) * d, c.z + Math.cos(view.yaw) * Math.cos(view.pitch) * d);
     camera.lookAt(c);
-    if (st.stkDirty) { st.stkDirty = false; G.Stickers.ghost(model, stkTry()); }
+    if (st.stkDirty && model) { st.stkDirty = false; G.Stickers.ghost(model, stkTry()); }
     renderer.render(scene, camera);
     placeDots();
   }
@@ -507,6 +513,7 @@ const G_GunsmithUI = (() => {
     const w = weapon();
     if (!container.dataset.gsInput) { container.dataset.gsInput = 1 as any; container.addEventListener('input', (e: Event) => { if (container.classList.contains('gs-host')) stkInput(e); }); } // (the sticker tool's sliders)
     if (w) {
+      G.GunModels.preload([w.def]); // (every pack of this gun's platform, so a part swap shows at once)
       container.querySelector('.gs-view')!.prepend(canvas);
       setModel(st.hoverPart ? previewDef(w.def, st.slot!, st.hoverPart) : w.def);
       paint();

@@ -2413,7 +2413,7 @@ const G_Me = {
   // Built once from the same parts as the viewmodel arms.
   fpLimbs() {
     if (this._limbs) return this._limbs;
-    const T = THREE, M = G.GunModels.M;
+    const T = THREE, M = G.GunMaterials.M;
     const arm = new T.Group();
     const glove = new T.Mesh(new T.BoxGeometry(0.075, 0.05, 0.11), M.glove()); arm.add(glove);
     const fingers = new T.Mesh(new T.BoxGeometry(0.07, 0.03, 0.05), M.glove()); fingers.position.set(0, 0.01, -0.07); arm.add(fingers);

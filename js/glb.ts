@@ -8,7 +8,7 @@
 //   - infoSchema(): a JSON Schema for the `info` extras (docs/gun-model-info.schema.json, written by `check:models --write`).
 //   - contractMarkdown(): the field tables in docs/models.md (between its contract markers; `check:models --selftest` fails
 //     when the committed doc or schema drifts from this file, and TypeScript fails when GunModelInfo and INFO_FIELDS differ).
-// The second half loads the baked models (tools/bake_models.mjs, docs/models.md) behind the ?bakedGuns flag.
+// The second half loads the baked models (tools/bake_models.mjs, docs/models.md): the platforms' indexes at boot, the packs as they are needed.
 
 // ===================================================================================================================
 //  THE CONTRACT
@@ -49,7 +49,7 @@ const NAMES = {
 interface PartSpec { doc: string; /** this `info.<field>` is non-null exactly when the model has this part */ pairedWith: keyof GunModelInfo | null }
 /** One mesh slot. */
 interface SlotSpec { doc: string; /** a model must have at least one mesh in it */ required?: boolean }
-/** A catalogue material (G.GunModels.M.<name>). */
+/** A catalogue material (G.GunMaterials.M.<name>). */
 interface MaterialSpec { doc: string; /** the relief map (js/gunmodels.ts `relief`) rebuilt at load: stp = stipple pits, chq = chequering diamonds */ bump?: 'stp' | 'chq' }
 
 // ---- the info anchors ------------------------------------------------------------------------------------------------
@@ -643,24 +643,20 @@ function contractMarkdown(): string {
 }
 
 // ===================================================================================================================
-//  THE LOADER (behind ?bakedGuns)
+//  THE LOADER
 // ===================================================================================================================
 
-/** The ES-module side (index.html's module script): G.GLB, there once the importmap'd GLTFLoader is in. */
 interface BakedIndex { version: number; three: string; src: string; guns: Record<string, { file: string; code: string; hash: string; bytes: number; gz: number; meshes: number; tris: number }> }
 
   const qs = (() => { try { return new URLSearchParams(location.search); } catch (e) { return new URLSearchParams(''); } })();
-  /** ?bakedGuns: use the baked models where there are some. ?checkModels: validate each model as it loads. */
-  const on = qs.has('bakedGuns'), checking = qs.has('checkModels');
-  const BASE = 'assets/models/guns/';
+  /** ?checkModels: validate each model as it loads. (Every gun the game shows comes from these files: there is no flag and no procedural fallback.) */
+  const on = true, checking = qs.has('checkModels');
+  const BASE = 'assets/models/guns/', R = { base: '' }; // (R.base: where the page's folder is from here: '' on the page, '../../' in the export worker, js/exportworker.ts)
   let index: Promise<BakedIndex | null> | null = null, indexData: BakedIndex | null = null;
   const loaded = new Map<string, any>(); // gun id -> its loaded root node (the glTF scene's child)
   const pending = new Map<string, Promise<boolean>>();
-  const glbReady = (): Promise<boolean> => new Promise((res) => {
-    const check = () => (G.GLB ? G.GLB.ready.then(res, () => res(false)) : false);
-    if (!check()) window.addEventListener('glb-module', () => { check(); }, { once: true });
-  });
-  const getIndex = () => index || (index = fetch(BASE + 'index.json', { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : null), () => null).then((ix) => (indexData = ix)));
+  const glbReady = (): Promise<boolean> => (G.GLB ? G.GLB.ready.then((x) => x, () => false) : Promise.resolve(false));
+  const getIndex = () => index || (index = fetch(R.base + BASE + 'index.json', { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : null), () => null).then((ix) => (indexData = ix)));
 
   /** Loads the baked models of these gun ids (all of them if none are named); resolves to how many are ready. */
   async function preload(ids?: string[]): Promise<number> {
@@ -690,7 +686,7 @@ interface BakedIndex { version: number; three: string; src: string; guns: Record
   const packRoots = new Map<string, any>(), packPending = new Map<string, Promise<boolean>>();
   const platformIndex = (id: string): Promise<PartsIndex | null> => {
     let p = platPending.get(id);
-    if (!p) platPending.set(id, (p = fetch(PARTS_BASE + id + '/index.json', { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : null), () => null).then((ix: PartsIndex | null) => {
+    if (!p) platPending.set(id, (p = fetch(R.base + PARTS_BASE + id + '/index.json', { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : null), () => null).then((ix: PartsIndex | null) => {
       if (ix && checking) { const r = validatePartsIndex(ix); for (const e of r.errors) console.error(`[checkModels] parts/${id}/index.json: ${e}`); }
       if (ix) platIx.set(id, ix); return ix;
     })));
@@ -730,7 +726,7 @@ interface BakedIndex { version: number; three: string; src: string; guns: Record
   }
   /** Own geometry for a mesh and the catalogue's material by name: what the whole-gun path does to every mesh (the gunsmith and icons dispose geometry; the game's materials are shared). */
   function finishMeshes(group: THREE.Object3D) {
-    const M = G.GunModels.M as Record<string, () => THREE.Material>;
+    const M = G.GunMaterials.M as Record<string, () => THREE.Material>;
     group.traverse((o: any) => {
       if (!o.isMesh) return;
       if (!o.userData.own) o.geometry = o.geometry.clone();
@@ -811,7 +807,7 @@ interface BakedIndex { version: number; three: string; src: string; guns: Record
     if (!src) return null;
     const code = def.code || G.Gunsmith.defaultCode(def.id);
     if (code !== G.Gunsmith.defaultCode(def.id) || (ix && ix.guns[def.id] && ix.guns[def.id].code !== code)) return null; // (a custom build, or a default that has moved on since the bake)
-    const group = src.clone(true) as THREE.Group, M = G.GunModels.M as Record<string, () => THREE.Material>;
+    const group = src.clone(true) as THREE.Group, M = G.GunMaterials.M as Record<string, () => THREE.Material>;
     const ex = src.userData[NAMES.extras.info] || {};
     group.name = ''; group.userData = {};
     group.traverse((o: any) => {
@@ -826,16 +822,63 @@ interface BakedIndex { version: number; three: string; src: string; guns: Record
     if (skin && skin.length) G.Stickers.decorate(group, skin);
     return { group, info };
   }
-  // with the flag on, load the whole set in the background once the glTF side is up (the gunsmith and the hangar then find them)
-  if (on) glbReady().then((ok) => { if (ok) preload(); });
+  // ===================================================================================================================
+  //  LOADING AT RUN TIME: the classic GLTFLoader, the boot's indexes, the preloads, what is ready (js/gunmodels.ts is the facade over these)
+  // ===================================================================================================================
+
+  // three's GLTFLoader and the meshopt decoder as a classic script (assets/vendor/gltf-classic.js, built by tools/build_gltf_classic.mjs from the r149
+  // examples, on the page's own global THREE): a global GLTFClassic, so the page and the highlights' export worker load glTF the same way, no importmap
+  const GL = (globalThis as any).GLTFClassic;
+  if (GL && !G.GLB) {
+    const loader = new GL.GLTFLoader().setMeshoptDecoder(GL.MeshoptDecoder), cache = new Map<string, Promise<any>>();
+    G.GLB = {
+      ready: Promise.resolve(GL.MeshoptDecoder.ready).then(() => true, () => false),
+      load: (url: string) => { const hit = cache.get(url); if (hit) return hit; const p: Promise<any> = loader.loadAsync(R.base + url).then((g: any) => g.scene, (e: any) => { cache.delete(url); throw e; }); cache.set(url, p); return p; },
+    };
+  }
+  /** Where the page's folder is from here (the export worker's scripts are two folders down: js/exportworker.ts sets '../../'). */
+  const setRoot = (base: string) => { R.base = base; };
+  /** A .glb or JSON of the game's assets (assets/models/...), by the loader above: for the props (js/gunmodels.ts). */
+  const loadFile = (url: string): Promise<any> => glbReady().then((ok) => { if (!ok) throw new Error('no glTF loader'); return G.GLB!.load(url); });
+  const fetchJson = (url: string): Promise<any> => fetch(R.base + url, { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : null), () => null);
+
+  /** Every platform's index (assets/models/parts/<id>/index.json: ~0.24 MB gzipped for all): what boot() waits on. */
+  let booting: Promise<number> | null = null;
+  function boot(): Promise<number> {
+    return booting || (booting = glbReady().then(async (ok) => {
+      if (!ok) return 0;
+      const ids = Object.keys(G.Gunsmith.PLATFORMS); let n = 0;
+      await pool(ids, 8, async (id) => { if (await platformIndex(id)) n++; });
+      return n;
+    }));
+  }
+  /** The info of a gun from its platform's index alone (anchors, muzzles, sight windows, mounts; info.anim empty: the nodes come with the packs); null while the index is not loaded or the build is not covered. */
+  function infoFromIndex(def: any): any | null {
+    return infoOf(def); // (the baker's: from the index's info tables, no packs needed)
+  }
+  /** Whether assemble(def) can work now: the platform's index and every pack the build needs are loaded. */
+  function ready(def: any): boolean {
+    const ix = def && platIx.get(def.id); if (!ix) return false;
+    const plan = planBuild(ix, buildOf(def)); // (every valid build has a plan: an inexact one is plan.approx, shown as it is)
+    return plan.tags.every((t) => !t.entry || packRoots.has(packUrl(def.id, t.entry.file!)));
+  }
+  /** Loads every platform's packs in the background, the ones named first, a few at a time (the hangar: all the guns it can show). */
+  let allPending: Promise<void> | null = null;
+  function preloadAll(first: string[] = []): Promise<void> {
+    return allPending || (allPending = boot().then(async () => {
+      const ids = [...new Set([...first, ...Object.keys(G.Gunsmith.PLATFORMS)])];
+      for (const id of ids) await preloadPlatform(id);
+    }));
+  }
+
   return {
-    on, checking, preload, preloadPlatform, ensure, assemble, infoOf, loadIndex: async (id: string) => !!(await platformIndex(id)), displayBaked, contract: GUN_MODEL_CONTRACT, infoFields: INFO_FIELDS, partsIndexFields: PARTS_INDEX_FIELDS, validate, validatePack, validatePartsIndex, describeGltfJson, describeScene, glbJson,
+    boot, preloadAll, ready, infoFromIndex, setRoot, loadFile, fetchJson, on, checking, preload, preloadPlatform, ensure, assemble, infoOf, loadIndex: async (id: string) => !!(await platformIndex(id)), displayBaked, contract: GUN_MODEL_CONTRACT, infoFields: INFO_FIELDS, partsIndexFields: PARTS_INDEX_FIELDS, validate, validatePack, validatePartsIndex, describeGltfJson, describeScene, glbJson,
     infoSchema, partsIndexSchema, contractMarkdown, loaded: (id: string) => loaded.has(id), platformLoaded: (id: string) => platIx.has(id), SLOTS, PARTS, NAMES,
     // the pure side of the packs (no three.js): the baker and the tests check the packs with the same code the game plans with
     planBuild, pickPack, infoLeaves, infoFromLeaves, buildKeyOf, slotKey, PARTS_INDEX_VERSION,
   };
 })();
 G.Models = G_Models;
-/** G.GLB, put there by index.html's module script (the ES-module GLTFLoader) when ?bakedGuns is on. */
+/** G.GLB: the glTF loader (made from assets/vendor/gltf-classic.js in js/glb.ts; tools replace it with their own). */
 interface GlbModuleApi { ready: Promise<boolean>; load(url: string): Promise<any> }
 interface GameModules { Models: typeof G_Models; GLB?: GlbModuleApi }

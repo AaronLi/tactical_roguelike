@@ -361,8 +361,12 @@ const G_Icons = (() => {
 
   // ---------------------------------------------------------------- guns: the model, side-on
   let gR: THREE.WebGLRenderer | null = null, gScene: THREE.Scene | null = null, gCam: THREE.OrthographicCamera | null = null;
-  function gunImage(def: WeaponDef, W: number, H: number) {
+  // (a gun whose packs are not in yet has no picture: the cell is left empty, not remembered, and 'gunicons' goes out to the screens that show icons when it has one)
+  let gunWaits = false;
+  function gunImage(def: WeaponDef, W: number, H: number): HTMLCanvasElement | null {
     const T = THREE;
+    const m = G.GunModels.display(def);
+    if (m.group.userData.pending) { gunWaits = true; G.GunModels.whenReady(m.group, () => { m.group.traverse((o: any) => { if (o.isMesh) o.geometry.dispose(); }); window.dispatchEvent(new Event('gunicons')); }); return null; }
     if (!gR) {
       gR = new T.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
       gScene = new T.Scene();
@@ -373,7 +377,7 @@ const G_Icons = (() => {
       gCam = new T.OrthographicCamera(-1, 1, 1, -1, 0.01, 20);
     }
     gR.setSize(W, H, false);
-    const { group } = G.GunModels.display(def);
+    const { group } = m;
     gScene!.add(group);
     // looking at its right side, muzzle to the right, fitted to the cell box
     const box = new T.Box3().setFromObject(group), c = box.getCenter(new T.Vector3()), sz = box.getSize(new T.Vector3());
@@ -410,7 +414,7 @@ const G_Icons = (() => {
       g.fillStyle = '#e8e4da'; g.fillRect(W * 0.43, H * 0.38, W * 0.14, H * 0.3); g.fillRect(W * 0.32, H * 0.46, W * 0.36, H * 0.12);
     }
     else if (it.k === 'part') drawPart(g, W, H, G.Gunsmith.PARTS[it.pid]);
-    else if (it.k === 'gun') { try { g.drawImage(gunImage(it.w.def, W, H), 0, 0); } catch (e) { console.warn(e); } }
+    else if (it.k === 'gun') { try { const im = gunImage(it.w.def, W, H); if (im) g.drawImage(im, 0, 0); } catch (e) { console.warn(e); } }
     return c;
   }
   // an item drawn in its natural orientation (w x h cells), turned if it's shown turned
@@ -420,11 +424,12 @@ const G_Icons = (() => {
     const key = [it.k, it.k === 'gun' ? it.w.def.code : it.wid || it.key || it.gid || it.pid || it.mt || '', it.vid || '', it.am || '', fill, w, h, rot ? 1 : 0, it.face ? it.face.gid : ''].join('|');
     let url = cache.get(key);
     if (url) return url;
+    gunWaits = false;
     const nw = rot ? h : w, nh = rot ? w : h, src = draw(it, nw * CELL, nh * CELL);
     let out = src;
     if (rot) { out = document.createElement('canvas'); out.width = h * CELL; out.height = w * CELL; const g = out.getContext('2d')!; g.translate(out.width, 0); g.rotate(Math.PI / 2); g.drawImage(src, 0, 0); }
     url = out.toDataURL();
-    cache.set(key, url);
+    if (!gunWaits) cache.set(key, url);
     return url;
   }
   // ---------------------------------------------------------------- the HUD's ammo gauges

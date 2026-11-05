@@ -22,7 +22,7 @@ type VmChamberSide = 'cyl' | 'breech' | 'port' | 'top' | 'right';
 const G_VMAnim = (() => {
   const T = THREE;
   type V3 = THREE.Vector3;
-  type Mats = typeof G.GunModels.M;
+  type Mats = typeof G.GunMaterials.M;
   type Def = WeaponDef; // a gun's definition (js/data.ts WEAPONS)
   type Pl = typeof G.Me; // the player (js/player.ts)
   // what a gun model says about its moving parts and anchor points (js/gunrig.ts): [forward, up, right] each
@@ -57,24 +57,12 @@ const G_VMAnim = (() => {
     return { g, sleeve, glove };
   }
   function prop(kind: VmPropKind, M: Mats, def?: Def) { // things carried in the hand: a shell (or a round: its real size), a fired case, a speed loader, a stripper clip, a bolt
-    const g = new T.Group(), rd = kind === 'shell' && G.GunModels.roundDims(def as { id: string }), real = (kind === 'shell' || kind === 'case') && G.GunModels.roundShape(def as { id: string });
-    if (real) {
-      // a cartridge to its real profile (js/gunmodels.ts roundShape), the bullet's tip forward, centred on the hand's hold
-      const turn = (pts: number[][], m: THREE.Material) => { const geo = new T.LatheGeometry(pts.map(([r, y]) => new T.Vector2(r, y)), 20); geo.rotateX(-Math.PI / 2); geo.translate(0, 0, real.oal / 2); const me = new T.Mesh(geo, m); g.add(me); };
-      turn(real.case, M.brass()); if (kind === 'shell') turn(real.bullet, new T.MeshStandardMaterial({ color: 0xb4764a, roughness: 0.4, metalness: 0.6 }));
-      g.userData.cart = true;
-    } else if (rd && !rd.shell) {
-      // a cartridge, centred on the hand's hold: the case (its rim at the back), the bullet out of its mouth
-      const ex = rd.pistol || rd.bd >= 0.01 ? rd.bd * 1.1 : rd.bl, oal = rd.cs + ex, add = (geo: THREE.BufferGeometry, m: THREE.Material, z: number) => { const c = new T.Mesh(geo, m); c.rotation.x = Math.PI / 2; c.position.z = z; g.add(c); };
-      const body = rd.pistol ? rd.head / 2 : rd.head * 0.42, rim = rd.pistol ? body + 0.0007 : rd.head / 2; // (a straight case: its head is its body, a rim proud of it)
-      add(new T.CylinderGeometry(body, body, rd.cs, 12), M.brass(), oal / 2 - rd.cs / 2);
-      add(new T.CylinderGeometry(rim, rim, 0.0015, 12), M.brass(), oal / 2 - 0.00075);
-      add(new T.CylinderGeometry(rd.bd / 2, rd.bd * 0.22, ex, 10), new T.MeshStandardMaterial({ color: 0x8a8f96, roughness: 0.55, metalness: 0.3 }), -oal / 2 + ex / 2);
-      g.userData.cart = true;
-    } else if (kind === 'shell') { const c = new T.Mesh(new T.CylinderGeometry(0.0095, 0.0095, 0.06, 10), new T.MeshStandardMaterial({ color: 0xa82a20, roughness: 0.6 })); c.rotation.x = Math.PI / 2; g.add(c); const b = new T.Mesh(new T.CylinderGeometry(0.0098, 0.0098, 0.014, 10), M.brass()); b.rotation.x = Math.PI / 2; b.position.z = 0.024; g.add(b); }
+    // (a cartridge, or a shotshell, or the crossbow's bolt, from the baked props: assets/models/props, js/gunmodels.ts; centred on the hand's hold, the nose forward)
+    let g = new T.Group();
+    if ((kind === 'shell' || kind === 'case') && def) g = G.GunModels.roundProp(def as { id: string }, kind);
     else if (kind === 'loader') { const plat = G.Gunsmith.PLATFORMS[def!.id], n = (plat && plat.spec.chambers) || 6, r = new T.Mesh(new T.CylinderGeometry(0.02, 0.02, 0.012, 14), M.black()); r.rotation.x = Math.PI / 2; g.add(r); for (let i = 0; i < n; i++) { const a = (i / n) * Math.PI * 2; const c = new T.Mesh(new T.CylinderGeometry(0.0045, 0.0045, 0.035, 8), M.brass()); c.rotation.x = Math.PI / 2; c.position.set(Math.cos(a) * 0.012, Math.sin(a) * 0.012, -0.02); g.add(c); } }
     else if (kind === 'clip') { const c = new T.Mesh(new T.BoxGeometry(0.014, 0.03, 0.06), M.brass()); g.add(c); }
-    else if (kind === 'bolt') g.add(G.GunModels.quarrel(true).group); // (the crossbow's own bolt: nock, shaft, vanes and head)
+    else if (kind === 'bolt') g = G.GunModels.quarrel(true).group; // (the crossbow's own bolt: nock, shaft, vanes and head)
     g.visible = false;
     return g;
   }
@@ -99,7 +87,7 @@ const G_VMAnim = (() => {
     return { reload, action };
   }
   function prepare(root: THREE.Object3D, def: Def) {
-    const M = G.GunModels.M, u = root.userData;
+    const M = G.GunMaterials.M, u = root.userData;
     const k = kinds(def);
     const hs = u.holders.map(({ holder, info, side }: { holder: THREE.Object3D; info: Info; side: number }) => G.GunRig.bind(holder, info, { def, side })); // (the parts, anchors and magazine-check data off the model: js/gunrig.ts)
     const R = makeArm(M), L = makeArm(M);
@@ -580,7 +568,7 @@ const G_VMAnim = (() => {
       if (an.cyl && A.cylHome) { const k = pose ? pose.cyl : 0; an.cyl.position.copy(A.cylHome); an.cyl.position.x -= 0.05 * k; an.cyl.position.y -= 0.016 * k; /* (swung clear of the frame) */ }
       if (an.brk) an.brk.rotation.x = (pose ? pose.brk : 0) * (A.load ? A.load.pitch : A.breech ? A.breech.pitch : -0.55); // (a derringer's hinge is at the top of the barrels' back: they tip up, muzzles first)
       if (an.cover) an.cover.rotation.x = (pose ? pose.cover : 0) * 1.1;
-      if (an.bipod) G.GunModels.bipodPose(an.bipod, pl.bipodT || 0); // (down on the ground or a ledge: js/player.ts bipodStep)
+      if (an.bipod) G.GunRig.bipodPose(an.bipod, pl.bipodT || 0); // (down on the ground or a ledge: js/player.ts bipodStep)
       if (an.pump && pose && pose.pump != null) an.pump.position.z = pose.pump * PUMP;
       if (an.lever) an.lever.rotation.x = (pose && pose.lever != null ? pose.lever : cyc && a.k.action === 'lever' ? cyc : 0) * 0.9;
       if (an.bolt && A.boltHome) { const b = (pose && pose.bolt) || [0, 0]; an.bolt.rotation.z = b[0] * BOLT_LIFT; an.bolt.position.z = A.boltHome.z + b[1] * BOLT_BACK; } // (worked by hand: js/player.ts rack)
@@ -654,7 +642,7 @@ const G_VMAnim = (() => {
           if (obj.visible && pose!.prop!.by) obj.position.add(pose!.prop!.by); // (by: held by its rim, not its middle)
           if (obj.visible && kind === 'shell' && !obj.userData.cart) {
             const shot = ((G.CALIBERS as Record<string, any>)[G.calOf(a.def)] || {}).group === 'shotgun', [hull, base] = obj.children as THREE.Mesh[], s = shot ? 1 : 0.5;
-            hull.material = shot ? shellMat(w.ammo) : G.GunModels.M.brass(); hull.scale.set(s, 1, s); base.scale.set(s, 1, s);
+            hull.material = shot ? shellMat(w.ammo) : G.GunMaterials.M.brass(); hull.scale.set(s, 1, s); base.scale.set(s, 1, s);
           }
         }
       }
@@ -683,7 +671,7 @@ const G_VMAnim = (() => {
     const n = w.mag || 0, tube = w.tube || [], top = tube.length ? tube[tube.length - 1] : w.ammo, key = n + '|' + cap + '|' + tube.join(',') + '|' + w.ammo;
     if (chk.key === key) return;
     chk.key = key;
-    const shot = ((G.CALIBERS as Record<string, any>)[G.calOf(a.def)] || {}).group === 'shotgun', M = G.GunModels.M;
+    const shot = ((G.CALIBERS as Record<string, any>)[G.calOf(a.def)] || {}).group === 'shotgun', M = G.GunMaterials.M;
     // the round at depth t down the stack (the top is the last in the tube)
     const at = (t: number) => tube.length ? tube[Math.max(0, tube.length - 1 - Math.min(tube.length - 1, Math.floor(t * cap)))] : w.ammo;
     // the top round: a bullet with its tip coloured for its type, or a shell (hull coloured, no point)

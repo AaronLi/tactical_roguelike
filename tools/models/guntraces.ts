@@ -1,11 +1,11 @@
 'use strict';
-// Pistols traced from photographs, for js/gunmodels.ts pistol(). Each is read off one side-on photo: the numbers are its
+// Pistols traced from photographs, for tools/models/recipes.ts pistol(). Each is read off one side-on photo: the numbers are its
 // pixels, at the scale the file is served at 1920 wide (ref: the Wikimedia Commons file unless noted). mm: millimetres a
 // pixel, from the gun's real length. x0, y0: the back of the slide and the bore's height. dir: -1 when the muzzle's at the
 // photo's left. top, bot: the slide's edges, rear to front. port: the ejection port's ends, along x. sights: where the rear
 // and front sights stand. hold: the middle of the firing hand. lug: where a stock clips on. tac: the front of an accessory and the underside it hangs from: far enough on that its body clears the trigger guard.
-// parts: outlines, see js/gunmodels.ts tracedParts.
-/** One outline of a traced gun (js/gunmodels.ts tracedParts): the outline in photo pixels (pts, or strips of them), its width w, bevel b, material name m, offset x, the part it rides on, and holes cut in it. */
+// parts: outlines, see tools/models/recipes.ts tracedParts.
+/** One outline of a traced gun (tools/models/recipes.ts tracedParts): the outline in photo pixels (pts, or strips of them), its width w, bevel b, material name m, offset x, the part it rides on, and holes cut in it. */
 interface TracePart { on?: string; [field: string]: any }
 /** A gun traced from a photograph (the header says what each field is; the odd ones, each recipe's own, are left open). */
 interface GunTrace { ref?: string; parts: TracePart[]; [field: string]: any }

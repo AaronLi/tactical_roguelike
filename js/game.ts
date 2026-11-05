@@ -90,6 +90,7 @@ const G_Game = {
 
   init() {
     G.Stickers.load(); // (which stickers there are: js/stickers.ts)
+    G.GunModels.boot(); // (every platform's model index and the props; the packs themselves as they are needed: js/gunmodels.ts)
     this.settings = { sens: G.U.store.get('sens', 1), fov: G.U.store.get('fov', 80), vol: G.U.store.get('vol', 0.6) };
     this.myName = G.U.store.get('name', 'Operator' + Math.floor(Math.random() * 90 + 10));
     G.U.store.set('name', this.myName); // (kept: the same name after a refresh, so the squad knows who's back)
@@ -210,7 +211,7 @@ const G_Game = {
   },
   // your own arms in first person: sleeves in your top's colour (bare forearms in a T-shirt), your gloves
   applyLook() {
-    const L = this.myLook, M = G.GunModels && G.GunModels.M;
+    const L = this.myLook, M = G.GunMaterials && G.GunMaterials.M;
     if (!M) return;
     const SKIN = 0xc89a78;
     M.fabric().color.setHex(L.top === 'tshirt' ? SKIN : L.topC);
@@ -1221,7 +1222,10 @@ const G_Game = {
     G.Loot.clear();
     G.R.setLevel(this.map);
     G.Views.clearLevel();
-    const team = [...G.Views.players.values()].map((p) => p.st && p.st.w && G.Gunsmith.fromCode(p.st.w)).filter(Boolean).map((d) => d.soundKey);
+    const teamDefs = [...G.Views.players.values()].map((p) => p.st && p.st.w && G.Gunsmith.fromCode(p.st.w)).filter(Boolean), team = teamDefs.map((d) => d.soundKey);
+    // the guns the level will show, fetched now: the squad's kits, the level's enemy weapon pool (every pack of each platform), the weapon case's gun and the loot (as it lands)
+    const caseGun = G.Server.wcase && G.Gunsmith.fromCode(G.Server.wcase.code);
+    G.GunModels.preload([...Object.values(G.Me.weapons).map((w) => w.def), ...teamDefs, ...(caseGun ? [caseGun] : [])], this.enemyGuns(level));
     G.GunAudio.prewarm([...Object.values(G.Me.weapons).flatMap((w) => [w.def.soundKey, G.Gunsmith.roundSoundKey(w.def, w.chamber || w.ammo)]), ...this.enemyGuns(level), ...team], this.map);
     // everyone in a seat of their own in the helicopter, on the pad (the same on every machine: by the sorted roster)
     const i = Math.max(0, Object.keys(this.roster).sort().indexOf(G.Net.myId!));
@@ -1362,3 +1366,5 @@ G.Game = G_Game;
 interface GameModules { Game: typeof G_Game; }
 
 window.addEventListener('load', () => G.Game.init());
+// a gun's picture came in after the sidearm web was drawn (js/icons.ts): draw it again
+window.addEventListener('gunicons', () => { const el = G.Game.$('sidearmPick'); if (el && !el.classList.contains('hidden') && !G.Me.sidearmChosen) G.Game.sidearmPick(); });

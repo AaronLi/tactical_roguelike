@@ -32,10 +32,10 @@ if (args.includes('--write')) {
   if (!fs.existsSync(SCHEMA) || lf(SCHEMA) !== schemaText()) fail('docs/gun-model-info.schema.json differs from js/glb.ts INFO_FIELDS: run npm run check:models -- --write');
   if (!fs.existsSync(SCHEMA2) || lf(SCHEMA2) !== schema2Text()) fail('docs/gun-parts-index.schema.json differs from js/glb.ts PARTS_INDEX_FIELDS: run npm run check:models -- --write');
   if (!fs.existsSync(DOC) || lf(DOC) !== docWith(lf(DOC))) fail('the contract tables in docs/models.md differ from js/glb.ts: run npm run check:models -- --write');
-  const G = loadGame(), cat = Object.keys(G.GunModels.M).sort(), named = Object.keys(Models.contract.materials.names).sort();
-  for (const k of cat) if (!named.includes(k)) fail(`material '${k}' is in G.GunModels.M but not in the contract's materials`);
-  for (const k of named) if (!cat.includes(k)) fail(`material '${k}' is in the contract but not in G.GunModels.M`);
-  for (const [k, m] of Object.entries(Models.contract.materials.names)) { const has = !!(G.GunModels.M[k] && G.GunModels.M[k]().bumpMap); if (has !== !!m.bump) fail(`material '${k}': the contract says bump=${m.bump || 'none'} but the catalogue ${has ? 'has' : 'has no'} a bump map`); }
+  const G = loadGame(), cat = Object.keys(G.GunMaterials.M).sort(), named = Object.keys(Models.contract.materials.names).sort();
+  for (const k of cat) if (!named.includes(k)) fail(`material '${k}' is in G.GunMaterials.M but not in the contract's materials`);
+  for (const k of named) if (!cat.includes(k)) fail(`material '${k}' is in the contract but not in G.GunMaterials.M`);
+  for (const [k, m] of Object.entries(Models.contract.materials.names)) { const has = !!(G.GunMaterials.M[k] && G.GunMaterials.M[k]().bumpMap); if (has !== !!m.bump) fail(`material '${k}': the contract says bump=${m.bump || 'none'} but the catalogue ${has ? 'has' : 'has no'} a bump map`); }
   for (const sl of ['base', 'grip', 'stock', 'mag', 'barrel', 'handguard', 'muzzle', 'optic', 'slide']) if (!Models.contract.slots[sl]) fail(`slot '${sl}' missing from the contract`);
   const dir = path.join(ROOT, 'assets/models/guns'); let n = 0;
   if (fs.existsSync(dir)) for (const f of fs.readdirSync(dir).filter((f) => f.endsWith('.glb'))) { n++; if (checkBuffer(f, fs.readFileSync(path.join(dir, f)), f.replace(/\.glb$/, ''))) bad++; }
