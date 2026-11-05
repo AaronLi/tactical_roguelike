@@ -6,7 +6,7 @@
 /** One mesh of an authored part: slot, catalogue material, geometry in the part's frame (three's axes), UVs where it has them, a display surface's canvas size. */
 interface AuthoredPartMesh { slot: string; mat: string; pos: Float32Array; nrm: Float32Array; uv: Float32Array | null; idx: Uint16Array | Uint32Array; display?: { width: number; height: number }; name: string }
 /** An optic's sight data in its own frame (model.json `optic`). */
-interface AuthoredOptic { sy: number; fSight: number; relief: number; reflex?: { f: number; y: number; w: number; h: number; round?: boolean; kind: string }; pip?: { f: number; y: number; r: number }; magnifier?: boolean; height: string }
+interface AuthoredOptic { sy: number; fSight: number; relief: number; reliefOnRiser?: number; reflex?: { f: number; y: number; w: number; h: number; round?: boolean; kind: string }; pip?: { f: number; y: number; r: number }; magnifier?: boolean; height: string }
 interface AuthoredPartSrc { id: string; slot: string; optic: AuthoredOptic; meshes: AuthoredPartMesh[] }
 {
 var G_AuthoredParts = {
@@ -15,9 +15,10 @@ var G_AuthoredParts = {
   geo: new WeakMap<AuthoredPartMesh, THREE.BufferGeometry>(),
   /**
    * Builds an authored optic on the kit at the gun's mount point: `f` forward and `top` up (the rail's top). Returns the sight (sy, fSight, relief) in the
-   * gun's frame and records the reflex window / pip lens, shifted the same way. The meshes are the optic's own and nothing else (the rail under it is the mount's).
+   * gun's frame and records the reflex window / pip lens, shifted the same way. The meshes are the optic's own and nothing else (the rail, riser or slide under it
+   * is the mount's: `top` is the plane its foot rests on). onRiser: it stands on a riser, so its eye relief is the riser's (optic.reliefOnRiser, when the model gives one).
    */
-  place(k: any, key: string, f: number, top: number) {
+  place(k: any, key: string, f: number, top: number, onRiser = false) {
     const A = G_AuthoredParts, p = A.store[key];
     if (!p) throw new Error(`authored part ${key} is not loaded (models/parts/${key}/)`);
     const M = G.GunMaterials.M as Record<string, () => THREE.Material>;
@@ -36,7 +37,7 @@ var G_AuthoredParts = {
     const o = p.optic;
     if (o.reflex) k.reflex = Object.assign({}, o.reflex, { f: f + o.reflex.f, y: top + o.reflex.y });
     if (o.pip) k.pip = { f: f + o.pip.f, y: top + o.pip.y, r: o.pip.r };
-    return { sy: top + o.sy, fSight: f + o.fSight, relief: o.relief };
+    return { sy: top + o.sy, fSight: f + o.fSight, relief: onRiser && o.reliefOnRiser != null ? o.reliefOnRiser : o.relief };
   },
 };
 G.AuthoredParts = G_AuthoredParts;
