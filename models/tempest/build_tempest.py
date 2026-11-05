@@ -186,7 +186,7 @@ pbrk = K.part('brk', (0, HINGE[0], HINGE[1]))
 ROD_X, ROD_U, ROD_R, ROD0 = 16 * mm, -0.0445, 4 * mm, HG1 - 0.150
 AX0, AX1, AW = 23 * mm, 29.5 * mm, 0.022                          # the arms' inner and outer faces; their depth on the run
 RUN_U = -0.006                                                    # the run's centre height (the barrels' axis, nearly)
-HS0 = HG1 - 0.045                                                 # the rod housing's rear
+HS0 = HG1 - 0.072                                                 # the rod housing's rear (long enough under it for a vertical grip)
 FLOOR = ROD_U - 0.008                                             # its underside
 TAC0, TAC1, FG0, FG1 = CH1 + 0.060, HS0 - 0.040, HS0 + 0.004, HG1 - 0.004      # the arms' rails; the housing's rail
 def band(path, w):
@@ -225,6 +225,18 @@ for s_ in (-1, 1): cut(hs, cyl(ROD_R + 0.3 * mm, HS0 - 0.01, HG1 + 0.01, 'y', (s
 cut(hs, prism(rounded((HS0 + HG1) / 2, (FLOOR + LOW) / 2 - 0.001, 0.014, 0.0035, 2 * mm, 2), 'x', -0.009, 0.009))
 smooth(hs); K.adopt(hs, 'handguard', TI, pbrk)
 picatinny(K, FG0, FG1, FLOOR, 'handguard', RAIL_M, pbrk, 'bottom')
+# the CENTRE ARM: a third titanium member under the barrels, from the hinge base forward and up to the rod housing (the junction of
+# the side arms, the centre arm and the guide rods, and where a vertical grip mounts); three filleted lightening slots along it
+CA0, CA1, CAW = (CH1 + 0.024, -0.066), (HS0 + 0.006, FLOOR + 0.004), 0.011
+ca = K.tmp(prism(band([CA0, CA1], CAW), 'x', -5 * mm, 5 * mm))
+boolean(ca, prism(band([CA0, (CA0[0] + 0.004, CA0[1])], CAW + 0.004), 'x', -5 * mm, 5 * mm), 'UNION')
+bevel(ca, 1.2 * mm, 2, 30)
+ang = math.atan2(CA1[1] - CA0[1], CA1[0] - CA0[0]); Lc = math.hypot(CA1[0] - CA0[0], CA1[1] - CA0[1])
+for i in range(3):
+    t = (i + 0.5) / 3; cx, cy = CA0[0] + (CA1[0] - CA0[0]) * t, CA0[1] + (CA1[1] - CA0[1]) * t
+    sl = [(cx + x * math.cos(ang) - y * math.sin(ang), cy + x * math.sin(ang) + y * math.cos(ang)) for x, y in rounded(0, 0, Lc / 3 / 2 - 0.006, CAW / 2 - 0.0028, 2 * mm, 3)]
+    cut(ca, prism(sl, 'x', -0.01, 0.01))
+smooth(ca); K.adopt(ca, 'handguard', TI, pbrk)
 # ---- the SLIDING FRONT (part_pump, inside the forend): the muzzle device on its two truss arms, a yoke under it, and two steel guide
 # rods running back into the forend's floor; it runs forward SLIDE for the reload, drawing the barrel block ----
 ppump = K.part('pump', (0, MZ0, 0))
