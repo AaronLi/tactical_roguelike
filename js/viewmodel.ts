@@ -63,6 +63,12 @@ const G_Viewmodel = (() => {
       g.strokeStyle = 'rgba(255,90,70,1)'; g.lineWidth = 4;
       g.beginPath(); g.arc(m, m, 98, 0, Math.PI * 2); g.stroke();
       g.fillStyle = 'rgba(255,225,215,1)'; g.beginPath(); g.arc(m, m, 7, 0, Math.PI * 2); g.fill();
+    } else if (kind === 'dotP') {
+      // a precision dot (a small-dot RMR-class sight): a crisp hot core about 2 mrad across, a thin red rim, barely any halo
+      const grd = g.createRadialGradient(m, m, 0, m, m, m);
+      grd.addColorStop(0, 'rgba(255,248,244,1)'); grd.addColorStop(0.1, 'rgba(255,150,130,1)'); grd.addColorStop(0.14, 'rgba(255,50,35,0.85)');
+      grd.addColorStop(0.2, 'rgba(255,25,15,0.12)'); grd.addColorStop(0.32, 'rgba(0,0,0,0)'); grd.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = grd; g.fillRect(0, 0, N, N);
     } else {
       // an LED dot: a hot near-white core bleeding to red (or green), with a soft halo
       const grn = kind === 'dotG', c1 = grn ? 'rgba(235,255,235,1)' : 'rgba(255,245,240,1)', c2 = grn ? 'rgba(110,255,120,1)' : 'rgba(255,120,100,1)';
@@ -76,8 +82,8 @@ const G_Viewmodel = (() => {
     t.minFilter = T.LinearMipmapLinearFilter;
     return (texCache[kind] = t);
   }
-  // angular size (radians) of the whole reticle texture: dot core about 3.5 mrad, holo ring 50 mrad across
-  const RETICLE_RAD: Record<string, number> = { dot: 0.028, dotG: 0.028, holo: 0.064, cdot: 0.062 };
+  // angular size (radians) of the whole reticle texture: dot core about 3.5 mrad, dotP's about 2 mrad, holo ring 50 mrad across
+  const RETICLE_RAD: Record<string, number> = { dot: 0.028, dotG: 0.028, dotP: 0.016, holo: 0.064, cdot: 0.062 };
   function reflex(g: THREE.Object3D, o: VmReflex) {
     const mask = new T.Mesh(o.round ? new T.CircleGeometry(o.w / 2, 28) : new T.PlaneGeometry(o.w, o.h), new T.MeshBasicMaterial({
       colorWrite: false, depthWrite: false, transparent: true, side: T.DoubleSide,
@@ -102,8 +108,8 @@ const G_Viewmodel = (() => {
   // axis with a field of view set by the magnification, into a texture this disk shows. The reticle is drawn
   // over it, and a dark crescent creeps in when your eye is off the scope's axis (the eyebox).
   // (dot, dotG, cdot and holo: a reflex sight's own reticle, seen through a magnifier)
-  const PIP_RETICLE: Record<string, number> = { cross: 0, chevron: 1, lpvo: 2, dot: 3, dotG: 3, cdot: 4, holo: 4, ring: 5, bdc: 6 };
-  const PIP_ILLUM: Record<string, number> = { ring: 0x000000, cross: 0x000000, chevron: 0xff9a18, lpvo: 0xff2a20, dot: 0xff2a20, dotG: 0x30ff50, cdot: 0xff2a20, holo: 0xff2a20, bdc: 0xff2a20 };
+  const PIP_RETICLE: Record<string, number> = { cross: 0, chevron: 1, lpvo: 2, dot: 3, dotG: 3, dotP: 3, cdot: 4, holo: 4, ring: 5, bdc: 6 };
+  const PIP_ILLUM: Record<string, number> = { ring: 0x000000, cross: 0x000000, chevron: 0xff9a18, lpvo: 0xff2a20, dot: 0xff2a20, dotP: 0xff2a20, dotG: 0x30ff50, cdot: 0xff2a20, holo: 0xff2a20, bdc: 0xff2a20 };
   // The crossbow's reticle (first focal plane: js/render.ts _renderPip says how big a mil is at this power, so it grows with
   // the picture and the marks are true at any power). In mils, on a canvas BDC_R either side of the centre:
   //   - a lit dot and, to pick it up at low power, a lit horseshoe; fine wires with heavy posts outside, a tick every mil near the middle

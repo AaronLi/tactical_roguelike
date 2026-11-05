@@ -205,7 +205,7 @@ const INFO_FIELDS: { [K in keyof GunModelInfo]-?: Field } = {
   quarrelMats: F('A crossbow\'s bolt materials as three.js Material JSON (free-form; viewmodel only).', { t: 'map', of: { t: 'free' } }, true),
   mounts: F('Mount points where a swappable part sits, `mount_<slot>` -> [forward, up, right] metres of the part\'s origin (e.g. mount_muzzle: where a muzzle device screws on). Normally assembled from the parts\' anchors (see GUN_MODEL_CONTRACT.anchors); a whole-gun bake may list them directly.', { t: 'map', of: { t: 'vec', n: 3 } }, true),
   // first-person extras (js/viewmodel.ts applies them; the third person ignores them)
-  reflex: F('A reflex or holographic sight\'s window (js/viewmodel.ts): the game draws a collimated reticle behind it, masked to it. f, y: the window\'s centre, [forward, up] metres; w, h: its size, metres (round: a disc of diameter w); kind: the reticle drawn: dot, dotG, cdot or holo.', { t: 'obj', props: { f: num('Forward position of the window, metres.'), y: num('Height of the window, metres.'), w: num('Width, metres.', false, { min: 0 }), h: num('Height, metres.', false, { min: 0 }), round: F('True: a disc of diameter w.', { t: 'bool' }, true), kind: F('The reticle: dot, dotG (green dot), cdot (circle-dot) or holo (a ring).', { t: 'str', enum: ['dot', 'dotG', 'cdot', 'holo'] }) } }, true),
+  reflex: F('A reflex or holographic sight\'s window (js/viewmodel.ts): the game draws a collimated reticle behind it, masked to it. f, y: the window\'s centre, [forward, up] metres; w, h: its size, metres (round: a disc of diameter w); kind: the reticle drawn: dot, dotG, dotP (a small precision dot), cdot or holo.', { t: 'obj', props: { f: num('Forward position of the window, metres.'), y: num('Height of the window, metres.'), w: num('Width, metres.', false, { min: 0 }), h: num('Height, metres.', false, { min: 0 }), round: F('True: a disc of diameter w.', { t: 'bool' }, true), kind: F('The reticle: dot, dotG (green dot), cdot (circle-dot) or holo (a ring).', { t: 'str', enum: ['dot', 'dotG', 'cdot', 'holo'] }) } }, true),
   pip: F('A scope\'s ocular lens (js/viewmodel.ts): the game draws the world through the scope on a disc there (picture-in-picture) with the reticle over it. f, y: its centre, [forward, up] metres; r: its radius. parent + pos: a lens that swings on a hinge (a magnifier\'s): the NAME of the node it hangs on and its place in that node, [x, y, z] metres in the node\'s own frame.', { t: 'obj', props: { f: num('Forward position of the lens, metres.'), y: num('Height of the lens centre, metres.'), r: num('Lens radius, metres.', false, { min: 0 }), parent: F('Node name the lens hangs on.', { t: 'str' }, true), pos: F('Place in the parent, [x, y, z] metres in its own frame.', { t: 'vec', n: 3 }, true) } }, true),
 };
 
@@ -291,7 +291,7 @@ const GUN_MODEL_CONTRACT = { ...CONTRACT_CORE, displays: {
     fSight: 'Forward position of the sight\'s rear/eye reference, metres from the origin (info.fSight = the mount point + this); with relief it places the aiming eye.',
     relief: 'Eye relief, metres (0.03 to 0.4); on a rifle riser (a mount piece under the part) optic.reliefOnRiser instead, when given.',
     reliefOnRiser: 'Optional: the eye relief when the part sits on a riser (a pistol dot lifted to a rifle sight line), metres (0.03 to 0.4). Eye relief belongs to the mount, not the file: a pistol cut and a riser put the eye at different distances.',
-    reflex: 'A reflex or holographic sight\'s window { f, y, w, h, round?, kind: dot|dotG|cdot|holo }, centre [forward, up] and size, in the part\'s frame (becomes info.reflex shifted to the gun). The game draws a collimated reticle behind it; it lies inside the model\'s bounds and y equals sy.',
+    reflex: 'A reflex or holographic sight\'s window { f, y, w, h, round?, kind: dot|dotG|dotP|cdot|holo }, centre [forward, up] and size, in the part\'s frame (becomes info.reflex shifted to the gun). The game draws a collimated reticle behind it; it lies inside the model\'s bounds and y equals sy.',
     pip: 'A scope\'s ocular lens { f, y, r } in the part\'s frame (becomes info.pip): a magnified sight needs it and the part\'s zoom/reticle/px (set.scoped). y equals sy.',
     magnifier: 'true when a magnifier goes behind it (a reflex sight with a window); the gun gets the anchor mount_magnifier [fSight, sy, 0].',
     height: 'low, mid or high: how tall the sight stands, for ordering and tests.',
@@ -674,7 +674,7 @@ function validateAuthored(model: ModelDesc, id?: string, opts: { factory?: strin
 
 // ---- authored parts (GUN_MODEL_CONTRACT.authoredParts): a shared attachment modelled in Blender
 const AUTHORED_PART_SLOTS: Record<string, { mounts: string[] }> = { optic: { mounts: ['op:pic', 'op:pso'] } };
-const RETICLES = ['dot', 'dotG', 'cdot', 'holo'], SCOPE_RETICLES = ['cross', 'chevron', 'lpvo', 'ring'];
+const RETICLES = ['dot', 'dotG', 'dotP', 'cdot', 'holo'], SCOPE_RETICLES = ['cross', 'chevron', 'lpvo', 'ring'];
 /** model.json of an authored part, checked: the shape, the ranges, and that the sight data agrees with itself (window on the sight line...). id: the folder name. */
 function validateAuthoredPartConfig(cfg: any, id?: string): string[] {
   const out: string[] = [], E = (m: string) => out.push('model.json: ' + m);

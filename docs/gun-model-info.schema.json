@@ -692,13 +692,13 @@
             "kind"
           ],
           "additionalProperties": false,
-          "description": "A reflex or holographic sight's window (js/viewmodel.ts): the game draws a collimated reticle behind it, masked to it. f, y: the window's centre, [forward, up] metres; w, h: its size, metres (round: a disc of diameter w); kind: the reticle drawn: dot, dotG, cdot or holo."
+          "description": "A reflex or holographic sight's window (js/viewmodel.ts): the game draws a collimated reticle behind it, masked to it. f, y: the window's centre, [forward, up] metres; w, h: its size, metres (round: a disc of diameter w); kind: the reticle drawn: dot, dotG, dotP (a small precision dot), cdot or holo."
         },
         {
           "type": "null"
         }
       ],
-      "description": "A reflex or holographic sight's window (js/viewmodel.ts): the game draws a collimated reticle behind it, masked to it. f, y: the window's centre, [forward, up] metres; w, h: its size, metres (round: a disc of diameter w); kind: the reticle drawn: dot, dotG, cdot or holo."
+      "description": "A reflex or holographic sight's window (js/viewmodel.ts): the game draws a collimated reticle behind it, masked to it. f, y: the window's centre, [forward, up] metres; w, h: its size, metres (round: a disc of diameter w); kind: the reticle drawn: dot, dotG, dotP (a small precision dot), cdot or holo."
     },
     "pip": {
       "oneOf": [
