@@ -74,6 +74,8 @@ const G_Game = {
   arms: undefined as Record<string, string> | undefined, // (each player's sidearm pick)
   armSel: undefined as string | null | undefined,
   armLook: undefined as string | null | undefined,
+  routeWait: 0,
+  armModels: undefined as Promise<unknown> | 'ready' | undefined, // (the sidearm web's guns, stock and pro, loading before it opens: sidearmPick)
   armView: undefined as unknown as GmArmView,
   armPlace: undefined as unknown as () => void,
   armFrom: undefined as string | null | undefined,
@@ -1116,7 +1118,26 @@ const G_Game = {
     if (!this.routeMap || this.routeMap.seed !== r.seed || this.routeMap.act !== r.act) this.routeMap = G.Route.gen(r.seed, r.act);
     this.routeSt = { path: r.path || [], votes: r.votes || {} };
   },
+  // The models of every gun on the sidearm web, stock and pro builds (models parse on first show: js/glb.ts), counted on the loading veil's line.
+  armLoad(): Promise<unknown> {
+    if (this.armModels === 'ready') return Promise.resolve();
+    if (this.armModels) return this.armModels;
+    const A = G.Arsenal, defs: any[] = [];
+    for (const q of A.NODES) { defs.push(G.Me.makeWeapon(q.id).def); if (q.pro) defs.push(G.Me.makeWeapon(q.id, A.build(q.id)).def); }
+    let n = 0; const say = () => this.veilSay(`Loading the arsenal ${n} / ${defs.length}`); say();
+    const each = (d: any) => G.Models.ensure(d, 0).catch(() => false).then(() => { n++; say(); });
+    return (this.armModels = Promise.all(defs.map(each)).then(() => { this.armModels = 'ready'; }));
+  },
   enterRoute(level: number) {
+    // the sidearm web comes up with every picture drawn: the screen goes behind the loading veil FIRST (all the way down, so nothing of the map shows),
+    // the arsenal loads there, and the route and the web are built behind it as it wipes off
+    if (this.armModels !== 'ready' && !G.Me.sidearmChosen) {
+      const veil = this.$('veil'), up = veil.classList.contains('on') && !veil.classList.contains('out');
+      if (!up) this.veil(true);
+      const at = this.routeWait = (this.routeWait || 0) + 1;
+      Promise.all([this.armLoad(), new Promise((r) => setTimeout(r, up ? 0 : 850))]).then(() => { if (this.routeWait === at) this.enterRoute(level); });
+      return;
+    }
     this.veil(false);
     this.toggleInv(false);
     this.closeShop();
@@ -1137,11 +1158,14 @@ const G_Game = {
   sidearmPick() {
     const el = this.$('sidearmPick'), arms = this.arms || {}, roster = this.roster || {}, A = G.Arsenal;
     if (G.Me.sidearmChosen) { el.classList.add('hidden'); return; }
+    // First the models of every gun on the web, stock and pro builds (models parse on first show: js/glb.ts), behind a loading screen, so the web opens
+    // with every picture drawn; anything still missing after that shows a spinner until it comes in ('gunicons')
+    if (this.armModels !== 'ready') { el.classList.add('hidden'); this.armLoad().then(() => { if (this.phase === 'route') this.sidearmPick(); }); return; }
     if (!this.armLook) { this.armLook = this.armSel = 'p9'; this.armView = { x: 0, y: 0, z: 0.7 }; }
     // who's taken it (the squad's own picks: told by the host)
     const takers = (id: string) => Object.entries(arms).filter(([pid, a]) => a === id && roster[pid]).map(([pid]) => `<i style="color:${G.U.hex(roster[pid].color)}">${G.Callsigns.html(roster[pid].animal)}${G.U.esc(roster[pid].name)}</i>`);
     const others = Object.keys(roster).filter((pid) => pid !== G.Net.myId), waiting = others.filter((pid) => !arms[pid]).length;
-    const pic = (id: string) => { const it = G.Gear.gunItem(G.Me.makeWeapon(id, A.proOn(id) ? A.build(id) : undefined)), [cw, ch] = G.Gear.size(it); return G.Icons.of(it, cw, ch, false); };
+    const pic = (id: string) => { const it = G.Gear.gunItem(G.Me.makeWeapon(id, A.proOn(id) ? A.build(id) : undefined)), [cw, ch] = G.Gear.size(it); const url = G.Icons.of(it, cw, ch, false); return G.Icons.pending() ? '' : url; };
     // the web: a ring for each step out, spokes between, and the paths on it
     const W = 1200, spokes = [...Array(6)].map((_, i) => ((-90 + i * 60) * Math.PI) / 180), spot = (a: number, r: number) => [Math.cos(a) * r, Math.sin(a) * r], rings = A.RINGS.slice(1);
     const web = rings.map((r) => `<polygon points="${spokes.map((a) => spot(a, r).map((v) => v.toFixed(1)).join()).join(' ')}"/>`).join('') + spokes.map((a) => { const [x, y] = spot(a, rings[rings.length - 1]); return `<line x1="0" y1="0" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"/>`; }).join('');
@@ -1151,7 +1175,7 @@ const G_Game = {
     }).join('');
     const nodes = A.NODES.map((q) => {
       const [x, y] = A.at(q), st = A.open(q.id) ? 'got' : A.open(q.from!) ? 'next' : 'far', tip = st === 'next' ? `<small>${A.left(q)}/${q.n} ${G.U.esc(q.what!)}</small>` : st === 'far' ? '<small>Locked</small>' : A.proGot(q.id) ? `<small>${A.proOn(q.id) ? 'Pro: ' : 'Pro earned: '}${G.U.esc(q.pro!.name)}</small>` : '';
-      return `<button class="web-node ${st}${this.armLook === q.id ? ' look' : ''}${this.armSel === q.id ? ' sel' : ''}" data-arm="${q.id}" style="left:${x.toFixed(1)}px;top:${y.toFixed(1)}px"><img src="${pic(q.id)}" alt="" draggable="false"><b>${G.U.esc(A.name(q.id))}</b>${tip}</button>`;
+      return `<button class="web-node ${st}${this.armLook === q.id ? ' look' : ''}${this.armSel === q.id ? ' sel' : ''}" data-arm="${q.id}" style="left:${x.toFixed(1)}px;top:${y.toFixed(1)}px">${((src) => src ? `<img src="${src}" alt="" draggable="false">` : '<span class="icon-wait"><span class="spin"></span></span>')(pic(q.id))}<b>${G.U.esc(A.name(q.id))}</b>${tip}</button>`;
     }).join('');
     const paths = Object.entries(A.PATHS).map(([k, p]) => { const [x, y] = A.along(k, A.RINGS[p.len] + 165); return `<span class="web-path" style="left:${x.toFixed(1)}px;top:${y.toFixed(1)}px">${p.name}</span>`; }).join('');
     // what you're looking at: the gun, and what it takes

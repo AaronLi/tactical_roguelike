@@ -1494,7 +1494,7 @@ const G_Gunsmith = (() => {
   // magazine are the model's own: tools/models/recipes.ts authoredPistol) and has the parts its model files give it: the barrel and magazine it comes with, and a
   // VARIANT of each when a file beside the model holds one (models/<id>/<name>.glb: barrel_short.glb -> <id>.br.short, mag_ext.glb -> <id>.mag.ext). A variant's
   // figures are the game's, PROPOSED here (the user confirms them): the stats of what it is (a shorter can: handier and louder; a longer magazine: more rounds,
-  // slower to swap). The Welrod is worked by a bolt (spec.bolt: js/player.ts boltGun, js/vmanim.ts), the Maxim 9 by its slide.
+  // slower to swap). The Welrod is worked by a bolt (def.manual: js/player.ts, the model's part_bolt: js/vmanim.ts), the Maxim 9 by its slide.
   const authoredPistol = (v: { barrel: Record<string, any>; mag: Record<string, any> }) => (h: any) => {
     const { slot, factory, own, plat, def, gs, brandA, brandB } = h, id = def.id as string;
     // the barrel: the integral suppressor with its front sight (no thread: nothing screws on), and its shortened one
@@ -1511,7 +1511,7 @@ const G_Gunsmith = (() => {
       plat.magVariants = true; }
   };
   // The Welrod Mk II (.32 ACP, manually cycled, integral suppressor): no slide, no optic cut, no rails; the grip is the magazine.
-  P('welrod', 'pistol', { rcv: 'authored', authored: 'welrod', bolt: 1, mag: { f: 0.0997, y: -0.0107 }, len0: 0.1056 }, { authoredPistol: authoredPistol({
+  P('welrod', 'pistol', { rcv: 'authored', authored: 'welrod', mag: { f: 0.0997, y: -0.0107 }, len0: 0.1056 }, { authoredPistol: authoredPistol({
     barrel: { short: { name: 'Welrod cut-down suppressor tube (260 mm)', price: 260, tier: 1, can: 'compact', st: { ergo: 11, weight: -0.14, recoil: 3 }, desc: 'The tube cut down 70 mm, its end cap and front sight with it: handier in the hand, and louder, with a flash. Not what the Welrod was built to be.' } },
     mag: { ext: { cap: 12, price: 80, tier: 1, st: { reload: 3, ergo: -1, weight: 0.04 }, desc: 'The grip magazine 30 mm longer: four more .32 rounds. A little slower to swap.' } } }) });
   // The Maxim 9 (9x19, integral suppressor, slide): a pistol dot goes in its slide's optic cut, a light under the frame.

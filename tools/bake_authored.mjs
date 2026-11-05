@@ -155,7 +155,7 @@ export function checkAuthored(Models, id, G = null) {
       const slots = G.Gunsmith.slotsOf(id, G.Gunsmith.defaultBuild(id)).map((s) => s.slot);
       if (slots.includes('optic') && !A.anchors.mount_optic) E(`models/${id}: the platform has an optic slot (a pistol sight sits in the optic cut): the model needs mount_optic and mount_optic_end`);
       if (slots.includes('tac') && !A.anchors.mount_tac) E(`models/${id}: the platform has a tactical slot: the model needs mount_tac`);
-      if (!!spec.bolt !== !!(A.info.anim && A.info.anim.bolt)) E(`js/parts.ts: ${id}'s spec bolt (${spec.bolt}) and the model's info.anim.bolt (${A.info.anim && A.info.anim.bolt}) disagree: a bolt pistol has both`);
+      { const man = !!(G.WEAPONS[id] && G.WEAPONS[id].manual), mv = !!(A.info.anim && (A.info.anim.bolt || A.info.anim.pump || A.info.anim.lever)); if (man !== mv) E(`js/data.ts: ${id}'s manual (${man}) and the model's moving part (part_bolt / part_pump / part_lever: ${mv}) disagree: a manually cycled pistol has both`); }
       for (const [name, v] of Object.entries(A.variants)) { const pid = id + (v.slot === 'barrel' ? '.br.' : '.mag.') + name.replace(/^(barrel|mag)_/, ''); if (!G.Gunsmith.PARTS[pid]) E(`js/parts.ts: the variant ${name}.glb has no part ${pid}`); }
     }
     const mg = spec.mag || {};
