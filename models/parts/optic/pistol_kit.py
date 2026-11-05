@@ -8,7 +8,7 @@
 #   'shroud' straight thick walls, square shoulders and a flat top, upright (a duty sight);
 #   'arch'   a low, round-topped hood leaning well back out of a low housing (a slim carry sight);
 #   'closed' an enclosed box: the window a tunnel through it, glass at both ends (a duty enclosed sight);
-#   solar: a solar panel on the housing's top; tray: a side battery tray on the right.
+#   solar: a solar panel on the housing's top; tray: a side battery tray on the right; open_top: no bar over the glass (two slim posts).
 import bpy, json, math, os
 HERE = globals().get('PART_DIR') or os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(HERE))))
@@ -78,13 +78,18 @@ else:
         outer = [(-W, hb), (W, hb), (W, 18.5 * mm), (10.9 * mm, 23.2 * mm)] + arc(10.5 * mm - TR, 0, 90) + arc(-10.5 * mm + TR, 90, 180) + [(-10.9 * mm, 23.2 * mm), (-W, 18.5 * mm)]
     hood = K.tmp(prism(outer, 'y', -HD, 0.0))
     cut(hood, prism(rounded(0, SY, WIN_W / 2, WIN_H / 2, 1.6 * mm if HOOD != 'arch' else 4.0 * mm, 4), 'y', -HD - 1 * mm, 1 * mm))
+    if C.get('open_top'):   # no bar over the glass: two slim posts, the lens's top edge free
+        cut(hood, box(-WIN_W / 2 - 0.05 * mm, WIN_W / 2 + 0.05 * mm, -HD - 1 * mm, 1 * mm, SY, TOP + 1 * mm))
+        for sx in (-1, 1):
+            x0, x1 = sorted((sx * W * 1.1, sx * WIN_W / 2))
+            cut(hood, box(x0, x1, -HD - 1 * mm, 1 * mm, SY + WIN_H / 2 + 1.0 * mm, TOP + 1 * mm))
     hood.data.transform(Matrix.Translation((0, -1.2 * mm, 0)))
     for v in hood.data.vertices:
         v.co.y -= max(0.0, v.co.z - LEDGE) * math.tan(LEAN_F if v.co.y > -1.2 * mm - HD / 2 else LEAN_R)
     bevel(hood, 0.5 * mm, 2); smooth(hood); K.adopt(hood, 'optic', 'black')
     # the lens, leaning with the hood, in the middle of its depth
     LF = -1.2 * mm - HD / 2 + (SY - LEDGE) * math.tan(LEAN)
-    WR = 1.6 * mm if HOOD != 'arch' else 4.0 * mm             # (the window's corner radius: the lens follows it, 0.4 mm into the hood)
+    WR = 4.0 * mm if (HOOD == 'arch' or C.get('open_top')) else 1.6 * mm   # (an open top's glass is rounded on top)             # (the window's corner radius: the lens follows it, 0.4 mm into the hood)
     lens = K.obj(prism(rounded(0, SY, WIN_W / 2 + 0.4 * mm, WIN_H / 2 + 0.4 * mm, WR + 0.4 * mm, 4), 'y', LF - 0.6 * mm, LF + 0.6 * mm), 'optic', 'reflexLens')
     for v in lens.data.vertices: v.co.y -= max(0.0, v.co.z - LEDGE) * math.tan(LEAN)
     LFW = LF - (SY - LEDGE) * math.tan(LEAN)                  # the lens's forward position at the sight line (the window)

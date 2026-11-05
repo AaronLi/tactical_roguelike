@@ -1,11 +1,11 @@
 # The shared builder of the OPEN-EMITTER rifle reflex sights (models/parts/optic/<id>/build_<id>.py set CFG and exec this): built to keep
 # the frame out of the sight picture. The window is wide and the hoop round it thin (1.6 mm at the sides, 2 mm on top); everything else
 # (the emitter housing, the turrets, the buttons, the deck) sits BELOW the window's bottom edge, so looking through the sight you see glass
-# with a hairline round it. On an integrated riser (a rail clamp) to its catalogue sight line.
+# with a hairline round it. The body is one casting from the rail clamp up (a rifle sight's mount, not a pistol dot on a riser).
 # Frame (docs/models.md "Authored parts"): Blender X = right, Y = forward, Z = up, metres; ORIGIN = the rail's top at the mount point, centred.
 # CFG: sy (the sight line, metres), win (w, h: the window, metres), ret (dot, dotG, cdot), replaces, and the look:
-#   top 'square' or 'round' (the hoop's top corners); lean (the hoop's lean back, degrees); solar: a panel on the deck between the housing
-#   and the hoop; tray: a side battery tray on the right; qd: a throw lever on the clamp; open_top: no bar over the glass (two side posts,
+#   top 'square' or 'round' (the hoop's top corners); lean (the hoop's lean back, degrees); solar: a panel on the hood's (deeper) top bar;
+#   wings: protective plates flaring forward outside the hood's sides; tray: a side battery tray on the right; qd: a throw lever on the clamp; open_top: no bar over the glass (two side posts,
 #   the lens's top edge free: nothing at all above the window).
 import bpy, json, math, os
 HERE = globals().get('PART_DIR') or os.path.dirname(os.path.abspath(__file__))
@@ -27,46 +27,42 @@ DT = WB - 2.2 * mm                     # the deck's top
 HT = WB - 0.6 * mm                     # the emitter housing's top: under the window's bottom
 LEAN = math.radians(C.get('lean', 10))
 
-# ---- the riser: a rail clamp up to the deck, a lightening window through it ----
-BT = DT - 4.0 * mm                     # the riser's top (the deck sits on it)
-BL = 0.036
-b = K.tmp(prism([(-0.0155, 0.0), (0.0155, 0.0), (0.0158, 0.004), (0.012, BT), (-0.012, BT), (-0.0158, 0.004)], 'y', -0.006 - BL / 2, -0.006 + BL / 2))
-cut(b, box(-0.0108, 0.0108, -0.1, 0.1, -0.001, 0.0015))
-if BT > 0.014: cut(b, prism(rounded(-0.006, (0.004 + BT) / 2 + 0.0005, BL / 2 - 6 * mm, (BT - 0.004) / 2 - 2.6 * mm, 2.0 * mm, 2), 'x', -0.03, 0.03))
-bevel(b, 0.8 * mm, 1, 30); smooth(b); K.adopt(b, 'optic', 'black')
-if C.get('qd'):
-    lv = K.tmp(prism([(-0.006 - 0.012, 0.002), (-0.006 + 0.012, 0.002), (-0.006 + 0.014, 0.007), (-0.006 - 0.008, 0.008)], 'x', 0.0158, 0.0188)); bevel(lv, 0.6 * mm, 1, 30); smooth(lv); K.adopt(lv, 'optic', 'black')
-    o = K.obj(cyl(2.4 * mm, 0.0158, 0.0178, 'x', (-0.006, 0.005), 12), 'optic', 'steel'); smooth(o)
-else:
-    for s in (-1, 1): o = K.obj(cyl(2.6 * mm, s * 0.0155, s * 0.0170, 'x', (-0.006, 0.005), 6 if s < 0 else 12), 'optic', 'steel'); smooth(o)
-
-# ---- the deck and the emitter housing (one side profile across the deck's width): the housing at the rear, low ----
+# ---- the BODY: one casting from the rail clamp up to the deck, the emitter housing at its rear (one side profile across its width), its
+# sides opened by a big lightening window (a rifle sight's mount is its body: nothing sits on a separate riser) ----
 HF = F0 + 0.016                        # the housing's front face
-prof = [(F0, BT - 0.5 * mm), (F1, BT - 0.5 * mm), (F1, DT - 1.0 * mm), (F1 - 1.0 * mm, DT), (HF + 1.5 * mm, DT), (HF, DT + 1.0 * mm), (HF - 1.0 * mm, HT),
+MID = DT - 3.5 * mm                    # (the side controls' height)
+prof = [(F0, 0.0), (F1, 0.0), (F1, 3.0 * mm), (F1 - 2.0 * mm, DT - 1.0 * mm), (F1 - 3.0 * mm, DT), (HF + 1.5 * mm, DT), (HF, DT + 1.0 * mm), (HF - 1.0 * mm, HT),
         (F0 + 2.5 * mm, HT), (F0, HT - 2.5 * mm)]
 dk = K.tmp(prism(prof, 'x', -DW, DW))
+cut(dk, box(-0.0108, 0.0108, -0.1, 0.1, -0.001, 0.0015))                                    # (the rail's top in the clamp's channel)
+cut(dk, box(-0.03, 0.03, F0 + 7 * mm, F1 - 7 * mm, -0.001, 2.2 * mm))                         # (relief between the clamp's jaws)
+cut(dk, prism(rounded((F0 + F1) / 2 + 1 * mm, (4.5 * mm + DT - 3.2 * mm) / 2, (F1 - F0) / 2 - 7.5 * mm, (DT - 3.2 * mm - 4.5 * mm) / 2, 3.0 * mm, 3), 'x', -0.04, 0.04))   # the lightening window
 EMU = DT + 0.9 * mm                    # the emitter's port: on the housing's face, just over the deck
 cut(dk, cyl(1.2 * mm, HF - 1.5 * mm, HF + 0.5 * mm, 'y', (0, EMU), 16))
 cut(dk, box(-1.2 * mm, 1.2 * mm, F0 - 1 * mm, F0 + 4 * mm, HT - 0.9 * mm, HT + 1 * mm))   # a notch in the housing's top (a rear-sight index)
 bevel(dk, 0.7 * mm, 1, 30); smooth(dk); K.adopt(dk, 'optic', 'black')
 o = K.obj(cyl(0.8 * mm, HF - 1.2 * mm, HF - 0.8 * mm, 'y', (0, EMU), 12), 'optic', 'glass'); smooth(o)
+# the QD lever (right) along the clamp, or a cross-bolt
+if C.get('qd'):
+    lv = K.tmp(prism([(F0 + 0.006, 0.0015), (F1 - 0.006, 0.0015), (F1 - 0.004, 0.0065), (F0 + 0.010, 0.0075)], 'x', DW - 0.2 * mm, DW + 2.6 * mm)); bevel(lv, 0.6 * mm, 1, 30); smooth(lv); K.adopt(lv, 'optic', 'black')
+    o = K.obj(cyl(2.4 * mm, DW + 2.6 * mm, DW + 3.4 * mm, 'x', (F0 + 0.012, 0.0045), 12), 'optic', 'steel'); smooth(o)
+else:
+    for s_ in (-1, 1): o = K.obj(cyl(2.6 * mm, min(s_ * (DW - 0.2 * mm), s_ * (DW + 1.2 * mm)), max(s_ * (DW - 0.2 * mm), s_ * (DW + 1.2 * mm)), 'x', (F0 + 0.012, 0.005), 6 if s_ < 0 else 12), 'optic', 'steel'); smooth(o)
 # the adjusters (steel screw heads, flush): elevation on the housing's top, windage on its right; the buttons on its left
 AF = F0 + 0.007
 el = K.obj(cyl(2.4 * mm, HT - 0.8 * mm, HT + 0.2 * mm, 'z', (4.5 * mm, AF), 16), 'optic', 'steel')
 cut(el, box(1.5 * mm, 7.5 * mm, AF - 0.35 * mm, AF + 0.35 * mm, HT - 0.3 * mm, HT + 1 * mm)); smooth(el)
-wd = K.obj(cyl(2.0 * mm, DW - 0.6 * mm, DW + 0.3 * mm, 'x', (AF + 1 * mm, (BT + HT) / 2 + 1 * mm), 16), 'optic', 'steel'); smooth(wd)
-cut(wd, box(DW, DW + 0.5 * mm, AF + 1 * mm - 1.8 * mm, AF + 1 * mm + 1.8 * mm, (BT + HT) / 2 + 0.7 * mm, (BT + HT) / 2 + 1.3 * mm))
+wd = K.obj(cyl(2.0 * mm, DW - 0.6 * mm, DW + 0.3 * mm, 'x', (AF + 1 * mm, MID + 1 * mm), 16), 'optic', 'steel'); smooth(wd)
+cut(wd, box(DW, DW + 0.5 * mm, AF + 1 * mm - 1.8 * mm, AF + 1 * mm + 1.8 * mm, MID + 0.7 * mm, MID + 1.3 * mm))
 for f in (F0 + 5 * mm, F0 + 11 * mm):
-    o = K.tmp(prism(rounded(f, (BT + HT) / 2 + 1 * mm, 2.2 * mm, 1.6 * mm, 0.8 * mm, 2), 'x', -DW - 0.8 * mm, -DW + 0.4 * mm)); smooth(o); K.adopt(o, 'optic', 'rubber')
-if C.get('solar'):
-    o = K.obj(box(-DW + 2 * mm, DW - 2 * mm, F0 + 11 * mm, HF - 1.5 * mm, HT - 0.1 * mm, HT + 0.2 * mm), 'optic', 'glass')
+    o = K.tmp(prism(rounded(f, MID + 1 * mm, 2.2 * mm, 1.6 * mm, 0.8 * mm, 2), 'x', -DW - 0.8 * mm, -DW + 0.4 * mm)); smooth(o); K.adopt(o, 'optic', 'rubber')
 if C.get('tray'):
-    o = K.tmp(box(DW - 0.2 * mm, DW + 1.4 * mm, F0 + 2 * mm, F0 + 14 * mm, BT + 0.5 * mm, HT - 1.5 * mm)); bevel(o, 0.4 * mm, 1); smooth(o); K.adopt(o, 'optic', 'black')
+    o = K.tmp(box(DW - 0.2 * mm, DW + 1.4 * mm, F0 + 2 * mm, F0 + 14 * mm, MID - 3 * mm, HT - 1.5 * mm)); bevel(o, 0.4 * mm, 1); smooth(o); K.adopt(o, 'optic', 'black')
 
 # ---- the hoop: a thin loop round the window, standing on the deck's front, leaning back; the lens in it ----
 HD = 4.5 * mm                          # its depth
 HFR = F1 - 0.6 * mm                    # its front face at the deck
-top = SY + WH / 2 + 2.0 * mm
+top = SY + WH / 2 + (4.5 * mm if C.get('solar') else 2.0 * mm)   # (a solar hood: a deeper top bar carries the panel)
 RT = (WW / 2 + 1.6 * mm) * 0.75 if C.get('top') == 'round' else 3.0 * mm
 outer = rounded(0, (DT - 0.5 * mm + top) / 2, DW, (top - DT + 0.5 * mm) / 2, RT, 5)
 cy_ = (DT - 0.5 * mm + top) / 2
@@ -80,6 +76,17 @@ if C.get('open_top'):   # no bar over the top: the hoop cut down to two side pos
     for sx in (-1, 1): cut(hp, box(sx * (DW + 0.1 * mm) if sx < 0 else WW / 2, DW + 0.1 * mm if sx > 0 else -WW / 2, HFR - HD - 0.01, HFR + 0.01, SY + WH / 2 + 1.0 * mm, top + 0.01))
 for v in hp.data.vertices: v.co.y -= max(0.0, v.co.z - DT) * math.tan(LEAN)
 bevel(hp, 0.5 * mm, 1, 30); smooth(hp); K.adopt(hp, 'optic', 'black')
+if C.get('solar'):   # the solar panel on the hood's top bar
+    o = K.obj(box(-WW / 2 + 1.5 * mm, WW / 2 - 1.5 * mm, HFR - HD + 0.6 * mm, HFR - 0.6 * mm, top - 0.15 * mm, top + 0.25 * mm), 'optic', 'glass')
+    for v in o.data.vertices: v.co.y -= max(0.0, v.co.z - DT) * math.tan(LEAN)
+if C.get('wings'):   # protective wings: a plate outside each side of the hood, flaring out toward the front
+    for s_ in (-1, 1):
+        x0, x1 = sorted((s_ * (DW - 0.3 * mm), s_ * (DW + 1.6 * mm)))
+        o = K.tmp(box(x0, x1, HFR - HD - 3 * mm, HFR + 5 * mm, DT - 0.5 * mm, top - 1.0 * mm))
+        for v in o.data.vertices:
+            v.co.x += s_ * max(0.0, v.co.y - (HFR - HD)) * math.tan(math.radians(14))
+            v.co.y -= max(0.0, v.co.z - DT) * math.tan(LEAN)
+        bevel(o, 0.5 * mm, 1, 30); smooth(o); K.adopt(o, 'optic', 'black')
 LF = HFR - HD / 2                      # the lens: in the hoop's middle, leaning with it
 ln = K.obj(prism(rounded(0, SY, WW / 2 + 0.4 * mm, WH / 2 + 0.4 * mm, (4.0 * mm if C.get('open_top') else max(1.2 * mm, WR)) + 0.4 * mm, 5), 'y', LF - 0.6 * mm, LF + 0.6 * mm), 'optic', 'reflexLens')
 for v in ln.data.vertices: v.co.y -= max(0.0, v.co.z - DT) * math.tan(LEAN)

@@ -53,16 +53,18 @@ o = K.obj(cyl(RIN + 0.05 * mm, WF - 0.75 * mm, WF + 0.75 * mm, 'y', (0, SY), SEG
 # ---- the centre block (the micro dots), or the turrets straight on the tube ----
 TF = C.get('turret_f', 0.004)
 if C.get('block'):
-    BH = R + 1.0 * mm                                            # its half width / height round the axis (just past the tube's skin: little of it shows round the window)
-    bk = K.tmp(prism(rounded(0, SY, BH, BH, 5.0 * mm, 3), 'y', TF - 9 * mm, TF + 9 * mm))
+    BH = R + 0.6 * mm                                            # its half width / height round the axis: shaved to just past the tube's skin,
+    bk = K.tmp(prism(rounded(0, SY, BH, BH, BH * 0.62, 4), 'y', TF - 7 * mm, TF + 7 * mm))   # its corners rounded nearly to the tube (it barely shows round it)
     cut(bk, cyl(RIN, -0.05, 0.05, 'y', (0, SY), SEG)); bevel(bk, 0.8 * mm, 1, 30); smooth(bk); K.adopt(bk, 'optic', 'black')
     TOP, RT = SY + BH, BH
 else:
     TOP, RT = SY + RB, RB
 # elevation (top) and windage (right): a capped turret; the brightness dial on the left (ribbed) or, with 'buttons', two rear buttons
 def turret(r, h, at, rot):
-    t = K.tmp(lathe([(0.0, r), (h - 1 * mm, r), (h, r - 1 * mm), (h, 0.0005)], 14))
-    t.data.transform(Matrix.Translation(at) @ rot); smooth(t); K.adopt(t, 'optic', 'black')
+    # its foot reaches down to where the tube's skin is lowest under it, then the bore is cut out of it: it saddles the tube, nothing inside
+    t = K.tmp(lathe([(-2.5 * mm, r), (h - 1 * mm, r), (h, r - 1 * mm), (h, 0.0005)], 14))
+    t.data.transform(Matrix.Translation(at) @ rot)
+    cut(t, cyl(RIN + 0.25 * mm, F0 - 0.01, F1 + 0.01, 'y', (0, SY), SEG)); smooth(t); K.adopt(t, 'optic', 'black')
 TR = C.get('turret_r', 6.0 * mm)
 turret(TR + 1.2 * mm, 3.0 * mm, (0, TF, TOP - 1.0 * mm), Matrix.Rotation(math.pi / 2, 4, 'X'))      # the boss
 turret(TR, 7.0 * mm, (0, TF, TOP - 1.0 * mm), Matrix.Rotation(math.pi / 2, 4, 'X'))                 # the cap
@@ -70,13 +72,14 @@ turret(TR + 1.2 * mm, 3.0 * mm, (RT - 1.0 * mm, TF, SY), Matrix.Rotation(-math.p
 turret(TR, 7.0 * mm, (RT - 1.0 * mm, TF, SY), Matrix.Rotation(-math.pi / 2, 4, 'Z'))
 if C.get('guards'):   # turret guards: two ears either side of the elevation cap (the micro dots)
     for s in (-1, 1):
-        o = K.tmp(prism([(TF - 7 * mm, TOP - 1 * mm), (TF + 7 * mm, TOP - 1 * mm), (TF + 5 * mm, TOP + 6.5 * mm), (TF - 5 * mm, TOP + 6.5 * mm)], 'x', s * (TR + 1.6 * mm), s * (TR + 3.6 * mm)))
+        o = K.tmp(prism([(TF - 6 * mm, TOP - 1 * mm), (TF + 6 * mm, TOP - 1 * mm), (TF + 4.5 * mm, TOP + 4.8 * mm), (TF - 4.5 * mm, TOP + 4.8 * mm)], 'x', s * (TR + 1.6 * mm), s * (TR + 3.6 * mm)))
         bevel(o, 0.7 * mm, 1, 30); smooth(o); K.adopt(o, 'optic', 'black')
 DR = C.get('dial_r', 7.0 * mm)
-dl = K.tmp(lathe([(0.0, DR), (5.5 * mm, DR), (6.0 * mm, DR - 0.8 * mm), (6.0 * mm, 0.0005)], 16))
+dl = K.tmp(lathe([(-2.5 * mm, DR), (5.5 * mm, DR), (6.0 * mm, DR - 0.8 * mm), (6.0 * mm, 0.0005)], 16))
 for i in range(8):
     g = box(-0.5 * mm, 0.5 * mm, 0.001, 0.007, DR - 0.6 * mm, DR + 1 * mm); g.transform(Matrix.Rotation(i * math.pi / 4, 4, 'Y')); cut(dl, g)
-dl.data.transform(Matrix.Translation((-RT + 1.0 * mm, TF - C.get('dial_df', 0.0), SY)) @ Matrix.Rotation(math.pi / 2, 4, 'Z')); smooth(dl); K.adopt(dl, 'optic', 'black')
+dl.data.transform(Matrix.Translation((-RT + 1.0 * mm, TF - C.get('dial_df', 0.0), SY)) @ Matrix.Rotation(math.pi / 2, 4, 'Z'))
+cut(dl, cyl(RIN + 0.25 * mm, F0 - 0.01, F1 + 0.01, 'y', (0, SY), SEG)); smooth(dl); K.adopt(dl, 'optic', 'black')
 if C.get('solar'):    # a solar panel on a flat pad on top, behind the elevation turret
     o = K.tmp(box(-RB + 3.5 * mm, RB - 3.5 * mm, F0 + 7 * mm, TF - TR - 2.5 * mm, TOP - 1.5 * mm, TOP + 1.2 * mm)); bevel(o, 0.6 * mm, 1, 30); smooth(o); K.adopt(o, 'optic', 'black')
     o = K.obj(box(-RB + 4.5 * mm, RB - 4.5 * mm, F0 + 8 * mm, TF - TR - 3.5 * mm, TOP + 1.2 * mm, TOP + 1.5 * mm), 'optic', 'glass')
