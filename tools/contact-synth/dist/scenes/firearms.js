@@ -691,9 +691,92 @@ function makeArBoltRelease(mag) {
 export const AR15_BOLT_RELEASE = makeArBoltRelease('loaded');
 export const AR15_BOLT_RELEASE_EMPTY = makeArBoltRelease('empty');
 export const AR15_BOLT_RELEASE_NO_MAG = makeArBoltRelease('none');
+// ---------- AR-15 magazine in / out ----------
+// The magazine well is part of the aluminium lower receiver; the mag catch is a spring-loaded
+// steel bar through the lower, pushed in by the release button on the right side.
+const arMagCatch = { ...mat('steel'), shape: 'bar', size: 2.5, thickness: 3, modes: 1, irregularity: 0.5, damping: 0.45, level: 0 };
+const arMagRelease = { ...mat('steel'), shape: 'block', size: 1.5, thickness: 8, modes: 0, irregularity: 0.4, damping: 0.6, level: 0 };
+const arMagWell = { ...arLower, modes: 2, damping: 0.55 };
+const arBaseplate = { ...mat('pom'), shape: 'plate', size: 6, thickness: 2.5, modes: 2, irregularity: 0.5, damping: 0.4, level: 0 };
+const palm = { ...mat('rubber'), shape: 'block', size: 8, thickness: 30, modes: 0, irregularity: 0, damping: 1, level: 0 };
+function makeArMagIn(fill) {
+    const body = fill === 'loaded' ? arMagBodyLoaded : arMagBody;
+    const own = fill === 'loaded' ? IN_LOADED_MAG : IN_MAG;
+    // A loaded 30-rd mag is ~0.5 kg, an empty one ~0.12 kg: it goes in heavier and rings less.
+    const v = fill === 'loaded' ? 1 : 0.8;
+    const els = [
+        hit('magazine top enters the mag well', 0, -8, 0.5 * v, body, arMagWell, { scatter: 0.4, radius: 3, click: 0.5 }),
+        rub('magazine slides up the mag well', 0.002, -10, { force: 4, duration: 0.105, speed: 0.45, profile: 'steady', roughness: 6, grain: 0.3, periodicity: 0, contactWidth: 0.08 }, body, arMagWell),
+        // The mag's side pushes the spring-loaded catch aside; it rides along until the slot.
+        rub('mag catch rides along the magazine side', 0.06, -12, { force: 6, duration: 0.045, speed: 0.4, profile: 'steady', roughness: 4, grain: 0.2, contactWidth: 0.03 }, arMagCatch, body, { coil: { level: 0.25, length: 2, dispersion: 0.35, decay: 0.05, brightness: 5000 } }),
+        snap('mag catch snaps into the magazine', 0.106, -2, { strength: 0.9, preload: 0, seat: 0.4, seatDelay: 1.5 }, arMagCatch, body, { coil: { level: 0.3, length: 2, dispersion: 0.35, decay: 0.06, brightness: 5000 } }),
+        hit('magazine bottoms in the well', 0.109, -6, 0.8 * v, body, arMagWell, { scatter: 0.4, radius: 4, click: 0.6 }),
+        hit('magazine body rings', 0.1095, fill === 'loaded' ? -14 : -8, 0.6, body, arMagWell, { scatter: 0.3, radius: 3, click: 0.1, sharp: 0.7 }, own),
+        // Palm slap on the baseplate to make sure it's seated: the mag is driven hard up against the catch.
+        hit('palm slaps the baseplate', 0.26, -4, 1.6, palm, arBaseplate, { scatter: 0.2, radius: 30, click: 0.4, sharp: 0.2 }),
+        hit('magazine settles hard against the catch', 0.2604, -6, 1.0 * v, body, arMagCatch, { scatter: 0.3, radius: 2, click: 0.7, sharp: 0.9 }),
+        hit('magazine body rings from the slap', 0.2606, fill === 'loaded' ? -16 : -9, 0.7, body, arBaseplate, { scatter: 0.3, radius: 3, click: 0.1, sharp: 0.7 }, own),
+    ];
+    if (fill === 'loaded') {
+        // With the bolt closed, the top round presses up against the bolt carrier's underside and the
+        // stack gives a little; the slap pushes it again.
+        els.push(rub('top round presses against the bolt carrier', 0.1, -14, { force: 6, duration: 0.012, speed: 0.3, profile: 'decelerate', roughness: 3, grain: 0.2, contactWidth: 0.05 }, arNextRound, arCarrier, IN_LOADED_MAG));
+        els.push(hit('stack gives against the spring', 0.108, -16, 0.4, arCase, arNextRound, { scatter: 0.1, radius: 3, click: 0.5 }, IN_LOADED_MAG));
+        els.push(hit('stack pushed up by the slap', 0.2608, -16, 0.5, arCase, arNextRound, { scatter: 0.1, radius: 3, click: 0.5 }, IN_LOADED_MAG));
+    }
+    return {
+        id: 'ar15-mag-in' + (fill === 'empty' ? '-empty' : ''),
+        title: `AR-15: ${fill} magazine inserted, catch locks, palm slap`,
+        room: 0.04,
+        roomSize: 0.35,
+        housing: LOWER_HOUSING,
+        tracks: [
+            { name: 'insert', description: 'Magazine enters and slides up the mag well; the catch rides along its side.', elements: els.filter((e) => /enters|slides up|rides along|top round presses/.test(e.what)) },
+            { name: 'catch-locks', description: 'The mag catch snaps into the magazine; it bottoms in the well.', elements: els.filter((e) => /snaps into|bottoms|body rings$|stack gives/.test(e.what)) },
+            { name: 'palm-slap', description: 'Palm slap on the baseplate seats it hard against the catch.', elements: els.filter((e) => /slap|settles/.test(e.what)) },
+        ],
+    };
+}
+function makeArMagOut(fill) {
+    const body = fill === 'loaded' ? arMagBodyLoaded : arMagBody;
+    const own = fill === 'loaded' ? IN_LOADED_MAG : IN_MAG;
+    const v = fill === 'loaded' ? 1 : 0.8;
+    const els = [
+        // Thumb presses the release button: it travels, bottoms, and pivots the catch out of the slot.
+        snap('mag release button pressed in', 0, -8, { strength: 0.5, preload: 60, creak: 0.15, seat: 0.3, seatDelay: 1.5 }, arMagRelease, arLower),
+        snap('mag catch pivots out of the magazine', 0.0615, -4, { strength: 0.7, preload: 0, seat: 0.2, seatDelay: 1 }, arMagCatch, body, { coil: { level: 0.3, length: 2, dispersion: 0.35, decay: 0.05, brightness: 5000 } }),
+        // Free of the catch, the magazine drops: a small release clunk, then it slides out of the well.
+        hit('magazine drops off the catch', 0.064, -8, 0.5 * v, body, arMagWell, { scatter: 0.4, radius: 3, click: 0.5 }),
+        rub('magazine slides down out of the mag well', 0.065, -10, { force: 3, duration: 0.07, speed: 0.6, profile: 'accelerate', roughness: 6, grain: 0.3, periodicity: 0, contactWidth: 0.08 }, body, arMagWell),
+        hit('magazine body rings as it drops', 0.0645, fill === 'loaded' ? -16 : -9, 0.6, body, arMagWell, { scatter: 0.3, radius: 3, click: 0.1, sharp: 0.7 }, own),
+        hit('magazine top lips clear the well', 0.136, -14, 0.5, body, arMagWell, { scatter: 0.5, radius: 2, click: 0.6 }),
+        // The thumb lets go: the button and catch spring back out.
+        snap('mag release button springs back', 0.22, -10, { strength: 0.5, preload: 0, seat: 0.3, seatDelay: 1.5 }, arMagRelease, arLower, { coil: { level: 0.25, length: 2, dispersion: 0.35, decay: 0.05, brightness: 5000 } }),
+    ];
+    if (fill === 'loaded') {
+        els.push(hit('rounds shift in the falling magazine', 0.0655, -16, 0.4, arCase, arNextRound, { scatter: 0.3, radius: 3, click: 0.5 }, IN_LOADED_MAG));
+    }
+    return {
+        id: 'ar15-mag-out' + (fill === 'empty' ? '-empty' : ''),
+        title: `AR-15: ${fill} magazine released and removed`,
+        room: 0.04,
+        roomSize: 0.35,
+        housing: LOWER_HOUSING,
+        tracks: [
+            { name: 'release', description: 'Release button pressed; the catch pivots out of the magazine.', elements: els.filter((e) => /button pressed|pivots out/.test(e.what)) },
+            { name: 'drop', description: 'The magazine drops off the catch and slides out of the well.', elements: els.filter((e) => /drops|slides down|rings as|lips clear|rounds shift/.test(e.what)) },
+            { name: 'button-return', description: 'Thumb lets go; the button and catch spring back.', elements: els.filter((e) => /springs back/.test(e.what)) },
+        ],
+    };
+}
+export const AR15_MAG_IN = makeArMagIn('loaded');
+export const AR15_MAG_IN_EMPTY = makeArMagIn('empty');
+export const AR15_MAG_OUT = makeArMagOut('loaded');
+export const AR15_MAG_OUT_EMPTY = makeArMagOut('empty');
 export const FIREARM_SCENES = [
     PUMP_SHOTGUN,
     AR15_CHARGE, AR15_CHARGE_EMPTY, AR15_CHARGE_NO_MAG,
     AR15_BOLT_RELEASE, AR15_BOLT_RELEASE_EMPTY, AR15_BOLT_RELEASE_NO_MAG,
+    AR15_MAG_IN, AR15_MAG_IN_EMPTY, AR15_MAG_OUT, AR15_MAG_OUT_EMPTY,
 ];
 //# sourceMappingURL=firearms.js.map

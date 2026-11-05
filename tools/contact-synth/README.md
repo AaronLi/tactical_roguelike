@@ -89,5 +89,11 @@ Other scenes, in `src/scenes/firearms.ts`:
   - No magazine: nothing under the bolt and no feeding.
 - `ar15-bolt-release`, `ar15-bolt-release-empty-mag`, `ar15-bolt-release-no-mag`: the bolt catch pressed with the bolt locked back. With an empty magazine, the press is firmer (the follower pushes up on the catch) and the bolt rides over the follower on the way home.
 
+- `ar15-mag-in`, `ar15-mag-in-empty`: a loaded or empty magazine inserted.
+  - It enters the mag well and slides up the lower receiver's aluminium well, and the spring-loaded mag catch rides along its side.
+  - The catch snaps into the magazine's slot and the magazine bottoms in the well. With a loaded magazine, the top round presses against the bolt carrier.
+  - A palm slap on the baseplate seats it hard against the catch.
+- `ar15-mag-out`, `ar15-mag-out-empty`: the mag release button pressed until the catch pivots out. The magazine drops off the catch and slides out of the well, and the button springs back. A loaded magazine is heavier and damped by its rounds; an empty one rings.
+
 The forward run is simulated from the reciprocating mass, the spring force and each magazine state's drag. Loaded takes 24.7 ms to the bolt face, empty 24.0 ms and no magazine 23.7 ms.
 
