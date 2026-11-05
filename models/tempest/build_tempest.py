@@ -327,29 +327,81 @@ for s_ in (-1, 1):
     bevel(a, 1 * mm, 2, 30)
     for z in (ROD_U + 0.004, -0.006):                                                     # its two counterbored screws
         cut(a, cyl(2.2 * mm, MZ0 - FL - 0.001, MZ0 - FL + 0.0015, 'y', (s_ * (SX0 + SX1) / 2, z), 12))
-        o = K.obj(cyl(1.8 * mm, MZ0 - FL - 0.0005, MZ0 - FL + 0.002, 'y', (s_ * (SX0 + SX1) / 2, z), 10), 'muzzle', 'black', ppump)
+        o = K.obj(cyl(1.8 * mm, MZ0 - FL - 0.0005, MZ0 - FL + 0.002, 'y', (s_ * (SX0 + SX1) / 2, z), 10), 'handguard', 'black', ppump)
     for tri, ws in (([TA, TM, TC], [WEB, WEB / 2, WEB]), ([TM, TB, TC], [WEB, WEB, WEB / 2])):
         cut(a, prism(fillet_poly(inset_poly(tri, ws), FIL, 3), 'x', -0.03, 0.03))
-    smooth(a); K.adopt(a, 'muzzle', TI, ppump)
+    smooth(a); K.adopt(a, 'handguard', TI, ppump)
     # the guide rail, and the rectangular sleeve round it that the strut's foot stands on: from the forend's mouth to under the device
-    o = K.tmp(rail_section(s_, RL_T, RL_D, ROD0, MZ0 + 0.008)); bevel(o, 0.6 * mm, 2, 30); smooth(o); K.adopt(o, 'muzzle', 'steel', ppump)
+    o = K.tmp(rail_section(s_, RL_T, RL_D, ROD0, MZ0 + 0.008)); bevel(o, 0.6 * mm, 2, 30); smooth(o); K.adopt(o, 'handguard', 'steel', ppump)
     sv = K.tmp(rail_section(s_, RL_T + 5 * mm, RL_D + 5 * mm, HG1 + 0.003, MZ0 + 0.010)); bevel(sv, 1.2 * mm, 2, 30)
-    smooth(sv); K.adopt(sv, 'muzzle', TI, ppump)
+    smooth(sv); K.adopt(sv, 'handguard', TI, ppump)
     # a boss from the sleeve's front up into the device's underside
     o = K.tmp(box(s_ * (ROD_X - 5 * mm), s_ * (ROD_X + 5 * mm), MZ0 - 0.002, MZ0 + 0.010, ROD_U, ZB - RB - 4 * mm)); bevel(o, 1 * mm, 2, 30); smooth(o)
-    K.adopt(o, 'muzzle', TI, ppump)
-# the muzzle device: a six-bore titanium block, chamfered nose, side ports along each row, the muzzles' seats in its rear face
-mzd = K.tmp(prism(circles_hull(BORES, RB + 9 * mm, 16), 'y', MZ0, MZ1))
-bevel(mzd, 3 * mm, 2, 30)
-for x, z in BORES:
-    cut(mzd, lathe([(MZ0 + 0.008, BORE + 0.4 * mm), (MZ1 - 0.006, BORE + 1.6 * mm), (MZ1 + 0.002, BORE + 2.4 * mm), (MZ1 + 0.01, BORE + 2.4 * mm)],
-                   16, (x, 0, z)))                                                          # the bores, flaring forward (the sabot's petals peel off)
-    cut(mzd, cyl(RB + 0.3 * mm, MZ0 - 0.01, MZ0 + 0.010, 'y', (x, z), 16))                  # the muzzles' seats
-for z in (D, 0.0, -D, ZB):
-    for i in range(2):
-        f = MZ0 + 0.024 + i * 0.016
-        cut(mzd, box(-0.05, 0.05, f, f + 0.007, z - 3.2 * mm, z + 3.2 * mm))                 # side ports, through (petals and gas out)
-smooth(mzd); K.adopt(mzd, 'muzzle', TI, ppump)
+    K.adopt(o, 'handguard', TI, ppump)
+# ---- the MUZZLE DEVICE (slot muzzle, on the sliding front): one rear interface for all of them (the barrels' muzzles seat in its rear face,
+# the struts' flanges and the rail bosses meet it there), different fronts. device() builds one; the factory one is the gun's, the others
+# are variants (their own files). Each carries the front sight (a notched fin on its top).
+def ring_cut(o, f0, f1, r_out, r_in):
+    # a groove round a hull-shaped body from f0 to f1, r_in deep inside its outline r_out (a fin's gap)
+    ring = prism(circles_hull(BORES, r_out + 2 * mm, 16), 'y', f0, f1)
+    tmpo = K.tmp(ring); boolean(tmpo, prism(circles_hull(BORES, r_in, 16), 'y', f0 - 0.001, f1 + 0.001), 'DIFFERENCE')
+    me = tmpo.data.copy(); bpy.data.objects.remove(tmpo, do_unlink=True); cut(o, me)
+def front_sight(Kx, parent, f_front, top):
+    fn = Kx.tmp(prism([(f_front - 0.042, top - 0.002), (f_front - 0.008, top - 0.002), (f_front - 0.012, SY + 3.5 * mm), (f_front - 0.036, SY + 3.5 * mm)], 'x', -3 * mm, 3 * mm))
+    bevel(fn, 0.6 * mm, 2, 30); cut(fn, box(-1.0 * mm, 1.0 * mm, f_front - 0.05, f_front + 0.01, SY, SY + 0.01))
+    smooth(fn); Kx.adopt(fn, 'muzzle', TI, parent)
+def device(Kx, parent, kind):
+    R = RB + 9 * mm                                                   # the device's outline round the bores
+    seats = lambda o: [cut(o, cyl(RB + 0.3 * mm, MZ0 - 0.01, MZ0 + 0.010, 'y', (x, z), 16)) for x, z in BORES]
+    if kind == 'factory':   # a six-bore block: heat fins round its rear half, side ports in its front half, the bores flaring (sabot strip)
+        L = MZ1 - MZ0
+        o = Kx.tmp(prism(circles_hull(BORES, R, 16), 'y', MZ0, MZ0 + L)); bevel(o, 3 * mm, 2, 30)
+        for i in range(4): ring_cut(o, MZ0 + 0.008 + i * 0.0048, MZ0 + 0.008 + i * 0.0048 + 2.2 * mm, R, R - 2.6 * mm)
+        for x, z in BORES:
+            cut(o, lathe([(MZ0 + 0.008, BORE + 0.4 * mm), (MZ0 + L - 0.006, BORE + 1.6 * mm), (MZ0 + L + 0.002, BORE + 2.4 * mm), (MZ0 + L + 0.01, BORE + 2.4 * mm)], 16, (x, 0, z)))
+        seats(o)
+        for z in (D, 0.0, -D, ZB):
+            for i in range(2):
+                f = MZ0 + 0.034 + i * 0.015
+                cut(o, box(-0.05, 0.05, f, f + 0.007, z - 3.2 * mm, z + 3.2 * mm))
+        smooth(o); Kx.adopt(o, 'muzzle', TI, parent); top = max(z for x, z in BORES) + R
+    elif kind == 'suppressor':   # a six-bore can: 150 mm, a bigger outline, heat fins along it, a steel end cap with six small exits
+        L, R = 0.150, RB + 11 * mm
+        o = Kx.tmp(prism(circles_hull(BORES, R, 16), 'y', MZ0, MZ0 + L - 0.004)); bevel(o, 4 * mm, 2, 30)
+        for i in range(9): ring_cut(o, MZ0 + 0.016 + i * 0.013, MZ0 + 0.016 + i * 0.013 + 3 * mm, R, R - 2 * mm)
+        for x, z in BORES: cut(o, cyl(BORE + 2 * mm, MZ0 + 0.008, MZ0 + L + 0.01, 'y', (x, z), 16))
+        seats(o); smooth(o); Kx.adopt(o, 'muzzle', TI, parent)
+        cap = Kx.tmp(prism(circles_hull(BORES, R - 2.5 * mm, 16), 'y', MZ0 + L - 0.006, MZ0 + L)); bevel(cap, 1.2 * mm, 2, 30)
+        for x, z in BORES: cut(cap, cyl(BORE + 0.8 * mm, MZ0 + L - 0.01, MZ0 + L + 0.01, 'y', (x, z), 16))
+        smooth(cap); Kx.adopt(cap, 'muzzle', 'black', parent); top = max(z for x, z in BORES) + R
+    elif kind == 'flash':   # a short base block and a four-prong flash hider on each bore
+        L, Lb = 0.082, 0.030
+        o = Kx.tmp(prism(circles_hull(BORES, R, 16), 'y', MZ0, MZ0 + Lb)); bevel(o, 3 * mm, 2, 30)
+        for x, z in BORES: cut(o, cyl(BORE + 1 * mm, MZ0 + 0.008, MZ0 + Lb + 0.01, 'y', (x, z), 16))
+        seats(o); smooth(o); Kx.adopt(o, 'muzzle', TI, parent)
+        for x, z in BORES:
+            t = Kx.tmp(lathe([(MZ0 + Lb - 0.002, 7.6 * mm), (MZ0 + L - 0.004, 7.6 * mm), (MZ0 + L, 6.6 * mm)], 16, (x, 0, z)))
+            cut(t, cyl(BORE + 1.6 * mm, MZ0 + Lb - 0.01, MZ0 + L + 0.01, 'y', (x, z), 16))
+            for k in range(4):   # the prongs: four slots from the front, rotated 45 degrees
+                sl = box(-1.1 * mm, 1.1 * mm, MZ0 + Lb + 0.016, MZ0 + L + 0.01, 0, 0.012)
+                sl.transform(Matrix.Translation((x, 0, z)) @ Matrix.Rotation(math.radians(45 + 90 * k), 4, 'Y')); cut(t, sl)
+            smooth(t); Kx.adopt(t, 'muzzle', 'park', parent)
+        top = max(z for x, z in BORES) + R; L = Lb + 0.020        # (the sight sits on the base block)
+    elif kind == 'comp':   # a compensator: vents straight up from every bore (the upper ones out through the top), windows each side
+        L = 0.060
+        o = Kx.tmp(prism(circles_hull(BORES, R, 16), 'y', MZ0, MZ0 + L)); bevel(o, 3 * mm, 2, 30)
+        for x, z in BORES: cut(o, cyl(BORE + 1.2 * mm, MZ0 + 0.008, MZ0 + L + 0.01, 'y', (x, z), 16))
+        seats(o)
+        for x in (-D, 0.0, D):
+            for i in range(3):
+                f = MZ0 + 0.020 + i * 0.012
+                cut(o, box(x - 1.8 * mm, x + 1.8 * mm, f, f + 0.006, -0.01, 0.06))
+        for s_ in (-1, 1): cut(o, prism(rounded(MZ0 + 0.040, -0.006, 0.012, 0.008, 2 * mm, 2), 'x', s_ * 0.01, s_ * 0.05))
+        smooth(o); Kx.adopt(o, 'muzzle', TI, parent); top = max(z for x, z in BORES) + R
+        L_s = L
+    front_sight(Kx, parent, MZ0 + (L if kind != 'flash' else 0.050), top)
+    return MZ0 + (L if kind != 'flash' else 0.082)
+MZ_END = device(K, ppump, 'factory')
 # the HEAT SHIELD: a short perforated titanium shell on the muzzle device's rear face, over the upper barrels (it slides with the device;
 # the barrel block slides back from under it, and off the seats, before it lifts out)
 HS_L, HS_R, HS_TH = 0.032, math.hypot(D, D) + RB + 1.5 * mm, 1.2 * mm
@@ -360,10 +412,8 @@ for a in (40, 65, 90, 115, 140):                                   # its perfora
         f = MZ0 - HS_L + 0.009 + i * 0.012 + (0.006 if a in (65, 115) else 0)
         h = cyl(2.4 * mm, HS_R - 0.004, HS_R + 0.004, 'z', (0, f), 12)
         h.transform(Matrix.Rotation(math.radians(90 - a), 4, 'Y')); cut(sh, h)
-bevel(sh, 0.4 * mm, 1, 30); smooth(sh); K.adopt(sh, 'muzzle', TI, ppump)
-fin = K.tmp(prism([(MZ0 + 0.026, D + RB + 6 * mm), (MZ1 - 0.008, D + RB + 6 * mm), (MZ1 - 0.012, SY + 3.5 * mm), (MZ0 + 0.032, SY + 3.5 * mm)], 'x', -3 * mm, 3 * mm))
-bevel(fin, 0.6 * mm, 2, 30); cut(fin, box(-1.0 * mm, 1.0 * mm, MZ0, MZ1 + 0.01, SY, SY + 0.01))       # the front sight: a fin with a notch
-smooth(fin); K.adopt(fin, 'muzzle', TI, ppump)
+bevel(sh, 0.4 * mm, 1, 30); smooth(sh); K.adopt(sh, 'handguard', TI, ppump)
+
 
 # ================================================== BARREL BLOCK (part_mag, inside part_brk) ==================================================
 MAG_AT = (BR0, 0.0)
@@ -392,7 +442,7 @@ for f0, rim in ((BR1 - 0.024, 1.2 * mm), ):   # clamp plates: titanium, pocketed
 info = {
     'sy': round(SY, 4), 'fSight': 0.017, 'relief': 0.10,
     'barrels': {'n': 6, 'rounds_each': ROUNDS, 'round_mm': [10, ROUND_L * 1000], 'free_bore_mm': round(FREE * 1000)},
-    'muzzles': [[MZ1, round(z, 4), round(x, 4)] for x, z in BORES],
+    'muzzles': [[round(MZ_END, 4), round(z, 4), round(x, 4)] for x, z in BORES],
     'grip': [0.030, -0.097, 0], 'support': [0.330, -0.095, 0],
     'anim': {'front': 'part_pump', 'brk': 'part_brk', 'mag': 'part_mag'},
     'magAt': [MAG_AT[0], MAG_AT[1]],
@@ -436,9 +486,20 @@ root['hinge_json'] = json.dumps({'sequence': [
     {'part': 'part_mag', 'move': [-UNSEAT, 0, 0], 'frame': 'part_brk', 'note': 'the block slides back off the muzzle device\'s seats'},
     {'part': 'part_mag', 'move': [0, 0.10, 0], 'frame': 'part_brk', 'note': 'and lifts straight up out of the cradle'}]})
 
+# ---- MUZZLE DEVICE VARIANTS: their own collections and files, the same rear interface and frame ----
+VARS = []
+for kind, note in (('suppressor', 'a six-bore suppressor: 150 mm, heat fins along it, a steel end cap'),
+                   ('flash', 'a flash suppressor: a four-prong flash hider on each bore'),
+                   ('comp', 'a compensator: vents up from every bore, windows each side')):
+    c_, r_, Kv = kit_variant(ID, 'muzzle_' + kind, 'muzzle', {})
+    end = device(Kv, None, kind)
+    r_['variant_json'] = json.dumps({'gun': ID, 'slot': 'muzzle', 'of': 'factory', 'note': note,
+                                     'info': {'muzzles': [[round(end, 4), round(z, 4), round(x, 4)] for x, z in BORES]}})
+    VARS.append(('muzzle_' + kind, c_))
 meshes = [o for o in coll.all_objects if o.type == 'MESH']
+vglb = {n: (export_glb(c, os.path.join(HERE, n + '.glb')) if EXPORT else None, tris_of(c.all_objects)) for n, c in VARS}
 bb_ = [[min((o.matrix_world @ v.co)[a] for o in meshes for v in o.data.vertices) for a in range(3)],
        [max((o.matrix_world @ v.co)[a] for o in meshes for v in o.data.vertices) for a in range(3)]]
 per = sorted(((tris_of([o]), o.name) for o in meshes), reverse=True)[:6]
 result = {'rail_clear_mm': round(RAIL_CLEAR * 1000, 2), 'meshes': len(meshes), 'tris': tris_of(meshes), 'top': per, 'bounds_mm': [[round(x * 1000, 1) for x in b] for b in bb_],
-          'glb': save_and_export(coll, root, HERE, ID, EXPORT)}
+          'glb': save_and_export(coll, root, HERE, ID, EXPORT, also=tuple(c for _, c in VARS)), 'variants': vglb}
