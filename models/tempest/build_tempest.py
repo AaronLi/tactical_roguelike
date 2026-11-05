@@ -519,6 +519,11 @@ info = {
     'barrels': {'n': 6, 'rounds_each': ROUNDS, 'round_mm': [10, ROUND_L * 1000], 'free_bore_mm': round(FREE * 1000),
                 'effective_mm': [round((MD0 - (BB1 + (ROUNDS - 1 - k) * ROUND_L)) * 1000) for k in range(ROUNDS)]},   # (shot 1 .. ROUNDS of a barrel)
     'muzzles': [[round(MZ_END, 4), round(z, 4), round(x, 4)] for x, z in BORES],
+    # the barrels, in info.muzzles' order: 0 upper left, 1 upper right, 2 centre, 3 lower left, 4 lower right, 5 the single bottom one;
+    # the triple mode fires a group (top: the upper pair and the centre; bottom: the lower pair and the bottom one)
+    'barrelGroups': {'top': [0, 1, 2], 'bottom': [3, 4, 5], 'all': [0, 1, 2, 3, 4, 5]},
+    # the fire-mode dial (left side of the back panel): its centre and axis, and its six detents (semi, low, high, double, triple, sextuple)
+    'modeDial': {'at': [0.058, 0.012, -0.0275], 'axis': [0, 0, -1], 'modes': ['semi', 'low', 'high', 'double', 'triple', 'sextuple'], 'stepDeg': 45},
     'grip': [0.030, -0.097, 0], 'support': [0.330, -0.095, 0],
     'anim': {'front': 'part_pump', 'brk': 'part_brk', 'mag': 'part_mag', 'latch': 'part_lever', 'carry': 'part_carry'},
     'magAt': [MAG_AT[0], MAG_AT[1]],
@@ -526,7 +531,7 @@ info = {
 anchors = {
     'mount_optic': [0.012, round(RAIL_TOP, 4), 0], 'mount_optic_end': [round(RAIL_F1 - 0.002, 4), round(RAIL_TOP, 4), 0],
     'mount_handguard': [CH1, 0, 0], 'mount_handguard_end': [HG1, 0, 0],
-    'mount_barrel': [BR0, 0, 0], 'mount_muzzle': [MZ0, 0, 0],
+    'mount_barrel': [BR0, 0, 0], 'mount_muzzle': [round(MD0, 4), 0, 0],          # (the muzzle device's rear face: the barrel extension's front)
     'mount_stock': [0, round((SR0 + SR1) / 2, 4), 0], 'mount_grip': [GRIP_SEAT[0], GRIP_SEAT[1], 0], 'mount_mag': [MAG_AT[0], MAG_AT[1], 0],
     'mount_tac': [round((TAC0 + TAC1) / 2, 4), RUN_U, AX1], 'mount_tacL': [round((TAC0 + TAC1) / 2, 4), RUN_U, -AX1],      # (M-LOK on the arms)
     'mount_fg': [round((FG0 + FG1) / 2, 4), round(BLO - 0.0056, 4), 0],
