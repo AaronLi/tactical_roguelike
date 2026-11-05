@@ -5,4 +5,4 @@ export { PRESETS, type Preset } from './presets.js';
 export { render, type RenderResult, type RenderInfo } from './render.js';
 export { encodeWav } from './wav.js';
 export { renderScene, type Scene, type SceneTrack, type SceneElement, type RenderedScene } from './scene.js';
-export { SCENES, RECON_CS6, RECON_CS6_DRY } from './scenes/recon-cs6.js';
+export { SCENES, RECON_CS6, RECON_CS6_DRY, PUMP_SHOTGUN, AR15_CHARGE, AR15_BOLT_RELEASE } from './scenes/index.js';

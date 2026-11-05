@@ -68,7 +68,7 @@ export function renderScene(scene, sr = 48000, seed = 1) {
     let k = 0;
     for (const track of scene.tracks) {
         const parts = track.elements.map((el) => ({ el, ...renderElement(el, sr, seed * 1000 + ++k, scene.housing) }));
-        const start = Math.max(0, Math.min(...parts.map((p) => p.offset)));
+        const start = Math.min(...parts.map((p) => p.offset));
         const end = Math.max(...parts.map((p) => p.offset + p.samples.length / sr));
         const tail = scene.room > 0 ? 0.25 + 0.5 * scene.roomSize : 0;
         let buf = new Float32Array(Math.ceil((end - start + tail) * sr));

@@ -377,4 +377,4 @@ export const RECON_CS6_DRY: Scene = {
   ],
 };
 
-export const SCENES: Scene[] = [RECON_CS6, RECON_CS6_DRY];
+export const RECON_SCENES: Scene[] = [RECON_CS6, RECON_CS6_DRY];

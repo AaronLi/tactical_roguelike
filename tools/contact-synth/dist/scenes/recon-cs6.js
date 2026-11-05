@@ -366,5 +366,5 @@ export const RECON_CS6_DRY = {
         },
     ],
 };
-export const SCENES = [RECON_CS6, RECON_CS6_DRY];
+export const RECON_SCENES = [RECON_CS6, RECON_CS6_DRY];
 //# sourceMappingURL=recon-cs6.js.map

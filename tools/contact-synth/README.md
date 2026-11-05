@@ -78,3 +78,10 @@ forward (including dart chambering, front stop and the trigger lock), air-restri
 trigger pull, sear release, plunger launch (spring, O-ring, air, dart leaving) and plunger impact.
 `recon-cs6-dry` is a dry fire. With no dart, the air restrictor stays shut and the trapped air
 cushions the plunger.
+
+Other scenes, in `src/scenes/firearms.ts`:
+
+- `pump-shotgun` (generic pump-action, racked). Tracks: action release, unlock, pull slide, extract and eject, carrier and feed, rear stop, push slide, chamber, lock-up.
+- `ar15-charge` (charging handle pulled back and let go). Tracks: latch, unlock, pull back, buffer spring compress, rear stop, release forward. The release-forward track is the spring slam, stripping and chambering a round, bolt lock-up and the charging-handle latch.
+- `ar15-bolt-release` (bolt catch pressed with the bolt locked back). Tracks: bolt catch, release forward, catch reset.
+
