@@ -156,7 +156,10 @@ const G_Shop = {
     if (G.Game.hub && kind !== 'hello' && kind !== 'ready') G.HUD.toast('VEX', text, 2);
   },
 
+  // (in the range nothing is bought: your kit there is put back as it was when you leave, js/range.ts, so what you bought would
+  // vanish with the money spent on it)
   spend(price: number) {
+    if (G.Game.hub && G.Range && G.Range.on()) { G.Audio.deny(); G.HUD.toast('THE RANGE', "Nothing's for sale in here: shop once you're back in the hangar", 2); return false; }
     if (G.Me.credits < price) { G.Audio.deny(); this.quip('broke'); return false; }
     G.Me.credits -= price;
     G.Audio.buy();

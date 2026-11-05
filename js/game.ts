@@ -326,6 +326,7 @@ const G_Game = {
   // from a point of sale in the hangar. The world carries on behind it; you stand where you are.
   openShop(tab?: string, title?: string) {
     if (!this.hub || this.shopOpen) return;
+    if (G.Range && G.Range.on()) { G.HUD.toast('THE RANGE', "Your kit stays as it is in here: shop and sort it out once you're back in the hangar", 2); return; } // (js/range.ts puts it back as it was when you leave)
     this.shopOpen = true;
     G.Me.keys = {}; G.Me.mouse.l = G.Me.mouse.r = false;
     G.Shop.tab = tab || 'stock'; G.Shop.title = title || null;
