@@ -688,6 +688,9 @@ const G_Views = {
     for (const ev of [...this.enemies.values()]) {
       if (ev.alive) {
         ev.pos.lerp(ev.tgt, Math.min(1, dt * 12));
+        // (the host keeps them out of the walls; the way between two of its snapshots can cut a corner, or a snap can carry it
+        // through a thin wall: slid back out as the host does it, so what's drawn is never inside one)
+        if (map && map.world && ev.pos.distanceToSquared(ev.tgt) > 1e-6) L.resolve(map, ev.pos, 0.38 * ev.def.scale, ev.pos.y, G.World.STEP, true);
         ev.yaw += G.U.angDiff(ev.yaw, ev.tgtYaw) * Math.min(1, dt * 12);
       } else {
         ev.deadT += dt;
@@ -724,7 +727,11 @@ const G_Views = {
       // to the side), not tilting from behind the edge (eased in and out with the lean itself)
       const leanTo = ev.alive ? ev.lean : 0;
       ev.leanS = (ev.leanS || 0) + (leanTo - (ev.leanS || 0)) * Math.min(1, dt * (Math.abs(leanTo) > Math.abs(ev.leanS || 0) ? 3.5 : 7)); // (out slowly, the Server's PEEK.UP; back quickly)
-      if (Math.abs(ev.leanS) > 0.01) at = ev.pos.clone().add(new THREE.Vector3(Math.cos(ev.yaw), 0, -Math.sin(ev.yaw)).multiplyScalar(ev.leanS * 0.45 * (ev.def.scale || 1)));
+      if (Math.abs(ev.leanS) > 0.01) {
+        at = ev.pos.clone().add(new THREE.Vector3(Math.cos(ev.yaw), 0, -Math.sin(ev.yaw)).multiplyScalar(ev.leanS * 0.45 * (ev.def.scale || 1)));
+        // (the lean point is checked for sight, not for room: by a wall's corner the body would be drawn into it, so it leans only as far as the wall allows)
+        const lm = G.Game.map; if (lm && lm.world) G.Level.resolve(lm, at, 0.22 * (ev.def.scale || 1), at.y, G.World.STEP, true);
+      }
       if (ev.alive && (pose === 'cuffed' || pose === 'takedown')) {
         const key = `${ev.pos.x.toFixed(2)},${ev.pos.z.toFixed(2)},${ev.yaw.toFixed(2)}`;
         if (ev.proneKey !== key) {

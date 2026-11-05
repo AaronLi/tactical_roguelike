@@ -15,6 +15,7 @@ interface Ragdoll { // the Verlet ragdoll a dead (or powered, living) rig carrie
   // (what the solver and the handling add as they go)
   handled?: { t: number } | null; calm?: number; push?: THREE.Vector3 | null; keepPin?: number; drive?: { T: THREE.Vector3[]; Tv: THREE.Vector3[]; [field: string]: any } | null;
   Pold?: THREE.Vector3[]; acc?: number; pinT?: number; Tprev?: THREE.Vector3[]; R?: THREE.Vector3[]; armL?: number;
+  near?: any[] | null; // the level's solids around the body (what stops a person), gathered once a step: gather
 }
 interface RagRoll { t: number; driven?: boolean; [field: string]: any } // a body being rolled onto its front (planRoll)
 interface RigArm { sh: THREE.Object3D; up: THREE.Object3D; lo: THREE.Object3D; tie: THREE.Mesh }
@@ -992,6 +993,10 @@ const G_Rig = (() => {
   // pass), and the corrections can only add so much speed to a joint (V_GAIN) or take it past V_MAX (about what a long fall comes to). A correction's a change in position, and to Verlet that's speed: without these, a joint
   // pushed out of a desk throws the body that's hanging from it.
   const PUSH = 0.015, V_GAIN = 0.03, V_MAX = 0.14, HOP_MAX = 0.16;
+  // ...but a joint that's inside a wall, centre and all, is a body that's half through it: that comes out a good deal faster
+  // (PUSH_IN a pass; the speed it adds is still capped, above). A wall also holds what slides along it back (WALL_FRIC of the
+  // sideways speed lost on each contact), and a body being turned over (roll) is moved out of one outright (ROLL_PUSH).
+  const PUSH_IN = 0.06, WALL_FRIC = 0.3, ROLL_PUSH = 1, ROLL_SLIDE = 0.03;
   // Joints aren't free: each has a range, the body has a twist limit, limbs are capsules that can't pass
   // through the torso or each other, and every joint has some friction (relative motion across a bone is
   // damped), so a limb swings and stops rather than spinning loose.
@@ -1080,6 +1085,10 @@ const G_Rig = (() => {
       min: MIN.map(([a, b, f]) => [a, b, rest(a, b) * f]),
     };
     rig.body.rotation.set(0, 0, 0); rig.body.position.set(0, 0, 0);
+    // A body that was against a wall when it went limp (an arm out to it, the gun up, a lean): out of the wall before the first
+    // step, not shoved out over the next few (it would take the rest of the body with it)
+    const rd0 = rig.rd; gather(rd0);
+    if (rd0.near && rd0.near.length) for (let pass = 0; pass < 4; pass++) for (let i = 0; i < P.length; i++) collide(rd0, i, true);
   }
   function relax(P: THREE.Vector3[], a: number, b: number, d: number, onlyMin: boolean) {
     const pa = P[a], pb = P[b];
@@ -1091,19 +1100,48 @@ const G_Rig = (() => {
   }
   // Contacts are inelastic: pushing a joint out of the floor or a box also cancels its velocity into it, so
   // bodies land with a dead weight instead of springing back up. A joint pushed up off something is resting on it (rd.on).
-  function collide(rd: Ragdoll, i: number) {
+  // The level's solids around a body, gathered once a step: a body's sixteen joints are each tested six or ten times a step,
+  // and every one of those goes through this short list instead of the world's grid.
+  function gather(rd: Ragdoll) {
+    const map: any = G.Game && G.Game.map;
+    if (!map || !map.world) { rd.near = null; return; }
+    let x0 = 1e9, y0 = 1e9, z0 = 1e9, x1 = -1e9, y1 = -1e9, z1 = -1e9;
+    for (const p of rd.P) { if (p.x < x0) x0 = p.x; if (p.x > x1) x1 = p.x; if (p.y < y0) y0 = p.y; if (p.y > y1) y1 = p.y; if (p.z < z0) z0 = p.z; if (p.z > z1) z1 = p.z; }
+    const m = 0.5, list: any[] = rd.near || [];
+    list.length = 0;
+    G.World.query(map.world, [x0 - m, y0 - m, z0 - m], [x1 + m, y1 + m, z1 + m], (s: any) => { if (s.move) list.push(s); });
+    rd.near = list;
+  }
+  // roll: a body being turned over by hand, out of a wall at once (not PUSH a pass)
+  function collide(rd: Ragdoll, i: number, roll = false) {
     const p = rd.P[i], q = rd.prev[i], r = rd.r[i], L = G.Level, map: any = G.Game && G.Game.map;
     if (map && map.world) { // out of whatever solid it's in (the world's: any floor, a step, a sofa), the shallowest way
-      G.World.query(map.world, [p.x - r, p.y - r, p.z - r], [p.x + r, p.y + r, p.z + r], (s: any) => {
-        if (!s.move) return;
+      if (!rd.near) gather(rd);
+      const list = rd.near!, qx = q.x, qz = q.z; // (where it was: which face of a wall it came in by)
+      for (let k = 0; k < list.length; k++) {
+        const s = list[k];
+        if (p.x + r <= s.min[0] || p.x - r >= s.max[0] || p.y + r <= s.min[1] || p.y - r >= s.max[1] || p.z + r <= s.min[2] || p.z - r >= s.max[2]) continue;
         const xl = p.x + r - s.min[0], xh = s.max[0] - (p.x - r), yl = p.y + r - s.min[1], yh = s.max[1] - (p.y - r), zl = p.z + r - s.min[2], zh = s.max[2] - (p.z - r);
         const ox = Math.min(xl, xh), oy = Math.min(yl, yh), oz = Math.min(zl, zh);
-        if (ox <= 0 || oy <= 0 || oz <= 0) return;
+        if (ox <= 0 || oy <= 0 || oz <= 0) continue;
         // resting on top of it wins for anything low (bodies can end up across a sofa, or down a flight of stairs)
-        if (yh <= yl && (yh < ox && yh < oz || s.max[1] - s.min[1] < 1.4 && yh < 0.5)) { p.y += Math.min(yh, PUSH); q.y = Math.max(q.y, p.y); rd.on[i] = 1; }
-        else if (oy < ox && oy < oz) { p.y -= Math.min(yl, PUSH); q.y = Math.min(q.y, p.y); }
-        else if (ox < oz) { p.x += xh < xl ? Math.min(xh, PUSH) : -Math.min(xl, PUSH); q.x = p.x; } else { p.z += zh < zl ? Math.min(zh, PUSH) : -Math.min(zl, PUSH); q.z = p.z; }
-      });
+        if (yh <= yl && (yh < ox && yh < oz || s.max[1] - s.min[1] < 1.4 && yh < 0.5)) { p.y += Math.min(yh, roll ? ROLL_PUSH : PUSH); q.y = Math.max(q.y, p.y); rd.on[i] = 1; }
+        else if (oy < ox && oy < oz) { p.y -= Math.min(yl, roll ? ROLL_PUSH : PUSH); q.y = Math.min(q.y, p.y); }
+        else {
+          // a wall (walls are built in cells, so there are seams along them: the shallowest way out can be along it, into the next cell).
+          // It went in by one face, so it comes back out of it: the axis it was clear of before, if only one.
+          const ex = qx + r <= s.min[0] || qx - r >= s.max[0], ez = qz + r <= s.min[2] || qz - r >= s.max[2];
+          const alongX = ex !== ez ? ex : ox < oz;
+          const cap = roll ? ROLL_PUSH : p.x > s.min[0] && p.x < s.max[0] && p.z > s.min[2] && p.z < s.max[2] ? PUSH_IN : PUSH; // (its centre in the wall: faster)
+          if (alongX) {
+            const left = ex ? qx < s.min[0] : xl < xh;
+            p.x += left ? -Math.min(xl, cap) : Math.min(xh, cap); q.x = p.x; q.z += (p.z - q.z) * WALL_FRIC;
+          } else {
+            const back = ez ? qz < s.min[2] : zl < zh;
+            p.z += back ? -Math.min(zl, cap) : Math.min(zh, cap); q.z = p.z; q.x += (p.x - q.x) * WALL_FRIC;
+          }
+        }
+      }
       return;
     }
     if (p.y < r) { p.y = r; if (q.y < r) q.y = r; rd.on[i] = 1; }
@@ -1132,13 +1170,28 @@ const G_Rig = (() => {
       if (!ro.driven) ro.t = Math.min(1, ro.t + dt / 0.5);
       const q = new T.Quaternion().setFromAxisAngle(ro.axis, ro.angle * G.U.smooth(0, 1, ro.t));
       let sink = 0;
-      P.forEach((p, i) => { p.copy(ro.base[i]).sub(ro.pivot).applyQuaternion(q).add(ro.pivot); sink = Math.max(sink, ro.ground + rd.r[i] - p.y); });
+      const sh = ro.shift || (ro.shift = new T.Vector3());
+      P.forEach((p, i) => { p.copy(ro.base[i]).sub(ro.pivot).applyQuaternion(q).add(ro.pivot).add(sh); sink = Math.max(sink, ro.ground + rd.r[i] - p.y); });
       const up = Math.max(0, sink) + ro.lift * Math.sin(Math.PI * ro.t); // nothing passes through the floor
-      P.forEach((p, i) => { p.y += up; prev[i].copy(p); });
+      P.forEach((p, i) => { p.y += up; });
+      // ...nor through a wall: what the turn sweeps into is pushed out of (nothing about it is physical, but it can't be
+      // seen to go through), and the whole body slides away from the wall as it goes (sh), a little each step, so it isn't
+      // left squashed against it
+      gather(rd);
+      if (rd.near && rd.near.length) {
+        const was = ro.was || (ro.was = P.map(() => new T.Vector3()));
+        P.forEach((p, i) => was[i].copy(p));
+        for (let pass = 0; pass < 3; pass++) for (let i = 0; i < P.length; i++) collide(rd, i, true);
+        let dx = 0, dz = 0;
+        P.forEach((p, i) => { const ex = p.x - was[i].x, ez = p.z - was[i].z; if (Math.abs(ex) > Math.abs(dx)) dx = ex; if (Math.abs(ez) > Math.abs(dz)) dz = ez; });
+        sh.x += G.U.clamp(dx, -ROLL_SLIDE, ROLL_SLIDE); sh.z += G.U.clamp(dz, -ROLL_SLIDE, ROLL_SLIDE);
+      }
+      P.forEach((p, i) => { prev[i].copy(p); });
       if (ro.t >= 1 && !ro.driven) { rd.roll = null; rd.asleep = false; rd.still = 0; rd.calm = 0.8; rd.pinT = 0; }
       return;
     }
     if (rd.asleep) return;
+    gather(rd);
     const h = dt, h2 = h * h;
     // the shots that landed since the last step: the upper body's knocked the way they went, less the less there is of them.
     // Limp, there's no muscle behind it either, and not much to shove
