@@ -563,6 +563,18 @@ const G_GunRecipes = (() => {
         const [mesh, tip] = round(F.cf + F.nf * off, yAt(t) + F.ny * off, x, F.ph);
         chk.rounds.push({ t, mesh, tip });
       }
+      // the FOLLOWER and the SPRING under the stack, drawn at one reference pose (the follower at the top, the coils spread to the floor) and
+      // posed by js/vmanim.ts magFill: the follower sits under the lowest round, the coils spread evenly from it to the floor plate, each
+      // moved along the spine (chk.spine: [t, f, y, tilt] samples down to the floor, tEnd) so a curved magazine's spring follows its curve
+      const tEnd = (len - 0.016) / (len - 0.026), N = 12, sp: number[][] = [];
+      for (let i = 0; i <= 8; i++) { const t = tEnd * i / 8, F = at(t); sp.push([t, F.cf, yAt(t), F.ph]); }
+      chk.spine = sp;
+      const bar = (t: number, h: number, wd: number, dp: number, mat: THREE.Material, slant: number) => { // a bar across the magazine at depth t, tilted with the spine
+        const F = at(t), b = k.box(wd, h, dp, mat, F.cf - dp / 2, yAt(t), 0); b.rotation.x = F.ph + slant; return b;
+      };
+      chk.follower = { t: 0, mesh: bar(0, 0.003, w * 0.8, d * 0.82, M.black(), 0) };
+      chk.springs = [];
+      for (let j = 0; j < N; j++) { const u = (j + 0.5) / N, t = tEnd * u; chk.springs.push({ t, u, mesh: bar(t, 0.0013, w * 0.62, d * 0.74, M.steel(), 0.3) }); }
     }
     else for (let i = 1; i <= 5; i++) { // the witness windows: one on each face, at the face's own point and tilt (side 1 the back, -1 the front: front ones mirrored across so they sit where they would read from there)
       const t = (i / 6) * 0.94, F = at(t), th = 0.0016;

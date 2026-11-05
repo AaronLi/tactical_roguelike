@@ -765,6 +765,27 @@ const G_VMAnim = (() => {
       r.mesh.visible = on; r.mesh.material = shot ? shellMat(am) : M.brass();
       if (r.tip) { r.tip.visible = on && !shot; r.tip.material = tipMat(am); }
     });
+    // the follower rides under the lowest round (or the top one, or the lips when empty) and the spring fills the space under it, down to the floor
+    // plate: extended when the magazine is empty, squeezed to the floor when full. Both ride the magazine's spine, so a curved one's curves.
+    if (chk.follower && chk.springs && chk.spine) {
+      const sp = chk.spine, tEnd = sp[sp.length - 1][0], half = chk.rounds.length ? chk.rounds[0].t / 2 : 0.03;
+      const tf = Math.min(tEnd - 0.01, n > 0 ? (show > 0 ? chk.rounds[show - 1].t : 0) + half : 0);
+      poseOnSpine(sp, chk.follower, tf);
+      for (const c of chk.springs) poseOnSpine(sp, c, tf + (tEnd - tf) * c.u);
+    }
+  }
+  // the spine ([t, f, y, tilt] samples) at depth t, linearly between the samples
+  function spineAt(sp: number[][], t: number) {
+    let i = 0;
+    while (i < sp.length - 2 && t > sp[i + 1][0]) i++;
+    const a = sp[i], b = sp[i + 1], k = b[0] > a[0] ? Math.max(0, Math.min(1, (t - a[0]) / (b[0] - a[0]))) : 0;
+    return [a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k, a[3] + (b[3] - a[3]) * k];
+  }
+  // moves a follower or coil, drawn at depth o.t, to depth t on the spine (its position and tilt follow the magazine)
+  function poseOnSpine(sp: number[][], o: { mesh: THREE.Mesh; t: number; px: number; py: number; pz: number; rx: number }, t: number) {
+    const A = spineAt(sp, o.t), B = spineAt(sp, t);
+    o.mesh.position.set(o.px, o.py + B[1] - A[1], o.pz - (B[0] - A[0]));
+    o.mesh.rotation.x = o.rx + B[2] - A[2];
   }
   // stretch an arm from the shoulder to the hand (both in viewmodel space)
   const _q2 = new T.Quaternion(), _q3 = new T.Quaternion(), _v2 = new T.Vector3();

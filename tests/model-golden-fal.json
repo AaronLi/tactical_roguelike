@@ -449,7 +449,7 @@
   },
   "barrel=fal.barrel,grip=oem.gr.ar.4,handguard=oem.hg.box.4,mag=fal.mag.clear,muzzle=mz.r762.a2,optic=op.pic.0,stock=stk.heavy.0": {
    "label": "mag=fal.mag.clear",
-   "geometry": "c59ac51c02daa1e5",
+   "geometry": "ce182c1e381cbbac",
    "info": "d9ae9dcea2678e38"
   },
   "barrel=fal.barrel,grip=oem.gr.ar.4,handguard=oem.hg.box.4,mag=fal.mag.drum,muzzle=mz.r762.a2,optic=op.pic.0,stock=stk.heavy.0": {
