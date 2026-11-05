@@ -106,7 +106,7 @@ export function buildExcitation(p, A, contact, sr, N, rng) {
     // ---------- Friction: slide / scrape / squeak ----------
     const fr = p.friction;
     const lowpassCeil = clamp(0.6 / contact.tauAt(0.5), 400, sr * 0.45);
-    if (fr.force > 0.001 && fr.duration > 0.01) {
+    if (fr.force > 0.001 && fr.duration > 0.002) {
         const n0 = Math.round(T0 * sr);
         const len = Math.min(N - n0, Math.round(fr.duration * sr));
         const depth = Math.max(0, fr.roughness) * 1e-6; // m
