@@ -76,10 +76,10 @@ const sgChamber = { ...mat('steel'), shape: 'shell', size: 9, thickness: 4, mode
 // Modelled as rods (bar shape, thickness ≈ effective section): the synth's 'shell' is a pot
 // whose diameter is its size, which made an 18 cm carrier a 2.8 kg pot and gave every slam a
 // soft, rubbery contact. As a rod: ~0.3 kg, bright steel ring from ~1.9 kHz.
-const arCarrier = { ...mat('steel'), shape: 'bar', size: 18, thickness: 12, modes: 3, irregularity: 0.7, damping: 0.5, level: 0 };
+const arCarrier = { ...mat('steel'), shape: 'bar', size: 18.9, thickness: 12, modes: 3, irregularity: 0.7, damping: 0.5, level: 0 };
 // The carrier group as it lands: carrier + buffer pressed behind it (~0.43 kg as a steel rod,
 // ~2.7 kHz up). Heavier contact = longer, weightier landing.
-const arCarrierGroup = { ...mat('steel'), shape: 'bar', size: 18, thickness: 17, modes: 3, irregularity: 0.7, damping: 0.5, level: 0 };
+const arCarrierGroup = { ...mat('steel'), shape: 'bar', size: 18.9, thickness: 17, modes: 3, irregularity: 0.7, damping: 0.5, level: 0 };
 const arBolt = { ...mat('steel'), shape: 'bar', size: 6, thickness: 15, modes: 1, irregularity: 0.5, damping: 0.5, level: 0 };
 const arCamPin = steelBar(1.5, 5);
 const arBarrelExt = steelBlock(3, 20);
@@ -93,14 +93,25 @@ const arBufferTube = { ...mat('aluminum'), shape: 'bar', size: 18, thickness: 15
 const BUFFER_TUBE_HOUSING = { amount: 0.8, cavity: 0.8, cavityWidth: 2.5, ...mat('aluminum'), shape: 'shell', size: 18, thickness: 2.5, modes: 0, irregularity: 0.6, damping: 0.45 };
 const arBufferSpring = springWire(25, 1.4);
 /**
- * Buffer spring strength relative to a standard carbine spring (~40 N in battery, ~70 N fully
- * back). 2 = a heavy spring: 80 N / 140 N. The forward run is simulated from this and the
+ * Buffer spring strength relative to a standard carbine spring (~40 N in battery, ~80 N fully
+ * back). 2 = a heavy spring: 80 N / 160 N. The forward run is simulated from this and the
  * reciprocating mass below, so stiffer = faster and harder, heavier = slower and harder.
  */
 const BUFFER_SPRING = 2.0;
-/** What moves forward together: bolt carrier group (~320 g) + buffer with weights (~140 g) + a
- *  third of the spring (~10 g). The charging handle (~30 g) rides along on a charge. */
-const RECIP_MASS = 0.47;
+/*
+ * Real-world AR-15 (carbine, collapsible stock) numbers this scene is built on:
+ *  - carrier travel 3.7" ≈ 94 mm (3.8" fixed stock; ≥3.5" needed to strip a round)
+ *  - BCG 11.5-11.6 oz ≈ 329 g; BCG with bolt extended 7 7/16" ≈ 189 mm
+ *  - H2 buffer 4.6-4.7 oz ≈ 132 g, carbine buffer ≈ 3.25" long
+ *  - carbine spring free length 10.06-11.25"; carbine receiver extension 7.1-7.3" deep. With
+ *    the buffer, the spring sits ≈3.6" compressed in battery and ≈7.3" fully back: ~2x force.
+ *  - top round's rim ≈ 86 mm behind the bolt face (stripping needs ≥3.5" of travel)
+ *  - upper receiver ≈ 7" (≈18 cm); 16" barrel; carbine gas tube ≈ 9.8"
+ */
+const STROKE_MM = 94;
+/** What moves forward together: BCG (329 g) + H2 buffer (132 g) + a third of the spring
+ *  (~10 g). The charging handle (~30 g) rides along on a charge. */
+const RECIP_MASS = 0.471;
 const CH_MASS = 0.03;
 /**
  * Simulate the forward run: m·x'' = spring force − friction − feed drag (stripping the round
@@ -109,21 +120,21 @@ const CH_MASS = 0.03;
  */
 function simulateRun(mass) {
     const F_BAT = 40 * BUFFER_SPRING;
-    const F_REAR = 70 * BUFFER_SPRING;
+    const F_REAR = 80 * BUFFER_SPRING; // ~2x the battery force: 7.3" vs 3.6" of compression
     const xs = [];
     const ts = [];
     const vs = [];
-    let x = 90; // mm from battery
+    let x = STROKE_MM; // mm from battery
     let v = 0;
     let tt = 0;
     const dt = 1e-5;
     while (x > 9.5 && tt < 0.5) {
-        const fs = F_BAT + (F_REAR - F_BAT) * (x / 90);
+        const fs = F_BAT + (F_REAR - F_BAT) * (x / STROKE_MM);
         let drag = 6;
-        if (x < 72 && x > 45)
-            drag += 25;
-        if (x < 28 && x > 10)
-            drag += 15;
+        if (x < 86 && x > 55)
+            drag += 25; // stripping the round over the feed lips
+        if (x < 45 && x > 3)
+            drag += 15; // pushing it into the chamber
         v += ((fs - drag) / mass) * dt;
         x -= v * 1000 * dt;
         tt += dt;
@@ -149,7 +160,7 @@ function simulateRun(mass) {
         const f = (xs[lo] - xq) / (xs[lo] - xs[hi]);
         return arr[lo] + (arr[hi] - arr[lo]) * f;
     };
-    return { timeAt: (xq) => (xq >= 90 ? 0 : look(ts, xq)), speedAt: (xq) => look(vs, xq), total: tt, arrive: v };
+    return { timeAt: (xq) => (xq >= STROKE_MM ? 0 : look(ts, xq)), speedAt: (xq) => look(vs, xq), total: tt, arrive: v };
 }
 const arBuffer = steelBlock(6, 18); // buffer with sliding weights
 const arCase = { ...mat('brass'), shape: 'shell', size: 4.5, thickness: 0.4, modes: 1, irregularity: 0.5, damping: 0.6, level: 0 }; // held by the magazine / chamber
@@ -175,7 +186,7 @@ const MAG_WELL = { length: 8, width: 2.5, depth: 6, q: 11, level: 0.6 };
 // Parts in the lower (trigger group) sound mostly in the fire-control pocket.
 const LOWER_HOUSING = {
     amount: 0.85, cavity: 1, ...mat('aluminum'), shape: 'shell', size: 20, thickness: 4, modes: 0, irregularity: 0.8, damping: 0.5,
-    cavities: [{ ...FCG_POCKET, level: 1 }, { ...MAG_WELL, level: 0.5 }, { length: 30, width: 2.6, depth: 2.2, q: 9, level: 0.3 }],
+    cavities: [{ ...FCG_POCKET, level: 1 }, { ...MAG_WELL, level: 0.5 }, { length: 18, width: 2.6, depth: 2.2, q: 9, level: 0.3 }],
 };
 // The forward-assist pawl is spring-loaded against the serrations on the carrier's right
 // side (~2.5 mm pitch): it clicks over them whenever the carrier moves past.
@@ -288,7 +299,7 @@ export const PUMP_SHOTGUN = {
 // narrow air space (~2.6 cm) that gives the pipe-like hollow "shk" of the slides.
 const AR_HOUSING = {
     amount: 0.65, cavity: 1, ...mat('aluminum'), shape: 'shell', size: 30, thickness: 3, modes: 0, irregularity: 0.8, damping: 0.6,
-    cavities: [{ length: 30, width: 2.6, depth: 2.2, q: 9, level: 0.8 }, FCG_POCKET, MAG_WELL],
+    cavities: [{ length: 18, width: 2.6, depth: 2.2, q: 9, level: 0.8 }, FCG_POCKET, MAG_WELL],
 };
 /** The carrier running home under the buffer spring, starting at t (round in the magazine). */
 function arForward(t, withChargingHandle) {
@@ -321,26 +332,27 @@ function arForward(t, withChargingHandle) {
         // tube. It's preloaded, so it never gets near free length: it pushes hard the whole way
         // and its surge pitch (set by stiffness and mass, not length) stays the same.
         hit('buffer spring lets go', t, -3, V(3), arBufferSpring, arBufferTube, { scatter: 0.2, radius: 1, click: 0.4, sharp: 0.8 }, { coil: { level: 0.7, length: 9, dispersion: 0.5, decay: 0.12, brightness: 3000 }, housing: BUFFER_TUBE_HOUSING }),
-        fwdRub('buffer spring extending in its tube', 89, 0, -11, { force: 3 * BUFFER_SPRING, roughness: 6, grain: 0.6, periodicity: 0, contactWidth: 0.2 }, arBufferSpring, arBufferTube, { coil: { level: 0.6, length: 11, dispersion: 0.5, decay: 0.12, brightness: 2800 }, housing: BUFFER_TUBE_HOUSING }),
-        hit('buffer weights shift', fwdAt(88), -20, vAt(88) + 1, steelBlock(1.5, 12), arBuffer, { scatter: 0.9, radius: 2 }),
+        fwdRub('buffer spring extending in its tube', STROKE_MM - 1, 0, -11, { force: 3 * BUFFER_SPRING, roughness: 6, grain: 0.6, periodicity: 0, contactWidth: 0.2 }, arBufferSpring, arBufferTube, { coil: { level: 0.6, length: 11, dispersion: 0.5, decay: 0.12, brightness: 2800 }, housing: BUFFER_TUBE_HOUSING }),
+        hit('buffer weights shift', fwdAt(STROKE_MM - 2), -20, vAt(STROKE_MM - 2) + 1, steelBlock(1.5, 12), arBuffer, { scatter: 0.9, radius: 2 }),
         // The carrier's tail runs out of the buffer tube, then the carrier runs on the upper's rails.
-        fwdRub('carrier tail running out of the buffer tube', 90, 40, -9, { force: 4, roughness: 2, grain: 0.3, periodicity: 0, contactWidth: 0.1 }, arCarrier, arBufferTube),
+        fwdRub('carrier tail running out of the buffer tube', STROKE_MM, 40, -9, { force: 4, roughness: 2, grain: 0.3, periodicity: 0, contactWidth: 0.1 }, arCarrier, arBufferTube),
         hit('carrier tail leaves the buffer tube', fwdAt(40), -14, vAt(40) * 0.15, arCarrier, arBufferTube, { scatter: 0.3, radius: 4 }),
         fwdRub('carrier rails in the upper', 40, 0, -9, { force: 6, ...OILY }, arCarrier, arUpper),
         // It runs over the cocked hammer until ~35 mm (light: the hammer is held down by the sear).
-        fwdRub('carrier running over the cocked hammer', 90, 35, -16, { force: 3, ...OILY }, arHammer, arCarrier, { housing: LOWER_HOUSING }),
+        fwdRub('carrier running over the cocked hammer', STROKE_MM, 35, -16, { force: 3, ...OILY }, arHammer, arCarrier, { housing: LOWER_HOUSING }),
         // The serrated stretch passes the spring-loaded forward-assist pawl: a ratchet run that
         // speeds up as the carrier does.
         fwdRub('forward-assist pawl over the serrations', 38, 8, -7, { force: 4, roughness: 200, grain: 2.5, periodicity: 1, contactWidth: 0.02 }, arFaPawl, arCarrier),
-        // Feeding: the bolt's lower lug catches the top round's rim (~72 mm), drags it over the
-        // feed lips, the rim snaps free (~45), the next round snaps up (~42), the nose ticks up the
-        // feed ramp (~32) and the round slides into the chamber (28-10).
-        hit('bolt picks up the top round', fwdAt(72), -8, vAt(72) * 0.5, arBolt, arCase, { scatter: 0.3, radius: 1.5, click: 0.7 }),
-        fwdRub('case dragged over the feed lips', 72, 45, -10, { force: 6, roughness: 15, grain: 0.3 }, arCase, arFeedLips),
-        snap('case rim snaps free of the feed lips', fwdAt(45), -1, { strength: 0.7, preload: 0, seat: 0.3, seatDelay: 1 }, arCase, arFeedLips),
-        snap('next round snaps up into the lips', fwdAt(42), -4, { strength: 0.5, preload: 0, seat: 0.3, seatDelay: 1.5 }, arNextRound, arFeedLips),
-        hit('bullet nose rides up the feed ramp', fwdAt(32), -7, vAt(32) * 0.4, arBullet, arFeedRamp, { scatter: 0.3, radius: 1.5 }),
-        fwdRub('round into the chamber', 28, 10, -11, { force: 5, roughness: 6, grain: 0.3 }, arCase, arChamber),
+        // Feeding (5.56 cartridge ≈ 57 mm long, rim ≈ 86 mm back): the bolt's lower lug catches the
+        // top round's rim (86 mm), drags it over the feed lips, the rim snaps free (~55), the next
+        // round snaps up (~52), the nose rides up the feed ramp (~50) and the case slides into the
+        // chamber (45 to battery).
+        hit('bolt picks up the top round', fwdAt(86), -8, vAt(86) * 0.5, arBolt, arCase, { scatter: 0.3, radius: 1.5, click: 0.7 }),
+        fwdRub('case dragged over the feed lips', 86, 55, -10, { force: 6, roughness: 15, grain: 0.3 }, arCase, arFeedLips),
+        snap('case rim snaps free of the feed lips', fwdAt(55), -1, { strength: 0.7, preload: 0, seat: 0.3, seatDelay: 1 }, arCase, arFeedLips),
+        snap('next round snaps up into the lips', fwdAt(52), -4, { strength: 0.5, preload: 0, seat: 0.3, seatDelay: 1.5 }, arNextRound, arFeedLips),
+        hit('bullet nose rides up the feed ramp', fwdAt(50), -7, vAt(50) * 0.4, arBullet, arFeedRamp, { scatter: 0.3, radius: 1.5 }),
+        fwdRub('round into the chamber', 45, 3, -11, { force: 5, roughness: 6, grain: 0.3 }, arCase, arChamber),
         // The gas tube enters the carrier key over the last ~20 mm.
         hit('gas tube slides into the carrier key', fwdAt(18), -9, vAt(18) * 0.2, arGasTube, gasKey, { scatter: 0.3, radius: 1.5 }),
         // Lock-up, staged as the mechanism does it (stretched to ~4 ms so the turn is heard as its own
@@ -380,10 +392,10 @@ function arForward(t, withChargingHandle) {
         snap('extractor snaps over the rim', TF + 0.001, -3, { strength: 0.8, preload: 0, seat: 0.3, seatDelay: 1 }, arExtractor, arCase),
     ];
     if (withChargingHandle) {
-        // Let go, the charging handle rides the whole 90 mm home with the carrier in its channel,
+        // Let go, the charging handle rides the whole stroke home with the carrier in its channel,
         // the gas key in its slot, and slams into its own front stop.
-        els.push(fwdRub('charging handle running home in its channel', 90, 0, -9, { force: 3, ...OILY }, arChargingHandle, arUpper));
-        els.push(fwdRub('gas key riding in the handle slot', 90, 0, -13, { force: 2, ...OILY }, gasKey, arChargingHandle));
+        els.push(fwdRub('charging handle running home in its channel', STROKE_MM, 0, -9, { force: 3, ...OILY }, arChargingHandle, arUpper));
+        els.push(fwdRub('gas key riding in the handle slot', STROKE_MM, 0, -13, { force: 2, ...OILY }, gasKey, arChargingHandle));
         // Let go, the charging handle rides home with the carrier and slams into its own front stop.
         els.push(hit('charging handle slams into its front stop', post(0.0581), 0, V(3.8), arChargingHandle, arUpper, { scatter: 0.4, radius: 3, click: 0.7 }));
         els.push(snap('charging handle latch catches', post(0.06), -9, { strength: 0.7, preload: 0, seat: 0.4, seatDelay: 2 }, arChLatch, arUpper));
@@ -392,9 +404,9 @@ function arForward(t, withChargingHandle) {
 }
 const CH_BACK = 0.0;
 // The pull, laid out by travel. The hand's speed follows a swell (accelerate, then brake),
-// so position along the 90 mm stroke is x(t) = 45 mm · (1 − cos(π t / T)). Each part comes in
+// so position along the stroke is x(t) = STROKE/2 · (1 − cos(π t / T)). Each part comes in
 // and out at its own point of travel, at the speed the stroke has there.
-const PULL_MM = 90;
+const PULL_MM = STROKE_MM;
 const PULL_T = 0.48; // a deliberate pull (3x the original brisk 0.16 s)
 // Hits driven by the hand's speed soften on a slower pull (impact speed ∝ hand speed; level ∝ √
 // is a gentler, more natural-sounding scaling than linear). Spring-driven snaps don't change.
@@ -457,14 +469,14 @@ export const AR15_CHARGE = {
         },
         {
             name: 'pull-back',
-            description: 'The slides, each over its own stretch of travel: charging handle in its channel (0-90 mm), gas key in the handle slot (2-90), carrier on the upper rails (2-40), carrier tail entering and running in the buffer tube (40-90), bolt tail in the carrier bore (11.5-90). Oiled, so light and slick.',
+            description: 'The slides, each over its own stretch of travel: charging handle in its channel (0-94 mm), gas key in the handle slot (2-94), carrier on the upper rails (2-40), carrier tail entering and running in the buffer tube (40-94), bolt tail in the carrier bore (11.5-94). Oiled, so light and slick.',
             elements: [
-                travelRub('charging handle in its channel', 0, 90, -11, { force: 4, ...OIL_ALU }, arChargingHandle, arUpper),
-                travelRub('gas key riding in the handle slot', 2, 90, -15, { force: 3, ...OIL_STEEL }, gasKey, arChargingHandle),
+                travelRub('charging handle in its channel', 0, STROKE_MM, -11, { force: 4, ...OIL_ALU }, arChargingHandle, arUpper),
+                travelRub('gas key riding in the handle slot', 2, STROKE_MM, -15, { force: 3, ...OIL_STEEL }, gasKey, arChargingHandle),
                 travelRub('carrier on the upper rails', 2, 40, -9, { force: 6, ...OIL_STEEL }, arCarrier, arUpper),
                 hit('carrier tail enters the buffer tube', tAt(40), -16, 0.5 * HAND, arCarrier, arBufferTube, { scatter: 0.3, radius: 4 }),
-                travelRub('carrier tail running in the buffer tube', 40, 90, -11, { force: 4, ...OIL_TUBE }, arCarrier, arBufferTube),
-                travelRub('bolt tail riding in the carrier bore', 11.5, 90, -20, { force: 2, ...OIL_STEEL }, arBolt, arCarrier),
+                travelRub('carrier tail running in the buffer tube', 40, STROKE_MM, -11, { force: 4, ...OIL_TUBE }, arCarrier, arBufferTube),
+                travelRub('bolt tail riding in the carrier bore', 11.5, STROKE_MM, -20, { force: 2, ...OIL_STEEL }, arBolt, arCarrier),
                 // The serrated stretch of the carrier passes the spring-loaded forward-assist pawl:
                 // a run of small ratchet clicks. (The slide bed offset doesn't apply to clicks.)
                 travelRub('forward-assist pawl over the serrations', 8, 38, 2, { force: 4, roughness: 200, grain: 2.5, periodicity: 1, contactWidth: 0.02 }, arFaPawl, arCarrier),
@@ -483,15 +495,15 @@ export const AR15_CHARGE = {
                 // stops pressing it down.
                 snap('sear snaps into the hammer notch', tAt(60), 0, { strength: 1, preload: 0, seat: 0.6, seatDelay: 1.2 }, arTriggerSear, arHammer, { coil: { level: 0.3, length: 1.5, dispersion: 0.3, decay: 0.05, brightness: 7000 }, housing: LOWER_HOUSING }),
                 snap('hammer settles onto the sear', tAt(70), -4, { strength: 0.7, preload: 0, seat: 0.3, seatDelay: 1 }, arHammer, arLower, { housing: LOWER_HOUSING }),
-                travelRub('carrier riding over the cocked hammer', 60, 90, -20, { force: 3, ...OIL_STEEL }, arHammer, arCarrier),
+                travelRub('carrier riding over the cocked hammer', 60, STROKE_MM, -20, { force: 3, ...OIL_STEEL }, arHammer, arCarrier),
             ],
         },
         {
             name: 'magazine',
-            description: '45-72 mm: the bolt rides over the top round in the magazine; once it clears, the magazine spring pops the round up against the feed lips.',
+            description: '30-86 mm: the bolt rides over the top round in the magazine; once it clears the rim (~88 mm), the magazine spring pops the round up against the feed lips.',
             elements: [
-                travelRub('bolt riding over the top round', 45, 72, -16, { force: 5, roughness: 2, grain: 0.2, contactWidth: 0.05 }, arCase, arBolt),
-                hit('round pops up against the feed lips', tAt(72) + 0.002, -4, 0.8, arNextRound, arFeedLips, { scatter: 0.3, radius: 2 }),
+                travelRub('bolt riding over the top round', 30, 86, -16, { force: 5, roughness: 2, grain: 0.2, contactWidth: 0.05 }, arCase, arBolt),
+                hit('round pops up against the feed lips', tAt(88) + 0.002, -4, 0.8, arNextRound, arFeedLips, { scatter: 0.3, radius: 2 }),
             ],
         },
         {
@@ -504,14 +516,14 @@ export const AR15_CHARGE = {
                 // length). Smooth: coils slide, they don't tick.
                 travelRub('buffer spring loading (first third)', 2, 32, -7 + 10 * Math.log10(BUFFER_SPRING), { force: 2.7 * BUFFER_SPRING, roughness: 6, grain: 0.6, periodicity: 0, contactWidth: 0.2 }, arBufferSpring, arBufferTube, { coil: { level: 0.5, length: 11, dispersion: 0.5, decay: 0.12, brightness: 2800 }, housing: BUFFER_TUBE_HOUSING }),
                 travelRub('buffer spring loading (second third)', 32, 62, -6.5 + 10 * Math.log10(BUFFER_SPRING), { force: 3.4 * BUFFER_SPRING, roughness: 6, grain: 0.6, periodicity: 0, contactWidth: 0.2 }, arBufferSpring, arBufferTube, { coil: { level: 0.52, length: 11, dispersion: 0.5, decay: 0.12, brightness: 2900 }, housing: BUFFER_TUBE_HOUSING }),
-                travelRub('buffer spring loading (last third)', 62, 90, -6 + 10 * Math.log10(BUFFER_SPRING), { force: 4.1 * BUFFER_SPRING, roughness: 6, grain: 0.6, periodicity: 0, contactWidth: 0.2 }, arBufferSpring, arBufferTube, { coil: { level: 0.55, length: 11, dispersion: 0.5, decay: 0.12, brightness: 3000 }, housing: BUFFER_TUBE_HOUSING }),
+                travelRub('buffer spring loading (last third)', 62, STROKE_MM, -6 + 10 * Math.log10(BUFFER_SPRING), { force: 4.1 * BUFFER_SPRING, roughness: 6, grain: 0.6, periodicity: 0, contactWidth: 0.2 }, arBufferSpring, arBufferTube, { coil: { level: 0.55, length: 11, dispersion: 0.5, decay: 0.12, brightness: 3000 }, housing: BUFFER_TUBE_HOUSING }),
                 hit('buffer weights lag', tAt(3), -22, 0.6, steelBlock(1.5, 12), arBuffer, { scatter: 0.9, radius: 2 }),
                 hit('buffer weights settle', CH_END + 0.004, -12, 0.8, steelBlock(1.5, 12), arBuffer, { scatter: 0.9, radius: 2 }, { housing: BUFFER_TUBE_HOUSING }),
             ],
         },
         {
             name: 'rear-stop',
-            description: '90 mm: the charging handle bottoms out; the bolt shifts inside the carrier.',
+            description: 'Full travel (3.7" ≈ 94 mm): the charging handle bottoms out; the bolt shifts inside the carrier.',
             elements: [
                 hit('handle bottoms out', CH_END, -6, 1.0 * HAND, arChargingHandle, arUpper, { scatter: 0.4, radius: 3 }),
                 hit('bolt shifts in the carrier', CH_END + 0.003, -14, 0.5 * HAND, arBolt, arCarrier, { scatter: 0.4, radius: 2 }),
