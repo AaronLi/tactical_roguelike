@@ -525,25 +525,51 @@ const G_GunRecipes = (() => {
   // (anything wider than a round and a half) zig-zags, each round half a diameter down from the last, offset each
   // side; a single stack (a shotgun's shells) is one column. Which of them show follows the rounds in it: the top
   // ones stay, the follower rises (js/vmanim.ts magFill). An opaque magazine shows its witness holes instead.
-  function magCheck(k: Kit, rear: (t: number) => number, top: number, len: number, w: number, d: number, clear: boolean, rnd?: RoundDims | null) {
+  // spine(s): the magazine's centreline at the fraction s of its length down (0 the top, 1 the floorplate) as [f, df/ds]: where
+  // it is along the gun and how fast it moves forward per unit s, so the faces' direction there is known (a curved one's
+  // bends, a straight one's rakes). A witness hole's t (0..1 down the stack) is read at s = (12 mm + t of all but 26 mm) / len.
+  // Holes are stamped on BOTH faces (the back, toward the shooter, and the front: each its own brass window and count, the
+  // same t, so each face reads from its side) and tilted to the face there; a clear one's rounds lean with the curve.
+  function magCheck(k: Kit, spine: (s: number) => number[], top: number, len: number, w: number, d: number, clear: boolean, rnd?: RoundDims | null) {
     const R: RoundDims = rnd || { head: Math.min(0.009, w * 0.4), cs: d * 0.5, bl: d * 0.16, bd: Math.min(0.0085, w * 0.35), shell: false };
     const r = R.head / 2, oal = Math.min(R.cs + R.bl, d * 0.94), cs = oal * R.cs / (R.cs + R.bl), bl = oal - cs, rb = R.bd / 2;
-    const chk: any = { holes: [], rounds: [], w }, yAt = (t: number) => top - 0.012 - t * (len - 0.026), back = (t: number) => rear(t) + Math.max(0.002, (d - oal) * 0.25);
+    const chk: any = { holes: [], rounds: [], w };
+    const sOf = (t: number) => (0.012 + t * (len - 0.026)) / len, yAt = (t: number) => top - 0.012 - t * (len - 0.026);
+    // the frame at depth t: the centre f, the face's tilt (positive: the bottom forward, its normal pointing up), and the unit normal (forward, up)
+    const at = (t: number) => { const [cf, sl] = spine(sOf(t)), n = Math.hypot(len, sl); return { cf, ph: Math.atan2(sl, len), nf: len / n, ny: sl / n }; };
+    // a cylinder along the bore tilted about its rear end (f0, y), so it follows the face's normal
+    const cylT = (rr: number, l: number, m: THREE.Material, f0: number, y: number, x: number, rf: number, seg: number, ph: number) => {
+      const c = k.cyl(rr, l, m, f0, y, x, rf, seg);
+      if (ph) { c.rotation.x = ph; c.position.z -= (Math.cos(ph) - 1) * l / 2; c.position.y += Math.sin(ph) * l / 2; }
+      return c;
+    };
     // the feed lips, and the top round sitting down between them (its crown just under their edges)
-    for (const s of [-1, 1]) k.box(w * 0.16, 0.003, d * 0.6, M.black(), rear(0) + 0.004, top + 0.0015, s * w * 0.42);
-    const ty = top - r + 0.0024;
-    const round = (f: number, y: number, x: number) => [k.cyl(r * 0.97, cs, M.brass(), f, y, x, R.shell ? r * 0.97 : rb * 1.15, 10), R.shell ? null : k.cyl(rb, bl, M.brass(), f + cs, y, x, rb * (R.pistol ? 0.55 : 0.18), 8)];
-    chk.top = round(back(0), ty, 0); if (!chk.top[1]) chk.top[1] = k.box(0.0001, 0.0001, 0.0001, M.brass(), back(0), ty);
+    for (const s of [-1, 1]) k.box(w * 0.16, 0.003, d * 0.6, M.black(), spine(0)[0] - d / 2 + 0.004, top + 0.0015, s * w * 0.42);
+    const ty = top - r + 0.0024, round = (f: number, y: number, x: number, ph = 0) => {
+      const c = Math.cos(ph), sn = Math.sin(ph);
+      return [cylT(r * 0.97, cs, M.brass(), f, y, x, R.shell ? r * 0.97 : rb * 1.15, 10, ph), R.shell ? null : cylT(rb, bl, M.brass(), f + c * cs, y + sn * cs, x, rb * (R.pistol ? 0.55 : 0.18), 8, ph)];
+    };
+    const T0 = at(0), back0 = T0.cf - d / 2 + Math.max(0.002, (d - oal) * 0.25);
+    chk.top = round(back0, ty, 0); if (!chk.top[1]) chk.top[1] = k.box(0.0001, 0.0001, 0.0001, M.brass(), back0, ty);
     if (clear) {
-      // as many as it holds under the top round (one drawn for each: R.cap), at the stack's pitch from the top down
+      // as many as it holds under the top round (one drawn for each: R.cap), at the stack's pitch from the top down, each leaning with the curve
       const dbl = w > r * 2 * 1.45, pitch = dbl ? r * 1.05 : r * 2.02, fit = Math.max(2, Math.floor((len - 0.026) / pitch)), n = R.cap! > 1 ? R.cap! - 1 : fit, xo = dbl ? Math.min(w / 2 - r - 0.0012, r * 0.86) : 0;
       const tOf = (j: number) => Math.min(1, j * Math.min(pitch, (len - 0.026) / n) / (len - 0.026)); // (packed tighter if it holds more than fits at its pitch)
       for (let j = 1; j <= n; j++) { // each with its own tip (or, a shotgun's, its hull coloured): js/vmanim.ts magFill
-        const t = tOf(j), x = dbl ? (j % 2 ? 1 : -1) * xo : 0, [mesh, tip] = round(back(t), yAt(t), x);
+        const t = tOf(j), x = dbl ? (j % 2 ? 1 : -1) * xo : 0, F = at(t), off = Math.max(0.002, (d - oal) * 0.25) - d / 2; // (its base against the back wall, along the normal)
+        const [mesh, tip] = round(F.cf + F.nf * off, yAt(t) + F.ny * off, x, F.ph);
         chk.rounds.push({ t, mesh, tip });
       }
     }
-    else for (let i = 1; i <= 5; i++) { const t = (i / 6) * 0.94; chk.holes.push({ t, mesh: k.box(w * 0.22, 0.0055, 0.0025, M.brass(), rear(t) - 0.0035, yAt(t), -w * 0.27) }); }
+    else for (let i = 1; i <= 5; i++) { // the witness windows: one on each face, at the face's own point and tilt (side 1 the back, -1 the front: front ones mirrored across so they sit where they would read from there)
+      const t = (i / 6) * 0.94, F = at(t), th = 0.0016;
+      for (const side of [1, -1]) {
+        const g = -side * (d / 2 + 0.002 + th / 4); // (along the normal: a little proud of the face: the body is its depth plus the profile's 2 mm bevel each side)
+        const mesh = k.box(w * 0.22, 0.0055, th, M.brass(), F.cf + F.nf * g - th / 2, yAt(t) + F.ny * g, -side * w * 0.27);
+        mesh.rotation.x = F.ph;
+        chk.holes.push({ t, i: i - 1, side, mesh });
+      }
+    }
     return chk;
   }
   // A drum's, for the same check: the top round up in its feed tower and (a clear drum) the rest wound round inside
@@ -603,20 +629,20 @@ const G_GunRecipes = (() => {
         for (const k0 of (o.ribs && !m.transparent ? [-0.18, 0.18] : [])) { const a = edge(k0 - 0.04), b = edge(k0 + 0.04); k.prof(a.slice(1, -1).concat(b.slice(1, -1).reverse()), w + 0.0012, M.rubber(), 0, null, 0); }
         const [bf, by] = at(1), fp = k.box(w + 0.004, 0.008, d + 0.006, m, bf - (d + 0.006) / 2, by - 0.002);
         fp.rotation.x = Math.atan2(2 * c / (1 - st), len);
-        return magCheck(k, (t) => { const [cf, , nf] = at(t); return cf - nf * d / 2; }, y, len, w, d, m.transparent, o.rnd);
+        return magCheck(k, (s) => { const u = Math.max(0, (s - st) / (1 - st)); return [o.f + c * u * u, 2 * c * u / (1 - st)]; }, y, len, w, d, m.transparent, o.rnd);
       }
       case 'straight': {
         const rk = o.rake || 0.012;
         k.prof([[o.f - d / 2, y], [o.f + d / 2, y], [o.f + d / 2 + rk, y - len], [o.f - d / 2 + rk, y - len]], w, m);
         k.box(w + 0.004, 0.008, d + 0.004, m, o.f - d / 2 + rk - 0.002, y - len - 0.002);
-        return magCheck(k, (t) => o.f - d / 2 + rk * t, y, len, w, d, m.transparent, o.rnd);
+        return magCheck(k, (s) => [o.f + rk * s, rk], y, len, w, d, m.transparent, o.rnd);
       }
       case 'pistol': { // a pistol magazine in a carbine's well adapter (the Glock-mag conversions)
         const pd = 0.032, pw = 0.022, pl = len * 0.85;
         k.box(pw + 0.012, 0.03, pd + 0.014, M.black(), o.f - pd / 2 - 0.007, y - 0.01);
         k.prof([[o.f - pd / 2, y], [o.f + pd / 2, y], [o.f + pd / 2 + 0.006, y - pl], [o.f - pd / 2 + 0.006, y - pl]], pw, m);
         k.box(pw + 0.004, 0.01, pd + 0.006, m, o.f - pd / 2 + 0.004, y - pl - 0.003);
-        return magCheck(k, (t) => o.f - pd / 2 + 0.006 * t, y, pl, pw, pd, m.transparent, o.rnd);
+        return magCheck(k, (s) => [o.f + 0.006 * s, 0.006], y, pl, pw, pd, m.transparent, o.rnd);
       }
       case 'drum': { // the round face toward the shooter, its axis along the bore
         const R = o.r || 0.075, dw = o.dw || 0.05;
@@ -1778,7 +1804,7 @@ const G_GunRecipes = (() => {
     else if (ext === 0 && !tm) k.box(0.026, 0.008, 0.032, M.black(), -0.006, -0.112);
     // (what the check shows, down its whole length along that back edge: witness holes, or a clear one's rounds)
     // (rear(t): the edge level with what's at depth t, as magCheck places it: 12 mm down, then over all but 26 mm of it)
-    magP.userData.chk = magCheck(k, (t) => mf - K * (0.012 + t * (L - 0.026)), my, L, mW, mD, !!mm.transparent, mg.rnd);
+    magP.userData.chk = magCheck(k, (s) => [mf + mD / 2 - K * L * s, -K * L], my, L, mW, mD, !!mm.transparent, mg.rnd);
     k.into(null);
     anim.mag = magP;
     k.tag('barrel');
