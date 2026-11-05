@@ -379,7 +379,7 @@ const G_Gunsmith = (() => {
   // power). zoom stays the aim-sensitivity multiplier.
   const RETICLE: Record<string, string> = { scope: 'cross', acog: 'chevron', prism: 'chevron', lpvo: 'lpvo', augscope: 'ring' };
   const scopeMag = (model: any, zoom: number) => model.px || ({ prism: 2, acog: 4, lpvo: 4, augscope: 1.5 } as Record<string, number>)[model.optic] || Math.min(8, Math.max(3, Math.round(1.6 / zoom)));
-  const FFP = new Set(['Meridian Longline 5-25× scope']); // (first focal plane: the range-finding marks are true at any power; every other scope is second focal plane, true at its top power)
+  const FFP = new Set(['Meridian Longline 5-25× scope', 'Meridian LV-6 1-6× variable']); // (first focal plane: the range-finding marks are true at any power; every other scope is second focal plane, true at its top power)
   const sightSet = (model: any, zoom: number, name?: string) => (RETICLE[model.optic] ? { zoom, scoped: true, reticle: RETICLE[model.optic], magnif: scopeMag(model, zoom), levels: model.levels || null, fp: name && FFP.has(name) ? 'ffp' : undefined } : { zoom, scoped: false });
   const REFLEX = ['reddot', 'holo', 'minidot']; // (a magnifier goes behind these)
   OPTICS.forEach(([b, n, model, zoom, price, st, tier]: any[], i) => add({ id: `op.pic.${i}`, slot: 'optic', mount: 'op:pic', brand: BR[b], name: n, price, tier, st, set: sightSet(model, zoom, n),
