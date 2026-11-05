@@ -2406,7 +2406,7 @@ const G_Me = {
     if (!vm) return;
     const u = vm.userData, a = this.adsT;
     G.R.pipLive = sg.scoped ? a : 0; // how far the scope picture is faded in (js/render.ts)
-    if (u.pip) u.pip.mag = sg.mag; // (at the power it's set to)
+    if (u.pip) { u.pip.mag = sg.mag; if (u.pip.sync) u.pip.sync(this.cur()); } // (at the power it's set to; a range-finding reticle's marks follow the round and the zero)
     const bobAmt = (1 - a * 0.85) * Math.min((this.hspeed || 0) / this.SPEED.walk, 1.5);
     let x = G.U.lerp(u.hip.x, u.ads.x, a) + Math.sin(this.bobT) * 0.012 * bobAmt;
     let y = G.U.lerp(u.hip.y, u.ads.y, a) - Math.abs(Math.cos(this.bobT)) * 0.012 * bobAmt;

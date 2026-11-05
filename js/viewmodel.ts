@@ -108,8 +108,8 @@ const G_Viewmodel = (() => {
   // axis with a field of view set by the magnification, into a texture this disk shows. The reticle is drawn
   // over it, and a dark crescent creeps in when your eye is off the scope's axis (the eyebox).
   // (dot, dotG, cdot and holo: a reflex sight's own reticle, seen through a magnifier)
-  const PIP_RETICLE: Record<string, number> = { cross: 0, chevron: 1, lpvo: 2, dot: 3, dotG: 3, dotP: 3, cdot: 4, holo: 4, ring: 5, bdc: 6 };
-  const PIP_ILLUM: Record<string, number> = { ring: 0x000000, cross: 0x000000, chevron: 0xff9a18, lpvo: 0xff2a20, dot: 0xff2a20, dotP: 0xff2a20, dotG: 0x30ff50, cdot: 0xff2a20, holo: 0xff2a20, bdc: 0xff2a20 };
+  const PIP_RETICLE: Record<string, number> = { cross: 0, chevron: 1, lpvo: 2, dot: 3, dotG: 3, dotP: 3, cdot: 4, holo: 4, ring: 5, bdc: 6, range: 7 };
+  const PIP_ILLUM: Record<string, number> = { ring: 0x000000, cross: 0x000000, chevron: 0xff9a18, lpvo: 0xff2a20, dot: 0xff2a20, dotP: 0xff2a20, dotG: 0x30ff50, cdot: 0xff2a20, holo: 0xff2a20, bdc: 0xff2a20, range: 0xff2a20 };
   // The crossbow's reticle (first focal plane: js/render.ts _renderPip says how big a mil is at this power, so it grows with
   // the picture and the marks are true at any power). In mils, on a canvas BDC_R either side of the centre:
   //   - a lit dot and, to pick it up at low power, a lit horseshoe; fine wires with heavy posts outside, a tick every mil near the middle
@@ -173,6 +173,53 @@ const G_Viewmodel = (() => {
     BDC_TEX.set(key, t);
     return t;
   }
+  // The range-finding reticle of every scope that goes above 4x (parts.ts sets d.reticle = 'range'), in mils like the BDC's:
+  //   - STADIA, left of the middle, standing on the horizontal wire (the ground line): for each of 100..500 m (numerals 1..5) a thin bar as tall as a man 1.8 m
+  //     is at that range (1800 / range mils: 18, 9, 6, 4.5, 3.6). Stand the target's feet on the wire, slide him along to the bar he fits: that is his range.
+  //     1.8 m, a full standing figure: it is the figure a suspect is, and the bar stays long enough to read at 500 m. The torso, shoulder to hip (0.5 m, 0.95-1.45 m
+  //     up), is the heavier part of each bar, for a target half behind cover (or a crouched man: his whole body is about this). A target of another size scales it.
+  //   - HOLDOVER, under the middle: a tick for each of 100..500 m, at the drop of the round that fires next (the chambered one) from this gun's bore as the zeroing
+  //     table has it turned (G.flight and G.boreTip, the sums every round is flown by), numbered 1..5. It is rebuilt when the load or the zero changes.
+  //   - FOCAL PLANE: first (ffp: the marks grow with the picture, true at any power) or second (sfp: they stay one size on the glass, true at one power only, the
+  //     scope's top: js/render.ts _renderPip puts pmil there). Mils are drawn on RANGE_R either side of the middle.
+  const RANGE_R = 44, RANGE_TEX = new Map<string, any>(), RANGES = [100, 200, 300, 400, 500];
+  function rangeHolds(def: any, w: any): { am: string; holds: (number | null)[] } {
+    const cdef = G.asCal(def, G.cartOf(w.def ? w : { def, rl: w.rl }) || G.calOf(def));
+    const am = (G.chambered(def) && w.chamber) || (w.tube && w.tube.length ? w.tube[w.tube.length - 1] : null) || w.ammo || G.ballFor(G.calOf(def));
+    if (def.cls === 'RAIL') return { am, holds: RANGES.map(() => null) }; // (a slug that flies flat: nothing to hold over)
+    const p = G.flight(cdef, am, G.boreTip({ def: cdef, clicks: w.clicks || 0 }), 500);
+    return { am, holds: RANGES.map((d) => (p[d] ? (-p[d].h / d) * 1000 : null)) };
+  }
+  function rangeTex(holds: (number | null)[]) {
+    const key = holds.map((h) => (h == null ? '-' : h.toFixed(2))).join();
+    if (RANGE_TEX.has(key)) return RANGE_TEX.get(key);
+    if (RANGE_TEX.size > 8) { const k = RANGE_TEX.keys().next().value!; RANGE_TEX.get(k).dispose(); RANGE_TEX.delete(k); }
+    const S0 = 4096, c = document.createElement('canvas');
+    c.width = c.height = S0;
+    const g = c.getContext('2d')!, line = (w: number, f: () => void) => { g.lineWidth = w; g.strokeStyle = '#000'; g.beginPath(); f(); g.stroke(); };
+    const label = (txt: string, x: number, y: number, h: number, al: CanvasTextAlign = 'left') => { g.fillStyle = '#000'; g.font = `600 ${h}px Arial, sans-serif`; g.textAlign = al; g.textBaseline = 'middle'; g.fillText(txt, x, y); };
+    g.translate(S0 / 2, S0 / 2); g.scale(S0 / (2 * RANGE_R), S0 / (2 * RANGE_R)); g.lineCap = 'butt';
+    const TH = 1.8, W = 0.07;
+    // the stadia: 1.8 m men, 100 m nearest the middle; the torso (0.95-1.45 m up) is bold with a cross-tick at each end
+    RANGES.forEach((d, i) => {
+      const x = -3.2 - i * 3.2, top = -1800 / d, hip = -950 / d, sh = -1450 / d;
+      line(W, () => { g.moveTo(x, 0); g.lineTo(x, top); g.moveTo(x - 0.5, top); g.lineTo(x + 0.5, top); }); // (the man's height, a cap at his head)
+      line(W * 3, () => { g.moveTo(x, hip); g.lineTo(x, sh); }); // (his torso)
+      line(W, () => { g.moveTo(x, hip); g.lineTo(x + 0.4, hip); g.moveTo(x, sh); g.lineTo(x + 0.4, sh); });
+      label(String(i + 1), x, TH * 0.95, TH, 'center');
+    });
+    // the holdover marks, down the vertical wire: a tick for each hundred metres and its number; the wire's mil ticks, finer, between
+    line(W * 0.7, () => { for (let m = 1; m <= 30; m++) { const h = m % 5 ? 0.3 : 0.55; g.moveTo(-h, m); g.lineTo(h, m); } });
+    holds.forEach((y, i) => {
+      if (y == null) return;
+      line(W * 1.5, () => { g.moveTo(-1.1, y); g.lineTo(1.1, y); });
+      label(String(i + 1), 1.5, y, TH);
+    });
+    const t = new T.CanvasTexture(c);
+    t.generateMipmaps = true; t.minFilter = T.LinearMipmapLinearFilter; t.anisotropy = 8;
+    RANGE_TEX.set(key, t);
+    return t;
+  }
   const PIP_VS = 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
   const PIP_FS = G.R.TONE + `
     uniform sampler2D map; uniform float live; uniform vec2 eye; uniform int ret; uniform vec3 illum;
@@ -197,9 +244,11 @@ const G_Viewmodel = (() => {
         glow = max(ink(abs(r - 0.42), 0.012), ink(r, 0.03));
       } else if (ret == 5) { // the AUG's: a black ring, the target in it (its size: a man at 300 m)
         black = ink(abs(r - 0.13), 0.012);
-      } else if (ret == 6) { // drawn in mils, looked up in mils: it grows with the picture
-        vec2 uv = 0.5 + p / pmil / (2.0 * ${BDC_R.toFixed(1)});
-        if (uv.x > 0.0 && uv.y > 0.0 && uv.x < 1.0 && uv.y < 1.0) { vec4 t = texture2D(rmap, uv); black = t.a * (1.0 - t.r); glow = t.a * mix(0.3, 1.0, t.r); } // (red: lit; the rest etched, and faintly lit, to be read in the dark)
+      } else if (ret >= 6) { // drawn in mils, looked up in mils: it grows with the picture (a second focal plane: pmil is held at its true power)
+        float rr = ret == 7 ? ${RANGE_R.toFixed(1)} : ${BDC_R.toFixed(1)};
+        if (ret == 7) { black = max(ink(abs(p.y), 0.0035), ink(abs(p.x), 0.0035)); glow = ink(r, 0.012); } // (fine wires across the lens, a lit dot)
+        vec2 uv = 0.5 + p / pmil / (2.0 * rr);
+        if (uv.x > 0.0 && uv.y > 0.0 && uv.x < 1.0 && uv.y < 1.0) { vec4 t = texture2D(rmap, uv); black = max(black, t.a * (1.0 - t.r)); glow = max(glow, t.a * mix(ret == 7 ? 0.14 : 0.3, 1.0, t.r)); } // (red: lit; the rest etched, and faintly lit, to be read in the dark)
       } else { // illuminated circle-dot with a gapped crosshair
         glow = max(ink(abs(r - 0.2), 0.006), ink(r, 0.018));
         float tw = abs(p.x) > 0.55 ? 0.022 : 0.0035, th = abs(p.y) > 0.55 ? 0.022 : 0.0035;
@@ -214,14 +263,22 @@ const G_Viewmodel = (() => {
   function pipLens(g: THREE.Object3D, o: VmPip, def: any) {
     const reticle = def.reticle || 'cross';
     const mat = new T.ShaderMaterial({
-      uniforms: { map: { value: G.R.pipTexture() }, live: { value: 0 }, eye: { value: new T.Vector2() }, ret: { value: PIP_RETICLE[reticle] || 0 }, illum: { value: new T.Color(PIP_ILLUM[reticle] || 0) }, rmap: { value: reticle === 'bdc' ? bdcTex(def) : null }, pmil: { value: 1 } },
+      uniforms: { map: { value: G.R.pipTexture() }, live: { value: 0 }, eye: { value: new T.Vector2() }, ret: { value: PIP_RETICLE[reticle] || 0 }, illum: { value: new T.Color(PIP_ILLUM[reticle] || 0) }, rmap: { value: reticle === 'bdc' ? bdcTex(def) : reticle === 'range' ? rangeTex(rangeHolds(def, { def, clicks: 0, ammo: G.ballFor(G.calOf(def)) }).holds) : null }, pmil: { value: 1 } },
       vertexShader: PIP_VS, fragmentShader: PIP_FS, extensions: { derivatives: true }, toneMapped: false, // (it rolls off the picture itself: bpTone)
     });
     const disk = new T.Mesh(new T.CircleGeometry(o.r, 48), mat);
     const parent = typeof o.parent === 'string' ? g.getObjectByName(o.parent) : o.parent;
     if (parent) { disk.position.copy(Array.isArray(o.pos) ? new T.Vector3(o.pos[0], o.pos[1], o.pos[2]) : o.pos!); parent.add(disk); } // (a magnifier's lens swings with it)
     else { disk.position.set(0, o.y, -o.f); g.add(disk); }
-    return { disk, r: o.r, mat, mag: def.magnif || 4 };
+    let sig = '';
+    // the range-finding reticle's holdover marks follow the weapon in the hands: called each frame with it; they are rebuilt when its round or its zero changes
+    const sync = (w: any) => {
+      if (reticle !== 'range' || !w) return;
+      const k = `${(G.chambered(w.def) && w.chamber) || (w.tube && w.tube[w.tube.length - 1]) || w.ammo}|${w.clicks || 0}`;
+      if (k === sig) return;
+      sig = k; mat.uniforms.rmap.value = rangeTex(rangeHolds(def, w).holds);
+    };
+    return { disk, r: o.r, mat, mag: def.magnif || 4, fp: def.fp as string | undefined, fpMag: (def.fpMag || def.magnif || 4) as number, sync };
   }
 
 

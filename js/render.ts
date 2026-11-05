@@ -853,7 +853,7 @@ const G_R = {
     sc.fov = THREE.MathUtils.radToDeg(2 * Math.atan(pip.r / d)) / pip.mag;
     sc.far = cam.far; // (as far as you can see without it)
     sc.updateProjectionMatrix();
-    pip.mat.uniforms.pmil.value = 0.001 / Math.tan(THREE.MathUtils.degToRad(sc.fov) / 2); // (a mil's share of the lens's radius, at this power)
+    pip.mat.uniforms.pmil.value = (0.001 / Math.tan(THREE.MathUtils.degToRad(sc.fov) / 2)) * (pip.fp === 'sfp' ? pip.fpMag / pip.mag : 1); // (a mil's share of the lens's radius, at this power; a second focal plane's marks are true at one power only, and a mil is that much wider at any other)
     const eye = pip.disk.worldToLocal(cam.position.clone());
     pip.mat.uniforms.eye.value.set((eye.x / pip.r) * 0.8, (eye.y / pip.r) * 0.8);
     const r = this.renderer;

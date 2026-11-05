@@ -22,6 +22,13 @@ const G_ZeroUI = (() => {
   const cm = (h: number) => `${h > 0 ? '+' : ''}${(h * 100).toFixed(Math.abs(h) < 1 ? 1 : 0)}`;
   const mil = (c: number) => `${c > 0 ? '+' : c < 0 ? '−' : ''}${Math.abs(c / 10).toFixed(1)} mil`;
 
+  // a scope above 4x draws its range marks from the zero and the load (js/viewmodel.ts rangeTex)
+  function scopeNote(w: GWeapon, viewed: string) {
+    const d = w.def as Record<string, any>;
+    if (d.reticle !== 'range') return '';
+    const nm = (a: string) => (G.AMMO as Record<string, any>)[a].name, next = (G.chambered(d) && w.chamber) || (w.tube && w.tube.length ? w.tube[w.tube.length - 1] : null) || w.ammo || viewed;
+    return `<div class="zr-note zr-scope">Scope marks: this scope's holdover marks (1-5, for 100-500 m) are worked out from the zero set here and the round that fires next, <b>${nm(next)}</b>${next === viewed ? '' : `. You are looking at ${nm(viewed)}: load it to get its marks`}. Change the elevation or the load and they follow. Its brackets (1.8 m man, 100-500 m) are true ${d.fp === 'ffp' ? 'at any power' : `at ${d.fpMag}×`}.</div>`;
+  }
   function html() {
     const Me = G.Me, w = weapon();
     if (!w) return '<div class="gs-empty">No weapon to zero.</div>';
@@ -46,6 +53,7 @@ const G_ZeroUI = (() => {
         ${clicks ? '<button class="tab" data-zc="reset">Reset</button>' : ''}</div></div>
       <div class="zr-note">${def.name}: the sights ${clicks ? `${mil(clicks)} from the standard zero (${std} m with ${(G.AMMO as Record<string, any>)[ball!].name})` : `at the standard zero, ${std} m with ${(G.AMMO as Record<string, any>)[ball!].name}`}. ${(G.AMMO as Record<string, any>)[am].name} leaves at <b>${Math.round(p[0].v)} m/s</b>;
         it crosses the line of sight at ${xs.length ? xs.map((x) => `<b>${Math.round(x)} m</b>`).join(' and ') : 'no point'}, peaks <b>${cm(peak.h)} cm</b> at ${peak.d} m${spent != null ? `, spent at <b>${spent} m</b>` : ''}.</div>
+      ${scopeNote(w, am)}
       <div class="zr-graph"><canvas id="zrCanvas"></canvas></div>
       <table class="zr-table"><tr><th>Range</th><th>Path</th><th>Hold</th><th>Speed</th><th>Time</th></tr>${rows}</table>
       <div class="zr-hint">Each click is 0.1 mil: a centimetre at 100 m, 5 at 500 (+ raises where it strikes). Path: where the round is against the line of sight (+ above). Hold: how far over (+) or under to aim.</div>

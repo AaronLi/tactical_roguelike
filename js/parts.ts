@@ -21,7 +21,7 @@ type SlotKind = 'receiver' | 'slide' | 'barrel' | 'limbs' | 'muzzle' | 'handguar
 type SlotName = SlotKind | 'buttstock' | 'riserdot' | 'tacL' | `${SlotKind | 'buttstock' | 'riserdot' | 'tacL'}${number}`;
 /** What a part sets outright (absolutes, where its st are deltas). */
 interface PartSet {
-  cap?: number; zoom?: number; scoped?: boolean; reticle?: string; magnif?: any; levels?: number[] | null; barrelIn?: number; barrelAdd?: number; device?: string; sup?: boolean; can?: string;
+  cap?: number; zoom?: number; scoped?: boolean; reticle?: string; magnif?: any; levels?: number[] | null; fp?: string; barrelIn?: number; barrelAdd?: number; device?: string; sup?: boolean; can?: string;
   ported?: boolean; shell?: number; reload?: number; magnifier?: number; full?: boolean; perLoad?: number; laser?: string; light?: number;
 }
 /** What a part changes in the model spec (a patch: a nested spec only has the keys it changes). */
@@ -379,10 +379,11 @@ const G_Gunsmith = (() => {
   // power). zoom stays the aim-sensitivity multiplier.
   const RETICLE: Record<string, string> = { scope: 'cross', acog: 'chevron', prism: 'chevron', lpvo: 'lpvo', augscope: 'ring' };
   const scopeMag = (model: any, zoom: number) => model.px || ({ prism: 2, acog: 4, lpvo: 4, augscope: 1.5 } as Record<string, number>)[model.optic] || Math.min(8, Math.max(3, Math.round(1.6 / zoom)));
-  const sightSet = (model: any, zoom: number) => (RETICLE[model.optic] ? { zoom, scoped: true, reticle: RETICLE[model.optic], magnif: scopeMag(model, zoom), levels: model.levels || null } : { zoom, scoped: false });
+  const FFP = new Set(['Meridian Longline 5-25× scope']); // (first focal plane: the range-finding marks are true at any power; every other scope is second focal plane, true at its top power)
+  const sightSet = (model: any, zoom: number, name?: string) => (RETICLE[model.optic] ? { zoom, scoped: true, reticle: RETICLE[model.optic], magnif: scopeMag(model, zoom), levels: model.levels || null, fp: name && FFP.has(name) ? 'ffp' : undefined } : { zoom, scoped: false });
   const REFLEX = ['reddot', 'holo', 'minidot']; // (a magnifier goes behind these)
-  OPTICS.forEach(([b, n, model, zoom, price, st, tier]: any[], i) => add({ id: `op.pic.${i}`, slot: 'optic', mount: 'op:pic', brand: BR[b], name: n, price, tier, st, set: sightSet(model, zoom),
-    desc: model.levels ? `${model.levels[0]}–${model.levels[model.levels.length - 1]}× variable: scroll while aiming to change power` : RETICLE[model.optic] ? `${scopeMag(model, zoom)}× magnified` : REFLEX.includes(model.optic) ? 'Unmagnified. Takes a magnifier behind it.' : 'Unmagnified',
+  OPTICS.forEach(([b, n, model, zoom, price, st, tier]: any[], i) => add({ id: `op.pic.${i}`, slot: 'optic', mount: 'op:pic', brand: BR[b], name: n, price, tier, st, set: sightSet(model, zoom, n),
+    desc: model.levels ? `${model.levels[0]}–${model.levels[model.levels.length - 1]}× variable: scroll while aiming to change power` + (RETICLE[model.optic] && Math.max(...model.levels) > 4 ? `. Range-finding reticle: brackets for a 1.8 m man at 100-500 m and holdover marks 1-5 from your zero and load (${FFP.has(n) ? 'first focal plane: true at any power' : `second focal plane: true at ${Math.max(...model.levels)}×`}).` : '') : RETICLE[model.optic] ? `${scopeMag(model, zoom)}× magnified` : REFLEX.includes(model.optic) ? 'Unmagnified. Takes a magnifier behind it.' : 'Unmagnified',
     model, provides: REFLEX.includes(model.optic) ? { magnifier: 'magn' } : null }));
   [['bright', 'Brightline tritium night sights', { optic: 'night' }, 0.8, 160, { hip: -4 }], ['strix', 'Strix Kite pistol red dot', { optic: 'minidot' }, 0.78, 420, { acc: -10, ergo: -2 }], ['halcyon', 'Halcyon Ember pistol dot', { optic: 'minidot' }, 0.76, 520, { acc: -13, ergo: -3 }, 2],
     ['osprey', 'Osprey Mite green pistol dot', { optic: 'minidot', ret: 'dotG' }, 0.77, 380, { acc: -10, ergo: -1 }],
@@ -1026,13 +1027,13 @@ const G_Gunsmith = (() => {
     // a stock on a slot a handgun's given one by (sl.brace: a chassis's, an SMG stock mount's): what bracing it on your
     // shoulder does, on top of the stock's own figures (they're for a stock on an SMG, against another stock)
     for (const sl of slotsOf(id, build)) { const sp = sl.brace && PARTS[build[sl.slot]]; if (sp && sp.stype !== 'folded' && !isAdapter(sp)) for (const [k, v] of Object.entries(sl.brace!)) s[k] += v; }
-    let perLoad = 1, levels = null, magnifier = 0, light = 0, laser = null, laserHip = 0, laserHipSum = 0, cap = base.mag, zoom = base.zoom, barrelIn = gs.barrel, device = gs.muzzleDevice || 'none', can = gs.suppressor || null, sup = false, hasMuzzleSlot = false, shell = base.shell, reload = base.reload, fullSt = null, scoped = base.zoom <= 0.5, reticle = 'cross', magnif = scoped ? scopeMag({}, base.zoom) : 1;
+    let ffp = false, perLoad = 1, levels = null, magnifier = 0, light = 0, laser = null, laserHip = 0, laserHipSum = 0, cap = base.mag, zoom = base.zoom, barrelIn = gs.barrel, device = gs.muzzleDevice || 'none', can = gs.suppressor || null, sup = false, hasMuzzleSlot = false, shell = base.shell, reload = base.reload, fullSt = null, scoped = base.zoom <= 0.5, reticle = 'cross', magnif = scoped ? scopeMag({}, base.zoom) : 1;
     const parts = Object.values(build).map((p) => PARTS[p]).filter(Boolean);
     for (const p of parts) {
       for (const [k, v] of Object.entries(partSt(p, id))) s[k] += v || 0; // (a shared barrel's: from its length against this gun's)
       if (p.set.cap != null) cap = p.set.cap;
       if (p.set.zoom != null) zoom = p.set.zoom;
-      if (p.set.scoped != null) { scoped = p.set.scoped; reticle = p.set.reticle || 'cross'; magnif = p.set.magnif || 1; }
+      if (p.set.scoped != null) { scoped = p.set.scoped; reticle = p.set.reticle || 'cross'; magnif = p.set.magnif || 1; ffp = p.set.fp === 'ffp'; }
       if (p.set.barrelIn != null) barrelIn = p.set.barrelIn;
       if (p.set.barrelAdd != null && gs.barrel) barrelIn = gs.barrel + p.set.barrelAdd; // (a pistol's: its own length and a little more)
       if (p.set.shell != null) shell = p.set.shell;
@@ -1084,6 +1085,9 @@ const G_Gunsmith = (() => {
     d.speed = base.speed * clamp(1 - s.weight * 0.02, 0.75, 1.1);
     d.zoom = zoom;
     d.scoped = scoped; d.reticle = reticle; d.magnif = magnif;
+    // a scope that goes above 4x gets the range-finding reticle (js/viewmodel.ts rangeTex): stadia brackets for a standing man at 100-500 m and holdover marks worked out from this
+    // gun's own ballistics. (The crossbow's own 'bdc' keeps its bolt-drop rungs.) Its focal plane: first (true at every power) or second (true at the top power only, d.fpMag)
+    if (scoped && (reticle === 'cross' || reticle === 'lpvo') && Math.max(magnif, ...(levels || [0])) > 4) { d.reticle = 'range'; d.fp = ffp ? 'ffp' : 'sfp'; d.fpMag = Math.max(magnif, ...(levels || [0])); }
     // powers you can step through while aiming (scroll): a variable scope's, or 1× and a magnifier's behind a dot
     d.magnifier = !!magnifier && !scoped;
     if (d.magnifier) { const om = (build.optic && PARTS[build.optic] && PARTS[build.optic].model) || {}; levels = [1, magnifier]; d.reticle = om.ret || (om.optic === 'holo' ? 'holo' : 'dot'); }
