@@ -1,44 +1,46 @@
 // The baked models, bundled (docs/models.md "Bundles"). The baker (tools/bundle_models.mjs, the last step of `npm run bake:models`) packs the
-// ~2,500 small files of assets/models into a few container files in assets/models/bundles/; the game fetches a WHOLE bundle once, keeps it in
-// memory and slices the files out of it, so a level or the gunsmith is a handful of requests instead of hundreds. There is no fallback to the
-// loose files: a path that belongs to a bundle comes from it or fails.
+// ~2,500 small files of assets/models into ONE container file, assets/models/bundles/models.rtb (~3.3 MB gzipped); the game fetches it once at boot
+// (the very first thing the page does: this is the first script in index.html), keeps it in memory and slices the files out of it, so there are no
+// model requests after that and nothing waits on a fetch later. Nothing is parsed at boot: a glTF is parsed when a model is first shown (js/glb.ts).
+// There is no fallback to the loose files: a path that belongs to the bundle comes from it or fails.
 //
-//   G.Bundles.bundleOf(path)        which bundle holds a path (null: not bundled, e.g. guns/*.glb): '_boot' | '_shared' | '<platform id>'
-//   G.Bundles.getFile(path)         Promise<ArrayBuffer>: the file's bytes (fetches and caches the bundle first)
-//   G.Bundles.getJson(path)         Promise<any | null>: the file parsed (null if its bundle or the file is missing)
-//   G.Bundles.prefetchBundle(name)  Promise<boolean>: start/await fetching a bundle (a scheduler's unit of work)
-//   G.Bundles.platformBundle(id)    the bundle with a platform's packs (its index is in '_boot'); sharedBundle / bootBundle
-//   G.Bundles.loaded(name)          is it in memory;  G.Bundles.stats() what was fetched
+//   G.Bundles.start()               Promise<boolean>: begin (or retry) the download; true once the bundle is in memory (it retries by itself first, then gives false)
+//   G.Bundles.state()               { phase: 'idle'|'loading'|'ready'|'failed', loaded, total, from: 'store'|'net'|null }   (bytes, for a progress line)
+//   G.Bundles.onChange(fn)          fn(state) on every progress step and phase change
+//   G.Bundles.getFile(path)         Promise<ArrayBuffer>: the file's bytes (waits for the bundle; starts it if nothing has)
+//   G.Bundles.getJson(path)         Promise<any | null>: the file parsed (null if the bundle or the file is missing)
+//   G.Bundles.bundleOf(path)        'models' if the path is in the bundle, null if not (guns/*.glb, the bake reports)
 //
-// Returning visitors: bundles/manifest.json ({ v, bundles: { name: content hash } }, fetched with no-cache at boot) says which bundles changed; the others come
-// from a local store (IndexedDB) with no request, the changed ones are fetched as `<name>.rtb?h=<hash>` and replace the stored copy.
+// Returning visitors: bundles/manifest.json ({ v: 2, hash, size }, fetched with no-cache at boot, ~100 bytes) says which bundle is current; the one hash is
+// compared with the stored copy (IndexedDB), which is used with no request if it matches; otherwise models.rtb?h=<hash> is fetched and replaces it.
 //
 // The container ("RTB1"): the bytes `RTB1`, u32le tocLength, the table of contents as UTF-8 JSON `{ "files": [[path, offset, length], ...] }`, zero padding to a
 // multiple of 4, then the files back to back (offsets count from the start of that data, paths are relative to assets/models/, sorted). The file on disk is that
-// container gzipped (the web server cannot be trusted to compress an unknown type): the reader recognises gzip by its magic bytes and also takes it raw.
+// container gzipped (the web server cannot be trusted to compress an unknown type): it is unpacked with DecompressionStream (off the main thread); a raw one is read as it is.
+
+(globalThis as any).G = (globalThis as any).G || {}; // (the page, the export worker, the tools: on the page this file runs before util.js)
 
 const G_Bundles = (() => {
-  const DIR = 'assets/models/bundles/', ROOT = 'assets/models/', EXT = '.rtb', MAGIC = 'RTB1';
-  const BOOT = '_boot', SHARED = '_shared';
+  const DIR = 'assets/models/bundles/', ROOT = 'assets/models/', EXT = '.rtb', MAGIC = 'RTB1', NAME = 'models';
   const R = { base: '' }; // (where the page's folder is from here: '' on the page, '../../' in the export worker: G.Models.setRoot)
 
-  interface Bundle { name: string; bytes: number; wire: number; files: Map<string, [number, number]>; buf: ArrayBuffer; from: 'net' | 'store' }
-  const done = new Map<string, Bundle>(), pending = new Map<string, Promise<Bundle>>();
+  interface Bundle { bytes: number; wire: number; files: Map<string, [number, number]>; buf: ArrayBuffer; from: 'net' | 'store' }
+  interface State { phase: 'idle' | 'loading' | 'ready' | 'failed'; loaded: number; total: number; from: 'net' | 'store' | null; error?: string }
+  const st: State = { phase: 'idle', loaded: 0, total: 0, from: null };
+  const listeners: ((s: State) => void)[] = [];
+  const emit = () => { for (const f of listeners) try { f({ ...st }); } catch { /* */ } };
+  let done: Bundle | null = null, running: Promise<boolean> | null = null;
 
-  /** `assets/models/parts/m4/index.json` or `parts/m4/index.json` -> the path inside the bundles (relative to assets/models/). */
+  /** `assets/models/parts/m4/index.json` or `parts/m4/index.json` -> the path inside the bundle (relative to assets/models/). */
   const rel = (path: string) => (path.startsWith(ROOT) ? path.slice(ROOT.length) : path);
-  /** The bundle that holds a path: every platform's index and the props in `_boot`, the shared packs in `_shared`, a platform's own packs in its own bundle; null for what is not bundled. */
+  /** 'models' if the path is in the bundle (props/**, parts/<id>/**), null for what is not bundled: whole-gun files and the bake's reports (parts/index.json, coverage.json...). */
   function bundleOf(path: string): string | null {
     const p = rel(path);
-    if (p.startsWith('props/')) return BOOT;
+    if (p.startsWith('props/')) return NAME;
     if (!p.startsWith('parts/')) return null;
-    const rest = p.slice(6), i = rest.indexOf('/');
-    if (i <= 0) return null; // (parts/index.json, coverage.json...: bake reports, not bundled)
-    const dir = rest.slice(0, i), file = rest.slice(i + 1);
-    if (dir === SHARED) return SHARED;
-    return file === 'index.json' ? BOOT : dir;
+    return p.indexOf('/', 6) > 6 ? NAME : null;
   }
-  const fileOf = (name: string) => R.base + DIR + name + EXT;
+  const fileOf = () => R.base + DIR + NAME + EXT;
 
   /** Container bytes (already gunzipped) -> its table of contents. Throws on a malformed one. */
   function parse(buf: ArrayBuffer): { files: Map<string, [number, number]> } {
@@ -59,11 +61,11 @@ const G_Bundles = (() => {
     return new (globalThis as any).Response(new (globalThis as any).Blob([buf]).stream().pipeThrough(ds)).arrayBuffer();
   }
 
-  // The local store (docs/models.md "Bundles"): bundles are kept in IndexedDB as downloaded (gzipped), keyed by name with the content hash from
-  // bundles/manifest.json, so a returning visitor fetches only the bundles whose hash changed. Every failure (no IndexedDB, private mode, quota,
-  // eviction, a corrupt record) falls back to the network without a word; a bundle that fails to parse is dropped and fetched again.
+  // The local store (docs/models.md "Bundles"): the bundle is kept in IndexedDB as downloaded (gzipped) with the content hash from bundles/manifest.json,
+  // so a returning visitor fetches nothing while it is current. Every failure (no IndexedDB, private mode, quota, eviction, a corrupt record) falls back to
+  // the network without a word; a stored copy that fails to parse is dropped and fetched again.
   interface Rec { hash: string; buf: ArrayBuffer }
-  const DB = 'rt-model-bundles', TABLE = 'bundles', checking = typeof location !== 'undefined' && /[?&]checkModels/.test(location.search || '');
+  const DB = 'rt-model-bundles', TABLE = 'bundles', checking = typeof location !== 'undefined' && /[?&]checkModels/.test(location.search || '');
   const log = (...a: any[]) => { if (checking) console.log('[bundles]', ...a); };
   let dbp: Promise<any | null> | null = null;
   const openDb = (): Promise<any | null> => dbp || (dbp = new Promise((res) => {
@@ -76,7 +78,7 @@ const G_Bundles = (() => {
     } catch { res(null); }
   }));
   /** One request on the store; resolves undefined on ANY failure. */
-  function idbDo<T>(mode: 'readonly' | 'readwrite', fn: (st: any) => any): Promise<T | undefined> {
+  function idbDo<T>(mode: 'readonly' | 'readwrite', fn: (s: any) => any): Promise<T | undefined> {
     return openDb().then((d) => new Promise<T | undefined>((res) => {
       if (!d) return res(undefined);
       try {
@@ -85,22 +87,11 @@ const G_Bundles = (() => {
       } catch { res(undefined); }
     }));
   }
-  const storeGet = (name: string) => idbDo<Rec>('readonly', (st) => st.get(name));
-  const storePut = (name: string, rec: Rec) => idbDo<any>('readwrite', (st) => st.put(rec, name));
-  const storeDrop = (name: string) => idbDo<any>('readwrite', (st) => st.delete(name));
-
-  /** bundles/manifest.json { v, bundles: { name: hash } }, fetched once per page with no-cache (one tiny request); null if it cannot be had (the bundles are then fetched from the network, revalidated). */
-  let manifest: Promise<Record<string, string> | null> | null = null;
-  function getManifest(): Promise<Record<string, string> | null> {
-    return manifest || (manifest = fetch(R.base + DIR + 'manifest.json', { cache: 'no-cache' })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((m) => (m && m.v === 1 && m.bundles && typeof m.bundles === 'object' ? (m.bundles as Record<string, string>) : null), () => null)
-      .then((m) => { if (m) { sweep(m); persist(); } else log('no manifest: fetching bundles from the network'); return m; }));
-  }
-  /** Once the manifest is known: drop stored bundles the manifest no longer lists. */
-  function sweep(m: Record<string, string>) {
-    idbDo<string[]>('readonly', (st) => st.getAllKeys()).then((keys) => { for (const k of keys || []) if (!(k in m)) { log('drop stale', k); storeDrop(k); } });
-  }
+  const storeGet = () => idbDo<Rec>('readonly', (s) => s.get(NAME));
+  const storePut = (rec: Rec) => idbDo<any>('readwrite', (s) => s.put(rec, NAME));
+  const storeDrop = () => idbDo<any>('readwrite', (s) => s.delete(NAME));
+  /** Records of the old per-platform bundles (anything that is not the one bundle) are dropped. */
+  function sweep() { idbDo<string[]>('readonly', (s) => s.getAllKeys()).then((keys) => { for (const k of keys || []) if (k !== NAME) { log('drop stale', k); idbDo<any>('readwrite', (s) => s.delete(k)); } }); }
   /** Ask the browser not to evict the store (no prompt in the browsers that have it; ignored where it does not exist), and under ?checkModels log the quota. */
   function persist() {
     try {
@@ -110,45 +101,114 @@ const G_Bundles = (() => {
     } catch { /* */ }
   }
 
-  /** Fetch (or take from the local store) a bundle once, cached for the life of the page; a failure is not cached. */
-  async function load(name: string): Promise<Bundle> {
-    const m = await getManifest(), hash = m ? m[name] : undefined;
-    if (hash) {
-      const rec = await storeGet(name);
-      if (rec && rec.hash === hash && rec.buf instanceof ArrayBuffer) {
-        try { const buf = await gunzip(rec.buf); log(name, 'from the local store'); return { name, bytes: buf.byteLength, wire: 0, files: parse(buf).files, buf, from: 'store' }; }
-        catch (e) { log(name, 'stored copy is corrupt, dropping it', e); storeDrop(name); }
-      } else if (rec) log(name, 'stored copy is for another hash');
-    }
-    // the hash in the URL: a new hash is a new URL, so no stale browser or CDN copy can answer for it; ordinary caching is fine
-    const r = await fetch(fileOf(name) + (hash ? '?h=' + hash : ''), hash ? undefined : { cache: 'no-cache' });
+  /** bundles/manifest.json { v: 2, hash, size }, fetched with no-cache (a ~100 byte request); null if it cannot be had (the bundle is then fetched from the network, revalidated). */
+  async function getManifest(): Promise<{ hash: string; size: number } | null> {
+    try {
+      const r = await fetch(R.base + DIR + 'manifest.json', { cache: 'no-cache' }); if (!r.ok) return null;
+      const m = await r.json();
+      return m && m.v === 2 && typeof m.hash === 'string' && m.hash ? { hash: m.hash, size: +m.size || 0 } : null;
+    } catch { return null; }
+  }
+  /** The bundle's bytes with progress (streamed when the browser can, in one piece when it cannot). */
+  async function download(res: Response | Promise<Response>, size: number): Promise<ArrayBuffer> {
+    const r = await res;
     if (!r.ok) throw new Error('HTTP ' + (r as any).status);
-    const raw = await r.arrayBuffer(), buf = await gunzip(raw), b: Bundle = { name, bytes: buf.byteLength, wire: raw.byteLength, files: parse(buf).files, buf, from: 'net' };
-    if (hash) storePut(name, { hash, buf: raw }); // (as downloaded; replaces the old hash; failures are silent)
-    log(name, 'fetched', raw.byteLength, 'B');
+    const len = +(r.headers && r.headers.get && r.headers.get('content-length') || 0) || size;
+    if (len) st.total = len;
+    const body = (r as any).body;
+    if (!body || !body.getReader) { const b = await r.arrayBuffer(); st.loaded = b.byteLength; emit(); return b; }
+    const rd = body.getReader(), parts: Uint8Array[] = []; let n = 0, lastEmit = 0;
+    for (;;) {
+      const { done: end, value } = await rd.read(); if (end) break;
+      parts.push(value); n += value.length; st.loaded = n;
+      const now = Date.now(); if (now - lastEmit > 100) { lastEmit = now; emit(); }
+    }
+    const out = new Uint8Array(n); let o = 0; for (const p of parts) { out.set(p, o); o += p.length; }
+    st.total = n; st.loaded = n; emit();
+    return out.buffer;
+  }
+  /** The content hash tools/model_bundles.mjs names a bundle by: the first 16 hex digits of the sha256 of the (gzipped) file's bytes. */
+  async function hashOf(buf: ArrayBuffer): Promise<string> {
+    const d = new Uint8Array(await (globalThis as any).crypto.subtle.digest('SHA-256', buf)); let s = '';
+    for (let i = 0; i < 8; i++) s += (d[i] < 16 ? '0' : '') + d[i].toString(16);
+    return s;
+  }
+  // localStorage remembers which hash the store holds (it can be read synchronously, IndexedDB cannot): no memory of one means a first visit, and its download is started
+  // at once (below), without waiting for the manifest or for the main thread to be free.
+  const FLAG = 'rt-models-stored';
+  const flagGet = (): string | null => { try { return localStorage.getItem(FLAG); } catch { return null; } };
+  const flagSet = (h: string | null) => { try { if (h) localStorage.setItem(FLAG, h); else localStorage.removeItem(FLAG); } catch { /* */ } };
+  let early: Promise<Response> | null = null;
+  async function loadOnce(): Promise<Bundle> {
+    const m = await getManifest(), hash = m ? m.hash : '';
+    if (m) st.total = m.size;
+    if (hash) {
+      const rec = await storeGet();
+      if (rec && rec.hash === hash && rec.buf instanceof ArrayBuffer) {
+        try { const buf = await gunzip(rec.buf); log('from the local store'); st.loaded = st.total = rec.buf.byteLength; st.from = 'store'; return { bytes: buf.byteLength, wire: 0, files: parse(buf).files, buf, from: 'store' }; }
+        catch (e) { log('stored copy is corrupt, dropping it', e); storeDrop(); flagSet(null); }
+      } else if (rec) log('stored copy is for another hash');
+    }
+    // A first visit (nothing stored, as far as localStorage knows) started this fetch when the script ran, before the main thread got busy with the rest of the
+    // page: take it if the manifest agrees with what came (the sha256 of the bytes), else fetch by hash. The hash in the URL means a new hash is a new URL, so no
+    // stale browser or CDN copy can answer for it; ordinary caching is fine.
+    let raw: ArrayBuffer | null = null;
+    if (early) {
+      const e = early; early = null;
+      try { const b = await download(e, m ? m.size : 0); if (!hash || await hashOf(b) === hash) raw = b; else log('the early fetch is not the current bundle'); } catch (err) { log('early fetch failed', err); }
+    }
+    if (!raw) { st.loaded = 0; raw = await download(fetch(fileOf() + (hash ? '?h=' + hash : ''), hash ? undefined : { cache: 'no-cache' }), m ? m.size : 0); }
+    const buf = await gunzip(raw);
+    const b: Bundle = { bytes: buf.byteLength, wire: raw.byteLength, files: parse(buf).files, buf, from: 'net' };
+    if (hash) storePut({ hash, buf: raw }).then((k) => flagSet(k ? hash : null)); // (as downloaded; replaces the old hash; failures are silent)
+    st.from = 'net'; log('fetched', raw.byteLength, 'B');
     return b;
   }
-  function prefetch(name: string): Promise<Bundle> {
-    const hit = done.get(name); if (hit) return Promise.resolve(hit);
-    let p = pending.get(name);
-    if (!p) pending.set(name, (p = load(name).then((b) => { done.set(name, b); return b; }).catch((e) => { pending.delete(name); throw e; })));
-    return p;
+  const RETRIES = 3, wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  /** Begin the download (or join the one running). A failed attempt is tried again (3 in all, 0.5 s and 1.5 s apart); a start() after a final failure begins afresh. */
+  function start(): Promise<boolean> {
+    if (done) return Promise.resolve(true);
+    if (running) return running;
+    st.phase = 'loading'; st.loaded = 0; st.error = undefined; emit();
+    return (running = (async () => {
+      let err: any = null;
+      for (let i = 0; i < RETRIES; i++) {
+        try {
+          if (i) { st.loaded = 0; emit(); await wait(i === 1 ? 500 : 1500); }
+          done = await loadOnce(); st.phase = 'ready'; emit(); persist(); sweep();
+          return true;
+        } catch (e) { err = e; console.warn('[bundles] attempt ' + (i + 1) + ': ' + (e && (e as any).message || e)); }
+      }
+      st.phase = 'failed'; st.error = String(err && err.message || err); emit();
+      return false;
+    })().finally(() => { running = null; }));
   }
   function getFile(path: string): Promise<ArrayBuffer> {
-    const name = bundleOf(path); if (!name) return Promise.reject(new Error('not in a bundle: ' + path));
+    if (!bundleOf(path)) return Promise.reject(new Error('not in a bundle: ' + path));
     const p = rel(path);
-    return prefetch(name).then((b) => { const e = b.files.get(p); if (!e) throw new Error(`${p} is not in bundle ${name}`); return b.buf.slice(e[0], e[1]); });
+    if (st.phase === 'failed' && !running) return Promise.reject(new Error('the model bundle did not load')); // (not retried per file: start() retries it)
+    return start().then((ok) => {
+      if (!ok || !done) throw new Error('the model bundle did not load');
+      const e = done.files.get(p); if (!e) throw new Error(`${p} is not in the model bundle`);
+      return done.buf.slice(e[0], e[1]);
+    });
   }
   const getJson = (path: string): Promise<any> => getFile(path).then((b) => JSON.parse(new TextDecoder().decode(b)), () => null);
-  const prefetchBundle = (name: string): Promise<boolean> => prefetch(name).then(() => true, (e) => { console.warn('[bundles] ' + name + ': ' + (e && e.message || e)); return false; });
 
-  return {
-    BOOT, SHARED, EXT, DIR, MAGIC, bundleOf, parse, getFile, getJson, prefetchBundle,
-    bootBundle: () => BOOT, sharedBundle: () => SHARED, platformBundle: (id: string) => id,
-    loaded: (name: string) => done.has(name), pending: (name: string) => pending.has(name),
+  const api = {
+    NAME, EXT, DIR, MAGIC, bundleOf, parse, start, getFile, getJson,
+    state: (): State => ({ ...st }), onChange: (fn: (s: State) => void) => { listeners.push(fn); },
+    loaded: () => !!done,
     setRoot: (base: string) => { R.base = base; },
-    stats: () => [...done.values()].map((b) => ({ name: b.name, files: b.files.size, bytes: b.bytes, wire: b.wire, from: b.from })),
+    stats: () => (done ? [{ name: NAME, files: done.files.size, bytes: done.bytes, wire: done.wire, from: done.from }] : []),
   };
+  // On the page the download is the first thing that happens: this script is the first one in index.html, before three.js and the rest.
+  if (typeof document !== 'undefined' && typeof fetch === 'function') {
+    if (!flagGet()) early = fetch(fileOf(), { cache: 'no-cache' }); // (a first visit: the download begins now)
+    if (early) early.catch(() => { /* (loadOnce falls back to the by-hash fetch) */ });
+    start();
+  }
+  return api;
 })();
 G.Bundles = G_Bundles;
 interface GameModules { Bundles: typeof G_Bundles }

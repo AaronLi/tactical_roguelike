@@ -18,9 +18,9 @@
 // just stays empty. viewmodel() is the one that cannot be empty (the hands are bound to its parts): it returns null until the build is loaded
 // (it asks for it), and js/player.ts, which sets the view model every frame it is not the right one, has it the frame it is.
 //
-// PRELOADING. boot(): every platform's index and the props (a quarter of a megabyte in all), at game start. preloadAll(): every pack of every
-// platform, in the background, when the hangar is entered (everything it and the gunsmith can show). preload(defs, platforms): a level's start: the
-// squad's kits, the level's enemy weapon pool, the loot (js/game.ts startLevel). Anything else is fetched when it is first asked for.
+// LOADING. Every model file is already in memory: the page downloads ONE bundle at start, beside the main menu (js/modelbundles.ts). What is left is parsing, when
+// a model is first shown. boot(): every platform's index (parsed) and the props. preload(defs, platforms): a level's start parses the squad's kits, the level's enemy
+// weapon pool, the loot (js/game.ts startLevel) ahead of need. Anything else is parsed when it is first asked for.
 const G_GunModels = (() => {
   const T = THREE;
 
@@ -181,12 +181,10 @@ const G_GunModels = (() => {
   // ---------------------------------------------------------------- what to have loaded
   /** Game start: every platform's index and the props. Resolves when they are in. */
   const boot = (): Promise<void> => Promise.all([G.Models.boot(), loadProps()]).then(() => undefined);
-  /** The hangar: every pack of every platform, the named ones first, in the background. */
-  const preloadAll = (first: string[] = []) => { G.Models.preloadAll(first); };
   /**
    * Fetches what is about to be shown, most urgent first (the queue is in js/glb.ts): the builds in these defs at once (priority 0); then, `wholePlatforms`
    * (the gunsmith: a part swap should show at once) every pack of their platforms; and for the gun ids in `platforms` (a level's enemy pool) the default
-   * build only. A level asks for no whole platforms: only the hangar warms everything (preloadAll). Resolves when the builds and the pool are in.
+   * build only. A level asks for no whole platforms. Resolves when the builds and the pool are in.
    */
   const platformsAsked = new Set<string>();
   function preload(defs: any[], platforms: string[] = [], wholePlatforms = true): Promise<void> {
@@ -198,7 +196,7 @@ const G_GunModels = (() => {
     });
   }
 
-  return { display, world, viewmodel, viewmodelReady, whenReady, roundDims, roundShape, roundProp, quarrel, boot, preloadAll, preload };
+  return { display, world, viewmodel, viewmodelReady, whenReady, roundDims, roundShape, roundProp, quarrel, boot, preload };
 })();
 G.GunModels = G_GunModels;
 interface GameModules { GunModels: typeof G_GunModels }
