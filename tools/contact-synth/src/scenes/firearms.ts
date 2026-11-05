@@ -744,7 +744,9 @@ const arMagWell: Body = { ...mat('aluminum'), shape: 'block', size: 9, thickness
 const magShell = (fill: 'loaded' | 'empty'): Body => ({ ...mat('aluminum'), shape: 'plate', size: 18, thickness: 0.9, modes: 5, irregularity: 0.85, damping: fill === 'loaded' ? 0.4 : 0.25, level: 0 });
 /** A knock or rub excites the small side panel it lands on (~6 x 2.2 cm between the folds), not the
  *  whole box: from ~750 Hz up, the tinny range of thin sheet metal. */
-const magPanel = (fill: 'loaded' | 'empty'): Body => ({ ...magShell(fill), size: 6, modes: 4 });
+// Dense noise bands only (the tinny edge), no clear pitch, and damped: a struck or rubbed
+// panel clatters briefly instead of singing like a tuning fork.
+const magPanel = (fill: 'loaded' | 'empty'): Body => ({ ...magShell(fill), size: 6, modes: 0, damping: fill === 'loaded' ? 0.65 : 0.55 });
 /** Sheet-metal edges ticking off the billet walls: heard directly, barely through the receiver. */
 const SHEET_EDGE = { housing: { amount: 0.2, cavity: 0.15 } };
 /** The thin sheet buzzing against the billet wall while it moves (loose fit, worn finish). */
