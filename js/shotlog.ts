@@ -18,7 +18,7 @@ interface ShotHolder { ghosts?: Map<string, ShotGhost>; }
 interface ShotInfo { holder: ShotHolder; name: string; burst?: boolean; }
 interface ShotLabel { p: THREE.Vector3; t: string; c: string; pri: number; key?: string; }
 interface ShotVert { p: THREE.Vector3; v: number; }
-interface ShotRec { keys: Set<string>; hits: ShotRow[]; line: THREE.Line; frags: THREE.LineSegments | null; labels: ShotLabel[]; ghosts: Map<string, ShotGhost>; }
+interface ShotRec { keys: Set<string>; hits: ShotRow[]; line: THREE.Line; frags: THREE.LineSegments | null; labels: ShotLabel[]; ghosts: Map<string, ShotGhost>; nade?: THREE.Object3D; }
 interface ShotArmour { e: string; b: number; r: { k: MatKey; o: number; un?: boolean }[]; }
 type ShotMark = (p: THREE.Vector3, t: string, c: string, pri: number, key?: string) => void;
 const G_ShotLog = (() => {
@@ -72,6 +72,7 @@ const G_ShotLog = (() => {
       for (const [k, gh] of o.ghosts) { if (r.ghosts.has(k)) gh.uses--; else r.ghosts.set(k, gh); } // (one person's ghost, counted once)
     }
     const at = paths[0].p[0];
+    r.nade = nadeGhost(at); // (the grenade where it went off; with it shown, every body it hit is shown too: frame)
     r.labels.push({ p: new T.Vector3(at[0], at[1], at[2]), t: `${info.name}: ${built.length} fragment${built.length > 1 ? 's' : ''} hit · ${r.keys.size} ${r.keys.size > 1 ? 'people' : 'person'}`, c: '#ffd9a0', pri: 4 });
     r.labels.sort((a, b) => b.pri - a.pri);
     recs.push(r);
@@ -163,12 +164,57 @@ const G_ShotLog = (() => {
       return row;
     });
   }
+  // A frag grenade's ghost where it burst: its body (a fluted egg), its fuze and lever, in the ghosts' see-through look but warm,
+  // so it isn't taken for a person
+  let nadeGeo: THREE.BufferGeometry[] | null = null;
+  function nadeGhost(at: number[]) {
+    if (!nadeGeo) {
+      const body = new T.SphereGeometry(0.032, 14, 10); body.scale(1, 1.25, 1);
+      const fuze = new T.CylinderGeometry(0.011, 0.013, 0.03, 10); fuze.translate(0, 0.05, 0);
+      const lever = new T.BoxGeometry(0.012, 0.075, 0.006); lever.translate(0.02, 0.025, 0); lever.rotateZ(-0.12);
+      nadeGeo = [body, fuze, lever];
+    }
+    const g = new T.Group(), mat = new T.MeshBasicMaterial({ color: 0xffb060, transparent: true, opacity: 0.6, depthTest: false, depthWrite: false, blending: T.AdditiveBlending });
+    for (const geo of nadeGeo) { const m = new T.Mesh(geo, mat); m.renderOrder = 997; m.frustumCulled = false; g.add(m); }
+    g.position.set(at[0], at[1], at[2]); g.scale.setScalar(1.6); g.visible = false; // (a little larger than life: it has to be found)
+    G.R.scene.add(g);
+    return g;
+  }
+  // ---- picking a grenade out: its ghost in the crosshair (within 25 cm of the line, nearer than any wall or body)
+  let sel: ShotRec | null = null;
+  function pickNade(o: THREE.Vector3, d: THREE.Vector3, maxT: number) {
+    let best: { r: ShotRec; t: number } | null = null;
+    for (const r of recs) {
+      if (!r.nade) continue;
+      const q = r.nade.position, t = (q.x - o.x) * d.x + (q.y - o.y) * d.y + (q.z - o.z) * d.z;
+      if (t < 0.2 || t > maxT) continue;
+      const off = Math.hypot(o.x + d.x * t - q.x, o.y + d.y * t - q.y, o.z + d.z * t - q.z);
+      if (off < 0.25 && (!best || t < best.t)) best = { r, t };
+    }
+    return best;
+  }
+  const select = (r: ShotRec | null) => { sel = r; };
+  const nameOf = (key: string) => { if (key[0] === 'e') { const ev = G.Views.enemies.get(+key.slice(1)); return `${ev && ev.def && ev.def.name ? ev.def.name : 'Suspect'} #${key.slice(1)}`; } const id = key.slice(1); return id === G.Net.myId ? 'You' : ((G.Views.players.get(id) || {} as { name?: string }).name || 'Officer'); };
+  // the readout for the grenade picked out: who its fragments hit, how many and how hard, and what stopped them
+  function nadeHtml() {
+    if (!sel) return '';
+    const esc = G.U.esc, by = new Map<string, ShotRow[]>();
+    for (const h of sel.hits) { if (!by.has(h.key)) by.set(h.key, []); by.get(h.key)!.push(h); }
+    const at = sel.nade!.position, me = G.R.camera.position;
+    const rows = [...by].map(([k, hs]) => {
+      const J = hs.reduce((a, h) => a + h.J, 0), through = hs.filter((h) => h.out != null).length, armour = hs.filter((h) => h.stop && /armour|plate|Stopped by|J to the body/.test(h.stop)).length;
+      return `<div class="hb-shot"><b>${esc(nameOf(k))}</b> <span class="hb-k">· ${hs[0].range} m from it</span><br>${hs.length} fragment${hs.length > 1 ? 's' : ''} · ${G.U.fmt(J)} J in all · fastest in ${Math.max(...hs.map((h) => h.vIn))} m/s${through ? ` · ${through} through` : ''}${armour ? ` <span class="warn">· ${armour} stopped by armour</span>` : ''}</div>`;
+    });
+    return `<h4>${esc(sel.hits[0] ? sel.hits[0].name : 'Grenade')} <small>${Math.hypot(at.x - me.x, at.z - me.z).toFixed(1)} m · picked out</small></h4><div class="hb-sec"><span class="hb-k">Fragments that hit someone: ${sel.hits.length}, ${by.size} ${by.size > 1 ? 'people' : 'person'}</span>${rows.join('')}</div><div class="hb-k">Look at someone to pick them out instead.</div>`;
+  }
   function drop(r: ShotRec) {
+    if (sel === r) sel = null;
+    if (r.nade) { r.nade.removeFromParent(); ((r.nade.children[0] as THREE.Mesh).material as THREE.Material).dispose(); } // (its shapes are shared)
     r.line.removeFromParent();
     r.line.traverse((o: THREE.Object3D & Record<string, any>) => { if (o.geometry) { o.geometry.dispose(); (o.material as THREE.Material).dispose(); } }); // (its own, its fragments', a grenade's other trails)
     for (const gh of r.ghosts.values()) if (--gh.uses <= 0) { gh.removeFromParent(); gh.mat.dispose(); }
   }
-  function clear() { for (const r of recs) drop(r); recs = []; count = new Map(); far = new Map(); }
+  function clear() { for (const r of recs) drop(r); recs = []; sel = null; count = new Map(); far = new Map(); }
   // the shots that hit someone, oldest first (js/hud.ts debugTarget's readout)
   const of = (key: string) => recs.flatMap((r) => r.hits.filter((h) => h.key === key));
   // whose shots are shown: whoever's picked out, or you if nobody is (you can't put the crosshair on yourself)
@@ -182,22 +228,27 @@ const G_ShotLog = (() => {
     const on = !!G.Rig.debug;
     if (!cv) { cv = document.getElementById('hbMarks') as HTMLCanvasElement; if (!cv) return; g = cv.getContext('2d')!; }
     if (!on || !recs.length) {
-      if (shown) { for (const r of recs) { r.line.visible = false; for (const gh of r.ghosts.values()) gh.visible = false; } cv.classList.add('hidden'); shown = false; }
+      if (shown) { for (const r of recs) { r.line.visible = false; if (r.nade) r.nade.visible = false; for (const gh of r.ghosts.values()) gh.visible = false; } cv.classList.add('hidden'); shown = false; }
       return;
     }
     if (!shown) { cv.classList.remove('hidden'); shown = true; }
     const dpr = window.devicePixelRatio || 1, W = window.innerWidth, H = window.innerHeight;
     if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
     g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
-    const fk = focus(), mine = recs.filter((r) => r.keys.has(fk)), cam = G.R.camera, v = new T.Vector3();
+    // a grenade picked out (its ghost in the crosshair: js/hud.ts debugTarget): its fragments' trails and everyone they hit, alone;
+    // otherwise whoever's picked out and the shots that hit them. Every grenade's ghost shows either way, to be found and picked.
+    if (sel && !recs.includes(sel)) sel = null;
+    const fk = focus(), mine = sel ? [sel] : recs.filter((r) => r.keys.has(fk)), cam = G.R.camera, v = new T.Vector3();
     for (const r of recs) {
-      r.line.visible = r.keys.has(fk);
-      for (const [k, gh] of r.ghosts) gh.visible = k === fk;
+      const on = sel ? r === sel : r.keys.has(fk);
+      r.line.visible = on;
+      if (r.nade) r.nade.visible = true;
+      for (const [k, gh] of r.ghosts) gh.visible = on && (k === fk || !!r.nade); // (a grenade's: everyone it hit, as they stood)
     }
     const el = document.getElementById('hbInfo'), panel = el && !el.classList.contains('hidden') ? el.getBoundingClientRect() : null, boxes = panel ? [[panel.left, panel.top, panel.right, panel.bottom]] : [];
     const free = (a: number[]) => !boxes.some((b) => a[0] < b[2] && a[2] > b[0] && a[1] < b[3] && a[3] > b[1]);
     g.font = '600 11px ui-monospace, Consolas, monospace'; g.textBaseline = 'middle';
-    const list = [...mine].reverse().flatMap((r, i) => r.labels.filter((l) => !l.key || l.key === fk).map((l) => ({ l, rank: l.pri * 2 - i }))).sort((a, b) => b.rank - a.rank), seen = new Set<string>();
+    const list = [...mine].reverse().flatMap((r, i) => r.labels.filter((l) => !l.key || l.key === fk || sel).map((l) => ({ l, rank: l.pri * 2 - i }))).sort((a, b) => b.rank - a.rank), seen = new Set<string>();
     for (const { l } of list) {
       v.copy(l.p).project(cam);
       if (v.z > 1 || Math.abs(v.x) > 1 || Math.abs(v.y) > 1 || l.p.distanceTo(cam.position) > RANGE) continue;
@@ -218,7 +269,7 @@ const G_ShotLog = (() => {
       g.fillStyle = '#fff'; g.fillText(l.t, at[0] + 6, at[1] + LH / 2 + 0.5);
     }
   }
-  return { pose, remote, keep, keepAll, clear, of, focus, frame };
+  return { pose, remote, keep, keepAll, clear, of, focus, frame, pickNade, select, nadeHtml, get selected() { return sel; } };
 })();
 G.ShotLog = G_ShotLog;
 

@@ -153,6 +153,11 @@ const G_HUD = {
     const sideOf = (s: string) => (s === 'L' ? ' (L)' : s === 'R' ? ' (R)' : '');
     // sticky: looking away (or at nothing), it stays on the last one you looked at, still live, with the line through
     // them as it was when you last had them in your sights (while they're still in the level)
+    // a frag grenade's ghost in line, nearer than anyone: it's picked out (its fragments and everyone they hit: js/shotlog.ts),
+    // and stays picked until someone is
+    const SL = G.ShotLog, nade = SL ? SL.pickNade(o, d, best ? best.h.t : maxT) : null;
+    if (nade) SL.select(nade.r); else if (best && SL) SL.select(null);
+    if (SL && SL.selected) { this.hbLast = null; this.xray(null, true); this.set('hbInfo', this.trailLegend() + SL.nadeHtml()); return; }
     const L = this.hbLast, still = L && (L.kind === 'e' ? G.Views.enemies.get(L.who.id) === L.who : G.Views.players.get(L.id!) === L.who && L.who.st);
     if (!best && !still) { this.hbLast = null; this.xray(null, true); this.set('hbInfo', `<h4>Nothing in line <small>${wall && wall.t != null ? `wall at ${wall.t.toFixed(1)} m` : ''}</small></h4>`.replace('<h4>', this.trailLegend() + '<h4>')); return; }
     let who: VwEnemy | VwPlayer, kind: HbKind, line: string, hit: string, dist: number;
