@@ -86,6 +86,11 @@ for s in (-1, 1):
     for f, z in SCREWS:
         o = K.obj(cyl(1.6 * mm, s * 22.9 * mm, s * 23.5 * mm, 'x', (f, z), 10), 'base', 'black')   # (the screw heads, down in their counterbores)
 o = K.obj(prism(circles_hull(BORES, RB + 3.6 * mm, 24), 'y', BP1 - 0.004, BP1 - 0.0028), 'base', 'brass'); smooth(o)   # the contact plate
+# the HARD MOUNT, the control side's half: two conical steel dowels standing out of the dock (the breech block's rear face takes them in
+# sockets: they square it up on the contacts), and the latches on the fixed chassis (below) that pull it home on its cradle pin
+DOWELS = [(0.0, 14 * mm), (0.0, -13 * mm)]                         # (right, up): between the barrels, inside the contacts' outline
+for x, z in DOWELS:
+    o = K.obj(lathe([(BP1 - 0.004, 3 * mm), (BP1 + 0.006, 3 * mm), (BP1 + 0.009, 1.8 * mm)], 16, (x, 0, z)), 'base', 'steel'); smooth(o)
 # the hinge (fixed): two outer knuckles under the fixed chassis's front (the forend's centre knuckle between them), the pin, flush caps
 KN_R = 7 * mm
 KN_IN, KN_OUT = 6 * mm, 17 * mm                                   # the forend's narrow centre knuckle is +-KN_IN; the chassis's two outside it
@@ -111,6 +116,24 @@ for s in (-1, 1):
         o = K.obj(cyl(1.6 * mm, s * 25.9 * mm, s * 26.5 * mm, 'x', (f, -0.044), 10), 'base', 'black')
 cut(ch, box(-9 * mm, 9 * mm, BP1 + 0.016, CH1 - 0.036, -0.06, -0.0365))   # a window through the floor
 smooth(ch); K.adopt(ch, 'base', TI)
+# the LATCHES (the control side's hard mount): a titanium hook each side, pivoted on a boss on the chassis's side member; locked, its jaw
+# drops over the breech block's cradle pin end and pulls the block home against the dock; its tab, forward and down, lifts it. One node
+# (part_lever) for both: they open together, first, for the reload
+PIN = (BR0 + 0.020, -0.004)                                         # (the cradle pin's axis: forward, up)
+LP = (0.136, -0.037)                                                # the latches' pivot
+plv = K.part('lever', (0, LP[0], LP[1]))
+for s in (-1, 1):
+    o = K.tmp(cyl(4.5 * mm, s * 26.5 * mm, s * 29.6 * mm, 'x', LP, 16)); bevel(o, 0.6 * mm, 1, 30); smooth(o); K.adopt(o, 'base', TI)     # the boss
+    lt = K.tmp(prism([(PIN[0] - 0.008, PIN[1] + 0.010), (PIN[0] + 0.008, PIN[1] + 0.010), (LP[0] + 0.004, LP[1] + 0.006), (LP[0] + 0.018, LP[1] - 0.008),
+                      (LP[0] + 0.013, LP[1] - 0.013), (LP[0] - 0.004, LP[1] - 0.005), (PIN[0] - 0.006, PIN[1] - 0.001)], 'x', s * 29.8 * mm, s * 33 * mm))
+    boolean(lt, cyl(5.5 * mm, s * 29.8 * mm, s * 33 * mm, 'x', LP, 20), 'UNION')
+    cut(lt, cyl(3.7 * mm, s * 29 * mm, s * 34 * mm, 'x', PIN, 20))                                       # the jaw's seat on the pin
+    cut(lt, box(s * 29 * mm, s * 34 * mm, PIN[0] - 0.0037, PIN[0] + 0.0037, PIN[1] - 0.012, PIN[1]))       # (the jaw opens downward-forward)
+    bevel(lt, 0.5 * mm, 1, 30)                                                                          # (rounded after its cuts)
+    smooth(lt); K.adopt(lt, 'base', TI, plv)
+    o = K.obj(cyl(2.2 * mm, s * 29.4 * mm, s * 33.6 * mm, 'x', LP, 14), 'base', 'steel', plv); smooth(o)                   # its pivot screw
+    o = K.tmp(prism(rounded(LP[0] + 0.0145, LP[1] - 0.011, 0.005, 0.0025, 1.2 * mm, 2), 'x', s * 29.6 * mm, s * 33.6 * mm))  # the tab's grip
+    smooth(o); K.adopt(o, 'base', 'rubber', plv)
 # the buffer tube's boss on the rear face, and the screen beside it (display_ammo: the game paints the rounds left per barrel)
 # the STOCK INTERFACE: a vertical Picatinny section on the rear face (a folding or fixed stock clamps on it)
 SR0, SR1 = -0.034, 0.012
@@ -444,10 +467,29 @@ for x, z in BORES:
 bb = K.tmp(prism(circles_hull(BORES, RB + 5 * mm, 16), 'y', BR0, BB1))
 bevel(bb, 1.5 * mm, 2, 30)
 for s in (-1, 1): cut(bb, prism(rounded(BR0 + 0.020, -0.010, 0.011, 0.012, 2 * mm, 2), 'x', s * 23 * mm, s * 27 * mm))     # side pockets
+for x, z in DOWELS: cut(bb, cyl(3.15 * mm, BR0 - 0.001, BR0 + 0.011, 'y', (x, z), 16))     # the dowels' sockets
 smooth(bb); K.adopt(bb, 'mag', TI, pm)
 for x, z in BORES:   # the firing contacts on its rear face
     o = K.obj(cyl(3.5 * mm, BR0 - 0.0008, BR0 + 0.001, 'y', (x, z), 12), 'mag', 'brass', pm)
-o = K.obj(cyl(3.5 * mm, -29 * mm, 29 * mm, 'x', (BR0 + 0.020, -0.004), 16), 'mag', 'steel', pm); smooth(o)   # the cradle pins
+o = K.obj(cyl(3.5 * mm, -32.5 * mm, 32.5 * mm, 'x', (BR0 + 0.020, -0.004), 16), 'mag', 'steel', pm); smooth(o)   # the cradle pin (the latches' hooks take its ends)
+# the CARRY / REMOVAL HANDLE: a titanium saddle clamped over the upper barrels, two hinge ears, and a U-shaped bail with a rubber-gripped
+# bar that folds forward flat on the barrels (stowed: under the sight line, clear of the rail) and flips up 90 degrees to lift the block out
+CH_F, CH_W, CH_L = 0.290, 13.5 * mm, 0.058                           # the hinge's forward position; the bail's half width; its length
+UP = [b for b in BORES if b[1] > -1e-6]                              # (the upper five barrels: the saddle sits on them)
+sd = K.tmp(prism(circles_hull(UP, RB + 2.2 * mm, 16), 'y', CH_F - 0.008, CH_F + 0.008))
+boolean(sd, box(-0.04, 0.04, CH_F - 0.01, CH_F + 0.01, D - 1 * mm, 0.05), 'INTERSECT')                      # (its top half only)
+for x, z in UP: cut(sd, cyl(RB + 0.05 * mm, CH_F - 0.02, CH_F + 0.02, 'y', (x, z), 20))
+bevel(sd, 0.8 * mm, 2, 30); smooth(sd); K.adopt(sd, 'mag', TI, pm)
+HU = D + RB + 3.2 * mm                                               # the hinge's height (just over the upper barrels)
+for s in (-1, 1):
+    o = K.tmp(box(s * (CH_W - 3 * mm), s * (CH_W + 3 * mm), CH_F - 0.005, CH_F + 0.005, D + RB, HU + 3 * mm)); bevel(o, 0.8 * mm, 2, 30); smooth(o); K.adopt(o, 'mag', TI, pm)
+pcy = K.part('carry', (0, CH_F, HU)); pcy.parent = pm; pcy.matrix_parent_inverse = pm.matrix_world.inverted()
+for s in (-1, 1):
+    o = K.tmp(box(s * (CH_W - 1.6 * mm), s * (CH_W + 1.6 * mm), CH_F - 0.003, CH_F + CH_L, HU - 1.6 * mm, HU + 1.6 * mm)); bevel(o, 0.7 * mm, 2, 30)
+    smooth(o); K.adopt(o, 'mag', TI, pcy)                                                                     # the bail's legs (folded forward)
+o = K.obj(cyl(1.6 * mm, -CH_W - 3.4 * mm, CH_W + 3.4 * mm, 'x', (CH_F, HU), 12), 'mag', 'steel', pcy); smooth(o)   # the hinge pin
+o = K.obj(cyl(1.8 * mm, -CH_W - 1.6 * mm, CH_W + 1.6 * mm, 'x', (CH_F + CH_L, HU), 14), 'mag', TI, pcy); smooth(o)     # the bar
+o = K.obj(cyl(3.6 * mm, -CH_W + 2.2 * mm, CH_W - 2.2 * mm, 'x', (CH_F + CH_L, HU), 18), 'mag', 'rubber', pcy); smooth(o)   # its grip
 for f0, rim in ((BR1 - 0.024, 1.2 * mm), ):   # clamp plates: titanium, pocketed; the front one a slim band (the struts pass it)
     cp = K.tmp(prism(circles_hull(BORES, RB + rim, 16), 'y', f0, f0 + 0.012))
     bevel(cp, 1.2 * mm, 2, 30)
@@ -464,7 +506,7 @@ info = {
                 'effective_mm': [round((MD0 - (BB1 + (ROUNDS - 1 - k) * ROUND_L)) * 1000) for k in range(ROUNDS)]},   # (shot 1 .. ROUNDS of a barrel)
     'muzzles': [[round(MZ_END, 4), round(z, 4), round(x, 4)] for x, z in BORES],
     'grip': [0.030, -0.097, 0], 'support': [0.330, -0.095, 0],
-    'anim': {'front': 'part_pump', 'brk': 'part_brk', 'mag': 'part_mag'},
+    'anim': {'front': 'part_pump', 'brk': 'part_brk', 'mag': 'part_mag', 'latch': 'part_lever', 'carry': 'part_carry'},
     'magAt': [MAG_AT[0], MAG_AT[1]],
 }
 anchors = {
@@ -501,6 +543,8 @@ for t in range(0, 101):                                                    # the
         f, u = _rot(f0, u0, OPEN, UNSEAT); f += up[0] * t * 0.001; u += up[1] * t * 0.001
         if inrail(f): RAIL_CLEAR = min(RAIL_CLEAR, RAIL_B - u)
 root['hinge_json'] = json.dumps({'sequence': [
+    {'part': 'part_lever', 'axis': 'x', 'at': [LP[0], LP[1], 0], 'rotate_deg': 40, 'note': 'the latches lift off the cradle pin: the block is free of the dock'},
+    {'part': 'part_carry', 'axis': 'x', 'at': [CH_F, HU, 0], 'rotate_deg': 90, 'frame': 'part_mag', 'note': 'the carry handle flips up'},
     {'part': 'part_pump', 'move': [SLIDE, 0, 0], 'note': 'the muzzle device runs forward on its guide rods, drawing the barrel block out from under the rail'},
     {'part': 'part_brk', 'axis': 'x', 'at': [HINGE[0], HINGE[1], 0], 'rotate_deg': -OPEN, 'note': 'the forend drops on the fixed hinge'},
     {'part': 'part_mag', 'move': [-UNSEAT, 0, 0], 'frame': 'part_brk', 'note': 'the block slides back off the muzzle device\'s seats'},
