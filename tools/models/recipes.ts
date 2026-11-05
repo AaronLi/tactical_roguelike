@@ -356,6 +356,13 @@ const G_GunRecipes = (() => {
       anim.magn = hinge;
       return { sy, fSight: fRear, relief: 0.075 };
     },
+    // A shotgun barrel's rib (spec.rib): a flat rib from the receiver to the muzzle, level with the top of the receiver (on posts where the barrel
+    // sits lower). It is part of the barrel (the barrel's own length, never stretched; five posts spread over it), whatever sight is fitted.
+    rib(k: Kit, f0: number, f1: number, sy: number, barrelTop: number) {
+      const ry = sy - 0.0065, len = f1 - f0, A = f0 + 0.01, D = len - 0.02, gap = ry - 0.0015 - barrelTop;
+      k.box(0.007, 0.003, len, M.black(), f0, ry);
+      if (gap > 0.004) for (let i = 0; i < 5; i++) k.box(0.003, gap, D * 0.01, M.black(), A + D * 0.99 * i / 4, barrelTop + gap / 2);
+    },
     // A shotgun's bead: a flat rib from the receiver to the muzzle, level with the top of the receiver (on
     // posts where the barrel sits lower), and the brass bead on its front end. You look along the rib; the
     // bead sits on it at the far end, the barrel(s) below.
@@ -364,12 +371,8 @@ const G_GunRecipes = (() => {
       // over [rib start + 10 mm, rib end - 10 mm], their lengths 1 % of that run each), so it is keyed by the barrel, as a part of it)
       // (two pieces, like an iron front sight: the bead is the sight's head (`optic@barrel`, the same on every gun) and the rib with its posts is the base
       // (`optic@sightbase`: a mount piece, as long as the barrel)
+      // (the rib of a gun whose barrels carry one (spec.rib) is the BARREL's (S.rib, drawn with it): here, on the barrel, only the bead, the one head every gun shares)
       if (onBarrel && rib) {
-        const ry = sy - 0.0065, len = rib[1] - rib[0], A = rib[0] + 0.01, D = len - 0.02, gap = ry - 0.0015 - barrelTop;
-        k.at('sightbase', () => {
-          k.box(0.007, 0.003, len, M.black(), rib[0], ry);
-          if (gap > 0.004) for (let i = 0; i < 5; i++) k.box(0.003, gap, D * 0.01, M.black(), A + D * 0.99 * i / 4, barrelTop + gap / 2);
-        });
         k.at('barrel', () => k.sphere(0.0036, BEAD, fFront, sy - 0.0018));
         return { sy, fSight: fRear, relief: 0.3 };
       }
@@ -1405,6 +1408,7 @@ const G_GunRecipes = (() => {
     const bEnd: number = front; // (the barrel's own end, before any muzzle device: where its front sight and a bead stand)
     // what the barrel provides: where a muzzle device screws on
     k.anchor('barrel', 'mount_muzzle', [bEnd, by, 0]);
+    if (o.rib && !o.integral) { k.tag('barrel'); S.rib(k, L, bEnd - 0.006, Math.max(rcvTop != null ? rcvTop : top, 0.014) + 0.009, by + 0.004); } // (a shotgun barrel's rib: part of the barrel)
     let hgLen = 0;
     const hgF = L + (o.hgGap || 0); // (where a handguard starts)
     // a traced breech sleeve carried forward to take a handguard (the Thor's long barrel): the same square section over the barrel's

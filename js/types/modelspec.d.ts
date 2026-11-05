@@ -40,7 +40,7 @@ interface RecipeSpec<M = THREE.Material | null> {
   grip?: number; gripT?: string; stock?: StockKind; hg?: HgSpec<M>; hgGap?: number; hgMax?: number; fg?: ForegripKind; fgAt?: number; vfg?: number; vfgM?: M; bipod?: number; slots?: string; under?: boolean;
   tac?: string; tacL?: string; tacAt?: { f: number; y: number; x: number }; railmount?: string | Record<string, any>; railExt?: number;
   // the barrel and what's on it
-  barrel?: BarrelSpec; mbr?: number /* (the barrel radius a muzzle device is drawn for: the gun's, whatever profile its barrel has) */; blen?: number; barrels?: number[]; integral?: { len: number; r: number } | null; muzzle?: MuzzleKind; thread?: boolean; match?: boolean; can?: { from: number; r: number }; comp?: boolean; recoilBarrel?: number; bIn?: number;
+  barrel?: BarrelSpec; rib?: boolean /* (its barrels carry a rib along the top, whatever sight is fitted) */; mbr?: number /* (the barrel radius a muzzle device is drawn for: the gun's, whatever profile its barrel has) */; blen?: number; barrels?: number[]; integral?: { len: number; r: number } | null; muzzle?: MuzzleKind; thread?: boolean; match?: boolean; can?: { from: number; r: number }; comp?: boolean; recoilBarrel?: number; bIn?: number;
   // the sights
   optic?: OpticKind; apart?: string; optF?: number; optCut?: boolean | number; ironsAt?: number[]; sightRise?: number; magnifier?: number | Record<string, any>; riser?: number; ret?: ReticleKind; dotR?: number; dotLen?: number; px?: number; scopeLen?: number; scopeObj?: number; closed?: boolean;
   // the magazine and where things sit
