@@ -9,12 +9,20 @@
 //   ?side=<weapon id>     your sidearm (the P9 otherwise)
 //   ?nofoes               nobody in the level; ?stronghold makes it one (js/route.ts)
 //   ?hangar               the hangar between levels instead of a level (the shop, the gunsmith, the range)
+//   ?tick                 stepped by a timer, not animation frames: it keeps running in a window that isn't shown (scripts, agents)
 // It plays as if the mouse were captured (no click-to-play screen). When it's there, window.__debugReady is true and
 // G.DebugStart.ready resolves: scripts wait on that. Add ?mute to keep it quiet.
 const G_DebugStart = (() => {
   const q = new URLSearchParams(location.search);
   const sleep = (s: number) => new Promise<void>((r) => setTimeout(r, s * 1000));
   const until = async (f: () => unknown, max = 60) => { const t0 = performance.now(); while (!f() && performance.now() - t0 < max * 1000) await sleep(0.1); return !!f(); };
+  // ?tick: the game stepped by a timer instead of animation frames (a browser hands a page no frames while its window isn't
+  // shown: a hidden pane, a tab driven by a script, and the game would stand still). Set before the game's loop first asks for one.
+  if (q.has('tick')) {
+    const ch = new MessageChannel(); let cbs: FrameRequestCallback[] = [];
+    ch.port1.onmessage = () => { const c = cbs, t = performance.now(); cbs = []; for (const f of c) f(t); };
+    window.requestAnimationFrame = (f: FrameRequestCallback) => { cbs.push(f); setTimeout(() => ch.port2.postMessage(0), 16); return 1; };
+  }
   let done: () => void = () => {};
   const ready = new Promise<void>((r) => { done = r; });
   const say = (m: string) => console.log('[debug start] ' + m);
@@ -82,9 +90,13 @@ const G_DebugStart = (() => {
       if (q.get('gun')) arm(); // (the level's kit is dealt as it starts: the gun again on top of it)
       // out of the helicopter: the flight skipped, then out of the seat (js/landing.ts interact: F held long enough)
       const L = G.Landing;
+      // (until out: a slow level, shaders still compiling, may take a while to touch down, and the seat can't be left before it has)
       if (L && G.Me.seat != null) {
-        for (let i = 0; i < 2 && G.Me.seat != null; i++) { (G.Me as any).fLatch = false; L.interact(G.Me, 10, true); await sleep(0.2); }
+        const t0 = performance.now();
+        while (G.Me.seat != null && performance.now() - t0 < 15000) { (G.Me as any).fLatch = false; L.interact(G.Me, 10, true); await sleep(0.3); }
+        if (G.Me.seat != null) say('still in the helicopter after 15 s');
       }
+      await until(() => !G.Game.$('veil').classList.contains('on'), 15); // (and the loading screen gone)
       if (q.has('nofoes')) SV.enemies.clear();
     }
     captured();
