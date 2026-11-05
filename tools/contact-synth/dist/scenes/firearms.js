@@ -76,7 +76,7 @@ const sgChamber = { ...mat('steel'), shape: 'shell', size: 9, thickness: 4, mode
 // Modelled as rods (bar shape, thickness ≈ effective section): the synth's 'shell' is a pot
 // whose diameter is its size, which made an 18 cm carrier a 2.8 kg pot and gave every slam a
 // soft, rubbery contact. As a rod: ~0.3 kg, bright steel ring from ~1.9 kHz.
-const arCarrier = { ...mat('steel'), shape: 'bar', size: 18, thickness: 12, modes: 2, irregularity: 0.6, damping: 0.5, level: 0 };
+const arCarrier = { ...mat('steel'), shape: 'bar', size: 18, thickness: 12, modes: 3, irregularity: 0.7, damping: 0.5, level: 0 };
 const arBolt = { ...mat('steel'), shape: 'bar', size: 6, thickness: 15, modes: 1, irregularity: 0.5, damping: 0.5, level: 0 };
 const arCamPin = steelBar(1.5, 5);
 const arBarrelExt = steelBlock(3, 20);
@@ -128,7 +128,12 @@ const gasKey = steelBar(3, 6);
 // What finally stops the carrier: the barrel extension, barrel and receiver. A thick steel
 // tube (~40 cm, ~6 mm wall) in the handguard: the low, heavy body of the slam.
 // Barrel (~16 mm steel rod, 40 cm) with the extension and upper: bends at ~500 Hz and up.
+// Barrel (~16 mm steel rod, 40 cm) with the extension and upper: bends at ~500 Hz and up.
 const arBarrel = { ...mat('steel'), shape: 'bar', size: 40, thickness: 16, modes: 3, irregularity: 0.5, damping: 0.55, level: 0 };
+// What the lugs actually ring: the barrel nut clamps the barrel to the receiver, so a hit at the
+// breech excites the short, stiff breech section (barrel extension, chamber, nut): ~2 kHz and up,
+// bright and inharmonic. That's the "clank" of metal locking up, not the whole barrel's bong.
+const arBreech = { ...mat('steel'), shape: 'bar', size: 20, thickness: 16, modes: 1, irregularity: 0.8, damping: 0.5, level: 0 };
 // The whole rifle (barrel, upper, lower, stock) flexing as one beam: its first bending modes
 // (~200 Hz and up) are the weight under a slam. Capped at the synth's 50 cm.
 const arRifleBody = { ...mat('aluminum'), shape: 'bar', size: 50, thickness: 10, modes: 3, irregularity: 0.5, damping: 0.8, level: 0 }; // held: highs die fast, the low bend carries
@@ -264,16 +269,20 @@ function arForward(t, withChargingHandle) {
         // first: a sharp, light hit. The carrier keeps going for its 9.5 mm of cam travel, the
         // cam pin turns the bolt into its lugs, and then the heavy hollow carrier lands on the
         // bolt: the "chunk", about 2.5 ms later.
-        hit('bolt face hits the barrel extension', t + T(0.055), 0, V(4.5), arBolt, arBarrelExt, { scatter: 0.3, radius: 2, click: 0.9, sharp: 0.95 }),
+        hit('bolt face hits the barrel extension', t + T(0.055), 0, V(4.5), arBolt, arBreech, { scatter: 0.3, radius: 2, click: 0.9, sharp: 0.95 }, { housing: { amount: 0.3, cavity: 0.25 } }),
         rub('cam pin turns the bolt', t + T(0.054), -12, { force: 10, duration: T(0.011), speed: V(1.2), profile: 'decelerate', roughness: 10, grain: 0.2, contactWidth: 0.02 }, arCamPin, arCarrier),
-        hit('bolt lugs rotate home', t + T(0.057), -9, V(1.5), arBolt, arBarrelExt, { scatter: 0.3, radius: 1.5 }),
-        hit('carrier slams onto the bolt', t + T(0.0578), 8, V(3.8), arCarrier, arBolt, { scatter: 0.5, radius: 3, click: 1, sharp: 0.95 }),
+        // The locking lugs mesh into the extension as the bolt turns: a short, bright, hard
+        // metal-on-metal grind under load, then they bottom.
+        rub('locking lugs mesh into the extension', t + T(0.0562), -2, { force: 20, duration: 0.003, speed: V(2), profile: 'steady', roughness: 25, grain: 0.08, periodicity: 0.3, contactWidth: 0.005 }, arBolt, arBreech, { housing: { amount: 0.3, cavity: 0.25 } }),
+        hit('bolt lugs rotate home', t + T(0.057), -5, V(1.5), arBolt, arBreech, { scatter: 0.3, radius: 1.5, click: 0.8, sharp: 0.95 }, { housing: { amount: 0.3, cavity: 0.25 } }),
+        hit('carrier slams onto the bolt', t + T(0.0578), 8, V(3.8), arCarrier, arBreech, { scatter: 0.5, radius: 3, click: 1, sharp: 0.95 }, { housing: { amount: 0.3, cavity: 0.25 } }),
         // Seating into the breech: the lugs bottom in the barrel extension and the carrier's
         // momentum goes into the barrel and receiver through hard steel faces: a metallic "chunk"
         // from the barrel's own bending modes (~500 Hz up), not a soft low thump.
         hit('lugs seat in the barrel extension', t + T(0.0579), 6, V(3.8), arBarrel, arCarrier, { scatter: 0.3, radius: 2, click: 0.8, sharp: 0.95 }, 
-        // The whole receiver takes this blow, so it comes through the housing much more than a slide does.
-        { housing: { amount: 0.95 } }),
+        // The receiver takes this blow too, but the lock-up is metal on metal: keep the receiver's
+        // air-space "pop" small so it doesn't turn the clank into a plunger in a tube.
+        { housing: { amount: 0.5, cavity: 0.25 } }),
         // ...and the rifle as a whole flexes from it: a hard-edged, low metallic "chunk" (not a sine thump).
         hit('rifle body takes the blow', t + T(0.058), 5, V(3.8), arRifleBody, arCarrier, { scatter: 0.2, radius: 3, click: 0.3, sharp: 0.85 }),
         // The lower receiver takes the blow through the takedown pins: its own ribbed aluminium ring.
