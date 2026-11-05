@@ -33,6 +33,19 @@ exec(open(os.path.join(REPO, 'models', 'blender_kit.py')).read(), globals())
 ID = 'tempest'
 EXPORT = os.environ.get('GUN_EXPORT', '1') == '1'
 TI = TITANIUM
+# ---- the triangle budget: curves sized for a viewmodel (the front of the gun is a metre from the eye) ----
+_cyl, _hull, _bevel = cyl, circles_hull, bevel
+def cyl(r, a0, a1, axis, c, seg=20):          # small round things at most 12 sides, larger ones 16
+    return _cyl(r, a0, a1, axis, c, min(seg, 8 if r < 3.5 * mm else (10 if r < 6 * mm else 16)))
+def circles_hull(cs, r, seg=24):              # outlines round the barrels: at most 10 segments a barrel
+    return _hull(cs, r, min(seg, 8))
+_pic = picatinny
+def picatinny(*a, **k):                         # rails in their six-point silhouette
+    k.setdefault('lean', True); return _pic(*a, **k)
+def bevel(o, w, seg=2, angle=40):             # forward of the back panel: one segment
+    vs = o.data.vertices
+    if len(vs) and sum(v.co.y for v in vs) / len(vs) > 0.15: seg = 1     # (only the panel, grip and rail, near the eye, keep two)
+    return _bevel(o, w, seg, angle)
 # COLOURWAYS: 'raw' (default): bare titanium everywhere, rails included, the barrels bead-blasted raw steel, only the grip and stock dark;
 # 'dark': titanium frame, blued barrels, black rails.
 COLOURWAY = os.environ.get('COLOURWAY', 'raw')
@@ -201,7 +214,7 @@ smooth(bt); K.adopt(bt, 'stock', 'polymer')                                     
 o = K.obj(cyl(5 * mm, -17.6 * mm, -15 * mm, 'x', (-0.252, -0.025), 16), 'stock', 'steel'); smooth(o)   # its QD sling socket
 pad = K.tmp(prism([(-0.264, 0.036), (-0.278, 0.036), (-0.280, 0.030), (-0.280, -0.090), (-0.278, -0.096), (-0.264, -0.096)], 'x', -17.5 * mm, 17.5 * mm))
 bevel(pad, 3 * mm, 3, 30)
-for i in range(7): cut(pad, box(-0.03, 0.03, -0.283, -0.277, -0.084 + i * 0.018, -0.080 + i * 0.018))   # its ribs
+for i in range(5): cut(pad, box(-0.03, 0.03, -0.283, -0.277, -0.080 + i * 0.024, -0.075 + i * 0.024))   # its ribs
 smooth(pad); K.adopt(pad, 'stock', 'rubber')
 GRIP_SEAT = (0.036, -0.054)
 gp = K.tmp(prism([(0.036, -0.052), (0.070, -0.052), (0.060, -0.075), (0.052, -0.085), (0.048, -0.100), (0.032, -0.153), (0.000, -0.153),
@@ -250,7 +263,7 @@ for s_ in (-1, 1):
     a = K.tmp(prism(band(ARM, AW), 'x', s_ * AX0, s_ * AX1))
     bevel(a, 1.5 * mm, 2, 30)
     for f in MLOK:   # M-LOK slots through the run (32 x 7 mm, 40 mm apart): a light or a laser bolts on
-        cut(a, prism(rounded(f, RUN_U, 0.016, 0.0035, 1.2 * mm, 2), 'x', s_ * (AX0 - 0.001), s_ * (AX1 + 0.001)))
+        cut(a, prism(rounded(f, RUN_U, 0.016, 0.0035, 1.2 * mm, 1), 'x', s_ * (AX0 - 0.001), s_ * (AX1 + 0.001)))
     smooth(a); K.adopt(a, 'handguard', TI, pbrk)
 def loft_box(ca, sa, cb, sb):
     # a straight member from the rectangle centred ca = (right, forward, up) sized sa = (width, height) to the one at cb sized sb
@@ -307,7 +320,7 @@ def warren(f0, f1, lo, hi, chord=None):
             pa, pb = c[k], c[(k + 1) % 3]
             on_chord = abs(pa[1] - pb[1]) < 1e-9
             ws.append(TW if is_end(pa, pb) else (chord if (chord and on_chord) else TW / 2))
-        holes.append(fillet_poly(inset_poly(c, ws), TFIL, 2))
+        holes.append(fillet_poly(inset_poly(c, ws), TFIL, 1))          # (one segment: a chamfer-like corner)
     return out, holes
 # the CENTRE BEAM: an I-beam (flanges 21 mm wide and 3 mm thick, a 4 mm web between them with Warren lightening holes), level under the
 # lowest barrel, from the hinge base to the rod housing
@@ -357,7 +370,7 @@ for s_ in (-1, 1):
         cut(a, cyl(2.2 * mm, MZ0 - FL - 0.001, MZ0 - FL + 0.0015, 'y', (s_ * (SX0 + SX1) / 2, z), 12))
         o = K.obj(cyl(1.8 * mm, MZ0 - FL - 0.0005, MZ0 - FL + 0.002, 'y', (s_ * (SX0 + SX1) / 2, z), 10), 'handguard', 'black', ppump)
     for tri, ws in (([TA, TM, TC], [WEB, WEB / 2, WEB]), ([TM, TB, TC], [WEB, WEB, WEB / 2])):
-        cut(a, prism(fillet_poly(inset_poly(tri, ws), FIL, 3), 'x', -0.03, 0.03))
+        cut(a, prism(fillet_poly(inset_poly(tri, ws), FIL, 1), 'x', -0.03, 0.03))
     smooth(a); K.adopt(a, 'handguard', TI, ppump)
     # the guide rail, and the rectangular sleeve round it that the strut's foot stands on: from the forend's mouth to under the device
     o = K.tmp(rail_section(s_, RL_T, RL_D, ROD0, MZ0 + 0.008)); bevel(o, 0.6 * mm, 2, 30); smooth(o); K.adopt(o, 'handguard', 'steel', ppump)
@@ -385,9 +398,9 @@ def device(Kx, parent, kind):
     if kind == 'factory':   # a six-bore block: heat fins round its rear half, side ports in its front half, the bores flaring (sabot strip)
         L = FAC_L
         o = Kx.tmp(prism(circles_hull(BORES, R, 16), 'y', MZ0, MZ0 + L)); bevel(o, 3 * mm, 2, 30)
-        for i in range(4): ring_cut(o, MZ0 + 0.008 + i * 0.0048, MZ0 + 0.008 + i * 0.0048 + 2.2 * mm, R, R - 2.6 * mm)
+        for i in range(3): ring_cut(o, MZ0 + 0.009 + i * 0.006, MZ0 + 0.009 + i * 0.006 + 2.4 * mm, R, R - 2.6 * mm)
         for x, z in BORES:
-            cut(o, lathe([(MZ0 + 0.008, BORE + 0.4 * mm), (MZ0 + L - 0.006, BORE + 1.6 * mm), (MZ0 + L + 0.002, BORE + 2.4 * mm), (MZ0 + L + 0.01, BORE + 2.4 * mm)], 16, (x, 0, z)))
+            cut(o, lathe([(MZ0 + 0.008, BORE + 0.4 * mm), (MZ0 + L - 0.006, BORE + 1.6 * mm), (MZ0 + L + 0.002, BORE + 2.4 * mm), (MZ0 + L + 0.01, BORE + 2.4 * mm)], 10, (x, 0, z)))
         seats(o)
         for z in (D, 0.0, -D, ZB):
             for i in range(2):
@@ -448,13 +461,14 @@ smooth(bd); K.adopt(bd, 'handguard', TI, ppump)
 # the barrel block slides back from under it, and off the seats, before it lifts out)
 HS_L, HS_R, HS_TH = 0.032, math.hypot(D, D) + RB + 1.5 * mm, 1.2 * mm      # (on the device's rear face, over the extension tubes)
 arc = lambda r, a0, a1, n: [(r * math.cos(math.radians(a0 + (a1 - a0) * i / n)), r * math.sin(math.radians(a0 + (a1 - a0) * i / n))) for i in range(n + 1)]
-sh = K.tmp(prism(arc(HS_R + HS_TH, 22, 158, 20) + list(reversed(arc(HS_R, 22, 158, 20))), 'y', MD0 - HS_L, MD0 + 0.004))
+sh = K.tmp(prism(arc(HS_R + HS_TH, 22, 158, 12) + list(reversed(arc(HS_R, 22, 158, 12))), 'y', MD0 - HS_L, MD0 + 0.004))
+bevel(sh, 0.4 * mm, 1, 30)                                         # (rounded first: the holes cut crisp)
 for a in (40, 65, 90, 115, 140):                                   # its perforation: round holes through it, radially, staggered
     for i in range(2):
         f = MD0 - HS_L + 0.009 + i * 0.012 + (0.006 if a in (65, 115) else 0)
         h = cyl(2.4 * mm, HS_R - 0.004, HS_R + 0.004, 'z', (0, f), 12)
         h.transform(Matrix.Rotation(math.radians(90 - a), 4, 'Y')); cut(sh, h)
-bevel(sh, 0.4 * mm, 1, 30); smooth(sh); K.adopt(sh, 'handguard', TI, ppump)
+smooth(sh); K.adopt(sh, 'handguard', TI, ppump)
 
 
 # ================================================== BARREL BLOCK (part_mag, inside part_brk) ==================================================

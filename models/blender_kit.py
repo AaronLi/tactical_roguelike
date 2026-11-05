@@ -101,13 +101,16 @@ def ccw(poly):
     s = sum(poly[i][0] * poly[(i + 1) % len(poly)][1] - poly[(i + 1) % len(poly)][0] * poly[i][1] for i in range(len(poly)))
     return poly if s > 0 else list(reversed(poly))
 
-def picatinny(Kx, f0, f1, u0, slot, mat, parent=None, axis='top', x0=0.0):
+def picatinny(Kx, f0, f1, u0, slot, mat, parent=None, axis='top', x0=0.0, lean=False):
     """A Picatinny rail from f0 to f1 standing on u0 (axis 'top'), or on a side face at x0 facing out (axis 'right'/'left'), or under u0
     (axis 'bottom'). 21.2 mm across, 5.6 mm tall, a slot every 10 mm: built as its section intersected with its toothed side profile
     (one boolean, few triangles)."""
     w, h, sd = 21.2 * mm, 5.6 * mm, 2.8 * mm
-    sec = [(-w / 2 + 1.5 * mm, 0), (w / 2 - 1.5 * mm, 0), (w / 2 - 1.5 * mm, 1.5 * mm), (w / 2, 2.8 * mm), (w / 2 - 1.2 * mm, h - 1.0 * mm),
-           (w / 2 - 1.2 * mm, h), (-w / 2 + 1.2 * mm, h), (-w / 2 + 1.2 * mm, h - 1.0 * mm), (-w / 2, 2.8 * mm), (-w / 2 + 1.5 * mm, 1.5 * mm)]
+    if lean:   # the dovetail's silhouette in six points (a viewmodel can't see the small flats)
+        sec = [(-w / 2 + 1.5 * mm, 0), (w / 2 - 1.5 * mm, 0), (w / 2, 2.8 * mm), (w / 2 - 1.2 * mm, h), (-w / 2 + 1.2 * mm, h), (-w / 2, 2.8 * mm)]
+    else:
+        sec = [(-w / 2 + 1.5 * mm, 0), (w / 2 - 1.5 * mm, 0), (w / 2 - 1.5 * mm, 1.5 * mm), (w / 2, 2.8 * mm), (w / 2 - 1.2 * mm, h - 1.0 * mm),
+               (w / 2 - 1.2 * mm, h), (-w / 2 + 1.2 * mm, h), (-w / 2 + 1.2 * mm, h - 1.0 * mm), (-w / 2, 2.8 * mm), (-w / 2 + 1.5 * mm, 1.5 * mm)]
     prof = [(f1, -0.001), (f0, -0.001), (f0, h)]
     f = f0 + 0.006
     while f + 0.0053 < f1 - 0.003:
