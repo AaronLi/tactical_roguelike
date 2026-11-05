@@ -46,10 +46,11 @@ export function groups(models, B) {
 /** Writes assets/models/bundles/<name>.rtb for every group and bundles/index.json; removes bundle files that are no longer wanted. Returns the manifest. */
 export function writeBundles(models, B, log = () => {}) {
   const dir = path.join(models, 'bundles'); fs.mkdirSync(dir, { recursive: true });
-  const bundles = {}, g = groups(models, B);
+  const bundles = {}, hashes = {}, g = groups(models, B);
   for (const [name, paths] of Object.entries(g)) {
     const raw = pack(paths.map((p) => [p, fs.readFileSync(path.join(models, p))])), z = gzip(raw);
     fs.writeFileSync(path.join(dir, name + B.EXT), z);
+    hashes[name] = hashOf(z);
     bundles[name] = { files: paths.length, bytes: raw.length, gz: z.length, sha1: crypto.createHash('sha1').update(z).digest('hex') };
     log(`  ${name}${B.EXT}: ${paths.length} files, ${raw.length} B, ${z.length} B gzipped`);
   }
@@ -57,8 +58,12 @@ export function writeBundles(models, B, log = () => {}) {
   const t = Object.values(bundles), sum = (k) => t.reduce((a, x) => a + x[k], 0);
   const manifest = { version: 1, bundles, totals: { bundles: t.length, files: sum('files'), bytes: sum('bytes'), gz: sum('gz') } };
   fs.writeFileSync(path.join(dir, 'index.json'), JSON.stringify(manifest, null, 1) + '\n');
+  fs.writeFileSync(path.join(dir, 'manifest.json'), JSON.stringify({ v: 1, bundles: hashes }) + '\n'); // (what the game fetches at boot: js/modelbundles.ts)
   return manifest;
 }
+
+/** The content hash the game keys its local store by: sha256 of the .rtb bytes (the gzipped file as served), first 16 hex digits. */
+export const hashOf = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex').slice(0, 16);
 
 /** Reads a bundle file back: { files: Map(path -> Buffer) } through the game's own reader. */
 export function readBundle(file, B) {
@@ -78,6 +83,8 @@ export function check(models, B) {
   const errs = [], dir = path.join(models, 'bundles'), g = groups(models, B);
   if (!Object.keys(g).length) return ['no baked parts or props under ' + models];
   let manifest = null; try { manifest = JSON.parse(fs.readFileSync(path.join(dir, 'index.json'), 'utf8')); } catch { errs.push('bundles/index.json missing or unreadable: run npm run bake:models (or node tools/bundle_models.mjs)'); }
+  let gm = null; try { gm = JSON.parse(fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8')); } catch { errs.push('bundles/manifest.json missing or unreadable: run node tools/bundle_models.mjs'); }
+  if (gm && (gm.v !== 1 || !gm.bundles || typeof gm.bundles !== 'object')) { errs.push('bundles/manifest.json is malformed (want { v: 1, bundles: { name: hash } })'); gm = null; }
   const have = {};
   for (const name of Object.keys(g)) {
     const f = path.join(dir, name + B.EXT);
@@ -86,6 +93,7 @@ export function check(models, B) {
     have[name] = files;
     const sha = crypto.createHash('sha1').update(fs.readFileSync(f)).digest('hex');
     if (manifest && (!manifest.bundles[name] || manifest.bundles[name].sha1 !== sha || manifest.bundles[name].files !== files.size)) errs.push(`bundles/index.json does not describe ${name}${B.EXT}`);
+    if (gm && gm.bundles[name] !== hashOf(fs.readFileSync(f))) errs.push(`bundles/manifest.json has the wrong hash for ${name}${B.EXT} (rebundle)`);
     for (const p of g[name]) {
       const e = files.get(p);
       if (!e) errs.push(`${p} is not in bundle ${name}`);
@@ -96,6 +104,7 @@ export function check(models, B) {
   }
   for (const f of fs.existsSync(dir) ? fs.readdirSync(dir) : []) if (f.endsWith(B.EXT) && !(f.slice(0, -B.EXT.length) in g)) errs.push(`bundle ${f} holds nothing the tree has`);
   if (manifest) for (const n of Object.keys(manifest.bundles)) if (!(n in g)) errs.push(`bundles/index.json lists ${n}, which has no files`);
+  if (gm) for (const n of Object.keys(gm.bundles)) if (!(n in g)) errs.push(`bundles/manifest.json lists ${n}, which has no files`);
   // every index entry resolves in the bundle the game would ask, and every bundled pack is named by some index
   const named = new Set(), resolve = (p, why) => {
     named.add(p); const b = B.bundleOf(p);

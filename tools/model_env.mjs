@@ -49,7 +49,7 @@ export async function loadGameWithModels() {
   await MeshoptDecoder.ready;
   const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder), cache = new Map();
   // The files the game reads: the bundles (assets/models/bundles, js/modelbundles.ts through a fetch that serves the bundle files), so the tests assemble from what the game loads.
-  const file = (url) => path.join(ROOT, url);
+  const file = (url) => path.join(ROOT, url.replace(/\?.*$/, '')); // (the bundle URLs carry ?h=<hash>)
   const G = loadGame(true, {
     location: { search: '' }, URLSearchParams, TextDecoder, addEventListener() {}, DecompressionStream, Response, Blob,
     fetch: async (url) => { const f = file(url); if (!fs.existsSync(f) || /guns\/index\.json$/.test(url)) return { ok: false, status: 404 }; const b = fs.readFileSync(f); return { ok: true, status: 200, arrayBuffer: async () => b.buffer.slice(b.byteOffset, b.byteOffset + b.length), json: async () => JSON.parse(b.toString('utf8')) }; },
