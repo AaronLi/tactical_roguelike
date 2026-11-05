@@ -34,12 +34,20 @@
    "build": { "barrel": "br.5.56x45.14.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "oem.op.pic.23", "receiver": "rcv.m4", "stock": "stk.tube.0", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "m4",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.5.56x45.14.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.pic.1", "receiver": "rcv.m4", "stock": "stk.tube.0", "tac": "tac.0", "tacL": "tac.0" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon)",
+   "build": { "barrel": "br.5.56x45.14.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "receiver": "rcv.m4", "stock": "stk.tube.0", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "m4",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.5.56x45.14.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.pic.4", "receiver": "rcv.m4", "stock": "stk.tube.0", "tac": "tac.0", "tacL": "tac.0" }
+  },
+  { "platform": "m4",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.5.56x45.14.5", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "receiver": "rcv.m4", "stock": "stk.tube.0" }
+  },
+  { "platform": "m4",
+   "why": "magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.5.56x45.14.5", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "receiver": "rcv.m4", "stock": "stk.tube.0" }
   },
   { "platform": "m4",
    "why": "bipod (fg.4)",
@@ -102,12 +110,16 @@
    "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "oem.op.pic.23", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
   },
   { "platform": "ak",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.slant", "optic": "op.pic.1", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon) + magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.slant", "optic": "op.auth.falcon", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
   },
   { "platform": "ak",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.slant", "optic": "op.pic.4", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+  },
+  { "platform": "ak",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "op.auth.falcon", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
   },
   { "platform": "ak",
    "why": "suppressor on the muzzle (mz.rak.can)",
@@ -138,12 +150,20 @@
    "build": { "barrel": "br.5.56x45.19.2", "grip": "oem.gr.ar.4", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "oem.op.pic.23", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "f2",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.5.56x45.19.2", "grip": "oem.gr.ar.4", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.pic.1", "tac": "tac.0", "tacL": "tac.0" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon)",
+   "build": { "barrel": "br.5.56x45.19.2", "grip": "oem.gr.ar.4", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "f2",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.5.56x45.19.2", "grip": "oem.gr.ar.4", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.pic.4", "tac": "tac.0", "tacL": "tac.0" }
+  },
+  { "platform": "f2",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.5.56x45.19.2", "grip": "oem.gr.ar.4", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon" }
+  },
+  { "platform": "f2",
+   "why": "magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.5.56x45.19.2", "grip": "oem.gr.ar.4", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon" }
   },
   { "platform": "f2",
    "why": "suppressor on the muzzle (mz.r556.can)",
@@ -186,12 +206,16 @@
    "build": { "barrel": "br.5.56x45.18.9", "grip": "oem.gr.ar.4", "handguard": "oem.hg.g36.0", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "oem.op.pic.23", "stock": "stk.heavy.g36" }
   },
   { "platform": "g36",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.5.56x45.18.9", "grip": "oem.gr.ar.4", "handguard": "oem.hg.g36.0", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.pic.1", "stock": "stk.heavy.g36" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon) + magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.5.56x45.18.9", "grip": "oem.gr.ar.4", "handguard": "oem.hg.g36.0", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "stock": "stk.heavy.g36" }
   },
   { "platform": "g36",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.5.56x45.18.9", "grip": "oem.gr.ar.4", "handguard": "oem.hg.g36.0", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.pic.4", "stock": "stk.heavy.g36" }
+  },
+  { "platform": "g36",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.5.56x45.18.9", "grip": "oem.gr.ar.4", "handguard": "oem.hg.g36.0", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "stock": "stk.heavy.g36" }
   },
   { "platform": "g36",
    "why": "suppressor on the muzzle (mz.r556.can)",
@@ -230,12 +254,20 @@
    "build": { "barrel": "br.7x43.16", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.6", "mag": "br3.mag", "muzzle": "mz.r762.comp", "optic": "oem.op.pic.23", "stock": "oem.stk.tube.5", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "br3",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.7x43.16", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.6", "mag": "br3.mag", "magnifier": "mgn.0", "muzzle": "mz.r762.comp", "optic": "op.pic.1", "stock": "oem.stk.tube.5", "tac": "tac.0", "tacL": "tac.0" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon)",
+   "build": { "barrel": "br.7x43.16", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.6", "mag": "br3.mag", "magnifier": "mgn.0", "muzzle": "mz.r762.comp", "optic": "op.auth.falcon", "stock": "oem.stk.tube.5", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "br3",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.7x43.16", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.6", "mag": "br3.mag", "magnifier": "mgn.0", "muzzle": "mz.r762.comp", "optic": "op.pic.4", "stock": "oem.stk.tube.5", "tac": "tac.0", "tacL": "tac.0" }
+  },
+  { "platform": "br3",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.7x43.16", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.6", "mag": "br3.mag", "muzzle": "mz.r762.comp", "optic": "op.auth.falcon", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "br3",
+   "why": "magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.7x43.16", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.6", "mag": "br3.mag", "magnifier": "mgn.0", "muzzle": "mz.r762.comp", "optic": "op.auth.falcon", "stock": "oem.stk.tube.5" }
   },
   { "platform": "br3",
    "why": "bipod (fg.4)",
@@ -274,12 +306,20 @@
    "build": { "barrel": "br.7.62x51.16", "fg": "fg.0", "grip": "oem.gr.ar.4", "mag": "scar.mag", "muzzle": "mz.r762.a2", "optic": "oem.op.pic.23", "stock": "stk.heavy.scar", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "scar",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.7.62x51.16", "fg": "fg.0", "grip": "oem.gr.ar.4", "mag": "scar.mag", "magnifier": "mgn.0", "muzzle": "mz.r762.a2", "optic": "op.pic.1", "stock": "stk.heavy.scar", "tac": "tac.0", "tacL": "tac.0" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon)",
+   "build": { "barrel": "br.7.62x51.16", "fg": "fg.0", "grip": "oem.gr.ar.4", "mag": "scar.mag", "magnifier": "mgn.0", "muzzle": "mz.r762.a2", "optic": "op.auth.falcon", "stock": "stk.heavy.scar", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "scar",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.7.62x51.16", "fg": "fg.0", "grip": "oem.gr.ar.4", "mag": "scar.mag", "magnifier": "mgn.0", "muzzle": "mz.r762.a2", "optic": "op.pic.4", "stock": "stk.heavy.scar", "tac": "tac.0", "tacL": "tac.0" }
+  },
+  { "platform": "scar",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.7.62x51.16", "grip": "oem.gr.ar.4", "mag": "scar.mag", "muzzle": "mz.r762.a2", "optic": "op.auth.falcon", "stock": "stk.heavy.scar" }
+  },
+  { "platform": "scar",
+   "why": "magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.7.62x51.16", "grip": "oem.gr.ar.4", "mag": "scar.mag", "magnifier": "mgn.0", "muzzle": "mz.r762.a2", "optic": "op.auth.falcon", "stock": "stk.heavy.scar" }
   },
   { "platform": "scar",
    "why": "bipod (fg.4)",
@@ -314,12 +354,20 @@
    "build": { "barrel": "br.5.56x45.16.5", "grip": "oem.gr.ar.4", "mag": "stanag.mag.40", "muzzle": "mz.r556.a2", "optic": "oem.op.pic.23", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "tavor",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.5.56x45.16.5", "grip": "oem.gr.ar.4", "mag": "stanag.mag.40", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.pic.1", "tac": "tac.0", "tacL": "tac.0" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon)",
+   "build": { "barrel": "br.5.56x45.16.5", "grip": "oem.gr.ar.4", "mag": "stanag.mag.40", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "tavor",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.5.56x45.16.5", "grip": "oem.gr.ar.4", "mag": "stanag.mag.40", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.pic.4", "tac": "tac.0", "tacL": "tac.0" }
+  },
+  { "platform": "tavor",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.5.56x45.16.5", "grip": "oem.gr.ar.4", "mag": "stanag.mag.40", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon" }
+  },
+  { "platform": "tavor",
+   "why": "magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.5.56x45.16.5", "grip": "oem.gr.ar.4", "mag": "stanag.mag.40", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon" }
   },
   { "platform": "tavor",
    "why": "suppressor on the muzzle (mz.r556.can)",
@@ -358,12 +406,20 @@
    "build": { "barrel": "br.5.56x45.14.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "hg.ar.2", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "oem.op.pic.23", "stock": "oem.stk.tube.5", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "hk416",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.5.56x45.14.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "hg.ar.2", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.pic.1", "stock": "oem.stk.tube.5", "tac": "tac.0", "tacL": "tac.0" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon)",
+   "build": { "barrel": "br.5.56x45.14.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "hg.ar.2", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "stock": "oem.stk.tube.5", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "hk416",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.5.56x45.14.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "hg.ar.2", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.pic.4", "stock": "oem.stk.tube.5", "tac": "tac.0", "tacL": "tac.0" }
+  },
+  { "platform": "hk416",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.5.56x45.14.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "hg.ar.2", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "hk416",
+   "why": "magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.5.56x45.14.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "hg.ar.2", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "stock": "oem.stk.tube.5" }
   },
   { "platform": "hk416",
    "why": "bipod (fg.4)",
@@ -402,12 +458,20 @@
    "build": { "barrel": "br.5.56x45.20", "grip": "oem.gr.ar.4", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "oem.op.pic.23", "receiver": "rcv.aug", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "aug",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.5.56x45.20", "grip": "oem.gr.ar.4", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.pic.1", "receiver": "rcv.aug", "tac": "tac.0", "tacL": "tac.0" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon)",
+   "build": { "barrel": "br.5.56x45.20", "grip": "oem.gr.ar.4", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "receiver": "rcv.aug", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "aug",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.5.56x45.20", "grip": "oem.gr.ar.4", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.pic.4", "receiver": "rcv.aug", "tac": "tac.0", "tacL": "tac.0" }
+  },
+  { "platform": "aug",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.5.56x45.20", "grip": "oem.gr.ar.4", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "receiver": "rcv.aug" }
+  },
+  { "platform": "aug",
+   "why": "magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.5.56x45.20", "grip": "oem.gr.ar.4", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "receiver": "rcv.aug" }
   },
   { "platform": "aug",
    "why": "suppressor on the muzzle (mz.r556.can)",
@@ -450,12 +514,20 @@
    "build": { "barrel": "br.7.62x39.16", "fg": "fg.0", "grip": "oem.gr.ak.3", "handguard": "hg.ak.1", "mag": "akm.mag.30", "muzzle": "mz.rak.brake", "optic": "oem.op.pic.23", "stock": "oem.stk.ak.5", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "galil",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.7.62x39.16", "fg": "fg.0", "grip": "oem.gr.ak.3", "handguard": "hg.ak.1", "mag": "akm.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.brake", "optic": "op.pic.1", "stock": "oem.stk.ak.5", "tac": "tac.0", "tacL": "tac.0" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon)",
+   "build": { "barrel": "br.7.62x39.16", "fg": "fg.0", "grip": "oem.gr.ak.3", "handguard": "hg.ak.1", "mag": "akm.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.brake", "optic": "op.auth.falcon", "stock": "oem.stk.ak.5", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "galil",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.7.62x39.16", "fg": "fg.0", "grip": "oem.gr.ak.3", "handguard": "hg.ak.1", "mag": "akm.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.brake", "optic": "op.pic.4", "stock": "oem.stk.ak.5", "tac": "tac.0", "tacL": "tac.0" }
+  },
+  { "platform": "galil",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.7.62x39.16", "grip": "oem.gr.ak.3", "handguard": "hg.ak.1", "mag": "akm.mag.30", "muzzle": "mz.rak.brake", "optic": "op.auth.falcon", "stock": "oem.stk.ak.5" }
+  },
+  { "platform": "galil",
+   "why": "magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.7.62x39.16", "grip": "oem.gr.ak.3", "handguard": "hg.ak.1", "mag": "akm.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.brake", "optic": "op.auth.falcon", "stock": "oem.stk.ak.5" }
   },
   { "platform": "galil",
    "why": "bipod (fg.4)",
@@ -518,12 +590,16 @@
    "build": { "barrel": "br.5.6x39.15.9", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.6", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "oem.op.pic.23", "stock": "oem.stk.ak.5" }
   },
   { "platform": "an94",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.5.6x39.15.9", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.6", "mag": "ak74.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.brake", "optic": "op.pic.1", "stock": "oem.stk.ak.5" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon) + magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.5.6x39.15.9", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.6", "mag": "ak74.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.brake", "optic": "op.auth.falcon", "stock": "oem.stk.ak.5" }
   },
   { "platform": "an94",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.5.6x39.15.9", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.6", "mag": "ak74.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.brake", "optic": "op.pic.4", "stock": "oem.stk.ak.5" }
+  },
+  { "platform": "an94",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.5.6x39.15.9", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.6", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "op.auth.falcon", "stock": "oem.stk.ak.5" }
   },
   { "platform": "an94",
    "why": "suppressor on the muzzle (mz.rak.can)",
@@ -566,12 +642,16 @@
    "build": { "barrel": "br.7.62x51.21", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.4", "mag": "fal.mag", "muzzle": "mz.r762.a2", "optic": "oem.op.pic.23", "stock": "stk.heavy.0" }
   },
   { "platform": "fal",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.7.62x51.21", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.4", "mag": "fal.mag", "magnifier": "mgn.0", "muzzle": "mz.r762.a2", "optic": "op.pic.1", "stock": "stk.heavy.0" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon) + magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.7.62x51.21", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.4", "mag": "fal.mag", "magnifier": "mgn.0", "muzzle": "mz.r762.a2", "optic": "op.auth.falcon", "stock": "stk.heavy.0" }
   },
   { "platform": "fal",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.7.62x51.21", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.4", "mag": "fal.mag", "magnifier": "mgn.0", "muzzle": "mz.r762.a2", "optic": "op.pic.4", "stock": "stk.heavy.0" }
+  },
+  { "platform": "fal",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.7.62x51.21", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.4", "mag": "fal.mag", "muzzle": "mz.r762.a2", "optic": "op.auth.falcon", "stock": "stk.heavy.0" }
   },
   { "platform": "fal",
    "why": "suppressor on the muzzle (mz.r762.can)",
@@ -610,12 +690,20 @@
    "build": { "barrel": "br.7.62x51.18", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "hg.ar.2", "mag": "m14.mag.20", "muzzle": "mz.r762.a2", "optic": "oem.op.pic.23", "receiver": "rcv.mk14", "stock": "oem.stk.tube.5", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "mk14",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.7.62x51.18", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "hg.ar.2", "mag": "m14.mag.20", "magnifier": "mgn.0", "muzzle": "mz.r762.a2", "optic": "op.pic.1", "receiver": "rcv.mk14", "stock": "oem.stk.tube.5", "tac": "tac.0", "tacL": "tac.0" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon)",
+   "build": { "barrel": "br.7.62x51.18", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "hg.ar.2", "mag": "m14.mag.20", "magnifier": "mgn.0", "muzzle": "mz.r762.a2", "optic": "op.auth.falcon", "receiver": "rcv.mk14", "stock": "oem.stk.tube.5", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "mk14",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.7.62x51.18", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "hg.ar.2", "mag": "m14.mag.20", "magnifier": "mgn.0", "muzzle": "mz.r762.a2", "optic": "op.pic.4", "receiver": "rcv.mk14", "stock": "oem.stk.tube.5", "tac": "tac.0", "tacL": "tac.0" }
+  },
+  { "platform": "mk14",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.7.62x51.18", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "hg.ar.2", "mag": "m14.mag.20", "muzzle": "mz.r762.a2", "optic": "op.auth.falcon", "receiver": "rcv.mk14", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "mk14",
+   "why": "magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.7.62x51.18", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "hg.ar.2", "mag": "m14.mag.20", "magnifier": "mgn.0", "muzzle": "mz.r762.a2", "optic": "op.auth.falcon", "receiver": "rcv.mk14", "stock": "oem.stk.tube.5" }
   },
   { "platform": "mk14",
    "why": "bipod (fg.4)",
@@ -658,12 +746,16 @@
    "build": { "barrel": "br.7.62x63.24", "handguard": "oem.hg.classic.3", "muzzle": "mz.r762.cap", "optic": "oem.op.pic.23", "stock": "oem.stk.classic.4" }
   },
   { "platform": "garand",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.7.62x63.24", "handguard": "oem.hg.classic.3", "magnifier": "mgn.0", "muzzle": "mz.r762.cap", "optic": "op.pic.1", "stock": "oem.stk.classic.4" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon) + magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.7.62x63.24", "handguard": "oem.hg.classic.3", "magnifier": "mgn.0", "muzzle": "mz.r762.cap", "optic": "op.auth.falcon", "stock": "oem.stk.classic.4" }
   },
   { "platform": "garand",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.7.62x63.24", "handguard": "oem.hg.classic.3", "magnifier": "mgn.0", "muzzle": "mz.r762.cap", "optic": "op.pic.4", "stock": "oem.stk.classic.4" }
+  },
+  { "platform": "garand",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.7.62x63.24", "handguard": "oem.hg.classic.3", "muzzle": "mz.r762.cap", "optic": "op.auth.falcon", "stock": "oem.stk.classic.4" }
   },
   { "platform": "garand",
    "why": "suppressor on the muzzle (mz.r762.can)",
@@ -714,12 +806,16 @@
    "build": { "barrel": "br.7.62x54.24.4", "handguard": "oem.hg.ak.7", "mag": "svd.mag", "muzzle": "mz.r762.a2", "optic": "oem.op.pic.23", "stock": "oem.stk.precision.4" }
   },
   { "platform": "svd",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.7.62x54.24.4", "handguard": "oem.hg.ak.7", "mag": "svd.mag", "magnifier": "mgn.0", "muzzle": "mz.r762.a2", "optic": "op.pic.1", "stock": "oem.stk.precision.4" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon) + magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.7.62x54.24.4", "handguard": "oem.hg.ak.7", "mag": "svd.mag", "magnifier": "mgn.0", "muzzle": "mz.r762.a2", "optic": "op.auth.falcon", "stock": "oem.stk.precision.4" }
   },
   { "platform": "svd",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.7.62x54.24.4", "handguard": "oem.hg.ak.7", "mag": "svd.mag", "magnifier": "mgn.0", "muzzle": "mz.r762.a2", "optic": "op.pic.4", "stock": "oem.stk.precision.4" }
+  },
+  { "platform": "svd",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.7.62x54.24.4", "handguard": "oem.hg.ak.7", "mag": "svd.mag", "muzzle": "mz.r762.a2", "optic": "op.auth.falcon", "stock": "oem.stk.precision.4" }
   },
   { "platform": "svd",
    "why": "suppressor on the muzzle (mz.r762.can)",
@@ -758,12 +854,20 @@
    "build": { "barrel": "vss.barrel", "mag": "vss.mag", "optic": "oem.op.pic.23", "railmount": "rm.0", "stock": "oem.stk.precision.4", "tac": "tac.0" }
   },
   { "platform": "vss",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "vss.barrel", "mag": "vss.mag", "magnifier": "mgn.0", "optic": "op.pic.1", "railmount": "rm.0", "stock": "oem.stk.precision.4", "tac": "tac.0" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon)",
+   "build": { "barrel": "vss.barrel", "mag": "vss.mag", "magnifier": "mgn.0", "optic": "op.auth.falcon", "railmount": "rm.0", "stock": "oem.stk.precision.4", "tac": "tac.0" }
   },
   { "platform": "vss",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "vss.barrel", "mag": "vss.mag", "magnifier": "mgn.0", "optic": "op.pic.4", "railmount": "rm.0", "stock": "oem.stk.precision.4", "tac": "tac.0" }
+  },
+  { "platform": "vss",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "vss.barrel", "mag": "vss.mag", "optic": "op.auth.falcon", "stock": "oem.stk.precision.4" }
+  },
+  { "platform": "vss",
+   "why": "magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "vss.barrel", "mag": "vss.mag", "magnifier": "mgn.0", "optic": "op.auth.falcon", "stock": "oem.stk.precision.4" }
   },
   { "platform": "vss",
    "why": "integral suppressor (vss.br.long)",
@@ -802,12 +906,16 @@
    "build": { "barrel": "br.11.6x53.18.5", "handguard": "oem.hg.classic.4", "muzzle": "mz.r762.cap", "optic": "oem.op.pic.23", "stock": "oem.stk.classic.5", "tube": "lever.tube" }
   },
   { "platform": "lever",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.11.6x53.18.5", "handguard": "oem.hg.classic.4", "magnifier": "mgn.0", "muzzle": "mz.r762.cap", "optic": "op.pic.1", "stock": "oem.stk.classic.5", "tube": "lever.tube" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon) + magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.11.6x53.18.5", "handguard": "oem.hg.classic.4", "magnifier": "mgn.0", "muzzle": "mz.r762.cap", "optic": "op.auth.falcon", "stock": "oem.stk.classic.5", "tube": "lever.tube" }
   },
   { "platform": "lever",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.11.6x53.18.5", "handguard": "oem.hg.classic.4", "magnifier": "mgn.0", "muzzle": "mz.r762.cap", "optic": "op.pic.4", "stock": "oem.stk.classic.5", "tube": "lever.tube" }
+  },
+  { "platform": "lever",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.11.6x53.18.5", "handguard": "oem.hg.classic.4", "muzzle": "mz.r762.cap", "optic": "op.auth.falcon", "stock": "oem.stk.classic.5", "tube": "lever.tube" }
   },
   { "platform": "lever",
    "why": "suppressor on the muzzle (mz.r762.can)",
@@ -850,12 +958,16 @@
    "build": { "barrel": "br.7.62x51.24", "handguard": "oem.hg.classic.5", "mag": "r700.mag", "muzzle": "mz.r762.cap", "optic": "oem.op.pic.23", "stock": "oem.stk.precision.5" }
   },
   { "platform": "r700",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.7.62x51.24", "handguard": "oem.hg.classic.5", "mag": "r700.mag", "magnifier": "mgn.0", "muzzle": "mz.r762.cap", "optic": "op.pic.1", "stock": "oem.stk.precision.5" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon) + magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.7.62x51.24", "handguard": "oem.hg.classic.5", "mag": "r700.mag", "magnifier": "mgn.0", "muzzle": "mz.r762.cap", "optic": "op.auth.falcon", "stock": "oem.stk.precision.5" }
   },
   { "platform": "r700",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.7.62x51.24", "handguard": "oem.hg.classic.5", "mag": "r700.mag", "magnifier": "mgn.0", "muzzle": "mz.r762.cap", "optic": "op.pic.4", "stock": "oem.stk.precision.5" }
+  },
+  { "platform": "r700",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.7.62x51.24", "handguard": "oem.hg.classic.5", "mag": "r700.mag", "muzzle": "mz.r762.cap", "optic": "op.auth.falcon", "stock": "oem.stk.precision.5" }
   },
   { "platform": "r700",
    "why": "biggest magazine (r700.mag.box)",
@@ -898,12 +1010,16 @@
    "build": { "barrel": "br.7.62x54.28.7", "handguard": "oem.hg.classic.6", "mag": "mosin.mag", "muzzle": "mz.r762.cap", "optic": "oem.op.pic.23", "stock": "oem.stk.classic.4" }
   },
   { "platform": "mosin",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.7.62x54.28.7", "handguard": "oem.hg.classic.6", "mag": "mosin.mag", "magnifier": "mgn.0", "muzzle": "mz.r762.cap", "optic": "op.pic.1", "stock": "oem.stk.classic.4" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon) + magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.7.62x54.28.7", "handguard": "oem.hg.classic.6", "mag": "mosin.mag", "magnifier": "mgn.0", "muzzle": "mz.r762.cap", "optic": "op.auth.falcon", "stock": "oem.stk.classic.4" }
   },
   { "platform": "mosin",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.7.62x54.28.7", "handguard": "oem.hg.classic.6", "mag": "mosin.mag", "magnifier": "mgn.0", "muzzle": "mz.r762.cap", "optic": "op.pic.4", "stock": "oem.stk.classic.4" }
+  },
+  { "platform": "mosin",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.7.62x54.28.7", "handguard": "oem.hg.classic.6", "mag": "mosin.mag", "muzzle": "mz.r762.cap", "optic": "op.auth.falcon", "stock": "oem.stk.classic.4" }
   },
   { "platform": "mosin",
    "why": "biggest magazine (mosin.mag.box)",
@@ -954,12 +1070,16 @@
    "build": { "barrel": "br.8.6x69.27", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.5", "mag": "awm.mag", "muzzle": "mz.r762.brake", "optic": "oem.op.pic.23", "stock": "oem.stk.precision.6" }
   },
   { "platform": "awm",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.8.6x69.27", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.5", "mag": "awm.mag", "magnifier": "mgn.0", "muzzle": "mz.r762.brake", "optic": "op.pic.1", "stock": "oem.stk.precision.6" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon) + magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.8.6x69.27", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.5", "mag": "awm.mag", "magnifier": "mgn.0", "muzzle": "mz.r762.brake", "optic": "op.auth.falcon", "stock": "oem.stk.precision.6" }
   },
   { "platform": "awm",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.8.6x69.27", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.5", "mag": "awm.mag", "magnifier": "mgn.0", "muzzle": "mz.r762.brake", "optic": "op.pic.4", "stock": "oem.stk.precision.6" }
+  },
+  { "platform": "awm",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.8.6x69.27", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.5", "mag": "awm.mag", "muzzle": "mz.r762.brake", "optic": "op.auth.falcon", "stock": "oem.stk.precision.6" }
   },
   { "platform": "awm",
    "why": "suppressor on the muzzle (mz.r762.can)",
@@ -1002,12 +1122,16 @@
    "build": { "barrel": "br.12.7x99.29", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.6", "mag": "barrett.mag", "muzzle": "mz.r50.big", "optic": "op.pic.0", "stock": "oem.stk.precision.7" }
   },
   { "platform": "barrett",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.12.7x99.29", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.6", "mag": "barrett.mag", "magnifier": "mgn.0", "muzzle": "mz.r50.big", "optic": "op.pic.1", "stock": "oem.stk.precision.7" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon) + magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.12.7x99.29", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.6", "mag": "barrett.mag", "magnifier": "mgn.0", "muzzle": "mz.r50.big", "optic": "op.auth.falcon", "stock": "oem.stk.precision.7" }
   },
   { "platform": "barrett",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.12.7x99.29", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.6", "mag": "barrett.mag", "magnifier": "mgn.0", "muzzle": "mz.r50.big", "optic": "op.pic.4", "stock": "oem.stk.precision.7" }
+  },
+  { "platform": "barrett",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.12.7x99.29", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.6", "mag": "barrett.mag", "muzzle": "mz.r50.big", "optic": "op.auth.falcon", "stock": "oem.stk.precision.7" }
   },
   { "platform": "barrett",
    "why": "suppressor on the muzzle (mz.r50.can)",
@@ -1042,12 +1166,20 @@
    "build": { "barrel": "br.12.7x99.28.7", "grip": "oem.gr.ar.4", "mag": "gm6.mag", "muzzle": "oem.mz.r50.7", "optic": "op.pic.0", "railmount": "rm.0", "tac": "tac.0" }
   },
   { "platform": "gm6",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.12.7x99.28.7", "grip": "oem.gr.ar.4", "mag": "gm6.mag", "magnifier": "mgn.0", "muzzle": "oem.mz.r50.7", "optic": "op.pic.1", "railmount": "rm.0", "tac": "tac.0" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon)",
+   "build": { "barrel": "br.12.7x99.28.7", "grip": "oem.gr.ar.4", "mag": "gm6.mag", "magnifier": "mgn.0", "muzzle": "oem.mz.r50.7", "optic": "op.auth.falcon", "railmount": "rm.0", "tac": "tac.0" }
   },
   { "platform": "gm6",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.12.7x99.28.7", "grip": "oem.gr.ar.4", "mag": "gm6.mag", "magnifier": "mgn.0", "muzzle": "oem.mz.r50.7", "optic": "op.pic.4", "railmount": "rm.0", "tac": "tac.0" }
+  },
+  { "platform": "gm6",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.12.7x99.28.7", "grip": "oem.gr.ar.4", "mag": "gm6.mag", "muzzle": "oem.mz.r50.7", "optic": "op.auth.falcon" }
+  },
+  { "platform": "gm6",
+   "why": "magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.12.7x99.28.7", "grip": "oem.gr.ar.4", "mag": "gm6.mag", "magnifier": "mgn.0", "muzzle": "oem.mz.r50.7", "optic": "op.auth.falcon" }
   },
   { "platform": "gm6",
    "why": "suppressor on the muzzle (mz.r50.can)",
@@ -1090,12 +1222,20 @@
    "build": { "barrel": "br.9x19.4", "grip": "oem.gr.smg.3", "mag": "uzi.mag", "muzzle": "mz.r9.cap", "optic": "oem.op.pic.23", "railmount": "rm.0", "stock": "stk.smg.0", "tac": "tac.0" }
   },
   { "platform": "uzi",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.9x19.4", "grip": "oem.gr.smg.3", "mag": "uzi.mag", "magnifier": "mgn.0", "muzzle": "mz.r9.cap", "optic": "op.pic.1", "railmount": "rm.0", "stock": "stk.smg.0", "tac": "tac.0" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon)",
+   "build": { "barrel": "br.9x19.4", "grip": "oem.gr.smg.3", "mag": "uzi.mag", "magnifier": "mgn.0", "muzzle": "mz.r9.cap", "optic": "op.auth.falcon", "railmount": "rm.0", "stock": "stk.smg.0", "tac": "tac.0" }
   },
   { "platform": "uzi",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.9x19.4", "grip": "oem.gr.smg.3", "mag": "uzi.mag", "magnifier": "mgn.0", "muzzle": "mz.r9.cap", "optic": "op.pic.4", "railmount": "rm.0", "stock": "stk.smg.0", "tac": "tac.0" }
+  },
+  { "platform": "uzi",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.9x19.4", "grip": "oem.gr.smg.3", "mag": "uzi.mag", "muzzle": "mz.r9.cap", "optic": "op.auth.falcon", "stock": "stk.smg.0" }
+  },
+  { "platform": "uzi",
+   "why": "magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.9x19.4", "grip": "oem.gr.smg.3", "mag": "uzi.mag", "magnifier": "mgn.0", "muzzle": "mz.r9.cap", "optic": "op.auth.falcon", "stock": "stk.smg.0" }
   },
   { "platform": "uzi",
    "why": "suppressor on the muzzle (mz.r9.can)",
@@ -1142,12 +1282,16 @@
    "build": { "barrel": "br.9x19.8.9", "grip": "oem.gr.ar.4", "handguard": "oem.hg.smg.3", "mag": "mp5.mag.30", "muzzle": "mz.r9.tri", "optic": "oem.op.pic.23", "receiver": "rcv.mp5", "stock": "stk.smg.1" }
   },
   { "platform": "mp5",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.9x19.8.9", "grip": "oem.gr.ar.4", "handguard": "oem.hg.smg.3", "mag": "mp5.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r9.tri", "optic": "op.pic.1", "receiver": "rcv.mp5", "stock": "stk.smg.1" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon) + magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.9x19.8.9", "grip": "oem.gr.ar.4", "handguard": "oem.hg.smg.3", "mag": "mp5.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r9.tri", "optic": "op.auth.falcon", "receiver": "rcv.mp5", "stock": "stk.smg.1" }
   },
   { "platform": "mp5",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.9x19.8.9", "grip": "oem.gr.ar.4", "handguard": "oem.hg.smg.3", "mag": "mp5.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r9.tri", "optic": "op.pic.4", "receiver": "rcv.mp5", "stock": "stk.smg.1" }
+  },
+  { "platform": "mp5",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.9x19.8.9", "grip": "oem.gr.ar.4", "handguard": "oem.hg.smg.3", "mag": "mp5.mag.30", "muzzle": "mz.r9.tri", "optic": "op.auth.falcon", "receiver": "rcv.mp5", "stock": "stk.smg.1" }
   },
   { "platform": "mp5",
    "why": "suppressor on the muzzle (mz.r9.can)",
@@ -1190,12 +1334,20 @@
    "build": { "barrel": "mp5sd.barrel", "grip": "oem.gr.ar.4", "mag": "mp5.mag.30", "optic": "oem.op.pic.23", "railmount": "rm.0", "receiver": "rcv.mp5sd", "stock": "stk.smg.1", "tac": "tac.0" }
   },
   { "platform": "mp5sd",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "mp5sd.barrel", "grip": "oem.gr.ar.4", "mag": "mp5.mag.30", "magnifier": "mgn.0", "optic": "op.pic.1", "railmount": "rm.0", "receiver": "rcv.mp5sd", "stock": "stk.smg.1", "tac": "tac.0" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon)",
+   "build": { "barrel": "mp5sd.barrel", "grip": "oem.gr.ar.4", "mag": "mp5.mag.30", "magnifier": "mgn.0", "optic": "op.auth.falcon", "railmount": "rm.0", "receiver": "rcv.mp5sd", "stock": "stk.smg.1", "tac": "tac.0" }
   },
   { "platform": "mp5sd",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "mp5sd.barrel", "grip": "oem.gr.ar.4", "mag": "mp5.mag.30", "magnifier": "mgn.0", "optic": "op.pic.4", "railmount": "rm.0", "receiver": "rcv.mp5sd", "stock": "stk.smg.1", "tac": "tac.0" }
+  },
+  { "platform": "mp5sd",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "mp5sd.barrel", "grip": "oem.gr.ar.4", "mag": "mp5.mag.30", "optic": "op.auth.falcon", "receiver": "rcv.mp5sd", "stock": "stk.smg.1" }
+  },
+  { "platform": "mp5sd",
+   "why": "magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "mp5sd.barrel", "grip": "oem.gr.ar.4", "mag": "mp5.mag.30", "magnifier": "mgn.0", "optic": "op.auth.falcon", "receiver": "rcv.mp5sd", "stock": "stk.smg.1" }
   },
   { "platform": "mp5sd",
    "why": "integral suppressor (mp5sd.br.long)",
@@ -1234,12 +1386,20 @@
    "build": { "barrel": "br.11.43x23.5.5", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.smg.4", "mag": "vector.mag", "muzzle": "mz.r45.a2", "optic": "oem.op.pic.23", "stock": "oem.stk.tube.5", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "vector",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.11.43x23.5.5", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.smg.4", "mag": "vector.mag", "magnifier": "mgn.0", "muzzle": "mz.r45.a2", "optic": "op.pic.1", "stock": "oem.stk.tube.5", "tac": "tac.0", "tacL": "tac.0" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon)",
+   "build": { "barrel": "br.11.43x23.5.5", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.smg.4", "mag": "vector.mag", "magnifier": "mgn.0", "muzzle": "mz.r45.a2", "optic": "op.auth.falcon", "stock": "oem.stk.tube.5", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "vector",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.11.43x23.5.5", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.smg.4", "mag": "vector.mag", "magnifier": "mgn.0", "muzzle": "mz.r45.a2", "optic": "op.pic.4", "stock": "oem.stk.tube.5", "tac": "tac.0", "tacL": "tac.0" }
+  },
+  { "platform": "vector",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.11.43x23.5.5", "grip": "oem.gr.ar.4", "handguard": "oem.hg.smg.4", "mag": "vector.mag", "muzzle": "mz.r45.a2", "optic": "op.auth.falcon", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "vector",
+   "why": "magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.11.43x23.5.5", "grip": "oem.gr.ar.4", "handguard": "oem.hg.smg.4", "mag": "vector.mag", "magnifier": "mgn.0", "muzzle": "mz.r45.a2", "optic": "op.auth.falcon", "stock": "oem.stk.tube.5" }
   },
   { "platform": "vector",
    "why": "bipod (fg.4)",
@@ -1286,12 +1446,20 @@
    "build": { "barrel": "br.11.43x23.10.5", "grip": "oem.gr.ak.3", "handguard": "oem.hg.shroud.3", "mag": "thompson.mag", "muzzle": "mz.r45.cutts", "optic": "oem.op.pic.23", "railmount": "rm.0", "stock": "oem.stk.classic.4", "tac": "tac.0" }
   },
   { "platform": "thompson",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.11.43x23.10.5", "grip": "oem.gr.ak.3", "handguard": "oem.hg.shroud.3", "mag": "thompson.mag", "magnifier": "mgn.0", "muzzle": "mz.r45.cutts", "optic": "op.pic.1", "railmount": "rm.0", "stock": "oem.stk.classic.4", "tac": "tac.0" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon)",
+   "build": { "barrel": "br.11.43x23.10.5", "grip": "oem.gr.ak.3", "handguard": "oem.hg.shroud.3", "mag": "thompson.mag", "magnifier": "mgn.0", "muzzle": "mz.r45.cutts", "optic": "op.auth.falcon", "railmount": "rm.0", "stock": "oem.stk.classic.4", "tac": "tac.0" }
   },
   { "platform": "thompson",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.11.43x23.10.5", "grip": "oem.gr.ak.3", "handguard": "oem.hg.shroud.3", "mag": "thompson.mag", "magnifier": "mgn.0", "muzzle": "mz.r45.cutts", "optic": "op.pic.4", "railmount": "rm.0", "stock": "oem.stk.classic.4", "tac": "tac.0" }
+  },
+  { "platform": "thompson",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.11.43x23.10.5", "grip": "oem.gr.ak.3", "handguard": "oem.hg.shroud.3", "mag": "thompson.mag", "muzzle": "mz.r45.cutts", "optic": "op.auth.falcon", "stock": "oem.stk.classic.4" }
+  },
+  { "platform": "thompson",
+   "why": "magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.11.43x23.10.5", "grip": "oem.gr.ak.3", "handguard": "oem.hg.shroud.3", "mag": "thompson.mag", "magnifier": "mgn.0", "muzzle": "mz.r45.cutts", "optic": "op.auth.falcon", "stock": "oem.stk.classic.4" }
   },
   { "platform": "thompson",
    "why": "suppressor on the muzzle (mz.r45.can)",
@@ -1338,12 +1506,20 @@
    "build": { "barrel": "br.7.62x25.10.5", "handguard": "oem.hg.shroud.4", "mag": "ppsh.mag", "muzzle": "mz.r9.comp", "optic": "oem.op.pic.23", "railmount": "rm.0", "stock": "oem.stk.classic.4", "tac": "tac.0" }
   },
   { "platform": "ppsh",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.7.62x25.10.5", "handguard": "oem.hg.shroud.4", "mag": "ppsh.mag", "magnifier": "mgn.0", "muzzle": "mz.r9.comp", "optic": "op.pic.1", "railmount": "rm.0", "stock": "oem.stk.classic.4", "tac": "tac.0" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon)",
+   "build": { "barrel": "br.7.62x25.10.5", "handguard": "oem.hg.shroud.4", "mag": "ppsh.mag", "magnifier": "mgn.0", "muzzle": "mz.r9.comp", "optic": "op.auth.falcon", "railmount": "rm.0", "stock": "oem.stk.classic.4", "tac": "tac.0" }
   },
   { "platform": "ppsh",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.7.62x25.10.5", "handguard": "oem.hg.shroud.4", "mag": "ppsh.mag", "magnifier": "mgn.0", "muzzle": "mz.r9.comp", "optic": "op.pic.4", "railmount": "rm.0", "stock": "oem.stk.classic.4", "tac": "tac.0" }
+  },
+  { "platform": "ppsh",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.7.62x25.10.5", "handguard": "oem.hg.shroud.4", "mag": "ppsh.mag", "muzzle": "mz.r9.comp", "optic": "op.auth.falcon", "stock": "oem.stk.classic.4" }
+  },
+  { "platform": "ppsh",
+   "why": "magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.7.62x25.10.5", "handguard": "oem.hg.shroud.4", "mag": "ppsh.mag", "magnifier": "mgn.0", "muzzle": "mz.r9.comp", "optic": "op.auth.falcon", "stock": "oem.stk.classic.4" }
   },
   { "platform": "ppsh",
    "why": "suppressor on the muzzle (mz.r9.can)",
@@ -1382,12 +1558,20 @@
    "build": { "barrel": "pump.barrel", "loader": "sgl.0", "muzzle": "mz.sg.cyl", "optic": "oem.op.pic.23", "pump": "pump.pump", "stock": "oem.stk.classic.5", "tube": "pump.tube" }
   },
   { "platform": "pump",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "pump.barrel", "loader": "sgl.0", "magnifier": "mgn.0", "muzzle": "mz.sg.cyl", "optic": "op.pic.1", "pump": "pump.pump", "stock": "oem.stk.classic.5", "tube": "pump.tube" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon)",
+   "build": { "barrel": "pump.barrel", "loader": "sgl.0", "magnifier": "mgn.0", "muzzle": "mz.sg.cyl", "optic": "op.auth.falcon", "pump": "pump.pump", "stock": "oem.stk.classic.5", "tube": "pump.tube" }
   },
   { "platform": "pump",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "pump.barrel", "loader": "sgl.0", "magnifier": "mgn.0", "muzzle": "mz.sg.cyl", "optic": "op.pic.4", "pump": "pump.pump", "stock": "oem.stk.classic.5", "tube": "pump.tube" }
+  },
+  { "platform": "pump",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "pump.barrel", "muzzle": "mz.sg.cyl", "optic": "op.auth.falcon", "pump": "pump.pump", "stock": "oem.stk.classic.5", "tube": "pump.tube" }
+  },
+  { "platform": "pump",
+   "why": "magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "pump.barrel", "magnifier": "mgn.0", "muzzle": "mz.sg.cyl", "optic": "op.auth.falcon", "pump": "pump.pump", "stock": "oem.stk.classic.5", "tube": "pump.tube" }
   },
   { "platform": "pump",
    "why": "suppressor on the muzzle (mz.sg.can)",
@@ -1430,12 +1614,16 @@
    "build": { "barrel": "dbl.barrel", "handguard": "oem.hg.classic.7", "optic": "oem.op.pic.23", "stock": "oem.stk.classic.4" }
   },
   { "platform": "dbl",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "dbl.barrel", "handguard": "oem.hg.classic.7", "magnifier": "mgn.0", "optic": "op.pic.1", "stock": "oem.stk.classic.4" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon) + magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "dbl.barrel", "handguard": "oem.hg.classic.7", "magnifier": "mgn.0", "optic": "op.auth.falcon", "stock": "oem.stk.classic.4" }
   },
   { "platform": "dbl",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "dbl.barrel", "handguard": "oem.hg.classic.7", "magnifier": "mgn.0", "optic": "op.pic.4", "stock": "oem.stk.classic.4" }
+  },
+  { "platform": "dbl",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "dbl.barrel", "handguard": "oem.hg.classic.7", "optic": "op.auth.falcon", "stock": "oem.stk.classic.4" }
   },
   { "platform": "saiga",
    "why": "default + loaded + loaded-last",
@@ -1490,12 +1678,16 @@
    "build": { "barrel": "saiga.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "saiga12.mag.8", "muzzle": "mz.sg.cyl", "optic": "oem.op.pic.23", "stock": "oem.stk.ak.5" }
   },
   { "platform": "saiga",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "saiga.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "saiga12.mag.8", "magnifier": "mgn.0", "muzzle": "mz.sg.cyl", "optic": "op.pic.1", "stock": "oem.stk.ak.5" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon) + magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "saiga.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "saiga12.mag.8", "magnifier": "mgn.0", "muzzle": "mz.sg.cyl", "optic": "op.auth.falcon", "stock": "oem.stk.ak.5" }
   },
   { "platform": "saiga",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "saiga.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "saiga12.mag.8", "magnifier": "mgn.0", "muzzle": "mz.sg.cyl", "optic": "op.pic.4", "stock": "oem.stk.ak.5" }
+  },
+  { "platform": "saiga",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "saiga.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "saiga12.mag.8", "muzzle": "mz.sg.cyl", "optic": "op.auth.falcon", "stock": "oem.stk.ak.5" }
   },
   { "platform": "saiga",
    "why": "suppressor on the muzzle (mz.sg.can)",
@@ -1542,12 +1734,16 @@
    "build": { "barrel": "aa12.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.7", "mag": "aa12.mag", "muzzle": "mz.sg.flash", "optic": "oem.op.pic.23", "stock": "stk.heavy.0" }
   },
   { "platform": "aa12",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "aa12.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.7", "mag": "aa12.mag", "magnifier": "mgn.0", "muzzle": "mz.sg.flash", "optic": "op.pic.1", "stock": "stk.heavy.0" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon) + magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "aa12.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.7", "mag": "aa12.mag", "magnifier": "mgn.0", "muzzle": "mz.sg.flash", "optic": "op.auth.falcon", "stock": "stk.heavy.0" }
   },
   { "platform": "aa12",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "aa12.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.7", "mag": "aa12.mag", "magnifier": "mgn.0", "muzzle": "mz.sg.flash", "optic": "op.pic.4", "stock": "stk.heavy.0" }
+  },
+  { "platform": "aa12",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "aa12.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.7", "mag": "aa12.mag", "muzzle": "mz.sg.flash", "optic": "op.auth.falcon", "stock": "stk.heavy.0" }
   },
   { "platform": "aa12",
    "why": "suppressor on the muzzle (mz.sg.can)",
@@ -1582,12 +1778,20 @@
    "build": { "barrel": "ksg.barrel", "grip": "oem.gr.ar.4", "loader": "sgl.0", "muzzle": "mz.sg.cyl", "optic": "oem.op.pic.23", "pump": "ksg.pump" }
   },
   { "platform": "ksg",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "ksg.barrel", "grip": "oem.gr.ar.4", "loader": "sgl.0", "magnifier": "mgn.0", "muzzle": "mz.sg.cyl", "optic": "op.pic.1", "pump": "ksg.pump" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon)",
+   "build": { "barrel": "ksg.barrel", "grip": "oem.gr.ar.4", "loader": "sgl.0", "magnifier": "mgn.0", "muzzle": "mz.sg.cyl", "optic": "op.auth.falcon", "pump": "ksg.pump" }
   },
   { "platform": "ksg",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "ksg.barrel", "grip": "oem.gr.ar.4", "loader": "sgl.0", "magnifier": "mgn.0", "muzzle": "mz.sg.cyl", "optic": "op.pic.4", "pump": "ksg.pump" }
+  },
+  { "platform": "ksg",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "ksg.barrel", "grip": "oem.gr.ar.4", "muzzle": "mz.sg.cyl", "optic": "op.auth.falcon", "pump": "ksg.pump" }
+  },
+  { "platform": "ksg",
+   "why": "magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "ksg.barrel", "grip": "oem.gr.ar.4", "magnifier": "mgn.0", "muzzle": "mz.sg.cyl", "optic": "op.auth.falcon", "pump": "ksg.pump" }
   },
   { "platform": "ksg",
    "why": "suppressor on the muzzle (mz.sg.can)",
@@ -1634,12 +1838,20 @@
    "build": { "barrel": "slug.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.classic.8", "loader": "sgl.0", "muzzle": "mz.sg.cyl", "optic": "oem.op.pic.23", "stock": "stk.tube.0", "tube": "slug.tube" }
   },
   { "platform": "slug",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "slug.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.classic.8", "loader": "sgl.0", "magnifier": "mgn.0", "muzzle": "mz.sg.cyl", "optic": "op.pic.1", "stock": "stk.tube.0", "tube": "slug.tube" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon)",
+   "build": { "barrel": "slug.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.classic.8", "loader": "sgl.0", "magnifier": "mgn.0", "muzzle": "mz.sg.cyl", "optic": "op.auth.falcon", "stock": "stk.tube.0", "tube": "slug.tube" }
   },
   { "platform": "slug",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "slug.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.classic.8", "loader": "sgl.0", "magnifier": "mgn.0", "muzzle": "mz.sg.cyl", "optic": "op.pic.4", "stock": "stk.tube.0", "tube": "slug.tube" }
+  },
+  { "platform": "slug",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "slug.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.classic.8", "muzzle": "mz.sg.cyl", "optic": "op.auth.falcon", "stock": "stk.tube.0", "tube": "slug.tube" }
+  },
+  { "platform": "slug",
+   "why": "magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "slug.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.classic.8", "magnifier": "mgn.0", "muzzle": "mz.sg.cyl", "optic": "op.auth.falcon", "stock": "stk.tube.0", "tube": "slug.tube" }
   },
   { "platform": "slug",
    "why": "suppressor on the muzzle (mz.sg.can)",
@@ -1682,12 +1894,20 @@
    "build": { "barrel": "br.5.56x45.20.5", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.8", "mag": "m249.mag", "muzzle": "mz.r556.a2", "optic": "oem.op.pic.23", "stock": "stk.heavy.0", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "m249",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.5.56x45.20.5", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.8", "mag": "m249.mag", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.pic.1", "stock": "stk.heavy.0", "tac": "tac.0", "tacL": "tac.0" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon)",
+   "build": { "barrel": "br.5.56x45.20.5", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.8", "mag": "m249.mag", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "stock": "stk.heavy.0", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "m249",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.5.56x45.20.5", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.8", "mag": "m249.mag", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.pic.4", "stock": "stk.heavy.0", "tac": "tac.0", "tacL": "tac.0" }
+  },
+  { "platform": "m249",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.5.56x45.20.5", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.8", "mag": "m249.mag", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "stock": "stk.heavy.0" }
+  },
+  { "platform": "m249",
+   "why": "magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.5.56x45.20.5", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.8", "mag": "m249.mag", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "stock": "stk.heavy.0" }
   },
   { "platform": "m249",
    "why": "bipod (fg.4)",
@@ -1734,12 +1954,20 @@
    "build": { "barrel": "br.7.62x54.25.4", "grip": "oem.gr.ak.3", "mag": "pkm.mag", "muzzle": "mz.r762.a2", "optic": "oem.op.pic.23", "railmount": "rm.0", "stock": "oem.stk.heavy.4", "tac": "tac.0" }
   },
   { "platform": "pkm",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.7.62x54.25.4", "grip": "oem.gr.ak.3", "mag": "pkm.mag", "magnifier": "mgn.0", "muzzle": "mz.r762.a2", "optic": "op.pic.1", "railmount": "rm.0", "stock": "oem.stk.heavy.4", "tac": "tac.0" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon)",
+   "build": { "barrel": "br.7.62x54.25.4", "grip": "oem.gr.ak.3", "mag": "pkm.mag", "magnifier": "mgn.0", "muzzle": "mz.r762.a2", "optic": "op.auth.falcon", "railmount": "rm.0", "stock": "oem.stk.heavy.4", "tac": "tac.0" }
   },
   { "platform": "pkm",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.7.62x54.25.4", "grip": "oem.gr.ak.3", "mag": "pkm.mag", "magnifier": "mgn.0", "muzzle": "mz.r762.a2", "optic": "op.pic.4", "railmount": "rm.0", "stock": "oem.stk.heavy.4", "tac": "tac.0" }
+  },
+  { "platform": "pkm",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.7.62x54.25.4", "grip": "oem.gr.ak.3", "mag": "pkm.mag", "muzzle": "mz.r762.a2", "optic": "op.auth.falcon", "stock": "oem.stk.heavy.4" }
+  },
+  { "platform": "pkm",
+   "why": "magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.7.62x54.25.4", "grip": "oem.gr.ak.3", "mag": "pkm.mag", "magnifier": "mgn.0", "muzzle": "mz.r762.a2", "optic": "op.auth.falcon", "stock": "oem.stk.heavy.4" }
   },
   { "platform": "pkm",
    "why": "suppressor on the muzzle (mz.r762.can)",
@@ -1786,12 +2014,16 @@
    "build": { "barrel": "br.7.62x51.22", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.3", "mag": "m60.mag", "muzzle": "mz.r762.a2", "optic": "oem.op.pic.23", "stock": "stk.heavy.0" }
   },
   { "platform": "m60",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.7.62x51.22", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.3", "mag": "m60.mag", "magnifier": "mgn.0", "muzzle": "mz.r762.a2", "optic": "op.pic.1", "stock": "stk.heavy.0" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon) + magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.7.62x51.22", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.3", "mag": "m60.mag", "magnifier": "mgn.0", "muzzle": "mz.r762.a2", "optic": "op.auth.falcon", "stock": "stk.heavy.0" }
   },
   { "platform": "m60",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.7.62x51.22", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.3", "mag": "m60.mag", "magnifier": "mgn.0", "muzzle": "mz.r762.a2", "optic": "op.pic.4", "stock": "stk.heavy.0" }
+  },
+  { "platform": "m60",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.7.62x51.22", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.3", "mag": "m60.mag", "muzzle": "mz.r762.a2", "optic": "op.auth.falcon", "stock": "stk.heavy.0" }
   },
   { "platform": "m60",
    "why": "suppressor on the muzzle (mz.r762.can)",
@@ -1834,12 +2066,20 @@
    "build": { "barrel": "br.7.65x17.4.5", "grip": "gr.ak.0", "mag": "skorp.mag", "muzzle": "mz.r9.cap", "optic": "oem.op.pic.23", "railmount": "rm.0", "stock": "stk.smg.2", "tac": "tac.0" }
   },
   { "platform": "skorp",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.7.65x17.4.5", "grip": "gr.ak.0", "mag": "skorp.mag", "magnifier": "mgn.0", "muzzle": "mz.r9.cap", "optic": "op.pic.1", "railmount": "rm.0", "stock": "stk.smg.2", "tac": "tac.0" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon)",
+   "build": { "barrel": "br.7.65x17.4.5", "grip": "gr.ak.0", "mag": "skorp.mag", "magnifier": "mgn.0", "muzzle": "mz.r9.cap", "optic": "op.auth.falcon", "railmount": "rm.0", "stock": "stk.smg.2", "tac": "tac.0" }
   },
   { "platform": "skorp",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.7.65x17.4.5", "grip": "gr.ak.0", "mag": "skorp.mag", "magnifier": "mgn.0", "muzzle": "mz.r9.cap", "optic": "op.pic.4", "railmount": "rm.0", "stock": "stk.smg.2", "tac": "tac.0" }
+  },
+  { "platform": "skorp",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.7.65x17.4.5", "grip": "gr.ak.0", "mag": "skorp.mag", "muzzle": "mz.r9.cap", "optic": "op.auth.falcon", "stock": "stk.smg.2" }
+  },
+  { "platform": "skorp",
+   "why": "magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.7.65x17.4.5", "grip": "gr.ak.0", "mag": "skorp.mag", "magnifier": "mgn.0", "muzzle": "mz.r9.cap", "optic": "op.auth.falcon", "stock": "stk.smg.2" }
   },
   { "platform": "skorp",
    "why": "suppressor on the muzzle (mz.r9.can)",
@@ -1882,12 +2122,20 @@
    "build": { "barrel": "br.11.43x23.5.75", "grip": "oem.gr.smg.3", "mag": "mac10.mag", "muzzle": "mz.r45.cap", "optic": "oem.op.pic.23", "railmount": "rm.0", "stock": "stk.smg.2", "tac": "tac.0" }
   },
   { "platform": "mac10",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.11.43x23.5.75", "grip": "oem.gr.smg.3", "mag": "mac10.mag", "magnifier": "mgn.0", "muzzle": "mz.r45.cap", "optic": "op.pic.1", "railmount": "rm.0", "stock": "stk.smg.2", "tac": "tac.0" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon)",
+   "build": { "barrel": "br.11.43x23.5.75", "grip": "oem.gr.smg.3", "mag": "mac10.mag", "magnifier": "mgn.0", "muzzle": "mz.r45.cap", "optic": "op.auth.falcon", "railmount": "rm.0", "stock": "stk.smg.2", "tac": "tac.0" }
   },
   { "platform": "mac10",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.11.43x23.5.75", "grip": "oem.gr.smg.3", "mag": "mac10.mag", "magnifier": "mgn.0", "muzzle": "mz.r45.cap", "optic": "op.pic.4", "railmount": "rm.0", "stock": "stk.smg.2", "tac": "tac.0" }
+  },
+  { "platform": "mac10",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.11.43x23.5.75", "grip": "oem.gr.smg.3", "mag": "mac10.mag", "muzzle": "mz.r45.cap", "optic": "op.auth.falcon", "stock": "stk.smg.2" }
+  },
+  { "platform": "mac10",
+   "why": "magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.11.43x23.5.75", "grip": "oem.gr.smg.3", "mag": "mac10.mag", "magnifier": "mgn.0", "muzzle": "mz.r45.cap", "optic": "op.auth.falcon", "stock": "stk.smg.2" }
   },
   { "platform": "mac10",
    "why": "suppressor on the muzzle (mz.r45.can)",
@@ -1918,12 +2166,20 @@
    "build": { "barrel": "br.4.6x30.7.1", "grip": "oem.gr.smg.3", "mag": "mp7.mag", "muzzle": "mz.r57.a2", "optic": "oem.op.pic.23", "stock": "stk.tube.0", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "mp7",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.4.6x30.7.1", "grip": "oem.gr.smg.3", "mag": "mp7.mag", "magnifier": "mgn.0", "muzzle": "mz.r57.a2", "optic": "op.pic.1", "stock": "stk.tube.0", "tac": "tac.0", "tacL": "tac.0" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon)",
+   "build": { "barrel": "br.4.6x30.7.1", "grip": "oem.gr.smg.3", "mag": "mp7.mag", "magnifier": "mgn.0", "muzzle": "mz.r57.a2", "optic": "op.auth.falcon", "stock": "stk.tube.0", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "mp7",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.4.6x30.7.1", "grip": "oem.gr.smg.3", "mag": "mp7.mag", "magnifier": "mgn.0", "muzzle": "mz.r57.a2", "optic": "op.pic.4", "stock": "stk.tube.0", "tac": "tac.0", "tacL": "tac.0" }
+  },
+  { "platform": "mp7",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.4.6x30.7.1", "grip": "oem.gr.smg.3", "mag": "mp7.mag", "muzzle": "mz.r57.a2", "optic": "op.auth.falcon", "stock": "stk.tube.0" }
+  },
+  { "platform": "mp7",
+   "why": "magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.4.6x30.7.1", "grip": "oem.gr.smg.3", "mag": "mp7.mag", "magnifier": "mgn.0", "muzzle": "mz.r57.a2", "optic": "op.auth.falcon", "stock": "stk.tube.0" }
   },
   { "platform": "mp7",
    "why": "suppressor on the muzzle (mz.r57.can)",
@@ -1982,12 +2238,16 @@
    "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.3", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "oem.op.pic.23", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
   },
   { "platform": "ak74",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.3", "mag": "ak74.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.brake", "optic": "op.pic.1", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon) + magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.3", "mag": "ak74.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.brake", "optic": "op.auth.falcon", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
   },
   { "platform": "ak74",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.3", "mag": "ak74.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.brake", "optic": "op.pic.4", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+  },
+  { "platform": "ak74",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.3", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "op.auth.falcon", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
   },
   { "platform": "ak74",
    "why": "suppressor on the muzzle (mz.rak.can)",
@@ -2034,12 +2294,16 @@
    "build": { "barrel": "br.5.6x39.8.1", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.8", "mag": "ak74.mag.30", "muzzle": "mz.rak.boost", "optic": "oem.op.pic.23", "stock": "oem.stk.ak.5" }
   },
   { "platform": "aks74u",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.5.6x39.8.1", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.8", "mag": "ak74.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.boost", "optic": "op.pic.1", "stock": "oem.stk.ak.5" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon) + magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.5.6x39.8.1", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.8", "mag": "ak74.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.boost", "optic": "op.auth.falcon", "stock": "oem.stk.ak.5" }
   },
   { "platform": "aks74u",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.5.6x39.8.1", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.8", "mag": "ak74.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.boost", "optic": "op.pic.4", "stock": "oem.stk.ak.5" }
+  },
+  { "platform": "aks74u",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.5.6x39.8.1", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.8", "mag": "ak74.mag.30", "muzzle": "mz.rak.boost", "optic": "op.auth.falcon", "stock": "oem.stk.ak.5" }
   },
   { "platform": "aks74u",
    "why": "suppressor on the muzzle (mz.rak.can)",
@@ -2098,12 +2362,16 @@
    "build": { "barrel": "br.7.62x39.23.2", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "oem.op.pic.23", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
   },
   { "platform": "rpk",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.7.62x39.23.2", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "magnifier": "mgn.0", "muzzle": "mz.rak.cap", "optic": "op.pic.1", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon) + magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.7.62x39.23.2", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "magnifier": "mgn.0", "muzzle": "mz.rak.cap", "optic": "op.auth.falcon", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
   },
   { "platform": "rpk",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.7.62x39.23.2", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "magnifier": "mgn.0", "muzzle": "mz.rak.cap", "optic": "op.pic.4", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+  },
+  { "platform": "rpk",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.7.62x39.23.2", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "op.auth.falcon", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
   },
   { "platform": "rpk",
    "why": "suppressor on the muzzle (mz.rak.can)",
@@ -2138,12 +2406,20 @@
    "build": { "barrel": "br.5.56x45.14.5", "fg": "fg.0", "grip": "oem.gr.ar.4", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "oem.op.pic.23", "stock": "stk.heavy.scar", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "scarl",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.5.56x45.14.5", "fg": "fg.0", "grip": "oem.gr.ar.4", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.pic.1", "stock": "stk.heavy.scar", "tac": "tac.0", "tacL": "tac.0" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon)",
+   "build": { "barrel": "br.5.56x45.14.5", "fg": "fg.0", "grip": "oem.gr.ar.4", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "stock": "stk.heavy.scar", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "scarl",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.5.56x45.14.5", "fg": "fg.0", "grip": "oem.gr.ar.4", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.pic.4", "stock": "stk.heavy.scar", "tac": "tac.0", "tacL": "tac.0" }
+  },
+  { "platform": "scarl",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.5.56x45.14.5", "grip": "oem.gr.ar.4", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "stock": "stk.heavy.scar" }
+  },
+  { "platform": "scarl",
+   "why": "magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.5.56x45.14.5", "grip": "oem.gr.ar.4", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "stock": "stk.heavy.scar" }
   },
   { "platform": "scarl",
    "why": "bipod (fg.4)",
@@ -2186,12 +2462,20 @@
    "build": { "barrel": "br.5.56x45.16.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.9", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "oem.op.pic.23", "stock": "oem.stk.tube.5", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "m27",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.5.56x45.16.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.9", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.pic.1", "stock": "oem.stk.tube.5", "tac": "tac.0", "tacL": "tac.0" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon)",
+   "build": { "barrel": "br.5.56x45.16.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.9", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "stock": "oem.stk.tube.5", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "m27",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.5.56x45.16.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.9", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.pic.4", "stock": "oem.stk.tube.5", "tac": "tac.0", "tacL": "tac.0" }
+  },
+  { "platform": "m27",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.5.56x45.16.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.9", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "m27",
+   "why": "magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.5.56x45.16.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.9", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "stock": "oem.stk.tube.5" }
   },
   { "platform": "m27",
    "why": "bipod (fg.4)",
@@ -2242,12 +2526,16 @@
    "build": { "barrel": "br.7.62x51.22", "handguard": "oem.hg.classic.9", "mag": "m14.mag.20", "muzzle": "mz.r762.a2", "optic": "oem.op.pic.23", "receiver": "rcv.m14", "stock": "oem.stk.classic.4" }
   },
   { "platform": "m14",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.7.62x51.22", "handguard": "oem.hg.classic.9", "mag": "m14.mag.20", "magnifier": "mgn.0", "muzzle": "mz.r762.a2", "optic": "op.pic.1", "receiver": "rcv.m14", "stock": "oem.stk.classic.4" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon) + magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.7.62x51.22", "handguard": "oem.hg.classic.9", "mag": "m14.mag.20", "magnifier": "mgn.0", "muzzle": "mz.r762.a2", "optic": "op.auth.falcon", "receiver": "rcv.m14", "stock": "oem.stk.classic.4" }
   },
   { "platform": "m14",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.7.62x51.22", "handguard": "oem.hg.classic.9", "mag": "m14.mag.20", "magnifier": "mgn.0", "muzzle": "mz.r762.a2", "optic": "op.pic.4", "receiver": "rcv.m14", "stock": "oem.stk.classic.4" }
+  },
+  { "platform": "m14",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.7.62x51.22", "handguard": "oem.hg.classic.9", "mag": "m14.mag.20", "muzzle": "mz.r762.a2", "optic": "op.auth.falcon", "receiver": "rcv.m14", "stock": "oem.stk.classic.4" }
   },
   { "platform": "m14",
    "why": "suppressor on the muzzle (mz.r762.can)",
@@ -2286,12 +2574,20 @@
    "build": { "barrel": "br.7.62x51.20", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.10", "mag": "sr25.mag", "muzzle": "mz.r762.a2", "optic": "oem.op.pic.23", "stock": "oem.stk.tube.5", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "sr25",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.7.62x51.20", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.10", "mag": "sr25.mag", "magnifier": "mgn.0", "muzzle": "mz.r762.a2", "optic": "op.pic.1", "stock": "oem.stk.tube.5", "tac": "tac.0", "tacL": "tac.0" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon)",
+   "build": { "barrel": "br.7.62x51.20", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.10", "mag": "sr25.mag", "magnifier": "mgn.0", "muzzle": "mz.r762.a2", "optic": "op.auth.falcon", "stock": "oem.stk.tube.5", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "sr25",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.7.62x51.20", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.10", "mag": "sr25.mag", "magnifier": "mgn.0", "muzzle": "mz.r762.a2", "optic": "op.pic.4", "stock": "oem.stk.tube.5", "tac": "tac.0", "tacL": "tac.0" }
+  },
+  { "platform": "sr25",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.7.62x51.20", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.10", "mag": "sr25.mag", "muzzle": "mz.r762.a2", "optic": "op.auth.falcon", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "sr25",
+   "why": "magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.7.62x51.20", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.10", "mag": "sr25.mag", "magnifier": "mgn.0", "muzzle": "mz.r762.a2", "optic": "op.auth.falcon", "stock": "oem.stk.tube.5" }
   },
   { "platform": "sr25",
    "why": "bipod (fg.4)",
@@ -2334,12 +2630,20 @@
    "build": { "barrel": "br.9x19.8", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.mpx.0", "mag": "mpx.mag", "muzzle": "mz.r9.a2", "optic": "oem.op.pic.23", "stock": "stk.tube.2", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "mpx",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.9x19.8", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.mpx.0", "mag": "mpx.mag", "magnifier": "mgn.0", "muzzle": "mz.r9.a2", "optic": "op.pic.1", "stock": "stk.tube.2", "tac": "tac.0", "tacL": "tac.0" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon)",
+   "build": { "barrel": "br.9x19.8", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.mpx.0", "mag": "mpx.mag", "magnifier": "mgn.0", "muzzle": "mz.r9.a2", "optic": "op.auth.falcon", "stock": "stk.tube.2", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "mpx",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.9x19.8", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.mpx.0", "mag": "mpx.mag", "magnifier": "mgn.0", "muzzle": "mz.r9.a2", "optic": "op.pic.4", "stock": "stk.tube.2", "tac": "tac.0", "tacL": "tac.0" }
+  },
+  { "platform": "mpx",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.9x19.8", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.mpx.0", "mag": "mpx.mag", "muzzle": "mz.r9.a2", "optic": "op.auth.falcon", "stock": "stk.tube.2" }
+  },
+  { "platform": "mpx",
+   "why": "magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.9x19.8", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.mpx.0", "mag": "mpx.mag", "magnifier": "mgn.0", "muzzle": "mz.r9.a2", "optic": "op.auth.falcon", "stock": "stk.tube.2" }
   },
   { "platform": "mpx",
    "why": "bipod (fg.4)",
@@ -2390,12 +2694,20 @@
    "build": { "barrel": "benelli.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.classic.10", "loader": "sgl.0", "muzzle": "mz.sg.cyl", "optic": "oem.op.pic.23", "stock": "stk.tube.0", "tube": "benelli.tube" }
   },
   { "platform": "benelli",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "benelli.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.classic.10", "loader": "sgl.0", "magnifier": "mgn.0", "muzzle": "mz.sg.cyl", "optic": "op.pic.1", "stock": "stk.tube.0", "tube": "benelli.tube" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon)",
+   "build": { "barrel": "benelli.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.classic.10", "loader": "sgl.0", "magnifier": "mgn.0", "muzzle": "mz.sg.cyl", "optic": "op.auth.falcon", "stock": "stk.tube.0", "tube": "benelli.tube" }
   },
   { "platform": "benelli",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "benelli.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.classic.10", "loader": "sgl.0", "magnifier": "mgn.0", "muzzle": "mz.sg.cyl", "optic": "op.pic.4", "stock": "stk.tube.0", "tube": "benelli.tube" }
+  },
+  { "platform": "benelli",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "benelli.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.classic.10", "muzzle": "mz.sg.cyl", "optic": "op.auth.falcon", "stock": "stk.tube.0", "tube": "benelli.tube" }
+  },
+  { "platform": "benelli",
+   "why": "magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "benelli.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.classic.10", "magnifier": "mgn.0", "muzzle": "mz.sg.cyl", "optic": "op.auth.falcon", "stock": "stk.tube.0", "tube": "benelli.tube" }
   },
   { "platform": "benelli",
    "why": "suppressor on the muzzle (mz.sg.can)",
@@ -2438,12 +2750,20 @@
    "build": { "barrel": "vepr.barrel", "fg": "fg.0", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.9", "mag": "saiga12.mag.8", "muzzle": "mz.sg.cyl", "optic": "oem.op.pic.23", "stock": "oem.stk.ak.5", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "vepr",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "vepr.barrel", "fg": "fg.0", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.9", "mag": "saiga12.mag.8", "magnifier": "mgn.0", "muzzle": "mz.sg.cyl", "optic": "op.pic.1", "stock": "oem.stk.ak.5", "tac": "tac.0", "tacL": "tac.0" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon)",
+   "build": { "barrel": "vepr.barrel", "fg": "fg.0", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.9", "mag": "saiga12.mag.8", "magnifier": "mgn.0", "muzzle": "mz.sg.cyl", "optic": "op.auth.falcon", "stock": "oem.stk.ak.5", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "vepr",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "vepr.barrel", "fg": "fg.0", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.9", "mag": "saiga12.mag.8", "magnifier": "mgn.0", "muzzle": "mz.sg.cyl", "optic": "op.pic.4", "stock": "oem.stk.ak.5", "tac": "tac.0", "tacL": "tac.0" }
+  },
+  { "platform": "vepr",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "vepr.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.9", "mag": "saiga12.mag.8", "muzzle": "mz.sg.cyl", "optic": "op.auth.falcon", "stock": "oem.stk.ak.5" }
+  },
+  { "platform": "vepr",
+   "why": "magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "vepr.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.9", "mag": "saiga12.mag.8", "magnifier": "mgn.0", "muzzle": "mz.sg.cyl", "optic": "op.auth.falcon", "stock": "oem.stk.ak.5" }
   },
   { "platform": "vepr",
    "why": "bipod (fg.4)",
@@ -2486,12 +2806,16 @@
    "build": { "barrel": "br.9x19.10.5", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "hg.ar.3", "mag": "glock.mag.33", "muzzle": "mz.r9.a2", "optic": "oem.op.pic.23", "receiver": "rcv.ar9", "stock": "stk.tube.0" }
   },
   { "platform": "ar9",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.9x19.10.5", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "hg.ar.3", "mag": "glock.mag.33", "magnifier": "mgn.0", "muzzle": "mz.r9.a2", "optic": "op.pic.1", "receiver": "rcv.ar9", "stock": "stk.tube.0" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon) + magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.9x19.10.5", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "hg.ar.3", "mag": "glock.mag.33", "magnifier": "mgn.0", "muzzle": "mz.r9.a2", "optic": "op.auth.falcon", "receiver": "rcv.ar9", "stock": "stk.tube.0" }
   },
   { "platform": "ar9",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.9x19.10.5", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "hg.ar.3", "mag": "glock.mag.33", "magnifier": "mgn.0", "muzzle": "mz.r9.a2", "optic": "op.pic.4", "receiver": "rcv.ar9", "stock": "stk.tube.0" }
+  },
+  { "platform": "ar9",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.9x19.10.5", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "hg.ar.3", "mag": "glock.mag.33", "muzzle": "mz.r9.a2", "optic": "op.auth.falcon", "receiver": "rcv.ar9", "stock": "stk.tube.0" }
   },
   { "platform": "ar9",
    "why": "suppressor on the muzzle (mz.r9.can)",
@@ -2526,12 +2850,20 @@
    "build": { "barrel": "br.9x19.16", "grip": "oem.gr.ar.4", "mag": "glock.mag.33", "muzzle": "mz.r9.cap", "optic": "oem.op.pic.23", "receiver": "rcv.aug9", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "aug9",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.9x19.16", "grip": "oem.gr.ar.4", "mag": "glock.mag.33", "magnifier": "mgn.0", "muzzle": "mz.r9.cap", "optic": "op.pic.1", "receiver": "rcv.aug9", "tac": "tac.0", "tacL": "tac.0" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon)",
+   "build": { "barrel": "br.9x19.16", "grip": "oem.gr.ar.4", "mag": "glock.mag.33", "magnifier": "mgn.0", "muzzle": "mz.r9.cap", "optic": "op.auth.falcon", "receiver": "rcv.aug9", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "aug9",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.9x19.16", "grip": "oem.gr.ar.4", "mag": "glock.mag.33", "magnifier": "mgn.0", "muzzle": "mz.r9.cap", "optic": "op.pic.4", "receiver": "rcv.aug9", "tac": "tac.0", "tacL": "tac.0" }
+  },
+  { "platform": "aug9",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.9x19.16", "grip": "oem.gr.ar.4", "mag": "glock.mag.33", "muzzle": "mz.r9.cap", "optic": "op.auth.falcon", "receiver": "rcv.aug9" }
+  },
+  { "platform": "aug9",
+   "why": "magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.9x19.16", "grip": "oem.gr.ar.4", "mag": "glock.mag.33", "magnifier": "mgn.0", "muzzle": "mz.r9.cap", "optic": "op.auth.falcon", "receiver": "rcv.aug9" }
   },
   { "platform": "aug9",
    "why": "suppressor on the muzzle (mz.r9.can)",
@@ -2570,12 +2902,16 @@
    "build": { "barrel": "sawn.barrel", "grip": "oem.gr.ak.4", "handguard": "oem.hg.classic.11", "optic": "oem.op.pic.23" }
   },
   { "platform": "sawn",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "sawn.barrel", "grip": "oem.gr.ak.4", "handguard": "oem.hg.classic.11", "magnifier": "mgn.0", "optic": "op.pic.1" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon) + magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "sawn.barrel", "grip": "oem.gr.ak.4", "handguard": "oem.hg.classic.11", "magnifier": "mgn.0", "optic": "op.auth.falcon" }
   },
   { "platform": "sawn",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "sawn.barrel", "grip": "oem.gr.ak.4", "handguard": "oem.hg.classic.11", "magnifier": "mgn.0", "optic": "op.pic.4" }
+  },
+  { "platform": "sawn",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "sawn.barrel", "grip": "oem.gr.ak.4", "handguard": "oem.hg.classic.11", "optic": "op.auth.falcon" }
   },
   { "platform": "p9",
    "why": "default",
@@ -3754,12 +4090,16 @@
    "build": { "barrel": "thor.barrel", "grip": "oem.gr.ak.5", "optic": "oem.op.pic.23" }
   },
   { "platform": "thor",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "thor.barrel", "grip": "oem.gr.ak.5", "magnifier": "mgn.0", "optic": "op.pic.1" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon) + magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "thor.barrel", "grip": "oem.gr.ak.5", "magnifier": "mgn.0", "optic": "op.auth.falcon" }
   },
   { "platform": "thor",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "thor.barrel", "grip": "oem.gr.ak.5", "magnifier": "mgn.0", "optic": "op.pic.4" }
+  },
+  { "platform": "thor",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "thor.barrel", "grip": "oem.gr.ak.5", "optic": "op.auth.falcon" }
   },
   { "platform": "p90",
    "why": "default",
@@ -3786,12 +4126,20 @@
    "build": { "barrel": "br.5.7x29.10.4", "mag": "p90.mag", "muzzle": "mz.r57.a2", "optic": "oem.op.pic.23", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "p90",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.5.7x29.10.4", "mag": "p90.mag", "magnifier": "mgn.0", "muzzle": "mz.r57.a2", "optic": "op.pic.1", "tac": "tac.0", "tacL": "tac.0" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon)",
+   "build": { "barrel": "br.5.7x29.10.4", "mag": "p90.mag", "magnifier": "mgn.0", "muzzle": "mz.r57.a2", "optic": "op.auth.falcon", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "p90",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.5.7x29.10.4", "mag": "p90.mag", "magnifier": "mgn.0", "muzzle": "mz.r57.a2", "optic": "op.pic.4", "tac": "tac.0", "tacL": "tac.0" }
+  },
+  { "platform": "p90",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.5.7x29.10.4", "mag": "p90.mag", "muzzle": "mz.r57.a2", "optic": "op.auth.falcon" }
+  },
+  { "platform": "p90",
+   "why": "magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.5.7x29.10.4", "mag": "p90.mag", "magnifier": "mgn.0", "muzzle": "mz.r57.a2", "optic": "op.auth.falcon" }
   },
   { "platform": "p90",
    "why": "suppressor on the muzzle (mz.r57.can)",
@@ -3822,12 +4170,20 @@
    "build": { "barrel": "shredder.barrel", "mag": "shredder.mag", "motor": "shredder.motor", "optic": "oem.op.pic.23", "tac": "tac.0" }
   },
   { "platform": "shredder",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "shredder.barrel", "mag": "shredder.mag", "magnifier": "mgn.0", "motor": "shredder.motor", "optic": "op.pic.1", "tac": "tac.0" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon)",
+   "build": { "barrel": "shredder.barrel", "mag": "shredder.mag", "magnifier": "mgn.0", "motor": "shredder.motor", "optic": "op.auth.falcon", "tac": "tac.0" }
   },
   { "platform": "shredder",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "shredder.barrel", "mag": "shredder.mag", "magnifier": "mgn.0", "motor": "shredder.motor", "optic": "op.pic.4", "tac": "tac.0" }
+  },
+  { "platform": "shredder",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "shredder.barrel", "mag": "shredder.mag", "motor": "shredder.motor", "optic": "op.auth.falcon" }
+  },
+  { "platform": "shredder",
+   "why": "magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "shredder.barrel", "mag": "shredder.mag", "magnifier": "mgn.0", "motor": "shredder.motor", "optic": "op.auth.falcon" }
   },
   { "platform": "m32",
    "why": "default + loaded + loaded-last + lowest optic (op.pic.0)",
@@ -3846,12 +4202,16 @@
    "build": { "barrel": "m32.barrel", "optic": "oem.op.pic.23", "stock": "stk.tube.0" }
   },
   { "platform": "m32",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "m32.barrel", "magnifier": "mgn.0", "optic": "op.pic.1", "stock": "stk.tube.0" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon) + magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "m32.barrel", "magnifier": "mgn.0", "optic": "op.auth.falcon", "stock": "stk.tube.0" }
   },
   { "platform": "m32",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "m32.barrel", "magnifier": "mgn.0", "optic": "op.pic.4", "stock": "stk.tube.0" }
+  },
+  { "platform": "m32",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "m32.barrel", "optic": "op.auth.falcon", "stock": "stk.tube.0" }
   },
   { "platform": "pocketgl",
    "why": "default + loaded + loaded-last",
@@ -3878,12 +4238,16 @@
    "build": { "barrel": "pocketgl.barrel", "optic": "oem.op.pic.23", "stock": "stk.smg.0" }
   },
   { "platform": "pocketgl",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "pocketgl.barrel", "magnifier": "mgn.0", "optic": "op.pic.1", "stock": "stk.smg.0" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon) + magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "pocketgl.barrel", "magnifier": "mgn.0", "optic": "op.auth.falcon", "stock": "stk.smg.0" }
   },
   { "platform": "pocketgl",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "pocketgl.barrel", "magnifier": "mgn.0", "optic": "op.pic.4", "stock": "stk.smg.0" }
+  },
+  { "platform": "pocketgl",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "pocketgl.barrel", "optic": "op.auth.falcon", "stock": "stk.smg.0" }
   },
   { "platform": "rail",
    "why": "default + loaded + loaded-last",
@@ -3906,12 +4270,16 @@
    "build": { "barrel": "rail.barrel", "cap": "rail.cap", "optic": "oem.op.pic.23", "stock": "oem.stk.precision.6" }
   },
   { "platform": "rail",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "rail.barrel", "cap": "rail.cap", "magnifier": "mgn.0", "optic": "op.pic.1", "stock": "oem.stk.precision.6" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon) + magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "rail.barrel", "cap": "rail.cap", "magnifier": "mgn.0", "optic": "op.auth.falcon", "stock": "oem.stk.precision.6" }
   },
   { "platform": "rail",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "rail.barrel", "cap": "rail.cap", "magnifier": "mgn.0", "optic": "op.pic.4", "stock": "oem.stk.precision.6" }
+  },
+  { "platform": "rail",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "rail.barrel", "cap": "rail.cap", "optic": "op.auth.falcon", "stock": "oem.stk.precision.6" }
   },
   { "platform": "crossbow",
    "why": "default + loaded + loaded-last",
@@ -3934,12 +4302,16 @@
    "build": { "limbs": "crossbow.limbs", "optic": "oem.op.pic.23", "stock": "oem.stk.precision.5" }
   },
   { "platform": "crossbow",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "limbs": "crossbow.limbs", "magnifier": "mgn.0", "optic": "op.pic.1", "stock": "oem.stk.precision.5" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon) + magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "limbs": "crossbow.limbs", "magnifier": "mgn.0", "optic": "op.auth.falcon", "stock": "oem.stk.precision.5" }
   },
   { "platform": "crossbow",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "limbs": "crossbow.limbs", "magnifier": "mgn.0", "optic": "op.pic.4", "stock": "oem.stk.precision.5" }
+  },
+  { "platform": "crossbow",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "limbs": "crossbow.limbs", "optic": "op.auth.falcon", "stock": "oem.stk.precision.5" }
   },
   { "platform": "tx22",
    "why": "default",
@@ -4074,12 +4446,20 @@
    "build": { "barrel": "br.5.8x42.18.2", "mag": "qbz.mag.30", "muzzle": "mz.r58.a2", "optic": "oem.op.pic.23", "railmount": "rm.0", "tac": "tac.0" }
   },
   { "platform": "qbz95",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.5.8x42.18.2", "mag": "qbz.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r58.a2", "optic": "op.pic.1", "railmount": "rm.0", "tac": "tac.0" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon)",
+   "build": { "barrel": "br.5.8x42.18.2", "mag": "qbz.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r58.a2", "optic": "op.auth.falcon", "railmount": "rm.0", "tac": "tac.0" }
   },
   { "platform": "qbz95",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.5.8x42.18.2", "mag": "qbz.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r58.a2", "optic": "op.pic.4", "railmount": "rm.0", "tac": "tac.0" }
+  },
+  { "platform": "qbz95",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.5.8x42.18.2", "mag": "qbz.mag.30", "muzzle": "mz.r58.a2", "optic": "op.auth.falcon" }
+  },
+  { "platform": "qbz95",
+   "why": "magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.5.8x42.18.2", "mag": "qbz.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r58.a2", "optic": "op.auth.falcon" }
   },
   { "platform": "qbz95",
    "why": "suppressor on the muzzle (mz.r58.can)",
@@ -4122,12 +4502,20 @@
    "build": { "barrel": "br.5.8x42.10.5", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.qbz.0", "mag": "qbz.mag.30", "muzzle": "mz.r58.a2", "optic": "oem.op.pic.23", "stock": "oem.stk.fold.0", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "qbz192",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.5.8x42.10.5", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.qbz.0", "mag": "qbz.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r58.a2", "optic": "op.pic.1", "stock": "oem.stk.fold.0", "tac": "tac.0", "tacL": "tac.0" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon)",
+   "build": { "barrel": "br.5.8x42.10.5", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.qbz.0", "mag": "qbz.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r58.a2", "optic": "op.auth.falcon", "stock": "oem.stk.fold.0", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "qbz192",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.5.8x42.10.5", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.qbz.0", "mag": "qbz.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r58.a2", "optic": "op.pic.4", "stock": "oem.stk.fold.0", "tac": "tac.0", "tacL": "tac.0" }
+  },
+  { "platform": "qbz192",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.5.8x42.10.5", "grip": "oem.gr.ar.4", "handguard": "oem.hg.qbz.0", "mag": "qbz.mag.30", "muzzle": "mz.r58.a2", "optic": "op.auth.falcon", "stock": "oem.stk.fold.0" }
+  },
+  { "platform": "qbz192",
+   "why": "magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.5.8x42.10.5", "grip": "oem.gr.ar.4", "handguard": "oem.hg.qbz.0", "mag": "qbz.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r58.a2", "optic": "op.auth.falcon", "stock": "oem.stk.fold.0" }
   },
   { "platform": "qbz192",
    "why": "bipod (fg.4)",
@@ -4174,12 +4562,20 @@
    "build": { "barrel": "br.5.56x45.11.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.mcx.0", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "oem.op.pic.23", "stock": "oem.stk.fold.1", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "mcx",
-   "why": "magnifier on the lowest optic that takes one (op.pic.1)",
-   "build": { "barrel": "br.5.56x45.11.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.mcx.0", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.pic.1", "stock": "oem.stk.fold.1", "tac": "tac.0", "tacL": "tac.0" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon)",
+   "build": { "barrel": "br.5.56x45.11.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.mcx.0", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "stock": "oem.stk.fold.1", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "mcx",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
    "build": { "barrel": "br.5.56x45.11.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.mcx.0", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.pic.4", "stock": "oem.stk.fold.1", "tac": "tac.0", "tacL": "tac.0" }
+  },
+  { "platform": "mcx",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.5.56x45.11.5", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.mcx.0", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "stock": "oem.stk.fold.1" }
+  },
+  { "platform": "mcx",
+   "why": "magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "br.5.56x45.11.5", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.mcx.0", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "stock": "oem.stk.fold.1" }
   },
   { "platform": "mcx",
    "why": "bipod (fg.4)",

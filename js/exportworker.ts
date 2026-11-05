@@ -12,7 +12,7 @@
 importScripts('https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js');
 importScripts('../../assets/vendor/gltf-classic.js'); // (three's GLTFLoader + the meshopt decoder, as a classic script: the guns are baked glTF, js/gunmodels.ts)
 importScripts(...['util', 'data', 'callsigns', 'parts', 'gear', 'medical', 'materials', 'ballistics', 'damage', 'level', 'world', 'furniture', 'homes', 'residents', 'lightgrid', 'render',
-  'stickers', 'gunmaterials', 'gunmodels', 'glb', 'gunrig', 'viewmodel', 'vmanim', 'headgear', 'rig', 'scars', 'highlights'].map((f) => f + '.js'));
+  'stickers', 'gunmaterials', 'gunmodels', 'modelbundles', 'glb', 'gunrig', 'viewmodel', 'vmanim', 'headgear', 'rig', 'scars', 'highlights'].map((f) => f + '.js'));
 // (the game the replay borrows from: the map the bodies fall on, and nobody's id)
 (G as any).Game = { map: null, phase: 'level' };
 (G as any).Net = { myId: '' };

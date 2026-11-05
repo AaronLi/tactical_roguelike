@@ -17,7 +17,6 @@ const G_GunRecipes = (() => {
   type Trace = GunTrace; // one of tools/models/guntraces.ts's tables of traced outlines
   type Anim = Record<string, any>; // a recipe's animated parts, by name
   type Sight = { sy: number; fSight: number; relief: number };
-  interface BipodLeg { p: THREE.Object3D; sub?: THREE.Object3D; back: boolean; side: number }
 
   // ---------------------------------------------------------------- primitive kit
   function kit() {
@@ -142,10 +141,15 @@ const G_GunRecipes = (() => {
 
   // ---------------------------------------------------------------- sights (return sight line height + eye relief)
   const S = {
+    // A rail section. Built while the optic's tag is active it is a MOUNT PIECE of the optic (`optic@mount`: docs/models.md "Mount pieces"): the gun's
+    // rail, riser or adapter under the sight, a piece of its own that follows the gun, never part of the optic, which is the same object on every gun.
     rail(k: Kit, f0: number, len: number, y: number, m: THREE.Material = M.black()) {
-      k.box(0.021, 0.007, len, m, f0, y + 0.0035);
-      const n = Math.floor(len / 0.0105);
-      for (let i = 0; i < n; i++) k.box(0.023, 0.004, 0.0052, m, f0 + 0.003 + i * 0.0105, y + 0.009);
+      const build = () => {
+        k.box(0.021, 0.007, len, m, f0, y + 0.0035);
+        const n = Math.floor(len / 0.0105);
+        for (let i = 0; i < n; i++) k.box(0.023, 0.004, 0.0052, m, f0 + 0.003 + i * 0.0105, y + 0.009);
+      };
+      if (k.slot === 'optic') k.at('mount', build); else build();
       return y + 0.011;
     },
     // Reflex sights record their window in k.reflex; the viewmodel puts a collimated reticle behind it.
@@ -217,8 +221,11 @@ const G_GunRecipes = (() => {
     // (onBarrel: the front sight stands on the barrel (tools/models/recipes.ts sightOf): it is built as a piece of its own, at the
     // barrel's mount_frontsight (fF), and from the sight line down to 4 mm above the bore (fb is then the bore's height), well
     // inside any barrel, so its shape is the sight's and the platform's and not the barrel's)
+    // (onBarrel: the front sight is two pieces, both placed by the barrel's mount_frontsight: the HEAD (post, ears, hood: `optic@barrel`, the same object on every
+    // gun, built on the sight line) and its BASE (the column from 4 mm over the bore up to the head: `optic@sightbase`, a mount piece, the one thing that follows the
+    // gun's sight height). Not onBarrel (a pistol's, an AUG's own): one piece in the optic's tag.)
     irons(k: Kit, fR: number, fF: number, sy: number, rb: number, fb: number, style = 'ar', onBarrel = false) {
-      const B = M.black(), frontOf = (build: () => void) => { if (onBarrel) { fb += 0.004; k.at('barrel', build); } else build(); };
+      const B = M.black(), frontOf = (head: () => void, base: () => void) => { if (onBarrel) { fb += 0.004; k.at('barrel', head); k.at('sightbase', base); } else { base(); head(); } };
       const col = (w: number, y0: number, y1: number, len: number, f0: number, x = 0) => { if (y1 - y0 > 0.0008) k.box(w, y1 - y0, len, B, f0, (y0 + y1) / 2, x); };
       if (style === 'ak') {
         // rear: the leaf rises toward you from its hinge; the notch blade stands at its back end
@@ -230,11 +237,10 @@ const G_GunRecipes = (() => {
         k.box(0.021, 0.004, 0.009, B, fR + t * 0.054 - 0.0045, yl + 0.001); // range slider
         // front: round post under a hood open at the top, on a block over the barrel
         frontOf(() => {
-          col(0.012, fb, sy - 0.012, 0.014, fF - 0.007);
           k.cylY(0.0017, 0.012, B, fF, sy - 0.006);
           k.hood(0.0105, 0.014, M.tubeDS(), fF - 0.007, sy - 0.004, 1.1);
           for (const ff of [fF - 0.007, fF + 0.007]) k.arcRing(0.0105, 0.0014, B, ff, sy - 0.004, 1.1);
-        });
+        }, () => col(0.012, fb, sy - 0.012, 0.014, fF - 0.007));
         return { sy, fSight: fR - 0.0042, relief: 0.17 };
       }
       if (style === 'buckhorn') {
@@ -242,10 +248,7 @@ const G_GunRecipes = (() => {
         col(0.008, rb, sy - 0.006, 0.006, fR - 0.003);
         k.plate([[-0.016, sy - 0.007], [0.016, sy - 0.007], [0.016, sy + 0.004], [0.013, sy + 0.0055], [0.008, sy + 0.0022], [0.0026, sy + 0.0003],
           [0, sy - 0.0026], [-0.0026, sy + 0.0003], [-0.008, sy + 0.0022], [-0.013, sy + 0.0055], [-0.016, sy + 0.004]], 0.0025, B, fR - 0.0012);
-        frontOf(() => {
-          col(0.0035, fb, sy - 0.0025, 0.012, fF - 0.006);
-          k.sphere(0.0018, M.brass(), fF - 0.004, sy - 0.0018);
-        });
+        frontOf(() => k.sphere(0.0018, M.brass(), fF - 0.004, sy - 0.0018), () => col(0.0035, fb, sy - 0.0025, 0.012, fF - 0.006));
         return { sy, fSight: fR - 0.0012, relief: 0.2 };
       }
       if (style === 'hk') {
@@ -256,11 +259,10 @@ const G_GunRecipes = (() => {
         for (const x of [-1, 1]) col(0.003, rb, sy + 0.009, 0.02, fR - 0.012, x * 0.0125);
         // front: a ring hood with the post standing up to its centre
         frontOf(() => {
-          col(0.011, fb, sy - 0.0095, 0.012, fF - 0.006);
           k.hood(0.0085, 0.012, M.tubeDS(), fF - 0.006, sy);
           for (const ff of [fF - 0.006, fF + 0.006]) k.ringZ(0.0085, 0.0012, B, ff, sy);
           col(0.0022, sy - 0.0088, sy, 0.0025, fF - 0.0012);
-        });
+        }, () => col(0.011, fb, sy - 0.0095, 0.012, fF - 0.006));
         return { sy, fSight: fR - 0.003, relief: 0.1 };
       }
       // 'ar': the large aperture between ears; square post between wings
@@ -269,10 +271,9 @@ const G_GunRecipes = (() => {
       for (const x of [-1, 1]) col(0.003, rb, sy + 0.009, 0.016, fR - 0.01, x * 0.0115);
       k.cylX(0.004, 0.006, B, fR - 0.006, sy - 0.012, 0.014); // windage drum
       frontOf(() => {
-        col(0.015, fb, sy - 0.014, 0.014, fF - 0.007);
         for (const x of [-1, 1]) col(0.0028, sy - 0.016, sy + 0.003, 0.01, fF - 0.005, x * 0.0072);
         col(0.0021, sy - 0.016, sy, 0.0021, fF - 0.001);
-      });
+      }, () => col(0.015, fb, sy - 0.014, 0.014, fF - 0.007));
       return { sy, fSight: fR - 0.003, relief: 0.1 };
     },
     notch(k: Kit, fRear: number, fFront: number, sy: number, rearBase: number, frontBase: number, onBarrel = false) { return S.irons(k, fRear, fFront, sy, rearBase, frontBase, 'ak', onBarrel); },
@@ -322,7 +323,7 @@ const G_GunRecipes = (() => {
     // An open reflex sight (pistol size, on the slide; o.riser lifts it to rifle height on a rail), or an enclosed
     // one (o.closed: a hood all round, glass at both ends)
     minidot(k: Kit, f: number, top: number, o: RecipeSpec = {}) {
-      if (o.riser) { k.box(0.024, o.riser, 0.034, M.black(), f - 0.017, top + o.riser / 2); top += o.riser; }
+      if (o.riser) { const rh = o.riser; k.at('mount', () => k.box(0.024, rh, 0.034, M.black(), f - 0.017, top + rh / 2)); top += rh; } // (a riser dot: a mount piece, the dot above it is the same dot as ever)
       const sy = top + 0.016;
       k.box(0.024, 0.008, 0.032, M.black(), f - 0.016, top + 0.004);
       // the window: a thin frame round the lens (two posts and a top bar), open in the middle
@@ -361,13 +362,17 @@ const G_GunRecipes = (() => {
     bead(k: Kit, fRear: number, fFront: number, sy: number, rib: number[] | null | undefined, barrelTop: number, onBarrel = false): { sy: number; fSight: number; relief: number } {
       // (onBarrel: the rib and the bead stand on the barrel, userData.at 'barrel'. The rib is built for the barrel's length (its posts spread
       // over [rib start + 10 mm, rib end - 10 mm], their lengths 1 % of that run each), so it is keyed by the barrel, as a part of it)
-      if (onBarrel && rib) return k.at('barrel', () => {
+      // (two pieces, like an iron front sight: the bead is the sight's head (`optic@barrel`, the same on every gun) and the rib with its posts is the base
+      // (`optic@sightbase`: a mount piece, as long as the barrel)
+      if (onBarrel && rib) {
         const ry = sy - 0.0065, len = rib[1] - rib[0], A = rib[0] + 0.01, D = len - 0.02, gap = ry - 0.0015 - barrelTop;
-        k.box(0.007, 0.003, len, M.black(), rib[0], ry);
-        if (gap > 0.004) for (let i = 0; i < 5; i++) k.box(0.003, gap, D * 0.01, M.black(), A + D * 0.99 * i / 4, barrelTop + gap / 2);
-        k.sphere(0.0036, BEAD, fFront, sy - 0.0018);
+        k.at('sightbase', () => {
+          k.box(0.007, 0.003, len, M.black(), rib[0], ry);
+          if (gap > 0.004) for (let i = 0; i < 5; i++) k.box(0.003, gap, D * 0.01, M.black(), A + D * 0.99 * i / 4, barrelTop + gap / 2);
+        });
+        k.at('barrel', () => k.sphere(0.0036, BEAD, fFront, sy - 0.0018));
         return { sy, fSight: fRear, relief: 0.3 };
-      });
+      }
       if (rib) {
         const ry = sy - 0.0065, len = rib[1] - rib[0];
         k.box(0.007, 0.003, len, M.black(), rib[0], ry);
@@ -766,22 +771,21 @@ const G_GunRecipes = (() => {
   }
 
   // ---------------------------------------------------------------- attachments
-  // A bipod leg hinged at (f, y): drawn by draw() in gun coordinates, on a part of its own that swings it down to stand
-  // the gun on (anim.bipod, posed by bipodPose). back: folded back along the gun (its foot behind the hinge), else forward.
-  // (Inside another moving part it's drawn fixed, folded.)
+  // A bipod leg hinged at (f, y): drawn by draw() in gun coordinates, on a node of its own that swings it down to stand the gun on.
+  // The legs are the children of ONE node, anim.bipod (baked as part_bipod; its own pivot is the first leg's hinge and nothing turns it);
+  // each leg is a group with its pivot at its hinge and userData.leg = { deploy: [rx, ry, rz] }: the rotation (radians, XYZ euler) it
+  // turns to when the bipod is down. Folded is rotation 0, which is how it is drawn (docs/models.md "Bipods"; js/gunrig.ts bipodPose drives
+  // it). back: folded back along the gun (its foot behind the hinge), else forward; x: which side. (Inside another moving part it's drawn
+  // fixed, folded.)
+  const BIPOD_SPLAY = 0.2;
   function bipodLeg(k: Kit, anim: Anim | null | undefined, f: number, y: number, x: number, back: boolean, draw: () => void) {
     if (!anim || k.inPart) { draw(); return; }
-    const p = k.part(f, y);
+    if (!anim.bipod) anim.bipod = k.part(f, y);
+    const bp: THREE.Object3D = anim.bipod, p = k.part(f, y);
+    bp.add(p); p.position.sub(bp.position); // (nested: its position is relative to the bipod's node)
     k.into(p, f, y); draw(); k.into(null);
-    (anim.bipod || (anim.bipod = [])).push({ p, back, side: Math.sign(x) || 1 });
-  }
-  // The legs down by k (0 folded, 1 standing the gun up): about their hinges to point at the ground, splayed a little.
-  // legs: anim.bipod (the viewmodel's), or a world model's userData.bipod (js/rig.ts).
-  const BIPOD_SPLAY = 0.2;
-  function bipodPose(legs: BipodLeg[] | null | undefined, k: number) {
-    if (!legs) return;
-    const e = k * k * (3 - 2 * k);
-    for (const l of legs) (l.sub || l.p).rotation.set(e * (l.back ? 1 : -1) * Math.PI / 2, e * l.side * BIPOD_SPLAY * (l.back ? 1 : -1), 0);
+    const s = back ? 1 : -1;
+    p.userData.leg = { deploy: [s * Math.PI / 2, s * (Math.sign(x) || 1) * BIPOD_SPLAY, 0] };
   }
   // Foregrips hang under the handguard at forward position f.
   function foregrip(k: Kit, t: string, f: number, m: THREE.Material, anim?: Anim | null) {
@@ -871,7 +875,7 @@ const G_GunRecipes = (() => {
   function sightOf(k: Kit, o: RecipeSpec, top: number, L: number, bl: number, br: number, front: number, ofs: number, onBarrel = false, by = 0) {
     const frontF = frontSightF(L, bl);
     if (onBarrel) k.anchor('barrel', 'mount_frontsight', [(o.optic || 'irons') === 'bead' ? front - 0.008 : frontF, by, 0]);
-    if (o.optic === 'riser') k.box(0.024, o.riser || 0.022, 0.034, M.black(), ofs - 0.017, top + (o.riser || 0.022) / 2); // a pistol optic riser with nothing on it (the irons still work)
+    if (o.optic === 'riser') k.at('mount', () => k.box(0.024, o.riser || 0.022, 0.034, M.black(), ofs - 0.017, top + (o.riser || 0.022) / 2)); // a pistol optic riser with nothing on it (the irons still work)
     switch (o.optic || 'irons') {
       case 'reddot': return S.reddot(k, ofs, top, o);
       case 'minidot': return S.minidot(k, ofs, top, o);
@@ -880,6 +884,7 @@ const G_GunRecipes = (() => {
       case 'prism': return S.prism(k, ofs, top, o);
       case 'lpvo': return S.scope(k, ofs, top, 0.24, 0.022, 0.038);
       case 'scope': return S.scope(k, ofs, top, o.scopeLen, o.scopeObj);
+      case 'authored': return G.AuthoredParts.place(k, o.apart!, ofs, top); // an optic made in Blender (models/parts/<slot>/<id>/): docs/models.md "Authored parts"
       case 'bead': { const sy = Math.max(top, onBarrel ? 0.014 : br) + 0.009; return S.bead(k, 0.02, front - 0.008, sy, [L, front - 0.006], onBarrel ? by + 0.004 : br, onBarrel); } // clear of the receiver's (bevelled) top
       case 'notch': if ((o.irons || 'ak') === 'ak') return S.irons(k, L * 0.85, frontF, top + 0.02, top, onBarrel ? by : br, 'ak', onBarrel);
       // falls through: a gun whose own sights are an aperture
@@ -1293,7 +1298,7 @@ const G_GunRecipes = (() => {
       k.box(0.05, V([0, 92])[1] - V([0, 128])[1], 0.01, B, -0.01, V([0, 110])[1]);
       top = S.rail(k, V([322, 0])[0], V([735, 0])[0] - V([322, 0])[0], V([0, 90])[1], up);
       // the flip-up sights folded flat at the rail's two ends when there's an optic on it (up, they're the irons below)
-      if (o.optic && !(['irons', 'notch'] as (string | undefined)[]).includes(o.optic)) k.under('optic', () => { k.box(0.024, 0.009, 0.026, B, V([346, 0])[0], top + 0.0045); k.box(0.022, 0.009, 0.022, B, V([690, 0])[0], top + 0.0045); }); // (the sights' own: they're the optic's, as the raised irons are)
+      if (o.optic && !(['irons', 'notch'] as (string | undefined)[]).includes(o.optic)) k.under('optic', () => k.at('mount', () => { k.box(0.024, 0.009, 0.026, B, V([346, 0])[0], top + 0.0045); k.box(0.022, 0.009, 0.022, B, V([690, 0])[0], top + 0.0045); })); // (the gun's own folded sights: a mount piece of the optic)
     } else if (rcv === 'break') {
       // the action: the barrels hinge at its front (L), so it's as long as the receiver
       if (tr) { tracedParts(k, tr, VT, 'base', mats); top = VT([0, tr.topY])[1]; }
@@ -1530,7 +1535,7 @@ const G_GunRecipes = (() => {
     let sight: Sight;
     if (ownIrons) { // (its own aperture, the front post's on the barrel; a riser on the rail over the aperture, the irons still used)
       authored(k, A!, (e) => e.slot === 'optic'); sight = { sy: A!.info.sy, fSight: A!.info.fSight, relief: A!.info.relief };
-      if (o.optic && A!.sights.rail.includes(o.optic)) k.box(0.024, o.riser || 0.022, 0.034, M.black(), ofs - 0.017, top + (o.riser || 0.022) / 2);
+      if (o.optic && A!.sights.rail.includes(o.optic)) k.at('mount', () => k.box(0.024, o.riser || 0.022, 0.034, M.black(), ofs - 0.017, top + (o.riser || 0.022) / 2));
     }
     else if (rcv === 'aug') {
       const V = augTrace;
@@ -1551,7 +1556,7 @@ const G_GunRecipes = (() => {
         // The A3 M2's: no handle and no hump, a flat-top receiver with its Picatinny rail the whole length of it, from the
         // barrel lock back over the front of the shell (25 slots, about 26 cm), on a low base moulded into the top
         const [ra] = V([900, 0]), [rb] = V([440, 0]);
-        k.box(0.03, V([0, 322])[1] - top, rb - ra, rm, ra, (top + V([0, 322])[1]) / 2);
+        k.at('mount', () => k.box(0.03, V([0, 322])[1] - top, rb - ra, rm, ra, (top + V([0, 322])[1]) / 2));
         top = S.rail(k, ra, rb - ra, V([0, 322])[1], rm);
         sight = (['irons', 'notch'] as (string | undefined)[]).includes(o.optic) ? S.irons(k, V([905, 0])[0], V([482, 0])[0], top + 0.034, top, top, 'ar') : sightOf(k, o, top, L, o.integral ? o.integral.len : bl, br, bEnd, ofs, true, by);
       }
@@ -1559,11 +1564,13 @@ const G_GunRecipes = (() => {
       // its own sights stay whatever's fitted: the rear aperture standing in the handle's opening, the front post
       // between its ears
       const V = qbzTrace, sy = V([0, 150])[1], [fR] = V([845, 0]), [fF] = V([1127, 0]), B = M.black();
-      k.box(0.012, sy - 0.0055 - top, 0.01, B, fR - 0.005, (top + sy - 0.0055) / 2);
-      k.annulus(0.0022, 0.0052, 0.003, B, fR - 0.0015, sy);
-      k.box(0.003, sy - V([0, 166])[1], 0.003, B, fF - 0.0015, (sy + V([0, 166])[1]) / 2);
-      for (const x of [-0.012, 0.012]) k.box(0.004, V([0, 95])[1] - V([0, 166])[1], V([1148, 0])[0] - V([1106, 0])[0], fm, V([1106, 0])[0], (V([0, 95])[1] + V([0, 166])[1]) / 2, x);
-      k.box(0.028, V([0, 95])[1] - V([0, 108])[1], V([1148, 0])[0] - V([1106, 0])[0], fm, V([1106, 0])[0], (V([0, 95])[1] + V([0, 108])[1]) / 2);
+      k.at('mount', () => { // (the gun's own sight fixtures, there whatever sight is fitted: a mount piece)
+        k.box(0.012, sy - 0.0055 - top, 0.01, B, fR - 0.005, (top + sy - 0.0055) / 2);
+        k.annulus(0.0022, 0.0052, 0.003, B, fR - 0.0015, sy);
+        k.box(0.003, sy - V([0, 166])[1], 0.003, B, fF - 0.0015, (sy + V([0, 166])[1]) / 2);
+        for (const x of [-0.012, 0.012]) k.box(0.004, V([0, 95])[1] - V([0, 166])[1], V([1148, 0])[0] - V([1106, 0])[0], fm, V([1106, 0])[0], (V([0, 95])[1] + V([0, 166])[1]) / 2, x);
+        k.box(0.028, V([0, 95])[1] - V([0, 108])[1], V([1148, 0])[0] - V([1106, 0])[0], fm, V([1106, 0])[0], (V([0, 95])[1] + V([0, 108])[1]) / 2);
+      });
       if (!o.optic || (['irons', 'notch', 'qbzirons'] as (string | undefined)[]).includes(o.optic)) sight = { sy, fSight: fR - 0.0015, relief: 0.12 };
       else {
         // anything else sits on a rail clamped along the top of the handle: very high over the bore, as on the real one
@@ -1573,7 +1580,7 @@ const G_GunRecipes = (() => {
     } else if (rcv === 'f2') {
       // its own sights stay whatever's fitted: the aperture in the handle's rear leg, the post in its front, the line between
       // them down the tunnel; anything else goes on a rail along the top of the handle, as high over the bore as the real handle
-      const V = f2Trace, own = S.irons(k, 0.3, 0.6, V([0, 798])[1], top, top, 'ar');
+      const V = f2Trace, own = k.at('mount', () => S.irons(k, 0.3, 0.6, V([0, 798])[1], top, top, 'ar')); // (its own sights are there whatever is fitted: a mount piece)
       if (!o.optic || (['irons', 'notch'] as (string | undefined)[]).includes(o.optic)) sight = Object.assign(own, { relief: 0.14 }); // (the eye well back from the handle's rear leg)
       else { const [ra] = V([1050, 0]), [rb] = V([1783, 0]); sight = sightOf(k, o, S.rail(k, ra, rb - ra, V([0, 692])[1], rm), L, bl, br, bEnd, ofs, true, by); }
     } else if (rcv === 'aksu' && (!o.optic || o.optic === 'notch')) {
@@ -2351,7 +2358,7 @@ const G_GunRecipes = (() => {
   // (skin: the gun's stickers, js/stickers.ts.) Nothing of this runs in the game: it loads baked glTF (js/gunmodels.ts).
   function display(def: any, skin?: any) { const k = kit(); const info = build(k, def); if (skin && skin.length) G.Stickers.decorate(k.g, skin); return { group: k.g, info }; }
 
-  return { M, build, display, roundDims, roundShape, quarrel, bipodPose };
+  return { M, build, display, roundDims, roundShape, quarrel };
 })();
 G.GunRecipes = G_GunRecipes;
 interface GameModules { GunRecipes: typeof G_GunRecipes; }

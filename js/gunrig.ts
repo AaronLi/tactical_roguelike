@@ -8,7 +8,7 @@
 //   G.GunRig.magCheck(mag)                      -> the magazine-check data off a magazine part (the model's tags, or the recipe's refs)
 //   G.GunRig.describe(group)                    -> the recipe's refs written down as data on the nodes, for the baker (see below)
 //   G.GunRig.setLoaded(world, bolt, cocked)     -> a crossbow's bolt on the rail or not, its string cocked or not (a world model's)
-//   G.GunRig.bipodPose(legs, k)                 -> a bipod's legs swung down by k (0 folded .. 1 standing the gun up)
+//   G.GunRig.bipodPose(bipod, k)                -> a bipod's legs (the children of part_bipod, each with extras.leg.deploy) swung down by k (0 folded .. 1 standing the gun up)
 //
 // Nothing here knows how a gun was built: the parts are found by name (info.anim, whose values are the nodes themselves
 // for a recipe's model, or the node NAMES for one read from a file) and the anchors are info's numbers.
@@ -34,7 +34,7 @@ const G_GunRig = (() => {
     const out: Record<string, any> = {};
     for (const [key, val] of Object.entries(info.anim || {})) {
       if (typeof val === 'string') { const n = group.getObjectByName(val); if (n) out[key] = n; } // (by node name: `part_<key>`)
-      else out[key] = val; // (a node, or a list of bipod legs)
+      else out[key] = val; // (a node)
     }
     return out as Parts;
   }
@@ -122,14 +122,14 @@ const G_GunRig = (() => {
     x.bolt.visible = !!bolt; x.cocked.visible = !!cocked; x.slack.visible = !cocked;
   }
   /**
-   * The bipod's legs down by k (0 folded, 1 standing the gun up): about their hinges to point at the ground, splayed a little.
-   * legs: an.bipod (the viewmodel's, a bound rig's), or a world model's userData.bipod (js/rig.ts).
+   * The bipod's legs down by k (0 folded, 1 standing the gun up): each leg (a child of the bipod node) turns about its own pivot to its
+   * `extras.leg.deploy` (radians, XYZ euler: the model says where its legs point and how they splay), eased: deploy * smoothstep(k).
+   * bipod: an.bipod (the viewmodel's, a bound rig's: the model's part_bipod node), or a world model's userData.bipod (js/viewmodel.ts, js/rig.ts).
    */
-  const BIPOD_SPLAY = 0.2;
-  function bipodPose(legs: VmLeg[] | null | undefined, k: number) {
-    if (!legs) return;
+  function bipodPose(bipod: THREE.Object3D | null | undefined, k: number) {
+    if (!bipod) return;
     const e = k * k * (3 - 2 * k);
-    for (const l of legs) (l.sub || l.p).rotation.set(e * (l.back ? 1 : -1) * Math.PI / 2, e * l.side * BIPOD_SPLAY * (l.back ? 1 : -1), 0);
+    for (const l of bipod.children) { const d: number[] | undefined = l.userData.leg && l.userData.leg.deploy; if (d) l.rotation.set(e * d[0], e * d[1], e * d[2]); }
   }
 
   return { bind, parts, magCheck, describe, setLoaded, bipodPose, v };
@@ -137,7 +137,7 @@ const G_GunRig = (() => {
 G.GunRig = G_GunRig;
 
 /** The moving parts of a gun (js/gunrig.ts): by info.anim key, the live nodes. */
-type GunRigParts = { mag?: THREE.Object3D; handle?: THREE.Object3D; ch?: THREE.Object3D; cyl?: THREE.Object3D; bolt?: THREE.Object3D; barrel?: THREE.Object3D; slide?: THREE.Object3D; brk?: THREE.Object3D; cover?: THREE.Object3D; bipod?: VmLeg[] | null; pump?: THREE.Object3D; lever?: THREE.Object3D; quarrel?: THREE.Object3D; stringCocked?: THREE.Object3D; stringSlack?: THREE.Object3D };
+type GunRigParts = { mag?: THREE.Object3D; handle?: THREE.Object3D; ch?: THREE.Object3D; cyl?: THREE.Object3D; bolt?: THREE.Object3D; barrel?: THREE.Object3D; slide?: THREE.Object3D; brk?: THREE.Object3D; cover?: THREE.Object3D; bipod?: THREE.Object3D; pump?: THREE.Object3D; lever?: THREE.Object3D; quarrel?: THREE.Object3D; stringCocked?: THREE.Object3D; stringSlack?: THREE.Object3D };
 /** Where a gun's round shows when it is checked (docs/models.md info.chamberAt). */
 interface GunRigChamberAt { side: VmChamberSide; n: number; r: number; R: number; z: number; bore?: boolean; heads: number[][]; x: number; y: number; f: number; w: number }
 /** What a model says about its moving parts and anchor points (docs/models.md `info`): [forward, up, right] each. */
