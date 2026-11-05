@@ -8,7 +8,7 @@ const types = {
 };
 const server = http.createServer((req, res) => {
   const url = decodeURIComponent(req.url.split('?')[0]);
-  const file = path.normalize(path.join(root, url === '/' ? 'index.html' : url));
+  const file = path.normalize(path.join(root, url.endsWith('/') ? url + 'index.html' : url));
   if (!file.startsWith(root)) { res.writeHead(403); return res.end(); }
   fs.readFile(file, (err, data) => {
     if (err) { res.writeHead(404); return res.end('Not found'); }

@@ -1,0 +1,6 @@
+// Public engine API (no DOM): import this from a game or a build script to bake sounds.
+export * from './params.js';
+export { MATERIALS, materialById, type Material } from './materials.js';
+export { PRESETS, type Preset } from './presets.js';
+export { render, type RenderResult, type RenderInfo } from './render.js';
+export { encodeWav } from './wav.js';
