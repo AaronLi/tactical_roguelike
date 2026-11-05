@@ -126,8 +126,8 @@ const G_Viewmodel = (() => {
   // axis with a field of view set by the magnification, into a texture this disk shows. The reticle is drawn
   // over it, and a dark crescent creeps in when your eye is off the scope's axis (the eyebox).
   // (dot, dotG, cdot and holo: a reflex sight's own reticle, seen through a magnifier)
-  const PIP_RETICLE: Record<string, number> = { cross: 0, chevron: 1, lpvo: 2, dot: 3, dotG: 3, dotP: 3, cdot: 4, holo: 4, ring: 5, bdc: 6, range: 7 };
-  const PIP_ILLUM: Record<string, number> = { ring: 0x000000, cross: 0x000000, chevron: 0xff9a18, lpvo: 0xff2a20, dot: 0xff2a20, dotP: 0xff2a20, dotG: 0x30ff50, cdot: 0xff2a20, holo: 0xff2a20, bdc: 0xff2a20, range: 0xff2a20 };
+  const PIP_RETICLE: Record<string, number> = { cross: 0, chevron: 1, lpvo: 2, dot: 3, dotG: 3, dotP: 3, cdot: 4, holo: 4, ring: 5, bdc: 6, range: 7, calc: 8 };
+  const PIP_ILLUM: Record<string, number> = { ring: 0x000000, cross: 0x000000, chevron: 0xff9a18, lpvo: 0xff2a20, dot: 0xff2a20, dotP: 0xff2a20, dotG: 0x30ff50, cdot: 0xff2a20, holo: 0xff2a20, bdc: 0xff2a20, range: 0xff2a20, calc: 0xff2a20 };
   // The crossbow's reticle (first focal plane: js/render.ts _renderPip says how big a mil is at this power, so it grows with
   // the picture and the marks are true at any power). In mils, on a canvas BDC_R either side of the centre:
   //   - a lit dot and, to pick it up at low power, a lit horseshoe; fine wires with heavy posts outside, a tick every mil near the middle
@@ -201,9 +201,13 @@ const G_Viewmodel = (() => {
   //   - FOCAL PLANE: first (ffp: the marks grow with the picture, true at any power) or second (sfp: they stay one size on the glass, true at one power only, the
   //     scope's top: js/render.ts _renderPip puts pmil there). Mils are drawn on RANGE_R either side of the middle.
   const RANGE_R = 44, RANGE_TEX = new Map<string, any>(), RANGES = [100, 200, 300, 400, 500];
-  function rangeHolds(def: any, w: any): { am: string; holds: (number | null)[] } {
+  function nextRound(def: any, w: any) {
     const cdef = G.asCal(def, G.cartOf(w.def ? w : { def, rl: w.rl }) || G.calOf(def));
     const am = (G.chambered(def) && w.chamber) || (w.tube && w.tube.length ? w.tube[w.tube.length - 1] : null) || w.ammo || G.ballFor(G.calOf(def));
+    return { cdef, am };
+  }
+  function rangeHolds(def: any, w: any): { am: string; holds: (number | null)[] } {
+    const { cdef, am } = nextRound(def, w);
     if (def.cls === 'RAIL') return { am, holds: RANGES.map(() => null) }; // (a slug that flies flat: nothing to hold over)
     const p = G.flight(cdef, am, G.boreTip({ def: cdef, clicks: w.clicks || 0 }), 500);
     return { am, holds: RANGES.map((d) => (p[d] ? (-p[d].h / d) * 1000 : null)) };
@@ -238,9 +242,33 @@ const G_Viewmodel = (() => {
     RANGE_TEX.set(key, t);
     return t;
   }
+  // The ballistic computer's readout (display_ cells of a seven-segment LCD, lit over faint unlit ones) is painted on a canvas the lens shows low on its right: the range in
+  // metres to whatever is under the crosshair, "----" for nothing (sky, or past 1500 m). White on clear: the shader tints it.
+  const LCD_W = 256, LCD_H = 64, LCD_SEG: Record<string, string> = { 0: 'abcdef', 1: 'bc', 2: 'abdeg', 3: 'abcdg', 4: 'bcfg', 5: 'acdfg', 6: 'acdefg', 7: 'abc', 8: 'abcdefg', 9: 'abcdfg', '-': 'g' };
+  function paintLcd(c: CanvasRenderingContext2D, text: string) {
+    c.clearRect(0, 0, LCD_W, LCD_H);
+    const w = 34, h = 50, t = 7, y0 = 7;
+    const hbar = (x: number, y: number, l: number) => { c.moveTo(x, y + t / 2); c.lineTo(x + t / 2, y); c.lineTo(x + l - t / 2, y); c.lineTo(x + l, y + t / 2); c.lineTo(x + l - t / 2, y + t); c.lineTo(x + t / 2, y + t); c.closePath(); };
+    const vbar = (x: number, y: number, l: number) => { c.moveTo(x + t / 2, y); c.lineTo(x + t, y + t / 2); c.lineTo(x + t, y + l - t / 2); c.lineTo(x + t / 2, y + l); c.lineTo(x, y + l - t / 2); c.lineTo(x, y + t / 2); c.closePath(); };
+    for (let i = 0; i < 4; i++) {
+      const x = 16 + i * 44, on = LCD_SEG[text[i]] || '';
+      for (const s of 'abcdefg') {
+        c.beginPath();
+        if (s === 'a') hbar(x + 2, y0, w - 4); else if (s === 'g') hbar(x + 2, y0 + h / 2 - t / 2, w - 4); else if (s === 'd') hbar(x + 2, y0 + h - t, w - 4);
+        else if (s === 'f') vbar(x, y0 + 2, h / 2 - 2); else if (s === 'b') vbar(x + w - t, y0 + 2, h / 2 - 2); else if (s === 'e') vbar(x, y0 + h / 2, h / 2 - 2); else vbar(x + w - t, y0 + h / 2, h / 2 - 2);
+        c.fillStyle = on.includes(s) ? '#fff' : 'rgba(255,255,255,0.1)'; c.fill();
+      }
+    }
+    c.fillStyle = '#fff'; // (the unit: a small "m" of bars, like the digits)
+    for (const x of [204, 216, 228]) c.fillRect(x, y0 + 22, 5, 28);
+    c.fillRect(204, y0 + 22, 29, 5);
+  }
+  // the point of impact, where the next round strikes at a range, is a lit cell of a coarse grid (a cell is this many mils: the marker snaps from cell to cell)
+  const POI_CELL = 0.5, POI_FAR = 560;
   const PIP_VS = 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
   const PIP_FS = G.R.TONE + `
     uniform sampler2D map; uniform float live; uniform vec2 eye; uniform int ret; uniform vec3 illum;
+    uniform int calc; uniform sampler2D dmap; uniform vec3 poi; // (a ballistic computer: its readout's picture; the marker's cell, in cells from the middle, and whether there is one)
     uniform sampler2D rmap; uniform float pmil; // (a first-focal-plane reticle: its picture, and how much of the lens's radius a mil is at this power)
     varying vec2 vUv;
     float seg(vec2 p, vec2 a, vec2 b) { vec2 pa = p - a, ba = b - a; float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0); return length(pa - ba * h); }
@@ -262,6 +290,10 @@ const G_Viewmodel = (() => {
         glow = max(ink(abs(r - 0.42), 0.012), ink(r, 0.03));
       } else if (ret == 5) { // the AUG's: a black ring, the target in it (its size: a man at 300 m)
         black = ink(abs(r - 0.13), 0.012);
+      } else if (ret == 8) { // a ballistic computer scope's: fine duplex wires, a lit dot (the computer's marks are drawn below)
+        float tw = abs(p.x) > 0.5 ? 0.02 : 0.0035, th = abs(p.y) > 0.5 ? 0.02 : 0.0035;
+        black = max(ink(abs(p.y), tw), ink(abs(p.x), th)) * step(0.025, max(abs(p.x), abs(p.y)));
+        glow = ink(r, 0.012);
       } else if (ret >= 6) { // drawn in mils, looked up in mils: it grows with the picture (a second focal plane: pmil is held at its true power)
         float rr = ret == 7 ? ${RANGE_R.toFixed(1)} : ${BDC_R.toFixed(1)};
         if (ret == 7) { black = max(ink(abs(p.y), 0.0035), ink(abs(p.x), 0.0035)); glow = ink(r, 0.012); } // (fine wires across the lens, a lit dot)
@@ -273,6 +305,17 @@ const G_Viewmodel = (() => {
         black = max(ink(abs(p.y), tw), ink(abs(p.x), th)) * step(0.3, max(abs(p.x), abs(p.y)));
       }
       vec3 col = img * (1.0 - black * 0.94) + illum * glow * 1.5;
+      if (calc > 0) { // the range readout, low on the right: a dark panel with a green seven-segment LCD
+        vec2 u = (p - vec2(0.08, -0.62)) / vec2(0.54, 0.14);
+        if (u.x > 0.0 && u.y > 0.0 && u.x < 1.0 && u.y < 1.0) { float a = texture2D(dmap, u).a; col = mix(col, vec3(0.01, 0.03, 0.02), 0.72); col += vec3(0.25, 1.0, 0.3) * a * 1.3; }
+      }
+      if (calc > 1 && poi.z > 0.5) { // the point of impact: a lit cell of a coarse LCD grid (cells of ${POI_CELL} mil), with the cells about it faintly showing
+        vec2 q = p / pmil / ${POI_CELL.toFixed(2)} + 0.5, c = floor(q), f = fract(q), dd = abs(c - poi.xy);
+        vec2 aa = fwidth(q) * 0.75, e = smoothstep(vec2(0.09), vec2(0.09) + aa, f) * (1.0 - smoothstep(vec2(0.91) - aa, vec2(0.91), f));
+        float cell = e.x * e.y, lit = step(dd.x, 0.5) * step(dd.y, 0.5), near = step(dd.x, 2.5) * step(dd.y, 2.5);
+        col = mix(col, vec3(0.02, 0.025, 0.02), near * cell * 0.5);
+        col += vec3(1.0, 0.7, 0.18) * cell * (lit * 1.5 + near * 0.12);
+      }
       col *= (1.0 - smoothstep(0.7, 1.0, length(p - eye))) * smoothstep(1.0, 0.9, r);
       vec3 glass = vec3(0.025, 0.04, 0.055) + vec3(0.1, 0.12, 0.18) * pow(max(0.0, 1.0 - length(p - vec2(-0.35, 0.4))), 3.0);
       glass = pow(glass, vec3(2.2)); // (sRGB, as written: to linear)
@@ -281,7 +324,7 @@ const G_Viewmodel = (() => {
   function pipLens(g: THREE.Object3D, o: VmPip, def: any) {
     const reticle = def.reticle || 'cross';
     const mat = new T.ShaderMaterial({
-      uniforms: { map: { value: G.R.pipTexture() }, live: { value: 0 }, eye: { value: new T.Vector2() }, ret: { value: PIP_RETICLE[reticle] || 0 }, illum: { value: new T.Color(PIP_ILLUM[reticle] || 0) }, rmap: { value: reticle === 'bdc' ? bdcTex(def) : reticle === 'range' ? rangeTex(rangeHolds(def, { def, clicks: 0, ammo: G.ballFor(G.calOf(def)) }).holds) : null }, pmil: { value: 1 } },
+      uniforms: { map: { value: G.R.pipTexture() }, live: { value: 0 }, eye: { value: new T.Vector2() }, ret: { value: PIP_RETICLE[reticle] || 0 }, illum: { value: new T.Color(PIP_ILLUM[reticle] || 0) }, rmap: { value: reticle === 'bdc' ? bdcTex(def) : reticle === 'range' ? rangeTex(rangeHolds(def, { def, clicks: 0, ammo: G.ballFor(G.calOf(def)) }).holds) : null }, pmil: { value: 1 }, calc: { value: def.calc || 0 }, dmap: { value: null }, poi: { value: new T.Vector3() } },
       vertexShader: PIP_VS, fragmentShader: PIP_FS, extensions: { derivatives: true }, toneMapped: false, // (it rolls off the picture itself: bpTone)
     });
     const disk = new T.Mesh(new T.CircleGeometry(o.r, 48), mat);
@@ -289,9 +332,32 @@ const G_Viewmodel = (() => {
     if (parent) { disk.position.copy(Array.isArray(o.pos) ? new T.Vector3(o.pos[0], o.pos[1], o.pos[2]) : o.pos!); parent.add(disk); } // (a magnifier's lens swings with it)
     else { disk.position.set(0, o.y, -o.f); g.add(disk); }
     let sig = '';
+    // a ballistic computer (def.calc: 1 a rangefinder's readout only, 2 with the point-of-impact marker): a few times a second it asks range() how far it is to what's under the crosshair, paints it and, from the
+    // flight of the round that fires next (the holdover marks' own sums), puts the marker where that round arrives at that range (below the crosshair, in mils)
+    let lcd: CanvasRenderingContext2D | null = null, lcdTex: any = null, lcdT = 0, lcdText = '', pathK = '', path: { h: number }[] = [];
+    if (def.calc) {
+      const cv = document.createElement('canvas'); cv.width = LCD_W; cv.height = LCD_H; lcd = cv.getContext('2d');
+      lcdTex = new T.CanvasTexture(cv); mat.uniforms.dmap.value = lcdTex; paintLcd(lcd!, '----'); lcdText = '----';
+    }
+    const calcStep = (w: any, range: () => number | null) => {
+      const now = performance.now();
+      if (now - lcdT < 200) return;
+      lcdT = now;
+      const r = range(), text = r == null ? '----' : String(Math.min(9999, Math.round(r))).padStart(4, ' ');
+      if (text !== lcdText) { lcdText = text; paintLcd(lcd!, text); lcdTex.needsUpdate = true; }
+      const poi = mat.uniforms.poi.value;
+      if (def.calc < 2 || r == null || r < 1) { poi.z = 0; return; }
+      const { cdef, am } = nextRound(def, w), k = `${cdef.id}|${am}|${w.clicks || 0}`;
+      if (k !== pathK) { pathK = k; path = G.flight(cdef, am, G.boreTip({ def: cdef, clicks: w.clicks || 0 }), POI_FAR); }
+      const q = path[Math.round(r)]; // (past the round's reach there is no impact to show)
+      if (!q) { poi.z = 0; return; }
+      poi.set(0, Math.round(((q.h / r) * 1000) / POI_CELL), 1);
+    };
     // the range-finding reticle's holdover marks follow the weapon in the hands: called each frame with it; they are rebuilt when its round or its zero changes
-    const sync = (w: any) => {
-      if (reticle !== 'range' || !w) return;
+    const sync = (w: any, range?: () => number | null) => {
+      if (!w) return;
+      if (def.calc && range) calcStep(w, range);
+      if (reticle !== 'range') return;
       const k = `${(G.chambered(w.def) && w.chamber) || (w.tube && w.tube[w.tube.length - 1]) || w.ammo}|${w.clicks || 0}`;
       if (k === sig) return;
       sig = k; mat.uniforms.rmap.value = rangeTex(rangeHolds(def, w).holds);

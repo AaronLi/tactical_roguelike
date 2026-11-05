@@ -407,6 +407,23 @@ const G_Me = {
     const d = w.def;
     return (w.light && d.light ? 1 | (d.light > 1.2 ? 8 : 0) : 0) | (w.laser && d.laser ? 2 | (d.laser === 'g' ? 4 : 0) : 0);
   },
+  // How far it is to what's under the crosshair of the scope you're looking through (a ballistic computer's readout: js/viewmodel.ts), along the scope's own axis: the level or a suspect, whichever's nearer;
+  // null for nothing in reach (sky, or past 1500 m) or while you're not looking through it
+  scopeRange(): number | null {
+    const sc = G.R.scopeCam, map = G.Game.map;
+    if (!sc || !map || (G.R.pipLive || 0) < 0.5) return null;
+    const MAX = 1500, o = sc.position, f = new THREE.Vector3(0, 0, -1).applyQuaternion(sc.quaternion);
+    let t = G.Level.raycast(map, o.x, o.y, o.z, f.x, f.y, f.z, MAX).t;
+    const rc = new THREE.Raycaster(o.clone(), f.clone(), 0, t);
+    for (const ev of G.Views.enemies.values()) {
+      if (!ev.alive || !ev.rig || !ev.rig.root.visible) continue;
+      const sc2 = ev.def.scale, cx = ev.pos.x - o.x, cy = ev.pos.y + sc2 - o.y, cz = ev.pos.z - o.z, along = cx * f.x + cy * f.y + cz * f.z;
+      if (along < 0 || along > t + 1.5 || Math.hypot(cx - f.x * along, cy - f.y * along, cz - f.z * along) > 1.4 * sc2) continue; // (nowhere near the line)
+      const hit = rc.intersectObject(ev.rig.root, true)[0];
+      if (hit && hit.distance < t) t = hit.distance;
+    }
+    return t < MAX - 0.5 ? t : null;
+  },
   // A ping: the spot you're looking at (on a wall, the floor, someone) marked for the whole squad, in your colour
   // with your name, and nothing about what's there (G.Views.addPing). Not too often.
   ping() {
@@ -2578,7 +2595,7 @@ const G_Me = {
     if (!vm) return;
     const u = vm.userData, a = this.adsT;
     G.R.pipLive = sg.scoped ? a : 0; // how far the scope picture is faded in (js/render.ts)
-    if (u.pip) { u.pip.mag = sg.mag; if (u.pip.sync) u.pip.sync(this.cur()); } // (at the power it's set to; a range-finding reticle's marks follow the round and the zero)
+    if (u.pip) { u.pip.mag = sg.mag; if (u.pip.sync) u.pip.sync(this.cur(), () => this.scopeRange()); } // (at the power it's set to; a range-finding reticle's marks follow the round and the zero)
     const bobAmt = (1 - a * 0.85) * Math.min((this.hspeed || 0) / this.SPEED.walk, 1.5);
     let x = G.U.lerp(u.hip.x, u.ads.x, a) + Math.sin(this.bobT) * 0.012 * bobAmt;
     let y = G.U.lerp(u.hip.y, u.ads.y, a) - Math.abs(Math.cos(this.bobT)) * 0.012 * bobAmt;

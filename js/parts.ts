@@ -22,7 +22,7 @@ type SlotName = SlotKind | 'buttstock' | 'riserdot' | 'tacL' | `${SlotKind | 'bu
 /** What a part sets outright (absolutes, where its st are deltas). */
 interface PartSet {
   cap?: number; zoom?: number; scoped?: boolean; reticle?: string; magnif?: any; levels?: number[] | null; fp?: string; barrelIn?: number; barrelAdd?: number; device?: string; sup?: boolean; can?: string;
-  ported?: boolean; shell?: number; reload?: number; magnifier?: number; full?: boolean; perLoad?: number; laser?: string; light?: number;
+  ported?: boolean; shell?: number; reload?: number; magnifier?: number; full?: boolean; perLoad?: number; laser?: string; light?: number; calc?: number; ranger?: number;
 }
 /** What a part changes in the model spec (a patch: a nested spec only has the keys it changes). */
 type PartModel = Omit<RecipeSpec<string | null>, 'mag' | 'hg' | 'pump'> & { mag?: Partial<MagSpec<string | null>>; hg?: Partial<HgSpec<string | null>>; pump?: Record<string, any>; pumpPatch?: Record<string, any> };
@@ -380,7 +380,8 @@ const G_Gunsmith = (() => {
   const RETICLE: Record<string, string> = { scope: 'cross', acog: 'chevron', prism: 'chevron', lpvo: 'lpvo', augscope: 'ring' };
   const scopeMag = (model: any, zoom: number) => model.px || ({ prism: 2, acog: 4, lpvo: 4, augscope: 1.5 } as Record<string, number>)[model.optic] || Math.min(8, Math.max(3, Math.round(1.6 / zoom)));
   // every variable-power optic is first focal plane: the range-finding marks grow with the picture, true at any power (a fixed-power scope has one power: its marks are true at it)
-  const sightSet = (model: any, zoom: number, name?: string) => (RETICLE[model.optic] ? { zoom, scoped: true, reticle: RETICLE[model.optic], magnif: scopeMag(model, zoom), levels: model.levels || null, fp: model.levels ? 'ffp' : undefined } : { zoom, scoped: false });
+  // (a ballistic computer scope, model.calc: its own plain reticle, a range readout and a point-of-impact marker drawn in the picture: js/viewmodel.ts)
+  const sightSet = (model: any, zoom: number, name?: string) => (RETICLE[model.optic] ? { zoom, scoped: true, reticle: model.calc ? 'calc' : RETICLE[model.optic], magnif: scopeMag(model, zoom), levels: model.levels || null, fp: model.levels ? 'ffp' : undefined, calc: model.calc ? 2 : undefined } : { zoom, scoped: false });
   const REFLEX = ['reddot', 'holo', 'minidot']; // (a magnifier goes behind these)
   OPTICS.forEach(([b, n, model, zoom, price, st, tier]: any[], i) => add({ id: `op.pic.${i}`, slot: 'optic', mount: 'op:pic', brand: BR[b], name: n, price, tier, st, set: sightSet(model, zoom, n),
     desc: model.levels ? `${model.levels[0]}–${model.levels[model.levels.length - 1]}× variable: scroll while aiming to change power` + (RETICLE[model.optic] && Math.max(...model.levels) > 4 ? `. Range-finding reticle: brackets for a 1.8 m man at 100-500 m and holdover marks 1-5 from your zero and load (first focal plane: true at any power).` : '') : RETICLE[model.optic] ? `${scopeMag(model, zoom)}× magnified` : REFLEX.includes(model.optic) ? 'Unmagnified. Takes a magnifier behind it.' : 'Unmagnified',
@@ -1027,13 +1028,14 @@ const G_Gunsmith = (() => {
     // a stock on a slot a handgun's given one by (sl.brace: a chassis's, an SMG stock mount's): what bracing it on your
     // shoulder does, on top of the stock's own figures (they're for a stock on an SMG, against another stock)
     for (const sl of slotsOf(id, build)) { const sp = sl.brace && PARTS[build[sl.slot]]; if (sp && sp.stype !== 'folded' && !isAdapter(sp)) for (const [k, v] of Object.entries(sl.brace!)) s[k] += v; }
-    let ffp = false, perLoad = 1, levels = null, magnifier = 0, light = 0, laser = null, laserHip = 0, laserHipSum = 0, cap = base.mag, zoom = base.zoom, barrelIn = gs.barrel, device = gs.muzzleDevice || 'none', can = gs.suppressor || null, sup = false, hasMuzzleSlot = false, shell = base.shell, reload = base.reload, fullSt = null, scoped = base.zoom <= 0.5, reticle = 'cross', magnif = scoped ? scopeMag({}, base.zoom) : 1;
+    let ffp = false, perLoad = 1, levels = null, magnifier = 0, light = 0, laser = null, laserHip = 0, laserHipSum = 0, cap = base.mag, zoom = base.zoom, barrelIn = gs.barrel, device = gs.muzzleDevice || 'none', can = gs.suppressor || null, sup = false, hasMuzzleSlot = false, shell = base.shell, reload = base.reload, fullSt = null, scoped = base.zoom <= 0.5, reticle = 'cross', magnif = scoped ? scopeMag({}, base.zoom) : 1, calc = 0, ranger = 0;
     const parts = Object.values(build).map((p) => PARTS[p]).filter(Boolean);
     for (const p of parts) {
       for (const [k, v] of Object.entries(partSt(p, id))) s[k] += v || 0; // (a shared barrel's: from its length against this gun's)
       if (p.set.cap != null) cap = p.set.cap;
       if (p.set.zoom != null) zoom = p.set.zoom;
-      if (p.set.scoped != null) { scoped = p.set.scoped; reticle = p.set.reticle || 'cross'; magnif = p.set.magnif || 1; ffp = p.set.fp === 'ffp'; }
+      if (p.set.ranger) ranger = 1;
+      if (p.set.scoped != null) { scoped = p.set.scoped; calc = p.set.calc || 0; reticle = p.set.reticle || 'cross'; magnif = p.set.magnif || 1; ffp = p.set.fp === 'ffp'; }
       if (p.set.barrelIn != null) barrelIn = p.set.barrelIn;
       if (p.set.barrelAdd != null && gs.barrel) barrelIn = gs.barrel + p.set.barrelAdd; // (a pistol's: its own length and a little more)
       if (p.set.shell != null) shell = p.set.shell;
@@ -1087,6 +1089,9 @@ const G_Gunsmith = (() => {
     d.scoped = scoped; d.reticle = reticle; d.magnif = magnif;
     // a scope that goes above 4x gets the range-finding reticle (js/viewmodel.ts rangeTex): stadia brackets for a standing man at 100-500 m and holdover marks worked out from this
     // gun's own ballistics. (The crossbow's own 'bdc' keeps its bolt-drop rungs.) Its focal plane: first (true at every power) or second (true at the top power only, d.fpMag)
+    if (scoped && reticle === 'calc') { d.reticle = 'calc'; d.fp = ffp ? 'ffp' : 'sfp'; d.fpMag = Math.max(magnif, ...(levels || [0])); }
+    // a rangefinder on the rail (a ballistic computer): the range readout in any magnified scope that hasn't one of its own
+    d.calc = scoped && Math.max(magnif, ...(levels || [0])) >= 2 ? calc || ranger : 0;
     if (scoped && (reticle === 'cross' || reticle === 'lpvo') && Math.max(magnif, ...(levels || [0])) > 4) { d.reticle = 'range'; d.fp = ffp ? 'ffp' : 'sfp'; d.fpMag = Math.max(magnif, ...(levels || [0])); }
     // powers you can step through while aiming (scroll): a variable scope's, or 1× and a magnifier's behind a dot
     d.magnifier = !!magnifier && !scoped;
@@ -1637,6 +1642,13 @@ const G_Gunsmith = (() => {
     for (const pid of Object.values(def.build || {})) { const p = PARTS[pid]; if (p && !p.factory && !p.variant && p.becomes !== def.id && !(p.len != null && PLATFORMS[def.id].defaults.barrel === pid)) stash[pid] = (stash[pid] || 0) + 1; } // (a magazine isn't a part; its own receiver kit is the gun)
   }
 
+  // Ballistic computers, made last: a part's id in a code is its place in the list, and a standard-issue part's number counts what is on its mount before it.
+  // The scope has its own rangefinder readout and a point-of-impact marker (js/viewmodel.ts); the rail module adds the readout to any magnified scope that has none of its own, and has a visible laser.
+  add({ id: 'op.bc.0', slot: 'optic', mount: 'op:pic', brand: BR.vantage, name: 'Vantage Overwatch BC 5-25× ballistic scope', price: 2600, tier: 3, st: { ergo: -15, acc: -22, weight: 0.35 },
+    set: sightSet({ optic: 'scope', calc: true, px: 8, levels: [5, 8, 12, 18, 25] }, 0.26), model: { optic: 'scope', calc: true, scopeLen: 0.38, scopeObj: 0.031, px: 8, levels: [5, 8, 12, 18, 25] },
+    desc: '5–25× variable: scroll while aiming to change power. A ballistic computer: a readout of the distance to whatever is under the crosshair, and a lit marker where your next round will strike at that range (from your zero and load), snapping from cell to cell on a coarse LCD grid. It has its own readout, so a ballistic computer on the rail adds nothing.' });
+  add({ id: 'tac.bc.0', slot: 'tac', mount: 'tac', brand: BR.oberon, name: 'Oberon BC-1 ballistic computer', price: 780, tier: 3, st: { hip: -13, ergo: -2, weight: 0.22 }, set: { laser: 'r', ranger: 1 }, model: { tac: 'bcomp' },
+    desc: 'A ballistic computer with a visible red laser (switched on the comms wheel: hold the middle mouse button; it steadies hip fire while it\'s on). It puts a range readout, the metres to whatever is under the crosshair, in any magnified scope you look through. A scope that already has one is left as it is.' });
   // what an attachments box offers for a weapon: parts that go straight onto it as it's built (a slot it has now, not
   // what's already in it), not factory parts, magazines, or anything that makes it another gun
   const ATTACH_SLOTS = new Set(['slide', 'barrel', 'muzzle', 'handguard', 'railmount', 'pump', 'fg', 'tac', 'tacL', 'optic', 'riserdot', 'magnifier', 'charging', 'grip', 'stock', 'buttstock', 'loader']);
