@@ -5,17 +5,37 @@
   "barrel=welrod.barrel,mag=welrod.mag": {
    "label": "default",
    "geometry": "f76e07f6db02e464",
-   "info": "9a105fa1649918fc"
+   "info": "143a0e5c2007dc85"
+  },
+  "barrel=welrod.br.bare_long,mag=welrod.mag": {
+   "label": "longest barrel welrod.br.bare_long",
+   "geometry": "0618913ef75378b9",
+   "info": "e303278fdd206c58"
   },
   "barrel=welrod.br.short,mag=welrod.mag": {
-   "label": "longest barrel welrod.br.short",
+   "label": "barrel=welrod.br.short",
    "geometry": "2a3b5224839c74ec",
-   "info": "80f78b576a28c223"
+   "info": "41dd1c61fb3ded99"
+  },
+  "barrel=welrod.br.optic,mag=welrod.mag": {
+   "label": "barrel=welrod.br.optic",
+   "geometry": "262e4710f1e4d686",
+   "info": "143a0e5c2007dc85"
+  },
+  "barrel=welrod.br.short_optic,mag=welrod.mag": {
+   "label": "barrel=welrod.br.short_optic",
+   "geometry": "40373f67a6d3060c",
+   "info": "41dd1c61fb3ded99"
+  },
+  "barrel=welrod.br.bare,mag=welrod.mag": {
+   "label": "barrel=welrod.br.bare",
+   "geometry": "db5df4810dfcccf6",
+   "info": "12efe6f5b50f122f"
   },
   "barrel=welrod.barrel,mag=welrod.mag.ext": {
    "label": "mag=welrod.mag.ext",
    "geometry": "95117cbf58276fbe",
-   "info": "9a105fa1649918fc"
+   "info": "143a0e5c2007dc85"
   }
  }
 }

@@ -470,6 +470,20 @@
       ],
       "description": "The bolt's rear, where the hand pulls it, [forward, up, right] metres."
     },
+    "boltTravel": {
+      "oneOf": [
+        {
+          "type": "number",
+          "minimum": 0.005,
+          "maximum": 0.3,
+          "description": "A bolt worked by hand (the pistol with part_bolt): how far the bolt comes back, metres (absent: 0.12)."
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "A bolt worked by hand (the pistol with part_bolt): how far the bolt comes back, metres (absent: 0.12)."
+    },
     "cheek": {
       "oneOf": [
         {

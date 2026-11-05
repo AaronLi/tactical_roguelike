@@ -188,9 +188,11 @@ const G_VMAnim = (() => {
   // an AR's charging handle, a pump come back
   const BOLT_LIFT = 1.3, BOLT_BACK = 0.12, SLIDE = 0.04, CH = 0.065, PUMP = 0.085;
   // where the bolt handle's knob is with the bolt turned up by lift (0..1) and drawn back by back (0..1)
-  const knobAt = (A: Anchors, lift: number, back: number) => new T.Vector3(A.bolt!.x * Math.cos(lift * BOLT_LIFT), A.bolt!.y + A.bolt!.x * Math.sin(lift * BOLT_LIFT), A.bolt!.z + back * BOLT_BACK);
+  // (how far this gun's bolt comes back: info.boltTravel, the Welrod's short stroke; else BOLT_BACK)
+  const boltBack = (h: Rig) => h.info.boltTravel || BOLT_BACK;
+  const knobAt = (A: Anchors, lift: number, back: number, travel = BOLT_BACK) => new T.Vector3(A.bolt!.x * Math.cos(lift * BOLT_LIFT), A.bolt!.y + A.bolt!.x * Math.sin(lift * BOLT_LIFT), A.bolt!.z + back * travel);
   // how far the bolt face comes back off the chamber at full pull (m)
-  const actTravel = (h: Rig, kind: VmHold) => kind === 'pistol' ? SLIDE : kind === 'ar' ? CH : kind === 'handle' ? h.travel : kind === 'bolt' ? BOLT_BACK : kind === 'pump' ? PUMP : kind === 'lever' ? 0.05 : 0;
+  const actTravel = (h: Rig, kind: VmHold) => kind === 'pistol' ? SLIDE : kind === 'ar' ? CH : kind === 'handle' ? h.travel : kind === 'bolt' ? boltBack(h) : kind === 'pump' ? PUMP : kind === 'lever' ? 0.05 : 0;
   // which action a gun's hands work: 'pistol' (the slide), 'ar' (the charging handle), 'handle' (a cocking handle),
   // 'bolt', 'pump', 'lever'
   const actKind = (a: Vma, h: Rig) => { const ac = a.k.action; return ac === 'pistol' || ac === 'bolt' || ac === 'pump' || ac === 'lever' ? ac : h.A.ch ? 'ar' : 'handle'; };
@@ -206,7 +208,7 @@ const G_VMAnim = (() => {
     if (kind === 'pistol' && A.slide) { pose.slide = pull; pose.L = lerpV(R0, off(grab || off(A.slide, -0.02, 0.012), -SLIDE * pull), on); }
     else if (kind === 'ar' && A.ch) { pose.ch = pull; pose.L = lerpV(R0, off(grab || off(A.ch, 0, 0.012), -CH * pull), on); }
     else if (kind === 'handle' && A.H) { pose.handle = pull; pose.L = lerpV(R0, off(grab || A.H, -h.travel * pull), on); }
-    else if (kind === 'bolt' && A.bolt) { const lift = G.U.clamp(pull * 2, 0, 1), back = G.U.clamp(pull * 2 - 1, 0, 1); pose.bolt = [lift, back]; pose.R = lerpV(A.G, knobAt(A, lift, back), on); }
+    else if (kind === 'bolt' && A.bolt) { const lift = G.U.clamp(pull * 2, 0, 1), back = G.U.clamp(pull * 2 - 1, 0, 1); pose.bolt = [lift, back]; pose.R = lerpV(A.G, knobAt(A, lift, back, boltBack(h)), on); }
     else if (kind === 'pump') { pose.pump = pull; pose.L = off(A.S, -PUMP * pull); } // (the left hand rides it)
     else if (kind === 'lever') pose.lever = pull;
   }
@@ -624,7 +626,7 @@ const G_VMAnim = (() => {
       if (an.pump && pose && pose.pump != null && !h.info.hinge) an.pump.position.z = pose.pump * PUMP;
       if (an.lever && !h.info.hinge) an.lever.rotation.x = (pose && pose.lever != null ? pose.lever : cyc && a.k.action === 'lever' ? cyc : 0) * 0.9;
       if (h.info.hinge) hingePose(h, pose && pose.hinge != null ? pose.hinge : 0); // (a model's own reload sequence, js/vmanim.ts hingeClip)
-      if (an.bolt && A.boltHome) { const b = (pose && pose.bolt) || [0, 0]; an.bolt.rotation.z = b[0] * BOLT_LIFT; an.bolt.position.z = A.boltHome.z + b[1] * BOLT_BACK; } // (worked by hand: js/player.ts rack)
+      if (an.bolt && A.boltHome) { const b = (pose && pose.bolt) || [0, 0]; an.bolt.rotation.z = b[0] * BOLT_LIFT; an.bolt.position.z = A.boltHome.z + b[1] * boltBack(h); } // (worked by hand: js/player.ts rack)
 
       // hands: resting on the gun unless the clip has them somewhere else
       let Rt = pose && pose.R ? res(pose.R) : A.G.clone(), Lt = pose && pose.L ? res(pose.L) : A.S.clone();

@@ -47,6 +47,7 @@ interface RecipeSpec<M = THREE.Material | null> {
   mag?: MagSpec<M>; magFit?: { len: number; c: number; d: number }; support?: number; chY?: number; chF?: number; slotOf?: Record<string, string>;
   // the odd ones
   avBarrel?: string; avMuzzle?: string; avMag?: string /* (an authored gun's variant barrel / magazine fitted: the file name beside the model, e.g. "barrel_short") */;
+  boltTravel?: number /* (a manually cycled pistol: how far its bolt comes back, metres; the Welrod's) */;
   ext?: number; len0?: number; cr?: number; cl?: number; chambers?: number; limb?: string; motor?: string; cap?: string; drum?: boolean | Record<string, any>; slide?: Record<string, any>;
 }
 /** A recipe's spec as the catalog holds it, its materials still names ('tan', 'woodDark'). */

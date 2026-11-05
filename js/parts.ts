@@ -1504,13 +1504,19 @@ const G_Gunsmith = (() => {
   // VARIANT of each when a file beside the model holds one (models/<id>/<name>.glb: barrel_short.glb -> <id>.br.short, mag_ext.glb -> <id>.mag.ext). A variant's
   // figures are the game's, PROPOSED here (the user confirms them): the stats of what it is (a shorter can: handier and louder; a longer magazine: more rounds,
   // slower to swap). The Welrod is worked by a bolt (def.manual: js/player.ts, the model's part_bolt: js/vmanim.ts), the Maxim 9 by its slide.
+  const LATE_AUTHORED: (() => void)[] = []; // (variants added after the last authored pistol: a part's id in a code is its place in the list)
   const authoredPistol = (v: { barrel: Record<string, any>; mag: Record<string, any> }) => (h: any) => {
     const { slot, factory, own, plat, def, gs, brandA, brandB } = h, id = def.id as string;
     // the barrel: the integral suppressor with its front sight (no thread: nothing screws on), and its shortened one
+    // (suppression is the variant's DATA: b.set overrides the suppressed defaults, e.g. { sup: false, device: 'none', can: null } for an unsuppressed barrel; b.optic: the barrel
+    // carries a pistol optic cut and opens the optic slot, the dot seated at the variant's info.mounts.mount_optic; b.late: added after the other authored pistols, so their ids don't move)
     { const mount = 'br:' + id, cap0 = { barrelIn: gs.barrel, sup: true, device: 'suppressor' };
       slot('barrel', mount, true);
       factory('barrel', mount, { name: `${def.name} integral suppressor`, model: {}, set: Object.assign({ can: 'integral' }, cap0) });
-      for (const [name, b] of Object.entries(v.barrel)) own({ id: `${id}.br.${name}`, slot: 'barrel', mount, brand: brandA, name: b.name, price: b.price, tier: b.tier, model: { avBarrel: 'barrel_' + name }, st: b.st, set: Object.assign({ can: b.can }, cap0), desc: b.desc }); }
+      for (const [name, b] of Object.entries(v.barrel)) {
+        const add1 = () => own(Object.assign({ id: `${id}.br.${name}`, slot: 'barrel', mount, brand: b.brand === 'B' ? brandB : brandA, name: b.name, price: b.price, tier: b.tier, model: { avBarrel: 'barrel_' + name }, st: b.st, set: Object.assign({ can: b.can }, cap0, b.set), desc: b.desc }, b.optic ? { provides: { optic: 'op:pso' } } : null));
+        if (b.late) LATE_AUTHORED.push(add1); else add1();
+      } }
     // the magazine: the one it comes with (the model's part_mag) and a longer one
     { const mount = 'mag:' + id, cap = def.mag as number;
       slot('mag', mount, true);
@@ -1520,8 +1526,13 @@ const G_Gunsmith = (() => {
       plat.magVariants = true; }
   };
   // The Welrod Mk II (.32 ACP, manually cycled, integral suppressor): no slide, no optic cut, no rails; the grip is the magazine.
-  P('welrod', 'pistol', { rcv: 'authored', authored: 'welrod', mag: { f: 0.0997, y: -0.0107 }, len0: 0.1056 }, { authoredPistol: authoredPistol({
-    barrel: { short: { name: 'Welrod cut-down suppressor tube (260 mm)', price: 260, tier: 1, can: 'compact', st: { ergo: 11, weight: -0.14, recoil: 3 }, desc: 'The tube cut down 70 mm, its end cap and front sight with it: handier in the hand, and louder, with a flash. Not what the Welrod was built to be.' } },
+  P('welrod', 'pistol', { rcv: 'authored', authored: 'welrod', mag: { f: 0.0997, y: -0.0107 }, len0: 0.1056, boltTravel: 0.04 }, { authoredPistol: authoredPistol({
+    barrel: { short: { name: 'Welrod cut-down suppressor tube (260 mm)', price: 260, tier: 1, can: 'compact', st: { ergo: 11, weight: -0.14, recoil: 3 }, desc: 'The tube cut down 70 mm, its end cap and front sight with it: handier in the hand, and louder, with a flash. Not what the Welrod was built to be.' },
+      // (the four of the model's second pass, proposed figures: the optic-cut tubes weigh a little more than their plain ones; the unsuppressed barrels are loud, light and handy)
+      optic: { late: true, brand: 'B', optic: true, name: 'Welrod optic-cut suppressor tube', price: 240, tier: 1, can: 'integral', st: { weight: 0.02 }, desc: 'The full suppressor tube with a pistol optic cut in a pad ahead of the waist: takes a pistol dot. Every bit as quiet.' },
+      short_optic: { late: true, brand: 'B', optic: true, name: 'Welrod cut-down optic-cut tube (260 mm)', price: 300, tier: 1, can: 'compact', st: { ergo: 11, weight: -0.12, recoil: 3 }, desc: 'The 260 mm tube with the pistol optic cut: handier, louder, and a dot to aim with.' },
+      bare: { late: true, set: { barrelIn: 3.5, sup: false, device: 'none', can: null }, name: 'Welrod unsuppressed barrel (174 mm)', price: 200, tier: 1, st: { ergo: 18, weight: -0.3, recoil: 6 }, desc: 'The tube taken off: a nose cap and a bare barrel with a post front sight. Loud, with a flash, but light and quick in the hand.' },
+      bare_long: { late: true, brand: 'B', set: { barrelIn: 4.4, sup: false, device: 'none', can: null }, name: 'Welrod long unsuppressed barrel (215 mm)', price: 240, tier: 1, st: { ergo: 14, weight: -0.24, recoil: 4, acc: -4 }, desc: 'A longer bare barrel: a little more velocity and sight radius than the short one. Still loud.' } },
     mag: { ext: { cap: 12, price: 80, tier: 1, st: { reload: 3, ergo: -1, weight: 0.04 }, desc: 'The grip magazine 30 mm longer: four more .32 rounds. A little slower to swap.' } } }) });
   // The Maxim 9 (9x19, integral suppressor, slide): a pistol dot goes in its slide's optic cut, a light under the frame.
   P('maxim9', 'pistol', { rcv: 'authored', authored: 'maxim9', mag: { f: 0.0615, y: -0.0167 }, len0: 0.1166 }, { optic: ['pso', { optic: 'notch' }], ptac: true, authoredPistol: authoredPistol({
@@ -1553,8 +1564,9 @@ const G_Gunsmith = (() => {
       factory('muzzle', mount, { name: `${def.name} muzzle block`, model: { muzzle: 'authored' }, set: { device: 'none' }, st: { ergo: 0, weight: 0 }, desc: 'Factory part: the six bores end in a plain block with the front sight fin.' });
       for (const [name, m] of Object.entries(MUZZLE_VARIANTS)) own({ id: `${id}.mz.${name}`, slot: 'muzzle', mount, brand: h.brandA, name: m.name, price: m.price, tier: m.tier, model: { muzzle: 'authored', avMuzzle: 'muzzle_' + name }, st: m.st, set: m.set, desc: m.desc }); }
   } });
+  for (const add1 of LATE_AUTHORED) add1();
   for (const id of AUTHORED_PISTOLS) { const plat = PLATFORMS[id]; plat.offset = {}; for (const k of STAT_KEYS) plat.offset[k] = -Object.values(plat.defaults).reduce((a, pid) => a + ((PARTS[pid] && PARTS[pid].st[k]) || 0), 0); }
-  PARTS['op.pso.0'].not = (PARTS['op.pso.0'].not || []).concat(['maxim9']); // (the tritium night sights: the Maxim 9 has its own irons, and a dot goes in its cut)
+  PARTS['op.pso.0'].not = (PARTS['op.pso.0'].not || []).concat(['maxim9', 'welrod']); // (the tritium night sights: the Maxim 9 and the Welrod have their own irons, and a dot goes in the cut)
   const compatible = (mount: string) => BY_MOUNT.get(mount) || [];
   const FITS = new Map(); // interface -> weapon ids that have (or can get) a slot for it
   for (const plat of Object.values(PLATFORMS)) {

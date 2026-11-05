@@ -1946,6 +1946,8 @@ const G_GunRecipes = (() => {
   function authoredPistol(k: Kit, o: RecipeSpec) {
     const A = G.Authored[o.authored!], a = A.anchors, anim: any = {};
     const ownIrons = !o.optic || o.optic === 'notch' || A.sights.builtin.includes(o.optic);
+    // (a variant barrel: its meshes replace the factory barrel's; it may carry a pistol optic cut of its own, info.mounts.mount_optic, which the dot is seated in)
+    const vb = o.avBarrel ? A.variants[o.avBarrel] : null, mountOptic: number[] = (vb && vb.info && vb.info.mounts && vb.info.mounts.mount_optic) || a.mount_optic;
     const draw = (list: AuthoredMesh[]) => { for (const e of list) k.place(geoOf(e), ((M as any)[e.mat] || M.black)(), 0, 0, 0); };
     // (an animated part: its pivot and the meshes that pass `which`; the pivot is where the model put the part_ node)
     const partOf = (list: AuthoredMesh[], key: string, which: (e: AuthoredMesh) => boolean = () => true) => {
@@ -1968,11 +1970,12 @@ const G_GunRecipes = (() => {
       draw(A.meshes.filter((e) => e.part === 'slide' && e.slot === 'slide'));
       k.tag('optic');
       if (ownIrons) draw(A.meshes.filter((e) => e.part === 'slide' && e.slot === 'optic'));
-      else if (dot) sight = pistolDot(k, o, a.mount_optic[0], a.mount_optic[1]); // (a pistol dot in the optic cut: the same part on any pistol, riding the slide)
+      else if (dot) sight = pistolDot(k, o, mountOptic[0], mountOptic[1]); // (a pistol dot in the optic cut: the same part on any pistol, riding the slide)
       k.into(null);
       anim.slide = slide;
     }
     if (ownIrons) { k.tag('optic'); draw(A.meshes.filter((e) => !e.part && e.slot === 'optic')); } // (the irons on the frame, when the model has any there)
+    else if (dot && !(A.info.anim && A.info.anim.slide)) { k.tag('optic'); sight = pistolDot(k, o, mountOptic[0], mountOptic[1]); } // (a slideless pistol: the dot sits in its barrel's optic cut, fixed)
     // THE GRIP (a part of the model when it has one), the magazine, the barrel
     k.tag('grip');
     draw(A.meshes.filter((e) => e.slot === 'grip' && !e.part));
@@ -1980,7 +1983,6 @@ const G_GunRecipes = (() => {
     const vm = o.avMag ? A.variants[o.avMag] : null;
     anim.mag = partOf(vm ? vm.meshes : A.meshes, 'mag');
     k.tag('barrel');
-    const vb = o.avBarrel ? A.variants[o.avBarrel] : null;
     draw(vb ? vb.meshes : A.meshes.filter((e) => e.slot === 'barrel'));
     // A light or laser under the frame, at the model's mount_tac (the underside of the frame, where a pistol's rail is)
     k.tag('tac');
@@ -1988,6 +1990,7 @@ const G_GunRecipes = (() => {
     k.tag('base');
     const info: any = { sy: sight.sy, fSight: sight.fSight, relief: sight.relief || A.info.relief, muzzles: (vb && vb.info ? vb.info.muzzles : A.info.muzzles).map((m: number[]) => m.slice()), anim, magAt: A.info.magAt.slice(), pistol: true };
     for (const f of ['grip', 'support', 'slide', 'chamberAt', 'port', 'bolt', 'ch', 'cheek']) if (A.info[f]) info[f] = JSON.parse(JSON.stringify(A.info[f]));
+    if (A.info.anim && A.info.anim.bolt) { const bt = A.info.boltTravel != null ? A.info.boltTravel : o.boltTravel; if (bt != null) info.boltTravel = bt; } // (how far a hand-worked bolt comes back: the model's, else the platform's)
     return info;
   }
 

@@ -5930,6 +5930,14 @@
    "build": { "barrel": "welrod.barrel", "mag": "welrod.mag" }
   },
   { "platform": "welrod",
+   "why": "opens slots: welrod.br.optic in barrel (optic)",
+   "build": { "barrel": "welrod.br.optic", "mag": "welrod.mag", "optic": "op.pso.1" }
+  },
+  { "platform": "welrod",
+   "why": "opens slots: welrod.br.short_optic in barrel (optic)",
+   "build": { "barrel": "welrod.br.short_optic", "mag": "welrod.mag", "optic": "op.pso.1" }
+  },
+  { "platform": "welrod",
    "why": "authored variant (welrod.br.short) + authored variant, loaded (welrod.br.short)",
    "build": { "barrel": "welrod.br.short", "mag": "welrod.mag" }
   },
@@ -5938,8 +5946,24 @@
    "build": { "barrel": "welrod.barrel", "mag": "welrod.mag.ext" }
   },
   { "platform": "welrod",
+   "why": "authored variant (welrod.br.optic) + authored variant, loaded (welrod.br.optic)",
+   "build": { "barrel": "welrod.br.optic", "mag": "welrod.mag" }
+  },
+  { "platform": "welrod",
+   "why": "authored variant (welrod.br.short_optic) + authored variant, loaded (welrod.br.short_optic)",
+   "build": { "barrel": "welrod.br.short_optic", "mag": "welrod.mag" }
+  },
+  { "platform": "welrod",
+   "why": "authored variant (welrod.br.bare) + authored variant, loaded (welrod.br.bare)",
+   "build": { "barrel": "welrod.br.bare", "mag": "welrod.mag" }
+  },
+  { "platform": "welrod",
+   "why": "authored variant (welrod.br.bare_long) + authored variant, loaded (welrod.br.bare_long)",
+   "build": { "barrel": "welrod.br.bare_long", "mag": "welrod.mag" }
+  },
+  { "platform": "welrod",
    "why": "authored variants together",
-   "build": { "barrel": "welrod.br.short", "mag": "welrod.mag.ext" }
+   "build": { "barrel": "welrod.br.bare_long", "mag": "welrod.mag.ext" }
   },
   { "platform": "maxim9",
    "why": "default",
