@@ -30,7 +30,7 @@ export const authoredFiles = (id) => ({ glb: glbPath(id), json: cfgPath(id) });
 export function authoredSrc() { return authoredIds().map((id) => id + '\0' + fs.readFileSync(cfgPath(id), 'utf8') + '\0' + (fs.existsSync(glbPath(id)) ? fs.readFileSync(glbPath(id)).toString('latin1') : '')).join('\0'); }
 
 // ---- the .glb ----
-function parseGlb(buf) {
+export function parseGlb(buf) {
   const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
   if (dv.getUint32(0, true) !== 0x46546c67) throw new Error('not a .glb (bad magic)');
   const jl = dv.getUint32(12, true), json = JSON.parse(new TextDecoder().decode(buf.subarray(20, 20 + jl)));
@@ -40,7 +40,7 @@ function parseGlb(buf) {
 }
 const COMP = { 5120: Int8Array, 5121: Uint8Array, 5122: Int16Array, 5123: Uint16Array, 5125: Uint32Array, 5126: Float32Array }, NCOMP = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4 };
 /** An accessor's elements as a plain Float64Array/typed copy (n * components). */
-function readAccessor(g, i) {
+export function readAccessor(g, i) {
   const a = g.json.accessors[i], bv = g.json.bufferViews[a.bufferView], T = COMP[a.componentType], nc = NCOMP[a.type];
   if (!T || !nc) throw new Error(`accessor ${i}: unsupported type`);
   if (a.sparse) throw new Error(`accessor ${i}: sparse accessors are not supported`);
@@ -50,8 +50,8 @@ function readAccessor(g, i) {
   for (let n = 0; n < a.count; n++) for (let c = 0; c < nc; c++) out[n * nc + c] = dv[rd](n * stride + c * sz, true);
   return out;
 }
-const mul = (a, b) => { const o = new Array(16).fill(0); for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) o[c * 4 + r] += a[k * 4 + r] * b[c * 4 + k]; return o; };
-function local(n) {
+export const mul = (a, b) => { const o = new Array(16).fill(0); for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) o[c * 4 + r] += a[k * 4 + r] * b[c * 4 + k]; return o; };
+export function local(n) {
   if (n.matrix) return n.matrix.slice();
   const t = n.translation || [0, 0, 0], [x, y, z, w] = n.rotation || [0, 0, 0, 1], s = n.scale || [1, 1, 1];
   return [(1 - 2 * (y * y + z * z)) * s[0], 2 * (x * y + z * w) * s[0], 2 * (x * z - y * w) * s[0], 0, 2 * (x * y - z * w) * s[1], (1 - 2 * (x * x + z * z)) * s[1], 2 * (y * z + x * w) * s[1], 0,

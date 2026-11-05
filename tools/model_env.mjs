@@ -3,6 +3,7 @@
 import fs from 'fs'; import vm from 'vm'; import path from 'path'; import { fileURLToPath } from 'url';
 import * as THREE_NS from 'three';
 import { loadAuthoredInto } from './bake_authored.mjs';
+import { loadAuthoredPartsInto } from './authored_parts.mjs';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const DIST = path.join(ROOT, 'dist/js/'), DIST_RECIPES = path.join(ROOT, 'dist/tools/tools/models/');
@@ -29,11 +30,12 @@ export function loadGame(withModels = false, extra = {}) {
   Object.assign(ctx, extra); ctx.window = ctx; ctx.self = ctx; ctx.G = { R: { flashTexture: () => null, _envMap: () => null } };
   vm.createContext(ctx);
   for (const f of ['util', 'data', 'callsigns', 'arsenal', 'parts', 'gear', 'medical', 'materials', 'stickers', 'gunmaterials']) vm.runInContext(readDist(f), ctx, { filename: f + '.js' });
-  for (const f of ['guntraces', 'authored', 'recipes']) vm.runInContext(readDist(f, DIST_RECIPES), ctx, { filename: f + '.js' }); // (the recipes: G.GunRecipes, the bake's only; the game's runtime has none)
+  for (const f of ['guntraces', 'authored', 'authoredparts', 'recipes']) vm.runInContext(readDist(f, DIST_RECIPES), ctx, { filename: f + '.js' }); // (the recipes: G.GunRecipes, the bake's only; the game's runtime has none)
+  loadAuthoredPartsInto(ctx.G); // (the sights etc. modelled in Blender: models/parts/<slot>/<id>/, tools/authored_parts.mjs)
   loadAuthoredInto(ctx.G); // (the guns modelled in Blender: models/<id>/, tools/bake_authored.mjs)
   vm.runInContext(readDist('gunrig'), ctx, { filename: 'gunrig.js' });
   ctx.G.GunModels = ctx.G.GunRecipes; // (the baker's name for them: .display(def), .M, .build; the game's G.GunModels is the facade over the baked files, js/gunmodels.ts, not loaded here)
-  if (withModels) vm.runInContext(readDist("glb"), ctx, { filename: "glb.js" });
+  if (withModels) { vm.runInContext(readDist('modelbundles'), ctx, { filename: 'modelbundles.js' }); vm.runInContext(readDist("glb"), ctx, { filename: "glb.js" }); }
   return ctx.G;
 }
 
@@ -46,14 +48,15 @@ export async function loadGameWithModels() {
   const { MeshoptDecoder } = await import('three/examples/jsm/libs/meshopt_decoder.module.js');
   await MeshoptDecoder.ready;
   const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder), cache = new Map();
+  // The files the game reads: the bundles (assets/models/bundles, js/modelbundles.ts through a fetch that serves the bundle files), so the tests assemble from what the game loads.
   const file = (url) => path.join(ROOT, url);
   const G = loadGame(true, {
-    location: { search: '' }, URLSearchParams, TextDecoder, addEventListener() {},
-    fetch: async (url) => { const f = file(url); if (!fs.existsSync(f) || /guns\/index\.json$/.test(url)) return { ok: false }; return { ok: true, json: async () => JSON.parse(fs.readFileSync(f, 'utf8')) }; },
+    location: { search: '' }, URLSearchParams, TextDecoder, addEventListener() {}, DecompressionStream, Response, Blob,
+    fetch: async (url) => { const f = file(url); if (!fs.existsSync(f) || /guns\/index\.json$/.test(url)) return { ok: false, status: 404 }; const b = fs.readFileSync(f); return { ok: true, status: 200, arrayBuffer: async () => b.buffer.slice(b.byteOffset, b.byteOffset + b.length), json: async () => JSON.parse(b.toString('utf8')) }; },
   });
   G.GLB = {
     ready: Promise.resolve(true),
-    load: (url) => { if (!cache.has(url)) { const b = fs.readFileSync(file(url)); cache.set(url, new Promise((res, rej) => loader.parse(b.buffer.slice(b.byteOffset, b.byteOffset + b.length), '', (g) => res(g.scene), rej))); } return cache.get(url); },
+    load: (url) => { if (!cache.has(url)) cache.set(url, G.Bundles.getFile(url).then((ab) => new Promise((res, rej) => loader.parse(ab, '', (g) => res(g.scene), rej)))); return cache.get(url); },
   };
   return G;
 }
