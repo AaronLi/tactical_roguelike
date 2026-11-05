@@ -112,6 +112,41 @@ export async function makeEmitter({ G, GM, Models }) {
   return { buildPack, write, sha };
 }
 
+/**
+ * A pack scene in a form that can be compared with another's up to a move: the triangles of every mesh in the gun's frame (float32, 9 per triangle), the corner of their
+ * bounding box (`min`, glTF axes), the nodes' pivots, and a `sig` text (materials, sizes, node names) that equal packs share. Two packs are one shared pack when
+ * their canon matches (sameCanon): the same shape wherever it sits.
+ */
+export function canonOf(root) {
+  root.updateMatrixWorld(true);
+  const meshes = [], min = [Infinity, Infinity, Infinity];
+  root.traverse((o) => {
+    if (!o.isMesh) return;
+    const e = o.matrixWorld.elements, pos = o.geometry.attributes.position, idx = o.geometry.index, n = idx ? idx.count : pos.count, v = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      const j = idx ? idx.getX(i) : i, x = pos.getX(j), y = pos.getY(j), z = pos.getZ(j);
+      const X = e[0] * x + e[4] * y + e[8] * z + e[12], Y = e[1] * x + e[5] * y + e[9] * z + e[13], Z = e[2] * x + e[6] * y + e[10] * z + e[14];
+      v[i * 3] = X; v[i * 3 + 1] = Y; v[i * 3 + 2] = Z;
+      if (X < min[0]) min[0] = X; if (Y < min[1]) min[1] = Y; if (Z < min[2]) min[2] = Z;
+    }
+    meshes.push({ mat: o.material.name, name: (o.name || '').startsWith('display_') ? o.name : '', v });
+  });
+  if (!isFinite(min[0])) min.fill(0);
+  const nodes = root.children.filter((c) => !c.isMesh).map((c) => ({ name: c.name, owner: c.userData.owner, parent: c.userData.parent || '', p: [c.position.x, c.position.y, c.position.z] }));
+  const sig = [root.userData.pack.tag, meshes.map((m) => m.mat + ':' + m.name + ':' + m.v.length).join(','), nodes.map((n) => n.name + ':' + n.owner + ':' + n.parent).join(',')].join('|');
+  return { sig, meshes, nodes, min };
+}
+/** Whether two canons are the same shape up to a move (every vertex and pivot within `tol` metres of the other's, measured from its own bounding-box corner). */
+export function sameCanon(a, b, tol = 2e-6) {
+  if (a.sig !== b.sig) return false;
+  for (let m = 0; m < a.meshes.length; m++) {
+    const x = a.meshes[m].v, y = b.meshes[m].v;
+    for (let i = 0; i < x.length; i += 3) for (let k = 0; k < 3; k++) if (Math.abs((x[i + k] - a.min[k]) - (y[i + k] - b.min[k])) > tol) return false;
+  }
+  for (let n = 0; n < a.nodes.length; n++) for (let k = 0; k < 3; k++) if (Math.abs((a.nodes[n].p[k] - a.min[k]) - (b.nodes[n].p[k] - b.min[k])) > tol) return false;
+  return true;
+}
+
 /** A file name for a pack: its key's parts joined by '+', safe characters only. */
 export function packFileName(tag, key) {
   const s = key.map((k) => (k === '' ? '_' : k === '*' ? 'x' : k.replace(/[^A-Za-z0-9._-]/g, '_'))).join('+') || 'all';

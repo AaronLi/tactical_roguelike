@@ -40,15 +40,15 @@ if (args.includes('--write')) {
   const dir = path.join(ROOT, 'assets/models/guns'); let n = 0;
   if (fs.existsSync(dir)) for (const f of fs.readdirSync(dir).filter((f) => f.endsWith('.glb'))) { n++; if (checkBuffer(f, fs.readFileSync(path.join(dir, f)), f.replace(/\.glb$/, ''))) bad++; }
   // the per-part packs: every platform's index against the index contract, every pack file against the pack contract, every file the index names there
-  const pdir = path.join(ROOT, 'assets/models/parts'); let np = 0, nf = 0;
+  const pdir = path.join(ROOT, 'assets/models/parts'), sharedSeen = new Set(); let np = 0, nf = 0;
   if (fs.existsSync(pdir)) for (const id of fs.readdirSync(pdir).filter((d) => fs.existsSync(path.join(pdir, d, 'index.json')))) {
     const ix = JSON.parse(fs.readFileSync(path.join(pdir, id, 'index.json'), 'utf8')), r = Models.validatePartsIndex(ix); np++;
     for (const e of r.errors) { bad++; console.error(`parts/${id}/index.json: ERROR ${e}`); }
     if (ix.platform !== id) fail(`parts/${id}/index.json is for platform ${ix.platform}`);
-    const files = new Set();
+    const files = new Set(), fp = (f) => (f.startsWith('_shared/') ? path.join(pdir, f) : path.join(pdir, id, f));
     for (const [tag, ti] of Object.entries(ix.tags || {})) for (const e of ti.packs || []) if (e.file) {
-      if (!fs.existsSync(path.join(pdir, id, e.file))) { fail(`parts/${id}: ${e.file} is in the index but missing`); continue; }
-      if (!files.has(e.file)) { files.add(e.file); nf++; const rep = Models.validatePack(Models.describeGltfJson(Models.glbJson(fs.readFileSync(path.join(pdir, id, e.file)))), tag); for (const m of rep.errors) { bad++; console.error(`parts/${id}/${e.file}: ERROR ${m}`); } }
+      if (!fs.existsSync(fp(e.file))) { fail(`parts/${id}: ${e.file} is in the index but missing`); continue; }
+      if (!files.has(e.file) && !(e.file.startsWith('_shared/') && sharedSeen.has(e.file))) { files.add(e.file); sharedSeen.add(e.file); nf++; const rep = Models.validatePack(Models.describeGltfJson(Models.glbJson(fs.readFileSync(fp(e.file)))), tag); for (const m of rep.errors) { bad++; console.error(`parts/${id}/${e.file}: ERROR ${m}`); } }
     }
   }
   console.log(bad ? `${bad} problem(s)` : `contract, schemas, docs, ${n} baked guns and ${nf} pack files of ${np} platforms agree`);

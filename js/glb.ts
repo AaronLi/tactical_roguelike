@@ -236,16 +236,17 @@ const GUN_MODEL_CONTRACT = { ...CONTRACT_CORE, displays: {
   muzzles: 'A gun can have MORE THAN ONE muzzle (an over/under, a Metal Storm-style barrel block): `info.muzzles` is always a list of at least one [forward, up, right]; consumers must iterate it and never assume entry [0] is the only one.',
   example: { name: 'part_barrel', extras: { part: 'barrel', anchors: { muzzles: [[0.4, 0.012, -0.012], [0.4, 0.012, 0.012]], mount_muzzle: [0.4, 0, 0] } } },
 }, packs: {
-  layout: 'assets/models/parts/<platform>/index.json and assets/models/parts/<platform>/<slot>/<file>.glb. One pack per (platform, slot) and combination of the parts that shape it; the platform\'s whole-gun files (assets/models/guns/<id>.glb) stay the fast path for the default build. One file per pack and not one per platform: a swap costs one small request, and a platform\'s packs together are many times what any one build needs.',
+  layout: 'assets/models/parts/<platform>/index.json and assets/models/parts/<platform>/<slot>/<file>.glb; parts that do not depend on the platform are stored once, in assets/models/parts/_shared/<slot>/<file>.glb (see "shared"). One pack per (platform, slot) and combination of the parts that shape it; the platform\'s whole-gun files (assets/models/guns/<id>.glb) stay the fast path for the default build. One file per pack and not one per platform: a swap costs one small request, and a platform\'s packs together are many times what any one build needs.',
   pack: 'A pack is a glTF binary holding ONE slot\'s meshes (every mesh extras.slot = that slot) as the slot looks on that platform with the parts named in its key fitted, in the gun\'s frame (mesh positions as in a whole-gun file). The slot "base" is the receiver and everything fixed (it also carries the animated parts nothing else owns: part_handle, part_bolt, ...). A pack may hold no meshes at all only if the index says its file is null (the slot is empty then).',
-  root: 'The pack\'s one root node is named `<platform>.<slot>.<n>` and has extras.pack = { platform, tag (the slot), key: { <slotOfBuild>: <partId> } }. No transform, no info. Its children are meshes (`<slot>_<n>`), part_ nodes and group_ nodes, all flat directly under it.',
+  root: 'The pack\'s one root node is named `<platform>.<slot>.<n>` and has extras.pack = { platform, tag (the slot), key: { <slotOfBuild>: <partId> } }. No transform, no info. Its children are meshes (`<slot>_<n>`), part_ nodes and group_ nodes, all flat directly under it. A shared pack\'s root says platform "_shared" and an empty key.',
   nodes: 'part_ and group_ nodes sit directly under the root with their position = the pivot in the GUN\'S frame (not relative to a parent); extras.parent names the node they nest under in the assembled gun (absent: the gun\'s root). extras.owner = false means the pivot belongs to another pack (e.g. an optic\'s meshes inside the slide\'s part_slide: the slide pack owns the node, the optic pack repeats it so the meshes know where it is); the assembler takes the node from its owner (default: owner) and re-expresses every other pack\'s meshes against it. Group nodes are named `group_<slot>_<n>` so they are unique across packs.',
-  index: 'The platform index.json is { version, platform, src, tags: { <slot>: { dep: [<build slot>...], packs: [{ key: [<partId or "*">...], file: <file or null>, tris, bytes }] } }, anchors: { "<buildSlot>=<partId>": { mount_<slot>: [f,u,r] } }, bases: [3 reference builds with their info], deltas: { "<buildSlot>=<partId>": [per base: { <info leaf path>: number (add) | { set } | { del } } | null] }, exact: { <build key>: { <leaf path>: value } } }. `dep` lists the build slots whose parts shape the tag; a pack\'s `key` lists those parts in the same order ("*" = any; the most specific matching pack is used); file null = the slot is empty for that key. A build slot is the gunsmith\'s slot id (barrel, handguard, optic, tac...) which is not always the mesh slot (a laser in `tac` is mesh slot tac).',
-  joint: 'COUPLED SLOTS. Where changing one part reshapes another slot\'s geometry (a pistol\'s grip changes its frame, magazine well and optic cut, a handguard changes the rail a light clamps to), the baker finds it by sweeping and the slot\'s pack is a JOINT pack: its key names every part that shapes it, one pack per combination seen, e.g. optic on a P9 = (optic, slide, grip). A coupling that is only a translation is NOT joint: it becomes an anchor (below).',
+  index: 'The platform index.json is { version, platform, src, slots, tags, anchors, info }. tags: { <slot>: { dep: [<build slot>...], packs: [{ key: [<partId or "*">...], file: <file or null>, at: [f,u,r], nodes: [<part_ node names>], tris, bytes }] } }: `dep` lists the build slots whose parts shape the tag; a pack\'s `key` lists those parts in the same order ("*" = any; the most specific matching pack is used); file null = the slot is empty for that key; `at` (shared packs) is the offset the stored geometry moves by on this platform; `nodes` the part_ nodes the pack has meshes in. A build slot is the gunsmith\'s slot id (barrel, handguard, optic, tac...) which is not always the mesh slot (a laser in `tac` is mesh slot tac). anchors: { "<buildSlot>=<partId>": { mount_<slot>: [f,u,r] } }. info: [{ dep: [<build slot>...], leaves: [<info leaf path>...], rows: [{ key: [<partId or "*">...], v: [<one value per leaf>] }] }].',
+  joint: 'COUPLED SLOTS. Where changing one part reshapes another slot\'s geometry (a pistol\'s grip changes its frame, magazine well and optic cut, a handguard changes the rail a light clamps to), the slot\'s pack is a JOINT pack: its key names every part that shapes it, one pack per combination the parts can make, e.g. optic on a P9 = (optic, slide, grip). A coupling that is only a translation is NOT joint: it becomes an anchor (below). The baker finds which slots shape which by sweeping and by building random builds, then makes a pack for EVERY valid combination of the parts in a tag\'s dep slots (coverage by construction), not only the ones it saw.',
   anchors: 'TRANSLATIONS. Where a part only MOVES another slot\'s geometry (a muzzle device follows its barrel\'s length, a light follows its handguard) the provider\'s part has `mount_<slot>` in the index\'s `anchors` table, an offset to add to that slot\'s whole pack. The reference part of each slot (the one in the platform\'s fullest reference build) has none.',
-  info: 'INFO. The assembled info is the nearest of the index\'s three reference builds (fewest differing slots) with each differing slot\'s `deltas` applied to its leaves (numbers add; others are replaced), then `info.anim` from the nodes and `info.mounts` from the anchors. `exact` holds the few builds the sums get wrong, as leaf corrections.',
-  assembly: 'ASSEMBLY (G.Models.assemble(def) in js/glb.ts, synchronous: the packs must be loaded, G.Models.ensure(def) / preloadPlatform(id) load them; it returns null otherwise or for a build the packs do not cover, and the procedural model is built). For each tag: pick the most specific pack for the build\'s parts; add up the anchors of every part in the build; take the owner nodes from the packs, and place every pack\'s meshes (translated) against them. The result is the whole-gun structure of docs/models.md: slot-tagged meshes, part_ nodes with their pivots, info.',
-  verify: 'VERIFICATION. The baker assembles every build of its sweep (each platform\'s default, two "loaded" builds and every single-part swap from each: ~9,000 builds) from the packs in memory and compares the triangles with the procedural model (the baker fails otherwise); `npm run test:models` does the same through the real files (glb, decoder, assembler) with a tolerance for compression.',
+  info: 'INFO. `info` is tabulated, not computed: each leaf (sy, fSight, relief, support, muzzles, reflex/f...) is a function of the parts in some build slots, and leaves with the same slots are one table (`info` in the index) with a row for every valid combination of the parts in those slots (the most specific matching row is used: "*" = any part). So a min, a max or a clamp over several parts (the support hand: a foregrip if one is fitted, else the handguard, limited by the barrel; the sight line with a magnifier) is one lookup and nothing is added up. Then `info.anim` from the nodes (G.Models.infoOf: from the index, the node names) and `info.mounts` from the anchors.',
+  assembly: 'ASSEMBLY (G.Models.assemble(def) in js/glb.ts, synchronous: the packs must be loaded, G.Models.ensure(def) / preloadPlatform(id) load them). For each tag: pick the most specific pack for the build\'s parts; add up the anchors of every part in the build (and the pack\'s own `at`); take the owner nodes from the packs, and place every pack\'s meshes (translated) against them. It never returns null for a platform whose index is loaded: a build the packs do not cover (a combination of parts no build of the baker held) is assembled from the nearest pack of each tag and the result says `approx` (the tests count that as a failure). G.Models.infoOf(def) gives the build\'s info from the index alone (no pack files, no three.js), synchronously, so a caller can use it before the meshes load. The result is the whole-gun structure of docs/models.md: slot-tagged meshes, part_ nodes with their pivots, info.',
+  shared: 'SHARED PACKS. A part that looks the same on every platform (an optic, a magnifier, a light, a foregrip, a muzzle device) is stored once: in assets/models/parts/_shared/<slot>/<file>.glb, in its own frame (the origin at the corner of its bounding box: smallest forward, up and right), and each platform\'s index entry names it (`file: "_shared/<slot>/<file>.glb"`) with the offset `at` that places it on that platform. Two packs are one when their triangles agree to 2 micrometres after the move.',
+  verify: 'VERIFICATION. The baker assembles every build it made (the sweep: each platform\'s default, two "loaded" builds and every single-part swap from each; random builds with 2 to 6 parts changed; and one build for every valid combination of parts in every pack\'s and table\'s dep slots: tens of thousands) from the packs in memory and compares triangles and info with the recipe (the baker fails otherwise); `npm run test:models` does the same through the real files (glb, decoder, assembler) with a tolerance for compression and the moves, on the sweep and on 10,000 random held-out builds with 3 to 6 parts changed.',
 } };
 
 // ---- the validator ------------------------------------------------------------------------------------------------------
@@ -379,33 +380,41 @@ function validate(model: ModelDesc, id?: string): ModelReport {
 
 // ---- per-part packs: the platform index and the pure planning (no three.js: the baker checks its work with this same code) --
 
-/** One pack of a tag: its key (the parts, aligned with the tag's `dep`; "*" = any), its file (null: the tag is empty there). */
-interface PackEntry { key: string[]; file: string | null; tris?: number | null; bytes?: number | null }
+/** One pack of a tag: its key (the parts, aligned with the tag's `dep`; "*" = any), its file (null: the tag is empty there; `_shared/...`: stored once for every platform),
+ *  `at` (the move that places a shared pack's geometry on this platform), `nodes` (the part_ nodes it has meshes in). */
+interface PackEntry { key: string[]; file: string | null; at?: Vec3; nodes?: string[]; tris?: number | null; bytes?: number | null }
 interface TagIndex { dep: string[]; packs: PackEntry[] }
-/** How a leaf of `info` changes when a part replaces the reference build's: a number is added; { set } replaces; { del } removes. */
-type LeafDelta = number | { set: any } | { del: number };
+/** A table of info leaves: the leaves are functions of the parts in `dep` slots, one row per combination (the value of an absent leaf is { del: 1 }). */
+interface InfoRow { key: string[]; v: any[] }
+interface InfoTable { dep: string[]; leaves: string[]; rows: InfoRow[] }
 interface PartsIndex {
   version: number; platform: string; src: string; slots: string[]; tags: Record<string, TagIndex>; anchors: Record<string, Record<string, Vec3>>;
-  bases: { build: Record<string, string>; info: Record<string, any> }[]; deltas: Record<string, (Record<string, LeafDelta> | null)[]>; exact: Record<string, Record<string, any>>;
-  totals?: Record<string, number>;
+  info: InfoTable[]; totals?: Record<string, number>;
 }
 
-const PARTS_INDEX_VERSION = 1;
+const PARTS_INDEX_VERSION = 2;
 /** The platform index (assets/models/parts/<platform>/index.json), as a shape: the validator, JSON Schema and docs come from it. */
 const PARTS_INDEX_FIELDS: Record<string, Field> = {
   version: num('Index format version (' + PARTS_INDEX_VERSION + ').'), platform: F('The platform (gun id) the packs are for.', { t: 'str' }), src: F('Hash of the recipe sources the packs came from (stale-pack detection).', { t: 'str' }),
-  slots: F('Every build slot seen in the platform\'s sweep: the ones `anchors` and `deltas` are keyed by.', { t: 'list', of: { t: 'str' } }),
+  slots: F('Every build slot seen in the platform\'s builds: the ones `anchors` is keyed by.', { t: 'list', of: { t: 'str' } }),
   tags: F('Per mesh slot (tag): which build slots shape it and its packs.', { t: 'map', of: { t: 'obj', props: {
     dep: F('The build slots whose parts shape this tag: a pack\'s `key` lists a part for each, in this order.', { t: 'list', of: { t: 'str' } }),
     packs: F('The packs: the most specific matching key is used.', { t: 'list', of: { t: 'obj', props: {
-      key: F('A part id per `dep` slot ("" = the slot is empty; "*" = any part).', { t: 'list', of: { t: 'str' } }), file: F('The pack\'s file under the platform folder; null when the tag is empty for this key.', { t: 'str' }, true),
+      key: F('A part id per `dep` slot ("" = the slot is empty; "*" = any part).', { t: 'list', of: { t: 'str' } }), file: F('The pack\'s file under the platform folder (or `_shared/<slot>/<file>.glb` under the parts folder: stored once for every platform); null when the tag is empty for this key.', { t: 'str' }, true),
+      at: F('A shared pack: the move [forward, up, right] metres that places its stored geometry on this platform.', { t: 'vec', n: 3 }, true),
+      nodes: F('The part_ nodes the pack has meshes in (info.anim keys, before the meshes are loaded).', { t: 'list', of: { t: 'str' } }, true),
       tris: num('Triangles in the pack.', true), bytes: num('File size in bytes.', true),
     } } }),
   } } }),
   anchors: F('Offsets parts give other slots: "<buildSlot>=<partId>" -> { mount_<tag>: [forward, up, right] } (metres, added up over the build).', { t: 'map', of: { t: 'map', of: { t: 'vec', n: 3 } } }),
-  bases: F('The three reference builds (default, loaded, loaded with sights) and their `info` as flat leaves (path -> value).', { t: 'list', of: { t: 'obj', props: { build: F('slot -> part id.', { t: 'map', of: { t: 'str' } }), info: F('Leaf path (a/b/0) -> value.', { t: 'free' }) } } }),
-  deltas: F('"<buildSlot>=<partId>" -> per reference build: the info leaves that change (number: add; { set: v }; { del: 1 }), or null where not observed.', { t: 'map', of: { t: 'list', of: { t: 'free' } } }),
-  exact: F('Builds the delta sums get wrong: build key -> leaf -> value.', { t: 'map', of: { t: 'free' } }),
+  info: F('The `info` leaves as tables: each leaf is a function of the parts in some slots, and leaves with the same slots are one table.', { t: 'list', of: { t: 'obj', props: {
+    dep: F('The build slots whose parts the table\'s leaves depend on: a row\'s `key` lists a part for each, in this order.', { t: 'list', of: { t: 'str' } }),
+    leaves: F('The info leaf paths (a/b/0: segments joined by "/", array indices as numbers) the rows give.', { t: 'list', of: { t: 'str' } }),
+    rows: F('One row per combination of parts: the most specific matching key is used.', { t: 'list', of: { t: 'obj', props: {
+      key: F('A part id per `dep` slot ("" = the slot is empty; "*" = any part).', { t: 'list', of: { t: 'str' } }),
+      v: F('The value of each leaf, in the order of `leaves` ({ "del": 1 }: the leaf is absent).', { t: 'list', of: { t: 'free' } }),
+    } } }),
+  } } }),
   totals: F('Counts and bytes (informational).', { t: 'free' }, true),
 };
 
@@ -430,47 +439,36 @@ function infoFromLeaves(leaves: Record<string, any>): any {
   }
   return root;
 }
-/** How `b`'s leaves differ from `a`'s: numbers as differences, anything else as { set }, a missing one as { del }. */
-function leafDelta(a: Record<string, any>, b: Record<string, any>): Record<string, LeafDelta> {
-  const d: Record<string, LeafDelta> = {};
-  for (const k of Object.keys(b)) { const x = a[k], y = b[k]; if (isNum(x) && isNum(y)) { if (x !== y) d[k] = y - x; } else if (JSON.stringify(x) !== JSON.stringify(y)) d[k] = { set: y }; }
-  for (const k of Object.keys(a)) if (!(k in b)) d[k] = { del: 1 };
-  return d;
-}
-function applyLeafDelta(leaves: Record<string, any>, d: Record<string, LeafDelta>) {
-  for (const [k, v] of Object.entries(d)) { if (typeof v === 'number') leaves[k] = (isNum(leaves[k]) ? leaves[k] : 0) + v; else if ('set' in v) leaves[k] = v.set; else delete leaves[k]; }
-}
 
-/** The pack of `tag` for this build (the most specific matching key), or undefined. */
-function pickPack(tag: TagIndex, build: Record<string, string>): PackEntry | undefined {
-  let best: PackEntry | undefined, bestStar = 1e9;
-  for (const e of tag.packs) {
-    let star = 0, ok = true;
-    for (let i = 0; i < tag.dep.length; i++) { const k = e.key[i]; if (k === '*') { star++; continue; } if (k !== (build[tag.dep[i]] || '')) { ok = false; break; } }
-    if (ok && star < bestStar) { best = e; bestStar = star; }
-  }
+/** How well a key (a part per dep slot, "*" = any) matches a build: undefined when a part differs; else the number of "*"s (fewer = more specific). */
+function matchKey(dep: string[], key: string[], build: Record<string, string>): number | undefined {
+  let star = 0;
+  for (let i = 0; i < dep.length; i++) { const k = key[i]; if (k === '*') { star++; continue; } if (k !== (build[dep[i]] || '')) return undefined; }
+  return star;
+}
+/** The entry whose key matches the build most specifically, or undefined (no entry covers it). */
+function pickBy<E extends { key: string[] }>(dep: string[], entries: E[], build: Record<string, string>): E | undefined {
+  let best: E | undefined, bestStar = 1e9;
+  for (const e of entries) { const s = matchKey(dep, e.key, build); if (s !== undefined && s < bestStar) { best = e; bestStar = s; } }
   return best;
 }
-
-/** For each info leaf, the build slots a swap was seen to change it by (from the index's deltas): what the leaf depends on. */
-const leafSlots = new WeakMap<PartsIndex, Map<string, Set<string>>>();
-function leafSlotsOf(ix: PartsIndex): Map<string, Set<string>> {
-  let m = leafSlots.get(ix);
-  if (!m) {
-    m = new Map();
-    for (const [key, ds] of Object.entries(ix.deltas)) {
-      const slot = key.slice(0, key.indexOf('='));
-      for (const d of ds) if (d) for (const leaf of Object.keys(d)) { let s = m.get(leaf); if (!s) m.set(leaf, (s = new Set())); s.add(slot); }
-    }
-    leafSlots.set(ix, m);
-  }
-  return m;
+/** The entry whose key agrees with the build in the most slots (when none matches: a combination of parts nothing was made for). */
+function nearestBy<E extends { key: string[] }>(dep: string[], entries: E[], build: Record<string, string>): E | undefined {
+  let best: E | undefined, bestScore = -1;
+  for (const e of entries) { let sc = 0; for (let i = 0; i < dep.length; i++) sc += e.key[i] === '*' ? 1 : e.key[i] === (build[dep[i]] || '') ? 2 ** (dep.length - i + 1) : 0; if (sc > bestScore) { best = e; bestScore = sc; } }
+  return best;
 }
+/** The pack of `tag` for this build (the most specific matching key), or undefined. */
+function pickPack(tag: TagIndex, build: Record<string, string>): PackEntry | undefined { return pickBy(tag.dep, tag.packs, build); }
 
-/** What assembling a build needs: which pack for each tag, the summed offsets, and the info. `missing` names the first tag no pack covers. */
-interface Plan { tags: { tag: string; entry: PackEntry | null; rigid: Vec3 }[]; info: any; missing: string | null; approx: boolean }
+/**
+ * What assembling a build needs: which pack for each tag, the offsets (`rigid`: the anchors' sum; `at`: the pack's own move), and the info (`info`, from the
+ * tables of the index alone: `anim` has the node names of the parts the packs hold). `approx` says what was not covered exactly (null: nothing).
+ */
+interface Plan { tags: { tag: string; entry: PackEntry | null; rigid: Vec3; at: Vec3 }[]; info: any; approx: string | null }
 function planBuild(ix: PartsIndex, build: Record<string, string>): Plan {
-  const tags: Plan['tags'] = []; let missing: string | null = null;
+  const tags: Plan['tags'] = []; let approx: string | null = null;
+  const note = (s: string) => { if (!approx) approx = s; };
   const rigid: Record<string, Vec3> = {};
   for (const s of ix.slots) {
     const a = ix.anchors[slotKey(s, build[s])]; if (!a) continue;
@@ -478,38 +476,23 @@ function planBuild(ix: PartsIndex, build: Record<string, string>): Plan {
       if (k.startsWith(NAMES.mountPrefix)) { const t = k.slice(NAMES.mountPrefix.length), r = rigid[t] || (rigid[t] = [0, 0, 0]); r[0] += v[0]; r[1] += v[1]; r[2] += v[2]; }
     }
   }
+  const anim: Record<string, string> = {};
   for (const [tag, ti] of Object.entries(ix.tags)) {
-    const entry = pickPack(ti, build);
-    if (!entry) { if (!missing) missing = tag + ' (' + ti.dep.map((s) => slotKey(s, build[s])).join(' ') + ')'; continue; }
-    tags.push({ tag, entry: entry.file ? entry : null, rigid: rigid[tag] || [0, 0, 0] });
+    let entry = pickPack(ti, build);
+    if (!entry) { entry = nearestBy(ti.dep, ti.packs, build); note(tag + ' (' + ti.dep.map((s) => slotKey(s, build[s])).join(' ') + ')'); if (!entry) continue; }
+    if (entry.file) for (const n of entry.nodes || []) anim[n.slice(NAMES.partPrefix.length)] = n;
+    tags.push({ tag, entry: entry.file ? entry : null, rigid: rigid[tag] || [0, 0, 0], at: entry.at || [0, 0, 0] });
   }
-  // info: the nearest reference build with the differing slots' deltas applied
-  let bi = 0, bestScore = 1e9, approx = false;
-  ix.bases.forEach((b, i) => {
-    let diff = 0, miss = 0;
-    for (const s of ix.slots) if ((b.build[s] || '') !== (build[s] || '')) { diff++; const d = ix.deltas[slotKey(s, build[s])]; if (!d || !d[i]) miss++; }
-    const score = miss * 1000 + diff; if (score < bestScore) { bestScore = score; bi = i; }
-  });
-  const leaves: Record<string, any> = { ...ix.bases[bi].info };
-  for (const s of ix.slots) if ((ix.bases[bi].build[s] || '') !== (build[s] || '')) {
-    const ds = ix.deltas[slotKey(s, build[s])]; const d = ds && (ds[bi] || ds.find((x) => x));
-    if (!d) { approx = true; continue; } if (!ds![bi]) approx = true;
-    applyLeafDelta(leaves, d);
+  const leaves: Record<string, any> = {};
+  for (const t of ix.info) {
+    let row = pickBy(t.dep, t.rows, build);
+    if (!row) { row = nearestBy(t.dep, t.rows, build); note('info ' + t.leaves[0] + ' (' + t.dep.map((s) => slotKey(s, build[s])).join(' ') + ')'); if (!row) continue; }
+    t.leaves.forEach((l, i) => { const v = row!.v[i]; if (!(isObj(v) && v.del === 1 && Object.keys(v).length === 1)) leaves[l] = v; });
   }
-  // A leaf that two slots shape together (the support hand: the handguard's length and whether a foregrip is on it) does not add up from just
-  // any reference build: take it from the one whose parts in the slots that shape that leaf are nearest the build's (a build with a foregrip,
-  // from a base with one), the differing slots' deltas from that base on top.
-  const dist = (j: number, slots: Set<string>) => { let n = 0; for (const s of slots) if ((ix.bases[j].build[s] || '') !== (build[s] || '')) { const ds = ix.deltas[slotKey(s, build[s])]; if (!ds || !ds[j]) return Infinity; n++; } return n; };
-  if (bi >= 0) for (const [leaf, slots] of leafSlotsOf(ix)) {
-    const d0 = dist(bi, slots); let best = bi, bd = d0;
-    for (let j = 0; j < ix.bases.length; j++) { const d = dist(j, slots); if (d < bd) { best = j; bd = d; } }
-    if (best === bi) continue;
-    const tmp: Record<string, any> = {}; if (leaf in ix.bases[best].info) tmp[leaf] = ix.bases[best].info[leaf];
-    for (const s of slots) if ((ix.bases[best].build[s] || '') !== (build[s] || '')) { const d = ix.deltas[slotKey(s, build[s])][best]!; if (leaf in d) applyLeafDelta(tmp, { [leaf]: d[leaf] }); }
-    if (leaf in tmp) leaves[leaf] = tmp[leaf]; else delete leaves[leaf];
-  }
-  const ex = ix.exact[buildKeyOf(build)]; if (ex) applyLeafDelta(leaves, ex as Record<string, LeafDelta>);
-  return { tags, info: infoFromLeaves(leaves), missing, approx };
+  const info = infoFromLeaves(leaves); info.anim = anim;
+  const mounts: Record<string, Vec3> = {}; for (const [t, r] of Object.entries(rigid)) if (r[0] || r[1] || r[2]) mounts[NAMES.mountPrefix + t] = [r[0], r[1], r[2]];
+  if (Object.keys(mounts).length) info.mounts = mounts;
+  return { tags, info, approx };
 }
 
 /** Checks a platform index: its shape, and that every pack's key lines up with its tag's `dep`. */
@@ -524,7 +507,14 @@ function validatePartsIndex(ix: any): ModelReport {
       if (isObj(p) && Array.isArray(p.key) && p.key.length !== ti.dep.length) errors.push(`index.tags.${tag}.packs[${i}].key has ${p.key.length} parts for ${ti.dep.length} dep slots`);
     });
   }
-  if (Array.isArray(ix.bases) && ix.bases.length !== 3) errors.push('index.bases: expected the three reference builds');
+  if (Array.isArray(ix.info)) ix.info.forEach((t: any, i: number) => {
+    if (!isObj(t) || !Array.isArray(t.dep) || !Array.isArray(t.leaves) || !Array.isArray(t.rows)) return;
+    t.rows.forEach((r: any, j: number) => {
+      if (!isObj(r)) return;
+      if (Array.isArray(r.key) && r.key.length !== t.dep.length) errors.push(`index.info[${i}].rows[${j}].key has ${r.key.length} parts for ${t.dep.length} dep slots`);
+      if (Array.isArray(r.v) && r.v.length !== t.leaves.length) errors.push(`index.info[${i}].rows[${j}].v has ${r.v.length} values for ${t.leaves.length} leaves`);
+    });
+  });
   return { errors, warnings };
 }
 
@@ -695,7 +685,7 @@ interface BakedIndex { version: number; three: string; src: string; guns: Record
   }
 
   // ---- per-part packs: loading, and assembling any build from them ----
-  const PARTS_BASE = 'assets/models/parts/';
+  const PARTS_BASE = 'assets/models/parts/', SHARED_DIR = '_shared/';
   const platIx = new Map<string, PartsIndex>(), platPending = new Map<string, Promise<PartsIndex | null>>();
   const packRoots = new Map<string, any>(), packPending = new Map<string, Promise<boolean>>();
   const platformIndex = (id: string): Promise<PartsIndex | null> => {
@@ -706,7 +696,7 @@ interface BakedIndex { version: number; three: string; src: string; guns: Record
     })));
     return p;
   };
-  const packUrl = (id: string, file: string) => PARTS_BASE + id + '/' + file;
+  const packUrl = (id: string, file: string) => PARTS_BASE + (file.startsWith(SHARED_DIR) ? '' : id + '/') + file; // (a shared pack is one file for every platform)
   const loadPack = (id: string, file: string): Promise<boolean> => {
     const url = packUrl(id, file); if (packRoots.has(url)) return Promise.resolve(true);
     let p = packPending.get(url);
@@ -723,7 +713,7 @@ interface BakedIndex { version: number; three: string; src: string; guns: Record
     if (!on || !def) return false;
     const ok = await glbReady(); if (!ok) return false;
     const ix = await platformIndex(def.id); if (!ix) return false;
-    const plan = planBuild(ix, buildOf(def)); if (plan.missing) return false;
+    const plan = planBuild(ix, buildOf(def));
     const r = await Promise.all(plan.tags.filter((t) => t.entry).map((t) => loadPack(def.id, t.entry!.file!)));
     return r.every((x) => x);
   }
@@ -753,13 +743,13 @@ interface BakedIndex { version: number; three: string; src: string; guns: Record
    * pivots, info with the muzzles list, the mounts and info.anim), or null if the platform's index or a pack it needs is not loaded
    * (ensure / preloadPlatform) or the packs do not cover the build (a combination the baker never saw).
    */
-  function assemble(def: any, skin?: any): { group: THREE.Group; info: any } | null {
+  function assemble(def: any, skin?: any): { group: THREE.Group; info: any; approx?: string } | null {
     const ix = def && platIx.get(def.id); if (!ix) return null;
-    const plan = planBuild(ix, buildOf(def)); if (plan.missing) return null;
+    const plan = planBuild(ix, buildOf(def));
     const T = THREE, group = new T.Group();
     interface Src { root: THREE.Object3D; rigid: Vec3 }
     const srcs: Src[] = [];
-    for (const t of plan.tags) { if (!t.entry) continue; const root = packRoots.get(packUrl(def.id, t.entry.file!)); if (!root) return null; srcs.push({ root, rigid: t.rigid }); }
+    for (const t of plan.tags) { if (!t.entry) continue; const root = packRoots.get(packUrl(def.id, t.entry.file!)); if (!root) return null; srcs.push({ root, rigid: [t.rigid[0] + t.at[0], t.rigid[1] + t.at[1], t.rigid[2] + t.at[2]] }); }
     /** A point of the pack's frame (glTF axes) moved to where it sits in this build. */
     const op = (s: Src, x: number, y: number, z: number, out: THREE.Vector3) => out.set(x + s.rigid[2], y + s.rigid[1], z - s.rigid[0]);
     const fin = new Map<string, THREE.Vector3>(), nodes = new Map<string, THREE.Group>(), parentOf = new Map<string, string>(), tmp = new T.Vector3();
@@ -789,13 +779,19 @@ interface BakedIndex { version: number; three: string; src: string; guns: Record
       node.position.copy(fin.get(name)!); if (pn) { node.position.sub(fin.get(par!)!); pn.add(node); } else group.add(node);
     }
     finishMeshes(group);
-    const info = plan.info; info.anim = {};
+    const info = plan.info; info.anim = {}; // (the tables' and the anchors' info: the same as infoOf(def) gives, with the live nodes in anim)
     for (const [name, node] of nodes) if (name.startsWith(NAMES.partPrefix) && node.userData[NAMES.extras.part]) info.anim[node.userData[NAMES.extras.part]] = node;
-    const mounts: Record<string, Vec3> = {};
-    for (const t of plan.tags) if (t.rigid[0] || t.rigid[1] || t.rigid[2]) mounts[NAMES.mountPrefix + t.tag] = [t.rigid[0], t.rigid[1], t.rigid[2]];
-    if (Object.keys(mounts).length) info.mounts = mounts;
     if (skin && skin.length) G.Stickers.decorate(group, skin);
-    return { group, info };
+    return plan.approx ? { group, info, approx: plan.approx } : { group, info };
+  }
+  /**
+   * The build's `info` from the platform's index alone: no pack files, no meshes, synchronous (once the platform's index.json is loaded:
+   * G.Models.platformIndex(id) / ensure / preloadPlatform load it). The same numbers assemble(def) gives; `anim` holds the NAMES of the part_
+   * nodes (key -> "part_<key>") instead of the live nodes. null while the index is not loaded.
+   */
+  function infoOf(def: any): any | null {
+    const ix = def && platIx.get(def.id); if (!ix) return null;
+    return planBuild(ix, buildOf(def)).info;
   }
 
   /**
@@ -833,10 +829,10 @@ interface BakedIndex { version: number; three: string; src: string; guns: Record
   // with the flag on, load the whole set in the background once the glTF side is up (the gunsmith and the hangar then find them)
   if (on) glbReady().then((ok) => { if (ok) preload(); });
   return {
-    on, checking, preload, preloadPlatform, ensure, assemble, displayBaked, contract: GUN_MODEL_CONTRACT, infoFields: INFO_FIELDS, partsIndexFields: PARTS_INDEX_FIELDS, validate, validatePack, validatePartsIndex, describeGltfJson, describeScene, glbJson,
+    on, checking, preload, preloadPlatform, ensure, assemble, infoOf, loadIndex: async (id: string) => !!(await platformIndex(id)), displayBaked, contract: GUN_MODEL_CONTRACT, infoFields: INFO_FIELDS, partsIndexFields: PARTS_INDEX_FIELDS, validate, validatePack, validatePartsIndex, describeGltfJson, describeScene, glbJson,
     infoSchema, partsIndexSchema, contractMarkdown, loaded: (id: string) => loaded.has(id), platformLoaded: (id: string) => platIx.has(id), SLOTS, PARTS, NAMES,
     // the pure side of the packs (no three.js): the baker and the tests check the packs with the same code the game plans with
-    planBuild, pickPack, infoLeaves, infoFromLeaves, leafDelta, applyLeafDelta, buildKeyOf, slotKey, PARTS_INDEX_VERSION,
+    planBuild, pickPack, infoLeaves, infoFromLeaves, buildKeyOf, slotKey, PARTS_INDEX_VERSION,
   };
 })();
 G.Models = G_Models;

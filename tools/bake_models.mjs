@@ -149,13 +149,18 @@ if (doGuns) {
 }
 if (doParts) {
   console.log('\nper-part packs:');
-  const r = await bakeParts({ G, GS, GM }, Models, ids2, src);
+  const r = await bakeParts({ G, GS, GM }, Models, ids2, src, console.log, only.length > 0);
   fails += r.fails;
-  const old2 = fs.existsSync(PARTS_DIR + 'index.json') ? JSON.parse(fs.readFileSync(PARTS_DIR + 'index.json', 'utf8')).platforms : {};
-  const plats = { ...(only.length ? old2 : {}), ...r.summary };
-  const vals = Object.values(plats), sum = (k) => vals.reduce((a, x) => a + (x[k] || 0), 0);
-  const totals = { platforms: vals.length, packs: sum('packs'), files: sum('files'), bytes: sum('bytes'), gz: sum('gz'), index: sum('index'), indexGz: sum('indexGz'), sweepBuilds: sum('sweepBuilds'), exactBuilds: sum('exactBuilds') };
-  fs.writeFileSync(PARTS_DIR + 'index.json', JSON.stringify({ version: 1, src, platforms: plats, totals }, null, 1));
-  console.log(`\nbaked packs for ${vals.length} platforms: ${totals.packs} packs in ${totals.files} files, ${totals.bytes} B, ${totals.gz} B gzipped (+ indexes ${totals.index} B, ${totals.indexGz} gzipped); ${totals.sweepBuilds} sweep builds assemble from them (${totals.exactBuilds} exact)`);
+  if (!r.fails) {
+    const old2 = fs.existsSync(PARTS_DIR + 'index.json') ? JSON.parse(fs.readFileSync(PARTS_DIR + 'index.json', 'utf8')).platforms : {};
+    const plats = { ...(only.length ? old2 : {}), ...r.summary };
+    const vals = Object.values(plats), sum = (k) => vals.reduce((a, x) => a + (x[k] || 0), 0);
+    const totals = { platforms: vals.length, packs: sum('entries'), files: sum('files'), bytes: sum('bytes'), gz: sum('gz'), sharedFiles: r.shared.files, sharedBytes: r.shared.bytes, sharedGz: r.shared.gz, index: sum('index'), indexGz: sum('indexGz'), builds: sum('builds'), coverBuilds: sum('coverBuilds') };
+    fs.writeFileSync(PARTS_DIR + 'index.json', JSON.stringify({ version: 2, src, platforms: plats, totals }, null, 1));
+    // what each platform's coverage was made of (the joint packs and info tables, with their combination counts): for docs/models.md and review
+    fs.writeFileSync(PARTS_DIR + 'coverage.json', JSON.stringify(Object.fromEntries(r.states.map((st) => [st.id, { builds: st.builds, coverBuilds: st.cover, rounds: st.rounds, combinations: st.stats, joint: st.joint, info: st.infoDeps }])), null, 1));
+    const gzAll = totals.gz + totals.sharedGz;
+    console.log(`\nbaked packs for ${vals.length} platforms: ${totals.packs} index entries; ${totals.files} platform files (${totals.bytes} B, ${totals.gz} B gzipped) + ${totals.sharedFiles} shared files (${totals.sharedBytes} B, ${totals.sharedGz} B gzipped) = ${gzAll} B gzipped (+ indexes ${totals.index} B, ${totals.indexGz} gzipped); ${totals.builds} builds (of which ${totals.coverBuilds} made to cover every combination) assemble from them`);
+  }
 }
 process.exit(fails ? 1 : 0);

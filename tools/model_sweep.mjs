@@ -68,6 +68,31 @@ export function randomBuilds(GS, id, bases, n, seed, exclude = new Set(), kmin =
   return out;
 }
 
+/**
+ * Builds around the parts that OPEN slots (an optic that takes a riser dot, a handguard that takes a foregrip and lights, a chassis, a stock adapter, a barrel that
+ * takes a muzzle device): from each base, fit such a part, then change each slot it opened to every part that fits it, and every other slot to `perOther` random
+ * alternatives. A swap of the slot a part opens cannot be in the sweep (the slot is not there in the bases), and what it interacts with only shows with the part fitted.
+ */
+export function providerBuilds(GS, id, bases, seed, exclude = new Set(), perOther = 2) {
+  let s = seed >>> 0; const rnd = () => (s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 4294967296;
+  const out = [], seen = new Set(exclude);
+  const add = (b) => { GS.prune(id, b); const k = buildKey(b); if (!seen.has(k)) { seen.add(k); out.push(b); } };
+  const fitting = (sl, b) => GS.compatible(sl.mount).filter((p) => GS.fitsSlot(sl, p, id, b)).map((p) => p.id);
+  for (const base of bases) {
+    const before = new Set(GS.slotsOf(id, base).map((x) => x.slot));
+    for (const sl of GS.slotsOf(id, base)) for (const pid of fitting(sl, base)) {
+      const P = GS.PARTS[pid]; if (!P || !(P.provides || P.chassis) || base[sl.slot] === pid) continue;
+      const b1 = { ...base, [sl.slot]: pid }; GS.prune(id, b1); if (b1[sl.slot] !== pid) continue;
+      for (const s2 of GS.slotsOf(id, b1)) {
+        const alts = fitting(s2, b1); if (!s2.req) alts.push('');
+        const isNew = !before.has(s2.slot), pick = isNew ? alts : Array.from({ length: Math.min(perOther, alts.length) }, () => alts[Math.floor(rnd() * alts.length)]);
+        for (const q of pick) { const b2 = { ...b1 }; if (q) b2[s2.slot] = q; else delete b2[s2.slot]; add(b2); }
+      }
+    }
+  }
+  return out;
+}
+
 /** The compiled def of a build, as the gunsmith builds a model from it. */
 export const defOf = (G, id, build) => ({ id, build, mag: G.WEAPONS[id].mag, code: G.Gunsmith.encode(id, build) });
 

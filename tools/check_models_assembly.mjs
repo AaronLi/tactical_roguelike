@@ -89,7 +89,7 @@ for (const id of plats) {
   if (!M.platformLoaded(id)) { console.error(`FAIL ${id}: no packs (run npm run bake:models)`); wrong.push({ id, which: 'sweep', build: {}, diffs: [{ kind: 'slot', what: '*', detail: 'no packs' }] }); continue; }
   // (the game computes bounds on the loaded packs as it renders them: an assembled copy must not inherit them)
   const ixf = JSON.parse(fs.readFileSync(path.join(ROOT, 'assets/models/parts', id, 'index.json'), 'utf8'));
-  for (const t of Object.values(ixf.tags)) for (const e of t.packs) if (e.file) (await G.GLB.load('assets/models/parts/' + id + '/' + e.file)).traverse((o) => { if (o.isMesh) { o.geometry.computeBoundingBox(); o.geometry.computeBoundingSphere(); } });
+  for (const t of Object.values(ixf.tags)) for (const e of t.packs) if (e.file) (await G.GLB.load('assets/models/parts/' + (e.file.startsWith('_shared/') ? '' : id + '/') + e.file)).traverse((o) => { if (o.isMesh) { o.geometry.computeBoundingBox(); o.geometry.computeBoundingSphere(); } });
   const { bases, list } = sweepOf(GS, id), seen = new Set(list.map((e) => buildKey(e.build))), mine = { sw: {}, he: {} };
   if (SWEEP) for (const e of list) { const r = run(id, 'sweep', e.build, `${e.slot || 'base'}=${e.part}`); mine.sw[r] = (mine.sw[r] || 0) + 1; }
   for (const b of randomBuilds(GS, id, bases, heldPer, SEED, seen, 3, 6)) { const r = run(id, 'held', b, buildKey(b)); mine.he[r] = (mine.he[r] || 0) + 1; }

@@ -63,8 +63,9 @@ expectPack('owner must be a boolean', packRoot([pnode('group_barrel_1', [bm()], 
 expectPack('anchors do not belong in a pack', packRoot([pnode('group_barrel_1', [bm()], { anchors: {} })]), /a pack carries no extras\.anchors/);
 expectPack('unknown material', packRoot([bm('barrel_1', 'barrel', 'foo')]), /material 'foo' is not in the catalogue/);
 // the platform index
-const ix = () => ({ version: 1, platform: 'x', src: 'abc', slots: ['barrel', 'handguard'], tags: { barrel: { dep: ['barrel'], packs: [{ key: ['b1'], file: 'barrel/b1.glb' }] }, handguard: { dep: ['barrel', 'handguard'], packs: [{ key: ['*', 'h1'], file: null }] } },
-  anchors: { 'barrel=b2': { mount_muzzle: [0.05, 0, 0] } }, bases: [0, 1, 2].map(() => ({ build: { barrel: 'b1' }, info: { sy: 0.07 } })), deltas: { 'barrel=b2': [{ sy: 0.001 }, null, null] }, exact: {} });
+const ix = () => ({ version: M.PARTS_INDEX_VERSION, platform: 'x', src: 'abc', slots: ['barrel', 'handguard'], tags: { barrel: { dep: ['barrel'], packs: [{ key: ['b1'], file: 'barrel/b1.glb' }, { key: ['b2'], file: '_shared/barrel/ab.glb', at: [0.1, 0, 0], nodes: ['part_barrel'] }] }, handguard: { dep: ['barrel', 'handguard'], packs: [{ key: ['*', 'h1'], file: null }] } },
+  anchors: { 'barrel=b2': { mount_muzzle: [0.05, 0, 0] } },
+  info: [{ dep: ['barrel'], leaves: ['sy', 'muzzles/0/0'], rows: [{ key: ['b1'], v: [0.07, 0.5] }, { key: ['b2'], v: [0.071, 0.55] }] }, { dep: ['barrel', 'handguard'], leaves: ['support/0', 'gone'], rows: [{ key: ['*', 'h1'], v: [0.2, { del: 1 }] }, { key: ['b2', 'h1'], v: [0.25, 3] }] }] });
 const expectIx = (label, mut, re) => {
   const o = ix(); mut(o); const r = M.validatePartsIndex(o), all = r.errors.join('\n'), ok = re === null ? r.errors.length === 0 : re.test(all);
   if (!ok) { bad++; console.error(`FAIL index ${label}: expected ${re}, got:\n  ${all || '(nothing)'}`); } else console.log('ok   index ' + label);
@@ -76,7 +77,9 @@ expectIx('a key that does not line up with dep', (o) => { o.tags.barrel.packs[0]
 expectIx('a tag that is not a slot', (o) => { o.tags.nowhere = { dep: [], packs: [] }; }, /index\.tags\.nowhere: not a slot/);
 expectIx('a stretch (there is none: a part is modelled at its own size)', (o) => { o.tags.handguard.packs[0].stretch = { from: 0.1, to: 0.3, gain: 1 }; }, /stretch: unknown field/);
 expectIx('an anchor with two numbers', (o) => { o.anchors['barrel=b2'].mount_muzzle = [1, 2]; }, /expected 3 numbers/);
-expectIx('three reference builds', (o) => { o.bases.pop(); }, /expected the three reference builds/);
+expectIx('an info row with too few values', (o) => { o.info[0].rows[0].v.pop(); }, /rows\[0\]\.v has 1 values for 2 leaves/);
+expectIx('an info row key that does not line up', (o) => { o.info[0].rows[0].key = ['b1', 'h1']; }, /rows\[0\]\.key has 2 parts for 1 dep slots/);
+expectIx('the old reference builds are gone', (o) => { o.bases = []; }, /index\.bases: unknown field/);
 // the info as leaves, and the planner
 const canon = (v) => JSON.stringify(v, (k, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.keys(x).sort().map((q) => [q, x[q]])) : x));
 const leavesBack = (v) => canon(M.infoFromLeaves(M.infoLeaves(v)));
@@ -84,8 +87,11 @@ for (const v of [{ sy: 0.07, muzzles: [[0.5, 0, 0], [0.5, 0, 0.01]], chamberAt: 
   if (leavesBack(v) === canon(v)) console.log('ok   info leaves round trip'); else { bad++; console.error('FAIL info leaves round trip: ' + leavesBack(v)); }
 }
 const plan = M.planBuild(ix(), { barrel: 'b2', handguard: 'h1' });
-const wantMiss = M.planBuild(ix(), { barrel: 'b1', handguard: 'h9' }).missing;
+const near = M.planBuild(ix(), { barrel: 'b1', handguard: 'h9' });
 const plan2 = M.planBuild(ix(), { barrel: 'b1', handguard: 'h1' });
-if (/^barrel/.test(plan.missing || '') && Math.abs(plan.info.sy - 0.071) < 1e-12 && plan2.missing === null && plan2.tags.length === 2 && plan2.tags[1].entry === null) console.log('ok   planBuild picks packs, applies the info deltas, reports what no pack covers'); else { bad++; console.error('FAIL planBuild: ' + JSON.stringify(plan)); }
-if (/handguard/.test(wantMiss || '')) console.log('ok   planBuild names the tag no pack covers'); else { bad++; console.error('FAIL planBuild missing: ' + wantMiss); }
+// exact covers: the most specific row / pack, the shared pack's move, the anchors' mounts, the absent leaf, the part nodes
+if (plan.approx === null && plan.info.sy === 0.071 && plan.info.muzzles[0][0] === 0.55 && plan.info.support[0] === 0.25 && plan.info.gone === 3 && plan.tags[0].at[0] === 0.1 && plan.info.mounts.mount_muzzle[0] === 0.05 && plan.info.anim.barrel === 'part_barrel'
+  && plan2.approx === null && plan2.info.support[0] === 0.2 && !('gone' in plan2.info) && plan2.tags.length === 2 && plan2.tags[1].entry === null) console.log('ok   planBuild picks packs and the most specific info rows, shared packs, mounts'); else { bad++; console.error('FAIL planBuild: ' + JSON.stringify(plan)); }
+// a combination nothing covers is still planned (the nearest pack and row) and says what was not covered exactly
+if (near.approx && near.tags.length === 2 && near.info.sy === 0.07) console.log('ok   planBuild falls back to the nearest and reports what no pack covers'); else { bad++; console.error('FAIL planBuild approx: ' + JSON.stringify(near)); }
 process.exit(bad ? 1 : 0);
