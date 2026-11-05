@@ -43,6 +43,8 @@ const G_R = {
   pBase: undefined as unknown as Float32Array,
   pGrav: undefined as unknown as Float32Array,
   pBlood: undefined as unknown as Uint8Array,
+  SN: 0, sIdx: 0, sLive: false, sPos: undefined as unknown as Float32Array, sCol: undefined as unknown as Float32Array, sVel: undefined as unknown as Float32Array, sLife: undefined as unknown as Float32Array, sBase: undefined as unknown as Float32Array,
+  streamPts: undefined as unknown as THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial>,
   pIdx: undefined as unknown as number,
   points: undefined as unknown as THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial>,
   decals: undefined as unknown as RMark[],
@@ -403,6 +405,18 @@ const G_R = {
     for (let i = 0; i < 24; i++) { const m = new THREE.Mesh(bgeo, this.bloodMats.pool); m.visible = false; m.rotation.x = -Math.PI / 2; m.userData = {}; this.scene.add(m); this.pools.push(m); }
     this.poolIdx = 0;
     this.pBlood = new Uint8Array(this.PN);
+    // a wound's stream: fine drops, many of them, in a pool of their own (a few bleeding bodies would otherwise use up the shared
+    // particles above, and drops at their size read as gobbets, not a stream). Each lands like any blood (bloodDrop), now and then.
+    this.SN = 2400;
+    const sg = new THREE.BufferGeometry();
+    this.sPos = new Float32Array(this.SN * 3); this.sCol = new Float32Array(this.SN * 3); this.sVel = new Float32Array(this.SN * 3); this.sLife = new Float32Array(this.SN); this.sBase = new Float32Array(this.SN * 3);
+    for (let i = 0; i < this.SN; i++) this.sPos[i * 3 + 1] = -100;
+    sg.setAttribute('position', new THREE.BufferAttribute(this.sPos, 3));
+    sg.setAttribute('color', new THREE.BufferAttribute(this.sCol, 3));
+    this.streamPts = new THREE.Points(sg, new THREE.PointsMaterial({ size: 0.028, vertexColors: true, transparent: true, depthWrite: false }));
+    this.streamPts.frustumCulled = false;
+    this.scene.add(this.streamPts);
+    this.sIdx = 0;
 
     // explosions: six fireballs, and two lights between them (every lit pixel of the level works through every light in
     // the scene each frame, lit or not; two blasts at once is plenty, and a third takes the dimmer one's light)
@@ -674,13 +688,12 @@ const G_R = {
   },
   // one drop of blood leaving a wound at p with this velocity: it falls and leaves its mark where it lands (js/views.ts woundStreams)
   bloodJet(p: THREE.Vector3, vx: number, vy: number, vz: number, color: number) {
-    const i = this.pIdx; this.pIdx = (this.pIdx + 1) % this.PN;
-    this.pBlood[i] = 2; // (a stream drop: leaves a mark on the floor only now and then, so a bleeding body doesn't wipe out the rest)
-    this.pPos[i * 3] = p.x; this.pPos[i * 3 + 1] = p.y; this.pPos[i * 3 + 2] = p.z;
-    this.pVel[i * 3] = vx; this.pVel[i * 3 + 1] = vy; this.pVel[i * 3 + 2] = vz;
-    this.pLife[i] = 1.3; this.pGrav[i] = 9.8;
+    const i = this.sIdx; this.sIdx = (this.sIdx + 1) % this.SN;
+    this.sPos[i * 3] = p.x; this.sPos[i * 3 + 1] = p.y; this.sPos[i * 3 + 2] = p.z;
+    this.sVel[i * 3] = vx; this.sVel[i * 3 + 1] = vy; this.sVel[i * 3 + 2] = vz;
+    this.sLife[i] = 1.3;
     const c = _bjc.setHex(color), v = 0.8 + Math.random() * 0.2;
-    this.pBase[i * 3] = c.r * v; this.pBase[i * 3 + 1] = c.g * v; this.pBase[i * 3 + 2] = c.b * v;
+    this.sBase[i * 3] = c.r * v; this.sBase[i * 3 + 1] = c.g * v; this.sBase[i * 3 + 2] = c.b * v;
   },
   // what a round throws up, by what it hit (js/materials.ts fx): sparks [colour, how many, speed, life, gravity], and the puff of it
   IMPACT: <Record<ImpactFx, { s: number[] | null; d: number[] | null }>>{
@@ -836,6 +849,25 @@ const G_R = {
     }
     this.points.geometry.attributes.position.needsUpdate = true;
     this.points.geometry.attributes.color.needsUpdate = true;
+    // the wound streams' fine drops: falling until they land, where one in eight or so leaves a small drop (the stream's many:
+    // every one marking the floor would use up the blood marks)
+    const SP = this.sPos, SV = this.sVel, SL = this.sLife, SC = this.sCol, SB = this.sBase;
+    let live = false;
+    for (let i = 0; i < this.SN; i++) {
+      if (SL[i] <= 0) continue;
+      live = true; SL[i] -= dt;
+      const g = this.bloodFloor(SP[i * 3], SP[i * 3 + 2], SP[i * 3 + 1]);
+      if (SP[i * 3 + 1] <= g + 0.02 || SL[i] <= 0) {
+        if (Math.random() < 0.13) this.bloodDrop(SP[i * 3], g, SP[i * 3 + 2], 0.025 + Math.random() * 0.03 + Math.min(0.04, Math.hypot(SV[i * 3], SV[i * 3 + 2]) * 0.01));
+        SL[i] = 0; SP[i * 3 + 1] = -100;
+        continue;
+      }
+      SV[i * 3 + 1] -= 9.8 * dt;
+      SP[i * 3] += SV[i * 3] * dt; SP[i * 3 + 1] += SV[i * 3 + 1] * dt; SP[i * 3 + 2] += SV[i * 3 + 2] * dt;
+      SC[i * 3] = SB[i * 3]; SC[i * 3 + 1] = SB[i * 3 + 1]; SC[i * 3 + 2] = SB[i * 3 + 2];
+    }
+    if (live || this.sLive) { this.streamPts.geometry.attributes.position.needsUpdate = true; this.streamPts.geometry.attributes.color.needsUpdate = true; }
+    this.sLive = live;
   },
   // ------------------------------------------------------------ picture-in-picture scopes
   pipTexture() {

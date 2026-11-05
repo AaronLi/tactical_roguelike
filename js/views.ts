@@ -616,7 +616,7 @@ const G_Views = {
   // rise and a slower fall, with a small bump after it; the rate climbs with stress and blood loss, and the flow weakens as
   // blood runs low. An artery spurts (almost nothing between beats, a jet at each), a vein flows (a steady stream that swells
   // a little). Dead, the heart has stopped: what's left of the pressure runs out in seconds (a massive wound) or a quarter
-  // minute. A few particles a wound (blood ones: each leaves a drop on the floor where it lands, js/render.ts), the nearest
+  // minute. Fine drops, a hundred or so a second from a spurting artery (blood: now and then one leaves a drop on the floor where it lands, js/render.ts bloodJet), the nearest
   // WOUND_CAP wounded bodies only, fewer with distance.
   WOUND_CAP: 10,
   // [bone, local position (x mirrored by side), local direction] by the part's index (js/medical.ts PARTS)
@@ -664,13 +664,13 @@ const G_Views = {
         const w = wnd[k], art = !!(w & 8);
         // (an artery: almost nothing between beats; a vein: a steady run that swells a little with each)
         const flow = (art ? 0.04 + 0.96 * pulse * beat : 0.62 + 0.38 * pulse * beat) * vol;
-        acc[k] = (acc[k] || 0) + dt * (art ? 36 : 14) * flow * lod * (w & 16 ? 1.5 : 1);
+        acc[k] = (acc[k] || 0) + dt * (art ? 110 : 45) * flow * lod * (w & 16 ? 1.5 : 1); // (fine drops, many: js/render.ts bloodJet)
         if (acc[k] < 1) continue;
         this.woundSpot(ev.rig, w, k, _p, _d);
-        const n = Math.min(4, acc[k] | 0); acc[k] -= n;
+        const n = Math.min(12, acc[k] | 0); acc[k] -= n;
         for (let i = 0; i < n; i++) {
-          const jet = art ? 1.2 + 2.6 * flow : 0.15 + 0.5 * flow, s = jet * (0.85 + Math.random() * 0.3), j = art ? 0.1 : 0.25;
-          G.R.bloodJet(_p, _d.x * s + (Math.random() - 0.5) * j, _d.y * s + (art ? 0.5 * flow : 0) + (Math.random() - 0.5) * j * 0.6, _d.z * s + (Math.random() - 0.5) * j, art ? 0x8c0a0a : 0x6e0808);
+          const jet = art ? 0.5 + 1.1 * flow : 0.06 + 0.22 * flow, s = jet * (0.85 + Math.random() * 0.3), j = art ? 0.05 : 0.1; // (slow: blood wells and spurts, it doesn't spray)
+          G.R.bloodJet(_p, _d.x * s + (Math.random() - 0.5) * j, _d.y * s + (art ? 0.2 * flow : 0) + (Math.random() - 0.5) * j * 0.6, _d.z * s + (Math.random() - 0.5) * j, art ? 0x8c0a0a : 0x6e0808);
         }
       }
       // down for good (alive or not): a pool grows under the body, from where it lies
