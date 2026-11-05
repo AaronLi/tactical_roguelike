@@ -163,7 +163,7 @@ const CONTRACT_CORE = {
   },
   /** extras keys. */
   extras: {
-    root: { info: 'The GunModelInfo object (INFO_FIELDS).', gun: 'The gun id, equal to the root node\'s name.' },
+    root: { info: 'The GunModelInfo object (INFO_FIELDS).', gun: 'The gun id, equal to the root node\'s name.', anchors: 'An AUTHORED SOURCE only (GUN_MODEL_CONTRACT.authored): the mount anchors, { mount_<slot>: [forward, up, right] } in the gun\'s frame. (Also written as the JSON text `anchors_json`, and `info` as `info_json`, for a tool that stores only flat custom properties: Blender.)', seat: 'An AUTHORED SOURCE only: { barrelR } scalars of the seats (GUN_MODEL_CONTRACT.authored.seat). (Also `seat_json`.)' },
     mesh: { slot: 'A SLOTS value.', display: 'Display surfaces only: { width, height } canvas pixels.', chk: 'A magazine-check mesh (under part_mag): { role, i, t? } (GUN_MODEL_CONTRACT.magCheck).' },
     part: { part: 'The PARTS key of this part_ node.', anchors: 'Anchors this part provides, in its own frame (GUN_MODEL_CONTRACT.anchors).', owner: 'Pack files only: false when this node\'s pivot belongs to another pack (GUN_MODEL_CONTRACT.packs.nodes).', parent: 'Pack files only: the name of the node this one nests under.', check: 'part_mag only: { w }, the magazine-check data (GUN_MODEL_CONTRACT.magCheck).' },
     pack: { pack: 'Pack files only, on the root: { platform, tag, key } (GUN_MODEL_CONTRACT.packs.root).' },
@@ -247,6 +247,30 @@ const GUN_MODEL_CONTRACT = { ...CONTRACT_CORE, displays: {
   assembly: 'ASSEMBLY (G.Models.assemble(def) in js/glb.ts, synchronous: the packs must be loaded, G.Models.ensure(def) / preloadPlatform(id) load them). For each tag: pick the most specific pack for the build\'s parts; add up the anchors of every part in the build (and the pack\'s own `at`); take the owner nodes from the packs, and place every pack\'s meshes (translated) against them. It never returns null for a platform whose index is loaded: a build the packs do not cover (a combination of parts no build of the baker held) is assembled from the nearest pack of each tag and the result says `approx` (the tests count that as a failure). G.Models.infoOf(def) gives the build\'s info from the index alone (no pack files, no three.js), synchronously, so a caller can use it before the meshes load. The result is the whole-gun structure of docs/models.md: slot-tagged meshes, part_ nodes with their pivots, info.',
   shared: 'SHARED PACKS. A part that looks the same on every platform (an optic, a magnifier, a light, a foregrip, a muzzle device) is stored once: in assets/models/parts/_shared/<slot>/<file>.glb, in its own frame (the origin at the corner of its bounding box: smallest forward, up and right), and each platform\'s index entry names it (`file: "_shared/<slot>/<file>.glb"`) with the offset `at` that places it on that platform. Two packs are one when their triangles agree to 2 micrometres after the move.',
   verify: 'VERIFICATION. The baker assembles every build it made (the sweep: each platform\'s default, two "loaded" builds and every single-part swap from each; random builds with 2 to 6 parts changed; and one build for every valid combination of parts in every pack\'s and table\'s dep slots: tens of thousands) from the packs in memory and compares triangles and info with the recipe (the baker fails otherwise); `npm run test:models` does the same through the real files (glb, decoder, assembler) with a tolerance for compression and the moves, on the sweep and on 10,000 random held-out builds with 3 to 6 parts changed.',
+}, authored: {
+  what: 'AUTHORED SOURCE. A gun modelled in Blender is baked straight from its .glb with no recipe (tools/bake_authored.mjs, `npm run bake:models`). The source is models/<id>/<id>.glb plus models/<id>/model.json ({ "source": "authored", "sights": { "builtin": [<optic kinds that mean the gun\'s own sights>], "rail": [<of those, the ones that still sit on a rail piece: a riser>] } }); the model is the authority for everything it holds, and a gun without model.json keeps being built by its recipe. `npm run check:models -- models/<id>/<id>.glb` validates a source (validateAuthored).',
+  nodes: 'The scene has one root node named after the gun. Its children are the base (receiver) and the gun\'s FACTORY parts, as meshes "<slot>_<n>" with extras.slot (the contract\'s slots) and a catalogue material: the base is every mesh of slot base that is not in a part_ node; the stock, grip, handguard, barrel, muzzle and optic (the irons) meshes are the parts the gun\'s default build fits, and the model must hold meshes for every slot the default build fills; the magazine is the node part_mag with its meshes (slot mag), the charging handle part_handle (slot base); every moving part is a part_<key> node (contract parts) with its pivot at the node origin and listed in info.anim. A factory part\'s id is the platform\'s (js/parts.ts), not written in the model.',
+  info: 'Root extras.info (or the JSON text info_json): the factory build\'s info, exactly INFO_FIELDS (sy, fSight, relief, muzzles, grip, support, anim, magAt, handle, port, chamberAt, ...).',
+  anchors: 'Root extras.anchors (or anchors_json): the gun\'s MOUNT ANCHORS, [forward, up, right] metres in the gun\'s frame, the places the gun\'s non-factory parts are seated on. Every part the gun accepts that is not one of the model\'s own is built at its own designed size and placed on these, never stretched: the table lists them. A `_end` anchor is the far end of a span. Further `mount_<slot>` anchors (a side rail: mount_tac, mount_tacL) are allowed and are carried into info.mounts.',
+  required: {
+    mount_optic: 'the START of the optic rail on the receiver: [forward, the receiver\'s top height, 0]. A rail piece is built over mount_optic .. mount_optic_end when a real optic (or one of sights.rail) is fitted; an optic sits on it by the platform\'s spec (optF).',
+    mount_optic_end: 'the END of that rail: [forward, top, 0]. Same height as mount_optic.',
+    mount_handguard: 'where a handguard starts (the barrel nut\'s front): [forward, up, 0]. The platform\'s spec L is this forward value.',
+    mount_handguard_end: 'the furthest forward a handguard may reach (the gas block\'s rear): [forward, up, 0]. A handguard longer than mount_handguard_end - mount_handguard - 3 mm is not offered for the gun (the platform\'s spec hgMax in js/parts.ts says so; the baker checks they agree). Nothing is clamped.',
+    mount_muzzle: 'where the factory barrel ends and a muzzle device screws on: [forward, up, 0]. Another barrel\'s end is this plus its length difference from the factory one; the factory muzzle device (slot muzzle) is modelled to start here.',
+    mount_barrel: 'where the factory barrel\'s bare tube begins (ahead of the last fixed fitting): [forward, up, 0]. The mesh with extras.role "tube" is the tube; another barrel\'s length moves the end of that one mesh (the tube is the only part of a model the baker resizes).',
+    mount_stock: 'where a stock is seated: [0 or the receiver\'s back, the centre height of the wrist at the receiver\'s back, 0].',
+    mount_grip: 'where a grip is seated: [forward of the grip\'s front, the height of the receiver\'s underside, 0]; the grip hangs from that height.',
+    mount_mag: 'the magazine well: [forward, up, 0] of the top of a magazine seated in it (equal to info.magAt).',
+  },
+  seat: 'Root extras.seat (or seat_json): { barrelR }, the factory barrel\'s radius at mount_muzzle, metres (the bore line is at height 0; another barrel is drawn at this radius).',
+  mesh: 'A mesh extras.role of "tube" marks the one barrel mesh that mount_barrel .. mount_muzzle resizes; no other role is defined.',
+  rules: [
+    'A gun\'s default build is its factory parts, taken from the model while they are fitted; every other part the gunsmith offers for the gun is the shared part for its slot, seated from the anchors above, so the same part is the same shape on every gun and on this one.',
+    'The model\'s own sights: an optic kind listed in model.json sights.builtin means the gun\'s own irons (the optic slot of the model: the rear sight on the receiver and the front sight on the barrel). A kind also listed in sights.rail (a riser) puts a rail piece between mount_optic and mount_optic_end over them.',
+    'Fit is data, not geometry: whether a part fits the gun is decided by js/parts.ts (fitsSlot, hgRoom with hgMax) from the platform\'s spec; the baker checks the platform\'s spec (L, hgMax, mag) against the anchors and fails when they disagree.',
+  ],
+  example: { name: 'fal', extras: { gun: 'fal', info_json: '{"sy":0.04,...}', anchors_json: '{"mount_optic":[0.0141,0.0232,0],"mount_optic_end":[0.1791,0.0232,0],"mount_handguard":[0.3012,0,0],"mount_handguard_end":[0.5357,0,0],"mount_muzzle":[0.7329,0,0],"mount_barrel":[0.6153,0,0],"mount_stock":[0,-0.01835,0],"mount_grip":[0.0661,-0.0452,0],"mount_mag":[0.2232,-0.0429,0]}', seat_json: '{"barrelR":0.0071}' } },
 } };
 
 // ---- the validator ------------------------------------------------------------------------------------------------------
@@ -518,6 +542,74 @@ function validatePartsIndex(ix: any): ModelReport {
   return { errors, warnings };
 }
 
+/** The three JSON-valued root extras of an authored source (info, anchors, seat): the object, or the text `<name>_json` (Blender stores only flat custom properties). */
+function authoredRoot(ex: Record<string, any>, errors: string[]): { info: any; anchors: any; seat: any } {
+  const get = (k: string) => {
+    if (ex[k] !== undefined) return ex[k];
+    const t = ex[k + '_json']; if (t === undefined) return undefined;
+    if (typeof t !== 'string') { errors.push(`root extras.${k}_json: expected JSON text, got ${JSON.stringify(t)}`); return undefined; }
+    try { return JSON.parse(t); } catch (e) { errors.push(`root extras.${k}_json is not valid JSON: ${(e as Error).message}`); return undefined; }
+  };
+  return { info: get('info'), anchors: get('anchors'), seat: get('seat') };
+}
+/** model.json of an authored gun: { source: 'authored', sights: { builtin: [...], rail: [...] } }. */
+function validateAuthoredConfig(cfg: any): string[] {
+  const out: string[] = [];
+  if (!isObj(cfg)) return ['model.json: expected an object { "source": "authored", "sights": { "builtin": [...], "rail": [...] } }'];
+  if (cfg.source !== 'authored') out.push(`model.json: "source" is ${JSON.stringify(cfg.source)}, expected "authored"`);
+  const sg = cfg.sights;
+  if (!isObj(sg)) out.push('model.json: "sights" is missing ({ builtin: [the optic kinds that mean the gun\'s own sights], rail: [those that still sit on a rail piece] })');
+  else {
+    for (const k of ['builtin', 'rail']) if (!Array.isArray(sg[k]) || !sg[k].every((x: any) => typeof x === 'string')) out.push(`model.json: sights.${k} must be a list of optic kind names`);
+    if (Array.isArray(sg.builtin) && Array.isArray(sg.rail)) for (const x of sg.rail) if (!sg.builtin.includes(x)) out.push(`model.json: sights.rail has "${x}", which is not in sights.builtin`);
+  }
+  for (const k of Object.keys(cfg)) if (k !== 'source' && k !== 'sights') out.push(`model.json: unknown field "${k}"`);
+  return out;
+}
+/**
+ * Checks an AUTHORED SOURCE (a gun modelled in Blender, GUN_MODEL_CONTRACT.authored): the model contract (node tree, slots, parts, info) with the root's
+ * extras read from info/anchors/seat (or their _json texts), plus the mount anchors and the factory slots. opts.factory: the mesh slots the platform's default
+ * build fills (the model must hold meshes for each).
+ */
+function validateAuthored(model: ModelDesc, id?: string, opts: { factory?: string[] } = {}): ModelReport {
+  const errors: string[] = [], warnings: string[] = [], C = GUN_MODEL_CONTRACT, E = (m: string) => errors.push(m);
+  if (model.roots.length !== 1) { E(`the scene has ${model.roots.length} root nodes; it needs exactly one, named after the gun`); return { errors, warnings }; }
+  const root = model.roots[0], a = authoredRoot(root.extras, errors);
+  if (a.info === undefined) E('root extras.info (or info_json) is missing: the factory build\'s info (sy, fSight, relief, muzzles, grip, support, anim, magAt, ...)');
+  const base = validate({ roots: [{ ...root, extras: { gun: root.extras.gun, info: a.info } }] }, id);
+  errors.push(...base.errors.filter((e) => !e.startsWith('root extras.info is missing'))); warnings.push(...base.warnings);
+  // the mount anchors
+  const R = C.authored.required as Record<string, string>, anchors = a.anchors;
+  if (anchors === undefined) E('root extras.anchors (or anchors_json) is missing: the mount anchors (' + Object.keys(R).join(', ') + ')');
+  else if (!isObj(anchors)) E(`root extras.anchors: expected an object { mount_<slot>: [forward, up, right] }, got ${JSON.stringify(anchors)}`);
+  else {
+    for (const [k, doc] of Object.entries(R)) if (anchors[k] === undefined) E(`anchors.${k} is missing: ${doc}`); else checkShape(anchors[k], { t: 'vec', n: 3 }, `anchors.${k}`, errors);
+    for (const [k, v] of Object.entries(anchors)) {
+      if (k in R) continue;
+      const slot = k.startsWith(NAMES.mountPrefix) ? k.slice(NAMES.mountPrefix.length).replace(/_end$/, '') : '';
+      if (!(slot in C.slots)) E(`anchors.${k}: not an anchor (the required ones: ${Object.keys(R).join(', ')}; others are mount_<slot> or mount_<slot>_end with a contract slot)`);
+      else checkShape(v, { t: 'vec', n: 3 }, `anchors.${k}`, errors);
+    }
+    const f = (k: string): number | null => (Array.isArray(anchors[k]) && isNum(anchors[k][0]) ? anchors[k][0] : null);
+    const order = (lo: string, hi: string, why: string) => { const x = f(lo), y = f(hi); if (x != null && y != null && !(x < y)) E(`anchors: ${lo} (${x}) must be behind ${hi} (${y}): ${why}`); };
+    order('mount_optic', 'mount_optic_end', 'the rail runs forward');
+    order('mount_handguard', 'mount_handguard_end', 'a handguard has room');
+    order('mount_handguard_end', 'mount_barrel', 'the handguard ends before the bare tube');
+    order('mount_barrel', 'mount_muzzle', 'the tube runs to the barrel\'s end');
+    const ro = anchors.mount_optic, re = anchors.mount_optic_end;
+    if (Array.isArray(ro) && Array.isArray(re) && ro[1] !== re[1]) E(`anchors: mount_optic and mount_optic_end differ in height (${ro[1]} vs ${re[1]}): a rail is level`);
+    if (isObj(a.info) && Array.isArray(a.info.magAt) && Array.isArray(anchors.mount_mag) && (Math.abs(a.info.magAt[0] - anchors.mount_mag[0]) > 1e-6 || Math.abs(a.info.magAt[1] - anchors.mount_mag[1]) > 1e-6)) E(`anchors.mount_mag ${JSON.stringify(anchors.mount_mag.slice(0, 2))} is not info.magAt ${JSON.stringify(a.info.magAt)}`);
+  }
+  if (a.seat === undefined) E('root extras.seat (or seat_json) is missing: { barrelR }'); else if (!isObj(a.seat) || !isNum(a.seat.barrelR) || a.seat.barrelR <= 0) E(`root extras.seat: expected { barrelR: metres > 0 }, got ${JSON.stringify(a.seat)}`);
+  // meshes: the factory slots, the tube
+  const count: Record<string, number> = {}; let tubes = 0;
+  const visit = (n: ModelNode) => { for (const c of n.children) { if (c.mesh) { const sl = c.extras[NAMES.extras.slot]; count[sl] = (count[sl] || 0) + 1; const role = c.extras.role; if (role === 'tube') { tubes++; if (sl !== 'barrel') E(`mesh "${c.name}": role "tube" belongs on a barrel mesh, not slot ${sl}`); } else if (role !== undefined) E(`mesh "${c.name}": role ${JSON.stringify(role)} is not defined (only "tube")`); } visit(c); } };
+  visit(root);
+  for (const sl of opts.factory || []) if (!count[sl]) E(`the platform\'s default build fits a ${sl}, but the model has no mesh in slot "${sl}": a factory part is modelled in the file`);
+  if (tubes !== 1) E(`the model has ${tubes} meshes with extras.role "tube"; it needs exactly one (the barrel\'s bare tube: another barrel\'s length moves its end)`);
+  return { errors, warnings };
+}
+
 /** Checks one pack file (a ModelDesc) against the pack rules: one root, flat part_/group_ nodes with a pivot, meshes of one slot, known materials. */
 function validatePack(model: ModelDesc, tag?: string): ModelReport {
   const errors: string[] = [], warnings: string[] = [], C = GUN_MODEL_CONTRACT, E = (m: string) => errors.push(m);
@@ -636,6 +728,9 @@ function contractMarkdown(): string {
   for (const [k, m] of Object.entries(C.materials.names)) L.push(`| \`${k}\` | ${esc(m.doc)} | ${m.bump ? 'rebuilt at load (' + m.bump + ')' : ''} |`);
   L.push('', '**Display surfaces** (`display_<name>`):', '', `- naming: ${C.displays.naming}`, `- UVs: ${C.displays.uvs}`, `- size: ${C.displays.size}`, `- material: ${C.displays.material}`, '- example: `' + JSON.stringify(C.displays.example) + '`');
   L.push('', '**Anchors a part provides** (`extras.anchors`):', '', `- where: ${C.anchors.where}`, ...C.anchors.assembly.map((a) => `- ${a}`), `- muzzles: ${C.anchors.muzzles}`, '- example: `' + JSON.stringify(C.anchors.example) + '`');
+  L.push('', '**Authored sources** (a gun modelled in Blender, baked with no recipe):', '', `- what: ${C.authored.what}`, `- nodes: ${C.authored.nodes}`, `- info: ${C.authored.info}`, `- anchors: ${C.authored.anchors}`, '', '| anchor (extras.anchors) | meaning |', '| --- | --- |');
+  for (const [k, v] of Object.entries(C.authored.required)) L.push(`| \`${k}\` (required) | ${esc(v as string)} |`);
+  L.push('', `- seat: ${C.authored.seat}`, `- mesh: ${C.authored.mesh}`, ...C.authored.rules.map((r) => `- ${r}`), '- example: \`' + JSON.stringify(C.authored.example) + '\`');
   L.push('', '**Magazine check** (`part_mag.extras.check`, meshes\' `extras.chk`):', '', `- what: ${C.magCheck.what}`, `- part: ${C.magCheck.part}`, `- meshes: ${C.magCheck.meshes}`, '- example: `' + JSON.stringify(C.magCheck.example) + '`');
   L.push('', '**Per-part packs** (assets/models/parts, milestone 2):', '', ...Object.entries(C.packs).map(([k, v]) => `- ${k}: ${v}`));
   L.push('', C.materials.anonymous, '', '**Extras keys:** ' + Object.entries(C.extras).map(([where, o]) => `${where}: ${Object.keys(o).map((k) => '`' + k + '`').join(', ')}`).join('; ') + '.');
@@ -872,7 +967,7 @@ interface BakedIndex { version: number; three: string; src: string; guns: Record
   }
 
   return {
-    boot, preloadAll, ready, infoFromIndex, setRoot, loadFile, fetchJson, on, checking, preload, preloadPlatform, ensure, assemble, infoOf, loadIndex: async (id: string) => !!(await platformIndex(id)), displayBaked, contract: GUN_MODEL_CONTRACT, infoFields: INFO_FIELDS, partsIndexFields: PARTS_INDEX_FIELDS, validate, validatePack, validatePartsIndex, describeGltfJson, describeScene, glbJson,
+    boot, preloadAll, ready, infoFromIndex, setRoot, loadFile, fetchJson, on, checking, preload, preloadPlatform, ensure, assemble, infoOf, loadIndex: async (id: string) => !!(await platformIndex(id)), displayBaked, contract: GUN_MODEL_CONTRACT, infoFields: INFO_FIELDS, partsIndexFields: PARTS_INDEX_FIELDS, validate, validateAuthored, validateAuthoredConfig, validatePack, validatePartsIndex, describeGltfJson, describeScene, glbJson,
     infoSchema, partsIndexSchema, contractMarkdown, loaded: (id: string) => loaded.has(id), platformLoaded: (id: string) => platIx.has(id), SLOTS, PARTS, NAMES,
     // the pure side of the packs (no three.js): the baker and the tests check the packs with the same code the game plans with
     planBuild, pickPack, infoLeaves, infoFromLeaves, buildKeyOf, slotKey, PARTS_INDEX_VERSION,

@@ -380,17 +380,20 @@ info = {
     'mounts': {'mount_muzzle': [round(F(1880), 4), 0, 0]},
 }
 ROOT['info_json'] = json.dumps(info)
-rig = {
-    'top': round(U(181), 4),                                       # the receiver's top: where an optic's rail goes
-    'rail': [round(F(608), 4), round(F(900), 4)],                  # ... from, to (forward): along the dust cover
-    'hgF': round(F(1116), 4),                                      # where a handguard starts (the barrel nut's front)
-    'gasRear': round(F(1531), 4), 'gasFront': round(GAS_F, 4),     # the gas block: a handguard ends before it
-    'tubeFrom': round(F(1672), 4),                                 # the bare tube from here (ahead of the bayonet lug's collar) to the end:
-    'end': round(F(1880), 4), 'endR': round(prof[-1][1], 4),       # what a longer or shorter barrel lengthens; the 21" barrel's end and radius there
-    'stockTop': round(U(219), 4), 'stockBot': round(U(290), 4),    # the stock's wrist at the receiver's back
-    'gripTop': round(U(302), 4), 'grip': [round(F(700), 4), round(U(302), 4)],   # the grip's top: the receiver's underside
+# the MOUNT ANCHORS (docs/models.md "Authored models", js/glb.ts GUN_MODEL_CONTRACT.authored): where the gun's non-factory parts are seated, [forward, up, right] metres
+anchors = {
+    'mount_optic': [round(F(608), 4), round(U(181), 4), 0],            # the optic rail's start: along the dust cover, at the receiver's top
+    'mount_optic_end': [round(F(900), 4), round(U(181), 4), 0],        # ... and its end (the same height)
+    'mount_handguard': [round(F(1116), 4), 0, 0],                      # where a handguard starts (the barrel nut's front)
+    'mount_handguard_end': [round(F(1531), 4), 0, 0],                  # the furthest forward one reaches: the gas block's rear (js/parts.ts hgMax is this minus mount_handguard minus 3 mm)
+    'mount_barrel': [round(F(1672), 4), 0, 0],                         # the bare tube (the mesh with role 'tube') from here, ahead of the bayonet lug's collar: another barrel's length moves its end
+    'mount_muzzle': [round(F(1880), 4), 0, 0],                         # the 21" barrel's end: a muzzle device screws on here
+    'mount_stock': [0, round((U(219) + U(290)) / 2, 5), 0],            # the stock's wrist at the receiver's back (the centre height)
+    'mount_grip': [round(F(700), 4), round(U(302), 4), 0],             # the grip's seat: the receiver's underside
+    'mount_mag': [round(MAG_F, 4), round(MAG_U, 4), 0],                # the magazine well (info.magAt)
 }
-ROOT['rig_json'] = json.dumps(rig)
+ROOT['anchors_json'] = json.dumps(anchors)
+ROOT['seat_json'] = json.dumps({'barrelR': round(prof[-1][1], 4)})     # the barrel's radius at its end
 
 # ---- save and export ----
 tris = sum(len(p.vertices) - 2 for o in coll.all_objects if o.type == 'MESH' for p in o.data.polygons)

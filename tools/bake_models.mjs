@@ -18,9 +18,10 @@
 //                                   sources the geometry comes from; `--check` rebuilds and compares hashes to find stale bakes.
 // (The recipes are bake-time code: tools/models/*.ts, compiled by tsconfig.tools.json to dist/tools; tools/model_env.mjs loads them.)
 //
-// AUTHORED MODELS (made in Blender: models/<id>/) reach the bake through the recipe: tools/models/authored_pack.mjs packs them into
-// tools/models/authored.ts and the gun's recipe builds its factory parts from them (tools/models/recipes.ts rifle(), rcv 'fal'), so the whole
-// gun, the packs and their checks treat it like any other.
+// AUTHORED MODELS (made in Blender: models/<id>/<id>.glb + model.json { source: 'authored' }) are baked from that file, with no recipe of their own:
+// tools/bake_authored.mjs checks the source against the contract and the platform's spec (a missing anchor or slot fails the bake here, naming it), reads it
+// into G.Authored, and the generic seating of the other parts on its mount anchors (tools/models/recipes.ts rifle(), rcv 'authored') makes every build, so
+// the whole gun, the packs and their checks treat it like any other. docs/models.md "Authored models".
 //
 // PER-PART PACKS (milestone 2; tools/bake_parts.mjs, model_packs.mjs, model_emit.mjs, docs/models.md): next to guns/,
 //   assets/models/parts/<platform>/index.json            the platform index: which slots shape which (JOINT packs), the anchors (offsets
@@ -36,6 +37,7 @@ import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { dedup, weld, quantize, meshopt, prune } from '@gltf-transform/functions';
 import { MeshoptEncoder, MeshoptDecoder } from 'meshoptimizer';
 import { bakeParts, staleParts, PARTS_DIR } from './bake_parts.mjs';
+import { authoredIds, authoredSrc, checkAuthored } from './bake_authored.mjs';
 
 const OUT = path.join(ROOT, 'assets/models/guns/');
 const args = process.argv.slice(2), check = args.includes('--check'), only = args.filter((a) => !a.startsWith('--'));
@@ -48,7 +50,7 @@ globalThis.FileReader = class { // (GLTFExporter wants a browser's FileReader on
 };
 const G = loadGame(), GM = G.GunRecipes, GS = G.Gunsmith, Models = loadModels();
 const sha = (s) => crypto.createHash('sha1').update(s).digest('hex').slice(0, 16);
-const src = sha(['tools/models/recipes', 'tools/models/guntraces', 'tools/models/authored', 'js/parts', 'js/materials', 'js/gunmaterials'].map((f) => fs.readFileSync(path.join(ROOT, f + '.ts'), 'utf8')).join('\0'));
+const src = sha(['tools/models/recipes', 'tools/models/guntraces', 'tools/models/authored', 'js/parts', 'js/materials', 'js/gunmaterials'].map((f) => fs.readFileSync(path.join(ROOT, f + '.ts'), 'utf8')).join('\0') + '\0' + authoredSrc());
 
 // material -> its catalogue name
 const matName = new Map();
@@ -97,6 +99,10 @@ function prepare(id, group, info) {
   return { ex, tris, meshes, hash: h.digest('hex').slice(0, 16) };
 }
 
+for (const id of authoredIds()) { // (the authored sources: the contract and the platform's spec first)
+  const r = checkAuthored(Models, id, G); for (const w of r.warnings) console.warn(id + ': warning ' + w);
+  if (r.errors.length) { console.error('authored source ' + id + ' is not valid:\n  ' + r.errors.join('\n  ')); process.exit(1); }
+}
 const platIds = Object.keys(GS.PLATFORMS || {}).filter((id) => G.WEAPONS[id]);
 const ids2 = only.length ? only : platIds.length ? platIds : G.WEAPON_LIST.map((w) => w.id);
 fs.mkdirSync(OUT, { recursive: true });

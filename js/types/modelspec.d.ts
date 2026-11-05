@@ -4,7 +4,7 @@
 /** A weapon platform's archetype: which recipe in tools/models/recipes.ts builds it. */
 type ArchKind = 'rifle' | 'pistol' | 'revolver' | 'derringer' | 'minigun' | 'launcher' | 'railgun' | 'crossbow' | 'p90';
 /** A long gun's receiver style (rifle()'s o.rcv). */
-type RcvKind = 'ar' | 'ak' | 'aksu' | 'aug' | 'box' | 'break' | 'bullpup' | 'f2' | 'g36' | 'gm6' | 'mcx' | 'mpx' | 'qbz192' | 'qbz95' | 'round' | 'scar' | 'vector' | 'fal';
+type RcvKind = 'ar' | 'ak' | 'aksu' | 'aug' | 'box' | 'break' | 'bullpup' | 'f2' | 'g36' | 'gm6' | 'mcx' | 'mpx' | 'qbz192' | 'qbz95' | 'round' | 'scar' | 'vector' | 'authored';
 /** A sight: the optics, and the iron sights a gun carries. */
 type OpticKind = 'irons' | 'notch' | 'bead' | 'none' | 'night' | 'riser' | 'reddot' | 'minidot' | 'holo' | 'acog' | 'prism' | 'lpvo' | 'scope' | 'augscope' | 'qbzirons';
 /** An iron sight's pattern (S.irons). */
@@ -32,7 +32,7 @@ interface BarrelSpec { len?: number; r?: number; y?: number; taper?: number; [fi
  */
 interface RecipeSpec<M = THREE.Material | null> {
   // the receiver
-  rcv?: RcvKind; look?: string; L?: number; H?: number; W?: number; rm?: M; fm?: M; sm?: M; gm?: M; m?: M; irons?: IronsKind; railTop?: boolean; siderails?: boolean;
+  rcv?: RcvKind; authored?: string; look?: string; L?: number; H?: number; W?: number; rm?: M; fm?: M; sm?: M; gm?: M; m?: M; irons?: IronsKind; railTop?: boolean; siderails?: boolean;
   carry?: number; carrySide?: boolean; cheek?: number | null; extra?: string; hammer?: boolean; feed?: boolean; chassis?: boolean; aksu?: boolean;
   // the action
   bolt?: number; lever?: boolean; cock?: Partial<CockHandle>; ch?: string; pump?: { f: number; len: number; m?: M; [field: string]: any }; tube?: number; tubeY?: number; saddle?: string | Record<string, any>;
