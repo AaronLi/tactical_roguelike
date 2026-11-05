@@ -97,6 +97,10 @@ const arCase: Body = { ...mat('brass'), shape: 'shell', size: 4.5, thickness: 0.
 const arFeedLips = steelBar(4, 0.8, 0.4);
 const arChamber: Body = { ...mat('steel'), shape: 'shell', size: 5, thickness: 4, modes: 2, irregularity: 0.6, damping: 0.7, level: 0 };
 const arBoltCatch = steelBar(4, 3);
+// Fire control group in the lower: the hammer (spring-loaded, under the carrier) and the
+// trigger, whose front hook is the sear that catches the hammer's notch.
+const arHammer = steelBar(4, 6);
+const arTriggerSear = steelBar(3, 5);
 const arExtractor = steelBar(2, 3);
 const arNextRound: Body = { ...arCase, level: -2 };
 
@@ -203,7 +207,7 @@ function arForward(t: number, withChargingHandle: boolean): SceneElement[] {
     hit('buffer spring drives the carrier', t, -18, 3, arBufferSpring, arBufferTube, { scatter: 0.2, radius: 1, click: 0.1, sharp: 0.5 },
       { coil: { level: 0.3, length: 14, dispersion: 0.4, decay: 0.2, brightness: 1800 } }),
     // What you actually hear: the steel carrier grinding along the aluminium upper.
-    rub('carrier rails in the upper', t + 0.002, -5, { force: 14, duration: 0.05, speed: 4, profile: 'accelerate', roughness: 8, grain: 0.15, periodicity: 0, contactWidth: 0.02 }, arCarrier, arUpper),
+    rub('carrier rails in the upper', t + 0.002, -8, { force: 6, duration: 0.05, speed: 4, profile: 'accelerate', roughness: 3, grain: 0.15, periodicity: 0, contactWidth: 0.08 }, arCarrier, arUpper),
     hit('buffer weights shift', t + 0.004, -20, 1.2, steelBlock(1.5, 12), arBuffer, { scatter: 0.9, radius: 2 }),
     // Bolt strips the top round over the steel feed lips.
     rub('case dragged over the feed lips', t + 0.02, -14, { force: 6, duration: 0.02, speed: 3, roughness: 15, grain: 0.3 }, arCase, arFeedLips),
@@ -227,7 +231,7 @@ function arForward(t: number, withChargingHandle: boolean): SceneElement[] {
 }
 
 const CH_BACK = 0.0;
-const CH_END = 0.2;
+const CH_END = 0.15; // a brisk, oiled pull
 const LET_GO = 0.45;
 
 export const AR15_CHARGE: Scene = {
@@ -253,15 +257,25 @@ export const AR15_CHARGE: Scene = {
     },
     {
       name: 'pull-back',
-      description: 'Charging handle and bolt carrier grinding back along the upper, with the gas key riding in the handle slot: the main sound of the pull.',
+      description: 'Charging handle and bolt carrier sliding back through the upper on an oil film, the gas key riding in the handle slot: a quick, slick "shhk" under the clicks.',
       elements: [
-        // Hard-anodised aluminium on aluminium, and phosphated/nitrided steel on aluminium,
-        // lightly oiled: a smooth, bright, hard "shhk" (fine random texture, sharp
-        // micro-contacts), not a periodic creak. The hollow tone comes from the bore.
-        rub('charging handle in its channel', CH_BACK, -5, { force: 8, duration: CH_END - CH_BACK, speed: 0.7, roughness: 8, grain: 0.15, periodicity: 0, contactWidth: 0.02 }, arChargingHandle, arUpper),
-        rub('carrier on the upper rails', CH_BACK + 0.017, -4, { force: 14, duration: CH_END - CH_BACK - 0.017, speed: 0.7, roughness: 8, grain: 0.15, periodicity: 0, contactWidth: 0.02 }, arCarrier, arUpper),
-        rub('bolt tail riding in the carrier bore', CH_BACK + 0.017, -14, { force: 3, duration: CH_END - CH_BACK - 0.017, speed: 0.7, roughness: 6, grain: 0.15, contactWidth: 0.02 }, arBolt, arCarrier),
-        rub('gas key riding in the handle slot', CH_BACK + 0.017, -10, { force: 5, duration: CH_END - CH_BACK - 0.017, speed: 0.7, roughness: 8, grain: 0.15, contactWidth: 0.02 }, steelBar(3, 6), arChargingHandle),
+        // Oiled: the film carries most of the load and smooths the micro-contacts, so the
+        // slide is light and slick (a dry part grinds; that's a bolt-action sound). The
+        // hollow tone comes from the bore; the clicks (unlock, hammer, sear, stop) lead.
+        rub('charging handle in its channel', CH_BACK, -9, { force: 4, duration: CH_END - CH_BACK, speed: 1.0, roughness: 3, grain: 0.15, periodicity: 0, contactWidth: 0.08 }, arChargingHandle, arUpper),
+        rub('carrier on the upper rails', CH_BACK + 0.017, -8, { force: 6, duration: CH_END - CH_BACK - 0.017, speed: 1.0, roughness: 3, grain: 0.15, periodicity: 0, contactWidth: 0.08 }, arCarrier, arUpper),
+        rub('bolt tail riding in the carrier bore', CH_BACK + 0.017, -18, { force: 2, duration: CH_END - CH_BACK - 0.017, speed: 1.0, roughness: 3, grain: 0.15, periodicity: 0, contactWidth: 0.08 }, arBolt, arCarrier),
+        rub('gas key riding in the handle slot', CH_BACK + 0.017, -14, { force: 3, duration: CH_END - CH_BACK - 0.017, speed: 1.0, roughness: 3, grain: 0.15, periodicity: 0, contactWidth: 0.08 }, steelBar(3, 6), arChargingHandle),
+      ],
+    },
+    {
+      name: 'hammer-cock',
+      description: 'With the hammer down, the carrier rides down over it and cocks it against its spring; the trigger sear snaps into the hammer notch with a click. (Leave this track out if the hammer was already cocked.)',
+      elements: [
+        rub('carrier pushes the hammer down', CH_BACK + 0.035, -12, { force: 12, duration: 0.035, speed: 1.0, profile: 'steady', roughness: 4, grain: 0.15, contactWidth: 0.05 }, arHammer, arCarrier,
+          { coil: { level: 0.15, length: 3, dispersion: 0.3, decay: 0.05, brightness: 4000 } }),
+        snap('trigger sear catches the hammer', CH_BACK + 0.07, -3, { strength: 0.9, preload: 0, seat: 0.5, seatDelay: 1.5 }, arTriggerSear, arHammer),
+        rub('carrier riding over the cocked hammer', CH_BACK + 0.073, -20, { force: 3, duration: CH_END - CH_BACK - 0.075, speed: 1.0, roughness: 3, grain: 0.15, contactWidth: 0.08 }, arHammer, arCarrier),
       ],
     },
     {
