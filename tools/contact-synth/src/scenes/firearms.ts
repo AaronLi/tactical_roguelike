@@ -736,8 +736,6 @@ export const AR15_BOLT_RELEASE_NO_MAG = makeArBoltRelease('none');
 const arMagCatch: Body = { ...mat('steel'), shape: 'bar', size: 2.5, thickness: 3, modes: 1, irregularity: 0.5, damping: 0.45, level: 0 };
 const arMagRelease: Body = { ...mat('steel'), shape: 'block', size: 1.5, thickness: 8, modes: 0, irregularity: 0.4, damping: 0.6, level: 0 };
 const arMagWell: Body = { ...arLower, modes: 2, damping: 0.55 };
-const arBaseplate: Body = { ...mat('pom'), shape: 'plate', size: 6, thickness: 2.5, modes: 2, irregularity: 0.5, damping: 0.4, level: 0 };
-const palm: Body = { ...mat('rubber'), shape: 'block', size: 8, thickness: 30, modes: 0, irregularity: 0, damping: 1, level: 0 };
 
 type MagFill = 'loaded' | 'empty';
 
@@ -756,28 +754,22 @@ function makeArMagIn(fill: MagFill): Scene {
       { coil: { level: 0.3, length: 2, dispersion: 0.35, decay: 0.06, brightness: 5000 } }),
     hit('magazine bottoms in the well', 0.109, -6, 0.8 * v, body, arMagWell, { scatter: 0.4, radius: 4, click: 0.6 }),
     hit('magazine body rings', 0.1095, fill === 'loaded' ? -14 : -8, 0.6, body, arMagWell, { scatter: 0.3, radius: 3, click: 0.1, sharp: 0.7 }, own),
-    // Palm slap on the baseplate to make sure it's seated: the mag is driven hard up against the catch.
-    hit('palm slaps the baseplate', 0.26, -4, 1.6, palm, arBaseplate, { scatter: 0.2, radius: 30, click: 0.4, sharp: 0.2 }),
-    hit('magazine settles hard against the catch', 0.2604, -6, 1.0 * v, body, arMagCatch, { scatter: 0.3, radius: 2, click: 0.7, sharp: 0.9 }),
-    hit('magazine body rings from the slap', 0.2606, fill === 'loaded' ? -16 : -9, 0.7, body, arBaseplate, { scatter: 0.3, radius: 3, click: 0.1, sharp: 0.7 }, own),
   ];
   if (fill === 'loaded') {
     // With the bolt closed, the top round presses up against the bolt carrier's underside and the
-    // stack gives a little; the slap pushes it again.
+    // stack gives a little.
     els.push(rub('top round presses against the bolt carrier', 0.1, -14, { force: 6, duration: 0.012, speed: 0.3, profile: 'decelerate', roughness: 3, grain: 0.2, contactWidth: 0.05 }, arNextRound, arCarrier, IN_LOADED_MAG));
     els.push(hit('stack gives against the spring', 0.108, -16, 0.4, arCase, arNextRound, { scatter: 0.1, radius: 3, click: 0.5 }, IN_LOADED_MAG));
-    els.push(hit('stack pushed up by the slap', 0.2608, -16, 0.5, arCase, arNextRound, { scatter: 0.1, radius: 3, click: 0.5 }, IN_LOADED_MAG));
   }
   return {
     id: 'ar15-mag-in' + (fill === 'empty' ? '-empty' : ''),
-    title: `AR-15: ${fill} magazine inserted, catch locks, palm slap`,
+    title: `AR-15: ${fill} magazine inserted, catch locks`,
     room: 0.04,
     roomSize: 0.35,
     housing: LOWER_HOUSING,
     tracks: [
       { name: 'insert', description: 'Magazine enters and slides up the mag well; the catch rides along its side.', elements: els.filter((e) => /enters|slides up|rides along|top round presses/.test(e.what)) },
       { name: 'catch-locks', description: 'The mag catch snaps into the magazine; it bottoms in the well.', elements: els.filter((e) => /snaps into|bottoms|body rings$|stack gives/.test(e.what)) },
-      { name: 'palm-slap', description: 'Palm slap on the baseplate seats it hard against the catch.', elements: els.filter((e) => /slap|settles/.test(e.what)) },
     ],
   };
 }
