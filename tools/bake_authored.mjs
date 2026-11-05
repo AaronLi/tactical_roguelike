@@ -64,7 +64,7 @@ export function readAuthored(id) {
   const cfg = JSON.parse(fs.readFileSync(cfgPath(id), 'utf8')), buf = fs.readFileSync(glbPath(id)), g = parseGlb(buf);
   const j = g.json, roots = (j.scenes[j.scene || 0] || {}).nodes || [];
   if (roots.length !== 1 || j.nodes[roots[0]].name !== id) throw new Error(`models/${id}/${id}.glb: one root node named "${id}"`);
-  const rn = j.nodes[roots[0]], rx = rn.extras || {}, info = jsonExtra(rx, 'info'), anchors = jsonExtra(rx, 'anchors'), seat = jsonExtra(rx, 'seat'), meshes = [];
+  const rn = j.nodes[roots[0]], rx = rn.extras || {}, info = jsonExtra(rx, 'info'), anchors = jsonExtra(rx, 'anchors'), meshes = [];
   const walk = (ni, parentW, part) => {
     const n = j.nodes[ni], W = mul(parentW, local(n)), ex = n.extras || {};
     if ((n.name || '').startsWith('part_')) part = { key: ex.part || n.name.slice(5), at: [W[12], W[13], W[14]] };
@@ -80,7 +80,7 @@ export function readAuthored(id) {
         const idx = prim.indices != null ? readAccessor(g, prim.indices) : Uint32Array.from({ length: cnt }, (_, i) => i);
         const e = { slot: ex.slot || 'base', mat: (prim.material != null && j.materials[prim.material].name) || 'black', pos, nrm, idx: idx instanceof Uint16Array || idx instanceof Uint32Array ? idx : Uint32Array.from(idx) };
         if (part) { e.part = part.key; e.at = part.at.map((c) => +c.toFixed(5)); }
-        if (ex.role) e.role = ex.role;
+        if (ex.role === 'tube') e.legacyTube = true; // (an older export: see below)
         meshes.push(e);
       }
     }
@@ -88,14 +88,18 @@ export function readAuthored(id) {
   };
   const I = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
   for (const c of rn.children || []) walk(c, mul(I, local(rn)), null);
-  return { id, cfg, json: j, rootExtras: rx, info, anchors, seat, meshes };
+  // An older export marks the barrel's bare tube with extras.role "tube" and holds the fixed fittings on the barrel (gas block, gas tube, collar) in slot
+  // barrel too. Slot barrel is now only the factory barrel and the fittings are slot base: read such a file that way (until it is exported again).
+  if (meshes.some((e) => e.legacyTube)) for (const e of meshes) if (e.slot === 'barrel' && !e.legacyTube) e.slot = 'base';
+  for (const e of meshes) delete e.legacyTube;
+  return { id, cfg, json: j, rootExtras: rx, info, anchors, meshes };
 }
 /** The recipes' view of a source (tools/models/authored.ts AuthoredGun): the anchors become the frame the shared parts are seated on. */
 export function toAuthoredGun(src) {
   const a = src.anchors, f = (k) => a[k][0];
   return {
     src: `models/${src.id}/${src.id}.glb`, info: src.info, meshes: src.meshes, sights: { builtin: src.cfg.sights.builtin.slice(), rail: src.cfg.sights.rail.slice() },
-    rig: { top: a.mount_optic[1], rail: [f('mount_optic'), f('mount_optic_end')], hgF: f('mount_handguard'), hgEnd: f('mount_handguard_end'), end: f('mount_muzzle'), barrelR: src.seat.barrelR, tubeFrom: f('mount_barrel'), stockY: a.mount_stock[1], gripY: a.mount_grip[1], mag: [a.mount_mag[0], a.mount_mag[1]] },
+    rig: { top: a.mount_optic[1], rail: [f('mount_optic'), f('mount_optic_end')], hgF: f('mount_handguard'), hgEnd: f('mount_handguard_end'), end: f('mount_muzzle'), barrel: f('mount_barrel'), stockY: a.mount_stock[1], gripY: a.mount_grip[1], mag: [a.mount_mag[0], a.mount_mag[1]] },
   };
 }
 /** Fills G.Authored (the vm's, tools/models/authored.ts) from every authored source. Call after the recipes are loaded. */

@@ -1,7 +1,7 @@
 // Negative tests for the model bundles (tools/model_bundles.mjs): a tiny fake models folder is bundled, must check clean and bundle byte-identically
 // twice, and each way of breaking it must be reported.  node tools/bundle_models.test.mjs
 import fs from 'fs'; import os from 'os'; import path from 'path';
-import { loadBundles, writeBundles, check, readBundle, pack, gzip } from './model_bundles.mjs';
+import { loadBundles, writeBundles, check, readBundle, pack, gzip, hashOf } from './model_bundles.mjs';
 
 const B = loadBundles(); let failed = 0, ran = 0;
 const ok = (name, cond, extra = '') => { ran++; if (!cond) { failed++; console.error('FAIL ' + name + (extra ? ': ' + extra : '')); } };
@@ -51,6 +51,19 @@ ok('the container is read raw too', (() => { const raw = pack([['x', Buffer.from
 { const r = tree(); writeBundles(r, B); fs.unlinkSync(path.join(r, 'bundles', 'index.json')); const e = errsOf(r); ok('missing manifest', has(e, /bundles\/index\.json missing/), e.join(' | ')); }
 { const r = tree(); writeBundles(r, B); fs.unlinkSync(path.join(r, 'parts/_shared/optic/s.glb')); const e = errsOf(r); ok('shared entry with no loose file', has(e, /orphan: parts\/_shared\/optic\/s\.glb is in bundle _shared but not on disk/), e.join(' | ')); }
 { const r = tree(); put(r, 'props/index.json', JSON.stringify({ version: 1, rounds: {}, keys: { '9x19': { file: 'round_missing.glb' } }, quarrel: { file: 'quarrel.glb' } })); writeBundles(r, B); const e = errsOf(r); ok('props index entry that resolves nowhere', has(e, /round_missing\.glb is not in bundle _boot/), e.join(' | ')); }
+
+// the hash manifest the game fetches
+{ const r = tree(); writeBundles(r, B); const m = JSON.parse(fs.readFileSync(path.join(r, 'bundles', 'manifest.json'), 'utf8'));
+  ok('manifest: v and a 16-hex hash per bundle', m.v === 1 && Object.keys(m.bundles).join() === '_boot,_shared,aa,bb' && Object.values(m.bundles).every((h) => /^[0-9a-f]{16}$/.test(h)), JSON.stringify(m));
+  ok('manifest: hash is of the .rtb bytes', m.bundles.aa === hashOf(fs.readFileSync(path.join(r, 'bundles', 'aa.rtb'))));
+  const r3 = tree(); writeBundles(r3, B); ok('manifest: byte-identical for the same input', fs.readFileSync(path.join(r, 'bundles', 'manifest.json')).equals(fs.readFileSync(path.join(r3, 'bundles', 'manifest.json'))));
+  put(r3, 'parts/aa/barrel/a.glb', Buffer.from('other')); writeBundles(r3, B); const m3 = JSON.parse(fs.readFileSync(path.join(r3, 'bundles', 'manifest.json'), 'utf8'));
+  ok('manifest: only the changed bundle gets a new hash', m3.bundles.aa !== m.bundles.aa && m3.bundles.bb === m.bundles.bb && m3.bundles._boot === m.bundles._boot && m3.bundles._shared === m.bundles._shared); }
+{ const r = tree(); writeBundles(r, B); fs.unlinkSync(path.join(r, 'bundles', 'manifest.json')); const e = errsOf(r); ok('missing hash manifest', has(e, /manifest\.json missing/), e.join(' | ')); }
+{ const r = tree(); writeBundles(r, B); const f = path.join(r, 'bundles', 'manifest.json'), m = JSON.parse(fs.readFileSync(f, 'utf8')); m.bundles.aa = '0'.repeat(16); fs.writeFileSync(f, JSON.stringify(m)); const e = errsOf(r); ok('stale hash in the manifest', has(e, /wrong hash for aa\.rtb/), e.join(' | ')); }
+{ const r = tree(); writeBundles(r, B); const f = path.join(r, 'bundles', 'manifest.json'), m = JSON.parse(fs.readFileSync(f, 'utf8')); delete m.bundles.bb; fs.writeFileSync(f, JSON.stringify(m)); const e = errsOf(r); ok('bundle missing from the manifest', has(e, /wrong hash for bb\.rtb/), e.join(' | ')); }
+{ const r = tree(); writeBundles(r, B); const f = path.join(r, 'bundles', 'manifest.json'), m = JSON.parse(fs.readFileSync(f, 'utf8')); m.bundles.zz = 'a'.repeat(16); fs.writeFileSync(f, JSON.stringify(m)); const e = errsOf(r); ok('manifest lists a bundle with no files', has(e, /manifest\.json lists zz/), e.join(' | ')); }
+{ const r = tree(); writeBundles(r, B); fs.writeFileSync(path.join(r, 'bundles', 'manifest.json'), '{"v":2}'); const e = errsOf(r); ok('malformed manifest', has(e, /manifest\.json is malformed/), e.join(' | ')); }
 
 console.log(failed ? `${failed} of ${ran} bundle tests FAILED` : `bundle tests: ${ran} checks passed`);
 process.exit(failed ? 1 : 0);

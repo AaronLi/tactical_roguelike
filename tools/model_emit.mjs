@@ -68,6 +68,7 @@ export async function makeEmitter({ G, GM, Models, logger }) {
   function buildPack({ id, tag, entry, name }) {
     const cap = entry.capture, off = entry.off;
     const { group, info } = GM.display(defOf(G, id, cap.build));
+    G.GunRig.describe(group); // (the magazine check's references as data on the nodes, as a whole-gun bake writes them)
     const fr = fragments(group, info, tag);
     const [rf, ru, rr] = off.rigid, shift = new T.Vector3(rr, ru, -rf);
     const un = (v) => v.sub(shift); // a point of the capture's frame back to the pack's
@@ -80,7 +81,7 @@ export async function makeEmitter({ G, GM, Models, logger }) {
     const nameOfMat = (m) => m.name || matName.get(m) || ('m_' + m.color.getHexString());
     const needUv = (o) => !!((catalogue[nameOfMat(o.material)] || {}).bump || o.material.map || o.userData.display || (o.name || '').startsWith('display_'));
     const addMesh = (o, into) => {
-      const c = new T.Mesh(o.geometry, matCopy(o.material, nameOfMat(o.material))); c.userData = { slot: tag.split('@')[0] }; if (o.userData.display) c.userData.display = o.userData.display;
+      const c = new T.Mesh(o.geometry, matCopy(o.material, nameOfMat(o.material))); c.userData = { slot: tag.split('@')[0] }; if (o.userData.display) c.userData.display = o.userData.display; if (o.userData.chk) c.userData.chk = o.userData.chk;
       c.position.copy(o.position); c.quaternion.copy(o.quaternion); c.scale.copy(o.scale); c.name = o.name && o.name.startsWith('display_') ? o.name : `${tag}_${++n}`;
       if (!needUv(o) && c.geometry.attributes.uv) { c.geometry = c.geometry.clone(); c.geometry.deleteAttribute('uv'); }
       const m = c.material;
@@ -93,7 +94,7 @@ export async function makeEmitter({ G, GM, Models, logger }) {
     for (const [nm, nd] of fr.nodes) {
       const g = new T.Group(); g.name = nm;
       const piv = nd.pivot.clone(); un(piv); g.position.copy(piv);
-      g.userData = { ...(nm.startsWith('part_') ? { part: nm.slice(5) } : {}), owner: ownerTag(nm) === tag, ...(nd.parent ? { parent: nd.parent } : {}), ...(nd.obj.userData.leg ? { leg: nd.obj.userData.leg } : {}) };
+      g.userData = { ...(nm.startsWith('part_') ? { part: nm.slice(5) } : {}), ...(nd.obj.userData.check ? { check: nd.obj.userData.check } : {}), owner: ownerTag(nm) === tag, ...(nd.parent ? { parent: nd.parent } : {}), ...(nd.obj.userData.leg ? { leg: nd.obj.userData.leg } : {}) };
       g.__piv = piv; h.update(`n|${nm}|${nd.parent}|${g.userData.owner}|${nd.obj.userData.leg ? JSON.stringify(nd.obj.userData.leg) : ''}|${piv.toArray().map((x) => Math.round(x * 1e6)).join(',')}|`);
       for (const o of nd.meshes) addMesh(o, g);
       root.add(g);

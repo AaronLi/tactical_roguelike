@@ -163,8 +163,8 @@ const CONTRACT_CORE = {
   },
   /** extras keys. */
   extras: {
-    root: { info: 'The GunModelInfo object (INFO_FIELDS).', gun: 'The gun id, equal to the root node\'s name.', anchors: 'An AUTHORED SOURCE only (GUN_MODEL_CONTRACT.authored): the mount anchors, { mount_<slot>: [forward, up, right] } in the gun\'s frame. (Also written as the JSON text `anchors_json`, and `info` as `info_json`, for a tool that stores only flat custom properties: Blender.)', seat: 'An AUTHORED SOURCE only: { barrelR } scalars of the seats (GUN_MODEL_CONTRACT.authored.seat). (Also `seat_json`.)' },
-    mesh: { slot: 'A SLOTS value.', display: 'Display surfaces only: { width, height } canvas pixels.', chk: 'A magazine-check mesh (under part_mag): { role, i, t? } (GUN_MODEL_CONTRACT.magCheck).' },
+    root: { info: 'The GunModelInfo object (INFO_FIELDS).', gun: 'The gun id, equal to the root node\'s name.', anchors: 'An AUTHORED SOURCE only (GUN_MODEL_CONTRACT.authored): the mount anchors, { mount_<slot>: [forward, up, right] } in the gun\'s frame. (Also written as the JSON text `anchors_json`, and `info` as `info_json`, for a tool that stores only flat custom properties: Blender.)' },
+    mesh: { slot: 'A SLOTS value.', display: 'Display surfaces only: { width, height } canvas pixels.', chk: 'A magazine-check mesh (under part_mag): { role, i, t?, side? } (GUN_MODEL_CONTRACT.magCheck).' },
     part: { part: 'The PARTS key of this part_ node.', anchors: 'Anchors this part provides, in its own frame (GUN_MODEL_CONTRACT.anchors).', owner: 'Pack files only: false when this node\'s pivot belongs to another pack (GUN_MODEL_CONTRACT.packs.nodes).', parent: 'Pack files only: the name of the node this one nests under.', leg: 'A leg of the bipod (a group_ child of part_bipod): { deploy: [rx, ry, rz] } (GUN_MODEL_CONTRACT.bipod).', check: 'part_mag only: { w }, the magazine-check data (GUN_MODEL_CONTRACT.magCheck).' },
     pack: { pack: 'Pack files only, on the root: { platform, tag, key } (GUN_MODEL_CONTRACT.packs.root).' },
   },
@@ -222,8 +222,8 @@ const GUN_MODEL_CONTRACT = { ...CONTRACT_CORE, displays: {
 }, magCheck: {
   what: 'The magazine check (hold R: the magazine is pulled out and looked at) shows what is in it on the magazine\'s own body: the top round, witness holes stamped with a count, or the rounds themselves through a clear body. The model says which of its meshes are those (js/gunrig.ts reads it; a gun without it simply shows nothing).',
   part: '`part_mag` has extras.check = { w }: the magazine\'s width in metres (the width of a hole\'s stamped count).',
-  meshes: 'Meshes under `part_mag` carry extras.chk = { role, i, t? }: role "top" (the round on top: i 0 its case, i 1 its tip; the game colours them for the load), "hole" (a witness hole, i = its order from the top, t = 0..1 how far down the stack it reads), "round" (the i-th round drawn through a clear magazine, t = how far down) and "tip" (the bullet tip of round i). Every mesh keeps a slot and a catalogue material like any other; the game replaces their materials as the rounds change. A gun with a magazine check has both top meshes.',
-  example: { name: 'part_mag', extras: { part: 'mag', check: { w: 0.024 } }, child: { name: 'mag_91', extras: { slot: 'mag', chk: { role: 'hole', i: 0, t: 0.1567 } } } },
+  meshes: 'Meshes under `part_mag` carry extras.chk = { role, i, t?, side? }: role "top" (the round on top: i 0 its case, i 1 its tip; the game colours them for the load), "hole" (a witness hole, i = its order from the top, t = 0..1 how far down the stack it reads, side = 1 on the back face of the magazine (toward the shooter) or -1 on its front: a magazine has the same holes, same i and t, on BOTH faces, each its own mesh, and the game stamps the count beside each reading from its own side. The rotation of the mesh node is the tilt of the face there: on a curved magazine each hole, and the count beside it, follows the curve; a round of a clear magazine leans with it the same way), "round" (the i-th round drawn through a clear magazine, t = how far down) and "tip" (the bullet tip of round i). Every mesh keeps a slot and a catalogue material like any other; the game replaces their materials as the rounds change. A gun with a magazine check has both top meshes.',
+  example: { name: 'part_mag', extras: { part: 'mag', check: { w: 0.024 } }, child: { name: 'mag_91', extras: { slot: 'mag', chk: { role: 'hole', i: 0, t: 0.1567, side: 1 } } } },
 }, bipod: {
   what: 'A BIPOD is one node, `part_bipod` (PARTS key bipod, listed in info.anim.bipod), whose children are its LEGS: each leg is a `group_<n>` node with extras.leg = { deploy: [rx, ry, rz] } holding that leg\'s meshes. A leg\'s pivot (its node origin) is its hinge. The model is drawn FOLDED: every leg at rotation 0. part_bipod\'s own origin is only a reference point (the first hinge) and nothing turns it. The legs\' meshes are slot fg when the bipod is a foregrip option (the Kodiak) or slot base when it is part of the gun (a machine gun\'s, a sniper rifle\'s); one gun may have both, in the one part_bipod node.',
   pose: 'extras.leg.deploy is the leg\'s rotation when the bipod is DOWN: three numbers, radians, an XYZ Euler rotation about the leg\'s pivot in the gun\'s frame (x right, y up, z back), the legs pointing at the ground and splayed a little. A leg folded back along the gun (its foot behind the hinge) turns by +PI/2 about x, one folded forward by -PI/2. Folded is rotation 0 (how the meshes are drawn): the folded and the deployed pose are both data of the model.',
@@ -265,19 +265,19 @@ const GUN_MODEL_CONTRACT = { ...CONTRACT_CORE, displays: {
     mount_handguard: 'where a handguard starts (the barrel nut\'s front): [forward, up, 0]. The platform\'s spec L is this forward value.',
     mount_handguard_end: 'the furthest forward a handguard may reach (the gas block\'s rear): [forward, up, 0]. A handguard longer than mount_handguard_end - mount_handguard - 3 mm is not offered for the gun (the platform\'s spec hgMax in js/parts.ts says so; the baker checks they agree). Nothing is clamped.',
     mount_muzzle: 'where the factory barrel ends and a muzzle device screws on: [forward, up, 0]. Another barrel\'s end is this plus its length difference from the factory one; the factory muzzle device (slot muzzle) is modelled to start here.',
-    mount_barrel: 'where the factory barrel\'s bare tube begins (ahead of the last fixed fitting): [forward, up, 0]. The mesh with extras.role "tube" is the tube; another barrel\'s length moves the end of that one mesh (the tube is the only part of a model the baker resizes).',
+    mount_barrel: 'where the factory barrel begins (the start of the slot barrel meshes, ahead of the last fixed fitting): [forward, up, 0]. Slot barrel holds only the factory barrel itself, which any other barrel replaces whole: its fixed fittings (gas block, gas tube, sight base, bayonet collar) are slot base, and stay when another barrel is fitted. Another barrel is the shared one of its length and profile, ending where that length ends from mount_muzzle (nothing in the model is resized).',
     mount_stock: 'where a stock is seated: [0 or the receiver\'s back, the centre height of the wrist at the receiver\'s back, 0].',
     mount_grip: 'where a grip is seated: [forward of the grip\'s front, the height of the receiver\'s underside, 0]; the grip hangs from that height.',
     mount_mag: 'the magazine well: [forward, up, 0] of the top of a magazine seated in it (equal to info.magAt).',
   },
-  seat: 'Root extras.seat (or seat_json): { barrelR }, the factory barrel\'s radius at mount_muzzle, metres (the bore line is at height 0; another barrel is drawn at this radius).',
-  mesh: 'A mesh extras.role of "tube" marks the one barrel mesh that mount_barrel .. mount_muzzle resizes; no other role is defined.',
+  seat: 'There is no seat: another barrel is drawn from its own part (a standard radius and profile). Root extras.seat and a mesh extras.role are no longer defined and are ignored if a file still has them.',
+  mesh: 'Every mesh of slot barrel is the factory barrel, drawn only while the platform\'s own barrel is fitted; a fixed fitting on the barrel is a mesh of slot base.',
   rules: [
     'A gun\'s default build is its factory parts, taken from the model while they are fitted; every other part the gunsmith offers for the gun is the shared part for its slot, seated from the anchors above, so the same part is the same shape on every gun and on this one.',
     'The model\'s own sights: an optic kind listed in model.json sights.builtin means the gun\'s own irons (the optic slot of the model: the rear sight on the receiver and the front sight on the barrel). A kind also listed in sights.rail (a riser) puts a rail piece between mount_optic and mount_optic_end over them.',
     'Fit is data, not geometry: whether a part fits the gun is decided by js/parts.ts (fitsSlot, hgRoom with hgMax) from the platform\'s spec; the baker checks the platform\'s spec (L, hgMax, mag) against the anchors and fails when they disagree.',
   ],
-  example: { name: 'fal', extras: { gun: 'fal', info_json: '{"sy":0.04,...}', anchors_json: '{"mount_optic":[0.0141,0.0232,0],"mount_optic_end":[0.1791,0.0232,0],"mount_handguard":[0.3012,0,0],"mount_handguard_end":[0.5357,0,0],"mount_muzzle":[0.7329,0,0],"mount_barrel":[0.6153,0,0],"mount_stock":[0,-0.01835,0],"mount_grip":[0.0661,-0.0452,0],"mount_mag":[0.2232,-0.0429,0]}', seat_json: '{"barrelR":0.0071}' } },
+  example: { name: 'fal', extras: { gun: 'fal', info_json: '{"sy":0.04,...}', anchors_json: '{"mount_optic":[0.0141,0.0232,0],"mount_optic_end":[0.1791,0.0232,0],"mount_handguard":[0.3012,0,0],"mount_handguard_end":[0.5357,0,0],"mount_muzzle":[0.7329,0,0],"mount_barrel":[0.6153,0,0],"mount_stock":[0,-0.01835,0],"mount_grip":[0.0661,-0.0452,0],"mount_mag":[0.2232,-0.0429,0]}' } },
 }, authoredParts: {
   what: 'AUTHORED PART. A shared attachment modelled in Blender (a sight, a prism, a scope; other slots are reserved) is baked straight from its .glb: models/parts/<slot>/<id>/<id>.glb plus models/parts/<slot>/<id>/model.json. It is ONE object, the same file on every gun whose mount takes it; everything gun-specific under it (the rail section, a riser) is the gun\'s mount piece (tag `optic@mount`), never part of the model. `npm run check:models -- models/parts/<slot>/<id>/<id>.glb` validates one; `npm run check:models -- --write` regenerates its catalogue entry.',
   frame: 'THE PART\'S OWN FRAME. Metres, the glTF axes (x right, y up, z = -forward); anchors are written [forward, up, right] = [-z, y, x] like everywhere in the contract. For an optic (the only slot defined) the ORIGIN is on the top of the rail, at the optic\'s mount point, centred (right = 0): the plane the optic\'s foot rests on, so no vertex is below y = 0 (the rail, riser or adapter is the mount piece\'s). The recipe places it at the gun\'s rail top and the platform\'s optic position (spec optF) and the baker finds that it only translates.',
@@ -402,6 +402,14 @@ function validate(model: ModelDesc, id?: string): ModelReport {
           if (!c.materials.length) E(`display "${c.name}": has no material (any name: the game replaces it)`);
         } else if (c.extras[NAMES.extras.display] !== undefined) E(`mesh "${c.name}": extras.display is only for meshes named "${NAMES.displayPrefix}<name>"`);
         if (c.children.length) warnings.push(`mesh "${c.name}" has child nodes; they will be kept but the game does not expect them`);
+        const chk = c.extras.chk;
+        if (chk !== undefined) {
+          if (!isObj(chk) || !['top', 'hole', 'round', 'tip'].includes(chk.role) || !Number.isInteger(chk.i) || chk.i < 0) E(`mesh "${c.name}": extras.chk must be { role: top|hole|round|tip, i: whole number, t?, side? }, got ${JSON.stringify(chk)}`);
+          else {
+            if (chk.role === 'hole' && (typeof chk.t !== 'number' || chk.t < 0 || chk.t > 1 || (chk.side !== 1 && chk.side !== -1))) E(`mesh "${c.name}": a witness hole needs t in 0..1 and side 1 (back face) or -1 (front face), got ${JSON.stringify(chk)}`);
+            if (chk.role === 'round' && (typeof chk.t !== 'number' || chk.t < 0 || chk.t > 1)) E(`mesh "${c.name}": a drawn round needs t in 0..1, got ${JSON.stringify(chk)}`);
+          }
+        }
         if (!c.materials.length && !display) E(`mesh "${c.name}": has no material`);
         for (const m of display ? [] : c.materials) if (!m) E(`mesh "${c.name}": its material has no name (name it with a catalogue key: ${Object.keys(C.materials.names).slice(0, 6).join(', ')}, ...)`); else if (!(m in C.materials.names) && !matOk.test(m)) E(`mesh "${c.name}": material '${m}' is not in the catalogue (${Object.keys(C.materials.names).join(', ')}) and is not an anonymous colour (m_<rrggbb>)`);
       } else if (c.name.startsWith(NAMES.partPrefix)) {
@@ -642,13 +650,11 @@ function validateAuthored(model: ModelDesc, id?: string, opts: { factory?: strin
     if (Array.isArray(ro) && Array.isArray(re) && ro[1] !== re[1]) E(`anchors: mount_optic and mount_optic_end differ in height (${ro[1]} vs ${re[1]}): a rail is level`);
     if (isObj(a.info) && Array.isArray(a.info.magAt) && Array.isArray(anchors.mount_mag) && (Math.abs(a.info.magAt[0] - anchors.mount_mag[0]) > 1e-6 || Math.abs(a.info.magAt[1] - anchors.mount_mag[1]) > 1e-6)) E(`anchors.mount_mag ${JSON.stringify(anchors.mount_mag.slice(0, 2))} is not info.magAt ${JSON.stringify(a.info.magAt)}`);
   }
-  if (a.seat === undefined) E('root extras.seat (or seat_json) is missing: { barrelR }'); else if (!isObj(a.seat) || !isNum(a.seat.barrelR) || a.seat.barrelR <= 0) E(`root extras.seat: expected { barrelR: metres > 0 }, got ${JSON.stringify(a.seat)}`);
-  // meshes: the factory slots, the tube
-  const count: Record<string, number> = {}; let tubes = 0;
-  const visit = (n: ModelNode) => { for (const c of n.children) { if (c.mesh) { const sl = c.extras[NAMES.extras.slot]; count[sl] = (count[sl] || 0) + 1; const role = c.extras.role; if (role === 'tube') { tubes++; if (sl !== 'barrel') E(`mesh "${c.name}": role "tube" belongs on a barrel mesh, not slot ${sl}`); } else if (role !== undefined) E(`mesh "${c.name}": role ${JSON.stringify(role)} is not defined (only "tube")`); } visit(c); } };
+  // meshes: the factory slots
+  const count: Record<string, number> = {};
+  const visit = (n: ModelNode) => { for (const c of n.children) { if (c.mesh) { const sl = c.extras[NAMES.extras.slot]; count[sl] = (count[sl] || 0) + 1; } visit(c); } };
   visit(root);
   for (const sl of opts.factory || []) if (!count[sl]) E(`the platform\'s default build fits a ${sl}, but the model has no mesh in slot "${sl}": a factory part is modelled in the file`);
-  if (tubes !== 1) E(`the model has ${tubes} meshes with extras.role "tube"; it needs exactly one (the barrel\'s bare tube: another barrel\'s length moves its end)`);
   return { errors, warnings };
 }
 

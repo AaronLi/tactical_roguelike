@@ -25,7 +25,7 @@ interface HgSpec<M = THREE.Material | null> { t: HandguardKind; len: number; m?:
 /** Where a gun's charging handle is, and how it moves. */
 interface CockHandle { f: number; y: number; x: number; travel?: number; recip?: boolean; style?: string; sz?: number; stem?: number; grab?: number[] }
 /** A barrel's model. */
-interface BarrelSpec { len?: number; r?: number; y?: number; taper?: number; [field: string]: any }
+interface BarrelSpec { len?: number; r?: number; y?: number; taper?: number; back?: number /* (a shared barrel: how far behind the receiver's front its tube starts) */; [field: string]: any }
 /**
  * What a recipe (rifle, pistol, revolver...) is built from: the platform's receiver spec with each fitted part's patch on
  * it (js/parts.ts modelSpec). Every key is optional: each archetype reads the ones it has. M: how a material is named.
@@ -40,13 +40,13 @@ interface RecipeSpec<M = THREE.Material | null> {
   grip?: number; gripT?: string; stock?: StockKind; hg?: HgSpec<M>; hgGap?: number; hgMax?: number; fg?: ForegripKind; fgAt?: number; vfg?: number; vfgM?: M; bipod?: number; slots?: string; under?: boolean;
   tac?: string; tacL?: string; tacAt?: { f: number; y: number; x: number }; railmount?: string | Record<string, any>; railExt?: number;
   // the barrel and what's on it
-  barrel?: BarrelSpec; blen?: number; barrels?: number[]; integral?: { len: number; r: number } | null; muzzle?: MuzzleKind; thread?: boolean; match?: boolean; can?: { from: number; r: number }; comp?: boolean; recoilBarrel?: number; bIn?: number;
+  barrel?: BarrelSpec; rib?: boolean /* (its barrels carry a rib along the top, whatever sight is fitted) */; mbr?: number /* (the barrel radius a muzzle device is drawn for: the gun's, whatever profile its barrel has) */; blen?: number; barrels?: number[]; integral?: { len: number; r: number } | null; muzzle?: MuzzleKind; thread?: boolean; match?: boolean; can?: { from: number; r: number }; comp?: boolean; recoilBarrel?: number; bIn?: number;
   // the sights
   optic?: OpticKind; apart?: string; optF?: number; optCut?: boolean | number; ironsAt?: number[]; sightRise?: number; magnifier?: number | Record<string, any>; riser?: number; ret?: ReticleKind; dotR?: number; dotLen?: number; px?: number; scopeLen?: number; scopeObj?: number; closed?: boolean;
   // the magazine and where things sit
   mag?: MagSpec<M>; magFit?: { len: number; c: number; d: number }; support?: number; chY?: number; chF?: number; slotOf?: Record<string, string>;
   // the odd ones
-  ext?: number; cr?: number; cl?: number; chambers?: number; limb?: string; motor?: string; cap?: string; drum?: boolean | Record<string, any>; slide?: Record<string, any>;
+  ext?: number; len0?: number; cr?: number; cl?: number; chambers?: number; limb?: string; motor?: string; cap?: string; drum?: boolean | Record<string, any>; slide?: Record<string, any>;
 }
 /** A recipe's spec as the catalog holds it, its materials still names ('tan', 'woodDark'). */
 type ModelSpec = RecipeSpec<string | null>;

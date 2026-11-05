@@ -356,6 +356,13 @@ const G_GunRecipes = (() => {
       anim.magn = hinge;
       return { sy, fSight: fRear, relief: 0.075 };
     },
+    // A shotgun barrel's rib (spec.rib): a flat rib from the receiver to the muzzle, level with the top of the receiver (on posts where the barrel
+    // sits lower). It is part of the barrel (the barrel's own length, never stretched; five posts spread over it), whatever sight is fitted.
+    rib(k: Kit, f0: number, f1: number, sy: number, barrelTop: number) {
+      const ry = sy - 0.0065, len = f1 - f0, A = f0 + 0.01, D = len - 0.02, gap = ry - 0.0015 - barrelTop;
+      k.box(0.007, 0.003, len, M.black(), f0, ry);
+      if (gap > 0.004) for (let i = 0; i < 5; i++) k.box(0.003, gap, D * 0.01, M.black(), A + D * 0.99 * i / 4, barrelTop + gap / 2);
+    },
     // A shotgun's bead: a flat rib from the receiver to the muzzle, level with the top of the receiver (on
     // posts where the barrel sits lower), and the brass bead on its front end. You look along the rib; the
     // bead sits on it at the far end, the barrel(s) below.
@@ -364,12 +371,8 @@ const G_GunRecipes = (() => {
       // over [rib start + 10 mm, rib end - 10 mm], their lengths 1 % of that run each), so it is keyed by the barrel, as a part of it)
       // (two pieces, like an iron front sight: the bead is the sight's head (`optic@barrel`, the same on every gun) and the rib with its posts is the base
       // (`optic@sightbase`: a mount piece, as long as the barrel)
+      // (the rib of a gun whose barrels carry one (spec.rib) is the BARREL's (S.rib, drawn with it): here, on the barrel, only the bead, the one head every gun shares)
       if (onBarrel && rib) {
-        const ry = sy - 0.0065, len = rib[1] - rib[0], A = rib[0] + 0.01, D = len - 0.02, gap = ry - 0.0015 - barrelTop;
-        k.at('sightbase', () => {
-          k.box(0.007, 0.003, len, M.black(), rib[0], ry);
-          if (gap > 0.004) for (let i = 0; i < 5; i++) k.box(0.003, gap, D * 0.01, M.black(), A + D * 0.99 * i / 4, barrelTop + gap / 2);
-        });
         k.at('barrel', () => k.sphere(0.0036, BEAD, fFront, sy - 0.0018));
         return { sy, fSight: fRear, relief: 0.3 };
       }
@@ -525,25 +528,51 @@ const G_GunRecipes = (() => {
   // (anything wider than a round and a half) zig-zags, each round half a diameter down from the last, offset each
   // side; a single stack (a shotgun's shells) is one column. Which of them show follows the rounds in it: the top
   // ones stay, the follower rises (js/vmanim.ts magFill). An opaque magazine shows its witness holes instead.
-  function magCheck(k: Kit, rear: (t: number) => number, top: number, len: number, w: number, d: number, clear: boolean, rnd?: RoundDims | null) {
+  // spine(s): the magazine's centreline at the fraction s of its length down (0 the top, 1 the floorplate) as [f, df/ds]: where
+  // it is along the gun and how fast it moves forward per unit s, so the faces' direction there is known (a curved one's
+  // bends, a straight one's rakes). A witness hole's t (0..1 down the stack) is read at s = (12 mm + t of all but 26 mm) / len.
+  // Holes are stamped on BOTH faces (the back, toward the shooter, and the front: each its own brass window and count, the
+  // same t, so each face reads from its side) and tilted to the face there; a clear one's rounds lean with the curve.
+  function magCheck(k: Kit, spine: (s: number) => number[], top: number, len: number, w: number, d: number, clear: boolean, rnd?: RoundDims | null) {
     const R: RoundDims = rnd || { head: Math.min(0.009, w * 0.4), cs: d * 0.5, bl: d * 0.16, bd: Math.min(0.0085, w * 0.35), shell: false };
     const r = R.head / 2, oal = Math.min(R.cs + R.bl, d * 0.94), cs = oal * R.cs / (R.cs + R.bl), bl = oal - cs, rb = R.bd / 2;
-    const chk: any = { holes: [], rounds: [], w }, yAt = (t: number) => top - 0.012 - t * (len - 0.026), back = (t: number) => rear(t) + Math.max(0.002, (d - oal) * 0.25);
+    const chk: any = { holes: [], rounds: [], w };
+    const sOf = (t: number) => (0.012 + t * (len - 0.026)) / len, yAt = (t: number) => top - 0.012 - t * (len - 0.026);
+    // the frame at depth t: the centre f, the face's tilt (positive: the bottom forward, its normal pointing up), and the unit normal (forward, up)
+    const at = (t: number) => { const [cf, sl] = spine(sOf(t)), n = Math.hypot(len, sl); return { cf, ph: Math.atan2(sl, len), nf: len / n, ny: sl / n }; };
+    // a cylinder along the bore tilted about its rear end (f0, y), so it follows the face's normal
+    const cylT = (rr: number, l: number, m: THREE.Material, f0: number, y: number, x: number, rf: number, seg: number, ph: number) => {
+      const c = k.cyl(rr, l, m, f0, y, x, rf, seg);
+      if (ph) { c.rotation.x = ph; c.position.z -= (Math.cos(ph) - 1) * l / 2; c.position.y += Math.sin(ph) * l / 2; }
+      return c;
+    };
     // the feed lips, and the top round sitting down between them (its crown just under their edges)
-    for (const s of [-1, 1]) k.box(w * 0.16, 0.003, d * 0.6, M.black(), rear(0) + 0.004, top + 0.0015, s * w * 0.42);
-    const ty = top - r + 0.0024;
-    const round = (f: number, y: number, x: number) => [k.cyl(r * 0.97, cs, M.brass(), f, y, x, R.shell ? r * 0.97 : rb * 1.15, 10), R.shell ? null : k.cyl(rb, bl, M.brass(), f + cs, y, x, rb * (R.pistol ? 0.55 : 0.18), 8)];
-    chk.top = round(back(0), ty, 0); if (!chk.top[1]) chk.top[1] = k.box(0.0001, 0.0001, 0.0001, M.brass(), back(0), ty);
+    for (const s of [-1, 1]) k.box(w * 0.16, 0.003, d * 0.6, M.black(), spine(0)[0] - d / 2 + 0.004, top + 0.0015, s * w * 0.42);
+    const ty = top - r + 0.0024, round = (f: number, y: number, x: number, ph = 0) => {
+      const c = Math.cos(ph), sn = Math.sin(ph);
+      return [cylT(r * 0.97, cs, M.brass(), f, y, x, R.shell ? r * 0.97 : rb * 1.15, 10, ph), R.shell ? null : cylT(rb, bl, M.brass(), f + c * cs, y + sn * cs, x, rb * (R.pistol ? 0.55 : 0.18), 8, ph)];
+    };
+    const T0 = at(0), back0 = T0.cf - d / 2 + Math.max(0.002, (d - oal) * 0.25);
+    chk.top = round(back0, ty, 0); if (!chk.top[1]) chk.top[1] = k.box(0.0001, 0.0001, 0.0001, M.brass(), back0, ty);
     if (clear) {
-      // as many as it holds under the top round (one drawn for each: R.cap), at the stack's pitch from the top down
+      // as many as it holds under the top round (one drawn for each: R.cap), at the stack's pitch from the top down, each leaning with the curve
       const dbl = w > r * 2 * 1.45, pitch = dbl ? r * 1.05 : r * 2.02, fit = Math.max(2, Math.floor((len - 0.026) / pitch)), n = R.cap! > 1 ? R.cap! - 1 : fit, xo = dbl ? Math.min(w / 2 - r - 0.0012, r * 0.86) : 0;
       const tOf = (j: number) => Math.min(1, j * Math.min(pitch, (len - 0.026) / n) / (len - 0.026)); // (packed tighter if it holds more than fits at its pitch)
       for (let j = 1; j <= n; j++) { // each with its own tip (or, a shotgun's, its hull coloured): js/vmanim.ts magFill
-        const t = tOf(j), x = dbl ? (j % 2 ? 1 : -1) * xo : 0, [mesh, tip] = round(back(t), yAt(t), x);
+        const t = tOf(j), x = dbl ? (j % 2 ? 1 : -1) * xo : 0, F = at(t), off = Math.max(0.002, (d - oal) * 0.25) - d / 2; // (its base against the back wall, along the normal)
+        const [mesh, tip] = round(F.cf + F.nf * off, yAt(t) + F.ny * off, x, F.ph);
         chk.rounds.push({ t, mesh, tip });
       }
     }
-    else for (let i = 1; i <= 5; i++) { const t = (i / 6) * 0.94; chk.holes.push({ t, mesh: k.box(w * 0.22, 0.0055, 0.0025, M.brass(), rear(t) - 0.0035, yAt(t), -w * 0.27) }); }
+    else for (let i = 1; i <= 5; i++) { // the witness windows: one on each face, at the face's own point and tilt (side 1 the back, -1 the front: front ones mirrored across so they sit where they would read from there)
+      const t = (i / 6) * 0.94, F = at(t), th = 0.0016;
+      for (const side of [1, -1]) {
+        const g = -side * (d / 2 + 0.002 + th / 4); // (along the normal: a little proud of the face: the body is its depth plus the profile's 2 mm bevel each side)
+        const mesh = k.box(w * 0.22, 0.0055, th, M.brass(), F.cf + F.nf * g - th / 2, yAt(t) + F.ny * g, -side * w * 0.27);
+        mesh.rotation.x = F.ph;
+        chk.holes.push({ t, i: i - 1, side, mesh });
+      }
+    }
     return chk;
   }
   // A drum's, for the same check: the top round up in its feed tower and (a clear drum) the rest wound round inside
@@ -603,20 +632,20 @@ const G_GunRecipes = (() => {
         for (const k0 of (o.ribs && !m.transparent ? [-0.18, 0.18] : [])) { const a = edge(k0 - 0.04), b = edge(k0 + 0.04); k.prof(a.slice(1, -1).concat(b.slice(1, -1).reverse()), w + 0.0012, M.rubber(), 0, null, 0); }
         const [bf, by] = at(1), fp = k.box(w + 0.004, 0.008, d + 0.006, m, bf - (d + 0.006) / 2, by - 0.002);
         fp.rotation.x = Math.atan2(2 * c / (1 - st), len);
-        return magCheck(k, (t) => { const [cf, , nf] = at(t); return cf - nf * d / 2; }, y, len, w, d, m.transparent, o.rnd);
+        return magCheck(k, (s) => { const u = Math.max(0, (s - st) / (1 - st)); return [o.f + c * u * u, 2 * c * u / (1 - st)]; }, y, len, w, d, m.transparent, o.rnd);
       }
       case 'straight': {
         const rk = o.rake || 0.012;
         k.prof([[o.f - d / 2, y], [o.f + d / 2, y], [o.f + d / 2 + rk, y - len], [o.f - d / 2 + rk, y - len]], w, m);
         k.box(w + 0.004, 0.008, d + 0.004, m, o.f - d / 2 + rk - 0.002, y - len - 0.002);
-        return magCheck(k, (t) => o.f - d / 2 + rk * t, y, len, w, d, m.transparent, o.rnd);
+        return magCheck(k, (s) => [o.f + rk * s, rk], y, len, w, d, m.transparent, o.rnd);
       }
       case 'pistol': { // a pistol magazine in a carbine's well adapter (the Glock-mag conversions)
         const pd = 0.032, pw = 0.022, pl = len * 0.85;
         k.box(pw + 0.012, 0.03, pd + 0.014, M.black(), o.f - pd / 2 - 0.007, y - 0.01);
         k.prof([[o.f - pd / 2, y], [o.f + pd / 2, y], [o.f + pd / 2 + 0.006, y - pl], [o.f - pd / 2 + 0.006, y - pl]], pw, m);
         k.box(pw + 0.004, 0.01, pd + 0.006, m, o.f - pd / 2 + 0.004, y - pl - 0.003);
-        return magCheck(k, (t) => o.f - pd / 2 + 0.006 * t, y, pl, pw, pd, m.transparent, o.rnd);
+        return magCheck(k, (s) => [o.f + 0.006 * s, 0.006], y, pl, pw, pd, m.transparent, o.rnd);
       }
       case 'drum': { // the round face toward the shooter, its axis along the bore
         const R = o.r || 0.075, dw = o.dw || 0.05;
@@ -921,6 +950,9 @@ const G_GunRecipes = (() => {
     const anim: any = {};
     let top!: number, rcvTop: number | null = null; // (rcvTop: the receiver's own top, under an optic's rail: what a carry handle or feed cover sits on)
     const rcv = o.rcv || 'ar', tr = (o.look && (G.GunTraces as Record<string, Trace>)[o.look]) as Trace | undefined, VT = (tr ? tracer(tr) : null) as Tracer, mats = { frame: o.rm || fm, grip: o.gm || fm, slide: rm, stock: o.sm || fm, forend: (o.pump && o.pump.m) || fm }; // (traced: tools/models/guntraces.ts)
+    // (an AR grip that "matches the furniture" is the standard one in the standard colour, whatever gun it is on; a box handguard likewise: one part,
+    // one file. Their finishes are the other parts of the mount.)
+    const stdGrip = !!(o.slotOf && o.slotOf.grip && G.Gunsmith.PARTS[o.slotOf.grip] && G.Gunsmith.PARTS[o.slotOf.grip].mount === 'gr:ar'), stdHg = !!(o.slotOf && o.slotOf.handguard && G.Gunsmith.PARTS[o.slotOf.handguard] && G.Gunsmith.PARTS[o.slotOf.handguard].mount === 'hg:box');
     // a gun made in Blender (rcv 'authored', o.authored its id: models/<id>/, read by tools/bake_authored.mjs): its factory parts are the model's own
     // while they're fitted (own(slot): the part in that slot is the platform's default one); any other part is the recipe's, seated on the model's
     // mount anchors (A.rig: the model's `mount_<slot>` anchors, docs/models.md "Authored models"). Nothing here is about one gun.
@@ -1335,15 +1367,15 @@ const G_GunRecipes = (() => {
     else if (handle) { const h = handle; anim.handle = k.under(rcv === 'mpx' || rcv === 'mcx' ? 'charging' : k.slot, () => cockHandle(k, h)); } // (the MPX's and MCX's: it stands in for the charging part when that slot's empty, so it's that part's)
 
     k.tag('grip');
-    if (tr && !(rcv === 'ar' && o.gripT && o.gripT !== 'ar')) tracedParts(k, tr, VT, 'grip', mats); // (an AR lower's own grip comes off for another shape: the lower stays)
+    if (tr && rcv !== 'ar') tracedParts(k, tr, VT, 'grip', mats); // (an AR lower's own grip is the standard AR grip, whatever the lower: the AR-9's too)
     const lugGrip = tr && tr.lug && o.gripT === 'lug'; // (a traced pistol's grip with a stock lug on its back: the stock on a part at the lug, under the hammer)
     if (lugGrip) {
       k.prof(tr.lug.pts.map(VT), 0.02, M.steel(), 0, null, 0.0015);
       if (o.stock) { k.tag('stock'); const [sf, sy] = VT(tr.lug.at), sp = k.part(sf, sy); k.into(sp, sf, sy); stock(k, o.stock, o.sm || M.black(), false); k.into(null); k.tag('grip'); } // (not in first person, as a rifle's isn't: it'd stand in front of your eye)
     }
     else if (A && own('grip')) authored(k, A, (e) => e.slot === 'grip');
-    else if (A && o.gripT !== 'none') k.moved(0, A.rig.gripY + 0.036, () => grip(k, gf, o.gm || fm, o.gripT || 'ar')); // (another grip, its top on the receiver's underside)
-    else if (o.gripT !== 'none' && rcv !== 'qbz95' && rcv !== 'f2' && rcv !== 'aksu' && !((rcv === 'vector' || rcv === 'aug' || rcv === 'gm6') && (o.gripT || 'ar') === 'ar')) grip(k, gf, o.gm || fm, o.gripT || (rcv === 'ak' ? 'wood' : 'ar')); // (the Vector's own is part of its lower)
+    else if (A && o.gripT !== 'none') k.moved(0, A.rig.gripY + 0.036, () => grip(k, gf, o.gm || (stdGrip ? M.polymer() : fm), o.gripT || 'ar')); // (another grip, its top on the receiver's underside)
+    else if (o.gripT !== 'none' && rcv !== 'qbz95' && rcv !== 'f2' && rcv !== 'aksu' && !((rcv === 'vector' || rcv === 'aug' || rcv === 'gm6') && (o.gripT || 'ar') === 'ar')) grip(k, gf, o.gm || (stdGrip ? M.polymer() : fm), o.gripT || (rcv === 'ak' ? 'wood' : 'ar')); // (the Vector's own is part of its lower)
     k.tag('stock');
     if (A && o.stock && own('stock')) authored(k, A, (e) => e.slot === 'stock');
     else if (A && o.stock) k.moved(0, A.rig.stockY + 0.002, () => stock(k, o.stock!, o.sm || fm, false)); // (another stock, centred on the receiver's back)
@@ -1367,7 +1399,7 @@ const G_GunRecipes = (() => {
     }
 
     // barrel, handguard, muzzle device
-    const b = o.barrel || {}, bl = b.len || 0.37, br = A ? A.rig.barrelR : b.r || 0.0095, by = b.y || 0;
+    const b = o.barrel || {}, bl = b.len || 0.37, br = b.r || 0.0095, by = b.y || 0, back = b.back || 0, mbr = o.mbr != null ? o.mbr : br; // (back: a shared barrel's tube starts that far behind the receiver's front; mbr: the radius a muzzle device is drawn for)
     let front;
     k.tag('barrel');
     const hy = tr && tr.pin ? VT(tr.pin)[1] : -0.035, brk = rcv === 'break' ? k.part(L, hy) : null;
@@ -1377,15 +1409,11 @@ const G_GunRecipes = (() => {
     const rcl = !brk && o.recoilBarrel ? k.part(L, by) : null, rcTravel = rcl ? Math.min(o.recoilBarrel!, bl - 0.02) : 0;
     if (rcl) { k.into(rcl, L, by); anim.barrel = rcl; k.cyl(0.0148, 0.012, b.m || M.blued(), L - 0.002, by); }
     if (A) {
-      // the model's barrel (its gas block and front sight on it, wherever the optic), the bare tube ahead of the bayonet lug's collar
-      // set to this barrel's length: the gas system and the handguard stay where they are
-      const end = A.rig.end + bl - factoryBarrel(o.authored!), f0 = A.rig.tubeFrom, sc = (end - f0) / (A.rig.end - f0);
-      authored(k, A, (e) => e.slot === 'barrel', (e, g) => {
-        if (e.role !== 'tube' || Math.abs(sc - 1) < 1e-9) return g;
-        const c = g.clone(), pa = c.attributes.position as THREE.BufferAttribute;
-        for (let i = 0; i < pa.count; i++) { const f = -pa.getZ(i); if (f > f0) pa.setZ(i, -(f0 + (f - f0) * sc)); }
-        c.computeBoundingSphere(); c.computeBoundingBox(); return c;
-      });
+      // the model's factory barrel is its own mesh (the gas block, tube and sight base are the receiver's: slot base); any other barrel is the shared
+      // one, a tube of its length and profile ending where that barrel ends: the factory end moved by the length's difference from the factory one
+      const end = A.rig.end + bl - factoryBarrel(o.authored!);
+      if (own('barrel')) authored(k, A, (e) => e.slot === 'barrel');
+      else k.cyl(br, bl + back, b.m || M.blued(), end - bl - back, by, 0, br * (b.taper || 1), 14);
       front = end;
     } else if (o.integral) {
       k.cyl(o.integral.r, o.integral.len, M.black(), L, by);
@@ -1394,7 +1422,7 @@ const G_GunRecipes = (() => {
     } else {
       const bIn = o.bIn || 0; // (how much of it's inside the receiver: a Vector's is mostly)
       if (o.barrels) for (const x of o.barrels) k.cyl(br, bl, b.m || M.blued(), L, by, x);
-      else k.cyl(br, bl, b.m || M.blued(), L - bIn, by, 0, br * (b.taper || 1), 14);
+      else k.cyl(br, bl + back, b.m || M.blued(), L - bIn - back, by, 0, br * (b.taper || 1), 14);
       if (o.barrels && tr && tr.rib) { k.box(0.008, 0.0102, bl, b.m || M.blued(), L, by + 0.0091); k.box(0.008, 0.008, bl, b.m || M.blued(), L, by - 0.008); } // (the ribs filling the valleys between the barrels, over and under)
       if (rcv === 'f2') { // the collar and the grenade spigot's ridges (as much of them as the barrel has)
         k.cyl(0.0105, Math.min(0.022, bl), M.black(), L + 0.003, by, 0, br);
@@ -1406,6 +1434,7 @@ const G_GunRecipes = (() => {
     const bEnd: number = front; // (the barrel's own end, before any muzzle device: where its front sight and a bead stand)
     // what the barrel provides: where a muzzle device screws on
     k.anchor('barrel', 'mount_muzzle', [bEnd, by, 0]);
+    if (o.rib && !o.integral) { k.tag('barrel'); S.rib(k, L, bEnd - 0.006, Math.max(rcvTop != null ? rcvTop : top, 0.014) + 0.009, by + 0.004); } // (a shotgun barrel's rib: part of the barrel)
     let hgLen = 0;
     const hgF = L + (o.hgGap || 0); // (where a handguard starts)
     // a traced breech sleeve carried forward to take a handguard (the Thor's long barrel): the same square section over the barrel's
@@ -1427,7 +1456,7 @@ const G_GunRecipes = (() => {
       if (hg.t === 'sig') hg.ext = o.railExt || 0;
       if (tr && tr.parts.some((p: TracePart) => p.on === 'fore') && hg.t === 'wood') { const sc = (hg.len - 0.03) / (tr.foreLen - 0.03), VF = (p: number[]) => { const [f, y] = VT(p); return [f > L + 0.03 ? L + 0.03 + (f - L - 0.03) * sc : f, y]; }; tracedParts(k, tr, VF, 'fore', Object.assign({}, mats, { fore: hg.m || fm })); } // (the traced forend, stretched or shortened ahead of the action to the wooden hand guard's length: a drawing's scale, not the part's)
       else {
-        handguard(k, hg, hgF, fm, rm);
+        handguard(k, hg, hgF, stdHg ? M.polymer() : fm, stdHg ? M.black() : rm);
         // the G36's sleeve round the barrel with the bayonet lug, in front of its guard when the barrel has room: the barrel's, where the guard ends
         if (hg.t === 'g36' && bl - hg.len > 0.000945 * 52) { k.tag('barrel'); k.at('handguard', () => { const V = (px: number) => px * 0.000945; k.cyl(V(10), V(27), M.black(), hgF + hg.len + V(25), 0); k.box(0.008, V(18), V(22), M.black(), hgF + hg.len + V(27), V(-11)); }); k.tag('handguard'); }
       }
@@ -1456,7 +1485,7 @@ const G_GunRecipes = (() => {
       for (let i = 0; i < n; i++) { k.cylY(0.0095, 0.05, M.redInsert(), f0 + 0.0125 + i * 0.025, -0.008, x); k.cylY(0.0098, 0.012, M.brass(), f0 + 0.0125 + i * 0.025, -0.038, x); }
     }
     if (A && o.muzzle && own('muzzle')) { k.tag('muzzle'); k.moved(front - A.rig.end, 0, () => authored(k, A, (e) => e.slot === 'muzzle')); front += A.info.muzzles[0][0] - A.rig.end; }
-    else if (!o.integral && o.muzzle) { k.tag('muzzle'); if (rcl) k.into(rcl, L, by); front += rcv === 'aksu' && o.muzzle === 'cutts' ? aksuBooster(k, front, by) : muzzle(k, o.muzzle, front, br, by); } // (the AKS-74U's booster is its own: the Thompson's Cutts is the plain one)
+    else if (!o.integral && o.muzzle) { k.tag('muzzle'); if (rcl) k.into(rcl, L, by); front += rcv === 'aksu' && o.muzzle === 'cutts' ? aksuBooster(k, front, by) : muzzle(k, o.muzzle, front, mbr, by); } // (the AKS-74U's booster is its own: the Thompson's Cutts is the plain one)
     if (brk || rcl) k.into(null);
     k.anchor(!o.integral && o.muzzle ? 'muzzle' : 'barrel', 'muzzles', [[front, by, 0]]); // (every muzzle: the device's end when there is one)
     if (o.pump) {
@@ -1487,7 +1516,7 @@ const G_GunRecipes = (() => {
     if (o.railmount) {
       k.tag('railmount');
       if (brk) k.into(brk, L, hy); // (it's clamped to the barrel: it tips open with it)
-      const run = o.integral ? o.integral.len : bl, R = (o.integral ? o.integral.r : br * (b.taper || 1)) + 0.002;
+      const run = o.integral ? o.integral.len : bl, R = (o.integral ? o.integral.r : mbr) + 0.002;
       const f0 = L + Math.max(0.005, Math.min(hgLen ? hgLen + 0.012 : 0.03, run - 0.05));
       k.cyl(R + 0.004, 0.032, M.black(), f0, by, 0, R + 0.004, 16);
       for (const sd of o.railmount === 'twin' ? [1, -1] : [1]) { k.box(0.006, 0.012, 0.03, M.black(), f0 + 0.001, by, sd * (R + 0.006)); sideRail(k, f0 - 0.004, 0.04, by, sd * (R + 0.011)); }
@@ -1624,12 +1653,19 @@ const G_GunRecipes = (() => {
     for (let i = 1; i < pts.length; i++) if (f <= pts[i][0]) { const [a, b] = [pts[i - 1], pts[i]]; return b[0] > a[0] ? a[1] + (b[1] - a[1]) * (f - a[0]) / (b[0] - a[0]) : b[1]; }
     return pts[pts.length - 1][1];
   };
+  // The slide's traced top and bottom edges at slide length `len` ([[f, y], ...] rear to front; a long slide stretches its front half) and the map
+  // from a traced f to the stretched one. What a slide does not own (its sights' heights, the barrel, the optic) is placed from the edges at the
+  // factory length, so that a longer slide only MOVES it (the pistol reform: docs/models.md).
+  function slideEdges(t: Trace, V: Tracer, len: number) {
+    const hi = t.top.map(V), lo = t.bot.map(V), L0 = t.nose ? V([t.nose, 0])[0] : hi[hi.length - 1][0], reach = (f: number) => (f <= L0 / 2 ? f : L0 / 2 + (f - L0 / 2) * (len - L0 / 2) / (L0 / 2));
+    for (const e of [hi, lo]) for (const p of e) p[0] = reach(p[0]);
+    return { hi, lo, reach };
+  }
   // The slide: the section swept from its traced top and bottom edges, its top corners chamfered or rounded (t.c: how far
   // in, t.seg: how many facets), the ejection port cut out of the right of it from xp over. A long slide stretches
   // its front half. Returns its edges, for what sits on them.
   function tracedSlide(k: Kit, t: Trace, V: Tracer, len: number, w: number, m: THREE.Material) {
-    const hi = t.top.map(V), lo = t.bot.map(V), L0 = t.nose ? V([t.nose, 0])[0] : hi[hi.length - 1][0], reach = (f: number) => (f <= L0 / 2 ? f : L0 / 2 + (f - L0 / 2) * (len - L0 / 2) / (L0 / 2));
-    for (const e of [hi, lo]) for (const p of e) p[0] = reach(p[0]);
+    const { hi, lo, reach } = slideEdges(t, V, len);
     const [p1, p0] = t.port.map((x: number) => V([x, 0])[0]).sort((a: number, b: number) => b - a), yP = t.portY != null ? V([0, t.portY])[1] : 0.016, xp = -0.0015, seg = t.seg || 1;
     const sec = (f: number, cut: boolean) => {
       const y1 = along(hi, f), y0 = along(lo, f), hw = w / 2, c = Math.min(t.c || 0.002, hw - 0.002, Math.max(0, (y1 - y0) * 0.45));
@@ -1714,12 +1750,17 @@ const G_GunRecipes = (() => {
   function pistol(k: Kit, o: RecipeSpec) {
     const sl = o.slide || {}, tr = (o.look && (G.GunTraces as Record<string, Trace>)[o.look]) as Trace | undefined, V = (tr ? tracer(tr) : null) as Tracer, len = sl.len || 0.19, w = sl.w || 0.026, sm = sl.sm || M.black(), fm = o.fm || M.polymer(), gm = o.gm || fm;
     const anim: any = {}, mats = { frame: fm, grip: gm, slide: sm };
+    // THE REFORM (docs/models.md "Pistols"): the frame, the slide, the barrel, the optic and the grip are independent parts with fixed interfaces. The slide
+    // owns its own geometry (its length and what it carries: a vent, a compensator) and provides two anchors: its rear (everything on it that does not
+    // reach the front sits at a fixed distance from there: the rear sight, the optic cut, the port) and its front (the front sight, the barrel's exit). Everything
+    // else is built for the FACTORY slide (len0, ts0, topAt0) and a longer slide only MOVES what stands at its front.
+    const len0 = o.len0 || len, ts0 = tr ? slideEdges(tr, V, len0) : null, reach0 = (f: number) => (ts0 ? ts0.reach(f) : f), topAt0 = (f: number) => (ts0 ? along(ts0.hi, f) : 0.026);
     k.tag('slide');
     const slide = k.part();
     k.into(slide);
     // the slide, with its ejection port: a cut out of the right half of its top, over the chamber (forward of where
     // a pistol dot sits), so a press-check shows the round in the barrel
-    const ts = tr ? tracedSlide(k, tr, V, len, w, sm) : null, pc = len * 0.44, p0 = ts ? ts.p0 : pc - 0.016, p1 = ts ? ts.p1 : pc + 0.016, sy = ts ? ts.yP : 0.016, topAt = (f: number) => (ts ? along(ts.hi, f) : 0.026);
+    const ts = tr ? tracedSlide(k, tr, V, len, w, sm) : null, pc = len0 * 0.44, p0 = ts ? ts.p0 : pc - 0.016, p1 = ts ? ts.p1 : pc + 0.016, sy = ts ? ts.yP : 0.016, topAt = (f: number) => (ts ? along(ts.hi, f) : 0.026);
     if (!ts) k.prof([[0, 0.002], [0, sy], [len, sy], [len, 0.002]], w, sm, 0, null, 0.001);
     const nose = 0.012, noseY = 0.02;
     if (ts) { tracedSer(k, tr!.ser, V, w, Mk[tr!.serM] ? Mk[tr!.serM]() : M.rubber()); tracedParts(k, tr!, V, 'slide', mats); }
@@ -1729,25 +1770,28 @@ const G_GunRecipes = (() => {
       k.prof([[p1, sy], [p1, 0.026], [len - nose, 0.026], [len, noseY], [len, sy]], w / 2, sm, w / 4, null, 0.001);
     }
     if (!ts) for (let i = 0; i < 5; i++) k.box(w + 0.001, 0.016, 0.0025, M.rubber(), 0.01 + i * 0.006, 0.014);
-    if (sl.vent) for (let i = 0; i < 4; i++) { const vf = len * 0.45 + i * 0.022; if (vf + 0.012 > p0 - 0.002 && vf < p1 + 0.002) continue; k.box(w + 0.002, 0.006, 0.012, M.rubber(), vf, topAt(vf) - 0.002); } // (none over the port)
+    if (sl.vent) for (let i = 0; i < 4; i++) { const vf = len0 * 0.45 + i * 0.022; if (vf + 0.012 > p0 - 0.002 && vf < p1 + 0.002) continue; k.box(w + 0.002, 0.006, 0.012, M.rubber(), vf, topAt(vf) - 0.002); } // (none over the port)
     k.into(null);
     anim.slide = slide;
     k.box(w / 2 - 0.002, 0.0015, p1 - p0, M.rubber(), p0, sy + 0.0008, w / 4); // (the barrel hood under it: the barrel's, so it stays put)
-    let front = len;
+    let front = len; // (the slide's front anchor: where the barrel comes out; a compensator's box pushes it on)
     if (sl.comp) { const fb = len - 0.014, y1 = tr && tr.noseTop ? V([0, tr.noseTop])[1] : topAt(fb), y0 = ts ? along(ts.lo, fb) : 0.001; k.box(w, y1 - y0, 0.03, sm, len, (y1 + y0) / 2); front += 0.03; }
+    // THE FRAME (base): the same under every grip (a chassis is built round it) and every slide
     k.tag('base');
-    const ch = o.chassis ? pistolChassis(k, o, len, w, p0, p1, anim) : null;
-    if (ch) { /* (the frame's inside it) */ } else if (tr) tracedParts(k, tr, V, 'base', mats);
+    if (tr) tracedParts(k, tr, V, 'base', mats);
     else {
-      k.prof([[0.004, 0.002], [len * 0.92, 0.002], [len * 0.92, -0.014], [0.07, -0.016], [0.05, -0.012], [0.004, -0.012]], w - 0.002, fm);
+      k.prof([[0.004, 0.002], [len0 * 0.92, 0.002], [len0 * 0.92, -0.014], [0.07, -0.016], [0.05, -0.012], [0.004, -0.012]], w - 0.002, fm);
       k.ringX(0.016, 0.0025, fm, 0.055, -0.016, 0, Math.PI, Math.PI);
     }
     if (!tr) k.box(0.004, 0.016, 0.005, M.black(), 0.05, -0.016);
     if (o.hammer && !tr) k.box(0.008, 0.014, 0.008, M.blued(), -0.008, 0.022);
+    // the magazine well (the frame's, whatever grip is fitted: a chassis is built round it): traced, its top back corner, its bottom back corner, how deep it is
+    const tm = tr ? tr.mag : null, [mf, my] = tm ? V(tm.top) : [0, -0.006], [bf, by] = tm ? V(tm.bot) : [-0.012, -0.102], mD = tm ? tm.D : 0.03, mW = tm ? tm.w : 0.02;
     k.tag('grip');
-    if (ch) { /* (its grip is the chassis's) */ } else if (tr) tracedParts(k, tr, V, 'grip', mats);
+    const ch = o.chassis ? pistolChassis(k, o, len0, w, p0, p1, anim, { mf, my, bf, by, mD, mW }) : null;
+    if (ch) { /* (the chassis is the grip) */ } else if (tr) tracedParts(k, tr, V, 'grip', mats);
     else k.prof([[-0.004, -0.004], [0.04, -0.004], [0.028, -0.115], [-0.018, -0.108]], 0.03, gm);
-    if (o.stock && !ch) { // a shoulder stock clipped to the back of the frame
+    if (o.stock) { // a shoulder stock clipped to the back of the frame's lug (a chassis's SMG stock mount is the lug's place too: the stock is the same part)
       k.tag('stock');
       // (an SMG stock mount on the lug, js/parts.ts stk.pistol.2: a block, and the SMG stock on its back if there is one)
       const mount = o.stock === 'smgmount' || (o.slotOf && o.slotOf.stock === 'stk.pistol.2');
@@ -1755,15 +1799,22 @@ const G_GunRecipes = (() => {
       if (o.stock !== 'smgmount') {
         const [lf, ly] = tr ? V(tr.lug) : [-0.006, -0.03], sp = mount ? k.part(lf - 0.034, ly + 0.012) : k.part(lf, ly);
         k.into(sp);
-        stock(k, o.stock, o.sm || M.black(), true); // (true: shown in first person too: a brace rides along your forearm, in view)
+        // (the stock on an adapter is a piece of its own, `stock@<its slot>`, keyed by that slot's part alone: the mount block above is the adapter's, the stock the same part wherever it sits)
+        // (so each part of the chain draws its own: an adapter's tube, then the stock on it)
+        const rank = (s: string) => (s === 'stock' ? 0 : s === 'buttstock' ? 1 : +s.replace('buttstock', '')), PP = G.Gunsmith.PARTS as Record<string, any>;
+        const chain = Object.keys(o.slotOf || {}).filter((s) => /^(stock|buttstock\d*)$/.test(s)).sort((a, b) => rank(a) - rank(b));
+        for (const sl of chain.length ? chain : ['stock']) {
+          const type = chain.length ? PP[o.slotOf![sl]]?.model?.stock : o.stock;
+          if (!type || type === 'smgmount') continue;
+          const draw = () => stock(k, type, o.sm || M.black(), true); // (true: shown in first person too: a brace rides along your forearm, in view)
+          if (sl === 'stock') draw(); else k.at(sl, draw);
+        }
         k.into(null);
       }
     }
     k.tag('mag');
     const mg = (o.mag || {}) as MagSpec;
-    // (traced: its top back corner, its bottom back corner, how deep it is: tr.mag)
-    // (in a chassis it's in the chassis's own grip: as the plain gun's)
-    const tm = tr && !ch ? tr.mag : null, [mf, my] = tm ? V(tm.top) : [0, -0.006], [bf, by] = tm ? V(tm.bot) : [-0.012, -0.102], mD = tm ? tm.D : 0.03, mW = tm ? tm.w : 0.02;
+    // (the frame's well, above: a chassis's grip is built round it, so the magazine is the same part in either)
     const magAt = [mf + 0.012, my + 0.002], magP = k.part(magAt[0], magAt[1]), mm = mg.m || M.black(); // (the magazine's own: a translucent one shows its rounds)
     k.into(magP, magAt[0], magAt[1]);
     const ext = mg.t === 'drum' ? 2 : (mg.len || 0.15) > 0.16 ? 1 : (mg.len || 0.15) < 0.12 ? -1 : o.ext ? 1 : 0;
@@ -1778,37 +1829,50 @@ const G_GunRecipes = (() => {
     else if (ext === 0 && !tm) k.box(0.026, 0.008, 0.032, M.black(), -0.006, -0.112);
     // (what the check shows, down its whole length along that back edge: witness holes, or a clear one's rounds)
     // (rear(t): the edge level with what's at depth t, as magCheck places it: 12 mm down, then over all but 26 mm of it)
-    magP.userData.chk = magCheck(k, (t) => mf - K * (0.012 + t * (L - 0.026)), my, L, mW, mD, !!mm.transparent, mg.rnd);
+    magP.userData.chk = magCheck(k, (s) => [mf + mD / 2 - K * L * s, -K * L], my, L, mW, mD, !!mm.transparent, mg.rnd);
     k.into(null);
     anim.mag = magP;
     k.tag('barrel');
-    if (tr) tracedParts(k, tr, ([x, y]) => { const [f, u] = V([x, y]); return [ts!.reach(f), u]; }, 'barrel', mats); // (the Desert Eagle's fixed barrel block: a long slide's stretches it too)
-    k.cyl(tr ? tr.bore : 0.0065, 0.01, M.rubber(), len - 0.009, 0.009);
-    if (tr) k.ringZ(tr.bore + 0.0008, 0.0008, M.gunmetal(), len + 0.0004, 0.009); // (the barrel's lip, in the end of the slide)
-    if (tr && tr.tube) k.cyl(tr.tube.r, len + tr.tube.out - tr.tube.from, Mk[tr.tube.m] ? Mk[tr.tube.m]() : M.gunmetal(), tr.tube.from, 0.009, 0, tr.tube.r, 20); // (an open-topped slide's: it shows, and it stays put)
-    if (o.match && !sl.comp) { k.cyl(0.0068, 0.012, M.steel(), len, 0.009); front += 0.012; }
-    if (o.thread && !sl.comp) { k.cyl(0.0058, 0.012, M.steel(), front, 0.009); front += 0.012; }
+    // THE BARREL: its fixed block (traced, set from the factory slide), and what shows of it past the slide's front anchor: its own length (a threaded
+    // barrel's thread, a match barrel's muzzle ring) follows the barrel part, not the slide. The bore at the slide's mouth is a piece of its own that only
+    // follows the slide's front.
+    if (tr) k.at('block', () => tracedParts(k, tr, ([x, y]) => { const [f, u] = V([x, y]); return [reach0(f), u]; }, 'barrel', mats)); // (the fixed barrel block: a piece of its own, the frame's, whatever barrel or slide is fitted)
+    k.at('slide', () => k.cyl(tr ? tr.bore : 0.0065, 0.01, M.rubber(), len - 0.009, 0.009));
+    k.ringZ((tr ? tr.bore : 0.0065) + 0.0008, 0.0008, M.gunmetal(), front + 0.0004, 0.009); // (the barrel's lip, where it comes out of the slide: the barrel part's own, so every barrel has a mesh and a slide only moves it)
+    if (tr && tr.tube) k.at('block', () => k.cyl(tr.tube.r, len0 + tr.tube.out - tr.tube.from, Mk[tr.tube.m] ? Mk[tr.tube.m]() : M.gunmetal(), tr.tube.from, 0.009, 0, tr.tube.r, 20)); // (an open-topped slide's: it shows, and it stays put)
+    if (o.match) { k.cyl(0.0068, 0.012, M.steel(), front, 0.009); front += 0.012; }
+    if (o.thread) { k.cyl(0.0058, 0.012, M.steel(), front, 0.009); front += 0.012; }
     if (o.muzzle && o.thread) { k.tag('muzzle'); front += muzzle(k, o.muzzle, front, 0.0065, 0.009); }
-    let sight;
-    if (ch) sight = ch.sights(anim);
-    else {
-      k.tag('tac');
-      const [tf, ty] = tr ? V(tr.tac).map((n, i) => (i ? n - 0.0115 : n)) : [len * 0.86, -0.026]; // (traced: its top, r 11 mm, on the frame's underside)
+    k.tag('tac');
+    if (!ch) {
+      const [tf, ty] = tr ? V(tr.tac).map((n, i) => (i ? n - 0.0115 : n)) : [len0 * 0.86, -0.026]; // (traced: its top, r 11 mm, on the frame's underside)
       tactical(k, o.tac, tf, ty, -0.01); // (hung under the dust cover's rail)
-      k.tag('optic');
-      if (o.optic === 'minidot') sight = S.minidot(k, len * 0.32, topAt(len * 0.32), o);
-      else {
-        const fR = tr ? V([tr.sights[0], 0])[0] : 0.012, fF = tr ? ts!.reach(V([tr.sights[1], 0])[0]) : len - 0.01, base = tr && tr.frontY ? V([0, tr.frontY])[1] : topAt(fF), rb = topAt(fR), sy1 = Math.max(base, rb) + (tr && tr.sh || 0.0075);
-        k.into(slide); sight = S.pistolSights(k, fR, tr && tr.frontY ? null : fF, sy1, base, o.optic === 'night', rb, tr && tr.sw); k.into(null);
-        if (tr && tr.frontY) S.pistolFront(k, fF, sy1, base, o.optic === 'night'); // (on the fixed barrel: the slide runs back under it)
-      }
     }
+    // THE SIGHTS. The slide's own irons are on the slide whatever grip is fitted (inside a chassis's shell they are hidden: the optic is the same part on any grip):
+    // the rear sight at a fixed distance from the slide's rear, the front sight (a piece of its own) at the slide's front; their heights are the factory slide's. A
+    // pistol dot replaces them (the optic cut, a fixed distance from the rear); on a chassis's rail a rifle's sight does.
+    k.tag('optic');
+    const railSight = ch && o.optic && o.optic !== 'notch' && o.optic !== 'night', onSlide = !railSight && o.optic === 'minidot';
+    let sight;
+    if (onSlide) { const fO = len0 * 0.32; sight = S.minidot(k, fO, topAt0(fO), o); }
+    else {
+      const fR = tr ? V([tr.sights[0], 0])[0] : 0.012, fF0 = tr ? reach0(V([tr.sights[1], 0])[0]) : len0 - 0.01, fF = tr ? ts!.reach(V([tr.sights[1], 0])[0]) : len - 0.01;
+      const base = tr && tr.frontY ? V([0, tr.frontY])[1] : topAt0(fF0), rb = topAt0(fR), sy1 = Math.max(base, rb) + (tr && tr.sh || 0.0075), night = o.optic === 'night';
+      k.into(slide);
+      // (hidden in a chassis's shell: a piece of its own, so that the rail sight above it is the same shared part on any pistol)
+      sight = railSight ? k.at('irons', () => S.pistolSights(k, fR, null, sy1, base, night, rb, tr && tr.sw)) : S.pistolSights(k, fR, null, sy1, base, night, rb, tr && tr.sw);
+      if (!(tr && tr.frontY)) k.at('slide', () => S.pistolFront(k, fF, sy1, base, night));
+      k.into(null);
+      if (tr && tr.frontY) S.pistolFront(k, fF0, sy1, base, night); // (on the fixed barrel: the slide runs back under it)
+    }
+    if (railSight) sight = ch!.sights(anim);
+    else if (ch) sight = ch.bare(); // (no rail sight: the sight line is the rail's)
     k.tag('base');
     const hold = tr && !ch ? V(tr.hold) : [0.012, -0.06];
     return {
       sy: sight.sy, fSight: sight.fSight, relief: sight.relief || (o.optic === 'minidot' ? 0.3 : 0.36),
       muzzles: [[Math.max(front, ch ? ch.front : 0), 0.009, 0]], grip: [hold[0], hold[1], 0], support: ch ? ch.support : [hold[0] + 0.018, hold[1] - 0.005, -0.022], anim, pistol: true,
-      magAt, slide: [len * 0.2, topAt(len * 0.2) - 0.006, 0], chamberAt: { side: 'port', f: p0 - 0.006, y: sy + 0.0015, x: w / 4 }, // (the round's back end, behind the hood, and its top, just under the hood's)
+      magAt, slide: [len0 * 0.2, topAt0(len0 * 0.2) - 0.006, 0], chamberAt: { side: 'port', f: p0 - 0.006, y: sy + 0.0015, x: w / 4 }, // (the round's back end, behind the hood, and its top, just under the hood's)
     };
   }
 
@@ -1817,7 +1881,9 @@ const G_GunRecipes = (() => {
   // over the top; a grip round the magazine well and a big trigger guard; a rail each side and one under the shroud; an
   // SMG stock mount at the back. The slide still runs inside it. Returns its sights (drawn after the rest: sights(anim)),
   // where the other hand goes, and how far the shroud runs.
-  function pistolChassis(k: Kit, o: RecipeSpec, len: number, w: number, p0: number, p1: number, anim: Anim) {
+  // THE REFORM: it is a part of the FRAME, built for the platform's factory slide (len = len0) with an OPEN FRONT: a longer slide just comes out of it past
+  // the shroud. Nothing in it depends on the slide, the optic or the magazine fitted: the grip is built round the frame's magazine well (well).
+  function pistolChassis(k: Kit, o: RecipeSpec, len: number, w: number, p0: number, p1: number, anim: Anim, well: { mf: number; my: number; bf: number; by: number; mD: number; mW: number }) {
     const C = M.polymer(), B = M.black(), W = w + 0.014, f0 = -0.05, fN = len + 0.045, rl = fN - f0;
     k.tag('grip');
     // the lower: under the frame from the stock mount to the shroud's front, its belly down to the bottom rail
@@ -1831,8 +1897,9 @@ const G_GunRecipes = (() => {
     k.box(W, 0.004, rl, C, f0, 0.041);
     const top = S.rail(k, f0 + 0.004, rl - 0.008, 0.043, B);
     // the grip round the magazine well (raked as the pistol's), the trigger guard
-    k.prof([[-0.008, -0.016], [0.044, -0.016], [0.032, -0.118], [-0.022, -0.112]], 0.034, C, 0, null, 0.003);
-    for (let i = 0; i < 4; i++) k.box(0.0352, 0.004, 0.02, M.rubber(), -0.004 - i * 0.003, -0.04 - i * 0.018); // (finger grooves' texture)
+    const { mf, my, bf, by, mD, mW } = well, gy0 = my - 0.01, edgeF = (y: number) => (mf - 0.008) + (y - gy0) * ((bf - 0.01) - (mf - 0.008)) / ((by - 0.01) - gy0);
+    k.prof([[mf - 0.008, gy0], [mf + mD + 0.014, gy0], [bf + mD + 0.014, by - 0.016], [bf - 0.01, by - 0.01]], mW + 0.014, C, 0, null, 0.003);
+    for (let i = 0; i < 4; i++) k.box(mW + 0.0152, 0.004, 0.02, M.rubber(), edgeF(my - 0.034 - i * 0.018) + 0.0075, my - 0.034 - i * 0.018); // (finger grooves' texture)
     k.ringX(0.019, 0.003, C, 0.057, -0.022, 0, Math.PI, Math.PI);
     // the stock mount at the back: a block, its steel dovetail
     k.box(0.026, 0.034, 0.016, C, f0 - 0.014, -0.004);
@@ -1846,8 +1913,8 @@ const G_GunRecipes = (() => {
     if (o.fg) { k.tag('fg'); fgF = rf + RL * 0.45; foregrip(k, o.fg, fgF, M.polymer(), anim); }
     if (o.tac) { k.tag('tac'); tactical(k, o.tac, rf + RL - 0.004, -0.006, W / 2 + 0.006); }
     if (o.tacL) { k.tag('tacL'); tactical(k, o.tacL, rf + RL - 0.004, -0.006, -(W / 2 + 0.006), -1); }
-    if (o.stock) { k.tag('stock'); const sp = k.part(f0 - 0.018, -0.004); k.into(sp); stock(k, o.stock, o.sm || M.black(), true); k.into(null); }
     k.tag('base');
+    const ch_bare = () => ({ sy: top + 0.026, fSight: f0 + 0.012 - 0.0042, relief: 0.17 }); // (the sight line of the flip-up irons a rifle sight would have there)
     return {
       front: fN, support: fgF != null && o.fg !== 'bipod' ? [fgF, -0.07, 0] : [len * 0.72, -0.034, -0.004],
       // a rifle's sight on the rail (with a magnifier behind a red dot, the sight forward so the magnifier's mount is on
@@ -1855,16 +1922,20 @@ const G_GunRecipes = (() => {
       sights(anim: Anim) {
         k.tag('optic');
         let sight;
-        const ofs = f0 + (o.magnifier ? Math.max(rl * 0.55, Math.min(rl - 0.035, 0.15)) : rl * 0.5);
+        const ofs = f0 + rl * 0.5; // (the rail's middle, whatever else is fitted: the sight is the same part, a magnifier only goes behind it)
         if (o.optic && !(['irons', 'notch', 'bead', 'none', 'night', 'riser'] as (string | undefined)[]).includes(o.optic)) { // (a pistol dot's here on a riser: the slide's own sight isn't drawn in a chassis)
-          sight = sightOf(k, o, top, f0, rl, 0.01, fN, ofs);
+          // (a dot on a riser is the riser dot's own piece, keyed by that part alone: the riser under it is the mount's)
+          sight = o.riser ? k.at('riserdot', () => sightOf(k, o, top, f0, rl, 0.01, fN, ofs)) : sightOf(k, o, top, f0, rl, 0.01, fN, ofs);
           if (o.magnifier && k.reflex) { k.tag('magnifier'); sight = S.magnifier(k, sight, o.magnifier, anim); }
         } else {
-          if (o.optic === 'riser') k.box(0.024, o.riser || 0.022, 0.034, B, ofs - 0.017, top + (o.riser || 0.022) / 2); // (with nothing on it: the irons still work)
-          sight = S.irons(k, f0 + 0.012, fN - 0.014, top + 0.026, top, top, 'ar');
+          if (o.optic === 'riser') k.at('mount', () => k.box(0.024, o.riser || 0.022, 0.034, B, ofs - 0.017, top + (o.riser || 0.022) / 2)); // (with nothing on it: the irons still work)
+          sight = o.optic === 'riser' ? ch_bare() : S.irons(k, f0 + 0.012, fN - 0.014, top + 0.026, top, top, 'ar'); // (a riser with nothing on it draws only its mount: the same optic piece with or without a dot on it)
         }
         return sight;
       },
+      // with no sight of the rail's fitted (the pistol's own sights, or none): the slide's irons are drawn as ever, inside the shell (so that the optic is the same part
+      // on any grip), and the sight line is the flip-up irons' a rifle sight would have there (they are a part to fit: the rifle sight 'irons')
+      bare: ch_bare,
     };
   }
 
