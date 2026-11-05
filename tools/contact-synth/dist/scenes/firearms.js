@@ -212,8 +212,34 @@ function arForward(t, withChargingHandle) {
     return els;
 }
 const CH_BACK = 0.0;
-const CH_END = 0.15; // a brisk, oiled pull
+// The pull, laid out by travel. The hand's speed follows a swell (accelerate, then brake),
+// so position along the 90 mm stroke is x(t) = 45 mm · (1 − cos(π t / T)). Each part comes in
+// and out at its own point of travel, at the speed the stroke has there.
+const PULL_MM = 90;
+const PULL_T = 0.16;
+const CH_END = CH_BACK + PULL_T;
 const LET_GO = 0.45;
+const tAt = (mm) => CH_BACK + (PULL_T * Math.acos(1 - (2 * Math.min(mm, PULL_MM)) / PULL_MM)) / Math.PI;
+const SLIDE_BED_DB = 10;
+/** A rubbing contact that exists only between two points of the pull's travel. */
+function travelRub(what, mm0, mm1, gainDb, f, A, B, extra = {}) {
+    const at = tAt(mm0);
+    const duration = Math.max(0.012, tAt(mm1) - at);
+    const speed = ((mm1 - mm0) / 1000 / duration) * 1.2;
+    const mid = (mm0 + mm1) / 2;
+    const profile = mid < 25 ? 'accelerate' : mid > 65 ? 'decelerate' : 'steady';
+    // Every element is normalised to the same peak before its gain; a continuous slide at the
+    // same gain as a click carries far more energy and would bury it. Slides sit 10 dB down so
+    // the events at each point of travel read on top of them.
+    return rub(what, at, gainDb - SLIDE_BED_DB, { duration, speed, profile, ...f }, A, B, extra);
+}
+// Oiled contact textures, each pair its own: anodised aluminium, phosphated steel, brass.
+const OIL_ALU = { roughness: 3, grain: 0.2, periodicity: 0, contactWidth: 0.08 };
+const OIL_STEEL = { roughness: 3, grain: 0.12, periodicity: 0, contactWidth: 0.06 };
+const OIL_TUBE = { roughness: 2, grain: 0.3, periodicity: 0, contactWidth: 0.1 };
+const gasKey = steelBar(3, 6);
+// Ejection-port dust cover: a thin spring-loaded steel flap that snaps open and slaps the upper.
+const arDustCover = { ...mat('steel'), shape: 'plate', size: 9, thickness: 0.8, modes: 2, irregularity: 0.6, damping: 0.35, level: 0 };
 export const AR15_CHARGE = {
     id: 'ar15-charge',
     title: 'AR-15: charging handle pulled back and released',
@@ -227,49 +253,67 @@ export const AR15_CHARGE = {
             elements: [snap('latch pivots out', CH_BACK - 0.04, -10, { strength: 0.5, preload: 35, seat: 0.2 }, arChLatch, arUpper)],
         },
         {
-            name: 'unlock',
-            description: 'Carrier moves back alone for its cam travel, the cam pin turns the bolt out of its lugs, then the carrier catches the bolt and drags it along.',
+            name: 'gas-key-pickup',
+            description: '0-2 mm: the charging handle takes up its free play and catches the carrier\'s gas key.',
+            elements: [hit('handle catches the gas key', tAt(2), -9, 0.5, gasKey, arChargingHandle, { scatter: 0.3, radius: 2 })],
+        },
+        {
+            name: 'dust-cover',
+            description: '~4 mm: the carrier trips the ejection-port dust cover, which springs open and slaps the side of the upper.',
             elements: [
-                rub('cam pin turns the bolt', CH_BACK + 0.004, -12, { force: 8, duration: 0.012, speed: 0.6, profile: 'steady', roughness: 10, grain: 0.2, contactWidth: 0.02 }, arCamPin, arCarrier),
-                hit('bolt lugs rotate free', CH_BACK + 0.012, -10, 0.6, arBolt, arBarrelExt, { scatter: 0.3, radius: 1.5 }),
-                hit('carrier picks up the bolt', CH_BACK + 0.017, -6, 0.9, arCarrier, arBolt, { scatter: 0.4, radius: 3, click: 0.7 }),
+                hit('dust cover snaps open', tAt(4) + 0.006, -5, 2.5, arDustCover, arUpper, { scatter: 0.4, radius: 6, click: 0.7 }, { flex: { amount: 0.3, freq: 70, decay: 0.05, rattle: 0.5, wobble: 0, tone: 0 }, coil: { level: 0.15, length: 2, dispersion: 0.3, decay: 0.04, brightness: 5000 } }),
+            ],
+        },
+        {
+            name: 'unlock',
+            description: '2-11.5 mm: the carrier moves alone through its cam travel, the cam pin turns the bolt out of its lugs (~10 mm), then the carrier catches the bolt and drags it along (11.5 mm).',
+            elements: [
+                travelRub('cam pin turns the bolt', 2, 11.5, -12, { force: 8, roughness: 10, grain: 0.2, contactWidth: 0.02 }, arCamPin, arCarrier),
+                hit('bolt lugs rotate free', tAt(10), -10, 0.6, arBolt, arBarrelExt, { scatter: 0.3, radius: 1.5 }),
+                hit('carrier picks up the bolt', tAt(11.5), -6, 0.9, arCarrier, arBolt, { scatter: 0.4, radius: 3, click: 0.7 }),
             ],
         },
         {
             name: 'pull-back',
-            description: 'Charging handle and bolt carrier sliding back through the upper on an oil film, the gas key riding in the handle slot: a quick, slick "shhk" under the clicks.',
+            description: 'The slides, each over its own stretch of travel: charging handle in its channel (0-90 mm), gas key in the handle slot (2-90), carrier on the upper rails (2-40), carrier tail entering and running in the buffer tube (40-90), bolt tail in the carrier bore (11.5-90). Oiled, so light and slick.',
             elements: [
-                // Oiled: the film carries most of the load and smooths the micro-contacts, so the
-                // slide is light and slick (a dry part grinds; that's a bolt-action sound). The
-                // hollow tone comes from the bore; the clicks (unlock, hammer, sear, stop) lead.
-                rub('charging handle in its channel', CH_BACK, -9, { force: 4, duration: CH_END - CH_BACK, speed: 1.0, roughness: 3, grain: 0.15, periodicity: 0, contactWidth: 0.08 }, arChargingHandle, arUpper),
-                rub('carrier on the upper rails', CH_BACK + 0.017, -8, { force: 6, duration: CH_END - CH_BACK - 0.017, speed: 1.0, roughness: 3, grain: 0.15, periodicity: 0, contactWidth: 0.08 }, arCarrier, arUpper),
-                rub('bolt tail riding in the carrier bore', CH_BACK + 0.017, -18, { force: 2, duration: CH_END - CH_BACK - 0.017, speed: 1.0, roughness: 3, grain: 0.15, periodicity: 0, contactWidth: 0.08 }, arBolt, arCarrier),
-                rub('gas key riding in the handle slot', CH_BACK + 0.017, -14, { force: 3, duration: CH_END - CH_BACK - 0.017, speed: 1.0, roughness: 3, grain: 0.15, periodicity: 0, contactWidth: 0.08 }, steelBar(3, 6), arChargingHandle),
+                travelRub('charging handle in its channel', 0, 90, -11, { force: 4, ...OIL_ALU }, arChargingHandle, arUpper),
+                travelRub('gas key riding in the handle slot', 2, 90, -15, { force: 3, ...OIL_STEEL }, gasKey, arChargingHandle),
+                travelRub('carrier on the upper rails', 2, 40, -9, { force: 6, ...OIL_STEEL }, arCarrier, arUpper),
+                hit('carrier tail enters the buffer tube', tAt(40), -16, 0.5, arCarrier, arBufferTube, { scatter: 0.3, radius: 4 }),
+                travelRub('carrier tail running in the buffer tube', 40, 90, -11, { force: 4, ...OIL_TUBE }, arCarrier, arBufferTube),
+                travelRub('bolt tail riding in the carrier bore', 11.5, 90, -20, { force: 2, ...OIL_STEEL }, arBolt, arCarrier),
             ],
         },
         {
             name: 'hammer-cock',
-            description: 'With the hammer down, the carrier rides down over it and cocks it against its spring; the trigger sear snaps into the hammer notch with a click. (Leave this track out if the hammer was already cocked.)',
+            description: '35-60 mm: with the hammer down, the carrier rides it down against its spring; at 60 mm the trigger sear snaps into the hammer notch; the carrier then rides over the cocked hammer. (Leave this track out if the hammer was already cocked.)',
             elements: [
-                rub('carrier pushes the hammer down', CH_BACK + 0.035, -12, { force: 12, duration: 0.035, speed: 1.0, profile: 'steady', roughness: 4, grain: 0.15, contactWidth: 0.05 }, arHammer, arCarrier, { coil: { level: 0.15, length: 3, dispersion: 0.3, decay: 0.05, brightness: 4000 } }),
-                snap('trigger sear catches the hammer', CH_BACK + 0.07, -3, { strength: 0.9, preload: 0, seat: 0.5, seatDelay: 1.5 }, arTriggerSear, arHammer),
-                rub('carrier riding over the cocked hammer', CH_BACK + 0.073, -20, { force: 3, duration: CH_END - CH_BACK - 0.075, speed: 1.0, roughness: 3, grain: 0.15, contactWidth: 0.08 }, arHammer, arCarrier),
+                travelRub('carrier pushes the hammer down', 35, 60, -12, { force: 12, roughness: 4, grain: 0.15, contactWidth: 0.05 }, arHammer, arCarrier, { coil: { level: 0.15, length: 3, dispersion: 0.3, decay: 0.05, brightness: 4000 } }),
+                snap('trigger sear catches the hammer', tAt(60), -3, { strength: 0.9, preload: 0, seat: 0.5, seatDelay: 1.5 }, arTriggerSear, arHammer),
+                travelRub('carrier riding over the cocked hammer', 60, 90, -20, { force: 3, ...OIL_STEEL }, arHammer, arCarrier),
+            ],
+        },
+        {
+            name: 'magazine',
+            description: '45-72 mm: the bolt rides over the top round in the magazine; once it clears, the magazine spring pops the round up against the feed lips.',
+            elements: [
+                travelRub('bolt riding over the top round', 45, 72, -16, { force: 5, roughness: 2, grain: 0.2, contactWidth: 0.05 }, arCase, arBolt),
+                hit('round pops up against the feed lips', tAt(72) + 0.002, -11, 0.8, arNextRound, arFeedLips, { scatter: 0.3, radius: 2 }),
             ],
         },
         {
             name: 'buffer-spring-compress',
-            description: 'Buffer spring compressing inside the buffer tube (inside the stock): a faint, muffled scrape and sproing.',
+            description: 'Buffer spring compressing inside the buffer tube (inside the stock) for the whole stroke: a faint, muffled scrape and sproing. The buffer weights lag at the start and settle at the stop.',
             elements: [
-                // Inside the buffer tube, inside the stock: a faint, muffled scrape. The coils
-                // slide smoothly along the tube; they don't tick or clash.
-                rub('coils scraping the buffer tube', CH_BACK + 0.02, -22, { force: 3, duration: CH_END - CH_BACK - 0.02, speed: 0.7, roughness: 12, grain: 0.5, periodicity: 0.1, contactWidth: 0.2 }, arBufferSpring, arBufferTube, { coil: { level: 0.2, length: 14, dispersion: 0.4, decay: 0.15, brightness: 1800 } }),
-                hit('buffer weights shift', CH_BACK + 0.03, -22, 0.6, steelBlock(1.5, 12), arBuffer, { scatter: 0.9, radius: 2 }),
+                travelRub('coils scraping the buffer tube', 2, 90, -22, { force: 3, roughness: 12, grain: 0.5, periodicity: 0.1, contactWidth: 0.2 }, arBufferSpring, arBufferTube, { coil: { level: 0.2, length: 14, dispersion: 0.4, decay: 0.15, brightness: 1800 } }),
+                hit('buffer weights lag', tAt(3), -22, 0.6, steelBlock(1.5, 12), arBuffer, { scatter: 0.9, radius: 2 }),
+                hit('buffer weights settle', CH_END + 0.004, -20, 0.8, steelBlock(1.5, 12), arBuffer, { scatter: 0.9, radius: 2 }),
             ],
         },
         {
             name: 'rear-stop',
-            description: 'Charging handle reaches the end of its travel; the bolt shifts inside the carrier.',
+            description: '90 mm: the charging handle bottoms out; the bolt shifts inside the carrier.',
             elements: [
                 hit('handle bottoms out', CH_END, -6, 1.0, arChargingHandle, arUpper, { scatter: 0.4, radius: 3 }),
                 hit('bolt shifts in the carrier', CH_END + 0.003, -14, 0.5, arBolt, arCarrier, { scatter: 0.4, radius: 2 }),
