@@ -229,36 +229,43 @@ for s_ in (-1, 1): cut(hs, cyl(ROD_R + 0.3 * mm, HS0 - 0.01, HG1 + 0.01, 'y', (s
 cut(hs, prism(rounded((HS0 + HG1) / 2, (FLOOR + LOW) / 2 - 0.001, 0.014, 0.0035, 2 * mm, 2), 'x', -0.009, 0.009))
 smooth(hs); K.adopt(hs, 'handguard', TI, pbrk)
 picatinny(K, FG0, FG1, FLOOR, 'handguard', RAIL_M, pbrk, 'bottom')
-# the CENTRE MEMBER: a titanium trough under the barrels from the hinge base forward and up to the rod housing (the junction of the
-# side arms, the trough and the guide rods, and where a vertical grip mounts): a floor plate, and side webs that wrap up to the arms'
-# runs; floor and webs are trusses: triangular lightening holes, the members between them a constant 4 mm, every corner filleted 2 mm
-TW, TFIL, TPL = 4 * mm, 2 * mm, 4 * mm                             # truss member width, fillet, plate thickness
-CA0, CA1 = (CH1 + 0.022, -0.068), (HS0 + 0.004, FLOOR + 0.002)    # the floor's line (its underside), from the hinge base to the housing
-slope = (CA1[1] - CA0[1]) / (CA1[0] - CA0[0])
-u_floor = lambda f: CA0[1] + (f - CA0[0]) * slope
-def truss_holes(b0, b1, t0, t1, n):
-    # a strip's quad (bottom edge b0 -> b1, top edge t0 -> t1) split into n panels with alternating diagonals: the holes' outlines
+# the CENTRE MEMBER: a titanium trough under the barrels from the hinge base to the rod housing (the junction of the side arms, the
+# trough and the guide rods, and where a vertical grip mounts): a level floor plate, and side webs that wrap up to the arms' runs.
+# Floor and webs are WARREN TRUSSES: equilateral triangles, pointing up and down alternately, their ends sloped at 60 degrees; the
+# holes are the triangles inset so the members between them are a constant 4 mm, every corner filleted 2 mm
+TW, TFIL = 4 * mm, 2 * mm
+FT, FB = -0.051, -0.058                                            # the floor plate's top and underside (level)
+WU = RUN_U - AW / 2                                                # the arms' runs' underside: the webs' top
+def warren(f0, f1, lo, hi):
+    # a Warren truss strip between the heights lo and hi, as long as fits in f0 .. f1 (centred): its outline (a parallelogram whose ends
+    # lean forward at 60 degrees) and its holes: n triangles pointing up and n pointing down, alternately, each inset TW / 2 from the
+    # diagonals and the chords and TW from the two sloped ends
+    H = hi - lo; A = 2 * H / math.sqrt(3); n = int(((f1 - f0) - A / 2) // A)
+    x0 = f0 + ((f1 - f0) - (n * A + A / 2)) / 2
+    out = [(x0, lo), (x0 + n * A, lo), (x0 + n * A + A / 2, hi), (x0 + A / 2, hi)]
+    ends = [((x0, lo), (x0 + A / 2, hi)), ((x0 + n * A, lo), (x0 + n * A + A / 2, hi))]
+    near = lambda p, q: abs(p[0] - q[0]) < 1e-9 and abs(p[1] - q[1]) < 1e-9
+    is_end = lambda pa, pb: any((near(pa, e[0]) and near(pb, e[1])) or (near(pa, e[1]) and near(pb, e[0])) for e in ends)
+    tris = [[(x0 + i * A, lo), (x0 + i * A + A, lo), (x0 + i * A + A / 2, hi)] for i in range(n)]                    # pointing up
+    tris += [[(x0 + i * A + A / 2, hi), (x0 + i * A + A, lo), (x0 + i * A + 3 * A / 2, hi)] for i in range(n)]       # pointing down
     holes = []
-    B = [(b0[0] + (b1[0] - b0[0]) * i / n, b0[1] + (b1[1] - b0[1]) * i / n) for i in range(n + 1)]
-    T = [(t0[0] + (t1[0] - t0[0]) * i / n, t0[1] + (t1[1] - t0[1]) * i / n) for i in range(n + 1)]
-    for i in range(n):
-        tris = ([B[i], B[i + 1], T[i + 1]], [B[i], T[i + 1], T[i]]) if i % 2 == 0 else ([B[i], B[i + 1], T[i]], [B[i + 1], T[i + 1], T[i]])
-        for tri in tris:
-            c = ccw(tri)
-            holes.append(fillet_poly(inset_poly(c, TW / 2 + 0.0004), TFIL, 3))
-    return holes
-F0, F1 = CA0[0] + 0.006, CA1[0] - 0.002                           # (the trough's length)
-# the floor plate: along the floor's line, 46 mm wide, holes in plan (a strip across its width)
-fl = K.tmp(prism([(F0, u_floor(F0)), (F1, u_floor(F1)), (F1, u_floor(F1) + TPL), (F0, u_floor(F0) + TPL)], 'x', -AX0, AX0))
-for h in truss_holes((F0 + TW, -AX0 + TW), (F1 - TW, -AX0 + TW), (F0 + TW, AX0 - TW), (F1 - TW, AX0 - TW), 5):
-    cut(fl, prism(h, 'z', -0.2, 0.2))                               # (cut straight down through it: the plate's tilt is slight)
+    for tri in tris:
+        c = ccw(tri)
+        ws = [TW if is_end(c[k], c[(k + 1) % 3]) else TW / 2 for k in range(3)]
+        holes.append(fillet_poly(inset_poly(c, ws), TFIL, 3))
+    return out, holes
+F0, F1 = CH1 + 0.010, HS0 + 0.010                                 # (the trough's length: the hinge base to the housing)
+# the floor plate: a slab the trough's length; its Warren holes in plan, across its width
+fl = K.tmp(prism([(F0, FB), (F1, FB), (F1, FT), (F0, FT)], 'x', -AX0, AX0))
+out_f, holes_f = warren(F0 + 0.004, F1 - 0.004, -AX0 + TW, AX0 - TW)      # (in the plate's plane: forward, right)
+for h in holes_f:
+    cut(fl, prism([(x, f) for f, x in h], 'z', FB - 0.01, FT + 0.01))
 bevel(fl, 1 * mm, 2, 30); smooth(fl); K.adopt(fl, 'handguard', TI, pbrk)
-# the side webs: from the floor's edge up to the underside of each arm's run, inside the arms' plane
-WU = RUN_U - AW / 2                                                 # (the arms' runs' underside)
-W0, W1 = CH1 + 0.048, HS0 - 0.016
+# the side webs: from the floor up to each arm's run, in the arms' plane, sloped ends
+out_w, holes_w = warren(CH1 + 0.040, HS0 - 0.012, FT, WU)
 for s_ in (-1, 1):
-    wb = K.tmp(prism([(W0, u_floor(W0)), (W1, u_floor(W1)), (W1, WU + 0.001), (W0, WU + 0.001)], 'x', s_ * AX0, s_ * (AX0 + TPL)))
-    for h in truss_holes((W0, u_floor(W0) + TPL), (W1, u_floor(W1) + TPL), (W0, WU), (W1, WU), 4):
+    wb = K.tmp(prism(out_w, 'x', s_ * AX0, s_ * (AX0 + 4 * mm)))
+    for h in holes_w:
         cut(wb, prism(h, 'x', -0.04, 0.04))
     bevel(wb, 0.8 * mm, 2, 30); smooth(wb); K.adopt(wb, 'handguard', TI, pbrk)
 # ---- the SLIDING FRONT (part_pump, inside the forend): the muzzle device on its two truss arms, a yoke under it, and two steel guide
