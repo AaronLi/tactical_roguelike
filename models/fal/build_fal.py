@@ -10,7 +10,7 @@
 # Blender frame: X = the gun's right, Y = forward, Z = up; metres. The glTF exporter turns that into the game's frame
 # (x right, y up, z = -forward). The origin is the back of the receiver on the bore line.
 import bpy, bmesh, json, math, os
-from mathutils import Vector, Matrix
+from mathutils import Vector, Matrix, geometry
 
 HERE = globals().get('FAL_DIR') or os.environ.get('FAL_DIR') or os.path.dirname(os.path.abspath(__file__))
 T = json.load(open(os.path.join(HERE, 'trace.json')))
@@ -97,24 +97,87 @@ def loops_of(name, eps=1.3):
         out.append([(F(x), U(y)) for x, y in q])
     return out
 
+def _seg_x(p, q, a, b):
+    """Do segments pq and ab cross (properly)?"""
+    def o(u, v, w): return (v[0] - u[0]) * (w[1] - u[1]) - (v[1] - u[1]) * (w[0] - u[0])
+    return o(p, q, a) * o(p, q, b) < 0 and o(a, b, p) * o(a, b, q) < 0
+
 def slab(loops, w, R, seg=3):
     """An outline (f, u loops; nested loops are holes) made solid w thick across X, its edges rounded to radius R in
-    section (a 2D curve's extrude + bevel, offset in so the silhouette stays the traced one)."""
+    section, the silhouette staying the traced one. Each outline point's radius is cut down where the part is thinner
+    than 2R or a corner is tighter (the trigger, the guard, the grip's corners), so the rounding never folds over
+    itself: an inset outline that crosses itself fills its flat sides with inside-out triangles (see-through)."""
     R = max(1e-5, min(R, w / 2 - 1e-5))
-    cu = bpy.data.curves.new('slab', 'CURVE'); cu.dimensions = '2D'; cu.fill_mode = 'BOTH'
-    cu.extrude = max(w / 2 - R, 1e-6); cu.bevel_depth = R; cu.bevel_resolution = seg; cu.offset = -R
-    for l in loops:
-        sp = cu.splines.new('POLY'); sp.points.add(len(l) - 1)
-        for i, (f, u) in enumerate(l): sp.points[i].co = (f, u, 0, 1)
-        sp.use_cyclic_u = True
-    ob = bpy.data.objects.new('slab', cu); coll.objects.link(ob); bpy.context.view_layer.update()
-    me = bpy.data.meshes.new_from_object(ob.evaluated_get(bpy.context.evaluated_depsgraph_get()))
-    bpy.data.objects.remove(ob, do_unlink=True); bpy.data.curves.remove(cu)
-    me.transform(Matrix(((0, 0, 1, 0), (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 0, 1))))   # curve (x, y, z) -> (f, u, across)
-    bm = bmesh.new(); bm.from_mesh(me); bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-7)
-    bmesh.ops.recalc_face_normals(bm, faces=bm.faces); bm.to_mesh(me); bm.free()
+    L = []
+    for l in loops:   # material to the left of travel: outer loops anticlockwise, holes clockwise
+        a = sum(l[i - 1][0] * l[i][1] - l[i][0] * l[i - 1][1] for i in range(len(l))) / 2
+        hole = sum(1 for m in loops if m is not l and _inside(l[0], m)) % 2 == 1
+        L.append(list(l) if (a > 0) != hole else list(reversed(l)))
+    segs = [(l[i], l[(i + 1) % len(l)]) for l in L for i in range(len(l))]
+    def inward(l, i):
+        p, c, n = l[i - 1], l[i], l[(i + 1) % len(l)]
+        t1 = Vector((c[0] - p[0], c[1] - p[1])).normalized(); t2 = Vector((n[0] - c[0], n[1] - c[1])).normalized()
+        v = Vector((-t1.y, t1.x)) + Vector((-t2.y, t2.x))
+        return v.normalized() if v.length > 1e-9 else Vector((-t1.y, t1.x))
+    N = [[inward(l, i) for i in range(len(l))] for l in L]
+    rad = []
+    for l, nl in zip(L, N):   # the part's thickness along each point's inward normal: a ray against every other edge
+        r = []
+        for i, (c, nv) in enumerate(zip(l, nl)):
+            d = 1.0; far = (c[0] + nv.x, c[1] + nv.y)
+            for a, b in segs:
+                if a == c or b == c: continue
+                h = geometry.intersect_line_line_2d(Vector(c), Vector(far), Vector(a), Vector(b))
+                if h: d = min(d, (h - Vector(c)).length)
+            r.append(min(R, 0.45 * d))
+        n = len(r); r = [min(r[(i + k) % n] for k in range(-2, 3)) for i in range(n)]
+        rad.append(r)
+    for _ in range(8):   # where the inset outlines still cross, shrink the radii there
+        ins = [[(c[0] + nv.x * r, c[1] + nv.y * r) for c, nv, r in zip(l, nl, rl)] for l, nl, rl in zip(L, N, rad)]
+        isg = [(k, i, l[i], l[(i + 1) % len(l)]) for k, l in enumerate(ins) for i in range(len(l))]
+        bad = set()
+        for x in range(len(isg)):
+            k, i, p, q = isg[x]
+            for y in range(x + 1, len(isg)):
+                k2, j, a, b = isg[y]
+                if k == k2 and (abs(i - j) <= 1 or abs(i - j) == len(ins[k]) - 1): continue   # neighbours share a point
+                if _seg_x(p, q, a, b):
+                    for kk, ii in ((k, i), (k2, j)):
+                        n = len(ins[kk])
+                        for s in (-1, 0, 1, 2): bad.add((kk, (ii + s) % n))
+        if not bad: break
+        for kk, ii in bad: rad[kk][ii] *= 0.6
+    bm = bmesh.new(); h = w / 2
+    caps = {+1: [], -1: []}
+    for l, nl, rl in zip(L, N, rad):
+        n = len(l)
+        def ring(sd, j):
+            out = []
+            for c, nv, r in zip(l, nl, rl):
+                ph = math.pi / 2 * j / seg; ins = r * (1 - math.sin(ph))
+                out.append(bm.verts.new((sd * (h - r + r * math.cos(ph)), c[0] + nv.x * ins, c[1] + nv.y * ins)))
+            return out
+        rings = [ring(+1, j) for j in range(seg + 1)] + [ring(-1, j) for j in range(seg, -1, -1)]
+        for A, B in zip(rings, rings[1:]):
+            for i in range(n): bm.faces.new((A[i], A[(i + 1) % n], B[(i + 1) % n], B[i]))
+        caps[+1].append(rings[0]); caps[-1].append(rings[-1])
+    for sd, rs in caps.items():   # the flat sides: the inset outlines (with their holes) triangulated
+        flat = [v for r in rs for v in r]
+        for tri in geometry.tessellate_polygon([[(v.co.y, v.co.z, 0) for v in r] for r in rs]):
+            try: bm.faces.new([flat[t] for t in tri])
+            except ValueError: pass
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-7)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    me = bpy.data.meshes.new('slab'); bm.to_mesh(me); bm.free()
     me['w0'] = w
     return me
+
+def _inside(p, poly):
+    c = False
+    for i in range(len(poly)):
+        (x1, y1), (x2, y2) = poly[i - 1], poly[i]
+        if (y1 > p[1]) != (y2 > p[1]) and p[0] < x1 + (p[1] - y1) * (x2 - x1) / (y2 - y1): c = not c
+    return c
 
 def loft(rings, cap=True):
     """Skin a list of equal-length rings of (x, y, z) points; capped at both ends."""
