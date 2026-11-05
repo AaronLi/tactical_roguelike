@@ -162,7 +162,18 @@ def _on_wedge(me, lift):   # a flat thing lying on the wedge's slope (made flat 
     me.transform(Matrix.Translation((0, SCR_F0, 0.030 + lift)) @ Matrix.Rotation(tilt, 4, 'X') @ Matrix.Translation((0, -SCR_F0, 0))); return me
 bz = K.tmp(_on_wedge(box(SCR_X0 + 0.5 * mm, SCR_X1 - 0.5 * mm, SCR_F0 + 0.004, SCR_F1 - 0.002, 0, 1.2 * mm), 0.0))
 cut(bz, _on_wedge(box(SCR_X0 + 1.6 * mm, SCR_X1 - 1.6 * mm, SCR_F0 + 0.007, SCR_F1 - 0.005, 0.4 * mm, 0.004), 0.0)); smooth(bz); K.adopt(bz, 'base', 'rubber')
-scr = K.obj(_on_wedge(box(SCR_X0 + 1.6 * mm, SCR_X1 - 1.6 * mm, SCR_F0 + 0.007, SCR_F1 - 0.005, 0, 0.6 * mm), 0.0), 'base', 'glass'); scr.name = 'display_ammo'
+# the glass under it (a dark plate), and the DISPLAY SURFACE on it: one quad with UVs (u across, left to right; v along, from the shooter's
+# end away), extras.display the canvas size (64 x 256: the screen's 1:4 shape; six rows of seven pips, a row a barrel)
+o = K.obj(_on_wedge(box(SCR_X0 + 1.6 * mm, SCR_X1 - 1.6 * mm, SCR_F0 + 0.007, SCR_F1 - 0.005, 0, 0.5 * mm), 0.0), 'base', 'glass')
+import bmesh as _bmd
+_b = _bmd.new(); _uv = _b.loops.layers.uv.new('UVMap')
+_q = [(SCR_X0 + 1.8 * mm, SCR_F0 + 0.0072), (SCR_X1 - 1.8 * mm, SCR_F0 + 0.0072), (SCR_X1 - 1.8 * mm, SCR_F1 - 0.0052), (SCR_X0 + 1.8 * mm, SCR_F1 - 0.0052)]
+_v = [_b.verts.new((x, f, 0.0)) for x, f in _q]
+_fc = _b.faces.new(_v)
+for lp, (u, v) in zip(_fc.loops, ((0, 0), (1, 0), (1, 1), (0, 1))): lp[_uv].uv = (u, v)
+_me = bpy.data.meshes.new('tmp'); _b.to_mesh(_me); _b.free()
+scr = K.obj(_on_wedge(_me, 0.55 * mm), 'base', 'display'); scr.name = 'display_ammo'
+scr['display'] = {'width': 64, 'height': 256}
 # the fire-mode dial (left side, over the grip): semi, low, high, double, sextuple
 o = K.obj(cyl(7 * mm, -27.5 * mm, -24.5 * mm, 'x', (0.058, 0.012), 24), 'base', 'black'); smooth(o)
 o = K.obj(box(-28.2 * mm, -27 * mm, 0.0565, 0.0595, 0.012, 0.0185), 'base', TI)
