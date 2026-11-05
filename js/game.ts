@@ -1366,6 +1366,7 @@ const G_Game = {
     this.screen(null);
     G.HUD.show(true);
     G.HUD.toast('THE HANGAR', `Level ${level} cleared · look at what you want and press <b>F</b>`, 4);
+    G.Shop.wishNotice(); // (starred parts in this visit's stock)
     if (this.lastBonus) G.HUD.chat(null, 0, `Mission bonus: +¢${this.lastBonus}`);
     if (!this.locked) this.$('clickToPlay').classList.remove('hidden');
     this.veilSay('Placing everyone');

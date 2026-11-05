@@ -724,7 +724,7 @@ const G_Hangar = (() => {
     const Sh = G.Shop, O = Sh.offers!;
     if (S.rosterKey !== rosterKey()) { enter(S.map); return; } // (someone joined or left: the benches are theirs)
     // only when something's changed (each change draws new signs)
-    const parts0 = [...(Sh.partStock || [])], prec0 = [...(Sh.precStock || [])], key = JSON.stringify([O.gear, parts0, prec0, Sh.stock]);
+    const parts0 = [...(Sh.partStock || [])].sort((a, b) => +Sh.wished(b as string) - +Sh.wished(a as string)), prec0 = [...(Sh.precStock || [])], key = JSON.stringify([O.gear, parts0, prec0, Sh.stock, parts0.concat(prec0).filter((i) => Sh.wished(i as string))]);
     if (!force && key === S.key) { vending(false); return; }
     S.key = key;
     // the pedestals: the five pieces of gear
@@ -744,15 +744,15 @@ const G_Hangar = (() => {
     const onShow = (S.partStands || []).map((tg: HangarTarget, i: number) => [tg, parts0[i]]).concat((S.precStands || []).map((tg: HangarTarget, i: number) => [tg, prec0[i]])) as [HangarTarget, string][];
     onShow.forEach(([tg, id]: [HangarTarget, string]) => {
       const p = id && G.Gunsmith.PARTS[id];
-      const left = p ? Sh.count('part:' + id) : 0;
+      const left = p ? Sh.count('part:' + id) : 0, wish = !!p && Sh.wished(id);
       tg.key = id || null; tg.sold = !p || !left;
       clear(tg.disp!); tg.spin = null;
       if (p && left) { const sh = tg.signTop ? partPiece(id, OUT.size, tg.signTop) : partPiece(id); tg.disp!.add(sh.root); tg.spin = sh.spin; }
       const n = p ? G.Gunsmith.fitsPart(p).length : 0;
-      const lines = !p ? ['—'] : !left ? [p.name, 'SOLD'] : [p.name, money(p.price) + (left > 1 ? ' · ' + left + ' left' : ''), `${G.Gunsmith.SLOT_LABEL[p.slot]}${n ? ' · fits ' + n + (n > 1 ? ' weapons' : ' weapon') : ''}`];
+      const lines = !p ? ['—'] : !left ? [p.name, 'SOLD'] : [(wish ? '★ ' : '') + p.name, money(p.price) + (left > 1 ? ' · ' + left + ' left' : ''), `${G.Gunsmith.SLOT_LABEL[p.slot]}${n ? ' · fits ' + n + (n > 1 ? ' weapons' : ' weapon') : ''}`];
       const SH = Math.min(0.62, 0.22 + 0.12 * lines.length);
       if (tg.sign!.material.map) tg.sign!.material.map.dispose(); tg.sign!.material.dispose();
-      tg.sign!.material = signMat(lines, 384, Math.round(384 * SH / 0.6), '#101418', left ? '#ffd24a' : '#ff6a5a', '#ffffff');
+      tg.sign!.material = signMat(lines, 384, Math.round(384 * SH / 0.6), '#101418', left ? (wish ? '#ffffff' : '#ffd24a') : '#ff6a5a', '#ffffff');
       tg.sign!.scale.set(1, SH / 0.4, 1);
       tg.sign!.position.y = 0.08 + ((tg.signTop || PARTS.top) - 0.11) / 2;
     });

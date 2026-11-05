@@ -473,7 +473,7 @@ const G_GunsmithUI = (() => {
       const plainOut = (p: Part) => (cur.slot === 'grip' ? (skinned ? GS.plainGrip(p) : GS.plainHere(p, def.id)) : !!p.skin && (p.alt || GS.sameFamily(fitted, p) || famStashed(p)));
       const parts = GS.compatible(cur.mount).filter((p: Part) => GS.fitsLen(p, def.id, build) && (!p.factory || p.plat === def.id || (Me.stash || {})[p.id] || build[cur.slot] === p.id) && !(p.not || []).includes(def.id) && (!plainOut(p) || own(p)));
       const rank = (p: Part) => (build[cur.slot] === p.id ? 0 : (Me.stash || {})[p.id] ? 1 : atShowcase(p) && !needed(p) ? 3 : forSale(p) ? 2 : 4);
-      parts.sort((a: Part, b: Part) => rank(a) - rank(b) || (a.len != null && b.len != null ? a.len - b.len : 0) || a.price - b.price); // (barrels: by length)
+      parts.sort((a: Part, b: Part) => rank(a) - rank(b) || +G.Shop.wished(b.id) - +G.Shop.wished(a.id) || (a.len != null && b.len != null ? a.len - b.len : 0) || a.price - b.price); // (barrels: by length)
       let head = false;
       for (const p of parts) {
         const r = rank(p), n = (Me.stash || {})[p.id] || 0, factoryHere = p.factory && p.plat === def.id;
@@ -484,8 +484,8 @@ const G_GunsmithUI = (() => {
         else if (r === 1) action = `<button class="btn small buy" data-ginstall="${p.id}">Fit (stash ×${n})</button> <button class="btn small" data-gsell="${p.id}">Sell ¢${G.U.fmt(GS.sellPrice(p))}</button>${p.skin && GS.skinsOf(def.id, p).length > 1 ? ` <select class="gs-skin" data-gskinstash="${p.id}" ${G.Shop.ready ? 'disabled' : ''}>${GS.skinsOf(def.id, p).map((q: any) => `<option value="${q.id}"${q === p ? ' selected' : ''}>${G.U.esc(q.skinName || q.name)}</option>`).join('')}</select>` : ''}`;
         else if (r === 2 || r === 3) action = `<button class="btn small buy" data-ginstall="${p.id}" ${Me.credits < GS.buyPrice(p) ? 'disabled' : ''}>¢${G.U.fmt(GS.buyPrice(p))}</button>`;
         else action = `<span class="tag">${factoryHere ? 'Comes with the gun' : p.tier > Math.min(3, 1 + Math.floor((G.Shop.level || 1) / 2)) ? 'Available later' : 'Out of stock'}</span>`;
-        list += `<div class="gs-part${r === 0 ? ' fitted' : ''}${r === 4 ? ' na' : ''}" data-gpart="${p.id}">
-          <div class="gs-pn"><small>${G.U.esc(p.brand)}</small>${G.U.esc(p.name)}${fitsLine(p, def.id)}</div>
+        list += `<div class="gs-part${r === 0 ? ' fitted' : ''}${r === 4 ? ' na' : ''}${G.Shop.wished(p.id) ? ' wished' : ''}" data-gpart="${p.id}">
+          <div class="gs-pn">${G.Shop.star(p.id)}<small>${G.U.esc(p.brand)}</small>${G.U.esc(p.name)}${fitsLine(p, def.id)}</div>
           <div class="gs-pe">${partEffects(p, def.id) || '<span>—</span>'}</div>
           <div class="gs-pa">${action}</div></div>`;
       }
@@ -534,6 +534,7 @@ const G_GunsmithUI = (() => {
     if (t.closest('[data-gstkmove]')) { st.stkAt = null; st.stkDirty = true; G.Audio.click(); return stkPanel(); }
     const gs = t.closest('[data-gslot]'); if (gs) { st.slot = gs.dataset.gslot; st.hoverPart = null; G.Audio.click(); return refresh(); }
     const gd = t.closest('[data-gdot]'); if (gd) { st.slot = gd.dataset.gdot; st.hoverPart = null; G.Audio.click(); return refresh(); }
+    const gwish = t.closest('[data-wish]'); if (gwish) { G.Shop.toggleWish(gwish.dataset.wish); G.Audio.click(); return refresh(); }
     const gi = t.closest('[data-ginstall]'); if (gi && !gi.disabled) return install(st.slot!, gi.dataset.ginstall);
     const gr = t.closest('[data-gremove]'); if (gr) return remove(gr.dataset.gremove);
     const gl = t.closest('[data-gsell]'); if (gl) return sell(gl.dataset.gsell);
