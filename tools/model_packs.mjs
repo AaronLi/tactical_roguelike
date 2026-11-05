@@ -99,6 +99,7 @@ export function devOf(norm, rigid, actual) {
  * One kind of offset: RIGID (a part moves another slot's unit: delta[t][s][part], measured off the reference build and filled out from the other bases).
  */
 export function analyze(C) {
+  const isPistol = !!(C.GS.PLATFORMS[C.id] && C.GS.PLATFORMS[C.id].arch === 'pistol');
   const { id, sw, bases } = C, builds = C.all(), Rb = bases[R].build, Rp = (s) => Rb[s] || '';
   const tagsAll = new Set(); for (const B of builds) for (const t of Object.keys(B.tags)) tagsAll.add(t);
   const slotsAll = new Set(); for (const B of builds) for (const s of Object.keys(B.build)) slotsAll.add(s);
@@ -108,7 +109,7 @@ export function analyze(C) {
     if (e.slot == null) continue;
     const base = bases[e.base], casc = cascadeOf(e, base);
     for (const t of tagsAll) {
-      if (casc.has(t)) continue; // (the slot of this tag was changed by pruning, not by the swap: its own part is why it differs)
+      if (casc.has(t) || (isPistol && t.split('@').some((x) => casc.has(x)))) continue; // (the slot of this tag was changed by pruning, not by the swap: its own part is why it differs)
       const d = diffUnits(base.tags[t], e.B.tags[t]);
       obs[t].push({ e, d });
       if (d.kind === 'shape') depShape[t].add(e.slot);
@@ -140,7 +141,7 @@ export function analyze(C) {
     }
     return { ok: true, rigid };
   };
-  const state = {};
+  const state = {}, droppedEn = new Set(), pendingEn = new Set();
   let iter = 0;
   for (; iter < 24; iter++) {
     let changed = false;
@@ -172,11 +173,27 @@ export function analyze(C) {
             const r = rigidOf(t, X.build); if (!r.ok) return false;
             return devOf(px.norm, r.rigid, X.tags[t]) <= GEO_TOL;
           };
+          // A slot that only ENABLES the tag's own slot (a pistol chassis opens the foregrip slot: no foregrip can be set without it) is not blamed the first time: the
+          // tag is keyed by its own slot's part alone, which holds wherever that part can be fitted at all. (If the closure fails again with it, it stays blamed.)
+          const own = t.includes('@') && slotsAll.has(t.split('@')[1]) ? t.split('@')[1] : t.split('@')[0];
+          const dropEnablers = (set) => {
+            if (set.length < 2 || !set.includes(own) || !(C.GS.PLATFORMS[id] && C.GS.PLATFORMS[id].arch === 'pistol')) return set; // (pistols only so far: on the rifles it broke the ppsh's tacL, whose rail does depend on the handguard that opens it)
+            const full = step(set);
+            return set.filter((s) => {
+              if (s === own || droppedEn.has(t + '|' + s)) return true;
+              const without = step(set.filter((x) => x !== s));
+              const enabler = (without.build[own] || '') !== (B.build[own] || '') && (full.build[own] || '') === (B.build[own] || '');
+              if (enabler) pendingEn.add(t + '|' + s);
+              return !enabler;
+            });
+          };
           const culprits = cand.filter((s) => !good(step([s])));
-          if (culprits.length) { for (const s of culprits) add.add(s); continue; }
-          for (const s of shrink(cand, (slots) => !good(step(slots))) || cand) add.add(s);
+          if (process.env.DBGDEP === t) console.log('BLAME', t, 'cand', cand.join(), 'culprits', culprits.join(), JSON.stringify(B.build));
+          if (culprits.length) { for (const s of dropEnablers(culprits)) add.add(s); continue; }
+          for (const s of dropEnablers(shrink(cand, (slots) => !good(step(slots))) || cand)) add.add(s);
         }
       }
+      for (const k2 of pendingEn) droppedEn.add(k2); pendingEn.clear();
       for (const s of add) if (s) { depShape[t].add(s); depMove[t].delete(s); changed = true; }
       state[t] = { dep, caps, norms };
     }

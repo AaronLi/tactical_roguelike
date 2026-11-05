@@ -763,7 +763,7 @@ const G_Gunsmith = (() => {
   P('aug9', 'rifle', { rcv: 'aug', siderails: true, mag: { f: 0.224, y: -0.074 }, L: 0.539, rm: 'black', fm: 'od', grip: 0.339, support: 0.542, optF: 0.42, cheek: 0.19, vfgM: 'od', cock: { f: 0.493, y: 0.0114, x: -0.024, travel: 0.09, recip: true, style: 'fold' } }, { barrel: { len: 0.12, m: 'black' }, thread: 'r9', muzzle: 'crown', grip: ['ar', 'ar'], mag: { t: 'pistol', f: 0.224, y: -0.074 }, optic: ['pic', { optic: 'augscope' }] });
   P('sawn', 'rifle', { rcv: 'break', L: 0.12, fm: 'wood', barrels: [-0.0105, 0.0105], gripT: 'wood', grip: 0.0, support: 0.16 }, { barrel: { len: 0.26, r: 0.0105 }, handguard: ['classic', { t: 'wood', len: 0.12 }], grip: ['ak', 'wood', 'wood'], optic: ['pic', { optic: 'bead' }] });
   // pistols
-  const pst = (id: string, slide: any, gm: any, extra?: any) => P(id, 'pistol', Object.assign({ gm }, extra), { slide, pbarrel: true, grip: ['pistol', null, gm], mag: { t: 'pistol' }, optic: ['pso', { optic: 'notch' }], ptac: true });
+  const pst = (id: string, slide: any, gm: any, extra?: any) => P(id, 'pistol', Object.assign({ gm, len0: slide.len }, extra), { slide, pbarrel: true, grip: ['pistol', null, gm], mag: { t: 'pistol' }, optic: ['pso', { optic: 'notch' }], ptac: true });
   pst('p9', { len: 0.175, w: 0.0275 }, 'polymer', { look: 'p9' });
   pst('usp', { len: 0.2, w: 0.0285 }, 'polymer', { look: 'usp' });
   pst('m1911', { len: 0.191, sm: 'blued', w: 0.0235 }, 'chequerWood', { fm: 'blued', look: 'm1911' });
@@ -1126,7 +1126,7 @@ const G_Gunsmith = (() => {
     .forEach(([k, b, n, t, price, st, tier, sup, d]: any[]) => add({ id: `mz.r22.${k}`, slot: 'muzzle', mount: 'mz:r22', brand: BR[b], name: n, desc: d, price, tier, st, set: { device: DEV[t], sup, can: CAN[t] }, model: { muzzle: t } }));
   for (const fam of ['r9', 'r556']) for (const q of BY_MOUNT.get('mz:' + fam)!.slice()) { q.alsoMounts = (q.alsoMounts || []).concat('mz:r22'); BY_MOUNT.get('mz:r22')!.push(q); }
   PSTOCK.add('tx22');
-  P('tx22', 'pistol', { gm: 'polymer', look: 'tx22' }, { slide: { len: 0.1728, w: 0.0255 }, pbarrel: 'r22', grip: ['pistol', null, 'polymer'], mag: { t: 'pistol', len: 0.13 }, optic: ['pso', { optic: 'notch' }], ptac: true });
+  P('tx22', 'pistol', { gm: 'polymer', look: 'tx22', len0: 0.1728 }, { slide: { len: 0.1728, w: 0.0255 }, pbarrel: 'r22', grip: ['pistol', null, 'polymer'], mag: { t: 'pistol', len: 0.13 }, optic: ['pso', { optic: 'notch' }], ptac: true });
   { const plat = PLATFORMS.tx22; plat.offset = {}; for (const k of STAT_KEYS) plat.offset[k] = -Object.values(plat.defaults).reduce((a, pid) => a + ((PARTS[pid] && PARTS[pid].st[k]) || 0), 0); }
 
   // The QBZ-95, QBZ-192 and SIG MCX (and what they brought: the 5.8×42 thread, the folding-stock hinge the MCX and the
