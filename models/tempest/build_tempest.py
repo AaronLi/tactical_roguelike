@@ -14,17 +14,18 @@
 #     centre, and one more centred below them; held by CNC titanium: a breech block (the firing contacts on its face, a pin each side
 #     that sits in the cradle) and two pocketed clamp plates.
 #   FIXED CHASSIS (base, titanium): runs on from the panel under the barrels' rear to the hinge (200 mm), with the hinge's outer knuckles.
-#   BACK PANEL (base, titanium): small (85 mm): only the battery, the control board and the LCD; the buffer tube's boss on its rear face (mount_stock), the AR pistol
+#   BACK PANEL (base, titanium): small (85 mm): only the battery, the control board and the LCD; a vertical Picatinny section on its rear face (the stock's interface, mount_stock), the AR pistol
 #     grip's seat under it (mount_grip), trigger and guard, a fire-mode dial, a screen on a wedge on its top left (display_ammo:
 #     the rounds left in each barrel), the hinge's outer knuckles at its front foot.
 #   SIGHT RAIL (base): a low titanium beam from the back panel's top, 3 mm over the barrel block, 75 mm past the panel: for the reload the
 #     muzzle device first runs forward on its guide rods (part_pump), drawing the block out from under it; then the forend drops.
+#   (the forend is two titanium ARMS from the hinge, along the barrels, down to a rod housing: see FOREND below)
 #   FRONT (part_brk: hinged under the back panel's front, between the grip and the foregrip; it drops for the reload, then the barrel
 #     block is lifted up and out of it): the LOWER SUPPORT BODY (slot handguard, titanium): a cradle under and beside the barrels, side
 #     rails (mount_tac, mount_tacL), a bottom rail for a foregrip (mount_fg), lightening slots, the hinge's centre knuckle; and the MUZZLE
 #     DEVICE (slot muzzle, titanium, part_pump: it slides): a six-bore block on two machined truss struts, each standing on a sleeve round
 #     a steel guide rod that runs back into a bore in the forend's floor; the barrels' muzzles seat in its rear face.
-#   STOCK (slot stock): the buffer tube and a skeletal stock. GRIP (slot grip): an AR-pattern grip. OPTIC: low titanium irons.
+#   STOCK (slot stock): a twin-rod telescoping stock on a folding adapter clamped to the rear rail. GRIP (slot grip): an AR-pattern grip. OPTIC: low titanium irons.
 import bpy, json, math, os
 HERE = globals().get('GUN_DIR') or os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
@@ -96,7 +97,7 @@ bevel(ch, 2 * mm, 2, 30)
 cut(ch, prism(circles_hull(BORES, RB + 5.6 * mm, 24) + [(-RB - 5.6 * mm - D, 0.03), (RB + 5.6 * mm + D, 0.03)], 'y', BP1 - 0.01, CH1 + 0.01))   # its channel
 # the same extrusion as the forend's rear: the cheeks down to a fluted side member, the floor up to a web (the hinge's leaves stay)
 for s in (-1, 1):
-    cut(ch, box(s * 19 * mm, s * 30 * mm, BP1 + 0.010, CH1 - 0.008, -0.034, 0.02))
+    cut(ch, box(s * 19 * mm, s * 30 * mm, BP1 + 0.010, CH1 + 0.010, -0.034, 0.02))
     for z in (-0.0385, -0.0445):
         cut(ch, box(s * 26.3 * mm, s * 28 * mm, BP1 + 0.002, CH1 + 0.002, z - 1.2 * mm, z + 1.2 * mm))
     for f in (BP1 + 0.012, CH1 - 0.016):
@@ -105,7 +106,10 @@ for s in (-1, 1):
 cut(ch, box(-9 * mm, 9 * mm, BP1 + 0.016, CH1 - 0.036, -0.06, -0.0365))   # a window through the floor
 smooth(ch); K.adopt(ch, 'base', TI)
 # the buffer tube's boss on the rear face, and the screen beside it (display_ammo: the game paints the rounds left per barrel)
-o = K.obj(cyl(17 * mm, -0.010, 0.002, 'y', (0, 0), 28), 'base', TI); bevel(o, 1 * mm, 2); smooth(o)
+# the STOCK INTERFACE: a vertical Picatinny section on the rear face (a folding or fixed stock clamps on it)
+SR0, SR1 = -0.034, 0.012
+rr = picatinny(K, 0.0, SR1 - SR0, 0.0, 'base', RAIL_M)
+rr.data.transform(Matrix.Translation((0, 0, SR0)) @ Matrix.Rotation(math.pi / 2, 4, 'X'))       # (its length up the face, its top facing back)
 # the AMMO SCREEN (display_ammo: the game paints the rounds left in each of the six barrels): on a wedge on the back panel's top left,
 # beside the rail, tilted back towards the shooter's eye; a rubber bezel round it
 SCR_F0, SCR_F1, SCR_X0, SCR_X1, SCR_RISE = 0.024, 0.072, -24.5 * mm, -12.5 * mm, 0.014
@@ -144,17 +148,31 @@ cut(top_rail, box(-GROOVE_W / 2, GROOVE_W / 2, 0.0, RAIL_F1 + 0.01, RAIL_TOP - G
 SY = RAIL_TOP - GROOVE_D
 
 # ================================================== STOCK and GRIP ==================================================
-o = K.obj(lathe([(-0.002, 14.5 * mm), (-0.008, 14.5 * mm), (-0.010, 15.5 * mm), (-0.014, 15.5 * mm), (-0.016, 14.5 * mm), (-0.205, 14.5 * mm), (-0.208, 13 * mm)], 24), 'stock', 'black')
-for f in (-0.060, -0.090, -0.120, -0.150, -0.180):
-    cut(o, cyl(1.8 * mm, -0.02, -0.01, 'z', (0, f), 10))
-smooth(o)
-st = K.tmp(prism([(-0.105, 0.018), (-0.270, 0.022), (-0.285, 0.020), (-0.288, -0.085), (-0.270, -0.088), (-0.250, -0.060), (-0.200, -0.030),
-                  (-0.105, -0.022)], 'x', -16 * mm, 16 * mm))
-bevel(st, 2 * mm, 2, 30)
-cut(st, cyl(15.2 * mm, -0.30, -0.10, 'y', (0, 0), 24))
-cut(st, prism([(-0.215, -0.030), (-0.262, -0.030), (-0.268, -0.072), (-0.255, -0.072)], 'x', -0.03, 0.03))
-smooth(st); K.adopt(st, 'stock', 'polymer')
-o = K.obj(prism([(-0.282, 0.024), (-0.300, 0.024), (-0.300, -0.090), (-0.282, -0.090)], 'x', -17 * mm, 17 * mm), 'stock', 'rubber'); bevel(o, 2 * mm, 2); smooth(o)
+# the STOCK (slot stock): a folding adapter clamped on the rear rail (its hinge on the left: it folds along the gun's left side), two
+# telescoping rods, a cheek piece riding them, a polymer buttplate with a QD socket and a ribbed rubber pad
+RH = 5.6 * mm                                                       # (the rail stands this far behind the face)
+ad = K.tmp(prism([(-RH, -0.038), (-0.032, -0.038), (-0.036, -0.030), (-0.036, 0.010), (-0.032, 0.016), (-RH, 0.016)], 'x', -13 * mm, 13 * mm))
+bevel(ad, 2 * mm, 2, 30)
+cut(ad, box(-11 * mm, 11 * mm, -RH - 0.001, -RH + 0.002, SR0 - 0.001, SR1 + 0.001))               # (it sits over the rail)
+smooth(ad); K.adopt(ad, 'stock', 'black')
+o = K.obj(cyl(6 * mm, -0.038, 0.016, 'z', (-13 * mm, -0.020), 20), 'stock', 'black'); smooth(o)        # the fold hinge (left)
+o = K.obj(cyl(3.5 * mm, 13 * mm, 15.5 * mm, 'x', (-0.020, -0.012), 14), 'stock', 'steel'); smooth(o)   # the clamp's lock button (right)
+for x in (-8 * mm, 8 * mm):                                                                          # the rods
+    o = K.obj(cyl(5 * mm, -0.250, -0.034, 'y', (x, -0.008), 16), 'stock', 'black'); smooth(o)
+ck = K.tmp(prism([(-0.150, 0.010), (-0.160, 0.024), (-0.236, 0.030), (-0.240, 0.012), (-0.240, -0.018), (-0.150, -0.018)], 'x', -16 * mm, 16 * mm))
+bevel(ck, 2.5 * mm, 3, 30)
+for x in (-8 * mm, 8 * mm): cut(ck, cyl(5.2 * mm, -0.30, -0.10, 'y', (x, -0.008), 16))
+smooth(ck); K.adopt(ck, 'stock', 'polymer')                                                          # the cheek piece
+bt = K.tmp(prism([(-0.238, 0.034), (-0.262, 0.036), (-0.266, -0.092), (-0.244, -0.094), (-0.238, -0.040)], 'x', -17 * mm, 17 * mm))
+bevel(bt, 3 * mm, 3, 30)
+cut(bt, prism(rounded(-0.252, -0.060, 0.006, 0.018, 3 * mm, 2), 'x', -0.03, 0.03))                 # a lightening window
+for x in (-8 * mm, 8 * mm): cut(bt, cyl(5.2 * mm, -0.30, -0.10, 'y', (x, -0.008), 16))
+smooth(bt); K.adopt(bt, 'stock', 'polymer')                                                          # the buttplate
+o = K.obj(cyl(5 * mm, -17.6 * mm, -15 * mm, 'x', (-0.252, -0.025), 16), 'stock', 'steel'); smooth(o)   # its QD sling socket
+pad = K.tmp(prism([(-0.264, 0.036), (-0.278, 0.036), (-0.280, 0.030), (-0.280, -0.090), (-0.278, -0.096), (-0.264, -0.096)], 'x', -17.5 * mm, 17.5 * mm))
+bevel(pad, 3 * mm, 3, 30)
+for i in range(7): cut(pad, box(-0.03, 0.03, -0.283, -0.277, -0.084 + i * 0.018, -0.080 + i * 0.018))   # its ribs
+smooth(pad); K.adopt(pad, 'stock', 'rubber')
 GRIP_SEAT = (0.006, -0.062)
 gp = K.tmp(prism([(0.006, -0.060), (0.038, -0.060), (0.028, -0.083), (0.020, -0.093), (0.016, -0.108), (0.000, -0.160), (-0.028, -0.160),
                   (-0.034, -0.152), (-0.026, -0.108), (-0.018, -0.068)], 'x', -14 * mm, 14 * mm))
@@ -162,42 +180,50 @@ bevel(gp, 3 * mm, 3, 30); smooth(gp); K.adopt(gp, 'grip', 'stipple')
 
 # ================================================== FRONT (part_brk): lower support body + muzzle device ==================================================
 pbrk = K.part('brk', (0, HINGE[0], HINGE[1]))
-FLOOR, CH = -0.052, LOW - 1.5 * mm                       # the body's underside; the channel's floor (under the lowest barrel)
-TAC0, TAC1, FG0, FG1 = HG1 - 0.140, HG1 - 0.012, HG1 - 0.200, HG1 - 0.012      # short rails where a light and a foregrip go
-body = K.tmp(prism([(CH1 + 0.003, -0.054), (CH1 + 0.016, FLOOR), (HG1 - 0.008, FLOOR), (HG1, FLOOR + 0.006), (HG1, -0.002), (CH1 + 0.003, -0.002)],
-                   'x', -27 * mm, 27 * mm))
-bevel(body, 2 * mm, 3, 30)
-cut(body, prism(circles_hull(BORES, RB + 1.5 * mm, 24) + [(-RB - 1.5 * mm - D, 0.03), (RB + 1.5 * mm + D, 0.03)], 'y', CH1 - 0.01, HG1 + 0.01))  # the cradle's channel
-for s in (-1, 1):
-    for i in range(4):   # lightening slots in the cheeks above the side rails
-        f = CH1 + 0.040 + i * 0.068
-        cut(body, prism(rounded(f, -0.010, 0.024, 0.0055, 3 * mm, 2), 'x', s * 18 * mm, s * 28 * mm))
-    for i in range(6):   # and a row of pockets along the floor's sides
-        f = CH1 + 0.030 + i * 0.048
-        cut(body, prism(rounded(f, FLOOR + 0.0085, 0.016, 0.0028, 1.5 * mm, 2), 'x', s * 25.5 * mm, s * 28 * mm))
-# behind the rails the body is an EXTRUSION, not a block: the cheeks cut down to a slim side member (a fluted profile, like extruded
-# aluminium but titanium), the floor raised to a thin web under the channel, from just ahead of the knuckle to the rails
-X0, X1 = CH1 + 0.020, TAC0 - 0.006
-EXU = -0.034                                                        # the side members' top (just over the lowest barrels' axis)
-for s_ in (-1, 1):
-    cut(body, box(s_ * 19 * mm, s_ * 30 * mm, X0, X1, EXU, 0.02))
-    for z in (EXU - 0.0045, EXU - 0.0105):                          # the extrusion's flutes along its outside
-        cut(body, box(s_ * 26.3 * mm, s_ * 28 * mm, X0 - 0.004, X1 + 0.004, z - 1.2 * mm, z + 1.2 * mm))
-cut(body, box(-0.03, 0.03, X0, FG0 - 0.008, FLOOR - 0.01, -0.050))   # the floor up to a web
-cut(body, box(-9 * mm, 9 * mm, X0 + 0.010, FG0 - 0.018, -0.051, CH + 0.0005))   # and a long window through it
-# the hinge's centre knuckle: a round boss on the body's rear foot between the panel's knuckles, bored for the pin
-boolean(body, cyl(KN_R, -10.6 * mm, 10.6 * mm, 'x', HINGE, 28), 'UNION')
-cut(body, box(-11 * mm, -10.6 * mm, CH1 - 0.02, CH1 + 0.02, -0.08, -0.04)); cut(body, box(10.6 * mm, 11 * mm, CH1 - 0.02, CH1 + 0.02, -0.08, -0.04))
-cut(body, box(-25.5 * mm, -11 * mm, CH1 - 0.012, CH1 + 0.010, HINGE[1] - KN_R - 1 * mm, -0.050))   # (room for the outer knuckles)
-cut(body, box(11 * mm, 25.5 * mm, CH1 - 0.012, CH1 + 0.010, HINGE[1] - KN_R - 1 * mm, -0.050))
-cut(body, cyl(3.1 * mm, -0.03, 0.03, 'x', HINGE, 18))
+# the FOREND (slot handguard, titanium): no block. A hinge base (the centre knuckle and a cross plate) and two ARMS that rise from it
+# to the barrels' height, run along beside them (a rail on each's outside), and descend at the front to the ROD HOUSING: a cross member
+# under the barrels that carries the muzzle device's guide rods (and a short rail under it for a foregrip)
 ROD_X, ROD_U, ROD_R, ROD0 = 16 * mm, -0.0445, 4 * mm, HG1 - 0.150
-for s_ in (-1, 1):   # the railed section's lower edges chamfered (a slim, precise section, not a deep box)
-    cut(body, prism([(s_ * 21 * mm, FLOOR - 0.001), (s_ * 0.03, FLOOR - 0.001), (s_ * 0.03, FLOOR + 0.007)], 'y', X1 - 0.002, HG1 + 0.01))       # the muzzle device's guide rods: their bores in the forend's floor
-for s_ in (-1, 1): cut(body, cyl(ROD_R + 0.3 * mm, ROD0 - 0.005, HG1 + 0.01, 'y', (s_ * ROD_X, ROD_U), 16))
-smooth(body); K.adopt(body, 'handguard', TI, pbrk)
-picatinny(K, TAC0, TAC1, -0.034, 'handguard', RAIL_M, pbrk, 'right', 27 * mm)
-picatinny(K, TAC0, TAC1, -0.034, 'handguard', RAIL_M, pbrk, 'left', -27 * mm)
+AX0, AX1, AW = 23 * mm, 29.5 * mm, 0.022                          # the arms' inner and outer faces; their depth on the run
+RUN_U = -0.006                                                    # the run's centre height (the barrels' axis, nearly)
+HS0 = HG1 - 0.045                                                 # the rod housing's rear
+FLOOR = ROD_U - 0.008                                             # its underside
+TAC0, TAC1, FG0, FG1 = CH1 + 0.060, HS0 - 0.040, HS0 + 0.004, HG1 - 0.004      # the arms' rails; the housing's rail
+def band(path, w):
+    """The outline of a band of width w round a polyline (mitred joins), as one polygon."""
+    L, R = [], []
+    n = len(path)
+    for i in range(n):
+        p = path[i]
+        ds = []
+        if i > 0: ds.append((p[0] - path[i - 1][0], p[1] - path[i - 1][1]))
+        if i < n - 1: ds.append((path[i + 1][0] - p[0], path[i + 1][1] - p[1]))
+        nrm = [(-d[1] / math.hypot(*d), d[0] / math.hypot(*d)) for d in ds]
+        nx, ny = sum(q[0] for q in nrm), sum(q[1] for q in nrm); l = math.hypot(nx, ny); nx, ny = nx / l, ny / l
+        k = 1.0 / max(0.3, nx * nrm[0][0] + ny * nrm[0][1])            # (the mitre's lengthening)
+        L.append((p[0] + nx * w / 2 * k, p[1] + ny * w / 2 * k)); R.append((p[0] - nx * w / 2 * k, p[1] - ny * w / 2 * k))
+    return L + list(reversed(R))
+ARM = [(CH1 + 0.006, HINGE[1] - 0.002), (CH1 + 0.042, RUN_U), (HS0 - 0.022, RUN_U), (HS0 + 0.006, ROD_U), (HG1, ROD_U)]
+for s_ in (-1, 1):
+    a = K.tmp(prism(band(ARM, AW), 'x', s_ * AX0, s_ * AX1))
+    bevel(a, 1.5 * mm, 2, 30)
+    smooth(a); K.adopt(a, 'handguard', TI, pbrk)
+    picatinny(K, TAC0, TAC1, RUN_U, 'handguard', RAIL_M, pbrk, 'right' if s_ > 0 else 'left', s_ * AX1)
+# the hinge base: the centre knuckle (between the chassis's two), and a cross plate to both arms' feet
+hb = K.tmp(prism([(CH1 - 0.004, -0.058), (CH1 + 0.030, -0.058), (CH1 + 0.030, -0.072), (CH1 - 0.004, -0.072)], 'x', -AX1, AX1))
+boolean(hb, cyl(KN_R, -10.6 * mm, 10.6 * mm, 'x', HINGE, 28), 'UNION')
+bevel(hb, 1.5 * mm, 2, 30)
+cut(hb, box(-25.5 * mm, -10.6 * mm, CH1 - 0.012, CH1 + 0.010, HINGE[1] - KN_R - 1 * mm, -0.050))   # (room for the outer knuckles)
+cut(hb, box(10.6 * mm, 25.5 * mm, CH1 - 0.012, CH1 + 0.010, HINGE[1] - KN_R - 1 * mm, -0.050))
+cut(hb, cyl(3.1 * mm, -0.03, 0.03, 'x', HINGE, 18))
+cut(hb, prism(rounded(CH1 + 0.017, -0.065, 0.008, 0.0035, 2 * mm, 2), 'x', -0.012, 0.012))
+smooth(hb); K.adopt(hb, 'handguard', TI, pbrk)
+# the rod housing: a cross member under the barrels between the arms' feet, bored for the two guide rods, a pocket between them
+hs = K.tmp(prism([(HS0, FLOOR), (HG1, FLOOR), (HG1, LOW - 2 * mm), (HS0, LOW - 2 * mm)], 'x', -AX1, AX1))
+bevel(hs, 1.5 * mm, 2, 30)
+for s_ in (-1, 1): cut(hs, cyl(ROD_R + 0.3 * mm, HS0 - 0.01, HG1 + 0.01, 'y', (s_ * ROD_X, ROD_U), 16))
+cut(hs, prism(rounded((HS0 + HG1) / 2, (FLOOR + LOW) / 2 - 0.001, 0.014, 0.0035, 2 * mm, 2), 'x', -0.009, 0.009))
+smooth(hs); K.adopt(hs, 'handguard', TI, pbrk)
 picatinny(K, FG0, FG1, FLOOR, 'handguard', RAIL_M, pbrk, 'bottom')
 # ---- the SLIDING FRONT (part_pump, inside the forend): the muzzle device on its two truss arms, a yoke under it, and two steel guide
 # rods running back into the forend's floor; it runs forward SLIDE for the reload, drawing the barrel block ----
@@ -259,7 +285,7 @@ smooth(bb); K.adopt(bb, 'mag', TI, pm)
 for x, z in BORES:   # the firing contacts on its rear face
     o = K.obj(cyl(3.5 * mm, BR0 - 0.0008, BR0 + 0.001, 'y', (x, z), 12), 'mag', 'brass', pm)
 o = K.obj(cyl(3.5 * mm, -29 * mm, 29 * mm, 'x', (BR0 + 0.020, -0.004), 16), 'mag', 'steel', pm); smooth(o)   # the cradle pins
-for f0, rim in ((0.352, 4.5 * mm), (BR1 - 0.024, 1.2 * mm)):   # clamp plates: titanium, pocketed; the front one a slim band (the struts pass it)
+for f0, rim in ((0.352, 1.2 * mm), (BR1 - 0.024, 1.2 * mm)):   # clamp plates: titanium, pocketed; the front one a slim band (the struts pass it)
     cp = K.tmp(prism(circles_hull(BORES, RB + rim, 16), 'y', f0, f0 + 0.012))
     bevel(cp, 1.2 * mm, 2, 30)
     for x, z in BORES: cut(cp, cyl(RB + 0.05 * mm, f0 - 0.01, f0 + 0.022, 'y', (x, z), 16))
@@ -280,7 +306,7 @@ anchors = {
     'mount_optic': [0.012, round(RAIL_TOP, 4), 0], 'mount_optic_end': [round(RAIL_F1 - 0.002, 4), round(RAIL_TOP, 4), 0],
     'mount_handguard': [CH1, 0, 0], 'mount_handguard_end': [HG1, 0, 0],
     'mount_barrel': [BR0, 0, 0], 'mount_muzzle': [MZ0, 0, 0],
-    'mount_stock': [0, 0, 0], 'mount_grip': [GRIP_SEAT[0], GRIP_SEAT[1], 0], 'mount_mag': [MAG_AT[0], MAG_AT[1], 0],
+    'mount_stock': [0, round((SR0 + SR1) / 2, 4), 0], 'mount_grip': [GRIP_SEAT[0], GRIP_SEAT[1], 0], 'mount_mag': [MAG_AT[0], MAG_AT[1], 0],
     'mount_tac': [round((TAC0 + TAC1) / 2, 4), -0.034, 0.027 + 0.0056], 'mount_tacL': [round((TAC0 + TAC1) / 2, 4), -0.034, -0.027 - 0.0056],
     'mount_fg': [round((FG0 + FG1) / 2, 4), round(FLOOR - 0.0056, 4), 0],
 }
