@@ -37,7 +37,7 @@ jobs:
           key: models-${{ hashFiles('tools/**', 'js/parts.ts', 'js/data.ts', 'js/glb.ts', 'js/gunmaterials.ts', 'models/**', 'package-lock.json') }}
       - name: Bake the models
         if: steps.models.outputs.cache-hit != 'true'
-        run: npm run bake:models
+        run: npm run bake:models -- -j 4
       - run: npm run test:models
       - name: The site
         run: |

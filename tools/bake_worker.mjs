@@ -74,7 +74,7 @@ export function createHandlers(env) {
     const ex = {};
     for (const [k, v] of Object.entries(info)) {
       if (k === 'anim') { ex.anim = Object.fromEntries([...animNames].map(([o, nm]) => [nm, o.name])); continue; }
-      try { ex[k] = JSON.parse(JSON.stringify(v, (kk, vv) => (vv && vv.isObject3D ? undefined : vv))); } catch (e) { /* skip */ }
+      try { ex[k] = JSON.parse(JSON.stringify(v, function (kk, vv) { return vv && vv.isObject3D ? undefined : kk === "uuid" && this && this.metadata ? undefined : vv; })); } /* (a three Material serialises with a random uuid: dropped, so a bake is the same every time) */ catch (e) { /* skip */ }
     }
     group.userData.info = ex; group.userData.gun = id;
     return { ex, tris, meshes, hash: h.digest('hex').slice(0, 16) };
