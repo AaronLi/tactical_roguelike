@@ -59,8 +59,10 @@ K = Kit(coll, root)
 BP1 = 0.085                    # the back panel's front: it holds only the battery, the control board and the LCD
 BR0, BR1 = BP1 + 0.002, 0.558  # barrels: breech face to muzzles (471 mm, 18.5 in: they run back to the panel)
 BB1 = BR0 + 0.040              # the breech block's front
-ROUND_L, FREE = 0.0385, 0.120  # a round's length (10 x 38.5 mm); the free bore ahead of the front round
-ROUNDS = int((0.558 - BB1 - FREE) / ROUND_L)   # rounds in each barrel (8: 48 in the block)
+FREE = 0.120                   # the free bore ahead of the front round
+STACK = 0.558 - BB1 - FREE     # each barrel's stack: from the breech block's front to FREE short of the muzzle (311 mm)
+# the ROUNDS it takes: one block, the round decides how many fit (a standard 10 x 31 mm: ten a barrel, 60; a rifle 10 x 53 mm: five, 30)
+ROUND_TYPES = {'standard': 0.031, 'rifle': 0.053}
 MZ0, MZ1 = 0.560, 0.628        # the barrel extension's rear (the barrels' muzzles seat in its collar there); (the factory device's length: MZ1 - MZ0)
 # the BARREL EXTENSION: six steel tubes carrying the bores on from the barrels' muzzles to the muzzle device, so the LAST round in each
 # barrel gets a 20 in (508 mm) barrel: the bore from the breech block's front to the device's rear face
@@ -163,7 +165,7 @@ def _on_wedge(me, lift):   # a flat thing lying on the wedge's slope (made flat 
 bz = K.tmp(_on_wedge(box(SCR_X0 + 0.5 * mm, SCR_X1 - 0.5 * mm, SCR_F0 + 0.004, SCR_F1 - 0.002, 0, 1.2 * mm), 0.0))
 cut(bz, _on_wedge(box(SCR_X0 + 1.6 * mm, SCR_X1 - 1.6 * mm, SCR_F0 + 0.007, SCR_F1 - 0.005, 0.4 * mm, 0.004), 0.0)); smooth(bz); K.adopt(bz, 'base', 'rubber')
 # the glass under it (a dark plate), and the DISPLAY SURFACE on it: one quad with UVs (u across, left to right; v along, from the shooter's
-# end away), extras.display the canvas size (64 x 256: the screen's 1:4 shape; six rows of eight pips, a row a barrel)
+# end away), extras.display the canvas size (64 x 256: the screen's 1:4 shape; six rows of pips, a row a barrel (ten or five: the round loaded))
 o = K.obj(_on_wedge(box(SCR_X0 + 1.6 * mm, SCR_X1 - 1.6 * mm, SCR_F0 + 0.007, SCR_F1 - 0.005, 0, 0.5 * mm), 0.0), 'base', 'glass')
 import bmesh as _bmd
 _b = _bmd.new(); _uv = _b.loops.layers.uv.new('UVMap')
@@ -529,8 +531,12 @@ for f0, rim in ((BR1 - 0.024, 1.2 * mm), ):   # clamp plates: titanium, pocketed
 # ================================================== info and anchors ==================================================
 info = {
     'sy': round(SY, 4), 'fSight': 0.017, 'relief': 0.10,
-    'barrels': {'n': 6, 'rounds_each': ROUNDS, 'round_mm': [10, ROUND_L * 1000], 'free_bore_mm': round(FREE * 1000),
-                'effective_mm': [round((MD0 - (BB1 + (ROUNDS - 1 - k) * ROUND_L)) * 1000) for k in range(ROUNDS)]},   # (shot 1 .. ROUNDS of a barrel)
+    # per round type: its size, how many fit a barrel, and the bore ahead of each shot (shot 1 .. n of a barrel: the last always the 20 in)
+    'barrels': {'n': 6, 'free_bore_mm': round(FREE * 1000), 'stack_mm': round(STACK * 1000),
+                'rounds': {k: {'round_mm': [10, round(L_ * 1000, 1)], 'rounds_each': int(STACK / L_ + 1e-9),
+                               'effective_mm': [round((MD0 - (BB1 + (int(STACK / L_ + 1e-9) - 1 - j) * L_)) * 1000) for j in range(int(STACK / L_ + 1e-9))]}
+                           for k, L_ in ROUND_TYPES.items()},
+                'default': 'standard'},
     'muzzles': [[round(MZ_END, 4), round(z, 4), round(x, 4)] for x, z in BORES],
     # the barrels, in info.muzzles' order: 0 upper left, 1 upper right, 2 centre, 3 lower left, 4 lower right, 5 the single bottom one;
     # the triple mode fires a group (top: the upper pair and the centre; bottom: the lower pair and the bottom one)
