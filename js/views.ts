@@ -1,4 +1,5 @@
 'use strict';
+const WP = new THREE.Vector3(), WD = new THREE.Vector3(); // (a wound's place and direction: woundStreams)
 // Client-side representations of networked things: remote players, enemies, grenades.
 // Characters are G.Rig skeletons; their hitboxes ride the animated bones (see js/rig.ts).
 // A remote officer, as drawn here: their rig, and the latest state the host sent (st: short keys, see js/server.ts snap)
@@ -9,7 +10,7 @@ interface VwEnemy {
   id: number; type: string; def: any; rig: Rig; tac: number; pos: THREE.Vector3; tgt: THREE.Vector3; yaw: number; tgtYaw: number; hp: number; alive: boolean; deadT: number; lean: number;
   // set as it goes: from the snapshots (bleed, limp, reloading, down: its flags), by the kill and the cuffing, and by the frame's own bookkeeping
   scode?: number; str?: number; bleed?: boolean; limp?: boolean; reloading?: boolean; down?: boolean; surp?: boolean; doorOn?: boolean; doorT?: number; arrested?: boolean; bodySecured?: boolean;
-  pooled?: boolean; leanS?: number; dripT?: number; proneKey?: string; proneShift?: THREE.Vector3 | null; recPitch?: number; recTk?: number;
+  pooled?: boolean; wnd?: number[] | null; wacc?: number[]; ph?: number; wpool?: boolean; leanS?: number; dripT?: number; proneKey?: string; proneShift?: THREE.Vector3 | null; recPitch?: number; recTk?: number;
   [k: string]: any;
 }
 interface VwEvidence { mesh: THREE.Object3D; wpn: string; x: number; y: number; z: number; secured?: boolean; [k: string]: any }
@@ -155,7 +156,7 @@ const G_Views = {
   applySnap(m: any) {
     if (!this.warmed) { this.warmed = true; G.Game.veilSay('Compiling shaders'); setTimeout(() => { G.R.warmup(); G.Game.veilN = G.Game.VEIL_SMOOTH; G.Game.veilWait = 0; }, 60); } // (compile everything once the level's full, then a few frames drawn and the veil lifts: js/game.ts veil. The wait: time to draw that line first)
     const seen = new Set<number>();
-    for (const [id, type, x, z, yaw, hp, aim, alert, crouch, lean, armed, scode, surp, door, kit, fl, str, y = 0] of m.e) {
+    for (const [id, type, x, z, yaw, hp, aim, alert, crouch, lean, armed, scode, surp, door, kit, fl, str, y = 0, wd] of m.e) {
       seen.add(id);
       let ev = this.enemies.get(id);
       if (!ev) {
@@ -181,6 +182,7 @@ const G_Views = {
       ev.tgt.set(x, y, z); ev.tgtYaw = yaw; ev.hp = hp; ev.aim = aim; ev.alert = alert; ev.crouch = !!crouch; ev.lean = lean || 0;
       ev.scode = scode || 0;
       ev.bleed = !!(fl & 1); ev.limp = !!(fl & 2); ev.reloading = !!(fl & 4); ev.down = !!(fl & 8); // wounds, reloads, down for good: from the host
+      ev.wnd = Array.isArray(wd) ? wd : null; // the moderate-or-worse wounds (js/views.ts woundStreams); none once treated
       ev.str = str == null ? 1 : str / 100; // what blood loss leaves them to stand with (js/rig.ts powered body)
       // weapon in hand follows the host: dropped on surrender, drawn again by a fake surrender
       if (!armed && ev.rig.gun) { ev.rig.dropGun(); this.discardDrop(ev.rig); }
@@ -225,7 +227,7 @@ const G_Views = {
   kill(m: any) {
     const ev = this.enemies.get(m.e);
     if (!ev || !ev.alive) return;
-    ev.alive = false; ev.deadT = 0;
+    ev.alive = false; ev.deadT = 0; ev.wnd = m.bo ? null : Array.isArray(m.wd) ? m.wd : ev.wnd; // (the wounds go on a while after: woundStreams)
     let dir = ev.lastHitDir;
     if (!dir) {
       const killer = m.by && m.by !== G.Net.myId && this.players.get(m.by) ? this.players.get(m.by)!.pos : this.nearestPlayer(ev.pos);
@@ -608,6 +610,77 @@ const G_Views = {
     this.nades.push({ pos: new THREE.Vector3().copy(p), vel: new THREE.Vector3().copy(v), fuse, own, enemy, mesh, kind });
   },
 
+  // ---------------------------------------------------------------- wound streams
+  // A suspect with a moderate or worse bleed (the host sends the wounds: js/server.ts injure) has a stream of blood from each
+  // wound, riding the bone it's on (so it follows them walking, falling, lying). It pulses with the heart: a beat is a sharp
+  // rise and a slower fall, with a small bump after it; the rate climbs with stress and blood loss, and the flow weakens as
+  // blood runs low. An artery spurts (almost nothing between beats, a jet at each), a vein flows (a steady stream that swells
+  // a little). Dead, the heart has stopped: what's left of the pressure runs out in seconds (a massive wound) or a quarter
+  // minute. A few particles a wound (blood ones: each leaves a drop on the floor where it lands, js/render.ts), the nearest
+  // WOUND_CAP wounded bodies only, fewer with distance.
+  WOUND_CAP: 10,
+  // [bone, local position (x mirrored by side), local direction] by the part's index (js/medical.ts PARTS)
+  woundSpot(rig: Rig, w: number, k: number, out: THREE.Vector3, dir: THREE.Vector3) {
+    const part = w & 7, sg = k & 1 ? 1 : -1; // (which side of the body: alternating)
+    let bone: THREE.Object3D, x = 0, y = 0, z = 0, dx = 0, dy = 0, dz = 0;
+    switch (part) {
+      case 0: bone = rig.head; x = sg * 0.08; y = 0.05; z = -0.06; dx = sg; dy = 0.2; dz = -0.6; break;
+      case 1: bone = rig.chest; x = sg * 0.11; y = 0.1; z = -0.13; dx = sg * 0.5; dy = 0.15; dz = -1; break;
+      case 2: bone = rig.spine; x = sg * 0.09; y = 0.1; z = -0.11; dx = sg * 0.5; dy = 0.1; dz = -1; break;
+      case 3: case 4: { const s = part === 3 ? -1 : 1; bone = (s < 0 ? rig.armL : rig.armR).up; x = s * 0.05; y = -0.14; z = -0.03; dx = s; dy = 0; dz = -0.4; break; }
+      default: { const s = part === 5 ? -1 : 1; bone = (s < 0 ? rig.legL : rig.legR).th; x = s * 0.02; y = -0.2; z = -0.07; dx = s * 0.3; dy = 0; dz = -1; break; }
+    }
+    bone.updateWorldMatrix(true, false);
+    out.set(x, y, z).applyMatrix4(bone.matrixWorld);
+    const e = bone.matrixWorld.elements; // (the direction, turned by the bone: no scale to speak of)
+    dir.set(dx * e[0] + dy * e[4] + dz * e[8], dx * e[1] + dy * e[5] + dz * e[9], dx * e[2] + dy * e[6] + dz * e[10]).normalize();
+  },
+  // The heartbeat's pressure at a phase (0..1 through a beat): 1 at the peak of the beat, falling away, a small second bump
+  pulseAt(f: number) { return Math.max(f < 0.08 ? f / 0.08 : Math.exp(-(f - 0.08) * 7), 0.2 * Math.exp(-(((f - 0.4) / 0.06) ** 2))); },
+  woundStreams(dt: number) {
+    const cam = G.R.camera.position, cand: [number, VwEnemy][] = [];
+    for (const ev of this.enemies.values()) {
+      if (!ev.wnd || !ev.wnd.length || !ev.rig.body.visible) continue;
+      const d2 = ev.pos.distanceToSquared(cam);
+      if (d2 < 36 * 36) cand.push([d2, ev]);
+    }
+    if (!cand.length) return;
+    cand.sort((a, b) => a[0] - b[0]);
+    const _p = WP, _d = WD;
+    for (let c = 0; c < Math.min(cand.length, this.WOUND_CAP); c++) {
+      const [d2, ev] = cand[c], wnd = ev.wnd!;
+      const dist = Math.sqrt(d2), lod = dist < 12 ? 1 : dist < 24 ? 0.5 : 0.25;
+      const hpf = G.U.clamp(ev.hp / 100, 0, 1), loss = 1 - hpf; // (their health stands for blood: wounds drain it)
+      // the heart: a resting rate, up with stress (they know they're hunted) and with what's been lost; down for good, slower and weaker
+      const bpm = (68 + (ev.alert ? 30 : 0) + 85 * loss * loss + (ev.hp < 15 ? -30 * (1 - ev.hp / 15) : 0)) * (ev.down ? 0.8 : 1);
+      let vol = 0.2 + 0.8 * Math.pow(hpf, 0.6), beat = 1; // (volume: less blood, less to bleed; beat: how hard the pulse is)
+      if (!ev.alive) { // (the heart's stopped: the pressure runs out)
+        const massive = wnd.some((w) => w & 16), tau = massive ? 2.5 : 12;
+        vol *= Math.exp(-ev.deadT / tau); beat = 0;
+      } else ev.ph = ((ev.ph || ev.id * 0.37) + dt * bpm / 60) % 1;
+      if (vol < 0.03) continue;
+      const pulse = this.pulseAt(ev.ph || 0), acc = ev.wacc || (ev.wacc = []);
+      for (let k = 0; k < wnd.length; k++) {
+        const w = wnd[k], art = !!(w & 8);
+        // (an artery: almost nothing between beats; a vein: a steady run that swells a little with each)
+        const flow = (art ? 0.04 + 0.96 * pulse * beat : 0.62 + 0.38 * pulse * beat) * vol;
+        acc[k] = (acc[k] || 0) + dt * (art ? 36 : 14) * flow * lod * (w & 16 ? 1.5 : 1);
+        if (acc[k] < 1) continue;
+        this.woundSpot(ev.rig, w, k, _p, _d);
+        const n = Math.min(4, acc[k] | 0); acc[k] -= n;
+        for (let i = 0; i < n; i++) {
+          const jet = art ? 1.2 + 2.6 * flow : 0.15 + 0.5 * flow, s = jet * (0.85 + Math.random() * 0.3), j = art ? 0.1 : 0.25;
+          G.R.bloodJet(_p, _d.x * s + (Math.random() - 0.5) * j, _d.y * s + (art ? 0.5 * flow : 0) + (Math.random() - 0.5) * j * 0.6, _d.z * s + (Math.random() - 0.5) * j, art ? 0x8c0a0a : 0x6e0808);
+        }
+      }
+      // down for good (alive or not): a pool grows under the body, from where it lies
+      if (!ev.wpool && (ev.down || !ev.alive)) {
+        ev.wpool = true;
+        const b = G.Rig.bodyAt(ev.rig);
+        if (ev.alive) G.R.bloodPool(ev, b.x, b.z, wnd.some((w) => w & 16) ? 1.2 : 0.8, 45, b.y - 0.2);
+      }
+    }
+  },
   // An officer losing blood: drops where they stand or walk (more, the heavier the bleeding), and a pool
   // under them when they're down or dead. who: the owner key, pos: their feet, bl: 0 none, 1 light, 2 heavy.
   officerBlood(who: { _drip?: number; [k: string]: any }, pos: THREE.Vector3, bl: number, down: boolean, dt: number) {
@@ -765,13 +838,14 @@ const G_Views = {
       }
       // bleeding: drips falling from them as they go; down for good, from the body where it lies (its ragdoll's hips,
       // not where they last stood)
-      if (ev.alive && ev.bleed && (ev.dripT = (ev.dripT || 0) - dt) <= 0) {
+      if (ev.alive && ev.bleed && !(ev.wnd && ev.wnd.length) && (ev.dripT = (ev.dripT || 0) - dt) <= 0) {
         ev.dripT = 0.25 + Math.random() * 0.35;
         const lying = ev.rig.limp, b = lying ? G.Rig.bodyAt(ev.rig) : ev.pos;
         G.R.particles(new THREE.Vector3(b.x + (Math.random() - 0.5) * (lying ? 0.2 : 0.3), lying ? b.y + 0.05 : (ev.crouch ? 0.6 : 0.9) * ev.def.scale, b.z + (Math.random() - 0.5) * (lying ? 0.2 : 0.3)), 2, 0x7a0808, 0.3, lying ? 0.3 : 0.7, 9, 0.2, null, true);
       }
     }
 
+    this.woundStreams(dt);
     // your own body, if you're dead: a ragdoll where you fell
     if (this.selfBody) { const sb = this.selfBody; sb.rig.update(dt, { pos: sb.pos, yaw: sb.yaw, pitch: 0, crouch: false, alert: false, lean: 0, state: 'dead' }); }
     // remote players

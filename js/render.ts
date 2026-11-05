@@ -1,5 +1,6 @@
 'use strict';
 const _tv = new THREE.Vector3(), _tv2 = new THREE.Vector3();
+const _bjc = new THREE.Color();
 // Three.js scene, character models, first-person viewmodels and particle effects.
 interface Trail { line: THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>; mat: THREE.LineBasicMaterial; n: number; N: number; shot: PShot; old: number | null; marks: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>[]; keys?: Set<any>; }
 type ImpactKind = 'wall' | 'blood' | 'armor'; // what a round hit (impact)
@@ -362,7 +363,7 @@ const G_R = {
     this.flareN = 0;
 
     // particles
-    this.PN = 600;
+    this.PN = 800;
     const pg = new THREE.BufferGeometry();
     this.pPos = new Float32Array(this.PN * 3);
     this.pCol = new Float32Array(this.PN * 3);
@@ -671,6 +672,16 @@ const G_R = {
       this.pBase[i * 3] = col.r * v; this.pBase[i * 3 + 1] = col.g * v; this.pBase[i * 3 + 2] = col.b * v;
     }
   },
+  // one drop of blood leaving a wound at p with this velocity: it falls and leaves its mark where it lands (js/views.ts woundStreams)
+  bloodJet(p: THREE.Vector3, vx: number, vy: number, vz: number, color: number) {
+    const i = this.pIdx; this.pIdx = (this.pIdx + 1) % this.PN;
+    this.pBlood[i] = 2; // (a stream drop: leaves a mark on the floor only now and then, so a bleeding body doesn't wipe out the rest)
+    this.pPos[i * 3] = p.x; this.pPos[i * 3 + 1] = p.y; this.pPos[i * 3 + 2] = p.z;
+    this.pVel[i * 3] = vx; this.pVel[i * 3 + 1] = vy; this.pVel[i * 3 + 2] = vz;
+    this.pLife[i] = 1.3; this.pGrav[i] = 9.8;
+    const c = _bjc.setHex(color), v = 0.8 + Math.random() * 0.2;
+    this.pBase[i * 3] = c.r * v; this.pBase[i * 3 + 1] = c.g * v; this.pBase[i * 3 + 2] = c.b * v;
+  },
   // what a round throws up, by what it hit (js/materials.ts fx): sparks [colour, how many, speed, life, gravity], and the puff of it
   IMPACT: <Record<ImpactFx, { s: number[] | null; d: number[] | null }>>{
     metal: { s: [0xffc070, 12, 5, 0.22, 12], d: null }, stone: { s: [0xffc070, 3, 3, 0.15, 12], d: [0x9a958a, 8, 1.5] }, wood: { s: null, d: [0xa8824e, 9, 2.2] }, plaster: { s: null, d: [0xe8e4da, 10, 1.2] },
@@ -811,7 +822,7 @@ const G_R = {
         const g = this.bloodFloor(P[i * 3], P[i * 3 + 2], P[i * 3 + 1]);
         if (P[i * 3 + 1] <= g + 0.02 || L[i] <= 0) {
           const sp = Math.hypot(V[i * 3], V[i * 3 + 2]);
-          this.bloodDrop(P[i * 3], g, P[i * 3 + 2], 0.035 + Math.random() * 0.04 + Math.min(0.05, sp * 0.012));
+          if (this.pBlood[i] < 2 || Math.random() < 0.4) this.bloodDrop(P[i * 3], g, P[i * 3 + 2], 0.035 + Math.random() * 0.04 + Math.min(0.05, sp * 0.012));
           this.pBlood[i] = 0; L[i] = 0; P[i * 3 + 1] = -100;
           continue;
         }

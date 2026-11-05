@@ -45,7 +45,7 @@ interface Enemy {
   strafe: number; strafeT: number; idleT: number; idleYaw: number; pendingAlert: number; lostT: number; lastHit: string | null;
   cover: EnemyCover | null; inCover: boolean; peek: boolean; peekT: number; coverT: number; coverStuck: number; crouch: boolean; nadeT: number;
   lastSeen: { x: number; y: number; z: number } | null; morale: number; broken: boolean; noise: { x: number; z: number } | null; holding: boolean; bold: boolean;
-  mag: number; magMax: number; reloadT: number; bleedH: number; bleedL: number; clotT: number; legs: number; arms: number; lung: boolean;
+  mag: number; magMax: number; reloadT: number; bleedH: number; bleedL: number; wnd?: number[]; clotT: number; legs: number; arms: number; lung: boolean;
   drawn: boolean; drawT: number; surprisedT: number; suspicious: boolean; calmT: number; state: EnemyState; armed: boolean; shouts: number; complyCd: number;
   suppressT: number; doorWait: number; leanOut: number; runner: boolean; home: { x: number; y: number; z: number }; walkTo: { x: number; z: number } | null;
   fleeT: number; fake: boolean; fakeT: number;
@@ -1249,6 +1249,12 @@ const G_Server = {
     if (E.has('massive')) e.bleedH = (e.bleedH || 0) + person * 0.12;
     if (E.has('heavy')) e.bleedH = (e.bleedH || 0) + person * 0.02;
     if (E.has('light') || E.has('gut')) { e.bleedL = (e.bleedL || 0) + person * (E.has('gut') ? 0.006 : 0.004); e.clotT = 0; }
+    // (a moderate or worse bleed also shows as a stream on the body, js/views.ts woundStreams: a wound is the part's index,
+    // + 8 for an artery (it spurts), + 16 for a massive one; the last four kept)
+    if (E.has('heavy') || E.has('massive') || E.has('cardiac')) {
+      const pi = G.Med.PARTS.findIndex((q: any) => q[0] === part);
+      if (pi >= 0) { const w = e.wnd || (e.wnd = []); w.push(pi | (/carotid|brachial|femoral|iliac|aorta|heart/.test(organs || '') ? 8 : 0) | (E.has('massive') || E.has('cardiac') ? 16 : 0)); if (w.length > 4) w.shift(); }
+    }
     if (E.has('frac')) {
       // which limb (the pelvis: the leg on its side, from the organs), kept for the record (e.broke: the F9 readout)
       const pl = /pelvis([LR])/.exec(organs || ''), limb = part.startsWith('arm') || part.startsWith('leg') ? part : 'leg' + (pl ? pl[1] : side === 'L' ? 'L' : 'R');
@@ -1273,7 +1279,7 @@ const G_Server = {
   // officers do: js/medical.ts)
   BLEED_K: 0.5,
   injuryTick(e: Enemy, dt: number) {
-    if (e.state === 'cuffed') { e.bleedH = e.bleedL = 0; return false; }
+    if (e.state === 'cuffed') { e.bleedH = e.bleedL = 0; e.wnd = undefined; return false; }
     if (e.bleedL) { e.clotT = (e.clotT || 0) + dt; if (e.clotT > 30) { e.bleedL = 0; e.clotT = 0; } }
     const b = ((e.bleedH || 0) + (e.bleedL || 0)) * this.BLEED_K;
     if (!b) return false;
@@ -1401,7 +1407,7 @@ const G_Server = {
           return { bo: m.bo && !shot ? 1 : 0, bt: m.bo && !shot && since != null ? Math.round(since) : 0, hd: shot ? Math.round(since * 100) / 100 : 0 };
         })() };
       if (e.lastAp && !hl.bo) hl.ap = 1; // (the round that did it went through their armour)
-      G.Net.broadcast(Object.assign({ t: 'kill', e: e.id, by: from, cr, h: !!m.h, ty: e.type, why, inc: inc ? 1 : 0 }, hl));
+      G.Net.broadcast(Object.assign({ t: 'kill', e: e.id, by: from, cr, h: !!m.h, ty: e.type, why, inc: inc ? 1 : 0, wd: e.wnd && e.wnd.length ? e.wnd : undefined }, hl));
       this.checkClear();
     }
   },
@@ -1499,7 +1505,7 @@ const G_Server = {
       const r2 = (v: number) => Math.round(v * 100) / 100;
       const e = [];
       for (const en of this.enemies.values()) {
-        e.push([en.id, en.type, r2(en.x), r2(en.z), r2(en.yaw), Math.max(1, Math.round((en.hp / en.maxHp) * 100)), en.aiming ? en.tgt : 0, en.alert ? 1 : 0, en.crouch ? 1 : 0, en.leanOut || 0, en.armed ? (en.drawn ? 2 : 1) : 0, STATE_CODE[en.state] || 0, en.surprisedT > 0 ? 1 : 0, en.doorWait > 0 ? 1 : 0, en.def.civ ? 0 : `${en.def.wpn}|${en.def.vest}|${en.def.helmet}|${en.def.face || ''}|${en.def.tac || 0}|${(en.def.ex || []).join(',')}`, ((en.bleedH || en.bleedL) ? 1 : 0) | (en.legs ? 2 : 0) | (en.reloadT > 0 ? 4 : 0) | (en.down ? 8 : 0), Math.round(Math.min(en.down ? 0.25 : 1, en.str == null ? 1 : en.str) * 100), r2(en.y || 0)]);
+        e.push([en.id, en.type, r2(en.x), r2(en.z), r2(en.yaw), Math.max(1, Math.round((en.hp / en.maxHp) * 100)), en.aiming ? en.tgt : 0, en.alert ? 1 : 0, en.crouch ? 1 : 0, en.leanOut || 0, en.armed ? (en.drawn ? 2 : 1) : 0, STATE_CODE[en.state] || 0, en.surprisedT > 0 ? 1 : 0, en.doorWait > 0 ? 1 : 0, en.def.civ ? 0 : `${en.def.wpn}|${en.def.vest}|${en.def.helmet}|${en.def.face || ''}|${en.def.tac || 0}|${(en.def.ex || []).join(',')}`, ((en.bleedH || en.bleedL) ? 1 : 0) | (en.legs ? 2 : 0) | (en.reloadT > 0 ? 4 : 0) | (en.down ? 8 : 0), Math.round(Math.min(en.down ? 0.25 : 1, en.str == null ? 1 : en.str) * 100), r2(en.y || 0), en.wnd && en.wnd.length ? en.wnd : 0]);
       }
       const p: Record<string, any> = {};
       for (const pl of all) p[pl.id] = pl.st;
