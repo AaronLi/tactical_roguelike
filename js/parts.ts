@@ -148,6 +148,19 @@ const G_Gunsmith = (() => {
     const n = hgLenOf(p), ref = PLATFORMS[id] && PLATFORMS[id].hgLen;
     return n == null || !PLATFORMS[id] || (n <= hgRoom(id, barrelId) + 1e-6 && !(p.hgScale && ref && (n / ref < HG_K[0] - 1e-9 || n / ref > HG_K[1] + 1e-9)));
   };
+  // How much barrel a gun needs showing past its receiver (m): the fixed fittings in front of it (a gas block, a front sight's base, the shortest handguard
+  // the gun takes: at least 45 mm) plus 15 mm for a muzzle device's thread, the margin hgRoom leaves too.
+  const clearCache = new Map<string, number>();
+  function barrelClear(id: string): number {
+    let r = clearCache.get(id);
+    if (r === undefined) {
+      const plat = PLATFORMS[id], hs = plat.slots.find((sl: Slot) => sl.slot === 'handguard');
+      let fixed = 0.045;
+      if (hs) { const lens = (BY_MOUNT.get(hs.mount) || []).filter((q: Part) => !q.retired && (q.plat == null || q.plat === id) && hgLenOf(q) != null).map((q: Part) => hgLenOf(q)!); if (lens.length) fixed = Math.max(fixed, Math.min(...lens)); }
+      r = fixed + 0.015; clearCache.set(id, r);
+    }
+    return r;
+  }
   function fitsLen(p: Part, id: string, build?: Record<string, string> | false) {
     if (build !== false && id && !hgFits(p, id, build && build.barrel)) return false;
     if (p.len == null || !id) return true;
@@ -155,10 +168,12 @@ const G_Gunsmith = (() => {
     if (!f) return true;
     const k = p.len / f, plat = PLATFORMS[id], B = plat && plat.barrelModel, lo = LEN_LO[id] ?? 0.6;
     if (k > 1.6 + 1e-9) return false;
-    // (the barrel is drawn from its length alone, a fixed amount of it in the receiver: the part must leave the gun's own barrel's showing
-    // share (lo) of what its factory one shows, and a handguard-less gun's with fittings on the barrel (LEN_MIN_IN) its front end clear of them)
+    // The barrel must end clear of what stands in front of the receiver on this gun (barrelClear): a physical rule, not a share of the factory one
+    // (a real AUG takes a 14" barrel). The barrel is drawn from its length alone: what shows past the receiver is the model's own visible length at the
+    // factory length plus the length's difference from it. Never less than what the gun's own barrel shows is asked.
     if (B && B.len && plat.arch === 'rifle') {
-      if (p.len < f - (1 - lo) * B.len / 0.0254 - 1e-9) return false;
+      const show = B.len - ((plat.spec as any).bIn || 0) + (p.len - f) * 0.0254;
+      if (show < Math.min(barrelClear(id), B.len - ((plat.spec as any).bIn || 0)) - 1e-9) return false;
     } else if (k < lo - 1e-9) return false;
     if (LEN_MIN_IN[id] != null && p.len < LEN_MIN_IN[id] - 1e-9) return false;
     // (a part that reads exactly as the gun's own barrel, which is a part of its own: the same part twice)

@@ -66,8 +66,8 @@
    "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "receiver": "rcv.ak" }
   },
   { "platform": "ak",
-   "why": "shortest barrel (br.7.62x39.12.5) x longest handguard that fits (oem.hg.ak.5)",
-   "build": { "barrel": "br.7.62x39.12.5", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "ak.optic", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+   "why": "shortest barrel (br.7.62x39.10.5) x longest handguard that fits (hg.ak.short.mlok)",
+   "build": { "barrel": "br.7.62x39.10.5", "grip": "oem.gr.ak.3", "handguard": "hg.ak.short.mlok", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "ak.optic", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
   },
   { "platform": "ak",
    "why": "longest barrel (br.7.62x39.23.2.heavy) x shortest handguard (oem.hg.ak.8)",
@@ -178,8 +178,8 @@
    "build": { "barrel": "br.5.56x45.18.9.light", "grip": "oem.gr.ar.4", "handguard": "oem.hg.g36.0", "mag": "stanag.mag.30" }
   },
   { "platform": "g36",
-   "why": "shortest barrel (br.5.56x45.12.5) x longest handguard that fits (hg.g36.risk)",
-   "build": { "barrel": "br.5.56x45.12.5", "grip": "oem.gr.ar.4", "handguard": "hg.g36.risk", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.0", "stock": "stk.heavy.g36" }
+   "why": "shortest barrel (br.5.56x45.11.5) x longest handguard that fits (hg.g36.risk)",
+   "build": { "barrel": "br.5.56x45.11.5", "grip": "oem.gr.ar.4", "handguard": "hg.g36.risk", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.0", "stock": "stk.heavy.g36" }
   },
   { "platform": "g36",
    "why": "longest barrel (br.5.56x45.24.heavy) x shortest handguard (hg.g36.k)",
@@ -494,8 +494,8 @@
    "build": { "barrel": "br.7.62x39.16", "fg": "fg.4", "grip": "oem.gr.ak.3", "handguard": "hg.ak.1", "mag": "akm.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.0", "stock": "oem.stk.ak.5", "tac": "tac.4", "tacL": "tac.4" }
   },
   { "platform": "galil",
-   "why": "shortest barrel (br.7.62x39.12.5) x longest handguard that fits (oem.hg.ak.5)",
-   "build": { "barrel": "br.7.62x39.12.5", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.0", "stock": "oem.stk.ak.5" }
+   "why": "shortest barrel (br.7.62x39.10.5) x longest handguard that fits (hg.ak.short.mlok)",
+   "build": { "barrel": "br.7.62x39.10.5", "grip": "oem.gr.ak.3", "handguard": "hg.ak.short.mlok", "mag": "akm.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.0", "stock": "oem.stk.ak.5" }
   },
   { "platform": "galil",
    "why": "longest barrel (br.7.62x39.23.2.heavy) x shortest handguard (oem.hg.ak.8)",
@@ -546,8 +546,8 @@
    "build": { "barrel": "br.5.6x39.15.9", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.6", "mag": "ak74.mag.30" }
   },
   { "platform": "an94",
-   "why": "shortest barrel (br.5.6x39.12.5) x longest handguard that fits (oem.hg.ak.5)",
-   "build": { "barrel": "br.5.6x39.12.5", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "an94.optic", "stock": "oem.stk.ak.5" }
+   "why": "shortest barrel (br.5.6x39.10.5) x longest handguard that fits (hg.ak.short.mlok)",
+   "build": { "barrel": "br.5.6x39.10.5", "grip": "oem.gr.ak.3", "handguard": "hg.ak.short.mlok", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "an94.optic", "stock": "oem.stk.ak.5" }
   },
   { "platform": "an94",
    "why": "longest barrel (br.5.6x39.20.heavy) x shortest handguard (oem.hg.ak.8)",
@@ -674,10 +674,6 @@
    "build": { "barrel": "br.7.62x51.18", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "hg.ar.2", "mag": "m14.mag.20", "muzzle": "mz.r762.a2", "optic": "op.pic.0", "receiver": "rcv.mk14", "stock": "oem.stk.tube.5", "tac": "tac.4", "tacL": "tac.4" }
   },
   { "platform": "mk14",
-   "why": "shortest barrel (br.7.62x51.16) x longest handguard that fits (hg.ar.0)",
-   "build": { "barrel": "br.7.62x51.16", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "hg.ar.0", "mag": "m14.mag.20", "muzzle": "mz.r762.a2", "optic": "op.pic.0", "receiver": "rcv.mk14", "stock": "oem.stk.tube.5" }
-  },
-  { "platform": "mk14",
    "why": "longest barrel (br.7.62x51.26.heavy) x shortest handguard (hg.ar.3)",
    "build": { "barrel": "br.7.62x51.26.heavy", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "hg.ar.3", "mag": "m14.mag.20", "muzzle": "mz.r762.a2", "optic": "op.pic.0", "receiver": "rcv.mk14", "stock": "oem.stk.tube.5" }
   },
@@ -770,8 +766,8 @@
    "build": { "barrel": "br.7.62x54.24.4", "handguard": "oem.hg.ak.7", "mag": "svd.mag" }
   },
   { "platform": "svd",
-   "why": "shortest barrel (br.7.62x54.20) x longest handguard that fits (oem.hg.ak.7)",
-   "build": { "barrel": "br.7.62x54.20", "handguard": "oem.hg.ak.7", "mag": "svd.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.0", "stock": "oem.stk.precision.4" }
+   "why": "shortest barrel (br.7.62x54.15) x longest handguard that fits (oem.hg.ak.7)",
+   "build": { "barrel": "br.7.62x54.15", "handguard": "oem.hg.ak.7", "mag": "svd.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.0", "stock": "oem.stk.precision.4" }
   },
   { "platform": "svd",
    "why": "longest barrel (br.7.62x54.32.heavy) x shortest handguard (oem.hg.ak.8)",
@@ -930,8 +926,8 @@
    "build": { "barrel": "br.7.62x51.24.tapered", "handguard": "oem.hg.classic.5", "mag": "r700.mag" }
   },
   { "platform": "r700",
-   "why": "shortest barrel (br.7.62x51.16) x longest handguard that fits (oem.hg.classic.8)",
-   "build": { "barrel": "br.7.62x51.16", "handguard": "oem.hg.classic.8", "mag": "r700.mag", "muzzle": "mz.r762.cap", "optic": "oem.op.pic.20", "stock": "oem.stk.precision.5" }
+   "why": "shortest barrel (br.7.62x51.10.5) x longest handguard that fits (oem.hg.classic.7)",
+   "build": { "barrel": "br.7.62x51.10.5", "handguard": "oem.hg.classic.7", "mag": "r700.mag", "muzzle": "mz.r762.cap", "optic": "oem.op.pic.20", "stock": "oem.stk.precision.5" }
   },
   { "platform": "r700",
    "why": "longest barrel (br.7.62x51.26.heavy) x shortest handguard (oem.hg.classic.7)",
@@ -1000,10 +996,6 @@
   { "platform": "mosin",
    "why": "bare",
    "build": { "barrel": "br.7.62x54.28.7.tapered", "handguard": "oem.hg.classic.6", "mag": "mosin.mag" }
-  },
-  { "platform": "mosin",
-   "why": "shortest barrel (br.7.62x54.20) x longest handguard that fits (oem.hg.classic.9)",
-   "build": { "barrel": "br.7.62x54.20", "handguard": "oem.hg.classic.9", "mag": "mosin.mag", "muzzle": "mz.r762.cap", "optic": "oem.op.pic.21", "stock": "oem.stk.classic.4" }
   },
   { "platform": "mosin",
    "why": "longest barrel (br.7.62x54.32.heavy) x shortest handguard (oem.hg.classic.5)",
@@ -1110,8 +1102,8 @@
    "build": { "barrel": "br.12.7x99.29.heavy", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.6", "mag": "barrett.mag" }
   },
   { "platform": "barrett",
-   "why": "shortest barrel (br.12.7x99.22) x longest handguard that fits (oem.hg.box.5)",
-   "build": { "barrel": "br.12.7x99.22", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.5", "mag": "barrett.mag", "muzzle": "mz.r50.big", "optic": "oem.op.pic.23", "stock": "oem.stk.precision.7" }
+   "why": "shortest barrel (br.12.7x99.18) x longest handguard that fits (oem.hg.box.6)",
+   "build": { "barrel": "br.12.7x99.18", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.6", "mag": "barrett.mag", "muzzle": "mz.r50.big", "optic": "oem.op.pic.23", "stock": "oem.stk.precision.7" }
   },
   { "platform": "barrett",
    "why": "longest barrel (br.12.7x99.36.heavy) x shortest handguard (oem.hg.box.7)",
@@ -1890,8 +1882,8 @@
    "build": { "barrel": "br.5.56x45.20.5", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.8", "mag": "m249.mag", "muzzle": "mz.r556.a2", "optic": "op.pic.0", "stock": "stk.heavy.0", "tac": "tac.4", "tacL": "tac.4" }
   },
   { "platform": "m249",
-   "why": "shortest barrel (br.5.56x45.16.5) x longest handguard that fits (oem.hg.box.6)",
-   "build": { "barrel": "br.5.56x45.16.5", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.6", "mag": "m249.mag", "muzzle": "mz.r556.a2", "optic": "op.pic.0", "stock": "stk.heavy.0" }
+   "why": "shortest barrel (br.5.56x45.12.5) x longest handguard that fits (hg.box.2)",
+   "build": { "barrel": "br.5.56x45.12.5", "grip": "oem.gr.ar.4", "handguard": "hg.box.2", "mag": "m249.mag", "muzzle": "mz.r556.a2", "optic": "op.pic.0", "stock": "stk.heavy.0" }
   },
   { "platform": "m249",
    "why": "longest barrel (br.5.56x45.24.heavy) x shortest handguard (oem.hg.box.7)",
@@ -2210,8 +2202,8 @@
    "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.3", "mag": "ak74.mag.30", "receiver": "rcv.ak74" }
   },
   { "platform": "ak74",
-   "why": "shortest barrel (br.5.6x39.12.5) x longest handguard that fits (hg.ak.short.mlok)",
-   "build": { "barrel": "br.5.6x39.12.5", "grip": "oem.gr.ak.3", "handguard": "hg.ak.short.mlok", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "ak74.optic", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+   "why": "shortest barrel (br.5.6x39.10.5) x longest handguard that fits (hg.ak.short.mlok)",
+   "build": { "barrel": "br.5.6x39.10.5", "grip": "oem.gr.ak.3", "handguard": "hg.ak.short.mlok", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "ak74.optic", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
   },
   { "platform": "ak74",
    "why": "longest barrel (br.5.6x39.20.heavy) x shortest handguard (oem.hg.ak.8)",
@@ -2334,8 +2326,8 @@
    "build": { "barrel": "br.7.62x39.23.2.tapered", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "receiver": "rcv.rpk" }
   },
   { "platform": "rpk",
-   "why": "shortest barrel (br.7.62x39.16) x longest handguard that fits (oem.hg.ak.7)",
-   "build": { "barrel": "br.7.62x39.16", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.7", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "rpk.optic", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+   "why": "shortest barrel (br.7.62x39.10.5) x longest handguard that fits (hg.ak.short.mlok)",
+   "build": { "barrel": "br.7.62x39.10.5", "grip": "oem.gr.ak.3", "handguard": "hg.ak.short.mlok", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "rpk.optic", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
   },
   { "platform": "rpk",
    "why": "longest barrel (br.7.62x39.23.2.heavy) x shortest handguard (oem.hg.ak.8)",
@@ -2510,10 +2502,6 @@
    "build": { "barrel": "br.7.62x51.22", "handguard": "oem.hg.classic.9", "mag": "m14.mag.20", "receiver": "rcv.m14" }
   },
   { "platform": "m14",
-   "why": "shortest barrel (br.7.62x51.16) x longest handguard that fits (oem.hg.classic.8)",
-   "build": { "barrel": "br.7.62x51.16", "handguard": "oem.hg.classic.8", "mag": "m14.mag.20", "muzzle": "mz.r762.a2", "optic": "op.pic.0", "receiver": "rcv.m14", "stock": "oem.stk.classic.4" }
-  },
-  { "platform": "m14",
    "why": "longest barrel (br.7.62x51.26.heavy) x shortest handguard (oem.hg.classic.7)",
    "build": { "barrel": "br.7.62x51.26.heavy", "handguard": "oem.hg.classic.7", "mag": "m14.mag.20", "muzzle": "mz.r762.a2", "optic": "op.pic.0", "receiver": "rcv.m14", "stock": "oem.stk.classic.4" }
   },
@@ -2598,8 +2586,8 @@
    "build": { "barrel": "br.7.62x51.20", "charging": "oem.ch.ar.3", "fg": "fg.4", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.10", "mag": "sr25.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.0", "stock": "oem.stk.tube.5", "tac": "tac.4", "tacL": "tac.4" }
   },
   { "platform": "sr25",
-   "why": "shortest barrel (br.7.62x51.16) x longest handguard that fits (hg.ar.4)",
-   "build": { "barrel": "br.7.62x51.16", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "hg.ar.4", "mag": "sr25.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.0", "stock": "oem.stk.tube.5" }
+   "why": "shortest barrel (br.7.62x51.10.5) x longest handguard that fits (oem.hg.ar.11)",
+   "build": { "barrel": "br.7.62x51.10.5", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.11", "mag": "sr25.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.0", "stock": "oem.stk.tube.5" }
   },
   { "platform": "sr25",
    "why": "longest barrel (br.7.62x51.26.heavy) x shortest handguard (hg.ar.3)",
@@ -2638,7 +2626,7 @@
    "build": { "barrel": "br.7.62x51.20", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.10", "mag": "sr25.mag", "muzzle": "mz.r762.can", "optic": "op.pic.0", "stock": "oem.stk.tube.5", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "mpx",
-   "why": "default",
+   "why": "default + shortest barrel (br.9x19.8) x longest handguard that fits (oem.hg.mpx.0)",
    "build": { "barrel": "br.9x19.8", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.mpx.0", "mag": "mpx.mag", "muzzle": "mz.r9.a2", "optic": "op.pic.0", "stock": "stk.tube.2" }
   },
   { "platform": "mpx",
@@ -4502,7 +4490,7 @@
    "build": { "barrel": "br.5.8x42.18.2.light", "mag": "qbz.mag.30", "muzzle": "mz.r58.can", "optic": "qbz95.optic", "railmount": "rm.0", "tac": "tac.0" }
   },
   { "platform": "qbz192",
-   "why": "default + shortest barrel (br.5.8x42.10.5) x longest handguard that fits (oem.hg.qbz.0)",
+   "why": "default",
    "build": { "barrel": "br.5.8x42.10.5", "grip": "oem.gr.ar.4", "handguard": "oem.hg.qbz.0", "mag": "qbz.mag.30", "muzzle": "mz.r58.a2", "optic": "op.pic.0", "stock": "oem.stk.fold.0" }
   },
   { "platform": "qbz192",
@@ -4516,6 +4504,10 @@
   { "platform": "qbz192",
    "why": "loaded-last",
    "build": { "barrel": "br.5.8x42.10.5", "fg": "fg.4", "grip": "oem.gr.ar.4", "handguard": "oem.hg.qbz.0", "mag": "qbz.mag.30", "muzzle": "mz.r58.a2", "optic": "op.pic.0", "stock": "oem.stk.fold.0", "tac": "tac.4", "tacL": "tac.4" }
+  },
+  { "platform": "qbz192",
+   "why": "shortest barrel (br.5.8x42.6.5) x longest handguard that fits (hg.qbz.short)",
+   "build": { "barrel": "br.5.8x42.6.5", "grip": "oem.gr.ar.4", "handguard": "hg.qbz.short", "mag": "qbz.mag.30", "muzzle": "mz.r58.a2", "optic": "op.pic.0", "stock": "oem.stk.fold.0" }
   },
   { "platform": "qbz192",
    "why": "longest barrel (br.5.8x42.14.5.heavy) x shortest handguard (hg.qbz.short)",
