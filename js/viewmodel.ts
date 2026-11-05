@@ -24,8 +24,6 @@ interface VmPip { f: number; y: number; r: number; parent?: THREE.Object3D | str
 interface VmModel { group: THREE.Object3D; info: GunRigInfo & { muzzles: number[][]; sy: number; fSight: number; relief: number; cheek?: number | null; pistol?: boolean | null; reflex?: VmReflex | null; pip?: VmPip | null }; reflex?: VmReflex | null; pip?: VmPip | null }
 /** A display surface (display_<name>): the canvas the game draws on and the texture that shows it on the mesh. Draw, then set tex.needsUpdate. */
 interface VmSurface { mesh: THREE.Mesh; canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D; tex: THREE.CanvasTexture; width: number; height: number }
-/** A bipod's leg (js/gunmodels.ts bipodPose): its node, which end it folds to, which side. */
-interface VmLeg { p: THREE.Object3D; sub?: THREE.Object3D; back: boolean; side: number }
 const G_Viewmodel = (() => {
   const T = THREE;
 
@@ -319,7 +317,7 @@ const G_Viewmodel = (() => {
   // (its magazine merged on its own, centred on itself, so a rig can take it off the gun and hold it: a reload,
   // a magazine check. g.userData.mag: the magazine's group; magHome: where it sits on the gun.)
   type Merged = { geometry: THREE.BufferGeometry; material: THREE.Material }[];
-  interface WorldProto { meshes: Merged; info: any; mag: { meshes: Merged; home: THREE.Vector3 } | null; xb: Record<string, Merged> | null; legs: { meshes: Merged; home: THREE.Vector3; back: boolean; side: number }[] }
+  interface WorldProto { meshes: Merged; info: any; mag: { meshes: Merged; home: THREE.Vector3 } | null; xb: Record<string, Merged> | null; legs: { meshes: Merged; home: THREE.Vector3; leg: { deploy: number[] } }[] }
   // NOTE: takes the model apart (the magazine, bolt, strings and legs are taken off the group): hand it one you are done with
   function worldProto(group: THREE.Object3D, info: any): WorldProto {
     let mag = null;
@@ -346,11 +344,13 @@ const G_Viewmodel = (() => {
       n.parent.remove(n); solo.add(n); n.visible = true;
       xb[key] = merge(solo);
     }
-    // (a bipod's legs, each on its own about its hinge, so they swing down: js/rig.ts)
-    const legs = (info.anim && info.anim.bipod || []).filter((l: VmLeg) => l.p.parent).map((l: VmLeg) => {
-      const home = l.p.position.clone(), solo = new T.Group();
-      l.p.parent!.remove(l.p); l.p.position.set(0, 0, 0); solo.add(l.p);
-      return { meshes: merge(solo), home, back: l.back, side: l.side };
+    // (a bipod's legs, each on its own about its hinge, so they swing down: js/rig.ts. The legs are the children of part_bipod that carry extras.leg)
+    group.updateMatrixWorld(true);
+    const bn = info.anim && info.anim.bipod;
+    const legs = (bn ? bn.children.filter((l: any) => l.userData.leg) : []).map((l: any) => {
+      const home = new T.Vector3().setFromMatrixPosition(l.matrixWorld), solo = new T.Group();
+      l.parent.remove(l); l.position.set(0, 0, 0); solo.add(l);
+      return { meshes: merge(solo), home, leg: l.userData.leg };
     });
     return { meshes: merge(group), info, mag, xb: xb.bolt ? xb : null, legs };
   }
@@ -373,12 +373,15 @@ const G_Viewmodel = (() => {
       }
       g.userData.xb.slack.visible = false;
     }
-    if (proto.legs.length) g.userData.bipod = proto.legs.map((l) => {
-      const sub = new T.Group();
-      for (const m of l.meshes) sub.add(new T.Mesh(m.geometry, m.material));
-      sub.position.copy(l.home); g.add(sub);
-      return { sub, back: l.back, side: l.side };
-    });
+    if (proto.legs.length) { // (the bipod: a node whose children are the legs, each at its hinge with its extras.leg; G.GunRig.bipodPose turns them)
+      const bp = new T.Group();
+      for (const l of proto.legs) {
+        const sub = new T.Group();
+        for (const m of l.meshes) sub.add(new T.Mesh(m.geometry, m.material));
+        sub.position.copy(l.home); sub.userData.leg = l.leg; bp.add(sub);
+      }
+      g.add(bp); g.userData.bipod = bp;
+    }
     g.userData.info = proto.info;
     return g;
   }
