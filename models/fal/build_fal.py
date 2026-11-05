@@ -469,7 +469,14 @@ out = {'objects': len(coll.all_objects), 'tris': tris, 'info': info, 'failed': F
 for o in coll.all_objects:
     if o.type == 'MESH' and 'w0' in o.data: del o.data['w0']
 if os.environ.get('FAL_EXPORT', '1') == '1':
-    bpy.ops.wm.save_as_mainfile(filepath=os.path.join(HERE, 'fal.blend'), copy=True)
+    # fal.blend holds the FAL only. A session holding nothing else is saved whole; one with other models in it (another part built in the
+    # same Blender) writes just this collection (kept by a fake user: File > Append > Collection > fal, or the Blender File view).
+    # (Never bpy.data.libraries.write a SCENE: Blender 5.2.3 crashes in BKE_view_layer_copy_data.)
+    others = [c.name for c in bpy.data.collections if c != coll and (c.objects or c.children)] + [s.name for s in bpy.data.scenes if s != bpy.context.scene]
+    if not others: bpy.ops.wm.save_as_mainfile(filepath=os.path.join(HERE, 'fal.blend'), copy=True)
+    else:
+        bpy.data.libraries.write(os.path.join(HERE, 'fal.blend'), {coll}, fake_user=True, compress=True)
+        print('fal.blend: the collection only (the session also holds %s)' % ', '.join(others))
     bpy.ops.object.select_all(action='DESELECT')
     for o in coll.all_objects: o.select_set(True)
     bpy.ops.export_scene.gltf(filepath=os.path.join(HERE, 'fal.glb'), export_format='GLB', use_selection=True, export_extras=True,
