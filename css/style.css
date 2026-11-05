@@ -824,3 +824,5 @@ i.c.heavy { background: #a02828; } i.c.light { background: #7a3a30; } i.c.frac {
 .hl-row .hl-prog i { display: block; height: 100%; width: 0; background: var(--accent); transition: width 0.25s; }
 .hl-row .hl-msg { flex: 1 1 100%; font: 12px var(--mono); color: var(--dim); }
 .hl-row .hl-msg.bad { color: var(--bad); }
+.route-svg .rsh circle { fill: #d2342b; stroke: #fff; stroke-width: 1.5; }
+.route-svg .rsh path { fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; }

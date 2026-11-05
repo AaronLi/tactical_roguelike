@@ -13,7 +13,7 @@ type GmTeamItem = [string, number, number, number, string];
 // the host's route: its seed and act (the map is rebuilt from them), the path taken, and each player's vote
 interface GmRoute { seed: number; act: number; path?: number[]; votes?: Record<string, number> }
 // the mission report the shop shows (more fields than these; only these are read here)
-interface GmReport { civKilled: number; unauth: number; allRescued?: boolean; [k: string]: any }
+interface GmReport { civKilled: number; unauth: number; allRescued?: boolean; stronghold?: boolean; [k: string]: any }
 // where the game is: the menu, the lobby, the route map, a level (the hangar between levels is a 'level' too: this.hub), the game-over table. ('shop' is
 // only ever the host's word for the hangar phase: this.phase is never set to it)
 type GmPhase = 'menu' | 'lobby' | 'route' | 'level' | 'shop' | 'gameover';
@@ -1124,6 +1124,11 @@ const G_Game = {
   },
   // ------------------------------------------------------------- the route map
   // the host's route: { seed, act, path, votes }, with the act's map rebuilt from its seed
+  // is the level being played (or just cleared) a stronghold: the route node the squad is on
+  stronghold() {
+    const st = this.routeSt, at = st && st.path[st.path.length - 1], n = this.routeMap && at != null ? this.routeMap.nodes.get(at) : null;
+    return !!(n && n.stronghold);
+  },
   setRoute(r: GmRoute | null) {
     if (!r) return;
     if (!this.routeMap || this.routeMap.seed !== r.seed || this.routeMap.act !== r.act) this.routeMap = G.Route.gen(r.seed, r.act);
@@ -1288,6 +1293,7 @@ const G_Game = {
     const ids = Object.keys(this.roster || {}), voted = ids.filter((id) => st.votes[id] != null).length;
     this.$('routeMsg').innerHTML = mine == null ? (boss ? 'The Kingpin is waiting. Click the node to go in.' : !st.path.length ? `The way in: ${G.U.esc(G.THEMES[rm.nodes.get(opts[0])!.th].name)}. Click it to deploy; the routes split after it.` : 'Pick where to deploy next: click one of the lit nodes. Each path decides the environments ahead.')
       : ids.length > 1 ? `Voted. Waiting for the squad (${voted}/${ids.length}); most votes wins, ties are a coin toss.` : 'Deploying...';
+    if (opts.some((o) => rm.nodes.get(o)!.stronghold)) this.$('routeMsg').innerHTML += `<div class="arm-squad"><b class="red">! Stronghold</b> (red badge): no civilians, about half as many suspects again, +¢${G.Route.strongholdPay(this.level)} for clearing it.</div>`;
     const arms = this.arms || {}, roster = this.roster || {};
     if (this.level === 1 && ids.length > 1 && G.Me.sidearmChosen) this.$('routeMsg').innerHTML += `<div class="arm-squad">Sidearms (each your own): ${ids.map((id) => `<i style="color:${G.U.hex(roster[id].color)}">${G.U.esc(roster[id].name)}</i> ${arms[id] ? G.U.esc(G.WEAPONS[arms[id]].name) : '<small>choosing…</small>'}`).join(' · ')}</div>`;
   },
@@ -1342,7 +1348,7 @@ const G_Game = {
     G.Shop.report = report || null;
     if (G.Me.pos) {
       const clean = report && report.civKilled === 0 && report.unauth === 0;
-      const bonus = Math.round((250 + 75 * level + (clean ? 200 : 0) + (report && report.allRescued ? 150 + 50 * level : 0)));
+      const bonus = Math.round((250 + 75 * level + (clean ? 200 : 0) + (report && report.allRescued ? 150 + 50 * level : 0) + (report && report.stronghold ? G.Route.strongholdPay(level) : 0)));
       G.Me.credits += bonus;
       this.lastBonus = bonus;
     }

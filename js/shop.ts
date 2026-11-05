@@ -13,7 +13,7 @@ interface ShopOffers { p: string[]; s: string[]; gear: string[]; ammo: ShopAmmo[
 // a purchase waiting on the host's say-so (take / took)
 interface ShopPending { key: string; buy: () => boolean | void; }
 // the level's report (js/game.ts shop)
-interface ShopReport { arrests?: number; incap?: number; bleedouts?: number; rescued?: number; evidence?: number; bodies?: number; civKilled?: number; unauth?: number; allRescued?: boolean; }
+interface ShopReport { arrests?: number; incap?: number; bleedouts?: number; rescued?: number; evidence?: number; bodies?: number; civKilled?: number; unauth?: number; allRescued?: boolean; stronghold?: boolean; }
 // a thing on the Supplies tab (services())
 interface ShopService { id: string; name: string; desc: string; price: number; disabled: boolean; apply: () => unknown; sel?: string; }
 const G_Shop = {
@@ -413,7 +413,7 @@ const G_Shop = {
     const rp = this.report;
     const rep = rp ? `<div class="report">${rp.arrests} arrested · ${rp.incap || 0} incapacitated${rp.bleedouts ? ` (${rp.bleedouts} bled out)` : ''} · ${rp.rescued} civilians secured · ${rp.evidence || 0} weapons bagged · ${rp.bodies || 0} bodies secured` +
       (rp.civKilled ? ` · <b class="red">${rp.civKilled} civilian casualties</b>` : '') + (rp.unauth ? ` · <b class="red">${rp.unauth} unauthorised kills</b>` : '') +
-      (!rp.civKilled && !rp.unauth ? ' · <b class="go">clean op +¢200</b>' : '') + (rp.allRescued ? ` · <b class="go">every civilian rescued +¢${150 + 50 * this.level}</b>` : '') + '</div>' : '';
+      (!rp.civKilled && !rp.unauth ? ' · <b class="go">clean op +¢200</b>' : '') + (rp.stronghold ? ` · <b class="go">stronghold cleared +¢${G.Route.strongholdPay(this.level)}</b>` : '') + (rp.allRescued ? ` · <b class="go">every civilian rescued +¢${150 + 50 * this.level}</b>` : '') + '</div>' : '';
     document.getElementById('shopTitle')!.innerHTML = `Level ${this.level} cleared <span>— next up: level ${this.level + 1}${G.Route.isBoss(this.level + 1) ? ' <b class="red">(BOSS)</b>' : ''}</span>${rep}`;
     const tabs = [['stock', 'Stock'], ['kit', 'Kit'], ['gunsmith', 'Gunsmith'], ['zero', 'Zeroing'], ['svc', 'Supplies']];
     document.getElementById('shopTabs')!.innerHTML = tabs.map(([k, n]) => `<button class="tab${this.tab === k ? ' on' : ''}" data-tab="${k}">${n}</button>`).join('');
