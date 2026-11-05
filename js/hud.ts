@@ -384,12 +384,12 @@ const G_HUD = {
     // an apartment block: each apartment cleared in turn
     const nu = Gm.map!.units;
     if (nu) obj += `<br>${(Gm.unitsCleared || 0) >= nu ? '<b class="go">✔ Clear every apartment</b>' : 'Clear every apartment'}`; // (no count: how many there are is for you to find)
-    obj += `<br>${o2}`;
+    if (!Gm.stronghold()) obj += `<br>${o2}`; // (a stronghold has no civilians to rescue)
     // (green only once every other objective's done, order restored, apartments cleared, civilians rescued, and
     // nothing's left lying about: every body secured, every dropped weapon bagged)
     const V = G.Views, bodies = [...V.enemies.values()].filter((ev) => !ev.alive), drops = [...V.evidence.values()];
     const pending = bodies.some((ev) => !ev.bodySecured) || drops.some((v) => !v.secured);
-    const othersDone = X.active && (!nu || (Gm.unitsCleared || 0) >= nu) && !X.civDead && !(Gm.civsLeft > 0);
+    const othersDone = X.active && (!nu || (Gm.unitsCleared || 0) >= nu) && (Gm.stronghold() || !X.civDead && !(Gm.civsLeft > 0));
     obj += othersDone && !pending ? '<br><b class="go">✔ Also pays: securing bodies and bagging dropped weapons</b>' : '<br><span style="opacity:0.65">Also pays: securing bodies and bagging dropped weapons</span>';
     if (X.active) obj += `<br><b class="go">Press Y to vote to leave</b> — ${X.votes}/${X.need}${X.voted ? ' <span style="opacity:0.7">(you voted)</span>' : ''}`;
     if (Gm.hub) {

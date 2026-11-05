@@ -25,7 +25,7 @@ interface Evidence { i: number; wpn: string; x: number; y: number; z: number; ow
 interface Loot { id: number; x: number; y: number; z: number; item: any; yaw: number; fit?: number }
 interface Cab { open: boolean; ver: number; items: any[][] }
 interface EnemyBody { id: number; type: EnemyKind; def: EnemyDef; x: number; y: number; z: number; yaw: number; civ: boolean; secured: boolean; rec: Enemy } // (the dead, until secured)
-interface ServerReport { incap: number; bleedouts: number; bleedBy: Record<string, number>; arrests: number; rescued: number; civKilled: number; unauth: number; evidence: number; bodies: number; allRescued?: boolean }
+interface ServerReport { incap: number; bleedouts: number; bleedBy: Record<string, number>; arrests: number; rescued: number; civKilled: number; unauth: number; evidence: number; bodies: number; allRescued?: boolean; stronghold?: boolean }
 interface ServerRoute { seed: number; act: number; path: number[]; votes: Record<string, number> }
 interface TeamLocker { ver: number; items: any[][] }
 interface WeaponCase { code: string; mag: number; reserve: number; am: any; rl?: string; alt?: { rl: string; n: number; am: string } }
@@ -405,6 +405,11 @@ const G_Server = {
       if (this.phase === from) go();
     }, G.Game.VEIL_MS + 40);
   },
+  // is the level being played a stronghold (a flag on its route node: js/route.ts)
+  isStronghold() {
+    const at = this.route && this.route.path[this.route.path.length - 1], n = this.routeMap && at != null ? this.routeMap.nodes.get(at) : null;
+    return !!(n && n.stronghold);
+  },
   startLevel() {
     this.phase = 'level';
     this.seed = (Math.random() * 2 ** 31) | 0;
@@ -412,7 +417,7 @@ const G_Server = {
     this.enemies.clear();
     this.extract = { active: false, votes: new Set() };
     this.flow = null; this.flowT = 0; this.wipeT = 0; this.summons = 0; this.nadeT = 8;
-    this.report = { incap: 0, bleedouts: 0, bleedBy: {}, arrests: 0, rescued: 0, civKilled: 0, unauth: 0, evidence: 0, bodies: 0 };
+    this.report = { incap: 0, bleedouts: 0, bleedBy: {}, arrests: 0, rescued: 0, civKilled: 0, unauth: 0, evidence: 0, bodies: 0, stronghold: this.isStronghold() };
     this.evidence = []; // weapons on the floor: { i, wpn, x, z, owner, secured, taken }
     this.loot = new Map(); // things officers have put down: id -> { id, x, y, z, item (packed), yaw }
     this.glassBroken = new Set(); this.glassCracked = []; // windows broken (map.windows ids), and fractured ([id, where])
@@ -649,7 +654,7 @@ const G_Server = {
   // --------------------------------------------------------------- enemies
   spawnEnemies() {
     const L = this.level, np = Math.max(1, this.players.size), U = G.U;
-    const big = this.map!.theme.big || 1, count = Math.min(Math.round((4 + Math.floor(L * 1.5) + (np - 1) * 2) * (this.map!.theme.foes || 1)), 32 * big); // (a bigger map: more of them, and room for more)
+    const big = this.map!.theme.big || 1, hold = this.report.stronghold, count = Math.min(Math.round((4 + Math.floor(L * 1.5) + (np - 1) * 2) * (this.map!.theme.foes || 1) * (hold ? 1.5 : 1)), (hold ? 44 : 32) * big); // (a bigger map: more of them, and room for more)
     const hpMult = 1 + 0.04 * (L - 1) + 0.1 * (np - 1);
     this.accMult = Math.min(1 + 0.03 * (L - 1), 1.5);
     this.dmgMult = 1 + 0.07 * (L - 1);
@@ -678,13 +683,14 @@ const G_Server = {
       used.push([tx, tz, tf]);
       let roll = Math.random() * total, type: EnemyKind = 'grunt';
       for (const [ty, w] of weights) { if (roll < w) { type = ty; break; } roll -= w; }
-      this.addEnemy(type, (tx + 0.5) * G.Level.TS, (tz + 0.5) * G.Level.TS, hpMult, fy(tf));
+      const se = this.addEnemy(type, (tx + 0.5) * G.Level.TS, (tz + 0.5) * G.Level.TS, hpMult, fy(tf));
+      if (hold) se.drawn = true; // (a stronghold's suspects have their weapons out already, not holstered)
     }
     // civilians caught up in it (more at a festival: some of them hiding behind the stalls' counters; the other
     // stalls were left as they ran)
-    const crowd = this.map!.theme.crowd || 1, civs = Math.min(Math.round((2 + Math.floor(L / 2)) * crowd), 8 * big), TS = G.Level.TS;
+    const crowd = this.map!.theme.crowd || 1, civs = hold ? 0 : Math.min(Math.round((2 + Math.floor(L / 2)) * crowd), 8 * big), TS = G.Level.TS;
     let placed = 0;
-    for (const s of U.shuffle(Math.random, ((this.map as MapCivSpots).civSpots || []).slice())) {
+    for (const s of hold ? [] : U.shuffle(Math.random, ((this.map as MapCivSpots).civSpots || []).slice())) {
       if (placed >= Math.ceil(civs * 0.6)) break;
       const tx = Math.floor(s.x / TS), tz = Math.floor(s.z / TS);
       if (this.map!.t[tz * this.map!.W + tx] !== 0 || close(tx, tz, 0)) continue;
@@ -1098,7 +1104,7 @@ const G_Server = {
     if (left === 0 && !this.extract.active) { this.extract.active = true; G.Net.broadcast({ t: 'clear' }); }
   },
   // every civilian secured, none killed
-  allRescued() { return this.remaining(true) === 0 && !this.report.civKilled; },
+  allRescued() { return !this.report.stronghold && this.remaining(true) === 0 && !this.report.civKilled; }, // (a stronghold has none to rescue: no bonus for it)
 
   // "POLICE! SHOW ME YOUR HANDS!" Everyone in earshot and sight rolls to comply.
   shout(p: LivePlayer, from: string) {

@@ -6,9 +6,12 @@
 const G_Route = (() => {
   const COLS = 10, ROWS = 7, WALKS = 4;
   // which column a level is in, and which act; the last level of each act is the boss
-  interface RNode { id: number; c: number; r: number; th: number; next: number[]; prev: number[]; boss: boolean }
+  interface RNode { id: number; c: number; r: number; th: number; next: number[]; prev: number[]; boss: boolean; stronghold: boolean }
   interface RMap { seed: number; act: number; cols: RNode[][]; nodes: Map<number, RNode> }
   interface RState { path: number[]; opts: number[]; votes?: Record<string, number>; colors?: Record<string, number>; mine?: number }
+  const STRONGHOLD = 1 / 7; // the share of levels that are strongholds
+  // what clearing a stronghold pays on top of the usual (credits)
+  const strongholdPay = (level: number) => 300 + 60 * level;
   const colOf = (level: number) => (level - 1) % COLS;
   const actOf = (level: number) => Math.floor((level - 1) / COLS) + 1;
   const isBoss = (level: number) => level % COLS === 0;
@@ -19,7 +22,7 @@ const G_Route = (() => {
     const id = (c: number, row: number) => c * 10 + row;
     const node = (c: number, row: number): RNode => {
       const k = id(c, row);
-      if (!nodes.has(k)) nodes.set(k, { id: k, c, r: row, th: 0, next: [], prev: [], boss: c === COLS - 1 });
+      if (!nodes.has(k)) nodes.set(k, { id: k, c, r: row, th: 0, next: [], prev: [], boss: c === COLS - 1, stronghold: false });
       return nodes.get(k)!;
     };
     // would a link (c, a) -> (c + 1, b) cross one already drawn?
@@ -61,6 +64,11 @@ const G_Route = (() => {
       for (let k = 0; k < nT && avoid.has(pool[k0]); k++) k0 = (k0 + 1) % nT;
       n.th = n === start && act === 1 && starter >= 0 ? starter : pool[k0]; // the first act starts at the convenience store
     }
+    // strongholds: about one level in seven is a suspects' stronghold (no civilians, a bigger crowd of suspects, better pay).
+    // Never the first level, the convenience store or a boss. Drawn from a generator of its own, so the map's shape and
+    // environments are as they'd be without them.
+    const rs = G.U.rng(seed ^ (act * 0x2545f491) ^ 0x57c0);
+    for (const n of order) if (rs() < STRONGHOLD && !n.boss && !(act === 1 && n.c === 0) && !G.THEMES[n.th].starter) n.stronghold = true;
     const cols = [];
     for (let c = 0; c < COLS; c++) cols.push(order.filter((n) => n.c === c));
     return { seed, act, cols, nodes };
@@ -99,10 +107,12 @@ const G_Route = (() => {
       const [x, y] = pos(n), th = G.THEMES[n.th], opt = st.opts.includes(n.id), here = n.id === last;
       const cls = `rn${opt ? ' opt' : ''}${visited.has(n.id) ? ' done' : ''}${here ? ' here' : ''}${n.boss ? ' boss' : ''}${st.mine === n.id ? ' mine' : ''}`;
       const rad = n.boss ? 30 : 21;
-      dots += `<g class="${cls}" data-node="${n.id}" transform="translate(${x},${y})"><title>${esc(th.name)}${n.boss ? ' (boss)' : ''}</title>`;
+      dots += `<g class="${cls}" data-node="${n.id}" transform="translate(${x},${y})"><title>${esc(th.name)}${n.boss ? ' (boss)' : ''}${n.stronghold ? ` - STRONGHOLD: no civilians, about half as many suspects again, +¢${strongholdPay((route.act - 1) * COLS + n.c + 1)} for clearing it` : ''}</title>`;
       dots += `<circle r="${rad}" style="--fill:${th.wall};--edge:${th.floor}"/>`;
       dots += n.boss ? `<path d="M-9 6H9 M-9 3L-10-7-4-2 0-9 4-2 10-7 9 3Z" class="ri" transform="scale(1.4)"/>`
         : `<path d="${ICON[th.name] || 'M-5-5H5V5H-5Z'}" class="ri" transform="scale(1.55)"/>`;
+      // a stronghold wears a small red alert badge at its top right, with an exclamation mark
+      if (n.stronghold) dots += `<g class="rsh" transform="translate(${rad * 0.72},${-rad * 0.72})"><circle r="8"/><path d="M0-4.5V1 M0 3.6V3.7"/></g>`;
       dots += n.boss ? `<text y="${rad + 15}" class="rt">THE KINGPIN</text><text y="${rad + 28}" class="rt sub">${esc(th.name)}</text>` : `<text y="${rad + 15}" class="rt">${esc(th.name)}</text>`;
       // who's voted for it
       const vs = Object.entries(st.votes || {}).filter(([, v]) => v === n.id);
@@ -113,7 +123,7 @@ const G_Route = (() => {
     for (let c = 0; c < COLS; c++) cols += `<text x="${PADX + c * STEP}" y="18" class="rc">${c === COLS - 1 ? 'BOSS' : 'LEVEL ' + ((route.act - 1) * COLS + c + 1)}</text>`;
     return `<svg viewBox="0 0 ${W} ${H + 10}" class="route-svg">${cols}${lines}${dots}</svg>`;
   }
-  return { COLS, gen, options, colOf, actOf, isBoss, svg };
+  return { COLS, strongholdPay, gen, options, colOf, actOf, isBoss, svg };
 })();
 G.Route = G_Route;
 
