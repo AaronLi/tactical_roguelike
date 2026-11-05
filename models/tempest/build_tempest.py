@@ -186,25 +186,8 @@ pbrk = K.part('brk', (0, HINGE[0], HINGE[1]))
 # to the barrels' height, run along beside them (a rail on each's outside), and descend at the front to the ROD HOUSING: a cross member
 # under the barrels that carries the muzzle device's guide rods (and a short rail under it for a foregrip)
 ROD_X, ROD_U, ROD_R, ROD0 = 16 * mm, -0.0445, 4 * mm, HG1 - 0.150
-# the arms are TILTED to the muzzle device's lower facets (the line from a lower corner barrel to the single lower barrel, ~47 degrees):
-# each arm's section is a 6 x 18 mm rectangle lying along that facet, its inner face 10 mm off both barrels' centres
-_ta = (BORES[4][0] - BORES[5][0], BORES[4][1] - BORES[5][1]); _tl = math.hypot(*_ta)
-FT_T = (_ta[0] / _tl, _ta[1] / _tl)                               # along the facet (up and out), right-hand side
-FT_N = (FT_T[1], -FT_T[0])                                        # its outward normal (out and down)
-ARM_T, ARM_D = 6 * mm, 0.018                                      # the arms' thickness (along the normal) and depth (along the facet)
-_mid = ((BORES[4][0] + BORES[5][0]) / 2, (BORES[4][1] + BORES[5][1]) / 2)
-ARM_C = (_mid[0] + FT_N[0] * (10 * mm + ARM_T / 2), _mid[1] + FT_N[1] * (10 * mm + ARM_T / 2))   # the section's centre (right side)
-RUN_U, AW = ARM_C[1], ARM_D
-AX0, AX1 = 19 * mm, 25 * mm                                       # (the rod housing's width: +-AX1)
-TILT = math.atan2(FT_T[0], FT_T[1])                               # (the rotation about forward that lays a plate's up along the facet)
-def arm_corners(s_, f):
-    # the tilted section's four corners at forward f, side s_ (+1 right, -1 left)
-    out = []
-    for a, b in ((-1, -1), (1, -1), (1, 1), (-1, 1)):
-        x = ARM_C[0] + a * ARM_T / 2 * FT_N[0] + b * ARM_D / 2 * FT_T[0]
-        u = ARM_C[1] + a * ARM_T / 2 * FT_N[1] + b * ARM_D / 2 * FT_T[1]
-        out.append((s_ * x, f, u))
-    return out
+AX0, AX1, AW = 19 * mm, 25 * mm, 0.014                            # the arms' inner and outer faces; their depth on the run
+RUN_U = -0.026                                                    # the run's centre height: beside the single lower barrel, under the corner ones
 HS0 = HG1 - 0.072                                                 # the rod housing's rear (long enough under it for a vertical grip)
 FLOOR = ROD_U - 0.008                                             # its underside
 TAC0, TAC1, FG0, FG1 = CH1 + 0.060, HS0 - 0.040, HS0 + 0.004, HG1 - 0.004      # the arms' rails; the housing's rail
@@ -227,21 +210,11 @@ _run0, _run1 = CH1 + 0.042 + 0.012, HS0 - 0.022 - 0.012
 MLOK = [(_run0 + _run1) / 2 + k * 0.040 for k in range(-3, 4) if abs(k * 0.040) + 0.016 <= (_run1 - _run0) / 2]   # (centred, 40 mm apart)
 TAC0, TAC1 = MLOK[0] - 0.016, MLOK[-1] + 0.016
 for s_ in (-1, 1):
-    a = K.tmp(prism(band(ARM, AW), 'x', -ARM_T / 2, ARM_T / 2))      # built upright, centred on x = 0, then tilted into place
+    a = K.tmp(prism(band(ARM, AW), 'x', s_ * AX0, s_ * AX1))
     bevel(a, 1.5 * mm, 2, 30)
     for f in MLOK:   # M-LOK slots through the run (32 x 7 mm, 40 mm apart): a light or a laser bolts on
-        cut(a, prism(rounded(f, RUN_U, 0.016, 0.0035, 1.2 * mm, 2), 'x', -0.01, 0.01))
-    a.data.transform(Matrix.Translation((s_ * ARM_C[0], 0, ARM_C[1])) @ Matrix.Rotation(s_ * TILT, 4, 'Y') @ Matrix.Translation((0, 0, -RUN_U)))
+        cut(a, prism(rounded(f, RUN_U, 0.016, 0.0035, 1.2 * mm, 2), 'x', s_ * (AX0 - 0.001), s_ * (AX1 + 0.001)))
     smooth(a); K.adopt(a, 'handguard', TI, pbrk)
-def loft_rings(A_pts, B_pts):
-    # a straight member between two 3D quads (four corners each, in the same order)
-    import bmesh as _bm
-    bm = _bm.new()
-    A = [bm.verts.new(p) for p in A_pts]; B = [bm.verts.new(p) for p in B_pts]
-    bm.faces.new(A); bm.faces.new(list(reversed(B)))
-    for i in range(4): bm.faces.new((A[i], A[(i + 1) % 4], B[(i + 1) % 4], B[i]))
-    _bm.ops.recalc_face_normals(bm, faces=bm.faces)
-    me = bpy.data.meshes.new('tmp'); bm.to_mesh(me); bm.free(); return me
 def loft_box(ca, sa, cb, sb):
     # a straight member from the rectangle centred ca = (right, forward, up) sized sa = (width, height) to the one at cb sized sb
     import bmesh as _bm
@@ -261,10 +234,8 @@ boolean(hb, box(-KN_IN, KN_IN, HINGE[0], CH1 + 0.016, HINGE[1] - KN_R, HINGE[1] 
 bevel(hb, 1 * mm, 2, 30); cut(hb, cyl(3.1 * mm, -0.03, 0.03, 'x', HINGE, 18))
 smooth(hb); K.adopt(hb, 'handguard', TI, pbrk)
 for s_ in (-1, 1):
-    kx, ku, kw, kh = s_ * (KN_IN - 1.5 * mm), HINGE[1] + 0.001, 2.5 * mm, 5.5 * mm
-    lg = K.tmp(loft_rings([(kx - kw, CH1 + 0.010, ku - kh), (kx + kw, CH1 + 0.010, ku - kh), (kx + kw, CH1 + 0.010, ku + kh), (kx - kw, CH1 + 0.010, ku + kh)]
-                          if s_ > 0 else [(kx + kw, CH1 + 0.010, ku - kh), (kx - kw, CH1 + 0.010, ku - kh), (kx - kw, CH1 + 0.010, ku + kh), (kx + kw, CH1 + 0.010, ku + kh)],
-                          arm_corners(s_, CH1 + 0.046)))
+    lg = K.tmp(loft_box((s_ * (KN_IN - 1.5 * mm), CH1 + 0.010, HINGE[1] + 0.001), (5 * mm, 11 * mm),
+                        (s_ * (AX0 + AX1) / 2, CH1 + 0.046, RUN_U), (AX1 - AX0, AW)))
     bevel(lg, 1.2 * mm, 2, 30); smooth(lg); K.adopt(lg, 'handguard', TI, pbrk)
 # the rod housing: a cross member under the barrels between the arms' feet, bored for the two guide rods, a pocket between them
 hs = K.tmp(prism([(HS0, FLOOR), (HG1, FLOOR), (HG1, LOW - 2 * mm), (HS0, LOW - 2 * mm)], 'x', -AX1, AX1))
@@ -312,12 +283,11 @@ for h in holes_b: cut(web, prism(h, 'x', -0.01, 0.01))
 smooth(web); K.adopt(web, 'handguard', TI, pbrk)
 for ua, ub in ((BLO, BLO + BFL), (BHI - BFL, BHI)):
     o = K.tmp(box(-BX, BX, f_b0, f_b1, ua, ub)); bevel(o, 0.8 * mm, 2, 30); smooth(o); K.adopt(o, 'handguard', TI, pbrk)
-# the SIDE STRIPS: sloping up from the I-beam's top flange edges to the tilted arms' lower faces (the forend's V underside)
-_lo = (ARM_C[0] - ARM_D / 2 * FT_T[0], ARM_C[1] - ARM_D / 2 * FT_T[1])     # the tilted arm's lower face's middle
-XB, UB, XT, UT = BX - 1.5 * mm, BHI - 0.5 * mm, _lo[0], _lo[1] + 0.5 * mm     # (the strip's foot and head, in (right, up))
+# the SIDE WEBS: sloping up and out, from the I-beam's top flange edges to the underside of the arms' runs (a V cradle under the
+# barrels), Warren trusses laid out in their sloped planes
+XB, UB, XT, UT = BX - 1 * mm, BHI, AX0 + 2 * mm, WU + 0.001      # (the slope's foot and head, in (right, up))
 Ls = math.hypot(XT - XB, UT - UB); dx, du = (XT - XB) / Ls, (UT - UB) / Ls
-# (only ~7 mm between the I-beam and the arms now: a plain strip; the Warren pattern stays in the I-beam's web)
-out_w, holes_w = [(CH1 + 0.050, 0.0), (HS0 - 0.016, 0.0), (HS0 - 0.016, Ls), (CH1 + 0.050, Ls)], []
+out_w, holes_w = warren(CH1 + 0.050, HS0 - 0.016, 0.0, Ls, chord=2.5 * mm)
 for s_ in (-1, 1):
     wb = K.tmp(prism(out_w, 'x', 0.0, 3.5 * mm)); bevel(wb, 0.8 * mm, 1, 30)          # built flat: x = thickness, y = forward, z = up the slope
     for h in holes_w:
@@ -409,8 +379,7 @@ anchors = {
     'mount_handguard': [CH1, 0, 0], 'mount_handguard_end': [HG1, 0, 0],
     'mount_barrel': [BR0, 0, 0], 'mount_muzzle': [MZ0, 0, 0],
     'mount_stock': [0, round((SR0 + SR1) / 2, 4), 0], 'mount_grip': [GRIP_SEAT[0], GRIP_SEAT[1], 0], 'mount_mag': [MAG_AT[0], MAG_AT[1], 0],
-    'mount_tac': [round((TAC0 + TAC1) / 2, 4), round(ARM_C[1] + FT_N[1] * ARM_T / 2, 4), round(ARM_C[0] + FT_N[0] * ARM_T / 2, 4)],
-    'mount_tacL': [round((TAC0 + TAC1) / 2, 4), round(ARM_C[1] + FT_N[1] * ARM_T / 2, 4), -round(ARM_C[0] + FT_N[0] * ARM_T / 2, 4)],      # (M-LOK on the arms)
+    'mount_tac': [round((TAC0 + TAC1) / 2, 4), RUN_U, AX1], 'mount_tacL': [round((TAC0 + TAC1) / 2, 4), RUN_U, -AX1],      # (M-LOK on the arms)
     'mount_fg': [round((FG0 + FG1) / 2, 4), round(FLOOR - 0.0056, 4), 0],
 }
 root['gun'] = ID; root['info_json'] = json.dumps(info); root['anchors_json'] = json.dumps(anchors)
