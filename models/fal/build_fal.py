@@ -406,6 +406,11 @@ clip(gb, [((0, F(1607), 0), (0, 1, 0))]); finish(gb.data)
 lug = obj(slab(loops_of('barrel'), 0.012, 0.001, 1), 'barrel', 'park')
 clip(lug, [((0, F(1607), 0), (0, -1, 0)), ((0, F(1670), 0), (0, 1, 0)), ((0, 0, -0.008), (0, 0, 1))]); finish(lug.data)
 o = obj(tube([(F(1598), 0.0058), (F(1614), 0.0058), (F(1616), 0.0045)], 18, 'y', (0, 0, U(178))), 'barrel', 'park'); finish(o.data)
+# the gas tube: from the receiver's face to the gas block's rear, over the barrel. It goes with the gas block (slot barrel). It is sized to sit
+# INSIDE every shared handguard seated at mount_handguard: its top is 17.0 mm over the bore, under the slim one's 16-sided r 18 mm (flats at 17.65 mm).
+# On the real rifle it sits higher (the gas plug's line, U(178)), hidden by the factory handguard either way.
+GT_R, GT_U = 0.0036, 0.0134                                         # 0.5 mm over the barrel (r 9.5 mm)
+o = obj(tube([(F(1116) - 0.002, GT_R), (F(1531) + 0.002, GT_R)], 12, 'y', (0, 0, GT_U)), 'barrel', 'park'); finish(o.data)
 
 # FRONT SIGHT (on the gas block, so the barrel's: it stays whatever optic is fitted): two protective ears and the post between them, its tip on the line of sight
 for s in (-1, 1):

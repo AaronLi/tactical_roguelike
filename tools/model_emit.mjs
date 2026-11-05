@@ -13,7 +13,7 @@ import { defOf } from './model_sweep.mjs';
 
 const T = THREE_NS;
 /** Who owns the pivot of a part_ node (the pack whose tag this is): the animated parts belong to the slot they move with, the rest to the receiver. */
-const PART_OWNER = { mag: 'mag', slide: 'slide', ch: 'charging', magn: 'magnifier', pump: 'pump', brk: 'barrel', barrel: 'barrel', spin: 'barrel', stringCocked: 'limbs', stringSlack: 'limbs' };
+const PART_OWNER = { mag: 'mag', slide: 'slide', ch: 'charging', magn: 'magnifier', pump: 'pump', brk: 'barrel', barrel: 'barrel', spin: 'barrel', bipod: 'base', stringCocked: 'limbs', stringSlack: 'limbs' };
 /** Position quantisation of the packs' vertices, in bits (MODELS_POSITION_BITS=14 for the smallest files); 0: float32, exact. */
 const POSITION_BITS = +(process.env.MODELS_POSITION_BITS || 0);
 export const ownerTag = (node) => (node.startsWith('part_') ? PART_OWNER[node.slice(5)] || 'base' : node.startsWith('group_') ? node.split('_')[1] : 'base');
@@ -41,18 +41,23 @@ export async function makeEmitter({ G, GM, Models, logger }) {
       names.set(o, n); return n;
     };
     const out = { root: [], nodes: new Map() };
-    group.traverse((o) => {
-      if (!o.isMesh || (o.userData.slot || 'base') + (o.userData.at ? '@' + o.userData.at : '') !== tag) return;
-      const p = o.parent;
-      if (p === group) { out.root.push(o); return; }
+    /** The node record of a group (made with its ancestors, up to the gun: a bipod's legs nest in part_bipod, which holds no mesh itself). */
+    const nodeOf = (p) => {
       const name = nameOf(p);
       let nd = out.nodes.get(name);
       if (!nd) {
         if (p.quaternion.angleTo(new T.Quaternion()) > 1e-9 || Math.abs(p.scale.x - 1) + Math.abs(p.scale.y - 1) + Math.abs(p.scale.z - 1) > 1e-9) throw new Error(`node ${name} is rotated or scaled`);
         const w = new T.Vector3().setFromMatrixPosition(p.matrixWorld);
+        if (p.parent !== group) nodeOf(p.parent);
         nd = { obj: p, parent: p.parent === group ? null : nameOf(p.parent), pivot: w, meshes: [] }; out.nodes.set(name, nd);
       }
-      nd.meshes.push(o);
+      return nd;
+    };
+    group.traverse((o) => {
+      if (!o.isMesh || (o.userData.slot || 'base') + (o.userData.at ? '@' + o.userData.at : '') !== tag) return;
+      const p = o.parent;
+      if (p === group) { out.root.push(o); return; }
+      nodeOf(p).meshes.push(o);
     });
     return out;
   }
@@ -88,8 +93,8 @@ export async function makeEmitter({ G, GM, Models, logger }) {
     for (const [nm, nd] of fr.nodes) {
       const g = new T.Group(); g.name = nm;
       const piv = nd.pivot.clone(); un(piv); g.position.copy(piv);
-      g.userData = { ...(nm.startsWith('part_') ? { part: nm.slice(5) } : {}), owner: ownerTag(nm) === tag, ...(nd.parent ? { parent: nd.parent } : {}) };
-      g.__piv = piv; h.update(`n|${nm}|${nd.parent}|${g.userData.owner}|${piv.toArray().map((x) => Math.round(x * 1e6)).join(',')}|`);
+      g.userData = { ...(nm.startsWith('part_') ? { part: nm.slice(5) } : {}), owner: ownerTag(nm) === tag, ...(nd.parent ? { parent: nd.parent } : {}), ...(nd.obj.userData.leg ? { leg: nd.obj.userData.leg } : {}) };
+      g.__piv = piv; h.update(`n|${nm}|${nd.parent}|${g.userData.owner}|${nd.obj.userData.leg ? JSON.stringify(nd.obj.userData.leg) : ''}|${piv.toArray().map((x) => Math.round(x * 1e6)).join(',')}|`);
       for (const o of nd.meshes) addMesh(o, g);
       root.add(g);
     }

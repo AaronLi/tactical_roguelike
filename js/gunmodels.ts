@@ -183,12 +183,18 @@ const G_GunModels = (() => {
   const boot = (): Promise<void> => Promise.all([G.Models.boot(), loadProps()]).then(() => undefined);
   /** The hangar: every pack of every platform, the named ones first, in the background. */
   const preloadAll = (first: string[] = []) => { G.Models.preloadAll(first); };
-  /** A level's start: the builds in these defs (the squad's kits, a case's gun) and every pack of the platforms of the squad's guns and of these gun ids (the level's enemy pool, loot). */
+  /**
+   * Fetches what is about to be shown, most urgent first (the queue is in js/glb.ts): the builds in these defs at once (priority 0); then, `wholePlatforms`
+   * (the gunsmith: a part swap should show at once) every pack of their platforms; and for the gun ids in `platforms` (a level's enemy pool) the default
+   * build only. A level asks for no whole platforms: only the hangar warms everything (preloadAll). Resolves when the builds and the pool are in.
+   */
   const platformsAsked = new Set<string>();
-  function preload(defs: any[], platforms: string[] = []) {
-    boot().then(() => {
-      for (const d of defs) if (d && d.id) { request(d); platforms = [...platforms, d.id]; }
-      for (const id of platforms) if (!platformsAsked.has(id)) { platformsAsked.add(id); G.Models.preloadPlatform(id); }
+  function preload(defs: any[], platforms: string[] = [], wholePlatforms = true): Promise<void> {
+    return boot().then(() => {
+      const all: Promise<unknown>[] = [];
+      for (const d of defs) if (d && d.id) { all.push(request(d)); if (wholePlatforms && !platformsAsked.has(d.id)) { platformsAsked.add(d.id); all.push(G.Models.preloadPlatform(d.id)); } }
+      for (const id of platforms) { const d = G.Gunsmith.PLATFORMS[id] && G.Gunsmith.fromCode(G.Gunsmith.defaultCode(id)); if (d) all.push(G.Models.ensure(d, 1)); }
+      return Promise.all(all).then(() => undefined);
     });
   }
 

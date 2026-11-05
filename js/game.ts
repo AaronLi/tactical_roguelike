@@ -1225,7 +1225,8 @@ const G_Game = {
     const teamDefs = [...G.Views.players.values()].map((p) => p.st && p.st.w && G.Gunsmith.fromCode(p.st.w)).filter(Boolean), team = teamDefs.map((d) => d.soundKey);
     // the guns the level will show, fetched now: the squad's kits, the level's enemy weapon pool (every pack of each platform), the weapon case's gun and the loot (as it lands)
     const caseGun = G.Server.wcase && G.Gunsmith.fromCode(G.Server.wcase.code);
-    G.GunModels.preload([...Object.values(G.Me.weapons).map((w) => w.def), ...teamDefs, ...(caseGun ? [caseGun] : [])], this.enemyGuns(level));
+    G.Models.pauseBackground(true); // (the hangar's warm-everything waits while the level loads, and goes on when its guns are in)
+    { let resumed = false; const resume = () => { if (!resumed) { resumed = true; G.Models.pauseBackground(false); } }; setTimeout(resume, 20000); G.GunModels.preload([...Object.values(G.Me.weapons).map((w) => w.def), ...teamDefs, ...(caseGun ? [caseGun] : [])], this.enemyGuns(level), false).then(resume, resume); }
     G.GunAudio.prewarm([...Object.values(G.Me.weapons).flatMap((w) => [w.def.soundKey, G.Gunsmith.roundSoundKey(w.def, w.chamber || w.ammo)]), ...this.enemyGuns(level), ...team], this.map);
     // everyone in a seat of their own in the helicopter, on the pad (the same on every machine: by the sorted roster)
     const i = Math.max(0, Object.keys(this.roster).sort().indexOf(G.Net.myId!));
