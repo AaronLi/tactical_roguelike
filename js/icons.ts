@@ -362,11 +362,20 @@ const G_Icons = (() => {
   // ---------------------------------------------------------------- guns: the model, side-on
   let gR: THREE.WebGLRenderer | null = null, gScene: THREE.Scene | null = null, gCam: THREE.OrthographicCamera | null = null;
   // (a gun whose packs are not in yet has no picture: the cell is left empty, not remembered, and 'gunicons' goes out to the screens that show icons when it has one)
-  let gunWaits = false;
+  // One wait per gun (by build code) and ONE 'gunicons' for any number that come in together: each 'gunicons' redraws a whole screen of icons, and a redraw
+  // while guns are still loading would otherwise add another wait per gun per redraw (the sidearm picker froze for tens of seconds on that cascade).
+  let gunWaits = false, iconsQueued = false;
+  const waiting = new Set<string>();
+  const iconsReady = () => { if (iconsQueued) return; iconsQueued = true; setTimeout(() => { iconsQueued = false; window.dispatchEvent(new Event('gunicons')); }, 30); };
   function gunImage(def: WeaponDef, W: number, H: number): HTMLCanvasElement | null {
     const T = THREE;
     const m = G.GunModels.display(def);
-    if (m.group.userData.pending) { gunWaits = true; G.GunModels.whenReady(m.group, () => { m.group.traverse((o: any) => { if (o.isMesh) o.geometry.dispose(); }); window.dispatchEvent(new Event('gunicons')); }); return null; }
+    if (m.group.userData.pending) {
+      gunWaits = true;
+      const k = def.code || def.id;
+      if (!waiting.has(k)) { waiting.add(k); G.GunModels.whenReady(m.group, () => { waiting.delete(k); m.group.traverse((o: any) => { if (o.isMesh) o.geometry.dispose(); }); iconsReady(); }); }
+      return null;
+    }
     if (!gR) {
       gR = new T.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
       gScene = new T.Scene();
