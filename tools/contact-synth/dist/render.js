@@ -149,8 +149,11 @@ export function render(p, sampleRate = 48000) {
     }
     if (p.impact.click > 0) {
         const click = contactNoise(events, ex.cont, sr, N, rng);
-        highpassInPlace(click, 400, sr);
-        highpassInPlace(click, 400, sr);
+        // A light part radiates its contact as a thin tick; a heavy one (a 300 g bolt carrier)
+        // stopping short also pushes air at low frequencies: the weight of the "chunk".
+        const clickHp = clamp(400 * Math.pow(0.02 / Math.max(1e-4, contact.mEff), 0.3), 90, 400);
+        highpassInPlace(click, clickHp, sr);
+        highpassInPlace(click, clickHp, sr);
         const pk = peak(click);
         if (pk > 0)
             mixInto(mix, click, (p.impact.click * ref * 0.7) / pk);

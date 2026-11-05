@@ -97,7 +97,7 @@ export function renderBody(comps: Component[], input: BankInput, sr: number, N: 
     // Unit-variance noise through a 0 dB-peak band-pass has RMS sqrt(π·bw/sr): undo that.
     const noiseNorm = 1 / Math.sqrt((Math.PI * Math.max(0.05, c.bw)) / sr);
     // A narrow resonance builds up more from continuous rubbing (gain ~ sqrt(Q)).
-    const fricGain = FRICTION_GAIN * c.amp * clamp(Math.sqrt(c.f / c.bw / 8), 1, 40);
+    const fricGain = FRICTION_GAIN * c.amp * clamp(Math.sqrt(c.f / c.bw / 8), 1, 8);
     let bq = bandpass(c.f, c.bw, sr);
     // Wide band for the in-phase onset, so it lasts only ~1/(π·bwC): a millisecond or two.
     const bwC = Math.max(c.bw, c.f * 0.35, 150);

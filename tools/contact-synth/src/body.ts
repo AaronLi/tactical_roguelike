@@ -201,8 +201,10 @@ export function deriveBody(bp: BodyParams, sr: number, rng: () => number): BodyM
       for (const f of inBand) {
         partials++;
         const a = decay(f);
-        // Even a lone resonance wobbles a little: real parts aren't perfectly uniform.
-        const bw = Math.max(a / Math.PI, f * (0.00015 + 0.0012 * irr));
+        // Even a lone resonance wobbles a little: real parts aren't perfectly uniform. A part
+        // that is held, pinned or pressed against others also smears in pitch, because its
+        // contact stiffness keeps shifting, so clamped metal reads as a clack and not a chime.
+        const bw = Math.max(a / Math.PI, f * (0.00015 + 0.0012 * irr + 0.012 * bp.damping * bp.damping));
         const amp = level(f) * (0.55 + 0.45 * rng());
         const split = bp.shape === 'shell' ? 0.0015 + irr * 0.02 : irr * 0.012;
         const k = 0.7 * partials + 0.3 * rng();

@@ -9,6 +9,15 @@
  * housing that stands for the receiver everything is mounted in. Springs that
  * matter acoustically (buffer spring, magazine spring, shell stop, latches) use
  * the coil layer or snaps. Levels are a sound-design balance.
+ *
+ * A firearm is an assembly: parts are pinned, greased, spring-loaded against each
+ * other and held in hands, so none of them rings freely. Joint and contact
+ * losses in built-up steel structures are orders of magnitude above solid
+ * steel's own loss. So parts here are heavily damped: small parts have no pitched
+ * partials at all (they're heard as part of the clack), heavy blocks and springs
+ * keep one or two, and the receiver housing has none (its modes overlap
+ * into dense noise). Free-ringing steel would sound like chimes or crystals,
+ * not a gun.
  */
 
 import type { Scene, SceneElement } from '../scene.js';
@@ -33,7 +42,7 @@ function rub(what: string, at: number, gainDb: number, friction: Partial<Frictio
     what, at, gainDb,
     sound: { kind: 'contact', patch: {
       impact: { velocity: 0, sharpness: 0.8, click: 0.4 },
-      friction: { profile: 'swell', periodicity: 0.1, stickSlip: 0.05, contactWidth: 0.05, ...friction },
+      friction: { profile: 'swell', periodicity: 0.1, stickSlip: 0, contactWidth: 0.05, ...friction }, // greased: no stick-slip unless asked
       bodyA: A, bodyB: B, out: { length: 0.8 }, ...extra,
     } },
   };
@@ -51,38 +60,38 @@ function snap(what: string, at: number, gainDb: number, s: Partial<SnapParams>, 
 }
 
 // ---------- parts ----------
-const steelBlock = (cm: number, mm: number): Body => ({ ...mat('steel'), shape: 'block', size: cm, thickness: mm, modes: 12, irregularity: 0.5, damping: 0.2, level: 0 });
-const steelBar = (cm: number, mm: number, damping = 0.3): Body => ({ ...mat('steel'), shape: 'bar', size: cm, thickness: mm, modes: 10, irregularity: 0.4, damping, level: 0 });
-const alu = (shape: BodyParams['shape'], cm: number, mm: number, damping = 0.3): Body => ({ ...mat('aluminum'), shape, size: cm, thickness: mm, modes: 12, irregularity: 0.5, damping, level: 0 });
-const springWire = (cm: number, mm: number): Body => ({ ...mat('springsteel'), shape: 'bar', size: cm, thickness: mm, modes: 10, irregularity: 0.4, damping: 0.3, level: 0 });
+const steelBlock = (cm: number, mm: number): Body => ({ ...mat('steel'), shape: 'block', size: cm, thickness: mm, modes: 1, irregularity: 0.7, damping: 0.65, level: 0 });
+const steelBar = (cm: number, mm: number, damping = 0.65): Body => ({ ...mat('steel'), shape: 'bar', size: cm, thickness: mm, modes: 0, irregularity: 0.7, damping, level: 0 });
+const alu = (shape: BodyParams['shape'], cm: number, mm: number, damping = 0.65): Body => ({ ...mat('aluminum'), shape, size: cm, thickness: mm, modes: 0, irregularity: 0.7, damping, level: 0 });
+const springWire = (cm: number, mm: number): Body => ({ ...mat('springsteel'), shape: 'bar', size: cm, thickness: mm, modes: 2, irregularity: 0.6, damping: 0.55, level: 0 });
 
 // Shotgun
 const sgBolt = steelBlock(7, 25);
 const sgBoltSlide = steelBar(6, 6);
-const sgReceiverRail = steelBar(20, 4, 0.5);
+const sgReceiverRail: Body = { ...steelBar(20, 4, 0.75), modes: 0 }; // part of the receiver
 const sgActionBars = steelBar(25, 2.5);
 const sgForend: Body = { ...mat('nylon'), shape: 'shell', size: 22, thickness: 4, modes: 12, irregularity: 0.6, damping: 0.6, level: 0 }; // gripped
-const sgMagTube: Body = { ...mat('steel'), shape: 'shell', size: 45, thickness: 1.2, modes: 16, irregularity: 0.3, damping: 0.6, level: 0 }; // fore-end hand damps it
+const sgMagTube: Body = { ...mat('steel'), shape: 'shell', size: 45, thickness: 1.2, modes: 0, irregularity: 0.6, damping: 0.75, level: 0 }; // fore-end hand damps it
 const sgCarrier = steelBar(7, 2);
 const sgShellStop = springWire(3, 1.5);
 const sgActionLock = steelBar(3, 2.5);
 const hull: Body = { ...mat('hdpe'), shape: 'shell', size: 7, thickness: 0.8, modes: 8, irregularity: 0.4, damping: 0.2, level: -4 };
-const brassHead: Body = { ...mat('brass'), shape: 'block', size: 2.2, thickness: 8, modes: 6, irregularity: 0.3, damping: 0.2, level: 0 };
-const sgChamber: Body = { ...mat('steel'), shape: 'shell', size: 9, thickness: 4, modes: 10, irregularity: 0.3, damping: 0.4, level: 0 };
+const brassHead: Body = { ...mat('brass'), shape: 'block', size: 2.2, thickness: 8, modes: 0, irregularity: 0.5, damping: 0.5, level: 0 };
+const sgChamber: Body = { ...mat('steel'), shape: 'shell', size: 9, thickness: 4, modes: 2, irregularity: 0.6, damping: 0.7, level: 0 };
 
 // AR-15
 const arCarrier = steelBlock(18, 22); // bolt carrier group, ~300 g
 const arBolt = steelBlock(6, 10);
 const arBarrelExt = steelBlock(3, 20);
-const arUpper = alu('shell', 25, 3, 0.4);
+const arUpper: Body = { ...alu('shell', 25, 3, 0.7), modes: 0 }; // receiver: thick, bolted to everything, no free ring
 const arChargingHandle = alu('bar', 18, 5, 0.4);
 const arChLatch = steelBar(2.5, 2);
-const arBufferTube = alu('shell', 18, 2.5, 0.3);
+const arBufferTube: Body = { ...alu('shell', 18, 2.5, 0.5), modes: 1 }; // the buffer tube's own short ring is part of the AR's sound
 const arBufferSpring = springWire(25, 1.4);
 const arBuffer = steelBlock(6, 18); // buffer with sliding weights
-const arCase: Body = { ...mat('brass'), shape: 'shell', size: 4.5, thickness: 0.4, modes: 10, irregularity: 0.3, damping: 0.2, level: 0 };
+const arCase: Body = { ...mat('brass'), shape: 'shell', size: 4.5, thickness: 0.4, modes: 1, irregularity: 0.5, damping: 0.6, level: 0 }; // held by the magazine / chamber
 const arFeedLips = steelBar(4, 0.8, 0.4);
-const arChamber: Body = { ...mat('steel'), shape: 'shell', size: 5, thickness: 4, modes: 10, irregularity: 0.3, damping: 0.4, level: 0 };
+const arChamber: Body = { ...mat('steel'), shape: 'shell', size: 5, thickness: 4, modes: 2, irregularity: 0.6, damping: 0.7, level: 0 };
 const arBoltCatch = steelBar(4, 3);
 const arExtractor = steelBar(2, 3);
 const arNextRound: Body = { ...arCase, level: -2 };
@@ -96,10 +105,10 @@ const PUSH_END = 0.44;
 export const PUMP_SHOTGUN: Scene = {
   id: 'pump-shotgun',
   title: 'Pump-action shotgun: rack (back and forward)',
-  room: 0.1,
+  room: 0.04,
   roomSize: 0.35,
   // Steel receiver (with barrel and magazine tube hung off it), held at shoulder.
-  housing: { amount: 0.5, cavity: 0.2, ...mat('steel'), shape: 'shell', size: 24, thickness: 4, modes: 16, irregularity: 0.6, damping: 0.55 },
+  housing: { amount: 0.5, cavity: 0.15, ...mat('steel'), shape: 'shell', size: 24, thickness: 4, modes: 0, irregularity: 0.8, damping: 0.75 },
   tracks: [
     {
       name: 'action-release',
@@ -177,14 +186,14 @@ export const PUMP_SHOTGUN: Scene = {
 
 // ---------- AR-15 ----------
 // Receiver housing: 7075 aluminium upper and lower, barrel and buffer tube hung off them.
-const AR_HOUSING: Scene['housing'] = { amount: 0.55, cavity: 0.25, ...mat('aluminum'), shape: 'shell', size: 30, thickness: 3, modes: 16, irregularity: 0.6, damping: 0.3 };
+const AR_HOUSING: Scene['housing'] = { amount: 0.5, cavity: 0.15, ...mat('aluminum'), shape: 'shell', size: 30, thickness: 3, modes: 0, irregularity: 0.8, damping: 0.7 };
 
 /** The carrier running home under the buffer spring, starting at t (round in the magazine). */
 function arForward(t: number, withChargingHandle: boolean): SceneElement[] {
   const els: SceneElement[] = [
     // Buffer spring decompressing: the classic AR "sproing", echoing in the buffer tube.
     hit('buffer spring drives the carrier', t, -6, 3, arBufferSpring, arBufferTube, { scatter: 0.2, radius: 1, click: 0.3, sharp: 0.7 },
-      { coil: { level: 1, length: 14, dispersion: 0.7, decay: 0.6, brightness: 6000 } }),
+      { coil: { level: 0.6, length: 14, dispersion: 0.45, decay: 0.35, brightness: 3500 } }),
     rub('carrier rails in the upper', t + 0.002, -12, { force: 8, duration: 0.05, speed: 4, profile: 'accelerate', roughness: 10, grain: 0.4 }, arCarrier, arUpper),
     hit('buffer weights shift', t + 0.004, -16, 1.2, steelBlock(1.5, 12), arBuffer, { scatter: 0.9, radius: 2 }),
     // Bolt strips the top round over the steel feed lips.
@@ -210,7 +219,7 @@ const LET_GO = 0.45;
 export const AR15_CHARGE: Scene = {
   id: 'ar15-charge',
   title: 'AR-15: charging handle pulled back and released',
-  room: 0.1,
+  room: 0.04,
   roomSize: 0.35,
   housing: AR_HOUSING,
   tracks: [
@@ -237,7 +246,7 @@ export const AR15_CHARGE: Scene = {
       description: 'Buffer spring compressing in the buffer tube: coils scraping the tube walls, the spring twanging.',
       elements: [
         rub('coils scraping the buffer tube', CH_BACK + 0.02, -9, { force: 3, duration: CH_END - CH_BACK - 0.02, speed: 0.7, roughness: 120, grain: 4, periodicity: 0.85 }, arBufferSpring, arBufferTube,
-          { coil: { level: 0.9, length: 14, dispersion: 0.7, decay: 0.4, brightness: 6000 }, flex: { amount: 0.4, freq: 110, decay: 0.2, rattle: 0.3, wobble: 0.2, tone: 0.25 } }),
+          { coil: { level: 0.55, length: 14, dispersion: 0.45, decay: 0.25, brightness: 3500 }, flex: { amount: 0.4, freq: 110, decay: 0.15, rattle: 0.3, wobble: 0.1, tone: 0.15 } }),
         hit('buffer weights shift', CH_BACK + 0.03, -16, 0.6, steelBlock(1.5, 12), arBuffer, { scatter: 0.9, radius: 2 }),
       ],
     },
@@ -260,7 +269,7 @@ const CATCH_DROPS = 0.07;
 export const AR15_BOLT_RELEASE: Scene = {
   id: 'ar15-bolt-release',
   title: 'AR-15: bolt catch pressed, bolt slams home',
-  room: 0.1,
+  room: 0.04,
   roomSize: 0.35,
   housing: AR_HOUSING,
   tracks: [
