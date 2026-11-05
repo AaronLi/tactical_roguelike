@@ -397,28 +397,33 @@ for px in range(1096, 1882, 3):
     r = col_run(px, PY0) if px >= 1606 else None
     rr = (r[1] - r[0] + 1) / 2 * S if r and (r[1] - r[0]) < 40 else 0.0095
     prof.append((F(px), min(rr, 0.0105)))
-GAS_F = F(1607)                                                    # the gas block's front: the barrel's own length starts showing here
-br = obj(lathe([q for q in prof if q[0] <= GAS_F + 1e-6] + [(GAS_F, prof[0][1])], 16), 'barrel', 'park'); finish(br.data)
-fr = obj(lathe([(GAS_F - 0.002, 0.0085)] + [q for q in prof if q[0] > GAS_F], 16), 'barrel', 'park'); finish(fr.data)
-fr['role'] = 'tube'                                                # (the game sets its length: everything else is fixed)
-gb = obj(slab(loops_of('barrel'), 0.032, 0.004, 2), 'barrel', 'park')
+GAS_F, BAR_F = F(1607), F(1672)                                    # the gas block's front; mount_barrel (the bare tube starts here, ahead of the bayonet lug's collar)
+# slot BARREL is the factory barrel only: the bare tube from mount_barrel to its end (mount_muzzle). Any other barrel is the shared standard
+# tube (r 9.5 mm) seated at mount_barrel. Everything that stays when it is swapped is BASE: the barrel's run inside the receiver, handguard
+# and gas block, the collar behind mount_barrel (at least r 10.5 mm at its front, so it hides where a standard tube starts), the gas block,
+# the bayonet lug, the gas plug, the gas tube and the front sight.
+br = obj(lathe([q for q in prof if q[0] <= GAS_F + 1e-6] + [(GAS_F, prof[0][1])], 16), 'base', 'park'); finish(br.data)
+col = [(GAS_F - 0.002, 0.0085)] + [(f, max(r, 0.0105)) for f, r in prof if GAS_F < f < BAR_F] + [(BAR_F, 0.0105), (BAR_F, 0.0075)]
+o = obj(lathe(col, 16), 'base', 'park'); finish(o.data)
+fr = obj(lathe([(BAR_F - 0.002, 0.0075)] + [q for q in prof if q[0] > BAR_F], 16), 'barrel', 'park'); finish(fr.data)
+gb = obj(slab(loops_of('barrel'), 0.032, 0.004, 2), 'base', 'park')
 clip(gb, [((0, F(1607), 0), (0, 1, 0))]); finish(gb.data)
-lug = obj(slab(loops_of('barrel'), 0.012, 0.001, 1), 'barrel', 'park')
+lug = obj(slab(loops_of('barrel'), 0.012, 0.001, 1), 'base', 'park')
 clip(lug, [((0, F(1607), 0), (0, -1, 0)), ((0, F(1670), 0), (0, 1, 0)), ((0, 0, -0.008), (0, 0, 1))]); finish(lug.data)
-o = obj(tube([(F(1598), 0.0058), (F(1614), 0.0058), (F(1616), 0.0045)], 18, 'y', (0, 0, U(178))), 'barrel', 'park'); finish(o.data)
-# the gas tube: from the receiver's face to the gas block's rear, over the barrel. It goes with the gas block (slot barrel). It is sized to sit
+o = obj(tube([(F(1598), 0.0058), (F(1614), 0.0058), (F(1616), 0.0045)], 18, 'y', (0, 0, U(178))), 'base', 'park'); finish(o.data)
+# the gas tube: from the receiver's face to the gas block's rear, over the barrel (base, with the gas block). It is sized to sit
 # INSIDE every shared handguard seated at mount_handguard: its top is 17.0 mm over the bore, under the slim one's 16-sided r 18 mm (flats at 17.65 mm).
 # On the real rifle it sits higher (the gas plug's line, U(178)), hidden by the factory handguard either way.
 GT_R, GT_U = 0.0036, 0.0134                                         # 0.5 mm over the barrel (r 9.5 mm)
-o = obj(tube([(F(1116) - 0.002, GT_R), (F(1531) + 0.002, GT_R)], 12, 'y', (0, 0, GT_U)), 'barrel', 'park'); finish(o.data)
+o = obj(tube([(F(1116) - 0.002, GT_R), (F(1531) + 0.002, GT_R)], 12, 'y', (0, 0, GT_U)), 'base', 'park'); finish(o.data)
 
-# FRONT SIGHT (on the gas block, so the barrel's: it stays whatever optic is fitted): two protective ears and the post between them, its tip on the line of sight
+# FRONT SIGHT (on the gas block, so base: it stays whatever barrel or optic is fitted): two protective ears and the post between them, its tip on the line of sight
 for s in (-1, 1):
-    e = obj(slab(loops_of('fsight'), 0.003, 0.0006, 1), 'barrel', 'park')
+    e = obj(slab(loops_of('fsight'), 0.003, 0.0006, 1), 'base', 'park')
     e.data.transform(Matrix.Translation((s * 0.0062, 0, 0))); finish(e.data)
 FPF = F(1575)
-o = obj(box(-0.0013, 0.0013, FPF - 0.0015, FPF + 0.0015, U(168), SY), 'barrel', 'park'); finish(o.data)
-o = obj(box(-0.0075, 0.0075, F(1550), F(1600), U(172), U(165)), 'barrel', 'park'); bevel(o, 0.001, 1); finish(o.data)
+o = obj(box(-0.0013, 0.0013, FPF - 0.0015, FPF + 0.0015, U(168), SY), 'base', 'park'); finish(o.data)
+o = obj(box(-0.0075, 0.0075, F(1550), F(1600), U(172), U(165)), 'base', 'park'); bevel(o, 0.001, 1); finish(o.data)
 
 # FLASH HIDER (muzzle): turned, bored, six slots
 mp = []
@@ -454,14 +459,13 @@ anchors = {
     'mount_optic_end': [round(F(900), 4), round(U(181), 4), 0],        # ... and its end (the same height)
     'mount_handguard': [round(F(1116), 4), 0, 0],                      # where a handguard starts (the barrel nut's front)
     'mount_handguard_end': [round(F(1531), 4), 0, 0],                  # the furthest forward one reaches: the gas block's rear (js/parts.ts hgMax is this minus mount_handguard minus 3 mm)
-    'mount_barrel': [round(F(1672), 4), 0, 0],                         # the bare tube (the mesh with role 'tube') from here, ahead of the bayonet lug's collar: another barrel's length moves its end
+    'mount_barrel': [round(BAR_F, 4), 0, 0],                           # the bare tube (slot barrel) from here, ahead of the bayonet lug's collar: another barrel is seated here
     'mount_muzzle': [round(F(1880), 4), 0, 0],                         # the 21" barrel's end: a muzzle device screws on here
     'mount_stock': [0, round((U(219) + U(290)) / 2, 5), 0],            # the stock's wrist at the receiver's back (the centre height)
     'mount_grip': [round(F(700), 4), round(U(302), 4), 0],             # the grip's seat: the receiver's underside
     'mount_mag': [round(MAG_F, 4), round(MAG_U, 4), 0],                # the magazine well (info.magAt)
 }
 ROOT['anchors_json'] = json.dumps(anchors)
-ROOT['seat_json'] = json.dumps({'barrelR': round(prof[-1][1], 4)})     # the barrel's radius at its end
 
 # ---- save and export ----
 tris = sum(len(p.vertices) - 2 for o in coll.all_objects if o.type == 'MESH' for p in o.data.polygons)
@@ -469,7 +473,14 @@ out = {'objects': len(coll.all_objects), 'tris': tris, 'info': info, 'failed': F
 for o in coll.all_objects:
     if o.type == 'MESH' and 'w0' in o.data: del o.data['w0']
 if os.environ.get('FAL_EXPORT', '1') == '1':
-    bpy.ops.wm.save_as_mainfile(filepath=os.path.join(HERE, 'fal.blend'), copy=True)
+    # fal.blend holds the FAL only. A session holding nothing else is saved whole; one with other models in it (another part built in the
+    # same Blender) writes just this collection (kept by a fake user: File > Append > Collection > fal, or the Blender File view).
+    # (Never bpy.data.libraries.write a SCENE: Blender 5.2.3 crashes in BKE_view_layer_copy_data.)
+    others = [c.name for c in bpy.data.collections if c != coll and (c.objects or c.children)] + [s.name for s in bpy.data.scenes if s != bpy.context.scene]
+    if not others: bpy.ops.wm.save_as_mainfile(filepath=os.path.join(HERE, 'fal.blend'), copy=True)
+    else:
+        bpy.data.libraries.write(os.path.join(HERE, 'fal.blend'), {coll}, fake_user=True, compress=True)
+        print('fal.blend: the collection only (the session also holds %s)' % ', '.join(others))
     bpy.ops.object.select_all(action='DESELECT')
     for o in coll.all_objects: o.select_set(True)
     bpy.ops.export_scene.gltf(filepath=os.path.join(HERE, 'fal.glb'), export_format='GLB', use_selection=True, export_extras=True,

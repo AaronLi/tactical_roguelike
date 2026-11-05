@@ -1,0 +1,32 @@
+{
+  "source": "authored",
+  "kind": "part",
+  "slot": "optic",
+  "frame": "rail-top",
+  "optic": {
+    "sy": 0.016,
+    "fSight": -0.016,
+    "relief": 0.3,
+    "reflex": {
+      "f": 0.009,
+      "y": 0.016,
+      "w": 0.02,
+      "h": 0.016,
+      "kind": "dot"
+    },
+    "magnifier": false,
+    "height": "low"
+  },
+  "part": {
+    "mount": "op:pic",
+    "brand": "halcyon",
+    "name": "Halcyon Ember open reflex on a riser",
+    "price": 420,
+    "tier": 1,
+    "zoom": 0.8,
+    "st": {
+      "ergo": 1,
+      "acc": -2
+    }
+  }
+}
