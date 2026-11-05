@@ -82,6 +82,19 @@ const mem = {}; G.U.store = { get: (k, d) => (k in mem ? mem[k] : d), set: (k, v
   confirm the magazine actually refills. Compare with a similar gun before calling something a fault: every bullpup throws its
   stock across the view.
 - **Other guns** sharing what you touched still build.
+- **A Blender-authored gun** (`models/<id>/`) must pass `npm run check:models -- models/<id>/<id>.glb`, whose model checks
+  (`tools/authored_checks.mjs`, docs/models.md "Model checks") need from the model:
+  - a. irons: the front post's tip at `sy` on the bore plane, no wider than 1.2 degrees from the eye (`fSight - relief`); a rear
+    aperture at least ~2.4 degrees in radius from the eye (a notch 1.5x the post's width); nothing else on the sight line or
+    0.6 degrees round the tip between the rear and front sights; `relief` 0.06-0.09 m for aperture irons on a long gun.
+  - b. magazine check: `part_mag` `extras.check.w`; `chk` top meshes `i: 0` (case) and `i: 1` (tip); witness holes (`role
+    "hole"`, the same `i` and `t` on side 1 and side -1, each its own mesh) or clear-body rounds (`role "round"`). Drums, belts
+    and barrel blocks need none.
+  - c. top round: its crown no more than 3 mm under the magazine body's top, and not under the feed lips' top.
+  - d. handguard: slot `handguard` ends 15 mm or more behind `mount_muzzle` and is no longer than the platform's `hgMax`.
+  - e. magazine well: modelled as a hollow shell round `magAt`, and the magazine stays inside it (0.5 mm).
+  - f. furniture (warning): each factory stock, grip, handguard and muzzle has a `models/parts/<slot>/<id>/` whose `replaces`
+    names its catalogue part.
 
 Browser traps: pass your tabId on every call and check `location.href` first, because a call without one lands on whatever tab is in front, which has put agents' scripts on the user's port. A tab that isn't in front stops ticking: the game loop freezes, so `adsT` stays 0 and reloads never end, and `tabs_select` is what fixes it. Some levels are blackouts: a black first-person view may be the level, so raise the AmbientLight's intensity in the test before suspecting the gun. `G.R.render()` called directly gives a frame even so. Don't leave `M.reloading` forced off and read the magazine: wait for it to finish.
 

@@ -7,7 +7,8 @@
 // What this file does for the baker (tools/bake_models.mjs, tools/model_env.mjs; nothing here is about one gun):
 //   authoredIds()                      the guns that have an authored source
 //   checkAuthored(Models, id, G?)      the source against the contract (js/glb.ts validateAuthored) and, with the game loaded, against the platform's
-//                                      spec in js/parts.ts (its default build's factory slots, L / hgMax / mag against the anchors)
+//                                      spec in js/parts.ts (its default build's factory slots, L / hgMax / mag against the anchors), then the geometric
+//                                      rules of tools/authored_checks.mjs (irons, magazine check, top round, handguard room, magazine well, furniture)
 //   loadAuthoredInto(G)                reads every source into G.Authored (tools/models/authored.ts): the mesh geometry in the gun's frame, the
 //                                      mount anchors as the frame the shared parts are seated on (rig), the sights rules, the factory info. The
 //                                      generic seating (rcv 'authored' in tools/models/recipes.ts rifle()) builds the whole gun from that, and the
@@ -16,6 +17,7 @@
 //   authoredSrc()                      the sources' text, for the bake's staleness hash
 // The .glb is read here with a small synchronous reader (positions, normals, indices, node transforms, extras): the recipes are synchronous.
 import fs from 'fs'; import path from 'path'; import { fileURLToPath } from 'url';
+import { authoredChecks, readForChecks, factoryCtx } from './authored_checks.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), MODELS = path.join(ROOT, 'models');
 const glbPath = (id) => path.join(MODELS, id, id + '.glb'), cfgPath = (id) => path.join(MODELS, id, 'model.json');
@@ -192,6 +194,10 @@ export function checkAuthored(Models, id, G = null) {
     }
     const mg = spec.mag || {};
     if (!near(mg.f, A.rig.mag[0]) || !near(mg.y, A.rig.mag[1])) E(`js/parts.ts: ${id}'s spec mag is [${mg.f}, ${mg.y}], the model's mount_mag is [${A.rig.mag}]`);
+  }
+  if (!errors.length) { // the geometric rules (tools/authored_checks.mjs: the irons, the magazine check and top round, the handguard's room, the magazine in its well, the furniture as parts)
+    const r = authoredChecks(readForChecks(fs.readFileSync(glbPath(id)), id, cfg), G ? factoryCtx(G, id) : {});
+    errors.push(...r.errors); warnings.push(...r.warnings);
   }
   return { errors, warnings };
 }
