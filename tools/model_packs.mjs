@@ -49,6 +49,13 @@ export function collect(env, Models, id, { extra = 0, seed = 7001 } = {}) {
 
 const keyStr = (b, dep) => dep.map((s) => b[s] || '').join('|');
 
+/** The slots a swap changed besides its own: what pruning did to the build (a shorter barrel takes a handguard that no longer fits off, a part off its slot takes what hung on it). */
+export function cascadeOf(e, base) {
+  const out = new Set();
+  for (const s of new Set([...Object.keys(e.build), ...Object.keys(base.build)])) if (s !== e.slot && (e.build[s] || '') !== (base.build[s] || '')) out.add(s);
+  return out;
+}
+
 /** Applies a rigid offset [f,u,r] to a unit's world vertices (sign -1: undoes it): returns new units. */
 export function moveUnit(unit, rigid, sign = 1) {
   if (!unit) return unit;
@@ -90,8 +97,9 @@ export function analyze(C) {
   const kinds = {}; // t|s -> { move }
   for (const e of sw.all) {
     if (e.slot == null) continue;
-    const base = bases[e.base];
+    const base = bases[e.base], casc = cascadeOf(e, base);
     for (const t of tagsAll) {
+      if (casc.has(t)) continue; // (the slot of this tag was changed by pruning, not by the swap: its own part is why it differs)
       const d = diffUnits(base.tags[t], e.B.tags[t]);
       obs[t].push({ e, d });
       if (d.kind === 'shape') depShape[t].add(e.slot);
@@ -197,10 +205,21 @@ export function indexOf(A, Models, src) {
   // info: the reference builds' leaves and each swap's deltas from its base
   const ixBases = bases.map((B) => ({ build: { ...B.build }, info: B.leaves }));
   const deltas = {};
+  const single = new Map(); // base|slot|part -> the swap
+  for (const e of sw.all) if (e.slot != null) single.set(e.base + '|' + e.slot + '|' + (e.part || ''), e);
   for (const e of sw.all) {
     if (e.slot == null) continue;
     const key = Models.slotKey(e.slot, e.part), arr = deltas[key] = deltas[key] || [null, null, null];
-    arr[e.base] = Models.leafDelta(bases[e.base].leaves, e.B.leaves);
+    const d = Models.leafDelta(bases[e.base].leaves, e.B.leaves);
+    // what pruning did besides (a barrel swap that took a handguard off, and put another on) is those slots' own swaps' deltas, which the planner adds: not this one's too
+    for (const c of cascadeOf(e, bases[e.base])) {
+      const e2 = single.get(e.base + '|' + c + '|' + (e.build[c] || '')); if (!e2) continue;
+      for (const [k, v] of Object.entries(Models.leafDelta(bases[e.base].leaves, e2.B.leaves))) {
+        if (typeof v === 'number' && (typeof d[k] === 'number' || !(k in d))) { const n = (d[k] || 0) - v; if (Math.abs(n) < 1e-12) delete d[k]; else d[k] = n; }
+        else if (k in d && JSON.stringify(v) === JSON.stringify(d[k])) delete d[k];
+      }
+    }
+    arr[e.base] = d;
   }
   const slots = [...slotsAll].sort();
   const ix = { version: Models.PARTS_INDEX_VERSION, platform: C.id, src, slots, tags, anchors, bases: ixBases, deltas, exact: {} };

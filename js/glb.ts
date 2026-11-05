@@ -452,6 +452,21 @@ function pickPack(tag: TagIndex, build: Record<string, string>): PackEntry | und
   return best;
 }
 
+/** For each info leaf, the build slots a swap was seen to change it by (from the index's deltas): what the leaf depends on. */
+const leafSlots = new WeakMap<PartsIndex, Map<string, Set<string>>>();
+function leafSlotsOf(ix: PartsIndex): Map<string, Set<string>> {
+  let m = leafSlots.get(ix);
+  if (!m) {
+    m = new Map();
+    for (const [key, ds] of Object.entries(ix.deltas)) {
+      const slot = key.slice(0, key.indexOf('='));
+      for (const d of ds) if (d) for (const leaf of Object.keys(d)) { let s = m.get(leaf); if (!s) m.set(leaf, (s = new Set())); s.add(slot); }
+    }
+    leafSlots.set(ix, m);
+  }
+  return m;
+}
+
 /** What assembling a build needs: which pack for each tag, the summed offsets, and the info. `missing` names the first tag no pack covers. */
 interface Plan { tags: { tag: string; entry: PackEntry | null; rigid: Vec3 }[]; info: any; missing: string | null; approx: boolean }
 function planBuild(ix: PartsIndex, build: Record<string, string>): Plan {
@@ -480,6 +495,18 @@ function planBuild(ix: PartsIndex, build: Record<string, string>): Plan {
     const ds = ix.deltas[slotKey(s, build[s])]; const d = ds && (ds[bi] || ds.find((x) => x));
     if (!d) { approx = true; continue; } if (!ds![bi]) approx = true;
     applyLeafDelta(leaves, d);
+  }
+  // A leaf that two slots shape together (the support hand: the handguard's length and whether a foregrip is on it) does not add up from just
+  // any reference build: take it from the one whose parts in the slots that shape that leaf are nearest the build's (a build with a foregrip,
+  // from a base with one), the differing slots' deltas from that base on top.
+  const dist = (j: number, slots: Set<string>) => { let n = 0; for (const s of slots) if ((ix.bases[j].build[s] || '') !== (build[s] || '')) { const ds = ix.deltas[slotKey(s, build[s])]; if (!ds || !ds[j]) return Infinity; n++; } return n; };
+  if (bi >= 0) for (const [leaf, slots] of leafSlotsOf(ix)) {
+    const d0 = dist(bi, slots); let best = bi, bd = d0;
+    for (let j = 0; j < ix.bases.length; j++) { const d = dist(j, slots); if (d < bd) { best = j; bd = d; } }
+    if (best === bi) continue;
+    const tmp: Record<string, any> = {}; if (leaf in ix.bases[best].info) tmp[leaf] = ix.bases[best].info[leaf];
+    for (const s of slots) if ((ix.bases[best].build[s] || '') !== (build[s] || '')) { const d = ix.deltas[slotKey(s, build[s])][best]!; if (leaf in d) applyLeafDelta(tmp, { [leaf]: d[leaf] }); }
+    if (leaf in tmp) leaves[leaf] = tmp[leaf]; else delete leaves[leaf];
   }
   const ex = ix.exact[buildKeyOf(build)]; if (ex) applyLeafDelta(leaves, ex as Record<string, LeafDelta>);
   return { tags, info: infoFromLeaves(leaves), missing, approx };
