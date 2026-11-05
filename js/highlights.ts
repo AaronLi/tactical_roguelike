@@ -75,6 +75,7 @@ const G_Highlights = (() => {
     react: any; fired: boolean; kn: number; mSt: number | null; snapDoors: boolean; prevTau: number | null; xp: THREE.Vector3 | null; frz: { p: THREE.Vector3; q: THREE.Quaternion } | null; frzCand: { p: THREE.Vector3; q: THREE.Quaternion } | null;
     look: THREE.Vector3 | null; lookT: number | null; fq: THREE.Quaternion | null; fp: THREE.Vector3 | null; pos: THREE.Vector3 | null; shot: number | null; cp: THREE.Vector3 | null; cmid?: THREE.Vector3; fov?: number; imp: number; xc: THREE.Vector3; wideScore?: number;
     k: string; code: string; def: any; rounds: number; kills: number; hs: number; far: number; others: any; parts: any; kit: any; verdicts: any; am: any; shoulder?: any;
+    tour?: GearStop[]; // (the gear room's tour of the gun's fitted parts: gearTour)
     vs?: string[]; // (a grenade's or a flashbang's camera: everyone it has to have in the picture)
   }
   // someone in the recording: an officer (kind 'p') or a suspect ('e')
@@ -82,6 +83,8 @@ const G_Highlights = (() => {
     kind: HlActorKind; id: any; name?: string; animal?: string; color?: number; look?: ReturnType<typeof G.Rig.cleanLook>; kt?: ReturnType<typeof G.Me.kitLook> | null; gun?: string | null;
     sk?: ReturnType<typeof G.Stickers.clean> | null; skins?: Record<string, ReturnType<typeof G.Stickers.clean>>; type?: string; wpn?: EnemyDef['wpn']; vest?: EnemyDef['vest']; helmet?: EnemyDef['helmet']; face?: number; ex?: any[]; civ?: boolean; scale?: number; boss?: boolean; style?: EnemyStyle;
   }
+  // a stop on the gear room's tour: a fitted part, the slot it's in, and the mesh slot its model's meshes are tagged with
+  interface GearStop { slot: string; kind: string; ms: string; p: Part }
   // a thing for sale on the ad breaks (storeProducts), and the made-up adverts (ADS)
   interface HlProduct { kind: string; name: string; brand: string; price: number; pic: any; left: () => number; slot?: string; unit?: string }
   interface HlAdvert { brand: string; line: string; sub: string; col: string[]; art: string }
@@ -120,7 +123,7 @@ const G_Highlights = (() => {
   interface PState {
     map: LvMap; level: THREE.Group | null; tvs: HlTv[]; seg: number; st: number; prog: Seg[]; rigs: Map<string, HlRigRec>; fx: HlFx[]; drops: { m: THREE.Mesh; v: THREE.Vector3; life: number }[]; marks: THREE.Mesh[]; clips: Clip[]; actors: Map<string, Actor>; stats: Map<string, HlStat>;
     ac: HlAc; au: HlAudio | null; bullets: HlBullet[]; cam: THREE.PerspectiveCamera; cv: HTMLCanvasElement; debris: ReturnType<typeof G.Scars.debris>; esc: THREE.Vector3; exporting: HlExport | null; fired: RState['fired']; frameT: number; fxRoot: THREE.Group;
-    g: CanvasRenderingContext2D; gcam: THREE.PerspectiveCamera; gen: { seed: number; level: number; th: number }; glass: HlGlass[]; gpiv: THREE.Group; gs: THREE.Scene; hide: THREE.Object3D[]; holeMat: THREE.MeshBasicMaterial; kgun: RState['kgun'];
+    g: CanvasRenderingContext2D; gcam: THREE.PerspectiveCamera; gt: any; gen: { seed: number; level: number; th: number }; glass: HlGlass[]; gpiv: THREE.Group; gs: THREE.Scene; hide: THREE.Object3D[]; holeMat: THREE.MeshBasicMaterial; kgun: RState['kgun'];
     las: { root: THREE.Group; pool: HlLaser[] }; lastVideo: { name: string; size: number; dur: number; ms: number; audio: boolean; frames: number } | null; levelN: number; losT: number; mat: THREE.ShaderMaterial; outVideo: HlChunk[] | null; ov: THREE.CanvasTexture;
     packing: boolean; ready: boolean; rnd: ReturnType<typeof G.U.rng>; rt: THREE.WebGLRenderTarget | null; scene: THREE.Scene; theme: string | undefined; thruMat: THREE.MeshBasicMaterial; time: number; tvShots: number; vol: number; xcam: THREE.PerspectiveCamera;
     xlook: THREE.Vector3; xo: HlXo | null; nx: HlNadeFx | null; xorg: HlOrgan[]; xrig: HlRig | null; xs: THREE.Scene; xtl: HlXtl | null; xtracks: HlXtracks; xview: { mid: THREE.Vector3; r: number } | null;
@@ -1037,8 +1040,21 @@ const G_Highlights = (() => {
     if (!kx.kills) v.push(['ALL BARK', `${e.n} rounds fired. Zero kills. Suppressive fire, we're told.`]);
     if (kx.d >= 25) v.push(['LONG ARM OF THE LAW', `A kill at ${kx.d} m.`]);
     if (!v.length) v.push(['SOLID PICK', 'Nothing fancy. Gets it done.']);
-    return { kind: 'gear' as const, k, code, def, rounds: e.n, kills: kx.kills, hs: kx.hs, far: kx.d, am: am ? am[0] : null, parts, kit, verdicts: v.slice(0, 2),
-      others: guns.slice(1, 3).map(([c, x]) => ({ def: defOf(c), n: x.n, kills: (kg.get(c) || {}).kills || 0 })).filter((o) => o.def), dur: 9 };
+    const tour = gearTour(def);
+    return { kind: 'gear' as const, k, code, def, tour, rounds: e.n, kills: kx.kills, hs: kx.hs, far: kx.d, am: am ? am[0] : null, parts, kit, verdicts: v.slice(0, 2),
+      others: guns.slice(1, 3).map(([c, x]) => ({ def: defOf(c), n: x.n, kills: (kg.get(c) || {}).kills || 0 })).filter((o) => o.def), dur: GT0 + (tour.length ? tour.length * GT + GT_BACK : 0) };
+  }
+  // The gear room's tour (after the overview, GT0 s in): the gun's fitted parts that matter, up to six, the camera going close to each in turn
+  // (GT s each) and reading out what it does, then back out to the whole gun (GT_BACK s). Worked out from the build alone (the length of the
+  // segment is fixed before any model is in, and the video export's the same): the factory receiver bits are left out. A mesh slot is what the
+  // model's meshes of that part are tagged with (docs/models.md); two slots of one kind (an optic and its riser) are the one stop.
+  const GT0 = 9, GT = 2.5, GT_BACK = 1.8, GT_KINDS = ['optic', 'muzzle', 'handguard', 'fg', 'tac', 'tacL', 'stock', 'buttstock', 'mag', 'grip'], GT_MESH: Record<string, string> = { buttstock: 'stock' };
+  function gearTour(def: any): GearStop[] {
+    const out: GearStop[] = [], seen = new Set<string>();
+    const all = Object.entries(def.build || {}).map(([slot, id]) => ({ slot, kind: G.Gunsmith.kindOf(slot), ms: '', p: G.Gunsmith.PARTS[id as string] as Part }))
+      .filter((x) => x.p && !x.p.factory && GT_KINDS.includes(x.kind)).sort((a, b) => GT_KINDS.indexOf(a.kind) - GT_KINDS.indexOf(b.kind));
+    for (const x of all) { x.ms = GT_MESH[x.kind] || x.kind; if (seen.has(x.ms)) continue; seen.add(x.ms); out.push(x); }
+    return out.slice(0, 6);
   }
   function program() {
     // (the edit's dice: seeded from the level, so the host and every client cut the same broadcast)
@@ -1989,21 +2005,120 @@ const G_Highlights = (() => {
       const disc = new T.Mesh(new T.CylinderGeometry(0.75, 0.8, 0.06, 40), new T.MeshStandardMaterial({ color: 0x1a2230, roughness: 0.4, metalness: 0.6 })); disc.position.y = -0.3; P.gs.add(disc);
       const ring = new T.Mesh(new T.TorusGeometry(0.78, 0.012, 8, 60), new T.MeshBasicMaterial({ color: 0xffb21a })); ring.rotation.x = Math.PI / 2; ring.position.y = -0.27; P.gs.add(ring);
       P.gpiv = new T.Group(); P.gs.add(P.gpiv);
-      P.gcam = new T.PerspectiveCamera(30, 16 / 9, 0.05, 50);
+      P.gcam = new T.PerspectiveCamera(30, 16 / 9, 0.02, 50);
     }
     while (P.gpiv.children.length) P.gpiv.remove(P.gpiv.children[0]);
+    P.gt = null; // (the last stage's tour: gearTourSet)
     let g = null; try { g = G.GunModels.world(s.code, (((P.actors.get(s.k) || {}) as Actor).skins || {})[s.code]); } catch (e) { /* no model */ }
     if (!g) return;
     const gun = g, pivot = P.gpiv;
+
     const put = () => { // (centred, the camera back by its size; again when a gun whose packs were still loading comes in: js/gunmodels.ts)
       gun.position.set(0, 0, 0);
       const b = new T.Box3().setFromObject(gun), c = b.getCenter(new T.Vector3()), len = Math.max(0.2, b.getSize(new T.Vector3()).length());
       gun.position.sub(c); pivot.add(gun);
       P.gcam.position.set(0, len * 0.3, len * 2.5); P.gcam.lookAt(0, -0.03, 0);
       P.gcam.setViewOffset(W, H, W * 0.26, -H * 0.04, W, H); // (the gun on the left: the read-out's on the right)
+      if (s.tour && s.tour.length) gearTourSet(s, gun);
     };
     put();
     if (gun.userData.pending) G.GunModels.whenReady(gun, (ok) => { if (ok && pivot.children.includes(gun)) put(); });
+  }
+  // The tour's own model of the gun: every part as separate slot-tagged meshes (G.GunModels.display, in the same frame as the turntable's merged
+  // one, which stands in for the overview), each part's box, and the materials of its meshes copied so one can be lit and the rest dimmed without
+  // touching the shared ones. Hidden until the tour starts (gearTourView swaps it in).
+  function gearTourSet(s: Seg, gun: THREE.Object3D) {
+    const pivot = P.gpiv, old = P.gt;
+    if (old && old.dg.parent) old.dg.parent.remove(old.dg);
+    if (old && old.box.parent) old.box.parent.remove(old.box);
+    let dg: THREE.Group | null = null, info: any = null; try { const d = G.GunModels.display(s.def, (((P.actors.get(s.k) || {}) as Actor).skins || {})[s.code]); dg = d.group; info = d.info; } catch (e) { /* no model */ }
+    if (!dg) return;
+    const gt: any = P.gt = { dg, info, world: gun, poses: null as any, stops: [] as any[], meshes: [] as any[], box: new T.Box3Helper(new T.Box3(), new T.Color(0xffb21a)), ov: { pos: P.gcam.position.clone(), look: new T.Vector3(0, -0.03, 0) }, built: false };
+    gt.box.visible = false; dg.visible = false; dg.position.copy(gun.position); pivot.add(dg); pivot.add(gt.box);
+    const build = () => {
+      pivot.rotation.y = 0; pivot.updateMatrixWorld(true);
+      gt.meshes = []; gt.stops = [];
+      dg!.traverse((o: any) => {
+        if (!o.isMesh) return;
+        o.material = Array.isArray(o.material) ? o.material.map((m: THREE.Material) => m.clone()) : o.material.clone(); // (a copy for each mesh: one lit, its neighbours dimmed)
+        const m0: any = Array.isArray(o.material) ? o.material[0] : o.material;
+        gt.meshes.push({ o, stop: -1, col: m0.color ? m0.color.clone() : null, em: m0.emissive ? m0.emissive.clone() : null });
+      });
+      const gb = new T.Box3().setFromObject(dg!);
+      s.tour!.forEach((st: GearStop, i: number) => {
+        const box = new T.Box3(); let n = 0;
+        for (const m of gt.meshes) if (m.o.userData.slot === st.ms) { box.expandByObject(m.o); m.stop = i; n++; }
+        gt.stops.push(n ? { st, box, c: box.getCenter(new T.Vector3()), n } : { st, box: gb.clone(), c: gb.getCenter(new T.Vector3()), n: 0 }); // (no meshes found for it: the whole gun, a little closer)
+      });
+      gt.gb = gb; gt.built = true;
+    };
+    if (dg.userData.pending) G.GunModels.whenReady(dg, (ok) => { if (ok && P.gt === gt) build(); }); else build();
+  }
+  // Where the camera stands for each stop (worked out once, with the turntable stopped at the angle the overview ended on): at the part's box centre,
+  // from a three-quarter view on the side it's mounted on (an optic or anything on the centre line: the side the overview's camera was on), a
+  // little ahead of it for a muzzle device and behind it for a stock, and as far back as puts the part's box at 60% of the picture's left part
+  // (where the gun is: the read-out takes the right), found by halving the distance. Poses are in the world: a centre, a unit direction to the camera, a distance.
+  const GT_DIR: Record<string, [number, number]> = { muzzle: [0.6, 0.3], stock: [-0.6, 0.3], buttstock: [-0.6, 0.3], optic: [-0.3, 0.5], mag: [0.25, 0.1], handguard: [0.2, 0.35], fg: [0.35, 0.3], tac: [0.35, 0.3], tacL: [0.35, 0.3], grip: [0.2, 0.2] };
+  function gearTourPoses(gt: any, R0: number) {
+    const ry = new T.Matrix4().makeRotationY(R0), ryi = new T.Matrix4().makeRotationY(-R0), tc = P.gcam.clone() as THREE.PerspectiveCamera;
+    const gc = gt.gb.getCenter(new T.Vector3()); // (the model is in glTF axes: the muzzle is towards -z, up is y, the gun's right is +x)
+    const home = Math.sign(gt.ov.pos.clone().applyMatrix4(ryi).x - gc.x) || 1;
+    const poseOf = (tw: THREE.Vector3, dir: THREE.Vector3, pts: THREE.Vector3[]) => {
+      const fill = (d: number) => {
+        tc.position.copy(tw).addScaledVector(dir, d); tc.lookAt(tw); tc.updateMatrixWorld(true);
+        let x0 = 9, x1 = -9, y0 = 9, y1 = -9;
+        for (const p of pts) { const v = p.clone().project(tc); x0 = Math.min(x0, v.x); x1 = Math.max(x1, v.x); y0 = Math.min(y0, v.y); y1 = Math.max(y1, v.y); }
+        return Math.max((x1 - x0) / 1.1, (y1 - y0) / 2);
+      };
+      let lo = 0.06, hi = 4; for (let i = 0; i < 28; i++) { const m = (lo + hi) / 2; if (fill(m) > 0.6) lo = m; else hi = m; }
+      return { tw, dir, dist: hi };
+    };
+    const corners = (b: THREE.Box3) => { const o: THREE.Vector3[] = []; for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z]) o.push(new T.Vector3(x, y, z).applyMatrix4(ry)); return o; };
+    const poses = gt.stops.map((sp: any) => {
+      const off = sp.c.x - gc.x, side = sp.n && Math.abs(off) > 0.015 ? Math.sign(off) : home, k = GT_DIR[sp.st.kind] || [0.2, 0.35];
+      const dir = new T.Vector3(side * 0.85, k[1], -k[0]).normalize().applyMatrix4(ry);
+      return poseOf(sp.c.clone().applyMatrix4(ry), dir, corners(sp.n ? sp.box : sp.box.clone().expandByScalar(-0.12 * sp.box.getSize(new T.Vector3()).length())));
+    });
+    const look = gt.ov.look, v = gt.ov.pos.clone().sub(look);
+    return { stops: poses, ov: { tw: look.clone(), dir: v.clone().normalize(), dist: v.length() } };
+  }
+  const _gq = new T.Vector3(), _gc = new T.Color();
+  // the camera between two poses: the centre slid across, the direction swung round (the distance swelling a little on the way, so it goes round the gun, not through it)
+  function gearMix(a: any, b: any, k: number, ad: number, bd: number) {
+    const rot = (d: THREE.Vector3, ang: number) => d.clone().applyAxisAngle(_gq.set(0, 1, 0), ang);
+    const da = rot(a.dir, ad), db = rot(b.dir, bd), dot = G.U.clamp(da.dot(db), -1, 1), an = Math.acos(dot), sn = Math.sin(an);
+    const dir = sn < 1e-3 ? db.clone() : da.clone().multiplyScalar(Math.sin((1 - k) * an) / sn).addScaledVector(db, Math.sin(k * an) / sn);
+    const tw = a.tw.clone().lerp(b.tw, k), dist = (a.dist + (b.dist - a.dist) * k) * (1 + 0.45 * Math.sin(Math.PI * k) * an / Math.PI);
+    return { tw, pos: tw.clone().addScaledVector(dir.normalize(), dist) };
+  }
+  // The tour's frame: the camera eased from stop to stop (a stop's first 0.9 s to get there, then a slow drift round it), the stopped turntable, the
+  // part lit and the rest dimmed, the outline of its box round it; then back out to the overview's view
+  const gsm = (x: number) => { x = G.U.clamp(x, 0, 1); return x * x * (3 - 2 * x); };
+  function gearTourView(s: Seg, gt: any) {
+    const t = P.st, n = gt.stops.length, tEnd = GT0 + n * GT, R0 = Math.PI / 2 + Math.sin(GT0 * 0.55) * 0.75;
+    P.gpiv.rotation.y = R0; P.gpiv.updateMatrixWorld(true);
+    gt.world.visible = false; gt.dg.visible = true;
+    if (!gt.poses) gt.poses = gearTourPoses(gt, R0);
+    const ps = gt.poses.stops, ov = gt.poses.ov, drift = (u: number) => (u / GT - 0.5) * 0.22;
+    let cam;
+    if (t >= tEnd) cam = gearMix(ps[n - 1], ov, gsm((t - tEnd) / GT_BACK), 0.11, 0);
+    else {
+      const i = Math.min(n - 1, Math.floor((t - GT0) / GT)), u = t - GT0 - i * GT;
+      cam = gearMix(i ? ps[i - 1] : ov, ps[i], gsm(u / 0.9), i ? 0.11 : 0, drift(u));
+    }
+    P.gcam.position.copy(cam.pos); P.gcam.lookAt(cam.tw);
+    // (lit and dimmed)
+    const dim = gsm((t - GT0) / 0.6) * (1 - gsm((t - tEnd) / (GT_BACK * 0.7))), pulse = 0.1 + 0.06 * Math.sin(P.time * 7);
+    const h: number[] = gt.stops.map((_: any, i: number) => gsm((t - (GT0 + i * GT)) / 0.5) * (1 - gsm((t - (GT0 + (i + 1) * GT)) / 0.4)));
+    for (const m of gt.meshes) {
+      const hw = m.stop >= 0 ? h[m.stop] : 0, mt: any = Array.isArray(m.o.material) ? m.o.material[0] : m.o.material;
+      if (m.col && mt.color) mt.color.copy(m.col).multiplyScalar(1 - 0.5 * dim * (1 - hw));
+      if (m.em && mt.emissive) mt.emissive.copy(m.em).add(_gc.setRGB(1, 0.7, 0.1).multiplyScalar(hw * pulse * dim));
+    }
+    let bi = 0; for (let i = 1; i < n; i++) if (h[i] > h[bi]) bi = i;
+    const bx = gt.stops[bi], bm = gt.box.material as THREE.LineBasicMaterial;
+    gt.box.box.copy(bx.box).expandByScalar(0.005); bm.transparent = true; bm.opacity = h[bi] * 0.9; gt.box.visible = h[bi] > 0.02 && bx.n > 0;
+    gt.last = { cam: cam.pos.clone(), look: cam.tw.clone(), stop: bi, h: h[bi], box: gt.box.box.clone() };
   }
   // The rounds that hit them, run through the x-ray body again (js/ballistics.ts through, traced): each one taken into
   // their frame as they were when it hit (where they were, which way they faced, crouched or not, hands up...: the body
@@ -2520,7 +2635,11 @@ const G_Highlights = (() => {
       if (U) U.lgGrid.value.w = gridW;
       live = 1;
     } else if (s.kind === 'gear' && P.gpiv && P.gpiv.children.length) {
-      P.gpiv.rotation.y = Math.PI / 2 + Math.sin(P.st * 0.55) * 0.75; // (swinging through its three-quarter views, never end-on)
+      if (P.gt && P.gt.built && P.st >= GT0) gearTourView(s, P.gt);
+      else {
+        P.gpiv.rotation.y = Math.PI / 2 + Math.sin(P.st * 0.55) * 0.75; // (swinging through its three-quarter views, never end-on)
+        if (P.gt && P.gt.world) { P.gt.world.visible = true; P.gt.dg.visible = false; P.gt.box.visible = false; P.gcam.position.copy(P.gt.ov.pos); P.gcam.lookAt(P.gt.ov.look); }
+      }
       if (U) U.lgGrid.value.w = 0;
       R2.setRenderTarget(P.rt); R2.clear(); R2.render(P.gs, P.gcam); R2.setRenderTarget(null);
       if (U) U.lgGrid.value.w = gridW;
@@ -2969,7 +3088,7 @@ const G_Highlights = (() => {
   }
   // the gear room: the gun turning on the left (the picture), its file on the right
   function gearRoom(g: CanvasRenderingContext2D, s: Seg, t: number) {
-    const k = s.k, def = s.def, A = (P.actors.get(k) || {}) as Actor, x0 = W * 0.55, slide = (1 - ease(t * 2)) * 460; // (the file slides in)
+    const k = s.k, def = s.def, A = (P.actors.get(k) || {}) as Actor, x0 = W * 0.55, tn = s.tour ? s.tour.length : 0, tEnd = GT0 + tn * GT, away = tn && P.gt && P.gt.built ? (t < GT0 ? 0 : t < tEnd ? ease((t - GT0) * 2.5) : 1 - ease((t - tEnd) * 2.5)) : 0, slide = (1 - ease(t * 2)) * 460 + away * 460; // (the file slides in, and out for the tour of the parts)
     bug(g);
     g.fillStyle = 'rgba(232,32,42,0.92)'; g.fillRect(18, 72, 210, 28); text(g, 'THE GEAR ROOM', 123, 86, 15, '#fff', 'center');
     text(g, 'presented by IRONVALE ARMS', 22, 112, 11, '#ffd24a', 'left', '800');
@@ -2993,14 +3112,47 @@ const G_Highlights = (() => {
     g.restore();
     // the verdict stamps, one after the other
     const vi = Math.min(s.verdicts.length - 1, Math.floor(Math.max(0, t - 2.5) / 3)), vt = t - 2.5 - vi * 3;
-    if (t > 2.5) {
+    if (t > 2.5 && !away) {
       const [head, line] = s.verdicts[vi], k2 = ease(vt * 3);
       g.save(); g.translate(W * 0.27, H * 0.73); g.rotate(-0.08); g.scale(0.6 + 0.4 * k2, 0.6 + 0.4 * k2);
       g.fillStyle = '#ffd24a'; g.fillRect(-200, -34, 400, 68); g.strokeStyle = '#14080a'; g.lineWidth = 5; g.strokeRect(-200, -34, 400, 68);
       fit(g, head, 0, 2, 370, 38, '#e8202a', 'center'); g.restore();
       text(g, line, W * 0.27, H * 0.73 + 56, 15, '#fff', 'center', '800', 'rgba(0,0,0,0.6)');
     }
+    if (tn && t >= GT0 && t < tEnd + 0.3) gearCaption(g, s, t);
     ticker(g, `THE GEAR ROOM · ${def.name.toUpperCase()} · ${s.rounds} ROUNDS DOWNRANGE TONIGHT · ALL THIS AND MORE AT VEX'S · `);
+  }
+  // The tour's caption card, on the right where the file was: which slot and which stop of how many, the part's name and maker, what it does in a
+  // few sentences (the start of its catalogue description), and the figures the gunsmith lists for it (green better, red worse)
+  function gearCaption(g: CanvasRenderingContext2D, s: Seg, t: number) {
+    const tour = s.tour!, n = tour.length, i = Math.min(n - 1, Math.floor((t - GT0) / GT)), u = t - GT0 - i * GT, st = tour[i], p = st.p;
+    const x0 = W * 0.55, y0 = 120, w = W - x0 - 18, k = ease((u - 0.2) * 3.5), out = i === n - 1 ? 1 - G.U.clamp((t - GT0 - n * GT) / 0.3, 0, 1) : 1;
+    if (k <= 0 || out <= 0) return;
+    const label = ((G.Gunsmith.SLOT_LABEL as Record<string, any>)[st.kind] || st.slot).replace(/ \(.*\)/, '').toUpperCase();
+    const sents = (p.desc || '').split(/(?<=[.!?])\s/); let blurb = sents[0] || ''; // (as many whole sentences as fit four lines)
+    for (let j = 1; j < sents.length && (blurb + ' ' + sents[j]).length <= 170; j++) blurb += ' ' + sents[j];
+    if (blurb.length > 170) blurb = blurb.slice(0, 167).replace(/[\s,;:–-]+\S*$/, '') + '…';
+    const stats = G.GunsmithUI.partEffects(p, s.def.id).split('</span>').map((x: string) => x.replace(/<[^>]*>/g, '').trim() ? [x.replace(/<[^>]*>/g, '').trim(), /class="g"/.test(x) ? 1 : /class="b"/.test(x) ? -1 : 0] : null).filter(Boolean) as [string, number][];
+    g.save(); g.globalAlpha = out; g.translate((1 - k) * 420, 0);
+    g.fillStyle = 'rgba(6,10,18,0.9)'; g.fillRect(x0, y0, w, 250); g.fillStyle = '#ffb21a'; g.fillRect(x0, y0, w, 6);
+    text(g, `${label}  ·  ${i + 1} / ${n}`, x0 + 16, y0 + 26, 13, '#ffb21a', 'left', '800');
+    fit(g, p.name.toUpperCase(), x0 + 16, y0 + 58, w - 32, 22, '#fff', 'left', '900', '#14080a');
+    text(g, (p.brand || '').toUpperCase(), x0 + 16, y0 + 84, 12, '#9fdcff', 'left', '800');
+    // (the sentence, wrapped to the card)
+    g.font = '800 14px "Arial Black", Impact, sans-serif';
+    const words = blurb.split(' '), lines: string[] = []; let cur = '';
+    for (const wd of words) { const tr = cur ? cur + ' ' + wd : wd; if (g.measureText(tr).width > w - 32 && cur) { lines.push(cur); cur = wd; } else cur = tr; }
+    if (cur) lines.push(cur);
+    lines.slice(0, 4).forEach((l, j) => text(g, l, x0 + 16, y0 + 112 + j * 19, 14, '#e8f0f8', 'left', '800'));
+    // (the figures, as chips along the foot)
+    let cx = x0 + 16, cy = y0 + 214;
+    for (const [lab, good] of stats.slice(0, 8)) {
+      g.font = '800 12px "Arial Black", Impact, sans-serif'; const cw = g.measureText(lab).width + 16;
+      if (cx + cw > x0 + w - 12) { cx = x0 + 16; cy += 26; }
+      g.fillStyle = good > 0 ? 'rgba(125,255,154,0.18)' : good < 0 ? 'rgba(255,106,74,0.2)' : 'rgba(159,220,255,0.15)'; g.fillRect(cx, cy - 11, cw, 22);
+      text(g, lab, cx + 8, cy, 12, good > 0 ? '#7dff9a' : good < 0 ? '#ff6a4a' : '#9fdcff', 'left', '800'); cx += cw + 6;
+    }
+    g.restore();
   }
   // an ad for something Vex is selling this visit: its icon big, what it is and costs, a line, how many are left
   function storeAd(g: CanvasRenderingContext2D, p: HlProduct, t: number, dur: number) {
@@ -3184,7 +3336,7 @@ const G_Highlights = (() => {
   }
 
   // (step and draw: the broadcast moved on and drawn by hand, for checking a replay without standing at a TV)
-  return { tick, shot, roundPath, glass, crack, door, laser, hitBy, kill, suspectDown, saved, incap, arrest, nade, boom, fragPaths, flash, take, drop, mount, unmount, update, step, draw, reset, exportPack, renderPack, cancelRender, exportHere, muxHere, toJSON, fromJSON, R, P };
+  return { tick, shot, roundPath, glass, crack, door, laser, hitBy, kill, suspectDown, saved, incap, arrest, nade, boom, fragPaths, flash, take, drop, mount, unmount, update, step, draw, gearFor, reset, exportPack, renderPack, cancelRender, exportHere, muxHere, toJSON, fromJSON, R, P };
 })();
 G.Highlights = G_Highlights;
 interface GameModules { Highlights: typeof G_Highlights; }
