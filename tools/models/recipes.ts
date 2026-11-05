@@ -1498,7 +1498,7 @@ const G_GunRecipes = (() => {
       for (let i = 0; i < n; i++) { k.cylY(0.0095, 0.05, M.redInsert(), f0 + 0.0125 + i * 0.025, -0.008, x); k.cylY(0.0098, 0.012, M.brass(), f0 + 0.0125 + i * 0.025, -0.038, x); }
     }
     let muzzleList: number[][] | null = null; // (a gun of several barrels: one muzzle each, from the model or from the muzzle variant fitted)
-    if (A && A.info.barrels && o.avMuzzle && A.variants[o.avMuzzle.replace(/^muzzle_/, '')]) { const v = A.variants[o.avMuzzle.replace(/^muzzle_/, '')]; k.tag('muzzle'); authoredVariant(k, A, v); muzzleList = v.info!.muzzles; }
+    if (A && A.info.barrels && o.avMuzzle && A.variants[o.avMuzzle]) { const v = A.variants[o.avMuzzle]; k.tag('muzzle'); authoredVariant(k, A, v); muzzleList = v.info!.muzzles; }
     else if (A && A.info.barrels && o.muzzle && own('muzzle')) { k.tag('muzzle'); authored(k, A, (e) => e.slot === 'muzzle'); muzzleList = A.info.muzzles; }
     else if (A && o.muzzle && own('muzzle')) { k.tag('muzzle'); k.moved(front - A.rig.end, 0, () => authored(k, A, (e) => e.slot === 'muzzle')); front += A.info.muzzles[0][0] - A.rig.end; }
     else if (!o.integral && o.muzzle) { k.tag('muzzle'); if (rcl) k.into(rcl, L, by); front += rcv === 'aksu' && o.muzzle === 'cutts' ? aksuBooster(k, front, by) : muzzle(k, o.muzzle, front, mbr, by); } // (the AKS-74U's booster is its own: the Thompson's Cutts is the plain one)
@@ -1635,7 +1635,7 @@ const G_GunRecipes = (() => {
     if (A && A.hinge) for (const key of Object.keys(A.parts)) { const nd = nodeMaps.get(k)?.get(key); if (nd) anim[key] = nd; } // (every node of the reload sequence)
     return {
       sy: sight.sy, fSight: sight.fSight, relief: sight.relief,
-      muzzles: [[front, by, 0]],
+      muzzles: muzzleList || [[front, by, 0]],
       grip: [gf + 0.005, -0.075, 0], support: [support, o.pump ? -0.03 : -0.028, 0],
       anim, magAt, handle, port, chamberAt, breech: tr && tr.chamber ? Object.assign(breechAt(L, hy, L - tr.chamber, by - hy, BRK_OPEN), { long: o.hgGap ? (o.optic === 'notch' ? 'irons' : 'rail') : null }) : null, ch: (rcv === 'ar' && !o.cock) || o.ch ? [-0.006, 0.026, 0] : null, bolt: o.bolt ? [o.bolt, 0.01, 0.068] : null,
       cheek: o.cheek != null ? o.cheek : null, // (a bullpup: where your eye is, whatever's on the rail: tools/models/recipes.ts viewmodel)
@@ -1725,6 +1725,7 @@ const G_GunRecipes = (() => {
       g = new T.BufferGeometry();
       g.setAttribute('position', new T.BufferAttribute(e.pos, 3)); g.setAttribute('normal', new T.BufferAttribute(e.nrm, 3));
       g.setIndex(new T.BufferAttribute(e.idx, 1));
+      if (e.uv) g.setAttribute('uv', new T.BufferAttribute(e.uv, 2)); // (a display surface's)
       g.computeBoundingSphere(); g.computeBoundingBox();
       authoredGeo.set(e, g);
     }
@@ -1751,9 +1752,11 @@ const G_GunRecipes = (() => {
   function authored(k: Kit, A: AuthoredGun, which: (e: AuthoredMesh) => boolean, bend?: (e: AuthoredMesh, g: THREE.BufferGeometry) => THREE.BufferGeometry) {
     for (const e of A.meshes) {
       if (!which(e)) continue;
-      const g = bend ? bend(e, geoOf(e)) : geoOf(e), mat = ((M as any)[e.mat] || M.black)();
-      if (A.hinge && e.part) { const at = A.parts[e.part].at; k.into(partNode(k, A, e.part), -at[2], at[1]); k.place(g, mat, 0, 0, 0); k.into(null); }
-      else k.place(g, mat, 0, 0, 0);
+      const g = bend ? bend(e, geoOf(e)) : geoOf(e), mat = e.display ? Object.assign(M.black().clone(), { name: 'black' }) : ((M as any)[e.mat] || M.black)(); // (a display surface: the game paints it, whatever material the file names)
+      let m: THREE.Mesh;
+      if (A.hinge && e.part) { const at = A.parts[e.part].at; k.into(partNode(k, A, e.part), -at[2], at[1]); m = k.place(g, mat, 0, 0, 0); k.into(null); }
+      else m = k.place(g, mat, 0, 0, 0);
+      if (e.display) { m.name = e.name!; m.userData.display = e.display; } // (a display surface: painted at run time)
     }
   }
   // a per-gun variant part's meshes (models/<id>/<name>.glb) drawn where the factory part's are: in the same node, when the model nests them

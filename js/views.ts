@@ -533,11 +533,11 @@ const G_Views = {
       if (def.cls === 'RAIL') G.R.tracer(fromP, toP, def.tracer || 0x55ddff, 0.06);
     });
     if (!m.sil) G.R.muzzleFlashAt(f, def.tracer || 0xffb060);
-    G.Casings.fired(def, false, f, to, m.am);
+    if (!def.caseless) G.Casings.fired(def, false, f, to, m.am);
     const d = G.R.camera.position.distanceTo(f);
     if (def.cls === 'RAIL') G.Audio.rail(d);
     else if (def.cls === 'BOW') G.Audio.bow(d);
-    else if (!G.GunAudio.play(G.Gunsmith.roundSoundKey(def, am), f, 'p' + m.id)) G.Audio.shot(m.sil ? G.SUPPRESSOR.snd : def.snd, d);
+    else if (!G.GunAudio.play(m.bm && def.barrels ? G.shotSoundKey(def, m.bm, am) : G.Gunsmith.roundSoundKey(def, am), f, 'p' + m.id, m.bm && def.barrels ? Math.pow(G.shotK(def.barrels, m.bm), 2) : 1)) G.Audio.shot(m.sil ? G.SUPPRESSOR.snd : def.snd, d);
   },
 
   // ---------------------------------------------------------------- other people's rounds

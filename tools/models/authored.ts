@@ -2,7 +2,7 @@
 // The guns made in Blender, as the recipes see them (rcv 'authored', tools/models/recipes.ts rifle()). NOT generated and not data: the store
 // starts empty and tools/model_env.mjs fills it from models/<id>/<id>.glb (tools/bake_authored.mjs reads the files, docs/models.md "Authored models").
 /** One authored mesh: slot, catalogue material, the part_<key> it rides in and that part's pivot (the gun's frame, three's axes), and the geometry in the gun's frame. */
-interface AuthoredMesh { slot: string; mat: string; part?: string; at?: number[]; chain?: string[]; pos: Float32Array; nrm: Float32Array; idx: Uint16Array | Uint32Array }
+interface AuthoredMesh { slot: string; mat: string; part?: string; at?: number[]; chain?: string[]; name?: string; display?: { width: number; height: number }; uv?: Float32Array; pos: Float32Array; nrm: Float32Array; idx: Uint16Array | Uint32Array }
 /** The frame the other parts are seated on: the model's mount anchors (`mount_<slot>`), metres, [forward] or [forward, up] as noted. */
 interface AuthoredRig {
   top: number; rail: [number, number];       // mount_optic (rail start, the receiver's top height) .. mount_optic_end (rail end): forward span

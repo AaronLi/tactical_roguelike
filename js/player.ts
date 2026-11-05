@@ -94,6 +94,7 @@ const G_Me = {
   handCase: undefined as any, handOut: undefined as unknown as boolean, ejected: undefined as unknown as string[] | undefined, ejecting: undefined as unknown as number, ejectT: undefined as unknown as number,
   adsT: undefined as unknown as number, ads: undefined as unknown as boolean,
   fireCd: undefined as unknown as number, swapT: undefined as unknown as number, swapMax: undefined as unknown as number, raiseT: undefined as unknown as number, raiseMax: undefined as unknown as number,
+  flashBarrels: null as number[] | null, lastShot: null as any, shotLog: [] as any[], // (a gun of several barrels: the barrel, its effective length and the rounds left in each, per round fired: for tuning and tests)
   burstQ: undefined as unknown as number, hyperQ: undefined as unknown as number, cylShots: undefined as unknown as number, cycleMax: undefined as unknown as number,
   spin: undefined as unknown as number, flashIdx: undefined as unknown as number, flashT: undefined as unknown as number, kick: undefined as unknown as number,
   sinceShot: undefined as unknown as number, sinceHurt: undefined as unknown as number, sinceFire: undefined as unknown as number,
@@ -233,7 +234,7 @@ const G_Me = {
     this.slot = slot; this.reloading = false; this.inspectT = 0; this.burstQ = 0;
     G.R.setViewmodel(w.def);
     this.raiseT = this.raiseMax = this.drawTime();
-    if (G.GunAudio.available()) { G.GunAudio.buildDry(w.def.soundKey); G.GunAudio.buildDry(G.Gunsmith.roundSoundKey(w.def, w.chamber || w.ammo)); }
+    if (G.GunAudio.available()) { G.GunAudio.buildDry(w.def.soundKey); G.GunAudio.buildDry(G.Gunsmith.roundSoundKey(w.def, w.chamber || w.ammo)); if (w.def.barrels) for (const mm of w.def.barrels.mm) G.GunAudio.buildDry(G.shotSoundKey(w.def, mm, w.ammo)); } // (a gun of several barrels: a report for each effective length)
     G.Audio.pickup();
     G.HUD.toast('', msg, 2);
   },
@@ -1134,8 +1135,8 @@ const G_Me = {
         const k = 1 - this.reloadT / this.reloadTotal, pistol = def.cls === 'PST' || def.cls === 'MP';
         // the old magazine leaves your hand onto the floor (as the viewmodel lets go of it)
         const km = k * (this.reloadSeat || 1); // (through the magazine change's motions)
-        if (this.reloadMode === 'floor' && !this.magDropped && !w.noMag && km > (pistol ? 0.06 : 0.2)) this.magDropped = G.Casings.dropMag(def) || true;
-        if (this.reloadEv === 0 && km > (this.reloadMode === 'retain' || this.reloadMode === 'pouch' ? 0.76 : 0.68)) { this.reloadEv = 1; G.Audio.sample('insert_magazine'); }
+        if (this.reloadMode === 'floor' && !this.magDropped && !w.noMag && km > (def.barrels ? 0.47 : pistol ? 0.06 : 0.2)) this.magDropped = G.Casings.dropMag(def) || true;
+        if (this.reloadEv === 0 && km > (def.barrels ? 0.8 : this.reloadMode === 'retain' || this.reloadMode === 'pouch' ? 0.76 : 0.68)) { this.reloadEv = 1; G.Audio.sample('insert_magazine'); }
       }
       if (this.reloadT <= 0) {
         if (this.revClose) { this.revClose = false; this.reloading = false; } // (shut: ready)
@@ -1156,7 +1157,7 @@ const G_Me = {
             if (went === 'floor') { const c = this.magDropped && this.magDropped !== true ? this.magDropped : G.Casings.dropMag(def); if (c && this.dumped) c.item = this.dumped; }
           } else if (G.Gear.ammoFor(def).kind === 'mag') G.Gear.swapMag(this, w, mag);
           else G.Gear.chamberIn(w, G.Gear.takeRounds(this, def, mag - w.mag, w.ammo));
-          this.reloading = false;
+          this.reloading = false; w.bl = null; // (a gun of several barrels: the new block's rounds spread over its barrels, js/data.ts G.barrelsOf)
           if (this.reloadAct) this.workAction(w, this.reloadAct, this.reloadSeat < 1 ? this.reloadSeat : null); // run dry: then the action, straight on
           else this.feed(w);
           if (!G.Audio.samples.insert_magazine) G.Audio.click();
@@ -1182,7 +1183,8 @@ const G_Me = {
     if (mode === 'burst' && this.pressBuf > 0 && this.burstQ === 0 && this.fireCd <= 0) { this.burstQ = def.burst || 3; this.pressBuf = 0; }
     if (mode === 'hyper' && pressed) this.hyperQ = def.hyper;
     if (mode === 'hyper' && !trigger && this.hyperQ !== 1) this.hyperQ = 0; // (a pair once begun finishes: it's too quick to let go of)
-    const want = mode === 'hyper' && this.hyperQ === 1 ? true : mode === 'auto' || mode === 'hyper' ? trigger && (!def.spinUp || this.spin >= 1) : mode === 'semi' ? this.pressBuf > 0 : this.burstQ > 0;
+    const mi = G.MODE_INFO[mode]; // (a gun of several barrels: its modes, js/data.ts)
+    const want = mode === 'hyper' && this.hyperQ === 1 ? true : mi ? (mi.auto ? trigger : this.pressBuf > 0) : mode === 'auto' || mode === 'hyper' ? trigger && (!def.spinUp || this.spin >= 1) : mode === 'semi' ? this.pressBuf > 0 : this.burstQ > 0;
     if (!want || this.fireCd > 0) return;
     if (def.missing && def.missing.length) { // a core part off: the trigger does nothing
       if (pressed || this.pressBuf > 0) {
@@ -1205,13 +1207,13 @@ const G_Me = {
       if (this.loose(def)) this.reloading = false; else return;
     }
     const bolt = ch && !!def.manual, round = w.chamber;
-    this.shoot(w);
+    this.shoot(w, def.barrels ? G.pickBarrels(w, mode) : null);
     if (bolt) { w.chamber = null; w.spentCh = round || w.ammo; } // (the case stays in: js/player.ts rack)
-    else if (ch) { w.chamber = null; (this as { feed(w: GWeapon, quiet: boolean): boolean }).feed(w, true); } else w.mag--; // (the action strips the next round into the chamber)
+    else if (ch) { w.chamber = null; (this as { feed(w: GWeapon, quiet: boolean): boolean }).feed(w, true); } else if (!def.barrels) w.mag--; // (the action strips the next round into the chamber; a gun of several barrels counts its rounds as each leaves: shoot)
     // AN-94 style hyper-burst: the first rounds of each pull leave at a much higher rate. The wait after this
     // round is set by the next one: still part of the pair (hyper rate), or the gun's own cyclic rate after it.
     if (this.hyperQ > 0) this.hyperQ--;
-    const rate = mode === 'hyper' && this.hyperQ > 0 ? def.hyperRpm : mode === 'burst' && def.burstRpm ? def.burstRpm : def.rpm;
+    const rate = mode === 'hyper' && this.hyperQ > 0 ? def.hyperRpm : mode === 'burst' && def.burstRpm ? def.burstRpm : mi && mi.rpm ? mi.rpm : def.rpm;
     // high rates aren't rounded up to whole frames: within a string of shots, what's left of the last frame
     // carries over (the first shot of a pull starts the clock fresh)
     this.fireCd = (this.sinceShot > 60 / rate + 0.034 ? 0 : Math.max(this.fireCd, -0.034)) + 60 / rate;
@@ -1255,12 +1257,14 @@ const G_Me = {
   // the fired case out of the port (at: how long from now)
   ejectSpent(w: GWeapon, at: number) { G.Casings.fired(w.def, true, null, null, w.spentCh, at); w.spentCh = null; },
 
-  shoot(w: PWeapon) {
-    // the round being fired, and the gun as that round sees it (G.roundDef: hollow points, AP, slugs...)
-    const round = G.chambered(w.def) && w.chamber ? w.chamber : w.tube && w.tube.length ? w.tube.pop()! : w.ammo; // (the chambered one, if it has a chamber)
-    if (!G.chambered(w.def)) { w.spent = w.spent || []; w.spent.unshift(round); w.spent.length = Math.min(w.spent.length, 8); } // (the empties a revolver or break-action keeps till it's opened)
-    const def = G.roundDef(w.def, round), cam = G.R.camera;
-    this.sinceFire = 0;
+  // One pull of the trigger. barrels: a gun of several barrels (def.barrels) fires those (indices into its muzzles, G.pickBarrels): a round from each, each as its barrel's
+  // effective length makes it (G.shotDef) from its own muzzle, a report each (stacking), the recoil of all of them at once.
+  shoot(w: PWeapon, barrels: number[] | null = null) {
+    const multi = !!(barrels && barrels.length), list: number[] = multi ? barrels! : [-1];
+    const mInfo = multi ? G.Models.infoOf(w.def) : null, mz = mInfo && mInfo.muzzles && mInfo.muzzles.length ? mInfo.muzzles as number[][] : null;
+    const cx = mz ? mz.reduce((a, m) => a + m[2], 0) / mz.length : 0, cy = mz ? mz.reduce((a, m) => a + m[1], 0) / mz.length : 0;
+    const cam = G.R.camera;
+    this.sinceFire = 0; this.flashBarrels = multi ? list : null;
     // the round leaves along the gun's bore: your aim plus the gun's offset (recoil, sway), not the camera
     const off = this.aimOffset();
     const aq = new THREE.Quaternion().setFromEuler(new THREE.Euler(this.pitch + off.p, this.yaw + off.y, cam.rotation.z, 'YXZ'));
@@ -1268,59 +1272,72 @@ const G_Me = {
     const right = new THREE.Vector3(1, 0, 0).applyQuaternion(aq);
     const up = new THREE.Vector3(0, 1, 0).applyQuaternion(aq);
     const origin = cam.position.clone();
-    let side = 1;
-    if (def.akimbo) { this.flashIdx = this.flashIdx ? 0 : 1; side = this.flashIdx ? 1 : -1; }
-    else if ((G.Gunsmith.PLATFORMS[w.def.id] || {}).arch === 'derringer') this.flashIdx = w.tube && w.tube.length ? 0 : 1; // (the top barrel first, then the bottom)
-    const muzzle = origin.clone().addScaledVector(fwd, 0.7).addScaledVector(right, (def.akimbo ? 0.13 * side : 0.17) * (1 - this.adsT)).addScaledVector(up, -0.12 * (1 - this.adsT) - 0.05);
+    let def0: WeaponDef = w.def, round0 = '', firstShot: any = null;
+    list.forEach((bi, n) => {
+      // the round being fired, and the gun as that round sees it (G.roundDef: hollow points, AP, slugs...)
+      const round = multi ? (w.tube && w.tube.length ? w.tube.pop()! : w.ammo) : G.chambered(w.def) && w.chamber ? w.chamber : w.tube && w.tube.length ? w.tube.pop()! : w.ammo; // (the chambered one, if it has a chamber)
+      if (!G.chambered(w.def) && !multi) { w.spent = w.spent || []; w.spent.unshift(round); w.spent.length = Math.min(w.spent.length, 8); } // (the empties a revolver or break-action keeps till it's opened)
+      let def = G.roundDef(w.def, round), eff = 0;
+      if (multi) { const sd = G.shotDef(def, w, bi); def = sd.def; eff = sd.eff; G.barrelsOf(w)![bi]--; w.mag--; this.lastShot = { barrel: bi, mm: Math.round(eff), k: Math.round(sd.k * 1000) / 1000, left: w.bl!.slice(), mag: w.mag }; this.shotLog.push(this.lastShot); if (this.shotLog.length > 60) this.shotLog.shift(); } // (the barrel's rounds: js/data.ts G.barrelsOf)
+      if (n === 0) { def0 = def; round0 = round; }
+      let side = 1;
+      if (def.akimbo) { this.flashIdx = this.flashIdx ? 0 : 1; side = this.flashIdx ? 1 : -1; }
+      else if ((G.Gunsmith.PLATFORMS[w.def.id] || {}).arch === 'derringer') this.flashIdx = w.tube && w.tube.length ? 0 : 1; // (the top barrel first, then the bottom)
+      const muzzle = origin.clone().addScaledVector(fwd, 0.7).addScaledVector(right, (def.akimbo ? 0.13 * side : 0.17) * (1 - this.adsT)).addScaledVector(up, -0.12 * (1 - this.adsT) - 0.05);
+      if (mz && bi >= 0) muzzle.addScaledVector(right, (mz[bi][2] - cx) * (1 - this.adsT * 0.5)).addScaledVector(up, (mz[bi][1] - cy) * (1 - this.adsT * 0.5)); // (this barrel's own: the block's six bores)
 
-    let spread = G.U.lerp(def.spreadNoLaser && !w.laser ? def.spreadNoLaser : def.spread, def.ads, this.adsT); // (a laser helps only while it's on)
-    spread *= this.steadiness();
-    if (this.prone) spread *= 0.5; else if (this.crouch) spread *= 0.75;
-    spread *= 1 + Math.min(this.hspeed / this.SPEED.walk, 1.4) * 0.8 * (1 - this.adsT * 0.6);
-    if (!this.onGround) spread *= 1.8;
-    const sr = (spread * Math.PI) / 180;
+      let spread = G.U.lerp(def.spreadNoLaser && !w.laser ? def.spreadNoLaser : def.spread, def.ads, this.adsT); // (a laser helps only while it's on)
+      spread *= this.steadiness();
+      if (this.prone) spread *= 0.5; else if (this.crouch) spread *= 0.75;
+      spread *= 1 + Math.min(this.hspeed / this.SPEED.walk, 1.4) * 0.8 * (1 - this.adsT * 0.6);
+      if (!this.onGround) spread *= 1.8;
+      const sr = (spread * Math.PI) / 180;
 
-    // where the gun actually points this shot (one error for the whole shot), then for a shotgun the pattern
-    // around it: the choke's cone, denser in the middle (roughly normal, clipped at 1.6x)
-    // (a hyper pair's second round: the same error as the first's, near enough: the gun hasn't moved)
-    const pair2 = this.hyperQ === 1 && this.pairAim && this.fireMode(w) === 'hyper';
-    const a0 = pair2 ? this.pairAim![0] : Math.random() * Math.PI * 2, r0 = pair2 ? this.pairAim![1] : Math.sqrt(Math.random()) * Math.tan(sr);
-    this.pairAim = this.hyperQ === 2 ? [a0, r0] : null;
-    const aim = fwd.clone().addScaledVector(right, Math.cos(a0) * r0).addScaledVector(up, Math.sin(a0) * r0).normalize();
-    const pr = Math.tan(((def.choke || 0) * Math.PI) / 180);
-    // each round (or pellet) leaves as a projectile (fly); the squad is told where it's headed, as far as the
-    // walls go (to draw it and hear it go by)
-    const shot: any = { sid: (this.sidN = (this.sidN || 0) + 1), ff: new Map(), w: w.def.code, am: round, f: [origin.x, origin.y, origin.z].map((v) => Math.round(v * 100) / 100), tos: def.pellets > 1 ? [] : null }; // (tos: each pellet's end, for the highlights)
-    for (let i = 0; i < def.pellets; i++) {
-      let dir = aim;
-      if (def.pellets > 1 && pr > 0) {
-        const a = Math.random() * Math.PI * 2, rr = pr * Math.min(1.6, Math.sqrt(-2 * Math.log(1 - Math.random())) * 0.6);
-        dir = aim.clone().addScaledVector(right, Math.cos(a) * rr).addScaledVector(up, Math.sin(a) * rr).normalize();
+      // where the gun actually points this shot (one error for the whole shot), then for a shotgun the pattern
+      // around it: the choke's cone, denser in the middle (roughly normal, clipped at 1.6x)
+      // (a hyper pair's second round: the same error as the first's, near enough: the gun hasn't moved)
+      const pair2 = this.hyperQ === 1 && this.pairAim && this.fireMode(w) === 'hyper';
+      const a0 = pair2 ? this.pairAim![0] : Math.random() * Math.PI * 2, r0 = pair2 ? this.pairAim![1] : Math.sqrt(Math.random()) * Math.tan(sr);
+      this.pairAim = this.hyperQ === 2 ? [a0, r0] : null;
+      const aim = fwd.clone().addScaledVector(right, Math.cos(a0) * r0).addScaledVector(up, Math.sin(a0) * r0).normalize();
+      const pr = Math.tan(((def.choke || 0) * Math.PI) / 180);
+      // each round (or pellet) leaves as a projectile (fly); the squad is told where it's headed, as far as the
+      // walls go (to draw it and hear it go by)
+      const shot: any = { sid: (this.sidN = (this.sidN || 0) + 1), ff: new Map(), w: w.def.code, am: round, f: [origin.x, origin.y, origin.z].map((v) => Math.round(v * 100) / 100), tos: def.pellets > 1 ? [] : null }; // (tos: each pellet's end, for the highlights)
+      for (let i = 0; i < def.pellets; i++) {
+        let dir = aim;
+        if (def.pellets > 1 && pr > 0) {
+          const a = Math.random() * Math.PI * 2, rr = pr * Math.min(1.6, Math.sqrt(-2 * Math.log(1 - Math.random())) * 0.6);
+          dir = aim.clone().addScaledVector(right, Math.cos(a) * rr).addScaledVector(up, Math.sin(a) * rr).normalize();
+        }
+        this.fly(origin, dir, muzzle, def, round, i === 0 || def.pellets <= 10, shot, w.sup, G.boreTip(w));
       }
-      this.fly(origin, dir, muzzle, def, round, i === 0 || def.pellets <= 10, shot, w.sup, G.boreTip(w));
-    }
-    const firstEnd = shot.to;
+      const firstEnd = shot.to;
 
-    if (def.cls === 'RAIL') G.Audio.rail();
-    else if (def.cls === 'BOW') G.Audio.bow();
-    else if (!G.GunAudio.play(G.Gunsmith.roundSoundKey(def, round), null)) G.Audio.shot(w.sup ? G.SUPPRESSOR.snd : def.snd); // (the report of the round fired, not just the gun's)
-    if (!w.sup && def.cls !== 'BOW') {
-      this.flashT = 0.05;
-      G.R.vmMuzzle.intensity = 3;
-      G.R.muzzleFlashAt(muzzle, def.tracer || 0xffb060);
-    }
+      if (def.cls === 'RAIL') G.Audio.rail();
+      else if (def.cls === 'BOW') G.Audio.bow();
+      else if (!G.GunAudio.play(multi ? G.shotSoundKey(def, eff, round) : G.Gunsmith.roundSoundKey(def, round), null, undefined, multi ? Math.pow(G.shotK(w.def.barrels, eff), 2) : 1)) G.Audio.shot(w.sup ? G.SUPPRESSOR.snd : def.snd); // (the report of the round fired, not just the gun's)
+      if (!w.sup && def.cls !== 'BOW') {
+        this.flashT = 0.05;
+        G.R.vmMuzzle.intensity = 3;
+        G.R.muzzleFlashAt(muzzle, def.tracer || 0xffb060);
+      }
+      if (!multi && !w.def.caseless && !w.def.manual) G.Casings.fired(def, true, null, null, round); // the spent case, out of the port (a bolt gun's when the bolt's worked; a caseless round has none)
 
+      const r2 = (v: number) => Math.round(v * 100) / 100;
+      // (a shotgun's: every pellet's end, so the squad's highlights show the pattern)
+      const tos = shot.tos ? shot.tos.slice(0, 24).map((p: THREE.Vector3) => [r2(p.x), r2(p.y), r2(p.z)]) : undefined;
+      if (G.Highlights) G.Highlights.shot('p' + G.Net.myId, muzzle, firstEnd, def.code, round, tos, shot.sid);
+      G.Net.toHost({ t: 'shot', f: [r2(muzzle.x), r2(muzzle.y), r2(muzzle.z)], to: [r2(firstEnd.x), r2(firstEnd.y), r2(firstEnd.z)], tos, sid: shot.sid, w: def.code, am: round, sil: def.cls === 'BOW' ? 2 : w.sup ? (def.quiet ? 2 : 1) : 0, bm: multi ? Math.round(eff) : undefined });
+      if (n === 0) firstShot = shot;
+    });
+    void firstShot;
     if (G.Game.hub && G.Range.on()) G.Course.shot(); // (on the clock in the IPSC course: a split)
-    if (!w.def.manual) G.Casings.fired(def, true, null, null, round); // the spent case, out of the port (a bolt gun's when the bolt's worked)
-    // the kick only throws the muzzle for the next shot: this one already left where you were aiming
-    this.recoilKick(def);
-    this.kick = Math.min(1, this.kick + 0.35 + def.recoil * 0.06);
-
-    const r2 = (v: number) => Math.round(v * 100) / 100;
-    // (a shotgun's: every pellet's end, so the squad's highlights show the pattern)
-    const tos = shot.tos ? shot.tos.slice(0, 24).map((p: THREE.Vector3) => [r2(p.x), r2(p.y), r2(p.z)]) : undefined;
-    if (G.Highlights) G.Highlights.shot('p' + G.Net.myId, muzzle, firstEnd, def.code, round, tos, shot.sid);
-    G.Net.toHost({ t: 'shot', f: [r2(muzzle.x), r2(muzzle.y), r2(muzzle.z)], to: [r2(firstEnd.x), r2(firstEnd.y), r2(firstEnd.z)], tos, sid: shot.sid, w: def.code, am: round, sil: def.cls === 'BOW' ? 2 : w.sup ? (def.quiet ? 2 : 1) : 0 });
+    // the kick only throws the muzzle for the next shot: this one already left where you were aiming (a pull of several barrels kicks as one)
+    const kd = multi && list.length > 1 ? Object.assign(Object.create(def0), { recoil: def0.recoil * Math.pow(list.length, 0.8) }) : def0;
+    this.recoilKick(kd);
+    this.kick = Math.min(1, this.kick + 0.35 + kd.recoil * 0.06);
+    void round0;
   },
 
   // ---------------------------------------------------------------- rounds in flight
@@ -2428,7 +2445,7 @@ const G_Me = {
     vm.rotation.y += (ry - vm.rotation.y) * lp * 0.6;
     vm.rotation.z += (rz - vm.rotation.z) * lp * 0.6;
     u.flashes.forEach((fl: any, i: number) => {
-      fl.visible = this.flashT > 0 && (u.flashes.length < 2 || i === this.flashIdx);
+      fl.visible = this.flashT > 0 && (this.flashBarrels ? this.flashBarrels.includes(i) : u.flashes.length < 2 || i === this.flashIdx); // (a gun of several barrels: a flash from each that fired)
       if (fl.visible) { fl.rotation.z = Math.random() * 6; fl.scale.setScalar(0.8 + Math.random() * 0.6); }
     });
     // moving parts: slides cycle (and lock back on empty), pumps and bolts work between shots,
@@ -2436,7 +2453,12 @@ const G_Me = {
     const an = u.anim, w = this.cur();
     const cyc = !w.def.manual && this.cycleMax > 0.2 && this.fireCd > 0 ? Math.sin(Math.PI * Math.min(1, (1 - this.fireCd / this.cycleMax) * 1.25)) : 0;
     if (an.slide) an.slide.position.z = Math.min(0.035, this.kick * 0.04 + (!G.loaded(w) ? 0.035 : 0)); // (locked back: nothing left, chamber included)
-    if (an.pump) an.pump.position.z = cyc * 0.085;
+    if (u.info.modeDial) { // (the fire-mode dial: the model's own part, or the marker the viewmodel puts on it, turned to the selected mode)
+      const md = u.info.modeDial, node = an.dial || u.dial, i = Math.max(0, md.modes.indexOf(this.fireMode(w)));
+      if (node) { const ax = an.dial ? new THREE.Vector3(md.axis[2], md.axis[1], -md.axis[0]).normalize() : node.userData.axis; node.quaternion.setFromAxisAngle(ax, (i * md.stepDeg * Math.PI) / 180); }
+    }
+    if (an.pump && !u.info.hinge) an.pump.position.z = cyc * 0.085; // (a gun with a reload sequence moves it only there)
+    if (u.displays && u.displays.ammo && w.def.barrels) G.Viewmodel.paintAmmo(u.displays.ammo, G.barrelsOf(w)!, w.def.barrels.per); // (the rounds left in each barrel)
     if (an.cyl) an.cyl.rotation.z += (this.cylShots * (Math.PI * 2) / u.info.chamberAt.n - an.cyl.rotation.z) * Math.min(1, dt * 18);
     if (an.spin) an.spin.rotation.z += dt * this.spin * 55;
     if (an.magn) an.magn.rotation.z += ((sg.scoped ? 0 : -2.8) - an.magn.rotation.z) * Math.min(1, dt * 14); // a magnifier flips in or out

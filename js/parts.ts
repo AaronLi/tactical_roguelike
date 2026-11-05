@@ -1132,6 +1132,10 @@ const G_Gunsmith = (() => {
     const g = G.GUN_SPECS[id];
     if (!g) return null;
     let s = inch === undefined ? g : Object.assign({}, g, { barrel: +inch, muzzleDevice: dev, suppressor: can || g.suppressor });
+    { // a gun of several barrels: a barrel's report is fuller the longer its effective length (the key's inches, js/data.ts G.shotSoundKey): more of the charge burnt and more pressure at the muzzle
+      const bd = (G.WEAPONS[id] || {}).barrels;
+      if (bd && inch !== undefined) { const t = G.U.clamp((+inch * 25.4 - bd.mm[0]) / (bd.mm[bd.mm.length - 1] - bd.mm[0]), 0, 1); s = Object.assign({}, s, { pressure: s.pressure * (0.55 + 0.45 * t), grain: s.grain * (0.6 + 0.4 * t) }); }
+    }
     if (LOAD_SOUND[am]) s = Object.assign({}, s, LOAD_SOUND[am](s));
     if (!LOAD_SOUND[am] || window.GunshotSynth) specs.set(key, s); // (a subsonic load's needs the synth to work out)
     return s;

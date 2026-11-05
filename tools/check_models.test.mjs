@@ -111,6 +111,25 @@ expectA('authored pistol: the barrel starts behind the muzzle', pGun(PA({ mount_
 expectA('authored pistol: a slide needs mount_slide', pGun(PA(), { anim: { slide: 'part_slide', mag: 'part_mag' } }), /anchors\.mount_slide is missing|part_slide/);
 expectA('authored pistol: tac and grip anchors are allowed', pGun(PA({ mount_tac: [0.15, -0.06, 0], mount_grip: [0.07, -0.04, 0], mount_stock: [0, -0.02, 0] })), null);
 expectA('a rifle still needs its handguard anchors', aGun({}, undefined, { anchors: PA() }), /anchors\.mount_optic is missing/);
+// a gun of several barrels and a reload sequence (GUN_MODEL_CONTRACT.multi): info.barrels, barrelGroups, modeDial, hinge (root extras hinge_json), nested part_ nodes, anim aliases
+{
+  const BAR = () => ({ n: 2, rounds_each: 3, effective_mm: [100, 150, 200] }), MZ = [[0.7, 0.01, 0], [0.7, -0.01, 0]];
+  const mgun = (over = {}, root = {}, kids = [B(), part('mag', [mesh('mag_3', 'mag'), part('carry', [mesh('mag_4', 'mag')])])]) => ({ roots: [{ name: 'x', extras: { gun: 'x', info: { ...info(), muzzles: MZ, magAt: [0.22, -0.043], anim: { mag: 'part_mag', carry: 'part_carry' }, barrels: BAR(), ...over }, anchors: ANCH(), ...root }, mesh: false, uv: false, materials: [], children: kids }] });
+  expectA('multi: a barrel block with its barrels is valid', mgun(), null);
+  expectA('multi: json-text hinge is read', mgun({}, { hinge_json: JSON.stringify({ sequence: [{ part: 'part_carry', axis: 'x', rotate_deg: 90 }] }) }), null);
+  expectA('multi: anim aliases are read by the node they name', (() => { const g = mgun({ anim: { block: 'part_mag', flap: 'part_carry' } }); return g; })(), null);
+  expectA('multi: barrels.n against the muzzles', mgun({ barrels: { ...BAR(), n: 3 } }), /info\.barrels\.n is 3 but info\.muzzles has 2/);
+  expectA('multi: one effective length per round', mgun({ barrels: { ...BAR(), effective_mm: [100, 150] } }), /effective_mm has 2 entries, rounds_each is 3/);
+  expectA('multi: effective lengths must grow', mgun({ barrels: { ...BAR(), effective_mm: [100, 90, 200] } }), /must be positive and increase/);
+  expectA('multi: a group names real barrels', mgun({ barrelGroups: { top: [0, 5] } }), /info\.barrelGroups\.top: indices into info\.muzzles/);
+  expectA('multi: groups need barrels', aGun({ info: { barrelGroups: { top: [0] } } }), /are for a gun with info\.barrels/);
+  expectA('multi: a hinge step names a part', mgun({}, { hinge: { sequence: [{ part: 'part_lever', axis: 'x', rotate_deg: 40 }] } }), /sequence\[0\]\.part: "part_lever" is not a part_ node/);
+  expectA('multi: a hinge frame names a part', mgun({}, { hinge: { sequence: [{ part: 'carry', move: [0, 0.1, 0], frame: 'part_brk' }] } }), /sequence\[0\]\.frame: "part_brk" is not a part_ node/);
+  expectA('multi: a step does something', mgun({}, { hinge: { sequence: [{ part: 'carry' }] } }), /turns \(axis \+ rotate_deg\) or slides \(move\)/);
+  expectA('multi: a rotation needs an axis', mgun({}, { hinge: { sequence: [{ part: 'carry', rotate_deg: 40 }] } }), /axis: x, y or z/);
+  expectA('multi: nested parts are fine (a barrel block inside a forend)', mgun({ anim: { brk: 'part_brk', mag: 'part_mag', carry: 'part_carry' } }, {}, [B(), part('brk', [part('mag', [mesh('mag_3', 'mag'), part('carry', [mesh('mag_4', 'mag')])])])]), null);
+  expectA('multi: carry is a part key', mgun({ anim: { mag: 'part_mag', carry: 'part_carry' } }), null);
+}
 // authored VARIANTS (models/<id>/<name>.glb: M.validateAuthoredVariant)
 const vDesc = (v, name = 'x_barrel_short', kids = [mesh('barrel_1', 'barrel', 'black')]) => ({ roots: [{ name, extras: v === undefined ? {} : { variant: v }, mesh: false, uv: false, materials: [], children: kids }] });
 const expectV = (label, desc, re) => {
@@ -121,7 +140,9 @@ const VB = () => ({ gun: 'x', slot: 'barrel', of: 'factory', info: { muzzles: [[
 expectV('variant: a complete barrel variant is valid', vDesc(VB()), null);
 expectV('variant: no variant_json', vDesc(undefined), /variant_json is missing/);
 expectV('variant: another gun\'s folder', vDesc({ ...VB(), gun: 'y' }), /variant\.gun is "y", expected "x"/);
-expectV('variant: a slot that is not barrel or mag', vDesc({ ...VB(), slot: 'grip' }), /variant\.slot is "grip"/);
+expectV('variant: a slot that is not barrel, muzzle or mag', vDesc({ ...VB(), slot: 'grip' }), /variant\.slot is "grip"/);
+expectV('variant: a muzzle variant is valid', vDesc({ ...VB(), slot: 'muzzle' }, 'x_barrel_short', [mesh('muzzle_1', 'muzzle', 'black')]), null);
+expectV('variant: a muzzle variant needs its muzzles', vDesc({ gun: 'x', slot: 'muzzle', of: 'factory' }, 'x_barrel_short', [mesh('muzzle_1', 'muzzle', 'black')]), /needs variant\.info\.muzzles/);
 expectV('variant: a barrel without its muzzle', vDesc({ ...VB(), info: {} }), /needs variant\.info\.muzzles/);
 expectV('variant: a magazine without its capacity', vDesc({ gun: 'x', slot: 'mag', of: 'factory' }, 'x_barrel_short', [part('mag', [mesh('mag_1', 'mag', 'black')])]), /needs variant\.cap/);
 expectV('variant: an unknown field', vDesc({ ...VB(), extra: 1 }), /variant\.extra: not a field/);

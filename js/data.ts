@@ -198,6 +198,48 @@ const G_MODE_INFO: Record<string, { take: number; auto?: boolean; rpm?: number; 
   low: { take: 1, auto: true, rpm: 500 }, high: { take: 1, auto: true, rpm: 1200 }, double: { take: 2 }, triple: { take: 3, group: true }, sextuple: { take: 6 },
 };
 G.MODE_INFO = G_MODE_INFO;
+// ---- a gun of several barrels (def.barrels: n barrels of per rounds each, fired electrically nose to tail; the model says the same, info.barrels, and the baker checks they agree)
+// Each barrel's rounds are bookkept in w.bl (rounds left per barrel; w.mag is their sum and stays the one number everything else reads). A magazine put in, or a gun
+// picked up with no bookkeeping, spreads its rounds evenly, the lowest barrels the emptier (the way fullest-first would have left them: see pickBarrels).
+const G_barrelsOf = (w: { def: Record<string, any>; mag: number; bl?: number[] | null }): number[] | null => {
+  const b = w.def.barrels;
+  if (!b) return null;
+  if (!w.bl || w.bl.length !== b.n || w.bl.reduce((a: number, x: number) => a + x, 0) !== w.mag) { const n = Math.max(0, Math.min(w.mag, b.n * b.per)); w.bl = Array.from({ length: b.n }, (_, i) => Math.min(b.per, Math.floor(n / b.n) + (i >= b.n - (n % b.n) ? 1 : 0))); }
+  return w.bl;
+};
+G.barrelsOf = G_barrelsOf;
+// Which barrels a pull of the trigger fires, in this mode. One or two (or any number a mode takes): the FULLEST barrels, ties to the lowest, so the barrels empty evenly and each
+// barrel's run of shots goes from its shortest effective length to its longest together. A group mode (three) fires the top or the bottom group (def.barrels.groups), whichever
+// has more rounds left (the top on a tie), and only the barrels in it that still have a round. Fewer rounds than the mode asks for: what there is.
+const G_pickBarrels = (w: { def: Record<string, any>; mag: number; bl?: number[] | null }, mode: string): number[] => {
+  const b = w.def.barrels, bl = G.barrelsOf(w)!, mi = G.MODE_INFO[mode] || { take: 1 };
+  const sum = (g: number[]) => g.reduce((a, i) => a + bl[i], 0);
+  let pool: number[] = bl.map((_: number, i: number) => i);
+  if (mi.group) { const t = b.groups.top, u = b.groups.bottom; pool = sum(u) > sum(t) ? u : t; }
+  return pool.filter((i) => bl[i] > 0).sort((p, q) => bl[q] - bl[p] || p - q).slice(0, mi.take);
+};
+G.pickBarrels = G_pickBarrels;
+// A shot from barrel i as the gun sees it: the barrel's effective length (def.barrels.mm, indexed by the rounds already fired from it) sets the muzzle velocity, and with it the
+// damage (energy) and the range, from def.barrels.full (x0.8) at the shortest to x1.0 at the longest. The velocity is the build's own at its longest, times the square root of that
+// factor (energy goes with its square). eff: that effective length in mm, k: the factor.
+const G_shotK = (b: { mm: number[]; full: number }, eff: number) => b.full + (1 - b.full) * (eff - b.mm[0]) / (b.mm[b.mm.length - 1] - b.mm[0]);
+G.shotK = G_shotK;
+const G_shotDef = (def: Record<string, any>, w: { def: Record<string, any>; bl?: number[] | null; mag: number }, i: number) => {
+  const b = w.def.barrels, bl = G.barrelsOf(w)!, mm: number[] = b.mm, gone = Math.max(0, Math.min(mm.length - 1, b.per - bl[i])), eff = mm[gone];
+  const k = G.shotK(b, eff), ref = (G.GUN_SPECS[w.def.id] || {}).barrel || 20;
+  const d = Object.create(def);
+  d.barrelIn = eff / 25.4; d.velK = (def.velK || 1) * Math.sqrt(k) * Math.pow(ref / (eff / 25.4), 0.2); d.range = def.range * k;
+  return { def: d, eff, k };
+};
+G.shotDef = G_shotDef;
+// the sound key of that shot: the gun's own, with the barrel length of the effective one (the synth's barrel length changes the report: longer is fuller and louder)
+const G_shotSoundKey = (def: Record<string, any>, eff: number, am: string): string => {
+  const key = G.Gunsmith.roundSoundKey(def, am), [base, load] = key.split('@'), p = base.split(':');
+  if (p.length < 3) return key;
+  p[1] = (eff / 25.4).toFixed(1);
+  return p.join(':') + (load ? '@' + load : '');
+};
+G.shotSoundKey = G_shotSoundKey;
 // Chambers. A closed-bolt gun (most of them) holds a round in its chamber as well as the ones in its magazine or
 // tube (w.chamber: its type, or null): it fires that one, and the action feeds the next from the magazine. A
 // reload with one chambered keeps it (30+1); run dry, the chamber's empty too and the reload ends by working the
@@ -769,4 +811,4 @@ const G_ENEMY_GEAR = {
 };
 G.ENEMY_GEAR = G_ENEMY_GEAR;
 
-interface GameModules { TIER_NAMES: typeof G_TIER_NAMES; TIER_COLORS: typeof G_TIER_COLORS; CLASS_SND: typeof G_CLASS_SND; WEAPON_LIST: WeaponDef[]; WEAPONS: typeof G_WEAPONS; EXPLOSIVES_OFF: typeof G_EXPLOSIVES_OFF; obtainable: typeof G_obtainable; AUTO_ONLY: typeof G_AUTO_ONLY; FIRE_MODES: typeof G_FIRE_MODES; MODE_NAME: typeof G_MODE_NAME; MODE_INFO: typeof G_MODE_INFO; OPEN_BOLT: typeof G_OPEN_BOLT; chambered: typeof G_chambered; revolver: typeof G_revolver; REV: typeof G_REV; fullReload: typeof G_fullReload; BOLT_HOLD: typeof G_BOLT_HOLD; boltHold: typeof G_boltHold; loaded: typeof G_loaded; MAG_FAMILY: typeof G_MAG_FAMILY; BELT_FAMILY: typeof G_BELT_FAMILY; magFam: typeof G_magFam; magFits: typeof G_magFits; beltFed: typeof G_beltFed; GUN_SPECS: typeof G_GUN_SPECS; SUPPRESSOR: typeof G_SUPPRESSOR; ARMOR_LIST: ArmorDef[]; ARMORS: typeof G_ARMORS; ENEMIES: typeof G_ENEMIES; THEMES: typeof G_THEMES; HANGAR_ROWS: typeof G_HANGAR_ROWS; HANGAR_THEME: typeof G_HANGAR_THEME; PLAYER_COLORS: typeof G_PLAYER_COLORS; VENDOR_QUIPS: typeof G_VENDOR_QUIPS; CALIBERS: typeof G_CALIBERS; calOf: typeof G_calOf; stdMag: typeof G_stdMag; AMMO: typeof G_AMMO; AMMO_TYPES: typeof G_AMMO_TYPES; MUZZLE_V: typeof G_MUZZLE_V; SOUND_SPEED: typeof G_SOUND_SPEED; dragOf: typeof G_dragOf; roundSpeed: typeof G_roundSpeed; CHARGE_GR: typeof G_CHARGE_GR; GUN_KG: typeof G_GUN_KG; RECOIL_K: typeof G_RECOIL_K; RECOIL: typeof G_RECOIL; aimSway: typeof G_aimSway; recoilImpulse: typeof G_recoilImpulse; physRecoil: typeof G_physRecoil; GRAVITY: typeof G_GRAVITY; zeroOf: typeof G_zeroOf; sightH: typeof G_sightH; ROUND_LIFE: typeof G_ROUND_LIFE; ballistics: typeof G_ballistics; flight: typeof G_flight; zeroSlope: typeof G_zeroSlope; CLICK: typeof G_CLICK; boreTip: typeof G_boreTip; ballFor: typeof G_ballFor; AMMO_RARITY: typeof G_AMMO_RARITY; rollAmmo: typeof G_rollAmmo; ammoOk: typeof G_ammoOk; roundDef: typeof G_roundDef; gearTier: typeof G_gearTier; ENEMY_GEAR: typeof G_ENEMY_GEAR; }
+interface GameModules { TIER_NAMES: typeof G_TIER_NAMES; TIER_COLORS: typeof G_TIER_COLORS; CLASS_SND: typeof G_CLASS_SND; WEAPON_LIST: WeaponDef[]; WEAPONS: typeof G_WEAPONS; EXPLOSIVES_OFF: typeof G_EXPLOSIVES_OFF; obtainable: typeof G_obtainable; AUTO_ONLY: typeof G_AUTO_ONLY; FIRE_MODES: typeof G_FIRE_MODES; MODE_NAME: typeof G_MODE_NAME; MODE_INFO: typeof G_MODE_INFO; barrelsOf: typeof G_barrelsOf; pickBarrels: typeof G_pickBarrels; shotDef: typeof G_shotDef; shotK: typeof G_shotK; shotSoundKey: typeof G_shotSoundKey; OPEN_BOLT: typeof G_OPEN_BOLT; chambered: typeof G_chambered; revolver: typeof G_revolver; REV: typeof G_REV; fullReload: typeof G_fullReload; BOLT_HOLD: typeof G_BOLT_HOLD; boltHold: typeof G_boltHold; loaded: typeof G_loaded; MAG_FAMILY: typeof G_MAG_FAMILY; BELT_FAMILY: typeof G_BELT_FAMILY; magFam: typeof G_magFam; magFits: typeof G_magFits; beltFed: typeof G_beltFed; GUN_SPECS: typeof G_GUN_SPECS; SUPPRESSOR: typeof G_SUPPRESSOR; ARMOR_LIST: ArmorDef[]; ARMORS: typeof G_ARMORS; ENEMIES: typeof G_ENEMIES; THEMES: typeof G_THEMES; HANGAR_ROWS: typeof G_HANGAR_ROWS; HANGAR_THEME: typeof G_HANGAR_THEME; PLAYER_COLORS: typeof G_PLAYER_COLORS; VENDOR_QUIPS: typeof G_VENDOR_QUIPS; CALIBERS: typeof G_CALIBERS; calOf: typeof G_calOf; stdMag: typeof G_stdMag; AMMO: typeof G_AMMO; AMMO_TYPES: typeof G_AMMO_TYPES; MUZZLE_V: typeof G_MUZZLE_V; SOUND_SPEED: typeof G_SOUND_SPEED; dragOf: typeof G_dragOf; roundSpeed: typeof G_roundSpeed; CHARGE_GR: typeof G_CHARGE_GR; GUN_KG: typeof G_GUN_KG; RECOIL_K: typeof G_RECOIL_K; RECOIL: typeof G_RECOIL; aimSway: typeof G_aimSway; recoilImpulse: typeof G_recoilImpulse; physRecoil: typeof G_physRecoil; GRAVITY: typeof G_GRAVITY; zeroOf: typeof G_zeroOf; sightH: typeof G_sightH; ROUND_LIFE: typeof G_ROUND_LIFE; ballistics: typeof G_ballistics; flight: typeof G_flight; zeroSlope: typeof G_zeroSlope; CLICK: typeof G_CLICK; boreTip: typeof G_boreTip; ballFor: typeof G_ballFor; AMMO_RARITY: typeof G_AMMO_RARITY; rollAmmo: typeof G_rollAmmo; ammoOk: typeof G_ammoOk; roundDef: typeof G_roundDef; gearTier: typeof G_gearTier; ENEMY_GEAR: typeof G_ENEMY_GEAR; }

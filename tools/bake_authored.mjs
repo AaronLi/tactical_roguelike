@@ -89,6 +89,7 @@ function readScene(buf, rootName, label) {
         }
         const idx = prim.indices != null ? readAccessor(g, prim.indices) : Uint32Array.from({ length: cnt }, (_, i) => i);
         const e = { slot: ex.slot || 'base', mat: (prim.material != null && j.materials[prim.material].name) || 'black', pos, nrm, idx: idx instanceof Uint16Array || idx instanceof Uint32Array ? idx : Uint32Array.from(idx) };
+        if ((n.name || '').startsWith('display_')) { e.name = n.name; e.display = ex.display; const U = prim.attributes.TEXCOORD_0 != null ? readAccessor(g, prim.attributes.TEXCOORD_0) : null; if (U) e.uv = Float32Array.from(U); } // (a display surface: the game paints it, so its name, size and UVs go on)
         if (part) { e.part = part.key; e.at = part.at.map((c) => +c.toFixed(5)); e.chain = part.chain.slice(); }
         if (ex.role === 'tube') e.legacyTube = true; // (an older export: see below)
         meshes.push(e);
