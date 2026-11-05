@@ -164,7 +164,7 @@ const CONTRACT_CORE = {
   /** extras keys. */
   extras: {
     root: { info: 'The GunModelInfo object (INFO_FIELDS).', gun: 'The gun id, equal to the root node\'s name.', anchors: 'An AUTHORED SOURCE only (GUN_MODEL_CONTRACT.authored): the mount anchors, { mount_<slot>: [forward, up, right] } in the gun\'s frame. (Also written as the JSON text `anchors_json`, and `info` as `info_json`, for a tool that stores only flat custom properties: Blender.)', seat: 'An AUTHORED SOURCE only: { barrelR } scalars of the seats (GUN_MODEL_CONTRACT.authored.seat). (Also `seat_json`.)' },
-    mesh: { slot: 'A SLOTS value.', display: 'Display surfaces only: { width, height } canvas pixels.', chk: 'A magazine-check mesh (under part_mag): { role, i, t? } (GUN_MODEL_CONTRACT.magCheck).' },
+    mesh: { slot: 'A SLOTS value.', display: 'Display surfaces only: { width, height } canvas pixels.', chk: 'A magazine-check mesh (under part_mag): { role, i, t?, side? } (GUN_MODEL_CONTRACT.magCheck).' },
     part: { part: 'The PARTS key of this part_ node.', anchors: 'Anchors this part provides, in its own frame (GUN_MODEL_CONTRACT.anchors).', owner: 'Pack files only: false when this node\'s pivot belongs to another pack (GUN_MODEL_CONTRACT.packs.nodes).', parent: 'Pack files only: the name of the node this one nests under.', check: 'part_mag only: { w }, the magazine-check data (GUN_MODEL_CONTRACT.magCheck).' },
     pack: { pack: 'Pack files only, on the root: { platform, tag, key } (GUN_MODEL_CONTRACT.packs.root).' },
   },
@@ -222,8 +222,8 @@ const GUN_MODEL_CONTRACT = { ...CONTRACT_CORE, displays: {
 }, magCheck: {
   what: 'The magazine check (hold R: the magazine is pulled out and looked at) shows what is in it on the magazine\'s own body: the top round, witness holes stamped with a count, or the rounds themselves through a clear body. The model says which of its meshes are those (js/gunrig.ts reads it; a gun without it simply shows nothing).',
   part: '`part_mag` has extras.check = { w }: the magazine\'s width in metres (the width of a hole\'s stamped count).',
-  meshes: 'Meshes under `part_mag` carry extras.chk = { role, i, t? }: role "top" (the round on top: i 0 its case, i 1 its tip; the game colours them for the load), "hole" (a witness hole, i = its order from the top, t = 0..1 how far down the stack it reads), "round" (the i-th round drawn through a clear magazine, t = how far down) and "tip" (the bullet tip of round i). Every mesh keeps a slot and a catalogue material like any other; the game replaces their materials as the rounds change. A gun with a magazine check has both top meshes.',
-  example: { name: 'part_mag', extras: { part: 'mag', check: { w: 0.024 } }, child: { name: 'mag_91', extras: { slot: 'mag', chk: { role: 'hole', i: 0, t: 0.1567 } } } },
+  meshes: 'Meshes under `part_mag` carry extras.chk = { role, i, t?, side? }: role "top" (the round on top: i 0 its case, i 1 its tip; the game colours them for the load), "hole" (a witness hole, i = its order from the top, t = 0..1 how far down the stack it reads, side = 1 on the back face of the magazine (toward the shooter) or -1 on its front: a magazine has the same holes, same i and t, on BOTH faces, each its own mesh, and the game stamps the count beside each reading from its own side. The rotation of the mesh node is the tilt of the face there: on a curved magazine each hole, and the count beside it, follows the curve; a round of a clear magazine leans with it the same way), "round" (the i-th round drawn through a clear magazine, t = how far down) and "tip" (the bullet tip of round i). Every mesh keeps a slot and a catalogue material like any other; the game replaces their materials as the rounds change. A gun with a magazine check has both top meshes.',
+  example: { name: 'part_mag', extras: { part: 'mag', check: { w: 0.024 } }, child: { name: 'mag_91', extras: { slot: 'mag', chk: { role: 'hole', i: 0, t: 0.1567, side: 1 } } } },
 }, anchors: {
   where: 'A node may carry `extras.anchors`: positions it PROVIDES, in the node\'s OWN frame (the same [forward, up, right] metres, measured from the node\'s origin along its axes; a part\'s mesh positions are in that same frame). Allowed on `part_<key>` and `group_<n>` nodes, and on the root of a per-part pack (a .glb holding one swappable part). Keys are the info anchors a part can provide (' + ANCHOR_KEYS.join(', ') + ') or a mount point `mount_<slot>` (a [forward, up, right] vec3; e.g. mount_muzzle on a frame says where a muzzle device sits).',
   assembly: [
@@ -361,6 +361,14 @@ function validate(model: ModelDesc, id?: string): ModelReport {
           if (!c.materials.length) E(`display "${c.name}": has no material (any name: the game replaces it)`);
         } else if (c.extras[NAMES.extras.display] !== undefined) E(`mesh "${c.name}": extras.display is only for meshes named "${NAMES.displayPrefix}<name>"`);
         if (c.children.length) warnings.push(`mesh "${c.name}" has child nodes; they will be kept but the game does not expect them`);
+        const chk = c.extras.chk;
+        if (chk !== undefined) {
+          if (!isObj(chk) || !['top', 'hole', 'round', 'tip'].includes(chk.role) || !Number.isInteger(chk.i) || chk.i < 0) E(`mesh "${c.name}": extras.chk must be { role: top|hole|round|tip, i: whole number, t?, side? }, got ${JSON.stringify(chk)}`);
+          else {
+            if (chk.role === 'hole' && (typeof chk.t !== 'number' || chk.t < 0 || chk.t > 1 || (chk.side !== 1 && chk.side !== -1))) E(`mesh "${c.name}": a witness hole needs t in 0..1 and side 1 (back face) or -1 (front face), got ${JSON.stringify(chk)}`);
+            if (chk.role === 'round' && (typeof chk.t !== 'number' || chk.t < 0 || chk.t > 1)) E(`mesh "${c.name}": a drawn round needs t in 0..1, got ${JSON.stringify(chk)}`);
+          }
+        }
         if (!c.materials.length && !display) E(`mesh "${c.name}": has no material`);
         for (const m of display ? [] : c.materials) if (!m) E(`mesh "${c.name}": its material has no name (name it with a catalogue key: ${Object.keys(C.materials.names).slice(0, 6).join(', ')}, ...)`); else if (!(m in C.materials.names) && !matOk.test(m)) E(`mesh "${c.name}": material '${m}' is not in the catalogue (${Object.keys(C.materials.names).join(', ')}) and is not an anonymous colour (m_<rrggbb>)`);
       } else if (c.name.startsWith(NAMES.partPrefix)) {

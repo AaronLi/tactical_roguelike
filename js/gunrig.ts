@@ -18,7 +18,8 @@
 // of its meshes are those as DATA (docs/models.md "Magazine check"):
 //   part_mag.extras.check = { w }                           w: the magazine's width, m (how wide a count label is)
 //   <mesh>.extras.chk = { role, i, t? }                     role 'top': i 0 the top round's case, i 1 its tip
-//                                                           role 'hole': a witness hole: t, 0 at the top .. 1 the bottom, how far down the stack it reads
+//                                                           role 'hole': a witness hole: i its order from the top, t 0 at the top .. 1 the bottom (how far down the stack it reads),
+//                                                           side 1 on the back face (toward the shooter) or -1 on the front; the mesh node's rotation is the face's tilt there
 //                                                           role 'round': the i-th drawn round, t how far down; role 'tip': the tip of round i
 // A recipe's model carries the same as live references (part.userData.chk = { w, top, holes, rounds }); magCheck reads either.
 const G_GunRig = (() => {
@@ -46,19 +47,19 @@ const G_GunRig = (() => {
   function magCheck(mag: THREE.Object3D | null | undefined): GunRigMagChk | null {
     if (!mag) return null;
     const r = mag.userData.chk;
-    if (r) return { key: '', top: r.top, holes: r.holes.map((h: any) => ({ t: h.t, mesh: h.mesh, n: 0 })), w: r.w, rounds: r.rounds.map((q: any) => ({ t: q.t, mesh: q.mesh, tip: q.tip })) };
+    if (r) return { key: '', top: r.top, holes: r.holes.map((h: any) => ({ t: h.t, i: h.i, side: h.side, mesh: h.mesh, n: 0 })), w: r.w, rounds: r.rounds.map((q: any) => ({ t: q.t, mesh: q.mesh, tip: q.tip })) };
     const meta = mag.userData.check;
     if (!meta) return null;
     const top: THREE.Mesh[] = [], holes: GunRigMagChk['holes'] = [], rounds: GunRigMagChk['rounds'] = [], tips: Record<number, THREE.Mesh> = {};
     mag.traverse((o: any) => {
       const c = o.isMesh && o.userData.chk;
       if (!c) return;
-      if (c.role === 'top') top[c.i] = o; else if (c.role === 'hole') holes[c.i] = { t: c.t, mesh: o, n: 0 };
+      if (c.role === 'top') top[c.i] = o; else if (c.role === 'hole') holes.push({ t: c.t, i: c.i, side: c.side === -1 ? -1 : 1, mesh: o, n: 0 });
       else if (c.role === 'round') rounds[c.i] = { t: c.t, mesh: o }; else if (c.role === 'tip') tips[c.i] = o;
     });
     rounds.forEach((q, i) => { if (tips[i]) q.tip = tips[i]; });
     if (!top[0] || !top[1]) return null;
-    return { key: '', top, holes: holes.filter(Boolean), w: meta.w, rounds: rounds.filter(Boolean) };
+    return { key: '', top, holes: holes.sort((p, q) => p.i - q.i || q.side - p.side), w: meta.w, rounds: rounds.filter(Boolean) };
   }
 
   /**
@@ -72,7 +73,7 @@ const G_GunRig = (() => {
       if (!r || !r.top) return;
       p.userData.check = { w: r.w };
       r.top.forEach((m: any, i: number) => { if (m) m.userData.chk = { role: 'top', i }; });
-      r.holes.forEach((h: any, i: number) => { h.mesh.userData.chk = { role: 'hole', i, t: h.t }; });
+      r.holes.forEach((h: any) => { h.mesh.userData.chk = { role: 'hole', i: h.i, t: h.t, side: h.side }; });
       r.rounds.forEach((q: any, i: number) => { q.mesh.userData.chk = { role: 'round', i, t: q.t }; if (q.tip) q.tip.userData.chk = { role: 'tip', i }; });
       delete p.userData.chk;
     });
@@ -144,7 +145,7 @@ interface GunRigInfo { anim?: Record<string, any>; grip?: number[]; support?: nu
 /** A hand's anchor points in the gun's space (null where the gun has none), and where its parts sit at rest. */
 interface GunRigAnchors { G: THREE.Vector3; S: THREE.Vector3; W: THREE.Vector3 | null; port: THREE.Vector3 | null; ch: THREE.Vector3 | null; slide: THREE.Vector3 | null; cyl: THREE.Vector3 | null; bolt: THREE.Vector3 | null; P: THREE.Vector3; F: THREE.Vector3; load?: { at: THREE.Vector3[]; pitch: number }; breech?: { at: THREE.Vector3; pitch: number; long: string; oal: number }; cup?: THREE.Vector3 | null; H?: THREE.Vector3 | null; WB: THREE.Vector3; magHome?: THREE.Vector3; magQ: THREE.Quaternion; magGrab?: THREE.Vector3; handleHome?: THREE.Vector3; chHome?: THREE.Vector3; cylHome?: THREE.Vector3; boltHome?: THREE.Vector3; barrelHome?: THREE.Vector3 }
 /** What a magazine shows when it is looked at: the top round (case, tip), witness holes (each with the count it stands for, once stamped), the rounds drawn through a clear body. */
-interface GunRigMagChk { key: string; top: THREE.Mesh[]; holes: { n: number; t: number; mesh: THREE.Mesh; lab?: THREE.Mesh }[]; labCap?: number; w: number; rounds: { t: number; mesh: THREE.Mesh; tip?: THREE.Mesh }[] }
+interface GunRigMagChk { key: string; top: THREE.Mesh[]; holes: { n: number; t: number; i: number; side: number; mesh: THREE.Mesh; lab?: THREE.Mesh }[]; labCap?: number; w: number; rounds: { t: number; mesh: THREE.Mesh; tip?: THREE.Mesh }[] }
 /** One gun in the hands: its holder, its parts, its anchors, its magazine's check data. */
 interface GunRig { holder: THREE.Object3D; info: GunRigInfo; side: number; an: GunRigParts; A: GunRigAnchors; chk: GunRigMagChk | null; travel: number; recip: boolean; open: boolean; boltAm?: string }
 interface GameModules { GunRig: typeof G_GunRig; }
