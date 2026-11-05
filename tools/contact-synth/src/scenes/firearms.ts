@@ -746,6 +746,10 @@ function makeArMagIn(fill: MagFill): Scene {
   const v = fill === 'loaded' ? 1 : 0.8;
   const els: SceneElement[] = [
     hit('magazine top enters the mag well', 0, -8, 0.5 * v, body, arMagWell, { scatter: 0.4, radius: 3, click: 0.5 }),
+    // The air column between the magazine's top and the open top of the well shrinks as it goes in
+    // (~8 cm -> ~1.2 cm): its quarter-wave resonance rises, ~1 kHz -> ~7 kHz, like filling a bottle.
+    { what: 'air column in the mag well shrinks', at: 0.002, gainDb: -9, sound: { kind: 'tube', fromCm: 8, toCm: 1.2, durationMs: 105, motion: 'linear', q: 6 } },
+    { what: 'air squeezed out as it seats', at: 0.107, gainDb: -16, sound: { kind: 'air', freq: 3200, q: 1.4, attackMs: 0.3, decayMs: 4 } },
     rub('magazine slides up the mag well', 0.002, -10, { force: 4, duration: 0.105, speed: 0.45, profile: 'steady', roughness: 6, grain: 0.3, periodicity: 0, contactWidth: 0.08 }, body, arMagWell),
     // The mag's side pushes the spring-loaded catch aside; it rides along until the slot.
     rub('mag catch rides along the magazine side', 0.06, -12, { force: 6, duration: 0.045, speed: 0.4, profile: 'steady', roughness: 4, grain: 0.2, contactWidth: 0.03 }, arMagCatch, body,
@@ -768,8 +772,8 @@ function makeArMagIn(fill: MagFill): Scene {
     roomSize: 0.35,
     housing: LOWER_HOUSING,
     tracks: [
-      { name: 'insert', description: 'Magazine enters and slides up the mag well; the catch rides along its side.', elements: els.filter((e) => /enters|slides up|rides along|top round presses/.test(e.what)) },
-      { name: 'catch-locks', description: 'The mag catch snaps into the magazine; it bottoms in the well.', elements: els.filter((e) => /snaps into|bottoms|body rings$|stack gives/.test(e.what)) },
+      { name: 'insert', description: 'Magazine enters and slides up the mag well; the catch rides along its side.', elements: els.filter((e) => /enters|slides up|rides along|top round presses|column/.test(e.what)) },
+      { name: 'catch-locks', description: 'The mag catch snaps into the magazine; it bottoms in the well.', elements: els.filter((e) => /snaps into|bottoms|body rings$|stack gives|squeezed/.test(e.what)) },
     ],
   };
 }
@@ -785,6 +789,10 @@ function makeArMagOut(fill: MagFill): Scene {
       { coil: { level: 0.3, length: 2, dispersion: 0.35, decay: 0.05, brightness: 5000 } }),
     // Free of the catch, the magazine drops: a small release clunk, then it slides out of the well.
     hit('magazine drops off the catch', 0.064, -8, 0.5 * v, body, arMagWell, { scatter: 0.4, radius: 3, click: 0.5 }),
+    // The air column in the well grows as the magazine drops (~1.2 cm -> ~8 cm, speeding up): its
+    // resonance falls. As the top clears the well, air rushes in: a small, low suction whump.
+    { what: 'air column in the mag well grows', at: 0.065, gainDb: -9, sound: { kind: 'tube', fromCm: 1.2, toCm: 8, durationMs: 71, motion: 'accelerate', q: 6 } },
+    { what: 'air rushes in as the magazine clears', at: 0.136, gainDb: -12, sound: { kind: 'air', freq: 700, q: 0.7, attackMs: 0.5, decayMs: 7, pop: { freq: 140, ms: 6, level: 1.2 } } },
     rub('magazine slides down out of the mag well', 0.065, -10, { force: 3, duration: 0.07, speed: 0.6, profile: 'accelerate', roughness: 6, grain: 0.3, periodicity: 0, contactWidth: 0.08 }, body, arMagWell),
     hit('magazine body rings as it drops', 0.0645, fill === 'loaded' ? -16 : -9, 0.6, body, arMagWell, { scatter: 0.3, radius: 3, click: 0.1, sharp: 0.7 }, own),
     hit('magazine top lips clear the well', 0.136, -14, 0.5, body, arMagWell, { scatter: 0.5, radius: 2, click: 0.6 }),
@@ -803,7 +811,7 @@ function makeArMagOut(fill: MagFill): Scene {
     housing: LOWER_HOUSING,
     tracks: [
       { name: 'release', description: 'Release button pressed; the catch pivots out of the magazine.', elements: els.filter((e) => /button pressed|pivots out/.test(e.what)) },
-      { name: 'drop', description: 'The magazine drops off the catch and slides out of the well.', elements: els.filter((e) => /drops|slides down|rings as|lips clear|rounds shift/.test(e.what)) },
+      { name: 'drop', description: 'The magazine drops off the catch and slides out of the well.', elements: els.filter((e) => /drops|slides down|rings as|lips clear|rounds shift|column|rushes in/.test(e.what)) },
       { name: 'button-return', description: 'Thumb lets go; the button and catch spring back.', elements: els.filter((e) => /springs back/.test(e.what)) },
     ],
   };

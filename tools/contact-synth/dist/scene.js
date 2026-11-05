@@ -51,9 +51,54 @@ function renderAir(a, sr, seed) {
     }
     return out;
 }
+function renderTube(tu, sr, seed) {
+    const len = Math.max(16, Math.round((tu.durationMs / 1000) * sr));
+    const out = new Float32Array(len);
+    const rng = makeRng(seed);
+    const q = Math.max(1, tu.q ?? 6);
+    const modes = 4;
+    const st = Array.from({ length: modes }, () => ({ x1: 0, x2: 0, y1: 0, y2: 0 }));
+    let co = st.map(() => ({ b0: 0, b2: 0, a1: 0, a2: 0 }));
+    for (let n = 0; n < len; n++) {
+        const u = n / len;
+        if (n % 32 === 0) {
+            const p = tu.motion === 'accelerate' ? u * u : u;
+            const L = Math.max(0.3, tu.fromCm + (tu.toCm - tu.fromCm) * p) / 100;
+            co = st.map((_, k) => {
+                const f = Math.min(sr * 0.45, ((2 * k + 1) * 343) / (4 * L));
+                const w0 = (2 * Math.PI * f) / sr;
+                const al = Math.sin(w0) / (2 * q);
+                const a0 = 1 + al;
+                return { b0: al / a0, b2: -al / a0, a1: (-2 * Math.cos(w0)) / a0, a2: (1 - al) / a0 };
+            });
+        }
+        // Envelope: in with the motion, out as it stops.
+        const env = Math.min(1, u / 0.12, (1 - u) / 0.15);
+        const x = (rng() * 2 - 1) * env;
+        let y = 0;
+        for (let k = 0; k < modes; k++) {
+            const c = co[k];
+            const s2 = st[k];
+            const yk = c.b0 * x + c.b2 * s2.x2 - c.a1 * s2.y1 - c.a2 * s2.y2;
+            s2.x2 = s2.x1;
+            s2.x1 = x;
+            s2.y2 = s2.y1;
+            s2.y1 = yk;
+            y += yk / (k + 1);
+        }
+        out[n] = y;
+    }
+    const pk = peak(out);
+    if (pk > 0)
+        for (let n = 0; n < len; n++)
+            out[n] /= pk;
+    return out;
+}
 function renderElement(el, sr, seed, housing) {
     if (el.sound.kind === 'air')
         return { offset: el.at, samples: renderAir(el.sound, sr, seed) };
+    if (el.sound.kind === 'tube')
+        return { offset: el.at, samples: renderTube(el.sound, sr, seed) };
     const patch = housing ? { ...el.sound.patch, housing: { ...housing, ...el.sound.patch.housing } } : el.sound.patch;
     const p = withPatch(patch);
     p.out.room = 0;
