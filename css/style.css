@@ -835,3 +835,33 @@ i.c.heavy { background: #a02828; } i.c.light { background: #7a3a30; } i.c.frac {
 .card.wished, .gs-part.wished { border-color: #ffd24a; box-shadow: 0 0 0 1px rgba(255,210,74,0.55); }
 .route-svg .rsh circle { fill: #d2342b; stroke: #fff; stroke-width: 1.5; }
 .route-svg .rsh path { fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; }
+/* ===== the main menu: a translucent panel on the right that fades out to the left into the guns going round behind it (js/menushow.ts);
+   thin type (Barlow, light weights; the system's sans if it can't load), white and greys, no colour but what matters ===== */
+#menu { --m-text: #e9edf0; --m-dim: rgba(233, 237, 240, 0.52); --m-line: rgba(255, 255, 255, 0.16); --m-font: 'Barlow', system-ui, -apple-system, 'Segoe UI', sans-serif; font-family: var(--m-font); color: var(--m-text); }
+#menu .menu-box { position: relative; isolation: isolate; background: none; border: 0; border-radius: 0; box-shadow: none; width: 540px; padding: 34px 40px 30px 120px; }
+#menu .menu-box::before { content: ''; position: absolute; inset: 0; z-index: -1; background: rgba(9, 12, 15, 0.7); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 140px); mask-image: linear-gradient(90deg, transparent 0, #000 140px); }
+#menu .title { font: 200 46px/1 var(--m-font); letter-spacing: 12px; color: var(--m-text); }
+#menu .title span { color: var(--m-text); font-weight: 500; font-size: 18px; letter-spacing: 15px; margin-top: 6px; opacity: 0.8; }
+#menu .subtitle { font: 300 13px var(--m-font); letter-spacing: 3px; color: var(--m-dim); margin-top: 10px; }
+#menu .menu-box label, #menu summary { font: 500 11px var(--m-font); letter-spacing: 2.5px; color: var(--m-dim); text-transform: uppercase; }
+#menu .menu-box label small { font-weight: 300; letter-spacing: 0.5px; text-transform: none; }
+#menu input, #menu select { background: rgba(255, 255, 255, 0.04); border: 1px solid var(--m-line); border-radius: 2px; color: var(--m-text); font: 300 16px var(--m-font); }
+#menu input:focus, #menu select:focus { border-color: rgba(255, 255, 255, 0.45); }
+#menu .btn { background: transparent; border: 1px solid var(--m-line); border-radius: 2px; color: var(--m-text); font: 500 13px var(--m-font); letter-spacing: 3px; }
+#menu .btn:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.4); }
+#menu .btn.primary { background: var(--m-text); border-color: var(--m-text); color: #0b0e11; }
+#menu .btn.primary:hover { background: #fff; }
+#menu .btn.small { font-size: 11px; letter-spacing: 2px; }
+#menu .sw.animal { background: rgba(255, 255, 255, 0.04); border: 1px solid transparent; font: 400 13px var(--m-font); }
+/* grey until hovered or picked: then in its own colours (the name's is set on it: js/game.ts) */
+#menu .sw.animal:not(.on):not(:hover) span { color: var(--m-dim) !important; }
+#menu .sw.animal img.anim { filter: grayscale(1); opacity: 0.6; transition: filter 0.15s, opacity 0.15s; }
+#menu .sw.animal:hover img.anim, #menu .sw.animal.on img.anim { filter: none; opacity: 1; }
+#menu .sw.animal.on { border-color: var(--m-line); background: rgba(255, 255, 255, 0.08); box-shadow: none; }
+#menu .model-load, #menu .msg, #menu .controls { font-family: var(--m-font); font-weight: 300; }
+#menu .controls b { font-family: var(--m-font); font-weight: 600; }
+#menu .model-load .ml-bar { background: var(--m-line); }
+#menu .model-load .ml-bar i { background: var(--m-text); }
+#menu .settings { border-top-color: var(--m-line); }
+@media (max-width: 760px) { #menu .menu-box { width: 100%; padding: 28px 24px; } #menu .menu-box::before { -webkit-mask-image: none; mask-image: none; } }
