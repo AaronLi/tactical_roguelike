@@ -44,7 +44,7 @@ interface RecipeSpec<M = THREE.Material | null> {
   // the action
   bolt?: number; lever?: boolean; cock?: Partial<CockHandle>; ch?: string; pump?: { f: number; len: number; m?: M; [field: string]: any }; tube?: number; tubeY?: number; saddle?: string | Record<string, any>;
   // the furniture
-  grip?: number; gripT?: string; stock?: StockKind; hg?: HgSpec<M>; hgNom?: number; hgGap?: number; fg?: ForegripKind; fgAt?: number; vfg?: number; vfgM?: M; bipod?: number; slots?: string; under?: boolean;
+  grip?: number; gripT?: string; stock?: StockKind; hg?: HgSpec<M>; hgGap?: number; hgMax?: number; fg?: ForegripKind; fgAt?: number; vfg?: number; vfgM?: M; bipod?: number; slots?: string; under?: boolean;
   tac?: string; tacL?: string; tacAt?: { f: number; y: number; x: number }; railmount?: string | Record<string, any>; railExt?: number;
   // the barrel and what's on it
   barrel?: BarrelSpec; blen?: number; barrels?: number[]; integral?: { len: number; r: number } | null; muzzle?: MuzzleKind; thread?: boolean; match?: boolean; can?: { from: number; r: number }; comp?: boolean; recoilBarrel?: number; bIn?: number;
@@ -129,11 +129,10 @@ const G_GunModels = (() => {
   // ---------------------------------------------------------------- primitive kit
   function kit() {
     const g = new T.Group();
-    let tgt: THREE.Object3D = g, of = 0, oy = 0, slot = 'base', at: string | null = null, rec: THREE.Mesh[] | null = null;
+    let tgt: THREE.Object3D = g, of = 0, oy = 0, slot = 'base', at: string | null = null, rec: THREE.Mesh[] | null = null; // (rec: the meshes made inside moved())
     // what a part provides for the baker (js/gunmodels.ts build(): g.userData.bake): anchors[slot][name] = [forward, up, right] in the gun's
-    // frame (mount_<slot>: where a part of that slot goes; others as info's), stretch[key] = [f0, f1]: the forward planes between which that
-    // part's geometry scales when its length changes (everything behind them stays, everything ahead translates by the change)
-    const bake: { anchors: Record<string, Record<string, number[] | number[][]>>; stretch: Record<string, number[]> } = { anchors: {}, stretch: {} };
+    // frame (mount_<slot>: where a part of that slot goes; others as info's)
+    const bake: { anchors: Record<string, Record<string, number[] | number[][]>> } = { anchors: {} };
     const put = (geo: THREE.BufferGeometry, m: THREE.Material, x: number, y: number, f: number) => { const mesh = new T.Mesh(geo, m); mesh.position.set(x, y - oy, -(f - of)); mesh.userData.slot = slot; if (at) mesh.userData.at = at; tgt.add(mesh); if (rec) rec.push(mesh); return mesh; };
     return {
       g,
@@ -143,7 +142,7 @@ const G_GunModels = (() => {
       under<T>(s: string, fn: () => T): T { const was = slot; slot = s; try { return fn(); } finally { slot = was; } },
       // geometry of this slot's part that is placed by ANOTHER part's anchor, not the part's own mount (userData.at = the anchor's
       // owner: 'barrel' = it stands on the barrel, at the barrel's mount_frontsight): it is baked as a piece of its own, which only
-      // translates (or, for a rib, stretches, info.stretch) with that part
+      // translates with that part (the rest of a part's own geometry, built for its barrel's length, is keyed by the barrel)
       at<T>(a: string, fn: () => T): T { const was = at; at = a; try { return fn(); } finally { at = was; } },
       add(mesh: THREE.Object3D) { mesh.userData.slot = slot; if (at) mesh.userData.at = at; g.add(mesh); if (rec && (mesh as THREE.Mesh).isMesh) rec.push(mesh as THREE.Mesh); return mesh; },
       place(geo: THREE.BufferGeometry, m: THREE.Material, x: number, y: number, f: number) { return put(geo, m, x, y, f); }, // (a shape of your own, on whatever part it's built on: it tips with a hinge, as add doesn't)
@@ -151,35 +150,10 @@ const G_GunModels = (() => {
       get slot() { return slot; },
       bake,
       anchor(owner: string, name: string, v: number[] | number[][]) { (bake.anchors[owner] || (bake.anchors[owner] = {}))[name] = v; },
-      region(key: string, f0: number, f1: number) { bake.stretch[key] = [f0, f1]; },
       // build something, then move all of it by (df forward, dy up): a part drawn for another gun's frame, seated on this one's
       moved<T>(df: number, dy: number, fn: () => T): T {
         const was = rec, ms: THREE.Mesh[] = (rec = []);
         try { return fn(); } finally { rec = was; for (const m of ms) { m.position.y += dy; m.position.z -= df; if (was) was.push(m); } }
-      },
-      // Build something at its nominal length `ref` and stretch it to `len`: everything of it between its two ends is scaled along the bore
-      // from its back end, so the details keep their COUNT (a rail's teeth, a handguard's slots) and a length change is a clean stretch,
-      // geometry between two planes scaling and the ends staying. Returns [back, front] in forward metres: the planes as built at `len`.
-      stretched(ref: number, len: number, fn: () => void): [number, number] {
-        const was = rec, ms: THREE.Mesh[] = (rec = []);
-        try { fn(); } finally { rec = was; }
-        g.updateMatrixWorld(true);
-        const vs = new T.Vector3();
-        let a = Infinity, b = -Infinity;
-        for (const m of ms) { const pa = m.geometry.attributes.position as THREE.BufferAttribute; for (let i = 0; i < pa.count; i++) { vs.fromBufferAttribute(pa, i).applyMatrix4(m.matrixWorld); a = Math.min(a, -vs.z); b = Math.max(b, -vs.z); } }
-        if (len === ref || !(b > a)) return [a, b];
-        const sc = (b - a + len - ref) / (b - a), nv = new T.Vector3();
-        for (const m of ms) {
-          const geo = m.geometry.clone().applyMatrix4(m.matrixWorld), pa = geo.attributes.position as THREE.BufferAttribute, na = geo.attributes.normal as THREE.BufferAttribute | undefined;
-          for (let i = 0; i < pa.count; i++) {
-            pa.setZ(i, -(a + (-pa.getZ(i) - a) * sc));
-            if (na) { nv.fromBufferAttribute(na, i); nv.z /= sc; nv.normalize(); na.setXYZ(i, nv.x, nv.y, nv.z); }
-          }
-          geo.applyMatrix4(new T.Matrix4().copy(m.parent!.matrixWorld).invert()); // (back into its parent's frame: a part's)
-          geo.computeBoundingSphere(); geo.computeBoundingBox();
-          m.geometry = geo; m.position.set(0, 0, 0); m.quaternion.identity(); m.scale.set(1, 1, 1); m.updateMatrix();
-        }
-        return [a, a + (b - a) * sc];
       },
       // animated sub-assembly pivoting at (f, y); parts added after into() use absolute gun coordinates
       part(f: number = 0, y: number = 0) { const p = new T.Group(); p.position.set(0, y, -f); g.add(p); return p; },
@@ -492,14 +466,12 @@ const G_GunModels = (() => {
     // posts where the barrel sits lower), and the brass bead on its front end. You look along the rib; the
     // bead sits on it at the far end, the barrel(s) below.
     bead(k: Kit, fRear: number, fFront: number, sy: number, rib: number[] | null | undefined, barrelTop: number, onBarrel = false): { sy: number; fSight: number; relief: number } {
-      // (onBarrel: the rib and the bead stand on the barrel, userData.at 'barrel'. The rib is a clean stretch with the barrel's length:
-      // its posts spread over [rib start + 10 mm, rib end - 10 mm] in proportion, their lengths too (1 % of that run each), so that run is
-      // its stretch region (info.stretch 'optic@barrel'), the rib's ends and the bead (at the barrel's end) only translate)
+      // (onBarrel: the rib and the bead stand on the barrel, userData.at 'barrel'. The rib is built for the barrel's length (its posts spread
+      // over [rib start + 10 mm, rib end - 10 mm], their lengths 1 % of that run each), so it is keyed by the barrel, as a part of it)
       if (onBarrel && rib) return k.at('barrel', () => {
         const ry = sy - 0.0065, len = rib[1] - rib[0], A = rib[0] + 0.01, D = len - 0.02, gap = ry - 0.0015 - barrelTop;
         k.box(0.007, 0.003, len, M.black(), rib[0], ry);
         if (gap > 0.004) for (let i = 0; i < 5; i++) k.box(0.003, gap, D * 0.01, M.black(), A + D * 0.99 * i / 4, barrelTop + gap / 2);
-        k.region('optic@barrel', A, A + D);
         k.sphere(0.0036, BEAD, fFront, sy - 0.0018);
         return { sy, fSight: fRear, relief: 0.3 };
       });
@@ -989,7 +961,7 @@ const G_GunModels = (() => {
       case 'prism': return S.prism(k, ofs, top, o);
       case 'lpvo': return S.scope(k, ofs, top, 0.24, 0.022, 0.038);
       case 'scope': return S.scope(k, ofs, top, o.scopeLen, o.scopeObj);
-      case 'bead': { if (onBarrel) k.region('optic@barrel', L, front - 0.0116); const sy = Math.max(top, onBarrel ? 0.014 : br) + 0.009; return S.bead(k, 0.02, front - 0.008, sy, [L, front - 0.006], onBarrel ? by + 0.004 : br, onBarrel); } // clear of the receiver's (bevelled) top
+      case 'bead': { const sy = Math.max(top, onBarrel ? 0.014 : br) + 0.009; return S.bead(k, 0.02, front - 0.008, sy, [L, front - 0.006], onBarrel ? by + 0.004 : br, onBarrel); } // clear of the receiver's (bevelled) top
       case 'notch': if ((o.irons || 'ak') === 'ak') return S.irons(k, L * 0.85, frontF, top + 0.02, top, onBarrel ? by : br, 'ak', onBarrel);
       // falls through: a gun whose own sights are an aperture
       default: {
@@ -1533,9 +1505,8 @@ const G_GunModels = (() => {
     }
     if (rcl) k.into(null); // (the handguard, if any, stays put: only the muzzle device rides on with it)
     const bEnd: number = front; // (the barrel's own end, before any muzzle device: where its front sight and a bead stand)
-    // what the barrel provides: where a muzzle device screws on, and (not an integral one: that's the platform's) the stretch of its length
+    // what the barrel provides: where a muzzle device screws on
     k.anchor('barrel', 'mount_muzzle', [bEnd, by, 0]);
-    if (!o.integral && !o.barrels) k.region('barrel', A ? A.rig.tubeFrom : rcv === 'f2' ? L + 0.022 : L - (o.bIn || 0), bEnd);
     let hgLen = 0;
     const hgF = L + (o.hgGap || 0); // (where a handguard starts)
     // a traced breech sleeve carried forward to take a handguard (the Thor's long barrel): the same square section over the barrel's
@@ -1551,19 +1522,16 @@ const G_GunModels = (() => {
     if (A && o.hg && own('handguard')) { k.tag('handguard'); authored(k, A, (e) => e.slot === 'handguard'); hgLen = A.rig.gasRear - hgF; }
     else if (o.hg) {
       k.tag('handguard');
-      const hg = Object.assign({}, o.hg, o.barrels ? { under: true } : {}), hgRef = A ? Math.min(o.hgNom || hg.len, A.rig.gasRear - hgF - 0.003) : o.hgNom || hg.len; // (the FAL's: up to its gas block, whatever the barrel)
-      if (A) hg.len = hgRef; // (hgRef: the part's own length, whatever barrel it's on: a handguard fitted to its barrel is stretched from its nominal one)
-      if (hg.t !== 'stockfore' && !A) hg.len = Math.max(0.06, Math.min(hg.len, (o.integral ? o.integral.len : bl - (o.bIn || 0)) - 0.015 - (o.hgGap || 0)));
+      const hg = Object.assign({}, o.hg, o.barrels ? { under: true } : {}); // (built at its own length: a part's, and one that doesn't fit its barrel isn't offered, js/parts.ts hgRoom)
+      if (A) hg.len = Math.min(hg.len, A.rig.gasRear - hgF - 0.003); // (the FAL's: its handguard ends at its gas block, by design)
       hgLen = hg.len;
-      if (rcv === 'aksu') { hg.len = Math.min(hg.len, 0.134); if (hg.t === 'wood') hg.aksu = true; }
+      if (rcv === 'aksu' && hg.t === 'wood') hg.aksu = true;
       if (hg.t === 'sig') hg.ext = o.railExt || 0;
-      if (tr && tr.parts.some((p: TracePart) => p.on === 'fore') && hg.t === 'wood') { const sc = (hg.len - 0.03) / (tr.foreLen - 0.03), VF = (p: number[]) => { const [f, y] = VT(p); return [f > L + 0.03 ? L + 0.03 + (f - L - 0.03) * sc : f, y]; }; const [, fEnd] = k.stretched(1, 1, () => tracedParts(k, tr, VF, 'fore', Object.assign({}, mats, { fore: hg.m || fm }))); k.region('handguard', L + 0.03, fEnd); } // (the traced forend, stretched or shortened ahead of the action to the wooden hand guard's length)
+      if (tr && tr.parts.some((p: TracePart) => p.on === 'fore') && hg.t === 'wood') { const sc = (hg.len - 0.03) / (tr.foreLen - 0.03), VF = (p: number[]) => { const [f, y] = VT(p); return [f > L + 0.03 ? L + 0.03 + (f - L - 0.03) * sc : f, y]; }; tracedParts(k, tr, VF, 'fore', Object.assign({}, mats, { fore: hg.m || fm })); } // (the traced forend, stretched or shortened ahead of the action to the wooden hand guard's length: a drawing's scale, not the part's)
       else {
-        // built at its own length (so its details are the part's: the count of a rail's teeth, a handguard's slots) and stretched to the length the barrel leaves it
-        const [a, b] = k.stretched(hgRef, hg.len, () => handguard(k, Object.assign({}, hg, { len: hgRef }), hgF, fm, rm));
-        k.region('handguard', a, b);
+        handguard(k, hg, hgF, fm, rm);
         // the G36's sleeve round the barrel with the bayonet lug, in front of its guard when the barrel has room: the barrel's, where the guard ends
-        if (hg.t === 'g36' && bl - hgRef > 0.000945 * 52) { k.tag('barrel'); k.at('handguard', () => { const V = (px: number) => px * 0.000945; k.cyl(V(10), V(27), M.black(), hgF + hgRef + V(25), 0); k.box(0.008, V(18), V(22), M.black(), hgF + hgRef + V(27), V(-11)); }); k.tag('handguard'); }
+        if (hg.t === 'g36' && bl - hg.len > 0.000945 * 52) { k.tag('barrel'); k.at('handguard', () => { const V = (px: number) => px * 0.000945; k.cyl(V(10), V(27), M.black(), hgF + hg.len + V(25), 0); k.box(0.008, V(18), V(22), M.black(), hgF + hg.len + V(27), V(-11)); }); k.tag('handguard'); }
       }
     }
     if (o.tube) {
@@ -2461,14 +2429,12 @@ const G_GunModels = (() => {
     const plat = G.Gunsmith.PLATFORMS[def.id];
     const spec: RecipeSpec = resolveMats(G.Gunsmith.modelSpec(def));
     if (spec.mag && typeof spec.mag === 'object') { spec.mag.rnd = roundDims(def); if (spec.mag.rnd) spec.mag.rnd.cap = def.mag; } // (the cartridges a clear magazine shows, as many as it holds)
-    const hgPart = G.Gunsmith.PARTS[(def.build || G.Gunsmith.defaultBuild(def.id)).handguard];
-    if (spec.hg && hgPart && hgPart.fit && plat.hgLen) spec.hgNom = plat.hgLen; // (a handguard fitted to its barrel's length: js/parts.ts fitModel; the gun's own handguard's length is what it's stretched from)
     const info = (ARCH[plat.arch] || rifle)(k, spec);
     k.tag('base');
     info.anim = info.anim || {};
     if (k.reflex) info.reflex = Object.assign({}, k.reflex); // (a reflex sight's window and a scope's picture-in-picture lens, for the viewmodel: js/glb.ts)
     if (k.pip) { const q = k.pip; info.pip = { f: q.f, y: q.y, r: q.r }; if (q.parent) { info.pip.parent = 'magn'; info.pip.pos = [q.f, q.y, 0]; } }
-    k.g.userData.bake = k.bake; // (what each part provides: anchors and stretch regions, for the baker; not info, whose fields are the contract's)
+    k.g.userData.bake = k.bake; // (what each part provides: anchors, for the baker; not info, whose fields are the contract's)
     return info;
   }
 

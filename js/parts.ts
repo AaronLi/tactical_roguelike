@@ -33,7 +33,7 @@ interface Part { // a part as the catalog holds it
   stype?: string; variant?: boolean; retired?: boolean; becomes: string /* (a receiver kit: the gun it makes) */;
   skin?: string; alt?: boolean; skinName?: string; /* (a skin family: the parts of one mount that are one part in different finishes; skin is the family's root part, alt a member that isn't it, skinName the finish) */
   into?: string; /* (a part merged into another, the same part in the same finish: it's retired, and a saved gun with it gets that one) */
-  fit?: boolean; hgScale?: boolean; /* (a handguard with no rails: it runs the barrel's length, whatever its own; one with rails: its figures follow its length against the gun's own handguard's) */
+  hgScale?: boolean; /* (a handguard of a type that comes in lengths: its figures follow its length against the gun's own handguard's) */
   len?: number; /* (a shared long-gun barrel: its length in inches, what fits is each gun's factory length's 0.6x-1.6x) */
 }
 interface MagFam {
@@ -43,7 +43,7 @@ interface MagFam {
 interface Slot { // a slot on a weapon platform (a nested one also has the parent slot it opens from)
   slot: SlotName; mount: string; req: boolean; bare?: boolean; parent?: string | null; brace?: Record<string, number>;
 }
-interface Platform { id: string; arch: ArchKind; spec: ModelSpec; slots: Slot[]; defaults: Record<string, string>; offset?: Record<string, number>; hgLen?: number; /* (its own handguard's length: what a fitted one is scaled from, what a railed one's figures are against) */ magVariants?: boolean; kg?: number; ergo?: number; barrelModel?: Record<string, any>; /* (its own barrel's shape, what a shared barrel of any length is scaled from) */ }
+interface Platform { id: string; arch: ArchKind; spec: ModelSpec; slots: Slot[]; defaults: Record<string, string>; offset?: Record<string, number>; hgLen?: number; /* (its own handguard's length: what a handguard's figures are against) */ magVariants?: boolean; kg?: number; ergo?: number; barrelModel?: Record<string, any>; /* (its own barrel's shape, what a shared barrel of any length is scaled from) */ }
 type RcvKit = [string, string, number, number, string]; // brand, name, price, tier, description
 const G_Gunsmith = (() => {
   const PARTS: Record<string, Part> = {}, LIST: Part[] = [], PLATFORMS: Record<string, Platform> = {}, BY_MOUNT = new Map<string, Part[]>();
@@ -119,11 +119,34 @@ const G_Gunsmith = (() => {
   const kindOf = (sl: string) => sl.replace(/\d+$/, '');
   const slotRank = (sl: string) => ORDER.indexOf(kindOf(sl)) + (parseInt((sl.match(/\d+$/) || [])[0]!, 10) || 0) * 0.01; // (the display order, each level of a nest after the last)
   // whether part p goes in slot s (its interface, and its kind or the kind the slot takes)
-  const fitsSlot = (s: Slot, p: Part, id: string) => !!(s && p) && (s.mount === p.mount || (p.alsoMounts || []).includes(s.mount)) && (s.slot === p.slot || ALIAS[kindOf(s.slot)] === p.slot) && !(id && p.not && p.not.includes(id)) && fitsLen(p, id); // (p.not: guns on that mount it still doesn't go on)
+  const fitsSlot = (s: Slot, p: Part, id: string, build?: Record<string, string> | false) => !!(s && p) && (s.mount === p.mount || (p.alsoMounts || []).includes(s.mount)) && (s.slot === p.slot || ALIAS[kindOf(s.slot)] === p.slot) && !(id && p.not && p.not.includes(id)) && fitsLen(p, id, build); // (p.not: guns on that mount it still doesn't go on)
   // A shared long-gun barrel (a cartridge's: br:<cartridge>) fits a gun whose factory barrel it's within 0.6x-1.6x the length of
   // (the MCX down to 0.45x: its Rattler barrel)
-  const LEN_LO: Record<string, number> = { mcx: 0.45 };
-  function fitsLen(p: Part, id: string) {
+  const LEN_LO: Record<string, number> = { mcx: 0.45, aks74u: 0.65 }; // (the AKS-74U: no handguard is short enough for less)
+  // A handguard is the length it is, and fits where its barrel leaves it that much: its own length, the gap behind it (hgGap: the Thor's
+  // sleeve) and 15 mm before the muzzle's end, within the barrel's visible length (what's outside the receiver, or an integral can's).
+  // A handguard shorter than 60 mm always fits, and the AKS-74U's takes nothing over its 134 mm. Checked where a build is given (its barrel
+  // is what decides); without one, on the gun's own barrel (false: not at all).
+  const roomCache = new Map<string, number>();
+  function hgRoom(id: string, barrelId?: string | null): number {
+    const plat = PLATFORMS[id], bid = barrelId || plat.defaults.barrel || '', key = id + '|' + bid;
+    let r = roomCache.get(key);
+    if (r === undefined) {
+      const spec: any = modelSpec({ id, build: bid ? { barrel: bid } : {} }), bl = (spec.barrel || {}).len || 0.37;
+      r = Math.max(0.06, (spec.integral ? spec.integral.len : bl - (spec.bIn || 0)) - 0.015 - (spec.hgGap || 0));
+      if (spec.hgMax != null) r = Math.min(r, spec.hgMax);
+      roomCache.set(key, r);
+    }
+    return r;
+  }
+  const hgLenOf = (p: Part): number | null => (p.slot === 'handguard' && p.model && p.model.hg && p.model.hg.len != null ? p.model.hg.len : null);
+  // (and one whose figures hgSt works out, within its range of the gun's own handguard's length: past it they'd stop following the length)
+  const hgFits = (p: Part, id: string, barrelId?: string | null) => {
+    const n = hgLenOf(p), ref = PLATFORMS[id] && PLATFORMS[id].hgLen;
+    return n == null || !PLATFORMS[id] || (n <= hgRoom(id, barrelId) + 1e-6 && !(p.hgScale && ref && (n / ref < HG_K[0] - 1e-9 || n / ref > HG_K[1] + 1e-9)));
+  };
+  function fitsLen(p: Part, id: string, build?: Record<string, string> | false) {
+    if (build !== false && id && !hgFits(p, id, build && build.barrel)) return false;
     if (p.len == null || !id) return true;
     const f = (G.GUN_SPECS[id] || {}).barrel;
     if (!f) return true;
@@ -145,16 +168,16 @@ const G_Gunsmith = (() => {
     }
     return o;
   };
-  // What a railed handguard's length does, from its length against the gun's own handguard's: k = length / that. Nothing at k = 1 (so a
+  // What a handguard's length does, from its length against the gun's own handguard's: k = length / that. Nothing at k = 1 (so a
   // gun's own keeps its figures). Longer: heavier (in proportion), a little less handy, a little steadier (the foregrip sits further out,
   // more of the barrel is held); shorter, the other way. ln k for the handling, as the barrel's curve does.
-  const HG_W = 1.5, HG_ERGO = -4, HG_RECOIL = -5, HG_ACC = -4;
+  const HG_W = 1.5, HG_ERGO = -4, HG_RECOIL = -5, HG_ACC = -4, HG_K = [0.45, 2.2]; // (HG_K: the lengths against the gun's own it takes)
   const hgSt = (st: Record<string, number>, k: number): Record<string, number> => {
     if (k === 1) return st;
-    const kk = Math.min(2.2, Math.max(0.45, k)), u = Math.log(kk), r1 = (v: number) => Math.round(v * 10) / 10;
+    const kk = Math.min(HG_K[1], Math.max(HG_K[0], k)), u = Math.log(kk), r1 = (v: number) => Math.round(v * 10) / 10;
     return Object.assign({}, st, { ergo: r1((st.ergo || 0) + HG_ERGO * u), recoil: r1((st.recoil || 0) + HG_RECOIL * u), acc: r1((st.acc || 0) + HG_ACC * u), weight: Math.round(((st.weight || 0) * (1 + HG_W * (kk - 1))) * 1000) / 1000 });
   };
-  // a part's stats on this gun (a shared barrel's depend on the gun's own length, a railed handguard's on its length against the gun's own)
+  // a part's stats on this gun (a shared barrel's depend on the gun's own length, a handguard's on its length against the gun's own)
   const partSt = (p: Part, id?: string | null): Record<string, number> => {
     if (p.len != null && id && (G.GUN_SPECS[id] || {}).barrel) return lenSt(p.len / G.GUN_SPECS[id].barrel);
     if (p.hgScale && id && PLATFORMS[id]) return hgSt(p.st, p.model!.hg!.len! / (PLATFORMS[id].hgLen || 0.24)); // (a gun with no handguard of its own, the Thor with an AR barrel nut: against a carbine's)
@@ -702,7 +725,7 @@ const G_Gunsmith = (() => {
   // grip, the barrel running back into the tube in front of it each shot (recoilBarrel: how far, js/vmanim.ts)
   P('gm6', 'rifle', { rcv: 'gm6', L: 0.8384, rm: 'black', fm: 'black', grip: 0.386, support: 0.577, optF: 0.36, cheek: 0.176, recoilBarrel: 0.15, mag: { f: 0.239, y: -0.0437 }, cock: { f: 0.32, y: -0.004, x: 0.034, travel: 0.1, style: 'knob', sz: 1.4 } }, { barrel: { len: 0.19, r: 0.0095 }, thread: 'r50', muzzle: 'lynx', grip: ['ar', 'ar'], mag: { t: 'straight', f: 0.239, y: -0.0437, len: 0.136, d: 0.137, w: 0.05 }, noDrum: true, optic: ['pic', { optic: 'scope', scopeLen: 0.36, scopeObj: 0.032 }] });
   P('uzi', 'rifle', { irons: 'ar', rcv: 'box', L: 0.2, H: 0.07, W: 0.045, rm: 'park', grip: 0.07, support: 0.2 }, { barrel: { len: 0.06 }, thread: 'r9', muzzle: 'crown', stock: ['smg', 'wire'], grip: ['smg', 'vertical'], mag: { t: 'straight', f: 0.085, y: -0.14, len: 0.1, d: 0.03, rake: 0 }, optic: ['pic', { optic: 'notch' }] });
-  P('mp5', 'rifle', { irons: 'hk', rcv: 'box', L: 0.26, H: 0.06, W: 0.038, optF: 0.12 }, { barrel: { len: 0.1 }, thread: 'r9', muzzle: 'tri', handguard: ['smg', { t: 'slim', len: 0.13, m: 'polymer' }], stock: ['smg', 'fixed'], grip: ['ar', 'ar'], mag: { t: 'curved', len: 0.15, d: 0.04, c: 0.04, w: 0.022 }, optic: ['pic', { optic: 'irons' }] });
+  P('mp5', 'rifle', { irons: 'hk', rcv: 'box', L: 0.26, H: 0.06, W: 0.038, optF: 0.12 }, { barrel: { len: 0.1 }, thread: 'r9', muzzle: 'tri', handguard: ['smg', { t: 'slim', len: 0.085, m: 'polymer' }], stock: ['smg', 'fixed'], grip: ['ar', 'ar'], mag: { t: 'curved', len: 0.15, d: 0.04, c: 0.04, w: 0.022 }, optic: ['pic', { optic: 'irons' }] });
   P('mp5sd', 'rifle', { irons: 'hk', rcv: 'box', L: 0.26, H: 0.06, W: 0.038, optF: 0.12, support: 0.36 }, { barrel: { len: 0.1 }, integral: { len: 0.2, r: 0.025 }, thread: 'r9', muzzle: 'crown', stock: ['smg', 'fixed'], grip: ['ar', 'ar'], mag: { t: 'curved', len: 0.15, d: 0.04, c: 0.04, w: 0.022 }, optic: ['pic', { optic: 'irons' }] });
   // the KRISS Vector Gen II, traced from a photo (js/gunmodels.ts rifle(), rcv 'vector'): the bore low, the magazine raked back
   // in the foot of the well's leg, the rails on the upper (its factory forend: 'vector', railed)
@@ -724,7 +747,7 @@ const G_Gunsmith = (() => {
   // the 2nd round
   P('ak74', 'rifle', { rcv: 'ak', L: 0.28, rm: 'black', fm: 'polymer' }, { barrel: { len: 0.31 }, thread: 'rak', muzzle: 'brake', handguard: ['ak', { t: 'wood', len: 0.2, m: 'woodRed' }], stock: ['ak', 'skeleton', 'polymer'], grip: ['ak', 'wood'], mag: { t: 'curved', len: 0.21, d: 0.068, c: 0.06, w: 0.026 }, optic: ['pic', { optic: 'notch' }] });
   // the AKS-74U, traced from a photo (js/gunmodels.ts rifle(), rcv 'aksu'): the Krinkov's hinged cover and rear sight, short gas system, booster and side-folding stock
-  P('aks74u', 'rifle', { rcv: 'aksu', L: 0.264, rm: 'black', fm: 'woodRed', optF: 0.17, grip: 0.03, mag: { f: 0.191, y: -0.028 }, magFit: { len: 0.79, c: 1.0, d: 0.066 } }, { barrel: { len: 0.162 }, thread: 'rak', muzzle: 'cutts', handguard: ['ak', { t: 'wood', len: 0.134, m: 'woodRed' }], stock: ['ak', 'skeleton'], grip: ['ak', 'wood'], mag: { t: 'curved', len: 0.21, d: 0.068, c: 0.06, w: 0.026 }, optic: ['pic', { optic: 'notch' }] });
+  P('aks74u', 'rifle', { rcv: 'aksu', hgMax: 0.134, L: 0.264, rm: 'black', fm: 'woodRed', optF: 0.17, grip: 0.03, mag: { f: 0.191, y: -0.028 }, magFit: { len: 0.79, c: 1.0, d: 0.066 } }, { barrel: { len: 0.162 }, thread: 'rak', muzzle: 'cutts', handguard: ['ak', { t: 'wood', len: 0.134, m: 'woodRed' }], stock: ['ak', 'skeleton'], grip: ['ak', 'wood'], mag: { t: 'curved', len: 0.21, d: 0.068, c: 0.06, w: 0.026 }, optic: ['pic', { optic: 'notch' }] });
   P('rpk', 'rifle', { rcv: 'ak', L: 0.3, rm: 'blued', fm: 'wood', bipod: 0.46 }, { barrel: { len: 0.5, taper: 0.9 }, thread: 'rak', muzzle: 'crown', handguard: ['ak', { t: 'wood', len: 0.2 }], stock: ['ak', 'akwood'], grip: ['ak', 'wood'], mag: { t: 'curved', len: 0.23, d: 0.072, c: 0.08, w: 0.028 }, optic: ['pic', { optic: 'notch' }] });
   P('scarl', 'rifle', SCAR_SPEC(), { barrel: { len: 0.185, r: 0.007 }, thread: 'r556', muzzle: 'flash', handguard: ['ar', { t: 'rail', len: 0.22, m: 'tan' }], stock: ['heavy', 'fixed'], grip: ['ar', 'ar'], mag: { t: 'curved', len: 0.19, d: 0.064, c: 0.03 }, optic: ['pic', { optic: 'irons' }] });
   P('m27', 'rifle', { L: 0.22 }, { barrel: { len: 0.4 }, thread: 'r556', muzzle: 'flash', handguard: ['ar', { t: 'rail', len: 0.34 }], fg: 'vertical', stock: ['tube', 'crane'], grip: ['ar', 'ar'], mag: { t: 'curved', len: 0.19, d: 0.064, c: 0.03 }, optic: ['pic', { optic: 'irons' }], charging: 'ar' });
@@ -799,7 +822,7 @@ const G_Gunsmith = (() => {
   const slotLabel = (s: Slot) => (s.slot === 'tac' && s.mount === 'tac' ? 'Tactical (right)' : kindOf(s.slot) === 'buttstock' ? `Stock (on the ${ifaceName(s.mount).replace(/^[A-Z][a-z]/, (c: any) => c.toLowerCase())})` : SLOT_LABEL[kindOf(s.slot)]);
   // where a part goes on this build: a slot it fits, an empty one first (a light with the right rail taken: the left)
   function slotFor(id: string, build: Record<string, string>, p: Part) {
-    const c = slotsOf(id, build).filter((s: Slot) => fitsSlot(s, p, id));
+    const c = slotsOf(id, build).filter((s: Slot) => fitsSlot(s, p, id, build));
     return c.find((s: Slot) => !build[s.slot]) || c[0] || null;
   }
   // the slots the gunsmith (and the gun's own panel) shows: not the magazine, where it's a magazine you carry
@@ -807,6 +830,16 @@ const G_Gunsmith = (() => {
   // what a magazine variant holds
   const magCap = (wid: string, vid: string) => (vid && PARTS[vid] && PARTS[vid].set.cap) || G.WEAPONS[wid].mag;
   // Drop parts whose slot no longer exists (e.g. a laser after swapping to an unrailed handguard).
+  // A handguard that no longer fits its barrel (a shorter one went on) comes off, to wherever the removed parts go (the stash), and the
+  // gun's own takes its place if that fits, else the longest that does (of the gun's own style first). Returns the part, or null if
+  // nothing fits.
+  function hgFallback(id: string, build: Record<string, string>, s: Slot): Part | null {
+    const own = PARTS[PLATFORMS[id].defaults.handguard];
+    if (own && !own.retired && own.mount === s.mount && fitsSlot(s, own, id, build)) return own;
+    const t = own && own.model && own.model.hg && own.model.hg.t;
+    return compatible(s.mount).filter((q: Part) => !q.retired && !q.factory && q.slot === 'handguard' && fitsSlot(s, q, id, build))
+      .sort((a: Part, b: Part) => hgLenOf(b)! - hgLenOf(a)! || (b.model!.hg!.t === t ? 1 : 0) - (a.model!.hg!.t === t ? 1 : 0) || (a.alt ? 1 : 0) - (b.alt ? 1 : 0) || a.idx - b.idx)[0] || null;
+  }
   function prune(id: string, build: Record<string, string>) {
     const removed = [];
     let changed = true;
@@ -815,7 +848,11 @@ const G_Gunsmith = (() => {
       const avail = slotsOf(id, build);
       for (const [sl, pid] of Object.entries(build)) {
         const s = avail.find((a: Slot) => a.slot === sl);
-        if (!s || !PARTS[pid] || (!fitsSlot(s, PARTS[pid], id) && !s.req)) { removed.push(pid); delete build[sl]; changed = true; }
+        if (!s || !PARTS[pid] || (!fitsSlot(s, PARTS[pid], id, build) && !s.req)) { removed.push(pid); delete build[sl]; changed = true; }
+        else if (s.req && sl === 'handguard' && fitsSlot(s, PARTS[pid], id, false) && !fitsSlot(s, PARTS[pid], id, build)) { // (too long for its barrel: the gun's own, or what's longest that fits, in its place)
+          const q = hgFallback(id, build, s);
+          if (q) { removed.push(pid); build[sl] = q.id; changed = true; }
+        }
       }
     }
     return removed;
@@ -838,7 +875,7 @@ const G_Gunsmith = (() => {
     }
     // each part into a free slot it fits, the slots a part opens going to the next (an adapter's stock waits for the adapter)
     for (let i = 0; i < left.length;) {
-      const s = PLATFORMS[id] && slotsOf(id, build).find((a: Slot) => !build[a.slot] && fitsSlot(a, left[i], id));
+      const s = PLATFORMS[id] && slotsOf(id, build).find((a: Slot) => !build[a.slot] && fitsSlot(a, left[i], id, build));
       if (s) { build[s.slot] = left[i].id; left.splice(i, 1); i = 0; } else i++;
     }
     // (what's left doesn't fit: a core part of another gun's stays on, and won't fire till it's changed)
@@ -975,7 +1012,7 @@ const G_Gunsmith = (() => {
     // core parts taken off (a barrel, a grip...): it won't fire until they're back
     d.missing = slotsOf(id, build).filter((sl: Slot) => sl.req && !build[sl.slot]).map((sl: Slot) => sl.slot);
     // ...or a core part made for another gun (a barrel of the wrong calibre, after a receiver swap)
-    d.misfit = slotsOf(id, build).filter((sl: Slot) => sl.req && build[sl.slot] && PARTS[build[sl.slot]] && !fitsSlot(sl, PARTS[build[sl.slot]], id)).map((sl: Slot) => sl.slot);
+    d.misfit = slotsOf(id, build).filter((sl: Slot) => sl.req && build[sl.slot] && PARTS[build[sl.slot]] && !fitsSlot(sl, PARTS[build[sl.slot]], id, false)).map((sl: Slot) => sl.slot);
     d.missing = d.missing.concat(d.misfit);
     d.range = Math.round(base.range * (1 + s.vel * 0.01));
     d.spread = base.spread * clamp(1 + (s.hip + s.acc * 0.35) / 100, 0.3, 2);
@@ -1049,12 +1086,6 @@ const G_Gunsmith = (() => {
     const plat = PLATFORMS[id], B = plat.barrelModel || {}, k = p.len! / (G.GUN_SPECS[id].barrel || p.len!);
     return plat.arch === 'rifle' ? { barrel: Object.assign({}, B, { len: B.len * k }) } : { blen: (B.len || 0.1) * k };
   }
-  // A handguard with no rails on this gun: as long as the gun's own handguard, and longer or shorter as the barrel on it is, against the
-  // gun's factory barrel (the model then keeps it back from the muzzle: js/gunmodels.ts)
-  function fitModel(id: string, p: Part, barrelId?: string): Record<string, any> {
-    const ref = PLATFORMS[id].hgLen, gb = (G.GUN_SPECS[id] || {}).barrel, bp = barrelId ? PARTS[barrelId] : null, bi = bp && barrelOf(bp, id);
-    return { hg: Object.assign({}, p.model!.hg, ref ? { len: ref * (gb && bi ? bi / gb : 1) } : {}) };
-  }
   // The model spec for a build: the platform's receiver spec with every installed part's patch applied.
   function modelSpec(def: any) {
     const plat = PLATFORMS[def.id];
@@ -1062,7 +1093,7 @@ const G_Gunsmith = (() => {
     // (in slot order, by the slot each is in: what's on an adapter goes over the adapter)
     const fitted = Object.entries(def.build || defaultBuild(def.id)).filter(([, p]) => PARTS[p])
       .sort((a, b) => slotRank(a[0]) - slotRank(b[0]));
-    for (const [sl, pid] of fitted) for (let [k, v] of Object.entries(PARTS[pid].len != null ? lenModel(def.id, PARTS[pid]) : PARTS[pid].fit ? fitModel(def.id, PARTS[pid], (def.build || {}).barrel) : PARTS[pid].model || {})) {
+    for (const [sl, pid] of fitted) for (let [k, v] of Object.entries(PARTS[pid].len != null ? lenModel(def.id, PARTS[pid]) : PARTS[pid].model || {})) {
       if (k === 'tac' && sl === 'tacL') k = 'tacL'; // (the left rail's)
       if (k === 'pumpPatch') { spec.pump = Object.assign({}, spec.pump || {}, v); continue; }
       if (v && typeof v === 'object' && !Array.isArray(v) && spec[k] && typeof spec[k] === 'object') spec[k] = Object.assign({}, spec[k], v);
@@ -1145,11 +1176,11 @@ const G_Gunsmith = (() => {
   // (the MCX's and MPX's handguards: their own, flat-topped, the upper's rail running on flush along them; nothing AR fits)
   [['hg.mcx.keymod', 'mcx', 'kestrel', 'Kestrel Gen 1 KeyMod handguard', { t: 'sig', len: 0.28, slots: 'keymod' }, { ergo: 1, weight: 0.2 }, 1],
     ['hg.mcx.lt', 'mcx', 'vantage', 'Vantage LT lightened handguard (FDE)', { t: 'sig', len: 0.28, slots: 'lite', m: 'tan' }, { ergo: 5, weight: 0.1 }, 2],
-    ['hg.mcx.short', 'mcx', 'lynx', 'Lynx Rattler 5" M-LOK handguard', { t: 'sig', len: 0.12 }, { ergo: 6, weight: 0.06 }, 1],
+    ['hg.mcx.short', 'mcx', 'lynx', 'Lynx Rattler 5" M-LOK handguard', { t: 'sig', len: 0.105 }, { ergo: 6, weight: 0.06 }, 1],
     ['hg.mcx.long', 'mcx', 'vantage', 'Vantage 15" M-LOK handguard', { t: 'sig', len: 0.36 }, { ergo: 0, weight: 0.24 }, 2],
-    ['oem.hg.mpx.0', 'mpx', 'kestrel', 'Kestrel 6.5" MPX M-LOK handguard', { t: 'sig', len: 0.17 }, HG_ST.sig, 1],
+    ['oem.hg.mpx.0', 'mpx', 'kestrel', 'Kestrel 5.7" MPX M-LOK handguard', { t: 'sig', len: 0.145 }, HG_ST.sig, 1],
     ['hg.mpx.keymod', 'mpx', 'kestrel', 'Kestrel Gen 1 MPX KeyMod handguard', { t: 'sig', len: 0.17, slots: 'keymod' }, { ergo: 2, weight: 0.18 }, 1],
-    ['hg.mpx.short', 'mpx', 'lynx', 'Lynx MPX-K 4.5" handguard', { t: 'sig', len: 0.1 }, { ergo: 6, weight: 0.05 }, 1],
+    ['hg.mpx.short', 'mpx', 'lynx', 'Lynx MPX-K 3.5" handguard', { t: 'sig', len: 0.09 }, { ergo: 6, weight: 0.05 }, 1],
     ['hg.mpx.long', 'mpx', 'vantage', 'Vantage 10" MPX M-LOK handguard (FDE)', { t: 'sig', len: 0.25, m: 'tan' }, { ergo: 1, weight: 0.22 }, 2]]
     .forEach(([id, fam, b, n, hg, st, tier]: any[]) => add({ id, slot: 'handguard', mount: 'hg:' + fam, brand: BR[b], name: n, price: 300, tier, st, desc: 'Railed: takes a foregrip, and a light or laser each side.', model: { hg }, provides: { fg: 'fg', tac: 'tac', tacL: 'tac' } }));
   Object.assign(PARTS['oem.hg.mpx.0'], { oem: true, price: 120, desc: 'Standard-issue part. Railed: takes a foregrip, and a light or laser each side.' });
@@ -1266,16 +1297,42 @@ const G_Gunsmith = (() => {
   // For any one gun, no two stocks or handguards it takes read the same: parts of one mount that differ in finish alone are one part in
   // different finishes (a skin family: the gunsmith's picker, free to change), the same part twice in one finish is merged (the one a gun
   // comes with stays: the other is retired, `into` it), and the rest differ in what they do:
-  //   - a handguard with no rails (wood, slim, box, fore-end, shroud, fins, carbine): one part for the type on a mount, as long as the
-  //     gun's own handguard is, longer or shorter with the barrel (modelSpec: fitModel);
-  //   - one with rails or M-LOK: a part for each length, its figures from its length against the gun's own handguard's (hgSt).
+  //   - a handguard is a part of a length (nothing stretches it to its barrel: HG_LENS, the lengths each type comes in on a mount, 2-4 of
+  //     them, every gun's own among them); its figures follow its length against the gun's own handguard's (hgSt), so the gun's own keeps
+  //     its, and it fits a barrel that leaves it its length (fitsLen);
+  //   - a stock differs in its type.
   // Their own handguards (the MCX's, MPX's and G36's) already differ in figures; a part's id in a code is its place in the list, so
   // none is removed: a merged part is retired and a saved gun with it gets the one it went into (decode, compile).
+  // (parts added last: a part's id is its place in the list) the lengths the barrels of the shorter guns leave: a short AK rail and M-LOK
+  // (the AKS-74U's, and a short-barrelled AK's), a short AR carbine handguard (the AR-9's short barrels, with a short M-LOK), a long chassis rail for the
+  // classic fore-ends (the Mosin's long barrel), the QBZ-192's and the G36's short ones
+  [['hg.ak.short.rail', 'ak', 'ironvale', 'Ironvale AK short quad rail', { t: 'rail', len: 0.134 }, 1], ['hg.ak.short.mlok', 'ak', 'vantage', 'Vantage AKX short M-LOK', { t: 'mlok', len: 0.134 }, 2],
+    ['hg.classic.long.rail', 'classic', 'ironvale', 'Ironvale long chassis rail fore-end', { t: 'rail', len: 0.36 }, 2], ['hg.qbz.short', 'qbz', 'north', 'Northmark short QBZ handguard', { t: 'qbz', len: 0.12 }, 1],
+    ['hg.ar.short.carbine', 'ar', 'gray', 'Graywater short carbine handguard', { t: 'carbine', len: 0.12 }, 1], ['hg.ar.short.mlok', 'ar', 'vantage', 'Vantage VX-5 M-LOK 5"', { t: 'mlok', len: 0.12 }, 1]]
+    .forEach(([id, fam, b, n, hg, tier]: any[]) => { const rails = railed(hg.t); add({ id, slot: 'handguard', mount: 'hg:' + fam, brand: BR[b], name: n, price: rails ? 320 : 180, tier, st: HG_ST[hg.t], desc: rails ? 'Railed: takes a foregrip, and a light or laser each side.' : 'No rails.', model: { hg }, provides: rails ? { fg: 'fg', tac: 'tac', tacL: 'tac' } : null }); });
+  add({ id: 'hg.g36.risk', slot: 'handguard', mount: 'hg:g36', brand: BR.ironvale, name: 'Ironvale G36K rail handguard', price: 320, tier: 2, st: { ergo: 1, weight: 0.21 }, desc: 'Railed: takes a foregrip, and a light or laser each side.',
+    model: { hg: { t: 'g36', len: 0.215, rails: true } }, provides: { fg: 'fg', tac: 'tac', tacL: 'tac' } });
   for (const plat of Object.values(PLATFORMS)) { const h = plat.defaults.handguard && PARTS[plat.defaults.handguard]; if (h && h.model && h.model.hg && h.model.hg.len) plat.hgLen = h.model.hg.len; }
   {
     const PLAIN_HG = new Set(['wood', 'slim', 'box', 'stockfore', 'shroud', 'fins', 'carbine']), SCALED_HG = new Set(['rail', 'mlok', 'qbz']);
+    // the lengths (metres) each rail-less type comes in on a mount: the old catalogue's, those within 15 mm of each other one, and every gun's own
+    const HG_LENS: Record<string, Record<string, number[]>> = {
+      'hg:ak': { wood: [0.134, 0.2, 0.22, 0.25] },
+      'hg:box': { slim: [0.16], box: [0.15, 0.2, 0.24, 0.28], wood: [0.22] },
+      'hg:smg': { slim: [0.085] },
+      'hg:ar': { carbine: [0.12, 0.17] },
+      'hg:classic': { stockfore: [0.36, 0.4, 0.48, 0.62], wood: [0.12, 0.18, 0.22, 0.24] },
+      'hg:shroud': { slim: [0.18], shroud: [0.22, 0.25], fins: [0.12, 0.14] },
+    };
     const FINISH: Record<string, string> = { f: 'Factory finish', tan: 'FDE', polymer: 'Polymer', woodRed: 'Laminate', woodDark: 'Walnut', wood: 'Wood', park: 'Parkerized', black: 'Black', blued: 'Blued', od: 'OD' };
-    const hgKey = (p: Part) => { const t = p.model!.hg!.t!; return PLAIN_HG.has(t) ? `${t}` : SCALED_HG.has(t) ? `${t}:${p.model!.hg!.len}` : null; };
+    for (const p of LIST) { // (a rail-less handguard in the nearest length its type comes in on its mount: the old ones' that are no gun's own, to one of those)
+      const t = p.slot === 'handguard' && !p.retired && p.model && p.model.hg && p.model.hg.t;
+      if (!t || !PLAIN_HG.has(t)) continue;
+      const lens = (HG_LENS[p.mount] || {})[t];
+      if (!lens) throw new Error(`no designed lengths for ${t} handguards on ${p.mount}`);
+      p.model!.hg!.len = lens.reduce((best, l) => (Math.abs(l - p.model!.hg!.len!) < Math.abs(best - p.model!.hg!.len!) - 1e-9 ? l : best), lens[0]);
+    }
+    const hgKey = (p: Part) => { const h = p.model!.hg!, t = h.t!; return PLAIN_HG.has(t) || SCALED_HG.has(t) ? `${t}:${h.len}` : null; };
     const merge = (slot: string, keyOf: (p: Part) => string | null, finOf: (p: Part) => string) => {
       for (const mount of [...BY_MOUNT.keys()]) {
         const groups = new Map<string, Part[]>();
@@ -1307,9 +1364,9 @@ const G_Gunsmith = (() => {
     for (const p of LIST) {
       if (p.slot !== 'handguard' || p.retired || !p.model || !p.model.hg) continue;
       const t = p.model.hg.t!;
-      if (PLAIN_HG.has(t)) { // (no rails: named for what it is, for it has no length of its own)
-        p.fit = true; p.desc = 'No rails. Fitted to the barrel: it runs as far as the barrel does, longer or shorter with it.';
-        const base = `${p.brand.split(' ')[0]} ${NAMES.handguard[t] || 'handguard'}`;
+      if (PLAIN_HG.has(t)) { // (no rails: named for what it is and its length)
+        p.desc = 'No rails.'; p.hgScale = true;
+        const base = `${p.brand.split(' ')[0]} ${(p.model.hg.len! * 39.37).toFixed(1)}" ${NAMES.handguard[t] || 'handguard'}`;
         p.name = p.alt ? `${base} (${p.skinName})` : base;
       } else if (SCALED_HG.has(t)) p.hgScale = true;
     }
@@ -1323,7 +1380,9 @@ const G_Gunsmith = (() => {
   }
   const fits = (mount: string) => FITS.get(mount) || [];
   // every weapon a part fits, through any interface it takes (a 9 mm can on a ½-28 .22)
-  const fitsPart = (p: Part) => [...new Set([p.mount, ...(p.alsoMounts || [])].flatMap((m) => fits(m)))].filter((id) => !(p.not || []).includes(id) && fitsLen(p, id));
+  // (a handguard fits a gun that has a barrel for it)
+  const hgFitsAny = (p: Part, id: string) => { const b = PLATFORMS[id].slots.find((sl: Slot) => sl.slot === 'barrel'); return hgFits(p, id, PLATFORMS[id].defaults.barrel) || (!!b && (BY_MOUNT.get(b.mount) || []).some((q: Part) => !q.retired && q.slot === 'barrel' && !(q.not || []).includes(id) && fitsLen(q, id, false) && hgFits(p, id, q.id))); };
+  const fitsPart = (p: Part) => [...new Set([p.mount, ...(p.alsoMounts || [])].flatMap((m) => fits(m)))].filter((id) => !(p.not || []).includes(id) && fitsLen(p, id, false) && (hgLenOf(p) == null || hgFitsAny(p, id)));
 
   // ------------------------------------------------------------------ the gunsmith's stock this visit
   // Six parts at a time (on pedestals in the hangar), the same for the whole squad. Parts that fit more weapons turn up more often;
@@ -1372,7 +1431,7 @@ const G_Gunsmith = (() => {
     const out: Part[] = [];
     for (const s of slotsOf(id, build)) {
       if (!ATTACH_SLOTS.has(kindOf(s.slot))) continue;
-      for (const p of compatible(s.mount)) if (!p.factory && !p.retired && !p.variant && !p.becomes && !plainHere(p, id) && p.id !== build[s.slot] && fitsSlot(s, p, id) && !out.includes(p)) out.push(p);
+      for (const p of compatible(s.mount)) if (!p.factory && !p.retired && !p.variant && !p.becomes && !plainHere(p, id) && p.id !== build[s.slot] && fitsSlot(s, p, id, build) && !out.includes(p)) out.push(p);
     }
     return out;
   }

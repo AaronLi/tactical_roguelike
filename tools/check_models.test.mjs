@@ -38,8 +38,7 @@ expect('anchor of an unknown kind', barrel({ bogus: [0, 0, 0] }), /not an anchor
 expect('mount of an unknown slot', barrel({ mount_nowhere: [0, 0, 0] }), /"nowhere" is not a slot/);
 expect('anchor with a bad shape', barrel({ muzzles: [[1, 2]] }), /muzzles\[0\]: expected 3 numbers/);
 expect('two roots', { roots: [gun([]).roots[0], gun([]).roots[0]] }, /2 root nodes/);
-expect('stretch anchor ok', barrel({ stretch_handguard: [0.05, 0, 0] }), null);
-expect('stretch anchor of an unknown slot', barrel({ stretch_nowhere: [0.05, 0, 0] }), /"nowhere" is not a slot/);
+expect('there is no stretch anchor (a part is modelled at its own size)', barrel({ stretch_handguard: [0.05, 0, 0] }), /not an anchor a part can provide/);
 expect('the slots a loaded build needs are known', gun([B(), mesh('tac_2', 'tac'), mesh('tacL_3', 'tacL'), mesh('magnifier_4', 'magnifier'), mesh('railmount_5', 'railmount')]), null);
 
 // ---- per-part packs
@@ -62,10 +61,9 @@ expectPack('node that is neither part_ nor group_', packRoot([pnode('hinge', [bm
 expectPack('a mesh inside a node of another slot', packRoot([pnode('group_barrel_1', [bm('grip_1', 'grip')])]), /expected "barrel"/);
 expectPack('owner must be a boolean', packRoot([pnode('group_barrel_1', [bm()], { owner: 'yes' })]), /extras\.owner must be true\/false/);
 expectPack('anchors do not belong in a pack', packRoot([pnode('group_barrel_1', [bm()], { anchors: {} })]), /a pack carries no extras\.anchors/);
-expectPack('stretch needs from, to, gain', { roots: [{ ...packRoot([bm()]).roots[0], extras: { pack: { platform: 'x', tag: 'barrel', key: {}, stretch: { from: 0.1 } } } }] }, /stretch\.to: missing/);
 expectPack('unknown material', packRoot([bm('barrel_1', 'barrel', 'foo')]), /material 'foo' is not in the catalogue/);
 // the platform index
-const ix = () => ({ version: 1, platform: 'x', src: 'abc', slots: ['barrel', 'handguard'], tags: { barrel: { dep: ['barrel'], packs: [{ key: ['b1'], file: 'barrel/b1.glb' }] }, handguard: { dep: ['barrel', 'handguard'], packs: [{ key: ['*', 'h1'], file: null, stretch: { from: 0.1, to: 0.3, gain: 1 } }] } },
+const ix = () => ({ version: 1, platform: 'x', src: 'abc', slots: ['barrel', 'handguard'], tags: { barrel: { dep: ['barrel'], packs: [{ key: ['b1'], file: 'barrel/b1.glb' }] }, handguard: { dep: ['barrel', 'handguard'], packs: [{ key: ['*', 'h1'], file: null }] } },
   anchors: { 'barrel=b2': { mount_muzzle: [0.05, 0, 0] } }, bases: [0, 1, 2].map(() => ({ build: { barrel: 'b1' }, info: { sy: 0.07 } })), deltas: { 'barrel=b2': [{ sy: 0.001 }, null, null] }, exact: {} });
 const expectIx = (label, mut, re) => {
   const o = ix(); mut(o); const r = M.validatePartsIndex(o), all = r.errors.join('\n'), ok = re === null ? r.errors.length === 0 : re.test(all);
@@ -76,7 +74,7 @@ expectIx('a missing field', (o) => { delete o.anchors; }, /index\.anchors: missi
 expectIx('an unknown field', (o) => { o.extra = 1; }, /index\.extra: unknown field/);
 expectIx('a key that does not line up with dep', (o) => { o.tags.barrel.packs[0].key = ['b1', 'h1']; }, /key has 2 parts for 1 dep slots/);
 expectIx('a tag that is not a slot', (o) => { o.tags.nowhere = { dep: [], packs: [] }; }, /index\.tags\.nowhere: not a slot/);
-expectIx('a stretch without gain', (o) => { delete o.tags.handguard.packs[0].stretch.gain; }, /stretch\.gain: missing/);
+expectIx('a stretch (there is none: a part is modelled at its own size)', (o) => { o.tags.handguard.packs[0].stretch = { from: 0.1, to: 0.3, gain: 1 }; }, /stretch: unknown field/);
 expectIx('an anchor with two numbers', (o) => { o.anchors['barrel=b2'].mount_muzzle = [1, 2]; }, /expected 3 numbers/);
 expectIx('three reference builds', (o) => { o.bases.pop(); }, /expected the three reference builds/);
 // the info as leaves, and the planner
@@ -88,6 +86,6 @@ for (const v of [{ sy: 0.07, muzzles: [[0.5, 0, 0], [0.5, 0, 0.01]], chamberAt: 
 const plan = M.planBuild(ix(), { barrel: 'b2', handguard: 'h1' });
 const wantMiss = M.planBuild(ix(), { barrel: 'b1', handguard: 'h9' }).missing;
 const plan2 = M.planBuild(ix(), { barrel: 'b1', handguard: 'h1' });
-if (/^barrel/.test(plan.missing || '') && Math.abs(plan.info.sy - 0.071) < 1e-12 && plan2.missing === null && plan2.tags.length === 2 && plan2.tags[1].entry === null && plan2.tags[1].stretch === 0) console.log('ok   planBuild picks packs, applies the info deltas, reports what no pack covers'); else { bad++; console.error('FAIL planBuild: ' + JSON.stringify(plan)); }
+if (/^barrel/.test(plan.missing || '') && Math.abs(plan.info.sy - 0.071) < 1e-12 && plan2.missing === null && plan2.tags.length === 2 && plan2.tags[1].entry === null) console.log('ok   planBuild picks packs, applies the info deltas, reports what no pack covers'); else { bad++; console.error('FAIL planBuild: ' + JSON.stringify(plan)); }
 if (/handguard/.test(wantMiss || '')) console.log('ok   planBuild names the tag no pack covers'); else { bad++; console.error('FAIL planBuild missing: ' + wantMiss); }
 process.exit(bad ? 1 : 0);
