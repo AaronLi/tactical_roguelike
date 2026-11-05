@@ -83,13 +83,14 @@ for s in (-1, 1):
 o = K.obj(prism(circles_hull(BORES, RB + 3.6 * mm, 24), 'y', BP1 - 0.004, BP1 - 0.0028), 'base', 'brass'); smooth(o)   # the contact plate
 # the hinge (fixed): two outer knuckles under the fixed chassis's front (the forend's centre knuckle between them), the pin, flush caps
 KN_R = 7 * mm
+KN_IN, KN_OUT = 6 * mm, 17 * mm                                   # the forend's narrow centre knuckle is +-KN_IN; the chassis's two outside it
 for s in (-1, 1):
-    kn = K.tmp(prism([(CH1 - 0.030, -0.050), (HINGE[0], -0.050), (HINGE[0], HINGE[1] - KN_R), (CH1 - 0.022, HINGE[1] - KN_R + 1 * mm)], 'x', s * 11 * mm, s * 25 * mm))
-    boolean(kn, cyl(KN_R, s * 11 * mm, s * 25 * mm, 'x', HINGE, 28), 'UNION')
+    kn = K.tmp(prism([(CH1 - 0.030, -0.050), (HINGE[0], -0.050), (HINGE[0], HINGE[1] - KN_R), (CH1 - 0.022, HINGE[1] - KN_R + 1 * mm)], 'x', s * (KN_IN + 0.4 * mm), s * KN_OUT))
+    boolean(kn, cyl(KN_R, s * (KN_IN + 0.4 * mm), s * KN_OUT, 'x', HINGE, 28), 'UNION')
     bevel(kn, 1 * mm, 2, 30); cut(kn, cyl(3 * mm, -0.03, 0.03, 'x', HINGE, 18))
     smooth(kn); K.adopt(kn, 'base', TI)
-    o = K.obj(cyl(4.2 * mm, s * 24.4 * mm, s * 25.3 * mm, 'x', HINGE, 20), 'base', 'steel'); smooth(o)      # the pin's flush cap
-o = K.obj(cyl(3 * mm, -24.5 * mm, 24.5 * mm, 'x', HINGE, 16), 'base', 'steel'); smooth(o)                   # the pin
+    o = K.obj(cyl(4.2 * mm, s * (KN_OUT - 0.6 * mm), s * (KN_OUT + 0.3 * mm), 'x', HINGE, 20), 'base', 'steel'); smooth(o)      # the pin's flush cap
+o = K.obj(cyl(3 * mm, -KN_OUT + 0.5 * mm, KN_OUT - 0.5 * mm, 'x', HINGE, 16), 'base', 'steel'); smooth(o)                   # the pin
 # the FIXED CHASSIS (base, titanium): from the panel's front to the hinge, under and beside the barrels' rear (the block's breech end
 # lies in it); its floor carries the hinge's outer knuckles
 ch = K.tmp(prism([(BP1 - 0.004, -0.054), (CH1 - 0.006, -0.054), (CH1, -0.048), (CH1, 0.002), (CH1 - 0.008, 0.006), (BP1 - 0.004, 0.006)], 'x', -27 * mm, 27 * mm))
@@ -185,8 +186,8 @@ pbrk = K.part('brk', (0, HINGE[0], HINGE[1]))
 # to the barrels' height, run along beside them (a rail on each's outside), and descend at the front to the ROD HOUSING: a cross member
 # under the barrels that carries the muzzle device's guide rods (and a short rail under it for a foregrip)
 ROD_X, ROD_U, ROD_R, ROD0 = 16 * mm, -0.0445, 4 * mm, HG1 - 0.150
-AX0, AX1, AW = 23 * mm, 29.5 * mm, 0.022                          # the arms' inner and outer faces; their depth on the run
-RUN_U = -0.006                                                    # the run's centre height (the barrels' axis, nearly)
+AX0, AX1, AW = 19 * mm, 25 * mm, 0.014                            # the arms' inner and outer faces; their depth on the run
+RUN_U = -0.026                                                    # the run's centre height: beside the single lower barrel, under the corner ones
 HS0 = HG1 - 0.072                                                 # the rod housing's rear (long enough under it for a vertical grip)
 FLOOR = ROD_U - 0.008                                             # its underside
 TAC0, TAC1, FG0, FG1 = CH1 + 0.060, HS0 - 0.040, HS0 + 0.004, HG1 - 0.004      # the arms' rails; the housing's rail
@@ -204,7 +205,7 @@ def band(path, w):
         k = 1.0 / max(0.3, nx * nrm[0][0] + ny * nrm[0][1])            # (the mitre's lengthening)
         L.append((p[0] + nx * w / 2 * k, p[1] + ny * w / 2 * k)); R.append((p[0] - nx * w / 2 * k, p[1] - ny * w / 2 * k))
     return L + list(reversed(R))
-ARM = [(CH1 + 0.006, HINGE[1] - 0.002), (CH1 + 0.042, RUN_U), (HS0 - 0.022, RUN_U), (HS0 + 0.006, ROD_U), (HG1, ROD_U)]
+ARM = [(CH1 + 0.040, RUN_U), (HS0 - 0.022, RUN_U), (HS0 + 0.006, ROD_U), (HG1, ROD_U)]       # (the run and the front drop: the leg is below)
 _run0, _run1 = CH1 + 0.042 + 0.012, HS0 - 0.022 - 0.012
 MLOK = [(_run0 + _run1) / 2 + k * 0.040 for k in range(-3, 4) if abs(k * 0.040) + 0.016 <= (_run1 - _run0) / 2]   # (centred, 40 mm apart)
 TAC0, TAC1 = MLOK[0] - 0.016, MLOK[-1] + 0.016
@@ -214,15 +215,28 @@ for s_ in (-1, 1):
     for f in MLOK:   # M-LOK slots through the run (32 x 7 mm, 40 mm apart): a light or a laser bolts on
         cut(a, prism(rounded(f, RUN_U, 0.016, 0.0035, 1.2 * mm, 2), 'x', s_ * (AX0 - 0.001), s_ * (AX1 + 0.001)))
     smooth(a); K.adopt(a, 'handguard', TI, pbrk)
-# the hinge base: the centre knuckle (between the chassis's two), and a cross plate to both arms' feet
-hb = K.tmp(prism([(CH1 - 0.004, -0.058), (CH1 + 0.030, -0.058), (CH1 + 0.030, -0.072), (CH1 - 0.004, -0.072)], 'x', -AX1, AX1))
-boolean(hb, cyl(KN_R, -10.6 * mm, 10.6 * mm, 'x', HINGE, 28), 'UNION')
-bevel(hb, 1.5 * mm, 2, 30)
-cut(hb, box(-25.5 * mm, -10.6 * mm, CH1 - 0.012, CH1 + 0.010, HINGE[1] - KN_R - 1 * mm, -0.050))   # (room for the outer knuckles)
-cut(hb, box(10.6 * mm, 25.5 * mm, CH1 - 0.012, CH1 + 0.010, HINGE[1] - KN_R - 1 * mm, -0.050))
-cut(hb, cyl(3.1 * mm, -0.03, 0.03, 'x', HINGE, 18))
-cut(hb, prism(rounded(CH1 + 0.017, -0.065, 0.008, 0.0035, 2 * mm, 2), 'x', -0.012, 0.012))
+def loft_box(ca, sa, cb, sb):
+    # a straight member from the rectangle centred ca = (right, forward, up) sized sa = (width, height) to the one at cb sized sb
+    import bmesh as _bm
+    bm = _bm.new()
+    def ring(c, sz):
+        w, h = sz[0] / 2, sz[1] / 2
+        return [bm.verts.new((c[0] + dx, c[1], c[2] + dz)) for dx, dz in ((-w, -h), (w, -h), (w, h), (-w, h))]
+    A, B = ring(ca, sa), ring(cb, sb)
+    bm.faces.new(A); bm.faces.new(list(reversed(B)))
+    for i in range(4): bm.faces.new((A[i], A[(i + 1) % 4], B[(i + 1) % 4], B[i]))
+    _bm.ops.recalc_face_normals(bm, faces=bm.faces)
+    me = bpy.data.meshes.new('tmp'); bm.to_mesh(me); bm.free(); return me
+# the hinge: the forend's NARROW centre knuckle (+-6 mm, between the chassis's two), a boss behind it, and each arm's rear LEG flaring
+# from the knuckle out and up to its run
+hb = K.tmp(cyl(KN_R, -KN_IN, KN_IN, 'x', HINGE, 28))
+boolean(hb, box(-KN_IN, KN_IN, HINGE[0], CH1 + 0.016, HINGE[1] - KN_R, HINGE[1] + 0.008), 'UNION')
+bevel(hb, 1 * mm, 2, 30); cut(hb, cyl(3.1 * mm, -0.03, 0.03, 'x', HINGE, 18))
 smooth(hb); K.adopt(hb, 'handguard', TI, pbrk)
+for s_ in (-1, 1):
+    lg = K.tmp(loft_box((s_ * (KN_IN - 1.5 * mm), CH1 + 0.010, HINGE[1] + 0.001), (5 * mm, 11 * mm),
+                        (s_ * (AX0 + AX1) / 2, CH1 + 0.046, RUN_U), (AX1 - AX0, AW)))
+    bevel(lg, 1.2 * mm, 2, 30); smooth(lg); K.adopt(lg, 'handguard', TI, pbrk)
 # the rod housing: a cross member under the barrels between the arms' feet, bored for the two guide rods, a pocket between them
 hs = K.tmp(prism([(HS0, FLOOR), (HG1, FLOOR), (HG1, LOW - 2 * mm), (HS0, LOW - 2 * mm)], 'x', -AX1, AX1))
 bevel(hs, 1.5 * mm, 2, 30)
@@ -273,7 +287,7 @@ for ua, ub in ((BLO, BLO + BFL), (BHI - BFL, BHI)):
 # barrels), Warren trusses laid out in their sloped planes
 XB, UB, XT, UT = BX - 1 * mm, BHI, AX0 + 2 * mm, WU + 0.001      # (the slope's foot and head, in (right, up))
 Ls = math.hypot(XT - XB, UT - UB); dx, du = (XT - XB) / Ls, (UT - UB) / Ls
-out_w, holes_w = warren(CH1 + 0.040, HS0 - 0.012, 0.0, Ls, chord=TW)
+out_w, holes_w = warren(CH1 + 0.050, HS0 - 0.016, 0.0, Ls, chord=2.5 * mm)
 for s_ in (-1, 1):
     wb = K.tmp(prism(out_w, 'x', 0.0, 3.5 * mm)); bevel(wb, 0.8 * mm, 1, 30)          # built flat: x = thickness, y = forward, z = up the slope
     for h in holes_w:
@@ -343,7 +357,7 @@ smooth(bb); K.adopt(bb, 'mag', TI, pm)
 for x, z in BORES:   # the firing contacts on its rear face
     o = K.obj(cyl(3.5 * mm, BR0 - 0.0008, BR0 + 0.001, 'y', (x, z), 12), 'mag', 'brass', pm)
 o = K.obj(cyl(3.5 * mm, -29 * mm, 29 * mm, 'x', (BR0 + 0.020, -0.004), 16), 'mag', 'steel', pm); smooth(o)   # the cradle pins
-for f0, rim in ((0.352, 1.2 * mm), (BR1 - 0.024, 1.2 * mm)):   # clamp plates: titanium, pocketed; the front one a slim band (the struts pass it)
+for f0, rim in ((BR1 - 0.024, 1.2 * mm), ):   # clamp plates: titanium, pocketed; the front one a slim band (the struts pass it)
     cp = K.tmp(prism(circles_hull(BORES, RB + rim, 16), 'y', f0, f0 + 0.012))
     bevel(cp, 1.2 * mm, 2, 30)
     for x, z in BORES: cut(cp, cyl(RB + 0.05 * mm, f0 - 0.01, f0 + 0.022, 'y', (x, z), 16))
