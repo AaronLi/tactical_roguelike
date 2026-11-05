@@ -70,7 +70,7 @@ smooth(ep); K.adopt(ep, 'optic', 'black')
 EC_L = C.get('eyecup', 0.008)
 ec = K.tmp(lathe([(F0 - 0.001, RE - 1 * mm), (F0 - EC_L, RE), (F0 - EC_L, LENS_E + 1.2 * mm), (F0 - 0.001, LENS_E + 1.2 * mm)], 32, (0, 0, SY)))
 smooth(ec); K.adopt(ec, 'optic', 'rubber')
-PIP_F = F0 - 0.0015
+PIP_F = F0 - 0.0015                                       # the eye lens' centre (a 1 mm slab); optic.pip.f sits 0.5 mm behind its rear face (PIP_F - 0.001), clear of the glass
 o = K.obj(cyl(LENS_E, PIP_F - 0.0005, PIP_F + 0.0005, 'y', (0, SY), 24), 'optic', 'lens'); smooth(o)
 
 # ---- turrets: elevation on top, windage on the right (capped), the illumination dial on the left (ribbed) ----
@@ -91,7 +91,7 @@ o = K.obj(cyl(1.4 * mm, -HW - 0.0062, -HW - 0.0058, 'x', (TF + C.get('dial_df', 
 # ---- model.json: the optic block (sy, fSight at the eyecup, relief, the pip lens) and what it replaces ----
 cfg = {'source': 'authored', 'kind': 'part', 'slot': 'optic', 'frame': 'rail-top',
        'optic': {'sy': round(SY, 4), 'fSight': round(F0 - EC_L, 4), 'relief': C.get('relief', 0.07),
-                 'pip': {'f': round(PIP_F, 4), 'y': round(SY, 4), 'r': round(LENS_E, 4)}, 'magnifier': False, 'height': 'high' if RISER else 'mid'},
+                 'pip': {'f': round(PIP_F - 0.001, 4), 'y': round(SY, 4), 'r': round(LENS_E, 4)}, 'magnifier': False, 'height': 'high' if RISER else 'mid'},
        'replaces': C['replaces']}
 if EXPORT:
     with open(os.path.join(HERE, 'model.json'), 'w') as fh: fh.write(json.dumps(cfg, indent=2, ensure_ascii=False) + '\n')
