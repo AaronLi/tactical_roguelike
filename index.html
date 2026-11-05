@@ -35,6 +35,7 @@
       <input id="hlFile" type="file" accept=".zip,application/zip" hidden>
       <div class="hl-prog hidden"><i id="hlBar"></i></div><div id="hlMsg" class="hl-msg"></div>
     </div>
+    <div id="modelLoad" class="model-load" title="The game's gun models download while you set up"><div class="ml-bar"><i id="modelBar"></i></div><span id="modelTxt"></span> <button id="modelRetry" class="btn small hidden">Retry</button></div>
     <div id="menuMsg" class="msg"></div>
 
     <details class="settings">
@@ -202,6 +203,8 @@
 <div id="clickToPlay" class="hidden">Click to engage</div>
 <div id="veil"><svg class="veil-shape" viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M0 15.6C33 10.4 66 5.2 100 0L100 84.4C66 89.6 33 94.8 0 100Z"/></svg><div class="veil-load"><div class="veil-row"><i class="veil-spin"></i><b>Loading</b></div><div id="veilStatus"></div></div></div>
 
+<!-- the model bundle starts downloading first thing, before three.js and the rest are even fetched (docs/models.md "Bundles") -->
+<script src="dist/js/modelbundles.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <!-- the gun models are baked glTF (docs/models.md): three's GLTFLoader and the meshopt decoder as one classic script on this global THREE (tools/build_gltf_classic.mjs) -->
@@ -234,7 +237,6 @@
 <script src="dist/js/bolts.js"></script>
 <script src="dist/js/gunmaterials.js"></script>
 <script src="dist/js/gunmodels.js"></script>
-<script src="dist/js/modelbundles.js"></script>
 <script src="dist/js/glb.js"></script>
 <script src="dist/js/gunrig.js"></script>
 <script src="dist/js/viewmodel.js"></script>

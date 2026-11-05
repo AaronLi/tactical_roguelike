@@ -936,32 +936,19 @@ interface BakedIndex { version: number; three: string; src: string; guns: Record
     return p;
   };
   const packUrl = (id: string, file: string) => PARTS_BASE + (file.startsWith(SHARED_DIR) ? '' : id + '/') + file; // (a shared pack is one file for every platform)
-  // ---- the load queue: what is needed now jumps what is only wanted soon, which jumps the background ----
-  // Priorities: 0 = needed now (a gun on screen, the squad's kits), 1 = wanted soon (the level's enemy pool, the gunsmith's platform), 2 = background
-  // (the hangar's warm-everything). Up to FG_MAX packs load at once, but the background only ever has BG_MAX in flight, only starts one when nothing
-  // more urgent is waiting, yields to the browser between files, and stops while paused (a level loading: pauseBackground).
+  // ---- the parse queue: what is needed now jumps what is only wanted soon ----
+  // Every file is already in memory (the one model bundle, js/modelbundles.ts), so nothing here waits on the network: the queue only schedules glTF PARSING,
+  // which is main-thread work. Priorities: 0 = needed now (a gun on screen, the squad's kits), 1 = wanted soon (the level's enemy pool, the gunsmith's
+  // platform). At most PARSE_MAX packs are in flight at once.
   type Job = { url: string; pri: number; start: () => Promise<boolean>; done: Promise<boolean>; resolve: (ok: boolean) => void; started: boolean };
-  const FG_MAX = 8, BG_MAX = 4;
+  const PARSE_MAX = 8;
   const jobs = new Map<string, Job>(), queue: Job[] = [];
-  let fgRunning = 0, bgRunning = 0, bgPaused = 0, pumping = false;
-  const yieldIdle = (): Promise<void> => new Promise((r) => { const ric = (globalThis as any).requestIdleCallback; if (ric) ric(() => r(), { timeout: 150 }); else setTimeout(r, 0); });
-  /** The background queue stops (n > 0 pauses; each pause is matched by a resume) while something more important loads. */
-  function pauseBackground(on: boolean) { bgPaused = Math.max(0, bgPaused + (on ? 1 : -1)); if (!bgPaused) pump(); }
-  /** Whether the connection asks for no extras (data saver, or 2g): the preload-everything is skipped then. */
-  const slowConnection = (): boolean => { const c = (globalThis as any).navigator && (globalThis as any).navigator.connection; return !!c && (!!c.saveData || /(^|-)2g$/.test(c.effectiveType || '')); };
+  let running = 0, pumping = false;
   function pump() {
     if (pumping) return; pumping = true;
     try {
       queue.sort((a, b) => a.pri - b.pri); // (stable: the order asked within a priority)
-      while (queue.length) {
-        const j = queue[0];
-        if (j.pri < 2) { if (fgRunning >= FG_MAX) break; queue.shift(); fgRunning++; run(j, () => { fgRunning--; pump(); }); }
-        else {
-          if (bgPaused || bgRunning >= BG_MAX || fgRunning > 0) break; // (the background waits for everything more urgent to finish)
-          queue.shift(); bgRunning++;
-          yieldIdle().then(() => run(j, () => { bgRunning--; pump(); }));
-        }
-      }
+      while (queue.length && running < PARSE_MAX) { const j = queue.shift()!; running++; run(j, () => { running--; pump(); }); }
     } finally { pumping = false; }
   }
   function run(j: Job, after: () => void) { j.started = true; j.start().then((ok) => { jobs.delete(j.url); j.resolve(ok); after(); }); }
@@ -1140,18 +1127,8 @@ interface BakedIndex { version: number; three: string; src: string; guns: Record
     const plan = planBuild(ix, buildOf(def)); // (every valid build has a plan: an inexact one is plan.approx, shown as it is)
     return plan.tags.every((t) => !t.entry || packRoots.has(packUrl(def.id, t.entry.file!)));
   }
-  /** Loads every platform's packs in the background (the hangar: all the guns it can show): lowest priority, a few at a time, one platform after another, the named ones first. Skipped on a data-saver or 2g connection. */
-  let allPending: Promise<void> | null = null;
-  function preloadAll(first: string[] = []): Promise<void> {
-    if (slowConnection()) return Promise.resolve();
-    return allPending || (allPending = boot().then(async () => {
-      const ids = [...new Set([...first, ...Object.keys(G.Gunsmith.PLATFORMS)])];
-      for (const id of ids) await preloadPlatform(id, undefined, 2);
-    }));
-  }
-
   return {
-    boot, preloadAll, pauseBackground, slowConnection, ready, infoFromIndex, setRoot, loadFile, fetchJson, on, checking, preload, preloadPlatform, ensure, assemble, infoOf, loadIndex: async (id: string) => !!(await platformIndex(id)), displayBaked, contract: GUN_MODEL_CONTRACT, infoFields: INFO_FIELDS, partsIndexFields: PARTS_INDEX_FIELDS, validate, validateAuthored, validateAuthoredConfig, validateAuthoredPart, validateAuthoredPartConfig, validatePack, validatePartsIndex, describeGltfJson, describeScene, glbJson,
+    boot, ready, infoFromIndex, setRoot, loadFile, fetchJson, on, checking, preload, preloadPlatform, ensure, assemble, infoOf, loadIndex: async (id: string) => !!(await platformIndex(id)), displayBaked, contract: GUN_MODEL_CONTRACT, infoFields: INFO_FIELDS, partsIndexFields: PARTS_INDEX_FIELDS, validate, validateAuthored, validateAuthoredConfig, validateAuthoredPart, validateAuthoredPartConfig, validatePack, validatePartsIndex, describeGltfJson, describeScene, glbJson,
     infoSchema, partsIndexSchema, contractMarkdown, loaded: (id: string) => loaded.has(id), platformLoaded: (id: string) => platIx.has(id), SLOTS, PARTS, NAMES,
     // the pure side of the packs (no three.js): the baker and the tests check the packs with the same code the game plans with
     planBuild, pickPack, infoLeaves, infoFromLeaves, buildKeyOf, slotKey, PARTS_INDEX_VERSION,

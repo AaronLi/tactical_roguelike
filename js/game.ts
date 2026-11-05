@@ -112,7 +112,7 @@ const G_Game = {
     // lost the host (they refreshed, or dropped): back to the menu, trying the same code again for a minute, so
     // as soon as they're hosting again you're back in
     G.Net.onHostLost = () => { const code = G.Net.code; this.toMenu('Lost connection to the host. Reconnecting...'); this.rejoin(code, Date.now() + 60000); };
-    this.menuBackdrop();
+    this.menuBackdropSoon(); // (the menu is already on the page: it is painted and answers clicks before the backdrop is built)
     this.last = performance.now();
     this.serverLast = performance.now();
     requestAnimationFrame(() => this.loop());
@@ -251,15 +251,16 @@ const G_Game = {
     const mute = this.$<HTMLInputElement>('mute');
     mute.checked = G.Audio.muted;
     mute.addEventListener('change', () => this.setMuted(mute.checked));
-    this.$('btnHost').onclick = () => this.host();
-    this.$('btnSolo').onclick = () => this.solo();
-    this.$('btnJoin').onclick = () => this.join();
-    this.$('joinCode').addEventListener('keydown', (e: KeyboardEvent) => { if (e.key === 'Enter') this.join(); });
+    this.modelStatus();
+    this.$('btnHost').onclick = () => this.needModels(() => this.host());
+    this.$('btnSolo').onclick = () => this.needModels(() => this.solo());
+    this.$('btnJoin').onclick = () => this.needModels(() => this.join());
+    this.$('joinCode').addEventListener('keydown', (e: KeyboardEvent) => { if (e.key === 'Enter') this.needModels(() => this.join()); });
     this.$<HTMLInputElement>('joinCode').value = G.U.store.get('lastCode', ''); // (the last game you joined)
     this.$('btnLan').onclick = () => this.lanScan();
     // a highlights recording (a .zip the hangar's TVs saved) made into a video, here (js/highlights.ts renderPack)
     this.$('btnRender').onclick = () => this.$('hlFile').click();
-    this.$('hlFile').onchange = ((e: GmEvt<HTMLInputElement>) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) this.renderHighlights(f); }) as EventListener;
+    this.$('hlFile').onchange = ((e: GmEvt<HTMLInputElement>) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) this.needModels(() => this.renderHighlights(f)); }) as EventListener;
     this.$('btnRenderStop').onclick = () => G.Highlights.cancelRender();
     // your own relay server, if you have one (used for every connection from now on: js/net.ts opts)
     { const t = G.U.store.get('turn', {}) || {}, save = () => G.U.store.set('turn', { url: this.$<HTMLInputElement>('turnUrl').value.trim(), user: this.$<HTMLInputElement>('turnUser').value.trim(), pass: this.$<HTMLInputElement>('turnPass').value });
@@ -387,6 +388,39 @@ const G_Game = {
       if (p && p.catch) p.catch(() => { try { c.requestPointerLock(); } catch (e) { /* ignore */ } });
     } catch (e) { try { c.requestPointerLock(); } catch (e2) { /* ignore */ } }
   },
+  // The game's models are ONE bundle that downloads from the moment the page loads (js/modelbundles.ts), beside the menu. The menu is usable at once; what
+  // enters the game (host, solo, join, the highlights video) waits for the models, and goes on by itself when they are in. A failed download (after its own
+  // retries) says so, with a Retry button: there is no partial play.
+  waitingModels: null as null | (() => void),
+  modelStatus() {
+    const box = this.$('modelLoad'), txt = this.$('modelTxt'), bar = this.$('modelBar'), retry = this.$('modelRetry');
+    const mb = (n: number) => (n / 1048576).toFixed(1);
+    const upd = (s: ReturnType<typeof G.Bundles.state>) => {
+      box.classList.toggle('bad', s.phase === 'failed'); retry.classList.toggle('hidden', s.phase !== 'failed');
+      if (s.phase === 'ready') {
+        txt.textContent = 'Models ready'; (bar as HTMLElement).style.width = '100%'; (bar.parentElement as HTMLElement).classList.add('hidden'); box.classList.add('ok');
+        setTimeout(() => box.classList.add('gone'), 2500);
+        const go = this.waitingModels; this.waitingModels = null;
+        if (go) { this.msg('menuMsg', ''); go(); }
+      } else if (s.phase === 'failed') {
+        txt.textContent = "Could not download the game's models (" + (s.error || 'network error') + '). Check your connection and retry.';
+        if (this.waitingModels) { this.waitingModels = null; this.msg('menuMsg', 'The models did not download: press Retry.', true); }
+      } else {
+        const pct = s.total ? Math.min(100, Math.round((s.loaded / s.total) * 100)) : 0;
+        (bar as HTMLElement).style.width = pct + '%'; (bar.parentElement as HTMLElement).classList.remove('hidden');
+        txt.textContent = 'Downloading models ' + (s.total ? mb(s.loaded) + ' / ' + mb(s.total) + ' MB' : '...');
+      }
+    };
+    G.Bundles.onChange(upd); upd(G.Bundles.state());
+    retry.onclick = () => { G.Bundles.start(); upd(G.Bundles.state()); };
+  },
+  /** Runs fn now if the models are in; otherwise when they arrive (the menu says so meanwhile). */
+  needModels(fn: () => void) {
+    const s = G.Bundles.state();
+    if (s.phase === 'ready') { fn(); return; }
+    this.waitingModels = fn; this.msg('menuMsg', 'Waiting for the models to finish downloading...');
+    if (s.phase === 'failed' || s.phase === 'idle') G.Bundles.start();
+  },
   msg(id: string, text: string, err?: boolean) { const el = this.$(id); el.textContent = text; el.classList.toggle('err', !!err); },
 
   host() {
@@ -488,6 +522,26 @@ const G_Game = {
     this.msg('menuMsg', reason || '', !!reason);
   },
   // a slowly rotating level behind the main menu
+  // At page start it is built after the first paint, in two tasks (the level's plan, then its meshes and light grid: ~40 and ~230 ms), so the page answers
+  // in between instead of freezing for the ~300 ms both took inside init(); a host / solo / join that gets in first simply wins.
+  menuBackdropSoon() {
+    // It also lets the models in first (they are what the game needs; the backdrop is decoration): it waits for the bundle to be in memory, 1.2 s at most, because
+    // unpacking it is a few small tasks that would otherwise queue behind the backdrop's one long one.
+    let started = false;
+    const go = () => {
+      if (started) return; started = true;
+      setTimeout(() => {
+        if (this.map) return;
+        const map = G.Level.generate(1234, 3);
+        setTimeout(() => { if (this.map) return; this.map = map; G.R.setLevel(map); this.backdropT = 0; }, 0);
+      }, 0);
+    };
+    requestAnimationFrame(() => {
+      if (G.Bundles.state().phase !== 'loading') return go();
+      G.Bundles.onChange((s) => { if (s.phase !== 'loading') go(); });
+      setTimeout(go, 1200);
+    });
+  },
   menuBackdrop() {
     this.map = G.Level.generate(1234, 3);
     G.R.setLevel(this.map);
@@ -1225,8 +1279,7 @@ const G_Game = {
     const teamDefs = [...G.Views.players.values()].map((p) => p.st && p.st.w && G.Gunsmith.fromCode(p.st.w)).filter(Boolean), team = teamDefs.map((d) => d.soundKey);
     // the guns the level will show, fetched now: the squad's kits, the level's enemy weapon pool (every pack of each platform), the weapon case's gun and the loot (as it lands)
     const caseGun = G.Server.wcase && G.Gunsmith.fromCode(G.Server.wcase.code);
-    G.Models.pauseBackground(true); // (the hangar's warm-everything waits while the level loads, and goes on when its guns are in)
-    { let resumed = false; const resume = () => { if (!resumed) { resumed = true; G.Models.pauseBackground(false); } }; setTimeout(resume, 20000); G.GunModels.preload([...Object.values(G.Me.weapons).map((w) => w.def), ...teamDefs, ...(caseGun ? [caseGun] : [])], this.enemyGuns(level), false).then(resume, resume); }
+    G.GunModels.preload([...Object.values(G.Me.weapons).map((w) => w.def), ...teamDefs, ...(caseGun ? [caseGun] : [])], this.enemyGuns(level), false); // (the models are all in memory: this only schedules their parsing)
     G.GunAudio.prewarm([...Object.values(G.Me.weapons).flatMap((w) => [w.def.soundKey, G.Gunsmith.roundSoundKey(w.def, w.chamber || w.ammo)]), ...this.enemyGuns(level), ...team], this.map);
     // everyone in a seat of their own in the helicopter, on the pad (the same on every machine: by the sorted roster)
     const i = Math.max(0, Object.keys(this.roster).sort().indexOf(G.Net.myId!));

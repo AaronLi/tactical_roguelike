@@ -271,7 +271,6 @@ const G_Hangar = (() => {
   // ------------------------------------------------------------------------ building the scene
   function enter(map: LvMap) {
     leave();
-    G.GunModels.preloadAll(); // (every gun the hangar and the gunsmith can show, fetched in the background: js/gunmodels.ts)
     S.map = map; S.root = new T.Group(); S.targets = []; S.items = []; S.stands = []; S.rigs = []; S.vend = []; S.t = 0; S.hold = 0; S.vexQuip = 3; S.key = ''; S.rosterKey = rosterKey();
     S.root.position.z = RZ;
     G.R.levelRoot.add(S.root);
