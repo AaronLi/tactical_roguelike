@@ -53,6 +53,8 @@ export interface SceneTrack {
 export interface Scene {
   id: string;
   title: string;
+  /** Enclosure applied to every contact element (unless the element sets its own). */
+  housing?: ParamPatch['housing'];
   room: number;
   roomSize: number;
   tracks: SceneTrack[];
@@ -103,9 +105,10 @@ function renderAir(a: AirSound, sr: number, seed: number): Float32Array {
   return out;
 }
 
-function renderElement(el: SceneElement, sr: number, seed: number): { offset: number; samples: Float32Array } {
+function renderElement(el: SceneElement, sr: number, seed: number, housing?: ParamPatch['housing']): { offset: number; samples: Float32Array } {
   if (el.sound.kind === 'air') return { offset: el.at, samples: renderAir(el.sound, sr, seed) };
-  const p = withPatch(el.sound.patch);
+  const patch = housing ? { ...el.sound.patch, housing: { ...housing, ...el.sound.patch.housing } } : el.sound.patch;
+  const p = withPatch(patch);
   p.out.room = 0;
   if (!el.sound.patch.out?.seed) p.out.seed = seed;
   const r = render(p, sr);
@@ -117,7 +120,7 @@ export function renderScene(scene: Scene, sr = 48000, seed = 1): RenderedScene {
   const raw: { track: SceneTrack; start: number; samples: Float32Array }[] = [];
   let k = 0;
   for (const track of scene.tracks) {
-    const parts = track.elements.map((el) => ({ el, ...renderElement(el, sr, seed * 1000 + ++k) }));
+    const parts = track.elements.map((el) => ({ el, ...renderElement(el, sr, seed * 1000 + ++k, scene.housing) }));
     const start = Math.max(0, Math.min(...parts.map((p) => p.offset)));
     const end = Math.max(...parts.map((p) => p.offset + p.samples.length / sr));
     const tail = scene.room > 0 ? 0.25 + 0.5 * scene.roomSize : 0;

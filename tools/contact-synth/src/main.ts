@@ -54,7 +54,7 @@ function saveToHash(): void {
 
 // ---------- build controls ----------
 const SECTION_SWITCH: Record<string, string> = {
-  impact: 'impact.velocity', friction: 'friction.force', snap: 'snap.count', flex: 'flex.amount', coil: 'coil.level',
+  impact: 'impact.velocity', friction: 'friction.force', snap: 'snap.count', flex: 'flex.amount', coil: 'coil.level', housing: 'housing.amount',
 };
 
 function buildControls(): void {
@@ -151,7 +151,7 @@ function buildControl(c: Control): HTMLElement {
       setPath(params, c.path, v);
       out.textContent = fmt(c, v);
       const [body, key] = c.path.split('.');
-      if ((body === 'bodyA' || body === 'bodyB') && ['stiffness', 'density', 'loss'].includes(key)) {
+      if ((body === 'bodyA' || body === 'bodyB' || body === 'housing') && ['stiffness', 'density', 'loss'].includes(key)) {
         setPath(params, `${body}.material`, 'custom');
         refreshers.get(`${body}.material`)?.();
       }

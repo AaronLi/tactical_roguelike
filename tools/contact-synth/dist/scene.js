@@ -51,10 +51,11 @@ function renderAir(a, sr, seed) {
     }
     return out;
 }
-function renderElement(el, sr, seed) {
+function renderElement(el, sr, seed, housing) {
     if (el.sound.kind === 'air')
         return { offset: el.at, samples: renderAir(el.sound, sr, seed) };
-    const p = withPatch(el.sound.patch);
+    const patch = housing ? { ...el.sound.patch, housing: { ...housing, ...el.sound.patch.housing } } : el.sound.patch;
+    const p = withPatch(patch);
     p.out.room = 0;
     if (!el.sound.patch.out?.seed)
         p.out.seed = seed;
@@ -66,7 +67,7 @@ export function renderScene(scene, sr = 48000, seed = 1) {
     const raw = [];
     let k = 0;
     for (const track of scene.tracks) {
-        const parts = track.elements.map((el) => ({ el, ...renderElement(el, sr, seed * 1000 + ++k) }));
+        const parts = track.elements.map((el) => ({ el, ...renderElement(el, sr, seed * 1000 + ++k, scene.housing) }));
         const start = Math.max(0, Math.min(...parts.map((p) => p.offset)));
         const end = Math.max(...parts.map((p) => p.offset + p.samples.length / sr));
         const tail = scene.room > 0 ? 0.25 + 0.5 * scene.roomSize : 0;

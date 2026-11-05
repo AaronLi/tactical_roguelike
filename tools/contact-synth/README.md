@@ -31,6 +31,7 @@ npm run check          # renders every preset in Node and checks the output
 | **Body A / Body B** | material (stiffness E, density ρ, loss η), shape (bar / plate / shell / block), size (up to 50 cm), thickness, how firmly it's held, irregularity | every metal and plastic, at any thickness |
 | **Flex** | swing amount, rate and decay; rattle against support; pitch wobble; swing tone | ruler twang, thunder sheet, saw blade, latch arm, door-stop spring |
 | **Coil** | level, spring length (round-trip ms), dispersion, decay, brightness | spring "boing / zing / pew", spring-loaded mechanisms |
+| **Housing** | amount, hollow air box, and the enclosure's own material, shape, size, thickness, hold | parts inside a blaster shell, case or housing: every contact rings the enclosure through its mounts, and the air inside resonates |
 
 The physics behind it:
 
@@ -41,6 +42,7 @@ The physics behind it:
 - **Micro-contacts:** each collision is followed by a few smaller touches within a few ms (more with Tumble/clatter), and the contact itself is a noise burst whose brightness comes from `τ`.
 - **Decay:** `α = π·f·η + 400·η` plus losses to air and to whatever is holding the body. The second term is a floor that stops the lowest modes of lossy plastic parts from humming on. Metals have η ≈ 10⁻⁴ and ring for seconds. Plastics have η ≈ 10⁻² and give a short "tok".
 - **Friction:** a fractal or ridged height profile is read at the sliding position `x(t)`, so the texture's pitch follows the speed. That force signal is then filtered through the body's bands. Stick-slip is a relaxation oscillator. The contact point moves along body A as it slides, which shifts which modes get excited.
+- **Housing:** the contact events reach the enclosure through its mounts, with contact times stretched and spots scattered, so the enclosure rings with the parts. Its walls drive the air-box resonances, with dimensions taken as L × 0.45L × 0.2L.
 - **Coil:** an all-pass dispersion chain inside a lossy delay loop, which is the standard spring-reverb waveguide model.
 
 ## Using it from code
@@ -68,7 +70,8 @@ npm run scene -- recon-cs6 out/recon        # stems + full mix + cues.json
 npm run scene -- recon-cs6-dry out/recon-dry
 ```
 
-`recon-cs6` (`src/scenes/recon-cs6.ts`) is a Nerf Recon CS-6 priming and firing cycle with these
+`recon-cs6` (`src/scenes/recon-cs6.ts`) is a Nerf Recon CS-6 priming and firing cycle, built from iFixit
+teardown photos. Every element plays through a housing modelled on the ~33 cm ribbed ABS clamshell. It has these
 tracks: slide back, spring compress, air-restrictor valve closing, sear engage, clip feed, slide
 forward (including dart chambering, front stop and the trigger lock), air-restrictor valve opening,
 trigger pull, sear release, plunger launch (spring, O-ring, air, dart leaving) and plunger impact.

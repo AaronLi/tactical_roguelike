@@ -133,6 +133,18 @@ export interface FlexParams {
   tone: number;
 }
 
+/**
+ * The enclosure the contact happens inside (a blaster's clamshell, a case, a
+ * housing). Every contact is transmitted into it through its mounts, so it rings
+ * along with the parts, and the air box inside it resonates. Off at amount 0.
+ */
+export interface HousingParams extends BodyParams {
+  /** 0..1 how much of the sound comes through the housing. 0 = no housing. */
+  amount: number;
+  /** 0..1 air-cavity resonance inside the housing (the "hollow box" tone). */
+  cavity: number;
+}
+
 export interface OutputParams {
   room: number;
   roomSize: number;
@@ -149,6 +161,7 @@ export interface Params {
   bodyB: BodyParams;
   coil: CoilParams;
   flex: FlexParams;
+  housing: HousingParams;
   out: OutputParams;
 }
 
@@ -170,6 +183,10 @@ export function defaultParams(): Params {
     },
     coil: { level: 0, length: 30, dispersion: 0.6, decay: 1.2, brightness: 6000 },
     flex: { amount: 0, freq: 20, decay: 1, rattle: 0, wobble: 0, tone: 0 },
+    housing: {
+      amount: 0, cavity: 0.5, material: 'abs', stiffness: 2.3, density: 1050, loss: 0.02, shape: 'shell', size: 25, thickness: 2,
+      modes: 16, irregularity: 0.6, damping: 0.3, level: 0,
+    },
     out: { room: 0.15, roomSize: 0.4, length: 3, seed: 1 },
   };
 }

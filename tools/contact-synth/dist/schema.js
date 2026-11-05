@@ -90,6 +90,15 @@ export const SECTIONS = [
         ],
     },
     {
+        id: 'housing', title: 'Housing (enclosure)',
+        blurb: 'The shell the contact happens inside: every contact rings it through its mounts, and the air box inside resonates. Makes parts sound like they are inside something hollow.',
+        controls: [
+            { kind: 'range', path: 'housing.amount', label: 'Housing amount', min: 0, max: 1, step: 0.01, digits: 2, hint: '0 = no housing. How much of the sound comes through the enclosure.' },
+            { kind: 'range', path: 'housing.cavity', label: 'Hollow air box', min: 0, max: 1, step: 0.01, digits: 2, hint: 'Resonance of the air inside the housing, from its size: the boxy, hollow tone.' },
+            ...bodyControls('housing').filter((c) => c.path !== 'housing.level'),
+        ],
+    },
+    {
         id: 'out', title: 'Output', blurb: 'Space, length and randomness.',
         controls: [
             { kind: 'range', path: 'out.room', label: 'Room', min: 0, max: 1, step: 0.01, digits: 2, hint: 'Dry to roomy.' },

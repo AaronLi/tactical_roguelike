@@ -13,7 +13,7 @@
 
 import type { Params } from './params.js';
 import { deriveBody, t60, type BodyModel } from './body.js';
-import { buildExcitation, edgeTau, eventPulse, makeContact, T0 } from './excitation.js';
+import { buildExcitation, edgeTau, eventPulse, makeContact, T0, type ContactEvent } from './excitation.js';
 import { renderBody } from './bank.js';
 import { runCoil, runFlex, wobbleTrack } from './elastic.js';
 import { applyRoom } from './room.js';
@@ -86,6 +86,56 @@ function contactNoise(events: ReturnType<typeof buildExcitation>['events'], cont
   return out;
 }
 
+/**
+ * The housing: every contact reaches the enclosure through its mounts and joints,
+ * which pass the push but smear the sharpest detail (contact times stretched), and
+ * hit it at scattered spots. Its walls then drive the air box inside: a few
+ * resonances from the box's dimensions (L × 0.45L × 0.2L), leaky because the walls
+ * are thin and full of gaps.
+ */
+function renderHousing(p: Params, events: ContactEvent[], cont: Float32Array, mix: Float32Array, ref: number, sr: number, N: number): void {
+  const hp = p.housing;
+  const rng = makeRng(p.out.seed * 7 + 3);
+  const H = deriveBody(hp, sr, rng);
+  const hEvents = events.map((e) => ({ ...e, tau: e.tau * 2.5 + 0.0001, posB: rng(), edge: (e.edge ?? 0) * 0.4 }));
+  const walls = renderBody(H.components, { events: hEvents, cont, posTrace: null, contPos: 0.3, which: 'B', pitch: null, seed: p.out.seed * 2 + 9 }, sr, N);
+  const wpk = peak(walls);
+  if (!(wpk > 0)) return;
+  const amount = clamp(hp.amount, 0, 1);
+  mixInto(mix, walls, (amount * ref * 1.1) / wpk);
+
+  if (hp.cavity > 0) {
+    const L = clamp(hp.size, 0.2, 50) / 100;
+    const dims = [L, 0.45 * L, 0.2 * L];
+    const freqs: number[] = [];
+    for (let l = 0; l <= 3; l++)
+      for (let m = 0; m <= 2; m++)
+        for (let n = 0; n <= 1; n++) {
+          if (l + m + n === 0) continue;
+          const f = (343 / 2) * Math.sqrt((l / dims[0]) ** 2 + (m / dims[1]) ** 2 + (n / dims[2]) ** 2);
+          if (f < sr * 0.4) freqs.push(f);
+        }
+    freqs.sort((a, b) => a - b);
+    const air = new Float32Array(N);
+    for (const f of freqs.slice(0, 8)) {
+      const w0 = (2 * Math.PI * f) / sr;
+      const al = Math.sin(w0) / (2 * 9);
+      const a0 = 1 + al;
+      const b0 = al / a0, b2 = -al / a0, a1 = (-2 * Math.cos(w0)) / a0, a2 = (1 - al) / a0;
+      let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+      const g = Math.pow(freqs[0] / f, 0.5);
+      for (let i = 0; i < N; i++) {
+        const x = walls[i];
+        const y = b0 * x + b2 * x2 - a1 * y1 - a2 * y2;
+        x2 = x1; x1 = x; y2 = y1; y1 = y;
+        air[i] += y * g;
+      }
+    }
+    const apk = peak(air);
+    if (apk > 0) mixInto(mix, air, (clamp(hp.cavity, 0, 1) * amount * ref * 0.9) / apk);
+  }
+}
+
 export function render(p: Params, sampleRate = 48000): RenderResult {
   const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
   const sr = sampleRate;
@@ -142,6 +192,8 @@ export function render(p: Params, sampleRate = 48000): RenderResult {
     const pk = peak(tone);
     if (pk > 0) mixInto(mix, tone, (p.flex.tone * ref * 0.8) / pk);
   }
+
+  if (p.housing && p.housing.amount > 0) renderHousing(p, events, ex.cont, mix, ref, sr, N);
 
   highpassInPlace(mix, 20, sr);
   let out = applyRoom(mix, p.out.room, p.out.roomSize, sr);

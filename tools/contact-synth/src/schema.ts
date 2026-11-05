@@ -37,7 +37,7 @@ const shapeOptions = [
   { value: 'block', label: 'Solid block / chunk' },
 ];
 
-function bodyControls(prefix: 'bodyA' | 'bodyB'): Control[] {
+function bodyControls(prefix: 'bodyA' | 'bodyB' | 'housing'): Control[] {
   return [
     { kind: 'select', path: `${prefix}.material`, label: 'Material', options: [], hint: 'Sets stiffness, density and loss below. Moving any of those makes it "Custom".' },
     { kind: 'range', path: `${prefix}.stiffness`, label: 'Stiffness (E)', min: 0.01, max: 250, log: true, unit: 'GPa', digits: 2, hint: 'Young\'s modulus. Raises pitch and makes contact harder and brighter. Metals 70-210, plastics 1-3.' },
@@ -120,6 +120,15 @@ export const SECTIONS: Section[] = [
       { kind: 'range', path: 'coil.dispersion', label: 'Dispersion (zing)', min: 0, max: 1, step: 0.01, digits: 2, hint: '0 = plain echo, 1 = strong "pew" chirps.' },
       { kind: 'range', path: 'coil.decay', label: 'Coil decay', min: 0.03, max: 8, log: true, unit: 's', digits: 2, hint: 'How long the echoes last.' },
       { kind: 'range', path: 'coil.brightness', label: 'Brightness', min: 300, max: 16000, log: true, unit: 'Hz', digits: 0, hint: 'Losses at high frequency inside the coil.' },
+    ],
+  },
+  {
+    id: 'housing', title: 'Housing (enclosure)',
+    blurb: 'The shell the contact happens inside: every contact rings it through its mounts, and the air box inside resonates. Makes parts sound like they are inside something hollow.',
+    controls: [
+      { kind: 'range', path: 'housing.amount', label: 'Housing amount', min: 0, max: 1, step: 0.01, digits: 2, hint: '0 = no housing. How much of the sound comes through the enclosure.' },
+      { kind: 'range', path: 'housing.cavity', label: 'Hollow air box', min: 0, max: 1, step: 0.01, digits: 2, hint: 'Resonance of the air inside the housing, from its size: the boxy, hollow tone.' },
+      ...bodyControls('housing').filter((c) => c.path !== 'housing.level'),
     ],
   },
   {
