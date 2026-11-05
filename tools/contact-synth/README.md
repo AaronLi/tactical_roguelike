@@ -83,6 +83,11 @@ cushions the plunger.
 Other scenes, in `src/scenes/firearms.ts`:
 
 - `pump-shotgun` (generic pump-action, racked). Tracks: action release, unlock, pull slide, extract and eject, carrier and feed, rear stop, push slide, chamber, lock-up.
-- `ar15-charge` (charging handle pulled back and let go). Tracks: latch, unlock, pull back, buffer spring compress, rear stop, release forward. The release-forward track is the spring slam, stripping and chambering a round, bolt lock-up and the charging-handle latch.
-- `ar15-bolt-release` (bolt catch pressed with the bolt locked back). Tracks: bolt catch, release forward, catch reset.
+- `ar15-charge`, `ar15-charge-empty-mag`, `ar15-charge-no-mag`: the charging handle pulled back and let go, with a loaded, empty or no magazine.
+  - Loaded: the round is stripped, fed, guided into the breech and chambered.
+  - Empty: on the pull, the follower pops up and lifts the bolt catch. On release, the carrier is caught on the raised catch a few mm forward (the bolt locks open), and the operator then pushes the charging handle home.
+  - No magazine: nothing under the bolt and no feeding.
+- `ar15-bolt-release`, `ar15-bolt-release-empty-mag`, `ar15-bolt-release-no-mag`: the bolt catch pressed with the bolt locked back. With an empty magazine, the press is firmer (the follower pushes up on the catch) and the bolt rides over the follower on the way home.
+
+The forward run is simulated from the reciprocating mass, the spring force and each magazine state's drag. Loaded takes 24.7 ms to the bolt face, empty 24.0 ms and no magazine 23.7 ms.
 

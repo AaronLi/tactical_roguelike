@@ -119,7 +119,7 @@ function renderElement(el: SceneElement, sr: number, seed: number, housing?: Par
 export function renderScene(scene: Scene, sr = 48000, seed = 1): RenderedScene {
   const raw: { track: SceneTrack; start: number; samples: Float32Array }[] = [];
   let k = 0;
-  for (const track of scene.tracks) {
+  for (const track of scene.tracks.filter((tr) => tr.elements.length > 0)) {
     const parts = track.elements.map((el) => ({ el, ...renderElement(el, sr, seed * 1000 + ++k, scene.housing) }));
     const start = Math.min(...parts.map((p) => p.offset));
     const end = Math.max(...parts.map((p) => p.offset + p.samples.length / sr));

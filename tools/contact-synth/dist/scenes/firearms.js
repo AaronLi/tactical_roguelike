@@ -113,12 +113,7 @@ const STROKE_MM = 94;
  *  (~10 g). The charging handle (~30 g) rides along on a charge. */
 const RECIP_MASS = 0.471;
 const CH_MASS = 0.03;
-/**
- * Simulate the forward run: m·x'' = spring force − friction − feed drag (stripping the round
- * over the feed lips 72→45 mm, pushing it into the chamber 28→10 mm). Returns time and speed
- * as functions of position (mm from battery) down to the bolt face meeting the extension (9.5).
- */
-function simulateRun(mass) {
+function simulateRun(mass, mag = 'loaded') {
     const F_BAT = 40 * BUFFER_SPRING;
     const F_REAR = 80 * BUFFER_SPRING; // ~2x the battery force: 7.3" vs 3.6" of compression
     const xs = [];
@@ -131,10 +126,16 @@ function simulateRun(mass) {
     while (x > 9.5 && tt < 0.5) {
         const fs = F_BAT + (F_REAR - F_BAT) * (x / STROKE_MM);
         let drag = 6;
-        if (x < 86 && x > 55)
-            drag += 25; // stripping the round over the feed lips
-        if (x < 45 && x > 3)
-            drag += 15; // pushing it into the chamber
+        if (mag === 'loaded') {
+            if (x < 86 && x > 55)
+                drag += 25; // stripping the round over the feed lips
+            if (x < 45 && x > 3)
+                drag += 15; // pushing it into the chamber
+        }
+        else if (mag === 'empty') {
+            if (x < 86 && x > 30)
+                drag += 6; // the follower pressing up under the bolt
+        }
         v += ((fs - drag) / mass) * dt;
         x -= v * 1000 * dt;
         tt += dt;
@@ -326,10 +327,21 @@ const AR_HOUSING = {
     cavities: [{ length: 18, width: 2.6, depth: 2.2, q: 9, level: 0.8 }, FCG_POCKET, MAG_WELL],
 };
 /** The carrier running home under the buffer spring, starting at t (round in the magazine). */
-function arForward(t, withChargingHandle) {
+/** Elements that only exist when a round is fed and chambered. */
+const FEED_ONLY = new Set([
+    'bolt picks up the top round', 'case dragged over the feed lips', 'stripped case slides off the next case',
+    'case rim snaps free of the feed lips', 'magazine spring shoves the stack up', 'cases clack against each other',
+    'cases settle in the stack', 'next round snaps up against the bolt', 'magazine body rings',
+    'next round rides along the carrier underside', 'bullet nose hits the feed ramp',
+    'bullet slides up the feed ramp into the chamber', 'case body slides along the chamber walls',
+    'case seats in the chamber', 'extractor snaps over the rim',
+]);
+// The empty magazine's follower (plastic).
+const arFollower = { ...mat('pom'), shape: 'bar', size: 6, thickness: 3, modes: 2, irregularity: 0.5, damping: 0.4, level: 0 };
+function arForward(t, withChargingHandle, mag = 'loaded') {
     // The run is simulated from the reciprocating mass and the spring (see simulateRun): every
     // forward time and speed comes from it.
-    const run = simulateRun(RECIP_MASS + (withChargingHandle ? CH_MASS : 0));
+    const run = simulateRun(RECIP_MASS + (withChargingHandle ? CH_MASS : 0), mag);
     const vArrive = run.arrive;
     // Impact speeds were tuned against a 3.8 m/s landing; scale them to the simulated arrival.
     const V = (v) => (v * vArrive) / 3.8;
@@ -434,7 +446,15 @@ function arForward(t, withChargingHandle) {
         els.push(hit('charging handle slams into its front stop', post(0.0581), 0, V(3.8), arChargingHandle, arUpper, { scatter: 0.4, radius: 3, click: 0.7 }));
         els.push(snap('charging handle latch catches', post(0.06), -9, { strength: 0.7, preload: 0, seat: 0.4, seatDelay: 2 }, arChLatch, arUpper));
     }
-    return els;
+    if (mag === 'loaded')
+        return els;
+    // Without a round to feed: none of the feeding, stack or chambering contacts.
+    const kept = els.filter((e) => !FEED_ONLY.has(e.what));
+    if (mag === 'empty') {
+        // The empty magazine's plastic follower presses up under the bolt as it passes over it.
+        kept.push(fwdRub('bolt rides over the empty follower', 86, 30, -10, { force: 4, roughness: 3, grain: 0.3, contactWidth: 0.1 }, arFollower, arBolt, IN_MAG));
+    }
+    return kept;
 }
 const CH_BACK = 0.0;
 // The pull, laid out by travel. The hand's speed follows a swell (accelerate, then brake),
@@ -467,137 +487,190 @@ const OIL_STEEL = { roughness: 3, grain: 0.12, periodicity: 0, contactWidth: 0.0
 const OIL_TUBE = { roughness: 2, grain: 0.3, periodicity: 0, contactWidth: 0.1 };
 // Ejection-port dust cover: a thin spring-loaded steel flap that snaps open and slaps the upper.
 const arDustCover = { ...mat('steel'), shape: 'plate', size: 9, thickness: 0.8, modes: 2, irregularity: 0.6, damping: 0.35, level: 0 };
-export const AR15_CHARGE = {
-    id: 'ar15-charge',
-    title: 'AR-15: charging handle pulled back and released',
-    room: 0.04,
-    roomSize: 0.35,
-    housing: AR_HOUSING,
-    tracks: [
-        {
-            name: 'latch-unlatch',
-            description: 'Finger squeezes the charging-handle latch out of its notch in the upper.',
-            elements: [snap('latch pivots out', CH_BACK - 0.04, -10, { strength: 0.5, preload: 35, seat: 0.2 }, arChLatch, arUpper)],
-        },
-        {
-            name: 'gas-key-pickup',
-            description: '0-2 mm: the charging handle takes up its free play and catches the carrier\'s gas key.',
-            elements: [hit('handle catches the gas key', tAt(2), -9, 0.5 * HAND, gasKey, arChargingHandle, { scatter: 0.3, radius: 2 })],
-        },
-        {
-            name: 'dust-cover',
-            description: '~4 mm: the carrier trips the ejection-port dust cover, which springs open and slaps the side of the upper.',
-            elements: [
-                hit('dust cover snaps open', tAt(4) + 0.006, -5, 2.5, arDustCover, arUpper, { scatter: 0.4, radius: 6, click: 0.7 }, { flex: { amount: 0.3, freq: 70, decay: 0.05, rattle: 0.5, wobble: 0, tone: 0 }, coil: { level: 0.15, length: 2, dispersion: 0.3, decay: 0.04, brightness: 5000 } }),
-            ],
-        },
-        {
-            name: 'unlock',
-            description: '2-11.5 mm: the carrier moves alone through its cam travel, the cam pin turns the bolt out of its lugs (~10 mm), then the carrier catches the bolt and drags it along (11.5 mm).',
-            elements: [
-                travelRub('cam pin turns the bolt', 2, 11.5, -12, { force: 8, roughness: 10, grain: 0.2, contactWidth: 0.02 }, arCamPin, arCarrier),
-                hit('bolt lugs rotate free', tAt(10), -10, 0.6 * HAND, arBolt, arBarrelExt, { scatter: 0.3, radius: 1.5 }),
-                snap('bolt rotation stops on the cam pin', tAt(10.5), -9, { strength: 0.5, preload: 0, seat: 0.2, seatDelay: 1 }, arBolt, arCamPin),
-                hit('carrier picks up the bolt', tAt(11.5), -6, 0.9 * HAND, arCarrier, arBolt, { scatter: 0.4, radius: 3, click: 0.7 }),
-            ],
-        },
-        {
-            name: 'pull-back',
-            description: 'The slides, each over its own stretch of travel: charging handle in its channel (0-94 mm), gas key in the handle slot (2-94), carrier on the upper rails (2-40), carrier tail entering and running in the buffer tube (40-94), bolt tail in the carrier bore (11.5-94). Oiled, so light and slick.',
-            elements: [
-                travelRub('charging handle in its channel', 0, STROKE_MM, -11, { force: 4, ...OIL_ALU }, arChargingHandle, arUpper),
-                travelRub('gas key riding in the handle slot', 2, STROKE_MM, -15, { force: 3, ...OIL_STEEL }, gasKey, arChargingHandle),
-                travelRub('carrier on the upper rails', 2, 40, -9, { force: 6, ...OIL_STEEL }, arCarrier, arUpper),
-                hit('carrier tail enters the buffer tube', tAt(40), -16, 0.5 * HAND, arCarrier, arBufferTube, { scatter: 0.3, radius: 4 }),
-                travelRub('carrier tail running in the buffer tube', 40, STROKE_MM, -11, { force: 4, ...OIL_TUBE }, arCarrier, arBufferTube),
-                travelRub('bolt tail riding in the carrier bore', 11.5, STROKE_MM, -20, { force: 2, ...OIL_STEEL }, arBolt, arCarrier),
-                // The serrated stretch of the carrier passes the spring-loaded forward-assist pawl:
-                // a run of small ratchet clicks. (The slide bed offset doesn't apply to clicks.)
-                travelRub('forward-assist pawl over the serrations', 8, 38, 2, { force: 4, roughness: 200, grain: 2.5, periodicity: 1, contactWidth: 0.02 }, arFaPawl, arCarrier),
-            ],
-        },
-        {
-            name: 'hammer-cock',
-            description: '35-60 mm: with the hammer down, the carrier rides it down against its spring; at 60 mm the trigger sear snaps into the hammer notch; the carrier then rides over the cocked hammer. (Leave this track out if the hammer was already cocked.)',
-            elements: [
-                hit('carrier meets the hammer', tAt(35), -10, 0.6 * HAND, arCarrier, arHammer, { scatter: 0.3, radius: 2 }),
-                travelRub('carrier pushes the hammer down', 35, 60, -8, { force: 12, roughness: 4, grain: 0.15, contactWidth: 0.05 }, arHammer, arCarrier, { coil: { level: 0.45, length: 2.5, dispersion: 0.35, decay: 0.08, brightness: 5000 }, housing: LOWER_HOUSING }),
-                // The hammer spring's legs bear on the trigger pin: loading it is a faint wiry tension.
-                travelRub('hammer spring loading', 35, 60, -14, { force: 4, roughness: 3, grain: 0.3, contactWidth: 0.1 }, arHammerSpring, arLower, { coil: { level: 0.5, length: 2, dispersion: 0.4, decay: 0.08, brightness: 6000 }, housing: LOWER_HOUSING }),
-                // Two clicks: the trigger's sear nose snaps into the hammer notch as the hammer is
-                // pushed past it, then the hammer rises back onto the sear once the carrier's tail
-                // stops pressing it down.
-                snap('sear snaps into the hammer notch', tAt(60), 0, { strength: 1, preload: 0, seat: 0.6, seatDelay: 1.2 }, arTriggerSear, arHammer, { coil: { level: 0.3, length: 1.5, dispersion: 0.3, decay: 0.05, brightness: 7000 }, housing: LOWER_HOUSING }),
-                snap('hammer settles onto the sear', tAt(70), -4, { strength: 0.7, preload: 0, seat: 0.3, seatDelay: 1 }, arHammer, arLower, { housing: LOWER_HOUSING }),
-                travelRub('carrier riding over the cocked hammer', 60, STROKE_MM, -20, { force: 3, ...OIL_STEEL }, arHammer, arCarrier),
-            ],
-        },
-        {
-            name: 'magazine',
-            description: '30-86 mm: the bolt rides over the top round in the magazine; once it clears the rim (~88 mm), the magazine spring pops the round up against the feed lips.',
-            elements: [
-                travelRub('bolt riding over the top round', 30, 86, -16, { force: 5, roughness: 2, grain: 0.2, contactWidth: 0.05 }, arCase, arBolt, IN_MAG),
-                // The bolt clears the rim: the stack jumps up against the feed lips.
-                ...magazineReaction(tAt(88) + 0.002, -4, arFeedLips, 'top round snaps up against the feed lips'),
-            ],
-        },
-        {
-            name: 'buffer-spring-compress',
-            description: 'Preloaded buffer spring loading further inside the buffer tube (inside the stock): pushing back hard from the start, tension climbing to the rear, singing in the tube. The buffer weights lag at the start and settle at the stop.',
-            elements: [
-                // Tension building from an already-preloaded spring: it pushes back hard from the first
-                // millimetre and the force climbs ~1.5x by the rear (louder, more pressure on the coils).
-                // Its surge pitch stays put (a linear spring's surge depends on stiffness and mass, not
-                // length). Smooth: coils slide, they don't tick.
-                travelRub('buffer spring loading (first third)', 2, 32, -7 + 10 * Math.log10(BUFFER_SPRING), { force: 2.7 * BUFFER_SPRING, roughness: 6, grain: 0.6, periodicity: 0, contactWidth: 0.2 }, arBufferSpring, arBufferTube, { coil: { level: 0.5, length: 11, dispersion: 0.5, decay: 0.12, brightness: 2800 }, housing: BUFFER_TUBE_HOUSING }),
-                travelRub('buffer spring loading (second third)', 32, 62, -6.5 + 10 * Math.log10(BUFFER_SPRING), { force: 3.4 * BUFFER_SPRING, roughness: 6, grain: 0.6, periodicity: 0, contactWidth: 0.2 }, arBufferSpring, arBufferTube, { coil: { level: 0.52, length: 11, dispersion: 0.5, decay: 0.12, brightness: 2900 }, housing: BUFFER_TUBE_HOUSING }),
-                travelRub('buffer spring loading (last third)', 62, STROKE_MM, -6 + 10 * Math.log10(BUFFER_SPRING), { force: 4.1 * BUFFER_SPRING, roughness: 6, grain: 0.6, periodicity: 0, contactWidth: 0.2 }, arBufferSpring, arBufferTube, { coil: { level: 0.55, length: 11, dispersion: 0.5, decay: 0.12, brightness: 3000 }, housing: BUFFER_TUBE_HOUSING }),
-                hit('buffer weights lag', tAt(3), -22, 0.6, steelBlock(1.5, 12), arBuffer, { scatter: 0.9, radius: 2 }),
-                hit('buffer weights settle', CH_END + 0.004, -12, 0.8, steelBlock(1.5, 12), arBuffer, { scatter: 0.9, radius: 2 }, { housing: BUFFER_TUBE_HOUSING }),
-            ],
-        },
-        {
-            name: 'rear-stop',
-            description: 'Full travel (3.7" ≈ 94 mm): the charging handle bottoms out; the bolt shifts inside the carrier.',
-            elements: [
-                hit('handle bottoms out', CH_END, -6, 1.0 * HAND, arChargingHandle, arUpper, { scatter: 0.4, radius: 3 }),
-                hit('bolt shifts in the carrier', CH_END + 0.003, -14, 0.5 * HAND, arBolt, arCarrier, { scatter: 0.4, radius: 2 }),
-            ],
-        },
-        {
-            name: 'release-forward',
-            description: 'Let go: buffer spring slams the carrier home, stripping and chambering a round, and the bolt locks up. The charging handle rides home and latches.',
-            elements: arForward(LET_GO, true),
-        },
-    ],
-};
+const MAG_ID = { loaded: '', empty: '-empty-mag', none: '-no-mag' };
+const MAG_TITLE = { loaded: ' (loaded magazine)', empty: ' (empty magazine)', none: ' (no magazine)' };
+/** Pull: what the magazine does as the bolt passes over it. */
+function pullMagazine(mag) {
+    if (mag === 'loaded') {
+        return [
+            travelRub('bolt riding over the top round', 30, 86, -16, { force: 5, roughness: 2, grain: 0.2, contactWidth: 0.05 }, arCase, arBolt, IN_MAG),
+            // The bolt clears the rim: the stack jumps up against the feed lips.
+            ...magazineReaction(tAt(88) + 0.002, -4, arFeedLips, 'top round snaps up against the feed lips'),
+        ];
+    }
+    if (mag === 'empty') {
+        return [
+            travelRub('bolt riding over the empty follower', 30, 86, -16, { force: 4, roughness: 3, grain: 0.3, contactWidth: 0.1 }, arFollower, arBolt, IN_MAG),
+            // The bolt clears the follower: the magazine spring snaps it up, and its tab lifts the
+            // bolt catch, which snaps up into the bolt's path.
+            hit('follower pops up', tAt(88) + 0.002, -5, 1.2, arFollower, arMagBody, { scatter: 0.3, radius: 2, click: 0.6 }, { coil: { level: 0.6, length: 4, dispersion: 0.45, decay: 0.08, brightness: 5000 }, ...IN_MAG }),
+            hit('empty magazine body rings', tAt(88) + 0.0026, -6, 1.0, arMagBody, arFollower, { scatter: 0.5, radius: 3, click: 0.2, sharp: 0.7 }, IN_MAG),
+            snap('bolt catch snaps up', tAt(88) + 0.004, -3, { strength: 0.8, preload: 0, seat: 0.4, seatDelay: 1.5 }, arBoltCatch, arLower, { housing: LOWER_HOUSING }),
+        ];
+    }
+    return [];
+}
+/** Charge with an empty magazine: let go, and the carrier is caught a few mm forward by the raised
+ *  bolt catch (it locks open). The charging handle stays back until the operator pushes it home. */
+function caughtOnCatch(t) {
+    return [
+        hit('buffer spring lets go', t, -3, 3, arBufferSpring, arBufferTube, { scatter: 0.2, radius: 1, click: 0.4, sharp: 0.8 }, { coil: { level: 0.7, length: 9, dispersion: 0.5, decay: 0.12, brightness: 3000 }, housing: BUFFER_TUBE_HOUSING }),
+        rub('carrier jumps forward a few mm', t + 0.001, -12, { force: 6, duration: 0.008, speed: 1.2, profile: 'accelerate', roughness: 3, grain: 0.15, contactWidth: 0.08 }, arCarrier, arUpper),
+        hit('bolt face slams into the raised bolt catch', t + 0.009, 4, 1.4, arBolt, arBoltCatch, { scatter: 0.4, radius: 2, click: 0.9, sharp: 0.95 }, { housing: LOWER_HOUSING }),
+        hit('carrier group stops on the bolt', t + 0.0094, 0, 1.4, arCarrierGroup, arBolt, { scatter: 0.4, radius: 3, click: 0.7, sharp: 0.9 }),
+        hit('buffer spring jolts, still loaded', t + 0.0096, -6, 1.2, arBufferSpring, arBufferTube, { scatter: 0.2, radius: 1, click: 0.05, sharp: 0.4 }, { coil: { level: 0.6, length: 11, dispersion: 0.45, decay: 0.12, brightness: 3000 }, housing: BUFFER_TUBE_HOUSING }),
+        hit('buffer weights slam forward', t + 0.012, -8, 1.2, steelBlock(1.5, 12), arBuffer, { scatter: 0.6, radius: 3, click: 0.6 }, { housing: BUFFER_TUBE_HOUSING }),
+        // A moment later the operator pushes the charging handle home; it latches.
+        rub('operator pushes the charging handle home', t + 0.25, -12, { force: 4, duration: 0.12, speed: 0.6, profile: 'swell', roughness: 3, grain: 0.2, contactWidth: 0.08 }, arChargingHandle, arUpper),
+        snap('charging handle latch catches', t + 0.37, -6, { strength: 0.7, preload: 0, seat: 0.4, seatDelay: 2 }, arChLatch, arUpper),
+    ];
+}
+function makeArCharge(mag) {
+    return {
+        id: 'ar15-charge' + MAG_ID[mag],
+        title: 'AR-15: charging handle pulled back and released' + MAG_TITLE[mag],
+        room: 0.04,
+        roomSize: 0.35,
+        housing: AR_HOUSING,
+        tracks: [
+            {
+                name: 'latch-unlatch',
+                description: 'Finger squeezes the charging-handle latch out of its notch in the upper.',
+                elements: [snap('latch pivots out', CH_BACK - 0.04, -10, { strength: 0.5, preload: 35, seat: 0.2 }, arChLatch, arUpper)],
+            },
+            {
+                name: 'gas-key-pickup',
+                description: '0-2 mm: the charging handle takes up its free play and catches the carrier\'s gas key.',
+                elements: [hit('handle catches the gas key', tAt(2), -9, 0.5 * HAND, gasKey, arChargingHandle, { scatter: 0.3, radius: 2 })],
+            },
+            {
+                name: 'dust-cover',
+                description: '~4 mm: the carrier trips the ejection-port dust cover, which springs open and slaps the side of the upper.',
+                elements: [
+                    hit('dust cover snaps open', tAt(4) + 0.006, -5, 2.5, arDustCover, arUpper, { scatter: 0.4, radius: 6, click: 0.7 }, { flex: { amount: 0.3, freq: 70, decay: 0.05, rattle: 0.5, wobble: 0, tone: 0 }, coil: { level: 0.15, length: 2, dispersion: 0.3, decay: 0.04, brightness: 5000 } }),
+                ],
+            },
+            {
+                name: 'unlock',
+                description: '2-11.5 mm: the carrier moves alone through its cam travel, the cam pin turns the bolt out of its lugs (~10 mm), then the carrier catches the bolt and drags it along (11.5 mm).',
+                elements: [
+                    travelRub('cam pin turns the bolt', 2, 11.5, -12, { force: 8, roughness: 10, grain: 0.2, contactWidth: 0.02 }, arCamPin, arCarrier),
+                    hit('bolt lugs rotate free', tAt(10), -10, 0.6 * HAND, arBolt, arBarrelExt, { scatter: 0.3, radius: 1.5 }),
+                    snap('bolt rotation stops on the cam pin', tAt(10.5), -9, { strength: 0.5, preload: 0, seat: 0.2, seatDelay: 1 }, arBolt, arCamPin),
+                    hit('carrier picks up the bolt', tAt(11.5), -6, 0.9 * HAND, arCarrier, arBolt, { scatter: 0.4, radius: 3, click: 0.7 }),
+                ],
+            },
+            {
+                name: 'pull-back',
+                description: 'The slides, each over its own stretch of travel: charging handle in its channel (0-94 mm), gas key in the handle slot (2-94), carrier on the upper rails (2-40), carrier tail entering and running in the buffer tube (40-94), bolt tail in the carrier bore (11.5-94). Oiled, so light and slick.',
+                elements: [
+                    travelRub('charging handle in its channel', 0, STROKE_MM, -11, { force: 4, ...OIL_ALU }, arChargingHandle, arUpper),
+                    travelRub('gas key riding in the handle slot', 2, STROKE_MM, -15, { force: 3, ...OIL_STEEL }, gasKey, arChargingHandle),
+                    travelRub('carrier on the upper rails', 2, 40, -9, { force: 6, ...OIL_STEEL }, arCarrier, arUpper),
+                    hit('carrier tail enters the buffer tube', tAt(40), -16, 0.5 * HAND, arCarrier, arBufferTube, { scatter: 0.3, radius: 4 }),
+                    travelRub('carrier tail running in the buffer tube', 40, STROKE_MM, -11, { force: 4, ...OIL_TUBE }, arCarrier, arBufferTube),
+                    travelRub('bolt tail riding in the carrier bore', 11.5, STROKE_MM, -20, { force: 2, ...OIL_STEEL }, arBolt, arCarrier),
+                    // The serrated stretch of the carrier passes the spring-loaded forward-assist pawl:
+                    // a run of small ratchet clicks. (The slide bed offset doesn't apply to clicks.)
+                    travelRub('forward-assist pawl over the serrations', 8, 38, 2, { force: 4, roughness: 200, grain: 2.5, periodicity: 1, contactWidth: 0.02 }, arFaPawl, arCarrier),
+                ],
+            },
+            {
+                name: 'hammer-cock',
+                description: '35-60 mm: with the hammer down, the carrier rides it down against its spring; at 60 mm the trigger sear snaps into the hammer notch; the carrier then rides over the cocked hammer. (Leave this track out if the hammer was already cocked.)',
+                elements: [
+                    hit('carrier meets the hammer', tAt(35), -10, 0.6 * HAND, arCarrier, arHammer, { scatter: 0.3, radius: 2 }),
+                    travelRub('carrier pushes the hammer down', 35, 60, -8, { force: 12, roughness: 4, grain: 0.15, contactWidth: 0.05 }, arHammer, arCarrier, { coil: { level: 0.45, length: 2.5, dispersion: 0.35, decay: 0.08, brightness: 5000 }, housing: LOWER_HOUSING }),
+                    // The hammer spring's legs bear on the trigger pin: loading it is a faint wiry tension.
+                    travelRub('hammer spring loading', 35, 60, -14, { force: 4, roughness: 3, grain: 0.3, contactWidth: 0.1 }, arHammerSpring, arLower, { coil: { level: 0.5, length: 2, dispersion: 0.4, decay: 0.08, brightness: 6000 }, housing: LOWER_HOUSING }),
+                    // Two clicks: the trigger's sear nose snaps into the hammer notch as the hammer is
+                    // pushed past it, then the hammer rises back onto the sear once the carrier's tail
+                    // stops pressing it down.
+                    snap('sear snaps into the hammer notch', tAt(60), 0, { strength: 1, preload: 0, seat: 0.6, seatDelay: 1.2 }, arTriggerSear, arHammer, { coil: { level: 0.3, length: 1.5, dispersion: 0.3, decay: 0.05, brightness: 7000 }, housing: LOWER_HOUSING }),
+                    snap('hammer settles onto the sear', tAt(70), -4, { strength: 0.7, preload: 0, seat: 0.3, seatDelay: 1 }, arHammer, arLower, { housing: LOWER_HOUSING }),
+                    travelRub('carrier riding over the cocked hammer', 60, STROKE_MM, -20, { force: 3, ...OIL_STEEL }, arHammer, arCarrier),
+                ],
+            },
+            {
+                name: 'magazine',
+                description: '30-86 mm: the bolt rides over the top round in the magazine; once it clears the rim (~88 mm), the magazine spring pops the round up against the feed lips.',
+                elements: pullMagazine(mag),
+            },
+            {
+                name: 'buffer-spring-compress',
+                description: 'Preloaded buffer spring loading further inside the buffer tube (inside the stock): pushing back hard from the start, tension climbing to the rear, singing in the tube. The buffer weights lag at the start and settle at the stop.',
+                elements: [
+                    // Tension building from an already-preloaded spring: it pushes back hard from the first
+                    // millimetre and the force climbs ~1.5x by the rear (louder, more pressure on the coils).
+                    // Its surge pitch stays put (a linear spring's surge depends on stiffness and mass, not
+                    // length). Smooth: coils slide, they don't tick.
+                    travelRub('buffer spring loading (first third)', 2, 32, -7 + 10 * Math.log10(BUFFER_SPRING), { force: 2.7 * BUFFER_SPRING, roughness: 6, grain: 0.6, periodicity: 0, contactWidth: 0.2 }, arBufferSpring, arBufferTube, { coil: { level: 0.5, length: 11, dispersion: 0.5, decay: 0.12, brightness: 2800 }, housing: BUFFER_TUBE_HOUSING }),
+                    travelRub('buffer spring loading (second third)', 32, 62, -6.5 + 10 * Math.log10(BUFFER_SPRING), { force: 3.4 * BUFFER_SPRING, roughness: 6, grain: 0.6, periodicity: 0, contactWidth: 0.2 }, arBufferSpring, arBufferTube, { coil: { level: 0.52, length: 11, dispersion: 0.5, decay: 0.12, brightness: 2900 }, housing: BUFFER_TUBE_HOUSING }),
+                    travelRub('buffer spring loading (last third)', 62, STROKE_MM, -6 + 10 * Math.log10(BUFFER_SPRING), { force: 4.1 * BUFFER_SPRING, roughness: 6, grain: 0.6, periodicity: 0, contactWidth: 0.2 }, arBufferSpring, arBufferTube, { coil: { level: 0.55, length: 11, dispersion: 0.5, decay: 0.12, brightness: 3000 }, housing: BUFFER_TUBE_HOUSING }),
+                    hit('buffer weights lag', tAt(3), -22, 0.6, steelBlock(1.5, 12), arBuffer, { scatter: 0.9, radius: 2 }),
+                    hit('buffer weights settle', CH_END + 0.004, -12, 0.8, steelBlock(1.5, 12), arBuffer, { scatter: 0.9, radius: 2 }, { housing: BUFFER_TUBE_HOUSING }),
+                ],
+            },
+            {
+                name: 'rear-stop',
+                description: 'Full travel (3.7" ≈ 94 mm): the charging handle bottoms out; the bolt shifts inside the carrier.',
+                elements: [
+                    hit('handle bottoms out', CH_END, -6, 1.0 * HAND, arChargingHandle, arUpper, { scatter: 0.4, radius: 3 }),
+                    hit('bolt shifts in the carrier', CH_END + 0.003, -14, 0.5 * HAND, arBolt, arCarrier, { scatter: 0.4, radius: 2 }),
+                ],
+            },
+            {
+                name: 'release-forward',
+                description: 'Let go: buffer spring slams the carrier home, stripping and chambering a round, and the bolt locks up. The charging handle rides home and latches.',
+                elements: mag === 'empty' ? caughtOnCatch(LET_GO) : arForward(LET_GO, true, mag),
+            },
+        ],
+    };
+}
+export const AR15_CHARGE = makeArCharge('loaded');
+export const AR15_CHARGE_EMPTY = makeArCharge('empty');
+export const AR15_CHARGE_NO_MAG = makeArCharge('none');
 const PRESS = 0.0;
 const CATCH_DROPS = 0.07;
-export const AR15_BOLT_RELEASE = {
-    id: 'ar15-bolt-release',
-    title: 'AR-15: bolt catch pressed, bolt slams home',
-    room: 0.04,
-    roomSize: 0.35,
-    housing: AR_HOUSING,
-    tracks: [
-        {
-            name: 'bolt-catch',
-            description: 'Thumb presses the bolt-catch paddle; the catch drops off the bolt face.',
-            elements: [
-                snap('catch pivots down off the bolt', PRESS, -6, { strength: 0.8, preload: (CATCH_DROPS - PRESS) * 1000, creak: 0.1, seat: 0.5, seatDelay: 3 }, arBoltCatch, arBolt),
-            ],
-        },
-        {
-            name: 'release-forward',
-            description: 'Buffer spring slams the carrier home, stripping and chambering a round; the bolt locks up.',
-            elements: arForward(CATCH_DROPS + 0.001, false),
-        },
-        {
-            name: 'catch-reset',
-            description: 'The bolt catch springs back up once the carrier is past.',
-            elements: [snap('catch spring resets', CATCH_DROPS + 0.02, -16, { strength: 0.4, preload: 0, seat: 0.2 }, arBoltCatch, arUpper)],
-        },
-    ],
-};
-export const FIREARM_SCENES = [PUMP_SHOTGUN, AR15_CHARGE, AR15_BOLT_RELEASE];
+function makeArBoltRelease(mag) {
+    return {
+        id: 'ar15-bolt-release' + MAG_ID[mag],
+        title: 'AR-15: bolt catch pressed, bolt slams home' + MAG_TITLE[mag],
+        room: 0.04,
+        roomSize: 0.35,
+        housing: AR_HOUSING,
+        tracks: [
+            {
+                name: 'bolt-catch',
+                description: 'Thumb presses the bolt-catch paddle; the catch drops off the bolt face.',
+                elements: [
+                    // With an empty magazine the follower is pushing the catch up: a firmer, longer press.
+                    snap('catch pivots down off the bolt', PRESS, -6, { strength: mag === 'empty' ? 1 : 0.8, preload: (CATCH_DROPS - PRESS) * 1000, creak: mag === 'empty' ? 0.3 : 0.1, seat: 0.5, seatDelay: 3 }, arBoltCatch, arBolt),
+                ],
+            },
+            {
+                name: 'release-forward',
+                description: mag === 'loaded'
+                    ? 'Buffer spring slams the carrier home, stripping and chambering a round; the bolt locks up.'
+                    : mag === 'empty'
+                        ? 'Buffer spring slams the carrier home over the empty follower; nothing to feed; the bolt locks up.'
+                        : 'Buffer spring slams the carrier home with no magazine; nothing to feed; the bolt locks up.',
+                elements: arForward(CATCH_DROPS + 0.001, false, mag),
+            },
+            {
+                name: 'catch-reset',
+                description: 'The bolt catch springs back up once the carrier is past.',
+                elements: [snap('catch spring resets', CATCH_DROPS + 0.02, -16, { strength: 0.4, preload: 0, seat: 0.2 }, arBoltCatch, arUpper)],
+            },
+        ],
+    };
+}
+export const AR15_BOLT_RELEASE = makeArBoltRelease('loaded');
+export const AR15_BOLT_RELEASE_EMPTY = makeArBoltRelease('empty');
+export const AR15_BOLT_RELEASE_NO_MAG = makeArBoltRelease('none');
+export const FIREARM_SCENES = [
+    PUMP_SHOTGUN,
+    AR15_CHARGE, AR15_CHARGE_EMPTY, AR15_CHARGE_NO_MAG,
+    AR15_BOLT_RELEASE, AR15_BOLT_RELEASE_EMPTY, AR15_BOLT_RELEASE_NO_MAG,
+];
 //# sourceMappingURL=firearms.js.map

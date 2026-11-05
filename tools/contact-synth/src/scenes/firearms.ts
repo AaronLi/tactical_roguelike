@@ -129,7 +129,10 @@ const CH_MASS = 0.03;
  * over the feed lips 72→45 mm, pushing it into the chamber 28→10 mm). Returns time and speed
  * as functions of position (mm from battery) down to the bolt face meeting the extension (9.5).
  */
-function simulateRun(mass: number): { timeAt: (x: number) => number; speedAt: (x: number) => number; total: number; arrive: number } {
+/** What's in the magazine well: a loaded magazine, an empty one (follower up), or nothing. */
+export type MagState = 'loaded' | 'empty' | 'none';
+
+function simulateRun(mass: number, mag: MagState = 'loaded'): { timeAt: (x: number) => number; speedAt: (x: number) => number; total: number; arrive: number } {
   const F_BAT = 40 * BUFFER_SPRING;
   const F_REAR = 80 * BUFFER_SPRING; // ~2x the battery force: 7.3" vs 3.6" of compression
   const xs: number[] = [];
@@ -142,8 +145,12 @@ function simulateRun(mass: number): { timeAt: (x: number) => number; speedAt: (x
   while (x > 9.5 && tt < 0.5) {
     const fs = F_BAT + (F_REAR - F_BAT) * (x / STROKE_MM);
     let drag = 6;
-    if (x < 86 && x > 55) drag += 25; // stripping the round over the feed lips
-    if (x < 45 && x > 3) drag += 15; // pushing it into the chamber
+    if (mag === 'loaded') {
+      if (x < 86 && x > 55) drag += 25; // stripping the round over the feed lips
+      if (x < 45 && x > 3) drag += 15; // pushing it into the chamber
+    } else if (mag === 'empty') {
+      if (x < 86 && x > 30) drag += 6; // the follower pressing up under the bolt
+    }
     v += ((fs - drag) / mass) * dt;
     x -= v * 1000 * dt;
     tt += dt;
@@ -333,10 +340,22 @@ const AR_HOUSING: Scene['housing'] = {
 };
 
 /** The carrier running home under the buffer spring, starting at t (round in the magazine). */
-function arForward(t: number, withChargingHandle: boolean): SceneElement[] {
+/** Elements that only exist when a round is fed and chambered. */
+const FEED_ONLY = new Set([
+  'bolt picks up the top round', 'case dragged over the feed lips', 'stripped case slides off the next case',
+  'case rim snaps free of the feed lips', 'magazine spring shoves the stack up', 'cases clack against each other',
+  'cases settle in the stack', 'next round snaps up against the bolt', 'magazine body rings',
+  'next round rides along the carrier underside', 'bullet nose hits the feed ramp',
+  'bullet slides up the feed ramp into the chamber', 'case body slides along the chamber walls',
+  'case seats in the chamber', 'extractor snaps over the rim',
+]);
+// The empty magazine's follower (plastic).
+const arFollower: Body = { ...mat('pom'), shape: 'bar', size: 6, thickness: 3, modes: 2, irregularity: 0.5, damping: 0.4, level: 0 };
+
+function arForward(t: number, withChargingHandle: boolean, mag: MagState = 'loaded'): SceneElement[] {
   // The run is simulated from the reciprocating mass and the spring (see simulateRun): every
   // forward time and speed comes from it.
-  const run = simulateRun(RECIP_MASS + (withChargingHandle ? CH_MASS : 0));
+  const run = simulateRun(RECIP_MASS + (withChargingHandle ? CH_MASS : 0), mag);
   const vArrive = run.arrive;
   // Impact speeds were tuned against a 3.8 m/s landing; scale them to the simulated arrival.
   const V = (v: number) => (v * vArrive) / 3.8;
@@ -445,7 +464,14 @@ function arForward(t: number, withChargingHandle: boolean): SceneElement[] {
     els.push(hit('charging handle slams into its front stop', post(0.0581), 0, V(3.8), arChargingHandle, arUpper, { scatter: 0.4, radius: 3, click: 0.7 }));
     els.push(snap('charging handle latch catches', post(0.06), -9, { strength: 0.7, preload: 0, seat: 0.4, seatDelay: 2 }, arChLatch, arUpper));
   }
-  return els;
+  if (mag === 'loaded') return els;
+  // Without a round to feed: none of the feeding, stack or chambering contacts.
+  const kept = els.filter((e) => !FEED_ONLY.has(e.what));
+  if (mag === 'empty') {
+    // The empty magazine's plastic follower presses up under the bolt as it passes over it.
+    kept.push(fwdRub('bolt rides over the empty follower', 86, 30, -10, { force: 4, roughness: 3, grain: 0.3, contactWidth: 0.1 }, arFollower, arBolt, IN_MAG));
+  }
+  return kept;
 }
 
 const CH_BACK = 0.0;
@@ -483,9 +509,54 @@ const OIL_TUBE = { roughness: 2, grain: 0.3, periodicity: 0, contactWidth: 0.1 }
 // Ejection-port dust cover: a thin spring-loaded steel flap that snaps open and slaps the upper.
 const arDustCover: Body = { ...mat('steel'), shape: 'plate', size: 9, thickness: 0.8, modes: 2, irregularity: 0.6, damping: 0.35, level: 0 };
 
-export const AR15_CHARGE: Scene = {
-  id: 'ar15-charge',
-  title: 'AR-15: charging handle pulled back and released',
+const MAG_ID: Record<MagState, string> = { loaded: '', empty: '-empty-mag', none: '-no-mag' };
+const MAG_TITLE: Record<MagState, string> = { loaded: ' (loaded magazine)', empty: ' (empty magazine)', none: ' (no magazine)' };
+
+/** Pull: what the magazine does as the bolt passes over it. */
+function pullMagazine(mag: MagState): SceneElement[] {
+  if (mag === 'loaded') {
+    return [
+      travelRub('bolt riding over the top round', 30, 86, -16, { force: 5, roughness: 2, grain: 0.2, contactWidth: 0.05 }, arCase, arBolt, IN_MAG),
+      // The bolt clears the rim: the stack jumps up against the feed lips.
+      ...magazineReaction(tAt(88) + 0.002, -4, arFeedLips, 'top round snaps up against the feed lips'),
+    ];
+  }
+  if (mag === 'empty') {
+    return [
+      travelRub('bolt riding over the empty follower', 30, 86, -16, { force: 4, roughness: 3, grain: 0.3, contactWidth: 0.1 }, arFollower, arBolt, IN_MAG),
+      // The bolt clears the follower: the magazine spring snaps it up, and its tab lifts the
+      // bolt catch, which snaps up into the bolt's path.
+      hit('follower pops up', tAt(88) + 0.002, -5, 1.2, arFollower, arMagBody, { scatter: 0.3, radius: 2, click: 0.6 },
+        { coil: { level: 0.6, length: 4, dispersion: 0.45, decay: 0.08, brightness: 5000 }, ...IN_MAG }),
+      hit('empty magazine body rings', tAt(88) + 0.0026, -6, 1.0, arMagBody, arFollower, { scatter: 0.5, radius: 3, click: 0.2, sharp: 0.7 }, IN_MAG),
+      snap('bolt catch snaps up', tAt(88) + 0.004, -3, { strength: 0.8, preload: 0, seat: 0.4, seatDelay: 1.5 }, arBoltCatch, arLower, { housing: LOWER_HOUSING }),
+    ];
+  }
+  return [];
+}
+
+/** Charge with an empty magazine: let go, and the carrier is caught a few mm forward by the raised
+ *  bolt catch (it locks open). The charging handle stays back until the operator pushes it home. */
+function caughtOnCatch(t: number): SceneElement[] {
+  return [
+    hit('buffer spring lets go', t, -3, 3, arBufferSpring, arBufferTube, { scatter: 0.2, radius: 1, click: 0.4, sharp: 0.8 },
+      { coil: { level: 0.7, length: 9, dispersion: 0.5, decay: 0.12, brightness: 3000 }, housing: BUFFER_TUBE_HOUSING }),
+    rub('carrier jumps forward a few mm', t + 0.001, -12, { force: 6, duration: 0.008, speed: 1.2, profile: 'accelerate', roughness: 3, grain: 0.15, contactWidth: 0.08 }, arCarrier, arUpper),
+    hit('bolt face slams into the raised bolt catch', t + 0.009, 4, 1.4, arBolt, arBoltCatch, { scatter: 0.4, radius: 2, click: 0.9, sharp: 0.95 }, { housing: LOWER_HOUSING }),
+    hit('carrier group stops on the bolt', t + 0.0094, 0, 1.4, arCarrierGroup, arBolt, { scatter: 0.4, radius: 3, click: 0.7, sharp: 0.9 }),
+    hit('buffer spring jolts, still loaded', t + 0.0096, -6, 1.2, arBufferSpring, arBufferTube, { scatter: 0.2, radius: 1, click: 0.05, sharp: 0.4 },
+      { coil: { level: 0.6, length: 11, dispersion: 0.45, decay: 0.12, brightness: 3000 }, housing: BUFFER_TUBE_HOUSING }),
+    hit('buffer weights slam forward', t + 0.012, -8, 1.2, steelBlock(1.5, 12), arBuffer, { scatter: 0.6, radius: 3, click: 0.6 }, { housing: BUFFER_TUBE_HOUSING }),
+    // A moment later the operator pushes the charging handle home; it latches.
+    rub('operator pushes the charging handle home', t + 0.25, -12, { force: 4, duration: 0.12, speed: 0.6, profile: 'swell', roughness: 3, grain: 0.2, contactWidth: 0.08 }, arChargingHandle, arUpper),
+    snap('charging handle latch catches', t + 0.37, -6, { strength: 0.7, preload: 0, seat: 0.4, seatDelay: 2 }, arChLatch, arUpper),
+  ];
+}
+
+function makeArCharge(mag: MagState): Scene {
+  return {
+  id: 'ar15-charge' + MAG_ID[mag],
+  title: 'AR-15: charging handle pulled back and released' + MAG_TITLE[mag],
   room: 0.04,
   roomSize: 0.35,
   housing: AR_HOUSING,
@@ -555,11 +626,7 @@ export const AR15_CHARGE: Scene = {
     {
       name: 'magazine',
       description: '30-86 mm: the bolt rides over the top round in the magazine; once it clears the rim (~88 mm), the magazine spring pops the round up against the feed lips.',
-      elements: [
-        travelRub('bolt riding over the top round', 30, 86, -16, { force: 5, roughness: 2, grain: 0.2, contactWidth: 0.05 }, arCase, arBolt, IN_MAG),
-        // The bolt clears the rim: the stack jumps up against the feed lips.
-        ...magazineReaction(tAt(88) + 0.002, -4, arFeedLips, 'top round snaps up against the feed lips'),
-      ],
+      elements: pullMagazine(mag),
     },
     {
       name: 'buffer-spring-compress',
@@ -590,17 +657,22 @@ export const AR15_CHARGE: Scene = {
     {
       name: 'release-forward',
       description: 'Let go: buffer spring slams the carrier home, stripping and chambering a round, and the bolt locks up. The charging handle rides home and latches.',
-      elements: arForward(LET_GO, true),
+      elements: mag === 'empty' ? caughtOnCatch(LET_GO) : arForward(LET_GO, true, mag),
     },
   ],
-};
+  };
+}
+export const AR15_CHARGE = makeArCharge('loaded');
+export const AR15_CHARGE_EMPTY = makeArCharge('empty');
+export const AR15_CHARGE_NO_MAG = makeArCharge('none');
 
 const PRESS = 0.0;
 const CATCH_DROPS = 0.07;
 
-export const AR15_BOLT_RELEASE: Scene = {
-  id: 'ar15-bolt-release',
-  title: 'AR-15: bolt catch pressed, bolt slams home',
+function makeArBoltRelease(mag: MagState): Scene {
+  return {
+  id: 'ar15-bolt-release' + MAG_ID[mag],
+  title: 'AR-15: bolt catch pressed, bolt slams home' + MAG_TITLE[mag],
   room: 0.04,
   roomSize: 0.35,
   housing: AR_HOUSING,
@@ -609,13 +681,18 @@ export const AR15_BOLT_RELEASE: Scene = {
       name: 'bolt-catch',
       description: 'Thumb presses the bolt-catch paddle; the catch drops off the bolt face.',
       elements: [
-        snap('catch pivots down off the bolt', PRESS, -6, { strength: 0.8, preload: (CATCH_DROPS - PRESS) * 1000, creak: 0.1, seat: 0.5, seatDelay: 3 }, arBoltCatch, arBolt),
+        // With an empty magazine the follower is pushing the catch up: a firmer, longer press.
+        snap('catch pivots down off the bolt', PRESS, -6, { strength: mag === 'empty' ? 1 : 0.8, preload: (CATCH_DROPS - PRESS) * 1000, creak: mag === 'empty' ? 0.3 : 0.1, seat: 0.5, seatDelay: 3 }, arBoltCatch, arBolt),
       ],
     },
     {
       name: 'release-forward',
-      description: 'Buffer spring slams the carrier home, stripping and chambering a round; the bolt locks up.',
-      elements: arForward(CATCH_DROPS + 0.001, false),
+      description: mag === 'loaded'
+        ? 'Buffer spring slams the carrier home, stripping and chambering a round; the bolt locks up.'
+        : mag === 'empty'
+          ? 'Buffer spring slams the carrier home over the empty follower; nothing to feed; the bolt locks up.'
+          : 'Buffer spring slams the carrier home with no magazine; nothing to feed; the bolt locks up.',
+      elements: arForward(CATCH_DROPS + 0.001, false, mag),
     },
     {
       name: 'catch-reset',
@@ -623,6 +700,14 @@ export const AR15_BOLT_RELEASE: Scene = {
       elements: [snap('catch spring resets', CATCH_DROPS + 0.02, -16, { strength: 0.4, preload: 0, seat: 0.2 }, arBoltCatch, arUpper)],
     },
   ],
-};
+  };
+}
+export const AR15_BOLT_RELEASE = makeArBoltRelease('loaded');
+export const AR15_BOLT_RELEASE_EMPTY = makeArBoltRelease('empty');
+export const AR15_BOLT_RELEASE_NO_MAG = makeArBoltRelease('none');
 
-export const FIREARM_SCENES: Scene[] = [PUMP_SHOTGUN, AR15_CHARGE, AR15_BOLT_RELEASE];
+export const FIREARM_SCENES: Scene[] = [
+  PUMP_SHOTGUN,
+  AR15_CHARGE, AR15_CHARGE_EMPTY, AR15_CHARGE_NO_MAG,
+  AR15_BOLT_RELEASE, AR15_BOLT_RELEASE_EMPTY, AR15_BOLT_RELEASE_NO_MAG,
+];
