@@ -17,7 +17,6 @@ const G_GunRecipes = (() => {
   type Trace = GunTrace; // one of tools/models/guntraces.ts's tables of traced outlines
   type Anim = Record<string, any>; // a recipe's animated parts, by name
   type Sight = { sy: number; fSight: number; relief: number };
-  interface BipodLeg { p: THREE.Object3D; sub?: THREE.Object3D; back: boolean; side: number }
 
   // ---------------------------------------------------------------- primitive kit
   function kit() {
@@ -740,22 +739,21 @@ const G_GunRecipes = (() => {
   }
 
   // ---------------------------------------------------------------- attachments
-  // A bipod leg hinged at (f, y): drawn by draw() in gun coordinates, on a part of its own that swings it down to stand
-  // the gun on (anim.bipod, posed by bipodPose). back: folded back along the gun (its foot behind the hinge), else forward.
-  // (Inside another moving part it's drawn fixed, folded.)
+  // A bipod leg hinged at (f, y): drawn by draw() in gun coordinates, on a node of its own that swings it down to stand the gun on.
+  // The legs are the children of ONE node, anim.bipod (baked as part_bipod; its own pivot is the first leg's hinge and nothing turns it);
+  // each leg is a group with its pivot at its hinge and userData.leg = { deploy: [rx, ry, rz] }: the rotation (radians, XYZ euler) it
+  // turns to when the bipod is down. Folded is rotation 0, which is how it is drawn (docs/models.md "Bipods"; js/gunrig.ts bipodPose drives
+  // it). back: folded back along the gun (its foot behind the hinge), else forward; x: which side. (Inside another moving part it's drawn
+  // fixed, folded.)
+  const BIPOD_SPLAY = 0.2;
   function bipodLeg(k: Kit, anim: Anim | null | undefined, f: number, y: number, x: number, back: boolean, draw: () => void) {
     if (!anim || k.inPart) { draw(); return; }
-    const p = k.part(f, y);
+    if (!anim.bipod) anim.bipod = k.part(f, y);
+    const bp: THREE.Object3D = anim.bipod, p = k.part(f, y);
+    bp.add(p); p.position.sub(bp.position); // (nested: its position is relative to the bipod's node)
     k.into(p, f, y); draw(); k.into(null);
-    (anim.bipod || (anim.bipod = [])).push({ p, back, side: Math.sign(x) || 1 });
-  }
-  // The legs down by k (0 folded, 1 standing the gun up): about their hinges to point at the ground, splayed a little.
-  // legs: anim.bipod (the viewmodel's), or a world model's userData.bipod (js/rig.ts).
-  const BIPOD_SPLAY = 0.2;
-  function bipodPose(legs: BipodLeg[] | null | undefined, k: number) {
-    if (!legs) return;
-    const e = k * k * (3 - 2 * k);
-    for (const l of legs) (l.sub || l.p).rotation.set(e * (l.back ? 1 : -1) * Math.PI / 2, e * l.side * BIPOD_SPLAY * (l.back ? 1 : -1), 0);
+    const s = back ? 1 : -1;
+    p.userData.leg = { deploy: [s * Math.PI / 2, s * (Math.sign(x) || 1) * BIPOD_SPLAY, 0] };
   }
   // Foregrips hang under the handguard at forward position f.
   function foregrip(k: Kit, t: string, f: number, m: THREE.Material, anim?: Anim | null) {
@@ -2325,7 +2323,7 @@ const G_GunRecipes = (() => {
   // (skin: the gun's stickers, js/stickers.ts.) Nothing of this runs in the game: it loads baked glTF (js/gunmodels.ts).
   function display(def: any, skin?: any) { const k = kit(); const info = build(k, def); if (skin && skin.length) G.Stickers.decorate(k.g, skin); return { group: k.g, info }; }
 
-  return { M, build, display, roundDims, roundShape, quarrel, bipodPose };
+  return { M, build, display, roundDims, roundShape, quarrel };
 })();
 G.GunRecipes = G_GunRecipes;
 interface GameModules { GunRecipes: typeof G_GunRecipes; }
