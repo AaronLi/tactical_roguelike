@@ -1432,6 +1432,8 @@ const G_Game = {
       G.Me.flushHits();
       this.updateZone();
       this.updateDoors(dt);
+    } else if (this.phase === 'menu' && G.MenuShow && G.MenuShow.update(dt)) {
+      // the main menu: the guns one after another (js/menushow.ts), drawn below instead of the level
     } else if (this.map) {
       // menu / shop backdrop camera
       this.backdropT = (this.backdropT || 0) + dt * 0.08;
@@ -1442,7 +1444,7 @@ const G_Game = {
     }
     G.R.update(dt);
     G.HUD.update(dt);
-    G.R.render();
+    if (this.phase === 'menu' && G.MenuShow && G.MenuShow.live) G.MenuShow.render(G.R.renderer); else G.R.render();
     // the veil lifts once the new place has drawn veilN SMOOTH frames in a row (the first ones after a build upload textures and collect garbage: lifting
     // on those makes the wipe stutter off), or after 90 frames whatever they took (a slow machine still gets in)
     if (this.veilN > 0) {

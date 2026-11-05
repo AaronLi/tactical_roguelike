@@ -3339,7 +3339,7 @@ const G_Highlights = (() => {
   }
 
   // (step and draw: the broadcast moved on and drawn by hand, for checking a replay without standing at a TV)
-  return { tick, shot, roundPath, glass, crack, door, laser, hitBy, kill, suspectDown, saved, incap, arrest, nade, boom, fragPaths, flash, take, drop, mount, unmount, update, step, draw, gearFor, reset, exportPack, renderPack, cancelRender, exportHere, muxHere, toJSON, fromJSON, R, P };
+  return { tourMoves: GT_MOVES, tourPath: gearPath, tick, shot, roundPath, glass, crack, door, laser, hitBy, kill, suspectDown, saved, incap, arrest, nade, boom, fragPaths, flash, take, drop, mount, unmount, update, step, draw, gearFor, reset, exportPack, renderPack, cancelRender, exportHere, muxHere, toJSON, fromJSON, R, P };
 })();
 G.Highlights = G_Highlights;
 interface GameModules { Highlights: typeof G_Highlights; }
