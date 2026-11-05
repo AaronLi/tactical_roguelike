@@ -108,6 +108,8 @@ const G_Me = {
   shove: undefined as unknown as number, shoveV: undefined as unknown as number, swayT: undefined as unknown as number, walkAmp: undefined as unknown as number,
   swayX: undefined as unknown as number, swayY: undefined as unknown as number, bobT: undefined as unknown as number, shakeT: undefined as unknown as number,
   bipodT: undefined as unknown as number, bipodOn: undefined as unknown as boolean,
+  // loose carry: where the arms point (they trail the head at the hip unless Shift brings the gun up), and how loose they are now
+  armYaw: undefined as unknown as number, armPitch: undefined as unknown as number, looseT: 0,
   // timers and the rest of what a frame leaves
   healLeft: undefined as unknown as number, reviveT: undefined as unknown as number, stateT: undefined as unknown as number, specIdx: undefined as unknown as number,
   noAmmoT: undefined as unknown as number | undefined, dryT: undefined as unknown as number | undefined, shoutT: undefined as unknown as number | undefined,
@@ -892,6 +894,7 @@ const G_Me = {
   // Breathing (two slow frequencies), the erratic twitch, walking and the low-health tremor. Looser from the
   // hip, tighter crouched or holding your breath (Shift); on a bipod, hardly any.
   swayStep(dt: number, def: WeaponDef) {
+    this.armStep(dt);
     const m = this.recoilModel(def), a = this.adsT || 0, low = this.lowHealth();
     this.swayT += dt;
     this.walkAmp += ((this.onGround ? Math.min((this.hspeed || 0) / this.SPEED.walk, 1.4) : 0) - this.walkAmp) * Math.min(1, dt * 4);
@@ -910,12 +913,42 @@ const G_Me = {
       + er * (0.005 * Math.sin(t * 5.7 + 1.1) + 0.0036 * Math.sin(t * 8.9 + 0.4))
       + wa * 0.02 * (Math.abs(Math.cos(this.bobT)) - 0.64)) + tremor(0.7);
   },
+  // LOOSE CARRY: at the hip without Shift, the head turns first and the arms (and the gun in them)
+  // catch up a moment later, as if the body follows the eyes; Shift (steadying) or aiming brings the gun up into
+  // the view as it always was. The arms follow on a soft spring and never trail by more than ARM_LAG_MAX.
+  // (lowered, low ready: looser still — the gun hangs from the arms, so the head gets further ahead and they're slower to follow)
+  ARM_FOLLOW: { loose: 6.5, low: 3.2, held: 40 }, // (per second: how fast the arms catch up loose, lowered, and held up)
+  ARM_LAG_MAX: { y: 0.5, p: 0.15 }, // (rad: ~28 degrees side to side, ~9 up and down)
+  ARM_LAG_MAX_LOW: { y: 0.9, p: 0.25 }, // (rad, lowered: ~52 and ~14 degrees)
+  ARM_PITCH_FOLLOW: 2, // (up and down the arms keep up this many times faster than side to side: a nod shouldn't swing the gun)
+  lowT: 0,
+  armStep(dt: number) {
+    const free = !this.steadying && !this.ads && (this.adsT || 0) < 0.05 && !this.stowed && !this.held && !this.down && !this.dead;
+    const loose = free, low = free && !!this.lowReady;
+    this.looseT += ((loose ? 1 : 0) - this.looseT) * Math.min(1, dt * 6);
+    this.lowT += ((low ? 1 : 0) - this.lowT) * Math.min(1, dt * 4);
+    if (this.armYaw == null || this.armPitch == null) { this.armYaw = this.yaw; this.armPitch = this.pitch; }
+    const follow = G.U.lerp(this.ARM_FOLLOW.held, G.U.lerp(this.ARM_FOLLOW.loose, this.ARM_FOLLOW.low, this.lowT), this.looseT);
+    const k = Math.min(1, dt * follow);
+    this.armYaw += G.U.angDiff(this.armYaw, this.yaw) * k;
+    this.armPitch += (this.pitch - this.armPitch) * Math.min(1, k * this.ARM_PITCH_FOLLOW);
+    const M = { y: G.U.lerp(this.ARM_LAG_MAX.y, this.ARM_LAG_MAX_LOW.y, this.lowT), p: G.U.lerp(this.ARM_LAG_MAX.p, this.ARM_LAG_MAX_LOW.p, this.lowT) };
+    const ly = G.U.angDiff(this.yaw, this.armYaw), lp = this.armPitch - this.pitch; // (how far behind they are)
+    if (Math.abs(ly) > M.y) this.armYaw = this.yaw + Math.sign(ly) * M.y;
+    if (Math.abs(lp) > M.p) this.armPitch = this.pitch + Math.sign(lp) * M.p;
+  },
+  // how far the arms trail the head (rad, in the aim offset's terms: the gun turns that much from where you look)
+  armLag() {
+    if (this.armYaw == null || this.armPitch == null) return { y: 0, p: 0 };
+    return { y: G.U.angDiff(this.yaw, this.armYaw), p: this.pitch - this.armPitch };
+  },
   // the gun's total offset from where you're looking (rad): recoil + sway + flinch + lag behind fast turns
   aimOffset() {
     const sc = 1 - (this.adsT || 0) * 0.75;
+    const lag = this.armLag(); // (the arms trailing the head: rounds go where the gun points)
     return {
-      y: this.rc.y + this.swayOff.y + this.flinch.y - (this.swayX || 0) * 0.25 * sc, // (a little drag behind a fast turn, not much)
-      p: this.rc.p + this.swayOff.p + this.flinch.p + (this.swayY || 0) * 0.25 * sc,
+      y: this.rc.y + this.swayOff.y + this.flinch.y - (this.swayX || 0) * 0.25 * sc + lag.y, // (a little drag behind a fast turn, not much)
+      p: this.rc.p + this.swayOff.p + this.flinch.p + (this.swayY || 0) * 0.25 * sc + lag.p,
     };
   },
 
@@ -2366,7 +2399,7 @@ const G_Me = {
     // (the shove back into your shoulder, recoilStep; from the hip the muzzle climbing tips it back a little more)
     let z = G.U.lerp(u.hip.z, u.ads.z, a) + this.shove + Math.max(0, this.rc.p) * 0.35 * (1 - a);
     let rx = off.p - punch, ry = off.y - punchY, rz = -this.rc.y * 0.3;
-    if (this.lowReady) { ry = 0.35; rx -= 0.6; x -= 0.04; y -= 0.07; } // muzzle down
+    if (this.lowReady) { ry = 0.35 + this.armLag().y; rx -= 0.6; x -= 0.04; y -= 0.07; } // muzzle down (still trailing the head)
     this.stowW = (this.stowW || 0) + ((this.stowed || this.held ? 1 : 0) - (this.stowW || 0)) * Math.min(1, dt * 9); // (a grenade in hand: the weapon down too)
     y -= this.stowW * 0.55; rx -= this.stowW * 1.1; // weapon put away while the hands are busy
     if (this.raiseT > 0) { const k = this.raiseT / (this.raiseMax || 0.3); rx -= k * 1.0; y -= k * 0.3; }
@@ -2385,6 +2418,10 @@ const G_Me = {
     const strafe = this.vel.x * Math.cos(this.yaw) - this.vel.z * Math.sin(this.yaw);
     x -= this.swayX * 0.2 * sc; y -= this.swayY * 0.15 * sc; rz -= strafe * 0.025 * sc; // (the turn lag itself is in aimOffset)
     if (this.down) { y -= 0.05; rz += 0.3; }
+    { // (the trailing arms swing about the eye, so the whole gun comes round, not just its nose)
+      const lag = this.armLag();
+      if (lag.y || lag.p) { const v = new THREE.Vector3(x, y, z).applyEuler(new THREE.Euler(lag.p, lag.y, 0, 'YXZ')); x = v.x; y = v.y; z = v.z; }
+    }
     const lp = Math.min(1, dt * 18);
     vm.position.x += (x - vm.position.x) * lp;
     vm.position.y += (y - vm.position.y) * lp;
