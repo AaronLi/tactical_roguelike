@@ -1,0 +1,23 @@
+{
+  "source": "authored",
+  "kind": "part",
+  "slot": "optic",
+  "frame": "rail-top",
+  "optic": {
+    "sy": 0.034,
+    "fSight": -0.026,
+    "relief": 0.09,
+    "reflex": {
+      "f": 0.0107,
+      "y": 0.034,
+      "w": 0.032,
+      "h": 0.023,
+      "kind": "cdot"
+    },
+    "magnifier": true,
+    "height": "mid"
+  },
+  "replaces": [
+    "Vantage Halo circle-dot sight"
+  ]
+}

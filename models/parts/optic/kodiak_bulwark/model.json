@@ -1,0 +1,24 @@
+{
+  "source": "authored",
+  "kind": "part",
+  "slot": "optic",
+  "frame": "rail-top",
+  "optic": {
+    "sy": 0.038,
+    "fSight": -0.033,
+    "relief": 0.085,
+    "reflex": {
+      "f": 0.027,
+      "y": 0.038,
+      "w": 0.0454,
+      "h": 0.0454,
+      "round": true,
+      "kind": "dot"
+    },
+    "magnifier": true,
+    "height": "mid"
+  },
+  "replaces": [
+    "Kodiak Bulwark 34mm red dot"
+  ]
+}

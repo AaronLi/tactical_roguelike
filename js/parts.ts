@@ -1483,11 +1483,22 @@ const G_Gunsmith = (() => {
     {"id":"op.auth.falcon","slot":"optic","mount":"op:pic","brand":"strix","name":"Strix Falcon open reflex","price":340,"tier":1,"st":{"ergo":-1,"acc":-2,"hip":2},"set":{"zoom":0.8,"scoped":false},"desc":"Unmagnified. Takes a magnifier behind it.","model":{"optic":"authored","apart":"optic/falcon","ret":"dot"},"magnifier":true,"height":"low","src":"models/parts/optic/falcon"},
   ];
   const AUTHORED_REPLACES: any[] = [
+    {"apart":"optic/brightline_pip","names":["Brightline Pip red dot"]},
     {"apart":"optic/ember","names":["Halcyon Ember pistol dot"]},
+    {"apart":"optic/halcyon_lantern","names":["Halcyon Lantern holographic"]},
     {"apart":"optic/halcyon_ta3","names":["Halcyon TA-3 3× prism"]},
+    {"apart":"optic/kodiak_bulwark","names":["Kodiak Bulwark 34mm red dot"]},
+    {"apart":"optic/kodiak_keep","names":["Kodiak Keep enclosed pistol dot"]},
     {"apart":"optic/meridian_p1","names":["Meridian P1 1× prism"]},
     {"apart":"optic/meridian_p2","names":["Meridian P2 prism 2×"]},
+    {"apart":"optic/osprey_mite","names":["Osprey Mite green pistol dot"]},
+    {"apart":"optic/osprey_viper","names":["Osprey Viper green dot"]},
+    {"apart":"optic/strix_hx2","names":["Strix HX-2 holographic"]},
+    {"apart":"optic/strix_kite","names":["Strix Kite pistol red dot"]},
     {"apart":"optic/strix_lynx","names":["Strix Lynx 1.5× prism"]},
+    {"apart":"optic/strix_owlet","names":["Strix Owlet micro dot"]},
+    {"apart":"optic/vantage_halo","names":["Vantage Halo circle-dot sight"]},
+    {"apart":"optic/vantage_halo_p","names":["Vantage Halo circle-dot pistol sight"]},
   ];
   // authored-parts:end
   for (const a of AUTHORED_PARTS) add({ id: a.id, slot: a.slot, mount: a.mount, brand: BR[a.brand], name: a.name, price: a.price, tier: a.tier, st: a.st, set: a.set, desc: a.desc, model: a.model, authored: { height: a.height }, provides: a.magnifier ? { magnifier: 'magn' } : null });

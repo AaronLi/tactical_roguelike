@@ -1,0 +1,24 @@
+{
+  "source": "authored",
+  "kind": "part",
+  "slot": "optic",
+  "frame": "rail-top",
+  "optic": {
+    "sy": 0.028,
+    "fSight": -0.02,
+    "relief": 0.085,
+    "reflex": {
+      "f": 0.014,
+      "y": 0.028,
+      "w": 0.0254,
+      "h": 0.0254,
+      "round": true,
+      "kind": "dot"
+    },
+    "magnifier": true,
+    "height": "low"
+  },
+  "replaces": [
+    "Strix Owlet micro dot"
+  ]
+}

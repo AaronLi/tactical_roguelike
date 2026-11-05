@@ -1,0 +1,23 @@
+{
+  "source": "authored",
+  "kind": "part",
+  "slot": "optic",
+  "frame": "rail-top",
+  "optic": {
+    "sy": 0.033,
+    "fSight": -0.022,
+    "relief": 0.1,
+    "reflex": {
+      "f": 0.023,
+      "y": 0.033,
+      "w": 0.033,
+      "h": 0.027,
+      "kind": "holo"
+    },
+    "magnifier": true,
+    "height": "mid"
+  },
+  "replaces": [
+    "Strix HX-2 holographic"
+  ]
+}
