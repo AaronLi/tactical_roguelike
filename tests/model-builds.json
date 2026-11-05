@@ -3,131 +3,135 @@
  "cases": [
   { "platform": "m4",
    "why": "default",
-   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.0", "receiver": "rcv.m4", "stock": "stk.tube.0" }
+   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "gr.ar.0", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.0", "receiver": "rcv.m4", "stock": "stk.tube.0" }
   },
   { "platform": "m4",
    "why": "bare",
-   "build": { "barrel": "br.5.56x45.10.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "receiver": "rcv.m4" }
+   "build": { "barrel": "br.5.56x45.10.3", "grip": "gr.ar.0", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "receiver": "rcv.m4" }
   },
   { "platform": "m4",
    "why": "loaded + lowest optic (op.pic.0)",
-   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.0", "receiver": "rcv.m4", "stock": "stk.tube.0", "tac": "tac.0", "tacL": "tac.0" }
+   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "gr.ar.0", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.0", "receiver": "rcv.m4", "stock": "stk.tube.0", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "m4",
    "why": "loaded-last",
-   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "fg": "fg.4", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.0", "receiver": "rcv.m4", "stock": "stk.tube.0", "tac": "tac.bc.0", "tacL": "tac.bc.0" }
+   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "fg": "fg.4", "grip": "gr.ar.0", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.0", "receiver": "rcv.m4", "stock": "stk.tube.0", "tac": "tac.bc.0", "tacL": "tac.bc.0" }
   },
   { "platform": "m4",
-   "why": "shortest barrel (br.5.56x45.10.3) x longest handguard that fits (oem.hg.ar.7)",
-   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.7", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.0", "receiver": "rcv.m4", "stock": "stk.tube.0" }
+   "why": "shortest barrel (br.5.56x45.10.3) x longest handguard that fits (oem.hg.ar.7) + authored handguard (oem.hg.ar.7)",
+   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "gr.ar.0", "handguard": "oem.hg.ar.7", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.0", "receiver": "rcv.m4", "stock": "stk.tube.0" }
   },
   { "platform": "m4",
    "why": "longest barrel (br.5.56x45.14.5.heavy) x shortest handguard (hg.ar.short.carbine)",
-   "build": { "barrel": "br.5.56x45.14.5.heavy", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "hg.ar.short.carbine", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.0", "receiver": "rcv.m4", "stock": "stk.tube.0" }
+   "build": { "barrel": "br.5.56x45.14.5.heavy", "charging": "oem.ch.ar.3", "grip": "gr.ar.0", "handguard": "hg.ar.short.carbine", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.0", "receiver": "rcv.m4", "stock": "stk.tube.0" }
   },
   { "platform": "m4",
    "why": "opens slots: op.pic.12 in optic (riserdot) + replaced optic (op.pso.1) on the riser",
-   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.12", "receiver": "rcv.m4", "riserdot": "op.pso.1", "stock": "stk.tube.0" }
+   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "gr.ar.0", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.12", "receiver": "rcv.m4", "riserdot": "op.pso.1", "stock": "stk.tube.0" }
   },
   { "platform": "m4",
    "why": "tallest optic (oem.op.pic.23)",
-   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "oem.op.pic.23", "receiver": "rcv.m4", "stock": "stk.tube.0", "tac": "tac.0", "tacL": "tac.0" }
+   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "gr.ar.0", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "oem.op.pic.23", "receiver": "rcv.m4", "stock": "stk.tube.0", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "m4",
    "why": "magnifier on the lowest optic that takes one (op.auth.falcon)",
-   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "receiver": "rcv.m4", "stock": "stk.tube.0", "tac": "tac.0", "tacL": "tac.0" }
+   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "gr.ar.0", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "receiver": "rcv.m4", "stock": "stk.tube.0", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "m4",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
-   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.pic.4", "receiver": "rcv.m4", "stock": "stk.tube.0", "tac": "tac.0", "tacL": "tac.0" }
+   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "gr.ar.0", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.pic.4", "receiver": "rcv.m4", "stock": "stk.tube.0", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "m4",
    "why": "authored optic (op.pic.1)",
-   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.1", "receiver": "rcv.m4", "stock": "stk.tube.0" }
+   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "gr.ar.0", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.1", "receiver": "rcv.m4", "stock": "stk.tube.0" }
   },
   { "platform": "m4",
    "why": "magnifier behind the authored optic (op.pic.1)",
-   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.pic.1", "receiver": "rcv.m4", "stock": "stk.tube.0" }
+   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "gr.ar.0", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.pic.1", "receiver": "rcv.m4", "stock": "stk.tube.0" }
   },
   { "platform": "m4",
    "why": "authored optic (op.pic.2)",
-   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.2", "receiver": "rcv.m4", "stock": "stk.tube.0" }
+   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "gr.ar.0", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.2", "receiver": "rcv.m4", "stock": "stk.tube.0" }
   },
   { "platform": "m4",
    "why": "magnifier behind the authored optic (op.pic.2)",
-   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.pic.2", "receiver": "rcv.m4", "stock": "stk.tube.0" }
+   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "gr.ar.0", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.pic.2", "receiver": "rcv.m4", "stock": "stk.tube.0" }
   },
   { "platform": "m4",
    "why": "authored optic (op.pic.3)",
-   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.3", "receiver": "rcv.m4", "stock": "stk.tube.0" }
+   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "gr.ar.0", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.3", "receiver": "rcv.m4", "stock": "stk.tube.0" }
   },
   { "platform": "m4",
    "why": "magnifier behind the authored optic (op.pic.3)",
-   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.pic.3", "receiver": "rcv.m4", "stock": "stk.tube.0" }
+   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "gr.ar.0", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.pic.3", "receiver": "rcv.m4", "stock": "stk.tube.0" }
   },
   { "platform": "m4",
    "why": "authored optic (op.pic.4)",
-   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.4", "receiver": "rcv.m4", "stock": "stk.tube.0" }
+   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "gr.ar.0", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.4", "receiver": "rcv.m4", "stock": "stk.tube.0" }
   },
   { "platform": "m4",
    "why": "magnifier behind the authored optic (op.pic.4)",
-   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.pic.4", "receiver": "rcv.m4", "stock": "stk.tube.0" }
+   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "gr.ar.0", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.pic.4", "receiver": "rcv.m4", "stock": "stk.tube.0" }
   },
   { "platform": "m4",
    "why": "authored optic (op.pic.5)",
-   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.5", "receiver": "rcv.m4", "stock": "stk.tube.0" }
+   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "gr.ar.0", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.5", "receiver": "rcv.m4", "stock": "stk.tube.0" }
   },
   { "platform": "m4",
    "why": "authored optic (op.pic.10)",
-   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.10", "receiver": "rcv.m4", "stock": "stk.tube.0" }
+   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "gr.ar.0", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.10", "receiver": "rcv.m4", "stock": "stk.tube.0" }
   },
   { "platform": "m4",
    "why": "magnifier behind the authored optic (op.pic.10)",
-   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.pic.10", "receiver": "rcv.m4", "stock": "stk.tube.0" }
+   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "gr.ar.0", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.pic.10", "receiver": "rcv.m4", "stock": "stk.tube.0" }
   },
   { "platform": "m4",
    "why": "authored optic (op.pic.11)",
-   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.11", "receiver": "rcv.m4", "stock": "stk.tube.0" }
+   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "gr.ar.0", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.11", "receiver": "rcv.m4", "stock": "stk.tube.0" }
   },
   { "platform": "m4",
    "why": "magnifier behind the authored optic (op.pic.11)",
-   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.pic.11", "receiver": "rcv.m4", "stock": "stk.tube.0" }
+   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "gr.ar.0", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.pic.11", "receiver": "rcv.m4", "stock": "stk.tube.0" }
   },
   { "platform": "m4",
    "why": "authored optic (op.pic.13)",
-   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.13", "receiver": "rcv.m4", "stock": "stk.tube.0" }
+   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "gr.ar.0", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.13", "receiver": "rcv.m4", "stock": "stk.tube.0" }
   },
   { "platform": "m4",
    "why": "magnifier behind the authored optic (op.pic.13)",
-   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.pic.13", "receiver": "rcv.m4", "stock": "stk.tube.0" }
+   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "gr.ar.0", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.pic.13", "receiver": "rcv.m4", "stock": "stk.tube.0" }
   },
   { "platform": "m4",
    "why": "authored optic (op.pic.14)",
-   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.14", "receiver": "rcv.m4", "stock": "stk.tube.0" }
+   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "gr.ar.0", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.14", "receiver": "rcv.m4", "stock": "stk.tube.0" }
   },
   { "platform": "m4",
    "why": "authored optic (op.pic.15)",
-   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.15", "receiver": "rcv.m4", "stock": "stk.tube.0" }
+   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "gr.ar.0", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.15", "receiver": "rcv.m4", "stock": "stk.tube.0" }
   },
   { "platform": "m4",
    "why": "authored optic (op.pic.16)",
-   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.16", "receiver": "rcv.m4", "stock": "stk.tube.0" }
+   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "gr.ar.0", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.16", "receiver": "rcv.m4", "stock": "stk.tube.0" }
   },
   { "platform": "m4",
    "why": "authored optic (op.auth.falcon)",
-   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "receiver": "rcv.m4", "stock": "stk.tube.0" }
+   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "gr.ar.0", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "receiver": "rcv.m4", "stock": "stk.tube.0" }
   },
   { "platform": "m4",
    "why": "magnifier behind the authored optic (op.auth.falcon)",
-   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "receiver": "rcv.m4", "stock": "stk.tube.0" }
+   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "gr.ar.0", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "receiver": "rcv.m4", "stock": "stk.tube.0" }
+  },
+  { "platform": "m4",
+   "why": "authored grip (oem.gr.ar.4)",
+   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.0", "receiver": "rcv.m4", "stock": "stk.tube.0" }
   },
   { "platform": "m4",
    "why": "bipod (fg.4)",
-   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "fg": "fg.4", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.0", "receiver": "rcv.m4", "stock": "stk.tube.0", "tac": "tac.0", "tacL": "tac.0" }
+   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "fg": "fg.4", "grip": "gr.ar.0", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.0", "receiver": "rcv.m4", "stock": "stk.tube.0", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "m4",
    "why": "suppressor on the muzzle (mz.r556.can)",
-   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.can", "optic": "op.pic.0", "receiver": "rcv.m4", "stock": "stk.tube.0", "tac": "tac.0", "tacL": "tac.0" }
+   "build": { "barrel": "br.5.56x45.10.3", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "gr.ar.0", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.can", "optic": "op.pic.0", "receiver": "rcv.m4", "stock": "stk.tube.0", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "ak",
    "why": "default + loaded + loaded-last",
@@ -378,6 +382,10 @@
    "build": { "barrel": "br.5.56x45.19.2.light", "grip": "oem.gr.ar.4", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon" }
   },
   { "platform": "f2",
+   "why": "authored grip (gr.ar.0)",
+   "build": { "barrel": "br.5.56x45.19.2.light", "grip": "gr.ar.0", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.0" }
+  },
+  { "platform": "f2",
    "why": "suppressor on the muzzle (mz.r556.can)",
    "build": { "barrel": "br.5.56x45.19.2.light", "grip": "oem.gr.ar.4", "mag": "stanag.mag.30", "muzzle": "mz.r556.can", "optic": "op.pic.0", "tac": "tac.0", "tacL": "tac.0" }
   },
@@ -496,6 +504,10 @@
   { "platform": "g36",
    "why": "authored optic (op.auth.falcon)",
    "build": { "barrel": "br.5.56x45.18.9.light", "grip": "oem.gr.ar.4", "handguard": "oem.hg.g36.0", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "stock": "stk.heavy.g36" }
+  },
+  { "platform": "g36",
+   "why": "authored grip (gr.ar.0)",
+   "build": { "barrel": "br.5.56x45.18.9.light", "grip": "gr.ar.0", "handguard": "oem.hg.g36.0", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.0", "stock": "stk.heavy.g36" }
   },
   { "platform": "g36",
    "why": "suppressor on the muzzle (mz.r556.can)",
@@ -622,6 +634,26 @@
    "build": { "barrel": "br.7x43.16", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.6", "mag": "br3.mag", "magnifier": "mgn.0", "muzzle": "mz.r762.comp", "optic": "op.auth.falcon", "stock": "oem.stk.tube.5" }
   },
   { "platform": "br3",
+   "why": "authored stock (stk.tube.0)",
+   "build": { "barrel": "br.7x43.16", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.6", "mag": "br3.mag", "muzzle": "mz.r762.comp", "optic": "op.pic.0", "stock": "stk.tube.0" }
+  },
+  { "platform": "br3",
+   "why": "authored grip (gr.ar.0)",
+   "build": { "barrel": "br.7x43.16", "charging": "oem.ch.ar.3", "grip": "gr.ar.0", "handguard": "oem.hg.ar.6", "mag": "br3.mag", "muzzle": "mz.r762.comp", "optic": "op.pic.0", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "br3",
+   "why": "authored handguard (hg.ar.2)",
+   "build": { "barrel": "br.7x43.16", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "hg.ar.2", "mag": "br3.mag", "muzzle": "mz.r762.comp", "optic": "op.pic.0", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "br3",
+   "why": "authored handguard (oem.hg.ar.5)",
+   "build": { "barrel": "br.7x43.16", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "br3.mag", "muzzle": "mz.r762.comp", "optic": "op.pic.0", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "br3",
+   "why": "authored handguard (oem.hg.ar.7)",
+   "build": { "barrel": "br.7x43.16", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.7", "mag": "br3.mag", "muzzle": "mz.r762.comp", "optic": "op.pic.0", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "br3",
    "why": "bipod (fg.4)",
    "build": { "barrel": "br.7x43.16", "charging": "oem.ch.ar.3", "fg": "fg.4", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.6", "mag": "br3.mag", "muzzle": "mz.r762.comp", "optic": "op.pic.0", "stock": "oem.stk.tube.5", "tac": "tac.0", "tacL": "tac.0" }
   },
@@ -746,6 +778,10 @@
    "build": { "barrel": "br.7.62x51.16.light", "grip": "oem.gr.ar.4", "mag": "scar.mag", "magnifier": "mgn.0", "muzzle": "mz.r762.a2", "optic": "op.auth.falcon", "stock": "stk.heavy.scar" }
   },
   { "platform": "scar",
+   "why": "authored grip (gr.ar.0)",
+   "build": { "barrel": "br.7.62x51.16.light", "grip": "gr.ar.0", "mag": "scar.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.0", "stock": "stk.heavy.scar" }
+  },
+  { "platform": "scar",
    "why": "bipod (fg.4)",
    "build": { "barrel": "br.7.62x51.16.light", "fg": "fg.4", "grip": "oem.gr.ar.4", "mag": "scar.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.0", "stock": "stk.heavy.scar", "tac": "tac.0", "tacL": "tac.0" }
   },
@@ -864,6 +900,10 @@
   { "platform": "tavor",
    "why": "magnifier behind the authored optic (op.auth.falcon)",
    "build": { "barrel": "br.5.56x45.16.5", "grip": "oem.gr.ar.4", "mag": "stanag.mag.40", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon" }
+  },
+  { "platform": "tavor",
+   "why": "authored grip (gr.ar.0)",
+   "build": { "barrel": "br.5.56x45.16.5", "grip": "gr.ar.0", "mag": "stanag.mag.40", "muzzle": "mz.r556.a2", "optic": "op.pic.0" }
   },
   { "platform": "tavor",
    "why": "suppressor on the muzzle (mz.r556.can)",
@@ -990,6 +1030,22 @@
    "build": { "barrel": "br.5.56x45.14.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "hg.ar.2", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "stock": "oem.stk.tube.5" }
   },
   { "platform": "hk416",
+   "why": "authored stock (stk.tube.0)",
+   "build": { "barrel": "br.5.56x45.14.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "hg.ar.2", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.0", "stock": "stk.tube.0" }
+  },
+  { "platform": "hk416",
+   "why": "authored grip (gr.ar.0)",
+   "build": { "barrel": "br.5.56x45.14.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "gr.ar.0", "handguard": "hg.ar.2", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.0", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "hk416",
+   "why": "authored handguard (oem.hg.ar.5)",
+   "build": { "barrel": "br.5.56x45.14.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.0", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "hk416",
+   "why": "authored handguard (oem.hg.ar.7)",
+   "build": { "barrel": "br.5.56x45.14.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.7", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.0", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "hk416",
    "why": "bipod (fg.4)",
    "build": { "barrel": "br.5.56x45.14.5", "charging": "oem.ch.ar.3", "fg": "fg.4", "grip": "oem.gr.ar.4", "handguard": "hg.ar.2", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.0", "stock": "oem.stk.tube.5", "tac": "tac.0", "tacL": "tac.0" }
   },
@@ -1112,6 +1168,10 @@
   { "platform": "aug",
    "why": "magnifier behind the authored optic (op.auth.falcon)",
    "build": { "barrel": "br.5.56x45.20", "grip": "oem.gr.ar.4", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "receiver": "rcv.aug" }
+  },
+  { "platform": "aug",
+   "why": "authored grip (gr.ar.0)",
+   "build": { "barrel": "br.5.56x45.20", "grip": "gr.ar.0", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "aug.optic", "receiver": "rcv.aug" }
   },
   { "platform": "aug",
    "why": "suppressor on the muzzle (mz.r556.can)",
@@ -1502,6 +1562,10 @@
    "build": { "barrel": "fal.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.4", "mag": "fal.mag", "muzzle": "mz.r762.a2", "optic": "op.auth.falcon", "stock": "stk.heavy.0" }
   },
   { "platform": "fal",
+   "why": "authored grip (gr.ar.0)",
+   "build": { "barrel": "fal.barrel", "grip": "gr.ar.0", "handguard": "oem.hg.box.4", "mag": "fal.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.0", "stock": "stk.heavy.0" }
+  },
+  { "platform": "fal",
    "why": "suppressor on the muzzle (mz.r762.can)",
    "build": { "barrel": "fal.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.4", "mag": "fal.mag", "muzzle": "mz.r762.can", "optic": "op.pic.0", "stock": "stk.heavy.0" }
   },
@@ -1620,6 +1684,22 @@
   { "platform": "mk14",
    "why": "magnifier behind the authored optic (op.auth.falcon)",
    "build": { "barrel": "br.7.62x51.18", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "hg.ar.2", "mag": "m14.mag.20", "magnifier": "mgn.0", "muzzle": "mz.r762.a2", "optic": "op.auth.falcon", "receiver": "rcv.mk14", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "mk14",
+   "why": "authored stock (stk.tube.0)",
+   "build": { "barrel": "br.7.62x51.18", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "hg.ar.2", "mag": "m14.mag.20", "muzzle": "mz.r762.a2", "optic": "op.pic.0", "receiver": "rcv.mk14", "stock": "stk.tube.0" }
+  },
+  { "platform": "mk14",
+   "why": "authored grip (gr.ar.0)",
+   "build": { "barrel": "br.7.62x51.18", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "gr.ar.0", "handguard": "hg.ar.2", "mag": "m14.mag.20", "muzzle": "mz.r762.a2", "optic": "op.pic.0", "receiver": "rcv.mk14", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "mk14",
+   "why": "authored handguard (oem.hg.ar.5)",
+   "build": { "barrel": "br.7.62x51.18", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "m14.mag.20", "muzzle": "mz.r762.a2", "optic": "op.pic.0", "receiver": "rcv.mk14", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "mk14",
+   "why": "authored handguard (oem.hg.ar.7)",
+   "build": { "barrel": "br.7.62x51.18", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.7", "mag": "m14.mag.20", "muzzle": "mz.r762.a2", "optic": "op.pic.0", "receiver": "rcv.mk14", "stock": "oem.stk.tube.5" }
   },
   { "platform": "mk14",
    "why": "bipod (fg.4)",
@@ -2490,6 +2570,10 @@
    "build": { "barrel": "br.8.6x69.27", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.5", "mag": "awm.mag", "muzzle": "mz.r762.brake", "optic": "op.auth.falcon", "stock": "oem.stk.precision.6" }
   },
   { "platform": "awm",
+   "why": "authored grip (gr.ar.0)",
+   "build": { "barrel": "br.8.6x69.27", "grip": "gr.ar.0", "handguard": "oem.hg.box.5", "mag": "awm.mag", "muzzle": "mz.r762.brake", "optic": "oem.op.pic.22", "stock": "oem.stk.precision.6" }
+  },
+  { "platform": "awm",
    "why": "suppressor on the muzzle (mz.r762.can)",
    "build": { "barrel": "br.8.6x69.27", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.5", "mag": "awm.mag", "muzzle": "mz.r762.can", "optic": "oem.op.pic.22", "stock": "oem.stk.precision.6" }
   },
@@ -2610,6 +2694,10 @@
    "build": { "barrel": "br.12.7x99.29.heavy", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.6", "mag": "barrett.mag", "muzzle": "mz.r50.big", "optic": "op.auth.falcon", "stock": "oem.stk.precision.7" }
   },
   { "platform": "barrett",
+   "why": "authored grip (gr.ar.0)",
+   "build": { "barrel": "br.12.7x99.29.heavy", "grip": "gr.ar.0", "handguard": "oem.hg.box.6", "mag": "barrett.mag", "muzzle": "mz.r50.big", "optic": "oem.op.pic.23", "stock": "oem.stk.precision.7" }
+  },
+  { "platform": "barrett",
    "why": "suppressor on the muzzle (mz.r50.can)",
    "build": { "barrel": "br.12.7x99.29.heavy", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.6", "mag": "barrett.mag", "muzzle": "mz.r50.can", "optic": "oem.op.pic.23", "stock": "oem.stk.precision.7" }
   },
@@ -2728,6 +2816,10 @@
   { "platform": "gm6",
    "why": "magnifier behind the authored optic (op.auth.falcon)",
    "build": { "barrel": "br.12.7x99.28.7", "grip": "oem.gr.ar.4", "mag": "gm6.mag", "magnifier": "mgn.0", "muzzle": "oem.mz.r50.7", "optic": "op.auth.falcon" }
+  },
+  { "platform": "gm6",
+   "why": "authored grip (gr.ar.0)",
+   "build": { "barrel": "br.12.7x99.28.7", "grip": "gr.ar.0", "mag": "gm6.mag", "muzzle": "oem.mz.r50.7", "optic": "oem.op.pic.23" }
   },
   { "platform": "gm6",
    "why": "suppressor on the muzzle (mz.r50.can)",
@@ -2982,6 +3074,10 @@
    "build": { "barrel": "br.9x19.8.9", "grip": "oem.gr.ar.4", "handguard": "oem.hg.smg.3", "mag": "mp5.mag.30", "muzzle": "mz.r9.tri", "optic": "op.auth.falcon", "receiver": "rcv.mp5", "stock": "stk.smg.1" }
   },
   { "platform": "mp5",
+   "why": "authored grip (gr.ar.0)",
+   "build": { "barrel": "br.9x19.8.9", "grip": "gr.ar.0", "handguard": "oem.hg.smg.3", "mag": "mp5.mag.30", "muzzle": "mz.r9.tri", "optic": "op.pic.0", "receiver": "rcv.mp5", "stock": "stk.smg.1" }
+  },
+  { "platform": "mp5",
    "why": "suppressor on the muzzle (mz.r9.can)",
    "build": { "barrel": "br.9x19.8.9", "grip": "oem.gr.ar.4", "handguard": "oem.hg.smg.3", "mag": "mp5.mag.30", "muzzle": "mz.r9.can", "optic": "op.pic.0", "receiver": "rcv.mp5", "stock": "stk.smg.1" }
   },
@@ -3110,6 +3206,10 @@
    "build": { "barrel": "mp5sd.barrel", "grip": "oem.gr.ar.4", "mag": "mp5.mag.30", "magnifier": "mgn.0", "optic": "op.auth.falcon", "receiver": "rcv.mp5sd", "stock": "stk.smg.1" }
   },
   { "platform": "mp5sd",
+   "why": "authored grip (gr.ar.0)",
+   "build": { "barrel": "mp5sd.barrel", "grip": "gr.ar.0", "mag": "mp5.mag.30", "optic": "op.pic.0", "receiver": "rcv.mp5sd", "stock": "stk.smg.1" }
+  },
+  { "platform": "mp5sd",
    "why": "integral suppressor (mp5sd.br.long)",
    "build": { "barrel": "mp5sd.br.long", "grip": "oem.gr.ar.4", "mag": "mp5.mag.30", "optic": "op.pic.0", "railmount": "rm.0", "receiver": "rcv.mp5sd", "stock": "stk.smg.1", "tac": "tac.0" }
   },
@@ -3232,6 +3332,14 @@
   { "platform": "vector",
    "why": "magnifier behind the authored optic (op.auth.falcon)",
    "build": { "barrel": "br.11.43x23.5.5.light", "grip": "oem.gr.ar.4", "handguard": "oem.hg.smg.4", "mag": "vector.mag", "magnifier": "mgn.0", "muzzle": "mz.r45.a2", "optic": "op.auth.falcon", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "vector",
+   "why": "authored stock (stk.tube.0)",
+   "build": { "barrel": "br.11.43x23.5.5.light", "grip": "oem.gr.ar.4", "handguard": "oem.hg.smg.4", "mag": "vector.mag", "muzzle": "mz.r45.a2", "optic": "op.pic.0", "stock": "stk.tube.0" }
+  },
+  { "platform": "vector",
+   "why": "authored grip (gr.ar.0)",
+   "build": { "barrel": "br.11.43x23.5.5.light", "grip": "gr.ar.0", "handguard": "oem.hg.smg.4", "mag": "vector.mag", "muzzle": "mz.r45.a2", "optic": "op.pic.0", "stock": "oem.stk.tube.5" }
   },
   { "platform": "vector",
    "why": "bipod (fg.4)",
@@ -3998,6 +4106,10 @@
    "build": { "barrel": "aa12.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.7", "mag": "aa12.mag", "muzzle": "mz.sg.flash", "optic": "op.auth.falcon", "stock": "stk.heavy.0" }
   },
   { "platform": "aa12",
+   "why": "authored grip (gr.ar.0)",
+   "build": { "barrel": "aa12.barrel", "grip": "gr.ar.0", "handguard": "oem.hg.box.7", "mag": "aa12.mag", "muzzle": "mz.sg.flash", "optic": "op.pic.0", "stock": "stk.heavy.0" }
+  },
+  { "platform": "aa12",
    "why": "suppressor on the muzzle (mz.sg.can)",
    "build": { "barrel": "aa12.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.7", "mag": "aa12.mag", "muzzle": "mz.sg.can", "optic": "op.pic.0", "stock": "stk.heavy.0" }
   },
@@ -4116,6 +4228,10 @@
   { "platform": "ksg",
    "why": "magnifier behind the authored optic (op.auth.falcon)",
    "build": { "barrel": "ksg.barrel", "grip": "oem.gr.ar.4", "magnifier": "mgn.0", "muzzle": "mz.sg.cyl", "optic": "op.auth.falcon", "pump": "ksg.pump" }
+  },
+  { "platform": "ksg",
+   "why": "authored grip (gr.ar.0)",
+   "build": { "barrel": "ksg.barrel", "grip": "gr.ar.0", "muzzle": "mz.sg.cyl", "optic": "op.pic.0", "pump": "ksg.pump" }
   },
   { "platform": "ksg",
    "why": "suppressor on the muzzle (mz.sg.can)",
@@ -4250,6 +4366,10 @@
    "build": { "barrel": "slug.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.classic.8", "magnifier": "mgn.0", "muzzle": "mz.sg.cyl", "optic": "op.auth.falcon", "stock": "stk.tube.0", "tube": "slug.tube" }
   },
   { "platform": "slug",
+   "why": "authored grip (gr.ar.0)",
+   "build": { "barrel": "slug.barrel", "grip": "gr.ar.0", "handguard": "oem.hg.classic.8", "muzzle": "mz.sg.cyl", "optic": "op.pic.0", "stock": "stk.tube.0", "tube": "slug.tube" }
+  },
+  { "platform": "slug",
    "why": "suppressor on the muzzle (mz.sg.can)",
    "build": { "barrel": "slug.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.classic.8", "loader": "sgl.0", "muzzle": "mz.sg.can", "optic": "op.pic.0", "stock": "stk.tube.0", "tube": "slug.tube" }
   },
@@ -4376,6 +4496,10 @@
   { "platform": "m249",
    "why": "magnifier behind the authored optic (op.auth.falcon)",
    "build": { "barrel": "br.5.56x45.20.5", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.8", "mag": "m249.mag", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "stock": "stk.heavy.0" }
+  },
+  { "platform": "m249",
+   "why": "authored grip (gr.ar.0)",
+   "build": { "barrel": "br.5.56x45.20.5", "fg": "fg.0", "grip": "gr.ar.0", "handguard": "oem.hg.box.8", "mag": "m249.mag", "muzzle": "mz.r556.a2", "optic": "op.pic.0", "stock": "stk.heavy.0" }
   },
   { "platform": "m249",
    "why": "bipod (fg.4)",
@@ -4632,6 +4756,10 @@
   { "platform": "m60",
    "why": "authored optic (op.auth.falcon)",
    "build": { "barrel": "br.7.62x51.22", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.3", "mag": "m60.mag", "muzzle": "mz.r762.a2", "optic": "op.auth.falcon", "stock": "stk.heavy.0" }
+  },
+  { "platform": "m60",
+   "why": "authored grip (gr.ar.0)",
+   "build": { "barrel": "br.7.62x51.22", "grip": "gr.ar.0", "handguard": "oem.hg.box.3", "mag": "m60.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.0", "stock": "stk.heavy.0" }
   },
   { "platform": "m60",
    "why": "suppressor on the muzzle (mz.r762.can)",
@@ -5522,6 +5650,10 @@
    "build": { "barrel": "br.5.56x45.14.5.light", "grip": "oem.gr.ar.4", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "stock": "stk.heavy.scar" }
   },
   { "platform": "scarl",
+   "why": "authored grip (gr.ar.0)",
+   "build": { "barrel": "br.5.56x45.14.5.light", "grip": "gr.ar.0", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.0", "stock": "stk.heavy.scar" }
+  },
+  { "platform": "scarl",
    "why": "bipod (fg.4)",
    "build": { "barrel": "br.5.56x45.14.5.light", "fg": "fg.4", "grip": "oem.gr.ar.4", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.0", "stock": "stk.heavy.scar", "tac": "tac.0", "tacL": "tac.0" }
   },
@@ -5648,6 +5780,26 @@
   { "platform": "m27",
    "why": "magnifier behind the authored optic (op.auth.falcon)",
    "build": { "barrel": "br.5.56x45.16.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.9", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "m27",
+   "why": "authored stock (stk.tube.0)",
+   "build": { "barrel": "br.5.56x45.16.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.9", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.0", "stock": "stk.tube.0" }
+  },
+  { "platform": "m27",
+   "why": "authored grip (gr.ar.0)",
+   "build": { "barrel": "br.5.56x45.16.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "gr.ar.0", "handguard": "oem.hg.ar.9", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.0", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "m27",
+   "why": "authored handguard (hg.ar.2)",
+   "build": { "barrel": "br.5.56x45.16.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "hg.ar.2", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.0", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "m27",
+   "why": "authored handguard (oem.hg.ar.5)",
+   "build": { "barrel": "br.5.56x45.16.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.0", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "m27",
+   "why": "authored handguard (oem.hg.ar.7)",
+   "build": { "barrel": "br.5.56x45.16.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.7", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.0", "stock": "oem.stk.tube.5" }
   },
   { "platform": "m27",
    "why": "bipod (fg.4)",
@@ -5922,6 +6074,26 @@
    "build": { "barrel": "br.7.62x51.20", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.10", "mag": "sr25.mag", "magnifier": "mgn.0", "muzzle": "mz.r762.a2", "optic": "op.auth.falcon", "stock": "oem.stk.tube.5" }
   },
   { "platform": "sr25",
+   "why": "authored stock (stk.tube.0)",
+   "build": { "barrel": "br.7.62x51.20", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.10", "mag": "sr25.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.0", "stock": "stk.tube.0" }
+  },
+  { "platform": "sr25",
+   "why": "authored grip (gr.ar.0)",
+   "build": { "barrel": "br.7.62x51.20", "charging": "oem.ch.ar.3", "grip": "gr.ar.0", "handguard": "oem.hg.ar.10", "mag": "sr25.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.0", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "sr25",
+   "why": "authored handguard (hg.ar.2)",
+   "build": { "barrel": "br.7.62x51.20", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "hg.ar.2", "mag": "sr25.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.0", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "sr25",
+   "why": "authored handguard (oem.hg.ar.5)",
+   "build": { "barrel": "br.7.62x51.20", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.5", "mag": "sr25.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.0", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "sr25",
+   "why": "authored handguard (oem.hg.ar.7)",
+   "build": { "barrel": "br.7.62x51.20", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.7", "mag": "sr25.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.0", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "sr25",
    "why": "bipod (fg.4)",
    "build": { "barrel": "br.7.62x51.20", "charging": "oem.ch.ar.3", "fg": "fg.4", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.10", "mag": "sr25.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.0", "stock": "oem.stk.tube.5", "tac": "tac.0", "tacL": "tac.0" }
   },
@@ -6044,6 +6216,14 @@
   { "platform": "mpx",
    "why": "magnifier behind the authored optic (op.auth.falcon)",
    "build": { "barrel": "br.9x19.8", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.mpx.0", "mag": "mpx.mag", "magnifier": "mgn.0", "muzzle": "mz.r9.a2", "optic": "op.auth.falcon", "stock": "stk.tube.2" }
+  },
+  { "platform": "mpx",
+   "why": "authored stock (stk.tube.0)",
+   "build": { "barrel": "br.9x19.8", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.mpx.0", "mag": "mpx.mag", "muzzle": "mz.r9.a2", "optic": "op.pic.0", "stock": "stk.tube.0" }
+  },
+  { "platform": "mpx",
+   "why": "authored grip (gr.ar.0)",
+   "build": { "barrel": "br.9x19.8", "charging": "oem.ch.ar.3", "grip": "gr.ar.0", "handguard": "oem.hg.mpx.0", "mag": "mpx.mag", "muzzle": "mz.r9.a2", "optic": "op.pic.0", "stock": "stk.tube.2" }
   },
   { "platform": "mpx",
    "why": "bipod (fg.4)",
@@ -6180,6 +6360,10 @@
   { "platform": "benelli",
    "why": "magnifier behind the authored optic (op.auth.falcon)",
    "build": { "barrel": "benelli.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.classic.10", "magnifier": "mgn.0", "muzzle": "mz.sg.cyl", "optic": "op.auth.falcon", "stock": "stk.tube.0", "tube": "benelli.tube" }
+  },
+  { "platform": "benelli",
+   "why": "authored grip (gr.ar.0)",
+   "build": { "barrel": "benelli.barrel", "grip": "gr.ar.0", "handguard": "oem.hg.classic.10", "muzzle": "mz.sg.cyl", "optic": "op.pic.0", "stock": "stk.tube.0", "tube": "benelli.tube" }
   },
   { "platform": "benelli",
    "why": "suppressor on the muzzle (mz.sg.can)",
@@ -6430,6 +6614,10 @@
    "build": { "barrel": "br.9x19.10.5", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "hg.ar.3", "mag": "glock.mag.33", "muzzle": "mz.r9.a2", "optic": "op.auth.falcon", "receiver": "rcv.ar9", "stock": "stk.tube.0" }
   },
   { "platform": "ar9",
+   "why": "authored grip (gr.ar.0)",
+   "build": { "barrel": "br.9x19.10.5", "charging": "oem.ch.ar.3", "grip": "gr.ar.0", "handguard": "hg.ar.3", "mag": "glock.mag.33", "muzzle": "mz.r9.a2", "optic": "op.pic.0", "receiver": "rcv.ar9", "stock": "stk.tube.0" }
+  },
+  { "platform": "ar9",
    "why": "suppressor on the muzzle (mz.r9.can)",
    "build": { "barrel": "br.9x19.10.5", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "hg.ar.3", "mag": "glock.mag.33", "muzzle": "mz.r9.can", "optic": "op.pic.0", "receiver": "rcv.ar9", "stock": "stk.tube.0" }
   },
@@ -6548,6 +6736,10 @@
   { "platform": "aug9",
    "why": "magnifier behind the authored optic (op.auth.falcon)",
    "build": { "barrel": "br.9x19.16", "grip": "oem.gr.ar.4", "mag": "glock.mag.33", "magnifier": "mgn.0", "muzzle": "mz.r9.cap", "optic": "op.auth.falcon", "receiver": "rcv.aug9" }
+  },
+  { "platform": "aug9",
+   "why": "authored grip (gr.ar.0)",
+   "build": { "barrel": "br.9x19.16", "grip": "gr.ar.0", "mag": "glock.mag.33", "muzzle": "mz.r9.cap", "optic": "aug9.optic", "receiver": "rcv.aug9" }
   },
   { "platform": "aug9",
    "why": "suppressor on the muzzle (mz.r9.can)",
@@ -8898,6 +9090,10 @@
    "build": { "barrel": "tx22.barrel", "grip": "oem.gr.pistol.4", "mag": "tx22.mag", "muzzle": "mz.r22.cap", "optic": "op.pso.5", "slide": "tx22.slide" }
   },
   { "platform": "tx22",
+   "why": "authored muzzle (mz.r556.a2)",
+   "build": { "barrel": "tx22.barrel", "grip": "oem.gr.pistol.4", "mag": "tx22.mag", "muzzle": "mz.r556.a2", "optic": "tx22.optic", "slide": "tx22.slide" }
+  },
+  { "platform": "tx22",
    "why": "suppressor on the muzzle (mz.r22.can)",
    "build": { "barrel": "tx22.barrel", "grip": "oem.gr.pistol.4", "mag": "tx22.mag", "muzzle": "mz.r22.can", "optic": "tx22.optic", "slide": "tx22.slide", "stock": "stk.pistol.0", "tac": "ptac.0" }
   },
@@ -9150,6 +9346,10 @@
    "build": { "barrel": "br.5.8x42.10.5", "grip": "oem.gr.ar.4", "handguard": "oem.hg.qbz.0", "mag": "qbz.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r58.a2", "optic": "op.auth.falcon", "stock": "oem.stk.fold.0" }
   },
   { "platform": "qbz192",
+   "why": "authored grip (gr.ar.0)",
+   "build": { "barrel": "br.5.8x42.10.5", "grip": "gr.ar.0", "handguard": "oem.hg.qbz.0", "mag": "qbz.mag.30", "muzzle": "mz.r58.a2", "optic": "op.pic.0", "stock": "oem.stk.fold.0" }
+  },
+  { "platform": "qbz192",
    "why": "bipod (fg.4)",
    "build": { "barrel": "br.5.8x42.10.5", "fg": "fg.4", "grip": "oem.gr.ar.4", "handguard": "oem.hg.qbz.0", "mag": "qbz.mag.30", "muzzle": "mz.r58.a2", "optic": "op.pic.0", "stock": "oem.stk.fold.0", "tac": "tac.0", "tacL": "tac.0" }
   },
@@ -9280,6 +9480,10 @@
   { "platform": "mcx",
    "why": "magnifier behind the authored optic (op.auth.falcon)",
    "build": { "barrel": "br.5.56x45.11.5", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.mcx.0", "mag": "stanag.mag.30", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "stock": "oem.stk.fold.1" }
+  },
+  { "platform": "mcx",
+   "why": "authored grip (gr.ar.0)",
+   "build": { "barrel": "br.5.56x45.11.5", "charging": "oem.ch.ar.3", "grip": "gr.ar.0", "handguard": "oem.hg.mcx.0", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.0", "stock": "oem.stk.fold.1" }
   },
   { "platform": "mcx",
    "why": "bipod (fg.4)",
@@ -9508,6 +9712,10 @@
   { "platform": "tempest",
    "why": "magnifier behind the authored optic (op.auth.falcon)",
    "build": { "grip": "oem.gr.ar.4", "handguard": "tempest.handguard", "mag": "tempest.mag", "magnifier": "mgn.0", "muzzle": "tempest.muzzle", "optic": "op.auth.falcon", "stock": "stk.smg.2" }
+  },
+  { "platform": "tempest",
+   "why": "authored grip (gr.ar.0)",
+   "build": { "grip": "gr.ar.0", "handguard": "tempest.handguard", "mag": "tempest.mag", "muzzle": "tempest.muzzle", "optic": "op.pic.0", "stock": "stk.smg.2" }
   },
   { "platform": "tempest",
    "why": "bipod (fg.4)",
