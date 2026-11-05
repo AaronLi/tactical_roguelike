@@ -302,7 +302,10 @@ const CH_BACK = 0.0;
 // so position along the 90 mm stroke is x(t) = 45 mm · (1 − cos(π t / T)). Each part comes in
 // and out at its own point of travel, at the speed the stroke has there.
 const PULL_MM = 90;
-const PULL_T = 0.16;
+const PULL_T = 0.48; // a deliberate pull (3x the original brisk 0.16 s)
+// Hits driven by the hand's speed soften on a slower pull (impact speed ∝ hand speed; level ∝ √
+// is a gentler, more natural-sounding scaling than linear). Spring-driven snaps don't change.
+const HAND = Math.sqrt(0.16 / PULL_T);
 const CH_END = CH_BACK + PULL_T;
 const LET_GO = CH_END + 0.08; // let go ~80 ms after the handle bottoms out
 const tAt = (mm) => CH_BACK + (PULL_T * Math.acos(1 - (2 * Math.min(mm, PULL_MM)) / PULL_MM)) / Math.PI;
@@ -340,7 +343,7 @@ export const AR15_CHARGE = {
         {
             name: 'gas-key-pickup',
             description: '0-2 mm: the charging handle takes up its free play and catches the carrier\'s gas key.',
-            elements: [hit('handle catches the gas key', tAt(2), -9, 0.5, gasKey, arChargingHandle, { scatter: 0.3, radius: 2 })],
+            elements: [hit('handle catches the gas key', tAt(2), -9, 0.5 * HAND, gasKey, arChargingHandle, { scatter: 0.3, radius: 2 })],
         },
         {
             name: 'dust-cover',
@@ -354,9 +357,9 @@ export const AR15_CHARGE = {
             description: '2-11.5 mm: the carrier moves alone through its cam travel, the cam pin turns the bolt out of its lugs (~10 mm), then the carrier catches the bolt and drags it along (11.5 mm).',
             elements: [
                 travelRub('cam pin turns the bolt', 2, 11.5, -12, { force: 8, roughness: 10, grain: 0.2, contactWidth: 0.02 }, arCamPin, arCarrier),
-                hit('bolt lugs rotate free', tAt(10), -10, 0.6, arBolt, arBarrelExt, { scatter: 0.3, radius: 1.5 }),
+                hit('bolt lugs rotate free', tAt(10), -10, 0.6 * HAND, arBolt, arBarrelExt, { scatter: 0.3, radius: 1.5 }),
                 snap('bolt rotation stops on the cam pin', tAt(10.5), -9, { strength: 0.5, preload: 0, seat: 0.2, seatDelay: 1 }, arBolt, arCamPin),
-                hit('carrier picks up the bolt', tAt(11.5), -6, 0.9, arCarrier, arBolt, { scatter: 0.4, radius: 3, click: 0.7 }),
+                hit('carrier picks up the bolt', tAt(11.5), -6, 0.9 * HAND, arCarrier, arBolt, { scatter: 0.4, radius: 3, click: 0.7 }),
             ],
         },
         {
@@ -366,7 +369,7 @@ export const AR15_CHARGE = {
                 travelRub('charging handle in its channel', 0, 90, -11, { force: 4, ...OIL_ALU }, arChargingHandle, arUpper),
                 travelRub('gas key riding in the handle slot', 2, 90, -15, { force: 3, ...OIL_STEEL }, gasKey, arChargingHandle),
                 travelRub('carrier on the upper rails', 2, 40, -9, { force: 6, ...OIL_STEEL }, arCarrier, arUpper),
-                hit('carrier tail enters the buffer tube', tAt(40), -16, 0.5, arCarrier, arBufferTube, { scatter: 0.3, radius: 4 }),
+                hit('carrier tail enters the buffer tube', tAt(40), -16, 0.5 * HAND, arCarrier, arBufferTube, { scatter: 0.3, radius: 4 }),
                 travelRub('carrier tail running in the buffer tube', 40, 90, -11, { force: 4, ...OIL_TUBE }, arCarrier, arBufferTube),
                 travelRub('bolt tail riding in the carrier bore', 11.5, 90, -20, { force: 2, ...OIL_STEEL }, arBolt, arCarrier),
                 // The serrated stretch of the carrier passes the spring-loaded forward-assist pawl:
@@ -378,7 +381,7 @@ export const AR15_CHARGE = {
             name: 'hammer-cock',
             description: '35-60 mm: with the hammer down, the carrier rides it down against its spring; at 60 mm the trigger sear snaps into the hammer notch; the carrier then rides over the cocked hammer. (Leave this track out if the hammer was already cocked.)',
             elements: [
-                hit('carrier meets the hammer', tAt(35), -10, 0.6, arCarrier, arHammer, { scatter: 0.3, radius: 2 }),
+                hit('carrier meets the hammer', tAt(35), -10, 0.6 * HAND, arCarrier, arHammer, { scatter: 0.3, radius: 2 }),
                 travelRub('carrier pushes the hammer down', 35, 60, -8, { force: 12, roughness: 4, grain: 0.15, contactWidth: 0.05 }, arHammer, arCarrier, { coil: { level: 0.45, length: 2.5, dispersion: 0.35, decay: 0.08, brightness: 5000 }, housing: LOWER_HOUSING }),
                 // The hammer spring's legs bear on the trigger pin: loading it is a faint wiry tension.
                 travelRub('hammer spring loading', 35, 60, -14, { force: 4, roughness: 3, grain: 0.3, contactWidth: 0.1 }, arHammerSpring, arLower, { coil: { level: 0.5, length: 2, dispersion: 0.4, decay: 0.08, brightness: 6000 }, housing: LOWER_HOUSING }),
@@ -417,8 +420,8 @@ export const AR15_CHARGE = {
             name: 'rear-stop',
             description: '90 mm: the charging handle bottoms out; the bolt shifts inside the carrier.',
             elements: [
-                hit('handle bottoms out', CH_END, -6, 1.0, arChargingHandle, arUpper, { scatter: 0.4, radius: 3 }),
-                hit('bolt shifts in the carrier', CH_END + 0.003, -14, 0.5, arBolt, arCarrier, { scatter: 0.4, radius: 2 }),
+                hit('handle bottoms out', CH_END, -6, 1.0 * HAND, arChargingHandle, arUpper, { scatter: 0.4, radius: 3 }),
+                hit('bolt shifts in the carrier', CH_END + 0.003, -14, 0.5 * HAND, arBolt, arCarrier, { scatter: 0.4, radius: 2 }),
             ],
         },
         {
