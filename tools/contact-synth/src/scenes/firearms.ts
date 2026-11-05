@@ -208,6 +208,32 @@ const arFeedRamp = steelBar(2, 4);
 const arGasTube: Body = { ...mat('stainless'), shape: 'bar', size: 25, thickness: 4.7, modes: 0, irregularity: 0.5, damping: 0.6, level: 0 };
 const arExtractor = steelBar(2, 3);
 const arNextRound: Body = { ...arCase, level: -2 };
+// The magazine: a thin aluminium box (USGI 30-rd: ~18 cm long, ~6 x 2.2 cm, ~0.9 mm walls). Its
+// walls ring bright and tinny and its air space resonates: the "mag ping" every feeding event
+// sounds through. Seated in the mag well, so lightly damped.
+const arMagBody: Body = { ...mat('aluminum'), shape: 'plate', size: 18, thickness: 0.9, modes: 4, irregularity: 0.6, damping: 0.35, level: 0 };
+const arMagSpring = springWire(8, 1);
+const MAG_HOUSING: Scene['housing'] = {
+  amount: 0.7, cavity: 0.5, ...mat('aluminum'), shape: 'plate', size: 18, thickness: 0.9, modes: 2, irregularity: 0.6, damping: 0.35,
+  cavities: [{ length: 18, width: 6, depth: 2.2, q: 8, level: 1 }],
+};
+const IN_MAG = { housing: MAG_HOUSING };
+
+/**
+ * The stack reacting when the top round leaves: the compressed magazine spring shoves the whole
+ * stack up a few mm (a coil zing inside the box), the cases clack against each other in a quick
+ * staggered burst, and the top round hits whatever is above it (feed lips or the bolt).
+ */
+function magazineReaction(at: number, gainDb: number, topHits: Body, topWhat: string): SceneElement[] {
+  return [
+    hit('magazine spring shoves the stack up', at, gainDb - 6, 1.2, arMagSpring, arMagBody, { scatter: 0.3, radius: 2, click: 0.3, sharp: 0.7 },
+      { coil: { level: 0.6, length: 4, dispersion: 0.45, decay: 0.08, brightness: 5000 }, ...IN_MAG }),
+    hit('cases clack against each other', at + 0.0004, gainDb - 4, 0.9, arCase, arNextRound, { scatter: 1, radius: 2, click: 0.8, sharp: 0.9 }, IN_MAG),
+    hit('cases settle in the stack', at + 0.0014, gainDb - 9, 0.6, arCase, arNextRound, { scatter: 1, radius: 2, click: 0.7, sharp: 0.9 }, IN_MAG),
+    snap(topWhat, at + 0.0008, gainDb, { strength: 0.6, preload: 0, seat: 0.3, seatDelay: 1 }, arNextRound, topHits, IN_MAG),
+    hit('magazine body rings', at + 0.0006, gainDb - 3, 1.0, arMagBody, arCase, { scatter: 0.5, radius: 3, click: 0.2, sharp: 0.7 }, IN_MAG),
+  ];
+}
 
 // ---------- pump-action shotgun ----------
 const PULL = 0.0;
@@ -355,11 +381,21 @@ function arForward(t: number, withChargingHandle: boolean): SceneElement[] {
     // round snaps up (~52), the nose rides up the feed ramp (~50) and the case slides into the
     // chamber (45 to battery).
     hit('bolt picks up the top round', fwdAt(86), -8, vAt(86) * 0.5, arBolt, arCase, { scatter: 0.3, radius: 1.5, click: 0.7 }),
-    fwdRub('case dragged over the feed lips', 86, 55, -10, { force: 6, roughness: 15, grain: 0.3 }, arCase, arFeedLips),
+    fwdRub('case dragged over the feed lips', 86, 55, -10, { force: 6, roughness: 15, grain: 0.3 }, arCase, arFeedLips, IN_MAG),
+    // The stripped case slides forward off the case beneath it: brass on brass.
+    fwdRub('stripped case slides off the next case', 86, 58, -6, { force: 5, roughness: 4, grain: 0.2, contactWidth: 0.05 }, arCase, arNextRound, IN_MAG),
     snap('case rim snaps free of the feed lips', fwdAt(55), -1, { strength: 0.7, preload: 0, seat: 0.3, seatDelay: 1 }, arCase, arFeedLips),
-    snap('next round snaps up into the lips', fwdAt(52), -4, { strength: 0.5, preload: 0, seat: 0.3, seatDelay: 1.5 }, arNextRound, arFeedLips),
-    hit('bullet nose rides up the feed ramp', fwdAt(50), -7, vAt(50) * 0.4, arBullet, arFeedRamp, { scatter: 0.3, radius: 1.5 }),
-    fwdRub('round into the chamber', 45, 3, -11, { force: 5, roughness: 6, grain: 0.3 }, arCase, arChamber),
+    // The stack jumps: the next round snaps up into the underside of the passing bolt/carrier,
+    // then rides along it, held by the feed lips, until the carrier is home.
+    ...magazineReaction(fwdAt(52), 4, arCarrier, 'next round snaps up against the bolt'),
+    fwdRub('next round rides along the carrier underside', 50, 0, -10, { force: 3, roughness: 3, grain: 0.2, contactWidth: 0.05 }, arNextRound, arCarrier, IN_MAG),
+    // Guided into the breech: the nose hits the feed ramp, the bullet slides up it into the
+    // chamber (copper on steel), the case body slides along the chamber walls, and the case
+    // seats just before the bolt face arrives.
+    hit('bullet nose hits the feed ramp', fwdAt(50), 0, vAt(50) * 0.4, arBullet, arFeedRamp, { scatter: 0.3, radius: 1.5, click: 0.6 }),
+    fwdRub('bullet slides up the feed ramp into the chamber', 50, 40, -5, { force: 6, roughness: 5, grain: 0.15, contactWidth: 0.03 }, arBullet, arFeedRamp),
+    fwdRub('case body slides along the chamber walls', 45, 3, -11, { force: 5, roughness: 6, grain: 0.3 }, arCase, arChamber),
+    hit('case seats in the chamber', TF - 0.0004, -2, vAt(10) * 0.3, arCase, arChamber, { scatter: 0.2, radius: 3, click: 0.6 }),
     // The gas tube enters the carrier key over the last ~20 mm.
     hit('gas tube slides into the carrier key', fwdAt(18), -9, vAt(18) * 0.2, arGasTube, gasKey, { scatter: 0.3, radius: 1.5 }),
     // Lock-up, staged as the mechanism does it (stretched to ~4 ms so the turn is heard as its own
@@ -520,8 +556,9 @@ export const AR15_CHARGE: Scene = {
       name: 'magazine',
       description: '30-86 mm: the bolt rides over the top round in the magazine; once it clears the rim (~88 mm), the magazine spring pops the round up against the feed lips.',
       elements: [
-        travelRub('bolt riding over the top round', 30, 86, -16, { force: 5, roughness: 2, grain: 0.2, contactWidth: 0.05 }, arCase, arBolt),
-        hit('round pops up against the feed lips', tAt(88) + 0.002, -4, 0.8, arNextRound, arFeedLips, { scatter: 0.3, radius: 2 }),
+        travelRub('bolt riding over the top round', 30, 86, -16, { force: 5, roughness: 2, grain: 0.2, contactWidth: 0.05 }, arCase, arBolt, IN_MAG),
+        // The bolt clears the rim: the stack jumps up against the feed lips.
+        ...magazineReaction(tAt(88) + 0.002, -4, arFeedLips, 'top round snaps up against the feed lips'),
       ],
     },
     {
