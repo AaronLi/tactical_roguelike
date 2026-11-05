@@ -1739,28 +1739,13 @@ const G_Me = {
     const F = this.FRAG, n = F.N, dir = new Float32Array(n * 3), m = new Float32Array(n), v = new Float32Array(n);
     const rnd = seed ? G.U.rng(seed) : Math.random;
     this.scorchAt(p, rnd);
-    // Where they go: no even spread. The casing tears along cracks, so the chips leave in clumps with gaps between (most of them
-    // from a few hundred tears, each throwing a little spray; the rest on their own), and more go out sideways from the body than
-    // off its ends (the fuze and the base): a band round the grenade's middle. It lies on its side when it goes off on the floor,
-    // so its axis is level, pointing anywhere round; in the air it can be at any angle.
+    // Where they go: anywhere over the whole sphere, each chip its own random direction (no lattice: with nothing evening
+    // them out they bunch and leave gaps by chance, as a burst casing's do)
     const norm = () => Math.sqrt(-2 * Math.log(1 - rnd())) * Math.cos(Math.PI * 2 * rnd());
-    const lying = !!G.Game.map && p.y - G.Level.groundAt(G.Game.map, p.x, p.z, 0.01, p.y + 0.05) < 0.3;
-    const ax = lying ? new THREE.Vector3(1, (rnd() - 0.5) * 0.3, 0).normalize() : new THREE.Vector3(rnd() - 0.5, rnd() - 0.5, rnd() - 0.5).normalize();
-    if (lying) ax.applyAxisAngle(new THREE.Vector3(0, 1, 0), rnd() * 6.283);
-    const side = new THREE.Vector3(0, 1, 0).cross(ax); if (side.lengthSq() < 1e-6) side.set(1, 0, 0); side.normalize();
-    const up = ax.clone().cross(side).normalize();
-    const pick = (out: THREE.Vector3) => { // (a direction off the body: its height along the axis peaked at the middle)
-      const c = G.U.clamp((rnd() + rnd() + rnd() - 1.5) * 0.9, -1, 1), r = Math.sqrt(1 - c * c), a = rnd() * 6.283;
-      return out.copy(ax).multiplyScalar(c).addScaledVector(side, Math.cos(a) * r).addScaledVector(up, Math.sin(a) * r);
-    };
-    const tears = Array.from({ length: 140 + Math.floor(rnd() * 80) }, () => pick(new THREE.Vector3()));
-    const u = new THREE.Vector3(), t1 = new THREE.Vector3(), t2 = new THREE.Vector3();
+    const u = new THREE.Vector3();
     for (let i = 0; i < n; i++) {
-      if (rnd() < 0.7) { // (one of a tear's spray: a few degrees round it)
-        const c = tears[Math.floor(rnd() * tears.length)], s = 0.07 + 0.05 * rnd();
-        t1.set(0, 1, 0).cross(c); if (t1.lengthSq() < 1e-6) t1.set(1, 0, 0); t1.normalize(); t2.copy(c).cross(t1);
-        u.copy(c).addScaledVector(t1, norm() * s).addScaledVector(t2, norm() * s).normalize();
-      } else pick(u);
+      const c = 2 * rnd() - 1, r = Math.sqrt(1 - c * c), a = rnd() * 6.283; // (uniform over the sphere: the height uniform, the angle round uniform)
+      u.set(Math.cos(a) * r, c, Math.sin(a) * r);
       dir[i * 3] = u.x; dir[i * 3 + 1] = u.y; dir[i * 3 + 2] = u.z;
       m[i] = G.U.clamp(F.M_MED * Math.exp(0.65 * norm()), 0.0001, 0.0016);
       v[i] = F.V0 * (0.85 + 0.3 * rnd()) * Math.pow(F.M_MED / m[i], 0.12);
