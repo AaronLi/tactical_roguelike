@@ -77,7 +77,7 @@ const G_VMAnim = (() => {
     else if (def.cls === 'BOW') reload = 'bow';
     else if (def.shell) reload = 'shell';
     else if (o.feed) reload = 'belt';
-    if (arch === 'pistol') action = def.action === 'bolt' ? 'bolt' : 'pistol'; // (a bolt-action pistol, the Welrod: its model's part_bolt)
+    if (arch === 'pistol') action = 'pistol';
     else if (o.bolt) action = 'bolt';
     else if (o.pump) action = 'pump';
     else if (o.lever) action = 'lever';
@@ -90,6 +90,8 @@ const G_VMAnim = (() => {
     const M = G.GunMaterials.M, u = root.userData;
     const k = kinds(def);
     const hs = u.holders.map(({ holder, info, side }: { holder: THREE.Object3D; info: Info; side: number }) => G.GunRig.bind(holder, info, { def, side })); // (the parts, anchors and magazine-check data off the model: js/gunrig.ts)
+    // a manually cycled gun's action is the moving part its model has (part_bolt / part_pump / part_lever); nothing in the weapon data names it
+    if (def.manual) { const an = hs[0].an; k.action = an.bolt ? 'bolt' : an.pump ? 'pump' : an.lever ? 'lever' : k.action; }
     const R = makeArm(M), L = makeArm(M);
     root.add(R.g, L.g);
     const props = { shell: prop('shell', M, def), case: prop('case', M, def), loader: prop('loader', M, def), clip: prop('clip', M), bolt: prop('bolt', M) };
@@ -209,10 +211,9 @@ const G_VMAnim = (() => {
   }
   // when, through a rack (or a release), the action's fully back (the case it held thrown) and home again (a round
   // fed): js/player.ts times the rounds to it
-  function actEvents(kind: string, action: VmAction | null) {
+  function actEvents(kind: string, action: VmAction | null, manual = false) {
     if (kind === 'release') return { back: 0, home: 0.38 };
-    if (action === 'bolt') return { back: 0.6, home: 0.85 };
-    if (action === 'pump' || action === 'lever') return { back: 0.45, home: 0.9 };
+    if (manual) return { back: 0.55, home: 0.88 }; // (one cycle for every manual action: bolt, pump, lever)
     return { back: 0.52, home: 0.6 };
   }
   // Racking: the action pulled through and let go (a riding open bolt's left back: cocked). c: 0..1 over it; from:
@@ -486,7 +487,7 @@ const G_VMAnim = (() => {
       else if (reload === 'bow') pose = bowClip(t, h);
       else if (reload === 'belt') pose = beltClip(t, h);
       else if (reload === 'akimbo') { pose = base(); const tilt = S(0.02, 0.15, t) * (1 - S(0.75, 0.92, t)); pose.gun[3] += 0.4 * tilt; pose.gun[1] -= 0.04 * tilt; pose.mag = t < 0.08 ? { mode: 'in' } : t < 0.4 ? { mode: 'drop', at: 0.08 } : t < 0.62 ? { mode: 'gone' } : { mode: 'rise', k: S(0.62, 0.72, t) }; }
-      else pose = magClip(t, h, action === 'pistol', pl.reloadMode, pl.reloadSeat);
+      else pose = magClip(t, h, !!(h.info as { pistol?: boolean }).pistol || action === 'pistol', pl.reloadMode, pl.reloadSeat);
     } else if (pl.act) { // the action, worked by hand (js/player.ts workAction): on its own, or straight on from a magazine just seated
       const ac = pl.act, c = G.U.clamp(ac.t, 0, 1), kind = actKind(a, h), from = ac.seat && h.A.WB ? off(h.A.WB, 0, 0.012) : null;
       pose = base();

@@ -44,7 +44,7 @@ const G_Casings = (() => {
     if (!def || def.explosive || def.cls === 'BOW' || def.cls === 'RAIL') return null;
     const plat = G.Gunsmith.PLATFORMS[def.id], spec = (plat && plat.spec) || {};
     if ((plat && (plat.arch === 'revolver' || plat.arch === 'derringer')) || spec.rcv === 'break') return 'reload';
-    if (spec.pump || spec.bolt || spec.lever) return 'cycle';
+    if (def.manual) return 'cycle';
     return 'shot';
   }
   // the case: what it's made of, its length (mm) and radius (m)

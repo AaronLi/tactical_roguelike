@@ -790,7 +790,7 @@ const G_Views = {
       // their restraining / bagging sounds, as they reach each step
       if (act && pv.lastAct === st.act) G.Audio.foley(act.kind, pv.lastAp || 0, act.t, pv.pos.distanceTo(G.R.camera.position));
       pv.lastAct = st.act; pv.lastAp = act ? act.t : 0;
-      if (st.ra != null && st.ra >= 0 && !(pv.lastRa >= 0) && !st.sw) { const rdef = G.Gunsmith.fromCode(st.w); G.Audio.sampleAt('rack_slide', pv.pos.clone().setY(pv.pos.y + 1.3), 0.7, rdef && rdef.action ? G.Me.RACK_SND[rdef.action] : 1); } // (their bolt / pump / lever worked: heard from where they stand)
+      if (st.ra != null && st.ra >= 0 && !(pv.lastRa >= 0) && !st.sw) { const rdef = G.Gunsmith.fromCode(st.w); G.Audio.sampleAt('rack_slide', pv.pos.clone().setY(pv.pos.y + 1.3), 0.7, rdef && rdef.manual ? G.Me.MANUAL_PITCH : 1); } // (their bolt / pump / lever worked: heard from where they stand)
       pv.lastRa = st.ra == null ? -1 : st.ra;
       const kneel = (st.act === 'z' && (st.ap || 0) > 0.3) || st.act === 'b';
       const hold = st.hk ? { kind: st.hk === 2 ? 'flash' : 'frag', cock: !!st.hc, str: st.hs == null ? 2 : st.hs } : null; // (a grenade in their hand)

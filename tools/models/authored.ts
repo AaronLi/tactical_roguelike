@@ -11,8 +11,13 @@ interface AuthoredRig {
   stockY: number; gripY: number;            // mount_stock (up: the centre of the wrist at the receiver's back), mount_grip (up: the receiver's underside)
   mag: [number, number];                    // mount_magazine: the well, [forward, up]
 }
-/** One authored gun: the frame the other parts are seated on (rig), which optic kinds are its own sights (sights), the factory build's info and the meshes. */
-interface AuthoredGun { src: string; rig: AuthoredRig; sights: { builtin: string[]; rail: string[] }; info: Record<string, any>; meshes: AuthoredMesh[] }
+/** A per-gun variant part (models/<id>/<name>.glb, GUN_MODEL_CONTRACT.authored.variants): the meshes that replace the factory barrel (info.muzzles: where it ends) or magazine (cap rounds), in the gun's frame. */
+interface AuthoredVariant { slot: 'barrel' | 'mag'; of: string; info: Record<string, any> | null; cap: number | null; note: string; meshes: AuthoredMesh[] }
+/**
+ * One authored gun: the frame the other parts are seated on (rig), which optic kinds are its own sights (sights), the factory build's info and the meshes.
+ * pistol: a pistol (info.pistol): the rig is made from the pistol anchor set, and the raw anchors (mount_slide, mount_optic, mount_tac...) are in `anchors`; variants: its per-gun parts by file name.
+ */
+interface AuthoredGun { src: string; rig: AuthoredRig; sights: { builtin: string[]; rail: string[] }; info: Record<string, any>; meshes: AuthoredMesh[]; pistol: boolean; anchors: Record<string, number[]>; variants: Record<string, AuthoredVariant> }
 {
 var G_Authored: Record<string, AuthoredGun> = {};
 G.Authored = G_Authored;
