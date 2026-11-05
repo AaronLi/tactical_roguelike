@@ -39,8 +39,8 @@
   },
   "barrel=maxim9.barrel,mag=maxim9.mag,optic=op.pso.1": {
    "label": "optic=op.pso.1",
-   "geometry": "e43c0cecdd464aef",
-   "info": "ce58c64ffd8d9ab0"
+   "geometry": "fecf17afecab4e93",
+   "info": "51daa515e970736d"
   },
   "barrel=maxim9.barrel,mag=maxim9.mag,optic=op.pso.2": {
    "label": "optic=op.pso.2",
@@ -49,18 +49,18 @@
   },
   "barrel=maxim9.barrel,mag=maxim9.mag,optic=op.pso.3": {
    "label": "optic=op.pso.3",
-   "geometry": "e43c0cecdd464aef",
-   "info": "bffaf38b73b242e8"
+   "geometry": "df8a05b56689ce63",
+   "info": "2729a871c3fdcfca"
   },
   "barrel=maxim9.barrel,mag=maxim9.mag,optic=op.pso.4": {
    "label": "optic=op.pso.4",
-   "geometry": "7383e6d24c4a0fdf",
-   "info": "ce58c64ffd8d9ab0"
+   "geometry": "304f1ddb7cbdab97",
+   "info": "da03399ce330a7ac"
   },
   "barrel=maxim9.barrel,mag=maxim9.mag,optic=op.pso.5": {
    "label": "optic=op.pso.5",
-   "geometry": "e43c0cecdd464aef",
-   "info": "7b2f5394fb015842"
+   "geometry": "8e8d8e718da724a2",
+   "info": "d44ffafccbe98513"
   },
   "barrel=maxim9.barrel,mag=maxim9.mag,optic=p9.optic": {
    "label": "optic=p9.optic",
@@ -149,8 +149,8 @@
   },
   "barrel=maxim9.barrel,mag=maxim9.mag,optic=op.pso.1,tac=ptac.0": {
    "label": "optic=op.pso.1 from loaded A",
-   "geometry": "db1790058589ab7e",
-   "info": "ce58c64ffd8d9ab0"
+   "geometry": "bd9c67c30f4a65cb",
+   "info": "51daa515e970736d"
   },
   "barrel=maxim9.barrel,mag=maxim9.mag,optic=op.pso.2,tac=ptac.0": {
    "label": "optic=op.pso.2 from loaded A",
@@ -159,18 +159,18 @@
   },
   "barrel=maxim9.barrel,mag=maxim9.mag,optic=op.pso.3,tac=ptac.0": {
    "label": "optic=op.pso.3 from loaded A",
-   "geometry": "db1790058589ab7e",
-   "info": "bffaf38b73b242e8"
+   "geometry": "25e6b3f39ca45d17",
+   "info": "2729a871c3fdcfca"
   },
   "barrel=maxim9.barrel,mag=maxim9.mag,optic=op.pso.4,tac=ptac.0": {
    "label": "optic=op.pso.4 from loaded A",
-   "geometry": "88ee31da25d3b427",
-   "info": "ce58c64ffd8d9ab0"
+   "geometry": "0c0a36f3fa51abc8",
+   "info": "da03399ce330a7ac"
   },
   "barrel=maxim9.barrel,mag=maxim9.mag,optic=op.pso.5,tac=ptac.0": {
    "label": "optic=op.pso.5 from loaded A",
-   "geometry": "db1790058589ab7e",
-   "info": "7b2f5394fb015842"
+   "geometry": "6ac6f74f0bbb20bf",
+   "info": "d44ffafccbe98513"
   },
   "barrel=maxim9.barrel,mag=maxim9.mag,optic=p9.optic,tac=ptac.0": {
    "label": "optic=p9.optic from loaded A",
