@@ -135,6 +135,11 @@ export function generate(G, id) {
     const b = { ...def, optic: p.id }; delete b.magnifier; GS.prune(id, b); add(`authored optic (${p.id})`, b);
     if (p.provides && p.provides.magnifier) { const ms = slotOf(b, 'magnifier'); const m = ms && options(ms, b)[0]; if (m) add(`magnifier behind the authored optic (${p.id})`, { ...b, magnifier: m.id }); }
   } }
+  // authored furniture (models/parts/{stock,grip,muzzle,handguard}): each entry an authored model replaces, fitted alone where it fits and is not the default (the
+  // Kestrel on any tube, the IR-12 on any AR, the FDE rail): the default build already has the factory ones
+  for (const name of ['stock', 'grip', 'muzzle', 'handguard']) { const s = slotOf(def, name); if (s) for (const p of options(s, def)) if (p.model && (p.model.apStock || p.model.apGrip || p.model.apMuzzle || p.model.apHg) && def[s.slot] !== p.id) {
+    const b = { ...def, [s.slot]: p.id }; GS.prune(id, b); if (b[s.slot] === p.id) add(`authored ${name} (${p.id})`, b);
+  } }
   // authored variants (models/<id>/<name>.glb: a per-gun barrel or magazine): each fitted alone, with the loaded build, and all of them together
   { const vs = Object.values(PARTS).filter((p) => p.plat === id && p.model && (p.model.avBarrel || p.model.avMag) && !p.retired);
     for (const p of vs) { add(`authored variant (${p.id})`, { ...def, [p.slot]: p.id }); add(`authored variant, loaded (${p.id})`, { ...loaded, [p.slot]: p.id }); }

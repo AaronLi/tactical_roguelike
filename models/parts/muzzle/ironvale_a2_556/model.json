@@ -1,0 +1,22 @@
+{
+  "source": "authored",
+  "kind": "part",
+  "slot": "muzzle",
+  "frame": "muzzle-mount",
+  "anchors": {
+    "muzzles": [
+      [
+        0.0505,
+        0,
+        0
+      ]
+    ]
+  },
+  "part": {
+    "thread": "r556",
+    "kind": "flash"
+  },
+  "replaces": [
+    "Ironvale A2 5.56 birdcage"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "source": "authored",
+  "kind": "part",
+  "slot": "grip",
+  "frame": "grip-mount",
+  "anchors": {
+    "grip": [
+      -0.04,
+      -0.04,
+      0
+    ]
+  },
+  "part": {
+    "mount": "ar"
+  },
+  "replaces": [
+    "Paragon PG-23 ergonomic grip"
+  ]
+}

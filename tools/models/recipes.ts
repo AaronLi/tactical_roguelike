@@ -397,19 +397,25 @@ const G_GunRecipes = (() => {
   };
 
   // ---------------------------------------------------------------- shared parts
-  function grip(k: Kit, gf: number, m: THREE.Material, type = 'ar') {
-    if (type === 'none') return;
-    if (type === 'wood') { k.prof([[gf - 0.005, -0.04], [gf + 0.035, -0.04], [gf + 0.02, -0.13], [gf - 0.025, -0.125]], 0.032, m); return; }
-    if (type === 'vertical') { k.prof([[gf - 0.01, -0.035], [gf + 0.03, -0.035], [gf + 0.028, -0.135], [gf - 0.012, -0.135]], 0.03, m); return; }
+  // ap: the fitted grip is an authored model (models/parts/grip/<id>/, o.apGrip), an AR grip: its origin at this grip's front top, where it meets the receiver,
+  // (gf + 0.028, -0.036). Returns it (its anchors in the gun's frame) when it is.
+  function grip(k: Kit, gf: number, m: THREE.Material, type = 'ar', ap?: string | null) {
+    if (type === 'none') return null;
+    if (ap && type === 'ar') return G.AuthoredParts.furniture(k, ap, gf + 0.028, -0.036, m);
+    if (type === 'wood') { k.prof([[gf - 0.005, -0.04], [gf + 0.035, -0.04], [gf + 0.02, -0.13], [gf - 0.025, -0.125]], 0.032, m); return null; }
+    if (type === 'vertical') { k.prof([[gf - 0.01, -0.035], [gf + 0.03, -0.035], [gf + 0.028, -0.135], [gf - 0.012, -0.135]], 0.03, m); return null; }
     k.prof([[gf - 0.012, -0.036], [gf + 0.028, -0.036], [gf + 0.012, -0.132], [gf - 0.028, -0.124]], 0.03, m);
+    return null;
   }
   function triggerGuard(k: Kit, gf: number, m: THREE.Material) {
     k.box(0.01, 0.004, 0.06, m, gf + 0.02, -0.062);
     k.box(0.01, 0.024, 0.004, m, gf + 0.076, -0.05);
     k.box(0.004, 0.02, 0.005, M.black(), gf + 0.04, -0.048);
   }
-  // Stocks: the first-person model has them too (it is the same geometry as display()).
-  function stock(k: Kit, type: string, m: THREE.Material, _wrist?: boolean): void {
+  // Stocks: the first-person model has them too (it is the same geometry as display()). ap: the fitted stock is an authored model (models/parts/stock/<id>/,
+  // o.apStock): its origin goes where the buffer tube meets the receiver, (0, -0.002) here, and the tube under it is the gun's (drawn as the 'm4' case's).
+  function stock(k: Kit, type: string, m: THREE.Material, _wrist?: boolean, ap?: string | null): void {
+    if (ap) { k.cyl(0.0155, 0.2, M.black(), -0.2, -0.002); G.AuthoredParts.furniture(k, ap, 0, -0.002, m); return; }
     const pad = (f: number, y: number, h: number) => k.box(0.044, h, 0.012, M.rubber(), f - 0.012, y);
     switch (type) {
       case 'tubeonly': // a buffer tube adapter with nothing on it
@@ -681,6 +687,12 @@ const G_GunRecipes = (() => {
         break;
       }
     }
+  }
+  // The fitted muzzle device at f0 on the bore at y: the authored model when it is one (o.apMuzzle, models/parts/muzzle/<id>/: its origin on the barrel's end),
+  // else the recipe's own. Returns how far it reaches forward of f0 (to where the bullet leaves it).
+  function muzzleDev(k: Kit, o: RecipeSpec, f0: number, br: number, y = 0) {
+    if (o.apMuzzle) return G.AuthoredParts.furniture(k, o.apMuzzle, f0, y).muzzles![0][0] - f0;
+    return muzzle(k, o.muzzle!, f0, br, y);
   }
   function muzzle(k: Kit, type: string, f0: number, br: number, y = 0) {
     switch (type) {
@@ -1408,21 +1420,23 @@ const G_GunRecipes = (() => {
 
     k.tag('grip');
     if (tr && rcv !== 'ar') tracedParts(k, tr, VT, 'grip', mats); // (an AR lower's own grip is the standard AR grip, whatever the lower: the AR-9's too)
+    let gripA: ReturnType<typeof grip> = null; // (an authored grip fitted: its anchors in the gun's frame)
     const lugGrip = tr && tr.lug && o.gripT === 'lug'; // (a traced pistol's grip with a stock lug on its back: the stock on a part at the lug, under the hammer)
     if (lugGrip) {
       k.prof(tr.lug.pts.map(VT), 0.02, M.steel(), 0, null, 0.0015);
-      if (o.stock) { k.tag('stock'); const [sf, sy] = VT(tr.lug.at), sp = k.part(sf, sy); k.into(sp, sf, sy); stock(k, o.stock, o.sm || M.black(), false); k.into(null); k.tag('grip'); } // (not in first person, as a rifle's isn't: it'd stand in front of your eye)
+      if (o.stock) { k.tag('stock'); const [sf, sy] = VT(tr.lug.at), sp = k.part(sf, sy); k.into(sp, sf, sy); stock(k, o.stock, o.sm || M.black(), false, o.apStock); k.into(null); k.tag('grip'); } // (not in first person, as a rifle's isn't: it'd stand in front of your eye)
     }
     else if (A && own('grip')) authored(k, A, (e) => e.slot === 'grip');
+    else if (A && o.gripT !== 'none' && o.apGrip && (o.gripT || 'ar') === 'ar') gripA = G.AuthoredParts.furniture(k, o.apGrip, A.anchors.mount_grip ? A.anchors.mount_grip[0] : gf + 0.028, A.rig.gripY, o.gm || (stdGrip ? M.polymer() : fm)); // (an authored grip: its origin on the model's mount_grip)
     else if (A && o.gripT !== 'none') k.moved(0, A.rig.gripY + 0.036, () => grip(k, gf, o.gm || (stdGrip ? M.polymer() : fm), o.gripT || 'ar')); // (another grip, its top on the receiver's underside)
-    else if (o.gripT !== 'none' && rcv !== 'qbz95' && rcv !== 'f2' && rcv !== 'aksu' && !((rcv === 'vector' || rcv === 'aug' || rcv === 'gm6') && (o.gripT || 'ar') === 'ar')) grip(k, gf, o.gm || (stdGrip ? M.polymer() : fm), o.gripT || (rcv === 'ak' ? 'wood' : 'ar')); // (the Vector's own is part of its lower)
+    else if (o.gripT !== 'none' && rcv !== 'qbz95' && rcv !== 'f2' && rcv !== 'aksu' && !((rcv === 'vector' || rcv === 'aug' || rcv === 'gm6') && (o.gripT || 'ar') === 'ar')) gripA = grip(k, gf, o.gm || (stdGrip ? M.polymer() : fm), o.gripT || (rcv === 'ak' ? 'wood' : 'ar'), o.apGrip); // (the Vector's own is part of its lower)
     k.tag('stock');
     if (A && o.stock && own('stock')) authored(k, A, (e) => e.slot === 'stock');
-    else if (A && o.stock) k.moved(0, A.rig.stockY + 0.002, () => stock(k, o.stock!, o.sm || fm, false)); // (another stock, centred on the receiver's back)
-    else if (rcv === 'vector' && o.stock) { const sp = k.part(0, vecTrace([0, 110])[1]); k.into(sp); stock(k, o.stock, o.sm || fm, false); k.into(null); } // (its tube level with the top of the receiver: the bore's below the shoulder)
-    else if (tr && o.stock === (tr.stockT || 'wood') && tr.parts.some((p: TracePart) => p.on === 'stock')) tracedParts(k, tr, VT, 'stock', mats); // (the traced stock, while the factory one's fitted: in first person just its wrist, what the hand holds, or the rest of it stands in front of your eye)
-    else if (!bull && o.stock && rcv === 'aksu') { const st = ({ skeleton: 'aksu', folded: 'aksufold' } as Record<string, string>)[o.stock] || o.stock; stock(k, st, o.sm || (st === 'akwood' || st === 'm4' ? fm : rm), false); } // (a skeleton stock here is its triangular side-folder, black steel unless painted)
-    else if (!bull && o.stock && !lugGrip) stock(k, o.stock, o.sm || fm, o.gripT === 'none');
+    else if (A && o.stock) k.moved(0, A.rig.stockY + 0.002, () => stock(k, o.stock!, o.sm || fm, false, o.apStock)); // (another stock, centred on the receiver's back)
+    else if (rcv === 'vector' && o.stock) { const sp = k.part(0, vecTrace([0, 110])[1]); k.into(sp); stock(k, o.stock, o.sm || fm, false, o.apStock); k.into(null); } // (its tube level with the top of the receiver: the bore's below the shoulder)
+    else if (tr && !o.apStock && o.stock === (tr.stockT || 'wood') && tr.parts.some((p: TracePart) => p.on === 'stock')) tracedParts(k, tr, VT, 'stock', mats); // (the traced stock, while the factory one's fitted and is not an authored model: in first person just its wrist, what the hand holds, or the rest of it stands in front of your eye)
+    else if (!bull && o.stock && rcv === 'aksu') { const st = ({ skeleton: 'aksu', folded: 'aksufold' } as Record<string, string>)[o.stock] || o.stock; stock(k, st, o.sm || (st === 'akwood' || st === 'm4' ? fm : rm), false, st === o.stock ? o.apStock : null); } // (a skeleton stock here is its triangular side-folder, black steel unless painted)
+    else if (!bull && o.stock && !lugGrip) stock(k, o.stock, o.sm || fm, o.gripT === 'none', o.apStock);
     k.tag('mag');
     let magAt = null;
     if (A && own('mag') && A.hinge) { authored(k, A, (e) => e.slot === 'mag'); anim.mag = partNode(k, A, 'mag'); magAt = A.info.magAt; } // (a barrel block: nested in the forend that slides and drops, with its carry handle)
@@ -1496,7 +1510,8 @@ const G_GunRecipes = (() => {
       hgLen = hg.len;
       if (rcv === 'aksu' && hg.t === 'wood') hg.aksu = true;
       if (hg.t === 'sig') hg.ext = o.railExt || 0;
-      if (tr && tr.parts.some((p: TracePart) => p.on === 'fore') && hg.t === 'wood') { const sc = (hg.len - 0.03) / (tr.foreLen - 0.03), VF = (p: number[]) => { const [f, y] = VT(p); return [f > L + 0.03 ? L + 0.03 + (f - L - 0.03) * sc : f, y]; }; tracedParts(k, tr, VF, 'fore', Object.assign({}, mats, { fore: hg.m || fm })); } // (the traced forend, stretched or shortened ahead of the action to the wooden hand guard's length: a drawing's scale, not the part's)
+      if (o.apHg) hgLen = G.AuthoredParts.furniture(k, o.apHg, hgF, 0, hg.m || (stdHg ? M.black() : rm)).part.len; // (an authored handguard, models/parts/handguard/<id>/: its origin on the bore at the receiver's front, its rails in the rail's colour; as long as the model, which the catalogue's length matches to 1.5 mm)
+      else if (tr && tr.parts.some((p: TracePart) => p.on === 'fore') && hg.t === 'wood') { const sc = (hg.len - 0.03) / (tr.foreLen - 0.03), VF = (p: number[]) => { const [f, y] = VT(p); return [f > L + 0.03 ? L + 0.03 + (f - L - 0.03) * sc : f, y]; }; tracedParts(k, tr, VF, 'fore', Object.assign({}, mats, { fore: hg.m || fm })); } // (the traced forend, stretched or shortened ahead of the action to the wooden hand guard's length: a drawing's scale, not the part's)
       else {
         handguard(k, hg, hgF, stdHg ? M.polymer() : fm, stdHg ? M.black() : rm);
         // the G36's sleeve round the barrel with the bayonet lug, in front of its guard when the barrel has room: the barrel's, where the guard ends
@@ -1530,7 +1545,7 @@ const G_GunRecipes = (() => {
     if (A && A.info.barrels && o.avMuzzle && A.variants[o.avMuzzle]) { const v = A.variants[o.avMuzzle]; k.tag('muzzle'); authoredVariant(k, A, v); muzzleList = v.info!.muzzles; }
     else if (A && A.info.barrels && o.muzzle && own('muzzle')) { k.tag('muzzle'); authored(k, A, (e) => e.slot === 'muzzle'); muzzleList = A.info.muzzles; }
     else if (A && o.muzzle && own('muzzle')) { k.tag('muzzle'); k.moved(front - A.rig.end, 0, () => authored(k, A, (e) => e.slot === 'muzzle')); front += A.info.muzzles[0][0] - A.rig.end; }
-    else if (!o.integral && o.muzzle) { k.tag('muzzle'); if (rcl) k.into(rcl, L, by); front += rcv === 'aksu' && o.muzzle === 'cutts' ? aksuBooster(k, front, by) : muzzle(k, o.muzzle, front, mbr, by); } // (the AKS-74U's booster is its own: the Thompson's Cutts is the plain one)
+    else if (!o.integral && o.muzzle) { k.tag('muzzle'); if (rcl) k.into(rcl, L, by); front += rcv === 'aksu' && o.muzzle === 'cutts' ? aksuBooster(k, front, by) : muzzleDev(k, o, front, mbr, by); } // (the AKS-74U's booster is its own: the Thompson's Cutts is the plain one)
     if (brk || rcl) k.into(null);
     k.anchor(!o.integral && o.muzzle ? 'muzzle' : 'barrel', 'muzzles', muzzleList || [[front, by, 0]]); // (every muzzle: the device's end when there is one)
     if (o.pump) {
@@ -1659,7 +1674,9 @@ const G_GunRecipes = (() => {
     if (o.magnifier && k.reflex) { k.tag('magnifier'); sight = S.magnifier(k, sight, o.magnifier, anim); } // (a Thor's: on the rail, it tips with it)
     if (onBarrels) k.into(null);
     k.tag('base');
-    const support = o.support != null && !(hgLen && o.hgGap) ? o.support : rcv === 'vector' && fgF == null ? L - 0.045 : o.pump ? L + o.pump.f + o.pump.len * 0.5 : fgF != null && o.fg !== 'bipod' ? fgF : o.vfg != null ? L + o.vfg : bull ? L + 0.07 : hgF + (hgLen ? Math.min(hgLen * 0.15, 0.04) : 0.03); // (a plain handguard: held near its back, the arm bent, not out at full stretch)
+    const hgHold = o.apHg && hgLen ? G.AuthoredParts.get(o.apHg).anchors!.support! : null; // (an authored handguard says where it is held: its support anchor, [forward, up] from its rear on the bore)
+    const support = o.support != null && !(hgLen && o.hgGap) ? o.support : rcv === 'vector' && fgF == null ? L - 0.045 : o.pump ? L + o.pump.f + o.pump.len * 0.5 : fgF != null && o.fg !== 'bipod' ? fgF : o.vfg != null ? L + o.vfg : bull ? L + 0.07 : hgHold ? hgF + hgHold[0] : hgF + (hgLen ? Math.min(hgLen * 0.15, 0.04) : 0.03); // (a plain handguard: held near its back, the arm bent, not out at full stretch)
+    const supportY = o.pump ? -0.03 : hgHold && support === hgF + hgHold[0] ? hgHold[1] : -0.028;
     // where the hands go for reloads and racking (gun space: [forward, up, right])
     const port = o.bolt ? [o.bolt - 0.02, top - 0.004, 0] : o.lever ? [L * 0.55, 0.0, 0.02] : o.pump || o.tube ? [L * 0.62, -0.042, 0] : rcv === 'break' ? [L, 0.0, 0] : [L * 0.5, top, 0];
     // where a chamber check shows the round: through the ejection port on the right (js/vmanim.ts), or for a
@@ -1673,7 +1690,7 @@ const G_GunRecipes = (() => {
     return {
       sy: sight.sy, fSight: sight.fSight, relief: sight.relief,
       muzzles: muzzleList || [[front, by, 0]],
-      grip: [gf + 0.005, -0.075, 0], support: [support, o.pump ? -0.03 : -0.028, 0],
+      grip: gripA && gripA.grip ? gripA.grip : [gf + 0.005, -0.075, 0], support: [support, supportY, 0], // (an authored grip: where its palm anchor is)
       anim, magAt, handle, port, chamberAt, breech: tr && tr.chamber ? Object.assign(breechAt(L, hy, L - tr.chamber, by - hy, BRK_OPEN), { long: o.hgGap ? (o.optic === 'notch' ? 'irons' : 'rail') : null }) : null, ch: (rcv === 'ar' && !o.cock) || o.ch ? [-0.006, 0.026, 0] : null, bolt: o.bolt ? [o.bolt, 0.01, 0.068] : null,
       cheek: o.cheek != null ? o.cheek : null, // (a bullpup: where your eye is, whatever's on the rail: tools/models/recipes.ts viewmodel)
       recoilBarrel: rcTravel, // (a long-recoil barrel: how far it runs back each shot, js/vmanim.ts)
@@ -1760,13 +1777,22 @@ const G_GunRecipes = (() => {
     let g = authoredGeo.get(e);
     if (!g) {
       g = new T.BufferGeometry();
-      g.setAttribute('position', new T.BufferAttribute(e.pos, 3)); g.setAttribute('normal', new T.BufferAttribute(e.nrm, 3));
+      const src = e.local || e; // (a magazine-check mesh: in its own node's frame, placed with that node's transform: placeAuthored)
+      g.setAttribute('position', new T.BufferAttribute(src.pos, 3)); g.setAttribute('normal', new T.BufferAttribute(src.nrm, 3));
       g.setIndex(new T.BufferAttribute(e.idx, 1));
       if (e.uv) g.setAttribute('uv', new T.BufferAttribute(e.uv, 2)); // (a display surface's)
       g.computeBoundingSphere(); g.computeBoundingBox();
       authoredGeo.set(e, g);
     }
     return g;
+  }
+  // One authored mesh on the kit where it was made: a magazine-check mesh (e.chk) at its own node's place and rotation, tagged (js/gunrig.ts magCheck reads the
+  // tags; a hole's rotation is the face's tilt), each its own mesh through the packs; any other with its geometry already in the gun's frame.
+  function placeAuthored(k: Kit, e: AuthoredMesh, g: THREE.BufferGeometry, mat: THREE.Material) {
+    if (!e.xf) return k.place(g, mat, 0, 0, 0);
+    const m = k.place(g, mat, e.xf.p[0], e.xf.p[1], -e.xf.p[2]);
+    m.quaternion.set(e.xf.q[0], e.xf.q[1], e.xf.q[2], e.xf.q[3]); m.userData.chk = Object.assign({}, e.chk);
+    return m;
   }
   // The part_ nodes of a gun with a reload sequence (A.hinge), made as nested groups the first time something is drawn in them: a part's meshes are placed
   // against its own pivot and its pivot against its parent's, so moving a node moves everything inside it (the docs: "Multi-barrel guns")
@@ -1776,6 +1802,7 @@ const G_GunRecipes = (() => {
     let p = m.get(key); if (p) return p;
     const pt = A.parts[key], f = -pt.at[2], y = pt.at[1];
     p = k.part(f, y); m.set(key, p);
+    if (pt.check) p.userData.check = Object.assign({}, pt.check); // (a magazine's check data: js/gunrig.ts magCheck)
     if (pt.parent) { const par = partNode(k, A, pt.parent), pa = A.parts[pt.parent].at; par.add(p); p.position.set(0, y - pa[1], pt.at[2] - pa[2]); }
     return p;
   }
@@ -1791,8 +1818,8 @@ const G_GunRecipes = (() => {
       if (!which(e)) continue;
       const g = bend ? bend(e, geoOf(e)) : geoOf(e), mat = e.display ? Object.assign(M.black().clone(), { name: 'black' }) : ((M as any)[e.mat] || M.black)(); // (a display surface: the game paints it, whatever material the file names)
       let m: THREE.Mesh;
-      if (A.hinge && e.part) { const at = A.parts[e.part].at; k.into(partNode(k, A, e.part), -at[2], at[1]); m = k.place(g, mat, 0, 0, 0); k.into(null); }
-      else m = k.place(g, mat, 0, 0, 0);
+      if (A.hinge && e.part) { const at = A.parts[e.part].at; k.into(partNode(k, A, e.part), -at[2], at[1]); m = placeAuthored(k, e, g, mat); k.into(null); }
+      else m = placeAuthored(k, e, g, mat);
       if (e.display) { m.name = e.name!; m.userData.display = e.display; } // (a display surface: painted at run time)
     }
   }
@@ -1800,7 +1827,7 @@ const G_GunRecipes = (() => {
   function authoredVariant(k: Kit, A: AuthoredGun, v: AuthoredVariant) {
     const host = A.hinge ? A.meshes.find((q) => q.slot === v.slot && q.part) : null;
     if (host) { const at = A.parts[host.part!].at; k.into(partNode(k, A, host.part!), -at[2], at[1]); }
-    for (const e of v.meshes) k.place(geoOf(e), ((M as any)[e.mat] || M.black)(), 0, 0, 0);
+    for (const e of v.meshes) placeAuthored(k, e, geoOf(e), ((M as any)[e.mat] || M.black)());
     if (host) k.into(null);
   }
   // an authored animated part (part_<key>): its pivot and its meshes
@@ -1808,6 +1835,7 @@ const G_GunRecipes = (() => {
     const first = A.meshes.find((e) => e.part === key);
     if (!first) return null;
     const [x, y, z] = first.at!, p = k.part(-z, y);
+    const ck = A.parts[key] && A.parts[key].check; if (ck) p.userData.check = Object.assign({}, ck); // (a magazine's check data: js/gunrig.ts magCheck)
     k.into(p, -z, y);
     authored(k, A, (e) => e.part === key);
     k.into(null);
@@ -1898,7 +1926,7 @@ const G_GunRecipes = (() => {
         for (const sl of chain.length ? chain : ['stock']) {
           const type = chain.length ? PP[o.slotOf![sl]]?.model?.stock : o.stock;
           if (!type || type === 'smgmount') continue;
-          const draw = () => stock(k, type, o.sm || M.black(), true); // (true: shown in first person too: a brace rides along your forearm, in view)
+          const ap = chain.length ? PP[o.slotOf![sl]]?.model?.apStock : o.apStock, draw = () => stock(k, type, o.sm || M.black(), true, ap); // (true: shown in first person too: a brace rides along your forearm, in view)
           if (sl === 'stock') draw(); else k.at(sl, draw);
         }
         k.into(null);
@@ -1934,7 +1962,7 @@ const G_GunRecipes = (() => {
     if (tr && tr.tube) k.at('block', () => k.cyl(tr.tube.r, len0 + tr.tube.out - tr.tube.from, Mk[tr.tube.m] ? Mk[tr.tube.m]() : M.gunmetal(), tr.tube.from, 0.009, 0, tr.tube.r, 20)); // (an open-topped slide's: it shows, and it stays put)
     if (o.match) { k.cyl(0.0068, 0.012, M.steel(), front, 0.009); front += 0.012; }
     if (o.thread) { k.cyl(0.0058, 0.012, M.steel(), front, 0.009); front += 0.012; }
-    if (o.muzzle && o.thread) { k.tag('muzzle'); front += muzzle(k, o.muzzle, front, 0.0065, 0.009); }
+    if (o.muzzle && o.thread) { k.tag('muzzle'); front += muzzleDev(k, o, front, 0.0065, 0.009); }
     k.tag('tac');
     if (!ch) {
       const [tf, ty] = tr ? V(tr.tac).map((n, i) => (i ? n - 0.0115 : n)) : [len0 * 0.86, -0.026]; // (traced: its top, r 11 mm, on the frame's underside)
@@ -1977,12 +2005,14 @@ const G_GunRecipes = (() => {
     const ownIrons = !o.optic || o.optic === 'notch' || A.sights.builtin.includes(o.optic);
     // (a variant barrel: its meshes replace the factory barrel's; it may carry a pistol optic cut of its own, info.mounts.mount_optic, which the dot is seated in)
     const vb = o.avBarrel ? A.variants[o.avBarrel] : null, mountOptic: number[] = (vb && vb.info && vb.info.mounts && vb.info.mounts.mount_optic) || a.mount_optic;
-    const draw = (list: AuthoredMesh[]) => { for (const e of list) k.place(geoOf(e), ((M as any)[e.mat] || M.black)(), 0, 0, 0); };
+    const draw = (list: AuthoredMesh[]) => { for (const e of list) placeAuthored(k, e, geoOf(e), ((M as any)[e.mat] || M.black)()); }; // (a magazine-check mesh at its own node's place and tilt)
     // (an animated part: its pivot and the meshes that pass `which`; the pivot is where the model put the part_ node)
     const partOf = (list: AuthoredMesh[], key: string, which: (e: AuthoredMesh) => boolean = () => true) => {
       const first = list.find((e) => e.part === key); if (!first) return null;
       const [, y, z] = first.at!, p = k.part(-z, y);
       k.into(p, -z, y); draw(list.filter((e) => e.part === key && which(e))); k.into(null);
+      const ck = list === A.meshes ? A.parts[key] && A.parts[key].check : (Object.values(A.variants).find((v) => v.meshes === list) || { check: null }).check; // (a magazine's check data: the model's part_mag's, or the variant's)
+      if (ck) p.userData.check = Object.assign({}, ck);
       return p;
     };
     // THE FRAME (everything of slot base that is not a moving part), then its bolt (a manually cycled pistol's knob: part_bolt)
@@ -2183,7 +2213,7 @@ const G_GunRecipes = (() => {
       // part at the lug so it sits level with the top of the grip, under the bore
       k.prof(pts([[118, 300], [176, 246], [250, 252], [290, 300], [300, 344], [298, 556], [140, 560], [124, 470], [112, 380]]), 0.024, o.gm || M.polymer(), 0, null, 0.003);
       k.prof(pts([[84, 262], [128, 262], [128, 340], [84, 340]]), 0.02, S0, 0, null, 0.0015);
-      if (o.stock) { k.tag('stock'); const sp = k.part(V([90, 0])[0], V([0, 284])[1]); k.into(sp); stock(k, o.stock, o.sm || M.black(), true); k.into(null); k.tag('grip'); }
+      if (o.stock) { k.tag('stock'); const sp = k.part(V([90, 0])[0], V([0, 284])[1]); k.into(sp); stock(k, o.stock, o.sm || M.black(), true, o.apStock); k.into(null); k.tag('grip'); }
     } else {
       k.prof(pts([[122, 300], [176, 246], [250, 252], [290, 300], [300, 344], [292, 420], [284, 500], [265, 548], [205, 558], [156, 546], [126, 500], [107, 420], [106, 352]]), 0.023, o.gm || M.woodDark(), 0, null, 0.003);
       for (const x of [-0.0118, 0.0118]) { const [f, y] = V([150, 405]); k.cylX(0.0028, 0.0008, S0, f, y, x); } // (the grip screw's escutcheons)
@@ -2319,7 +2349,7 @@ const G_GunRecipes = (() => {
       k.cyl(0.024, bl, M.black(), 0.24, 0.04);
       k.box(0.05, 0.03, bl, M.black(), 0.24, 0.01);
       k.tag('stock');
-      stock(k, o.stock || 'm4', o.sm || M.polymer());
+      stock(k, o.stock || 'm4', o.sm || M.polymer(), false, o.apStock);
       k.tag('optic');
       const sight = magIn(k, sightOf(k, o, top, 0.24, bl, 0.024, 0.24 + bl, magOfs(o, 0.24, 0.2, 0.34), true, 0.04), top, o, anim);
       k.tag('base');
@@ -2333,7 +2363,7 @@ const G_GunRecipes = (() => {
     k.cyl(0.024, bl, M.od(), 0.0, 0.0);
     k.cyl(0.027, 0.03, M.black(), 0.0, 0.0);
     k.tag('stock');
-    stock(k, o.stock || 'wire', o.sm || M.blued());
+    stock(k, o.stock || 'wire', o.sm || M.blued(), false, o.apStock);
     k.tag('optic');
     const rt = o.optic && o.optic !== 'notch' && S.rail(k, 0.05, 0.12, 0.024, M.black());
     const sight = rt ? magIn(k, sightOf(k, o, rt, bl, bl, 0.024, bl, magOfs(o, 0.05, 0.12, 0.1), true, 0), rt, o, anim) : S.notch(k, 0.05, bl - 0.03, 0.042, 0.024, 0, true);
@@ -2349,7 +2379,7 @@ const G_GunRecipes = (() => {
     triggerGuard(k, 0.06, M.black());
     const top = S.rail(k, 0.08, 0.22, 0.03, M.black());
     k.tag('stock');
-    stock(k, o.stock || 'skeleton', o.sm || M.polymer());
+    stock(k, o.stock || 'skeleton', o.sm || M.polymer(), false, o.apStock);
     k.tag('barrel');
     for (const y of [0.022, -0.022]) k.box(0.03, 0.01, bl, M.black(), 0.34, y);
     for (let i = 0; i < Math.round(bl / 0.09); i++) k.ringZ(0.03, 0.005, M.glow(), 0.4 + i * 0.08, 0);
@@ -2425,7 +2455,7 @@ const G_GunRecipes = (() => {
     for (const f of [0.1, 0.275]) for (const x of [-0.0125, 0.0125]) k.box(0.004, 0.018, 0.02, B, f, 0.017, x); // (the posts that bridge it over the bolt)
     k.tag('stock');
     const stk = o.stock || 'sniper';
-    if (stk !== 'sniper') stock(k, stk, o.sm || M.polymer());
+    if (stk !== 'sniper') stock(k, stk, o.sm || M.polymer(), false, o.apStock);
     else { // the factory stock: a thumbhole with a high comb, the pad on its butt
       k.prof([[0, -0.024], [0, 0.012], [-0.1, 0.012], [-0.18, 0.026], [-0.33, 0.034], [-0.356, 0.03], [-0.364, -0.13], [-0.33, -0.14], [-0.26, -0.13], [-0.19, -0.1], [-0.13, -0.075], [-0.07, -0.082], [-0.01, -0.095], [0.0, -0.05]], 0.042, o.sm || M.polymer(), 0,
         [[[-0.03, -0.012], [-0.15, -0.002], [-0.2, -0.04], [-0.12, -0.07], [-0.04, -0.06]]]);
@@ -2511,7 +2541,7 @@ const G_GunRecipes = (() => {
     k.tag('barrel');
     k.cyl(0.0085, bl, M.blued(), F(167) - 0.045, 0); // (most of it in the receiver: a stub and the flash hider stand out of it)
     let front = F(167) - 0.045 + bl;
-    if (o.muzzle) { k.tag('muzzle'); front += muzzle(k, o.muzzle, front, 0.0085, 0); }
+    if (o.muzzle) { k.tag('muzzle'); front += muzzleDev(k, o, front, 0.0085, 0); }
     k.tag('optic');
     // (irons at the two ends of the housing's rail; anything else in the middle of it)
     const anim = { mag: magP, handle: hp };

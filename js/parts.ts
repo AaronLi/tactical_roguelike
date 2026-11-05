@@ -1162,6 +1162,9 @@ const G_Gunsmith = (() => {
     delete b.m;
     return { barrel: b, mbr: B.r || 0.0095 };
   }
+  // The key an authored piece of furniture's model rides on in a part's model (and so in the spec): the recipe draws the model there instead of its own
+  // (tools/models/recipes.ts; the parts replaced are set at the end of the catalogue). One per slot, as the spec merges every slot's patch into one object.
+  const AP_KEY: Record<string, 'apStock' | 'apGrip' | 'apMuzzle' | 'apHg'> = { stock: 'apStock', grip: 'apGrip', muzzle: 'apMuzzle', handguard: 'apHg' };
   // The model spec for a build: the platform's receiver spec with every installed part's patch applied.
   function modelSpec(def: any) {
     const plat = PLATFORMS[def.id];
@@ -1169,7 +1172,7 @@ const G_Gunsmith = (() => {
     // (in slot order, by the slot each is in: what's on an adapter goes over the adapter)
     const fitted = Object.entries(def.build || defaultBuild(def.id)).filter(([, p]) => PARTS[p])
       .sort((a, b) => slotRank(a[0]) - slotRank(b[0]));
-    for (const [sl, pid] of fitted) for (let [k, v] of Object.entries(PARTS[pid].len != null ? lenModel(def.id, PARTS[pid]) : PARTS[pid].model || {})) {
+    for (const [sl, pid] of fitted) for (let [k, v] of Object.entries(Object.assign(AP_KEY[PARTS[pid].slot] ? { [AP_KEY[PARTS[pid].slot]]: null } : {}, PARTS[pid].len != null ? lenModel(def.id, PARTS[pid]) : PARTS[pid].model || {}))) { // (a stock, grip, muzzle or handguard says whether it is an authored model, so one on an adapter is the one drawn)
       if (k === 'tac' && sl === 'tacL') k = 'tacL'; // (the left rail's)
       if (k === 'pumpPatch') { spec.pump = Object.assign({}, spec.pump || {}, v); continue; }
       if (v && typeof v === 'object' && !Array.isArray(v) && spec[k] && typeof spec[k] === 'object') spec[k] = Object.assign({}, spec[k], v);
@@ -1287,6 +1290,9 @@ const G_Gunsmith = (() => {
   add({ id: 'stk.heavy.g36', slot: 'stock', mount: 'stk:heavy', brand: 'Factory', oem: true, name: 'G36 folding stock', price: 230, tier: 1, stype: 'g36', st: STK_ST.g36,
     desc: 'A skeleton stock that folds to the right; the rifle still fires folded.', model: { stock: 'g36', sm: null } });
   { const plat = PLATFORMS.g36; plat.slots.find((sl: Slot) => sl.slot === 'handguard')!.mount = 'hg:g36'; plat.defaults.handguard = 'oem.hg.g36.0'; plat.defaults.stock = 'stk.heavy.g36'; LATE.add('g36'); }
+  // the Mk18 comes with the Paragon PG-23 (its model's own grip, models/m4, is that polymer grip), not the standard A2 one, which it still takes. Set here, not in
+  // its spec (grip: ['ar', 'ar']), so the standard grip is still made where it was: a part's id in a code is its place in the list
+  { PLATFORMS.m4.defaults.grip = 'gr.ar.0'; LATE.add('m4'); }
   // the derringer as a kit: its own grips (one with a stock lug, for any SMG stock), long barrels (a carbine's and a
   // rifle's: a .44 Magnum from 16" or 20", a rail along their rib for a rifle's sight and a railed forend), and its
   // own length with an optic cut in the rib for a pistol sight (the sights tip open with the barrels)
@@ -1494,6 +1500,11 @@ const G_Gunsmith = (() => {
     {"id":"op.auth.falcon","slot":"optic","mount":"op:pic","brand":"strix","name":"Strix Falcon open reflex","price":340,"tier":1,"st":{"ergo":-1,"acc":-2,"hip":2},"set":{"zoom":0.8,"scoped":false},"desc":"Unmagnified. Takes a magnifier behind it.","model":{"optic":"authored","apart":"optic/falcon","ret":"dot"},"magnifier":true,"height":"low","src":"models/parts/optic/falcon"},
   ];
   const AUTHORED_REPLACES: any[] = [
+    {"apart":"grip/brightline_a2","names":["Brightline A2 pistol grip (matches the furniture)"]},
+    {"apart":"grip/paragon_pg23","names":["Paragon PG-23 ergonomic grip"]},
+    {"apart":"handguard/ironvale_ir12","names":["Ironvale IR-12 quad rail"],"len":0.3},
+    {"apart":"handguard/quad_rail_240","names":["Brightline 9.4\" quad rail handguard","Brightline 9.4\" quad rail handguard (FDE)"],"len":0.2395},
+    {"apart":"muzzle/ironvale_a2_556","names":["Ironvale A2 5.56 birdcage"]},
     {"apart":"optic/brightline_pip","names":["Brightline Pip red dot"]},
     {"apart":"optic/ember","names":["Halcyon Ember pistol dot"]},
     {"apart":"optic/halcyon_lantern","names":["Halcyon Lantern holographic"]},
@@ -1510,12 +1521,14 @@ const G_Gunsmith = (() => {
     {"apart":"optic/strix_owlet","names":["Strix Owlet micro dot"]},
     {"apart":"optic/vantage_halo","names":["Vantage Halo circle-dot sight"]},
     {"apart":"optic/vantage_halo_p","names":["Vantage Halo circle-dot pistol sight"]},
+    {"apart":"stock/kestrel_cs4","names":["Kestrel CS-4 carbine stock"]},
   ];
   // authored-parts:end
   for (const a of AUTHORED_PARTS) add({ id: a.id, slot: a.slot, mount: a.mount, brand: BR[a.brand], name: a.name, price: a.price, tier: a.tier, st: a.st, set: a.set, desc: a.desc, model: a.model, authored: { height: a.height }, provides: a.magnifier ? { magnifier: 'magn' } : null });
   // A REPLACE-ONLY authored part (model.json "replaces") gives existing entries its model: the id, stats, price, tier, mount, what it opens and its build code stay; `was` keeps the
   // old model's optic kind for what ranks or groups sights by kind (tools/model_cases.mjs), and a riser the entry stands on stays the gun's mount piece (model.riser).
-  for (const r of AUTHORED_REPLACES) for (const n of r.names) {
+  // (FURNITURE, a stock, grip, muzzle device or handguard, gives its model at the end, once every gun's parts are made: furnitureReplaces below)
+  for (const r of AUTHORED_REPLACES) if (r.apart.split('/')[0] === 'optic') for (const n of r.names) {
     const p = Object.values(PARTS).find((q) => q.name === n);
     if (!p || !p.model) throw new Error(`models/parts/${r.apart}/model.json replaces "${n}", which is not in the catalogue`);
     const m = p.model as any; m.was = m.was || m.optic; m.optic = 'authored'; m.apart = r.apart; delete m.ret;
@@ -1589,7 +1602,27 @@ const G_Gunsmith = (() => {
   for (const add1 of LATE_AUTHORED) add1();
   for (const id of AUTHORED_PISTOLS) { const plat = PLATFORMS[id]; plat.offset = {}; for (const k of STAT_KEYS) plat.offset[k] = -Object.values(plat.defaults).reduce((a, pid) => a + ((PARTS[pid] && PARTS[pid].st[k]) || 0), 0); }
   PARTS['op.pso.0'].not = (PARTS['op.pso.0'].not || []).concat(['maxim9', 'welrod']); // (the tritium night sights: the Maxim 9 and the Welrod have their own irons, and a dot goes in the cut)
-  const compatible = (mount: string) => BY_MOUNT.get(mount) || [];
+  // AUTHORED FURNITURE (models/parts/{stock,grip,muzzle,handguard}/<id>/, docs/models.md "Authored parts"): a REPLACE-ONLY part that gives the entries it names, or
+  // matches (every entry of its slot, on the mount if given, whose model has the values given: the factory 9.4" rail in either finish), its model. Only the model
+  // gains the part's key (AP_KEY: model.apStock...), so ids, stats, prices, fits and what std() takes for the same part stay. Done last, so a standard-issue part a late
+  // gun made is matched too. A handguard's entries must be the model's length, to 1.5 mm (the catalogue's length decides the fit; the model is drawn at its own).
+  { const same = (want: any, have: any): boolean => (want === null ? have == null : typeof want === 'number' ? typeof have === 'number' && Math.abs(want - have) < 1e-6
+      : want && typeof want === 'object' ? !!have && typeof have === 'object' && Object.keys(want).every((k) => same(want[k], have[k])) : want === have);
+    for (const r of AUTHORED_REPLACES) {
+      const slot = r.apart.split('/')[0], key = AP_KEY[slot];
+      if (slot === 'optic') continue;
+      if (!key) throw new Error(`models/parts/${r.apart}: authored parts of slot ${slot} are not placed by the recipes`);
+      for (const n of r.names) {
+        const ps = typeof n === 'string' ? Object.values(PARTS).filter((q) => q.name === n) : Object.values(PARTS).filter((q) => q.slot === slot && (n.mount == null || q.mount === n.mount) && same(n.model, q.model || {}));
+        if (!ps.length) throw new Error(`models/parts/${r.apart}/model.json replaces ${JSON.stringify(n)}, which ${typeof n === 'string' ? 'is not in the catalogue' : 'matches no entry'}`);
+        for (const p of ps) {
+          if (!p.model || p.slot !== slot) throw new Error(`models/parts/${r.apart}/model.json replaces "${p.name}", which is not a ${slot}`);
+          if (r.len != null && !(p.model.hg && Math.abs((p.model.hg.len || 0) - r.len) <= 0.0015)) throw new Error(`models/parts/${r.apart}/model.json replaces "${p.name}", ${p.model.hg ? p.model.hg.len : '?'} m long; the model is ${r.len} m`);
+          (p.model as any)[key] = r.apart;
+        }
+      }
+    } }
+  const compatible =(mount: string) => BY_MOUNT.get(mount) || [];
   const FITS = new Map(); // interface -> weapon ids that have (or can get) a slot for it
   for (const plat of Object.values(PLATFORMS)) {
     const mounts = new Set<string>(plat.slots.map((s: Slot) => s.mount));

@@ -1,0 +1,38 @@
+{
+  "source": "authored",
+  "kind": "part",
+  "slot": "handguard",
+  "frame": "handguard-mount",
+  "anchors": {
+    "support": [
+      0.18,
+      -0.0274,
+      0
+    ]
+  },
+  "part": {
+    "t": "rail",
+    "len": 0.3,
+    "rails": {
+      "top": [
+        0,
+        0.298
+      ],
+      "bottom": [
+        0.01,
+        0.298
+      ],
+      "left": [
+        0.012,
+        0.298
+      ],
+      "right": [
+        0.012,
+        0.298
+      ]
+    }
+  },
+  "replaces": [
+    "Ironvale IR-12 quad rail"
+  ]
+}

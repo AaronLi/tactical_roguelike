@@ -62,7 +62,14 @@ if (args.includes('--write')) {
   if (lf(PARTS_TS) !== partsTsWithBlock(lf(PARTS_TS))) fail('the authored-parts block of js/parts.ts differs from models/parts/*/*/model.json: run npm run check:models -- --write');
   for (const k of authoredPartKeys()) { const n = checkAuthoredPartFile(`models/parts/${k}`, k); if (n) bad++; }
   for (const k of authoredPartKeys()) {
-    if (isReplaceOnly(k)) { for (const r of replacements().filter((r) => r.apart === k)) for (const nm of r.names) { const pt = Object.values(G.Gunsmith.PARTS).find((q) => q.name === nm); if (!pt) fail(`${k}: replaces "${nm}", which is not in the catalogue`); else if (!pt.model || pt.model.apart !== k) fail(`${k}: "${nm}" does not use the model after the replace`); } continue; }
+    if (isReplaceOnly(k)) {
+      const ak = { optic: 'apart', stock: 'apStock', grip: 'apGrip', muzzle: 'apMuzzle', handguard: 'apHg' }[k.split('/')[0]]; // (the model key the part rides on: js/parts.ts AP_KEY)
+      for (const r of replacements().filter((r) => r.apart === k)) for (const nm of r.names) {
+        if (typeof nm !== 'string') { if (!Object.values(G.Gunsmith.PARTS).some((q) => q.model && q.model[ak] === k)) fail(`${k}: the match ${JSON.stringify(nm)} gave no entry the model`); continue; }
+        const pt = Object.values(G.Gunsmith.PARTS).find((q) => q.name === nm); if (!pt) fail(`${k}: replaces "${nm}", which is not in the catalogue`); else if (!pt.model || pt.model[ak] !== k) fail(`${k}: "${nm}" does not use the model after the replace`);
+      }
+      continue;
+    }
     const pid = 'op.auth.' + k.split('/')[1], pt = G.Gunsmith.PARTS[pid]; if (!pt) fail(`${k}: the catalogue (js/parts.ts) has no part ${pid}`); else if (!G.Gunsmith.fits(pt.mount).length) fail(`${pid}: fits no gun`);
   }
   const dir = path.join(ROOT, 'assets/models/guns'); let n = 0;
