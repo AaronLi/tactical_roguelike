@@ -6,8 +6,8 @@
 # bolt knob's back, up = (253 - y) px over the bore. That gives 330 mm overall (published 310 to 370 mm), the receiver 29 mm across.
 # Published: .32 ACP, 83 mm barrel inside the tube, 8 rounds in the magazine that is the grip; a rotating bolt worked by the knurled rear knob.
 # Frame: Blender X = right, Y = forward, Z = up, metres; ORIGIN = the bolt knob's back face on the bore line.
-# Parts: base = the receiver tube, the frame plate under it, trigger, wire trigger guard, grip safety; muzzle = the suppressor tube (the front
-# section, integral); optic = the fixed sights; part_bolt = the knurled knob (twist and pull back to load); part_mag = the grip (the magazine:
+# Parts (the authored-pistol interface, TASK 15; no slide): base = the receiver tube, the frame plate under it, trigger, wire trigger guard, grip safety; barrel = the suppressor tube (the front
+# section: the integral suppressor is the factory barrel); optic = the fixed sights; part_bolt = the knurled knob (twist and pull back to load); part_mag = the grip (the magazine:
 # its sheet-metal top and the rubber cover over it, all of it drops out).
 import bpy, json, math, os
 HERE = globals().get('GUN_DIR') or os.path.dirname(os.path.abspath(__file__))
@@ -48,10 +48,10 @@ o = K.obj(cyl(0.9 * mm, F(662), F(615), 'y', (6 * mm, U(292)), 8), 'base', 'stee
 # the grip safety: a plate at the grip's back, angled with it
 o = K.obj(prism(PL([(604, 292), (614, 292), (628, 338), (620, 342)]), 'x', -5 * mm, 5 * mm), 'base', 'blued'); bevel(o, 0.5 * mm, 1); smooth(o)
 
-# ---- SUPPRESSOR (muzzle): the front tube, its end cap chamfered, the bore's exit ----
+# ---- SUPPRESSOR = the factory BARREL (integral: no muzzle thread): the front tube, its end cap chamfered, the bore's exit ----
 sp = K.tmp(lathe([(FW - 1.5 * mm, RR), (FW + 2.5 * mm, RM), (F(37), RM), (F(35), RM - 1.2 * mm)], 32))
 cut(sp, cyl(3.4 * mm, F(45), F(30), 'y', (0, 0), 16))
-smooth(sp); K.adopt(sp, 'muzzle', 'park')
+smooth(sp); K.adopt(sp, 'barrel', 'park')
 
 # ---- SIGHTS (optic): a blade at the muzzle, a notched blade on the receiver ----
 o = K.obj(prism(PL([(84, 219), (113, 219), (110, 208), (88, 208)]), 'x', -1.5 * mm, 1.5 * mm), 'optic', 'park'); bevel(o, 0.3 * mm, 1); smooth(o)
@@ -71,7 +71,7 @@ o = K.obj(prism(PL([(531, 276), (604, 276), (612, 342), (538, 342)]), 'x', -9 * 
 gr = K.tmp(prism(PL([(538, 340), (622, 340), (646, 462), (644, 482), (634, 492), (580, 494), (566, 486)]), 'x', -13.5 * mm, 13.5 * mm))
 bevel(gr, 4 * mm, 3, 30); smooth(gr); K.adopt(gr, 'mag', 'rubber', pm)
 
-# ---- the gun's info and anchors (placeholders until the pistol reform settles the pistol anchors) ----
+# ---- the gun's info and the authored-pistol anchors (TASK 15's names) ----
 SY = U(209)
 info = {
     'sy': round(SY, 4), 'fSight': round(F(662), 4), 'relief': 0.36, 'pistol': True,
@@ -81,10 +81,10 @@ info = {
     'magAt': [round(MAG_TOP[0], 4), round(MAG_TOP[1], 4)],
 }
 anchors = {
-    'mount_muzzle': [round(F(35), 4), 0, 0], 'mount_barrel': [round(FW, 4), 0, 0],
-    'mount_grip': [round(F(531), 4), round(U(292), 4), 0], 'mount_mag': [round(MAG_TOP[0], 4), round(MAG_TOP[1], 4), 0],
+    'mount_barrel': [round(FW, 4), 0, 0],                                       # the waist: the suppressor (the factory barrel) begins
+    'mount_mag': [round(MAG_TOP[0], 4), round(MAG_TOP[1], 4), 0],               # the top of the magazine (the grip); no slide, no grip seat
 }
-root['gun'] = ID; root['info_json'] = json.dumps(info); root['anchors_json'] = json.dumps(anchors); root['seat_json'] = json.dumps({'barrelR': 0.0058})
+root['gun'] = ID; root['info_json'] = json.dumps(info); root['anchors_json'] = json.dumps(anchors)
 
 meshes = [o for o in coll.all_objects if o.type == 'MESH']
 bb = [[min((o.matrix_world @ v.co)[a] for o in meshes for v in o.data.vertices) for a in range(3)],
