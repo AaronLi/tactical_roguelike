@@ -14,6 +14,21 @@
  * rubber several ms. The spectrum of the force pulse rolls off above ~1/τ.
  */
 import { clamp, hash1, smoothstep, valueNoise } from './dsp.js';
+/** Duration of the edge/burr contact that precedes a hard contact. */
+export const edgeTau = (tau) => clamp(tau * 0.08, 5e-6, 4e-5);
+/** Spectrum of a contact: main Hertzian pulse plus the short edge crack. */
+export function contactSpectrum(f, tau, edge = 0) {
+    const s = (t) => {
+        const x = 1.2 * f * t;
+        return 1 / Math.sqrt(1 + x * x * x * x);
+    };
+    return (1 - edge) * s(tau) + edge * s(edgeTau(tau));
+}
+/** How much edge crack a pair of materials can produce: none for rubber, full for plastics and metals. */
+export function edgeAmount(sharpness, Estar) {
+    const l = Math.log10(Math.max(1, Estar));
+    return clamp(sharpness, 0, 1) * smoothstep(Math.log10(0.05e9), Math.log10(1.5e9), l);
+}
 const NU2 = 0.09; // Poisson's ratio² (≈0.3²)
 export const T0 = 0.03; // pre-roll before the gesture starts, s
 // Gains that put the three gesture layers in the same ballpark at their default settings.
@@ -22,6 +37,7 @@ const K_HISS = 1e-8;
 const K_STICK = 7.5e-6;
 const K_CREAK = 2.5e-7;
 const K_SNAP = 0.02;
+const K_TOOTH = 0.006;
 export function makeContact(A, B, contactRadiusMm) {
     const Estar = 1 / ((1 - NU2) / A.E + (1 - NU2) / B.E);
     const mEff = (A.mass * B.mass) / (A.mass + B.mass);
@@ -124,8 +140,16 @@ export function buildExcitation(p, A, contact, sr, N, rng) {
             }
             return h * depth;
         };
+        const texture2 = (x) => texture(x) * (P > 0 ? 1 - P + P * ridgeScrape : 1);
+        // Teeth: with a regular, deep texture, the follower (pawl, tongue, ridge) drops off
+        // each tooth and its spring slams it into the next one: a discrete click per tooth.
+        const toothAmt = P * P * smoothstep(15, 150, fr.roughness);
+        // The tooth clicks carry the drops; keep only a little of the continuous ridge scrape.
+        const ridgeScrape = 1 - 0.85 * toothAmt;
+        let lastTooth = Math.floor(0 / grain);
+        let teeth = 0;
         let x = 0;
-        let hPrev = texture(0);
+        let hPrev = texture2(0);
         let lp1 = 0;
         let lp2 = 0;
         let ssPhase = 0;
@@ -138,7 +162,19 @@ export function buildExcitation(p, A, contact, sr, N, rng) {
             const env = Math.min(1, i / fadeIn, (len - i) / fadeOut);
             const Fn = fr.force * env;
             x += v / sr;
-            const hNow = texture(x);
+            const hNow = texture2(x);
+            if (toothAmt > 0.01) {
+                const tooth = Math.floor(x / grain);
+                if (tooth !== lastTooth && teeth < 4000) {
+                    lastTooth = tooth;
+                    teeth++;
+                    const vDrop = 0.3 + 2 * Math.sqrt(fr.roughness / 1000);
+                    events.push({
+                        t: n / sr, J: K_TOOTH * vDrop * Math.sqrt(Fn / 5) * toothAmt * (0.75 + 0.5 * rng()),
+                        tau: contact.tauAt(vDrop) * 0.5, kind: 'tooth', posA: nearby(basePosA, 0.05), posB: nearby(basePosB, 0.05), flex: 0.2,
+                    });
+                }
+            }
             const dhdt = (hNow - hPrev) * sr;
             hPrev = hNow;
             let f = K_TEXTURE * Fn * (dhdt / 0.001);
@@ -209,7 +245,7 @@ export function buildExcitation(p, A, contact, sr, N, rng) {
     const chatter = [];
     const sc = clamp(p.impact.scatter, 0, 1);
     for (const ev of events) {
-        if (ev.kind === 'snap')
+        if (ev.kind === 'snap' || ev.kind === 'tooth')
             continue;
         const n = Math.floor(rng() * (1.5 + 3.5 * sc) + 0.6);
         let t = ev.t;
@@ -221,6 +257,9 @@ export function buildExcitation(p, A, contact, sr, N, rng) {
         }
     }
     events.push(...chatter);
+    const edge = edgeAmount(p.impact.sharpness ?? 0.6, contact.Estar);
+    for (const ev of events)
+        ev.edge = ev.kind === 'snap' || ev.kind === 'tooth' ? Math.min(1, edge * 1.5) : edge;
     events.sort((a, b) => a.t - b.t);
     return { events, cont, posA };
 }

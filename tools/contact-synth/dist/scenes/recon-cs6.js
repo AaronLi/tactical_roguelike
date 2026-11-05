@@ -40,7 +40,8 @@ const dart = { ...mat('rubber'), shape: 'block', size: 7, thickness: 13, modes: 
 const clip = { ...mat('abs'), shape: 'shell', size: 9, thickness: 1.5, modes: 16, irregularity: 0.4, damping: 0.3, level: 0 };
 const trigger = { ...mat('abs'), shape: 'bar', size: 4, thickness: 4, modes: 8, irregularity: 0.3, damping: 0.4, level: 0 };
 const oring = { ...mat('rubber'), shape: 'block', size: 2.5, thickness: 3, modes: 4, irregularity: 0, damping: 1, level: -20 };
-const off = { velocity: 0 };
+// Hard ABS / POM parts: strong edge crack on every contact.
+const off = { velocity: 0, sharpness: 0.85, click: 0.5 };
 // Timeline (s)
 const BACK = 0.0; // slide starts back
 const BACK_END = 0.2; // slide reaches the rear
@@ -69,7 +70,7 @@ export const RECON_CS6 = {
                 {
                     what: 'slide hits rear stop', at: BACK_END, gainDb: -9,
                     sound: { kind: 'contact', patch: {
-                            impact: { velocity: 0.7, restitution: 0, scatter: 0.3, contactRadius: 4, click: 0.4 },
+                            impact: { velocity: 0.7, restitution: 0, scatter: 0.3, contactRadius: 4, click: 0.4, sharpness: 0.85 },
                             bodyA: slide, bodyB: shell, out: { length: 0.5 },
                         } },
                 },
@@ -139,14 +140,14 @@ export const RECON_CS6 = {
                 {
                     what: 'dart lifted against the feed lips', at: BACK_END + 0.015, gainDb: -22,
                     sound: { kind: 'contact', patch: {
-                            impact: { velocity: 0.4, restitution: 0.1, scatter: 0.2, contactRadius: 6, click: 0.2 },
+                            impact: { velocity: 0.4, restitution: 0.1, scatter: 0.2, contactRadius: 6, click: 0.2, sharpness: 0.85 },
                             bodyA: dart, bodyB: clip, out: { length: 0.3 },
                         } },
                 },
                 {
                     what: 'follower tick', at: BACK_END + 0.02, gainDb: -25,
                     sound: { kind: 'contact', patch: {
-                            impact: { velocity: 0.3, restitution: 0.2, scatter: 0.1, contactRadius: 2, click: 0.3 },
+                            impact: { velocity: 0.3, restitution: 0.2, scatter: 0.1, contactRadius: 2, click: 0.3, sharpness: 0.85 },
                             bodyA: { ...mat('abs'), shape: 'bar', size: 3, thickness: 1.5, modes: 6, irregularity: 0.2, damping: 0.3, level: 0 },
                             bodyB: clip, out: { length: 0.3 },
                         } },
@@ -176,7 +177,7 @@ export const RECON_CS6 = {
                 {
                     what: 'slide hits front stop', at: FWD_END, gainDb: -5,
                     sound: { kind: 'contact', patch: {
-                            impact: { velocity: 0.9, restitution: 0, scatter: 0.3, contactRadius: 4, click: 0.4 },
+                            impact: { velocity: 0.9, restitution: 0, scatter: 0.3, contactRadius: 4, click: 0.4, sharpness: 0.85 },
                             bodyA: slide, bodyB: shell, out: { length: 0.5 },
                         } },
                 },
@@ -244,7 +245,7 @@ export const RECON_CS6 = {
                 {
                     what: 'main spring decompresses', at: BREAK + 0.001, gainDb: -10,
                     sound: { kind: 'contact', patch: {
-                            impact: { velocity: 2, restitution: 0, scatter: 0, contactRadius: 1, click: 0.1 },
+                            impact: { velocity: 2, restitution: 0, scatter: 0, contactRadius: 1, click: 0.1, sharpness: 0.85 },
                             bodyA: springWire, bodyB: tube,
                             coil: { level: 1, length: 7, dispersion: 0.65, decay: 0.12, brightness: 6000 },
                             out: { length: 0.5 },
@@ -269,7 +270,7 @@ export const RECON_CS6 = {
                 {
                     what: 'plunger head hits tube end', at: BREAK + 0.016, gainDb: 0,
                     sound: { kind: 'contact', patch: {
-                            impact: { velocity: 4, restitution: 0, scatter: 0.6, contactRadius: 15, click: 0.5 },
+                            impact: { velocity: 4, restitution: 0, scatter: 0.6, contactRadius: 15, click: 0.5, sharpness: 0.85 },
                             bodyA: plunger, bodyB: tube,
                             coil: { level: 0.35, length: 7, dispersion: 0.6, decay: 0.2, brightness: 5000 },
                             flex: { amount: 0.25, freq: 75, decay: 0.12, rattle: 0.4, wobble: 0, tone: 0 },
@@ -279,7 +280,7 @@ export const RECON_CS6 = {
                 {
                     what: 'shell rings', at: BREAK + 0.0165, gainDb: -6,
                     sound: { kind: 'contact', patch: {
-                            impact: { velocity: 3, restitution: 0, scatter: 0.2, contactRadius: 10, click: 0.1 },
+                            impact: { velocity: 3, restitution: 0, scatter: 0.2, contactRadius: 10, click: 0.1, sharpness: 0.85 },
                             bodyA: shell, bodyB: plunger, out: { length: 0.8 },
                         } },
                 },
@@ -314,7 +315,7 @@ export const RECON_CS6_DRY = {
                 {
                     what: 'cushioned plunger stop', at: BREAK + 0.03, gainDb: -4,
                     sound: { kind: 'contact', patch: {
-                            impact: { velocity: 1.4, restitution: 0, scatter: 0.2, contactRadius: 30, click: 0.2 },
+                            impact: { velocity: 1.4, restitution: 0, scatter: 0.2, contactRadius: 30, click: 0.2, sharpness: 0.85 },
                             bodyA: plunger, bodyB: tube,
                             coil: { level: 0.25, length: 7, dispersion: 0.6, decay: 0.15, brightness: 4000 },
                             out: { length: 0.6 },
@@ -323,7 +324,7 @@ export const RECON_CS6_DRY = {
                 {
                     what: 'shell rings', at: BREAK + 0.0305, gainDb: -10,
                     sound: { kind: 'contact', patch: {
-                            impact: { velocity: 1.2, restitution: 0, scatter: 0.1, contactRadius: 20, click: 0.05 },
+                            impact: { velocity: 1.2, restitution: 0, scatter: 0.1, contactRadius: 20, click: 0.05, sharpness: 0.85 },
                             bodyA: shell, bodyB: plunger, out: { length: 0.6 },
                         } },
                 },

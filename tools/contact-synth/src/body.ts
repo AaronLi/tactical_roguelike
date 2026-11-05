@@ -16,7 +16,7 @@
  * modes become one wide noise band (the clank / wash of a sheet, case or pot).
  * The bank (bank.ts) renders these from noise.
  *
- * Each region decays at  α = π·f·η  (internal loss)  + air/radiation loss  + mounting loss.
+ * Each region decays at  α = π·f·η + 400·η  (internal loss)  + air/radiation loss  + mounting loss.
  */
 
 import type { BodyParams, Shape } from './params.js';
@@ -169,8 +169,10 @@ export function deriveBody(bp: BodyParams, sr: number, rng: () => number): BodyM
   const irr = clamp(bp.irregularity, 0, 1);
   const nyq = sr * 0.45;
   const fmin = 20;
+  // Internal loss + a loss-scaled floor (real lossy parts are assemblies: joints, ribs and
+  // fasteners stop the lowest modes of a plastic case humming on) + air + mounting.
   const decay = (f: number) =>
-    Math.PI * f * bp.loss + 0.6 + 2.5e-4 * f + bp.damping * bp.damping * 60 + bp.damping * f * 0.004;
+    Math.PI * f * bp.loss + 400 * bp.loss + 0.6 + 2.5e-4 * f + bp.damping * bp.damping * 60 + bp.damping * f * 0.004;
   const level = (f: number) => radW(f) * Math.pow(Math.min(1, f1 / f), 0.35);
 
   // Every audible mode, detuned by irregularity.

@@ -56,6 +56,12 @@ export interface ImpactParams {
   contactRadius: number;
   /** Rigid-body "click" radiated directly by the contact, 0..1. */
   click: number;
+  /**
+   * 0..1 edge hardness: how much of each contact happens first through a hard edge,
+   * corner or burr, giving a very short, bright crack ahead of the main contact.
+   * Hard plastics and metals snap; rubber and foam can't (scaled by stiffness).
+   */
+  sharpness: number;
 }
 
 export interface FrictionParams {
@@ -148,7 +154,7 @@ export interface Params {
 
 export function defaultParams(): Params {
   return {
-    impact: { velocity: 1.5, restitution: 0.4, scatter: 0.4, contactRadius: 3, click: 0.25 },
+    impact: { velocity: 1.5, restitution: 0.4, scatter: 0.4, contactRadius: 3, click: 0.25, sharpness: 0.6 },
     friction: {
       force: 0, duration: 1, speed: 0.3, profile: 'steady', strokes: 2, roughness: 10, grain: 0.5,
       periodicity: 0, stickSlip: 0, stickPitch: 600, contactWidth: 0.05,

@@ -17,15 +17,11 @@
  * Narrow (tonal) components give a pitched but slightly unsteady ring; wide
  * ones give the noisy "clank / wash" that dense-mode objects actually make.
  */
+import { contactSpectrum } from './excitation.js';
 import { clamp } from './dsp.js';
 const BLOCK = 32;
 /** Scales the rubbed path against the struck path. */
 const FRICTION_GAIN = 1100;
-/** Spectrum of a contact pulse lasting tau: flat, then falling 12 dB/octave above ~1/tau. */
-export const contactSpectrum = (f, tau) => {
-    const x = 1.2 * f * tau;
-    return 1 / Math.sqrt(1 + x * x * x * x);
-};
 function bandpass(f, bw, sr) {
     const w0 = (2 * Math.PI * clamp(f, 10, sr * 0.49)) / sr;
     const Q = clamp(f / Math.max(0.05, bw), 0.3, 20000);
@@ -75,7 +71,7 @@ export function renderBody(comps, input, sr, N) {
             const spatial = c.tonal
                 ? Math.abs(Math.sin(Math.PI * c.k * pos + c.theta))
                 : 0.35 + 0.65 * Math.abs(Math.sin(Math.PI * c.k * pos + c.theta + e * 2.399));
-            kicks[e] = ev.J * contactSpectrum(c.f, ev.tau) * spatial * c.amp;
+            kicks[e] = ev.J * contactSpectrum(c.f, ev.tau, ev.edge ?? 0) * spatial * c.amp;
             if (kicks[e] > 0)
                 anyKick = true;
         }

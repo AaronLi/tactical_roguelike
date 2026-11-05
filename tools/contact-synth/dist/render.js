@@ -11,7 +11,7 @@
  *              room ──► normalise ──► trim
  */
 import { deriveBody, t60 } from './body.js';
-import { buildExcitation, eventPulse, makeContact, T0 } from './excitation.js';
+import { buildExcitation, edgeTau, eventPulse, makeContact, T0 } from './excitation.js';
 import { renderBody } from './bank.js';
 import { runCoil, runFlex, wobbleTrack } from './elastic.js';
 import { applyRoom } from './room.js';
@@ -33,13 +33,11 @@ function bodyInfo(m) {
  */
 function contactNoise(events, cont, sr, N, rng) {
     const out = Float32Array.from(cont);
-    for (const ev of events) {
-        const start = Math.round(ev.t * sr);
-        const decay = Math.max(0.00015, ev.tau * 1.5);
-        const len = Math.min(N - start, Math.ceil(decay * 6 * sr));
-        const fc = clamp(0.45 / ev.tau, 300, sr * 0.45);
+    const burst = (start, tau, amp) => {
+        const decay = Math.max(0.00004, tau * 1.5);
+        const len = Math.min(N - start, Math.ceil(decay * 6 * sr) + 2);
+        const fc = clamp(0.45 / tau, 300, sr * 0.45);
         const a = 1 - Math.exp((-2 * Math.PI * fc) / sr);
-        const amp = ev.J / Math.sqrt(ev.tau);
         let l1 = 0;
         let l2 = 0;
         for (let i = 0; i < len; i++) {
@@ -47,6 +45,16 @@ function contactNoise(events, cont, sr, N, rng) {
             l1 += a * (x - l1);
             l2 += a * (l1 - l2);
             out[start + i] += l2 * amp;
+        }
+    };
+    for (const ev of events) {
+        const start = Math.round(ev.t * sr);
+        const edge = ev.edge ?? 0;
+        burst(start, ev.tau, ((1 - edge) * ev.J) / Math.sqrt(ev.tau));
+        // The edge crack: very short, so it carries the bright "tick" of a hard contact.
+        if (edge > 0) {
+            const te = edgeTau(ev.tau);
+            burst(start, te, (edge * ev.J) / Math.sqrt(te));
         }
     }
     return out;
@@ -61,6 +69,9 @@ export function render(p, sampleRate = 48000) {
     const contact = makeContact(A, B, p.impact.contactRadius);
     const ex = buildExcitation(p, A, contact, sr, N, rng);
     const flex = runFlex(p.flex, ex.events, contact, sr, N, rng);
+    const baseEdge = ex.events.find((e) => e.kind !== 'snap' && e.kind !== 'tooth')?.edge ?? ex.events[0]?.edge ?? 0;
+    for (const r of flex.rattle)
+        r.edge = baseEdge;
     const events = ex.events.concat(flex.rattle).sort((a, b) => a.t - b.t);
     const pitch = flex.y && p.flex.wobble > 0 ? wobbleTrack(flex.y, p.flex.wobble) : null;
     const seed = p.out.seed;

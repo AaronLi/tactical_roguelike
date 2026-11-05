@@ -22,12 +22,13 @@ function bodyControls(prefix) {
 }
 export const SECTIONS = [
     {
-        id: 'impact', title: 'Impact', blurb: 'A hit or drop, with bounces.',
+        id: 'impact', title: 'Impact & contact', blurb: 'A hit or drop, with bounces. Edge hardness and click apply to every contact.',
         controls: [
             { kind: 'range', path: 'impact.velocity', label: 'Impact speed', min: 0, max: 8, step: 0.01, unit: 'm/s', digits: 2, hint: '0 = no impact. Faster is louder and slightly brighter (shorter contact).' },
             { kind: 'range', path: 'impact.restitution', label: 'Bounciness', min: 0, max: 0.9, step: 0.01, digits: 2, hint: 'Coefficient of restitution: how much speed survives each bounce.' },
             { kind: 'range', path: 'impact.scatter', label: 'Tumble / clatter', min: 0, max: 1, step: 0.01, digits: 2, hint: '0 = a ball bouncing cleanly; 1 = an awkward object hitting end-over-end at different spots.' },
             { kind: 'range', path: 'impact.contactRadius', label: 'Contact curvature', min: 0.1, max: 60, log: true, unit: 'mm', digits: 1, hint: 'Small = a corner or edge hits; large = a flat face. Also used for snaps and rattles.' },
+            { kind: 'range', path: 'impact.sharpness', label: 'Edge hardness', min: 0, max: 1, step: 0.01, digits: 2, hint: 'How much each contact (hits, snaps, teeth, rattles) first lands on a hard edge or burr: adds the bright, short crack of hard plastic and metal. No effect with rubber or foam.' },
             { kind: 'range', path: 'impact.click', label: 'Contact click', min: 0, max: 1, step: 0.01, digits: 2, hint: 'The sharp tick radiated by the collision itself, apart from any ringing.' },
         ],
     },

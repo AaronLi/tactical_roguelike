@@ -81,7 +81,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'plastic-case-drop', label: 'Plastic case dropped on the floor', group: 'Impacts',
     patch: {
-      impact: { velocity: 3, restitution: 0.3, scatter: 0.8, contactRadius: 8, click: 0.4 },
+      impact: { velocity: 3, restitution: 0.3, scatter: 0.8, contactRadius: 8, click: 0.4, sharpness: 0.85 },
       bodyA: { ...mat('abs'), shape: 'shell', size: 30, thickness: 3, modes: 32, irregularity: 0.5, damping: 0, level: 0 },
       bodyB: { ...mat('concrete'), shape: 'block', size: 50, thickness: 50, modes: 12, irregularity: 0.5, damping: 1, level: -10 },
       out: { length: 1.5 },
@@ -90,9 +90,9 @@ export const PRESETS: Preset[] = [
   {
     id: 'pen-desk', label: 'Plastic pen dropped on a desk', group: 'Impacts',
     patch: {
-      impact: { velocity: 1.8, restitution: 0.45, scatter: 0.9, contactRadius: 2, click: 0.5 },
-      bodyA: { ...mat('polystyrene'), shape: 'bar', size: 14, thickness: 7, modes: 16, irregularity: 0.4, damping: 0, level: 0 },
-      bodyB: { ...mat('wood'), shape: 'plate', size: 50, thickness: 25, modes: 24, irregularity: 0.3, damping: 0.6, level: -6 },
+      impact: { velocity: 1.8, restitution: 0.45, scatter: 0.9, contactRadius: 1, click: 0.7, sharpness: 0.9 },
+      bodyA: { ...mat('polystyrene'), shape: 'bar', size: 14, thickness: 7, modes: 3, irregularity: 0.7, damping: 0.45, level: 0 }, // ink tube and cap damp the barrel
+      bodyB: { ...mat('wood'), shape: 'plate', size: 50, thickness: 25, modes: 8, irregularity: 0.3, damping: 0.7, level: -14 },
       out: { length: 1.5 },
     },
   },
@@ -149,7 +149,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'tray-slide', label: 'Plastic tray slid across a table', group: 'Sliding & scraping',
     patch: {
-      impact: NO_IMPACT,
+      impact: { velocity: 0, sharpness: 0.7, click: 0.5 },
       friction: { force: 6, duration: 0.9, speed: 0.5, profile: 'swell', roughness: 4, grain: 0.2, periodicity: 0, stickSlip: 0.05, contactWidth: 0.08 },
       bodyA: { ...mat('pp'), shape: 'plate', size: 35, thickness: 2, modes: 32, irregularity: 0.3, damping: 0.2, level: 0 },
       bodyB: { ...mat('wood'), shape: 'plate', size: 50, thickness: 25, modes: 24, irregularity: 0.3, damping: 0.6, level: -6 },
@@ -159,7 +159,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'crate-drag', label: 'Plastic crate dragged on concrete', group: 'Sliding & scraping',
     patch: {
-      impact: { velocity: 0.4, restitution: 0, scatter: 0.3, contactRadius: 10, click: 0.2 },
+      impact: { velocity: 0.4, restitution: 0, scatter: 0.3, contactRadius: 10, click: 0.2, sharpness: 0.7 },
       friction: { force: 30, duration: 1.5, speed: 0.4, profile: 'steady', roughness: 120, grain: 1.2, periodicity: 0.1, stickSlip: 0.35, stickPitch: 90, contactWidth: 0.3 },
       bodyA: { ...mat('hdpe'), shape: 'shell', size: 45, thickness: 4, modes: 32, irregularity: 0.5, damping: 0.1, level: 0 },
       bodyB: { ...mat('concrete'), shape: 'block', size: 50, thickness: 50, modes: 12, irregularity: 0.5, damping: 1, level: -8 },
@@ -168,7 +168,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'zip-tie', label: 'Zip tie pulled tight', group: 'Sliding & scraping',
     patch: {
-      impact: NO_IMPACT,
+      impact: { velocity: 0, sharpness: 0.85, click: 0.5 },
       friction: { force: 5, duration: 0.8, speed: 0.12, profile: 'accelerate', roughness: 250, grain: 1.3, periodicity: 1, stickSlip: 0, contactWidth: 0.05 },
       bodyA: { ...mat('nylon'), shape: 'bar', size: 3, thickness: 1.5, modes: 12, irregularity: 0.3, damping: 0.2, level: 0 },
       bodyB: { ...mat('nylon'), shape: 'bar', size: 20, thickness: 1.2, modes: 16, irregularity: 0.3, damping: 0.3, level: -4 },
@@ -178,10 +178,10 @@ export const PRESETS: Preset[] = [
   {
     id: 'ratchet', label: 'Ratchet wrench (back and forth)', group: 'Sliding & scraping',
     patch: {
-      impact: NO_IMPACT,
+      impact: { velocity: 0, sharpness: 0.9, click: 0.8 },
       friction: { force: 10, duration: 1.6, speed: 0.06, profile: 'backforth', strokes: 4, roughness: 400, grain: 1.5, periodicity: 1, stickSlip: 0, contactWidth: 0.02 },
       bodyA: { ...mat('steel'), shape: 'block', size: 4, thickness: 2.5, modes: 12, irregularity: 0.3, damping: 0.4, level: 0 },
-      bodyB: { ...mat('steel'), shape: 'bar', size: 22, thickness: 8, modes: 20, irregularity: 0.3, damping: 0.5, level: 0 },
+      bodyB: { ...mat('steel'), shape: 'bar', size: 22, thickness: 8, modes: 0, irregularity: 0.5, damping: 0.85, level: -6 }, // handle, gripped
       out: { length: 2 },
     },
   },
@@ -198,7 +198,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'plastic-squeak', label: 'Plastic parts rubbing (creak/squeak)', group: 'Sliding & scraping',
     patch: {
-      impact: NO_IMPACT,
+      impact: { velocity: 0, sharpness: 0.7, click: 0.5 },
       friction: { force: 10, duration: 1.2, speed: 0.04, profile: 'backforth', strokes: 2, roughness: 2, grain: 0.2, periodicity: 0, stickSlip: 0.7, stickPitch: 260, contactWidth: 0.1 },
       bodyA: { ...mat('pvc'), shape: 'shell', size: 15, thickness: 2, modes: 32, irregularity: 0.4, damping: 0.1, level: 0 },
       bodyB: { ...mat('abs'), shape: 'plate', size: 12, thickness: 2, modes: 24, irregularity: 0.3, damping: 0.2, level: -2 },
@@ -210,10 +210,10 @@ export const PRESETS: Preset[] = [
   {
     id: 'latch-snap', label: 'Plastic latch snapping shut', group: 'Latches & clicks',
     patch: {
-      impact: NO_IMPACT,
+      impact: { velocity: 0, sharpness: 0.9, click: 0.5 },
       snap: { count: 1, strength: 0.8, preload: 140, creak: 0.5, seat: 0.6, seatDelay: 9 },
       bodyA: { ...mat('abs'), shape: 'bar', size: 2.5, thickness: 1.6, modes: 16, irregularity: 0.3, damping: 0.2, level: 0 },
-      bodyB: { ...mat('abs'), shape: 'shell', size: 12, thickness: 2.2, modes: 32, irregularity: 0.4, damping: 0.1, level: 0 },
+      bodyB: { ...mat('abs'), shape: 'shell', size: 12, thickness: 2.2, modes: 8, irregularity: 0.5, damping: 0.4, level: 0 },
       flex: { amount: 0.4, freq: 220, decay: 0.06, rattle: 0.3, wobble: 0, tone: 0.1 },
       out: { length: 0.6, room: 0.1 },
     },
@@ -221,7 +221,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'battery-cover', label: 'Battery cover clicking in', group: 'Latches & clicks',
     patch: {
-      impact: NO_IMPACT,
+      impact: { velocity: 0, sharpness: 0.85, click: 0.5 },
       friction: { force: 3, duration: 0.18, speed: 0.08, profile: 'steady', roughness: 3, grain: 0.15, periodicity: 0, stickSlip: 0.2, stickPitch: 300, contactWidth: 0.05 },
       snap: { count: 2, strength: 0.6, spacing: 35, preload: 160, creak: 0.3, seat: 0.4, seatDelay: 4 },
       bodyA: { ...mat('polycarbonate'), shape: 'plate', size: 5, thickness: 1, modes: 24, irregularity: 0.3, damping: 0.2, level: 0 },
@@ -232,7 +232,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'buckle', label: 'Side-release buckle clipping', group: 'Latches & clicks',
     patch: {
-      impact: NO_IMPACT,
+      impact: { velocity: 0, sharpness: 0.95, click: 0.5 },
       snap: { count: 2, strength: 0.9, spacing: 6, preload: 90, creak: 0.2, seat: 0.7, seatDelay: 14 },
       bodyA: { ...mat('pom'), shape: 'bar', size: 3, thickness: 2, modes: 16, irregularity: 0.2, damping: 0.1, level: 0 },
       bodyB: { ...mat('pom'), shape: 'shell', size: 5, thickness: 1.8, modes: 24, irregularity: 0.3, damping: 0.2, level: 0 },
@@ -243,7 +243,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'pen-click', label: 'Retractable pen click', group: 'Latches & clicks',
     patch: {
-      impact: NO_IMPACT,
+      impact: { velocity: 0, sharpness: 0.9, click: 0.5 },
       snap: { count: 1, strength: 0.7, preload: 60, creak: 0.1, seat: 0.8, seatDelay: 6 },
       bodyA: { ...mat('pom'), shape: 'bar', size: 1.5, thickness: 2, modes: 12, irregularity: 0.2, damping: 0.2, level: 0 },
       bodyB: { ...mat('abs'), shape: 'shell', size: 13, thickness: 1.2, modes: 24, irregularity: 0.3, damping: 0.3, level: 0 },
@@ -254,7 +254,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'toggle-switch', label: 'Metal toggle switch', group: 'Latches & clicks',
     patch: {
-      impact: NO_IMPACT,
+      impact: { velocity: 0, sharpness: 0.8, click: 0.5 },
       snap: { count: 1, strength: 1, preload: 40, creak: 0, seat: 0.9, seatDelay: 2.5 },
       bodyA: { ...mat('brass'), shape: 'bar', size: 2, thickness: 3, modes: 12, irregularity: 0.2, damping: 0.3, level: 0 },
       bodyB: { ...mat('steel'), shape: 'plate', size: 15, thickness: 1.2, modes: 32, irregularity: 0.3, damping: 0.4, level: -2 },
@@ -265,7 +265,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'bottle-cap', label: 'Plastic bottle cap twisted open', group: 'Latches & clicks',
     patch: {
-      impact: NO_IMPACT,
+      impact: { velocity: 0, sharpness: 0.85, click: 0.5 },
       friction: { force: 6, duration: 0.6, speed: 0.03, profile: 'swell', roughness: 150, grain: 0.8, periodicity: 0.9, stickSlip: 0.3, stickPitch: 80, contactWidth: 0.05 },
       snap: { count: 3, strength: 0.4, spacing: 120, preload: 60, creak: 0.3, seat: 0, seatDelay: 5 },
       bodyA: { ...mat('pp'), shape: 'shell', size: 3, thickness: 1.2, modes: 16, irregularity: 0.4, damping: 0.3, level: 0 },
@@ -323,7 +323,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'plastic-ruler', label: 'Plastic ruler twanged', group: 'Springs',
     patch: {
-      impact: NO_IMPACT,
+      impact: { velocity: 0, sharpness: 0.8, click: 0.5 },
       snap: { count: 1, strength: 0.5, preload: 0, creak: 0, seat: 0, seatDelay: 5 },
       bodyA: { ...mat('acrylic'), shape: 'bar', size: 30, thickness: 2.5, modes: 24, irregularity: 0.2, damping: 0.3, level: 0 },
       bodyB: { ...mat('wood'), shape: 'plate', size: 50, thickness: 25, modes: 24, irregularity: 0.3, damping: 0.6, level: -2 },

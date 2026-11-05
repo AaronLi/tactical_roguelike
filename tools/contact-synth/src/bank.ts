@@ -19,7 +19,7 @@
  */
 
 import type { Component } from './body.js';
-import type { ContactEvent } from './excitation.js';
+import { contactSpectrum, type ContactEvent } from './excitation.js';
 import { clamp } from './dsp.js';
 
 const BLOCK = 32;
@@ -37,11 +37,6 @@ export interface BankInput {
   seed: number;
 }
 
-/** Spectrum of a contact pulse lasting tau: flat, then falling 12 dB/octave above ~1/tau. */
-export const contactSpectrum = (f: number, tau: number): number => {
-  const x = 1.2 * f * tau;
-  return 1 / Math.sqrt(1 + x * x * x * x);
-};
 
 interface Biquad { b0: number; b2: number; a1: number; a2: number }
 function bandpass(f: number, bw: number, sr: number): Biquad {
@@ -85,7 +80,7 @@ export function renderBody(comps: Component[], input: BankInput, sr: number, N: 
       const spatial = c.tonal
         ? Math.abs(Math.sin(Math.PI * c.k * pos + c.theta))
         : 0.35 + 0.65 * Math.abs(Math.sin(Math.PI * c.k * pos + c.theta + e * 2.399));
-      kicks[e] = ev.J * contactSpectrum(c.f, ev.tau) * spatial * c.amp;
+      kicks[e] = ev.J * contactSpectrum(c.f, ev.tau, ev.edge ?? 0) * spatial * c.amp;
       if (kicks[e] > 0) anyKick = true;
     }
     const r = Math.exp(-c.alpha / sr);
