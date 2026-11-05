@@ -48,7 +48,12 @@ BR0, BR1 = BP1 + 0.002, 0.558  # barrels: breech face to muzzles (471 mm, 18.5 i
 BB1 = BR0 + 0.040              # the breech block's front
 ROUND_L, FREE = 0.044, 0.120   # a round's length; the free bore ahead of the front round
 ROUNDS = int((0.558 - BB1 - FREE) / ROUND_L)   # rounds in each barrel (7: 42 in the block)
-MZ0, MZ1 = 0.560, 0.628        # the muzzle device
+MZ0, MZ1 = 0.560, 0.628        # the barrel extension's rear (the barrels' muzzles seat in its collar there); (the factory device's length: MZ1 - MZ0)
+# the BARREL EXTENSION: six steel tubes carrying the bores on from the barrels' muzzles to the muzzle device, so the LAST round in each
+# barrel gets a 20 in (508 mm) barrel: the bore from the breech block's front to the device's rear face
+EXT = (BB1 + 0.508) - MZ0      # (BB1 is defined above: the breech block's front)
+MD0 = MZ0 + EXT                # the muzzle device's rear face
+FAC_L = MZ1 - MZ0              # the factory muzzle device's length
 HG1 = 0.500                    # the lower body's front (its arms run on to the muzzle device)
 RB, D, ZB = 8.5 * mm, 12.5 * mm, -26 * mm      # a barrel's radius; the 2 x 2's half spacing; the lower barrel's height
 BORES = [(-D, D), (D, D), (0, 0), (-D, -D), (D, -D), (0, ZB)]
@@ -60,8 +65,8 @@ LOW = ZB - RB                                     # the lowest barrel's undersid
 CH1 = 0.200                                       # the FIXED chassis's front: it runs on from the panel under the barrels to the hinge
 HINGE = (CH1 - 0.002, -0.062)                     # (forward, up) of the hinge pin
 OPEN = 25.0                                       # the front's drop for the reload, degrees
-SLIDE = 0.120                                     # the muzzle device's run forward (it draws the barrel block with it) before the drop
-UNSEAT = 0.040                                    # then the block slides back this far in its cradle, off the muzzle device's seats
+SLIDE = 0.090                                     # the muzzle device's run forward (it draws the barrel block with it) before the drop
+UNSEAT = 0.012                                    # then the block slides back this far in its cradle, off the muzzle device's seats
 # the reload: the MUZZLE DEVICE runs forward SLIDE on two guide rods in the forend (part_pump), drawing the barrel block (its muzzles
 # are seated in the device) until the block's rear is out from under the rail; the forend drops OPEN degrees on the fixed hinge; the
 # block slides back UNSEAT off the seats and lifts out. So the rail stays low, just over the block (checked below: RAIL_CLEAR)
@@ -351,10 +356,11 @@ def front_sight(Kx, parent, f_front, top):
     bevel(fn, 0.6 * mm, 2, 30); cut(fn, box(-1.0 * mm, 1.0 * mm, f_front - 0.05, f_front + 0.01, SY, SY + 0.01))
     smooth(fn); Kx.adopt(fn, 'muzzle', TI, parent)
 def device(Kx, parent, kind):
+    MZ0 = MD0                                                         # (every device starts at the extension's front)
     R = RB + 9 * mm                                                   # the device's outline round the bores
     seats = lambda o: [cut(o, cyl(RB + 0.3 * mm, MZ0 - 0.01, MZ0 + 0.010, 'y', (x, z), 16)) for x, z in BORES]
     if kind == 'factory':   # a six-bore block: heat fins round its rear half, side ports in its front half, the bores flaring (sabot strip)
-        L = MZ1 - MZ0
+        L = FAC_L
         o = Kx.tmp(prism(circles_hull(BORES, R, 16), 'y', MZ0, MZ0 + L)); bevel(o, 3 * mm, 2, 30)
         for i in range(4): ring_cut(o, MZ0 + 0.008 + i * 0.0048, MZ0 + 0.008 + i * 0.0048 + 2.2 * mm, R, R - 2.6 * mm)
         for x, z in BORES:
@@ -402,14 +408,27 @@ def device(Kx, parent, kind):
     front_sight(Kx, parent, MZ0 + (L if kind != 'flash' else 0.050), top)
     return MZ0 + (L if kind != 'flash' else 0.082)
 MZ_END = device(K, ppump, 'factory')
+# the barrel extension (slot handguard: it stays whatever device is fitted): a titanium collar the barrels' muzzles seat in (the struts'
+# flanges and the rail bosses meet its rear face), six steel tubes on to the device, a slim band halfway
+co = K.tmp(prism(circles_hull(BORES, RB + 6 * mm, 16), 'y', MZ0, MZ0 + 0.014)); bevel(co, 1.5 * mm, 2, 30)
+for x, z in BORES:
+    cut(co, cyl(RB + 0.3 * mm, MZ0 - 0.01, MZ0 + 0.010, 'y', (x, z), 16))
+    cut(co, cyl(BORE, MZ0, MZ0 + 0.02, 'y', (x, z), 16))
+smooth(co); K.adopt(co, 'handguard', TI, ppump)
+for x, z in BORES:
+    o = K.tmp(lathe([(MZ0 + 0.012, 7.2 * mm), (MD0 + 0.008, 7.2 * mm), (MD0 + 0.008, BORE), (MZ0 + 0.012, BORE)], 16, (x, 0, z)))
+    smooth(o); K.adopt(o, 'handguard', BARREL_M, ppump)
+bd = K.tmp(prism(circles_hull(BORES, 7.2 * mm + 1.2 * mm, 16), 'y', MZ0 + EXT / 2 - 0.005, MZ0 + EXT / 2 + 0.005)); bevel(bd, 0.8 * mm, 2, 30)
+for x, z in BORES: cut(bd, cyl(7.25 * mm, MZ0, MD0, 'y', (x, z), 16))
+smooth(bd); K.adopt(bd, 'handguard', TI, ppump)
 # the HEAT SHIELD: a short perforated titanium shell on the muzzle device's rear face, over the upper barrels (it slides with the device;
 # the barrel block slides back from under it, and off the seats, before it lifts out)
-HS_L, HS_R, HS_TH = 0.032, math.hypot(D, D) + RB + 1.5 * mm, 1.2 * mm
+HS_L, HS_R, HS_TH = 0.032, math.hypot(D, D) + RB + 1.5 * mm, 1.2 * mm      # (on the device's rear face, over the extension tubes)
 arc = lambda r, a0, a1, n: [(r * math.cos(math.radians(a0 + (a1 - a0) * i / n)), r * math.sin(math.radians(a0 + (a1 - a0) * i / n))) for i in range(n + 1)]
-sh = K.tmp(prism(arc(HS_R + HS_TH, 22, 158, 20) + list(reversed(arc(HS_R, 22, 158, 20))), 'y', MZ0 - HS_L, MZ0 + 0.004))
+sh = K.tmp(prism(arc(HS_R + HS_TH, 22, 158, 20) + list(reversed(arc(HS_R, 22, 158, 20))), 'y', MD0 - HS_L, MD0 + 0.004))
 for a in (40, 65, 90, 115, 140):                                   # its perforation: round holes through it, radially, staggered
     for i in range(2):
-        f = MZ0 - HS_L + 0.009 + i * 0.012 + (0.006 if a in (65, 115) else 0)
+        f = MD0 - HS_L + 0.009 + i * 0.012 + (0.006 if a in (65, 115) else 0)
         h = cyl(2.4 * mm, HS_R - 0.004, HS_R + 0.004, 'z', (0, f), 12)
         h.transform(Matrix.Rotation(math.radians(90 - a), 4, 'Y')); cut(sh, h)
 bevel(sh, 0.4 * mm, 1, 30); smooth(sh); K.adopt(sh, 'handguard', TI, ppump)
@@ -441,7 +460,8 @@ for f0, rim in ((BR1 - 0.024, 1.2 * mm), ):   # clamp plates: titanium, pocketed
 # ================================================== info and anchors ==================================================
 info = {
     'sy': round(SY, 4), 'fSight': 0.017, 'relief': 0.10,
-    'barrels': {'n': 6, 'rounds_each': ROUNDS, 'round_mm': [10, ROUND_L * 1000], 'free_bore_mm': round(FREE * 1000)},
+    'barrels': {'n': 6, 'rounds_each': ROUNDS, 'round_mm': [10, ROUND_L * 1000], 'free_bore_mm': round(FREE * 1000),
+                'effective_mm': [round((MD0 - (BB1 + (ROUNDS - 1 - k) * ROUND_L)) * 1000) for k in range(ROUNDS)]},   # (shot 1 .. ROUNDS of a barrel)
     'muzzles': [[round(MZ_END, 4), round(z, 4), round(x, 4)] for x, z in BORES],
     'grip': [0.030, -0.097, 0], 'support': [0.330, -0.095, 0],
     'anim': {'front': 'part_pump', 'brk': 'part_brk', 'mag': 'part_mag'},
