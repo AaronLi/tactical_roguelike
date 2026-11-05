@@ -1,14 +1,13 @@
 'use strict';
 // The guns made in Blender, as the recipes see them (rcv 'authored', tools/models/recipes.ts rifle()). NOT generated and not data: the store
 // starts empty and tools/model_env.mjs fills it from models/<id>/<id>.glb (tools/bake_authored.mjs reads the files, docs/models.md "Authored models").
-/** One authored mesh: slot, catalogue material, the part_<key> it rides in and that part's pivot (the gun's frame, three's axes), a role, and the geometry in the gun's frame. */
-interface AuthoredMesh { slot: string; mat: string; part?: string; at?: number[]; role?: string; pos: Float32Array; nrm: Float32Array; idx: Uint16Array | Uint32Array }
+/** One authored mesh: slot, catalogue material, the part_<key> it rides in and that part's pivot (the gun's frame, three's axes), and the geometry in the gun's frame. */
+interface AuthoredMesh { slot: string; mat: string; part?: string; at?: number[]; pos: Float32Array; nrm: Float32Array; idx: Uint16Array | Uint32Array }
 /** The frame the other parts are seated on: the model's mount anchors (`mount_<slot>`), metres, [forward] or [forward, up] as noted. */
 interface AuthoredRig {
   top: number; rail: [number, number];       // mount_optic (rail start, the receiver's top height) .. mount_optic_end (rail end): forward span
   hgF: number; hgEnd: number;               // mount_handguard .. mount_handguard_end: a handguard starts, and the furthest forward one may reach
-  end: number; barrelR: number;             // mount_muzzle: the factory barrel's end; the barrel's radius there (seat.barrelR)
-  tubeFrom: number;                         // mount_barrel_tube: where the factory barrel's bare tube begins (set to another barrel's length)
+  end: number; barrel: number;              // mount_muzzle: the factory barrel's end; mount_barrel: where it begins (another barrel is the shared one, ending where its length ends from `end`)
   stockY: number; gripY: number;            // mount_stock (up: the centre of the wrist at the receiver's back), mount_grip (up: the receiver's underside)
   mag: [number, number];                    // mount_magazine: the well, [forward, up]
 }
