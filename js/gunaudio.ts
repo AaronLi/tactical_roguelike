@@ -248,7 +248,7 @@ const G_GunAudio = {
   },
   // pos = world position of the muzzle, or null for the local player's own gun. who: the shooter (for a can's first-round pop).
   // Returns false when no synth buffer exists yet so the caller can play a fallback.
-  play(id: string, pos: THREE.Vector3 | null, who?: string) {
+  play(id: string, pos: THREE.Vector3 | null, who?: string, vol = 1) { // (vol: this shot's own level: a gun of several barrels, each as loud as its effective length makes it, js/data.ts G.shotDef)
     const A = G.Audio, ctx = A.ctx, map = G.Game.map;
     if (!ctx || !map || !this.spec(id) || !this.available()) return false;
     const cam = G.R.camera.position;
@@ -262,7 +262,7 @@ const G_GunAudio = {
       if (!buf) return false;
     }
 
-    const base = this.GAIN * this.firstRound(id, who || (pos ? 'x' : 'me'), ctx.currentTime);
+    const base = this.GAIN * vol * this.firstRound(id, who || (pos ? 'x' : 'me'), ctx.currentTime);
     let gain = base, occluded = false, d = 0, panPos = pos as EchoPt, portal: EchoTap | null = null; // (panPos is only read inside `if (pos)`)
     const taps = this.echoTaps(map, src, cam);
     if (this.debugEchoes) this.drawEchoes(taps, cam);

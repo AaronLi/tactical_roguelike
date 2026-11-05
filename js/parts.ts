@@ -732,6 +732,7 @@ const G_Gunsmith = (() => {
       own({ id: `${id}.limbs.heavy`, slot: 'limbs', mount, brand: brandA, name: `${brandA.split(' ')[0]} 200 lb heavy limbs`, price: 600, tier: 2, model: { limb: 'heavy' }, st: { vel: 22, reload: 30, weight: 0.5, ergo: -5 }, desc: 'Harder-hitting bolts. Slower to cock.' });
       own({ id: `${id}.limbs.compact`, slot: 'limbs', mount, brand: brandB, name: `${brandB.split(' ')[0]} compact limbs`, price: 400, model: { limb: 'compact' }, st: { vel: -10, reload: -20, ergo: 8, weight: -0.4 }, desc: 'Narrow and quick.' });
     }
+    if (s.authoredGun) s.authoredGun({ slot, factory, own, std, plat, def, gs, brandA, brandB });
     if (s.authoredPistol) s.authoredPistol({ slot, factory, own, plat, def, gs, brandA, brandB }); // (an authored pistol's own barrel and magazine parts: below, AUTHORED_PISTOLS)
     // every platform with an optic slot and a ptac declared gets the frame rail
     plat.slots.sort((a: Slot, b: Slot) => ORDER.indexOf(a.slot) - ORDER.indexOf(b.slot));
@@ -841,7 +842,7 @@ const G_Gunsmith = (() => {
 
   // anything without a platform entry (shouldn't happen) gets a bare one
   const LATE = new Set(['qbz95', 'qbz192', 'mcx']);
-  const AUTHORED_PISTOLS = new Set(['welrod', 'maxim9']); // (made after the authored parts: AUTHORED_PISTOLS below) // (their platforms are made at the end: a part's id in a code is its place in the list)
+  const AUTHORED_PISTOLS = new Set(['welrod', 'maxim9', 'tempest']); // (and the Tempest, a rifle) // (made after the authored parts: AUTHORED_PISTOLS below) // (their platforms are made at the end: a part's id in a code is its place in the list)
   for (const def of G.WEAPON_LIST) if (!PLATFORMS[def.id] && !LATE.has(def.id) && !AUTHORED_PISTOLS.has(def.id)) P(def.id, 'rifle', {}, {});
   // Calibration: the weapon's tuned stats are what its default build shoots like, so each platform carries
   // the negated sum of its default parts' effects. Changing a part changes the stats relative to that.
@@ -1131,6 +1132,10 @@ const G_Gunsmith = (() => {
     const g = G.GUN_SPECS[id];
     if (!g) return null;
     let s = inch === undefined ? g : Object.assign({}, g, { barrel: +inch, muzzleDevice: dev, suppressor: can || g.suppressor });
+    { // a gun of several barrels: a barrel's report is fuller the longer its effective length (the key's inches, js/data.ts G.shotSoundKey): more of the charge burnt and more pressure at the muzzle
+      const bd = (G.WEAPONS[id] || {}).barrels;
+      if (bd && inch !== undefined) { const t = G.U.clamp((+inch * 25.4 - bd.mm0) / (bd.mm1 - bd.mm0), 0, 1); s = Object.assign({}, s, { pressure: s.pressure * (0.55 + 0.45 * t), grain: s.grain * (0.6 + 0.4 * t) }); }
+    }
     if (LOAD_SOUND[am]) s = Object.assign({}, s, LOAD_SOUND[am](s));
     if (!LOAD_SOUND[am] || window.GunshotSynth) specs.set(key, s); // (a subsonic load's needs the synth to work out)
     return s;
@@ -1522,6 +1527,32 @@ const G_Gunsmith = (() => {
   P('maxim9', 'pistol', { rcv: 'authored', authored: 'maxim9', mag: { f: 0.0615, y: -0.0167 }, len0: 0.1166 }, { optic: ['pso', { optic: 'notch' }], ptac: true, authoredPistol: authoredPistol({
     barrel: { short: { name: 'Maxim 9 short suppressor (242 mm)', price: 320, tier: 2, can: 'compact', st: { ergo: 16, weight: -0.2, recoil: 4 }, desc: 'The front block off at the main seam: 94 mm shorter and far handier, a good deal louder with more flash. The long suppressor is the quiet one.' } },
     mag: { ext: { cap: 22, price: 90, tier: 1, st: { reload: 4, ergo: -2, weight: 0.05 }, desc: 'The magazine 25 mm longer down the grip: five more rounds. A little slower to swap.' } } }) });
+  // The Tempest (models/tempest, docs/models.md "Multi-barrel guns"): a rifle modelled in Blender whose barrels are the magazine (a block of six bores with seven stacked rounds each) and whose handguard, muzzle
+  // block and reload are the model's own. It has no barrel slot. Its handguard (M-LOK arms: lights and lasers; an I-beam with a Picatinny bottom flange: foregrips and bipods), grip and stock are the factory parts
+  // of the model, on the shared mounts; the muzzle takes only its own variants (the per-gun parts beside the model, models/tempest/muzzle_*.glb: avMuzzle). The figures of the variants are PROPOSED here.
+  const MUZZLE_VARIANTS: Record<string, { name: string; price: number; tier: number; set: Record<string, any>; st: Record<string, number>; desc: string }> = {
+    suppressor: { name: 'Tempest six-bore suppressor', price: 900, tier: 3, set: { device: 'suppressor', sup: true, can: 'full' }, st: { recoil: -10, ergo: -10, weight: 0.7, vel: 1 }, desc: 'A 150 mm can over all six bores, heat fins along it: shots are only heard close by and there is no flash. Front-heavy.' },
+    flash: { name: 'Tempest six-bore flash hider', price: 260, tier: 2, set: { device: 'flash' }, st: { recoil: -2, weight: 0.08 }, desc: 'A hider across the six muzzles. Kills the flash a stacked round makes at the end of the bore.' },
+    comp: { name: 'Tempest six-bore compensator', price: 380, tier: 2, set: { device: 'comp' }, st: { recoil: -10, ergo: -1, weight: 0.11 }, desc: 'Vents up from every bore, windows each side. Keeps the muzzle down when a pull is six rounds.' },
+  };
+  P('tempest', 'rifle', { rcv: 'authored', authored: 'tempest', hgMax: 0.297, L: 0.2, W: 0.04, rm: 'park', fm: 'polymer', optF: 0.1, grip: 0.036, mag: { f: 0.087, y: 0 } }, { optic: ['pic', { optic: 'irons' }], grip: ['ar', 'ar'], stock: ['smg', 'folded'], authoredGun: (h: any) => {
+    const { slot, factory, own, plat, def } = h, id = def.id as string;
+    // the handguard: arms with M-LOK on each side and an I-beam under, one piece (the model's), the only one it takes
+    slot('handguard', 'hg:' + id, true);
+    factory('handguard', 'hg:' + id, { name: `${def.name} handguard`, model: { hg: { t: 'authored', len: 0.3 } }, st: { ergo: 0, weight: 0 }, desc: 'Factory part: M-LOK arms for a light or laser each side and an I-beam with a Picatinny bottom rail for a foregrip or bipod.', provides: { fg: 'fg', tac: 'tac', tacL: 'tac' } });
+    // (the grip, an AR pattern, and the stock, a twin-rod folding adapter on the back panel's rail, are the shared parts of their mounts: the model draws them while they are fitted)
+    // the barrel block is the magazine: one per gun, a case-found rifle's whole barrel set, swapped on a reload
+    { const mount = 'mag:' + id, cap = def.mag as number;
+      slot('mag', mount, true);
+      factory('mag', mount, { name: `${def.name} ${cap}-round barrel block`, model: {}, set: { cap } });
+      for (const p of BY_MOUNT.get(mount) || []) p.variant = true;
+      plat.magVariants = true; }
+    // the muzzle: the model's muzzle block (its front sight fin on it) or one of its own variants
+    { const mount = 'mz:' + id;
+      slot('muzzle', mount, true);
+      factory('muzzle', mount, { name: `${def.name} muzzle block`, model: { muzzle: 'authored' }, set: { device: 'none' }, st: { ergo: 0, weight: 0 }, desc: 'Factory part: the six bores end in a plain block with the front sight fin.' });
+      for (const [name, m] of Object.entries(MUZZLE_VARIANTS)) own({ id: `${id}.mz.${name}`, slot: 'muzzle', mount, brand: h.brandA, name: m.name, price: m.price, tier: m.tier, model: { muzzle: 'authored', avMuzzle: 'muzzle_' + name }, st: m.st, set: m.set, desc: m.desc }); }
+  } });
   for (const id of AUTHORED_PISTOLS) { const plat = PLATFORMS[id]; plat.offset = {}; for (const k of STAT_KEYS) plat.offset[k] = -Object.values(plat.defaults).reduce((a, pid) => a + ((PARTS[pid] && PARTS[pid].st[k]) || 0), 0); }
   PARTS['op.pso.0'].not = (PARTS['op.pso.0'].not || []).concat(['maxim9']); // (the tritium night sights: the Maxim 9 has its own irons, and a dot goes in its cut)
   const compatible = (mount: string) => BY_MOUNT.get(mount) || [];

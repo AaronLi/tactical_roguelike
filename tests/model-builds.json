@@ -5988,6 +5988,78 @@
   { "platform": "maxim9",
    "why": "authored variants together",
    "build": { "barrel": "maxim9.br.short", "mag": "maxim9.mag.ext", "optic": "maxim9.optic", "tac": "ptac.0" }
+  },
+  { "platform": "tempest",
+   "why": "default",
+   "build": { "grip": "oem.gr.ar.4", "handguard": "tempest.handguard", "mag": "tempest.mag", "muzzle": "tempest.muzzle", "optic": "op.pic.0", "stock": "stk.smg.2" }
+  },
+  { "platform": "tempest",
+   "why": "bare",
+   "build": { "grip": "oem.gr.ar.4", "handguard": "tempest.handguard", "mag": "tempest.mag", "muzzle": "tempest.muzzle" }
+  },
+  { "platform": "tempest",
+   "why": "loaded + lowest optic (op.pic.0)",
+   "build": { "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "tempest.handguard", "mag": "tempest.mag", "muzzle": "tempest.muzzle", "optic": "op.pic.0", "stock": "stk.smg.2", "tac": "tac.0", "tacL": "tac.0" }
+  },
+  { "platform": "tempest",
+   "why": "loaded-last",
+   "build": { "fg": "fg.4", "grip": "oem.gr.ar.4", "handguard": "tempest.handguard", "mag": "tempest.mag", "muzzle": "tempest.muzzle", "optic": "op.pic.0", "stock": "stk.smg.2", "tac": "tac.4", "tacL": "tac.4" }
+  },
+  { "platform": "tempest",
+   "why": "opens slots: op.pic.12 in optic (riserdot)",
+   "build": { "grip": "oem.gr.ar.4", "handguard": "tempest.handguard", "mag": "tempest.mag", "muzzle": "tempest.muzzle", "optic": "op.pic.12", "riserdot": "op.pso.1", "stock": "stk.smg.2" }
+  },
+  { "platform": "tempest",
+   "why": "opens slots: stk.smg.6 in stock (buttstock)",
+   "build": { "buttstock": "stk.tube.0", "grip": "oem.gr.ar.4", "handguard": "tempest.handguard", "mag": "tempest.mag", "muzzle": "tempest.muzzle", "optic": "op.pic.0", "stock": "stk.smg.6" }
+  },
+  { "platform": "tempest",
+   "why": "tallest optic (oem.op.pic.23)",
+   "build": { "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "tempest.handguard", "mag": "tempest.mag", "muzzle": "tempest.muzzle", "optic": "oem.op.pic.23", "stock": "stk.smg.2", "tac": "tac.0", "tacL": "tac.0" }
+  },
+  { "platform": "tempest",
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon)",
+   "build": { "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "tempest.handguard", "mag": "tempest.mag", "magnifier": "mgn.0", "muzzle": "tempest.muzzle", "optic": "op.auth.falcon", "stock": "stk.smg.2", "tac": "tac.0", "tacL": "tac.0" }
+  },
+  { "platform": "tempest",
+   "why": "magnifier on the tallest optic that takes one (op.pic.4)",
+   "build": { "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "tempest.handguard", "mag": "tempest.mag", "magnifier": "mgn.0", "muzzle": "tempest.muzzle", "optic": "op.pic.4", "stock": "stk.smg.2", "tac": "tac.0", "tacL": "tac.0" }
+  },
+  { "platform": "tempest",
+   "why": "replaced optic (op.pso.2) on the riser",
+   "build": { "grip": "oem.gr.ar.4", "handguard": "tempest.handguard", "mag": "tempest.mag", "muzzle": "tempest.muzzle", "optic": "op.pic.12", "riserdot": "op.pso.2", "stock": "stk.smg.2" }
+  },
+  { "platform": "tempest",
+   "why": "authored optic (op.pic.5)",
+   "build": { "grip": "oem.gr.ar.4", "handguard": "tempest.handguard", "mag": "tempest.mag", "muzzle": "tempest.muzzle", "optic": "op.pic.5", "stock": "stk.smg.2" }
+  },
+  { "platform": "tempest",
+   "why": "authored optic (op.pic.14)",
+   "build": { "grip": "oem.gr.ar.4", "handguard": "tempest.handguard", "mag": "tempest.mag", "muzzle": "tempest.muzzle", "optic": "op.pic.14", "stock": "stk.smg.2" }
+  },
+  { "platform": "tempest",
+   "why": "authored optic (op.pic.15)",
+   "build": { "grip": "oem.gr.ar.4", "handguard": "tempest.handguard", "mag": "tempest.mag", "muzzle": "tempest.muzzle", "optic": "op.pic.15", "stock": "stk.smg.2" }
+  },
+  { "platform": "tempest",
+   "why": "authored optic (op.pic.16)",
+   "build": { "grip": "oem.gr.ar.4", "handguard": "tempest.handguard", "mag": "tempest.mag", "muzzle": "tempest.muzzle", "optic": "op.pic.16", "stock": "stk.smg.2" }
+  },
+  { "platform": "tempest",
+   "why": "authored optic (op.auth.falcon)",
+   "build": { "grip": "oem.gr.ar.4", "handguard": "tempest.handguard", "mag": "tempest.mag", "muzzle": "tempest.muzzle", "optic": "op.auth.falcon", "stock": "stk.smg.2" }
+  },
+  { "platform": "tempest",
+   "why": "magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "grip": "oem.gr.ar.4", "handguard": "tempest.handguard", "mag": "tempest.mag", "magnifier": "mgn.0", "muzzle": "tempest.muzzle", "optic": "op.auth.falcon", "stock": "stk.smg.2" }
+  },
+  { "platform": "tempest",
+   "why": "bipod (fg.4)",
+   "build": { "fg": "fg.4", "grip": "oem.gr.ar.4", "handguard": "tempest.handguard", "mag": "tempest.mag", "muzzle": "tempest.muzzle", "optic": "op.pic.0", "stock": "stk.smg.2", "tac": "tac.0", "tacL": "tac.0" }
+  },
+  { "platform": "tempest",
+   "why": "suppressor on the muzzle (tempest.mz.suppressor)",
+   "build": { "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "tempest.handguard", "mag": "tempest.mag", "muzzle": "tempest.mz.suppressor", "optic": "op.pic.0", "stock": "stk.smg.2", "tac": "tac.0", "tacL": "tac.0" }
   }
  ]
 }

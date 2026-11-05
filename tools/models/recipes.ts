@@ -994,8 +994,9 @@ const G_GunRecipes = (() => {
     } else if (rcv === 'authored') {
       // A gun made in Blender: the receiver is the model's own. With an optic (or a riser, A.sights.rail), a rail along the model's optic mount
       authored(k, A!, (e) => e.slot === 'base' && !e.part);
+      if (A!.hinge) authored(k, A!, (e) => e.slot === 'base' && !!e.part); // (a gun with a reload sequence has its moving parts as nodes: the latch is the receiver's)
       top = A!.rig.top;
-      if (o.optic && (!ownIrons || A!.sights.rail.includes(o.optic))) { rcvTop = top; top = k.under('optic', () => S.rail(k, A!.rig.rail[0], A!.rig.rail[1] - A!.rig.rail[0], top, rm)); }
+      if (o.optic && (!ownIrons || A!.sights.rail.includes(o.optic))) { rcvTop = top; if (!A!.sights.railed) top = k.under('optic', () => S.rail(k, A!.rig.rail[0], A!.rig.rail[1] - A!.rig.rail[0], top, rm)); } // (railed: the model's receiver top is the rail)
     } else if (rcv === 'round') {
       if (tr) { tracedParts(k, tr, VT, 'base', mats); top = VT([0, tr.topY])[1]; } // (the 870's: traced)
       else {
@@ -1372,7 +1373,8 @@ const G_GunRecipes = (() => {
       else handle = { f: L * 0.62, y: 0.016, x: 0.024, travel: 0.07, recip: true }; // (an op rod or a bolt handle: Garand, M14, PPSh, Benelli)
     }
     if (o.cock) handle = Object.assign(handle || {}, o.cock) as CockHandle;
-    if (A) { handle = Object.assign({}, A.info.handle) as CockHandle; anim.handle = authoredPart(k, A, 'handle'); } // (the model's own)
+    if (A && A.info.handle) { handle = Object.assign({}, A.info.handle) as CockHandle; anim.handle = authoredPart(k, A, 'handle'); } // (the model's own)
+    else if (A) handle = null; // (an electric gun has none)
     else if (handle) { const h = handle; anim.handle = k.under(rcv === 'mpx' || rcv === 'mcx' ? 'charging' : k.slot, () => cockHandle(k, h)); } // (the MPX's and MCX's: it stands in for the charging part when that slot's empty, so it's that part's)
 
     k.tag('grip');
@@ -1394,7 +1396,8 @@ const G_GunRecipes = (() => {
     else if (!bull && o.stock && !lugGrip) stock(k, o.stock, o.sm || fm, o.gripT === 'none');
     k.tag('mag');
     let magAt = null;
-    if (A && own('mag')) { anim.mag = authoredPart(k, A, 'mag'); magAt = A.info.magAt; } // (the model's own, up in the well to its feed lips)
+    if (A && own('mag') && A.hinge) { authored(k, A, (e) => e.slot === 'mag'); anim.mag = partNode(k, A, 'mag'); magAt = A.info.magAt; } // (a barrel block: nested in the forend that slides and drops, with its carry handle)
+    else if (A && own('mag')) { anim.mag = authoredPart(k, A, 'mag'); magAt = A.info.magAt; } // (the model's own, up in the well to its feed lips)
     else if (o.mag && o.mag.t !== 'internal') {
       const mo = Object.assign({ f: bull ? L * 0.22 : gf + 0.078, y: rcv === 'ak' ? -0.046 : rcv === 'box' ? -(o.H || 0.085) * 0.55 : -0.042 }, o.mag);
       if (rcv !== 'ar') mo.well = null; // (a magazine's well block is an AR lower's; any other gun's well is its own)
@@ -1417,7 +1420,8 @@ const G_GunRecipes = (() => {
     // receiver each shot (js/vmanim.ts), as far as the barrel showing allows (rcTravel)
     const rcl = !brk && o.recoilBarrel ? k.part(L, by) : null, rcTravel = rcl ? Math.min(o.recoilBarrel!, bl - 0.02) : 0;
     if (rcl) { k.into(rcl, L, by); anim.barrel = rcl; k.cyl(0.0148, 0.012, b.m || M.blued(), L - 0.002, by); }
-    if (A) {
+    if (A && A.info.barrels) front = A.rig.end; // (a gun of barrels in its magazine: no barrel of its own to fit; the muzzle block is the muzzle slot's)
+    else if (A) {
       // the model's factory barrel is its own mesh (the gas block, tube and sight base are the receiver's: slot base); any other barrel is the shared
       // one, a tube of its length and profile ending where that barrel ends: the factory end moved by the length's difference from the factory one
       const end = A.rig.end + bl - factoryBarrel(o.authored!);
@@ -1442,7 +1446,7 @@ const G_GunRecipes = (() => {
     if (rcl) k.into(null); // (the handguard, if any, stays put: only the muzzle device rides on with it)
     const bEnd: number = front; // (the barrel's own end, before any muzzle device: where its front sight and a bead stand)
     // what the barrel provides: where a muzzle device screws on
-    k.anchor('barrel', 'mount_muzzle', [bEnd, by, 0]);
+    if (!(A && A.info.barrels)) k.anchor('barrel', 'mount_muzzle', [bEnd, by, 0]);
     if (o.rib && !o.integral) { k.tag('barrel'); S.rib(k, L, bEnd - 0.006, Math.max(rcvTop != null ? rcvTop : top, 0.014) + 0.009, by + 0.004); } // (a shotgun barrel's rib: part of the barrel)
     let hgLen = 0;
     const hgF = L + (o.hgGap || 0); // (where a handguard starts)
@@ -1493,10 +1497,13 @@ const G_GunRecipes = (() => {
       k.box(0.004, 0.03, n * 0.025 + 0.006, M.black(), f0 - 0.003, -0.012, x + 0.008);
       for (let i = 0; i < n; i++) { k.cylY(0.0095, 0.05, M.redInsert(), f0 + 0.0125 + i * 0.025, -0.008, x); k.cylY(0.0098, 0.012, M.brass(), f0 + 0.0125 + i * 0.025, -0.038, x); }
     }
-    if (A && o.muzzle && own('muzzle')) { k.tag('muzzle'); k.moved(front - A.rig.end, 0, () => authored(k, A, (e) => e.slot === 'muzzle')); front += A.info.muzzles[0][0] - A.rig.end; }
+    let muzzleList: number[][] | null = null; // (a gun of several barrels: one muzzle each, from the model or from the muzzle variant fitted)
+    if (A && A.info.barrels && o.avMuzzle && A.variants[o.avMuzzle]) { const v = A.variants[o.avMuzzle]; k.tag('muzzle'); authoredVariant(k, A, v); muzzleList = v.info!.muzzles; }
+    else if (A && A.info.barrels && o.muzzle && own('muzzle')) { k.tag('muzzle'); authored(k, A, (e) => e.slot === 'muzzle'); muzzleList = A.info.muzzles; }
+    else if (A && o.muzzle && own('muzzle')) { k.tag('muzzle'); k.moved(front - A.rig.end, 0, () => authored(k, A, (e) => e.slot === 'muzzle')); front += A.info.muzzles[0][0] - A.rig.end; }
     else if (!o.integral && o.muzzle) { k.tag('muzzle'); if (rcl) k.into(rcl, L, by); front += rcv === 'aksu' && o.muzzle === 'cutts' ? aksuBooster(k, front, by) : muzzle(k, o.muzzle, front, mbr, by); } // (the AKS-74U's booster is its own: the Thompson's Cutts is the plain one)
     if (brk || rcl) k.into(null);
-    k.anchor(!o.integral && o.muzzle ? 'muzzle' : 'barrel', 'muzzles', [[front, by, 0]]); // (every muzzle: the device's end when there is one)
+    k.anchor(!o.integral && o.muzzle ? 'muzzle' : 'barrel', 'muzzles', muzzleList || [[front, by, 0]]); // (every muzzle: the device's end when there is one)
     if (o.pump) {
       k.tag('pump');
       const p = k.part();
@@ -1517,10 +1524,21 @@ const G_GunRecipes = (() => {
     if (o.bipod) for (const x of [-0.012, 0.012]) bipodLeg(k, anim, L + o.bipod, -0.032, x, true, () => { k.cyl(0.004, 0.2, M.black(), L + o.bipod! - 0.2, -0.032, x); k.box(0.012, 0.008, 0.01, M.rubber(), L + o.bipod! - 0.21, -0.032, x); });
     if (o.vfg != null) k.prof([[L + o.vfg - 0.012, -0.022], [L + o.vfg + 0.016, -0.022], [L + o.vfg + 0.014, -0.11], [L + o.vfg - 0.01, -0.11]], 0.026, o.vfgM || fm);
     let fgF = null;
-    if (o.fg && !hgLen && o.fgAt != null) { k.tag('fg'); fgF = o.fgAt; foregrip(k, o.fg, fgF, fm, anim); } // (a rail under the receiver itself: the SCAR's)
+    const rn = A && A.hinge ? railNode(k, A) : null; // (the forend of a gun with a reload sequence drops and slides: what is clamped to its rails goes with it)
+    if (rn) k.into(rn.node, rn.f, rn.y);
+    if (o.fg === 'bipod' && A && A.anchors.mount_fg) { // (a bipod on the rail under the model's own forend: drawn outside it, so its legs are free to deploy, then hung from the forend's node: it drops with it)
+      k.tag('fg'); fgF = A.anchors.mount_fg[0];
+      if (rn) k.into(null);
+      foregrip(k, 'bipod', fgF, fm, anim);
+      const bp = (anim as any).bipod as THREE.Object3D | undefined;
+      if (bp) { bp.position.y += A.anchors.mount_fg[1] + 0.022; if (rn) { bp.position.sub(rn.node.position); rn.node.add(bp); } }
+      if (rn) k.into(rn.node, rn.f, rn.y);
+    }
+    else if (o.fg && A && A.anchors.mount_fg) { k.tag('fg'); fgF = A.anchors.mount_fg[0]; k.moved(0, A.anchors.mount_fg[1] + 0.022, () => foregrip(k, o.fg!, fgF!, fm, anim)); } // (a rail under the model's own forend: the foregrip hangs from it)
+    else if (o.fg && !hgLen && o.fgAt != null) { k.tag('fg'); fgF = o.fgAt; foregrip(k, o.fg, fgF, fm, anim); } // (a rail under the receiver itself: the SCAR's)
     else if (o.fg && hgLen) { k.tag('fg'); fgF = rcv === 'vector' && o.hg && o.hg.t === 'vector' ? L - 0.05 : hgF + Math.min(hgLen * 0.35, 0.09, hgLen - 0.04); foregrip(k, o.fg, fgF, fm, anim); } // (the Vector's: on the rail under the front of the upper) // (near the rail's back: the support arm bent, the gun out in front)
     // a clamp-on rail mount: a collar round the barrel (or the can), in front of any jacket, a short rail on one side or both
-    let tacAt = o.tacAt ? Object.assign({}, o.tacAt) : rcv === 'vector' && o.hg && o.hg.t === 'vector' ? { f: L - 0.012, y: vecTrace([0, 132])[1], x: 0.027 } // (on the short rails each side of the front)
+    let tacAt = A && A.anchors.mount_tac ? { f: A.anchors.mount_tac[0], y: A.anchors.mount_tac[1], x: Math.abs(A.anchors.mount_tac[2]) } : o.tacAt ? Object.assign({}, o.tacAt) : rcv === 'vector' && o.hg && o.hg.t === 'vector' ? { f: L - 0.012, y: vecTrace([0, 132])[1], x: 0.027 } // (on the short rails each side of the front)
       : hgLen && !o.pump ? { f: hgF + hgLen - 0.01, y: 0, x: 0.024 } : o.siderails ? (rcv === 'box' ? { f: L - 0.012, y: -0.004, x: (o.W || 0.045) / 2 + 0.0075 } : { f: L - 0.02, y: -0.006, x: 0.029 }) : null;
     if (o.railmount) {
       k.tag('railmount');
@@ -1535,7 +1553,7 @@ const G_GunRecipes = (() => {
       if (o.tac) { k.tag('tac'); tactical(k, o.tac, tacAt.f, tacAt.y, tacAt.x); }
       if (o.tacL) { k.tag('tacL'); tactical(k, o.tacL, tacAt.f, tacAt.y, -tacAt.x, -1); }
     }
-    if (brk) k.into(null);
+    if (brk || rn) k.into(null);
 
     // sights
     k.tag('optic');
@@ -1622,14 +1640,18 @@ const G_GunRecipes = (() => {
       : rcv === 'break' ? { side: 'breech', heads: (o.barrels || [0]).map((x: number) => [x, by - hy]), z: -0.0005, r: br } // (in the barrels' hinge frame)
       : o.bolt ? { side: 'top', f: o.bolt - 0.05, y: rcv === 'round' ? top - 0.0015 : top, x: rcv === 'round' ? 0.006 : 0.011, w: 0.024 } // (a bolt gun's port is its open top, to the right of a scope's line, above the stock)
       : { side: 'right', f: o.chF != null ? o.chF : o.lever ? L * 0.55 : magAt ? magAt[0] + 0.005 : !o.pump && handle && handle.x > 0 ? handle.f + 0.026 : o.pump || o.tube ? L * 0.55 : L * 0.5, y: o.chY != null ? o.chY : by, x: hw };
+    if (A && A.hinge) for (const key of Object.keys(A.parts)) { const nd = nodeMaps.get(k)?.get(key); if (nd) anim[key] = nd; } // (every node of the reload sequence)
     return {
       sy: sight.sy, fSight: sight.fSight, relief: sight.relief,
-      muzzles: [[front, by, 0]],
+      muzzles: muzzleList || [[front, by, 0]],
       grip: [gf + 0.005, -0.075, 0], support: [support, o.pump ? -0.03 : -0.028, 0],
       anim, magAt, handle, port, chamberAt, breech: tr && tr.chamber ? Object.assign(breechAt(L, hy, L - tr.chamber, by - hy, BRK_OPEN), { long: o.hgGap ? (o.optic === 'notch' ? 'irons' : 'rail') : null }) : null, ch: (rcv === 'ar' && !o.cock) || o.ch ? [-0.006, 0.026, 0] : null, bolt: o.bolt ? [o.bolt, 0.01, 0.068] : null,
       cheek: o.cheek != null ? o.cheek : null, // (a bullpup: where your eye is, whatever's on the rail: tools/models/recipes.ts viewmodel)
       recoilBarrel: rcTravel, // (a long-recoil barrel: how far it runs back each shot, js/vmanim.ts)
       ...(A ? { grip: A.info.grip, port: A.info.port, chamberAt: A.info.chamberAt } : {}), // (the model's own)
+      ...(A && A.anchors.mount_fg ? { support: [fgF != null ? fgF : A.info.support[0], A.info.support[1], A.info.support[2]] } : {}), // (held on the I-beam's rail, or at the foregrip)
+      ...(A && A.info.barrels ? { barrels: A.info.barrels, barrelGroups: A.info.barrelGroups, modeDial: A.info.modeDial } : {}), // (a gun of several barrels)
+      ...(A && A.hinge ? { hinge: A.hinge } : {}), // (and its reload sequence)
     };
   }
 
@@ -1711,19 +1733,46 @@ const G_GunRecipes = (() => {
       g = new T.BufferGeometry();
       g.setAttribute('position', new T.BufferAttribute(e.pos, 3)); g.setAttribute('normal', new T.BufferAttribute(e.nrm, 3));
       g.setIndex(new T.BufferAttribute(e.idx, 1));
+      if (e.uv) g.setAttribute('uv', new T.BufferAttribute(e.uv, 2)); // (a display surface's)
       g.computeBoundingSphere(); g.computeBoundingBox();
       authoredGeo.set(e, g);
     }
     return g;
   }
+  // The part_ nodes of a gun with a reload sequence (A.hinge), made as nested groups the first time something is drawn in them: a part's meshes are placed
+  // against its own pivot and its pivot against its parent's, so moving a node moves everything inside it (the docs: "Multi-barrel guns")
+  const nodeMaps = new WeakMap<Kit, Map<string, THREE.Object3D>>();
+  function partNode(k: Kit, A: AuthoredGun, key: string): THREE.Object3D {
+    let m = nodeMaps.get(k); if (!m) nodeMaps.set(k, (m = new Map()));
+    let p = m.get(key); if (p) return p;
+    const pt = A.parts[key], f = -pt.at[2], y = pt.at[1];
+    p = k.part(f, y); m.set(key, p);
+    if (pt.parent) { const par = partNode(k, A, pt.parent), pa = A.parts[pt.parent].at; par.add(p); p.position.set(0, y - pa[1], pt.at[2] - pa[2]); }
+    return p;
+  }
+  // the outermost part_ node that holds the model's handguard (the forend): where its rails are, with its pivot ({node, f, y})
+  function railNode(k: Kit, A: AuthoredGun) {
+    const e = A.meshes.find((q) => q.slot === 'handguard' && q.part && q.chain), key = e ? e.chain![0] : null;
+    return key ? { node: partNode(k, A, key), f: -A.parts[key].at[2], y: A.parts[key].at[1] } : null;
+  }
   // an authored gun's meshes that pass `which`, in the kit's current slot (or each its own: `own`), placed where they were made (a
-  // copy of the geometry when `bend` reshapes it: the barrel's tube set to its length)
+  // copy of the geometry when `bend` reshapes it: the barrel's tube set to its length). A gun with a reload sequence puts the meshes of a part_ node in it.
   function authored(k: Kit, A: AuthoredGun, which: (e: AuthoredMesh) => boolean, bend?: (e: AuthoredMesh, g: THREE.BufferGeometry) => THREE.BufferGeometry) {
     for (const e of A.meshes) {
       if (!which(e)) continue;
-      const g = bend ? bend(e, geoOf(e)) : geoOf(e), mat = ((M as any)[e.mat] || M.black)();
-      k.place(g, mat, 0, 0, 0);
+      const g = bend ? bend(e, geoOf(e)) : geoOf(e), mat = e.display ? Object.assign(M.black().clone(), { name: 'black' }) : ((M as any)[e.mat] || M.black)(); // (a display surface: the game paints it, whatever material the file names)
+      let m: THREE.Mesh;
+      if (A.hinge && e.part) { const at = A.parts[e.part].at; k.into(partNode(k, A, e.part), -at[2], at[1]); m = k.place(g, mat, 0, 0, 0); k.into(null); }
+      else m = k.place(g, mat, 0, 0, 0);
+      if (e.display) { m.name = e.name!; m.userData.display = e.display; } // (a display surface: painted at run time)
     }
+  }
+  // a per-gun variant part's meshes (models/<id>/<name>.glb) drawn where the factory part's are: in the same node, when the model nests them
+  function authoredVariant(k: Kit, A: AuthoredGun, v: AuthoredVariant) {
+    const host = A.hinge ? A.meshes.find((q) => q.slot === v.slot && q.part) : null;
+    if (host) { const at = A.parts[host.part!].at; k.into(partNode(k, A, host.part!), -at[2], at[1]); }
+    for (const e of v.meshes) k.place(geoOf(e), ((M as any)[e.mat] || M.black)(), 0, 0, 0);
+    if (host) k.into(null);
   }
   // an authored animated part (part_<key>): its pivot and its meshes
   function authoredPart(k: Kit, A: AuthoredGun, key: string) {

@@ -60,7 +60,7 @@ export function createHandlers(env) {
     group.traverse((o) => {
       if (o === group) return;
       if (o.isMesh) {
-        meshes++; n++; o.name = (o.userData.slot || 'base') + '_' + n;
+        meshes++; n++; if (!(o.name || '').startsWith('display_')) o.name = (o.userData.slot || 'base') + '_' + n; // (a display surface keeps its name: the game paints it by name)
         const m0 = o.material, m = copyOf(m0, m0.name || matName.get(m0) || ('m_' + m0.color.getHexString())); o.material = m; // (a copy without the bump map: rebuilt at load from the catalogue, by name)
         const pos = o.geometry.attributes.position, idx = o.geometry.index;
         tris += (idx ? idx.count : pos.count) / 3;

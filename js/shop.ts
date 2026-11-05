@@ -94,7 +94,7 @@ const G_Shop = {
       }
       return out.sort((a, b) => a.price - b.price);
     };
-    const weapons = G.WEAPON_LIST.filter(G.obtainable);
+    const weapons = G.WEAPON_LIST.filter((w) => G.obtainable(w) && !w.caseOnly);
     this.offers = {
       p: pickW(weapons.filter((w) => w.slot === 'p'), 3).map((w) => w.id),
       s: pickW(weapons.filter((w) => w.slot === 's'), 2).map((w) => w.id),

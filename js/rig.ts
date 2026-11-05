@@ -715,6 +715,7 @@ const G_Rig = (() => {
           const hp = rig.armL.lo.localToWorld(new T.Vector3(0, -FARM - 0.06, -0.01)); // (in the palm)
           mg.position.copy(rig.gun.worldToLocal(hp));
         } else mg.position.copy(rig.gun.userData.magHome);
+        mg.visible = !p.nomag || inHand; // (a gun with its magazine out has none on it)
       }
       // the bipod's legs: down when they've put it down (a quarter of a second either way)
       if (rig.gun.userData.bipod) { rig.bipodK = U.clamp((rig.bipodK || 0) + (p.bipod ? 1 : -1) * dt * 4, 0, 1); G.GunRig.bipodPose(rig.gun.userData.bipod, rig.bipodK); }

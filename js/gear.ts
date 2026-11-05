@@ -217,12 +217,14 @@ const G_Gear = (() => {
     const v = magVid(def, vid), cap = G.Gunsmith.magCap(def.id, v), count = Math.min(cap, n == null ? cap : n);
     const it = magItem({ k: 'mag', key: a.key, wid: def.id, cap, vid: v }, Array(count).fill(type));
     it.base = type;
+    if (def.barrels && count === def.barrels.n * def.barrels.per) (it as any).bl = Array(def.barrels.n).fill(def.barrels.per); // (a full barrel block: every barrel full; a part-full one is spread evenly when it goes in, js/data.ts G.barrelsOf)
     return it;
   }
   // a magazine's shape in the grid, by what it holds
   function magShape(def: GDef, cap: number, vid?: string | null) {
     const a = ammoFor(def), drum = vid && G.Gunsmith.PARTS[vid] && G.Gunsmith.PARTS[vid].model && G.Gunsmith.PARTS[vid].model.mag && G.Gunsmith.PARTS[vid].model.mag.t === 'drum';
     if (G.beltFed(def)) return cap > def.mag * 1.2 ? [2, 3] : cap < def.mag * 0.8 ? [2, 1] : [2, 2];
+    if (def.barrels) return [2, 2]; // (a block of six bores: as big as a drum)
     if (a.label !== 'MAG') return [1, 1]; // clips
     if (drum || cap > 60) return [2, 2];
     return [1, cap <= 20 ? 1 : 2];
@@ -430,15 +432,17 @@ const G_Gear = (() => {
   // a magazine goes in: its rounds are the gun's, and its variant is the gun's magazine (capacity, reload)
   function loadIn(me: GMe, w: GWeapon, mag: GItem | { r: string[]; vid?: string | null; cap?: number }) {
     setLoad(w, mag.r);
+    w.bl = w.def.barrels && (mag as any).bl && (mag as any).bl.reduce((a: number, x: number) => a + x, 0) === mag.r.length ? (mag as any).bl.slice() : null; // (a gun of several barrels: the rounds left in each, if the block says)
     if (mag.vid && w.def.build && w.def.build.mag !== mag.vid && me.refit) me.refit(w, Object.assign({}, w.def.build, { mag: mag.vid }));
   }
   // the magazine item becomes the one that was in the gun (its rounds and its variant), and the gun gets what
   // the item held
   function exchange(me: GMe, w: GWeapon, mag: GItem) {
-    const inR = mag.r, inV = mag.vid, inCap = mag.cap, outV = w.def.build && w.def.build.mag;
+    const inR = mag.r, inV = mag.vid, inCap = mag.cap, inBl = (mag as any).bl, outV = w.def.build && w.def.build.mag;
+    (mag as any).bl = w.def.barrels ? G.barrelsOf(w)!.slice() : undefined; // (the block coming out keeps the count of each of its barrels)
     mag.r = w.tube || []; mag.base = w.ammo;
     if (outV) { mag.vid = outV; mag.cap = G.Gunsmith.magCap(w.def.id, outV); mag.wid = mag.key = w.def.id; } // (its name and shape are the gun's it came out of: a shared box)
-    loadIn(me, w, { r: inR, vid: inV, cap: inCap });
+    loadIn(me, w, { r: inR, vid: inV, cap: inCap, bl: inBl } as any);
   }
   // A normal (retention) reload: the old magazine goes back in the pouch the fresh one came out of.
   function swapMag(me: GMe, w: GWeapon, cap: number) {

@@ -8,7 +8,7 @@
 // and both hands. The arms run from fixed shoulders just off-screen to wherever the hands are, so a hand
 // can leave the gun, go to a pouch for a magazine and come back.
 /** How a gun is reloaded (js/vmanim.ts kinds). */
-type VmReload = 'mag' | 'akimbo' | 'revolver' | 'break' | 'enbloc' | 'bow' | 'shell' | 'belt';
+type VmReload = 'mag' | 'akimbo' | 'revolver' | 'break' | 'enbloc' | 'bow' | 'shell' | 'belt' | 'hinge';
 /** Which part of a gun the hand works to rack it. */
 type VmAction = 'ar' | 'pistol' | 'bolt' | 'pump' | 'lever' | 'handle';
 /** What the hand works: a gun's action, or the cylinder or barrels it opens (an inspection). */
@@ -31,7 +31,7 @@ const G_VMAnim = (() => {
   type Rig = GunRig; // (one gun in the hands: its holder, its parts, its anchors, its magazine's check data: js/gunrig.ts)
   interface MagState { mode: VmMagMode; at?: number; d?: number; k?: number; q?: THREE.Quaternion }
   // one frame of a clip: the gun's offset and what each part and hand is doing (null: left alone)
-  interface Pose { gun: number[]; L: V3 | null; R: V3 | null; mag: MagState; ch: number; handle: number | null; open: number | null; slide: number | null; cyl: number; brk: number; cover: number; pump: number | null; lever: number | null; bolt: number[] | null; prop: { kind: VmPropKind; rx?: number; dx?: number; by?: V3 } | null; chk?: number; dropCase?: boolean; fed?: number; pulled?: boolean }
+  interface Pose { gun: number[]; L: V3 | null; R: V3 | null; mag: MagState; ch: number; handle: number | null; open: number | null; slide: number | null; cyl: number; brk: number; cover: number; pump: number | null; lever: number | null; hinge: number | null; bolt: number[] | null; prop: { kind: VmPropKind; rx?: number; dx?: number; by?: V3 } | null; chk?: number; dropCase?: boolean; fed?: number; pulled?: boolean }
   interface Arm { g: THREE.Group; sleeve: THREE.Mesh; glove: THREE.Group }
   interface ChvHeads { heads: THREE.Group[]; shot: boolean; cyl?: boolean }
   interface ChvPort { g: THREE.Group; round: THREE.Group; face: THREE.Mesh; shot: boolean; real: boolean; bolt: THREE.Mesh | null; win: number; f: number }
@@ -67,7 +67,7 @@ const G_VMAnim = (() => {
     return g;
   }
   // what kind of reload and which handle a weapon has
-  function kinds(def: Def) {
+  function kinds(def: Def): { reload: VmReload; action: VmAction | null } {
     const plat = G.Gunsmith.PLATFORMS[def.id], o: ModelSpec = plat ? plat.spec : {}, arch = plat ? plat.arch : 'rifle';
     let reload: VmReload = 'mag', action: VmAction | null = 'ar';
     if (def.akimbo) reload = 'akimbo';
@@ -92,6 +92,7 @@ const G_VMAnim = (() => {
     const hs = u.holders.map(({ holder, info, side }: { holder: THREE.Object3D; info: Info; side: number }) => G.GunRig.bind(holder, info, { def, side })); // (the parts, anchors and magazine-check data off the model: js/gunrig.ts)
     // a manually cycled gun's action is the moving part its model has (part_bolt / part_pump / part_lever); nothing in the weapon data names it
     if (def.manual) { const an = hs[0].an; k.action = an.bolt ? 'bolt' : an.pump ? 'pump' : an.lever ? 'lever' : k.action; }
+    if (hs[0].info.hinge) { k.reload = 'hinge'; if (!def.manual) k.action = null; } // (a model with a reload sequence (info.hinge): its moving parts are driven by that and by nothing else, see hingeClip)
     const R = makeArm(M), L = makeArm(M);
     root.add(R.g, L.g);
     const props = { shell: prop('shell', M, def), case: prop('case', M, def), loader: prop('loader', M, def), clip: prop('clip', M), bolt: prop('bolt', M) };
@@ -280,6 +281,55 @@ const G_VMAnim = (() => {
     }
     return pose;
   }
+  // A reload that takes the gun apart, from the model's own sequence (info.hinge: GUN_MODEL_CONTRACT.multi): the steps play in order (pose.hinge 0..1 through them) as the block comes out, a
+  // moment with it clear of the gun, then back in the other way round with the new one. The left hand follows the block (carried by its handle), the right stays on the grip, the gun
+  // turned up a little to see into it. Nothing in it is a gun: the parts, their pivots and their moves are the model's.
+  const pl0 = () => G.Me;
+  function hingeClip(t: number, h: Rig) {
+    const A = h.A, pose = base(), out = S(0.05, 0.43, t), back = S(0.55, 0.93, t);
+    pose.hinge = out * (1 - back);
+    const tilt = S(0.02, 0.14, t) * (1 - S(0.88, 0.97, t));
+    pose.gun[3] += 0.3 * tilt; pose.gun[5] -= 0.22 * tilt; pose.gun[1] += 0.035 * tilt; pose.gun[0] -= 0.05 * tilt;
+    const blk = h.an.mag, had = !pl0().cur().noMag; // (had: there is a block in the gun to take out)
+    let grab: V3 = A.S;
+    if (blk) { blk.updateWorldMatrix(true, false); grab = h.holder.worldToLocal(new T.Vector3().setFromMatrixPosition(blk.matrixWorld)); grab.y += 0.04; } // (the carry handle: on top of the block)
+    // the old block comes out in the hand (t < 0.44), goes away to the pouch (or the floor) while the hand fetches the fresh one (0.44 to 0.54), which comes back
+    // along the same path; with no block in the gun there is none to take out, and the hand fetches one first
+    const P = off(A.P, 0, 0.02), gone = had ? t >= 0.44 && t < 0.54 : t < 0.54;
+    if (had) pose.L = path(t, [[0, A.S], [0.07, A.S], [0.2, grab], [0.44, grab], [0.49, P], [0.54, grab], [0.93, grab], [1, A.S]]);
+    else pose.L = path(t, [[0, A.S], [0.08, P], [0.46, P], [0.54, grab], [0.93, grab], [1, A.S]]);
+    pose.mag = { mode: gone ? 'gone' : 'in' };
+    return pose;
+  }
+  // The model's sequence at p (0..1 through its steps, js/vmanim.ts hingeClip): each step in turn, eased, moves or turns its node from where it rests. A rotation turns the node about its own pivot (rotate_deg about
+  // axis x, y or z); a move slides it [forward, up, right] metres in the frame of the node named by frame (default: its parent's), which has to be worked out as the frame stands as the earlier steps left it.
+  const _hv = new T.Vector3(), _hq = new T.Quaternion(), _hq2 = new T.Quaternion();
+  function hingePose(h: Rig, p: number) {
+    const seq = h.info.hinge && h.info.hinge.sequence;
+    if (!seq) return;
+    const node = (k: string) => (h.an as Record<string, THREE.Object3D | undefined>)[k.replace(/^part_/, '')];
+    const done = new Set<THREE.Object3D>();
+    for (const st of seq) { const n = node(st.part); if (n && !done.has(n)) { done.add(n); if (!n.userData.home) n.userData.home = { p: n.position.clone(), r: n.rotation.clone() }; n.position.copy(n.userData.home.p); n.rotation.copy(n.userData.home.r); } }
+    const n = seq.length;
+    seq.forEach((st: { part: string; axis?: string | null; rotate_deg?: number | null; move?: number[] | null; frame?: string | null }, i: number) => {
+      const nd = node(st.part);
+      if (!nd) return;
+      const s = S(i / n, (i + 1) / n, p);
+      if (st.rotate_deg != null && st.axis) (nd.rotation as any)[st.axis] += (st.rotate_deg * Math.PI / 180) * s;
+      if (st.move) {
+        _hv.set(st.move[2] || 0, st.move[1], -st.move[0]).multiplyScalar(s); // (the move in its frame's own axes: x right, y up, z back)
+        const fr = st.frame ? node(st.frame) : null;
+        if (fr && nd.parent) { // (another node's frame: its turn, then back into the parent's)
+          h.holder.updateMatrixWorld(true);
+          fr.getWorldQuaternion(_hq); nd.parent.getWorldQuaternion(_hq2).invert();
+          _hv.applyQuaternion(_hq).applyQuaternion(_hq2);
+        }
+        nd.position.add(_hv);
+      }
+      nd.updateMatrix();
+      if (st.rotate_deg != null) nd.updateMatrixWorld(true); // (what's inside it turns with it, for the steps after)
+    });
+  }
   // Belt-fed: cover up, box out, new box in, lay the belt, cover down (run dry, the charging handle after: its
   // own clip)
   function beltClip(t: number, h: Rig) {
@@ -463,7 +513,7 @@ const G_VMAnim = (() => {
     const a: Vma | undefined = vm && vm.userData.vma;
     return !!(a && a.k.reload === 'mag' && !a.def.akimbo && a.hs[0].an.mag && a.hs[0].A.WB && !a.hs[0].info.magTop);
   }
-  const base = (): Pose => ({ gun: [0, 0, 0, 0, 0, 0], L: null, R: null, mag: { mode: 'in' }, ch: 0, handle: null, open: null, slide: null, cyl: 0, brk: 0, cover: 0, pump: null, lever: null, bolt: null, prop: null });
+  const base = (): Pose => ({ gun: [0, 0, 0, 0, 0, 0], L: null, R: null, mag: { mode: 'in' }, ch: 0, handle: null, open: null, slide: null, cyl: 0, brk: 0, cover: 0, pump: null, lever: null, hinge: null, bolt: null, prop: null });
 
   const _m = new T.Matrix4(), _inv = new T.Matrix4(), _X = new T.Vector3(1, 0, 0);
   // ------------------------------------------------------------------ per frame
@@ -486,6 +536,7 @@ const G_VMAnim = (() => {
       else if (reload === 'enbloc') pose = enblocClip(t, h);
       else if (reload === 'bow') pose = bowClip(t, h);
       else if (reload === 'belt') pose = beltClip(t, h);
+      else if (reload === 'hinge') pose = hingeClip(t, h);
       else if (reload === 'akimbo') { pose = base(); const tilt = S(0.02, 0.15, t) * (1 - S(0.75, 0.92, t)); pose.gun[3] += 0.4 * tilt; pose.gun[1] -= 0.04 * tilt; pose.mag = t < 0.08 ? { mode: 'in' } : t < 0.4 ? { mode: 'drop', at: 0.08 } : t < 0.62 ? { mode: 'gone' } : { mode: 'rise', k: S(0.62, 0.72, t) }; }
       else pose = magClip(t, h, !!(h.info as { pistol?: boolean }).pistol || action === 'pistol', pl.reloadMode, pl.reloadSeat);
     } else if (pl.act) { // the action, worked by hand (js/player.ts workAction): on its own, or straight on from a magazine just seated
@@ -527,7 +578,7 @@ const G_VMAnim = (() => {
       // magazine
       if (an.mag && A.magHome) {
         const mg: MagState = pose ? pose.mag : { mode: 'in' };
-        an.mag.visible = mg.mode !== 'gone';
+        an.mag.visible = mg.mode !== 'gone' && !(w.noMag && mg.mode === 'in' && !pl.reloading); // (a gun with its magazine out has none on it)
         if (mg.mode !== 'chk') an.mag.quaternion.copy(A.magQ);
         if (idx === 0 && !pl.reloading) magFill(a, h.chk, w, pl.magSize(w.def));
         if (mg.mode === 'in') an.mag.position.copy(A.magHome);
@@ -567,11 +618,12 @@ const G_VMAnim = (() => {
       }
       if (an.slide && pose && pose.slide != null) an.slide.position.z = pose.slide * SLIDE;
       if (an.cyl && A.cylHome) { const k = pose ? pose.cyl : 0; an.cyl.position.copy(A.cylHome); an.cyl.position.x -= 0.05 * k; an.cyl.position.y -= 0.016 * k; /* (swung clear of the frame) */ }
-      if (an.brk) an.brk.rotation.x = (pose ? pose.brk : 0) * (A.load ? A.load.pitch : A.breech ? A.breech.pitch : -0.55); // (a derringer's hinge is at the top of the barrels' back: they tip up, muzzles first)
+      if (an.brk && !h.info.hinge) an.brk.rotation.x = (pose ? pose.brk : 0) * (A.load ? A.load.pitch : A.breech ? A.breech.pitch : -0.55); // (a derringer's hinge is at the top of the barrels' back: they tip up, muzzles first)
       if (an.cover) an.cover.rotation.x = (pose ? pose.cover : 0) * 1.1;
       if (an.bipod) G.GunRig.bipodPose(an.bipod, pl.bipodT || 0); // (down on the ground or a ledge: js/player.ts bipodStep)
-      if (an.pump && pose && pose.pump != null) an.pump.position.z = pose.pump * PUMP;
-      if (an.lever) an.lever.rotation.x = (pose && pose.lever != null ? pose.lever : cyc && a.k.action === 'lever' ? cyc : 0) * 0.9;
+      if (an.pump && pose && pose.pump != null && !h.info.hinge) an.pump.position.z = pose.pump * PUMP;
+      if (an.lever && !h.info.hinge) an.lever.rotation.x = (pose && pose.lever != null ? pose.lever : cyc && a.k.action === 'lever' ? cyc : 0) * 0.9;
+      if (h.info.hinge) hingePose(h, pose && pose.hinge != null ? pose.hinge : 0); // (a model's own reload sequence, js/vmanim.ts hingeClip)
       if (an.bolt && A.boltHome) { const b = (pose && pose.bolt) || [0, 0]; an.bolt.rotation.z = b[0] * BOLT_LIFT; an.bolt.position.z = A.boltHome.z + b[1] * BOLT_BACK; } // (worked by hand: js/player.ts rack)
 
       // hands: resting on the gun unless the clip has them somewhere else

@@ -243,12 +243,28 @@ const G_Viewmodel = (() => {
     return out;
   }
 
+  // The rounds-left display (display_ammo) of a gun of several barrels: one row per barrel, in info.muzzles order (v runs from the shooter's end away, so the first barrel is the top
+  // row of the canvas), one pip per round across it, lit while the round remains. left: rounds left per barrel; per: a full barrel's. Redraws only when it changed.
+  function paintAmmo(s: VmSurface, left: number[], per: number) {
+    const sig = left.join(',') + '/' + per;
+    if ((s as any).sig === sig) return;
+    (s as any).sig = sig;
+    const c = s.ctx, W = s.width, H = s.height, rows = left.length, rh = H / rows, pw = W / per;
+    c.fillStyle = '#04100c'; c.fillRect(0, 0, W, H);
+    for (let r = 0; r < rows; r++) for (let j = 0; j < per; j++) {
+      const on = j < left[r], x = j * pw + pw * 0.5, y = r * rh + rh * 0.5, rad = Math.min(pw, rh) * 0.34;
+      c.fillStyle = on ? (left[r] <= 2 ? '#ffb040' : '#5dffc8') : '#0c2a22';
+      c.beginPath(); c.arc(x, y, rad, 0, Math.PI * 2); c.fill();
+    }
+    s.tex.needsUpdate = true;
+  }
+
   // ---------------------------------------------------------------- the first-person gun
   // models: one per gun in the hands (two for an akimbo pair), each already built and decorated
   function assemble(def: any, models: VmModel[]) {
     const root = new T.Group();
     let info0: VmModel['info'] | null = null, pip: ReturnType<typeof pipLens> | null = null;
-    const flashes: THREE.Mesh[] = [], holders: { holder: THREE.Group; info: VmModel['info']; side: number }[] = [], displays: Record<string, VmSurface> = {};
+    const dials: THREE.Group[] = [], flashes: THREE.Mesh[] = [], holders: { holder: THREE.Group; info: VmModel['info']; side: number }[] = [], displays: Record<string, VmSurface> = {};
     const guns = def.akimbo ? [-1, 1] : [1];
     guns.forEach((side, i) => {
       const m = models[i], g = m.group, info = m.info;
@@ -259,6 +275,11 @@ const G_Viewmodel = (() => {
       if (!info0) info0 = info;
       const holder = new T.Group();
       holder.add(g);
+      if (info.modeDial && !(info.anim && info.anim.dial)) { // a fire-mode dial the model has no turning part for (no part_dial): a marker on its face, turned with the mode
+        const md = info.modeDial, piv = new T.Group(), mk = new T.Mesh(new T.BoxGeometry(0.0006, 0.0045, 0.0014), new T.MeshBasicMaterial({ color: 0xffd36a }));
+        piv.position.set(md.at[2] + (md.axis[2] < 0 ? -0.0011 : 0.0011), md.at[1], -md.at[0]); mk.position.y = 0.0047; piv.add(mk); g.add(piv);
+        piv.userData.axis = new T.Vector3(md.axis[2], md.axis[1], -md.axis[0]).normalize(); dials.push(piv);
+      }
       if (def.akimbo) holder.position.x = side * 0.13;
       holders.push({ holder, info, side });
       for (const [f, y, x] of info.muzzles) {
@@ -277,7 +298,7 @@ const G_Viewmodel = (() => {
     const ads = def.akimbo ? new T.Vector3(0, -0.12, -0.36) : new T.Vector3(0, -info.sy, adsZ);
     // hip: lower-right and well forward of the eye, so the optic doesn't fill the screen
     const hip = def.akimbo ? new T.Vector3(0, -0.15, -0.34) : info.pistol ? new T.Vector3(0.1, -0.1 - info.sy, -0.32) : new T.Vector3(0.1, -0.1 - info.sy * 0.6, adsZ - 0.1);
-    root.userData = { flash: flashes[0], flashes, sightY: info.sy, hip, ads, anim: info.anim, info, holders, pip };
+    root.userData = { flash: flashes[0], flashes, dial: dials[0] || null, sightY: info.sy, hip, ads, anim: info.anim, info, holders, pip };
     if (Object.keys(displays).length) root.userData.displays = displays;
     G.VMAnim.prepare(root, def); // arms, reload and inspect animation (js/vmanim.ts), bound to the parts by js/gunrig.ts
     return root;
@@ -392,7 +413,7 @@ const G_Viewmodel = (() => {
     return g;
   }
 
-  return { assemble, reflex, pipLens, flash, surfaces, worldProto, worldInstance, merge };
+  return { assemble, reflex, pipLens, flash, surfaces, paintAmmo, worldProto, worldInstance, merge };
 })();
 G.Viewmodel = G_Viewmodel;
 interface GameModules { Viewmodel: typeof G_Viewmodel; }
