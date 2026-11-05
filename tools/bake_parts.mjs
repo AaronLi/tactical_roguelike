@@ -145,65 +145,102 @@ export async function bakePlatform(env, Models, em, reg, id, src, log) {
   return { id, ix, final, res, stats, couplings, builds: C.memo.size, cover: C.all().filter((B) => B.cover).length, rounds: rounds + 1, joint, infoDeps: ix.info.map((t) => `${t.dep.join('+') || '-'}:${t.rows.length}x${t.leaves.length}`) };
 }
 
-/** Writes every pack file and index of the platforms baked: packs that are the same up to a move are one file. */
-export async function writeAll(em, Models, states, reg, partial, log) {
+/**
+ * One platform's job (tools/bake_worker.mjs, in whichever thread): bakePlatform on a registry of its own, returned as plain data the driver can merge with
+ * the other platforms' (the pack shapes `reps` for the sharing, the index with its entries numbered, which of them are the final packs). The pack scenes stay
+ * in `keep` (platform id -> scenes by local rep number) for the write jobs.
+ */
+export async function platformJob(env, Models, em, id, src, keep) {
+  const logs = [], reg = makeRegistry();
+  const st = await bakePlatform(env, Models, em, reg, id, src, (...a) => logs.push(a.join(' ')));
+  keep.set(id, reg.reps.map((r) => r.scene));
+  const ref = new Map(), tags = {};
+  for (const [t, ti] of Object.entries(st.ix.tags)) tags[t] = { dep: ti.dep, packs: ti.packs.map((e, i) => { ref.set(e, [t, i]); return { key: e.key, nodes: e.nodes, tris: e.tris, min: e.min, rep: e.rep ? reg.reps.indexOf(e.rep) : -1 }; }) };
+  return {
+    id, ix: { ...st.ix, tags }, final: st.final.map((f) => ref.get(f.entry)), reps: reg.reps.map((r) => ({ tag: r.tag, canon: r.canon })),
+    maxDev: st.res.maxDev, builds: st.builds, cover: st.cover, rounds: st.rounds, stats: st.stats, couplings: st.couplings, joint: st.joint, infoDeps: st.infoDeps, logs,
+  };
+}
+
+/** Merges the platforms' pack shapes (in platform order: the same ids, owners and users as one process registering them in turn) into a registry; fills each state's final entries. */
+function mergeStates(states) {
+  const reg = makeRegistry();
+  for (const st of states) {
+    const reps = st.reps.map((r, i) => register(reg, r.canon, { owner: st.id, local: i }, r.tag));
+    st.res = { maxDev: st.maxDev };
+    st.final = st.final.map(([t, i]) => {
+      const entry = st.ix.tags[t].packs[i];
+      if (entry.rep >= 0) { entry.rep = reps[entry.rep]; entry.rep.users.push({ id: st.id, entry }); } else delete entry.rep;
+      return { tag: t, entry };
+    });
+  }
+  return reg;
+}
+
+/**
+ * Writes every pack file and index of the platforms baked: packs that are the same up to a move are one file. Names and places are decided here, in
+ * order (so they are the same however many workers write); the files are written by `write(job)` (a worker holding the scene) concurrently.
+ */
+export async function writeAll(Models, states, reg, partial, log, write, progress = () => {}) {
   if (!partial) fs.rmSync(PARTS_DIR, { recursive: true, force: true });
   fs.mkdirSync(PARTS_DIR, { recursive: true });
   const written = new Map(); // rep -> { file (relative to the platform folder or shared), bytes, gz }
-  const sharedNames = new Set();
-  let files = 0, sharedFiles = 0;
+  const sharedNames = new Set(), jobs = [];
+  let files = 0, sharedFiles = 0, done = 0;
   const sha = (s) => crypto.createHash('sha1').update(s).digest('hex').slice(0, 16);
   const usedLocal = new Map(); // platform -> Set of file names
   const platOf = (id) => { if (!usedLocal.has(id)) { usedLocal.set(id, new Set()); fs.rmSync(PARTS_DIR + id, { recursive: true, force: true }); fs.mkdirSync(PARTS_DIR + id, { recursive: true }); } return usedLocal.get(id); };
   for (const st of states) platOf(st.id);
   const byPlat = {}; // totals per platform
   for (const st of states) byPlat[st.id] = { files: 0, bytes: 0, gz: 0 };
+  const job = (w, j) => { jobs.push(write({ ...j, platform: j.rep.scene.owner, local: j.rep.scene.local }).then((r) => { w.bytes = r.bytes; w.gz = r.gz; progress(jobs.length, ++done); })); };
   /** A rep's file: shared when it is used at more than one place (platform or position), else a file of the platform. */
-  const fileOf = async (rep, st, entry) => {
+  const fileOf = (rep, st, entry) => {
     let w = written.get(rep);
     const places = new Set(rep.users.map((u) => u.id + '@' + u.entry.min.map((x) => Math.round(x * 1e5)).join(',')));
     const shared = places.size > 1;
     if (!shared) {
       if (w) return w;
-      const root = rep.scene, used = platOf(st.id);
+      const used = platOf(st.id);
       let file = packFileName(rep.tag, entry.key), k = 1; while (used.has(file)) file = packFileName(rep.tag, entry.key).replace(/\.glb$/, '') + '-' + ++k + '.glb';
       used.add(file);
-      const wr = await em.write(root, st.id, rep.tag);
-      fs.mkdirSync(path.dirname(PARTS_DIR + st.id + '/' + file), { recursive: true }); fs.writeFileSync(PARTS_DIR + st.id + '/' + file, wr.buf);
-      w = { file, bytes: wr.buf.length, gz: wr.gz, owner: st.id }; written.set(rep, w); files++; byPlat[st.id].files++; byPlat[st.id].bytes += w.bytes; byPlat[st.id].gz += w.gz;
+      w = { file, owner: st.id }; written.set(rep, w); files++;
+      job(w, { rep, shared: false, tag: rep.tag, id: st.id, path: PARTS_DIR + st.id + '/' + file });
       return w;
     }
     if (w) return w;
-    // shared: in its own frame (the corner of its bounding box at the origin), named by its shape
-    const root = rep.scene, m = rep.canon.min;
-    for (const c of root.children) c.position.set(c.position.x - m[0], c.position.y - m[1], c.position.z - m[2]);
-    root.name = `_shared.${rep.tag}.${rep.id}`; root.userData = { pack: { platform: '_shared', tag: rep.tag, key: {} } };
+    const m = rep.canon.min;
     const h = sha(rep.canon.sig + '|' + rep.canon.meshes.map((mm) => { let s = 0; for (let i = 0; i < mm.v.length; i += 97) s = (s * 31 + Math.round((mm.v[i] - m[i % 3]) * 1e5)) | 0; return s; }).join(','));
     let file = SHARED + rep.tag.replace('@', '-on-') + '/' + h + '.glb', k = 1; while (sharedNames.has(file)) file = SHARED + rep.tag.replace('@', '-on-') + '/' + h + '-' + ++k + '.glb';
     sharedNames.add(file);
-    const wr = await em.write(root, '_shared', rep.tag);
-    fs.mkdirSync(path.dirname(PARTS_DIR + file), { recursive: true }); fs.writeFileSync(PARTS_DIR + file, wr.buf);
-    w = { file, bytes: wr.buf.length, gz: wr.gz, shared: true }; written.set(rep, w); sharedFiles++; return w;
+    w = { file, shared: true }; written.set(rep, w); sharedFiles++;
+    job(w, { rep, shared: true, tag: rep.tag, id: '_shared', min: m, name: `_shared.${rep.tag}.${rep.id}`, path: PARTS_DIR + file });
+    return w;
   };
+  for (const st of states) for (const { entry } of st.final) { if (entry.rep) entry.__w = fileOf(entry.rep, st, entry); }
+  progress(jobs.length, 0);
+  await Promise.all(jobs);
   const sharedTotals = { bytes: 0, gz: 0 };
+  for (const w of written.values()) {
+    if (w.shared) { sharedTotals.bytes += w.bytes; sharedTotals.gz += w.gz; } else { const b = byPlat[w.owner]; b.files++; b.bytes += w.bytes; b.gz += w.gz; }
+  }
   const summary = {};
   for (const st of states) {
     const { id, ix, final } = st;
     for (const { entry } of final) {
       if (!entry.rep) continue;
-      const w = await fileOf(entry.rep, st, entry);
+      const w = entry.__w; delete entry.__w;
       entry.file = w.file; entry.bytes = w.bytes;
       if (w.shared) entry.at = [-entry.min[2], entry.min[1], entry.min[0]].map((x) => Math.round(x * 1e9) / 1e9); // [forward, up, right] of the corner the stored shape is moved to
       else delete entry.at;
     }
     // pack entries with no meshes keep file null; the index as written: only what the contract lists
-    const out = { ...ix, tags: Object.fromEntries(Object.entries(ix.tags).map(([t, ti]) => [t, { dep: ti.dep, packs: ti.packs.map((e) => ({ key: e.key, file: e.file, ...(e.file ? { ...(e.at ? { at: e.at } : {}), ...(e.nodes && e.nodes.length ? { nodes: e.nodes } : {}), tris: e.tris, bytes: e.bytes } : {}) })) }])) };
+    const out = { ...ix, tags: Object.fromEntries(Object.entries(ix.tags).map(([t, ti]) => [t, { dep: ti.dep, packs: ti.packs.map((e) => ({ key: e.key, file: e.file === undefined ? null : e.file, ...(e.file ? { ...(e.at ? { at: e.at } : {}), ...(e.nodes && e.nodes.length ? { nodes: e.nodes } : {}), tris: e.tris, bytes: e.bytes } : {}) })) }])) };
     out.totals = { ...ix.totals, entries: Object.values(ix.tags).reduce((a, t) => a + t.packs.length, 0), builds: st.builds, coverBuilds: st.cover, maxDevM: st.res.maxDev };
     const rep = Models.validatePartsIndex(out); if (rep.errors.length) throw new Error(`${id}: index breaks the contract:\n  ` + rep.errors.slice(0, 8).join('\n  '));
     const text = JSON.stringify(out); fs.writeFileSync(PARTS_DIR + id + '/index.json', text);
     summary[id] = { ...out.totals, index: text.length, indexGz: zlib.gzipSync(text, { level: 9 }).length, ...byPlat[id] };
   }
-  for (const w of written.values()) if (w.shared) { sharedTotals.bytes += w.bytes; sharedTotals.gz += w.gz; }
   return { summary, shared: { files: sharedFiles, ...sharedTotals }, files };
 }
 
@@ -226,16 +263,24 @@ export function reportCouplings(states, log) {
   return { list, errors };
 }
 
-/** Bakes the packs of these platforms. Returns { fails, summary, shared, stats }. */
-export async function bakeParts(env, Models, ids, src, log = console.log, partial = false) {
-  const em = await makeEmitter({ G: env.G, GM: env.GM, Models });
-  const reg = makeRegistry(), states = []; let fails = 0;
-  for (const id of ids) {
-    try { states.push(await bakePlatform(env, Models, em, reg, id, src, log)); }
-    catch (e) { fails++; console.error('FAIL', id, (e && e.stack) || e); }
-  }
-  if (fails) return { fails, summary: {}, shared: {}, states };
-  const w = await writeAll(em, Models, states, reg, partial, log);
+/**
+ * Bakes the packs of these platforms on a pool (tools/bake_pool.mjs). `order`: the ids slowest first (the pool starts them in that order); the results are
+ * merged in `ids` order whatever order they finish in. onPlatform / onWrite / phase report to the driver. Returns { fails, summary, shared, states, couplings }.
+ */
+export async function bakeParts(Models, pool, ids, { order = ids, log = console.log, partial = false, onPlatform = () => {}, onWrite = () => {}, phase = () => {} } = {}) {
+  const results = new Map(), owner = new Map(); let fails = 0;
+  phase('platforms');
+  await Promise.all(order.map((id) => {
+    const job = { type: 'platform', id };
+    return pool.submit(job).then((r) => { results.set(id, r); owner.set(id, pool.ran(job)); onPlatform(r); }, (e) => { fails++; console.error('FAIL', id, (e && e.stack) || e); });
+  }));
+  if (fails) return { fails, summary: {}, shared: {}, states: [] };
+  const states = ids.map((id) => results.get(id));
+  phase('sharing');
+  const reg = mergeStates(states);
+  phase('writes');
+  const w = await writeAll(Models, states, reg, partial, log, (j) => pool.submit({ type: 'write', ...j, rep: undefined }, { worker: owner.get(j.platform) }), onWrite);
+  phase('indexes');
   const couplings = reportCouplings(states, log);
-  return { fails: fails + (couplings.errors ? 1 : 0), summary: w.summary, shared: w.shared, states, couplings: couplings.list };
+  return { fails: couplings.errors ? 1 : 0, summary: w.summary, shared: w.shared, states, couplings: couplings.list };
 }

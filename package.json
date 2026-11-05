@@ -9,7 +9,7 @@
     "typecheck": "tsc -p . --noEmit && tsc -p tsconfig.tools.json --noEmit",
     "typecheck:strict": "tsc -p . --noEmit --strict",
     "build:vendor": "node tools/build_gltf_classic.mjs",
-    "bake:models": "tsc -p . && tsc -p tsconfig.tools.json && node tools/bake_models.mjs && node tools/bake_props.mjs",
+    "bake:models": "tsc -p . && tsc -p tsconfig.tools.json && node tools/bake_models.mjs",
     "bake:props": "tsc -p . && tsc -p tsconfig.tools.json && node tools/bake_props.mjs",
     "check:models": "tsc -p . && tsc -p tsconfig.tools.json && node tools/check_models.mjs",
     "test:models": "tsc -p . && tsc -p tsconfig.tools.json && node tools/check_models.mjs --selftest && node tools/check_models.test.mjs && node tools/check_authored_golden.mjs && node tools/check_model_cases.mjs --quiet",
