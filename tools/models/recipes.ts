@@ -559,7 +559,7 @@ const G_GunRecipes = (() => {
     else for (let i = 1; i <= 5; i++) { // the witness windows: one on each face, at the face's own point and tilt (side 1 the back, -1 the front: front ones mirrored across so they sit where they would read from there)
       const t = (i / 6) * 0.94, F = at(t), th = 0.0016;
       for (const side of [1, -1]) {
-        const g = -side * d / 2 - side * th / 4; // (along the normal: a little proud of the face)
+        const g = -side * (d / 2 + 0.002 + th / 4); // (along the normal: a little proud of the face: the body is its depth plus the profile's 2 mm bevel each side)
         const mesh = k.box(w * 0.22, 0.0055, th, M.brass(), F.cf + F.nf * g - th / 2, yAt(t) + F.ny * g, -side * w * 0.27);
         mesh.rotation.x = F.ph;
         chk.holes.push({ t, i: i - 1, side, mesh });
