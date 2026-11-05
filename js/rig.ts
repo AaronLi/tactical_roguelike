@@ -38,7 +38,7 @@ interface Rig { // a character's skeleton and its meshes (what create makes, and
   // (what the animation keeps from frame to frame)
   powered?: boolean; limp?: boolean; zipped?: boolean; zipKit?: THREE.Object3D; zipT?: number; zipYaw?: number | null; zipSw?: ZipSwing; proneW?: number; proneS?: number; effPh?: number; effT?: number; braceW?: number; gunAimW?: number; gunKick?: number;
   gunBase?: { p: THREE.Vector3; q: THREE.Quaternion; s: THREE.Vector3 }; gunBaseOf?: THREE.Object3D; gunSupport?: THREE.Vector3 | null; bipodK?: number; hitDir?: THREE.Vector3; xbLoaded?: any;
-  blindW?: number; dazeW?: number; blindT?: number; atakW?: number; atak?: THREE.Group; handNade?: any; throwHand?: boolean; throwStr?: any; dropped?: { g: THREE.Object3D; vy: number; spin: number; floor?: number; [field: string]: any } | null;
+  blindW?: number; radioW?: number; dazeW?: number; blindT?: number; atakW?: number; atak?: THREE.Group; handNade?: any; throwHand?: boolean; throwStr?: any; dropped?: { g: THREE.Object3D; vy: number; spin: number; floor?: number; [field: string]: any } | null;
   [bone: string]: any; // (a bone looked up by name: js/ballistics.ts boneOf, the hitbox readouts of js/hud.ts and js/highlights.ts; and what js/hud.ts keeps on a rig)
 }
 const G_Rig = (() => {
@@ -349,6 +349,21 @@ const G_Rig = (() => {
       const strap = M_(new T.BoxGeometry(0.045, 0.34, 0.012), L(0xc9a227), -0.1, 0.12, -0.151, chest); strap.rotation.z = -0.5; // gold, across the chest
     }
     if (style === 'suspect' && !headCover && rnd() < 0.5) { if (hairMesh) hairMesh.scale.y *= 0.9; G.Headgear.cap((c: number, op?: Record<string, any>) => (op ? new T.MeshLambertMaterial(Object.assign({ color: c }, op)) : L(c)), (m: THREE.Object3D) => head.add(m), pick(PAL.hoodie)); } // a baseball cap
+
+    // a leader's radio kit (o.leader): a headset over the head (a band, an ear cup on the left with a boom mic curving to the mouth, a foam cup
+    // on the right), and a radio set on the chest harness with its antenna up by the shoulder, a push-to-talk lead to the headset
+    if (o.leader) {
+      const hs = L(0x1c1d1f), cup = L(0x2c2f33), led = new T.MeshBasicMaterial({ color: 0x57e06b });
+      const band = M_(new T.TorusGeometry(0.108, 0.006, 5, 24, Math.PI), hs, 0, 0.14, 0.005, head); band.rotation.z = 0; band.scale.set(1, 1.02, 1.0); band.rotation.y = Math.PI / 2;
+      for (const x of [-1, 1]) M_(cyl(0.032, 0.032, 0.026, 12), x < 0 ? cup : hs, x * 0.106, 0.12, 0.005, head).rotation.z = Math.PI / 2;
+      const boom = M_(new T.TorusGeometry(0.06, 0.0035, 4, 10, Math.PI * 0.6), hs, -0.09, 0.085, -0.055, head); boom.rotation.set(0, 0.6, -Math.PI / 2 - 0.5);
+      M_(new T.SphereGeometry(0.011, 6, 5), cup, -0.045, 0.062, -0.1, head);
+      M_(new T.BoxGeometry(0.075, 0.125, 0.04), cup, -0.15, 0.1, -0.175, chest); // the set
+      M_(new T.BoxGeometry(0.05, 0.03, 0.006), L(0x4a5a46), -0.15, 0.13, -0.197, chest); // its little screen
+      M_(new T.BoxGeometry(0.008, 0.008, 0.005), led, -0.128, 0.083, -0.197, chest); // a pilot light
+      M_(cyl(0.005, 0.006, 0.2, 5), hs, -0.17, 0.27, -0.165, chest); // the antenna, up past the collar
+      const lead = M_(cyl(0.0035, 0.0035, 0.2, 4), hs, -0.17, 0.2, -0.13, chest); lead.rotation.z = 0.18;
+    }
 
     // ---- arms: tapered, with elbows; sleeves (short for a T-shirt), and hands with fingers and a thumb
     const longSleeves = look.top !== 'tshirt';
@@ -867,6 +882,14 @@ const G_Rig = (() => {
       const k = U.smooth(0, 1, bw), gw = Math.sin(bt * 2.6 + ph);
       hand(rig.armL, rig.head.localToWorld(new T.Vector3(-0.05, 0.13, -0.14)), rig.chest.localToWorld(new T.Vector3(-0.55, 0.1, -0.7)), k);
       if (!(rig.gun && rig.gunInfo && !rig.slung)) hand(rig.armR, rig.head.localToWorld(new T.Vector3(0.05, 0.11 + 0.01 * gw, -0.15)), rig.chest.localToWorld(new T.Vector3(0.55, 0.1, -0.7)), k);
+    }
+    // on the radio (p.radio): the left hand goes up to the headset's ear cup and stays there (the gun hand keeps the weapon), the head tilted to it
+    rig.radioW = (rig.radioW || 0) + ((p.radio && !posed && !p.blind ? 1 : 0) - (rig.radioW || 0)) * Math.min(1, dt * 7);
+    if (rig.radioW > 0.01) {
+      rig.chest.updateMatrixWorld(true); rig.head.updateMatrixWorld(true);
+      const cur = rig.armL.lo.localToWorld(new T.Vector3(0, -FARM, 0)), k = U.smooth(0, 1, rig.radioW);
+      ik(rig.armL.up, rig.armL.lo, UARM * s, FARM * s, cur.lerp(rig.head.localToWorld(new T.Vector3(-0.13, 0.11, -0.01)), k), rig.chest.localToWorld(new T.Vector3(-0.8, -0.1, -0.1)));
+      rig.head.rotation.z -= 0.12 * k;
     }
     // door actions: one hand reaches for the handle / door edge (players use the right hand with the
     // weapon put away; an enemy with a gun in hand uses his free left hand)

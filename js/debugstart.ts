@@ -7,6 +7,7 @@
 //   ?gun=<weapon id>      your primary, its factory build; ?parts=slot:partId,slot:partId changes parts on it
 //                         (?gun=m4&parts=optic:op.bc.0,tacL:tac.bc.0)
 //   ?side=<weapon id>     your sidearm (the P9 otherwise)
+//   ?leader               a leader in the level for sure (one is at random from level 2: js/server.ts spawnEnemies)
 //   ?nofoes               nobody in the level; ?stronghold makes it one (js/route.ts)
 //   ?hangar               the hangar between levels instead of a level (the shop, the gunsmith, the range)
 //   ?tick                 stepped by a timer, not animation frames: it keeps running in a window that isn't shown (scripts, agents)
@@ -78,6 +79,7 @@ const G_DebugStart = (() => {
         SV.startLevel = start;
         if (th != null) this.theme = th;
         if (lvl != null) this.level = lvl;
+        if (q.has('leader')) this.forceLeader = true;
         if (q.has('stronghold') && this.routeMap && this.route) { const n = this.routeMap.nodes.get(this.route.path[this.route.path.length - 1]); if (n) n.stronghold = true; }
         return start.call(this);
       };

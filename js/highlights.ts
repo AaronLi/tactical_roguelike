@@ -1278,7 +1278,7 @@ const G_Highlights = (() => {
     let rig: HlRig;
     if (A.kind === 'e') {
       const def = G.ENEMIES[A.type!] || {};
-      rig = G.Rig.create({ style: A.style || def.style, scale: A.scale, boss: A.boss, seed: A.id * 7919 + 13, dressed: true }) as HlRig;
+      rig = G.Rig.create({ style: A.style || def.style, scale: A.scale, boss: A.boss, leader: A.type === 'leader', seed: A.id * 7919 + 13, dressed: true }) as HlRig;
       if (!A.civ) rig.setKit(G.Rig.armourKit(A.vest, A.helmet, (A.style || def.style) === 'armored', A.face, A.ex));
       if (A.wpn && !A.civ) rig.setGun(A.wpn);
     } else {
@@ -2294,7 +2294,7 @@ const G_Highlights = (() => {
     for (const k of P.xtracks || []) { if (k.m.grp.parent) k.m.grp.parent.remove(k.m.grp); k.m.grp.traverse((o: any) => { if (o.geometry && o.geometry !== bulletGeo && o.geometry !== glowGeo) o.geometry.dispose(); if (o.material && o.material !== bulletMat && o.material !== glowMat) o.material.dispose(); }); }
     P.xtracks = [];
     const A = P.actors.get(c.v); if (!A) return;
-    const rig = G.Rig.create({ style: A.style || (G.ENEMIES[A.type!] || {}).style, scale: A.scale, boss: A.boss, seed: A.id * 7919 + 13, dressed: true });
+    const rig = G.Rig.create({ style: A.style || (G.ENEMIES[A.type!] || {}).style, scale: A.scale, boss: A.boss, leader: A.type === 'leader', seed: A.id * 7919 + 13, dressed: true });
     const ghost = new T.MeshBasicMaterial({ color: 0x5ab8ff, transparent: true, opacity: 0.14, depthWrite: false, blending: T.AdditiveBlending });
     rig.root.traverse((o: any) => { if (o.isMesh) o.material = ghost; });
     // (posed as they were at the killing round: crouched, hands up, cowering...)

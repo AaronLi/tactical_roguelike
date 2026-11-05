@@ -199,6 +199,21 @@ const G_Audio = {
       o.connect(bp); bp.connect(g); g.connect(this.master); o.start(t + st); o.stop(t + st + len + 0.05);
     }
   },
+  // a leader on the radio: the squelch of the key, a gruff bark (three clipped syllables, lower than a shout, through a narrow radio band),
+  // the squelch again as it lets go; heard by everyone near enough (it's loud: he's shouting into it)
+  radio(from: THREE.Vector3 | null) {
+    if (!this.ctx) return;
+    const d = from && G.R ? G.R.camera.position.distanceTo(from) : 0, att = 1 / (1 + d * 0.07), t = this.ctx.currentTime;
+    this._noise(t, 0.07, 2400, 2, 0.16 * att, 'bandpass');
+    for (const [f, st, len] of [[440, 0.12, 0.14], [380, 0.3, 0.12], [500, 0.46, 0.22]]) {
+      const o = this.ctx.createOscillator(), g = this.ctx.createGain(), bp = this.ctx.createBiquadFilter();
+      o.type = 'sawtooth'; o.frequency.setValueAtTime(f * 0.4, t + st); o.frequency.linearRampToValueAtTime(f * 0.33, t + st + len);
+      bp.type = 'bandpass'; bp.frequency.value = 1300; bp.Q.value = 2.5;
+      g.gain.setValueAtTime(0.0001, t + st); g.gain.linearRampToValueAtTime(0.24 * att, t + st + 0.02); g.gain.exponentialRampToValueAtTime(0.001, t + st + len);
+      o.connect(bp); bp.connect(g); g.connect(this.master); o.start(t + st); o.stop(t + st + len + 0.05);
+    }
+    this._noise(t + 0.74, 0.09, 2000, 2, 0.14 * att, 'bandpass');
+  },
   // boot into a door: a heavy thump and the crack of the frame
   kick(dist = 0) {
     if (!this.ctx) return;

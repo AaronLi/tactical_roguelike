@@ -497,6 +497,10 @@ const G_ENEMIES: Record<string, EnemyDef> = {
   marksman: { ready: true, morale: 0.5, style: 'suspect', wpn: 'r700', name: 'Lookout', hp: 100, speed: 1.9, range: 60, pref: 15, pellets: 1, aimTime: 1.2, pause: [2.0, 3.0], acc: 0.75, cr: 90, scale: 1, headMult: 2, comply: 0.4, fake: 0.05, snd: 'SNP' },
   heavy: { ready: true, morale: 0.85, steady: 0.3, hunt: true, style: 'armored', nades: true, wpn: 'm249', name: 'Enforcer', hp: 150, armor: 'heavy', speed: 1.9, range: 30, pref: 8, pellets: 1, burst: [6, 12], rof: 0.08, pause: [1.2, 2.0], acc: 0.38, cr: 160, scale: 1.04, headMult: 1.6, comply: 0.1, fake: 0, snd: 'LMG' },
   warden: { ready: true, morale: 1.0, style: 'armored', boss: true, nades: true, wpn: 'scar', name: 'The Kingpin', hp: 600, armor: 'boss', speed: 2.0, range: 40, pref: 8, pellets: 1, burst: [3, 6], rof: 0.1, pause: [0.8, 1.4], acc: 0.45, cr: 1500, scale: 1.06, headMult: 1.6, comply: 0, fake: 0, snd: 'BR' },
+  // The Leader: one to a level at most, from level 2 (js/server.ts spawnEnemies). A plate carrier with a radio on the chest and a headset;
+  // tougher than a gunman and steady, and he stays back (pref) and lets the others do the walking: when he spots or hears police he
+  // calls it in on the radio and the suspects near him come for the spot (js/server.ts callIn, dispatch). Take him out and they lose the plan.
+  leader: { ready: true, leader: true, morale: 0.8, steady: 0.5, style: 'armored', armor: 'leader', wpn: 'ak', name: 'Leader', hp: 130, speed: 2.0, range: 32, pref: 16, pellets: 1, burst: [3, 5], rof: 0.11, pause: [1.0, 1.8], acc: 0.4, cr: 220, scale: 1.02, headMult: 1.8, comply: 0.2, fake: 0.05, snd: 'AR' },
   civ: { style: 'civ', civ: true, name: 'Civilian', hp: 100, speed: 1.1, run: 3.2, scale: 1, headMult: 2, cr: 0 },
 };
 G.ENEMIES = G_ENEMIES;
@@ -868,6 +872,7 @@ const G_ENEMY_GEAR = {
     marksman: [['lever', 'mosin'], ['mosin', 'r700', 'm14'], ['r700', 'svd', 'mk14', 'm14', 'sr25'], ['svd', 'awm', 'mk14', 'sr25']],
     heavy: [['pkm', 'rpk'], ['pkm', 'm249', 'rpk'], ['m249', 'pkm', 'm60', 'rpk'], ['m60', 'm249']],
     warden: [['scar'], ['scar', 'fal'], ['scar', 'fal'], ['scar', 'hk416']],
+    leader: [['mp5', 'uzi', 'aks74u'], ['ak', 'mp5', 'mpx', 'ak74'], ['ak', 'm4', 'scarl', 'mp5', 'aug9'], ['hk416', 'scar', 'tavor', 'mcx', 'scarl']],
   },
   // What they wear by the level: the chance of each, in the order of ids, at the levels in at, in a line between them, and
   // no further than the last. Armour's weighted by the level and not the tier, so it goes on getting heavier after the
@@ -890,6 +895,7 @@ const G_ENEMY_GEAR = {
   // the Enforcer is always armoured, more heavily as tiers go up; the Kingpin wears the best
   fixed: {
     heavy: { vest: ['steel', 'steel', 'ceramic', 'assault'], helmet: ['ach', 'ach', 'riflehelm', 'riflehelm'], face: [0, 0, 'f.mandible', 'f.shield'], ex: [[], ['g.flap'], ['s.axil', 'g.flap', 'l.thigh'], ['l.shin']] },
+    leader: { vest: ['soft', 'steel', 'steel', 'ceramic'], helmet: ['ach', 'ach', 'ach', 'riflehelm'], ex: [[], [], ['g.flap'], ['g.flap', 's.axil']] },
     boss: { vest: ['assault', 'assault', 'assault', 'assault'], helmet: ['riflehelm', 'visor', 'visor', 'visor'], ex: [[], ['l.shin'], ['l.shin'], ['l.shin']] },
   },
 };

@@ -22,7 +22,7 @@ type GmScreen = 'menu' | 'lobby' | 'shop' | 'route' | 'gameover' | 'pause';
 // the sliders in the menu, and the keys they keep in storage
 type GmSetting = 'sens' | 'fov' | 'vol' | 'loadKit';
 // what the host tells the clients (js/server.ts), by t: onMsg dispatches on it
-type GmMsgKind = 'welcome' | 'roster' | 'arms' | 'rvotes' | 'newrun' | 'veil' | 'phase' | 'snap' | 'rfx' | 'bstk' | 'hole' | 'dpart' | 'dfall' | 'rpath' | 'npath' | 'skin' | 'loot' | 'lootRm' | 'glass' | 'crack' | 'lootGot' | 'team' | 'cab' | 'sbox' | 'abox' | 'wcase' | 'eshot' | 'shot' | 'nade' | 'boom' | 'course' | 'crun' | 'flash' | 'kill' | 'incap' | 'edown' | 'saved' | 'stock' | 'took' | 'ereload' | 'clear' | 'treat' | 'applying' | 'revive' | 'chat' | 'ping' | 'ffhit' | 'left' | 'door' | 'order' | 'shout' | 'evid' | 'evtake' | 'evsec' | 'cuffed' | 'refund';
+type GmMsgKind = 'welcome' | 'roster' | 'arms' | 'rvotes' | 'newrun' | 'veil' | 'phase' | 'snap' | 'rfx' | 'bstk' | 'hole' | 'dpart' | 'dfall' | 'rpath' | 'npath' | 'skin' | 'loot' | 'lootRm' | 'glass' | 'crack' | 'lootGot' | 'team' | 'cab' | 'sbox' | 'abox' | 'wcase' | 'eshot' | 'shot' | 'nade' | 'boom' | 'course' | 'crun' | 'flash' | 'kill' | 'incap' | 'edown' | 'saved' | 'stock' | 'took' | 'ereload' | 'clear' | 'treat' | 'applying' | 'revive' | 'chat' | 'ping' | 'ffhit' | 'left' | 'door' | 'order' | 'shout' | 'radio' | 'evid' | 'evtake' | 'evsec' | 'cuffed' | 'refund';
 // the map as js/damage.ts takes it (its own cut-down shape of a level's)
 type GmDmgMap = Parameters<typeof G.Damage.apply>[0];
 // the turning figure of you in the menu (lookPreview)
@@ -728,6 +728,7 @@ const G_Game = {
         break;
       }
       case 'order': if (m.id !== G.Net.myId) G.Audio.order(this.playerPos(m.id)!); break;
+      case 'radio': { const ev = G.Views.enemies.get(m.e); G.Audio.radio(ev ? ev.pos : null); break; }
       case 'shout': {
         if (m.id !== G.Net.myId) G.Audio.shout(this.playerPos(m.id)!);
         if (m.n > 0) G.HUD.feed(`<b>${G.U.esc(this.nameOf(m.id))}</b>: ${m.n} complying`);

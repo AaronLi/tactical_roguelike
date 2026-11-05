@@ -9,7 +9,7 @@ interface VwPlayer { id: string; name: string; color: number; animal: string; lo
 interface VwEnemy {
   id: number; type: string; def: any; rig: Rig; tac: number; pos: THREE.Vector3; tgt: THREE.Vector3; yaw: number; tgtYaw: number; hp: number; alive: boolean; deadT: number; lean: number;
   // set as it goes: from the snapshots (bleed, limp, reloading, down: its flags), by the kill and the cuffing, and by the frame's own bookkeeping
-  scode?: number; str?: number; bleed?: boolean; limp?: boolean; reloading?: boolean; down?: boolean; surp?: boolean; doorOn?: boolean; doorT?: number; arrested?: boolean; bodySecured?: boolean;
+  scode?: number; radio?: boolean; str?: number; bleed?: boolean; limp?: boolean; reloading?: boolean; down?: boolean; surp?: boolean; doorOn?: boolean; doorT?: number; arrested?: boolean; bodySecured?: boolean;
   pooled?: boolean; wnd?: number[] | null; wacc?: number[]; ph?: number; wpool?: boolean; leanS?: number; dripT?: number; proneKey?: string; proneShift?: THREE.Vector3 | null; recPitch?: number; recTk?: number;
   [k: string]: any;
 }
@@ -156,7 +156,7 @@ const G_Views = {
   applySnap(m: any) {
     if (!this.warmed) { this.warmed = true; G.Game.veilSay('Compiling shaders'); setTimeout(() => { G.R.warmup(); G.Game.veilN = G.Game.VEIL_SMOOTH; G.Game.veilWait = 0; }, 60); } // (compile everything once the level's full, then a few frames drawn and the veil lifts: js/game.ts veil. The wait: time to draw that line first)
     const seen = new Set<number>();
-    for (const [id, type, x, z, yaw, hp, aim, alert, crouch, lean, armed, scode, surp, door, kit, fl, str, y = 0, wd, fc = 0] of m.e) {
+    for (const [id, type, x, z, yaw, hp, aim, alert, crouch, lean, armed, scode, surp, door, kit, fl, str, y = 0, wd, fc = 0, rd = 0] of m.e) {
       seen.add(id);
       let ev = this.enemies.get(id);
       if (!ev) {
@@ -164,7 +164,7 @@ const G_Views = {
         // the type, with this suspect's kit (weapon | vest | helmet | face | tac | what's mounted) laid over it
         const def = Object.create((G.ENEMIES as Record<string, any>)[type]);
         if (kit) { const [wpn, vest, helmet, face, tac, ex] = kit.split('|'); def.wpn = wpn; def.vest = vest; def.helmet = helmet; def.face = face || 0; def.tac = +tac || 0; def.ex = ex ? ex.split(',') : []; }
-        const rig = G.Rig.create({ style: def.style, scale: def.scale, boss: !!def.boss, seed: id * 7919 + 13, dressed: true });
+        const rig = G.Rig.create({ style: def.style, scale: def.scale, boss: !!def.boss, leader: !!def.leader, seed: id * 7919 + 13, dressed: true });
         rig.powered = true; // a physically simulated body, held up by its muscles (js/rig.ts powerStep)
         if (!def.civ) rig.setKit(G.Rig.armourKit(def.vest, def.helmet, def.style === 'armored', def.face, def.ex)); // their armour, as an officer's would look
         if (def.wpn && armed) { rig.setGun(def.wpn); rig.holster(armed === 1); this.tacOnGun(rig, def.tac); }
@@ -180,7 +180,7 @@ const G_Views = {
       }
       ev.selfHit = false;
       ev.tgt.set(x, y, z); ev.tgtYaw = yaw; ev.hp = hp; ev.aim = aim; ev.alert = alert; ev.crouch = !!crouch; ev.lean = lean || 0;
-      ev.scode = scode || 0; ev.fc = fc || 0; // (fc: a flashbang's: 1 blinded and deaf, 2 coming round)
+      ev.radio = !!rd; ev.scode = scode || 0; ev.fc = fc || 0; // (fc: a flashbang's: 1 blinded and deaf, 2 coming round)
       ev.bleed = !!(fl & 1); ev.limp = !!(fl & 2); ev.reloading = !!(fl & 4); ev.down = !!(fl & 8); // wounds, reloads, down for good: from the host
       ev.wnd = Array.isArray(wd) ? wd : null; // the moderate-or-worse wounds (js/views.ts woundStreams); none once treated
       ev.str = str == null ? 1 : str / 100; // what blood loss leaves them to stand with (js/rig.ts powered body)
@@ -362,7 +362,7 @@ const G_Views = {
     if (this.enemies.has(id)) return;
     const def = (G.ENEMIES as Record<string, any>)[type];
     if (!def) return;
-    const rig = G.Rig.create({ style: def.style, scale: def.scale, boss: !!def.boss, seed: id * 7919 + 13, dressed: true });
+    const rig = G.Rig.create({ style: def.style, scale: def.scale, boss: !!def.boss, leader: !!def.leader, seed: id * 7919 + 13, dressed: true });
     if (!def.civ) rig.setKit(G.Rig.armourKit(def.vest, def.helmet, def.style === 'armored'));
     G.R.dynRoot.add(rig.root);
     const ev = { id, type, def, rig, pos: new THREE.Vector3(x, y, z), tgt: new THREE.Vector3(x, y, z), yaw, tgtYaw: yaw, hp: 0, alive: false, deadT: 0, lean: 0 } as VwEnemy;
@@ -825,7 +825,7 @@ const G_Views = {
       const aimAt = tgt && ev.armed === 2 && ev.alert && !ev.surp && !ev.reloading && !pose && !ev.down ? new THREE.Vector3(tgt.x, tgt.y + 1.2, tgt.z) : null;
       const rlP = ev.reloadAt && ev.reloading ? (performance.now() - ev.reloadAt) / ev.reloadDur : -1; // (how far into a magazine change)
       ev.aimP = aimed ? aimAt : null; // (who they're on: where their light and laser go)
-      ev.rig.update(dt, { pos: at, yaw: ev.yaw, pitch, crouch: ev.crouch || (ev.str != null && ev.str < 0.4), rise: 3.5, alert: !!ev.alert && ev.armed === 2 && !ev.surp && !ev.reloading, lean: ev.leanS, pose, blind: ev.alive && !ev.down && ev.scode !== 1 && ev.scode !== 2 && !ev.arrested ? ev.fc || 0 : 0, tk, act, str: near ? (ev.str == null ? 1 : ev.str) : null, aimAt,
+      ev.rig.update(dt, { pos: at, yaw: ev.yaw, pitch, crouch: ev.crouch || (ev.str != null && ev.str < 0.4), rise: 3.5, alert: !!ev.alert && ev.armed === 2 && !ev.surp && !ev.reloading, lean: ev.leanS, pose, radio: ev.radio && ev.alive && !ev.down, blind: ev.alive && !ev.down && ev.scode !== 1 && ev.scode !== 2 && !ev.arrested ? ev.fc || 0 : 0, tk, act, str: near ? (ev.str == null ? 1 : ev.str) : null, aimAt,
         reload: rlP >= 0 && rlP < 1 ? rlP : -1 });
       // past the fog (it's the background's colour out there: nothing to see) they aren't drawn, each one's forty-odd
       // pieces a draw call. The body, not the root: the root's what a shot checks for (js/player.ts), and it still hits.

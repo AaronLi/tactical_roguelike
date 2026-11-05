@@ -15,7 +15,7 @@ type CabLayout = any[][] & { left?: [string, number][] }; // (a cabinet's items,
 type MapCivSpots = LvMap & { civSpots?: { x: number; z: number; yaw: number }[] | null };
 type SvWin = LvWin & { cracked?: boolean; fy?: number }; // (a window, and whether it's fractured, and the floor's height)
 type SvRoom = LvRoom & { out?: boolean };
-type EnemyKind = 'suspect' | 'grunt' | 'rusher' | 'marksman' | 'heavy' | 'warden' | 'civ'; // (G.ENEMIES' keys)
+type EnemyKind = 'suspect' | 'grunt' | 'rusher' | 'marksman' | 'heavy' | 'warden' | 'leader' | 'civ'; // (G.ENEMIES' keys)
 type ArmourKind = 'vest' | 'helmet' | 'face' | 'shoulder' | 'groin' | 'legs'; // (G.ENEMY_GEAR.odds' keys)
 type ServerPhase = 'lobby' | 'route' | 'level' | 'shop' | 'gameover';
 // What a suspect or civilian is doing ('hide': a civilian behind cover; 'dead' is only ever tested for)
@@ -57,7 +57,17 @@ interface Enemy {
   spine?: boolean; cardiac?: boolean; out?: boolean; incap?: { by: string | null; t: number }; lastHitAt?: number; lastH?: boolean; lastAp?: boolean; lastGr?: number; lastFb?: number; flashId?: number;
   hitState?: EnemyState; hitUnaware?: boolean; hitYield?: boolean; hitAt?: number; shock?: number; kick?: number; headDelay?: number; engAt?: number; engTgt?: string;
   firedAt?: number; sawAt?: number; engagedAt?: number; allyT?: number; allyN?: number; proof?: boolean; seeK?: number; blind?: boolean; onWait?: number;
+  order?: Order | null; radioT?: number; callAt?: number; callTgt?: { x: number; y: number; z: number } | null; callLog?: string[]; calls?: number; noLead?: number;
   coverFlow?: ReturnType<typeof G.Level.flow> | null; coverCheckT?: number; emboldened?: boolean; fl?: number;
+}
+// A leader's order to a suspect (js/server.ts dispatch): get to the spot the police were last known at, by this way in (entry: a door, or a
+// point round it), and then search outward. role: 'push' goes in, 'hold' covers the way in from a little way off and goes in later; phase:
+// 'approach' (to the entry), 'hold', 'enter' (the entry to the spot), 'search' (spot to spot, outward from it).
+interface OrderSpot { x: number; y: number; z: number; flow: ReturnType<typeof G.Level.flow>; kind: 'door' | 'point'; n: number }
+interface Order {
+  by: number; role: 'push' | 'hold'; phase: 'approach' | 'hold' | 'enter' | 'search'; x: number; y: number; z: number; entry: OrderSpot; tflow: ReturnType<typeof G.Level.flow>;
+  at: number; until: number; holdUntil: number; rest: number; leg: 'cover' | 'run'; legT: number; cv: EnemyCover | null; cvFlow: ReturnType<typeof G.Level.flow> | null;
+  sp: { x: number; z: number; flow: ReturnType<typeof G.Level.flow> } | null; ring: number; done: [number, number][]; look: number; delay: number; rt: number;
 }
 interface DoorPeekSpot { d: LvDoor; x: number; y: number; z: number; px: number; pz: number; lean: number; yaw: number; fl: number; phase: string; t: number; n: number; flow?: ReturnType<typeof G.Level.flow> }
 
@@ -77,6 +87,7 @@ const G_Server = {
   wipeT: 0,
   summons: 0,
   accMult: 1,
+  forceLeader: false, // (a debug start: ?leader, js/debugstart.ts)
   dmgMult: 1,
   skins: new Map<string, any>(), // the squad's guns' sticker lists by hash (js/stickers.ts share): kept for whoever joins
   // made as the run and the level go on (undefined until then)
@@ -687,6 +698,15 @@ const G_Server = {
       const se = this.addEnemy(type, (tx + 0.5) * G.Level.TS, (tz + 0.5) * G.Level.TS, hpMult, fy(tf));
       if (hold) se.drawn = true; // (a stronghold's suspects have their weapons out already, not holstered)
     }
+    // a leader, one at most, from level 2: more likely the bigger the map and in a stronghold. He takes the place of the suspect furthest from the
+    // helicopter (he stays back), so the count is the same.
+    const lead = this.forceLeader || (L >= 2 && Math.random() < Math.min(0.9, (0.22 + 0.06 * L) * big * (hold ? 1.8 : 1)));
+    if (lead) {
+      const sp = this.map!.spawn || { x: 0, z: 0 };
+      let far: Enemy | null = null, fd = -1;
+      for (const o of this.enemies.values()) { const d = Math.hypot(o.x - sp.x, o.z - sp.z); if (!o.def.civ && !o.def.boss && d > fd) { fd = d; far = o; } }
+      if (far) { this.enemies.delete(far.id); const le = this.addEnemy('leader', far.x, far.z, hpMult, far.y || 0); le.drawn = true; }
+    }
     // civilians caught up in it (more at a festival: some of them hiding behind the stalls' counters; the other
     // stalls were left as they ran)
     const crowd = this.map!.theme.crowd || 1, civs = hold ? 0 : Math.min(Math.round((2 + Math.floor(L / 2)) * crowd), 8 * big), TS = G.Level.TS;
@@ -823,6 +843,7 @@ const G_Server = {
     e.drawT = e.def.draw || 0.8;
   },
   alertEnemy(e: Enemy, spread: boolean, heardOnly?: boolean) {
+    const was = e.alert;
     if (heardOnly && !e.alert && !e.def.ready && !e.def.boss && Math.random() < 0.55) e.lurk = true; // hides first, draws when it sees you
     else { e.lurk = false; this.draw(e); }
     if (!e.alert) {
@@ -834,6 +855,11 @@ const G_Server = {
       for (const o of this.enemies.values()) {
         if (!o.alert && !o.def.civ && o.pendingAlert < 0 && this.heardAt(field, o.x, o.z, o.y) < 12) o.pendingAlert = 0.4 + Math.random() * 0.6;
       }
+    }
+    // a leader who's been brought into it (seen them, been shot at) calls it in, on where he knows they are (or the nearest of them)
+    if (e.def.leader && !was && !e.down) {
+      const at = e.lastSeen || e.noise || this.nearestOfficer(e);
+      if (at) this.callIn(e, at.x, (at as { y?: number }).y || e.y || 0, at.z, 'spotted police');
     }
   },
   // Sound travels through the building, not through walls: distance in metres along walkable tiles from
@@ -890,6 +916,7 @@ const G_Server = {
       if (this.heardAt(field, e.x, e.z, e.y) > radius) continue;
       if (e.def.civ) { this.panic(e, { x, z }); continue; }
       if (e.state === 'normal') { e.noise = { x, z }; this.noted(e, x, y, z); }
+      if (e.def.leader && e.state === 'normal' && !e.down) this.callIn(e, x, y, z, 'heard a noise');
       if (!e.alert && e.state === 'normal') e.pendingAlert = e.pendingAlert >= 0 ? e.pendingAlert : 0.2 + Math.random() * 0.5;
     }
   },
@@ -1130,7 +1157,8 @@ const G_Server = {
           + (!e.drawn ? 0.3 : e.drawT > 0 ? 0.05 : -0.15) // holstered / still drawing / gun up
           + 0.5 * (1 - (e.str == null ? 1 : e.str)) + (e.collapsed ? 0.3 : 0) + (e.suppressT > 0 ? 0.15 : 0) + (e.broken ? 0.3 : 0) // weakened: losing the will to fight
           + 0.08 * Math.min(3, e.shouts) + 0.08 * Math.max(0, seen - 1) - (d > 10 ? 0.1 : 0) + (e.flashT! > 0 ? 0.35 : e.flashRec! > 0 ? 0.2 : 0) // (dazed by a flashbang: in no state to argue)
-          - Math.max(0, e.morale - 0.5) * 0.8 - (e.def.hunt && e.drawn ? 0.15 : 0);
+          - Math.max(0, e.morale - 0.5) * 0.8 - (e.def.hunt && e.drawn ? 0.15 : 0)
+          + (this.clock - (e.noLead || -99) < 60 ? 0.15 : 0); // (their leader's down: no one's telling them what to do)
         chance = e.def.comply ? G.U.clamp(chance, 0, e.collapsed ? 0.97 : 0.92) : 0; // never a sure thing
         // Braver together: with armed friends around who can see them, almost nobody gives up. And anyone
         // who's already been shooting at you, or who faked a surrender and went back for a weapon, is past
@@ -1483,6 +1511,7 @@ const G_Server = {
     this.noiseT = (this.noiseT || 0) - dt;
     if (this.noiseT <= 0) { this.noiseT = 0.25; this.footsteps(alive); }
     const onFoot = alive.filter((p) => !p.st.se); // (se: still in the helicopter that brought them: nobody's to aim at yet, js/landing.ts)
+    this.leaderCheck();
     for (const e of this.enemies.values()) this.think(e, dt, onFoot);
 
     // keep enemies from stacking
@@ -1516,7 +1545,7 @@ const G_Server = {
       const r2 = (v: number) => Math.round(v * 100) / 100;
       const e = [];
       for (const en of this.enemies.values()) {
-        e.push([en.id, en.type, r2(en.x), r2(en.z), r2(en.yaw), Math.max(1, Math.round((en.hp / en.maxHp) * 100)), en.aiming ? en.tgt : 0, en.alert ? 1 : 0, en.crouch ? 1 : 0, en.leanOut || 0, en.armed ? (en.drawn ? 2 : 1) : 0, STATE_CODE[en.state] || 0, en.surprisedT > 0 ? 1 : 0, en.doorWait > 0 ? 1 : 0, en.def.civ ? 0 : `${en.def.wpn}|${en.def.vest}|${en.def.helmet}|${en.def.face || ''}|${en.def.tac || 0}|${(en.def.ex || []).join(',')}`, ((en.bleedH || en.bleedL) ? 1 : 0) | (en.legs ? 2 : 0) | (en.reloadT > 0 ? 4 : 0) | (en.down ? 8 : 0), Math.round(Math.min(en.down ? 0.25 : 1, en.str == null ? 1 : en.str) * 100), r2(en.y || 0), en.wnd && en.wnd.length ? en.wnd : 0, en.flashT! > 0 ? 1 : en.flashRec! > 0 ? 2 : 0]); // (wounds for the bleeding streams, then the flash state)
+        e.push([en.id, en.type, r2(en.x), r2(en.z), r2(en.yaw), Math.max(1, Math.round((en.hp / en.maxHp) * 100)), en.aiming ? en.tgt : 0, en.alert ? 1 : 0, en.crouch ? 1 : 0, en.leanOut || 0, en.armed ? (en.drawn ? 2 : 1) : 0, STATE_CODE[en.state] || 0, en.surprisedT > 0 ? 1 : 0, en.doorWait > 0 ? 1 : 0, en.def.civ ? 0 : `${en.def.wpn}|${en.def.vest}|${en.def.helmet}|${en.def.face || ''}|${en.def.tac || 0}|${(en.def.ex || []).join(',')}`, ((en.bleedH || en.bleedL) ? 1 : 0) | (en.legs ? 2 : 0) | (en.reloadT > 0 ? 4 : 0) | (en.down ? 8 : 0), Math.round(Math.min(en.down ? 0.25 : 1, en.str == null ? 1 : en.str) * 100), r2(en.y || 0), en.wnd && en.wnd.length ? en.wnd : 0, en.flashT! > 0 ? 1 : en.flashRec! > 0 ? 2 : 0, en.radioT! > 0 ? 1 : 0]); // (wounds for the bleeding streams, then the flash state, then on the radio)
       }
       const p: Record<string, any> = {};
       for (const pl of all) p[pl.id] = pl.st;
@@ -1558,6 +1587,7 @@ const G_Server = {
     if (e.state === 'surrender') return this.thinkSurrendered(e, dt, alive);
     if (e.flashT! > 0) { this.thinkFlashed(e, dt); return; } // (blind and deaf: out of the fight)
     this.reloadTick(e, dt);
+    if (def.leader && this.leaderTick(e, dt)) return;
     if (e.pendingAlert >= 0) { e.pendingAlert -= dt; if (e.pendingAlert < 0) this.alertEnemy(e, false, true); }
     if (e.supQ && e.supQ.length) e.supQ = e.supQ.filter((q: number[]) => { if (q[0] > this.clock) return true; if (e.state === 'normal') this.nearMiss(e, q[1]); return false; });
     if (e.suppressT > 0 && !e.cover) e.coverT = Math.min(e.coverT, 0); // get behind something
@@ -1574,7 +1604,7 @@ const G_Server = {
     // (friends around hold them together: each one nearby lowers the point where they break)
     if ((e.allyT = (e.allyT || 0) - dt) <= 0) { e.allyT = 1; e.allyN = this.allies(e); }
     if (!e.broken && !engaged && e.alert && e.morale < 0.3 - 0.08 * Math.min(3, e.allyN || 0) && !def.boss) {
-      e.broken = true; e.fleeT = 3 + Math.random() * 3;
+      e.broken = true; e.fleeT = 3 + Math.random() * 3; e.order = null;
       e.cover = null; e.inCover = false; e.peek = false; e.leanOut = 0; e.aiming = false;
     }
 
@@ -1689,6 +1719,7 @@ const G_Server = {
     if (st && e.canSee) {
       e.lostT = 0;
       e.lastSeen = { x: st.p[0], y: st.p[1], z: st.p[2] };
+      if (def.leader) this.callIn(e, st.p[0], st.p[1], st.p[2], 'has eyes on police'); // (again, now and then, as they move: callIn's gap)
       const dx = st.p[0] - e.x, dz = st.p[2] - e.z, d = Math.hypot(dx, dz) || 1;
       const toYaw = Math.atan2(-dx, -dz);
       e.yaw += U.angDiff(e.yaw, toYaw) * Math.min(1, dt * 8);
@@ -1756,7 +1787,10 @@ const G_Server = {
       e.aiming = false; e.peekDone = true; e.leanOut = 0;
       // just lost sight of them (round a door, behind its leaf): about half keep firing for a moment at where
       // they were, blind. Rounds rarely land, and only if you're still there and in the open.
-      if (e.lostT === 0) e.blind = !def.aimTime && Math.random() < 0.5;
+      if (e.lostT === 0) {
+        e.blind = !def.aimTime && Math.random() < 0.5;
+        if (e.order && e.lastSeen && (e.sawAt || -99) > e.order.at && this.clock - e.order.rt > 4) this.retarget(e, e.lastSeen); // (the search starts again from where they were seen)
+      }
       e.lostT += dt;
       if (e.blind && !e.flinchT && st && e.drawn && e.lastSeen && e.lostT < 1.1 && e.tgtD < def.range) {
         e.cool -= dt;
@@ -1768,7 +1802,11 @@ const G_Server = {
         if (ld > 5 && ld < 20) this.tryNade(e, e.lastSeen.x, e.lastSeen.z);
       }
       const leash = Math.hypot(e.x - e.home.x, e.z - e.home.z) < 12;
-      if (this.brave(e) && e.lastSeen && e.lostT < 12 && leash && Math.hypot(e.lastSeen.x - e.x, e.lastSeen.z - e.z) > 2) {
+      if (e.order) {
+        // under a leader's order (callIn): to the spot by its own way in, and then searching outward from it
+        const os = this.orderStep(e, dt);
+        if (os) { mx = os.mx; mz = os.mz; sp = os.sp; e.holding = false; } else e.holding = true;
+      } else if (this.brave(e) && e.lastSeen && e.lostT < 12 && leash && Math.hypot(e.lastSeen.x - e.x, e.lastSeen.z - e.z) > 2) {
         e.cover = null; e.inCover = false; e.holding = false;
         huntStep(); sp = 0.6; // advance cautiously toward where police were last seen
       } else {
@@ -1899,6 +1937,229 @@ const G_Server = {
     if (!there) { e.leanOut = 0; return; }
     e.cover = { x: q.x, y: q.y, z: q.z, lean: q.lean, px: q.px, pz: q.pz, fl: q.fl };
     e.inCover = true; e.peek = true; e.peekT = out ? 0.2 : 0.45; e.peekOut = this.PEEK.MIN; e.peekDone = false; e.coverT = 3; e.coverStuck = 0; e.coverFlow = null;
+  },
+
+  // ---------------------------------------------------------------- the leader (js/data.ts ENEMIES.leader)
+  // He calls it in. Spotting police, being shot at, or hearing a noise gets him on the radio (he stops, a hand to his headset, and barks
+  // it: everyone near enough hears that too), and a moment later every suspect within RADIO.R of him (as the crow flies, and a way
+  // through the building: sound's way, soundField) is alerted to where he says: dispatch. Then he's at it again every RADIO.GAP seconds
+  // while he has eyes on police. Take him out, down, arrest him or have him give up and the plan goes with him: leaderCheck.
+  RADIO: { R: 25, GAP: 12, KEY: 1.5, LIFE: 75, HOLD: 5 },
+  // metres to a flow field's source from (x, y, z), -1: no way
+  flowDist(flow: Int16Array, x: number, y: number, z: number) {
+    const map = this.map!, L = G.Level, TS = L.TS;
+    let i;
+    if (map.floors) i = L.navNode(map, x, y, z);
+    else { const tx = Math.floor(x / TS), tz = Math.floor(z / TS); i = tx < 0 || tz < 0 || tx >= map.W || tz >= map.H ? -1 : tz * map.W + tx; }
+    return i < 0 || flow[i] < 0 ? -1 : flow[i] * TS;
+  },
+  // A flow field to a point and the cells beside it (the point itself may be under a crate or in a doorframe)
+  flowTo(x: number, y: number, z: number) {
+    const L = G.Level, map = this.map!, [tx, tz, f] = L.src(map, x, y, z), src: number[][] = [];
+    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) src.push([tx + dx, tz + dz, f]);
+    return L.flow(map, src);
+  },
+  callIn(l: Enemy, x: number, y: number, z: number, why: string) {
+    const c = this.clock;
+    if (l.state !== 'normal' || l.down || c < (l.callAt || 0) || (l.radioT || 0) > 0) return;
+    l.callAt = c + this.RADIO.GAP; l.radioT = this.RADIO.KEY; l.callTgt = { x, y, z }; l.calls = (l.calls || 0) + 1;
+    this.logCall(l, `${why}: on the radio, police at (${x.toFixed(0)}, ${z.toFixed(0)})`);
+    l.cover = null; l.inCover = false; l.peek = false; l.leanOut = 0; l.aiming = false; l.crouch = false;
+    if (!l.alert) this.alertEnemy(l, false);
+    G.Net.broadcast({ t: 'radio', e: l.id });
+  },
+  logCall(l: Enemy, m: string) { const a = l.callLog || (l.callLog = []); a.push(`${this.clock.toFixed(0)}s ${m}`); if (a.length > 14) a.shift(); },
+  // the leader's keying the radio: he's stopped, facing the spot, hand to his headset; when he's done the word goes out
+  leaderTick(l: Enemy, dt: number) {
+    if (!(l.radioT! > 0) || !l.callTgt) return false;
+    l.radioT! -= dt;
+    l.yaw += G.U.angDiff(l.yaw, Math.atan2(-(l.callTgt.x - l.x), -(l.callTgt.z - l.z))) * Math.min(1, dt * 3);
+    l.aiming = false; l.crouch = false; l.cool = Math.max(l.cool, 0.4);
+    if (l.radioT! <= 0) { l.radioT = 0; this.dispatch(l); }
+    return true;
+  },
+  // The word goes out: everyone in earshot of the radio is alerted to the spot, each by its own way in. The ways in are the doors round it
+  // (a few, well apart; or, in the open, points round it on different bearings); each suspect takes the one it's nearest to, less for every
+  // other that's taken it, so they come at it from different sides and not in a line. The first to an entry pushes through it; the second
+  // holds the way in from a few metres off, gun on the door, and goes in a while later; a third pushes after a delay. Lookouts (a rifle with
+  // a scope) always hold. Then they search outward from the spot (orderStep).
+  dispatch(l: Enemy) {
+    const T = l.callTgt!, c = this.clock, map = this.map!, L = G.Level, TS = L.TS, R = this.RADIO, fT = this.flowTo(T.x, T.y, T.z);
+    const field = this.soundField(l.x, l.z, l.y);
+    const who: Enemy[] = [];
+    for (const e of this.enemies.values()) {
+      if (e === l || e.def.civ || e.def.boss || e.def.leader || e.state !== 'normal' || e.down || e.broken || e.flashT! > 0 || e.guard) continue;
+      if (Math.hypot(e.x - l.x, e.z - l.z) > R.R || Math.abs((e.y || 0) - (l.y || 0)) > 4 || this.heardAt(field, e.x, e.z, e.y) > R.R * 1.8) continue;
+      if (this.flowDist(fT, e.x, e.y || 0, e.z) < 0) continue;
+      who.push(e);
+    }
+    if (!who.length) { this.logCall(l, 'nobody within earshot'); return; }
+    // the ways in
+    const entries: OrderSpot[] = [], want = Math.min(5, Math.max(2, Math.ceil(who.length / 2)));
+    const mk = (x: number, y: number, z: number, kind: 'door' | 'point') => entries.push({ x, y, z, flow: this.flowTo(x, y, z), kind, n: 0 });
+    const doors: { d: LvDoor; g: number }[] = [];
+    for (const d of map.doors) {
+      if (d.kind === 'vault' || d.fallen || Math.abs((d.fy || 0) - T.y) > 1.5 || Math.hypot(d.x - T.x, d.z - T.z) > 22) continue;
+      const g = this.flowDist(fT, d.x, d.fy || 0, d.z);
+      if (g >= 0 && g <= 30) doors.push({ d, g });
+    }
+    doors.sort((a, b) => a.g - b.g);
+    for (const { d } of doors) { if (entries.length >= want) break; if (!entries.some((q) => Math.hypot(q.x - d.x, q.z - d.z) < 4)) mk(d.x, d.fy || 0, d.z, 'door'); }
+    if (entries.length < Math.min(3, who.length)) { // not enough doors: points 7 to 20 m round it, one in each direction (eighths of a circle)
+      const used = new Set(entries.map((q) => Math.floor(((Math.atan2(q.z - T.z, q.x - T.x) + Math.PI) / (Math.PI * 2)) * 8) % 8));
+      for (const sp of G.U.shuffle(Math.random, map.enemySpots.slice())) {
+        if (entries.length >= want) break;
+        const f = sp[2] || 0, x = (sp[0] + 0.5) * TS, z = (sp[1] + 0.5) * TS, y = L.floorMap(map, f).fy || 0;
+        if (Math.abs(y - T.y) > 1.5) continue;
+        const g = this.flowDist(fT, x, y, z), sec = Math.floor(((Math.atan2(z - T.z, x - T.x) + Math.PI) / (Math.PI * 2)) * 8) % 8;
+        if (g < 7 || g > 20 || used.has(sec)) continue;
+        used.add(sec); mk(x, y, z, 'point');
+      }
+    }
+    if (!entries.length) mk(T.x, T.y, T.z, 'point');
+    // each suspect takes the way in it's nearest, less for every other that's taken it
+    who.sort((a, b) => Math.hypot(a.x - T.x, a.z - T.z) - Math.hypot(b.x - T.x, b.z - T.z));
+    const split: string[] = [];
+    for (const e of who) {
+      let best: OrderSpot | null = null, bs = 1e9;
+      for (const q of entries) { const g = this.flowDist(q.flow, e.x, e.y || 0, e.z); if (g < 0) continue; const sc = g + 14 * q.n; if (sc < bs) { bs = sc; best = q; } }
+      if (!best) continue;
+      const hold = best.n === 1 || !!e.def.aimTime, delay = best.n >= 2 ? 3 * (best.n - 1) : 0;
+      if (!e.def.aimTime) best.n++; // (a lookout holds wherever it is and doesn't take the way in from the rest)
+      e.order = { by: l.id, role: hold ? 'hold' : 'push', phase: 'approach', x: T.x, y: T.y, z: T.z, entry: best, tflow: fT, at: c, until: c + R.LIFE, holdUntil: 0, rest: delay + Math.random() * 0.6, leg: 'run', legT: 0, cv: null, cvFlow: null, sp: null, ring: 6, done: [], look: 0, delay, rt: c };
+      e.cover = null; e.inCover = false; e.peek = false; e.leanOut = 0; e.lurk = false; e.hide = null; e.dp = null; e.heard = undefined; e.walkTo = null; e.pendingAlert = -1; e.dpOk = c + 20;
+      e.noise = { x: T.x, z: T.z };
+      this.alertEnemy(e, false);
+      split.push(`#${e.id}>${best.kind}${entries.indexOf(best)}${hold ? 'H' : ''}`);
+    }
+    this.logCall(l, `dispatched ${split.length} (${entries.length} ways in: ${entries.map((q, i) => `${q.kind}${i}@${q.x.toFixed(0)},${q.z.toFixed(0)}`).join(' ')}): ${split.join(' ')}`);
+  },
+  endOrder(e: Enemy) { e.order = null; e.holding = false; e.cover = null; e.inCover = false; },
+  // They've seen the police and lost them: the search starts again from where they were last seen
+  retarget(e: Enemy, at: { x: number; y: number; z: number }) {
+    const o = e.order!;
+    o.x = at.x; o.y = at.y; o.z = at.z; o.tflow = this.flowTo(at.x, at.y, at.z);
+    o.phase = 'enter'; o.role = 'push'; o.ring = 6; o.done = []; o.sp = null; o.cv = null; o.legT = 0; o.rest = 0; o.rt = this.clock; o.until = Math.max(o.until, this.clock + 45);
+  },
+  // Called every tick: orders from a leader who's no longer able to give them (killed, down, arrested, given up) lapse. The suspects who
+  // had them are back on their own behaviour, and shaken: nerve down (a few will break and run), and a shout will do better with them.
+  leaderCheck() {
+    let gone: Set<number> | null = null;
+    for (const e of this.enemies.values()) {
+      if (!e.order) continue;
+      const l = this.enemies.get(e.order.by);
+      if (!l || l.down || l.collapsed || l.state === 'surrender' || l.state === 'cuffed') (gone || (gone = new Set())).add(e.order.by);
+    }
+    if (!gone) return;
+    for (const by of gone) {
+      const l = this.enemies.get(by) || (this.bodies.get(by) && this.bodies.get(by)!.rec) || null;
+      let n = 0;
+      for (const e of this.enemies.values()) {
+        if (!e.order || e.order.by !== by) continue;
+        this.endOrder(e); n++;
+        e.noLead = this.clock; e.morale -= 0.25 * (e.def.steady || 1); e.relocate = false;
+      }
+      if (l) this.logCall(l, `down: ${n} lost the plan, nerve -0.25`);
+    }
+  },
+  // Where an order is taking them this tick: a step of the way (returns {mx, mz, sp}), or null while they wait (at a cover spot between
+  // bounds, or holding a way in). They go in bounds: to a cover spot a few metres on, down behind it a moment, to the next (a run for
+  // a couple of seconds if there's none).
+  orderStep(e: Enemy, dt: number): { mx: number; mz: number; sp: number } | null {
+    const o = e.order!, L = G.Level, c = this.clock, rnd = Math.random;
+    if (c > o.until) { this.endOrder(e); return null; }
+    const at = (fl: Int16Array) => this.flowDist(fl, e.x, e.y || 0, e.z);
+    let goal: Int16Array, gx: number, gz: number;
+    if (o.phase === 'approach') {
+      const d = at(o.entry.flow);
+      if (o.role === 'hold' && d >= 0 && d <= this.RADIO.HOLD) { o.phase = 'hold'; o.holdUntil = c + 12 + rnd() * 6; o.cv = null; }
+      else if (d < 0 || d <= 2) o.phase = 'enter';
+    }
+    if (o.phase === 'hold') { // the way in covered: crouched, the gun on the door, till it's time
+      if (c > o.holdUntil) { o.phase = 'enter'; o.role = 'push'; }
+      else {
+        e.yaw += G.U.angDiff(e.yaw, Math.atan2(-(o.entry.x - e.x), -(o.entry.z - e.z))) * Math.min(1, dt * 4);
+        return null;
+      }
+    }
+    if (o.phase === 'enter' && Math.hypot(o.x - e.x, o.z - e.z) < 2.5 && Math.abs(o.y - (e.y || 0)) < 1.5) { o.phase = 'search'; o.sp = null; o.rest = 1 + rnd(); }
+    if (o.phase === 'search') {
+      if (!o.sp) {
+        o.sp = this.searchSpot(e, o);
+        if (!o.sp) { o.ring += 7; if (o.ring > 70) this.endOrder(e); o.rest = 0.5; return null; }
+      }
+      if (Math.hypot(o.sp.x - e.x, o.sp.z - e.z) < 1.6) { o.done.push([o.sp.x, o.sp.z]); o.sp = null; o.rest = 1.2 + rnd() * 1.2; e.yaw += (rnd() - 0.5) * 2; return null; } // (a look round it)
+    }
+    if (o.phase === 'search' && o.sp) { goal = o.sp.flow; gx = o.sp.x; gz = o.sp.z; }
+    else if (o.phase === 'approach') { goal = o.entry.flow; gx = o.entry.x; gz = o.entry.z; }
+    else { goal = o.tflow; gx = o.x; gz = o.z; }
+    if (o.rest > 0) { o.rest -= dt; return null; }
+    // a new bound
+    if (!o.cv && o.legT <= 0) {
+      const cv = this.nextCover(e, goal);
+      e.cover = null; e.inCover = false; e.peek = false;
+      const cf = cv ? this.flowTo(cv.x, cv.y, cv.z) : null, cd = cv ? this.flowDist(cf!, e.x, e.y || 0, e.z) : -1;
+      if (cv && cd >= 0 && cd < Math.hypot(cv.x - e.x, cv.z - e.z) * 1.6 + 2) { o.cv = cv; o.cvFlow = cf; o.leg = 'cover'; o.legT = 6; } // (not one behind a wall, a long way round)
+      else { o.leg = 'run'; o.legT = 2.2 + rnd() * 1.2; }
+    }
+    let tx = gx, tz = gz;
+    o.legT -= dt;
+    if (o.cv) {
+      const cd = Math.hypot(o.cv.x - e.x, o.cv.z - e.z);
+      if (cd < 0.35 || o.legT <= 0) { // there: down behind it a moment
+        if (cd < 0.7) { e.cover = o.cv; e.coverFlow = null; e.inCover = true; e.peek = false; e.coverStuck = 0; e.coverT = 2; }
+        o.cv = null; o.legT = 0; o.rest = 1.1 + rnd() * 1.5;
+        return null;
+      }
+      const st = cd > 1.6 && o.cvFlow ? L.flowStep(this.map!, o.cvFlow, e.x, e.z, e.y) : null;
+      if (st) { tx = st.x; tz = st.z; } else { tx = o.cv.x; tz = o.cv.z; }
+    } else {
+      if (o.legT <= 0) { o.rest = 0.8 + rnd() * 0.9; return null; }
+      const st = L.flowStep(this.map!, goal, e.x, e.z, e.y);
+      if (st) { tx = st.x; tz = st.z; }
+    }
+    const dx = tx - e.x, dz = tz - e.z, d = Math.hypot(dx, dz) || 1;
+    return { mx: dx / d, mz: dz / d, sp: 0.9 };
+  },
+  // The cover spot a bound away that gets them most of the way on: 3 to 10 m off, at least 2.5 m closer to where they're going, no one else's
+  nextCover(e: Enemy, goal: Int16Array) {
+    const here = this.flowDist(goal, e.x, e.y || 0, e.z);
+    if (here < 0) return null;
+    let best: EnemyCover | null = null, bs = -1e9;
+    for (const c of this.map!.cover as FlPt[]) {
+      if (Math.abs((c.y || 0) - (e.y || 0)) > 1.5) continue;
+      const d = Math.hypot(c.x - e.x, c.z - e.z);
+      if (d < 3 || d > 10) continue;
+      const g = this.flowDist(goal, c.x, c.y || 0, c.z);
+      if (g < 0 || here - g < 2.5) continue;
+      let claimed = false;
+      for (const o of this.enemies.values()) if (o !== e && ((o.order && o.order.cv && Math.hypot(o.order.cv.x - c.x, o.order.cv.z - c.z) < 1.5) || (o.cover && Math.hypot(o.cover.x - c.x, o.cover.z - c.z) < 1.2))) { claimed = true; break; }
+      if (claimed) continue;
+      const sc = (here - g) - d * 0.3 + Math.random() * 2;
+      if (sc > bs) { bs = sc; best = c as EnemyCover; }
+    }
+    return best;
+  },
+  // Where to look next: somewhere a suspect could stand, on the ring round the spot they've got to (o.ring metres from it by the
+  // building's ways, nine metres wide), nearest to them, not looked at, not another's
+  searchSpot(e: Enemy, o: Order) {
+    const map = this.map!, L = G.Level, TS = L.TS;
+    for (let r = o.ring; r <= 70; r += 7) {
+      let best: { x: number; z: number; y: number; f: number; tx: number; tz: number } | null = null, bd = 1e9;
+      for (const sp of map.enemySpots) {
+        const f = sp[2] || 0, x = (sp[0] + 0.5) * TS, z = (sp[1] + 0.5) * TS, y = L.floorMap(map, f).fy || 0;
+        const g = this.flowDist(o.tflow, x, y, z);
+        if (g < r || g > r + 9) continue;
+        if (o.done.some(([dx, dz]) => Math.hypot(dx - x, dz - z) < 4)) continue;
+        let taken = false;
+        for (const q of this.enemies.values()) if (q !== e && q.order && q.order.sp && Math.hypot(q.order.sp.x - x, q.order.sp.z - z) < 5) { taken = true; break; }
+        if (taken) continue;
+        const d = Math.hypot(x - e.x, z - e.z) + Math.abs(y - (e.y || 0)) * 3;
+        if (d < bd) { bd = d; best = { x, z, y, f, tx: sp[0], tz: sp[1] }; }
+      }
+      if (best) { o.ring = r; return { x: best.x, z: best.z, flow: L.flow(map, [[best.tx, best.tz, best.f]]) }; }
+    }
+    return null;
   },
 
   // Broken: run from the police, then hide. Panicked, inaccurate shots only; a cornered suspect with
