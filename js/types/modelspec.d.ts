@@ -42,7 +42,7 @@ interface RecipeSpec<M = THREE.Material | null> {
   // the barrel and what's on it
   barrel?: BarrelSpec; rib?: boolean /* (its barrels carry a rib along the top, whatever sight is fitted) */; mbr?: number /* (the barrel radius a muzzle device is drawn for: the gun's, whatever profile its barrel has) */; blen?: number; barrels?: number[]; integral?: { len: number; r: number } | null; muzzle?: MuzzleKind; thread?: boolean; match?: boolean; can?: { from: number; r: number }; comp?: boolean; recoilBarrel?: number; bIn?: number;
   // the sights
-  optic?: OpticKind; apart?: string; optF?: number; optCut?: boolean | number; ironsAt?: number[]; sightRise?: number; magnifier?: number | Record<string, any>; riser?: number; ret?: ReticleKind; dotR?: number; dotLen?: number; px?: number; scopeLen?: number; scopeObj?: number; closed?: boolean;
+  optic?: OpticKind; apart?: string; optF?: number; optCut?: boolean | number; ironsAt?: number[]; sightRise?: number; magnifier?: number | Record<string, any>; riser?: number; ret?: ReticleKind; dotR?: number; dotLen?: number; px?: number; scopeLen?: number; scopeObj?: number; calc?: boolean; closed?: boolean;
   // the magazine and where things sit
   mag?: MagSpec<M>; magFit?: { len: number; c: number; d: number }; support?: number; chY?: number; chF?: number; slotOf?: Record<string, string>;
   // the odd ones

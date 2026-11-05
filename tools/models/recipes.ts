@@ -195,7 +195,7 @@ const G_GunRecipes = (() => {
       k.pip = { f: f - 0.0765, y: sy, r: 0.0125 };
       return { sy, fSight: f - 0.075, relief: 0.06 };
     },
-    scope(k: Kit, f: number, top: number, len = 0.33, obj = 0.025, h = 0.04) {
+    scope(k: Kit, f: number, top: number, len = 0.33, obj = 0.025, h = 0.04, calc = false) {
       const sy = top + h;
       for (const rf of [f - len * 0.22, f + len * 0.18]) { k.box(0.026, sy - top, 0.014, M.black(), rf - 0.007, top + (sy - top) / 2); k.ringZ(0.0135, 0.004, M.black(), rf, sy); }
       k.cyl(0.0127, len * 0.55, M.black(), f - len * 0.3, sy);
@@ -207,6 +207,14 @@ const G_GunRecipes = (() => {
       k.cyl(obj * 0.85, 0.002, M.lens(), f + len / 2 + 0.009, sy);
       k.cyl(0.0165, 0.001, M.lens(), f - len / 2 - 0.0012, sy);
       k.pip = { f: f - len / 2 - 0.0015, y: sy, r: 0.0165 };
+      if (calc) { // a ballistic computer scope: its computer and rangefinder on the left of the tube, a green display on its top and the rangefinder's two windows in front
+        const cl = 0.11, cx = -(0.0127 + 0.0165), cf = f - len * 0.1 - cl / 2;
+        k.box(0.016, 0.014, 0.05, M.black(), cf + 0.03, sy, cx * 0.55);
+        k.box(0.03, 0.034, cl, M.black(), cf, sy, cx);
+        k.box(0.034, 0.004, cl * 0.5, M.black(), cf + 0.012, sy + 0.019, cx);
+        k.box(0.018, 0.0016, 0.034, M.glow(), cf + 0.02, sy + 0.0212, cx);
+        for (const dz of [-0.0085, 0.0085]) k.cyl(0.0055, 0.003, M.lens(), cf + cl, sy + 0.002, cx + dz);
+      }
       return { sy, fSight: f - len / 2, relief: 0.07 };
     },
     // Iron sights, modelled on the real sight pictures. In every family the top of the front post is exactly on
@@ -832,6 +840,15 @@ const G_GunRecipes = (() => {
       if (t === 'pcombo') k.cyl(0.0035, 0.004, M.dot(), f, y - r - 0.004, cx);
       return;
     }
+    if (t === 'bcomp') { // a ballistic computer: a long box on the rail, a rangefinder's two windows and the laser in front, a green display on its outer side
+      const hw = 0.0125, bx = x + side * hw;
+      k.box(2 * hw, 0.03, 0.09, M.black(), f - 0.09, y, bx);
+      k.box(0.02, 0.006, 0.05, M.black(), f - 0.07, y + 0.017, bx);
+      k.box(0.0016, 0.012, 0.03, M.glow(), f - 0.06, y + 0.002, bx + side * (hw + 0.0006));
+      for (const dx of [-0.007, 0.007]) k.cyl(0.0052, 0.004, M.lens(), f, y + 0.004, bx + dx);
+      k.cyl(0.0042, 0.004, M.dot(), f, y - 0.0085, bx);
+      return;
+    }
     const peq = t === 'peq', big = peq ? 1.4 : 1;
     k.box(0.02 * big, 0.022 * big, 0.05 * big, peq ? M.tan() : M.black(), f - 0.05 * big, y, x + side * 0.01 * big);
     k.cyl(0.0045, 0.004, t === 'laserG' || t === 'plaserG' ? M.glow() : M.dot(), f, y + 0.004, x + side * 0.01 * big);
@@ -907,7 +924,7 @@ const G_GunRecipes = (() => {
       case 'acog': return S.acog(k, ofs, top);
       case 'prism': return S.prism(k, ofs, top, o);
       case 'lpvo': return S.scope(k, ofs, top, 0.24, 0.022, 0.038);
-      case 'scope': return S.scope(k, ofs, top, o.scopeLen, o.scopeObj);
+      case 'scope': return S.scope(k, ofs, top, o.scopeLen, o.scopeObj, undefined, !!o.calc);
       case 'authored': return authoredOptic(k, o, ofs, top); // an optic made in Blender (models/parts/<slot>/<id>/): docs/models.md "Authored parts"
       case 'bead': { const sy = Math.max(top, onBarrel ? 0.014 : br) + 0.009; return S.bead(k, 0.02, front - 0.008, sy, [L, front - 0.006], onBarrel ? by + 0.004 : br, onBarrel); } // clear of the receiver's (bevelled) top
       case 'notch': if ((o.irons || 'ak') === 'ak') return S.irons(k, L * 0.85, frontF, top + 0.02, top, onBarrel ? by : br, 'ak', onBarrel);
