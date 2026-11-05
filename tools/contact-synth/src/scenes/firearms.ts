@@ -101,10 +101,10 @@ const BUFFER_TUBE_HOUSING: Scene['housing'] = { amount: 0.8, cavity: 0.8, cavity
 const arBufferSpring = springWire(25, 1.4);
 /**
  * Buffer spring strength relative to a standard carbine spring. Stiffer: faster, harder slam
- * home (and a bit more effort and noise compressing it on the pull). 1.6 ≈ a heavy
- * "extra power" spring.
+ * home (and more effort and noise compressing it on the pull). 3.2 = twice a heavy "extra
+ * power" spring: an explosive return.
  */
-const BUFFER_SPRING = 1.6;
+const BUFFER_SPRING = 3.2;
 const arBuffer = steelBlock(6, 18); // buffer with sliding weights
 const arCase: Body = { ...mat('brass'), shape: 'shell', size: 4.5, thickness: 0.4, modes: 1, irregularity: 0.5, damping: 0.6, level: 0 }; // held by the magazine / chamber
 // Spring-steel feed lips on the magazine body: they ring briefly (the magazine "ping").
@@ -261,7 +261,7 @@ function arForward(t: number, withChargingHandle: boolean): SceneElement[] {
     // The buffer spring unloading: tension let go, coils surging along it inside the buffer
     // tube. It's preloaded, so it never gets near free length: it pushes hard the whole way
     // and its surge pitch (set by stiffness and mass, not length) stays the same.
-    hit('buffer spring lets go', t, -8, V(3), arBufferSpring, arBufferTube, { scatter: 0.2, radius: 1, click: 0.1, sharp: 0.5 },
+    hit('buffer spring lets go', t, -3, V(3), arBufferSpring, arBufferTube, { scatter: 0.2, radius: 1, click: 0.4, sharp: 0.8 },
       { coil: { level: 0.7, length: 9, dispersion: 0.5, decay: 0.12, brightness: 3000 }, housing: BUFFER_TUBE_HOUSING }),
     rub('buffer spring extending in its tube', t + T(0.004), -16, { force: 3 * BUFFER_SPRING, duration: T(0.05), speed: V(3), profile: 'accelerate', roughness: 6, grain: 0.6, periodicity: 0, contactWidth: 0.2 }, arBufferSpring, arBufferTube,
       { coil: { level: 0.6, length: 11, dispersion: 0.5, decay: 0.12, brightness: 2800 }, housing: BUFFER_TUBE_HOUSING }),
@@ -282,14 +282,14 @@ function arForward(t: number, withChargingHandle: boolean): SceneElement[] {
     // first: a sharp, light hit. The carrier keeps going for its 9.5 mm of cam travel, the
     // cam pin turns the bolt into its lugs, and then the heavy hollow carrier lands on the
     // bolt: the "chunk", about 2.5 ms later.
-    hit('bolt face hits the barrel extension', t + T(0.055), -4, V(4.5), arBolt, arBarrelExt, { scatter: 0.3, radius: 3, click: 0.7 }),
+    hit('bolt face hits the barrel extension', t + T(0.055), 0, V(4.5), arBolt, arBarrelExt, { scatter: 0.3, radius: 2, click: 0.9, sharp: 0.95 }),
     rub('cam pin turns the bolt', t + T(0.054), -12, { force: 10, duration: T(0.011), speed: V(1.2), profile: 'decelerate', roughness: 10, grain: 0.2, contactWidth: 0.02 }, arCamPin, arCarrier),
     hit('bolt lugs rotate home', t + T(0.057), -9, V(1.5), arBolt, arBarrelExt, { scatter: 0.3, radius: 1.5 }),
-    hit('carrier slams onto the bolt', t + T(0.0578), 4, V(3.8), arCarrier, arBolt, { scatter: 0.5, radius: 4, click: 0.8 }),
+    hit('carrier slams onto the bolt', t + T(0.0578), 8, V(3.8), arCarrier, arBolt, { scatter: 0.5, radius: 3, click: 1, sharp: 0.95 }),
     // Seating into the breech: the lugs bottom in the barrel extension and the carrier's
     // momentum goes into the barrel and receiver through hard steel faces: a metallic "chunk"
     // from the barrel's own bending modes (~500 Hz up), not a soft low thump.
-    hit('lugs seat in the barrel extension', t + T(0.0579), 2, V(3.8), arBarrel, arCarrier, { scatter: 0.3, radius: 3, click: 0.6, sharp: 0.85 },
+    hit('lugs seat in the barrel extension', t + T(0.0579), 6, V(3.8), arBarrel, arCarrier, { scatter: 0.3, radius: 2, click: 0.8, sharp: 0.95 },
       // The whole receiver takes this blow, so it comes through the housing much more than a slide does.
       { housing: { amount: 0.95 } }),
     // ...and the rifle as a whole flexes from it: a hard-edged, low metallic "chunk" (not a sine thump).
