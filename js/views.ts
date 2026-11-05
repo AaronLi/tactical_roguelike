@@ -834,7 +834,9 @@ const G_Views = {
       const fog = G.R.scene.fog, cam = G.R.camera;
       if (fog) {
         const e = cam.matrixWorld.elements, depth = -((at.x - e[12]) * e[8] + (at.y - e[13]) * e[9] + (at.z - e[14]) * e[10]); // (along the view, as the fog's reckoned)
-        ev.rig.body.visible = depth < (fog as THREE.Fog).far + 2.5 && this.inSight(ev.rig, at);
+        // (through a magnified scope the fog's stretched in its picture, js/render.ts scopeReach: they're drawn out to there)
+        const pip = G.R.vm && G.R.vm.visible && G.R.vm.userData.pip, sk = pip && (G.R.pipLive || 0) > 0.35 ? G.R.scopeReach(pip.mag).k : 1;
+        ev.rig.body.visible = depth < (fog as THREE.Fog).far * sk + 2.5 && this.inSight(ev.rig, at);
       }
       // bleeding: drips falling from them as they go; down for good, from the body where it lies (its ragdoll's hips,
       // not where they last stood)

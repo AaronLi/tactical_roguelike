@@ -2,6 +2,7 @@
 const _tv = new THREE.Vector3(), _tv2 = new THREE.Vector3();
 const _fq = new THREE.Quaternion(), _fq2 = new THREE.Quaternion(), _fz = new THREE.Vector3(0, 0, 1), _fn = new THREE.Vector3(), _fp = new THREE.Vector3(), _fs = new THREE.Vector3(), _fm = new THREE.Matrix4(), _fc = new THREE.Color();
 const _bjc = new THREE.Color();
+const SCOPE_FAR = 600; // (how far a magnified scope's picture is drawn, m)
 // Three.js scene, character models, first-person viewmodels and particle effects.
 interface Trail { line: THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>; mat: THREE.LineBasicMaterial; n: number; N: number; shot: PShot; old: number | null; marks: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>[]; keys?: Set<any>; }
 type ImpactKind = 'wall' | 'blood' | 'armor'; // what a round hit (impact)
@@ -953,7 +954,8 @@ const G_R = {
     pip.disk.matrixWorld.decompose(sc.position, sc.quaternion, this._pipScale || (this._pipScale = new THREE.Vector3()));
     const d = Math.max(0.03, cam.position.distanceTo(sc.position));
     sc.fov = THREE.MathUtils.radToDeg(2 * Math.atan(pip.r / d)) / pip.mag;
-    sc.far = cam.far; // (as far as you can see without it)
+    const reach = this.scopeReach(pip.mag);
+    sc.far = reach.far;
     sc.updateProjectionMatrix();
     pip.mat.uniforms.pmil.value = (0.001 / Math.tan(THREE.MathUtils.degToRad(sc.fov) / 2)) * (pip.fp === 'sfp' ? pip.fpMag / pip.mag : 1); // (a mil's share of the lens's radius, at this power; a second focal plane's marks are true at one power only, and a mil is that much wider at any other)
     const eye = pip.disk.worldToLocal(cam.position.clone());
@@ -961,8 +963,20 @@ const G_R = {
     const r = this.renderer;
     r.setRenderTarget(this.pipRT!);
     r.clear();
+    const fog = this.scene.fog as THREE.Fog | null, n0 = fog ? fog.near : 0, f0 = fog ? fog.far : 0;
+    if (fog && reach.k > 1) { fog.near = n0 * reach.k; fog.far = f0 * reach.k; } // (the haze in the scope picture thins out: the same air, but it takes the power's worth of distance to see as little)
     r.render(this.scene, sc);
+    if (fog) { fog.near = n0; fog.far = f0; }
     r.setRenderTarget(null);
+  },
+  // How far a scope of this power sees: a magnified one reaches out to 600 m (the main view's far plane is 280 m, or
+  // the level's own), and its picture's fog is stretched by the power (k) so it still thickens with distance, without
+  // the wall at 60 m; never stretched past the far plane, so there's no edge to pop at.
+  scopeReach(mag: number) {
+    const cam = this.camera, fog = this.scene.fog as THREE.Fog | null;
+    if (!(mag > 1)) return { k: 1, far: cam.far };
+    const far = Math.max(cam.far, SCOPE_FAR), f = fog && fog.far < 1e4 ? fog.far : 0;
+    return { k: f ? Math.min(mag, Math.max(1, far / f)) : 1, far };
   },
   // Shaders are compiled the first time something is drawn, which is a stall (a big one on some GPUs): the
   // first shot (casing, tracer, bullet hole, blood), the first explosion, the first suspect to come into
