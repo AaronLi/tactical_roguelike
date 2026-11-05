@@ -93,6 +93,20 @@ export function checkGeometry(slot, cfg, b) {
   if (o.reflex && isFinite(o.fSight) && o.fSight > o.reflex.f) E(`optic.fSight (${mm(o.fSight)}) is forward of the window (${mm(o.reflex.f)}): fSight is the rear/eye side of the sight`);
   return out;
 }
+/** The pip disk (the scope's picture, js/viewmodel.ts pipLens) is drawn at optic.pip: no glass may be on the eye side of it there, or the
+ *  glass covers the picture (the lens shows solid). Each lens/glass mesh whose outline holds the disk's centre must end forward of it. */
+export function checkPipClear(cfg, meshes) {
+  const o = (cfg && cfg.optic) || {}, w = o.pip, out = [];
+  if (!w) return out;
+  const zDisk = -w.f, mm = (x) => (x * 1000).toFixed(1) + ' mm';
+  for (const m of meshes) {
+    if (!/lens|glass/i.test(m.mat || '') || (m.name && m.name.startsWith('display_'))) continue;
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, z1 = -Infinity;
+    for (let i = 0; i < m.pos.length; i += 3) { x0 = Math.min(x0, m.pos[i]); x1 = Math.max(x1, m.pos[i]); y0 = Math.min(y0, m.pos[i + 1]); y1 = Math.max(y1, m.pos[i + 1]); z1 = Math.max(z1, m.pos[i + 2]); }
+    if (x0 <= 0 && x1 >= 0 && y0 <= w.y && y1 >= w.y && z1 > zDisk - 1e-4) out.push(`optic.pip (forward ${mm(w.f)}) is not on the eye side of the ${m.mat} mesh "${m.name}" (its rear face is at forward ${mm(-z1)}): the glass covers the scope's picture; put pip.f at ${(-(z1 + 0.0005)).toFixed(4)} or further back`);
+  }
+  return out;
+}
 /** A part against the contract (Models = js/glb.ts in node): the config, the node tree, and the geometry. Returns { errors, warnings }. */
 export function checkAuthoredPart(Models, key) {
   const [slot, id] = key.split('/'), errors = [], warnings = [];
@@ -102,7 +116,7 @@ export function checkAuthoredPart(Models, key) {
   if (cfg.slot !== slot) errors.push(`model.json: "slot" is ${JSON.stringify(cfg.slot)} but the folder is models/parts/${slot}/`);
   let rep; try { rep = Models.validateAuthoredPart(Models.describeGltfJson(Models.glbJson(fs.readFileSync(glbOf(key)))), id, slot); } catch (e) { return { errors: [...errors, `${id}.glb: ${e.message}`], warnings }; }
   errors.push(...rep.errors); warnings.push(...rep.warnings);
-  if (!errors.length) { const p = readAuthoredPart(key); errors.push(...checkGeometry(slot, cfg, boundsOf(p.meshes))); }
+  if (!errors.length) { const p = readAuthoredPart(key); errors.push(...checkGeometry(slot, cfg, boundsOf(p.meshes)), ...checkPipClear(cfg, p.meshes)); }
   return { errors, warnings };
 }
 
