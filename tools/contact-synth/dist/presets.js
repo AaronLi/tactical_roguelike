@@ -5,7 +5,7 @@
  */
 import { materialById } from './materials.js';
 /** Material fields for a body patch. */
-function mat(id) {
+export function mat(id) {
     const m = materialById(id);
     if (!m)
         throw new Error(`unknown material ${id}`);

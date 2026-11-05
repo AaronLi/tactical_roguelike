@@ -15,7 +15,7 @@ export interface Preset {
 }
 
 /** Material fields for a body patch. */
-function mat(id: string): Pick<BodyParams, 'material' | 'stiffness' | 'density' | 'loss'> {
+export function mat(id: string): Pick<BodyParams, 'material' | 'stiffness' | 'density' | 'loss'> {
   const m = materialById(id);
   if (!m) throw new Error(`unknown material ${id}`);
   return { material: m.id, stiffness: m.stiffness, density: m.density, loss: m.loss };

@@ -52,3 +52,23 @@ const { samples, sampleRate } = render(withPatch(PRESETS.find(p => p.id === 'lat
 
 `Copy JSON` in the UI gives a full parameter set you can pass to `render()`. The page URL also stores the
 current patch, so a link opens the exact same sound.
+
+## Scenes (multi-part mechanisms)
+
+A scene sequences many contact sounds, each with its own pair of bodies, into named tracks on one
+timeline (`src/scene.ts`). Besides contact sounds, a scene can use an `air` source: band-passed noise
+for air pushed out of a plunger tube or barrel, with an optional "pop". All stems share one gain, so
+they keep their balance and sum exactly to the full mix.
+
+```
+npm run build
+npm run scene -- recon-cs6 out/recon        # stems + full mix + cues.json
+npm run scene -- recon-cs6-dry out/recon-dry
+```
+
+`recon-cs6` (`src/scenes/recon-cs6.ts`) is a Nerf Recon CS-6 priming and firing cycle with these
+tracks: slide back, spring compress, air-restrictor valve closing, sear engage, clip feed, slide
+forward (including dart chambering, front stop and the trigger lock), air-restrictor valve opening,
+trigger pull, sear release, plunger launch (spring, O-ring, air, dart leaving) and plunger impact.
+`recon-cs6-dry` is a dry fire. With no dart, the air restrictor stays shut and the trapped air
+cushions the plunger.

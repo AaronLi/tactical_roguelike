@@ -7,7 +7,8 @@
   "scripts": {
     "build": "tsc -p .",
     "watch": "tsc -p . --watch",
-    "check": "node test/render-all.mjs"
+    "check": "node test/render-all.mjs",
+    "scene": "node scripts/render-scene.mjs"
   },
   "devDependencies": {
     "typescript": "^6.0.2"
