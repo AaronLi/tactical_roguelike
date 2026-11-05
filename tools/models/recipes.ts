@@ -1510,7 +1510,7 @@ const G_GunRecipes = (() => {
     let sight: Sight;
     if (ownIrons) { // (its own aperture, the front post's on the barrel; a riser on the rail over the aperture, the irons still used)
       authored(k, A!, (e) => e.slot === 'optic'); sight = { sy: A!.info.sy, fSight: A!.info.fSight, relief: A!.info.relief };
-      if (o.optic && A!.sights.rail.includes(o.optic)) k.box(0.024, o.riser || 0.022, 0.034, M.black(), ofs - 0.017, top + (o.riser || 0.022) / 2);
+      if (o.optic && A!.sights.rail.includes(o.optic)) k.at('mount', () => k.box(0.024, o.riser || 0.022, 0.034, M.black(), ofs - 0.017, top + (o.riser || 0.022) / 2));
     }
     else if (rcv === 'aug') {
       const V = augTrace;
