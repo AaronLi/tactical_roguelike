@@ -640,6 +640,7 @@ const G_VMAnim = (() => {
       if (idx === 0) {
         place(a.R, SHOULDER_R.clone().applyMatrix4(_inv), Rt.applyMatrix4(h.holder.matrix));
         place(a.L, SHOULDER_L.clone().applyMatrix4(_inv), Lt.clone().applyMatrix4(h.holder.matrix));
+        a.L.sleeve.visible = a.L.glove.visible = !pl.zipRide; // (on a zipline the left hand's up on the trolley, out of view)
         // looking something over, the hands turn with it: the right with the gun on its grip, the left under
         // the magazine it's holding (eased in and out so nothing snaps)
         const look = !!(pose && (pl.inspectT > 0 || pl.magChk || pl.rChk));

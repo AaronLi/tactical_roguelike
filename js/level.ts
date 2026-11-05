@@ -2130,8 +2130,8 @@ const G_Level = {
   // colours (unlit materials: the light grid only knows the level), the sun from low in the west.
   // a point on a zipline's cable (crest.lines), s from 0 at its start to 1 at its end: straight between its ends, sagging in
   // the middle (a parabola's near enough to the catenary)
-  // A zipline's trolley as it hangs off the cable: the yellow trolley on it, a strap down to the grab bar ZIP_BAR under the
-  // cable, the bar across (along x: turned across the cable by whoever hangs it). Its origin is the cable. One waits at each
+  // A zipline's trolley as it hangs off the cable: the yellow trolley on it, a strap down to the handle ZIP_BAR under the
+  // cable, a short bar across it for one hand (along x: turned across the cable by whoever hangs it). Its origin is the cable. One waits at each
   // line's start (buildCrest); a rider takes one across (js/rig.ts, js/player.ts zipArms), hanging by the bar, their feet
   // ZIP_HANG under the cable.
   ZIP_BAR: 0.65, ZIP_HANG: 2.65,
@@ -2141,7 +2141,9 @@ const G_Level = {
     const g = new T.Group(), B = this.ZIP_BAR;
     const tro = new T.Mesh(new T.BoxGeometry(0.12, 0.16, 0.28), M.yel); tro.position.y = -0.13; g.add(tro);
     const strap = new T.Mesh(new T.BoxGeometry(0.03, B - 0.2, 0.03), M.steel); strap.position.y = -(0.2 + B) / 2; g.add(strap);
-    const bar = new T.Mesh(new T.CylinderGeometry(0.02, 0.02, 0.52, 6), M.steel); bar.rotation.z = Math.PI / 2; bar.position.y = -B; g.add(bar);
+    const bar = new T.Mesh(new T.CylinderGeometry(0.022, 0.022, 0.2, 6), M.steel); bar.rotation.z = Math.PI / 2; bar.position.y = -B; g.add(bar); // (the handle: one hand's width)
+    const wheel = new T.Mesh(new T.CylinderGeometry(0.06, 0.06, 0.05, 12), M.steel); wheel.rotation.z = Math.PI / 2; wheel.position.y = 0.01; g.add(wheel); // (the trolley's wheels, fore and aft, on the cable)
+    wheel.position.z = 0.09; const w2 = wheel.clone(); w2.position.z = -0.09; g.add(w2);
     return g;
   },
   zipPoint(l: { a: number[]; b: number[]; sag: number }, s: number) { return [l.a[0] + (l.b[0] - l.a[0]) * s, l.a[1] + (l.b[1] - l.a[1]) * s - l.sag * 4 * s * (1 - s), l.a[2] + (l.b[2] - l.a[2]) * s]; },

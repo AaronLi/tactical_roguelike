@@ -19,6 +19,9 @@ interface Ragdoll { // the Verlet ragdoll a dead (or powered, living) rig carrie
 }
 interface RagRoll { t: number; driven?: boolean; [field: string]: any } // a body being rolled onto its front (planRoll)
 interface RigArm { sh: THREE.Object3D; up: THREE.Object3D; lo: THREE.Object3D; tie: THREE.Mesh }
+// a rider's swing under the trolley (zipSwing): th, how far the feet are swung forward of hanging straight down (rad), its rate, and
+// the speed along the line (eased) and the acceleration of that it has been working from
+interface ZipSwing { th: number; w: number; v: number; a: number }
 interface RigLeg { th: THREE.Object3D; sh: THREE.Object3D }
 type RigState = 'alive' | 'down' | 'dead';
 interface Rig { // a character's skeleton and its meshes (what create makes, and what update, the hit and the zip tie add as they go)
@@ -33,7 +36,7 @@ interface Rig { // a character's skeleton and its meshes (what create makes, and
   die(dir: any): void; throwNade(str?: number): void; setKit(k: any): void; setCallsign(id: string, name: string): void; holster(on: boolean): void; zip(on: boolean, instant?: boolean): void;
   secure(t: number): void; settle(sec?: number): void; startle(): void; dispose(): void;
   // (what the animation keeps from frame to frame)
-  powered?: boolean; limp?: boolean; zipped?: boolean; zipKit?: THREE.Object3D; zipT?: number; zipYaw?: number | null; proneW?: number; proneS?: number; effPh?: number; effT?: number; braceW?: number; gunAimW?: number; gunKick?: number;
+  powered?: boolean; limp?: boolean; zipped?: boolean; zipKit?: THREE.Object3D; zipT?: number; zipYaw?: number | null; zipSw?: ZipSwing; proneW?: number; proneS?: number; effPh?: number; effT?: number; braceW?: number; gunAimW?: number; gunKick?: number;
   gunBase?: { p: THREE.Vector3; q: THREE.Quaternion; s: THREE.Vector3 }; gunBaseOf?: THREE.Object3D; gunSupport?: THREE.Vector3 | null; bipodK?: number; hitDir?: THREE.Vector3; xbLoaded?: any;
   blindW?: number; dazeW?: number; blindT?: number; atakW?: number; atak?: THREE.Group; handNade?: any; throwHand?: boolean; throwStr?: any; dropped?: { g: THREE.Object3D; vy: number; spin: number; floor?: number; [field: string]: any } | null;
   [bone: string]: any; // (a bone looked up by name: js/ballistics.ts boneOf, the hitbox readouts of js/hud.ts and js/highlights.ts; and what js/hud.ts keeps on a rig)
@@ -569,6 +572,17 @@ const G_Rig = (() => {
     rig.chest.add(mount); mount.visible = false;
     return hinge;
   }
+  // A rider's swing (rig.zipSw): a pendulum hung from the trolley's handle (about a metre down to where they weigh), pushed back by
+  // being speeded up, forward by being slowed, and leant back a little by the speed itself (the wind); v is how fast they're going
+  // along the line (m/s). Their own view (js/player.ts) runs the same, from their own motion.
+  function zipSwing(sw: ZipSwing, v: number, dt: number) {
+    if (!(dt > 0)) return;
+    const f = sw.v + (v - sw.v) * Math.min(1, dt * 3); sw.a = (f - sw.v) / dt; sw.v = f; // (their speed as the trolley picks it up: over a third of a second or so, not all at once)
+    for (let left = Math.min(dt, 0.25); left > 1e-6; left -= 0.02) {
+      const h = Math.min(left, 0.02);
+      sw.w += (-9.5 * (sw.th + 0.011 * sw.v) - 1.5 * sw.w - 0.3 * sw.a) * h; sw.th = G.U.clamp(sw.th + sw.w * h, -0.7, 0.7);
+    }
+  }
   function update(rig: Rig, dt: number, p: any) {
     const U = G.U, s = rig.scale;
     const root = rig.root;
@@ -621,7 +635,7 @@ const G_Rig = (() => {
     const crouchTo = p.crouch || posed ? 1 - lie : Math.max(0, Math.min(1, 0.42 * bw + 0.14 * dz)); // (hunched over, knees soft)
     rig.crouchW += (crouchTo - rig.crouchW) * Math.min(1, dt * (crouchTo < rig.crouchW && p.rise || 9)); // (rise: a suspect comes up out of cover slower than they duck)
     rig.downW += ((p.state === 'down' ? 1 : 0) - rig.downW) * Math.min(1, dt * 5);
-    rig.aimW += ((p.alert && !posed && !p.blind && !rig.slung ? 1 : 0) - rig.aimW) * Math.min(1, dt * 6);
+    rig.aimW += (((p.zip ? p.aim : p.alert) && !posed && !p.blind && !rig.slung ? 1 : 0) - rig.aimW) * Math.min(1, dt * 6); // (on a zipline the gun hangs low in the one hand till they aim or fire)
     rig.lean += ((p.lean || 0) - rig.lean) * Math.min(1, dt * 8);
     rig.kick = Math.max(0, rig.kick - dt * 7);
     rig.flinch.z = Math.max(0, rig.flinch.z - dt * 5);
@@ -635,7 +649,17 @@ const G_Rig = (() => {
     // body: hips height, lean, downed pose
     const hipH = U.lerp(HIP_H, CROUCH_H, rig.crouchW) - bob + 0.02 * moving;
     rig.body.rotation.set(-Math.PI / 2 * 0.96 * lie, 0, 0); // tips forward about the feet
-    rig.body.position.y = 0.12 * lie;
+    rig.body.position.set(0, 0.12 * lie, 0);
+    // on a zipline: the whole body swings from the left hand on the trolley's handle (a pendulum, zipSwing), a little more as it
+    // speeds up and stops, with a slow small sway of its own, and hangs a hand's width off the line so the arm goes straight up
+    if (p.zip) {
+      const sw = rig.zipSw || (rig.zipSw = { th: 0, w: 0, v: 0, a: 0 }), L = G.Level, h = L.ZIP_HANG - L.ZIP_BAR;
+      rig.zipT = (rig.zipT || 0) + dt;
+      zipSwing(sw, -(rig.vel.x * Math.sin(rig.zipYaw!) + rig.vel.z * Math.cos(rig.zipYaw!)), dt); // (along the way they face)
+      const th = sw.th + 0.03 * Math.sin(rig.zipT * 1.9 + rig.phase);
+      rig.body.rotation.x = th; rig.body.rotation.z = 0.04 * Math.sin(rig.zipT * 1.3 + rig.phase * 2); // (turned about their hand: the feet carry the swing)
+      rig.body.position.set(0.09, h * (1 - Math.cos(th)), -h * Math.sin(th));
+    } else rig.zipSw = undefined;
     rig.hips.position.set(rig.lean * 0.14, U.lerp(hipH, 0.17, rig.downW), U.lerp(0, 0.06, rig.crouchW));
     rig.hips.rotation.set(0, Math.sin(rig.phase) * 0.12 * moving, 0);
     const fl = rig.flinch.z;
@@ -670,6 +694,11 @@ const G_Rig = (() => {
     const pup = gi && !pistol ? Math.max(0, gi.grip[0] - 0.05) : 0;
     if (pup) { mount.position.z += pup * (1 - rig.proneS); mount.position.y -= pup * rig.proneS; }
     if (rig.proneS > 0.001) { mount.position.x += (PRONE.gunX - mount.position.x) * rig.proneS; mount.position.z += PRONE.gunUp * rig.proneS; mount.position.y += PRONE.gunFwd * rig.proneS; } // (in under the cheek, up off the ground)
+    if (p.zip) { // one-handed: the gun out low at the right hip's side, a long one laid over the forearm, up to level as they aim
+      const k = 1 - rig.aimW;
+      if (!pistol) { mount.position.x += 0.04 * k; mount.position.y -= 0.07 * k; mount.position.z += 0.06 * k; mount.rotation.x += 0.45 * k; mount.rotation.y = 0.12 * k; }
+      else { mount.position.y -= 0.05 * k; mount.rotation.x -= 0.2 * k; }
+    }
     if (dz > 0.002) { mount.rotation.x -= 0.75 * dz; mount.position.y -= 0.1 * dz; mount.position.z += 0.06 * dz; } // (the weapon lowered, hanging from the hand: it can't be aimed)
     if (rig.throwT >= 0 && !rig.throwHand) mount.rotation.x -= 0.6 * Math.sin(Math.PI * Math.min(1, rig.throwT / 0.9));
     // a reload: the gun canted toward the support hand; inspecting it: rolled over and turned to look along it
@@ -726,7 +755,7 @@ const G_Rig = (() => {
     } else if (rig.gun && gi && !rig.slung) {
       // held out in front: a long gun's forend can be past where the left arm reaches; it comes back along itself
       // till the support hand's on it
-      if (!gi.pistol) {
+      if (!gi.pistol && !p.zip) { // (one-handed on a zipline: the left's on the trolley)
         rig.chest.updateMatrixWorld(true);
         const S = rig.gun.localToWorld(_a.set(gi.support[2] - 0.01, gi.support[1], -gi.support[0])), P = rig.armL.up.getWorldPosition(_b);
         const f = _c.set(0, 0, -1).transformDirection(rig.gun.matrixWorld), D = _d.subVectors(S, P), R = (UARM + FARM) * s * 0.98;
@@ -875,19 +904,17 @@ const G_Rig = (() => {
       for (const [leg, side, k] of [[rig.legL, -1, 'fL'], [rig.legR, 1, 'fR']] as [RigLeg, number, string][]) ik(leg.th, leg.sh, THIGH * s, SHIN * s, at(k), new T.Vector3(l.x - 0.6, y + 0.7, l.z - side * 0.25));
       for (const [arm, side, k] of [[rig.armL, -1, 'hL'], [rig.armR, 1, 'hR']] as [RigArm, number, string][]) ik(arm.up, arm.lo, UARM * s, FARM * s, at(k), new T.Vector3(l.x + 0.5, y + 1.0, l.z - side * 0.7));
     }
-    // on a zipline (p.zip): hanging by both hands from the grab bar over their head, a trolley and its bar going with them
-    // (G.Level.zipKit, the cable ZIP_HANG over their feet); the body hanging under it, the legs a little bent and swinging
+    // on a zipline (p.zip): hanging by the left hand from the handle of a trolley on the line (G.Level.zipKit, the cable ZIP_HANG over
+    // their feet), the right hand with the gun (above); the body swings under it (above), the legs together, a little bent, the feet
+    // kicked up and trailing the swing
     if (p.zip) {
       const L = G.Level;
       if (!rig.zipKit) { rig.zipKit = L.zipKit(); root.add(rig.zipKit); }
       rig.zipKit.visible = true; rig.zipKit.position.set(0, L.ZIP_HANG, 0);
-      rig.zipT = (rig.zipT || 0) + dt;
-      const sw = Math.sin(rig.zipT * 2.3) * 0.12, bar = L.ZIP_HANG - L.ZIP_BAR;
-      rig.hips.position.z -= sw * 0.3; rig.spine.rotation.x += sw * 0.3; rig.chest.rotation.x -= 0.1;
       root.updateMatrixWorld(true);
-      const R = (x: number, y: number, z: number) => root.localToWorld(new T.Vector3(x, y, z));
-      for (const [arm, side] of [[rig.armL, -1], [rig.armR, 1]] as [RigArm, number][]) ik(arm.up, arm.lo, UARM * s, FARM * s, R(side * 0.17, bar, 0), R(side * 0.9, 1.3, 0.1));
-      for (const [leg, side] of [[rig.legL, -1], [rig.legR, 1]] as [RigLeg, number][]) ik(leg.th, leg.sh, THIGH * s, SHIN * s, rig.body.localToWorld(new T.Vector3(side * 0.12, 0.12 + Math.max(0, sw) * 0.3, -0.12 - sw * (side > 0 ? 1.2 : 0.8))), R(side * 0.15, 0.7, -1.2));
+      ik(rig.armL.up, rig.armL.lo, UARM * s, FARM * s, root.localToWorld(new T.Vector3(0, L.ZIP_HANG - L.ZIP_BAR, 0)), rig.chest.localToWorld(new T.Vector3(-0.55, 0.15, 0.1)));
+      const lag = U.clamp(-(rig.zipSw ? rig.zipSw.th : 0), 0, 0.6); // (the feet trail more the further back the swing)
+      for (const [leg, side] of [[rig.legL, -1], [rig.legR, 1]] as [RigLeg, number][]) ik(leg.th, leg.sh, THIGH * s, SHIN * s, rig.body.localToWorld(new T.Vector3(side * 0.07, 0.2 + lag * 0.15, -0.08 - side * 0.02)), rig.body.localToWorld(new T.Vector3(side * 0.1, 0.6, -0.9)));
     } else if (rig.zipKit) { rig.zipKit.visible = false; rig.zipT = 0; }
     if (rig.powered && p.str != null) powerStep(rig, dt, p.str, p.aimAt);
     else if (rig.powered) rig.rd = null!; // (far off: animated only; the body starts again from the pose when near)
@@ -1617,7 +1644,7 @@ const G_Rig = (() => {
   // where someone lying (dead, or down for good) is: their ragdoll's hips, wherever it came to rest
   function bodyAt(rig: Rig) { return (rig.hips || rig.root).getWorldPosition(new THREE.Vector3()); }
   return {
-    create, raycast, rayCapsule, OFFICER_LOOK, LOOKS, cleanLook, armourKit, zipPoint, bodyAt,
+    create, zipSwing, raycast, rayCapsule, OFFICER_LOOK, LOOKS, cleanLook, armourKit, zipPoint, bodyAt,
     get debug() { return debug; },
     toggleDebug() { debug = !debug; return debug; },
   };
