@@ -3,11 +3,11 @@
   case?: any; abox?: any; sbox?: any; winAt?: any; leafAt: Map<number, any>; unitAt?: Int8Array | null; doorAt?: any; doorMeshes?: any; fy: number; fl?: number; spawn: any; spawnRoom: LvRoom; exitRoom: LvRoom; extract?: any;
   grate?: any; railSteel?: boolean; fest?: any; base?: number; NF: number; minY?: number; rails: any[]; lz?: any; lzSpots?: number[][]; terrain?: any; skirt: number; entries?: number[][]; caseView?: any; cabViews?: any; aboxView?: any; sboxView?: any;
   above?: LvMap | null; voidAbove?: ArrayLike<number> | null; units?: number; navG?: any; lightT?: number; underground?: boolean; rollers?: number[][]; hub?: boolean; glassRuns?: any; fences: LvFence[]; doorVer?: number; cracked?: any; dmg?: any;
-  wallMesh?: any; wallIdx?: Map<number, number>; wallBase?: Float32Array; homes?: any; civSpots?: { x: number; z: number; yaw: number }[] | null } interface LvLight { x: number; z: number; y?: number; kind?: LvLightKind; color?: number; i?: number; d?: number; up?: number; porch?: number; fl?: number } interface LvWin { solids?: any[]; id: number; cells: number[]; nx: number; nz: number; ext: boolean; broken: boolean; x: number; z: number; len: number; armor?: boolean; cooler?: boolean; sill?: number; top?: number; door?: LvDoor; cracked?: any; fy?: number; rail?: any; fl?: number } interface LvCab { x: number; z: number; yaw: number } interface LvRoom { cars?: any; type: RoomType; x: number; z: number; w: number; h: number; cx: number; cz: number; dress?: LvDress | null; unit?: number; lid?: any; door?: any; out?: boolean; loft?: boolean; lamp?: any; cover?: any[][]; carved?: boolean; front?: any; tall?: any; house?: any; fl?: number; flush?: boolean } interface LvLz { x: number; z: number; f?: number; lamps?: number[][]; y?: number } type LvFence = [number, number, string, string?]; type LvRng = () => number; type LvObj = THREE.Object3D & Record<string, any>; interface LvBox { m?: any; cx: number; cz: number; hx: number; hz: number; y0: number; h: number; ray?: LvBox[]; gy?: number } interface LvDoor { id: number; i: number; tx: number; tz: number; x: number; z: number; axis: LvAxis; open: boolean; mirror: boolean; kind: any; cells?: number[]; w?: number; leaf?: LvBox; solids?: any[]; holes: any; gone: any; fallen?: boolean; rest?: any; pane?: any; fy?: number; fl?: number } interface LvProp { style?: Record<string, any>; name: string; x: number; z: number; q: number; v: number; boxes: LvBox[]; gy?: number; gone?: any; wd?: any; own?: boolean; block?: number } // a room's purpose (what furniture.ts fits it out as; homes.ts re-types a room to a resident's)
+  wallMesh?: any; wallIdx?: Map<number, number>; wallBase?: Float32Array; homes?: any; civSpots?: { x: number; z: number; yaw: number }[] | null; night?: boolean; lux?: LvLux } interface LvLight { x: number; z: number; y?: number; kind?: LvLightKind; color?: number; i?: number; d?: number; up?: number; porch?: number; fl?: number; glow?: number; off?: boolean; sign?: { x: number; z: number; ax: LvAxis } } interface LvLux { W: number; H: number; NF: number; v: Float32Array } interface LvWin { solids?: any[]; id: number; cells: number[]; nx: number; nz: number; ext: boolean; broken: boolean; x: number; z: number; len: number; armor?: boolean; cooler?: boolean; sill?: number; top?: number; door?: LvDoor; cracked?: any; fy?: number; rail?: any; fl?: number } interface LvCab { x: number; z: number; yaw: number } interface LvRoom { cars?: any; type: RoomType; x: number; z: number; w: number; h: number; cx: number; cz: number; dress?: LvDress | null; unit?: number; lid?: any; door?: any; out?: boolean; loft?: boolean; lamp?: any; cover?: any[][]; carved?: boolean; front?: any; tall?: any; house?: any; fl?: number; flush?: boolean } interface LvLz { x: number; z: number; f?: number; lamps?: number[][]; y?: number } type LvFence = [number, number, string, string?]; type LvRng = () => number; type LvObj = THREE.Object3D & Record<string, any>; interface LvBox { m?: any; cx: number; cz: number; hx: number; hz: number; y0: number; h: number; ray?: LvBox[]; gy?: number } interface LvDoor { id: number; i: number; tx: number; tz: number; x: number; z: number; axis: LvAxis; open: boolean; mirror: boolean; kind: any; cells?: number[]; w?: number; leaf?: LvBox; solids?: any[]; holes: any; gone: any; fallen?: boolean; rest?: any; pane?: any; fy?: number; fl?: number } interface LvProp { style?: Record<string, any>; name: string; x: number; z: number; q: number; v: number; boxes: LvBox[]; gy?: number; gone?: any; wd?: any; own?: boolean; block?: number } // a room's purpose (what furniture.ts fits it out as; homes.ts re-types a room to a resident's)
 type RoomType = 'living' | 'kitchen' | 'dining' | 'bedroom' | 'office' | 'storage' | 'breakroom' | 'yard' | 'hall' | 'hangar' | 'lz' | 'street' | 'road' | 'lot' | 'corridor' | 'bathroom' | 'alley' | 'stage' | 'washroom' | 'plaza' | 'cafe' | 'store' | 'mart' | 'bar' | 'melt' | 'control' | 'mcc' | 'locker' | 'kitchenette' | 'lobby' | 'observe' | 'boss' | 'meeting' | 'trail' | 'garden' | 'giftshop' | 'storeroom' | 'stockroom' | 'freezer' | 'cashier' | 'dock' | 'lawn' | 'landing' | 'range' | 'seating' | 'roof' | 'picnic' | 'parking' | 'pad' | 'gate' | 'cubicle' | 'court' | 'aisle' | 'overlook' | 'catwalk' | 'ridge' | 'saddle' | 'greenhouse' | 'antennas' | 'carpark' | 'mill' | 'loading' | 'restroom';
 type LvAxis = 'x' | 'z'; // (which way a door, stair or fence runs)
 type LvDoorKind = 'stair' | 'fire' | 'vault'; // (a door that isn't the plain wooden one)
-type LvLightKind = 'string' | 'highbay' | 'panel';
+type LvLightKind = 'string' | 'highbay' | 'panel' | 'exit';
 type LvFxKind = 'sparks' | 'jet' | 'embers' | 'steam' | 'smoke';
 interface LvDress { who: string; type0: RoomType; wall: string; paper?: number; ceil: string; trim: string; floor: HomeFloor; cells: number[] | null; hung: any[]; was: Map<any, any>; gone: any[]; own: any[] }
 // what a ray is asked to do (G.World.raycast, G.Level.raycast): through glass, a look not a round, bars, what stops people, solids to skip
@@ -34,8 +34,14 @@ const G_Level = {
   CRATE_HX: 0.8,
   DOOR_H: 2.3,
 
-  // th: the environment (index into G.THEMES) picked on the route map; by default they come round in turn
-  generate(seed: number, level: number, th?: number) {
+  // th: the environment (index into G.THEMES) picked on the route map; by default they come round in turn. night: a night
+  // level (the route node's: js/route.ts), the same place with the lights out (nightify)
+  generate(seed: number, level: number, th?: number, night = false) {
+    const map = this.generateDay(seed, level, th);
+    if (night) this.nightify(map, seed);
+    return map;
+  },
+  generateDay(seed: number, level: number, th?: number) {
     const U = G.U, r = U.rng(seed);
     const theme = G.THEMES[th != null && G.THEMES[th] ? th : (level - 1) % G.THEMES.length];
     // the layout: an apartment block, a warehouse, two houses back to back with their gardens between, or a
@@ -81,6 +87,111 @@ const G_Level = {
     for (const sp of map.enemySpots) (seen(sp) ? lzSpots : kept).push(sp);
     map.enemySpots = kept; map.lzSpots = lzSpots;
     return map;
+  },
+  // A night level: the same place with the power off. The theme's lamps are dark (their fittings still there, unlit), what
+  // glows of itself still glows (a furnace, molten metal: a light with glow), and a few emergency lights are on: exit signs
+  // over doorways (green, one in five red), each a dim light of a few metres, over every stairwell's door and about one
+  // door in four besides. Outdoors, and in through the windows, it's the moon: the theme's sky light (js/lightgrid.ts),
+  // much dimmer and bluer (NIGHT). Drawn from a generator of its own (from the seed), so the place is the day's.
+  NIGHT: { fog: 0x04060b, hemi: 0x8a9ad0, hemiI: 0.15, cloud: 0x1c2030 }, // (cloud: the clouds the helicopter flies through, js/landing.ts)
+  nightify(map: LvMap, seed: number) {
+    const r = G.U.rng(seed ^ 0x6e1647), TS = this.TS, th = Object.assign({}, map.theme, this.NIGHT) as ThemeDef;
+    map.night = true; map.theme = th;
+    for (const fm of map.floors || [map]) {
+      fm.night = true; fm.theme = th;
+      for (const l of fm.lights) if (!l.glow) l.off = true;
+      const W = fm.W, t = fm.t;
+      for (const d of fm.doors) {
+        if (d.kind !== 'stair' && r() >= 0.25) continue;
+        // the sign goes over the doorway on its indoor side (open floor, under a roof), or whichever side's open
+        const side = [-1, 1].map((sg) => { const i = d.axis === 'z' ? (d.tz + sg) * W + d.tx : d.tz * W + d.tx + sg; return { sg, open: t[i] != null && t[i] !== 1 && t[i] !== 5, inside: !(fm.out && fm.out[i]) }; });
+        const sd = side.find((q) => q.open && q.inside) || side.find((q) => q.open);
+        if (!sd) continue;
+        const ox = d.axis === 'x' ? sd.sg : 0, oz = d.axis === 'z' ? sd.sg : 0, green = r() < 0.8;
+        fm.lights.push({ kind: 'exit', x: d.x + ox * (TS / 2 + 0.3), z: d.z + oz * (TS / 2 + 0.3), y: this.DOOR_H + 0.35, color: green ? 0x5cff88 : 0xff4a3a, i: 0.18, d: 5.5,
+          sign: { x: d.x + ox * (TS / 2 + 0.03), z: d.z + oz * (TS / 2 + 0.03), ax: d.axis } });
+      }
+    }
+    return map;
+  },
+  // The light a lamp gives off, as the light grid takes it (js/lightgrid.ts), from where it hangs (map.lights): null for one
+  // that's off (a night level's). Its height from its own floor.
+  lampOf(l: LvLight, th: ThemeDef): LvLight | null {
+    if (l.off) return null;
+    if (l.kind === 'string' || l.kind === 'exit') return { x: l.x, y: l.y, z: l.z, color: l.color, i: l.i, d: l.d };
+    if (l.porch) return { x: l.x, y: l.y! - 0.1, z: l.z + l.porch * 0.5, color: 0xffd59a, i: 0.9, d: 11 };
+    if (l.kind === 'panel') return { x: l.x, y: this.WALL_H - 0.4, z: l.z, color: 0xf2f6ff, i: 0.45, d: 9 };
+    if (l.kind === 'highbay') return { x: l.x, y: l.y! - 0.4, z: l.z, color: l.color, i: l.i, d: l.d };
+    return { x: l.x, y: this.WALL_H - 0.4, z: l.z, color: th.light, i: 0.85, d: 14 };
+  },
+  // How lit each spot on the floor is, for the suspects' eyes (js/server.ts lightK): a number a fine tile, a layer a
+  // floor, worked out once a level (the first time it's asked) from the same lamps and sky the light grid draws
+  // (js/lightgrid.ts), but cheaply and in grey (a light's brightness the mean of its colour, as written: (r + g + b) / 3):
+  //   tile = FILL                               what's flat everywhere (the hemisphere light's share: js/render.ts setLevel)
+  //        + sky                                open to the sky, the theme's (hemiI^2); by an outside window 0.6 of it
+  //        + sum over lamps i * (1 - d / r)^1.6 each in line of the tile (no wall between; the doors taken as open), d to a
+  //                                             point a metre over it (a body's middle), r the lamp's reach
+  //        + BOUNCE * that, spread round        (a blur over the open tiles: the light back off the walls and floor)
+  // On the light grid's scale: under a room's lamp 0.3 to 0.7, a corridor between its lamps about 0.1, outdoors under a
+  // level's evening sky about 0.08; a night level's rooms, away from the exit signs, under 0.01.
+  lux(map: LvMap): LvLux {
+    if (map.lux) return map.lux;
+    const TS = this.TS, fms = map.floors || [map], W = map.W, H = map.H, N = W * H, NF = fms.length, th = map.theme, v = new Float32Array(N * NF);
+    const lum = (hex: number) => (((hex >> 16) & 255) + ((hex >> 8) & 255) + (hex & 255)) / 765;
+    const sky = (th.hemiI || 0.26) ** 2 * lum(th.hemi || th.light || 0xffffff), FILL = sky * 0.25, BOUNCE = 0.45, PASSES = 12, DECAY = 1.6;
+    fms.forEach((fm: LvMap, f: number) => {
+      const t = fm.t, base = f * N, win = new Set<number>(), out = new Float32Array(N);
+      for (const w of map.windows || []) if ((w.fl || 0) === f) for (const c of w.cells) win.add(c);
+      for (const l0 of fm.lights) {
+        const l = this.lampOf(l0, th);
+        if (!l) continue;
+        const k = l.i! * lum(l.color!), r = l.d!, dy = l.y! - 1;
+        const x0 = Math.max(0, Math.floor((l.x - r) / TS)), x1 = Math.min(W - 1, Math.floor((l.x + r) / TS));
+        const z0 = Math.max(0, Math.floor((l.z - r) / TS)), z1 = Math.min(H - 1, Math.floor((l.z + r) / TS));
+        for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) {
+          const i = z * W + x;
+          if (t[i] === 1) continue;
+          const cx = (x + 0.5) * TS, cz = (z + 0.5) * TS, dx: number = l.x - cx, dz: number = l.z - cz, d = Math.hypot(dx, dy, dz);
+          if (d >= r) continue;
+          // (the line to it, as the light grid's: through no wall but glass; it may start in one, a lantern on a wall)
+          const flat = Math.hypot(dx, dz), steps = Math.ceil(flat / (TS * 0.4));
+          let blocked = false;
+          for (let s = 1; s < steps && !blocked; s++) {
+            const u = s / steps;
+            if (flat * (1 - u) < 0.35) continue;
+            const j = Math.floor((cz + dz * u) / TS) * W + Math.floor((cx + dx * u) / TS);
+            if (j !== i && t[j] === 1 && !win.has(j)) blocked = true;
+          }
+          if (!blocked) out[i] += k * Math.pow(1 - d / r, DECAY);
+        }
+      }
+      if (fm.out) for (let i = 0; i < N; i++) if (fm.out[i] && t[i] !== 1) out[i] += sky;
+      for (const w of map.windows || []) if ((w.fl || 0) === f && w.ext) for (const c of w.cells) { const q = c - w.nx - w.nz * W; if (q >= 0 && q < N && t[q] !== 1) out[q] += sky * 0.6; }
+      let a = Float32Array.from(out), b = new Float32Array(N);
+      for (let pass = 0; pass < PASSES; pass++) {
+        for (let z = 0, i = 0; z < H; z++) for (let x = 0; x < W; x++, i++) {
+          if (t[i] === 1) { b[i] = 0; continue; }
+          let sum = a[i], n = 1;
+          if (x > 0 && t[i - 1] !== 1) { sum += a[i - 1]; n++; }
+          if (x < W - 1 && t[i + 1] !== 1) { sum += a[i + 1]; n++; }
+          if (z > 0 && t[i - W] !== 1) { sum += a[i - W]; n++; }
+          if (z < H - 1 && t[i + W] !== 1) { sum += a[i + W]; n++; }
+          b[i] = sum / n;
+        }
+        [a, b] = [b, a];
+      }
+      for (let i = 0; i < N; i++) v[base + i] = t[i] === 1 ? 0 : FILL + out[i] + BOUNCE * a[i];
+    });
+    return (map.lux = { W, H, NF, v });
+  },
+  // the light at (x, y, z) (lux): its tile's on its floor (by a wall, the open tile beside it), or none off the map
+  luxAt(map: LvMap, x: number, y: number, z: number) {
+    const g = this.lux(map), W = g.W, N = W * g.H, tx = Math.floor(x / this.TS), tz = Math.floor(z / this.TS);
+    if (tx < 0 || tz < 0 || tx >= W || tz >= g.H) return 0;
+    const o = Math.min(g.NF - 1, this.floorAt(map, x, y, z)) * N, i = tz * W + tx;
+    let v = g.v[o + i];
+    if (!v) for (const j of [i - 1, i + 1, i - W, i + W]) if (j >= 0 && j < N) v = Math.max(v, g.v[o + j]);
+    return v;
   },
   // The hangar between levels (js/hangar.ts): the whole map is the same as any level's (the same walls, floor,
   // lights, collision and rays), with nothing in it but what G.Hangar puts there.
@@ -456,7 +567,7 @@ const G_Level = {
       const rec = G.Furniture.R[p.name];
       if (!rec.glow && !rec.fx) continue;
       const s = Math.round(Math.sin(p.q * Math.PI / 2)), c = Math.round(Math.cos(p.q * Math.PI / 2)), at = (lx: number, lz: number) => [p.x + lx * c + lz * s, p.z - lx * s + lz * c];
-      if (rec.glow) { const g = rec.glow, [x, z] = at(g.x || 0, g.z || 0); map.lights.push({ kind: 'string', x, z, y: g.y, color: g.color, i: g.i, d: g.d, up: 1 }); }
+      if (rec.glow) { const g = rec.glow, [x, z] = at(g.x || 0, g.z || 0); map.lights.push({ kind: 'string', x, z, y: g.y, color: g.color, i: g.i, d: g.d, up: 1, glow: 1 }); }
       for (const f of rec.fx || []) {
         const [x, z] = at(f.x || 0, f.z || 0), d = f.dir ? [f.dir[0] * c + f.dir[2] * s, f.dir[1], -f.dir[0] * s + f.dir[2] * c] : null;
         map.fx.push(Object.assign({}, f, { x, z, dir: d }));
@@ -1373,7 +1484,7 @@ const G_Level = {
       const up = fms[f + 1];
       if (up) for (const l of m.lights) if (l.up) {
         const i = Math.floor(l.z / TS) * up.W + Math.floor(l.x / TS);
-        if (up.t[i] === 5 || (up.grate && up.grate[i])) up.lights.push({ kind: 'string', x: l.x, z: l.z, y: l.y! - FH, color: l.color, i: l.i, d: l.d });
+        if (up.t[i] === 5 || (up.grate && up.grate[i])) up.lights.push({ kind: 'string', x: l.x, z: l.z, y: l.y! - FH, color: l.color, i: l.i, d: l.d, glow: l.glow });
       }
     });
     const map = Object.assign({}, fms[base]); // (the level's own map is the ground floor's: the spawn, the outdoors)
@@ -2855,32 +2966,38 @@ const G_Level = {
     const porchMat = new THREE.MeshBasicMaterial({ color: 0xffe2a8 }), porchBox = new THREE.MeshStandardMaterial({ color: 0x1c1c1e, roughness: 0.6 });
     // every lamp's fitting, and where its light comes from: the light grid lights the level from them all
     // (js/lightgrid.ts; a building of several floors builds it once, from every floor's lamps: buildStack)
+    // (a lamp that's off, a night level's: its fitting unlit, a dull glass; an exit sign: a lit panel over a doorway)
+    const offMat = new THREE.MeshStandardMaterial({ color: 0x4a4844, roughness: 0.4 }), signGeo = new THREE.BoxGeometry(0.36, 0.15, 0.05), signMats = new Map<number, THREE.Material>();
     map.lamps = [];
     map.lights.forEach((l) => {
-      if (l.kind === 'string') { map.lamps.push({ x: l.x, y: l.y, z: l.z, color: l.color, i: l.i, d: l.d }); return; } // (its bulbs: buildFestival)
+      const lp = this.lampOf(l, th), lit = !!lp;
+      if (lp) map.lamps.push(lp);
+      if (l.kind === 'string') return; // (its bulbs: buildFestival)
+      if (l.kind === 'exit') { // an exit sign over a door (a night level's: nightify)
+        const sg = l.sign!, mat = signMats.get(l.color!) || new THREE.MeshBasicMaterial({ color: l.color! });
+        signMats.set(l.color!, mat);
+        const m = new THREE.Mesh(signGeo, mat); m.position.set(sg.x, this.DOOR_H + 0.3, sg.z); if (sg.ax === 'x') m.rotation.y = Math.PI / 2; root.add(m);
+        return;
+      }
       if (l.porch) { // a lantern on the wall over a back door
         const box = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.26, 0.14), porchBox); box.position.set(l.x, l.y!, l.z + l.porch! * 0.07); root.add(box);
-        const glow = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.18, 0.1), porchMat); glow.position.set(l.x, l.y!, l.z + l.porch! * 0.1); root.add(glow);
-        map.lamps.push({ x: l.x, y: l.y! - 0.1, z: l.z + l.porch * 0.5, color: 0xffd59a, i: 0.9, d: 11 });
+        const glow = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.18, 0.1), lit ? porchMat : offMat); glow.position.set(l.x, l.y!, l.z + l.porch! * 0.1); root.add(glow);
         return;
       }
       if (l.kind === 'panel') { // a shop's flat ceiling panel
-        const pn = new THREE.Mesh(panelGeo, panelMat); pn.position.set(l.x, this.WALL_H - 0.02, l.z); root.add(pn);
-        map.lamps.push({ x: l.x, y: this.WALL_H - 0.4, z: l.z, color: 0xf2f6ff, i: 0.45, d: 9 });
+        const pn = new THREE.Mesh(panelGeo, lit ? panelMat : offMat); pn.position.set(l.x, this.WALL_H - 0.02, l.z); root.add(pn);
         return;
       }
       if (l.kind === 'highbay') { // a hall's: a dome on a rod down from the roof (the floor above's ceiling)
         const roof = this.FLOOR_H + this.WALL_H, rod = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, roof - l.y!), bayMat);
         rod.position.set(l.x, (roof + l.y!) / 2, l.z); root.add(rod);
         const dome = new THREE.Mesh(bayGeo, bayMat); dome.position.set(l.x, l.y! - 0.1, l.z); root.add(dome);
-        const glow = new THREE.Mesh(bayLens, lampMat); glow.position.set(l.x, l.y! - 0.26, l.z); root.add(glow);
-        map.lamps.push({ x: l.x, y: l.y! - 0.4, z: l.z, color: l.color, i: l.i, d: l.d });
+        const glow = new THREE.Mesh(bayLens, lit ? lampMat : offMat); glow.position.set(l.x, l.y! - 0.26, l.z); root.add(glow);
         return;
       }
-      const lamp = new THREE.Mesh(lampGeo, lampMat);
+      const lamp = new THREE.Mesh(lampGeo, lit ? lampMat : offMat);
       lamp.position.set(l.x, this.WALL_H, l.z);
       root.add(lamp);
-      map.lamps.push({ x: l.x, y: this.WALL_H - 0.4, z: l.z, color: th.light, i: 0.85, d: 14 });
     });
     map.lightPool = [];
     if (pool) G.LightGrid.build(map);
@@ -3065,4 +3182,5 @@ const G_Level = {
     return root;
   },
 };
-G.Level = G_Level; interface GameModules { Level: typeof G_Level; }
+G.Level = G_Level;
+ interface GameModules { Level: typeof G_Level; }

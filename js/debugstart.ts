@@ -8,7 +8,8 @@
 //                         (?gun=m4&parts=optic:op.bc.0,tacL:tac.bc.0)
 //   ?side=<weapon id>     your sidearm (the P9 otherwise)
 //   ?leader               a leader in the level for sure (one is at random from level 2: js/server.ts spawnEnemies)
-//   ?nofoes               nobody in the level; ?stronghold makes it one (js/route.ts)
+//   ?nofoes               nobody in the level; ?stronghold makes it one (js/route.ts); ?night makes it a night level
+//                         (the lights out: js/level.ts nightify)
 //   ?hangar               the hangar between levels instead of a level (the shop, the gunsmith, the range)
 //   ?tick                 stepped by a timer, not animation frames: it keeps running in a window that isn't shown (scripts, agents)
 // It plays as if the mouse were captured (no click-to-play screen). When it's there, window.__debugReady is true and
@@ -80,7 +81,9 @@ const G_DebugStart = (() => {
         if (th != null) this.theme = th;
         if (lvl != null) this.level = lvl;
         if (q.has('leader')) this.forceLeader = true;
-        if (q.has('stronghold') && this.routeMap && this.route) { const n = this.routeMap.nodes.get(this.route.path[this.route.path.length - 1]); if (n) n.stronghold = true; }
+        const n = this.routeMap && this.route ? this.routeMap.nodes.get(this.route.path[this.route.path.length - 1]) : null;
+        if (n && q.has('stronghold')) n.stronghold = true;
+        if (n && q.has('night')) n.night = true;
         return start.call(this);
       };
       SV.startRun();

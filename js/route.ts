@@ -6,10 +6,11 @@
 const G_Route = (() => {
   const COLS = 10, ROWS = 7, WALKS = 4;
   // which column a level is in, and which act; the last level of each act is the boss
-  interface RNode { id: number; c: number; r: number; th: number; next: number[]; prev: number[]; boss: boolean; stronghold: boolean }
+  interface RNode { id: number; c: number; r: number; th: number; next: number[]; prev: number[]; boss: boolean; stronghold: boolean; night: boolean }
   interface RMap { seed: number; act: number; cols: RNode[][]; nodes: Map<number, RNode> }
   interface RState { path: number[]; opts: number[]; votes?: Record<string, number>; colors?: Record<string, number>; mine?: number }
   const STRONGHOLD = 1 / 7; // the share of levels that are strongholds
+  const NIGHT = 0.23; // and of those that can be, the share that are night levels (the lights out: js/level.ts nightify): about one level in five, all told
   // what clearing a stronghold pays on top of the usual (credits)
   const strongholdPay = (level: number) => 300 + 60 * level;
   const colOf = (level: number) => (level - 1) % COLS;
@@ -22,7 +23,7 @@ const G_Route = (() => {
     const id = (c: number, row: number) => c * 10 + row;
     const node = (c: number, row: number): RNode => {
       const k = id(c, row);
-      if (!nodes.has(k)) nodes.set(k, { id: k, c, r: row, th: 0, next: [], prev: [], boss: c === COLS - 1, stronghold: false });
+      if (!nodes.has(k)) nodes.set(k, { id: k, c, r: row, th: 0, next: [], prev: [], boss: c === COLS - 1, stronghold: false, night: false });
       return nodes.get(k)!;
     };
     // would a link (c, a) -> (c + 1, b) cross one already drawn?
@@ -69,6 +70,11 @@ const G_Route = (() => {
     // environments are as they'd be without them.
     const rs = G.U.rng(seed ^ (act * 0x2545f491) ^ 0x57c0);
     for (const n of order) if (rs() < STRONGHOLD && !n.boss && !(act === 1 && n.c === 0) && !G.THEMES[n.th].starter) n.stronghold = true;
+    // night levels: about one in five, never the first act's way in (the corner store),
+    // nor a place that's outdoors at night already (the festival: th.night) or a mountain top at sundown (the Crest). From
+    // a generator of their own too, so nothing else on the map changes.
+    const rn = G.U.rng(seed ^ (act * 0x6c8e9cf5) ^ 0x4e17);
+    for (const n of order) { const T = G.THEMES[n.th]; if (rn() < NIGHT && !(act === 1 && n.c === 0) && !T.starter && !T.night && !T.rock) n.night = true; }
     const cols = [];
     for (let c = 0; c < COLS; c++) cols.push(order.filter((n) => n.c === c));
     return { seed, act, cols, nodes };
@@ -107,12 +113,14 @@ const G_Route = (() => {
       const [x, y] = pos(n), th = G.THEMES[n.th], opt = st.opts.includes(n.id), here = n.id === last;
       const cls = `rn${opt ? ' opt' : ''}${visited.has(n.id) ? ' done' : ''}${here ? ' here' : ''}${n.boss ? ' boss' : ''}${st.mine === n.id ? ' mine' : ''}`;
       const rad = n.boss ? 30 : 21;
-      dots += `<g class="${cls}" data-node="${n.id}" transform="translate(${x},${y})"><title>${esc(th.name)}${n.boss ? ' (boss)' : ''}${n.stronghold ? ` - STRONGHOLD: no civilians, about half as many suspects again, +¢${strongholdPay((route.act - 1) * COLS + n.c + 1)} for clearing it` : ''}</title>`;
+      dots += `<g class="${cls}" data-node="${n.id}" transform="translate(${x},${y})"><title>${esc(th.name)}${n.boss ? ' (boss)' : ''}${n.stronghold ? ` - STRONGHOLD: no civilians, about half as many suspects again, +¢${strongholdPay((route.act - 1) * COLS + n.c + 1)} for clearing it` : ''}${n.night ? ' - NIGHT: the lights are out but for the emergency lights; suspects can hardly see you in the dark, unless your weapon light gives you away' : ''}</title>`;
       dots += `<circle r="${rad}" style="--fill:${th.wall};--edge:${th.floor}"/>`;
       dots += n.boss ? `<path d="M-9 6H9 M-9 3L-10-7-4-2 0-9 4-2 10-7 9 3Z" class="ri" transform="scale(1.4)"/>`
         : `<path d="${ICON[th.name] || 'M-5-5H5V5H-5Z'}" class="ri" transform="scale(1.55)"/>`;
       // a stronghold wears a small red alert badge at its top right, with an exclamation mark
       if (n.stronghold) dots += `<g class="rsh" transform="translate(${rad * 0.72},${-rad * 0.72})"><circle r="8"/><path d="M0-4.5V1 M0 3.6V3.7"/></g>`;
+      // a night level wears a crescent moon at its top left
+      if (n.night) dots += `<g class="rnt" transform="translate(${-rad * 0.72},${-rad * 0.72})"><circle r="8"/><path d="M1.6-4.6A5 5 0 1 0 1.6 4.6 4 4 0 1 1 1.6-4.6Z"/></g>`;
       dots += n.boss ? `<text y="${rad + 15}" class="rt">THE KINGPIN</text><text y="${rad + 28}" class="rt sub">${esc(th.name)}</text>` : `<text y="${rad + 15}" class="rt">${esc(th.name)}</text>`;
       // who's voted for it
       const vs = Object.entries(st.votes || {}).filter(([, v]) => v === n.id);

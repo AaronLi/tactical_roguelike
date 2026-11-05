@@ -443,7 +443,8 @@ const G_Views = {
     const map = G.Game.map;
     if (!map) return;
     const src = drawFrom || from; // (where the light and the beam visibly come from)
-    if (fl & 1) { G.R.tacLight(src, dir, fl & 8 ? 1.6 : 1, skip != null); if (skip != null) G.Glare.add(skip, src, dir, fl & 8 ? 1.6 : 1); }
+    if (fl & 1) { G.R.tacLight(src, dir, fl & 8 ? 1.6 : 1, skip != null, skip == null && !!map.night); // (your own beam in the air: only in the dark of a night level)
+      if (skip != null) G.Glare.add(skip, src, dir, fl & 8 ? 1.6 : 1); }
     if (!(fl & 2)) return;
     let t = G.Level.raycast(map, from.x, from.y, from.z, dir.x, dir.y, dir.z, 60, { glass: true }).t;
     const hz = Math.hypot(dir.x, dir.z) || 1e-6;

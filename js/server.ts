@@ -34,7 +34,7 @@ interface StickerBox { s: string; by: string | null }
 interface SoundCache { map: LvMap; cache: Map<string, Float32Array> }
 // A player's last state (position p: [x, y, z]); the rest is the client's short-keyed state (js/player.ts state())
 interface PState { [k: string]: any; p: number[]; dd: number; dn: number; pr: number; cr: number; sx: any; yw: number; mv: any; tl: number; ln: number; sd: number; se: number; lr: number }
-interface Player { id: string; name: string; color: any; animal: any; look: any; ready: boolean; st: PState | null }
+interface Player { id: string; name: string; color: any; animal: any; look: any; ready: boolean; st: PState | null; lux?: number; luxAt?: number; firedAt?: number } // (lux: the light on them this tick, officerLux; firedAt: their last shot, the level's clock)
 type LivePlayer = Player & { st: PState }
 // A suspect or civilian (addEnemy makes them; think() and the hit/injury code grow the optional fields)
 interface EnemyCover { x: number; y: number; z: number; lean: number; px?: number; pz?: number; fl?: number; cx?: number; cz?: number }
@@ -56,7 +56,7 @@ interface Enemy {
   flinchT?: number; flinchOk?: number; flashT?: number; flashRec?: number; flashRecLen?: number; flashK?: number; flashOn?: boolean; flashBy?: { x: number; y: number; z: number } | null; stumbleT?: number; stumbleYaw?: number; stumbleV?: number; peekDone?: boolean; peekOut?: number; organs?: Record<string, number>; broke?: Record<string, number>;
   spine?: boolean; cardiac?: boolean; out?: boolean; incap?: { by: string | null; t: number }; lastHitAt?: number; lastH?: boolean; lastAp?: boolean; lastGr?: number; lastFb?: number; flashId?: number;
   hitState?: EnemyState; hitUnaware?: boolean; hitYield?: boolean; hitAt?: number; shock?: number; kick?: number; headDelay?: number; engAt?: number; engTgt?: string;
-  firedAt?: number; sawAt?: number; engagedAt?: number; allyT?: number; allyN?: number; proof?: boolean; seeK?: number; blind?: boolean; onWait?: number;
+  firedAt?: number; sawAt?: number; engagedAt?: number; allyT?: number; allyN?: number; proof?: boolean; seeVis?: number; blind?: boolean; onWait?: number;
   order?: Order | null; radioT?: number; callAt?: number; callTgt?: { x: number; y: number; z: number } | null; callLog?: string[]; calls?: number; noLead?: number;
   coverFlow?: ReturnType<typeof G.Level.flow> | null; coverCheckT?: number; emboldened?: boolean; fl?: number;
 }
@@ -76,6 +76,7 @@ const G_Server = {
   phase: 'lobby' as ServerPhase,
   level: 0,
   seed: 0,
+  night: false, // (the level being played is a night level: isNight, as it starts)
   shopSeed: 0,
   map: null as LvMap | null,
   enemies: new Map<number | string, Enemy>(), // (by id: a number; js/hud.ts looks them up by an id that may be a string)
@@ -144,7 +145,7 @@ const G_Server = {
         this.players.set(from, { id: from, name, color, animal, look: G.Rig.cleanLook(m.look), ready: false, st: null });
         G.Net.sendTo(from, {
           t: 'welcome', id: from, roster: this.roster(), phase: this.phase, level: this.level,
-          seed: this.seed, shopSeed: this.shopSeed, th: this.theme, route: this.routeMsg(), stock: this.phase === 'shop' ? this.stock : null,
+          seed: this.seed, shopSeed: this.shopSeed, th: this.theme, night: this.night ? 1 : 0, route: this.routeMsg(), stock: this.phase === 'shop' ? this.stock : null,
           doors: this.map && this.phase === 'level' ? this.map.doors.map((d: Door) => (d.open ? 1 : 0)) : null,
           holes: this.phase === 'level' ? this.holes || null : null, fallen: this.phase === 'level' ? this.fallen || null : null,
           evidence: this.phase === 'level' && this.evidence ? this.evidence.filter((v: Evidence) => !v.taken).map((v: Evidence) => [v.i, v.wpn, v.x, v.z, v.secured ? 1 : 0, v.y || 0]) : null,
@@ -186,6 +187,7 @@ const G_Server = {
       case 'saved': if (p && this.phase === 'level') G.Net.broadcast({ t: 'saved', id: from, n: Math.max(1, Math.min(9, m.n | 0)) }); break;
       case 'shot':
         if (p && p.st && this.phase === 'level') this.hear(p.st.p[0], p.st.p[2], m.sil === 2 ? 2 : m.sil ? 6 : 28, p.st.p[1]); // (not at the range)
+        if (p && this.phase === 'level' && m.sil !== 2) p.firedAt = this.clock; // (the muzzle flash lights them up: officerLux)
         if (m.f && m.to && this.phase === 'level') this.suppress(m.f, m.to, G.Gunsmith.fromCode(m.w), (G.AMMO as Tbl)[m.am] ? m.am : undefined);
         G.Net.broadcast({ t: 'shot', id: from, sid: m.sid, f: m.f, to: m.to, w: m.w, sil: m.sil, bm: Number.isFinite(m.bm) ? m.bm : undefined, rl: typeof m.rl === 'string' && m.rl.length < 12 ? m.rl : undefined, am: (G.AMMO as Tbl)[m.am] ? m.am : undefined,
           tos: Array.isArray(m.tos) && m.tos.length <= 24 && m.tos.every((p: unknown) => Array.isArray(p) && p.length === 3 && p.every(Number.isFinite)) ? m.tos : undefined }, from); // (a shotgun's pellets: for the highlights)
@@ -422,10 +424,16 @@ const G_Server = {
     const at = this.route && this.route.path[this.route.path.length - 1], n = this.routeMap && at != null ? this.routeMap.nodes.get(at) : null;
     return !!(n && n.stronghold);
   },
+  // and a night level (its lights out: js/level.ts nightify)
+  isNight() {
+    const at = this.route && this.route.path[this.route.path.length - 1], n = this.routeMap && at != null ? this.routeMap.nodes.get(at) : null;
+    return !!(n && n.night);
+  },
   startLevel() {
     this.phase = 'level';
     this.seed = (Math.random() * 2 ** 31) | 0;
-    this.map = G.Level.generate(this.seed, this.level, this.theme as number);
+    this.night = this.isNight();
+    this.map = G.Level.generate(this.seed, this.level, this.theme as number, this.night);
     this.enemies.clear();
     this.extract = { active: false, votes: new Set() };
     this.flow = null; this.flowT = 0; this.wipeT = 0; this.summons = 0; this.nadeT = 8;
@@ -444,7 +452,7 @@ const G_Server = {
     // the sticker box's sticker: one of the host's (js/stickers.ts names; none, and the box isn't there)
     const sn = G.Stickers.names;
     this.sbox = this.map.sbox && sn.length ? { s: sn[Math.floor(Math.random() * sn.length)], by: null } : null;
-    G.Net.broadcast({ t: 'phase', phase: 'level', level: this.level, seed: this.seed, th: this.theme, route: this.routeMsg(), wcase: this.caseMsg(), cabs: this.cabMsg(), abox: this.aboxMsg(), sbox: this.sboxMsg() });
+    G.Net.broadcast({ t: 'phase', phase: 'level', level: this.level, seed: this.seed, th: this.theme, night: this.night ? 1 : 0, route: this.routeMsg(), wcase: this.caseMsg(), cabs: this.cabMsg(), abox: this.aboxMsg(), sbox: this.sboxMsg() });
   },
   // The level's weapon case: a weapon in its standard build, fully loaded, picked by rarity. Each tier has a
   // share (CASE_RARITY), split evenly between that tier's weapons so a tier with many weapons isn't more
@@ -770,7 +778,7 @@ const G_Server = {
     // shoulder, pelvis and leg armour, on what a plate carrier can take
     d.ex = fixed ? (fixed.ex || [])[tier - 1] || [] : d.vest === 'steel' || d.vest === 'ceramic' ? (['shoulder', 'groin', 'legs'] as ArmourKind[]).map((k) => this.armourRoll(k, kitL)).filter(Boolean) : [];
     // a light and a laser on the gun, more often the better equipped they are (flags as an officer's: js/player.ts tacFlags)
-    const tl = G2.tac, light = this.level >= tl.lightFrom && (base.boss || Math.random() < tl.light[tier - 1]), laser = this.level >= tl.laserFrom && (base.boss || Math.random() < tl.laser[tier - 1]);
+    const tl = G2.tac, light = this.night ? base.boss || Math.random() < tl.nightLight[tier - 1] : this.level >= tl.lightFrom && (base.boss || Math.random() < tl.light[tier - 1]), laser = this.level >= tl.laserFrom && (base.boss || Math.random() < tl.laser[tier - 1]);
     d.tac = (light ? 1 | (tier >= 4 ? 8 : 0) : 0) | (laser ? 2 | (Math.random() < 0.35 ? 4 : 0) : 0);
     // automatic weapons fire at their own rate in the type's bursts; others as fast as the type works them
     if (base.rof) {
@@ -1201,6 +1209,75 @@ const G_Server = {
     const c = (dx * -Math.sin(st.yw) + dz * -Math.cos(st.yw)) / d;
     return c > 0.97 ? 0.55 : c > 0.93 ? 0.8 : 1;
   },
+  // ---- seeing by the light there is (every level: in a lit room it makes no difference, in the dark all the difference)
+  // HALF: the light (on the light grid's scale: js/level.ts lux) that makes someone half as easy to pick out as all the
+  // light there could be; LIT: a room under its lamp, the light counted as full; a suspect only picks out an officer
+  // within REACH0 + REACH * k metres (k: lightK; twice that once they're alert); CLOSE: nearer than that, a shape in the
+  // dark, a breath, a step, gives you away whatever the light; FLASH: a muzzle flash's light, for FLASH_T after a shot;
+  // SPILL: what an officer's own weapon light, on but pointed elsewhere, throws back on them off what it lights;
+  // SUS: a suspect's own weapon light, on someone in its beam (up to SUS_R metres)
+  SIGHT: { HALF: 0.05, LIT: 0.3, REACH0: 6, REACH: 69, CLOSE: 5, FLASH: 0.6, FLASH_T: 0.5, SPILL: 0.12, SUS: 0.8, SUS_R: 20 },
+  // The light where an officer stands: the level's (G.Level.luxAt), and a muzzle flash for a moment after they fire.
+  // Kept for the tick: every suspect looking their way asks.
+  officerLux(p: LivePlayer) {
+    if (p.luxAt === this.clock) return p.lux!;
+    const S = this.SIGHT, st = p.st;
+    let v = G.Level.luxAt(this.map!, st.p[0], st.p[1], st.p[2]);
+    if (this.clock - (p.firedAt == null ? -99 : p.firedAt) < S.FLASH_T) v += S.FLASH;
+    p.luxAt = this.clock; p.lux = v;
+    return v;
+  },
+  // Is officer st's weapon light on suspect e (d metres off, along the ground)? 1 in its beam (the spot light's cone: 0.3 rad
+  // round where they aim, js/render.ts tacLight), fading to 0 by 0.45 rad, and none past its reach (24 m, a bright one 34).
+  beamAt(e: Enemy, st: PState, d: number) {
+    if (!st || !(st.tl & 1) || st.sw || d > (st.tl & 8 ? 34 : 24)) return 0;
+    const cp = Math.cos(st.pt || 0), fx = -Math.sin(st.yw) * cp, fy = Math.sin(st.pt || 0), fz = -Math.cos(st.yw) * cp;
+    const dx = e.x - st.p[0], dy = (e.y || 0) + 1.3 * e.def.scale - st.p[1] - 1.5, dz = e.z - st.p[2], dd = Math.hypot(dx, dy, dz) || 1;
+    const c = (dx * fx + dy * fy + dz * fz) / dd;
+    return G.U.clamp((c - 0.9) / (0.955 - 0.9), 0, 1);
+  },
+  // How well suspect e can make out officer p, d metres off, by the light on them: 0 (pitch dark) to 1 (a lit room, or better).
+  //   L = the light where they stand (officerLux: the level's lamps, sky and bounce, and a muzzle flash)
+  //     + the suspect's own weapon light, if it's on them (theirs on, the gun out, within ~18 deg of where they face):
+  //       SUS * (1 - d / SUS_R)^1.6
+  //     + the officer's weapon light, on but pointed elsewhere: SPILL (twice that, a bright one)
+  //   k = ((L / (L + HALF)) / (LIT / (LIT + HALF)))^2, at most 1: a lit room 1; a corridor between its lamps (0.1) about 0.6;
+  //       outdoors under a level's evening sky (0.08) about 0.5; moonlight (0.03) about 0.2; a night level's dark rooms
+  //       (under 0.01) under 0.05
+  //   and the officer's light pointed at them (beamAt) is the brightest thing in sight: k up to 1; close up (CLOSE),
+  //   at least 0.8 * (1 - d / CLOSE).
+  lightK(e: Enemy, p: LivePlayer, d: number) {
+    const S = this.SIGHT, st = p.st;
+    let L = this.officerLux(p);
+    if ((e.def.tac & 1) && e.armed && e.drawn && d < S.SUS_R) {
+      const c = ((st.p[0] - e.x) * -Math.sin(e.yaw) + (st.p[2] - e.z) * -Math.cos(e.yaw)) / (d || 1);
+      if (c > 0.95) L += S.SUS * Math.pow(1 - d / S.SUS_R, 1.6);
+    }
+    const bm = this.beamAt(e, st, d);
+    if ((st.tl & 1) && !st.sw) L += S.SPILL * (st.tl & 8 ? 2 : 1);
+    const k = Math.min(1, ((L / (L + S.HALF)) / (S.LIT / (S.LIT + S.HALF))) ** 2);
+    return Math.max(k, bm, 0.8 * (1 - d / S.CLOSE));
+  },
+  // How much of officer st suspect e can see from (ax, ay, az): 0 .. 1. Sight lines to six points on them, each counting
+  // its share of a body (head 0.25, chest 0.2, either shoulder 0.12, hips 0.16, knees 0.15) by how clear its line is
+  // (G.Level.see: through glass less). Behind a crate to the waist, about half; a head round a corner, a quarter.
+  // Shoulders: either side of them across the line of sight; lying down, the body runs back from the head along the ground.
+  bodySeen(st: PState, ax: number, ay: number, az: number) {
+    const L = G.Level, map = this.map!, [px, py, pz] = st.p, [hx, hz] = this.headXZ(st);
+    const sx = px - ax, sz = pz - az, sd = Math.hypot(sx, sz) || 1, qx = -sz / sd * 0.22, qz = sx / sd * 0.22; // (across the line, a shoulder's width)
+    const pts: number[][] = []; // [x, y, z, share]
+    if (st.pr) {
+      const bx = Math.sin(st.yw), bz = Math.cos(st.yw); // (back along the body: behind where they face)
+      pts.push([hx, py + 0.3, hz, 0.25], [px + bx * 0.35, py + 0.25, pz + bz * 0.35, 0.2], [px + bx * 0.35 + qx, py + 0.22, pz + bz * 0.35 + qz, 0.12], [px + bx * 0.35 - qx, py + 0.22, pz + bz * 0.35 - qz, 0.12],
+        [px + bx * 0.8, py + 0.2, pz + bz * 0.8, 0.16], [px + bx * 1.2, py + 0.15, pz + bz * 1.2, 0.15]);
+    } else {
+      const c = st.cr ? 0.63 : 1, mx = (hx + px) / 2, mz = (hz + pz) / 2; // (crouched: everything lower; the chest leans with the head)
+      pts.push([hx, py + (st.cr ? 0.95 : 1.5), hz, 0.25], [mx, py + 1.2 * c, mz, 0.2], [mx + qx, py + 1.3 * c, mz + qz, 0.12], [mx - qx, py + 1.3 * c, mz - qz, 0.12], [px, py + 0.9 * c, pz, 0.16], [px, py + 0.45 * c, pz, 0.15]);
+    }
+    let v = 0;
+    for (const [x, y, z, w] of pts) v += w * L.see(map, ax, ay, az, x, y, z);
+    return v;
+  },
   // armed suspects still in the fight near this one (within 9 m) who can see them
   allies(e: Enemy) {
     let n = 0;
@@ -1615,22 +1692,29 @@ const G_Server = {
       let best = null, bs = 1e9, bvis = false, bd = 99;
       e.proof = false;
       if (e.flashRec! > 0) alive = alive.filter((q: LivePlayer) => Math.hypot(q.st.p[0] - e.x, q.st.p[2] - e.z) < this.FLASH.SEE_R); // (coming round from a flashbang: sees a few metres)
-      const ey = (e.y || 0) + Math.min(1.6 * s, 2.4);
+      const ey = (e.y || 0) + Math.min(1.6 * s, 2.4), SG = this.SIGHT;
+      const lp = e.dp ? (e.leanOut ? e.dp : null) : e.cover && e.cover.lean ? e.cover : null, lx = lp ? lp.px! : e.x, lz = lp ? lp.pz! : e.z;
+      let bk = 1;
       for (const p of alive) {
         const [px, py, pz] = p.st.p;
         const d = Math.hypot(px - e.x, pz - e.z);
         // (outdoors at night they can't pick you out past `night` metres, unless your light or laser gives you away)
         if (d > (map.theme.night && !(p.st.tl & 3) ? map.theme.night : 75)) continue;
-        const lp = e.dp ? (e.leanOut ? e.dp : null) : e.cover && e.cover.lean ? e.cover : null, lx = lp ? lp.px! : e.x, lz = lp ? lp.pz! : e.z;
+        // nor, anywhere, much past what the light on you shows (lightK): in the dark, a few metres
+        const lk = this.lightK(e, p, d);
+        if (d > (SG.REACH0 + SG.REACH * lk) * (e.alert ? 2 : 1)) continue;
         const [hx, hz] = this.headXZ(p.st);
         const hy = py + (p.st.pr ? 0.35 : p.st.cr ? 0.95 : 1.5), k = L.see(map, lx, ey, lz, hx, hy, hz);
         // (through a window: k < 1; through bulletproof glass, seen but not to be shot: no round gets through it)
         let proof = false;
         if (k > 0 && k < 1) { const dx = hx - lx, dy = hy - ey, dz = hz - lz, dd = Math.hypot(dx, dy, dz) || 1; proof = L.raycast(map, lx, ey, lz, dx / dd, dy / dd, dz / dd, dd, { glass: true }).t < dd - 0.1; }
         const vis = k > 0 && !proof, score = d + (vis ? 0 : proof ? 30 : 40) + (k < 1 && vis ? 8 : 0);
-        if (score < bs) { bs = score; best = p; bvis = vis; bd = d; e.seeK = k; e.proof = proof; }
+        if (score < bs) { bs = score; best = p; bvis = vis; bd = d; bk = lk; e.proof = proof; }
       }
       e.tgt = best ? best.id : null; e.canSee = bvis; e.tgtD = bd;
+      // how easily they'd pick out the one they've a sight of, unaware: the light on them, times how much of them shows
+      // (only worked out for a suspect who's still to spot anyone: a few more sight lines, a few times a second)
+      e.seeVis = best && bvis && !e.alert ? bk * this.bodySeen(best.st, lx, ey, lz) : 1;
       // seen behind bulletproof glass: they know where you are (and that shooting's no use): they come round for you
       if (best && e.proof) { e.alert = true; e.lostT = G.U.clamp(e.lostT || 0, 0.01, 1); e.blind = false; e.lastSeen = { x: best.st.p[0], y: best.st.p[1], z: best.st.p[2] }; }
     }
@@ -1644,9 +1728,12 @@ const G_Server = {
     if (!e.alert) {
       if (st && e.canSee) {
         const toYaw = Math.atan2(-(st.p[0] - e.x), -(st.p[2] - e.z));
-        const inFov = Math.abs(U.angDiff(e.yaw, toYaw)) < 1.2 || e.tgtD < 5;
+        // (a weapon light shone on them, or swept over them: they notice it whichever way they're facing, and twice as fast)
+        const bm = this.beamAt(e, st, e.tgtD);
+        const inFov = Math.abs(U.angDiff(e.yaw, toYaw)) < 1.2 || e.tgtD < 5 || bm > 0.5;
         if (inFov && e.tgtD < def.range * 1.4) {
-          const rate = (1.7 - e.tgtD / (def.range * 1.4)) * (st.pr ? 0.5 : st.cr ? 0.7 : 1) * 1.3 * (e.suspicious ? 1.8 : 1) * (e.dp ? 2.5 : 1) * (e.seeK == null ? 1 : e.seeK); // slower through glass (and looking for you, quicker)
+          // slower through glass, in the dark, and the less of you shows (seeVis: lightK times bodySeen); quicker looking for you
+          const rate = (1.7 - e.tgtD / (def.range * 1.4)) * (st.pr ? 0.5 : st.cr ? 0.7 : 1) * 1.3 * (e.suspicious ? 1.8 : 1) * (e.dp ? 2.5 : 1) * (e.seeVis == null ? 1 : e.seeVis) * (1 + bm);
           e.spot += dt * rate;
           if (e.spot >= 1) {
             // caught off guard: police appear close by while they weren't expecting anyone

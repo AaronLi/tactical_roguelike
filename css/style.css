@@ -865,3 +865,5 @@ i.c.heavy { background: #a02828; } i.c.light { background: #7a3a30; } i.c.frac {
 #menu .model-load .ml-bar i { background: var(--m-text); }
 #menu .settings { border-top-color: var(--m-line); }
 @media (max-width: 760px) { #menu .menu-box { width: 100%; padding: 28px 24px; } #menu .menu-box::before { -webkit-mask-image: none; mask-image: none; } }
+.route-svg .rnt circle { fill: #1a2240; stroke: #c8d4ff; stroke-width: 1.5; }
+.route-svg .rnt path { fill: #f2e8b8; stroke: none; }

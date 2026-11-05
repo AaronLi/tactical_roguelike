@@ -567,7 +567,7 @@ const G_Game = {
         if (m.route) this.setRoute(m.route);
         if (m.phase === 'route') (this.enterRoute as (level: number, route?: unknown) => void)(m.level, m.route);
         else if (m.phase === 'level') {
-          this.enterLevel(m.level, m.seed, m.th);
+          this.enterLevel(m.level, m.seed, m.th, !!m.night);
           if (m.doors) m.doors.forEach((o: number, i: number) => { const d = this.map!.doors[i]; if (d && d.open !== !!o) { d.open = !!o; G.World.door(this.map!.world, this.map!, d); } });
           if (m.holes) for (const h of m.holes) G.Damage.apply(this.map as unknown as GmDmgMap, h); // (what's been shot out of the place)
           if (m.fallen) for (const [i, ang, dir, seed] of m.fallen) G.Damage.fall(this.map as unknown as GmDmgMap, this.map!.doors[i] as any, ang, dir, seed, true);
@@ -603,7 +603,7 @@ const G_Game = {
       case 'phase':
         if (m.route) this.setRoute(m.route);
         if (m.phase === 'route') (this.enterRoute as (level: number, route?: unknown) => void)(m.level, m.route);
-        else if (m.phase === 'level') { this.aboxHide(); this.enterLevel(m.level, m.seed, m.th); this.setCase(m.wcase); this.abox = m.abox || null; this.sbox = m.sbox || null; this.cabs = m.cabs || []; G.Views.syncCabs(); }
+        else if (m.phase === 'level') { this.aboxHide(); this.enterLevel(m.level, m.seed, m.th, !!m.night); this.setCase(m.wcase); this.abox = m.abox || null; this.sbox = m.sbox || null; this.cabs = m.cabs || []; G.Views.syncCabs(); }
         else if (m.phase === 'shop') this.enterShop(m.level, m.shopSeed, m.report, m.stock);
         else if (m.phase === 'gameover') this.enterGameover(m);
         else if (m.phase === 'lobby') this.enterLobby();
@@ -1298,6 +1298,7 @@ const G_Game = {
     this.$('routeMsg').innerHTML = mine == null ? (boss ? 'The Kingpin is waiting. Click the node to go in.' : !st.path.length ? `The way in: ${G.U.esc(G.THEMES[rm.nodes.get(opts[0])!.th].name)}. Click it to deploy; the routes split after it.` : 'Pick where to deploy next: click one of the lit nodes. Each path decides the environments ahead.')
       : ids.length > 1 ? `Voted. Waiting for the squad (${voted}/${ids.length}); most votes wins, ties are a coin toss.` : 'Deploying...';
     if (opts.some((o) => rm.nodes.get(o)!.stronghold)) this.$('routeMsg').innerHTML += `<div class="arm-squad"><b class="red">! Stronghold</b> (red badge): no civilians, about half as many suspects again, +¢${G.Route.strongholdPay(this.level)} for clearing it.</div>`;
+    if (opts.some((o) => rm.nodes.get(o)!.night)) this.$('routeMsg').innerHTML += `<div class="arm-squad"><b>☾ Night</b> (moon badge): the lights are out bar the emergency lights. Suspects can hardly see you in the dark, unless you show a light; you'll want yours.</div>`;
     const arms = this.arms || {}, roster = this.roster || {};
     if (this.level === 1 && ids.length > 1 && G.Me.sidearmChosen) this.$('routeMsg').innerHTML += `<div class="arm-squad">Sidearms (each your own): ${ids.map((id) => `<i style="color:${G.U.hex(roster[id].color)}">${G.U.esc(roster[id].name)}</i> ${arms[id] ? G.U.esc(G.WEAPONS[arms[id]].name) : '<small>choosing…</small>'}`).join(' · ')}</div>`;
   },
@@ -1307,14 +1308,14 @@ const G_Game = {
     G.Audio.click();
     G.Net.toHost({ t: 'pick', n });
   },
-  enterLevel(level: number, seed: number, th?: number) {
+  enterLevel(level: number, seed: number, th?: number, night = false) {
     this.veil(true, true); // (already black, unless you've just joined)
     this.leaveHub();
     this.phase = 'level';
     this.level = level;
     this.extract = { active: false, votes: 0, need: 0, civDead: 0, voted: false };
     this.enemiesLeft = 0;
-    this.map = G.Level.generate(seed, level, th);
+    this.map = G.Level.generate(seed, level, th, night);
     if (G.Prof) G.Prof.reset(); // (the worst frames and totals: this level's)
     if (G.Highlights) { G.Highlights.drop(); G.Highlights.reset(); } // (last level's replays go; this one's start recording)
     G.Views.warmed = false; // compile the new level's shaders once it's populated (G.R.warmup)

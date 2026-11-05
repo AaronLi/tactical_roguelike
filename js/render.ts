@@ -25,6 +25,7 @@ const G_R = {
   vmHolder: undefined as unknown as THREE.Group,
   vmRoot: undefined as unknown as THREE.Group,
   vmMuzzle: undefined as unknown as THREE.PointLight,
+  vmLights: [] as [THREE.Light, number][], // (the gun in your hands' own light, and how bright it is by day)
   levelRoot: undefined as unknown as THREE.Group,
   dynRoot: undefined as unknown as THREE.Group,
   flashTex: undefined as unknown as THREE.CanvasTexture,
@@ -139,8 +140,9 @@ const G_R = {
     this.vmScene.add(this.vmHolder);
     this.vmRoot = new THREE.Group();
     this.vmHolder.add(this.vmRoot);
-    this.vmScene.add(new THREE.HemisphereLight(0xdde6f0, 0x2a2622, 0.55));
+    const vhl = new THREE.HemisphereLight(0xdde6f0, 0x2a2622, 0.55); this.vmScene.add(vhl);
     const vdl = new THREE.DirectionalLight(0xffffff, 0.3); vdl.position.set(1, 2, 1); this.vmScene.add(vdl);
+    this.vmLights = [[vhl, 0.55], [vdl, 0.3]];
     this.vmScene.environment = this._envMap(r);
     this.vmMuzzle = new THREE.PointLight(0xffb060, 0, 3, 2);
     this.vmMuzzle.position.set(0.2, -0.1, -0.8);
@@ -212,6 +214,9 @@ const G_R = {
     // round the rooms): what's left of it flat everywhere is a little, so nowhere's black (all of it in the hangar,
     // daylit)
     this.hemi.color.setHex(th.hemi || th.light, THREE.LinearSRGBColorSpace); this.hemi.intensity = (th.hemiI || 0.26) ** 2 * (th.hub ? 1 : G.LightGrid.opts.fill);
+    // a night level (js/level.ts nightify): the gun in your hands lit about as dimly as the dark round it (its own light a
+    // quarter of the day's: the light grid and your weapon light do the rest)
+    for (const [l, k] of this.vmLights) l.intensity = k * (map.night ? 0.25 : 1);
   },
   // The level's meshes, taken out of the scene without being thrown away (js/highlights.ts replays the level in them on
   // the hangar's TVs, and disposes of them when it's done)
@@ -507,15 +512,16 @@ const G_R = {
     }
   },
   tacBegin() { this.spotUsed = 0; this.pLaserUsed = 0; this.coneUsed = 0; },
-  // a weapon light at pos shining along dir (k: how bright; seen: someone else's, so you see the beam and the lamp)
-  tacLight(pos: THREE.Vector3, dir: THREE.Vector3, k = 1, seen = false) {
+  // a weapon light at pos shining along dir (k: how bright; seen: someone else's, so you see the beam and the lamp; haze:
+  // your own, on a night level: its beam in the air in front of you, without the lamp)
+  tacLight(pos: THREE.Vector3, dir: THREE.Vector3, k = 1, seen = false, haze = false) {
     const s = this.spots[this.spotUsed++]; if (!s) return;
     s.position.copy(pos); s.target.position.copy(pos).add(dir); s.intensity = 0.9 * k; s.distance = 24 + 10 * k; s.shadow.needsUpdate = true;
-    const C = seen && this.cones[this.coneUsed++];
+    const C = (seen || haze) && this.cones[this.coneUsed++];
     if (!C) return;
     const len = 9 * k, r = len * Math.tan(0.3), at = _tv.subVectors(this.camera.position, pos).normalize().dot(dir); // (at: how nearly it's pointing at you)
     C.cone.position.copy(pos); C.cone.quaternion.setFromUnitVectors(_tv2.set(0, -1, 0), _tv.copy(dir)); C.cone.scale.set(r, len, r); C.cone.visible = true;
-    C.lamp.position.copy(pos).addScaledVector(dir, 0.02); C.lamp.scale.setScalar(0.1 + 0.5 * k * Math.max(0, at) ** 3); C.lamp.visible = true;
+    C.lamp.position.copy(pos).addScaledVector(dir, 0.02); C.lamp.scale.setScalar(0.1 + 0.5 * k * Math.max(0, at) ** 3); C.lamp.visible = seen;
   },
   // a laser from a to b (where it lands), red or green: a faint beam and a bright dot
   tacLaser(a: THREE.Vector3, b: THREE.Vector3, green: boolean) {
