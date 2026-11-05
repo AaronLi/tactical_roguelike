@@ -1,4 +1,5 @@
-// Breach Protocol: F9's record of the shots that hit someone (js/player.ts roundDone, and the squad's through the host).
+// Breach Protocol: F9's record of the shots that hit someone (js/player.ts roundDone, and the squad's through the host), and of
+// the fragments of your grenades and of suspects' grenades thrown at you (js/player.ts fragDone: one shot a grenade).
 // A round's path is kept whether F9's on or not (js/player.ts newPath), so this works for a shot fired before you pressed it:
 // each one that hit someone leaves, for the level (the last MAX of them), a ghost of whoever it hit as they stood when it
 // struck, the whole of its trail, coloured by speed as the trails are (js/render.ts trailColour), and markers on it: its speed
@@ -11,10 +12,10 @@
 type ShotEv = any[]; // [point, 'e' | 'x' | 'r', fx, nx, ny, nz, material name, ...]: a row of mixed numbers and strings
 type ShotHit = any[]; // [point, key, speed in, [kg], dx, dy, dz, passed through, armour (ShotArmour), [depth, what] it stopped in, fragments]
 interface ShotPath { p: number[][]; ev: ShotEv[]; hit: ShotHit[]; }
-interface ShotRow { key: string; n: number; name: string; range: number; muzzle: number; vIn: number; J: number; frags?: string; stop?: string; post?: number; out?: number; }
+interface ShotRow { key: string; n: number; burst?: boolean; name: string; range: number; muzzle: number; vIn: number; J: number; frags?: string; stop?: string; post?: number; out?: number; }
 interface ShotGhost extends THREE.Group { mat: THREE.Material; uses: number; }
 interface ShotHolder { ghosts?: Map<string, ShotGhost>; }
-interface ShotInfo { holder: ShotHolder; name: string; }
+interface ShotInfo { holder: ShotHolder; name: string; burst?: boolean; }
 interface ShotLabel { p: THREE.Vector3; t: string; c: string; pri: number; key?: string; }
 interface ShotVert { p: THREE.Vector3; v: number; }
 interface ShotRec { keys: Set<string>; hits: ShotRow[]; line: THREE.Line; frags: THREE.LineSegments | null; labels: ShotLabel[]; ghosts: Map<string, ShotGhost>; }
@@ -53,13 +54,37 @@ const G_ShotLog = (() => {
   // stepRound), so its speed along that stretch is a geometric curve, and that's where it's found to have crossed a Mach
   // number. Through a solid or a body there's no such thing: the speed in and out are told instead.
   function keep(path: ShotPath | null | undefined, info: ShotInfo) {
-    if (!path || !path.hit.length) return;
+    const r = build(path, info);
+    if (!r) return;
+    recs.push(r);
+    while (recs.length > MAX) drop(recs.shift()!);
+  }
+  // A grenade's fragments (js/player.ts fragDone): the paths of every one that hit someone, kept as one shot: their trails, one
+  // marker at the burst, a ghost of each person they hit, a row for each fragment in them. (info.burst: no muzzle or Mach markers)
+  function keepAll(paths: ShotPath[], info: ShotInfo) {
+    const built = paths.map((p) => build(p, info)).filter(Boolean) as ShotRec[];
+    if (!built.length) return;
+    const r = built[0];
+    for (const o of built.slice(1)) {
+      r.line.add(o.line); o.line.visible = true; // (shown and hidden with the first)
+      for (const k of o.keys) r.keys.add(k);
+      r.hits.push(...o.hits); r.labels.push(...o.labels);
+      for (const [k, gh] of o.ghosts) { if (r.ghosts.has(k)) gh.uses--; else r.ghosts.set(k, gh); } // (one person's ghost, counted once)
+    }
+    const at = paths[0].p[0];
+    r.labels.push({ p: new T.Vector3(at[0], at[1], at[2]), t: `${info.name}: ${built.length} fragment${built.length > 1 ? 's' : ''} hit · ${r.keys.size} ${r.keys.size > 1 ? 'people' : 'person'}`, c: '#ffd9a0', pri: 4 });
+    r.labels.sort((a, b) => b.pri - a.pri);
+    recs.push(r);
+    while (recs.length > MAX) drop(recs.shift()!);
+  }
+  function build(path: ShotPath | null | undefined, info: ShotInfo): ShotRec | null {
+    if (!path || !path.hit.length) return null;
     const P = path.p.map((a) => ({ p: new T.Vector3(a[0], a[1], a[2]), v: a[3] })), xs = [0], A = G.SOUND_SPEED, inside = new Set<number>(), labels: ShotLabel[] = [], verts: ShotVert[] = [];
     for (let i = 1; i < P.length; i++) xs.push(xs[i - 1] + P[i].p.distanceTo(P[i - 1].p));
     for (const e of path.ev) if (e[1] === 'e') { const x = path.ev.find((q) => q[1] === 'x' && q[0] > e[0]); if (x) for (let k = e[0]; k < x[0]; k++) inside.add(k); }
     for (const h of path.hit) if (h[7]) inside.add(h[0]);
     const add = (p: THREE.Vector3, v: number) => verts.push({ p, v }), mark = (p: THREE.Vector3, t: string, c: string, pri: number, key?: string) => labels.push({ p, t, c, pri, key }); // (key: a marker of what it did to them: only with them picked out)
-    mark(P[0].p, `Muzzle ${P[0].v} m/s · M${mach(P[0].v)}`, css(P[0].v), 3);
+    if (!info.burst) mark(P[0].p, `Muzzle ${P[0].v} m/s · M${mach(P[0].v)}`, css(P[0].v), 3);
     add(P[0].p, P[0].v);
     const after = new Map<number, number>(); // (the speed it was going past their armour, by the point it went in)
     const hits = hitRows(path, P, xs, after, mark, info);
@@ -69,7 +94,7 @@ const G_ShotLog = (() => {
       if (air) {
         const n = Math.min(16, Math.ceil(len / 2));
         for (let k = 1; k < n; k++) { const u = k / n; add(a.p.clone().lerp(b.p, u), a.v * Math.pow(b.v / a.v, u)); }
-        for (const m of MACHS) {
+        if (!info.burst) for (const m of MACHS) {
           const th = m * A;
           if (a.v > th && b.v <= th) { const u = Math.log(th / a.v) / Math.log(b.v / a.v), p = a.p.clone().lerp(b.p, u); mark(p, `Mach ${m} · ${Math.round(xs[i] + len * u)} m`, css(th), 2); }
         }
@@ -94,8 +119,7 @@ const G_ShotLog = (() => {
     if (frags) line.add(frags);
     const ghosts = new Map<string, ShotGhost>(), m = info.holder.ghosts;
     for (const h of hits) { if (!m || !m.has(h.key)) pose(info.holder, h.key, rigOf(h.key)); const gh = info.holder.ghosts && info.holder.ghosts.get(h.key); if (gh && !ghosts.has(h.key)) { ghosts.set(h.key, gh); gh.uses++; } }
-    recs.push({ keys: new Set(hits.map((h) => h.key)), hits, line, frags, labels: labels.sort((a, b) => b.pri - a.pri), ghosts });
-    while (recs.length > MAX) drop(recs.shift()!);
+    return { keys: new Set(hits.map((h) => h.key)), hits, line, frags, labels: labels.sort((a, b) => b.pri - a.pri), ghosts };
   }
   // What it threw off inside them (js/ballistics.ts through: path.hit [10], js/player.ts pathFrags): each fragment and splinter's own
   // track from where it broke off, going from the speed it broke off at to what it was doing when it ended, a marker at
@@ -123,7 +147,7 @@ const G_ShotLog = (() => {
   // a hit's markers (in, past the armour, out) and its row in the readout
   function hitRows(path: ShotPath, P: ShotVert[], xs: number[], after: Map<number, number>, mark: ShotMark, info: ShotInfo) {
     return path.hit.map((h) => {
-      const q = P[h[0]], v = h[2], key = h[1], n = (count.get(key) || 0) + 1, kg = h[3] ? h[3][0] : 0, a: ShotArmour | undefined = h[8], rows = a ? a.r.filter((r) => !r.un) : [], row: ShotRow = { key, n, name: info.name, range: Math.round(xs[h[0]]), muzzle: P[0].v, vIn: v, J: Math.round(0.5 * kg * v * v) };
+      const q = P[h[0]], v = h[2], key = h[1], n = (count.get(key) || 0) + 1, kg = h[3] ? h[3][0] : 0, a: ShotArmour | undefined = h[8], rows = a ? a.r.filter((r) => !r.un) : [], row: ShotRow = { key, n, burst: !!info.burst, name: info.name, range: Math.round(xs[h[0]]), muzzle: P[0].v, vIn: v, J: Math.round(0.5 * kg * v * v) };
       count.set(key, n);
       const fr: number[][] = h[10] || [], ns = fr.filter((f) => f[9]).length;
       row.frags = [fr.length > ns && `${fr.length - ns} fragments`, ns && `${ns} bone splinters`].filter(Boolean).join(', ');
@@ -140,8 +164,8 @@ const G_ShotLog = (() => {
     });
   }
   function drop(r: ShotRec) {
-    r.line.removeFromParent(); r.line.geometry.dispose(); (r.line.material as THREE.Material).dispose();
-    if (r.frags) { r.frags.geometry.dispose(); (r.frags.material as THREE.Material).dispose(); }
+    r.line.removeFromParent();
+    r.line.traverse((o: THREE.Object3D & Record<string, any>) => { if (o.geometry) { o.geometry.dispose(); (o.material as THREE.Material).dispose(); } }); // (its own, its fragments', a grenade's other trails)
     for (const gh of r.ghosts.values()) if (--gh.uses <= 0) { gh.removeFromParent(); gh.mat.dispose(); }
   }
   function clear() { for (const r of recs) drop(r); recs = []; count = new Map(); far = new Map(); }
@@ -194,7 +218,7 @@ const G_ShotLog = (() => {
       g.fillStyle = '#fff'; g.fillText(l.t, at[0] + 6, at[1] + LH / 2 + 0.5);
     }
   }
-  return { pose, remote, keep, clear, of, focus, frame };
+  return { pose, remote, keep, keepAll, clear, of, focus, frame };
 })();
 G.ShotLog = G_ShotLog;
 

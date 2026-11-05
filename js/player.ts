@@ -1771,6 +1771,8 @@ const G_Me = {
     q.fade = 0.25;
     for (const [tg, f] of q.shot.ff) G.Net.toHost(Object.assign({ t: 'ff', tg, f: 0, e: q.shot.enemy }, f)); // (what they did to a teammate)
     q.shot.ff.clear();
+    if (q.paths && G.ShotLog) G.ShotLog.keepAll(q.paths, { holder: q.shot, name: q.enemy ? "Suspect's frag grenade" : 'Frag grenade', burst: true }); // (F9: its fragments that hit someone, as one shot)
+    q.paths = null;
     const per: Record<string, any> = {};
     for (const [k, v] of q.per) per[k] = v;
     this.fragLogs.push({ at: q.p.toArray().map((x: number) => +x.toFixed(2)), n: q.n, frames: q.frames, ms: +q.ms.toFixed(2), maxFrameMs: +q.maxMs.toFixed(2), walls: q.walls, mats: q.mats, escaped: q.escaped, per });
@@ -1784,6 +1786,9 @@ const G_Me = {
     const drag0 = (2 * m) / (F.CD * 1.2 * Math.PI / 4 * dia * dia); // (metres to lose a factor e of its speed in the air)
     let drag = drag0, v = q.v[i], rest = F.RANGE, hitSomething = false;
     const b: any = { hit: new Set(), enemy: q.enemy, events: 1 };
+    const pb: any = { path: this.newPath(o, v) }, pt = (p: THREE.Vector3, vv: number) => this.pathPt(pb, p, vv); // (F9: its path, kept if it hits someone: fragDone)
+    const wallEv = (k: string, n: number[], name: string) => pb.path.ev.push([pt(o, v), k, 0, n[0], n[1], n[2], name || '', '', Math.round(0.5 * proj.m * v * v), 0, 0, +(proj.d * 1000).toFixed(1)]);
+    const end = () => { pt(o, v > F.VMIN ? v : 0); if (pb.path.hit.length) (q.paths = q.paths || []).push(pb.path); this.fragShow(q, i, o); };
     const adv = (t: number) => { o.addScaledVector(d, t); rest -= t; v *= Math.exp(-t / drag); };
     const key = (h: any) => (h.ev ? 'e' + h.ev.id : h.mate ? 'p' + h.mate.id : 'me');
     legs: for (let leg = 0; leg < 10 && rest > 1e-3 && v > F.VMIN; leg++) {
@@ -1795,10 +1800,13 @@ const G_Me = {
         rec.tests++;
         const vh = v * Math.exp(-h.t / drag), ev = h.ev, mate = h.mate;
         const rig = ev ? ev.rig : mate ? mate.rig : h.rig, armour = ev ? B.suspectArmour(ev) : mate ? B.stateArmour(mate.st) : B.kitArmour(this);
-        const r = B.through(rig, o, d, vh, proj, armour, Math.min(wallT + 0.8, h.t + 2.5), null);
+        const tr = [] as PTrack, arrived = B.snap(proj); // (F9: the track through them, for its fragments)
+        const r = B.through(rig, o, d, vh, proj, armour, Math.min(wallT + 0.8, h.t + 2.5), tr);
         if (!r || r.entryT == null) continue;
         b.hit.add(ev || mate || this); rec.hits++; hitSomething = true;
-        const hp = o.clone().addScaledVector(d, r.entryT);
+        const hp = o.clone().addScaledVector(d, r.entryT), hk = k === 'me' ? 'p' + G.Net.myId : k;
+        pb.path.hit.push([pt(hp, vh), hk, Math.round(vh), arrived, +d.x.toFixed(4), +d.y.toFixed(4), +d.z.toFixed(4), r.exitV ? 1 : 0, B.armourLog(r), [+(r.exitT - r.entryT).toFixed(3), r.log && r.log.length ? r.log[r.log.length - 1].m : ''], this.pathFrags(o, d, tr)]);
+        if (!h.self && G.ShotLog) G.ShotLog.pose(q.shot, hk, rig as Rig); // (F9: them as they stood)
         if (ev) {
           B.wearOut(armour);
           this.hitEnemy(ev, r, null as any); // (not a gun's: no weapon path counts it)
@@ -1818,9 +1826,9 @@ const G_Me = {
         if (r.hits.some((x: any) => x.armour.some((a: any) => !a.through))) rec.armourStopped++;
         if (q.blood < F.BLOOD && r.hits.some((x: any) => x.E > 1)) { q.blood++; G.R.impact(hp, null, 'blood'); }
         proj.m = r.p ? r.p.m : proj.m;
-        if (!r.exitV) { rec.stopped++; adv(r.entryT); this.fragShow(q, i, o); return; }
+        if (!r.exitV) { rec.stopped++; adv(r.entryT); v = 0; end(); return; }
         rec.through++;
-        adv(r.exitT); v = r.exitV;
+        adv(r.exitT); v = r.exitV; pt(o, v);
         d.copy(B.deflect(d, { dev: r.dev, bend: 0 }, null));
         drag = B.flightDrag(proj, drag0);
         continue legs;
@@ -1829,14 +1837,15 @@ const G_Me = {
       adv(wall.t);
       q.walls++;
       const r = B.crossSolid(map, proj, v, wall, o, d);
+      wallEv(r.ric ? 'r' : 'e', wall.n, r.name);
       { const mm = q.mats[r.name || "?"] = q.mats[r.name || "?"] || [0, 0, 0]; if (r.ric) mm[2]++; else if (!r.v) mm[0]++; else mm[1]++; } // (what the walls did: stopped, let through, glanced)
       if (q.puffs < F.PUFFS && !hitSomething && Math.random() < 0.05) { q.puffs++; G.R.particles(o.clone(), 3, 0xb4aa98, 2.5, 0.35, 2, 0.5); }
       if (r.ric) { o.addScaledVector(new THREE.Vector3(...wall.n), 0.004); d.copy(B.deflect(d, r, wall.n)); v = r.v; continue; }
-      if (!r.v) { this.fragShow(q, i, o); return; }
-      adv(r.t); v = r.v; d.copy(B.deflect(d, r, wall.n)); o.addScaledVector(d, 0.004);
+      if (!r.v) { v = 0; end(); return; }
+      adv(r.t); v = r.v; pb.path.ev.push([pt(o, v), 'x']); d.copy(B.deflect(d, r, wall.n)); o.addScaledVector(d, 0.004);
     }
     if (v > F.VMIN) q.escaped++;
-    this.fragShow(q, i, o);
+    end();
   },
   // a chip's streak, from the burst to where it ended (the first FRAG.SHOW metres of it)
   fragShow(q: any, i: number, end: THREE.Vector3) {
