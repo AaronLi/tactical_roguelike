@@ -27,7 +27,10 @@ export function authoredIds() {
 }
 export const authoredFiles = (id) => ({ glb: glbPath(id), json: cfgPath(id) });
 /** The text of every authored source (the bake's staleness hash covers it). */
-export function authoredSrc() { return authoredIds().map((id) => id + '\0' + fs.readFileSync(cfgPath(id), 'utf8') + '\0' + (fs.existsSync(glbPath(id)) ? fs.readFileSync(glbPath(id)).toString('latin1') : '')).join('\0'); }
+export function authoredSrc() { return authoredIds().map((id) => id + '\0' + fs.readFileSync(cfgPath(id), 'utf8') + '\0' + (fs.existsSync(glbPath(id)) ? fs.readFileSync(glbPath(id)).toString('latin1') : '') + variantNames(id).map((n) => '\0' + n + '\0' + fs.readFileSync(variantPath(id, n)).toString('latin1')).join('')).join('\0'); }
+/** The per-gun variant parts beside a gun's model: models/<id>/<name>.glb (any .glb in the folder but <id>.glb). Offered on that gun only (docs/models.md "Authored pistols"). */
+export const variantPath = (id, name) => path.join(MODELS, id, name + '.glb');
+export function variantNames(id) { const d = path.join(MODELS, id); return fs.existsSync(d) ? fs.readdirSync(d).filter((f) => f.endsWith('.glb') && f !== id + '.glb').map((f) => f.slice(0, -4)).sort() : []; }
 
 // ---- the .glb ----
 export function parseGlb(buf) {
@@ -61,9 +64,15 @@ const jsonExtra = (ex, k) => { if (ex[k] !== undefined) return ex[k]; if (typeof
 
 /** One authored source, read: { cfg, root extras, meshes in the gun's frame, rig, sights, info }. Throws on a malformed file (checkAuthored reports the contract). */
 export function readAuthored(id) {
-  const cfg = JSON.parse(fs.readFileSync(cfgPath(id), 'utf8')), buf = fs.readFileSync(glbPath(id)), g = parseGlb(buf);
+  const cfg = JSON.parse(fs.readFileSync(cfgPath(id), 'utf8')), r = readScene(fs.readFileSync(glbPath(id)), id, `models/${id}/${id}.glb`), variants = {};
+  for (const name of variantNames(id)) { const v = readScene(fs.readFileSync(variantPath(id, name)), id + '_' + name, `models/${id}/${name}.glb`); variants[name] = { meta: jsonExtra(v.rootExtras, 'variant'), meshes: v.meshes }; }
+  return { id, cfg, json: r.json, rootExtras: r.rootExtras, info: r.info, anchors: r.anchors, meshes: r.meshes, variants };
+}
+/** A .glb scene read for the recipes: its one root node (named rootName), root extras, info and anchors, and every mesh's geometry in the root's frame. */
+function readScene(buf, rootName, label) {
+  const g = parseGlb(buf);
   const j = g.json, roots = (j.scenes[j.scene || 0] || {}).nodes || [];
-  if (roots.length !== 1 || j.nodes[roots[0]].name !== id) throw new Error(`models/${id}/${id}.glb: one root node named "${id}"`);
+  if (roots.length !== 1 || j.nodes[roots[0]].name !== rootName) throw new Error(`${label}: one root node named "${rootName}"`);
   const rn = j.nodes[roots[0]], rx = rn.extras || {}, info = jsonExtra(rx, 'info'), anchors = jsonExtra(rx, 'anchors'), meshes = [];
   const walk = (ni, parentW, part) => {
     const n = j.nodes[ni], W = mul(parentW, local(n)), ex = n.extras || {};
@@ -92,14 +101,24 @@ export function readAuthored(id) {
   // barrel too. Slot barrel is now only the factory barrel and the fittings are slot base: read such a file that way (until it is exported again).
   if (meshes.some((e) => e.legacyTube)) for (const e of meshes) if (e.slot === 'barrel' && !e.legacyTube) e.slot = 'base';
   for (const e of meshes) delete e.legacyTube;
-  return { id, cfg, json: j, rootExtras: rx, info, anchors, meshes };
+  return { json: j, rootExtras: rx, info, anchors, meshes };
 }
 /** The recipes' view of a source (tools/models/authored.ts AuthoredGun): the anchors become the frame the shared parts are seated on. */
 export function toAuthoredGun(src) {
-  const a = src.anchors, f = (k) => a[k][0];
+  const a = src.anchors, f = (k) => (a[k] ? a[k][0] : 0), y = (k) => (a[k] ? a[k][1] : 0), pistol = src.info && src.info.pistol === true;
+  const info = Object.assign({}, src.info);
+  // a manually cycled pistol: the knob the hand takes is the middle of the part_bolt's meshes unless the model says (info.bolt: [forward, up, right])
+  if (pistol && info.anim && info.anim.bolt && !info.bolt) {
+    const bb = [1e9, 1e9, 1e9, -1e9, -1e9, -1e9];
+    for (const e of src.meshes) if (e.part === 'bolt') for (let i = 0; i < e.pos.length; i += 3) for (let c = 0; c < 3; c++) { bb[c] = Math.min(bb[c], e.pos[i + c]); bb[3 + c] = Math.max(bb[3 + c], e.pos[i + c]); }
+    info.bolt = [+(-bb[5]).toFixed(4), +((bb[1] + bb[4]) / 2).toFixed(4), +((bb[0] + bb[3]) / 2).toFixed(4)]; // (its rear, its middle height, its middle across)
+  }
+  const variants = {};
+  for (const [name, v] of Object.entries(src.variants || {})) variants[name] = { slot: v.meta.slot, of: v.meta.of, info: v.meta.info || null, cap: v.meta.cap || null, note: v.meta.note || '', meshes: v.meshes };
   return {
-    src: `models/${src.id}/${src.id}.glb`, info: src.info, meshes: src.meshes, sights: { builtin: src.cfg.sights.builtin.slice(), rail: src.cfg.sights.rail.slice() },
-    rig: { top: a.mount_optic[1], rail: [f('mount_optic'), f('mount_optic_end')], hgF: f('mount_handguard'), hgEnd: f('mount_handguard_end'), end: f('mount_muzzle'), barrel: f('mount_barrel'), stockY: a.mount_stock[1], gripY: a.mount_grip[1], mag: [a.mount_mag[0], a.mount_mag[1]] },
+    src: `models/${src.id}/${src.id}.glb`, info, meshes: src.meshes, sights: { builtin: src.cfg.sights.builtin.slice(), rail: src.cfg.sights.rail.slice() }, pistol, anchors: a, variants,
+    rig: pistol ? { top: y('mount_optic'), rail: [f('mount_optic'), f('mount_optic_end')], hgF: 0, hgEnd: 0, end: info.muzzles[0][0], barrel: f('mount_barrel'), stockY: y('mount_stock'), gripY: y('mount_grip'), mag: [a.mount_mag[0], a.mount_mag[1]] }
+      : { top: a.mount_optic[1], rail: [f('mount_optic'), f('mount_optic_end')], hgF: f('mount_handguard'), hgEnd: f('mount_handguard_end'), end: f('mount_muzzle'), barrel: f('mount_barrel'), stockY: a.mount_stock[1], gripY: a.mount_grip[1], mag: [a.mount_mag[0], a.mount_mag[1]] },
   };
 }
 /** Fills G.Authored (the vm's, tools/models/authored.ts) from every authored source. Call after the recipes are loaded. */
@@ -122,12 +141,23 @@ export function checkAuthored(Models, id, G = null) {
   for (const m of Models.validateAuthoredConfig(cfg)) E(m);
   const rep = Models.validateAuthored(Models.describeGltfJson(Models.glbJson(fs.readFileSync(glbPath(id)))), id, { factory: G ? factorySlots(G, id) : undefined });
   errors.push(...rep.errors); warnings.push(...rep.warnings);
+  for (const name of variantNames(id)) {
+    const label = `${name}.glb`;
+    try { const vr = Models.validateAuthoredVariant(Models.describeGltfJson(Models.glbJson(fs.readFileSync(variantPath(id, name)))), id, name); errors.push(...vr.errors.map((e) => `${label}: ${e}`)); warnings.push(...vr.warnings.map((e) => `${label}: ${e}`)); } catch (e) { errors.push(`${label}: ${e.message}`); }
+  }
   if (G && !errors.length) {
     const a = readAuthored(id), A = toAuthoredGun(a), spec = G.Gunsmith.modelSpec({ id, build: G.Gunsmith.defaultBuild(id) });
     if (spec.rcv !== 'authored' || spec.authored !== id) E(`js/parts.ts: the platform ${id} is an authored gun: its spec needs rcv: 'authored', authored: '${id}' (it says rcv ${spec.rcv}, authored ${spec.authored})`);
-    if (spec.L == null || !near(spec.L, A.rig.hgF)) E(`js/parts.ts: ${id}'s spec L is ${spec.L}, the model's mount_handguard is ${A.rig.hgF}: the same point (where a handguard starts)`);
+    if (!A.pistol && (spec.L == null || !near(spec.L, A.rig.hgF))) E(`js/parts.ts: ${id}'s spec L is ${spec.L}, the model's mount_handguard is ${A.rig.hgF}: the same point (where a handguard starts)`);
     const room = A.rig.hgEnd - A.rig.hgF - 0.003;
-    if (spec.hgMax == null || Math.abs(spec.hgMax - room) > 1e-4) E(`js/parts.ts: ${id}'s spec hgMax is ${spec.hgMax}, the model's mount_handguard_end - mount_handguard - 3 mm is ${room.toFixed(4)}: the longest handguard it takes (fit is data)`);
+    if (!A.pistol && (spec.hgMax == null || Math.abs(spec.hgMax - room) > 1e-4)) E(`js/parts.ts: ${id}'s spec hgMax is ${spec.hgMax}, the model's mount_handguard_end - mount_handguard - 3 mm is ${room.toFixed(4)}: the longest handguard it takes (fit is data)`);
+    if (A.pistol) { // the pistol anchor set (GUN_MODEL_CONTRACT.authored.pistol): each thing the platform fits has its anchor
+      const slots = G.Gunsmith.slotsOf(id, G.Gunsmith.defaultBuild(id)).map((s) => s.slot);
+      if (slots.includes('optic') && !A.anchors.mount_optic) E(`models/${id}: the platform has an optic slot (a pistol sight sits in the optic cut): the model needs mount_optic and mount_optic_end`);
+      if (slots.includes('tac') && !A.anchors.mount_tac) E(`models/${id}: the platform has a tactical slot: the model needs mount_tac`);
+      if (!!spec.bolt !== !!(A.info.anim && A.info.anim.bolt)) E(`js/parts.ts: ${id}'s spec bolt (${spec.bolt}) and the model's info.anim.bolt (${A.info.anim && A.info.anim.bolt}) disagree: a bolt pistol has both`);
+      for (const [name, v] of Object.entries(A.variants)) { const pid = id + (v.slot === 'barrel' ? '.br.' : '.mag.') + name.replace(/^(barrel|mag)_/, ''); if (!G.Gunsmith.PARTS[pid]) E(`js/parts.ts: the variant ${name}.glb has no part ${pid}`); }
+    }
     const mg = spec.mag || {};
     if (!near(mg.f, A.rig.mag[0]) || !near(mg.y, A.rig.mag[1])) E(`js/parts.ts: ${id}'s spec mag is [${mg.f}, ${mg.y}], the model's mount_mag is [${A.rig.mag}]`);
   }
