@@ -22,7 +22,7 @@ KIT_COL = {'black': (0.03, 0.03, 0.035, 1), 'polymer': (0.035, 0.035, 0.04, 1), 
            'glass': (0.05, 0.08, 0.1, 1), 'reflexLens': (0.55, 0.6, 0.85, 0.3), 'brass': (0.7, 0.55, 0.2, 1), 'sightPaint': (0.95, 0.95, 0.9, 1),
            'tritium': (0.5, 1, 0.55, 1)}
 # one-off materials (the contract's `m_<rrggbb>`: kept as exported, a standard PBR material): name -> (metallic, roughness)
-KIT_PBR = {'m_9c9ea1': (1.0, 0.42)}     # raw bead-blasted titanium: a light satin grey
+KIT_PBR = {'m_9c9ea1': (1.0, 0.42), 'm_80838a': (1.0, 0.48)}     # raw bead-blasted titanium: a light satin grey; raw bead-blasted steel
 TITANIUM = 'm_9c9ea1'
 def kit_mat(n):
     m = bpy.data.materials.get(n)
