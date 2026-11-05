@@ -95,6 +95,12 @@ const arChargingHandle = alu('bar', 18, 5, 0.7); // in the hand
 const arChLatch = steelBar(2.5, 2);
 const arBufferTube: Body = { ...alu('shell', 18, 2.5, 0.5), modes: 1 }; // the buffer tube's own short ring is part of the AR's sound
 const arBufferSpring = springWire(25, 1.4);
+/**
+ * Buffer spring strength relative to a standard carbine spring. Stiffer: faster, harder slam
+ * home (and a bit more effort and noise compressing it on the pull). 1.6 ≈ a heavy
+ * "extra power" spring.
+ */
+const BUFFER_SPRING = 1.6;
 const arBuffer = steelBlock(6, 18); // buffer with sliding weights
 const arCase: Body = { ...mat('brass'), shape: 'shell', size: 4.5, thickness: 0.4, modes: 1, irregularity: 0.5, damping: 0.6, level: 0 }; // held by the magazine / chamber
 // Spring-steel feed lips on the magazine body: they ring briefly (the magazine "ping").
@@ -221,45 +227,49 @@ const AR_HOUSING: Scene['housing'] = { amount: 0.55, cavity: 0.5, cavityWidth: 2
 
 /** The carrier running home under the buffer spring, starting at t (round in the magazine). */
 function arForward(t: number, withChargingHandle: boolean): SceneElement[] {
+  // A stiffer buffer spring drives the same carrier home faster (travel time ∝ 1/√k) and
+  // harder (speed ∝ √k): every forward time and impact scales from the reference spring.
+  const T = (s: number) => s / Math.sqrt(BUFFER_SPRING);
+  const V = (v: number) => v * Math.sqrt(BUFFER_SPRING);
   const els: SceneElement[] = [
     // Buffer spring decompressing: the classic AR "sproing", echoing in the buffer tube.
     // The buffer spring is inside the buffer tube, behind the receiver, inside the stock:
     // heard only as a faint, muffled sproing under the carrier.
-    hit('buffer spring drives the carrier', t, -18, 3, arBufferSpring, arBufferTube, { scatter: 0.2, radius: 1, click: 0.1, sharp: 0.5 },
+    hit('buffer spring drives the carrier', t, -18, V(3), arBufferSpring, arBufferTube, { scatter: 0.2, radius: 1, click: 0.1, sharp: 0.5 },
       { coil: { level: 0.3, length: 14, dispersion: 0.4, decay: 0.2, brightness: 1800 } }),
     // What you actually hear: the steel carrier grinding along the aluminium upper.
-    rub('carrier rails in the upper', t + 0.002, -14, { force: 6, duration: 0.05, speed: 4, profile: 'accelerate', roughness: 3, grain: 0.15, periodicity: 0, contactWidth: 0.08 }, arCarrier, arUpper),
-    hit('buffer weights shift', t + 0.004, -20, 1.2, steelBlock(1.5, 12), arBuffer, { scatter: 0.9, radius: 2 }),
+    rub('carrier rails in the upper', t + T(0.002), -14, { force: 6, duration: T(0.05), speed: V(4), profile: 'accelerate', roughness: 3, grain: 0.15, periodicity: 0, contactWidth: 0.08 }, arCarrier, arUpper),
+    hit('buffer weights shift', t + T(0.004), -20, V(1.2), steelBlock(1.5, 12), arBuffer, { scatter: 0.9, radius: 2 }),
     // Bolt strips the top round over the steel feed lips.
     // Forward-assist pawl rattles over the carrier serrations as it flies past.
-    rub('forward-assist pawl over the serrations', t + 0.01, -8, { force: 4, duration: 0.012, speed: 3, profile: 'steady', roughness: 200, grain: 2.5, periodicity: 1, contactWidth: 0.02 }, arFaPawl, arCarrier),
-    rub('case dragged over the feed lips', t + 0.02, -14, { force: 6, duration: 0.02, speed: 3, roughness: 15, grain: 0.3 }, arCase, arFeedLips),
+    rub('forward-assist pawl over the serrations', t + T(0.01), -8, { force: 4, duration: T(0.012), speed: V(3), profile: 'steady', roughness: 200, grain: 2.5, periodicity: 1, contactWidth: 0.02 }, arFaPawl, arCarrier),
+    rub('case dragged over the feed lips', t + T(0.02), -14, { force: 6, duration: T(0.02), speed: V(3), roughness: 15, grain: 0.3 }, arCase, arFeedLips),
     // The rim snaps free of the lips; the nose ticks up the feed ramp; the next round snaps up.
-    snap('case rim snaps free of the feed lips', t + 0.03, 3, { strength: 0.7, preload: 0, seat: 0.3, seatDelay: 1 }, arCase, arFeedLips),
-    hit('bullet nose rides up the feed ramp', t + 0.032, -7, 1.5, arBullet, arFeedRamp, { scatter: 0.3, radius: 1.5 }),
-    snap('next round snaps up into the lips', t + 0.034, 0, { strength: 0.5, preload: 0, seat: 0.3, seatDelay: 1.5 }, arNextRound, arFeedLips),
-    hit('gas tube slides into the carrier key', t + 0.046, -9, 0.8, arGasTube, gasKey, { scatter: 0.3, radius: 1.5 }),
-    rub('round into the chamber', t + 0.04, -15, { force: 5, duration: 0.015, speed: 3, profile: 'decelerate', roughness: 6, grain: 0.3 }, arCase, arChamber),
+    snap('case rim snaps free of the feed lips', t + T(0.03), 3, { strength: 0.7, preload: 0, seat: 0.3, seatDelay: 1 }, arCase, arFeedLips),
+    hit('bullet nose rides up the feed ramp', t + T(0.032), -7, V(1.5), arBullet, arFeedRamp, { scatter: 0.3, radius: 1.5 }),
+    snap('next round snaps up into the lips', t + T(0.034), 0, { strength: 0.5, preload: 0, seat: 0.3, seatDelay: 1.5 }, arNextRound, arFeedLips),
+    hit('gas tube slides into the carrier key', t + T(0.046), -9, V(0.8), arGasTube, gasKey, { scatter: 0.3, radius: 1.5 }),
+    rub('round into the chamber', t + T(0.04), -15, { force: 5, duration: T(0.015), speed: V(3), profile: 'decelerate', roughness: 6, grain: 0.3 }, arCase, arChamber),
     // Lock-up in two parts. The bolt (out front of the carrier) hits the barrel extension
     // first: a sharp, light hit. The carrier keeps going for its 9.5 mm of cam travel, the
     // cam pin turns the bolt into its lugs, and then the heavy hollow carrier lands on the
     // bolt: the "chunk", about 2.5 ms later.
-    hit('bolt face hits the barrel extension', t + 0.055, -4, 4.5, arBolt, arBarrelExt, { scatter: 0.3, radius: 3, click: 0.7 }),
-    rub('cam pin turns the bolt', t + 0.054, -12, { force: 10, duration: 0.011, speed: 1.2, profile: 'decelerate', roughness: 10, grain: 0.2, contactWidth: 0.02 }, arCamPin, arCarrier),
-    hit('bolt lugs rotate home', t + 0.057, -9, 1.5, arBolt, arBarrelExt, { scatter: 0.3, radius: 1.5 }),
-    hit('carrier slams onto the bolt', t + 0.0578, 0, 3.8, arCarrier, arBolt, { scatter: 0.5, radius: 4, click: 0.8 }),
+    hit('bolt face hits the barrel extension', t + T(0.055), -4, V(4.5), arBolt, arBarrelExt, { scatter: 0.3, radius: 3, click: 0.7 }),
+    rub('cam pin turns the bolt', t + T(0.054), -12, { force: 10, duration: T(0.011), speed: V(1.2), profile: 'decelerate', roughness: 10, grain: 0.2, contactWidth: 0.02 }, arCamPin, arCarrier),
+    hit('bolt lugs rotate home', t + T(0.057), -9, V(1.5), arBolt, arBarrelExt, { scatter: 0.3, radius: 1.5 }),
+    hit('carrier slams onto the bolt', t + T(0.0578), 0, V(3.8), arCarrier, arBolt, { scatter: 0.5, radius: 4, click: 0.8 }),
     // Seating into the breech: the lugs bottom in the barrel extension and the carrier's
     // momentum goes into the barrel and receiver through hard steel faces: a metallic "chunk"
     // from the barrel's own bending modes (~500 Hz up), not a soft low thump.
-    hit('lugs seat in the barrel extension', t + 0.0579, -2, 3.8, arBarrel, arCarrier, { scatter: 0.3, radius: 3, click: 0.6, sharp: 0.85 },
+    hit('lugs seat in the barrel extension', t + T(0.0579), -2, V(3.8), arBarrel, arCarrier, { scatter: 0.3, radius: 3, click: 0.6, sharp: 0.85 },
       // The whole receiver takes this blow, so it comes through the housing much more than a slide does.
       { housing: { amount: 0.95 } }),
     // ...and the rifle as a whole flexes from it: a hard-edged, low metallic "chunk" (not a sine thump).
-    hit('rifle body takes the blow', t + 0.058, 2, 3.8, arRifleBody, arCarrier, { scatter: 0.2, radius: 3, click: 0.3, sharp: 0.85 }),
-    snap('extractor snaps over the rim', t + 0.056, -3, { strength: 0.8, preload: 0, seat: 0.3, seatDelay: 1 }, arExtractor, arCase),
+    hit('rifle body takes the blow', t + T(0.058), 2, V(3.8), arRifleBody, arCarrier, { scatter: 0.2, radius: 3, click: 0.3, sharp: 0.85 }),
+    snap('extractor snaps over the rim', t + T(0.056), -3, { strength: 0.8, preload: 0, seat: 0.3, seatDelay: 1 }, arExtractor, arCase),
   ];
   if (withChargingHandle) {
-    els.push(snap('charging handle latch catches', t + 0.06, -9, { strength: 0.7, preload: 0, seat: 0.4, seatDelay: 2 }, arChLatch, arUpper));
+    els.push(snap('charging handle latch catches', t + T(0.06), -9, { strength: 0.7, preload: 0, seat: 0.4, seatDelay: 2 }, arChLatch, arUpper));
   }
   return els;
 }
@@ -271,7 +281,7 @@ const CH_BACK = 0.0;
 const PULL_MM = 90;
 const PULL_T = 0.16;
 const CH_END = CH_BACK + PULL_T;
-const LET_GO = 0.45;
+const LET_GO = CH_END + 0.08; // let go ~80 ms after the handle bottoms out
 const tAt = (mm: number): number => CH_BACK + (PULL_T * Math.acos(1 - (2 * Math.min(mm, PULL_MM)) / PULL_MM)) / Math.PI;
 
 const SLIDE_BED_DB = 10;
@@ -374,7 +384,7 @@ export const AR15_CHARGE: Scene = {
       name: 'buffer-spring-compress',
       description: 'Buffer spring compressing inside the buffer tube (inside the stock) for the whole stroke: a faint, muffled scrape and sproing. The buffer weights lag at the start and settle at the stop.',
       elements: [
-        travelRub('coils scraping the buffer tube', 2, 90, -22, { force: 3, roughness: 12, grain: 0.5, periodicity: 0.1, contactWidth: 0.2 }, arBufferSpring, arBufferTube,
+        travelRub('coils scraping the buffer tube', 2, 90, -22 + 10 * Math.log10(BUFFER_SPRING), { force: 3 * BUFFER_SPRING, roughness: 12, grain: 0.5, periodicity: 0.1, contactWidth: 0.2 }, arBufferSpring, arBufferTube,
           { coil: { level: 0.2, length: 14, dispersion: 0.4, decay: 0.15, brightness: 1800 } }),
         hit('buffer weights lag', tAt(3), -22, 0.6, steelBlock(1.5, 12), arBuffer, { scatter: 0.9, radius: 2 }),
         hit('buffer weights settle', CH_END + 0.004, -20, 0.8, steelBlock(1.5, 12), arBuffer, { scatter: 0.9, radius: 2 }),
