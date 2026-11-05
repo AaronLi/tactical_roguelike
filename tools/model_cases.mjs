@@ -28,7 +28,7 @@ export const keyOf = (b) => Object.keys(b).sort().map((s) => s + '=' + b[s]).joi
 
 /** Optic height, roughly: the order the sight stack's extremes are picked by (lowest = irons, tallest = a long variable scope on a riser). */
 const OPTIC_H = { none: 0, irons: 0, notch: 0, bead: 0, night: 0.5, qbzirons: 1, augscope: 3, minidot: 1, reddot: 2, holo: 2.5, riser: 2, prism: 3, acog: 4, lpvo: 5, scope: 6 };
-const opticHeight = (p) => { const m = (p.model || {}), o = m.optic; return (OPTIC_H[o] ?? 3) + (m.riser || 0) * 20 + (m.dotR || 0) * 10 + (m.scopeObj || 0) * 10; };
+const opticHeight = (p) => { const m = (p.model || {}), o = m.optic; if (p.authored) return { low: 1.5, mid: 2.8, high: 4.5 }[p.authored.height] ?? 3; return (OPTIC_H[o] ?? 3) + (m.riser || 0) * 20 + (m.dotR || 0) * 10 + (m.scopeObj || 0) * 10; };
 
 export function generate(G, id) {
   const GS = G.Gunsmith, PARTS = GS.PARTS, out = [], index = new Map();
@@ -124,6 +124,11 @@ export function generate(G, id) {
     }
   }
 
+  // authored parts (models/parts): each one fitted alone where it fits, and a magnifier behind it where it takes one
+  { const os = slotOf(def, 'optic'); if (os) for (const p of options(os, def)) if (p.id.startsWith('op.auth.')) {
+    const b = { ...def, optic: p.id }; delete b.magnifier; GS.prune(id, b); add(`authored optic (${p.id})`, b);
+    if (p.provides && p.provides.magnifier) { const ms = slotOf(b, 'magnifier'); const m = ms && options(ms, b)[0]; if (m) add(`magnifier behind the authored optic (${p.id})`, { ...b, magnifier: m.id }); }
+  } }
   // specials
   const brs = slotOf(def, 'barrel');
   if (brs) for (const p of options(brs, def)) if (p.model && p.model.integral) add(`integral suppressor (${p.id})`, { ...loaded, barrel: p.id });

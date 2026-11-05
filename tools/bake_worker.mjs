@@ -13,6 +13,7 @@ import { MeshoptEncoder, MeshoptDecoder } from 'meshoptimizer';
 import { makeEmitter } from './model_emit.mjs';
 import { platformJob } from './bake_parts.mjs';
 import { authoredSrc } from './bake_authored.mjs';
+import { authoredPartsSrc } from './authored_parts.mjs';
 
 export const GUNS_DIR = path.join(ROOT, 'assets/models/guns/');
 const sha = (s) => crypto.createHash('sha1').update(s).digest('hex').slice(0, 16);
@@ -24,7 +25,7 @@ export async function makeEnv({ verbose = false } = {}) {
     readAsDataURL(b) { b.arrayBuffer().then((r) => { this.result = 'data:' + b.type + ';base64,' + Buffer.from(r).toString('base64'); this.onloadend && this.onloadend(); }); }
   };
   const G = loadGame(), GM = G.GunRecipes, GS = G.Gunsmith, Models = loadModels();
-  const src = sha(['tools/models/recipes', 'tools/models/guntraces', 'tools/models/authored', 'js/parts', 'js/materials', 'js/gunmaterials'].map((f) => fs.readFileSync(path.join(ROOT, f + '.ts'), 'utf8')).join('\0') + '\0' + authoredSrc());
+  const src = sha(['tools/models/recipes', 'tools/models/guntraces', 'tools/models/authored', 'tools/models/authoredparts', 'js/parts', 'js/materials', 'js/gunmaterials'].map((f) => fs.readFileSync(path.join(ROOT, f + '.ts'), 'utf8')).join('\0') + '\0' + authoredSrc() + '\0' + authoredPartsSrc());
   await MeshoptEncoder.ready; await MeshoptDecoder.ready;
   const logger = new Logger(verbose ? Logger.Verbosity.INFO : Logger.Verbosity.WARN);
   const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.encoder': MeshoptEncoder, 'meshopt.decoder': MeshoptDecoder }).setLogger(logger);

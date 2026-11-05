@@ -35,6 +35,7 @@ import { ROOT } from './model_env.mjs';
 import * as THREE_NS from 'three';
 import { bakeParts, staleParts, PARTS_DIR } from './bake_parts.mjs';
 import { authoredIds, checkAuthored } from './bake_authored.mjs';
+import { authoredPartKeys, checkAuthoredPart } from './authored_parts.mjs';
 import { makeEnv, GUNS_DIR } from './bake_worker.mjs';
 import { makePool } from './bake_pool.mjs';
 
@@ -71,6 +72,10 @@ const env = await makeEnv({ verbose }), { G, GS, Models, src } = env;
 for (const id of authoredIds()) { // (the authored sources: the contract and the platform's spec first)
   const r = checkAuthored(Models, id, G); for (const w of r.warnings) console.warn(id + ': warning ' + w);
   if (r.errors.length) { console.error('authored source ' + id + ' is not valid:\n  ' + r.errors.join('\n  ')); process.exit(1); }
+}
+for (const k of authoredPartKeys()) { // (the authored parts: sights etc. made in Blender, checked before anything is baked with them)
+  const r = checkAuthoredPart(Models, k); for (const w of r.warnings) console.warn(k + ': warning ' + w);
+  if (r.errors.length) { console.error('authored part ' + k + ' is not valid:\n  ' + r.errors.join('\n  ')); process.exit(1); }
 }
 const platIds = Object.keys(GS.PLATFORMS || {}).filter((id) => G.WEAPONS[id]);
 const ids2 = only.length ? only : platIds.length ? platIds : G.WEAPON_LIST.map((w) => w.id);

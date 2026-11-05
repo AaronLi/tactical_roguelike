@@ -1,0 +1,15 @@
+{
+  "_doc": "The Strix Falcon's shapes, in the optic's own frame (docs/models.md 'Authored parts'): metres, at = [forward, up, right] of the shape's CENTRE, origin = the top of the rail at the mount point. box: size = [width (x), height (y), length (forward)]. cyl: r, len along `axis` (x, y or z). Read by tools/build_authored_optic.mjs (node + three) and build_falcon.py (Blender).",
+  "shapes": [
+    { "name": "base", "mat": "black", "box": [0.034, 0.009, 0.056], "at": [0.002, 0.0045, 0] },
+    { "name": "wall_l", "mat": "black", "box": [0.0035, 0.0365, 0.046], "at": [-0.001, 0.02725, -0.01675] },
+    { "name": "wall_r", "mat": "black", "box": [0.0035, 0.0365, 0.046], "at": [-0.001, 0.02725, 0.01675] },
+    { "name": "front_sill", "mat": "black", "box": [0.034, 0.006, 0.01], "at": [0.017, 0.012, 0] },
+    { "name": "hood", "mat": "black", "box": [0.034, 0.0045, 0.048], "at": [0.0, 0.04775, 0] },
+    { "name": "emitter", "mat": "black", "box": [0.022, 0.01, 0.014], "at": [-0.017, 0.014, 0] },
+    { "name": "glass", "mat": "reflexLens", "box": [0.026, 0.026, 0.0015], "at": [0.014, 0.0285, 0] },
+    { "name": "windage", "mat": "black", "cyl": { "r": 0.0045, "len": 0.009, "axis": "x" }, "at": [0.002, 0.028, 0.0215] },
+    { "name": "elevation", "mat": "black", "cyl": { "r": 0.0045, "len": 0.008, "axis": "y" }, "at": [0.002, 0.054, 0] },
+    { "name": "lever", "mat": "rubber", "cyl": { "r": 0.0035, "len": 0.008, "axis": "x" }, "at": [-0.012, 0.0045, -0.0215] }
+  ]
+}
