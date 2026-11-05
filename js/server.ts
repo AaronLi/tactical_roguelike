@@ -6,7 +6,7 @@ const STATE_CODE: Partial<Record<EnemyState, number>> = { normal: 0, flee: 0, su
 type Tbl = Record<string, any>;
 interface Loose { [k: string]: any }
 // The kinds of message the host's handle() switches on (what an officer's game sends it with G.Net.toHost: the `t` field)
-type NetMsgKind = 'hello' | 'st' | 'rfx' | 'bstk' | 'hole' | 'dhit' | 'rpath' | 'skin' | 'skinReq' | 'hit' | 'saved' | 'shot' | 'nade' | 'flash' | 'glass' | 'crack' | 'boom' | 'revive' | 'course' | 'crun' | 'treat' | 'applying' | 'vote' | 'ready' | 'arm' | 'pick' | 'chat' | 'ff' | 'ping' | 'drop' | 'take' | 'useDoor' | 'kickDoor' | 'shout' | 'openCase' | 'openAbox' | 'takeAbox' | 'openSbox' | 'teamEdit' | 'openCab' | 'cabEdit' | 'turn' | 'drag' | 'cuff' | 'stake' | 'sgive' | 'secure';
+type NetMsgKind = 'hello' | 'st' | 'rfx' | 'bstk' | 'hole' | 'dhit' | 'rpath' | 'npath' | 'skin' | 'skinReq' | 'hit' | 'saved' | 'shot' | 'nade' | 'flash' | 'glass' | 'crack' | 'boom' | 'revive' | 'course' | 'crun' | 'treat' | 'applying' | 'vote' | 'ready' | 'arm' | 'pick' | 'chat' | 'ff' | 'ping' | 'drop' | 'take' | 'useDoor' | 'kickDoor' | 'shout' | 'openCase' | 'openAbox' | 'takeAbox' | 'openSbox' | 'teamEdit' | 'openCab' | 'cabEdit' | 'turn' | 'drag' | 'cuff' | 'stake' | 'sgive' | 'secure';
 // A message off the wire: its kind, and whatever else that kind carries (dynamic: checked where it's read)
 interface NetMsg { t: NetMsgKind; [k: string]: any }
 type DamageMap = Parameters<typeof G.Damage.apply>[0]; // (what js/damage.ts takes for a map)
@@ -54,7 +54,7 @@ interface Enemy {
   guard?: boolean; dp?: DoorPeekSpot | null; dpT?: number; dpOk?: number; heard?: { x: number; y: number; z: number; at: number };
   threat?: { x: number; z: number; y?: number; d?: number } | null; str?: number; collapsed?: boolean; down?: boolean; sup?: number; supAt?: number; supQ?: number[][];
   flinchT?: number; flinchOk?: number; flashT?: number; flashRec?: number; flashRecLen?: number; flashK?: number; flashOn?: boolean; flashBy?: { x: number; y: number; z: number } | null; stumbleT?: number; stumbleYaw?: number; stumbleV?: number; peekDone?: boolean; peekOut?: number; organs?: Record<string, number>; broke?: Record<string, number>;
-  spine?: boolean; cardiac?: boolean; out?: boolean; incap?: { by: string | null; t: number }; lastHitAt?: number; lastH?: boolean; lastAp?: boolean;
+  spine?: boolean; cardiac?: boolean; out?: boolean; incap?: { by: string | null; t: number }; lastHitAt?: number; lastH?: boolean; lastAp?: boolean; lastGr?: number; lastFb?: number; flashId?: number;
   hitState?: EnemyState; hitUnaware?: boolean; hitYield?: boolean; hitAt?: number; shock?: number; kick?: number; headDelay?: number; engAt?: number; engTgt?: string;
   firedAt?: number; sawAt?: number; engagedAt?: number; allyT?: number; allyN?: number; proof?: boolean; seeK?: number; blind?: boolean; onWait?: number;
   coverFlow?: ReturnType<typeof G.Level.flow> | null; coverCheckT?: number; emboldened?: boolean; fl?: number;
@@ -160,6 +160,7 @@ const G_Server = {
         break;
       case 'dhit': { const d = this.map && this.phase === 'level' ? this.map.doors[m.i] : null; if (d && p) this.doorHit(d, m.pt, m.J, m.dir); break; }
       case 'rpath': if (p && Array.isArray(m.ps)) G.Net.broadcast({ t: 'rpath', k: m.e ? 'e' + m.e : 'p' + from, sid: m.sid, ps: m.ps.slice(0, 32) }, from); break; // (where it went: for everyone's replays)
+      case 'npath': if (p && Array.isArray(m.ps) && Number.isFinite(m.s)) G.Net.broadcast({ t: 'npath', s: m.s, ps: m.ps.slice(0, 48) }, from); break; // (a grenade's chips that hit someone: the same)
       // a gun's stickers (js/stickers.ts): kept and passed on; asked for by someone who's seen its hash and not it
       case 'skin': {
         if (!p || typeof m.h !== 'string' || m.h.length > 24 || this.skins.has(m.h)) break;
@@ -179,7 +180,7 @@ const G_Server = {
           tos: Array.isArray(m.tos) && m.tos.length <= 24 && m.tos.every((p: unknown) => Array.isArray(p) && p.length === 3 && p.every(Number.isFinite)) ? m.tos : undefined }, from); // (a shotgun's pellets: for the highlights)
         break;
       case 'nade': G.Net.broadcast({ t: 'nade', id: from, p: m.p, v: m.v, fuse: m.fuse, k: m.k === 'flash' ? 'flash' : 'frag', s: [0, 1, 2].includes(m.s) ? m.s : 2 }, from); break;
-      case 'flash': if (this.phase === 'level' && Array.isArray(m.p) && m.p.length === 3 && m.p.every(Number.isFinite)) this.flashbang(m.p, p && p.st ? p.st.p : null); break;
+      case 'flash': if (this.phase === 'level' && Array.isArray(m.p) && m.p.length === 3 && m.p.every(Number.isFinite)) this.flashbang(m.p, p && p.st ? p.st.p : null, from); break;
       // an officer's round went through these windows
       case 'glass': if (this.phase === 'level' && Array.isArray(m.ids)) this.breakGlass(m.ids, m.p); break;
       case 'crack': { // (a first round through a pane: it's fractured, and it's heard)
@@ -1365,7 +1366,8 @@ const G_Server = {
     const d = m.k ? e.hp + 1 : Math.min(5000, (+m.d || 0) + Math.min(5, Math.max(0, +m.f || 0)) * person);
     if (!(d > 0)) return;
     e.hp -= d;
-    if (!m.bo) { e.lastHit = from; e.lastHitAt = this.clock || 0; e.lastH = !!m.h; e.lastAp = !!m.ap; e.hitState = e.state; e.hitUnaware = !e.alert || (e.surprisedT || 0) > 0; e.hitYield = this.wouldYield(e); } // bleeding out is judged by what they were doing when shot
+    if (!m.bo) { e.lastHit = from; e.lastHitAt = this.clock || 0; e.lastH = !!m.h; e.lastAp = !!m.ap; e.hitState = e.state; e.hitUnaware = !e.alert || (e.surprisedT || 0) > 0; e.hitYield = this.wouldYield(e);
+      e.lastGr = Number.isFinite(m.gr) ? m.gr : 0; e.lastFb = e.flashT! > 0 ? e.flashId || 0 : 0; } // bleeding out is judged by what they were doing when shot (and for the highlights: a frag grenade's, gr its seed; blind from a flashbang, which)
     // Shock: being hit wrecks your aim for a moment (most of it, for a hard hit), throws off the shot you were
     // about to take, and starts your aim over from the body. It fades over a couple of seconds.
     if (!m.bo) {
@@ -1414,6 +1416,8 @@ const G_Server = {
           return { bo: m.bo && !shot ? 1 : 0, bt: m.bo && !shot && since != null ? Math.round(since) : 0, hd: shot ? Math.round(since * 100) / 100 : 0 };
         })() };
       if (e.lastAp && !hl.bo) hl.ap = 1; // (the round that did it went through their armour)
+      if (!hl.bo && e.lastGr) hl.gr = e.lastGr; // (a frag grenade did it: which)
+      if (!hl.bo && e.lastFb) hl.fb = e.lastFb; // (blind from a flashbang when it was done: which)
       G.Net.broadcast(Object.assign({ t: 'kill', e: e.id, by: from, cr, h: !!m.h, ty: e.type, why, inc: inc ? 1 : 0, wd: e.wnd && e.wnd.length ? e.wnd : undefined }, hl));
       this.checkClear();
     }
@@ -1446,7 +1450,7 @@ const G_Server = {
     G.Net.broadcast({ t: 'edown', e: e.id, by: from, h: !!e.lastH, ty: e.type, why: (e.hitState || e.state) !== 'normal' ? 'unauth' : null,
       sur: e.hitUnaware ? 1 : 0, ws: e.hitYield ? 1 : 0, br: kick != null && e.lastHitAt! - kick < 5 ? 1 : 0,
       d: kpos ? Math.round(Math.hypot(kpos[0] - e.x, kpos[2] - e.z)) : 0, o: e.organs || undefined, hd: bo ? 0 : Math.round(since * 100) / 100, bo: bo ? 1 : 0, bt: bo && since != null ? Math.round(since) : 0,
-      ap: e.lastAp && !bo ? 1 : undefined });
+      ap: e.lastAp && !bo ? 1 : undefined, gr: !bo && e.lastGr ? e.lastGr : undefined, fb: !bo && e.lastFb ? e.lastFb : undefined });
   },
 
   // Apartments cleared: an officer has been inside, and no suspect in it is still a threat (armed and free).
@@ -2122,9 +2126,11 @@ const G_Server = {
     const path = this.heardAt(field, e.x, e.z, e.y), kd = path <= F.ROOM ? F.DEAF * (1 - path / F.ROOM) : 0;
     return { k: Math.min(1, Math.max(kv, kd)), see, face, d, path };
   },
-  // by: where the thrower stood (what the suspects know of where it came from)
-  flashbang(p: number[], by?: number[] | null) {
-    const [x, y, z] = p, F = this.FLASH, U = G.U;
+  // by: where the thrower stood (what the suspects know of where it came from); id: who threw it. Each bang has its number (n), kept on
+  // those it blinds (flashId), so a kill of one while they're still blind says which (js/highlights.ts: the bang shown before it)
+  flashN: 0,
+  flashbang(p: number[], by?: number[] | null, id?: string | null) {
+    const [x, y, z] = p, F = this.FLASH, U = G.U, n = ++this.flashN;
     const field = this.soundField(x, z, y), yaws = new Map<Enemy, number>();
     for (const e of this.enemies.values()) yaws.set(e, e.yaw); // (which way they were facing as the flash went off: the bang's what turns them)
     this.hear(x, z, 30, y);
@@ -2145,14 +2151,14 @@ const G_Server = {
       if (e.state === 'surrender' || e.collapsed) continue;
       // a suspect: out of the fight. Weapon lowered, no cover, no door, nothing aimed
       const fresh = !(e.flashT! > 0);
-      e.flashT = Math.max(e.flashT || 0, stun); e.flashRecLen = Math.max(e.flashRecLen || 0, rec); e.flashK = Math.max(e.flashK || 0, k); e.flashOn = true;
+      e.flashT = Math.max(e.flashT || 0, stun); e.flashRecLen = Math.max(e.flashRecLen || 0, rec); e.flashK = Math.max(e.flashK || 0, k); e.flashOn = true; e.flashId = n;
       e.morale -= 0.25 * k * (e.def.steady || 1);
       e.aiming = false; e.cover = null; e.inCover = false; e.peek = false; e.leanOut = 0; e.dp = null; e.lurk = false; e.hide = null; e.walkTo = null; e.holding = false;
       e.surprisedT = 0; e.pendingAlert = -1; e.burstLeft = 0;
       if (e.armed && e.drawn) { e.drawn = false; e.drawT = 0; } // (the gun comes down)
       if (fresh) { e.stumbleT = 0; e.flashBy = by ? { x: by[0], y: by[1], z: by[2] } : null; }
     }
-    G.Net.broadcast({ t: 'flash', p });
+    G.Net.broadcast({ t: 'flash', p, n, by: id || undefined });
   },
   // the stun is over: unless they give it up they come round, alert, the gun coming back up
   flashEnd(e: Enemy) {

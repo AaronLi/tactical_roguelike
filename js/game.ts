@@ -22,7 +22,7 @@ type GmScreen = 'menu' | 'lobby' | 'shop' | 'route' | 'gameover' | 'pause';
 // the sliders in the menu, and the keys they keep in storage
 type GmSetting = 'sens' | 'fov' | 'vol' | 'loadKit';
 // what the host tells the clients (js/server.ts), by t: onMsg dispatches on it
-type GmMsgKind = 'welcome' | 'roster' | 'arms' | 'rvotes' | 'newrun' | 'veil' | 'phase' | 'snap' | 'rfx' | 'bstk' | 'hole' | 'dpart' | 'dfall' | 'rpath' | 'skin' | 'loot' | 'lootRm' | 'glass' | 'crack' | 'lootGot' | 'team' | 'cab' | 'sbox' | 'abox' | 'wcase' | 'eshot' | 'shot' | 'nade' | 'boom' | 'course' | 'crun' | 'flash' | 'kill' | 'incap' | 'edown' | 'saved' | 'stock' | 'took' | 'ereload' | 'clear' | 'treat' | 'applying' | 'revive' | 'chat' | 'ping' | 'ffhit' | 'left' | 'door' | 'order' | 'shout' | 'evid' | 'evtake' | 'evsec' | 'cuffed' | 'refund';
+type GmMsgKind = 'welcome' | 'roster' | 'arms' | 'rvotes' | 'newrun' | 'veil' | 'phase' | 'snap' | 'rfx' | 'bstk' | 'hole' | 'dpart' | 'dfall' | 'rpath' | 'npath' | 'skin' | 'loot' | 'lootRm' | 'glass' | 'crack' | 'lootGot' | 'team' | 'cab' | 'sbox' | 'abox' | 'wcase' | 'eshot' | 'shot' | 'nade' | 'boom' | 'course' | 'crun' | 'flash' | 'kill' | 'incap' | 'edown' | 'saved' | 'stock' | 'took' | 'ereload' | 'clear' | 'treat' | 'applying' | 'revive' | 'chat' | 'ping' | 'ffhit' | 'left' | 'door' | 'order' | 'shout' | 'evid' | 'evtake' | 'evsec' | 'cuffed' | 'refund';
 // the map as js/damage.ts takes it (its own cut-down shape of a level's)
 type GmDmgMap = Parameters<typeof G.Damage.apply>[0];
 // the turning figure of you in the menu (lookPreview)
@@ -621,6 +621,7 @@ const G_Game = {
         break;
       }
       case 'rpath': for (const [i, path] of m.ps || []) { const s = G.Highlights && G.Highlights.roundPath(m.k, m.sid, i, path), def = s && (G.WEAPONS[s.code] || G.Gunsmith.fromCode(s.code)); if (G.ShotLog) G.ShotLog.keep(path, { holder: G.ShotLog.remote(m.k, m.sid), name: def ? def.name : '' }); } break;
+      case 'npath': if (G.Highlights) G.Highlights.fragPaths(m.s, m.ps); break; // (a squadmate's grenade: its chips that hit someone, for the replays)
       case 'skin': G.Stickers.learn(m.h, m.l); break; // (a gun's stickers, by their hash: js/stickers.ts)
       // a first aid cabinet opened, emptied a bit, or put back into
       // things lying about: put down, picked up, and what you picked up
@@ -666,7 +667,7 @@ const G_Game = {
         break;
       case 'eshot': if (this.phase === 'level') G.Views.enemyShot(m); break;
       case 'shot': if (this.phase === 'level' && m.id !== G.Net.myId) G.Views.remoteShot(m); break;
-      case 'nade': if (this.phase === 'level' && m.id !== G.Net.myId) { G.Views.addNade(new THREE.Vector3(...m.p), new THREE.Vector3(...m.v), m.fuse, false, !!m.en, m.k || 'frag'); const tp = !m.en && G.Views.players.get(m.id); if (tp) tp.rig.throwNade(m.s == null ? 2 : m.s); /* (their arm throws it) */ if (m.en) G.Views.enemyThrow(m.e); } break;
+      case 'nade': if (this.phase === 'level' && m.id !== G.Net.myId) { G.Views.addNade(new THREE.Vector3(...m.p), new THREE.Vector3(...m.v), m.fuse, false, !!m.en, m.k || 'frag'); if (G.Highlights) G.Highlights.nade(m.en ? 'e' + m.e : 'p' + m.id, new THREE.Vector3(...m.p), new THREE.Vector3(...m.v), m.fuse, m.k || 'frag'); const tp = !m.en && G.Views.players.get(m.id); if (tp) tp.rig.throwNade(m.s == null ? 2 : m.s); /* (their arm throws it) */ if (m.en) G.Views.enemyThrow(m.e); } break;
       case 'boom': this.onBoom(m); break;
       case 'course': if (G.Course) G.Course.setCourse(m.seed); break;
       case 'crun': if (G.Course && m.s) G.Course.remoteRun(Object.assign({}, m.s, { who: m.by || m.s.who })); break;
@@ -798,6 +799,7 @@ const G_Game = {
     if (this.phase !== 'level') return;
     const p = new THREE.Vector3(m.p[0], m.p[1], m.p[2]);
     if (m.id !== G.Net.myId) { G.R.explosion(p, m.r); G.Audio.boom(G.R.camera.position.distanceTo(p)); }
+    if (m.fr && m.s && G.Highlights) G.Highlights.boom(m.en ? null : 'p' + m.id, p, m.s); // (a frag's burst, for the replays: yours is kept as it went off)
     const Me = G.Me;
     if (m.fr && m.id !== G.Net.myId && Me.pos && Math.hypot(Me.pos.x - p.x, Me.pos.z - p.z) < Me.FRAG.RANGE) {
       // A frag grenade: a suspect's, its chips flown here for you alone (if you're up); anyone else's (a teammate's: its
@@ -817,6 +819,7 @@ const G_Game = {
     const p = new THREE.Vector3(m.p[0], m.p[1], m.p[2]), cam = G.R.camera, eye = cam.position, d = eye.distanceTo(p);
     G.R.flashAt(p);
     G.Audio.flashbang(d);
+    if (G.Highlights) G.Highlights.flash(m); // (for the replays of the kills of those it blinds)
     const Me = G.Me;
     if (!Me.pos || (Me.dead && !Me.spectating)) return; // (dead, on someone's helmet cam: it's them it blinds and deafens, as you see and hear it)
     const seen = G.Level.los(this.map!, p.x, p.y, p.z, eye.x, eye.y, eye.z);

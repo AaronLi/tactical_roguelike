@@ -43,7 +43,7 @@ interface PClimb { l: any; up: boolean; ph: PLadderPhase; t: number; from: THREE
 interface PHeld { kind: PHeldKind; cock: boolean; str: number; readyT: number; throwT: number; lastL: boolean; lastR: boolean; queued?: boolean }
 interface PTreat { name: string; part: string; mt: string; t0: number; dur: number }
 // what's owed the host for one suspect this frame: plain damage, wounds (as a share of a life), a headshot, a kill, armour got through, the wounds' detail
-interface PHitQ { d: number; f: number; h: boolean; k: boolean; ap?: boolean; w?: any[] }
+interface PHitQ { d: number; f: number; h: boolean; k: boolean; ap?: boolean; w?: any[]; gr?: number } // (gr: a frag grenade's, its seed: js/highlights.ts)
 // your own limbs in the viewmodel pass (fpLimbs)
 interface PLimbs { arm: THREE.Group; leg: THREE.Group; armL: THREE.Group; tie: THREE.Mesh; held: THREE.Group; env: THREE.Group; nade: { frag: THREE.Mesh; flash: THREE.Mesh } }
 type PTrack = { t: number; v: number; bone: string }[] & { frags?: any[] };
@@ -1715,7 +1715,7 @@ const G_Me = {
   flushHits() {
     if (!this.hitQ || !this.hitQ.size) return;
     for (const [e, q] of this.hitQ) {
-      G.Net.toHost({ t: 'hit', e, d: Math.round(q.d), f: Math.round(q.f * 1000) / 1000, k: q.k ? 1 : 0, h: q.h, ap: q.ap ? 1 : undefined, w: q.w ? q.w.slice(0, 12) : undefined });
+      G.Net.toHost({ t: 'hit', e, d: Math.round(q.d), f: Math.round(q.f * 1000) / 1000, k: q.k ? 1 : 0, h: q.h, ap: q.ap ? 1 : undefined, w: q.w ? q.w.slice(0, 12) : undefined, gr: q.gr || undefined });
       this.stats.dmg += q.d + q.f * 100 + (q.k ? 100 : 0);
     }
     this.hitQ.clear();
@@ -1725,6 +1725,11 @@ const G_Me = {
     G.R.explosion(p, r);
     G.Audio.boom(G.R.camera.position.distanceTo(p));
     const map = G.Game.map!;
+    // The burst's seed goes out with the boom (a number, not 800 positions): every screen flies the same chips off the same
+    // walls from it (fragBurst), so the pocks and the clean shadows behind cover are the same for everyone. What the chips
+    // do to bodies, and what the walls' own dice do to a chip after its first strike, is each screen's own. (It names the
+    // grenade too: the hits its blast and chips do carry it, gr, so a kill of them is the grenade's in the highlights.)
+    const seed = isNade ? ((Math.random() * 4294967295) >>> 0) + 1 : 0; // (never 0: that's no seed)
     for (const ev of G.Views.enemies.values()) {
       if (!ev.alive) continue;
       const cy = (ev.pos.y || 0) + 1.0 * ev.def.scale; // (their middle, on whatever floor they stand on)
@@ -1732,13 +1737,11 @@ const G_Me = {
       if (d > r + 0.4 * ev.def.scale) continue;
       if (!G.Level.los(map, p.x, p.y + 0.2, p.z, ev.pos.x, cy, ev.pos.z)) continue;
       this.queueHit(ev.id, dmg * (1 - Math.min(1, d / r) * 0.6), false);
+      if (seed) this.hitQ.get(ev.id)!.gr = seed;
       ev.selfHit = true;
     }
     const r2 = (v: number) => Math.round(v * 100) / 100;
-    // The burst's seed goes out with the boom (a number, not 800 positions): every screen flies the same chips off the same
-    // walls from it (fragBurst), so the pocks and the clean shadows behind cover are the same for everyone. What the chips
-    // do to bodies, and what the walls' own dice do to a chip after its first strike, is each screen's own.
-    const seed = isNade ? (Math.random() * 4294967296) >>> 0 : 0;
+    if (isNade && G.Highlights) G.Highlights.boom('p' + G.Net.myId, p, seed); // (the replays: when and where, as it goes off here)
     if (isNade) this.fragBurst(p, undefined, seed);
     G.Net.toHost({ t: 'boom', p: [r2(p.x), r2(p.y), r2(p.z)], r: r2(r), d: Math.round(dmg), fr: isNade ? 1 : undefined, s: isNade ? seed : undefined });
   },
@@ -1784,7 +1787,7 @@ const G_Me = {
       line = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0xffd9a0, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }));
       line.frustumCulled = false; G.R.dynRoot.add(line);
     }
-    const q = { p: p.clone(), enemy, marksOnly: !!marksOnly, n, i: 0, dir, m, v, pos, line, geo, shot: { sid: 0, ff: new Map(), f: 0, enemy: enemy || undefined } as any, per: new Map<string, any>(),
+    const q = { p: p.clone(), enemy, seed: seed || 0, marksOnly: !!marksOnly, n, i: 0, dir, m, v, pos, line, geo, shot: { sid: 0, ff: new Map(), f: 0, enemy: enemy || undefined } as any, per: new Map<string, any>(),
       ms: 0, maxMs: 0, frames: 0, walls: 0, mats: {} as Record<string, number[]>, escaped: 0, puffs: 0, blood: 0, fade: -1 };
     (this.fragQ = this.fragQ || []).push(q);
   },
@@ -1812,6 +1815,13 @@ const G_Me = {
     for (const [tg, f] of q.shot.ff) G.Net.toHost(Object.assign({ t: 'ff', tg, f: 0, e: q.shot.enemy }, f)); // (what they did to a teammate)
     q.shot.ff.clear();
     if (q.paths && G.ShotLog) G.ShotLog.keepAll(q.paths, { holder: q.shot, name: q.enemy ? "Suspect's frag grenade" : 'Frag grenade', burst: true }); // (F9: its fragments that hit someone, as one shot)
+    // and for the replays, here and on the squad's machines (yours only: a suspect's is flown here for you alone): those same paths, their
+    // points and who they went into, less what only F9 reads (what the armour did, the track through them), 48 at most
+    if (q.paths && !q.enemy && q.seed && G.Highlights) {
+      const ps = q.paths.slice(0, 48).map((b: ShotPath) => ({ p: b.p, hit: b.hit.map((h: any[]) => [h[0], h[1], h[2], 0, h[4], h[5], h[6], h[7]]) }));
+      G.Highlights.fragPaths(q.seed, ps as ShotPath[]);
+      G.Net.toHost({ t: 'npath', s: q.seed, ps });
+    }
     q.paths = null;
     const per: Record<string, any> = {};
     for (const [k, v] of q.per) per[k] = v;
@@ -1854,6 +1864,7 @@ const G_Me = {
         if (ev) {
           B.wearOut(armour);
           this.hitEnemy(ev, r, null as any); // (not a gun's: no weapon path counts it)
+          if (q.seed) this.hitQ.get(ev.id)!.gr = q.seed; // (the grenade's: its kill is the grenade's, in the highlights)
           if (rec.hits <= 6) ev.rig.hit(d, proj.m * vh);
           ev.selfHit = true; ev.engagedT = performance.now(); ev.lastHitDir = d.clone().setY(0).normalize();
         } else {
@@ -1992,6 +2003,7 @@ const G_Me = {
     if (!G.Gear.take(this, kind)) { this.unequip(); return; }
     const { p, v } = this.throwLaunch(h.str), fuse = this.fuseOf(kind);
     G.Views.addNade(p, v, fuse, true, false, kind);
+    if (G.Highlights) G.Highlights.nade('p' + G.Net.myId, p, v, fuse, kind); // (its flight, for the replays)
     h.throwT = 0;
     const r2 = (x: number) => Math.round(x * 100) / 100;
     G.Net.toHost({ t: 'nade', p: [p.x, p.y, p.z].map(r2), v: [v.x, v.y, v.z].map(r2), fuse, k: kind, s: h.str });
