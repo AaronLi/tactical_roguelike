@@ -1719,7 +1719,7 @@ const G_Me = {
   // ---------------------------------------------------------------- fragmentation
   // A frag grenade's body is a steel casing that comes apart into FRAG.N chips, thrown out over the whole sphere
   // (a ragged 0.4 g chip on average, some a third of that, a few four times, at about 1,350 m/s). Each is a round of
-  // its own (js/ballistics.ts: a mild-steel ball of that mass and size): it slows in the air by its own drag, goes into
+  // its own (js/ballistics.ts: a ragged flake of mild steel that mass, tumbling: fragOne): it slows in the air by its own drag, goes into
   // whoever is in its way through their armour and body (through), through walls and cover by what they are made of
   // (crossSolid), or stops in them. So how many reach someone is how much of the sphere they fill (a body at 3 m
   // fills about 1/200th of it), and the lethal radius, a few metres, is where that is enough to wound a few times
@@ -1729,7 +1729,7 @@ const G_Me = {
   // flown is flown at once (at a kilometre a second the air time is nothing). A body takes at most FRAG.CAP of them
   // through the full wound sums (the rest pass it by) so a crowd of chips on one man costs no more than that.
   BLAST: { r: 3.2, dmg: 70 }, // (the burst's own push of air, close in: the chips are the rest)
-  FRAG: { N: 800, V0: 1350, VMIN: 70, RANGE: 70, CAP: 28, BUDGET_MS: 2.5, MIN_PER_FRAME: 40, M_MED: 0.0004, CD: 1.5, SHOW: 26, PUFFS: 14, BLOOD: 24 },
+  FRAG: { N: 800, V0: 1350, VMIN: 70, RANGE: 70, CAP: 28, BUDGET_MS: 2.5, MIN_PER_FRAME: 40, M_MED: 0.0004, CD: 1.2, FLAKE: 4, SHOW: 26, PUFFS: 14, BLOOD: 24 },
   fragQ: null as null | any[],
   fragLogs: [] as any[],
   // p: where it went off. enemy: a suspect's (id): it is you it is meant for, and no one else it hurts here. seed: the
@@ -1739,12 +1739,28 @@ const G_Me = {
     const F = this.FRAG, n = F.N, dir = new Float32Array(n * 3), m = new Float32Array(n), v = new Float32Array(n);
     const rnd = seed ? G.U.rng(seed) : Math.random;
     this.scorchAt(p, rnd);
-    // points over the sphere (the golden angle), the whole lot turned at random, each nudged a little off its place
-    const gold = Math.PI * (3 - Math.sqrt(5)), a0 = rnd() * 6.283, tilt = new THREE.Quaternion().setFromEuler(new THREE.Euler(rnd() * 6.283, rnd() * 6.283, rnd() * 6.283));
-    const u = new THREE.Vector3(), norm = () => Math.sqrt(-2 * Math.log(1 - rnd())) * Math.cos(Math.PI * 2 * rnd());
+    // Where they go: no even spread. The casing tears along cracks, so the chips leave in clumps with gaps between (most of them
+    // from a few hundred tears, each throwing a little spray; the rest on their own), and more go out sideways from the body than
+    // off its ends (the fuze and the base): a band round the grenade's middle. It lies on its side when it goes off on the floor,
+    // so its axis is level, pointing anywhere round; in the air it can be at any angle.
+    const norm = () => Math.sqrt(-2 * Math.log(1 - rnd())) * Math.cos(Math.PI * 2 * rnd());
+    const lying = !!G.Game.map && p.y - G.Level.groundAt(G.Game.map, p.x, p.z, 0.01, p.y + 0.05) < 0.3;
+    const ax = lying ? new THREE.Vector3(1, (rnd() - 0.5) * 0.3, 0).normalize() : new THREE.Vector3(rnd() - 0.5, rnd() - 0.5, rnd() - 0.5).normalize();
+    if (lying) ax.applyAxisAngle(new THREE.Vector3(0, 1, 0), rnd() * 6.283);
+    const side = new THREE.Vector3(0, 1, 0).cross(ax); if (side.lengthSq() < 1e-6) side.set(1, 0, 0); side.normalize();
+    const up = ax.clone().cross(side).normalize();
+    const pick = (out: THREE.Vector3) => { // (a direction off the body: its height along the axis peaked at the middle)
+      const c = G.U.clamp((rnd() + rnd() + rnd() - 1.5) * 0.9, -1, 1), r = Math.sqrt(1 - c * c), a = rnd() * 6.283;
+      return out.copy(ax).multiplyScalar(c).addScaledVector(side, Math.cos(a) * r).addScaledVector(up, Math.sin(a) * r);
+    };
+    const tears = Array.from({ length: 140 + Math.floor(rnd() * 80) }, () => pick(new THREE.Vector3()));
+    const u = new THREE.Vector3(), t1 = new THREE.Vector3(), t2 = new THREE.Vector3();
     for (let i = 0; i < n; i++) {
-      const y = 1 - (2 * (i + 0.5)) / n, r = Math.sqrt(1 - y * y), a = a0 + i * gold;
-      u.set(Math.cos(a) * r + (rnd() - 0.5) * 0.04, y + (rnd() - 0.5) * 0.04, Math.sin(a) * r + (rnd() - 0.5) * 0.04).normalize().applyQuaternion(tilt);
+      if (rnd() < 0.7) { // (one of a tear's spray: a few degrees round it)
+        const c = tears[Math.floor(rnd() * tears.length)], s = 0.07 + 0.05 * rnd();
+        t1.set(0, 1, 0).cross(c); if (t1.lengthSq() < 1e-6) t1.set(1, 0, 0); t1.normalize(); t2.copy(c).cross(t1);
+        u.copy(c).addScaledVector(t1, norm() * s).addScaledVector(t2, norm() * s).normalize();
+      } else pick(u);
       dir[i * 3] = u.x; dir[i * 3 + 1] = u.y; dir[i * 3 + 2] = u.z;
       m[i] = G.U.clamp(F.M_MED * Math.exp(0.65 * norm()), 0.0001, 0.0016);
       v[i] = F.V0 * (0.85 + 0.3 * rnd()) * Math.pow(F.M_MED / m[i], 0.12);
@@ -1793,9 +1809,13 @@ const G_Me = {
   // one chip, flown from the burst to wherever it ends
   fragOne(q: any, i: number) {
     const F = this.FRAG, B = G.Ballistics, L = G.Level, map = G.Game.map!, m = q.m[i];
-    const d = new THREE.Vector3(q.dir[i * 3], q.dir[i * 3 + 1], q.dir[i * 3 + 2]), o = q.p.clone(), dia = Math.cbrt(m / 7850) * 1.24;
-    const proj: any = { m, d: dia, len: dia, core: 'mild', nose: 'ball', d0: dia, m0: m, ang: 0 };
-    const drag0 = (2 * m) / (F.CD * 1.2 * Math.PI / 4 * dia * dia); // (metres to lose a factor e of its speed in the air)
+    // A chip of a burst casing is a ragged flake, not a ball: it shows the air and whatever it strikes about four times the area of
+    // a cube of its steel (a 0.4 g chip: 8 mm across, a millimetre thick), tumbling, so it slows quickly (a factor e in about
+    // 10 m) and goes into things like a blunt, wide object (js/ballistics.ts vLimit: the wider, the harder to get through)
+    const A = F.FLAKE * Math.pow(m / 7850, 2 / 3), dia = Math.sqrt(4 * A / Math.PI);
+    const d = new THREE.Vector3(q.dir[i * 3], q.dir[i * 3 + 1], q.dir[i * 3 + 2]), o = q.p.clone();
+    const proj: any = { m, d: dia, len: m / (7850 * A), core: 'mild', nose: 'ball', flat: true, d0: dia, m0: m, ang: 0 };
+    const drag0 = (2 * m) / (F.CD * 1.2 * A); // (metres to lose a factor e of its speed in the air)
     let drag = drag0, v = q.v[i], rest = F.RANGE, hitSomething = false;
     const b: any = { hit: new Set(), enemy: q.enemy, events: 1 };
     const pb: any = { path: this.newPath(o, v) }, pt = (p: THREE.Vector3, vv: number) => this.pathPt(pb, p, vv); // (F9: its path, kept if it hits someone: fragDone)
