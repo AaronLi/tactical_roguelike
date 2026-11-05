@@ -33,7 +33,7 @@ export function loadGame(withModels = false, extra = {}) {
   loadAuthoredInto(ctx.G); // (the guns modelled in Blender: models/<id>/, tools/bake_authored.mjs)
   vm.runInContext(readDist('gunrig'), ctx, { filename: 'gunrig.js' });
   ctx.G.GunModels = ctx.G.GunRecipes; // (the baker's name for them: .display(def), .M, .build; the game's G.GunModels is the facade over the baked files, js/gunmodels.ts, not loaded here)
-  if (withModels) vm.runInContext(readDist("glb"), ctx, { filename: "glb.js" });
+  if (withModels) { vm.runInContext(readDist('modelbundles'), ctx, { filename: 'modelbundles.js' }); vm.runInContext(readDist("glb"), ctx, { filename: "glb.js" }); }
   return ctx.G;
 }
 
@@ -46,14 +46,15 @@ export async function loadGameWithModels() {
   const { MeshoptDecoder } = await import('three/examples/jsm/libs/meshopt_decoder.module.js');
   await MeshoptDecoder.ready;
   const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder), cache = new Map();
+  // The files the game reads: the bundles (assets/models/bundles, js/modelbundles.ts through a fetch that serves the bundle files), so the tests assemble from what the game loads.
   const file = (url) => path.join(ROOT, url);
   const G = loadGame(true, {
-    location: { search: '' }, URLSearchParams, TextDecoder, addEventListener() {},
-    fetch: async (url) => { const f = file(url); if (!fs.existsSync(f) || /guns\/index\.json$/.test(url)) return { ok: false }; return { ok: true, json: async () => JSON.parse(fs.readFileSync(f, 'utf8')) }; },
+    location: { search: '' }, URLSearchParams, TextDecoder, addEventListener() {}, DecompressionStream, Response, Blob,
+    fetch: async (url) => { const f = file(url); if (!fs.existsSync(f) || /guns\/index\.json$/.test(url)) return { ok: false, status: 404 }; const b = fs.readFileSync(f); return { ok: true, status: 200, arrayBuffer: async () => b.buffer.slice(b.byteOffset, b.byteOffset + b.length), json: async () => JSON.parse(b.toString('utf8')) }; },
   });
   G.GLB = {
     ready: Promise.resolve(true),
-    load: (url) => { if (!cache.has(url)) { const b = fs.readFileSync(file(url)); cache.set(url, new Promise((res, rej) => loader.parse(b.buffer.slice(b.byteOffset, b.byteOffset + b.length), '', (g) => res(g.scene), rej))); } return cache.get(url); },
+    load: (url) => { if (!cache.has(url)) cache.set(url, G.Bundles.getFile(url).then((ab) => new Promise((res, rej) => loader.parse(ab, '', (g) => res(g.scene), rej)))); return cache.get(url); },
   };
   return G;
 }

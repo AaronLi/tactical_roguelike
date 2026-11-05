@@ -1,6 +1,6 @@
 # The game on GitHub Pages: its TypeScript compiled (npm run build: js/*.ts -> dist/js/), its gun models baked and
 # tested (npm run bake:models, test:models: assets/models/), then the site published as it is in the repo with dist/
-# and assets/models/ added. Pull requests and other branches build only (a check that it compiles, bakes and passes).
+# and the model bundles (assets/models/bundles: the only form of the models the game loads) added. Pull requests and other branches build only (a check that it compiles, bakes and passes).
 # One-time setup: Settings -> Pages -> Source: GitHub Actions.
 name: pages
 on:
@@ -34,7 +34,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: assets/models
-          key: models-${{ hashFiles('tools/**', 'js/parts.ts', 'js/data.ts', 'js/glb.ts', 'js/gunmaterials.ts', 'models/**', 'package-lock.json') }}
+          key: models-${{ hashFiles('tools/**', 'js/parts.ts', 'js/data.ts', 'js/glb.ts', 'js/modelbundles.ts', 'js/gunmaterials.ts', 'models/**', 'package-lock.json') }}
       - name: Bake the models
         if: steps.models.outputs.cache-hit != 'true'
         run: npm run bake:models
@@ -42,7 +42,8 @@ jobs:
       - name: The site
         run: |
           mkdir -p _site
-          rsync -a --exclude node_modules --exclude _site --exclude .git --exclude .github ./ _site/
+          # the game loads the models only from assets/models/bundles (js/modelbundles.ts): the loose packs, props and whole-gun files are for the tools and tests, not shipped
+          rsync -a --exclude node_modules --exclude _site --exclude .git --exclude .github --exclude /assets/models/guns --exclude /assets/models/parts --exclude /assets/models/props ./ _site/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

@@ -781,7 +781,7 @@ interface BakedIndex { version: number; three: string; src: string; guns: Record
   const packRoots = new Map<string, any>(), packPending = new Map<string, Promise<boolean>>();
   const platformIndex = (id: string): Promise<PartsIndex | null> => {
     let p = platPending.get(id);
-    if (!p) platPending.set(id, (p = fetch(R.base + PARTS_BASE + id + '/index.json', { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : null), () => null).then((ix: PartsIndex | null) => {
+    if (!p) platPending.set(id, (p = G.Bundles.getJson(PARTS_BASE + id + '/index.json').then((ix: PartsIndex | null) => { // (from the '_boot' bundle: js/modelbundles.ts)
       if (ix && checking) { const r = validatePartsIndex(ix); for (const e of r.errors) console.error(`[checkModels] parts/${id}/index.json: ${e}`); }
       if (ix) platIx.set(id, ix); return ix;
     })));
@@ -928,14 +928,14 @@ interface BakedIndex { version: number; three: string; src: string; guns: Record
     const loader = new GL.GLTFLoader().setMeshoptDecoder(GL.MeshoptDecoder), cache = new Map<string, Promise<any>>();
     G.GLB = {
       ready: Promise.resolve(GL.MeshoptDecoder.ready).then(() => true, () => false),
-      load: (url: string) => { const hit = cache.get(url); if (hit) return hit; const p: Promise<any> = loader.loadAsync(R.base + url).then((g: any) => g.scene, (e: any) => { cache.delete(url); throw e; }); cache.set(url, p); return p; },
+      load: (url: string) => { const hit = cache.get(url); if (hit) return hit; const p: Promise<any> = (G.Bundles.bundleOf(url) ? G.Bundles.getFile(url).then((b) => loader.parseAsync(b, '')) : loader.loadAsync(R.base + url)).then((g: any) => g.scene, (e: any) => { cache.delete(url); throw e; }); cache.set(url, p); return p; },
     };
   }
   /** Where the page's folder is from here (the export worker's scripts are two folders down: js/exportworker.ts sets '../../'). */
-  const setRoot = (base: string) => { R.base = base; };
+  const setRoot = (base: string) => { R.base = base; G.Bundles.setRoot(base); };
   /** A .glb or JSON of the game's assets (assets/models/...), by the loader above: for the props (js/gunmodels.ts). */
   const loadFile = (url: string): Promise<any> => glbReady().then((ok) => { if (!ok) throw new Error('no glTF loader'); return G.GLB!.load(url); });
-  const fetchJson = (url: string): Promise<any> => fetch(R.base + url, { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : null), () => null);
+  const fetchJson = (url: string): Promise<any> => (G.Bundles.bundleOf(url) ? G.Bundles.getJson(url) : fetch(R.base + url, { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : null), () => null));
 
   /** Every platform's index (assets/models/parts/<id>/index.json: ~0.24 MB gzipped for all): what boot() waits on. */
   let booting: Promise<number> | null = null;
