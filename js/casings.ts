@@ -43,7 +43,7 @@ const G_Casings = (() => {
   function mode(def: WeaponDef | null | undefined) {
     if (!def || def.explosive || def.cls === 'BOW' || def.cls === 'RAIL') return null;
     const plat = G.Gunsmith.PLATFORMS[def.id], spec = (plat && plat.spec) || {};
-    if ((plat && (plat.arch === 'revolver' || plat.arch === 'derringer')) || spec.rcv === 'break') return 'reload';
+    if ((plat && (plat.arch === 'revolver' || plat.arch === 'derringer' || plat.arch === 'pepperbox')) || spec.rcv === 'break') return 'reload'; // (a falling block's come out as the block drops)
     if (def.manual) return 'cycle';
     return 'shot';
   }

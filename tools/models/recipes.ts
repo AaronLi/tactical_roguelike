@@ -2291,6 +2291,62 @@ const G_GunRecipes = (() => {
       chamberAt: { side: 'breech', heads: [[0, lo - py], [0, -py]], z: pf + 0.0026, r: 0.0066 } }; // (in the hinge's frame: just proud of the block's back; the bottom's first, the round left when the top's fired)
   }
 
+  // A pepperbox long gun (the Hailstorm .22, js/data.ts def.volley): a block of eight .22 LR barrels behind a falling-block breech. The action is a
+  // steel box from the receiver's back (f 0) to the block's rear face (L): solid behind the breech block, two side walls either side of it, open
+  // under it. The breech block (part_brk) slides straight down between the walls when the lever (part_lever: the trigger guard, pivoted at the
+  // action's front, its tail along the wrist) swings down, baring the eight chambers from above to load them; up, its face closes on the case
+  // heads. The barrels: eight tubes in a ring round a core, joined in one block with a band at each end and the middle, a rib along the top with
+  // the bead on it (the factory sight), a wooden forend under it on the action. The stock is a classic one, its wrist the grip.
+  function pepperbox(k: Kit, o: RecipeSpec) {
+    const L = o.L || 0.118, bl = o.blen || 0.305, S0 = M.blued(), B = M.gunmetal(), D = M.rubber(), anim: any = {};
+    const top = 0.021, bot = -0.03, BLK = 0.034, face = L - 0.0035, DROP = 0.05, LEVER = 0.75; // (the receiver's top and bottom; the block's length, its face clear of the case heads; how far it drops, how far the lever swings)
+    const RR = 0.0115, tr = 0.0052, N = 8, bores = Array.from({ length: N }, (_, i) => { const a = (i + 0.5) / N * Math.PI * 2; return [Math.sin(a) * RR, Math.cos(a) * RR]; }); // ([right, up] of each bore: none straight up, a pair either side of the rib)
+    const outer = RR + tr;
+    k.tag('base');
+    // the action: solid behind the block, then the two walls the block runs between and the collar the barrels screw into
+    k.prof([[0, bot + 0.004], [0, top - 0.003], [0.004, top], [L - BLK, top], [L - BLK, bot], [0.006, bot]], 0.041, S0, 0, null, 0.0015);
+    for (const x of [-1, 1]) k.box(0.006, top - bot, BLK, S0, L - BLK, (top + bot) / 2, x * 0.0175);
+    k.cyl(outer + 0.003, 0.012, S0, L, 0); // (from the chambers' mouths forward: the case heads stand proud of it, in the gap the block drops out of)
+    k.box(0.041, 0.006, 0.012, S0, L, bot + 0.003); // (the collar's foot, the lever's pivot behind it)
+    k.cylX(0.0028, 0.044, M.steel(), L - 0.006, bot - 0.001); // (the lever's pin)
+    // the trigger, inside the lever's bow
+    k.prof([[0.044, bot], [0.05, bot], [0.046, bot - 0.012], [0.04, bot - 0.02], [0.038, bot - 0.018], [0.042, bot - 0.01]], 0.005, M.steel(), 0, null, 0.0006);
+    // the forend: wood under the barrels, from the collar forward (shorter than the shortest block)
+    k.prof([[L + 0.012, -0.012], [L + 0.165, -0.012], [L + 0.162, -0.026], [L + 0.15, -0.033], [L + 0.03, -0.036], [L + 0.012, -0.03]], 0.032, o.fm || M.wood(), 0, null, 0.003);
+    // the breech block: a steel slab between the walls, flush with the top of the action, its face on the chambers; it slides down (js/vmanim.ts apply: info.block)
+    const blk = k.part(L - BLK / 2, (top + bot) / 2);
+    k.into(blk, L - BLK / 2, (top + bot) / 2);
+    k.prof([[L - BLK, bot + 0.004], [L - BLK, top - 0.001], [face, top - 0.001], [face, bot + 0.004], [face - 0.006, bot - 0.004], [L - BLK + 0.004, bot - 0.004]], 0.028, B, 0, null, 0.001);
+    k.cyl(0.0035, 0.001, M.steel(), face - 0.0008, 0); // (the firing pin bushing, in the middle of the face)
+    k.into(null);
+    anim.brk = blk;
+    // the lever: a bar under the action from the pivot back, the bow round the trigger, its tail along the underside of the wrist
+    const lv = k.part(L - 0.006, bot - 0.001);
+    k.into(lv, L - 0.006, bot - 0.001);
+    k.prof([[L - 0.001, bot + 0.001], [L - 0.001, bot - 0.006], [0.076, bot - 0.006], [0.072, bot - 0.032], [0.06, bot - 0.037], [0.014, bot - 0.037], [-0.03, bot - 0.046], [-0.036, bot - 0.041], [0.004, bot - 0.028], [0.014, bot - 0.002], [0.08, bot - 0.002]],
+      0.008, S0, 0, [[[0.066, bot - 0.008], [0.064, bot - 0.03], [0.056, bot - 0.033], [0.022, bot - 0.033], [0.02, bot - 0.008]]], 0.0012);
+    k.into(null);
+    anim.lever = lv;
+    // the barrels: eight tubes round a core, bands at the back, the middle and the muzzle, the bores dark in the muzzle face, the rib along the top
+    k.tag('barrel');
+    const front = L + bl, sy = Math.max(top, 0.014) + 0.009;
+    k.cyl(RR - 0.002, bl, S0, L, 0, 0, RR - 0.002, 16);
+    for (const [x, y] of bores) { k.cyl(tr, bl, S0, L, y, x, tr, 14); k.cyl(0.0029, 0.001, D, front - 0.0006, y, x, 0.0029, 10); }
+    for (const [f, w] of [[L + 0.004, 0.016], [L + bl * 0.55, 0.012], [front - 0.012, 0.012]]) k.cyl(outer + 0.0012, w, S0, f, 0, 0, outer + 0.0012, 24);
+    S.rib(k, L, front - 0.006, sy, outer);
+    // the sights: the bead on the rib's front end, or a rail over the action for anything else
+    k.tag('optic');
+    let sight: Sight;
+    if (!o.optic || o.optic === 'bead') sight = sightOf(k, { ...o, optic: 'bead' }, top, L, bl, outer, front, L * 0.5, true, 0);
+    else { const rt = S.rail(k, 0.008, L - BLK - 0.012, top, M.black()); sight = magIn(k, sightOf(k, o, rt, L, bl, outer, front, magOfs(o, 0.008, L - BLK - 0.012, (L - BLK) * 0.5), true, 0), rt, o, anim); }
+    k.tag('stock');
+    if (o.stock) stock(k, o.stock, o.sm || M.wood(), true, o.apStock);
+    k.tag('base');
+    // where the chambers are (the case heads show in them: js/vmanim.ts chamberView, side 'face'), and how the block and lever move
+    return { sy: sight.sy, fSight: sight.fSight, relief: sight.relief, muzzles: bores.map(([x, y]) => [front, y, x]), grip: [-0.03, -0.06, 0], support: [L + 0.09, -0.042, 0], anim,
+      port: [L - BLK / 2, 0.012, 0], chamberAt: { side: 'face', f: L, heads: bores.map(([x, y]) => [x, y]), r: 0.0035, bore: true }, block: { drop: DROP, lever: LEVER } };
+  }
+
   function minigun(k: Kit, o: RecipeSpec) {
     const anim: any = {}, bl = o.blen || 0.55;
     k.tag('base');
@@ -2551,7 +2607,7 @@ const G_GunRecipes = (() => {
       magAt: [m0 + 0.08, my], magTop: true, chamberAt: { side: 'right', f: F(780), y: Y(275), x: 0.028 } };
   }
 
-  const ARCH: Record<ArchKind, (k: Kit, o: RecipeSpec) => any> = { rifle, pistol, revolver, derringer, minigun, launcher, railgun, crossbow, p90 };
+  const ARCH: Record<ArchKind, (k: Kit, o: RecipeSpec) => any> = { rifle, pistol, revolver, derringer, minigun, launcher, railgun, crossbow, p90, pepperbox };
   // Material names in a model spec ('tan', 'woodDark') become materials.
   const MAT_KEYS = new Set(['rm', 'fm', 'sm', 'gm', 'm', 'well', 'vfgM']);
   function resolveMats(o: any) {

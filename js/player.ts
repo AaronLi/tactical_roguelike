@@ -1045,15 +1045,15 @@ const G_Me = {
     // a breech with nothing to throw the empty out (a Thor's): it's pulled by hand (js/vmanim.ts breakClip), and falls when it's let go
     const info = G.R.vm && G.R.vm.userData.info;
     this.handCase = info && info.breech && w.spent && w.spent.length ? w.spent[0] : null; this.handOut = false;
-    if (!this.handCase) G.Casings.emptied(w.def, mag - w.mag, w.spent); // a revolver or break-action: the empties fall out (each hull its load's colour)
+    if (!this.handCase) G.Casings.emptied(w.def, w.def.volley ? (w.spent || []).length : mag - w.mag, w.spent); // a revolver or break-action: the empties fall out (each hull its load's colour; a volley gun's: what it fired, however many were in it)
     this.ejected = w.spent; this.ejecting = (w.spent || []).length; this.ejectT = this.handCase ? this.reloadTotal * 0.3 : 0.25; w.spent = []; // (still in it till they do: js/vmanim.ts)
     if (this.loose(w.def) || !G.Audio.sample('pull_magazine')) G.Audio.reload();
   },
   reloadTime(def: WeaponDef) { return this.byHand && def.handReload ? def.handReload : def.reload; },
   // loaded a round (or a push of shells) at a time, this reload: a shell-fed gun, or a revolver topped up by hand
   loose(def: WeaponDef) { return def.shell || (!!this.byHand && G.revolver(def)); },
-  // a revolver loaded a round at a time: it stays open till it's shut, which takes a moment
-  revHand(def: WeaponDef) { return G.revolver(def) && this.loose(def); },
+  // a revolver loaded a round at a time: it stays open till it's shut, which takes a moment (a falling block likewise: the block stays down till it's shut, js/data.ts G.fblock)
+  revHand(def: WeaponDef) { return (G.revolver(def) || G.fblock(def)) && this.loose(def); },
   revShut() { this.revClose = true; this.reloadT = this.reloadTotal = G.REV.close; },
   ACT_T: { release: 0.4, rack: 0.6 },
   // how far through its motions a magazine change goes before the action, from empty: it stops as the magazine
@@ -1236,9 +1236,9 @@ const G_Me = {
       if (this.loose(def)) this.reloading = false; else return;
     }
     const bolt = ch && !!def.manual, round = w.chamber;
-    this.shoot(w, def.barrels ? G.pickBarrels(w, mode) : null);
+    this.shoot(w, def.barrels ? G.pickBarrels(w, mode) : null); // (a volley gun: every loaded barrel, shoot)
     if (bolt) { w.chamber = null; w.spentCh = round || w.ammo; } // (the case stays in: js/player.ts rack)
-    else if (ch) { w.chamber = null; (this as { feed(w: GWeapon, quiet: boolean): boolean }).feed(w, true); } else if (!def.barrels) w.mag--; // (the action strips the next round into the chamber; a gun of several barrels counts its rounds as each leaves: shoot)
+    else if (ch) { w.chamber = null; (this as { feed(w: GWeapon, quiet: boolean): boolean }).feed(w, true); } else if (!def.barrels && !def.volley) w.mag--; // (the action strips the next round into the chamber; a gun of several barrels counts its rounds as each leaves: shoot)
     // AN-94 style hyper-burst: the first rounds of each pull leave at a much higher rate. The wait after this
     // round is set by the next one: still part of the pair (hyper rate), or the gun's own cyclic rate after it.
     if (this.hyperQ > 0) this.hyperQ--;
@@ -1288,7 +1288,14 @@ const G_Me = {
 
   // One pull of the trigger. barrels: a gun of several barrels (def.barrels) fires those (indices into its muzzles, G.pickBarrels): a round from each, each as its barrel's
   // effective length makes it (G.shotDef) from its own muzzle, a report each (stacking), the recoil of all of them at once.
+  // A volley gun (def.volley: the Hailstorm) fires every loaded barrel at one pull, each round from its own barrel on its own path: the barrels' muzzles off the
+  // bore line (info.muzzles), bored to meet at def.volleyZ metres, each straying on its own by def.volleySpread degrees round the one aim the whole volley shares;
+  // one report for all of them, as loud as the rounds in it make it (G.volleyVol). Its empties stay in the chambers till the block drops (w.spent).
   shoot(w: PWeapon, barrels: number[] | null = null) {
+    const vol = !!w.def.volley && !barrels;
+    if (vol) barrels = Array.from({ length: Math.max(1, Math.min(w.mag, w.def.volley)) }, (_, i) => i);
+    const nv = vol ? barrels!.length : 0;
+    let vAim: number[] | null = null; // (the volley's one aim error, for every barrel in it)
     const multi = !!(barrels && barrels.length), list: number[] = multi ? barrels! : [-1];
     const mInfo = multi ? G.Models.infoOf(w.def) : null, mz = mInfo && mInfo.muzzles && mInfo.muzzles.length ? mInfo.muzzles as number[][] : null;
     const cx = mz ? mz.reduce((a, m) => a + m[2], 0) / mz.length : 0, cy = mz ? mz.reduce((a, m) => a + m[1], 0) / mz.length : 0;
@@ -1305,8 +1312,9 @@ const G_Me = {
     list.forEach((bi, n) => {
       // the round being fired, and the gun as that round sees it (G.roundDef: hollow points, AP, slugs...)
       const round = multi ? (w.tube && w.tube.length ? w.tube.pop()! : w.ammo) : G.chambered(w.def) && w.chamber ? w.chamber : w.tube && w.tube.length ? w.tube.pop()! : w.ammo; // (the chambered one, if it has a chamber)
-      if (!G.chambered(w.def) && !multi) { w.spent = w.spent || []; w.spent.unshift(round); w.spent.length = Math.min(w.spent.length, 8); } // (the empties a revolver or break-action keeps till it's opened)
-      const sd = multi ? G.shotDef(w.def, w, bi) : null; // (a gun of several barrels: the gun as this barrel's round type and length make it; then as the load sees it)
+      if (!G.chambered(w.def) && (!multi || vol)) { w.spent = w.spent || []; w.spent.unshift(round); w.spent.length = Math.min(w.spent.length, Math.max(8, w.def.volley || 0)); } // (the empties a revolver or break-action keeps till it's opened)
+      if (vol) w.mag--;
+      const sd = multi && !vol ? G.shotDef(w.def, w, bi) : null; // (a gun of several barrels: the gun as this barrel's round type and length make it; then as the load sees it)
       let def = G.roundDef(sd ? sd.def : w.def, round), eff = 0;
       if (sd) { eff = sd.eff; G.barrelsOf(w)![bi]--; w.mag--; this.lastShot = { barrel: bi, mm: Math.round(eff), k: Math.round(sd.k * 1000) / 1000, rl: G.roundOf(w.def, w.rl)!.rl, am: round, left: w.bl!.slice(), mag: w.mag }; this.shotLog.push(this.lastShot); if (this.shotLog.length > 60) this.shotLog.shift(); } // (the barrel's rounds: js/data.ts G.barrelsOf)
       if (n === 0) { def0 = def; round0 = round; }
@@ -1327,9 +1335,19 @@ const G_Me = {
       // around it: the choke's cone, denser in the middle (roughly normal, clipped at 1.6x)
       // (a hyper pair's second round: the same error as the first's, near enough: the gun hasn't moved)
       const pair2 = this.hyperQ === 1 && this.pairAim && this.fireMode(w) === 'hyper';
-      const a0 = pair2 ? this.pairAim![0] : Math.random() * Math.PI * 2, r0 = pair2 ? this.pairAim![1] : Math.sqrt(Math.random()) * Math.tan(sr);
+      const a0 = pair2 ? this.pairAim![0] : vAim ? vAim[0] : Math.random() * Math.PI * 2, r0 = pair2 ? this.pairAim![1] : vAim ? vAim[1] : Math.sqrt(Math.random()) * Math.tan(sr);
       this.pairAim = this.hyperQ === 2 ? [a0, r0] : null;
+      if (vol && !vAim) vAim = [a0, r0];
       const aim = fwd.clone().addScaledVector(right, Math.cos(a0) * r0).addScaledVector(up, Math.sin(a0) * r0).normalize();
+      // (a volley's barrel: it leaves from its own bore, offset from the line of sight as the bore is from the block's middle, turned in to meet the
+      // others at volleyZ, and strays a little on its own: roughly normal, clipped at 2x)
+      let from = origin;
+      if (vol && mz && bi >= 0) {
+        const dx = mz[bi][2] - cx, dy = mz[bi][1] - cy, z = w.def.volleyZ || 10, vs = Math.tan(((w.def.volleySpread || 0) * Math.PI) / 180);
+        const a = Math.random() * Math.PI * 2, rr = vs * Math.min(2, Math.sqrt(-2 * Math.log(1 - Math.random())));
+        from = origin.clone().addScaledVector(right, dx).addScaledVector(up, dy);
+        aim.addScaledVector(right, -dx / z + Math.cos(a) * rr).addScaledVector(up, -dy / z + Math.sin(a) * rr).normalize();
+      }
       const pr = Math.tan(((def.choke || 0) * Math.PI) / 180);
       // each round (or pellet) leaves as a projectile (fly); the squad is told where it's headed, as far as the
       // walls go (to draw it and hear it go by)
@@ -1340,14 +1358,15 @@ const G_Me = {
           const a = Math.random() * Math.PI * 2, rr = pr * Math.min(1.6, Math.sqrt(-2 * Math.log(1 - Math.random())) * 0.6);
           dir = aim.clone().addScaledVector(right, Math.cos(a) * rr).addScaledVector(up, Math.sin(a) * rr).normalize();
         }
-        this.fly(origin, dir, muzzle, def, round, i === 0 || def.pellets <= 10, shot, w.sup, G.boreTip(w));
+        this.fly(from, dir, muzzle, def, round, i === 0 || def.pellets <= 10, shot, w.sup, G.boreTip(w));
       }
       const firstEnd = shot.to;
 
       if (def.cls === 'RAIL') G.Audio.rail();
       else if (def.cls === 'BOW') G.Audio.bow();
-      else if (!G.GunAudio.play(multi ? G.shotSoundKey(def, eff, round) : G.Gunsmith.roundSoundKey(def, round), null, undefined, multi ? Math.pow(G.shotK(w.def, eff), 2) : 1)) G.Audio.shot(w.sup ? G.SUPPRESSOR.snd : def.snd); // (the report of the round fired, not just the gun's)
-      if (!w.sup && def.cls !== 'BOW') {
+      else if (vol && n > 0) { /* (one report for the whole volley: the first round's) */ }
+      else if (!G.GunAudio.play(multi && !vol ? G.shotSoundKey(def, eff, round) : G.Gunsmith.roundSoundKey(def, round), null, undefined, vol ? G.volleyVol(w.def, nv) : multi ? Math.pow(G.shotK(w.def, eff), 2) : 1)) G.Audio.shot(w.sup ? G.SUPPRESSOR.snd : def.snd); // (the report of the round fired, not just the gun's)
+      if (!w.sup && def.cls !== 'BOW' && !(vol && n > 0)) { // (a volley: one flash, the barrels' together)
         this.flashT = 0.05;
         G.R.vmMuzzle.intensity = 3;
         G.R.muzzleFlashAt(muzzle, def.tracer || 0xffb060);
@@ -1358,7 +1377,8 @@ const G_Me = {
       // (a shotgun's: every pellet's end, so the squad's highlights show the pattern)
       const tos = shot.tos ? shot.tos.slice(0, 24).map((p: THREE.Vector3) => [r2(p.x), r2(p.y), r2(p.z)]) : undefined;
       if (G.Highlights) G.Highlights.shot('p' + G.Net.myId, muzzle, firstEnd, def.code, round, tos, shot.sid);
-      G.Net.toHost({ t: 'shot', f: [r2(muzzle.x), r2(muzzle.y), r2(muzzle.z)], to: [r2(firstEnd.x), r2(firstEnd.y), r2(firstEnd.z)], tos, sid: shot.sid, w: def.code, am: round, sil: def.cls === 'BOW' ? 2 : w.sup ? (def.quiet ? 2 : 1) : 0, bm: multi ? Math.round(eff) : undefined, rl: multi ? G.roundOf(w.def, w.rl)!.rl : undefined });
+      G.Net.toHost({ t: 'shot', f: [r2(muzzle.x), r2(muzzle.y), r2(muzzle.z)], to: [r2(firstEnd.x), r2(firstEnd.y), r2(firstEnd.z)], tos, sid: shot.sid, w: def.code, am: round, sil: def.cls === 'BOW' ? 2 : w.sup ? (def.quiet ? 2 : 1) : 0, bm: multi && !vol ? Math.round(eff) : undefined, rl: multi && !vol ? G.roundOf(w.def, w.rl)!.rl : undefined,
+        vi: vol ? n : undefined, vn: vol && n === 0 ? nv : undefined }); // (a volley's rounds: which one this is, and how many went (the first's): js/views.ts remoteShot plays one report)
       if (n === 0) firstShot = shot;
     });
     void firstShot;

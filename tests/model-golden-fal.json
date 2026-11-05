@@ -382,6 +382,11 @@
    "geometry": "31d8a67d177b2094",
    "info": "c435d304d17576ca"
   },
+  "barrel=fal.barrel,grip=oem.gr.ar.4,handguard=oem.hg.box.4,mag=fal.mag,muzzle=mz.r762.a2,optic=hailstorm.optic,stock=stk.heavy.0": {
+   "label": "optic=hailstorm.optic",
+   "geometry": "7da8f98e996f3273",
+   "info": "5a1e192a7b704030"
+  },
   "barrel=fal.barrel,grip=oem.gr.ar.4,handguard=oem.hg.box.4,mag=fal.mag,muzzle=mz.r762.a2,stock=stk.heavy.0": {
    "label": "optic=(none)",
    "geometry": "7da8f98e996f3273",

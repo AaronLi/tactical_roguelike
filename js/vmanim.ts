@@ -8,7 +8,7 @@
 // and both hands. The arms run from fixed shoulders just off-screen to wherever the hands are, so a hand
 // can leave the gun, go to a pouch for a magazine and come back.
 /** How a gun is reloaded (js/vmanim.ts kinds). */
-type VmReload = 'mag' | 'akimbo' | 'revolver' | 'break' | 'enbloc' | 'bow' | 'shell' | 'belt' | 'hinge';
+type VmReload = 'mag' | 'akimbo' | 'revolver' | 'break' | 'enbloc' | 'bow' | 'shell' | 'belt' | 'hinge' | 'block';
 /** Which part of a gun the hand works to rack it. */
 type VmAction = 'ar' | 'pistol' | 'bolt' | 'pump' | 'lever' | 'handle';
 /** What the hand works: a gun's action, or the cylinder or barrels it opens (an inspection). */
@@ -18,7 +18,7 @@ type VmMagMode = 'in' | 'hand' | 'drop' | 'gone' | 'peek' | 'rise' | 'chk';
 /** Something the left hand carries. */
 type VmPropKind = 'shell' | 'case' | 'loader' | 'clip' | 'bolt';
 /** Where a gun's round shows when it is checked: at the back of the cylinder, the open breech, the ejection port, the top or right of the receiver. */
-type VmChamberSide = 'cyl' | 'breech' | 'port' | 'top' | 'right';
+type VmChamberSide = 'cyl' | 'breech' | 'face' | 'port' | 'top' | 'right';
 const G_VMAnim = (() => {
   const T = THREE;
   type V3 = THREE.Vector3;
@@ -73,6 +73,7 @@ const G_VMAnim = (() => {
     if (def.akimbo) reload = 'akimbo';
     else if (arch === 'revolver') reload = 'revolver';
     else if (arch === 'derringer' || o.rcv === 'break' || def.id === 'pocketgl') reload = 'break';
+    else if (arch === 'pepperbox') reload = 'block'; // (a falling block, loaded a round at a time: blockRound)
     else if (def.enbloc) reload = 'enbloc';
     else if (def.cls === 'BOW') reload = 'bow';
     else if (def.shell) reload = 'shell';
@@ -134,6 +135,12 @@ const G_VMAnim = (() => {
         h.an.cyl.add(d); heads.push(d);
       }
       return { heads, shot, cyl: true };
+    }
+    if (c.side === 'face') { // a falling block's: the chambers in the barrels' rear face, on the frame (the block drops away from them), a head standing proud of each loaded one
+      const z = -c.f;
+      if (c.bore) for (const [x, y] of c.heads) for (const [r, mat, dz] of [[c.r * 1.14, M.steel(), 0.0002], [c.r * 0.95, DARK, 0.0004]] as [number, THREE.Material, number][]) { const b = new T.Mesh(new T.CylinderGeometry(r, r, 0.0002, 20), mat); b.rotation.x = Math.PI / 2; b.position.set(x, y, z + dz); h.holder.add(b); }
+      const heads = c.heads.map(([x, y]) => { const d = head(c.r * 1.05, 0.003, shot, M, c.bore); d.position.set(x, y, z + 0.0015); h.holder.add(d); return d; });
+      return { heads, shot };
     }
     if (c.side === 'breech') {
       if (!h.an.brk) return null;
@@ -390,6 +397,32 @@ const G_VMAnim = (() => {
     if (rt < 0.72) pose.prop = { kind: 'shell' };
     return pose;
   }
+  // A falling block loaded a round at a time (js/player.ts: as a revolver by hand, revOpen and revClose). As the first round's reload begins the lever
+  // swings down and the block drops with it (pose.brk, js/vmanim.ts apply: info.block), the gun tipped muzzle-down a little and rolled toward you so the
+  // chambers face up out of the gap; then each time round a round from the pouch, brought in over the next empty chamber from behind and pushed home along
+  // its bore (held by its base: the prop's middle is ahead of the hand), its head showing in the chamber once it's in (pose.fed); the block up at the end.
+  function blockRound(t: number, h: Rig, pl: Pl) {
+    const A = h.A, pose = base(), tilt = (k: number) => { pose.gun[3] -= 0.2 * k; pose.gun[5] += 0.3 * k; pose.gun[1] += 0.025 * k; pose.gun[0] -= 0.02 * k; };
+    if (pl.revClose) {
+      pose.brk = 1 - S(0.15, 0.7, t); tilt(1 - S(0.35, 1, t));
+      pose.L = path(t, [[0, A.P], [0.55, A.S], [1, A.S]]);
+      return pose;
+    }
+    let rt = t;
+    if (pl.revOpen) {
+      const k = G.REV.open / pl.reloadTotal;
+      if (t < k) { const u = t / k; pose.brk = S(0.1, 0.75, u); tilt(S(0, 0.8, u)); pose.L = path(u, [[0, A.S], [0.55, A.S], [1, A.P]]); return pose; } // (the right hand drops the lever; the left lets go of the forend for the pouch)
+      rt = (t - k) / (1 - k);
+    }
+    pose.brk = 1; tilt(1);
+    const B = A.block, w = pl.cur();
+    if (!B || !B.at.length) { pose.L = path(rt, [[0, A.P], [0.5, A.S], [1, A.P]]); return pose; }
+    const c = B.at[Math.min(B.at.length - 1, w.mag || 0)], home = new T.Vector3(c.x, c.y + 0.012, c.z - B.oal / 2 + 0.001 + 0.03), out = off(home, -0.035, 0.022); // (the hand where the round's base is at the chamber's mouth, all but its rim in; and behind and above it)
+    pose.L = path(rt, [[0, A.P], [0.28, A.P], [0.56, out], [0.72, home], [0.8, home], [1, A.P]]);
+    if (rt > 0.24 && rt < 0.74) pose.prop = { kind: 'shell' };
+    if (rt >= 0.72) pose.fed = (w.mag || 0) + 1;
+    return pose;
+  }
   function breakClip(t: number, h: Rig, n: number, pl: Pl) {
     const A = h.A, pose = base(), port = A.port || A.S;
     pose.brk = S(0.04, 0.16, t) * (1 - S(0.8, 0.9, t));
@@ -535,6 +568,7 @@ const G_VMAnim = (() => {
       if (reload === 'shell') pose = shellClip(t, h);
       else if (reload === 'revolver') pose = pl.revHand(a.def) ? revolverRound(t, h, pl) : revolverClip(t, h);
       else if (reload === 'break') pose = breakClip(t, h, pl.reloadN, pl);
+      else if (reload === 'block') pose = blockRound(t, h, pl);
       else if (reload === 'enbloc') pose = enblocClip(t, h);
       else if (reload === 'bow') pose = bowClip(t, h);
       else if (reload === 'belt') pose = beltClip(t, h);
@@ -550,7 +584,7 @@ const G_VMAnim = (() => {
       const Qh = new T.Quaternion(); _m.copy(vm.matrix).multiply(h.holder.matrix).decompose(new T.Vector3(), Qh, new T.Vector3());
       pose = magCheckClip(pl.magChk, h, Qh);
     } else if (pl.inspectT > 0 || pl.rChk) {
-      const kind = action === 'pistol' || action === 'bolt' || action === 'pump' || action === 'lever' ? action : reload === 'revolver' || reload === 'break' ? reload : h.A.ch ? 'ar' : 'handle';
+      const kind = action === 'pistol' || action === 'bolt' || action === 'pump' || action === 'lever' ? action : reload === 'revolver' || reload === 'break' ? reload : reload === 'block' ? 'break' : h.A.ch ? 'ar' : 'handle'; // (a falling block's check drops the block, as a break-action's opens it)
       pose = inspectClip(pl.rChk ? 0 : 1 - pl.inspectT / pl.inspectDur, h, kind === 'ar' || kind === 'handle' ? actKind(a, h) : kind, pl.inspHold || pl.rChk || pl.inspYaw || pl.inspPitch ? [pl.inspYaw || 0, pl.inspPitch || 0] : null, pl, pl.rChk ? pl.rChk.k : null);
     }
     a.pose = pose;
@@ -620,11 +654,12 @@ const G_VMAnim = (() => {
       }
       if (an.slide && pose && pose.slide != null) an.slide.position.z = pose.slide * SLIDE;
       if (an.cyl && A.cylHome) { const k = pose ? pose.cyl : 0; an.cyl.position.copy(A.cylHome); an.cyl.position.x -= 0.05 * k; an.cyl.position.y -= 0.016 * k; /* (swung clear of the frame) */ }
-      if (an.brk && !h.info.hinge) an.brk.rotation.x = (pose ? pose.brk : 0) * (A.load ? A.load.pitch : A.breech ? A.breech.pitch : -0.55); // (a derringer's hinge is at the top of the barrels' back: they tip up, muzzles first)
+      if (an.brk && !h.info.hinge && h.info.block && A.brkHome) { an.brk.position.copy(A.brkHome); an.brk.position.y -= (pose ? pose.brk : 0) * h.info.block.drop; } // (a falling block: straight down between the walls)
+      else if (an.brk && !h.info.hinge) an.brk.rotation.x = (pose ? pose.brk : 0) * (A.load ? A.load.pitch : A.breech ? A.breech.pitch : -0.55); // (a derringer's hinge is at the top of the barrels' back: they tip up, muzzles first)
       if (an.cover) an.cover.rotation.x = (pose ? pose.cover : 0) * 1.1;
       if (an.bipod) G.GunRig.bipodPose(an.bipod, pl.bipodT || 0); // (down on the ground or a ledge: js/player.ts bipodStep)
       if (an.pump && pose && pose.pump != null && !h.info.hinge) an.pump.position.z = pose.pump * PUMP;
-      if (an.lever && !h.info.hinge) an.lever.rotation.x = (pose && pose.lever != null ? pose.lever : cyc && a.k.action === 'lever' ? cyc : 0) * 0.9;
+      if (an.lever && !h.info.hinge) an.lever.rotation.x = h.info.block ? (pose ? pose.brk : 0) * h.info.block.lever : (pose && pose.lever != null ? pose.lever : cyc && a.k.action === 'lever' ? cyc : 0) * 0.9; // (a falling block's lever: down with the block)
       if (h.info.hinge) hingePose(h, pose && pose.hinge != null ? pose.hinge : 0); // (a model's own reload sequence, js/vmanim.ts hingeClip)
       if (an.bolt && A.boltHome) { const b = (pose && pose.bolt) || [0, 0]; an.bolt.rotation.z = b[0] * BOLT_LIFT; an.bolt.position.z = A.boltHome.z + b[1] * boltBack(h); } // (worked by hand: js/player.ts rack)
 

@@ -189,7 +189,7 @@ const G_Server = {
         if (p && p.st && this.phase === 'level') this.hear(p.st.p[0], p.st.p[2], m.sil === 2 ? 2 : m.sil ? 6 : 28, p.st.p[1]); // (not at the range)
         if (p && this.phase === 'level' && m.sil !== 2) p.firedAt = this.clock; // (the muzzle flash lights them up: officerLux)
         if (m.f && m.to && this.phase === 'level') this.suppress(m.f, m.to, G.Gunsmith.fromCode(m.w), (G.AMMO as Tbl)[m.am] ? m.am : undefined);
-        G.Net.broadcast({ t: 'shot', id: from, sid: m.sid, f: m.f, to: m.to, w: m.w, sil: m.sil, bm: Number.isFinite(m.bm) ? m.bm : undefined, rl: typeof m.rl === 'string' && m.rl.length < 12 ? m.rl : undefined, am: (G.AMMO as Tbl)[m.am] ? m.am : undefined,
+        G.Net.broadcast({ t: 'shot', id: from, sid: m.sid, f: m.f, to: m.to, w: m.w, sil: m.sil, bm: Number.isFinite(m.bm) ? m.bm : undefined, rl: typeof m.rl === 'string' && m.rl.length < 12 ? m.rl : undefined, am: (G.AMMO as Tbl)[m.am] ? m.am : undefined, vi: Number.isInteger(m.vi) && m.vi >= 0 && m.vi < 16 ? m.vi : undefined, vn: Number.isInteger(m.vn) && m.vn > 0 && m.vn <= 16 ? m.vn : undefined, // (a volley's rounds: js/player.ts shoot)
           tos: Array.isArray(m.tos) && m.tos.length <= 24 && m.tos.every((p: unknown) => Array.isArray(p) && p.length === 3 && p.every(Number.isFinite)) ? m.tos : undefined }, from); // (a shotgun's pellets: for the highlights)
         break;
       case 'nade': G.Net.broadcast({ t: 'nade', id: from, p: m.p, v: m.v, fuse: m.fuse, k: m.k === 'flash' ? 'flash' : 'frag', s: [0, 1, 2].includes(m.s) ? m.s : 2 }, from); break;

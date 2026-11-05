@@ -165,6 +165,7 @@ A mesh `display_ammo` (extras `{ slot, display: { width: 128, height: 32 } }`, *
 | `cylAt` | no | [forward, up, right] m | A revolver cylinder's centre, [forward, up, right] metres. |
 | `load` | no | object | A break-open gun: where the open breeches are and the angle the barrels tip to. |
 | `cup` | no | [forward, up, right] m | Where the left hand cups the frame (a derringer), [forward, up, right] metres. |
+| `block` | no | object | A falling-block breech (the Hailstorm): part_brk is the block, which slides straight down `drop` metres to bare the chambers, and part_lever its lever, which swings down `lever` radians (about x, at its pivot) as it does. |
 | `magTop` | no | boolean | True when the hand takes the magazine from its top instead of its base. |
 | `quarrelMats` | no | object | A crossbow's bolt materials as three.js Material JSON (free-form; viewmodel only). |
 | `mounts` | no | object | Mount points where a swappable part sits, `mount_<slot>` -> [forward, up, right] metres of the part's origin (e.g. mount_muzzle: where a muzzle device screws on). Normally assembled from the parts' anchors (see GUN_MODEL_CONTRACT.anchors); a whole-gun bake may list them directly. |

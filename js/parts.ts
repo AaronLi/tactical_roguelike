@@ -489,7 +489,7 @@ const G_Gunsmith = (() => {
   // among them, and a gun takes the lengths within 0.6x-1.6x of its own (fitsLen). A pistol's: one plain, one threaded and one match barrel
   // for the cartridge (pbr:<cartridge>), the length the gun's own (the threaded and match ones add a little: set.barrelAdd). Not shared:
   // integrally suppressed barrels, break-actions and oddities, revolvers, shotguns, and the TX22's threaded one.
-  const NOT_SHARED = new Set(['dbl', 'sawn', 'derringer', 'thor', 'm32', 'pocketgl', 'shredder', 'rail', 'crossbow']);
+  const NOT_SHARED = new Set(['dbl', 'sawn', 'derringer', 'thor', 'm32', 'pocketgl', 'shredder', 'rail', 'crossbow', 'hailstorm']);
   const calKey = (cal: string) => cal.replace('/', 'x');
   const lenId = (cal: string, len: number) => `br.${calKey(cal)}.${len}`;
   // Barrel PROFILES: what a barrel looks like and does besides its cartridge and length. A shared barrel is cartridge x length x profile and is
@@ -843,9 +843,9 @@ const G_Gunsmith = (() => {
   P('crossbow', 'crossbow', {}, { limbs: true, stock: ['precision', 'sniper'], optic: ['pic', { optic: 'reddot' }] });
 
   // anything without a platform entry (shouldn't happen) gets a bare one
-  const LATE = new Set(['qbz95', 'qbz192', 'mcx']);
+  const LATE = new Set(['qbz95', 'qbz192', 'mcx']), LAST = new Set(['hailstorm']); // (LAST: made after everything else, below the ballistic computers)
   const AUTHORED_PISTOLS = new Set(['welrod', 'maxim9', 'tempest']); // (and the Tempest, a rifle) // (made after the authored parts: AUTHORED_PISTOLS below) // (their platforms are made at the end: a part's id in a code is its place in the list)
-  for (const def of G.WEAPON_LIST) if (!PLATFORMS[def.id] && !LATE.has(def.id) && !AUTHORED_PISTOLS.has(def.id)) P(def.id, 'rifle', {}, {});
+  for (const def of G.WEAPON_LIST) if (!PLATFORMS[def.id] && !LATE.has(def.id) && !LAST.has(def.id) && !AUTHORED_PISTOLS.has(def.id)) P(def.id, 'rifle', {}, {});
   // Calibration: the weapon's tuned stats are what its default build shoots like, so each platform carries
   // the negated sum of its default parts' effects. Changing a part changes the stats relative to that.
   const STAT_KEYS = ['ergo', 'recoil', 'acc', 'hip', 'weight', 'vel', 'reload', 'rpm', 'spin'];
@@ -1130,6 +1130,10 @@ const G_Gunsmith = (() => {
     birdshot: (g: any) => ({ shotCount: 16, bulletWeight: g.bulletWeight * 0.9 }),
     flechette: (g: any) => ({ shotCount: 20, bulletWeight: g.bulletWeight * 0.7 }),
   };
+  // A volley (a gun with def.volley barrels fired together, the Hailstorm's) as the synth hears it: one report with the gas of several rounds behind it. Three rounds'
+  // worth of bullet and charge (bulletWeight x 3, and pressure x 2 behind a bore of half as much area again: the same speed, three times the gas at the muzzle) is louder and a
+  // little lower than one round's, and still one crack: the barrels go off together, not one after another. How loud one pull is with fewer barrels loaded is G.volleyVol.
+  const volleySound = (g: any) => ({ bulletWeight: g.bulletWeight * 3, pressure: g.pressure * 2, caliber: g.caliber * Math.sqrt(1.5) });
   // the sound key for this gun firing a round of this type ("<soundKey>@<type>" when the load changes the report)
   const roundSoundKey = (def: Record<string, any>, am: string) => ((LOAD_SOUND[G.baseAm(am)] || (G.AMMO[am] && G.AMMO[am].plus)) && G.GUN_SPECS[def.id] ? `${def.soundKey}@${am}` : def.soundKey); // (a +P load's report: hotter, so louder: its own key)
   // gunshot synth inputs for a sound key ("id:barrelInches:device" or a plain id, either with "@type" for the load)
@@ -1148,6 +1152,7 @@ const G_Gunsmith = (() => {
     const ba = G.baseAm(am), wd = G.WEAPONS[id] || G.WEAPONS[id.split('.')[0]], P = G.plusOf(wd ? G.calOf(wd) : 'rifle', am);
     if (LOAD_SOUND[ba]) s = Object.assign({}, s, LOAD_SOUND[ba](s));
     if (P) s = Object.assign({}, s, { pressure: s.pressure * P.p }); // (+P: more chamber pressure at the muzzle, a sharper, louder report)
+    if (wd && wd.volley) s = Object.assign({}, s, volleySound(s)); // (a volley gun: every barrel at once)
     if (!LOAD_SOUND[ba] || window.GunshotSynth) specs.set(key, s); // (a subsonic load's needs the synth to work out)
     return s;
   }
@@ -1624,11 +1629,12 @@ const G_Gunsmith = (() => {
     } }
   const compatible =(mount: string) => BY_MOUNT.get(mount) || [];
   const FITS = new Map(); // interface -> weapon ids that have (or can get) a slot for it
-  for (const plat of Object.values(PLATFORMS)) {
+  const addFits = (plat: Platform) => {
     const mounts = new Set<string>(plat.slots.map((s: Slot) => s.mount));
     for (let pass = 0; pass < 2; pass++) for (const m of [...mounts]) for (const p of compatible(m)) if (!(p.not || []).includes(plat.id)) for (const pm of [...Object.values(p.provides || {}), ...Object.values(p.chassis || {})]) mounts.add(slotMount(pm));
     for (const m of mounts) { if (!FITS.has(m)) FITS.set(m, []); FITS.get(m).push(plat.id); }
-  }
+  };
+  for (const plat of Object.values(PLATFORMS)) addFits(plat);
   const fits = (mount: string) => FITS.get(mount) || [];
   // every weapon a part fits, through any interface it takes (a 9 mm can on a ½-28 .22)
   // (a handguard fits a gun that has a barrel for it)
@@ -1682,6 +1688,16 @@ const G_Gunsmith = (() => {
     desc: '5–25× variable: scroll while aiming to change power. A ballistic computer: a readout of the distance to whatever is under the crosshair, and a lit marker where your next round will strike at that range (from your zero and load), snapping from cell to cell on a coarse LCD grid. It has its own readout, so a ballistic computer on the rail adds nothing.' });
   add({ id: 'tac.bc.0', slot: 'tac', mount: 'tac', brand: BR.oberon, name: 'Oberon BC-1 ballistic computer', price: 780, tier: 3, st: { hip: -13, ergo: -2, weight: 0.22 }, set: { laser: 'r', ranger: 1 }, model: { tac: 'bcomp' },
     desc: 'A ballistic computer with a visible red laser (switched on the comms wheel: hold the middle mouse button; it steadies hip fire while it\'s on). It puts a range readout, the metres to whatever is under the crosshair, in any magnified scope you look through. A scope that already has one is left as it is.' });
+  // The Hailstorm (js/data.ts, GitHub #38): a pepperbox platform (tools/models/recipes.ts pepperbox), made after everything else for the same reason. Its barrel is the
+  // eight-bore block (its own lengths: none of the shared .22 barrels), the stock a classic stock's (the double barrel's mount: its wrist is the grip), the sight its own bead on a
+  // rib along the block or anything on a Picatinny rail over the action. Nothing screws on its muzzles.
+  P('hailstorm', 'pepperbox', { L: 0.118 }, { barrel: { len: 0.305 }, stock: ['classic', 'wood'], optic: ['pic', { optic: 'bead' }] });
+  { const plat = PLATFORMS.hailstorm, inch = G.GUN_SPECS.hailstorm.barrel;
+    PARTS['hailstorm.barrel'].name = `Hailstorm .22 ${inch.toFixed(1)}" eight-bore block`;
+    PARTS['hailstorm.br.short'].name = PARTS['hailstorm.br.short'].name.replace('short barrel', 'short block'); PARTS['hailstorm.br.short'].desc = 'The block cut down: handier, a little slower out of every bore.';
+    PARTS['hailstorm.br.long'].name = PARTS['hailstorm.br.long'].name.replace('match barrel', 'long block'); PARTS['hailstorm.br.long'].desc = 'A longer, heavier block: more speed out of the .22s, and a tighter group.';
+    plat.offset = {}; for (const k of STAT_KEYS) plat.offset[k] = -Object.values(plat.defaults).reduce((a, pid) => a + ((PARTS[pid] && PARTS[pid].st[k]) || 0), 0);
+    addFits(plat); }
   // what an attachments box offers for a weapon: parts that go straight onto it as it's built (a slot it has now, not
   // what's already in it), not factory parts, magazines, or anything that makes it another gun
   const ATTACH_SLOTS = new Set(['slide', 'barrel', 'muzzle', 'handguard', 'railmount', 'pump', 'fg', 'tac', 'tacL', 'optic', 'riserdot', 'magnifier', 'charging', 'grip', 'stock', 'buttstock', 'loader']);

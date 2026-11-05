@@ -526,8 +526,8 @@ const G_Views = {
     const f = new THREE.Vector3(m.f[0], m.f[1], m.f[2]), to = new THREE.Vector3(m.to[0], m.to[1], m.to[2]);
     const def = G.Gunsmith.fromCode(m.w);
     if (!def) return;
-    const pv = this.players.get(m.id);
-    if (pv) pv.rig.recoil();
+    const pv = this.players.get(m.id), more = !!m.vi; // (more: a volley's round after its first, which brought the kick, the flash and the report for all of them: js/player.ts shoot)
+    if (pv && !more) pv.rig.recoil();
     if (G.Highlights) G.Highlights.shot('p' + m.id, f, to, m.w, m.am, m.tos, m.sid);
     G.Audio.flyby(f, to, def, m.am || G.ballFor(G.calOf(def))); // a teammate's round going past you
     // their round flies to where it was headed (the walls it'll meet, as the shooter worked it out)
@@ -535,12 +535,13 @@ const G_Views = {
     this.visRound(f, to, def, am, () => {
       if (def.cls === 'RAIL') G.R.tracer(fromP, toP, def.tracer || 0x55ddff, 0.06);
     });
+    if (more) return;
     if (!m.sil) G.R.muzzleFlashAt(f, def.tracer || 0xffb060);
-    if (!def.caseless) G.Casings.fired(def, false, f, to, m.am);
+    if (!def.caseless && !def.volley) G.Casings.fired(def, false, f, to, m.am); // (a volley gun's empties stay in its chambers)
     const d = G.R.camera.position.distanceTo(f);
     if (def.cls === 'RAIL') G.Audio.rail(d);
     else if (def.cls === 'BOW') G.Audio.bow(d);
-    else if (!G.GunAudio.play(m.bm && def.barrels ? G.shotSoundKey(G.roundSpec(def, m.rl), m.bm, am) : G.Gunsmith.roundSoundKey(def, am), f, 'p' + m.id, m.bm && def.barrels ? Math.pow(G.shotK(def, m.bm), 2) : 1)) G.Audio.shot(m.sil ? G.SUPPRESSOR.snd : def.snd, d);
+    else if (!G.GunAudio.play(m.bm && def.barrels ? G.shotSoundKey(G.roundSpec(def, m.rl), m.bm, am) : G.Gunsmith.roundSoundKey(def, am), f, 'p' + m.id, m.bm && def.barrels ? Math.pow(G.shotK(def, m.bm), 2) : def.volley ? G.volleyVol(def, m.vn || def.volley) : 1)) G.Audio.shot(m.sil ? G.SUPPRESSOR.snd : def.snd, d);
   },
 
   // ---------------------------------------------------------------- other people's rounds

@@ -171,6 +171,12 @@ const G_WEAPON_LIST: WeaponDef[] = [
     barrels: { n: 6, mm0: 229, mm1: 508, groups: { top: [0, 1, 2], bottom: [3, 4, 5], all: [0, 1, 2, 3, 4, 5] }, full: 0.8, default: 'standard',
       rounds: { standard: { per: 10, mm0: 229, cal: '10/31', spec: 'tempest' }, rifle: { per: 5, mm0: 296, cal: '10/53', spec: 'tempest.rifle' } } },
     desc: 'Six barrels of stacked 10 mm caseless rounds, fired electrically: the short round, ten to a barrel, or the long rifle round, five, and the block holds whichever it was loaded with. Semi, two automatic rates, or two, three or all six barrels at once. A barrel shoots harder the fewer rounds it has left in it. Legendary.' }),
+  // The Hailstorm (GitHub #38): a .22 LR volley gun, a pepperbox for a shoulder. Eight rifled barrels bored in one block (volley: how many) behind a falling-block breech: a lever
+  // under the action drops the block to bare the chambers, a round goes into each by hand (shell: a short step a round, as a tube's; the empties stay in their chambers till
+  // the block drops), and one pull fires every barrel that has a round in it (js/player.ts shoot). The barrels are bored to meet at volleyZ metres (each round leaves from its own
+  // barrel on its own path), and each strays a little on its own (volleySpread: degrees): a fist of small holes up close that opens out with range. A curiosity: tier 2, and cheap.
+  W({ id: 'hailstorm', slot: 'p', cls: 'SG', tier: 2, price: 900, name: 'Hailstorm .22', volley: 8, volleyZ: 10, volleySpread: 0.28, rpm: 300, mode: 'semi', mag: 8, reserve: 96, reload: 0.42, shell: true, spread: 3.4, ads: 0.035, range: 16, falloff: 0.55, speed: 0.98,
+    desc: 'Eight .22 LR barrels in one block behind a falling-block breech. Drop the lever, thumb a round into each chamber, and one pull sends every one of them: a fist of small holes up close, a scatter further out. Slow to fill, quick to empty.' }),
 ];
 G.WEAPON_LIST = G_WEAPON_LIST;
 const G_WEAPONS: Record<string, any> = {}; // (any, not WeaponDef: icons.ts, gunsmith.ts and parts.ts index it as (G.WEAPONS[x] || {}).field)
@@ -296,7 +302,7 @@ G.OPEN_BOLT = G_OPEN_BOLT;
 const G_chambered = (def: Record<string, any> | null | undefined) => {
   if (!def || G.OPEN_BOLT.includes(def.id) || def.enbloc || def.akimbo || def.barrels || ['GL', 'BOW', 'RAIL'].includes(def.cls)) return false;
   const P = G.Gunsmith && G.Gunsmith.PLATFORMS[def.id];
-  return !(P && (P.arch === 'revolver' || P.arch === 'derringer' || (P.spec && P.spec.rcv === 'break')));
+  return !(P && (P.arch === 'revolver' || P.arch === 'derringer' || P.arch === 'pepperbox' || (P.spec && P.spec.rcv === 'break')));
 };
 G.chambered = G_chambered;
 // A revolver takes loose rounds, a round at a time (its reload figure's a round's), with the cylinder swung out first
@@ -305,8 +311,15 @@ const G_revolver = (def: Record<string, any> | null | undefined) => { const P = 
 G.revolver = G_revolver;
 const G_REV = { open: 0.55, close: 0.35 };
 G.REV = G_REV;
+// A falling-block breech (the Hailstorm's: a pepperbox platform) is loaded the same way: the block dropped first (its lever swung down), a round into each
+// chamber, the block up after; the times are the revolver's (G.REV), and a pull of the trigger with the block down shuts it first.
+const G_fblock = (def: Record<string, any> | null | undefined) => { const P = def && G.Gunsmith && G.Gunsmith.PLATFORMS[def.id]; return !!P && P.arch === 'pepperbox'; };
+G.fblock = G_fblock;
+// how loud a volley is, as a share of a full one (every barrel): n rounds of def.volley at once (each round's blast adds to the others': the energy, not the pressure)
+const G_volleyVol = (def: Record<string, any>, n: number) => Math.sqrt(Math.max(1, n) / (def.volley || 1));
+G.volleyVol = G_volleyVol;
 // a whole reload from empty, as the stat cards show it (a revolver loaded by hand; a tube's stays its figure a shell)
-const G_fullReload = (d: Record<string, any>) => (G.revolver(d) && d.shell ? G.REV.open + d.reload * d.mag + G.REV.close : d.reload);
+const G_fullReload = (d: Record<string, any>) => ((G.revolver(d) || G.fblock(d)) && d.shell ? G.REV.open + d.reload * d.mag + G.REV.close : d.reload);
 G.fullReload = G_fullReload;
 // Bolt hold-open: the action locks back on the last round, so a reload from empty is a magazine change and a
 // thumb on the bolt catch (or the slide stop), not a full rack. Every pistol with a slide, the AR-15 family and the
@@ -425,6 +438,8 @@ const G_GUN_SPECS: Record<string, any> = { // (any, not GunSpec, for the same re
   thor:     GS(15.0, 12.7, 'brake', 55000, 1.60, 660, 0.05, 0.05, 'recoil', 'brass', 99),
   derringer:GS(3.0, 10.9, 'none', 36000, 0.60, 240, 0.05, 0.05, 'recoil', 'brass', 33), // (.44 Magnum: one of the American Derringer Model 1's)
   tx22:     GS(4.1, 5.60, 'none', 24000, 0.10, 40, 0.15, 0.40, 'blowback', 'brass', 15),
+  // (the Hailstorm: the TX22's .22 LR round from a 12 in barrel; a falling block, so nothing cycles. The report of a volley is worked out from this one round's: js/parts.ts soundSpec)
+  hailstorm:GS(12.0, 5.60, 'none', 24000, 0.10, 40, 0.05, 0.05, 'recoil', 'brass', 15),
   ak74:     GS(16.3, 5.60, 'brake', 50000, 0.70, 53, 0.55, 0.60, 'longstroke', 'steel', 39),
   aks74u:   GS(8.1, 5.60, 'comp', 50000, 0.70, 53, 0.50, 0.65, 'longstroke', 'steel', 39),
   rpk:      GS(23.2, 7.62, 'none', 45000, 1.00, 123, 0.72, 0.70, 'longstroke', 'steel', 39),
@@ -723,13 +738,14 @@ const G_GUN_KG: Record<string, number> = { // each gun as it comes (kg)
   tempest: 4.6, p9: 0.75, g19: 0.7, m1911: 1.1, usp: 0.75, fiveseven: 0.75, thor: 5.4, b92: 0.97, ppk: 0.59, auto9: 1.1, deagle: 2.0, rev: 1.1, hc500: 2.0, akimbo: 0.95, derringer: 0.4,
   welrod: 1.0, maxim9: 1.2, // (estimates: a little over a kilo for the Welrod with its tube, about 1.2 kg for the Maxim 9 with its suppressor; the P9 is 0.75)
   g18: 0.9, skorp: 1.3, mp7: 1.9, mac10: 2.8, tx22: 0.6, sawn: 2.0, judge: 0.85, pocketgl: 1.8,
+  hailstorm: 3.1, // (an estimate: the eight-bore block is most of it, about 1.3 kg of steel)
 };
 G.GUN_KG = G_GUN_KG;
 const G_RECOIL_K = (() => {
   const k: Record<string, number> = {}, set = (ids: string, f: number) => ids.split(' ').forEach((id) => { k[id] = (k[id] || 1) * f; });
   set('ak ak74 aks74u an94 galil rpk svd saiga vepr garand thompson ppsh mosin pump dbl', 1.25); // (the stock drops below the bore)
   set('m14', 1.15);
-  set('r700 mosin awm pump ksg dbl lever rev derringer', 1.4); // (manual actions)
+  set('r700 mosin awm pump ksg dbl lever rev derringer hailstorm', 1.4); // (manual actions)
   set('vector', 0.75); // (the KRISS action throws its bolt down, not back)
   set('g36', 0.75);
   set('shredder', 0.4); // (braced on its harness)
@@ -902,4 +918,4 @@ const G_ENEMY_GEAR = {
 };
 G.ENEMY_GEAR = G_ENEMY_GEAR;
 
-interface GameModules { PLUSP: typeof G_PLUSP; baseAm: typeof G_baseAm; plusOf: typeof G_plusOf; TIER_NAMES: typeof G_TIER_NAMES; TIER_COLORS: typeof G_TIER_COLORS; CLASS_SND: typeof G_CLASS_SND; WEAPON_LIST: WeaponDef[]; WEAPONS: typeof G_WEAPONS; EXPLOSIVES_OFF: typeof G_EXPLOSIVES_OFF; obtainable: typeof G_obtainable; AUTO_ONLY: typeof G_AUTO_ONLY; FIRE_MODES: typeof G_FIRE_MODES; MODE_NAME: typeof G_MODE_NAME; MODE_INFO: typeof G_MODE_INFO; barrelsOf: typeof G_barrelsOf; roundOf: typeof G_roundOf; perOf: typeof G_perOf; cartOf: typeof G_cartOf; calsOf: typeof G_calsOf; asCal: typeof G_asCal; roundSpec: typeof G_roundSpec; capOf: typeof G_capOf; ammoTypes: typeof G_ammoTypes; loadOf: typeof G_loadOf; pickBarrels: typeof G_pickBarrels; shotDef: typeof G_shotDef; shotK: typeof G_shotK; barrelMm: typeof G_barrelMm; shotSoundKey: typeof G_shotSoundKey; OPEN_BOLT: typeof G_OPEN_BOLT; chambered: typeof G_chambered; revolver: typeof G_revolver; REV: typeof G_REV; fullReload: typeof G_fullReload; BOLT_HOLD: typeof G_BOLT_HOLD; boltHold: typeof G_boltHold; loaded: typeof G_loaded; MAG_FAMILY: typeof G_MAG_FAMILY; BELT_FAMILY: typeof G_BELT_FAMILY; magFam: typeof G_magFam; magFits: typeof G_magFits; beltFed: typeof G_beltFed; GUN_SPECS: typeof G_GUN_SPECS; SUPPRESSOR: typeof G_SUPPRESSOR; ARMOR_LIST: ArmorDef[]; ARMORS: typeof G_ARMORS; ENEMIES: typeof G_ENEMIES; THEMES: typeof G_THEMES; HANGAR_ROWS: typeof G_HANGAR_ROWS; HANGAR_THEME: typeof G_HANGAR_THEME; PLAYER_COLORS: typeof G_PLAYER_COLORS; VENDOR_QUIPS: typeof G_VENDOR_QUIPS; CALIBERS: typeof G_CALIBERS; calOf: typeof G_calOf; stdMag: typeof G_stdMag; AMMO: typeof G_AMMO; AMMO_TYPES: typeof G_AMMO_TYPES; MUZZLE_V: typeof G_MUZZLE_V; SOUND_SPEED: typeof G_SOUND_SPEED; dragOf: typeof G_dragOf; roundSpeed: typeof G_roundSpeed; CHARGE_GR: typeof G_CHARGE_GR; GUN_KG: typeof G_GUN_KG; RECOIL_K: typeof G_RECOIL_K; RECOIL: typeof G_RECOIL; aimSway: typeof G_aimSway; recoilImpulse: typeof G_recoilImpulse; physRecoil: typeof G_physRecoil; GRAVITY: typeof G_GRAVITY; zeroOf: typeof G_zeroOf; sightH: typeof G_sightH; ROUND_LIFE: typeof G_ROUND_LIFE; ballistics: typeof G_ballistics; flight: typeof G_flight; zeroSlope: typeof G_zeroSlope; CLICK: typeof G_CLICK; boreTip: typeof G_boreTip; ballFor: typeof G_ballFor; AMMO_RARITY: typeof G_AMMO_RARITY; rollAmmo: typeof G_rollAmmo; ammoOk: typeof G_ammoOk; roundDef: typeof G_roundDef; gearTier: typeof G_gearTier; ENEMY_GEAR: typeof G_ENEMY_GEAR; }
+interface GameModules { PLUSP: typeof G_PLUSP; baseAm: typeof G_baseAm; plusOf: typeof G_plusOf; TIER_NAMES: typeof G_TIER_NAMES; TIER_COLORS: typeof G_TIER_COLORS; CLASS_SND: typeof G_CLASS_SND; WEAPON_LIST: WeaponDef[]; WEAPONS: typeof G_WEAPONS; EXPLOSIVES_OFF: typeof G_EXPLOSIVES_OFF; obtainable: typeof G_obtainable; AUTO_ONLY: typeof G_AUTO_ONLY; FIRE_MODES: typeof G_FIRE_MODES; MODE_NAME: typeof G_MODE_NAME; MODE_INFO: typeof G_MODE_INFO; barrelsOf: typeof G_barrelsOf; roundOf: typeof G_roundOf; perOf: typeof G_perOf; cartOf: typeof G_cartOf; calsOf: typeof G_calsOf; asCal: typeof G_asCal; roundSpec: typeof G_roundSpec; capOf: typeof G_capOf; ammoTypes: typeof G_ammoTypes; loadOf: typeof G_loadOf; pickBarrels: typeof G_pickBarrels; shotDef: typeof G_shotDef; shotK: typeof G_shotK; barrelMm: typeof G_barrelMm; shotSoundKey: typeof G_shotSoundKey; OPEN_BOLT: typeof G_OPEN_BOLT; chambered: typeof G_chambered; revolver: typeof G_revolver; REV: typeof G_REV; fblock: typeof G_fblock; volleyVol: typeof G_volleyVol; fullReload: typeof G_fullReload; BOLT_HOLD: typeof G_BOLT_HOLD; boltHold: typeof G_boltHold; loaded: typeof G_loaded; MAG_FAMILY: typeof G_MAG_FAMILY; BELT_FAMILY: typeof G_BELT_FAMILY; magFam: typeof G_magFam; magFits: typeof G_magFits; beltFed: typeof G_beltFed; GUN_SPECS: typeof G_GUN_SPECS; SUPPRESSOR: typeof G_SUPPRESSOR; ARMOR_LIST: ArmorDef[]; ARMORS: typeof G_ARMORS; ENEMIES: typeof G_ENEMIES; THEMES: typeof G_THEMES; HANGAR_ROWS: typeof G_HANGAR_ROWS; HANGAR_THEME: typeof G_HANGAR_THEME; PLAYER_COLORS: typeof G_PLAYER_COLORS; VENDOR_QUIPS: typeof G_VENDOR_QUIPS; CALIBERS: typeof G_CALIBERS; calOf: typeof G_calOf; stdMag: typeof G_stdMag; AMMO: typeof G_AMMO; AMMO_TYPES: typeof G_AMMO_TYPES; MUZZLE_V: typeof G_MUZZLE_V; SOUND_SPEED: typeof G_SOUND_SPEED; dragOf: typeof G_dragOf; roundSpeed: typeof G_roundSpeed; CHARGE_GR: typeof G_CHARGE_GR; GUN_KG: typeof G_GUN_KG; RECOIL_K: typeof G_RECOIL_K; RECOIL: typeof G_RECOIL; aimSway: typeof G_aimSway; recoilImpulse: typeof G_recoilImpulse; physRecoil: typeof G_physRecoil; GRAVITY: typeof G_GRAVITY; zeroOf: typeof G_zeroOf; sightH: typeof G_sightH; ROUND_LIFE: typeof G_ROUND_LIFE; ballistics: typeof G_ballistics; flight: typeof G_flight; zeroSlope: typeof G_zeroSlope; CLICK: typeof G_CLICK; boreTip: typeof G_boreTip; ballFor: typeof G_ballFor; AMMO_RARITY: typeof G_AMMO_RARITY; rollAmmo: typeof G_rollAmmo; ammoOk: typeof G_ammoOk; roundDef: typeof G_roundDef; gearTier: typeof G_gearTier; ENEMY_GEAR: typeof G_ENEMY_GEAR; }

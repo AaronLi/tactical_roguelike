@@ -65,7 +65,8 @@ type ChamberAt =
   | { side: 'port'; f: number; y: number; x: number }
   | { side: 'top'; f: number; y: number; x: number; w: number }
   | { side: 'cyl'; z: number; R: number; r: number; n: number }
-  | { side: 'breech'; heads: Vec2[]; r: number; z: number; bore?: boolean };
+  | { side: 'breech'; heads: Vec2[]; r: number; z: number; bore?: boolean }
+  | { side: 'face'; f: number; heads: Vec2[]; r: number; bore?: boolean };
 
 /** A cocking handle / operating lever. */
 interface HandleInfo { f: number; y: number; x: number; travel: number; grab?: Vec3; recip?: boolean; style?: string; sz?: number; stem?: number }
@@ -75,7 +76,7 @@ interface GunModelInfo {
   sy: number; fSight: number; relief: number; muzzles: Vec3[]; grip: Vec3; support: Vec3; anim: Record<string, string>;
   magAt?: Vec2 | null; handle?: HandleInfo | null; port?: Vec3 | null; chamberAt?: ChamberAt | null;
   breech?: { at: Vec2; pitch: number; long: string | null } | null; ch?: Vec3 | null; bolt?: Vec3 | null; boltTravel?: number | null; cheek?: number | null; recoilBarrel?: number | null;
-  pistol?: boolean | null; slide?: Vec3 | null; cylAt?: Vec3 | null; load?: { at: Vec2[]; pitch: number } | null; cup?: Vec3 | null; magTop?: boolean | null;
+  pistol?: boolean | null; slide?: Vec3 | null; cylAt?: Vec3 | null; load?: { at: Vec2[]; pitch: number } | null; cup?: Vec3 | null; block?: { drop: number; lever: number } | null; magTop?: boolean | null;
   quarrelMats?: Record<string, unknown> | null; mounts?: Record<string, Vec3> | null;
   // first-person extras (js/viewmodel.ts), written by whoever makes the model:
   reflex?: { f: number; y: number; w: number; h: number; round?: boolean | null; kind: string } | null;
@@ -194,6 +195,7 @@ const INFO_FIELDS: { [K in keyof GunModelInfo]-?: Field } = {
       top: { f: num('Forward, metres.'), y: num('Up, metres.'), x: num('Right, metres.'), w: num('Width of the open top, metres.') },
       cyl: { z: num('Half the cylinder\'s length, metres (the face the rounds show on).'), R: num('Radius of the ring of chambers, metres.'), r: num('Radius of one chamber, metres.'), n: num('Number of chambers.', false, { min: 1 }) },
       breech: { heads: F('Case heads at the open breech: [sideways, up] metres from the hinge, one per barrel.', { t: 'list', of: { t: 'vec', n: 2 } }), r: num('Case radius, metres.'), z: num('Back/forward offset in the hinge frame, metres.'), bore: F('True: the bore shows there when it is empty.', { t: 'bool' }, true) },
+      face: { f: num('Forward of the mouths of the chambers (the rear face of the barrels), metres.'), heads: F('Case heads in the chambers, fixed to the frame (a falling block bares them): [right, up] metres, one per barrel, in the order they are loaded.', { t: 'list', of: { t: 'vec', n: 2 } }), r: num('Case radius, metres.'), bore: F('True: the bore shows there when it is empty.', { t: 'bool' }, true) },
     },
   }, true),
   breech: F('A tipping breech (the Thor): where it sits once open.', { t: 'obj', props: { at: vec2('[forward, up] metres of the open breech from the hinge pin.'), pitch: num('Opening angle, radians.'), long: F('Which long handguard it carries, "irons" or "rail", or null.', { t: 'str' }, true) } }, true),
@@ -207,6 +209,7 @@ const INFO_FIELDS: { [K in keyof GunModelInfo]-?: Field } = {
   cylAt: vec3('A revolver cylinder\'s centre, [forward, up, right] metres.', true),
   load: F('A break-open gun: where the open breeches are and the angle the barrels tip to.', { t: 'obj', props: { at: F('[forward, up] metres of each open breech.', { t: 'list', of: { t: 'vec', n: 2 } }), pitch: num('Tip angle, radians.') } }, true),
   cup: vec3('Where the left hand cups the frame (a derringer), [forward, up, right] metres.', true),
+  block: F('A falling-block breech (the Hailstorm): part_brk is the block, which slides straight down `drop` metres to bare the chambers, and part_lever its lever, which swings down `lever` radians (about x, at its pivot) as it does.', { t: 'obj', props: { drop: num('How far the block drops, metres.'), lever: num('How far the lever swings, radians.') } }, true),
   magTop: F('True when the hand takes the magazine from its top instead of its base.', { t: 'bool' }, true),
   quarrelMats: F('A crossbow\'s bolt materials as three.js Material JSON (free-form; viewmodel only).', { t: 'map', of: { t: 'free' } }, true),
   mounts: F('Mount points where a swappable part sits, `mount_<slot>` -> [forward, up, right] metres of the part\'s origin (e.g. mount_muzzle: where a muzzle device screws on). Normally assembled from the parts\' anchors (see GUN_MODEL_CONTRACT.anchors); a whole-gun bake may list them directly.', { t: 'map', of: { t: 'vec', n: 3 } }, true),

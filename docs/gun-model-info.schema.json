@@ -382,6 +382,57 @@
                 "z"
               ],
               "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "side": {
+                  "type": "string",
+                  "enum": [
+                    "face"
+                  ],
+                  "description": "side = face"
+                },
+                "f": {
+                  "type": "number",
+                  "description": "Forward of the mouths of the chambers (the rear face of the barrels), metres."
+                },
+                "heads": {
+                  "type": "array",
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 2,
+                    "maxItems": 2
+                  },
+                  "description": "Case heads in the chambers, fixed to the frame (a falling block bares them): [right, up] metres, one per barrel, in the order they are loaded."
+                },
+                "r": {
+                  "type": "number",
+                  "description": "Case radius, metres."
+                },
+                "bore": {
+                  "oneOf": [
+                    {
+                      "type": "boolean",
+                      "description": "True: the bore shows there when it is empty."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "True: the bore shows there when it is empty."
+                }
+              },
+              "required": [
+                "side",
+                "f",
+                "heads",
+                "r"
+              ],
+              "additionalProperties": false
             }
           ],
           "description": "Where a round shows in the chamber, as `side` says (a tagged union)."
@@ -606,6 +657,33 @@
         }
       ],
       "description": "Where the left hand cups the frame (a derringer), [forward, up, right] metres."
+    },
+    "block": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "drop": {
+              "type": "number",
+              "description": "How far the block drops, metres."
+            },
+            "lever": {
+              "type": "number",
+              "description": "How far the lever swings, radians."
+            }
+          },
+          "required": [
+            "drop",
+            "lever"
+          ],
+          "additionalProperties": false,
+          "description": "A falling-block breech (the Hailstorm): part_brk is the block, which slides straight down `drop` metres to bare the chambers, and part_lever its lever, which swings down `lever` radians (about x, at its pivot) as it does."
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "A falling-block breech (the Hailstorm): part_brk is the block, which slides straight down `drop` metres to bare the chambers, and part_lever its lever, which swings down `lever` radians (about x, at its pivot) as it does."
     },
     "magTop": {
       "oneOf": [

@@ -2,7 +2,7 @@
 // by the game for what a platform is (which archetype, its receiver style, its sights). Types only.
 // ---------------------------------------------------------------- what a recipe is given (the model spec)
 /** A weapon platform's archetype: which recipe in tools/models/recipes.ts builds it. */
-type ArchKind = 'rifle' | 'pistol' | 'revolver' | 'derringer' | 'minigun' | 'launcher' | 'railgun' | 'crossbow' | 'p90';
+type ArchKind = 'rifle' | 'pistol' | 'revolver' | 'derringer' | 'minigun' | 'launcher' | 'railgun' | 'crossbow' | 'p90' | 'pepperbox';
 /** A long gun's receiver style (rifle()'s o.rcv). */
 type RcvKind = 'ar' | 'ak' | 'aksu' | 'aug' | 'box' | 'break' | 'bullpup' | 'f2' | 'g36' | 'gm6' | 'mcx' | 'mpx' | 'qbz192' | 'qbz95' | 'round' | 'scar' | 'vector' | 'authored';
 /** A sight: the optics, and the iron sights a gun carries. */
