@@ -342,10 +342,10 @@ def mag_stanag(top):
     pm = K.part('mag', (0, top[0], top[1])); pm['check'] = {'w': 0.0228}
     R = lambda pts: RL(pts, 866, 232, top)
     HWm = 11.4 * mm
-    back = [(788, 250), (785, 316), (786, 363), (790, 395), (800, 445), (810, 481), (820, 516), (832, 548)]
+    back = [(792, 250), (792, 320), (787, 350), (786, 363), (790, 395), (800, 445), (810, 481), (820, 516), (832, 548)]
     front = [(937, 284), (946, 310), (946, 400), (960, 459), (975, 506)]   # (inside the well its front stays behind the well's front wall: x 937, 1 mm clear)
     mg = K.tmp(prism(R([(795, 232), (937, 232), (937, 284), (946, 310), (946, 400), (960, 459), (975, 506), (975, 515), (960, 522), (940, 524), (900, 536), (860, 548),
-                        (838, 553), (832, 548), (820, 516), (810, 481), (800, 445), (790, 395), (786, 363), (785, 316), (788, 250)]), 'x', -HWm, HWm))
+                        (838, 553), (832, 548), (820, 516), (810, 481), (800, 445), (790, 395), (786, 363), (787, 350), (792, 320), (792, 250)]), 'x', -HWm, HWm))   # (its back 1 mm clear of the well's back wall, x 792, down through the well)
     cut(mg, prism(R([(800, 226), (936, 226), (936, 246), (800, 246)]), 'x', -HWm + 1.0 * mm, HWm - 1.0 * mm))      # (open at the top: the follower's well)
 
     def along(poly, y):    # the face's point at photo height y, and its direction there (downward)
