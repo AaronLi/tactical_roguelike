@@ -4916,6 +4916,70 @@
   { "platform": "mcx",
    "why": "suppressor on the muzzle (mz.r556.can)",
    "build": { "barrel": "br.5.56x45.11.5", "charging": "oem.ch.ar.3", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.mcx.0", "mag": "stanag.mag.30", "muzzle": "mz.r556.can", "optic": "op.pic.0", "stock": "oem.stk.fold.1", "tac": "tac.0", "tacL": "tac.0" }
+  },
+  { "platform": "welrod",
+   "why": "default + bare + loaded + loaded-last",
+   "build": { "barrel": "welrod.barrel", "mag": "welrod.mag" }
+  },
+  { "platform": "welrod",
+   "why": "authored variant (welrod.br.short) + authored variant, loaded (welrod.br.short)",
+   "build": { "barrel": "welrod.br.short", "mag": "welrod.mag" }
+  },
+  { "platform": "welrod",
+   "why": "authored variant (welrod.mag.ext) + authored variant, loaded (welrod.mag.ext)",
+   "build": { "barrel": "welrod.barrel", "mag": "welrod.mag.ext" }
+  },
+  { "platform": "welrod",
+   "why": "authored variants together",
+   "build": { "barrel": "welrod.br.short", "mag": "welrod.mag.ext" }
+  },
+  { "platform": "maxim9",
+   "why": "default",
+   "build": { "barrel": "maxim9.barrel", "mag": "maxim9.mag", "optic": "maxim9.optic" }
+  },
+  { "platform": "maxim9",
+   "why": "bare",
+   "build": { "barrel": "maxim9.barrel", "mag": "maxim9.mag" }
+  },
+  { "platform": "maxim9",
+   "why": "loaded",
+   "build": { "barrel": "maxim9.barrel", "mag": "maxim9.mag", "optic": "maxim9.optic", "tac": "ptac.0" }
+  },
+  { "platform": "maxim9",
+   "why": "loaded-last",
+   "build": { "barrel": "maxim9.barrel", "mag": "maxim9.mag", "optic": "maxim9.optic", "tac": "ptac.3" }
+  },
+  { "platform": "maxim9",
+   "why": "lowest optic (p9.optic)",
+   "build": { "barrel": "maxim9.barrel", "mag": "maxim9.mag", "optic": "p9.optic", "tac": "ptac.0" }
+  },
+  { "platform": "maxim9",
+   "why": "tallest optic (op.pso.5)",
+   "build": { "barrel": "maxim9.barrel", "mag": "maxim9.mag", "optic": "op.pso.5", "tac": "ptac.0" }
+  },
+  { "platform": "maxim9",
+   "why": "authored optic (op.pso.2)",
+   "build": { "barrel": "maxim9.barrel", "mag": "maxim9.mag", "optic": "op.pso.2" }
+  },
+  { "platform": "maxim9",
+   "why": "authored variant (maxim9.br.short)",
+   "build": { "barrel": "maxim9.br.short", "mag": "maxim9.mag", "optic": "maxim9.optic" }
+  },
+  { "platform": "maxim9",
+   "why": "authored variant, loaded (maxim9.br.short)",
+   "build": { "barrel": "maxim9.br.short", "mag": "maxim9.mag", "optic": "maxim9.optic", "tac": "ptac.0" }
+  },
+  { "platform": "maxim9",
+   "why": "authored variant (maxim9.mag.ext)",
+   "build": { "barrel": "maxim9.barrel", "mag": "maxim9.mag.ext", "optic": "maxim9.optic" }
+  },
+  { "platform": "maxim9",
+   "why": "authored variant, loaded (maxim9.mag.ext)",
+   "build": { "barrel": "maxim9.barrel", "mag": "maxim9.mag.ext", "optic": "maxim9.optic", "tac": "ptac.0" }
+  },
+  { "platform": "maxim9",
+   "why": "authored variants together",
+   "build": { "barrel": "maxim9.br.short", "mag": "maxim9.mag.ext", "optic": "maxim9.optic", "tac": "ptac.0" }
   }
  ]
 }

@@ -732,6 +732,7 @@ const G_Gunsmith = (() => {
       own({ id: `${id}.limbs.heavy`, slot: 'limbs', mount, brand: brandA, name: `${brandA.split(' ')[0]} 200 lb heavy limbs`, price: 600, tier: 2, model: { limb: 'heavy' }, st: { vel: 22, reload: 30, weight: 0.5, ergo: -5 }, desc: 'Harder-hitting bolts. Slower to cock.' });
       own({ id: `${id}.limbs.compact`, slot: 'limbs', mount, brand: brandB, name: `${brandB.split(' ')[0]} compact limbs`, price: 400, model: { limb: 'compact' }, st: { vel: -10, reload: -20, ergo: 8, weight: -0.4 }, desc: 'Narrow and quick.' });
     }
+    if (s.authoredPistol) s.authoredPistol({ slot, factory, own, plat, def, gs, brandA, brandB }); // (an authored pistol's own barrel and magazine parts: below, AUTHORED_PISTOLS)
     // every platform with an optic slot and a ptac declared gets the frame rail
     plat.slots.sort((a: Slot, b: Slot) => ORDER.indexOf(a.slot) - ORDER.indexOf(b.slot));
     plat.ergo = CLS_ERGO[def.cls] || 50; plat.kg = (G.GUN_KG as Record<string, number>)[id] || CLS_KG[def.cls] || 3;
@@ -839,8 +840,9 @@ const G_Gunsmith = (() => {
   P('crossbow', 'crossbow', {}, { limbs: true, stock: ['precision', 'sniper'], optic: ['pic', { optic: 'reddot' }] });
 
   // anything without a platform entry (shouldn't happen) gets a bare one
-  const LATE = new Set(['qbz95', 'qbz192', 'mcx']); // (their platforms are made at the end: a part's id in a code is its place in the list)
-  for (const def of G.WEAPON_LIST) if (!PLATFORMS[def.id] && !LATE.has(def.id)) P(def.id, 'rifle', {}, {});
+  const LATE = new Set(['qbz95', 'qbz192', 'mcx']);
+  const AUTHORED_PISTOLS = new Set(['welrod', 'maxim9']); // (made after the authored parts: AUTHORED_PISTOLS below) // (their platforms are made at the end: a part's id in a code is its place in the list)
+  for (const def of G.WEAPON_LIST) if (!PLATFORMS[def.id] && !LATE.has(def.id) && !AUTHORED_PISTOLS.has(def.id)) P(def.id, 'rifle', {}, {});
   // Calibration: the weapon's tuned stats are what its default build shoots like, so each platform carries
   // the negated sum of its default parts' effects. Changing a part changes the stats relative to that.
   const STAT_KEYS = ['ergo', 'recoil', 'acc', 'hip', 'weight', 'vel', 'reload', 'rpm', 'spin'];
@@ -1487,6 +1489,37 @@ const G_Gunsmith = (() => {
     if (!p || !p.model) throw new Error(`models/parts/${r.apart}/model.json replaces "${n}", which is not in the catalogue`);
     const m = p.model as any; m.was = m.was || m.optic; m.optic = 'authored'; m.apart = r.apart; delete m.ret;
   }
+  // ------------------------------------------------------------------ pistols modelled in Blender (models/<id>/, docs/models.md "Authored pistols")
+  // (appended after the authored parts: a part's id in a code is its place in the list) Each is rcv 'authored' (its frame, slide, barrel / suppressor, grip and
+  // magazine are the model's own: tools/models/recipes.ts authoredPistol) and has the parts its model files give it: the barrel and magazine it comes with, and a
+  // VARIANT of each when a file beside the model holds one (models/<id>/<name>.glb: barrel_short.glb -> <id>.br.short, mag_ext.glb -> <id>.mag.ext). A variant's
+  // figures are the game's, PROPOSED here (the user confirms them): the stats of what it is (a shorter can: handier and louder; a longer magazine: more rounds,
+  // slower to swap). The Welrod is worked by a bolt (spec.bolt: js/player.ts boltGun, js/vmanim.ts), the Maxim 9 by its slide.
+  const authoredPistol = (v: { barrel: Record<string, any>; mag: Record<string, any> }) => (h: any) => {
+    const { slot, factory, own, plat, def, gs, brandA, brandB } = h, id = def.id as string;
+    // the barrel: the integral suppressor with its front sight (no thread: nothing screws on), and its shortened one
+    { const mount = 'br:' + id, cap0 = { barrelIn: gs.barrel, sup: true, device: 'suppressor' };
+      slot('barrel', mount, true);
+      factory('barrel', mount, { name: `${def.name} integral suppressor`, model: {}, set: Object.assign({ can: 'integral' }, cap0) });
+      for (const [name, b] of Object.entries(v.barrel)) own({ id: `${id}.br.${name}`, slot: 'barrel', mount, brand: brandA, name: b.name, price: b.price, tier: b.tier, model: { avBarrel: 'barrel_' + name }, st: b.st, set: Object.assign({ can: b.can }, cap0), desc: b.desc }); }
+    // the magazine: the one it comes with (the model's part_mag) and a longer one
+    { const mount = 'mag:' + id, cap = def.mag as number;
+      slot('mag', mount, true);
+      factory('mag', mount, { name: `${def.name} ${cap}-round magazine`, model: {}, set: { cap } });
+      for (const [name, m] of Object.entries(v.mag)) own({ id: `${id}.mag.${name}`, slot: 'mag', mount, brand: brandB, name: `${brandB.split(' ')[0]} ${m.cap}-round extended magazine`, price: m.price, tier: m.tier, model: { avMag: 'mag_' + name }, st: m.st, set: { cap: m.cap }, desc: m.desc });
+      for (const p of BY_MOUNT.get(mount) || []) p.variant = true;
+      plat.magVariants = true; }
+  };
+  // The Welrod Mk II (.32 ACP, manually cycled, integral suppressor): no slide, no optic cut, no rails; the grip is the magazine.
+  P('welrod', 'pistol', { rcv: 'authored', authored: 'welrod', bolt: 1, mag: { f: 0.0997, y: -0.0107 }, len0: 0.1056 }, { authoredPistol: authoredPistol({
+    barrel: { short: { name: 'Welrod cut-down suppressor tube (260 mm)', price: 260, tier: 1, can: 'compact', st: { ergo: 11, weight: -0.14, recoil: 3 }, desc: 'The tube cut down 70 mm, its end cap and front sight with it: handier in the hand, and louder, with a flash. Not what the Welrod was built to be.' } },
+    mag: { ext: { cap: 12, price: 80, tier: 1, st: { reload: 3, ergo: -1, weight: 0.04 }, desc: 'The grip magazine 30 mm longer: four more .32 rounds. A little slower to swap.' } } }) });
+  // The Maxim 9 (9x19, integral suppressor, slide): a pistol dot goes in its slide's optic cut, a light under the frame.
+  P('maxim9', 'pistol', { rcv: 'authored', authored: 'maxim9', mag: { f: 0.0615, y: -0.0167 }, len0: 0.1166 }, { optic: ['pso', { optic: 'notch' }], ptac: true, authoredPistol: authoredPistol({
+    barrel: { short: { name: 'Maxim 9 short suppressor (242 mm)', price: 320, tier: 2, can: 'compact', st: { ergo: 16, weight: -0.2, recoil: 4 }, desc: 'The front block off at the main seam: 94 mm shorter and far handier, a good deal louder with more flash. The long suppressor is the quiet one.' } },
+    mag: { ext: { cap: 22, price: 90, tier: 1, st: { reload: 4, ergo: -2, weight: 0.05 }, desc: 'The magazine 25 mm longer down the grip: five more rounds. A little slower to swap.' } } }) });
+  for (const id of AUTHORED_PISTOLS) { const plat = PLATFORMS[id]; plat.offset = {}; for (const k of STAT_KEYS) plat.offset[k] = -Object.values(plat.defaults).reduce((a, pid) => a + ((PARTS[pid] && PARTS[pid].st[k]) || 0), 0); }
+  PARTS['op.pso.0'].not = (PARTS['op.pso.0'].not || []).concat(['maxim9']); // (the tritium night sights: the Maxim 9 has its own irons, and a dot goes in its cut)
   const compatible = (mount: string) => BY_MOUNT.get(mount) || [];
   const FITS = new Map(); // interface -> weapon ids that have (or can get) a slot for it
   for (const plat of Object.values(PLATFORMS)) {

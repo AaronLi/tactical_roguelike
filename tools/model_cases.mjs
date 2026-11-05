@@ -15,6 +15,7 @@
 //   openers        every part that OPENS slots (railmounts, buttstock adapters, riser dots, chassis, barrels that give a handguard mount ...), fitted, with the slots it opens filled
 //   sight stack    the lowest and the tallest optic alone; a magnifier behind the lowest and behind the tallest optic that takes one
 //   pistols        each slide x each grip (the pistol chassis among them), each with a red dot
+//   variants       an authored gun's per-gun barrel and magazine files (models/<id>/<name>.glb), each alone, loaded, and all together
 //   specials       integral suppressors (barrels with the can built in), the biggest magazine and a drum, a bipod, a suppressor on the muzzle
 // Dedupe by build; a build two rules give carries both labels.
 import fs from 'fs'; import path from 'path'; import { pathToFileURL } from 'url';
@@ -134,6 +135,10 @@ export function generate(G, id) {
     const b = { ...def, optic: p.id }; delete b.magnifier; GS.prune(id, b); add(`authored optic (${p.id})`, b);
     if (p.provides && p.provides.magnifier) { const ms = slotOf(b, 'magnifier'); const m = ms && options(ms, b)[0]; if (m) add(`magnifier behind the authored optic (${p.id})`, { ...b, magnifier: m.id }); }
   } }
+  // authored variants (models/<id>/<name>.glb: a per-gun barrel or magazine): each fitted alone, with the loaded build, and all of them together
+  { const vs = Object.values(PARTS).filter((p) => p.plat === id && p.model && (p.model.avBarrel || p.model.avMag) && !p.retired);
+    for (const p of vs) { add(`authored variant (${p.id})`, { ...def, [p.slot]: p.id }); add(`authored variant, loaded (${p.id})`, { ...loaded, [p.slot]: p.id }); }
+    if (vs.length > 1) add('authored variants together', vs.reduce((b, p) => ({ ...b, [p.slot]: p.id }), { ...loaded })); }
   // specials
   const brs = slotOf(def, 'barrel');
   if (brs) for (const p of options(brs, def)) if (p.model && p.model.integral) add(`integral suppressor (${p.id})`, { ...loaded, barrel: p.id });

@@ -159,6 +159,9 @@ const G_WEAPON_LIST: WeaponDef[] = [
   W({ id: 'b92', slot: 's', cls: 'MP', tier: 1, price: 600, name: '92FS Burst', rpm: 1100, mode: 'burst', burst: 3, mag: 15, reserve: 90, reload: 1.6, spread: 2.4, ads: 0.08333, range: 20, desc: 'The Italian service pistol with a third position on the selector. Three rounds a pull.' }),
   W({ id: 'ppk', slot: 's', cls: 'PST', tier: 0, price: 250, name: 'Walther PPK', rpm: 400, mode: 'semi', mag: 7, reserve: 56, reload: 1.4, spread: 2.2, ads: 0.1, range: 14, desc: 'Slim, quiet and easy to forget about, which is the idea.' }),
   W({ id: 'fiveseven', slot: 's', cls: 'PST', tier: 2, price: 1100, name: 'Five-seveN', rpm: 450, mode: 'semi', mag: 20, reserve: 100, reload: 1.6, spread: 1.8, ads: 0.06667, range: 28, pen: 1, desc: 'Twenty rounds of 5.7 mm, flat and fast. A rifle round\'s manners in a pistol.' }),
+  // The authored pistols (models/maxim9, models/welrod). Figures modelled on the P9 / G19 / USP (9x19) and the PPK (.32 ACP): see the notes at GS and GUN_KG below.
+  W({ id: 'welrod', slot: 's', cls: 'PST', tier: 1, price: 700, name: 'Welrod Mk II', rpm: 80, mode: 'semi', action: 'bolt', mag: 8, reserve: 48, reload: 1.5, spread: 1.6, ads: 0.075, range: 16, speed: 0.97, integral: true, desc: 'The wartime assassin\'s pistol: .32 ACP, an integral suppressor and a bolt you work by hand after every shot. Slow, silent, and it does not miss much.' }),
+  W({ id: 'maxim9', slot: 's', cls: 'PST', tier: 2, price: 1200, name: 'Maxim 9', rpm: 450, mode: 'semi', mag: 17, reserve: 102, reload: 1.5, spread: 2.0, ads: 0.075, range: 20, speed: 0.95, integral: true, desc: 'A 9mm pistol with its suppressor built in: seventeen rounds, a long sight radius and a report you barely hear. Its front block comes off for a shorter, louder, handier gun.' }),
   W({ id: 'thor', slot: 's', cls: 'PST', tier: 4, price: 4500, name: 'Thor .50', rpm: 40, mode: 'semi', mag: 1, reserve: 10, reload: 3.2, spread: 3, ads: 0.03, range: 60, pen: 3, desc: 'One round of .50 BMG, in a pistol, because someone asked if it could be done. It can. Hold on.' }),
 ];
 G.WEAPON_LIST = G_WEAPON_LIST;
@@ -214,7 +217,7 @@ const G_BOLT_HOLD = new Set(['scar', 'scarl', 'g36', 'aug', 'aug9', 'tavor', 'fa
 G.BOLT_HOLD = G_BOLT_HOLD;
 const G_boltHold = (def: Record<string, any>) => {
   const P = def && G.Gunsmith && G.Gunsmith.PLATFORMS[def.id];
-  return !!P && (P.arch === 'pistol' || G.BOLT_HOLD.has(def.id) || (P.arch === 'rifle' && (P.spec.rcv || 'ar') === 'ar')); // (the AR-15 pattern: a bolt catch over the well)
+  return !!P && ((P.arch === 'pistol' && !P.spec.bolt) || G.BOLT_HOLD.has(def.id) || (P.arch === 'rifle' && (P.spec.rcv || 'ar') === 'ar')); // (the AR-15 pattern: a bolt catch over the well)
 };
 G.boltHold = G_boltHold;
 // what's in the gun, all told: the magazine (or tube) and the chamber
@@ -312,6 +315,10 @@ const G_GUN_SPECS: Record<string, any> = { // (any, not GunSpec, for the same re
   b92:      GS(4.9, 9.00, 'none', 35000, 0.40, 124, 0.40, 0.60, 'recoil', 'brass', 19),
   ppk:      GS(3.3, 7.65, 'none', 22000, 0.20, 71, 0.30, 0.40, 'blowback', 'brass', 17),
   fiveseven:GS(4.8, 5.70, 'none', 50000, 0.35, 31, 0.30, 0.50, 'blowback', 'brass', 29),
+  // (the Welrod Mk II: the PPK's .32 ACP load and case (22000 psi, 71 gr, 17 mm); a 4 in barrel (an estimate: its 330 mm tube is mostly baffles); worked by hand, so the bolt figures are the Mosin's; the integral can)
+  welrod:   GS(4.0, 7.65, 'suppressor', 22000, 0.20, 71, 0.05, 0.10, 'recoil', 'brass', 17),
+  // (the Maxim 9: the MP5SD's integral-can 9x19 load (35000 psi, 147 gr, 19 mm case, loudness 0.55) in the P9's slide (boltMass 0.45); barrel 4.38 in, the published figure)
+  maxim9:   GS(4.38, 9.00, 'suppressor', 35000, 0.35, 147, 0.45, 0.55, 'recoil', 'brass', 19),
   thor:     GS(15.0, 12.7, 'brake', 55000, 1.60, 660, 0.05, 0.05, 'recoil', 'brass', 99),
   derringer:GS(3.0, 10.9, 'none', 36000, 0.60, 240, 0.05, 0.05, 'recoil', 'brass', 33), // (.44 Magnum: one of the American Derringer Model 1's)
   tx22:     GS(4.1, 5.60, 'none', 24000, 0.10, 40, 0.15, 0.40, 'blowback', 'brass', 15),
@@ -334,7 +341,7 @@ const G_GUN_SPECS: Record<string, any> = { // (any, not GunSpec, for the same re
 };
 G.GUN_SPECS = G_GUN_SPECS;
 // (the integrally suppressed guns: which of the synth's suppressors theirs is, GunshotSynth.SUPPRESSORS)
-G.GUN_SPECS.vss.suppressor = G.GUN_SPECS.mp5sd.suppressor = 'integral';
+G.GUN_SPECS.vss.suppressor = G.GUN_SPECS.mp5sd.suppressor = G.GUN_SPECS.welrod.suppressor = G.GUN_SPECS.maxim9.suppressor = 'integral';
 
 // Suppressed fire (suppressors are muzzle parts, see js/parts.ts): damage factor and the fallback sound.
 const G_SUPPRESSOR = { snd: { f: 900, len: 0.12, boom: 0.15, vol: 0.25 } };
@@ -573,6 +580,7 @@ const G_GUN_KG: Record<string, number> = { // each gun as it comes (kg)
   pump: 3.6, dbl: 3.2, saiga: 3.6, aa12: 4.8, ksg: 3.6, slug: 3.6, benelli: 3.8, vepr: 4.0, m249: 7.5, pkm: 7.5, m60: 10.5,
   rpk: 4.8, shredder: 16, r700: 4.1, barrett: 14, gm6: 11.5, mosin: 4.0, awm: 6.5, m32: 5.3, rail: 7.5, crossbow: 3.5,
   p9: 0.75, g19: 0.7, m1911: 1.1, usp: 0.75, fiveseven: 0.75, thor: 5.4, b92: 0.97, ppk: 0.59, auto9: 1.1, deagle: 2.0, rev: 1.1, hc500: 2.0, akimbo: 0.95, derringer: 0.4,
+  welrod: 1.0, maxim9: 1.2, // (estimates: a little over a kilo for the Welrod with its tube, about 1.2 kg for the Maxim 9 with its suppressor; the P9 is 0.75)
   g18: 0.9, skorp: 1.3, mp7: 1.9, mac10: 2.8, tx22: 0.6, sawn: 2.0, judge: 0.85, pocketgl: 1.8,
 };
 G.GUN_KG = G_GUN_KG;
