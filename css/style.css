@@ -34,6 +34,10 @@ input[type=range] { padding: 0; accent-color: var(--accent); }
 
 /* ---------- screens ---------- */
 .screen { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: radial-gradient(ellipse at center, rgba(0,0,0,0.35), rgba(0,0,0,0.8)); z-index: 20; padding: 16px; overflow-y: auto; }
+/* the main menu on the right, the guns going round on the left behind it (js/menushow.ts); a shade over the menu's side only. On a narrow
+   screen it goes back to the middle. */
+#menu { justify-content: flex-end; padding-right: max(16px, 6vw); background: linear-gradient(90deg, rgba(0,0,0,0) 35%, rgba(0,0,0,0.55) 70%, rgba(0,0,0,0.8)); }
+@media (max-width: 760px) { #menu { justify-content: center; padding-right: 16px; background: rgba(0,0,0,0.55); } }
 /* the route map */
 .route-box { background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--accent); padding: 18px 22px; width: 940px; max-width: 100%; border-radius: 4px; box-shadow: 0 20px 60px rgba(0,0,0,0.6); }
 .route-title { font-size: 20px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }

@@ -1,7 +1,7 @@
 'use strict';
 // The main menu's background: the guns, one after another, each alone against black while the camera runs a couple of
 // the gear room's slow moves round it, slowed down further (js/highlights.ts tourMoves, tourPath: the same paths the highlight reel's tour
-// uses), with a fade to black between guns. The gun sits to one side of the menu's box, the side alternating gun to gun. It takes over from
+// uses), with a fade to black between guns. The gun is on the left, the menu on the right. It takes over from
 // the rotating level (js/game.ts menuBackdrop) once its first gun is in (the models arrive with the bundle: js/modelbundles.ts).
 const G_MenuShow = (() => {
   const T = THREE;
@@ -48,7 +48,7 @@ const G_MenuShow = (() => {
     S.pivot.updateMatrixWorld(true);
     const b = new T.Box3().setFromObject(g);
     S.pivot.rotation.y = YAW; S.pivot.updateMatrixWorld(true);
-    S.gun = g; S.side = -S.side;
+    S.gun = g;
     const slow = (G.Highlights.tourMoves as any[]).filter((m) => m.tempo === 'slow');
     S.moves = G.U.shuffle(Math.random, slow.slice()).slice(0, MOVES);
     S.poses = S.moves.map((m: any) => (m.keys || [m.a]).map((sh: any) => pose(b, sh)));
@@ -78,10 +78,10 @@ const G_MenuShow = (() => {
     S.veil.material.opacity = Math.max(1 - G.U.clamp(edge / FADE, 0, 1), cut * 0.85);
     return true;
   }
-  // drawn instead of the level (js/game.ts loop): the gun to the side of the menu's box, the other side each gun
+  // drawn instead of the level (js/game.ts loop): the gun on the left, the menu's box on the right (css: #menu)
   function render(r: THREE.WebGLRenderer) {
     const W = window.innerWidth, H = window.innerHeight;
-    S.cam.aspect = W / H; S.cam.setViewOffset(W, H, S.side * W * 0.27, -H * 0.02, W, H); S.cam.updateProjectionMatrix();
+    S.cam.aspect = W / H; S.cam.setViewOffset(W, H, W > 760 ? W * 0.2 : 0, -H * 0.02, W, H); // (the gun in the left half: the menu's on the right; in the middle on a narrow screen) S.cam.updateProjectionMatrix();
     r.render(S.scene, S.cam);
   }
   return { update, render, get live() { return !!(S && S.live); } };
