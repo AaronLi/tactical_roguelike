@@ -87,6 +87,9 @@ const sgChamber: Body = { ...mat('steel'), shape: 'shell', size: 9, thickness: 4
 // whose diameter is its size, which made an 18 cm carrier a 2.8 kg pot and gave every slam a
 // soft, rubbery contact. As a rod: ~0.3 kg, bright steel ring from ~1.9 kHz.
 const arCarrier: Body = { ...mat('steel'), shape: 'bar', size: 18, thickness: 12, modes: 3, irregularity: 0.7, damping: 0.5, level: 0 };
+// The carrier group as it lands: carrier + buffer pressed behind it (~0.43 kg as a steel rod,
+// ~2.7 kHz up). Heavier contact = longer, weightier landing.
+const arCarrierGroup: Body = { ...mat('steel'), shape: 'bar', size: 18, thickness: 17, modes: 3, irregularity: 0.7, damping: 0.5, level: 0 };
 const arBolt: Body = { ...mat('steel'), shape: 'bar', size: 6, thickness: 15, modes: 1, irregularity: 0.5, damping: 0.5, level: 0 };
 const arCamPin = steelBar(1.5, 5);
 const arBarrelExt = steelBlock(3, 20);
@@ -100,11 +103,53 @@ const arBufferTube: Body = { ...mat('aluminum'), shape: 'bar', size: 18, thickne
 const BUFFER_TUBE_HOUSING: Scene['housing'] = { amount: 0.8, cavity: 0.8, cavityWidth: 2.5, ...mat('aluminum'), shape: 'shell', size: 18, thickness: 2.5, modes: 0, irregularity: 0.6, damping: 0.45 };
 const arBufferSpring = springWire(25, 1.4);
 /**
- * Buffer spring strength relative to a standard carbine spring. Stiffer: faster, harder slam
- * home (and more effort and noise compressing it on the pull). 3.2 = twice a heavy "extra
- * power" spring: an explosive return.
+ * Buffer spring strength relative to a standard carbine spring (~40 N in battery, ~70 N fully
+ * back). 2 = a heavy spring: 80 N / 140 N. The forward run is simulated from this and the
+ * reciprocating mass below, so stiffer = faster and harder, heavier = slower and harder.
  */
-const BUFFER_SPRING = 3.2;
+const BUFFER_SPRING = 2.0;
+/** What moves forward together: bolt carrier group (~320 g) + buffer with weights (~140 g) + a
+ *  third of the spring (~10 g). The charging handle (~30 g) rides along on a charge. */
+const RECIP_MASS = 0.47;
+const CH_MASS = 0.03;
+
+/**
+ * Simulate the forward run: m·x'' = spring force − friction − feed drag (stripping the round
+ * over the feed lips 72→45 mm, pushing it into the chamber 28→10 mm). Returns time and speed
+ * as functions of position (mm from battery) down to the bolt face meeting the extension (9.5).
+ */
+function simulateRun(mass: number): { timeAt: (x: number) => number; speedAt: (x: number) => number; total: number; arrive: number } {
+  const F_BAT = 40 * BUFFER_SPRING;
+  const F_REAR = 70 * BUFFER_SPRING;
+  const xs: number[] = [];
+  const ts: number[] = [];
+  const vs: number[] = [];
+  let x = 90; // mm from battery
+  let v = 0;
+  let tt = 0;
+  const dt = 1e-5;
+  while (x > 9.5 && tt < 0.5) {
+    const fs = F_BAT + (F_REAR - F_BAT) * (x / 90);
+    let drag = 6;
+    if (x < 72 && x > 45) drag += 25;
+    if (x < 28 && x > 10) drag += 15;
+    v += ((fs - drag) / mass) * dt;
+    x -= v * 1000 * dt;
+    tt += dt;
+    xs.push(x); ts.push(tt); vs.push(v);
+  }
+  const look = (arr: number[], xq: number) => {
+    // xs is decreasing
+    let lo = 0;
+    let hi = xs.length - 1;
+    if (xq >= xs[0]) return arr[0];
+    if (xq <= xs[hi]) return arr[hi];
+    while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (xs[mid] > xq) lo = mid; else hi = mid; }
+    const f = (xs[lo] - xq) / (xs[lo] - xs[hi]);
+    return arr[lo] + (arr[hi] - arr[lo]) * f;
+  };
+  return { timeAt: (xq) => (xq >= 90 ? 0 : look(ts, xq)), speedAt: (xq) => look(vs, xq), total: tt, arrive: v };
+}
 const arBuffer = steelBlock(6, 18); // buffer with sliding weights
 const arCase: Body = { ...mat('brass'), shape: 'shell', size: 4.5, thickness: 0.4, modes: 1, irregularity: 0.5, damping: 0.6, level: 0 }; // held by the magazine / chamber
 // Spring-steel feed lips on the magazine body: they ring briefly (the magazine "ping").
@@ -252,27 +297,23 @@ const AR_HOUSING: Scene['housing'] = {
 
 /** The carrier running home under the buffer spring, starting at t (round in the magazine). */
 function arForward(t: number, withChargingHandle: boolean): SceneElement[] {
-  // A stiffer buffer spring drives the same carrier home faster (travel time ∝ 1/√k) and
-  // harder (speed ∝ √k): every forward time and impact scales from the reference spring.
-  // Reference timings were a ~58 ms run; a released carrier (≈0.4 kg with the buffer, 60-80 N
-  // of spring, 89 mm) gets home in ~30-36 ms at 5-6 m/s. SPRING_RUN compresses the run to that.
-  const SPRING_RUN = 0.62;
-  const T = (s: number) => (s * SPRING_RUN) / Math.sqrt(BUFFER_SPRING);
-  const V = (v: number) => v * 1.2 * Math.sqrt(BUFFER_SPRING);
+  // The run is simulated from the reciprocating mass and the spring (see simulateRun): every
+  // forward time and speed comes from it.
+  const run = simulateRun(RECIP_MASS + (withChargingHandle ? CH_MASS : 0));
+  const vArrive = run.arrive;
+  // Impact speeds were tuned against a 3.8 m/s landing; scale them to the simulated arrival.
+  const V = (v: number) => (v * vArrive) / 3.8;
+  // After-landing spacing (buffer weights, spring jolt...) in the reference run's units, scaled
+  // to this run's length.
+  const T = (s: number) => (s * run.total) / 0.055;
   // Lock-up timeline: the bolt face hits at TF, the turn takes ROT, the carrier lands at TL, and
   // everything after the landing keeps its spacing from it.
-  const TF = t + T(0.055);
+  const TF = t + run.total;
   const ROT = 0.004;
   const TL = TF + ROT + 0.0004;
   const post = (x: number) => TL + (T(x) - T(0.0578));
-  // The run, laid out by travel like the pull. Position is measured from battery (90 mm = fully
-  // back). The carrier starts from rest and speeds up the whole way under the preloaded spring:
-  // time to reach position x is  TF · f^(1/P)  with f the fraction of the run covered (to the
-  // bolt face at 9.5 mm) and P≈1.5 (between constant force, 2, and constant speed, 1).
-  const P = 1.5;
-  const RUN_MM = 90 - 9.5;
-  const fwdAt = (x: number) => t + (TF - t) * Math.pow(Math.max(0, Math.min(1, (90 - x) / RUN_MM)), 1 / P);
-  const vAt = (x: number) => (RUN_MM / 1000 / (TF - t)) * P * Math.pow(Math.max(1e-3, Math.min(1, (90 - x) / RUN_MM)), (P - 1) / P);
+  const fwdAt = (x: number) => t + run.timeAt(x);
+  const vAt = (x: number) => run.speedAt(x);
   // A contact that exists only between two positions on the way forward (x0 > x1).
   const fwdRub = (what: string, x0: number, x1: number, gainDb: number, fr: Partial<FrictionParams>, A: Body, B: Body, extra: Extra = {}): SceneElement => {
     const at = fwdAt(x0);
@@ -324,7 +365,7 @@ function arForward(t: number, withChargingHandle: boolean): SceneElement[] {
     // a fine machined texture read out as they slide round (~3.7 mm of arc).
     rub('locking lugs rotate across the extension lugs', TF + 0.0003, 2, { force: 30, duration: ROT, speed: 0.9, profile: 'steady', roughness: 25, grain: 0.05, periodicity: 0.5, contactWidth: 0.004 }, arBolt, arBreech, { housing: { amount: 0.3, cavity: 0.25 } }),
     hit('bolt lugs rotate home', TF + ROT + 0.0002, -3, V(1.5), arBolt, arBreech, { scatter: 0.3, radius: 1.5, click: 0.8, sharp: 0.95 }, { housing: { amount: 0.3, cavity: 0.25 } }),
-    hit('carrier slams onto the bolt', TL, 8, V(3.8), arCarrier, arBreech, { scatter: 0.5, radius: 3, click: 1, sharp: 0.95 }, { housing: { amount: 0.3, cavity: 0.25 } }),
+    hit('carrier slams onto the bolt', TL, 8, V(3.8), arCarrierGroup, arBarrel, { scatter: 0.5, radius: 3, click: 1, sharp: 0.95 }, { housing: { amount: 0.3, cavity: 0.25 } }),
     hit('lugs seat in the barrel extension', post(0.0579), 6, V(3.8), arBarrel, arCarrier, { scatter: 0.3, radius: 2, click: 0.8, sharp: 0.95 },
       // The receiver takes this blow too, but the lock-up is metal on metal: keep the receiver's
       // air-space "pop" small so it doesn't turn the clank into a plunger in a tube.
