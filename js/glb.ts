@@ -285,11 +285,12 @@ const GUN_MODEL_CONTRACT = { ...CONTRACT_CORE, displays: {
   what: 'AUTHORED PART. A shared attachment modelled in Blender (a sight, a prism, a scope; other slots are reserved) is baked straight from its .glb: models/parts/<slot>/<id>/<id>.glb plus models/parts/<slot>/<id>/model.json. It is ONE object, the same file on every gun whose mount takes it; everything gun-specific under it (the rail section, a riser) is the gun\'s mount piece (tag `optic@mount`), never part of the model. `npm run check:models -- models/parts/<slot>/<id>/<id>.glb` validates one; `npm run check:models -- --write` regenerates its catalogue entry.',
   frame: 'THE PART\'S OWN FRAME. Metres, the glTF axes (x right, y up, z = -forward); anchors are written [forward, up, right] = [-z, y, x] like everywhere in the contract. For an optic (the only slot defined) the ORIGIN is on the top of the rail, at the optic\'s mount point, centred (right = 0): the plane the optic\'s foot rests on, so no vertex is below y = 0 (the rail, riser or adapter is the mount piece\'s). The recipe places it at the gun\'s rail top and the platform\'s optic position (spec optF) and the baker finds that it only translates.',
   model: 'The .glb has ONE root node named after the part (the folder name), no extras.info and no part_ nodes; its children are meshes "<slot>_<n>" (the slot\'s name: optic) with extras.slot and a catalogue material name (or display surfaces, as in the contract). Triangles outside the sight: none. Geometry limits for an optic: within 0.12 m either side of the origin forward and 0.04 m left/right, up to 0.15 m high.',
-  config: 'model.json: { "source": "authored", "kind": "part", "slot": "optic", "frame": "rail-top", "optic": { sy, fSight, relief, reflex?, pip?, magnifier?, height }, "part": { mount, brand, name, price, tier, zoom, st, desc?, scoped?, reticle?, px?, levels? } }. The catalogue id is derived: `op.auth.<id>`.',
+  config: 'model.json: { "source": "authored", "kind": "part", "slot": "optic", "frame": "rail-top", "optic": { sy, fSight, relief, reflex?, pip?, magnifier?, height }, "part": { mount, brand, name, price, tier, zoom, st, desc?, scoped?, reticle?, px?, levels? } }. The catalogue id is derived: `op.auth.<id>`. A REPLACE-ONLY part has "replaces": [entry names] instead of "part" (see rules).',
   optic: {
     sy: 'Height of the line of sight above the origin, metres (info.sy = the rail top + this). A reflex window\'s centre height must equal it.',
     fSight: 'Forward position of the sight\'s rear/eye reference, metres from the origin (info.fSight = the mount point + this); with relief it places the aiming eye.',
-    relief: 'Eye relief, metres (0.03 to 0.4).',
+    relief: 'Eye relief, metres (0.03 to 0.4); on a rifle riser (a mount piece under the part) optic.reliefOnRiser instead, when given.',
+    reliefOnRiser: 'Optional: the eye relief when the part sits on a riser (a pistol dot lifted to a rifle sight line), metres (0.03 to 0.4). Eye relief belongs to the mount, not the file: a pistol cut and a riser put the eye at different distances.',
     reflex: 'A reflex or holographic sight\'s window { f, y, w, h, round?, kind: dot|dotG|cdot|holo }, centre [forward, up] and size, in the part\'s frame (becomes info.reflex shifted to the gun). The game draws a collimated reticle behind it; it lies inside the model\'s bounds and y equals sy.',
     pip: 'A scope\'s ocular lens { f, y, r } in the part\'s frame (becomes info.pip): a magnified sight needs it and the part\'s zoom/reticle/px (set.scoped). y equals sy.',
     magnifier: 'true when a magnifier goes behind it (a reflex sight with a window); the gun gets the anchor mount_magnifier [fSight, sy, 0].',
@@ -299,6 +300,8 @@ const GUN_MODEL_CONTRACT = { ...CONTRACT_CORE, displays: {
   rules: [
     'The same part is the same file on every gun: the model never depends on a gun. Nothing is stretched.',
     'Bounds, origin and window are checked on the file (tools/authored_parts.mjs): a vertex below the rail top, a window outside the model, a window not on the sight line and an unknown material are errors that name the mesh and the number.',
+    'MOUNTS. op:pic: the origin is the top of the rail at the optic\'s mount point. op:pso (the pistol optic cut): the origin is the top of the slide at the optic\'s mount point, the plane the foot rests on, so the same file also sits on a riser (the pistol optic riser, or a riser dot on a rifle: the riser is the gun\'s mount piece `optic@mount`, the part sits on its top). A pistol takes the part at 0.32 x the factory slide length from the slide\'s rear on the factory slide\'s top, whatever slide is fitted.',
+    'REPLACE-ONLY (`"replaces": ["<entry name>", ...]` instead of `"part"`): the file becomes the model of existing catalogue entries (matched by their exact name in js/parts.ts); ids, stats, prices, tiers, mounts, build codes and what they open stay as they are, the generated block adds no part. An entry that uses a riser keeps its riser as the mount piece. Entries that are not listed (another pistol dot that shares the old model) keep the old model.',
     'On a gun with TASK-3 mount pieces the rail under the part is `optic@mount`; the part\'s own meshes are the `optic` pack and are shared across guns by content.',
   ],
   example: { name: 'falcon', extras: {}, child: { name: 'optic_1', extras: { slot: 'optic' }, material: 'black' }, model_json: { source: 'authored', kind: 'part', slot: 'optic', frame: 'rail-top', optic: { sy: 0.0285, fSight: -0.026, relief: 0.09, reflex: { f: 0.0135, y: 0.0285, w: 0.026, h: 0.026, kind: 'dot' }, magnifier: true, height: 'low' } } },
@@ -670,7 +673,7 @@ function validateAuthored(model: ModelDesc, id?: string, opts: { factory?: strin
 }
 
 // ---- authored parts (GUN_MODEL_CONTRACT.authoredParts): a shared attachment modelled in Blender
-const AUTHORED_PART_SLOTS: Record<string, { mounts: string[] }> = { optic: { mounts: ['op:pic'] } };
+const AUTHORED_PART_SLOTS: Record<string, { mounts: string[] }> = { optic: { mounts: ['op:pic', 'op:pso'] } };
 const RETICLES = ['dot', 'dotG', 'cdot', 'holo'], SCOPE_RETICLES = ['cross', 'chevron', 'lpvo', 'ring'];
 /** model.json of an authored part, checked: the shape, the ranges, and that the sight data agrees with itself (window on the sight line...). id: the folder name. */
 function validateAuthoredPartConfig(cfg: any, id?: string): string[] {
@@ -681,12 +684,18 @@ function validateAuthoredPartConfig(cfg: any, id?: string): string[] {
   if (!(cfg.slot in AUTHORED_PART_SLOTS)) E(`"slot" is ${JSON.stringify(cfg.slot)}, expected one of ${Object.keys(AUTHORED_PART_SLOTS).join(', ')}`);
   if (cfg.frame !== 'rail-top') E(`"frame" is ${JSON.stringify(cfg.frame)}, expected "rail-top" (the origin is the top of the rail at the optic's mount point)`);
   if (id !== undefined && !/^[a-z][a-z0-9_]*$/.test(id)) E(`the folder name "${id}" must be lower-case letters, digits and underscores (it makes the part id op.auth.${id})`);
-  for (const k of Object.keys(cfg)) if (!['source', 'kind', 'slot', 'frame', 'optic', 'part'].includes(k)) E(`unknown field "${k}"`);
-  const o = cfg.optic, p = cfg.part;
+  for (const k of Object.keys(cfg)) if (!['source', 'kind', 'slot', 'frame', 'optic', 'part', 'replaces'].includes(k)) E(`unknown field "${k}"`);
+  const o = cfg.optic, p = cfg.part, rep = cfg.replaces;
+  if (rep !== undefined) { // a REPLACE-ONLY part: it gives existing catalogue entries a new model and adds no part of its own
+    if (p !== undefined) E('"replaces" and "part" are exclusive: a part either adds a catalogue entry ("part") or gives existing entries its model ("replaces")');
+    if (!Array.isArray(rep) || !rep.length || !rep.every((n: any) => typeof n === 'string' && n.trim())) E('"replaces": expected a non-empty list of catalogue entry names (the names in js/parts.ts, e.g. "Halcyon Ember pistol dot")');
+    else if (new Set(rep).size !== rep.length) E('"replaces": an entry is named twice');
+  }
   if (!isObj(o)) E('"optic" is missing ({ sy, fSight, relief, reflex?, pip?, magnifier?, height })');
   else {
     const num = (k: string, lo: number, hi: number) => { if (!isNum(o[k])) E(`optic.${k}: expected a number (metres), got ${JSON.stringify(o[k])}`); else if (o[k] < lo || o[k] > hi) E(`optic.${k}: ${o[k]} is out of range (${lo} to ${hi} m)`); };
     num('sy', 0.005, 0.12); num('fSight', -0.2, 0.2); num('relief', 0.03, 0.4);
+    if (o.reliefOnRiser !== undefined) num('reliefOnRiser', 0.03, 0.4);
     if (!['low', 'mid', 'high'].includes(o.height)) E(`optic.height: ${JSON.stringify(o.height)} must be low, mid or high`);
     if (o.magnifier !== undefined && typeof o.magnifier !== 'boolean') E('optic.magnifier: expected true/false');
     if (o.reflex === undefined && o.pip === undefined) E('optic needs a reflex window or a pip lens (it is the picture the sight shows)');
@@ -713,9 +722,10 @@ function validateAuthoredPartConfig(cfg: any, id?: string): string[] {
       }
     }
     if (o.magnifier === true && o.reflex === undefined) E('optic.magnifier is true but there is no reflex window: a magnifier goes behind a reflex sight');
-    for (const k of Object.keys(o)) if (!['sy', 'fSight', 'relief', 'reflex', 'pip', 'magnifier', 'height'].includes(k)) E(`optic: unknown field "${k}"`);
+    for (const k of Object.keys(o)) if (!['sy', 'fSight', 'relief', 'reliefOnRiser', 'reflex', 'pip', 'magnifier', 'height'].includes(k)) E(`optic: unknown field "${k}"`);
   }
-  if (!isObj(p)) E('"part" is missing ({ mount, brand, name, price, tier, zoom, st })');
+  if (rep !== undefined) { /* replace-only: the entries keep their ids, stats, prices, tiers and mounts */ }
+  else if (!isObj(p)) E('"part" is missing ({ mount, brand, name, price, tier, zoom, st }) (or "replaces": [entry names] to give existing entries this model)');
   else {
     const spec = AUTHORED_PART_SLOTS[cfg.slot];
     if (spec && !spec.mounts.includes(p.mount)) E(`part.mount: ${JSON.stringify(p.mount)} must be one of ${spec.mounts.join(', ')}`);
