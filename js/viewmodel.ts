@@ -37,53 +37,63 @@ const G_Viewmodel = (() => {
   // ---------------------------------------------------------------- reflex reticles
   // A reflex sight's reticle is collimated: it sits at infinity along the sight's axis, so it points where the
   // gun points, not where the glass is, and you only see it through the window. It's drawn as a glowing plane
-  // a few metres down the axis, masked by the stencil to the sight's window (the window mesh writes 1; hands
-  // or the housing in front of the window keep it at 0).
-  const RETICLE_D = 6;
-  const texCache: Record<string, THREE.CanvasTexture> = {};
-  function reticleTex(kind: string) {
-    if (texCache[kind]) return texCache[kind];
-    const N = kind === 'holo' || kind === 'cdot' ? 256 : 128, c = document.createElement('canvas');
-    c.width = c.height = N;
-    const g = c.getContext('2d')!, m = N / 2;
-    if (kind === 'holo') {
-      // 68 MOA ring with tick marks and a centre dot, laser-red, with the grain of a hologram
-      g.shadowColor = 'rgba(255,40,25,1)'; g.shadowBlur = 7;
-      g.strokeStyle = 'rgba(255,95,75,1)'; g.lineWidth = 4;
-      g.beginPath(); g.arc(m, m, 100, 0, Math.PI * 2); g.stroke();
-      g.lineWidth = 5;
-      for (let i = 0; i < 4; i++) { const a = (i * Math.PI) / 2; g.beginPath(); g.moveTo(m + Math.cos(a) * 100, m + Math.sin(a) * 100); g.lineTo(m + Math.cos(a) * 84, m + Math.sin(a) * 84); g.stroke(); }
-      g.fillStyle = 'rgba(255,225,215,1)'; g.beginPath(); g.arc(m, m, 8, 0, Math.PI * 2); g.fill();
-      const img = g.getImageData(0, 0, N, N), d = img.data;
-      for (let i = 3; i < d.length; i += 4) d[i] *= 0.62 + Math.random() * 0.38;
-      g.putImageData(img, 0, 0);
-    } else if (kind === 'cdot') {
-      // a 65 MOA circle round a 2 MOA dot: a clean LED ring
-      g.shadowColor = 'rgba(255,40,25,1)'; g.shadowBlur = 6;
-      g.strokeStyle = 'rgba(255,90,70,1)'; g.lineWidth = 4;
-      g.beginPath(); g.arc(m, m, 98, 0, Math.PI * 2); g.stroke();
-      g.fillStyle = 'rgba(255,225,215,1)'; g.beginPath(); g.arc(m, m, 7, 0, Math.PI * 2); g.fill();
-    } else if (kind === 'dotP') {
-      // a precision dot (a small-dot RMR-class sight): a crisp hot core about 2 mrad across, a thin red rim, barely any halo
-      const grd = g.createRadialGradient(m, m, 0, m, m, m);
-      grd.addColorStop(0, 'rgba(255,248,244,1)'); grd.addColorStop(0.1, 'rgba(255,150,130,1)'); grd.addColorStop(0.14, 'rgba(255,50,35,0.85)');
-      grd.addColorStop(0.2, 'rgba(255,25,15,0.12)'); grd.addColorStop(0.32, 'rgba(0,0,0,0)'); grd.addColorStop(1, 'rgba(0,0,0,0)');
-      g.fillStyle = grd; g.fillRect(0, 0, N, N);
-    } else {
-      // an LED dot: a hot near-white core bleeding to red (or green), with a soft halo
-      const grn = kind === 'dotG', c1 = grn ? 'rgba(235,255,235,1)' : 'rgba(255,245,240,1)', c2 = grn ? 'rgba(110,255,120,1)' : 'rgba(255,120,100,1)';
-      const c3 = grn ? 'rgba(40,255,60,0.75)' : 'rgba(255,45,30,0.75)', c4 = grn ? 'rgba(20,255,40,0.16)' : 'rgba(255,25,15,0.16)';
-      const grd = g.createRadialGradient(m, m, 0, m, m, m);
-      grd.addColorStop(0, c1); grd.addColorStop(0.16, c2); grd.addColorStop(0.26, c3);
-      grd.addColorStop(0.45, c4); grd.addColorStop(1, 'rgba(0,0,0,0)');
-      g.fillStyle = grd; g.fillRect(0, 0, N, N);
-    }
-    const t = new T.CanvasTexture(c);
-    t.minFilter = T.LinearMipmapLinearFilter;
-    return (texCache[kind] = t);
-  }
-  // angular size (radians) of the whole reticle texture: dot core about 3.5 mrad, dotP's about 2 mrad, holo ring 50 mrad across
-  const RETICLE_RAD: Record<string, number> = { dot: 0.028, dotG: 0.028, dotP: 0.016, holo: 0.064, cdot: 0.062 };
+  // far down the axis (RETICLE_D: far enough that a few centimetres of eye movement shift it by a hair, so it stays
+  // on the target while the head or the gun sways, and slides across the window instead of being painted on the
+  // glass), masked by the stencil to the sight's window (the window mesh writes 1; hands or the housing in front of
+  // the window keep it at 0). The window's edge clips it, so a reticle off to one side is cut by the frame.
+  // It's drawn by a shader in screen pixels from its size in minutes of angle, so a 2 MOA dot is 2 MOA at the
+  // view model's field of view (never less than 1.5 px, so it can't vanish) and a ring is its true size.
+  const RETICLE_D = 200;
+  const MOA = Math.PI / 10800, MIN_DOT_PX = 1.5;
+  // per kind: dot diameter and ring diameter (MOA, 0 = none), 1 = ticks on the ring, the colour of the glow, the hot core
+  const RETICLES: Record<string, { dot: number; ring: number; ticks: number; col: number[]; core: number[] }> = {
+    dot: { dot: 2, ring: 0, ticks: 0, col: [1, 0.12, 0.08], core: [1, 0.55, 0.5] },
+    dotG: { dot: 2, ring: 0, ticks: 0, col: [0.1, 1, 0.2], core: [0.55, 1, 0.6] },
+    dotP: { dot: 1, ring: 0, ticks: 0, col: [1, 0.12, 0.08], core: [1, 0.6, 0.55] },
+    cdot: { dot: 2, ring: 32, ticks: 0, col: [1, 0.15, 0.1], core: [1, 0.55, 0.5] },
+    holo: { dot: 1, ring: 65, ticks: 1, col: [1, 0.2, 0.15], core: [1, 0.55, 0.5] },
+  };
+  const RETICLE_VERT = `
+    uniform float spanPx; uniform float pxPerTan; varying vec2 vP;
+    void main() {
+      // the plane is a quad of spanPx screen pixels centred on the reticle's point, at whatever depth it is
+      vec4 mv = modelViewMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+      mv.xy += position.xy * (spanPx / pxPerTan) * -mv.z;
+      vP = position.xy * spanPx;
+      gl_Position = projectionMatrix * mv;
+    }`;
+  const RETICLE_FRAG = `
+    uniform float dotMOA; uniform float ringMOA; uniform float ticks; uniform float holo; uniform float t;
+    uniform vec3 col; uniform vec3 core; uniform float pxPerTan; varying vec2 vP;
+    float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+    void main() {
+      float moaPx = ${MOA} * pxPerTan, r = length(vP), a = 0.0, occ = 0.0, hot = 0.0;
+      // the dot: its true size, a floor of MIN_DOT_PX across, a hot core and a soft glow round it
+      float dr = max(dotMOA * moaPx * 0.5, ${MIN_DOT_PX / 2});
+      float body = 1.0 - smoothstep(dr - 0.5, dr + 0.5, r);
+      float glow = exp(-max(r - dr, 0.0) / (dr * 1.6 + 1.2)) * 0.32;
+      a = max(body, glow); occ = body; hot = body;
+      if (ringMOA > 0.0) {
+        float R = ringMOA * moaPx * 0.5, hw = max(0.5 * moaPx * 0.5, 0.65);
+        float d = abs(r - R);
+        float line = 1.0 - smoothstep(hw - 0.5, hw + 0.5, d);
+        if (ticks > 0.5) { // four ticks pointing in from the ring: left, right, up, down
+          vec2 q = abs(vP); float tk = (1.0 - smoothstep(hw - 0.5, hw + 0.5, min(q.x, q.y))) * step(R * 0.74, r) * step(r, R);
+          line = max(line, tk);
+        }
+        float bloom = exp(-d / 3.0) * 0.28;
+        float s = 1.0;
+        if (holo > 0.5) {
+          // a hologram's speckle: the laser's grain, twinkling a little, on the ring (a lit dot doesn't have it)
+          float n = hash(floor(gl_FragCoord.xy * 0.75) + floor(t * 9.0));
+          s = 0.62 + 0.38 * n; bloom *= 0.8 + 0.4 * hash(floor(gl_FragCoord.xy * 0.5) + 7.0);
+        }
+        a = max(a, max(line * s, bloom)); occ = max(occ, line * s);
+      }
+      vec3 c = mix(col, core, hot);
+      // premultiplied: the lit parts cover what's behind them (a red dot shows on a bright sky too), the glow only adds
+      gl_FragColor = vec4(c * clamp(a, 0.0, 1.0), clamp(occ, 0.0, 1.0) * 0.9);
+    }`;
   function reflex(g: THREE.Object3D, o: VmReflex) {
     const mask = new T.Mesh(o.round ? new T.CircleGeometry(o.w / 2, 28) : new T.PlaneGeometry(o.w, o.h), new T.MeshBasicMaterial({
       colorWrite: false, depthWrite: false, transparent: true, side: T.DoubleSide,
@@ -92,14 +102,22 @@ const G_Viewmodel = (() => {
     mask.position.set(0, o.y, -o.f);
     mask.renderOrder = 20;
     g.add(mask);
-    const size = RETICLE_D * RETICLE_RAD[o.kind];
-    const ret = new T.Mesh(new T.PlaneGeometry(size, size), new T.MeshBasicMaterial({
-      map: reticleTex(o.kind), transparent: true, blending: T.AdditiveBlending, depthTest: false, depthWrite: false,
+    const k = RETICLES[o.kind] || RETICLES.dot;
+    const u = { pxPerTan: { value: 1000 }, spanPx: { value: 48 }, dotMOA: { value: k.dot }, ringMOA: { value: k.ring }, ticks: { value: k.ticks }, holo: { value: o.kind === 'holo' ? 1 : 0 }, t: { value: 0 }, col: { value: new T.Vector3(...k.col) }, core: { value: new T.Vector3(...k.core) } };
+    const mat = new T.ShaderMaterial({
+      uniforms: u, vertexShader: RETICLE_VERT, fragmentShader: RETICLE_FRAG, transparent: true, blending: T.CustomBlending, blendEquation: T.AddEquation, blendSrc: T.OneFactor, blendDst: T.OneMinusSrcAlphaFactor, depthTest: false, depthWrite: false, toneMapped: false,
       stencilWrite: true, stencilRef: 1, stencilFunc: T.EqualStencilFunc, stencilFail: T.KeepStencilOp, stencilZFail: T.KeepStencilOp, stencilZPass: T.KeepStencilOp,
-    }));
+    });
+    const ret = new T.Mesh(new T.PlaneGeometry(1, 1), mat);
     ret.position.set(0, o.y, -(o.f + RETICLE_D));
     ret.renderOrder = 21;
     ret.frustumCulled = false;
+    // pixels per unit of tangent at this view model's field of view; the quad covers the ring and a margin for the glow
+    ret.onBeforeRender = (r: THREE.WebGLRenderer, _s: THREE.Scene, cam: THREE.Camera) => {
+      const ppt = (r.getDrawingBufferSize(new T.Vector2()).y / 2) * (cam as THREE.PerspectiveCamera).projectionMatrix.elements[5];
+      u.pxPerTan.value = ppt; u.t.value = performance.now() / 1000;
+      u.spanPx.value = Math.max(k.ring * MOA * ppt * 1.3 + 16, 48);
+    };
     g.add(ret);
   }
 
