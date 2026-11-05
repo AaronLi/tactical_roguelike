@@ -59,6 +59,32 @@ const G_Shop = {
     return s;
   },
   scaleStock(s: ShopStock, n: number) { const o: ShopStock = {}; for (const k in s) o[k] = s[k] * Math.max(1, n); return o; },
+  // The parts you've starred (from the gunsmith's lists or here): kept with the rest of what's saved in the browser, so a
+  // reload keeps them. A bought part stays starred (you may want a second, or a spare) until you unstar it.
+  wishSet: null as Set<string> | null,
+  wishes() {
+    if (!this.wishSet) { const v = G.U.store.get('wishlist', []); this.wishSet = new Set(Array.isArray(v) ? v.filter((x: unknown) => typeof x === 'string') : []); }
+    return this.wishSet;
+  },
+  wished(id: string) { return this.wishes().has(id); },
+  toggleWish(id: string) {
+    const w = this.wishes();
+    if (!w.delete(id)) w.add(id);
+    G.U.store.set('wishlist', [...w]);
+    return w.has(id);
+  },
+  // the star on a part: lit when it's on the wishlist
+  star(id: string) { const on = this.wished(id); return `<button class="wish${on ? ' on' : ''}" data-wish="${id}" title="${on ? 'On your wishlist (click to remove)' : 'Add to your wishlist (you are told when it is in the store)'}">${on ? '★' : '☆'}</button>`; },
+  // the starred parts on the shelves right now (the gunsmith's and Timberline's showcase), by name
+  wishInStock(): string[] {
+    const ids = new Set<string>([...(this.partStock || []), ...(this.precStock || [])] as string[]);
+    return [...ids].filter((id) => this.wished(id) && this.inStock('part:' + id) && G.Gunsmith.PARTS[id]).map((id) => G.Gunsmith.PARTS[id].name);
+  },
+  // told when a visit's stock has starred parts in it (the hangar's welcome, js/game.ts)
+  wishNotice() {
+    const n = this.wishInStock();
+    if (n.length) G.HUD.toast('★ ON YOUR WISHLIST, IN STOCK', G.U.esc(n.slice(0, 4).join(', ')) + (n.length > 4 ? ` and ${n.length - 4} more` : ''), 6);
+  },
   count(key: string) { return (this.stock && this.stock[key]) || 0; },
   inStock(key: string) { return this.count(key) > 0; },
   // the host's count, whenever it changes (someone bought something, or put it back)
@@ -309,8 +335,8 @@ const G_Shop = {
     const Me = G.Me, GS = G.Gunsmith, ids = GS.fitsPart(p);
     const yours = ['p', 's'].map((k) => Me.weapons[k]).filter(Boolean)
       .map((w) => `<span class="${ids.includes(w.def.id) ? 'fit-y' : 'fit-n'}">${ids.includes(w.def.id) ? '✓' : '✗'} ${w.def.name}</span>`).join(' ');
-    return `<div class="card part">
-      <div class="ch"><span class="cn">${G.U.esc(p.name)}</span><span class="tier">${GS.SLOT_LABEL[p.slot]}</span></div>
+    return `<div class="card part${this.wished(p.id) ? ' wished' : ''}">
+      <div class="ch"><span class="cn">${this.star(p.id)}${G.U.esc(p.name)}</span><span class="tier">${GS.SLOT_LABEL[p.slot]}</span></div>
       <div class="cd"><small class="brand">${G.U.esc(p.brand)}</small> ${G.U.esc(p.desc || '')}</div>
       <div class="gs-pe">${G.GunsmithUI.partEffects(p, (['p', 's'].map((k) => Me.weapons[k]).filter(Boolean).find((w) => ids.includes(w.def.id)) || { def: { id: null } }).def.id) || ''}</div>
       <div class="fits">Fits: ${G.U.esc(GS.ifaceName(p.mount))} (${ids.length} weapon${ids.length === 1 ? '' : 's'})<br>${yours}</div>
@@ -420,7 +446,7 @@ const G_Shop = {
     let html = '';
     const O = this.offers;
     if (this.tab === 'stock') html = O.ammo.map((o: ShopAmmo) => this.ammoCard(o)).join('') + O.gear.map((id: string) => this.gearCard(G.Gear.DEFS[id])).join('') +
-      [...(this.partStock || [])].map((id) => this.partCard(G.Gunsmith.PARTS[id as string])).join('') +
+      [...(this.partStock || [])].sort((a, b) => +this.wished(b as string) - +this.wished(a as string)).map((id) => this.partCard(G.Gunsmith.PARTS[id as string])).join('') +
       `<h3 class="shop-sub">Pouches and magazines</h3>` + O.pouches.map((o: { id: string }) => this.pouchCard(o.id)).join('') + O.mags.map((o: { id: string }) => this.magCard(o.id)).join('');
     else if (this.tab === 'svc') html = this.services().map((s: ShopService) => `<div class="card">
         <div class="ch"><span class="cn">${s.name}</span></div>${s.sel || ''}<div class="cd">${s.desc}</div>
@@ -460,6 +486,8 @@ const G_Shop = {
     items.addEventListener('click', (e) => {
       if (this.tab === 'gunsmith') return G.GunsmithUI.onClick(e);
       if (this.tab === 'zero') return G.ZeroUI.onClick(e);
+      const wb = (e.target as Element).closest<HTMLElement>('[data-wish]');
+      if (wb) { this.toggleWish(wb.dataset.wish!); G.Audio.click(); this.render(); return; }
       const b = (e.target as Element).closest<HTMLButtonElement>('.buy');
       if (b && !b.disabled) this.buy(b.dataset.k!, b.dataset.id!);
     });

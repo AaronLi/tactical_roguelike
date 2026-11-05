@@ -824,3 +824,8 @@ i.c.heavy { background: #a02828; } i.c.light { background: #7a3a30; } i.c.frac {
 .hl-row .hl-prog i { display: block; height: 100%; width: 0; background: var(--accent); transition: width 0.25s; }
 .hl-row .hl-msg { flex: 1 1 100%; font: 12px var(--mono); color: var(--dim); }
 .hl-row .hl-msg.bad { color: var(--bad); }
+
+/* the wishlist star on a part (js/shop.ts wished/star): lit on starred parts, which also get an accent outline */
+.wish { background: none; border: 0; padding: 0 calc(6px * var(--ik, 1)) 0 0; color: var(--dim); font-size: calc(16px * var(--ik, 1)); line-height: 1; cursor: pointer; vertical-align: middle; }
+.wish:hover, .wish.on { color: #ffd24a; }
+.card.wished, .gs-part.wished { border-color: #ffd24a; box-shadow: 0 0 0 1px rgba(255,210,74,0.55); }
