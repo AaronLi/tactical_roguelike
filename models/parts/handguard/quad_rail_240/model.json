@@ -33,14 +33,7 @@
     }
   },
   "replaces": [
-    {
-      "mount": "hg:ar",
-      "model": {
-        "hg": {
-          "t": "rail",
-          "len": 0.24
-        }
-      }
-    }
+    "Brightline 9.4\" quad rail handguard",
+    "Brightline 9.4\" quad rail handguard (FDE)"
   ]
 }

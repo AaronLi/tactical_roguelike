@@ -53,10 +53,12 @@ write_part('stock', 'kestrel_cs4', slot_meshes('stock'), (0.0, 0.0),
 # ---- the grip (the modern polymer one): its origin is the gun's mount_grip
 GA = g['la']['grip']
 write_part('grip', 'paragon_pg23', slot_meshes('grip'), GA, {'grip': [-0.04, -0.04, 0]},
-           {'part': {'mount': 'ar'}, 'replaces': ['Paragon PG-23 ergonomic grip',
-                                                   # (and the standard-issue AR grip "that matches the furniture": on an AR grip mount it is drawn in
-                                                   # polymer, the same grip, so the model; docs/models.md "replaces by match")
-                                                   {'mount': 'gr:ar', 'model': {'gripT': 'ar', 'gm': None}}]})
+           {'part': {'mount': 'ar'}, 'replaces': ['Paragon PG-23 ergonomic grip']})
+# ---- the A2 grip (finger swell, chequered panels): built on its own at the same mount
+before = slot_meshes('grip')
+g['grip_a2'](GA)
+write_part('grip', 'brightline_a2', slot_meshes('grip') - before, GA, {'grip': [-0.04, -0.04, 0]},
+           {'part': {'mount': 'ar'}, 'replaces': ['Brightline A2 pistol grip (matches the furniture)']})  # (the catalogue's name for the standard-issue AR grip)
 
 # ---- the birdcage: its origin is the gun's mount_muzzle
 MZ0, MUZ = g['MZ0'], g['MUZ']
@@ -68,9 +70,7 @@ HG0, HB_B = g['HG0'], g['HB_B']
 def rails(L): return {'top': r4([0, L - 2 * mm]), 'bottom': r4([0.010, L - 2 * mm]), 'left': r4([0.012, L - 2 * mm]), 'right': r4([0.012, L - 2 * mm])}
 L = g['HG1'] - HG0
 write_part('handguard', 'quad_rail_240', slot_meshes('handguard'), (HG0, 0.0), {'support': r4([L / 2 + 0.03, HB_B - 6 * mm, 0])},
-           {'part': {'t': 'rail', 'len': round(L, 4), 'rails': rails(L)}, 'replaces': [
-               # (the factory rail, no catalogue name: every AR-mount handguard that is a 0.24 m quad rail, in black or the SCAR's FDE)
-               {'mount': 'hg:ar', 'model': {'hg': {'t': 'rail', 'len': 0.24}}}]})
+           {'part': {'t': 'rail', 'len': round(L, 4), 'rails': rails(L)}, 'replaces': ['Brightline 9.4\" quad rail handguard', 'Brightline 9.4\" quad rail handguard (FDE)']})  # (and the same rail in FDE, the SCAR's)
 before = slot_meshes('handguard')
 L = 0.300
 g['handguard_quad'](HG0, HG0 + L)

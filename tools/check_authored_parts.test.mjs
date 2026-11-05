@@ -85,7 +85,8 @@ fconf('stock/kestrel_cs4', 'sight data on a stock', (c) => { c.optic = { sy: 0.0
 fconf('stock/kestrel_cs4', 'no part data', (c) => { delete c.part; }, /"part" is missing: the stock's own data/);
 fconf('stock/kestrel_cs4', 'an unknown part field', (c) => { c.part.colour = 'red'; }, /part: unknown field "colour"/);
 fconf('stock/kestrel_cs4', 'furniture always replaces', (c) => { delete c.replaces; }, /"replaces": expected a non-empty list .*always replace-only/);
-fconf('grip/paragon_pg23', 'the PG-23 (a name and a match) is valid', () => {}, null);
+fconf('grip/paragon_pg23', 'the PG-23 is valid', () => {}, null);
+fconf('grip/paragon_pg23', 'a match is a valid replace', (c) => { c.replaces.push({ mount: 'gr:ar', model: { gripT: 'ar', gm: 'polymer' } }); }, null);
 fconf('grip/paragon_pg23', 'a match with no model', (c) => { c.replaces = [{ mount: 'gr:ar' }]; }, /"replaces": expected a non-empty list/);
 fconf('muzzle/ironvale_a2_556', 'the A2 is valid', () => {}, null);
 fconf('muzzle/ironvale_a2_556', 'muzzles not a list of points', (c) => { c.anchors.muzzles = [0.05, 0, 0]; }, /anchors\.muzzles: expected \[\[forward, up, right\], \.\.\.\]/);
@@ -112,13 +113,16 @@ FG('handguard/ironvale_ir12', 'the support off the handguard', () => {}, /anchor
   const byName = (n) => Object.values(P).find((q) => q.name === n).id;
   run('the Kestrel CS-4 (the Mk18\'s, AR-9\'s, Benelli\'s factory stock) has the model', has(byName('Kestrel CS-4 carbine stock'), 'apStock', 'stock/kestrel_cs4'), null);
   run('the IR-12 (the HK416\'s factory rail) has the model', has(Gm.Gunsmith.PLATFORMS.hk416.defaults.handguard, 'apHg', 'handguard/ironvale_ir12'), null);
-  run('the Mk18\'s factory 9.4" rail has the model (a match)', has(Gm.Gunsmith.PLATFORMS.m4.defaults.handguard, 'apHg', 'handguard/quad_rail_240'), null);
+  run('the Mk18\'s factory 9.4" rail has the model', has(Gm.Gunsmith.PLATFORMS.m4.defaults.handguard, 'apHg', 'handguard/quad_rail_240'), null);
   run('the FDE 9.4" rail has it too, in its finish', Object.values(P).filter((q) => q.slot === 'handguard' && q.model && q.model.hg && q.model.hg.m === 'tan' && q.model.hg.len === 0.24 && q.mount === 'hg:ar').flatMap((q) => has(q.id, 'apHg', 'handguard/quad_rail_240')), null);
-  run('the standard AR grip and the PG-23 have the model', [...has(Gm.Gunsmith.PLATFORMS.m4.defaults.grip, 'apGrip', 'grip/paragon_pg23'), ...has(byName('Paragon PG-23 ergonomic grip'), 'apGrip', 'grip/paragon_pg23')], null);
-  run('the rubber and OD AR grips (other products) do not', ['Northmark rubber overmold grip', 'Lynx OD skeleton grip'].filter((n) => P[byName(n)].model.apGrip), null);
+  run('the PG-23 (the Mk18\'s default grip) has its model', [...has(byName('Paragon PG-23 ergonomic grip'), 'apGrip', 'grip/paragon_pg23'), ...(Gm.Gunsmith.PLATFORMS.m4.defaults.grip === byName('Paragon PG-23 ergonomic grip') ? [] : ['the Mk18\'s default grip is ' + Gm.Gunsmith.PLATFORMS.m4.defaults.grip])], null);
+  run('the standard A2 grip (the other rifles\' default) has the A2 model', has(Gm.Gunsmith.PLATFORMS.hk416.defaults.grip, 'apGrip', 'grip/brightline_a2'), null);
+  run('the rubber and OD AR grips (other products) do not', ['Northmark rubber overmold grip', 'Lynx OD skeleton grip'].map(byName).filter((id) => P[id].model.apGrip), null);
+  { const GS = Gm.Gunsmith, d = GS.defaultBuild('m4'), old = { ...d, grip: byName('Brightline A2 pistol grip (matches the furniture)') }, back = GS.decode(GS.encode('m4', old)).build;
+    run('a Mk18 code with the A2 grip (the old default) still decodes to it', Object.keys(old).filter((k) => back[k] !== old[k]).map((k) => `${k}: ${back[k]} for ${old[k]}`), null); }
   run('the A2 birdcage (the r556 factory muzzle) has the model', has(Gm.Gunsmith.PLATFORMS.hk416.defaults.muzzle, 'apMuzzle', 'muzzle/ironvale_a2_556'), null);
   const spec = Gm.Gunsmith.modelSpec({ id: 'ar9', build: Gm.Gunsmith.defaultBuild('ar9') });
-  run('a build\'s spec carries the furniture keys (the AR-9: the Kestrel and the AR grip)', spec.apStock === 'stock/kestrel_cs4' && spec.apGrip === 'grip/paragon_pg23' && spec.apHg == null ? [] : [JSON.stringify({ apStock: spec.apStock, apGrip: spec.apGrip, apHg: spec.apHg })], null); }
+  run('a build\'s spec carries the furniture keys (the AR-9: the Kestrel and the A2 grip)', spec.apStock === 'stock/kestrel_cs4' && spec.apGrip === 'grip/brightline_a2' && spec.apHg == null ? [] : [JSON.stringify({ apStock: spec.apStock, apGrip: spec.apGrip, apHg: spec.apHg })], null); }
 // the catalogue entry and the generated block
 const entry = entryOf('optic/falcon', cfg0());
 run('the catalogue id is derived', entry.id === 'op.auth.falcon' && entry.model.apart === 'optic/falcon' && entry.model.optic === 'authored' && entry.model.ret === 'dot' && entry.magnifier === true ? [] : ['entry ' + JSON.stringify(entry)], null);

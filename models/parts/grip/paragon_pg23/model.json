@@ -14,13 +14,6 @@
     "mount": "ar"
   },
   "replaces": [
-    "Paragon PG-23 ergonomic grip",
-    {
-      "mount": "gr:ar",
-      "model": {
-        "gripT": "ar",
-        "gm": null
-      }
-    }
+    "Paragon PG-23 ergonomic grip"
   ]
 }

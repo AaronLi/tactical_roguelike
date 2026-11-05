@@ -1285,6 +1285,9 @@ const G_Gunsmith = (() => {
   add({ id: 'stk.heavy.g36', slot: 'stock', mount: 'stk:heavy', brand: 'Factory', oem: true, name: 'G36 folding stock', price: 230, tier: 1, stype: 'g36', st: STK_ST.g36,
     desc: 'A skeleton stock that folds to the right; the rifle still fires folded.', model: { stock: 'g36', sm: null } });
   { const plat = PLATFORMS.g36; plat.slots.find((sl: Slot) => sl.slot === 'handguard')!.mount = 'hg:g36'; plat.defaults.handguard = 'oem.hg.g36.0'; plat.defaults.stock = 'stk.heavy.g36'; LATE.add('g36'); }
+  // the Mk18 comes with the Paragon PG-23 (its model's own grip, models/m4, is that polymer grip), not the standard A2 one, which it still takes. Set here, not in
+  // its spec (grip: ['ar', 'ar']), so the standard grip is still made where it was: a part's id in a code is its place in the list
+  { PLATFORMS.m4.defaults.grip = 'gr.ar.0'; LATE.add('m4'); }
   // the derringer as a kit: its own grips (one with a stock lug, for any SMG stock), long barrels (a carbine's and a
   // rifle's: a .44 Magnum from 16" or 20", a rail along their rib for a rifle's sight and a railed forend), and its
   // own length with an optic cut in the rib for a pistol sight (the sights tip open with the barrels)
@@ -1492,9 +1495,10 @@ const G_Gunsmith = (() => {
     {"id":"op.auth.falcon","slot":"optic","mount":"op:pic","brand":"strix","name":"Strix Falcon open reflex","price":340,"tier":1,"st":{"ergo":-1,"acc":-2,"hip":2},"set":{"zoom":0.8,"scoped":false},"desc":"Unmagnified. Takes a magnifier behind it.","model":{"optic":"authored","apart":"optic/falcon","ret":"dot"},"magnifier":true,"height":"low","src":"models/parts/optic/falcon"},
   ];
   const AUTHORED_REPLACES: any[] = [
-    {"apart":"grip/paragon_pg23","names":["Paragon PG-23 ergonomic grip",{"mount":"gr:ar","model":{"gripT":"ar","gm":null}}]},
+    {"apart":"grip/brightline_a2","names":["Brightline A2 pistol grip (matches the furniture)"]},
+    {"apart":"grip/paragon_pg23","names":["Paragon PG-23 ergonomic grip"]},
     {"apart":"handguard/ironvale_ir12","names":["Ironvale IR-12 quad rail"],"len":0.3},
-    {"apart":"handguard/quad_rail_240","names":[{"mount":"hg:ar","model":{"hg":{"t":"rail","len":0.24}}}],"len":0.2395},
+    {"apart":"handguard/quad_rail_240","names":["Brightline 9.4\" quad rail handguard","Brightline 9.4\" quad rail handguard (FDE)"],"len":0.2395},
     {"apart":"muzzle/ironvale_a2_556","names":["Ironvale A2 5.56 birdcage"]},
     {"apart":"optic/brightline_pip","names":["Brightline Pip red dot"]},
     {"apart":"optic/ember","names":["Halcyon Ember pistol dot"]},
