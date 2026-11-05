@@ -501,7 +501,7 @@ function validatePartsIndex(ix: any): ModelReport {
   checkProps(ix, PARTS_INDEX_FIELDS, 'index', errors, false);
   if (!isObj(ix) || !isObj(ix.tags)) return { errors, warnings };
   for (const [tag, ti] of Object.entries<any>(ix.tags)) {
-    if (!(tag in GUN_MODEL_CONTRACT.slots)) errors.push(`index.tags.${tag}: not a slot`);
+    if (!(tag.split('@')[0] in GUN_MODEL_CONTRACT.slots)) errors.push(`index.tags.${tag}: not a slot`);
     if (!isObj(ti) || !Array.isArray(ti.dep) || !Array.isArray(ti.packs)) continue;
     ti.packs.forEach((p: any, i: number) => {
       if (isObj(p) && Array.isArray(p.key) && p.key.length !== ti.dep.length) errors.push(`index.tags.${tag}.packs[${i}].key has ${p.key.length} parts for ${ti.dep.length} dep slots`);
@@ -526,11 +526,11 @@ function validatePack(model: ModelDesc, tag?: string): ModelReport {
   if (!isObj(pk)) E('root extras.pack is missing ({ platform, tag, key })');
   else {
     if (typeof pk.platform !== 'string') E('extras.pack.platform: expected a string');
-    if (typeof pk.tag !== 'string' || !(pk.tag in C.slots)) E(`extras.pack.tag: ${JSON.stringify(pk.tag)} is not a slot`);
+    if (typeof pk.tag !== 'string' || !(pk.tag.split('@')[0] in C.slots)) E(`extras.pack.tag: ${JSON.stringify(pk.tag)} is not a slot`);
     else if (tag && pk.tag !== tag) E(`extras.pack.tag is "${pk.tag}", expected "${tag}"`);
     if (!isObj(pk.key)) E('extras.pack.key: expected an object slot -> part id');
   }
-  const t = isObj(pk) ? pk.tag : tag, names = new Set<string>(), matOk = new RegExp(C.materials.anonymousPattern);
+  const t = (isObj(pk) ? pk.tag : tag || '').split('@')[0], names = new Set<string>(), matOk = new RegExp(C.materials.anonymousPattern);
   if (root.extras[NAMES.extras.info] !== undefined) E('a pack has no extras.info (the platform index carries the info)');
   let meshes = 0;
   for (const c of root.children) {

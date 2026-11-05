@@ -179,7 +179,7 @@ export async function writeAll(em, Models, states, reg, partial, log) {
     for (const c of root.children) c.position.set(c.position.x - m[0], c.position.y - m[1], c.position.z - m[2]);
     root.name = `_shared.${rep.tag}.${rep.id}`; root.userData = { pack: { platform: '_shared', tag: rep.tag, key: {} } };
     const h = sha(rep.canon.sig + '|' + rep.canon.meshes.map((mm) => { let s = 0; for (let i = 0; i < mm.v.length; i += 97) s = (s * 31 + Math.round((mm.v[i] - m[i % 3]) * 1e5)) | 0; return s; }).join(','));
-    let file = SHARED + rep.tag + '/' + h + '.glb', k = 1; while (sharedNames.has(file)) file = SHARED + rep.tag + '/' + h + '-' + ++k + '.glb';
+    let file = SHARED + rep.tag.replace('@', '-on-') + '/' + h + '.glb', k = 1; while (sharedNames.has(file)) file = SHARED + rep.tag.replace('@', '-on-') + '/' + h + '-' + ++k + '.glb';
     sharedNames.add(file);
     const wr = await em.write(root, '_shared', rep.tag);
     fs.mkdirSync(path.dirname(PARTS_DIR + file), { recursive: true }); fs.writeFileSync(PARTS_DIR + file, wr.buf);

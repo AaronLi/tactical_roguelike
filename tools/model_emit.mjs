@@ -41,7 +41,7 @@ export async function makeEmitter({ G, GM, Models }) {
     };
     const out = { root: [], nodes: new Map() };
     group.traverse((o) => {
-      if (!o.isMesh || (o.userData.slot || 'base') !== tag) return;
+      if (!o.isMesh || (o.userData.slot || 'base') + (o.userData.at ? '@' + o.userData.at : '') !== tag) return;
       const p = o.parent;
       if (p === group) { out.root.push(o); return; }
       const name = nameOf(p);
@@ -74,7 +74,7 @@ export async function makeEmitter({ G, GM, Models }) {
     const nameOfMat = (m) => m.name || matName.get(m) || ('m_' + m.color.getHexString());
     const needUv = (o) => !!((catalogue[nameOfMat(o.material)] || {}).bump || o.material.map || o.userData.display || (o.name || '').startsWith('display_'));
     const addMesh = (o, into) => {
-      const c = new T.Mesh(o.geometry, matCopy(o.material, nameOfMat(o.material))); c.userData = { slot: tag }; if (o.userData.display) c.userData.display = o.userData.display;
+      const c = new T.Mesh(o.geometry, matCopy(o.material, nameOfMat(o.material))); c.userData = { slot: tag.split('@')[0] }; if (o.userData.display) c.userData.display = o.userData.display;
       c.position.copy(o.position); c.quaternion.copy(o.quaternion); c.scale.copy(o.scale); c.name = o.name && o.name.startsWith('display_') ? o.name : `${tag}_${++n}`;
       if (!needUv(o) && c.geometry.attributes.uv) { c.geometry = c.geometry.clone(); c.geometry.deleteAttribute('uv'); }
       const m = c.material;
@@ -150,5 +150,5 @@ export function sameCanon(a, b, tol = 2e-6) {
 /** A file name for a pack: its key's parts joined by '+', safe characters only. */
 export function packFileName(tag, key) {
   const s = key.map((k) => (k === '' ? '_' : k === '*' ? 'x' : k.replace(/[^A-Za-z0-9._-]/g, '_'))).join('+') || 'all';
-  return `${tag}/${s.length > 110 ? s.slice(0, 80) + '-' + crypto.createHash('sha1').update(s).digest('hex').slice(0, 8) : s}.glb`;
+  return `${tag.replace('@', '-on-')}/${s.length > 110 ? s.slice(0, 80) + '-' + crypto.createHash('sha1').update(s).digest('hex').slice(0, 8) : s}.glb`;
 }

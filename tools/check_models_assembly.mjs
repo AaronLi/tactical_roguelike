@@ -26,7 +26,7 @@ const G = await loadGameWithModels(), GS = G.Gunsmith, GM = G.GunModels, M = G.M
 const plats = Object.keys(GS.PLATFORMS).filter((id) => !ids.length || ids.includes(id));
 
 const R4 = (x) => Math.round(x * 1e4);
-const unitsOf = (ms) => { const o = {}; for (const m of ms) (o[m.tag] = o[m.tag] || []).push(m); return o; };
+const unitsOf = (ms) => { const o = {}; for (const m of ms) { const t = m.tag.split('@')[0]; (o[t] = o[t] || []).push(m); } return o; };
 function triHash(ms) {
   const parts = [];
   for (const m of ms) for (let i = 0; i < m.v.length; i += 9) { const c = [0, 1, 2].map((k) => [R4(m.v[i + k * 3]), R4(m.v[i + k * 3 + 1]), R4(m.v[i + k * 3 + 2])]); let r = 0; for (let k = 1; k < 3; k++) if (c[k].join() < c[r].join()) r = k; parts.push(m.mat + "|" + [c[r], c[(r + 1) % 3], c[(r + 2) % 3]].join(";")); } // (a triangle's corners may start anywhere: the compressed file reorders them, winding kept)

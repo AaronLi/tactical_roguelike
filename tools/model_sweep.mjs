@@ -114,7 +114,7 @@ export function meshesOf(group, info) {
       v[i * 3] = e[0] * x + e[4] * y + e[8] * z + e[12]; v[i * 3 + 1] = e[1] * x + e[5] * y + e[9] * z + e[13]; v[i * 3 + 2] = e[2] * x + e[6] * y + e[10] * z + e[14];
     }
     const m = o.material || {};
-    out.push({ tag: o.userData.slot || 'base', node, mat: m.name || ('m_' + (m.color ? m.color.getHexString() : '')), v });
+    out.push({ tag: (o.userData.slot || 'base') + (o.userData.at ? '@' + o.userData.at : ''), node, mat: m.name || ('m_' + (m.color ? m.color.getHexString() : '')), v });
   });
   return out;
 }
