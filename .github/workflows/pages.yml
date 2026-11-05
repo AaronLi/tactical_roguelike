@@ -1,5 +1,6 @@
-# The game on GitHub Pages: its TypeScript compiled (npm run build: js/*.ts -> dist/js/), then the site published as
-# it is in the repo with dist/ added. Pull requests and other branches build only (a check that it compiles).
+# The game on GitHub Pages: its TypeScript compiled (npm run build: js/*.ts -> dist/js/), its gun models baked and
+# tested (npm run bake:models, test:models: assets/models/), then the site published as it is in the repo with dist/
+# and assets/models/ added. Pull requests and other branches build only (a check that it compiles, bakes and passes).
 # One-time setup: Settings -> Pages -> Source: GitHub Actions.
 name: pages
 on:
@@ -25,6 +26,19 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run build
+      # The guns: the game loads them only as baked glTF (assets/models, git-ignored), so the site bakes them here.
+      # Cached on everything a bake reads (the recipes and the baker, the parts data, the authored models): a push that
+      # changes none of it reuses the last bake.
+      - name: Baked models (cache)
+        id: models
+        uses: actions/cache@v4
+        with:
+          path: assets/models
+          key: models-${{ hashFiles('tools/**', 'js/parts.ts', 'js/data.ts', 'js/glb.ts', 'js/gunmaterials.ts', 'models/**', 'package-lock.json') }}
+      - name: Bake the models
+        if: steps.models.outputs.cache-hit != 'true'
+        run: npm run bake:models
+      - run: npm run test:models
       - name: The site
         run: |
           mkdir -p _site
