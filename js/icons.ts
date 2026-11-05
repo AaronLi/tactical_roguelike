@@ -367,9 +367,10 @@ const G_Icons = (() => {
   let gunWaits = false, iconsQueued = false;
   const waiting = new Set<string>();
   const iconsReady = () => { if (iconsQueued) return; iconsQueued = true; setTimeout(() => { iconsQueued = false; window.dispatchEvent(new Event('gunicons')); }, 30); };
-  function gunImage(def: WeaponDef, W: number, H: number): HTMLCanvasElement | null {
+  function gunImage(def: WeaponDef, W: number, H: number, noMag = false): HTMLCanvasElement | null {
     const T = THREE;
     const m = G.GunModels.display(def);
+    if (noMag && m.info.anim && m.info.anim.mag) m.info.anim.mag.visible = false; // (a gun with its magazine out: none on it)
     if (m.group.userData.pending) {
       gunWaits = true;
       const k = def.code || def.id;
@@ -423,14 +424,14 @@ const G_Icons = (() => {
       g.fillStyle = '#e8e4da'; g.fillRect(W * 0.43, H * 0.38, W * 0.14, H * 0.3); g.fillRect(W * 0.32, H * 0.46, W * 0.36, H * 0.12);
     }
     else if (it.k === 'part') drawPart(g, W, H, G.Gunsmith.PARTS[it.pid]);
-    else if (it.k === 'gun') { try { const im = gunImage(it.w.def, W, H); if (im) g.drawImage(im, 0, 0); } catch (e) { console.warn(e); } }
+    else if (it.k === 'gun') { try { const im = gunImage(it.w.def, W, H, !!it.w.noMag); if (im) g.drawImage(im, 0, 0); } catch (e) { console.warn(e); } }
     return c;
   }
   // an item drawn in its natural orientation (w x h cells), turned if it's shown turned
   function of(it: GItem, w: number, h: number, rot?: boolean) {
     // (a magazine or tube is drawn as full as it is: that's part of the key, to a round on small ones)
     const fill = it.k === 'mag' || (it.k as string) === 'tube' ? (it.cap ? Math.round(G.U.clamp(it.n / it.cap, 0, 1) * Math.min(it.cap, 40)) : it.n > 0 ? 1 : 0) + '/' + (it.cap || 0) : it.k === 'ammo' ? Math.ceil(fillOf(it) * 20) : it.n > 0 ? 1 : 0;
-    const key = [it.k, it.k === 'gun' ? it.w.def.code : it.wid || it.key || it.gid || it.pid || it.mt || '', it.vid || '', it.am || '', fill, w, h, rot ? 1 : 0, it.face ? it.face.gid : ''].join('|');
+    const key = [it.k, it.k === 'gun' ? it.w.def.code + (it.w.noMag ? 'n' : '') : it.wid || it.key || it.gid || it.pid || it.mt || '', it.vid || '', it.am || '', fill, w, h, rot ? 1 : 0, it.face ? it.face.gid : ''].join('|');
     let url = cache.get(key);
     if (url) return url;
     gunWaits = false;

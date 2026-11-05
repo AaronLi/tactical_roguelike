@@ -234,7 +234,7 @@ const G_Me = {
     this.slot = slot; this.reloading = false; this.inspectT = 0; this.burstQ = 0;
     G.R.setViewmodel(w.def);
     this.raiseT = this.raiseMax = this.drawTime();
-    if (G.GunAudio.available()) { G.GunAudio.buildDry(w.def.soundKey); G.GunAudio.buildDry(G.Gunsmith.roundSoundKey(w.def, w.chamber || w.ammo)); if (w.def.barrels) for (const mm of w.def.barrels.mm) G.GunAudio.buildDry(G.shotSoundKey(w.def, mm, w.ammo)); } // (a gun of several barrels: a report for each effective length)
+    if (G.GunAudio.available()) { G.GunAudio.buildDry(w.def.soundKey); G.GunAudio.buildDry(G.Gunsmith.roundSoundKey(w.def, w.chamber || w.ammo)); if (w.def.barrels) for (const mm of G.barrelMm(w.def)) G.GunAudio.buildDry(G.shotSoundKey(w.def, mm, w.ammo)); } // (a gun of several barrels: a report for each effective length)
     G.Audio.pickup();
     G.HUD.toast('', msg, 2);
   },
@@ -1157,7 +1157,7 @@ const G_Me = {
             if (went === 'floor') { const c = this.magDropped && this.magDropped !== true ? this.magDropped : G.Casings.dropMag(def); if (c && this.dumped) c.item = this.dumped; }
           } else if (G.Gear.ammoFor(def).kind === 'mag') G.Gear.swapMag(this, w, mag);
           else G.Gear.chamberIn(w, G.Gear.takeRounds(this, def, mag - w.mag, w.ammo));
-          this.reloading = false; w.bl = null; // (a gun of several barrels: the new block's rounds spread over its barrels, js/data.ts G.barrelsOf)
+          this.reloading = false; // (a gun of several barrels: the new block's own counts are in G.Gear loadIn, or spread evenly: js/data.ts G.barrelsOf)
           if (this.reloadAct) this.workAction(w, this.reloadAct, this.reloadSeat < 1 ? this.reloadSeat : null); // run dry: then the action, straight on
           else this.feed(w);
           if (!G.Audio.samples.insert_magazine) G.Audio.click();
@@ -1316,7 +1316,7 @@ const G_Me = {
 
       if (def.cls === 'RAIL') G.Audio.rail();
       else if (def.cls === 'BOW') G.Audio.bow();
-      else if (!G.GunAudio.play(multi ? G.shotSoundKey(def, eff, round) : G.Gunsmith.roundSoundKey(def, round), null, undefined, multi ? Math.pow(G.shotK(w.def.barrels, eff), 2) : 1)) G.Audio.shot(w.sup ? G.SUPPRESSOR.snd : def.snd); // (the report of the round fired, not just the gun's)
+      else if (!G.GunAudio.play(multi ? G.shotSoundKey(def, eff, round) : G.Gunsmith.roundSoundKey(def, round), null, undefined, multi ? Math.pow(G.shotK(w.def, eff), 2) : 1)) G.Audio.shot(w.sup ? G.SUPPRESSOR.snd : def.snd); // (the report of the round fired, not just the gun's)
       if (!w.sup && def.cls !== 'BOW') {
         this.flashT = 0.05;
         G.R.vmMuzzle.intensity = 3;
@@ -2683,7 +2683,7 @@ const G_Me = {
       pr: this.prone ? 1 : 0, bp: this.bipodT > 0.5 ? 1 : 0, cl: this.climb ? 1 : 0, zp: this.zipRide ? 1 : 0, se: this.seat != null ? 1 : 0, dn: this.down ? 1 : 0, uc: this.out ? 1 : 0, dd: this.dead ? 1 : 0, bl: this.down ? (this.bleed == null ? -1 : Math.ceil(this.bleed)) : 0, bd: this.body ? G.Med.encode(this.body) : null,
       w: this.cur().def.code, ac: G.Ballistics.armourState(this), sk: G.Stickers.share(this.cur().stickers) || undefined, tl: this.tacFlags(this.cur()), cr: this.crouch || this.down || this.prone ? 1 : 0, ln: r2(this.lean || 0), lr: this.lowReady ? 1 : 0, sd: this.steadying ? 1 : 0, sw: this.stowed || this.held ? 1 : 0,
       hk: this.held ? (this.held.kind === 'flash' ? 2 : 1) : 0, hc: this.held && this.held.cock ? 1 : 0, hs: this.held ? this.held.str : 0,
-      ra: this.act && this.cur().def.manual ? r2(Math.min(1, this.act.t)) : -1, ld: G.loaded(this.cur()) > 0 ? 1 : 0, rl: this.reloading && this.reloadTotal ? r2(G.U.clamp(1 - this.reloadT / this.reloadTotal, 0, 1)) : -1, in: this.inspectT > 0 && this.inspectDur ? r2(1 - this.inspectT / this.inspectDur) : this.rChk ? r2(0.58 + (G.VMAnim.INSPECT_HOLD - 0.58) * this.rChk.k) : -1,
+      ra: this.act && this.cur().def.manual ? r2(Math.min(1, this.act.t)) : -1, ld: G.loaded(this.cur()) > 0 ? 1 : 0, nm: this.cur().noMag ? 1 : 0, rl: this.reloading && this.reloadTotal ? r2(G.U.clamp(1 - this.reloadT / this.reloadTotal, 0, 1)) : -1, in: this.inspectT > 0 && this.inspectDur ? r2(1 - this.inspectT / this.inspectDur) : this.rChk ? r2(0.58 + (G.VMAnim.INSPECT_HOLD - 0.58) * this.rChk.k) : -1,
       mc: this.magChk ? r2(this.magChk.back > 0 ? Math.max(0, 1 - this.magChk.back) : this.magChk.k) : -1,
       act: this.action && this.action.kind ? this.action.kind[0] : 0, ap: this.action ? r2(Math.min(1, this.action.t / this.action.dur)) : 0, zt: this.action && this.action.kind === 'zip' ? this.action.target : -1, bt: this.action && this.action.kind === 'bag' ? this.action.target : -1, pl: this.action && this.action.pull ? 1 : 0, mv: r2(this.hspeed || 0),
       cred: Math.round(this.credits), sx: [this.stats.kills, Math.round(this.stats.dmg), this.stats.hs, this.stats.downs, this.stats.revives],

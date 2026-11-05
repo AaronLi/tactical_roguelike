@@ -1526,7 +1526,15 @@ const G_GunRecipes = (() => {
     let fgF = null;
     const rn = A && A.hinge ? railNode(k, A) : null; // (the forend of a gun with a reload sequence drops and slides: what is clamped to its rails goes with it)
     if (rn) k.into(rn.node, rn.f, rn.y);
-    if (o.fg && A && A.anchors.mount_fg) { k.tag('fg'); fgF = A.anchors.mount_fg[0]; k.moved(0, A.anchors.mount_fg[1] + 0.022, () => foregrip(k, o.fg!, fgF!, fm, anim)); } // (a rail under the model's own forend: the foregrip hangs from it)
+    if (o.fg === 'bipod' && A && A.anchors.mount_fg) { // (a bipod on the rail under the model's own forend: drawn outside it, so its legs are free to deploy, then hung from the forend's node: it drops with it)
+      k.tag('fg'); fgF = A.anchors.mount_fg[0];
+      if (rn) k.into(null);
+      foregrip(k, 'bipod', fgF, fm, anim);
+      const bp = (anim as any).bipod as THREE.Object3D | undefined;
+      if (bp) { bp.position.y += A.anchors.mount_fg[1] + 0.022; if (rn) { bp.position.sub(rn.node.position); rn.node.add(bp); } }
+      if (rn) k.into(rn.node, rn.f, rn.y);
+    }
+    else if (o.fg && A && A.anchors.mount_fg) { k.tag('fg'); fgF = A.anchors.mount_fg[0]; k.moved(0, A.anchors.mount_fg[1] + 0.022, () => foregrip(k, o.fg!, fgF!, fm, anim)); } // (a rail under the model's own forend: the foregrip hangs from it)
     else if (o.fg && !hgLen && o.fgAt != null) { k.tag('fg'); fgF = o.fgAt; foregrip(k, o.fg, fgF, fm, anim); } // (a rail under the receiver itself: the SCAR's)
     else if (o.fg && hgLen) { k.tag('fg'); fgF = rcv === 'vector' && o.hg && o.hg.t === 'vector' ? L - 0.05 : hgF + Math.min(hgLen * 0.35, 0.09, hgLen - 0.04); foregrip(k, o.fg, fgF, fm, anim); } // (the Vector's: on the rail under the front of the upper) // (near the rail's back: the support arm bent, the gun out in front)
     // a clamp-on rail mount: a collar round the barrel (or the can), in front of any jacket, a short rail on one side or both

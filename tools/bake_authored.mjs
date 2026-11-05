@@ -166,7 +166,7 @@ export function checkAuthored(Models, id, G = null) {
       if (!!mb !== !!db) E(`js/data.ts: ${id}'s def.barrels (${!!db}) and the model's info.barrels (${!!mb}) disagree: a gun of several barrels has both`);
       else if (mb) {
         if (db.n !== mb.n || db.per !== mb.rounds_each) E(`js/data.ts: ${id}'s def.barrels is ${db.n} x ${db.per}, the model's info.barrels ${mb.n} x ${mb.rounds_each}`);
-        if (JSON.stringify(db.mm) !== JSON.stringify(mb.effective_mm)) E(`js/data.ts: ${id}'s def.barrels.mm ${JSON.stringify(db.mm)} is not the model's info.barrels.effective_mm ${JSON.stringify(mb.effective_mm)}`);
+        if (Math.abs(db.mm0 - mb.effective_mm[0]) > 0.5 || Math.abs(db.mm1 - mb.effective_mm[mb.effective_mm.length - 1]) > 0.5) E(`js/data.ts: ${id}'s def.barrels.mm0/mm1 ${db.mm0}/${db.mm1} are not the ends of the model's info.barrels.effective_mm ${JSON.stringify(mb.effective_mm)} (the game reads the list from the model; these are its stand-in until the index loads)`);
         if (JSON.stringify(db.groups) !== JSON.stringify(A.info.barrelGroups)) E(`js/data.ts: ${id}'s def.barrels.groups ${JSON.stringify(db.groups)} is not the model's info.barrelGroups ${JSON.stringify(A.info.barrelGroups)}`);
         if (A.info.modeDial && JSON.stringify(A.info.modeDial.modes) !== JSON.stringify(def.modes)) E(`js/data.ts: ${id}'s modes ${JSON.stringify(def.modes)} are not the model's info.modeDial.modes ${JSON.stringify(A.info.modeDial.modes)}`);
         if (G.GUN_SPECS[id] && Math.abs(G.GUN_SPECS[id].barrel * 25.4 - mb.effective_mm[mb.effective_mm.length - 1]) > 1) E(`js/data.ts: ${id}'s GUN_SPECS barrel (${G.GUN_SPECS[id].barrel} in) is not the longest effective length (${mb.effective_mm[mb.effective_mm.length - 1]} mm)`);

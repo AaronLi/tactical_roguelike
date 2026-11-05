@@ -284,15 +284,21 @@ const G_VMAnim = (() => {
   // A reload that takes the gun apart, from the model's own sequence (info.hinge: GUN_MODEL_CONTRACT.multi): the steps play in order (pose.hinge 0..1 through them) as the block comes out, a
   // moment with it clear of the gun, then back in the other way round with the new one. The left hand follows the block (carried by its handle), the right stays on the grip, the gun
   // turned up a little to see into it. Nothing in it is a gun: the parts, their pivots and their moves are the model's.
+  const pl0 = () => G.Me;
   function hingeClip(t: number, h: Rig) {
     const A = h.A, pose = base(), out = S(0.05, 0.43, t), back = S(0.55, 0.93, t);
     pose.hinge = out * (1 - back);
     const tilt = S(0.02, 0.14, t) * (1 - S(0.88, 0.97, t));
     pose.gun[3] += 0.3 * tilt; pose.gun[5] -= 0.22 * tilt; pose.gun[1] += 0.035 * tilt; pose.gun[0] -= 0.05 * tilt;
-    const blk = h.an.mag;
+    const blk = h.an.mag, had = !pl0().cur().noMag; // (had: there is a block in the gun to take out)
     let grab: V3 = A.S;
-    if (blk) { blk.updateWorldMatrix(true, false); grab = h.holder.worldToLocal(new T.Vector3().setFromMatrixPosition(blk.matrixWorld)); grab.y += 0.04; }
-    pose.L = lerpV(A.S, grab, S(0.1, 0.24, t) * (1 - S(0.9, 0.98, t)));
+    if (blk) { blk.updateWorldMatrix(true, false); grab = h.holder.worldToLocal(new T.Vector3().setFromMatrixPosition(blk.matrixWorld)); grab.y += 0.04; } // (the carry handle: on top of the block)
+    // the old block comes out in the hand (t < 0.44), goes away to the pouch (or the floor) while the hand fetches the fresh one (0.44 to 0.54), which comes back
+    // along the same path; with no block in the gun there is none to take out, and the hand fetches one first
+    const P = off(A.P, 0, 0.02), gone = had ? t >= 0.44 && t < 0.54 : t < 0.54;
+    if (had) pose.L = path(t, [[0, A.S], [0.07, A.S], [0.2, grab], [0.44, grab], [0.49, P], [0.54, grab], [0.93, grab], [1, A.S]]);
+    else pose.L = path(t, [[0, A.S], [0.08, P], [0.46, P], [0.54, grab], [0.93, grab], [1, A.S]]);
+    pose.mag = { mode: gone ? 'gone' : 'in' };
     return pose;
   }
   // The model's sequence at p (0..1 through its steps, js/vmanim.ts hingeClip): each step in turn, eased, moves or turns its node from where it rests. A rotation turns the node about its own pivot (rotate_deg about
@@ -572,7 +578,7 @@ const G_VMAnim = (() => {
       // magazine
       if (an.mag && A.magHome) {
         const mg: MagState = pose ? pose.mag : { mode: 'in' };
-        an.mag.visible = mg.mode !== 'gone';
+        an.mag.visible = mg.mode !== 'gone' && !(w.noMag && mg.mode === 'in' && !pl.reloading); // (a gun with its magazine out has none on it)
         if (mg.mode !== 'chk') an.mag.quaternion.copy(A.magQ);
         if (idx === 0 && !pl.reloading) magFill(a, h.chk, w, pl.magSize(w.def));
         if (mg.mode === 'in') an.mag.position.copy(A.magHome);
