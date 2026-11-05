@@ -167,11 +167,27 @@ export function checkAuthored(Models, id, G = null) {
       const def = G.WEAPONS[id] || {}, mb = A.info.barrels, db = def.barrels;
       if (!!mb !== !!db) E(`js/data.ts: ${id}'s def.barrels (${!!db}) and the model's info.barrels (${!!mb}) disagree: a gun of several barrels has both`);
       else if (mb) {
-        if (db.n !== mb.n || db.per !== mb.rounds_each) E(`js/data.ts: ${id}'s def.barrels is ${db.n} x ${db.per}, the model's info.barrels ${mb.n} x ${mb.rounds_each}`);
-        if (Math.abs(db.mm0 - mb.effective_mm[0]) > 0.5 || Math.abs(db.mm1 - mb.effective_mm[mb.effective_mm.length - 1]) > 0.5) E(`js/data.ts: ${id}'s def.barrels.mm0/mm1 ${db.mm0}/${db.mm1} are not the ends of the model's info.barrels.effective_mm ${JSON.stringify(mb.effective_mm)} (the game reads the list from the model; these are its stand-in until the index loads)`);
+        // the round types: one def.barrels.rounds entry for each of the model's info.barrels.rounds, with the same count a barrel holds, the same default, the shortest and longest effective lengths (mm0/mm1: one scale for every type) and a real caliber and sound spec
+        if (db.n !== mb.n) E(`js/data.ts: ${id}'s def.barrels.n is ${db.n}, the model's info.barrels.n ${mb.n}`);
+        const dr = db.rounds || {}, mr = mb.rounds || {};
+        if (JSON.stringify(Object.keys(dr).sort()) !== JSON.stringify(Object.keys(mr).sort())) E(`js/data.ts: ${id}'s def.barrels.rounds types ${JSON.stringify(Object.keys(dr))} are not the model's info.barrels.rounds ${JSON.stringify(Object.keys(mr))}`);
+        if (db.default !== mb.default) E(`js/data.ts: ${id}'s def.barrels.default ${JSON.stringify(db.default)} is not the model's info.barrels.default ${JSON.stringify(mb.default)}`);
+        let lo = Infinity, hi = -Infinity;
+        for (const [rn, r] of Object.entries(mr)) {
+          const d = dr[rn]; if (!d) continue;
+          if (d.per !== r.rounds_each) E(`js/data.ts: ${id}'s def.barrels.rounds.${rn}.per is ${d.per}, the model's rounds_each ${r.rounds_each}`);
+          if (Math.abs(d.mm0 - r.effective_mm[0]) > 0.5) E(`js/data.ts: ${id}'s def.barrels.rounds.${rn}.mm0 ${d.mm0} is not the model's first effective length ${r.effective_mm[0]} (the game's stand-in until the index loads)`);
+          if (!G.CALIBERS[d.cal]) E(`js/data.ts: ${id}'s def.barrels.rounds.${rn}.cal ${JSON.stringify(d.cal)} is not in G.CALIBERS`);
+          if (!G.GUN_SPECS[d.spec]) E(`js/data.ts: ${id}'s def.barrels.rounds.${rn}.spec ${JSON.stringify(d.spec)} is not in G.GUN_SPECS`);
+          else if (G.GUN_SPECS[d.spec].caliber + '/' + G.GUN_SPECS[d.spec].caseLength !== d.cal) E(`js/data.ts: ${id}'s def.barrels.rounds.${rn}: the spec ${d.spec} makes caliber ${G.GUN_SPECS[d.spec].caliber + '/' + G.GUN_SPECS[d.spec].caseLength}, not ${d.cal}`);
+          if (Math.abs(r.effective_mm[r.effective_mm.length - 1] - mr[mb.default].effective_mm[mr[mb.default].effective_mm.length - 1]) > 0.5) E(`js/data.ts: ${id}: every round type's last shot has the same effective length (${rn} ends at ${r.effective_mm[r.effective_mm.length - 1]} mm)`);
+          lo = Math.min(lo, r.effective_mm[0]); hi = Math.max(hi, r.effective_mm[r.effective_mm.length - 1]);
+        }
+        if (Math.abs(db.mm0 - lo) > 0.5 || Math.abs(db.mm1 - hi) > 0.5) E(`js/data.ts: ${id}'s def.barrels.mm0/mm1 ${db.mm0}/${db.mm1} are not the shortest and longest effective lengths of the model's info.barrels.rounds (${lo}/${hi}); one scale for every round type`);
         if (JSON.stringify(db.groups) !== JSON.stringify(A.info.barrelGroups)) E(`js/data.ts: ${id}'s def.barrels.groups ${JSON.stringify(db.groups)} is not the model's info.barrelGroups ${JSON.stringify(A.info.barrelGroups)}`);
         if (A.info.modeDial && JSON.stringify(A.info.modeDial.modes) !== JSON.stringify(def.modes)) E(`js/data.ts: ${id}'s modes ${JSON.stringify(def.modes)} are not the model's info.modeDial.modes ${JSON.stringify(A.info.modeDial.modes)}`);
-        if (G.GUN_SPECS[id] && Math.abs(G.GUN_SPECS[id].barrel * 25.4 - mb.effective_mm[mb.effective_mm.length - 1]) > 1) E(`js/data.ts: ${id}'s GUN_SPECS barrel (${G.GUN_SPECS[id].barrel} in) is not the longest effective length (${mb.effective_mm[mb.effective_mm.length - 1]} mm)`);
+        if (G.GUN_SPECS[id] && Math.abs(G.GUN_SPECS[id].barrel * 25.4 - hi) > 1) E(`js/data.ts: ${id}'s GUN_SPECS barrel (${G.GUN_SPECS[id].barrel} in) is not the longest effective length (${hi} mm)`);
+        { const dm = G.WEAPONS[id].mag, want = db.n * (db.rounds[db.default] || {}).per; if (dm !== want) E(`js/data.ts: ${id}'s mag ${dm} is not the default block's capacity (${db.n} x ${(db.rounds[db.default] || {}).per})`); }
       }
     }
     const mg = spec.mag || {};

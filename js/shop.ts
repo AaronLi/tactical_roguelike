@@ -248,16 +248,16 @@ const G_Shop = {
     // load every magazine (and the guns) from the loose rounds you own: free, it's just your time
     let empty = 0, loose = 0;
     Gr.each(Gr.all(Me), (it) => { if (it.k === 'mag') empty += it.cap - it.n; if (it.k === 'ammo') loose += it.n; });
-    for (const w of Object.values(Me.weapons)) empty += Me.magSize(w.def) - w.mag + (G.chambered(w.def) && !w.chamber ? 1 : 0);
+    for (const w of Object.values(Me.weapons)) empty += Me.magSize(w) - w.mag + (G.chambered(w.def) && !w.chamber ? 1 : 0);
     out.push({ id: 'load', name: 'Load Magazines', desc: `Top up every magazine you own (and your guns) from your loose rounds, same type first. ${loose} loose rounds, ${empty} empty places.`, price: 0, disabled: !empty || !loose,
       apply: () => Gr.loadAll(Me) });
     // a box of any load for every caliber you own a gun in: the load picked on the card (loadSel), each priced by what
     // it does (G.AMMO k: birdshot under buck, ball, tracer, subsonic, a slug, hollow points, AP, flechettes)
-    const cals = [...new Set<string>(Gr.guns(Me).map((w) => G.calOf(w.def)))];
+    const cals = [...new Set<string>(Gr.guns(Me).flatMap((w) => G.calsOf(w.def)))];
     this.loadSel = this.loadSel || {};
     for (const cal of cals) {
-      const C = G.CALIBERS[cal], types = G.AMMO_TYPES[C.group], am = types.includes(this.loadSel[cal]) ? this.loadSel[cal] : types[0], it = Gr.boxItem(cal, am, C.box);
-      const gdef = Gr.guns(Me).map((w) => w.def).find((d) => G.calOf(d) === cal), notes = gdef ? G.Ballistics.loadNotes(gdef, am).join(' · ') : '';
+      const C = G.CALIBERS[cal], types = G.ammoTypes(cal), am = types.includes(this.loadSel[cal]) ? this.loadSel[cal] : types[0], it = Gr.boxItem(cal, am, C.box);
+      const gdef = Gr.guns(Me).map((w) => w.def).filter((d) => G.calsOf(d).includes(cal)).map((d) => G.asCal(d, cal))[0], notes = gdef ? G.Ballistics.loadNotes(gdef, am).join(' · ') : '';
       const sel = types.length > 1 ? `<select class="load-sel" data-cal="${cal}">${types.map((t) => `<option value="${t}"${t === am ? ' selected' : ''}>${G.AMMO[t].name} · ¢${G.U.fmt(Gr.price(Gr.boxItem(cal, t, C.box)))}</option>`).join('')}</select>` : '';
       out.push({ id: 'box.' + cal, name: `${C.name} ×${C.box}`, sel, desc: `A box of ${C.box} ${G.AMMO[am].name} (${Gr.size(it).join('×')}). ${G.AMMO[am].desc}${notes ? `<div class="gs-pe">${notes}</div>` : ''}`, price: Gr.price(it), disabled: !this.room(it), apply: () => this.stow(Gr.boxItem(cal, am, C.box)) });
     }
@@ -345,8 +345,8 @@ const G_Shop = {
   // the special load in stock this visit
   ammoCard(o: ShopAmmo) {
     const Me = G.Me, A = G.AMMO[o.am], C = G.CALIBERS[o.cal], it = G.Gear.boxItem(o.cal, o.am, o.n), price = G.Gear.price(it);
-    const guns = G.Gear.guns(Me).filter((w) => G.calOf(w.def) === o.cal).map((w) => w.def.name);
-    const gdef = Object.values(G.WEAPONS).find((d) => G.calOf(d) === o.cal);
+    const guns = G.Gear.guns(Me).filter((w) => G.calsOf(w.def).includes(o.cal)).map((w) => w.def.name);
+    const gdef = Object.values(G.WEAPONS).filter((d) => G.calsOf(d).includes(o.cal)).map((d) => G.asCal(d, o.cal))[0];
     const fx = [...(gdef ? G.Ballistics.loadNotes(gdef, o.am) : []), A.rangeK ? `range ×${A.rangeK}` : '', A.quiet ? 'near-silent suppressed' : '', A.tracer ? 'visible tracer' : '', A.slug ? 'single slug' : '', A.pelletsK ? `pellets ×${A.pelletsK}` : ''].filter(Boolean).join(' · ');
     return `<div class="card ammo">
       <div class="ch"><img class="ci" src="${G.Icons.of(it, ...(G.Gear.size(it) as [number, number]))}"><span class="cn">${C.name} ${A.name}</span><span class="tier">AMMO ×${o.n}</span></div>
@@ -432,7 +432,7 @@ const G_Shop = {
     items.classList.toggle('locked', this.ready);
 
     const kitName = (it: GItem | null | undefined) => (it ? G.U.esc(G.Gear.defOf(it)!.name) : '—');
-    const wline = (w: GWeapon) => `<div class="lo"><span style="color:${G.TIER_COLORS[w.def.tier]}">${w.def.name}${w.def.modified ? ' <small>CUSTOM</small>' : ''}${w.sup ? ' <small>SUPP</small>' : ''}</span><small>${w.mag}${w.chamber ? '+1' : ''}/${Me.magSize(w.def)}</small></div>`; // (between levels: the count)
+    const wline = (w: GWeapon) => `<div class="lo"><span style="color:${G.TIER_COLORS[w.def.tier]}">${w.def.name}${w.def.modified ? ' <small>CUSTOM</small>' : ''}${w.sup ? ' <small>SUPP</small>' : ''}</span><small>${w.mag}${w.chamber ? '+1' : ''}/${Me.magSize(w)}</small></div>`; // (between levels: the count)
     document.getElementById('shopLoadout')!.innerHTML =
       (Me.weapons.p ? wline(Me.weapons.p) : '<div class="lo"><span>No primary</span></div>') + (Me.weapons.s ? wline(Me.weapons.s) : '<div class="lo"><span>No sidearm</span></div>') +
       G.Gear.packGuns(Me).map(([it]) => wline(it.w).replace('<div class="lo">', '<div class="lo"><small>PACK</small> ')).join('') +

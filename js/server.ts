@@ -28,7 +28,7 @@ interface EnemyBody { id: number; type: EnemyKind; def: EnemyDef; x: number; y: 
 interface ServerReport { incap: number; bleedouts: number; bleedBy: Record<string, number>; arrests: number; rescued: number; civKilled: number; unauth: number; evidence: number; bodies: number; allRescued?: boolean }
 interface ServerRoute { seed: number; act: number; path: number[]; votes: Record<string, number> }
 interface TeamLocker { ver: number; items: any[][] }
-interface WeaponCase { code: string; mag: number; reserve: number; am: any }
+interface WeaponCase { code: string; mag: number; reserve: number; am: any; rl?: string; alt?: { rl: string; n: number; am: string } }
 interface AttachBox { open: boolean; uses: Record<string, { items: string[]; taken: string | null }> }
 interface StickerBox { s: string; by: string | null }
 interface SoundCache { map: LvMap; cache: Map<string, Float32Array> }
@@ -175,7 +175,7 @@ const G_Server = {
       case 'shot':
         if (p && p.st && this.phase === 'level') this.hear(p.st.p[0], p.st.p[2], m.sil === 2 ? 2 : m.sil ? 6 : 28, p.st.p[1]); // (not at the range)
         if (m.f && m.to && this.phase === 'level') this.suppress(m.f, m.to, G.Gunsmith.fromCode(m.w), (G.AMMO as Tbl)[m.am] ? m.am : undefined);
-        G.Net.broadcast({ t: 'shot', id: from, sid: m.sid, f: m.f, to: m.to, w: m.w, sil: m.sil, bm: Number.isFinite(m.bm) ? m.bm : undefined, am: (G.AMMO as Tbl)[m.am] ? m.am : undefined,
+        G.Net.broadcast({ t: 'shot', id: from, sid: m.sid, f: m.f, to: m.to, w: m.w, sil: m.sil, bm: Number.isFinite(m.bm) ? m.bm : undefined, rl: typeof m.rl === 'string' && m.rl.length < 12 ? m.rl : undefined, am: (G.AMMO as Tbl)[m.am] ? m.am : undefined,
           tos: Array.isArray(m.tos) && m.tos.length <= 24 && m.tos.every((p: unknown) => Array.isArray(p) && p.length === 3 && p.every(Number.isFinite)) ? m.tos : undefined }, from); // (a shotgun's pellets: for the highlights)
         break;
       case 'nade': G.Net.broadcast({ t: 'nade', id: from, p: m.p, v: m.v, fuse: m.fuse, k: m.k === 'flash' ? 'flash' : 'frag', s: [0, 1, 2].includes(m.s) ? m.s : 2 }, from); break;
@@ -455,6 +455,10 @@ const G_Server = {
     // rounds to match.
     const kits = G.Gunsmith.kitsFor(w.id).filter((k) => G.obtainable(G.WEAPONS[G.Gunsmith.PARTS[k].becomes]));
     if (kits.length && Math.random() < 0.35) w = G.WEAPONS[G.Gunsmith.PARTS[kits[Math.floor(Math.random() * kits.length)]].becomes] || w;
+    if (w.barrels) { // a gun of several barrels (its round types are different lengths of round, G.roundOf): loaded with one, a spare block of the other, and a spare of the first: both turn up
+      const keys = Object.keys(w.barrels.rounds), rl = keys[Math.floor(Math.random() * keys.length)], other = keys.filter((k) => k !== rl)[0], cap = (k: string) => w.barrels.n * w.barrels.rounds[k].per;
+      return { code: G.Gunsmith.defaultCode(w.id), mag: cap(rl), reserve: cap(rl), rl, am: G.rollAmmo(w.barrels.rounds[rl].cal), alt: other ? { rl: other, n: cap(other), am: G.rollAmmo(w.barrels.rounds[other].cal) } : undefined };
+    }
     return { code: G.Gunsmith.defaultCode(w.id), mag: w.mag, reserve: w.mag > 2 ? w.mag * 2 : G.Gear.boxCap(G.calOf(w)), am: G.rollAmmo(G.calOf(w)) };
   },
   // Something lying in the world (G.Loot), and how it's sent
@@ -472,13 +476,14 @@ const G_Server = {
     if (!def) return;
     this.wcase = null;
     const Gr = G.Gear, w = G.Me.makeWeapon(def.id, def.build), ch = G.chambered(def) && got.mag > 0; // (the count is everything in it: one of them's in the chamber)
-    w.ammo = G.ammoOk(G.calOf(def), got.am);
-    w.mag = Math.min(got.mag - (ch ? 1 : 0), G.Me.magSize(def));
+    if (def.barrels && got.rl) w.rl = G.roundOf(def, got.rl)!.rl;
+    w.ammo = G.ammoOk(G.cartOf(w), got.am);
+    w.mag = Math.min(got.mag - (ch ? 1 : 0), G.Me.magSize(w));
     if (w.tube) w.tube = Array(w.mag).fill(w.ammo);
     w.chamber = ch ? w.ammo : null;
     const cos = Math.cos(c.yaw), sin = Math.sin(c.yaw), FOAM = 0.032;
     const put = (it: any, lx: number, lz: number, turn: number, fit?: number) => this.lootMsg(this.lootAdd(c.x + lx * cos + lz * sin, FOAM, c.z - lx * sin + lz * cos, Gr.pack(it), c.yaw + turn, fit));
-    G.Net.broadcast({ t: 'loot', a: [put(Gr.gunItem(w), 0, -0.03, -Math.PI / 2, 1.28), ...Gr.spares(def, got.reserve, w.ammo).map((it, i) => put(it, 0.55 - i * 0.2, 0.13, 0))] });
+    G.Net.broadcast({ t: 'loot', a: [put(Gr.gunItem(w), 0, -0.03, -Math.PI / 2, 1.28), ...Gr.spares(def, got.reserve, w.ammo, w.rl).concat(got.alt ? [Gr.ammoItem(def, got.alt.n, G.ammoOk(G.roundOf(def, got.alt.rl)!.cal, got.alt.am), undefined, got.alt.rl)] : []).map((it, i) => put(it, 0.55 - i * 0.2, 0.13, 0))] });
   },
   // A first aid cabinet's contents: one to three things, mostly bandages and painkillers, now and then a
   // tourniquet, gauze, a chest seal or a splint. [[mt, n], ...], like kinds stacked together.

@@ -113,14 +113,17 @@ expectA('authored pistol: tac and grip anchors are allowed', pGun(PA({ mount_tac
 expectA('a rifle still needs its handguard anchors', aGun({}, undefined, { anchors: PA() }), /anchors\.mount_optic is missing/);
 // a gun of several barrels and a reload sequence (GUN_MODEL_CONTRACT.multi): info.barrels, barrelGroups, modeDial, hinge (root extras hinge_json), nested part_ nodes, anim aliases
 {
-  const BAR = () => ({ n: 2, rounds_each: 3, effective_mm: [100, 150, 200] }), MZ = [[0.7, 0.01, 0], [0.7, -0.01, 0]];
+  const BAR = () => ({ n: 2, rounds: { standard: { rounds_each: 3, effective_mm: [100, 150, 200] }, rifle: { rounds_each: 2, effective_mm: [150, 200] } }, default: 'standard' }), MZ = [[0.7, 0.01, 0], [0.7, -0.01, 0]];
   const mgun = (over = {}, root = {}, kids = [B(), part('mag', [mesh('mag_3', 'mag'), part('carry', [mesh('mag_4', 'mag')])])]) => ({ roots: [{ name: 'x', extras: { gun: 'x', info: { ...info(), muzzles: MZ, magAt: [0.22, -0.043], anim: { mag: 'part_mag', carry: 'part_carry' }, barrels: BAR(), ...over }, anchors: ANCH(), ...root }, mesh: false, uv: false, materials: [], children: kids }] });
   expectA('multi: a barrel block with its barrels is valid', mgun(), null);
   expectA('multi: json-text hinge is read', mgun({}, { hinge_json: JSON.stringify({ sequence: [{ part: 'part_carry', axis: 'x', rotate_deg: 90 }] }) }), null);
   expectA('multi: anim aliases are read by the node they name', (() => { const g = mgun({ anim: { block: 'part_mag', flap: 'part_carry' } }); return g; })(), null);
   expectA('multi: barrels.n against the muzzles', mgun({ barrels: { ...BAR(), n: 3 } }), /info\.barrels\.n is 3 but info\.muzzles has 2/);
-  expectA('multi: one effective length per round', mgun({ barrels: { ...BAR(), effective_mm: [100, 150] } }), /effective_mm has 2 entries, rounds_each is 3/);
-  expectA('multi: effective lengths must grow', mgun({ barrels: { ...BAR(), effective_mm: [100, 90, 200] } }), /must be positive and increase/);
+  expectA('multi: one effective length per round', mgun({ barrels: { ...BAR(), rounds: { ...BAR().rounds, standard: { rounds_each: 3, effective_mm: [100, 150] } } } }), /rounds\.standard\.effective_mm has 2 entries, rounds_each is 3/);
+  expectA('multi: the other round type counts too', mgun({ barrels: { ...BAR(), rounds: { ...BAR().rounds, rifle: { rounds_each: 4, effective_mm: [150, 200] } } } }), /rounds\.rifle\.effective_mm has 2 entries, rounds_each is 4/);
+  expectA('multi: a default that is a round type', mgun({ barrels: { ...BAR(), default: 'sabot' } }), /info\.barrels\.default "sabot" is not one of info\.barrels\.rounds \(standard, rifle\)/);
+  expectA('multi: the round types are required', mgun({ barrels: { n: 2, default: 'standard' } }), /info\.barrels\.rounds is missing|info\.barrels\.rounds: at least one round type/);
+  expectA('multi: effective lengths must grow', mgun({ barrels: { ...BAR(), rounds: { ...BAR().rounds, standard: { rounds_each: 3, effective_mm: [100, 90, 200] } } } }), /rounds\.standard\.effective_mm must be positive and increase/);
   expectA('multi: a group names real barrels', mgun({ barrelGroups: { top: [0, 5] } }), /info\.barrelGroups\.top: indices into info\.muzzles/);
   expectA('multi: groups need barrels', aGun({ info: { barrelGroups: { top: [0] } } }), /are for a gun with info\.barrels/);
   expectA('multi: a hinge step names a part', mgun({}, { hinge: { sequence: [{ part: 'part_lever', axis: 'x', rotate_deg: 40 }] } }), /sequence\[0\]\.part: "part_lever" is not a part_ node/);

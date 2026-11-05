@@ -786,26 +786,6 @@
               "minimum": 2,
               "description": "How many barrels."
             },
-            "rounds_each": {
-              "type": "number",
-              "minimum": 1,
-              "description": "Rounds a full barrel holds."
-            },
-            "round_mm": {
-              "oneOf": [
-                {
-                  "type": "array",
-                  "items": {
-                    "type": "number"
-                  },
-                  "description": "One round: [diameter, length], millimetres."
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "One round: [diameter, length], millimetres."
-            },
             "free_bore_mm": {
               "oneOf": [
                 {
@@ -818,28 +798,78 @@
               ],
               "description": "The bore a fresh barrel has before its first round, millimetres."
             },
-            "effective_mm": {
-              "type": "array",
-              "items": {
-                "type": "number"
+            "stack_mm": {
+              "oneOf": [
+                {
+                  "type": "number",
+                  "description": "The length of a barrel's stack of rounds, millimetres (the same for every round type)."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The length of a barrel's stack of rounds, millimetres (the same for every round type)."
+            },
+            "rounds": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "round_mm": {
+                    "oneOf": [
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        },
+                        "description": "One round: [diameter, length], millimetres."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "One round: [diameter, length], millimetres."
+                  },
+                  "rounds_each": {
+                    "type": "number",
+                    "minimum": 1,
+                    "description": "Rounds a full barrel holds of this type."
+                  },
+                  "effective_mm": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 1,
+                    "description": "The effective barrel length for each round of a barrel in turn, millimetres: shortest first."
+                  }
+                },
+                "required": [
+                  "rounds_each",
+                  "effective_mm"
+                ],
+                "additionalProperties": false
               },
-              "minItems": 1,
-              "description": "The effective barrel length for each round of a barrel in turn, millimetres: shortest first."
+              "description": "The round types the block takes, by name: each { round_mm, rounds_each, effective_mm }."
+            },
+            "default": {
+              "type": "string",
+              "description": "The round type a gun starts with (a key of rounds)."
             }
           },
           "required": [
             "n",
-            "rounds_each",
-            "effective_mm"
+            "rounds",
+            "default"
           ],
           "additionalProperties": false,
-          "description": "A gun with several barrels, each holding a stack of rounds fired nose to tail: n barrels (info.muzzles has one entry each, in the same order), rounds_each the rounds a barrel holds, effective_mm the length the bullet has run down the bore for the 1st, 2nd... last round of a barrel (rounds_each + 1 entries, longest last: the more rounds are gone, the longer the run), round_mm [diameter, length] of one round and free_bore_mm the part of the bore a fresh barrel has before its first round (both informational). The game takes the speed of a shot from the effective length (GUN_MODEL_CONTRACT.multi)."
+          "description": "A gun with several barrels, each holding a stack of rounds fired nose to tail: n barrels (info.muzzles has one entry each, in the same order). The ROUND LENGTH loaded decides how many rounds a barrel holds, so the model lists the round types it takes in `rounds`, keyed by name (standard, rifle...): each has rounds_each (the rounds a barrel holds of that type), effective_mm (the length the bullet has run down the bore for the 1st, 2nd... last round of a barrel: rounds_each entries, longest last: the more rounds are gone, the longer the run) and round_mm [diameter, length] of one round (informational). `default` names the type a gun starts with. stack_mm is the length of a barrel's stack (the same for every type: a longer round, fewer of them) and free_bore_mm the part of the bore a fresh barrel has before its first round (both informational). The game takes the speed of a shot from the effective length (GUN_MODEL_CONTRACT.multi)."
         },
         {
           "type": "null"
         }
       ],
-      "description": "A gun with several barrels, each holding a stack of rounds fired nose to tail: n barrels (info.muzzles has one entry each, in the same order), rounds_each the rounds a barrel holds, effective_mm the length the bullet has run down the bore for the 1st, 2nd... last round of a barrel (rounds_each + 1 entries, longest last: the more rounds are gone, the longer the run), round_mm [diameter, length] of one round and free_bore_mm the part of the bore a fresh barrel has before its first round (both informational). The game takes the speed of a shot from the effective length (GUN_MODEL_CONTRACT.multi)."
+      "description": "A gun with several barrels, each holding a stack of rounds fired nose to tail: n barrels (info.muzzles has one entry each, in the same order). The ROUND LENGTH loaded decides how many rounds a barrel holds, so the model lists the round types it takes in `rounds`, keyed by name (standard, rifle...): each has rounds_each (the rounds a barrel holds of that type), effective_mm (the length the bullet has run down the bore for the 1st, 2nd... last round of a barrel: rounds_each entries, longest last: the more rounds are gone, the longer the run) and round_mm [diameter, length] of one round (informational). `default` names the type a gun starts with. stack_mm is the length of a barrel's stack (the same for every type: a longer round, fewer of them) and free_bore_mm the part of the bore a fresh barrel has before its first round (both informational). The game takes the speed of a shot from the effective length (GUN_MODEL_CONTRACT.multi)."
     },
     "barrelGroups": {
       "oneOf": [

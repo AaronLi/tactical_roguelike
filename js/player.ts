@@ -158,7 +158,7 @@ const G_Me = {
   helmCond() { return G.Gear.cond(this.kit.helmet); },
   maxHp() { return 100; },
   maxNades() { return 3; },
-  magSize(def: WeaponDef) { return def.mag; },
+  magSize(x: WeaponDef | { def: WeaponDef; rl?: string | null }) { return G.capOf(x); }, // (a weapon, or a def: a gun of several barrels holds what the round type in its block lets it, js/data.ts G.capOf)
   reserveMax(def: WeaponDef) { return def.reserve; },
   // a weapon as built: def is the compiled build (stats changed by its parts), see js/parts.ts
   makeWeapon(id: string, build?: PBuild): PWeapon {
@@ -166,6 +166,7 @@ const G_Me = {
     // ammo: the type of round in it (a magazine holds one type); a gun loaded a round at a time keeps the
     // order in its tube (the last one in is the next one fired)
     const w: any = { def, sup: def.sup, mag: def.mag, ammo: G.ballFor(G.calOf(def)), fm: (def.modes || [def.mode])[0] }; // fm: where its selector is
+    if (def.barrels) w.rl = def.barrels.default; // (a gun of several barrels: the round type its block holds, js/data.ts)
     w.tube = Array(w.mag).fill(w.ammo); // every gun: its rounds in order (a magazine's own stack, when it has one in)
     w.chamber = G.chambered(def) ? w.ammo : null; // and the round in the chamber (G.chambered)
     // reserve: the rounds in the magazines and boxes you carry for it
@@ -234,7 +235,7 @@ const G_Me = {
     this.slot = slot; this.reloading = false; this.inspectT = 0; this.burstQ = 0;
     G.R.setViewmodel(w.def);
     this.raiseT = this.raiseMax = this.drawTime();
-    if (G.GunAudio.available()) { G.GunAudio.buildDry(w.def.soundKey); G.GunAudio.buildDry(G.Gunsmith.roundSoundKey(w.def, w.chamber || w.ammo)); if (w.def.barrels) for (const mm of G.barrelMm(w.def)) G.GunAudio.buildDry(G.shotSoundKey(w.def, mm, w.ammo)); } // (a gun of several barrels: a report for each effective length)
+    if (G.GunAudio.available()) { G.GunAudio.buildDry(w.def.soundKey); G.GunAudio.buildDry(G.Gunsmith.roundSoundKey(w.def, w.chamber || w.ammo)); if (w.def.barrels) for (const k of Object.keys(w.def.barrels.rounds)) { const sd = G.roundSpec(w.def, k); for (const mm of G.barrelMm(w.def, k)) G.GunAudio.buildDry(G.shotSoundKey(sd, mm, w.ammo)); } } // (a gun of several barrels: a report for each effective length)
     G.Audio.pickup();
     G.HUD.toast('', msg, 2);
   },
@@ -277,7 +278,7 @@ const G_Me = {
     const def = G.Gunsmith.compile(w.def.id, build);
     w.def = def; w.sup = def.sup;
     if (this.cur && this.cur() === w && G.R && G.R.vm && G.Game.phase === 'level') G.R.setViewmodel(def); // a different magazine in it, say
-    w.mag = Math.min(w.mag, this.magSize(def));
+    w.mag = Math.min(w.mag, this.magSize(w));
     G.Gear.refitMags(this, def);
     if (w.tube) w.tube.length = Math.min(w.tube.length, w.mag);
   },
@@ -300,7 +301,7 @@ const G_Me = {
       if (a1.kind === 'mag') w.noMag = true; else delete w.noMag;
     }
     w.def = def; w.sup = def.sup;
-    if (keep) { w.mag = Math.min(w.mag, this.magSize(def)); if (w.tube) w.tube.length = Math.min(w.tube.length, w.mag); }
+    if (keep) { w.mag = Math.min(w.mag, this.magSize(w)); if (w.tube) w.tube.length = Math.min(w.tube.length, w.mag); }
     if (!G.chambered(def)) { if (w.chamber) { w.tube.push(w.chamber); w.mag++; } w.chamber = null; } // (no chamber of its own: into the magazine)
     if (this.cur && this.cur() === w && G.R && G.R.vm && G.Game.phase === 'level') G.R.setViewmodel(def);
     const misfit = (def.misfit || []).map((s: string) => GS.PARTS[def.build[s]].name);
@@ -387,7 +388,7 @@ const G_Me = {
   ammoReport() {
     const w = this.cur();
     if (!w || w.def.cls === 'BOW' && !w.def.cal) return 'Need ammo.';
-    const inGun = w.mag + (w.chamber ? 1 : 0), spare = G.Gear.rounds(this, w.def), cap = this.magSize(w.def), mags = cap ? spare / cap : 0;
+    const inGun = w.mag + (w.chamber ? 1 : 0), spare = G.Gear.rounds(this, w.def), cap = this.magSize(w), mags = cap ? spare / cap : 0;
     return spare + inGun === 0 ? 'I\'m out! Need ammo.' : mags < 1.5 ? `Low on ammo: ${inGun} in the gun, ${spare} spare.` : `Ammo's fine: ${inGun} in the gun, ${spare} spare (about ${Math.floor(mags)} reloads).`;
   },
 
@@ -991,7 +992,7 @@ const G_Me = {
   // whatever was left in it (fastest). Digging a magazine out of your backpack takes much longer.
   RELOAD_K: { retain: 1.35, pouch: 1.0, floor: 0.82, plain: 1 },
   startReload() {
-    const w = this.cur(), mag = this.magSize(w.def);
+    const w = this.cur(), mag = this.magSize(w);
     if (!this.reloading && this.swapT <= 0 && G.chambered(w.def) && !w.chamber && w.mag > 0 && w.mag >= mag) { this.rack(w); return; } // (full, nothing chambered: just work the action)
     if (this.reloading || w.mag >= mag || this.swapT > 0) return;
     // something to reload from: a fuller magazine, or rounds
@@ -1067,7 +1068,7 @@ const G_Me = {
   },
 
   weaponUpdate(dt: number) {
-    const w = this.cur(), def = w.def, mag = this.magSize(def);
+    const w = this.cur(), def = w.def, mag = this.magSize(w);
     this.fireCd = Math.max(-0.05, this.fireCd - dt); // (a little below zero: what's left of a frame carries into the next shot)
     this.sinceShot = (this.sinceShot || 0) + dt;
     this.swapT = Math.max(0, this.swapT - dt);
@@ -1277,8 +1278,9 @@ const G_Me = {
       // the round being fired, and the gun as that round sees it (G.roundDef: hollow points, AP, slugs...)
       const round = multi ? (w.tube && w.tube.length ? w.tube.pop()! : w.ammo) : G.chambered(w.def) && w.chamber ? w.chamber : w.tube && w.tube.length ? w.tube.pop()! : w.ammo; // (the chambered one, if it has a chamber)
       if (!G.chambered(w.def) && !multi) { w.spent = w.spent || []; w.spent.unshift(round); w.spent.length = Math.min(w.spent.length, 8); } // (the empties a revolver or break-action keeps till it's opened)
-      let def = G.roundDef(w.def, round), eff = 0;
-      if (multi) { const sd = G.shotDef(def, w, bi); def = sd.def; eff = sd.eff; G.barrelsOf(w)![bi]--; w.mag--; this.lastShot = { barrel: bi, mm: Math.round(eff), k: Math.round(sd.k * 1000) / 1000, left: w.bl!.slice(), mag: w.mag }; this.shotLog.push(this.lastShot); if (this.shotLog.length > 60) this.shotLog.shift(); } // (the barrel's rounds: js/data.ts G.barrelsOf)
+      const sd = multi ? G.shotDef(w.def, w, bi) : null; // (a gun of several barrels: the gun as this barrel's round type and length make it; then as the load sees it)
+      let def = G.roundDef(sd ? sd.def : w.def, round), eff = 0;
+      if (sd) { eff = sd.eff; G.barrelsOf(w)![bi]--; w.mag--; this.lastShot = { barrel: bi, mm: Math.round(eff), k: Math.round(sd.k * 1000) / 1000, rl: G.roundOf(w.def, w.rl)!.rl, am: round, left: w.bl!.slice(), mag: w.mag }; this.shotLog.push(this.lastShot); if (this.shotLog.length > 60) this.shotLog.shift(); } // (the barrel's rounds: js/data.ts G.barrelsOf)
       if (n === 0) { def0 = def; round0 = round; }
       let side = 1;
       if (def.akimbo) { this.flashIdx = this.flashIdx ? 0 : 1; side = this.flashIdx ? 1 : -1; }
@@ -1328,7 +1330,7 @@ const G_Me = {
       // (a shotgun's: every pellet's end, so the squad's highlights show the pattern)
       const tos = shot.tos ? shot.tos.slice(0, 24).map((p: THREE.Vector3) => [r2(p.x), r2(p.y), r2(p.z)]) : undefined;
       if (G.Highlights) G.Highlights.shot('p' + G.Net.myId, muzzle, firstEnd, def.code, round, tos, shot.sid);
-      G.Net.toHost({ t: 'shot', f: [r2(muzzle.x), r2(muzzle.y), r2(muzzle.z)], to: [r2(firstEnd.x), r2(firstEnd.y), r2(firstEnd.z)], tos, sid: shot.sid, w: def.code, am: round, sil: def.cls === 'BOW' ? 2 : w.sup ? (def.quiet ? 2 : 1) : 0, bm: multi ? Math.round(eff) : undefined });
+      G.Net.toHost({ t: 'shot', f: [r2(muzzle.x), r2(muzzle.y), r2(muzzle.z)], to: [r2(firstEnd.x), r2(firstEnd.y), r2(firstEnd.z)], tos, sid: shot.sid, w: def.code, am: round, sil: def.cls === 'BOW' ? 2 : w.sup ? (def.quiet ? 2 : 1) : 0, bm: multi ? Math.round(eff) : undefined, rl: multi ? G.roundOf(w.def, w.rl)!.rl : undefined });
       if (n === 0) firstShot = shot;
     });
     void firstShot;
@@ -2458,7 +2460,7 @@ const G_Me = {
       if (node) { const ax = an.dial ? new THREE.Vector3(md.axis[2], md.axis[1], -md.axis[0]).normalize() : node.userData.axis; node.quaternion.setFromAxisAngle(ax, (i * md.stepDeg * Math.PI) / 180); }
     }
     if (an.pump && !u.info.hinge) an.pump.position.z = cyc * 0.085; // (a gun with a reload sequence moves it only there)
-    if (u.displays && u.displays.ammo && w.def.barrels) G.Viewmodel.paintAmmo(u.displays.ammo, G.barrelsOf(w)!, w.def.barrels.per); // (the rounds left in each barrel)
+    if (u.displays && u.displays.ammo && w.def.barrels) G.Viewmodel.paintAmmo(u.displays.ammo, G.barrelsOf(w)!, G.perOf(w)); // (the rounds left in each barrel)
     if (an.cyl) an.cyl.rotation.z += (this.cylShots * (Math.PI * 2) / u.info.chamberAt.n - an.cyl.rotation.z) * Math.min(1, dt * 18);
     if (an.spin) an.spin.rotation.z += dt * this.spin * 55;
     if (an.magn) an.magn.rotation.z += ((sg.scoped ? 0 : -2.8) - an.magn.rotation.z) * Math.min(1, dt * 14); // a magnifier flips in or out

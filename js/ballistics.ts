@@ -92,7 +92,7 @@ const G_Ballistics = (() => {
   // By caliber: [mass g, diameter mm, length mm, core, tissue yaw depth cm (0: stays nose-first), fragmentation speed m/s
   // (0: doesn't), pellets (0: a single bullet)]
   const CAL: Record<string, any[]> = {
-    '5.56/45': [4.0, 5.7, 23, 'mild', 12, 760], '7.62/39': [7.9, 7.9, 26.8, 'mild', 26, 0], '7/43': [8.7, 7.0, 34, 'mild', 11, 0], '10/38.5': [6.125, 10.0, 22, 'mild', 14, 0], // (7.0 g x 38.5/44: the bullet is shorter with the round)
+    '5.56/45': [4.0, 5.7, 23, 'mild', 12, 760], '7.62/39': [7.9, 7.9, 26.8, 'mild', 26, 0], '7/43': [8.7, 7.0, 34, 'mild', 11, 0], '10/31': [8.0, 10.0, 24, 'lead', 14, 0], '10/53': [9.8, 10.0, 36, 'lead', 15, 0], // (the Tempest's rounds: a full-bore 10 mm lead-cored bullet, 8 g and 9.8 g; the loads' own masses and the sabot's rod: G.CALIBERS loads)
     '7.62/51': [9.5, 7.82, 28.9, 'lead', 15, 790], '9/19': [8.0, 9.0, 15.5, 'lead', 0, 0], '5.7/29': [2.0, 5.7, 21.6, 'hard', 9, 0],
     '11.43/23': [14.9, 11.43, 16.5, 'lead', 0, 0], '18.5/70': [3.5, 8.4, 8.4, 'lead', 0, 0, 9], '7.62/54': [9.6, 7.92, 30, 'mild', 15, 0],
     '12.7/99': [42, 12.95, 58, 'mild', 25, 0], '7.65/17': [4.6, 7.9, 12, 'lead', 0, 0], '12.7/33': [19.4, 12.7, 20, 'lead', 0, 0],
@@ -111,6 +111,7 @@ const G_Ballistics = (() => {
     if (cal === '5.6/15' && am !== 'hp') p.soft = 1.3; // (bare soft lead: it flattens a couple of centimetres in)
     if (am === 'hp') { p.nose = 'hp'; p.core = 'lead'; p.frag = 0; p.vExp = opens(pistol ? 260 : 480); }
     else if (am === 'ap') { p.core = pistol ? 'hard' : 'wc'; p.m *= 0.85; p.frag = 0; p.yaw = p.yaw ? p.yaw * 1.3 : 0; p.jkt = pistol ? 0.3 : 0.35; } // (jkt: the share of it that's jacket: deform)
+    else if (am === 'sabot') { p.core = 'wc'; p.frag = 0; p.yaw = 0; p.nose = 'dart'; p.spike = true; } // (a sub-calibre tungsten rod: the sabot has fallen away; it stays nose-first and parts a weave)
     else if (am === 'tracer') p.m *= 0.97;
     else if (am === 'subsonic') { p.m *= 1.4; p.len *= 1.25; p.frag = 0; }
     else if (am === 'slug') { p.m = 0.028; p.d = 0.0185; p.len = 0.02; p.n = 1; p.nose = 'hp'; p.vExp = opens(300); }
@@ -122,6 +123,7 @@ const G_Ballistics = (() => {
     else if (am === 'broadhead') { p.nose = 'broad'; p.blade = 0.012; p.cut = 0.015; }
     else if (am === 'mechanical') { p.nose = 'broad'; p.blade = 0.017; p.cut = 0.025; }
     else if (am === 'bodkin') { p.nose = 'dart'; p.m = 0.04; p.d = 0.008; p.spike = true; } // (a heavy needle: it parts a weave, vLimit)
+    { const L = G.loadOf(cal, am); if (L) { p.m = L.g / 1000; if (L.d) p.d = L.d / 1000; if (L.len) p.len = L.len / 1000; } } // (a caliber with loads of its own: their masses and shapes)
     if (p.n! > 1 && am !== 'birdshot' && am !== 'flechette') p.nose = 'ball';
     if (p.n! > 1) p.n = def.pellets || p.n; // (the gun's pattern: the round as fired is one pellet)
     p.d0 = p.d; p.m0 = p.m; p.ang = 0; // (as it left the gun; ang: how far it's yawed off its line, rad)
