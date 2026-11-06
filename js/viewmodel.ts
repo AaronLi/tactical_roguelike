@@ -42,9 +42,10 @@ const G_Viewmodel = (() => {
   // glass), masked by the stencil to the sight's window (the window mesh writes 1; hands or the housing in front of
   // the window keep it at 0). The window's edge clips it, so a reticle off to one side is cut by the frame.
   // It's drawn by a shader in screen pixels from its size in minutes of angle, so a 2 MOA dot is 2 MOA at the
-  // view model's field of view (never less than 1.5 px, so it can't vanish) and a ring is its true size.
+  // view model's field of view (never less than MIN_DOT_PX across: at a normal field of view a 2 MOA dot is under half a pixel, and a
+  // lit dot looks bigger and brighter to the eye than its size, so it's drawn as the eye sees it), and a ring is its true size.
   const RETICLE_D = 200;
-  const MOA = Math.PI / 10800, MIN_DOT_PX = 1.5;
+  const MOA = Math.PI / 10800, MIN_DOT_PX = 2.4, LIT = 1.45; // (LIT: how bright the lit parts are drawn, over full colour: a dot's core burns near white)
   // per kind: dot diameter and ring diameter (MOA, 0 = none), 1 = ticks on the ring, the colour of the glow, the hot core
   const RETICLES: Record<string, { dot: number; ring: number; ticks: number; col: number[]; core: number[] }> = {
     dot: { dot: 2, ring: 0, ticks: 0, col: [1, 0.12, 0.08], core: [1, 0.55, 0.5] },
@@ -71,7 +72,7 @@ const G_Viewmodel = (() => {
       // the dot: its true size, a floor of MIN_DOT_PX across, a hot core and a soft glow round it
       float dr = max(dotMOA * moaPx * 0.5, ${MIN_DOT_PX / 2});
       float body = 1.0 - smoothstep(dr - 0.5, dr + 0.5, r);
-      float glow = exp(-max(r - dr, 0.0) / (dr * 1.6 + 1.2)) * 0.32;
+      float glow = exp(-max(r - dr, 0.0) / (dr * 1.8 + 1.6)) * 0.5;
       a = max(body, glow); occ = body; hot = body;
       if (ringMOA > 0.0) {
         float R = ringMOA * moaPx * 0.5, hw = max(0.5 * moaPx * 0.5, 0.65);
@@ -92,7 +93,7 @@ const G_Viewmodel = (() => {
       }
       vec3 c = mix(col, core, hot);
       // premultiplied: the lit parts cover what's behind them (a red dot shows on a bright sky too), the glow only adds
-      gl_FragColor = vec4(c * clamp(a, 0.0, 1.0), clamp(occ, 0.0, 1.0) * 0.9);
+      gl_FragColor = vec4(c * ${LIT.toFixed(2)} * clamp(a, 0.0, 1.0), clamp(occ, 0.0, 1.0) * 0.9);
     }`;
   function reflex(g: THREE.Object3D, o: VmReflex) {
     const mask = new T.Mesh(o.round ? new T.CircleGeometry(o.w / 2, 28) : new T.PlaneGeometry(o.w, o.h), new T.MeshBasicMaterial({
