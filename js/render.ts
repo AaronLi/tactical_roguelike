@@ -105,7 +105,7 @@ const G_R = {
   nvScene: undefined as THREE.Scene | undefined,
   depthOnly: undefined as THREE.MeshBasicMaterial | undefined,
   init() {
-    const r = (this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' }));
+    const r = (this.renderer = new THREE.WebGLRenderer({ antialias: true, stencil: true, powerPreference: 'high-performance' }));
     r.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     r.setSize(window.innerWidth, window.innerHeight);
     r.domElement.id = 'c';

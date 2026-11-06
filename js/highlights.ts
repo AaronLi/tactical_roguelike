@@ -887,7 +887,7 @@ const G_Highlights = (() => {
       if (s.kind === 'ad' && s.store && typeof s.store.left === 'number') { const n = s.store.left; s.store.left = () => n; }
       P.prog.push(s);
     }
-    const cv = new OffscreenCanvas(W, H), R2 = new T.WebGLRenderer({ canvas: cv, antialias: false, preserveDrawingBuffer: false });
+    const cv = new OffscreenCanvas(W, H), R2 = new T.WebGLRenderer({ canvas: cv, antialias: false, stencil: true, preserveDrawingBuffer: false });
     G.R.renderer = R2;
     P.rt = new T.WebGLRenderTarget(W, H, { samples: 2 });
     P.cv = new OffscreenCanvas(W, H) as unknown as HTMLCanvasElement; P.g = P.cv.getContext('2d')!;
