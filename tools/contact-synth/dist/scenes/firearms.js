@@ -743,7 +743,7 @@ function makeArMagIn(fill) {
         // sheet metal round the hole: hard steel on a thin aluminium panel, a sharp tinny click, with a
         // trace of its spring. The magazine then stops at the top of its travel and settles back down
         // onto the catch.
-        hit('mag catch clicks into the hole in the magazine', 0.101, 0, 1.4, arMagCatch, panel, { scatter: 0.1, radius: 0.6, click: 0.9, sharp: 1 }, { coil: { level: 0.15, length: 1.5, dispersion: 0.3, decay: 0.025, brightness: 7000 }, ...SHEET_EDGE }),
+        hit('mag catch clicks into the hole in the magazine', 0.101, 4, 1.4, arMagCatch, panel, { scatter: 0.1, radius: 0.6, click: 0.9, sharp: 1 }, { coil: { level: 0.15, length: 1.5, dispersion: 0.3, decay: 0.025, brightness: 7000 }, ...SHEET_EDGE }),
         // Still accelerating, the magazine slams into its stop at the top of the well: a hard stop.
         // Struck at its top edge, with the hand gripping it and the catch now in its hole, the shell
         // can't ring as a whole: the panel at the stop takes the hit.
