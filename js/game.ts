@@ -852,6 +852,8 @@ const G_Game = {
     const deaf = G.U.clamp(1 - d / 22, 0, 1) * (seen ? 1 : 0.6);
     if (blind > 0.03) G.HUD.flash(blind);
     if (deaf > 0.03) G.Audio.deafen(deaf);
+    // through night vision: the tubes whited out by the glare, the room's if not the flash itself (js/render.ts flashOver)
+    G.R.flashOver(G.U.clamp(1.25 - d / 24, 0, 1) * (seen ? (look > 0 ? 1 : 0.7) : 0.45));
   },
   onKill(m: any) {
     if (this.phase !== 'level') return;

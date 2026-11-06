@@ -338,6 +338,9 @@ const G_Me = {
       { id: 'hold', label: 'Hold', sub: 'hold position', act: () => this.say('Holding here.') },
       { id: 'clear', label: 'Clear', sub: 'room clear', act: () => this.say('Clear!') },
       { id: 'contact', label: 'Contact', sub: 'and ping it', act: () => { (this as { ping(strong: boolean): void }).ping(true); this.say('Contact! Where I\'ve marked.'); } },
+      { id: 'nvg', label: 'Night vision', sub: this.nvItem() ? (this.nvItem()!.dn ? 'down (N)' : 'up (N)') : 'none on', off: !this.nvItem(), act: () => this.nvFlip() },
+      ...(d && d.reticle === 'thermal' ? [{ id: 'thpal', label: 'Thermal', sub: ['white-hot', 'black-hot', 'ironbow'][w.thPal || 0] + ' (T)', act: () => this.thermalPalette() }] : []),
+      { id: 'ir', label: 'IR illuminator', sub: this.nvItem() ? (this.irOn ? 'on' : 'off') + ' (Shift+N)' : 'no goggles', off: !this.nvItem(), act: () => this.irToggle() },
     ];
   },
   wheelOpen() {
@@ -366,7 +369,7 @@ const G_Me = {
     if (el) el.classList.remove('on');
     const it = W && pick && W.sel >= 0 ? W.items[W.sel] : null;
     if (!it) return;
-    if (it.off) { G.HUD.toast('', `No ${it.label.toLowerCase()} on the ${this.cur().def.name}`, 1); G.Audio.deny(); return; }
+    if (it.off) { G.HUD.toast('', it.id === 'nvg' || it.id === 'ir' ? 'No night vision on your helmet' : `No ${it.label.toLowerCase()} on the ${this.cur().def.name}`, 1); G.Audio.deny(); return; }
     it.act();
   },
   // a call to the squad (the chat, under your name)
@@ -473,6 +476,8 @@ const G_Me = {
         case 'KeyB': this.packSwap(); break;
         case 'KeyV': this.shout(); break;
         case 'KeyX': this.selectFire(); break;
+        case 'KeyN': if (e.shiftKey) this.irToggle(); else this.nvFlip(); break;
+        case 'KeyT': this.thermalPalette(); break;
         case 'KeyM': G.Game.setMuted(!G.Audio.muted); G.HUD.toast('', G.Audio.muted ? 'Sound muted' : 'Sound on', 1); break;
         case 'KeyF': this.fEdge = true; break;
         case 'Space': this.lowToggle = !this.lowToggle; break;
@@ -576,6 +581,7 @@ const G_Me = {
     this.stepRounds(dt);
     this.stepFrags(dt);
     G.R.fisheye = 0; // (spectating turns it on: js/player.ts spectate)
+    G.R.nv = null; // (night vision: nvStep, while you're up and about)
     if (this.dead) { if (G.R.vm) G.R.vm.visible = false; this.sendState(dt); return; } // (no gun of yours in the view of someone else's helmet; the camera's placed once their rigs are posed: G.Game.loop, spectate)
 
     this.sinceHurt += dt; this.sinceFire += dt;
@@ -601,8 +607,56 @@ const G_Me = {
     this.weaponUpdate(dt);
     this.interact(dt);
     this.updateCamera(dt);
+    this.nvStep(dt);
     this.sendState(dt);
     this.fEdge = false;
+  },
+  // ------------------------------------------------------------- night vision
+  // On the helmet's shroud (js/gear.ts 'nvg'): N (or the comms wheel) flips it down in front of your eyes or up over the
+  // brow, a third of a second either way; whether it's down is kept on the item (dn: saved with your kit). Down, the
+  // view's drawn through it (js/render.ts nvPass); others see it on your helmet, down or up (kitLook: js/rig.ts).
+  // Shift+N (or the wheel) switches the goggles' IR illuminator: a cone of infrared from the head, light only night vision
+  // sees (js/lightgrid.ts lgNv), for a room with no light at all to amplify. Anyone else with goggles sees it glaring at
+  // them (its source, from inside its cone), as a weapon light gives you away; the suspects have none, so not to them.
+  NV_FLIP: 0.32,
+  nvK: 0,
+  irOn: false,
+  // T (or the wheel): a thermal sight's palette, white-hot, black-hot, ironbow, round again
+  thermalPalette() {
+    const w = this.cur();
+    if (!w || w.def.reticle !== 'thermal') return;
+    w.thPal = ((w.thPal || 0) + 1) % 3;
+    G.Audio.click(); G.HUD.toast('', ['White-hot', 'Black-hot', 'Ironbow'][w.thPal], 0.8);
+  },
+  irToggle() {
+    if (!this.nvItem()) { G.HUD.toast('', 'No night vision on your helmet', 1.2); G.Audio.deny(); return; }
+    this.irOn = !this.irOn;
+    G.Audio.click(); G.HUD.toast('', this.irOn ? 'IR illuminator on: anyone with night vision sees it' : 'IR illuminator off', 1.4);
+  },
+  nvItem(): GItem | null { const h = this.kit && this.kit.helmet; return (h && h.nvg) || null; },
+  nvFlip() {
+    const n = this.nvItem();
+    if (!n) { G.HUD.toast('', this.kit && this.kit.helmet ? 'No night vision on your helmet' : 'No helmet, no night vision', 1.2); G.Audio.deny(); return; }
+    if (this.dead || this.out) return;
+    n.dn = !n.dn;
+    G.Audio.nvFlip(!!n.dn);
+  },
+  nvStep(dt: number) {
+    const n = this.nvItem(), want = n && n.dn && !this.out && !this.dead ? 1 : 0;
+    this.nvK += G.U.clamp(want - this.nvK, -dt / this.NV_FLIP, dt / this.NV_FLIP);
+    const d = n ? G.Gear.defOf(n) : null;
+    G.R.nv = d && d.nv && this.nvK > 0 ? { spec: d.nv, k: this.nvK, fov: G.Game.settings.fov, ir: this.irOn } : null;
+    // others' illuminators, seen through the goggles: their source glaring from their head, the brighter the more it's pointed at you
+    if (G.R.nv && G.R.nv.k > 0.9 && G.Views && G.Game.map) {
+      const cam = G.R.camera.position;
+      for (const pv of G.Views.players.values()) {
+        const st = pv.st;
+        if (!st || !st.ir || st.dd || !pv.rig || !pv.rig.root.visible) continue;
+        const p = pv.rig.head.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.08, 0));
+        const to = cam.clone().sub(p), d = to.length(), fw = new THREE.Vector3(-Math.sin(st.yw), 0, -Math.cos(st.yw)), face = fw.dot(to.normalize());
+        if (d < 40 && G.Level.los(G.Game.map, p.x, p.y, p.z, cam.x, cam.y, cam.z)) G.R.flare(p, 0xffffff, 0.04, face > 0.85 ? 1 : face > 0.5 ? 0.6 : 0.2, face > 0.85 ? 7 : 4);
+      }
+    }
   },
 
   move(dt: number, map: LvMap) {
@@ -3044,7 +3098,7 @@ const G_Me = {
   // what you're wearing, as others see it (js/rig.ts setKit)
   kitLook() {
     const k = this.kit || {}, g = (it: GItem | null) => (it ? it.gid : 0), n = (it: GItem | null) => (it && it.molle ? it.molle.items.length : 0);
-    return { helmet: g(k.helmet), face: k.helmet && k.helmet.face ? k.helmet.face.gid : 0, carrier: g(k.carrier), plate: k.carrier && k.carrier.plate ? 1 : 0, sh: k.carrier && k.carrier.shoulder ? k.carrier.shoulder.gid : 0, gr: k.carrier && k.carrier.groin ? k.carrier.groin.gid : 0, cp: n(k.carrier), belt: g(k.belt), lg: k.belt && k.belt.legs ? k.belt.legs.gid : 0, bp: n(k.belt), pack: g(k.pack), ifak: k.ifak ? 1 : 0 };
+    return { helmet: g(k.helmet), face: k.helmet && k.helmet.face ? k.helmet.face.gid : 0, nv: k.helmet && k.helmet.nvg ? k.helmet.nvg.gid : 0, nd: k.helmet && k.helmet.nvg && k.helmet.nvg.dn ? 1 : 0, carrier: g(k.carrier), plate: k.carrier && k.carrier.plate ? 1 : 0, sh: k.carrier && k.carrier.shoulder ? k.carrier.shoulder.gid : 0, gr: k.carrier && k.carrier.groin ? k.carrier.groin.gid : 0, cp: n(k.carrier), belt: g(k.belt), lg: k.belt && k.belt.legs ? k.belt.legs.gid : 0, bp: n(k.belt), pack: g(k.pack), ifak: k.ifak ? 1 : 0 };
   },
   menuLook(): boolean { const pz = document.getElementById('pause'); return G.Game.phase === 'level' && !this.dead && !this.down && (G.Game.menuOpen() || !!(pz && !pz.classList.contains('hidden'))); }, // (a screen is up: others see the ATAK)
   state() {
@@ -3059,7 +3113,7 @@ const G_Me = {
       mc: this.magChk ? r2(this.magChk.back > 0 ? Math.max(0, 1 - this.magChk.back) : this.magChk.k) : -1,
       act: this.action && this.action.kind ? this.action.kind[0] : 0, ap: this.action ? r2(Math.min(1, this.action.t / this.action.dur)) : 0, zt: this.action && this.action.kind === 'zip' ? this.action.target : -1, bt: this.action && this.action.kind === 'bag' ? this.action.target : -1, pl: this.action && this.action.pull ? 1 : 0, mv: r2(this.hspeed || 0),
       cred: Math.round(this.credits), sx: [this.stats.kills, Math.round(this.stats.dmg), this.stats.hs, this.stats.downs, this.stats.revives],
-      kt: this.kitLook(), md: this.medCounts(),
+      kt: this.kitLook(), md: this.medCounts(), ir: this.irOn && this.nvK > 0.9 ? 1 : 0, // (its IR illuminator lit: others' goggles see it)
     };
   },
 };
