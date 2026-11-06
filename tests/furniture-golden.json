@@ -1,0 +1,6099 @@
+{
+ "note": "node tools/check_furniture_golden.mjs --update (docs/furniture-data.md)",
+ "version": 1,
+ "levels": {
+  "00-apartments-day/floor-0": {
+   "seed": 9001,
+   "level": 1,
+   "theme": 0,
+   "night": false,
+   "floor": 0,
+   "groups": 73,
+   "prims": 1845,
+   "mats": 213,
+   "tex": 33,
+   "kinds": {
+    "box": 1563,
+    "cyl": 155,
+    "ico": 36,
+    "sph": 20,
+    "plane": 71
+   },
+   "hash": "ce07c551",
+   "solids": "4b5231d0",
+   "pieces": {
+    "(rooms)": [
+     19,
+     852,
+     "c788c369"
+    ],
+    "almond": [
+     1,
+     9,
+     "e37f2ed2"
+    ],
+    "bed": [
+     4,
+     50,
+     "1f4363c8"
+    ],
+    "bin": [
+     3,
+     6,
+     "aa0fada8"
+    ],
+    "bookshelf": [
+     2,
+     226,
+     "9b0061ec"
+    ],
+    "calendar": [
+     1,
+     34,
+     "c90f5507"
+    ],
+    "canisters": [
+     1,
+     32,
+     "c01bb14d"
+    ],
+    "china": [
+     1,
+     56,
+     "2fb30261"
+    ],
+    "clockshelf": [
+     1,
+     10,
+     "2f0a2e8f"
+    ],
+    "cooler": [
+     1,
+     3,
+     "618a40ff"
+    ],
+    "couch": [
+     1,
+     49,
+     "d25bb981"
+    ],
+    "counter": [
+     1,
+     23,
+     "9fd9d1a8"
+    ],
+    "crt": [
+     1,
+     15,
+     "e953e7ed"
+    ],
+    "cuptable": [
+     1,
+     18,
+     "16cb9c03"
+    ],
+    "desk": [
+     3,
+     72,
+     "d9e4dfaa"
+    ],
+    "dresser": [
+     1,
+     22,
+     "f721c807"
+    ],
+    "easy": [
+     2,
+     30,
+     "5cf623d7"
+    ],
+    "enamel": [
+     1,
+     10,
+     "23378fc1"
+    ],
+    "flamp": [
+     1,
+     3,
+     "ec1c59fe"
+    ],
+    "guides": [
+     1,
+     12,
+     "ff817945"
+    ],
+    "halfbed": [
+     1,
+     15,
+     "dc960857"
+    ],
+    "lacetable": [
+     1,
+     83,
+     "24cb5c8b"
+    ],
+    "lamp": [
+     4,
+     12,
+     "ce9b0f48"
+    ],
+    "nightstand": [
+     1,
+     12,
+     "d18c7313"
+    ],
+    "photo": [
+     4,
+     20,
+     "ad368ed5"
+    ],
+    "plant": [
+     5,
+     40,
+     "019b9223"
+    ],
+    "shrine": [
+     1,
+     22,
+     "a970ec90"
+    ],
+    "sidetable": [
+     3,
+     28,
+     "dfb10248"
+    ],
+    "sofa": [
+     1,
+     11,
+     "0d0eb84c"
+    ],
+    "tallplant": [
+     1,
+     12,
+     "93cbf834"
+    ],
+    "treadle": [
+     1,
+     24,
+     "dc843a6a"
+    ],
+    "tv": [
+     2,
+     26,
+     "e4949997"
+    ],
+    "wardrobe": [
+     1,
+     8,
+     "2a8cad91"
+    ]
+   }
+  },
+  "00-apartments-day/floor-1": {
+   "seed": 9001,
+   "level": 1,
+   "theme": 0,
+   "night": false,
+   "floor": 1,
+   "groups": 64,
+   "prims": 1287,
+   "mats": 140,
+   "tex": 33,
+   "kinds": {
+    "box": 1008,
+    "cyl": 113,
+    "ico": 54,
+    "sph": 16,
+    "plane": 96
+   },
+   "hash": "a8481272",
+   "solids": "8132eb52",
+   "pieces": {
+    "(rooms)": [
+     19,
+     797,
+     "491af1ba"
+    ],
+    "basin": [
+     2,
+     10,
+     "8da2742d"
+    ],
+    "bed": [
+     5,
+     64,
+     "76d3b75a"
+    ],
+    "bedd": [
+     1,
+     7,
+     "36b5bb34"
+    ],
+    "bin": [
+     2,
+     4,
+     "1e95bd09"
+    ],
+    "canpyramid": [
+     1,
+     56,
+     "d752fc10"
+    ],
+    "cardboard": [
+     1,
+     2,
+     "de820f88"
+    ],
+    "couch": [
+     1,
+     14,
+     "371715e9"
+    ],
+    "counter": [
+     2,
+     51,
+     "0ca0ec8e"
+    ],
+    "dresser": [
+     2,
+     41,
+     "377d2429"
+    ],
+    "flattv": [
+     1,
+     4,
+     "46b21996"
+    ],
+    "foampanels": [
+     1,
+     18,
+     "c67e947f"
+    ],
+    "gamechair": [
+     1,
+     10,
+     "1586ea17"
+    ],
+    "greenscreen": [
+     1,
+     2,
+     "46cb5c0b"
+    ],
+    "icebox": [
+     1,
+     5,
+     "26edad8d"
+    ],
+    "kitrun": [
+     1,
+     22,
+     "923f0eb2"
+    ],
+    "lamp": [
+     2,
+     6,
+     "853c419c"
+    ],
+    "livesign": [
+     1,
+     2,
+     "8479f6e5"
+    ],
+    "pctower": [
+     1,
+     2,
+     "c982e47d"
+    ],
+    "plant": [
+     8,
+     64,
+     "78bdafe3"
+    ],
+    "rigdesk": [
+     1,
+     16,
+     "30f50d72"
+    ],
+    "ringlight": [
+     1,
+     8,
+     "171d23fb"
+    ],
+    "sidetable": [
+     3,
+     24,
+     "2446928b"
+    ],
+    "toilet": [
+     1,
+     4,
+     "df6f81da"
+    ],
+    "tv": [
+     3,
+     47,
+     "bac4b628"
+    ],
+    "wardrobe": [
+     1,
+     7,
+     "48b01899"
+    ]
+   }
+  },
+  "00-apartments-day/floor-2": {
+   "seed": 9001,
+   "level": 1,
+   "theme": 0,
+   "night": false,
+   "floor": 2,
+   "groups": 210,
+   "prims": 579,
+   "mats": 11,
+   "tex": 3,
+   "kinds": {
+    "box": 469,
+    "cyl": 10,
+    "plane": 100
+   },
+   "hash": "6f7f2e59",
+   "solids": "455472f8",
+   "pieces": {
+    "(rooms)": [
+     3,
+     100,
+     "2f4d3247"
+    ],
+    "hvac": [
+     4,
+     68,
+     "4efb9c32"
+    ],
+    "parapet": [
+     202,
+     404,
+     "26479225"
+    ],
+    "watertank": [
+     1,
+     7,
+     "f53982aa"
+    ]
+   }
+  },
+  "00-apartments-night/floor-0": {
+   "seed": 9001,
+   "level": 1,
+   "theme": 0,
+   "night": true,
+   "floor": 0,
+   "groups": 73,
+   "prims": 1845,
+   "mats": 213,
+   "tex": 33,
+   "kinds": {
+    "box": 1563,
+    "cyl": 155,
+    "ico": 36,
+    "sph": 20,
+    "plane": 71
+   },
+   "hash": "ce07c551",
+   "solids": "4b5231d0",
+   "pieces": {
+    "(rooms)": [
+     19,
+     852,
+     "c788c369"
+    ],
+    "almond": [
+     1,
+     9,
+     "e37f2ed2"
+    ],
+    "bed": [
+     4,
+     50,
+     "1f4363c8"
+    ],
+    "bin": [
+     3,
+     6,
+     "aa0fada8"
+    ],
+    "bookshelf": [
+     2,
+     226,
+     "9b0061ec"
+    ],
+    "calendar": [
+     1,
+     34,
+     "c90f5507"
+    ],
+    "canisters": [
+     1,
+     32,
+     "c01bb14d"
+    ],
+    "china": [
+     1,
+     56,
+     "2fb30261"
+    ],
+    "clockshelf": [
+     1,
+     10,
+     "2f0a2e8f"
+    ],
+    "cooler": [
+     1,
+     3,
+     "618a40ff"
+    ],
+    "couch": [
+     1,
+     49,
+     "d25bb981"
+    ],
+    "counter": [
+     1,
+     23,
+     "9fd9d1a8"
+    ],
+    "crt": [
+     1,
+     15,
+     "e953e7ed"
+    ],
+    "cuptable": [
+     1,
+     18,
+     "16cb9c03"
+    ],
+    "desk": [
+     3,
+     72,
+     "d9e4dfaa"
+    ],
+    "dresser": [
+     1,
+     22,
+     "f721c807"
+    ],
+    "easy": [
+     2,
+     30,
+     "5cf623d7"
+    ],
+    "enamel": [
+     1,
+     10,
+     "23378fc1"
+    ],
+    "flamp": [
+     1,
+     3,
+     "ec1c59fe"
+    ],
+    "guides": [
+     1,
+     12,
+     "ff817945"
+    ],
+    "halfbed": [
+     1,
+     15,
+     "dc960857"
+    ],
+    "lacetable": [
+     1,
+     83,
+     "24cb5c8b"
+    ],
+    "lamp": [
+     4,
+     12,
+     "ce9b0f48"
+    ],
+    "nightstand": [
+     1,
+     12,
+     "d18c7313"
+    ],
+    "photo": [
+     4,
+     20,
+     "ad368ed5"
+    ],
+    "plant": [
+     5,
+     40,
+     "019b9223"
+    ],
+    "shrine": [
+     1,
+     22,
+     "a970ec90"
+    ],
+    "sidetable": [
+     3,
+     28,
+     "dfb10248"
+    ],
+    "sofa": [
+     1,
+     11,
+     "0d0eb84c"
+    ],
+    "tallplant": [
+     1,
+     12,
+     "93cbf834"
+    ],
+    "treadle": [
+     1,
+     24,
+     "dc843a6a"
+    ],
+    "tv": [
+     2,
+     26,
+     "e4949997"
+    ],
+    "wardrobe": [
+     1,
+     8,
+     "2a8cad91"
+    ]
+   }
+  },
+  "00-apartments-night/floor-1": {
+   "seed": 9001,
+   "level": 1,
+   "theme": 0,
+   "night": true,
+   "floor": 1,
+   "groups": 64,
+   "prims": 1287,
+   "mats": 140,
+   "tex": 33,
+   "kinds": {
+    "box": 1008,
+    "cyl": 113,
+    "ico": 54,
+    "sph": 16,
+    "plane": 96
+   },
+   "hash": "a8481272",
+   "solids": "8132eb52",
+   "pieces": {
+    "(rooms)": [
+     19,
+     797,
+     "491af1ba"
+    ],
+    "basin": [
+     2,
+     10,
+     "8da2742d"
+    ],
+    "bed": [
+     5,
+     64,
+     "76d3b75a"
+    ],
+    "bedd": [
+     1,
+     7,
+     "36b5bb34"
+    ],
+    "bin": [
+     2,
+     4,
+     "1e95bd09"
+    ],
+    "canpyramid": [
+     1,
+     56,
+     "d752fc10"
+    ],
+    "cardboard": [
+     1,
+     2,
+     "de820f88"
+    ],
+    "couch": [
+     1,
+     14,
+     "371715e9"
+    ],
+    "counter": [
+     2,
+     51,
+     "0ca0ec8e"
+    ],
+    "dresser": [
+     2,
+     41,
+     "377d2429"
+    ],
+    "flattv": [
+     1,
+     4,
+     "46b21996"
+    ],
+    "foampanels": [
+     1,
+     18,
+     "c67e947f"
+    ],
+    "gamechair": [
+     1,
+     10,
+     "1586ea17"
+    ],
+    "greenscreen": [
+     1,
+     2,
+     "46cb5c0b"
+    ],
+    "icebox": [
+     1,
+     5,
+     "26edad8d"
+    ],
+    "kitrun": [
+     1,
+     22,
+     "923f0eb2"
+    ],
+    "lamp": [
+     2,
+     6,
+     "853c419c"
+    ],
+    "livesign": [
+     1,
+     2,
+     "8479f6e5"
+    ],
+    "pctower": [
+     1,
+     2,
+     "c982e47d"
+    ],
+    "plant": [
+     8,
+     64,
+     "78bdafe3"
+    ],
+    "rigdesk": [
+     1,
+     16,
+     "30f50d72"
+    ],
+    "ringlight": [
+     1,
+     8,
+     "171d23fb"
+    ],
+    "sidetable": [
+     3,
+     24,
+     "2446928b"
+    ],
+    "toilet": [
+     1,
+     4,
+     "df6f81da"
+    ],
+    "tv": [
+     3,
+     47,
+     "bac4b628"
+    ],
+    "wardrobe": [
+     1,
+     7,
+     "48b01899"
+    ]
+   }
+  },
+  "00-apartments-night/floor-2": {
+   "seed": 9001,
+   "level": 1,
+   "theme": 0,
+   "night": true,
+   "floor": 2,
+   "groups": 210,
+   "prims": 579,
+   "mats": 11,
+   "tex": 3,
+   "kinds": {
+    "box": 469,
+    "cyl": 10,
+    "plane": 100
+   },
+   "hash": "6f7f2e59",
+   "solids": "455472f8",
+   "pieces": {
+    "(rooms)": [
+     3,
+     100,
+     "2f4d3247"
+    ],
+    "hvac": [
+     4,
+     68,
+     "4efb9c32"
+    ],
+    "parapet": [
+     202,
+     404,
+     "26479225"
+    ],
+    "watertank": [
+     1,
+     7,
+     "f53982aa"
+    ]
+   }
+  },
+  "01-warehouse-day": {
+   "seed": 9102,
+   "level": 2,
+   "theme": 1,
+   "night": false,
+   "groups": 299,
+   "prims": 5116,
+   "mats": 116,
+   "tex": 9,
+   "kinds": {
+    "box": 4874,
+    "cyl": 198,
+    "ico": 27,
+    "plane": 17
+   },
+   "hash": "4280dec7",
+   "solids": "b0abe322",
+   "pieces": {
+    "(rooms)": [
+     7,
+     480,
+     "3af981b8"
+    ],
+    "bin": [
+     3,
+     6,
+     "3e0658de"
+    ],
+    "bookshelf": [
+     2,
+     162,
+     "8ffe3118"
+    ],
+    "cardboard": [
+     3,
+     6,
+     "ffa6def3"
+    ],
+    "container": [
+     2,
+     148,
+     "21c50800"
+    ],
+    "cooler": [
+     4,
+     12,
+     "b6d526fa"
+    ],
+    "counter": [
+     1,
+     28,
+     "565d9086"
+    ],
+    "crates": [
+     12,
+     17,
+     "84274220"
+    ],
+    "desk": [
+     3,
+     72,
+     "b8151f63"
+    ],
+    "deskpair": [
+     1,
+     20,
+     "f6358499"
+    ],
+    "dumpster": [
+     2,
+     12,
+     "5ccd3c80"
+    ],
+    "fence": [
+     152,
+     1162,
+     "643ac2cf"
+    ],
+    "files": [
+     3,
+     90,
+     "579ed265"
+    ],
+    "fridge": [
+     1,
+     15,
+     "10be5f36"
+    ],
+    "pallet": [
+     7,
+     107,
+     "91a172ff"
+    ],
+    "palletrack": [
+     84,
+     2575,
+     "ae58e071"
+    ],
+    "plant": [
+     4,
+     29,
+     "2ea66c74"
+    ],
+    "rack": [
+     7,
+     162,
+     "be69d649"
+    ],
+    "sofa": [
+     1,
+     13,
+     "b6e2eb21"
+    ]
+   }
+  },
+  "01-warehouse-night": {
+   "seed": 9102,
+   "level": 2,
+   "theme": 1,
+   "night": true,
+   "groups": 299,
+   "prims": 5116,
+   "mats": 116,
+   "tex": 9,
+   "kinds": {
+    "box": 4874,
+    "cyl": 198,
+    "ico": 27,
+    "plane": 17
+   },
+   "hash": "4280dec7",
+   "solids": "b0abe322",
+   "pieces": {
+    "(rooms)": [
+     7,
+     480,
+     "3af981b8"
+    ],
+    "bin": [
+     3,
+     6,
+     "3e0658de"
+    ],
+    "bookshelf": [
+     2,
+     162,
+     "8ffe3118"
+    ],
+    "cardboard": [
+     3,
+     6,
+     "ffa6def3"
+    ],
+    "container": [
+     2,
+     148,
+     "21c50800"
+    ],
+    "cooler": [
+     4,
+     12,
+     "b6d526fa"
+    ],
+    "counter": [
+     1,
+     28,
+     "565d9086"
+    ],
+    "crates": [
+     12,
+     17,
+     "84274220"
+    ],
+    "desk": [
+     3,
+     72,
+     "b8151f63"
+    ],
+    "deskpair": [
+     1,
+     20,
+     "f6358499"
+    ],
+    "dumpster": [
+     2,
+     12,
+     "5ccd3c80"
+    ],
+    "fence": [
+     152,
+     1162,
+     "643ac2cf"
+    ],
+    "files": [
+     3,
+     90,
+     "579ed265"
+    ],
+    "fridge": [
+     1,
+     15,
+     "10be5f36"
+    ],
+    "pallet": [
+     7,
+     107,
+     "91a172ff"
+    ],
+    "palletrack": [
+     84,
+     2575,
+     "ae58e071"
+    ],
+    "plant": [
+     4,
+     29,
+     "2ea66c74"
+    ],
+    "rack": [
+     7,
+     162,
+     "be69d649"
+    ],
+    "sofa": [
+     1,
+     13,
+     "b6e2eb21"
+    ]
+   }
+  },
+  "02-bunker-day": {
+   "seed": 9203,
+   "level": 3,
+   "theme": 2,
+   "night": false,
+   "groups": 196,
+   "prims": 2580,
+   "mats": 145,
+   "tex": 18,
+   "kinds": {
+    "box": 2419,
+    "cyl": 79,
+    "ico": 34,
+    "sph": 18,
+    "plane": 30
+   },
+   "hash": "7958af1e",
+   "solids": "f252eded",
+   "pieces": {
+    "(rooms)": [
+     10,
+     400,
+     "c9c509dd"
+    ],
+    "bin": [
+     5,
+     10,
+     "1ebe6f22"
+    ],
+    "bookshelf": [
+     4,
+     354,
+     "29e723ee"
+    ],
+    "cardboard": [
+     6,
+     12,
+     "921a983b"
+    ],
+    "cooler": [
+     3,
+     9,
+     "afb6c88f"
+    ],
+    "counter": [
+     2,
+     55,
+     "7380a210"
+    ],
+    "crates": [
+     6,
+     10,
+     "0e3f12de"
+    ],
+    "desk": [
+     4,
+     96,
+     "ff2d41db"
+    ],
+    "deskpair": [
+     3,
+     57,
+     "fcbf426a"
+    ],
+    "dining": [
+     1,
+     34,
+     "0b00d172"
+    ],
+    "dresser": [
+     3,
+     63,
+     "78e7ca32"
+    ],
+    "fence": [
+     119,
+     910,
+     "7fe15a9b"
+    ],
+    "files": [
+     4,
+     120,
+     "cd05c703"
+    ],
+    "fridge": [
+     1,
+     15,
+     "61b03fd8"
+    ],
+    "hesco": [
+     6,
+     180,
+     "df9cbb49"
+    ],
+    "lamp": [
+     3,
+     9,
+     "d22c5e6e"
+    ],
+    "pallet": [
+     3,
+     45,
+     "6dbb819c"
+    ],
+    "plant": [
+     4,
+     32,
+     "d02d779f"
+    ],
+    "rack": [
+     5,
+     118,
+     "810f929e"
+    ],
+    "sofa": [
+     2,
+     25,
+     "54cbfa1b"
+    ],
+    "tv": [
+     2,
+     26,
+     "d4ae4c48"
+    ]
+   }
+  },
+  "02-bunker-night": {
+   "seed": 9203,
+   "level": 3,
+   "theme": 2,
+   "night": true,
+   "groups": 196,
+   "prims": 2580,
+   "mats": 145,
+   "tex": 18,
+   "kinds": {
+    "box": 2419,
+    "cyl": 79,
+    "ico": 34,
+    "sph": 18,
+    "plane": 30
+   },
+   "hash": "7958af1e",
+   "solids": "f252eded",
+   "pieces": {
+    "(rooms)": [
+     10,
+     400,
+     "c9c509dd"
+    ],
+    "bin": [
+     5,
+     10,
+     "1ebe6f22"
+    ],
+    "bookshelf": [
+     4,
+     354,
+     "29e723ee"
+    ],
+    "cardboard": [
+     6,
+     12,
+     "921a983b"
+    ],
+    "cooler": [
+     3,
+     9,
+     "afb6c88f"
+    ],
+    "counter": [
+     2,
+     55,
+     "7380a210"
+    ],
+    "crates": [
+     6,
+     10,
+     "0e3f12de"
+    ],
+    "desk": [
+     4,
+     96,
+     "ff2d41db"
+    ],
+    "deskpair": [
+     3,
+     57,
+     "fcbf426a"
+    ],
+    "dining": [
+     1,
+     34,
+     "0b00d172"
+    ],
+    "dresser": [
+     3,
+     63,
+     "78e7ca32"
+    ],
+    "fence": [
+     119,
+     910,
+     "7fe15a9b"
+    ],
+    "files": [
+     4,
+     120,
+     "cd05c703"
+    ],
+    "fridge": [
+     1,
+     15,
+     "61b03fd8"
+    ],
+    "hesco": [
+     6,
+     180,
+     "df9cbb49"
+    ],
+    "lamp": [
+     3,
+     9,
+     "d22c5e6e"
+    ],
+    "pallet": [
+     3,
+     45,
+     "6dbb819c"
+    ],
+    "plant": [
+     4,
+     32,
+     "d02d779f"
+    ],
+    "rack": [
+     5,
+     118,
+     "810f929e"
+    ],
+    "sofa": [
+     2,
+     25,
+     "54cbfa1b"
+    ],
+    "tv": [
+     2,
+     26,
+     "d4ae4c48"
+    ]
+   }
+  },
+  "03-houses-day/floor-0": {
+   "seed": 9304,
+   "level": 4,
+   "theme": 3,
+   "night": false,
+   "floor": 0,
+   "groups": 39,
+   "prims": 883,
+   "mats": 83,
+   "tex": 15,
+   "kinds": {
+    "box": 815,
+    "cyl": 26,
+    "ico": 11,
+    "plane": 31
+   },
+   "hash": "07b5892d",
+   "solids": "9982d219",
+   "pieces": {
+    "(rooms)": [
+     10,
+     452,
+     "5371dbb8"
+    ],
+    "bin": [
+     3,
+     6,
+     "d5c87d6a"
+    ],
+    "bookshelf": [
+     1,
+     83,
+     "41fdf5fe"
+    ],
+    "cardboard": [
+     6,
+     12,
+     "e619c033"
+    ],
+    "cooler": [
+     2,
+     6,
+     "3b5b9fc1"
+    ],
+    "crates": [
+     1,
+     1,
+     "155cd171"
+    ],
+    "desk": [
+     3,
+     72,
+     "0198ba0b"
+    ],
+    "pallet": [
+     1,
+     17,
+     "f7e9bc7f"
+    ],
+    "plant": [
+     1,
+     7,
+     "386a3fc1"
+    ],
+    "rack": [
+     7,
+     174,
+     "d7a904ee"
+    ],
+    "sidetable": [
+     1,
+     10,
+     "5bcdeba2"
+    ],
+    "sofa": [
+     1,
+     13,
+     "9803aabb"
+    ],
+    "tv": [
+     2,
+     30,
+     "a4da048d"
+    ]
+   }
+  },
+  "03-houses-day/floor-1": {
+   "seed": 9304,
+   "level": 4,
+   "theme": 3,
+   "night": false,
+   "floor": 1,
+   "groups": 551,
+   "prims": 4949,
+   "mats": 146,
+   "tex": 30,
+   "kinds": {
+    "box": 4631,
+    "cyl": 47,
+    "ico": 107,
+    "sph": 75,
+    "plane": 89
+   },
+   "hash": "5a0d2776",
+   "solids": "8920fae3",
+   "pieces": {
+    "(rooms)": [
+     20,
+     488,
+     "8efe458a"
+    ],
+    "bbq": [
+     3,
+     21,
+     "d1b930dd"
+    ],
+    "bed": [
+     1,
+     13,
+     "8f2ea396"
+    ],
+    "bin": [
+     2,
+     4,
+     "d03ba620"
+    ],
+    "bookshelf": [
+     1,
+     100,
+     "eb249b72"
+    ],
+    "boxtruck": [
+     1,
+     16,
+     "952c625f"
+    ],
+    "counter": [
+     2,
+     60,
+     "324d18b5"
+    ],
+    "desk": [
+     1,
+     24,
+     "b6e1cd25"
+    ],
+    "dresser": [
+     1,
+     22,
+     "04ff4fff"
+    ],
+    "fence": [
+     485,
+     3708,
+     "e32d9f54"
+    ],
+    "files": [
+     1,
+     30,
+     "51216221"
+    ],
+    "hedge": [
+     3,
+     33,
+     "bdea91c8"
+    ],
+    "patio": [
+     1,
+     28,
+     "5e7662e3"
+    ],
+    "plant": [
+     5,
+     40,
+     "8ee41798"
+    ],
+    "planter": [
+     11,
+     132,
+     "f10e5199"
+    ],
+    "police": [
+     6,
+     138,
+     "52f9a102"
+    ],
+    "shed": [
+     3,
+     42,
+     "f6c38102"
+    ],
+    "sidetable": [
+     1,
+     8,
+     "7712f20c"
+    ],
+    "sofa": [
+     1,
+     12,
+     "ade0646d"
+    ],
+    "tv": [
+     2,
+     30,
+     "c2c15a0d"
+    ]
+   }
+  },
+  "03-houses-day/floor-2": {
+   "seed": 9304,
+   "level": 4,
+   "theme": 3,
+   "night": false,
+   "floor": 2,
+   "groups": 36,
+   "prims": 863,
+   "mats": 95,
+   "tex": 17,
+   "kinds": {
+    "box": 714,
+    "cyl": 42,
+    "ico": 32,
+    "sph": 6,
+    "plane": 69
+   },
+   "hash": "c5a564b6",
+   "solids": "7495153f",
+   "pieces": {
+    "(rooms)": [
+     10,
+     495,
+     "457fc9c8"
+    ],
+    "bed": [
+     6,
+     74,
+     "8a5cda46"
+    ],
+    "bin": [
+     4,
+     8,
+     "70bb22e1"
+    ],
+    "bookshelf": [
+     1,
+     106,
+     "806d8504"
+    ],
+    "desk": [
+     3,
+     72,
+     "2503d124"
+    ],
+    "dresser": [
+     1,
+     19,
+     "ab53a3c1"
+    ],
+    "files": [
+     1,
+     30,
+     "db37922b"
+    ],
+    "lamp": [
+     4,
+     12,
+     "65facb0f"
+    ],
+    "plant": [
+     5,
+     39,
+     "75269ec4"
+    ],
+    "wardrobe": [
+     1,
+     8,
+     "e4152417"
+    ]
+   }
+  },
+  "03-houses-night/floor-0": {
+   "seed": 9304,
+   "level": 4,
+   "theme": 3,
+   "night": true,
+   "floor": 0,
+   "groups": 39,
+   "prims": 883,
+   "mats": 83,
+   "tex": 15,
+   "kinds": {
+    "box": 815,
+    "cyl": 26,
+    "ico": 11,
+    "plane": 31
+   },
+   "hash": "07b5892d",
+   "solids": "9982d219",
+   "pieces": {
+    "(rooms)": [
+     10,
+     452,
+     "5371dbb8"
+    ],
+    "bin": [
+     3,
+     6,
+     "d5c87d6a"
+    ],
+    "bookshelf": [
+     1,
+     83,
+     "41fdf5fe"
+    ],
+    "cardboard": [
+     6,
+     12,
+     "e619c033"
+    ],
+    "cooler": [
+     2,
+     6,
+     "3b5b9fc1"
+    ],
+    "crates": [
+     1,
+     1,
+     "155cd171"
+    ],
+    "desk": [
+     3,
+     72,
+     "0198ba0b"
+    ],
+    "pallet": [
+     1,
+     17,
+     "f7e9bc7f"
+    ],
+    "plant": [
+     1,
+     7,
+     "386a3fc1"
+    ],
+    "rack": [
+     7,
+     174,
+     "d7a904ee"
+    ],
+    "sidetable": [
+     1,
+     10,
+     "5bcdeba2"
+    ],
+    "sofa": [
+     1,
+     13,
+     "9803aabb"
+    ],
+    "tv": [
+     2,
+     30,
+     "a4da048d"
+    ]
+   }
+  },
+  "03-houses-night/floor-1": {
+   "seed": 9304,
+   "level": 4,
+   "theme": 3,
+   "night": true,
+   "floor": 1,
+   "groups": 551,
+   "prims": 4949,
+   "mats": 146,
+   "tex": 30,
+   "kinds": {
+    "box": 4631,
+    "cyl": 47,
+    "ico": 107,
+    "sph": 75,
+    "plane": 89
+   },
+   "hash": "5a0d2776",
+   "solids": "8920fae3",
+   "pieces": {
+    "(rooms)": [
+     20,
+     488,
+     "8efe458a"
+    ],
+    "bbq": [
+     3,
+     21,
+     "d1b930dd"
+    ],
+    "bed": [
+     1,
+     13,
+     "8f2ea396"
+    ],
+    "bin": [
+     2,
+     4,
+     "d03ba620"
+    ],
+    "bookshelf": [
+     1,
+     100,
+     "eb249b72"
+    ],
+    "boxtruck": [
+     1,
+     16,
+     "952c625f"
+    ],
+    "counter": [
+     2,
+     60,
+     "324d18b5"
+    ],
+    "desk": [
+     1,
+     24,
+     "b6e1cd25"
+    ],
+    "dresser": [
+     1,
+     22,
+     "04ff4fff"
+    ],
+    "fence": [
+     485,
+     3708,
+     "e32d9f54"
+    ],
+    "files": [
+     1,
+     30,
+     "51216221"
+    ],
+    "hedge": [
+     3,
+     33,
+     "bdea91c8"
+    ],
+    "patio": [
+     1,
+     28,
+     "5e7662e3"
+    ],
+    "plant": [
+     5,
+     40,
+     "8ee41798"
+    ],
+    "planter": [
+     11,
+     132,
+     "f10e5199"
+    ],
+    "police": [
+     6,
+     138,
+     "52f9a102"
+    ],
+    "shed": [
+     3,
+     42,
+     "f6c38102"
+    ],
+    "sidetable": [
+     1,
+     8,
+     "7712f20c"
+    ],
+    "sofa": [
+     1,
+     12,
+     "ade0646d"
+    ],
+    "tv": [
+     2,
+     30,
+     "c2c15a0d"
+    ]
+   }
+  },
+  "03-houses-night/floor-2": {
+   "seed": 9304,
+   "level": 4,
+   "theme": 3,
+   "night": true,
+   "floor": 2,
+   "groups": 36,
+   "prims": 863,
+   "mats": 95,
+   "tex": 17,
+   "kinds": {
+    "box": 714,
+    "cyl": 42,
+    "ico": 32,
+    "sph": 6,
+    "plane": 69
+   },
+   "hash": "c5a564b6",
+   "solids": "7495153f",
+   "pieces": {
+    "(rooms)": [
+     10,
+     495,
+     "457fc9c8"
+    ],
+    "bed": [
+     6,
+     74,
+     "8a5cda46"
+    ],
+    "bin": [
+     4,
+     8,
+     "70bb22e1"
+    ],
+    "bookshelf": [
+     1,
+     106,
+     "806d8504"
+    ],
+    "desk": [
+     3,
+     72,
+     "2503d124"
+    ],
+    "dresser": [
+     1,
+     19,
+     "ab53a3c1"
+    ],
+    "files": [
+     1,
+     30,
+     "db37922b"
+    ],
+    "lamp": [
+     4,
+     12,
+     "65facb0f"
+    ],
+    "plant": [
+     5,
+     39,
+     "75269ec4"
+    ],
+    "wardrobe": [
+     1,
+     8,
+     "e4152417"
+    ]
+   }
+  },
+  "04-research-lab-day": {
+   "seed": 9405,
+   "level": 5,
+   "theme": 4,
+   "night": false,
+   "groups": 205,
+   "prims": 2587,
+   "mats": 158,
+   "tex": 17,
+   "kinds": {
+    "box": 2418,
+    "cyl": 101,
+    "ico": 31,
+    "sph": 6,
+    "plane": 31
+   },
+   "hash": "b1a29d56",
+   "solids": "cc90c994",
+   "pieces": {
+    "(rooms)": [
+     11,
+     421,
+     "0efc0bd4"
+    ],
+    "armchairs": [
+     1,
+     22,
+     "64bdc3e3"
+    ],
+    "bin": [
+     5,
+     10,
+     "7550dd2e"
+    ],
+    "bookshelf": [
+     3,
+     298,
+     "e0641ad9"
+    ],
+    "boxtruck": [
+     2,
+     32,
+     "d798a056"
+    ],
+    "cardboard": [
+     3,
+     6,
+     "071cef35"
+    ],
+    "cooler": [
+     3,
+     9,
+     "c7e81427"
+    ],
+    "counter": [
+     2,
+     55,
+     "d0f21a00"
+    ],
+    "crates": [
+     10,
+     16,
+     "865f38e5"
+    ],
+    "desk": [
+     4,
+     96,
+     "9f8d191c"
+    ],
+    "deskpair": [
+     2,
+     37,
+     "8622595b"
+    ],
+    "dining": [
+     3,
+     108,
+     "b2fdb4c5"
+    ],
+    "dresser": [
+     1,
+     19,
+     "e9ca8e49"
+    ],
+    "dumpster": [
+     2,
+     12,
+     "dbaead5e"
+    ],
+    "fence": [
+     125,
+     958,
+     "4380b916"
+    ],
+    "files": [
+     5,
+     150,
+     "6da8dea5"
+    ],
+    "fridge": [
+     1,
+     15,
+     "0646f2e9"
+    ],
+    "lamp": [
+     2,
+     6,
+     "4fc0c22f"
+    ],
+    "pallet": [
+     4,
+     64,
+     "1fe7c774"
+    ],
+    "plant": [
+     3,
+     24,
+     "ff4bddb2"
+    ],
+    "rack": [
+     6,
+     140,
+     "89b6554f"
+    ],
+    "sidetable": [
+     1,
+     10,
+     "25e359d5"
+    ],
+    "sofa": [
+     3,
+     36,
+     "74c591d7"
+    ],
+    "tv": [
+     3,
+     43,
+     "70483d9c"
+    ]
+   }
+  },
+  "04-research-lab-night": {
+   "seed": 9405,
+   "level": 5,
+   "theme": 4,
+   "night": true,
+   "groups": 205,
+   "prims": 2587,
+   "mats": 158,
+   "tex": 17,
+   "kinds": {
+    "box": 2418,
+    "cyl": 101,
+    "ico": 31,
+    "sph": 6,
+    "plane": 31
+   },
+   "hash": "b1a29d56",
+   "solids": "cc90c994",
+   "pieces": {
+    "(rooms)": [
+     11,
+     421,
+     "0efc0bd4"
+    ],
+    "armchairs": [
+     1,
+     22,
+     "64bdc3e3"
+    ],
+    "bin": [
+     5,
+     10,
+     "7550dd2e"
+    ],
+    "bookshelf": [
+     3,
+     298,
+     "e0641ad9"
+    ],
+    "boxtruck": [
+     2,
+     32,
+     "d798a056"
+    ],
+    "cardboard": [
+     3,
+     6,
+     "071cef35"
+    ],
+    "cooler": [
+     3,
+     9,
+     "c7e81427"
+    ],
+    "counter": [
+     2,
+     55,
+     "d0f21a00"
+    ],
+    "crates": [
+     10,
+     16,
+     "865f38e5"
+    ],
+    "desk": [
+     4,
+     96,
+     "9f8d191c"
+    ],
+    "deskpair": [
+     2,
+     37,
+     "8622595b"
+    ],
+    "dining": [
+     3,
+     108,
+     "b2fdb4c5"
+    ],
+    "dresser": [
+     1,
+     19,
+     "e9ca8e49"
+    ],
+    "dumpster": [
+     2,
+     12,
+     "dbaead5e"
+    ],
+    "fence": [
+     125,
+     958,
+     "4380b916"
+    ],
+    "files": [
+     5,
+     150,
+     "6da8dea5"
+    ],
+    "fridge": [
+     1,
+     15,
+     "0646f2e9"
+    ],
+    "lamp": [
+     2,
+     6,
+     "4fc0c22f"
+    ],
+    "pallet": [
+     4,
+     64,
+     "1fe7c774"
+    ],
+    "plant": [
+     3,
+     24,
+     "ff4bddb2"
+    ],
+    "rack": [
+     6,
+     140,
+     "89b6554f"
+    ],
+    "sidetable": [
+     1,
+     10,
+     "25e359d5"
+    ],
+    "sofa": [
+     3,
+     36,
+     "74c591d7"
+    ],
+    "tv": [
+     3,
+     43,
+     "70483d9c"
+    ]
+   }
+  },
+  "05-foundry-day/floor-0": {
+   "seed": 9506,
+   "level": 6,
+   "theme": 5,
+   "night": false,
+   "floor": 0,
+   "groups": 292,
+   "prims": 4331,
+   "mats": 200,
+   "tex": 18,
+   "kinds": {
+    "box": 3925,
+    "cyl": 350,
+    "sph": 4,
+    "ico": 24,
+    "plane": 28
+   },
+   "hash": "bde0baf0",
+   "solids": "9d2e868f",
+   "pieces": {
+    "(rooms)": [
+     16,
+     909,
+     "3add35d9"
+    ],
+    "billets": [
+     6,
+     210,
+     "4547870e"
+    ],
+    "bin": [
+     2,
+     4,
+     "1adf5a97"
+    ],
+    "bookshelf": [
+     1,
+     94,
+     "ae29a35b"
+    ],
+    "car": [
+     10,
+     190,
+     "508453ff"
+    ],
+    "coils": [
+     12,
+     120,
+     "11b94e70"
+    ],
+    "container": [
+     2,
+     148,
+     "196aa133"
+    ],
+    "conveyor": [
+     10,
+     179,
+     "694f4752"
+    ],
+    "cooler": [
+     1,
+     3,
+     "ec618b70"
+    ],
+    "counter": [
+     2,
+     64,
+     "1c42095e"
+    ],
+    "crates": [
+     1,
+     2,
+     "1abefb9c"
+    ],
+    "desk": [
+     2,
+     48,
+     "fc788afa"
+    ],
+    "fence": [
+     176,
+     1345,
+     "5b79e812"
+    ],
+    "files": [
+     1,
+     30,
+     "3d20c71b"
+    ],
+    "forklift": [
+     2,
+     58,
+     "c62ef1a1"
+    ],
+    "fridge": [
+     1,
+     15,
+     "09788d65"
+    ],
+    "furnace": [
+     2,
+     60,
+     "5e1f0e10"
+    ],
+    "ingots": [
+     2,
+     62,
+     "eb4cba00"
+    ],
+    "lockers": [
+     1,
+     27,
+     "2b13f9e0"
+    ],
+    "mill": [
+     3,
+     30,
+     "b59f172f"
+    ],
+    "moulds": [
+     5,
+     105,
+     "97590350"
+    ],
+    "palletrack": [
+     6,
+     195,
+     "f69cebe9"
+    ],
+    "panel": [
+     7,
+     152,
+     "3051cf74"
+    ],
+    "plant": [
+     4,
+     32,
+     "a6864b56"
+    ],
+    "press": [
+     1,
+     9,
+     "202cb0f0"
+    ],
+    "quench": [
+     2,
+     12,
+     "1de58588"
+    ],
+    "saw": [
+     2,
+     14,
+     "52af5114"
+    ],
+    "scrap": [
+     4,
+     104,
+     "ecbb4637"
+    ],
+    "sinks": [
+     2,
+     20,
+     "d60f630f"
+    ],
+    "stall": [
+     4,
+     40,
+     "844c7451"
+    ],
+    "vat": [
+     2,
+     50,
+     "af98be13"
+    ]
+   }
+  },
+  "05-foundry-day/floor-1": {
+   "seed": 9506,
+   "level": 6,
+   "theme": 5,
+   "night": false,
+   "floor": 1,
+   "groups": 49,
+   "prims": 1586,
+   "mats": 98,
+   "tex": 14,
+   "kinds": {
+    "box": 1436,
+    "cyl": 74,
+    "ico": 28,
+    "plane": 48
+   },
+   "hash": "b5af8e44",
+   "solids": "ad1a1c41",
+   "pieces": {
+    "(rooms)": [
+     15,
+     742,
+     "255443db"
+    ],
+    "bin": [
+     2,
+     4,
+     "e64539e1"
+    ],
+    "bookshelf": [
+     3,
+     297,
+     "2391e5bf"
+    ],
+    "console": [
+     12,
+     336,
+     "963c7a06"
+    ],
+    "cooler": [
+     3,
+     9,
+     "41242273"
+    ],
+    "desk": [
+     2,
+     48,
+     "306b3228"
+    ],
+    "files": [
+     2,
+     60,
+     "3f736ba9"
+    ],
+    "lamp": [
+     3,
+     9,
+     "b608c1e3"
+    ],
+    "panel": [
+     1,
+     22,
+     "3cb5b9ef"
+    ],
+    "plant": [
+     4,
+     33,
+     "b9e7d850"
+    ],
+    "sofa": [
+     1,
+     13,
+     "0802318f"
+    ],
+    "tv": [
+     1,
+     13,
+     "e2f22563"
+    ]
+   }
+  },
+  "05-foundry-night/floor-0": {
+   "seed": 9506,
+   "level": 6,
+   "theme": 5,
+   "night": true,
+   "floor": 0,
+   "groups": 292,
+   "prims": 4331,
+   "mats": 200,
+   "tex": 18,
+   "kinds": {
+    "box": 3925,
+    "cyl": 350,
+    "sph": 4,
+    "ico": 24,
+    "plane": 28
+   },
+   "hash": "bde0baf0",
+   "solids": "9d2e868f",
+   "pieces": {
+    "(rooms)": [
+     16,
+     909,
+     "3add35d9"
+    ],
+    "billets": [
+     6,
+     210,
+     "4547870e"
+    ],
+    "bin": [
+     2,
+     4,
+     "1adf5a97"
+    ],
+    "bookshelf": [
+     1,
+     94,
+     "ae29a35b"
+    ],
+    "car": [
+     10,
+     190,
+     "508453ff"
+    ],
+    "coils": [
+     12,
+     120,
+     "11b94e70"
+    ],
+    "container": [
+     2,
+     148,
+     "196aa133"
+    ],
+    "conveyor": [
+     10,
+     179,
+     "694f4752"
+    ],
+    "cooler": [
+     1,
+     3,
+     "ec618b70"
+    ],
+    "counter": [
+     2,
+     64,
+     "1c42095e"
+    ],
+    "crates": [
+     1,
+     2,
+     "1abefb9c"
+    ],
+    "desk": [
+     2,
+     48,
+     "fc788afa"
+    ],
+    "fence": [
+     176,
+     1345,
+     "5b79e812"
+    ],
+    "files": [
+     1,
+     30,
+     "3d20c71b"
+    ],
+    "forklift": [
+     2,
+     58,
+     "c62ef1a1"
+    ],
+    "fridge": [
+     1,
+     15,
+     "09788d65"
+    ],
+    "furnace": [
+     2,
+     60,
+     "5e1f0e10"
+    ],
+    "ingots": [
+     2,
+     62,
+     "eb4cba00"
+    ],
+    "lockers": [
+     1,
+     27,
+     "2b13f9e0"
+    ],
+    "mill": [
+     3,
+     30,
+     "b59f172f"
+    ],
+    "moulds": [
+     5,
+     105,
+     "97590350"
+    ],
+    "palletrack": [
+     6,
+     195,
+     "f69cebe9"
+    ],
+    "panel": [
+     7,
+     152,
+     "3051cf74"
+    ],
+    "plant": [
+     4,
+     32,
+     "a6864b56"
+    ],
+    "press": [
+     1,
+     9,
+     "202cb0f0"
+    ],
+    "quench": [
+     2,
+     12,
+     "1de58588"
+    ],
+    "saw": [
+     2,
+     14,
+     "52af5114"
+    ],
+    "scrap": [
+     4,
+     104,
+     "ecbb4637"
+    ],
+    "sinks": [
+     2,
+     20,
+     "d60f630f"
+    ],
+    "stall": [
+     4,
+     40,
+     "844c7451"
+    ],
+    "vat": [
+     2,
+     50,
+     "af98be13"
+    ]
+   }
+  },
+  "05-foundry-night/floor-1": {
+   "seed": 9506,
+   "level": 6,
+   "theme": 5,
+   "night": true,
+   "floor": 1,
+   "groups": 49,
+   "prims": 1586,
+   "mats": 98,
+   "tex": 14,
+   "kinds": {
+    "box": 1436,
+    "cyl": 74,
+    "ico": 28,
+    "plane": 48
+   },
+   "hash": "b5af8e44",
+   "solids": "ad1a1c41",
+   "pieces": {
+    "(rooms)": [
+     15,
+     742,
+     "255443db"
+    ],
+    "bin": [
+     2,
+     4,
+     "e64539e1"
+    ],
+    "bookshelf": [
+     3,
+     297,
+     "2391e5bf"
+    ],
+    "console": [
+     12,
+     336,
+     "963c7a06"
+    ],
+    "cooler": [
+     3,
+     9,
+     "41242273"
+    ],
+    "desk": [
+     2,
+     48,
+     "306b3228"
+    ],
+    "files": [
+     2,
+     60,
+     "3f736ba9"
+    ],
+    "lamp": [
+     3,
+     9,
+     "b608c1e3"
+    ],
+    "panel": [
+     1,
+     22,
+     "3cb5b9ef"
+    ],
+    "plant": [
+     4,
+     33,
+     "b9e7d850"
+    ],
+    "sofa": [
+     1,
+     13,
+     "0802318f"
+    ],
+    "tv": [
+     1,
+     13,
+     "e2f22563"
+    ]
+   }
+  },
+  "06-cold-storage-day": {
+   "seed": 9607,
+   "level": 7,
+   "theme": 6,
+   "night": false,
+   "groups": 212,
+   "prims": 2768,
+   "mats": 155,
+   "tex": 18,
+   "kinds": {
+    "box": 2597,
+    "cyl": 101,
+    "ico": 24,
+    "sph": 22,
+    "plane": 24
+   },
+   "hash": "8db41ae2",
+   "solids": "1fd42f9f",
+   "pieces": {
+    "(rooms)": [
+     13,
+     412,
+     "399a6c06"
+    ],
+    "bed": [
+     1,
+     12,
+     "c7296d31"
+    ],
+    "bin": [
+     9,
+     18,
+     "978dcd8c"
+    ],
+    "bookshelf": [
+     4,
+     400,
+     "196b8094"
+    ],
+    "cardboard": [
+     4,
+     8,
+     "679eb4b7"
+    ],
+    "container": [
+     2,
+     154,
+     "04b35b86"
+    ],
+    "cooler": [
+     2,
+     6,
+     "d4efd321"
+    ],
+    "counter": [
+     4,
+     116,
+     "fa95d192"
+    ],
+    "crates": [
+     7,
+     12,
+     "b69b42f7"
+    ],
+    "desk": [
+     2,
+     48,
+     "ad59cdb7"
+    ],
+    "deskpair": [
+     1,
+     20,
+     "4609021c"
+    ],
+    "dining": [
+     2,
+     72,
+     "04af654b"
+    ],
+    "dresser": [
+     1,
+     22,
+     "bd0a9fc3"
+    ],
+    "dumpster": [
+     2,
+     12,
+     "88cce54e"
+    ],
+    "fence": [
+     131,
+     1003,
+     "4762f9dc"
+    ],
+    "files": [
+     3,
+     90,
+     "3794e243"
+    ],
+    "fridge": [
+     1,
+     15,
+     "f0ae7704"
+    ],
+    "lamp": [
+     4,
+     12,
+     "885f20c4"
+    ],
+    "pallet": [
+     7,
+     112,
+     "f4ddeccc"
+    ],
+    "plant": [
+     3,
+     24,
+     "a644f4fd"
+    ],
+    "rack": [
+     7,
+     174,
+     "23e7b445"
+    ],
+    "sofa": [
+     1,
+     13,
+     "97f083c2"
+    ],
+    "tv": [
+     1,
+     13,
+     "efab1e42"
+    ]
+   }
+  },
+  "06-cold-storage-night": {
+   "seed": 9607,
+   "level": 7,
+   "theme": 6,
+   "night": true,
+   "groups": 212,
+   "prims": 2768,
+   "mats": 155,
+   "tex": 18,
+   "kinds": {
+    "box": 2597,
+    "cyl": 101,
+    "ico": 24,
+    "sph": 22,
+    "plane": 24
+   },
+   "hash": "8db41ae2",
+   "solids": "1fd42f9f",
+   "pieces": {
+    "(rooms)": [
+     13,
+     412,
+     "399a6c06"
+    ],
+    "bed": [
+     1,
+     12,
+     "c7296d31"
+    ],
+    "bin": [
+     9,
+     18,
+     "978dcd8c"
+    ],
+    "bookshelf": [
+     4,
+     400,
+     "196b8094"
+    ],
+    "cardboard": [
+     4,
+     8,
+     "679eb4b7"
+    ],
+    "container": [
+     2,
+     154,
+     "04b35b86"
+    ],
+    "cooler": [
+     2,
+     6,
+     "d4efd321"
+    ],
+    "counter": [
+     4,
+     116,
+     "fa95d192"
+    ],
+    "crates": [
+     7,
+     12,
+     "b69b42f7"
+    ],
+    "desk": [
+     2,
+     48,
+     "ad59cdb7"
+    ],
+    "deskpair": [
+     1,
+     20,
+     "4609021c"
+    ],
+    "dining": [
+     2,
+     72,
+     "04af654b"
+    ],
+    "dresser": [
+     1,
+     22,
+     "bd0a9fc3"
+    ],
+    "dumpster": [
+     2,
+     12,
+     "88cce54e"
+    ],
+    "fence": [
+     131,
+     1003,
+     "4762f9dc"
+    ],
+    "files": [
+     3,
+     90,
+     "3794e243"
+    ],
+    "fridge": [
+     1,
+     15,
+     "f0ae7704"
+    ],
+    "lamp": [
+     4,
+     12,
+     "885f20c4"
+    ],
+    "pallet": [
+     7,
+     112,
+     "f4ddeccc"
+    ],
+    "plant": [
+     3,
+     24,
+     "a644f4fd"
+    ],
+    "rack": [
+     7,
+     174,
+     "23e7b445"
+    ],
+    "sofa": [
+     1,
+     13,
+     "97f083c2"
+    ],
+    "tv": [
+     1,
+     13,
+     "efab1e42"
+    ]
+   }
+  },
+  "07-mart-day": {
+   "seed": 9708,
+   "level": 8,
+   "theme": 7,
+   "night": false,
+   "groups": 124,
+   "prims": 3773,
+   "mats": 149,
+   "tex": 10,
+   "kinds": {
+    "box": 2287,
+    "cyl": 1478,
+    "plane": 8
+   },
+   "hash": "c884e18f",
+   "solids": "d0a910e4",
+   "pieces": {
+    "(rooms)": [
+     6,
+     157,
+     "6bf8975f"
+    ],
+    "aisle": [
+     6,
+     1818,
+     "85511632"
+    ],
+    "atm": [
+     1,
+     5,
+     "b1628472"
+    ],
+    "boxtruck": [
+     1,
+     16,
+     "9b7bd625"
+    ],
+    "cardboard": [
+     1,
+     2,
+     "93bfb0c3"
+    ],
+    "counter": [
+     1,
+     28,
+     "fec876ec"
+    ],
+    "crates": [
+     2,
+     4,
+     "312dc00b"
+    ],
+    "dumpster": [
+     4,
+     24,
+     "661e04b3"
+    ],
+    "endcap": [
+     3,
+     36,
+     "48513051"
+    ],
+    "fence": [
+     86,
+     658,
+     "e29c10bc"
+    ],
+    "icechest": [
+     1,
+     4,
+     "1f7ab65f"
+    ],
+    "rack": [
+     3,
+     70,
+     "d196cfaa"
+    ],
+    "register": [
+     1,
+     7,
+     "05eadb93"
+    ],
+    "shopwall": [
+     4,
+     548,
+     "53dfca69"
+    ],
+    "tobacco": [
+     4,
+     396,
+     "2716d0cc"
+    ]
+   }
+  },
+  "07-mart-night": {
+   "seed": 9708,
+   "level": 8,
+   "theme": 7,
+   "night": true,
+   "groups": 124,
+   "prims": 3773,
+   "mats": 149,
+   "tex": 10,
+   "kinds": {
+    "box": 2287,
+    "cyl": 1478,
+    "plane": 8
+   },
+   "hash": "c884e18f",
+   "solids": "d0a910e4",
+   "pieces": {
+    "(rooms)": [
+     6,
+     157,
+     "6bf8975f"
+    ],
+    "aisle": [
+     6,
+     1818,
+     "85511632"
+    ],
+    "atm": [
+     1,
+     5,
+     "b1628472"
+    ],
+    "boxtruck": [
+     1,
+     16,
+     "9b7bd625"
+    ],
+    "cardboard": [
+     1,
+     2,
+     "93bfb0c3"
+    ],
+    "counter": [
+     1,
+     28,
+     "fec876ec"
+    ],
+    "crates": [
+     2,
+     4,
+     "312dc00b"
+    ],
+    "dumpster": [
+     4,
+     24,
+     "661e04b3"
+    ],
+    "endcap": [
+     3,
+     36,
+     "48513051"
+    ],
+    "fence": [
+     86,
+     658,
+     "e29c10bc"
+    ],
+    "icechest": [
+     1,
+     4,
+     "1f7ab65f"
+    ],
+    "rack": [
+     3,
+     70,
+     "d196cfaa"
+    ],
+    "register": [
+     1,
+     7,
+     "05eadb93"
+    ],
+    "shopwall": [
+     4,
+     548,
+     "53dfca69"
+    ],
+    "tobacco": [
+     4,
+     396,
+     "2716d0cc"
+    ]
+   }
+  },
+  "08-festival-day": {
+   "seed": 9809,
+   "level": 9,
+   "theme": 8,
+   "night": false,
+   "groups": 1323,
+   "prims": 19353,
+   "mats": 273,
+   "tex": 22,
+   "kinds": {
+    "box": 16334,
+    "cyl": 1004,
+    "sph": 1844,
+    "ico": 140,
+    "plane": 31
+   },
+   "hash": "71374f52",
+   "solids": "12e08ed0",
+   "pieces": {
+    "(rooms)": [
+     16,
+     645,
+     "78bfe834"
+    ],
+    "bench": [
+     6,
+     54,
+     "4371eae2"
+    ],
+    "bigfood": [
+     51,
+     4788,
+     "b9cf4271"
+    ],
+    "bigmerch": [
+     39,
+     4188,
+     "34e583ac"
+    ],
+    "bin": [
+     11,
+     22,
+     "13e097d7"
+    ],
+    "bookshelf": [
+     4,
+     373,
+     "4ef78995"
+    ],
+    "booth": [
+     2,
+     10,
+     "5a44c12f"
+    ],
+    "boxtruck": [
+     2,
+     32,
+     "da46fe13"
+    ],
+    "car": [
+     95,
+     1805,
+     "98c422a9"
+    ],
+    "cardboard": [
+     6,
+     12,
+     "932fd444"
+    ],
+    "counter": [
+     14,
+     371,
+     "a16df8cc"
+    ],
+    "files": [
+     4,
+     120,
+     "e2f12861"
+    ],
+    "foh": [
+     1,
+     32,
+     "7da00205"
+    ],
+    "fountain": [
+     1,
+     6,
+     "1f1e165e"
+    ],
+    "fridge": [
+     4,
+     60,
+     "9d011307"
+    ],
+    "hoarding": [
+     868,
+     3981,
+     "3db16961"
+    ],
+    "lamp": [
+     2,
+     6,
+     "4155dc34"
+    ],
+    "patio": [
+     4,
+     112,
+     "ee772698"
+    ],
+    "picnic": [
+     9,
+     78,
+     "80f44318"
+    ],
+    "plant": [
+     9,
+     71,
+     "15185e48"
+    ],
+    "portaloo": [
+     2,
+     8,
+     "c760b4bc"
+    ],
+    "rack": [
+     14,
+     358,
+     "5d65751c"
+    ],
+    "seats": [
+     80,
+     1520,
+     "abd94e91"
+    ],
+    "sinks": [
+     2,
+     20,
+     "71cfa533"
+    ],
+    "sofa": [
+     1,
+     11,
+     "f5bf3d9b"
+    ],
+    "speaker": [
+     2,
+     24,
+     "bfba8959"
+    ],
+    "stagedeck": [
+     54,
+     137,
+     "73419f52"
+    ],
+    "stallfood": [
+     5,
+     306,
+     "53a769f5"
+    ],
+    "stallmerch": [
+     1,
+     71,
+     "ca6824d8"
+    ],
+    "toilet": [
+     4,
+     16,
+     "476fd393"
+    ],
+    "tree": [
+     9,
+     99,
+     "c1bb872d"
+    ],
+    "tv": [
+     1,
+     17,
+     "5e468eca"
+    ]
+   }
+  },
+  "08-festival-night": {
+   "seed": 9809,
+   "level": 9,
+   "theme": 8,
+   "night": true,
+   "groups": 1323,
+   "prims": 19353,
+   "mats": 273,
+   "tex": 22,
+   "kinds": {
+    "box": 16334,
+    "cyl": 1004,
+    "sph": 1844,
+    "ico": 140,
+    "plane": 31
+   },
+   "hash": "71374f52",
+   "solids": "12e08ed0",
+   "pieces": {
+    "(rooms)": [
+     16,
+     645,
+     "78bfe834"
+    ],
+    "bench": [
+     6,
+     54,
+     "4371eae2"
+    ],
+    "bigfood": [
+     51,
+     4788,
+     "b9cf4271"
+    ],
+    "bigmerch": [
+     39,
+     4188,
+     "34e583ac"
+    ],
+    "bin": [
+     11,
+     22,
+     "13e097d7"
+    ],
+    "bookshelf": [
+     4,
+     373,
+     "4ef78995"
+    ],
+    "booth": [
+     2,
+     10,
+     "5a44c12f"
+    ],
+    "boxtruck": [
+     2,
+     32,
+     "da46fe13"
+    ],
+    "car": [
+     95,
+     1805,
+     "98c422a9"
+    ],
+    "cardboard": [
+     6,
+     12,
+     "932fd444"
+    ],
+    "counter": [
+     14,
+     371,
+     "a16df8cc"
+    ],
+    "files": [
+     4,
+     120,
+     "e2f12861"
+    ],
+    "foh": [
+     1,
+     32,
+     "7da00205"
+    ],
+    "fountain": [
+     1,
+     6,
+     "1f1e165e"
+    ],
+    "fridge": [
+     4,
+     60,
+     "9d011307"
+    ],
+    "hoarding": [
+     868,
+     3981,
+     "3db16961"
+    ],
+    "lamp": [
+     2,
+     6,
+     "4155dc34"
+    ],
+    "patio": [
+     4,
+     112,
+     "ee772698"
+    ],
+    "picnic": [
+     9,
+     78,
+     "80f44318"
+    ],
+    "plant": [
+     9,
+     71,
+     "15185e48"
+    ],
+    "portaloo": [
+     2,
+     8,
+     "c760b4bc"
+    ],
+    "rack": [
+     14,
+     358,
+     "5d65751c"
+    ],
+    "seats": [
+     80,
+     1520,
+     "abd94e91"
+    ],
+    "sinks": [
+     2,
+     20,
+     "71cfa533"
+    ],
+    "sofa": [
+     1,
+     11,
+     "f5bf3d9b"
+    ],
+    "speaker": [
+     2,
+     24,
+     "bfba8959"
+    ],
+    "stagedeck": [
+     54,
+     137,
+     "73419f52"
+    ],
+    "stallfood": [
+     5,
+     306,
+     "53a769f5"
+    ],
+    "stallmerch": [
+     1,
+     71,
+     "ca6824d8"
+    ],
+    "toilet": [
+     4,
+     16,
+     "476fd393"
+    ],
+    "tree": [
+     9,
+     99,
+     "c1bb872d"
+    ],
+    "tv": [
+     1,
+     17,
+     "5e468eca"
+    ]
+   }
+  },
+  "09-crest-day": {
+   "seed": 9910,
+   "level": 10,
+   "theme": 9,
+   "night": false,
+   "groups": 2690,
+   "prims": 26139,
+   "mats": 175,
+   "tex": 26,
+   "kinds": {
+    "box": 19788,
+    "cyl": 2790,
+    "ico": 3110,
+    "side": 7,
+    "sph": 417,
+    "plane": 10,
+    "grid": 17
+   },
+   "hash": "00e15cbe",
+   "solids": "ea9e9e37",
+   "pieces": {
+    "(rooms)": [
+     23,
+     246,
+     "3c0bab9a"
+    ],
+    "bench": [
+     6,
+     54,
+     "5dcaaab8"
+    ],
+    "bin": [
+     1,
+     2,
+     "0008357f"
+    ],
+    "bmw340": [
+     1,
+     112,
+     "8be1e153"
+    ],
+    "boulder": [
+     49,
+     294,
+     "10436045"
+    ],
+    "boxtruck": [
+     2,
+     32,
+     "8f6d1074"
+    ],
+    "cardboard": [
+     1,
+     2,
+     "b947905e"
+    ],
+    "chilebed": [
+     129,
+     4128,
+     "791d3cf2"
+    ],
+    "cholla": [
+     9,
+     99,
+     "e4c64d40"
+    ],
+    "cliffwall": [
+     2240,
+     17920,
+     "e0aedc3e"
+    ],
+    "counter": [
+     1,
+     19,
+     "0c29ee49"
+    ],
+    "coyote": [
+     57,
+     513,
+     "847fb113"
+    ],
+    "desk": [
+     1,
+     24,
+     "9bfcbbb5"
+    ],
+    "endcap": [
+     2,
+     24,
+     "5e4e014d"
+    ],
+    "files": [
+     1,
+     30,
+     "efc63785"
+    ],
+    "fruittree": [
+     8,
+     152,
+     "66340d62"
+    ],
+    "hvac": [
+     5,
+     85,
+     "92e6b062"
+    ],
+    "juniper": [
+     36,
+     648,
+     "bc7f4a81"
+    ],
+    "mast": [
+     2,
+     134,
+     "2b077138"
+    ],
+    "pinon": [
+     38,
+     456,
+     "e3abdcf2"
+    ],
+    "plant": [
+     1,
+     8,
+     "a4a86c84"
+    ],
+    "potbench": [
+     8,
+     339,
+     "e616957c"
+    ],
+    "rack": [
+     1,
+     28,
+     "78a49a64"
+    ],
+    "ristra": [
+     1,
+     57,
+     "92e3c3ab"
+    ],
+    "scope": [
+     4,
+     32,
+     "25bd3ba7"
+    ],
+    "shed": [
+     4,
+     56,
+     "aae53617"
+    ],
+    "siterail": [
+     58,
+     638,
+     "e32dc458"
+    ],
+    "watertank": [
+     1,
+     7,
+     "eee4bd0f"
+    ]
+   }
+  },
+  "09-crest-night": {
+   "seed": 9910,
+   "level": 10,
+   "theme": 9,
+   "night": true,
+   "groups": 2690,
+   "prims": 26139,
+   "mats": 175,
+   "tex": 26,
+   "kinds": {
+    "box": 19788,
+    "cyl": 2790,
+    "ico": 3110,
+    "side": 7,
+    "sph": 417,
+    "plane": 10,
+    "grid": 17
+   },
+   "hash": "00e15cbe",
+   "solids": "ea9e9e37",
+   "pieces": {
+    "(rooms)": [
+     23,
+     246,
+     "3c0bab9a"
+    ],
+    "bench": [
+     6,
+     54,
+     "5dcaaab8"
+    ],
+    "bin": [
+     1,
+     2,
+     "0008357f"
+    ],
+    "bmw340": [
+     1,
+     112,
+     "8be1e153"
+    ],
+    "boulder": [
+     49,
+     294,
+     "10436045"
+    ],
+    "boxtruck": [
+     2,
+     32,
+     "8f6d1074"
+    ],
+    "cardboard": [
+     1,
+     2,
+     "b947905e"
+    ],
+    "chilebed": [
+     129,
+     4128,
+     "791d3cf2"
+    ],
+    "cholla": [
+     9,
+     99,
+     "e4c64d40"
+    ],
+    "cliffwall": [
+     2240,
+     17920,
+     "e0aedc3e"
+    ],
+    "counter": [
+     1,
+     19,
+     "0c29ee49"
+    ],
+    "coyote": [
+     57,
+     513,
+     "847fb113"
+    ],
+    "desk": [
+     1,
+     24,
+     "9bfcbbb5"
+    ],
+    "endcap": [
+     2,
+     24,
+     "5e4e014d"
+    ],
+    "files": [
+     1,
+     30,
+     "efc63785"
+    ],
+    "fruittree": [
+     8,
+     152,
+     "66340d62"
+    ],
+    "hvac": [
+     5,
+     85,
+     "92e6b062"
+    ],
+    "juniper": [
+     36,
+     648,
+     "bc7f4a81"
+    ],
+    "mast": [
+     2,
+     134,
+     "2b077138"
+    ],
+    "pinon": [
+     38,
+     456,
+     "e3abdcf2"
+    ],
+    "plant": [
+     1,
+     8,
+     "a4a86c84"
+    ],
+    "potbench": [
+     8,
+     339,
+     "e616957c"
+    ],
+    "rack": [
+     1,
+     28,
+     "78a49a64"
+    ],
+    "ristra": [
+     1,
+     57,
+     "92e3c3ab"
+    ],
+    "scope": [
+     4,
+     32,
+     "25bd3ba7"
+    ],
+    "shed": [
+     4,
+     56,
+     "aae53617"
+    ],
+    "siterail": [
+     58,
+     638,
+     "e32dc458"
+    ],
+    "watertank": [
+     1,
+     7,
+     "eee4bd0f"
+    ]
+   }
+  },
+  "apartment-residents/floor-0": {
+   "seed": 1,
+   "level": 1,
+   "theme": 0,
+   "night": false,
+   "floor": 0,
+   "groups": 95,
+   "prims": 1955,
+   "mats": 275,
+   "tex": 30,
+   "kinds": {
+    "box": 1635,
+    "cyl": 222,
+    "ico": 26,
+    "sph": 17,
+    "plane": 55
+   },
+   "hash": "11156f98",
+   "solids": "a75f21bb",
+   "pieces": {
+    "(none)": [
+     1,
+     13,
+     "e9d5abff"
+    ],
+    "(rooms)": [
+     20,
+     807,
+     "a5fcd180"
+    ],
+    "almond": [
+     1,
+     9,
+     "31e53808"
+    ],
+    "basin": [
+     3,
+     15,
+     "5894445b"
+    ],
+    "bed": [
+     2,
+     24,
+     "d961bbd3"
+    ],
+    "bedd": [
+     1,
+     6,
+     "524a596d"
+    ],
+    "bedn": [
+     2,
+     12,
+     "6a28d6f8"
+    ],
+    "bin": [
+     1,
+     2,
+     "6d5ebd9c"
+    ],
+    "bookshelf": [
+     2,
+     151,
+     "daff8b1c"
+    ],
+    "boots": [
+     1,
+     6,
+     "8f20b2d1"
+    ],
+    "calendar": [
+     1,
+     34,
+     "e1089915"
+    ],
+    "canisters": [
+     1,
+     32,
+     "bcd0aa2c"
+    ],
+    "cardboard": [
+     1,
+     2,
+     "649e419b"
+    ],
+    "china": [
+     1,
+     56,
+     "2cdd1405"
+    ],
+    "claysacks": [
+     1,
+     5,
+     "4c739c3a"
+    ],
+    "clockshelf": [
+     1,
+     10,
+     "de0c7c98"
+    ],
+    "clothesrail": [
+     1,
+     14,
+     "3c8abbf8"
+    ],
+    "couch": [
+     2,
+     63,
+     "6dff7007"
+    ],
+    "counter": [
+     1,
+     28,
+     "c59da5c4"
+    ],
+    "crt": [
+     1,
+     15,
+     "1aac601b"
+    ],
+    "cuptable": [
+     1,
+     18,
+     "0532db65"
+    ],
+    "dryrack": [
+     2,
+     64,
+     "a59febcd"
+    ],
+    "easy": [
+     4,
+     52,
+     "c39a1350"
+    ],
+    "enamel": [
+     1,
+     10,
+     "72926f7a"
+    ],
+    "flamp": [
+     1,
+     3,
+     "03424db7"
+    ],
+    "flattv": [
+     1,
+     4,
+     "2acd1bfb"
+    ],
+    "gamechair": [
+     1,
+     10,
+     "cfb1280e"
+    ],
+    "glazes": [
+     1,
+     6,
+     "915e0ae0"
+    ],
+    "guides": [
+     1,
+     12,
+     "0780bb3b"
+    ],
+    "halfbed": [
+     1,
+     15,
+     "fa3618e8"
+    ],
+    "hookd": [
+     1,
+     4,
+     "686919e8"
+    ],
+    "icebox": [
+     2,
+     24,
+     "f38ca8bf"
+    ],
+    "kiln": [
+     1,
+     6,
+     "e5cee9f1"
+    ],
+    "kitrun": [
+     2,
+     48,
+     "92c31997"
+    ],
+    "lacetable": [
+     1,
+     83,
+     "9565c020"
+    ],
+    "lamp": [
+     3,
+     9,
+     "6e8b94ad"
+    ],
+    "nightstand": [
+     2,
+     24,
+     "2fb248d7"
+    ],
+    "photo": [
+     4,
+     20,
+     "d026a610"
+    ],
+    "photodresser": [
+     1,
+     33,
+     "56d19a9f"
+    ],
+    "plant": [
+     3,
+     26,
+     "89d18057"
+    ],
+    "rigdesk": [
+     1,
+     16,
+     "da659497"
+    ],
+    "ringlight": [
+     1,
+     8,
+     "2fa5544c"
+    ],
+    "shrine": [
+     1,
+     22,
+     "21500979"
+    ],
+    "sidetable": [
+     3,
+     28,
+     "8b118452"
+    ],
+    "sofa": [
+     1,
+     12,
+     "87e69329"
+    ],
+    "tallplant": [
+     1,
+     12,
+     "9150fea7"
+    ],
+    "tapestry": [
+     1,
+     17,
+     "8ef3dd07"
+    ],
+    "toilet": [
+     2,
+     8,
+     "0b0a9688"
+    ],
+    "treadle": [
+     1,
+     24,
+     "55883adb"
+    ],
+    "tv": [
+     1,
+     13,
+     "7ea4e580"
+    ],
+    "wardrobe": [
+     2,
+     15,
+     "728d16ed"
+    ],
+    "wheel": [
+     1,
+     5,
+     "75afe974"
+    ]
+   }
+  },
+  "apartment-residents/floor-1": {
+   "seed": 1,
+   "level": 1,
+   "theme": 0,
+   "night": false,
+   "floor": 1,
+   "groups": 55,
+   "prims": 1294,
+   "mats": 142,
+   "tex": 28,
+   "kinds": {
+    "box": 1067,
+    "cyl": 103,
+    "sph": 12,
+    "ico": 34,
+    "plane": 78
+   },
+   "hash": "31a53a3b",
+   "solids": "e79a2e45",
+   "pieces": {
+    "(none)": [
+     1,
+     13,
+     "ae932878"
+    ],
+    "(rooms)": [
+     17,
+     740,
+     "2e885a3d"
+    ],
+    "basin": [
+     2,
+     10,
+     "dcc91ba4"
+    ],
+    "bed": [
+     3,
+     38,
+     "39951eeb"
+    ],
+    "bin": [
+     1,
+     2,
+     "d80433c1"
+    ],
+    "bookshelf": [
+     1,
+     115,
+     "02734bb2"
+    ],
+    "canpyramid": [
+     1,
+     56,
+     "e4faa943"
+    ],
+    "cardboard": [
+     1,
+     2,
+     "9fba5403"
+    ],
+    "cooler": [
+     1,
+     3,
+     "cec63e43"
+    ],
+    "couch": [
+     1,
+     14,
+     "59f50d42"
+    ],
+    "desk": [
+     3,
+     72,
+     "fd08db4a"
+    ],
+    "dresser": [
+     2,
+     41,
+     "fed50ab4"
+    ],
+    "files": [
+     1,
+     30,
+     "e1208548"
+    ],
+    "flattv": [
+     1,
+     4,
+     "c89abe5e"
+    ],
+    "foampanels": [
+     1,
+     18,
+     "c080baa7"
+    ],
+    "gamechair": [
+     1,
+     10,
+     "7fe19ac5"
+    ],
+    "greenscreen": [
+     1,
+     2,
+     "aad880a6"
+    ],
+    "icebox": [
+     1,
+     5,
+     "359ca553"
+    ],
+    "kitrun": [
+     1,
+     22,
+     "1c9f5c57"
+    ],
+    "lamp": [
+     2,
+     6,
+     "5fca00cf"
+    ],
+    "livesign": [
+     1,
+     2,
+     "6c0472d7"
+    ],
+    "pctower": [
+     1,
+     2,
+     "2ee1983d"
+    ],
+    "plant": [
+     6,
+     46,
+     "70d923f3"
+    ],
+    "rigdesk": [
+     1,
+     16,
+     "95920eb0"
+    ],
+    "sidetable": [
+     1,
+     8,
+     "914bd9b4"
+    ],
+    "toilet": [
+     1,
+     4,
+     "fb5bfef6"
+    ],
+    "tv": [
+     1,
+     13,
+     "bcfa4322"
+    ]
+   }
+  },
+  "apartment-residents/floor-2": {
+   "seed": 1,
+   "level": 1,
+   "theme": 0,
+   "night": false,
+   "floor": 2,
+   "groups": 210,
+   "prims": 579,
+   "mats": 11,
+   "tex": 3,
+   "kinds": {
+    "box": 469,
+    "cyl": 10,
+    "plane": 100
+   },
+   "hash": "acc1a73c",
+   "solids": "7f375f4f",
+   "pieces": {
+    "(rooms)": [
+     3,
+     100,
+     "ac691f8d"
+    ],
+    "hvac": [
+     4,
+     68,
+     "e7e29131"
+    ],
+    "parapet": [
+     202,
+     404,
+     "26479225"
+    ],
+    "watertank": [
+     1,
+     7,
+     "3f86dd78"
+    ]
+   }
+  },
+  "hangar": {
+   "seed": 5150,
+   "level": 1,
+   "theme": "hangar",
+   "night": false,
+   "groups": 122,
+   "prims": 1042,
+   "mats": 19,
+   "tex": 9,
+   "kinds": {
+    "box": 1033,
+    "plane": 9
+   },
+   "hash": "0a82f1ac",
+   "solids": "49304ef7",
+   "pieces": {
+    "(rooms)": [
+     6,
+     153,
+     "915d26ac"
+    ],
+    "fence": [
+     116,
+     889,
+     "b5079ee9"
+    ]
+   }
+  }
+ },
+ "pieces": {
+  "aisle": {
+   "v": 0.4408981651067734,
+   "groups": 1,
+   "prims": 292,
+   "mats": 47,
+   "tex": 1,
+   "kinds": {
+    "box": 123,
+    "cyl": 169
+   },
+   "hash": "487bd80c",
+   "solids": "57976d8b"
+  },
+  "almond": {
+   "v": 0.8423453299328685,
+   "style": {},
+   "groups": 1,
+   "prims": 9,
+   "mats": 3,
+   "tex": 0,
+   "kinds": {
+    "box": 7,
+    "cyl": 2
+   },
+   "hash": "d91f27e7",
+   "solids": "c4e59a3d"
+  },
+  "armchairs": {
+   "v": 0.30301498365588486,
+   "groups": 1,
+   "prims": 22,
+   "mats": 5,
+   "tex": 0,
+   "kinds": {
+    "box": 18,
+    "cyl": 4
+   },
+   "hash": "493fc92a",
+   "solids": "10b2b03a"
+  },
+  "atm": {
+   "v": 0.666456620907411,
+   "groups": 1,
+   "prims": 5,
+   "mats": 4,
+   "tex": 0,
+   "kinds": {
+    "box": 5
+   },
+   "hash": "cadca6c3",
+   "solids": "930aab66"
+  },
+  "basin": {
+   "v": 0.3868783959187567,
+   "style": {},
+   "groups": 1,
+   "prims": 5,
+   "mats": 3,
+   "tex": 0,
+   "kinds": {
+    "cyl": 2,
+    "box": 3
+   },
+   "hash": "3712f764",
+   "solids": "057216b1"
+  },
+  "bbq": {
+   "v": 0.3453464126214385,
+   "groups": 1,
+   "prims": 7,
+   "mats": 2,
+   "tex": 0,
+   "kinds": {
+    "box": 6,
+    "sph": 1
+   },
+   "hash": "a29a42b0",
+   "solids": "c681634d"
+  },
+  "bed": {
+   "v": 0.6108703087083995,
+   "groups": 1,
+   "prims": 12,
+   "mats": 5,
+   "tex": 0,
+   "kinds": {
+    "box": 12
+   },
+   "hash": "2128843a",
+   "solids": "438029d3"
+  },
+  "bedd": {
+   "v": 0.3149255118332803,
+   "style": {
+    "cover": 1315864,
+    "unmade": 1
+   },
+   "groups": 1,
+   "prims": 7,
+   "mats": 3,
+   "tex": 0,
+   "kinds": {
+    "box": 7
+   },
+   "hash": "65a47908",
+   "solids": "b6e3fa47"
+  },
+  "bedn": {
+   "v": 0.4646520495880395,
+   "style": {
+    "cover": 4872762
+   },
+   "groups": 1,
+   "prims": 6,
+   "mats": 4,
+   "tex": 0,
+   "kinds": {
+    "box": 6
+   },
+   "hash": "4dfe0e65",
+   "solids": "30c9a057"
+  },
+  "bench": {
+   "v": 0.21152393822558224,
+   "groups": 1,
+   "prims": 9,
+   "mats": 2,
+   "tex": 0,
+   "kinds": {
+    "box": 9
+   },
+   "hash": "01e3f682",
+   "solids": "3966e5dd"
+  },
+  "bigfood": {
+   "v": 0.7818047609180212,
+   "groups": 1,
+   "prims": 94,
+   "mats": 24,
+   "tex": 0,
+   "kinds": {
+    "box": 59,
+    "sph": 18,
+    "cyl": 17
+   },
+   "hash": "be5dbc28",
+   "solids": "294183a4"
+  },
+  "bigmerch": {
+   "v": 0.15962104685604572,
+   "groups": 1,
+   "prims": 104,
+   "mats": 26,
+   "tex": 0,
+   "kinds": {
+    "box": 80,
+    "sph": 21,
+    "cyl": 3
+   },
+   "hash": "c1990408",
+   "solids": "692d7412"
+  },
+  "billets": {
+   "v": 0.27071559987962246,
+   "groups": 1,
+   "prims": 35,
+   "mats": 6,
+   "tex": 0,
+   "kinds": {
+    "box": 35
+   },
+   "hash": "15fd9bf5",
+   "solids": "9b202814"
+  },
+  "bin": {
+   "v": 0.06833425047807395,
+   "groups": 1,
+   "prims": 2,
+   "mats": 2,
+   "tex": 0,
+   "kinds": {
+    "cyl": 2
+   },
+   "hash": "11c61474",
+   "solids": "4e69c594"
+  },
+  "bmw340": {
+   "v": 0.3411024098750204,
+   "style": {},
+   "groups": 1,
+   "prims": 112,
+   "mats": 15,
+   "tex": 0,
+   "kinds": {
+    "side": 7,
+    "box": 80,
+    "cyl": 25
+   },
+   "hash": "fef4ec39",
+   "solids": "8cb949f2"
+  },
+  "bookshelf": {
+   "v": 0.8860213796142489,
+   "groups": 1,
+   "prims": 88,
+   "mats": 18,
+   "tex": 0,
+   "kinds": {
+    "box": 75,
+    "cyl": 13
+   },
+   "hash": "df4e4a53",
+   "solids": "52ebea9e"
+  },
+  "booth": {
+   "v": 0.508429997600615,
+   "groups": 1,
+   "prims": 5,
+   "mats": 4,
+   "tex": 0,
+   "kinds": {
+    "box": 5
+   },
+   "hash": "71bb3be3",
+   "solids": "ca644f87"
+  },
+  "boots": {
+   "v": 0.49834060901775956,
+   "style": {},
+   "groups": 1,
+   "prims": 6,
+   "mats": 2,
+   "tex": 0,
+   "kinds": {
+    "box": 6
+   },
+   "hash": "3ca09b0b",
+   "solids": "81aa3db3"
+  },
+  "boulder": {
+   "v": 0.8605300385970622,
+   "style": {
+    "c": 15131350,
+    "stripe": 3107396
+   },
+   "groups": 1,
+   "prims": 6,
+   "mats": 3,
+   "tex": 0,
+   "kinds": {
+    "ico": 6
+   },
+   "hash": "0f067bee",
+   "solids": "24446c37"
+  },
+  "boxtruck": {
+   "v": 0.4151624666992575,
+   "style": {
+    "c": 14735560,
+    "stripe": 3111498
+   },
+   "groups": 1,
+   "prims": 16,
+   "mats": 6,
+   "tex": 0,
+   "kinds": {
+    "box": 8,
+    "cyl": 8
+   },
+   "hash": "3eacaeae",
+   "solids": "a6f95600"
+  },
+  "calendar": {
+   "v": 0.4902729766909033,
+   "style": {
+    "h": 1.55
+   },
+   "groups": 1,
+   "prims": 34,
+   "mats": 4,
+   "tex": 0,
+   "kinds": {
+    "box": 34
+   },
+   "hash": "fe397f02",
+   "solids": "91f9da1b"
+  },
+  "canisters": {
+   "v": 0.2666282644495368,
+   "style": {
+    "cab": 15129792,
+    "top": 10127976,
+    "tin": 14209208
+   },
+   "groups": 1,
+   "prims": 32,
+   "mats": 8,
+   "tex": 0,
+   "kinds": {
+    "box": 19,
+    "cyl": 13
+   },
+   "hash": "10c63ba7",
+   "solids": "145fbf89"
+  },
+  "canpyramid": {
+   "v": 0.9173474626149982,
+   "style": {},
+   "groups": 1,
+   "prims": 56,
+   "mats": 2,
+   "tex": 0,
+   "kinds": {
+    "cyl": 56
+   },
+   "hash": "11ddf5d2",
+   "solids": "b7ebdc3e"
+  },
+  "car": {
+   "v": 0.8656700232531875,
+   "groups": 1,
+   "prims": 19,
+   "mats": 7,
+   "tex": 0,
+   "kinds": {
+    "box": 19
+   },
+   "hash": "48603d14",
+   "solids": "b69e9f38"
+  },
+  "cardboard": {
+   "v": 0.7526659213472158,
+   "style": {},
+   "groups": 1,
+   "prims": 2,
+   "mats": 2,
+   "tex": 0,
+   "kinds": {
+    "box": 2
+   },
+   "hash": "1df39f11",
+   "solids": "4c2d0a20"
+  },
+  "chilebed": {
+   "v": 0.7522232108749449,
+   "groups": 1,
+   "prims": 32,
+   "mats": 5,
+   "tex": 0,
+   "kinds": {
+    "box": 2,
+    "ico": 15,
+    "cyl": 15
+   },
+   "hash": "932413f1",
+   "solids": "aaa42c5b"
+  },
+  "china": {
+   "v": 0.5699062095955014,
+   "style": {},
+   "groups": 1,
+   "prims": 56,
+   "mats": 7,
+   "tex": 0,
+   "kinds": {
+    "box": 18,
+    "sph": 2,
+    "cyl": 36
+   },
+   "hash": "784c75ee",
+   "solids": "e56a251a"
+  },
+  "cholla": {
+   "v": 0.2046759147197008,
+   "groups": 1,
+   "prims": 11,
+   "mats": 2,
+   "tex": 0,
+   "kinds": {
+    "cyl": 6,
+    "sph": 5
+   },
+   "hash": "0f843af3",
+   "solids": "67897310"
+  },
+  "claysacks": {
+   "v": 0.46285144495777786,
+   "style": {},
+   "groups": 1,
+   "prims": 5,
+   "mats": 1,
+   "tex": 0,
+   "kinds": {
+    "box": 5
+   },
+   "hash": "88a26e8a",
+   "solids": "e9e6f1ea"
+  },
+  "cliffwall": {
+   "v": 0.8235294117647058,
+   "groups": 1,
+   "prims": 8,
+   "mats": 3,
+   "tex": 0,
+   "kinds": {
+    "box": 8
+   },
+   "hash": "8fc48ef2",
+   "solids": "8941c196"
+  },
+  "clockshelf": {
+   "v": 0.0014603522140532732,
+   "style": {
+    "h": 1.5
+   },
+   "groups": 1,
+   "prims": 10,
+   "mats": 6,
+   "tex": 0,
+   "kinds": {
+    "box": 7,
+    "cyl": 3
+   },
+   "hash": "1f703f5b",
+   "solids": "d17e3017"
+  },
+  "clothesrail": {
+   "v": 0.6983442262280732,
+   "style": {},
+   "groups": 1,
+   "prims": 14,
+   "mats": 6,
+   "tex": 0,
+   "kinds": {
+    "box": 14
+   },
+   "hash": "1e5af0c1",
+   "solids": "6421ffef"
+  },
+  "coils": {
+   "v": 0.8025358205195516,
+   "groups": 1,
+   "prims": 10,
+   "mats": 4,
+   "tex": 0,
+   "kinds": {
+    "box": 6,
+    "cyl": 4
+   },
+   "hash": "05fd62d7",
+   "solids": "01c72355"
+  },
+  "console": {
+   "v": 0.4541394296102226,
+   "groups": 1,
+   "prims": 28,
+   "mats": 9,
+   "tex": 0,
+   "kinds": {
+    "box": 26,
+    "cyl": 2
+   },
+   "hash": "c48f7540",
+   "solids": "b4253516"
+  },
+  "container": {
+   "v": 0.19665322778746486,
+   "style": {
+    "c": 3103354
+   },
+   "groups": 1,
+   "prims": 74,
+   "mats": 3,
+   "tex": 0,
+   "kinds": {
+    "box": 74
+   },
+   "hash": "f77aa269",
+   "solids": "fa8cc488"
+  },
+  "conveyor": {
+   "v": 0.2477336183656007,
+   "groups": 1,
+   "prims": 18,
+   "mats": 4,
+   "tex": 0,
+   "kinds": {
+    "box": 7,
+    "cyl": 11
+   },
+   "hash": "178cf666",
+   "solids": "a7672772"
+  },
+  "cooler": {
+   "v": 0.38841373356990516,
+   "groups": 1,
+   "prims": 3,
+   "mats": 3,
+   "tex": 0,
+   "kinds": {
+    "box": 2,
+    "cyl": 1
+   },
+   "hash": "ccfacd67",
+   "solids": "937bbd97"
+  },
+  "couch": {
+   "v": 0.3878730891738087,
+   "style": {
+    "fabric": 9400880
+   },
+   "groups": 1,
+   "prims": 49,
+   "mats": 7,
+   "tex": 0,
+   "kinds": {
+    "box": 47,
+    "cyl": 2
+   },
+   "hash": "83070a3a",
+   "solids": "4e364950"
+  },
+  "counter": {
+   "v": 0.6060105888172984,
+   "groups": 1,
+   "prims": 25,
+   "mats": 7,
+   "tex": 0,
+   "kinds": {
+    "box": 16,
+    "cyl": 9
+   },
+   "hash": "57cca348",
+   "solids": "d5291adb"
+  },
+  "coyote": {
+   "v": 0,
+   "groups": 1,
+   "prims": 9,
+   "mats": 5,
+   "tex": 0,
+   "kinds": {
+    "box": 2,
+    "cyl": 7
+   },
+   "hash": "3d726171",
+   "solids": "17ec3bdb"
+  },
+  "crates": {
+   "v": 0.5061473259702325,
+   "groups": 1,
+   "prims": 1,
+   "mats": 1,
+   "tex": 1,
+   "kinds": {
+    "box": 1
+   },
+   "hash": "521cddf4",
+   "solids": "d9f9e57e"
+  },
+  "crt": {
+   "v": 0.5156534870620817,
+   "style": {},
+   "groups": 1,
+   "prims": 15,
+   "mats": 7,
+   "tex": 0,
+   "kinds": {
+    "box": 13,
+    "cyl": 2
+   },
+   "hash": "9cf2ec8f",
+   "solids": "e410b6e6"
+  },
+  "cuptable": {
+   "v": 0.3966107666492462,
+   "style": {},
+   "groups": 1,
+   "prims": 18,
+   "mats": 4,
+   "tex": 0,
+   "kinds": {
+    "box": 7,
+    "cyl": 11
+   },
+   "hash": "79453a90",
+   "solids": "d20f9ce2"
+  },
+  "desk": {
+   "v": 0.09257093002088368,
+   "groups": 1,
+   "prims": 24,
+   "mats": 7,
+   "tex": 0,
+   "kinds": {
+    "box": 22,
+    "cyl": 2
+   },
+   "hash": "649589a2",
+   "solids": "157eb17b"
+  },
+  "deskpair": {
+   "v": 0.509652040200308,
+   "groups": 1,
+   "prims": 18,
+   "mats": 7,
+   "tex": 0,
+   "kinds": {
+    "box": 18
+   },
+   "hash": "2c3ace44",
+   "solids": "d7a6a423"
+  },
+  "dining": {
+   "v": 0.4776965503115207,
+   "groups": 1,
+   "prims": 35,
+   "mats": 4,
+   "tex": 0,
+   "kinds": {
+    "box": 29,
+    "cyl": 6
+   },
+   "hash": "3b93bca1",
+   "solids": "d09f8777"
+  },
+  "dresser": {
+   "v": 0.0017481192480772734,
+   "groups": 1,
+   "prims": 19,
+   "mats": 8,
+   "tex": 0,
+   "kinds": {
+    "box": 11,
+    "sph": 6,
+    "cyl": 2
+   },
+   "hash": "038999e4",
+   "solids": "26c9ede9"
+  },
+  "dryrack": {
+   "v": 0.47247533663176,
+   "style": {},
+   "groups": 1,
+   "prims": 32,
+   "mats": 4,
+   "tex": 0,
+   "kinds": {
+    "box": 8,
+    "cyl": 24
+   },
+   "hash": "e7455027",
+   "solids": "937c2d5c"
+  },
+  "dumpster": {
+   "v": 0.36108160810545087,
+   "style": {
+    "c": 3103354
+   },
+   "groups": 1,
+   "prims": 6,
+   "mats": 2,
+   "tex": 0,
+   "kinds": {
+    "box": 6
+   },
+   "hash": "96c87c95",
+   "solids": "6534072f"
+  },
+  "easy": {
+   "v": 0.3554788641631603,
+   "style": {
+    "fabric": 7232062,
+    "worn": 11049596,
+    "slippers": 1
+   },
+   "groups": 1,
+   "prims": 19,
+   "mats": 6,
+   "tex": 0,
+   "kinds": {
+    "box": 19
+   },
+   "hash": "2a0441b8",
+   "solids": "3b01855f"
+  },
+  "enamel": {
+   "v": 0.5899700107984245,
+   "style": {
+    "h": 1.72
+   },
+   "groups": 1,
+   "prims": 10,
+   "mats": 2,
+   "tex": 0,
+   "kinds": {
+    "box": 10
+   },
+   "hash": "2e433491",
+   "solids": "78570a4d"
+  },
+  "endcap": {
+   "v": 0.7748050498776138,
+   "groups": 1,
+   "prims": 12,
+   "mats": 4,
+   "tex": 1,
+   "kinds": {
+    "box": 12
+   },
+   "hash": "95fb783f",
+   "solids": "da3fe5e3"
+  },
+  "fence": {
+   "v": 0,
+   "groups": 1,
+   "prims": 9,
+   "mats": 3,
+   "tex": 0,
+   "kinds": {
+    "box": 9
+   },
+   "hash": "380ea54e",
+   "solids": "e0a08de0"
+  },
+  "files": {
+   "v": 0.6603206908330321,
+   "groups": 1,
+   "prims": 30,
+   "mats": 7,
+   "tex": 0,
+   "kinds": {
+    "box": 26,
+    "cyl": 1,
+    "ico": 3
+   },
+   "hash": "f6d5dbd7",
+   "solids": "efca4559"
+  },
+  "flamp": {
+   "v": 0.27942180912941694,
+   "style": {},
+   "groups": 1,
+   "prims": 3,
+   "mats": 2,
+   "tex": 0,
+   "kinds": {
+    "cyl": 3
+   },
+   "hash": "22b95dbd",
+   "solids": "9f0c676b"
+  },
+  "flattv": {
+   "v": 0.23231815663166344,
+   "style": {
+    "stand": 1184276
+   },
+   "groups": 1,
+   "prims": 4,
+   "mats": 3,
+   "tex": 0,
+   "kinds": {
+    "box": 4
+   },
+   "hash": "93ff2a4b",
+   "solids": "73571ad4"
+  },
+  "foampanels": {
+   "v": 0.4758901570457965,
+   "style": {
+    "h": 1.6
+   },
+   "groups": 1,
+   "prims": 18,
+   "mats": 2,
+   "tex": 0,
+   "kinds": {
+    "box": 18
+   },
+   "hash": "237e9cef",
+   "solids": "51d93716"
+  },
+  "foh": {
+   "v": 0.033265793696045876,
+   "groups": 1,
+   "prims": 32,
+   "mats": 9,
+   "tex": 0,
+   "kinds": {
+    "box": 32
+   },
+   "hash": "9eac8b30",
+   "solids": "8ee08e02"
+  },
+  "forklift": {
+   "v": 0.9880712202284485,
+   "groups": 1,
+   "prims": 29,
+   "mats": 6,
+   "tex": 0,
+   "kinds": {
+    "box": 19,
+    "cyl": 10
+   },
+   "hash": "8d95f959",
+   "solids": "45e0cf90"
+  },
+  "fountain": {
+   "v": 0.5800298473332077,
+   "groups": 1,
+   "prims": 6,
+   "mats": 2,
+   "tex": 0,
+   "kinds": {
+    "cyl": 6
+   },
+   "hash": "82f6dea2",
+   "solids": "c98e3dbf"
+  },
+  "fridge": {
+   "v": 0.10691990912891924,
+   "groups": 1,
+   "prims": 15,
+   "mats": 8,
+   "tex": 0,
+   "kinds": {
+    "box": 15
+   },
+   "hash": "1c94dd61",
+   "solids": "676836ce"
+  },
+  "fruittree": {
+   "v": 0.1786352931521833,
+   "groups": 1,
+   "prims": 19,
+   "mats": 3,
+   "tex": 0,
+   "kinds": {
+    "cyl": 1,
+    "ico": 8,
+    "sph": 10
+   },
+   "hash": "c1bf458c",
+   "solids": "b7006d06"
+  },
+  "furnace": {
+   "v": 0.793502563610673,
+   "groups": 1,
+   "prims": 30,
+   "mats": 9,
+   "tex": 0,
+   "kinds": {
+    "box": 15,
+    "cyl": 15
+   },
+   "hash": "d0c477cb",
+   "solids": "755a8cc6"
+  },
+  "gamechair": {
+   "v": 0.9061542148701847,
+   "style": {},
+   "groups": 1,
+   "prims": 10,
+   "mats": 2,
+   "tex": 0,
+   "kinds": {
+    "box": 9,
+    "cyl": 1
+   },
+   "hash": "dfb12840",
+   "solids": "d27a2820"
+  },
+  "glazes": {
+   "v": 0.2812277933117002,
+   "style": {},
+   "groups": 1,
+   "prims": 6,
+   "mats": 2,
+   "tex": 0,
+   "kinds": {
+    "cyl": 6
+   },
+   "hash": "5e5a1e25",
+   "solids": "b9500f7a"
+  },
+  "greenscreen": {
+   "v": 0.6751392071601003,
+   "style": {
+    "h": 1.5
+   },
+   "groups": 1,
+   "prims": 2,
+   "mats": 2,
+   "tex": 0,
+   "kinds": {
+    "box": 2
+   },
+   "hash": "805b883d",
+   "solids": "cddbe181"
+  },
+  "guides": {
+   "v": 0.7853670089971274,
+   "style": {},
+   "groups": 1,
+   "prims": 12,
+   "mats": 3,
+   "tex": 0,
+   "kinds": {
+    "box": 12
+   },
+   "hash": "348e47db",
+   "solids": "16d35de0"
+  },
+  "halfbed": {
+   "v": 0.7202967216726393,
+   "style": {
+    "cover": 9067098
+   },
+   "groups": 1,
+   "prims": 15,
+   "mats": 5,
+   "tex": 0,
+   "kinds": {
+    "box": 15
+   },
+   "hash": "8c05d440",
+   "solids": "7dfd1dd2"
+  },
+  "hedge": {
+   "v": 0.37003838596865535,
+   "groups": 1,
+   "prims": 11,
+   "mats": 1,
+   "tex": 0,
+   "kinds": {
+    "box": 1,
+    "ico": 10
+   },
+   "hash": "ab531370",
+   "solids": "e66482c6"
+  },
+  "hesco": {
+   "v": 0.04314387892372906,
+   "style": {},
+   "groups": 1,
+   "prims": 30,
+   "mats": 3,
+   "tex": 0,
+   "kinds": {
+    "box": 30
+   },
+   "hash": "99039304",
+   "solids": "ef387737"
+  },
+  "hoarding": {
+   "v": 0.7647058823529411,
+   "groups": 1,
+   "prims": 3,
+   "mats": 2,
+   "tex": 0,
+   "kinds": {
+    "box": 3
+   },
+   "hash": "e089686a",
+   "solids": "10eaa78c"
+  },
+  "hookd": {
+   "v": 0.08009664481505752,
+   "style": {
+    "c": 15235612,
+    "h": 1.45
+   },
+   "groups": 1,
+   "prims": 4,
+   "mats": 2,
+   "tex": 0,
+   "kinds": {
+    "box": 4
+   },
+   "hash": "f26e8724",
+   "solids": "249609a7"
+  },
+  "hvac": {
+   "v": 0.5393235583323985,
+   "style": {},
+   "groups": 1,
+   "prims": 17,
+   "mats": 3,
+   "tex": 0,
+   "kinds": {
+    "box": 15,
+    "cyl": 2
+   },
+   "hash": "5a03ecf4",
+   "solids": "92ce832a"
+  },
+  "icebox": {
+   "v": 0.04088116576895118,
+   "style": {
+    "c": 2763824
+   },
+   "groups": 1,
+   "prims": 5,
+   "mats": 3,
+   "tex": 0,
+   "kinds": {
+    "box": 5
+   },
+   "hash": "ce61fb99",
+   "solids": "37c45237"
+  },
+  "icechest": {
+   "v": 0.5107468764763325,
+   "groups": 1,
+   "prims": 4,
+   "mats": 2,
+   "tex": 0,
+   "kinds": {
+    "box": 4
+   },
+   "hash": "c320e89a",
+   "solids": "ceaa8c23"
+  },
+  "ingots": {
+   "v": 0.37252913834527135,
+   "groups": 1,
+   "prims": 31,
+   "mats": 2,
+   "tex": 0,
+   "kinds": {
+    "box": 31
+   },
+   "hash": "e5cc3b0a",
+   "solids": "b461be56"
+  },
+  "juniper": {
+   "v": 0.3009161278605461,
+   "groups": 1,
+   "prims": 18,
+   "mats": 3,
+   "tex": 0,
+   "kinds": {
+    "cyl": 1,
+    "ico": 9,
+    "sph": 8
+   },
+   "hash": "82beb717",
+   "solids": "adb5ed3d"
+  },
+  "kiln": {
+   "v": 0.464470382547006,
+   "style": {},
+   "groups": 1,
+   "prims": 6,
+   "mats": 6,
+   "tex": 0,
+   "kinds": {
+    "box": 6
+   },
+   "hash": "83c7fd03",
+   "solids": "424f6d1c"
+  },
+  "kitrun": {
+   "v": 0.7785576309543103,
+   "style": {
+    "cab": 2763828,
+    "top": 3816516,
+    "on": "boxes"
+   },
+   "groups": 1,
+   "prims": 22,
+   "mats": 7,
+   "tex": 0,
+   "kinds": {
+    "box": 21,
+    "cyl": 1
+   },
+   "hash": "a21329ea",
+   "solids": "6aa42fd4"
+  },
+  "lacetable": {
+   "v": 0.8852808370720595,
+   "style": {},
+   "groups": 1,
+   "prims": 83,
+   "mats": 11,
+   "tex": 0,
+   "kinds": {
+    "box": 73,
+    "cyl": 10
+   },
+   "hash": "e517f954",
+   "solids": "80c0a6a2"
+  },
+  "lamp": {
+   "v": 0.8106442936696112,
+   "groups": 1,
+   "prims": 3,
+   "mats": 2,
+   "tex": 0,
+   "kinds": {
+    "cyl": 3
+   },
+   "hash": "ad3571f3",
+   "solids": "23d68e7c"
+  },
+  "livesign": {
+   "v": 0.7593815529253334,
+   "style": {
+    "h": 2.2
+   },
+   "groups": 1,
+   "prims": 2,
+   "mats": 2,
+   "tex": 0,
+   "kinds": {
+    "box": 2
+   },
+   "hash": "59b3ee56",
+   "solids": "d2b34f2d"
+  },
+  "lockers": {
+   "v": 0.45898219710215926,
+   "groups": 1,
+   "prims": 27,
+   "mats": 2,
+   "tex": 0,
+   "kinds": {
+    "box": 27
+   },
+   "hash": "5c2d7b4d",
+   "solids": "9c72b763"
+  },
+  "mast": {
+   "v": 0.5133615699596703,
+   "groups": 1,
+   "prims": 65,
+   "mats": 6,
+   "tex": 0,
+   "kinds": {
+    "box": 55,
+    "cyl": 8,
+    "sph": 2
+   },
+   "hash": "3e107234",
+   "solids": "1b9b3b8f"
+  },
+  "mill": {
+   "v": 0.4223129057791084,
+   "groups": 1,
+   "prims": 10,
+   "mats": 4,
+   "tex": 0,
+   "kinds": {
+    "box": 7,
+    "cyl": 3
+   },
+   "hash": "df4691b4",
+   "solids": "9e92b6be"
+  },
+  "moulds": {
+   "v": 0.20554994489066303,
+   "groups": 1,
+   "prims": 21,
+   "mats": 5,
+   "tex": 0,
+   "kinds": {
+    "box": 21
+   },
+   "hash": "34197812",
+   "solids": "ca8393cc"
+  },
+  "nightstand": {
+   "v": 0.8843326629139483,
+   "style": {},
+   "groups": 1,
+   "prims": 12,
+   "mats": 8,
+   "tex": 0,
+   "kinds": {
+    "box": 7,
+    "sph": 1,
+    "cyl": 4
+   },
+   "hash": "e741e869",
+   "solids": "f5163ae4"
+  },
+  "pallet": {
+   "v": 0.19197297096252441,
+   "groups": 1,
+   "prims": 17,
+   "mats": 5,
+   "tex": 0,
+   "kinds": {
+    "box": 17
+   },
+   "hash": "22a55132",
+   "solids": "217ed7f6"
+  },
+  "palletrack": {
+   "v": 0.3562991402577609,
+   "groups": 1,
+   "prims": 26,
+   "mats": 4,
+   "tex": 0,
+   "kinds": {
+    "box": 26
+   },
+   "hash": "9dbd939a",
+   "solids": "adf96c61"
+  },
+  "panel": {
+   "v": 0.5123186439741403,
+   "groups": 1,
+   "prims": 23,
+   "mats": 7,
+   "tex": 0,
+   "kinds": {
+    "box": 23
+   },
+   "hash": "ac354449",
+   "solids": "fb56d11c"
+  },
+  "parapet": {
+   "v": 0.7647058823529411,
+   "groups": 1,
+   "prims": 2,
+   "mats": 2,
+   "tex": 0,
+   "kinds": {
+    "box": 2
+   },
+   "hash": "132a6652",
+   "solids": "5ccdf421"
+  },
+  "patio": {
+   "v": 0.19952561939135194,
+   "groups": 1,
+   "prims": 28,
+   "mats": 3,
+   "tex": 0,
+   "kinds": {
+    "cyl": 4,
+    "box": 24
+   },
+   "hash": "a0eece04",
+   "solids": "4a1315a0"
+  },
+  "pctower": {
+   "v": 0.4221188072115183,
+   "style": {},
+   "groups": 1,
+   "prims": 2,
+   "mats": 2,
+   "tex": 0,
+   "kinds": {
+    "box": 2
+   },
+   "hash": "4808c850",
+   "solids": "ff77ae16"
+  },
+  "photo": {
+   "v": 0.4735590077470988,
+   "style": {
+    "h": 1.6
+   },
+   "groups": 1,
+   "prims": 5,
+   "mats": 5,
+   "tex": 0,
+   "kinds": {
+    "box": 4,
+    "sph": 1
+   },
+   "hash": "0f9974fd",
+   "solids": "fc53ba83"
+  },
+  "photodresser": {
+   "v": 0.5678539786022156,
+   "style": {},
+   "groups": 1,
+   "prims": 33,
+   "mats": 8,
+   "tex": 0,
+   "kinds": {
+    "box": 27,
+    "sph": 6
+   },
+   "hash": "de93827a",
+   "solids": "84a0797c"
+  },
+  "picnic": {
+   "v": 0.1449501838069409,
+   "groups": 1,
+   "prims": 10,
+   "mats": 3,
+   "tex": 0,
+   "kinds": {
+    "box": 7,
+    "cyl": 3
+   },
+   "hash": "c60c5c51",
+   "solids": "0463c8a5"
+  },
+  "pinon": {
+   "v": 0.14955248101614416,
+   "groups": 1,
+   "prims": 12,
+   "mats": 2,
+   "tex": 0,
+   "kinds": {
+    "cyl": 2,
+    "ico": 10
+   },
+   "hash": "3489b563",
+   "solids": "5757f9f6"
+  },
+  "plant": {
+   "v": 0.546421907376498,
+   "groups": 1,
+   "prims": 7,
+   "mats": 6,
+   "tex": 0,
+   "kinds": {
+    "cyl": 2,
+    "ico": 5
+   },
+   "hash": "6458a1dc",
+   "solids": "1b4a3f3f"
+  },
+  "planter": {
+   "v": 0.0360236638225615,
+   "groups": 1,
+   "prims": 12,
+   "mats": 9,
+   "tex": 0,
+   "kinds": {
+    "box": 2,
+    "sph": 6,
+    "ico": 4
+   },
+   "hash": "41b713f1",
+   "solids": "5f153703"
+  },
+  "police": {
+   "v": 0.35837168735451996,
+   "groups": 1,
+   "prims": 23,
+   "mats": 10,
+   "tex": 0,
+   "kinds": {
+    "box": 23
+   },
+   "hash": "34db77c0",
+   "solids": "9a2c5e45"
+  },
+  "portaloo": {
+   "v": 0.30578028969466686,
+   "style": {
+    "c": 2763314,
+    "stripe": 14241696
+   },
+   "groups": 1,
+   "prims": 4,
+   "mats": 3,
+   "tex": 0,
+   "kinds": {
+    "box": 4
+   },
+   "hash": "ee066e6c",
+   "solids": "7cd887ff"
+  },
+  "potbench": {
+   "v": 0.024433439131826162,
+   "groups": 1,
+   "prims": 40,
+   "mats": 7,
+   "tex": 0,
+   "kinds": {
+    "box": 13,
+    "cyl": 16,
+    "ico": 11
+   },
+   "hash": "93b45269",
+   "solids": "10ff9b56"
+  },
+  "press": {
+   "v": 0.8920215466059744,
+   "groups": 1,
+   "prims": 9,
+   "mats": 4,
+   "tex": 0,
+   "kinds": {
+    "box": 3,
+    "cyl": 6
+   },
+   "hash": "06b05524",
+   "solids": "02e9df24"
+  },
+  "quench": {
+   "v": 0.6296432702802122,
+   "groups": 1,
+   "prims": 6,
+   "mats": 2,
+   "tex": 0,
+   "kinds": {
+    "box": 6
+   },
+   "hash": "8988d7fa",
+   "solids": "d2e99f64"
+  },
+  "rack": {
+   "v": 0.5814191680401564,
+   "groups": 1,
+   "prims": 24,
+   "mats": 7,
+   "tex": 0,
+   "kinds": {
+    "box": 24
+   },
+   "hash": "c91bf036",
+   "solids": "0bfe3a21"
+  },
+  "register": {
+   "v": 0.8915321924723685,
+   "groups": 1,
+   "prims": 7,
+   "mats": 5,
+   "tex": 0,
+   "kinds": {
+    "box": 7
+   },
+   "hash": "9d7889fd",
+   "solids": "fb218cd7"
+  },
+  "rigdesk": {
+   "v": 0.18257820280268788,
+   "style": {
+    "back": 16727972
+   },
+   "groups": 1,
+   "prims": 16,
+   "mats": 6,
+   "tex": 0,
+   "kinds": {
+    "box": 16
+   },
+   "hash": "ec1f8460",
+   "solids": "f3553ae9"
+  },
+  "ringlight": {
+   "v": 0.16822371468879282,
+   "style": {},
+   "groups": 1,
+   "prims": 8,
+   "mats": 2,
+   "tex": 0,
+   "kinds": {
+    "box": 7,
+    "cyl": 1
+   },
+   "hash": "8e0ebd27",
+   "solids": "ca342eaf"
+  },
+  "ristra": {
+   "v": 0.9702107000630349,
+   "groups": 1,
+   "prims": 57,
+   "mats": 3,
+   "tex": 0,
+   "kinds": {
+    "box": 5,
+    "cyl": 52
+   },
+   "hash": "711c2c6f",
+   "solids": "77ee4e69"
+  },
+  "saw": {
+   "v": 0.04666348802857101,
+   "groups": 1,
+   "prims": 7,
+   "mats": 4,
+   "tex": 0,
+   "kinds": {
+    "box": 4,
+    "cyl": 3
+   },
+   "hash": "036cc444",
+   "solids": "c45647e2"
+  },
+  "scope": {
+   "v": 0.13731264020316303,
+   "groups": 1,
+   "prims": 8,
+   "mats": 3,
+   "tex": 0,
+   "kinds": {
+    "cyl": 6,
+    "box": 2
+   },
+   "hash": "94cca1c4",
+   "solids": "d9999e96"
+  },
+  "scrap": {
+   "v": 0.9812459838576615,
+   "style": {
+    "c": 8011560
+   },
+   "groups": 1,
+   "prims": 26,
+   "mats": 8,
+   "tex": 0,
+   "kinds": {
+    "box": 20,
+    "cyl": 6
+   },
+   "hash": "5fac917c",
+   "solids": "10a0446e"
+  },
+  "seats": {
+   "v": 0.7052443472202867,
+   "groups": 1,
+   "prims": 19,
+   "mats": 2,
+   "tex": 0,
+   "kinds": {
+    "box": 19
+   },
+   "hash": "cb0464b3",
+   "solids": "2fd3ed47"
+  },
+  "shed": {
+   "v": 0.3261703772004694,
+   "groups": 1,
+   "prims": 14,
+   "mats": 5,
+   "tex": 0,
+   "kinds": {
+    "box": 14
+   },
+   "hash": "ea9765e9",
+   "solids": "aeec70a0"
+  },
+  "shopwall": {
+   "v": 0.24541831645183265,
+   "groups": 1,
+   "prims": 148,
+   "mats": 32,
+   "tex": 1,
+   "kinds": {
+    "box": 65,
+    "cyl": 83
+   },
+   "hash": "77e68890",
+   "solids": "f79f8c0a"
+  },
+  "shrine": {
+   "v": 0.12604550342075527,
+   "style": {},
+   "groups": 1,
+   "prims": 22,
+   "mats": 9,
+   "tex": 0,
+   "kinds": {
+    "box": 15,
+    "sph": 3,
+    "cyl": 4
+   },
+   "hash": "ac4686ba",
+   "solids": "74662445"
+  },
+  "sidetable": {
+   "v": 0.2839330642018467,
+   "groups": 1,
+   "prims": 8,
+   "mats": 3,
+   "tex": 0,
+   "kinds": {
+    "box": 6,
+    "cyl": 2
+   },
+   "hash": "68807bad",
+   "solids": "5ff7a9a2"
+  },
+  "sinks": {
+   "v": 0.9941675276495516,
+   "groups": 1,
+   "prims": 10,
+   "mats": 6,
+   "tex": 0,
+   "kinds": {
+    "box": 8,
+    "cyl": 2
+   },
+   "hash": "389564ee",
+   "solids": "89d90ad2"
+  },
+  "siterail": {
+   "v": 0.17647058823529413,
+   "groups": 1,
+   "prims": 11,
+   "mats": 4,
+   "tex": 0,
+   "kinds": {
+    "box": 11
+   },
+   "hash": "ad012c7e",
+   "solids": "2f533fb8"
+  },
+  "sofa": {
+   "v": 0.2520849963184446,
+   "groups": 1,
+   "prims": 12,
+   "mats": 4,
+   "tex": 0,
+   "kinds": {
+    "box": 12
+   },
+   "hash": "3e6b44c9",
+   "solids": "b343e601"
+  },
+  "speaker": {
+   "v": 0.42755015566945076,
+   "groups": 1,
+   "prims": 12,
+   "mats": 3,
+   "tex": 0,
+   "kinds": {
+    "box": 6,
+    "cyl": 6
+   },
+   "hash": "f1edabe9",
+   "solids": "00932162"
+  },
+  "stagedeck": {
+   "v": 0.5851186981890351,
+   "groups": 1,
+   "prims": 3,
+   "mats": 3,
+   "tex": 0,
+   "kinds": {
+    "box": 3
+   },
+   "hash": "c40c86f3",
+   "solids": "c90ce555"
+  },
+  "stall": {
+   "v": 0.7981771498452872,
+   "groups": 1,
+   "prims": 10,
+   "mats": 4,
+   "tex": 0,
+   "kinds": {
+    "box": 7,
+    "cyl": 3
+   },
+   "hash": "240faca9",
+   "solids": "5a68a301"
+  },
+  "stallfood": {
+   "v": 0.40925710275769234,
+   "groups": 1,
+   "prims": 63,
+   "mats": 21,
+   "tex": 0,
+   "kinds": {
+    "box": 43,
+    "sph": 9,
+    "cyl": 11
+   },
+   "hash": "428603a5",
+   "solids": "d1b93847"
+  },
+  "stallmerch": {
+   "v": 0.6899625316727906,
+   "groups": 1,
+   "prims": 69,
+   "mats": 24,
+   "tex": 0,
+   "kinds": {
+    "box": 55,
+    "sph": 12,
+    "cyl": 2
+   },
+   "hash": "d138518b",
+   "solids": "b332a933"
+  },
+  "tallplant": {
+   "v": 0.5899099137168378,
+   "style": {},
+   "groups": 1,
+   "prims": 12,
+   "mats": 5,
+   "tex": 0,
+   "kinds": {
+    "cyl": 3,
+    "box": 9
+   },
+   "hash": "2252fc2c",
+   "solids": "24c6dd2a"
+  },
+  "tapestry": {
+   "v": 0.5019418669398874,
+   "style": {
+    "h": 1.75
+   },
+   "groups": 1,
+   "prims": 17,
+   "mats": 5,
+   "tex": 0,
+   "kinds": {
+    "box": 17
+   },
+   "hash": "b1e19db4",
+   "solids": "137bc7fa"
+  },
+  "tobacco": {
+   "v": 0.4307816179934889,
+   "groups": 1,
+   "prims": 99,
+   "mats": 4,
+   "tex": 1,
+   "kinds": {
+    "box": 99
+   },
+   "hash": "f377fc0a",
+   "solids": "d3a555d7"
+  },
+  "toilet": {
+   "v": 0.7682410259731114,
+   "style": {},
+   "groups": 1,
+   "prims": 4,
+   "mats": 3,
+   "tex": 0,
+   "kinds": {
+    "cyl": 2,
+    "box": 2
+   },
+   "hash": "3030d6a2",
+   "solids": "86fd5be3"
+  },
+  "treadle": {
+   "v": 0.9804452052339911,
+   "style": {},
+   "groups": 1,
+   "prims": 24,
+   "mats": 4,
+   "tex": 0,
+   "kinds": {
+    "box": 22,
+    "cyl": 2
+   },
+   "hash": "d9d45b54",
+   "solids": "8163d078"
+  },
+  "tree": {
+   "v": 0.26237073075026274,
+   "groups": 1,
+   "prims": 11,
+   "mats": 3,
+   "tex": 0,
+   "kinds": {
+    "cyl": 1,
+    "ico": 9,
+    "box": 1
+   },
+   "hash": "802acd0a",
+   "solids": "6209f1e7"
+  },
+  "tv": {
+   "v": 0.7916872787754983,
+   "groups": 1,
+   "prims": 17,
+   "mats": 7,
+   "tex": 0,
+   "kinds": {
+    "box": 13,
+    "cyl": 1,
+    "ico": 3
+   },
+   "hash": "dc9ad8ef",
+   "solids": "28e87dd7"
+  },
+  "vat": {
+   "v": 0.8389294384978712,
+   "groups": 1,
+   "prims": 25,
+   "mats": 5,
+   "tex": 0,
+   "kinds": {
+    "box": 17,
+    "cyl": 8
+   },
+   "hash": "151d76b2",
+   "solids": "226d9e2e"
+  },
+  "wardrobe": {
+   "v": 0.15669417660683393,
+   "style": {},
+   "groups": 1,
+   "prims": 8,
+   "mats": 5,
+   "tex": 0,
+   "kinds": {
+    "box": 8
+   },
+   "hash": "1ad36891",
+   "solids": "e3c9e8c5"
+  },
+  "watertank": {
+   "v": 0.24783227150328457,
+   "style": {},
+   "groups": 1,
+   "prims": 7,
+   "mats": 3,
+   "tex": 0,
+   "kinds": {
+    "box": 5,
+    "cyl": 2
+   },
+   "hash": "a9cf96bb",
+   "solids": "342d4a0d"
+  },
+  "wheel": {
+   "v": 0.911052864510566,
+   "style": {},
+   "groups": 1,
+   "prims": 5,
+   "mats": 5,
+   "tex": 0,
+   "kinds": {
+    "box": 2,
+    "cyl": 3
+   },
+   "hash": "9a4b30d7",
+   "solids": "fc385661"
+  }
+ }
+}
