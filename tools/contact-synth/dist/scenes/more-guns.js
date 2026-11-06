@@ -24,6 +24,8 @@ import { hit, rub, snap, steelBar, steelBlock, springWire, arCase, arFollower, S
  * and it cushions the hard edge of the closing a little. (As the AR's greased carrier, firearms.ts.)
  */
 const LUBED = { roughness: 1, grain: 0.8, periodicity: 0, contactWidth: 0.25 };
+/** Packed with grease (the MP5's cocking handle in its tube): a thick film, its texture almost gone. */
+const GREASED = { roughness: 0.3, grain: 2, periodicity: 0, contactWidth: 0.6 };
 /*
  * Heard through the shell. The action works inside a closed metal part, so what reaches the ear comes through its
  * walls (they pass the low end and stop the highs) plus a little straight out of its openings. The parts that are
@@ -203,8 +205,8 @@ function makeMp5Charge(fill, timing = {}) {
     const vHome = runAt(MP5_STROKE, MP5_M, MP5_F).v;
     const TL = fwd(MP5_STROKE);
     const els = [
-        rub('cocking handle slides back in its tube', back(0.001), -11, { force: 4, duration: T - back(0.001), speed: 0.9, profile: 'swell', ...LUBED }, mp5Handle, mp5Tube, TUBE_AIR),
-        rub('handle spring compresses in the tube', back(0.003), -16, { force: 3, duration: T - back(0.003), speed: 0.9, profile: 'swell', roughness: 3, grain: 0.3, contactWidth: 0.05 }, mp5HandleSpring, mp5Tube, { coil: { level: 0.3, length: 9, dispersion: 0.55, decay: 0.1, brightness: 4500 }, ...TUBE_AIR }),
+        rub('cocking handle slides back in its tube', back(0.001), -12, { force: 4, duration: T - back(0.001), speed: 0.9, profile: 'swell', ...GREASED }, mp5Handle, mp5Tube, TUBE_AIR),
+        rub('handle spring compresses in the tube', back(0.003), -17, { force: 3, duration: T - back(0.003), speed: 0.9, profile: 'swell', ...GREASED }, mp5HandleSpring, mp5Tube, { coil: { level: 0.25, length: 9, dispersion: 0.55, decay: 0.08, brightness: 2800 }, ...TUBE_AIR }),
         // the rollers pushed back out of the trunnion's recesses: the bolt unlocks with a short double tick
         snap('rollers cam in out of the trunnion', back(0.004), -8, { strength: 0.6, preload: 0, seat: 0.5, seatDelay: 1.2 }, mp5Roller, mp5Trunnion),
         rub('bolt runs back in the receiver', back(0.005), -12, { force: 5, duration: T - back(0.005), speed: 1, profile: 'swell', ...LUBED }, mp5BoltSliding, mp5Receiver),
@@ -220,8 +222,8 @@ function makeMp5Charge(fill, timing = {}) {
         hit('handle stops at the end of its slot', T, -4, 1.3, mp5Handle, mp5Tube, { radius: 2, click: 0.8, sharp: 0.85 }, TUBE_AIR),
         // let go: the bolt flies home; the handle, not tied to it, is sent home by its own spring in the tube
         rub('bolt flies home', LET_GO, -10, { force: 5, duration: TL - LET_GO, speed: vHome, profile: 'accelerate', ...LUBED }, mp5BoltSliding, mp5Receiver),
-        rub('cocking handle snaps home in its tube', LET_GO + 0.002, -12, { force: 3, duration: 0.03, speed: 2.5, profile: 'accelerate', ...LUBED }, mp5Handle, mp5Tube, TUBE_AIR),
-        hit('handle hits the front of its slot', LET_GO + 0.032, -7, 1.6, mp5Handle, mp5Tube, { radius: 2, click: 0.8, sharp: 0.85 }, { coil: { level: 0.35, length: 9, dispersion: 0.55, decay: 0.12, brightness: 5000 }, ...TUBE_AIR }),
+        rub('cocking handle snaps home in its tube', LET_GO + 0.002, -13, { force: 3, duration: 0.03, speed: 2.5, profile: 'accelerate', ...GREASED }, mp5Handle, mp5Tube, TUBE_AIR),
+        hit('handle hits the front of its slot', LET_GO + 0.032, -7, 1.6, mp5Handle, mp5Tube, { radius: 2, click: 0.8, sharp: 0.85 }, { coil: { level: 0.3, length: 9, dispersion: 0.55, decay: 0.1, brightness: 3000 }, ...TUBE_AIR }),
     ];
     if (fill === 'loaded') {
         const strip = fwd(0.03);

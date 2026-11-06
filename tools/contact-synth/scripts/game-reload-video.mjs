@@ -47,6 +47,7 @@ const GUNS = {
 // The charge sound is rebuilt with the animation's own timing (js/vmanim.ts rack: the hand draws the action
 // back from 30% to 52% of it and lets go at once, home at 60%), keeping each gun's real stroke.
 const CHARGE_BUILD = { m4: (t) => arChargeScene('loaded', t), ak: (t) => chargeScene('ak', 'loaded', t), mp5: (t) => chargeScene('mp5', 'loaded', t), g19: (t) => chargeScene('g19', 'loaded', t) };
+const HANDLE_PARTS = { m4: /charging handle|handle (bottoms|rattles)|latch/, mp5: /cocking handle|handle (stops|hits|spring)/ };
 const C = GUNS[GUN];
 if (!C) { console.error('--gun: one of ' + Object.keys(GUNS).join(', ')); process.exit(1); }
 // 30 fps at 960x540: headless WebGL (SwiftShader) takes seconds a frame, so this keeps a run to ~45 min.
@@ -122,6 +123,16 @@ await page.evaluate(async () => {
   window.__caption = (a, b) => { cap.innerHTML = `${a}<div style="font-size:17px;font-weight:500;opacity:.85;margin-top:4px">${b}</div>`; };
   // the moments, logged on the stepped clock
   window.__log = [];
+  // where the gun's parts are at each logged moment, relative to the camera (the viewmodel is drawn by the main
+  // camera in its own pass): the magazine well, the ejection port (the action), the handle that's worked
+  const rel3 = (h, v) => { if (!v) return null; G.R.vmScene.updateMatrixWorld(true); G.R.camera.updateMatrixWorld(); return G.R.camera.worldToLocal(h.holder.localToWorld(v.clone())).toArray(); };
+  window.__anchors = () => {
+    const a = G.R.vm && G.R.vm.userData && G.R.vm.userData.vma;
+    if (!a) return null;
+    const h = a.hs[0], A = h.A;
+    return { well: rel3(h, A.WB), port: rel3(h, A.port || A.ch || A.slide || A.WB), handle: rel3(h, A.H || A.ch || A.slide || A.port) };
+  };
+  window.__log.push = (e) => Array.prototype.push.call(window.__log, { ...e, parts: window.__anchors() });
   const feed = m.feed.bind(m); m.feed = (ww) => { window.__log.push({ ev: 'bolt home', t: window.__clock.t() }); return feed(ww); };
   // an emergency (dump) reload drops the magazine on the floor (js/casings.ts dropMag): when it's let go, and from where
   const dropMag = G.Casings.dropMag.bind(G.Casings);
@@ -220,125 +231,136 @@ if (REDUB) {
   for (const e of log) console.log(`  ${e.t.toFixed(3)} s  ${e.ev}`);
 }
 
-// ---------- the sounds, each on its moment ----------
+// ---------- the sounds, each on its moment, each from its part of the gun ----------
 const sr = 48000, total = frames / FPS;
-const mix = new Float32Array(Math.ceil((total + 1) * sr));
+const N = Math.ceil((total + 1) * sr);
+const sources = []; // { data: Float32Array, part: 'well'|'port'|'handle'|'floor', t (to look the part up), what }
 const scene = (id) => SCENES.find((s) => s.id === id);
-/** Place a rendered stem (or the whole mix) so that element `what` of the scene lands at time `at`. */
-function place(id, what, at, tracks = null, gainDb = 0) {
-  const sc = typeof id === 'string' ? scene(id) : id;
+// the gun's parts where they were at time t (the logged moment nearest it); a default spot if none was logged
+const DEFAULT = { well: [0.12, -0.25, -0.35], port: [0.1, -0.17, -0.4], handle: [0.1, -0.15, -0.45] };
+const partsAt = (t) => { let best = null; for (const e of log) if (e.parts && (!best || Math.abs(e.t - t) < Math.abs(best.t - t))) best = e; return (best && best.parts) || DEFAULT; };
+/**
+ * Place a rendered scene (or some of its tracks, or only the elements `keep` passes) so that element `what` lands at
+ * time `at`, heard from the gun's `part`.
+ */
+function place(id, what, at, tracks = null, gainDb = 0, part = 'port', keep = null) {
+  const sc0 = typeof id === 'string' ? scene(id) : id;
+  const all = sc0.tracks.flatMap((t) => t.elements);
+  const el = all.find((e) => e.what === what);
+  if (!el) throw new Error(`${sc0.id}: no "${what}"`);
+  const sc = keep ? { ...sc0, tracks: sc0.tracks.map((t) => ({ ...t, elements: t.elements.filter(keep) })).filter((t) => t.elements.length) } : sc0;
   const els = sc.tracks.flatMap((t) => t.elements);
-  const el = els.find((e) => e.what === what);
-  if (!el) throw new Error(`${id}: no "${what}"`);
+  if (!els.length) return;
   const r = renderScene(sc, sr, 1, { dry: !WET });
   // the mix's sample 0 is at scene time (earliest element start - T0); stems start `start` s after it
   const origin = Math.min(...els.map((e) => e.at - (e.sound.kind === 'contact' ? T0 : 0)));
-  const g = Math.pow(10, gainDb / 20);
+  const g = Math.pow(10, gainDb / 20), data = new Float32Array(N);
   const add = (samples, start) => {
     const o = Math.round((at - (el.at - origin) + start) * sr);
-    for (let i = 0; i < samples.length; i++) if (o + i >= 0 && o + i < mix.length) mix[o + i] += samples[i] * g;
+    for (let i = 0; i < samples.length; i++) if (o + i >= 0 && o + i < N) data[o + i] += samples[i] * g;
   };
   if (!tracks) add(r.mix, 0);
   else for (const t of r.tracks) if (tracks.includes(t.name)) add(t.samples, t.start);
+  sources.push({ data, part, t: at, what: sc0.id });
 }
 const at = (ev, n = 0) => { const l = log.filter((e) => e.ev === ev); if (!l[n]) throw new Error(`no ${ev} #${n}`); return l[n].t; };
 // The action worked by hand (a charge): its pull-back stems with the rear stop on the handle (or slide) at the
-// rear, its run home with the slam on the bolt home (the first one logged after it).
+// rear, its run home with the slam on the bolt home (the first one logged after it). The handle's own sounds come
+// from the handle (the MP5's out at the front of its tube); the rest from the action, at the port.
 const homeAfter = (t) => log.find((e) => e.ev === 'bolt home' && e.t >= t - 1e-6).t;
 function worked([id, rear, slam], back) {
   // the action logged just before the handle reached the rear: its length sets the pull
   const act = log.filter((e) => e.ev === 'action' && e.t <= back + 1e-6).pop();
   const sc = act && act.dur ? CHARGE_BUILD[GUN]({ pull: 0.22 * act.dur, hold: 0 }) : scene(id);
   if (act && act.dur) console.log(`  ${sc.id}: pull ${(0.22 * act.dur * 1000).toFixed(0)} ms (the animation's), no hold`);
-  place(sc, rear, back, sc.tracks.filter((t) => t.name !== 'release-forward').map((t) => t.name));
-  place(sc, slam, homeAfter(back), ['release-forward']);
+  const hp = HANDLE_PARTS[GUN], isHandle = (e) => !!hp && hp.test(e.what);
+  const pullTracks = sc.tracks.filter((t) => t.name !== 'release-forward').map((t) => t.name), home = homeAfter(back);
+  place(sc, rear, back, pullTracks, 0, 'port', (e) => !isHandle(e));
+  place(sc, slam, home, ['release-forward'], 0, 'port', (e) => !isHandle(e));
+  if (hp) {
+    place(sc, rear, back, pullTracks, 0, 'handle', isHandle);
+    place(sc, slam, home, ['release-forward'], 0, 'handle', isHandle);
+  }
 }
 // (a pistol's slide at the rear is cued 'drop_slide' by the game, a rifle's handle 'rack_slide'; a release's home
 // is 'drop_slide' too, so for a pistol it's the next one after the charge's)
 const rearCue = C.rearCue || 'rack_slide';
 worked(C.charge_, at(rearCue, 0));
-// the partial reload: the loaded magazine out, a fresh one in
-place(C.magOut[0], C.magOut[1], at('magazine out', 0), null, -2);
-place(C.magIn[0], C.magIn[1], at('insert_magazine', 0), null, -2);
+// the partial reload: the loaded magazine out, a fresh one in (at the magazine well)
+place(C.magOut[0], C.magOut[1], at('magazine out', 0), null, -2, 'well');
+place(C.magIn[0], C.magIn[1], at('insert_magazine', 0), null, -2, 'well');
 // run dry, an emergency reload: the empty one let go (it falls free), a fresh one in, then the action
 const dropped = log.find((e) => e.ev === 'magazine dropped'), rests = log.find((e) => e.ev === 'magazine rests');
-place(C.magOutEmpty[0], C.magOutEmpty[1], dropped ? dropped.t : at('magazine out', 1), null, -2);
+place(C.magOutEmpty[0], C.magOutEmpty[1], dropped ? dropped.t : at('magazine out', 1), null, -2, 'well');
+place(C.magIn[0], C.magIn[1], at('insert_magazine', 1), null, -2, 'well');
+if (C.after === 'release') place(C.release[0], C.release[1], at('drop_slide', rearCue === 'drop_slide' ? 1 : 0), null, 0, 'port');
+// (the game has the final say: if it racked when we expected the catch, or the reverse, the log shows which)
+else worked(C.rackEmpty, at(rearCue, 1));
 // ... and it hits the floor: the simulated drop of this gun's magazine, empty, from the height it was let go at,
 // its release on the moment the game let it go (it clears the well ~50 ms later), heard from where it lands
-const floorMix = new Float32Array(mix.length);
 if (dropped) {
   const height = dropped.y != null && rests ? Math.max(0.3, dropped.y - rests.y) : 1.2;
   const sc = magDropScene({ mag: C.mag, rounds: 0, way: 'forwards', height, toss: 0.4, surface: 'concrete' });
   const els = sc.tracks.flatMap((t) => t.elements);
   const origin = Math.min(...els.map((e) => e.at - (e.sound.kind === 'contact' ? T0 : 0)));
   const r = renderScene(sc, sr, 1, { dry: !WET });
-  const o = Math.round((dropped.t + 0.05 + origin) * sr);
-  for (let i = 0; i < r.mix.length; i++) if (o + i >= 0 && o + i < floorMix.length) floorMix[o + i] += r.mix[i] * Math.pow(10, -4 / 20);
+  const o = Math.round((dropped.t + 0.05 + origin) * sr), data = new Float32Array(N);
+  for (let i = 0; i < r.mix.length; i++) if (o + i >= 0 && o + i < N) data[o + i] += r.mix[i] * Math.pow(10, -4 / 20);
+  sources.push({ data, part: 'floor', t: dropped.t, what: sc.id });
   console.log(`  ${sc.id}: let go ${height.toFixed(2)} m above the floor`);
 }
-place(C.magIn[0], C.magIn[1], at('insert_magazine', 1), null, -2);
-if (C.after === 'release') place(C.release[0], C.release[1], at('drop_slide', rearCue === 'drop_slide' ? 1 : 0));
-// (the game has the final say: if it racked when we expected the catch, or the reverse, the log shows which)
-else worked(C.rackEmpty, at(rearCue, 1));
-let pk = 0; for (let i = 0; i < mix.length; i++) pk = Math.max(pk, Math.abs(mix[i] + floorMix[i]));
-for (let i = 0; i < mix.length; i++) { mix[i] *= 0.89 / pk; floorMix[i] *= 0.89 / pk; }
+// one level for all of them (they keep their balance)
+let pk = 0;
+for (let i = 0; i < N; i++) { let v = 0; for (const s of sources) v += s.data[i]; pk = Math.max(pk, Math.abs(v)); }
+for (const s of sources) for (let i = 0; i < N; i++) s.data[i] *= 0.89 / pk;
 
-// ---------- placed where the gun is, in the game's own acoustics ----------
-// The dry sound, rendered offline in the game page: through an HRTF panner at the gun's action (in front of you,
-// below and to the right of your eyes, against a listener at the camera), plus the game's own echo paths from that
-// spot (js/gunaudio.ts echoTaps: rays off the level's walls, each echo from its wall, darker each bounce). This is
-// what the game would do with a sound placed at the gun: out in front of you, in the room you're standing in.
-let L = mix.map((v, i) => v + floorMix[i]), R = L, echoes = 0;
+// ---------- placed where each part is, in the game's own acoustics ----------
+// Rendered offline in the game page: each sound through an HRTF panner at its part of the gun (where the part was
+// when it happened, against a listener at the camera), plus the game's own echo paths from there
+// (js/gunaudio.ts echoTaps: rays off the level's walls, each echo from its wall, darker each bounce). The dropped
+// magazine is heard from where it came to rest on the floor, quieter for being further off.
+let L = new Float32Array(N), R = L, echoes = 0;
+for (const s of sources) for (let i = 0; i < N; i++) L[i] += s.data[i];
 if (SPACE) {
-  const b64 = Buffer.from(mix.buffer).toString('base64'), b64f = Buffer.from(floorMix.buffer).toString('base64');
-  const res = await page.evaluate(async ({ b64, b64f, sr, rest }) => {
+  const payload = sources.map((s) => ({ b64: Buffer.from(s.data.buffer).toString('base64'), rel: s.part === 'floor' ? null : partsAt(s.t)[s.part] || DEFAULT[s.part], floor: s.part === 'floor' }));
+  const res = await page.evaluate(async ({ payload, sr, rest, N }) => {
     const unb = (s) => { const bin = atob(s), bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i); return new Float32Array(bytes.buffer); };
-    const dry = unb(b64), dryFloor = unb(b64f);
     const cam = G.R.camera, p = cam.position, q = cam.quaternion;
-    const src = p.clone().add(new THREE.Vector3(0.1, -0.17, -0.4).applyQuaternion(q)); // the action: ~40 cm ahead, below and right
-    const ctx = new OfflineAudioContext(2, dry.length, sr);
+    const ctx = new OfflineAudioContext(2, N, sr);
     const l = ctx.listener, f = new THREE.Vector3(0, 0, -1).applyQuaternion(q), u = new THREE.Vector3(0, 1, 0).applyQuaternion(q);
     if (l.positionX) { l.positionX.value = p.x; l.positionY.value = p.y; l.positionZ.value = p.z; l.forwardX.value = f.x; l.forwardY.value = f.y; l.forwardZ.value = f.z; l.upX.value = u.x; l.upY.value = u.y; l.upZ.value = u.z; }
     else { l.setPosition(p.x, p.y, p.z); l.setOrientation(f.x, f.y, f.z, u.x, u.y, u.z); }
-    const buf = ctx.createBuffer(1, dry.length, sr); buf.copyToChannel(dry, 0);
     const placeAt = (node, at) => { if (node.positionX) { node.positionX.value = at.x; node.positionY.value = at.y; node.positionZ.value = at.z; } else node.setPosition(at.x, at.y, at.z); };
-    const s = ctx.createBufferSource(); s.buffer = buf;
-    const pan = ctx.createPanner(); pan.panningModel = 'HRTF'; pan.distanceModel = 'inverse'; pan.rolloffFactor = 0; placeAt(pan, src);
-    s.connect(pan).connect(ctx.destination); s.start(0);
-    // the dropped magazine: from where it came to rest on the floor, with that spot's own echoes
-    if (rest) {
-      const fb = ctx.createBuffer(1, dryFloor.length, sr); fb.copyToChannel(dryFloor, 0);
-      const at = new THREE.Vector3(rest.x, rest.y, rest.z);
-      const fs = ctx.createBufferSource(); fs.buffer = fb;
-      const fp = ctx.createPanner(); fp.panningModel = 'HRTF'; fp.distanceModel = 'inverse'; fp.rolloffFactor = 0; placeAt(fp, at);
-      const fg = ctx.createGain(); fg.gain.value = Math.min(1, 0.6 / Math.max(0.6, at.distanceTo(p))); // (further off than the gun: quieter)
-      fs.connect(fp).connect(fg).connect(ctx.destination); fs.start(0);
-      for (const tp of G.GunAudio.echoTaps(G.Game.map, at, p)) {
-        const es = ctx.createBufferSource(); es.buffer = fb;
+    let ntaps = 0;
+    for (const sp of payload) {
+      const data = unb(sp.b64);
+      const buf = ctx.createBuffer(1, data.length, sr); buf.copyToChannel(data, 0);
+      const pos = sp.floor ? new THREE.Vector3(rest.x, rest.y, rest.z) : p.clone().add(new THREE.Vector3(...sp.rel).applyQuaternion(q));
+      const gain = sp.floor ? Math.min(1, 0.6 / Math.max(0.6, pos.distanceTo(p))) : 1;
+      const s = ctx.createBufferSource(); s.buffer = buf;
+      const pan = ctx.createPanner(); pan.panningModel = 'HRTF'; pan.distanceModel = 'inverse'; pan.rolloffFactor = 0; placeAt(pan, pos);
+      const g0 = ctx.createGain(); g0.gain.value = gain;
+      s.connect(pan).connect(g0).connect(ctx.destination); s.start(0);
+      const taps = G.GunAudio.echoTaps(G.Game.map, pos, p); ntaps += taps.length;
+      for (const tp of taps) {
+        const es = ctx.createBufferSource(); es.buffer = buf;
         const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = tp.order === 1 ? 5000 : 2800;
         const ep = ctx.createPanner(); ep.panningModel = 'HRTF'; ep.rolloffFactor = 0; placeAt(ep, tp.pos);
-        const g = ctx.createGain(); g.gain.value = tp.amp * fg.gain.value;
+        const g = ctx.createGain(); g.gain.value = tp.amp * gain;
         es.connect(lp).connect(ep).connect(g).connect(ctx.destination); es.start(tp.delay);
       }
     }
-    const taps = G.GunAudio.echoTaps(G.Game.map, src, p);
-    for (const tp of taps) {
-      const es = ctx.createBufferSource(); es.buffer = buf;
-      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = tp.order === 1 ? 5000 : 2800;
-      const ep = ctx.createPanner(); ep.panningModel = 'HRTF'; ep.rolloffFactor = 0; placeAt(ep, tp.pos);
-      const g = ctx.createGain(); g.gain.value = tp.amp;
-      es.connect(lp).connect(ep).connect(g).connect(ctx.destination);
-      es.start(tp.delay);
-    }
     const o = await ctx.startRendering();
     const enc = (a) => { const u8 = new Uint8Array(a.buffer); let str = ''; for (let i = 0; i < u8.length; i += 0x8000) str += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(str); };
-    return { L: enc(o.getChannelData(0)), R: enc(o.getChannelData(1)), taps: taps.length };
-  }, { b64, b64f, sr, rest: rests ? { x: rests.x, y: rests.y, z: rests.z } : null });
+    return { L: enc(o.getChannelData(0)), R: enc(o.getChannelData(1)), taps: ntaps };
+  }, { payload, sr, N, rest: rests ? { x: rests.x, y: rests.y, z: rests.z } : null });
   const dec = (s) => { const b = Buffer.from(s, 'base64'); return new Float32Array(b.buffer, b.byteOffset, b.length / 4); };
   L = dec(res.L); R = dec(res.R); echoes = res.taps;
   let m = 0; for (let i = 0; i < L.length; i++) m = Math.max(m, Math.abs(L[i]), Math.abs(R[i]));
   for (let i = 0; i < L.length; i++) { L[i] *= 0.89 / m; R[i] *= 0.89 / m; }
-  console.log(`  placed at the gun (HRTF), with ${echoes} echo paths from the level`);
+  const seen = {};
+  for (const s of sources) if (s.part !== 'floor') { const r = (partsAt(s.t)[s.part] || DEFAULT[s.part]).map((v) => v.toFixed(2)).join(', '); seen[s.part] = r; }
+  console.log(`  ${sources.length} sounds placed at their parts (camera-relative x, y, z m: ${Object.entries(seen).map(([k, v]) => `${k} ${v}`).join('; ')}), ${echoes} echo paths`);
 }
 await browser.close();
 // a 16-bit stereo WAV
