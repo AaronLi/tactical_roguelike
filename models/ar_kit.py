@@ -120,6 +120,22 @@ def lower_ar15_well():
     cut(o, prism(rounded(F(771), U(210), 15 * S, 19 * S, 5 * S, 3), 'x', HW_MW - 1.5 * mm, HW_MW + 3 * mm)); bevel(o, 0.4 * mm, 1); smooth(o); K.adopt(o, 'base', RCV)
     o = K.obj(cyl(4.3 * mm, HW_MW - 1.6 * mm, HW_MW + 0.2 * mm, 'x', (F(768), U(208)), 16), 'base', 'steel'); smooth(o)
 
+def bolt_catch():
+    """The bolt catch (left), behind the magazine well and over the trigger guard's front: a raised boss on the lower, the paddle (part_catch) pinned
+    in it by a roll pin, its upper arm the release and its raised pad, cut across with serrations, the lock: a paddle about 10 x 25 mm whose pad
+    stands 3.8 mm off the receiver. The catch is steel (phosphated) against the anodised lower. Its pivot is the pin; turned about it (the
+    node's x), the catch's upper arm tips back as the bolt is held open (js/vmanim.ts). The right end of the pin shows in the lower's boss."""
+    cx, cy = F(753), U(196)
+    o = K.tmp(prism(rounded(cx, U(197), 10.5 * mm, 17 * mm * RY, 4.5 * mm, 3), 'x', -HW_LO - 0.9 * mm, -HW_LO + 0.5 * mm)); bevel(o, 0.4 * mm, 1); smooth(o); K.adopt(o, 'base', RCV)   # (the boss)
+    o = K.tmp(prism(rounded(cx, U(197), 3.0 * mm, 3.0 * mm, 1.4 * mm, 2), 'x', HW_LO - 0.5 * mm, HW_LO + 0.5 * mm)); smooth(o); K.adopt(o, 'base', 'steel')                         # (the pin's end, right)
+    pc = K.part('catch', (0, cx, cy))
+    o = K.tmp(prism(PL([(745, 167), (761, 167), (763, 175), (763, 198), (768, 202), (768, 223), (763, 229), (743, 229), (738, 223), (738, 202), (743, 198), (743, 175)]), 'x', -HW_LO - 1.9 * mm, -HW_LO - 0.4 * mm))
+    bevel(o, 0.5 * mm, 1); smooth(o); K.adopt(o, 'base', 'gunmetal', pc)                                                            # (the paddle: the release arm, the pad's wider foot)
+    pad = K.tmp(prism(PL([(740, 203), (766, 203), (766, 222), (762, 227), (744, 227), (740, 222)]), 'x', -HW_LO - 3.8 * mm, -HW_LO - 1.5 * mm))
+    for k in range(5): cut(pad, box(-HW_LO - 4.0 * mm, -HW_LO - 2.9 * mm, F(736), F(770), U(206.5 + 3.8 * k) - 0.9 * mm, U(206.5 + 3.8 * k)))
+    bevel(pad, 0.35 * mm, 1); smooth(pad); K.adopt(pad, 'base', 'gunmetal', pc)                                                     # (the raised, serrated pad)
+    o = K.obj(cyl(1.5 * mm, -HW_LO - 2.3 * mm, -HW_LO + 0.3 * mm, 'x', (cx, cy), 12), 'base', 'steel', pc); smooth(o)                  # (the roll pin)
+
 def lower_rest():
     # the trigger guard: the rear post at the grip, the bar, the rounded front against the well; its opening rounded at the corners
     tg = K.tmp(prism(PL([(646, 242), (787, 242), (787, 302), (781, 315), (769, 321), (660, 321), (648, 314), (646, 302)]), 'x', -5.0 * mm, 5.0 * mm))
@@ -136,7 +152,7 @@ def lower_rest():
     o = K.obj(cyl(5.5 * mm, HW_LO, HW_LO + 1.2 * mm, 'x', (F(620), U(202)), 16), 'base', RCV); smooth(o)
     o = K.tmp(prism(PL([(612, 196), (664, 192), (668, 202), (614, 210)]), 'x', -HW_LO - 1.8 * mm, -HW_LO)); bevel(o, 0.6 * mm, 1); smooth(o); K.adopt(o, 'base', RCV)
     o = K.obj(cyl(5.5 * mm, -HW_LO - 1.2 * mm, -HW_LO, 'x', (F(620), U(202)), 16), 'base', RCV); smooth(o)
-    o = K.tmp(prism(PL([(742, 168), (764, 168), (764, 214), (750, 222), (742, 214)]), 'x', -HW_LO - 1.4 * mm, -HW_LO)); bevel(o, 0.4 * mm, 1); smooth(o); K.adopt(o, 'base', RCV)
+    bolt_catch()
     # the receiver extension (buffer tube), its castle nut and the end plate's sling loop
     o = K.obj(cyl(14.6 * mm, F(120), F(470), 'y', (0, 0), 24), 'base', RCV); smooth(o)
     cn = K.tmp(cyl(16.8 * mm, F(470), F(492), 'y', (0, 0), 24))
@@ -702,7 +718,7 @@ info = {
     'sy': round(SY, 4), 'fSight': round(RS, 4), 'relief': 0.075,
     'muzzles': [[round(MUZ, 4), 0, 0]],
     'grip': [round(la['grip'][0] - 0.040, 4), round(la['grip'][1] - 0.040, 4), 0], 'support': [round((HG0 + HG1) / 2 + 0.03, 4), round(HGB - 6 * mm, 4), 0],
-    'anim': {'ch': 'part_ch', 'mag': 'part_mag'},
+    'anim': {'ch': 'part_ch', 'mag': 'part_mag', 'catch': 'part_catch'},
     'magAt': [round(MTOP[0], 4), round(MTOP[1], 4)],
     **({'magRake': round(GRK, 4)} if C.get('lower', 'ar15') == 'glock' else {}),   # (the well's rake: a reload draws the magazine out along it)
     'port': [round(F((PORT[0] + PORT[1]) / 2), 4), round(U(116), 4), round(HW_UP, 4)],

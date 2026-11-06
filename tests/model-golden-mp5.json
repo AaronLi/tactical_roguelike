@@ -119,12 +119,12 @@
   },
   "barrel=br.9x19.8.9,grip=oem.gr.ar.4,handguard=oem.hg.smg.3,mag=mp5.mag.30,muzzle=mz.r9.tri,optic=op.pic.5,receiver=rcv.mp5,stock=stk.smg.1": {
    "label": "optic=op.pic.5",
-   "geometry": "0e055607add5ef4e",
+   "geometry": "40c48d3170d71c78",
    "info": "0101242fe36c1658"
   },
   "barrel=br.9x19.8.9,grip=oem.gr.ar.4,handguard=oem.hg.smg.3,mag=mp5.mag.30,muzzle=mz.r9.tri,optic=op.pic.6,receiver=rcv.mp5,stock=stk.smg.1": {
    "label": "optic=op.pic.6",
-   "geometry": "75a6af36fdbb5cf4",
+   "geometry": "7fc0e0179f7480b8",
    "info": "9ed8b8741ebb9286"
   },
   "barrel=br.9x19.8.9,grip=oem.gr.ar.4,handguard=oem.hg.smg.3,mag=mp5.mag.30,muzzle=mz.r9.tri,optic=op.pic.7,receiver=rcv.mp5,stock=stk.smg.1": {
@@ -164,17 +164,17 @@
   },
   "barrel=br.9x19.8.9,grip=oem.gr.ar.4,handguard=oem.hg.smg.3,mag=mp5.mag.30,muzzle=mz.r9.tri,optic=op.pic.14,receiver=rcv.mp5,stock=stk.smg.1": {
    "label": "optic=op.pic.14",
-   "geometry": "a825a10634c6fba0",
+   "geometry": "c24285608bf87c28",
    "info": "5dc3d1d799947fbe"
   },
   "barrel=br.9x19.8.9,grip=oem.gr.ar.4,handguard=oem.hg.smg.3,mag=mp5.mag.30,muzzle=mz.r9.tri,optic=op.pic.15,receiver=rcv.mp5,stock=stk.smg.1": {
    "label": "optic=op.pic.15",
-   "geometry": "63e717683676f687",
+   "geometry": "350abdb90f9cd07f",
    "info": "7b20aad546ac8ff8"
   },
   "barrel=br.9x19.8.9,grip=oem.gr.ar.4,handguard=oem.hg.smg.3,mag=mp5.mag.30,muzzle=mz.r9.tri,optic=op.pic.16,receiver=rcv.mp5,stock=stk.smg.1": {
    "label": "optic=op.pic.16",
-   "geometry": "ea5098cc7ae229bf",
+   "geometry": "e100d7cbfad22317",
    "info": "e007908bd6079bcb"
   },
   "barrel=br.9x19.8.9,grip=oem.gr.ar.4,handguard=oem.hg.smg.3,mag=mp5.mag.30,muzzle=mz.r9.tri,optic=ak.optic,receiver=rcv.mp5,stock=stk.smg.1": {
@@ -309,7 +309,7 @@
   },
   "barrel=br.9x19.8.9,grip=oem.gr.ar.4,handguard=oem.hg.smg.3,mag=mp5.mag.30,muzzle=mz.r9.tri,optic=op.bc.0,receiver=rcv.mp5,stock=stk.smg.1": {
    "label": "optic=op.bc.0",
-   "geometry": "e5ff56213b5ac491",
+   "geometry": "9dc99aa21d54493f",
    "info": "5a97795167a357f7"
   },
   "barrel=br.9x19.8.9,grip=oem.gr.ar.4,handguard=oem.hg.smg.3,mag=mp5.mag.30,muzzle=mz.r9.tri,optic=hailstorm.optic,receiver=rcv.mp5,stock=stk.smg.1": {
