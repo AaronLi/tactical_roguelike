@@ -101,8 +101,11 @@ function renderTube(tu, sr, seed) {
                 return { b0: al / a0, b2: -al / a0, a1: (-2 * Math.cos(w0)) / a0, a2: (1 - al) / a0 };
             });
         }
-        // Envelope: in with the motion, out as it stops.
-        const env = Math.min(1, u / 0.12, (1 - u) / 0.15);
+        // Envelope: in with the motion, out as it stops. The air is stirred by the moving part, so it
+        // is as loud as the part is fast: an accelerating part starts nearly silent (speed ∝ u, the
+        // turbulent noise rising faster than the speed).
+        const speed = tu.motion === 'accelerate' ? 0.05 + 0.95 * Math.pow(u, 1.5) : 1;
+        const env = Math.min(1, u / 0.12, (1 - u) / 0.15) * speed;
         const x = (rng() * 2 - 1) * env;
         let y = 0;
         for (let k = 0; k < modes; k++) {
