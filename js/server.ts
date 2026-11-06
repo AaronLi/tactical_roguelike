@@ -55,7 +55,7 @@ interface Enemy {
   threat?: { x: number; z: number; y?: number; d?: number } | null; str?: number; collapsed?: boolean; down?: boolean; sup?: number; supAt?: number; supQ?: number[][];
   flinchT?: number; flinchOk?: number; flashT?: number; flashRec?: number; flashRecLen?: number; flashK?: number; flashOn?: boolean; flashBy?: { x: number; y: number; z: number } | null; stumbleT?: number; stumbleYaw?: number; stumbleV?: number; peekDone?: boolean; peekOut?: number; organs?: Record<string, number>; broke?: Record<string, number>;
   dodge?: { x: number; y: number; z: number; at: number; until: number; run?: boolean; ux?: number; uz?: number; clear?: number; from?: number[] } | null; // (a grenade they've seen land: when they move, and till when)
-  spine?: boolean; cardiac?: boolean; out?: boolean; incap?: { by: string | null; t: number }; lastHitAt?: number; lastH?: boolean; lastAp?: boolean; lastGr?: number; lastFb?: number; flashId?: number;
+  spine?: boolean; cardiac?: boolean; out?: boolean; incap?: { by: string | null; t: number }; lastHitAt?: number; lastH?: boolean; lastAp?: boolean; lastGr?: number; lastFb?: number; tb?: { burn: number; blast: number; n: number }; flashId?: number;
   hitState?: EnemyState; hitUnaware?: boolean; hitYield?: boolean; hitAt?: number; shock?: number; kick?: number; headDelay?: number; engAt?: number; engTgt?: string;
   firedAt?: number; sawAt?: number; engagedAt?: number; allyT?: number; allyN?: number; proof?: boolean; seeVis?: number; blind?: boolean; onWait?: number;
   order?: Order | null; radioT?: number; callAt?: number; callTgt?: { x: number; y: number; z: number } | null; callLog?: string[]; calls?: number; noLead?: number;
@@ -1491,6 +1491,7 @@ const G_Server = {
     if (!(d > 0)) return;
     e.hp -= d;
     if (!m.bo) { e.lastHit = from; e.lastHitAt = this.clock || 0; e.lastH = !!m.h; e.lastAp = !!m.ap; e.hitState = e.state; e.hitUnaware = !e.alert || (e.surprisedT || 0) > 0; e.hitYield = this.wouldYield(e);
+      if (Array.isArray(m.tb) && m.tb.length === 2 && m.tb.every(Number.isFinite)) { const t = e.tb || (e.tb = { burn: 0, blast: 0, n: 0 }); t.burn += G.U.clamp(m.tb[0], 0, 2); t.blast += G.U.clamp(m.tb[1], 0, 2); t.n++; } // (a thermobaric's burns and blast, for F9: js/hud.ts)
       e.lastGr = Number.isFinite(m.gr) ? m.gr : 0; e.lastFb = e.flashT! > 0 ? e.flashId || 0 : 0; } // bleeding out is judged by what they were doing when shot (and for the highlights: a frag grenade's, gr its seed; blind from a flashbang, which)
     // Shock: being hit wrecks your aim for a moment (most of it, for a hard hit), throws off the shot you were
     // about to take, and starts your aim over from the body. It fades over a couple of seconds.

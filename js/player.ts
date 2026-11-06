@@ -45,7 +45,7 @@ interface PHeld { kind: PHeldKind; cock: boolean; str: number; readyT: number; t
 interface PTbModel { map: LvMap; p: THREE.Vector3; fill: ReturnType<typeof G_Level.blastFill>; cloud: number; space: number; closed: boolean; conf: number; qs: number; rc: number; idx: Int32Array; outFrac: number; areaCloud: number; areaSpace: number; V: number }
 interface PTreat { name: string; part: string; mt: string; t0: number; dur: number }
 // what's owed the host for one suspect this frame: plain damage, wounds (as a share of a life), a headshot, a kill, armour got through, the wounds' detail
-interface PHitQ { d: number; f: number; h: boolean; k: boolean; ap?: boolean; w?: any[]; gr?: number } // (gr: a frag grenade's, its seed: js/highlights.ts)
+interface PHitQ { d: number; f: number; h: boolean; k: boolean; ap?: boolean; w?: any[]; gr?: number; tb?: number[] } // (gr: a frag grenade's, its seed: js/highlights.ts)
 // your own limbs in the viewmodel pass (fpLimbs)
 interface PLimbs { arm: THREE.Group; leg: THREE.Group; armL: THREE.Group; tie: THREE.Mesh; held: THREE.Group; env: THREE.Group; nade: { frag: THREE.Mesh; flash: THREE.Mesh; tb: THREE.Mesh } }
 type PTrack = { t: number; v: number; bone: string }[] & { frags?: any[] };
@@ -1807,7 +1807,7 @@ const G_Me = {
   flushHits() {
     if (!this.hitQ || !this.hitQ.size) return;
     for (const [e, q] of this.hitQ) {
-      G.Net.toHost({ t: 'hit', e, d: Math.round(q.d), f: Math.round(q.f * 1000) / 1000, k: q.k ? 1 : 0, h: q.h, ap: q.ap ? 1 : undefined, w: q.w ? q.w.slice(0, 12) : undefined, gr: q.gr || undefined });
+      G.Net.toHost({ t: 'hit', e, d: Math.round(q.d), f: Math.round(q.f * 1000) / 1000, k: q.k ? 1 : 0, h: q.h, ap: q.ap ? 1 : undefined, w: q.w ? q.w.slice(0, 12) : undefined, gr: q.gr || undefined, tb: q.tb || undefined });
       this.stats.dmg += q.d + q.f * 100 + (q.k ? 100 : 0);
     }
     this.hitQ.clear();
@@ -2103,6 +2103,7 @@ const G_Me = {
       if (f < 0.01) continue;
       this.queueHit(ev.id, 0, false, f);
       const h = this.hitQ.get(ev.id)!; h.gr = seed;
+      h.tb = [+(q.burn.toFixed(2)), +(q.blast.toFixed(2))]; // (what the fireball did, burns and blast, each a share of a life: the host keeps it on them for F9, js/hud.ts)
       if (q.blast > 0.3) (h.w = h.w || []).push(['thorax', 'lung', '', `lungL:${Math.round(Math.min(1, q.blast) * 80)},lungR:${Math.round(Math.min(1, q.blast) * 80)}`]); // (blast lung: the air sacs torn)
       ev.selfHit = true;
     }
