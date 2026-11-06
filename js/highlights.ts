@@ -636,8 +636,8 @@ const G_Highlights = (() => {
   function stage() {
     P.scene = new T.Scene(); P.scene.background = new T.Color(0x1a2028);
     P.scene.add(P.level!);
-    P.scene.add(new T.HemisphereLight(0xe8f0ff, 0x4a4038, 1.05));
-    const dl = new T.DirectionalLight(0xffffff, 0.55); dl.position.set(0.4, 1, 0.3); P.scene.add(dl);
+    P.scene.add(new T.HemisphereLight(0xe8f0ff, 0x4a4038, Math.PI * 1.05));
+    const dl = new T.DirectionalLight(0xffffff, Math.PI * 0.55); dl.position.set(0.4, 1, 0.3); P.scene.add(dl);
     P.cam = new T.PerspectiveCamera(60, 16 / 9, 0.05, 200);
     P.scene.add(P.fxRoot = new T.Group());
     P.debris = G.Scars.debris(P.scene, (x: number, z: number, y: number) => floorAt(x, z, y));
@@ -2068,16 +2068,16 @@ const G_Highlights = (() => {
   function buildXray() {
     P.xs = new T.Scene(); P.xs.background = new T.Color(0x03101c);
     const grid = new T.GridHelper(6, 24, 0x1d6a8a, 0x0c3044); P.xs.add(grid);
-    P.xs.add(new T.HemisphereLight(0xcfe8ff, 0x10202a, 1.2));
+    P.xs.add(new T.HemisphereLight(0xcfe8ff, 0x10202a, Math.PI * 1.2));
     P.xcam = new T.PerspectiveCamera(36, 16 / 9, 0.05, 50);
   }
   // the gear room's stand: a turntable under studio lights, the gun on it (its model shared: js/gunmodels.ts world)
   function gearScene() {
     if (!P.gs) {
       P.gs = new T.Scene(); P.gs.background = new T.Color(0x0b1220);
-      P.gs.add(new T.HemisphereLight(0xdfe8ff, 0x1a1410, 1.1));
-      const key = new T.DirectionalLight(0xffffff, 1.0); key.position.set(1, 2, 1.5); P.gs.add(key);
-      const rim = new T.DirectionalLight(0xff9a40, 0.7); rim.position.set(-2, 1, -1.5); P.gs.add(rim);
+      P.gs.add(new T.HemisphereLight(0xdfe8ff, 0x1a1410, Math.PI * 1.1));
+      const key = new T.DirectionalLight(0xffffff, Math.PI * 1.0); key.position.set(1, 2, 1.5); P.gs.add(key);
+      const rim = new T.DirectionalLight(0xff9a40, Math.PI * 0.7); rim.position.set(-2, 1, -1.5); P.gs.add(rim);
       const disc = new T.Mesh(new T.CylinderGeometry(0.75, 0.8, 0.06, 40), new T.MeshStandardMaterial({ color: 0x1a2230, roughness: 0.4, metalness: 0.6 })); disc.position.y = -0.3; P.gs.add(disc);
       const ring = new T.Mesh(new T.TorusGeometry(0.78, 0.012, 8, 60), new T.MeshBasicMaterial({ color: 0xffb21a })); ring.rotation.x = Math.PI / 2; ring.position.y = -0.27; P.gs.add(ring);
       P.gpiv = new T.Group(); P.gs.add(P.gpiv);
@@ -2410,8 +2410,8 @@ const G_Highlights = (() => {
   }
   function acStage() {
     const sc = new T.Scene(); sc.background = new T.Color(0x03101c);
-    sc.add(new T.HemisphereLight(0xdfeeff, 0x182430, 1.5));
-    const key = new T.DirectionalLight(0xffffff, 1.1); key.position.set(1, 2, 3); sc.add(key);
+    sc.add(new T.HemisphereLight(0xdfeeff, 0x182430, Math.PI * 1.5));
+    const key = new T.DirectionalLight(0xffffff, Math.PI * 1.1); key.position.set(1, 2, 3); sc.add(key);
     const grid = new T.GridHelper(24, 96, 0x1d6a8a, 0x0c3044); grid.position.y = -0.62; sc.add(grid);
     // the round: a jacketed slug, its nose along +x
     const prof = [[0, 0.5], [0.13, 0.42], [0.27, 0.27], [0.4, 0.05], [0.5, -0.2], [0.5, -0.5], [0, -0.5]].map(([x, y]) => new T.Vector2(x, y));

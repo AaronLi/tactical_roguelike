@@ -106,7 +106,12 @@ const G_LightGrid = (() => {
     shader.vertexShader = VS_HEAD + shader.vertexShader.replace('#include <worldpos_vertex>', '#include <worldpos_vertex>' + VS_BODY);
     shader.fragmentShader = FS_HEAD + shader.fragmentShader.replace('#include <color_fragment>', FS_PAINT).replace('#include <lights_fragment_end>', FS_BODY);
   }
-  for (const C of [T.MeshStandardMaterial, T.MeshLambertMaterial, T.MeshPhongMaterial]) C.prototype.onBeforeCompile = patch;
+  // (and a Lambert or Phong material takes nothing from the scene's environment, as in three r149: only a standard one did. three
+  // now lights them by it too, and reflects it in them: the gun's scene has one for its metal (js/render.ts), and the hands and
+  // the plastic in it would come out lit by the studio at night, as would the gunsmith's and the icons' pictures)
+  const noEnv = (shader: THREE.WebGLProgramParametersWithUniforms) => { patch(shader); shader.vertexShader = '#undef USE_ENVMAP\n' + shader.vertexShader; shader.fragmentShader = '#undef USE_ENVMAP\n' + shader.fragmentShader; };
+  T.MeshStandardMaterial.prototype.onBeforeCompile = patch;
+  for (const C of [T.MeshLambertMaterial, T.MeshPhongMaterial]) C.prototype.onBeforeCompile = noEnv;
   // and anything can be shaded from a weapon light (js/render.ts), not only what's been told to
   Object.defineProperty(T.Mesh.prototype, 'receiveShadow', { get: () => true, set() {} });
 

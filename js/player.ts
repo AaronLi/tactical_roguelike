@@ -1440,7 +1440,7 @@ const G_Me = {
       else if (!G.GunAudio.play(multi && !vol ? G.shotSoundKey(def, eff, round) : G.Gunsmith.roundSoundKey(def, round), null, undefined, vol ? G.volleyVol(w.def, nv) : multi ? Math.pow(G.shotK(w.def, eff), 2) : 1)) G.Audio.shot(w.sup ? G.SUPPRESSOR.snd : def.snd); // (the report of the round fired, not just the gun's)
       if (!w.sup && def.cls !== 'BOW' && !(vol && n > 0)) { // (a volley: one flash, the barrels' together)
         this.flashT = 0.05;
-        G.R.vmMuzzle.intensity = 3;
+        G.R.vmMuzzle.intensity = Math.PI * 3;
         G.R.muzzleFlashAt(muzzle, def.tracer || 0xffb060);
       }
       if (!multi && !w.def.caseless && !w.def.manual) G.Casings.fired(def, true, null, null, round); // the spent case, out of the port (a bolt gun's when the bolt's worked; a caseless round has none)

@@ -420,9 +420,9 @@ const G_Icons = (() => {
       gR = new T.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
       gScene = new T.Scene();
       gScene.environment = G.R._envMap(gR);
-      gScene.add(new T.HemisphereLight(0xe8eef5, 0x2a2622, 0.7));
-      const key = new T.DirectionalLight(0xffffff, 0.9); key.position.set(1.5, 2, 0.5); gScene.add(key);
-      const fill = new T.DirectionalLight(0xffffff, 0.35); fill.position.set(1, -0.5, -1); gScene.add(fill);
+      gScene.add(new T.HemisphereLight(0xe8eef5, 0x2a2622, Math.PI * 0.7));
+      const key = new T.DirectionalLight(0xffffff, Math.PI * 0.9); key.position.set(1.5, 2, 0.5); gScene.add(key);
+      const fill = new T.DirectionalLight(0xffffff, Math.PI * 0.35); fill.position.set(1, -0.5, -1); gScene.add(fill);
       gCam = new T.OrthographicCamera(-1, 1, 1, -1, 0.01, 20);
     }
     gR.setSize(W, H, false);

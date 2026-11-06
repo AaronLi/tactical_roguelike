@@ -129,7 +129,7 @@ const G_R = {
     this.scene.add(this.camera);
 
     // Dim by design: rooms are lit by their ceiling lamps, corridors are left in the gloom
-    this.hemi = new THREE.HemisphereLight(0xb0c0d0, 0x302820, 0.26);
+    this.hemi = new THREE.HemisphereLight(0xb0c0d0, 0x302820, Math.PI * 0.26);
     this.scene.add(this.hemi);
     this.ambient = new THREE.AmbientLight(0xffffff, 0);
     this.scene.add(this.ambient);
@@ -150,9 +150,9 @@ const G_R = {
     this.vmScene.add(this.vmHolder);
     this.vmRoot = new THREE.Group();
     this.vmHolder.add(this.vmRoot);
-    const vhl = new THREE.HemisphereLight(0xdde6f0, 0x2a2622, 0.55); this.vmScene.add(vhl);
-    const vdl = new THREE.DirectionalLight(0xffffff, 0.3); vdl.position.set(1, 2, 1); this.vmScene.add(vdl);
-    this.vmLights = [[vhl, 0.55], [vdl, 0.3]];
+    const vhl = new THREE.HemisphereLight(0xdde6f0, 0x2a2622, Math.PI * 0.55); this.vmScene.add(vhl);
+    const vdl = new THREE.DirectionalLight(0xffffff, Math.PI * 0.3); vdl.position.set(1, 2, 1); this.vmScene.add(vdl);
+    this.vmLights = [[vhl, Math.PI * 0.55], [vdl, Math.PI * 0.3]];
     this.vmScene.environment = this._envMap(r);
     this.vmMuzzle = new THREE.PointLight(0xffb060, 0, 3, 2);
     this.vmMuzzle.position.set(0.2, -0.1, -0.8);
@@ -229,7 +229,7 @@ const G_R = {
     // daylit)
     // On a night level (js/level.ts nightify) there's none of that: with the power off, a room with no window is black but
     // for what the emergency lights, the moon through a doorway, a weapon light or a flash actually reach.
-    this.hemi.color.setHex(th.hemi || th.light, THREE.LinearSRGBColorSpace); this.hemi.intensity = map.night ? 0 : (th.hemiI || 0.26) ** 2 * (th.hub ? 1 : G.LightGrid.opts.fill);
+    this.hemi.color.setHex(th.hemi || th.light, THREE.LinearSRGBColorSpace); this.hemi.intensity = map.night ? 0 : Math.PI * (th.hemiI || 0.26) ** 2 * (th.hub ? 1 : G.LightGrid.opts.fill);
     // the gun in your hands: lit by what's lit where you stand (eyeLight), on a level with its lamps in the light grid
     this.vmDark = !th.hub && G.LightGrid.built;
     for (const [l, k] of this.vmLights) l.intensity = k;
@@ -260,7 +260,8 @@ const G_R = {
     for (const s of this.vmSpots) s.intensity = 0;
     if (!this.vmDark || !map) return 1;
     G.LightGrid.at(p.x, p.y, p.z, E, 0.7);
-    E.r += this.hemi.color.r * this.hemi.intensity; E.g += this.hemi.color.g * this.hemi.intensity; E.b += this.hemi.color.b * this.hemi.intensity;
+    const hk = this.hemi.intensity / Math.PI; // (the lights' figures in r149's units, as the light grid's are: js/util.ts)
+    E.r += this.hemi.color.r * hk; E.g += this.hemi.color.g * hk; E.b += this.hemi.color.b * hk;
     const fall = (d: number, r: number, decay: number) => (r > 0 ? Math.pow(Math.max(0, 1 - d / r), decay) : 1 / (1 + d * d)); // (three.js' own, with a reach)
     const seen = (q: THREE.Vector3) => L.los(map, q.x, q.y, q.z, p.x, p.y, p.z);
     // points: the muzzle flashes and flashbangs (not your own: the gun's own flash, vmMuzzle, has that), the fireballs
@@ -269,7 +270,7 @@ const G_R = {
       if (!(l.intensity > 0)) continue;
       const d = l.position.distanceTo(p);
       if ((this.muzzleLights.includes(l) && d < 1.2) || d >= l.distance || !seen(l.position)) continue;
-      const a = l.intensity * fall(d, l.distance, l.decay);
+      const a = l.intensity / Math.PI * fall(d, l.distance, l.decay);
       C.copy(l.color).multiplyScalar(a * this.EYE_BOUNCE); E.add(C);
       pts.push([l, a]);
     }
@@ -284,7 +285,7 @@ const G_R = {
       const hit = L.raycast(map, s.position.x, s.position.y, s.position.z, dir.x, dir.y, dir.z, s.distance), hp = this._eyeV.copy(s.position).addScaledVector(dir, Math.max(0, hit.t - 0.08));
       const dh = hp.distanceTo(p);
       if (dh < s.distance && (dh < 0.3 || seen(hp))) {
-        const a = s.intensity * fall(hit.t, s.distance, s.decay) * this.SPOT_BOUNCE / Math.max(0.5, hit.t) ** 2 * fall(dh, s.distance, s.decay);
+        const a = s.intensity / Math.PI * fall(hit.t, s.distance, s.decay) * this.SPOT_BOUNCE / Math.max(0.5, hit.t) ** 2 * fall(dh, s.distance, s.decay);
         C.copy(s.color).multiplyScalar(a); E.add(C);
       }
       const d = s.position.distanceTo(p), toEye = this._eyeV.subVectors(p, s.position).normalize();
@@ -621,7 +622,7 @@ const G_R = {
   // your own, on a night level: its beam in the air in front of you, without the lamp)
   tacLight(pos: THREE.Vector3, dir: THREE.Vector3, k = 1, seen = false, haze = false) {
     const s = this.spots[this.spotUsed++]; if (!s) return;
-    s.position.copy(pos); s.target.position.copy(pos).add(dir); s.intensity = 0.9 * k; s.distance = 24 + 10 * k; s.shadow.needsUpdate = true;
+    s.position.copy(pos); s.target.position.copy(pos).add(dir); s.intensity = Math.PI * 0.9 * k; s.distance = 24 + 10 * k; s.shadow.needsUpdate = true;
     const C = (seen || haze) && this.cones[this.coneUsed++];
     if (!C) return;
     const len = 9 * k, r = len * Math.tan(0.3), at = _tv.subVectors(this.camera.position, pos).normalize().dot(dir); // (at: how nearly it's pointing at you)
@@ -939,7 +940,7 @@ const G_R = {
     m.position.copy(p); m.visible = true;
     m.userData.life = m.userData.max = 0.45; m.userData.r = radius;
     const l = this.blastLights.reduce((a: THREE.PointLight, b: THREE.PointLight) => (b.intensity < a.intensity ? b : a));
-    l.position.copy(p); l.intensity = 6; l.userData.by = m;
+    l.position.copy(p); l.intensity = Math.PI * 6; l.userData.by = m;
     this.particles(p, 40, 0xffa040, 9, 0.6, 4, 1);
     this.particles(p, 30, 0x444038, 3, 1.4, -0.5, 1);
   },
@@ -1025,7 +1026,7 @@ const G_R = {
       r.smoke.instanceMatrix.needsUpdate = true;
       (r.smoke.material as THREE.MeshBasicMaterial).opacity = 0.75 * G.U.clamp(1 - (t - 2) / (F.SMOKE - 2), 0, 1);
       const l = r.light;
-      if (l.userData.by === r) l.intensity = t < 0.15 ? 14 * t / 0.15 : t < 0.55 ? 14 : Math.max(0, 14 * (1 - (t - 0.55) / 0.9));
+      if (l.userData.by === r) l.intensity = Math.PI * (t < 0.15 ? 14 * t / 0.15 : t < 0.55 ? 14 : Math.max(0, 14 * (1 - (t - 0.55) / 0.9)));
       if (t > F.SMOKE + 0.2) {
         this.scene.remove(r.flame, r.smoke);
         (r.flame.material as THREE.Material).dispose(); (r.smoke.material as THREE.Material).dispose(); r.flame.dispose(); r.smoke.dispose();
@@ -1059,12 +1060,12 @@ const G_R = {
   // a flashbang going off: a blinding point of light and a burst of sparks
   flashAt(p: THREE.Vector3) {
     const l = this.muzzleLights[this.mlIdx = ((this.mlIdx || 0) + 1) % this.muzzleLights.length];
-    if (l) { l.position.copy(p); l.color.setHex(0xffffff); l.intensity = 40; l.distance = 26; l.userData.t = 0.12; }
+    if (l) { l.position.copy(p); l.color.setHex(0xffffff); l.intensity = Math.PI * 40; l.distance = 26; l.userData.t = 0.12; }
     this.particles(p, 30, 0xfff6d8, 5, 0.35, 2, 1.6);
   },
   muzzleFlashAt(p: THREE.Vector3, color = 0xffb060) {
     const l = this.muzzleLights[this.muzzleIdx]; this.muzzleIdx = (this.muzzleIdx + 1) % this.muzzleLights.length;
-    l.position.copy(p); l.color.setHex(color); l.intensity = 2.5; l.userData.t = 0.05;
+    l.position.copy(p); l.color.setHex(color); l.intensity = Math.PI * 2.5; l.userData.t = 0.05;
   },
   beginLasers() { this.laserUsed = 0; },
   laser(a: THREE.Vector3, b: THREE.Vector3) {
@@ -1082,7 +1083,7 @@ const G_R = {
       if (m.userData.life <= 0) m.visible = false; else m.material.opacity = 0.9 * (m.userData.life / m.userData.max);
     }
     for (const l of this.muzzleLights) if (l.intensity > 0) { l.userData.t -= dt; if (l.userData.t <= 0) l.intensity = 0; }
-    if (this.vmMuzzle.intensity > 0) this.vmMuzzle.intensity = Math.max(0, this.vmMuzzle.intensity - dt * 40);
+    if (this.vmMuzzle.intensity > 0) this.vmMuzzle.intensity = Math.max(0, this.vmMuzzle.intensity - Math.PI * dt * 40);
     if (this.nvOver > 0) this.nvOver = Math.max(0, this.nvOver - dt * (this.nvOver > 0.6 ? 0.5 : 1.1)); // (the tubes come back from a flash: slowly at first)
     this.fireStep(dt);
     for (const b of this.blasts) if (b.visible) {
@@ -1091,7 +1092,7 @@ const G_R = {
       b.scale.setScalar(0.3 + k * b.userData.r);
       b.material.opacity = (1 - k) * 0.8;
       const l = this.blastLights.find((x: THREE.PointLight) => x.userData.by === b);
-      if (l) l.intensity = b.userData.life > 0 ? (1 - k) * 6 : 0;
+      if (l) l.intensity = b.userData.life > 0 ? Math.PI * (1 - k) * 6 : 0;
       if (b.userData.life <= 0) { b.visible = false; if (l) l.userData.by = null; }
     }
     for (const m of this.pools || []) {
@@ -1708,12 +1709,12 @@ const G_R = {
     r.clearDepth();
     r.clearStencil(); // reflex sight windows mark the stencil for their reticles
     // the gun's own light, as much as there is where you stand (eyeLight): its lights and what its metal reflects
-    const ek = this.eyeLight(), envd: [THREE.MeshStandardMaterial, number][] = [];
+    // (what its metal reflects: three takes the scene's figure for a material lit by the scene's environment, not the material's own)
+    const ek = this.eyeLight();
     for (const [l, k] of this.vmLights) l.intensity = k * ek;
-    if (ek < 1) this.vmRoot.traverse((o: any) => { const ms = o.isMesh ? (Array.isArray(o.material) ? o.material : [o.material]) : []; for (const mt of ms) if (mt.isMeshStandardMaterial && !mt.envMap) { envd.push([mt, mt.envMapIntensity]); mt.envMapIntensity *= ek; } });
+    this.vmScene.environmentIntensity = ek;
     if (nv) this.nvRT!.texture.generateMipmaps = true;
     r.render(this.vmScene, this.camera);
-    for (let i = envd.length - 1; i >= 0; i--) envd[i][0].envMapIntensity = envd[i][1]; // (materials the gunsmith's and the icons' pictures share)
     if (nv) { LU.lgNv.value.w = 0; this._heatPass(this.camera, this.nvHeat!, true); this._nvComposite(); }
     G.LightGrid.on(false);
     r.info.autoReset = true;

@@ -699,7 +699,7 @@ const G_Level = {
       const e = near[k];
       if (!e) { pl.intensity = 0; return; }
       const l = e[0];
-      pl.position.set(l.x, l.y!, l.z); pl.color.setHex(l.color!, THREE.LinearSRGBColorSpace); pl.intensity = l.i!; pl.distance = l.d!;
+      pl.position.set(l.x, l.y!, l.z); pl.color.setHex(l.color!, THREE.LinearSRGBColorSpace); pl.intensity = Math.PI * l.i!; pl.distance = l.d!; // (l.i: in r149's units, as the light grid has it: js/util.ts)
     });
   },
   // ---------------------------------------------------------------- windows

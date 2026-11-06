@@ -9,12 +9,28 @@ self.G = self.G || ({} as GameNamespace); // (the page, or the highlights' expor
 // loaded textures are marked sRGB (decoded as they're sampled; the light grid's and render targets' data stay
 // linear), and every renderer writes sRGB. (three does the first and the last itself, ColorManagement and the
 // renderer's outputColorSpace; a texture it can't know is a picture, so the canvases and loaded ones are marked here.)
+//
+// Light, in three's physical units (since r155): a lamp's intensity is candela, a directional or hemisphere light's lux.
+// The game's figures were set in r149's legacy units, which three multiplied by pi as it lit (its diffuse is divided by
+// pi): so every light's intensity is the figure as it was, times Math.PI, and anything reading one back as light at a
+// spot (js/render.ts eyeLight, where the light grid's figures, never multiplied, are added in) divides it out again.
+// How a point or spot light falls off with distance stays r149's: (1 - d / distance) ^ decay to nothing at its
+// distance, not three's inverse square with a window. The lamps were placed and the light grid (js/lightgrid.ts, which
+// stands in for the lamps and works it out the same way) was built on it; inverse square would pin a flash's light on
+// whatever's an arm's length off it and leave the room round it dark.
 if (window.THREE) {
   const THREE = window.THREE;
   const CT: any = THREE.CanvasTexture;
   (THREE as any).CanvasTexture = class extends CT { constructor(...a: any[]) { super(...a); this.colorSpace = THREE.SRGBColorSpace; } };
   const load = THREE.TextureLoader.prototype.load;
   THREE.TextureLoader.prototype.load = function (this: any, ...a: any[]) { const t = (load as any).apply(this, a); t.colorSpace = THREE.SRGBColorSpace; return t; };
+  const SC = THREE.ShaderChunk as Record<string, string>, fall = /float getDistanceAttenuation\([^)]*\) \{[\s\S]*?\n\}\n/;
+  if (!fall.test(SC.lights_pars_begin)) console.error('three.js: no getDistanceAttenuation to replace (the lights would fall off as the inverse square)');
+  SC.lights_pars_begin = SC.lights_pars_begin.replace(fall, `float getDistanceAttenuation( const in float lightDistance, const in float cutoffDistance, const in float decayExponent ) {
+	if ( cutoffDistance > 0.0 && decayExponent > 0.0 ) return pow( saturate( - lightDistance / cutoffDistance + 1.0 ), decayExponent );
+	return 1.0;
+}
+`);
 }
 
 const G_U = {

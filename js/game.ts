@@ -185,7 +185,7 @@ const G_Game = {
       r.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
       const sc = new THREE.Scene(), cam = new THREE.PerspectiveCamera(30, cv.width / cv.height, 0.1, 20);
       cam.position.set(0, 1.1, 3.0); cam.lookAt(0, 0.92, 0);
-      sc.add(new THREE.HemisphereLight(0xffffff, 0x404048, 1.1)); const dl = new THREE.DirectionalLight(0xffffff, 0.8); dl.position.set(1, 2, 2); sc.add(dl);
+      sc.add(new THREE.HemisphereLight(0xffffff, 0x404048, Math.PI * 1.1)); const dl = new THREE.DirectionalLight(0xffffff, Math.PI * 0.8); dl.position.set(1, 2, 2); sc.add(dl);
       this._lp = { r, sc, cam, rig: null, yaw: 0.5 };
       const spin = () => {
         if (!this._lp) return;
