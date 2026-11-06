@@ -886,7 +886,7 @@ const G_ENEMY_GEAR = {
     grunt: [['mac10', 'uzi', 'skorp', 'aks74u', 'ar9'], ['ak', 'mp5', 'uzi', 'thompson', 'aks74u', 'ak74', 'mpx'], ['ak', 'm4', 'galil', 'mp5', 'vector', 'ak74', 'scarl', 'aug9', 'qbz95'], ['hk416', 'scar', 'an94', 'tavor', 'aug', 'scarl', 'm27', 'qbz192', 'mcx']],
     rusher: [['sawn', 'dbl'], ['pump', 'dbl', 'sawn'], ['pump', 'saiga', 'ksg', 'vepr', 'benelli'], ['saiga', 'aa12', 'ksg', 'benelli', 'vepr']],
     marksman: [['lever', 'mosin'], ['mosin', 'r700', 'm14'], ['r700', 'svd', 'mk14', 'm14', 'sr25'], ['svd', 'awm', 'mk14', 'sr25']],
-    heavy: [['rpk', 'ak'], ['rpk', 'ak', 'm249'], ['m249', 'pkm', 'm60', 'rpk'], ['m60', 'm249', 'pkm']], // (the belt-fed 7.62s only from the third tier: an early Enforcer has a drum-fed RPK or an AK)
+    heavy: [['thompson', 'uzi', 'mp5'], ['ak', 'rpk', 'thompson'], ['m249', 'pkm', 'm60', 'rpk'], ['m60', 'm249', 'pkm']], // (an early Enforcer is armour and an SMG, a drum-fed Thompson as often as not; a rifle or an RPK at the second tier; the belt-fed guns from the third)
     warden: [['scar'], ['scar', 'fal'], ['scar', 'fal'], ['scar', 'hk416']],
     leader: [['mp5', 'uzi', 'aks74u'], ['ak', 'mp5', 'mpx', 'ak74'], ['ak', 'm4', 'scarl', 'mp5', 'aug9'], ['hk416', 'scar', 'tavor', 'mcx', 'scarl']],
   },
