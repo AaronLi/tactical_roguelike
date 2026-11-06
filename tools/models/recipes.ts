@@ -1463,12 +1463,13 @@ const G_GunRecipes = (() => {
     if (rcl) { k.into(rcl, L, by); anim.barrel = rcl; k.cyl(0.0148, 0.012, b.m || M.blued(), L - 0.002, by); }
     if (A && A.info.barrels) front = A.rig.end; // (a gun of barrels in its magazine: no barrel of its own to fit; the muzzle block is the muzzle slot's)
     else if (A) {
-      // the model's factory barrel is its own mesh (the gas block, tube and sight base are the receiver's: slot base); any other barrel is the shared
-      // one, a tube of its length and profile ending where that barrel ends: the factory end moved by the length's difference from the factory one
-      const end = A.rig.end + bl - factoryBarrel(o.authored!);
-      if (own('barrel')) authored(k, A, (e) => e.slot === 'barrel');
-      else k.cyl(br, bl + back, b.m || M.blued(), end - bl - back, by, 0, br * (b.taper || 1), 14);
-      front = end;
+      // the model's factory barrel is its own mesh (the gas block, tube and sight base are the receiver's: slot base); a barrel modelled beside the gun
+      // (a variant, o.avBarrel: the MP5SD's other cans) is drawn whole, ending where its muzzle is; any other barrel is the shared one, a tube of its
+      // length and profile ending where that barrel ends: the factory end moved by the length's difference from the factory one
+      const vb = o.avBarrel ? A.variants[o.avBarrel] : null;
+      if (vb) { authoredVariant(k, A, vb); front = vb.info!.muzzles[0][0]; }
+      else if (own('barrel')) { authored(k, A, (e) => e.slot === 'barrel'); front = A.rig.end; }
+      else { const end = A.rig.end + bl - factoryBarrel(o.authored!); k.cyl(br, bl + back, b.m || M.blued(), end - bl - back, by, 0, br * (b.taper || 1), 14); front = end; }
     } else if (o.integral) {
       k.cyl(o.integral.r, o.integral.len, M.black(), L, by);
       for (let i = 0; i < 3; i++) k.ringZ(o.integral.r, 0.0012, M.rubber(), L + 0.03 + i * o.integral.len * 0.3, by);
