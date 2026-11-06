@@ -12,8 +12,8 @@
 <body>
 
 <!-- ======================= MAIN MENU ======================= -->
-<div id="menu" class="screen">
-  <div class="menu-box">
+<div id="menu" class="screen side ui">
+  <div class="menu-box ui-panel fade">
     <h1 class="title">BREACH<span>PROTOCOL</span></h1>
     <div class="subtitle">co-op roguelike tactical shooter</div>
 
@@ -63,8 +63,8 @@
 </div>
 
 <!-- ======================= LOBBY ======================= -->
-<div id="lobby" class="screen hidden">
-  <div class="menu-box wide">
+<div id="lobby" class="screen side ui hidden">
+  <div class="menu-box wide ui-panel fade">
     <h2>Squad Lobby</h2>
     <div id="codeBlock" class="code-block">
       <div>Room code &mdash; give this to your friends</div>
@@ -105,18 +105,24 @@
   <div id="progress" class="hidden"><div id="progressBar"></div><span id="progressText"></span></div>
   <div id="treatFx" class="hidden"></div>
 
+  <div id="hudLeft">
+  <div id="chatLog"></div>
+  <input id="chatInput" class="hidden" maxlength="120" placeholder="say something...">
   <div id="vitals">
     <div class="vrow"><span class="vlabel">ARMOR</span><div class="bar armor"><div id="armorFill"></div></div><span id="armorText"></span></div>
     <div class="vrow"><span class="vlabel">BLOOD</span><div class="bar hp"><div id="hpFill"></div></div><span id="hpText"></span></div>
     <div id="bodyMini" class="body-mini"></div>
     <div id="items"></div>
   </div>
+  </div>
+  <div id="hudRight">
+  <div id="credits"></div>
   <div id="ammo">
     <div id="weapName"></div>
     <div><span id="ammoMag"></span><span id="ammoRes"></span></div>
     <div id="weapAlt"></div>
   </div>
-  <div id="credits"></div>
+  </div>
 
   <div id="downed" class="hidden">
     <div class="big" id="downTitle">YOU ARE DOWN</div>
@@ -128,17 +134,14 @@
     <div class="small">Spectating &mdash; you'll redeploy next level if your squad extracts. Click to switch view.</div>
   </div>
 
-  <div id="chatLog"></div>
-  <input id="chatInput" class="hidden" maxlength="120" placeholder="say something...">
-
-  <div id="scoreboard" class="hidden"></div>
-  <div id="fieldInv" class="hidden"><div id="fiScore" class="fi-score"></div><div id="fiBody"></div></div>
-  <div id="aboxPick" class="sidearm-pick abox-pick hidden"></div>
+  <div id="scoreboard" class="ui ui-panel hidden"></div>
+  <div id="fieldInv" class="ui hidden"><div id="fiScore" class="fi-score"></div><div id="fiBody"></div></div>
+  <div id="aboxPick" class="sidearm-pick abox-pick ui hidden"></div>
 </div>
 
 <!-- ======================= PAUSE ======================= -->
-<div id="pause" class="screen hidden">
-  <div class="menu-box">
+<div id="pause" class="screen side ui hidden">
+  <div class="menu-box ui-panel fade">
     <h2>Paused</h2>
     <div class="small dim">The game keeps running for your squad.</div>
     <div class="set-grid">
@@ -156,9 +159,9 @@
   </div>
 </div>
 
-<!-- ======================= SHOP ======================= -->
-<div id="route" class="screen hidden">
-  <div class="route-box">
+<!-- ======================= ROUTE MAP ======================= -->
+<div id="route" class="screen ui hidden">
+  <div class="route-box ui-panel">
     <div id="routeTitle" class="route-title">Act 1</div>
     <div id="routeMap"></div>
     <div id="routeMsg" class="msg"></div>
@@ -166,9 +169,10 @@
   </div>
 </div>
 
-<div id="shop" class="screen hidden">
+<!-- ======================= SHOP ======================= -->
+<div id="shop" class="screen ui hidden">
   <div class="shop-wrap">
-    <div class="shop-left">
+    <div class="shop-left ui-panel">
       <div id="vendorArt"></div>
       <div class="vendor-name">VEX <span>// quartermaster</span></div>
       <div id="vendorQuip" class="quip"></div>
@@ -190,8 +194,8 @@
 </div>
 
 <!-- ======================= GAME OVER ======================= -->
-<div id="gameover" class="screen hidden">
-  <div class="menu-box wide">
+<div id="gameover" class="screen side ui hidden">
+  <div class="menu-box wide ui-panel fade">
     <h2 class="red">SQUAD WIPED</h2>
     <div id="goSub" class="small dim"></div>
     <div id="goStats"></div>
@@ -203,8 +207,8 @@
   </div>
 </div>
 
-<div id="clickToPlay" class="hidden">Click to engage</div>
-<div id="veil"><svg class="veil-shape" viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M0 15.6C33 10.4 66 5.2 100 0L100 84.4C66 89.6 33 94.8 0 100Z"/></svg><div class="veil-load"><div class="veil-row"><i class="veil-spin"></i><b>Loading</b></div><div id="veilStatus"></div></div></div>
+<div id="clickToPlay" class="ui hidden">Click to engage</div>
+<div id="veil"><svg class="veil-shape" viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M0 15.6C33 10.4 66 5.2 100 0L100 84.4C66 89.6 33 94.8 0 100Z"/></svg><div class="veil-load ui"><div class="veil-row"><i class="veil-spin"></i><b>Loading</b></div><div id="veilStatus"></div></div></div>
 
 <!-- the model bundle starts downloading first thing, before three.js and the rest are even fetched (docs/models.md "Bundles") -->
 <script src="dist/js/modelbundles.js"></script>
