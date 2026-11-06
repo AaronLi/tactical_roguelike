@@ -1228,7 +1228,7 @@ const G_R = {
   //     intensified picture as amber outlines, stronger the hotter against what's behind: a warm body in a black room
   //     or in smoke is a crisp outline where the picture has nothing.
   // What the suspects see is the host's business and the same as ever: night vision only helps you see.
-  GAIN_MIN: 14, NV_TARGET: 0.1, NV_DIM: 0.1, NV_VM_D: 1.1, HEAT_LAYER: 3,
+  GAIN_MIN: 14, NV_TARGET: 0.1, NV_DIM: 0.1, NV_VM_D: 1.1, NV_LENS_D: 0.04, HEAT_LAYER: 3,
   _nvTubes: [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()],
   nvMaterial() {
     return new THREE.ShaderMaterial({ depthTest: false, depthWrite: false, toneMapped: false,
@@ -1255,7 +1255,7 @@ const G_R = {
           if (inside <= 0.0) { gl_FragColor = LinearTosRGB(vec4(bpTone(plain), 1.0)); return; }
           vec2 uv = ctr + (vUv - ctr) * (1.0 - 0.035 * e * e); // (pincushioned toward the edge)
           vec2 hq = texture2D(heatMap, uv).rg; float dist = hq.g > 0.0 ? 1.0 / hq.g - 1.0 : 1e4; // (distance: 1 / (1 + d))
-          float blur = smoothstep(0.45, 1.0, e) * 2.2 + clamp(1.35 / max(dist, 0.05) - 0.12, 0.0, 2.6);
+          float blur = smoothstep(0.45, 1.0, e) * 2.2 + clamp(1.35 / max(dist, 0.05) - 0.12, 0.0, 2.6) + (dist < 0.07 ? 3.4 : 0.0); // (under 7 cm: a magnified scope's lens, NV_LENS_D, nothing else that near: past use)
           float avg = max(cath(textureLod(map, vec2(0.5), lod).rgb), 1e-6), gain = clamp(target / avg, gMin, gMax);
           float L = cath(textureLod(map, uv, blur).rgb) * gain;
           // halos: the blurred frame's over-bright part where it is, and on two rings round it (the soft ringing edge)
@@ -1294,7 +1294,7 @@ const G_R = {
   // on HEAT_LAYER (js/rig.ts heatMark: a living body's warm, a dead one cooling), and the hot spots (the muzzle flashes and
   // fireballs this moment); then, with vm, the gun in your hands (near, at the room's temperature: but a reflex sight's window far, its dot
   // being at infinity, and a 1x scope's lens likewise)
-  heatMats: null as null | { cold: THREE.ShaderMaterial; near: THREE.ShaderMaterial; far: THREE.ShaderMaterial; warm: THREE.ShaderMaterial[] },
+  heatMats: null as null | { cold: THREE.ShaderMaterial; near: THREE.ShaderMaterial; lens: THREE.ShaderMaterial; far: THREE.ShaderMaterial; warm: THREE.ShaderMaterial[] },
   heatFx: null as null | { scene: THREE.Scene; spots: THREE.Mesh[] },
   // (heat < 0: the room's own temperature, as the cold things are: a little warmer facing up (the warm air under the ceiling,
   // the floor's own), a slow mottle over it, so a thermal picture has walls and floors to it)
@@ -1334,7 +1334,7 @@ const G_R = {
   },
   _heatPass(cam: THREE.Camera, rt: THREE.WebGLRenderTarget, vm: boolean) {
     const r = this.renderer, sc = this.scene, bg = sc.background, hid: THREE.Object3D[] = [];
-    const H = this.heatMats || (this.heatMats = { cold: this._heatMat(-1, null), near: this._heatMat(-1, this.NV_VM_D), far: this._heatMat(-1, Infinity, { depthTest: false, depthWrite: false, side: THREE.DoubleSide }), warm: Array.from({ length: 11 }, (_, i) => this._heatMat(i / 10, null)) });
+    const H = this.heatMats || (this.heatMats = { cold: this._heatMat(-1, null), near: this._heatMat(-1, this.NV_VM_D), lens: this._heatMat(-1, this.NV_LENS_D), far: this._heatMat(-1, Infinity, { depthTest: false, depthWrite: false, side: THREE.DoubleSide }), warm: Array.from({ length: 11 }, (_, i) => this._heatMat(i / 10, null)) });
     const cc = r.getClearColor(new THREE.Color()), ca = r.getClearAlpha();
     r.setRenderTarget(rt); r.setClearColor(0x000000, 1); r.clear();
     sc.background = null;
@@ -1368,7 +1368,7 @@ const G_R = {
       this.vmRoot.traverseVisible((o: any) => {
         if (!o.isMesh) { if (o.isSprite || o.isPoints || o.isLine) vh.push(o); return; }
         const m = o.material;
-        if (pip && o === pip.disk) { vsw.push([o, m]); o.material = pip.mag <= 1.05 || pip.thermal ? H.far : H.near; return; } // (a 1x scope, and a thermal sight's screen, in focus; magnified glass not)
+        if (pip && o === pip.disk) { vsw.push([o, m]); o.material = pip.mag <= 1.05 || pip.thermal ? H.far : H.lens; return; } // (a 1x scope, and a thermal sight's screen, in focus; magnified glass far out of it: its picture's a smear through the goggles, NV_LENS_D)
         if (m.colorWrite === false && m.stencilWrite) { vsw.push([o, m]); o.material = H.far; return; } // (a reflex sight's window)
         if (m.stencilWrite || m.transparent || m.blending === THREE.AdditiveBlending) { vh.push(o); return; } // (its reticle, a flash, glass)
         vsw.push([o, m]); o.material = H.near;
