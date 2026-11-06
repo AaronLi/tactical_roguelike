@@ -338,7 +338,7 @@ def front_flip(f, base):
 def mag_stanag(top):
     """A curved 30-round STANAG magazine, its top (the photo point 866, 232) at `top`: open at the top between its feed lips, the top
     two rounds in it (the top one is the magazine check's: its case, its tip), its pressed ribs, its floorplate, and the game's
-    witness windows (five down its back, five down its front: brass showing through, each its own mesh at the face's tilt)."""
+    witness windows (five down its back, toward the shooter; none on the front: brass showing through, each its own mesh at the face's tilt)."""
     pm = K.part('mag', (0, top[0], top[1])); pm['check'] = {'w': 0.0228}
     R = lambda pts: RL(pts, 866, 232, top)
     HWm = 11.4 * mm
@@ -356,7 +356,7 @@ def mag_stanag(top):
     wins = []
     for i in range(1, 6):
         t = i / 6 * 0.94; y = 250 + t * (520 - 250)
-        for side, poly in ((1, back), (-1, front)):
+        for side, poly in ((1, back),):   # (the back face only: the front has none)
             (px, py), (dx_, dy_) = along(poly, y)
             q = R([(px, py)])[0]
             uF, uU = -dx_ * S, dy_ * S; n_ = math.hypot(uF, uU); uF, uU = uF / n_, uU / n_      # (up the face, forward/up in the gun's frame)

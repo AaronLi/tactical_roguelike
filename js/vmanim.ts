@@ -774,18 +774,16 @@ const G_VMAnim = (() => {
       chk.labCap = cap;
       const step = cap >= 25 ? 5 : cap >= 12 ? 2 : 1; // (stamped in round numbers, like the real thing)
       let last = 0;
-      const nOf = new Map<number, number>(); // (the two faces' holes at the same depth stand for the same count)
+      const nOf = new Map<number, number>(); // (holes at the same depth stand for the same count)
       for (const hl of chk.holes) {
         if (!nOf.has(hl.i)) nOf.set(hl.i, last = Math.max(last + step, Math.round(hl.t * cap / step) * step));
         hl.n = nOf.get(hl.i)!;
-        if (!hl.lab) { // the count beside its hole, flat on that face (tilted with it: the mesh's turn) and reading from that side
+        if (!hl.lab) { // the count beside its hole, flat on the back face (tilted with it: the mesh's turn) and reading from behind, where you hold it
           hl.lab = new T.Mesh(new T.PlaneGeometry(chk.w * 0.56, 0.0095), null as any);
-          const side = hl.side || 1;
           hl.lab.quaternion.copy(hl.mesh.quaternion);
-          if (side < 0) hl.lab.quaternion.multiply(new T.Quaternion().setFromAxisAngle(UPV, Math.PI));
           hl.lab.position.copy(hl.mesh.position)
-            .addScaledVector(new T.Vector3(1, 0, 0).applyQuaternion(hl.mesh.quaternion), side * chk.w * 0.43)
-            .addScaledVector(new T.Vector3(0, 0, side).applyQuaternion(hl.mesh.quaternion), 0.0013);
+            .addScaledVector(new T.Vector3(1, 0, 0).applyQuaternion(hl.mesh.quaternion), chk.w * 0.43)
+            .addScaledVector(new T.Vector3(0, 0, 1).applyQuaternion(hl.mesh.quaternion), 0.0013);
           hl.mesh.parent!.add(hl.lab);
         }
         hl.lab.material = numMat(hl.n);

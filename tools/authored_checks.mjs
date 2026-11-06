@@ -3,7 +3,7 @@
 // run them). Each rule is something that went wrong on a modelled gun (the Mk18 first) and is measured on the model's own triangles:
 //
 //   a. irons      the gun's own iron sights can be used: from the aiming eye the front post is seen through the rear sight with room round it
-//   b. magcheck   the magazine carries the magazine check (the top round's two meshes, and witness holes on both faces or rounds through a clear body)
+//   b. magcheck   the magazine carries the magazine check (the top round's two meshes, and witness holes down the back face or rounds through a clear body)
 //   c. topround   the top round sits in the magazine's open top, not buried in its body
 //   d. handguard  the factory handguard leaves a muzzle device its 15 mm and is no longer than the longest handguard the gun takes (spec hgMax)
 //   e. magwell    the magazine stays inside the receiver's magazine well
@@ -186,7 +186,7 @@ function magParts(M) {
   const body = plain.filter((m) => !lips.includes(m) && !rounds.includes(m));
   return { ms, tops, lips, rounds, body };
 }
-/** b: part_mag's extras.check.w, the top round's chk meshes i 0 and 1, and witness holes on both faces or clear-body rounds (a box magazine; a drum, a belt or a barrel block shows none). */
+/** b: part_mag's extras.check.w, the top round's chk meshes i 0 and 1, and witness holes down the back face (none on the front) or clear-body rounds (a box magazine; a drum, a belt or a barrel block shows none). */
 export function checkMagCheck(M, E, kind) {
   const mp = magParts(M), at = `models/${M.id}: the magazine (part_mag)`;
   if (!mp) return;
@@ -198,8 +198,9 @@ export function checkMagCheck(M, E, kind) {
   if (!holes.length && !rounds.length) { E(`${at}: no witness holes (chk role "hole") and no clear-body rounds (chk role "round"): a box magazine shows its count by one or the other`); return; }
   const byI = new Map(); for (const h of holes) { const k = h.chk.i; if (!byI.has(k)) byI.set(k, []); byI.get(k).push(h); }
   for (const [i, hs] of [...byI].sort((x, y) => x[0] - y[0])) {
-    for (const side of [1, -1]) { const n = hs.filter((h) => h.chk.side === side).length; if (n !== 1) E(`${at}: witness hole i ${i} has ${n} meshes on side ${side} (${side === 1 ? 'the back face' : 'the front face'}): one on each face, each its own mesh`); }
-    const ts = [...new Set(hs.map((h) => h.chk.t))]; if (ts.length > 1) E(`${at}: witness hole i ${i} reads t ${ts.join(' and ')} on its two faces: the same t on both`);
+    const front = hs.filter((h) => h.chk.side !== 1);
+    if (front.length) E(`${at}: witness hole i ${i} has ${front.length} mesh${front.length > 1 ? 'es' : ''} on side ${front.map((h) => h.chk.side).join(', ')} (${front.map((h) => h.name).join(', ')}): holes go down the back face only (side 1, toward the shooter), none on the front`);
+    const n = hs.length - front.length; if (n !== 1) E(`${at}: witness hole i ${i} has ${n} meshes on side 1 (the back face): one, its own mesh`);
   }
 }
 /** c: the top round's crown (the top of its chk "top" meshes) within LIMITS.topRoundBuried of the body's top and at or above the feed lips' top. */
