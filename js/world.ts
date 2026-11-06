@@ -478,6 +478,49 @@ const G_World = (() => {
     if (!o.world) map.world = w;
     return w;
   }
+  // The world from a level's description alone (js/leveldesc.ts, docs/level-data.md): its solids, in their order (the same ids,
+  // so the same hash), each hung back on what it belongs to in the generator's map: the piece of furniture (desc.props: the
+  // same list G.LevelDesc.propList makes from the map), the door, the window, the flight of stairs, what it's made of. The
+  // doors' and windows' solids are theirs to change from there (door, windowSolids: as they open, shut and break). map.world
+  // (and each floor's) is this world.
+  function fromDesc(d: LvDesc, map: any) {
+    const w = create(), props = G.LevelDesc.propList(map), doors = map.doors || [], wins = map.windows || [], stairs = map.stairs || [];
+    const M: Record<string, any> = { props: G.Materials.PROPS, parts: G.Materials.PARTS };
+    for (const q of doors) q.solids = [];
+    for (const q of wins) q.solids = [];
+    for (const st of stairs) st.steps = [];
+    d.solids.forEach((o: any, i: number) => {
+      if (!o) { w.solids[i] = null; w.free.push(i); return; }
+      const b = o.b, s: Solid = { min: [b[0], b[1], b[2]], max: [b[3], b[4], b[5]], kind: o.k };
+      if (o.mv === 0) s.move = false;
+      if (o.ry === 0) s.ray = false;
+      if (o.hull) s.hull = o.hull;
+      if (o.e) s.edge = true;
+      if (o.vw) s.view = true;
+      if (o.tr) s.terrain = true;
+      if (o.bars) s.bars = true;
+      if (o.ns) s.nostep = true;
+      if (o.pr != null && o.pr >= 0) s.prop = props[o.pr];
+      if (o.dr != null) s.door = doors[o.dr];
+      if (o.wn != null) s.win = wins[o.wn];
+      if (o.gl != null) s.glass = o.gl;
+      if (o.st != null && o.st >= 0) s.stair = stairs[o.st];
+      if (o.mat) { const [k, n] = String(o.mat).split(':'); s.mat = M[k] && M[k][n]; }
+      if (s.move == null) s.move = true;
+      if (s.ray == null) s.ray = true;
+      s.id = i; w.solids[i] = s;
+      if (w.mark.length <= i) { const m = new Int32Array(Math.max(w.mark.length * 2, i + 1)); m.set(w.mark); w.mark = m; }
+      insert(w, s);
+      if (s.door) s.door.solids.push(s); else if (s.win) s.win.solids.push(s);
+      if (s.stair && s.kind === 'step') s.stair.steps.push(s);
+    });
+    if (d.world && d.world.bounds) w.bounds = d.world.bounds;
+    if (map.terrain) w.terrain = map.terrain;
+    if (stairs.length) w.ramps = stairs.slice();
+    map.world = w;
+    for (const m of map.floors || []) m.world = w;
+    return w;
+  }
   // A flight of stairs (G.Level.stack's): steps as solids, each a block from the floor at its foot up to its tread,
   // climbing st.rise over its run in about 20 cm steps (low enough to walk up: STEP)
   function stairs(w: WorldT, st: LvStair) {
@@ -533,7 +576,7 @@ const G_World = (() => {
     }
   }
 
-  return { CELL, STEP, HEIGHT, GLASS_SEE, create, add, remove, reshape, box, hullOf, fitBoxes, touches, raycast, span, los, see, query, resolve, groundAt, terrainAt, terrainUnder, rampAt, ceilingAt, fromTileMap, stairs, door, windowSolids };
+  return { CELL, STEP, HEIGHT, GLASS_SEE, create, add, remove, reshape, box, hullOf, fitBoxes, touches, raycast, span, los, see, query, resolve, groundAt, terrainAt, terrainUnder, rampAt, ceilingAt, fromTileMap, fromDesc, stairs, door, windowSolids };
 })();
 G.World = G_World;
 

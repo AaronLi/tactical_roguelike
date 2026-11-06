@@ -317,7 +317,7 @@ const G_Hangar = (() => {
   // about half the hangar's draw calls. Not anything that's kept hold of to be moved or changed later, nor what's under it:
   // what's on show and turning, its sign, the vending machines' slots, the pouch shelf, the helicopter (its rotors), the
   // people, the range's plates, carriers and screens, the course's stage, the TVs.
-  //   (G.Level.batchStatic leaves alone anything with a material of its own, as a sign's or a screen's is.)
+  //   (G.LevelView.batchStatic leaves alone anything with a material of its own, as a sign's or a screen's is.)
   function batch() {
     const keep = new Set<THREE.Object3D>(), hold = (o: unknown, d = 0) => {
       if (!o || typeof o !== 'object' || d > 2) return;
@@ -330,7 +330,7 @@ const G_Hangar = (() => {
     if (G.Course) { const C = G.Course.S; hold([C.grp, C.tg, C.board, C.screens]); }
     if (G.Highlights && (G.Highlights as any).P) hold((G.Highlights as any).P.tvs);
     keep.delete(S.root);
-    G.Level.batchStatic(S.root, keep);
+    G.LevelView.batchStatic(S.root, keep);
   }
   function leave() {
     if (G.Range) G.Range.leave();

@@ -879,7 +879,7 @@ const G_Highlights = (() => {
     for (const [n, bm] of Object.entries(m.stickers || {})) G.Stickers.provide(n, bm); // (the stickers' pictures, from the file)
     const map = G.Level.generate(d.gen.seed, d.gen.level, d.gen.th, !!d.gen.night);
     G.Game.map = map;
-    P.map = map; P.level = new T.Group(); P.level.add(G.Level.buildMesh(map));
+    P.map = map; P.level = new T.Group(); P.level.add(G.LevelView.build(map));
     Object.assign(P, { clips: d.clips, stats: d.stats, actors: d.actors, fired: d.fired, kgun: d.kgun, glass: d.glass, levelN: d.levelN, theme: d.theme });
     P.prog = [];
     for (const s of d.prog) {

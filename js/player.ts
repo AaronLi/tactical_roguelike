@@ -817,7 +817,7 @@ const G_Me = {
   // Your own arms while your hands are on something (the gun's away): a sleeved forearm and a glove each, in the world, from
   // in front of your shoulder to where the hand is. On the ladder, where G.Level.ladderGrip has it on a rung (each one holding
   // as you rise past it, then reaching up two); on a zipline there are no arms to draw (the left hand's up on the trolley's
-  // handle, out of view, the right has the gun) but the trolley itself, on the cable over your head (G.Level.zipKit). Everyone
+  // handle, out of view, the right has the gun) but the trolley itself, on the cable over your head (G.LevelView.zipKit). Everyone
   // else sees the whole of you (js/rig.ts).
   holdArms(cam: THREE.Camera) {
     let A = this._climbArms;
@@ -826,7 +826,7 @@ const G_Me = {
     if (!this.climb && !z) { if (A) A.g.visible = false; return; }
     if (z) { // (the trolley, over your head: the cable ZIP_HANG over your feet)
       if (A) A.g.visible = false;
-      const k = this._zipKit || (this._zipKit = G.Level.zipKit());
+      const k = this._zipKit || (this._zipKit = G.LevelView.zipKit());
       if (!k.parent) G.R.scene.add(k);
       k.visible = true; k.position.set(this.pos.x, this.pos.y + G.Level.ZIP_HANG, this.pos.z); k.rotation.y = Math.atan2(z.l.b[0] - z.l.a[0], z.l.b[2] - z.l.a[2]);
       return;
