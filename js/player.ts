@@ -406,6 +406,15 @@ const G_Me = {
     G.Audio.click();
     G.HUD.toast('', `${kind === 'light' ? 'Light' : 'Laser'} ${w[kind] ? 'on' : 'off'}`, 0.7);
   },
+  // How much muzzle flash a shot from this gun makes, against a bare muzzle's 1 (sent with the shot: on a night level it's how far
+  // it gives you away, and how well they can shoot back at it: js/server.ts NIGHT): a brake or a compensator throws it out to the
+  // sides (1.2), a flash hider all but kills it (0.3), a suppressor more so (0.1), a subsonic suppressed round or a bow none
+  flashOf(w: GWeapon) {
+    const d = w.def;
+    if (d.cls === 'BOW') return 0;
+    if (w.sup) return d.quiet ? 0 : 0.1;
+    return d.device === 'flash' ? 0.3 : d.device === 'brake' || d.device === 'comp' ? 1.2 : 1;
+  },
   // what's lit on this gun (as sent to the squad): 1 light, 2 laser, 4 green laser, 8 bright light
   tacFlags(w: GWeapon) {
     if (!w || this.stowed) return 0;
@@ -1466,7 +1475,7 @@ const G_Me = {
       // (a shotgun's: every pellet's end, so the squad's highlights show the pattern)
       const tos = shot.tos ? shot.tos.slice(0, 24).map((p: THREE.Vector3) => [r2(p.x), r2(p.y), r2(p.z)]) : undefined;
       if (G.Highlights) G.Highlights.shot('p' + G.Net.myId, muzzle, firstEnd, def.code, round, tos, shot.sid);
-      G.Net.toHost({ t: 'shot', f: [r2(muzzle.x), r2(muzzle.y), r2(muzzle.z)], to: [r2(firstEnd.x), r2(firstEnd.y), r2(firstEnd.z)], tos, sid: shot.sid, w: def.code, am: round, sil: def.cls === 'BOW' ? 2 : w.sup ? (def.quiet ? 2 : 1) : 0, bm: multi && !vol ? Math.round(eff) : undefined, rl: multi && !vol ? G.roundOf(w.def, w.rl)!.rl : undefined,
+      G.Net.toHost({ t: 'shot', f: [r2(muzzle.x), r2(muzzle.y), r2(muzzle.z)], to: [r2(firstEnd.x), r2(firstEnd.y), r2(firstEnd.z)], tos, sid: shot.sid, w: def.code, am: round, sil: def.cls === 'BOW' ? 2 : w.sup ? (def.quiet ? 2 : 1) : 0, fl: this.flashOf(w), bm: multi && !vol ? Math.round(eff) : undefined, rl: multi && !vol ? G.roundOf(w.def, w.rl)!.rl : undefined,
         vi: vol ? n : undefined, vn: vol && n === 0 ? nv : undefined }); // (a volley's rounds: which one this is, and how many went (the first's): js/views.ts remoteShot plays one report)
       if (n === 0) firstShot = shot;
     });
