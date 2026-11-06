@@ -987,14 +987,14 @@ const G_Level = {
   //  - The Crest House's: over the whole house (the slab over its ceilings: you stand on that, js/world.ts), nothing round
   //    its edge but air, ROOF_Y up.
   //  - The viewing building's, out over the gorge: a slab over the whole of it, out past its walls to the edge of their tiles
-  //    (crestSolids), a parapet round it (PARAPET high: you can't walk off it, and you see and shoot over it), the overlook
+  //    (crestSolids), a railing round it on a low kerb (PARAPET high: you can't walk off it, and you see and shoot through it), the overlook
   //    one way along the gorge and the garden the other.
   // Each roof's ladder is on its east wall (the house's, the gorge side; the viewing building's, at its back corner, from
   // the east terrace): at a stretch of wall with no window or door in it and clear ground in front, nearest the middle.
   // foot: where you stand to climb (and step off at the bottom), y0 the ground there; top: the roof's height; head: where
   // you step off on the roof; over: how high over the roof's edge you're lifted getting on and off (a parapet's).
   // (Hold F at either end: js/player.ts climbStep. Suspects don't climb them.)
-  ROOF_Y: 4.3, PARAPET: { H: 1.05, T: 0.2 }, GUARD_H: 1.05,
+  ROOF_Y: 4.3, PARAPET: { H: 1.05, T: 0.2, KERB: 0.15 }, GUARD_H: 1.05,
   crestLadder(map: LvMap) {
     const cr = map.crest, { W, t } = map, TS = this.TS, K = this.K, [HX, HZ] = cr.house, [BX0, BX1] = cr.viewing, VZ1 = cr.site[2];
     cr.roofs = []; cr.ladders = [];
@@ -1041,7 +1041,13 @@ const G_Level = {
     for (const R of map.crest.roofs || []) {
       if (!R.parapet) continue;
       G.World.add(w, G.World.box(R.x0, R.gy + WH, R.z0, R.x1, R.y, R.z1, { kind: 'ceil' }));
-      for (const [x0, z0, x1, z1] of this.parapetRuns(R)) G.World.add(w, G.World.box(x0, R.y, z0, x1, R.y + P.H, z1, { kind: 'wall', edge: true })); // (edge: concrete, cast; no hole knocked through it)
+      // (a steel railing on a low concrete kerb: you can't walk through it or off the roof, but you see and shoot through it, as at the
+      // terraces: only the kerb and the handrail stop a round)
+      for (const [x0, z0, x1, z1] of this.parapetRuns(R)) {
+        G.World.add(w, G.World.box(x0, R.y, z0, x1, R.y + P.KERB, z1, { kind: 'wall', edge: true })); // (the kerb: concrete, cast)
+        G.World.add(w, G.World.box(x0, R.y, z0, x1, R.y + P.H, z1, { kind: 'rail', ray: false }));
+        G.World.add(w, G.World.box(x0, R.y + P.H - 0.05, z0, x1, R.y + P.H, z1, { kind: 'rail', move: false }));
+      }
     }
   },
   // a roof's parapet, as boxes [x0, z0, x1, z1] in plan: along each edge, inside it
@@ -2645,8 +2651,8 @@ const G_Level = {
       const kit = this.zipKit(); kit.position.set(...(l.a as [number, number, number])); kit.rotation.y = Math.atan2(l.b[0] - l.a[0], l.b[2] - l.a[2]); root.add(kit); // (the next one, waiting)
     }
     // ---- the flat roofs (crest.roofs): a deck of grey pavers over the slab. The Crest House's edge flush with its walls (no
-    // parapet: nothing between you and the far summit); the viewing building's out to the edge of its walls' tiles, a cast
-    // concrete parapet round it, coped. The ladder up to each on its east wall (crest.ladders), steel, its rails carried on
+    // parapet: nothing between you and the far summit); the viewing building's out to the edge of its walls' tiles, a steel
+    // railing round it on a concrete kerb. The ladder up to each on its east wall (crest.ladders), steel, its rails carried on
     // past the top to hold as you step off (over a parapet: up over it and down onto the roof, a hoop)
     for (const R of cr.roofs || []) {
       const WH = this.WALL_H, B = R.gy + WH, dt = this._tex('floor', '#6e6a66'); dt.repeat.set((R.x1 - R.x0) / 2, (R.z1 - R.z0) / 2);
@@ -2656,10 +2662,16 @@ const G_Level = {
       const gravel = new T.Mesh(new T.PlaneGeometry(R.x1 - R.x0, R.z1 - R.z0), new T.MeshStandardMaterial({ map: dt, roughness: 0.95 }));
       gravel.rotation.x = -Math.PI / 2; gravel.position.set((R.x0 + R.x1) / 2, R.y + 0.004, (R.z0 + R.z1) / 2); gravel.layers.enable(1); root.add(gravel);
       if (!R.parapet) continue;
-      const P = this.PARAPET, conc = new T.MeshStandardMaterial({ color: 0xa9a49c, roughness: 0.9 }), cope = new T.MeshStandardMaterial({ color: 0xc4beb4, roughness: 0.8 });
+      // (its railing: a concrete kerb, steel posts about every 1.3 m, a top rail and a mid rail, open between: js/level.ts crestSolids)
+      const P = this.PARAPET, conc = new T.MeshStandardMaterial({ color: 0xa9a49c, roughness: 0.9 }), st = new T.MeshStandardMaterial({ color: 0x9aa0a4, roughness: 0.35, metalness: 0.8 });
       for (const [x0, z0, x1, z1] of this.parapetRuns(R)) {
-        const pw = new T.Mesh(new T.BoxGeometry(x1 - x0, P.H - 0.05, z1 - z0), conc); pw.position.set((x0 + x1) / 2, R.y + (P.H - 0.05) / 2, (z0 + z1) / 2); pw.layers.enable(1); root.add(pw);
-        const cp = new T.Mesh(new T.BoxGeometry(x1 - x0 + 0.06, 0.05, z1 - z0 + 0.06), cope); cp.position.set((x0 + x1) / 2, R.y + P.H - 0.025, (z0 + z1) / 2); cp.layers.enable(1); root.add(cp);
+        const along = x1 - x0 >= z1 - z0, len = along ? x1 - x0 : z1 - z0, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+        const kb = new T.Mesh(new T.BoxGeometry(x1 - x0, P.KERB, z1 - z0), conc); kb.position.set(cx, R.y + P.KERB / 2, cz); kb.layers.enable(1); root.add(kb);
+        for (const [h, r] of [[P.H - 0.025, 0.025], [0.55, 0.012]] as [number, number][]) {
+          const bar = new T.Mesh(new T.CylinderGeometry(r, r, len, 8), st); bar.rotation[along ? 'z' : 'x'] = Math.PI / 2; bar.position.set(cx, R.y + h, cz); root.add(bar);
+        }
+        const n = Math.max(1, Math.round(len / 1.3));
+        for (let i = 0; i <= n; i++) { const t = -len / 2 + 0.04 + (len - 0.08) * i / n, po = new T.Mesh(new T.BoxGeometry(0.04, P.H - P.KERB - 0.03, 0.04), st); po.position.set(along ? cx + t : cx, R.y + P.KERB + (P.H - P.KERB - 0.03) / 2, along ? cz : cz + t); root.add(po); }
       }
     }
     for (const L of cr.ladders || []) {
