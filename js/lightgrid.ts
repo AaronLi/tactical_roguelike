@@ -43,9 +43,10 @@ const G_LightGrid = (() => {
   // dark foundry's or bunker's three; every tile then within about two steps of the screen's 255 of where it would
   // settle, its doors open or shut. Each bounce costs 50-130 ms of a level's build, the festival's 150, the foundry's 250:
   // with the doors' layers worked out no further than the light gets (REACH), most places build in 0.1 to 0.6 s);
-  // reach: see REACH; sky: the night sky's (the theme's fill)
+  // reach: see REACH; sky: the night sky's (the theme's fill); spill, spillK: the sky's light carried in through what's open
+  // to it, how many tiles and how much of it the first tile in gets (below)
   // through what's open to it, a window, a doorway; fill: what's left of the flat fill everywhere (js/render.ts)
-  const opts = { bounce: 1.75, bounces: 6, settle: 0.06, sky: 1, fill: 0.25, reach: 5 };
+  const opts = { bounce: 1.75, bounces: 6, settle: 0.06, sky: 1, fill: 0.25, reach: 5, spill: 4, spillK: 0.55 };
 
   // every lit material reads the grid (added to its shader as three.js compiles it)
   const VS_HEAD = 'varying vec3 vLgP;\nvarying vec3 vLgN;\n';
@@ -188,6 +189,30 @@ const G_LightGrid = (() => {
         for (const w of map.windows || []) if ((w.fl || 0) === f && w.ext) for (const c of w.cells) {
           const r = c - w.nx - w.nz * W;
           if (r >= 0 && r < N && t[r] !== 1) into(null, base + r, skyI * 0.6, w.nx * 0.8, 0.6, w.nz * 0.8, skyI * 0.6 * lum);
+        }
+        // and carried on in: through an open doorway, a garage door, an outside window, the sky's light reaches some way into
+        // the building, less with every tile (SPILL: how far, in tiles; SPILL_K: the first tile in's share of the sky's), from
+        // the way it came in, round no wall and through no shut door. Without it a doorway's the edge of the dark, one tile wide
+        // (sharpest at night, where the goggles' gain finds it)
+        if (fm.out) {
+          const R = opts.spill, dist = new Int16Array(N).fill(-1), dir = new Float32Array(N * 2), q: number[] = [];
+          for (let i = 0; i < N; i++) if (fm.out[i] && t[i] !== 1 && !doorAt.has(i)) { dist[i] = 0; q.push(i); }
+          for (const w of map.windows || []) if ((w.fl || 0) === f && w.ext) for (const c of w.cells) {
+            const r = c - w.nx - w.nz * W;
+            if (r >= 0 && r < N && t[r] !== 1 && dist[r] < 0 && !fm.out[r]) { dist[r] = 1; dir[r * 2] = w.nx; dir[r * 2 + 1] = w.nz; q.push(r); }
+          }
+          for (let h = 0; h < q.length; h++) {
+            const i = q[h], d = dist[i]; if (d >= R) continue;
+            const x = i % W, z = (i / W) | 0;
+            for (const [ox, oz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+              const nx = x + ox, nz = z + oz; if (nx < 0 || nz < 0 || nx >= W || nz >= H) continue;
+              const j = nz * W + nx;
+              if (dist[j] >= 0 || t[j] === 1 || doorAt.has(j) || fm.out[j]) continue;
+              dist[j] = d + 1; dir[j * 2] = d === 0 ? -ox : dir[i * 2]; dir[j * 2 + 1] = d === 0 ? -oz : dir[i * 2 + 1]; q.push(j);
+              const a = skyI * opts.spillK * Math.pow(1 - (d + 1) / (R + 1), 1.6);
+              into(null, base + j, a, dir[j * 2] * 0.6, 0.5, dir[j * 2 + 1] * 0.6, a * lum);
+            }
+          }
         }
       }
       // a doorway's open weight comes with its door

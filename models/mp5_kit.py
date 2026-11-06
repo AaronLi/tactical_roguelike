@@ -52,7 +52,7 @@ POST_F = F(1121.5)                # the front post
 MUZ = F(1202)                     # the MP5's muzzle
 BR_R = 7.8 * mm                   # the barrel's radius under the handguard and through the front sight housing
 HANDLE_F = F(977)                 # the cocking lever at rest, at the front of its slot
-HANDLE_TRAVEL = 0.055             # its pull back to the receiver's face
+HANDLE_TRAVEL = 0.053             # its pull back to the receiver's face
 # the MP5SD's front: its can ends 110 mm ahead of the MP5's muzzle (HK: the SD2 is 790 mm to the A2's 680); its ribbed handguard is a bit over half of it
 SD_END = MUZ + 0.110
 SD_HG1 = RF + 0.166               # the ribbed handguard's front, where the front sight's collar is
@@ -109,28 +109,43 @@ def receiver():
             o = K.obj(box(*xs(s * 12.6 * mm, s * 14.4 * mm), f - 2.5 * mm, f + 2.5 * mm, TOP - 3.6 * mm, TOP - 1.4 * mm), 'base', 'gunmetal')
 
 # ===================================================================================== COCKING TUBE AND LEVER
+# The HK slap handle: a lever on the LEFT of the cocking tube, at 10 o'clock, riding in a slot along the tube and folded forward along it at rest. A reload pulls it
+# back the length of the slot and turns it up about the tube into the notch cut at the slot's rear (it locks the bolt open: the HK "slap" position), then slaps it
+# back down, out of the notch, and the bolt runs home. The part's node (part_handle) has its origin ON the tube's axis, so a turn about it is the turn up into the notch.
+HANDLE_ROT = math.radians(30)     # the lever's place round the tube: 30 degrees above its left side (10 o'clock, seen from behind)
+HANDLE_LOCK = math.radians(32)    # how far it turns up from there into the notch
+def about_tube(me, a):
+    """A mesh turned about the cocking tube's axis by a (positive: the left side turns up)."""
+    me.transform(Matrix.Translation((0, 0, CT_Z)) @ Matrix.Rotation(a, 4, 'Y') @ Matrix.Translation((0, 0, -CT_Z))); return me
+
 def cocking_tube(f1, slot='base', parent=None):
-    """The cocking tube from inside the receiver's top forward to f1, its slot down the left side with the notch at its back (where the lever
-    is hooked to hold the bolt open)."""
+    """The cocking tube from inside the receiver's top forward to f1, its slot down the left side at 10 o'clock with, at its back, the notch (up and round from
+    the slot) where the lever is turned to hold the bolt open."""
     ct = K.tmp(cyl(CT_R, RF - 0.012, f1, 'y', (0, CT_Z), 20))
     if f1 > HANDLE_F:
-        cut(ct, box(-CT_R - 1 * mm, -CT_R + 3.5 * mm, RF + 4 * mm, HANDLE_F + 4 * mm, CT_Z - 2.6 * mm, CT_Z + 2.6 * mm))
-        cut(ct, box(-CT_R - 1 * mm, -CT_R + 3.5 * mm, RF + 4 * mm, RF + 10 * mm, CT_Z - 2.6 * mm, CT_Z + 5.6 * mm))
+        cut(ct, about_tube(box(-CT_R - 1 * mm, -CT_R + 3.5 * mm, RF + 4 * mm, HANDLE_F + 4 * mm, CT_Z - 2.6 * mm, CT_Z + 2.6 * mm), HANDLE_ROT))
+        for k in range(5):      # the way up from the slot to the notch, and the notch (a wider cut, at the slot's rear)
+            cut(ct, about_tube(box(-CT_R - 1 * mm, -CT_R + 3.5 * mm, RF + 4 * mm, RF + 12 * mm, CT_Z - 2.6 * mm, CT_Z + 2.6 * mm), HANDLE_ROT + HANDLE_LOCK * k / 4))
     smooth(ct); K.adopt(ct, slot, RCV, parent)
     return ct
 
 def cocking_lever():
-    """The cocking lever (part_handle): a stem out of the tube's slot on the left, a flat paddle on it angled up and forward."""
-    ph = K.part('handle', (-CT_R, HANDLE_F, CT_Z))
-    f = HANDLE_F
-    o = K.tmp(box(-CT_R - 4.5 * mm, -CT_R + 3.0 * mm, f - 3.5 * mm, f + 3.5 * mm, CT_Z - 2.3 * mm, CT_Z + 2.3 * mm)); bevel(o, 0.6 * mm, 1); smooth(o); K.adopt(o, 'base', 'black', ph)
-    pd = K.tmp(rprism([(f - 6 * mm, CT_Z - 3.5 * mm), (f + 5 * mm, CT_Z - 3.5 * mm), (f + 22 * mm, CT_Z + 6.0 * mm), (f + 21 * mm, CT_Z + 11.0 * mm), (f + 15 * mm, CT_Z + 12.0 * mm),
-                        (f - 4 * mm, CT_Z + 4.0 * mm)], -CT_R - 8.5 * mm, -CT_R - 4.0 * mm))
-    for k in range(4):   # the paddle's grip grooves
-        g = f + 4 * mm + k * 4 * mm
-        cut(pd, box(-CT_R - 9 * mm, -CT_R - 8.0 * mm, g, g + 1.6 * mm, CT_Z - 4 * mm, CT_Z + 13 * mm))
-    bevel(pd, 1.0 * mm, 2, 35); smooth(pd); K.adopt(pd, 'base', 'black', ph)
-    return ph, [round(f + 14 * mm, 4), round(CT_Z + 8 * mm, 4), round(-CT_R - 6.3 * mm, 4)]
+    """The slap handle (part_handle, its origin on the tube's axis): a stem out of the slot, a flat lever on it folded forward along the tube with its thumb
+    tab turned out at the tip, grooved on its face."""
+    ph = K.part('handle', (0, HANDLE_F, CT_Z))
+    f, xo = HANDLE_F, CT_R                        # (built at 9 o'clock, then turned to 10)
+    def put(o, mat):
+        about_tube(o.data, HANDLE_ROT); K.adopt(o, 'base', mat, ph)
+    st = K.tmp(cyl(3.3 * mm, -xo - 5.2 * mm, -xo + 1.6 * mm, 'x', (f, CT_Z), 18)); bevel(st, 0.5 * mm, 1); smooth(st); put(st, 'black')
+    bl = K.tmp(rprism([(f - 4.5 * mm, CT_Z - 3.8 * mm), (f + 9 * mm, CT_Z - 3.8 * mm), (f + 27 * mm, CT_Z - 2.4 * mm), (f + 30.5 * mm, CT_Z + 0.2 * mm), (f + 27 * mm, CT_Z + 3.0 * mm),
+                       (f + 9 * mm, CT_Z + 4.6 * mm), (f - 4.5 * mm, CT_Z + 4.6 * mm)], -xo - 7.8 * mm, -xo - 5.0 * mm))
+    for k in range(4):   # the grooves across its face
+        g = f + 8 * mm + k * 4.2 * mm
+        cut(bl, box(-xo - 8.2 * mm, -xo - 7.0 * mm, g, g + 1.5 * mm, CT_Z - 5 * mm, CT_Z + 6 * mm))
+    bevel(bl, 0.8 * mm, 2, 35); smooth(bl); put(bl, 'black')
+    tb = K.tmp(box(-xo - 12.4 * mm, -xo - 7.4 * mm, f + 21 * mm, f + 30.5 * mm, CT_Z - 2.8 * mm, CT_Z + 2.4 * mm)); bevel(tb, 1.0 * mm, 2, 35); smooth(tb); put(tb, 'black')
+    g = Vector((-xo - 10.0 * mm, f + 26 * mm, CT_Z)); g = Matrix.Translation((0, 0, CT_Z)) @ Matrix.Rotation(HANDLE_ROT, 4, 'Y') @ Matrix.Translation((0, 0, -CT_Z)) @ g
+    return ph, [round(g.y, 4), round(g.z, 4), round(g.x, 4)]
 
 # ===================================================================================== TRIGGER HOUSING (base) AND GRIP (factory: grip)
 MW0, MW1 = F(747), F(815.5)       # the magazine well's inside, back and front (the magazine's back and front edges, 1 mm clear)
@@ -230,34 +245,37 @@ def stock_a2():
 
 # ===================================================================================== DRUM REAR SIGHT (factory: optic)
 def rear_drum():
-    """The rotary drum sight: its base welded to the receiver's top, the bracket's two cheeks holding the drum on its cross axis, the windage
-    screw at the back; the aperture in use is the large one (a ghost ring, countersunk both ways); the others are blind on the drum's other faces."""
-    b = K.tmp(rprism(PL([(500, 97.5), (506, 92), (578, 92), (584, 97.5)]), -8.0 * mm, 8.0 * mm)); bevel(b, 0.6 * mm, 1); smooth(b); K.adopt(b, 'optic', RCV)
-    # the windage bracket at the back, its screw head each side
-    # (low behind the drum: the eye looks over it into the aperture)
-    o = K.tmp(rprism(PL([(512, 93), (538, 93), (538, 85), (530, 81), (518, 82), (512, 86)]), -6.5 * mm, 6.5 * mm)); bevel(o, 0.8 * mm, 2, 35); smooth(o); K.adopt(o, 'optic', RCV)
+    """HK's rotary diopter sight (Commons "HK MP5 noBG.png": a small drum between two protective ears on a base clamped to the receiver's top). The drum turns
+    on a cross axis (it is knurled round its rim, its four settings marked on its left face): the large aperture (a ghost ring, countersunk both ways) is
+    the one in use, the V notch is cut across its top, the two smaller apertures are on the drum's other faces. The ears stand either side of it, rounded
+    behind, sloping down to the front, a screw through each at the drum's axis; the windage screw on the base behind."""
+    R, DW = 9.0 * mm, 14.0 * mm                           # the drum's radius and width
+    EX0, EX1 = DW / 2 + 0.4 * mm, DW / 2 + 3.2 * mm       # the ears' inside and outside
+    b = K.tmp(rprism(PL([(500, 97.5), (506, 93.5), (582, 93.5), (588, 97.5)]), -11.0 * mm, 11.0 * mm)); bevel(b, 0.7 * mm, 1); smooth(b); K.adopt(b, 'optic', RCV)
+    # the ears: a profile about the drum's axis (forward, up from it)
+    EAR = [(-17.0, -11.4), (-17.0, -1.5), (-15.4, 3.6), (-11.5, 7.6), (-5.5, 9.8), (2.0, 10.4), (9.5, 8.6), (12.8, 3.6), (13.6, -2.0), (13.6, -11.4)]
     for s in (-1, 1):
-        o = K.obj(cyl(4.0 * mm, *xs(s * 6.5 * mm, s * 8.2 * mm), 'x', (F(523), U(87)), 16), 'optic', 'steel'); smooth(o)
-        o = K.obj(box(*xs(s * 8.0 * mm, s * 8.4 * mm), F(523) - 0.6 * mm, F(523) + 0.6 * mm, U(87) - 2.8 * mm, U(87) + 2.8 * mm), 'optic', 'black')
-    # the cheeks either side of the drum
-    R = 9.2 * mm
-    for s in (-1, 1):
-        ck = K.tmp(rprism([(DRUM_F - 11 * mm, TOP + 1.5 * mm), (DRUM_F + 12 * mm, TOP + 1.5 * mm), (DRUM_F + 10.5 * mm, SY - 2 * mm), (DRUM_F + 4 * mm, SY + 9.5 * mm),
-                           (DRUM_F - 6 * mm, SY + 8.5 * mm), (DRUM_F - 11 * mm, SY)], *xs(s * 7.2 * mm, s * 9.2 * mm)))
-        cut(ck, cyl(1.6 * mm, -0.02, 0.02, 'x', (DRUM_F, SY), 12))
-        bevel(ck, 0.7 * mm, 1); smooth(ck); K.adopt(ck, 'optic', RCV)
-        o = K.obj(cyl(2.4 * mm, *xs(s * 9.2 * mm, s * 9.9 * mm), 'x', (DRUM_F, SY), 12), 'optic', 'steel'); smooth(o)
-    # the drum: a cylinder across the gun (axis X), its aperture through it along the sight line
-    dr = K.tmp(cyl(R, -7.0 * mm, 7.0 * mm, 'x', (DRUM_F, SY), 28))
+        ear = K.tmp(rprism([(DRUM_F + a * mm, SY + z * mm) for a, z in EAR], *xs(s * EX0, s * EX1)))
+        bevel(ear, 0.9 * mm, 2, 35); smooth(ear); K.adopt(ear, 'optic', RCV)
+        o = K.obj(cyl(3.0 * mm, *xs(s * EX1, s * (EX1 + 0.9 * mm)), 'x', (DRUM_F, SY), 16), 'optic', 'steel'); smooth(o)                  # the axle's screw head
+        o = K.obj(box(*xs(s * (EX1 + 0.7 * mm), s * (EX1 + 1.0 * mm)), DRUM_F - 2.4 * mm, DRUM_F + 2.4 * mm, SY - 0.5 * mm, SY + 0.5 * mm), 'optic', 'black')   # its slot
+    # the windage screw behind the drum, on the right: a knurled head on the base's rear
+    o = K.obj(cyl(3.2 * mm, 11.0 * mm, 14.2 * mm, 'x', (DRUM_F - 14.0 * mm, TOP + 3.0 * mm), 18), 'optic', 'steel'); smooth(o)
+    o = K.obj(box(13.6 * mm, 14.5 * mm, DRUM_F - 14.0 * mm - 0.5 * mm, DRUM_F - 14.0 * mm + 0.5 * mm, TOP + 0.4 * mm, TOP + 5.6 * mm), 'optic', 'black')
+    # the drum: a cylinder across the gun (axis X), the aperture through it along the sight line
+    dr = K.tmp(cyl(R, -DW / 2, DW / 2, 'x', (DRUM_F, SY), 36))
     cut(dr, lathe([(DRUM_F - R - 1 * mm, 4.6 * mm), (DRUM_F - 3 * mm, 3.3 * mm), (DRUM_F + 3 * mm, 3.3 * mm), (DRUM_F + R + 1 * mm, 4.6 * mm)], 28, (0, 0, SY)))
-    for a in (math.pi / 2, -math.pi / 2):   # the other apertures, blind: a dimple each on its top and bottom faces
-        z = SY + math.sin(a) * R
-        cut(dr, cyl(1.4 * mm, z - 2.2 * mm, z + 2.2 * mm, 'z', (0, DRUM_F), 12))
-    for k in range(10):   # the knurled rim's flats
-        a = 2 * math.pi * k / 10
-        g = box(-7.2 * mm, -5.6 * mm, -0.6 * mm, 0.6 * mm, R - 0.6 * mm, R + 1 * mm); g.transform(Matrix.Translation((0, DRUM_F, SY)) @ Matrix.Rotation(a, 4, 'X')); cut(dr, g)
-        g = box(5.6 * mm, 7.2 * mm, -0.6 * mm, 0.6 * mm, R - 0.6 * mm, R + 1 * mm); g.transform(Matrix.Translation((0, DRUM_F, SY)) @ Matrix.Rotation(a, 4, 'X')); cut(dr, g)
+    # the V notch across the drum's top, and two smaller apertures on its other faces: a blind hole each (down the bottom, and across the top's side)
+    cut(dr, prism([(-3.6 * mm, SY + R + 1 * mm), (3.6 * mm, SY + R + 1 * mm), (0.0, SY + R - 4.2 * mm)], 'y', DRUM_F - R - 1 * mm, DRUM_F + R + 1 * mm))
+    cut(dr, cyl(1.6 * mm, SY - R - 1 * mm, SY - R + 4.5 * mm, 'z', (0, DRUM_F), 14))
+    for k in range(18):   # the knurl: a flat every 20 degrees round the rim, across its width
+        a = 2 * math.pi * k / 18
+        g = box(-DW / 2 - 1 * mm, DW / 2 + 1 * mm, -0.55 * mm, 0.55 * mm, R - 0.5 * mm, R + 1 * mm); g.transform(Matrix.Translation((0, DRUM_F, SY)) @ Matrix.Rotation(a, 4, 'X')); cut(dr, g)
     smooth(dr); K.adopt(dr, 'optic', 'black')
+    # the four settings' marks on the drum's left face: a pip each, a ring of them round the axis at 90 degrees (the one at the rear is the one in use)
+    for k in range(4):
+        a = math.pi + k * math.pi / 2
+        o = K.obj(cyl(0.8 * mm, -DW / 2 - 0.5 * mm, -DW / 2, 'x', (DRUM_F + 6.0 * mm * math.cos(a), SY + 6.0 * mm * math.sin(a))), 'optic', 'steel'); smooth(o)
 
 # ===================================================================================== FRONT SIGHT
 def front_sight(post_f, base_f0, base_f1, slot, bottom, collar=None):
@@ -282,7 +300,7 @@ def front_sight(post_f, base_f0, base_f1, slot, bottom, collar=None):
     o = K.obj(cyl(1.6 * mm, -9.8 * mm, 9.8 * mm, 'x', ((base_f0 + base_f1) / 2, CT_Z - 4 * mm), 12), slot, 'steel'); smooth(o)
 
 # ===================================================================================== MP5 FRONT: HANDGUARD, BARREL, THREE LUGS
-def handguard_slim(slot='handguard'):
+def handguard_slim(slot='handguard', shell='polymer'):
     """The slim handguard: an oval polymer forend under the cocking tube (a channel along its top for it), a smooth ring at each end, the
     pebbled bands along its sides above and below a plain groove."""
     sec = rounded(0, (U(123.5) + U(192)) / 2, 17.5 * mm, (U(123.5) - U(192)) / 2, 7.0 * mm, 4)
@@ -293,12 +311,36 @@ def handguard_slim(slot='handguard'):
     for s in (-1, 1):
         for z1, z0 in bands: cut(hg, box(*xs(s * 16.9 * mm, s * 19 * mm), HG0 + 9 * mm, HG1 - 8 * mm, z0, z1))
         cut(hg, box(*xs(s * 17.1 * mm, s * 19 * mm), HG0 + 9 * mm, HG1 - 8 * mm, U(167), U(154)))         # the plain groove between them
-    bevel(hg, 1.2 * mm, 2, 30); smooth(hg); K.adopt(hg, slot, 'polymer')
+    bevel(hg, 1.2 * mm, 2, 30); smooth(hg); K.adopt(hg, slot, shell)
     for s in (-1, 1):
         for z1, z0 in bands:
             o = K.obj(box(*xs(s * 17.0 * mm, s * 17.4 * mm), HG0 + 9.3 * mm, HG1 - 8.3 * mm, z0 + 0.3 * mm, z1 - 0.3 * mm), slot, 'stipple')
     # under the front: the bottom band
     o = K.obj(box(-8 * mm, 8 * mm, HG0 + 9.3 * mm, HG1 - 8.3 * mm, U(192) - 0.3 * mm, U(192) + 0.2 * mm), slot, 'stipple')
+
+def handguard_trirail(slot='handguard', f0=None, f1=None):
+    """The clamp-on tri-rail forend (the railed MP5 handguard: a Picatinny rail under it and one each side): an aluminium shell the slim forend's size with the
+    channel for the cocking tube along its top, a clamp ring at each end with its pinch screws, the three rails on its bottom and flats. Its length is the slim's:
+    from the receiver's face to the front sight housing."""
+    f0, f1 = HG0 if f0 is None else f0, HG1 if f1 is None else f1
+    zb, zt = U(192), U(123.5)                                     # the shell's bottom and top
+    sec = rounded(0, (zb + zt) / 2, 17.5 * mm, (zt - zb) / 2, 6.0 * mm, 4)
+    hg = K.tmp(prism(sec, 'y', f0, f1))
+    cut(hg, cyl(CT_R + 0.6 * mm, f0 - 0.01, f1 + 0.01, 'y', (0, CT_Z), 20))
+    cut(hg, cyl(BR_R + 1.5 * mm, f1 - 6 * mm, f1 + 0.01, 'y', (0, 0), 20))
+    bevel(hg, 1.0 * mm, 2, 30); smooth(hg); K.adopt(hg, slot, 'black')
+    zc = (zb + zt) / 2
+    for fa, fb in ((f0, f0 + 9 * mm), (f1 - 9 * mm, f1)):         # the clamp rings, a little proud
+        ring = K.tmp(prism([(x * 1.0, z) for x, z in rounded(0, zc, 18.3 * mm, (zt - zb) / 2 + 0.8 * mm, 6.6 * mm, 4)], 'y', fa, fb))
+        cut(ring, cyl(CT_R + 0.6 * mm, fa - 0.01, fb + 0.01, 'y', (0, CT_Z), 20)); cut(ring, cyl(BR_R + 1.5 * mm, fa - 0.01, fb + 0.01, 'y', (0, 0), 20))
+        bevel(ring, 0.8 * mm, 2, 35); smooth(ring); K.adopt(ring, slot, 'black')
+        for s in (-1, 1):                                         # the pinch screw each side
+            o = K.tmp(cyl(2.6 * mm, *xs(s * 18.2 * mm, s * 20.2 * mm), 'x', ((fa + fb) / 2, zc - 9 * mm), 14)); cut(o, cyl(1.2 * mm, *xs(s * 19.6 * mm, s * 20.6 * mm), 'x', ((fa + fb) / 2, zc - 9 * mm), 6))
+            smooth(o); K.adopt(o, slot, 'steel')
+    r0, r1 = f0 + 12 * mm, f1 - 5 * mm
+    picatinny(K, r0, r1, zb, slot, 'black', axis='bottom')
+    picatinny(K, r0, r1, zc, slot, 'black', axis='right', x0=17.5 * mm - 0.6 * mm)
+    picatinny(K, r0, r1, zc, slot, 'black', axis='left', x0=-17.5 * mm + 0.6 * mm)
 
 def mp5_front():
     cocking_tube(FSH0 + 6 * mm)
@@ -497,7 +539,7 @@ info = {
     'grip': [0.058, -0.082, 0], 'support': [0.36 if SD else 0.31, -0.028, 0],
     'anim': {'handle': 'part_handle', 'mag': 'part_mag'},
     'magAt': [round(MAG_F, 4), round(MAG_Y, 4)],
-    'handle': {'f': round(HANDLE_F, 4), 'y': round(CT_Z, 4), 'x': round(-CT_R, 4), 'travel': HANDLE_TRAVEL, 'style': 'tube', 'recip': False, 'grab': grab},
+    'handle': {'f': round(HANDLE_F, 4), 'y': round(CT_Z, 4), 'x': round(-CT_R, 4), 'travel': HANDLE_TRAVEL, 'style': 'tube', 'recip': False, 'grab': grab, 'lock': round(HANDLE_LOCK, 4)},
     'port': [round((F(707) + F(775)) / 2, 4), round(U(129), 4), round(HW, 4)],
     'chamberAt': {'side': 'right', 'f': round(F(760), 4), 'y': round(U(129), 4), 'x': round(HW - 4.8 * mm, 4)},
     'recoilBarrel': 0,

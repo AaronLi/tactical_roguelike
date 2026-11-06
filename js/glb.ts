@@ -27,7 +27,7 @@ type SlotName = (typeof SLOTS)[keyof typeof SLOTS];
 /** The key of an animated sub-assembly: its node is named `part_<key>` and is listed under `info.anim.<key>`. */
 const PARTS = {
   mag: 'mag', slide: 'slide', bolt: 'bolt', ch: 'ch', handle: 'handle', pump: 'pump', lever: 'lever', cyl: 'cyl', brk: 'brk', barrel: 'barrel', cover: 'cover', magn: 'magn',
-  spin: 'spin', carry: 'carry', dial: 'dial', bipod: 'bipod', quarrel: 'quarrel', quarrelHead: 'quarrelHead', quarrelNock: 'quarrelNock', stringCocked: 'stringCocked', stringSlack: 'stringSlack',
+  spin: 'spin', carry: 'carry', dial: 'dial', catch: 'catch', bipod: 'bipod', quarrel: 'quarrel', quarrelHead: 'quarrelHead', quarrelNock: 'quarrelNock', stringCocked: 'stringCocked', stringSlack: 'stringSlack',
 } as const;
 type PartKey = (typeof PARTS)[keyof typeof PARTS];
 
@@ -69,7 +69,7 @@ type ChamberAt =
   | { side: 'face'; f: number; heads: Vec2[]; r: number; bore?: boolean };
 
 /** A cocking handle / operating lever. */
-interface HandleInfo { f: number; y: number; x: number; travel: number; grab?: Vec3; recip?: boolean; style?: string; sz?: number; stem?: number }
+interface HandleInfo { f: number; y: number; x: number; travel: number; grab?: Vec3; recip?: boolean; style?: string; sz?: number; stem?: number; lock?: number }
 
 /** What `extras.info` on the root node says about the gun. Fields marked required must be present (and non-null); the others may be absent or null. */
 interface GunModelInfo {
@@ -115,6 +115,7 @@ const HANDLE_PROPS: Record<string, Field> = {
   recip: F('True if it reciprocates with the bolt (an AK, a Thompson: it moves with every shot).', { t: 'bool' }, true),
   style: F('Shape of the handle (free text, e.g. "fold", "tube", "pair", "top").', { t: 'str' }, true),
   sz: num('Size of the handle, metres (free, per style).', true), stem: num('Length of the handle stem, metres (free, per style).', true),
+  lock: num('A handle that locks the bolt open by turning about its own pivot (the HK slap handle: part_handle\'s origin is on the tube\'s axis): how far it turns up from rest into the notch, radians, positive turning the left side up. Its reload is the slap: pulled back, turned up into the notch, the magazine changed, slapped down.', true, { min: 0.05, max: 1.5 }),
 };
 
 /**
@@ -145,6 +146,7 @@ const CONTRACT_CORE = {
   parts: {
     mag: { doc: 'The magazine: drops out and swaps on a reload.', pairedWith: 'magAt' }, slide: { doc: 'A pistol slide: cycles with each shot.', pairedWith: 'slide' },
     bolt: { doc: 'An exposed bolt / carrier.', pairedWith: null }, ch: { doc: 'A charging handle.', pairedWith: null },
+    catch: { doc: 'The bolt catch (an AR\'s paddle on the left of the lower, behind the magazine well): its origin is its pivot pin, and it turns about x (up to 0.14 rad, the upper arm tipping back) when the bolt is held open on an empty magazine; the hand presses it to send the bolt home (js/vmanim.ts).', pairedWith: null },
     handle: { doc: 'A cocking handle that reciprocates or is worked by the hand.', pairedWith: 'handle' }, pump: { doc: 'A pump-action forend.', pairedWith: null },
     lever: { doc: 'A lever-action lever.', pairedWith: null }, cyl: { doc: 'A revolver cylinder: it rotates (z) by 1/n per shot.', pairedWith: null },
     brk: { doc: 'A break-action barrel group that tips open on its hinge.', pairedWith: null }, barrel: { doc: 'A long-recoil barrel (runs back by info.recoilBarrel).', pairedWith: null },
@@ -787,7 +789,8 @@ const RETICLES = ['dot', 'dotG', 'dotP', 'cdot', 'holo'], SCOPE_RETICLES = ['cro
 const isPt = (v: any) => Array.isArray(v) && v.length === 3 && v.every(isNum);
 /** model.json of a piece of authored FURNITURE (a stock, grip, muzzle device, handguard): its anchors, its own data ("part") and what it replaces (names or matches). */
 function validateFurnitureConfig(cfg: any, spec: NonNullable<typeof AUTHORED_PART_SLOTS[string]>, E: (m: string) => void) {
-  for (const k of Object.keys(cfg)) if (!['source', 'kind', 'slot', 'frame', 'anchors', 'part', 'replaces'].includes(k)) E(`unknown field "${k}"${k === 'optic' ? ' (a ' + cfg.slot + ' has no sight data)' : ''}`);
+  for (const k of Object.keys(cfg)) if (!['source', 'kind', 'slot', 'frame', 'anchors', 'part', 'replaces', 'gun'].includes(k)) E(`unknown field "${k}"${k === 'optic' ? ' (a ' + cfg.slot + ' has no sight data)' : ''}`);
+  if (cfg.gun !== undefined && (typeof cfg.gun !== 'string' || !/^[a-z][a-z0-9_]*$/.test(cfg.gun))) E(`"gun": expected a platform id (lower-case letters, digits and underscores), got ${JSON.stringify(cfg.gun)}`);
   const a = cfg.anchors, p = cfg.part, rep = cfg.replaces;
   if (!isObj(a)) E(`"anchors" is missing: { ${spec.anchors!.join(', ')} } as [forward, up, right] metres from the origin`);
   else {

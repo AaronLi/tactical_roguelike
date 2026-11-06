@@ -1,0 +1,35 @@
+{
+  "source": "authored",
+  "kind": "part",
+  "slot": "handguard",
+  "frame": "handguard-mount",
+  "anchors": {
+    "support": [
+      0.055,
+      -0.028,
+      0
+    ]
+  },
+  "part": {
+    "t": "rail",
+    "len": 0.1216,
+    "rails": {
+      "bottom": [
+        0.012,
+        0.1166
+      ],
+      "left": [
+        0.012,
+        0.1166
+      ],
+      "right": [
+        0.012,
+        0.1166
+      ]
+    }
+  },
+  "gun": "mp5",
+  "replaces": [
+    "Northmark railed front (under and each side)"
+  ]
+}

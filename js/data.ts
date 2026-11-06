@@ -325,7 +325,7 @@ G.fullReload = G_fullReload;
 // Bolt hold-open: the action locks back on the last round, so a reload from empty is a magazine change and a
 // thumb on the bolt catch (or the slide stop), not a full rack. Every pistol with a slide, the AR-15 family and the
 // rifles and SMGs built the same way; not the AK family, the MP5's roller bolt, the open-bolt guns or a bolt-action.
-const G_BOLT_HOLD = new Set(['scar', 'scarl', 'g36', 'aug', 'aug9', 'tavor', 'fal', 'm14', 'mk14', 'sr25', 'barrett', 'gm6', 'mpx', 'mp7', 'vector', 'skorp', 'svd', 'ar9', 'm27', 'hk416', 'br3', 'qbz192']);
+const G_BOLT_HOLD = new Set(['scar', 'scarl', 'g36', 'aug', 'aug9', 'tavor', 'fal', 'm14', 'mk14', 'sr25', 'barrett', 'gm6', 'mpx', 'mp7', 'vector', 'skorp', 'svd', 'ar9', 'm27', 'hk416', 'br3', 'qbz192', 'm4', 'mcx']); // (m4: the Mk18, authored in Blender, so no longer rcv 'ar' below; mcx: SIG's own lower, which locks back too)
 G.BOLT_HOLD = G_BOLT_HOLD;
 const G_boltHold = (def: Record<string, any>) => {
   const P = def && G.Gunsmith && G.Gunsmith.PLATFORMS[def.id];
@@ -908,8 +908,8 @@ const G_ENEMY_GEAR = {
   },
   // chance of a light / a laser on their gun, by tier (the Kingpin has both), and
   // the levels they first turn up on, whatever the tier: none in the first half of an act, and lights before lasers.
-  // nightLight: on a night level (js/level.ts nightify) a light's what they'd reach for: that chance, on any level
-  tac: { light: [0, 0.1, 0.2, 0.3], laser: [0, 0.1, 0.35, 0.6], lightFrom: 5, laserFrom: 7, nightLight: [0.3, 0.4, 0.5, 0.6] },
+  // On a night level (js/level.ts nightify) no light at all (js/server.ts equip): they're in the dark as you are.
+  tac: { light: [0, 0.1, 0.2, 0.3], laser: [0, 0.1, 0.35, 0.6], lightFrom: 5, laserFrom: 7 },
   // the Enforcer is always armoured, more heavily as tiers go up; the Kingpin wears the best
   fixed: {
     heavy: { vest: ['steel', 'steel', 'ceramic', 'assault'], helmet: ['ach', 'ach', 'riflehelm', 'riflehelm'], face: [0, 0, 'f.mandible', 'f.shield'], ex: [[], ['g.flap'], ['s.axil', 'g.flap', 'l.thigh'], ['l.shin']] },

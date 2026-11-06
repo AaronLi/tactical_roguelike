@@ -855,9 +855,24 @@ const G_Rig = (() => {
       // seating it; in a magazine check: the magazine out and up in front of the chest
       const well = rig.gun.localToWorld(new T.Vector3(gi.grip[2], gi.grip[1] - 0.07, -(gi.grip[0] + 0.09)));
       let sp = supp;
+      // (an MP5's slap reload, js/vmanim.ts slapState: the hand on the handle as it is drawn back and turned up, the magazine change (a run through the magazine's own path, from SLAP.mag0
+      // to SLAP.mag1), then the slap that sends it home; the handle's own node moves with it)
+      const hd = rig.gun.userData.handle as THREE.Object3D | undefined, hi = gi && gi.handle && gi.handle.lock ? gi.handle : null;
+      let ru = rl, sh: { on: THREE.Vector3; k: number } | null = null;
+      if (hd && hi) {
+        const SL = G.VMAnim.SLAP, st = rl >= 0 ? G.VMAnim.slapState(rl) : { back: 0, lock: 0, hand: 0 }, home = rig.gun.userData.handleHome as THREE.Vector3;
+        hd.position.copy(home); hd.position.z += st.back * hi.travel; hd.rotation.z = -hi.lock! * st.lock;
+        if (rl >= 0) {
+          ru = U.clamp((rl - SL.mag0) / (SL.mag1 - SL.mag0), 0, 1);
+          const g0 = hi.grab || [hi.f, hi.y, hi.x], c = hi.y, dx = g0[2], dy = g0[1] - c, a = -hi.lock! * st.lock; // (the grab point turned about the tube's axis, as js/vmanim.ts slapGrab)
+          const onH = rig.gun.localToWorld(new T.Vector3(dx * Math.cos(a) - dy * Math.sin(a), dy * Math.cos(a) + dx * Math.sin(a) + c, -g0[0] + st.back * hi.travel));
+          sh = { on: onH, k: st.hand };
+        }
+      }
       if (rl >= 0) {
         const pouch = rig.hips.localToWorld(new T.Vector3(-0.2, 0.06, -0.12)), L2 = (a: THREE.Vector3, b: THREE.Vector3, u: number) => a.clone().lerp(b, U.smooth(0, 1, u));
-        sp = rl < 0.15 ? L2(supp, well, rl / 0.15) : rl < 0.35 ? L2(well, pouch, (rl - 0.15) / 0.2) : rl < 0.6 ? L2(pouch, well, (rl - 0.35) / 0.25) : rl < 0.82 ? well : L2(well, supp, (rl - 0.82) / 0.18);
+        sp = ru < 0.15 ? L2(supp, well, ru / 0.15) : ru < 0.35 ? L2(well, pouch, (ru - 0.15) / 0.2) : ru < 0.6 ? L2(pouch, well, (ru - 0.35) / 0.25) : ru < 0.82 ? well : L2(well, supp, (ru - 0.82) / 0.18);
+        if (sh) sp = L2(sp, sh.on, sh.k);
       } else if (p.magChk != null && p.magChk >= 0) sp = well.clone().lerp(rig.chest.localToWorld(new T.Vector3(-0.04, 0.32, -0.4)), U.smooth(0.25, 1, p.magChk));
       // the elbows: out and down beside you standing; prone, planted on the ground ahead of the shoulders
       const elbow = (side: any, stand: any) => { const q = rig.chest.localToWorld(stand); if (rig.proneS! > 0.01) q.lerp(rig.root.localToWorld(new T.Vector3(side * PRONE.elbowX, PRONE.elbowY, PRONE.elbowZ)), rig.proneS!); return q; };
@@ -867,13 +882,16 @@ const G_Rig = (() => {
       // checked), otherwise on the gun
       const mg = rig.gun.userData.mag;
       if (mg) {
-        const inHand = (rl >= 0.15 && rl < 0.8) || (p.magChk != null && p.magChk >= 0.12);
+        const inHand = (ru >= 0.15 && ru < 0.8) || (p.magChk != null && p.magChk >= 0.12);
         if (inHand) {
           const hp = rig.armL.lo.localToWorld(new T.Vector3(0, -FARM - 0.06, -0.01)); // (in the palm)
           mg.position.copy(rig.gun.worldToLocal(hp));
         } else mg.position.copy(rig.gun.userData.magHome);
         mg.visible = !p.nomag || inHand; // (a gun with its magazine out has none on it)
       }
+      // the bolt catch (part_catch, js/vmanim.ts CATCH_LOCK): up while the gun is held open on an empty magazine, down once it's loaded (the thumb's press is the last of the reload)
+      const bcg = rig.gun.userData.catch as THREE.Object3D | undefined;
+      if (bcg) bcg.rotation.x = (p.loaded != null && !p.loaded ? 1 : 0) * 0.14;
       // the bipod's legs: down when they've put it down (a quarter of a second either way)
       if (rig.gun.userData.bipod) { rig.bipodK = U.clamp((rig.bipodK || 0) + (p.bipod ? 1 : -1) * dt * 4, 0, 1); G.GunRig.bipodPose(rig.gun.userData.bipod, rig.bipodK); }
     } else {

@@ -31,7 +31,7 @@ const G_VMAnim = (() => {
   type Rig = GunRig; // (one gun in the hands: its holder, its parts, its anchors, its magazine's check data: js/gunrig.ts)
   interface MagState { mode: VmMagMode; at?: number; d?: number; k?: number; q?: THREE.Quaternion }
   // one frame of a clip: the gun's offset and what each part and hand is doing (null: left alone)
-  interface Pose { gun: number[]; L: V3 | null; R: V3 | null; mag: MagState; ch: number; handle: number | null; open: number | null; slide: number | null; cyl: number; brk: number; cover: number; pump: number | null; lever: number | null; hinge: number | null; bolt: number[] | null; prop: { kind: VmPropKind; rx?: number; dx?: number; by?: V3; n?: number; seat?: number; up?: number; at?: V3[]; home?: V3 } | null; chk?: number; dropCase?: boolean; fed?: number; pulled?: boolean }
+  interface Pose { gun: number[]; L: V3 | null; R: V3 | null; mag: MagState; ch: number; catch?: number | null; handle: number | null; open: number | null; slide: number | null; cyl: number; brk: number; cover: number; pump: number | null; lever: number | null; hinge: number | null; lock: number; bolt: number[] | null; prop: { kind: VmPropKind; rx?: number; dx?: number; by?: V3; n?: number; seat?: number; up?: number; at?: V3[]; home?: V3 } | null; chk?: number; dropCase?: boolean; fed?: number; pulled?: boolean }
   interface Arm { g: THREE.Group; sleeve: THREE.Mesh; glove: THREE.Group; fist?: THREE.Group }
   interface ChvHeads { heads: THREE.Group[]; shot: boolean; cyl?: boolean }
   interface ChvPort { g: THREE.Group; round: THREE.Group; face: THREE.Mesh; shot: boolean; real: boolean; bolt: THREE.Mesh | null; win: number; f: number }
@@ -263,16 +263,59 @@ const G_VMAnim = (() => {
   }
   // Sending the action home from where it locked open: the left thumb on the slide stop (a pistol) or the palm
   // on the bolt catch over the magazine well (a rifle); the slide (or bolt) slams forward and the gun jumps.
+  const CATCH_LOCK = 0.14, CATCH_HAND = [-0.012, 0.012, -0.03]; // (the bolt catch's turn about its pin with the bolt held open, radians; where the hand rests on it, from the pin: forward, up, right)
   function release(c: number, h: Rig, kind: VmAction, pose: Pose, from: V3 | null) {
     const A = h.A;
-    const at = kind === 'pistol' ? off(A.G, 0.035, 0.045, -0.02) : off(A.W || A.WB || A.S, 0.01, 0.045, -0.03);
+    // (a rifle with a bolt catch of its own, part_catch: the hand takes the catch's upper paddle, where the model has it; any other, over the well)
+    const at = kind === 'pistol' ? off(A.G, 0.035, 0.045, -0.02) : A.catchHome ? off(A.catchHome, CATCH_HAND[0], CATCH_HAND[1], CATCH_HAND[2]) : off(A.W || A.WB || A.S, 0.01, 0.045, -0.03);
     pose.L = path(c, [[0, from || A.S], [0.28, at], [0.4, off(at, 0, -0.008)], [0.68, A.S], [1, A.S]]);
     const k = 1 - S(0.34, 0.4, c);
+    pose.catch = 1 - S(0.31, 0.37, c); // (the paddle pressed in just ahead of the bolt: it drops, the carrier runs home)
     if (kind === 'pistol') pose.slide = k;
     pose.open = k * actTravel(h, kind);
     const j = c > 0.36 && c < 0.56 ? Math.sin(Math.PI * (c - 0.36) / 0.2) : 0;
     pose.gun[2] += 0.012 * j; pose.gun[3] += 0.03 * j;
     const r = S(0, 0.3, c) * (1 - S(0.7, 1, c)); pose.gun[5] -= 0.25 * r; pose.gun[3] += 0.12 * r; // (turned a little to get at it)
+  }
+
+  // The HK slap reload (a gun whose cocking handle locks the bolt open by turning up into a notch, info.handle.lock: the MP5 and MP5SD), the same for everyone who
+  // is shown it (js/rig.ts too). t: 0..1 through the whole reload. The left hand takes the handle and draws it back the length of its slot (back 0..1), turns it up
+  // into the notch (lock 0..1: the bolt is held open); the magazine change runs from SLAP.mag0 to SLAP.mag1 (js/player.ts times its sounds to them); then the heel
+  // of the hand slaps the handle down out of the notch (lock back to 0) and the bolt runs home (back to 0), chambering a round.
+  const SLAP = { grab: 0.053, pull: 0.143, lock: 0.196, mag0: 0.208, mag1: 0.774, slap: 0.836, home: 0.87, rest: 0.966 }; // (an MP5 keeping its magazine, 2.65 s: the draw back 0.24 s, the turn into the notch 0.14 s, the change 1.5 s)
+  const slapState = (t: number) => ({
+    back: S(SLAP.grab, SLAP.pull, t) * (1 - S(SLAP.slap - 0.005, SLAP.home, t)),
+    lock: S(SLAP.pull, SLAP.lock, t) * (1 - S(SLAP.slap - 0.02, SLAP.slap + 0.005, t)),
+    hand: S(0, SLAP.grab, t) * (1 - S(SLAP.lock, SLAP.mag0 + 0.06, t)) + S(SLAP.mag1 - 0.055, SLAP.mag1 + 0.02, t) * (1 - S(SLAP.home, SLAP.rest, t)), // (how much of the hand is on the handle: straight there from the seated magazine, slapM)
+  });
+  const isSlap = (def: Def) => { const i = G.Models.infoOf(def); return !!(i && i.handle && i.handle.lock > 0 && !def.akimbo && kinds(def).reload === 'mag'); };
+  // the grab point on the handle when it is back (0..1 of its slot) and turned up (0..1 of its lock): the point turned about the tube's axis (its x is 0, its height info.handle.y)
+  function slapGrab(h: Rig, back: number, lock: number) {
+    const A = h.A, c = h.info.handle!.y, dx = A.H!.x, dy = A.H!.y - c, a = -h.lock * lock;
+    return new T.Vector3(dx * Math.cos(a) - dy * Math.sin(a), dy * Math.cos(a) + dx * Math.sin(a) + c, A.H!.z + h.travel * back);
+  }
+  // the magazine change runs to the moment the new one's pushed home (SEAT: its own clip's fraction there, by how the old one's
+  // stowed), just before the hand leaves for the handle; what's left of it (the gun levelled, the hand back to the handguard)
+  // plays after the slap, so the hand goes straight from the magazine to the handle with no rest on the handguard between
+  const slapSeat = (how: string) => (how === 'retain' || how === 'pouch' ? 0.8 : 0.72); // (just after the magazine's seated: its clip's little lift for it, magClip's "seat it", done, so the gun doesn't drop when the clip goes on after the slap)
+  const slapM = (t: number, how: string) => {
+    const seat = slapSeat(how), end = SLAP.mag1 - 0.05;
+    return t < end ? seat * G.U.clamp((t - SLAP.mag0) / (end - SLAP.mag0), 0, 1) : seat + (1 - seat) * S(SLAP.slap, SLAP.rest, t);
+  };
+  function slapClip(t: number, h: Rig, how: string) {
+    const A = h.A, st = slapState(t), m = slapM(t, how);
+    const pose = magClip(m, h, false, how); // (the magazine change alone, between the lock and the slap; its tilt and its hand)
+    pose.handle = st.back; pose.lock = st.lock; pose.open = h.travel * st.back; // (the bolt: off the chamber while the handle is back)
+    // the left hand: on the handle, wherever it is, while it works it; on the magazine in between
+    const onH = slapGrab(h, st.back, st.lock);
+    pose.L = lerpV(pose.L || A.S, onH, st.hand);
+    // the gun turned to show its left side to the hand on the handle, as for any left-hand handle
+    const r = S(0.02, 0.09, t) * (1 - S(0.0, 0.14, m)) * (t < SLAP.mag1 - 0.05 ? 1 : 0) + S(SLAP.mag1 - 0.04, SLAP.mag1, t) * (1 - S(SLAP.home, SLAP.rest, t)); // (the turn to the handle hands over to the magazine's own tilt as it comes in, magTilt, not before it: no sag between)
+    pose.gun[5] -= 0.3 * r; pose.gun[3] += 0.2 * r; pose.gun[0] -= 0.04 * r; pose.gun[1] += 0.02 * r;
+    if (m > 0.5) tiltPose(pose, (1 - magTilt(m)) * (1 - S(SLAP.slap, SLAP.rest, t))); // (the magazine's tilt held whole from the seat to the slap, as its clip starts to level the gun there: no dip before the slap; both settle after it)
+    const j = t > SLAP.slap - 0.01 && t < SLAP.slap + 0.06 ? Math.sin(Math.PI * (t - SLAP.slap + 0.01) / 0.07) : 0; // (the slap lands: the gun jumps)
+    pose.gun[2] += 0.014 * j; pose.gun[3] += 0.035 * j;
+    return pose;
   }
 
   // the magazine change's turn of the gun at m through its motions: the well lifted into view, pulled toward the
@@ -580,7 +623,7 @@ const G_VMAnim = (() => {
     const a: Vma | undefined = vm && vm.userData.vma;
     return !!(a && a.k.reload === 'mag' && !a.def.akimbo && a.hs[0].an.mag && a.hs[0].A.WB && !a.hs[0].info.magTop);
   }
-  const base = (): Pose => ({ gun: [0, 0, 0, 0, 0, 0], L: null, R: null, mag: { mode: 'in' }, ch: 0, handle: null, open: null, slide: null, cyl: 0, brk: 0, cover: 0, pump: null, lever: null, hinge: null, bolt: null, prop: null });
+  const base = (): Pose => ({ gun: [0, 0, 0, 0, 0, 0], L: null, R: null, mag: { mode: 'in' }, ch: 0, handle: null, open: null, slide: null, cyl: 0, brk: 0, cover: 0, pump: null, lever: null, hinge: null, lock: 0, bolt: null, prop: null });
 
   const _m = new T.Matrix4(), _inv = new T.Matrix4(), _X = new T.Vector3(1, 0, 0);
   // ------------------------------------------------------------------ per frame
@@ -606,6 +649,7 @@ const G_VMAnim = (() => {
       else if (reload === 'belt') pose = beltClip(t, h);
       else if (reload === 'hinge') pose = hingeClip(t, h);
       else if (reload === 'akimbo') { pose = base(); const tilt = S(0.02, 0.15, t) * (1 - S(0.75, 0.92, t)); pose.gun[3] += 0.4 * tilt; pose.gun[1] -= 0.04 * tilt; pose.mag = t < 0.08 ? { mode: 'in' } : t < 0.4 ? { mode: 'drop', at: 0.08 } : t < 0.62 ? { mode: 'gone' } : { mode: 'rise', k: S(0.62, 0.72, t) }; }
+      else if (isSlap(a.def)) pose = slapClip(t, h, pl.reloadMode);
       else pose = magClip(t, h, !!(h.info as { pistol?: boolean }).pistol || action === 'pistol', pl.reloadMode, pl.reloadSeat);
     } else if (pl.act) { // the action, worked by hand (js/player.ts workAction): on its own, or straight on from a magazine just seated
       const ac = pl.act, c = G.U.clamp(ac.t, 0, 1), kind = actKind(a, h), from = ac.seat && h.A.WB ? off(h.A.WB, 0, 0.012) : null;
@@ -668,6 +712,10 @@ const G_VMAnim = (() => {
       }
       // handles and slides
       if (an.ch && A.chHome) an.ch.position.copy(A.chHome).z += (pose ? pose.ch : 0) * CH;
+      if (an.catch && A.catchHome) { // the bolt catch: up (its upper arm tipped back) with the bolt held open on an empty magazine, and through a reload from empty until the thumb sends the bolt home
+        const held = pose && pose.catch != null ? pose.catch : (pl as unknown as { reloading: boolean; reloadAct: string | null }).reloading && (pl as unknown as { reloadAct: string | null }).reloadAct === 'release' ? 1 : !G.loaded(w) && G.boltHold(a.def) ? 1 : 0;
+        an.catch.position.copy(A.catchHome); an.catch.rotation.x = held * CATCH_LOCK;
+      }
       if (an.handle && A.handleHome) {
         // at rest: home, or (an open bolt with a round to fire) back; a riding handle jumps with each shot: a closed
         // bolt's back and home, an open bolt's slams home to fire and comes back to be caught
@@ -676,6 +724,7 @@ const G_VMAnim = (() => {
         if (pose && pose.handle != null) k = pose.handle;
         else if (h.recip && ts < CYC) k = h.open ? (loaded ? Math.min(1, ts / (CYC * 0.5)) : 0) : Math.sin(Math.PI * ts / CYC);
         an.handle.position.copy(A.handleHome).z += k * h.travel;
+        if (h.lock) an.handle.rotation.z = -h.lock * (pose ? pose.lock : 0); // (a handle that turns up into a notch: about the tube's axis, the part's origin)
       }
       // a long-recoil barrel (the GM6's): slammed back the whole stroke with the shot, the bolt locked to it; a moment there while
       // the bolt unlocks and is held, then it runs home ahead of the bolt (eased in at the end, as the spring's spent)
@@ -888,7 +937,7 @@ const G_VMAnim = (() => {
     arm.glove.quaternion.copy(_q).multiply(RX);
   }
 
-  return { prepare, sample, apply, kinds, canMagCheck, actEvents, INSPECT_HOLD };
+  return { prepare, sample, apply, kinds, canMagCheck, actEvents, INSPECT_HOLD, SLAP, slapState, slapM, isSlap };
 })();
 G.VMAnim = G_VMAnim;
 

@@ -770,7 +770,7 @@ const G_Gunsmith = (() => {
   P('br3', 'rifle', { L: 0.23, rm: 'tan', fm: 'tan' }, { barrel: { len: 0.37 }, thread: 'r762', muzzle: 'comp', handguard: ['ar', { t: 'mlok', len: 0.3, m: 'tan' }], stock: ['tube', 'crane'], grip: ['ar', 'ar'], mag: { t: 'curved', len: 0.19, d: 0.064, c: 0.03, well: 'tan' }, optic: ['pic', { optic: 'holo' }], charging: 'ar' });
   P('scar', 'rifle', SCAR_SPEC(), { barrel: { len: 0.22, r: 0.0075 }, thread: 'r762', muzzle: 'flash', handguard: ['ar', { t: 'rail', len: 0.24, m: 'tan' }], stock: ['heavy', 'fixed'], grip: ['ar', 'ar'], mag: { t: 'straight', len: 0.15, d: 0.07, w: 0.026, well: 'tan' }, optic: ['pic', { optic: 'holo' }] });
   P('tavor', 'rifle', { rcv: 'bullpup', siderails: true, L: 0.42, fm: 'od' }, { barrel: { len: 0.24 }, thread: 'r556', muzzle: 'flash', grip: ['ar', 'ar'], mag: { t: 'curved', len: 0.16, d: 0.06, c: 0.02 }, optic: ['pic', { optic: 'reddot' }] });
-  P('hk416', 'rifle', { L: 0.22 }, { barrel: { len: 0.35 }, thread: 'r556', muzzle: 'flash', handguard: ['ar', { t: 'rail', len: 0.3 }], fg: 'vertical', stock: ['tube', 'crane'], grip: ['ar', 'ar'], mag: { t: 'curved', len: 0.19, d: 0.064, c: 0.03, well: 'black', m: 'tan' }, optic: ['pic', { optic: 'holo' }], charging: 'ar' });
+  P('hk416', 'rifle', { L: 0.22, ambi: true }, { barrel: { len: 0.35 }, thread: 'r556', muzzle: 'flash', handguard: ['ar', { t: 'rail', len: 0.3 }], fg: 'vertical', stock: ['tube', 'crane'], grip: ['ar', 'ar'], mag: { t: 'curved', len: 0.19, d: 0.064, c: 0.03, well: 'black', m: 'tan' }, optic: ['pic', { optic: 'holo' }], charging: 'ar' });
   // the Steyr AUG, traced from a photo (js/gunmodels.ts rifle(), rcv 'aug'): one shell from butt to nose, the guard round the whole
   // hand, the integral optic in its handle (the A3's rail for any other sight)
   P('aug', 'rifle', { rcv: 'aug', siderails: true, mag: { f: 0.224, y: -0.074 }, L: 0.539, rm: 'black', fm: 'od', grip: 0.339, support: 0.542, optF: 0.42, cheek: 0.19, vfgM: 'od', cock: { f: 0.493, y: 0.0114, x: -0.024, travel: 0.09, recip: true, style: 'fold' } }, { barrel: { len: 0.21, m: 'black' }, thread: 'r556', muzzle: 'flash', grip: ['ar', 'ar'], mag: { t: 'straight', f: 0.224, y: -0.074, len: 0.16, d: 0.06, rake: 0.043, m: 'clear' }, optic: ['pic', { optic: 'augscope' }] });
@@ -824,7 +824,7 @@ const G_Gunsmith = (() => {
   P('aks74u', 'rifle', { rcv: 'aksu', hgMax: 0.134, L: 0.264, rm: 'black', fm: 'woodRed', optF: 0.17, grip: 0.03, mag: { f: 0.191, y: -0.028 }, magFit: { len: 0.79, c: 1.0, d: 0.066 } }, { barrel: { len: 0.162 }, thread: 'rak', muzzle: 'cutts', handguard: ['ak', { t: 'wood', len: 0.134, m: 'woodRed' }], stock: ['ak', 'skeleton'], grip: ['ak', 'wood'], mag: { t: 'curved', len: 0.21, d: 0.068, c: 0.06, w: 0.026 }, optic: ['pic', { optic: 'notch' }] });
   P('rpk', 'rifle', { rcv: 'ak', L: 0.3, rm: 'blued', fm: 'wood', bipod: 0.46 }, { barrel: { len: 0.5, taper: 0.9 }, thread: 'rak', muzzle: 'crown', handguard: ['ak', { t: 'wood', len: 0.2 }], stock: ['ak', 'akwood'], grip: ['ak', 'wood'], mag: { t: 'curved', len: 0.23, d: 0.072, c: 0.08, w: 0.028 }, optic: ['pic', { optic: 'notch' }] });
   P('scarl', 'rifle', SCAR_SPEC(), { barrel: { len: 0.185, r: 0.007 }, thread: 'r556', muzzle: 'flash', handguard: ['ar', { t: 'rail', len: 0.22, m: 'tan' }], stock: ['heavy', 'fixed'], grip: ['ar', 'ar'], mag: { t: 'curved', len: 0.19, d: 0.064, c: 0.03 }, optic: ['pic', { optic: 'irons' }] });
-  P('m27', 'rifle', { L: 0.22 }, { barrel: { len: 0.4 }, thread: 'r556', muzzle: 'flash', handguard: ['ar', { t: 'rail', len: 0.34 }], fg: 'vertical', stock: ['tube', 'crane'], grip: ['ar', 'ar'], mag: { t: 'curved', len: 0.19, d: 0.064, c: 0.03 }, optic: ['pic', { optic: 'irons' }], charging: 'ar' });
+  P('m27', 'rifle', { L: 0.22, ambi: true }, { barrel: { len: 0.4 }, thread: 'r556', muzzle: 'flash', handguard: ['ar', { t: 'rail', len: 0.34 }], fg: 'vertical', stock: ['tube', 'crane'], grip: ['ar', 'ar'], mag: { t: 'curved', len: 0.19, d: 0.064, c: 0.03 }, optic: ['pic', { optic: 'irons' }], charging: 'ar' });
   P('m14', 'rifle', { rcv: 'round', L: 0.25, rm: 'park', fm: 'wood', gripT: 'none', optF: 0.14 }, { barrel: { len: 0.45 }, thread: 'r762', muzzle: 'flash', handguard: ['classic', { t: 'stockfore', len: 0.4 }], stock: ['classic', 'wood'], mag: { t: 'straight', len: 0.15, d: 0.07, w: 0.026 }, optic: ['pic', { optic: 'irons' }] });
   P('sr25', 'rifle', { rcv: 'authored', authored: 'sr25', L: 0.2337, hgMax: 0.4844, optF: 0.15, mag: { f: 0.1857, y: -0.0533 } }, { /* (the AR-10 pattern modelled in Blender: models/sr25, built by models/ar_kit.py; L, hgMax and mag from its anchors. Its 20" barrel is 0.50 m ahead of the upper, the model's; it comes with the six-position stock, the model's, the Kestrel CS-4) */ barrel: { len: 0.5 }, thread: 'r762', muzzle: 'flash', handguard: ['ar', { t: 'mlok', len: 0.34 }], stock: ['tube', 'm4'], grip: ['ar', 'ar'], mag: { t: 'straight', len: 0.15, d: 0.07, w: 0.026 }, optic: ['pic', { optic: 'scope', scopeLen: 0.3 }], charging: 'ar' });
   P('mpx', 'rifle', { rcv: 'mpx', L: 0.2, optF: 0.1, railExt: 0.06 }, { barrel: { len: 0.16 }, thread: 'r9', muzzle: 'flash', handguard: ['ar', { t: 'mlok', len: 0.17 }], stock: ['tube', 'pdw'], grip: ['ar', 'ar'], mag: { t: 'straight', len: 0.15, d: 0.034, w: 0.022, rake: 0.008 }, optic: ['pic', { optic: 'irons' }], charging: 'ar' });
@@ -1197,6 +1197,7 @@ const G_Gunsmith = (() => {
       .sort((a, b) => slotRank(a[0]) - slotRank(b[0]));
     for (const [sl, pid] of fitted) for (let [k, v] of Object.entries(Object.assign(AP_KEY[PARTS[pid].slot] ? { [AP_KEY[PARTS[pid].slot]]: null } : {}, PARTS[pid].len != null ? lenModel(def.id, PARTS[pid]) : PARTS[pid].model || {}))) { // (a stock, grip, muzzle or handguard says whether it is an authored model, so one on an adapter is the one drawn)
       if (k === 'tac' && sl === 'tacL') k = 'tacL'; // (the left rail's)
+      if (k === 'apHgBy') { if (v[def.id]) spec.apHg = v[def.id]; continue; } // (a handguard entry shared between guns that has a model of its own on this one: models/parts/handguard, model.json "gun")
       if (k === 'pumpPatch') { spec.pump = Object.assign({}, spec.pump || {}, v); continue; }
       if (v && typeof v === 'object' && !Array.isArray(v) && spec[k] && typeof spec[k] === 'object') spec[k] = Object.assign({}, spec[k], v);
       else spec[k] = v;
@@ -1526,6 +1527,8 @@ const G_Gunsmith = (() => {
     {"apart":"grip/brightline_a2","names":["Brightline A2 pistol grip (matches the furniture)"]},
     {"apart":"grip/paragon_pg23","names":["Paragon PG-23 ergonomic grip"]},
     {"apart":"handguard/ironvale_ir12","names":["Ironvale IR-12 quad rail"],"len":0.3},
+    {"apart":"handguard/mp5_slim","names":["Halcyon 3.3\" slim forend (FDE)"],"len":0.1216,"gun":"mp5"},
+    {"apart":"handguard/mp5_trirail","names":["Northmark railed front (under and each side)"],"len":0.1216,"gun":"mp5"},
     {"apart":"handguard/quad_rail_240","names":["Brightline 9.4\" quad rail handguard","Brightline 9.4\" quad rail handguard (FDE)"],"len":0.2395},
     {"apart":"muzzle/ironvale_a2_556","names":["Ironvale A2 5.56 birdcage"]},
     {"apart":"optic/brightline_pip","names":["Brightline Pip red dot"]},
@@ -1640,7 +1643,8 @@ const G_Gunsmith = (() => {
         if (!ps.length) throw new Error(`models/parts/${r.apart}/model.json replaces ${JSON.stringify(n)}, which ${typeof n === 'string' ? 'is not in the catalogue' : 'matches no entry'}`);
         for (const p of ps) {
           if (!p.model || p.slot !== slot) throw new Error(`models/parts/${r.apart}/model.json replaces "${p.name}", which is not a ${slot}`);
-          if (r.len != null && !(p.model.hg && Math.abs((p.model.hg.len || 0) - r.len) <= 0.0015)) throw new Error(`models/parts/${r.apart}/model.json replaces "${p.name}", ${p.model.hg ? p.model.hg.len : '?'} m long; the model is ${r.len} m`);
+          if (r.len != null && !r.gun && !(p.model.hg && Math.abs((p.model.hg.len || 0) - r.len) <= 0.0015)) throw new Error(`models/parts/${r.apart}/model.json replaces "${p.name}", ${p.model.hg ? p.model.hg.len : '?'} m long; the model is ${r.len} m`);
+          if (r.gun) { const m = p.model as any; m[key + 'By'] = Object.assign(m[key + 'By'] || {}, { [r.gun]: r.apart }); continue; } // (one gun's own model for a shared entry: modelSpec picks it by the gun)
           (p.model as any)[key] = r.apart;
         }
       }

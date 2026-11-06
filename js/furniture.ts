@@ -1264,6 +1264,10 @@ const G_Furniture = (() => {
   // Runs on the coarse (2 m) grid; G.Level.refine then lays the pieces on the fine grid. wd: the wall(s) a
   // piece is set against, so it can follow the wall when the wall is thinned.
   function plan(map: LvMap, r: () => number, spawnRoom: Room, exitRoom: Room, tryBlock: (x: number, z: number, n: number) => boolean) {
+    // a night level's car parks: most have gone home (NIGHT_CARS of them stay), each kept or not by its own dice from the seed and
+    // its bay, apart from the plan's own, so the rest of the place is the day's (js/level.ts generate: genNight)
+    const NIGHT_CARS = 0.3, night = !!(G.Level && (G.Level as any).genNight), seed0 = ((map as any).seed || 0) >>> 0;
+    const nightCar = (x: number, z: number) => !night || G.U.rng(((seed0 ^ 0x5ca7) + x * 7919 + z * 104729) >>> 0)() < NIGHT_CARS;
     const U = G.U, { W, t, rooms } = map, TS = map.TS || G.Level.TS, home = map.theme.home == null ? 1 : map.theme.home;
     map.props = new Map();
     const homes = U.shuffle(r, HOME.slice());
@@ -1376,7 +1380,9 @@ const G_Furniture = (() => {
             for (let x = rm.x + 1; x <= rm.x + rm.w - 2; x++) {
               if (r() < 0.3 || t[za * W + x] !== 0 || t[(za + 1) * W + x] !== 0 || !tryBlock(x, za, 2)) continue; // (an empty bay)
               if (!tryBlock(x, za + 1, 2)) continue;
-              put('car', x, za, C(x), (za + 1) * TS, r() < 0.5 ? 0 : 2, r());
+              const yaw = r() < 0.5 ? 0 : 2, v = r();
+              if (!nightCar(x, za)) continue; // (gone home: the bay's kept clear, the dice as by day)
+              put('car', x, za, C(x), (za + 1) * TS, yaw, v);
             }
           }
           for (let x = rm.x + 2; x < rm.x + rm.w; x += 8) F.lamps.push([C(x), (rm.z + 4) * TS]);
@@ -1449,7 +1455,7 @@ const G_Furniture = (() => {
         },
         carpark(rm: Room) {
           const z = rm.z + rm.h - 2;
-          for (let x = rm.x + 1; x < rm.x + rm.w - 1; x += 2) if (r() < 0.6) long('car', x, z, r() < 0.5 ? 0 : 2);
+          for (let x = rm.x + 1; x < rm.x + rm.w - 1; x += 2) if (r() < 0.6) { const yaw = r() < 0.5 ? 0 : 2; if (nightCar(x, z)) long('car', x, z, yaw); }
         },
       };
     }
