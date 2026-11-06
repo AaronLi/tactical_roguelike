@@ -137,7 +137,7 @@ export function generate(G, id) {
   } }
   // authored furniture (models/parts/{stock,grip,muzzle,handguard}): each entry an authored model replaces, fitted alone where it fits and is not the default (the
   // Kestrel on any tube, the IR-12 on any AR, the FDE rail): the default build already has the factory ones
-  for (const name of ['stock', 'grip', 'muzzle', 'handguard']) { const s = slotOf(def, name); if (s) for (const p of options(s, def)) if (p.model && (p.model.apStock || p.model.apGrip || p.model.apMuzzle || p.model.apHg) && def[s.slot] !== p.id) {
+  for (const name of ['stock', 'grip', 'muzzle', 'handguard']) { const s = slotOf(def, name); if (s) for (const p of options(s, def)) if (p.model && (p.model.apStock || p.model.apGrip || p.model.apMuzzle || p.model.apHg || (p.model.apHgBy && p.model.apHgBy[id])) && def[s.slot] !== p.id) {
     const b = { ...def, [s.slot]: p.id }; GS.prune(id, b); if (b[s.slot] === p.id) add(`authored ${name} (${p.id})`, b);
   } }
   // authored variants (models/<id>/<name>.glb: a per-gun barrel or magazine): each fitted alone, with the loaded build, and all of them together

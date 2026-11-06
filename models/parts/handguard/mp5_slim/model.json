@@ -1,0 +1,21 @@
+{
+  "source": "authored",
+  "kind": "part",
+  "slot": "handguard",
+  "frame": "handguard-mount",
+  "anchors": {
+    "support": [
+      0.055,
+      -0.028,
+      0
+    ]
+  },
+  "part": {
+    "t": "slim",
+    "len": 0.1216
+  },
+  "gun": "mp5",
+  "replaces": [
+    "Halcyon 3.3\" slim forend (FDE)"
+  ]
+}

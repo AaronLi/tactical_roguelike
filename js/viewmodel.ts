@@ -515,7 +515,7 @@ const G_Viewmodel = (() => {
   // (its magazine merged on its own, centred on itself, so a rig can take it off the gun and hold it: a reload,
   // a magazine check. g.userData.mag: the magazine's group; magHome: where it sits on the gun.)
   type Merged = { geometry: THREE.BufferGeometry; material: THREE.Material }[];
-  interface WorldProto { meshes: Merged; info: any; mag: { meshes: Merged; home: THREE.Vector3 } | null; xb: Record<string, Merged> | null; legs: { meshes: Merged; home: THREE.Vector3; leg: { deploy: number[] } }[] }
+  interface WorldProto { meshes: Merged; info: any; mag: { meshes: Merged; home: THREE.Vector3 } | null; handle: { meshes: Merged; home: THREE.Vector3 } | null; xb: Record<string, Merged> | null; legs: { meshes: Merged; home: THREE.Vector3; leg: { deploy: number[] } }[] }
   // NOTE: takes the model apart (the magazine, bolt, strings and legs are taken off the group): hand it one you are done with
   function worldProto(group: THREE.Object3D, info: any): WorldProto {
     let mag = null;
@@ -530,6 +530,18 @@ const G_Viewmodel = (() => {
       const c = box.getCenter(new T.Vector3());
       for (const m of meshes) m.geometry.translate(-c.x, -c.y, -c.z);
       mag = { meshes, home: c };
+    }
+    // (a cocking handle that turns up to lock the bolt open, info.handle.lock, on its own about its pivot on the tube's axis: the slap reload's hand takes it, js/rig.ts)
+    let handle = null;
+    const hn = info.anim && info.anim.handle;
+    if (hn && hn.parent && info.handle && info.handle.lock) {
+      group.updateMatrixWorld(true);
+      const hw = hn.matrixWorld.clone(), solo = new T.Group();
+      hn.parent.remove(hn);
+      solo.add(hn); hw.decompose(hn.position, hn.quaternion, hn.scale);
+      const meshes = merge(solo), home = hn.position.clone();
+      for (const m of meshes) m.geometry.translate(-home.x, -home.y, -home.z);
+      handle = { meshes, home };
     }
     // (a crossbow's bolt and its two strings, kept as groups of their own: the bolt's gone once it's shot, the string's
     // forward until it's cocked. Merged on their own, each in place; setLoaded)
@@ -550,7 +562,7 @@ const G_Viewmodel = (() => {
       l.parent.remove(l); l.position.set(0, 0, 0); solo.add(l);
       return { meshes: merge(solo), home, leg: l.userData.leg };
     });
-    return { meshes: merge(group), info, mag, xb: xb.bolt ? xb : null, legs };
+    return { meshes: merge(group), info, mag, handle, xb: xb.bolt ? xb : null, legs };
   }
   function worldInstance(proto: WorldProto) {
     const g = new T.Group();
@@ -561,6 +573,13 @@ const G_Viewmodel = (() => {
       mg.position.copy(proto.mag.home);
       g.add(mg);
       g.userData.mag = mg; g.userData.magHome = proto.mag.home;
+    }
+    if (proto.handle) {
+      const hg = new T.Group();
+      for (const m of proto.handle.meshes) hg.add(new T.Mesh(m.geometry, m.material));
+      hg.position.copy(proto.handle.home);
+      g.add(hg);
+      g.userData.handle = hg; g.userData.handleHome = proto.handle.home;
     }
     if (proto.xb) {
       g.userData.xb = {};

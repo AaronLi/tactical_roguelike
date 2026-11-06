@@ -3078,6 +3078,14 @@
    "build": { "barrel": "br.9x19.8.9", "grip": "gr.ar.0", "handguard": "oem.hg.smg.3", "mag": "mp5.mag.30", "muzzle": "mz.r9.tri", "optic": "op.pic.0", "receiver": "rcv.mp5", "stock": "stk.smg.1" }
   },
   { "platform": "mp5",
+   "why": "authored handguard (hg.smg.2)",
+   "build": { "barrel": "br.9x19.8.9", "grip": "oem.gr.ar.4", "handguard": "hg.smg.2", "mag": "mp5.mag.30", "muzzle": "mz.r9.tri", "optic": "op.pic.0", "receiver": "rcv.mp5", "stock": "stk.smg.1" }
+  },
+  { "platform": "mp5",
+   "why": "authored handguard (oem.hg.smg.4)",
+   "build": { "barrel": "br.9x19.8.9", "grip": "oem.gr.ar.4", "handguard": "oem.hg.smg.4", "mag": "mp5.mag.30", "muzzle": "mz.r9.tri", "optic": "op.pic.0", "receiver": "rcv.mp5", "stock": "stk.smg.1" }
+  },
+  { "platform": "mp5",
    "why": "suppressor on the muzzle (mz.r9.can)",
    "build": { "barrel": "br.9x19.8.9", "grip": "oem.gr.ar.4", "handguard": "oem.hg.smg.3", "mag": "mp5.mag.30", "muzzle": "mz.r9.can", "optic": "op.pic.0", "receiver": "rcv.mp5", "stock": "stk.smg.1" }
   },
