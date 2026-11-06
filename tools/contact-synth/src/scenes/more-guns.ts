@@ -82,6 +82,22 @@ const akRearTrunnion = steelBlock(5, 25);
 const onRod = (b: Body): Body => ({ ...b, modes: 0, damping: 0.75 });
 const akSpring = onRod(springWire(22, 1.4));
 const akHammer = steelBar(5, 8);
+/*
+ * The AK's springs are loud, and part of its sound:
+ *  - the recoil spring: a long, stiff coil on a two-piece wire guide that slaps the guide and the receiver as it
+ *    goes. Free to sing along its length (a coil wave ~14 ms round trip, dispersive: the "zing"), its coils grind
+ *    on the guide rod, and it ticks against the rod as it bows.
+ *  - the trigger group: a heavy double-wound hammer spring (~1.5 mm wire round the hammer pin). The carrier's
+ *    underside rides the hammer down against it, steel on steel with little grease, the spring winding up under it:
+ *    the gritty, springy "crunch". Going home, the carrier rides over the cocked hammer again, the hammer bucking
+ *    against its spring.
+ */
+const akSpringSings = springWire(22, 1.4); // (the coil's own ring, unlike the damped onRod contact body)
+const akHammerSpring = springWire(4, 1.5);
+const AK_RECOIL_COIL = { level: 0.75, length: 14, dispersion: 0.65, decay: 0.22, brightness: 4200 };
+const AK_HAMMER_COIL = { level: 0.7, length: 3.5, dispersion: 0.55, decay: 0.12, brightness: 5000 };
+// steel on steel, barely greased, the hammer's edge catching on the carrier's machining: a gritty crunch
+const AK_HAMMER_GRIT = { roughness: 9, grain: 0.35, periodicity: 0.25, stickSlip: 0.3, stickPitch: 900, contactWidth: 0.04 };
 const akRound: Body = { ...arCase, size: 5.6, thickness: 7 };
 const akMag = (f: Fill): Body => ({ ...mat('steel'), shape: 'plate', size: 22, thickness: 1, modes: f === 'empty' ? 4 : 2, irregularity: 0.8, damping: f === 'empty' ? 0.35 : 0.65, level: 0 });
 const akMagLug = steelBlock(1.5, 4);
@@ -102,10 +118,15 @@ function makeAkCharge(fill: Fill | 'none', timing: ChargeTiming = {}): Scene {
     rub('carrier starts back, bolt cam turns', back(0.001), -8, { force: 10, duration: 0.012, speed: 0.6, profile: 'accelerate', roughness: 8, grain: 0.3, contactWidth: 0.05 }, akBolt, akCarrierSliding),
     snap('bolt lugs turn free of the trunnion', back(0.006), -9, { strength: 0.6, preload: 0, seat: 0.2, seatDelay: 1 }, akBolt, akTrunnion),
     rub('carrier on the receiver rails', back(0.004), -9, { force: 6, duration: T - back(0.004), speed: 1.1, profile: 'swell', roughness: 12, grain: 0.6, periodicity: 0, contactWidth: 0.08 }, akCarrierSliding, akReceiver, AK_COVER_RATTLE),
-    rub('recoil spring compresses on its guide', back(0.01), -15, { force: 5, duration: T - back(0.01), speed: 1, profile: 'swell', roughness: 4, grain: 0.3, contactWidth: 0.05 }, akSpring, akReceiver, { coil: { level: 0.35, length: 14, dispersion: 0.5, decay: 0.12, brightness: 3500 } }),
+    rub('recoil spring compresses on its guide', back(0.01), -9, { force: 7, duration: T - back(0.01), speed: 1, profile: 'swell', roughness: 6, grain: 0.3, contactWidth: 0.05 }, akSpring, akReceiver, { coil: AK_RECOIL_COIL }),
+    // the coils bow and tick against the guide rod as they close up
+    ...[0.02, 0.035, 0.05, 0.062, 0.073, 0.082, 0.09, 0.096].map((x, i) =>
+      hit('recoil spring coils tick on the guide', back(x), -17 + i * 0.6, 0.5 + i * 0.05, akSpringSings, steelBar(20, 3), { radius: 1, click: 0.4, sharp: 0.6 })),
     hit('carrier meets the hammer', back(0.025), -12, 0.9, akCarrier, akHammer, { radius: 2, click: 0.6, sharp: 0.8 }),
-    rub('carrier pushes the hammer down', back(0.026), -15, { force: 8, duration: back(0.07) - back(0.026), speed: 0.9, profile: 'steady', roughness: 3, grain: 0.2, contactWidth: 0.05 }, akCarrierSliding, akHammer),
-    snap('hammer cocks onto the trigger hook', back(0.072), -8, { strength: 0.7, preload: 0, seat: 0.3, seatDelay: 2 }, akHammer, steelBar(3, 5)),
+    rub('carrier pushes the hammer down', back(0.026), -10, { force: 12, duration: back(0.07) - back(0.026), speed: 0.9, profile: 'steady', ...AK_HAMMER_GRIT }, akCarrierSliding, akHammer),
+    rub('hammer spring winds up', back(0.027), -11, { force: 8, duration: back(0.07) - back(0.027), speed: 0.6, profile: 'accelerate', roughness: 4, grain: 0.3, contactWidth: 0.04 }, akHammerSpring, akHammer, { coil: AK_HAMMER_COIL }),
+    snap('hammer cocks onto the trigger hook', back(0.072), -3, { strength: 0.8, preload: 0, seat: 0.3, seatDelay: 2 }, akHammer, steelBar(3, 5), { coil: AK_HAMMER_COIL }),
+    rub('carrier rides over the cocked hammer', back(0.074), -14, { force: 7, duration: T - back(0.074), speed: 1, profile: 'steady', ...AK_HAMMER_GRIT }, akCarrierSliding, akHammer),
     // going back, the bolt's underside rides over the top round (pressed up against it by the magazine spring)
     // until its face clears the rim, ~75 mm back (a 56 mm cartridge); then the round pops up into the lips
     ...(fill === 'loaded' ? [
@@ -118,8 +139,9 @@ function makeAkCharge(fill: Fill | 'none', timing: ChargeTiming = {}): Scene {
     hit('receiver rings', T + 0.0005, -10, 0.9, akReceiver, akCarrier, { radius: 6, click: 0.2, sharp: 0.7 }),
     // let go: the spring drives it home with nothing to slow it but the round it strips
     rub('carrier flies home on the rails', LET_GO, -7, { force: 6, duration: TL - LET_GO, speed: vHome, profile: 'accelerate', roughness: 12, grain: 0.6, periodicity: 0, contactWidth: 0.08 }, akCarrierSliding, akReceiver, AK_COVER_RATTLE),
-    rub('recoil spring extends', LET_GO + 0.001, -14, { force: 4, duration: TL - LET_GO, speed: vHome, profile: 'accelerate', roughness: 4, grain: 0.3, contactWidth: 0.05 }, akSpring, akReceiver, { coil: { level: 0.4, length: 14, dispersion: 0.5, decay: 0.15, brightness: 3500 } }),
-    rub('carrier runs over the cocked hammer', fwd(0.03), -15, { force: 6, duration: fwd(0.08) - fwd(0.03), speed: vHome * 0.8, profile: 'steady', roughness: 3, grain: 0.2, contactWidth: 0.05 }, akCarrierSliding, akHammer),
+    rub('recoil spring extends', LET_GO + 0.001, -8, { force: 6, duration: TL - LET_GO, speed: vHome, profile: 'accelerate', roughness: 6, grain: 0.3, contactWidth: 0.05 }, akSpring, akReceiver, { coil: { ...AK_RECOIL_COIL, level: 0.85 } }),
+    rub('carrier runs over the cocked hammer', fwd(0.03), -11, { force: 9, duration: fwd(0.08) - fwd(0.03), speed: vHome * 0.8, profile: 'steady', ...AK_HAMMER_GRIT }, akCarrierSliding, akHammer),
+    hit('hammer bucks against its spring', fwd(0.031), -13, 1.0, akHammer, akHammerSpring, { radius: 2, click: 0.5, sharp: 0.6 }, { coil: AK_HAMMER_COIL }),
   ];
   if (fill === 'loaded') {
     const strip = fwd(0.035);

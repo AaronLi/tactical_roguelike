@@ -89,6 +89,15 @@ const arBarrelExt = steelBlock(3, 20);
 const arUpper = { ...alu('shell', 25, 3, 0.7), modes: 0 }; // receiver: thick, bolted to everything, no free ring
 const arChargingHandle = alu('bar', 18, 5, 0.7); // in the hand
 const arChLatch = steelBar(2.5, 2);
+/*
+ * The charging handle let go, seating: an aluminium T-handle (~18 cm, ~5 mm), free of the hand now, rings bright
+ * and light. The gas key drives it home through its slot's play; when the carrier stops dead, the handle runs on
+ * the last few millimetres on its own and claps into its front stop in the upper (a light, ringing aluminium
+ * clack, after the carrier's heavy steel one). Then its latch, a small spring-loaded aluminium lever on its side,
+ * snaps into the notch in the upper: a little clack of its own.
+ */
+const arHandleFree = { ...mat('aluminum'), shape: 'bar', size: 18, thickness: 5, modes: 2, irregularity: 0.6, damping: 0.4, level: 0 };
+const arHandleLatch = { ...mat('aluminum'), shape: 'bar', size: 2.5, thickness: 3, modes: 1, irregularity: 0.5, damping: 0.45, level: 0 };
 // Buffer tube (receiver extension): an aluminium tube, ~18 cm, in the stock. As a rod its own
 // ring sits at ~2 kHz; the air inside it (18 cm × 2.5 cm bore) resonates at ~950 Hz and up,
 // which is the hollow note the buffer spring sings in.
@@ -494,10 +503,13 @@ function arForward(t, withChargingHandle, mag = 'loaded') {
         els.push(fwdRub('charging handle running home in its channel', STROKE_MM, 0, -6, { force: 3, ...OILY }, arChargingHandle, arUpper));
         els.push(fwdRub('gas key riding in the handle slot', STROKE_MM, 0, -13, { force: 2, ...OILY }, gasKey, arChargingHandle));
         // Let go, the charging handle rides home with the carrier and slams into its own front stop.
-        els.push(hit('charging handle slams into its front stop', post(0.0581), 0, V(3.8), arChargingHandle, arUpper, { scatter: 0.4, radius: 3, click: 0.7 }));
-        els.push(snap('charging handle latch catches', post(0.06), -9, { strength: 0.7, preload: 0, seat: 0.4, seatDelay: 2 }, arChLatch, arUpper));
+        // the carrier stops dead; the handle runs on through its slot's play (~6 mm, slowing on the channel) and claps
+        // home ~5 ms later, clear of the carrier's slam
+        const seat = post(0.0578) + 0.005;
+        els.push(hit('charging handle claps into its front stop', seat, 8, V(1.8), arHandleFree, arUpper, { scatter: 0, radius: 1.5, click: 0.85, sharp: 0.95 }));
+        els.push(snap('charging handle latch clacks into the upper', seat + 0.0045, 6, { strength: 0.75, preload: 0, seat: 0.2, seatDelay: 1.2 }, arHandleLatch, arUpper, { coil: { level: 0.15, length: 1.2, dispersion: 0.3, decay: 0.02, brightness: 7000 } }));
         // Free of the hand, it rattles in its play on the gas key and in its channel as it settles.
-        els.push(...handleRattle(post(0.0581), V(1.4), -1, 5, 0.008));
+        els.push(...handleRattle(seat + 0.005, V(1.2), -4, 5, 0.008));
     }
     if (mag === 'loaded')
         return els;
