@@ -676,7 +676,7 @@ const G_Me = {
   VIEWER: { MAG: 15, REACH: 1.3, EYE: 1.36, AHEAD: 0.24, YAW: 1.2, UP: 0.25, DOWN: 0.45 },
   viewerNear(map: LvMap) {
     const sc = map && map.crest && map.crest.scopes;
-    return (sc && Math.abs(this.pos.y) < 0.5 && sc.find((v: any) => Math.hypot(v.x - this.pos.x, v.z - this.pos.z) < this.VIEWER.REACH)) || null;
+    return (sc && sc.find((v: any) => Math.hypot(v.x - this.pos.x, v.z - this.pos.z) < this.VIEWER.REACH && Math.abs(this.pos.y - (v.y || 0)) < 0.5)) || null; // (y: the ground it stands on)
   },
   viewerOn(v: any) { this.viewer = { v, was: !!this.stowed, yaw: this.yaw, pitch: this.pitch }; this.yaw = v.yaw; this.pitch = 0; this.stowed = true; this.lowToggle = false; this.mouse.r = false; G.Audio.click(); },
   viewerOff() { const w = this.viewer; if (!w) return; this.viewer = null; this.viewerMask(false); if (G.R.vmRoot) G.R.vmRoot.visible = true; this.stowed = w.was; this.yaw = w.v.yaw + G.U.clamp(G.U.angDiff(w.v.yaw, this.yaw), -this.VIEWER.YAW, this.VIEWER.YAW); G.Audio.click(); },
@@ -705,7 +705,7 @@ const G_Me = {
   ZIP: { UP: 0.7, DOWN: 0.5, HANG: G.Level.ZIP_HANG, V0: 7, V1: 17, REACH: 1.6, HOLD: 0.4, ONE_HAND: { SPREAD: 2.2, KICK: 1.5, SWAY: 2.2, GRIP: 0.7 } }, // (HANG: hanging by the handle, js/level.ts zipKit)
   zipNear(map: LvMap) {
     const ls = map && map.crest && map.crest.lines;
-    return (ls && Math.abs(this.pos.y) < 0.5 && ls.find((l: any) => Math.hypot(l.on[0] - this.pos.x, l.on[1] - this.pos.z) < this.ZIP.REACH)) || null;
+    return (ls && ls.find((l: any) => Math.hypot(l.on[0] - this.pos.x, l.on[1] - this.pos.z) < this.ZIP.REACH && Math.abs(this.pos.y - l.gy[0]) < 0.5)) || null; // (gy: the ground each end's on)
   },
   zipStep(dt: number) {
     const z = this.zipRide!, l = z.l, Z = this.ZIP, under = (s: number) => { const p = G.Level.zipPoint(l, s); return new THREE.Vector3(p[0], p[1] - Z.HANG, p[2]); };
@@ -719,7 +719,7 @@ const G_Me = {
       p = under(z.s);
       if (z.s >= 1) { z.ph = 'down'; z.t = 0; }
     } else {
-      p = under(1).lerp(new THREE.Vector3(l.off[0], 0, l.off[1]), G.U.smooth(0, 1, z.t / Z.DOWN));
+      p = under(1).lerp(new THREE.Vector3(l.off[0], l.gy[1], l.off[1]), G.U.smooth(0, 1, z.t / Z.DOWN));
       if (z.t >= Z.DOWN) this.zipRide = null;
     }
     this.pos.copy(p); this.vel.set(0, 0, 0); this.onGround = true; this.hspeed = 0; this.crouch = false; this.prone = false;
@@ -2393,7 +2393,7 @@ const G_Me = {
       // the attachments box: one use each. Your first look rolls your three (for the weapon in your hands); then look
       // in again till you've taken one
       const ab = map.abox, abs = G.Game.abox, mineAb = G.Game.aboxMine();
-      if (!tgt && !cuffTgt && !prompt && ab && abs && Math.hypot(ab.x - this.pos.x, ab.z - this.pos.z) < 1.4 && Math.abs(this.pos.y) < 1.5) { // (it's on the ground floor: not from the floor above or a basement)
+      if (!tgt && !cuffTgt && !prompt && ab && abs && Math.hypot(ab.x - this.pos.x, ab.z - this.pos.z) < 1.4 && Math.abs(this.pos.y - (ab.fy || 0)) < 1.5) { // (it's on the ground floor: not from the floor above or a basement)
         if (!mineAb) {
           const w = this.cur();
           prompt = `Hold <b>F</b> to ${abs[0] ? 'take your turn at' : 'open'} the attachments box${w ? ` <small>(three attachments for your ${w.def.name})</small>` : ''}`;
@@ -2406,7 +2406,7 @@ const G_Me = {
       }
       // the sticker box: close by and facing it, the sticker's yours (the first to open it)
       const sb = map.sbox, sbs = G.Game.sbox;
-      if (!tgt && !cuffTgt && !prompt && sb && sbs && sbs[0] && Math.hypot(sb.x - this.pos.x, sb.z - this.pos.z) < 1.5 && Math.abs(this.pos.y) < 1.5) {
+      if (!tgt && !cuffTgt && !prompt && sb && sbs && sbs[0] && Math.hypot(sb.x - this.pos.x, sb.z - this.pos.z) < 1.5 && Math.abs(this.pos.y - (sb.fy || 0)) < 1.5) {
         const fx = -Math.sin(this.yaw), fz = -Math.cos(this.yaw), dx = sb.x - this.pos.x, dz = sb.z - this.pos.z, dl = Math.hypot(dx, dz) || 1;
         if ((fx * dx + fz * dz) / dl > 0.6) {
           if (sbs[1]) prompt = 'The sticker box is empty';
@@ -2418,7 +2418,7 @@ const G_Me = {
       }
       // the level's weapon case: open it, and what's inside is there to be picked up (js/server.ts casePut)
       const mc = map.case;
-      if (!tgt && !cuffTgt && !prompt && mc && !G.Game.caseOpen && Math.hypot(mc.x - this.pos.x, mc.z - this.pos.z) < 1.6 && Math.abs(this.pos.y) < 1.5) {
+      if (!tgt && !cuffTgt && !prompt && mc && !G.Game.caseOpen && Math.hypot(mc.x - this.pos.x, mc.z - this.pos.z) < 1.6 && Math.abs(this.pos.y - (mc.fy || 0)) < 1.5) { // (fy: the ground it's on, where that rolls)
         prompt = 'Hold <b>F</b> to open the weapon case';
         if (F) { this.startAction('Opening the case', 1.0, () => G.Net.toHost({ t: 'openCase' }), 'case'); busy = true; }
       }

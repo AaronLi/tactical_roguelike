@@ -1223,6 +1223,7 @@ const G_Furniture = (() => {
     // the Sandia Crest (js/level.ts layCrest): out on the mountain, laid out on its own (plan()); the Crest House furnished
     // as any room is. sound: what a case lands on, outdoors (js/casings.ts), if it isn't soft ground.
     trail: { floor: 'dirt', out: 1 }, ridge: { floor: 'dirt', out: 1 }, saddle: { floor: 'dirt', out: 1 }, overlook: { floor: 'flag', out: 1, sound: 'concrete' },
+    terrace: { floor: 'flag', out: 1, sound: 'concrete' }, viewing: { floor: 'tile', noArt: 1 },
     garden: { floor: 'soil', out: 1 }, greenhouse: { floor: 'flag', out: 1, sound: 'concrete' }, antennas: { floor: 'dirt', out: 1 },
     giftshop: { must: 'counter', wall: ['shopwall', 'rack', 'shopwall', 'files'], center: ['endcap'], small: ['plant', 'cardboard', 'bin'], floor: 'wood' },
     storeroom: { must: 'rack', wall: ['rack', 'crates', 'rack'], center: [], small: ['cardboard', 'bin'], floor: null, noArt: 1 },
@@ -1477,6 +1478,20 @@ const G_Furniture = (() => {
           for (const z of [cr.OZ0, cr.OZ1]) { put('scope', cr.OX1, z, x, C(z), facing(1, 0), r()); cr.scopes.push({ x, z: C(z), yaw: -Math.PI / 2 }); }
           const bx = cr.CX0 + 1;
           if (tryBlock(bx, cr.OZ0, 4)) put('bench', bx, cr.OZ0, C(bx), cr.OZ0 * TS + 0.32, facing(0, -1), r());
+        },
+        // the viewing site: a viewer at the front of the room, at its glass, looking down the gorge, and benches facing the
+        // glass; a viewer at the end of the east terrace looking along the gorge to the garden, a bench on the west one (where
+        // you come in off the line)
+        viewing(rm: Room) {
+          const x = rm.cx, z = rm.z + rm.h - 1, zm = (rm.z + rm.h) * TS - 0.55;
+          put('scope', x, z, (x + 0.5) * TS, zm, facing(0, 1), r()); cr.scopes.push({ x: (x + 0.5) * TS, z: zm, yaw: Math.PI });
+          for (const bx of [rm.x + 1, rm.x + rm.w - 2]) one('bench', bx, rm.z + 1, facing(0, 1), true);
+        },
+        terrace(rm: Room) {
+          if (rm.x > cr.viewing[1]) {
+            const z = rm.z + rm.h - 1, xm = (rm.x + rm.w) * TS - 0.55;
+            put('scope', rm.x + rm.w - 1, z, xm, C(z), facing(1, 0), r()); cr.scopes.push({ x: xm, z: C(z), yaw: -Math.PI / 2 });
+          } else one('bench', rm.x, rm.z + rm.h - 1, facing(0, 1), true);
         },
         garden(rm: Room) {
           const gate = (x: number, z: number) => z >= 30 && x > cr.gh[0] && x < cr.gh[0] + 6; // (the way to the coyote fence's gate)
@@ -2044,7 +2059,7 @@ const G_Furniture = (() => {
       const tr = map.terrain;
       if (tr && rm.out && rm.flush && !drop) {
         let hilly = false;
-        for (let z = rm.z; z <= rm.z + rm.h && !hilly; z++) for (let x = rm.x; x <= rm.x + rm.w; x++) if (tr.v[z * tr.VW + x] > 1e-3) { hilly = true; break; }
+        for (let z = rm.z; z <= rm.z + rm.h && !hilly; z++) for (let x = rm.x; x <= rm.x + rm.w; x++) if (Math.abs(tr.v[z * tr.VW + x]) > 1e-3) { hilly = true; break; }
         if (hilly) {
           const g = new T.PlaneGeometry(w, d, rm.w, rm.h), p = g.attributes.position as THREE.BufferAttribute;
           for (let k = 0; k < p.count; k++) p.setZ(k, G.World.terrainAt(tr, x0 + w / 2 + p.getX(k), z0 + d / 2 - p.getY(k))); // (the plane's z is up once it's laid flat)
@@ -2097,6 +2112,9 @@ const G_Furniture = (() => {
       if (rm.carved) { dressRoom(rm); continue; } // (a room that wouldn't have been: nothing to go through)
       if (rm.dress) { G.Homes.swap(map, rm); sink = true; } // (the room as it would have been, for the stream's sake)
       const spec = (ROOMS as Record<string, any>)[rm.type] || {};
+      // (a room indoors on rolling ground: all of it at the ground it's built on, level there; outdoors its floor's laid
+      // over the ground as it lies: layFloor)
+      frame = map.terrain && !(rm.out && rm.flush) ? new T.Matrix4().makeTranslation(0, L.groundHeight(map, (rm.x + rm.w / 2) * TS, (rm.z + rm.h / 2) * TS), 0) : new T.Matrix4();
       const x0 = rm.x * TS, z0 = rm.z * TS, w = rm.w * TS, d = rm.h * TS;
       if (spec.floor) {
         let tex;
@@ -2158,6 +2176,7 @@ const G_Furniture = (() => {
       }
       if (rm.dress) { G.Homes.swap(map, rm); sink = false; dressRoom(rm); }
     }
+    frame = new T.Matrix4();
 
     // merge
     for (const [m, geos] of byMat) {
