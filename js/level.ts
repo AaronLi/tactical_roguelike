@@ -59,6 +59,7 @@ const G_Level = {
     const map = this.plan(lay, r, seed, level, theme);
     if (map.crest) { this.crestLadder(map); this.crestGround(map); } // (a way up onto the Crest House; a mountain top: the ground rolls)
     G.World.fromTileMap(map); // the level as 3D solids (js/world.ts): what every ray, sight line and step is asked of
+    if (map.crest) this.crestSolids(map); // (the viewing building's roof and its parapet)
     return this.landing(map, lay.lz);
   },
   // Where the helicopter sets the squad down (js/landing.ts): a pad of LZ_W x LZ_H coarse tiles, its rectangle the layout's
@@ -306,6 +307,7 @@ const G_Level = {
     const solid = (x: number, z: number) => { const v = cv(x, z); return v === 1 || v === 3; };
     const fenceC = new Map<number, any>(c.fences.map(([x, z, axis]: LvFence) => [z * c.W + x, axis])), fenceAx = new Map();
     const fenceName = new Map(c.fences.filter((f: LvFence) => f[3]).map(([x, z, , name]: LvFence) => [z * c.W + x, name])); // (a fourth figure: what it is, if it isn't the theme's fencing)
+    const fenceInto = new Map<number, any>(); // (a fence's cells run on into a wall's tile: what they are, the fence's: below)
     // steel grating (a foundry's catwalks, upstairs): floor you stand on that rounds and eyes go through (c.grate, coarse)
     const cg = c.grate, grate = cg ? new Uint8Array(W * H) : null, cgr = (x: number, z: number) => !!cg && x >= 0 && z >= 0 && x < c.W && z < c.H && !!cg[z * c.W + x];
     // A thin wall separates two spaces (open on both sides along one axis). A wall where thin walls meet (a T or
@@ -353,6 +355,15 @@ const G_Level = {
         if (x + dx >= c.W || z + dz >= c.H || !fenceC.has((z + dz) * c.W + x + dx)) continue;
         for (let s = 1; s < K; s++) { const fi = (z * K + 1 + dz * s) * W + x * K + 1 + dx * s; t[fi] = 4; out[fi] = 1; if (!fenceAx.has(fi)) fenceAx.set(fi, dx ? 'x' : 'z'); }
       }
+      // on a mountain top, a fence that ends at a wall in line with it runs on into the wall's middle line (a gap between
+      // them there would be a way over the edge: the Sandia Crest's viewing site, its railing to the building's front)
+      if (c.crest) for (const [dx, dz] of fenceC.get(ci) === 'x' ? [[1, 0], [-1, 0]] : [[0, 1], [0, -1]]) {
+        if (cv(x + dx, z + dz) !== 1) continue;
+        for (let s = 1; s < K; s++) {
+          const fi = (z * K + 1 + dz * s) * W + x * K + 1 + dx * s;
+          if (t[fi] === 0 || t[fi] === 5) { t[fi] = 4; out[fi] = 1; fenceAx.set(fi, dx ? 'x' : 'z'); if (fenceName.has(ci)) fenceInto.set(fi, fenceName.get(ci)); }
+        }
+      }
     }
     // doors: one record for both cells of each opening
     const doors: LvDoor[] = [], doorAt = new Map<number, LvDoor>();
@@ -395,7 +406,7 @@ const G_Level = {
     for (let i = 0; i < W * H; i++) {
       if (t[i] !== 4 || props.has(i)) continue;
       const x = i % W, z = (i / W) | 0;
-      const name = fenceName.get(((z / K) | 0) * c.W + ((x / K) | 0)) || c.theme.fence || 'fence'; // (a festival's site fencing)
+      const name = fenceInto.get(i) || fenceName.get(((z / K) | 0) * c.W + ((x / K) | 0)) || c.theme.fence || 'fence'; // (a festival's site fencing)
       const p = { name, q: fenceAx.get(i) === 'z' ? 1 : 0, x: (x + 0.5) * cs, z: (z + 0.5) * cs, v: ((x * 7 + z * 13) % 17) / 17 } as LvProp;
       p.boxes = wb(R[name], p.x, p.z, p.q, p.v);
       props.set(i, p); propList.push(p);
@@ -901,7 +912,7 @@ const G_Level = {
     for (let i = 0; i < W * H; i++) if ((t[i] !== 0 && !natural(i)) || !map.out[i] || (map.props.has(i) && !natural(i))) flat[i] = 1;
     for (const q of keepRooms) for (let z = q.z; z < q.z + q.h; z++) for (let x = q.x; x < q.x + q.w; x++) flat[z * W + x] = 1;
     for (const d of map.doors) for (const i of d.cells || []) flat[i] = 1;
-    for (const l of cr.lines.concat(cr.ladder ? [{ on: cr.ladder.foot, off: cr.ladder.foot }] : [])) for (const [mx, mz] of [l.on, l.off]) for (let z = Math.floor((mz - 2.5) / TS); z <= (mz + 2.5) / TS; z++) for (let x = Math.floor((mx - 2.5) / TS); x <= (mx + 2.5) / TS; x++) if (x >= 0 && z >= 0 && x < W && z < H) flat[z * W + x] = 1;
+    for (const l of cr.lines.concat((cr.ladders || []).map((l: any) => ({ on: l.foot, off: l.foot })))) for (const [mx, mz] of [l.on, l.off]) for (let z = Math.floor((mz - 2.5) / TS); z <= (mz + 2.5) / TS; z++) for (let x = Math.floor((mx - 2.5) / TS); x <= (mx + 2.5) / TS; x++) if (x >= 0 && z >= 0 && x < W && z < H) flat[z * W + x] = 1;
     const fixed = new Uint8Array(VW * VH);
     for (let i = 0; i < W * H; i++) if (flat[i]) { const x = i % W, z = (i / W) | 0; for (let dz = -1; dz <= 2; dz++) for (let dx = -1; dx <= 2; dx++) { const vx = x + dx, vz = z + dz; if (vx >= 0 && vz >= 0 && vx < VW && vz < VH) fixed[vz * VW + vx] = 1; } }
     // what the ground would do left to itself (m)
@@ -972,33 +983,71 @@ const G_Level = {
   // the height of the floor a spot is on (f, a storey's: fy), and of the ground there on the ground floor of a level whose
   // ground rolls
   spotY(map: LvMap, x: number, z: number, f?: number) { return (this.floorMap(map, f || 0).fy || 0) + (f ? 0 : this.groundHeight(map, x, z)); },
-  // The Crest House's roof, a sniper's perch over the gorge (crest.roof): flat, over the whole house (the slab over its
-  // ceilings: you stand on that, js/world.ts), nothing round its edge but air, ROOF_Y up. A ladder up to it (crest.ladder)
-  // on the east wall, the gorge side: at a stretch of wall with no window or door in it and clear ground in front, nearest
-  // the middle. foot: where you stand to climb (and step off at the bottom); head: where you step off on the roof.
-  // (Hold F at either end: js/player.ts climbStep. Suspects don't climb it.)
-  ROOF_Y: 4.3,
+  // The flat roofs on the Sandia Crest, each a perch over the gorge (crest.roofs), and a ladder up to each (crest.ladders).
+  //  - The Crest House's: over the whole house (the slab over its ceilings: you stand on that, js/world.ts), nothing round
+  //    its edge but air, ROOF_Y up.
+  //  - The viewing building's, out over the gorge: a slab over the whole of it, out past its walls to the edge of their tiles
+  //    (crestSolids), a parapet round it (PARAPET high: you can't walk off it, and you see and shoot over it), the overlook
+  //    one way along the gorge and the garden the other.
+  // Each roof's ladder is on its east wall (the house's, the gorge side; the viewing building's, at its back corner, from
+  // the east terrace): at a stretch of wall with no window or door in it and clear ground in front, nearest the middle.
+  // foot: where you stand to climb (and step off at the bottom), y0 the ground there; top: the roof's height; head: where
+  // you step off on the roof; over: how high over the roof's edge you're lifted getting on and off (a parapet's).
+  // (Hold F at either end: js/player.ts climbStep. Suspects don't climb them.)
+  ROOF_Y: 4.3, PARAPET: { H: 1.05, T: 0.2 }, GUARD_H: 1.05,
   crestLadder(map: LvMap) {
-    const cr = map.crest, { W, t } = map, TS = this.TS, K = this.K, [HX, HZ] = cr.house;
-    let x0 = Infinity, x1 = -1, z0 = Infinity, z1 = -1;
-    for (let z = HZ * K; z < (HZ + 9) * K; z++) for (let x = HX * K; x < (HX + 9) * K; x++) if (!map.out[z * W + x]) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
-    if (x1 < 0) return;
-    cr.roof = { x0: x0 * TS, x1: (x1 + 1) * TS, z0: z0 * TS, z1: (z1 + 1) * TS, y: this.ROOF_Y };
-    const doorCell = new Set(map.doors.flatMap((d) => d.cells || [])), mid = (z0 + z1) >> 1;
-    const clear = (z: number) => {
-      for (let zz = z - 1; zz <= z + 1; zz++) {
-        const wi = zz * W + x1;
-        if (t[wi] !== 1 || doorCell.has(wi) || (map.winAt && map.winAt.has(wi))) return false;
-        for (let x = x1 + 1; x <= x1 + 2; x++) if (t[zz * W + x] !== 0 || map.props.has(zz * W + x)) return false;
+    const cr = map.crest, { W, t } = map, TS = this.TS, K = this.K, [HX, HZ] = cr.house, [BX0, BX1] = cr.viewing, VZ1 = cr.site[2];
+    cr.roofs = []; cr.ladders = [];
+    for (const [cx, cz, cw, ch, parapet] of [[HX, HZ, 9, 9, false], [BX0, cr.SZ, BX1 - BX0 + 1, VZ1 - cr.SZ + 1, true]] as [number, number, number, number, boolean][]) {
+      let x0 = Infinity, x1 = -1, z0 = Infinity, z1 = -1;
+      for (let z = cz * K; z < (cz + ch) * K; z++) for (let x = cx * K; x < (cx + cw) * K; x++) if (!map.out[z * W + x]) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+      if (x1 < 0) continue;
+      const gy = this.crestFall(cr, (x0 + x1) / 2 * TS), top = gy + this.ROOF_Y; // (what it's built on: the summit's, or the viewing site's level, down the saddle)
+      cr.roofs.push({ x0: x0 * TS, x1: (x1 + 1) * TS, z0: z0 * TS, z1: (z1 + 1) * TS, y: top, gy, parapet });
+      const doorCell = new Set(map.doors.flatMap((d) => d.cells || [])), mid = (z0 + z1) >> 1;
+      const clear = (z: number) => {
+        for (let zz = z - 1; zz <= z + 1; zz++) {
+          const wi = zz * W + x1;
+          if (t[wi] !== 1 || doorCell.has(wi) || (map.winAt && map.winAt.has(wi))) return false;
+          for (let x = x1 + 1; x <= x1 + 2; x++) if (t[zz * W + x] !== 0 || map.props.has(zz * W + x)) return false;
+        }
+        return true;
+      };
+      search: for (let d = 0; d <= (z1 - z0) / 2 - 1; d++) for (const z of d ? [mid + d, mid - d] : [mid]) {
+        if (!clear(z)) continue;
+        const wx = (x1 + 1) * TS, wz = (z + 0.5) * TS;
+        cr.ladders.push({ x: wx, z: wz, y0: gy, top, foot: [wx + 0.55, wz], head: [wx - 0.7, wz], yaw: Math.PI / 2, over: parapet ? this.PARAPET.H + 0.1 : 0 }); // (yaw: facing the wall, west)
+        break search;
       }
-      return true;
-    };
-    for (let d = 0; d <= (z1 - z0) / 2 - 2; d++) for (const z of d ? [mid + d, mid - d] : [mid]) {
-      if (!clear(z)) continue;
-      const wx = (x1 + 1) * TS, wz = (z + 0.5) * TS;
-      cr.ladder = { x: wx, z: wz, top: this.ROOF_Y, foot: [wx + 0.55, wz], head: [wx - 0.7, wz], yaw: Math.PI / 2 }; // (yaw: facing the wall, west)
-      return;
     }
+  },
+  // the ladder someone at (x, z) is on (the nearest of a level's: crest.ladders), or null
+  ladderAt(map: LvMap | null | undefined, x: number, z: number) {
+    const ls = map && map.crest && map.crest.ladders;
+    if (!ls || !ls.length) return null;
+    return ls.reduce((a: any, l: any) => (Math.hypot(l.x - x, l.z - z) < Math.hypot(a.x - x, a.z - z) ? l : a));
+  },
+  // The viewing building's roof as solids (after the rest of the level's: js/world.ts fromTileMap): its slab over the whole
+  // of it (the ceilings stop at the walls' middle lines), the parapet round its edge; and the guard rail inside its front
+  // glass (crest.guard: it stops you walking out where the glass is shot out; only its handrail stops a round, as a
+  // railing's: G.Level.stack)
+  crestSolids(map: LvMap) {
+    const w = map.world, WH = this.WALL_H, P = this.PARAPET, gd = map.crest.guard;
+    if (gd) {
+      const [x0, x1, z] = gd, y = this.crestFall(map.crest, (x0 + x1) / 2), H = this.GUARD_H;
+      G.World.add(w, G.World.box(x0, y, z - 0.03, x1, y + H, z + 0.03, { kind: 'rail', ray: false }));
+      G.World.add(w, G.World.box(x0, y + H - 0.05, z - 0.03, x1, y + H, z + 0.03, { kind: 'rail', move: false }));
+    }
+    for (const R of map.crest.roofs || []) {
+      if (!R.parapet) continue;
+      G.World.add(w, G.World.box(R.x0, R.gy + WH, R.z0, R.x1, R.y, R.z1, { kind: 'ceil' }));
+      for (const [x0, z0, x1, z1] of this.parapetRuns(R)) G.World.add(w, G.World.box(x0, R.y, z0, x1, R.y + P.H, z1, { kind: 'wall', edge: true })); // (edge: concrete, cast; no hole knocked through it)
+    }
+  },
+  // a roof's parapet, as boxes [x0, z0, x1, z1] in plan: along each edge, inside it
+  parapetRuns(R: any) {
+    const T = this.PARAPET.T;
+    return [[R.x0, R.z0, R.x1, R.z0 + T], [R.x0, R.z1 - T, R.x1, R.z1], [R.x0, R.z0 + T, R.x0 + T, R.z1 - T], [R.x1 - T, R.z0 + T, R.x1, R.z1 - T]];
   },
   // Where a climber's hand or foot is on the ladder (limb: hL, hR, fL, fR), their feet at y, as [x, y, z]: each holds its rung
   // while they rise past it, then goes up two rungs (RUNG apart) over the last third of that, the left hand with the right foot
@@ -1026,9 +1075,9 @@ const G_Level = {
     const U = G.U, CX0 = 24, CX1 = 265, W = CX1 + 25, H = 46, SZ = 6; // the gorge from x CX0 to CX1 (482 m across), south of the saddle's wall (row SZ)
     const OZ0 = 12, OZ1 = 17, OX1 = CX0 + 3; // the overlook: its rows, its east side
     const HX = 13, HZ = 23, GX = CX1 + 9, GZ = 13; // the Crest House's and the greenhouse's north-west corners (walls and all)
-    // the viewing site halfway along the saddle, out over the gorge from its rim: x SX0 to SX1 (the low wall down each side),
-    // rows SZ + 1 to VZ1 (the wall along its front); the viewing building in the middle of it, x BX0 to BX1 (walls and all),
-    // from the rim to its glass front over the drop; a terrace either side of it
+    // the viewing site halfway along the saddle, out over the gorge from its rim: x SX0 to SX1 (the railing down each side),
+    // rows SZ + 1 to VZ1 (the railing along its front); the viewing building in the middle of it, x BX0 to BX1 (walls and
+    // all), from the rim to its glass front over the drop (row VZ1, in line with the railing); a terrace either side of it
     const SX0 = 139, SX1 = 156, VZ1 = 12, BX0 = 143, BX1 = 152;
     // the ziplines, a tile each end to step on and off them ([x, z], coarse), and where on the rim each end's cable is (x, m: just
     // out over the drop from the wall), how far it sags: from the ridge north of the overlook down to the viewing site's west
@@ -1049,8 +1098,10 @@ const G_Level = {
     for (let x = 0; x < W; x++) for (const z of [0, H - 1]) if (t[at(x, z)] !== 5) fence(x, z, 'x');
     for (let z = 1; z < H - 1; z++) for (const x of [0, W - 1]) fence(x, z, 'z');
     for (let x = CX0; x <= CX1; x++) if (x < SX0 || x > SX1) fence(x, SZ, 'x');
-    for (let z = SZ; z <= VZ1; z++) for (const x of [SX0, SX1]) fence(x, z, 'z');
-    for (let x = SX0 + 1; x < SX1; x++) if (x < BX0 || x > BX1) fence(x, VZ1, 'x');
+    // (the viewing site's: a railing on it, chest high, js/furniture.ts siterail; along the front it runs into the viewing
+    // building's front wall, in line with it: refine)
+    for (let z = SZ; z <= VZ1; z++) for (const x of [SX0, SX1]) fence(x, z, 'z', z > SZ ? 'siterail' : undefined);
+    for (let x = SX0 + 1; x < SX1; x++) if (x < BX0 || x > BX1) fence(x, VZ1, 'x', 'siterail');
     for (let z = SZ; z < H - 1; z++) { if (z < OZ0 || z > OZ1) fence(CX0 - 1, z, 'z'); fence(CX1 + 1, z, 'z'); }
     for (let x = CX0; x <= OX1 + 1; x++) { fence(x, OZ0 - 1, 'x'); fence(x, OZ1 + 1, 'x'); }
     for (let z = OZ0; z <= OZ1; z++) fence(OX1 + 1, z, 'z');
@@ -1063,13 +1114,14 @@ const G_Level = {
     doors.push([HX + 3, HZ + 8, 'z', false, false], [HX + 4, HZ + 8, 'z', false, true]);
     doors.push([HX + 2, HZ + 3, 'z', false, false], [HX + 6, HZ + 3, 'z', false, false], [HX + 6, HZ, 'z', false, false]);
     // the viewing building, out over the gorge from its rim: concrete walls, glass nearly floor to ceiling across the front
-    // (the gorge below it) and down both sides (the overlook along it one way, the garden the other: lay.glass); a double
-    // door in the back from the saddle, a door onto each terrace; a roof over it
-    fill(BX0, SZ, BX1 - BX0 + 1, VZ1 - SZ, 1); fill(BX0 + 1, SZ + 1, BX1 - BX0 - 1, VZ1 - SZ - 2, 0);
-    for (let z = SZ; z < VZ1; z++) for (let x = BX0; x <= BX1; x++) { out[at(x, z)] = 0; kind[at(x, z)] = 2; }
+    // (the gorge below it), in line with the terraces' railings, and down both sides (the overlook along it one way, the
+    // garden the other: lay.glass); a double door in the back from the saddle, a door onto each terrace; a flat roof over it
+    // with a parapet round it, a ladder up to it (crestLadder)
+    fill(BX0, SZ, BX1 - BX0 + 1, VZ1 - SZ + 1, 1); fill(BX0 + 1, SZ + 1, BX1 - BX0 - 1, VZ1 - SZ - 1, 0);
+    for (let z = SZ; z <= VZ1; z++) for (let x = BX0; x <= BX1; x++) { out[at(x, z)] = 0; kind[at(x, z)] = 2; }
     const VM = (BX0 + BX1) >> 1, VD = SZ + 1, view = { sill: 0.15, top: 3.7 };
     doors.push([VM, SZ, 'z', false, false], [VM + 1, SZ, 'z', false, true], [BX0, VD, 'x', false, false], [BX1, VD, 'x', false, false]);
-    glass.push(Object.assign({ x0: BX0 + 1, z0: VZ1 - 1, x1: BX1 - 1, z1: VZ1 - 1 }, view), Object.assign({ x0: BX0, z0: VD + 1, x1: BX0, z1: VZ1 - 2, v: 1 }, view), Object.assign({ x0: BX1, z0: VD + 1, x1: BX1, z1: VZ1 - 2, v: 1 }, view));
+    glass.push(Object.assign({ x0: BX0 + 1, z0: VZ1, x1: BX1 - 1, z1: VZ1 }, view), Object.assign({ x0: BX0, z0: VD + 1, x1: BX0, z1: VZ1 - 1, v: 1 }, view), Object.assign({ x0: BX1, z0: VD + 1, x1: BX1, z1: VZ1 - 1, v: 1 }, view));
     // the greenhouse, 7 x 9 tiles: glass all round from a low sill (lay.glass), a double door on the west (toward the
     // overlook), one on the east; no roof over it but glass (open to the sky: buildCrest's)
     fill(GX, GZ, 7, 9, 1); fill(GX + 1, GZ + 1, 5, 7, 0);
@@ -1137,7 +1189,7 @@ const G_Level = {
     room(CX0 - 1, OZ0, OX1 - CX0 + 2, OZ1 - OZ0 + 1, 'overlook', { front: true }); // (yours: nobody starts on it)
     room(CX0 - 1, 1, SX0 - CX0 + 1, SZ - 1, 'saddle'); room(SX0, 1, SX1 - SX0 + 1, SZ - 1, 'saddle'); room(SX1 + 1, 1, CX1 - SX1 + 1, SZ - 1, 'saddle');
     room(SX0 + 1, SZ, BX0 - SX0 - 1, VZ1 - SZ, 'terrace'); room(BX1 + 1, SZ, SX1 - BX1 - 1, VZ1 - SZ, 'terrace');
-    room(BX0 + 1, SZ + 1, BX1 - BX0 - 1, VZ1 - SZ - 2, 'viewing', { out: false });
+    room(BX0 + 1, SZ + 1, BX1 - BX0 - 1, VZ1 - SZ - 1, 'viewing', { out: false });
     room(CX1 + 2, 1, W - CX1 - 3, 3, 'ridge');
     room(CX1 + 2, 4, GX - CX1 - 2, 28, 'garden'); room(GX + 7, 4, W - GX - 8, 28, 'garden'); room(GX, 4, 7, GZ - 4, 'garden'); room(GX, GZ + 9, 7, 32 - GZ - 9, 'garden');
     room(GX + 1, GZ + 1, 5, 7, 'greenhouse');
@@ -1147,7 +1199,10 @@ const G_Level = {
     // middle, and the ground you step on and off at
     const C = ([x, z]: number[]) => [(x + 0.5) * CS, (z + 0.5) * CS];
     const lines = ZL.map(({ on, off, ax, bx, sag }) => ({ a: [ax, 6.6, C(on)[1]], b: [bx, 3.9, C(off)[1]], sag, on: C(on), off: C(off), keep: [on, off], gy: [0, 0] }));
-    const crest = { W, H, kind, CX0, CX1, SZ, OZ0, OZ1, OX1, site: [SX0, SX1, VZ1], viewing: [BX0, BX1], house: [HX, HZ], gh: [GX, GZ], masts: [], scopes: [], lines };
+    // the guard rail inside the viewing building's front glass (x0, x1, z in metres: just inside the wall's middle line), a
+    // hand's width in from it: shot out, the glass leaves a sill you'd step over into the gorge (crestSolids)
+    const guard = [(BX0 + 1) * CS, BX1 * CS, VZ1 * CS + this.TS - 0.14];
+    const crest = { W, H, kind, CX0, CX1, SZ, OZ0, OZ1, OX1, site: [SX0, SX1, VZ1], viewing: [BX0, BX1], house: [HX, HZ], gh: [GX, GZ], masts: [], scopes: [], lines, guard };
     return { W, H, t, rooms, doors, out, fences, glass, spawn: lot, lz, crest, chasm: this.CHASM };
   },
   // Each returns { W, H, t, rooms, doors?, ringDoors?, out?, fences?, spawn? } on the coarse grid. t starts as all wall
@@ -2589,22 +2644,40 @@ const G_Level = {
       }
       const kit = this.zipKit(); kit.position.set(...(l.a as [number, number, number])); kit.rotation.y = Math.atan2(l.b[0] - l.a[0], l.b[2] - l.a[2]); root.add(kit); // (the next one, waiting)
     }
-    // ---- the Crest House's roof (crest.roof): a flat deck of grey pavers over the slab, its edge flush with the walls (no
-    // parapet: nothing between you and the far summit); the ladder up to it on the east wall (crest.ladder), steel, its rails
-    // carried on past the top to hold as you step off
-    if (cr.roof) {
-      const R = cr.roof, WH = this.WALL_H, dt = this._tex('floor', '#6e6a66'); dt.repeat.set((R.x1 - R.x0) / 2, (R.z1 - R.z0) / 2);
+    // ---- the flat roofs (crest.roofs): a deck of grey pavers over the slab. The Crest House's edge flush with its walls (no
+    // parapet: nothing between you and the far summit); the viewing building's out to the edge of its walls' tiles, a cast
+    // concrete parapet round it, coped. The ladder up to each on its east wall (crest.ladders), steel, its rails carried on
+    // past the top to hold as you step off (over a parapet: up over it and down onto the roof, a hoop)
+    for (const R of cr.roofs || []) {
+      const WH = this.WALL_H, B = R.gy + WH, dt = this._tex('floor', '#6e6a66'); dt.repeat.set((R.x1 - R.x0) / 2, (R.z1 - R.z0) / 2);
       // (one material to a mesh: the level's meshes are merged by material, so a box's other faces would go)
-      const deck = new T.Mesh(new T.BoxGeometry(R.x1 - R.x0, R.y - WH, R.z1 - R.z0), new T.MeshStandardMaterial({ color: 0x8a8580, roughness: 0.95 }));
-      deck.position.set((R.x0 + R.x1) / 2, (WH + R.y) / 2, (R.z0 + R.z1) / 2); deck.layers.enable(1); root.add(deck);
+      const deck = new T.Mesh(new T.BoxGeometry(R.x1 - R.x0, R.y - B, R.z1 - R.z0), new T.MeshStandardMaterial({ color: 0x8a8580, roughness: 0.95 }));
+      deck.position.set((R.x0 + R.x1) / 2, (B + R.y) / 2, (R.z0 + R.z1) / 2); deck.layers.enable(1); root.add(deck);
       const gravel = new T.Mesh(new T.PlaneGeometry(R.x1 - R.x0, R.z1 - R.z0), new T.MeshStandardMaterial({ map: dt, roughness: 0.95 }));
       gravel.rotation.x = -Math.PI / 2; gravel.position.set((R.x0 + R.x1) / 2, R.y + 0.004, (R.z0 + R.z1) / 2); gravel.layers.enable(1); root.add(gravel);
+      if (!R.parapet) continue;
+      const P = this.PARAPET, conc = new T.MeshStandardMaterial({ color: 0xa9a49c, roughness: 0.9 }), cope = new T.MeshStandardMaterial({ color: 0xc4beb4, roughness: 0.8 });
+      for (const [x0, z0, x1, z1] of this.parapetRuns(R)) {
+        const pw = new T.Mesh(new T.BoxGeometry(x1 - x0, P.H - 0.05, z1 - z0), conc); pw.position.set((x0 + x1) / 2, R.y + (P.H - 0.05) / 2, (z0 + z1) / 2); pw.layers.enable(1); root.add(pw);
+        const cp = new T.Mesh(new T.BoxGeometry(x1 - x0 + 0.06, 0.05, z1 - z0 + 0.06), cope); cp.position.set((x0 + x1) / 2, R.y + P.H - 0.025, (z0 + z1) / 2); cp.layers.enable(1); root.add(cp);
+      }
     }
-    if (cr.ladder) {
-      const L = cr.ladder, rail = new T.MeshStandardMaterial({ color: 0x5a5e62, roughness: 0.45, metalness: 0.7 }), hi = L.top + 1.0, x = L.x + 0.1;
-      for (const s of [-1, 1]) { const r = new T.Mesh(new T.BoxGeometry(0.05, hi, 0.05), rail); r.position.set(x, hi / 2, L.z + s * 0.24); root.add(r); }
-      for (let y = 0.3; y < L.top; y += 0.3) { const g = new T.Mesh(new T.CylinderGeometry(0.016, 0.016, 0.48, 6), rail); g.rotation.x = Math.PI / 2; g.position.set(x, y, L.z); root.add(g); }
-      for (const s of [-1, 1]) { const b = new T.Mesh(new T.BoxGeometry(0.12, 0.04, 0.04), rail); b.position.set(L.x + 0.04, 1.5, L.z + s * 0.24); root.add(b); const b2 = b.clone(); b2.position.y = L.top - 0.6; root.add(b2); } // (brackets to the wall)
+    for (const L of cr.ladders || []) {
+      const rail = new T.MeshStandardMaterial({ color: 0x5a5e62, roughness: 0.45, metalness: 0.7 }), x = L.x + 0.1, y0 = L.y0 || 0, hi = L.top + (L.over ? L.over + 0.2 : 1.0) - y0;
+      for (const s of [-1, 1]) { const r = new T.Mesh(new T.BoxGeometry(0.05, hi, 0.05), rail); r.position.set(x, y0 + hi / 2, L.z + s * 0.24); root.add(r); }
+      for (let y = 0.3; y < L.top - y0; y += 0.3) { const g = new T.Mesh(new T.CylinderGeometry(0.016, 0.016, 0.48, 6), rail); g.rotation.x = Math.PI / 2; g.position.set(x, y0 + y, L.z); root.add(g); }
+      for (const s of [-1, 1]) { const b = new T.Mesh(new T.BoxGeometry(0.12, 0.04, 0.04), rail); b.position.set(L.x + 0.04, y0 + 1.5, L.z + s * 0.24); root.add(b); const b2 = b.clone(); b2.position.y = L.top - 0.6; root.add(b2); } // (brackets to the wall)
+      if (L.over) for (const s of [-1, 1]) { // (the hoop over the parapet: across it at the rails' top, and down onto the roof inside it)
+        const reach = 0.1 + this.PARAPET.T + 0.35, a = new T.Mesh(new T.BoxGeometry(reach, 0.05, 0.05), rail); a.position.set(x - reach / 2, y0 + hi, L.z + s * 0.24); root.add(a);
+        const d = new T.Mesh(new T.BoxGeometry(0.05, y0 + hi - L.top, 0.05), rail); d.position.set(x - reach, (y0 + hi + L.top) / 2, L.z + s * 0.24); root.add(d);
+      }
+    }
+    // ---- the guard rail inside the viewing building's front glass (crest.guard): brushed steel, a post at every mullion
+    if (cr.guard) {
+      const [gx0, gx1, gz] = cr.guard, gy = this.crestFall(cr, (gx0 + gx1) / 2), H = this.GUARD_H, st = new T.MeshStandardMaterial({ color: 0x9aa0a4, roughness: 0.35, metalness: 0.8 });
+      const top = new T.Mesh(new T.CylinderGeometry(0.025, 0.025, gx1 - gx0, 10), st); top.rotation.z = Math.PI / 2; top.position.set((gx0 + gx1) / 2, gy + H - 0.025, gz); root.add(top);
+      const mid = new T.Mesh(new T.CylinderGeometry(0.012, 0.012, gx1 - gx0, 8), st); mid.rotation.z = Math.PI / 2; mid.position.set((gx0 + gx1) / 2, gy + 0.5, gz); root.add(mid);
+      for (let x = gx0 + 0.04; x <= gx1 - 0.03; x += (gx1 - gx0 - 0.08) / Math.round((gx1 - gx0) / (2 * this.TS))) { const p = new T.Mesh(new T.BoxGeometry(0.04, H - 0.05, 0.04), st); p.position.set(x, gy + (H - 0.05) / 2, gz); root.add(p); }
     }
     // ---- the greenhouse's roof: a ridge down its length, white glazing bars, glass between
     const [gx0, gz0] = cr.gh, x0 = gx0 * CS + 1, x1 = (gx0 + 6) * CS + 1, z0 = gz0 * CS + 1, z1 = (gz0 + 8) * CS + 1, ridge = 2.2, Y = this.groundHeight(map, x0, z0) + this.WALL_H, half = (x1 - x0) / 2, slope = Math.hypot(half, ridge), ang = Math.atan2(ridge, half);
