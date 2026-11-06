@@ -389,7 +389,7 @@ const G_Server = {
       case 'noFoes': if (from === SvNet.myId) this.enemies.clear(); break;
       // a suspect's grenade went off on the host's screen (js/views.ts): there
       case 'eboom': if (from === SvNet.myId && this.phase === 'level' && this.map && Array.isArray(m.p) && m.p.length === 3 && m.p.every(Number.isFinite)) this.enemyBoom({ x: m.p[0], y: m.p[1], z: m.p[2] }); break;
-      // the suspects' guns as the host's screen drew them (js/game.ts boresOut): [id, muzzle x, y, z, bore x, y, z, ...]
+      // the suspects' guns as the host's screen drew them (js/views.ts boresOut): [id, muzzle x, y, z, bore x, y, z, ...]
       case 'bores': {
         if (from !== SvNet.myId || !Array.isArray(m.a)) break;
         const b = new Map<number, number[]>();
