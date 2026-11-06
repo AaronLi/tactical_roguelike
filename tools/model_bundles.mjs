@@ -46,9 +46,9 @@ export function writeBundles(models, B, log = () => {}) {
   fs.writeFileSync(path.join(dir, B.NAME + B.EXT), z);
   log(`  ${B.NAME}${B.EXT}: ${paths.length} files, ${raw.length} B, ${z.length} B gzipped`);
   for (const f of fs.readdirSync(dir)) if (f.endsWith(B.EXT) && f !== B.NAME + B.EXT) fs.unlinkSync(path.join(dir, f)); // (the old per-platform bundles)
-  const hash = hashOf(z), index = { version: 2, name: B.NAME + B.EXT, files: paths.length, bytes: raw.length, gz: z.length, sha1: crypto.createHash('sha1').update(z).digest('hex'), hash };
+  const hash = hashOf(z), index = { version: B.FORMAT, name: B.NAME + B.EXT, files: paths.length, bytes: raw.length, gz: z.length, sha1: crypto.createHash('sha1').update(z).digest('hex'), hash };
   fs.writeFileSync(path.join(dir, 'index.json'), JSON.stringify(index, null, 1) + '\n');
-  fs.writeFileSync(path.join(dir, 'manifest.json'), JSON.stringify({ v: 2, hash, size: z.length }) + '\n'); // (what the game fetches at boot: js/modelbundles.ts)
+  fs.writeFileSync(path.join(dir, 'manifest.json'), JSON.stringify({ v: B.FORMAT, hash, size: z.length }) + '\n'); // (what the game fetches at boot: js/modelbundles.ts)
   return index;
 }
 
@@ -71,7 +71,7 @@ export function check(models, B) {
   if (!paths.length) return ['no baked parts or props under ' + models];
   let ix = null; try { ix = JSON.parse(fs.readFileSync(path.join(dir, 'index.json'), 'utf8')); } catch { errs.push('bundles/index.json missing or unreadable: run npm run bake:models (or node tools/bundle_models.mjs)'); }
   let gm = null; try { gm = JSON.parse(fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8')); } catch { errs.push('bundles/manifest.json missing or unreadable: run node tools/bundle_models.mjs'); }
-  if (gm && (gm.v !== 2 || typeof gm.hash !== 'string' || !/^[0-9a-f]{16}$/.test(gm.hash) || !(gm.size > 0))) { errs.push('bundles/manifest.json is malformed (want { v: 2, hash, size })'); gm = null; }
+  if (gm && (gm.v !== B.FORMAT || typeof gm.hash !== 'string' || !/^[0-9a-f]{16}$/.test(gm.hash) || !(gm.size > 0))) { errs.push(`bundles/manifest.json is malformed (want { v: ${B.FORMAT}, hash, size })`); gm = null; }
   for (const f of fs.existsSync(dir) ? fs.readdirSync(dir) : []) if (f.endsWith(B.EXT) && f !== B.NAME + B.EXT) errs.push(`bundle ${f} holds nothing the game loads (only ${B.NAME}${B.EXT} is wanted)`);
   if (!fs.existsSync(file)) { errs.push(`bundle ${B.NAME}${B.EXT} is missing (${paths.length} files belong in it)`); return errs; }
   let files; try { files = readBundle(file, B); } catch (e) { errs.push(`bundle ${B.NAME}${B.EXT} does not read: ${e.message}`); return errs; }

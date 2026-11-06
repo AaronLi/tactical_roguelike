@@ -45,7 +45,7 @@ interface PHeld { kind: PHeldKind; cock: boolean; str: number; readyT: number; t
 interface PTbModel { map: LvMap; p: THREE.Vector3; fill: ReturnType<typeof G_Level.blastFill>; cloud: number; space: number; closed: boolean; conf: number; qs: number; rc: number; idx: Int32Array; outFrac: number; areaCloud: number; areaSpace: number; V: number }
 interface PTreat { name: string; part: string; mt: string; t0: number; dur: number }
 // what's owed the host for one suspect this frame: plain damage, wounds (as a share of a life), a headshot, a kill, armour got through, the wounds' detail
-interface PHitQ { d: number; f: number; h: boolean; k: boolean; ap?: boolean; w?: any[]; gr?: number } // (gr: a frag grenade's, its seed: js/highlights.ts)
+interface PHitQ { d: number; f: number; h: boolean; k: boolean; ap?: boolean; w?: any[]; gr?: number; tb?: number[] } // (gr: a frag grenade's, its seed: js/highlights.ts)
 // your own limbs in the viewmodel pass (fpLimbs)
 interface PLimbs { arm: THREE.Group; leg: THREE.Group; armL: THREE.Group; tie: THREE.Mesh; held: THREE.Group; env: THREE.Group; nade: { frag: THREE.Mesh; flash: THREE.Mesh; tb: THREE.Mesh } }
 type PTrack = { t: number; v: number; bone: string }[] & { frags?: any[] };
@@ -956,8 +956,8 @@ const G_Me = {
     this.yaw += side * R.VIEW.y;
   },
   // A bipod (the Kodiak, or one the gun's built with: js/gunmodels.ts bipodLeg) goes down when you're lying behind it, or
-  // crouched with something in front to stand it on: a top from 35 cm under the gun to 10 cm over it (you come up onto
-  // a counter), 30 to 80 cm out, nothing in the way over it. Held still and not aimed steeply. bipodT: how far down it is (the legs: js/vmanim.ts; what it
+  // crouched or standing with something in front to stand it on (a counter crouched; a sill, a wall's top or a tall crate
+  // standing): a top from 35 cm under the gun to 10 cm over it (you come up onto it), 30 to 80 cm out, nothing in the way over it. Held still and not aimed steeply. bipodT: how far down it is (the legs: js/vmanim.ts; what it
   // does to the sway and kick: swayStep, recoilKick). BIPOD: what's left of the sway and the twitch, and of the kick.
   BIPOD: { SWAY: 0.12, ERRATIC: 0.1, KICK: 0.55, RATE: 4 },
   bipodStep(dt: number) {
@@ -965,7 +965,7 @@ const G_Me = {
     let on = false;
     if (has && !this.stowed && !this.held && this.onGround && (this.hspeed || 0) < 0.4 && Math.abs(this.pitch) < 0.35) {
       if (this.prone && this.stanceT <= 0) on = true;
-      else if (this.crouch && G.Game.map && G.Game.map.world) {
+      else if (!this.prone && !this.climb && !this.zipRide && this.seat == null && G.Game.map && G.Game.map.world) {
         const w = G.Game.map.world, dx = -Math.sin(this.yaw), dz = -Math.cos(this.yaw), y = this.pos.y + this.eyeH - 0.1 + 0.15; // (just over the gun)
         if (G.World.raycast(w, this.pos.x, y, this.pos.z, dx, 0, dz, 1).t >= 1) {
           for (const d of [0.35, 0.55, 0.75]) { const t = G.World.raycast(w, this.pos.x + dx * d, y, this.pos.z + dz * d, 0, -1, 0, 0.5).t; if (t >= 0.05 && t < 0.5) { on = true; break; } }
@@ -1796,7 +1796,7 @@ const G_Me = {
   flushHits() {
     if (!this.hitQ || !this.hitQ.size) return;
     for (const [e, q] of this.hitQ) {
-      G.Net.toHost({ t: 'hit', e, d: Math.round(q.d), f: Math.round(q.f * 1000) / 1000, k: q.k ? 1 : 0, h: q.h, ap: q.ap ? 1 : undefined, w: q.w ? q.w.slice(0, 12) : undefined, gr: q.gr || undefined });
+      G.Net.toHost({ t: 'hit', e, d: Math.round(q.d), f: Math.round(q.f * 1000) / 1000, k: q.k ? 1 : 0, h: q.h, ap: q.ap ? 1 : undefined, w: q.w ? q.w.slice(0, 12) : undefined, gr: q.gr || undefined, tb: q.tb || undefined });
       this.stats.dmg += q.d + q.f * 100 + (q.k ? 100 : 0);
     }
     this.hitQ.clear();
@@ -1853,6 +1853,7 @@ const G_Me = {
     const F = this.FRAG, n = F.N, dir = new Float32Array(n * 3), m = new Float32Array(n), v = new Float32Array(n);
     const rnd = seed ? G.U.rng(seed) : Math.random;
     this.scorchAt(p, rnd);
+    const crater = this.craterAt(p, seed); // (its own dice, not rnd's: the chips fly as they always have from the seed)
     // Where they go: anywhere over the whole sphere, each chip its own random direction (no lattice: with nothing evening
     // them out they bunch and leave gaps by chance, as a burst casing's do)
     const norm = () => Math.sqrt(-2 * Math.log(1 - rnd())) * Math.cos(Math.PI * 2 * rnd());
@@ -1871,7 +1872,7 @@ const G_Me = {
       line = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0xffd9a0, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }));
       line.frustumCulled = false; G.R.dynRoot.add(line);
     }
-    const q = { p: p.clone(), enemy, seed: seed || 0, marksOnly: !!marksOnly, n, i: 0, dir, m, v, pos, line, geo, shot: { sid: 0, ff: new Map(), f: 0, enemy: enemy || undefined } as any, per: new Map<string, any>(),
+    const q = { p: p.clone(), crater, enemy, seed: seed || 0, marksOnly: !!marksOnly, n, i: 0, dir, m, v, pos, line, geo, shot: { sid: 0, ff: new Map(), f: 0, enemy: enemy || undefined } as any, per: new Map<string, any>(),
       ms: 0, maxMs: 0, frames: 0, walls: 0, mats: {} as Record<string, number[]>, escaped: 0, puffs: 0, blood: 0, fade: -1 };
     (this.fragQ = this.fragQ || []).push(q);
   },
@@ -1976,8 +1977,10 @@ const G_Me = {
       adv(wall.t);
       q.walls++;
       const vIn = v, r = B.crossSolid(map, proj, v, wall, o, d);
-      // its pock on the face it struck (whether it stopped, went through or glanced off), turned to face the way it came
-      { const f = d.x * wall.n[0] + d.y * wall.n[1] + d.z * wall.n[2] > 0 ? -1 : 1; G.R.fragMark(o, [wall.n[0] * f, wall.n[1] * f, wall.n[2] * f], r.fx, G.U.clamp(Math.sqrt(vIn / 600), 0.5, 1.3) * (r.ric ? 0.6 : 1), (i * 0.6180339) % 1, (i * 0.7548777) % 1); }
+      // its pock on the face it struck (whether it stopped, went through or glanced off), turned to face the way it came; none
+      // in the crater under the burst, which stands for them all (craterAt)
+      const C = q.crater;
+      if (!(C && Math.abs(wall.n[1]) > 0.7 && Math.abs(o.y - C.y) < 0.12 && Math.hypot(o.x - C.x, o.z - C.z) < C.r)) { const f = d.x * wall.n[0] + d.y * wall.n[1] + d.z * wall.n[2] > 0 ? -1 : 1; G.R.fragMark(o, [wall.n[0] * f, wall.n[1] * f, wall.n[2] * f], r.fx, G.U.clamp(Math.sqrt(vIn / 600), 0.5, 1.3) * (r.ric ? 0.6 : 1), (i * 0.6180339) % 1, (i * 0.7548777) % 1); }
       wallEv(r.ric ? 'r' : 'e', wall.n, r.name);
       { const mm = q.mats[r.name || "?"] = q.mats[r.name || "?"] || [0, 0, 0]; if (r.ric) mm[2]++; else if (!r.v) mm[0]++; else mm[1]++; } // (what the walls did: stopped, let through, glanced)
       if (q.puffs < F.PUFFS && !hitSomething && Math.random() < 0.05) { q.puffs++; G.R.particles(o.clone(), 3, 0xb4aa98, 2.5, 0.35, 2, 0.5); }
@@ -1991,6 +1994,19 @@ const G_Me = {
   // The soot where a grenade went off, on the floor (or table) under it: faint if it went off in the air, none if high. The
   // same on every screen: it is worked out from the burst's point and seed alone. (Flashbangs leave none: they are all
   // light and noise.)
+  // A frag that went off on (or just over) the floor blows a shallow pit in it, and its downward chips (about half of them, at a
+  // hand's breadth up: most within half a metre) tear up the ground round that: one crater (js/render.ts crater) in place of
+  // hundreds of pocks heaped on top of each other. Its size: CRATER.R across the torn-up patch, less the higher it went off;
+  // none over CRATER.H. Its dice are the seed's own (every screen the same crater), apart from the chips'.
+  CRATER: { R: 0.5, H: 0.3 },
+  craterAt(p: THREE.Vector3, seed?: number) {
+    const map = G.Game.map; if (!map) return null;
+    const g = G.Level.groundAt(map, p.x, p.z, 0.01, p.y + 0.05), h = p.y - g;
+    if (h > this.CRATER.H || h < -0.05) return null;
+    const rnd = seed ? G.U.rng(((seed ^ 0x5bd1e995) >>> 0) || 1) : Math.random, r = this.CRATER.R * (1 - 0.45 * Math.max(0, h) / this.CRATER.H) * (0.9 + 0.2 * rnd());
+    G.R.crater(p.x, g, p.z, r * 2.1, rnd() * 6.283);
+    return { x: p.x, y: g, z: p.z, r };
+  },
   scorchAt(p: THREE.Vector3, rnd: () => number) {
     const map = G.Game.map; if (!map) return;
     const g = G.Level.groundAt(map, p.x, p.z, 0.01, p.y + 0.05), h = p.y - g, d = 0.6 + 0.9 * rnd(), rot = rnd() * 6.283;
@@ -2042,6 +2058,7 @@ const G_Me = {
       if (f < 0.01) continue;
       this.queueHit(ev.id, 0, false, f);
       const h = this.hitQ.get(ev.id)!; h.gr = seed;
+      h.tb = [+(q.burn.toFixed(2)), +(q.blast.toFixed(2))]; // (what the fireball did, burns and blast, each a share of a life: the host keeps it on them for F9, js/hud.ts)
       if (q.blast > 0.3) (h.w = h.w || []).push(['thorax', 'lung', '', `lungL:${Math.round(Math.min(1, q.blast) * 80)},lungR:${Math.round(Math.min(1, q.blast) * 80)}`]); // (blast lung: the air sacs torn)
       ev.selfHit = true;
     }
@@ -2665,6 +2682,7 @@ const G_Me = {
     this.bleed = G.Med.bleedOut(this.body);
     this.stats.downs++;
     this.reloading = false;
+    this.action = null; // (whatever your hands were doing, zip-tying, bagging, at a door: let go, so the squad doesn't see you still reaching)
     if (this.slot !== 's' && this.weapons.s) { this.slot = 's'; G.R.setViewmodel(this.cur().def); }
     G.Audio.down();
     G.Net.toHost({ t: 'chat', m: '[is down and needs a revive!]' });
@@ -2691,6 +2709,7 @@ const G_Me = {
     this.down = false; this.out = false;
     this.dead = true;
     this.hp = 0;
+    this.action = null; // (killed outright mid-action: let go of it, as going down does)
     this.deathCause = how || 'Bled out';
     G.R.setViewmodel(null);
     G.HUD.toast('KIA', this.deathCause, 3);

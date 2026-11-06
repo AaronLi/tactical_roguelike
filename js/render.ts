@@ -55,7 +55,7 @@ const G_R = {
   points: undefined as unknown as THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial>,
   decals: undefined as unknown as RMark[],
   decalIdx: undefined as unknown as number,
-  FRAG_MARKS: 3000, fragMarks: undefined as unknown as THREE.InstancedMesh, fragN: 0, fragDirty: false, scorches: [] as THREE.Mesh[], scorchIdx: 0,
+  FRAG_MARKS: 3000, fragMarks: undefined as unknown as THREE.InstancedMesh, fragN: 0, fragDirty: false, scorches: [] as THREE.Mesh[], scorchIdx: 0, craters: [] as THREE.Mesh[], craterIdx: 0,
   bloodMats: undefined as unknown as RBloodMats,
   bloodMarks: undefined as unknown as RMark[],
   bloodIdx: undefined as unknown as number,
@@ -105,7 +105,8 @@ const G_R = {
   nvScene: undefined as THREE.Scene | undefined,
   depthOnly: undefined as THREE.MeshBasicMaterial | undefined,
   init() {
-    const r = (this.renderer = new THREE.WebGLRenderer({ antialias: true, stencil: true, powerPreference: 'high-performance' }));
+    const r = (this.renderer = new THREE.WebGLRenderer({ antialias: true, stencil: true, powerPreference: 'high-performance', reversedDepthBuffer: true }));
+    this.reverseDepth(r);
     r.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     r.setSize(window.innerWidth, window.innerHeight);
     r.domElement.id = 'c';
@@ -167,6 +168,29 @@ const G_R = {
 
     this._initFx();
     window.addEventListener('resize', () => this.resize());
+  },
+  // A reversed depth buffer (EXT_clip_control: the near plane at depth 1, the far plane at 0, cleared to 0 and tested
+  // greater-than; three does that, the shadow maps' comparisons included, when it's asked for and the browser has it, and
+  // falls back to the usual one when it hasn't). Its point is a floating-point depth buffer: there the float's own
+  // precision, finest near 0, sits at the far end, where the projection leaves least, so distant surfaces close together
+  // (a roof's edge on a wall 300 m off through a scope) no longer fight. The screen's own depth buffer is 24-bit fixed
+  // point (a canvas can't have another), where it changes little either way; the scope's picture, magnified, is where
+  // distant surfaces come close enough to see fight, and it gets a 32-bit float one (viewRT). (Night vision's and the
+  // fisheye's frames, the screen's size, keep 24 bits: a float one with its stencil there cost the GPU more and showed nothing.)
+  //   - three turns a polygon offset's factor round for a reversed buffer but not its units (r186), so a decal held
+  //     off its wall by units (the stickers, the range's lane numbers) went behind it: both are turned here.
+  //   - a point projected through a camera that's been drawn with it is behind the eye with z < 0 (it was z > 1): behind().
+  reverseDepth(r: THREE.WebGLRenderer) {
+    if (!r.capabilities.reversedDepthBuffer) return;
+    const st = r.state as any, po = st.setPolygonOffset;
+    st.setPolygonOffset = function (on: boolean, factor: number, units: number) { return po.call(this, on, factor, st.buffers.depth.getReversed() ? -units : units); };
+  },
+  behind(v: THREE.Vector3, cam: THREE.Camera) { return (cam as any).reversedDepth ? v.z < 0 : v.z > 1; },
+  // the scope picture's target (opts: the WebGLRenderTarget's): with a reversed depth buffer, its
+  // depth 32-bit float (see above); the depth isn't read after, so it's not resolved out of the multisampled buffer
+  viewRT(w: number, h: number, opts: THREE.RenderTargetOptions) {
+    const rev = this.renderer && this.renderer.capabilities.reversedDepthBuffer;
+    return new THREE.WebGLRenderTarget(w, h, rev ? Object.assign({}, opts, { depthTexture: new THREE.DepthTexture(w, h, THREE.FloatType), resolveDepthBuffer: false, resolveStencilBuffer: false }) : opts);
   },
   // the roll-off (the shoulder of Khronos' PBR Neutral, on linear light): a channel's peak over the knee (0.76) eased
   // toward 1, the colour scaled with it, and toward white by how much was taken off (desaturation 0.15). (Not its toe:
@@ -322,13 +346,14 @@ const G_R = {
     for (const m of [...(this.decals || []), ...(this.bloodMarks || [])]) if (m.parent && m.parent !== this.scene) this.scene.add(m);
     const dispose = (o: THREE.Object3D) => {
       o.traverse((c: any) => {
+        if (c.isBatchedMesh && c._matricesTexture) c.dispose(); // (its geometry, and the textures of its instances' matrices)
         if (c.geometry) c.geometry.dispose();
         if (c.material && !c.userData.keepMat) (Array.isArray(c.material) ? c.material : [c.material]).forEach((m: THREE.Material & { map?: THREE.Texture | null }) => { if (m.map) m.map.dispose(); m.dispose(); }); // (keepMat: shared, js/scars.ts's)
       });
     };
     while (this.levelRoot.children.length) { const c = this.levelRoot.children[0]; dispose(c); this.levelRoot.remove(c); }
     this.decals.forEach((d: THREE.Object3D) => (d.visible = false));
-    this.fragMarks.count = 0; this.fragN = 0; this.scorches.forEach((m) => (m.visible = false));
+    this.fragMarks.count = 0; this.fragN = 0; this.scorches.forEach((m) => (m.visible = false)); this.craters.forEach((m) => (m.visible = false));
     for (const r of this.fires) r.t = 1e9; this.fireStep(0); // (a thermobaric's fireball still burning: gone with the level)
     if (this.bloodMarks) { this.bloodMarks.forEach((d: THREE.Object3D) => (d.visible = false)); this.pools.forEach((d: THREE.Object3D) => { d.visible = false; d.userData.owner = null; }); }
   },
@@ -513,6 +538,15 @@ const G_R = {
         m.rotation.x = -Math.PI / 2; m.visible = false; this.scene.add(m); this.scorches.push(m);
       }
       this.scorchIdx = 0;
+      // and the crater a frag leaves on the floor it went off on (crater): a few looks, lit (its pale rim and dust would glow in
+      // the dark unlit), over the scorch
+      const looks = [3301, 4409, 5527].map((sd) => this.craterTexture(sd));
+      this.craters = [];
+      for (let i = 0; i < 12; i++) {
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshLambertMaterial({ map: looks[i % looks.length], transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3 }));
+        m.rotation.x = -Math.PI / 2; m.renderOrder = 1; m.visible = false; this.scene.add(m); this.craters.push(m);
+      }
+      this.craterIdx = 0;
     }
 
     // Blood where it lands: droplets (a drop with a few satellites) and smears on the floor or a tabletop,
@@ -806,8 +840,20 @@ const G_R = {
     m.material.color.setHex(color); m.material.opacity = op;
     m.userData.f = this.frameNo; m.visible = true;
   },
-  particles(p: THREE.Vector3, n: number, color: number, speed: number, life: number, grav = 9, spread = 1, dir?: ArrayLike<number> | null, blood?: boolean) {
+  // How lit a point is, for what's drawn unlit (the particles, the blood's drops: points, not lit by three.js): the light grid
+  // there with the sky's fill, as a share of an ordinary lit room's (PART_LIT), so dust and blood are dark in a dark room
+  // (bright under night vision's gain otherwise) and as they were in the light. 1 where there's no grid (the menus' scenes).
+  PART_LIT: 0.35, PART_MIN: 0.03, _partC: new THREE.Color(),
+  partLight(p: THREE.Vector3) {
+    if (!this.vmDark || !G.LightGrid) return 1;
+    const E = G.LightGrid.at(p.x, p.y, p.z, this._partC, 0.4), h = this.hemi, hk = h.intensity / Math.PI; // (the fill in r149's units, as the grid's: eyeLight)
+    const l = 0.2126 * (E.r + h.color.r * hk) + 0.7152 * (E.g + h.color.g * hk) + 0.0722 * (E.b + h.color.b * hk);
+    return G.U.clamp(l / this.PART_LIT, this.PART_MIN, 1);
+  },
+  // (glow: what gives off its own light, sparks, fire, embers, a flash: not dimmed by the dark)
+  particles(p: THREE.Vector3, n: number, color: number, speed: number, life: number, grav = 9, spread = 1, dir?: ArrayLike<number> | null, blood?: boolean, glow = false) {
     const col = new THREE.Color(color);
+    if (!glow) col.multiplyScalar(this.partLight(p));
     for (let k = 0; k < n; k++) {
       const i = this.pIdx; this.pIdx = (this.pIdx + 1) % this.PN;
       this.pBlood[i] = blood ? 1 : 0;
@@ -828,7 +874,7 @@ const G_R = {
     this.sPos[i * 3] = p.x; this.sPos[i * 3 + 1] = p.y; this.sPos[i * 3 + 2] = p.z;
     this.sVel[i * 3] = vx; this.sVel[i * 3 + 1] = vy; this.sVel[i * 3 + 2] = vz;
     this.sLife[i] = 1.3;
-    const c = _bjc.setHex(color), v = 0.8 + Math.random() * 0.2;
+    const c = _bjc.setHex(color), v = (0.8 + Math.random() * 0.2) * this.partLight(p);
     this.sBase[i * 3] = c.r * v; this.sBase[i * 3 + 1] = c.g * v; this.sBase[i * 3 + 2] = c.b * v;
   },
   // what a round throws up, by what it hit (js/materials.ts fx): sparks [colour, how many, speed, life, gravity], and the puff of it
@@ -841,7 +887,7 @@ const G_R = {
     if (kind === 'blood') { this.particles(p, 8, 0x8a0a0a, 2.5, 1.2, 9, 0.8, n, true); return; } // (each leaves a drop where it lands)
     if (kind === 'armor') { this.particles(p, 6, 0x9fd8ff, 3, 0.25, 6, 1); return; }
     const fxs = (this.IMPACT as Record<string, any>)[fx!] || this.IMPACT.stone;
-    if (fxs.s) this.particles(p, fxs.s[1], fxs.s[0], fxs.s[2], fxs.s[3], fxs.s[4], 0.8, n);
+    if (fxs.s) this.particles(p, fxs.s[1], fxs.s[0], fxs.s[2], fxs.s[3], fxs.s[4], 0.8, n, false, true); // (sparks: hot, their own light)
     if (fxs.d && !o) this.particles(p, fxs.d[1], fxs.d[0], fxs.d[2], 0.6, 1, 0.6, n); // (the rest of what's thrown out: js/scars.ts)
     if (kind !== 'wall' || (o && o.m === '')) return; // (o.m '': nothing there to damage)
     // the damage it did, and what it threw out of it (js/scars.ts), by what it hit and how; marks are from the pool, so a reused
@@ -926,6 +972,50 @@ const G_R = {
     for (let i = 0; i < 40; i++) { const a = rnd() * 6.283, r = S * (0.2 + 0.25 * rnd()); g.fillStyle = `rgba(35,33,30,${0.08 + 0.15 * rnd()})`; g.beginPath(); g.arc(Math.cos(a) * r, Math.sin(a) * r, 1 + rnd() * 4, 0, 6.283); g.fill(); } // (flecks of it)
     return new THREE.CanvasTexture(c);
   },
+  // A frag grenade's crater, seen from above (one look of three, seed: its dice): a shallow pit blown into the surface, dark and
+  // ragged, a pale rim of what was pulverised, and round it the ground its downward chips tore up, pocked thick near the pit and
+  // thinning out. It stands in for those chips' own pocks there (js/player.ts fragOne leaves none inside it), which in a heap
+  // read as a sieve, not as a hole. The texture's edge is the patch it covers (crater: d across).
+  craterTexture(seed: number) {
+    const S = 256, c = document.createElement('canvas'); c.width = c.height = S;
+    const g = c.getContext('2d') as CanvasRenderingContext2D, rnd = G.U.rng(seed), H = S / 2, PIT = H * 0.3;
+    g.translate(H, H);
+    // the torn-up ground: dust and grit, fading out to the edge
+    const dust = g.createRadialGradient(0, 0, PIT, 0, 0, H * 0.98);
+    dust.addColorStop(0, 'rgba(70,66,60,0.55)'); dust.addColorStop(0.45, 'rgba(95,90,82,0.28)'); dust.addColorStop(1, 'rgba(110,105,96,0)');
+    g.fillStyle = dust; g.beginPath(); g.arc(0, 0, H * 0.98, 0, 6.283); g.fill();
+    // gouges running out from the pit, where chips skipped along the surface
+    g.lineCap = 'round';
+    for (let i = 0; i < 46; i++) {
+      const a = rnd() * 6.283, r0 = PIT * (0.9 + 0.2 * rnd()), r1 = r0 + H * (0.1 + 0.45 * rnd() * rnd());
+      g.strokeStyle = `rgba(${18 + rnd() * 20 | 0},${17 + rnd() * 18 | 0},${15 + rnd() * 16 | 0},${0.25 + 0.4 * rnd()})`; g.lineWidth = 1 + rnd() * 2.5;
+      g.beginPath(); g.moveTo(Math.cos(a) * r0, Math.sin(a) * r0); g.lineTo(Math.cos(a) * r1, Math.sin(a) * r1); g.stroke();
+    }
+    // the chips' pocks, thick by the pit and fewer outwards, each a dark hole with a pale chipped edge
+    for (let i = 0; i < 420; i++) {
+      const a = rnd() * 6.283, r = PIT + (H * 0.95 - PIT) * Math.pow(rnd(), 1.8), s = 0.6 + 1.6 * rnd() * (1 - 0.5 * (r - PIT) / H);
+      const x = Math.cos(a) * r, y = Math.sin(a) * r;
+      g.fillStyle = `rgba(190,184,172,${0.25 + 0.25 * rnd()})`; g.beginPath(); g.arc(x, y, s * 1.7, 0, 6.283); g.fill();
+      g.fillStyle = `rgba(14,13,12,${0.65 + 0.3 * rnd()})`; g.beginPath(); g.arc(x, y, s, 0, 6.283); g.fill();
+    }
+    // the rim: what the blast smashed, pale and broken
+    const rim: number[] = []; for (let i = 0; i < 40; i++) rim.push(PIT * (0.85 + 0.35 * rnd()));
+    const ring = (k: number) => { g.beginPath(); for (let i = 0; i <= 40; i++) { const a = (i / 40) * 6.283, r = rim[i % 40] * k; i ? g.lineTo(Math.cos(a) * r, Math.sin(a) * r) : g.moveTo(Math.cos(a) * r, Math.sin(a) * r); } g.closePath(); };
+    ring(1.22); g.fillStyle = 'rgba(176,170,158,0.7)'; g.fill();
+    // the pit: dark, deeper looking where the light from above doesn't reach (its far wall lit, the near one in shadow)
+    ring(1);
+    const pit = g.createRadialGradient(PIT * 0.25, PIT * 0.25, PIT * 0.1, 0, 0, PIT * 1.15);
+    pit.addColorStop(0, 'rgba(8,7,6,0.97)'); pit.addColorStop(0.6, 'rgba(22,20,18,0.95)'); pit.addColorStop(1, 'rgba(70,66,60,0.9)');
+    g.fillStyle = pit; g.fill();
+    for (let i = 0; i < 26; i++) { const a = rnd() * 6.283, r = PIT * 0.8 * Math.sqrt(rnd()); g.fillStyle = `rgba(${90 + rnd() * 60 | 0},${86 + rnd() * 56 | 0},${80 + rnd() * 50 | 0},${0.3 + 0.4 * rnd()})`; g.beginPath(); g.arc(Math.cos(a) * r, Math.sin(a) * r, 0.8 + 2 * rnd(), 0, 6.283); g.fill(); } // (rubble in it)
+    const t = new THREE.CanvasTexture(c); t.anisotropy = 4;
+    return t;
+  },
+  // a frag's crater (craterTexture) on the surface it went off over (y: its height), d across, turned rot. Pooled: the oldest reused.
+  crater(x: number, y: number, z: number, d: number, rot: number) {
+    const m = this.craters[this.craterIdx]; this.craterIdx = (this.craterIdx + 1) % this.craters.length;
+    m.position.set(x, y + 0.016 + 0.0004 * this.craterIdx, z); m.rotation.z = rot; m.scale.set(d, d, 1); m.visible = true;
+  },
   // A scorch on the surface a grenade went off over (y: that surface's height): d across, k how strong (a grenade that
   // went off in the air leaves a faint one), rot: its turn. Pooled: the oldest is reused.
   scorch(x: number, y: number, z: number, d: number, k: number, rot: number) {
@@ -939,7 +1029,7 @@ const G_R = {
     m.userData.life = m.userData.max = 0.45; m.userData.r = radius;
     const l = this.blastLights.reduce((a: THREE.PointLight, b: THREE.PointLight) => (b.intensity < a.intensity ? b : a));
     l.position.copy(p); l.intensity = Math.PI * 6; l.userData.by = m;
-    this.particles(p, 40, 0xffa040, 9, 0.6, 4, 1);
+    this.particles(p, 40, 0xffa040, 9, 0.6, 4, 1, null, false, true);
     this.particles(p, 30, 0x444038, 3, 1.4, -0.5, 1);
   },
   // A thermobaric's fireball (js/player.ts tbModel): flame in every cell of floor its cloud reached, lit in the order it reached
@@ -992,7 +1082,7 @@ const G_R = {
     this.fires.push(rec);
     // soot on the floor where it burned, and the embers it throws
     for (let k = 0; k < Math.min(6, 1 + (n / 18 | 0)); k++) { const i = Math.floor(rnd() * n), c = M.fill.order[i]; this.scorch(((c % W) + 0.5) * TS, gys[i], (((c / W) | 0) + 0.5) * TS, 1.3 + rnd(), 0.75, rnd() * 6.283); }
-    for (let k = 0; k < 6; k++) { const i = Math.floor(rnd() * n), c = M.fill.order[i]; this.particles(new T.Vector3(((c % W) + 0.5) * TS, floor + 1.2, (((c / W) | 0) + 0.5) * TS), 8, 0xffa040, 4, 0.9, 3, 1); }
+    for (let k = 0; k < 6; k++) { const i = Math.floor(rnd() * n), c = M.fill.order[i]; this.particles(new T.Vector3(((c % W) + 0.5) * TS, floor + 1.2, (((c / W) | 0) + 0.5) * TS), 8, 0xffa040, 4, 0.9, 3, 1, null, false, true); }
   },
   fireStep(dt: number) {
     if (!this.fires.length) return;
@@ -1059,7 +1149,7 @@ const G_R = {
   flashAt(p: THREE.Vector3) {
     const l = this.muzzleLights[this.mlIdx = ((this.mlIdx || 0) + 1) % this.muzzleLights.length];
     if (l) { l.position.copy(p); l.color.setHex(0xffffff); l.intensity = Math.PI * 40; l.distance = 26; l.userData.t = 0.12; }
-    this.particles(p, 30, 0xfff6d8, 5, 0.35, 2, 1.6);
+    this.particles(p, 30, 0xfff6d8, 5, 0.35, 2, 1.6, null, false, true);
   },
   muzzleFlashAt(p: THREE.Vector3, color = 0xffb060) {
     const l = this.muzzleLights[this.muzzleIdx]; this.muzzleIdx = (this.muzzleIdx + 1) % this.muzzleLights.length;
@@ -1180,7 +1270,7 @@ const G_R = {
   //     intensified picture as amber outlines, stronger the hotter against what's behind: a warm body in a black room
   //     or in smoke is a crisp outline where the picture has nothing.
   // What the suspects see is the host's business and the same as ever: night vision only helps you see.
-  GAIN_MIN: 14, NV_TARGET: 0.1, NV_DIM: 0.1, NV_VM_D: 1.1, HEAT_LAYER: 3,
+  GAIN_MIN: 14, NV_TARGET: 0.1, NV_DIM: 0.1, NV_VM_D: 1.1, NV_LENS_D: 0.04, HEAT_LAYER: 3,
   _nvTubes: [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()],
   nvMaterial() {
     return new THREE.ShaderMaterial({ depthTest: false, depthWrite: false, toneMapped: false,
@@ -1207,7 +1297,7 @@ const G_R = {
           if (inside <= 0.0) { gl_FragColor = sRGBTransferOETF(vec4(bpTone(plain), 1.0)); return; }
           vec2 uv = ctr + (vUv - ctr) * (1.0 - 0.035 * e * e); // (pincushioned toward the edge)
           vec2 hq = texture2D(heatMap, uv).rg; float dist = hq.g > 0.0 ? 1.0 / hq.g - 1.0 : 1e4; // (distance: 1 / (1 + d))
-          float blur = smoothstep(0.45, 1.0, e) * 2.2 + clamp(1.35 / max(dist, 0.05) - 0.12, 0.0, 2.6);
+          float blur = smoothstep(0.45, 1.0, e) * 2.2 + clamp(1.35 / max(dist, 0.05) - 0.12, 0.0, 2.6) + (dist < 0.07 ? 3.4 : 0.0); // (under 7 cm: a magnified scope's lens, NV_LENS_D, nothing else that near: past use)
           float avg = max(cath(textureLod(map, vec2(0.5), lod).rgb), 1e-6), gain = clamp(target / avg, gMin, gMax);
           float L = cath(textureLod(map, uv, blur).rgb) * gain;
           // halos: the blurred frame's over-bright part where it is, and on two rings round it (the soft ringing edge)
@@ -1246,13 +1336,18 @@ const G_R = {
   // on HEAT_LAYER (js/rig.ts heatMark: a living body's warm, a dead one cooling), and the hot spots (the muzzle flashes and
   // fireballs this moment); then, with vm, the gun in your hands (near, at the room's temperature: but a reflex sight's window far, its dot
   // being at infinity, and a 1x scope's lens likewise)
-  heatMats: null as null | { cold: THREE.ShaderMaterial; near: THREE.ShaderMaterial; far: THREE.ShaderMaterial; warm: THREE.ShaderMaterial[] },
+  heatMats: null as null | { cold: THREE.ShaderMaterial; near: THREE.ShaderMaterial; lens: THREE.ShaderMaterial; far: THREE.ShaderMaterial; warm: THREE.ShaderMaterial[] },
   heatFx: null as null | { scene: THREE.Scene; spots: THREE.Mesh[] },
   // (heat < 0: the room's own temperature, as the cold things are: a little warmer facing up (the warm air under the ceiling,
   // the floor's own), a slow mottle over it, so a thermal picture has walls and floors to it)
   _heatMat(heat: number, d: number | null, opts: THREE.ShaderMaterialParameters = {}) {
     return new THREE.ShaderMaterial(Object.assign({ toneMapped: false, fog: false,
-      vertexShader: `varying float vD; varying vec3 vW; varying float vN; void main() { vec4 p = vec4(position, 1.0); vec3 n = normal;
+      vertexShader: `#include <batching_pars_vertex>
+        varying float vD; varying vec3 vW; varying float vN; void main() { vec4 p = vec4(position, 1.0); vec3 n = normal;
+        #include <batching_vertex>
+        #ifdef USE_BATCHING
+        p = batchingMatrix * p; n = mat3(batchingMatrix) * n;
+        #endif
         #ifdef USE_INSTANCING
         p = instanceMatrix * p; n = mat3(instanceMatrix) * n;
         #endif
@@ -1286,7 +1381,7 @@ const G_R = {
   },
   _heatPass(cam: THREE.Camera, rt: THREE.WebGLRenderTarget, vm: boolean) {
     const r = this.renderer, sc = this.scene, bg = sc.background, hid: THREE.Object3D[] = [];
-    const H = this.heatMats || (this.heatMats = { cold: this._heatMat(-1, null), near: this._heatMat(-1, this.NV_VM_D), far: this._heatMat(-1, Infinity, { depthTest: false, depthWrite: false, side: THREE.DoubleSide }), warm: Array.from({ length: 11 }, (_, i) => this._heatMat(i / 10, null)) });
+    const H = this.heatMats || (this.heatMats = { cold: this._heatMat(-1, null), near: this._heatMat(-1, this.NV_VM_D), lens: this._heatMat(-1, this.NV_LENS_D), far: this._heatMat(-1, Infinity, { depthTest: false, depthWrite: false, side: THREE.DoubleSide }), warm: Array.from({ length: 11 }, (_, i) => this._heatMat(i / 10, null)) });
     const cc = r.getClearColor(new THREE.Color()), ca = r.getClearAlpha();
     r.setRenderTarget(rt); r.setClearColor(0x000000, 1); r.clear();
     sc.background = null;
@@ -1320,7 +1415,7 @@ const G_R = {
       this.vmRoot.traverseVisible((o: any) => {
         if (!o.isMesh) { if (o.isSprite || o.isPoints || o.isLine) vh.push(o); return; }
         const m = o.material;
-        if (pip && o === pip.disk) { vsw.push([o, m]); o.material = pip.mag <= 1.05 || pip.thermal ? H.far : H.near; return; } // (a 1x scope, and a thermal sight's screen, in focus; magnified glass not)
+        if (pip && o === pip.disk) { vsw.push([o, m]); o.material = pip.mag <= 1.05 || pip.thermal ? H.far : H.lens; return; } // (a 1x scope, and a thermal sight's screen, in focus; magnified glass far out of it: its picture's a smear through the goggles, NV_LENS_D)
         if (m.colorWrite === false && m.stencilWrite) { vsw.push([o, m]); o.material = H.far; return; } // (a reflex sight's window)
         if (m.stencilWrite || m.transparent || m.blending === THREE.AdditiveBlending) { vh.push(o); return; } // (its reticle, a flash, glass)
         vsw.push([o, m]); o.material = H.near;
@@ -1358,7 +1453,7 @@ const G_R = {
   },
   // ------------------------------------------------------------ picture-in-picture scopes
   pipTexture() {
-    if (!this.pipRT) this.pipRT = new THREE.WebGLRenderTarget(512, 512, { samples: 4 });
+    if (!this.pipRT) this.pipRT = this.viewRT(512, 512, { samples: 4 });
     return this.pipRT.texture;
   },
   // Render the world from the scope's ocular lens along its axis. The view is the lens's angular size (seen

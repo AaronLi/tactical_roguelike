@@ -67,6 +67,7 @@ const G_Game = {
   weaponsLeft: undefined as unknown as number,
   lastBonus: undefined as number | undefined,
   backdropT: undefined as number | undefined,
+  backdropMap: null as LvMap | null, // (the menus' turning level: menuBackdrop)
   invT: undefined as number | undefined,
   abox: undefined as GmAbox | null | undefined,
   sbox: undefined as GmSbox | null | undefined,
@@ -557,7 +558,7 @@ const G_Game = {
       setTimeout(() => {
         if (this.map) return;
         const map = G.Level.generate(1234, 3);
-        setTimeout(() => { if (this.map) return; this.map = map; G.R.setLevel(map); this.backdropT = 0; }, 0);
+        setTimeout(() => { if (this.map) return; this.map = this.backdropMap = map; G.R.setLevel(map); this.backdropT = 0; }, 0);
       }, 0);
     };
     requestAnimationFrame(() => {
@@ -566,8 +567,15 @@ const G_Game = {
       setTimeout(go, 1200);
     });
   },
+  // What's behind the menus before a run's first level: the main menu's guns (js/menushow.ts) on the menu, in the lobby and on
+  // the first route (the hangar's behind a later one), not the slowly turning level. That level is only drawn when the guns
+  // aren't up yet (their models still coming), so its shaders aren't compiled on the spot the first time a menu shows it.
+  showcaseBehind() {
+    const p = this.phase;
+    return !!G.MenuShow && (p === 'menu' || p === 'lobby' || (p === 'route' && (!this.map || this.map === this.backdropMap)));
+  },
   menuBackdrop() {
-    this.map = G.Level.generate(1234, 3);
+    this.map = this.backdropMap = G.Level.generate(1234, 3);
     G.R.setLevel(this.map);
     this.backdropT = 0;
   },
@@ -863,7 +871,7 @@ const G_Game = {
     if (G.Highlights) G.Highlights.kill(m);
     if (m.inc) { // (down already: counted then, js/server.ts incapacitate)
       const def = (G.ENEMIES as Record<string, any>)[m.ty];
-      if (m.bo) G.HUD.feed(`<span class="dim">${def ? def.name : 'Suspect'} bled out</span>`);
+      if (m.bo || m.cz) G.HUD.feed(`<span class="dim">${def ? def.name : 'Suspect'} ${m.cz === 'burns' ? 'died of burns' : m.cz === 'blast' ? 'died of blast lung' : 'bled out'}</span>`);
       return;
     }
     this.credit(m);
@@ -908,7 +916,7 @@ const G_Game = {
     this.phase = 'lobby';
     if (document.pointerLockElement) document.exitPointerLock();
     G.Views.clearLevel();
-    if (!this.map) this.menuBackdrop();
+    if (!this.map && !(G.MenuShow && G.MenuShow.live)) this.menuBackdrop(); // (the menu's guns go on behind the lobby too: showcaseBehind; the level's only built for it if they're not up yet)
     this.screen('lobby');
     this.renderLobby();
   },
@@ -1195,7 +1203,7 @@ const G_Game = {
     if (document.pointerLockElement) document.exitPointerLock();
     this.$('clickToPlay').classList.add('hidden');
     G.Views.clearLevel();
-    if (!this.map) this.menuBackdrop();
+    if (!this.map && !(G.MenuShow && G.MenuShow.live)) this.menuBackdrop();
     this.screen('route');
     this.renderRoute();
     this.sidearmPick();
@@ -1462,8 +1470,8 @@ const G_Game = {
       G.Me.flushHits();
       this.updateZone();
       this.updateDoors(dt);
-    } else if (this.phase === 'menu' && G.MenuShow && G.MenuShow.update(dt)) {
-      // the main menu: the guns one after another (js/menushow.ts), drawn below instead of the level
+    } else if (this.showcaseBehind() && G.MenuShow.update(dt)) {
+      // the main menu, the lobby and a run's first route: the guns one after another (js/menushow.ts), drawn below instead of the level
     } else if (this.map) {
       // menu / shop backdrop camera
       this.backdropT = (this.backdropT || 0) + dt * 0.08;
@@ -1474,7 +1482,7 @@ const G_Game = {
     }
     G.R.update(dt);
     G.HUD.update(dt);
-    if (this.phase === 'menu' && G.MenuShow && G.MenuShow.live) G.MenuShow.render(G.R.renderer); else if (!G.R.warmStep()) G.R.render(); // (the shaders being built under the veil: nothing drawn till they are, js/render.ts warmup)
+    if (this.showcaseBehind() && G.MenuShow.live) G.MenuShow.render(G.R.renderer); else if (!G.R.warmStep()) G.R.render(); // (the shaders being built under the veil: nothing drawn till they are, js/render.ts warmup)
     // the veil lifts once the new place has drawn veilN SMOOTH frames in a row (the first ones after a build upload textures and collect garbage: lifting
     // on those makes the wipe stutter off), or after 90 frames whatever they took (a slow machine still gets in)
     if (this.veilN > 0) {

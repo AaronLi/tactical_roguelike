@@ -572,7 +572,7 @@ const G_Highlights = (() => {
     P.clips = R.clips.slice().sort((a, b) => a.t - b.t); P.stats = new Map(R.stats); P.actors = new Map(R.actors); P.levelN = R.level; P.theme = R.theme;
     P.fired = new Map(R.fired); P.kgun = new Map(R.kgun); P.glass = R.glass.slice();
   }
-  function disposeNodes(nodes: THREE.Object3D[]) { for (const n of nodes || []) n.traverse((c: any) => { if (c.geometry) c.geometry.dispose(); if (c.material) (Array.isArray(c.material) ? c.material : [c.material]).forEach((m: any) => { if (m.map) m.map.dispose(); m.dispose(); }); }); }
+  function disposeNodes(nodes: THREE.Object3D[]) { for (const n of nodes || []) n.traverse((c: any) => { if (c.isBatchedMesh && c._matricesTexture) c.dispose(); if (c.geometry) c.geometry.dispose(); if (c.material) (Array.isArray(c.material) ? c.material : [c.material]).forEach((m: any) => { if (m.map) m.map.dispose(); m.dispose(); }); }); }
   function drop() {
     if (P.level) { disposeNodes(P.level.children.slice()); P.level = null; }
     P.map = null as unknown as LvMap; P.clips = []; clearRigs();
@@ -3156,7 +3156,7 @@ const G_Highlights = (() => {
     fl.events.forEach((e, i: number) => {
       if (e.k === 'x' || e.x > x + 0.01 || !e.name) return;
       v.copy(e.p).project(P.cam);
-      if (v.z > 1) return;
+      if (G.R.behind(v, P.cam)) return;
       const out = fl.events.slice(i + 1).find((q) => q.k === 'x'), vIn = fl.pts[e.i].v, vOut = e.k === 'r' ? (fl.pts[e.i + 1] || fl.pts[e.i]).v : out ? fl.pts[out.i].v : vIn;
       const px = G.U.clamp((v.x + 1) / 2 * W, 150, W - 150), py = G.U.clamp((1 - v.y) / 2 * H - 44, 130, H - 130), ice = e.k === 'r';
       const inc = ice ? Math.round(Math.asin(Math.min(1, Math.abs(fl.dirAt(Math.max(0, e.x - 0.05)).dot(new T.Vector3(...e.n))))) * 180 / Math.PI) : 0;

@@ -868,7 +868,7 @@ const G_Views = {
       pv.pitch += (st.pt - pv.pitch) * Math.min(1, dt * 14);
       pv.rig.setGun(st.w, G.Stickers.of(st.sk)); // their build code: the same parts on their gun (and its stickers, by their hash: js/stickers.ts)
       pv.rig.holster(!!st.sw, true); // hands busy: weapon away (by hand, not in a jump)
-      const act: VwAct | null = st.act ? { kind: ({ o: 'open', c: 'close', k: 'kick', z: 'zip', b: 'bag' } as Record<string, VwActKind>)[st.act], t: st.ap || 0, hand: 'R' } : null;
+      const act: VwAct | null = st.act && !st.dn && !st.dd ? { kind: ({ o: 'open', c: 'close', k: 'kick', z: 'zip', b: 'bag' } as Record<string, VwActKind>)[st.act], t: st.ap || 0, hand: 'R' } : null;
       if (act && act.kind === 'zip') { const tv = this.enemies.get(st.zt); if (tv) act.pt = this.zipPoint(tv, act.t, tv.alive && !tv.down); act.pull = !!st.pl; }
       // their restraining / bagging sounds, as they reach each step
       if (act && pv.lastAct === st.act) G.Audio.foley(act.kind, pv.lastAp || 0, act.t, pv.pos.distanceTo(G.R.camera.position));

@@ -73,9 +73,19 @@ const G_DebugStart = (() => {
       say(`wearing ${d.name}`);
     }
   }
+  // In the level at once, playable without a click (a script driving the page has no mouse to capture): taken as captured till
+  // someone really clicks. Then the first click captures the mouse (and isn't a shot), and from then on it's the real state
+  // (Esc lets it go and pauses, as ever).
   function captured() {
-    const g = G.Game;
-    Object.defineProperty(g, 'locked', { get: () => true, set: () => {}, configurable: true });
+    const g = G.Game, cv = G.R.renderer.domElement;
+    let real = false;
+    Object.defineProperty(g, 'locked', { get: () => (real ? document.pointerLockElement === cv : true), set: () => {}, configurable: true });
+    document.addEventListener('pointerlockchange', () => { if (document.pointerLockElement === cv) real = true; });
+    window.addEventListener('mousedown', (e) => {
+      if (g.phase !== 'level' || document.pointerLockElement === cv || (e.target !== cv && e.target !== document.body)) return;
+      if (real) return; // (once captured for real, the game's own click-to-play does it)
+      e.stopImmediatePropagation(); e.preventDefault(); g.lock();
+    }, true);
     for (const id of ['pause', 'clickToPlay']) { const e = g.$(id); if (e) e.classList.add('hidden'); }
   }
 

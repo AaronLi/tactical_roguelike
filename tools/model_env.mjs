@@ -43,7 +43,7 @@ export function loadGame(withModels = false, extra = {}) {
 
 /**
  * The game as loadGame() gives it, plus js/glb.js running the way it does in the browser with ?bakedGuns: a G.GLB made of three's own GLTFLoader (on the
- * files under assets/models, with the meshopt decoder) and a fetch that reads those files. For tests that assemble guns from the packs (check_models_assembly.mjs).
+ * files under assets/models, with the meshopt decoder, and the game's own dequantize after it) and a fetch that reads those files. For tests that assemble guns from the packs (check_models_assembly.mjs).
  */
 export async function loadGameWithModels() {
   const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
@@ -58,7 +58,7 @@ export async function loadGameWithModels() {
   });
   G.GLB = {
     ready: Promise.resolve(true),
-    load: (url) => { if (!cache.has(url)) cache.set(url, G.Bundles.getFile(url).then((ab) => new Promise((res, rej) => loader.parse(ab, '', (g) => res(g.scene), rej)))); return cache.get(url); },
+    load: (url) => { if (!cache.has(url)) cache.set(url, G.Bundles.getFile(url).then((ab) => new Promise((res, rej) => loader.parse(ab, '', (g) => res(G.Models.dequantize(g.scene)), rej)))); return cache.get(url); },
   };
   return G;
 }
