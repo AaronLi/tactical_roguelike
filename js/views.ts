@@ -484,6 +484,22 @@ const G_Views = {
     setTimeout(() => { if (ev.alive) A.sampleAt('insert_magazine', at(), 0.6, 1); }, dur * 0.6);
     setTimeout(() => { if (ev.alive) A.sampleAt('rack_slide', at(), 0.5, 1); }, dur * 0.88);
   },
+  // The host's: each suspect's gun as it was last drawn here, where their bodies are simulated (js/rig.ts powerStep), for the
+  // simulation to know whether it's on its target before they fire (js/server.ts onTarget): [id, muzzle x, y, z, bore x, y, z, ...]
+  _bv: new THREE.Vector3(),
+  boresOut() {
+    if (!this.enemies.size) return;
+    const a: number[] = [], v = this._bv;
+    for (const ev of this.enemies.values()) {
+      const rig = ev.rig, gi = rig && rig.gunInfo;
+      if (!rig || !rig.rd || !rig.gun || !gi || rig.slung || !gi.muzzles || !gi.muzzles[0]) continue;
+      const m = rig.gun.localToWorld(v.set(gi.muzzles[0][2], gi.muzzles[0][1], -gi.muzzles[0][0]));
+      a.push(ev.id, m.x, m.y, m.z);
+      const b = v.set(0, 0, -1).transformDirection(rig.gun.matrixWorld);
+      a.push(b.x, b.y, b.z);
+    }
+    G.Net.toHost({ t: 'bores', a });
+  },
   enemyShot(m: any) {
     let to = new THREE.Vector3(m.to[0], m.to[1], m.to[2]);
     let f = new THREE.Vector3(m.f[0], m.f[1], m.f[2]);
@@ -507,7 +523,7 @@ const G_Views = {
     G.Audio.flyby(f, to, wdef, G.ballFor(G.calOf(wdef)));
     this.pings.push({ x: m.f[0], z: m.f[2], t: 2.5 });
     const ev = this.enemies.get(m.e);
-    if (ev) ev.rig.recoil(G.Server.kickOf({ str: ev.str } as any, wdef)); // (the same kick the host gave it)
+    if (ev) ev.rig.recoil(G.Sim.kickOf(ev.str, wdef)); // (the same kick the host gave it)
   },
   // The marks a round left (js/ballistics.ts mark: [x, y, z, normal, what it looks like, e(ntry) x (exit) r(icochet)]), on your
   // screen: skip the first (the arrival drew it). A ricochet's next leg shows as a streak.
@@ -572,38 +588,11 @@ const G_Views = {
   // rolling along the floor, slowed by friction, till it stops. n: { pos, vel } (and n.onGround, set here). The
   // same steps for everyone's grenades and for the throw you're lining up (predictNade), so where the arc says it
   // ends up is where it does.
-  NADE_R: 0.05, NADE_G: 14,
-  nadeStep(n: VwNadeMotion, dt: number, map: LvMap | null) {
-    const R = this.NADE_R, w = map && map.world, p = n.pos, v = n.vel;
-    const hits = (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number) => { if (!w) return y0 < 0; let h = false; G.World.query(w, [x0, y0, z0], [x1, y1, z1], (s) => { if ((s.move || s.ray) && !(s.nostep && !s.ray) && (!s.hull || G.World.touches(s, [x0, y0, z0], [x1, y1, z1]))) h = true; }); return h; }; // (a rock: its own shape, not the boxes that stop people)
-    const side = (x: number, y: number, z: number) => hits(x - R, y - R + 0.03, z - R, x + R, y + R, z + R); // (clear of the floor it's on)
-    const below = (x: number, y: number, z: number) => hits(x - R + 0.01, y - R, z - R + 0.01, x + R - 0.01, y + R - 0.02, z + R - 0.01);
-    const N = Math.max(1, Math.ceil(dt / (1 / 120))), h = dt / N;
-    for (let k = 0; k < N; k++) {
-      v.y -= this.NADE_G * h;
-      let nx = p.x + v.x * h;
-      if (side(nx, p.y, p.z)) { v.x *= -0.42; v.z *= 0.85; nx = p.x; }
-      let nz = p.z + v.z * h;
-      if (side(nx, p.y, nz)) { v.z *= -0.42; v.x *= 0.85; nz = p.z; }
-      let ny = p.y + v.y * h;
-      if (v.y < 0 ? below(nx, ny, nz) : hits(nx - R, ny - R + 0.03, nz - R, nx + R, ny + R, nz + R)) {
-        if (v.y < 0) { v.y = v.y < -1.6 ? -v.y * 0.32 : 0; v.x *= 0.78; v.z *= 0.78; } // (a floor: a bounce, or it settles)
-        else v.y *= -0.3;
-        ny = p.y;
-      }
-      p.set(nx, ny, nz);
-      // rolling on the floor: friction slows it to a stop
-      n.onGround = v.y === 0 && below(p.x, p.y - 0.02, p.z);
-      if (n.onGround) { const f = Math.exp(-2.4 * h); v.x *= f; v.z *= f; if (Math.hypot(v.x, v.z) < 0.04) v.x = v.z = 0; }
-    }
-  },
+  NADE_R: G_Sim.NADE_R, NADE_G: G_Sim.NADE_G, // (js/sim.ts: the flight itself, the same for the host's simulation)
+  nadeStep(n: VwNadeMotion, dt: number, map: LvMap | null) { G.Sim.nadeStep(n, dt, map); },
   // Where a throw goes: its path, stepped as a grenade flies (nadeStep) for as long as the fuse burns. Returns
   // the points along it (Vector3s) and where it goes off (the last).
-  predictNade(p: THREE.Vector3, v: THREE.Vector3, fuse: number, map: LvMap | null) {
-    const n = { pos: p.clone(), vel: v.clone() }, pts = [n.pos.clone()], h = 1 / 60;
-    for (let t = 0; t < fuse; t += h) { this.nadeStep(n, h, map); pts.push(n.pos.clone()); }
-    return pts;
-  },
+  predictNade(p: THREE.Vector3, v: THREE.Vector3, fuse: number, map: LvMap | null) { return G.Sim.predictNade(p, v, fuse, map); },
   // A thermobaric grenade's body: an olive can with an orange band round its middle and a grey fuze on top (std: a lit
   // material, for the hand in front of you)
   tbMesh(r: number, h: number, std = false) {
@@ -1059,7 +1048,7 @@ const G_Views = {
         if (n.own && n.kind === 'flash') G.Me.flashBang(p.clone().add(new THREE.Vector3(0, 0.1, 0)));
         else if (n.own && n.kind === 'tb') G.Me.thermobaric(p.clone());
         else if (n.own) G.Me.explode(p.clone(), G.Me.blastR(map, p), G.Me.BLAST.dmg, true);
-        else if (n.enemy && G.Net.isHost) G.Server.enemyBoom(p.clone());
+        else if (n.enemy && G.Net.isHost) G.Net.toHost({ t: 'eboom', p: [p.x, p.y, p.z] }); // (a suspect's: where it went off on the host's screen is where it goes off, js/server.ts enemyBoom)
       }
     }
 

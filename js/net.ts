@@ -1,7 +1,9 @@
 'use strict';
 // Peer-to-peer transport (WebRTC via PeerJS). Star topology: the host is the authority,
-// clients talk only to the host and the host relays. The host is also a client of itself:
-// toHost() / broadcast() short-circuit to local handlers so game code has one path.
+// clients talk only to the host and the host relays. The host's authority is its simulation, in a thread of its own
+// (js/serverlink.ts, docs/threads.md), and the host's game is a client of it like any other: toHost() goes to it on a port
+// of its own, and its word comes back to onClient. What it says to the remote players is sent from here (relay, relayTo),
+// and what they send comes in to onServer (js/game.ts hands it on to the simulation).
 const G_Net = {
   PREFIX: 'breachproto-v1-',
   peer: null as any,
@@ -11,7 +13,7 @@ const G_Net = {
   code: null as string | null,
   conns: new Map<string, any>(),
   hostConn: null as any,
-  onServer: (() => {}) as (msg: any, from: string) => void,   // (msg, fromId)   — host only
+  onServer: (() => {}) as (msg: any, from: string) => void,   // (msg, fromId)   — host only: a remote player's
   onClient: (() => {}) as (msg: any) => void,   // (msg)           — everyone
   onPeerJoin: (() => {}) as (id: string) => void, // (id)            — host only
   onPeerLeave: (() => {}) as (id: string) => void,// (id)            — host only
@@ -163,16 +165,14 @@ const G_Net = {
   },
 
   toHost(msg: any) {
-    if (this.isHost) this.onServer(msg, this.myId!);
+    if (this.isHost) G.ServerLink.toServer(msg); // (the simulation's thread: js/serverlink.ts)
     else if (this.hostConn && this.hostConn.open) this.hostConn.send(msg);
   },
-  // host only: send to all clients (and handle locally)
-  broadcast(msg: any, exceptId?: string | null) {
+  // host only: what the simulation says to every remote player (but exceptId), and to one of them (js/serverlink.ts)
+  relay(msg: any, exceptId?: string | null) {
     for (const [id, c] of this.conns) if (id !== exceptId && c.open) { try { c.send(msg); } catch (e) { /* closing */ } }
-    if (exceptId !== this.myId) this.onClient(msg);
   },
-  sendTo(id: string, msg: any) {
-    if (id === this.myId) { this.onClient(msg); return; }
+  relayTo(id: string, msg: any) {
     const c = this.conns.get(id);
     if (c && c.open) { try { c.send(msg); } catch (e) { /* closing */ } }
   },

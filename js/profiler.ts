@@ -113,6 +113,7 @@ const G_Prof = (() => {
       renderer: info ? { calls: info.render.calls, triangles: info.render.triangles, geometries: info.memory.geometries, textures: info.memory.textures, programs: info.programs ? info.programs.length : 0 } : null,
       heapMB: performance.memory ? r2(performance.memory.usedJSHeapSize / 1048576) : null,
       settings: g.settings || null,
+      serverThread: G.ServerLink ? { mode: G.ServerLink.mode, lastSecond: G.ServerLink.prof } : null, // (where the host's simulation runs, and its ticks' time there)
     };
   }
   function countObjects(o: THREE.Object3D) { let n = 0; o.traverse(() => n++); return n; }
@@ -144,7 +145,7 @@ const G_Prof = (() => {
     const Gm = G.Game;
     const loop = Gm.loop;
     Gm.loop = function () { frameBegin(); try { return loop.apply(this, arguments as any); } finally { frameEnd(); } };
-    wrap(Gm, 'serverTick', 'host: server tick');
+    wrap(G.ServerHost, 'tick', 'host: server tick'); // (on the page only when the simulation runs there: ?serverthread=0, js/serverlink.ts)
     wrap(Gm, 'updateDoors', 'doors');
     wrap(G.Me, 'update', 'Me.update'); wrap(G.Me, 'move', 'Me.move'); wrap(G.Me, 'weaponUpdate', 'Me.weapon'); wrap(G.Me, 'interact', 'Me.interact');
     wrap(G.Me, 'updateCamera', 'Me.camera'); wrap(G.Me, 'stepRounds', 'Me.rounds'); wrap(G.Me, 'sendState', 'Me.sendState'); wrap(G.Me, 'spectate', 'Me.spectate'); wrap(G.Me, 'flushHits', 'Me.flushHits');
@@ -156,7 +157,7 @@ const G_Prof = (() => {
     wrap(G.HUD, 'update', 'HUD.update');
     wrap(G.LightGrid, 'flush', 'LightGrid.flush');
     wrap(G.Casings, 'update', 'Casings.update');
-    // the host's AI and the world (inside the server tick, and inside other things: their own lines)
+    // the host's AI and the world (inside the server tick, and inside other things: their own lines; the AI's only when it runs on the page)
     wrap(G.Server, 'update', 'host: update'); wrap(G.Server, 'think', 'host: enemy AI'); wrap(G.Server, 'footsteps', 'host: footsteps'); wrap(G.Server, 'snapshot', 'host: snapshot');
     wrap(G.Level, 'flow', 'pathfinding (flow)'); wrap(G.Level, 'los', 'line of sight');
     wrap(G.World, 'raycast', 'World.raycast'); wrap(G.World, 'resolve', 'World.resolve'); wrap(G.World, 'query', 'World.query');

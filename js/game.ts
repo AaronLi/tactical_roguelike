@@ -22,7 +22,7 @@ type GmScreen = 'menu' | 'lobby' | 'shop' | 'route' | 'gameover' | 'pause';
 // the sliders in the menu, and the keys they keep in storage
 type GmSetting = 'sens' | 'fov' | 'vol' | 'loadKit';
 // what the host tells the clients (js/server.ts), by t: onMsg dispatches on it
-type GmMsgKind = 'welcome' | 'roster' | 'arms' | 'rvotes' | 'newrun' | 'veil' | 'phase' | 'snap' | 'rfx' | 'bstk' | 'hole' | 'dpart' | 'dfall' | 'rpath' | 'npath' | 'skin' | 'loot' | 'lootRm' | 'glass' | 'crack' | 'lootGot' | 'team' | 'cab' | 'sbox' | 'abox' | 'wcase' | 'eshot' | 'shot' | 'nade' | 'boom' | 'course' | 'crun' | 'flash' | 'kill' | 'incap' | 'edown' | 'saved' | 'stock' | 'took' | 'ereload' | 'clear' | 'treat' | 'applying' | 'revive' | 'chat' | 'ping' | 'ffhit' | 'left' | 'door' | 'order' | 'shout' | 'radio' | 'evid' | 'evtake' | 'evsec' | 'cuffed' | 'refund';
+type GmMsgKind = 'eround' | 'eInfo' | 'welcome' | 'roster' | 'arms' | 'rvotes' | 'newrun' | 'veil' | 'phase' | 'snap' | 'rfx' | 'bstk' | 'hole' | 'dpart' | 'dfall' | 'rpath' | 'npath' | 'skin' | 'loot' | 'lootRm' | 'glass' | 'crack' | 'lootGot' | 'team' | 'cab' | 'sbox' | 'abox' | 'wcase' | 'eshot' | 'shot' | 'nade' | 'boom' | 'course' | 'crun' | 'flash' | 'kill' | 'incap' | 'edown' | 'saved' | 'stock' | 'took' | 'ereload' | 'clear' | 'treat' | 'applying' | 'revive' | 'chat' | 'ping' | 'ffhit' | 'left' | 'door' | 'order' | 'shout' | 'radio' | 'evid' | 'evtake' | 'evsec' | 'cuffed' | 'refund';
 // the map as js/damage.ts takes it (its own cut-down shape of a level's)
 type GmDmgMap = Parameters<typeof G.Damage.apply>[0];
 // the turning figure of you in the menu (lookPreview)
@@ -50,8 +50,7 @@ const G_Game = {
   myAnimal: undefined as unknown as string,
   myColor: undefined as unknown as number,
   myLook: undefined as unknown as ReturnType<typeof G.Rig.cleanLook>,
-  last: undefined as unknown as number, // (init: the clock of the last frame, and of the last host tick)
-  serverLast: undefined as unknown as number,
+  last: undefined as unknown as number, // (init: the clock of the last frame)
   veilT: undefined as ReturnType<typeof setTimeout> | undefined,
   veilWait: 0,
   veilN: undefined as unknown as number, // (frames to draw before the veil lifts: set by veil, and by js/views.ts applySnap)
@@ -92,7 +91,8 @@ const G_Game = {
   routeSt: undefined as { path: number[]; votes: Record<string, number> } | undefined,
 
   init() {
-    G.Stickers.load(); // (which stickers there are: js/stickers.ts)
+    G.ServerLink.boot(); // (the host's simulation's thread, loading now so it's there when you host: js/serverlink.ts)
+    G.Stickers.load().then((names) => G.ServerLink.stickers(names)); // (which stickers there are: js/stickers.ts; the sticker box hands out one of them)
     G.GunModels.boot(); // (every platform's model index and the props; the packs themselves as they are needed: js/gunmodels.ts)
     this.settings = { sens: G.U.store.get('sens', 1), fov: G.U.store.get('fov', 80), vol: G.U.store.get('vol', 0.6), loadKit: G.U.store.get('loadKit', 1) }; // (loadKit: the hangar's Load Magazines tops up the equipped guns' and the kit's magazines only (1), or everything (0))
     this.myName = G.U.store.get('name', 'Operator' + Math.floor(Math.random() * 90 + 10));
@@ -109,18 +109,18 @@ const G_Game = {
     G.Audio.vol = this.settings.vol;
     G.Audio.muted = new URLSearchParams(location.search).has('mute') || G.U.store.get('muted', false);
     this.bindMenu();
-    G.Net.onServer = (m, from) => G.Server.handle(m, from);
+    // hosting: the remote players' messages to the simulation's thread, and their comings and goings (js/serverlink.ts); everyone's
+    // game (the host's own too) hears the host's word in onMsg
+    G.Net.onServer = (m, from) => G.ServerLink.fromPeer(m, from);
     G.Net.onClient = (m) => this.onMsg(m);
-    G.Net.onPeerLeave = (id) => G.Server.onLeave(id);
+    G.Net.onPeerJoin = (id) => G.ServerLink.join(id);
+    G.Net.onPeerLeave = (id) => G.ServerLink.leave(id);
     // lost the host (they refreshed, or dropped): back to the menu, trying the same code again for a minute, so
     // as soon as they're hosting again you're back in
     G.Net.onHostLost = () => { const code = G.Net.code; this.toMenu('Lost connection to the host. Reconnecting...'); this.rejoin(code, Date.now() + 60000); };
     this.menuBackdropSoon(); // (the menu is already on the page: it is painted and answers clicks before the backdrop is built)
     this.last = performance.now();
-    this.serverLast = performance.now();
-    requestAnimationFrame(() => this.loop());
-    // keep the host simulation ticking even if its tab is in the background
-    setInterval(() => { if (G.Net.isHost && performance.now() - this.last > 150) this.serverTick(); }, 50);
+    requestAnimationFrame(() => this.loop()); // (the host's simulation ticks on its own, in its thread: js/serverhost.ts)
   },
 
   // ------------------------------------------------------------- menu UI
@@ -131,9 +131,9 @@ const G_Game = {
   },
   // The loading veil: a change of scene goes behind a black panel, wobbled down the screen on a slant (css/style.css #veil). A
   // level's built, and its shaders compiled, in one go on the main thread, and the picture stands still while that's
-  // done. So the host sends the panel across first (G.Server.overBlack) and does it there, and the panel wipes on off
+  // done. So the host sends the panel across first (js/server.ts overBlack) and does it there, and the panel wipes on off
   // the bottom once the new place has drawn a few frames (js/views.ts applySnap).
-  VEIL_MS: 820, VEIL_OUT: 650, VEIL_SMOOTH: 6, // (VEIL_MS: the wipe on, css/style.css veilIn 0.8 s, and a frame: the work waits until it's all the way down, or it freezes the wipe halfway)
+  VEIL_MS: G_Sim.VEIL_MS, VEIL_OUT: 650, VEIL_SMOOTH: 6, // (VEIL_MS: the wipe on, css/style.css veilIn 0.8 s, and a frame: the work waits until it's all the way down, or it freezes the wipe halfway)
   veil(on: boolean, instant?: boolean) {
     const el = this.$('veil'), was = el.classList.contains('on');
     if (!on && !was && !instant) return; // (not up, or already on its way off)
@@ -290,15 +290,15 @@ const G_Game = {
       this.$<HTMLInputElement>('turnUrl').value = t.url || ''; this.$<HTMLInputElement>('turnUser').value = t.user || ''; this.$<HTMLInputElement>('turnPass').value = t.pass || '';
       for (const id of ['turnUrl', 'turnUser', 'turnPass']) this.$(id).addEventListener('change', save); }
     // what a host's LAN beacon tells whoever's looking
-    G.Net.lanInfo = () => ({ name: this.myName, players: G.Server.players.size, phase: this.phase });
-    this.$('btnStart').onclick = () => { if (G.Net.isHost) G.Server.startRun(); };
+    G.Net.lanInfo = () => ({ name: this.myName, players: Object.keys(this.roster || {}).length || 1, phase: this.phase });
+    this.$('btnStart').onclick = () => { if (G.Net.isHost) G.Net.toHost({ t: 'startRun' }); };
     this.$('btnLeave').onclick = () => this.toMenu();
     this.$('btnNewCode').onclick = () => this.newCode();
     this.$('btnCopy').onclick = () => { navigator.clipboard && navigator.clipboard.writeText(G.Net.code || ''); this.$('btnCopy').textContent = 'Copied'; setTimeout(() => (this.$('btnCopy').textContent = 'Copy'), 1200); };
     this.$('btnResume').onclick = () => this.lock();
     this.$('btnQuit').onclick = () => this.toMenu();
     this.$('btnProf').onclick = () => { G.Prof.save(); this.$('profLine').textContent = 'Saved: ' + G.Prof.line(); };
-    this.$('btnNewRun').onclick = () => { if (G.Net.isHost) G.Server.toLobby(); };
+    this.$('btnNewRun').onclick = () => { if (G.Net.isHost) G.Net.toHost({ t: 'toLobby' }); };
     this.$('btnMenu').onclick = () => this.toMenu();
     this.$('clickToPlay').onclick = () => this.lock();
     G.R.renderer.domElement.addEventListener('click', () => { if (this.phase === 'level' && !this.locked) this.lock(); });
@@ -524,7 +524,7 @@ const G_Game = {
   setBusy(b: boolean) { ['btnHost', 'btnSolo', 'btnJoin'].forEach((id) => (this.$<HTMLButtonElement>(id).disabled = b)); },
   afterConnect() {
     this.msg('menuMsg', '');
-    if (G.Net.isHost) G.Server.reset();
+    if (G.Net.isHost) G.ServerLink.start(G.Net.myId!); // (a session of the simulation, as everyone starts hosting it)
     if (G.Net.isHost && !G.Net.solo) G.Net.startBeacon(); // (findable from the same network)
     G.Me.newRun();
     this.runStarted = false;
@@ -532,7 +532,7 @@ const G_Game = {
   },
   toMenu(reason?: string) {
     G.Net.leave();
-    G.Server.reset();
+    G.ServerLink.stop();
     G.Views.clearAll();
     this.leaveHub();
     G.R.clearLevel();
@@ -583,7 +583,7 @@ const G_Game = {
         if (m.route) this.setRoute(m.route);
         if (m.phase === 'route') (this.enterRoute as (level: number, route?: unknown) => void)(m.level, m.route);
         else if (m.phase === 'level') {
-          this.enterLevel(m.level, m.seed, m.th, !!m.night);
+          this.enterLevel(m.level, m.seed, m.th, !!m.night, m.wc);
           if (m.doors) m.doors.forEach((o: number, i: number) => { const d = this.map!.doors[i]; if (d && d.open !== !!o) { d.open = !!o; G.World.door(this.map!.world, this.map!, d); } });
           if (m.holes) for (const h of m.holes) G.Damage.apply(this.map as unknown as GmDmgMap, h); // (what's been shot out of the place)
           if (m.fallen) for (const [i, ang, dir, seed] of m.fallen) G.Damage.fall(this.map as unknown as GmDmgMap, this.map!.doors[i] as any, ang, dir, seed, true);
@@ -619,7 +619,7 @@ const G_Game = {
       case 'phase':
         if (m.route) this.setRoute(m.route);
         if (m.phase === 'route') (this.enterRoute as (level: number, route?: unknown) => void)(m.level, m.route);
-        else if (m.phase === 'level') { this.aboxHide(); this.enterLevel(m.level, m.seed, m.th, !!m.night); this.setCase(m.wcase); this.abox = m.abox || null; this.sbox = m.sbox || null; this.cabs = m.cabs || []; G.Views.syncCabs(); }
+        else if (m.phase === 'level') { this.aboxHide(); this.enterLevel(m.level, m.seed, m.th, !!m.night, m.wc); this.setCase(m.wcase); this.abox = m.abox || null; this.sbox = m.sbox || null; this.cabs = m.cabs || []; G.Views.syncCabs(); }
         else if (m.phase === 'shop') this.enterShop(m.level, m.shopSeed, m.report, m.stock);
         else if (m.phase === 'gameover') this.enterGameover(m);
         else if (m.phase === 'lobby') this.enterLobby();
@@ -682,6 +682,8 @@ const G_Game = {
         this.setCase(m.c);
         break;
       case 'eshot': if (this.phase === 'level') G.Views.enemyShot(m); break;
+      case 'eround': if (this.phase === 'level' && G.Net.isHost) G.Me.enemyRounds(m); break; // (the host's: a suspect's rounds, flown here)
+      case 'eInfo': G.HUD.eInfoGot(m); break; // (the host's: the F9 readout's look at a suspect)
       case 'shot': if (this.phase === 'level' && m.id !== G.Net.myId) G.Views.remoteShot(m); break;
       case 'nade': if (this.phase === 'level' && m.id !== G.Net.myId) { G.Views.addNade(new THREE.Vector3(...m.p), new THREE.Vector3(...m.v), m.fuse, false, !!m.en, m.k || 'frag'); if (G.Highlights) G.Highlights.nade(m.en ? 'e' + m.e : 'p' + m.id, new THREE.Vector3(...m.p), new THREE.Vector3(...m.v), m.fuse, m.k || 'frag'); const tp = !m.en && G.Views.players.get(m.id); if (tp) tp.rig.throwNade(m.s == null ? 2 : m.s); /* (their arm throws it) */ if (m.en) G.Views.enemyThrow(m.e); } break;
       case 'boom': this.onBoom(m); break;
@@ -1102,15 +1104,15 @@ const G_Game = {
     if (lay === g.lay) return; // as you left it
     g.items = c[1].map(([mt, n, x, y, r]) => ({ it: G.Gear.medItem(mt, n), x, y, r }));
     g.lay = lay;
-    g.counts = G.Server.cabCounts ? G.Server.cabCounts(c[1] as any) : null;
+    g.counts = G.Sim.cabCounts(c[1] as any);
   },
   // ------------------------------------------------------------- the team locker
-  // the squad's shared locker at the quartermaster's (G.Server.teamEdit), kept as the host has it. Its items
+  // the squad's shared locker at the quartermaster's (js/server.ts teamEdit), kept as the host has it. Its items
   // carry a tid (the host's name for them); you move things in and out in the stash, and teamSync tells the
   // host what changed. base: the tids the host has; gone: those you've taken out (and not had back yet);
   // sent: what you've put in that the host hasn't answered yet.
   teamGrid() {
-    if (!this.tGrid) Object.assign((this.tGrid = G.Gear.grid(G.Server.TEAM_W, G.Server.TEAM_H, null, 'Team locker')), { locker: true, team: true, ver: 0, lay: '', base: new Set(), gone: new Set(), sent: new Set() });
+    if (!this.tGrid) Object.assign((this.tGrid = G.Gear.grid(G.Sim.TEAM_W, G.Sim.TEAM_H, null, 'Team locker')), { locker: true, team: true, ver: 0, lay: '', base: new Set(), gone: new Set(), sent: new Set() });
     return this.tGrid;
   },
   teamLay(items: (string | number)[][]) { return items.map((e) => e.slice(0, 4).join(':')).sort().join('|'); },
@@ -1339,7 +1341,7 @@ const G_Game = {
     G.Audio.click();
     G.Net.toHost({ t: 'pick', n });
   },
-  enterLevel(level: number, seed: number, th?: number, night = false) {
+  enterLevel(level: number, seed: number, th?: number, night = false, wc?: string | null) {
     this.veil(true, true); // (already black, unless you've just joined)
     this.leaveHub();
     this.phase = 'level';
@@ -1347,6 +1349,7 @@ const G_Game = {
     this.extract = { active: false, votes: 0, need: 0, civDead: 0, voted: false };
     this.enemiesLeft = 0;
     this.map = G.Level.generate(seed, level, th, night);
+    G.ServerHost.born(this.map); // (as it was built: the host's simulation built it too, G.ServerLink.digest)
     if (G.Prof) G.Prof.reset(); // (the worst frames and totals: this level's)
     if (G.Highlights) { G.Highlights.drop(); G.Highlights.reset(); } // (last level's replays go; this one's start recording)
     G.Views.warmed = false; // compile the new level's shaders once it's populated (G.R.warmup)
@@ -1356,7 +1359,7 @@ const G_Game = {
     G.Views.clearLevel();
     const teamDefs = [...G.Views.players.values()].map((p) => p.st && p.st.w && G.Gunsmith.fromCode(p.st.w)).filter(Boolean), team = teamDefs.map((d) => d.soundKey);
     // the guns the level will show, fetched now: the squad's kits, the level's enemy weapon pool (every pack of each platform), the weapon case's gun and the loot (as it lands)
-    const caseGun = G.Server.wcase && G.Gunsmith.fromCode(G.Server.wcase.code);
+    const caseGun = typeof wc === 'string' ? G.Gunsmith.fromCode(wc) : null; // (the host says what's in the case: 'wc')
     G.GunModels.preload([...Object.values(G.Me.weapons).map((w) => w.def), ...teamDefs, ...(caseGun ? [caseGun] : [])], this.enemyGuns(level), false); // (the models are all in memory: this only schedules their parsing)
     G.GunAudio.prewarm([...Object.values(G.Me.weapons).flatMap((w) => [w.def.soundKey, G.Gunsmith.roundSoundKey(w.def, w.chamber || w.ammo), ...(w.def.barrels ? Object.keys(w.def.barrels.rounds).flatMap((k) => G.barrelMm(w.def, k).map((mm: number) => G.shotSoundKey(G.roundSpec(w.def, k), mm, w.ammo))) : [])]), ...this.enemyGuns(level), ...team], this.map);
     // everyone in a seat of their own in the helicopter, on the pad (the same on every machine: by the sorted roster)
@@ -1440,19 +1443,13 @@ const G_Game = {
   },
 
   // ------------------------------------------------------------- loop
-  serverTick() {
-    const now = performance.now();
-    const dt = Math.min((now - this.serverLast) / 1000, 0.1);
-    this.serverLast = now;
-    if (G.Net.isHost) G.Server.update(dt);
-  },
   loop() {
     requestAnimationFrame(() => this.loop());
     const now = performance.now();
     const raw = now - this.last, dt = Math.min(raw / 1000, 0.05);
     this.last = now;
-    this.serverTick();
     if (this.phase === 'level') {
+      if (G.Net.isHost && !this.hub) G.Views.boresOut(); // (the suspects' guns as they were last drawn, to the simulation: before anything moves this frame)
       if (this.invOpen) G.InvUI.update(dt);
       if (this.invOpen && (this.invT = (this.invT || 0) + dt) > 0.25) { this.invT = 0; G.InvUI.tick(); this.$('fiScore').innerHTML = G.HUD.scoreboardHTML(); }
       G.Me.update(dt);

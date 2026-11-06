@@ -177,7 +177,7 @@ const G_HUD = {
     }
     const out = [], tag = best ? '' : ' · <span class="hb-k">(last seen)</span>';
     if (kind === 'e') {
-      const ev = who as VwEnemy, def = ev.def, SV = G.Server, bd = SV && SV.bodies && SV.bodies.get(ev.id), e = (SV && SV.enemies && SV.enemies.get(ev.id)) || (bd && bd.rec), dead = !ev.alive;
+      const ev = who as VwEnemy, def = ev.def, e = this.eInfo(ev.id), dead = !ev.alive;
       const st = e ? e.state : ['normal', 'surrendered', 'cuffed', 'cowering'][ev.scode || 0];
       out.push(`<h4>${esc(def.name)} <small>#${ev.id} · ${dist.toFixed(1)} m · ${dead ? '<span class="bad">dead</span>' : ev.down ? '<span class="bad">down</span>' : esc(st || 'normal')}${e ? '' : ' · (as the host sends it)'}${tag}</small></h4>`);
       out.push(`<div class="hb-k">${hit}</div>${line}`);
@@ -185,7 +185,7 @@ const G_HUD = {
       const c = [];
       let orgHtml = '';
       if (e) {
-        const rate = dead ? 0 : ((e.bleedH || 0) + (e.bleedL || 0)) * G.Server.BLEED_K, left = rate > 0 ? Math.max(0, e.hp) / rate : null;
+        const rate = dead ? 0 : ((e.bleedH || 0) + (e.bleedL || 0)) * e.bleedK, left = rate > 0 ? Math.max(0, e.hp) / rate : null;
         c.push(`<div class="hb-row"><span>Health ${Math.max(0, Math.round(e.hp))}/${Math.round(e.maxHp)} (${pct(Math.max(0, e.hp) / e.maxHp)})</span><span>Strength ${dead ? '—' : pct(e.str == null ? 1 : e.str)}</span></div>`);
         if (rate > 0) c.push(`<div class="bad">Bleeding ${(rate / e.maxHp * 100).toFixed(1)}%/s${e.bleedH ? ' (heavy)' : ''}${e.bleedL ? ` (light, clots in ${Math.max(0, 30 - (e.clotT || 0)).toFixed(0)} s)` : ''} · gone in ${left!.toFixed(1)} s</div>`);
         const f = [e.cardiac && 'heart wrecked', e.out && 'unconscious', e.spine && 'spine: paralysed', e.lung && 'collapsed lung', ...Object.keys(e.broke || {}).map((k) => `broken ${k.endsWith('L') ? 'left' : 'right'} ${k.startsWith('arm') ? 'arm' : 'leg'}`), e.collapsed && 'collapsed', e.down && 'down for good'].filter(Boolean);
@@ -195,7 +195,7 @@ const G_HUD = {
         orgHtml = (`<div class="hb-sec hb-org">${this.HB_ORGANS.map(([reg, ids]: [string, string[]]) => `<div class="hb-reg">${reg}</div>${ids.map((id: string) => { const v = O[id] || 0; return `<div class="hb-row"><span>${esc(B.ORG[id].label)}</span><span class="${v >= 100 ? 'bad' : v > 0 ? 'warn' : 'ok'}">${v >= 100 ? 'destroyed' : v > 0 ? v + '%' : 'intact'}</span></div>`; }).join('')}`).join('')}</div>`);
         if (!rate && !f.length && !org.length && e.hp >= e.maxHp) c.push('<div class="ok">Unhurt</div>');
         if (def.leader) c.push(`<div class="warn">Leader · ${e.calls || 0} call${e.calls === 1 ? '' : 's'}${e.radioT! > 0 ? ' · on the radio now' : ''}</div>${(e.callLog || []).slice(-6).map((m: string) => `<div class="hb-k">${esc(m)}</div>`).join('')}`);
-        if (e.order) { const o = e.order; c.push(`<div class="hb-k">ordered by #${o.by}: ${o.role} · ${o.phase} · way in: ${o.entry.kind} at ${o.entry.x.toFixed(0)}, ${o.entry.z.toFixed(0)} · spot ${o.x.toFixed(0)}, ${o.z.toFixed(0)} · ${Math.max(0, o.until - G.Server.clock).toFixed(0)} s left</div>`); }
+        if (e.order) { const o = e.order; c.push(`<div class="hb-k">ordered by #${o.by}: ${o.role} · ${o.phase} · way in: ${o.entry.kind} at ${o.entry.x.toFixed(0)}, ${o.entry.z.toFixed(0)} · spot ${o.x.toFixed(0)}, ${o.z.toFixed(0)} · ${Math.max(0, o.left).toFixed(0)} s left</div>`); }
         if (!def.civ) c.push(`<div class="hb-k">nerve ${pct(Math.max(0, e.morale || 0))}${e.broken ? ' (broken)' : ''} · ${e.alert ? 'alert' : 'unaware'}${e.canSee ? ', sees a target' : ''}${e.surprisedT > 0 ? ', surprised' : ''}${e.suppressT > 0 ? ', suppressed' : ''}${def.comply != null ? ` · complies ${pct(def.comply)}` : ''}</div>`);
       } else {
         c.push(`<div class="hb-row"><span>Health ${ev.alive ? ev.hp || 0 : 0}%</span><span>Strength ${pct(ev.str == null ? 1 : ev.str)}</span></div>`);
@@ -296,10 +296,20 @@ const G_HUD = {
     }
     return out;
   },
+  // The host's record of a suspect (or of the body they left), for the readout: asked of the simulation (js/server.ts eInfo) a few
+  // times a second while it's looked at, the last answer kept. Only the host has it (anyone else's readout is what the snapshots say).
+  eInfos: new Map<number, { at: number; e: any }>(),
+  eInfo(id: number) {
+    if (!G.Net.isHost) return null;
+    const now = performance.now(), q = this.eInfos.get(id);
+    if (!q || now - q.at > 200) { this.eInfos.set(id, { at: now, e: q ? q.e : null }); G.Net.toHost({ t: 'eInfo', id }); }
+    return q ? q.e : null;
+  },
+  eInfoGot(m: any) { const q = this.eInfos.get(m.id); if (q) q.e = m.e || null; if (this.eInfos.size > 64) this.eInfos.delete(this.eInfos.keys().next().value!); },
   // what's been done to each organ (id -> % of it gone): the host's record of a suspect (or of the body they left), a
   // teammate's body as they send it (by part: the worst of each organ)
   organState(who: VwEnemy | VwPlayer, kind: HbKind) {
-    if (kind === 'e') { const SV = G.Server, bd = SV && SV.bodies && SV.bodies.get((who as VwEnemy).id), e = (SV && SV.enemies && SV.enemies.get((who as VwEnemy).id)) || (bd && bd.rec); return (e && e.organs) || {}; }
+    if (kind === 'e') { const e = this.eInfo((who as VwEnemy).id); return (e && e.organs) || {}; }
     const b = who.st && who.st.bd ? G.Med.decode(who.st.bd) : null, O: Record<string, number> = {};
     if (b) for (const p of Object.values(b.parts) as any[]) for (const [id, f] of Object.entries(p.org || {}) as [string, number][]) O[id] = Math.max(O[id] || 0, Math.round(f * 100));
     return O;

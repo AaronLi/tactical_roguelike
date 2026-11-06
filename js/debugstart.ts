@@ -82,27 +82,16 @@ const G_DebugStart = (() => {
   async function run() {
     const th = themeOf(q.get('play')), lvl = q.has('level') ? Math.max(1, +q.get('level')! || 1) : null;
     G.Game.solo(); await sleep(0.8);
-    const SV = G.Server;
+    // (the host's simulation is in its own thread, js/serverlink.ts: what's wanted of it is asked, as the lobby and the menus ask)
     if (q.has('hangar')) {
-      SV.startRun();
+      G.Net.toHost({ t: 'startRun' });
       await until(() => G.Game.phase === 'route');
       arm();
-      SV.overBlack(() => SV.toShop());
+      G.Net.toHost({ t: 'toShop' });
       await until(() => G.Game.hub && G.Me.pos);
     } else {
-      // the level the route would build: its place and number set as it starts (js/server.ts startLevel)
-      const start = SV.startLevel;
-      SV.startLevel = function (this: typeof SV) {
-        SV.startLevel = start;
-        if (th != null) this.theme = th;
-        if (lvl != null) this.level = lvl;
-        if (q.has('leader')) this.forceLeader = true;
-        const n = this.routeMap && this.route ? this.routeMap.nodes.get(this.route.path[this.route.path.length - 1]) : null;
-        if (n && q.has('stronghold')) n.stronghold = true;
-        if (n && q.has('night')) n.night = true;
-        return start.call(this);
-      };
-      SV.startRun();
+      // the level the route would build: its place and number set as it starts (js/server.ts startLevel: dbg)
+      G.Net.toHost({ t: 'startRun', dbg: { th: th == null ? undefined : th, lvl: lvl == null ? undefined : lvl, leader: q.has('leader'), stronghold: q.has('stronghold'), night: q.has('night') } });
       await until(() => G.Game.phase === 'route' && G.Game.routeMap);
       arm();
       const g0 = G.Game;
@@ -118,11 +107,11 @@ const G_DebugStart = (() => {
         if (G.Me.seat != null) say('still in the helicopter after 15 s');
       }
       await until(() => !G.Game.$('veil').classList.contains('on'), 15); // (and the loading screen gone)
-      if (q.has('nofoes')) SV.enemies.clear();
+      if (q.has('nofoes')) { G.Net.toHost({ t: 'noFoes' }); await until(() => ![...G.Views.enemies.values()].some((e) => e.alive), 5); }
     }
     captured();
     (window as any).__debugReady = true;
-    say(`ready: ${G.Game.hub ? 'the hangar' : `level ${SV.level}, ${(G.THEMES as { name: string }[])[SV.theme as number]?.name || '?'}`}`);
+    say(`ready: ${G.Game.hub ? 'the hangar' : `level ${G.Game.level}, ${(G.Game.map && G.Game.map.theme && G.Game.map.theme.name) || '?'}`}`);
     done();
   }
   if (q.has('play') || q.has('hangar')) window.addEventListener('load', () => setTimeout(() => { run().catch((e) => console.error('[debug start]', e)); }, 300));
