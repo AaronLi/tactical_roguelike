@@ -7,7 +7,8 @@
 import { simulateBoxDrop, magDropSpec, magDropScene, renderScene, encodeWav, quatMatrix } from '../dist/index.js';
 import { T0 } from '../dist/excitation.js';
 import { spawn } from 'node:child_process';
-import { writeFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { writeFileSync, mkdtempSync, rmSync, renameSync } from 'node:fs';
+import { speakerMaster } from './speaker-master.mjs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -218,4 +219,11 @@ for (let f = 0; f < total; f++) {
 ff.stdin.end();
 await new Promise((res, rej) => ff.on('close', (c) => (c === 0 ? res() : rej(new Error('ffmpeg ' + c)))));
 rmSync(tmp, { recursive: true, force: true });
+// Up to normal media loudness, for speakers (--raw: leave it at the synth's own peak-normalised level).
+if (!args.includes('--raw')) {
+  const loud = out.replace(/(\.\w+)$/, '.loud$1');
+  const g = speakerMaster(out, loud);
+  renameSync(loud, out);
+  console.log(`speaker master: +${g} dB to -16 LUFS`);
+}
 console.log('wrote', out);

@@ -11,7 +11,8 @@
 import { createRequire } from 'node:module';
 const { chromium } = createRequire(import.meta.url)('playwright'); // (the globally installed one)
 import { spawn } from 'node:child_process';
-import { writeFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { writeFileSync, mkdtempSync, rmSync, renameSync } from 'node:fs';
+import { speakerMaster } from './speaker-master.mjs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SCENES, renderScene, encodeWav } from '../dist/index.js';
@@ -183,4 +184,11 @@ writeFileSync(wav, Buffer.from(encodeWav(mix, sr)));
 await new Promise((res, rej) => spawn('ffmpeg', ['-y', '-loglevel', 'error', '-i', videoPath, '-i', wav, '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-t', String(total), out], { stdio: 'inherit' })
   .on('close', (c) => (c === 0 ? res() : rej(new Error('ffmpeg ' + c)))));
 rmSync(tmp, { recursive: true, force: true });
+// Up to normal media loudness, for speakers (--raw: leave it at the synth's own peak-normalised level).
+if (!args.includes('--raw')) {
+  const loud = out.replace(/(\.\w+)$/, '.loud$1');
+  const g = speakerMaster(out, loud);
+  renameSync(loud, out);
+  console.log(`speaker master: +${g} dB to -16 LUFS`);
+}
 console.log('wrote', out);
