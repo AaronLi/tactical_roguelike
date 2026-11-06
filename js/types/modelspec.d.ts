@@ -32,7 +32,7 @@ interface BarrelSpec { len?: number; r?: number; y?: number; taper?: number; bac
  */
 interface RecipeSpec<M = THREE.Material | null> {
   // the receiver
-  rcv?: RcvKind; authored?: string; look?: string; L?: number; H?: number; W?: number; rm?: M; fm?: M; sm?: M; gm?: M; m?: M; irons?: IronsKind; railTop?: boolean; siderails?: boolean;
+  rcv?: RcvKind; authored?: string; look?: string; L?: number; H?: number; W?: number; rm?: M; fm?: M; sm?: M; gm?: M; m?: M; irons?: IronsKind; ambi?: boolean; railTop?: boolean; siderails?: boolean;
   carry?: number; carrySide?: boolean; cheek?: number | null; extra?: string; hammer?: boolean; feed?: boolean; chassis?: boolean; aksu?: boolean;
   // the action
   bolt?: number; lever?: boolean; cock?: Partial<CockHandle>; ch?: string; pump?: { f: number; len: number; m?: M; [field: string]: any }; tube?: number; tubeY?: number; saddle?: string | Record<string, any>;

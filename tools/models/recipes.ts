@@ -1036,6 +1036,23 @@ const G_GunRecipes = (() => {
         k.prof([[0, -0.012], [0, 0.026], [L, 0.026], [L, -0.012]], 0.03, rm);
         k.prof([[0.004, -0.012], [0.004, -0.034], [0.03, -0.042], [L * 0.74, -0.042], [L * 0.8, -0.012]], 0.028, rm);
         k.box(0.004, 0.013, 0.045, M.black(), L * 0.36, 0.007, 0.0158);
+        // the lower's controls, which an AR has the same everywhere (the HK416's and the M27's selector is ambidextrous, o.ambi): the bolt catch behind the well
+        // on the left (its boss, the paddle on its roll pin, the raised serrated pad: part_catch, it turns about the pin with the bolt held open, js/vmanim.ts),
+        // the magazine release's button on the right in its fence, the selector on its shaft over the grip (its lever on the left, and the right where ambidextrous)
+        const bf = gf + 0.02, cpy = -0.0175, cpf = bf + 0.005, G_ = M.gunmetal(), D_ = M.black();
+        k.box(0.001, 0.021, 0.0165, rm, bf - 0.0005, -0.0215, -0.0145);
+        const bc = k.part(cpf, cpy);
+        k.into(bc, cpf, cpy);
+        k.box(0.0012, 0.0115, 0.0075, G_, bf + 0.0015, -0.0205, -0.0156);
+        k.box(0.0014, 0.0095, 0.0115, G_, bf - 0.0005, -0.0305, -0.0169);
+        for (let i = 0; i < 4; i++) k.box(0.0006, 0.0006, 0.0115, D_, bf - 0.0005, -0.0276 - i * 0.0017, -0.0178);
+        k.cylX(0.0012, 0.0026, M.steel(), cpf, cpy, -0.0158);
+        k.into(null);
+        anim.catch = bc;
+        k.box(0.0012, 0.017, 0.0145, rm, bf - 0.0015, -0.0245, 0.0146); // (the magazine release's fence, round its button)
+        k.cylX(0.0042, 0.0034, M.steel(), bf + 0.0055, -0.0255, 0.0163);
+        for (const s of o.ambi ? [-1, 1] : [1]) k.cylX(0.0045, 0.0018, M.steel(), gf, -0.0215, s * 0.0147); // (the selector's boss each side where it's ambidextrous, its shaft's end on the right if not)
+        for (const s of o.ambi ? [-1, 1] : [-1]) { k.box(0.0016, 0.0042, 0.0145, G_, gf, -0.0215, s * 0.0158); k.box(0.0016, 0.0058, 0.0045, G_, gf + 0.0105, -0.0222, s * 0.0158); }
       }
       top = o.railTop === false ? 0.026 : S.rail(k, 0.004, L - 0.008, 0.026, rm);
     } else if (rcv === 'ak') {
@@ -1054,6 +1071,7 @@ const G_GunRecipes = (() => {
       // the model's own adapter (A.rig.mount: the MP5's claw mount, its meshes extras.mount), the sight on its rail
       authored(k, A!, (e) => e.slot === 'base' && !e.part);
       if (A!.hinge) authored(k, A!, (e) => e.slot === 'base' && !!e.part); // (a gun with a reload sequence has its moving parts as nodes: the latch is the receiver's)
+      if (A!.info.anim && A!.info.anim.catch && !A!.hinge) anim.catch = authoredPart(k, A!, 'catch'); // (the bolt catch, part_catch: the receiver's own, a node that turns with the bolt held open)
       top = A!.rig.top;
       if (o.optic && (!ownIrons || A!.sights.rail.includes(o.optic))) {
         rcvTop = top;

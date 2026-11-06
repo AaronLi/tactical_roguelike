@@ -27,7 +27,7 @@ type SlotName = (typeof SLOTS)[keyof typeof SLOTS];
 /** The key of an animated sub-assembly: its node is named `part_<key>` and is listed under `info.anim.<key>`. */
 const PARTS = {
   mag: 'mag', slide: 'slide', bolt: 'bolt', ch: 'ch', handle: 'handle', pump: 'pump', lever: 'lever', cyl: 'cyl', brk: 'brk', barrel: 'barrel', cover: 'cover', magn: 'magn',
-  spin: 'spin', carry: 'carry', dial: 'dial', bipod: 'bipod', quarrel: 'quarrel', quarrelHead: 'quarrelHead', quarrelNock: 'quarrelNock', stringCocked: 'stringCocked', stringSlack: 'stringSlack',
+  spin: 'spin', carry: 'carry', dial: 'dial', catch: 'catch', bipod: 'bipod', quarrel: 'quarrel', quarrelHead: 'quarrelHead', quarrelNock: 'quarrelNock', stringCocked: 'stringCocked', stringSlack: 'stringSlack',
 } as const;
 type PartKey = (typeof PARTS)[keyof typeof PARTS];
 
@@ -146,6 +146,7 @@ const CONTRACT_CORE = {
   parts: {
     mag: { doc: 'The magazine: drops out and swaps on a reload.', pairedWith: 'magAt' }, slide: { doc: 'A pistol slide: cycles with each shot.', pairedWith: 'slide' },
     bolt: { doc: 'An exposed bolt / carrier.', pairedWith: null }, ch: { doc: 'A charging handle.', pairedWith: null },
+    catch: { doc: 'The bolt catch (an AR\'s paddle on the left of the lower, behind the magazine well): its origin is its pivot pin, and it turns about x (up to 0.14 rad, the upper arm tipping back) when the bolt is held open on an empty magazine; the hand presses it to send the bolt home (js/vmanim.ts).', pairedWith: null },
     handle: { doc: 'A cocking handle that reciprocates or is worked by the hand.', pairedWith: 'handle' }, pump: { doc: 'A pump-action forend.', pairedWith: null },
     lever: { doc: 'A lever-action lever.', pairedWith: null }, cyl: { doc: 'A revolver cylinder: it rotates (z) by 1/n per shot.', pairedWith: null },
     brk: { doc: 'A break-action barrel group that tips open on its hinge.', pairedWith: null }, barrel: { doc: 'A long-recoil barrel (runs back by info.recoilBarrel).', pairedWith: null },

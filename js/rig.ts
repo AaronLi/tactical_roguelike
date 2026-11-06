@@ -896,6 +896,9 @@ const G_Rig = (() => {
         } else mg.position.copy(rig.gun.userData.magHome);
         mg.visible = !p.nomag || inHand; // (a gun with its magazine out has none on it)
       }
+      // the bolt catch (part_catch, js/vmanim.ts CATCH_LOCK): up while the gun is held open on an empty magazine, down once it's loaded (the thumb's press is the last of the reload)
+      const bcg = rig.gun.userData.catch as THREE.Object3D | undefined;
+      if (bcg) bcg.rotation.x = (p.loaded != null && !p.loaded ? 1 : 0) * 0.14;
       // the bipod's legs: down when they've put it down (a quarter of a second either way)
       if (rig.gun.userData.bipod) { rig.bipodK = U.clamp((rig.bipodK || 0) + (p.bipod ? 1 : -1) * dt * 4, 0, 1); G.GunRig.bipodPose(rig.gun.userData.bipod, rig.bipodK); }
     } else {
