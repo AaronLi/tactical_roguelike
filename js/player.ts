@@ -2727,6 +2727,7 @@ const G_Me = {
     this.bleed = G.Med.bleedOut(this.body);
     this.stats.downs++;
     this.reloading = false;
+    this.action = null; // (whatever your hands were doing, zip-tying, bagging, at a door: let go, so the squad doesn't see you still reaching)
     if (this.slot !== 's' && this.weapons.s) { this.slot = 's'; G.R.setViewmodel(this.cur().def); }
     G.Audio.down();
     G.Net.toHost({ t: 'chat', m: '[is down and needs a revive!]' });
@@ -2753,6 +2754,7 @@ const G_Me = {
     this.down = false; this.out = false;
     this.dead = true;
     this.hp = 0;
+    this.action = null; // (killed outright mid-action: let go of it, as going down does)
     this.deathCause = how || 'Bled out';
     G.R.setViewmodel(null);
     G.HUD.toast('KIA', this.deathCause, 3);
