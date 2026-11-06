@@ -66,8 +66,13 @@ async function finish(code) {
 async function inPage(threeVer) {
   const T = THREE, G = window.G, RZ = G.Hangar.RZ, WALL_H = G.Level.WALL_H;
   const { GLTFExporter } = await import(`https://cdn.jsdelivr.net/npm/three@${threeVer}/examples/jsm/exporters/GLTFExporter.js/+esm`);
-  // the scene, for a map
+  // the scene, for a map (Math.random seeded while it's drawn: the level's own textures' speckle, js/level.ts _tex, is random,
+  // and a bake that came out the same twice would change the bundle for nothing)
   const build = (seed, level) => {
+    let s = 0x5eed; const rnd = Math.random; Math.random = () => { s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    try { return drawn(seed, level); } finally { Math.random = rnd; }
+  };
+  const drawn = (seed, level) => {
     const map = G.Level.generateHub(seed, level), root = G.Hangar.fixtures(map), shell = new T.Group();
     shell.name = 'shell'; shell.position.z = -RZ; root.add(shell);
     const lv = G.Level.buildMesh(map, { pool: false, hubFixed: true }); // (the shell's fixed pieces, marked: js/level.ts buildMesh)
