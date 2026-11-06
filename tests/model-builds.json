@@ -3210,8 +3210,20 @@
    "build": { "barrel": "mp5sd.barrel", "grip": "gr.ar.0", "mag": "mp5.mag.30", "optic": "op.pic.0", "receiver": "rcv.mp5sd", "stock": "stk.smg.1" }
   },
   { "platform": "mp5sd",
-   "why": "integral suppressor (mp5sd.br.long)",
+   "why": "authored variant (mp5sd.br.long)",
+   "build": { "barrel": "mp5sd.br.long", "grip": "oem.gr.ar.4", "mag": "mp5.mag.30", "optic": "op.pic.0", "receiver": "rcv.mp5sd", "stock": "stk.smg.1" }
+  },
+  { "platform": "mp5sd",
+   "why": "authored variant, loaded (mp5sd.br.long) + integral suppressor (mp5sd.br.long)",
    "build": { "barrel": "mp5sd.br.long", "grip": "oem.gr.ar.4", "mag": "mp5.mag.30", "optic": "op.pic.0", "railmount": "rm.0", "receiver": "rcv.mp5sd", "stock": "stk.smg.1", "tac": "tac.0" }
+  },
+  { "platform": "mp5sd",
+   "why": "authored variant (mp5sd.br.open)",
+   "build": { "barrel": "mp5sd.br.open", "grip": "oem.gr.ar.4", "mag": "mp5.mag.30", "optic": "op.pic.0", "receiver": "rcv.mp5sd", "stock": "stk.smg.1" }
+  },
+  { "platform": "mp5sd",
+   "why": "authored variant, loaded (mp5sd.br.open) + authored variants together",
+   "build": { "barrel": "mp5sd.br.open", "grip": "oem.gr.ar.4", "mag": "mp5.mag.30", "optic": "op.pic.0", "railmount": "rm.0", "receiver": "rcv.mp5sd", "stock": "stk.smg.1", "tac": "tac.0" }
   },
   { "platform": "vector",
    "why": "default",

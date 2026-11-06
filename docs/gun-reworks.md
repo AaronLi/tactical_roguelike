@@ -40,3 +40,5 @@ date doesn't say which came first. `traced`: from a photo. `by eye`: built looki
 | aks74u | 2026-10-30 | traced | c665baf | "AK74andAKS74U.jpg", cross-checked against "Stepanov AKS-74Us.jpg" and "AKSU-74.jpg" |
 | ar9 | 2026-10-30 | traced | feb9d29 | "AR Colt 9mm left.jpg" (the Colt 9mm SMG's receiver pair; the Glock magazine goes in the same well) |
 | gm6 | 2026-11-01 | traced | (new gun) | IMFDB "GepardM6.jpg" (the maker's studio shot); the front end checked against Commons "Sniper rifle (18218366812) (GM6 Lynx).jpg" |
+| mp5 | 2026-11-05 | traced | (this commit) | authored in Blender (models/mp5_kit.py): Commons "HK MP5 noBG.png" (an A3, 0.576 mm/px from its 660 mm), the A2 stock from "MP5 in U.S. Ordnance Museum.jpg" (issue #30) |
+| mp5sd | 2026-11-05 | traced | (this commit) | authored in Blender (models/mp5_kit.py): the MP5's receiver; the front from "MP5SD.JPG" and "MP5SD_EP.jpg", its length from HK's figures (the SD2 790 mm to the A2's 680) |
