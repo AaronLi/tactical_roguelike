@@ -127,13 +127,13 @@ def magazine(Kx, ext=0):
     # part_mag: the body (ext px longer down the slope) and its base pad (a deeper one, and a sleeve over the extension, when extended)
     dx = ext * MAG_SLOPE
     pm = Kx.part('mag', (0, MAG_TOP[0], MAG_TOP[1])); pm['check'] = {'w': 0.020}
-    # the body: open at the top between its feed lips (the top round sits in it), a witness window cut down each face (the game's
-    # magazine check: four down its back, four down its front, the stack's brass showing; each window its own mesh at the face's tilt)
+    # the body: open at the top between its feed lips (the top round sits in it), witness windows cut down its back (the game's
+    # magazine check: four down the back, toward the shooter, none on the front, the stack's brass showing; each window its own mesh at the face's tilt)
     body = Kx.tmp(prism(PL([(605, 192), (712, 192), (778 + dx, 486 + ext), (664 + dx, 486 + ext)]), 'x', -10 * mm, 10 * mm))
     cut(body, prism(PL([(610, 186), (707, 186), (707, 201), (610, 201)]), 'x', -9.0 * mm, 9.0 * mm))
     bevel(body, 0.8 * mm, 1)
     wins = []
-    for side, (a0, a1) in ((1, ((712, 192), (778 + dx, 486 + ext))), (-1, ((605, 192), (664 + dx, 486 + ext)))):
+    for side, (a0, a1) in ((1, ((712, 192), (778 + dx, 486 + ext))),):
         q0, q1 = PL([a0])[0], PL([a1])[0]
         uF, uU = q0[0] - q1[0], q0[1] - q1[1]; n_ = math.hypot(uF, uU); uF, uU = uF / n_, uU / n_      # (up the face)
         ang = math.atan2(-uF, uU); nF, nU = math.cos(ang), math.sin(ang)                             # (about X: Z up the face; the face's forward normal)

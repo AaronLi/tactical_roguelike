@@ -21,6 +21,7 @@ for (const id of authoredIds()) {
     if (Math.abs(c.w - src.parts[key].check.w) > 1e-6) out.push(`w is ${c.w}, the source's ${src.parts[key].check.w}`);
     if (!c.top[0] || !c.top[1]) out.push('no top round (case and tip)');
     if (c.holes.length !== holes.length) out.push(`${c.holes.length} witness holes, the source has ${holes.length}`);
+    for (const h of c.holes) if (h.side !== 1) out.push(`hole i ${h.i} is on side ${h.side}: holes go down the back face only (side 1), none on the front`);
     for (const e of holes) { // (each its own mesh, at its node's tilt)
       const h = c.holes.find((q) => q.i === e.chk.i && q.side === (e.chk.side === -1 ? -1 : 1));
       if (!h) { out.push(`hole i ${e.chk.i} side ${e.chk.side} is missing`); continue; }

@@ -35,7 +35,8 @@ function gun(o = {}) {
     mag('mag_4', [0.075, o.caseLo ?? -0.026, -0.0045], [0.11, o.crown ?? -0.018, 0.0045], { role: 'top', i: 0 }),
     ...(o.noTip ? [] : [mag('mag_5', [0.11, o.tipLo ?? -0.025, -0.002], [0.12, o.tipTop ?? -0.019, 0.002], { role: 'top', i: 1 })]),
     ...(o.noHoles ? [] : [mag('mag_6', [0.0715, -0.06, -0.003], [0.072, -0.055, 0], { role: 'hole', i: 0, t: 0.2, side: 1 })]),
-    ...(o.noHoles || o.oneSided ? [] : [mag('mag_7', [0.128, -0.06, 0], [0.1285, -0.055, 0.003], { role: 'hole', i: 0, t: 0.2, side: -1 })]),
+    ...(o.front ? [mag('mag_7', [0.128, -0.06, 0], [0.1285, -0.055, 0.003], { role: 'hole', i: 0, t: 0.2, side: -1 })] : []), // (a hole on the front face: there are none)
+    ...(o.twice ? [mag('mag_9', [0.0715, -0.07, -0.003], [0.072, -0.065, 0], { role: 'hole', i: 0, t: 0.25, side: 1 })] : []),
     ...(o.rounds ? [mag('mag_8', [0.075, -0.034, -0.0045], [0.11, -0.026, 0.0045], { role: 'round', i: 1, t: 0.05 })] : []),
     ...(o.extra || []),
   ];
@@ -62,7 +63,8 @@ T('magcheck: no check.w', { noW: true }, /no extras\.check\.w/);
 T('magcheck: no top round tip (i 1)', { noTip: true }, /no mesh with extras\.chk \{ role: "top", i: 1 \}/);
 T('magcheck: no holes and no clear rounds', { noHoles: true }, /no witness holes \(chk role "hole"\) and no clear-body rounds/);
 T('magcheck: clear-body rounds instead of holes', { noHoles: true, rounds: true }, null);
-T('magcheck: a hole on one face only', { oneSided: true }, /witness hole i 0 has 0 meshes on side -1/);
+T('magcheck: a hole on the front face', { front: true }, /witness hole i 0 has 1 mesh on side -1 \(mag_7\): holes go down the back face only/);
+T('magcheck: two meshes for one hole', { twice: true }, /witness hole i 0 has 2 meshes on side 1 \(the back face\): one/);
 T('magcheck: a drum shows none', { noHoles: true, noW: true, noTip: true }, null, { magKind: 'drum' });
 // c. the top round
 T('topround: buried in the body', { crown: -0.026, caseLo: -0.032, tipTop: -0.027, tipLo: -0.031 }, /its crown is at -26\.0 mm up, 5\.0 mm under the magazine body's top .* buried/);

@@ -368,7 +368,7 @@ mg = obj(slab(loops_of('mag'), 0.028, 0.0017, 2), 'mag', 'park', pm)
 rib = []
 for px in (936, 972, 1021):
     for s in (-1, 1): rib.append(box(s * 0.0128, s * 0.03, F(px) - 0.0016, F(px) + 0.0016, U(492), U(318)))
-# the witness windows (the game's magazine check): four down the back face (toward the shooter) and four down the front, slots with
+# the witness windows (the game's magazine check): four down the back face (toward the shooter), none on the front, slots with
 # the stack's brass showing, each window its own mesh at the face's tilt there (the faces read off the magazine's own outline)
 def face_at(z, back):
     ys = []
@@ -378,7 +378,7 @@ def face_at(z, back):
     return min(ys) if back else max(ys)
 WZ0, WZ1 = U(330), U(480)
 wins = []
-for side in (1, -1):
+for side in (1,):
     for i in range(1, 5):
         t = i / 5 * 0.94; z = WZ0 + (WZ1 - WZ0) * (0.05 + 0.85 * i / 5)
         y = face_at(z, side == 1); ya, yb = face_at(z + 0.008, side == 1), face_at(z - 0.008, side == 1)

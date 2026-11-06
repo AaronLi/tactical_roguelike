@@ -122,10 +122,10 @@ def magazine(Kx, ext=0):
     low = [(646 + dx, 462 + ext), (644 + dx, 482 + ext), (634 + dx, 492 + ext), (580 + dx, 494 + ext), (566 + dx, 486 + ext)]
     gr = Kx.tmp(prism(PL([(538, 340), (622, 340)] + low), 'x', -13.5 * mm, 13.5 * mm))
     bevel(gr, 4 * mm, 3, 30)
-    # the witness windows (the game's magazine check): four down the grip's back and four down its front, slots in the rubber with the
+    # the witness windows (the game's magazine check): four down the grip's back (toward the shooter), none on its front, slots in the rubber with the
     # brass of the stack showing; each window its own mesh, its node turned to the face's tilt there
     wins = []
-    for side, (a0, a1) in ((1, ((538, 340), (566 + dx, 486 + ext))), (-1, ((622, 340), (646 + dx, 462 + ext)))):
+    for side, (a0, a1) in ((1, ((622, 340), (646 + dx, 462 + ext))),):   # (the grip's back edge: f = 746 - x px, so the larger x is the back)
         q0, q1 = PL([a0])[0], PL([a1])[0]
         uF, uU = q0[0] - q1[0], q0[1] - q1[1]; n_ = math.hypot(uF, uU); uF, uU = uF / n_, uU / n_      # (up the face)
         ang = math.atan2(-uF, uU); nF, nU = math.cos(ang), math.sin(ang)                             # (rotation about X standing Z up the face; the face's normal forward)

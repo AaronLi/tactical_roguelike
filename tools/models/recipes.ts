@@ -545,8 +545,8 @@ const G_GunRecipes = (() => {
   // spine(s): the magazine's centreline at the fraction s of its length down (0 the top, 1 the floorplate) as [f, df/ds]: where
   // it is along the gun and how fast it moves forward per unit s, so the faces' direction there is known (a curved one's
   // bends, a straight one's rakes). A witness hole's t (0..1 down the stack) is read at s = (12 mm + t of all but 26 mm) / len.
-  // Holes are stamped on BOTH faces (the back, toward the shooter, and the front: each its own brass window and count, the
-  // same t, so each face reads from its side) and tilted to the face there; a clear one's rounds lean with the curve.
+  // Holes are stamped on the back face only (toward the shooter, side 1: what you see checking it; the front has none, as on
+  // the real ones) and tilted to the face there; a clear one's rounds lean with the curve.
   function magCheck(k: Kit, spine: (s: number) => number[], top: number, len: number, w: number, d: number, clear: boolean, rnd?: RoundDims | null) {
     const R: RoundDims = rnd || { head: Math.min(0.009, w * 0.4), cs: d * 0.5, bl: d * 0.16, bd: Math.min(0.0085, w * 0.35), shell: false };
     const r = R.head / 2, oal = Math.min(R.cs + R.bl, d * 0.94), cs = oal * R.cs / (R.cs + R.bl), bl = oal - cs, rb = R.bd / 2;
@@ -590,14 +590,12 @@ const G_GunRecipes = (() => {
       chk.springs = [];
       for (let j = 0; j < N; j++) { const u = (j + 0.5) / N, t = tEnd * u; chk.springs.push({ t, u, mesh: bar(t, 0.0013, w * 0.62, d * 0.74, M.steel(), 0.3) }); }
     }
-    else for (let i = 1; i <= 5; i++) { // the witness windows: one on each face, at the face's own point and tilt (side 1 the back, -1 the front: front ones mirrored across so they sit where they would read from there)
+    else for (let i = 1; i <= 5; i++) { // the witness windows down the back face (side 1), at the face's own point and tilt there
       const t = (i / 6) * 0.94, F = at(t), th = 0.0016;
-      for (const side of [1, -1]) {
-        const g = -side * (d / 2 + 0.002 + th / 4); // (along the normal: a little proud of the face: the body is its depth plus the profile's 2 mm bevel each side)
-        const mesh = k.box(w * 0.22, 0.0055, th, M.brass(), F.cf + F.nf * g - th / 2, yAt(t) + F.ny * g, -side * w * 0.27);
-        mesh.rotation.x = F.ph;
-        chk.holes.push({ t, i: i - 1, side, mesh });
-      }
+      const g = -(d / 2 + 0.002 + th / 4); // (back along the normal: a little proud of the face: the body is its depth plus the profile's 2 mm bevel each side)
+      const mesh = k.box(w * 0.22, 0.0055, th, M.brass(), F.cf + F.nf * g - th / 2, yAt(t) + F.ny * g, -w * 0.27);
+      mesh.rotation.x = F.ph;
+      chk.holes.push({ t, i: i - 1, side: 1, mesh });
     }
     return chk;
   }
