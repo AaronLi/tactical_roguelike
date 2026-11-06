@@ -279,7 +279,7 @@ const G_VMAnim = (() => {
   // is shown it (js/rig.ts too). t: 0..1 through the whole reload. The left hand takes the handle and draws it back the length of its slot (back 0..1), turns it up
   // into the notch (lock 0..1: the bolt is held open); the magazine change runs from SLAP.mag0 to SLAP.mag1 (js/player.ts times its sounds to them); then the heel
   // of the hand slaps the handle down out of the notch (lock back to 0) and the bolt runs home (back to 0), chambering a round.
-  const SLAP = { grab: 0.07, pull: 0.2, lock: 0.29, mag0: 0.3, mag1: 0.8, slap: 0.855, home: 0.885, rest: 0.97 };
+  const SLAP = { grab: 0.053, pull: 0.143, lock: 0.196, mag0: 0.208, mag1: 0.774, slap: 0.836, home: 0.87, rest: 0.966 }; // (an MP5 keeping its magazine, 2.65 s: the draw back 0.24 s, the turn into the notch 0.14 s, the change 1.5 s)
   const slapState = (t: number) => ({
     back: S(SLAP.grab, SLAP.pull, t) * (1 - S(SLAP.slap - 0.005, SLAP.home, t)),
     lock: S(SLAP.pull, SLAP.lock, t) * (1 - S(SLAP.slap - 0.02, SLAP.slap + 0.005, t)),

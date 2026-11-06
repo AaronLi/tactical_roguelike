@@ -1080,8 +1080,8 @@ const G_Me = {
   // the old one: into a dump pouch if you wear one with room (a little slower), else on the floor, gone with
   // whatever was left in it (fastest). Digging a magazine out of your backpack takes much longer.
   RELOAD_K: { retain: 1.35, pouch: 1.0, floor: 0.82, plain: 1 },
-  // a slap reload does the handle's work as well as the magazine's: longer for each way of stowing the old magazine (an MP5's 2.0 s: 3.0, 2.6 and 2.5 s)
-  SLAP_K: { retain: 1.5, pouch: 1.3, floor: 1.25, plain: 1.3 },
+  // a slap reload does the handle's work as well as the magazine's: longer for each way of stowing the old magazine (an MP5's 2.0 s: 2.65, 2.25 and 2.15 s)
+  SLAP_K: { retain: 1.325, pouch: 1.125, floor: 1.075, plain: 1.125 },
   startReload() {
     const w = this.cur(), mag = this.magSize(w);
     if (this.zipRide) { if (!this.noAmmoT || this.noAmmoT < performance.now()) { G.HUD.toast('', "Can't reload hanging from the zipline", 1.2); this.noAmmoT = performance.now() + 1500; } return; } // (the left hand's on the trolley)
