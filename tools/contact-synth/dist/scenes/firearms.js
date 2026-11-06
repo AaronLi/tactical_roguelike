@@ -993,6 +993,8 @@ export function magDropScene(o, sim = simulateBoxDrop(magDropSpec(o))) {
     const els = [];
     const opt = (radius, sharp = 0.85) => ({ scatter: 0, radius, click: 0.8 - 0.45 * f, sharp: sharp - 0.25 * f });
     const where = (s) => (s === 'floor' ? '' : ` (${s})`);
+    // How loose the magazine is: empty is all play; the stack holds the walls still as it fills.
+    const loose = f < 0.5 ? { shellBuzz: { amount: 0.4 * (1 - 2 * f), freq: 140, decay: 0.035, rattle: 0.65 * (1 - 2 * f), wobble: 0, tone: 0 } } : null;
     const PART = {
         'bottom-end': { what: 'floorplate lands flat', layer: magFloorplate, radius: 6, trim: 0 },
         'bottom-end-edge': { what: 'edge of the floorplate lands', layer: magFloorplate, radius: 2, trim: 0 },
@@ -1012,16 +1014,26 @@ export function magDropScene(o, sim = simulateBoxDrop(magDropSpec(o))) {
         const v = Math.max(0.05, ct.speed);
         const o2 = opt(p.radius, p.sharp);
         const what = p.what + where(ct.surface);
-        els.push(hit(what, ct.t, g, v, loaded, sf.body, o2, inMag));
+        // A lightly loaded magazine's thin shell isn't held still from inside: it buzzes against the
+        // follower, the spring and the floorplate's tabs for a moment after each blow.
+        els.push(hit(what, ct.t, g, v, loaded, sf.body, o2, loose ? { ...inMag, flex: loose.shellBuzz } : inMag));
         if (p.layer && g > -35)
             els.push(hit(`${what} (the ${p.layer === magFloorplate ? 'floorplate' : p.layer === edge ? 'edge' : 'feed lips'} rings)`, ct.t, g - 7 - 5 * f, v, p.layer, sf.body, o2, inMag));
         if (p.round && n > 0 && g > -35)
             els.push(hit('top round strikes' + where(ct.surface), ct.t + 0.0003, g - 8, v * 0.8, arCase, sf.body, { scatter: 0, radius: 1.5, click: 0.6, sharp: 0.7 }, inMag));
         // Loose things inside ticking against the walls: an empty follower, a light stack's cases.
-        if (g > -22) {
+        if (n === 0 ? g > -32 : g > -22) {
             if (n === 0) {
-                for (const [dt, k] of [[0.009, 0.25], [0.016, 0.15]])
-                    els.push(hit('follower rattles in the shell', ct.t + dt, g - 16, v * k, arFollower, shell, { scatter: 0, radius: 1.5, click: 0.5, sharp: 0.6 }, inMag));
+                // The follower has ~1-2 mm of play each way in the shell and tilts on its spring: knocked
+                // off its seat it rattles from wall to wall, each knock lighter and sooner, for ~30 ms.
+                let dt = 0.004, kv = 0.35;
+                for (let i = 0; i < 6; i++) {
+                    els.push(hit('follower rattles in the shell', ct.t + dt, g - 9 - i * 2.2, v * kv, arFollower, i % 2 ? edge : shell, { scatter: 0, radius: 1.5, click: 0.6, sharp: 0.65 }, inMag));
+                    dt += 0.0065 * Math.pow(0.82, i);
+                    kv *= 0.78;
+                }
+                // The long, barely compressed spring: its coils slap the walls and buzz.
+                els.push(hit('spring coils buzz against the walls', ct.t + 0.001, g - 11, v * 0.4, arMagSpring, shell, { scatter: 0, radius: 1, click: 0.3, sharp: 0.5 }, { ...inMag, flex: { amount: 0.6, freq: 85, decay: 0.07, rattle: 0.85, wobble: 0, tone: 0 }, coil: { level: 0.35, length: 12, dispersion: 0.5, decay: 0.12, brightness: 3500 } }));
             }
             else {
                 const ticks = Math.round(4 * (1 - f));
