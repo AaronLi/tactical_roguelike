@@ -37,10 +37,13 @@ const G_Level = {
   // th: the environment (index into G.THEMES) picked on the route map; by default they come round in turn. night: a night
   // level (the route node's: js/route.ts), the same place with the lights out (nightify)
   generate(seed: number, level: number, th?: number, night = false) {
-    const map = this.generateDay(seed, level, th);
+    this.genNight = night; // (the furniture's plan reads it: fewer cars left in the car parks at night, js/furniture.ts)
+    let map: LvMap;
+    try { map = this.generateDay(seed, level, th); } finally { this.genNight = false; }
     if (night) this.nightify(map, seed);
     return map;
   },
+  genNight: false,
   generateDay(seed: number, level: number, th?: number) {
     const U = G.U, r = U.rng(seed);
     const theme = G.THEMES[th != null && G.THEMES[th] ? th : (level - 1) % G.THEMES.length];
@@ -2726,6 +2729,9 @@ const G_Level = {
   },
   buildFestival(map: LvMap, root: THREE.Object3D) {
     const T = THREE, f = map.fest, TS = this.TS, rnd = G.U.rng((map.seed ^ 0xfe57) >>> 0), Wm = map.W * TS, Hm = map.H * TS;
+    // (a night level's festival is the small hours, everyone gone home and the power off: the bulbs, lanterns, street lamps, stage
+    // lamps and its sign are dead glass and paint, lit only by the moon, no glows or beams; nightify has their lights off)
+    const dark = !!map.night, deadGlass = (hex: number) => new T.MeshStandardMaterial({ color: new T.Color(hex).multiplyScalar(0.35), roughness: 0.25, metalness: 0.1 });
     const tx = G.Furniture.textures(rnd);
     // the lawn (worn in the lanes), paving at the gate
     const grass = tx.grass(); grass.repeat.set(map.W / 3, map.H / 3);
@@ -2749,14 +2755,14 @@ const G_Level = {
     if (f.plaza) slab({ x0: f.plaza.x0 - TS, x1: f.plaza.x1, z0: f.plaza.z0 - TS, z1: f.plaza.z1 + TS * 2 }, tx.tile('#6a645a', '#4a463e'), 1.2, 0.005);
     if (f.lot) {
       slab({ x0: f.lot.x0 - TS, x1: f.lot.x1 + TS, z0: f.lot.z0 - TS / 2, z1: f.lot.z1 + TS }, tx.carpet('#26282a'), 2, 0.005);
-      const paint = new T.MeshBasicMaterial({ color: 0xb8b4a8 }), geos = [];
+      const paint = dark ? new T.MeshStandardMaterial({ color: 0xb8b4a8, roughness: 0.9 }) : new T.MeshBasicMaterial({ color: 0xb8b4a8 }), geos = []; // (by moonlight at night, lit as the road is)
       for (const [bx0, bx1, bz0, bz1] of f.bays) {
         for (let x = bx0; x <= bx1 + 0.01; x += TS * this.K) { const g = new T.PlaneGeometry(0.1, bz1 - bz0 - 0.4); g.rotateX(-Math.PI / 2); g.translate(x, 0.008, (bz0 + bz1) / 2); geos.push(g); }
       }
       for (const g of geos) root.add(new T.Mesh(g, paint));
     }
     // street lamps: a tall post and a lantern head (their light is in map.lights)
-    const postMat = new T.MeshStandardMaterial({ color: 0x1c1e20, roughness: 0.5, metalness: 0.5 }), headMat = new T.MeshBasicMaterial({ color: 0xffe2b8 });
+    const postMat = new T.MeshStandardMaterial({ color: 0x1c1e20, roughness: 0.5, metalness: 0.5 }), headMat = dark ? deadGlass(0xffe2b8) : new T.MeshBasicMaterial({ color: 0xffe2b8 });
     const postGeo = new T.CylinderGeometry(0.07, 0.1, 6, 8), headGeo = new T.BoxGeometry(0.34, 0.42, 0.34), globeGeo = new T.SphereGeometry(0.15, 10, 8);
     for (const [x, z] of f.lamps) {
       const p = new T.Mesh(postGeo, postMat); p.position.set(x, 3, z); root.add(p);
@@ -2774,7 +2780,7 @@ const G_Level = {
         if (!rm) continue;
         const [txt, col] = SIGN[rm.type], c = document.createElement('canvas'); c.width = 256; c.height = 64;
         const g = c.getContext('2d')!; g.fillStyle = '#16141a'; g.fillRect(0, 0, 256, 64); g.font = 'bold 44px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.shadowColor = col; g.shadowBlur = 16; g.fillStyle = col; g.fillText(txt, 128, 34);
-        const sign = new T.Mesh(new T.PlaneGeometry(1.6, 0.4), new T.MeshBasicMaterial({ map: new T.CanvasTexture(c) }));
+        const sign = new T.Mesh(new T.PlaneGeometry(1.6, 0.4), dark ? new T.MeshStandardMaterial({ map: new T.CanvasTexture(c), roughness: 0.8 }) : new T.MeshBasicMaterial({ map: new T.CanvasTexture(c) }));
         sign.position.set(d.x + ax * s * (TS / 2 + 0.03), this.DOOR_H + 0.45, d.z + az * s * (TS / 2 + 0.03)); sign.rotation.y = Math.atan2(ax * s, az * s); root.add(sign);
       }
     }
@@ -2824,10 +2830,11 @@ const G_Level = {
     if (wirePts.length) root.add(new T.LineSegments(new T.BufferGeometry().setFromPoints(wirePts), new T.LineBasicMaterial({ color: 0x0a0a0a })));
     const lights = (list: [THREE.Vector3, number][], geo: THREE.BufferGeometry, size: number) => {
       if (!list.length) return;
-      const im = new T.InstancedMesh(geo, new T.MeshBasicMaterial({ color: 0xffffff }), list.length), m4 = new T.Matrix4(), c = new T.Color();
+      const im = new T.InstancedMesh(geo, dark ? deadGlass(0xffffff) : new T.MeshBasicMaterial({ color: 0xffffff }), list.length), m4 = new T.Matrix4(), c = new T.Color();
       const pos = new Float32Array(list.length * 3), col = new Float32Array(list.length * 3);
       list.forEach(([p, hex], i) => { m4.makeTranslation(p.x, p.y, p.z); im.setMatrixAt(i, m4); im.setColorAt(i, c.setHex(hex)); pos.set([p.x, p.y, p.z], i * 3); col.set([c.r * 0.9, c.g * 0.9, c.b * 0.9], i * 3); });
       root.add(im);
+      if (dark) return; // (no glow round a dead bulb)
       const g = new T.BufferGeometry(); g.setAttribute('position', new T.BufferAttribute(pos, 3)); g.setAttribute('color', new T.BufferAttribute(col, 3));
       root.add(new T.Points(g, new T.PointsMaterial({ size, map: glowTex, vertexColors: true, transparent: true, depthWrite: false, blending: T.AdditiveBlending })));
     };
@@ -2867,7 +2874,8 @@ const G_Level = {
         const x = x0 + 0.6 + (i / 7) * (x1 - x0 - 1.2), color = COLS[i % COLS.length];
         const target = new T.Vector3(x + (rnd() - 0.5) * 6, 0, st.z1 + 1 + rnd() * 8), from = new T.Vector3(x, H - 0.35, zF), d = target.clone().sub(from), l = d.length();
         const q = new T.Quaternion().setFromUnitVectors(new T.Vector3(0, -1, 0), d.clone().normalize());
-        const lamp = new T.Mesh(can, new T.MeshBasicMaterial({ color })); lamp.position.copy(from); lamp.quaternion.copy(q); root.add(lamp);
+        const lamp = new T.Mesh(can, dark ? deadGlass(color) : new T.MeshBasicMaterial({ color })); lamp.position.copy(from); lamp.quaternion.copy(q); root.add(lamp);
+        if (dark) continue; // (no beam from a lamp that's off)
         const beam = new T.Mesh(new T.ConeGeometry(1.4, l, 16, 1, true), new T.MeshBasicMaterial({ color, transparent: true, opacity: 0.07, depthWrite: false, blending: T.AdditiveBlending, side: T.DoubleSide }));
         beam.geometry.translate(0, -l / 2, 0); beam.position.copy(from); beam.quaternion.copy(q); root.add(beam);
       }
@@ -2880,10 +2888,10 @@ const G_Level = {
       g.shadowColor = '#ff4fd0'; g.shadowBlur = 30; g.fillStyle = '#ffe6fa'; g.fillText('SUMMER LIGHTS', 512, 160);
       g.font = 'bold 54px sans-serif'; g.shadowColor = '#40d0ff'; g.fillStyle = '#d8f6ff'; g.fillText('MUSIC  •  FOOD  •  ART', 512, 280);
       const bt = new T.CanvasTexture(c);
-      const back = new T.Mesh(new T.PlaneGeometry(x1 - x0 - 0.6, 5.2), new T.MeshBasicMaterial({ map: bt, color: 0xcccccc }));
+      const back = new T.Mesh(new T.PlaneGeometry(x1 - x0 - 0.6, 5.2), dark ? new T.MeshStandardMaterial({ map: bt, color: 0x9a9a9a, roughness: 0.9 }) : new T.MeshBasicMaterial({ map: bt, color: 0xcccccc })); // (a printed banner by moonlight, unlit, at night)
       back.position.set((x0 + x1) / 2, 1.2 + 2.7, zB - 0.05); root.add(back);
       // an LED strip along the stage's front edge
-      const lip = new T.Mesh(new T.BoxGeometry(st.x1 - st.x0 - 2.8, 0.04, 0.04), new T.MeshBasicMaterial({ color: 0x40c0ff }));
+      const lip = new T.Mesh(new T.BoxGeometry(st.x1 - st.x0 - 2.8, 0.04, 0.04), dark ? deadGlass(0x40c0ff) : new T.MeshBasicMaterial({ color: 0x40c0ff }));
       lip.position.set((st.x0 + st.x1) / 2, 1.18, st.z1 + 0.01); root.add(lip);
     }
     // the arch over the gate (you came in under it), on the fence behind the spawn
@@ -2893,7 +2901,7 @@ const G_Level = {
       const c = document.createElement('canvas'); c.width = 1024; c.height = 160;
       const g2 = c.getContext('2d')!; g2.fillStyle = '#2a1238'; g2.fillRect(0, 0, 1024, 160);
       g2.textAlign = 'center'; g2.textBaseline = 'middle'; g2.font = 'bold 96px sans-serif'; g2.shadowColor = '#ffb040'; g2.shadowBlur = 24; g2.fillStyle = '#fff2d8'; g2.fillText('WELCOME', 512, 84);
-      const sign = new T.Mesh(new T.BoxGeometry(7.5, 1.2, 0.2), [pm, pm, pm, pm, new T.MeshBasicMaterial({ map: new T.CanvasTexture(c) }), new T.MeshBasicMaterial({ map: new T.CanvasTexture(c) })]);
+      const sign = new T.Mesh(new T.BoxGeometry(7.5, 1.2, 0.2), [pm, pm, pm, pm, ...[0, 1].map(() => (dark ? new T.MeshStandardMaterial({ map: new T.CanvasTexture(c), roughness: 0.8 }) : new T.MeshBasicMaterial({ map: new T.CanvasTexture(c) })))]);
       sign.position.set(cx, 4.7, z); sign.rotation.y = Math.PI; root.add(sign);
     }
   },
