@@ -82,6 +82,19 @@ await page.evaluate(async () => {
   const g0 = G.Game; g0.pickRoute(G.Route.options(g0.routeMap, g0.routeSt.path[g0.routeSt.path.length - 1])[0]);
   await until(() => G.Game.phase === 'level' && G.Me.kit);
   await sleep(1.0);
+  // the loading veil (shaders compiling) has to lift first: the game waits for it, in real time
+  const veiled = () => { const v = G.Game.$('veil'); return !!v && v.classList.contains('on'); };
+  await until(() => !veiled());
+  // The level opens with the insertion flight (js/landing.ts): skip it as holding F does, and get out on the pad.
+  const Ld = G.Landing;
+  if (Ld && Ld.S) {
+    await until(() => Ld.S.fly || Ld.S.landed);
+    if (!Ld.S.landed) { Ld.S.ft = Ld.S.fly.dur; await until(() => Ld.S.landed); }
+    for (let i = 0; i < 20 && Ld.S.landed && G.Me.seat != null; i++) { G.Me.fLatch = false; Ld.interact(G.Me, 10, true); await sleep(0.2); }
+    G.Me.fLatch = false;
+    await sleep(0.5);
+  }
+  await until(() => !veiled());
   G.Server.enemies.clear();
   const g = G.Game; let lk = true; Object.defineProperty(g, 'locked', { get: () => lk, set: () => {}, configurable: true });
   for (const el of ['pause', 'clickToPlay']) { const e = g.$(el); if (e) e.classList.add('hidden'); }
