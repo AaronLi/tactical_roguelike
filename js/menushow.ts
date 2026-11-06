@@ -1,13 +1,13 @@
 'use strict';
 // The main menu's background: the guns, one after another, each alone against black while the camera runs a couple of
-// the gear room's slow moves round it, slowed down further (js/highlights.ts tourMoves, tourPath: the same paths the highlight reel's tour
+// the gear room's slow moves round it, slowed down further (about a quarter of the reel's speed; js/highlights.ts tourMoves, tourPath: the same paths the highlight reel's tour
 // uses), with a fade to black between guns. The gun is on the left, the menu on the right. It takes over from
 // the rotating level (js/game.ts menuBackdrop) once its first gun is in (the models arrive with the bundle: js/modelbundles.ts).
 const G_MenuShow = (() => {
   const T = THREE;
   // the guns it shows (their factory builds), in a shuffled order, round and round
   const GUNS = ['m4', 'hk416', 'ak', 'scar', 'mk14', 'awm', 'r700', 'mp5', 'vector', 'aug', 'tavor', 'fal', 'tempest', 'm249', 'hailstorm', 'benelli', 'mcx', 'galil', 'svd', 'p90'];
-  const SLOW = 1.8, MOVES = 2, FADE = 0.8, YAW = Math.PI / 2 + 0.45; // (SLOW: the moves this many times as long as in the reel)
+  const SLOW = 3.6, MOVES = 2, FADE = 0.8, YAW = Math.PI / 2 + 0.45; // (SLOW: the moves this many times as long as in the reel)
   let S: any = null;
 
   function stage() {
