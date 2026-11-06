@@ -61,6 +61,9 @@ current patch, so a link opens the exact same sound.
 
 ## Scenes (multi-part mechanisms)
 
+See [SOUND_DESIGN.md](SOUND_DESIGN.md) for how scenes are planned and tuned, and `scripts/analyze/` for the measurement scripts it uses.
+
+
 A scene sequences many contact sounds, each with its own pair of bodies, into named tracks on one
 timeline (`src/scene.ts`). Besides contact sounds, a scene can use an `air` source: band-passed noise
 for air pushed out of a plunger tube or barrel, with an optional "pop". All stems share one gain, so
