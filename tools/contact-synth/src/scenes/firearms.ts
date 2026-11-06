@@ -813,10 +813,11 @@ function makeArMagOut(fill: MagFill): Scene {
   const own = fill === 'loaded' ? IN_LOADED_MAG : IN_MAG;
   const v = fill === 'loaded' ? 1 : 0.8;
   const els: SceneElement[] = [
-    // Thumb presses the release button: it travels, bottoms, and pivots the catch out of the slot.
-    snap('mag release button pressed in', 0, -8, { strength: 0.5, preload: 60, creak: 0.15, seat: 0.3, seatDelay: 1.5 }, arMagRelease, arLower),
-    snap('mag catch pivots out of the magazine', 0.0615, -4, { strength: 0.7, preload: 0, seat: 0.2, seatDelay: 1 }, arMagCatch, body,
-      { coil: { level: 0.3, length: 2, dispersion: 0.35, decay: 0.05, brightness: 5000 } }),
+    // The finger drives the button and the catch the whole way, so nothing snaps: the button
+    // travels with a faint scuff and bottoms softly under the fingertip, and the catch is drawn
+    // slowly out of the magazine's slot (a barely-there rub). The first real sound is the drop.
+    snap('mag release button pressed in', 0, -26, { strength: 0.2, preload: 60, creak: 0.05, seat: 0.1, seatDelay: 1.5 }, arMagRelease, arLower),
+    rub('mag catch pivots out of the magazine', 0.05, -34, { force: 3, duration: 0.012, speed: 0.05, profile: 'decelerate', roughness: 3, grain: 0.2, contactWidth: 0.03 }, arMagCatch, body),
     // Free of the catch, the magazine drops: a small release clunk, then it slides out of the well.
     hit('magazine drops off the catch', 0.064, -8, 0.5 * v, panel, arMagWell, { scatter: 0.6, radius: 2, click: 0.6 }, SHEET_RATTLE),
     // The air column in the well grows as the magazine drops (~1.2 cm -> ~8 cm, speeding up): its
