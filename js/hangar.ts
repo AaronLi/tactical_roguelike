@@ -4,7 +4,7 @@
 //   the workshop (west): a bench for each officer, with a computer that opens the gunsmith, and a rack of the
 //     gunsmith's parts for sale;
 //   the store (middle): Vex at his counter (his till opens the whole stock), the kit for sale on pedestals,
-//     a shelf of pouches, and two vending machines (ammunition; medical gear and grenades);
+//     a shelf of pouches, and a vending machine (medical gear and grenades; ammunition's at his till);
 //   the stash (east, at the back, by the walkway to the lounge): your crates in a cage, and a console that opens your stash and loadout;
 //   Nightjar Optronics (east, at the back, where the warehouse was): a special-operations outfitter behind a glass front,
 //     night vision in glass cases (G.Shop.offers.nvg), a counter with their rep behind it;
@@ -49,7 +49,7 @@ const G_Hangar = (() => {
   const POUCH = { x0: 17.2, x1: 18.0, z0: 8.7, step: 1.12, n: 5 };
   const ZERO = { x0: 6.3, x1: 8.1, z0: 13.1, z1: 14.9, h: 0.9 }; // the zeroing table, in the middle of the workshop floor
   const PARTS = { x0: 12.9, z: 3.5, step: 1.15, n: 7, top: 0.9 }; // the gunsmith's parts, on pedestals along the north wall (east of the range's garage door)
-  const VEND: HangarVend[] = [{ id: 'ammo', title: 'AMMUNITION', x: 35.0, z: 10.0, cols: 2, rows: 3, tab: 'svc' }, { id: 'supply', title: 'FIELD SUPPLIES', x: 35.0, z: 12.2, cols: 3, rows: 3, tab: 'svc' }];
+  const VEND: HangarVend[] = [{ id: 'supply', title: 'FIELD SUPPLIES', x: 35.0, z: 12.2, cols: 3, rows: 3, tab: 'svc' }];
   const CONSOLE = { x0: 36.7, x1: 37.5, z0: 2.5, z1: 4.9 }; // the stash console, beside its cage, turned to the store
   const STACK = { x: 38.9, z: 3.4 }; // (the stash's cage, against the back wall)
   // Nightjar Optronics: the back of the east side (the warehouse's floor, x 40 to the east wall, the back wall to the lounge's),
@@ -559,7 +559,7 @@ const G_Hangar = (() => {
     const r = S.root, x1 = v.x + 1.1;
     box(r, v.x, 0, v.z - 0.55, x1, 1.95, v.z + 0.55, M(0x2d3237));
     box(r, v.x - 0.02, 1.6, v.z - 0.55, v.x + 0.02, 1.95, v.z + 0.55, M(0x15181b));
-    const ttl = new T.Mesh(new T.PlaneGeometry(1.0, 0.3), screenMat(v.title, ['F: the full list'], 256, 76, v.id === 'ammo' ? '#ffd24a' : '#7dff9a'));
+    const ttl = new T.Mesh(new T.PlaneGeometry(1.0, 0.3), screenMat(v.title, ['F: the full list'], 256, 76, '#7dff9a'));
     ttl.rotation.y = -Math.PI / 2; ttl.position.set(v.x - 0.025, 1.78, v.z); r.add(ttl);
     const glass = new T.Mesh(new T.PlaneGeometry(0.98, 1.36), new T.MeshBasicMaterial({ color: 0x0b1620, transparent: true, opacity: 0.55 })); glass.rotation.y = -Math.PI / 2; glass.position.set(v.x - 0.02, 0.88, v.z); r.add(glass);
     box(r, v.x - 0.04, 0.12, v.z - 0.5, v.x + 0.02, 0.26, v.z + 0.5, M(0x0e0f10)); // the delivery flap
@@ -927,20 +927,14 @@ const G_Hangar = (() => {
     // the gear and magazines Vex lists in his stock, that don't have a place on a shelf, are at his till
   }
 
-  // the vending machines' contents: ammunition (the special loads, and ball for every caliber you carry a gun in), and
-  // field supplies (medical items, flashbangs and frags)
-  function vendList(id: string) {
+  // the vending machine's contents: field supplies (medical items, flashbangs, frags and thermobarics)
+  function vendList(_id: string) {
     const Sh = G.Shop, Gr = G.Gear, out = [], sv = Sh.services();
-    if (id === 'ammo') {
-      for (const o of Sh.offers!.ammo) { const A = G.AMMO[o.am], C = G.CALIBERS[o.cal], it = Gr.boxItem(o.cal, o.am, o.n); out.push({ k: 'ammo', key: o.cal, item: it, name: `${C.name} ${A.name} ×${o.n}`, price: Gr.price(it), sold: !Sh.inStock('ammo:' + o.cal) }); }
-      for (const s of sv) if (s.id.startsWith('ball.')) { const cal = s.id.slice(5), C = G.CALIBERS[cal], am = G.ballFor(cal); out.push({ k: 'svc', key: s.id, item: Gr.boxItem(cal, am, C.box), name: s.name, price: s.price, sold: false }); }
-    } else {
-      for (const s of sv) {
-        if (s.id.startsWith('med.')) out.push({ k: 'svc', key: s.id, item: Gr.medItem(s.id.slice(4)), name: s.name, price: s.price, sold: false });
-        else if (s.id === 'flash') out.push({ k: 'svc', key: s.id, item: Gr.flashItem(), name: s.name, price: s.price, sold: false });
-        else if (s.id === 'nade') out.push({ k: 'svc', key: s.id, item: Gr.fragItem(), name: s.name, price: s.price, sold: false });
-        else if (s.id === 'tb') out.push({ k: 'svc', key: s.id, item: Gr.tbItem(), name: s.name, price: s.price, sold: false });
-      }
+    for (const s of sv) {
+      if (s.id.startsWith('med.')) out.push({ k: 'svc', key: s.id, item: Gr.medItem(s.id.slice(4)), name: s.name, price: s.price, sold: false });
+      else if (s.id === 'flash') out.push({ k: 'svc', key: s.id, item: Gr.flashItem(), name: s.name, price: s.price, sold: false });
+      else if (s.id === 'nade') out.push({ k: 'svc', key: s.id, item: Gr.fragItem(), name: s.name, price: s.price, sold: false });
+      else if (s.id === 'tb') out.push({ k: 'svc', key: s.id, item: Gr.tbItem(), name: s.name, price: s.price, sold: false });
     }
     return out;
   }
