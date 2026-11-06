@@ -11,7 +11,7 @@ type BloodKind = 'drop' | 'spatter' | 'pool';
 interface RBloodMats { [kind: string]: THREE.MeshStandardMaterial; drop: THREE.MeshStandardMaterial; spatter: THREE.MeshStandardMaterial; pool: THREE.MeshStandardMaterial; }
 type RMark = THREE.Mesh<THREE.BufferGeometry, THREE.Material>; // a pooled decal or blood mark
 type RWound = (THREE.Mesh<THREE.BufferGeometry, THREE.Material> | THREE.Line<THREE.BufferGeometry, THREE.Material>) & { onRig?: any }; // a track kept on a body
-interface RWarm { t0: number; tWait: number; waitMs?: number; done: (() => void) | null; tasks: (() => void)[]; stage: number; frames: number; undo: (() => void)[]; had: Set<any>; pending: Promise<unknown>[]; compiled: boolean } // (js/render.ts warmup)
+interface RWarm { t0: number; tWait: number; waitMs?: number; done: (() => void) | null; tasks: (() => void)[]; stage: number; frames: number; undo: (() => void)[]; had: Set<any>; ask?: any[] } // (js/render.ts warmup)
 interface RArc { dots: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial>; ring: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>; N: number; f?: number; }
 const G_R = {
   // (set in init / _initFx before anything uses them: they hold undefined till then, as before)
@@ -1419,9 +1419,9 @@ const G_R = {
   //     and in the hangar the TVs' sets (js/highlights.ts warm)
   //   - then a few real frames with nothing culled, for what only drawing builds: the weapon lights' shadow maps (their
   //     depth shaders, one for each kind of thing that casts) and the evidence outlines' passes.
-  // The programs go to the graphics driver all at once and it builds them side by side (three's compileAsync: it asks for
-  // them all and doesn't look at one till KHR_parallel_shader_compile says it's built, so the veil keeps moving: warmStep),
-  // and they're kept for good (pinned), so
+  // The programs go to the graphics driver all at once and it builds them side by side (three's compile asks for them and
+  // looks at none till it's first used; each program's isReady() asks KHR_parallel_shader_compile without waiting, as
+  // compileAsync does: waited on frame by frame, so the veil keeps moving: warmStep), and they're kept for good (pinned), so
   // the next level, or the hangar, finds most of them built. The light counts every program is built for never change:
   // every dynamic light is one of a fixed pool, always in the scene, dark when it's not in use (muzzleLights, blastLights,
   // spots; vmMuzzle, vmPts, vmSpots in the gun's scene).
@@ -1498,7 +1498,7 @@ const G_R = {
     const r = this.renderer;
     if (!r || !this.scene || !this.camera) { if (done) done(); return; }
     if (this._warm) this._warmEnd(); // (one still going: put the scene back as it was first)
-    const W: RWarm = (this._warm = { t0: performance.now(), tWait: 0, done: done || null, tasks: [], stage: 0, frames: 0, undo: [], had: new Set(r.info.programs || []), pending: [], compiled: false });
+    const W: RWarm = (this._warm = { t0: performance.now(), tWait: 0, done: done || null, tasks: [], stage: 0, frames: 0, undo: [], had: new Set(r.info.programs || []) });
     const extras: THREE.Object3D[] = [];
     const put = (m: THREE.Object3D | null | undefined) => { if (m) { m.position.set(0, -50, 0); this.dynRoot.add(m); extras.push(m); } };
     try {
@@ -1525,21 +1525,45 @@ const G_R = {
     // each place things are drawn, one compile a task: (scene, camera, what it's drawn into, the layer a pass draws and the
     // material it draws everything in, if it's such a pass)
     // (away: another scene the world's samples are drawn in, the TVs' sets: they go there for it)
-    const compile = (scene: THREE.Scene, cam: THREE.Camera, target: THREE.WebGLRenderTarget | null, layer?: number, over?: THREE.Material, away = false) => W.tasks.push(() => {
-      if (away) scene.add(kit.world);
-      const swapped: [any, THREE.Material][] = [];
-      if (layer != null) {
-        kit.world.traverse((o) => o.layers.enable(layer));
-        cam.layers.set(layer);
-        if (over) scene.traverse((o: any) => { if (o.material && o.layers.test(cam.layers)) { swapped.push([o, o.material]); o.material = over; } });
+    // (a plain place is compiled a piece at a time, each with the whole scene's lights and fog (compile's target scene), so no
+    // frame takes more than a few dozen programs: the scene's children, a big one's children, and theirs. A piece holds no
+    // light: compile counts a piece's lights on top of its target scene's, and would build for the wrong number)
+    const lit = (o: THREE.Object3D) => { let f = false; o.traverse((x) => { if ((x as THREE.Light).isLight) f = true; }); return f; };
+    const compile = (scene: THREE.Scene, cam: THREE.Camera, target: THREE.WebGLRenderTarget | null, layer?: number, over?: THREE.Material, away = false) => {
+      if (layer == null && !away) {
+        const bare = new Set<THREE.Object3D>(); // (compiled without its children, which are pieces of their own)
+        const split = (o: THREE.Object3D, d: number): THREE.Object3D[] => {
+          if ((o as THREE.Light).isLight) return [];
+          if (!lit(o) && (o.children.length <= 8 || d >= 3)) return [o];
+          bare.add(o); return [o, ...o.children.flatMap((c) => split(c, d + 1))];
+        };
+        const pieces = scene.children.flatMap((c) => split(c, 0));
+        for (const c of pieces) W.tasks.push(() => {
+          const kids = bare.has(c) ? c.children.splice(0) : null;
+          try { r.setRenderTarget(target); r.compile(c, cam, scene); } catch (e) { console.warn('warmup', e); }
+          if (kids) c.children.push(...kids);
+          r.setRenderTarget(null);
+        });
+        return;
       }
-      // (into a target: three builds what's drawn into one for it, from the target that's set)
-      try { r.setRenderTarget(target); W.pending.push(r.compileAsync(scene, cam)); } catch (e) { console.warn('warmup', e); }
-      r.setRenderTarget(null);
-      for (const [o, m] of swapped) o.material = m;
-      if (layer != null) { cam.layers.set(0); kit.world.traverse((o) => o.layers.disable(layer)); }
-      if (away) this.dynRoot.add(kit.world);
-    });
+      W.tasks.push(() => {
+        if (away) scene.add(kit.world);
+        const swapped: [any, THREE.Material][] = [];
+        if (layer != null) {
+          kit.world.traverse((o) => o.layers.enable(layer));
+          cam.layers.set(layer);
+          if (over) scene.traverse((o: any) => { if (o.material && o.layers.test(cam.layers)) { swapped.push([o, o.material]); o.material = over; } });
+        }
+        // (into a target: three builds what's drawn into one for it, from the target that's set. compile, not compileAsync: that
+        // asks after the programs straight away, and on ANGLE the question waits for the driver to have translated every shader
+        // just handed over, a 0.2-0.6 s stall a task; the asking's done below, a frame at a time, once they're all handed over)
+        try { r.setRenderTarget(target); r.compile(scene, cam); } catch (e) { console.warn('warmup', e); }
+        r.setRenderTarget(null);
+        for (const [o, m] of swapped) o.material = m;
+        if (layer != null) { cam.layers.set(0); kit.world.traverse((o) => o.layers.disable(layer)); }
+        if (away) this.dynRoot.add(kit.world);
+      });
+    };
     compile(this.scene, this.camera, null);
     compile(this.vmScene, this.camera, null);
     // (the stocks: in a scene of their own with the same lights as the gun's, so only they are built cut)
@@ -1563,14 +1587,21 @@ const G_R = {
     if (W.stage === 0) {
       const t = performance.now();
       while (W.tasks.length && performance.now() - t < 12) W.tasks.shift()!();
-      if (!W.tasks.length) { W.stage = 1; W.tWait = performance.now(); Promise.all(W.pending).then(() => { W.compiled = true; }); }
+      if (!W.tasks.length) { W.stage = 1; W.tWait = performance.now(); }
       return true;
     }
     if (W.stage === 1) {
-      // (compileAsync says it's done when each material's last program is: the others it built along the way, a material's
-      // for the scope's picture or the TVs', are waited for too, so the first frame that draws one doesn't stand and wait)
+      // (every program built since it began, a material's for the scope's picture or the TVs' as well as its last one, which
+      // is all compileAsync would wait for: so the first frame that draws one doesn't stand and wait)
       const progs = ((r.info.programs || []) as any[]).filter((p) => !W.had.has(p)), left = progs.filter((p) => !p.isReady()).length;
-      if ((!W.compiled || left) && performance.now() - W.tWait < 20000) { G.Game.veilSay(`Compiling shaders ${progs.length - left} / ${progs.length}`); return true; }
+      if (left && performance.now() - W.tWait < 20000) { G.Game.veilSay(`Compiling shaders ${progs.length - left} / ${progs.length}`); return true; }
+      // (built: then what three asks of a program the first time it's used, whether it linked and where its inputs are, a
+      // few dozen calls that each wait on the driver: asked here, 50 ms of them a frame, not in the first frame that
+      // looks through a scope)
+      const t = performance.now();
+      W.ask = W.ask || progs;
+      while (W.ask.length && performance.now() - t < 50) { const p = W.ask.pop(); p.getUniforms(); p.getAttributes(); }
+      if (W.ask.length) return true;
       W.stage = 2;
       W.waitMs = performance.now() - W.tWait;
       return true;
