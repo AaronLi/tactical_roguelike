@@ -1839,7 +1839,7 @@ const G_Furniture = (() => {
   function outsideMaterial(rnd: () => number, drop = 0) {
     // (its pictures sampled as written, sRGB, mixed with the colours below as they're written, and the result turned
     // linear at the end: js/util.ts)
-    const mk = (w: number, h: number, draw: (g: CanvasRenderingContext2D, w: number, h: number) => void) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d')!, w, h); const t = new THREE.CanvasTexture(c); t.encoding = THREE.LinearEncoding; t.wrapS = THREE.RepeatWrapping; t.anisotropy = 4; return t; };
+    const mk = (w: number, h: number, draw: (g: CanvasRenderingContext2D, w: number, h: number) => void) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d')!, w, h); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.NoColorSpace; t.wrapS = THREE.RepeatWrapping; t.anisotropy = 4; return t; };
     // sky + skyline panorama; the horizon sits at 62% down the canvas
     const sky = mk(2048, 512, (g, w, h) => {
       const hz = Math.round(h * 0.62);

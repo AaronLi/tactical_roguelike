@@ -159,6 +159,20 @@
                 }
               ],
               "description": "Length of the handle stem, metres (free, per style)."
+            },
+            "lock": {
+              "oneOf": [
+                {
+                  "type": "number",
+                  "minimum": 0.05,
+                  "maximum": 1.5,
+                  "description": "A handle that locks the bolt open by turning about its own pivot (the HK slap handle: part_handle's origin is on the tube's axis): how far it turns up from rest into the notch, radians, positive turning the left side up. Its reload is the slap: pulled back, turned up into the notch, the magazine changed, slapped down."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A handle that locks the bolt open by turning about its own pivot (the HK slap handle: part_handle's origin is on the tube's axis): how far it turns up from rest into the notch, radians, positive turning the left side up. Its reload is the slap: pulled back, turned up into the notch, the magazine changed, slapped down."
             }
           },
           "required": [

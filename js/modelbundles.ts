@@ -11,8 +11,8 @@
 //   G.Bundles.getJson(path)         Promise<any | null>: the file parsed (null if the bundle or the file is missing)
 //   G.Bundles.bundleOf(path)        'models' if the path is in the bundle, null if not (guns/*.glb, the bake reports)
 //
-// Returning visitors: bundles/manifest.json ({ v: 2, hash, size }, fetched with no-cache at boot, ~100 bytes) says which bundle is current; the one hash is
-// compared with the stored copy (IndexedDB), which is used with no request if it matches; otherwise models.rtb?h=<hash> is fetched and replaces it.
+// Returning visitors: bundles/manifest.json ({ v: 3, hash, size }, fetched with no-cache at boot, ~100 bytes) says which bundle is current; the one hash is
+// compared with the stored copy (IndexedDB), which is used with no request if it matches and is of this format (FORMAT: 3 since the packs' positions are int16); otherwise models.rtb?h=<hash> is fetched and replaces it.
 //
 // The container ("RTB1"): the bytes `RTB1`, u32le tocLength, the table of contents as UTF-8 JSON `{ "files": [[path, offset, length], ...] }`, zero padding to a
 // multiple of 4, then the files back to back (offsets count from the start of that data, paths are relative to assets/models/, sorted). The file on disk is that
@@ -22,6 +22,8 @@
 
 const G_Bundles = (() => {
   const DIR = 'assets/models/bundles/', ROOT = 'assets/models/', EXT = '.rtb', MAGIC = 'RTB1', NAME = 'models';
+  /** The format of the files in the bundle, in the manifest (v) and on the stored copy: 2 = meshopt with float32 positions, 3 = int16 positions the loader undoes (js/glb.ts dequantize). A copy of another format is never used. */
+  const FORMAT = 3;
   const R = { base: '' }; // (where the page's folder is from here: '' on the page, '../../' in the export worker: G.Models.setRoot)
 
   interface Bundle { bytes: number; wire: number; files: Map<string, [number, number]>; buf: ArrayBuffer; from: 'net' | 'store' }
@@ -64,7 +66,7 @@ const G_Bundles = (() => {
   // The local store (docs/models.md "Bundles"): the bundle is kept in IndexedDB as downloaded (gzipped) with the content hash from bundles/manifest.json,
   // so a returning visitor fetches nothing while it is current. Every failure (no IndexedDB, private mode, quota, eviction, a corrupt record) falls back to
   // the network without a word; a stored copy that fails to parse is dropped and fetched again.
-  interface Rec { hash: string; buf: ArrayBuffer }
+  interface Rec { hash: string; v?: number; buf: ArrayBuffer }
   const DB = 'rt-model-bundles', TABLE = 'bundles', checking = typeof location !== 'undefined' && /[?&]checkModels/.test(location.search || '');
   const log = (...a: any[]) => { if (checking) console.log('[bundles]', ...a); };
   let dbp: Promise<any | null> | null = null;
@@ -101,12 +103,12 @@ const G_Bundles = (() => {
     } catch { /* */ }
   }
 
-  /** bundles/manifest.json { v: 2, hash, size }, fetched with no-cache (a ~100 byte request); null if it cannot be had (the bundle is then fetched from the network, revalidated). */
+  /** bundles/manifest.json { v: FORMAT, hash, size }, fetched with no-cache (a ~100 byte request); null if it cannot be had (the bundle is then fetched from the network, revalidated). */
   async function getManifest(): Promise<{ hash: string; size: number } | null> {
     try {
       const r = await fetch(R.base + DIR + 'manifest.json', { cache: 'no-cache' }); if (!r.ok) return null;
       const m = await r.json();
-      return m && m.v === 2 && typeof m.hash === 'string' && m.hash ? { hash: m.hash, size: +m.size || 0 } : null;
+      return m && m.v === FORMAT && typeof m.hash === 'string' && m.hash ? { hash: m.hash, size: +m.size || 0 } : null;
     } catch { return null; }
   }
   /** The bundle's bytes with progress (streamed when the browser can, in one piece when it cannot). */
@@ -144,10 +146,10 @@ const G_Bundles = (() => {
     if (m) st.total = m.size;
     if (hash) {
       const rec = await storeGet();
-      if (rec && rec.hash === hash && rec.buf instanceof ArrayBuffer) {
+      if (rec && rec.hash === hash && rec.v === FORMAT && rec.buf instanceof ArrayBuffer) {
         try { const buf = await gunzip(rec.buf); log('from the local store'); st.loaded = st.total = rec.buf.byteLength; st.from = 'store'; return { bytes: buf.byteLength, wire: 0, files: parse(buf).files, buf, from: 'store' }; }
         catch (e) { log('stored copy is corrupt, dropping it', e); storeDrop(); flagSet(null); }
-      } else if (rec) log('stored copy is for another hash');
+      } else if (rec) log(rec.v === FORMAT ? 'stored copy is for another hash' : 'stored copy is of another format');
     }
     // A first visit (nothing stored, as far as localStorage knows) started this fetch when the script ran, before the main thread got busy with the rest of the
     // page: take it if the manifest agrees with what came (the sha256 of the bytes), else fetch by hash. The hash in the URL means a new hash is a new URL, so no
@@ -160,7 +162,7 @@ const G_Bundles = (() => {
     if (!raw) { st.loaded = 0; raw = await download(fetch(fileOf() + (hash ? '?h=' + hash : ''), hash ? undefined : { cache: 'no-cache' }), m ? m.size : 0); }
     const buf = await gunzip(raw);
     const b: Bundle = { bytes: buf.byteLength, wire: raw.byteLength, files: parse(buf).files, buf, from: 'net' };
-    if (hash) storePut({ hash, buf: raw }).then((k) => flagSet(k ? hash : null)); // (as downloaded; replaces the old hash; failures are silent)
+    if (hash) storePut({ hash, v: FORMAT, buf: raw }).then((k) => flagSet(k ? hash : null)); // (as downloaded; replaces the old hash; failures are silent)
     st.from = 'net'; log('fetched', raw.byteLength, 'B');
     return b;
   }
@@ -196,7 +198,7 @@ const G_Bundles = (() => {
   const getJson = (path: string): Promise<any> => getFile(path).then((b) => JSON.parse(new TextDecoder().decode(b)), () => null);
 
   const api = {
-    NAME, EXT, DIR, MAGIC, bundleOf, parse, start, getFile, getJson,
+    NAME, EXT, DIR, MAGIC, FORMAT, bundleOf, parse, start, getFile, getJson,
     state: (): State => ({ ...st }), onChange: (fn: (s: State) => void) => { listeners.push(fn); },
     loaded: () => !!done,
     setRoot: (base: string) => { R.base = base; },

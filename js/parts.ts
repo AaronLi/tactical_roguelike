@@ -1197,6 +1197,7 @@ const G_Gunsmith = (() => {
       .sort((a, b) => slotRank(a[0]) - slotRank(b[0]));
     for (const [sl, pid] of fitted) for (let [k, v] of Object.entries(Object.assign(AP_KEY[PARTS[pid].slot] ? { [AP_KEY[PARTS[pid].slot]]: null } : {}, PARTS[pid].len != null ? lenModel(def.id, PARTS[pid]) : PARTS[pid].model || {}))) { // (a stock, grip, muzzle or handguard says whether it is an authored model, so one on an adapter is the one drawn)
       if (k === 'tac' && sl === 'tacL') k = 'tacL'; // (the left rail's)
+      if (k === 'apHgBy') { if (v[def.id]) spec.apHg = v[def.id]; continue; } // (a handguard entry shared between guns that has a model of its own on this one: models/parts/handguard, model.json "gun")
       if (k === 'pumpPatch') { spec.pump = Object.assign({}, spec.pump || {}, v); continue; }
       if (v && typeof v === 'object' && !Array.isArray(v) && spec[k] && typeof spec[k] === 'object') spec[k] = Object.assign({}, spec[k], v);
       else spec[k] = v;
@@ -1526,6 +1527,8 @@ const G_Gunsmith = (() => {
     {"apart":"grip/brightline_a2","names":["Brightline A2 pistol grip (matches the furniture)"]},
     {"apart":"grip/paragon_pg23","names":["Paragon PG-23 ergonomic grip"]},
     {"apart":"handguard/ironvale_ir12","names":["Ironvale IR-12 quad rail"],"len":0.3},
+    {"apart":"handguard/mp5_slim","names":["Halcyon 3.3\" slim forend (FDE)"],"len":0.1216,"gun":"mp5"},
+    {"apart":"handguard/mp5_trirail","names":["Northmark railed front (under and each side)"],"len":0.1216,"gun":"mp5"},
     {"apart":"handguard/quad_rail_240","names":["Brightline 9.4\" quad rail handguard","Brightline 9.4\" quad rail handguard (FDE)"],"len":0.2395},
     {"apart":"muzzle/ironvale_a2_556","names":["Ironvale A2 5.56 birdcage"]},
     {"apart":"optic/brightline_pip","names":["Brightline Pip red dot"]},
@@ -1640,7 +1643,8 @@ const G_Gunsmith = (() => {
         if (!ps.length) throw new Error(`models/parts/${r.apart}/model.json replaces ${JSON.stringify(n)}, which ${typeof n === 'string' ? 'is not in the catalogue' : 'matches no entry'}`);
         for (const p of ps) {
           if (!p.model || p.slot !== slot) throw new Error(`models/parts/${r.apart}/model.json replaces "${p.name}", which is not a ${slot}`);
-          if (r.len != null && !(p.model.hg && Math.abs((p.model.hg.len || 0) - r.len) <= 0.0015)) throw new Error(`models/parts/${r.apart}/model.json replaces "${p.name}", ${p.model.hg ? p.model.hg.len : '?'} m long; the model is ${r.len} m`);
+          if (r.len != null && !r.gun && !(p.model.hg && Math.abs((p.model.hg.len || 0) - r.len) <= 0.0015)) throw new Error(`models/parts/${r.apart}/model.json replaces "${p.name}", ${p.model.hg ? p.model.hg.len : '?'} m long; the model is ${r.len} m`);
+          if (r.gun) { const m = p.model as any; m[key + 'By'] = Object.assign(m[key + 'By'] || {}, { [r.gun]: r.apart }); continue; } // (one gun's own model for a shared entry: modelSpec picks it by the gun)
           (p.model as any)[key] = r.apart;
         }
       }
