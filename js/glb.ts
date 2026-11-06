@@ -1330,9 +1330,16 @@ interface BakedIndex { version: number; three: string; src: string; guns: Record
       for (const g of (o.isMesh ? [o] : o.children.filter((c: any) => c.isMesh)).map((m: any) => m.geometry)) {
         if (done.has(g)) continue;
         done.add(g);
-        const a = g.attributes.position, n = a.count, f = new Float32Array(n * 3);
-        for (let i = 0; i < n; i++) { f[i * 3] = ox + s * a.getX(i); f[i * 3 + 1] = oy + s * a.getY(i); f[i * 3 + 2] = oz + s * a.getZ(i); }
-        g.setAttribute('position', new THREE.BufferAttribute(f, 3)); g.boundingBox = null; g.boundingSphere = null; g.computeBoundingBox(); g.computeBoundingSphere();
+        // (int16 xyz padded to 8 bytes: the loader gives an interleaved attribute, stride 4)
+        const a = g.attributes.position, il = !!a.isInterleavedBufferAttribute, q = (il ? a.data.array : a.array) as Int16Array, st = il ? a.data.stride : a.itemSize, o0 = il ? a.offset : 0;
+        if (!(q instanceof Int16Array) || !a.normalized) throw new Error('dequantize: positions are not normalised int16'); // (what the bake writes: tools/model_emit.mjs)
+        const n = a.count, f = new Float32Array(n * 3), k = s / 32767;
+        for (let i = 0, j = o0; i < n * 3; i += 3, j += st) { f[i] = ox + k * q[j]; f[i + 1] = oy + k * q[j + 1]; f[i + 2] = oz + k * q[j + 2]; }
+        g.setAttribute('position', new THREE.BufferAttribute(f, 3));
+        // (the loader's bounds, from the accessor's min / max in the box's units, moved the same way: no pass over the vertices)
+        const o3 = new THREE.Vector3(ox, oy, oz);
+        if (g.boundingBox) { g.boundingBox.min.multiplyScalar(s).add(o3); g.boundingBox.max.multiplyScalar(s).add(o3); } else g.computeBoundingBox();
+        if (g.boundingSphere) { g.boundingSphere.center.multiplyScalar(s).add(o3); g.boundingSphere.radius *= s; } else g.computeBoundingSphere();
       }
       o.scale.set(snap(o.scale.x / s), snap(o.scale.y / s), snap(o.scale.z / s));
       v.set(ox * o.scale.x, oy * o.scale.y, oz * o.scale.z).applyQuaternion(o.quaternion);

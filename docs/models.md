@@ -441,7 +441,18 @@ Every pack and prop (`tools/model_emit.mjs` `compression()`, after the weld on f
 - **No textures.** The packs carry no images (every material is a catalogue name or a flat `m_<rrggbb>`; bump maps and display surfaces are drawn at load on canvases, by material name), so there is nothing for KTX2 / `KHR_texture_basisu` to do and no transcoder is loaded.
 - **Not done**: meshopt's lossy filters (`method: filter`: octahedral normals at 8 bits, ~17% smaller again) would change the shading, so normals stay at 10 bits. The glTF JSON chunks (node trees, extras, accessors: ~12 MB of the ~29 MB raw) are only gzipped with the bundle.
 
-**Sizes** (83 platforms, 1,858 files): see the table under Bundles, "Measured".
+**Measured** (83 platforms, 1,858 files; headless Edge, local server, medians of 3 to 6 runs, other agents' bakes on the machine):
+
+| | float32 positions (format 2) | int16 positions (format 3) |
+|---|---|---|
+| models.rtb raw / gzipped | 31.84 MB / 7.15 MB | 29.20 MB / 5.50 MB (-8% / -23%) |
+| the glb files' binary chunks (sum) | 12.00 MB | 8.92 MB |
+| the props (27 files) | 330 KB, uncompressed | 180 KB |
+| bundle in memory, first visit / from the store | ~1.5 s / ~0.55 s after navigation | the same (localhost: the download is 40 ms either way) |
+| parse every pack and prop (1,730 loads, `preloadPlatform` of all 83) | ~455 ms | ~465 ms |
+| a level's loads (`?play=1&level=3`: ~385 packs and props) | 4.2-4.5 s from the first to the last, spread over the level build | the same |
+| GPU memory | float32 positions | the same (dequantised at load; no textures) |
+
 
 ## Bundles
 
