@@ -50,7 +50,7 @@ export function readForChecks(buf, id, cfg = {}) {
         pos[i * 3] = -q[2]; pos[i * 3 + 1] = q[1]; pos[i * 3 + 2] = q[0]; // ([forward, up, right] = [-z, y, x])
       }
       const idx = prim.indices != null ? Array.from(readAccessor(g, prim.indices)) : Array.from({ length: cnt }, (_, i) => i);
-      meshes.push({ name: n.name, slot: ex.slot || 'base', chain: chain.slice(), chk: ex.chk || null, pos, idx });
+      meshes.push({ name: n.name, slot: ex.slot || 'base', chain: chain.slice(), chk: ex.chk || null, mount: ex.mount === true, pos, idx }); // (mount: a piece of the gun's own optic mount, there only with a rail sight)
     }
     for (const c of n.children || []) walk(c, W, chain);
   };
@@ -114,6 +114,7 @@ function offAxis(ax, th, az) {
  *    APERTURE: its radius (the mean of the 16) must be at least LIMITS.apertureDeg. If it is open on top it is a NOTCH: the clear angle to either side must be
  *    LIMITS.notchClear times the post's half-width at least. Nothing in the rear part: a bead or front-only sight (only the post and the line are checked).
  * The irons are found by geometry, not by mesh names: a front sight on the barrel slot (the pistols') or on the base counts the same as slot optic meshes.
+ * The gun's own optic mount (meshes with extras.mount: the MP5's claw mount) is drawn only under a rail sight, so it is left out.
  * A gun whose sights are meshless (the Tempest: its irons are the catalogue's sight on its rail) is not looked through.
  */
 export function checkIrons(M, E, W) {
@@ -121,7 +122,8 @@ export function checkIrons(M, E, W) {
   if (!kinds.length) return null;
   if (M.cfg.sights.meshless) return { meshless: true }; // (sights.meshless: the gun's irons are the catalogue's sight on its rail, drawn by the recipe, not the model's: nothing here to look through)
   const { sy, fSight, relief } = M.info; if (![sy, fSight, relief].every((x) => typeof x === 'number')) return null;
-  const pistol = M.info.pistol === true, S = scene(M.meshes), all = boxOf(M.meshes), eye = [fSight - relief, sy, 0], at = `models/${M.id}: the iron sights (sights.builtin ${kinds.join(', ')}; eye at forward ${mm(eye[0])} mm, sy ${mm(sy)} mm)`;
+  const irons = M.meshes.filter((m) => !m.mount); // (the gun's own optic mount is never there with the irons: a rail sight stands on it)
+  const pistol = M.info.pistol === true, S = scene(irons), all = boxOf(irons), eye = [fSight - relief, sy, 0], at = `models/${M.id}: the iron sights (sights.builtin ${kinds.join(', ')}; eye at forward ${mm(eye[0])} mm, sy ${mm(sy)} mm)`;
   const out = { eye };
   // the front post's tip: scan forward from the eye, rays straight down at right = 0
   const lo = sy - 0.0015, hi = sy + 0.0006, top = Math.max(all[4], sy) + 0.01, step = 0.00025;

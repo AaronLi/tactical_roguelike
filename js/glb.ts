@@ -291,6 +291,11 @@ const GUN_MODEL_CONTRACT = { ...CONTRACT_CORE, displays: {
     mount_grip: 'where a grip is seated: [forward of the grip\'s front, the height of the receiver\'s underside, 0]; the grip hangs from that height.',
     mount_mag: 'the magazine well: [forward, up, 0] of the top of a magazine seated in it (equal to info.magAt).',
   },
+  optional: {
+    mount_optic_rail: 'the START of the rail on the gun\'s own optic mount (opticMount below): [forward, the rail\'s top, 0]. Required with an optic mount, allowed only with one.',
+    mount_optic_rail_end: 'the END of that rail: [forward, top, 0]. Same height as mount_optic_rail.',
+  },
+  opticMount: 'THE GUN\'S OWN OPTIC MOUNT. A receiver with no rail takes a rail sight on an adapter of its own (the MP5\'s claw mount: a Picatinny rail on clamps whose claws hook into recesses in the receiver). The model holds it as meshes of slot optic with extras.mount = true (outside any part_ node): they are drawn, as the optic\'s mount piece (optic@mount), whenever a real optic or one of sights.rail is fitted, INSTEAD of the generic rail piece over mount_optic .. mount_optic_end, and never with the gun\'s own irons (they are not the irons: nothing looks through them). The sight stands on the adapter\'s rail top at the platform\'s optF: mount_optic_rail .. mount_optic_rail_end is that rail, its height is the top the optic\'s foot rests on (so info.sy follows it), and optF must lie on it (the baker checks). mount_optic / mount_optic_end stay the receiver\'s top under it.',
   pistol: 'AUTHORED PISTOLS. A pistol (root extras.info.pistol = true) uses the pistol anchor set instead of the rifle one: REQUIRED mount_barrel (where the factory barrel/suppressor begins) and mount_mag (= info.magAt); mount_slide ([the slide\'s rear, the frame\'s slide seat height, 0]) when the pistol has a slide (info.anim.slide = part_slide); and, for each thing the platform lets you fit, the anchor the part is seated on: mount_optic (+ mount_optic_end, equal: the optic cut\'s centre on the slide\'s top, [forward of the slide\'s rear, the cut\'s floor, 0]; a pistol sight sits there), mount_tac (a light or laser under the frame: [forward, the underside, 0]), mount_grip, mount_stock (optional). The muzzle is info.muzzles[0]. The slots are the same as a rifle\'s: the frame is slot base (a slide, an action knob or a control that moves is a part_ node), the slide is slot slide in part_slide, the barrel slot holds the whole barrel/suppressor with its front sight, the grip slot (when the grip is a part), mag in part_mag, optic the rear sight and the optic cut\'s cover plate. A slideless pistol (a manually cycled one) moves its bolt in part_bolt (info.anim.bolt) and the model carries info.bolt, the knob the hand takes. The same rules as a rifle\'s otherwise: the platform in js/parts.ts says which of those anchors it uses and the baker checks they agree (mount_optic against the pistol\'s optic cut, mount_mag against its spec).',
   variants: 'AUTHORED VARIANTS. A per-gun part modelled beside the gun: models/<id>/<name>.glb (any other .glb in the gun\'s folder than <id>.glb), offered on that gun only. ONE root node named <id>_<name> whose extras.variant_json is { gun: <id>, slot: "barrel" | "mag", of: "factory", info?: { muzzles, mounts? }, cap?: <rounds>, note }: gun is the folder, slot the slot it replaces, of the part it replaces (the factory one); info.muzzles is the new muzzle position (a barrel), info.mounts.mount_optic ([forward, up, right] metres: the centre and floor of a pistol optic cut the barrel carries, where a pistol dot is seated; the platform variant part then PROVIDES the optic slot, which only this barrel opens), cap the new capacity (a magazine). Whether the barrel is suppressed is the platform data on the part (js/parts.ts set.sup / device), not the model. The meshes are in the gun\'s own frame, all of slot <slot> with catalogue materials (a magazine is one part_mag node with the pivot of the factory one); nothing else. The platform in js/parts.ts adds the part (id <id>.br.<name> / <id>.mag.<name>, its figures proposed there) and the recipe draws these meshes while it is fitted; nothing is scaled.',
   seat: 'There is no seat: another barrel is drawn from its own part (a standard radius and profile). Root extras.seat and a mesh extras.role are no longer defined and are ignored if a file still has them.',
@@ -714,6 +719,7 @@ function validateAuthored(model: ModelDesc, id?: string, opts: { factory?: strin
     for (const [k, doc] of Object.entries(R)) if (anchors[k] === undefined) E(`anchors.${k} is missing: ${doc}`); else checkShape(anchors[k], { t: 'vec', n: 3 }, `anchors.${k}`, errors);
     for (const [k, v] of Object.entries(anchors)) {
       if (k in R) continue;
+      if (!pistol && k in C.authored.optional) { checkShape(v, { t: 'vec', n: 3 }, `anchors.${k}`, errors); continue; }
       const slot = k.startsWith(NAMES.mountPrefix) ? k.slice(NAMES.mountPrefix.length).replace(/_end$/, '') : '';
       if (!(slot in C.slots)) E(`anchors.${k}: not an anchor (the required ones: ${Object.keys(R).join(', ')}; others are mount_<slot> or mount_<slot>_end with a contract slot)`);
       else checkShape(v, { t: 'vec', n: 3 }, `anchors.${k}`, errors);
@@ -735,6 +741,27 @@ function validateAuthored(model: ModelDesc, id?: string, opts: { factory?: strin
     }
     const ro = anchors.mount_optic, re = anchors.mount_optic_end;
     if (Array.isArray(ro) && Array.isArray(re) && ro[1] !== re[1]) E(`anchors: mount_optic and mount_optic_end differ in height (${ro[1]} vs ${re[1]}): a rail is level`);
+    // the gun's own optic mount (C.authored.opticMount): its meshes and its rail go together
+    let mounts = 0;
+    const seen = (n: ModelNode, inPart: boolean) => { for (const c of n.children) {
+      const inP = inPart || (!c.mesh && c.name.startsWith(NAMES.partPrefix));
+      if (c.mesh && c.extras.mount !== undefined) {
+        mounts++;
+        if (c.extras.mount !== true) E(`mesh "${c.name}": extras.mount must be true (a piece of the gun's own optic mount), got ${JSON.stringify(c.extras.mount)}`);
+        if (c.extras[NAMES.extras.slot] !== 'optic') E(`mesh "${c.name}": a piece of the gun's optic mount (extras.mount) is slot optic, not ${JSON.stringify(c.extras[NAMES.extras.slot])}`);
+        if (inP) E(`mesh "${c.name}": a piece of the gun's optic mount (extras.mount) is not in a part_ node`);
+      }
+      seen(c, inP);
+    } };
+    seen(root, false);
+    const mr = anchors.mount_optic_rail, me = anchors.mount_optic_rail_end;
+    if (mounts && (mr === undefined || me === undefined)) E('the model has an optic mount (meshes with extras.mount) but not its rail: anchors mount_optic_rail and mount_optic_rail_end (where the sight stands)');
+    if (!mounts && (mr !== undefined || me !== undefined)) E('anchors.mount_optic_rail / mount_optic_rail_end are the rail of the gun\'s own optic mount, and the model has none (no mesh with extras.mount)');
+    if (Array.isArray(mr) && Array.isArray(me)) {
+      order('mount_optic_rail', 'mount_optic_rail_end', 'the rail runs forward');
+      if (mr[1] !== me[1]) E(`anchors: mount_optic_rail and mount_optic_rail_end differ in height (${mr[1]} vs ${me[1]}): a rail is level`);
+      if (Array.isArray(ro) && !(mr[1] > ro[1])) E(`anchors: mount_optic_rail (${mr[1]}) must be above the receiver's top, mount_optic (${ro[1]}): the mount stands on it`);
+    }
     if (isObj(a.info) && Array.isArray(a.info.magAt) && Array.isArray(anchors.mount_mag) && (Math.abs(a.info.magAt[0] - anchors.mount_mag[0]) > 1e-6 || Math.abs(a.info.magAt[1] - anchors.mount_mag[1]) > 1e-6)) E(`anchors.mount_mag ${JSON.stringify(anchors.mount_mag.slice(0, 2))} is not info.magAt ${JSON.stringify(a.info.magAt)}`);
   }
   // meshes: the factory slots
@@ -1066,7 +1093,8 @@ function contractMarkdown(): string {
   L.push('', '**Anchors a part provides** (`extras.anchors`):', '', `- where: ${C.anchors.where}`, ...C.anchors.assembly.map((a) => `- ${a}`), `- muzzles: ${C.anchors.muzzles}`, '- example: `' + JSON.stringify(C.anchors.example) + '`');
   L.push('', '**Authored sources** (a gun modelled in Blender, baked with no recipe):', '', `- what: ${C.authored.what}`, `- nodes: ${C.authored.nodes}`, `- info: ${C.authored.info}`, `- anchors: ${C.authored.anchors}`, '', '| anchor (extras.anchors) | meaning |', '| --- | --- |');
   for (const [k, v] of Object.entries(C.authored.required)) L.push(`| \`${k}\` (required) | ${esc(v as string)} |`);
-  L.push('', `- pistol: ${C.authored.pistol}`, `- variants: ${C.authored.variants}`, `- seat: ${C.authored.seat}`, `- mesh: ${C.authored.mesh}`, ...C.authored.rules.map((r) => `- ${r}`), '- example: \`' + JSON.stringify(C.authored.example) + '\`');
+  for (const [k, v] of Object.entries(C.authored.optional)) L.push(`| \`${k}\` (optional) | ${esc(v as string)} |`);
+  L.push('', `- opticMount: ${C.authored.opticMount}`, `- pistol: ${C.authored.pistol}`, `- variants: ${C.authored.variants}`, `- seat: ${C.authored.seat}`, `- mesh: ${C.authored.mesh}`, ...C.authored.rules.map((r) => `- ${r}`), '- example: \`' + JSON.stringify(C.authored.example) + '\`');
   const AP = C.authoredParts;
   L.push('', '**Authored parts** (a shared attachment modelled in Blender: sights, prisms, scopes, and furniture: stocks, grips, muzzle devices, handguards):', '', `- what: ${AP.what}`, `- frame: ${AP.frame}`, `- model: ${AP.model}`, `- config: ${AP.config}`, ...Object.entries(AP.optic).map(([k, v]) => `- optic.${k}: ${v}`), `- part: ${AP.part}`, ...AP.rules.map((r) => `- ${r}`), ...Object.entries(AP.furniture).map(([k, v]) => `- furniture ${k}: ${v}`), '- example: \`' + JSON.stringify(AP.example) + '\`');
   L.push('', '**Magazine check** (`part_mag.extras.check`, meshes\' `extras.chk`):', '', `- what: ${C.magCheck.what}`, `- part: ${C.magCheck.part}`, `- meshes: ${C.magCheck.meshes}`, '- example: `' + JSON.stringify(C.magCheck.example) + '`');
