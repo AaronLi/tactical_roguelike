@@ -18,7 +18,7 @@ import { applyRoom } from './room.js';
 import { clamp, dbToGain, makeRng, peak } from './dsp.js';
 /**
  * Several scenes played one after another as one scene (e.g. a full reload: mag in, charge, mag
- * out). Each part's elements move to its start time, its tracks are kept (named `<label>:<track>`),
+ * out). Each part's elements move to its start time, its tracks are kept (named `<label>.<track>`),
  * and its housing goes onto its own contact elements, since the parts may happen in different
  * enclosures (the lower's mag well vs the whole receiver). Room and room size come from the first.
  *
@@ -31,7 +31,7 @@ export function chainScenes(id, title, parts) {
     for (const { label, at, scene, gainDb = 0 } of parts) {
         for (const tr of scene.tracks) {
             tracks.push({
-                name: `${label}:${tr.name}`,
+                name: `${label}.${tr.name}`,
                 description: tr.description,
                 elements: tr.elements.map((el) => {
                     let sound = el.sound;
