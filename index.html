@@ -105,18 +105,24 @@
   <div id="progress" class="hidden"><div id="progressBar"></div><span id="progressText"></span></div>
   <div id="treatFx" class="hidden"></div>
 
+  <div id="hudLeft">
+  <div id="chatLog"></div>
+  <input id="chatInput" class="hidden" maxlength="120" placeholder="say something...">
   <div id="vitals">
     <div class="vrow"><span class="vlabel">ARMOR</span><div class="bar armor"><div id="armorFill"></div></div><span id="armorText"></span></div>
     <div class="vrow"><span class="vlabel">BLOOD</span><div class="bar hp"><div id="hpFill"></div></div><span id="hpText"></span></div>
     <div id="bodyMini" class="body-mini"></div>
     <div id="items"></div>
   </div>
+  </div>
+  <div id="hudRight">
+  <div id="credits"></div>
   <div id="ammo">
     <div id="weapName"></div>
     <div><span id="ammoMag"></span><span id="ammoRes"></span></div>
     <div id="weapAlt"></div>
   </div>
-  <div id="credits"></div>
+  </div>
 
   <div id="downed" class="hidden">
     <div class="big" id="downTitle">YOU ARE DOWN</div>
@@ -127,9 +133,6 @@
     <div class="big">KIA</div>
     <div class="small">Spectating &mdash; you'll redeploy next level if your squad extracts. Click to switch view.</div>
   </div>
-
-  <div id="chatLog"></div>
-  <input id="chatInput" class="hidden" maxlength="120" placeholder="say something...">
 
   <div id="scoreboard" class="ui ui-panel hidden"></div>
   <div id="fieldInv" class="ui hidden"><div id="fiScore" class="fi-score"></div><div id="fiBody"></div></div>
