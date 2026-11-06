@@ -35,9 +35,14 @@ const G_LightGrid = (() => {
   };
   let built = false;
   // bounce: how much of what a surface reflects comes back into the room (on top of its colour: the theme's walls',
-  // floor's and ceiling's, js below); bounces: how many times it goes round; sky: the night sky's (the theme's fill)
+  // floor's and ceiling's, js below); bounces: how many times it goes round at most, and settle: it stops sooner once a
+  // bounce adds no tile more than that share of its light (bounced: a pale shop's or lab's goes round five times, a
+  // dark foundry's or bunker's three; every tile then within about two steps of the screen's 255 of where it would
+  // settle, its doors open or shut. Each bounce costs 50-130 ms of a level's build, the festival's 150, the foundry's 250:
+  // with the doors' layers worked out no further than the light gets (REACH), most places build in 0.1 to 0.6 s);
+  // reach: see REACH; sky: the night sky's (the theme's fill)
   // through what's open to it, a window, a doorway; fill: what's left of the flat fill everywhere (js/render.ts)
-  const opts = { bounce: 1.75, bounces: 2, sky: 1, fill: 0.25 };
+  const opts = { bounce: 1.75, bounces: 6, settle: 0.06, sky: 1, fill: 0.25, reach: 5 };
 
   // every lit material reads the grid (added to its shader as three.js compiles it)
   const VS_HEAD = 'varying vec3 vLgP;\nvarying vec3 vLgN;\n';
@@ -107,7 +112,7 @@ const G_LightGrid = (() => {
   const K = 8;
   interface LgState { W: number; H: number; NF: number; N: number; cur: Float32Array; hl: Uint16Array; hd: Uint16Array; tl: THREE.DataTexture; td: THREE.DataTexture; dirty: Set<number>; layers: ({ at: Int32Array; v: Float32Array } | null)[]; k: Float32Array }
   let G0: LgState | null = null; // { W, H, NF, N, cur (sums, K a tile), hl, hd (half floats sent), tl, td (textures), layers: [door id] -> { at, v } , k: [door id] -> how far open it counts }
-  function build(map: LvMap & { lightGridMs?: number; lightLayers?: number }) {
+  function build(map: LvMap & { lightGridMs?: number; lightLayers?: number; lightBounces?: number[] }) {
     const L = G.Level, TS = L.TS, floors = map.floors || [map], NF = floors.length, W = map.W, H = map.H, N = W * H;
     const col = new T.Color(), DECAY = 1.6, t0 = performance.now();
     const cur = new Float32Array(N * NF * K), doors = map.doors || [], layers: (Map<number, Float32Array> | null)[] = doors.map(() => null), shutAt: Map<number, LvDoor>[] = [], winAt: Set<number>[] = [];
@@ -181,7 +186,11 @@ const G_LightGrid = (() => {
     // doorway open, less the base's bounced with it shut (a dark room next to a lit one gets the lit one's glow through
     // the door, the street's sky comes in; the lit room loses a little out of it).
     //   Open to the sky, most of it goes up and away (OUTB of it stays).
-    const BOUNCE = opts.bounce, NB = opts.bounces, PASSES = 28, UP = 0.6, REACH = PASSES * NB, OUTB = 0.3;
+    // (REACH: how far round a door its layer's worked out. Each pass of the spread moves the light about a tile at most, but
+    // on average much less: it spreads as a random walk does, a standard deviation of sqrt(2/3 passes) tiles down a corridor
+    // (less in a room). Out to opts.reach of those, past which what's left is nothing to see; and never more than a tile a pass.)
+    const BOUNCE = opts.bounce, NB = opts.bounces, PASSES = 28, UP = 0.6, OUTB = 0.3;
+    const reachOf = (nb: number) => Math.min(PASSES * nb, opts.reach > 0 ? Math.ceil(opts.reach * Math.sqrt(PASSES * nb * 2 / 3)) : Infinity);
     // (what the room reflects: its colour, half as strong as the paint's (a beige corridor doesn't go yellow), and how
     // much, the square root of the paint's (its textures darken it, and the furniture in it's lighter than a foundry's
     // floor): a pale room's about 0.45 a bounce, at most 0.5, a dark one's 0.3)
@@ -209,15 +218,24 @@ const G_LightGrid = (() => {
       }
       return a;
     };
-    const bounced = (src: Float32Array, open: ArrayLike<number>, bw: number, bh: number) => {
+    // (nb: that many bounces; or, left out, as many as change anything: until the last one added no tile more than
+    // opts.settle of the light it has (a little light counted as more, so a near-black corner doesn't keep it going),
+    // at most NB. A pale room's light goes round more times before it's spent than a dark one's.)
+    const bounced = (src: Float32Array, open: ArrayLike<number>, bw: number, bh: number, nb?: number) => {
       const acc = new Float32Array(src.length);
-      let s = src;
-      for (let n = 0; n < NB; n++) {
-        s = spread(s, open, bw, bh);
-        for (let q = 0; q < s.length; q += 4) { s[q] *= RHO[0]; s[q + 1] *= RHO[1]; s[q + 2] *= RHO[2]; s[q + 3] = (s[q] + s[q + 1] + s[q + 2]) / 3; acc[q] += s[q]; acc[q + 1] += s[q + 1]; acc[q + 2] += s[q + 2]; acc[q + 3] += s[q + 3]; }
+      let s = src, n = 0;
+      while (n < (nb || NB)) {
+        s = spread(s, open, bw, bh); n++;
+        let most = 0;
+        for (let q = 0; q < s.length; q += 4) {
+          s[q] *= RHO[0]; s[q + 1] *= RHO[1]; s[q + 2] *= RHO[2]; s[q + 3] = (s[q] + s[q + 1] + s[q + 2]) / 3; acc[q] += s[q]; acc[q + 1] += s[q + 1]; acc[q + 2] += s[q + 2]; acc[q + 3] += s[q + 3];
+          if (!nb && s[q + 3] > 1e-4) { const k = s[q + 3] / (src[q + 3] + acc[q + 3] + 0.005); if (k > most) most = k; }
+        }
+        if (!nb && n >= 2 && most < opts.settle) break;
       }
-      return acc;
+      return { acc, n };
     };
+    const bouncesUsed: number[] = [];
     floors.forEach((fm: LvMap, f: number) => {
       const base = f * N, win = winAt[f], out0 = fm.out;
       // (takes light: open floor; passes it on, the doors shut: that, or glass)
@@ -227,7 +245,9 @@ const G_LightGrid = (() => {
       // the base: everything with the doors shut
       const src = new Float32Array(N * 4);
       for (let i = 0; i < N; i++) { const o = (base + i) * K; src[i * 4] = cur[o]; src[i * 4 + 1] = cur[o + 1]; src[i * 4 + 2] = cur[o + 2]; src[i * 4 + 3] = cur[o + 6]; }
-      const out = bounced(src, shut, W, H);
+      // (the doors' layers go round as many times as the floor's light did)
+      const { acc: out, n: nf } = bounced(src, shut, W, H), REACH = reachOf(nf);
+      bouncesUsed.push(nf);
       // each door's (worked out before the base's bounce goes in: from the light as it came off the lamps and the sky)
       doors.forEach((d: LvDoor) => {
         const ly = layers[d.id];
@@ -240,7 +260,7 @@ const G_LightGrid = (() => {
         const so = Float32Array.from(sb), mo = Uint8Array.from(ms);
         for (const [gi, o] of ly) { const i = gi - base, q = ((((i / W) | 0) - z0) * bw + (i % W) - x0) * 4; so[q] += o[0]; so[q + 1] += o[1]; so[q + 2] += o[2]; so[q + 3] += o[6]; }
         for (const c of d.cells || [d.i]) { const x = c % W, z = (c / W) | 0; if (x >= x0 && x <= x1 && z >= z0 && z <= z1) mo[(z - z0) * bw + x - x0] = 1; }
-        const rOpen = bounced(so, mo, bw, bh), rShut = bounced(sb, ms, bw, bh);
+        const rOpen = bounced(so, mo, bw, bh, nf).acc, rShut = bounced(sb, ms, bw, bh, nf).acc;
         for (let z = z0, j = 0; z <= z1; z++) for (let x = x0; x <= x1; x++, j++) {
           const q = j * 4, i = z * W + x;
           if (!(lit[i] || (mo[j] && !ms[j] && !win.has(i)))) continue;
@@ -275,6 +295,7 @@ const G_LightGrid = (() => {
     built = true;
     map.lightGridMs = Math.round(performance.now() - t0);
     map.lightLayers = G0.layers.filter(Boolean).length;
+    map.lightBounces = bouncesUsed;
   }
   // a tile's sums, to what the textures hold: the light and its direction, premultiplied by how open the tile is
   // (so the texture's filtering averages only open tiles: the shader divides by it)
@@ -305,9 +326,31 @@ const G_LightGrid = (() => {
     for (const k of ['lgLight', 'lgDir', 'lgPaint'] as const) if (U[k].value !== blank) { U[k].value.dispose(); U[k].value = blank; }
     G0 = null; built = false;
   }
+  // The light at a point (x, y, z in metres), as a surface there would take it facing every way at once: the four tiles
+  // round it blended as the texture's filtering does (only the open ones), from the layer of the floor it's on. Into out
+  // (linear RGB); black with no grid. Spread: averaged over a square that wide round it too (a body's width: standing in
+  // a doorway, the rooms either side). (For what has no place in the grid: the gun in your hands, js/render.ts eyeLight.)
+  function at(x: number, y: number, z: number, out: THREE.Color, spread = 0) {
+    out.setRGB(0, 0, 0);
+    if (!G0) return out;
+    const TS = U.lgGrid.value.z, { W, H, NF, N, cur } = G0, s = spread / 2;
+    const f = Math.max(0, Math.min(NF - 1, Math.floor((y - U.lgSize.value.w) / U.lgFloorH.value)));
+    let r = 0, g = 0, b = 0, w = 0;
+    for (let q = 0; q < (s > 0 ? 4 : 1); q++) {
+      const u = (x + (s > 0 ? ((q & 1) ? s : -s) : 0)) / TS - 0.5, v = Math.max(0, Math.min(H - 1, (z + (s > 0 ? ((q >> 1) ? s : -s) : 0)) / TS - 0.5));
+      const x0 = Math.floor(u), z0 = Math.floor(v), fx = u - x0, fz = v - z0;
+      for (let k = 0; k < 4; k++) {
+        const tx = Math.max(0, Math.min(W - 1, x0 + (k & 1))), tz = Math.max(0, Math.min(H - 1, z0 + (k >> 1)));
+        const o = (f * N + tz * W + tx) * K, ow = Math.max(0, Math.min(1, cur[o + 7])) * ((k & 1) ? fx : 1 - fx) * ((k >> 1) ? fz : 1 - fz);
+        r += Math.max(0, cur[o]) * ow; g += Math.max(0, cur[o + 1]) * ow; b += Math.max(0, cur[o + 2]) * ow; w += ow;
+      }
+    }
+    if (w > 0.02) out.setRGB(r / w, g / w, b / w);
+    return out;
+  }
   // on while the level's drawn (G.R.render), off for anything else drawn with the same materials
   const on = (v: boolean) => { U.lgGrid.value.w = v && built ? 1 : 0; };
-  return { build, dispose, on, setDoor: (id: number, k: number) => { if (built) setDoor(id, k); }, flush, U, opts, get built() { return built; }, get layers() { return G0 && G0.layers; } };
+  return { build, dispose, on, at, setDoor: (id: number, k: number) => { if (built) setDoor(id, k); }, flush, U, opts, get built() { return built; }, get layers() { return G0 && G0.layers; } };
 })();
 G.LightGrid = G_LightGrid;
 interface GameModules { LightGrid: typeof G_LightGrid; }

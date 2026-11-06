@@ -127,7 +127,8 @@ const G_Level = {
   // How lit each spot on the floor is, for the suspects' eyes (js/server.ts lightK): a number a fine tile, a layer a
   // floor, worked out once a level (the first time it's asked) from the same lamps and sky the light grid draws
   // (js/lightgrid.ts), but cheaply and in grey (a light's brightness the mean of its colour, as written: (r + g + b) / 3):
-  //   tile = FILL                               what's flat everywhere (the hemisphere light's share: js/render.ts setLevel)
+  //   tile = FILL                               what's flat everywhere (the hemisphere light's share: js/render.ts setLevel;
+  //                                             none on a night level)
   //        + sky                                open to the sky, the theme's (hemiI^2); by an outside window 0.6 of it
   //        + sum over lamps i * (1 - d / r)^1.6 each in line of the tile (no wall between; the doors taken as open), d to a
   //                                             point a metre over it (a body's middle), r the lamp's reach
@@ -138,7 +139,7 @@ const G_Level = {
     if (map.lux) return map.lux;
     const TS = this.TS, fms = map.floors || [map], W = map.W, H = map.H, N = W * H, NF = fms.length, th = map.theme, v = new Float32Array(N * NF);
     const lum = (hex: number) => (((hex >> 16) & 255) + ((hex >> 8) & 255) + (hex & 255)) / 765;
-    const sky = (th.hemiI || 0.26) ** 2 * lum(th.hemi || th.light || 0xffffff), FILL = sky * 0.25, BOUNCE = 0.45, PASSES = 12, DECAY = 1.6;
+    const sky = (th.hemiI || 0.26) ** 2 * lum(th.hemi || th.light || 0xffffff), FILL = map.night ? 0 : sky * 0.25, BOUNCE = 0.45, PASSES = 12, DECAY = 1.6;
     fms.forEach((fm: LvMap, f: number) => {
       const t = fm.t, base = f * N, win = new Set<number>(), out = new Float32Array(N);
       for (const w of map.windows || []) if ((w.fl || 0) === f) for (const c of w.cells) win.add(c);
