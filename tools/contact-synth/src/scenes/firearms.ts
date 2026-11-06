@@ -26,11 +26,11 @@ import { makeRng } from '../dsp.js';
 import type { BodyParams, Cavity, FrictionParams, ParamPatch, SnapParams } from '../params.js';
 import { mat } from '../presets.js';
 
-type Body = Partial<BodyParams>;
-type Extra = Omit<ParamPatch, 'impact' | 'friction' | 'snap' | 'bodyA' | 'bodyB'>;
+export type Body = Partial<BodyParams>;
+export type Extra = Omit<ParamPatch, 'impact' | 'friction' | 'snap' | 'bodyA' | 'bodyB'>;
 
 // ---------- element helpers ----------
-function hit(what: string, at: number, gainDb: number, velocity: number, A: Body, B: Body, opts: { scatter?: number; radius?: number; click?: number; sharp?: number } = {}, extra: Extra = {}): SceneElement {
+export function hit(what: string, at: number, gainDb: number, velocity: number, A: Body, B: Body, opts: { scatter?: number; radius?: number; click?: number; sharp?: number } = {}, extra: Extra = {}): SceneElement {
   return {
     what, at, gainDb,
     sound: { kind: 'contact', patch: {
@@ -39,7 +39,7 @@ function hit(what: string, at: number, gainDb: number, velocity: number, A: Body
     } },
   };
 }
-function rub(what: string, at: number, gainDb: number, friction: Partial<FrictionParams>, A: Body, B: Body, extra: Extra = {}): SceneElement {
+export function rub(what: string, at: number, gainDb: number, friction: Partial<FrictionParams>, A: Body, B: Body, extra: Extra = {}): SceneElement {
   return {
     what, at, gainDb,
     sound: { kind: 'contact', patch: {
@@ -50,7 +50,7 @@ function rub(what: string, at: number, gainDb: number, friction: Partial<Frictio
   };
 }
 /** A spring-loaded part letting go. `at` is when the finger/part starts loading it; the snap is `preload` ms later. */
-function snap(what: string, at: number, gainDb: number, s: Partial<SnapParams>, A: Body, B: Body, extra: Extra = {}): SceneElement {
+export function snap(what: string, at: number, gainDb: number, s: Partial<SnapParams>, A: Body, B: Body, extra: Extra = {}): SceneElement {
   return {
     what, at, gainDb,
     sound: { kind: 'contact', patch: {
@@ -62,10 +62,10 @@ function snap(what: string, at: number, gainDb: number, s: Partial<SnapParams>, 
 }
 
 // ---------- parts ----------
-const steelBlock = (cm: number, mm: number): Body => ({ ...mat('steel'), shape: 'block', size: cm, thickness: mm, modes: 1, irregularity: 0.7, damping: 0.65, level: 0 });
-const steelBar = (cm: number, mm: number, damping = 0.65): Body => ({ ...mat('steel'), shape: 'bar', size: cm, thickness: mm, modes: 0, irregularity: 0.7, damping, level: 0 });
-const alu = (shape: BodyParams['shape'], cm: number, mm: number, damping = 0.65): Body => ({ ...mat('aluminum'), shape, size: cm, thickness: mm, modes: 0, irregularity: 0.7, damping, level: 0 });
-const springWire = (cm: number, mm: number): Body => ({ ...mat('springsteel'), shape: 'bar', size: cm, thickness: mm, modes: 2, irregularity: 0.6, damping: 0.55, level: 0 });
+export const steelBlock = (cm: number, mm: number): Body => ({ ...mat('steel'), shape: 'block', size: cm, thickness: mm, modes: 1, irregularity: 0.7, damping: 0.65, level: 0 });
+export const steelBar = (cm: number, mm: number, damping = 0.65): Body => ({ ...mat('steel'), shape: 'bar', size: cm, thickness: mm, modes: 0, irregularity: 0.7, damping, level: 0 });
+export const alu = (shape: BodyParams['shape'], cm: number, mm: number, damping = 0.65): Body => ({ ...mat('aluminum'), shape, size: cm, thickness: mm, modes: 0, irregularity: 0.7, damping, level: 0 });
+export const springWire = (cm: number, mm: number): Body => ({ ...mat('springsteel'), shape: 'bar', size: cm, thickness: mm, modes: 2, irregularity: 0.6, damping: 0.55, level: 0 });
 
 // Shotgun
 const sgBolt = steelBlock(7, 25);
@@ -183,7 +183,7 @@ const arBuffer = steelBlock(6, 18); // buffer with sliding weights
 // (~1.6 g) with a ~4 g copper-jacketed lead bullet crimped in, ~12 g in all. The powder fill and
 // the lead core soak up vibration, so it barely rings: a short, solid "tock", with a crisp click
 // where its hard brass head and rim meet steel. (As a 4.5 cm x 6 mm brass bar: ~13 g.)
-const arCase: Body = { ...mat('brass'), shape: 'bar', size: 4.5, thickness: 6, modes: 1, irregularity: 0.6, damping: 0.8, level: 0 };
+export const arCase: Body = { ...mat('brass'), shape: 'bar', size: 4.5, thickness: 6, modes: 1, irregularity: 0.6, damping: 0.8, level: 0 };
 // Spring-steel feed lips: with a round pressed up into them by the whole stack they're clamped,
 // so their contacts are crisp and dead rather than a free ring.
 const arFeedLips: Body = { ...mat('springsteel'), shape: 'bar', size: 4, thickness: 0.8, modes: 1, irregularity: 0.5, damping: 0.75, level: 0 };
@@ -257,7 +257,7 @@ const arNextRound: Body = { ...arCase, level: -2 };
 const arMagBody: Body = { ...mat('aluminum'), shape: 'plate', size: 18, thickness: 0.9, modes: 4, irregularity: 0.6, damping: 0.35, level: 0 };
 // A loaded magazine: the column of cartridges pressed against the walls damps them hard.
 const arMagBodyLoaded: Body = { ...arMagBody, modes: 2, damping: 0.7 };
-const arMagSpring = springWire(8, 1);
+export const arMagSpring = springWire(8, 1);
 const MAG_HOUSING: Scene['housing'] = {
   amount: 0.7, cavity: 0.5, ...mat('aluminum'), shape: 'plate', size: 18, thickness: 0.9, modes: 2, irregularity: 0.6, damping: 0.35,
   cavities: [{ length: 18, width: 6, depth: 2.2, q: 8, level: 1 }],
@@ -392,7 +392,7 @@ const FEED_ONLY = new Set([
   'case shoulder seats in the chamber', 'extractor snaps over the rim',
 ]);
 // The empty magazine's follower (plastic).
-const arFollower: Body = { ...mat('pom'), shape: 'bar', size: 6, thickness: 3, modes: 2, irregularity: 0.5, damping: 0.4, level: 0 };
+export const arFollower: Body = { ...mat('pom'), shape: 'bar', size: 6, thickness: 3, modes: 2, irregularity: 0.5, damping: 0.4, level: 0 };
 
 function arForward(t: number, withChargingHandle: boolean, mag: MagState = 'loaded'): SceneElement[] {
   // The run is simulated from the reciprocating mass and the spring (see simulateRun): every
@@ -782,11 +782,11 @@ const magShell = (fill: 'loaded' | 'empty'): Body => ({ ...mat('aluminum'), shap
 // panel clatters briefly instead of singing like a tuning fork.
 const magPanel = (fill: 'loaded' | 'empty'): Body => ({ ...magShell(fill), size: 6, modes: 0, damping: fill === 'loaded' ? 0.65 : 0.55 });
 /** Sheet-metal edges ticking off the billet walls: heard directly, barely through the receiver. */
-const SHEET_EDGE = { housing: { amount: 0.2, cavity: 0.15 } };
+export const SHEET_EDGE = { housing: { amount: 0.2, cavity: 0.15 } };
 /** The thin sheet buzzing against the billet wall while it moves (loose fit, worn finish). */
-const SHEET_BUZZ = { flex: { amount: 0.45, freq: 150, decay: 0.08, rattle: 0.75, wobble: 0, tone: 0 }, housing: { amount: 0.35, cavity: 0.2 } };
+export const SHEET_BUZZ = { flex: { amount: 0.45, freq: 150, decay: 0.08, rattle: 0.75, wobble: 0, tone: 0 }, housing: { amount: 0.35, cavity: 0.2 } };
 /** A brief rattle when the magazine bottoms or drops free: held by the catch (or the hand), it dies fast. */
-const SHEET_RATTLE = { flex: { amount: 0.35, freq: 150, decay: 0.025, rattle: 0.6, wobble: 0, tone: 0 }, housing: { amount: 0.35, cavity: 0.2 } };
+export const SHEET_RATTLE = { flex: { amount: 0.35, freq: 150, decay: 0.025, rattle: 0.6, wobble: 0, tone: 0 }, housing: { amount: 0.35, cavity: 0.2 } };
 
 type MagFill = 'loaded' | 'empty';
 
@@ -824,8 +824,8 @@ function withMagAir<T extends { housing?: Partial<NonNullable<Scene['housing']>>
  * shallow texture read over a wide contact averages out the highs), and knocks are blunter.
  * The fit is looser for it, so the rattle stays.
  */
-const WORN_SLIDE = { roughness: 3, grain: 3, periodicity: 0, contactWidth: 0.2 };
-const WORN_KNOCK = { scatter: 0.8, radius: 2.5, click: 0.6, sharp: 0.35 };
+export const WORN_SLIDE = { roughness: 3, grain: 3, periodicity: 0, contactWidth: 0.2 };
+export const WORN_KNOCK = { scatter: 0.8, radius: 2.5, click: 0.6, sharp: 0.35 };
 
 function makeArMagIn(fill: MagFill): Scene {
   const body = magShell(fill);
