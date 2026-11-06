@@ -715,6 +715,15 @@ const SHEET_EDGE = { housing: { amount: 0.2, cavity: 0.15 } };
 const SHEET_BUZZ = { flex: { amount: 0.45, freq: 150, decay: 0.08, rattle: 0.75, wobble: 0, tone: 0 }, housing: { amount: 0.35, cavity: 0.2 } };
 /** A brief rattle when the magazine bottoms or drops free: held by the catch (or the hand), it dies fast. */
 const SHEET_RATTLE = { flex: { amount: 0.35, freq: 150, decay: 0.025, rattle: 0.6, wobble: 0, tone: 0 }, housing: { amount: 0.35, cavity: 0.2 } };
+/**
+ * Wear from years of reloads: the anodising and finish on the well and the magazine's sides are
+ * polished smooth where they rub, burrs and sharp edges are rounded off, and the rubbing happens
+ * over broad worn patches. The slide is a smooth, dull hiss instead of a scratch (a fine,
+ * shallow texture read over a wide contact averages out the highs), and knocks are blunter.
+ * The fit is looser for it, so the rattle stays.
+ */
+const WORN_SLIDE = { roughness: 3, grain: 3, periodicity: 0, contactWidth: 0.2 };
+const WORN_KNOCK = { scatter: 0.8, radius: 2.5, click: 0.6, sharp: 0.35 };
 function makeArMagIn(fill) {
     const body = magShell(fill);
     const panel = magPanel(fill);
@@ -731,19 +740,19 @@ function makeArMagIn(fill) {
         // so the rise speeds up too.
         { what: 'air column in the mag well shrinks', at: 0.002, gainDb: -13, sound: { kind: 'tube', fromCm: 8, toCm: 1.2, durationMs: 105, motion: 'accelerate', q: 2.5 } },
         { what: 'air squeezed out as it seats', at: 0.107, gainDb: -26, sound: { kind: 'air', freq: 3200, q: 1.4, attackMs: 0.3, decayMs: 4 } },
-        rub('magazine slides up the mag well', 0.002, -11, { force: 2.5, duration: 0.105, speed: 0.9, profile: 'accelerate', roughness: 14, grain: 0.4, periodicity: 0.1, contactWidth: 0.04 }, panel, arMagWell, SHEET_BUZZ),
+        rub('magazine slides up the mag well', 0.002, -11, { force: 2.5, duration: 0.105, speed: 0.9, profile: 'accelerate', ...WORN_SLIDE }, panel, arMagWell, SHEET_BUZZ),
         // The mag's side pushes the spring-loaded catch aside; it rides along the side panel until the hole.
-        rub('mag catch rides along the magazine side', 0.06, -12, { force: 6, duration: 0.04, speed: 0.9, profile: 'accelerate', roughness: 4, grain: 0.2, contactWidth: 0.03 }, arMagCatch, panel, { coil: { level: 0.25, length: 2, dispersion: 0.35, decay: 0.05, brightness: 5000 } }),
+        rub('mag catch rides along the magazine side', 0.06, -12, { force: 6, duration: 0.04, speed: 0.9, profile: 'accelerate', roughness: 1.5, grain: 3, contactWidth: 0.15 }, arMagCatch, panel, { coil: { level: 0.25, length: 2, dispersion: 0.35, decay: 0.05, brightness: 5000 } }),
         // Loose and worn: the sheet-metal shell clatters against the billet walls on the way up. The
         // knocks are spread evenly along the travel, so as the magazine speeds up they come closer
         // together and land harder.
-        ...[0.06, 0.16, 0.27, 0.38, 0.5, 0.62, 0.72].map((x, i) => hit('magazine clatters against the well', 0.002 + 0.105 * Math.sqrt(x), -17 + i * 1.2, (0.15 + i * 0.035) * v, panel, arMagWell, { scatter: 0.8, radius: 1, click: 0.85, sharp: 1 }, SHEET_EDGE)),
+        ...[0.06, 0.16, 0.27, 0.38, 0.5, 0.62, 0.72].map((x, i) => hit('magazine clatters against the well', 0.002 + 0.105 * Math.sqrt(x), -17 + i * 1.2, (0.15 + i * 0.035) * v, panel, arMagWell, WORN_KNOCK, SHEET_EDGE)),
         // The catch: spring-loaded, it has been riding along the magazine's side. When the hole in the
         // side panel lines up, its spring throws it sideways into the hole and its shoulder strikes the
         // sheet metal round the hole: hard steel on a thin aluminium panel, a sharp tinny click, with a
         // trace of its spring. The magazine then stops at the top of its travel and settles back down
         // onto the catch.
-        hit('mag catch clicks into the hole in the magazine', 0.101, 4, 1.4, arMagCatch, panel, { scatter: 0.1, radius: 0.6, click: 0.9, sharp: 1 }, { coil: { level: 0.15, length: 1.5, dispersion: 0.3, decay: 0.025, brightness: 7000 }, ...SHEET_EDGE }),
+        hit('mag catch clicks into the hole in the magazine', 0.101, 6, 1.4, arMagCatch, panel, { scatter: 0.1, radius: 0.6, click: 0.9, sharp: 1 }, { coil: { level: 0.15, length: 1.5, dispersion: 0.3, decay: 0.025, brightness: 7000 }, ...SHEET_EDGE }),
         // Still accelerating, the magazine slams into its stop at the top of the well: a hard stop.
         // Struck at its top edge, with the hand gripping it and the catch now in its hole, the shell
         // can't ring as a whole: the panel at the stop takes the hit.
@@ -792,11 +801,11 @@ function makeArMagOut(fill) {
         // suction whump. From there it touches nothing.
         { what: 'air column in the mag well grows', at: 0.065, gainDb: -13, sound: { kind: 'tube', fromCm: 1.2, toCm: 8, durationMs: 128, motion: 'accelerate', q: 2.5 } },
         { what: 'air rushes in as the magazine clears', at: 0.193, gainDb: -20, sound: { kind: 'air', freq: 700, q: 0.7, attackMs: 0.5, decayMs: 7, pop: { freq: 140, ms: 6, level: 1.2 } } },
-        rub('magazine slides down out of the mag well', 0.065, -11, { force: 2, duration: 0.128, speed: 1.2, profile: 'accelerate', roughness: 14, grain: 0.4, periodicity: 0.1, contactWidth: 0.04 }, panel, arMagWell, SHEET_BUZZ),
+        rub('magazine slides down out of the mag well', 0.065, -11, { force: 2, duration: 0.128, speed: 1.2, profile: 'accelerate', ...WORN_SLIDE }, panel, arMagWell, SHEET_BUZZ),
         hit('magazine body rings as it drops', 0.0645, fill === 'loaded' ? -16 : -9, 0.6, body, arMagWell, { scatter: 0.3, radius: 3, click: 0.1, sharp: 0.7 }, own),
         // Loose in the well as it drops: the shell clatters off the billet walls, the knocks spread
         // evenly along the travel, so they come faster and harder as it falls, and stop once it's out.
-        ...[0.06, 0.18, 0.31, 0.45, 0.6, 0.76].map((x, i) => hit('magazine clatters against the well', 0.065 + 0.128 * Math.sqrt(x), -16 + i * 1.4, (0.15 + i * 0.04) * v, panel, arMagWell, { scatter: 0.8, radius: 1, click: 0.85, sharp: 1 }, SHEET_EDGE)),
+        ...[0.06, 0.18, 0.31, 0.45, 0.6, 0.76].map((x, i) => hit('magazine clatters against the well', 0.065 + 0.128 * Math.sqrt(x), -16 + i * 1.4, (0.15 + i * 0.04) * v, panel, arMagWell, WORN_KNOCK, SHEET_EDGE)),
         // The thumb lets go: the button and catch spring back out.
         snap('mag release button springs back', 0.22, -10, { strength: 0.5, preload: 0, seat: 0.3, seatDelay: 1.5 }, arMagRelease, arLower, { coil: { level: 0.25, length: 2, dispersion: 0.35, decay: 0.05, brightness: 5000 } }),
     ];
