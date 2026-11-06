@@ -1772,8 +1772,9 @@ const G_Me = {
   },
 
   // ---------------------------------------------------------------- fragmentation
-  // A frag grenade's body is a steel casing that comes apart into FRAG.N chips, thrown out over the whole sphere
-  // (a ragged 0.4 g chip on average, some a third of that, a few four times, at about 1,350 m/s). Each is a round of
+  // A frag grenade (an M26 / M61 / L2 sort: a thin sheet body lined with a notched steel wire coil) comes apart into about FRAG.N
+  // chips, thrown out over the whole sphere: short square bits of the coil, about 130 mg each and much of a size (the notches decide
+  // where it breaks), at about 1,150 m/s (some 86 J apiece). That's 3.7 to a square metre at 5 m and 0.9 at 10 m. Each is a round of
   // its own (js/ballistics.ts: a ragged flake of mild steel that mass, tumbling: fragOne): it slows in the air by its own drag, goes into
   // whoever is in its way through their armour and body (through), through walls and cover by what they are made of
   // (crossSolid), or stops in them. So how many reach someone is how much of the sphere they fill (a body at 3 m
@@ -1793,7 +1794,7 @@ const G_Me = {
     const g = G.Level.groundAt(map, p.x, p.z, 0.01, p.y + 0.05);
     return g != null && p.y - g < 0.15 ? this.BLAST.r * this.BLAST.SURFACE : this.BLAST.r;
   },
-  FRAG: { N: 1200, V0: 1350, VMIN: 70, RANGE: 70, CAP: 28, BUDGET_MS: 3, MIN_PER_FRAME: 40, M_MED: 0.0004, CD: 1.2, FLAKE: 4, SHOW: 26, PUFFS: 14, BLOOD: 24 },
+  FRAG: { N: 1200, V0: 1150, VMIN: 70, RANGE: 70, CAP: 28, BUDGET_MS: 3, MIN_PER_FRAME: 40, M_MED: 0.00013, M_SD: 0.25, CD: 1.0, FLAKE: 1.5, SHOW: 26, PUFFS: 14, BLOOD: 24 },
   fragQ: null as null | any[],
   fragLogs: [] as any[],
   // p: where it went off. enemy: a suspect's (id): it is you it is meant for, and no one else it hurts here. seed: the
@@ -1811,7 +1812,7 @@ const G_Me = {
       const c = 2 * rnd() - 1, r = Math.sqrt(1 - c * c), a = rnd() * 6.283; // (uniform over the sphere: the height uniform, the angle round uniform)
       u.set(Math.cos(a) * r, c, Math.sin(a) * r);
       dir[i * 3] = u.x; dir[i * 3 + 1] = u.y; dir[i * 3 + 2] = u.z;
-      m[i] = G.U.clamp(F.M_MED * Math.exp(0.65 * norm()), 0.0001, 0.0016);
+      m[i] = G.U.clamp(F.M_MED * Math.exp(F.M_SD * norm()), F.M_MED * 0.4, F.M_MED * 2.5); // (the coil's notches make them much of a size)
       v[i] = F.V0 * (0.85 + 0.3 * rnd()) * Math.pow(F.M_MED / m[i], 0.12);
     }
     const pos = marksOnly ? null : new Float32Array(n * 6), geo = new THREE.BufferGeometry();
@@ -1865,9 +1866,9 @@ const G_Me = {
   // one chip, flown from the burst to wherever it ends
   fragOne(q: any, i: number) {
     const F = this.FRAG, B = G.Ballistics, L = G.Level, map = G.Game.map!, m = q.m[i];
-    // A chip of a burst casing is a ragged flake, not a ball: it shows the air and whatever it strikes about four times the area of
-    // a cube of its steel (a 0.4 g chip: 8 mm across, a millimetre thick), tumbling, so it slows quickly (a factor e in about
-    // 10 m) and goes into things like a blunt, wide object (js/ballistics.ts vLimit: the wider, the harder to get through)
+    // A chip of the coil is a short square bit of wire, not a ball: tumbling, it shows the air and whatever it strikes about one and a
+    // half times the area of a cube of its steel (a 130 mg chip: about 3.5 mm across), so it slows by a factor e in about 22 m (some
+    // 55 J left at 5 m, 35 J at 10 m) and goes into things like a small blunt object (js/ballistics.ts vLimit: the wider, the harder)
     const A = F.FLAKE * Math.pow(m / 7850, 2 / 3), dia = Math.sqrt(4 * A / Math.PI);
     const d = new THREE.Vector3(q.dir[i * 3], q.dir[i * 3 + 1], q.dir[i * 3 + 2]), o = q.p.clone();
     const proj: any = { m, d: dia, len: m / (7850 * A), core: 'mild', nose: 'ball', flat: true, d0: dia, m0: m, ang: 0 };
