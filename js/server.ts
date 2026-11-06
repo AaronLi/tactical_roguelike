@@ -794,6 +794,8 @@ const G_Server = {
     const tl = G2.tac, light = this.night ? base.boss || Math.random() < tl.nightLight[tier - 1] : this.level >= tl.lightFrom && (base.boss || Math.random() < tl.light[tier - 1]), laser = this.level >= tl.laserFrom && (base.boss || Math.random() < tl.laser[tier - 1]);
     d.tac = (light ? 1 | (tier >= 4 ? 8 : 0) : 0) | (laser ? 2 | (Math.random() < 0.35 ? 4 : 0) : 0);
     // automatic weapons fire at their own rate in the type's bursts; others as fast as the type works them
+    // an Enforcer early on is less of a machine gunner: shorter bursts and a looser aim at the first two gear tiers (the guns too: ENEMY_GEAR)
+    if (type === 'heavy' && tier <= 2) { d.burst = tier === 1 ? [3, 5] : [4, 8]; d.acc = base.acc * (tier === 1 ? 0.8 : 0.9); }
     if (base.rof) {
       if (w.mode === 'auto') d.rof = 60 / w.rpm;
       else { d.rof = Math.max(base.rof, 60 / w.rpm); d.burst = [1, w.shell || w.cls === 'SNP' ? 1 : 2]; }
