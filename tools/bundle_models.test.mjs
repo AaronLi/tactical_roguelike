@@ -55,9 +55,9 @@ ok('the container is read raw too', (() => { const raw = pack([['x', Buffer.from
 { const r = tree(); writeBundles(r, B); fs.unlinkSync(path.join(r, 'parts/_shared/optic/s.glb')); const e = errsOf(r); ok('shared entry with no loose file', has(e, /orphan: parts\/_shared\/optic\/s\.glb is in bundle models but not on disk/), e.join(' | ')); }
 { const r = tree(); put(r, 'props/index.json', JSON.stringify({ version: 1, rounds: {}, keys: { '9x19': { file: 'round_missing.glb' } }, quarrel: { file: 'quarrel.glb' } })); writeBundles(r, B); const e = errsOf(r); ok('props index entry that resolves nowhere', has(e, /round_missing\.glb is not in bundle models/), e.join(' | ')); }
 
-// the hash manifest the game fetches: { v: 2, hash, size }
+// the hash manifest the game fetches: { v: FORMAT (3), hash, size }
 { const r = tree(); writeBundles(r, B); const m = JSON.parse(fs.readFileSync(mf(r), 'utf8'));
-  ok('manifest: v 2, a 16-hex hash, the gzipped size', m.v === 2 && /^[0-9a-f]{16}$/.test(m.hash) && m.size === fs.statSync(bf(r)).size && Object.keys(m).sort().join() === 'hash,size,v', JSON.stringify(m));
+  ok('manifest: v ' + B.FORMAT + ', a 16-hex hash, the gzipped size', m.v === B.FORMAT && B.FORMAT === 3 && /^[0-9a-f]{16}$/.test(m.hash) && m.size === fs.statSync(bf(r)).size && Object.keys(m).sort().join() === 'hash,size,v', JSON.stringify(m));
   ok('manifest: hash is of the .rtb bytes', m.hash === hashOf(fs.readFileSync(bf(r))));
   const r3 = tree(); put(r3, 'parts/aa/barrel/a.glb', Buffer.from('other')); writeBundles(r3, B); const m3 = JSON.parse(fs.readFileSync(mf(r3), 'utf8'));
   ok('manifest: any changed file gives a new hash', m3.hash !== m.hash); }
@@ -65,7 +65,8 @@ ok('the container is read raw too', (() => { const raw = pack([['x', Buffer.from
 { const r = tree(); writeBundles(r, B); const m = JSON.parse(fs.readFileSync(mf(r), 'utf8')); m.hash = '0'.repeat(16); fs.writeFileSync(mf(r), JSON.stringify(m)); const e = errsOf(r); ok('stale hash in the manifest', has(e, /wrong hash for models\.rtb/), e.join(' | ')); }
 { const r = tree(); writeBundles(r, B); const m = JSON.parse(fs.readFileSync(mf(r), 'utf8')); m.size += 1; fs.writeFileSync(mf(r), JSON.stringify(m)); const e = errsOf(r); ok('wrong size in the manifest', has(e, /wrong size for models\.rtb/), e.join(' | ')); }
 { const r = tree(); writeBundles(r, B); fs.writeFileSync(mf(r), '{"v":1,"bundles":{"aa":"0123456789abcdef"}}'); const e = errsOf(r); ok('the old per-bundle manifest is malformed now', has(e, /manifest\.json is malformed/), e.join(' | ')); }
-{ const r = tree(); writeBundles(r, B); fs.writeFileSync(mf(r), '{"v":2}'); const e = errsOf(r); ok('malformed manifest', has(e, /manifest\.json is malformed/), e.join(' | ')); }
+{ const r = tree(); writeBundles(r, B); fs.writeFileSync(mf(r), '{"v":3}'); const e = errsOf(r); ok('malformed manifest', has(e, /manifest\.json is malformed/), e.join(' | ')); }
+{ const r = tree(); writeBundles(r, B); const m = JSON.parse(fs.readFileSync(mf(r), 'utf8')); m.v = 2; fs.writeFileSync(mf(r), JSON.stringify(m)); const e = errsOf(r); ok('a manifest of the float32 format (v 2) is not this one', has(e, /manifest\.json is malformed/), e.join(' | ')); }
 
 console.log(failed ? `${failed} of ${ran} bundle tests FAILED` : `bundle tests: ${ran} checks passed`);
 process.exit(failed ? 1 : 0);

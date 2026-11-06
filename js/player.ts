@@ -90,7 +90,7 @@ const G_Me = {
   slot: undefined as unknown as string,
   reloading: undefined as unknown as boolean, reloadT: undefined as unknown as number, reloadTotal: undefined as unknown as number, reloadMode: undefined as unknown as PReloadMode,
   reloadSeat: undefined as unknown as number, reloadPackK: undefined as unknown as number, reloadN: undefined as unknown as number, reloadEv: undefined as unknown as number, loadN: undefined as unknown as number,
-  reloadEmpty: undefined as unknown as boolean, reloadAct: undefined as unknown as PActKind | null,
+  reloadEmpty: undefined as unknown as boolean, reloadAct: undefined as unknown as PActKind | null, slap: undefined as unknown as boolean,
   byHand: undefined as unknown as boolean, revOpen: undefined as unknown as boolean, revClose: undefined as unknown as boolean,
   magDropped: undefined as any, dumpDest: undefined as unknown as GGrid | null, dumped: undefined as unknown as GItem | null,
   handCase: undefined as any, handOut: undefined as unknown as boolean, ejected: undefined as unknown as string[] | undefined, ejecting: undefined as unknown as number, ejectT: undefined as unknown as number,
@@ -1089,6 +1089,8 @@ const G_Me = {
   // the old one: into a dump pouch if you wear one with room (a little slower), else on the floor, gone with
   // whatever was left in it (fastest). Digging a magazine out of your backpack takes much longer.
   RELOAD_K: { retain: 1.35, pouch: 1.0, floor: 0.82, plain: 1 },
+  // a slap reload does the handle's work as well as the magazine's: longer for each way of stowing the old magazine (an MP5's 2.0 s: 2.65, 2.25 and 2.15 s)
+  SLAP_K: { retain: 1.325, pouch: 1.125, floor: 1.075, plain: 1.125 },
   startReload() {
     const w = this.cur(), mag = this.magSize(w);
     if (this.zipRide) { if (!this.noAmmoT || this.noAmmoT < performance.now()) { G.HUD.toast('', "Can't reload hanging from the zipline", 1.2); this.noAmmoT = performance.now() + 1500; } return; } // (the left hand's on the trolley)
@@ -1109,6 +1111,8 @@ const G_Me = {
     // the bolt catch (a gun that locked open on its last round: quick) or the action worked by hand (a rack)
     this.byHand = !!w.def.handReload && w.mag > 0; // (a speed loader with rounds still in the cylinder: by hand, a round at a time)
     this.reloadAct = this.reloadEmpty && isMag && !w.def.enbloc && !w.def.akimbo && G.VMAnim.kinds(w.def).action ? (G.boltHold(w.def) ? 'release' : 'rack') : null; // (a revolver has nothing to work)
+    this.slap = isMag && G.VMAnim.isSlap(w.def); // (an MP5: the handle drawn back and turned up into its notch, the magazine changed, the handle slapped down: js/vmanim.ts slapClip. It chambers the next round itself, so no action after)
+    if (this.slap) this.reloadAct = null;
     this.reloadTimes(w.def);
     this.loadN = this.loadCount(w, mag);
     this.revOpen = this.revHand(w.def); this.revClose = false; // (a revolver by hand: the cylinder comes out first)
@@ -1119,7 +1123,7 @@ const G_Me = {
     this.handCase = info && info.breech && w.spent && w.spent.length ? w.spent[0] : null; this.handOut = false;
     if (!this.handCase) G.Casings.emptied(w.def, w.def.volley ? (w.spent || []).length : mag - w.mag, w.spent); // a revolver or break-action: the empties fall out (each hull its load's colour; a volley gun's: what it fired, however many were in it)
     this.ejected = w.spent; this.ejecting = (w.spent || []).length; this.ejectT = this.handCase ? this.reloadTotal * 0.3 : 0.25; w.spent = []; // (still in it till they do: js/vmanim.ts)
-    if (this.loose(w.def) || !G.Audio.sample('pull_magazine')) G.Audio.reload();
+    if (!this.slap && (this.loose(w.def) || !G.Audio.sample('pull_magazine'))) G.Audio.reload(); // (a slap reload's own sounds come as it goes: slapSounds)
   },
   reloadTime(def: WeaponDef) { return this.byHand && def.handReload ? def.handReload : def.reload; },
   // how many rounds the next step of a loose reload puts in: one, or with a loader several (a tube's push, the Hailstorm's Wolverine grip: three), fewer when
@@ -1145,7 +1149,7 @@ const G_Me = {
   reloadTimes(def: WeaponDef, done = 0) {
     const seat = this.reloadAct && G.VMAnim.kinds(def).reload === 'mag' ? this.SEAT[this.reloadMode] || 0.7 : 1;
     this.reloadSeat = seat;
-    this.reloadTotal = this.reloadTime(def) * this.RELOAD_K[this.reloadMode] * this.reloadPackK * seat;
+    this.reloadTotal = this.reloadTime(def) * (this.slap ? this.SLAP_K : this.RELOAD_K)[this.reloadMode] * this.reloadPackK * seat;
     const plat = G.Gunsmith.PLATFORMS[def.id];
     if (plat && plat.arch === 'derringer' && this.reloadN) this.reloadTotal *= 0.6 + 0.4 * this.reloadN / this.magSize(def); // (turning it over, opening and shutting it take most of it: one round in is a little quicker)
     this.reloadT = Math.max(0.05, this.reloadTotal - done);
@@ -1244,9 +1248,10 @@ const G_Me = {
       if (!this.loose(def) && this.reloadTotal) {
         const k = 1 - this.reloadT / this.reloadTotal, pistol = def.cls === 'PST' || def.cls === 'MP';
         // the old magazine leaves your hand onto the floor (as the viewmodel lets go of it)
+        if (this.slap) this.slapSounds(w, k);
         const km = k * (this.reloadSeat || 1); // (through the magazine change's motions)
-        if (this.reloadMode === 'floor' && !this.magDropped && !w.noMag && km > (def.barrels ? 0.47 : pistol ? 0.06 : 0.2)) this.magDropped = G.Casings.dropMag(def) || true;
-        if (this.reloadEv === 0 && km > (def.barrels ? 0.8 : this.reloadMode === 'retain' || this.reloadMode === 'pouch' ? 0.76 : 0.68)) { this.reloadEv = 1; G.Audio.sample('insert_magazine'); }
+        if (this.slap) { /* (its own: slapSounds) */ } else if (this.reloadMode === 'floor' && !this.magDropped && !w.noMag && km > (def.barrels ? 0.47 : pistol ? 0.06 : 0.2)) this.magDropped = G.Casings.dropMag(def) || true;
+        if (this.slap) { /* (its own: slapSounds) */ } else if (this.reloadEv === 0 && km > (def.barrels ? 0.8 : this.reloadMode === 'retain' || this.reloadMode === 'pouch' ? 0.76 : 0.68)) { this.reloadEv = 1; G.Audio.sample('insert_magazine'); }
       }
       if (this.reloadT <= 0) {
         if (this.revClose) { this.revClose = false; this.reloading = false; } // (shut: ready)
@@ -1339,6 +1344,18 @@ const G_Me = {
     }
     this.pressBuf = 0;
     if (mode === 'burst') { this.burstQ--; if (this.burstQ <= 0 || !G.loaded(w)) { this.burstQ = 0; this.fireCd += 0.24; } }
+  },
+  // What a slap reload (js/vmanim.ts slapClip) sounds like as it goes, at k through it: the handle drawn back, its click into the notch, the old magazine out (and, dumped on
+  // the floor, falling), the new one in, then the slap that frees the bolt: a sharp crack over the bolt going home.
+  slapSounds(w: GWeapon, k: number) {
+    const S = G.VMAnim.SLAP, km = G.VMAnim.slapM(k, this.reloadMode), def = w.def, // (how far the magazine change is: js/vmanim.ts slapM)
+      keep = this.reloadMode === 'retain' || this.reloadMode === 'pouch';
+    if (this.reloadEv === 0 && k > (S.grab + S.pull) / 2) { this.reloadEv = 1; G.Audio.sample('rack_slide', 0.7, 1.2); }
+    if (this.reloadEv === 1 && k > S.lock) { this.reloadEv = 2; G.Audio.click(); }
+    if (this.reloadEv === 2 && km > 0.1) { this.reloadEv = 3; if (!G.Audio.sample('pull_magazine')) G.Audio.reload(); }
+    if (this.reloadMode === 'floor' && !this.magDropped && !w.noMag && km > 0.2) this.magDropped = G.Casings.dropMag(def) || true;
+    if (this.reloadEv === 3 && km > (keep ? 0.76 : 0.68)) { this.reloadEv = 4; G.Audio.sample('insert_magazine'); }
+    if (this.reloadEv === 4 && k > S.slap) { this.reloadEv = 5; G.Audio.sample('drop_bolt', 1, 1.3); G.Audio.sample('drop_slide', 0.7, 1.4); }
   },
   // the next round from the magazine (or tube) into an empty chamber
   feed(w: GWeapon) {
@@ -1449,7 +1466,7 @@ const G_Me = {
       else if (!G.GunAudio.play(multi && !vol ? G.shotSoundKey(def, eff, round) : G.Gunsmith.roundSoundKey(def, round), null, undefined, vol ? G.volleyVol(w.def, nv) : multi ? Math.pow(G.shotK(w.def, eff), 2) : 1)) G.Audio.shot(w.sup ? G.SUPPRESSOR.snd : def.snd); // (the report of the round fired, not just the gun's)
       if (!w.sup && def.cls !== 'BOW' && !(vol && n > 0)) { // (a volley: one flash, the barrels' together)
         this.flashT = 0.05;
-        G.R.vmMuzzle.intensity = 3;
+        G.R.vmMuzzle.intensity = Math.PI * 3;
         G.R.muzzleFlashAt(muzzle, def.tracer || 0xffb060);
       }
       if (!multi && !w.def.caseless && !w.def.manual) G.Casings.fired(def, true, null, null, round); // the spent case, out of the port (a bolt gun's when the bolt's worked; a caseless round has none)

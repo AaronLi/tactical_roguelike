@@ -325,7 +325,7 @@ G.fullReload = G_fullReload;
 // Bolt hold-open: the action locks back on the last round, so a reload from empty is a magazine change and a
 // thumb on the bolt catch (or the slide stop), not a full rack. Every pistol with a slide, the AR-15 family and the
 // rifles and SMGs built the same way; not the AK family, the MP5's roller bolt, the open-bolt guns or a bolt-action.
-const G_BOLT_HOLD = new Set(['scar', 'scarl', 'g36', 'aug', 'aug9', 'tavor', 'fal', 'm14', 'mk14', 'sr25', 'barrett', 'gm6', 'mpx', 'mp7', 'vector', 'skorp', 'svd', 'ar9', 'm27', 'hk416', 'br3', 'qbz192']);
+const G_BOLT_HOLD = new Set(['scar', 'scarl', 'g36', 'aug', 'aug9', 'tavor', 'fal', 'm14', 'mk14', 'sr25', 'barrett', 'gm6', 'mpx', 'mp7', 'vector', 'skorp', 'svd', 'ar9', 'm27', 'hk416', 'br3', 'qbz192', 'm4', 'mcx']); // (m4: the Mk18, authored in Blender, so no longer rcv 'ar' below; mcx: SIG's own lower, which locks back too)
 G.BOLT_HOLD = G_BOLT_HOLD;
 const G_boltHold = (def: Record<string, any>) => {
   const P = def && G.Gunsmith && G.Gunsmith.PLATFORMS[def.id];

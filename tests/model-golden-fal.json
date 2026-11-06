@@ -189,12 +189,12 @@
   },
   "barrel=fal.barrel,grip=oem.gr.ar.4,handguard=oem.hg.box.4,mag=fal.mag,muzzle=mz.r762.a2,optic=op.pic.5,stock=stk.heavy.0": {
    "label": "optic=op.pic.5",
-   "geometry": "76507e186cf52968",
+   "geometry": "37ec7bca9813e0ba",
    "info": "3567172b21a3f5cd"
   },
   "barrel=fal.barrel,grip=oem.gr.ar.4,handguard=oem.hg.box.4,mag=fal.mag,muzzle=mz.r762.a2,optic=op.pic.6,stock=stk.heavy.0": {
    "label": "optic=op.pic.6",
-   "geometry": "148a8ab9aa157851",
+   "geometry": "2471e0b3877384a5",
    "info": "2dd8b8a6bb81df36"
   },
   "barrel=fal.barrel,grip=oem.gr.ar.4,handguard=oem.hg.box.4,mag=fal.mag,muzzle=mz.r762.a2,optic=op.pic.7,stock=stk.heavy.0": {
@@ -234,17 +234,17 @@
   },
   "barrel=fal.barrel,grip=oem.gr.ar.4,handguard=oem.hg.box.4,mag=fal.mag,muzzle=mz.r762.a2,optic=op.pic.14,stock=stk.heavy.0": {
    "label": "optic=op.pic.14",
-   "geometry": "ce6d1d09065659cf",
+   "geometry": "0f18992c9ff3f0f7",
    "info": "00db9fc73a7817b3"
   },
   "barrel=fal.barrel,grip=oem.gr.ar.4,handguard=oem.hg.box.4,mag=fal.mag,muzzle=mz.r762.a2,optic=op.pic.15,stock=stk.heavy.0": {
    "label": "optic=op.pic.15",
-   "geometry": "408058e426d04f47",
+   "geometry": "537167477d886ce6",
    "info": "6f3cc7fc3657b0f1"
   },
   "barrel=fal.barrel,grip=oem.gr.ar.4,handguard=oem.hg.box.4,mag=fal.mag,muzzle=mz.r762.a2,optic=op.pic.16,stock=stk.heavy.0": {
    "label": "optic=op.pic.16",
-   "geometry": "130a180124cb0d94",
+   "geometry": "8d4623bdb56cddc5",
    "info": "1c0a0cbe832e2beb"
   },
   "barrel=fal.barrel,grip=oem.gr.ar.4,handguard=oem.hg.box.4,mag=fal.mag,muzzle=mz.r762.a2,optic=ak.optic,stock=stk.heavy.0": {
@@ -379,7 +379,7 @@
   },
   "barrel=fal.barrel,grip=oem.gr.ar.4,handguard=oem.hg.box.4,mag=fal.mag,muzzle=mz.r762.a2,optic=op.bc.0,stock=stk.heavy.0": {
    "label": "optic=op.bc.0",
-   "geometry": "87615bf97734c7b2",
+   "geometry": "fbb1dbe4543bad62",
    "info": "c435d304d17576ca"
   },
   "barrel=fal.barrel,grip=oem.gr.ar.4,handguard=oem.hg.box.4,mag=fal.mag,muzzle=mz.r762.a2,optic=hailstorm.optic,stock=stk.heavy.0": {

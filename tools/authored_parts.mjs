@@ -184,7 +184,7 @@ const cfgAt = (k) => JSON.parse(fs.readFileSync(cfgOf(k), 'utf8'));
 export function catalogue() { return authoredPartKeys().map((k) => [k, cfgAt(k)]).filter(([, c]) => !c.replaces).map(([k, c]) => entryOf(k, c)); }
 /** Every REPLACE-ONLY part (a model.json with "replaces": [entry names, or (furniture) matches { mount?, model }]): { apart, names }, and a handguard's len (the
  *  entries it takes must be that long, to 1.5 mm: js/parts.ts). The entries keep everything but their model. */
-export function replacements() { return authoredPartKeys().map((k) => [k, cfgAt(k)]).filter(([, c]) => c.replaces).map(([k, c]) => Object.assign({ apart: k, names: c.replaces }, c.slot === 'handguard' ? { len: c.part.len } : {})); }
+export function replacements() { return authoredPartKeys().map((k) => [k, cfgAt(k)]).filter(([, c]) => c.replaces).map(([k, c]) => Object.assign({ apart: k, names: c.replaces }, c.slot === 'handguard' ? { len: c.part.len } : {}, c.gun ? { gun: c.gun } : {})); }
 /** The generated block for js/parts.ts. */
 export function catalogueBlock() { return ['  ' + BLOCK_BEGIN,'  const AUTHORED_PARTS: any[] = [', ...catalogue().map((e) => '    ' + JSON.stringify(e) + ','), '  ];', '  const AUTHORED_REPLACES: any[] = [', ...replacements().map((e) => '    ' + JSON.stringify(e) + ','), '  ];', '  ' + BLOCK_END].join('\n'); }
 /** js/parts.ts's text with its generated block current (throws if the markers are missing). */

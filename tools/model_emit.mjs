@@ -1,27 +1,73 @@
 // Writes the packs of tools/model_packs.mjs as glTF binaries (assets/models/parts/<platform>/<tag>/<file>.glb) and the platform's index.json.
 // A pack is rebuilt from its capture build (the recipe's own display model), keeping only the meshes tagged with its slot, moved to the
 // platform's reference frame (the capture's offsets undone) and exported exactly as the whole guns are (tools/bake_models.mjs): the game's
-// materials by catalogue name, UVs only where a bump map or display needs them, welded, quantised, meshopt-compressed; nothing is joined.
+// materials by catalogue name, UVs only where a bump map or display needs them, welded, quantised (positions to int16 in each mesh's box: quantizePositions),
+// meshopt-compressed; nothing is joined.
 import fs from 'fs'; import path from 'path'; import zlib from 'zlib'; import crypto from 'crypto';
 import * as THREE_NS from 'three';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { NodeIO } from '@gltf-transform/core';
-import { ALL_EXTENSIONS, EXTMeshoptCompression } from '@gltf-transform/extensions';
-import { dedup, weld, quantize, meshopt, prune, reorder } from '@gltf-transform/functions';
+import { ALL_EXTENSIONS, EXTMeshoptCompression, KHRMeshQuantization } from '@gltf-transform/extensions';
+import { dedup, weld, quantize, prune, reorder } from '@gltf-transform/functions';
 import { MeshoptEncoder, MeshoptDecoder } from 'meshoptimizer';
 import { defOf } from './model_sweep.mjs';
 
 const T = THREE_NS;
 /** Who owns the pivot of a part_ node (the pack whose tag this is): the animated parts belong to the slot they move with, the rest to the receiver. */
 const PART_OWNER = { mag: 'mag', slide: 'slide', ch: 'charging', magn: 'magnifier', pump: 'pump', brk: 'barrel', barrel: 'barrel', spin: 'barrel', bipod: 'base', stringCocked: 'limbs', stringSlack: 'limbs' };
-/** Position quantisation of the packs' vertices, in bits (MODELS_POSITION_BITS=14 for the smallest files); 0: float32, exact. */
-const POSITION_BITS = +(process.env.MODELS_POSITION_BITS || 0);
+/** Position quantisation of the packs' vertices: 16 (int16, KHR_mesh_quantization, the default) or 0 (MODELS_POSITION_BITS=0: float32, exact). */
+const POSITION_BITS = +(process.env.MODELS_POSITION_BITS ?? 16);
+if (POSITION_BITS !== 0 && POSITION_BITS !== 16) throw new Error('MODELS_POSITION_BITS: 16 or 0');
+
+/**
+ * The positions of every mesh as normalised int16 (KHR_mesh_quantization), each mesh in its own box: p = o + s * q / 32767, with o (the box's centre) and s (its
+ * half-size, rounded up) rounded to whole micrometres so they are short in the JSON. The node takes the decoding (its matrix times translate(o) scale(s): the file is
+ * standard glTF and opens anywhere at the right size), and extras.dq = [ox, oy, oz, s] records it, so the game undoes it as it loads (js/glb.ts dequantize: float32
+ * positions and the node's own transform back, so nothing downstream sees a scaled node). One step is s / 32767: 7.6 um for a 0.5 m mesh, the largest move half that.
+ */
+export const quantizePositions = () => (doc) => {
+  const root = doc.getRoot(), done = new Map(); // (accessor -> the dq it was quantised with: dedup can share one between meshes)
+  for (const mesh of root.listMeshes()) {
+    const prims = mesh.listPrimitives().filter((p) => p.getAttribute('POSITION') && p.getAttribute('POSITION').getComponentType() === 5126);
+    if (!prims.length) continue;
+    const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity], el = [0, 0, 0];
+    for (const p of prims) { const a = p.getAttribute('POSITION'); for (let i = 0; i < a.getCount(); i++) { a.getElement(i, el); for (let k = 0; k < 3; k++) { if (el[k] < min[k]) min[k] = el[k]; if (el[k] > max[k]) max[k] = el[k]; } } }
+    const um = (x) => Math.round(x * 1e6) / 1e6, o = [0, 1, 2].map((k) => um((min[k] + max[k]) / 2));
+    const s = Math.ceil((Math.max(...[0, 1, 2].map((k) => Math.max(max[k] - o[k], o[k] - min[k]))) + 1e-7) * 1e6) / 1e6 || 1e-6, dq = [...o, s];
+    for (const p of prims) {
+      let a = p.getAttribute('POSITION');
+      const was = done.get(a); if (was && was.join() === dq.join()) continue;
+      if (was) { a = a.clone(); p.setAttribute('POSITION', a); }
+      const n = a.getCount(), q = new Int16Array(n * 3);
+      for (let i = 0; i < n; i++) { a.getElement(i, el); for (let k = 0; k < 3; k++) q[i * 3 + k] = Math.max(-32767, Math.min(32767, Math.round(((el[k] - o[k]) / s) * 32767))); }
+      a.setArray(q).setNormalized(true); done.set(a, dq);
+    }
+    const nodes = root.listNodes().filter((nd) => nd.getMesh() === mesh);
+    for (const nd of nodes) {
+      if (nd.listChildren().length) throw new Error(`quantizePositions: mesh node "${nd.getName()}" has children`);
+      const m = nd.getMatrix(), Q = [s, 0, 0, 0, 0, s, 0, 0, 0, 0, s, 0, o[0], o[1], o[2], 1], r = new Array(16).fill(0);
+      for (let c = 0; c < 4; c++) for (let rw = 0; rw < 4; rw++) for (let k = 0; k < 4; k++) r[c * 4 + rw] += m[k * 4 + rw] * Q[c * 4 + k];
+      nd.setMatrix(r).setExtras({ ...nd.getExtras(), dq });
+    }
+  }
+  if (root.listAccessors().some((a) => a.getNormalized() && a.getComponentType() !== 5126)) doc.createExtension(KHRMeshQuantization).setRequired(true);
+};
+/** The compression every baked file gets after its welding: vertices reordered for meshopt, normals (10 bits) and UVs (12) quantised, positions too (above, unless MODELS_POSITION_BITS=0), the whole meshopt-compressed (EXT_meshopt_compression). */
+export const compression = () => [
+  reorder({ encoder: MeshoptEncoder, target: 'size' }), quantize({ pattern: /^(NORMAL|TEXCOORD_\d+)$/, patternTargets: /.*/, quantizeNormal: 10, quantizeTexcoord: 12 }),
+  ...(POSITION_BITS ? [quantizePositions()] : []),
+  (d) => { d.createExtension(EXTMeshoptCompression).setRequired(true).setEncoderOptions({ method: EXTMeshoptCompression.EncoderMethod.QUANTIZE }); }];
+/** A NodeIO that reads and writes the compressed files (meshopt encoder and decoder ready). */
+export async function makeIO(logger) {
+  await MeshoptEncoder.ready; await MeshoptDecoder.ready;
+  const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.encoder': MeshoptEncoder, 'meshopt.decoder': MeshoptDecoder });
+  if (logger) io.setLogger(logger);
+  return io;
+}
 export const ownerTag = (node) => (node.startsWith('part_') ? PART_OWNER[node.slice(5)] || 'base' : node.startsWith('group_') ? node.split('_')[1] : 'base');
 
 export async function makeEmitter({ G, GM, Models, logger }) {
-  await MeshoptEncoder.ready; await MeshoptDecoder.ready;
-  const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.encoder': MeshoptEncoder, 'meshopt.decoder': MeshoptDecoder });
-  if (logger) io.setLogger(logger); // (the baker passes a quiet one: gltf-transform's "prune: Removed types..." lines are noise unless --verbose)
+  const io = await makeIO(logger); // (the baker passes a quiet logger: gltf-transform's "prune: Removed types..." lines are noise unless --verbose)
   const matName = new Map();
   for (const [k, f] of Object.entries(GM.M)) { try { const m = f(); if (m && m.isMaterial && !matName.has(m)) matName.set(m, k); } catch (e) { /* not a material */ } }
   const copies = new Map(); // (the game's materials are shared: the export gets copies without the canvas bump map, named by catalogue key)
@@ -106,11 +152,8 @@ export async function makeEmitter({ G, GM, Models, logger }) {
   async function write(root, id, tag) {
     const raw = await new GLTFExporter().parseAsync(root, { binary: true, onlyVisible: false, includeCustomExtensions: false });
     const doc = await io.readBinary(new Uint8Array(raw));
-    await doc.transform(dedup(), weld({ tolerance: POSITION_BITS ? 1e-7 : 1e-9, toleranceNormal: 0.01 }), prune({ keepLeaves: true, keepAttributes: true }),
-      ...(POSITION_BITS ? [meshopt({ encoder: MeshoptEncoder, level: 'medium', quantizePosition: POSITION_BITS, quantizeNormal: 10, quantizeTexcoord: 12 })] : [
-        // positions stay float32 (exact: assembling reproduces the recipe's triangles bit for bit); normals and UVs are quantised; the whole is meshopt-compressed
-        reorder({ encoder: MeshoptEncoder, target: 'size' }), quantize({ pattern: /^(NORMAL|TEXCOORD_\d+)$/, patternTargets: /.*/, quantizeNormal: 10, quantizeTexcoord: 12 }),
-        (d) => { d.createExtension(EXTMeshoptCompression).setRequired(true).setEncoderOptions({ method: EXTMeshoptCompression.EncoderMethod.QUANTIZE }); }]));
+    // (welded on the float32 positions, as exact as before: the quantising comes after, in compression())
+    await doc.transform(dedup(), weld({ tolerance: 1e-9, toleranceNormal: 0.01 }), prune({ keepLeaves: true, keepAttributes: true }), ...compression());
     const buf = Buffer.from(await io.writeBinary(doc));
     const rep = Models.validatePack(Models.describeGltfJson(Models.glbJson(buf)), tag);
     if (rep.errors.length) throw new Error(`pack ${id}/${tag} breaks the pack contract:\n  ` + rep.errors.join('\n  '));

@@ -7,17 +7,18 @@
 //   assets/models/props/index.json                   { version, rounds: { <gun id>: <key> }, keys: { <key>: { file, dims, shape? } }, quarrel: { file } }
 //                                                    dims: what the game needs to know about the round (roundDims: head, case length, bullet length and diameter,
 //                                                    shell, pistol), shape: the .50 BMG's real outline (oal, case and bullet profiles); both from tools/models/recipes.ts.
-// The geometry is bake-time code (here and tools/models/recipes.ts quarrel()); the game reads the files.
+// The geometry is bake-time code (here and tools/models/recipes.ts quarrel()); the game reads the files, compressed like the packs (meshopt, int16 positions).
 import fs from 'fs'; import path from 'path';
 import * as T from 'three';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { ROOT, loadGame } from './model_env.mjs';
+import { makeIO, compression } from './model_emit.mjs';
 
 globalThis.FileReader = class { // (GLTFExporter wants a browser's FileReader on a Blob)
   readAsArrayBuffer(b) { b.arrayBuffer().then((r) => { this.result = r; this.onloadend && this.onloadend(); }); }
   readAsDataURL(b) { b.arrayBuffer().then((r) => { this.result = 'data:' + b.type + ';base64,' + Buffer.from(r).toString('base64'); this.onloadend && this.onloadend(); }); }
 };
-const G = loadGame(), R = G.GunRecipes, OUT = path.join(ROOT, 'assets/models/props/');
+const G = loadGame(), R = G.GunRecipes, OUT = path.join(ROOT, 'assets/models/props/'), io = await makeIO();
 fs.mkdirSync(OUT, { recursive: true });
 
 // a material named for the exporter: the catalogue's by key (the game puts its own back by name), else m_<hex>
@@ -56,8 +57,11 @@ function shotshell() {
 const write = async (file, group) => {
   const sc = new T.Scene(); for (const c of [...group.children]) sc.add(c); // (a scene: its children are the file's top-level nodes, the props' parts)
   const raw = await new GLTFExporter().parseAsync(sc, { binary: true, onlyVisible: false });
-  fs.writeFileSync(OUT + file, Buffer.from(raw));
-  return raw.byteLength;
+  const doc = await io.readBinary(new Uint8Array(raw));
+  await doc.transform(...compression()); // (compressed as the packs are, tools/model_emit.mjs: nothing welded or merged, the nodes as they were drawn)
+  const buf = Buffer.from(await io.writeBinary(doc));
+  fs.writeFileSync(OUT + file, buf);
+  return buf.length;
 };
 
 const index = { version: 1, rounds: {}, keys: {}, quarrel: { file: 'quarrel.glb' } };
