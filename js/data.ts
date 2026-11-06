@@ -908,8 +908,8 @@ const G_ENEMY_GEAR = {
   },
   // chance of a light / a laser on their gun, by tier (the Kingpin has both), and
   // the levels they first turn up on, whatever the tier: none in the first half of an act, and lights before lasers.
-  // nightLight: on a night level (js/level.ts nightify) a light's what they'd reach for: that chance, on any level
-  tac: { light: [0, 0.1, 0.2, 0.3], laser: [0, 0.1, 0.35, 0.6], lightFrom: 5, laserFrom: 7, nightLight: [0.3, 0.4, 0.5, 0.6] },
+  // On a night level (js/level.ts nightify) no light at all (js/server.ts equip): they're in the dark as you are.
+  tac: { light: [0, 0.1, 0.2, 0.3], laser: [0, 0.1, 0.35, 0.6], lightFrom: 5, laserFrom: 7 },
   // the Enforcer is always armoured, more heavily as tiers go up; the Kingpin wears the best
   fixed: {
     heavy: { vest: ['steel', 'steel', 'ceramic', 'assault'], helmet: ['ach', 'ach', 'riflehelm', 'riflehelm'], face: [0, 0, 'f.mandible', 'f.shield'], ex: [[], ['g.flap'], ['s.axil', 'g.flap', 'l.thigh'], ['l.shin']] },

@@ -794,8 +794,9 @@ const G_Server = {
     d.face = d.helmet === 'ach' || d.helmet === 'riflehelm' ? (fixed && fixed.face ? fixed.face[tier - 1] || 0 : this.armourRoll('face', kitL)) : 0;
     // shoulder, pelvis and leg armour, on what a plate carrier can take
     d.ex = fixed ? (fixed.ex || [])[tier - 1] || [] : d.vest === 'steel' || d.vest === 'ceramic' ? (['shoulder', 'groin', 'legs'] as ArmourKind[]).map((k) => this.armourRoll(k, kitL)).filter(Boolean) : [];
-    // a light and a laser on the gun, more often the better equipped they are (flags as an officer's: js/player.ts tacFlags)
-    const tl = G2.tac, light = this.night ? base.boss || Math.random() < tl.nightLight[tier - 1] : this.level >= tl.lightFrom && (base.boss || Math.random() < tl.light[tier - 1]), laser = this.level >= tl.laserFrom && (base.boss || Math.random() < tl.laser[tier - 1]);
+    // a light and a laser on the gun, more often the better equipped they are (flags as an officer's: js/player.ts tacFlags).
+    // No light on a night level: they see by the level's own light, and find you by sound and what gives you away (NIGHT)
+    const tl = G2.tac, light = !this.night && this.level >= tl.lightFrom && (base.boss || Math.random() < tl.light[tier - 1]), laser = this.level >= tl.laserFrom && (base.boss || Math.random() < tl.laser[tier - 1]);
     d.tac = (light ? 1 | (tier >= 4 ? 8 : 0) : 0) | (laser ? 2 | (Math.random() < 0.35 ? 4 : 0) : 0);
     // automatic weapons fire at their own rate in the type's bursts; others as fast as the type works them
     // an Enforcer early on is less of a machine gunner: shorter bursts and a looser aim at the first two gear tiers (the guns too: ENEMY_GEAR)
