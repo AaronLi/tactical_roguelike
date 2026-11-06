@@ -98,6 +98,9 @@ Other scenes, in `src/scenes/firearms.ts`:
 - `ar15-mag-out`, `ar15-mag-out-empty`: the finger presses the mag release button and draws the catch out (nearly silent). The magazine falls from rest out of the well, speeding up, and touches nothing once it's clear; then the button springs back.
 - `ar15-load-rack-unload`: the full cycle, made with `chainScenes`: a loaded magazine in, the charging handle racked and released (chambering a round), and the magazine out, with the hand's travel between them and a level balance between the parts.
 - `ar15-mag-in-out`: just the magazine: a loaded magazine in, a short pause, and back out.
+- `ar15-mag-drop-<way>-<fill>`: a USGI magazine dropped ~1.2 m onto concrete (it lands at ~4.8 m/s), 16 scenes:
+  - `<fill>`: `empty`, `third` (10 rounds), `two-thirds` (20) or `full` (30). The load sets the mass (0.12 to 0.48 kg) and how much it bounces, how damped the shell is, the size and pitch of the hollow space below the stack, and what moves inside: an empty magazine's follower and spring bounce and rattle, a light stack jumps and its cases tick, a full one only shifts as one.
+  - `<way>`: `bottom` (lands on the floorplate, hops, tips over), `top` (lands on the feed lips, and the top round), `sideways` (tumbling about its long axis: edge, side, edge, side) or `forwards` (end over end: floorplate corner, top end whips down, bounces, falls flat).
 
 The forward run is simulated from the reciprocating mass, the spring force and each magazine state's drag. Loaded takes 24.7 ms to the bolt face, empty 24.0 ms and no magazine 23.7 ms.
 
