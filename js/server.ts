@@ -34,7 +34,7 @@ interface StickerBox { s: string; by: string | null }
 interface SoundCache { map: LvMap; cache: Map<string, Float32Array> }
 // A player's last state (position p: [x, y, z]); the rest is the client's short-keyed state (js/player.ts state())
 interface PState { [k: string]: any; p: number[]; dd: number; dn: number; pr: number; cr: number; sx: any; yw: number; mv: any; tl: number; ln: number; sd: number; se: number; lr: number }
-interface Player { id: string; name: string; color: any; animal: any; look: any; ready: boolean; st: PState | null; lux?: number; luxAt?: number; firedAt?: number } // (lux: the light on them this tick, officerLux; firedAt: their last shot, the level's clock)
+interface Player { id: string; name: string; color: any; animal: any; look: any; ready: boolean; st: PState | null; lux?: number; luxAt?: number; firedAt?: number; flashK?: number } // (lux: the light on them this tick, officerLux; firedAt: their last shot, the level's clock; flashK: how much flash it made, its muzzle's)
 type LivePlayer = Player & { st: PState }
 // A suspect or civilian (addEnemy makes them; think() and the hit/injury code grow the optional fields)
 interface EnemyCover { x: number; y: number; z: number; lean: number; px?: number; pz?: number; fl?: number; cx?: number; cz?: number }
@@ -60,6 +60,7 @@ interface Enemy {
   firedAt?: number; sawAt?: number; engagedAt?: number; allyT?: number; allyN?: number; proof?: boolean; seeVis?: number; blind?: boolean; onWait?: number;
   order?: Order | null; radioT?: number; callAt?: number; callTgt?: { x: number; y: number; z: number } | null; callLog?: string[]; calls?: number; noLead?: number;
   coverFlow?: ReturnType<typeof G.Level.flow> | null; coverCheckT?: number; emboldened?: boolean; fl?: number;
+  visK?: number; noiseAt?: number; nsAt?: number; guess?: { x: number; y: number; z: number; until: number } | null; // (night: how well they see who they're on, lightK; when they last heard something; when their own search last started; where they think you are)
 }
 // A leader's order to a suspect (js/server.ts dispatch): get to the spot the police were last known at, by this way in (entry: a door, or a
 // point round it), and then search outward. role: 'push' goes in, 'hold' covers the way in from a little way off and goes in later; phase:
@@ -69,6 +70,7 @@ interface Order {
   by: number; role: 'push' | 'hold'; phase: 'approach' | 'hold' | 'enter' | 'search'; x: number; y: number; z: number; entry: OrderSpot; tflow: ReturnType<typeof G.Level.flow>;
   at: number; until: number; holdUntil: number; rest: number; leg: 'cover' | 'run'; legT: number; cv: EnemyCover | null; cvFlow: ReturnType<typeof G.Level.flow> | null;
   sp: { x: number; z: number; flow: ReturnType<typeof G.Level.flow> } | null; ring: number; done: [number, number][]; look: number; delay: number; rt: number;
+  own?: boolean; lookYaw?: number; // (own: a search of their own in the dark, no leader's: nightSearch)
 }
 interface DoorPeekSpot { d: LvDoor; x: number; y: number; z: number; px: number; pz: number; lean: number; yaw: number; fl: number; phase: string; t: number; n: number; flow?: ReturnType<typeof G.Level.flow> }
 
@@ -188,7 +190,8 @@ const G_Server = {
       case 'saved': if (p && this.phase === 'level') G.Net.broadcast({ t: 'saved', id: from, n: Math.max(1, Math.min(9, m.n | 0)) }); break;
       case 'shot':
         if (p && p.st && this.phase === 'level') this.hear(p.st.p[0], p.st.p[2], m.sil === 2 ? 2 : m.sil ? 6 : 28, p.st.p[1]); // (not at the range)
-        if (p && this.phase === 'level' && m.sil !== 2) p.firedAt = this.clock; // (the muzzle flash lights them up: officerLux)
+        // (the muzzle flash lights them up: officerLux; fl, how much flash its muzzle makes: js/player.ts flashOf)
+        if (p && this.phase === 'level' && m.sil !== 2) { p.firedAt = this.clock; p.flashK = Number.isFinite(m.fl) ? G.U.clamp(m.fl, 0, 1.5) : m.sil ? 0.1 : 1; }
         if (m.f && m.to && this.phase === 'level') this.suppress(m.f, m.to, G.Gunsmith.fromCode(m.w), (G.AMMO as Tbl)[m.am] ? m.am : undefined);
         G.Net.broadcast({ t: 'shot', id: from, sid: m.sid, f: m.f, to: m.to, w: m.w, sil: m.sil, bm: Number.isFinite(m.bm) ? m.bm : undefined, rl: typeof m.rl === 'string' && m.rl.length < 12 ? m.rl : undefined, am: (G.AMMO as Tbl)[m.am] ? m.am : undefined, vi: Number.isInteger(m.vi) && m.vi >= 0 && m.vi < 16 ? m.vi : undefined, vn: Number.isInteger(m.vn) && m.vn > 0 && m.vn <= 16 ? m.vn : undefined, // (a volley's rounds: js/player.ts shoot)
           tos: Array.isArray(m.tos) && m.tos.length <= 24 && m.tos.every((p: unknown) => Array.isArray(p) && p.length === 3 && p.every(Number.isFinite)) ? m.tos : undefined }, from); // (a shotgun's pellets: for the highlights)
@@ -794,8 +797,9 @@ const G_Server = {
     d.face = d.helmet === 'ach' || d.helmet === 'riflehelm' ? (fixed && fixed.face ? fixed.face[tier - 1] || 0 : this.armourRoll('face', kitL)) : 0;
     // shoulder, pelvis and leg armour, on what a plate carrier can take
     d.ex = fixed ? (fixed.ex || [])[tier - 1] || [] : d.vest === 'steel' || d.vest === 'ceramic' ? (['shoulder', 'groin', 'legs'] as ArmourKind[]).map((k) => this.armourRoll(k, kitL)).filter(Boolean) : [];
-    // a light and a laser on the gun, more often the better equipped they are (flags as an officer's: js/player.ts tacFlags)
-    const tl = G2.tac, light = this.night ? base.boss || Math.random() < tl.nightLight[tier - 1] : this.level >= tl.lightFrom && (base.boss || Math.random() < tl.light[tier - 1]), laser = this.level >= tl.laserFrom && (base.boss || Math.random() < tl.laser[tier - 1]);
+    // a light and a laser on the gun, more often the better equipped they are (flags as an officer's: js/player.ts tacFlags).
+    // No light on a night level: they see by the level's own light, and find you by sound and what gives you away (NIGHT)
+    const tl = G2.tac, light = !this.night && this.level >= tl.lightFrom && (base.boss || Math.random() < tl.light[tier - 1]), laser = this.level >= tl.laserFrom && (base.boss || Math.random() < tl.laser[tier - 1]);
     d.tac = (light ? 1 | (tier >= 4 ? 8 : 0) : 0) | (laser ? 2 | (Math.random() < 0.35 ? 4 : 0) : 0);
     // automatic weapons fire at their own rate in the type's bursts; others as fast as the type works them
     // an Enforcer early on is less of a machine gunner: shorter bursts and a looser aim at the first two gear tiers (the guns too: ENEMY_GEAR)
@@ -942,7 +946,10 @@ const G_Server = {
     for (const e of this.enemies.values()) {
       if (this.heardAt(field, e.x, e.z, e.y) > radius) continue;
       if (e.def.civ) { this.panic(e, { x, z }); continue; }
-      if (e.state === 'normal') { e.noise = { x, z }; this.noted(e, x, y, z); }
+      if (e.state === 'normal') { e.noise = { x, z }; e.noiseAt = this.clock; this.noted(e, x, y, z); }
+      // (searching in the dark on their own: a new noise somewhere else is where they look now)
+      const o = e.order;
+      if (o && o.own && e.state === 'normal' && this.clock - o.rt > this.NIGHT.RT_GAP && Math.hypot(x - o.x, z - o.z) > this.NIGHT.RETARGET) { this.retarget(e, { x, y, z }); o.ring = 0; o.until = Math.max(o.until, this.clock + this.NIGHT.SEARCH_T * 0.5); }
       if (e.def.leader && e.state === 'normal' && !e.down) this.callIn(e, x, y, z, 'heard a noise');
       if (!e.alert && e.state === 'normal') e.pendingAlert = e.pendingAlert >= 0 ? e.pendingAlert : 0.2 + Math.random() * 0.5;
     }
@@ -1236,13 +1243,33 @@ const G_Server = {
   // SPILL: what an officer's own weapon light, on but pointed elsewhere, throws back on them off what it lights;
   // SUS: a suspect's own weapon light, on someone in its beam (up to SUS_R metres)
   SIGHT: { HALF: 0.05, LIT: 0.3, REACH0: 6, REACH: 69, CLOSE: 5, FLASH: 0.6, FLASH_T: 0.5, SPILL: 0.12, SUS: 0.8, SUS_R: 20 },
+  // ---- a night level (this.night: the power's off, and nobody has a light or night vision but the police)
+  // Seeing (lightK, perception): REACH0, CLOSE as SIGHT's but nearer (a shape in the dark is made out at a few metres), and
+  // ALERT for how much further an alert suspect looks than an unaware one (SIGHT: twice). A visible laser that's on: LASER
+  // (its dot and its beam in the air give you away, a little light where you are). A muzzle flash: SIGHT.FLASH times the
+  // muzzle's flash (flashK: 1 bare, 1.2 a brake, 0.3 a flash hider, 0.1 a suppressor; js/player.ts flashOf) squared, for
+  // FLASH_T times it (at most once): a hider's flash is dim and gone in a moment, a can's next to nothing.
+  // Aim (fire): their hit chance times AIM + (1 - AIM) * sqrt(k) (k: lightK over LITK, at most 1: how well they see you, the level's
+  // light on you, your own light or laser, a flash, or close by; from LITK on, a weapon light's spill on you or a bare muzzle's
+  // flash, as well as by day); and where they aim is a guess, GUESS * (1 - k)² metres off (none at k = 1),
+  // a new guess every GUESS_T seconds. Picking you up again after losing you: ACQ seconds more before the first shot at
+  // k = 0 (a marksman's aim time AIMT times longer).
+  // Search (nightSearch, orderStep): having lost you (or only heard you), after HOLD seconds (HOLD_B for those who'd push on
+  // anyway) they go and look for themselves, as a leader's order would send them: to where you were seen or heard, then
+  // spot to spot outward from it, at CREEP of their walk, stopping a while at each (REST seconds, more by chance) to listen and
+  // look round, till SEARCH_T seconds have gone or they've looked as far as RING metres out from it. A new noise sends it
+  // there (RETARGET metres off, at most every RT_GAP seconds).
+  NIGHT: { REACH0: 3, CLOSE: 4, ALERT: 1.4, LASER: 0.04, AIM: 0.3, LITK: 0.6, GUESS: 1.2, GUESS_T: 1.1, ACQ: 1.0, AIMT: 1, HOLD: 2.5, HOLD_B: 0.8, CREEP: 0.5, REST: 2.2, SEARCH_T: 60, RING: 21, RETARGET: 3, RT_GAP: 2 },
   // The light where an officer stands: the level's (G.Level.luxAt), and a muzzle flash for a moment after they fire.
   // Kept for the tick: every suspect looking their way asks.
   officerLux(p: LivePlayer) {
     if (p.luxAt === this.clock) return p.lux!;
     const S = this.SIGHT, st = p.st;
     let v = G.Level.luxAt(this.map!, st.p[0], st.p[1], st.p[2]);
-    if (this.clock - (p.firedAt == null ? -99 : p.firedAt) < S.FLASH_T) v += S.FLASH;
+    const since = this.clock - (p.firedAt == null ? -99 : p.firedAt);
+    if (!this.night) { if (since < S.FLASH_T) v += S.FLASH; }
+    else { const fk = p.flashK == null ? 1 : p.flashK; if (since < S.FLASH_T * Math.min(1, fk)) v += S.FLASH * fk * fk; } // (night: by the muzzle's flash, NIGHT)
+    if (this.night && (st.tl & 2) && !st.sw) v += this.NIGHT.LASER; // (a visible laser on: its dot and beam in the dark)
     p.luxAt = this.clock; p.lux = v;
     return v;
   },
@@ -1275,7 +1302,7 @@ const G_Server = {
     const bm = this.beamAt(e, st, d);
     if ((st.tl & 1) && !st.sw) L += S.SPILL * (st.tl & 8 ? 2 : 1);
     const k = Math.min(1, ((L / (L + S.HALF)) / (S.LIT / (S.LIT + S.HALF))) ** 2);
-    return Math.max(k, bm, 0.8 * (1 - d / S.CLOSE));
+    return Math.max(k, bm, 0.8 * (1 - d / (this.night ? this.NIGHT.CLOSE : S.CLOSE)));
   },
   // How much of officer st suspect e can see from (ax, ay, az): 0 .. 1. Sight lines to six points on them, each counting
   // its share of a body (head 0.25, chest 0.2, either shoulder 0.12, hips 0.16, knees 0.15) by how clear its line is
@@ -1742,7 +1769,7 @@ const G_Server = {
         if (d > (map.theme.night && !(p.st.tl & 3) ? map.theme.night : 75)) continue;
         // nor, anywhere, much past what the light on you shows (lightK): in the dark, a few metres
         const lk = this.lightK(e, p, d);
-        if (d > (SG.REACH0 + SG.REACH * lk) * (e.alert ? 2 : 1)) continue;
+        if (d > (this.night ? (this.NIGHT.REACH0 + SG.REACH * lk) * (e.alert ? this.NIGHT.ALERT : 1) : (SG.REACH0 + SG.REACH * lk) * (e.alert ? 2 : 1))) continue;
         const [hx, hz] = this.headXZ(p.st);
         const hy = py + (p.st.pr ? 0.35 : p.st.cr ? 0.95 : 1.5), k = L.see(map, lx, ey, lz, hx, hy, hz);
         // (through a window: k < 1; through bulletproof glass, seen but not to be shot: no round gets through it)
@@ -1751,7 +1778,7 @@ const G_Server = {
         const vis = k > 0 && !proof, score = d + (vis ? 0 : proof ? 30 : 40) + (k < 1 && vis ? 8 : 0);
         if (score < bs) { bs = score; best = p; bvis = vis; bd = d; bk = lk; e.proof = proof; }
       }
-      e.tgt = best ? best.id : null; e.canSee = bvis; e.tgtD = bd;
+      e.tgt = best ? best.id : null; e.canSee = bvis; e.tgtD = bd; e.visK = best && bvis ? bk : 0;
       // how easily they'd pick out the one they've a sight of, unaware: the light on them, times how much of them shows
       // (only worked out for a suspect who's still to spot anyone: a few more sight lines, a few times a second)
       e.seeVis = best && bvis && !e.alert ? bk * this.bodySeen(best.st, lx, ey, lz) : 1;
@@ -1844,6 +1871,8 @@ const G_Server = {
     }
 
     if (st && e.canSee) {
+      // (night: picking you out again in the dark takes them a moment before they can shoot: NIGHT.ACQ)
+      if (this.night && e.lostT > 0.3) e.cool = Math.max(e.cool, this.NIGHT.ACQ * (1 - (e.visK || 0)));
       e.lostT = 0;
       e.lastSeen = { x: st.p[0], y: st.p[1], z: st.p[2] };
       if (def.leader) this.callIn(e, st.p[0], st.p[1], st.p[2], 'has eyes on police'); // (again, now and then, as they move: callIn's gap)
@@ -1893,7 +1922,7 @@ const G_Server = {
         const canFire = !e.inCover || (e.peek && e.peekT <= 0);
         if (canFire) {
           if (def.aimTime) {
-            if (!e.aiming && e.cool <= 0) { e.aiming = true; e.aimT = def.aimTime; }
+            if (!e.aiming && e.cool <= 0) { e.aiming = true; e.aimT = def.aimTime * (this.night ? 1 + this.NIGHT.AIMT * (1 - (e.visK || 0)) : 1); } // (longer on someone hard to see, at night)
             if (e.aiming) {
               sp = 0;
               e.aimT -= dt;
@@ -1923,6 +1952,7 @@ const G_Server = {
         if (e.cool <= 0) { this.fire(e, p as LivePlayer, true); e.cool = U.rf(0.15, 0.4); }
       } else e.cool = Math.max(e.cool, 0.6);
       const leash = Math.hypot(e.x - e.home.x, e.z - e.home.z) < 12;
+      if (this.night && !e.order) this.nightSearch(e); // (in the dark they go and look for themselves)
       if (e.order) {
         // under a leader's order (callIn): to the spot by its own way in, and then searching outward from it
         const os = this.orderStep(e, dt);
@@ -2168,14 +2198,36 @@ const G_Server = {
   retarget(e: Enemy, at: { x: number; y: number; z: number }) {
     const o = e.order!;
     o.x = at.x; o.y = at.y; o.z = at.z; o.tflow = this.flowTo(at.x, at.y, at.z);
-    o.phase = 'enter'; o.role = 'push'; o.ring = 6; o.done = []; o.sp = null; o.cv = null; o.legT = 0; o.rest = 0; o.rt = this.clock; o.until = Math.max(o.until, this.clock + 45);
+    o.phase = 'enter'; o.role = 'push'; o.ring = o.own ? 0 : 6; o.done = []; o.sp = null; o.cv = null; o.legT = 0; o.rest = 0; o.rt = this.clock; o.until = Math.max(o.until, this.clock + 45);
+  },
+  // A night level: an alert suspect who's lost sight of the police (or only heard them) doesn't sit and wait for them to walk into
+  // view, it goes and looks, carefully: an order of its own (by itself, own) to where they were last seen or heard, searched as a
+  // leader's would be (orderStep: to the spot, then spot to spot outward from it, the nearest first), at a creep, stopping to listen.
+  // Not a lookout (it holds), a guard, the Kingpin or one lurking; not again on what it's already searched (nsAt), only on something
+  // new seen or heard. NIGHT says how long they wait first and how long they keep at it.
+  nightSearch(e: Enemy) {
+    const N = this.NIGHT, c = this.clock;
+    if (e.def.civ || e.def.boss || e.def.aimTime || e.guard || e.lurk || e.state !== 'normal' || e.broken) return;
+    const ns = e.nsAt == null ? -99 : e.nsAt;
+    const seen = e.lastSeen && (e.sawAt == null ? -99 : e.sawAt) > ns ? e.lastSeen : null, heard = !seen && e.noise && (e.noiseAt == null ? -99 : e.noiseAt) > ns ? e.noise : null;
+    const at = seen || heard;
+    if (!at || e.lostT < (this.brave(e) ? N.HOLD_B : N.HOLD) + (e.id % 5) * 0.3) return; // (not all of them at once)
+    e.nsAt = c;
+    const y = seen ? seen.y : e.y || 0, tflow = this.flowTo(at.x, y, at.z);
+    if (this.flowDist(tflow, e.x, e.y || 0, e.z) < 0) return; // (no way there)
+    // (one who'd have pushed on with a grenade first still throws it, as a push does)
+    const ld = Math.hypot(at.x - e.x, at.z - e.z);
+    if (seen && this.brave(e) && ld > 5 && ld < 20 && !e.proof) this.tryNade(e, at.x, at.z);
+    e.order = { by: e.id, own: true, role: 'push', phase: 'enter', x: at.x, y, z: at.z, entry: { x: at.x, y, z: at.z, flow: tflow, kind: 'point', n: 0 }, tflow, at: c, until: c + N.SEARCH_T, holdUntil: 0,
+      rest: 0.4 + Math.random() * 0.6, leg: 'run', legT: 0, cv: null, cvFlow: null, sp: null, ring: 0, done: [], look: 0, delay: 0, rt: c };
+    e.cover = null; e.inCover = false; e.peek = false; e.leanOut = 0; e.pushing = false;
   },
   // Called every tick: orders from a leader who's no longer able to give them (killed, down, arrested, given up) lapse. The suspects who
   // had them are back on their own behaviour, and shaken: nerve down (a few will break and run), and a shout will do better with them.
   leaderCheck() {
     let gone: Set<number> | null = null;
     for (const e of this.enemies.values()) {
-      if (!e.order) continue;
+      if (!e.order || e.order.own) continue; // (a search of their own isn't anyone's plan)
       const l = this.enemies.get(e.order.by);
       if (!l || l.down || l.collapsed || l.state === 'surrender' || l.state === 'cuffed') (gone || (gone = new Set())).add(e.order.by);
     }
@@ -2215,14 +2267,22 @@ const G_Server = {
     if (o.phase === 'search') {
       if (!o.sp) {
         o.sp = this.searchSpot(e, o);
-        if (!o.sp) { o.ring += 7; if (o.ring > 70) this.endOrder(e); o.rest = 0.5; return null; }
+        if (!o.sp) { o.ring += 7; if (o.ring > (o.own ? this.NIGHT.RING : 70)) this.endOrder(e); o.rest = 0.5; return null; }
       }
-      if (Math.hypot(o.sp.x - e.x, o.sp.z - e.z) < 1.6) { o.done.push([o.sp.x, o.sp.z]); o.sp = null; o.rest = 1.2 + rnd() * 1.2; e.yaw += (rnd() - 0.5) * 2; return null; } // (a look round it)
+      if (Math.hypot(o.sp.x - e.x, o.sp.z - e.z) < 1.6) { o.done.push([o.sp.x, o.sp.z]); o.sp = null; o.rest = o.own ? this.NIGHT.REST + rnd() * 2 : 1.2 + rnd() * 1.2; e.yaw += (rnd() - 0.5) * 2; return null; } // (a look round it; in the dark, a longer one, listening)
     }
     if (o.phase === 'search' && o.sp) { goal = o.sp.flow; gx = o.sp.x; gz = o.sp.z; }
     else if (o.phase === 'approach') { goal = o.entry.flow; gx = o.entry.x; gz = o.entry.z; }
     else { goal = o.tflow; gx = o.x; gz = o.z; }
-    if (o.rest > 0) { o.rest -= dt; return null; }
+    if (o.rest > 0) {
+      o.rest -= dt;
+      // (searching in the dark: stopped, listening, and looking round where there's room to look: the doorways, the room's corners)
+      if (o.own) {
+        if ((o.look -= dt) <= 0) { o.look = 0.8 + rnd() * 0.9; o.lookYaw = this.openYaw(e, e.yaw + (rnd() - 0.5) * 3.2, 3.2); }
+        if (o.lookYaw != null) e.yaw += G.U.angDiff(e.yaw, o.lookYaw) * Math.min(1, dt * 3);
+      }
+      return null;
+    }
     // a new bound
     if (!o.cv && o.legT <= 0) {
       const cv = this.nextCover(e, goal);
@@ -2243,12 +2303,12 @@ const G_Server = {
       const st = cd > 1.6 && o.cvFlow ? L.flowStep(this.map!, o.cvFlow, e.x, e.z, e.y) : null;
       if (st) { tx = st.x; tz = st.z; } else { tx = o.cv.x; tz = o.cv.z; }
     } else {
-      if (o.legT <= 0) { o.rest = 0.8 + rnd() * 0.9; return null; }
+      if (o.legT <= 0) { o.rest = o.own ? 1.4 + rnd() * 1.4 : 0.8 + rnd() * 0.9; return null; } // (in the dark: a few steps, then a stop to listen)
       const st = L.flowStep(this.map!, goal, e.x, e.z, e.y);
       if (st) { tx = st.x; tz = st.z; }
     }
     const dx = tx - e.x, dz = tz - e.z, d = Math.hypot(dx, dz) || 1;
-    return { mx: dx / d, mz: dz / d, sp: 0.9 };
+    return { mx: dx / d, mz: dz / d, sp: o.own ? this.NIGHT.CREEP : 0.9 };
   },
   // The cover spot a bound away that gets them most of the way on: 3 to 10 m off, at least 2.5 m closer to where they're going, no one else's
   nextCover(e: Enemy, goal: Int16Array) {
@@ -2724,11 +2784,20 @@ const G_Server = {
     const [hx, hz] = this.headXZ(st), leaning = Math.abs(st.ln || 0) > 0.3;
     let tx = hx, ty = st.p[1] + (st.pr ? 0.25 : st.cr ? 0.75 : 1.2) + (leaning ? 0.3 : 0) + (leaning ? 0 : up * (st.pr ? 0.08 : st.cr ? 0.25 : 0.38)), tz = hz; // (prone: low, a small target)
     if (blind) { tx = e.lastSeen!.x + (Math.random() - 0.5) * 1.4; tz = e.lastSeen!.z + (Math.random() - 0.5) * 1.4; ty = (e.lastSeen!.y || 0) + 0.8 + Math.random() * 0.9; }
+    // In the dark (a night level) they shoot at where they make you out to be: how well they see you (vk: lightK, the light on you,
+    // yours, a flash, how close) sets how far off that is (a guess, held a moment, NIGHT.GUESS metres off at vk 0) and their aim
+    let vk = 1;
+    if (this.night) {
+      const N = this.NIGHT, gn = () => Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(Math.PI * 2 * Math.random());
+      vk = Math.min(1, this.lightK(e, p, Math.hypot(st.p[0] - e.x, st.p[2] - e.z)) / N.LITK);
+      if (!e.guess || this.clock > e.guess.until) e.guess = { x: gn(), y: gn() * 0.35, z: gn(), until: this.clock + N.GUESS_T * (0.6 + 0.8 * Math.random()) };
+      if (!blind) { const r = N.GUESS * (1 - vk) ** 2; tx += e.guess.x * r; ty += e.guess.y * r; tz += e.guess.z * r; }
+    }
     const dx = tx - from[0], dy = ty - from[1], dz = tz - from[2], d = Math.hypot(dx, dy, dz);
     // a bit worse up close, much worse at range: at their weapon's range they hit about a sixth as often
     const distF = 0.9 * G.U.clamp(0.95 - 0.8 * Math.pow(d / def.range, 1.2), 0.12, 0.95);
     const moveF = st.mv > 3 ? 0.72 : st.mv > 0.5 ? 0.88 : 1;
-    const chance = (blind ? 0.15 : 1) * (1 - 0.2 * up) * this.injAim(e) * def.acc * distF * moveF * this.accMult * (1 - 0.6 * (e.sup || 0)) * (1 - 0.5 * Math.min(1, e.shock || 0)) * (e.collapsed ? 0.4 : 1) * (e.str != null && e.str < this.TWO_HAND ? 0.7 : 1) * (1 - Math.min(0.5, kickNow / 16)) * (e.broken ? (e.fleeT > 0 ? 0.4 : 0.8) : 1) * this.dazzle(e, st) * (e.flashRec! > 0 ? this.FLASH.AIM : 1);
+    const chance = (blind ? 0.15 : 1) * (1 - 0.2 * up) * this.injAim(e) * def.acc * distF * moveF * this.accMult * (1 - 0.6 * (e.sup || 0)) * (1 - 0.5 * Math.min(1, e.shock || 0)) * (e.collapsed ? 0.4 : 1) * (e.str != null && e.str < this.TWO_HAND ? 0.7 : 1) * (1 - Math.min(0.5, kickNow / 16)) * (e.broken ? (e.fleeT > 0 ? 0.4 : 0.8) : 1) * this.dazzle(e, st) * (e.flashRec! > 0 ? this.FLASH.AIM : 1) * (this.night ? this.NIGHT.AIM + (1 - this.NIGHT.AIM) * Math.sqrt(vk) : 1);
     // Their round is a round, flown from here as yours are (js/player.ts enemyRound) to whatever it meets. All that's rolled is
     // how well it's aimed: chance is the share that would land on a body a BODY_R across at that distance, so the aim's
     // error at the target is the spread that gives that (a two-dimensional normal: 1 - exp(-R²/2σ²)). The rest is what's
