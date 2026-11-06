@@ -1249,8 +1249,9 @@ const G_Server = {
   // (its dot and its beam in the air give you away, a little light where you are). A muzzle flash: SIGHT.FLASH times the
   // muzzle's flash (flashK: 1 bare, 1.2 a brake, 0.3 a flash hider, 0.1 a suppressor; js/player.ts flashOf) squared, for
   // FLASH_T times it (at most once): a hider's flash is dim and gone in a moment, a can's next to nothing.
-  // Aim (fire): their hit chance times AIM + (1 - AIM) * sqrt(k) (k: lightK, how well they see you: the level's light on you, your
-  // own light or laser, a flash, or close by); and where they aim is a guess, GUESS * (1 - k)² metres off (none at k = 1),
+  // Aim (fire): their hit chance times AIM + (1 - AIM) * sqrt(k) (k: lightK over LITK, at most 1: how well they see you, the level's
+  // light on you, your own light or laser, a flash, or close by; from LITK on, a weapon light's spill on you or a bare muzzle's
+  // flash, as well as by day); and where they aim is a guess, GUESS * (1 - k)² metres off (none at k = 1),
   // a new guess every GUESS_T seconds. Picking you up again after losing you: ACQ seconds more before the first shot at
   // k = 0 (a marksman's aim time AIMT times longer).
   // Search (nightSearch, orderStep): having lost you (or only heard you), after HOLD seconds (HOLD_B for those who'd push on
@@ -1258,7 +1259,7 @@ const G_Server = {
   // spot to spot outward from it, at CREEP of their walk, stopping a while at each (REST seconds, more by chance) to listen and
   // look round, till SEARCH_T seconds have gone or they've looked as far as RING metres out from it. A new noise sends it
   // there (RETARGET metres off, at most every RT_GAP seconds).
-  NIGHT: { REACH0: 3, CLOSE: 4, ALERT: 1.4, LASER: 0.04, AIM: 0.3, GUESS: 1.2, GUESS_T: 1.1, ACQ: 1.0, AIMT: 1, HOLD: 2.5, HOLD_B: 0.8, CREEP: 0.5, REST: 2.2, SEARCH_T: 60, RING: 21, RETARGET: 3, RT_GAP: 2 },
+  NIGHT: { REACH0: 3, CLOSE: 4, ALERT: 1.4, LASER: 0.04, AIM: 0.3, LITK: 0.6, GUESS: 1.2, GUESS_T: 1.1, ACQ: 1.0, AIMT: 1, HOLD: 2.5, HOLD_B: 0.8, CREEP: 0.5, REST: 2.2, SEARCH_T: 60, RING: 21, RETARGET: 3, RT_GAP: 2 },
   // The light where an officer stands: the level's (G.Level.luxAt), and a muzzle flash for a moment after they fire.
   // Kept for the tick: every suspect looking their way asks.
   officerLux(p: LivePlayer) {
@@ -2788,7 +2789,7 @@ const G_Server = {
     let vk = 1;
     if (this.night) {
       const N = this.NIGHT, gn = () => Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(Math.PI * 2 * Math.random());
-      vk = this.lightK(e, p, Math.hypot(st.p[0] - e.x, st.p[2] - e.z));
+      vk = Math.min(1, this.lightK(e, p, Math.hypot(st.p[0] - e.x, st.p[2] - e.z)) / N.LITK);
       if (!e.guess || this.clock > e.guess.until) e.guess = { x: gn(), y: gn() * 0.35, z: gn(), until: this.clock + N.GUESS_T * (0.6 + 0.8 * Math.random()) };
       if (!blind) { const r = N.GUESS * (1 - vk) ** 2; tx += e.guess.x * r; ty += e.guess.y * r; tz += e.guess.z * r; }
     }
