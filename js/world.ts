@@ -247,18 +247,25 @@ const G_World = (() => {
   // than a step up (-Infinity: nothing, they're falling into the void)
   // smooth: a walker's ground (stairs as their slope, not their treads: rampAt)
   // Rolling ground (a level's terrain: G.Level.crestGround): its height at (x, z), across a cell the two triangles between
-  // its corners (corner 00 to 10 to 01, and 10 to 11 to 01), as it's drawn. 0 off it.
+  // its corners (corner 00 to 10 to 01, and 10 to 11 to 01), as it's drawn. 0 off it. (The ground floor of a level with it
+  // is all of it: sloped, or level and built on, high or low.)
   function terrainAt(tr: any, x: number, z: number) {
     const fx = x / tr.TS, fz = z / tr.TS, cx = Math.floor(fx), cz = Math.floor(fz);
     if (cx < 0 || cz < 0 || cx >= tr.VW - 1 || cz >= tr.VH - 1) return 0;
     const u = fx - cx, q = fz - cz, k = cz * tr.VW + cx, v = tr.v, a = v[k], b = v[k + 1], c = v[k + tr.VW], d = v[k + tr.VW + 1];
     return u + q <= 1 ? a + (b - a) * u + (c - a) * q : d + (c - d) * (1 - u) + (b - d) * (1 - q);
   }
+  // the ground there to stand or lie on: as terrainAt, but none over a hole in it (tr.hole: a cell of open air, a gorge)
+  function terrainUnder(tr: any, x: number, z: number) {
+    const cx = Math.floor(x / tr.TS), cz = Math.floor(z / tr.TS);
+    if (tr.hole && cx >= 0 && cz >= 0 && cx < tr.VW - 1 && cz < tr.VH - 1 && tr.hole[cz * (tr.VW - 1) + cx]) return -Infinity;
+    return terrainAt(tr, x, z);
+  }
   function groundAt(w: WorldT, x: number, z: number, r: number, y: number, step = STEP, smooth = false) {
     let g = -Infinity;
     const k = r * 0.6;
     query(w, [x - k, y - 50, z - k], [x + k, y + step, z + k], (s) => { if (s.move && !(smooth && s.stair) && s.max[1] <= y + step + 1e-6 && s.max[1] > g) g = s.max[1]; });
-    if (w.terrain) { const th = terrainAt(w.terrain, x, z); if (th <= y + step + 1e-6 && th > g) g = th; } // (walked on as it lies: its blocks are for rays)
+    if (w.terrain) { const th = terrainUnder(w.terrain, x, z); if (th > g) g = th; } // (walked on as it lies: its blocks are for rays. There's nothing under it: anyone who's got under it is back up on it, not falling through it to the gorge's floor)
     if (smooth) for (const st of w.ramps || []) {
       const q = rampAt(st, x, z);
       if (q.across && q.u > 0 && q.u < q.len && q.h <= y + step + 1e-6 && q.h > g) g = q.h;
@@ -286,31 +293,38 @@ const G_World = (() => {
     const o = opts || {}, L = G.Level, TS = L.TS, { W, H, t } = map, WH = L.WALL_H, w = o.world || create();
     const Y = o.y || 0, SK = o.skirt || 0, va = o.voidAbove;
     w.bounds = { min: [0, 0, 0], max: [W * TS, Y + WH, H * TS] };
-    // runs of tiles merged into rectangles (greedy: along x, then down z while the whole run continues)
-    const rects = (want: (i: number) => boolean) => {
+    // runs of tiles merged into rectangles (greedy: along x, then down z while the whole run continues); by: only tiles
+    // with the same value in it in one rectangle (its fifth number)
+    const rects = (want: (i: number) => boolean, by?: Int16Array | null) => {
       const used = new Uint8Array(W * H), out: number[][] = [];
       for (let z = 0; z < H; z++) for (let x = 0; x < W; x++) {
-        const i = z * W + x;
+        const i = z * W + x, n = by ? by[i] : 0, ok1 = (j: number) => !used[j] && want(j) && (!by || by[j] === n);
         if (used[i] || !want(i)) continue;
         let x1 = x;
-        while (x1 + 1 < W && !used[i + x1 + 1 - x] && want(z * W + x1 + 1)) x1++;
+        while (x1 + 1 < W && ok1(z * W + x1 + 1)) x1++;
         let z1 = z;
         for (;;) {
           if (z1 + 1 >= H) break;
           let ok = true;
-          for (let xx = x; xx <= x1 && ok; xx++) { const j = (z1 + 1) * W + xx; if (used[j] || !want(j)) ok = false; }
+          for (let xx = x; xx <= x1 && ok; xx++) if (!ok1((z1 + 1) * W + xx)) ok = false;
           if (!ok) break;
           z1++;
         }
         for (let zz = z; zz <= z1; zz++) for (let xx = x; xx <= x1; xx++) used[zz * W + xx] = 1;
-        out.push([x, z, x1, z1]);
+        out.push([x, z, x1, z1, n]);
       }
       return out;
     };
+    // rolling ground (map.terrain), on the ground floor: a cell's corners' heights, and the height it's built on (gb: the
+    // lowest of them, in 5 cm steps, which is where its wall stands, and its ceiling over it). What's built is level ground
+    // (G.Level.crestGround), so that's its height all over.
+    const tr = o.ground !== false ? map.terrain : null, VW = tr ? tr.VW : 0;
+    const corners = (i: number) => { const k = ((i / W) | 0) * VW + (i % W); return [tr.v[k], tr.v[k + 1], tr.v[k + VW], tr.v[k + VW + 1]]; };
+    const gb = tr ? Int16Array.from({ length: W * H }, (_, i) => Math.round(Math.min(...corners(i)) / 0.05)) : null;
     // the floor (on the ground: everywhere, under the gardens too, and beyond the edge; upstairs, all but the drops)
     // (a mountain top's gorge, map.chasm metres deep: nothing under its open air but the gorge's floor, far down)
     if (o.ground !== false && map.chasm) {
-      for (const [x0, z0, x1, z1] of rects((i: number) => t[i] !== 5)) add(w, box(x0 * TS, Y - 0.5, z0 * TS, (x1 + 1) * TS, Y, (z1 + 1) * TS, { kind: 'floor' }));
+      for (const [x0, z0, x1, z1] of rects((i: number) => t[i] !== 5 && (!tr || corners(i).every((h) => Math.abs(h) < 1e-3)))) add(w, box(x0 * TS, Y - 0.5, z0 * TS, (x1 + 1) * TS, Y, (z1 + 1) * TS, { kind: 'floor' }));
       add(w, box(-TS * 4, Y - map.chasm - 0.5, -TS * 4, (W + 4) * TS, Y - map.chasm, (H + 4) * TS, { kind: 'floor' }));
     } else if (o.ground !== false) add(w, box(-TS * 4, Y - 0.5, -TS * 4, (W + 4) * TS, Y, (H + 4) * TS, { kind: 'floor' }));
     else {
@@ -319,31 +333,36 @@ const G_World = (() => {
       // steel grating (a catwalk): it holds you up, and eyes go through it from above and below; a round goes between its bars, or meets one (barHit)
       if (gr) for (const [x0, z0, x1, z1] of rects((i: number) => gr[i] && t[i] !== 5)) add(w, box(x0 * TS, Y - 0.05, z0 * TS, (x1 + 1) * TS, Y, (z1 + 1) * TS, { kind: 'grate', ray: false, bars: true }));
     }
-    // rolling ground over it (map.terrain): for rays and sight, a block under each cell up to its corners' mean (5 cm
-    // steps, merged); feet go by the slope itself (groundAt), so the blocks don't stop anyone
-    if (map.terrain && o.ground !== false) {
-      const tr = map.terrain, q = new Int16Array(W * H), tops = new Set<number>();
+    // rolling ground over it (map.terrain), wherever it isn't level at 0: for rays and sight, a block under each cell up to
+    // its corners' mean (5 cm steps, merged), half a metre deep (from under 0 where it's over it); feet go by the slope
+    // itself (groundAt), so the blocks don't stop anyone
+    if (tr) {
+      const q = new Int16Array(W * H), none = -32768;
       for (let i = 0; i < W * H; i++) {
-        const x = i % W, z = (i / W) | 0, k = z * tr.VW + x, m = (tr.v[k] + tr.v[k + 1] + tr.v[k + tr.VW] + tr.v[k + tr.VW + 1]) / 4;
-        q[i] = Math.round(m / 0.05); if (q[i] > 0) tops.add(q[i]);
+        const c = corners(i);
+        q[i] = t[i] === 5 || c.every((h) => Math.abs(h) < 1e-3) ? none : Math.round((c[0] + c[1] + c[2] + c[3]) / 4 / 0.05);
       }
-      for (const n of tops) for (const [x0, z0, x1, z1] of rects((i: number) => q[i] === n)) add(w, box(x0 * TS, Y - 0.5, z0 * TS, (x1 + 1) * TS, Y + n * 0.05, (z1 + 1) * TS, { kind: 'floor', terrain: true, move: false }));
+      for (const [x0, z0, x1, z1, n] of rects((i: number) => q[i] !== none, q)) add(w, box(x0 * TS, Y + Math.min(0, n * 0.05) - 0.5, z0 * TS, (x1 + 1) * TS, Y + n * 0.05, (z1 + 1) * TS, { kind: 'floor', terrain: true, move: false }));
       w.terrain = tr;
     }
-    // ceilings over everything indoors (not under a drop in the floor above)
-    for (const [x0, z0, x1, z1] of rects((i: number) => !map.out[i] && !(va && va[i]))) add(w, box(x0 * TS, Y + WH, z0 * TS, (x1 + 1) * TS, Y + WH + 0.3, (z1 + 1) * TS, { kind: 'ceil' }));
+    // ceilings over everything indoors (not under a drop in the floor above), over the ground each stands on
+    for (const [x0, z0, x1, z1, n] of rects((i: number) => !map.out[i] && !(va && va[i]), gb)) add(w, box(x0 * TS, Y + n * 0.05 + WH, z0 * TS, (x1 + 1) * TS, Y + n * 0.05 + WH + 0.3, (z1 + 1) * TS, { kind: 'ceil' }));
     // walls (not where a window is: its own solids below), and the solid edge round the map
-    for (const [x0, z0, x1, z1] of rects((i: number) => t[i] === 1 && !(map.winAt && map.winAt.has(i)))) add(w, box(x0 * TS, Y - SK, z0 * TS, (x1 + 1) * TS, Y + WH, (z1 + 1) * TS, { kind: 'wall' }));
+    for (const [x0, z0, x1, z1, n] of rects((i: number) => t[i] === 1 && !(map.winAt && map.winAt.has(i)), gb)) add(w, box(x0 * TS, Y + n * 0.05 - SK, z0 * TS, (x1 + 1) * TS, Y + n * 0.05 + WH, (z1 + 1) * TS, { kind: 'wall' }));
     const E = TS * 4;
     // (on a mountain top it reaches down to the gorge's floor, and rounds fly on over it: there's only air past the wall)
     for (const b of [[-E, 0, -E, 0, WH, H * TS + E], [W * TS, 0, -E, W * TS + E, WH, H * TS + E], [0, 0, -E, W * TS, WH, 0], [0, 0, H * TS, W * TS, WH, H * TS + E]]) { b[1] = Y - SK - (map.chasm || 0); b[4] += Y; add(w, box(...(b as [number, number, number, number, number, number]), { kind: 'wall', edge: true, ray: !map.chasm })); }
     // furniture and fences: each piece's boxes (a piece hangs on every tile it covers: once each)
     const fromB = (b: any, q: any, gy = b.gy || 0) => box(b.cx - b.hx, Y + gy + b.y0, b.cz - b.hz, b.cx + b.hx, Y + gy + b.h, b.cz + b.hz, q); // (gy: a piece on rolling ground)
-    const seen = new Set<LvProp>();
-    for (const [, p] of map.props || []) {
+    // (each box once, with the piece it's part of: a cell two pieces share, or one piece's boxes overlap, holds them all
+    // again, js/level.ts layProp)
+    const seen = new Set<LvProp>(), seenB = new Set<LvBox>();
+    for (const p of [...(map.propList || []), ...(map.props || new Map()).values()]) {
       if (seen.has(p)) continue;
       seen.add(p);
       for (const b of p.boxes) {
+        if (seenB.has(b)) continue;
+        seenB.add(b);
         if (b.ray) { add(w, fromB(b, { kind: 'prop', prop: p, ray: false })); for (const q of b.ray) add(w, fromB(q, Object.assign({ kind: 'prop', prop: p, move: false }, q.m ? { mat: (G.Materials.PARTS as Record<string, any>)[q.m] } : null), b.gy || 0)); }
         else add(w, fromB(b, { kind: 'prop', prop: p }));
       }
@@ -352,7 +371,7 @@ const G_World = (() => {
     for (let i = 0; i < W * H; i++) {
       if ((t[i] !== 2 && t[i] !== 4) || (map.props && map.props.has(i))) continue; // (5 drops and 7 flights: nothing here)
       const b = L.boxAt(map, i % W, (i / W) | 0);
-      if (b) add(w, fromB(b, { kind: 'prop' }));
+      if (b) add(w, fromB(b, { kind: 'prop' }, gb ? gb[i] * 0.05 : 0));
     }
     // doors (a storey's: their floor's map holds their cells)
     for (const d of map.doors) { d.solids = []; door(w, map, d); }
@@ -416,7 +435,7 @@ const G_World = (() => {
     }
   }
 
-  return { CELL, STEP, HEIGHT, GLASS_SEE, create, add, remove, reshape, box, raycast, span, los, see, query, resolve, groundAt, terrainAt, rampAt, ceilingAt, fromTileMap, stairs, door, windowSolids };
+  return { CELL, STEP, HEIGHT, GLASS_SEE, create, add, remove, reshape, box, raycast, span, los, see, query, resolve, groundAt, terrainAt, terrainUnder, rampAt, ceilingAt, fromTileMap, stairs, door, windowSolids };
 })();
 G.World = G_World;
 

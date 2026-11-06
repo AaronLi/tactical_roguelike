@@ -1281,6 +1281,9 @@ const G_Rig = (() => {
           }
         }
       }
+      // rolling ground (js/world.ts terrainAt: its blocks are for rays): up out of it to lie on it as it lies
+      const tr = map.world.terrain;
+      if (tr) { const g = G.World.terrainUnder(tr, p.x, p.z) + r; if (p.y < g) { p.y = g; if (q.y < g) q.y = g; rd.on[i] = 1; } }
       return;
     }
     if (p.y < r) { p.y = r; if (q.y < r) q.y = r; rd.on[i] = 1; }

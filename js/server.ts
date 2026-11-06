@@ -284,7 +284,7 @@ const G_Server = {
       // open the weapon case (once, for everyone)
       case 'openCase': {
         const c = this.map && this.map.case;
-        if (this.phase !== 'level' || !c || this.caseOpen || !p || !p.st || Math.hypot(c.x - p.st.p[0], c.z - p.st.p[2]) > 2.4 || Math.abs(p.st.p[1]) > 1.5) break; // (on the ground floor: this one and the two boxes)
+        if (this.phase !== 'level' || !c || this.caseOpen || !p || !p.st || Math.hypot(c.x - p.st.p[0], c.z - p.st.p[2]) > 2.4 || Math.abs(p.st.p[1] - (c.fy || 0)) > 1.5) break; // (on the ground floor: this one and the two boxes)
         this.caseOpen = true;
         G.Net.broadcast({ t: 'wcase', c: this.caseMsg() });
         this.casePut();
@@ -294,7 +294,7 @@ const G_Server = {
       // then you take one of them, fitted to your weapon or carried
       case 'openAbox': case 'takeAbox': {
         const b = this.map && this.map.abox, a = this.abox;
-        if (this.phase !== 'level' || !b || !a || !p || !p.st || Math.hypot(b.x - p.st.p[0], b.z - p.st.p[2]) > 2.4 || Math.abs(p.st.p[1]) > 1.5) break;
+        if (this.phase !== 'level' || !b || !a || !p || !p.st || Math.hypot(b.x - p.st.p[0], b.z - p.st.p[2]) > 2.4 || Math.abs(p.st.p[1] - (b.fy || 0)) > 1.5) break;
         const mine = a.uses[from];
         if (m.t === 'openAbox') {
           if (mine) break;
@@ -311,7 +311,7 @@ const G_Server = {
       // the sticker box: the sticker goes to whoever opens it first
       case 'openSbox': {
         const b = this.map && this.map.sbox, s = this.sbox;
-        if (this.phase !== 'level' || !b || !s || s.by || !p || !p.st || Math.hypot(b.x - p.st.p[0], b.z - p.st.p[2]) > 2.4 || Math.abs(p.st.p[1]) > 1.5) break;
+        if (this.phase !== 'level' || !b || !s || s.by || !p || !p.st || Math.hypot(b.x - p.st.p[0], b.z - p.st.p[2]) > 2.4 || Math.abs(p.st.p[1] - (b.fy || 0)) > 1.5) break;
         s.by = from;
         G.Net.broadcast({ t: 'sbox', s: this.sboxMsg() });
         break;
@@ -788,7 +788,7 @@ const G_Server = {
     return d;
   },
   addEnemy(type: EnemyKind, x: number, z: number, hpMult: number, y = 0) {
-    if (this.map) y = Math.max(y, G.Level.groundHeight(this.map, x, z)); // (on the ground where it rolls: the Sandia Crest's)
+    if (this.map && this.map.terrain) y = G.Level.groundHeight(this.map, x, z); // (on the ground where it rolls, high or low: the Sandia Crest's)
     const def = this.equip(type);
     const e: Enemy = {
       id: this.nextEid++, type, def, x, z, yaw: Math.random() * Math.PI * 2,
@@ -2096,7 +2096,7 @@ const G_Server = {
       const used = new Set(entries.map((q) => Math.floor(((Math.atan2(q.z - T.z, q.x - T.x) + Math.PI) / (Math.PI * 2)) * 8) % 8));
       for (const sp of G.U.shuffle(Math.random, map.enemySpots.slice())) {
         if (entries.length >= want) break;
-        const f = sp[2] || 0, x = (sp[0] + 0.5) * TS, z = (sp[1] + 0.5) * TS, y = L.floorMap(map, f).fy || 0;
+        const f = sp[2] || 0, x = (sp[0] + 0.5) * TS, z = (sp[1] + 0.5) * TS, y = L.spotY(map, x, z, f);
         if (Math.abs(y - T.y) > 1.5) continue;
         const g = this.flowDist(fT, x, y, z), sec = Math.floor(((Math.atan2(z - T.z, x - T.x) + Math.PI) / (Math.PI * 2)) * 8) % 8;
         if (g < 7 || g > 20 || used.has(sec)) continue;
@@ -2234,7 +2234,7 @@ const G_Server = {
     for (let r = o.ring; r <= 70; r += 7) {
       let best: { x: number; z: number; y: number; f: number; tx: number; tz: number } | null = null, bd = 1e9;
       for (const sp of map.enemySpots) {
-        const f = sp[2] || 0, x = (sp[0] + 0.5) * TS, z = (sp[1] + 0.5) * TS, y = L.floorMap(map, f).fy || 0;
+        const f = sp[2] || 0, x = (sp[0] + 0.5) * TS, z = (sp[1] + 0.5) * TS, y = L.spotY(map, x, z, f);
         const g = this.flowDist(o.tflow, x, y, z);
         if (g < r || g > r + 9) continue;
         if (o.done.some(([dx, dz]) => Math.hypot(dx - x, dz - z) < 4)) continue;
