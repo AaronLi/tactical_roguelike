@@ -2,6 +2,7 @@
 // The gun recipes are bake-time code (tools/models/*.ts, tsconfig.tools.json -> dist/tools/tools/models): this file is what loads them, next to the game's data.
 import fs from 'fs'; import vm from 'vm'; import path from 'path'; import { fileURLToPath } from 'url';
 import * as THREE_NS from 'three';
+import { useExtrudeR149 } from './extrude_r149.mjs';
 import { loadAuthoredInto } from './bake_authored.mjs';
 import { loadAuthoredPartsInto } from './authored_parts.mjs';
 
@@ -24,6 +25,7 @@ export function loadModels() {
 /** The game's data and gun-building files, on the node build of three (ONE copy: the game's and the exporter's). */
 export function loadGame(withModels = false, extra = {}) {
   const THREE = { ...THREE_NS };
+  useExtrudeR149(THREE); // (the recipes' extrusions as three r149 made them: tools/extrude_r149.mjs)
   const ctx2d = new Proxy({}, { get: (t, k) => (k in t ? t[k] : () => ({ addColorStop() {} })), set: (t, k, v) => { t[k] = v; return true; } });
   const document = { createElement: () => ({ width: 64, height: 64, getContext: () => ctx2d, style: {} }) };
   const ctx = { console, Math, JSON, Set, Map, WeakMap, Object, Array, Number, String, Boolean, Uint8Array, Int8Array, Int16Array, Int32Array, Uint16Array, Uint32Array, Float32Array, Float64Array, Infinity, NaN, isFinite, parseInt, parseFloat, Error, Symbol, Date, Proxy, Reflect, THREE, document, performance };
