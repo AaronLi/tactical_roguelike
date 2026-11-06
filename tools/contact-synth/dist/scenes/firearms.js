@@ -20,6 +20,8 @@
  * not a gun.
  */
 import { chainScenes } from '../scene.js';
+import { simulateBoxDrop, boxSurfaces, axisAngle, quatMul } from '../rigid.js';
+import { makeRng } from '../dsp.js';
 import { mat } from '../presets.js';
 // ---------- element helpers ----------
 function hit(what, at, gainDb, velocity, A, B, opts = {}, extra = {}) {
@@ -907,8 +909,15 @@ export const AR15_MAG_IN_OUT = chainScenes('ar15-mag-in-out', 'AR-15: mag in, ma
     { label: 'mag-in', at: 0, scene: AR15_MAG_IN },
     { label: 'mag-out', at: 0.9, scene: AR15_MAG_OUT, gainDb: 4 },
 ]);
-const DROP_V = 4.8;
+const DROP_V = 4.85;
 const concrete = { ...mat('concrete'), shape: 'block', size: 50, thickness: 100, modes: 0, irregularity: 0.9, damping: 0.9, level: -4 };
+// Asphalt: aggregate in bitumen. Softer and far lossier than concrete (the binder is viscoelastic):
+// a duller, shorter contact, a rough, gritty slide, and less bounce.
+const asphalt = { material: 'custom', stiffness: 4, density: 2350, loss: 0.12, shape: 'block', size: 50, thickness: 80, modes: 0, irregularity: 1, damping: 0.95, level: -6 };
+const SURFACE = {
+    concrete: { body: concrete, restitution: 0.35, friction: 0.45, stiffness: 3e6, texture: { roughness: 40, grain: 0.8, periodicity: 0, contactWidth: 0.3 } },
+    asphalt: { body: asphalt, restitution: 0.25, friction: 0.7, stiffness: 1.5e6, texture: { roughness: 250, grain: 4, periodicity: 0, contactWidth: 0.4 } },
+};
 // USGI magazines have a stamped steel floorplate.
 const magFloorplate = { ...mat('steel'), shape: 'plate', size: 7, thickness: 1, modes: 1, irregularity: 0.5, damping: 0.5, level: 0 };
 const magFeedLips = { ...mat('aluminum'), shape: 'plate', size: 4, thickness: 0.9, modes: 0, irregularity: 0.8, damping: 0.5, level: 0 };
@@ -923,135 +932,146 @@ function dropParts(n) {
     };
     // The stack: ~5 mm of magazine per round (double column), a brass and lead block.
     const stack = { ...mat('brass'), shape: 'block', size: Math.max(1.5, n * 0.5), thickness: 10, modes: 0, irregularity: 0.7, damping: 0.85, level: 0 };
-    return { f, shell, edge, housing, stack, inMag: { housing } };
-}
-/**
- * The inside of the magazine reacting to one blow at `at` with speed `v`: the stack (or, empty,
- * the follower) is thrown against one end, the spring takes it up and bounces it, and anything
- * loose ticks around for a few ms. Every element renders normalised, so its level is set here:
- * `base` is the blow's own level, and the inside follows it.
- */
-function dropInside(n, at, v, end, label, base) {
-    const { f, shell, stack, inMag } = dropParts(n);
-    const els = [];
-    const hitIn = (what, t, db, ...rest) => hit(what, t, db + base, ...rest);
-    const springCoil = { level: 0.55 * (1 - f) + 0.05, length: 6 + 6 * (1 - f), dispersion: 0.5, decay: 0.08 + 0.12 * (1 - f), brightness: 4000 };
-    if (n === 0) {
-        els.push(hitIn(`follower knocks against the ${label}`, at + 0.0004, -8, v * 0.45, arFollower, end, { scatter: 0, radius: 2, click: 0.6, sharp: 0.6 }, inMag));
-        els.push(hitIn('empty spring boings', at + 0.0006, -10, v * 0.3, arMagSpring, shell, { scatter: 0, radius: 1, click: 0.1, sharp: 0.4 }, { coil: springCoil, ...inMag }));
-        // The follower, nothing holding it but the spring, bounces back and taps the walls.
-        for (const [dt, k] of [[0.009, 0.25], [0.016, 0.15]])
-            els.push(hitIn('follower rattles in the shell', at + dt, -16, v * k, arFollower, shell, { scatter: 0, radius: 1.5, click: 0.5, sharp: 0.6 }, inMag));
-        return els;
-    }
-    // The stack lands on the end through the rounds' soft lead and copper tips and the follower: a
-    // dull, heavy push into the whole shell rather than a sharp knock on the end piece.
-    els.push(hitIn(`stack slams against the ${label}`, at + 0.0006, -9 + 6 * f, v * (0.35 + 0.25 * f), stack, { ...shell, density: (shell.density ?? 2700) * (1 + 3 * f) }, { scatter: 0, radius: 4, click: 0.5, sharp: 0.5 }, inMag));
-    els.push(hitIn('spring takes up the stack', at + 0.0008, -14 + 4 * (1 - f), v * 0.3, arMagSpring, shell, { scatter: 0, radius: 1, click: 0.05, sharp: 0.3 }, { coil: springCoil, ...inMag }));
-    // A light stack on a long, weak spring jumps and its cases tick; a full one is held tight.
-    const ticks = Math.round(4 * (1 - f));
-    for (let i = 0; i < ticks; i++)
-        els.push(hitIn('cases tick against each other', at + 0.005 + i * 0.0045 + (i % 2) * 0.0012, -13 - i * 2, v * (0.25 - i * 0.04), arCase, i % 2 ? shell : arCase, { scatter: 0, radius: 1.5, click: 0.5, sharp: 0.55 }, inMag));
-    return els;
-}
-/**
- * A blow on the floor: the part of the magazine that lands, plus everything inside reacting.
- * Elements render normalised, so the level comes from the blow's speed (20 log v, relative to the
- * first landing); `trim` adds what the contact itself changes (a broad flat slap pushes more air
- * than an edge).
- */
-const partName = (b) => b === magFloorplate ? 'floorplate' : b.size === magFeedLips.size ? 'feed lips' : 'edge';
-function dropHit(n, what, at, trim, v, part, opts, inside) {
-    const { inMag } = dropParts(n);
-    const gainDb = trim + 20 * Math.log10(Math.max(0.05, v) / DROP_V);
-    // The whole magazine lands, carrying its load (0.12 kg empty to 0.48 kg full): the rounds load
-    // the shell, so it hits with more mass and rings lower and deader. Modelled as the shell's
-    // density scaled by the total mass. The part that touches (floorplate, feed lips, a folded edge)
-    // sets the contact (radius, edge hardness) and adds its own, smaller ring on top.
-    const { shell } = dropParts(n);
+    // The whole magazine as it lands, its walls loaded by the rounds.
     const load = (0.12 + 0.012 * n) / 0.12;
-    const body = { ...shell, density: (shell.density ?? 2700) * load };
-    // A shell damped by the rounds rings only briefly, so the contact's own click would take over the
-    // sound; the stack behind the wall also softens the contact. Both scale back with the load.
-    const f = n / 30;
-    const opt = { scatter: 0, radius: opts.radius, click: 0.8 - 0.45 * f, sharp: (opts.sharp ?? 0.85) - 0.25 * f };
-    const els = [hit(what, at, gainDb, v, body, concrete, opt, inMag)];
-    if (part !== shell && part.size !== shell.size)
-        els.push(hit(`${what} (the ${partName(part)} rings)`, at, gainDb - 7 - 5 * f, v, part, concrete, opt, inMag));
-    if (inside)
-        els.push(...dropInside(n, at, v, inside.end, inside.label, gainDb));
-    return els;
+    const loaded = { ...shell, density: (shell.density ?? 2700) * load };
+    return { f, shell, edge, housing, stack, loaded, inMag: { housing } };
 }
-function makeMagDrop(n, way) {
-    const { f, shell, edge } = dropParts(n);
-    // Heavier lands with more weight and bounces less.
-    const bounce = 0.32 - 0.12 * f;
-    const els = [];
-    const lips = n === 0 ? magFeedLips : { ...magFeedLips, damping: 0.6 };
-    const skid = (at, ms, gainDb) => rub('slides a little on the concrete', at, gainDb, { force: 3 + 4 * f, duration: ms / 1000, speed: 0.6, profile: 'decelerate', roughness: 40, grain: 0.8, periodicity: 0, contactWidth: 0.3 }, edge, concrete, dropParts(n).inMag);
-    // Toppling over from standing on an end: a ~18 cm box tips over in ~0.35 s and lands on its
-    // broad side with its far end at ~sqrt(3 g L) = ~2.3 m/s (~1.2 m/s at its middle).
-    const topple = (at) => [
-        ...dropHit(n, 'topples over and slaps down flat', at, 2, 1.6, shell, { radius: 10, scatter: 0, sharp: 0.6 }, { end: shell, label: 'side wall' }),
-        ...dropHit(n, 'rocks and settles', at + 0.028, 0, 0.4, edge, { radius: 4 }),
-    ];
-    if (way === 'bottom') {
-        // Lands square on its steel floorplate, hops a little on it, then tips over.
-        els.push(...dropHit(n, 'floorplate hits the concrete', 0, 0, DROP_V, magFloorplate, { radius: 6 }, { end: magFloorplate, label: 'floorplate' }));
-        els.push(...dropHit(n, 'hops back down on the floorplate', 0.07 + 0.05 * (1 - f), 0, DROP_V * bounce * 0.6, magFloorplate, { radius: 3 }));
-        els.push(...topple(0.42));
+/** The magazine and its contents as a rigid body for the simulation. */
+export function magDropSpec(o) {
+    const n = o.rounds, f = n / 30, L = 0.18;
+    const sf = SURFACE[o.surface ?? 'concrete'];
+    const rng = makeRng(1000 + (o.seed ?? 1) * 97 + n * 7 + ['bottom', 'top', 'sideways', 'forwards'].indexOf(o.way) * 13);
+    const j = (x) => x * (rng() * 2 - 1);
+    const stackLen = Math.max(0.01, n * 0.005);
+    // USGI spring: ~10 N on an empty follower, rising ~130 N/m as it's compressed by the stack.
+    const contents = {
+        mass: 0.01 + 0.012 * n, x: L / 2 - stackLen / 2, length: stackLen, springRate: 130, preload: 10 + 130 * n * 0.005,
+        travel: Math.max(0.002, 0.16 * (1 - f) * 0.7), damping: 0.5 + 3 * f,
+    };
+    const h = o.height ?? 1.2;
+    let q, spin, half;
+    if (o.way === 'bottom') {
+        q = quatMul(axisAngle([1, j(1), 0], 0.04 + j(0.02)), axisAngle([0, 1, 0], -Math.PI / 2));
+        spin = [j(0.5), 0.5 + j(0.3), 0];
+        half = L / 2;
     }
-    else if (way === 'top') {
-        // Lands on its feed lips (and, loaded, the top round sitting between them): thin sheet edges
-        // and brass, a sharper, tinnier strike. The stack is already against the lips; the spring
-        // and floorplate end carry on and snap back.
-        els.push(...dropHit(n, 'feed lips hit the concrete', 0, 0, DROP_V, lips, { radius: 1.5, sharp: 0.95 }, { end: lips, label: 'feed lips' }));
-        if (n > 0)
-            els.push(hit('top round strikes the concrete', 0.0003, -8, DROP_V * 0.8, arCase, concrete, { scatter: 0, radius: 1.5, click: 0.6, sharp: 0.7 }, dropParts(n).inMag));
-        els.push(...dropHit(n, 'hops back down on the feed lips', 0.06 + 0.05 * (1 - f), 0, DROP_V * bounce * 0.5, lips, { radius: 1.5 }));
-        els.push(...topple(0.4));
+    else if (o.way === 'top') {
+        q = quatMul(axisAngle([1, j(1), 0], 0.04 + j(0.02)), axisAngle([0, 1, 0], Math.PI / 2));
+        spin = [j(0.5), -0.5 + j(0.3), 0];
+        half = L / 2;
     }
-    else if (way === 'sideways') {
-        // Spinning about its long axis, like a tumbling box: it lands on a folded edge, slaps over
-        // onto a broad side, bounces up onto the other edge and flops back flat, each smaller.
-        els.push(...dropHit(n, 'folded edge hits the concrete', 0, 0, DROP_V * 0.85, edge, { radius: 1.2, sharp: 0.9 }, { end: shell, label: 'side wall' }));
-        els.push(...dropHit(n, 'slaps over onto its side', 0.035, 2, DROP_V * 0.5, shell, { radius: 10, scatter: 0, sharp: 0.6 }, { end: shell, label: 'side wall' }));
-        els.push(skid(0.037, 25, -16));
-        els.push(...dropHit(n, 'bounces onto the other edge', 0.035 + 0.11 * (bounce / 0.32), 0, DROP_V * bounce * 0.7, edge, { radius: 1.2 }, { end: shell, label: 'side wall' }));
-        els.push(...dropHit(n, 'flops back flat', 0.035 + 0.15 * (bounce / 0.32), 2, DROP_V * bounce * 0.45, shell, { radius: 10, scatter: 0, sharp: 0.6 }));
-        els.push(...dropHit(n, 'rocks and settles', 0.035 + 0.175 * (bounce / 0.32), 0, 0.3, edge, { radius: 4 }));
+    else if (o.way === 'sideways') {
+        q = quatMul(axisAngle([0, 0, 1], j(0.4)), axisAngle([1, 0, 0], j(1)));
+        spin = [12 + j(3), j(0.6), j(0.6)];
+        half = 0.035;
     }
     else {
-        // End over end: the floorplate's corner lands first, the magazine whips over and its top end
-        // slams down, it bounces into the air, lands on the floorplate end again and falls flat.
-        els.push(...dropHit(n, 'floorplate corner hits the concrete', 0, 0, DROP_V * 0.8, magFloorplate, { radius: 1.5, sharp: 0.9 }, { end: magFloorplate, label: 'floorplate' }));
-        els.push(...dropHit(n, 'top end whips down onto the concrete', 0.045, 0, DROP_V * 0.7, lips, { radius: 2, sharp: 0.9 }, { end: lips, label: 'feed lips' }));
-        if (n > 0)
-            els.push(hit('top round strikes the concrete', 0.0453, -11, DROP_V * 0.5, arCase, concrete, { scatter: 0, radius: 1.5, click: 0.6, sharp: 0.7 }, dropParts(n).inMag));
-        const air = 0.1 + 0.12 * (bounce / 0.32);
-        els.push(...dropHit(n, 'lands on the floorplate end again', 0.045 + air, 0, DROP_V * bounce * 0.8, magFloorplate, { radius: 2 }, { end: magFloorplate, label: 'floorplate' }));
-        els.push(...dropHit(n, 'falls flat on its side', 0.045 + air + 0.06, 2, 1.2, shell, { radius: 10, scatter: 0, sharp: 0.6 }, { end: shell, label: 'side wall' }));
-        els.push(skid(0.045 + air + 0.062, 30, -17));
-        els.push(...dropHit(n, 'rocks and settles', 0.045 + air + 0.085, 0, 0.3, edge, { radius: 4 }));
+        q = quatMul(axisAngle([0, 0, 1], j(0.4)), axisAngle([0, 1, 0], -0.3 + j(0.3)));
+        spin = [j(0.6), 9 + j(2), j(0.6)];
+        half = 0.06;
+    }
+    const surfaceSpec = { restitution: sf.restitution * (1 - 0.4 * f), friction: sf.friction, stiffness: sf.stiffness };
+    return {
+        dims: [L, 0.06, 0.022], mass: 0.11, contents, surfaces: boxSurfaces(surfaceSpec, o.box || undefined, 0.18),
+        position: [(o.start ?? 0) + j(0.05), j(0.05), h + half], orientation: q, velocity: [(o.toss ?? 0.15) + j(0.05), j(0.08), 0], spin,
+        duration: 3, dt: 1e-5, traceRate: 240,
+    };
+}
+/** The sound of a simulated drop: one hit per contact, one rub per slide, plus the contents. */
+export function magDropScene(o, sim = simulateBoxDrop(magDropSpec(o))) {
+    const n = o.rounds;
+    const { f, shell, edge, stack, loaded, inMag } = dropParts(n);
+    const sf = SURFACE[o.surface ?? 'concrete'];
+    const mTot = 0.12 + 0.012 * n;
+    const e = sf.restitution * (1 - 0.4 * f);
+    // Levels: every element renders normalised, so each gets its level from its impulse, relative to
+    // the magazine landing square at full speed.
+    const Jref = mTot * DROP_V * (1 + e);
+    const db = (J) => 20 * Math.log10(Math.max(1e-6, J) / Jref);
+    const lips = n === 0 ? magFeedLips : { ...magFeedLips, damping: 0.6 };
+    const els = [];
+    const opt = (radius, sharp = 0.85) => ({ scatter: 0, radius, click: 0.8 - 0.45 * f, sharp: sharp - 0.25 * f });
+    const where = (s) => (s === 'floor' ? '' : ` (${s})`);
+    const PART = {
+        'bottom-end': { what: 'floorplate lands flat', layer: magFloorplate, radius: 6, trim: 0 },
+        'bottom-end-edge': { what: 'edge of the floorplate lands', layer: magFloorplate, radius: 2, trim: 0 },
+        'bottom-corner': { what: 'floorplate corner lands', layer: magFloorplate, radius: 1.2, sharp: 0.9, trim: 0 },
+        'top-end': { what: 'feed lips land', layer: lips, radius: 2, sharp: 0.95, trim: 0, round: true },
+        'top-end-edge': { what: 'edge of the feed lips lands', layer: lips, radius: 1.5, sharp: 0.95, trim: 0, round: true },
+        'top-corner': { what: 'top corner lands', layer: lips, radius: 1, sharp: 0.9, trim: 0 },
+        'broad-side': { what: 'slaps down flat on its side', radius: 10, sharp: 0.6, trim: 2 },
+        'narrow-side': { what: 'lands on its spine', layer: edge, radius: 4, sharp: 0.7, trim: 1 },
+        'long-edge': { what: 'folded edge lands', layer: edge, radius: 1.2, sharp: 0.9, trim: 0 },
+    };
+    for (const ct of sim.contacts) {
+        const p = PART[ct.part];
+        const g = db(ct.impulse) + p.trim;
+        if (g < -45)
+            continue;
+        const v = Math.max(0.05, ct.speed);
+        const o2 = opt(p.radius, p.sharp);
+        const what = p.what + where(ct.surface);
+        els.push(hit(what, ct.t, g, v, loaded, sf.body, o2, inMag));
+        if (p.layer && g > -35)
+            els.push(hit(`${what} (the ${p.layer === magFloorplate ? 'floorplate' : p.layer === edge ? 'edge' : 'feed lips'} rings)`, ct.t, g - 7 - 5 * f, v, p.layer, sf.body, o2, inMag));
+        if (p.round && n > 0 && g > -35)
+            els.push(hit('top round strikes' + where(ct.surface), ct.t + 0.0003, g - 8, v * 0.8, arCase, sf.body, { scatter: 0, radius: 1.5, click: 0.6, sharp: 0.7 }, inMag));
+        // Loose things inside ticking against the walls: an empty follower, a light stack's cases.
+        if (g > -22) {
+            if (n === 0) {
+                for (const [dt, k] of [[0.009, 0.25], [0.016, 0.15]])
+                    els.push(hit('follower rattles in the shell', ct.t + dt, g - 16, v * k, arFollower, shell, { scatter: 0, radius: 1.5, click: 0.5, sharp: 0.6 }, inMag));
+            }
+            else {
+                const ticks = Math.round(4 * (1 - f));
+                for (let i = 0; i < ticks; i++)
+                    els.push(hit('cases tick against each other', ct.t + 0.005 + i * 0.0045 + (i % 2) * 0.0012, g - 13 - i * 2, v * (0.25 - i * 0.04), arCase, i % 2 ? shell : arCase, { scatter: 0, radius: 1.5, click: 0.5, sharp: 0.55 }, inMag));
+            }
+        }
+    }
+    // The contents on the spring.
+    const mC = 0.01 + 0.012 * n;
+    for (const k of sim.knocks) {
+        const g = db(mC * k.speed * 1.5) + 3;
+        if (g < -42)
+            continue;
+        if (k.end === 'top')
+            els.push(hit(n === 0 ? 'follower slams back into the feed lips' : 'stack slams back into the feed lips', k.t, g, k.speed, n === 0 ? arFollower : stack, n === 0 ? lips : loaded, { scatter: 0, radius: 2, click: 0.6, sharp: n === 0 ? 0.7 : 0.5 }, inMag));
+        else
+            els.push(hit('spring goes solid under the stack', k.t, g, k.speed, stack, magFloorplate, { scatter: 0, radius: 3, click: 0.4, sharp: 0.4 }, inMag));
+    }
+    for (const l of sim.launches) {
+        const g = db(mC * l.speed) - 2;
+        if (g < -40)
+            continue;
+        els.push(hit(n === 0 ? 'empty spring boings' : 'spring takes up the stack', l.t, g, l.speed, arMagSpring, shell, { scatter: 0, radius: 1, click: 0.05, sharp: 0.35 }, { coil: { level: 0.55 * (1 - f) + 0.05, length: 6 + 6 * (1 - f), dispersion: 0.5, decay: 0.08 + 0.12 * (1 - f), brightness: 4000 }, ...inMag }));
+    }
+    for (const sl of sim.slides) {
+        if (sl.speed < 0.08)
+            continue;
+        const body = sl.part === 'broad-side' ? loaded : edge;
+        els.push(rub('slides' + where(sl.surface), sl.t, -12 + 20 * Math.log10(Math.min(1.5, sl.speed)), { force: Math.min(10, Math.max(0.5, sl.force)), duration: sl.duration, speed: sl.speed, profile: 'decelerate', ...sf.texture }, body, sf.body, inMag));
     }
     const fillName = n === 0 ? 'empty' : n === 30 ? 'full' : n === 10 ? 'third' : 'two-thirds';
     const fillTitle = n === 0 ? 'empty' : n === 30 ? 'full (30 rounds)' : n === 10 ? '1/3 full (10 rounds)' : '2/3 full (20 rounds)';
-    const wayTitle = { bottom: 'lands on its floorplate', top: 'lands on its feed lips', sideways: 'tumbling sideways', forwards: 'tumbling end over end' }[way];
-    const inside = (e) => /follower|spring|stack|cases tick/.test(e.what);
-    const first = (e) => e.at < 0.002 && !inside(e);
+    const wayTitle = { bottom: 'lands on its floorplate', top: 'lands on its feed lips', sideways: 'tumbling sideways', forwards: 'tumbling end over end' }[o.way];
+    const surf = o.surface ?? 'concrete';
+    const inside = (el) => /follower|spring|stack|cases tick/.test(el.what);
+    const slideEl = (el) => /^slides/.test(el.what);
     return {
-        id: `ar15-mag-drop-${way}-${fillName}`,
-        title: `AR-15 magazine dropped on concrete, ${fillTitle}, ${wayTitle}`,
-        room: 0.12,
+        id: `ar15-mag-drop-${o.box ? surf + '-box-' : surf === 'concrete' ? '' : surf + '-'}${o.way}-${fillName}`,
+        title: `AR-15 magazine dropped on ${surf}${o.box ? ' in a walled box' : ''}, ${fillTitle}, ${wayTitle} (simulated)`,
+        room: o.box ? 0.08 : 0.12,
         roomSize: 0.45,
         tracks: [
-            { name: 'impact', description: 'The magazine hits the floor.', elements: els.filter((e) => first(e)) },
-            { name: 'inside', description: 'The follower, spring and rounds react inside it.', elements: els.filter(inside) },
-            { name: 'bounce-settle', description: 'It bounces, tips or tumbles, and comes to rest.', elements: els.filter((e) => !first(e) && !inside(e)) },
+            { name: 'contacts', description: 'Every simulated contact with the floor (and walls).', elements: els.filter((el) => !inside(el) && !slideEl(el)) },
+            { name: 'inside', description: 'The follower, spring and rounds reacting inside it.', elements: els.filter(inside) },
+            { name: 'slides', description: 'Where it slides along the surface.', elements: els.filter(slideEl) },
         ],
     };
 }
-export const AR15_MAG_DROPS = ['bottom', 'top', 'sideways', 'forwards'].flatMap((way) => [0, 10, 20, 30].map((n) => makeMagDrop(n, way)));
+export const AR15_MAG_DROPS = ['bottom', 'top', 'sideways', 'forwards'].flatMap((way) => [0, 10, 20, 30].map((rounds) => magDropScene({ rounds, way })));
 export const FIREARM_SCENES = [
     PUMP_SHOTGUN,
     AR15_CHARGE, AR15_CHARGE_EMPTY, AR15_CHARGE_NO_MAG,
