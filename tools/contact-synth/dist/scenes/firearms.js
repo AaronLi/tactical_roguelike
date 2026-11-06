@@ -730,23 +730,23 @@ function makeArMagIn(fill) {
         { what: 'air squeezed out as it seats', at: 0.107, gainDb: -26, sound: { kind: 'air', freq: 3200, q: 1.4, attackMs: 0.3, decayMs: 4 } },
         rub('magazine slides up the mag well', 0.002, -11, { force: 2.5, duration: 0.105, speed: 0.45, profile: 'steady', roughness: 14, grain: 0.4, periodicity: 0.1, contactWidth: 0.04 }, panel, arMagWell, SHEET_BUZZ),
         // The mag's side pushes the spring-loaded catch aside; it rides along until the slot.
-        rub('mag catch rides along the magazine side', 0.06, -12, { force: 6, duration: 0.045, speed: 0.4, profile: 'steady', roughness: 4, grain: 0.2, contactWidth: 0.03 }, arMagCatch, body, { coil: { level: 0.25, length: 2, dispersion: 0.35, decay: 0.05, brightness: 5000 } }),
+        rub('mag catch rides along the magazine side', 0.06, -12, { force: 6, duration: 0.04, speed: 0.4, profile: 'steady', roughness: 4, grain: 0.2, contactWidth: 0.03 }, arMagCatch, body, { coil: { level: 0.25, length: 2, dispersion: 0.35, decay: 0.05, brightness: 5000 } }),
         // Play in the well: the magazine wobbles and knocks lightly against the walls on the way up.
         // Loose and worn: the sheet-metal shell clatters against the billet walls on the way up.
-        ...[0.014, 0.027, 0.034, 0.051, 0.066, 0.071, 0.088, 0.097].map((at, i) => hit('magazine clatters against the well', at, -10 - (i % 3) * 3, (0.35 - i * 0.02) * v, panel, arMagWell, { scatter: 0.8, radius: 1, click: 0.85, sharp: 1 }, SHEET_EDGE)),
-        // The catch: a small, hard steel part dropping into the slot under a light spring. A subtle,
-        // dry tick (no bounce, a trace of spring), heard directly. Order: the magazine is pushed a hair
-        // past its seat, the catch ticks into the slot during that overtravel, then the magazine
-        // settles back onto the catch.
-        snap('mag catch snaps into the magazine', 0.114, -8, { strength: 0.45, preload: 0, seat: 0, seatDelay: 1 }, arMagCatch, body, { coil: { level: 0.1, length: 1.5, dispersion: 0.3, decay: 0.02, brightness: 7000 }, ...SHEET_EDGE }),
-        hit('magazine settles back onto the catch', 0.121, -13, 0.3, body, arMagCatch, { scatter: 0.3, radius: 2, click: 0.5 }),
-        hit('magazine bottoms in the well', 0.109, -6, 0.8 * v, panel, arMagWell, { scatter: 0.6, radius: 2, click: 0.7 }, SHEET_RATTLE),
-        hit('magazine body rings', 0.1095, fill === 'loaded' ? -14 : -8, 0.6, body, arMagWell, { scatter: 0.3, radius: 3, click: 0.1, sharp: 0.7 }, own),
+        ...[0.014, 0.027, 0.034, 0.051, 0.066, 0.071, 0.084, 0.092].map((at, i) => hit('magazine clatters against the well', at, -10 - (i % 3) * 3, (0.35 - i * 0.02) * v, panel, arMagWell, { scatter: 0.8, radius: 1, click: 0.85, sharp: 1 }, SHEET_EDGE)),
+        // The catch: a small, hard steel part snapping into the slot under its spring, heard directly
+        // and through the lower it's mounted in. It engages as the slot reaches it, just before the
+        // magazine stops on the well: a crisp tick first, then the softer bottoming, then the magazine
+        // settles back onto the catch. (Landing after the bottoming, it was swallowed by it.)
+        snap('mag catch snaps into the magazine', 0.101, -6, { strength: 0.6, preload: 0, seat: 0, seatDelay: 1 }, arMagCatch, body, { coil: { level: 0.15, length: 1.5, dispersion: 0.3, decay: 0.025, brightness: 7000 }, ...SHEET_EDGE }),
+        hit('magazine bottoms in the well', 0.109, -10, 0.7 * v, panel, arMagWell, { scatter: 0.6, radius: 2, click: 0.6 }, SHEET_RATTLE),
+        hit('magazine settles back onto the catch', 0.124, -15, 0.3, body, arMagCatch, { scatter: 0.3, radius: 2, click: 0.5 }),
+        hit('magazine body rings', 0.1095, fill === 'loaded' ? -17 : -12, 0.6, body, arMagWell, { scatter: 0.3, radius: 3, click: 0.1, sharp: 0.7 }, own),
     ];
     if (fill === 'loaded') {
         // With the bolt closed, the top round presses up against the bolt carrier's underside and the
         // stack gives a little.
-        els.push(rub('top round presses against the bolt carrier', 0.1, -14, { force: 6, duration: 0.012, speed: 0.3, profile: 'decelerate', roughness: 3, grain: 0.2, contactWidth: 0.05 }, arNextRound, arCarrier, IN_LOADED_MAG));
+        els.push(rub('top round presses against the bolt carrier', 0.103, -14, { force: 6, duration: 0.012, speed: 0.3, profile: 'decelerate', roughness: 3, grain: 0.2, contactWidth: 0.05 }, arNextRound, arCarrier, IN_LOADED_MAG));
         els.push(hit('stack gives against the spring', 0.108, -16, 0.4, arCase, arNextRound, { scatter: 0.1, radius: 3, click: 0.5 }, IN_LOADED_MAG));
     }
     return {
