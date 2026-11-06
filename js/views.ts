@@ -475,14 +475,15 @@ const G_Views = {
     const ev = this.enemies.get(m.e);
     if (!ev || !ev.alive) return;
     if (ev.pos.distanceTo(G.R.camera.position) > 25) return;
-    const A = G.Audio, dur = Math.min(5, +m.dur || 2) * 1000;
+    const dur = Math.min(5, +m.dur || 2) * 1000;
     if (!(m.n > 0)) { ev.reloadAt = performance.now(); ev.reloadDur = dur; } // (a magazine change: their hands show it, js/rig.ts)
     // from their hands, wherever they are when each part of it happens (heard from that side, muffled through walls)
     const at = () => new THREE.Vector3(ev.pos.x, 1.15 * (ev.crouch ? 0.7 : 1) * ev.def.scale, ev.pos.z);
-    if (m.n > 0) { for (let i = 0; i < Math.min(8, m.n); i++) setTimeout(() => { if (ev.alive && ev.reloading !== false) A.sampleAt('insert_magazine', at(), 0.45, 1.6) || A.shell(); }, i * dur + dur * 0.7); return; }
-    A.sampleAt('pull_magazine', at(), 0.6, 1);
-    setTimeout(() => { if (ev.alive) A.sampleAt('insert_magazine', at(), 0.6, 1); }, dur * 0.6);
-    setTimeout(() => { if (ev.alive) A.sampleAt('rack_slide', at(), 0.5, 1); }, dur * 0.88);
+    const S = G.SynthAudio, wd = G.WEAPONS[ev.def.wpn]; // (their gun's family of sounds: js/synthaudio.ts)
+    if (m.n > 0) { for (let i = 0; i < Math.min(8, m.n); i++) setTimeout(() => { if (ev.alive && ev.reloading !== false) S.play(wd, S.roundClip(wd), { pos: at(), vol: 0.45 }); }, i * dur + dur * 0.7); return; }
+    S.play(wd, 'mag-out', { pos: at(), vol: 0.6 });
+    setTimeout(() => { if (ev.alive) S.play(wd, 'mag-in', { pos: at(), vol: 0.6 }); }, dur * 0.6);
+    setTimeout(() => { if (ev.alive && wd) S.action(wd, 'rack', 0.45, 0.52 * 0.45, 0.6 * 0.45, at()); }, dur * 0.88);
   },
   enemyShot(m: any) {
     let to = new THREE.Vector3(m.to[0], m.to[1], m.to[2]);
@@ -884,7 +885,7 @@ const G_Views = {
       // their restraining / bagging sounds, as they reach each step
       if (act && pv.lastAct === st.act) G.Audio.foley(act.kind, pv.lastAp || 0, act.t, pv.pos.distanceTo(G.R.camera.position));
       pv.lastAct = st.act; pv.lastAp = act ? act.t : 0;
-      if (st.ra != null && st.ra >= 0 && !(pv.lastRa >= 0) && !st.sw) { const rdef = G.Gunsmith.fromCode(st.w); G.Audio.sampleAt('rack_slide', pv.pos.clone().setY(pv.pos.y + 1.3), 0.7, rdef && rdef.manual ? G.Me.MANUAL_PITCH : 1); } // (their bolt / pump / lever worked: heard from where they stand)
+      if (st.ra != null && st.ra >= 0 && !(pv.lastRa >= 0) && !st.sw) { const rdef = G.Gunsmith.fromCode(st.w); if (rdef) { const man = !!rdef.manual, d = man ? G.Me.MANUAL_T : 0.45; G.SynthAudio.action(rdef, 'rack', d, (man ? 0.55 : 0.52) * d, (man ? 0.88 : 0.6) * d, pv.pos.clone().setY(pv.pos.y + 1.3)); } } // (their bolt / pump / lever worked: heard from where they stand)
       pv.lastRa = st.ra == null ? -1 : st.ra;
       const kneel = (st.act === 'z' && (st.ap || 0) > 0.3) || st.act === 'b';
       const hold = st.hk ? { kind: st.hk === 2 ? 'flash' : st.hk === 3 ? 'tb' : 'frag', cock: !!st.hc, str: st.hs == null ? 2 : st.hs } : null; // (a grenade in their hand)

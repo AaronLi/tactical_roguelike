@@ -125,7 +125,7 @@ const G_InvUI = (() => {
         if (!b) return 'done';
         b.n--; GG().chamberIn(w, [b.am]);
         if (b.n <= 0) dropItem(me, b);
-        G.Audio.shell ? G.Audio.shell() : G.Audio.click();
+        G.SynthAudio.play(w.def, G.SynthAudio.roundClip(w.def), { vol: 0.6, part: 'well' });
         return w.mag >= cap ? 'done' : 'more';
       } };
   }
@@ -763,7 +763,7 @@ const G_InvUI = (() => {
     if (old) { magItems.delete(w); if (at && GG().fits(at[0], old, at[1], at[2], at[3])) (GG().put as any)(...at.slice(0, 1), old, ...at.slice(1)); else GG().stow(me, old); }
     GG().loadIn(me, w, it as Item & { r: string[] }); w.noMag = false;
     magItems.set(w, it);
-    G.Audio.sample('insert_magazine', 0.5) || G.Audio.click();
+    G.SynthAudio.play(w.def, 'mag-in', { vol: 0.5, part: 'well' });
   }
   // put it on the ground at your feet (in the field): anything but a part on a gun, and not your last gun
   function dropIt(me: Me, src: Src) {

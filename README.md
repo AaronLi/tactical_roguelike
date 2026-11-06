@@ -2470,3 +2470,13 @@ and level-matched:
 | `crowd_laugh`, `crowd_laugh_long` | "72842 lonemonk approx-800-laugh-1.wav", "72844 lonemonk approx-800-laughter-and-clapter-1.wav" (freesound.org) | lonemonk | CC BY 3.0 |
 | `crowd_wow` | "Group Ooh Aah" (freesound.org, sound 870652) | CHallSmith | CC0 |
 | `crowd_awww` | "aww.wav" (freesound.org, sound 124996) | phmiller42 | CC0 |
+
+## Test branch: synthesized gun handling
+
+On this branch every gun-handling sound is synthesized: racks and bolt releases, magazines in and out, magazines
+landing on the floor (a rigid-body simulation of the magazine, as full as it is), bolts and pumps worked by hand,
+and rounds loaded one at a time. The recorded reload foley isn't loaded. The clips are baked by the contact synth
+(`tools/contact-synth/scripts/game-bank.mjs` on `claude/great-wozniak-4nmx0u`) into `assets/audio/synth/`, one
+bank per family of guns (the AR-15, the KV-47, the MP5, the G19, the SR-25, a blowback SMG, a 5.56 bullpup, and the
+manual actions), and played by `js/synthaudio.ts`, which picks the family for each gun and lines each clip's moment
+up with the animation.

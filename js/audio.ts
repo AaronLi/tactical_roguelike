@@ -10,7 +10,9 @@ const G_Audio = {
   vol: 0.6,
   muted: false,
   samples: {} as Record<string, AudioBuffer>,
-  SAMPLES: ['pull_magazine', 'insert_magazine', 'rack_slide', 'drop_slide', 'drop_bolt', 'drop_magazine', 'door_open', 'door_close',
+  // (TEST BRANCH: the recorded reload foley, pull_magazine, insert_magazine, rack_slide, drop_slide, drop_bolt and
+  // drop_magazine, isn't loaded: every gun-handling sound is synthesized, js/synthaudio.ts)
+  SAMPLES: ['door_open', 'door_close',
     // the highlights' studio audience (js/highlights.ts; recordings credited in the README)
     'crowd_bed', 'crowd_cheer', 'crowd_cheer_big', 'crowd_roar', 'crowd_laugh', 'crowd_laugh_long', 'crowd_ooh', 'crowd_wow', 'crowd_awww'],
   lastShot: 0,
@@ -30,7 +32,8 @@ const G_Audio = {
     this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
     const d = this.noise.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
-    // recorded reload foley; fails quietly (e.g. when opened from file://) and the synthesized clicks are used instead
+    G.SynthAudio.init();
+    // recorded sounds (doors, the highlights' audience); fails quietly (e.g. when opened from file://) and the synthesized clicks are used instead
     for (const n of this.SAMPLES) {
       fetch('assets/audio/' + n + '.ogg').then((r) => r.arrayBuffer()).then((b) => this.ctx.decodeAudioData(b))
         .then((buf) => { this.samples[n] = buf; }).catch(() => {});

@@ -21,7 +21,7 @@ const G_Casings = (() => {
   type CaseGun = Record<string, any>; // a gun, as far as a case is concerned (its id)
   interface CaseKind { mat: CaseMat; len: number; r: number; h?: number }
   // one thing falling: a spent case (slots in the instanced meshes, am: its load) or a dropped magazine (mesh, item: what it carries, box: its pick-up box)
-  interface Spent { k: CaseKind; p: THREE.Vector3; v: THREE.Vector3; q: THREE.Quaternion; w: THREE.Vector3; rest: boolean; age: number; slots?: number[]; am?: string; mesh?: THREE.Mesh; item?: any; box?: any }
+  interface Spent { k: CaseKind; p: THREE.Vector3; v: THREE.Vector3; q: THREE.Quaternion; w: THREE.Vector3; rest: boolean; age: number; slots?: number[]; am?: string; mesh?: THREE.Mesh; item?: any; box?: any; def?: WeaponDef; rounds?: number; landed?: boolean }
   // a case or some cases due out of a gun, in t seconds
   interface Pending { t: number; def: WeaponDef; local: boolean; from?: THREE.Vector3 | null; to?: THREE.Vector3 | null; am?: string | string[]; drop?: boolean; n?: number }
   let metal: THREE.InstancedMesh = null!, hull: THREE.InstancedMesh = null!, live: Spent[] = [], queue: Pending[] = [], free: number[] = [], sounds = 0;
@@ -145,7 +145,7 @@ const G_Casings = (() => {
     h.holder.getWorldQuaternion(q);
     const v = G.Me.vel ? V().set(G.Me.vel.x, 0, G.Me.vel.z) : V();
     v.y -= 0.6;
-    const c: Spent = { mesh, p, q, v, w: new T.Vector3((Math.random() - 0.5) * 6, (Math.random() - 0.5) * 4, (Math.random() - 0.5) * 6), rest: false, age: 0, k: { mat: 'steel', len: 120, r } };
+    const c: Spent = { mesh, p, q, v, w: new T.Vector3((Math.random() - 0.5) * 6, (Math.random() - 0.5) * 4, (Math.random() - 0.5) * 6), rest: false, age: 0, k: { mat: 'steel', len: 120, r }, def, rounds: 0 };
     G.R.dynRoot.add(mesh);
     mags.push(c);
     // too many lying about: the oldest one that nobody can pick up goes
@@ -189,6 +189,12 @@ const G_Casings = (() => {
     return map.surf[f * map.W * map.H + tz * map.W + tx] || 'concrete';
   }
   function impact(c: Spent, speed: number, map: any) {
+    // a dropped magazine: its first touch of the floor plays its whole simulated landing (js/synthaudio.ts), and the
+    // bounces after it here are in that already
+    if (c.def && !(c.item && c.item.k === 'ammo')) {
+      if (!c.landed && speed >= 0.35) { c.landed = true; G.SynthAudio.drop(c.def, c.item ? c.item.n || 0 : c.rounds || 0, c.p.clone(), surface(map, c.p.x, c.p.z, c.p.y - c.k.r)); }
+      return;
+    }
     if (speed < 0.35 || sounds > 5) return;
     const cam = G.R.camera, d = c.p.distanceTo(cam.position);
     if (d > 26) return;

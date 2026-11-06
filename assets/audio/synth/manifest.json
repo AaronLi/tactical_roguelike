@@ -1,0 +1,754 @@
+{
+ "sampleRate": 48000,
+ "note": "Baked by tools/contact-synth/scripts/game-bank.mjs. anchor: s into the clip the cue lines up with; gain: the family's playback gain.",
+ "families": {
+  "ar15": {
+   "gain": 1,
+   "clips": {
+    "rack-45": {
+     "anchor": 0.169,
+     "len": 0.554
+    },
+    "pull": {
+     "anchor": 0.169,
+     "len": 0.529
+    },
+    "home": {
+     "anchor": 0.0574,
+     "len": 0.39
+    },
+    "rack-60": {
+     "anchor": 0.202,
+     "len": 0.587
+    },
+    "release": {
+     "anchor": 0.1301,
+     "len": 0.446
+    },
+    "mag-in": {
+     "anchor": 0.131,
+     "len": 0.415
+    },
+    "mag-in-empty": {
+     "anchor": 0.131,
+     "len": 0.561
+    },
+    "mag-out": {
+     "anchor": 0,
+     "len": 0.526
+    },
+    "mag-out-empty": {
+     "anchor": 0,
+     "len": 0.578
+    },
+    "drop-empty-bottom": {
+     "anchor": 0.03,
+     "len": 1.238
+    },
+    "drop-empty-top": {
+     "anchor": 0.03,
+     "len": 1.328
+    },
+    "drop-empty-sideways": {
+     "anchor": 0.03,
+     "len": 1.117
+    },
+    "drop-empty-forwards": {
+     "anchor": 0.03,
+     "len": 0.97
+    },
+    "drop-third-bottom": {
+     "anchor": 0.03,
+     "len": 0.919
+    },
+    "drop-third-top": {
+     "anchor": 0.03,
+     "len": 0.785
+    },
+    "drop-third-sideways": {
+     "anchor": 0.03,
+     "len": 0.529
+    },
+    "drop-third-forwards": {
+     "anchor": 0.03,
+     "len": 0.585
+    },
+    "drop-two-thirds-bottom": {
+     "anchor": 0.03,
+     "len": 0.806
+    },
+    "drop-two-thirds-top": {
+     "anchor": 0.03,
+     "len": 0.693
+    },
+    "drop-two-thirds-sideways": {
+     "anchor": 0.03,
+     "len": 0.319
+    },
+    "drop-two-thirds-forwards": {
+     "anchor": 0.03,
+     "len": 0.994
+    },
+    "drop-full-bottom": {
+     "anchor": 0.03,
+     "len": 0.582
+    },
+    "drop-full-top": {
+     "anchor": 0.03,
+     "len": 0.751
+    },
+    "drop-full-sideways": {
+     "anchor": 0.03,
+     "len": 0.5
+    },
+    "drop-full-forwards": {
+     "anchor": 0.03,
+     "len": 0.519
+    }
+   }
+  },
+  "kv47": {
+   "gain": 1,
+   "clips": {
+    "rack-45": {
+     "anchor": 0.1232,
+     "len": 0.713
+    },
+    "pull": {
+     "anchor": 0.1232,
+     "len": 0.569
+    },
+    "home": {
+     "anchor": 0.0809,
+     "len": 0.559
+    },
+    "rack-60": {
+     "anchor": 0.1542,
+     "len": 0.73
+    },
+    "mag-in": {
+     "anchor": 0.13,
+     "len": 0.516
+    },
+    "mag-in-empty": {
+     "anchor": 0.13,
+     "len": 0.539
+    },
+    "mag-out": {
+     "anchor": 0,
+     "len": 0.586
+    },
+    "mag-out-empty": {
+     "anchor": 0,
+     "len": 0.662
+    },
+    "drop-empty-bottom": {
+     "anchor": 0.03,
+     "len": 1.161
+    },
+    "drop-empty-top": {
+     "anchor": 0.03,
+     "len": 1.128
+    },
+    "drop-empty-sideways": {
+     "anchor": 0.03,
+     "len": 0.947
+    },
+    "drop-empty-forwards": {
+     "anchor": 0.03,
+     "len": 0.749
+    },
+    "drop-third-bottom": {
+     "anchor": 0.03,
+     "len": 0.755
+    },
+    "drop-third-top": {
+     "anchor": 0.03,
+     "len": 0.795
+    },
+    "drop-third-sideways": {
+     "anchor": 0.03,
+     "len": 1.037
+    },
+    "drop-third-forwards": {
+     "anchor": 0.03,
+     "len": 0.884
+    },
+    "drop-two-thirds-bottom": {
+     "anchor": 0.03,
+     "len": 0.728
+    },
+    "drop-two-thirds-top": {
+     "anchor": 0.03,
+     "len": 0.679
+    },
+    "drop-two-thirds-sideways": {
+     "anchor": 0.03,
+     "len": 0.64
+    },
+    "drop-two-thirds-forwards": {
+     "anchor": 0.03,
+     "len": 0.64
+    },
+    "drop-full-bottom": {
+     "anchor": 0.03,
+     "len": 0.586
+    },
+    "drop-full-top": {
+     "anchor": 0.03,
+     "len": 0.514
+    },
+    "drop-full-sideways": {
+     "anchor": 0.03,
+     "len": 0.316
+    },
+    "drop-full-forwards": {
+     "anchor": 0.03,
+     "len": 0.465
+    }
+   }
+  },
+  "mp5": {
+   "gain": 1,
+   "clips": {
+    "rack-45": {
+     "anchor": 0.1222,
+     "len": 0.555
+    },
+    "pull": {
+     "anchor": 0.1222,
+     "len": 0.509
+    },
+    "home": {
+     "anchor": 0.0641,
+     "len": 0.464
+    },
+    "rack-60": {
+     "anchor": 0.153,
+     "len": 0.585
+    },
+    "mag-in": {
+     "anchor": 0.1,
+     "len": 0.396
+    },
+    "mag-in-empty": {
+     "anchor": 0.1,
+     "len": 0.583
+    },
+    "mag-out": {
+     "anchor": 0,
+     "len": 0.377
+    },
+    "mag-out-empty": {
+     "anchor": 0,
+     "len": 0.641
+    },
+    "drop-empty-bottom": {
+     "anchor": 0.03,
+     "len": 1.04
+    },
+    "drop-empty-top": {
+     "anchor": 0.03,
+     "len": 1.076
+    },
+    "drop-empty-sideways": {
+     "anchor": 0.03,
+     "len": 0.712
+    },
+    "drop-empty-forwards": {
+     "anchor": 0.03,
+     "len": 0.875
+    },
+    "drop-third-bottom": {
+     "anchor": 0.03,
+     "len": 0.862
+    },
+    "drop-third-top": {
+     "anchor": 0.03,
+     "len": 0.883
+    },
+    "drop-third-sideways": {
+     "anchor": 0.03,
+     "len": 0.552
+    },
+    "drop-third-forwards": {
+     "anchor": 0.03,
+     "len": 0.39
+    },
+    "drop-two-thirds-bottom": {
+     "anchor": 0.03,
+     "len": 0.772
+    },
+    "drop-two-thirds-top": {
+     "anchor": 0.03,
+     "len": 0.659
+    },
+    "drop-two-thirds-sideways": {
+     "anchor": 0.03,
+     "len": 0.312
+    },
+    "drop-two-thirds-forwards": {
+     "anchor": 0.03,
+     "len": 0.446
+    },
+    "drop-full-bottom": {
+     "anchor": 0.03,
+     "len": 0.431
+    },
+    "drop-full-top": {
+     "anchor": 0.03,
+     "len": 0.514
+    },
+    "drop-full-sideways": {
+     "anchor": 0.03,
+     "len": 0.203
+    },
+    "drop-full-forwards": {
+     "anchor": 0.03,
+     "len": 1.183
+    }
+   }
+  },
+  "g19": {
+   "gain": 1,
+   "clips": {
+    "rack-45": {
+     "anchor": 0.1217,
+     "len": 0.318
+    },
+    "pull": {
+     "anchor": 0.1217,
+     "len": 0.283
+    },
+    "home": {
+     "anchor": 0.037,
+     "len": 0.217
+    },
+    "rack-60": {
+     "anchor": 0.1522,
+     "len": 0.349
+    },
+    "release": {
+     "anchor": 0.0882,
+     "len": 0.273
+    },
+    "mag-in": {
+     "anchor": 0.1,
+     "len": 0.262
+    },
+    "mag-in-empty": {
+     "anchor": 0.1,
+     "len": 0.439
+    },
+    "mag-out": {
+     "anchor": 0,
+     "len": 0.295
+    },
+    "mag-out-empty": {
+     "anchor": 0,
+     "len": 0.378
+    },
+    "drop-empty-bottom": {
+     "anchor": 0.03,
+     "len": 0.611
+    },
+    "drop-empty-top": {
+     "anchor": 0.03,
+     "len": 0.59
+    },
+    "drop-empty-sideways": {
+     "anchor": 0.03,
+     "len": 0.597
+    },
+    "drop-empty-forwards": {
+     "anchor": 0.03,
+     "len": 0.715
+    },
+    "drop-third-bottom": {
+     "anchor": 0.03,
+     "len": 0.622
+    },
+    "drop-third-top": {
+     "anchor": 0.03,
+     "len": 0.586
+    },
+    "drop-third-sideways": {
+     "anchor": 0.03,
+     "len": 0.256
+    },
+    "drop-third-forwards": {
+     "anchor": 0.03,
+     "len": 0.482
+    },
+    "drop-two-thirds-bottom": {
+     "anchor": 0.03,
+     "len": 0.573
+    },
+    "drop-two-thirds-top": {
+     "anchor": 0.03,
+     "len": 0.526
+    },
+    "drop-two-thirds-sideways": {
+     "anchor": 0.03,
+     "len": 0.431
+    },
+    "drop-two-thirds-forwards": {
+     "anchor": 0.03,
+     "len": 0.427
+    },
+    "drop-full-bottom": {
+     "anchor": 0.03,
+     "len": 0.592
+    },
+    "drop-full-top": {
+     "anchor": 0.03,
+     "len": 0.442
+    },
+    "drop-full-sideways": {
+     "anchor": 0.03,
+     "len": 0.236
+    },
+    "drop-full-forwards": {
+     "anchor": 0.03,
+     "len": 0.514
+    }
+   }
+  },
+  "sr25": {
+   "gain": 1,
+   "clips": {
+    "rack-45": {
+     "anchor": 0.119,
+     "len": 0.467
+    },
+    "pull": {
+     "anchor": 0.119,
+     "len": 0.387
+    },
+    "home": {
+     "anchor": 0.0641,
+     "len": 0.418
+    },
+    "rack-60": {
+     "anchor": 0.1487,
+     "len": 0.497
+    },
+    "release": {
+     "anchor": 0.1061,
+     "len": 0.471
+    },
+    "mag-in": {
+     "anchor": 0.0975,
+     "len": 0.284
+    },
+    "mag-in-empty": {
+     "anchor": 0.0975,
+     "len": 0.616
+    },
+    "mag-out": {
+     "anchor": 0,
+     "len": 0.35
+    },
+    "mag-out-empty": {
+     "anchor": 0,
+     "len": 0.718
+    },
+    "drop-empty-bottom": {
+     "anchor": 0.03,
+     "len": 1.413
+    },
+    "drop-empty-top": {
+     "anchor": 0.03,
+     "len": 0.956
+    },
+    "drop-empty-sideways": {
+     "anchor": 0.03,
+     "len": 1.277
+    },
+    "drop-empty-forwards": {
+     "anchor": 0.03,
+     "len": 1.056
+    },
+    "drop-third-bottom": {
+     "anchor": 0.03,
+     "len": 0.938
+    },
+    "drop-third-top": {
+     "anchor": 0.03,
+     "len": 0.854
+    },
+    "drop-third-sideways": {
+     "anchor": 0.03,
+     "len": 1.146
+    },
+    "drop-third-forwards": {
+     "anchor": 0.03,
+     "len": 0.412
+    },
+    "drop-two-thirds-bottom": {
+     "anchor": 0.03,
+     "len": 0.613
+    },
+    "drop-two-thirds-top": {
+     "anchor": 0.03,
+     "len": 1.018
+    },
+    "drop-two-thirds-sideways": {
+     "anchor": 0.03,
+     "len": 0.317
+    },
+    "drop-two-thirds-forwards": {
+     "anchor": 0.03,
+     "len": 0.641
+    },
+    "drop-full-bottom": {
+     "anchor": 0.03,
+     "len": 0.632
+    },
+    "drop-full-top": {
+     "anchor": 0.03,
+     "len": 0.631
+    },
+    "drop-full-sideways": {
+     "anchor": 0.03,
+     "len": 0.56
+    },
+    "drop-full-forwards": {
+     "anchor": 0.03,
+     "len": 0.316
+    }
+   }
+  },
+  "smg": {
+   "gain": 1,
+   "clips": {
+    "rack-45": {
+     "anchor": 0.119,
+     "len": 0.672
+    },
+    "pull": {
+     "anchor": 0.119,
+     "len": 0.665
+    },
+    "home": {
+     "anchor": 0.0389,
+     "len": 0.636
+    },
+    "rack-60": {
+     "anchor": 0.1487,
+     "len": 0.702
+    },
+    "mag-in": {
+     "anchor": 0.13,
+     "len": 0.579
+    },
+    "mag-in-empty": {
+     "anchor": 0.13,
+     "len": 0.676
+    },
+    "mag-out": {
+     "anchor": 0,
+     "len": 0.506
+    },
+    "mag-out-empty": {
+     "anchor": 0,
+     "len": 0.618
+    },
+    "drop-empty-bottom": {
+     "anchor": 0.03,
+     "len": 1.017
+    },
+    "drop-empty-top": {
+     "anchor": 0.03,
+     "len": 1.119
+    },
+    "drop-empty-sideways": {
+     "anchor": 0.03,
+     "len": 0.721
+    },
+    "drop-empty-forwards": {
+     "anchor": 0.03,
+     "len": 1.087
+    },
+    "drop-third-bottom": {
+     "anchor": 0.03,
+     "len": 0.748
+    },
+    "drop-third-top": {
+     "anchor": 0.03,
+     "len": 0.735
+    },
+    "drop-third-sideways": {
+     "anchor": 0.03,
+     "len": 0.974
+    },
+    "drop-third-forwards": {
+     "anchor": 0.03,
+     "len": 0.779
+    },
+    "drop-two-thirds-bottom": {
+     "anchor": 0.03,
+     "len": 0.556
+    },
+    "drop-two-thirds-top": {
+     "anchor": 0.03,
+     "len": 0.678
+    },
+    "drop-two-thirds-sideways": {
+     "anchor": 0.03,
+     "len": 0.261
+    },
+    "drop-two-thirds-forwards": {
+     "anchor": 0.03,
+     "len": 0.432
+    },
+    "drop-full-bottom": {
+     "anchor": 0.03,
+     "len": 0.611
+    },
+    "drop-full-top": {
+     "anchor": 0.03,
+     "len": 0.562
+    },
+    "drop-full-sideways": {
+     "anchor": 0.03,
+     "len": 0.645
+    },
+    "drop-full-forwards": {
+     "anchor": 0.03,
+     "len": 0.267
+    }
+   }
+  },
+  "bullpup": {
+   "gain": 1,
+   "clips": {
+    "rack-45": {
+     "anchor": 0.1182,
+     "len": 0.36
+    },
+    "pull": {
+     "anchor": 0.1182,
+     "len": 0.379
+    },
+    "home": {
+     "anchor": 0.0618,
+     "len": 0.226
+    },
+    "rack-60": {
+     "anchor": 0.1475,
+     "len": 0.376
+    },
+    "release": {
+     "anchor": 0.1038,
+     "len": 0.292
+    },
+    "mag-in": {
+     "anchor": 0.111,
+     "len": 0.201
+    },
+    "mag-in-empty": {
+     "anchor": 0.111,
+     "len": 0.221
+    },
+    "mag-out": {
+     "anchor": 0,
+     "len": 0.281
+    },
+    "mag-out-empty": {
+     "anchor": 0,
+     "len": 0.312
+    },
+    "drop-empty-bottom": {
+     "anchor": 0.03,
+     "len": 0.695
+    },
+    "drop-empty-top": {
+     "anchor": 0.03,
+     "len": 0.628
+    },
+    "drop-empty-sideways": {
+     "anchor": 0.03,
+     "len": 0.244
+    },
+    "drop-empty-forwards": {
+     "anchor": 0.03,
+     "len": 0.449
+    },
+    "drop-third-bottom": {
+     "anchor": 0.03,
+     "len": 0.523
+    },
+    "drop-third-top": {
+     "anchor": 0.03,
+     "len": 0.527
+    },
+    "drop-third-sideways": {
+     "anchor": 0.03,
+     "len": 0.501
+    },
+    "drop-third-forwards": {
+     "anchor": 0.03,
+     "len": 0.728
+    },
+    "drop-two-thirds-bottom": {
+     "anchor": 0.03,
+     "len": 0.643
+    },
+    "drop-two-thirds-top": {
+     "anchor": 0.03,
+     "len": 0.554
+    },
+    "drop-two-thirds-sideways": {
+     "anchor": 0.03,
+     "len": 0.54
+    },
+    "drop-two-thirds-forwards": {
+     "anchor": 0.03,
+     "len": 0.259
+    },
+    "drop-full-bottom": {
+     "anchor": 0.03,
+     "len": 0.804
+    },
+    "drop-full-top": {
+     "anchor": 0.03,
+     "len": 0.627
+    },
+    "drop-full-sideways": {
+     "anchor": 0.03,
+     "len": 0.624
+    },
+    "drop-full-forwards": {
+     "anchor": 0.03,
+     "len": 0.208
+    }
+   }
+  },
+  "manual": {
+   "gain": 1,
+   "clips": {
+    "mag-in": {
+     "anchor": 0.131,
+     "len": 0.415
+    },
+    "bolt": {
+     "anchor": 0.21,
+     "len": 0.675
+    },
+    "pump": {
+     "anchor": 0.22,
+     "len": 0.723
+    },
+    "shell-in": {
+     "anchor": 0.08,
+     "len": 0.279
+    },
+    "cartridge-in": {
+     "anchor": 0.06,
+     "len": 0.091
+    }
+   }
+  }
+ }
+}
