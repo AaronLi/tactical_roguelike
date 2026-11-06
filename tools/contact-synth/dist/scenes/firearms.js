@@ -744,14 +744,19 @@ function makeArMagIn(fill) {
         // onto the catch.
         hit('mag catch clicks into the hole in the magazine', 0.101, 0, 1.4, arMagCatch, panel, { scatter: 0.1, radius: 0.6, click: 0.9, sharp: 1 }, { coil: { level: 0.15, length: 1.5, dispersion: 0.3, decay: 0.025, brightness: 7000 }, ...SHEET_EDGE }),
         // Still accelerating, the magazine slams into its stop at the top of the well: a hard stop.
-        hit('magazine bottoms in the well', 0.109, -5, 1.5 * v, body, arMagWell, { scatter: 0.3, radius: 3, click: 0.8, sharp: 0.9 }, SHEET_RATTLE),
+        // Struck at its top edge, with the hand gripping it and the catch now in its hole, the shell
+        // can't ring as a whole: the panel at the stop takes the hit.
+        hit('magazine bottoms in the well', 0.109, -5, 1.5 * v, panel, arMagWell, { scatter: 0.3, radius: 3, click: 0.8, sharp: 0.9 }, SHEET_RATTLE),
         hit('magazine settles back onto the catch', 0.124, -15, 0.3, body, arMagCatch, { scatter: 0.3, radius: 2, click: 0.5 }),
         hit('magazine body rings', 0.1095, fill === 'loaded' ? -17 : -12, 0.6, body, arMagWell, { scatter: 0.3, radius: 3, click: 0.1, sharp: 0.7 }, own),
     ];
     if (fill === 'loaded') {
         // With the bolt closed, the top round presses up against the bolt carrier's underside and the
         // stack gives a little.
-        els.push(rub('top round presses against the bolt carrier', 0.103, -14, { force: 6, duration: 0.012, speed: 0.3, profile: 'decelerate', roughness: 3, grain: 0.2, contactWidth: 0.05 }, arNextRound, arCarrier, IN_LOADED_MAG));
+        // The round is pinned between the feed lips and the carrier under the magazine spring, and the
+        // carrier is held in battery by the buffer spring: a light scuff, too gentle to ring either
+        // (as a free bar the carrier would ping at ~1.75 kHz).
+        els.push(rub('top round presses against the bolt carrier', 0.103, -14, { force: 6, duration: 0.012, speed: 0.3, profile: 'decelerate', roughness: 3, grain: 0.2, contactWidth: 0.05 }, { ...arNextRound, modes: 0, damping: 0.95 }, { ...arCarrier, modes: 0, damping: 0.8 }, IN_LOADED_MAG));
         els.push(hit('stack gives against the spring', 0.108, -16, 0.4, arCase, arNextRound, { scatter: 0.1, radius: 3, click: 0.5 }, IN_LOADED_MAG));
     }
     return {
