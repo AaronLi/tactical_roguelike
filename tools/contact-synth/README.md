@@ -106,5 +106,8 @@ Other scenes, in `src/scenes/firearms.ts`:
 
 - From measurements (`src/scenes/from-spec.ts`): fill in a `GunSpec` (action mass, stroke, spring, lock-up, receiver, barrel, cartridge, magazine) and `gunScenes(spec)` builds a first attempt at every sound of the gun: `<id>-charge` (loaded, `-empty-mag`, `-no-mag`), `<id>-release`, `<id>-mag-in`/`-mag-out` (and `-empty`), and `<id>-mag-drop-*`. `sr25-*` is built from measurements alone; `spec-ar15-*`, `spec-kv47-*`, `spec-mp5-*` and `spec-g19-*` are the hand-tuned guns restated as measurements, for comparison (`scripts/analyze/compare.mjs`). See SOUND_DESIGN.md, part 3.
 
+- `smg-*` (a 9 mm blowback SMG) and `bullpup-*` (a 5.56 bullpup): two generic families from measurements; `bolt-action` (a turn bolt worked by hand), `shell-in` and `cartridge-in` (rounds loaded by hand).
+- `node scripts/game-bank.mjs <out-dir>` bakes the game's gun-handling clips (each family's rack on the game's two rack clocks, the release, the pull and the run home apart, magazine in and out, the 16 drops; the manual actions and rounds by hand) as OGG with a `manifest.json` of anchors: the moment in each clip the game lines its cue up with. The `claude/synth-audio-test` branch of the game plays only these.
+
 The forward run is simulated from the reciprocating mass, the spring force and each magazine state's drag. Loaded takes 24.7 ms to the bolt face, empty 24.0 ms and no magazine 23.7 ms.
 

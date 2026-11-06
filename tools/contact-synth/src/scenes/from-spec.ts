@@ -43,8 +43,9 @@ export interface GunSpec {
     /** The carrier (or slide) length and the bolt (or barrel) length, cm. */
     carrierCm: number;
     boltCm: number;
-    /** How it locks: a turning bolt, roller-delayed, or a tilting barrel (Browning). */
-    lockup: 'rotating' | 'rollers' | 'tilting';
+    /** How it locks: a turning bolt, roller-delayed, a tilting barrel (Browning), or not at all (straight blowback:
+     *  the bolt's mass and spring hold it). */
+    lockup: 'rotating' | 'rollers' | 'tilting' | 'blowback';
     /** Lubrication of the sliding parts. */
     lube: 'greased' | 'oiled' | 'dry';
     /** Locks open on an empty magazine (and is let go by a catch or slide stop). */
@@ -248,6 +249,12 @@ function runHome(g: GunSpec, d: ReturnType<typeof derive>, t0: number, fill: Fil
       snap('rollers snap out into the trunnion', TL + 0.0015, 3, { strength: 0.9, preload: 0, seat: 0.6, seatDelay: 0.8 }, steelBar(1.3, 6, 0.5), d.trunnion),
       hit('carrier slams home', TL + 0.003, -2, v * 0.7, d.carrier, d.trunnion, { radius: 5, click: 0.85, sharp: 0.8 }),
     );
+  } else if (a.lockup === 'blowback') {
+    // nothing locks: the heavy bolt slams into the breech face and is held there by its spring
+    els.push(
+      hit('bolt slams into the breech', TL, 0, v, d.bolt, d.trunnion, { radius: 5, click: 0.85, sharp: 0.8 }),
+      hit('bolt rebounds and settles', TL + 0.004, -16, v * 0.2, d.bolt, d.trunnion, { radius: 3, click: 0.6 }),
+    );
   } else {
     els.push(
       rub('barrel cams up onto the locking block', TL - 0.003, -9, { force: 12, duration: 0.003, speed: 1.2, profile: 'steady', roughness: 6, grain: 0.1, contactWidth: 0.02 }, d.bolt, steelBlock(2, 8)),
@@ -256,7 +263,7 @@ function runHome(g: GunSpec, d: ReturnType<typeof derive>, t0: number, fill: Fil
     );
   }
   // the whole gun takes the blow: the barrel rings, the gun flexes as one body, a separate lower rings on its pins
-  const gn = g.gun, slam = TL + (a.lockup === 'rotating' ? 0.0046 : a.lockup === 'rollers' ? 0.0031 : 0.0006);
+  const gn = g.gun, slam = TL + (a.lockup === 'rotating' ? 0.0046 : a.lockup === 'rollers' ? 0.0031 : a.lockup === 'blowback' ? 0.0002 : 0.0006);
   // (a tilting barrel is the part that locks: its blow is already the hood locking into the slide; a polymer frame
   // in the hand soaks most of it up)
   if (a.lockup !== 'tilting') els.push(
@@ -289,6 +296,7 @@ export function chargeFromSpec(g: GunSpec, fill: Fill, timing: { pull?: number; 
     // pulling: the action unlocks, runs back on its rails, the spring loads, the trigger is cocked
     a.lockup === 'rotating' ? snap('bolt lugs turn free', back(0.004), -9, { strength: 0.6, preload: 0, seat: 0.2, seatDelay: 1 }, d.bolt, d.trunnion)
       : a.lockup === 'rollers' ? snap('rollers cam in out of the trunnion', back(0.004), -8, { strength: 0.6, preload: 0, seat: 0.5, seatDelay: 1.2 }, steelBar(1.3, 6, 0.5), d.trunnion)
+      : a.lockup === 'blowback' ? rub('bolt breaks away from the breech', back(0.002), -14, { force: 4, duration: 0.004, speed: 0.6, profile: 'steady', ...d.texture }, d.bolt, d.trunnion)
       : hit('barrel drops off the locking block', back(0.003), -9, 0.6, d.bolt, steelBlock(2, 8), { radius: 2, click: 0.7, sharp: 0.8 }),
     rub(a.lockup === 'tilting' ? 'slide drawn back on its rails' : 'carrier runs back', back(0.004), -10, { force: 6, duration: T - back(0.004), speed: 1, profile: 'swell', ...d.texture }, d.carrierSliding, d.shell),
     rub('return spring compresses', back(0.008), -10, { force: 6, duration: T - back(0.008), speed: 1, profile: 'swell', roughness: 5, grain: 0.3, contactWidth: 0.05 }, d.spring, d.shell, { coil: d.coil, ...(d.tube || {}) }),
@@ -473,4 +481,81 @@ export const GUN_SPECS: Record<string, GunSpec> = {
   },
 };
 
-export const SPEC_SCENES: Scene[] = Object.values(GUN_SPECS).flatMap(gunScenes);
+/**
+ * Two generic families for the game's guns that have no hand-tuned twin: a 9 mm blowback submachine gun (Uzi / MPX /
+ * MAC-10 class: a heavy stamped-steel bolt, nothing locking) and a 5.56 bullpup (Tavor / AUG / F2 class: a rotating
+ * bolt in a polymer stock, a non-reciprocating handle on its own spring, polymer magazines). Typical figures, not one
+ * gun's.
+ */
+GUN_SPECS.smg = {
+  id: 'smg', name: 'Blowback SMG',
+  action: { mass: 0.42, stroke: 0.07, springHome: 40, springRear: 70, carrierCm: 11, boltCm: 11, lockup: 'blowback', lube: 'oiled', holdOpen: false, trigger: 'striker' },
+  handle: { kind: 'on-carrier', material: 'steel', lengthCm: 3 },
+  receiver: { build: 'stamped', wallMm: 1, lengthCm: 25, widthCm: 3.5, heightCm: 3.5, ports: 'closed' },
+  gun: { barrelCm: 26, barrelMm: 12, lengthCm: 60, frame: 'steel' },
+  cartridge: { oalMm: 29, caseMm: 19, massG: 8 },
+  magazine: { capacity: 32, lengthCm: 23, widthCm: 3, thicknessCm: 2.4, material: 'steel', wallMm: 0.8, massEmptyKg: 0.2, springN: 9, springRate: 110, insert: 'straight', catch: 'button', freeDrop: false, well: 'stamped' },
+};
+GUN_SPECS.bullpup = {
+  id: 'bullpup', name: '5.56 bullpup',
+  action: { mass: 0.4, stroke: 0.09, springHome: 60, springRear: 120, carrierCm: 15, boltCm: 6, lockup: 'rotating', lube: 'oiled', holdOpen: true, trigger: 'hammer', hammerSpringMm: 1.2 },
+  handle: { kind: 'separate', material: 'steel', lengthCm: 5, returns: 'own-spring' },
+  receiver: { build: 'polymer', wallMm: 3, lengthCm: 28, widthCm: 4, heightCm: 4, ports: 'closed' },
+  gun: { barrelCm: 42, barrelMm: 16, lengthCm: 73, frame: 'polymer' },
+  cartridge: { oalMm: 57, caseMm: 45, massG: 12 },
+  magazine: { capacity: 30, lengthCm: 18, widthCm: 6.5, thicknessCm: 2.4, material: 'polymer', wallMm: 2, massEmptyKg: 0.135, springN: 10, springRate: 130, insert: 'straight', catch: 'button', freeDrop: true, well: 'polymer' },
+};
+
+/**
+ * A turn-bolt worked by hand (Remington 700 / Mosin class), on the game's manual-action clock: the handle lifted
+ * (cocking the striker and turning the lugs free), the bolt drawn back (the case pulled and flicked out), its stop,
+ * pushed home (stripping and chambering a round) and turned down into its notch. `T`: when it reaches the rear stop.
+ */
+export function boltActionScene(T = 0.33): Scene {
+  const steel = (cm: number, mm: number, damping = 0.6): Body => ({ ...mat('steel'), shape: 'bar', size: cm, thickness: mm, modes: 1, irregularity: 0.6, damping, level: 0 });
+  const bolt = steel(20, 18, 0.7), boltSliding: Body = { ...bolt, modes: 0, damping: 0.8 }, rcv = { ...mat('steel'), shape: 'shell' as const, size: 22, thickness: 4, modes: 0, irregularity: 0.7, damping: 0.6, level: 0 };
+  const handle = steel(6, 8, 0.5), cock = steel(3, 10), round: Body = { ...arCase, size: 8.4, thickness: 10 };
+  const oiled = TEXTURE.oiled, coil = { level: 0.5, length: 4, dispersion: 0.55, decay: 0.12, brightness: 4000 };
+  const L = T - 0.15, F = T + 0.04;
+  const els: SceneElement[] = [
+    hit('hand takes the bolt handle', L - 0.03, -18, 0.4, handle, steel(2, 2), { radius: 1, click: 0.3, sharp: 0.3 }),
+    rub('cocking piece cams back up the bolt', L, -9, { force: 12, duration: 0.03, speed: 0.4, profile: 'steady', ...GRIT, stickSlip: 0.15 }, cock, bolt),
+    rub('firing pin spring compresses', L + 0.002, -14, { force: 6, duration: 0.028, speed: 0.3, profile: 'accelerate', roughness: 4, grain: 0.3, contactWidth: 0.04 }, springWire(6, 1.1), bolt, { coil }),
+    snap('lugs turn free', L + 0.03, -6, { strength: 0.7, preload: 0, seat: 0.3, seatDelay: 1 }, bolt, rcv),
+    rub('bolt drawn back in the receiver', L + 0.035, -10, { force: 5, duration: T - L - 0.035, speed: 1, profile: 'swell', ...oiled }, boltSliding, rcv),
+    rub('case pulled out of the chamber', L + 0.035, -12, { force: 6, duration: 0.03, speed: 0.6, profile: 'accelerate', roughness: 4, grain: 0.2, contactWidth: 0.05 }, round, steel(10, 12)),
+    hit('case flicked out by the ejector', T - 0.006, -8, 1.2, round, steel(2, 3), { radius: 1.5, click: 0.8, sharp: 0.8 }),
+    hit('bolt hits its stop', T, -2, 1.3, bolt, rcv, { radius: 4, click: 0.8, sharp: 0.8 }),
+    rub('bolt pushed home in the receiver', F, -10, { force: 5, duration: 0.11, speed: 0.9, profile: 'swell', ...oiled }, boltSliding, rcv),
+    hit('bolt face strips the top round', F + 0.04, -7, 0.7, bolt, round, { radius: 1.5, click: 0.6, sharp: 0.7 }),
+    rub('round slides into the chamber', F + 0.045, -12, { force: 4, duration: 0.05, speed: 0.6, profile: 'steady', roughness: 4, grain: 0.2, contactWidth: 0.05 }, round, steel(10, 12)),
+    hit('next round snaps up into the lips', F + 0.05, -14, 0.8, round, steel(5, 1), { radius: 1.5, click: 0.6, sharp: 0.7 }),
+    hit('bolt closes on the chamber', F + 0.11, -4, 0.9, bolt, steel(10, 12), { radius: 3, click: 0.8, sharp: 0.8 }),
+    snap('extractor snaps over the rim', F + 0.112, -10, { strength: 0.7, preload: 0, seat: 0.3, seatDelay: 1 }, steel(2, 3), round),
+    rub('lugs cam home as the handle turns down', F + 0.125, -9, { force: 14, duration: 0.025, speed: 0.4, profile: 'steady', roughness: 8, grain: 0.1, periodicity: 0.2, contactWidth: 0.02 }, bolt, rcv),
+    hit('handle drops into its notch', F + 0.152, -3, 1.0, handle, rcv, { radius: 2, click: 0.85, sharp: 0.85 }),
+  ];
+  return {
+    id: 'bolt-action', title: 'Turn-bolt action worked by hand, chambering a round', room: 0.04, roomSize: 0.35,
+    housing: { amount: 0.5, cavity: 0.3, ...rcv, cavities: [{ length: 18, width: 2, depth: 2, q: 8, level: 1 }] },
+    tracks: [{ name: 'bolt', description: 'Up, back, the case out, home, down.', elements: els }],
+  };
+}
+
+/** A round pushed in by hand: a shotshell past the loading gate into the tube, or a cartridge into a chamber. */
+export function roundInScene(kind: 'shell' | 'cartridge'): Scene {
+  const shell: Body = kind === 'shell' ? { ...mat('nylon'), material: 'custom', stiffness: 1.4, loss: 0.08, shape: 'bar', size: 7, thickness: 18, modes: 0, irregularity: 0.6, damping: 0.6, level: 0 } : { ...arCase, size: 4, thickness: 9 };
+  const head = { ...mat('brass'), shape: 'bar' as const, size: 1, thickness: 20, modes: 1, irregularity: 0.5, damping: 0.5, level: 0 };
+  const steel = (cm: number, mm: number): Body => ({ ...mat('steel'), shape: 'bar', size: cm, thickness: mm, modes: 1, irregularity: 0.6, damping: 0.6, level: 0 });
+  const els: SceneElement[] = kind === 'shell' ? [
+    rub('shell pushed past the loading gate', 0, -10, { force: 8, duration: 0.05, speed: 0.6, profile: 'accelerate', roughness: 3, grain: 0.6, contactWidth: 0.1 }, shell, steel(4, 2)),
+    snap('shell latch clicks behind its rim', 0.05, -4, { strength: 0.7, preload: 0, seat: 0.3, seatDelay: 1 }, steel(2, 2), head),
+    rub('magazine spring takes it', 0.052, -14, { force: 5, duration: 0.02, speed: 0.3, profile: 'steady', roughness: 4, grain: 0.3, contactWidth: 0.04 }, springWire(20, 1), steel(30, 2), { coil: { level: 0.5, length: 9, dispersion: 0.5, decay: 0.1, brightness: 3000 } }),
+  ] : [
+    rub('cartridge slid into the chamber', 0, -12, { force: 3, duration: 0.03, speed: 0.5, profile: 'accelerate', roughness: 3, grain: 0.2, contactWidth: 0.05 }, shell, steel(5, 12)),
+    hit('rim seats on the chamber face', 0.03, -4, 0.8, head, steel(5, 12), { radius: 1.5, click: 0.8, sharp: 0.85 }),
+  ];
+  return { id: `${kind}-in`, title: kind === 'shell' ? 'Shotshell loaded into the tube' : 'Cartridge pushed into the chamber', room: 0.04, roomSize: 0.35, tracks: [{ name: 'in', description: 'In by hand.', elements: els }] };
+}
+
+export const SPEC_SCENES: Scene[] = [...Object.values(GUN_SPECS).flatMap(gunScenes), boltActionScene(), roundInScene('shell'), roundInScene('cartridge')];
