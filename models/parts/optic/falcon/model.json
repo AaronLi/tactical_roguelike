@@ -1,0 +1,34 @@
+{
+  "source": "authored",
+  "kind": "part",
+  "slot": "optic",
+  "frame": "rail-top",
+  "optic": {
+    "sy": 0.0285,
+    "fSight": -0.044,
+    "relief": 0.09,
+    "reflex": {
+      "f": 0.013,
+      "y": 0.0285,
+      "w": 0.026,
+      "h": 0.026,
+      "kind": "dot",
+      "round": true
+    },
+    "magnifier": true,
+    "height": "low"
+  },
+  "part": {
+    "mount": "op:pic",
+    "brand": "strix",
+    "name": "Strix Falcon open reflex",
+    "price": 340,
+    "tier": 1,
+    "zoom": 0.8,
+    "st": {
+      "ergo": -1,
+      "acc": -2,
+      "hip": 2
+    }
+  }
+}

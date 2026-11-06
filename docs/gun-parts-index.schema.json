@@ -1,0 +1,228 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gun-parts-index.schema.json",
+  "title": "Per-part packs: a platform's index.json",
+  "description": "Generated from js/glb.ts PARTS_INDEX_FIELDS: do not edit (npm run check:models -- --write). See docs/models.md.",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "number",
+      "description": "Index format version (2)."
+    },
+    "platform": {
+      "type": "string",
+      "description": "The platform (gun id) the packs are for."
+    },
+    "src": {
+      "type": "string",
+      "description": "Hash of the recipe sources the packs came from (stale-pack detection)."
+    },
+    "slots": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Every build slot seen in the platform's builds: the ones `anchors` is keyed by."
+    },
+    "tags": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "dep": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The build slots whose parts shape this tag: a pack's `key` lists a part for each, in this order."
+          },
+          "packs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "A part id per `dep` slot (\"\" = the slot is empty; \"*\" = any part)."
+                },
+                "file": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "description": "The pack's file under the platform folder (or `_shared/<slot>/<file>.glb` under the parts folder: stored once for every platform); null when the tag is empty for this key."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The pack's file under the platform folder (or `_shared/<slot>/<file>.glb` under the parts folder: stored once for every platform); null when the tag is empty for this key."
+                },
+                "at": {
+                  "oneOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      },
+                      "minItems": 3,
+                      "maxItems": 3,
+                      "description": "A shared pack: the move [forward, up, right] metres that places its stored geometry on this platform."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A shared pack: the move [forward, up, right] metres that places its stored geometry on this platform."
+                },
+                "nodes": {
+                  "oneOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The part_ nodes the pack has meshes in (info.anim keys, before the meshes are loaded)."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The part_ nodes the pack has meshes in (info.anim keys, before the meshes are loaded)."
+                },
+                "tris": {
+                  "oneOf": [
+                    {
+                      "type": "number",
+                      "description": "Triangles in the pack."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Triangles in the pack."
+                },
+                "bytes": {
+                  "oneOf": [
+                    {
+                      "type": "number",
+                      "description": "File size in bytes."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "File size in bytes."
+                }
+              },
+              "required": [
+                "key"
+              ],
+              "additionalProperties": false
+            },
+            "description": "The packs: the most specific matching key is used."
+          }
+        },
+        "required": [
+          "dep",
+          "packs"
+        ],
+        "additionalProperties": false
+      },
+      "description": "Per mesh slot (tag): which build slots shape it and its packs."
+    },
+    "anchors": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3
+        }
+      },
+      "description": "Offsets parts give other slots: \"<buildSlot>=<partId>\" -> { mount_<tag>: [forward, up, right] } (metres, added up over the build)."
+    },
+    "info": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "dep": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The build slots whose parts the table's leaves depend on: a row's `key` lists a part for each, in this order."
+          },
+          "leaves": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The info leaf paths (a/b/0: segments joined by \"/\", array indices as numbers) the rows give."
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "A part id per `dep` slot (\"\" = the slot is empty; \"*\" = any part)."
+                },
+                "v": {
+                  "type": "array",
+                  "items": {},
+                  "description": "The value of each leaf, in the order of `leaves` ({ \"del\": 1 }: the leaf is absent)."
+                }
+              },
+              "required": [
+                "key",
+                "v"
+              ],
+              "additionalProperties": false
+            },
+            "description": "One row per combination of parts: the most specific matching key is used."
+          }
+        },
+        "required": [
+          "dep",
+          "leaves",
+          "rows"
+        ],
+        "additionalProperties": false
+      },
+      "description": "The `info` leaves as tables: each leaf is a function of the parts in some slots, and leaves with the same slots are one table."
+    },
+    "totals": {
+      "oneOf": [
+        {
+          "description": "Counts and bytes (informational)."
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Counts and bytes (informational)."
+    }
+  },
+  "required": [
+    "version",
+    "platform",
+    "src",
+    "slots",
+    "tags",
+    "anchors",
+    "info"
+  ],
+  "additionalProperties": false
+}

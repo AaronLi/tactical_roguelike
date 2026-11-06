@@ -1,4 +1,12 @@
 node_modules/
+dist/
+# (the contact synth's compiled JS is committed: its page runs without a build step)
+!tools/contact-synth/dist/
 .DS_Store
 Thumbs.db
 *.log
+assets/models/
+scratch/
+
+# Blender backups
+*.blend1

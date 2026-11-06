@@ -1,0 +1,3 @@
+{
+  "_comment": "Model-check waivers (tools/authored_checks.mjs, docs/models.md 'Model checks'): { gun: { rule letter: why, and what fixes it } }. A waived gun+rule failure prints as a warning with this note instead of failing the bake; any other rule, and every new gun, stays an error. Only for the models that failed when the rules came in (2026-11-05): fix the model, then remove its entry (a waiver whose rule passes warns 'no longer needed')."
+}

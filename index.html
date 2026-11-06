@@ -2,8 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<link rel="icon" href="data:,">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Breach Protocol</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@200;300;400;500;600&amp;display=swap">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -29,6 +32,12 @@
       <button id="btnJoin" class="btn">Join</button>
     </div>
     <div class="lan-row"><button id="btnLan" class="btn small">Find LAN games</button><div id="lanList" class="lan-list"></div></div>
+    <div class="hl-row" title="The hangar's TVs save the last level's highlights as a .zip: this makes the video from one">
+      <button id="btnRender" class="btn small">Render highlights video</button><button id="btnRenderStop" class="btn small hidden">Cancel</button>
+      <input id="hlFile" type="file" accept=".zip,application/zip" hidden>
+      <div class="hl-prog hidden"><i id="hlBar"></i></div><div id="hlMsg" class="hl-msg"></div>
+    </div>
+    <div id="modelLoad" class="model-load" title="The game's gun models download while you set up"><div class="ml-bar"><i id="modelBar"></i></div><span id="modelTxt"></span> <button id="modelRetry" class="btn small hidden">Retry</button></div>
     <div id="menuMsg" class="msg"></div>
 
     <details class="settings">
@@ -37,14 +46,14 @@
         <label>Mouse sensitivity <span id="sensVal"></span></label><input id="sens" type="range" min="0.2" max="3" step="0.05">
         <label>Field of view <span id="fovVal"></span></label><input id="fov" type="range" min="60" max="110" step="1">
         <label>Volume <span id="volVal"></span></label><input id="vol" type="range" min="0" max="1" step="0.05">
+        <label>Load Magazines (hangar) <span class="dim">which magazines it tops up</span></label><select id="loadKit"><option value="1">Equipped and carried only</option><option value="0">Everything</option></select>
         <label class="check"><input type="checkbox" id="mute"> Mute all sound <span class="dim">(M in game)</span></label>
         <label>Relay (TURN) server <span class="dim">optional: if friends can't connect to you</span></label>
         <div class="turn-row"><input id="turnUrl" placeholder="turn:host:3478"><input id="turnUser" placeholder="username"><input id="turnPass" type="password" placeholder="password"></div>
       </div>
       <div class="controls">
         <b>WASD</b> move &middot; <b>Space</b> toggle lowered weapon &middot; <b>Shift</b> slow &amp; steady &middot; <b>C</b> crouch &middot; <b>Q / E</b> lean<br>
-        <b>LMB</b> fire &middot; <b>RMB</b> aim &middot; <b>MMB</b> ping &middot; <b>R</b> reload (<b>R R</b> dump reload, <b>hold R</b> check the magazine) &middot; <b>I</b> inspect (<b>hold I</b> hold the chamber check open; the mouse turns what you hold) &middot; <b>1 / 2 / wheel</b> swap (<b>wheel</b> while aiming: magnification)<br>
-        <b>Mouse back</b> weapon light &middot; <b>Mouse forward</b> laser<br>
+        <b>LMB</b> fire &middot; <b>RMB</b> aim &middot; <b>MMB</b> ping (<b>hold MMB</b> the comms wheel: light, laser, magnifier, calls to the squad) &middot; <b>R</b> reload (<b>R R</b> dump reload, <b>hold R</b> check the magazine, or the chamber on a gun without one) &middot; <b>I</b> inspect (<b>hold I</b> hold the chamber check open; the mouse turns what you hold) &middot; <b>1 / 2 / wheel</b> swap (<b>wheel</b> while aiming: magnification)<br>
         <b>3 / 4 / 5</b> a grenade into your hand (frag and flashbang to start; drag one onto a key's box in the inventory to change it): <b>hold LMB</b> to pull the pin, <b>release</b> to throw, <b>RMB</b> underhand / weak / strong; the key again or 1 / 2 puts it away &middot; <b>H</b> body &amp; kit (as Tab) &middot; hold <b>B</b> swap with the gun in your backpack &middot; <b>V</b> shout compliance &middot; <b>X</b> fire selector<br>
         hold <b>F</b> doors (aim high: open, low: kick), bag evidence, arrest, restrain or revive<br>
         <b>Y</b> vote to leave &middot; <b>M</b> mute &middot; <b>F8</b> echo paths &middot; <b>F9</b> hitboxes &middot; <b>Tab</b> inventory, health &amp; scoreboard &middot; <b>Enter</b> chat &middot; <b>Esc</b> menu
@@ -74,6 +83,8 @@
 <div id="hud" class="hidden">
   <div id="crosshair"><i class="t"></i><i class="b"></i><i class="l"></i><i class="r"></i><i class="dot"></i></div>
   <div id="vignette"></div>
+  <canvas id="maskFx" class="hidden"></canvas>
+  <canvas id="glareFx" class="hidden"></canvas>
   <div id="flashFx"></div>
   <div id="dmgDirs"></div>
 
@@ -84,9 +95,10 @@
   <div id="bossBar" class="hidden"><div class="bname">THE WARDEN</div><div class="bbar"><div id="bossFill"></div></div></div>
 
   <div id="team"></div>
-  <canvas id="minimap" width="200" height="200" style="display:none"></canvas>
 
   <div id="killfeed"></div>
+  <canvas id="hbMarks" class="hb-marks hidden"></canvas>
+  <div id="hbInfo" class="hb-info hidden"></div>
   <div id="toast"></div>
   <div id="prompt"></div>
   <div id="nadeWarn" class="hidden"><i>&#9650;</i>GRENADE</div>
@@ -121,6 +133,7 @@
 
   <div id="scoreboard" class="hidden"></div>
   <div id="fieldInv" class="hidden"><div id="fiScore" class="fi-score"></div><div id="fiBody"></div></div>
+  <div id="aboxPick" class="sidearm-pick abox-pick hidden"></div>
 </div>
 
 <!-- ======================= PAUSE ======================= -->
@@ -138,6 +151,8 @@
       <button id="btnResume" class="btn primary">Resume</button>
       <button id="btnQuit" class="btn">Leave game</button>
     </div>
+    <div class="btn-row"><button id="btnProf" class="btn">Save performance profile</button></div>
+    <div id="profLine" class="small dim"></div>
   </div>
 </div>
 
@@ -189,44 +204,70 @@
 </div>
 
 <div id="clickToPlay" class="hidden">Click to engage</div>
+<div id="veil"><svg class="veil-shape" viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M0 15.6C33 10.4 66 5.2 100 0L100 84.4C66 89.6 33 94.8 0 100Z"/></svg><div class="veil-load"><div class="veil-row"><i class="veil-spin"></i><b>Loading</b></div><div id="veilStatus"></div></div></div>
 
+<!-- the model bundle starts downloading first thing, before three.js and the rest are even fetched (docs/models.md "Bundles") -->
+<script src="dist/js/modelbundles.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script src="js/util.js"></script>
-<script src="js/data.js"></script>
-<script src="js/callsigns.js"></script>
-<script src="js/parts.js"></script>
-  <script src="js/gear.js"></script>
-<script src="js/medical.js"></script>
-<script src="js/audio.js"></script>
-<script src="js/level.js"></script>
-<script src="js/world.js"></script>
-<script src="js/furniture.js"></script>
-<script src="js/gunshot-synth.js"></script>
-<script src="js/gunaudio.js"></script>
-<script src="js/lightgrid.js"></script>
-<script src="js/render.js"></script>
-<script src="js/gunmodels.js"></script>
-<script src="js/vmanim.js"></script>
-<script src="js/headgear.js"></script>
-<script src="js/rig.js"></script>
-<script src="js/net.js"></script>
-<script src="js/server.js"></script>
-<script src="js/player.js"></script>
-<script src="js/views.js"></script>
-  <script src="js/casings.js"></script>
-<script src="js/icons.js"></script>
-<script src="js/hud.js"></script>
-<script src="js/shop.js"></script>
-  <script src="js/invui.js"></script>
-<script src="js/gunsmith.js"></script>
-<script src="js/zeroing.js"></script>
-<script src="js/route.js"></script>
-<script src="js/loot.js"></script>
-<script src="js/course.js"></script>
-<script src="js/range.js"></script>
-<script src="js/hangar.js"></script>
-<script src="js/game.js"></script>
-<script src="js/demo.js"></script>
+<!-- the gun models are baked glTF (docs/models.md): three's GLTFLoader and the meshopt decoder as one classic script on this global THREE (tools/build_gltf_classic.mjs) -->
+<script src="assets/vendor/gltf-classic.js"></script>
+<script src="dist/js/util.js"></script>
+<script src="dist/js/zip.js"></script>
+<script src="dist/js/data.js"></script>
+<script src="dist/js/callsigns.js"></script>
+<script src="dist/js/arsenal.js"></script>
+<script src="dist/js/parts.js"></script>
+<script src="dist/js/gear.js"></script>
+<script src="dist/js/medical.js"></script>
+<script src="dist/js/materials.js"></script>
+<script src="dist/js/ballistics.js"></script>
+<script src="dist/js/audio.js"></script>
+<script src="dist/js/level.js"></script>
+<script src="dist/js/world.js"></script>
+<script src="dist/js/furniture.js"></script>
+<script src="dist/js/homes.js"></script>
+<script src="dist/js/residents.js"></script>
+<script src="dist/js/gunshot-synth.js"></script>
+<script src="dist/js/gunaudio.js"></script>
+<script src="dist/js/lightgrid.js"></script>
+<script src="dist/js/render.js"></script>
+<script src="dist/js/scars.js"></script>
+<script src="dist/js/damage.js"></script>
+<script src="dist/js/glare.js"></script>
+<script src="dist/js/shotlog.js"></script>
+<script src="dist/js/stickers.js"></script>
+<script src="dist/js/bolts.js"></script>
+<script src="dist/js/gunmaterials.js"></script>
+<script src="dist/js/gunmodels.js"></script>
+<script src="dist/js/glb.js"></script>
+<script src="dist/js/gunrig.js"></script>
+<script src="dist/js/viewmodel.js"></script>
+<script src="dist/js/vmanim.js"></script>
+<script src="dist/js/headgear.js"></script>
+<script src="dist/js/rig.js"></script>
+<script src="dist/js/net.js"></script>
+<script src="dist/js/server.js"></script>
+<script src="dist/js/player.js"></script>
+<script src="dist/js/views.js"></script>
+<script src="dist/js/casings.js"></script>
+<script src="dist/js/icons.js"></script>
+<script src="dist/js/hud.js"></script>
+<script src="dist/js/shop.js"></script>
+<script src="dist/js/invui.js"></script>
+<script src="dist/js/gunsmith.js"></script>
+<script src="dist/js/zeroing.js"></script>
+<script src="dist/js/route.js"></script>
+<script src="dist/js/loot.js"></script>
+<script src="dist/js/course.js"></script>
+<script src="dist/js/range.js"></script>
+<script src="dist/js/highlights.js"></script>
+<script src="dist/js/menushow.js"></script>
+<script src="dist/js/hangar.js"></script>
+<script src="dist/js/landing.js"></script>
+<script src="dist/js/game.js"></script>
+<script src="dist/js/profiler.js"></script>
+<script src="dist/js/demo.js"></script>
+<script src="dist/js/debugstart.js"></script>
 </body>
 </html>

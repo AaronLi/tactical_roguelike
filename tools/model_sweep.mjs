@@ -1,0 +1,134 @@
+// The set of builds the model pipeline is verified over, and a geometry fingerprint of a built gun. Shared by the baker
+// (tools/bake_models.mjs: coupling detection) and the tests (tools/check_models_assembly.mjs).
+//
+// SWEEP SET. For each platform: three base builds (the default; "loaded A" = every empty slot filled with its first part but
+// no optic or magnifier; "loaded B" = the same with a red dot and a magnifier), and from each base every single swap: each slot
+// set to each part that fits it, and each optional slot emptied (then pruned: a part whose slot has gone goes with it).
+// ~9,200 distinct builds over the 79 platforms.
+
+/** The "loaded" build of a platform (see the sweep set): mode 'A' no optic/magnifier, 'B' with them. */
+export function loadedBuild(GS, id, mode) {
+  let b = GS.defaultBuild(id);
+  // (a pistol's own barrel opens no muzzle slot: its loaded builds use a threaded one, so that the muzzle device and the thread are in the reference builds and the analysis can see them MOVE with the slide instead of blaming it)
+  if (GS.PLATFORMS[id] && GS.PLATFORMS[id].arch === 'pistol') {
+    const s = GS.slotsOf(id, b).find((x) => x.slot === 'barrel'), th = s && GS.compatible(s.mount).find((p) => p.provides && p.provides.muzzle && GS.fitsSlot(s, p, id));
+    if (th) b.barrel = th.id;
+    // (and the pistol chassis, a part that opens the rail slots: the foregrip, both side rails, the SMG stock and the magnifier are in the reference builds too)
+    const g = GS.slotsOf(id, b).find((x) => x.slot === 'grip'), ch = g && GS.compatible(g.mount).find((p) => p.chassis && GS.fitsSlot(g, p, id));
+    if (ch) { b.grip = ch.id; GS.prune(id, b); }
+  }
+  for (let pass = 0; pass < 3; pass++) for (const s of GS.slotsOf(id, b)) {
+    if (b[s.slot]) continue;
+    const k = s.slot.replace(/\d+$/, '');
+    if (['mag', 'receiver', 'charging', 'loader', 'pump', 'tube', 'limbs', 'motor', 'cap'].includes(k)) continue;
+    let c = GS.compatible(s.mount).filter((p) => GS.fitsSlot(s, p, id) && !p.retired && !p.variant);
+    if (mode === 'C') { if (k === 'optic' || k === 'magnifier') continue; const rich = (p) => Object.keys(p.provides || {}).length; const best = c.reduce((a, p) => (a && rich(a) >= rich(p) ? a : p), null); c = best ? [best] : []; } // ('C': each slot's part that opens the most slots, so that a twin railmount's left rail is in a base and what moves it, the barrel, is swapped around it)
+    else if (k === 'optic' || k === 'magnifier') { if (mode === 'A') continue; if (k === 'optic') { const r = c.find((p) => p.model && p.model.optic === 'reddot'); c = r ? [r] : c; } }
+    if (c[0]) b = Object.assign({}, b, { [s.slot]: c[0].id });
+  }
+  if (GS.PLATFORMS[id] && GS.PLATFORMS[id].arch === 'pistol') { // (a muzzle device that is drawn: a thread protector is no mesh at all)
+    const s = GS.slotsOf(id, b).find((x) => x.slot === 'muzzle'), p = s && GS.PARTS[b.muzzle];
+    if (s && p && p.set && p.set.device === 'none') { const q = GS.compatible(s.mount).find((x) => x.set && x.set.device && x.set.device !== 'none' && GS.fitsSlot(s, x, id, b)); if (q) b.muzzle = q.id; }
+  }
+  if (mode === 'B') {
+    for (const s of GS.slotsOf(id, b)) if (s.slot === 'optic' && GS.PARTS[b.optic] && GS.PARTS[b.optic].factory) { const r = GS.compatible(s.mount).find((p) => p.model && p.model.optic === 'reddot' && GS.fitsSlot(s, p, id)); if (r) b.optic = r.id; }
+    for (const s of GS.slotsOf(id, b)) if (s.slot === 'magnifier' && !b.magnifier) { const r = GS.compatible(s.mount).find((p) => GS.fitsSlot(s, p, id)); if (r) b.magnifier = r.id; }
+  }
+  GS.prune(id, b); return b;
+}
+
+/** A stable text key of a build (slot=part pairs, sorted). */
+export const buildKey = (b) => Object.keys(b).sort().map((s) => s + '=' + b[s]).join(',');
+
+/** The sweep of one platform: { bases: [the three base builds], list: [{ base: index into bases, slot, part ('' = emptied; null for a base itself), build }] }, distinct builds only. */
+export function sweepOf(GS, id) {
+  const out = [], seen = new Set(), all = [];
+  const add = (e) => { const k = buildKey(e.build); all.push(e); if (seen.has(k)) return false; seen.add(k); out.push(e); return true; };
+  const bases = [GS.defaultBuild(id), loadedBuild(GS, id, 'A'), loadedBuild(GS, id, 'B')];
+  { const C = loadedBuild(GS, id, 'C'), k = buildKey(C); if (!bases.some((b) => buildKey(b) === k)) bases.push(C); } // (a fourth base, only where it differs)
+  bases.forEach((b, i) => add({ base: i, slot: null, part: null, build: b }));
+  bases.forEach((base, i) => {
+    for (const s of GS.slotsOf(id, base)) {
+      const opts = GS.compatible(s.mount).filter((p) => GS.fitsSlot(s, p, id)).map((p) => p.id);
+      if (!s.req) opts.push('');
+      for (const pid of opts) {
+        if ((base[s.slot] || '') === pid) continue;
+        const nb = Object.assign({}, base); if (pid) nb[s.slot] = pid; else delete nb[s.slot];
+        GS.prune(id, nb);
+        add({ base: i, slot: s.slot, part: pid, build: nb });
+      }
+    }
+  });
+  return { bases, list: out, all };
+}
+
+/**
+ * `n` distinct random builds of a platform that are NOT in its sweep: two or three random swaps (a part or an emptied slot) from a random base,
+ * pruned. Deterministic for a seed. The baker feeds some to its coupling analysis (so interactions between two parts changed at once are learnt);
+ * the test uses other seeds as a held-out check.
+ */
+export function randomBuilds(GS, id, bases, n, seed, exclude = new Set(), kmin = 2, kmax = 3) {
+  let s = seed >>> 0; const rnd = () => (s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 4294967296;
+  const out = [], seen = new Set(exclude);
+  for (let tries = 0; out.length < n && tries < n * 8; tries++) {
+    const b = { ...bases[Math.floor(rnd() * bases.length)] }, k = kmin + Math.floor(rnd() * (kmax - kmin + 1));
+    for (let j = 0; j < k; j++) {
+      const slots = GS.slotsOf(id, b); if (!slots.length) break; const sl = slots[Math.floor(rnd() * slots.length)];
+      const opts = GS.compatible(sl.mount).filter((p) => GS.fitsSlot(sl, p, id)).map((p) => p.id); if (!sl.req) opts.push('');
+      const pid = opts[Math.floor(rnd() * opts.length)]; if (pid) b[sl.slot] = pid; else delete b[sl.slot]; GS.prune(id, b);
+    }
+    const key = buildKey(b); if (seen.has(key)) continue; seen.add(key); out.push(b);
+  }
+  return out;
+}
+
+/**
+ * Builds around the parts that OPEN slots (an optic that takes a riser dot, a handguard that takes a foregrip and lights, a chassis, a stock adapter, a barrel that
+ * takes a muzzle device): from each base, fit such a part, then change each slot it opened to every part that fits it, and every other slot to `perOther` random
+ * alternatives. A swap of the slot a part opens cannot be in the sweep (the slot is not there in the bases), and what it interacts with only shows with the part fitted.
+ */
+export function providerBuilds(GS, id, bases, seed, exclude = new Set(), perOther = 2) {
+  let s = seed >>> 0; const rnd = () => (s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 4294967296;
+  const out = [], seen = new Set(exclude);
+  const add = (b) => { GS.prune(id, b); const k = buildKey(b); if (!seen.has(k)) { seen.add(k); out.push(b); } };
+  const fitting = (sl, b) => GS.compatible(sl.mount).filter((p) => GS.fitsSlot(sl, p, id, b)).map((p) => p.id);
+  for (const base of bases) {
+    const before = new Set(GS.slotsOf(id, base).map((x) => x.slot));
+    for (const sl of GS.slotsOf(id, base)) for (const pid of fitting(sl, base)) {
+      const P = GS.PARTS[pid]; if (!P || !(P.provides || P.chassis) || base[sl.slot] === pid) continue;
+      const b1 = { ...base, [sl.slot]: pid }; GS.prune(id, b1); if (b1[sl.slot] !== pid) continue;
+      for (const s2 of GS.slotsOf(id, b1)) {
+        const alts = fitting(s2, b1); if (!s2.req) alts.push('');
+        const isNew = !before.has(s2.slot), pick = isNew ? alts : Array.from({ length: Math.min(perOther, alts.length) }, () => alts[Math.floor(rnd() * alts.length)]);
+        for (const q of pick) { const b2 = { ...b1 }; if (q) b2[s2.slot] = q; else delete b2[s2.slot]; add(b2); }
+      }
+    }
+  }
+  return out;
+}
+
+/** The compiled def of a build, as the gunsmith builds a model from it. */
+export const defOf = (G, id, build) => ({ id, build, mag: G.WEAPONS[id].mag, code: G.Gunsmith.encode(id, build) });
+
+/**
+ * A built gun's meshes in the gun's frame: [{ tag, node ('' = directly under the root; else the part_/group_ node's key), mat, v: Float64Array of the triangles' vertices (9 per triangle) }],
+ * world-space (every node transform applied), the way the game draws them.
+ */
+export function meshesOf(group, info) {
+  group.updateMatrixWorld(true);
+  const animOf = new Map(); for (const [k, v] of Object.entries(info.anim || {})) if (v && v.isObject3D) animOf.set(v, k);
+  const out = [];
+  group.traverse((o) => {
+    if (!o.isMesh) return;
+    let node = '', p = o.parent;
+    while (p && p !== group) { const a = animOf.get(p); node = a ? 'part_' + a : node || 'group'; if (a) break; p = p.parent; }
+    const pos = o.geometry.attributes.position, idx = o.geometry.index, e = o.matrixWorld.elements, n = idx ? idx.count : pos.count, v = new Float64Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      const j = idx ? idx.getX(i) : i, x = pos.getX(j), y = pos.getY(j), z = pos.getZ(j);
+      v[i * 3] = e[0] * x + e[4] * y + e[8] * z + e[12]; v[i * 3 + 1] = e[1] * x + e[5] * y + e[9] * z + e[13]; v[i * 3 + 2] = e[2] * x + e[6] * y + e[10] * z + e[14];
+    }
+    const m = o.material || {};
+    out.push({ tag: (o.userData.slot || 'base') + (o.userData.at ? '@' + o.userData.at : ''), node, mat: m.name || ('m_' + (m.color ? m.color.getHexString() : '')), v });
+  });
+  return out;
+}

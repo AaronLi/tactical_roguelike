@@ -1,0 +1,1164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gun-model-info.schema.json",
+  "title": "Gun model info (glTF root node extras.info)",
+  "description": "Metres. The glTF frame (x = right, y = up, z = -forward) with the origin at the gun's own origin (the point the recipe builds around: roughly the back of the receiver on the bore line). Every anchor in `info` is written [forward, up, right] = [-z, y, x]; a node's transform is in the same frame, so a part is built \"in place\" and its node origin is only its pivot. Generated from js/glb.ts INFO_FIELDS: do not edit (npm run check:models -- --write).",
+  "type": "object",
+  "properties": {
+    "sy": {
+      "type": "number",
+      "description": "Height of the line of sight above the origin, metres up: where the sight picture sits."
+    },
+    "fSight": {
+      "type": "number",
+      "description": "Forward position of the front sight (or the sight's front), metres: with sy and relief it places the aiming eye."
+    },
+    "relief": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Eye relief, metres: how far behind the sight the eye sits when aiming."
+    },
+    "muzzles": {
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "number"
+        },
+        "minItems": 3,
+        "maxItems": 3
+      },
+      "minItems": 1,
+      "description": "Where the bullet leaves, one [forward, up, right] metres entry per barrel (usually one; an over/under has two, a barrel block more): never assume [0] is the only one. The flash, tracers and shot start here. A part may provide them (GUN_MODEL_CONTRACT.anchors)."
+    },
+    "grip": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 3,
+      "maxItems": 3,
+      "description": "Where the firing hand's palm sits on the grip, [forward, up, right] metres."
+    },
+    "support": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 3,
+      "maxItems": 3,
+      "description": "Where the support hand takes the gun (handguard, foregrip, magazine), [forward, up, right] metres."
+    },
+    "anim": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Animated parts: key (a PARTS value) -> the NAME of its `part_<key>` node. Rebuilt into live node references at load."
+    },
+    "magAt": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "Where the magazine seats: [forward, up] metres of its top/centre in the well. Present exactly when the model has a part_mag."
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Where the magazine seats: [forward, up] metres of its top/centre in the well. Present exactly when the model has a part_mag."
+    },
+    "handle": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "f": {
+              "type": "number",
+              "description": "Forward position of the handle, metres."
+            },
+            "y": {
+              "type": "number",
+              "description": "Height of the handle above the origin, metres."
+            },
+            "x": {
+              "type": "number",
+              "description": "Sideways position, metres, right positive (a left-hand handle is negative)."
+            },
+            "travel": {
+              "type": "number",
+              "minimum": 0,
+              "description": "How far it moves back when worked, metres."
+            },
+            "grab": {
+              "oneOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "minItems": 3,
+                  "maxItems": 3,
+                  "description": "Where the hand takes it, [forward, up, right] metres (default: its own [f, y, x])."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Where the hand takes it, [forward, up, right] metres (default: its own [f, y, x])."
+            },
+            "recip": {
+              "oneOf": [
+                {
+                  "type": "boolean",
+                  "description": "True if it reciprocates with the bolt (an AK, a Thompson: it moves with every shot)."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "True if it reciprocates with the bolt (an AK, a Thompson: it moves with every shot)."
+            },
+            "style": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "description": "Shape of the handle (free text, e.g. \"fold\", \"tube\", \"pair\", \"top\")."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Shape of the handle (free text, e.g. \"fold\", \"tube\", \"pair\", \"top\")."
+            },
+            "sz": {
+              "oneOf": [
+                {
+                  "type": "number",
+                  "description": "Size of the handle, metres (free, per style)."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Size of the handle, metres (free, per style)."
+            },
+            "stem": {
+              "oneOf": [
+                {
+                  "type": "number",
+                  "description": "Length of the handle stem, metres (free, per style)."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Length of the handle stem, metres (free, per style)."
+            }
+          },
+          "required": [
+            "f",
+            "y",
+            "x",
+            "travel"
+          ],
+          "additionalProperties": false,
+          "description": "The cocking handle, when there is one (part_handle)."
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The cocking handle, when there is one (part_handle)."
+    },
+    "port": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3,
+          "description": "The ejection port, [forward, up, right] metres: where spent cases leave."
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The ejection port, [forward, up, right] metres: where spent cases leave."
+    },
+    "chamberAt": {
+      "oneOf": [
+        {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "side": {
+                  "type": "string",
+                  "enum": [
+                    "right"
+                  ],
+                  "description": "side = right"
+                },
+                "f": {
+                  "type": "number",
+                  "description": "Forward, metres."
+                },
+                "y": {
+                  "type": "number",
+                  "description": "Up, metres."
+                },
+                "x": {
+                  "type": "number",
+                  "description": "Right, metres."
+                }
+              },
+              "required": [
+                "side",
+                "f",
+                "y",
+                "x"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "side": {
+                  "type": "string",
+                  "enum": [
+                    "port"
+                  ],
+                  "description": "side = port"
+                },
+                "f": {
+                  "type": "number",
+                  "description": "Forward of the case head, metres."
+                },
+                "y": {
+                  "type": "number",
+                  "description": "Up, metres."
+                },
+                "x": {
+                  "type": "number",
+                  "description": "Right, metres."
+                }
+              },
+              "required": [
+                "side",
+                "f",
+                "y",
+                "x"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "side": {
+                  "type": "string",
+                  "enum": [
+                    "top"
+                  ],
+                  "description": "side = top"
+                },
+                "f": {
+                  "type": "number",
+                  "description": "Forward, metres."
+                },
+                "y": {
+                  "type": "number",
+                  "description": "Up, metres."
+                },
+                "x": {
+                  "type": "number",
+                  "description": "Right, metres."
+                },
+                "w": {
+                  "type": "number",
+                  "description": "Width of the open top, metres."
+                }
+              },
+              "required": [
+                "side",
+                "f",
+                "y",
+                "x",
+                "w"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "side": {
+                  "type": "string",
+                  "enum": [
+                    "cyl"
+                  ],
+                  "description": "side = cyl"
+                },
+                "z": {
+                  "type": "number",
+                  "description": "Half the cylinder's length, metres (the face the rounds show on)."
+                },
+                "R": {
+                  "type": "number",
+                  "description": "Radius of the ring of chambers, metres."
+                },
+                "r": {
+                  "type": "number",
+                  "description": "Radius of one chamber, metres."
+                },
+                "n": {
+                  "type": "number",
+                  "minimum": 1,
+                  "description": "Number of chambers."
+                }
+              },
+              "required": [
+                "side",
+                "z",
+                "R",
+                "r",
+                "n"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "side": {
+                  "type": "string",
+                  "enum": [
+                    "breech"
+                  ],
+                  "description": "side = breech"
+                },
+                "heads": {
+                  "type": "array",
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 2,
+                    "maxItems": 2
+                  },
+                  "description": "Case heads at the open breech: [sideways, up] metres from the hinge, one per barrel."
+                },
+                "r": {
+                  "type": "number",
+                  "description": "Case radius, metres."
+                },
+                "z": {
+                  "type": "number",
+                  "description": "Back/forward offset in the hinge frame, metres."
+                },
+                "bore": {
+                  "oneOf": [
+                    {
+                      "type": "boolean",
+                      "description": "True: the bore shows there when it is empty."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "True: the bore shows there when it is empty."
+                }
+              },
+              "required": [
+                "side",
+                "heads",
+                "r",
+                "z"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "side": {
+                  "type": "string",
+                  "enum": [
+                    "face"
+                  ],
+                  "description": "side = face"
+                },
+                "f": {
+                  "type": "number",
+                  "description": "Forward of the mouths of the chambers (the rear face of the barrels), metres."
+                },
+                "heads": {
+                  "type": "array",
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 2,
+                    "maxItems": 2
+                  },
+                  "description": "Case heads in the chambers, fixed to the frame (a falling block bares them): [right, up] metres, one per barrel, in the order they are loaded."
+                },
+                "r": {
+                  "type": "number",
+                  "description": "Case radius, metres."
+                },
+                "bore": {
+                  "oneOf": [
+                    {
+                      "type": "boolean",
+                      "description": "True: the bore shows there when it is empty."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "True: the bore shows there when it is empty."
+                }
+              },
+              "required": [
+                "side",
+                "f",
+                "heads",
+                "r"
+              ],
+              "additionalProperties": false
+            }
+          ],
+          "description": "Where a round shows in the chamber, as `side` says (a tagged union)."
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Where a round shows in the chamber, as `side` says (a tagged union)."
+    },
+    "breech": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "at": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 2,
+              "maxItems": 2,
+              "description": "[forward, up] metres of the open breech from the hinge pin."
+            },
+            "pitch": {
+              "type": "number",
+              "description": "Opening angle, radians."
+            },
+            "long": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "description": "Which long handguard it carries, \"irons\" or \"rail\", or null."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Which long handguard it carries, \"irons\" or \"rail\", or null."
+            }
+          },
+          "required": [
+            "at",
+            "pitch"
+          ],
+          "additionalProperties": false,
+          "description": "A tipping breech (the Thor): where it sits once open."
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "A tipping breech (the Thor): where it sits once open."
+    },
+    "ch": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3,
+          "description": "The charging handle's grab point, [forward, up, right] metres."
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The charging handle's grab point, [forward, up, right] metres."
+    },
+    "bolt": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3,
+          "description": "The bolt's rear, where the hand pulls it, [forward, up, right] metres."
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The bolt's rear, where the hand pulls it, [forward, up, right] metres."
+    },
+    "boltTravel": {
+      "oneOf": [
+        {
+          "type": "number",
+          "minimum": 0.005,
+          "maximum": 0.3,
+          "description": "A bolt worked by hand (the pistol with part_bolt): how far the bolt comes back, metres (absent: 0.12)."
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "A bolt worked by hand (the pistol with part_bolt): how far the bolt comes back, metres (absent: 0.12)."
+    },
+    "cheek": {
+      "oneOf": [
+        {
+          "type": "number",
+          "description": "A bullpup: the forward position (metres) the eye rests at when aiming, whatever sight is on the rail."
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "A bullpup: the forward position (metres) the eye rests at when aiming, whatever sight is on the rail."
+    },
+    "recoilBarrel": {
+      "oneOf": [
+        {
+          "type": "number",
+          "minimum": 0,
+          "description": "A long-recoil barrel: how far it runs back each shot, metres (0 or absent: none)."
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "A long-recoil barrel: how far it runs back each shot, metres (0 or absent: none)."
+    },
+    "pistol": {
+      "oneOf": [
+        {
+          "type": "boolean",
+          "description": "True for a handgun: the hands, the ADS and the holster use the pistol pose."
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "True for a handgun: the hands, the ADS and the holster use the pistol pose."
+    },
+    "slide": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3,
+          "description": "A pistol slide's grab point, [forward, up, right] metres. Present exactly when the model has a part_slide."
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "A pistol slide's grab point, [forward, up, right] metres. Present exactly when the model has a part_slide."
+    },
+    "cylAt": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3,
+          "description": "A revolver cylinder's centre, [forward, up, right] metres."
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "A revolver cylinder's centre, [forward, up, right] metres."
+    },
+    "load": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "at": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "description": "[forward, up] metres of each open breech."
+            },
+            "pitch": {
+              "type": "number",
+              "description": "Tip angle, radians."
+            }
+          },
+          "required": [
+            "at",
+            "pitch"
+          ],
+          "additionalProperties": false,
+          "description": "A break-open gun: where the open breeches are and the angle the barrels tip to."
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "A break-open gun: where the open breeches are and the angle the barrels tip to."
+    },
+    "cup": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3,
+          "description": "Where the left hand cups the frame (a derringer), [forward, up, right] metres."
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Where the left hand cups the frame (a derringer), [forward, up, right] metres."
+    },
+    "block": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "drop": {
+              "type": "number",
+              "description": "How far the block drops, metres."
+            },
+            "lever": {
+              "type": "number",
+              "description": "How far the lever swings, radians."
+            }
+          },
+          "required": [
+            "drop",
+            "lever"
+          ],
+          "additionalProperties": false,
+          "description": "A falling-block breech (the Hailstorm): part_brk is the block, which slides straight down `drop` metres to bare the chambers, and part_lever its lever, which swings down `lever` radians (about x, at its pivot) as it does."
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "A falling-block breech (the Hailstorm): part_brk is the block, which slides straight down `drop` metres to bare the chambers, and part_lever its lever, which swings down `lever` radians (about x, at its pivot) as it does."
+    },
+    "magTop": {
+      "oneOf": [
+        {
+          "type": "boolean",
+          "description": "True when the hand takes the magazine from its top instead of its base."
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "True when the hand takes the magazine from its top instead of its base."
+    },
+    "magRake": {
+      "oneOf": [
+        {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.6,
+          "description": "A raked magazine well (a Glock-pattern one, its bottom back like a pistol grip's): how far the magazine's axis is turned back from straight down, radians. A reload draws it out and seats it along that axis, and a non-factory magazine is drawn at that angle. Absent or 0: straight down."
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "A raked magazine well (a Glock-pattern one, its bottom back like a pistol grip's): how far the magazine's axis is turned back from straight down, radians. A reload draws it out and seats it along that axis, and a non-factory magazine is drawn at that angle. Absent or 0: straight down."
+    },
+    "quarrelMats": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "A crossbow's bolt materials as three.js Material JSON (free-form; viewmodel only)."
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "A crossbow's bolt materials as three.js Material JSON (free-form; viewmodel only)."
+    },
+    "mounts": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 3,
+            "maxItems": 3
+          },
+          "description": "Mount points where a swappable part sits, `mount_<slot>` -> [forward, up, right] metres of the part's origin (e.g. mount_muzzle: where a muzzle device screws on). Normally assembled from the parts' anchors (see GUN_MODEL_CONTRACT.anchors); a whole-gun bake may list them directly."
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Mount points where a swappable part sits, `mount_<slot>` -> [forward, up, right] metres of the part's origin (e.g. mount_muzzle: where a muzzle device screws on). Normally assembled from the parts' anchors (see GUN_MODEL_CONTRACT.anchors); a whole-gun bake may list them directly."
+    },
+    "reflex": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "f": {
+              "type": "number",
+              "description": "Forward position of the window, metres."
+            },
+            "y": {
+              "type": "number",
+              "description": "Height of the window, metres."
+            },
+            "w": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Width, metres."
+            },
+            "h": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Height, metres."
+            },
+            "round": {
+              "oneOf": [
+                {
+                  "type": "boolean",
+                  "description": "True: a disc of diameter w."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "True: a disc of diameter w."
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "dot",
+                "dotG",
+                "cdot",
+                "holo"
+              ],
+              "description": "The reticle: dot, dotG (green dot), cdot (circle-dot) or holo (a ring)."
+            }
+          },
+          "required": [
+            "f",
+            "y",
+            "w",
+            "h",
+            "kind"
+          ],
+          "additionalProperties": false,
+          "description": "A reflex or holographic sight's window (js/viewmodel.ts): the game draws a collimated reticle behind it, masked to it. f, y: the window's centre, [forward, up] metres; w, h: its size, metres (round: a disc of diameter w); kind: the reticle drawn: dot, dotG, dotP (a small precision dot), cdot or holo."
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "A reflex or holographic sight's window (js/viewmodel.ts): the game draws a collimated reticle behind it, masked to it. f, y: the window's centre, [forward, up] metres; w, h: its size, metres (round: a disc of diameter w); kind: the reticle drawn: dot, dotG, dotP (a small precision dot), cdot or holo."
+    },
+    "pip": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "f": {
+              "type": "number",
+              "description": "Forward position of the lens, metres."
+            },
+            "y": {
+              "type": "number",
+              "description": "Height of the lens centre, metres."
+            },
+            "r": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Lens radius, metres."
+            },
+            "parent": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "description": "Node name the lens hangs on."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Node name the lens hangs on."
+            },
+            "pos": {
+              "oneOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "minItems": 3,
+                  "maxItems": 3,
+                  "description": "Place in the parent, [x, y, z] metres in its own frame."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Place in the parent, [x, y, z] metres in its own frame."
+            }
+          },
+          "required": [
+            "f",
+            "y",
+            "r"
+          ],
+          "additionalProperties": false,
+          "description": "A scope's ocular lens (js/viewmodel.ts): the game draws the world through the scope on a disc there (picture-in-picture) with the reticle over it. f, y: its centre, [forward, up] metres; r: its radius. parent + pos: a lens that swings on a hinge (a magnifier's): the NAME of the node it hangs on and its place in that node, [x, y, z] metres in the node's own frame."
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "A scope's ocular lens (js/viewmodel.ts): the game draws the world through the scope on a disc there (picture-in-picture) with the reticle over it. f, y: its centre, [forward, up] metres; r: its radius. parent + pos: a lens that swings on a hinge (a magnifier's): the NAME of the node it hangs on and its place in that node, [x, y, z] metres in the node's own frame."
+    },
+    "barrels": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "n": {
+              "type": "number",
+              "minimum": 2,
+              "description": "How many barrels."
+            },
+            "free_bore_mm": {
+              "oneOf": [
+                {
+                  "type": "number",
+                  "description": "The bore a fresh barrel has before its first round, millimetres."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The bore a fresh barrel has before its first round, millimetres."
+            },
+            "stack_mm": {
+              "oneOf": [
+                {
+                  "type": "number",
+                  "description": "The length of a barrel's stack of rounds, millimetres (the same for every round type)."
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The length of a barrel's stack of rounds, millimetres (the same for every round type)."
+            },
+            "rounds": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "round_mm": {
+                    "oneOf": [
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        },
+                        "description": "One round: [diameter, length], millimetres."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "One round: [diameter, length], millimetres."
+                  },
+                  "rounds_each": {
+                    "type": "number",
+                    "minimum": 1,
+                    "description": "Rounds a full barrel holds of this type."
+                  },
+                  "effective_mm": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 1,
+                    "description": "The effective barrel length for each round of a barrel in turn, millimetres: shortest first."
+                  }
+                },
+                "required": [
+                  "rounds_each",
+                  "effective_mm"
+                ],
+                "additionalProperties": false
+              },
+              "description": "The round types the block takes, by name: each { round_mm, rounds_each, effective_mm }."
+            },
+            "default": {
+              "type": "string",
+              "description": "The round type a gun starts with (a key of rounds)."
+            }
+          },
+          "required": [
+            "n",
+            "rounds",
+            "default"
+          ],
+          "additionalProperties": false,
+          "description": "A gun with several barrels, each holding a stack of rounds fired nose to tail: n barrels (info.muzzles has one entry each, in the same order). The ROUND LENGTH loaded decides how many rounds a barrel holds, so the model lists the round types it takes in `rounds`, keyed by name (standard, rifle...): each has rounds_each (the rounds a barrel holds of that type), effective_mm (the length the bullet has run down the bore for the 1st, 2nd... last round of a barrel: rounds_each entries, longest last: the more rounds are gone, the longer the run) and round_mm [diameter, length] of one round (informational). `default` names the type a gun starts with. stack_mm is the length of a barrel's stack (the same for every type: a longer round, fewer of them) and free_bore_mm the part of the bore a fresh barrel has before its first round (both informational). The game takes the speed of a shot from the effective length (GUN_MODEL_CONTRACT.multi)."
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "A gun with several barrels, each holding a stack of rounds fired nose to tail: n barrels (info.muzzles has one entry each, in the same order). The ROUND LENGTH loaded decides how many rounds a barrel holds, so the model lists the round types it takes in `rounds`, keyed by name (standard, rifle...): each has rounds_each (the rounds a barrel holds of that type), effective_mm (the length the bullet has run down the bore for the 1st, 2nd... last round of a barrel: rounds_each entries, longest last: the more rounds are gone, the longer the run) and round_mm [diameter, length] of one round (informational). `default` names the type a gun starts with. stack_mm is the length of a barrel's stack (the same for every type: a longer round, fewer of them) and free_bore_mm the part of the bore a fresh barrel has before its first round (both informational). The game takes the speed of a shot from the effective length (GUN_MODEL_CONTRACT.multi)."
+    },
+    "barrelGroups": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "description": "Named groups of barrels (indices into info.muzzles): the game fires the \"top\" or \"bottom\" group for a three-barrel pull and \"all\" for every barrel."
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Named groups of barrels (indices into info.muzzles): the game fires the \"top\" or \"bottom\" group for a three-barrel pull and \"all\" for every barrel."
+    },
+    "modeDial": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "at": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 3,
+              "maxItems": 3,
+              "description": "The dial's centre."
+            },
+            "axis": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 3,
+              "maxItems": 3,
+              "description": "The axis it turns about (a unit vector)."
+            },
+            "modes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1,
+              "description": "The fire modes, in dial order."
+            },
+            "stepDeg": {
+              "type": "number",
+              "description": "Degrees between two positions."
+            }
+          },
+          "required": [
+            "at",
+            "axis",
+            "modes",
+            "stepDeg"
+          ],
+          "additionalProperties": false,
+          "description": "A fire-mode dial on the model, turned with the selected mode: at its centre [forward, up, right] metres, axis the way it turns, modes the positions in order (the game's fire modes), stepDeg the angle between two positions. The mesh that turns is part of the model; the game only reports the angle."
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "A fire-mode dial on the model, turned with the selected mode: at its centre [forward, up, right] metres, axis the way it turns, modes the positions in order (the game's fire modes), stepDeg the angle between two positions. The mesh that turns is part of the model; the game only reports the angle."
+    },
+    "hinge": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "sequence": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "part": {
+                    "type": "string",
+                    "description": "The part_ node this step moves."
+                  },
+                  "axis": {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "description": "The axis a rotation turns about: x, y or z."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The axis a rotation turns about: x, y or z."
+                  },
+                  "at": {
+                    "oneOf": [
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        },
+                        "minItems": 3,
+                        "maxItems": 3,
+                        "description": "Where the axis is (informational: the node's own pivot is used)."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Where the axis is (informational: the node's own pivot is used)."
+                  },
+                  "rotate_deg": {
+                    "oneOf": [
+                      {
+                        "type": "number",
+                        "description": "Degrees about the axis."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Degrees about the axis."
+                  },
+                  "move": {
+                    "oneOf": [
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        },
+                        "minItems": 3,
+                        "maxItems": 3,
+                        "description": "A slide, [forward, up, right] metres."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "A slide, [forward, up, right] metres."
+                  },
+                  "frame": {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "description": "A part_ node whose frame the move is in."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "A part_ node whose frame the move is in."
+                  },
+                  "note": {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "description": "What it is (free text)."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "What it is (free text)."
+                  }
+                },
+                "required": [
+                  "part"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 1,
+              "description": "The steps, in order."
+            }
+          },
+          "required": [
+            "sequence"
+          ],
+          "additionalProperties": false,
+          "description": "A sequence of moves that takes the gun apart for a reload (the Tempest changes its whole barrel block): each step moves one part_ node, in order; the reload animation plays them forward (the old block comes out) and back (the new one goes in). part: the node (its key, \"lever\", or its name \"part_lever\"); rotate_deg turns it about axis x, y or z (three.js rotation, degrees) at its pivot; move slides it [forward, up, right] metres, in the frame of the part_ node named by frame (default: its own parent's). GUN_MODEL_CONTRACT.multi."
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "A sequence of moves that takes the gun apart for a reload (the Tempest changes its whole barrel block): each step moves one part_ node, in order; the reload animation plays them forward (the old block comes out) and back (the new one goes in). part: the node (its key, \"lever\", or its name \"part_lever\"); rotate_deg turns it about axis x, y or z (three.js rotation, degrees) at its pivot; move slides it [forward, up, right] metres, in the frame of the part_ node named by frame (default: its own parent's). GUN_MODEL_CONTRACT.multi."
+    }
+  },
+  "required": [
+    "sy",
+    "fSight",
+    "relief",
+    "muzzles",
+    "grip",
+    "support",
+    "anim"
+  ],
+  "additionalProperties": false
+}

@@ -5,11 +5,23 @@ const root = __dirname, port = +process.env.PORT || 8080, host = process.env.HOS
 const types = {
   '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml',
   '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.ico': 'image/x-icon', '.ogg': 'audio/ogg', '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.md': 'text/markdown',
+  '.map': 'application/json', '.ts': 'text/plain', // (the source maps, and the TypeScript they point back to: the browser's devtools show js/*.ts)
 };
 const server = http.createServer((req, res) => {
   const url = decodeURIComponent(req.url.split('?')[0]);
-  const file = path.normalize(path.join(root, url.endsWith('/') ? url + 'index.html' : url));
+  let file = path.normalize(path.join(root, url === '/' ? 'index.html' : url));
   if (!file.startsWith(root)) { res.writeHead(403); return res.end(); }
+  // a folder: its index.html if it has one (a tool's page, e.g. tools/contact-synth/), else a listing of its files
+  // (how the game finds what's in assets/stickers/, js/stickers.ts)
+  if (url !== '/' && url.endsWith('/') && fs.existsSync(path.join(file, 'index.html'))) file = path.join(file, 'index.html');
+  else if (url !== '/' && url.endsWith('/')) {
+    return fs.readdir(file, { withFileTypes: true }, (err, list) => {
+      if (err) { res.writeHead(404); return res.end('Not found'); }
+      const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+      res.writeHead(200, { 'Content-Type': 'text/html', 'Cache-Control': 'no-store' });
+      res.end(`<!doctype html><ul>${list.filter((d) => d.isFile()).map((d) => `<li><a href="${esc(encodeURIComponent(d.name))}">${esc(d.name)}</a></li>`).join('')}</ul>`);
+    });
+  }
   fs.readFile(file, (err, data) => {
     if (err) { res.writeHead(404); return res.end('Not found'); }
     res.writeHead(200, { 'Content-Type': types[path.extname(file).toLowerCase()] || 'application/octet-stream', 'Cache-Control': 'no-store' });

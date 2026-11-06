@@ -1,0 +1,80 @@
+# Apartment personas: young and creative renters
+
+## Dessa Okonkwo - ceramicist who turned a loft into a kiln-warm studio
+- **Who:** 31, potter and part-time art-school technician. Lives alone, two years in. Telling habit: wipes wet hands down her apron and then onto the nearest wall, so every wall has hand-height clay smears.
+- **Home type:** ground-floor double-height loft. Living (studio, double height), kitchen, bedroom on the open upper floor, small office nook under the mezzanine. Bathroom (NEW) off the hall.
+- **Mood:** dusty, warm, cluttered
+- **Palette:**
+  - Living/studio: wall #c9774f (terracotta), ceiling #efe3d0 (bisque), trim #3b2a22 (kiln-brick brown)
+  - Kitchen: wall #e0b86a (mustard glaze), ceiling #efe3d0 (bisque), trim #6e4a2e (walnut)
+  - Bedroom: wall #a9b59a (sage), ceiling #e8e4d4 (oat), trim #f0ede2 (chalk)
+  - Office: wall #d9c7a8 (raw clay), ceiling #efe3d0 (bisque), trim #3b2a22 (kiln-brick brown)
+- **Floors:** living polished concrete NEW #8d867c (clay-dusted grey); kitchen tile #b5553a (red quarry); bedroom wood #7a5a3c (honey, paint-splashed); office wood #6a4e36 (worn oak).
+- **Furniture:**
+  - Living: two armchairs in mismatched mustard #d8a63a and teal #2f7f7a, one sagging; bookshelf of plank-and-brick, unpainted; plant x4, big, some dead; workbench NEW (long desk-shaped table, plaster-white).
+  - Kitchen: counter chipped, island used as a glazing table, fridge covered in magnets.
+  - Bedroom: bed as mattress on pallets, low; wardrobe replaced by a clothes rail NEW.
+  - Office: desk buried in sketchbooks, files stacked on the floor.
+- **What they own:**
+  - Electric kiln NEW, 1m cube, steel grey #8a8e92 with a glowing orange seam
+  - Pottery wheel NEW, 0.8m, bucket-blue #3d6fa3 with a clay-grey splash tray
+  - Drying racks NEW, 2m tall metal shelving full of pale grey #b9b2a6 bisque pots
+  - Glaze buckets x8 NEW, white #e6e6e6, lids askew
+  - Hanging pot lights, three yellow-orange cones #e8a640 on the mezzanine rail
+  - Huge tapestry, 2x1.5m, rust and cream, over the bed
+  - Clay sacks, stacked 1m, off-white #d6d0c2
+- **Signs of life:** Grey footprints from studio to kitchen. A half-glazed vase on the island. Dried clay on the stair treads. Bin of broken failures.
+- **In a raid:** Dessa is in the upstairs bedroom, headphones on, kiln humming in the studio below, one lamp on. She comes down the stairs with her hands up, shouting that the kiln is hot.
+
+## Kez Marchetti - streamer with a blacked-out room and a very loud screen
+- **Who:** 24, full-time Twitch streamer. Lives with his partner Juno (25, remote QA tester) in a single-floor flat, eight months in. Telling habit: sleeps till 2pm, never opens the blinds, and the flat has smelt of energy drinks since March.
+- **Home type:** single-floor. Living, kitchen, bedroom (the stream room), office (Juno's), bathroom (NEW).
+- **Mood:** dark, neon, stale
+- **Palette:**
+  - Living: wall #232a3d (ink navy), ceiling #14161f (near black), trim #ff3fa4 (hot pink LED)
+  - Kitchen: wall #3a3f4c (slate), ceiling #20232b (charcoal), trim #3fe0d0 (mint LED)
+  - Bedroom (stream room): wall #0f0f14 (blackout black), ceiling #0a0a0d (void), trim #8a4dff (violet LED)
+  - Office: wall #2d2a3a (dusk plum), ceiling #1a1822 (night), trim #8a4dff (violet LED)
+- **Floors:** living carpet #2a2a30 (dark grey, stained); kitchen vinyl NEW #55575e (sticky grey); bedroom carpet #1c1c22 (black-grey with acoustic foam offcuts); office carpet #2a2a30.
+- **Furniture:**
+  - Living: sofa black faux leather, cracked at the arm; tv huge and permanently on a console; sidetable holds six cans.
+  - Kitchen: counter hidden under takeaway boxes; fridge with energy drinks only.
+  - Bedroom: desk NEW as a wide L-shape with three monitors; bed unmade, duvet black; wardrobe door hangs open.
+  - Office: deskpair, Juno's tidy side against Kez's spill-over; files nonexistent; cooler NEW as a water dispenser.
+- **What they own:**
+  - Triple-monitor rig, 1.8m wide, black with a pink backlight glow
+  - Gaming chair, red and black #c0202e, 1.2m tall, in the stream room
+  - Acoustic foam panels x20, 0.6m squares, charcoal #2b2b2f
+  - Ring light on a stand, 1.7m, white disc #f5f5f5
+  - LED strip along ceilings, cycling pink to violet to mint
+  - Green screen, 2x2m, lime #3fbf3f, pinned to a wall
+  - Pyramid of 200 empty cans, 1m, silver and neon green
+  - Tall PC tower with a glass side, 0.5m, purple glow
+- **Signs of life:** Pizza box on the keyboard. Cables across the floor. Dead streamer mugs. A "LIVE" sign above the bedroom door.
+- **In a raid:** Kez is in the stream room mid-broadcast, headset on, door shut, the sign glowing red. He freezes with hands visible, then whispers "chat, don't clip this". Juno is in the office, awake.
+
+## Tobias Rennick - 28-year-old trader with a showroom loft and nothing of himself in it
+- **Who:** 28, junior derivatives trader who landed a huge bonus and a promotion. Lives alone, five months in. Telling habit: has the flat photographed for magazines, and never cooks; the oven still has its plastic on.
+- **Home type:** ground-floor double-height loft. Living (double height, glass-rail mezzanine), kitchen, bedroom on the open upper floor, office. Bathroom (NEW) in marble.
+- **Mood:** sterile, glossy, empty
+- **Palette:**
+  - Living: wall #e4e1da (pale stone), ceiling #f6f5f2 (gallery white), trim #1a1a1a (matte black)
+  - Kitchen: wall #cfd3d6 (cold steel grey), ceiling #f6f5f2 (gallery white), trim #b8924a (brushed brass)
+  - Bedroom: wall #b9bfc7 (fog blue-grey), ceiling #eceef0 (frost), trim #1a1a1a (matte black)
+  - Office: wall #d4cfc6 (greige), ceiling #f6f5f2 (gallery white), trim #b8924a (brushed brass)
+- **Floors:** living polished concrete NEW #9a9a9a (mirror grey); kitchen tile #d9d9d6 (large white format); bedroom carpet #8d8f94 (deep grey, vacuum-striped); office wood #8b7355 (pale smoked oak).
+- **Furniture:**
+  - Living: sofa huge, cream #e8e2d4, unsat-in; armchairs x2, one single black leather statement piece; tv wall-sized, off; bookshelf holds three books and one vase; plant a single sculptural tree in a white pot.
+  - Kitchen: island marble-white #ececec, bare; counter spotless; fridge steel, near empty.
+  - Bedroom: bed low, platform, white linen; wardrobe floor-to-ceiling, mirrored.
+  - Office: desk glass-top, minimal; no files.
+- **What they own:**
+  - Statement chandelier NEW, 1.5m, brass rings #b8924a, hung through the void
+  - Bar cart NEW, 1m, brass and smoked glass
+  - Sports car keys on a bowl and a car-shaped bronze sculpture, 0.6m, black
+  - Giant abstract canvas, 2x1.5m, red and black blocks #b3202a / #111, bought for the colour
+  - Treadmill NEW, 1.6m, black, facing the window, unused
+  - Wine fridge NEW, 1.5m, black glass, with a blue strip light
+  - Three monitors on a standing desk, 1.4m, black on white
+- **Signs of life:** Almost none. Gym bag by the door, one dry-cleaning bag, an unopened parcel stack, a laptop open on the sofa with market tickers.
+- **In a raid:** Tobias is awake and dressed at his desk, markets open on a night session. He shouts for the officers to mind the floor and asks if they have a warrant.

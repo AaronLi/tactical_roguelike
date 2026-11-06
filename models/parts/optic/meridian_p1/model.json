@@ -1,0 +1,21 @@
+{
+  "source": "authored",
+  "kind": "part",
+  "slot": "optic",
+  "frame": "rail-top",
+  "optic": {
+    "sy": 0.045,
+    "fSight": -0.026,
+    "relief": 0.07,
+    "pip": {
+      "f": -0.0225,
+      "y": 0.045,
+      "r": 0.0114
+    },
+    "magnifier": false,
+    "height": "high"
+  },
+  "replaces": [
+    "Meridian P1 1× prism"
+  ]
+}

@@ -34,6 +34,10 @@ input[type=range] { padding: 0; accent-color: var(--accent); }
 
 /* ---------- screens ---------- */
 .screen { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: radial-gradient(ellipse at center, rgba(0,0,0,0.35), rgba(0,0,0,0.8)); z-index: 20; padding: 16px; overflow-y: auto; }
+/* the main menu on the right, the guns going round on the left behind it (js/menushow.ts); a shade over the menu's side only. On a narrow
+   screen it goes back to the middle. */
+#menu { justify-content: flex-end; padding-right: max(16px, 6vw); background: linear-gradient(90deg, rgba(0,0,0,0) 35%, rgba(0,0,0,0.55) 70%, rgba(0,0,0,0.8)); }
+@media (max-width: 760px) { #menu { justify-content: center; padding-right: 16px; background: rgba(0,0,0,0.55); } }
 /* the route map */
 .route-box { background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--accent); padding: 18px 22px; width: 940px; max-width: 100%; border-radius: 4px; box-shadow: 0 20px 60px rgba(0,0,0,0.6); }
 .route-title { font-size: 20px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
@@ -82,6 +86,12 @@ img.anim { width: 1.25em; height: 1.25em; vertical-align: -0.3em; margin-right: 
 .join-row input { text-transform: uppercase; letter-spacing: 4px; text-align: center; }
 .msg { min-height: 20px; margin-top: 12px; color: var(--dim); font-size: 13px; }
 .msg.err { color: var(--bad); }
+.model-load { margin-top: 10px; font: 12px var(--mono); color: var(--dim); display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; transition: opacity 0.6s; }
+.model-load.ok { opacity: 0.55; }
+.model-load.gone { opacity: 0; pointer-events: none; }
+.model-load.bad { color: var(--bad); }
+.model-load .ml-bar { flex: 1 1 100%; height: 3px; background: var(--line); border-radius: 2px; overflow: hidden; }
+.model-load .ml-bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width 0.2s; }
 .settings { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 10px; }
 .settings summary { cursor: pointer; color: var(--dim); font: 600 12px var(--mono); letter-spacing: 1px; text-transform: uppercase; }
 .set-grid label { margin: 10px 0 4px; }
@@ -101,6 +111,84 @@ img.anim { width: 1.25em; height: 1.25em; vertical-align: -0.3em; margin-right: 
 
 #clickToPlay { position: fixed; left: 50%; top: 58%; transform: translateX(-50%); z-index: 15; background: var(--panel); border: 1px solid var(--accent); color: var(--accent); padding: 12px 24px; font: 700 14px var(--mono); letter-spacing: 3px; text-transform: uppercase; cursor: pointer; animation: pulse 1.4s infinite; }
 @keyframes pulse { 50% { opacity: 0.55; } }
+/* the loading veil (js/game.ts veil): over everything, and takes the clicks while it's up. Two layers. The shape: a black panel with slanted top and bottom edges,
+   wobbling down the screen like jelly, settling over it, and pulling away off the bottom. --s: how far its edges fall across the screen; --m: how far past the screen it
+   reaches, so the wobble never shows round it. What's on it stays still and fades (a jelly's for the edges, not the words).
+   It's covered by about 0.34 s (G.Game.VEIL_MS); the way out's time is js/game.ts VEIL_OUT. The shape's travel, its slant, the words and the spinner are transforms and opacity, which the compositor
+   runs, so they keep going while the page is busy building a level. The ripple along its edges (d) is the page's own: it stalls if the page does, but
+   by then the edges are off the screen. VEIL_IN and VEIL_OUT below are made together: a wave running along each edge, by moving the handles of one curve in a 100 x 100 box stretched over the panel. */
+#veil { --s: 28vh; --m: 12vh; position: fixed; inset: 0; z-index: 90; visibility: hidden; pointer-events: none; }
+#veil.on { visibility: visible; pointer-events: auto; }
+#veil.out { visibility: visible; }
+.veil-shape { position: absolute; left: 0; top: calc(-1 * (var(--s) + var(--m))); width: 100%; height: calc(100vh + 2 * (var(--s) + var(--m))); overflow: visible; fill: #000; transform: translateY(-100%); will-change: transform; }
+#veil.on .veil-shape { transform: none; animation: veilIn 0.8s both; }
+#veil.out .veil-shape { transform: translateY(106%); animation: veilOut 0.65s both; }
+#veil.on path { animation: veilInEdge 0.8s linear both; }
+#veil.out path { animation: veilOutEdge 0.65s linear both; }
+#veil.now .veil-shape, #veil.now path, #veil.now .veil-load { animation: none; }
+@keyframes veilIn {
+  0% { transform: translateY(-100%) skewY(-7deg) scaleY(1.14); animation-timing-function: cubic-bezier(0.5, 0, 0.75, 0.7); }
+  42% { transform: translateY(3%) skewY(4deg) scaleY(1.05); animation-timing-function: cubic-bezier(0.3, 0, 0.6, 1); }
+  62% { transform: translateY(-1.8%) skewY(-2.2deg) scaleY(0.985); animation-timing-function: cubic-bezier(0.3, 0, 0.6, 1); }
+  80% { transform: translateY(0.7%) skewY(1deg) scaleY(1.006); animation-timing-function: cubic-bezier(0.3, 0, 0.6, 1); }
+  100% { transform: none; }
+}
+@keyframes veilOut {
+  0% { transform: none; animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1); }
+  20% { transform: translateY(-2.4%) skewY(-2.5deg) scaleY(1.02); animation-timing-function: cubic-bezier(0.55, 0, 0.9, 0.5); }
+  100% { transform: translateY(106%) skewY(7deg) scaleY(1.14); }
+}
+@keyframes veilInEdge {
+  0% { d: path("M0 15.6C33 15.6 66 2.7 100 0L100 84.4C66 98.1 33 102 0 100Z"); }
+  6% { d: path("M0 15.6C33 13.2 66 0.8 100 0L100 84.4C66 101.8 33 90.4 0 100Z"); }
+  12% { d: path("M0 15.6C33 9.7 66 2.2 100 0L100 84.4C66 96.9 33 85.3 0 100Z"); }
+  19% { d: path("M0 15.6C33 7.6 66 5 100 0L100 84.4C66 89.2 33 87.7 0 100Z"); }
+  25% { d: path("M0 15.6C33 7.8 66 7.2 100 0L100 84.4C66 84.3 33 93.6 0 100Z"); }
+  31% { d: path("M0 15.6C33 9.6 66 7.6 100 0L100 84.4C66 84.2 33 98.3 0 100Z"); }
+  38% { d: path("M0 15.6C33 11.4 66 6.3 100 0L100 84.4C66 87.4 33 99.3 0 100Z"); }
+  44% { d: path("M0 15.6C33 12.1 66 4.7 100 0L100 84.4C66 90.9 33 97.3 0 100Z"); }
+  50% { d: path("M0 15.6C33 11.6 66 3.9 100 0L100 84.4C66 92.5 33 94.4 0 100Z"); }
+  56% { d: path("M0 15.6C33 10.5 66 4 100 0L100 84.4C66 91.7 33 92.7 0 100Z"); }
+  62% { d: path("M0 15.6C33 9.6 66 4.9 100 0L100 84.4C66 90 33 92.9 0 100Z"); }
+  69% { d: path("M0 15.6C33 9.5 66 5.7 100 0L100 84.4C66 88.6 33 94.1 0 100Z"); }
+  75% { d: path("M0 15.6C33 10 66 6 100 0L100 84.4C66 88.2 33 95.4 0 100Z"); }
+  81% { d: path("M0 15.6C33 10.6 66 5.7 100 0L100 84.4C66 88.9 33 95.9 0 100Z"); }
+  88% { d: path("M0 15.6C33 10.9 66 5.2 100 0L100 84.4C66 89.7 33 95.6 0 100Z"); }
+  94% { d: path("M0 15.6C33 10.9 66 4.8 100 0L100 84.4C66 90.2 33 94.9 0 100Z"); }
+  100% { d: path("M0 15.6C33 10.4 66 5.2 100 0L100 84.4C66 89.6 33 94.8 0 100Z"); }
+}
+@keyframes veilOutEdge {
+  0% { d: path("M0 15.6C33 10.4 66 5.2 100 0L100 84.4C66 89.6 33 94.8 0 100Z"); }
+  6% { d: path("M0 15.6C33 12.9 66 4.9 100 0L100 84.4C66 90.2 33 95.5 0 100Z"); }
+  12% { d: path("M0 15.6C33 14.2 66 2.4 100 0L100 84.4C66 90.7 33 95 0 100Z"); }
+  19% { d: path("M0 15.6C33 13.6 66 0.4 100 0L100 84.4C66 90.8 33 94 0 100Z"); }
+  25% { d: path("M0 15.6C33 10.5 66 0.6 100 0L100 84.4C66 90.1 33 93.2 0 100Z"); }
+  31% { d: path("M0 15.6C33 6.1 66 3.8 100 0L100 84.4C66 88.8 33 92.9 0 100Z"); }
+  38% { d: path("M0 15.6C33 2.9 66 8.9 100 0L100 84.4C66 87.6 33 93.8 0 100Z"); }
+  44% { d: path("M0 15.6C33 3 66 13.2 100 0L100 84.4C66 87.1 33 95.4 0 100Z"); }
+  50% { d: path("M0 15.6C33 7.3 66 14.1 100 0L100 84.4C66 87.9 33 97.1 0 100Z"); }
+  56% { d: path("M0 15.6C33 14.3 66 10.4 100 0L100 84.4C66 89.8 33 97.9 0 100Z"); }
+  62% { d: path("M0 15.6C33 20.5 66 3.1 100 0L100 84.4C66 92 33 97.2 0 100Z"); }
+  69% { d: path("M0 15.6C33 22.4 66 -4.4 100 0L100 84.4C66 93.3 33 95.1 0 100Z"); }
+  75% { d: path("M0 15.6C33 18.3 66 -8 100 0L100 84.4C66 92.8 33 92.5 0 100Z"); }
+  81% { d: path("M0 15.6C33 9.5 66 -5.3 100 0L100 84.4C66 90.6 33 90.7 0 100Z"); }
+  88% { d: path("M0 15.6C33 -0.1 66 3.3 100 0L100 84.4C66 87.5 33 90.8 0 100Z"); }
+  94% { d: path("M0 15.6C33 -5.6 66 14 100 0L100 84.4C66 85.1 33 93 0 100Z"); }
+  100% { d: path("M0 15.6C33 -3.5 66 21.5 100 0L100 84.4C66 84.7 33 96.4 0 100Z"); }
+}
+.veil-load { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 8px; }
+#veil.on .veil-load { animation: veilText 0.2s 0.3s ease-out both; }
+#veil.out .veil-load { opacity: 0; animation: veilText 0.14s 0.12s ease-in reverse both; }
+@keyframes veilText { from { opacity: 0; } to { opacity: 1; } }
+.veil-row { display: flex; align-items: center; gap: 14px; color: var(--accent); font: 700 14px var(--mono); letter-spacing: 3px; text-transform: uppercase; }
+.veil-spin { width: 20px; height: 20px; box-sizing: border-box; border: 3px solid rgba(255, 255, 255, 0.16); border-top-color: var(--accent); border-radius: 50%; will-change: transform; animation: veilSpin 0.8s linear infinite; }
+@keyframes veilSpin { to { transform: rotate(360deg); } }
+/* what it's doing now: the line turns down out of sight and the next comes over from above, as on a drum */
+#veilStatus { position: relative; width: 240px; height: 16px; overflow: hidden; perspective: 60px; color: #7d8288; font: 11px var(--mono); letter-spacing: 1px; text-align: center; }
+#veilStatus span { position: absolute; inset: 0; line-height: 16px; backface-visibility: hidden; will-change: transform, opacity; animation: statusIn 0.14s ease-out both; }
+#veilStatus span.gone { animation: statusOut 0.14s ease-in both; }
+@keyframes statusIn { from { transform: translateY(-100%) rotateX(80deg); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes statusOut { to { transform: translateY(100%) rotateX(-80deg); opacity: 0; } }
 
 /* ---------- HUD ---------- */
 #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; font-family: var(--mono); }
@@ -122,6 +210,9 @@ img.anim { width: 1.25em; height: 1.25em; vertical-align: -0.3em; margin-right: 
 .inv-quick .qbox span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .inv-quick .qbox i { position: absolute; right: 4px; top: 1px; font-style: normal; cursor: pointer; opacity: 0.7; }
 .inv-quick .qbox i:hover { opacity: 1; }
+#maskFx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; }
+#glareFx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 4; mix-blend-mode: screen; }
+#maskFx.hidden, #glareFx.hidden { display: none; }
 #flashFx { position: absolute; inset: 0; opacity: 0; background: #fffdf4; pointer-events: none; z-index: 5; }
 #items .qs { margin-right: 8px; }
 #items .qs b { display: inline-block; min-width: 14px; padding: 0 3px; margin-right: 2px; border: 1px solid rgba(255,255,255,0.35); border-radius: 3px; font-size: 10px; text-align: center; }
@@ -150,9 +241,28 @@ img.anim { width: 1.25em; height: 1.25em; vertical-align: -0.3em; margin-right: 
 .tb { height: 3px; background: rgba(255,255,255,0.1); margin-top: 2px; }
 .tb .th { height: 100%; background: #e8eef2; }
 .tb .ta { height: 100%; background: var(--armor); }
-#minimap { position: absolute; right: 16px; top: 16px; width: 200px; height: 200px; }
 
 #killfeed { position: absolute; right: 16px; top: 228px; text-align: right; font-size: 12px; }
+/* F9's readout: everything about whoever's under the crosshair (js/hud.ts debugTarget) */
+.hb-info { position: absolute; left: 16px; top: 96px; width: 360px; max-height: calc(100vh - 330px); overflow: hidden; padding: 8px 10px; background: rgba(6, 8, 10, 0.78); border: 1px solid rgba(255, 255, 255, 0.12); font: 11px/1.45 var(--mono); color: #c9d1d6; pointer-events: none; }
+.hb-info.hidden { display: none; }
+.hb-marks { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; }
+.hb-marks.hidden { display: none; }
+.hb-info .hb-shot { margin-top: 3px; font-size: 10px; line-height: 1.35; }
+.hb-info .hb-shot b { color: #ffb43a; }
+.hb-info h4 { margin: 0 0 4px; font: 600 12px var(--mono); color: #fff; }
+.hb-info h4 small { color: #8a959c; font-weight: 400; }
+.hb-info .hb-sec { margin-top: 6px; padding-top: 4px; border-top: 1px dashed rgba(255, 255, 255, 0.12); }
+.hb-info .hb-k { color: #8a959c; }
+.hb-info .hb-line b { color: #ffb43a; }
+.hb-info .hb-old { opacity: 0.6; }
+.hb-info .hb-path { font-size: 0.92em; line-height: 1.4; }
+.hb-info .hb-legend i { display: block; height: 6px; margin: 3px 0 1px; border-radius: 2px; }
+.hb-info .hb-legend { margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px dashed rgba(255, 255, 255, 0.12); font-size: 10px; }
+.hb-info .bad { color: #ff7a6a; } .hb-info .warn { color: #ffc65a; } .hb-info .ok { color: #8fd18a; }
+.hb-info .hb-row { display: flex; justify-content: space-between; gap: 8px; }
+.hb-info .hb-org { display: grid; grid-template-columns: 1fr 1fr; column-gap: 14px; margin-top: 4px; line-height: 1.3; }
+.hb-info .hb-reg { grid-column: 1 / -1; margin-top: 3px; color: #8a959c; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; }
 #killfeed div { background: rgba(0,0,0,0.45); padding: 3px 8px; margin-bottom: 3px; display: inline-block; clear: both; float: right; transition: opacity 1s; }
 #killfeed .fade { opacity: 0; }
 #killfeed .hs { color: #ff5050; }
@@ -245,6 +355,7 @@ img.anim { width: 1.25em; height: 1.25em; vertical-align: -0.3em; margin-right: 
 .card { background: var(--panel); border: 1px solid var(--line); padding: calc(14px * var(--ik, 1)); display: flex; flex-direction: column; gap: calc(6px * var(--ik, 1)); }
 .card.owned { border-color: var(--good); }
 .card.squad { border-color: rgba(61,255,122,0.35); background: linear-gradient(180deg, rgba(61,255,122,0.06), var(--panel)); }
+.card .load-sel { width: 100%; background: #14181b; color: #e8eef2; border: 1px solid #3a424a; padding: calc(4px * var(--ik, 1)); font: calc(12px * var(--ik, 1)) var(--mono); }
 .ch { display: flex; justify-content: space-between; align-items: baseline; gap: calc(8px * var(--ik, 1)); }
 .cn { font: 700 calc(15px * var(--ik, 1)) var(--mono); }
 .tier { font: 600 calc(10px * var(--ik, 1)) var(--mono); letter-spacing: 1px; text-transform: uppercase; color: var(--dim); white-space: nowrap; }
@@ -262,7 +373,7 @@ img.anim { width: 1.25em; height: 1.25em; vertical-align: -0.3em; margin-right: 
   .shop-wrap { flex-direction: column; }
   .shop-left { width: 100%; }
   #vendorArt { width: calc(120px * var(--ik, 1)); }
-  #team, #minimap { transform: scale(0.8); transform-origin: top; }
+  #team { transform: scale(0.8); transform-origin: top; }
 }
 label.check { display: flex; align-items: center; gap: 8px; text-transform: none; letter-spacing: 0; font: 13px 'Segoe UI', system-ui, sans-serif; color: var(--text); cursor: pointer; }
 label.check input { width: auto; accent-color: var(--accent); }
@@ -292,6 +403,9 @@ label.check input { width: auto; accent-color: var(--accent); }
 .gs-slot.on { background: rgba(255,176,46,0.14); }
 .gs-slot.on span { color: var(--accent); }
 .gs-stats { display: flex; flex-direction: column; gap: calc(3px * var(--ik, 1)); }
+.gs-change { padding: calc(6px * var(--ik, 1)) calc(8px * var(--ik, 1)); margin-bottom: calc(4px * var(--ik, 1)); border: 1px dashed var(--line); background: rgba(255,255,255,0.03); }
+.gs-change .gs-ch-h { font: 600 calc(10px * var(--ik, 1)) var(--mono); color: var(--text); margin-bottom: calc(4px * var(--ik, 1)); }
+.gs-change .gs-pe { color: var(--text); }
 .gs-stat { display: grid; grid-template-columns: calc(86px * var(--ik, 1)) 1fr calc(92px * var(--ik, 1)); gap: calc(6px * var(--ik, 1)); align-items: center; font: calc(10px * var(--ik, 1)) var(--mono); color: var(--dim); }
 .gs-stat div { height: calc(4px * var(--ik, 1)); background: rgba(255,255,255,0.08); }
 .gs-stat i { display: block; height: 100%; background: var(--accent); }
@@ -299,6 +413,13 @@ label.check input { width: auto; accent-color: var(--accent); }
 .gs-stat.up b, .gs-stat.up em { color: var(--good); }
 .gs-stat.down b, .gs-stat.down em { color: #ff6b6b; }
 .gs-stat em { font-style: normal; font-size: calc(9px * var(--ik, 1)); }
+/* each load through the build's barrel: muzzle velocity and energy */
+.gs-loads { display: grid; grid-template-columns: 1fr auto auto; gap: calc(2px * var(--ik, 1)) calc(10px * var(--ik, 1)); margin-top: calc(6px * var(--ik, 1)); padding-top: calc(6px * var(--ik, 1)); border-top: 1px solid rgba(255,255,255,0.08); font: calc(10px * var(--ik, 1)) var(--mono); color: var(--dim); }
+.gs-loads > span:nth-child(-n+3) { color: var(--accent); font-size: calc(9px * var(--ik, 1)); letter-spacing: 0.06em; text-transform: uppercase; }
+.gs-loads b { color: var(--text); font-weight: 600; text-align: right; }
+.gs-loads b.up, .gs-loads b.up em { color: var(--good); }
+.gs-loads b.down, .gs-loads b.down em { color: #ff6b6b; }
+.gs-loads em { font-style: normal; font-size: calc(9px * var(--ik, 1)); }
 .gs-list { display: flex; flex-direction: column; gap: calc(4px * var(--ik, 1)); }
 .gs-sub { font: 600 calc(11px * var(--ik, 1)) var(--mono); color: var(--dim); letter-spacing: 2px; text-transform: uppercase; margin-top: 2px; }
 .gs-left { display: flex; flex-direction: column; gap: calc(10px * var(--ik, 1)); min-width: 0; }
@@ -307,13 +428,32 @@ label.check input { width: auto; accent-color: var(--accent); }
 .gs-slot.misfit b, .gs-slot.misfit b i { color: #ff8a7a; }
 .gs-part:hover { border-color: rgba(255,176,46,0.5); }
 .gs-part.fitted { border-color: var(--good); }
-.gs-part.na { opacity: 0.45; }
+.gs-part.na { opacity: 0.45; } .gs-part.na:hover { opacity: 0.9; }
+/* the sticker tool (js/gunsmith.ts): its tab at the end of the row, the stickers you own, the controls */
+.gs-tabs .gs-stk-tab { margin-left: auto; }
+.gs-tabs .gs-stk-tab small { color: var(--accent); }
+.gs-stk .stk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(76px * var(--ik, 1)), 1fr)); gap: calc(6px * var(--ik, 1)); }
+.gs-stk .stk-card { position: relative; aspect-ratio: 1; padding: calc(6px * var(--ik, 1)); background: var(--panel); border: 1px solid var(--line); border-radius: 3px; cursor: pointer; }
+.gs-stk .stk-card:hover { border-color: rgba(255,176,46,0.5); }
+.gs-stk .stk-card.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.gs-stk .stk-card img { width: 100%; height: 100%; object-fit: contain; display: block; pointer-events: none; }
+.gs-stk .stk-card b { position: absolute; right: 4px; bottom: 2px; font: 700 calc(11px * var(--ik, 1)) var(--mono); color: var(--accent); text-shadow: 0 1px 2px #000; }
+.gs-stk .stk-ctl { display: flex; flex-wrap: wrap; gap: calc(6px * var(--ik, 1)) calc(16px * var(--ik, 1)); align-items: center; font: calc(12px * var(--ik, 1)) var(--mono); color: var(--dim); }
+.gs-stk .stk-ctl.off { opacity: 0.4; pointer-events: none; }
+.gs-stk .stk-ctl label { display: flex; align-items: center; gap: 6px; margin: 0; flex: 1 1 calc(190px * var(--ik, 1)); min-width: 0; }
+.gs-stk .stk-ctl label.stk-flip { flex: 0 0 auto; }
+.gs-stk .stk-ctl input[type=range] { flex: 1 1 auto; min-width: 50px; width: auto; }
+.gs-stk .stk-ctl span { flex: 0 0 4.5em; color: var(--text); white-space: nowrap; }
+.gs-stk .stk-act { display: flex; gap: 6px; align-items: center; min-height: calc(28px * var(--ik, 1)); font: calc(12px * var(--ik, 1)) var(--mono); color: var(--text); }
+.gs-stk .stk-hint, .gs-stk .stk-none { font: calc(11px * var(--ik, 1)) var(--mono); color: var(--dim); margin: 0; }
+#toast .stk-toast { height: 1.8em; vertical-align: middle; margin-right: 4px; }
 .gs-pn { font: 600 calc(12px * var(--ik, 1)) var(--mono); }
 .gs-pn small { display: block; font-weight: 400; font-size: calc(10px * var(--ik, 1)); color: var(--dim); letter-spacing: 1px; text-transform: uppercase; }
 .gs-pe { font: calc(10px * var(--ik, 1)) var(--mono); color: var(--dim); display: flex; flex-wrap: wrap; gap: calc(2px * var(--ik, 1)) calc(10px * var(--ik, 1)); }
 .gs-pe .g { color: var(--good); }
 .gs-pe .b { color: #ff8a7a; }
 .gs-pa { display: flex; gap: calc(4px * var(--ik, 1)); align-items: center; white-space: nowrap; }
+.gs-skin { max-width: calc(250px * var(--ik, 1)); background: #14181b; color: #e8eef2; border: 1px solid #3a424a; padding: calc(3px * var(--ik, 1)); font: calc(11px * var(--ik, 1)) var(--mono); }
 .gs-pa .tag { font: calc(10px * var(--ik, 1)) var(--mono); color: var(--dim); letter-spacing: 1px; text-transform: uppercase; }
 .gs-empty { font: calc(13px * var(--ik, 1)) var(--mono); color: var(--dim); padding: calc(20px * var(--ik, 1)); }
 @media (max-width: 900px) { .gs-main { grid-template-columns: 1fr; } }
@@ -326,7 +466,7 @@ label.check input { width: auto; accent-color: var(--accent); }
 .fit-y { color: var(--good); margin-right: 8px; }
 .fit-n { color: #ff8a7a; margin-right: 8px; opacity: 0.8; }
 
-/* ---------------------------------------------------------------- Kit tab: grid inventory (js/invui.js) */
+/* ---------------------------------------------------------------- Kit tab: grid inventory (js/invui.ts) */
 #shopItems.inv-host { display: block; }
 .inv { display: flex; flex-wrap: wrap; gap: calc(18px * var(--ik, 1)); align-items: flex-start; user-select: none; }
 /* equipment, what you carry, then the locker (or your body in the field): side by side when there's room,
@@ -467,7 +607,10 @@ i.c.heavy { background: #a02828; } i.c.light { background: #7a3a30; } i.c.frac {
 .inv-item i.am { font-style: normal; font-weight: 700; padding: 0 2px; border-radius: 2px; background: rgba(255,255,255,0.12); }
 .inv-item i.am.mix { margin-left: 2px; background: rgba(240,150,40,0.35); }
 .am-hp { color: #ff8a7a; } .am-ap { color: #8ac4ff; } .am-tracer { color: #ff6a3a; } .am-subsonic { color: #b8c0c8; }
-.am-slug { color: #ffd27a; } .am-birdshot { color: #c8e08a; } .am-flechette { color: #8ac4ff; }
+.am-slug { color: #ffd27a; } .am-birdshot { color: #c8e08a; } .am-flechette { color: #8ac4ff; } .am-sabot { color: #7ad0ff; }
+/* +P loads: a hot amber label, in the inventory and on the HUD */
+.inv-item i.am[class*="_p"] { background: rgba(255,170,30,0.28); color: #ffc24a; }
+.amtag.plus { color: #ffb020; text-shadow: 0 0 6px rgba(255,150,20,0.5); }
 .amtag { font-size: calc(11px * var(--ik, 1)); letter-spacing: 1px; color: var(--accent); margin-left: calc(4px * var(--ik, 1)); }
 .card.ammo .gs-pe { font: calc(11px * var(--ik, 1)) var(--mono); color: #9fb48a; margin: calc(6px * var(--ik, 1)) 0; }
 .card.ammo .fits { font: calc(10px * var(--ik, 1)) var(--mono); color: var(--dim); }
@@ -521,14 +664,14 @@ i.c.heavy { background: #a02828; } i.c.light { background: #7a3a30; } i.c.frac {
 .turn-row { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 4px; grid-column: 1 / -1; }
 .turn-row input { min-width: 0; }
 
-/* the range's spotting view: the lane's IPSC target and its hits (js/range.js spotting) */
+/* the range's spotting view: the lane's IPSC target and its hits (js/range.ts spotting) */
 #rangeSpot { position: fixed; right: 16px; top: 50%; transform: translateY(-50%); z-index: 12; width: 200px; padding: 8px; background: rgba(8,12,16,0.82); border: 1px solid #3a4a56; border-radius: 4px; font: 11px var(--mono, monospace); color: #a8e8ff; text-align: center; pointer-events: none; }
 #rangeSpot b { display: block; margin-bottom: 4px; color: #7fe0ff; letter-spacing: 1px; }
 #rangeSpot canvas { display: block; width: 100%; height: auto; }
 #rangeSpot small { display: block; margin-top: 4px; color: #a8ffc0; }
 @media (max-width: 700px) { #rangeSpot { width: 130px; right: 8px; } }
 
-/* the zeroing table (js/zeroing.js) */
+/* the zeroing table (js/zeroing.ts) */
 .zr .zr-row { display: flex; align-items: center; gap: calc(8px * var(--ik, 1)); flex-wrap: wrap; }
 .zr .zr-l { font: 600 calc(11px * var(--ik, 1)) var(--mono); color: var(--dim); letter-spacing: 1px; text-transform: uppercase; min-width: calc(48px * var(--ik, 1)); }
 .zr .tab small { opacity: 0.7; font-size: 0.8em; margin-left: 3px; }
@@ -549,7 +692,7 @@ i.c.heavy { background: #a02828; } i.c.light { background: #7a3a30; } i.c.frac {
 .zr .zr-dial { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; min-width: calc(150px * var(--ik, 1)); font: 700 calc(15px * var(--ik, 1)) var(--mono); color: var(--accent); }
 .zr .zr-dial small { font: 500 calc(10px * var(--ik, 1)) var(--mono); color: var(--dim); }
 
-/* the sidearm picker, over the route map before a run's first level (js/game.js sidearmPick) */
+/* the sidearm picker, over the route map before a run's first level (js/game.ts sidearmPick) */
 .route-box { position: relative; }
 .sidearm-pick { position: absolute; inset: 0; background: rgba(8, 10, 13, 0.9); display: flex; align-items: center; justify-content: center; z-index: 5; }
 .sidearm-pick .arm-box { max-width: 980px; padding: 24px; text-align: center; }
@@ -574,3 +717,168 @@ i.c.heavy { background: #a02828; } i.c.light { background: #7a3a30; } i.c.frac {
 .sidearm-pick .arm-who i > * { width: 14px !important; height: 14px !important; margin: 0 !important; }
 .sidearm-pick .arm.sel { border-color: var(--accent); background: #232016; box-shadow: 0 0 0 2px var(--accent) inset; }
 .sidearm-pick .arm-ok { margin-top: 16px; min-width: 260px; }
+.sidearm-pick:has(.web-full) { position: fixed; inset: 0; z-index: 60; background: #080a0d; }
+.web-full { position: absolute; inset: 0; display: flex; }
+.web-view { position: relative; flex: 1 1 auto; min-width: 0; overflow: hidden; cursor: grab; touch-action: none; user-select: none; background: radial-gradient(circle at 50% 50%, #151a20 0, #080a0d 75%); }
+.web-view:active { cursor: grabbing; }
+.web-world { position: absolute; left: 50%; top: 50%; width: 0; height: 0; transform-origin: 0 0; }
+.web-world.glide { transition: transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.web-world svg { position: absolute; overflow: visible; pointer-events: none; }
+.web-lines polygon, .web-lines line { fill: none; stroke: #2b333b; stroke-width: 1.5; }
+.web-world .strand { stroke: #47535e; stroke-width: 5; stroke-linecap: round; }
+.web-world .strand.on { stroke: var(--accent); stroke-width: 7; }
+.web-path { position: absolute; transform: translate(-50%, -50%); font: 700 15px var(--mono); letter-spacing: 3px; text-transform: uppercase; color: #8b98a4; white-space: nowrap; pointer-events: none; }
+.web-node { position: absolute; transform: translate(-50%, -50%); width: 176px; padding: 10px 8px; display: flex; flex-direction: column; align-items: center; gap: 4px; background: #14181d; border: 1px solid var(--line); border-radius: 6px; color: #dfe5ea; cursor: pointer; }
+.web-node img { height: 72px; max-width: 100%; object-fit: contain; pointer-events: none; }
+/* a gun picture still loading (js/icons.ts pending) */
+.spin { width: 22px; height: 22px; border: 3px solid rgba(255,255,255,0.15); border-top-color: var(--accent, #f5a524); border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.web-node .icon-wait { height: 72px; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+
+.web-node b { font: 700 15px var(--mono); line-height: 1.15; text-align: center; color: inherit; }
+.web-node small { font: 11.5px var(--mono); color: var(--accent); text-align: center; line-height: 1.25; }
+.web-node:hover { border-color: var(--accent); }
+.web-node.got { border-color: #6d6240; }
+.web-node.next { color: #aab5bf; border-style: dashed; }
+.web-node.next img { filter: grayscale(1) brightness(0.8); }
+.web-node.far { color: #66717b; background: #0f1215; }
+.web-node.far img { filter: grayscale(1) brightness(0.3); }
+.web-node.far small { color: #66717b; }
+.web-node.look { box-shadow: 0 0 0 2px #dfe5ea; }
+.web-node.sel { border-color: var(--accent); background: #232016; box-shadow: 0 0 0 3px var(--accent); }
+.web-head { position: absolute; left: 20px; top: 16px; pointer-events: none; text-align: left; }
+.sidearm-pick .web-head h2 { margin: 0; font-size: 22px; }
+.sidearm-pick .web-head p { margin: 2px 0 0; font-size: 12.5px; }
+.web-home { position: absolute; left: 20px; bottom: 16px; }
+.web-side { flex: 0 0 310px; box-sizing: border-box; padding: 18px; background: #0d1014; border-left: 1px solid var(--line); display: flex; flex-direction: column; gap: 9px; overflow-y: auto; text-align: left; }
+.web-side > img { height: 96px; max-width: 100%; object-fit: contain; align-self: center; }
+.web-side h3 { font: 700 20px var(--mono); color: var(--accent); margin: 0; }
+.web-side h4 { font: 700 11px var(--mono); letter-spacing: 1px; text-transform: uppercase; color: var(--dim); margin: 6px 0 0; }
+.web-side em { font-size: 13px; color: var(--dim); font-style: normal; line-height: 1.4; }
+.web-side .arm-stats { display: flex; flex-wrap: wrap; gap: 4px 12px; font: 12px var(--mono); color: #b8c2cc; }
+.web-ask { border-left: 3px solid var(--accent); padding: 4px 0 4px 8px; font-size: 13px; color: #dfe5ea; }
+.web-ask.far { border-color: var(--line); color: var(--dim); }
+.web-ask b { font-family: var(--mono); }
+.web-ask small, .web-next small { display: block; color: var(--dim); font-size: 12px; margin-top: 2px; }
+.web-next { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; font-size: 13px; color: #dfe5ea; }
+.web-next span { font-family: var(--mono); color: var(--accent); }
+.web-pro { border-left: 3px solid var(--line); padding: 4px 0 4px 8px; font-size: 13px; color: #dfe5ea; }
+.web-pro.got { border-color: var(--accent); }
+.web-pro b { font-family: var(--mono); color: var(--accent); }
+.web-pro ul { list-style: none; margin: 3px 0 5px; padding: 0; color: var(--dim); font-size: 12px; line-height: 1.4; }
+.web-pro span { font-family: var(--mono); color: var(--accent); }
+.web-pro label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-weight: 600; }
+.web-pro label input { width: auto; flex: 0 0 auto; margin: 0; }
+.web-pro:hover, .web-pro:focus-visible { background: #14181d; outline: none; }
+.web-preview { position: absolute; right: 322px; top: 50%; transform: translateY(-50%); width: min(360px, calc(100vw - 350px)); max-height: calc(100% - 24px); overflow-y: auto; box-sizing: border-box; padding: 14px; background: #0d1014; border: 1px solid var(--accent); border-radius: 6px; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6); display: flex; flex-direction: column; gap: 8px; text-align: left; pointer-events: none; z-index: 2; }
+.web-preview img { height: 110px; max-width: 100%; object-fit: contain; align-self: center; }
+.web-preview h3 { font: 700 16px var(--mono); color: #dfe5ea; margin: 0; }
+.web-preview h3 b { color: var(--accent); }
+.web-preview h4 { font: 700 11px var(--mono); letter-spacing: 1px; text-transform: uppercase; color: var(--dim); margin: 2px 0 0; }
+.web-preview ul { list-style: none; margin: 0; padding: 0; color: var(--dim); font-size: 12.5px; line-height: 1.4; }
+.web-foot { margin-top: auto; padding-top: 10px; }
+.sidearm-pick .web-foot p { margin: 0 0 8px; font-size: 12px; line-height: 1.4; }
+.web-side .arm-ok { margin-top: 4px; min-width: 0; width: 100%; }
+.web-side .arm-who { justify-content: flex-start; }
+@media (max-width: 720px) { .web-full { flex-direction: column; } .web-view { flex: 1 1 55%; } .web-side { flex: 0 0 45%; border-left: 0; border-top: 1px solid var(--line); } }
+/* the attachments box: three wheels, each spun till you stop it, then fit what it landed on or carry it (js/game.ts aboxShow) */
+.abox-pick { position: fixed; z-index: 45; pointer-events: auto; }
+.abox-pick .arm { cursor: default; min-height: 300px; }
+.abox-pick .abox-win { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; padding: 10px 6px; border: 1px solid var(--line); background: #0d1013; overflow: hidden; }
+.abox-pick .abox-reel { position: relative; width: 100%; overflow: hidden; border: 1px solid var(--line); background: #0d1013; }
+.abox-pick .abox-reel::before, .abox-pick .abox-reel::after { content: ''; position: absolute; left: 0; right: 0; height: 26px; z-index: 1; pointer-events: none; }
+.abox-pick .abox-reel::before { top: 0; background: linear-gradient(#0d1013, rgba(13, 16, 19, 0)); }
+.abox-pick .abox-reel::after { bottom: 0; background: linear-gradient(rgba(13, 16, 19, 0), #0d1013); }
+.abox-pick .abox-strip { will-change: transform; }
+.abox-pick .abox-face { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 0 6px; box-sizing: border-box; border-bottom: 1px solid #1a1f25; }
+.abox-pick .abox-face img { height: 64px; }
+.abox-pick .abox-win small { font: 11px var(--mono); color: var(--dim); text-transform: uppercase; letter-spacing: 1px; }
+.abox-pick .abox-acts { display: flex; flex-direction: column; gap: 6px; width: 100%; margin-top: auto; }
+.abox-pick .abox-acts .btn { width: 100%; }
+.abox-pick .arm.taken { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
+.abox-pick .arm.gone { opacity: 0.45; }
+.abox-pick .abox-close { margin-top: 16px; min-width: 200px; }
+/* the weapon case: one wheel, wide enough for a long gun (js/game.ts caseShow) */
+/* an armour card's make-up and what it stops (js/shop.ts gearCard, from js/ballistics.ts rating) */
+.card .arm-rate { font-size: 11px; line-height: 1.35; margin: 4px 0 2px; }
+.card .arm-rate small { opacity: 0.7; display: block; }
+.card .arm-rate b { display: inline-block; min-width: 34px; color: #cfd6dc; }
+
+/* the attachments box: what the pick you're over does to your gun */
+.abox-stats { margin: 12px auto 0; max-width: 560px; text-align: left; padding: 10px 12px; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.08); }
+.abox-stats h4 { margin: 0 0 6px; font: 600 12px var(--mono); color: var(--text); }
+.abox-stats h4 small { color: var(--dim); font-weight: 400; }
+.abox-stats .gs-pe { margin-bottom: 6px; }
+.abox-stats .abox-hint { margin: 0; color: var(--dim); font: 11px var(--mono); }
+.abox-stats .gs-stats { display: grid; grid-template-columns: 1fr 1fr; column-gap: 18px; }
+.abox-stats .gs-loads { grid-column: 1 / -1; }
+/* the comms wheel (hold the middle button: js/player.ts wheelOpen): eight slices round the crosshair, a pointer the mouse moves */
+#commWheel { position: fixed; left: 50%; top: 50%; width: 0; height: 0; z-index: 40; pointer-events: none; opacity: 0; transition: opacity 0.08s; }
+#commWheel.on { opacity: 1; }
+#commWheel::before { content: ''; position: absolute; left: -165px; top: -165px; width: 330px; height: 330px; border-radius: 50%; background: radial-gradient(circle, rgba(10,12,14,0.25) 0 22%, rgba(10,12,14,0.72) 23% 100%); border: 1px solid rgba(255,255,255,0.1); }
+#commWheel .cw-it { position: absolute; transform: translate(-50%, -50%); width: 92px; padding: 6px 4px; text-align: center; font: 600 12px var(--mono); color: var(--text); background: rgba(20,24,28,0.85); border: 1px solid rgba(255,255,255,0.12); }
+#commWheel .cw-it small { display: block; font-weight: 400; font-size: 10px; color: var(--dim); margin-top: 2px; }
+#commWheel .cw-it.sel { border-color: var(--accent); background: rgba(255,176,46,0.22); color: #fff; }
+#commWheel .cw-it.off { opacity: 0.4; }
+#commWheel .cw-ptr { position: absolute; left: -5px; top: -5px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 6px rgba(255,176,46,0.8); }
+
+/* the main menu's highlights renderer (js/game.ts renderHighlights) */
+.hl-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+.hl-row .hl-prog { flex: 1 1 100%; height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; }
+.hl-row .hl-prog i { display: block; height: 100%; width: 0; background: var(--accent); transition: width 0.25s; }
+.hl-row .hl-msg { flex: 1 1 100%; font: 12px var(--mono); color: var(--dim); }
+.hl-row .hl-msg.bad { color: var(--bad); }
+
+/* the wishlist star on a part (js/shop.ts wished/star): lit on starred parts, which also get an accent outline */
+.wish { background: none; border: 0; padding: 0 calc(6px * var(--ik, 1)) 0 0; color: var(--dim); font-size: calc(16px * var(--ik, 1)); line-height: 1; cursor: pointer; vertical-align: middle; }
+.wish:hover, .wish.on { color: #ffd24a; }
+.card.wished, .gs-part.wished { border-color: #ffd24a; box-shadow: 0 0 0 1px rgba(255,210,74,0.55); }
+.route-svg .rsh circle { fill: #d2342b; stroke: #fff; stroke-width: 1.5; }
+.route-svg .rsh path { fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; }
+/* ===== the main menu: a translucent panel on the right that fades out to the left into the guns going round behind it (js/menushow.ts);
+   thin type (Barlow, light weights; the system's sans if it can't load), white and greys, no colour but what matters ===== */
+#menu { --m-text: #e9edf0; --m-dim: rgba(233, 237, 240, 0.52); --m-line: rgba(255, 255, 255, 0.16); --m-font: 'Barlow', system-ui, -apple-system, 'Segoe UI', sans-serif; font-family: var(--m-font); color: var(--m-text); }
+#menu .menu-box { position: relative; isolation: isolate; background: none; border: 0; border-radius: 0; box-shadow: none; width: 540px; padding: 34px 40px 30px 120px; }
+#menu .menu-box::before { content: ''; position: absolute; inset: 0; z-index: -1; background: rgba(9, 12, 15, 0.7); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 140px); mask-image: linear-gradient(90deg, transparent 0, #000 140px); }
+#menu .title { font: 200 46px/1 var(--m-font); letter-spacing: 12px; color: var(--m-text); }
+#menu .title span { color: var(--m-text); font-weight: 500; font-size: 18px; letter-spacing: 15px; margin-top: 6px; opacity: 0.8; }
+#menu .subtitle { font: 300 13px var(--m-font); letter-spacing: 3px; color: var(--m-dim); margin-top: 10px; }
+#menu .menu-box label, #menu summary { font: 500 11px var(--m-font); letter-spacing: 2.5px; color: var(--m-dim); text-transform: uppercase; }
+#menu .menu-box label small { font-weight: 300; letter-spacing: 0.5px; text-transform: none; }
+#menu input, #menu select { background: rgba(255, 255, 255, 0.04); border: 1px solid var(--m-line); border-radius: 2px; color: var(--m-text); font: 300 16px var(--m-font); }
+#menu input:focus, #menu select:focus { border-color: rgba(255, 255, 255, 0.45); }
+#menu .btn { background: transparent; border: 1px solid var(--m-line); border-radius: 2px; color: var(--m-text); font: 500 13px var(--m-font); letter-spacing: 3px; }
+#menu .btn:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.4); }
+#menu .btn.primary { background: var(--m-text); border-color: var(--m-text); color: #0b0e11; }
+#menu .btn.primary:hover { background: #fff; }
+#menu .btn.small { font-size: 11px; letter-spacing: 2px; }
+#menu .sw.animal { background: rgba(255, 255, 255, 0.04); border: 1px solid transparent; font: 400 13px var(--m-font); }
+/* grey until hovered or picked: then in its own colours (the name's is set on it: js/game.ts) */
+#menu .sw.animal:not(.on):not(:hover) span { color: var(--m-dim) !important; }
+#menu .sw.animal img.anim { filter: grayscale(1); opacity: 0.6; transition: filter 0.15s, opacity 0.15s; }
+#menu .sw.animal:hover img.anim, #menu .sw.animal.on img.anim { filter: none; opacity: 1; }
+#menu .sw.animal.on { border-color: var(--m-line); background: rgba(255, 255, 255, 0.08); box-shadow: none; }
+#menu .model-load, #menu .msg, #menu .controls { font-family: var(--m-font); font-weight: 300; }
+#menu .controls b { font-family: var(--m-font); font-weight: 600; }
+#menu .model-load .ml-bar { background: var(--m-line); }
+#menu .model-load .ml-bar i { background: var(--m-text); }
+#menu .settings { border-top-color: var(--m-line); }
+@media (max-width: 760px) { #menu .menu-box { width: 100%; padding: 28px 24px; } #menu .menu-box::before { -webkit-mask-image: none; mask-image: none; } }
+.route-svg .rnt circle { fill: #1a2240; stroke: #c8d4ff; stroke-width: 1.5; }
+.route-svg .rnt path { fill: #f2e8b8; stroke: none; }
+/* the route map's card for the node under the pointer (js/route.ts tip) */
+.route-tip { position: fixed; z-index: 60; pointer-events: none; width: 300px; background: rgba(12, 15, 18, 0.96); border: 1px solid var(--line); border-top: 2px solid var(--accent); border-radius: 3px; padding: 10px 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.55); font-size: 13px; line-height: 1.35; color: #d6dde2; }
+.route-tip .tt-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.route-tip .tt-head span { font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; font-size: 14px; color: #fff; }
+.route-tip .tt-head small { color: #8a949c; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap; }
+.route-tip .tt-row { display: flex; gap: 9px; align-items: flex-start; padding: 6px 0; border-top: 1px solid rgba(255,255,255,0.07); }
+.route-tip .tt-row b { display: block; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 1px; }
+.route-tip .tt-row em { font-style: normal; color: #ffd24a; font-weight: 700; }
+.route-tip .tt-badge { flex: none; width: 20px; height: 20px; margin-top: 1px; }
+.route-tip .tt-badge svg { width: 100%; height: 100%; overflow: visible; }
+.route-tip .sh b { color: #ff6a5e; } .route-tip .sh circle { fill: #d2342b; stroke: #fff; stroke-width: 1.5; } .route-tip .sh path { fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; }
+.route-tip .nt b { color: #c8d4ff; } .route-tip .nt circle { fill: #1a2240; stroke: #c8d4ff; stroke-width: 1.5; } .route-tip .nt path { fill: #f2e8b8; }
+.route-tip .boss b { color: #ffd24a; } .route-tip .boss path { fill: #ffd24a; stroke: #ffd24a; stroke-width: 1; stroke-linejoin: round; }
+.route-tip .tt-plain { color: #9aa4ac; padding: 6px 0; border-top: 1px solid rgba(255,255,255,0.07); }
+.route-tip .tt-foot { margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.07); color: #9fb0bc; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; }

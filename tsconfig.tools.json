@@ -1,0 +1,8 @@
+{
+  // The gun recipes: bake-time code (tools/models/*.ts), the procedural models the baker turns into the glTF files the game loads (docs/models.md).
+  // Compiled to dist/tools/tools/models/*.js and loaded by tools/model_env.mjs next to the game's compiled data (dist/js). The game's own
+  // files are included so the recipes are type-checked against its globals (G.Gunsmith, G.GunMaterials ...); their copies under dist/tools/js are not used.
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "outDir": "./dist/tools" },
+  "include": ["js/**/*.ts", "tools/models/**/*.ts"]
+}

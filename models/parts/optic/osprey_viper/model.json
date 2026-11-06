@@ -1,0 +1,23 @@
+{
+  "source": "authored",
+  "kind": "part",
+  "slot": "optic",
+  "frame": "rail-top",
+  "optic": {
+    "sy": 0.031,
+    "fSight": -0.044,
+    "relief": 0.09,
+    "reflex": {
+      "f": 0.0117,
+      "y": 0.031,
+      "w": 0.03,
+      "h": 0.023,
+      "kind": "dotG"
+    },
+    "magnifier": true,
+    "height": "mid"
+  },
+  "replaces": [
+    "Osprey Viper green dot"
+  ]
+}

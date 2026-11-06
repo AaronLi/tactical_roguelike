@@ -1,0 +1,41 @@
+{
+ "gun": "welrod",
+ "note": "node tools/check_authored_golden.mjs --update welrod",
+ "builds": {
+  "barrel=welrod.barrel,mag=welrod.mag": {
+   "label": "default",
+   "geometry": "61330c8118f3e6e8",
+   "info": "143a0e5c2007dc85"
+  },
+  "barrel=welrod.br.bare_long,mag=welrod.mag": {
+   "label": "longest barrel welrod.br.bare_long",
+   "geometry": "2e8056061aeb5661",
+   "info": "e303278fdd206c58"
+  },
+  "barrel=welrod.br.short,mag=welrod.mag": {
+   "label": "barrel=welrod.br.short",
+   "geometry": "239211886df3871f",
+   "info": "41dd1c61fb3ded99"
+  },
+  "barrel=welrod.br.optic,mag=welrod.mag": {
+   "label": "barrel=welrod.br.optic",
+   "geometry": "56d8c69395080e5c",
+   "info": "143a0e5c2007dc85"
+  },
+  "barrel=welrod.br.short_optic,mag=welrod.mag": {
+   "label": "barrel=welrod.br.short_optic",
+   "geometry": "356886a9a5446906",
+   "info": "41dd1c61fb3ded99"
+  },
+  "barrel=welrod.br.bare,mag=welrod.mag": {
+   "label": "barrel=welrod.br.bare",
+   "geometry": "a3e774da150ebd74",
+   "info": "12efe6f5b50f122f"
+  },
+  "barrel=welrod.barrel,mag=welrod.mag.ext": {
+   "label": "mag=welrod.mag.ext",
+   "geometry": "88661f81698ccd54",
+   "info": "143a0e5c2007dc85"
+  }
+ }
+}
