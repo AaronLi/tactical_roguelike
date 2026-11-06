@@ -294,8 +294,10 @@ const G_Shop = {
       let have = 0; Gr.each(Gr.all(Me), (it) => { if (it.k === 'med' && it.mt === mt) have += it.n || 1; });
       out.push({ id: 'med.' + mt, name: I.name, desc: `${I.desc} ${I.time} s to apply. ${I.size.join('×')}${I.stack ? `, ${I.stack} to a stack` : ''}. You have ${have}.`, price: I.price, disabled: !this.room(Gr.medItem(mt)), apply: () => this.stow(Gr.medItem(mt)) });
     }
-    out.push({ id: 'flash', name: 'Flashbang', desc: `Blinds and deafens whoever's looking when it goes off (1.5 s fuse), hurts nobody: suspects it dazes are far easier to talk down. Key ${G.Me.quick.indexOf('flash') >= 0 ? G.Me.quick.indexOf('flash') + 3 : '3, 4 or 5'}. 1×1. You carry ${G.Gear.count(Me, 'flash')}.`, price: 150, disabled: !this.room(Gr.flashItem()), apply: () => this.stow(Gr.flashItem()) });
-    out.push({ id: 'nade', name: 'Frag Grenade', desc: `Cook, throw, duck (G). 1×1. You carry ${Me.nades}.`, price: 200, disabled: !this.room(Gr.fragItem()), apply: () => this.stow(Gr.fragItem()) });
+    out.push({ id: 'flash', name: 'Flashbang', desc: `Blinds whoever's looking when it goes off, and in a room the glare off the walls and the bang stun everyone in it for a few seconds (1.5 s fuse), hurts nobody: go in at once and they're yours to cuff or talk down. Key ${G.Me.quick.indexOf('flash') >= 0 ? G.Me.quick.indexOf('flash') + 3 : '3, 4 or 5'}. 1×1. You carry ${G.Gear.count(Me, 'flash')}.`, price: 150, disabled: !this.room(Gr.flashItem()), apply: () => this.stow(Gr.flashItem()) });
+    const key = (k: string) => G.Me.quick.indexOf(k) >= 0 ? G.Me.quick.indexOf(k) + 3 : '3, 4 or 5';
+    out.push({ id: 'nade', name: 'Frag Grenade', desc: `Steel chips over the whole sphere: deadly a few metres out in the open, stopped by walls and cover, and the blast dazes whoever's left in a small room. Pull the pin (left click), R to let the spoon go and cook it, let go to throw. Key ${key('frag')}. 1×1. You carry ${Me.nades}.`, price: 200, disabled: !this.room(Gr.fragItem()), apply: () => this.stow(Gr.fragItem()) });
+    out.push({ id: 'tb', name: 'Thermobaric Grenade', desc: `Throws out a cloud of fuel and lights it: a fireball that fills the room it lands in (out through an open door, not a shut one) and a long blast wave that's deadly in a closed room, far weaker in the open or a room with its windows out. Burns and blast, no fragments. ${G.Me.TB.FUSE} s fuse. Key ${key('tb')}. 1×1. You carry ${G.Gear.count(Me, 'tb')}.`, price: 450, disabled: !this.room(Gr.tbItem()), apply: () => this.stow(Gr.tbItem()) });
     return out;
   },
 

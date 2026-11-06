@@ -54,6 +54,7 @@ interface Enemy {
   guard?: boolean; dp?: DoorPeekSpot | null; dpT?: number; dpOk?: number; heard?: { x: number; y: number; z: number; at: number };
   threat?: { x: number; z: number; y?: number; d?: number } | null; str?: number; collapsed?: boolean; down?: boolean; sup?: number; supAt?: number; supQ?: number[][];
   flinchT?: number; flinchOk?: number; flashT?: number; flashRec?: number; flashRecLen?: number; flashK?: number; flashOn?: boolean; flashBy?: { x: number; y: number; z: number } | null; stumbleT?: number; stumbleYaw?: number; stumbleV?: number; peekDone?: boolean; peekOut?: number; organs?: Record<string, number>; broke?: Record<string, number>;
+  dodge?: { x: number; y: number; z: number; at: number; until: number; run?: boolean; ux?: number; uz?: number; clear?: number; from?: number[] } | null; // (a grenade they've seen land: when they move, and till when)
   spine?: boolean; cardiac?: boolean; out?: boolean; incap?: { by: string | null; t: number }; lastHitAt?: number; lastH?: boolean; lastAp?: boolean; lastGr?: number; lastFb?: number; flashId?: number;
   hitState?: EnemyState; hitUnaware?: boolean; hitYield?: boolean; hitAt?: number; shock?: number; kick?: number; headDelay?: number; engAt?: number; engTgt?: string;
   firedAt?: number; sawAt?: number; engagedAt?: number; allyT?: number; allyN?: number; proof?: boolean; seeVis?: number; blind?: boolean; onWait?: number;
@@ -192,7 +193,12 @@ const G_Server = {
         G.Net.broadcast({ t: 'shot', id: from, sid: m.sid, f: m.f, to: m.to, w: m.w, sil: m.sil, bm: Number.isFinite(m.bm) ? m.bm : undefined, rl: typeof m.rl === 'string' && m.rl.length < 12 ? m.rl : undefined, am: (G.AMMO as Tbl)[m.am] ? m.am : undefined, vi: Number.isInteger(m.vi) && m.vi >= 0 && m.vi < 16 ? m.vi : undefined, vn: Number.isInteger(m.vn) && m.vn > 0 && m.vn <= 16 ? m.vn : undefined, // (a volley's rounds: js/player.ts shoot)
           tos: Array.isArray(m.tos) && m.tos.length <= 24 && m.tos.every((p: unknown) => Array.isArray(p) && p.length === 3 && p.every(Number.isFinite)) ? m.tos : undefined }, from); // (a shotgun's pellets: for the highlights)
         break;
-      case 'nade': G.Net.broadcast({ t: 'nade', id: from, p: m.p, v: m.v, fuse: m.fuse, k: m.k === 'flash' ? 'flash' : 'frag', s: [0, 1, 2].includes(m.s) ? m.s : 2 }, from); break;
+      case 'nade': {
+        const k = m.k === 'flash' ? 'flash' : m.k === 'tb' ? 'tb' : 'frag';
+        G.Net.broadcast({ t: 'nade', id: from, p: m.p, v: m.v, fuse: m.fuse, k, s: [0, 1, 2].includes(m.s) ? m.s : 2 }, from);
+        if (this.phase === 'level' && Array.isArray(m.p) && Array.isArray(m.v) && m.p.length === 3 && m.v.length === 3 && [...m.p, ...m.v].every(Number.isFinite) && Number.isFinite(m.fuse)) this.liveNade(m.p, m.v, Math.min(6, m.fuse), k);
+        break;
+      }
       case 'flash': if (this.phase === 'level' && Array.isArray(m.p) && m.p.length === 3 && m.p.every(Number.isFinite)) this.flashbang(m.p, p && p.st ? p.st.p : null, from); break;
       // an officer's round went through these windows
       case 'glass': if (this.phase === 'level' && Array.isArray(m.ids)) this.breakGlass(m.ids, m.p); break;
@@ -204,10 +210,12 @@ const G_Server = {
         break;
       }
       case 'boom':
+        if (!Array.isArray(m.p) || m.p.length !== 3 || !m.p.every(Number.isFinite)) break;
         this.hear(m.p[0], m.p[2], 35, m.p[1] || 0);
+        if (this.phase === 'level' && this.map) this.blastDaze(m.p, m.tb ? 'tb' : m.fr ? 'frag' : null, p && p.st ? p.st.p : null);
         // the blast takes out the windows round it
         if (this.map && this.map.windows && Array.isArray(m.p)) this.breakGlass(this.map.windows.filter((w: SvWin) => !w.broken && Math.hypot(w.x - m.p[0], w.z - m.p[2]) < (+m.r || 4) * 1.3 && Math.abs((w.fy || 0) + 1.3 - (m.p[1] || 0)) < 2.5).map((w: SvWin) => w.id), m.p);
-        G.Net.broadcast({ t: 'boom', id: from, p: m.p, r: m.r, d: m.d, fr: m.fr ? 1 : undefined, s: m.fr ? m.s : undefined }); // (fr, s: a frag grenade, and its burst's seed: the pocks it leaves are the same on every screen)
+        G.Net.broadcast({ t: 'boom', id: from, p: m.p, r: m.r, d: m.d, fr: m.fr ? 1 : undefined, tb: m.tb ? 1 : undefined, s: m.fr || m.tb ? m.s : undefined }); // (fr, s: a frag grenade, and its burst's seed: the pocks it leaves are the same on every screen; tb: a thermobaric's, the same fireball everywhere)
         break;
       case 'revive': G.Net.broadcast({ t: 'revive', tg: m.tg, by: from, hp: m.hp }); break;
       // the range's IPSC course: a new stage laid (its seed), and a run as it happens (passed on to the others)
@@ -436,7 +444,7 @@ const G_Server = {
     this.map = G.Level.generate(this.seed, this.level, this.theme as number, this.night);
     this.enemies.clear();
     this.extract = { active: false, votes: new Set() };
-    this.flow = null; this.flowT = 0; this.wipeT = 0; this.summons = 0; this.nadeT = 8;
+    this.flow = null; this.flowT = 0; this.wipeT = 0; this.summons = 0; this.nadeT = 8; this.live = [];
     this.report = { incap: 0, bleedouts: 0, bleedBy: {}, arrests: 0, rescued: 0, civKilled: 0, unauth: 0, evidence: 0, bodies: 0, stronghold: this.isStronghold() };
     this.evidence = []; // weapons on the floor: { i, wpn, x, z, owner, secured, taken }
     this.loot = new Map(); // things officers have put down: id -> { id, x, y, z, item (packed), yaw }
@@ -1585,6 +1593,7 @@ const G_Server = {
     }
 
     this.nadeT -= dt;
+    if (this.live.length) this.dodgeTick();
     this.noiseT = (this.noiseT || 0) - dt;
     if (this.noiseT <= 0) { this.noiseT = 0.25; this.footsteps(alive); }
     const onFoot = alive.filter((p) => !p.st.se); // (se: still in the helicopter that brought them: nobody's to aim at yet, js/landing.ts)
@@ -1663,6 +1672,7 @@ const G_Server = {
     if (e.state === 'cuffed') return;
     if (e.state === 'surrender') return this.thinkSurrendered(e, dt, alive);
     if (e.flashT! > 0) { this.thinkFlashed(e, dt); return; } // (blind and deaf: out of the fight)
+    if (e.dodge && this.dodgeStep(e, dt)) return; // (getting away from a grenade)
     this.reloadTick(e, dt);
     if (def.leader && this.leaderTick(e, dt)) return;
     if (e.pendingAlert >= 0) { e.pendingAlert -= dt; if (e.pendingAlert < 0) this.alertEnemy(e, false, true); }
@@ -2457,7 +2467,11 @@ const G_Server = {
   // goes in at once has the whole of the stun to take them; somebody who peeks round a doorway meets a suspect who is
   // as unaware as before, and a blast that has done nothing. The steadier types (steady, bosses) shake it off sooner.
   // Civilians curl up where they are.
-  FLASH: { RANGE: 16, ROOM: 12, DEAF: 0.4, STUN: [0.5, 8], REC: [1.5, 5.5], FACE: [1, 0.65, 0.4], PARTIAL: 0.6, SEE_R: 5, AIM: 0.25, SHOUT: 0.85, GIVE_UP_R: 6 },
+  // Indoors a few million candela don't need a line of sight: the walls and ceiling of the room throw it back (GLARE: as
+  // much of it as a half-seen blast, to anyone in the same room, ROOM metres or less round by the floor, roofed over), and
+  // turned away the room behind you is lit up just the same (FACE: what's left of it turned side-on and away); and 170 dB a
+  // couple of metres off is more than deafening: the inner ear's balance goes with it (DEAF: the bang alone, close in).
+  FLASH: { RANGE: 16, ROOM: 10, DEAF: 0.6, STUN: [0.5, 8], REC: [1.5, 5.5], FACE: [1, 0.75, 0.55], PARTIAL: 0.6, GLARE: 0.45, SEE_R: 5, AIM: 0.25, SHOUT: 0.85, GIVE_UP_R: 6 },
   flashLog: [] as Record<string, any>[],
   // how hard a flash at (x, y, z) hits e: { k (0..1), see (1 full, 0.6 partial, 0 none), face, d, path }
   flashDose(e: Enemy, x: number, y: number, z: number, field: Float32Array, yaw = e.yaw) {
@@ -2470,8 +2484,11 @@ const G_Server = {
     }
     const flat = Math.hypot(x - e.x, z - e.z) || 1, look = (-Math.sin(yaw) * (x - e.x) + -Math.cos(yaw) * (z - e.z)) / flat;
     const face = d < 1 ? 1 : look > 0.3 ? F.FACE[0] : look > -0.3 ? F.FACE[1] : F.FACE[2];
+    const path = this.heardAt(field, e.x, e.z, e.y), TS = L.TS, cell = G.U.clamp(Math.floor(z / TS), 0, map.H - 1) * map.W + G.U.clamp(Math.floor(x / TS), 0, map.W - 1);
+    const roofed = !(L.floorMap(map, L.floorAt(map, x, y, z)).out || map.out)[cell];
+    if (see < F.GLARE && roofed && path <= F.ROOM && d <= F.RANGE) see = F.GLARE; // (the room lit up round them: FLASH GLARE)
     const kv = see ? Math.pow(Math.max(0, 1 - d / F.RANGE), 0.6) * face * see : 0;
-    const path = this.heardAt(field, e.x, e.z, e.y), kd = path <= F.ROOM ? F.DEAF * (1 - path / F.ROOM) : 0;
+    const kd = path <= F.ROOM ? F.DEAF * (1 - path / F.ROOM) : 0;
     return { k: Math.min(1, Math.max(kv, kd)), see, face, d, path };
   },
   // by: where the thrower stood (what the suspects know of where it came from); id: who threw it. Each bang has its number (n), kept on
@@ -2491,22 +2508,122 @@ const G_Server = {
       if (e.def.boss) k *= 0.5; else k *= U.lerp(1, Math.min(1, e.def.steady == null ? 1 : e.def.steady + 0.35), 0.8);
       const stun = U.lerp(F.STUN[0], F.STUN[1], k), rec = U.lerp(F.REC[0], F.REC[1], k);
       this.flashLog.push({ id: e.id, type: e.type, civ: !!e.def.civ, d: +q.d.toFixed(1), see: q.see, face: q.face, path: +q.path.toFixed(1), k: +k.toFixed(2), stun: +stun.toFixed(1), rec: +rec.toFixed(1), state: e.state });
-      if (e.def.civ) { // curled up where they are
-        e.state = 'cower'; e.hide = null; e.crouch = false; e.leanOut = 0; e.walkTo = null;
-        e.flashT = Math.max(e.flashT || 0, stun); e.flashRecLen = Math.max(e.flashRecLen || 0, rec); e.flashK = Math.max(e.flashK || 0, k); e.flashOn = true;
-        continue;
-      }
-      if (e.state === 'surrender' || e.collapsed) continue;
-      // a suspect: out of the fight. Weapon lowered, no cover, no door, nothing aimed
-      const fresh = !(e.flashT! > 0);
-      e.flashT = Math.max(e.flashT || 0, stun); e.flashRecLen = Math.max(e.flashRecLen || 0, rec); e.flashK = Math.max(e.flashK || 0, k); e.flashOn = true; e.flashId = n;
-      e.morale -= 0.25 * k * (e.def.steady || 1);
-      e.aiming = false; e.cover = null; e.inCover = false; e.peek = false; e.leanOut = 0; e.dp = null; e.lurk = false; e.hide = null; e.walkTo = null; e.holding = false;
-      e.surprisedT = 0; e.pendingAlert = -1; e.burstLeft = 0;
-      if (e.armed && e.drawn) { e.drawn = false; e.drawT = 0; } // (the gun comes down)
-      if (fresh) { e.stumbleT = 0; e.flashBy = by ? { x: by[0], y: by[1], z: by[2] } : null; }
+      this.stun(e, k, stun, rec, n, by);
     }
     G.Net.broadcast({ t: 'flash', p, n, by: id || undefined });
+  },
+  // Knocked senseless (a flashbang, or a blast's concussion: blastDaze), k how hard (0..1): out of the fight for `stun` seconds,
+  // then `rec` coming round (thinkFlashed, flashEnd). n: the flashbang's number (0: a blast's), kept for the highlights.
+  stun(e: Enemy, k: number, stun: number, rec: number, n: number, by?: number[] | null) {
+    if (e.state === 'cuffed' || e.state === 'dead') return;
+    if (e.def.civ) { // curled up where they are
+      e.state = 'cower'; e.hide = null; e.crouch = false; e.leanOut = 0; e.walkTo = null;
+      e.flashT = Math.max(e.flashT || 0, stun); e.flashRecLen = Math.max(e.flashRecLen || 0, rec); e.flashK = Math.max(e.flashK || 0, k); e.flashOn = true;
+      return;
+    }
+    if (e.state === 'surrender' || e.collapsed) return;
+    // a suspect: out of the fight. Weapon lowered, no cover, no door, nothing aimed
+    const fresh = !(e.flashT! > 0);
+    e.flashT = Math.max(e.flashT || 0, stun); e.flashRecLen = Math.max(e.flashRecLen || 0, rec); e.flashK = Math.max(e.flashK || 0, k); e.flashOn = true;
+    if (n) e.flashId = n; else if (fresh) e.flashId = 0; // (a blast's daze isn't a flashbang's, for the highlights)
+    e.morale -= 0.25 * k * (e.def.steady || 1);
+    e.aiming = false; e.cover = null; e.inCover = false; e.peek = false; e.leanOut = 0; e.dp = null; e.lurk = false; e.hide = null; e.walkTo = null; e.holding = false; e.dodge = null;
+    e.surprisedT = 0; e.pendingAlert = -1; e.burstLeft = 0;
+    if (e.armed && e.drawn) { e.drawn = false; e.drawT = 0; } // (the gun comes down)
+    if (fresh) { e.stumbleT = 0; e.flashBy = by ? { x: by[0], y: by[1], z: by[2] } : null; }
+  },
+  // ---------------------------------------------------------------- blasts' concussion, and getting away from a grenade
+  // A blast leaves whoever it didn't kill shaken: ears gone, the balance with them, a moment of not knowing where they are.
+  // A frag's (180 g or so of explosive) does that a few metres round by the floor (BLAST.FRAG_R), twice as hard where the room
+  // holds it in (closed and roofed: the wave comes back off every wall) as out in the open; a thermobaric's all through the
+  // space it filled and a little through its walls (js/player.ts tbDose: daze). k sets the stun and the coming round, as a
+  // flashbang's does, shorter (BLAST.STUN, BLAST.REC). by: where the thrower stood.
+  BLAST: { FRAG_R: 6, STUN: [0.4, 3.5], REC: [1, 4] },
+  blastLog: [] as Record<string, any>[],
+  blastDaze(p: number[], kind: 'frag' | 'tb' | null, by?: number[] | null) {
+    if (!kind) return;
+    const B = this.BLAST, U = G.U, L = G.Level, map = this.map!, at = new THREE.Vector3(p[0], p[1], p[2]);
+    this.blastLog = [];
+    const M = kind === 'tb' ? G.Me.tbModel(map, at) : null, fill = M ? null : L.blastFill(map, p[0], p[1], p[2], 400);
+    const conf = fill && fill.n < 400 && fill.out < fill.n * 0.1 ? 1 : 0.5, idx = new Map<number, number>();
+    if (fill) for (let i = 0; i < fill.n; i++) idx.set(fill.order[i], i);
+    for (const e of this.enemies.values()) {
+      if (e.state === 'cuffed' || e.state === 'dead' || e.collapsed) continue;
+      let k = 0;
+      if (M) k = G.Me.tbDose(M, e.x, (e.y || 0) + 1, e.z).daze;
+      else if (fill) {
+        const c = U.clamp(Math.floor(e.z / L.TS), 0, map.H - 1) * map.W + U.clamp(Math.floor(e.x / L.TS), 0, map.W - 1), i = idx.get(c);
+        if (i != null && L.floorAt(map, e.x, e.y || 0, e.z) === fill.f && fill.d[i] < B.FRAG_R) k = conf * (1 - fill.d[i] / B.FRAG_R);
+      }
+      if (e.def.boss) k *= 0.5; else k *= U.lerp(1, Math.min(1, e.def.steady == null ? 1 : e.def.steady + 0.35), 0.6);
+      if (k < 0.08) continue;
+      this.blastLog.push({ id: e.id, type: e.type, kind, k: +k.toFixed(2) });
+      this.stun(e, k, U.lerp(B.STUN[0], B.STUN[1], k), U.lerp(B.REC[0], B.REC[1], k), 0, by);
+    }
+  },
+  // A grenade thrown (handle 'nade': where from, how fast, its fuse; flown here as on every screen, js/views.ts predictNade):
+  // suspects who see it land near them, or hear it clatter right by them, get away from it: after a moment to take in what it
+  // is (DODGE.REACT: less if they're already in the fight), they run for whatever's between it and them, or just away, and get
+  // down, till it's gone off. A cooked one, let go late, leaves them no time at all.
+  DODGE: { R: 7, HEAR: 2.5, REACT: [[0.8, 1.3], [0.45, 0.8]], LOOK: -0.2, RUN: 1.25 },
+  dodgeLog: [] as Record<string, any>[],
+  live: [] as { t0: number; fuse: number; pts: THREE.Vector3[]; kind: string; seen: Set<number> }[],
+  liveNade(p: number[], v: number[], fuse: number, kind: string) {
+    if (!this.map || !G.Views) return;
+    const pts = G.Views.predictNade(new THREE.Vector3(p[0], p[1], p[2]), new THREE.Vector3(v[0], v[1], v[2]), fuse, this.map);
+    this.live.push({ t0: this.clock || 0, fuse, pts, kind, seen: new Set() });
+  },
+  dodgeTick() {
+    const D = this.DODGE, L = G.Level, map = this.map!, now = this.clock || 0, U = G.U;
+    this.live = this.live.filter((n) => now - n.t0 < n.fuse);
+    for (const n of this.live) {
+      const age = now - n.t0, q = n.pts[Math.min(n.pts.length - 1, Math.round(age * 60))], end = n.pts[n.pts.length - 1];
+      if (age < 0.25) continue; // (still leaving the hand)
+      for (const e of this.enemies.values()) {
+        if (n.seen.has(e.id) || e.def.civ || e.state !== 'normal' || e.collapsed || e.flashT! > 0 || e.dodge) continue;
+        const ey = (e.y || 0) + 1.5 * e.def.scale, d = Math.hypot(q.x - e.x, q.z - e.z);
+        if (d > D.R || Math.abs(q.y - (e.y || 0)) > 2.5) continue;
+        const look = (-Math.sin(e.yaw) * (q.x - e.x) - Math.cos(e.yaw) * (q.z - e.z)) / (d || 1);
+        const sees = (look > D.LOOK || e.alert) && L.los(map, e.x, ey, e.z, q.x, q.y + 0.08, q.z), hears = d < D.HEAR && age > 0.5;
+        if (!sees && !hears) continue;
+        n.seen.add(e.id);
+        const R = D.REACT[e.alert ? 1 : 0], react = U.lerp(R[0], R[1], Math.random());
+        e.dodge = { x: end.x, y: end.y, z: end.z, at: now + react, until: n.t0 + n.fuse + 0.4 };
+        this.dodgeLog.push({ id: e.id, kind: n.kind, d: +d.toFixed(1), sees, react: +react.toFixed(2), left: +(n.fuse - age - react).toFixed(2) }); // (how long they had to move: for tuning)
+        if (this.dodgeLog.length > 20) this.dodgeLog.shift();
+      }
+    }
+  },
+  // getting away from the grenade (e.dodge): to cover from it if there's some close, otherwise straight away from it; down once
+  // they're clear. True while it lasts (nothing else this tick).
+  dodgeStep(e: Enemy, dt: number) {
+    const g = e.dodge!, now = this.clock || 0;
+    if (now >= g.until) { e.dodge = null; if (e.hide && e.state === 'normal') e.hide = null; return false; }
+    if (now < g.at) return false; // (still taking it in)
+    e.aiming = false; e.cover = null; e.inCover = false; e.peek = false; e.leanOut = 0; e.dp = null; e.burstLeft = 0;
+    if (!g.run) {
+      g.run = true; e.alert = true;
+      // cover from it: close, further from it than they are, and not past it to get there
+      const spot = this.findHide(e, g), here = Math.hypot(e.x - g.x, e.z - g.z);
+      e.hide = spot && Math.hypot(spot.x - e.x, spot.z - e.z) < 6 && Math.hypot(spot.x - g.x, spot.z - g.z) > here + 1 && (spot.x - e.x) * (e.x - g.x) + (spot.z - e.z) * (e.z - g.z) > 0 ? spot : null;
+      if (!e.hide) { // none: the way out that's most away from it and open furthest (round the room, not into its wall)
+        const W = this.map!.world, ey = (e.y || 0) + 1.0;
+        let best = -Infinity;
+        for (let k = 0; k < 12; k++) {
+          const a = k * Math.PI / 6, ux = Math.sin(a), uz = Math.cos(a), away = (ux * (e.x - g.x) + uz * (e.z - g.z)) / (here || 1);
+          const r = W ? G.World.raycast(W, e.x, ey, e.z, ux, 0, uz, 4, { move: true }) : null, clear = r && r.solid ? r.t : 4, sc = Math.min(clear, 4) * (away + 1.2);
+          if (sc > best) { best = sc; g.ux = ux; g.uz = uz; g.clear = clear; }
+        }
+        g.from = [e.x, e.z];
+      }
+    }
+    const sp = e.def.speed * this.DODGE.RUN;
+    if (e.hide && this.hideStep(e, dt, sp)) { e.crouch = true; return true; }
+    e.hide = null;
+    const gone = g.from ? Math.hypot(e.x - g.from[0], e.z - g.from[1]) : 0, d = Math.hypot(e.x - g.x, e.z - g.z);
+    if (g.ux != null && d < 6 && gone < (g.clear || 0) - 0.5) { this.moveEntity(e, g.ux, g.uz!, sp, dt); e.yaw += G.U.angDiff(e.yaw, Math.atan2(-g.ux, -g.uz!)) * Math.min(1, dt * 8); e.crouch = false; } // (facing the way they run)
+    else e.crouch = true; // (clear of it, or as far as they can get: down)
+    return true;
   },
   // the stun is over: unless they give it up they come round, alert, the gun coming back up
   flashEnd(e: Enemy) {
@@ -2538,6 +2655,7 @@ const G_Server = {
   enemyBoom(p: { x: number; y: number; z: number }) {
     const r2 = (x: number) => Math.round(x * 100) / 100;
     this.hear(p.x, p.z, 20, p.y || 0);
+    this.blastDaze([p.x, p.y, p.z], 'frag'); // (their own, too, if they're close to it)
     G.Net.broadcast({ t: 'boom', id: 'enemy', p: [p.x, p.y, p.z].map(r2), r: G.Me.BLAST.r, d: Math.round(G.Me.BLAST.dmg * this.dmgMult), en: 1, fr: 1, s: (Math.random() * 4294967296) >>> 0 });
   },
 

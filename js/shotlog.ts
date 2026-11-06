@@ -5,6 +5,9 @@
 // struck, the whole of its trail, coloured by speed as the trails are (js/render.ts trailColour), and markers on it: its speed
 // at the muzzle, where it crossed each Mach number, what it went through or off, how fast it went in, how fast it was past
 // their armour, how fast it came out or where it stopped, and the track of each fragment and splinter it threw off inside them.
+// A thermobaric's burst (js/player.ts tbModel) is kept too, as the volume it filled: every cell of floor its fireball reached as a glowing
+// column floor to ceiling, the rest of the space its pressure filled as tiles on the floor, and what it came to (how big, how closed,
+// the pressure it held, what it did to each suspect): shown whenever F9 is (keepFill).
 // All of it's only for whoever you've picked out with the crosshair, who stays picked when you look away (js/hud.ts debugTarget:
 // hbLast): nobody else's shows, and with nobody picked out it's the shots that hit you.
 // A round's finished path (js/player.ts newPath): p the points [x, y, z, speed], ev the events [point, 'e' | 'x' | 'r', ...],
@@ -214,7 +217,29 @@ const G_ShotLog = (() => {
     r.line.traverse((o: THREE.Object3D & Record<string, any>) => { if (o.geometry) { o.geometry.dispose(); (o.material as THREE.Material).dispose(); } }); // (its own, its fragments', a grenade's other trails)
     for (const gh of r.ghosts.values()) if (--gh.uses <= 0) { gh.removeFromParent(); gh.mat.dispose(); }
   }
-  function clear() { for (const r of recs) drop(r); recs = []; sel = null; count = new Map(); far = new Map(); }
+  // ---- a thermobaric's fill (js/player.ts thermobaric, and the squad's: js/game.ts onBoom). log: what it did to each suspect (yours only)
+  interface FillRec { g: THREE.Group; labels: ShotLabel[] }
+  let fills: FillRec[] = [];
+  function keepFill(M: any, log: any[] | null, name: string) {
+    const L = G.Level, TS = L.TS, W = M.map.W, g = new T.Group(), gy = M.p.y - 0.25, labels: ShotLabel[] = [];
+    const cells = (from: number, to: number, h: number, col: number, op: number) => {
+      const n = Math.max(0, to - from); if (!n) return;
+      const im = new T.InstancedMesh(new T.BoxGeometry(TS * 0.94, h, TS * 0.94), new T.MeshBasicMaterial({ color: col, transparent: true, opacity: op, depthTest: false, depthWrite: false, blending: T.AdditiveBlending }), n), m = new T.Matrix4();
+      for (let i = from; i < to; i++) { const c = M.fill.order[i]; m.makeTranslation(((c % W) + 0.5) * TS, gy + h / 2 + 0.02, (((c / W) | 0) + 0.5) * TS); im.setMatrixAt(i - from, m); }
+      im.renderOrder = 995; im.frustumCulled = false; g.add(im);
+    };
+    cells(0, M.cloud, L.WALL_H - 0.1, 0xff7a30, 0.07); // (the fireball: floor to ceiling)
+    cells(M.cloud, M.space, 0.04, 0x4aa8ff, 0.3); // (the rest of the space its pressure filled: on the floor)
+    g.visible = false; G.R.scene.add(g);
+    const pct = (v: number) => Math.round(v * 100) + '%';
+    labels.push({ p: M.p.clone().setY(gy + 2.2), t: `${name}: fireball ${M.areaCloud.toFixed(0)} m² of floor (${(M.areaCloud * G.Me.TB.ROOM_H).toFixed(0)} m³)${M.outFrac > 0.05 ? `, ${pct(M.outFrac)} under the sky` : ''}`, c: '#ffb070', pri: 6 });
+    labels.push({ p: M.p.clone().setY(gy + 1.6), t: `Space ${M.areaSpace.toFixed(0)} m²${M.closed ? ' (closed)' : ' or more (open onto the rest)'}, ${M.fill.vents} way${M.fill.vents === 1 ? '' : 's'} out · confinement ${pct(M.conf)} · ${M.qs.toFixed(0)} kPa held`, c: '#8fc8ff', pri: 6 });
+    for (const q of log || []) if (q.at !== 'none' && q.p) labels.push({ p: new T.Vector3(q.p[0], q.p[1] + 1.9, q.p[2]), t: `#${q.id} ${q.at === 'cloud' ? 'in the fireball' : q.at === 'space' ? 'in its space' : 'through a wall'} · burn ${pct(q.burn)} blast ${pct(q.blast)} of a life · dazed ${pct(q.daze)}`, c: q.at === 'cloud' ? '#ff9a50' : q.at === 'space' ? '#8fc8ff' : '#c0c0c0', pri: 5 });
+    fills.push({ g, labels });
+    while (fills.length > 6) dropFill(fills.shift()!);
+  }
+  function dropFill(f: FillRec) { f.g.removeFromParent(); f.g.traverse((o: THREE.Object3D & Record<string, any>) => { if (o.geometry) { o.geometry.dispose(); (o.material as THREE.Material).dispose(); } }); }
+  function clear() { for (const r of recs) drop(r); recs = []; sel = null; count = new Map(); far = new Map(); for (const f of fills) dropFill(f); fills = []; }
   // the shots that hit someone, oldest first (js/hud.ts debugTarget's readout)
   const of = (key: string) => recs.flatMap((r) => r.hits.filter((h) => h.key === key));
   // whose shots are shown: whoever's picked out, or you if nobody is (you can't put the crosshair on yourself)
@@ -227,10 +252,11 @@ const G_ShotLog = (() => {
   function frame() {
     const on = !!G.Rig.debug;
     if (!cv) { cv = document.getElementById('hbMarks') as HTMLCanvasElement; if (!cv) return; g = cv.getContext('2d')!; }
-    if (!on || !recs.length) {
-      if (shown) { for (const r of recs) { r.line.visible = false; if (r.nade) r.nade.visible = false; for (const gh of r.ghosts.values()) gh.visible = false; } cv.classList.add('hidden'); shown = false; }
+    if (!on || (!recs.length && !fills.length)) {
+      if (shown) { for (const r of recs) { r.line.visible = false; if (r.nade) r.nade.visible = false; for (const gh of r.ghosts.values()) gh.visible = false; } for (const f of fills) f.g.visible = false; cv.classList.add('hidden'); shown = false; }
       return;
     }
+    for (const f of fills) f.g.visible = true;
     if (!shown) { cv.classList.remove('hidden'); shown = true; }
     const dpr = window.devicePixelRatio || 1, W = window.innerWidth, H = window.innerHeight;
     if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
@@ -248,7 +274,7 @@ const G_ShotLog = (() => {
     const el = document.getElementById('hbInfo'), panel = el && !el.classList.contains('hidden') ? el.getBoundingClientRect() : null, boxes = panel ? [[panel.left, panel.top, panel.right, panel.bottom]] : [];
     const free = (a: number[]) => !boxes.some((b) => a[0] < b[2] && a[2] > b[0] && a[1] < b[3] && a[3] > b[1]);
     g.font = '600 11px ui-monospace, Consolas, monospace'; g.textBaseline = 'middle';
-    const list = [...mine].reverse().flatMap((r, i) => r.labels.filter((l) => !l.key || l.key === fk || sel).map((l) => ({ l, rank: l.pri * 2 - i }))).sort((a, b) => b.rank - a.rank), seen = new Set<string>();
+    const list = [...mine].reverse().flatMap((r, i) => r.labels.filter((l) => !l.key || l.key === fk || sel).map((l) => ({ l, rank: l.pri * 2 - i }))).concat([...fills].reverse().flatMap((f, i) => f.labels.map((l) => ({ l, rank: l.pri * 2 - i })))).sort((a, b) => b.rank - a.rank), seen = new Set<string>();
     for (const { l } of list) {
       v.copy(l.p).project(cam);
       if (v.z > 1 || Math.abs(v.x) > 1 || Math.abs(v.y) > 1 || l.p.distanceTo(cam.position) > RANGE) continue;
@@ -269,7 +295,7 @@ const G_ShotLog = (() => {
       g.fillStyle = '#fff'; g.fillText(l.t, at[0] + 6, at[1] + LH / 2 + 0.5);
     }
   }
-  return { pose, remote, keep, keepAll, clear, of, focus, frame, pickNade, select, nadeHtml, get selected() { return sel; } };
+  return { pose, remote, keep, keepAll, keepFill, clear, of, focus, frame, pickNade, select, nadeHtml, get selected() { return sel; } };
 })();
 G.ShotLog = G_ShotLog;
 

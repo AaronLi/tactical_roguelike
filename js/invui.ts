@@ -249,14 +249,14 @@ const G_InvUI = (() => {
     if (w && G.R.vm && G.R.vm.userData.key !== G.R.vmKey(w.def, w.stickers)) G.R.setViewmodel(w.def);
   }
   let opened: number[] = []; // uids of the open containers, newest first
-  const COLORS: Record<string, string> = { mag: '#3d4a33', ammo: '#4a4130', med: '#5a2a2a', frag: '#3a4237', flash: '#3d4247', carrier: '#2f3a44', plate: '#3c3f46', helmet: '#33393f', face: '#30363c', belt: '#3b3528', pack: '#3a3a2c', gun: '#262b30', pouch: '#353a2e', part: '#2c3136' };
+  const COLORS: Record<string, string> = { mag: '#3d4a33', ammo: '#4a4130', med: '#5a2a2a', frag: '#3a4237', flash: '#3d4247', tb: '#3e4430', carrier: '#2f3a44', plate: '#3c3f46', helmet: '#33393f', face: '#30363c', belt: '#3b3528', pack: '#3a3a2c', gun: '#262b30', pouch: '#353a2e', part: '#2c3136' };
   const GS = () => G.Gunsmith;
   const SLOTS = [['wp', 'Primary weapon'], ['ws', 'Sidearm'], ['helmet', 'Helmet'], ['face', 'Face shield / mandible'], ['carrier', 'Body armour / rig'], ['plate', 'Plate'], ['shoulder', 'Shoulders'], ['groin', 'Pelvis'], ['belt', 'Belt'], ['legs', 'Legs'], ['ifak', 'IFAK'], ['pack', 'Backpack']];
   const GEAR_SLOTS = ['helmet', 'face', 'carrier', 'plate', 'shoulder', 'groin', 'belt', 'legs', 'ifak', 'pack'];
   // an empty mount's slot, and which gear it's missing: what it says when it can't be used
   const NO_MOUNT: Record<string, string> = { face: 'no mount on this helmet', plate: 'no plate pocket', shoulder: 'no shoulder mounts', groin: 'no pelvis mount', legs: 'no leg hangers' };
   const WSLOT: Record<string, string> = { wp: 'p', ws: 's' };
-  const ACCEPT: Record<string, string> = { mag: 'magazines', ammo: 'ammo', frag: 'grenade', flash: 'grenade', med: 'medkit' };
+  const ACCEPT: Record<string, string> = { mag: 'magazines', ammo: 'ammo', frag: 'grenade', flash: 'grenade', tb: 'grenade', med: 'medkit' };
 
   // ---------------------------------------------------------------- where things are
   function slotItem(me: Me, s: string) {
@@ -651,7 +651,7 @@ const G_InvUI = (() => {
     if (qEl) {
       const kind = G.Me.quickKind(d.it);
       if (kind) { G.Me.setQuick(+qEl.dataset.quick!, kind); G.Audio.click(); }
-      else { G.HUD.toast('', 'Only grenades and flashbangs go on a quick slot', 1.5); G.Audio.deny(); }
+      else { G.HUD.toast('', 'Only grenades go on a quick slot', 1.5); G.Audio.deny(); }
       return rerender();
     }
     const gEl = t.closest<HTMLElement>('.inv-grid'), sEl = t.closest<HTMLElement>('[data-slot]'), sell = t.closest('[data-sell]'), onItem = t.closest<HTMLElement>('.inv-item');

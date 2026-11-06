@@ -29,8 +29,8 @@ type VwPose = 'handsup' | 'cuffed' | 'cower' | 'takedown';
 type VwActKind = 'open' | 'close' | 'kick' | 'zip' | 'bag';
 // an officer's action as drawn: how far along it is (0..1), the hand that opens a door, where the hands are on someone being tied (zip), whether they pull
 interface VwAct { kind: VwActKind; t: number; hand: 'L' | 'R'; pt?: THREE.Vector3; pull?: boolean }
-// a grenade: 'frag' (a sphere) or 'flash' (a grey can)
-type VwNadeKind = 'frag' | 'flash';
+// a grenade: 'frag' (a sphere), 'flash' (a grey can) or 'tb' (a thermobaric: a fatter olive can)
+type VwNadeKind = 'frag' | 'flash' | 'tb';
 interface VwAboxView extends VwLid { key: string | null; lights: THREE.Group }
 interface VwSboxView extends VwLid { name: string | null; card: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial> }
 const G_Views = {
@@ -604,9 +604,18 @@ const G_Views = {
     for (let t = 0; t < fuse; t += h) { this.nadeStep(n, h, map); pts.push(n.pos.clone()); }
     return pts;
   },
+  // A thermobaric grenade's body: an olive can with an orange band round its middle and a grey fuze on top (std: a lit
+  // material, for the hand in front of you)
+  tbMesh(r: number, h: number, std = false) {
+    const T = THREE, M = (c: number, o: Record<string, any> = {}) => std ? new T.MeshStandardMaterial(Object.assign({ color: c, roughness: 0.65 }, o)) : new T.MeshLambertMaterial(Object.assign({ color: c }, o));
+    const body = new T.Mesh(new T.CylinderGeometry(r, r, h, 12), M(0x4c5634, std ? {} : { emissive: 0x220000 }));
+    const band = new T.Mesh(new T.CylinderGeometry(r * 1.03, r * 1.03, h * 0.16, 12), M(0xc8641e)); band.position.y = h * 0.12; body.add(band);
+    const fuze = new T.Mesh(new T.CylinderGeometry(r * 0.38, r * 0.45, h * 0.24, 8), M(0x8a8f94)); fuze.position.y = h * 0.6; body.add(fuze);
+    return body;
+  },
   addNade(p: THREE.Vector3, v: THREE.Vector3, fuse: number, own: boolean, enemy: boolean, kind: VwNadeKind = 'frag') {
     const flash = kind === 'flash';
-    const mesh = new THREE.Mesh(flash ? new THREE.CylinderGeometry(0.035, 0.035, 0.13, 10) : new THREE.SphereGeometry(0.08, 8, 6), new THREE.MeshLambertMaterial({ color: flash ? 0x7d8388 : 0x3a4a2a, emissive: 0x220000 }));
+    const mesh = kind === 'tb' ? this.tbMesh(0.045, 0.15) as THREE.Mesh<THREE.BufferGeometry, THREE.MeshLambertMaterial> : new THREE.Mesh(flash ? new THREE.CylinderGeometry(0.035, 0.035, 0.13, 10) : new THREE.SphereGeometry(0.08, 8, 6), new THREE.MeshLambertMaterial({ color: flash ? 0x7d8388 : 0x3a4a2a, emissive: 0x220000 }));
     mesh.position.copy(p);
     G.R.dynRoot.add(mesh);
     this.nades.push({ pos: new THREE.Vector3().copy(p), vel: new THREE.Vector3().copy(v), fuse, own, enemy, mesh, kind });
@@ -878,7 +887,7 @@ const G_Views = {
       if (st.ra != null && st.ra >= 0 && !(pv.lastRa >= 0) && !st.sw) { const rdef = G.Gunsmith.fromCode(st.w); G.Audio.sampleAt('rack_slide', pv.pos.clone().setY(pv.pos.y + 1.3), 0.7, rdef && rdef.manual ? G.Me.MANUAL_PITCH : 1); } // (their bolt / pump / lever worked: heard from where they stand)
       pv.lastRa = st.ra == null ? -1 : st.ra;
       const kneel = (st.act === 'z' && (st.ap || 0) > 0.3) || st.act === 'b';
-      const hold = st.hk ? { kind: st.hk === 2 ? 'flash' : 'frag', cock: !!st.hc, str: st.hs == null ? 2 : st.hs } : null; // (a grenade in their hand)
+      const hold = st.hk ? { kind: st.hk === 2 ? 'flash' : st.hk === 3 ? 'tb' : 'frag', cock: !!st.hc, str: st.hs == null ? 2 : st.hs } : null; // (a grenade in their hand)
       pv.rig.update(dt, { pos: pv.pos, yaw: pv.yaw, pitch: pv.pitch, crouch: (!!st.cr || kneel) && !st.dn, prone: !!st.pr, bipod: !!st.bp, climb: st.cl && G.Game.map && G.Game.map.crest ? G.Game.map.crest.ladder : null, zip: !!st.zp, aim: !!st.ad, alert: !st.lr && !st.sw, atak: !!st.mn, lean: st.ln || 0, state: st.dn ? 'down' : 'alive', act,
         hold, rack: st.ra == null ? -1 : st.ra, reload: st.rl == null ? -1 : st.rl, loaded: st.ld == null ? null : !!st.ld, nomag: !!st.nm, inspect: st.in == null ? -1 : st.in, magChk: st.mc == null ? -1 : st.mc });
       if (pv.tag) pv.tag.position.y = st.dn ? 0.8 : st.cr ? 1.7 : 2.15;
@@ -1042,10 +1051,11 @@ const G_Views = {
       n.fuse -= dt;
       n.mesh.material.emissive.setHex(Math.floor(n.fuse * 8) % 2 ? 0xff2200 : 0x220000);
       if (n.fuse <= 0) {
-        if (n.kind === 'flash' && !n.own) { G.R.dynRoot.remove(n.mesh); this.nades.splice(this.nades.indexOf(n), 1); continue; } // (someone else's: its bang comes from the host)
+        if ((n.kind === 'flash' || n.kind === 'tb') && !n.own) { G.R.dynRoot.remove(n.mesh); this.nades.splice(this.nades.indexOf(n), 1); continue; } // (someone else's: its bang comes from the host)
         G.R.dynRoot.remove(n.mesh);
         this.nades.splice(this.nades.indexOf(n), 1);
         if (n.own && n.kind === 'flash') G.Me.flashBang(p.clone().add(new THREE.Vector3(0, 0.1, 0)));
+        else if (n.own && n.kind === 'tb') G.Me.thermobaric(p.clone().add(new THREE.Vector3(0, 0.25, 0)));
         else if (n.own) G.Me.explode(p.clone().add(new THREE.Vector3(0, 0.25, 0)), G.Me.BLAST.r, G.Me.BLAST.dmg, true); // (just off the floor it's on, any floor)
         else if (n.enemy && G.Net.isHost) G.Server.enemyBoom(p.clone().add(new THREE.Vector3(0, 0.25, 0)));
       }

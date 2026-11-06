@@ -124,6 +124,23 @@ const G_Audio = {
     this._noise(now, 0.9, 900, 0.6, 0.6 * att, 'lowpass', 60);
     this.tone(140, 0.4, 'sine', 0.8 * att, 40);
   },
+  // A thermobaric: the burster's sharp pop as it throws the fuel out, then, a moment later, the cloud lighting: a deep whump and a
+  // long roar as it burns through the room (the afterburn), a rumble that goes on after the bang has gone
+  thermobaric(dist = 0) {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime, att = 1 / (1 + dist * 0.035), t1 = now + 0.12;
+    this._noise(now, 0.12, 3000, 0.6, 0.5 * att, 'lowpass', 600);
+    this._noise(t1, 0.5, 2200, 0.5, 1.3 * att, 'lowpass', 120);
+    this._noise(t1, 1.0, 520, 0.7, 0.9 * att, 'lowpass', 90); // (the roar, in pieces: the noise buffer is a second and a half long)
+    this._noise(t1 + 0.8, 1.0, 260, 0.7, 0.5 * att, 'lowpass', 45);
+    this._noise(t1 + 0.1, 0.95, 900, 1.2, 0.35 * att, 'bandpass', 180);
+    const c = this.ctx, o = c.createOscillator(), g = c.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(70, t1); o.frequency.exponentialRampToValueAtTime(18, t1 + 1.8);
+    g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(1.1 * att, t1 + 0.03); g.gain.exponentialRampToValueAtTime(0.001, t1 + 1.9);
+    o.connect(g); g.connect(this.master); o.start(now); o.stop(t1 + 2);
+  },
+  // a grenade's spoon flying off: the striker's snap and the lever's ping
+  spoon() { this.tone(3400, 0.04, 'square', 0.06); this.tone(1900, 0.09, 'triangle', 0.07, 1500, 0.03); },
   // deafened (k 0..1): a high ringing that fades, and everything else muffled down and slowly coming back
   deafen(k: number) {
     if (!this.ctx) return;

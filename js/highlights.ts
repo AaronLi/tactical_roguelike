@@ -28,7 +28,7 @@ const G_Highlights = (() => {
   // (the same on every machine: js/player.ts fragBurst) and, from the thrower's machine, the paths of the chips that went into someone
   // (js/player.ts fragDone: [x, y, z, speed] points, and the hits as a round's are, less what only F9 reads)
   interface HlNade { t: number; a: string | null; p: number[]; v: number[]; fuse: number; kind: string }
-  interface HlBoom { t: number; a: string | null; p: number[]; s: number; nade: HlNade | null; paths: ShotPath[] }
+  interface HlBoom { t: number; a: string | null; p: number[]; s: number; nade: HlNade | null; paths: ShotPath[]; kind?: string } // (kind: 'frag', or 'tb' a thermobaric's)
   // a flashbang going off: when, whose, where, the host's number for it (js/server.ts flashbang), the throw that took it there
   interface HlFlashFx { t: number; a: string | null; p: number[]; n: number; nade: HlNade | null }
   type HlSegKind = 'open' | 'quiet' | 'ad' | 'sponsor' | 'clip' | 'armour' | 'xray' | 'table' | 'gear' | 'card';
@@ -444,7 +444,7 @@ const G_Highlights = (() => {
   // becomes (boom) to find. a: whose ('p' or 'e' and their id, or null)
   function nade(a: string | null, p: XYZ, v: XYZ, fuse: number, kind: string) {
     if (G.Game.phase !== 'level' || G.Game.hub) return;
-    R.nades.push({ t: R.t, a, p: [p.x, p.y, p.z], v: [v.x, v.y, v.z], fuse, kind: kind === 'flash' ? 'flash' : 'frag' });
+    R.nades.push({ t: R.t, a, p: [p.x, p.y, p.z], v: [v.x, v.y, v.z], fuse, kind: kind === 'flash' || kind === 'tb' ? kind : 'frag' });
   }
   // the throw that went off at p: the latest of that kind (and thrower, if known) whose fuse has burnt, its arc ending within 2 m of it
   function throwOf(a: string | null, p: number[], kind: string) {
@@ -456,16 +456,18 @@ const G_Highlights = (() => {
     }
     return null;
   }
-  // A frag grenade went off (js/game.ts onBoom: every machine; the thrower's own as it goes off, js/player.ts explode): by its seed, which is
-  // what the hits it does (js/player.ts flushHits gr) and the kills they make (js/server.ts kill gr) name it by. The same burst told twice
-  // (the thrower's, then the host's echo) is the one.
-  function boom(a: string | null, p: XYZ, s: number) {
+  // A frag grenade went off (js/game.ts onBoom: every machine; the thrower's own as it goes off, js/player.ts explode), or a thermobaric
+  // (kind 'tb': js/player.ts thermobaric): by its seed, which is what the hits it does (js/player.ts flushHits gr) and the kills they make
+  // (js/server.ts kill gr) name it by, so a thermobaric's kills are one moment a grenade as a frag's are. The same burst told twice (the
+  // thrower's, then the host's echo) is the one.
+  function boom(a: string | null, p: XYZ, s: number, kind = 'frag') {
     if (G.Game.phase !== 'level' || G.Game.hub || !s) return;
     let b = R.booms.get(s);
-    if (!b) R.booms.set(s, (b = { t: R.t, a, p: [p.x, p.y, p.z], s, nade: null, paths: [] }));
+    if (!b) R.booms.set(s, (b = { t: R.t, a, p: [p.x, p.y, p.z], s, nade: null, paths: [], kind }));
     else if (b.t < 0) { b.t = R.t; b.p = [p.x, p.y, p.z]; }
+    b.kind = kind;
     if (!b.a) b.a = a;
-    if (!b.nade) b.nade = throwOf(b.a, b.p, 'frag');
+    if (!b.nade) b.nade = throwOf(b.a, b.p, kind);
   }
   // The paths of a burst's chips that went into someone (js/player.ts fragDone, sent on to the squad: js/game.ts 'npath'), at most 48
   function fragPaths(s: number, ps: ShotPath[]) {
@@ -1512,8 +1514,8 @@ const G_Highlights = (() => {
   // a clip's grenade: where it went off, when, the throw that took it there, and whether it was a flashbang (a frag's kill: its boom; a
   // flashbang's own clip: its fx). Null for a clip without one.
   function burstOf(c: Clip) {
-    if (c.boom) return { p: new T.Vector3(...(c.boom.p as [number, number, number])), t: c.boom.t >= 0 ? c.boom.t : c.t, n: c.boom.nade, flash: false, s: c.boom.s };
-    if (c.fx) return { p: new T.Vector3(...(c.fx.p as [number, number, number])), t: c.fx.t, n: c.fx.nade, flash: true, s: c.fx.n * 2654435761 };
+    if (c.boom) return { p: new T.Vector3(...(c.boom.p as [number, number, number])), t: c.boom.t >= 0 ? c.boom.t : c.t, n: c.boom.nade, flash: false, tb: c.boom.kind === 'tb', s: c.boom.s };
+    if (c.fx) return { p: new T.Vector3(...(c.fx.p as [number, number, number])), t: c.fx.t, n: c.fx.nade, flash: true, tb: false, s: c.fx.n * 2654435761 };
     return null;
   }
   // The throw's arc, as the grenade flew (js/views.ts predictNade, against the replayed level), bent the last of the way onto where it
@@ -1552,13 +1554,13 @@ const G_Highlights = (() => {
     const c = s.clip, B = burstOf(c);
     if (!B) return;
     if (!P.nx) {
-      const K = B.flash ? 0 : 90, rr = G.U.rng((B.s >>> 0) || 1), dirs = new Float32Array(K * 3), lens = new Float32Array(K), vs = new Float32Array(K);
+      const K = B.flash || B.tb ? 0 : 90, rr = G.U.rng((B.s >>> 0) || 1), dirs = new Float32Array(K * 3), lens = new Float32Array(K), vs = new Float32Array(K);
       for (let i = 0; i < K; i++) { // (the rest of the burst: a few of its chips each way, out to whatever stopped them)
         const cz = 2 * rr() - 1, r = Math.sqrt(1 - cz * cz), a = rr() * 6.283, x = Math.cos(a) * r, z = Math.sin(a) * r;
         dirs[i * 3] = x; dirs[i * 3 + 1] = cz; dirs[i * 3 + 2] = z; vs[i] = 1350 * (0.85 + 0.3 * rr());
         lens[i] = Math.min(14, G.Level.raycast(P.map, B.p.x, B.p.y, B.p.z, x, cz, z, 14).t);
       }
-      const mesh = new T.Mesh(B.flash ? new T.CylinderGeometry(0.035, 0.035, 0.13, 10) : new T.SphereGeometry(0.08, 10, 8), new T.MeshLambertMaterial({ color: B.flash ? 0x7d8388 : 0x3a4a2a, emissive: 0x220000 }));
+      const mesh = new T.Mesh(B.flash ? new T.CylinderGeometry(0.035, 0.035, 0.13, 10) : B.tb ? new T.CylinderGeometry(0.045, 0.045, 0.15, 10) : new T.SphereGeometry(0.08, 10, 8), new T.MeshLambertMaterial({ color: B.flash ? 0x7d8388 : B.tb ? 0x4c5634 : 0x3a4a2a, emissive: 0x220000 }));
       P.fxRoot.add(mesh);
       let streaks = null;
       if (K) {
@@ -1584,7 +1586,17 @@ const G_Highlights = (() => {
         m.position.copy(B.p); m.scale.setScalar(grow * 0.34); m.userData.grow = grow; P.fxRoot.add(m); P.fx.push({ obj: m, life, max: life, op, mist: true, noGeo: true });
       };
       if (B.flash) { puff(0xffffff, 3.2, 0.3, 1, true); puff(0xfff4d0, 1.2, 0.6, 0.8, true); }
-      else {
+      else if (B.tb) { // a thermobaric: its fireball through the room it filled (js/player.ts tbModel, against the replayed level), and the soot after
+        let cells: number[][] = [];
+        try { const M = G.Me && G.Me.tbModel ? G.Me.tbModel(P.map, B.p) : null; if (M) for (let i = 0; i < M.cloud; i += 2) { const c = M.fill.order[i]; cells.push([((c % P.map.W) + 0.5) * G.Level.TS, ((c / P.map.W | 0) + 0.5) * G.Level.TS, M.fill.d[i]]); } } catch (e) { cells = []; }
+        if (!cells.length) cells = [[B.p.x, B.p.z, 0]];
+        puff(0xffffff, 1.4, 0.02, 1, true);
+        for (const [x, z, d] of cells.slice(0, 60)) {
+          const m = new T.Mesh(dropGeo, new T.MeshBasicMaterial({ color: d < 2 ? 0xffd080 : 0xff8a30, transparent: true, opacity: 0.9, depthWrite: false, blending: T.AdditiveBlending }));
+          m.position.set(x, B.p.y + 0.8, z); m.scale.setScalar(0.4); m.userData.grow = 2.6; P.fxRoot.add(m); P.fx.push({ obj: m, life: 0.9 + d * 0.04, max: 0.9 + d * 0.04, op: 0.9, mist: true, noGeo: true });
+        }
+        puff(0x2a2622, 5, 3, 0.5, false);
+      } else {
         puff(0xffffff, 0.7, 0.004, 1, true); puff(0xffa040, 1.5, 0.012, 0.95, true); puff(0x8a8478, 2.4, 0.9, 0.5, false);
         // its chips that went in: as rounds (slowed: each flown along its path; live, all at once), and a few wounds' blood a body
         const per: Record<string, number> = {};

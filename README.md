@@ -876,14 +876,26 @@ says the same), but not whose: the shooter's name isn't shown.
       its own (about 0.4 g, 1,350 m/s, slowed by its own drag): through armour and bodies by the same sums as a bullet,
       through walls and cover by what they are made of. It kills out to about 3 m, wounds badly to 5 and is a hazard to
       9 or more; plasterboard and wood let them through, concrete stops them, and a corridor throws them back. They are
-      worked off over a few frames, so a detonation costs no frame more than about 3 ms.
+      worked off over a few frames, so a detonation costs no frame more than about 3 ms. Its blast **concusses** whoever it
+      doesn't kill within about 6 m round by the floor, wall or no line of sight, twice as hard in a closed room as in the
+      open: stunned up to 3.5 s, then groggy (as a flashbang's, shorter).
+    - A **thermobaric** (enhanced-blast) grenade throws out a cloud of fuel and lights it: a fireball that fills the room
+      it lands in, cell by cell out from where it went off, round furniture and out through open doorways (a shut door
+      stops it), up to about 50 m² of floor; less, and smaller, the more open the space is (a big hall, open sky, windows
+      out). Inside the fireball: burns (0.45 of a life) and blast (0.9 of a life, by how closed in the space is: blast
+      lung); the rest of the space it reached feels the long pressure it leaves (its energy over the room's volume, about
+      10 to 25 kPa in a closed apartment room, enough to daze and, small and closed, to hurt); through a wall, a thump
+      that dazes a little. Almost no fragments. Every screen draws the same fireball (from where it went off and the
+      doors), and F9 shows the volume it filled with what it came to.
     - A **flashbang** blinds whoever has it in sight (falling off to 16 m, and by how squarely they face it; half
       behind cover) and shakes anyone in the same room by the way sound goes. A suspect is **stunned** (up to 8 s: hands
       to their eyes, weapon lowered, stumbling about, unable to fire; they give up almost every time they are shouted
       at, and can be cuffed where they stand) and then **groggy** (a few more seconds: they see about 5 m, shoot at a
       quarter of their aim, come round slowly). A star over their head says so: solid while stunned, fading while
       groggy. Civilians curl up. Going in straight away beats looking round the door, which meets a suspect no
-      different from before; going in late meets them recovering.
+      different from before; going in late meets them recovering. Indoors the room's walls throw the flash back: anyone
+      in the same room is dazzled even without a line to it, and turned away it's still most of it; and the bang alone
+      a couple of metres off takes the balance with the hearing.
   - **Blood is what puts you down.** Every hit costs blood at once (about half a point per point of damage
     to the torso, a third to a limb; none to the head), and then for as long as it bleeds:
     - over 40%: you're up, however hurt
@@ -1266,9 +1278,13 @@ says the same), but not whose: the shooter's name isn't shown.
     the squad too): the screen goes white and fades back over a few seconds, half as bad facing away and not
     at all round a wall, and your ears ring with everything muffled for a while. It's heard 30 m off through
     the building.
+  - **Thermobaric grenades** (¢450): a 2.6 s fuse, a fireball that fills the room (see Grenades). Key 5 to start.
   - **Throwing:** a grenade's key (3, 4, 5) brings it into your hand. While it's there its arc shows, dotted, to a
     ring where it'll go off (the throw it'll be, from the same flight steps as the real thing, so it's right).
-    Hold left click to pull the pin (brighter), let go to throw. Right click picks the throw: underhand (a lob
+    Hold left click to pull the pin (brighter), let go to throw. With the pin out, R lets the spoon fly: the fuse
+    burns in your hand (the HUD counts it down, the arc shortens to where it'll be when it goes off), so it bursts in
+    the air or the moment it lands, before anyone can get away from it; hold it too long and it goes off in your
+    hand, and put away live it's dropped at your feet. Right click picks the throw: underhand (a lob
     from the hip, about 7 m, rolling on along the floor), weak (about 13 m) or strong (about 21 m). Grenades
     bounce off walls, floors and ceilings, losing speed each time, then roll till friction stops them. You keep
     the next one in hand while you have more; out of them, the weapon comes back up.
@@ -1299,7 +1315,7 @@ says the same), but not whose: the shooter's name isn't shown.
   - **Ammo resupply** refills your guns and every magazine and box you own. There are no ammo caches in
     levels, so this is how you restock.
   - **Spare magazines or boxes** for each of your guns.
-  - **Medical items** (all six, see Injuries), **frag grenades and flashbangs.**
+  - **Medical items** (all six, see Injuries), **frag grenades, flashbangs and thermobaric grenades.**
 
   Anything you buy needs room: it goes into a pouch or pocket that takes it, otherwise into your locker. Suppressors are muzzle parts from the gunsmith:
   enemies only hear suppressed shots from about 6 m instead of 28 m, so you can thin out a room before it wakes up.
@@ -1420,7 +1436,10 @@ says the same), but not whose: the shooter's name isn't shown.
 - Enemies use cover. They path to furniture between themselves and you, crouch, and stand up for a moment to shoot,
   so watch for the visor glint and catch them as they rise. They also hold wall corners and doorways,
   leaning out sideways to fire. From level 2 they also throw grenades at players hiding
-  behind cover or where they last saw you. A GRENADE warning points at any live grenade nearby.
+  behind cover or where they last saw you. A GRENADE warning points at any live grenade nearby. Suspects who see
+  yours land near them (or hear it clatter right by them) get away from it after a moment to take it in (about a
+  second, half that already in the fight): to cover from it if there's some close, otherwise away, down once clear,
+  and not shooting meanwhile. Cook it and they've no time.
 
 ## Characters, hitboxes and gun models
 
@@ -2183,7 +2202,7 @@ On top of the baked room reverb, echoes are **ray-traced through the level** for
 | Hold middle button | The comms wheel: eight slices round the crosshair, the mouse moves a pointer onto one, let go to pick it (in the middle: nothing). Your gun's light, laser, a magnifier flipped in or out (greyed when it has none), and calls to the squad in the chat: your injuries (each hurt part and what's wrong with it, your blood), your ammo (in the gun, spare, about how many reloads), contact (with a ping where you're looking), clear, holding. (The mouse's side buttons no longer do anything: a browser's back and forward can't be reliably kept off them.) |
 | I (hold) | Inspect your weapon; held, the chamber check stays open; mouse side to side rolls the gun, up and down pitches it |
 | H | Open your body and kit (as Tab) |
-| 3 / 4 / 5 | Bring the grenade on that key into your hand (frag on 3 and flashbang on 4 to start; the weapon goes down). Hold LMB to pull the pin and draw back, release to throw; RMB picks underhand, weak or strong. The key again, or 1 / 2, puts it away. Drag a frag or flashbang onto a key's box under Equipment in the inventory to put that kind on it; × clears it. Medical gear doesn't go on them |
+| 3 / 4 / 5 | Bring the grenade on that key into your hand (frag on 3, flashbang on 4 and thermobaric on 5 to start; the weapon goes down). Hold LMB to pull the pin and draw back, release to throw; R while drawn back cooks it; RMB picks underhand, weak or strong. The key again, or 1 / 2, puts it away. Drag a frag or flashbang onto a key's box under Equipment in the inventory to put that kind on it; × clears it. Medical gear doesn't go on them |
 | B (hold) | Swap the gun in your hands with the next one in your backpack |
 | V | Shout compliance ("Police! Show me your hands!") |
 | X | Fire selector: semi / auto (or burst), on guns that have one |

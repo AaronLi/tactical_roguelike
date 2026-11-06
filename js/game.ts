@@ -799,6 +799,13 @@ const G_Game = {
   onBoom(m: any) {
     if (this.phase !== 'level') return;
     const p = new THREE.Vector3(m.p[0], m.p[1], m.p[2]);
+    if (m.tb) { // a thermobaric: the same fireball on every screen, from where it went off (the thrower's drew its own as it went)
+      const Me = G.Me, M = Me.tbModel(this.map!, p);
+      if (m.id !== G.Net.myId) { G.R.fireball(M); G.Audio.thermobaric(G.R.camera.position.distanceTo(p)); if (G.ShotLog) G.ShotLog.keepFill(M, null, m.en ? "Suspect's thermobaric" : 'Thermobaric'); }
+      if (m.s && G.Highlights) G.Highlights.boom(m.en ? null : 'p' + m.id, p, m.s, 'tb');
+      Me.tbOnMe(M, !m.en);
+      return;
+    }
     if (m.id !== G.Net.myId) { G.R.explosion(p, m.r); G.Audio.boom(G.R.camera.position.distanceTo(p)); }
     if (m.fr && m.s && G.Highlights) G.Highlights.boom(m.en ? null : 'p' + m.id, p, m.s); // (a frag's burst, for the replays: yours is kept as it went off)
     const Me = G.Me;

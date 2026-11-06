@@ -9,7 +9,7 @@ interface PShot { sid: number; ff: Map<any, any>; to?: THREE.Vector3; tos: THREE
 // what a timed F action is (it drives the animation), the zipline's and the ladder's phases, and how a hit leaves you
 type PReloadMode = 'retain' | 'pouch' | 'floor' | 'plain';
 type PActKind = 'rack' | 'release';
-type PHeldKind = 'frag' | 'flash';
+type PHeldKind = 'frag' | 'flash' | 'tb'; // (tb: a thermobaric grenade)
 type PActionKind = 'order' | 'zip' | 'bag' | 'open' | 'kick' | 'close' | 'case';
 type PZipPhase = 'up' | 'ride' | 'down';
 type PLadderPhase = 'on' | 'climb' | 'off';
@@ -40,12 +40,14 @@ interface PViewer { v: any; was: boolean; yaw: number; pitch: number }
 interface PZip { l: any; ph: PZipPhase; t: number; s: number; from: THREE.Vector3; was: boolean; L?: number; sw: { th: number; w: number; v: number; a: number } }
 interface PClimb { l: any; up: boolean; ph: PLadderPhase; t: number; from: THREE.Vector3; was: boolean; y: number }
 // a throwable in your hand (keys 3, 4, 5): its kind, whether the pin's out, the strength picked, and the throw's timers
-interface PHeld { kind: PHeldKind; cock: boolean; str: number; readyT: number; throwT: number; lastL: boolean; lastR: boolean; queued?: boolean }
+interface PHeld { kind: PHeldKind; cock: boolean; str: number; readyT: number; throwT: number; lastL: boolean; lastR: boolean; queued?: boolean; cook?: number } // (cook: the spoon's gone, the fuse burning in your hand: what's left of it)
+// a thermobaric's burst, worked out from where it went off (js/player.ts tbModel)
+interface PTbModel { map: LvMap; p: THREE.Vector3; fill: ReturnType<typeof G_Level.blastFill>; cloud: number; space: number; closed: boolean; conf: number; qs: number; rc: number; idx: Int32Array; outFrac: number; areaCloud: number; areaSpace: number; V: number }
 interface PTreat { name: string; part: string; mt: string; t0: number; dur: number }
 // what's owed the host for one suspect this frame: plain damage, wounds (as a share of a life), a headshot, a kill, armour got through, the wounds' detail
 interface PHitQ { d: number; f: number; h: boolean; k: boolean; ap?: boolean; w?: any[]; gr?: number } // (gr: a frag grenade's, its seed: js/highlights.ts)
 // your own limbs in the viewmodel pass (fpLimbs)
-interface PLimbs { arm: THREE.Group; leg: THREE.Group; armL: THREE.Group; tie: THREE.Mesh; held: THREE.Group; env: THREE.Group; nade: { frag: THREE.Mesh; flash: THREE.Mesh } }
+interface PLimbs { arm: THREE.Group; leg: THREE.Group; armL: THREE.Group; tie: THREE.Mesh; held: THREE.Group; env: THREE.Group; nade: { frag: THREE.Mesh; flash: THREE.Mesh; tb: THREE.Mesh } }
 type PTrack = { t: number; v: number; bone: string }[] & { frags?: any[] };
 interface PRound { p: THREE.Vector3; v: THREE.Vector3; def: WeaponDef; am: string; drag: number; hit: Set<any>; shot: PShot; path: { p: number[][]; ev: any[]; hit: any[] }; enemy?: number; [k: string]: any }
 // The local player: input, movement, weapons, damage, revive/down state.
@@ -996,7 +998,7 @@ const G_Me = {
   // with none to pull (a revolver, a shotgun's tube, a break-action, a magazine you can't get at), goes straight to
   // the chamber check a held inspect ends on (rChk)
   rPress() {
-    if (this.held) return;
+    if (this.held) { this.cookHeld(); return; }
     const w = this.cur();
     if (this.reloading || this.magChk || this.rChk || this.stowed || this.down || !w || w.def.akimbo || w.def.cls === 'BOW' || (w.noMag && G.VMAnim.canMagCheck(G.R.vm))) { this.reloadKey(); return; }
     this.rHeldAt = performance.now();
@@ -1940,15 +1942,109 @@ const G_Me = {
     P[i * 6] = a.x; P[i * 6 + 1] = a.y; P[i * 6 + 2] = a.z; P[i * 6 + 3] = a.x + dx * k; P[i * 6 + 4] = a.y + dy * k; P[i * 6 + 5] = a.z + dz * k;
   },
 
+  // ---------------------------------------------------------------- the thermobaric grenade
+  // An enhanced-blast (thermobaric) charge: a small burster that throws its fuel out as a cloud (aluminium and an oxidiser-poor
+  // explosive, mostly), which then lights. It burns as a fireball that fills the space the cloud reached, and the burning goes on
+  // for a good part of a second (the afterburn, as the aluminium finds air), so the pressure it makes lasts many times longer
+  // than a frag's crack: a long, pushing wave that goes round corners and bounces about a closed room, and that's what kills,
+  // in the lungs and the gut (primary blast injury), along with the burns from the fireball itself. In a closed room nearly all
+  // of that energy stays in: the pressure builds up over the whole room (quasi-static: its energy over the room's volume) and
+  // holds. In the open the cloud thins and rises, burns less of its fuel, and there's nothing to hold the pressure in: a far
+  // smaller fireball and a short shove. Almost no fragments (a thin casing). Here:
+  //   the cloud: from where it went off, cell by cell through the room as gas spreads (G.Level.blastFill: walls and shut doors
+  //   stop it, open doorways let it through), CLOUD cells of floor at most (a room of about 50 m²), fewer the more of it is open
+  //   to the sky. Inside it: BURN and BLAST (a share of a life each), the blast by how confined it is (conf).
+  //   the space: the same fill carried on to SPACE cells (the room and what's open onto it), its volume at a real room's height
+  //   (ROOM_H), what the burn puts in it as pressure (E: the energy that ends up as heat in the air, 0.4 of it as pressure in
+  //   a diatomic gas): qs kPa, held for a long time. Outside the cloud but in that space: hurt by qs past QS0, and dazed.
+  //   through a wall or a shut door: a thump, no harm: dazed a little, close by.
+  // The same everywhere from where it went off (the map and its doors), so every machine draws the same fireball and the F9
+  // view shows the volume it filled.
+  TB: { FUSE: 2.6, CLOUD: 110, SPACE: 900, ROOM_H: 2.7, E: 6.0e6, BURN: 0.45, BLAST: 0.9, QS0: 25, QS_K: 180, WALL_R: 3 },
+  tbModel(map: LvMap, p: THREE.Vector3): PTbModel {
+    const T = this.TB, L = G.Level, TS = L.TS, cellA = TS * TS;
+    const fill = L.blastFill(map, p.x, p.y, p.z, T.SPACE);
+    // how much of the cloud's reach is open to the sky (counted over the first CLOUD cells): the cloud thins and rises there
+    let outC = 0; const fm = L.floorMap(map, fill.f), out = fm.out || map.out, nC = Math.min(fill.n, T.CLOUD);
+    for (let i = 0; i < nC; i++) if (out[fill.order[i]]) outC++;
+    const space = fill.n, closed = space < T.SPACE, skyAll = space ? fill.out / space : 1, outFrac = nC ? outC / nC : 1;
+    // how well the space holds the burn in: open sky over it, the ways out it met (broken windows, the map's edge), and how much
+    // more room past the cloud there is for it to spread into (a big hall holds it in hardly better than the open). Less held
+    // in, the cloud's thinner and smaller as it lights, and burns less of its fuel.
+    const held = G.U.clamp(T.CLOUD * 2.5 / Math.max(1, space), 0, 1), conf = G.U.clamp((1 - outFrac) / (1 + 0.12 * fill.vents) * (0.3 + 0.7 * held), 0.08, 1);
+    const cloud = Math.max(Math.min(fill.n, 12), Math.min(fill.n, Math.round(T.CLOUD * (0.45 + 0.55 * held) * (1 - 0.6 * outFrac))));
+    const V = Math.max(1, space) * cellA * T.ROOM_H, qs = closed || skyAll < 0.05 ? 0.4 * T.E / V / 1000 * (1 - skyAll) / (1 + 0.12 * fill.vents) : 0;
+    const rc = cloud ? fill.d[cloud - 1] : 0; // (the cloud's edge, along the floor)
+    const idx = new Int32Array(map.W * map.H).fill(-1);
+    for (let i = 0; i < fill.n; i++) idx[fill.order[i]] = i;
+    return { map, p: p.clone(), fill, cloud, space, closed, conf, qs, rc, idx, outFrac, areaCloud: cloud * cellA, areaSpace: space * cellA, V };
+  },
+  // what a thermobaric's burst does to someone at (x, y, z): burn and blast (shares of a life), daze (0..1), and where they were
+  tbDose(M: PTbModel, x: number, y: number, z: number) {
+    const T = this.TB, L = G.Level, map = M.map, TS = L.TS, f = L.floorAt(map, x, y, z);
+    const i = G.U.clamp(Math.floor(z / TS), 0, map.H - 1) * map.W + G.U.clamp(Math.floor(x / TS), 0, map.W - 1), k = f === M.fill.f ? M.idx[i] : -1;
+    if (k >= 0 && k < M.cloud) return { burn: T.BURN, blast: T.BLAST * M.conf, daze: 1, at: 'cloud', d: M.fill.d[k] };
+    if (k >= 0) { // in the space it filled, past the fireball: the long push of the pressure, and the front's last of it close to the edge
+      const past = M.fill.d[k] - M.rc, front = M.conf * Math.exp(-past / 1.5);
+      return { burn: 0.15 * Math.exp(-past / 0.7), blast: G.U.clamp((M.qs - T.QS0) / T.QS_K, 0, 0.5) + 0.45 * front, daze: G.U.clamp(M.qs / 50 + front, 0, 1), at: 'space', d: M.fill.d[k] };
+    }
+    const r = Math.hypot(x - M.p.x, z - M.p.z), reach = M.rc + T.WALL_R; // (through a wall, or a floor)
+    return { burn: 0, blast: 0, daze: r < reach ? 0.35 * (1 - r / reach) * (f === M.fill.f ? 1 : 0.5) : 0, at: r < reach ? 'wall' : 'none', d: r };
+  },
+  // Yours went off: what it does to the suspects here (as a frag's chips do: told to the host as their hits, gr its seed, so a
+  // kill of them is the grenade's in the highlights), drawn, heard, and the host told (it dazes those it didn't kill, js/server.ts,
+  // and tells the squad: everyone draws the same fireball from it, and takes what it does to them: js/game.ts onBoom)
+  thermobaric(p: THREE.Vector3) {
+    const map = G.Game.map!, M = this.tbModel(map, p), seed = ((Math.random() * 4294967295) >>> 0) + 1;
+    G.R.fireball(M);
+    G.Audio.thermobaric(G.R.camera.position.distanceTo(p));
+    const log: any[] = [];
+    this.hitQ = this.hitQ || new Map();
+    for (const ev of G.Views.enemies.values()) {
+      if (!ev.alive) continue;
+      const q = this.tbDose(M, ev.pos.x, (ev.pos.y || 0) + 1.0, ev.pos.z), f = q.burn + q.blast;
+      log.push({ id: ev.id, p: [ev.pos.x, ev.pos.y || 0, ev.pos.z], at: q.at, d: +q.d.toFixed(1), burn: +q.burn.toFixed(2), blast: +q.blast.toFixed(2), daze: +q.daze.toFixed(2) });
+      if (f < 0.01) continue;
+      this.queueHit(ev.id, 0, false, f);
+      const h = this.hitQ.get(ev.id)!; h.gr = seed;
+      if (q.blast > 0.3) (h.w = h.w || []).push(['thorax', 'lung', '', `lungL:${Math.round(Math.min(1, q.blast) * 80)},lungR:${Math.round(Math.min(1, q.blast) * 80)}`]); // (blast lung: the air sacs torn)
+      ev.selfHit = true;
+    }
+    this.tbLogs.push({ at: p.toArray().map((x) => +x.toFixed(2)), cloud: M.cloud, space: M.space, closed: M.closed, conf: +M.conf.toFixed(2), qs: +M.qs.toFixed(1), m2: +M.areaCloud.toFixed(1), who: log });
+    if (this.tbLogs.length > 10) this.tbLogs.shift();
+    if (G.ShotLog) G.ShotLog.keepFill(M, log, 'Thermobaric');
+    if (G.Highlights) G.Highlights.boom('p' + G.Net.myId, p, seed, 'tb');
+    const r2 = (v: number) => Math.round(v * 100) / 100;
+    G.Net.toHost({ t: 'boom', p: [r2(p.x), r2(p.y), r2(p.z)], r: r2(Math.max(3, M.rc)), d: 0, tb: 1, s: seed });
+  },
+  tbLogs: [] as any[],
+  // someone's thermobaric went off where you are (js/game.ts onBoom): the fireball's burns, the blast in your chest, the daze
+  // (the room swims, your ears ring). friendly: an officer's (40%, as a frag's blast is to you)
+  tbOnMe(M: PTbModel, friendly: boolean) {
+    if (!this.pos || this.down || this.dead) return;
+    const q = this.tbDose(M, this.pos.x, this.pos.y + 1.0, this.pos.z), k = friendly ? 0.4 : 1;
+    if (q.daze > 0.03) { G.Audio.deafen(Math.min(1, q.daze)); this.shakeT = Math.max(this.shakeT || 0, 0.3 + 0.6 * q.daze); }
+    if (q.at === 'cloud') G.HUD.flash(0.6);
+    const burn = q.burn * 100 * k, blast = q.blast * 100 * k;
+    if (burn + blast < 1) return;
+    let fate = null;
+    // the blast: the chest and the gut most (the air in them); the burns: wherever skin shows, the head and arms most
+    for (const [part, b, u] of [['thorax', 0.45, 0.15], ['stomach', 0.25, 0.1], ['head', 0.05, 0.3], ['armL', 0.05, 0.15], ['armR', 0.05, 0.15], ['legL', 0.075, 0.075], ['legR', 0.075, 0.075]] as [string, number, number][]) {
+      fate = this.worse(fate, G.Med.hit(this.body, part, blast * b + burn * u, false, 0, true)); // (no wound to bleed from: through 0)
+    }
+    if (q.blast * k > 0.3) this.body.parts.thorax.lung = true;
+    if (fate === 'dead') { this.killed(M.p, q.at === 'cloud' ? 'Caught in the fireball' : 'Killed by the blast'); return; }
+    this.hurt(burn + blast, M.p, fate);
+  },
   // a flashbang of yours went off: the host works out who it blinds (and tells everyone, you too)
   flashBang(p: THREE.Vector3) {
     const r2 = (v: number) => Math.round(v * 100) / 100;
     G.Net.toHost({ t: 'flash', p: [r2(p.x), r2(p.y), r2(p.z)] });
   },
   // ------------------------------------------------------------- quick slots: 3, 4 and 5
-  // Each holds a kind of throwable: 'frag' or 'flash' (or nothing). The key throws one from your kit. Bound by
+  // Each holds a kind of throwable: 'frag', 'flash' or 'tb' (or nothing). The key throws one from your kit. Bound by
   // dragging a grenade onto the slot's box in the inventory (G.InvUI); kept between sessions.
-  QUICK_DEFAULT: ['frag', 'flash', null] as (PHeldKind | null)[],
+  QUICK_DEFAULT: ['frag', 'flash', 'tb'] as (PHeldKind | null)[],
   get quick(): any[] { // (the slots' kinds, PHeldKind | null; wider for the HUD's and the inventory's callbacks)
     if (!this._quick) { const q = G.U.store.get('quick', null); this._quick = Array.isArray(q) && q.length === 3 ? q.slice() : this.QUICK_DEFAULT.slice(); }
     return this._quick;
@@ -1962,32 +2058,46 @@ const G_Me = {
   },
   // the kind of quick-slot gear an item is (null: not one)
   // the kind of quick-slot gear an item is: a throwable (null: not one; medical gear isn't)
-  quickKind(it: GItem | null) { return it && (it.k === 'frag' || it.k === 'flash') ? it.k : null; },
-  quickName(kind: string | null) { return kind === 'frag' ? 'Frag' : kind === 'flash' ? 'Flashbang' : '—'; },
+  quickKind(it: GItem | null) { return it && (it.k === 'frag' || it.k === 'flash' || it.k === 'tb') ? it.k : null; },
+  quickName(kind: string | null) { return kind === 'frag' ? 'Frag' : kind === 'flash' ? 'Flashbang' : kind === 'tb' ? 'Thermobaric' : '—'; },
   // how many of that kind you carry
   quickCount(kind: string | null) { return this.kit && kind ? G.Gear.count(this, kind) : 0; },
   // ------------------------------------------------------------- gear in hand (keys 3, 4, 5)
   // The key brings that grenade into your hand (the weapon goes down; the key again, or 1 / 2, brings it back).
   // Left click pulls the pin and draws back, letting go throws it; right click picks the throw: underhand (a lob
   // that rolls on along the floor), weak, or strong. While it's in your hand, its arc shows where it'll go off.
-  // Out of them, the weapon comes back up. held: { kind, cock, str, readyT (bringing it up), throwT (the throw) }.
+  // Drawn back, R lets the spoon fly: the fuse is burning in your hand from then (cooking it), the arc shortens with
+  // it, and let go late it bursts in the air over them or just as it lands, with no time to get away from it (js/server.ts
+  // dodge); hold it too long and it goes off where you stand. Put away while it's cooking, it's dropped at your feet.
+  // Out of them, the weapon comes back up. held: { kind, cock, str, readyT (bringing it up), throwT (the throw), cook }.
   THROWS: [['Underhand', 6.5, 2.4], ['Weak', 10, 3], ['Strong', 15.5, 3.2]] as [string, number, number][],
   equip(i: number) {
     const kind = this.quick[i];
     if (this.dead || this.down || this.action || G.Game.hub || this.seat != null) return; // (no throwing in the hangar)
     if (!kind) { G.HUD.toast('', `Nothing on key ${i + 3}: drag a grenade onto its box in the inventory`, 1.6); return; }
     if (this.held && this.held.kind === kind) { if (this.held.throwT < 0 && !this.held.cock) this.unequip(); return; }
-    if (!this.quickCount(kind)) { G.HUD.toast('', kind === 'flash' ? 'No flashbangs' : 'No grenades', 1.2); G.Audio.deny(); return; }
+    if (!this.quickCount(kind)) { G.HUD.toast('', kind === 'flash' ? 'No flashbangs' : kind === 'tb' ? 'No thermobarics' : 'No grenades', 1.2); G.Audio.deny(); return; }
     this.held = { kind, cock: false, str: this.throwStr == null ? 2 : this.throwStr, readyT: 0.35, throwT: -1, lastL: true, lastR: true };
     this.reloading = false; this.burstQ = 0; this.inspectT = 0; this.magChk = null; this.rChk = null; this.rHeldAt = 0; this.lowToggle = false;
     G.Audio.click();
   },
   unequip() {
     if (!this.held) return;
+    if (this.held.cook != null && this.held.throwT < 0) this.throwHeld(true); // (live in your hand: it can't go back in the pouch)
     this.held = null;
     this.raiseT = this.raiseMax = this.drawTime(); // (the weapon comes back up)
   },
-  fuseOf(kind: PHeldKind) { return kind === 'flash' ? 1.5 : 2.2; },
+  // the fuses: a flashbang's short (an M84's 1-2.3 s), a frag's and a thermobaric's a little longer (cook them to cut that)
+  fuseOf(kind: PHeldKind) { return kind === 'flash' ? 1.5 : kind === 'tb' ? this.TB.FUSE : 2.2; },
+  // what's left of the fuse of the one in your hand (all of it, till the spoon's gone)
+  fuseLeft(h: PHeld) { return h.cook != null ? Math.max(0.02, h.cook) : this.fuseOf(h.kind); },
+  // R, drawn back: the spoon goes, and the fuse with it
+  cookHeld() {
+    const h = this.held;
+    if (!h || !h.cock || h.cook != null || h.throwT >= 0) return;
+    h.cook = this.fuseOf(h.kind);
+    G.Audio.spoon();
+  },
   // where a throw of this strength leaves your hand, and how fast (underhand: from the hip, a lob)
   throwLaunch(str: number) {
     const cam = G.R.camera, fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion), [, sp, up] = this.THROWS[str];
@@ -2014,14 +2124,17 @@ const G_Me = {
     h.readyT -= dt;
     if (h.readyT > 0) return;
     if (h.queued && !h.cock) { h.cock = true; h.queued = false; G.Audio.pin(); } // pin out, drawn back
-    if (h.cock && !l) { h.cock = false; this.throwHeld(); } // let go: thrown
-    if (!h.cock && !this.down) { const { p, v } = this.throwLaunch(h.str); G.R.throwArc(G.Views.predictNade(p, v, this.fuseOf(h.kind), G.Game.map), false); }
-    else if (h.cock) { const { p, v } = this.throwLaunch(h.str); G.R.throwArc(G.Views.predictNade(p, v, this.fuseOf(h.kind), G.Game.map), true); }
+    if (h.cook != null) { h.cook -= dt; if (h.cook <= 0) { h.cock = false; this.throwHeld(true); return; } } // (held too long: it goes off in your hand)
+    if (h.cock && (!l || this.down)) { h.cock = false; this.throwHeld(this.down); } // let go: thrown (gone down: it falls from your hand)
+    if (!h.cock && !this.down) { const { p, v } = this.throwLaunch(h.str); G.R.throwArc(G.Views.predictNade(p, v, this.fuseLeft(h), G.Game.map), false); }
+    else if (h.cock) { const { p, v } = this.throwLaunch(h.str); G.R.throwArc(G.Views.predictNade(p, v, this.fuseLeft(h), G.Game.map), true); }
   },
-  throwHeld() {
-    const h = this.held!, kind = h.kind;
+  // drop: not thrown but let fall where you stand (a cooked one put away, held too long, or you went down with it)
+  throwHeld(drop = false) {
+    const h = this.held!, kind = h.kind, fuse = this.fuseLeft(h);
+    h.cook = undefined;
     if (!G.Gear.take(this, kind)) { this.unequip(); return; }
-    const { p, v } = this.throwLaunch(h.str), fuse = this.fuseOf(kind);
+    const { p, v } = drop ? { p: this.pos.clone().add(new THREE.Vector3(0, 0.9, 0)), v: new THREE.Vector3(this.vel.x * 0.3, -0.5, this.vel.z * 0.3) } : this.throwLaunch(h.str);
     G.Views.addNade(p, v, fuse, true, false, kind);
     if (G.Highlights) G.Highlights.nade('p' + G.Net.myId, p, v, fuse, kind); // (its flight, for the replays)
     h.throwT = 0;
@@ -2737,8 +2850,8 @@ const G_Me = {
     const flapPivot = new T.Group(); flapPivot.position.set(0, 0.007, -0.165); env.add(flapPivot);
     const flap = new T.Mesh(new T.BoxGeometry(0.24, 0.004, 0.08), new T.MeshLambertMaterial({ color: 0xb8975c })); flap.position.z = 0.04; flapPivot.add(flap);
     env.userData.flap = flapPivot;
-    // a grenade in the hand (keys 3, 4, 5): a frag, or a flashbang's can
-    const nade = { frag: new T.Mesh(new T.SphereGeometry(0.038, 12, 8), new T.MeshStandardMaterial({ color: 0x3a4a2a, roughness: 0.7 })), flash: new T.Mesh(new T.CylinderGeometry(0.026, 0.026, 0.1, 12), new T.MeshStandardMaterial({ color: 0x7d8388, roughness: 0.5, metalness: 0.4 })) };
+    // a grenade in the hand (keys 3, 4, 5): a frag, a flashbang's can, or a thermobaric's fatter olive can
+    const nade = { frag: new T.Mesh(new T.SphereGeometry(0.038, 12, 8), new T.MeshStandardMaterial({ color: 0x3a4a2a, roughness: 0.7 })), flash: new T.Mesh(new T.CylinderGeometry(0.026, 0.026, 0.1, 12), new T.MeshStandardMaterial({ color: 0x7d8388, roughness: 0.5, metalness: 0.4 })), tb: G.Views.tbMesh(0.032, 0.115, true) };
     for (const m of Object.values(nade)) { m.position.set(0, 0.035, -0.075); m.visible = false; arm.add(m); }
     arm.visible = leg.visible = armL.visible = tie.visible = held.visible = env.visible = false;
     G.R.vmRoot.add(arm, leg, armL, tie, held, env);
@@ -2923,7 +3036,7 @@ const G_Me = {
       hp: Math.ceil(this.hp), mhp: this.maxHp(), ar: Math.round(this.vestCond() * 100), amx: G.Gear.piece(this, 'chest') ? 100 : 0,
       pr: this.prone ? 1 : 0, bp: this.bipodT > 0.5 ? 1 : 0, cl: this.climb ? 1 : 0, zp: this.zipRide ? 1 : 0, se: this.seat != null ? 1 : 0, dn: this.down ? 1 : 0, uc: this.out ? 1 : 0, dd: this.dead ? 1 : 0, bl: this.down ? (this.bleed == null ? -1 : Math.ceil(this.bleed)) : 0, bd: this.body ? G.Med.encode(this.body) : null,
       w: this.cur().def.code, ac: G.Ballistics.armourState(this), sk: G.Stickers.share(this.cur().stickers) || undefined, tl: this.tacFlags(this.cur()), cr: this.crouch || this.down || this.prone ? 1 : 0, ln: r2(this.lean || 0), lr: this.lowReady ? 1 : 0, ad: this.zipRide && (this.ads || this.sinceShot < 0.9) ? 1 : 0, sd: this.steadying ? 1 : 0, sw: this.stowed || this.held || this.menuLook() ? 1 : 0, mn: this.menuLook() ? 1 : 0,
-      hk: this.held ? (this.held.kind === 'flash' ? 2 : 1) : 0, hc: this.held && this.held.cock ? 1 : 0, hs: this.held ? this.held.str : 0,
+      hk: this.held ? (this.held.kind === 'flash' ? 2 : this.held.kind === 'tb' ? 3 : 1) : 0, hc: this.held && this.held.cock ? 1 : 0, hs: this.held ? this.held.str : 0,
       ra: this.act && this.cur().def.manual ? r2(Math.min(1, this.act.t)) : -1, ld: G.loaded(this.cur()) > 0 ? 1 : 0, nm: this.cur().noMag ? 1 : 0, rl: this.reloading && this.reloadTotal ? r2(G.U.clamp(1 - this.reloadT / this.reloadTotal, 0, 1)) : -1, in: this.inspectT > 0 && this.inspectDur ? r2(1 - this.inspectT / this.inspectDur) : this.rChk ? r2(0.58 + (G.VMAnim.INSPECT_HOLD - 0.58) * this.rChk.k) : -1,
       mc: this.magChk ? r2(this.magChk.back > 0 ? Math.max(0, 1 - this.magChk.back) : this.magChk.k) : -1,
       act: this.action && this.action.kind ? this.action.kind[0] : 0, ap: this.action ? r2(Math.min(1, this.action.t / this.action.dur)) : 0, zt: this.action && this.action.kind === 'zip' ? this.action.target : -1, bt: this.action && this.action.kind === 'bag' ? this.action.target : -1, pl: this.action && this.action.pull ? 1 : 0, mv: r2(this.hspeed || 0),
