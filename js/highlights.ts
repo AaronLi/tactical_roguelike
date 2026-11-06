@@ -27,8 +27,8 @@ const G_Highlights = (() => {
   // a grenade thrown (nade): when, whose, from where and how fast, its fuse and kind; a frag's burst (boom): when, whose, where, its seed
   // (the same on every machine: js/player.ts fragBurst) and, from the thrower's machine, the paths of the chips that went into someone
   // (js/player.ts fragDone: [x, y, z, speed] points, and the hits as a round's are, less what only F9 reads)
-  interface HlNade { t: number; a: string | null; p: number[]; v: number[]; fuse: number; kind: string }
-  interface HlBoom { t: number; a: string | null; p: number[]; s: number; nade: HlNade | null; paths: ShotPath[]; kind?: string } // (kind: 'frag', or 'tb' a thermobaric's)
+  interface HlNade { t: number; a: string | null; p: number[]; v: number[]; fuse: number; kind: string; arc?: number[][] } // (arc: its flight as worked out when it was thrown: arcOf)
+  interface HlBoom { t: number; a: string | null; p: number[]; s: number; nade: HlNade | null; paths: ShotPath[]; kind?: string; cells?: number[][] } // (kind: 'frag', or 'tb' a thermobaric's; cells: the fireball's, [x, z, how far it spread], when it went off)
   // a flashbang going off: when, whose, where, the host's number for it (js/server.ts flashbang), the throw that took it there
   interface HlFlashFx { t: number; a: string | null; p: number[]; n: number; nade: HlNade | null }
   type HlSegKind = 'open' | 'quiet' | 'ad' | 'sponsor' | 'clip' | 'armour' | 'xray' | 'table' | 'gear' | 'card';
@@ -124,7 +124,7 @@ const G_Highlights = (() => {
   interface PState {
     map: LvMap; level: THREE.Group | null; tvs: HlTv[]; seg: number; st: number; prog: Seg[]; rigs: Map<string, HlRigRec>; fx: HlFx[]; drops: { m: THREE.Mesh; v: THREE.Vector3; life: number }[]; marks: THREE.Mesh[]; clips: Clip[]; actors: Map<string, Actor>; stats: Map<string, HlStat>;
     ac: HlAc; au: HlAudio | null; bullets: HlBullet[]; cam: THREE.PerspectiveCamera; cv: HTMLCanvasElement; debris: ReturnType<typeof G.Scars.debris>; esc: THREE.Vector3; exporting: HlExport | null; fired: RState['fired']; frameT: number; fxRoot: THREE.Group;
-    g: CanvasRenderingContext2D; gcam: THREE.PerspectiveCamera; gt: any; gen: { seed: number; level: number; th: number }; glass: HlGlass[]; gpiv: THREE.Group; gs: THREE.Scene; hide: THREE.Object3D[]; holeMat: THREE.MeshBasicMaterial; kgun: RState['kgun'];
+    g: CanvasRenderingContext2D; gcam: THREE.PerspectiveCamera; gt: any; gen: { seed: number; level: number; th: number; night?: boolean }; glass: HlGlass[]; gpiv: THREE.Group; gs: THREE.Scene; hide: THREE.Object3D[]; holeMat: THREE.MeshBasicMaterial; kgun: RState['kgun'];
     las: { root: THREE.Group; pool: HlLaser[] }; lastVideo: { name: string; size: number; dur: number; ms: number; audio: boolean; frames: number } | null; levelN: number; losT: number; mat: THREE.ShaderMaterial; outVideo: HlChunk[] | null; ov: THREE.CanvasTexture;
     packing: boolean; ready: boolean; rnd: ReturnType<typeof G.U.rng>; rt: THREE.WebGLRenderTarget | null; scene: THREE.Scene; theme: string | undefined; thruMat: THREE.MeshBasicMaterial; time: number; tvShots: number; vol: number; xcam: THREE.PerspectiveCamera;
     xlook: THREE.Vector3; xo: HlXo | null; nx: HlNadeFx | null; xorg: HlOrgan[]; xrig: HlRig | null; xs: THREE.Scene; xtl: HlXtl | null; xtracks: HlXtracks; xview: { mid: THREE.Vector3; r: number } | null;
@@ -359,7 +359,7 @@ const G_Highlights = (() => {
     if (G.Game.phase !== 'level' || G.Game.hub) return;
     const s: any = { t: R.t, a, f: [f.x, f.y, f.z], to: [to.x, to.y, to.z], code, am, sid };
     if (Array.isArray(tos) && tos.length > 1) s.tos = tos.map((p) => (Array.isArray(p) ? p.slice(0, 3) : [p.x, p.y, p.z]));
-    else { const def = defOf(code); if (def && def.pellets > 1) s.tos = spread(s.f, s.to, def.pellets, def.choke || 3); }
+    else { const def = defOf(code); if (def && def.pellets > 1) s.tos = spread(s.f, s.to, def.pellets, def.choke || 3, G.U.rng(((sid | 0) ^ 0x5be11e7) >>> 0)); } // (by the shot's id: the same spread on every machine)
     R.shots.push(s);
     if (a[0] === 'p' && code) { // (an officer's rounds, by gun and load: for the gear room)
       let m = R.fired.get(a); if (!m) R.fired.set(a, (m = new Map()));
@@ -390,10 +390,10 @@ const G_Highlights = (() => {
   // (a pane fractured, and where: p)
   function crack(id: number, p: XYZ) { if (G.Game.phase === 'level' && !G.Game.hub) R.glass.push({ t: R.t, id, p: [p.x, p.y, p.z] }); }
   // pellets round one end: a cone of the choke's half-angle (degrees), denser in the middle, as the guns throw them
-  function spread(f: number[], to: number[], n: number, choke: number) {
+  function spread(f: number[], to: number[], n: number, choke: number, rnd: () => number = Math.random) {
     const F0 = new T.Vector3(...f), d = new T.Vector3(...to).sub(F0), len = d.length(); d.divideScalar(len || 1);
     const a = Math.abs(d.y) < 0.9 ? new T.Vector3(0, 1, 0) : new T.Vector3(1, 0, 0), r = new T.Vector3().crossVectors(d, a).normalize(), u = new T.Vector3().crossVectors(r, d), k = Math.tan(choke * Math.PI / 180), out = [to.slice()];
-    for (let i = 1; i < n; i++) { const th = Math.random() * Math.PI * 2, rr = k * Math.min(1.6, Math.sqrt(-2 * Math.log(1 - Math.random())) * 0.6), e = d.clone().addScaledVector(r, Math.cos(th) * rr).addScaledVector(u, Math.sin(th) * rr).normalize().multiplyScalar(len).add(F0); out.push([e.x, e.y, e.z]); }
+    for (let i = 1; i < n; i++) { const th = rnd() * Math.PI * 2, rr = k * Math.min(1.6, Math.sqrt(-2 * Math.log(1 - rnd())) * 0.6), e = d.clone().addScaledVector(r, Math.cos(th) * rr).addScaledVector(u, Math.sin(th) * rr).normalize().multiplyScalar(len).add(F0); out.push([e.x, e.y, e.z]); }
     return out;
   }
   // How near a round's path (f to to) comes to someone standing at pos (the line up their middle, shin to crown): the
@@ -444,15 +444,22 @@ const G_Highlights = (() => {
   // becomes (boom) to find. a: whose ('p' or 'e' and their id, or null)
   function nade(a: string | null, p: XYZ, v: XYZ, fuse: number, kind: string) {
     if (G.Game.phase !== 'level' || G.Game.hub) return;
-    R.nades.push({ t: R.t, a, p: [p.x, p.y, p.z], v: [v.x, v.y, v.z], fuse, kind: kind === 'flash' || kind === 'tb' ? kind : 'frag' });
+    const n: HlNade = { t: R.t, a, p: [p.x, p.y, p.z], v: [v.x, v.y, v.z], fuse, kind: kind === 'flash' || kind === 'tb' ? kind : 'frag' };
+    // its flight, worked out now against the level as it is (its doors as they are) and kept with it: the broadcast, the video's worker
+    // (which has no js/views.ts to work it out) and every machine draw the same arc. Every other point of it, to a centimetre.
+    try {
+      const pts = G.Views.predictNade(new T.Vector3(p.x, p.y, p.z), new T.Vector3(v.x, v.y, v.z), fuse, G.Game.map), r = (x: number) => Math.round(x * 100) / 100;
+      n.arc = pts.filter((q, i) => i % 2 === 0 || i === pts.length - 1).map((q) => [r(q.x), r(q.y), r(q.z)]);
+    } catch (e) { /* worked out when it's played, then */ }
+    R.nades.push(n);
   }
   // the throw that went off at p: the latest of that kind (and thrower, if known) whose fuse has burnt, its arc ending within 2 m of it
   function throwOf(a: string | null, p: number[], kind: string) {
     for (let i = R.nades.length - 1; i >= 0; i--) {
       const n = R.nades[i], age = R.t - n.t;
       if (n.kind !== kind || (a && n.a && n.a !== a) || age < n.fuse - 0.6 || age > n.fuse + 1.5) continue;
-      const pts = G.Views.predictNade(new T.Vector3(...(n.p as [number, number, number])), new T.Vector3(...(n.v as [number, number, number])), n.fuse, G.Game.map), e = pts[pts.length - 1];
-      if (Math.hypot(e.x - p[0], e.y - p[1], e.z - p[2]) < 2) return n;
+      const e = n.arc && n.arc.length ? n.arc[n.arc.length - 1] : (() => { const q = G.Views.predictNade(new T.Vector3(...(n.p as [number, number, number])), new T.Vector3(...(n.v as [number, number, number])), n.fuse, G.Game.map); const l = q[q.length - 1]; return [l.x, l.y, l.z]; })();
+      if (Math.hypot(e[0] - p[0], e[1] - p[1], e[2] - p[2]) < 2) return n;
     }
     return null;
   }
@@ -466,6 +473,15 @@ const G_Highlights = (() => {
     if (!b) R.booms.set(s, (b = { t: R.t, a, p: [p.x, p.y, p.z], s, nade: null, paths: [], kind }));
     else if (b.t < 0) { b.t = R.t; b.p = [p.x, p.y, p.z]; }
     b.kind = kind;
+    // a thermobaric's fireball, the room it filled as it was then (its doors open or shut then): kept with it, so the replay shows that
+    // room filling, on every machine and in the video (whose worker has no js/player.ts to work it out)
+    if (kind === 'tb' && !b.cells && G.Me && G.Me.tbModel && G.Game.map) {
+      try {
+        const M = G.Me.tbModel(G.Game.map, new T.Vector3(p.x, p.y, p.z)), W = G.Game.map.W, TS = G.Level.TS, cells: number[][] = [];
+        for (let i = 0; i < M.cloud && cells.length < 60; i += 2) { const c = M.fill.order[i]; cells.push([((c % W) + 0.5) * TS, ((c / W | 0) + 0.5) * TS, M.fill.d[i]]); }
+        b.cells = cells;
+      } catch (e) { /* worked out when it's played, then */ }
+    }
     if (!b.a) b.a = a;
     if (!b.nade) b.nade = throwOf(b.a, b.p, kind);
   }
@@ -552,7 +568,7 @@ const G_Highlights = (() => {
     for (const c of R.open) closed(c); R.open = []; // (clips cut short by the level ending)
     if (!map || !nodes || !nodes.length || !R.clips.length && !R.stats.size) { disposeNodes(nodes); return; }
     P.map = map; P.level = new T.Group(); for (const n of nodes) P.level.add(n);
-    P.gen = { seed: map.seed, level: map.level, th: G.THEMES.indexOf(map.theme) }; // (to build it again: js/exportworker.ts)
+    P.gen = { seed: map.seed, level: map.level, th: G.THEMES.indexOf(map.theme), night: !!map.night }; // (to build it again: js/exportworker.ts; a night level's lights out as they were)
     P.clips = R.clips.slice().sort((a, b) => a.t - b.t); P.stats = new Map(R.stats); P.actors = new Map(R.actors); P.levelN = R.level; P.theme = R.theme;
     P.fired = new Map(R.fired); P.kgun = new Map(R.kgun); P.glass = R.glass.slice();
   }
@@ -670,7 +686,7 @@ const G_Highlights = (() => {
       if (s.kind === 'ad' && s.store) {
         const st = s.store, im = st.pic && st.pic.im;
         prog.push(Object.assign({}, s, { store: Object.assign({}, st, { pic: im && im.src ? { src: im.src, w: st.pic.w, h: st.pic.h } : null, left: st.left ? st.left() : 1 }) }));
-      } else if (s.kind === 'gear') prog.push({ kind: 'gear', k: s.k, code: s.code, dur: s.dur }); // (worked out again from the rest)
+      } else if (s.kind === 'gear') prog.push({ kind: 'gear', k: s.k, code: s.code, dur: s.dur, seed: s.seed }); // (worked out again from the rest; its seed as the broadcast had it)
       else prog.push(s);
     }
     return plain({ v: PACK_V, gen: P.gen, clips: P.clips, stats: P.stats, actors: P.actors, fired: P.fired, kgun: P.kgun, glass: P.glass, levelN: P.levelN, theme: P.theme, prog });
@@ -861,13 +877,13 @@ const G_Highlights = (() => {
   async function exportHere(m: Rec, post: (...a: any[]) => void) {
     const d = revive(m.data);
     for (const [n, bm] of Object.entries(m.stickers || {})) G.Stickers.provide(n, bm); // (the stickers' pictures, from the file)
-    const map = G.Level.generate(d.gen.seed, d.gen.level, d.gen.th);
+    const map = G.Level.generate(d.gen.seed, d.gen.level, d.gen.th, !!d.gen.night);
     G.Game.map = map;
     P.map = map; P.level = new T.Group(); P.level.add(G.Level.buildMesh(map));
     Object.assign(P, { clips: d.clips, stats: d.stats, actors: d.actors, fired: d.fired, kgun: d.kgun, glass: d.glass, levelN: d.levelN, theme: d.theme });
     P.prog = [];
     for (const s of d.prog) {
-      if (s.kind === 'gear') { const gs = gearFor(s.k); if (gs) P.prog.push(gs as Seg); continue; }
+      if (s.kind === 'gear') { const gs = gearFor(s.k); if (gs) { if (s.seed != null) (gs as Seg).seed = s.seed; P.prog.push(gs as Seg); } continue; }
       if (s.kind === 'ad' && s.store && typeof s.store.left === 'number') { const n = s.store.left; s.store.left = () => n; }
       P.prog.push(s);
     }
@@ -1224,6 +1240,7 @@ const G_Highlights = (() => {
     clearRigs();
     P.seg = (P.seg + 1) % P.prog.length; P.st = 0;
     const s = P.prog[P.seg];
+    fxr = G.U.rng(((s.seed | 0) ^ 0xb100d) >>> 0);
     s.react = null; s.fired = false; s.kn = 0; s.mSt = null; s.snapDoors = true; s.prevTau = null; s.xp = null; s.frz = null; s.frzCand = null; s.look = null; s.lookT = null; s.fq = null; s.fp = null; if (s.cam === 'wide') { s.pos = null; s.shot = null; } s.cp = null; if (s.rates) s.rate = s.rates[0][1];
     acClear();
     if (s.kind === 'clip') {
@@ -1514,8 +1531,8 @@ const G_Highlights = (() => {
   // a clip's grenade: where it went off, when, the throw that took it there, and whether it was a flashbang (a frag's kill: its boom; a
   // flashbang's own clip: its fx). Null for a clip without one.
   function burstOf(c: Clip) {
-    if (c.boom) return { p: new T.Vector3(...(c.boom.p as [number, number, number])), t: c.boom.t >= 0 ? c.boom.t : c.t, n: c.boom.nade, flash: false, tb: c.boom.kind === 'tb', s: c.boom.s };
-    if (c.fx) return { p: new T.Vector3(...(c.fx.p as [number, number, number])), t: c.fx.t, n: c.fx.nade, flash: true, tb: false, s: c.fx.n * 2654435761 };
+    if (c.boom) return { p: new T.Vector3(...(c.boom.p as [number, number, number])), t: c.boom.t >= 0 ? c.boom.t : c.t, n: c.boom.nade, flash: false, tb: c.boom.kind === 'tb', s: c.boom.s, cells: c.boom.cells };
+    if (c.fx) return { p: new T.Vector3(...(c.fx.p as [number, number, number])), t: c.fx.t, n: c.fx.nade, flash: true, tb: false, s: c.fx.n * 2654435761, cells: undefined as number[][] | undefined };
     return null;
   }
   // The throw's arc, as the grenade flew (js/views.ts predictNade, against the replayed level), bent the last of the way onto where it
@@ -1527,7 +1544,8 @@ const G_Highlights = (() => {
     const gm = G.Game.map; G.Game.map = P.map;
     try {
       const p0 = new T.Vector3(...(n.p as [number, number, number])), v0 = new T.Vector3(...(n.v as [number, number, number]));
-      if (G.Views) pts = G.Views.predictNade(p0, v0, n.fuse, P.map);
+      if (n.arc && n.arc.length > 1) pts = n.arc.map((q) => new T.Vector3(q[0], q[1], q[2])); // (as it flew: kept when it was thrown, nade)
+      else if (G.Views) pts = G.Views.predictNade(p0, v0, n.fuse, P.map);
       else { // (the video's worker has no js/views.ts: the same fall, with only the floor it lands on to stop it)
         pts = [p0.clone()];
         for (let t = 0, h = 1 / 60; t < n.fuse; t += h) { v0.y -= 14 * h; p0.addScaledVector(v0, h); if (p0.y < end.y) { p0.y = end.y; v0.y = 0; v0.x *= 0.9; v0.z *= 0.9; } pts.push(p0.clone()); }
@@ -1588,7 +1606,8 @@ const G_Highlights = (() => {
       if (B.flash) { puff(0xffffff, 3.2, 0.3, 1, true); puff(0xfff4d0, 1.2, 0.6, 0.8, true); }
       else if (B.tb) { // a thermobaric: its fireball through the room it filled (js/player.ts tbModel, against the replayed level), and the soot after
         let cells: number[][] = [];
-        try { const M = G.Me && G.Me.tbModel ? G.Me.tbModel(P.map, B.p) : null; if (M) for (let i = 0; i < M.cloud; i += 2) { const c = M.fill.order[i]; cells.push([((c % P.map.W) + 0.5) * G.Level.TS, ((c / P.map.W | 0) + 0.5) * G.Level.TS, M.fill.d[i]]); } } catch (e) { cells = []; }
+        if (B.cells && B.cells.length) cells = B.cells.map((c) => c.slice()); // (as it went off: boom)
+        else try { const M = G.Me && G.Me.tbModel ? G.Me.tbModel(P.map, B.p) : null; if (M) for (let i = 0; i < M.cloud; i += 2) { const c = M.fill.order[i]; cells.push([((c % P.map.W) + 0.5) * G.Level.TS, ((c / P.map.W | 0) + 0.5) * G.Level.TS, M.fill.d[i]]); } } catch (e) { cells = []; }
         if (!cells.length) cells = [[B.p.x, B.p.z, 0]];
         puff(0xffffff, 1.4, 0.02, 1, true);
         for (const [x, z, d] of cells.slice(0, 60)) {
@@ -1704,23 +1723,25 @@ const G_Highlights = (() => {
     }
     return out.sort((a, b) => a.x - b.x);
   }
+  // the blood's dice (its drops, the spatter's turn and size): the segment's own (next), so the broadcast, the video and every machine splash the same
+  let fxr: () => number = Math.random;
   function mark(kind: string, p: THREE.Vector3, size: number, n?: number[]) {
     const m = kind === 'hole' ? new T.Mesh(holeGeo, P.holeMat || (P.holeMat = new T.MeshBasicMaterial({ color: 0x0c0b0a }))) : new T.Mesh(markGeo, G.R.bloodMaterials()[kind]); m.renderOrder = 1;
-    if (n) { m.position.set(p.x + n[0] * 0.012, p.y + n[1] * 0.012, p.z + n[2] * 0.012); m.lookAt(p.x + n[0], p.y + n[1], p.z + n[2]); m.rotation.z = Math.random() * 6.28; }
-    else { m.position.set(p.x, p.y + 0.004, p.z); m.rotation.set(-Math.PI / 2, 0, Math.random() * 6.28); }
-    m.scale.set(size * (0.8 + Math.random() * 0.5), size * (0.8 + Math.random() * 0.5), 1);
+    if (n) { m.position.set(p.x + n[0] * 0.012, p.y + n[1] * 0.012, p.z + n[2] * 0.012); m.lookAt(p.x + n[0], p.y + n[1], p.z + n[2]); m.rotation.z = fxr() * 6.28; }
+    else { m.position.set(p.x, p.y + 0.004, p.z); m.rotation.set(-Math.PI / 2, 0, fxr() * 6.28); }
+    m.scale.set(size * (0.8 + fxr() * 0.5), size * (0.8 + fxr() * 0.5), 1);
     P.fxRoot.add(m); P.marks.push(m);
     if (P.marks.length > 160) { const o = P.marks.shift()!; if (o.parent) o.parent.remove(o); }
     return m;
   }
   const floorAt = (x: number, z: number, y: number) => G.Level.groundAt(P.map, x, z, 0.01, y);
   function bleed(p: THREE.Vector3, dir: THREE.Vector3, through: boolean) {
-    const rnd = (a: number) => (Math.random() - 0.5) * a;
+    const rnd = (a: number) => (fxr() - 0.5) * a;
     const n = through ? 18 : 7;
     for (let i = 0; i < n; i++) {
       const back = !through || i < 5;
-      const v = dir.clone().multiplyScalar(back ? -(0.5 + Math.random()) : 2 + Math.random() * 3.5).add(new T.Vector3(rnd(1.6), Math.random() * 1.2, rnd(1.6)));
-      const m = new T.Mesh(dropGeo, dropMat); m.scale.setScalar(0.007 + Math.random() * 0.014);
+      const v = dir.clone().multiplyScalar(back ? -(0.5 + fxr()) : 2 + fxr() * 3.5).add(new T.Vector3(rnd(1.6), fxr() * 1.2, rnd(1.6)));
+      const m = new T.Mesh(dropGeo, dropMat); m.scale.setScalar(0.007 + fxr() * 0.014);
       m.position.copy(p).addScaledVector(dir, back ? -0.03 : 0.22); P.fxRoot.add(m);
       P.drops.push({ m, v, life: 1.6 });
     }
@@ -1731,7 +1752,7 @@ const G_Highlights = (() => {
     }
     if (through && P.map) { // (spatter on a wall close behind them)
       const o = p.clone().addScaledVector(dir, 0.3), hit = G.Level.raycast(P.map, o.x, o.y, o.z, dir.x, dir.y, dir.z, 2.2);
-      if (hit && hit.t < 2.2 && hit.n) mark('spatter', o.addScaledVector(dir, hit.t), 0.3 + Math.random() * 0.25 * (1 - hit.t / 2.2), Array.isArray(hit.n) ? hit.n : [hit.n.x, hit.n.y, hit.n.z]);
+      if (hit && hit.t < 2.2 && hit.n) mark('spatter', o.addScaledVector(dir, hit.t), 0.3 + fxr() * 0.25 * (1 - hit.t / 2.2), Array.isArray(hit.n) ? hit.n : [hit.n.x, hit.n.y, hit.n.z]);
     }
   }
   // the blood in the air falling (clip time), and the pools spreading
