@@ -58,7 +58,7 @@ const G_VMAnim = (() => {
   }
   // The Wolverine grip (js/parts.ts hsl.0): the loading hand a loose fist, a round held in each of the three gaps between its four fingers, bases toward the
   // palm and noses out past the knuckles like claws. CLAW_X: across the glove, the gaps; CLAW_AT: a round's middle, up and along the glove (its -z the fingers' way).
-  const CLAW_N = 3, CLAW_X = [-0.0105, 0, 0.0105], CLAW_Y = -0.008, CLAW_Z = -0.06;
+  const CLAW_N = 3, CLAW_X = [-0.0105, 0, 0.0105], CLAW_Y = -0.008, CLAW_Z = -0.069;
   // the fist held up between the pouch and the gun, the knuckles to the eye and the rounds standing up out of them, leaning away a little (the viewmodel's frame: x right, y up, z back)
   const CLAW_UP = (() => { const Z = new T.Vector3(-0.12, -0.8, 0.45).normalize(), X = new T.Vector3(1, 0, 0), Y = new T.Vector3().crossVectors(Z, X).normalize(); X.crossVectors(Y, Z).normalize(); return new T.Quaternion().setFromRotationMatrix(new T.Matrix4().makeBasis(X, Y, Z)); })();
   function makeFist(M: Mats) { // four knuckles curled in, shown in place of the flat fingers while the hand holds the rounds
@@ -445,7 +445,7 @@ const G_VMAnim = (() => {
     const at: V3[] = [], C = new T.Vector3();
     for (let i = 0; i < n; i++) { const c = B.at[Math.min(B.at.length - 1, m + i)]; at.push(new T.Vector3(c.x, c.y, c.z - B.oal / 2 + 0.001)); C.add(c); } // (each round's middle, seated: its rim at the chamber's mouth)
     C.divideScalar(n);
-    const home = new T.Vector3(C.x, C.y + 0.012, C.z - B.oal / 2 + 0.001 + 0.03), out = off(home, -0.04, 0.026), show = A.F.clone().lerp(out, 0.3); // (the hand over the chambers' middle; behind and above; up in view between)
+    const home = new T.Vector3(C.x, C.y + 0.012, C.z - B.oal / 2 + 0.001 + 0.03), out = off(home, -0.04, 0.026), show = A.F.clone().lerp(out, 0.12); // (the hand over the chambers' middle; behind and above; up in view between)
     pose.L = path(rt, [[0, A.P], [0.16, A.P], [0.4, show], [0.52, show], [0.68, out], [0.8, home], [0.86, home], [1, A.P]]);
     if (rt > 0.12 && rt < 0.82) pose.prop = { kind: 'claw', n, seat: S(0.54, 0.7, rt), up: S(0.18, 0.38, rt) * (1 - S(0.5, 0.64, rt)), at, home }; // (up: the fist turned to show them)
     if (rt >= 0.8) pose.fed = m + n;
