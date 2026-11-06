@@ -1,13 +1,14 @@
-// Record the game's own AR-15 viewmodel (fitted with the short barrel: an MK18) working through its
-// actions, and dub it with this synth's sounds, each placed on the frame the animation reaches its
-// moment: the charging handle at the rear and the bolt home, the old magazine out of the well, the
-// new one seated, the bolt catch hit.
+// Record one of the game's guns in first person working through its actions, and dub it with this
+// synth's sounds, each placed on the frame the animation reaches its moment: the handle or slide at
+// the rear and the bolt home, the old magazine out of the well, the new one seated, the bolt catch or
+// slide stop hit. Guns: m4 (the Mk18 CQBR), ak (KV-47), mp5, g19.
 //
 // The game runs in headless Chromium on a stepped clock (exactly one frame's time per frame, whatever the
 // rendering speed), so every frame and every logged moment lines up with the sound.
 //
 // Usage: (from the repo root) HOST=127.0.0.1 node serve.js &
-//        cd tools/contact-synth && npm run build && node scripts/game-reload-video.mjs <out.mp4> [--url http://127.0.0.1:8080/]
+//        (the game built and its models baked: npm run build && npm run bake:models)
+//        cd tools/contact-synth && npm run build && node scripts/game-reload-video.mjs <out.mp4> [--gun m4|ak|mp5|g19] [--url http://127.0.0.1:8080/]
 import { createRequire } from 'node:module';
 const { chromium } = createRequire(import.meta.url)('playwright'); // (the globally installed one)
 import { spawn } from 'node:child_process';
@@ -22,6 +23,25 @@ const args = process.argv.slice(2);
 const out = args[0];
 const opt = (k, d) => { const i = args.indexOf('--' + k); return i >= 0 ? args[i + 1] : d; };
 const URL = opt('url', 'http://127.0.0.1:8080/');
+const GUN = opt('gun', 'm4');
+// Each gun: its caption, how it's charged, how its action is worked after a run-dry reload ('release': a bolt
+// catch or slide stop, 'rack': the handle again), and which sound goes on which moment.
+const GUNS = {
+  m4: { title: 'Mk18 CQBR (AR-15)', charge: 'Charging handle pulled back and let go: chambers a round', after: 'release', afterCap: 'Magazine change, then the bolt catch hit',
+    charge_: ['ar15-charge', 'handle bottoms out', 'carrier slams onto the bolt'], magOut: ['ar15-mag-out', 'magazine drops off the catch'], magOutEmpty: ['ar15-mag-out-empty', 'magazine drops off the catch'],
+    magIn: ['ar15-mag-in', 'mag catch clicks into the hole in the magazine'], release: ['ar15-bolt-release', 'carrier slams onto the bolt'] },
+  ak: { title: 'KV-47 (AKM)', charge: 'Charging handle yanked back and let go: chambers a round', after: 'rack', afterCap: 'Magazine rocked in, then the handle racked (no hold-open)',
+    charge_: ['kv47-charge', 'carrier slams into the rear trunnion', 'carrier slams home'], rackEmpty: ['kv47-charge', 'carrier slams into the rear trunnion', 'carrier slams home'],
+    magOut: ['kv47-mag-out', 'front lug unhooks from the trunnion'], magOutEmpty: ['kv47-mag-out-empty', 'front lug unhooks from the trunnion'], magIn: ['kv47-mag-in', 'paddle snaps over the rear lug'] },
+  mp5: { title: 'MP5', charge: 'Cocking handle pulled back and let go: chambers a round', after: 'rack', afterCap: 'Magazine change, then the cocking handle',
+    charge_: ['mp5-charge', 'handle stops at the end of its slot', 'rollers snap out into the trunnion'], rackEmpty: ['mp5-charge', 'handle stops at the end of its slot', 'rollers snap out into the trunnion'],
+    magOut: ['mp5-mag-out', 'catch lets go of the magazine'], magOutEmpty: ['mp5-mag-out-empty', 'catch lets go of the magazine'], magIn: ['mp5-mag-in', 'catch clicks into the magazine'] },
+  g19: { title: 'G19', charge: 'Slide racked and let go: chambers a round', after: 'release', afterCap: 'Magazine change, then the slide stop hit',
+    charge_: ['g19-rack', 'slide stops at the rear', 'slide slams home'], magOut: ['g19-mag-out', 'catch lets go of the magazine'], magOutEmpty: ['g19-mag-out-empty', 'catch lets go of the magazine'],
+    magIn: ['g19-mag-in', 'catch clicks into the magazine'], release: ['g19-slide-release', 'slide slams home'] },
+};
+const C = GUNS[GUN];
+if (!C) { console.error('--gun: one of ' + Object.keys(GUNS).join(', ')); process.exit(1); }
 // 30 fps at 960x540: headless WebGL (SwiftShader) takes seconds a frame, so this keeps a run to ~45 min.
 const FPS = +opt('fps', '30'), W = 960, H = 540;
 if (!out) { console.error('usage: game-reload-video.mjs <out.mp4>'); process.exit(1); }
@@ -42,7 +62,7 @@ await page.addInitScript(() => {
   Date.now = () => (fake ? dateBase + off : realDate());
   window.requestAnimationFrame = (cb) => { if (fake) { q.push(cb); return 1; } return realRaf(cb); };
 });
-await page.addInitScript((f) => { window.__fps = f; }, FPS);
+await page.addInitScript(([f, g]) => { window.__fps = f; window.__gun = g; }, [FPS, GUN]);
 await page.goto(URL);
 await page.waitForFunction(() => window.G && G.Game && G.Me, null, { timeout: 60000 });
 
@@ -50,7 +70,9 @@ await page.waitForFunction(() => window.G && G.Game && G.Me, null, { timeout: 60
 await page.evaluate(async () => {
   const sleep = (s) => new Promise((r) => setTimeout(r, s * 1000));
   const until = async (f) => { while (!f()) await sleep(0.1); };
-  G.Game.solo(); await sleep(0.8);
+  // (the game waits for the gun models to load before a solo run)
+  if (G.Game.needModels) await new Promise((r) => G.Game.needModels(() => { G.Game.solo(); r(); })); else G.Game.solo();
+  await sleep(0.8);
   G.Server.startRun();
   await until(() => G.Game.phase === 'route' && G.Game.routeMap);
   G.Me.sidearmChosen = true; // (the route waits on the sidearm choice)
@@ -65,10 +87,10 @@ await page.evaluate(async () => {
   // real time, which the stepped clock doesn't run).
   const m = G.Me; m.pitch = -0.05; if (m.vel) m.vel.set(0, 0, 0);
   const css = document.createElement('style'); css.textContent = '#toast,#levelInfo,#objective{display:none!important}'; document.head.appendChild(css);
-  // The MK18: the AR-15 carbine with the short barrel fitted.
-  const build = Object.assign({}, G.Gunsmith.compile('m4').build, { barrel: 'm4.br.short' });
-  m.weapons.p = m.makeWeapon('m4', build); m.slot = null; m.swap('p');
-  const w = m.weapons.p;
+  // the gun, as it comes from the factory: a sidearm goes in the secondary slot
+  const id = window.__gun, slot = G.WEAPONS[id] && G.WEAPONS[id].slot === 's' ? 's' : 'p';
+  m.weapons[slot] = m.makeWeapon(id); m.slot = null; m.swap(slot);
+  const w = m.weapons[slot];
   const pocket = { id: 99999, w: 14, h: 14, accept: null, label: 'Demo', items: [] }; m.pockets.unshift(pocket);
   for (let i = 0; i < 4; i++) G.Gear.stow(m, G.Gear.ammoItem(w.def), [pocket]);
   w.chamber = null; // nothing chambered yet: the first thing is to charge it
@@ -99,7 +121,7 @@ await page.evaluate(async () => {
   };
   window.__clock.on();
 });
-console.log('in the level, the MK18 drawn');
+console.log(`in the level, the ${C.title} drawn`);
 // --still <frames>: step that many frames, save one picture, stop (to check the framing)
 if (opt('still', null) !== null) {
   for (let i = 0; i < +opt('still'); i++) await page.evaluate(() => window.__step());
@@ -124,16 +146,16 @@ async function frame() {
 const hold = async (s) => { for (let i = 0; i < Math.round(s * FPS); i++) await frame(); };
 const busy = async () => { for (let i = 0; i < 20 * FPS; i++) { const st = await frame(); if (!st.reloading && !st.act && !st.swap) return; } };
 const cap = (a, b) => page.evaluate(([x, y]) => window.__caption(x, y), [a, b]);
-const T = 'MK18 (AR-15 carbine, short barrel)';
+const T = C.title;
 
 await cap(T, 'Drawn, a full magazine in, nothing chambered'); await busy(); await hold(1.0);
-await cap(T, 'Charging handle pulled back and let go: chambers a round');
+await cap(T, C.charge);
 await page.evaluate(() => G.Me.startReload()); await busy(); await hold(1.0);
 await cap(T, 'Magazine change with rounds left');
 await page.evaluate(() => { const w = G.Me.cur(); w.mag = 12; w.tube = w.tube.slice(-12); G.Me.startReload(); }); await busy(); await hold(1.0);
-await cap(T, 'Run dry: the bolt locks back');
+await cap(T, C.after === 'release' ? 'Run dry: it locks open' : 'Run dry: nothing to hold it open');
 await page.evaluate(() => { const w = G.Me.cur(); w.mag = 0; w.tube = []; w.chamber = null; }); await hold(0.8);
-await cap(T, 'Magazine change, then the bolt catch hit');
+await cap(T, C.afterCap);
 await page.evaluate(() => G.Me.startReload()); await busy(); await hold(1.5);
 ff.stdin.end();
 await new Promise((r) => ff.on('close', r));
@@ -164,18 +186,23 @@ function place(id, what, at, tracks = null, gainDb = 0) {
   else for (const t of r.tracks) if (tracks.includes(t.name)) add(t.samples, t.start);
 }
 const at = (ev, n = 0) => { const l = log.filter((e) => e.ev === ev); if (!l[n]) throw new Error(`no ${ev} #${n}`); return l[n].t; };
-// the charge: the pull to the rear stop on the handle at the rear, the run home on the bolt home
-const chargeBack = at('rack_slide'), chargeHome = at('bolt home', 0);
-const charge = scene('ar15-charge');
-place('ar15-charge', 'handle bottoms out', chargeBack, charge.tracks.filter((t) => t.name !== 'release-forward').map((t) => t.name));
-place('ar15-charge', 'carrier slams onto the bolt', chargeHome, ['release-forward']);
+// The action worked by hand (a charge): its pull-back stems with the rear stop on the handle (or slide) at the
+// rear, its run home with the slam on the bolt home (the first one logged after it).
+const homeAfter = (t) => log.find((e) => e.ev === 'bolt home' && e.t >= t - 1e-6).t;
+function worked([id, rear, slam], back) {
+  const sc = scene(id);
+  place(id, rear, back, sc.tracks.filter((t) => t.name !== 'release-forward').map((t) => t.name));
+  place(id, slam, homeAfter(back), ['release-forward']);
+}
+worked(C.charge_, at('rack_slide', 0));
 // the partial reload: the loaded magazine out, a fresh one in
-place('ar15-mag-out', 'magazine drops off the catch', at('magazine out', 0), null, -2);
-place('ar15-mag-in', 'mag catch clicks into the hole in the magazine', at('insert_magazine', 0), null, -2);
-// run dry: the empty one out, a fresh one in, the bolt catch
-place('ar15-mag-out-empty', 'magazine drops off the catch', at('magazine out', 1), null, -2);
-place('ar15-mag-in', 'mag catch clicks into the hole in the magazine', at('insert_magazine', 1), null, -2);
-place('ar15-bolt-release', 'carrier slams onto the bolt', at('drop_slide'));
+place(C.magOut[0], C.magOut[1], at('magazine out', 0), null, -2);
+place(C.magIn[0], C.magIn[1], at('insert_magazine', 0), null, -2);
+// run dry: the empty one out, a fresh one in, then the action
+place(C.magOutEmpty[0], C.magOutEmpty[1], at('magazine out', 1), null, -2);
+place(C.magIn[0], C.magIn[1], at('insert_magazine', 1), null, -2);
+if (C.after === 'release') place(C.release[0], C.release[1], at('drop_slide'));
+else worked(C.rackEmpty, at('rack_slide', 1));
 let pk = 0; for (const v of mix) pk = Math.max(pk, Math.abs(v));
 for (let i = 0; i < mix.length; i++) mix[i] *= 0.89 / pk;
 const tmp = mkdtempSync(join(tmpdir(), 'ga-'));
