@@ -100,6 +100,7 @@ const G_Arsenal = (() => {
     const ev = G.Views.enemies.get(m.e), k = ev && ev.mine;
     if (!k || k.done) return;
     k.done = true;
+    if (m.gr) return; // (the grenade did it, frag or thermobaric: m.gr its seed, js/server.ts. Not the gun that hit them before)
     const id = k.wid, ts = k.ts, n = ts.length, now = performance.now();
     const within = (hits: number, ms: number) => n >= hits && ts[n - 1] - ts[n - hits] <= ms;
     tally(id, 'kills');

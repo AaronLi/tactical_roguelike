@@ -1871,6 +1871,7 @@ const G_Me = {
     const F = this.FRAG, n = F.N, dir = new Float32Array(n * 3), m = new Float32Array(n), v = new Float32Array(n);
     const rnd = seed ? G.U.rng(seed) : Math.random;
     this.scorchAt(p, rnd);
+    const crater = this.craterAt(p, seed); // (its own dice, not rnd's: the chips fly as they always have from the seed)
     // Where they go: anywhere over the whole sphere, each chip its own random direction (no lattice: with nothing evening
     // them out they bunch and leave gaps by chance, as a burst casing's do)
     const norm = () => Math.sqrt(-2 * Math.log(1 - rnd())) * Math.cos(Math.PI * 2 * rnd());
@@ -1889,7 +1890,7 @@ const G_Me = {
       line = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0xffd9a0, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }));
       line.frustumCulled = false; G.R.dynRoot.add(line);
     }
-    const q = { p: p.clone(), enemy, seed: seed || 0, marksOnly: !!marksOnly, n, i: 0, dir, m, v, pos, line, geo, shot: { sid: 0, ff: new Map(), f: 0, enemy: enemy || undefined } as any, per: new Map<string, any>(),
+    const q = { p: p.clone(), crater, enemy, seed: seed || 0, marksOnly: !!marksOnly, n, i: 0, dir, m, v, pos, line, geo, shot: { sid: 0, ff: new Map(), f: 0, enemy: enemy || undefined } as any, per: new Map<string, any>(),
       ms: 0, maxMs: 0, frames: 0, walls: 0, mats: {} as Record<string, number[]>, escaped: 0, puffs: 0, blood: 0, fade: -1 };
     (this.fragQ = this.fragQ || []).push(q);
   },
@@ -1994,8 +1995,10 @@ const G_Me = {
       adv(wall.t);
       q.walls++;
       const vIn = v, r = B.crossSolid(map, proj, v, wall, o, d);
-      // its pock on the face it struck (whether it stopped, went through or glanced off), turned to face the way it came
-      { const f = d.x * wall.n[0] + d.y * wall.n[1] + d.z * wall.n[2] > 0 ? -1 : 1; G.R.fragMark(o, [wall.n[0] * f, wall.n[1] * f, wall.n[2] * f], r.fx, G.U.clamp(Math.sqrt(vIn / 600), 0.5, 1.3) * (r.ric ? 0.6 : 1), (i * 0.6180339) % 1, (i * 0.7548777) % 1); }
+      // its pock on the face it struck (whether it stopped, went through or glanced off), turned to face the way it came; none
+      // in the crater under the burst, which stands for them all (craterAt)
+      const C = q.crater;
+      if (!(C && Math.abs(wall.n[1]) > 0.7 && Math.abs(o.y - C.y) < 0.12 && Math.hypot(o.x - C.x, o.z - C.z) < C.r)) { const f = d.x * wall.n[0] + d.y * wall.n[1] + d.z * wall.n[2] > 0 ? -1 : 1; G.R.fragMark(o, [wall.n[0] * f, wall.n[1] * f, wall.n[2] * f], r.fx, G.U.clamp(Math.sqrt(vIn / 600), 0.5, 1.3) * (r.ric ? 0.6 : 1), (i * 0.6180339) % 1, (i * 0.7548777) % 1); }
       wallEv(r.ric ? 'r' : 'e', wall.n, r.name);
       { const mm = q.mats[r.name || "?"] = q.mats[r.name || "?"] || [0, 0, 0]; if (r.ric) mm[2]++; else if (!r.v) mm[0]++; else mm[1]++; } // (what the walls did: stopped, let through, glanced)
       if (q.puffs < F.PUFFS && !hitSomething && Math.random() < 0.05) { q.puffs++; G.R.particles(o.clone(), 3, 0xb4aa98, 2.5, 0.35, 2, 0.5); }
@@ -2009,6 +2012,19 @@ const G_Me = {
   // The soot where a grenade went off, on the floor (or table) under it: faint if it went off in the air, none if high. The
   // same on every screen: it is worked out from the burst's point and seed alone. (Flashbangs leave none: they are all
   // light and noise.)
+  // A frag that went off on (or just over) the floor blows a shallow pit in it, and its downward chips (about half of them, at a
+  // hand's breadth up: most within half a metre) tear up the ground round that: one crater (js/render.ts crater) in place of
+  // hundreds of pocks heaped on top of each other. Its size: CRATER.R across the torn-up patch, less the higher it went off;
+  // none over CRATER.H. Its dice are the seed's own (every screen the same crater), apart from the chips'.
+  CRATER: { R: 0.5, H: 0.3 },
+  craterAt(p: THREE.Vector3, seed?: number) {
+    const map = G.Game.map; if (!map) return null;
+    const g = G.Level.groundAt(map, p.x, p.z, 0.01, p.y + 0.05), h = p.y - g;
+    if (h > this.CRATER.H || h < -0.05) return null;
+    const rnd = seed ? G.U.rng(((seed ^ 0x5bd1e995) >>> 0) || 1) : Math.random, r = this.CRATER.R * (1 - 0.45 * Math.max(0, h) / this.CRATER.H) * (0.9 + 0.2 * rnd());
+    G.R.crater(p.x, g, p.z, r * 2.1, rnd() * 6.283);
+    return { x: p.x, y: g, z: p.z, r };
+  },
   scorchAt(p: THREE.Vector3, rnd: () => number) {
     const map = G.Game.map; if (!map) return;
     const g = G.Level.groundAt(map, p.x, p.z, 0.01, p.y + 0.05), h = p.y - g, d = 0.6 + 0.9 * rnd(), rot = rnd() * 6.283;
