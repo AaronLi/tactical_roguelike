@@ -168,7 +168,8 @@ floor after `finish`.
 
 ## 7. Visual pass (in game)
 
-Start one with `G.Server.theme = TH; G.Server.level = 3; G.Server.startLevel()`, after deploying.
+Start one with the debug start, `?play=TH&level=3` (js/debugstart.ts). (The host's simulation runs in its own thread,
+docs/threads.md: `G.Server` in the page's console isn't the one playing, unless the page is opened with `?serverthread=0`.)
 
 - [ ] From the spawn: you can see where to go in. Screenshot the approach.
 - [ ] Walk the whole map: no holes in walls, no floating furniture, no z-fighting, doors in their frames,

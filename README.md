@@ -50,8 +50,9 @@ Every player needs to load the game page, and the host shares a 5-letter room co
 
 The PeerJS public broker (0.peerjs.com) is only used to introduce peers. Game traffic goes
 directly between browsers, and PeerJS's TURN relay is the fallback for strict NATs.
-The host runs the authoritative simulation (enemy AI, damage, objectives), so the host should
-keep their tab open. It keeps ticking in the background, but slower.
+The host runs the authoritative simulation (enemy AI, damage, objectives), in a thread of its own
+([docs/threads.md](docs/threads.md)), so the host should keep their tab open. It keeps ticking at full speed in the
+background (the host's own screen, like a remote player's, is slowed there by the browser).
 **LAN games.** **Find LAN games** on the main menu lists the games hosted behind the same router as you (name,
 squad size, what they're doing, code): click one to join. No server of our own: everyone on a network shares
 a public address, which WebRTC's public STUN server reports; a host takes one of a few beacon ids on the PeerJS

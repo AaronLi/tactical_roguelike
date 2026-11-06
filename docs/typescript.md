@@ -1,8 +1,9 @@
 # TypeScript
 
 The game is TypeScript: `js/*.ts`, compiled one-to-one to `dist/js/*.js` by `tsc` and loaded by `index.html` with
-plain `<script>` tags, in order, as the JavaScript was. The highlights' export worker (`js/exportworker.ts`) loads the
-same compiled files with `importScripts`.
+plain `<script>` tags, in order, as the JavaScript was. Two workers load some of the same compiled files with
+`importScripts`: the host's simulation (`js/serverworker.ts`, the server's own thread: [threads.md](threads.md)) and the
+highlights' export worker (`js/exportworker.ts`).
 
 | Command | What it does |
 | --- | --- |
@@ -42,7 +43,8 @@ error, and every call from one file into another is checked against the callee's
 gains at runtime go in a `NameFields` interface next to it (`typeof G_Me & MeFields`).
 
 Adding a file: create `js/<name>.ts`, add `<script defer src="dist/js/<name>.js">` to `index.html` in the right order,
-and to `js/exportworker.ts`'s list if the highlights' replay needs it.
+to `js/serverworker.ts`'s `SERVER_SCRIPTS` if the host's simulation needs it (nothing that draws there: what both sides
+reckon goes in `js/sim.ts`), and to `js/exportworker.ts`'s list if the highlights' replay needs it.
 
 ## Status
 
@@ -57,7 +59,7 @@ rigs...) have interfaces, and string kinds are unions (`ItemKind`, `FireMode`, `
 `EnemyState`, `RoomType`, `MatKey`...): a misspelt kind is a type error. Every script's top-level types are global,
 so new type names are specific (prefixed by module: `Hl...`, `Lv...`, `Gm...`).
 
-All 53 files pass, with no `@ts-nocheck`, `@ts-ignore` or `@ts-expect-error`. Getting there was type-only: each
+Every file passes, with no `@ts-nocheck`, `@ts-ignore` or `@ts-expect-error`. Getting there was type-only: each
 step's compiled JavaScript was compared with the step before and came out the same (exceptions, on purpose: the
 snapshot key below, `SCAR_SPEC()` losing an argument it never took, and the `const G_Name` binding each module now
 has). Where strictNullChecks found a value that really can be null, the code keeps its behaviour (`x!`) and the spot
