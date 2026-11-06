@@ -819,7 +819,7 @@ function makeArMagOut(fill) {
         // travels with a faint scuff and bottoms softly under the fingertip, and the catch is drawn
         // slowly out of the magazine's slot (a barely-there rub). The first real sound is the drop.
         snap('mag release button pressed in', 0, -26, { strength: 0.2, preload: 60, creak: 0.05, seat: 0.1, seatDelay: 1.5 }, arMagRelease, arLower),
-        rub('mag catch pivots out of the magazine', 0.05, -34, { force: 3, duration: 0.012, speed: 0.05, profile: 'decelerate', roughness: 3, grain: 0.2, contactWidth: 0.03 }, arMagCatch, body),
+        rub('mag catch pivots out of the magazine', 0.05, -34, { force: 3, duration: 0.012, speed: 0.05, profile: 'decelerate', roughness: 3, grain: 0.2, contactWidth: 0.03 }, arMagCatch, panel),
         // The other hand already grips the magazine and pulls it the moment the catch lets go: it
         // leaves the well in ~55 ms instead of falling for 128 ms (~8 cm at ~53 m/s^2, ~5 g, leaving
         // at ~2.9 m/s). Gripped, the shell is damped and rings less than a free-falling one.
