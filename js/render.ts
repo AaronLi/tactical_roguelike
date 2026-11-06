@@ -105,7 +105,8 @@ const G_R = {
   nvScene: undefined as THREE.Scene | undefined,
   depthOnly: undefined as THREE.MeshBasicMaterial | undefined,
   init() {
-    const r = (this.renderer = new THREE.WebGLRenderer({ antialias: true, stencil: true, powerPreference: 'high-performance' }));
+    const r = (this.renderer = new THREE.WebGLRenderer({ antialias: true, stencil: true, powerPreference: 'high-performance', reversedDepthBuffer: true }));
+    this.reverseDepth(r);
     r.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     r.setSize(window.innerWidth, window.innerHeight);
     r.domElement.id = 'c';
@@ -167,6 +168,29 @@ const G_R = {
 
     this._initFx();
     window.addEventListener('resize', () => this.resize());
+  },
+  // A reversed depth buffer (EXT_clip_control: the near plane at depth 1, the far plane at 0, cleared to 0 and tested
+  // greater-than; three does that, the shadow maps' comparisons included, when it's asked for and the browser has it, and
+  // falls back to the usual one when it hasn't). Its point is a floating-point depth buffer: there the float's own
+  // precision, finest near 0, sits at the far end, where the projection leaves least, so distant surfaces close together
+  // (a roof's edge on a wall 300 m off through a scope) no longer fight. The screen's own depth buffer is 24-bit fixed
+  // point (a canvas can't have another), where it changes little either way; the scope's picture, magnified, is where
+  // distant surfaces come close enough to see fight, and it gets a 32-bit float one (viewRT). (Night vision's and the
+  // fisheye's frames, the screen's size, keep 24 bits: a float one with its stencil there cost the GPU more and showed nothing.)
+  //   - three turns a polygon offset's factor round for a reversed buffer but not its units (r186), so a decal held
+  //     off its wall by units (the stickers, the range's lane numbers) went behind it: both are turned here.
+  //   - a point projected through a camera that's been drawn with it is behind the eye with z < 0 (it was z > 1): behind().
+  reverseDepth(r: THREE.WebGLRenderer) {
+    if (!r.capabilities.reversedDepthBuffer) return;
+    const st = r.state as any, po = st.setPolygonOffset;
+    st.setPolygonOffset = function (on: boolean, factor: number, units: number) { return po.call(this, on, factor, st.buffers.depth.getReversed() ? -units : units); };
+  },
+  behind(v: THREE.Vector3, cam: THREE.Camera) { return (cam as any).reversedDepth ? v.z < 0 : v.z > 1; },
+  // the scope picture's target (opts: the WebGLRenderTarget's): with a reversed depth buffer, its
+  // depth 32-bit float (see above); the depth isn't read after, so it's not resolved out of the multisampled buffer
+  viewRT(w: number, h: number, opts: THREE.RenderTargetOptions) {
+    const rev = this.renderer && this.renderer.capabilities.reversedDepthBuffer;
+    return new THREE.WebGLRenderTarget(w, h, rev ? Object.assign({}, opts, { depthTexture: new THREE.DepthTexture(w, h, THREE.FloatType), resolveDepthBuffer: false, resolveStencilBuffer: false }) : opts);
   },
   // the roll-off (the shoulder of Khronos' PBR Neutral, on linear light): a channel's peak over the knee (0.76) eased
   // toward 1, the colour scaled with it, and toward white by how much was taken off (desaturation 0.15). (Not its toe:
@@ -1364,7 +1388,7 @@ const G_R = {
   },
   // ------------------------------------------------------------ picture-in-picture scopes
   pipTexture() {
-    if (!this.pipRT) this.pipRT = new THREE.WebGLRenderTarget(512, 512, { samples: 4 });
+    if (!this.pipRT) this.pipRT = this.viewRT(512, 512, { samples: 4 });
     return this.pipRT.texture;
   },
   // Render the world from the scope's ocular lens along its axis. The view is the lens's angular size (seen
