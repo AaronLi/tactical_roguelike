@@ -12,7 +12,7 @@
 // three as the page has it (js/threeboot.ts: its module build, with the glTF loader, on the global THREE): a module, so it's
 // imported (a classic worker can), and the game's own scripts, classic as on the page, after it
 const booted = import('./threeboot.js').then(() => {
-  importScripts(...['util', 'data', 'callsigns', 'parts', 'gear', 'medical', 'materials', 'ballistics', 'damage', 'level', 'world', 'furniture', 'homes', 'residents', 'lightgrid', 'render',
+  importScripts(...['util', 'data', 'callsigns', 'parts', 'gear', 'medical', 'sim', 'materials', 'ballistics', 'damage', 'level', 'world', 'furniture', 'homes', 'residents', 'lightgrid', 'render',
     'stickers', 'gunmaterials', 'gunmodels', 'modelbundles', 'glb', 'gunrig', 'viewmodel', 'vmanim', 'headgear', 'rig', 'scars', 'highlights'].map((f) => f + '.js'));
   // (the game the replay borrows from: the map the bodies fall on, and nobody's id)
   (G as any).Game = { map: null, phase: 'level' };

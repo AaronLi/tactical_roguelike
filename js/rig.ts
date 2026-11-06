@@ -101,17 +101,10 @@ const G_Rig = (() => {
   // k: { helmet, face, carrier, plate, sh (shoulder armour), gr (pelvis armour), cp (pouches on the carrier), belt, lg (leg
   // armour), bp (on the belt), pack, ifak } (gear ids, or flags). Built from boxes in the chest / head / hips / limb frames:
   // x right, y up, -z the front.
-  // An officer's own look (the main menu), and what they wear if they haven't picked
-  const OFFICER_LOOK: Record<string, string | number> = { top: 'combat', topC: 0x3a4048, pants: 'combat', pantsC: 0x2e3238, eyes: 'shooting', gloves: 'tactical' };
-  const LOOKS: Record<string, string[]> = { top: ['combat', 'longsleeve', 'tshirt', 'hoodie'], pants: ['combat', 'cargo', 'jeans'], eyes: ['none', 'glasses', 'shooting', 'goggles'], gloves: ['tactical', 'leather', 'fingerless', 'none'] };
-  // a look from anywhere (the network): known options and colours only
-  function cleanLook(l: Record<string, any>) {
-    const o = Object.assign({}, OFFICER_LOOK);
-    if (!l || typeof l !== 'object') return o;
-    for (const k of Object.keys(LOOKS)) if (LOOKS[k].includes(l[k])) o[k] = l[k];
-    for (const k of ['topC', 'pantsC']) if (Number.isInteger(l[k]) && l[k] >= 0 && l[k] <= 0xffffff) o[k] = l[k];
-    return o;
-  }
+  // An officer's own look (the main menu), and what they wear if they haven't picked; a look from anywhere (the network),
+  // known options and colours only (js/sim.ts: the host's simulation cleans what it's told with the same)
+  const OFFICER_LOOK = G.Sim.OFFICER_LOOK, LOOKS = G.Sim.LOOKS;
+  const cleanLook = (l: Record<string, any>) => G.Sim.cleanLook(l);
   const KIT_COL = (d: any) => (!d ? 0x2e3236 : /Sable|Paragon/.test(d.brand || '') ? 0x5a5240 : /Kestrel|Vantage/.test(d.brand || '') ? 0x4d5639 : 0x2e3236);
   const kitMat = new Map();
   const KM = (c: number, o?: Record<string, any>) => { const key = c + JSON.stringify(o || {}); if (!kitMat.has(key)) kitMat.set(key, new T.MeshLambertMaterial(Object.assign({ color: c }, o || {}))); return kitMat.get(key); };

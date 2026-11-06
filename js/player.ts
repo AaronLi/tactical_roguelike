@@ -164,13 +164,7 @@ const G_Me = {
   reserveMax(def: WeaponDef) { return def.reserve; },
   // a weapon as built: def is the compiled build (stats changed by its parts), see js/parts.ts
   makeWeapon(id: string, build?: PBuild): PWeapon {
-    const def = G.Gunsmith.compile(id, build!);
-    // ammo: the type of round in it (a magazine holds one type); a gun loaded a round at a time keeps the
-    // order in its tube (the last one in is the next one fired)
-    const w: any = { def, sup: def.sup, mag: def.mag, ammo: G.ballFor(G.calOf(def)), fm: (def.modes || [def.mode])[0] }; // fm: where its selector is
-    if (def.barrels) w.rl = def.barrels.default; // (a gun of several barrels: the round type its block holds, js/data.ts)
-    w.tube = Array(w.mag).fill(w.ammo); // every gun: its rounds in order (a magazine's own stack, when it has one in)
-    w.chamber = G.chambered(def) ? w.ammo : null; // and the round in the chamber (G.chambered)
+    const w = G.Sim.makeWeapon(id, build); // (js/sim.ts: the gun as built, loaded)
     // reserve: the rounds in the magazines and boxes you carry for it
     Object.defineProperty(w, 'reserve', { get: () => (G.Me.kit ? G.Gear.rounds(G.Me, w.def) : 0) });
     return w;
@@ -1498,6 +1492,14 @@ const G_Me = {
     (this.rounds = this.rounds || []).push({ p: from.clone(), v: dir.clone().multiplyScalar(v0), def, am, drag, drag0: drag, grav: G.GRAVITY, n: 0, dist: 0, t: 0, off: new THREE.Vector3(), muzzle: from.clone(), show: false, tracer: false, shot, hit: new Set(), proj: G.Ballistics.projectile(def, am), enemy: id, i: this.roundIndex(shot), path: this.newPath(from, v0),
       trail: G.Rig.debug ? G.R.trailStart(shot, from, v0) : null });
   },
+  // A suspect's shot as the host's simulation sends it to the host's own screen ('eround', js/server.ts fire): every pellet's
+  // direction from the one muzzle, all of the one shot (its friendly-fire hits and paths sent together). Flown here, on the
+  // host's machine, against everyone's bodies as they stand on it, as they were when the simulation ran in this thread.
+  enemyRounds(m: { e: number; wp: string; am: string; sid: number; f: number[]; ds: number[][] }) {
+    const wdef = G.WEAPONS[m.wp] || G.WEAPONS.p9, fv = new THREE.Vector3(m.f[0], m.f[1], m.f[2]), r2 = (v: number) => Math.round(v * 100) / 100;
+    const shot = { sid: m.sid, ff: new Map(), w: wdef.code || m.wp, am: m.am, f: m.f.map(r2), tos: null, enemy: m.e } as unknown as PShot;
+    for (const d of m.ds) this.enemyRound(m.e, fv, new THREE.Vector3(d[0], d[1], d[2]), wdef, m.am, shot);
+  },
   // A round's path, for the replays (js/highlights.ts roundPath): p, the points it passed ([x, y, z, speed]: everything it met,
   // and every so often in the air); ev, what it did to things ([point, e(ntry) x (exit) r(icochet), what it looks like, the
   // surface's normal, what it was]); hit, who it went into ([point, their key, its speed, its state then, its direction,
@@ -1519,20 +1521,7 @@ const G_Me = {
   },
   // where a round would end up if nobody's in the way: its arc, stepped against the walls only (what the squad
   // is told, to draw it going there)
-  predictEnd(p0: THREE.Vector3, v0: THREE.Vector3, drag: number, grav: number) {
-    const map = G.Game.map!, p = p0.clone(), v = v0.clone(), dt = 1 / 60;
-    for (let i = 0, dist = 0; i < 240 && dist < G.ROUND_LIFE.dist; i++) {
-      const p1 = p.clone().addScaledVector(v, dt); p1.y -= 0.5 * grav * dt * dt;
-      const seg = p1.clone().sub(p), len = seg.length();
-      if (len < 1e-4) break;
-      seg.divideScalar(len);
-      const h = G.Level.raycast(map, p.x, p.y, p.z, seg.x, seg.y, seg.z, len);
-      if (h.t < len) return p.addScaledVector(seg, h.t);
-      v.multiplyScalar(Math.exp(-len / drag)); v.y -= grav * dt;
-      p.copy(p1); dist += len;
-    }
-    return p;
-  },
+  predictEnd(p0: THREE.Vector3, v0: THREE.Vector3, drag: number, grav: number) { return G.Sim.predictEnd(p0, v0, drag, grav, G.Game.map!); }, // (js/sim.ts, on the level you are in)
   // every round in flight, one frame on (and the friendly fire they did, sent)
   stepRounds(dt: number) {
     const rs = this.rounds;
@@ -1851,16 +1840,9 @@ const G_Me = {
   // a time budget a frame (FRAG.BUDGET_MS, at least FRAG.MIN_PER_FRAME chips): a few frames at most. A chip that has
   // flown is flown at once (at a kilometre a second the air time is nothing). A body takes at most FRAG.CAP of them
   // through the full wound sums (the rest pass it by) so a crowd of chips on one man costs no more than that.
-  BLAST: { r: 4, dmg: 90, SURFACE: 1.22 }, // (the burst's own push of air, close in: the chips are the rest)
-  // A burst lying on something hard (a floor, a table: within 15 cm of it) pushes its whole blast into the half above it: the surface
-  // reflects the downward half back up, so close in it acts like about 1.8 times the charge, which carries a blast about 1.22 times as
-  // far (as the cube root of the charge). In the air it's the plain BLAST.r. (The chips are the same either way: the floor stops or
-  // turns the downward ones itself, js/ballistics.ts glances.)
-  blastR(map: LvMap | null, p: THREE.Vector3) {
-    if (!map) return this.BLAST.r;
-    const g = G.Level.groundAt(map, p.x, p.z, 0.01, p.y + 0.05);
-    return g != null && p.y - g < 0.15 ? this.BLAST.r * this.BLAST.SURFACE : this.BLAST.r;
-  },
+  BLAST: G_Sim.BLAST, // (the burst's own push of air, close in: the chips are the rest. js/sim.ts)
+  // A burst lying on something hard pushes its whole blast into the half above it, and it carries further (js/sim.ts blastR)
+  blastR(map: LvMap | null, p: THREE.Vector3) { return G.Sim.blastR(map, p); },
   FRAG: { N: 1200, V0: 1150, VMIN: 70, RANGE: 70, CAP: 28, BUDGET_MS: 3, MIN_PER_FRAME: 40, M_MED: 0.00013, M_SD: 0.25, CD: 1.0, FLAKE: 1.5, SHOW: 26, PUFFS: 14, BLOOD: 24 },
   fragQ: null as null | any[],
   fragLogs: [] as any[],
@@ -2040,37 +2022,10 @@ const G_Me = {
   //   through a wall or a shut door: a thump, no harm: dazed a little, close by.
   // The same everywhere from where it went off (the map and its doors), so every machine draws the same fireball and the F9
   // view shows the volume it filled.
-  TB: { FUSE: 2.6, CLOUD: 110, SPACE: 900, ROOM_H: 2.7, E: 6.0e6, BURN: 0.45, BLAST: 0.9, QS0: 25, QS_K: 180, WALL_R: 3 },
-  tbModel(map: LvMap, p: THREE.Vector3): PTbModel {
-    const T = this.TB, L = G.Level, TS = L.TS, cellA = TS * TS;
-    const fill = L.blastFill(map, p.x, p.y, p.z, T.SPACE);
-    // how much of the cloud's reach is open to the sky (counted over the first CLOUD cells): the cloud thins and rises there
-    let outC = 0; const fm = L.floorMap(map, fill.f), out = fm.out || map.out, nC = Math.min(fill.n, T.CLOUD);
-    for (let i = 0; i < nC; i++) if (out[fill.order[i]]) outC++;
-    const space = fill.n, closed = space < T.SPACE, skyAll = space ? fill.out / space : 1, outFrac = nC ? outC / nC : 1;
-    // how well the space holds the burn in: open sky over it, the ways out it met (broken windows, the map's edge), and how much
-    // more room past the cloud there is for it to spread into (a big hall holds it in hardly better than the open). Less held
-    // in, the cloud's thinner and smaller as it lights, and burns less of its fuel.
-    const held = G.U.clamp(T.CLOUD * 2.5 / Math.max(1, space), 0, 1), conf = G.U.clamp((1 - outFrac) / (1 + 0.12 * fill.vents) * (0.3 + 0.7 * held), 0.08, 1);
-    const cloud = Math.max(Math.min(fill.n, 12), Math.min(fill.n, Math.round(T.CLOUD * (0.45 + 0.55 * held) * (1 - 0.6 * outFrac))));
-    const V = Math.max(1, space) * cellA * T.ROOM_H, qs = closed || skyAll < 0.05 ? 0.4 * T.E / V / 1000 * (1 - skyAll) / (1 + 0.12 * fill.vents) : 0;
-    const rc = cloud ? fill.d[cloud - 1] : 0; // (the cloud's edge, along the floor)
-    const idx = new Int32Array(map.W * map.H).fill(-1);
-    for (let i = 0; i < fill.n; i++) idx[fill.order[i]] = i;
-    return { map, p: p.clone(), fill, cloud, space, closed, conf, qs, rc, idx, outFrac, areaCloud: cloud * cellA, areaSpace: space * cellA, V };
-  },
+  TB: G_Sim.TB, // (the reckoning: js/sim.ts tbModel, tbDose)
+  tbModel(map: LvMap, p: THREE.Vector3): PTbModel { return G.Sim.tbModel(map, p); },
   // what a thermobaric's burst does to someone at (x, y, z): burn and blast (shares of a life), daze (0..1), and where they were
-  tbDose(M: PTbModel, x: number, y: number, z: number) {
-    const T = this.TB, L = G.Level, map = M.map, TS = L.TS, f = L.floorAt(map, x, y, z);
-    const i = G.U.clamp(Math.floor(z / TS), 0, map.H - 1) * map.W + G.U.clamp(Math.floor(x / TS), 0, map.W - 1), k = f === M.fill.f ? M.idx[i] : -1;
-    if (k >= 0 && k < M.cloud) return { burn: T.BURN, blast: T.BLAST * M.conf, daze: 1, at: 'cloud', d: M.fill.d[k] };
-    if (k >= 0) { // in the space it filled, past the fireball: the long push of the pressure, and the front's last of it close to the edge
-      const past = M.fill.d[k] - M.rc, front = M.conf * Math.exp(-past / 1.5);
-      return { burn: 0.15 * Math.exp(-past / 0.7), blast: G.U.clamp((M.qs - T.QS0) / T.QS_K, 0, 0.5) + 0.45 * front, daze: G.U.clamp(M.qs / 50 + front, 0, 1), at: 'space', d: M.fill.d[k] };
-    }
-    const r = Math.hypot(x - M.p.x, z - M.p.z), reach = M.rc + T.WALL_R; // (through a wall, or a floor)
-    return { burn: 0, blast: 0, daze: r < reach ? 0.35 * (1 - r / reach) * (f === M.fill.f ? 1 : 0.5) : 0, at: r < reach ? 'wall' : 'none', d: r };
-  },
+  tbDose(M: PTbModel, x: number, y: number, z: number) { return G.Sim.tbDose(M, x, y, z); },
   // Yours went off: what it does to the suspects here (as a frag's chips do: told to the host as their hits, gr its seed, so a
   // kill of them is the grenade's in the highlights), drawn, heard, and the host told (it dazes those it didn't kill, js/server.ts,
   // and tells the squad: everyone draws the same fireball from it, and takes what it does to them: js/game.ts onBoom)
