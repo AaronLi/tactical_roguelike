@@ -563,7 +563,7 @@ const G_Rig = (() => {
   function makeAtak(rig: Rig): THREE.Group {
     const W = 0.16, H = 0.08, D = 0.016; // (landscape: the hinge runs along a long edge)
     const mount = new T.Group();
-    mount.position.set(0, 0.17, -0.19); // mid-chest, on the front of the carrier
+    mount.position.set(0, 0.17, -0.19); // mid-chest; its depth set against the front of what's worn there as it comes out (chestFront)
     const plate = new T.Mesh(new T.BoxGeometry(W + 0.02, 0.05, 0.008), new T.MeshLambertMaterial({ color: 0x2b2e2a }));
     plate.position.set(0, -0.015, 0.006);
     const hinge = new T.Group(); // (its x axis is the hinge line, along the phone's bottom edge)
@@ -586,6 +586,24 @@ const G_Rig = (() => {
     hinge.userData.glow = glow; hinge.userData.phone = phone; hinge.userData.mount = mount; hinge.userData.H = H; hinge.userData.W = W;
     rig.chest.add(mount); mount.visible = false;
     return hinge;
+  }
+  // How far forward the front of the chest is at the ATAK's mount (chest-local z, forward negative): the frontmost surface of
+  // whatever's worn there (the torso, a vest, a carrier, its plate and pouches), across the mount's width at its height. The mount's
+  // plate goes flat against it, so the phone sits on the chest whatever's on it (a slick carrier's plate, a soft vest, a shirt).
+  function chestFront(rig: Rig, y0: number, y1: number, hw: number) {
+    // (rays from in front straight back at the chest across where the plate goes: it rests on the frontmost thing any of them meets)
+    const meshes: THREE.Object3D[] = [], mt = rig.atak && rig.atak.userData.mount;
+    rig.chest.traverse((o: THREE.Object3D) => { if ((o as THREE.Mesh).isMesh && o.visible) meshes.push(o); });
+    const skip = new Set<THREE.Object3D>(); if (mt) mt.traverse((o: THREE.Object3D) => skip.add(o));
+    const list = meshes.filter((o) => !skip.has(o)), rc = new T.Raycaster(), o = new T.Vector3(), d = new T.Vector3();
+    let z = Infinity;
+    for (const x of [-hw, -hw / 2, 0, hw / 2, hw]) for (const y of [y0, (y0 + y1) / 2, y1]) {
+      o.set(x, y, -0.6); rig.chest.localToWorld(o); d.set(x, y, 0); rig.chest.localToWorld(d); d.sub(o); const len = d.length(); d.divideScalar(len);
+      rc.set(o, d); rc.far = len + 0.3;
+      const h = rc.intersectObjects(list, false)[0];
+      if (h) { const q = rig.chest.worldToLocal(h.point.clone()); if (q.z < z) z = q.z; } // (a flat plate rests on whatever stands furthest out)
+    }
+    return Number.isFinite(z) ? z : -0.12;
   }
   // A rider's swing (rig.zipSw): a pendulum hung from the trolley's handle (about a metre down to where they weigh), pushed back by
   // being speeded up, forward by being slowed, and leant back a little by the speed itself (the wind); v is how fast they're going
@@ -857,7 +875,12 @@ const G_Rig = (() => {
     if (rig.atakW > 0.01) {
       if (!rig.atak) rig.atak = makeAtak(rig);
       const k = U.smooth(0, 1, rig.atakW), hg = rig.atak, ph = hg.userData.phone as THREE.Object3D, H = hg.userData.H as number, W = hg.userData.W as number;
-      (hg.userData.mount as THREE.Object3D).visible = true;
+      const mt = hg.userData.mount as THREE.Object3D;
+      if (!mt.visible) { // (coming out: seated on the front of what's worn now, the kit may have changed since)
+        rig.chest.updateMatrixWorld(true);
+        mt.position.z = chestFront(rig, mt.position.y - 0.04, mt.position.y + 0.1, W / 2) - 0.01; // (the plate's back on it)
+        mt.visible = true;
+      }
       hg.rotation.x = ATAK_OPEN * U.smooth(0.15, 0.85, k); // (the hand reaches it first, then folds it out)
       rig.neck.rotation.x -= 0.55 * k; // head down to the screen
       const gl = hg.userData.glow as THREE.Mesh; if (gl) (gl.material as THREE.MeshBasicMaterial).opacity = (0.22 + 0.06 * Math.sin(performance.now() / 400)) * U.smooth(0.5, 1, k);
