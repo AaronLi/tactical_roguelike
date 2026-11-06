@@ -215,21 +215,25 @@ function renderElement(el: SceneElement, sr: number, seed: number, housing?: Par
   return { offset: el.at - T0, samples: r.samples };
 }
 
-export function renderScene(scene: Scene, sr = 48000, seed = 1): RenderedScene {
+/**
+ * Render a scene's tracks and their mix. `dry`: no room at all (the scene's own room is left out), so the sound can
+ * go through a game's own real-time acoustics. What stays is the object itself, the air spaces inside it included.
+ */
+export function renderScene(scene: Scene, sr = 48000, seed = 1, opts: { dry?: boolean } = {}): RenderedScene {
   const raw: { track: SceneTrack; start: number; samples: Float32Array }[] = [];
   let k = 0;
   for (const track of scene.tracks.filter((tr) => tr.elements.length > 0)) {
     const parts = track.elements.map((el) => ({ el, ...renderElement(el, sr, seed * 1000 + ++k, scene.housing, scene.enclosure) }));
     const start = Math.min(...parts.map((p) => p.offset));
     const end = Math.max(...parts.map((p) => p.offset + p.samples.length / sr));
-    const tail = scene.room > 0 ? 0.25 + 0.5 * scene.roomSize : 0;
+    const tail = scene.room > 0 && !opts.dry ? 0.25 + 0.5 * scene.roomSize : 0;
     let buf: Float32Array = new Float32Array(Math.ceil((end - start + tail) * sr));
     for (const p of parts) {
       const g = dbToGain(p.el.gainDb);
       const o = Math.round((p.offset - start) * sr);
       for (let i = 0; i < p.samples.length; i++) if (o + i >= 0 && o + i < buf.length) buf[o + i] += p.samples[i] * g;
     }
-    buf = applyRoom(buf, scene.room, scene.roomSize, sr);
+    if (!opts.dry) buf = applyRoom(buf, scene.room, scene.roomSize, sr);
     raw.push({ track, start, samples: buf });
   }
   // The mix starts with the first sound; stem start times are relative to it.

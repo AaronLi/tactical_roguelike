@@ -12,11 +12,11 @@
 import { createRequire } from 'node:module';
 const { chromium } = createRequire(import.meta.url)('playwright'); // (the globally installed one)
 import { spawn } from 'node:child_process';
-import { writeFileSync, mkdtempSync, rmSync, renameSync } from 'node:fs';
+import { writeFileSync, readFileSync, copyFileSync, mkdtempSync, rmSync, renameSync } from 'node:fs';
 import { speakerMaster } from './speaker-master.mjs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { SCENES, renderScene, encodeWav, arChargeScene, chargeScene } from '../dist/index.js';
+import { SCENES, renderScene, encodeWav, arChargeScene, chargeScene, magDropScene } from '../dist/index.js';
 import { T0 } from '../dist/excitation.js';
 
 const args = process.argv.slice(2);
@@ -24,19 +24,23 @@ const out = args[0];
 const opt = (k, d) => { const i = args.indexOf('--' + k); return i >= 0 ? args[i + 1] : d; };
 const URL = opt('url', 'http://127.0.0.1:8080/');
 const GUN = opt('gun', 'm4');
+// --redub <silent.mp4> --events <recording.log | .events.json>: don't record; dub a recording made earlier
+const REDUB = opt('redub', null), EVENTS = opt('events', null);
+// --wet: the synth's own room on every sound (default: dry, the room left to the game); --no-space: plain mono
+const WET = args.includes('--wet'), SPACE = !args.includes('--no-space');
 // Each gun: its caption, how it's charged, how its action is worked after a run-dry reload ('release': a bolt
 // catch or slide stop, 'rack': the handle again), and which sound goes on which moment.
 const GUNS = {
-  m4: { title: 'Mk18 CQBR (AR-15)', charge: 'Charging handle pulled back and let go: chambers a round', after: 'release', afterCap: 'Magazine change, then the bolt catch hit',
+  m4: { mag: 'ar15', title: 'Mk18 CQBR (AR-15)', charge: 'Charging handle pulled back and let go: chambers a round', after: 'release', afterCap: 'Magazine change, then the bolt catch hit',
     charge_: ['ar15-charge', 'handle bottoms out', 'carrier slams onto the bolt'], magOut: ['ar15-mag-out', 'magazine drops off the catch'], magOutEmpty: ['ar15-mag-out-empty', 'magazine drops off the catch'],
     magIn: ['ar15-mag-in', 'mag catch clicks into the hole in the magazine'], release: ['ar15-bolt-release', 'carrier slams onto the bolt'] },
-  ak: { title: 'KV-47 (AKM)', charge: 'Charging handle yanked back and let go: chambers a round', after: 'rack', afterCap: 'Magazine rocked in, then the handle racked (no hold-open)',
+  ak: { mag: 'kv47', title: 'KV-47 (AKM)', charge: 'Charging handle yanked back and let go: chambers a round', after: 'rack', afterCap: 'Magazine rocked in, then the handle racked (no hold-open)',
     charge_: ['kv47-charge', 'carrier slams into the rear trunnion', 'carrier slams home'], rackEmpty: ['kv47-charge', 'carrier slams into the rear trunnion', 'carrier slams home'],
     magOut: ['kv47-mag-out', 'front lug unhooks from the trunnion'], magOutEmpty: ['kv47-mag-out-empty', 'front lug unhooks from the trunnion'], magIn: ['kv47-mag-in', 'paddle snaps over the rear lug'] },
-  mp5: { title: 'MP5', charge: 'Cocking handle pulled back and let go: chambers a round', after: 'rack', afterCap: 'Magazine change, then the cocking handle',
+  mp5: { mag: 'mp5', title: 'MP5', charge: 'Cocking handle pulled back and let go: chambers a round', after: 'rack', afterCap: 'Magazine change, then the cocking handle',
     charge_: ['mp5-charge', 'handle stops at the end of its slot', 'rollers snap out into the trunnion'], rackEmpty: ['mp5-charge', 'handle stops at the end of its slot', 'rollers snap out into the trunnion'],
     magOut: ['mp5-mag-out', 'catch lets go of the magazine'], magOutEmpty: ['mp5-mag-out-empty', 'catch lets go of the magazine'], magIn: ['mp5-mag-in', 'catch clicks into the magazine'] },
-  g19: { title: 'G19', rearCue: 'drop_slide', charge: 'Slide racked and let go: chambers a round', after: 'release', afterCap: 'Magazine change, then the slide stop hit',
+  g19: { mag: 'g19', title: 'G19', rearCue: 'drop_slide', charge: 'Slide racked and let go: chambers a round', after: 'release', afterCap: 'Magazine change, then the slide stop hit',
     charge_: ['g19-rack', 'slide stops at the rear', 'slide slams home'], magOut: ['g19-mag-out', 'catch lets go of the magazine'], magOutEmpty: ['g19-mag-out-empty', 'catch lets go of the magazine'],
     magIn: ['g19-mag-in', 'catch clicks into the magazine'], release: ['g19-slide-release', 'slide slams home'] },
 };
@@ -119,6 +123,9 @@ await page.evaluate(async () => {
   // the moments, logged on the stepped clock
   window.__log = [];
   const feed = m.feed.bind(m); m.feed = (ww) => { window.__log.push({ ev: 'bolt home', t: window.__clock.t() }); return feed(ww); };
+  // an emergency (dump) reload drops the magazine on the floor (js/casings.ts dropMag): when it's let go, and from where
+  const dropMag = G.Casings.dropMag.bind(G.Casings);
+  G.Casings.dropMag = (def) => { const c = dropMag(def); window.__dropped = c; window.__log.push({ ev: 'magazine dropped', t: window.__clock.t(), y: c && c.p ? c.p.y : null }); return c; };
   const sample = G.Audio.sample.bind(G.Audio);
   G.Audio.sample = (name, ...r) => { window.__log.push({ ev: name, t: window.__clock.t() }); return sample(name, ...r); };
   window.__prevM = -1;
@@ -158,38 +165,60 @@ if (opt('still', null) !== null) {
   process.exit(0);
 }
 
-// ---------- the sequence, frame by frame ----------
-const ff = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-c:v', 'mjpeg', '-r', String(FPS), '-i', '-', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '20', '-preset', 'medium', join(mkdtempSync(join(tmpdir(), 'gv-')), 'v.mp4')], { stdio: ['pipe', 'inherit', 'inherit'] });
-const videoPath = ff.spawnargs[ff.spawnargs.length - 1];
-let frames = 0;
-const write = (b) => new Promise((res) => (ff.stdin.write(b) ? res() : ff.stdin.once('drain', res)));
-async function frame() {
-  const st = await page.evaluate(() => window.__step());
-  await write(await page.screenshot({ type: 'jpeg', quality: 92 }));
-  frames++;
-  if (frames % FPS === 0) console.log(`${(frames / FPS).toFixed(0)} s recorded`);
-  return st;
+// ---------- the sequence, frame by frame (or a recording made earlier) ----------
+let frames = 0, videoPath, log;
+if (REDUB) {
+  videoPath = REDUB;
+  const d = await new Promise((res) => { const p = spawn('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', REDUB]); let o = ''; p.stdout.on('data', (x) => (o += x)); p.on('close', () => res(+o)); });
+  frames = Math.round(d * FPS);
+  const txt = readFileSync(EVENTS, 'utf8');
+  if (EVENTS.endsWith('.json')) log = JSON.parse(txt);
+  else {
+    // a recording's printed log: "  1.700 s  rack_slide" (its actions' lengths are the game's: a charge from a
+    // full magazine 0.45 s, a rack straight after a magazine change 0.6 s, a catch or slide stop 0.4 s)
+    log = [...txt.matchAll(/^\s+([\d.]+) s\s+(\S+(?: \S+)*)\s*$/gm)].map((m) => ({ t: +m[1], ev: m[2] }));
+    let nAct = 0;
+    for (const e of log) if (e.ev === 'action') e.dur = nAct++ === 0 ? 0.45 : C.after === 'release' ? 0.4 : 0.6;
+  }
+  console.log(`re-dubbing ${REDUB}: ${frames} frames, ${log.length} logged moments`);
+} else {
+  const ff = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-c:v', 'mjpeg', '-r', String(FPS), '-i', '-', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '20', '-preset', 'medium', join(mkdtempSync(join(tmpdir(), 'gv-')), 'v.mp4')], { stdio: ['pipe', 'inherit', 'inherit'] });
+  videoPath = ff.spawnargs[ff.spawnargs.length - 1];
+  const write = (b) => new Promise((res) => (ff.stdin.write(b) ? res() : ff.stdin.once('drain', res)));
+  const frame = async () => {
+    const st = await page.evaluate(() => window.__step());
+    await write(await page.screenshot({ type: 'jpeg', quality: 92 }));
+    frames++;
+    if (frames % FPS === 0) console.log(`${(frames / FPS).toFixed(0)} s recorded`);
+    return st;
+  };
+  const hold = async (s) => { for (let i = 0; i < Math.round(s * FPS); i++) await frame(); };
+  const busy = async () => { for (let i = 0; i < 20 * FPS; i++) { const st = await frame(); if (!st.reloading && !st.act && !st.swap) return; } };
+  const cap = (a, b) => page.evaluate(([x, y]) => window.__caption(x, y), [a, b]);
+  const T = C.title;
+  await cap(T, 'Drawn, a full magazine in, nothing chambered'); await busy(); await hold(1.0);
+  await cap(T, C.charge);
+  await page.evaluate(() => G.Me.startReload()); await busy(); await hold(1.0);
+  await cap(T, 'Magazine change with rounds left');
+  await page.evaluate(() => { const w = G.Me.cur(); w.mag = 12; w.tube = w.tube.slice(-12); G.Me.startReload(); }); await busy(); await hold(1.0);
+  await cap(T, C.after === 'release' ? 'Run dry: it locks open' : 'Run dry: nothing to hold it open');
+  await page.evaluate(() => { const w = G.Me.cur(); w.mag = 0; w.tube = []; w.chamber = null; }); await hold(0.8);
+  await cap(T, 'Emergency reload: the empty magazine dropped, a fresh one in, ' + C.afterCap.replace(/^Magazine (change|rocked in), then /, ''));
+  // R twice, quickly (js/player.ts): the reload becomes a dump reload, and with no dump pouch the magazine goes on the floor
+  await page.evaluate(() => { const m = G.Me; m.startReload(); m.toDump(); if (m.reloadMode !== 'floor') { m.dumpDest = null; m.reloadMode = 'floor'; m.reloadTimes(m.cur().def, m.reloadTotal - m.reloadT); } });
+  await busy(); await hold(1.8);
+  // where the dropped magazine came to rest
+  const rest = await page.evaluate(() => { const c = window.__dropped; return c && c.p ? { x: c.p.x, y: c.p.y, z: c.p.z } : null; });
+  if (rest) await page.evaluate((r) => window.__log.push({ ev: 'magazine rests', t: window.__clock.t(), ...r }), rest);
+  ff.stdin.end();
+  await new Promise((r) => ff.on('close', r));
+  log = await page.evaluate(() => window.__log);
+  // keep the silent video and its moments, to dub again later (--redub)
+  copyFileSync(videoPath, out.replace(/\.mp4$/, '') + '.silent.mp4');
+  writeFileSync(out.replace(/\.mp4$/, '') + '.events.json', JSON.stringify(log));
+  console.log(`\n${frames} frames`);
+  for (const e of log) console.log(`  ${e.t.toFixed(3)} s  ${e.ev}`);
 }
-const hold = async (s) => { for (let i = 0; i < Math.round(s * FPS); i++) await frame(); };
-const busy = async () => { for (let i = 0; i < 20 * FPS; i++) { const st = await frame(); if (!st.reloading && !st.act && !st.swap) return; } };
-const cap = (a, b) => page.evaluate(([x, y]) => window.__caption(x, y), [a, b]);
-const T = C.title;
-
-await cap(T, 'Drawn, a full magazine in, nothing chambered'); await busy(); await hold(1.0);
-await cap(T, C.charge);
-await page.evaluate(() => G.Me.startReload()); await busy(); await hold(1.0);
-await cap(T, 'Magazine change with rounds left');
-await page.evaluate(() => { const w = G.Me.cur(); w.mag = 12; w.tube = w.tube.slice(-12); G.Me.startReload(); }); await busy(); await hold(1.0);
-await cap(T, C.after === 'release' ? 'Run dry: it locks open' : 'Run dry: nothing to hold it open');
-await page.evaluate(() => { const w = G.Me.cur(); w.mag = 0; w.tube = []; w.chamber = null; }); await hold(0.8);
-await cap(T, C.afterCap);
-await page.evaluate(() => G.Me.startReload()); await busy(); await hold(1.5);
-ff.stdin.end();
-await new Promise((r) => ff.on('close', r));
-const log = await page.evaluate(() => window.__log);
-await browser.close();
-console.log(`\n${frames} frames`);
-for (const e of log) console.log(`  ${e.t.toFixed(3)} s  ${e.ev}`);
 
 // ---------- the sounds, each on its moment ----------
 const sr = 48000, total = frames / FPS;
@@ -201,7 +230,7 @@ function place(id, what, at, tracks = null, gainDb = 0) {
   const els = sc.tracks.flatMap((t) => t.elements);
   const el = els.find((e) => e.what === what);
   if (!el) throw new Error(`${id}: no "${what}"`);
-  const r = renderScene(sc, sr);
+  const r = renderScene(sc, sr, 1, { dry: !WET });
   // the mix's sample 0 is at scene time (earliest element start - T0); stems start `start` s after it
   const origin = Math.min(...els.map((e) => e.at - (e.sound.kind === 'contact' ? T0 : 0)));
   const g = Math.pow(10, gainDb / 20);
@@ -219,8 +248,8 @@ const homeAfter = (t) => log.find((e) => e.ev === 'bolt home' && e.t >= t - 1e-6
 function worked([id, rear, slam], back) {
   // the action logged just before the handle reached the rear: its length sets the pull
   const act = log.filter((e) => e.ev === 'action' && e.t <= back + 1e-6).pop();
-  const sc = act ? CHARGE_BUILD[GUN]({ pull: 0.22 * act.dur, hold: 0 }) : scene(id);
-  if (act) console.log(`  ${sc.id}: pull ${(0.22 * act.dur * 1000).toFixed(0)} ms (the animation's), no hold`);
+  const sc = act && act.dur ? CHARGE_BUILD[GUN]({ pull: 0.22 * act.dur, hold: 0 }) : scene(id);
+  if (act && act.dur) console.log(`  ${sc.id}: pull ${(0.22 * act.dur * 1000).toFixed(0)} ms (the animation's), no hold`);
   place(sc, rear, back, sc.tracks.filter((t) => t.name !== 'release-forward').map((t) => t.name));
   place(sc, slam, homeAfter(back), ['release-forward']);
 }
@@ -231,25 +260,105 @@ worked(C.charge_, at(rearCue, 0));
 // the partial reload: the loaded magazine out, a fresh one in
 place(C.magOut[0], C.magOut[1], at('magazine out', 0), null, -2);
 place(C.magIn[0], C.magIn[1], at('insert_magazine', 0), null, -2);
-// run dry: the empty one out, a fresh one in, then the action
-place(C.magOutEmpty[0], C.magOutEmpty[1], at('magazine out', 1), null, -2);
+// run dry, an emergency reload: the empty one let go (it falls free), a fresh one in, then the action
+const dropped = log.find((e) => e.ev === 'magazine dropped'), rests = log.find((e) => e.ev === 'magazine rests');
+place(C.magOutEmpty[0], C.magOutEmpty[1], dropped ? dropped.t : at('magazine out', 1), null, -2);
+// ... and it hits the floor: the simulated drop of this gun's magazine, empty, from the height it was let go at,
+// its release on the moment the game let it go (it clears the well ~50 ms later), heard from where it lands
+const floorMix = new Float32Array(mix.length);
+if (dropped) {
+  const height = dropped.y != null && rests ? Math.max(0.3, dropped.y - rests.y) : 1.2;
+  const sc = magDropScene({ mag: C.mag, rounds: 0, way: 'forwards', height, toss: 0.4, surface: 'concrete' });
+  const els = sc.tracks.flatMap((t) => t.elements);
+  const origin = Math.min(...els.map((e) => e.at - (e.sound.kind === 'contact' ? T0 : 0)));
+  const r = renderScene(sc, sr, 1, { dry: !WET });
+  const o = Math.round((dropped.t + 0.05 + origin) * sr);
+  for (let i = 0; i < r.mix.length; i++) if (o + i >= 0 && o + i < floorMix.length) floorMix[o + i] += r.mix[i] * Math.pow(10, -4 / 20);
+  console.log(`  ${sc.id}: let go ${height.toFixed(2)} m above the floor`);
+}
 place(C.magIn[0], C.magIn[1], at('insert_magazine', 1), null, -2);
 if (C.after === 'release') place(C.release[0], C.release[1], at('drop_slide', rearCue === 'drop_slide' ? 1 : 0));
 // (the game has the final say: if it racked when we expected the catch, or the reverse, the log shows which)
 else worked(C.rackEmpty, at(rearCue, 1));
-let pk = 0; for (const v of mix) pk = Math.max(pk, Math.abs(v));
-for (let i = 0; i < mix.length; i++) mix[i] *= 0.89 / pk;
+let pk = 0; for (let i = 0; i < mix.length; i++) pk = Math.max(pk, Math.abs(mix[i] + floorMix[i]));
+for (let i = 0; i < mix.length; i++) { mix[i] *= 0.89 / pk; floorMix[i] *= 0.89 / pk; }
+
+// ---------- placed where the gun is, in the game's own acoustics ----------
+// The dry sound, rendered offline in the game page: through an HRTF panner at the gun's action (in front of you,
+// below and to the right of your eyes, against a listener at the camera), plus the game's own echo paths from that
+// spot (js/gunaudio.ts echoTaps: rays off the level's walls, each echo from its wall, darker each bounce). This is
+// what the game would do with a sound placed at the gun: out in front of you, in the room you're standing in.
+let L = mix.map((v, i) => v + floorMix[i]), R = L, echoes = 0;
+if (SPACE) {
+  const b64 = Buffer.from(mix.buffer).toString('base64'), b64f = Buffer.from(floorMix.buffer).toString('base64');
+  const res = await page.evaluate(async ({ b64, b64f, sr, rest }) => {
+    const unb = (s) => { const bin = atob(s), bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i); return new Float32Array(bytes.buffer); };
+    const dry = unb(b64), dryFloor = unb(b64f);
+    const cam = G.R.camera, p = cam.position, q = cam.quaternion;
+    const src = p.clone().add(new THREE.Vector3(0.1, -0.17, -0.4).applyQuaternion(q)); // the action: ~40 cm ahead, below and right
+    const ctx = new OfflineAudioContext(2, dry.length, sr);
+    const l = ctx.listener, f = new THREE.Vector3(0, 0, -1).applyQuaternion(q), u = new THREE.Vector3(0, 1, 0).applyQuaternion(q);
+    if (l.positionX) { l.positionX.value = p.x; l.positionY.value = p.y; l.positionZ.value = p.z; l.forwardX.value = f.x; l.forwardY.value = f.y; l.forwardZ.value = f.z; l.upX.value = u.x; l.upY.value = u.y; l.upZ.value = u.z; }
+    else { l.setPosition(p.x, p.y, p.z); l.setOrientation(f.x, f.y, f.z, u.x, u.y, u.z); }
+    const buf = ctx.createBuffer(1, dry.length, sr); buf.copyToChannel(dry, 0);
+    const placeAt = (node, at) => { if (node.positionX) { node.positionX.value = at.x; node.positionY.value = at.y; node.positionZ.value = at.z; } else node.setPosition(at.x, at.y, at.z); };
+    const s = ctx.createBufferSource(); s.buffer = buf;
+    const pan = ctx.createPanner(); pan.panningModel = 'HRTF'; pan.distanceModel = 'inverse'; pan.rolloffFactor = 0; placeAt(pan, src);
+    s.connect(pan).connect(ctx.destination); s.start(0);
+    // the dropped magazine: from where it came to rest on the floor, with that spot's own echoes
+    if (rest) {
+      const fb = ctx.createBuffer(1, dryFloor.length, sr); fb.copyToChannel(dryFloor, 0);
+      const at = new THREE.Vector3(rest.x, rest.y, rest.z);
+      const fs = ctx.createBufferSource(); fs.buffer = fb;
+      const fp = ctx.createPanner(); fp.panningModel = 'HRTF'; fp.distanceModel = 'inverse'; fp.rolloffFactor = 0; placeAt(fp, at);
+      const fg = ctx.createGain(); fg.gain.value = Math.min(1, 0.6 / Math.max(0.6, at.distanceTo(p))); // (further off than the gun: quieter)
+      fs.connect(fp).connect(fg).connect(ctx.destination); fs.start(0);
+      for (const tp of G.GunAudio.echoTaps(G.Game.map, at, p)) {
+        const es = ctx.createBufferSource(); es.buffer = fb;
+        const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = tp.order === 1 ? 5000 : 2800;
+        const ep = ctx.createPanner(); ep.panningModel = 'HRTF'; ep.rolloffFactor = 0; placeAt(ep, tp.pos);
+        const g = ctx.createGain(); g.gain.value = tp.amp * fg.gain.value;
+        es.connect(lp).connect(ep).connect(g).connect(ctx.destination); es.start(tp.delay);
+      }
+    }
+    const taps = G.GunAudio.echoTaps(G.Game.map, src, p);
+    for (const tp of taps) {
+      const es = ctx.createBufferSource(); es.buffer = buf;
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = tp.order === 1 ? 5000 : 2800;
+      const ep = ctx.createPanner(); ep.panningModel = 'HRTF'; ep.rolloffFactor = 0; placeAt(ep, tp.pos);
+      const g = ctx.createGain(); g.gain.value = tp.amp;
+      es.connect(lp).connect(ep).connect(g).connect(ctx.destination);
+      es.start(tp.delay);
+    }
+    const o = await ctx.startRendering();
+    const enc = (a) => { const u8 = new Uint8Array(a.buffer); let str = ''; for (let i = 0; i < u8.length; i += 0x8000) str += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(str); };
+    return { L: enc(o.getChannelData(0)), R: enc(o.getChannelData(1)), taps: taps.length };
+  }, { b64, b64f, sr, rest: rests ? { x: rests.x, y: rests.y, z: rests.z } : null });
+  const dec = (s) => { const b = Buffer.from(s, 'base64'); return new Float32Array(b.buffer, b.byteOffset, b.length / 4); };
+  L = dec(res.L); R = dec(res.R); echoes = res.taps;
+  let m = 0; for (let i = 0; i < L.length; i++) m = Math.max(m, Math.abs(L[i]), Math.abs(R[i]));
+  for (let i = 0; i < L.length; i++) { L[i] *= 0.89 / m; R[i] *= 0.89 / m; }
+  console.log(`  placed at the gun (HRTF), with ${echoes} echo paths from the level`);
+}
+await browser.close();
+// a 16-bit stereo WAV
+const n = L.length, wavBuf = Buffer.alloc(44 + n * 4);
+wavBuf.write('RIFF', 0); wavBuf.writeUInt32LE(36 + n * 4, 4); wavBuf.write('WAVE', 8); wavBuf.write('fmt ', 12);
+wavBuf.writeUInt32LE(16, 16); wavBuf.writeUInt16LE(1, 20); wavBuf.writeUInt16LE(2, 22); wavBuf.writeUInt32LE(sr, 24); wavBuf.writeUInt32LE(sr * 4, 28); wavBuf.writeUInt16LE(4, 32); wavBuf.writeUInt16LE(16, 34);
+wavBuf.write('data', 36); wavBuf.writeUInt32LE(n * 4, 40);
+const s16 = (v) => Math.round(Math.max(-1, Math.min(1, v)) * 32767);
+for (let i = 0; i < n; i++) { wavBuf.writeInt16LE(s16(L[i]), 44 + i * 4); wavBuf.writeInt16LE(s16(R[i]), 46 + i * 4); }
 const tmp = mkdtempSync(join(tmpdir(), 'ga-'));
 const wav = join(tmp, 'a.wav');
-writeFileSync(wav, Buffer.from(encodeWav(mix, sr)));
+writeFileSync(wav, wavBuf);
 await new Promise((res, rej) => spawn('ffmpeg', ['-y', '-loglevel', 'error', '-i', videoPath, '-i', wav, '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-t', String(total), out], { stdio: 'inherit' })
   .on('close', (c) => (c === 0 ? res() : rej(new Error('ffmpeg ' + c)))));
 rmSync(tmp, { recursive: true, force: true });
-// Up to normal media loudness, for speakers (--raw: leave it at the synth's own peak-normalised level).
+// Up to normal media loudness, for speakers (--raw: leave it at its own peak-normalised level).
 if (!args.includes('--raw')) {
   const loud = out.replace(/(\.\w+)$/, '.loud$1');
   const g = speakerMaster(out, loud);
   renameSync(loud, out);
-  console.log(`speaker master: +${g} dB to -16 LUFS`);
+  console.log(`speaker master: +${g} dB`);
 }
 console.log('wrote', out);

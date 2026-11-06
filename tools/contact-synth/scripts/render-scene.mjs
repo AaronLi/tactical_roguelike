@@ -1,17 +1,19 @@
 // Render a scene's tracks as WAV stems plus the full mix and a cue sheet.
-// Usage: npm run build && node scripts/render-scene.mjs <scene-id> <out-dir> [seed]
+// Usage: npm run build && node scripts/render-scene.mjs <scene-id> <out-dir> [seed] [--dry]
+//   --dry: no room reverb (for a game that adds its own acoustics in real time)
 import { SCENES, renderScene, encodeWav } from '../dist/index.js';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const [id, outDir = `out/${id}`, seedArg = '1'] = process.argv.slice(2);
+const argv = process.argv.slice(2), dry = argv.includes('--dry');
+const [id, outDir = `out/${id}`, seedArg = '1'] = argv.filter((a) => a !== '--dry');
 const scene = SCENES.find((s) => s.id === id);
 if (!scene) {
   console.error(`Unknown scene "${id}". Available: ${SCENES.map((s) => s.id).join(', ')}`);
   process.exit(1);
 }
 mkdirSync(outDir, { recursive: true });
-const r = renderScene(scene, 48000, Number(seedArg));
+const r = renderScene(scene, 48000, Number(seedArg), { dry });
 const cues = [];
 r.tracks.forEach((t, i) => {
   const file = `${String(i + 1).padStart(2, '0')}-${t.name}.wav`;
