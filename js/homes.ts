@@ -31,7 +31,7 @@ interface HomeHung { name: string; x: number; z: number; q: number; v: number; s
 //   be. What doesn't fit is swapped for what's next on its list, or left out. A room that isn't there (a bathroom) is cut
 //   from a corner of one that is. The rest of the home is painted and floored to match, its furniture left in it.
 //   rm.dress holds what's left to draw: the wall, ceiling, trim and floor colours and what hangs on the walls. Walls:
-//   js/lightgrid.ts (from paint()); ceilings: js/level.ts buildMesh; floor, trim, hung things: js/furniture.ts dressRoom.
+//   js/lightgrid.ts (from paint()); ceilings: js/level.ts buildMesh; floor, trim, hung things: js/furnspec.ts describe (dressRoom).
 // All of it's on its own random streams and comes after everything else, so a home that gets a resident changes nothing
 // outside itself.
 //
@@ -40,7 +40,7 @@ interface HomeHung { name: string; x: number; z: number; q: number; v: number; s
 //   rate: the chance, each eligible home, of it being theirs (at most once a level)
 //   rest: { wall, ceil, trim, floor }: any room of the home they've no list for: painted and floored, its furniture left
 //   rooms: by room type: { wall, ceil, trim (hex strings), paper (the walls striped, as wallpaper),
-//     floor: { kind (a texture of js/furniture.ts textures), color, grout (its second colour), sound (what it sounds like,
+//     floor: { kind (a texture of js/furnspec.ts painters), color, grout (its second colour), sound (what it sounds like,
 //       js/casings.ts surface, if not its kind) }, spare, carve, tight, items }
 //     spare: the home needn't have a room of this type: one it can spare becomes it (no walls move)
 //     carve: { from: the room types to take it out of, first that'll do; size: [short, long], in cells }: a small room that
