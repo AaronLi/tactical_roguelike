@@ -195,6 +195,23 @@ const G_GunRecipes = (() => {
       k.pip = { f: f - 0.0765, y: sy, r: 0.0125 };
       return { sy, fSight: f - 0.075, relief: 0.06 };
     },
+    // a digital thermal riflescope: a squarish housing on a QD mount, a germanium objective in a short shade at the front, a
+    // rubber eyecup over the eyepiece's screen at the back, buttons along the top and a battery cap on the side
+    thermal(k: Kit, f: number, top: number) {
+      const sy = top + 0.034, hl = 0.15, f0 = f - hl / 2, hw = 0.05, hh = 0.048;
+      k.box(0.032, 0.012, 0.06, M.black(), f - 0.03, top + 0.006);
+      k.box(0.026, sy - hh / 2 - top - 0.004, 0.05, M.black(), f - 0.025, (sy - hh / 2 + top + 0.012) / 2);
+      k.box(hw, hh, hl, M.polymer(), f0, sy);
+      k.box(hw + 0.004, 0.006, hl * 0.6, M.black(), f0 + hl * 0.2, sy + hh / 2 + 0.003);
+      for (let i = 0; i < 3; i++) k.box(0.009, 0.004, 0.012, M.rubber(), f0 + 0.04 + i * 0.022, sy + hh / 2 + 0.008);
+      k.cylX(0.012, 0.016, M.black(), f0 + 0.05, sy, hw / 2 + 0.008);
+      k.cyl(0.028, 0.03, M.black(), f0 + hl, sy, 0, 0.029, 24, true);
+      k.cyl(0.024, 0.002, M.germanium(), f0 + hl + 0.018, sy);
+      k.cyl(0.019, 0.03, M.rubber(), f0 - 0.03, sy, 0, 0.017, 20, true);
+      k.cyl(0.014, 0.001, M.lens(), f0 - 0.0302, sy);
+      k.pip = { f: f0 - 0.0305, y: sy, r: 0.014 };
+      return { sy, fSight: f0 - 0.03, relief: 0.06 };
+    },
     scope(k: Kit, f: number, top: number, len = 0.33, obj = 0.025, h = 0.04, calc = false) {
       const sy = top + h;
       for (const rf of [f - len * 0.22, f + len * 0.18]) { k.box(0.026, sy - top, 0.014, M.black(), rf - 0.007, top + (sy - top) / 2); k.ringZ(0.0135, 0.004, M.black(), rf, sy); }
@@ -932,6 +949,7 @@ const G_GunRecipes = (() => {
       case 'minidot': return S.minidot(k, ofs, top, o);
       case 'holo': return S.holo(k, ofs, top);
       case 'acog': return S.acog(k, ofs, top);
+      case 'thermal': return S.thermal(k, ofs, top);
       case 'prism': return S.prism(k, ofs, top, o);
       case 'lpvo': return S.scope(k, ofs, top, 0.24, 0.022, 0.038);
       case 'scope': return S.scope(k, ofs, top, o.scopeLen, o.scopeObj, undefined, !!o.calc);

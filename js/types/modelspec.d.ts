@@ -6,7 +6,7 @@ type ArchKind = 'rifle' | 'pistol' | 'revolver' | 'derringer' | 'minigun' | 'lau
 /** A long gun's receiver style (rifle()'s o.rcv). */
 type RcvKind = 'ar' | 'ak' | 'aksu' | 'aug' | 'box' | 'break' | 'bullpup' | 'f2' | 'g36' | 'gm6' | 'mcx' | 'mpx' | 'qbz192' | 'qbz95' | 'round' | 'scar' | 'vector' | 'authored';
 /** A sight: the optics, and the iron sights a gun carries. */
-type OpticKind = 'irons' | 'notch' | 'bead' | 'none' | 'night' | 'riser' | 'reddot' | 'minidot' | 'holo' | 'acog' | 'prism' | 'lpvo' | 'scope' | 'augscope' | 'qbzirons' | 'authored';
+type OpticKind = 'irons' | 'notch' | 'bead' | 'none' | 'night' | 'riser' | 'reddot' | 'minidot' | 'holo' | 'acog' | 'prism' | 'lpvo' | 'scope' | 'augscope' | 'qbzirons' | 'authored' | 'thermal';
 /** An iron sight's pattern (S.irons). */
 type IronsKind = 'ar' | 'ak' | 'hk' | 'buckhorn';
 /** A reflex sight's reticle (reticleTex). */

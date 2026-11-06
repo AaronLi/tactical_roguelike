@@ -204,6 +204,7 @@ A mesh `display_ammo` (extras `{ slot, display: { width: 128, height: 32 } }`, *
 | `glass` | Dark glass. |  |
 | `tubeDS` | Double-sided black (a tube you see inside). |  |
 | `lens` | Blue-coated lens. |  |
+| `germanium` | A thermal sight's germanium objective: dark grey, a purple sheen. |  |
 | `reflexLens` | Reflex sight glass. |  |
 | `clearLens` | Clear lens. |  |
 | `dot` | Red emissive dot. |  |
