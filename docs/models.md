@@ -121,7 +121,7 @@ A mesh `display_ammo` (extras `{ slot, display: { width: 128, height: 32 } }`, *
 | `part_slide` | A pistol slide: cycles with each shot. | `info.slide` (present exactly when the part is) |
 | `part_bolt` | An exposed bolt / carrier. |  |
 | `part_ch` | A charging handle. |  |
-| `part_catch` | The bolt catch (an AR's paddle on the left of the lower, behind the magazine well). Its origin is its pivot pin; it turns about x (0.14 rad, the upper arm tipping back) while the bolt is held open on an empty magazine, and the reload from empty presses it back down before the bolt runs home (js/vmanim.ts `release`, the third-person rig in js/rig.ts). A rifle without one has the hand go over the well as before. |  |
+| `part_catch` | The bolt catch (an AR's paddle on the left of the lower, behind the magazine well): its origin is its pivot pin, and it turns about x (up to 0.14 rad, the upper arm tipping back) when the bolt is held open on an empty magazine; the hand presses it to send the bolt home (js/vmanim.ts). |  |
 | `part_handle` | A cocking handle that reciprocates or is worked by the hand. | `info.handle` (present exactly when the part is) |
 | `part_pump` | A pump-action forend. |  |
 | `part_lever` | A lever-action lever. |  |
