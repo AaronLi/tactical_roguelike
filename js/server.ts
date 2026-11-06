@@ -465,8 +465,9 @@ const G_Server = {
   // The level's weapon case: a weapon in its standard build, fully loaded, picked by rarity. Each tier has a
   // share (CASE_RARITY), split evenly between that tier's weapons so a tier with many weapons isn't more
   // likely; deeper levels shift the odds toward rarer tiers, and legendaries only turn up from level 3.
-  // Three in four are long guns. (Tier 0, the starter pistol, turns up too: less often the deeper you go.)
-  CASE_RARITY: { 0: 15, 1: 60, 2: 28, 3: 10, 4: 2 } as Record<string, number>,
+  // Nine in ten are long guns, and mostly ones worth building on from the start (the second tier the likeliest at the first level,
+  // the first tier a quarter or so of them, and fading). (Tier 0, the starter pistol, turns up too, rarely.)
+  CASE_RARITY: { 0: 5, 1: 25, 2: 45, 3: 15, 4: 3 } as Record<string, number>,
   caseOdds(level: number, slot: string) {
     const byTier: Record<string, any[]> = {};
     for (const w of G.WEAPON_LIST) if (w.slot === slot && G.obtainable(w) && this.CASE_RARITY[w.tier] && !(w.tier === 4 && level < 3)) (byTier[w.tier] = byTier[w.tier] || []).push(w);
@@ -482,7 +483,7 @@ const G_Server = {
   rollCase(seed?: number, level?: number) {
     if (seed == null) seed = this.seed; if (level == null) level = this.level;
     const r = G.U.rng((seed ^ 0x5ca5e) >>> 0);
-    const odds = this.caseOdds(level, r() < 0.75 ? 'p' : 's');
+    const odds = this.caseOdds(level, r() < 0.9 ? 'p' : 's');
     let x = r() * odds.reduce((a: number, [, wt]: [any, number]) => a + wt, 0), w = odds[0][0];
     for (const [cand, wt] of odds) { x -= wt; if (x <= 0) { w = cand; break; } }
     // loaded, with two full spare magazines (or that many rounds; a full box, for a gun that only holds a round or two), all of one type: mostly ball, now and then
