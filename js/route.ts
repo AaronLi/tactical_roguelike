@@ -9,8 +9,9 @@ const G_Route = (() => {
   interface RNode { id: number; c: number; r: number; th: number; next: number[]; prev: number[]; boss: boolean; stronghold: boolean; night: boolean }
   interface RMap { seed: number; act: number; cols: RNode[][]; nodes: Map<number, RNode> }
   interface RState { path: number[]; opts: number[]; votes?: Record<string, number>; colors?: Record<string, number>; mine?: number }
-  const STRONGHOLD = 1 / 7; // the share of levels that are strongholds
-  const NIGHT = 0.23; // and of those that can be, the share that are night levels (the lights out: js/level.ts nightify): about one level in five, all told
+  const STRONGHOLD = 1 / 12; // the share of the levels that can be (past FROM) that are strongholds
+  const NIGHT = 0.12; // and of those that can be, the share that are night levels (the lights out: js/level.ts nightify): about one in ten
+  const FROM = 4; // neither before this level: the first three are always ordinary ones
   // what clearing a stronghold pays on top of the usual (credits)
   const strongholdPay = (level: number) => 300 + 60 * level;
   const colOf = (level: number) => (level - 1) % COLS;
@@ -65,16 +66,17 @@ const G_Route = (() => {
       for (let k = 0; k < nT && avoid.has(pool[k0]); k++) k0 = (k0 + 1) % nT;
       n.th = n === start && act === 1 && starter >= 0 ? starter : pool[k0]; // the first act starts at the convenience store
     }
-    // strongholds: about one level in seven is a suspects' stronghold (no civilians, a bigger crowd of suspects, better pay).
-    // Never the first level, the convenience store or a boss. Drawn from a generator of its own, so the map's shape and
+    // strongholds: about one level in twelve from level FROM is a suspects' stronghold (no civilians, a bigger crowd of suspects,
+    // better pay). Never before it, the convenience store or a boss. Drawn from a generator of its own, so the map's shape and
     // environments are as they'd be without them.
     const rs = G.U.rng(seed ^ (act * 0x2545f491) ^ 0x57c0);
-    for (const n of order) if (rs() < STRONGHOLD && !n.boss && !(act === 1 && n.c === 0) && !G.THEMES[n.th].starter) n.stronghold = true;
-    // night levels: about one in five, never the first act's way in (the corner store),
+    const lvlOf = (n: RNode) => (act - 1) * COLS + n.c + 1;
+    for (const n of order) if (rs() < STRONGHOLD && !n.boss && lvlOf(n) >= FROM && !G.THEMES[n.th].starter) n.stronghold = true;
+    // night levels: about one in ten from level FROM (never before it, nor the corner store),
     // nor a place that's outdoors at night already (the festival: th.night) or a mountain top at sundown (the Crest). From
     // a generator of their own too, so nothing else on the map changes.
     const rn = G.U.rng(seed ^ (act * 0x6c8e9cf5) ^ 0x4e17);
-    for (const n of order) { const T = G.THEMES[n.th]; if (rn() < NIGHT && !(act === 1 && n.c === 0) && !T.starter && !T.night && !T.rock) n.night = true; }
+    for (const n of order) { const T = G.THEMES[n.th]; if (rn() < NIGHT && lvlOf(n) >= FROM && !T.starter && !T.night && !T.rock) n.night = true; }
     const cols = [];
     for (let c = 0; c < COLS; c++) cols.push(order.filter((n) => n.c === c));
     return { seed, act, cols, nodes };
