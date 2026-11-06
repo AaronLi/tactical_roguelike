@@ -33,7 +33,7 @@ interface Rig { // a character's skeleton and its meshes (what create makes, and
   hb: any[] | null; dbg: THREE.Mesh[] | null; rd: Ragdoll;
   // (set by create)
   setGun(code: any, skin?: any): void; update(dt: number, p: any): void; hitboxes(): any[]; recoil(deg?: number): void; hit(dir: any, mv?: number): void; dropGun(): void; goLimp(): void;
-  die(dir: any): void; throwNade(str?: number): void; setKit(k: any): void; setCallsign(id: string, name: string): void; holster(on: boolean): void; zip(on: boolean, instant?: boolean): void;
+  die(dir: any): void; throwNade(str?: number): void; setKit(k: any): void; setCallsign(id: string, name: string): void; holster(on: boolean, anim?: boolean): void; swap?: { on: boolean; t: number; Rs: THREE.Matrix4 } | null; slingWant?: boolean | null; zip(on: boolean, instant?: boolean): void;
   secure(t: number): void; settle(sec?: number): void; startle(): void; dispose(): void;
   // (what the animation keeps from frame to frame)
   powered?: boolean; limp?: boolean; zipped?: boolean; zipKit?: THREE.Object3D; zipT?: number; zipYaw?: number | null; zipSw?: ZipSwing; proneW?: number; proneS?: number; effPh?: number; effT?: number; braceW?: number; gunAimW?: number; gunKick?: number;
@@ -451,7 +451,7 @@ const G_Rig = (() => {
       const g = rig.gun;
       g.getWorldPosition(_a); g.getWorldQuaternion(_q);
       if (g.parent) g.parent.remove(g);
-      rig.slung = false;
+      rig.slung = false; rig.swap = null; rig.slingWant = null; // (dropped: no longer anyone's to sling)
       if (rig.dropped && rig.dropped.g.parent) rig.dropped.g.parent.remove(rig.dropped.g);
       root.parent && root.parent.add(g);
       g.position.copy(_a); g.quaternion.copy(_q); g.scale.setScalar(s);
@@ -486,8 +486,16 @@ const G_Rig = (() => {
     setKit(rig, null); // (the back patch, before any kit)
     setSeat(rig);
     // put the weapon away (true) or bring it to the hands (false)
-    rig.holster = (on: boolean) => {
-      if (!rig.gun || rig.slung === on) return;
+    // anim: the hand carries it there (slingSwap) rather than it jumping; and it isn't taken back up while the ATAK's still out
+    // (the phone's folded away first: rig.slingWant waits for it)
+    rig.holster = (on: boolean, anim?: boolean) => {
+      if (!anim) { rig.slingWant = null; if (rig.swap) endSwap(rig); }
+      if (!rig.gun) return;
+      if (rig.swap) { if (rig.swap.on !== on) rig.slingWant = on; return; } // (one move at a time: the other after it)
+      if (rig.slung === on) { rig.slingWant = null; return; }
+      if (anim && !on && (rig.atakW || 0) > 0.02) { rig.slingWant = on; return; }
+      rig.slingWant = null;
+      if (anim && rig.state === 'alive') { startSwap(rig, on); return; }
       rig.slung = on;
       if (rig.gunBaseOf === rig.gun) gunHome(rig); // (off the hand it was following)
       (on ? (rig.gunInfo && rig.gunInfo.pistol ? rig.hipMount : rig.slingMount) : rig.gunMount).add(rig.gun);
@@ -539,7 +547,7 @@ const G_Rig = (() => {
     if (rig.gunKey === key) return;
     if (rig.gun && rig.gun.parent) rig.gun.parent.remove(rig.gun);
     if (rig.gun) rig.gun.traverse((o: any) => { if (o.userData.sticker) o.geometry.dispose(); }); // (its stickers' own: the model's shared)
-    rig.slung = false;
+    rig.slung = false; rig.swap = null; rig.slingWant = null; // (a new gun starts in the hands: whatever the old one was doing is over)
     rig.gunKey = key;
     const def = code ? G.Gunsmith.fromCode(code) : null;
     if (!def) { rig.gun = null; rig.gunInfo = null; return; }
@@ -870,8 +878,15 @@ const G_Rig = (() => {
     }
     // looking at the ATAK (a menu is open: p.atak): the left hand pulls the phone down off its chest mount (it folds out on
     // its hinge until the screen faces up at the face); both hands hold its ends, a thumb working the screen; the head tips
-    // down to it. The weapon is already slung (the caller holsters it). Eased in and out; the fold follows the left hand.
-    rig.atakW = (rig.atakW || 0) + ((p.atak && !posed && !p.act && p.state === 'alive' ? 1 : 0) - (rig.atakW || 0)) * Math.min(1, dt * 5);
+    // down to it. The weapon's slung by hand first (the caller holsters it: slingSwap) and taken back up once it's folded away.
+    // Eased in and out; the fold follows the left hand.
+    // the weapon going to or from the sling by hand (rig.holster(on, true): slingSwap); one asked for while the ATAK's out waits for it
+    // to be folded away
+    if (rig.swap) swapStep(rig, dt);
+    else if (rig.slingWant != null && (rig.slingWant || (rig.atakW || 0) <= 0.02)) rig.holster(rig.slingWant, true);
+    // (the phone comes out once the hands are free: the weapon slung first, if there is one)
+    const atakOk = !rig.swap && (!rig.gun || rig.slung);
+    rig.atakW = (rig.atakW || 0) + ((p.atak && atakOk && !posed && !p.act && p.state === 'alive' ? 1 : 0) - (rig.atakW || 0)) * Math.min(1, dt * 5);
     if (rig.atakW > 0.01) {
       if (!rig.atak) rig.atak = makeAtak(rig);
       const k = U.smooth(0, 1, rig.atakW), hg = rig.atak, ph = hg.userData.phone as THREE.Object3D, H = hg.userData.H as number, W = hg.userData.W as number;
@@ -990,6 +1005,51 @@ const G_Rig = (() => {
   // the gun back in its own place on the mount (where the animation's hands go for it); powerStep then moves it
   // with the simulated hand. Done first thing each frame, or the arms would chase where the hand took it last
   // frame (and the hand, the gun: round and round).
+  // Slinging or unslinging the weapon by hand (rig.holster(on, true)): the right hand takes it from where it is to where it goes
+  // (reaching back for it first, unslinging), over SWAP_T seconds, lifted a little on the way (a long gun swung up over the shoulder to the back, a pistol down to the hip),
+  // the arm following its grip. While it moves it's parented where it rests when slung (so nothing else poses it), and it's
+  // only put in the hands at the end. rig.swap: { on: slinging, t, Rs: its start pose in the chest's frame, base: its resting pose }.
+  const SWAP_T = 0.55;
+  function startSwap(rig: Rig, on: boolean) {
+    const g = rig.gun!; rig.chest.updateMatrixWorld(true);
+    if (rig.gunBaseOf === g) gunHome(rig); else { rig.gunBaseOf = g; rig.gunBase = { p: g.position.clone(), q: g.quaternion.clone(), s: g.scale.clone() }; }
+    g.updateMatrixWorld(true);
+    const Rs = new T.Matrix4().copy(rig.chest.matrixWorld).invert().multiply(g.matrixWorld);
+    const sl = rig.gunInfo && rig.gunInfo.pistol ? rig.hipMount : rig.slingMount;
+    rig.slung = true; sl.add(g); // (in transit: posed here by swapStep, nothing else)
+    rig.swap = { on, t: 0, Rs };
+  }
+  function endSwap(rig: Rig) {
+    const sw = rig.swap!, g = rig.gun; rig.swap = null;
+    if (!g) return;
+    g.position.copy(rig.gunBase!.p); g.quaternion.copy(rig.gunBase!.q); g.scale.copy(rig.gunBase!.s);
+    if (!sw.on) { rig.slung = false; rig.gunMount.add(g); }
+  }
+  function swapStep(rig: Rig, dt: number) {
+    const sw = rig.swap!, g = rig.gun!, gi = rig.gunInfo;
+    sw.t += dt;
+    // (unslinging, the hand reaches back to it first, REACH of the time, then brings it round; slinging, it's in the hand already)
+    const f = Math.min(1, sw.t / SWAP_T), REACH = 0.3, u = G.U.smooth(0, 1, sw.on ? f : Math.max(0, (f - REACH) / (1 - REACH)));
+    rig.chest.updateMatrixWorld(true);
+    const B = new T.Matrix4().compose(rig.gunBase!.p, rig.gunBase!.q, rig.gunBase!.s);
+    const sl = g.parent!, hand = new T.Matrix4().multiplyMatrices(rig.gunMount.matrixWorld, B), rest = new T.Matrix4().multiplyMatrices(sl.matrixWorld, B);
+    // slinging: from where it was in the hands (in the chest's frame, so it moves with them) to its place on the sling; unslinging: back
+    const A = sw.on ? new T.Matrix4().multiplyMatrices(rig.chest.matrixWorld, sw.Rs) : rest, to = sw.on ? rest : hand;
+    const p0 = new T.Vector3(), q0 = new T.Quaternion(), s0 = new T.Vector3(), p1 = new T.Vector3(), q1 = new T.Quaternion(), s1 = new T.Vector3();
+    A.decompose(p0, q0, s0); to.decompose(p1, q1, s1);
+    const up = new T.Vector3(0, 1, 0).transformDirection(rig.chest.matrixWorld), out = new T.Vector3(0, 0, -1).transformDirection(rig.chest.matrixWorld);
+    const pos = p0.lerp(p1, u).addScaledVector(up, Math.sin(Math.PI * u) * (gi && gi.pistol ? 0.05 : 0.16) * rig.scale).addScaledVector(out, Math.sin(Math.PI * u) * 0.08 * rig.scale);
+    const W = new T.Matrix4().compose(pos, q0.slerp(q1, u), s0.lerp(s1, u));
+    const L = new T.Matrix4().copy(sl.matrixWorld).invert().multiply(W);
+    L.decompose(g.position, g.quaternion, g.scale); g.updateMatrixWorld(true);
+    // the right hand on its grip all the way (letting go over the last bit when it's slung)
+    if (gi && gi.grip) {
+      const grip = g.localToWorld(new T.Vector3(gi.grip[2], gi.grip[1], -gi.grip[0])), arm = rig.armR;
+      const w = sw.on ? 1 - G.U.smooth(0.8, 1, f) : G.U.smooth(0, REACH, f), cur = arm.lo.localToWorld(new T.Vector3(0, -FARM, 0));
+      ik(arm.up, arm.lo, UARM * rig.scale, FARM * rig.scale, cur.lerp(grip, w), rig.chest.localToWorld(new T.Vector3(0.7, -0.3, 0.1)));
+    }
+    if (sw.t >= SWAP_T) endSwap(rig);
+  }
   function gunHome(rig: Rig) {
     const g = rig.gun;
     if (!g) return;
