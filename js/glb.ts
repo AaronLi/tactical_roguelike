@@ -1314,12 +1314,38 @@ interface BakedIndex { version: number; three: string; src: string; guns: Record
 
   // three's own GLTFLoader and meshopt decoder, from the same three as the global THREE (js/threeboot.ts: a global ThreeAddons, on the page and in the
   // highlights' export worker alike)
+  /**
+   * Undoes the bake's position quantisation as a file loads (tools/model_emit.mjs quantizePositions): a mesh node with extras.dq = [ox, oy, oz, s] holds int16
+   * positions in its own box, p = o + s * q, the node's transform carrying translate(o) scale(s). The positions come back as float32 in the node's frame and the node
+   * gets its own transform again (scale / s, the translation less the rotated, scaled o), so everything after the loader sees what an uncompressed file gave: no
+   * scaled mesh nodes, no integer positions. (Within half a step of the recipe: s / 65534, 3.8 um for a 0.5 m mesh.) Returns the scene.
+   */
+  function dequantize(scene: any): any {
+    const done = new Set<any>(), v = new THREE.Vector3(), snap = (x: number) => Math.round(x * 1e12) / 1e12;
+    scene.traverse((o: any) => {
+      const dq = o.userData && o.userData.dq; if (!dq) return;
+      delete o.userData.dq;
+      const [ox, oy, oz, s] = dq as number[];
+      // (a mesh of several primitives loads as a group of meshes, the node's extras on the group)
+      for (const g of (o.isMesh ? [o] : o.children.filter((c: any) => c.isMesh)).map((m: any) => m.geometry)) {
+        if (done.has(g)) continue;
+        done.add(g);
+        const a = g.attributes.position, n = a.count, f = new Float32Array(n * 3);
+        for (let i = 0; i < n; i++) { f[i * 3] = ox + s * a.getX(i); f[i * 3 + 1] = oy + s * a.getY(i); f[i * 3 + 2] = oz + s * a.getZ(i); }
+        g.setAttribute('position', new THREE.BufferAttribute(f, 3)); g.boundingBox = null; g.boundingSphere = null; g.computeBoundingBox(); g.computeBoundingSphere();
+      }
+      o.scale.set(snap(o.scale.x / s), snap(o.scale.y / s), snap(o.scale.z / s));
+      v.set(ox * o.scale.x, oy * o.scale.y, oz * o.scale.z).applyQuaternion(o.quaternion);
+      o.position.set(snap(o.position.x - v.x), snap(o.position.y - v.y), snap(o.position.z - v.z));
+    });
+    return scene;
+  }
   const GL = (globalThis as any).ThreeAddons;
   if (GL && !G.GLB) {
     const loader = new GL.GLTFLoader().setMeshoptDecoder(GL.MeshoptDecoder), cache = new Map<string, Promise<any>>();
     G.GLB = {
       ready: Promise.resolve(GL.MeshoptDecoder.ready).then(() => true, () => false),
-      load: (url: string) => { const hit = cache.get(url); if (hit) return hit; const p: Promise<any> = (G.Bundles.bundleOf(url) ? G.Bundles.getFile(url).then((b) => loader.parseAsync(b, '')) : loader.loadAsync(R.base + url)).then((g: any) => g.scene, (e: any) => { cache.delete(url); throw e; }); cache.set(url, p); return p; },
+      load: (url: string) => { const hit = cache.get(url); if (hit) return hit; const p: Promise<any> = (G.Bundles.bundleOf(url) ? G.Bundles.getFile(url).then((b) => loader.parseAsync(b, '')) : loader.loadAsync(R.base + url)).then((g: any) => dequantize(g.scene), (e: any) => { cache.delete(url); throw e; }); cache.set(url, p); return p; },
     };
   }
   /** Where the page's folder is from here (the export worker's scripts are two folders down: js/exportworker.ts sets '../../'). */
@@ -1349,7 +1375,7 @@ interface BakedIndex { version: number; three: string; src: string; guns: Record
     return plan.tags.every((t) => !t.entry || packRoots.has(packUrl(def.id, t.entry.file!)));
   }
   return {
-    boot, ready, infoFromIndex, setRoot, loadFile, fetchJson, on, checking, preload, preloadPlatform, ensure, assemble, infoOf, loadIndex: async (id: string) => !!(await platformIndex(id)), displayBaked, contract: GUN_MODEL_CONTRACT, infoFields: INFO_FIELDS, partsIndexFields: PARTS_INDEX_FIELDS, validate, validateAuthored, validateAuthoredConfig, validateAuthoredVariant, validateAuthoredPart, validateAuthoredPartConfig, authoredPartSlots: AUTHORED_PART_SLOTS, validatePack, validatePartsIndex, describeGltfJson, describeScene, glbJson,
+    boot, ready, infoFromIndex, setRoot, loadFile, dequantize, fetchJson, on, checking, preload, preloadPlatform, ensure, assemble, infoOf, loadIndex: async (id: string) => !!(await platformIndex(id)), displayBaked, contract: GUN_MODEL_CONTRACT, infoFields: INFO_FIELDS, partsIndexFields: PARTS_INDEX_FIELDS, validate, validateAuthored, validateAuthoredConfig, validateAuthoredVariant, validateAuthoredPart, validateAuthoredPartConfig, authoredPartSlots: AUTHORED_PART_SLOTS, validatePack, validatePartsIndex, describeGltfJson, describeScene, glbJson,
     infoSchema, partsIndexSchema, contractMarkdown, loaded: (id: string) => loaded.has(id), platformLoaded: (id: string) => platIx.has(id), SLOTS, PARTS, NAMES,
     // the pure side of the packs (no three.js): the baker and the tests check the packs with the same code the game plans with
     planBuild, pickPack, infoLeaves, infoFromLeaves, buildKeyOf, slotKey, PARTS_INDEX_VERSION,
