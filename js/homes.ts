@@ -1,21 +1,8 @@
 'use strict';
-// The builder kit js/furniture.ts hands to a piece's build() (the same as its Kit), a piece's style, and a floor spec.
-type HomeMat = THREE.MeshStandardMaterial;
-interface HomeKit {
-  rnd(): number; pick<T>(a: T[]): T; tint(hex: number, f: number): number;
-  mat(hex: number, rough?: number, metal?: number, extra?: Record<string, any>): HomeMat;
-  box(m: HomeMat, w: number, h: number, d: number, x: number, y: number, z: number, ry?: number, rx?: number): void;
-  cyl(m: HomeMat, rt: number, rb: number, h: number, x: number, y: number, z: number, seg?: number, rx?: number): void;
-  cylX(m: HomeMat, rt: number, rb: number, h: number, x: number, y: number, z: number, seg?: number): void;
-  sph(m: HomeMat, r: number, x: number, y: number, z: number): void;
-  ico(m: HomeMat, r: number, x: number, y: number, z: number): void;
-  side(m: HomeMat, pts: number[][], w: number, x?: number, b?: number): void;
-  leaf(): HomeMat; screen(): HomeMat; shade(): HomeMat; crate(): HomeMat;
-  pack(kind: string, shade?: number): HomeMat; label(): number;
-  boxL(m: HomeMat, lb: number, w: number, h: number, d: number, x: number, y: number, z: number, ry?: number, rx?: number): void;
-  cylL(m: HomeMat, lb: number, rt: number, rb: number, h: number, x: number, y: number, z: number, seg?: number): void;
-  tableLamp(x: number, y: number, z: number): void; plantSmall(x: number, y: number, z: number): void; fruit(x: number, y: number, z: number): void;
-}
+// The kit js/furniture.ts hands to a piece's build() (js/furnspec.ts FdKit: it records what the piece is made of), its
+// materials, a piece's style, and a floor spec.
+type HomeMat = FdMat;
+type HomeKit = FdKit;
 type HomeStyle = Record<string, any>; // (a piece's style: whatever its build reads)
 interface HomeFloor { kind: string; color: string; grout?: string; sound?: string }
 // A resident's data: see the notes below.

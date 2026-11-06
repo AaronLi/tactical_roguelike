@@ -2,30 +2,18 @@
 // Furnishing. Every room gets a purpose (living room, kitchen, bedroom, ...) and furniture to suit.
 //   plan()  - deterministic layout from the level seed: which tile holds what, and its collision boxes.
 //             Runs on every peer (host and clients) as part of G.Level.generate.
-//   build() - the meshes: furniture, room floors, rugs, wall art, windows, baseboards. Merged per material.
+//   R       - the pieces: each one's footprint, solids (solids(): what stops people, rounds and eyes) and its build(),
+//             what it's made of, handed a kit that records it (js/furnspec.ts: a piece's description, as data; the meshes
+//             are js/furnmesh.ts's, on the page: room floors, rugs, wall art and baseboards with them).
 // Furniture tiles: 2 = furniture you can take cover behind (sofa, counter, dresser, crates), 4 = other
 // furniture (beds, tables, shelves, wardrobes). Small things in corners (plants, lamps) leave the tile as
 // floor (0) but still carry a collision box. map.props: tile index -> { name, q, x, z, v, boxes }.
 const G_Furniture = (() => {
   // Local frame of a piece: footprint centred on the origin, back at -z (against the wall), front +z.
   // boxes: [x, z, w, d, h] in that frame (all from the floor up).
-  // The builder kit handed to every piece's build(): box/cyl/mat/pick/rnd/... (made in build() below).
-  type Mat = THREE.MeshStandardMaterial;
-  interface Kit {
-    rnd(): number; pick<T>(a: T[]): T; tint(hex: number, f: number): number;
-    mat(hex: number, rough?: number, metal?: number, extra?: Record<string, any>): Mat;
-    box(m: Mat, w: number, h: number, d: number, x: number, y: number, z: number, ry?: number, rx?: number): void;
-    cyl(m: Mat, rt: number, rb: number, h: number, x: number, y: number, z: number, seg?: number, rx?: number): void;
-    cylX(m: Mat, rt: number, rb: number, h: number, x: number, y: number, z: number, seg?: number): void;
-    sph(m: Mat, r: number, x: number, y: number, z: number): void;
-    ico(m: Mat, r: number, x: number, y: number, z: number, ry?: number): void;
-    side(m: Mat, pts: number[][], w: number, x?: number, b?: number): void;
-    leaf(): Mat; screen(): Mat; shade(): Mat; crate(): Mat;
-    pack(kind: string, shade?: number): Mat; label(): number;
-    boxL(m: Mat, lb: number, w: number, h: number, d: number, x: number, y: number, z: number, ry?: number, rx?: number): void;
-    cylL(m: Mat, lb: number, rt: number, rb: number, h: number, x: number, y: number, z: number, seg?: number): void;
-    tableLamp(x: number, y: number, z: number): void; plantSmall(x: number, y: number, z: number): void; fruit(x: number, y: number, z: number): void;
-  }
+  // The kit handed to every piece's build(): box/cyl/mat/pick/rnd/... It records what the piece is made of (js/furnspec.ts:
+  // a piece's description is data, drawn by js/furnmesh.ts on the page; docs/furniture-data.md).
+  type Kit = FdKit;
   type MatArgs = [number, number, number, Record<string, any>];
   // A room as the level lays it out (x, z, w, h in tiles) plus whatever else the layout hangs on it.
   interface Room { x: number; z: number; w: number; h: number; type: RoomType; [key: string]: any }
@@ -46,7 +34,7 @@ const G_Furniture = (() => {
 
   // ---------------------------------------------------------------- living room
   R.sofa = { w: 2.0, d: 0.92, cover: 1, boxes: [[0, 0, 2.0, 0.92, 0.85]], build(k: Kit) {
-    const f = k.mat(k.pick(FABRIC), 0.95), f2 = k.mat(k.tint(f.color.getHex(), 1.12), 0.95), dark = k.mat(0x241c16, 0.6);
+    const f = k.mat(k.pick(FABRIC), 0.95), f2 = k.mat(k.tint(f.c, 1.12), 0.95), dark = k.mat(0x241c16, 0.6);
     for (const x of [-0.9, 0.9]) for (const z of [-0.38, 0.38]) k.box(dark, 0.06, 0.08, 0.06, x, 0.04, z);
     k.box(f, 2.0, 0.34, 0.92, 0, 0.25, 0);
     for (const x of [-0.41, 0.41]) k.box(f2, 0.8, 0.13, 0.66, x, 0.485, 0.11);
@@ -58,7 +46,7 @@ const G_Furniture = (() => {
     if (k.rnd() < 0.4) k.box(k.mat(k.pick(ACCENT), 1), 0.55, 0.025, 0.6, 0.45, 0.565, 0.12, 0.1);
   } };
   R.armchairs = { w: 1.9, d: 0.86, cover: 1, boxes: [[-0.55, 0, 0.8, 0.86, 0.85], [0.55, 0, 0.8, 0.86, 0.85], [0, 0, 0.3, 0.3, 0.56]], build(k: Kit) {
-    const f = k.mat(k.pick(FABRIC), 0.95), f2 = k.mat(k.tint(f.color.getHex(), 1.12), 0.95), dark = k.mat(0x241c16, 0.6);
+    const f = k.mat(k.pick(FABRIC), 0.95), f2 = k.mat(k.tint(f.c, 1.12), 0.95), dark = k.mat(0x241c16, 0.6);
     for (const cx of [-0.55, 0.55]) {
       for (const x of [-0.34, 0.34]) for (const z of [-0.36, 0.36]) k.box(dark, 0.05, 0.08, 0.05, cx + x, 0.04, z);
       k.box(f, 0.8, 0.34, 0.86, cx, 0.25, 0);
@@ -84,7 +72,7 @@ const G_Furniture = (() => {
     if (k.rnd() < 0.6) k.plantSmall(-0.62, 0.51, 0.04);
   } };
   R.bookshelf = { w: 1.5, d: 0.38, boxes: [[0, 0, 1.5, 0.38, 2.0]], build(k: Kit) {
-    const w = k.mat(k.pick(WOOD.concat([0xe9e4da, 0x2f3a40])), 0.65), back = k.mat(k.tint(w.color.getHex(), 0.7), 0.8);
+    const w = k.mat(k.pick(WOOD.concat([0xe9e4da, 0x2f3a40])), 0.65), back = k.mat(k.tint(w.c, 0.7), 0.8);
     for (const x of [-0.735, 0.735]) k.box(w, 0.03, 2.0, 0.38, x, 1.0, 0);
     k.box(w, 1.5, 0.03, 0.38, 0, 1.985, 0);
     k.box(w, 1.44, 0.08, 0.36, 0, 0.04, 0);
@@ -190,7 +178,7 @@ const G_Furniture = (() => {
     k.box(w, 1.6, 0.24, 1.88, 0, 0.2, 0.03);
     k.box(sheet, 1.5, 0.22, 1.84, 0, 0.43, 0.03);
     k.box(blanket, 1.56, 0.07, 1.25, 0, 0.555, 0.33);
-    k.box(k.mat(k.tint(blanket.color.getHex(), 1.25), 0.95), 1.56, 0.08, 0.16, 0, 0.56, -0.25);
+    k.box(k.mat(k.tint(blanket.c, 1.25), 0.95), 1.56, 0.08, 0.16, 0, 0.56, -0.25);
     for (const x of [-0.36, 0.36]) k.box(sheet, 0.6, 0.12, 0.36, x, 0.6, -0.7, (k.rnd() - 0.5) * 0.15);
     const hb = k.rnd() < 0.5 ? w : k.mat(k.pick(FABRIC), 0.95);
     k.box(hb, 1.64, 0.95, 0.07, 0, 0.6, -0.94);
@@ -198,7 +186,7 @@ const G_Furniture = (() => {
     if (k.rnd() < 0.5) k.box(k.mat(k.pick(ACCENT), 0.95), 0.4, 0.3, 0.1, 0, 0.66, -0.55, 0.1);
   } };
   R.dresser = { w: 1.3, d: 0.5, cover: 1, boxes: [[0, 0, 1.3, 0.5, 0.95]], build(k: Kit) {
-    const w = k.mat(k.pick(WOOD.concat([0xe9e4da])), 0.6), face = k.mat(k.tint(w.color.getHex(), 1.08), 0.55), knob = k.mat(0xb8a060, 0.3, 0.9);
+    const w = k.mat(k.pick(WOOD.concat([0xe9e4da])), 0.6), face = k.mat(k.tint(w.c, 1.08), 0.55), knob = k.mat(0xb8a060, 0.3, 0.9);
     k.box(k.mat(0x1a1410, 0.8), 1.26, 0.07, 0.44, 0, 0.035, 0);
     k.box(w, 1.3, 0.86, 0.48, 0, 0.5, 0);
     k.box(w, 1.34, 0.03, 0.52, 0, 0.945, 0);
@@ -213,7 +201,7 @@ const G_Furniture = (() => {
     if (k.rnd() < 0.6) for (let i = 0; i < 3; i++) k.box(k.mat(k.pick(BOOKS), 0.85), 0.2, 0.035, 0.27, 0.45, 0.98 + i * 0.036, 0, (k.rnd() - 0.5) * 0.3);
   } };
   R.wardrobe = { w: 1.6, d: 0.62, boxes: [[0, 0, 1.6, 0.62, 2.1]], build(k: Kit) {
-    const w = k.mat(k.pick(WOOD.concat([0xe9e4da, 0xcfc6b4])), 0.6), face = k.mat(k.tint(w.color.getHex(), 1.07), 0.55), metal = k.mat(0xb8bcc0, 0.3, 0.8);
+    const w = k.mat(k.pick(WOOD.concat([0xe9e4da, 0xcfc6b4])), 0.6), face = k.mat(k.tint(w.c, 1.07), 0.55), metal = k.mat(0xb8bcc0, 0.3, 0.8);
     k.box(k.mat(0x1a1410, 0.8), 1.56, 0.05, 0.56, 0, 0.025, 0);
     k.box(w, 1.6, 2.0, 0.6, 0, 1.05, 0);
     k.box(w, 1.64, 0.05, 0.64, 0, 2.075, 0);
@@ -246,7 +234,7 @@ const G_Furniture = (() => {
     for (const x of [-0.25, 0.25]) k.box(black, 0.04, 0.03, 0.26, x, 0.68, 0.3);
   } };
   R.files = { w: 1.0, d: 0.62, cover: 1, boxes: [[0, 0, 1.0, 0.62, 1.32]], build(k: Kit) {
-    const m = k.mat(k.pick([0x7d8389, 0x5b6770, 0xb9bbb6, 0x3a4044]), 0.45, 0.5), face = k.mat(k.tint(m.color.getHex(), 1.1), 0.4, 0.5), metal = k.mat(0xc8ccd0, 0.3, 0.8);
+    const m = k.mat(k.pick([0x7d8389, 0x5b6770, 0xb9bbb6, 0x3a4044]), 0.45, 0.5), face = k.mat(k.tint(m.c, 1.1), 0.4, 0.5), metal = k.mat(0xc8ccd0, 0.3, 0.8);
     for (const x of [-0.25, 0.25]) {
       k.box(m, 0.48, 1.3, 0.6, x, 0.65, 0);
       for (const y of [0.17, 0.48, 0.79, 1.1]) { k.box(face, 0.44, 0.29, 0.02, x, y, 0.305); k.box(metal, 0.14, 0.02, 0.025, x, y + 0.08, 0.32); k.box(k.mat(0xf2efe6, 0.9), 0.08, 0.03, 0.004, x, y + 0.03, 0.317); }
@@ -1015,7 +1003,7 @@ const G_Furniture = (() => {
   const boulderFit = (v: number) => { let f = fitted.get(v); if (!f) { if (fitted.size > 4096) fitted.clear(); fitted.set(v, (f = { boxes: boulderLumps(v).flatMap(lumpBoxes), hulls: boulderLumps(v).concat(boulderLichen(v)).map(lumpTris) })); } return f; };
   const boulderBoxes = (v: number) => boulderFit(v).boxes.map((q) => q.slice());
   R.boulder = { w: 1.9, d: 1.5, cover: 1, lumps: (v: number) => boulderLumps(v).concat(boulderLichen(v)), boxes: boulderBoxes, hulls: (v: number) => boulderFit(v).hulls, build(k: Kit, v: number) {
-    const g = k.mat(k.pick(GRANITE), 0.95, 0, { flatShading: true }), g2 = k.mat(k.tint(g.color.getHex(), 0.88), 0.95, 0, { flatShading: true });
+    const g = k.mat(k.pick(GRANITE), 0.95, 0, { flatShading: true }), g2 = k.mat(k.tint(g.c, 0.88), 0.95, 0, { flatShading: true });
     boulderLumps(v).forEach((l, i) => k.ico(i ? g2 : g, l.r, l.x, l.y, l.z, l.ry));
     const lichen = k.mat(k.pick([0x8a9a6a, 0xb4b080, 0x6a7a5a]), 1, 0, { flatShading: true });
     for (const l of boulderLichen(v)) k.ico(lichen, l.r, l.x, l.y, l.z, l.ry);
@@ -1240,21 +1228,31 @@ const G_Furniture = (() => {
   const HOME = ['living', 'kitchen', 'bedroom', 'dining', 'living', 'bedroom', 'office'];
   const WORK = ['storage', 'office', 'breakroom', 'storage'];
 
+  // A piece's solids, in its own frame (part of its description, js/furnspec.ts piece): boxes, what stops people (and rounds
+  // and eyes, unless there's more to say), [x, z, w, d, top, bottom = 0, what it's made of]; ray, what rounds and eyes meet
+  // of an open piece (shelving: its posts, shelves and stock), the same; hulls, a rock's own convex shapes (each a list of
+  // triangles, nine numbers to a face)
+  function solids(rec: PieceRec, v: number): FdSolids {
+    const out: FdSolids = { boxes: typeof rec.boxes === 'function' ? rec.boxes(v) : rec.boxes };
+    if (rec.ray) out.ray = rec.ray(v);
+    if (rec.hulls) out.hulls = rec.hulls(v);
+    return out;
+  }
   // world-space collision boxes for a piece placed at (x, z) turned q quarter-turns
   function worldBoxes(rec: PieceRec, x: number, z: number, q: number, v: number): WBox[] {
-    const s = Math.round(Math.sin(q * Math.PI / 2)), c = Math.round(Math.cos(q * Math.PI / 2));
+    const s = Math.round(Math.sin(q * Math.PI / 2)), c = Math.round(Math.cos(q * Math.PI / 2)), sd = solids(rec, v);
     const at = (list: [number, number, number, number, number, number?, any?][]): WBox[] => list.map(([lx, lz, w, d, h, y0 = 0, m]) => ({
       cx: x + lx * c + lz * s, cz: z - lx * s + lz * c,
       hx: (c ? w : d) / 2, hz: (c ? d : w) / 2, y0, h, m,
     }));
-    const out = at(typeof rec.boxes === 'function' ? rec.boxes(v) : rec.boxes).sort((a, b) => b.h - a.h);
+    const out = at(sd.boxes).sort((a, b) => b.h - a.h);
     // open pieces (shelving): you walk into the whole footprint, but rounds and eyes meet only what's solid
-    if (rec.ray) out[0].ray = at(rec.ray(v));
+    if (sd.ray) out[0].ray = at(sd.ray);
     // a rock: rounds and eyes meet its own convex shapes (each a list of triangles, turned and placed as its meshes are: hull,
     // y still from its foot), and its boxes only stop people (walk: js/world.ts fromTileMap)
-    if (rec.hulls) {
+    if (sd.hulls) {
       for (const b of out) b.walk = true;
-      out[0].ray = rec.hulls(v).map((t) => ({ cx: x, cz: z, hx: 0, hz: 0, y0: 0, h: 0, m: null, hull: t.map((n, i) => i % 3 === 0 ? x + n * c + t[i + 2] * s : i % 3 === 2 ? z - t[i - 2] * s + n * c : n) }));
+      out[0].ray = sd.hulls.map((t) => ({ cx: x, cz: z, hx: 0, hz: 0, y0: 0, h: 0, m: null, hull: t.map((n, i) => i % 3 === 0 ? x + n * c + t[i + 2] * s : i % 3 === 2 ? z - t[i - 2] * s + n * c : n) }));
     }
     return out;
   }
@@ -1663,554 +1661,7 @@ const G_Furniture = (() => {
       }
     }
   }
-
-  // ---------------------------------------------------------------- meshes
-  // Packaging: an atlas of printed labels, PACK_N x PACK_N of them, each a product's face (a colour, a band across it,
-  // a maker's mark, lines of type, a printed edge), in the colours print has, not pure ones (made once, kept). A piece
-  // of stock takes one of them over every face (k.boxL, k.cylL): it reads as a packet, a tin, a bottle with a label,
-  // not a block of colour, and the light falls on card and paper, matte.
-  const PACK_N = 8;
-  let packTex: THREE.CanvasTexture | null = null;
-  function packaging() {
-    if (packTex) return packTex;
-    const S = 128, c = document.createElement('canvas'); c.width = c.height = S * PACK_N;
-    const g = c.getContext('2d')!, rnd = G.U.rng(0x9ac4a6e);
-    const INK = ['#b8392e', '#d8a632', '#2c5aa6', '#2f8a48', '#d0702c', '#6c3a9a', '#26262a', '#b8386e', '#3a9a9e', '#9a7238', '#e8e2d2', '#5a2a22', '#c8c03a', '#1e3a5e', '#e6d9b8', '#8a1e24'];
-    const pick = <T,>(a: T[]): T => a[Math.floor(rnd() * a.length)];
-    for (let ty = 0; ty < PACK_N; ty++) for (let tx = 0; tx < PACK_N; tx++) {
-      const x0 = tx * S, y0 = ty * S, bg = pick(INK);
-      let a = pick(INK); while (a === bg) a = pick(INK);
-      g.save(); g.beginPath(); g.rect(x0, y0, S, S); g.clip();
-      g.fillStyle = bg; g.fillRect(x0, y0, S, S);
-      const sh = g.createLinearGradient(0, y0, 0, y0 + S); sh.addColorStop(0, 'rgba(255,255,255,0.10)'); sh.addColorStop(1, 'rgba(0,0,0,0.14)'); g.fillStyle = sh; g.fillRect(x0, y0, S, S);
-      const style = rnd(), light = ['#e8e2d2', '#e6d9b8', '#c8c03a', '#d8a632'].includes(bg), type = light ? '#2a2420' : '#f0ebe0';
-      if (style < 0.4) { // a band across the middle, the mark on it
-        const by = y0 + S * (0.3 + rnd() * 0.15), bh = S * (0.22 + rnd() * 0.12);
-        g.fillStyle = rnd() < 0.5 ? '#ece6d8' : a; g.fillRect(x0, by, S, bh);
-        g.fillStyle = rnd() < 0.5 ? bg : '#26262a'; g.font = `bold ${Math.round(bh * 0.62)}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
-        g.fillText(pick(['CRISP', 'ZAP', 'MAXI', 'GOLD', 'FRESH', 'KO', 'BOLT', 'RUSH', 'PURE', 'MEGA', 'SNAX', 'FIZZ']), x0 + S / 2, by + bh / 2, S * 0.9);
-      } else if (style < 0.7) { // a round mark, a burst of colour behind it
-        const cx = x0 + S * (0.35 + rnd() * 0.3), cy = y0 + S * (0.35 + rnd() * 0.2), r = S * (0.18 + rnd() * 0.1);
-        g.fillStyle = a; g.beginPath(); g.ellipse(cx, cy, r * 1.3, r, 0, 0, 7); g.fill();
-        g.fillStyle = '#ece6d8'; g.beginPath(); g.ellipse(cx, cy, r * 0.8, r * 0.55, 0, 0, 7); g.fill();
-        g.fillStyle = a; g.font = `bold ${Math.round(r * 0.6)}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(pick(['Co', 'No.1', 'Hi', 'XL', 'OK', '99']), cx, cy, r * 1.4);
-      } else { // a window onto the product: a lighter panel, a shape in it
-        const px = x0 + S * 0.18, py = y0 + S * 0.3, pw = S * 0.64, ph = S * 0.4;
-        g.fillStyle = '#e8dcc0'; g.fillRect(px, py, pw, ph);
-        g.fillStyle = pick(['#a8642a', '#c89a4a', '#7a3a22', '#d8b060', '#6a8a3a']);
-        for (let i = 0; i < 5; i++) { g.beginPath(); g.ellipse(px + pw * (0.15 + rnd() * 0.7), py + ph * (0.25 + rnd() * 0.5), pw * 0.12, ph * 0.18, rnd() * 3, 0, 7); g.fill(); }
-        g.fillStyle = a; g.fillRect(x0, y0 + S * 0.08, S, S * 0.16);
-      }
-      g.fillStyle = type; g.globalAlpha = 0.8; // lines of type
-      for (let i = 0; i < 3; i++) g.fillRect(x0 + S * 0.14, y0 + S * (0.76 + i * 0.06), S * (0.3 + rnd() * 0.5), S * 0.025);
-      g.globalAlpha = 1;
-      g.fillStyle = a; g.fillRect(x0, y0 + S * 0.94, S, S * 0.06); // the printed edge
-      g.restore();
-    }
-    packTex = new THREE.CanvasTexture(c); packTex.anisotropy = 4;
-    return packTex;
-  }
-  // a geometry's UVs (0..1 a face) squeezed onto one label of the atlas (a little in from its edges: no neighbour bleeds in)
-  function labelUV(geo: THREE.BufferGeometry, i: number) {
-    const uv = geo.attributes.uv as THREE.BufferAttribute, n = PACK_N, u0 = (i % n) / n, v0 = 1 - (Math.floor(i / n) + 1) / n, s = (1 - 0.06) / n, o = 0.03 / n;
-    for (let j = 0; j < uv.count; j++) uv.setXY(j, u0 + o + uv.getX(j) * s, v0 + o + uv.getY(j) * s);
-    return geo;
-  }
-
-  function textures(rnd: () => number) {
-    const mk = (w: number, h: number, draw: (g: CanvasRenderingContext2D, w: number, h: number) => void) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d')!, w, h); const tx = new THREE.CanvasTexture(c); tx.wrapS = tx.wrapT = THREE.RepeatWrapping; tx.anisotropy = 4; return tx; };
-    const speckle = (g: CanvasRenderingContext2D, w: number, h: number, n: number, a: number) => { for (let i = 0; i < n; i++) { const v = rnd() < 0.5 ? 0 : 255; g.fillStyle = `rgba(${v},${v},${v},${rnd() * a})`; g.fillRect(rnd() * w, rnd() * h, 1 + rnd() * 3, 1 + rnd() * 3); } };
-    return {
-      wood: (base: string) => mk(256, 256, (g, w, h) => {
-        g.fillStyle = base; g.fillRect(0, 0, w, h);
-        const rows = 8, rh = h / rows;
-        for (let i = 0; i < rows; i++) {
-          let x = -rnd() * 200;
-          while (x < w) {
-            const len = 120 + rnd() * 140, l = (rnd() - 0.5) * 0.16;
-            g.fillStyle = l > 0 ? `rgba(255,240,220,${l})` : `rgba(0,0,0,${-l})`;
-            g.fillRect(x, i * rh, len, rh);
-            for (let k = 0; k < 5; k++) { g.fillStyle = `rgba(40,20,5,${0.05 + rnd() * 0.08})`; g.fillRect(x, i * rh + rnd() * rh, len, 1); }
-            g.fillStyle = 'rgba(20,10,0,0.55)'; g.fillRect(x, i * rh, 2, rh);
-            x += len;
-          }
-          g.fillStyle = 'rgba(20,10,0,0.5)'; g.fillRect(0, i * rh, w, 2);
-        }
-      }),
-      tile: (base: string, grout: string) => mk(128, 128, (g, w, h) => {
-        g.fillStyle = grout; g.fillRect(0, 0, w, h);
-        const n = 4, s = w / n;
-        for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
-          g.fillStyle = base; g.fillRect(i * s + 1.5, j * s + 1.5, s - 3, s - 3);
-          g.fillStyle = `rgba(${rnd() < 0.5 ? '0,0,0' : '255,255,255'},${rnd() * 0.06})`; g.fillRect(i * s + 1.5, j * s + 1.5, s - 3, s - 3);
-        }
-        speckle(g, w, h, 300, 0.06);
-      }),
-      carpet: (base: string) => mk(128, 128, (g, w, h) => { g.fillStyle = base; g.fillRect(0, 0, w, h); speckle(g, w, h, 2500, 0.12); }),
-      // bare concrete, cloudy, a few stains
-      concrete: (base: string) => mk(256, 256, (g, w, h) => {
-        g.fillStyle = base; g.fillRect(0, 0, w, h);
-        for (let i = 0; i < 26; i++) { g.fillStyle = `rgba(${rnd() < 0.5 ? '0,0,0' : '255,255,255'},${0.02 + rnd() * 0.05})`; g.beginPath(); g.arc(rnd() * w, rnd() * h, 14 + rnd() * 50, 0, 7); g.fill(); }
-        for (let i = 0; i < 3; i++) { g.fillStyle = 'rgba(20,16,10,0.14)'; g.beginPath(); g.arc(rnd() * w, rnd() * h, 6 + rnd() * 16, 0, 7); g.fill(); }
-        speckle(g, w, h, 1800, 0.08);
-      }),
-      // lino in a check of two colours, scuffed
-      lino: (base: string, other: string) => mk(128, 128, (g, w, h) => {
-        const s = w / 2;
-        g.fillStyle = base; g.fillRect(0, 0, w, h); g.fillStyle = other; g.fillRect(0, 0, s, s); g.fillRect(s, s, s, s);
-        g.strokeStyle = 'rgba(0,0,0,0.18)'; g.lineWidth = 1; g.strokeRect(0, 0, s, s); g.strokeRect(s, s, s, s);
-        speckle(g, w, h, 500, 0.08);
-      }),
-      // parquet in a herringbone: blocks four long by one wide, laid out on a lattice that repeats every eight
-      parquet: (base: string) => mk(256, 256, (g, w, h) => {
-        const u = w / 8, block = (x: number, y: number, bw: number, bh: number) => { const v = (rnd() - 0.5) * 0.2; g.fillStyle = base; g.fillRect(x, y, bw, bh); g.fillStyle = v > 0 ? `rgba(255,235,200,${v})` : `rgba(0,0,0,${-v})`; g.fillRect(x, y, bw, bh); g.strokeStyle = 'rgba(30,15,0,0.55)'; g.lineWidth = 1.5; g.strokeRect(x, y, bw, bh); };
-        for (let i = -16; i <= 16; i++) for (let j = -6; j <= 6; j++) {
-          const x = (i + 4 * j) * u, y = (i - 4 * j) * u;
-          if (x < -5 * u || y < -5 * u || x > w + u || y > h + 4 * u) continue;
-          block(x, y, 4 * u, u); block(x + 4 * u, y - 3 * u, u, 4 * u);
-        }
-      }),
-      // a lawn at night: dark green with blades and the odd bare patch
-      grass: () => mk(256, 256, (g, w, h) => {
-        g.fillStyle = '#2c4423'; g.fillRect(0, 0, w, h);
-        for (let i = 0; i < 6; i++) { g.fillStyle = `rgba(${60 + rnd() * 30},${50 + rnd() * 20},30,0.25)`; g.beginPath(); g.arc(rnd() * w, rnd() * h, 10 + rnd() * 25, 0, 7); g.fill(); }
-        for (let i = 0; i < 5000; i++) { const v = rnd(); g.fillStyle = v < 0.5 ? `rgba(20,40,15,${0.3 + rnd() * 0.4})` : `rgba(${80 + rnd() * 40},${110 + rnd() * 50},${50 + rnd() * 30},${0.25 + rnd() * 0.35})`; g.fillRect(rnd() * w, rnd() * h, 1, 2 + rnd() * 4); }
-      }),
-      // a mountain trail: decomposed granite, tan grit and pebbles, the odd tuft (soil: a garden's dark, worked earth)
-      dirt: (base: string, dark?: boolean) => mk(256, 256, (g, w, h) => {
-        g.fillStyle = base; g.fillRect(0, 0, w, h);
-        for (let i = 0; i < 14; i++) { g.fillStyle = `rgba(${rnd() < 0.5 ? '40,24,12' : '255,236,210'},${0.04 + rnd() * 0.06})`; g.beginPath(); g.arc(rnd() * w, rnd() * h, 16 + rnd() * 50, 0, 7); g.fill(); }
-        for (let i = 0; i < 2600; i++) { const v = rnd(); g.fillStyle = v < 0.4 ? `rgba(30,18,10,${0.2 + rnd() * 0.3})` : v < 0.8 ? `rgba(255,240,220,${0.12 + rnd() * 0.2})` : `rgba(190,120,100,${0.3 + rnd() * 0.3})`; const s = 1 + rnd() * 2.5; g.fillRect(rnd() * w, rnd() * h, s, s); }
-        if (!dark) for (let i = 0; i < 40; i++) { g.fillStyle = `rgba(${90 + rnd() * 40},${100 + rnd() * 30},60,0.5)`; const x = rnd() * w, y = rnd() * h; for (let j = 0; j < 6; j++) g.fillRect(x + (rnd() - 0.5) * 6, y + (rnd() - 0.5) * 3, 1, 3 + rnd() * 3); }
-      }),
-      // flagstones: irregular slabs of pinkish stone in grey mortar
-      flag: (base: string) => mk(256, 256, (g, w, h) => {
-        g.fillStyle = '#6e645c'; g.fillRect(0, 0, w, h);
-        for (let j = 0; j < 4; j++) for (let i = 0; i < 4; i++) {
-          const x = i * 64 + (j % 2) * 20, y = j * 64, v = (rnd() - 0.5) * 0.18;
-          g.fillStyle = base; g.beginPath(); g.moveTo(x + 3 + rnd() * 6, y + 3 + rnd() * 5); g.lineTo(x + 58 + rnd() * 5, y + 2 + rnd() * 6); g.lineTo(x + 61, y + 58 + rnd() * 4); g.lineTo(x + 2 + rnd() * 6, y + 60); g.closePath(); g.fill();
-          g.fillStyle = v > 0 ? `rgba(255,235,220,${v})` : `rgba(0,0,0,${-v})`; g.fill();
-        }
-        speckle(g, w, h, 1500, 0.08);
-      }),
-      rug: (a: string, b: string, c: string) => mk(256, 256, (g, w, h) => {
-        g.fillStyle = a; g.fillRect(0, 0, w, h);
-        g.strokeStyle = b; g.lineWidth = 14; g.strokeRect(14, 14, w - 28, h - 28);
-        g.strokeStyle = c; g.lineWidth = 4; g.strokeRect(30, 30, w - 60, h - 60);
-        g.fillStyle = b;
-        for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
-          const x = 64 + i * 64, y = 64 + j * 64;
-          g.beginPath(); g.moveTo(x, y - 20); g.lineTo(x + 20, y); g.lineTo(x, y + 20); g.lineTo(x - 20, y); g.closePath(); g.fill();
-        }
-        speckle(g, w, h, 1500, 0.1);
-      }),
-      art: () => mk(128, 96, (g, w, h) => {
-        if (rnd() < 0.5) { // landscape
-          const sky = g.createLinearGradient(0, 0, 0, h);
-          const top = U8(), hor = U8();
-          sky.addColorStop(0, `rgb(${top})`); sky.addColorStop(1, `rgb(${hor})`);
-          g.fillStyle = sky; g.fillRect(0, 0, w, h);
-          g.fillStyle = `rgba(255,240,200,0.8)`; g.beginPath(); g.arc(20 + rnd() * 88, 18 + rnd() * 20, 6 + rnd() * 6, 0, 7); g.fill();
-          for (let l = 0; l < 3; l++) {
-            const y0 = h * (0.5 + l * 0.15), sh = 30 + l * 25;
-            g.fillStyle = `rgb(${sh + rnd() * 30},${sh + 20 + rnd() * 40},${sh * 0.6 + rnd() * 20})`;
-            g.beginPath(); g.moveTo(0, h);
-            for (let x = 0; x <= w; x += 8) g.lineTo(x, y0 + Math.sin(x * 0.05 + l * 2 + rnd()) * 8);
-            g.lineTo(w, h); g.closePath(); g.fill();
-          }
-        } else { // abstract
-          g.fillStyle = `rgb(${U8()})`; g.fillRect(0, 0, w, h);
-          for (let i = 0; i < 6; i++) {
-            g.fillStyle = `rgba(${U8()},0.85)`;
-            if (rnd() < 0.5) g.fillRect(rnd() * w, rnd() * h, 10 + rnd() * 50, 10 + rnd() * 40);
-            else { g.beginPath(); g.arc(rnd() * w, rnd() * h, 6 + rnd() * 22, 0, 7); g.fill(); }
-          }
-        }
-      }),
-    };
-    function U8() { return `${Math.floor(40 + rnd() * 200)},${Math.floor(40 + rnd() * 200)},${Math.floor(40 + rnd() * 200)}`; }
-  }
-
-
-  // ---------------------------------------------------------------- the view out of a window
-  // A night street behind the glass, faked in the shader. The view ray from the camera is traced from the
-  // glass: first the ground outside (level with the floor), then a near layer 7 m out (trees, a fence,
-  // streetlamps), then a city skyline and sky at infinity. Everything shifts with parallax as you move.
-  function outsideMaterial(rnd: () => number, drop = 0) {
-    // (its pictures sampled as written, sRGB, mixed with the colours below as they're written, and the result turned
-    // linear at the end: js/util.ts)
-    const mk = (w: number, h: number, draw: (g: CanvasRenderingContext2D, w: number, h: number) => void) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d')!, w, h); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.NoColorSpace; t.wrapS = THREE.RepeatWrapping; t.anisotropy = 4; return t; };
-    // sky + skyline panorama; the horizon sits at 62% down the canvas
-    const sky = mk(2048, 512, (g, w, h) => {
-      const hz = Math.round(h * 0.62);
-      const gr = g.createLinearGradient(0, 0, 0, hz);
-      gr.addColorStop(0, '#04070f'); gr.addColorStop(0.7, '#0e1626'); gr.addColorStop(1, '#3a2c26');
-      g.fillStyle = gr; g.fillRect(0, 0, w, hz);
-      g.fillStyle = '#07080a'; g.fillRect(0, hz, w, h - hz);
-      for (let i = 0; i < 500; i++) { g.fillStyle = `rgba(255,255,255,${0.2 + rnd() * 0.7})`; g.fillRect(rnd() * w, rnd() * hz * 0.75, rnd() < 0.1 ? 2 : 1, 1); }
-      const mx = 300 + rnd() * 1400, my = 70 + rnd() * 60;
-      const mg = g.createRadialGradient(mx, my, 0, mx, my, 60); mg.addColorStop(0, 'rgba(220,225,240,0.35)'); mg.addColorStop(1, 'rgba(220,225,240,0)');
-      g.fillStyle = mg; g.fillRect(mx - 60, my - 60, 120, 120);
-      g.fillStyle = '#e8ecf4'; g.beginPath(); g.arc(mx, my, 13, 0, 7); g.fill();
-      // skyline: far, then nearer and taller, with lit windows and aircraft-warning lights
-      for (const [col, minH, maxH, lit] of [['#0d121c', 15, 55, 0.05], ['#090c13', 25, 120, 0.22], ['#06080c', 10, 60, 0.3]] as [string, number, number, number][]) {
-        let x = -20;
-        while (x < w) {
-          const bw = 20 + rnd() * 70, bh = minH + rnd() * (maxH - minH);
-          g.fillStyle = col; g.fillRect(x, hz - bh, bw, bh + 2);
-          for (let wy = hz - bh + 4; wy < hz - 3; wy += 6) for (let wx = x + 3; wx < x + bw - 3; wx += 5) {
-            if (rnd() < lit) { g.fillStyle = rnd() < 0.7 ? `rgba(255,${190 + rnd() * 50},${110 + rnd() * 60},${0.5 + rnd() * 0.5})` : 'rgba(170,200,255,0.7)'; g.fillRect(wx, wy, 2, 3); }
-          }
-          if (bh > 90 && rnd() < 0.5) { g.fillStyle = '#ff3020'; g.fillRect(x + bw / 2, hz - bh - 3, 2, 2); }
-          x += bw + rnd() * 6;
-        }
-      }
-    });
-    // near layer, 24 m wide x 8 m tall, repeating along the street
-    const near = mk(1024, 256, (g, w, h) => {
-      g.clearRect(0, 0, w, h);
-      const px = w / 24, py = h / 8, Y = (m: number) => h - m * py;
-      for (const ux of [6, 18]) { // streetlamps, glow first
-        const lx = ux * px, ly = Y(5);
-        const gl = g.createRadialGradient(lx, ly, 0, lx, ly, 70); gl.addColorStop(0, 'rgba(255,200,120,0.55)'); gl.addColorStop(1, 'rgba(255,200,120,0)');
-        g.fillStyle = gl; g.fillRect(lx - 70, ly - 70, 140, 140);
-      }
-      for (const ux of [2.5, 11.5, 21]) { // a few street trees between the lamps
-        if (rnd() < 0.25) continue;
-        const tx = (ux + (rnd() - 0.5) * 2) * px, th = 3.6 + rnd() * 2;
-        g.fillStyle = '#0a0806'; g.fillRect(tx - 3, Y(th * 0.45), 6, th * 0.45 * py);
-        for (let k = 0; k < 7; k++) {
-          const r = (0.6 + rnd() * 0.7) * px;
-          g.fillStyle = ['#05070a', '#070a0c', '#090c0e'][k % 3];
-          g.beginPath(); g.ellipse(tx + (rnd() - 0.5) * 1.6 * px, Y(th * (0.6 + rnd() * 0.35)), r, r * 0.85, 0, 0, 7); g.fill();
-        }
-      }
-      for (const ux of [6, 18]) { // lamp posts and heads
-        const lx = ux * px;
-        g.fillStyle = '#0c0c0e'; g.fillRect(lx - 2, Y(5), 4, 5 * py); g.fillRect(lx - 2, Y(5.05), 22, 5);
-        g.fillStyle = '#ffe2b0'; g.fillRect(lx + 10, Y(4.95), 12, 4);
-      }
-      g.fillStyle = '#0b0b0c'; // fence
-      for (let x = 0; x < w; x += 2 * px) g.fillRect(x, Y(1.3), 4, 1.3 * py);
-      g.fillRect(0, Y(1.15), w, 4); g.fillRect(0, Y(0.5), w, 4);
-      for (let i = 0; i < 12; i++) { g.fillStyle = '#070b08'; g.beginPath(); g.ellipse(rnd() * w, h, (0.6 + rnd()) * px, (0.5 + rnd() * 0.5) * py, 0, Math.PI, 0); g.fill(); } // hedges
-    });
-    return new THREE.ShaderMaterial({
-      uniforms: { sky: { value: sky }, near: { value: near }, drop: { value: drop } },
-      vertexShader: `
-        varying vec3 vW; varying vec3 vN;
-        void main() { vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; vN = normalize(mat3(modelMatrix) * normal); gl_Position = projectionMatrix * viewMatrix * w; }`,
-      fragmentShader: `
-        uniform sampler2D sky; uniform sampler2D near; uniform float drop;
-        varying vec3 vW; varying vec3 vN;
-        float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-        // a tower block across the road (high up): concrete, a grid of windows, some lit
-        vec3 facade(vec3 h, vec3 r) {
-          vec2 c = vec2(dot(h, r) / 2.6, h.y / 3.1), f = fract(c), id = floor(c);
-          float win = step(0.18, f.x) * step(f.x, 0.82) * step(0.22, f.y) * step(f.y, 0.78);
-          float lit = step(0.62, hash(id)), warm = hash(id + 7.0);
-          vec3 wall = vec3(0.035, 0.036, 0.04), dark = vec3(0.02, 0.028, 0.04);
-          vec3 light = mix(vec3(1.0, 0.78, 0.5), vec3(0.7, 0.8, 1.0), step(0.8, warm)) * (0.45 + 0.3 * hash(id + 3.0));
-          return mix(wall, mix(dark, light, lit), win);
-        }
-        vec3 ground(vec3 g, vec3 o, vec3 r, float t) {
-          // dark grass and pavement, lit in pools under the streetlamps (every 12 m, 7 m out)
-          float u = dot(g, r), s = dot(g - vW, o);
-          float lu = (fract(u / 12.0 - 0.5) - 0.5) * 12.0;
-          float pool = exp(-(lu * lu) / 10.0 - (s - 7.0) * (s - 7.0) / 6.0);
-          vec3 c = vec3(0.018, 0.022, 0.02) + vec3(0.32, 0.22, 0.12) * pool;
-          return mix(c, vec3(0.03, 0.035, 0.05), smoothstep(12.0, 70.0, t));
-        }
-        void main() {
-          vec3 d = normalize(vW - cameraPosition), o = -vN, r = normalize(cross(vec3(0.0, 1.0, 0.0), o));
-          float dn = max(dot(d, o), 0.02);
-          float tN = 7.0 / dn;
-          float tG = d.y < -0.001 ? (-drop - vW.y) / d.y : 1e9; // the ground: level with the floor, or far below
-          vec3 col;
-          if (drop > 0.5) { // high up: the tower across the road, else the street below, else the sky and skyline
-            float tF = 38.0 / dn; vec3 hf = vW + d * tF;
-            if (tF < tG && hf.y > -drop && hf.y < 4.0 + 6.0 * step(0.5, fract(dot(hf, r) / 60.0))) col = facade(hf, r); // (two blocks, one taller)
-            else if (tG < 1e8) col = ground(vW + d * tG, o, r, tG) * 1.6;
-            else col = texture2D(sky, vec2(atan(d.x, d.z) / 6.2831853 * 3.0, clamp(0.38 + asin(clamp(d.y, -1.0, 1.0)) / 1.4, 0.0, 0.999))).rgb;
-          } else if (tG < tN) col = ground(vW + d * tG, o, r, tG);
-          else {
-            vec3 h = vW + d * tN;
-            vec2 uv = vec2(dot(h, r) / 24.0, h.y / 8.0);
-            vec4 nr = (uv.y >= 0.0 && uv.y <= 1.0) ? texture2D(near, uv) : vec4(0.0);
-            vec3 far = d.y < -0.001 ? ground(vW + d * tG, o, r, tG)
-              : texture2D(sky, vec2(atan(d.x, d.z) / 6.2831853 * 3.0, clamp(0.38 + asin(clamp(d.y, -1.0, 1.0)) / 1.4, 0.0, 0.999))).rgb;
-            col = mix(far, nr.rgb, nr.a);
-          }
-          // a little sheen on the glass
-          float fres = pow(1.0 - abs(dot(d, vN)), 3.0);
-          gl_FragColor = linearToOutputTexel(vec4(pow(col * 0.9 + vec3(0.02, 0.025, 0.035) + fres * 0.06, vec3(2.2)), 1.0));
-        }`,
-    });
-  }
-
-  function build(map: any, root: THREE.Object3D, crateTex: THREE.Texture) {
-    const T = THREE, L = G.Level, TS = L.TS, { W, t } = map;
-    // (the one stream everything's looks draw on, in turn, so a room that's built differently would change every room
-    // after it. A resident's room: what it would have been is still built, into nothing (sink), and what's really there
-    // draws on a stream of its own (cur). Every other room comes out the same, Harold's or no.)
-    const rnd0 = G.U.rng((map.seed ^ 0x5eed1e) >>> 0);
-    let cur = rnd0, sink = false;
-    const rnd = () => cur();
-    // A piece's colour goes in its vertices: what's drawn is one material per finish (roughness, metalness, texture,
-    // glow), not one per colour as well, so a houseful of furniture is a few dozen draw calls, not hundreds.
-    // (mat() still hands back a material of that colour, to be read and tinted; base is what it's drawn with.)
-    const cache = new Map<string, Mat>(), base = new Map<THREE.Material, THREE.Material>(), finish = new Map<string, Mat>();
-    const texIds = new Map(), texId = (t: any): number => { if (!texIds.has(t)) texIds.set(t, texIds.size); return texIds.get(t); }; // (by the texture itself, not its uuid)
-    const mat = (hex: number, rough = 0.8, metal = 0, extra?: Record<string, any>): Mat => {
-      const fk = rough + '|' + metal + (extra ? JSON.stringify(Object.keys(extra)) + (extra.map ? texId(extra.map) : '') + (extra.emissive || '') : ''), key = hex + '|' + fk;
-      let m = cache.get(key);
-      if (!m) {
-        m = new T.MeshStandardMaterial(Object.assign({ color: hex, roughness: rough, metalness: metal }, extra || {})); cache.set(key, m);
-        if (!finish.has(fk)) finish.set(fk, new T.MeshStandardMaterial(Object.assign({ color: 0xffffff, roughness: rough, metalness: metal, vertexColors: true }, extra || {})));
-        base.set(m, finish.get(fk)!);
-      }
-      return m;
-    };
-    const tint = (hex: number, f: number) => { const c = new T.Color(hex); c.r = Math.min(1, c.r * f); c.g = Math.min(1, c.g * f); c.b = Math.min(1, c.b * f); return c.getHex(); };
-    const pick = <T,>(a: T[]): T => a[Math.floor(rnd() * a.length)];
-    // everything static is merged into one mesh per material
-    const byMat = new Map<THREE.Material, THREE.BufferGeometry[]>();
-    const add = (geo: THREE.BufferGeometry, m: THREE.Material, matrix: THREE.Matrix4) => {
-      if (sink) { geo.dispose(); return; }
-      const g2 = geo.index ? geo.toNonIndexed() : geo;
-      g2.applyMatrix4(matrix);
-      const b = base.get(m) || m;
-      if (b !== m) g2.userData.col = (m as Mat).color; // (its colour, for its vertices: the merge below)
-      if (!byMat.has(b)) byMat.set(b, []);
-      byMat.get(b)!.push(g2);
-      if (g2 !== geo) geo.dispose();
-    };
-    const tmp = new T.Object3D(); tmp.rotation.order = 'YXZ'; // turn to face the room first, then tilt
-    let frame = new T.Matrix4();
-    const place = (geo: THREE.BufferGeometry, m: THREE.Material, x: number, y: number, z: number, ry = 0, rx = 0) => {
-      tmp.position.set(x, y, z); tmp.rotation.set(rx, ry, 0); tmp.updateMatrix();
-      add(geo, m, new T.Matrix4().multiplyMatrices(frame, tmp.matrix));
-    };
-    const shadeMat = mat(0xf2e2c0, 0.9, 0, { emissive: 0xffc070, emissiveIntensity: 0.55 });
-    const k = {
-      rnd, pick, tint, mat,
-      box: (m: Mat, w: number, h: number, d: number, x: number, y: number, z: number, ry?: number, rx?: number) => place(new T.BoxGeometry(w, h, d), m, x, y, z, ry, rx),
-      cyl: (m: Mat, rt: number, rb: number, h: number, x: number, y: number, z: number, seg = 14, rx = 0) => place(new T.CylinderGeometry(rt, rb, h, seg), m, x, y, z, 0, rx),
-      cylX: (m: Mat, rt: number, rb: number, h: number, x: number, y: number, z: number, seg = 14) => place(new T.CylinderGeometry(rt, rb, h, seg), m, x, y, z, Math.PI / 2, Math.PI / 2), // (lying along x)
-      sph: (m: Mat, r: number, x: number, y: number, z: number) => place(new T.SphereGeometry(r, 8, 6), m, x, y, z),
-      ico: (m: Mat, r: number, x: number, y: number, z: number, ry?: number) => { const a = rnd() * 6; place(new T.IcosahedronGeometry(r, 0), m, x, y, z, ry ?? a); },
-      // a side profile ([z, y] points: along the piece and up) drawn across w at x, its edges rounded by b (a car's body)
-      side: (m: Mat, pts: number[][], w: number, x = 0, b = 0) => {
-        const sh = new T.Shape(pts.map(([z, y]) => new T.Vector2(z, y)));
-        const g = new T.ExtrudeGeometry(sh, { depth: w - 2 * b, bevelEnabled: b > 0, bevelThickness: b, bevelSize: b, bevelSegments: 2, curveSegments: 4 });
-        g.translate(0, 0, -(w - 2 * b) / 2); g.rotateY(-Math.PI / 2);
-        place(g, m, x, 0, 0);
-      },
-      leaf: () => mat(pick([0x3f6b35, 0x4d7a3a, 0x2f5a2c, 0x5a8040]), 0.85, 0, { flatShading: true }),
-      screen: () => mat(0x0b0f14, 0.15, 0.2, { emissive: pick([0x1a2a3a, 0x0c1622, 0x202a20]), emissiveIntensity: 0.6 }),
-      shade: () => shadeMat,
-      crate: () => mat(0xffffff, 0.8, 0, { map: crateTex }),
-      // stock: one of the packaging atlas' labels (packaging()) over a box or a cylinder; its material by what it's made
-      // of (card and paper, a tin, a plastic bottle), each a little lighter or darker (shade: in the shadow of a shelf)
-      pack: (kind: string, shade = 1) => mat(tint(0xffffff, (0.86 + rnd() * 0.14) * shade), kind === 'tin' ? 0.42 : kind === 'bottle' ? 0.3 : 0.82, kind === 'tin' ? 0.15 : 0, { map: packaging() }),
-      label: () => Math.floor(rnd() * PACK_N * PACK_N),
-      boxL: (m: Mat, lb: number, w: number, h: number, d: number, x: number, y: number, z: number, ry?: number, rx?: number) => place(labelUV(new T.BoxGeometry(w, h, d), lb), m, x, y, z, ry, rx),
-      cylL: (m: Mat, lb: number, rt: number, rb: number, h: number, x: number, y: number, z: number, seg = 14) => place(labelUV(new T.CylinderGeometry(rt, rb, h, seg), lb), m, x, y, z),
-      tableLamp(x: number, y: number, z: number) { k.cyl(mat(pick([0x2a2a2a, 0xb8a060, 0xe8e4da, 0x6d7b66]), 0.4, 0.3), 0.05, 0.08, 0.22, x, y + 0.11, z); k.cyl(shadeMat, 0.1, 0.16, 0.2, x, y + 0.31, z); },
-      plantSmall(x: number, y: number, z: number) { k.cyl(mat(pick([0xa0522d, 0xe8e4da, 0x2f3a40]), 0.7), 0.07, 0.055, 0.12, x, y + 0.06, z); for (let i = 0; i < 3; i++) k.ico(k.leaf(), 0.06 + rnd() * 0.04, x + (rnd() - 0.5) * 0.06, y + 0.16 + rnd() * 0.08, z + (rnd() - 0.5) * 0.06); },
-      fruit(x: number, y: number, z: number) { k.cyl(mat(pick([0xe8e4da, 0x6b4428, 0x3a5a6a]), 0.4), 0.13, 0.08, 0.06, x, y + 0.03, z); for (let i = 0; i < 4; i++) k.sph(mat(pick([0xd8642a, 0xc0302a, 0x8fb040, 0xe8c040]), 0.5), 0.04, x + (rnd() - 0.5) * 0.12, y + 0.08, z + (rnd() - 0.5) * 0.12); },
-    };
-
-    // furniture
-    for (const p of map.propList || new Set(map.props.values())) {
-      // (gy: on rolling ground, a rock or a tree where it lies: G.Level.crestGround)
-      frame = new T.Matrix4().compose(new T.Vector3(p.x, p.gy || 0, p.z), new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), p.q * Math.PI / 2), new T.Vector3(1, 1, 1));
-      sink = !!p.gone; cur = p.own ? G.U.rng(Math.floor(p.v * 4294967295)) : rnd0; // (p.gone, p.own: js/homes.ts)
-      R[p.name].build(k, p.v, p.style);
-    }
-    sink = false; cur = rnd0;
-    frame = new T.Matrix4();
-
-    // rooms: floor covering, rug, baseboards, art and windows on the walls
-    const tx = textures(rnd), inRoom = (rm: Room, x: number, z: number) => x >= rm.x && x < rm.x + rm.w && z >= rm.z && z < rm.z + rm.h;
-    const arts = [0, 1, 2, 3, 4, 5].map(() => mat(0xffffff, 0.7, 0, { map: tx.art() }));
-    const board = mat(map.theme.home >= 1 ? 0xe8e4da : 0x2a2826, 0.6);
-    const frameMats = [mat(0x1c1c1e, 0.5), mat(0xb8a060, 0.35, 0.7), mat(0x6b4428, 0.6), mat(0xe8e4da, 0.6)];
-    const glass = outsideMaterial(rnd), blind = mat(0xd8d4ca, 0.7), sill = mat(0xe8e4da, 0.5);
-    // a wall facing the outside of the building: solid wall from here to the edge of the map, and not
-    // impossibly thick; windows only go there
-    const exterior = (x: number, z: number, dx: number, dz: number) => {
-      let n = 0;
-      for (let cx = x + dx, cz = z + dz; cx >= 0 && cz >= 0 && cx < map.W && cz < map.H; cx += dx, cz += dz) {
-        if (t[cz * W + cx] !== 1 || ++n > 4 * (G.Level.K || 1)) return false;
-      }
-      return true;
-    };
-    // a wall face wide enough to hang something on: this cell and its neighbours either side along the wall
-    // all face the same wall, and nothing's been hung there yet
-    const hung = new Set();
-    const wide = (x: number, z: number, dx: number, dz: number) => {
-      const ax = dz ? 1 : 0, az = dx ? 1 : 0;
-      for (const s of [-1, 0, 1]) {
-        const xx = x + ax * s, zz = z + az * s;
-        if (t[zz * W + xx] !== 0 || L.tile(map, xx + dx, zz + dz) !== 1 || hung.has(zz * W + xx)) return false;
-        if (map.winAt && [-1, 0, 1].some((k) => map.winAt.has((zz + dz + az * k) * W + xx + dx + ax * k))) return false; // (not over a window)
-      }
-      for (const s of [-1, 0, 1]) hung.add((z + az * s) * W + x + ax * s);
-      return true;
-    };
-    // a floor covering over a room (a lawn runs under the fences to the edge; inside, the floor stops at the walls)
-    const layFloor = (rm: Room, fm: Mat, y = 0.004) => {
-      const x0 = rm.x * TS, z0 = rm.z * TS, w = rm.w * TS, d = rm.h * TS;
-      let drop = false;
-      for (let z = rm.z; z < rm.z + rm.h && !drop; z++) for (let x = rm.x; x < rm.x + rm.w; x++) if (t[z * W + x] === 5 && !(rm.out && map.out[z * W + x])) { drop = true; break; } // (outdoors upstairs, open air's no hole in it)
-      // on rolling ground (map.terrain: the Sandia Crest's), over it as it lies: a corner at each of the cells' (split as the
-      // ground is, so it sits the same few millimetres over it everywhere)
-      const tr = map.terrain;
-      if (tr && rm.out && rm.flush && !drop) {
-        let hilly = false;
-        for (let z = rm.z; z <= rm.z + rm.h && !hilly; z++) for (let x = rm.x; x <= rm.x + rm.w; x++) if (Math.abs(tr.v[z * tr.VW + x]) > 1e-3) { hilly = true; break; }
-        if (hilly) {
-          const g = new T.PlaneGeometry(w, d, rm.w, rm.h), p = g.attributes.position as THREE.BufferAttribute;
-          for (let k = 0; k < p.count; k++) p.setZ(k, G.World.terrainAt(tr, x0 + w / 2 + p.getX(k), z0 + d / 2 - p.getY(k))); // (the plane's z is up once it's laid flat)
-          g.computeVertexNormals();
-          place(g, fm, x0 + w / 2, y, z0 + d / 2, 0, -Math.PI / 2);
-          return;
-        }
-      }
-      if (rm.out && !drop && !rm.flush) place(new T.PlaneGeometry(w + 2 * TS, d + TS), fm, x0 + w / 2, y, z0 + d / 2, 0, -Math.PI / 2); // (flush: outdoors, but up against the next room's ground, not over it)
-      else if (!drop) place(new T.PlaneGeometry(w, d), fm, x0 + w / 2, y, z0 + d / 2, 0, -Math.PI / 2);
-      else for (let z = Math.max(0, rm.z - (rm.out ? 1 : 0)), x0 = Math.max(0, rm.x - (rm.out ? 1 : 0)), ze = Math.min(map.H, rm.z + rm.h + (rm.out ? 1 : 0)), xe = Math.min(W, rm.x + rm.w + (rm.out ? 1 : 0)), gap = (i: number) => (rm.out ? !map.out[i] : t[i] === 5); z < ze; z++) for (let x = x0; x < xe;) { // (round a drop in the floor: a strip per run of floor. A roof: round what's built on it too, out to its edge)
-        if (gap(z * W + x)) { x++; continue; }
-        let x1 = x; while (x1 + 1 < xe && !gap(z * W + x1 + 1)) x1++;
-        const g = new T.PlaneGeometry((x1 - x + 1) * TS, TS), uv = g.attributes.uv as THREE.BufferAttribute;
-        for (let k = 0; k < uv.count; k++) uv.setXY(k, (x - rm.x + uv.getX(k) * (x1 - x + 1)) / rm.w, (rm.z + rm.h - 1 - z + uv.getY(k)) / rm.h); // (the room's texture, continuous across strips)
-        place(g, fm, (x + x1 + 1) / 2 * TS, y, (z + 0.5) * TS, 0, -Math.PI / 2);
-        x = x1 + 1;
-      }
-    };
-    // A resident's room (js/homes.ts, rm.dress): its floor, its trim round the walls, what hangs on them. Its walls and
-    // ceiling are G.Level.buildMesh's; its furniture went by with the rest.
-    const dressRoom = (rm: Room) => {
-      const dr = rm.dress, f = dr.floor;
-      cur = G.U.rng((map.seed ^ Math.imul(rm.z * W + rm.x + 1, 0x9e3779b1)) >>> 0);
-      const tex = (tx as Record<string, any>)[f.kind === 'laminate' ? 'wood' : f.kind](f.color, f.grout || '#7a7670');
-      tex.repeat.set(rm.w, rm.h);
-      const fm = mat(0xffffff, f.kind === 'tile' ? 0.45 : 0.85, 0, { map: tex }), mine = new Set(dr.cells);
-      layFloor(rm, fm, rm.carved ? 0.006 : 0.004); // (a carved room's floor lies over the floor of the room it came out of)
-      const trim = mat(parseInt(dr.trim.slice(1), 16), 0.5);
-      for (const i of dr.cells) {
-        const x = i % W, z = (i / W) | 0;
-        if (t[i] === 1 || t[i] === 5) continue;
-        if (!inRoom(rm, x, z)) { // (a strip off the side of the room: the room's floor carried on over it)
-          const g = new T.PlaneGeometry(TS, TS), uv = g.attributes.uv as THREE.BufferAttribute;
-          for (let n = 0; n < uv.count; n++) uv.setXY(n, (x - rm.x + uv.getX(n)) / rm.w, (rm.z + rm.h - 1 - z + uv.getY(n)) / rm.h);
-          place(g, fm, (x + 0.5) * TS, 0.004, (z + 0.5) * TS, 0, -Math.PI / 2);
-        }
-        for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-          if (mine.has(z * W + x + dx + dz * W) || L.tile(map, x + dx, z + dz) !== 1) continue;
-          place(new T.BoxGeometry(TS, 0.14, 0.03), trim, (x + 0.5) * TS + dx * (TS / 2 - 0.02), 0.07, (z + 0.5) * TS + dz * (TS / 2 - 0.02), Math.atan2(-dx, -dz));
-        }
-      }
-      for (const h of dr.hung) {
-        frame = new T.Matrix4().compose(new T.Vector3(h.x, 0, h.z), new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), h.q * Math.PI / 2), new T.Vector3(1, 1, 1));
-        R[h.name].build(k, h.v, h.style);
-      }
-      frame = new T.Matrix4(); cur = rnd0;
-    };
-    for (const rm of map.rooms) {
-      if (rm.carved) { dressRoom(rm); continue; } // (a room that wouldn't have been: nothing to go through)
-      if (rm.dress) { G.Homes.swap(map, rm); sink = true; } // (the room as it would have been, for the stream's sake)
-      const spec = (ROOMS as Record<string, any>)[rm.type] || {};
-      // (a room indoors on rolling ground: all of it at the ground it's built on, level there; outdoors its floor's laid
-      // over the ground as it lies: layFloor)
-      frame = map.terrain && !(rm.out && rm.flush) ? new T.Matrix4().makeTranslation(0, L.groundHeight(map, (rm.x + rm.w / 2) * TS, (rm.z + rm.h / 2) * TS), 0) : new T.Matrix4();
-      const x0 = rm.x * TS, z0 = rm.z * TS, w = rm.w * TS, d = rm.h * TS;
-      if (spec.floor) {
-        let tex;
-        if (spec.floor === 'wood') tex = tx.wood(pick(['#7a5232', '#9a6e44', '#5e4028', '#a88458']));
-        else if (spec.floor === 'grass') tex = tx.grass();
-        else if (spec.floor === 'dirt') tex = tx.dirt(pick(['#9a8068', '#a08670', '#94806c']));
-        else if (spec.floor === 'soil') tex = tx.dirt('#5a4232', true);
-        else if (spec.floor === 'flag') tex = tx.flag(pick(['#b0948a', '#a8968a', '#b89c8e']));
-        else if (spec.floor === 'pave') tex = tx.tile(pick(['#55524c', '#4a4844', '#5e5a52']), '#34322e');
-        else if (rm.lid) tex = tx.concrete('#6e6d69');
-        else if (spec.floor === 'tile') tex = tx.tile(pick(['#d8d4cc', '#b8c0c4', '#e4dccc', '#3a3d40']), '#7a7670');
-        else tex = tx.carpet(pick(['#5a5f6a', '#6a5a4a', '#4a5a52', '#7a6e62', '#3d4452']));
-        tex.repeat.set(rm.w, rm.h);
-        if (spec.floor === 'wood' && rnd() < 0.5) { tex.rotation = Math.PI / 2; }
-        layFloor(rm, mat(0xffffff, spec.floor === 'tile' ? 0.45 : spec.floor === 'grass' || spec.floor === 'dirt' || spec.floor === 'soil' ? 1 : 0.85, 0, { map: tex }));
-      }
-      if (rm.out || rm.lid) continue; // no rugs, skirting, pictures or windows out in the garden, nor in a roof's stair head
-      if (spec.rug && rnd() < spec.rug && rm.w >= 3 && rm.h >= 3) {
-        const rw = Math.min(3.6, w - 2.4), rd = Math.min(2.6, d - 2.4);
-        const rt = tx.rug(pick(['#7a2e2e', '#2e4a6a', '#5a4a3a', '#3a5a4a', '#6a5a7a']), pick(['#d8c8a0', '#c0a060', '#e8e0d0']), pick(['#2a2a2a', '#5a2a1a', '#1a2a3a']));
-        place(new T.PlaneGeometry(rw, rd), mat(0xffffff, 1, 0, { map: rt }), x0 + w / 2, 0.008, z0 + d / 2, rnd() < 0.5 ? 0 : Math.PI / 2, -Math.PI / 2);
-      }
-      let pics = 0, wins = 0, clock = rm.type === 'kitchen' || rm.type === 'office' || rm.type === 'breakroom';
-      for (let z = rm.z; z < rm.z + rm.h; z++) for (let x = rm.x; x < rm.x + rm.w; x++) {
-        if (t[z * W + x] === 1 || t[z * W + x] === 5) continue; // a wall corner inside the room's rectangle (or a drop)
-        for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-          const nx = x + dx, nz = z + dz;
-          if (inRoom(rm, nx, nz) || L.tile(map, nx, nz) !== 1) continue;
-          const cx = (x + 0.5) * TS + dx * (TS / 2 - 0.01), cz = (z + 0.5) * TS + dz * (TS / 2 - 0.01), ry = Math.atan2(-dx, -dz);
-          // baseboard along this wall face
-          place(new T.BoxGeometry(TS, 0.1, 0.02), board, cx - dx * 0.01, 0.05, cz - dz * 0.01, ry);
-          const p = map.props.get(z * W + x), tall = p && p.boxes[0].h > 1.0 && !(R[p.name] && R[p.name].small);
-          if (tall) continue;
-          const v = rnd() * 3;
-          if (v > 0.65 || !wide(x, z, dx, dz)) continue;
-          // under a window there can only be something low (a sofa, a plant in the corner)
-          const clear = !p || p.name === 'sofa' || (R[p.name] && R[p.name].small);
-          if (false && clear && wins < 2 && v < 0.4 && exterior(x, z, dx, dz)) {
-            wins++;
-            place(new T.BoxGeometry(1.2, 1.32, 0.04), sill, cx, 1.6, cz, ry);
-            place(new T.PlaneGeometry(1.08, 1.2), glass, cx - dx * 0.022, 1.6, cz - dz * 0.022, ry);
-            place(new T.BoxGeometry(0.04, 1.2, 0.03), sill, cx - dx * 0.03, 1.6, cz - dz * 0.03, ry); // mullion
-            const open = rnd() < 0.3 ? 0 : 0.15 + rnd() * 0.5; // blinds up, or part-way down
-            for (let s = 0; s < 14 * open; s++) place(new T.BoxGeometry(1.1, 0.012, 0.05), blind, cx - dx * 0.06, 2.15 - s * 0.042, cz - dz * 0.06, ry, 0.35);
-            place(new T.BoxGeometry(1.3, 0.04, 0.12), sill, cx - dx * 0.05, 0.98, cz - dz * 0.05, ry);
-          } else if (pics < 3 && v < 0.5 && rm.type !== 'washroom' && rm.type !== 'cubicle' && !spec.noArt) { // (no art in a toilet block)
-            pics++;
-            const fw = 0.5 + rnd() * 0.5, fh = fw * 0.75, y = p ? 1.7 : 1.55;
-            place(new T.BoxGeometry(fw + 0.06, fh + 0.06, 0.03), pick(frameMats), cx - dx * 0.015, y, cz - dz * 0.015, ry);
-            place(new T.PlaneGeometry(fw, fh), pick(arts), cx - dx * 0.032, y, cz - dz * 0.032, ry);
-          } else if (clock && v < 0.65) {
-            clock = false;
-            place(new T.CylinderGeometry(0.16, 0.16, 0.04, 20), mat(0x1c1c1e, 0.5), cx - dx * 0.02, 2.35, cz - dz * 0.02, ry, Math.PI / 2);
-            place(new T.CylinderGeometry(0.14, 0.14, 0.01, 20), mat(0xf2efe6, 0.6), cx - dx * 0.042, 2.35, cz - dz * 0.042, ry, Math.PI / 2);
-            place(new T.BoxGeometry(0.012, 0.1, 0.004), mat(0x111111, 0.5), cx - dx * 0.05, 2.38, cz - dz * 0.05, ry);
-            place(new T.BoxGeometry(0.075, 0.012, 0.004), mat(0x111111, 0.5), cx - dx * 0.05, 2.35, cz - dz * 0.05, ry);
-          }
-        }
-      }
-      if (rm.dress) { G.Homes.swap(map, rm); sink = false; dressRoom(rm); }
-    }
-    frame = new T.Matrix4();
-
-    // merge
-    for (const [m, geos] of byMat) {
-      let n = 0; for (const g of geos) n += g.attributes.position.count;
-      const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), uv = new Float32Array(n * 2), col = m.vertexColors ? new Float32Array(n * 3) : null;
-      let o = 0;
-      for (const g of geos) {
-        const c = g.attributes.position.count;
-        pos.set((g.attributes.position as THREE.BufferAttribute).array, o * 3); nor.set((g.attributes.normal as THREE.BufferAttribute).array, o * 3);
-        if (g.attributes.uv) uv.set((g.attributes.uv as THREE.BufferAttribute).array, o * 2);
-        if (col) { const k = g.userData.col; for (let i = o; i < o + c; i++) { col[i * 3] = k.r; col[i * 3 + 1] = k.g; col[i * 3 + 2] = k.b; } }
-        o += c; g.dispose();
-      }
-      const bg = new T.BufferGeometry();
-      bg.setAttribute('position', new T.BufferAttribute(pos, 3));
-      bg.setAttribute('normal', new T.BufferAttribute(nor, 3));
-      bg.setAttribute('uv', new T.BufferAttribute(uv, 2));
-      if (col) bg.setAttribute('color', new T.BufferAttribute(col, 3));
-      bg.computeBoundingSphere();
-      root.add(new T.Mesh(bg, m));
-    }
-  }
-
-  return { plan, build, R, ROOMS, worldBoxes, facing, outsideMaterial, textures };
+  return { plan, R, ROOMS, solids, worldBoxes, facing };
 })();
 G.Furniture = G_Furniture;
 
