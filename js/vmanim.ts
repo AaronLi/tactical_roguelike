@@ -294,7 +294,7 @@ const G_VMAnim = (() => {
   // the magazine change runs to the moment the new one's pushed home (SEAT: its own clip's fraction there, by how the old one's
   // stowed), just before the hand leaves for the handle; what's left of it (the gun levelled, the hand back to the handguard)
   // plays after the slap, so the hand goes straight from the magazine to the handle with no rest on the handguard between
-  const slapSeat = (how: string) => (how === 'retain' || how === 'pouch' ? 0.78 : 0.7);
+  const slapSeat = (how: string) => (how === 'retain' || how === 'pouch' ? 0.8 : 0.72); // (just after the magazine's seated: its clip's little lift for it, magClip's "seat it", done, so the gun doesn't drop when the clip goes on after the slap)
   const slapM = (t: number, how: string) => {
     const seat = slapSeat(how), end = SLAP.mag1 - 0.05;
     return t < end ? seat * G.U.clamp((t - SLAP.mag0) / (end - SLAP.mag0), 0, 1) : seat + (1 - seat) * S(SLAP.slap, SLAP.rest, t);
@@ -307,8 +307,9 @@ const G_VMAnim = (() => {
     const onH = slapGrab(h, st.back, st.lock);
     pose.L = lerpV(pose.L || A.S, onH, st.hand);
     // the gun turned to show its left side to the hand on the handle, as for any left-hand handle
-    const r = S(0.02, 0.09, t) * (1 - S(SLAP.lock, SLAP.mag0 + 0.04, t)) + S(SLAP.mag1 - 0.04, SLAP.mag1, t) * (1 - S(SLAP.home, SLAP.rest, t));
+    const r = S(0.02, 0.09, t) * (1 - S(0.0, 0.14, m)) * (t < SLAP.mag1 - 0.05 ? 1 : 0) + S(SLAP.mag1 - 0.04, SLAP.mag1, t) * (1 - S(SLAP.home, SLAP.rest, t)); // (the turn to the handle hands over to the magazine's own tilt as it comes in, magTilt, not before it: no sag between)
     pose.gun[5] -= 0.3 * r; pose.gun[3] += 0.2 * r; pose.gun[0] -= 0.04 * r; pose.gun[1] += 0.02 * r;
+    if (m > 0.5) tiltPose(pose, (1 - magTilt(m)) * (1 - S(SLAP.slap, SLAP.rest, t))); // (the magazine's tilt held whole from the seat to the slap, as its clip starts to level the gun there: no dip before the slap; both settle after it)
     const j = t > SLAP.slap - 0.01 && t < SLAP.slap + 0.06 ? Math.sin(Math.PI * (t - SLAP.slap + 0.01) / 0.07) : 0; // (the slap lands: the gun jumps)
     pose.gun[2] += 0.014 * j; pose.gun[3] += 0.035 * j;
     return pose;
