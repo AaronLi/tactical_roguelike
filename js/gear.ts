@@ -17,7 +17,7 @@ type GMe = typeof G.Me;
 type GTbl = Record<string, any>; // a data table indexed by key (js/data.ts CALIBERS, AMMO)
 type GDef = Record<string, any>; // a gun's definition (js/data.ts WEAPONS) or a gear definition (GearDef)
 // what the quartermaster's gear is (the kinds of item that go on you), and every kind of item there is
-type GearKind = 'carrier' | 'plate' | 'helmet' | 'face' | 'shoulder' | 'groin' | 'legs' | 'belt' | 'pack' | 'ifak';
+type GearKind = 'carrier' | 'plate' | 'helmet' | 'face' | 'nvg' | 'shoulder' | 'groin' | 'legs' | 'belt' | 'pack' | 'ifak';
 type ItemKind = 'gun' | 'mag' | 'ammo' | 'med' | 'frag' | 'flash' | 'tb' | 'part' | 'pouch' | 'tube' | GearKind; // ('tube': a shotgun's magazine tube, drawn as an icon only)
 // a piece of gear's definition (LIST, DEFS): the fields that only some kinds have are optional
 interface GearDef {
@@ -25,7 +25,15 @@ interface GearDef {
   dur?: number; plate?: boolean; shoulder?: boolean; groin?: boolean; legs?: boolean; face?: boolean; thin?: boolean; col?: number;
   prot?: { at: string; layers: [string, number][] }[]; molle?: [number, number]; pouches?: [string, number, number][];
   kg?: number; fwd?: number; cut?: string; cover?: number; lower?: boolean; sz?: [number, number]; grids?: [number, number, string[] | null][];
+  nvg?: boolean; nv?: NvSpec; lv?: number;
 }
+// night vision (kind 'nvg', on a helmet's shroud: d.nvg): what the tubes make of the view (js/render.ts nvPass). tubes: the
+// image circles, each [left/right, up/down] of straight ahead and its radius (degrees); phos: the phosphor's colour (linear RGB);
+// gain: the most it amplifies (the tube's generation); ir: how bright its IR illuminator is (switched on: Shift+N); grain: how
+// much it scintillates in the dark; rest: how much of the plain view shows round the tubes (a monocular leaves the other
+// eye's whole field; binoculars and panoramics block most of it); persist: the phosphor's afterglow (green P43 lingers
+// longer than white P45); thermal: a thermal channel's outlines fused over it
+interface NvSpec { tubes: [number, number, number][]; phos: [number, number, number]; gain: number; ir: number; grain: number; rest: number; persist?: number; thermal?: boolean; }
 // a pouch's definition (POUCHES): w x h what it holds, mw x mh the MOLLE it takes, acc what it accepts (null: anything small)
 interface PouchDef { name: string; brand: string; w: number; h: number; mw: number; mh: number; acc: string[] | null; price: number; desc: string; split?: number; dump?: boolean; }
 // a weapon as carried (Me.makeWeapon): its definition, the rounds in it and the state of its action; other files add the rest
@@ -38,13 +46,13 @@ interface GItem {
   k: ItemKind; uid?: number;
   w: GWeapon; key: string; wid: string; cap: number; n: number; am: string; vid?: string | null; mt: string; pid: string; gid: string; dur: number;
   r: string[]; base?: string; grids?: GGrid[]; molle?: GGrid;
-  plate?: GItem | null; face?: GItem | null; shoulder?: GItem | null; groin?: GItem | null; legs?: GItem | null;
+  plate?: GItem | null; face?: GItem | null; nvg?: GItem | null; dn?: boolean; shoulder?: GItem | null; groin?: GItem | null; legs?: GItem | null;
   tid?: number;
 }
 interface GCell { it: GItem; x: number; y: number; r: number; }
 interface GGrid { id: number; w: number; h: number; accept: string[] | null; label: string; items: GCell[]; locker?: boolean; pack?: boolean; molle?: boolean; dump?: boolean; [field: string]: any; }
 const G_Gear = (() => {
-  const B = { north: 'Northmark Defense', kest: 'Kestrel Tactical', iron: 'Ironvale Arms', mer: 'Meridian Armor', sable: 'Sable Ridge', para: 'Paragon Systems', halc: 'Halcyon Labs', gray: 'Graywater Supply', vant: 'Vantage Industries' };
+  const B = { nj: 'Nightjar Optronics', north: 'Northmark Defense', kest: 'Kestrel Tactical', iron: 'Ironvale Arms', mer: 'Meridian Armor', sable: 'Sable Ridge', para: 'Paragon Systems', halc: 'Halcyon Labs', gray: 'Graywater Supply', vant: 'Vantage Industries' };
   // pouch grids: [w, h, accepts] (accepts: null = anything small, or a list of item kinds)
   const MAG = ['mag', 'ammo'], MED = ['med'];
   const LIST: GearDef[] = [
@@ -85,15 +93,31 @@ const G_Gear = (() => {
     { id: 'p.ceramic', kind: 'plate', brand: B.halc, name: 'Ceramic plate (IV)', tier: 3, price: 1600, speed: 0.98, dur: 4, prot: [{ at: 'plate', layers: [['ceramic', 9], ['pe', 6]] }], desc: 'Stops even armour-piercing rounds, cracking as it does.' },
     { id: 'p.ceramic2', kind: 'plate', brand: B.vant, name: 'Multi-hit ceramic plate (IV)', tier: 4, price: 2400, speed: 0.975, dur: 7, prot: [{ at: 'plate', layers: [['ceramic', 9.5], ['pe', 8]] }], desc: 'Level IV that holds together hit after hit.' },
     // ---------------------------------------------------------------- helmets (the top of the head; a visor covers the face)
-    { id: 'h.bump', kind: 'helmet', brand: B.north, name: 'Bump helmet', tier: 1, price: 150, kg: 0.55, fwd: 0.01, speed: 1, dur: 2, cut: 'high', prot: [{ at: 'helmet', layers: [['abs', 3]] }], desc: 'For doorframes, not bullets. Turns the odd handgun round.' },
-    { id: 'h.fast', kind: 'helmet', brand: B.kest, name: 'High-cut ballistic helmet (IIIA)', tier: 1, price: 600, kg: 1.1, fwd: 0.01, speed: 1, dur: 3, face: true, cut: 'high', prot: [{ at: 'helmet', layers: [['aramid', 8]] }], desc: 'Stops handgun rounds to the top of the head. Not your face.' },
-    { id: 'h.ach', kind: 'helmet', brand: B.iron, name: 'Full-cut combat helmet (IIIA)', tier: 2, price: 800, kg: 1.45, fwd: 0.01, speed: 0.995, dur: 4, face: true, cut: 'full', prot: [{ at: 'helmet', layers: [['aramid', 9]] }], desc: 'More coverage, more hits before it gives.' },
-    { id: 'h.rifle', kind: 'helmet', brand: B.mer, name: 'Rifle-rated helmet', tier: 3, price: 1700, kg: 1.6, fwd: 0.02, speed: 0.99, dur: 3, face: true, cut: 'high', prot: [{ at: 'helmet', layers: [['pe', 18]] }], desc: 'Turns some rifle rounds too. Still not your face.' },
+    { id: 'h.bump', kind: 'helmet', brand: B.north, name: 'Bump helmet', tier: 1, price: 150, kg: 0.55, fwd: 0.01, speed: 1, dur: 2, cut: 'high', nvg: true, prot: [{ at: 'helmet', layers: [['abs', 3]] }], desc: 'For doorframes, not bullets. Turns the odd handgun round.' },
+    { id: 'h.fast', kind: 'helmet', brand: B.kest, name: 'High-cut ballistic helmet (IIIA)', tier: 1, price: 600, kg: 1.1, fwd: 0.01, speed: 1, dur: 3, face: true, cut: 'high', nvg: true, prot: [{ at: 'helmet', layers: [['aramid', 8]] }], desc: 'Stops handgun rounds to the top of the head. Not your face.' },
+    { id: 'h.ach', kind: 'helmet', brand: B.iron, name: 'Full-cut combat helmet (IIIA)', tier: 2, price: 800, kg: 1.45, fwd: 0.01, speed: 0.995, dur: 4, face: true, cut: 'full', nvg: true, prot: [{ at: 'helmet', layers: [['aramid', 9]] }], desc: 'More coverage, more hits before it gives.' },
+    { id: 'h.rifle', kind: 'helmet', brand: B.mer, name: 'Rifle-rated helmet', tier: 3, price: 1700, kg: 1.6, fwd: 0.02, speed: 0.99, dur: 3, face: true, cut: 'high', nvg: true, prot: [{ at: 'helmet', layers: [['pe', 18]] }], desc: 'Turns some rifle rounds too. Still not your face.' },
     // ---------------------------------------------------------------- face protection (on a helmet's mount: face: true)
     // cover: the share of rounds to the face it's in the way of (a mandible guards the jaw, a shield the lot)
     { id: 'f.mandible', kind: 'face', brand: B.kest, name: 'Mandible guard', tier: 1, price: 350, kg: 0.45, fwd: 0.11, speed: 0.995, dur: 2, cover: 0.4, lower: true, prot: [{ at: 'face', layers: [['pc', 10]] }], desc: 'Bolts on under the rim and guards the jaw: in the way of about two face hits in five. Handgun-rated.' },
     { id: 'f.shield', kind: 'face', brand: B.iron, name: 'Ballistic face shield (IIIA)', tier: 2, price: 750, kg: 1.1, fwd: 0.13, speed: 0.985, dur: 3, cover: 0.9, prot: [{ at: 'face', layers: [['pc', 10]] }], desc: 'A polycarbonate shield over the whole face. Stops handgun rounds, not rifles.' },
     { id: 'f.rifle', kind: 'face', brand: B.mer, name: 'Rifle-rated face shield', tier: 3, price: 1900, kg: 2.4, fwd: 0.13, speed: 0.97, dur: 3, cover: 0.9, prot: [{ at: 'face', layers: [['pc', 14], ['pe', 10]] }], desc: 'Thick laminated shield over the whole face: turns some rifle rounds too. Heavy.' },
+    // ---------------------------------------------------------------- night vision (on a helmet's shroud: nvg: true). Nightjar's,
+    // sold only at their counter in the hangar (js/hangar.ts NJ). A full face shield is in the way of the eyepieces (clash).
+    // Their tier, and the level they're first stocked at (lv): a monocular from the start, binoculars a few levels in, the
+    // quad panoramics later, the fused thermal last.
+    { id: 'n.mono', kind: 'nvg', brand: B.nj, name: 'NJ-14 night vision monocular', tier: 2, lv: 0, price: 2800, kg: 0.38, fwd: 0.11, speed: 1, sz: [1, 2],
+      nv: { tubes: [[2, 0, 20]], phos: [0.32, 1.0, 0.42], gain: 260, ir: 0.3, grain: 1.25, rest: 1, persist: 0.6 },
+      desc: 'One Gen 2+ tube over your right eye: green phosphor, a 40° circle, the other eye left to see what it can. It amplifies what light there is: for a room with none, its IR illuminator (Shift+N), which other goggles can see. Focused far: red dots, holographic sights and irons work through it, magnified optics don\'t. N flips it down.' },
+    { id: 'n.bino', kind: 'nvg', brand: B.nj, name: 'NJ-31 dual-tube binocular', tier: 3, lv: 3, price: 5600, kg: 0.55, fwd: 0.12, speed: 1, sz: [2, 1],
+      nv: { tubes: [[-4.5, 0, 20], [4.5, 0, 20]], phos: [0.3, 1.0, 0.45], gain: 420, ir: 0.3, grain: 1, rest: 0.18, persist: 0.55 },
+      desc: 'A Gen 3 tube for each eye: depth, a brighter and cleaner picture, a 40° field, green phosphor, an IR illuminator (Shift+N). Use a red dot or holographic sight: a magnified scope, prism or magnifier is out of focus through them. N flips them down.' },
+    { id: 'n.pano', kind: 'nvg', brand: B.nj, name: 'NJ-97 quad-tube panoramic', tier: 4, lv: 5, price: 9800, kg: 0.82, fwd: 0.13, speed: 0.995, sz: [2, 2],
+      nv: { tubes: [[-28.5, 0, 20], [-9, 0, 20], [9, 0, 20], [28.5, 0, 20]], phos: [0.8, 0.92, 1.0], gain: 620, ir: 0.35, grain: 0.75, rest: 0.1, persist: 0.4 },
+      desc: 'Four filmless white-phosphor tubes, the outer two canted out: a 97° by 40° field, the picture the operators get, and an IR illuminator (Shift+N). Red dots and holographic sights only: magnified optics are out of focus through them. N flips them down.' },
+    { id: 'n.fuse', kind: 'nvg', brand: B.nj, name: 'NJ-97F panoramic thermal fusion', tier: 4, lv: 7, price: 14500, kg: 0.95, fwd: 0.13, speed: 0.995, sz: [2, 2],
+      nv: { tubes: [[-28.5, 0, 20], [-9, 0, 20], [9, 0, 20], [28.5, 0, 20]], phos: [0.8, 0.92, 1.0], gain: 620, ir: 0.35, grain: 0.75, rest: 0.1, persist: 0.4, thermal: true },
+      desc: 'The NJ-97 with a thermal core fused in: the edges of anything warm drawn over the picture in amber, a body outlined in a black room or through smoke (not through glass or walls). Red dots and holographic sights only. N flips them down, Shift+N the IR illuminator.' },
     // { id: 'h.visor', kind: 'helmet', brand: B.sable, name: 'Helmet with ballistic visor', tier: 4, price: 2800, speed: 0.97, dur: 4, cut: 'high', prot: [{ at: 'helmet', layers: [['pe', 18]] }, { at: 'face', layers: [['pc', 10]] }], desc: 'Rifle-rated, and a visor that stops handgun rounds to the face.' },
     // ---------------------------------------------------------------- belts (more pouches)
     { id: 'b.duty', kind: 'belt', brand: B.gray, name: 'Duty belt', tier: 1, price: 120, speed: 1, molle: [3, 1], pouches: [['q.pistol', 0, 0]], desc: 'One row of MOLLE, one pistol magazine pouch as issued. Too shallow for rifle pouches, and no mount for leg armour.' },
@@ -110,7 +134,7 @@ const G_Gear = (() => {
   LIST.forEach((d) => (DEFS[d.id] = d));
   // What's fitted to something you wear: its kind, and the kind of gear it goes on, which has to say so (d.plate, d.face...).
   // On it, it's it.plate, it.face...: it comes off with it, and goes wherever it goes.
-  const MOUNTS: Record<string, string> = { plate: 'carrier', face: 'helmet', shoulder: 'carrier', groin: 'carrier', legs: 'belt' };
+  const MOUNTS: Record<string, string> = { plate: 'carrier', face: 'helmet', nvg: 'helmet', shoulder: 'carrier', groin: 'carrier', legs: 'belt' };
   // pouches: w x h is what they hold (their grid inside, and their size stowed); mw x mh is the MOLLE they
   // take mounted (the same unless said: a rifle mag pouch or a med pouch hangs from one 1x1 slot)
   const POUCHES: Record<string, PouchDef> = {
@@ -122,7 +146,7 @@ const G_Gear = (() => {
     'q.med': { name: 'Med pouch', brand: B.halc, w: 2, h: 2, mw: 1, mh: 1, acc: MED, price: 150, desc: 'A 2×2 roll-out medical pouch on a single MOLLE slot: a splint and a few more.' },
   };
   // how gear sits in the locker
-  const GEAR_SIZE: Record<string, number[]> = { carrier: [3, 3], plate: [2, 3], helmet: [2, 2], face: [2, 2], shoulder: [2, 2], groin: [2, 2], legs: [2, 3], belt: [3, 1], pack: [3, 3], ifak: [2, 3] };
+  const GEAR_SIZE: Record<string, number[]> = { carrier: [3, 3], plate: [2, 3], helmet: [2, 2], face: [2, 2], nvg: [2, 1], shoulder: [2, 2], groin: [2, 2], legs: [2, 3], belt: [3, 1], pack: [3, 3], ifak: [2, 3] };
   // A gun as an item (stowed in a backpack or the locker): it's the weapon itself, magazine, build and all.
   // Long guns are wide: a pistol 2x1, a compact SMG 3x2, a carbine, rifle or shotgun 5x2, a sniper rifle or
   // LMG 6x2.
@@ -628,10 +652,20 @@ const G_Gear = (() => {
   const cond = (it: GItem) => { const d = defOf(it); return d && d.dur ? it.dur / d.dur : 0; };
   // what you're wearing that takes something of that kind, if it has the mount for it
   const mountOn = (me: GMe, m: string) => { const h = me.kit[MOUNTS[m]]; return h && defOf(h)![m] ? h : null; };
-  // is that mount there, with nothing on it?
-  const mountFree = (me: GMe, m: string) => { const h = mountOn(me, m); return !!h && !h[m]; };
+  // What's on a helmet's mount that's in the way of something else going on it: a full face shield (not a mandible) and
+  // night vision's eyepieces both sit right in front of the eyes. Null if nothing is; else what's in the way (it: what's
+  // going on, if it's known).
+  function clash(h: GItem | null | undefined, m: string, it?: GItem | null) {
+    if (!h) return null;
+    const full = (f: GItem | null | undefined) => !!f && (defOf(f)!.cover || 1) >= 0.9;
+    if (m === 'nvg' && full(h.face)) return h.face!;
+    if (m === 'face' && h.nvg && (!it || full(it))) return h.nvg;
+    return null;
+  }
+  // is that mount there, with nothing on it (and nothing in the way of it)?
+  const mountFree = (me: GMe, m: string, it?: GItem | null) => { const h = mountOn(me, m); return !!h && !h[m] && !clash(h, m, it); };
   // what you've got on your head: the helmet and what's on its mount, how heavy (kg) and how far that hangs in front of your neck (kg m: fwd, m, each)
-  const headLoad = (me: GMe) => { const h = me.kit.helmet, ds = h ? [defOf(h), h.face && defOf(h.face)].filter(Boolean) : []; return { kg: ds.reduce((s, d) => s + (d.kg || 0), 0), nose: ds.reduce((s, d) => s + (d.kg || 0) * (d.fwd || 0), 0) }; };
+  const headLoad = (me: GMe) => { const h = me.kit.helmet, ds = h ? [defOf(h), h.face && defOf(h.face), h.nvg && defOf(h.nvg)].filter(Boolean) : []; return { kg: ds.reduce((s, d) => s + (d.kg || 0), 0), nose: ds.reduce((s, d) => s + (d.kg || 0) * (d.fwd || 0), 0) }; };
   // which piece of kit a round to that zone meets: the helmet for the head and face, the plate over the chest
   // (if there is one), the carrier's soft armour anywhere else it covers
   function piece(me: GMe, zone: string, roll?: boolean) {
@@ -645,7 +679,7 @@ const G_Gear = (() => {
     return k.carrier;
   }
   function speed(me: GMe) {
-    const k = me.kit, ds = [k.helmet, k.helmet && k.helmet.face, k.carrier, k.carrier && k.carrier.plate, k.carrier && k.carrier.shoulder, k.carrier && k.carrier.groin, k.belt, k.belt && k.belt.legs, k.pack, k.ifak].map(defOf).filter(Boolean) as GDef[];
+    const k = me.kit, ds = [k.helmet, k.helmet && k.helmet.face, k.helmet && k.helmet.nvg, k.carrier, k.carrier && k.carrier.plate, k.carrier && k.carrier.shoulder, k.carrier && k.carrier.groin, k.belt, k.belt && k.belt.legs, k.pack, k.ifak].map(defOf).filter(Boolean) as GDef[];
     return ds.reduce((a, d) => a * (d.speed || 1), 1);
   }
   // the starting kit: a worn bump helmet and concealable vest, two spare pistol magazines in your pockets (no
@@ -701,7 +735,7 @@ const G_Gear = (() => {
     return base > 0 ? Math.max(1, Math.floor(base * c * c)) : 0;
   }
   return {
-    LIST, DEFS, POUCHES, MOUNTS, mountOn, mountFree, headLoad, mixed, pack, unpack, mergeBox, mergeMed, medStack, medCount, absorb, combine, setLoad, loadIn, magShape, magName, magVid, BRANDS: B, ammoFor, ammoItem, gearItem, gunItem, pouchItem, mounted, molles, pickMag, dumpGrid, dumpMag, partItem, partSize, flashItem, tbItem, stow, inField, roomFor, unloadMag, unloadGun, fillMag, fillFrom, fillGun, partCount, stashProxy, gunSize, guns, packGuns, medItem, fragItem, grid, size, isGear, fits, put, findSpot, place, removeFrom,
+    LIST, DEFS, POUCHES, MOUNTS, mountOn, mountFree, clash, headLoad, mixed, pack, unpack, mergeBox, mergeMed, medStack, medCount, absorb, combine, setLoad, loadIn, magShape, magName, magVid, BRANDS: B, ammoFor, ammoItem, gearItem, gunItem, pouchItem, mounted, molles, pickMag, dumpGrid, dumpMag, partItem, partSize, flashItem, tbItem, stow, inField, roomFor, unloadMag, unloadGun, fillMag, fillFrom, fillGun, partCount, stashProxy, gunSize, guns, packGuns, medItem, fragItem, grid, size, isGear, fits, put, findSpot, place, removeFrom,
     newKit, starter, body, all, each, feeds, rounds, count, take, swapMag, exchange, takeRounds, chamberIn, spares, refitMags, boxItem, boxCap, loadMag, loadAll, loadTargets, loadNeed, roundPrice,
     defOf, cond, piece, speed, label, price, sale,
   };

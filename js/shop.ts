@@ -9,7 +9,7 @@
 interface ShopAmmo { cal: string; am: string; n: number; }
 type ShopStock = Record<string, number>;
 // this visit's shelves (genOffers): gear ids, weapon ids by slot, special ammo, pouches and magazines, and the plate / face shield each carrier / helmet comes with
-interface ShopOffers { p: string[]; s: string[]; gear: string[]; ammo: ShopAmmo[]; pouches: { id: string; n: number }[]; mags: { id: string; n: number }[]; plates?: Record<string, string>; faces?: Record<string, string>; }
+interface ShopOffers { p: string[]; s: string[]; gear: string[]; ammo: ShopAmmo[]; pouches: { id: string; n: number }[]; mags: { id: string; n: number }[]; plates?: Record<string, string>; faces?: Record<string, string>; nvg?: string[]; njParts?: string[]; }
 // a purchase waiting on the host's say-so (take / took)
 interface ShopPending { key: string; buy: () => boolean | void; }
 // the level's report (js/game.ts shop)
@@ -51,6 +51,8 @@ const G_Shop = {
     const t = Object.create(G.Shop); t.genOffers(level, seed);
     const O = t.offers, s: ShopStock = {};
     for (const id of O.gear) s['gear:' + id] = 1;
+    for (const id of O.nvg || []) s['gear:' + id] = 1; // (Nightjar's night vision: js/hangar.ts NJ)
+    for (const id of O.njParts || []) s['part:' + id] = 1; // (and their thermal sight)
     for (const o of O.ammo) s['ammo:' + o.cal] = 1;
     for (const o of O.pouches) s['pouch:' + o.id] = o.n;
     for (const o of O.mags) s['mag:' + o.id] = o.n;
@@ -174,6 +176,12 @@ const G_Shop = {
       for (const [p, w] of odds) { x -= w; if (x <= 0) { pick = p; break; } }
       this.offers.faces[id] = pick.id;
     }
+    // Nightjar's counter (js/hangar.ts NJ): their night vision. Each model that's out by now (its tier, as the rest of the
+    // kit's, and lv: the level it's first stocked at), the monocular every visit, the dearer ones most visits.
+    // (Rolled last, so the rest of the stock is what it was before there was a Nightjar.)
+    this.offers.nvg = G.Gear.LIST.filter((d) => d.kind === 'nvg' && d.tier <= maxTier && level >= (d.lv || 0)).filter((d) => r() < (d.tier <= 2 ? 1 : 0.75)).map((d) => d.id);
+    // and the parts only they sell (the thermal riflescope: js/parts.ts seller 'nj'), most visits once it's out
+    this.offers.njParts = G.Gunsmith.LIST.filter((p) => p.seller === 'nj' && p.tier <= maxTier).filter(() => r() < 0.8).map((p) => p.id);
   },
 
   quip(kind: string) {
@@ -212,13 +220,17 @@ const G_Shop = {
       if (fc) it.face = G.Gear.gearItem(fc); // and a helmet with its face shield
       if (!this.inStock('gear:' + id)) { G.Audio.deny(); return; }
       // straight on if the slot's free, else into the locker
-      const free = () => (G.Gear.MOUNTS[d.kind] ? G.Gear.mountFree(Me, d.kind) : !Me.kit[d.kind]);
+      const free = () => (G.Gear.MOUNTS[d.kind] ? G.Gear.mountFree(Me, d.kind, it) : !Me.kit[d.kind]);
       const fits = () => free() || G.Gear.findSpot(Me.locker, it);
       if (!fits()) { G.HUD.toast('', 'No room in your locker', 1.5); G.Audio.deny(); return; }
       if (!this.afford(this.gearPrice(id))) return;
       this.take('gear:' + id, () => {
         if (!fits() || !this.spend(this.gearPrice(id))) return false;
         if (free()) { if (G.Gear.MOUNTS[d.kind]) G.Gear.mountOn(Me, d.kind)[d.kind] = it; else Me.kit[d.kind] = it; } else G.Gear.place([Me.locker], it);
+        if (d.kind === 'nvg') { // (where it went, and why)
+          const h = G.Gear.mountOn(Me, 'nvg');
+          G.HUD.toast('NIGHTJAR', G.U.esc(d.name) + ': ' + (h && h.nvg === it ? 'on your helmet. <b>N</b> flips it down' : !h ? 'in your locker (no helmet with a shroud on)' : h.nvg ? 'in your locker (your helmet has night vision on it)' : 'in your locker (a full face shield is in the way: swap it for a mandible)'), 3);
+        }
         return undefined;
       });
       return;
@@ -399,6 +411,11 @@ const G_Shop = {
     const kinds = [['pistols', 'p9'], ['compact SMGs', 'mp5'], ['rifles and shotguns', 'm4'], ['sniper rifles and LMGs', 'r700']].filter(([, id]) => ok(G.Gear.gunSize(G.WEAPONS[id]))).map(([n]) => n);
     return kinds.length ? 'takes ' + kinds.join(', ') : 'no guns';
   },
+  // what a set of night vision shows: its tubes and field, its phosphor
+  nvField(d: GDef) {
+    const v = d.nv as NvSpec, n = v.tubes.length, w = Math.round(Math.max(...v.tubes.map((t) => t[0] + t[2])) - Math.min(...v.tubes.map((t) => t[0] - t[2]))), h = Math.round(v.tubes[0][2] * 2);
+    return `${n === 1 ? 'one tube, one eye' : n === 2 ? 'two tubes, both eyes' : 'four tubes, panoramic'} · ${w === h ? w + '°' : w + '° × ' + h + '°'} · ${v.phos[0] > 0.6 ? 'white' : 'green'} phosphor${v.thermal ? ' · thermal fusion' : ''}`;
+  },
   // a piece of kit's price as offered: a carrier's includes the plate fitted in it
   gearPrice(id: string) {
     const pl = this.offers && this.offers.plates && this.offers.plates[id], fc = this.offers && this.offers.faces && this.offers.faces[id];
@@ -407,7 +424,7 @@ const G_Shop = {
   gearCard(d: GDef) {
     const sold = !this.inStock('gear:' + d.id), pl = this.offers && this.offers.plates && G.Gear.DEFS[this.offers.plates[d.id]], price = this.gearPrice(d.id);
     const Me = G.Me;
-    const KN: Record<string, string> = { carrier: d.dur ? (d.plate ? 'PLATE CARRIER' : 'SOFT VEST') : 'CHEST RIG', plate: 'PLATE', helmet: 'HELMET', face: d.cover < 0.9 ? 'MANDIBLE' : 'FACE SHIELD', shoulder: 'SHOULDER ARMOUR', groin: 'PELVIS ARMOUR', legs: 'LEG ARMOUR', belt: 'BELT', pack: 'BACKPACK' };
+    const KN: Record<string, string> = { carrier: d.dur ? (d.plate ? 'PLATE CARRIER' : 'SOFT VEST') : 'CHEST RIG', plate: 'PLATE', helmet: 'HELMET', nvg: 'NIGHT VISION', face: d.cover < 0.9 ? 'MANDIBLE' : 'FACE SHIELD', shoulder: 'SHOULDER ARMOUR', groin: 'PELVIS ARMOUR', legs: 'LEG ARMOUR', belt: 'BELT', pack: 'BACKPACK' };
     const fc = this.offers && this.offers.faces && G.Gear.DEFS[this.offers.faces[d.id]];
     const cardIt = G.Gear.gearItem(d.id); if (fc) cardIt.face = G.Gear.gearItem(fc.id); // (its icon shows what's fitted)
     const B = G.Ballistics, L = B.mainLayers(d, pl), rt = L && B.rating(L);
@@ -421,6 +438,8 @@ const G_Shop = {
     const foot = [d.prot && d.prot.length ? 'Covers ' + [...new Set(d.prot.map((p: { at: string }) => B.AT_NAME[p.at] || p.at))].join(', ') : '', d.plate ? (pl ? `Fitted with <b style="color:${G.TIER_COLORS[pl.tier]}">${G.U.esc(pl.name)}</b> (${G.TIER_NAMES[pl.tier]}, ¢${G.U.fmt(pl.price)} of the price)` : 'Plate pocket') : '', pouches.length ? 'Holds ' + pouches.join(', ') + ': ' + this.packFits(d) : '', d.molle ? `MOLLE ${d.molle[0]}×${d.molle[1]}, issued with ${this.issued(d)}` : '',
       d.kind === 'helmet' && d.face ? (fc ? `Fitted with <b style="color:${G.TIER_COLORS[fc.tier]}">${G.U.esc(fc.name)}</b> (${G.TIER_NAMES[fc.tier]}, ¢${G.U.fmt(fc.price)} of the price)` : 'Mount for a face shield or mandible') : '',
       d.kind === 'face' ? `Fits helmets with a mount · in the way of ${Math.round((d.cover || 1) * 100)}% of face hits · <b>helmet not included</b>` : '',
+      d.kind === 'nvg' ? `${this.nvField(d)} · fits a helmet's shroud, not with a full face shield · <b>helmet not included</b>` : '',
+      d.kind === 'helmet' && d.nvg ? 'Shroud for night vision' : '',
       d.kind === 'plate' ? '<b>Carrier not included</b>: it goes in a plate carrier\'s pocket' : '',
       d.kind === 'shoulder' || d.kind === 'groin' ? '<b>Carrier not included</b>: it fits a plate carrier\'s mounts' : '', d.kind === 'legs' ? '<b>Belt not included</b>: it hangs from a battle belt or war belt' : '',
       d.kind === 'carrier' && (d.shoulder || d.groin) ? 'Mounts for shoulder and pelvis armour' : '', d.kind === 'belt' && d.legs ? 'Hangers for leg armour' : ''].filter(Boolean).join(' · ');
@@ -449,6 +468,7 @@ const G_Shop = {
     const O = this.offers;
     if (this.tab === 'stock') html = O.ammo.map((o: ShopAmmo) => this.ammoCard(o)).join('') + O.gear.map((id: string) => this.gearCard(G.Gear.DEFS[id])).join('') +
       [...(this.partStock || [])].sort((a, b) => +this.wished(b as string) - +this.wished(a as string)).map((id) => this.partCard(G.Gunsmith.PARTS[id as string])).join('') +
+      ((O.nvg || []).length || (O.njParts || []).length ? `<h3 class="shop-sub">Nightjar Optronics · night vision and thermal</h3>` + (O.nvg || []).map((id: string) => this.gearCard(G.Gear.DEFS[id])).join('') + (O.njParts || []).map((id: string) => this.partCard(G.Gunsmith.PARTS[id])).join('') : '') +
       `<h3 class="shop-sub">Pouches and magazines</h3>` + O.pouches.map((o: { id: string }) => this.pouchCard(o.id)).join('') + O.mags.map((o: { id: string }) => this.magCard(o.id)).join('');
     else if (this.tab === 'svc') html = this.services().map((s: ShopService) => `<div class="card">
         <div class="ch"><span class="cn">${s.name}</span></div>${s.sel || ''}<div class="cd">${s.desc}</div>

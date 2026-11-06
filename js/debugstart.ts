@@ -7,6 +7,9 @@
 //   ?gun=<weapon id>      your primary, its factory build; ?parts=slot:partId,slot:partId changes parts on it
 //                         (?gun=m4&parts=optic:op.bc.0,tacL:tac.bc.0)
 //   ?side=<weapon id>     your sidearm (the P9 otherwise)
+//   ?gear=<id>,<id>       gear put on you (js/gear.ts ids): worn, or fitted to what it goes on (a helmet, a carrier, a belt: one's
+//                         put on if you've none, and whatever's in the way taken off): ?gear=n.pano for the panoramic night vision
+//                         on a high-cut helmet; ?nvg flips night vision down to start with
 //   ?leader               a leader in the level for sure (one is at random from level 2: js/server.ts spawnEnemies)
 //   ?nofoes               nobody in the level; ?stronghold makes it one (js/route.ts); ?night makes it a night level
 //                         (the lights out: js/level.ts nightify)
@@ -56,6 +59,19 @@ const G_DebugStart = (() => {
       Me.weapons[w.def.slot] = w;
       say(`${w.def.name}: ${JSON.stringify(w.def.build || {})}`);
     }
+    for (const id of (q.get('gear') || '').split(',').filter(Boolean)) {
+      const Gr = G.Gear, d = Gr.DEFS[id];
+      if (!d) { say(`no gear "${id}"`); continue; }
+      const it = Gr.gearItem(id), on = Gr.MOUNTS[d.kind];
+      if (on) {
+        if (!Me.kit[on]) Me.kit[on] = Gr.gearItem(on === 'helmet' ? 'h.fast' : on === 'carrier' ? 'c.patrol' : 'b.battle');
+        const h = Me.kit[on], c = Gr.clash(h, d.kind, it);
+        if (c) h[c.k] = null;
+        h[d.kind] = it;
+      } else Me.kit[d.kind] = it;
+      if (d.kind === 'nvg' && q.has('nvg')) it.dn = true;
+      say(`wearing ${d.name}`);
+    }
   }
   function captured() {
     const g = G.Game;
@@ -92,7 +108,7 @@ const G_DebugStart = (() => {
       const g0 = G.Game;
       g0.pickRoute(G.Route.options(g0.routeMap!, g0.routeSt!.path[g0.routeSt!.path.length - 1])[0]);
       await until(() => G.Game.phase === 'level' && G.Me.pos && G.Game.map);
-      if (q.get('gun')) arm(); // (the level's kit is dealt as it starts: the gun again on top of it)
+      if (q.get('gun') || q.get('gear')) arm(); // (the level's kit is dealt as it starts: the gun and gear again on top of it)
       // out of the helicopter: the flight skipped, then out of the seat (js/landing.ts interact: F held long enough)
       const L = G.Landing;
       // (until out: a slow level, shaders still compiling, may take a while to touch down, and the seat can't be left before it has)
