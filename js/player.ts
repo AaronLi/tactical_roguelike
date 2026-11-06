@@ -962,8 +962,8 @@ const G_Me = {
     this.yaw += side * R.VIEW.y;
   },
   // A bipod (the Kodiak, or one the gun's built with: js/gunmodels.ts bipodLeg) goes down when you're lying behind it, or
-  // crouched with something in front to stand it on: a top from 35 cm under the gun to 10 cm over it (you come up onto
-  // a counter), 30 to 80 cm out, nothing in the way over it. Held still and not aimed steeply. bipodT: how far down it is (the legs: js/vmanim.ts; what it
+  // crouched or standing with something in front to stand it on (a counter crouched; a sill, a wall's top or a tall crate
+  // standing): a top from 35 cm under the gun to 10 cm over it (you come up onto it), 30 to 80 cm out, nothing in the way over it. Held still and not aimed steeply. bipodT: how far down it is (the legs: js/vmanim.ts; what it
   // does to the sway and kick: swayStep, recoilKick). BIPOD: what's left of the sway and the twitch, and of the kick.
   BIPOD: { SWAY: 0.12, ERRATIC: 0.1, KICK: 0.55, RATE: 4 },
   bipodStep(dt: number) {
@@ -971,7 +971,7 @@ const G_Me = {
     let on = false;
     if (has && !this.stowed && !this.held && this.onGround && (this.hspeed || 0) < 0.4 && Math.abs(this.pitch) < 0.35) {
       if (this.prone && this.stanceT <= 0) on = true;
-      else if (this.crouch && G.Game.map && G.Game.map.world) {
+      else if (!this.prone && !this.climb && !this.zipRide && this.seat == null && G.Game.map && G.Game.map.world) {
         const w = G.Game.map.world, dx = -Math.sin(this.yaw), dz = -Math.cos(this.yaw), y = this.pos.y + this.eyeH - 0.1 + 0.15; // (just over the gun)
         if (G.World.raycast(w, this.pos.x, y, this.pos.z, dx, 0, dz, 1).t >= 1) {
           for (const d of [0.35, 0.55, 0.75]) { const t = G.World.raycast(w, this.pos.x + dx * d, y, this.pos.z + dz * d, 0, -1, 0, 0.5).t; if (t >= 0.05 && t < 0.5) { on = true; break; } }
