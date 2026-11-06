@@ -28,6 +28,10 @@ const GUN = opt('gun', 'm4');
 const REDUB = opt('redub', null), EVENTS = opt('events', null);
 // --wet: the synth's own room on every sound (default: dry, the room left to the game); --no-space: plain mono
 const WET = args.includes('--wet'), SPACE = !args.includes('--no-space');
+// --forward <m>: every sound placed this much further out ahead of you than its part of the gun (default 0.5)
+const FORWARD = +opt('forward', '0.5');
+// --no-shots: no gunshots (they're there for a loudness reference: the game's own reports, at the game's own levels)
+const SHOTS = !args.includes('--no-shots');
 // Each gun: its caption, how it's charged, how its action is worked after a run-dry reload ('release': a bolt
 // catch or slide stop, 'rack': the handle again), and which sound goes on which moment.
 const GUNS = {
@@ -137,6 +141,9 @@ await page.evaluate(async () => {
   // an emergency (dump) reload drops the magazine on the floor (js/casings.ts dropMag): when it's let go, and from where
   const dropMag = G.Casings.dropMag.bind(G.Casings);
   G.Casings.dropMag = (def) => { const c = dropMag(def); window.__dropped = c; window.__log.push({ ev: 'magazine dropped', t: window.__clock.t(), y: c && c.p ? c.p.y : null }); return c; };
+  // the gun's reports (js/gunaudio.ts play): which sound, how loud, when
+  const gplay = G.GunAudio.play.bind(G.GunAudio);
+  G.GunAudio.play = (id, pos, who, vol = 1) => { if (!pos) window.__log.push({ ev: 'shot', t: window.__clock.t(), id, vol }); return gplay(id, pos, who, vol); };
   const sample = G.Audio.sample.bind(G.Audio);
   G.Audio.sample = (name, ...r) => { window.__log.push({ ev: name, t: window.__clock.t() }); return sample(name, ...r); };
   window.__prevM = -1;
@@ -210,6 +217,15 @@ if (REDUB) {
   await cap(T, 'Drawn, a full magazine in, nothing chambered'); await busy(); await hold(1.0);
   await cap(T, C.charge);
   await page.evaluate(() => G.Me.startReload()); await busy(); await hold(1.0);
+  if (SHOTS) {
+    // three shots, for a loudness reference: the game's own reports, mixed at its own levels against the rest
+    await cap(T, 'Fired three times (the game\'s own gunshot, for loudness)');
+    for (let i = 0; i < 3; i++) {
+      await page.evaluate(() => { const m = G.Me; m.mouse.l = true; m.pressBuf = 0.15; }); await hold(0.07);
+      await page.evaluate(() => { G.Me.mouse.l = false; }); await hold(0.45);
+    }
+    await hold(0.5);
+  }
   await cap(T, 'Magazine change with rounds left');
   await page.evaluate(() => { const w = G.Me.cur(); w.mag = 12; w.tube = w.tube.slice(-12); G.Me.startReload(); }); await busy(); await hold(1.0);
   await cap(T, C.after === 'release' ? 'Run dry: it locks open' : 'Run dry: nothing to hold it open');
@@ -289,6 +305,7 @@ worked(C.charge_, at(rearCue, 0));
 // the partial reload: the loaded magazine out, a fresh one in (at the magazine well)
 place(C.magOut[0], C.magOut[1], at('magazine out', 0), null, -2, 'well');
 place(C.magIn[0], C.magIn[1], at('insert_magazine', 0), null, -2, 'well');
+sources[sources.length - 1].calib = true;
 // run dry, an emergency reload: the empty one let go (it falls free), a fresh one in, then the action
 const dropped = log.find((e) => e.ev === 'magazine dropped'), rests = log.find((e) => e.ev === 'magazine rests');
 place(C.magOutEmpty[0], C.magOutEmpty[1], dropped ? dropped.t : at('magazine out', 1), null, -2, 'well');
@@ -309,10 +326,17 @@ if (dropped) {
   sources.push({ data, part: 'floor', t: dropped.t, what: sc.id });
   console.log(`  ${sc.id}: let go ${height.toFixed(2)} m above the floor`);
 }
-// one level for all of them (they keep their balance)
-let pk = 0;
-for (let i = 0; i < N; i++) { let v = 0; for (const s of sources) v += s.data[i]; pk = Math.max(pk, Math.abs(v)); }
-for (const s of sources) for (let i = 0; i < N; i++) s.data[i] *= 0.89 / pk;
+// Levels against the game's own mix: our magazine going in is set as loud as the game's own insert_magazine sample
+// plays (its peak at the volume it's played at, 0.7), so its gunshots, played at their own gain, sit where the game
+// puts them. (Without the game's sample: our sounds' peak at 0.89, as before.)
+const ref = await page.evaluate(() => { const b = G.Audio.samples && G.Audio.samples.insert_magazine; if (!b) return null; let m = 0; for (let c = 0; c < b.numberOfChannels; c++) { const d = b.getChannelData(c); for (let i = 0; i < d.length; i++) m = Math.max(m, Math.abs(d[i])); } return m * 0.7; });
+const peakOf = (d) => { let m = 0; for (let i = 0; i < d.length; i++) m = Math.max(m, Math.abs(d[i])); return m; };
+const calib = sources.find((s) => s.calib);
+let k;
+if (ref && calib) { k = ref / peakOf(calib.data); console.log(`  levels: our magazine-in matched to the game's insert_magazine sample (peak ${ref.toFixed(3)})`); }
+else { let pk = 0; for (let i = 0; i < N; i++) { let v = 0; for (const s of sources) v += s.data[i]; pk = Math.max(pk, Math.abs(v)); } k = 0.89 / pk; }
+for (const s of sources) for (let i = 0; i < N; i++) s.data[i] *= k;
+const shots = SHOTS ? log.filter((e) => e.ev === 'shot') : [];
 
 // ---------- placed where each part is, in the game's own acoustics ----------
 // Rendered offline in the game page: each sound through an HRTF panner at its part of the gun (where the part was
@@ -323,7 +347,8 @@ let L = new Float32Array(N), R = L, echoes = 0;
 for (const s of sources) for (let i = 0; i < N; i++) L[i] += s.data[i];
 if (SPACE) {
   const payload = sources.map((s) => ({ b64: Buffer.from(s.data.buffer).toString('base64'), rel: s.part === 'floor' ? null : partsAt(s.t)[s.part] || DEFAULT[s.part], floor: s.part === 'floor' }));
-  const res = await page.evaluate(async ({ payload, sr, rest, N }) => {
+  const muzzle = (() => { const p = (partsAt(shots[0] ? shots[0].t : 0).port || DEFAULT.port); return [p[0], p[1] + 0.02, p[2] - 0.35]; })();
+  const res = await page.evaluate(async ({ payload, sr, rest, N, FORWARD, shots, muzzle }) => {
     const unb = (s) => { const bin = atob(s), bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i); return new Float32Array(bytes.buffer); };
     const cam = G.R.camera, p = cam.position, q = cam.quaternion;
     const ctx = new OfflineAudioContext(2, N, sr);
@@ -335,29 +360,57 @@ if (SPACE) {
     for (const sp of payload) {
       const data = unb(sp.b64);
       const buf = ctx.createBuffer(1, data.length, sr); buf.copyToChannel(data, 0);
-      const pos = sp.floor ? new THREE.Vector3(rest.x, rest.y, rest.z) : p.clone().add(new THREE.Vector3(...sp.rel).applyQuaternion(q));
+      // (pushed FORWARD m further out ahead of you than the part itself)
+      const pos = sp.floor ? new THREE.Vector3(rest.x, rest.y, rest.z) : p.clone().add(new THREE.Vector3(sp.rel[0], sp.rel[1], sp.rel[2] - FORWARD).applyQuaternion(q));
       const gain = sp.floor ? Math.min(1, 0.6 / Math.max(0.6, pos.distanceTo(p))) : 1;
       const s = ctx.createBufferSource(); s.buffer = buf;
       const pan = ctx.createPanner(); pan.panningModel = 'HRTF'; pan.distanceModel = 'inverse'; pan.rolloffFactor = 0; placeAt(pan, pos);
       const g0 = ctx.createGain(); g0.gain.value = gain;
       s.connect(pan).connect(g0).connect(ctx.destination); s.start(0);
+      // The game's echo levels are for a source at least 2 m off (its gunshots); this one is closer, so its direct
+      // sound is louder against what comes back off walls metres away: by the inverse-distance law, d/2.
+      const near = Math.min(1, pos.distanceTo(p) / 2);
       const taps = G.GunAudio.echoTaps(G.Game.map, pos, p); ntaps += taps.length;
       for (const tp of taps) {
         const es = ctx.createBufferSource(); es.buffer = buf;
         const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = tp.order === 1 ? 5000 : 2800;
         const ep = ctx.createPanner(); ep.panningModel = 'HRTF'; ep.rolloffFactor = 0; placeAt(ep, tp.pos);
-        const g = ctx.createGain(); g.gain.value = tp.amp * gain;
+        const g = ctx.createGain(); g.gain.value = tp.amp * gain * near;
         es.connect(lp).connect(ep).connect(g).connect(ctx.destination); es.start(tp.delay);
+      }
+    }
+    // The gunshots: the game's own report for this spot (its room baked in, as it plays it), at its own gain, and its
+    // echo paths at its own levels, from the muzzle (out ahead of the port)
+    const GA = G.GunAudio, map = G.Game.map;
+    for (const sh of shots) {
+      const mz = p.clone().add(new THREE.Vector3(muzzle[0], muzzle[1], muzzle[2] - FORWARD).applyQuaternion(q));
+      const sig = GA.roomSig(map, p.x, p.z, GA.floorY(map, p));
+      const buf = GA.bufs.get(sh.id + '|' + GA.sigKey(sig)) || GA.dry.get(sh.id);
+      if (!buf) continue;
+      const base = GA.GAIN * (sh.vol || 1);
+      const s = ctx.createBufferSource(); s.buffer = buf;
+      const pan = ctx.createPanner(); pan.panningModel = 'HRTF'; pan.rolloffFactor = 0; placeAt(pan, mz);
+      const g = ctx.createGain(); g.gain.value = base;
+      s.connect(pan).connect(g).connect(ctx.destination); s.start(sh.t);
+      const eb = GA.dry.get(sh.id) || buf;
+      for (const tp of GA.echoTaps(map, mz, p)) {
+        const es = ctx.createBufferSource(); es.buffer = eb;
+        const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = tp.order === 1 ? 5000 : 2800;
+        const ep = ctx.createPanner(); ep.panningModel = 'HRTF'; ep.rolloffFactor = 0; placeAt(ep, tp.pos);
+        const eg = ctx.createGain(); eg.gain.value = base * tp.amp;
+        es.connect(lp).connect(ep).connect(eg).connect(ctx.destination); es.start(sh.t + tp.delay);
       }
     }
     const o = await ctx.startRendering();
     const enc = (a) => { const u8 = new Uint8Array(a.buffer); let str = ''; for (let i = 0; i < u8.length; i += 0x8000) str += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(str); };
     return { L: enc(o.getChannelData(0)), R: enc(o.getChannelData(1)), taps: ntaps };
-  }, { payload, sr, N, rest: rests ? { x: rests.x, y: rests.y, z: rests.z } : null });
+  }, { payload, sr, N, FORWARD, shots, muzzle, rest: rests ? { x: rests.x, y: rests.y, z: rests.z } : null });
   const dec = (s) => { const b = Buffer.from(s, 'base64'); return new Float32Array(b.buffer, b.byteOffset, b.length / 4); };
   L = dec(res.L); R = dec(res.R); echoes = res.taps;
   let m = 0; for (let i = 0; i < L.length; i++) m = Math.max(m, Math.abs(L[i]), Math.abs(R[i]));
-  for (let i = 0; i < L.length; i++) { L[i] *= 0.89 / m; R[i] *= 0.89 / m; }
+  const down = m > 0.89 ? 0.89 / m : 1; // (only down, if it would clip: the balance is the game's)
+  for (let i = 0; i < L.length; i++) { L[i] *= down; R[i] *= down; }
+  console.log(`  ${shots.length} gunshots at the game's own level; peak ${(20 * Math.log10(m)).toFixed(1)} dBFS before any trim`);
   const seen = {};
   for (const s of sources) if (s.part !== 'floor') { const r = (partsAt(s.t)[s.part] || DEFAULT[s.part]).map((v) => v.toFixed(2)).join(', '); seen[s.part] = r; }
   console.log(`  ${sources.length} sounds placed at their parts (camera-relative x, y, z m: ${Object.entries(seen).map(([k, v]) => `${k} ${v}`).join('; ')}), ${echoes} echo paths`);
