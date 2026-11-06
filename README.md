@@ -795,7 +795,6 @@ says the same), but not whose: the shooter's name isn't shown.
 
   | Core | Guns |
   |---|---|
-  | AR-15 lower receiver | M4 ↔ AR-9 (9mm, Glock magazines) |
   | AK receiver and trunnion | KV-47 ↔ AK-74M ↔ RPK |
   | AUG stock group | Steyr AUG ↔ AUG 9mm (Glock magazines) |
   | MP5 lower | MP5 ↔ MP5SD |
@@ -803,14 +802,14 @@ says the same), but not whose: the shooter's name isn't shown.
   | M14 action | M14 ↔ Mk14 EBR (chassis) |
 
   Only the receiver group changes: every other part stays exactly as it was. Optics, stocks and grips carry on.
-  But a core part made for the old gun (the M4's 5.56 barrel on an AR-9 receiver, a P9 slide on a G18 frame)
+  But a core part made for the old gun (the AUG's 5.56 barrel on its 9mm kit, a P9 slide on a G18 frame)
   doesn't fit, and the gun won't fire until the right one is in. The gunsmith always sells the right core part
   for a gun that needs one. Fitting it takes off whatever hung on the old one that doesn't fit the new one
   (a 5.56 suppressor on a 9mm barrel), to your locker, with the old barrel and the old receiver group, so you
   can convert back. If the new gun takes different rounds or magazines, the magazine comes out with its rounds.
   The converted guns are guns in their own right: they're sold, carried by suspects, and found in weapon
   cases. A convertible gun rolled for a weapon case comes built on one of its alternate receiver
-  groups 35% of the time (an M4 as an AR-9, an AK as an RPK), fitted and working. The gunsmith stocks receiver groups now and then.
+  groups 35% of the time (an AUG as an AUG 9mm, an AK as an RPK), fitted and working. The gunsmith stocks receiver groups now and then.
 - **The crossbow's scope.** It comes with a Meridian LV-12 1-12× (scroll while aiming), its marks in the first focal plane:
   they're fixed in angle and grow with the picture, so they're true at any power (`js/gunmodels.ts` `bdcTex`, in mils, drawn
   from the same sums that fly the bolts, as the gun comes from the factory: clicks at the zeroing table move the shots, not the marks). Down the post, a rung for each range to
@@ -979,7 +978,7 @@ says the same), but not whose: the shooter's name isn't shown.
     so its iron sights, or any optic, sit low on the rail), with a side rail on the right for a light or laser.
   - **Shell by shell**: lever-action, Mosin, pump shotguns, the KSG and the Benelli load one round at a time
     (a speed loader pushes in two or four).
-  - **Conversions**: some guns turn into others with a kit (an M4 into a 9mm AR-9, an AK into an RPK).
+  - **Conversions**: some guns turn into others with a kit (an AUG into an AUG 9mm, an AK into an RPK).
     See "Conversion kits" above.
   - **Slugs**: a slug shotgun that reaches out to range.
   - **Recoil** kicks hard. Each shot throws the muzzle up and to one side; a soft spring brings most of it
@@ -1821,11 +1820,7 @@ says the same), but not whose: the shooter's name isn't shown.
   spigot's ridges and the flash hider. A STANAG sits seated in the well as the photo's does (`magFit` draws the shared
   magazines to it: about 11 cm below the well, moderately curved, whatever they hold). A grip sleeve (the Talon
   vertical grip) replaces the traced grip, on the same joint and rake and clear of the guard; the other grips recolour it. **The Double Barrel** (`rcv: 'break'`, `look: 'dbl'`) is a Baikal IZH-43E, a Russian side-by-side, traced from a left-side photo (Wikimedia Commons, "ИЖ-43Е (1).jpg" by ViktorJulin, CC BY-SA 4.0) at 0.55 mm a pixel, its barrels 60 cm from the hinge: the boxlock action with its top lever and pins, the double triggers in a long guard, the Monte Carlo stock with its pistol grip and recoil pad, and the splinter fore-end with its escutcheons, shortened or stretched to the fitted wooden fore-end's length. The barrels hinge on the pin in the action's knuckle, and the fore-end, the ribs between the barrels, the bead and anything clamped to them tip open together; the two shell heads sit in the barrels' breech face in the reload. The traced stock and fore-end are drawn only while the factory ones are fitted; the gunsmith's others are the generic ones. **The QBZ-192** (`rcv: 'qbz192'`) is built by eye from photos: a tall flat-sided upper railed its whole
-  vertical grip) replaces the traced grip, on the same joint and rake and clear of the guard; the other grips recolour it. **The AR-9** (`look: 'ar9'` on the default `'ar'` receiver, `G.GunTraces.ar9`) is modelled on the Colt 9mm SMG, an AR-15 lower and upper with a 9 mm blowback
-  barrel and a magazine well fitted for the smaller cartridge, traced from a left-side photo (Wikimedia Commons, "AR Colt 9mm left.jpg", Arthurrh, CC BY-SA 3.0, turned 1.6 degrees to level the bore) at 0.506 mm a pixel, so its upper is the 210 mm of a real AR's. The real
-  gun takes Colt stick magazines; the game's takes Glock ones, in the same well. Only the receiver pair is traced: the upper, flat to the rail's seat, with the dust cover and a case deflector on the right and no forward assist (the Colt has
-  none); the lower, with its flat-fronted well flaring to a raked floor, the thin trigger guard, the A1-style grip, the magazine catch, bolt catch and selector. The carrying handle, barrel and stock are the photo's own and aren't modelled: the
-  handguard, barrel, muzzle, stock, rail and optics are the gun's usual parts, and the Glock magazine seats in the traced well. Another grip option replaces the traced grip (the lower stays); the other AR-pattern rifles still build the generic receiver. **The QBZ-192** (`rcv: 'qbz192'`) is built by eye from photos: a tall flat-sided upper railed its whole
+  vertical grip) replaces the traced grip, on the same joint and rake and clear of the guard; the other grips recolour it. **The AR-9** (`rcv: 'authored'`, `models/ar9`) is modelled in Blender on the Mk18's shared AR builder (`models/ar_kit.py`, `lower: 'glock'`): a dedicated 9 mm lower whose magazine well is fitted to a Glock magazine and raked 20 degrees like a Glock's grip (its bottom back, the magazine's top cut level so the rounds lie flat), a blowback upper with no forward assist or deflector and a shorter port, an 8" barrel, an A2 front sight base on the receiver and a 6.7" carbine handguard (nothing longer fits: the sight base is in the way, whatever the barrel), a six-position stock and an A2 grip. The reload draws the magazine out and seats it along the well's rake (`info.magRake`), and the other Glock magazines, the drum too, sit at the same rake. **The QBZ-192** (`rcv: 'qbz192'`) is built by eye from photos: a tall flat-sided upper railed its whole
   length, the rail carried on over a deep squared handguard (`hg: 'qbz'`), the lower's flared well, the charging
   handle at the front right, a folding telescoping stock (`stock: 'qbz'`). **The SIG MCX and MPX** (`rcv: 'mcx'`,
   `'mpx'`): AR-shaped, no buffer tube (the stock hinges on the back of the upper; the MPX keeps its tube stock), the

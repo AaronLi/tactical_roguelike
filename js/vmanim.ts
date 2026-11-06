@@ -190,6 +190,9 @@ const G_VMAnim = (() => {
     return lerpV(a, b, S(t0, t1, t));
   };
   const off = (p: V3, f = 0, y = 0, x = 0) => p.clone().add(new T.Vector3(x, y, -f));
+  // d metres down the magazine's axis from p (up it, d < 0): straight down, or along a raked well (js/gunrig.ts magDn), so the
+  // magazine comes out of it and goes back in the way its body points
+  const alongMag = (A: Rig['A'], p: V3, d: number) => (A.magDn ? p.clone().addScaledVector(A.magDn, d) : off(p, 0, -d));
 
   // a bolt-action's bolt: turned up (radians) and drawn back (m) at full lift and pull; how far a pistol's slide,
   // an AR's charging handle, a pump come back
@@ -270,20 +273,20 @@ const G_VMAnim = (() => {
   function magClip(t: number, h: Rig, freeDrop: boolean, how: string, seat?: number) {
     const A = h.A, pose = base();
     const m = t * (seat || 1);
-    const WB = A.WB || A.S, below = off(WB, 0.0, -0.07);
+    const WB = A.WB || A.S, below = alongMag(A, WB, 0.07), pushed = alongMag(A, WB, -0.012);
     tiltPose(pose, magTilt(m));
     if (m < 1) {
       if (how === 'retain' || how === 'pouch') {
         // old one out, carried down and stowed (the hand pauses in the pouch), a fresh one out, in
         const P = how === 'pouch' ? off(A.P, -0.02, -0.07) : A.P, Pin = off(P, 0, -0.035);
-        pose.L = path(m, [[0, A.S], [0.1, WB], [0.18, below], [0.32, P], [0.38, Pin], [0.44, Pin], [0.48, A.P], [0.53, off(A.P, 0, -0.03)], [0.58, A.P], [0.68, below], [0.74, WB], [0.78, off(WB, 0, 0.012)], [0.9, A.S], [1, A.S]]);
+        pose.L = path(m, [[0, A.S], [0.1, WB], [0.18, below], [0.32, P], [0.38, Pin], [0.44, Pin], [0.48, A.P], [0.53, off(A.P, 0, -0.03)], [0.58, A.P], [0.68, below], [0.74, WB], [0.78, pushed], [0.9, A.S], [1, A.S]]);
         pose.mag = m < 0.1 ? { mode: 'in' } : m < 0.38 ? { mode: 'hand' } : m < 0.53 ? { mode: 'gone' } : m < 0.74 ? { mode: 'hand' } : { mode: 'in' };
         if (m > 0.74 && m < 0.8) pose.gun[1] += 0.008 * Math.sin(Math.PI * (m - 0.74) / 0.06); // seat it
       } else if (freeDrop) { // pistols: the magazine falls out when you hit the release
-        pose.L = path(m, [[0, A.S], [0.12, off(A.S, -0.02, -0.04)], [0.36, A.P], [0.44, A.P], [0.58, below], [0.66, WB], [0.7, off(WB, 0, 0.012)], [0.86, A.S], [1, A.S]]);
+        pose.L = path(m, [[0, A.S], [0.12, off(A.S, -0.02, -0.04)], [0.36, A.P], [0.44, A.P], [0.58, below], [0.66, WB], [0.7, pushed], [0.86, A.S], [1, A.S]]);
         pose.mag = m < 0.06 ? { mode: 'in' } : m < 0.42 ? { mode: 'drop', at: 0.06 } : m < 0.66 ? { mode: 'hand' } : { mode: 'in' };
       } else {
-        pose.L = path(m, [[0, A.S], [0.14, WB], [0.22, below], [0.36, A.P], [0.44, A.P], [0.58, below], [0.66, WB], [0.7, off(WB, 0, 0.012)], [0.86, A.S], [1, A.S]]);
+        pose.L = path(m, [[0, A.S], [0.14, WB], [0.22, below], [0.36, A.P], [0.44, A.P], [0.58, below], [0.66, WB], [0.7, pushed], [0.86, A.S], [1, A.S]]);
         pose.mag = m < 0.14 ? { mode: 'in' } : m < 0.24 ? { mode: 'hand' } : m < 0.42 ? { mode: 'drop', at: 0.24 } : m < 0.66 ? { mode: 'hand' } : { mode: 'in' };
       }
       if (how !== 'retain' && how !== 'pouch' && m > 0.66 && m < 0.72) pose.gun[1] += 0.008 * Math.sin(Math.PI * (m - 0.66) / 0.06); // seat it
@@ -531,15 +534,16 @@ const G_VMAnim = (() => {
   // it in your hand as far as a wrist goes (mc.yaw: rolled about its length, mc.pitch: tipped toward or away) to
   // see the witness holes down its back or the rounds through a clear one. mc.k: out 0..1, mc.back: going back 0..1.
   function magCheckClip(mc: { k: number; back: number; yaw: number; pitch: number }, h: Rig, Qh: THREE.Quaternion) {
-    const A = h.A, pose = base(), WB = A.WB || A.S, below = off(WB, 0.0, -0.07);
+    const A = h.A, pose = base(), WB = A.WB || A.S, below = alongMag(A, WB, 0.07);
     const p = mc.back > 0 ? 1 - mc.back : mc.k;
     const g = S(0.0, 0.45, p);
     pose.gun[0] += 0.07 * g; pose.gun[1] -= 0.06 * g; pose.gun[5] -= 0.45 * g; pose.gun[3] -= 0.08 * g; pose.gun[4] -= 0.15 * g; // the gun down and away to the right
     pose.L = path(p, [[0, A.S], [0.22, WB], [0.4, below], [1, A.F]]);
     if (p < 0.22) { pose.mag = { mode: 'in' }; return pose; }
-    // its turn in camera space: upright, tipped as the mouse tips it, then rolled; back into the gun's frame (Qh: the gun's turn)
-    const tip = mc.pitch, k = S(0.4, 1, p);
-    const qc = new T.Quaternion().setFromEuler(new T.Euler(tip * k, mc.yaw * k, 0, 'XYZ')).multiply(A.magQ);
+    // its turn in camera space: upright, tipped as the mouse tips it, then rolled; back into the gun's frame (Qh: the gun's turn).
+    // (a raked well's magazine, info.magRake, is stood upright in the hand as it comes up: turned forward by the rake)
+    const tip = mc.pitch, k = S(0.4, 1, p), rake = (h.info as { magRake?: number | null }).magRake || 0;
+    const qc = new T.Quaternion().setFromEuler(new T.Euler(tip * k, mc.yaw * k, 0, 'XYZ')).multiply(new T.Quaternion().setFromAxisAngle(_X, rake)).multiply(A.magQ);
     pose.mag = { mode: 'chk', q: Qh.clone().invert().multiply(qc).slerp(A.magQ, 1 - S(0.22, 0.5, p)) };
     return pose;
   }
@@ -618,8 +622,8 @@ const G_VMAnim = (() => {
         if (mg.mode !== 'chk') an.mag.quaternion.copy(A.magQ);
         if (idx === 0 && !pl.reloading) magFill(a, h.chk, w, pl.magSize(w));
         if (mg.mode === 'in') an.mag.position.copy(A.magHome);
-        else if (mg.mode === 'peek') an.mag.position.copy(A.magHome).y -= mg.d!;
-        else if (mg.mode === 'rise') { an.mag.position.copy(A.magHome); an.mag.position.y -= 0.15 * (1 - mg.k!); }
+        else if (mg.mode === 'peek') an.mag.position.copy(alongMag(A, A.magHome, mg.d!));
+        else if (mg.mode === 'rise') an.mag.position.copy(alongMag(A, A.magHome, 0.15 * (1 - mg.k!)));
         else if (mg.mode === 'hand' && pose!.L) { const hand = res(pose!.L!); an.mag.position.copy(hand).sub(A.WB).add(A.magHome); }
         else if (mg.mode === 'chk' && pose!.L) { // turned in the hand about where the hand holds it
           an.mag.quaternion.copy(mg.q!);

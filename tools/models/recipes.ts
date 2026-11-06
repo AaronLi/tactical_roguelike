@@ -602,7 +602,7 @@ const G_GunRecipes = (() => {
   // A drum's, for the same check: the top round up in its feed tower and (a clear drum) the rest wound round inside
   // it, each lying along the bore, ring by ring from the outside in round the hub, the ones nearest the tower (the
   // next to feed, t near 0) first. As many as fit, standing for as many as it holds (js/vmanim.ts scales the count).
-  function drumCheck(k: Kit, f: number, y: number, R: number, dw: number, d: number, w: number, clear: boolean, rnd?: RoundDims | null) {
+  function drumCheck(k: Kit, f: number, y: number, R: number, dw: number, d: number, w: number, clear: boolean, rnd?: RoundDims | null, drop = 0) {
     const C: RoundDims = rnd || { head: 0.0096, cs: 0.045, bl: 0.012, bd: 0.0057, shell: false };
     const r = C.head / 2, oal = Math.min(C.cs + C.bl, dw * 0.92), cs = oal * C.cs / (C.cs + C.bl), bl = oal - cs, rb = C.bd / 2;
     const round = (f0: number, yy: number, x: number) => [k.cyl(r * 0.97, cs, M.brass(), f0, yy, x, C.shell ? r * 0.97 : rb * 1.15, 10), C.shell ? null : k.cyl(rb, bl, M.brass(), f0 + cs, yy, x, rb * (C.pistol ? 0.55 : 0.18), 8)];
@@ -611,7 +611,7 @@ const G_GunRecipes = (() => {
     for (const sd of [-1, 1]) k.box(w * 0.16, 0.003, d * 0.6, M.black(), f - d * 0.35 - d * 0.3 + 0.004, y + 0.0015, sd * w * 0.42);
     chk.top = round(tf, y - r + 0.0024, 0); if (!chk.top[1]) chk.top[1] = k.box(0.0001, 0.0001, 0.0001, M.brass(), tf, y);
     if (clear) {
-      const cy = y - R * 0.95, f0 = f - dw / 2 + (dw - oal) / 2, step = r * 2.1, spots: number[][] = [];
+      const cy = y - drop - R * 0.95, f0 = f - dw / 2 + (dw - oal) / 2, step = r * 2.1, spots: number[][] = [];
       for (let rr = R - r - 0.004; rr > R * 0.35 + r + 0.001; rr -= step) {
         const n = Math.floor((2 * Math.PI * rr) / step);
         for (let i = 0; i < n; i++) { const a = Math.PI / 2 + (i / n) * Math.PI * 2; spots.push([Math.cos(a) * rr, cy + Math.sin(a) * rr]); }
@@ -666,17 +666,18 @@ const G_GunRecipes = (() => {
       }
       case 'pistol': { // a pistol magazine in a carbine's well adapter (the Glock-mag conversions)
         const pd = 0.032, pw = 0.022, pl = len * 0.85;
-        k.box(pw + 0.012, 0.03, pd + 0.014, M.black(), o.f - pd / 2 - 0.007, y - 0.01);
-        k.prof([[o.f - pd / 2, y], [o.f + pd / 2, y], [o.f + pd / 2 + 0.006, y - pl], [o.f - pd / 2 + 0.006, y - pl]], pw, m);
-        k.box(pw + 0.004, 0.01, pd + 0.006, m, o.f - pd / 2 + 0.004, y - pl - 0.003);
-        return magCheck(k, (s) => [o.f + 0.006 * s, 0.006], y, pl, pw, pd, m.transparent, o.rnd);
+        const sl = o.bare ? 0 : 0.006; // (in a well of its own (o.bare): no adapter block, and straight along the well)
+        if (!o.bare) k.box(pw + 0.012, 0.03, pd + 0.014, M.black(), o.f - pd / 2 - 0.007, y - 0.01);
+        k.prof([[o.f - pd / 2, y], [o.f + pd / 2, y], [o.f + pd / 2 + sl, y - pl], [o.f - pd / 2 + sl, y - pl]], pw, m);
+        k.box(pw + 0.004, 0.01, pd + 0.006, m, o.f - pd / 2 + (o.bare ? -0.002 : 0.004), y - pl - 0.003);
+        return magCheck(k, (s) => [o.f + sl * s, sl], y, pl, pw, pd, m.transparent, o.rnd);
       }
       case 'drum': { // the round face toward the shooter, its axis along the bore
-        const R = o.r || 0.075, dw = o.dw || 0.05;
-        k.box(w, 0.03, d * 0.7, m, o.f - d * 0.35, y - 0.012);
-        k.cyl(R, dw, m, o.f - dw / 2, y - R * 0.95, 0, R, 24);
-        k.cyl(R * 0.35, dw + 0.006, M.steel(), o.f - dw / 2 - 0.003, y - R * 0.95);
-        return drumCheck(k, o.f, y, R, dw, d, w, m.transparent, o.rnd);
+        const R = o.r || 0.075, dw = o.dw || 0.05, drop = o.bare ? 0.045 : 0; // (in a well of the gun's own, deeper than an adapter's: the drum hangs below it on a longer feed tower)
+        k.box(w, 0.03 + drop, d * 0.7, m, o.f - d * 0.35, y - 0.012 - drop / 2);
+        k.cyl(R, dw, m, o.f - dw / 2, y - drop - R * 0.95, 0, R, 24);
+        k.cyl(R * 0.35, dw + 0.006, M.steel(), o.f - dw / 2 - 0.003, y - drop - R * 0.95);
+        return drumCheck(k, o.f, y, R, dw, d, w, m.transparent, o.rnd, drop);
       }
       case 'ammobox': {
         const sc = o.scale || 1;
@@ -1449,11 +1450,21 @@ const G_GunRecipes = (() => {
       const mo = Object.assign({ f: bull ? L * 0.22 : gf + 0.078, y: rcv === 'ak' ? -0.046 : rcv === 'box' ? -(o.H || 0.085) * 0.55 : -0.042 }, o.mag);
       if (rcv !== 'ar') mo.well = null; // (a magazine's well block is an AR lower's; any other gun's well is its own)
       if (o.magFit && mo.len) { mo.len *= o.magFit.len; mo.c = (mo.c || 0) * o.magFit.c; mo.d = o.magFit.d; } // (a shared magazine drawn to this gun's: the F2's short near-straight box)
+      if (A && A.info.magRake) mo.bare = true; // (a dedicated pistol-magazine well, the AR-9's: no adapter block in it, and a drum hangs below it)
       const p = k.part(mo.f, mo.y);
       k.into(p, mo.f, mo.y);
       const chk = mag(k, mo);
       if (chk) p.userData.chk = chk;
       k.into(null);
+      if (A && A.info.magRake) { // (a raked well, a Glock-pattern one: the magazine at its angle, its bottom back, each piece turned about its top, the part's origin. The part itself stays unturned (a pack's nodes are). f runs along -z: tilting the bottom back is a negative turn)
+        const q = new T.Quaternion().setFromAxisAngle(new T.Vector3(1, 0, 0), -A.info.magRake);
+        for (const c of p.children) { c.position.applyQuaternion(q); c.quaternion.premultiply(q); }
+        if (chk) { // (and its check's spine, [t, forward, up, tilt], turned with it about the top; the follower's and coils' rest poses taken again)
+          const r = A.info.magRake, cs = Math.cos(r), sn = Math.sin(r), c: any = chk;
+          if (c.spine) c.spine = c.spine.map(([t, f, y, a]: number[]) => [t, mo.f + (y - mo.y) * sn + (f - mo.f) * cs, mo.y + (y - mo.y) * cs - (f - mo.f) * sn, a - r]);
+          for (const o of [c.follower, ...(c.springs || [])]) if (o && o.mesh) Object.assign(o, { px: o.mesh.position.x, py: o.mesh.position.y, pz: o.mesh.position.z, rx: o.mesh.rotation.x });
+        }
+      }
       anim.mag = p; magAt = [mo.f, mo.y];
     }
 
@@ -1700,6 +1711,7 @@ const G_GunRecipes = (() => {
       cheek: o.cheek != null ? o.cheek : null, // (a bullpup: where your eye is, whatever's on the rail: tools/models/recipes.ts viewmodel)
       recoilBarrel: rcTravel, // (a long-recoil barrel: how far it runs back each shot, js/vmanim.ts)
       ...(A ? { grip: A.info.grip, port: A.info.port, chamberAt: A.info.chamberAt } : {}), // (the model's own)
+      ...(A && A.info.magRake ? { magRake: A.info.magRake } : {}), // (its well's rake: js/vmanim.ts draws the magazine out along it)
       ...(A && A.anchors.mount_fg ? { support: [fgF != null ? fgF : A.info.support[0], A.info.support[1], A.info.support[2]] } : {}), // (held on the I-beam's rail, or at the foregrip)
       ...(A && A.info.barrels ? { barrels: A.info.barrels, barrelGroups: A.info.barrelGroups, modeDial: A.info.modeDial } : {}), // (a gun of several barrels)
       ...(A && A.hinge ? { hinge: A.hinge } : {}), // (and its reload sequence)

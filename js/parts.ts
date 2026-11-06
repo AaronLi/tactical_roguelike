@@ -69,13 +69,10 @@ const G_Gunsmith = (() => {
       caps: [[5, false, 80, { reload: -12, ergo: 3, weight: -0.15 }, 1], [8, false, 70, {}, 1], [12, false, 260, { reload: 10, ergo: -3, weight: 0.3 }, 2], [20, true, 620, { reload: 40, ergo: -9, weight: 1.1 }, 3]] },
   };
   // Receivers: guns that are the same core (a lower, a frame, an action) with a different kit in it. The core
-  // takes any of its group's kits (a 'receiver' part), and the kit decides which gun it is: fit the AR-9 kit to
-  // an M4 and you have an AR-9; the parts that fit the new gun stay on it. Each gun's own kit is its default.
+  // takes any of its group's kits (a 'receiver' part), and the kit decides which gun it is: fit the 9mm kit to
+  // an AUG and you have an AUG 9mm; the parts that fit the new gun stay on it. Each gun's own kit is its default.
   //   kits: { gun: [brand, name, price, tier, description] }
   const RCV: Record<string, { name: string; kits: Record<string, RcvKit> }> = {
-    ar15: { name: 'AR-15 lower receiver', kits: {
-      m4: ['kestrel', 'Mk18 5.56 upper receiver group', 520, 1, 'Upper, bolt, gas system and barrel for 5.56: an Mk18 again.'],
-      ar9: ['redline', 'AR-9 9mm conversion kit', 640, 2, 'A blowback 9mm upper and a magazine-well block for Glock magazines. Turns an Mk18 into a 9mm carbine.'] } },
     ak: { name: 'AK receiver and trunnion', kits: {
       ak: ['north', 'AKM 7.62×39 barrel and bolt group', 560, 1, 'Front trunnion, bolt and barrel for 7.62×39: a KV-47.'],
       ak74: ['north', 'AK-74 5.45×39 conversion group', 620, 2, 'Trunnion, bolt and barrel for 5.45×39: an AK-74M, on AK-74 magazines.'],
@@ -95,6 +92,17 @@ const G_Gunsmith = (() => {
   };
   const RCV_OF: Record<string, string> = {};
   for (const [grp, r] of Object.entries(RCV)) for (const id of Object.keys(r.kits)) RCV_OF[id] = grp;
+  // (retired groups: the AR-15's. The AR-9 is a gun of its own now, a dedicated 9 mm lower with a Glock magazine's well, so
+  // no kit turns an Mk18 into one or back, and neither has a receiver slot. Their kits are still made, retired, where they
+  // always were (a part's id in a code is its place in the list, so the parts after them keep theirs): a saved build or a
+  // replay code with either decodes without it, the gun it names on its own factory receiver (decode skips a retired part))
+  const RCV_RETIRED: Record<string, { name: string; kits: Record<string, RcvKit> }> = {
+    ar15: { name: 'AR-15 lower receiver', kits: {
+      m4: ['kestrel', 'Mk18 5.56 upper receiver group', 520, 1, 'Upper, bolt, gas system and barrel for 5.56: an Mk18 again.'],
+      ar9: ['redline', 'AR-9 9mm conversion kit', 640, 2, 'A blowback 9mm upper and a magazine-well block for Glock magazines. Turns an Mk18 into a 9mm carbine.'] } },
+  };
+  const RETIRED_OF: Record<string, string> = {};
+  for (const [grp, r] of Object.entries(RCV_RETIRED)) for (const id of Object.keys(r.kits)) RETIRED_OF[id] = grp;
   // machine pistols (and the Glocks) take a stock; tube shotguns a side saddle or a speed loader. Neither
   // comes fitted.
   const PSTOCK = new Set(['p9', 'g18', 'g19', 'auto9']), SGLOAD = new Set(['pump', 'ksg', 'slug', 'benelli']);
@@ -466,7 +474,7 @@ const G_Gunsmith = (() => {
     if (IFACE[mount]) return IFACE[mount];
     const [kind, rest] = mount.split(':');
     if (kind === 'mz') return `${THREAD[rest] || rest} muzzle thread`;
-    if (kind === 'rcv') return RCV[rest] ? RCV[rest].name : mount;
+    if (kind === 'rcv') return RCV[rest] ? RCV[rest].name : RCV_RETIRED[rest] ? RCV_RETIRED[rest].name : mount;
     if ((kind === 'br' || kind === 'pbr') && (G.CALIBERS as Record<string, any>)[rest]) return `${(G.CALIBERS as Record<string, any>)[rest].name} ${kind === 'br' ? 'rifle barrel' : 'pistol barrel'}`;
     const w = G.WEAPONS[rest];
     const what = { br: 'barrel extension', pbr: 'barrel', mag: 'magazine well', sl: 'slide rails', tube: 'magazine tube', motor: 'drive housing', cap: 'capacitor bay', limbs: 'limb pockets' }[kind] || kind;
@@ -713,6 +721,9 @@ const G_Gunsmith = (() => {
       const mount = 'rcv:' + rg, [b, n, price, tier, desc] = RCV[rg].kits[id];
       slot('receiver', mount, true);
       plat.defaults.receiver = (PARTS[`rcv.${id}`] || add({ id: `rcv.${id}`, slot: 'receiver', mount, brand: BR[b], name: n, price, tier, desc, becomes: id, model: {} })).id;
+    } else if (RETIRED_OF[id] && !PARTS[`rcv.${id}`]) { // (a retired group's kit: made, so the ids after it stay, but no slot takes it and nothing offers it)
+      const g = RETIRED_OF[id], [b, n, price, tier, desc] = RCV_RETIRED[g].kits[id];
+      add({ id: `rcv.${id}`, slot: 'receiver', mount: 'rcv:' + g, brand: BR[b], name: n, price, tier, desc, model: {}, retired: true });
     }
     if (s.motor) {
       slot('motor', 'motor:' + id, true);
@@ -818,7 +829,7 @@ const G_Gunsmith = (() => {
   P('mpx', 'rifle', { rcv: 'mpx', L: 0.2, optF: 0.1, railExt: 0.06 }, { barrel: { len: 0.16 }, thread: 'r9', muzzle: 'flash', handguard: ['ar', { t: 'mlok', len: 0.17 }], stock: ['tube', 'pdw'], grip: ['ar', 'ar'], mag: { t: 'straight', len: 0.15, d: 0.034, w: 0.022, rake: 0.008 }, optic: ['pic', { optic: 'irons' }], charging: 'ar' });
   P('benelli', 'rifle', { rcv: 'round', L: 0.24, rm: 'black', fm: 'polymer', optF: 0.12 }, { barrel: { len: 0.45, r: 0.0105 }, thread: 'sg', muzzle: 'crown', tube: 0.38, handguard: ['classic', { t: 'wood', len: 0.22, m: 'polymer' }], stock: ['tube', 'm4'], grip: ['ar', 'ar'], optic: ['pic', { optic: 'irons' }] });
   P('vepr', 'rifle', { rcv: 'ak', L: 0.34, rm: 'black', fm: 'polymer' }, { barrel: { len: 0.42, r: 0.011 }, thread: 'sg', muzzle: 'crown', handguard: ['ak', { t: 'rail', len: 0.22 }], stock: ['ak', 'skeleton'], grip: ['ak', 'wood'], mag: { t: 'straight', len: 0.13, d: 0.09, w: 0.034, rake: 0.02 }, optic: ['pic', { optic: 'irons' }] });
-  P('ar9', 'rifle', { look: 'ar9', L: 0.21, grip: 0.025, mag: { f: 0.157, y: -0.062 } }, { barrel: { len: 0.2 }, thread: 'r9', muzzle: 'flash', handguard: ['ar', { t: 'carbine', len: 0.17 }], stock: ['tube', 'm4'], grip: ['ar', 'ar'], mag: { t: 'pistol', f: 0.157, y: -0.062 }, optic: ['pic', { optic: 'irons' }], charging: 'ar' });
+  P('ar9', 'rifle', { rcv: 'authored', authored: 'ar9', L: 0.2069, hgMax: 0.17, mag: { f: 0.1592, y: -0.0503 } }, { /* (a dedicated 9 mm AR lower and upper modelled in Blender: models/ar9, built by models/ar_kit.py; L, hgMax and mag from its anchors. Its A2 front sight base is on the receiver, so nothing longer than the carbine handguard fits whatever the barrel) */ barrel: { len: 0.2 }, thread: 'r9', muzzle: 'flash', handguard: ['ar', { t: 'carbine', len: 0.17 }], stock: ['tube', 'm4'], grip: ['ar', 'ar'], mag: { t: 'pistol', f: 0.1592, y: -0.0503 }, optic: ['pic', { optic: 'irons' }], charging: 'ar' });
   P('aug9', 'rifle', { rcv: 'aug', siderails: true, mag: { f: 0.224, y: -0.074 }, L: 0.539, rm: 'black', fm: 'od', grip: 0.339, support: 0.542, optF: 0.42, cheek: 0.19, vfgM: 'od', cock: { f: 0.493, y: 0.0114, x: -0.024, travel: 0.09, recip: true, style: 'fold' } }, { barrel: { len: 0.12, m: 'black' }, thread: 'r9', muzzle: 'crown', grip: ['ar', 'ar'], mag: { t: 'pistol', f: 0.224, y: -0.074 }, optic: ['pic', { optic: 'augscope' }] });
   P('sawn', 'rifle', { rcv: 'break', rib: true, L: 0.12, fm: 'wood', barrels: [-0.0105, 0.0105], gripT: 'wood', grip: 0.0, support: 0.16 }, { barrel: { len: 0.26, r: 0.0105 }, handguard: ['classic', { t: 'wood', len: 0.12 }], grip: ['ak', 'wood', 'wood'], optic: ['pic', { optic: 'bead' }] });
   // pistols

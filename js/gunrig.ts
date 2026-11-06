@@ -102,11 +102,25 @@ const G_GunRig = (() => {
     if (info.handle) A.H = v(info.handle.grab || [info.handle.f, info.handle.y, info.handle.x]); // (where the hand takes it)
     // the bottom of the magazine, where the hand takes hold of it
     if (an.mag) {
-      const box = new T.Box3().setFromObject(an.mag);
+      // (a raked well, info.magRake: the magazine's axis turned back from straight down. magDn: down that axis, in the gun's frame;
+      // the bottom is found square to it, the magazine's points turned upright about its top, so the hand takes the floorplate's middle)
+      const rake = info.magRake || 0, up = new T.Quaternion().setFromAxisAngle(new T.Vector3(1, 0, 0), rake);
+      A.magDn = new T.Vector3(0, -1, 0).applyQuaternion(up.clone().invert());
       an.mag.updateMatrixWorld(true);
       const inv = new T.Matrix4().copy(group.matrixWorld).invert();
-      box.applyMatrix4(inv);
+      const box = new T.Box3(), home = an.mag.position.clone();
+      if (!rake) box.setFromObject(an.mag).applyMatrix4(inv);
+      else {
+        const p = new T.Vector3();
+        an.mag.traverse((o: any) => {
+          const pos = o.isMesh && o.geometry && o.geometry.attributes.position;
+          if (!pos) return;
+          const m = new T.Matrix4().multiplyMatrices(inv, o.matrixWorld);
+          for (let i = 0; i < pos.count; i++) box.expandByPoint(p.fromBufferAttribute(pos, i).applyMatrix4(m).sub(home).applyQuaternion(up));
+        });
+      }
       A.WB = new T.Vector3((box.min.x + box.max.x) / 2, info.magTop ? box.max.y : box.min.y, (box.min.z + box.max.z) / 2);
+      if (rake) A.WB.applyQuaternion(up.clone().invert()).add(home);
       A.magHome = an.mag.position.clone(); A.magQ = an.mag.quaternion.clone();
       A.magGrab = A.WB.clone().sub(an.mag.position); // hand -> magazine origin offset (inverted below)
     }
@@ -151,9 +165,9 @@ type GunRigParts = { mag?: THREE.Object3D; handle?: THREE.Object3D; ch?: THREE.O
 /** Where a gun's round shows when it is checked (docs/models.md info.chamberAt). */
 interface GunRigChamberAt { side: VmChamberSide; n: number; r: number; R: number; z: number; bore?: boolean; heads: number[][]; x: number; y: number; f: number; w: number }
 /** What a model says about its moving parts and anchor points (docs/models.md `info`): [forward, up, right] each. */
-interface GunRigInfo { block?: { drop: number; lever: number } | null; modeDial?: { at: number[]; axis: number[]; modes: string[]; stepDeg: number } | null; hinge?: { sequence: { part: string; axis?: string | null; rotate_deg?: number | null; move?: number[] | null; frame?: string | null }[] } | null; anim?: Record<string, any>; grip?: number[]; support?: number[]; magAt?: number[]; port?: number[]; ch?: number[]; slide?: number[]; cylAt?: number[]; bolt?: number[]; boltTravel?: number; cup?: number[]; magTop?: boolean; recoilBarrel?: number; load?: { at: number[][]; pitch: number }; breech?: { at: number[]; pitch: number; long: string }; handle?: { grab?: number[]; f: number; y: number; x: number; travel: number; recip?: boolean }; chamberAt?: GunRigChamberAt; quarrelMats?: { nock?: THREE.MeshStandardMaterial } }
+interface GunRigInfo { magRake?: number | null; block?: { drop: number; lever: number } | null; modeDial?: { at: number[]; axis: number[]; modes: string[]; stepDeg: number } | null; hinge?: { sequence: { part: string; axis?: string | null; rotate_deg?: number | null; move?: number[] | null; frame?: string | null }[] } | null; anim?: Record<string, any>; grip?: number[]; support?: number[]; magAt?: number[]; port?: number[]; ch?: number[]; slide?: number[]; cylAt?: number[]; bolt?: number[]; boltTravel?: number; cup?: number[]; magTop?: boolean; recoilBarrel?: number; load?: { at: number[][]; pitch: number }; breech?: { at: number[]; pitch: number; long: string }; handle?: { grab?: number[]; f: number; y: number; x: number; travel: number; recip?: boolean }; chamberAt?: GunRigChamberAt; quarrelMats?: { nock?: THREE.MeshStandardMaterial } }
 /** A hand's anchor points in the gun's space (null where the gun has none), and where its parts sit at rest. */
-interface GunRigAnchors { G: THREE.Vector3; S: THREE.Vector3; W: THREE.Vector3 | null; port: THREE.Vector3 | null; ch: THREE.Vector3 | null; slide: THREE.Vector3 | null; cyl: THREE.Vector3 | null; bolt: THREE.Vector3 | null; P: THREE.Vector3; F: THREE.Vector3; load?: { at: THREE.Vector3[]; pitch: number }; breech?: { at: THREE.Vector3; pitch: number; long: string; oal: number }; cup?: THREE.Vector3 | null; H?: THREE.Vector3 | null; WB: THREE.Vector3; magHome?: THREE.Vector3; magQ: THREE.Quaternion; magGrab?: THREE.Vector3; handleHome?: THREE.Vector3; chHome?: THREE.Vector3; cylHome?: THREE.Vector3; boltHome?: THREE.Vector3; barrelHome?: THREE.Vector3; brkHome?: THREE.Vector3; block?: { at: THREE.Vector3[]; oal: number } }
+interface GunRigAnchors { G: THREE.Vector3; S: THREE.Vector3; W: THREE.Vector3 | null; port: THREE.Vector3 | null; ch: THREE.Vector3 | null; slide: THREE.Vector3 | null; cyl: THREE.Vector3 | null; bolt: THREE.Vector3 | null; P: THREE.Vector3; F: THREE.Vector3; load?: { at: THREE.Vector3[]; pitch: number }; breech?: { at: THREE.Vector3; pitch: number; long: string; oal: number }; cup?: THREE.Vector3 | null; H?: THREE.Vector3 | null; WB: THREE.Vector3; magHome?: THREE.Vector3; magQ: THREE.Quaternion; magDn?: THREE.Vector3 /* (down the magazine's axis: straight down, or a raked well's, info.magRake) */; magGrab?: THREE.Vector3; handleHome?: THREE.Vector3; chHome?: THREE.Vector3; cylHome?: THREE.Vector3; boltHome?: THREE.Vector3; barrelHome?: THREE.Vector3; brkHome?: THREE.Vector3; block?: { at: THREE.Vector3[]; oal: number } }
 /** What a magazine shows when it is looked at: the top round (case, tip), witness holes (each with the count it stands for, once stamped), the rounds drawn through a clear body. */
 interface GunRigPoseMesh { mesh: THREE.Mesh; t: number; px: number; py: number; pz: number; rx: number }
 interface GunRigMagChk { spine?: number[][]; follower?: GunRigPoseMesh; springs?: (GunRigPoseMesh & { u: number })[]; key: string; top: THREE.Mesh[]; holes: { n: number; t: number; i: number; side: number; mesh: THREE.Mesh; lab?: THREE.Mesh }[]; labCap?: number; w: number; rounds: { t: number; mesh: THREE.Mesh; tip?: THREE.Mesh }[] }
