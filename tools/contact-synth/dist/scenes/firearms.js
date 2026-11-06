@@ -937,21 +937,21 @@ function dropInside(n, at, v, end, label, base) {
     const hitIn = (what, t, db, ...rest) => hit(what, t, db + base, ...rest);
     const springCoil = { level: 0.55 * (1 - f) + 0.05, length: 6 + 6 * (1 - f), dispersion: 0.5, decay: 0.08 + 0.12 * (1 - f), brightness: 4000 };
     if (n === 0) {
-        els.push(hitIn(`follower knocks against the ${label}`, at + 0.0004, -8, v * 0.45, arFollower, end, { scatter: 0.5, radius: 2, click: 0.6, sharp: 0.6 }, inMag));
-        els.push(hitIn('empty spring boings', at + 0.0006, -10, v * 0.3, arMagSpring, shell, { scatter: 0.3, radius: 1, click: 0.1, sharp: 0.4 }, { coil: springCoil, ...inMag }));
+        els.push(hitIn(`follower knocks against the ${label}`, at + 0.0004, -8, v * 0.45, arFollower, end, { scatter: 0, radius: 2, click: 0.6, sharp: 0.6 }, inMag));
+        els.push(hitIn('empty spring boings', at + 0.0006, -10, v * 0.3, arMagSpring, shell, { scatter: 0, radius: 1, click: 0.1, sharp: 0.4 }, { coil: springCoil, ...inMag }));
         // The follower, nothing holding it but the spring, bounces back and taps the walls.
         for (const [dt, k] of [[0.009, 0.25], [0.016, 0.15]])
-            els.push(hitIn('follower rattles in the shell', at + dt, -16, v * k, arFollower, shell, { scatter: 0.8, radius: 1.5, click: 0.5, sharp: 0.6 }, inMag));
+            els.push(hitIn('follower rattles in the shell', at + dt, -16, v * k, arFollower, shell, { scatter: 0, radius: 1.5, click: 0.5, sharp: 0.6 }, inMag));
         return els;
     }
     // The stack lands on the end through the rounds' soft lead and copper tips and the follower: a
     // dull, heavy push into the whole shell rather than a sharp knock on the end piece.
-    els.push(hitIn(`stack slams against the ${label}`, at + 0.0006, -9 + 6 * f, v * (0.35 + 0.25 * f), stack, { ...shell, density: (shell.density ?? 2700) * (1 + 3 * f) }, { scatter: 0.4, radius: 4, click: 0.5, sharp: 0.5 }, inMag));
-    els.push(hitIn('spring takes up the stack', at + 0.0008, -14 + 4 * (1 - f), v * 0.3, arMagSpring, shell, { scatter: 0.3, radius: 1, click: 0.05, sharp: 0.3 }, { coil: springCoil, ...inMag }));
+    els.push(hitIn(`stack slams against the ${label}`, at + 0.0006, -9 + 6 * f, v * (0.35 + 0.25 * f), stack, { ...shell, density: (shell.density ?? 2700) * (1 + 3 * f) }, { scatter: 0, radius: 4, click: 0.5, sharp: 0.5 }, inMag));
+    els.push(hitIn('spring takes up the stack', at + 0.0008, -14 + 4 * (1 - f), v * 0.3, arMagSpring, shell, { scatter: 0, radius: 1, click: 0.05, sharp: 0.3 }, { coil: springCoil, ...inMag }));
     // A light stack on a long, weak spring jumps and its cases tick; a full one is held tight.
     const ticks = Math.round(4 * (1 - f));
     for (let i = 0; i < ticks; i++)
-        els.push(hitIn('cases tick against each other', at + 0.005 + i * 0.0045 + (i % 2) * 0.0012, -13 - i * 2, v * (0.25 - i * 0.04), arCase, i % 2 ? shell : arCase, { scatter: 0.7, radius: 1.5, click: 0.5, sharp: 0.55 }, inMag));
+        els.push(hitIn('cases tick against each other', at + 0.005 + i * 0.0045 + (i % 2) * 0.0012, -13 - i * 2, v * (0.25 - i * 0.04), arCase, i % 2 ? shell : arCase, { scatter: 0, radius: 1.5, click: 0.5, sharp: 0.55 }, inMag));
     return els;
 }
 /**
@@ -974,7 +974,7 @@ function dropHit(n, what, at, trim, v, part, opts, inside) {
     // A shell damped by the rounds rings only briefly, so the contact's own click would take over the
     // sound; the stack behind the wall also softens the contact. Both scale back with the load.
     const f = n / 30;
-    const opt = { scatter: opts.scatter ?? 0.4, radius: opts.radius, click: 0.8 - 0.45 * f, sharp: (opts.sharp ?? 0.85) - 0.25 * f };
+    const opt = { scatter: 0, radius: opts.radius, click: 0.8 - 0.45 * f, sharp: (opts.sharp ?? 0.85) - 0.25 * f };
     const els = [hit(what, at, gainDb, v, body, concrete, opt, inMag)];
     if (part !== shell && part.size !== shell.size)
         els.push(hit(`${what} (the ${partName(part)} rings)`, at, gainDb - 7 - 5 * f, v, part, concrete, opt, inMag));
@@ -992,7 +992,7 @@ function makeMagDrop(n, way) {
     // Toppling over from standing on an end: a ~18 cm box tips over in ~0.35 s and lands on its
     // broad side with its far end at ~sqrt(3 g L) = ~2.3 m/s (~1.2 m/s at its middle).
     const topple = (at) => [
-        ...dropHit(n, 'topples over and slaps down flat', at, 2, 1.6, shell, { radius: 10, scatter: 0.3, sharp: 0.6 }, { end: shell, label: 'side wall' }),
+        ...dropHit(n, 'topples over and slaps down flat', at, 2, 1.6, shell, { radius: 10, scatter: 0, sharp: 0.6 }, { end: shell, label: 'side wall' }),
         ...dropHit(n, 'rocks and settles', at + 0.028, 0, 0.4, edge, { radius: 4 }),
     ];
     if (way === 'bottom') {
@@ -1007,7 +1007,7 @@ function makeMagDrop(n, way) {
         // and floorplate end carry on and snap back.
         els.push(...dropHit(n, 'feed lips hit the concrete', 0, 0, DROP_V, lips, { radius: 1.5, sharp: 0.95 }, { end: lips, label: 'feed lips' }));
         if (n > 0)
-            els.push(hit('top round strikes the concrete', 0.0003, -8, DROP_V * 0.8, arCase, concrete, { scatter: 0.3, radius: 1.5, click: 0.6, sharp: 0.7 }, dropParts(n).inMag));
+            els.push(hit('top round strikes the concrete', 0.0003, -8, DROP_V * 0.8, arCase, concrete, { scatter: 0, radius: 1.5, click: 0.6, sharp: 0.7 }, dropParts(n).inMag));
         els.push(...dropHit(n, 'hops back down on the feed lips', 0.06 + 0.05 * (1 - f), 0, DROP_V * bounce * 0.5, lips, { radius: 1.5 }));
         els.push(...topple(0.4));
     }
@@ -1015,10 +1015,10 @@ function makeMagDrop(n, way) {
         // Spinning about its long axis, like a tumbling box: it lands on a folded edge, slaps over
         // onto a broad side, bounces up onto the other edge and flops back flat, each smaller.
         els.push(...dropHit(n, 'folded edge hits the concrete', 0, 0, DROP_V * 0.85, edge, { radius: 1.2, sharp: 0.9 }, { end: shell, label: 'side wall' }));
-        els.push(...dropHit(n, 'slaps over onto its side', 0.035, 2, DROP_V * 0.5, shell, { radius: 10, scatter: 0.3, sharp: 0.6 }, { end: shell, label: 'side wall' }));
+        els.push(...dropHit(n, 'slaps over onto its side', 0.035, 2, DROP_V * 0.5, shell, { radius: 10, scatter: 0, sharp: 0.6 }, { end: shell, label: 'side wall' }));
         els.push(skid(0.037, 25, -16));
         els.push(...dropHit(n, 'bounces onto the other edge', 0.035 + 0.11 * (bounce / 0.32), 0, DROP_V * bounce * 0.7, edge, { radius: 1.2 }, { end: shell, label: 'side wall' }));
-        els.push(...dropHit(n, 'flops back flat', 0.035 + 0.15 * (bounce / 0.32), 2, DROP_V * bounce * 0.45, shell, { radius: 10, scatter: 0.3, sharp: 0.6 }));
+        els.push(...dropHit(n, 'flops back flat', 0.035 + 0.15 * (bounce / 0.32), 2, DROP_V * bounce * 0.45, shell, { radius: 10, scatter: 0, sharp: 0.6 }));
         els.push(...dropHit(n, 'rocks and settles', 0.035 + 0.175 * (bounce / 0.32), 0, 0.3, edge, { radius: 4 }));
     }
     else {
@@ -1027,10 +1027,10 @@ function makeMagDrop(n, way) {
         els.push(...dropHit(n, 'floorplate corner hits the concrete', 0, 0, DROP_V * 0.8, magFloorplate, { radius: 1.5, sharp: 0.9 }, { end: magFloorplate, label: 'floorplate' }));
         els.push(...dropHit(n, 'top end whips down onto the concrete', 0.045, 0, DROP_V * 0.7, lips, { radius: 2, sharp: 0.9 }, { end: lips, label: 'feed lips' }));
         if (n > 0)
-            els.push(hit('top round strikes the concrete', 0.0453, -11, DROP_V * 0.5, arCase, concrete, { scatter: 0.3, radius: 1.5, click: 0.6, sharp: 0.7 }, dropParts(n).inMag));
+            els.push(hit('top round strikes the concrete', 0.0453, -11, DROP_V * 0.5, arCase, concrete, { scatter: 0, radius: 1.5, click: 0.6, sharp: 0.7 }, dropParts(n).inMag));
         const air = 0.1 + 0.12 * (bounce / 0.32);
         els.push(...dropHit(n, 'lands on the floorplate end again', 0.045 + air, 0, DROP_V * bounce * 0.8, magFloorplate, { radius: 2 }, { end: magFloorplate, label: 'floorplate' }));
-        els.push(...dropHit(n, 'falls flat on its side', 0.045 + air + 0.06, 2, 1.2, shell, { radius: 10, scatter: 0.3, sharp: 0.6 }, { end: shell, label: 'side wall' }));
+        els.push(...dropHit(n, 'falls flat on its side', 0.045 + air + 0.06, 2, 1.2, shell, { radius: 10, scatter: 0, sharp: 0.6 }, { end: shell, label: 'side wall' }));
         els.push(skid(0.045 + air + 0.062, 30, -17));
         els.push(...dropHit(n, 'rocks and settles', 0.045 + air + 0.085, 0, 0.3, edge, { radius: 4 }));
     }
