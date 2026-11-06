@@ -948,13 +948,13 @@ export const MAG_TYPES = {
     // AKM steel 30-round: stamped ~1 mm steel, ribbed, ~23.5 x 7.5 x 3 cm, ~0.32 kg; 7.62x39 rounds ~16 g, ~6.5 mm
     // each along its curve; a stiffer spring for the heavier stack; steel floorplate and thick steel lips.
     kv47: { id: 'kv47', name: 'KV-47 (AKM steel 30-round)', capacity: 30, dims: [0.235, 0.075, 0.03], shellMass: 0.3, followerMass: 0.02, roundMass: 0.0163, stackPerRound: 0.0065,
-        springPreload: 14, springRate: 150, wall: mat('steel'), wallMm: 1, wallModes: 4, wallDamping: 0.3, bounce: 1, edgeHardness: 1,
+        springPreload: 14, springRate: 150, wall: mat('steel'), wallMm: 1, wallModes: 4, wallDamping: 0.3, bounce: 1, edgeHardness: 1, folded: true, ribbed: { pitch: 2.5, stiffen: 2.5 },
         floorplate: { ...mat('steel'), shape: 'plate', size: 8, thickness: 1.2, modes: 1, irregularity: 0.5, damping: 0.5, level: 0 },
         lips: { ...mat('steel'), shape: 'plate', size: 5, thickness: 1.2, modes: 0, irregularity: 0.7, damping: 0.5, level: 0 },
         round: { ...arCase, size: 5.6, thickness: 7 }, follower: { ...arFollower, ...mat('steel'), modes: 1 }, spring: springWire(10, 1.3) },
     // MP5 steel 30-round (curved): ~0.8 mm steel, ~20 x 5.5 x 2.5 cm, ~0.12 kg; 9 mm rounds ~8 g, ~4.7 mm each.
     mp5: { id: 'mp5', name: 'MP5 (steel 30-round)', capacity: 30, dims: [0.2, 0.055, 0.025], shellMass: 0.12, followerMass: 0.01, roundMass: 0.008, stackPerRound: 0.0047,
-        springPreload: 9, springRate: 110, wall: mat('steel'), wallMm: 0.8, wallModes: 4, wallDamping: 0.3, bounce: 1, edgeHardness: 1,
+        springPreload: 9, springRate: 110, wall: mat('steel'), wallMm: 0.8, wallModes: 4, wallDamping: 0.3, bounce: 1, edgeHardness: 1, folded: true, ribbed: { pitch: 4, stiffen: 1.7 },
         floorplate: { ...mat('steel'), shape: 'plate', size: 6, thickness: 1, modes: 1, irregularity: 0.5, damping: 0.5, level: 0 },
         lips: { ...mat('steel'), shape: 'plate', size: 3.5, thickness: 0.8, modes: 0, irregularity: 0.7, damping: 0.5, level: 0 },
         round: { ...arCase, size: 2.9, thickness: 9 }, follower: arFollower, spring: springWire(8, 1) },
@@ -969,7 +969,10 @@ export const MAG_TYPES = {
 function dropParts(M, n) {
     const f = n / M.capacity;
     const L = M.dims[0] * 100;
-    const shell = { ...M.wall, shape: 'plate', size: L, thickness: M.wallMm, modes: Math.round(M.wallModes * (1 - 0.6 * f)), irregularity: 0.85, damping: M.wallDamping + 0.45 * f, level: 0 };
+    let shell = { ...M.wall, shape: 'plate', size: L, thickness: M.wallMm, modes: Math.round(M.wallModes * (1 - 0.6 * f)), irregularity: 0.85, damping: M.wallDamping + 0.45 * f, level: 0 };
+    // ribbed: stiffer for the same mass per area (thicker, lighter), its modes detuned and fewer clean ones
+    if (M.ribbed)
+        shell = { ...shell, thickness: M.wallMm * M.ribbed.stiffen, density: (shell.density ?? 7850) / M.ribbed.stiffen, irregularity: 1, modes: Math.min(2, shell.modes ?? 0) };
     const edge = { ...shell, size: M.dims[1] * 100, modes: 0, damping: Math.min(0.9, shell.damping + 0.25) };
     // The hollow below the stack (the stack sits at the top, against the lips).
     const airLen = Math.max(1.5, (L - 2) * (1 - f));
@@ -1068,6 +1071,11 @@ function buildMagDropScene(o, sim) {
     const Jref = mTot * DROP_V * (1 + e);
     const db = (J) => 20 * Math.log10(Math.max(1e-6, J) / Jref);
     const lips = n === 0 ? M.lips : { ...M.lips, damping: 0.6 };
+    // (folded steel: a face between the folds, its width across; the rounds pressed on it damp it as it fills)
+    // (ribbed: a panel between two ribs, short-lived: the ribs around it scatter its ring)
+    const panel = M.ribbed
+        ? { ...M.wall, shape: 'plate', size: M.ribbed.pitch, thickness: M.wallMm, modes: Math.round(3 - 1.5 * f), irregularity: 0.95, damping: 0.3 + 0.4 * f, level: 0 }
+        : { ...M.wall, shape: 'plate', size: M.dims[1] * 100, thickness: M.wallMm, modes: Math.round(4 - 2 * f), irregularity: 0.8, damping: 0.22 + 0.45 * f, level: 0 };
     const els = [];
     const opt = (radius, sharp = 0.85) => ({ scatter: 0, radius, click: (0.8 - 0.45 * f) * (0.6 + 0.4 * M.edgeHardness), sharp: (sharp - 0.25 * f) * M.edgeHardness });
     const where = (s) => (s === 'floor' ? '' : ` (${s})`);
@@ -1097,6 +1105,8 @@ function buildMagDropScene(o, sim) {
         els.push(hit(what, ct.t, g, v, loaded, sf.body, o2, loose ? { ...inMag, flex: loose.shellBuzz } : inMag));
         if (p.layer && g > -35)
             els.push(hit(`${what} (the ${p.layer === M.floorplate ? 'floorplate' : p.layer === edge ? 'edge' : 'feed lips'} rings)`, ct.t, g - 7 - 5 * f, v, p.layer, sf.body, o2, inMag));
+        if (M.folded && g > -38)
+            els.push(hit(`${what} (the folded panels clank)`, ct.t + 0.0002, g - 1 - 5 * f, v, panel, sf.body, { ...o2, radius: Math.min(o2.radius, 2) }, inMag));
         if (p.round && n > 0 && g > -35)
             els.push(hit('top round strikes' + where(ct.surface), ct.t + 0.0003, g - 8, v * 0.8, M.round, sf.body, { scatter: 0, radius: 1.5, click: 0.6, sharp: 0.7 }, inMag));
         // Loose things inside ticking against the walls: an empty follower, a light stack's cases.
