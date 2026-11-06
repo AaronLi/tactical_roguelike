@@ -1399,7 +1399,7 @@ const G_Highlights = (() => {
       if (k[0] === 'e' && fl & 8 && !r.died) { r.rig.goLimp(); pool(r); } // (a suspect down for good: limp, bleeding out)
       const reload = !r.died && !act && p[10] != null && p[10] >= 0 && p[10] < 1 ? p[10] : -1; // (a magazine change, as it was played)
       const blind = k[0] === 'e' && !r.died ? (fl & 1024 ? 1 : fl & 2048 ? 2 : 0) : 0; // (a flashbang's dazzle: hands to the eyes, reeling)
-      r.rig.update(Math.max(0.001, dt * s.rate), { pos: new T.Vector3(p[0], p[1], p[2]), yaw: p[3], pitch: p[4], crouch, prone: !!(fl & 2), climb: fl & 256 && P.map && P.map.crest ? P.map.crest.ladder : null, zip: !!(fl & 512), alert: !!(fl & 4) && !act && reload < 0 && !(fl & 768) && !blind, lean: p[6], pose, tk, act, reload, blind, state: r.died ? 'dead' : fl & 8 ? 'down' : 'alive' });
+      r.rig.update(Math.max(0.001, dt * s.rate), { pos: new T.Vector3(p[0], p[1], p[2]), yaw: p[3], pitch: p[4], crouch, prone: !!(fl & 2), climb: fl & 256 ? G.Level.ladderAt(P.map, p[0], p[2]) : null, zip: !!(fl & 512), alert: !!(fl & 4) && !act && reload < 0 && !(fl & 768) && !blind, lean: p[6], pose, tk, act, reload, blind, state: r.died ? 'dead' : fl & 8 ? 'down' : 'alive' });
     }
   }
   // Lasers, as they were: from the gun in their hands to where it landed then (frame [11]): the line and a glowing dot, from a pool

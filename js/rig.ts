@@ -955,7 +955,7 @@ const G_Rig = (() => {
       ik(rig.armR.up, rig.armR.lo, UARM * s, FARM * s, rig.body.localToWorld(rh), rig.chest.localToWorld(new T.Vector3(0.7, -0.3, 0.2)));
       ik(rig.armL.up, rig.armL.lo, UARM * s, FARM * s, rig.body.localToWorld(lh), rig.chest.localToWorld(new T.Vector3(-0.7, -0.3, 0.2)));
     }
-    // on a ladder (p.climb: the ladder, a level's crest.ladder): hands and feet on its rungs, where G.Level.ladderGrip has them
+    // on a ladder (p.climb: the ladder, one of a level's crest.ladders): hands and feet on its rungs, where G.Level.ladderGrip has them
     // for how high their feet are; the hips held off it a little and sat down into the lower foot (so it reaches its rung),
     // the knees and elbows out from it
     if (p.climb) {

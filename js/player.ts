@@ -730,30 +730,33 @@ const G_Me = {
     G.Rig.zipSwing(z.sw, ((this.pos.x - was.x) * dx + (this.pos.z - was.z) * dz) / n / Math.max(dt, 1e-3), dt); // (the swing of your own body, for the view: the same as others see)
     this.eyeH += (1.62 - this.eyeH) * Math.min(1, dt * 12);
   },
-  // The ladder up the Crest House (crest.ladder: js/level.ts crestLadder): hold F at its foot to climb onto the roof, or at its
-  // head on the roof to climb down. Onto it (ON s), carried up or down it (CLIMB m/s), off it onto the roof or the ground (OFF
+  // The ladders up the Crest House and the viewing building (crest.ladders: js/level.ts crestLadder): hold F at one's foot to
+  // climb onto the roof, or at its head on the roof to climb down (over a parapet: lifted over it, l.over). Onto it (ON s), carried up or down it (CLIMB m/s), off it onto the roof or the ground (OFF
   // s); the weapon's away till you're off, and you can look round. REACH: how close to an end you have to be.
   LADDER: { CLIMB: 1.3, ON: 0.35, OFF: 0.45, REACH: 1.1, HOLD: 0.3, OUT: 0.42 },
   ladderNear(map: LvMap) {
-    const l = map && map.crest && map.crest.ladder, R = this.LADDER.REACH;
-    if (!l) return null;
-    if (Math.abs(this.pos.y) < 0.5 && Math.hypot(l.foot[0] - this.pos.x, l.foot[1] - this.pos.z) < R) return { l, up: true };
-    if (Math.abs(this.pos.y - l.top) < 0.5 && Math.hypot(l.head[0] - this.pos.x, l.head[1] - this.pos.z) < R) return { l, up: false };
+    const R = this.LADDER.REACH;
+    for (const l of (map && map.crest && map.crest.ladders) || []) { // (y0: the ground at its foot)
+      if (Math.abs(this.pos.y - (l.y0 || 0)) < 0.5 && Math.hypot(l.foot[0] - this.pos.x, l.foot[1] - this.pos.z) < R) return { l, up: true };
+      if (Math.abs(this.pos.y - l.top) < 0.5 && Math.hypot(l.head[0] - this.pos.x, l.head[1] - this.pos.z) < R) return { l, up: false };
+    }
     return null;
   },
   climbStep(dt: number) {
     const c = this.climb!, l = c.l, C = this.LADDER, on = (y: number) => new THREE.Vector3(l.x + C.OUT, y, l.z); // (on it: just out from the wall)
+    const y0 = l.y0 || 0, over = (u: number) => (l.over || 0) * Math.sin(Math.PI * u); // (over a parapet: lifted over it between the ladder and the roof)
     c.t += dt;
     let p;
-    if (c.ph === 'on') { p = c.from.clone().lerp(on(c.from.y), G.U.smooth(0, 1, c.t / C.ON)); if (c.t >= C.ON) { c.ph = 'climb'; c.t = 0; c.y = c.from.y; } }
+    if (c.ph === 'on') { const u = G.U.smooth(0, 1, c.t / C.ON); p = c.from.clone().lerp(on(c.from.y), u); if (!c.up) p.y += over(u); if (c.t >= C.ON) { c.ph = 'climb'; c.t = 0; c.y = c.from.y; } }
     else if (c.ph === 'climb') {
-      const to = c.up ? l.top : 0;
+      const to = c.up ? l.top : y0;
       c.y += (c.up ? 1 : -1) * C.CLIMB * dt;
       if (c.up ? c.y >= to : c.y <= to) { c.y = to; c.ph = 'off'; c.t = 0; }
       p = on(c.y);
     } else {
-      const end = c.up ? new THREE.Vector3(l.head[0], l.top, l.head[1]) : new THREE.Vector3(l.foot[0], 0, l.foot[1]);
-      p = on(c.up ? l.top : 0).lerp(end, G.U.smooth(0, 1, c.t / C.OFF));
+      const end = c.up ? new THREE.Vector3(l.head[0], l.top, l.head[1]) : new THREE.Vector3(l.foot[0], y0, l.foot[1]), u = G.U.smooth(0, 1, c.t / C.OFF);
+      p = on(c.up ? l.top : y0).lerp(end, u);
+      if (c.up) p.y += over(u);
       if (c.t >= C.OFF) this.climb = null;
     }
     this.pos.copy(p); this.vel.set(0, 0, 0); this.onGround = true; this.hspeed = 0; this.crouch = false; this.prone = false;
@@ -2319,7 +2322,7 @@ const G_Me = {
       if (this.zipHold >= this.ZIP.HOLD) { this.zipHold = 0; this.fLatch = true; this.zipRide = { l: zl, ph: 'up', t: 0, s: 0, from: this.pos.clone(), was: !!this.stowed, sw: { th: 0, w: 0, v: 0, a: 0 } }; G.Audio.click(); }
       return;
     }
-    // at the foot of the Crest House's ladder, or at its head on the roof: hold F to climb (climbStep)
+    // at the foot of a roof's ladder, or at its head on the roof: hold F to climb (climbStep)
     const ld = !this.action && !this.down && !this.dead && this.ladderNear(map);
     if (ld) {
       this.ladderHold = F ? (this.ladderHold || 0) + dt : 0;

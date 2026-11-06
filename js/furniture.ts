@@ -1105,6 +1105,18 @@ const G_Furniture = (() => {
     for (let i = 0; i < 3; i++) for (const s of [-1, 1]) k.box(k.mat(GRANITE[Math.floor((v * 7 + i * 3 + s + 1) * 5) % GRANITE.length], 0.95), 0.2 + k.rnd() * 0.1, 0.2 + k.rnd() * 0.06, 0.04, -0.22 + i * 0.22 + (k.rnd() - 0.5) * 0.04, 0.16 + (i % 2) * 0.26 + k.rnd() * 0.1, s * 0.19);
     k.box(cap, 0.7, 0.09, 0.44, 0, 0.905, 0);
   } };
+  // The viewing site's railing (the Sandia Crest's, round its terraces: js/level.ts layCrest): a low wall of the same granite
+  // and coping, a steel railing on it, posts and two rails, the handrail 1.1 m up. You see, and shoot, over it and between
+  // its rails; it stops anyone walking off the edge.
+  R.siterail = { w: 0.68, d: 0.42, boxes: [[0, 0, 0.68, 0.42, 1.1]], build(k: Kit, v: number) {
+    const mortar = k.mat(0x9a8a7e, 1), cap = k.mat(0x8a7468, 0.9), steel = k.mat(0x3c4044, 0.45, 0.7);
+    k.box(mortar, 0.68, 0.5, 0.38, 0, 0.25, 0);
+    for (let i = 0; i < 3; i++) for (const s of [-1, 1]) k.box(k.mat(GRANITE[Math.floor((v * 7 + i * 3 + s + 1) * 5) % GRANITE.length], 0.95), 0.2 + k.rnd() * 0.1, 0.18 + k.rnd() * 0.05, 0.04, -0.22 + i * 0.22 + (k.rnd() - 0.5) * 0.04, 0.14 + (i % 2) * 0.16, s * 0.19);
+    k.box(cap, 0.7, 0.08, 0.44, 0, 0.54, 0);
+    k.box(steel, 0.05, 0.54, 0.05, 0, 0.85, 0); // (a post to a panel: they stand 0.67 m apart)
+    k.box(steel, 0.69, 0.05, 0.06, 0, 1.08, 0); // (the handrail)
+    k.box(steel, 0.69, 0.03, 0.03, 0, 0.82, 0);
+  } };
   // A coyote fence: latillas (peeled poles) side by side, ragged along the top, wired to rails. Too tall to see over.
   R.coyote = { w: 0.68, d: 0.14, boxes: [[0, 0, 0.68, 0.14, 1.6]], build(k: Kit, v: number) {
     const wire = k.mat(0x5a5a5a, 0.5, 0.6);

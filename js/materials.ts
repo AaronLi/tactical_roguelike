@@ -163,7 +163,7 @@ const G_Materials = (() => {
     barcart: ONE([['glass', 6]]), treadmill: C([['mild', 3]], 'iron', 0.1), winefridge: SHEET(0.7, 'water', 0.3), standdesk: ONE([['mdf', 25]]), piano: C([['hardwood', 19]], 'iron', 0.2), grandclock: C([['hardwood', 12]]), chaise: C([['fabric', 8]], 'foam'), dressform: C([['fabric', 4]], 'foam'), rolledcarpet: SOLID('wool'), samovar: ONE([['mild', 2]]),
     canisters: C([['mdf', 18]], 'goods', 0.15), almond: SHEET(0.7, 'pur', 0.5), lacetable: ONE([['hardwood', 28]]), shrine: CAB, halfbed: C([['fabric', 6]], 'foam'), nightstand: CAB, photodresser: CAB,
     boulder: SOLID('granite'), juniper: SOLID('foliage'), pinon: SOLID('hardwood'), cholla: SOLID('foliage'), chilebed: C([['pine', 38]], 'soil'), potbench: C([['pine', 22]], 'soil', 0.25), // (the Sandia Crest)
-    fruittree: SOLID('hardwood'), ristra: C([['pine', 60]], 'foliage', 0.3), scope: SHEET(3, 'iron', 0.4), cliffwall: SOLID('granite'), coyote: ONE([['pine', 50]]), mast: SHEET(2, 'goods', 0.3),
+    fruittree: SOLID('hardwood'), ristra: C([['pine', 60]], 'foliage', 0.3), scope: SHEET(3, 'iron', 0.4), cliffwall: SOLID('granite'), siterail: SOLID('granite'), coyote: ONE([['pine', 50]]), mast: SHEET(2, 'goods', 0.3),
     forklift: SHEET(4, 'iron', 0.2), billets: SOLID('mild'), ingots: SOLID('alu'), coils: C([['mild', 20]], 'mild', 0.6), console: C([['sheet', 1.5]], 'goods', 0.1),
   };
   // what shelving's parts are made of, one by one (a ray box of an open piece: js/furniture.ts)
