@@ -190,6 +190,7 @@ const G_HUD = {
         if (rate > 0) c.push(`<div class="bad">Bleeding ${(rate / e.maxHp * 100).toFixed(1)}%/s${e.bleedH ? ' (heavy)' : ''}${e.bleedL ? ` (light, clots in ${Math.max(0, 30 - (e.clotT || 0)).toFixed(0)} s)` : ''} · gone in ${left!.toFixed(1)} s</div>`);
         const f = [e.cardiac && 'heart wrecked', e.out && 'unconscious', e.spine && 'spine: paralysed', e.lung && 'collapsed lung', ...Object.keys(e.broke || {}).map((k) => `broken ${k.endsWith('L') ? 'left' : 'right'} ${k.startsWith('arm') ? 'arm' : 'leg'}`), e.collapsed && 'collapsed', e.down && 'down for good'].filter(Boolean);
         if (f.length) c.push(`<div class="warn">${f.join(' · ')}</div>`);
+        if (e.tb) c.push(`<div class="bad">Thermobaric${e.tb.n > 1 ? ' ×' + e.tb.n : ''}: burns ${pct(e.tb.burn)} · blast ${pct(e.tb.blast)}${e.tb.blast > 0.3 ? ' (lungs torn)' : ''} <span class="hb-k">of a life each</span></div>`); // (js/player.ts thermobaric: what its fireball did)
         // every organ, by region, and how much of it's gone (none: intact)
         const org = Object.entries(e.organs || {}), O = e.organs || {};
         orgHtml = (`<div class="hb-sec hb-org">${this.HB_ORGANS.map(([reg, ids]: [string, string[]]) => `<div class="hb-reg">${reg}</div>${ids.map((id: string) => { const v = O[id] || 0; return `<div class="hb-row"><span>${esc(B.ORG[id].label)}</span><span class="${v >= 100 ? 'bad' : v > 0 ? 'warn' : 'ok'}">${v >= 100 ? 'destroyed' : v > 0 ? v + '%' : 'intact'}</span></div>`; }).join('')}`).join('')}</div>`);
