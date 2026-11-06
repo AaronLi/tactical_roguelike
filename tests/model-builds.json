@@ -9738,7 +9738,7 @@
    "build": { "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "tempest.handguard", "mag": "tempest.mag", "muzzle": "tempest.mz.suppressor", "optic": "op.pic.0", "stock": "stk.smg.2", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "hailstorm",
-   "why": "default + loaded + loaded-last",
+   "why": "default",
    "build": { "barrel": "hailstorm.barrel", "optic": "hailstorm.optic", "stock": "oem.stk.classic.4" }
   },
   { "platform": "hailstorm",
@@ -9746,24 +9746,28 @@
    "build": { "barrel": "hailstorm.barrel" }
   },
   { "platform": "hailstorm",
+   "why": "loaded + loaded-last",
+   "build": { "barrel": "hailstorm.barrel", "loader": "hsl.0", "optic": "hailstorm.optic", "stock": "oem.stk.classic.4" }
+  },
+  { "platform": "hailstorm",
    "why": "opens slots: op.pic.12 in optic (riserdot) + replaced optic (op.pso.1) on the riser",
    "build": { "barrel": "hailstorm.barrel", "optic": "op.pic.12", "riserdot": "op.pso.1", "stock": "oem.stk.classic.4" }
   },
   { "platform": "hailstorm",
    "why": "lowest optic (op.pic.0)",
-   "build": { "barrel": "hailstorm.barrel", "optic": "op.pic.0", "stock": "oem.stk.classic.4" }
+   "build": { "barrel": "hailstorm.barrel", "loader": "hsl.0", "optic": "op.pic.0", "stock": "oem.stk.classic.4" }
   },
   { "platform": "hailstorm",
    "why": "tallest optic (oem.op.pic.23)",
-   "build": { "barrel": "hailstorm.barrel", "optic": "oem.op.pic.23", "stock": "oem.stk.classic.4" }
+   "build": { "barrel": "hailstorm.barrel", "loader": "hsl.0", "optic": "oem.op.pic.23", "stock": "oem.stk.classic.4" }
   },
   { "platform": "hailstorm",
-   "why": "magnifier on the lowest optic that takes one (op.auth.falcon) + magnifier behind the authored optic (op.auth.falcon)",
-   "build": { "barrel": "hailstorm.barrel", "magnifier": "mgn.0", "optic": "op.auth.falcon", "stock": "oem.stk.classic.4" }
+   "why": "magnifier on the lowest optic that takes one (op.auth.falcon)",
+   "build": { "barrel": "hailstorm.barrel", "loader": "hsl.0", "magnifier": "mgn.0", "optic": "op.auth.falcon", "stock": "oem.stk.classic.4" }
   },
   { "platform": "hailstorm",
-   "why": "magnifier on the tallest optic that takes one (op.pic.4) + magnifier behind the authored optic (op.pic.4)",
-   "build": { "barrel": "hailstorm.barrel", "magnifier": "mgn.0", "optic": "op.pic.4", "stock": "oem.stk.classic.4" }
+   "why": "magnifier on the tallest optic that takes one (op.pic.4)",
+   "build": { "barrel": "hailstorm.barrel", "loader": "hsl.0", "magnifier": "mgn.0", "optic": "op.pic.4", "stock": "oem.stk.classic.4" }
   },
   { "platform": "hailstorm",
    "why": "authored optic (op.pic.1)",
@@ -9792,6 +9796,10 @@
   { "platform": "hailstorm",
    "why": "authored optic (op.pic.4)",
    "build": { "barrel": "hailstorm.barrel", "optic": "op.pic.4", "stock": "oem.stk.classic.4" }
+  },
+  { "platform": "hailstorm",
+   "why": "magnifier behind the authored optic (op.pic.4)",
+   "build": { "barrel": "hailstorm.barrel", "magnifier": "mgn.0", "optic": "op.pic.4", "stock": "oem.stk.classic.4" }
   },
   { "platform": "hailstorm",
    "why": "authored optic (op.pic.5)",
@@ -9836,6 +9844,10 @@
   { "platform": "hailstorm",
    "why": "authored optic (op.auth.falcon)",
    "build": { "barrel": "hailstorm.barrel", "optic": "op.auth.falcon", "stock": "oem.stk.classic.4" }
+  },
+  { "platform": "hailstorm",
+   "why": "magnifier behind the authored optic (op.auth.falcon)",
+   "build": { "barrel": "hailstorm.barrel", "magnifier": "mgn.0", "optic": "op.auth.falcon", "stock": "oem.stk.classic.4" }
   }
  ]
 }

@@ -89,7 +89,7 @@ const G_Me = {
   // the weapon in hand
   slot: undefined as unknown as string,
   reloading: undefined as unknown as boolean, reloadT: undefined as unknown as number, reloadTotal: undefined as unknown as number, reloadMode: undefined as unknown as PReloadMode,
-  reloadSeat: undefined as unknown as number, reloadPackK: undefined as unknown as number, reloadN: undefined as unknown as number, reloadEv: undefined as unknown as number,
+  reloadSeat: undefined as unknown as number, reloadPackK: undefined as unknown as number, reloadN: undefined as unknown as number, reloadEv: undefined as unknown as number, loadN: undefined as unknown as number,
   reloadEmpty: undefined as unknown as boolean, reloadAct: undefined as unknown as PActKind | null,
   byHand: undefined as unknown as boolean, revOpen: undefined as unknown as boolean, revClose: undefined as unknown as boolean,
   magDropped: undefined as any, dumpDest: undefined as unknown as GGrid | null, dumped: undefined as unknown as GItem | null,
@@ -1047,6 +1047,7 @@ const G_Me = {
     this.byHand = !!w.def.handReload && w.mag > 0; // (a speed loader with rounds still in the cylinder: by hand, a round at a time)
     this.reloadAct = this.reloadEmpty && isMag && !w.def.enbloc && !w.def.akimbo && G.VMAnim.kinds(w.def).action ? (G.boltHold(w.def) ? 'release' : 'rack') : null; // (a revolver has nothing to work)
     this.reloadTimes(w.def);
+    this.loadN = this.loadCount(w, mag);
     this.revOpen = this.revHand(w.def); this.revClose = false; // (a revolver by hand: the cylinder comes out first)
     if (this.revOpen) { this.reloadTotal += G.REV.open; this.reloadT = this.reloadTotal; }
     this.reloadEv = 0;
@@ -1058,6 +1059,15 @@ const G_Me = {
     if (this.loose(w.def) || !G.Audio.sample('pull_magazine')) G.Audio.reload();
   },
   reloadTime(def: WeaponDef) { return this.byHand && def.handReload ? def.handReload : def.reload; },
+  // how many rounds the next step of a loose reload puts in: one, or with a loader several (a tube's push, the Hailstorm's Wolverine grip: three), fewer when
+  // fewer are empty or fewer are carried (of the type it takes: G.Gear takeRounds). js/vmanim.ts shows that many in the hand.
+  loadCount(w: PWeapon, mag: number) {
+    const per = w.def.perLoad || 1;
+    if (per <= 1) return 1;
+    const fs = G.Gear.feeds(this, w.def), first = fs.find((f) => f.it.am === w.ammo) ? w.ammo : fs.length ? fs[0].it.am : null;
+    const have = fs.filter((f) => f.it.am === first).reduce((a, f) => a + f.it.n, 0);
+    return Math.max(1, Math.min(per, mag - w.mag, have));
+  },
   // loaded a round (or a push of shells) at a time, this reload: a shell-fed gun, or a revolver topped up by hand
   loose(def: WeaponDef) { return def.shell || (!!this.byHand && G.revolver(def)); },
   // a revolver loaded a round at a time: it stays open till it's shut, which takes a moment (a falling block likewise: the block stays down till it's shut, js/data.ts G.fblock)
@@ -1182,7 +1192,7 @@ const G_Me = {
           this.revOpen = false;
           const got = w.mag < mag ? G.Gear.takeRounds(this, def, Math.min(def.perLoad || 1, mag - w.mag), w.ammo) : [];
           if (got.length) { G.Gear.chamberIn(w, got); G.Audio.sample('insert_magazine', 0.5, 1.6) || G.Audio.shell(); }
-          if (w.mag < mag && w.reserve > 0) { this.reloadT = this.reloadTime(def); this.reloadTotal = this.reloadT; }
+          if (w.mag < mag && w.reserve > 0) { this.reloadT = this.reloadTime(def); this.reloadTotal = this.reloadT; this.loadN = this.loadCount(w, mag); }
           else if (this.revHand(def)) this.revShut();
           else { this.reloading = false; if (this.reloadEmpty) this.rack(w); else this.feed(w); }
         } else {

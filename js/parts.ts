@@ -459,7 +459,7 @@ const G_Gunsmith = (() => {
     'stk:tube': 'AR-15 buffer tube', 'stk:ak': 'AK stock trunnion', 'stk:classic': 'Rifle stock inletting', 'stk:precision': 'Precision stock mount', 'stk:smg': 'SMG stock mount', 'stk:heavy': 'Machine-gun buttstock mount',
     'gr:ar': 'AR-15 grip mount', 'gr:ak': 'AK grip mount', 'gr:smg': 'SMG grip frame', 'gr:pistol': 'Pistol grip frame', 'gr:rev': 'Revolver grip frame',
     'hg:ar': 'AR-15 barrel nut', 'hg:ak': 'AK handguard retainer', 'hg:box': 'Rifle forend mount', 'hg:smg': 'SMG forend mount', 'hg:classic': 'Rifle fore-end inletting', 'hg:shroud': 'Barrel jacket mount',
-    'ch:ar': 'AR-15 upper receiver', pump: 'Pump action bar', loader: 'Revolver cylinder', 'stk:pistol': 'Pistol stock lug', sgload: 'Shotgun receiver', 'rm:clamp': 'Clamp-on rail mount',
+    'ch:ar': 'AR-15 upper receiver', pump: 'Pump action bar', loader: 'Revolver cylinder', 'stk:pistol': 'Pistol stock lug', sgload: 'Shotgun receiver', hsload: 'Falling-block breech', 'rm:clamp': 'Clamp-on rail mount',
     'stk:fold': 'Folding stock hinge', 'hg:mcx': 'MCX barrel nut (flush rail)', 'hg:mpx': 'MPX barrel nut (flush rail)', 'hg:qbz': 'QBZ-191 handguard mount', 'hg:g36': 'G36 handguard mount', 'gr:derringer': 'Derringer grip frame', 'rm:derringer': 'Derringer barrel rib',
   };
   function ifaceName(mount: string) {
@@ -1702,6 +1702,13 @@ const G_Gunsmith = (() => {
     PARTS['hailstorm.barrel'].name = `Hailstorm .22 ${inch.toFixed(1)}" eight-bore block`;
     PARTS['hailstorm.br.short'].name = PARTS['hailstorm.br.short'].name.replace('short barrel', 'short block'); PARTS['hailstorm.br.short'].desc = 'The block cut down: handier, a little slower out of every bore.';
     PARTS['hailstorm.br.long'].name = PARTS['hailstorm.br.long'].name.replace('match barrel', 'long block'); PARTS['hailstorm.br.long'].desc = 'A longer, heavier block: more speed out of the .22s, and a tighter group.';
+    // Its loading: by hand a round at a time (nothing fitted), or the Wolverine grip, three rounds held between the fingers of the loading hand (one in each gap
+    // between the four, bases in the palm, noses out like claws) put into three chambers at once (perLoad, js/player.ts loadCount; drawn by js/vmanim.ts blockRound).
+    // It isn't a thing on the gun but a way of holding the rounds, so it has no model: like a revolver's speed loader, it's bought and fitted as the gun's loader
+    // (a grip a little slower than one round, 3 + 3 + 2 for the eight: 0.63 s a grip against 0.42 s a round). Made here, after the gun's own parts: last in the list.
+    plat.slots.push({ slot: 'loader', mount: 'hsload', req: false, bare: true }); plat.slots.sort((a: Slot, b: Slot) => ORDER.indexOf(a.slot) - ORDER.indexOf(b.slot));
+    add({ id: 'hsl.0', slot: 'loader', mount: 'hsload', brand: BR.kestrel, name: 'Wolverine grip speed loader', price: 240, tier: 1, st: { reload: 50 }, set: { perLoad: 3 },
+      desc: 'Not a thing on the gun: a way of holding the rounds. Three .22s between the fingers of your loading hand, one in each gap, bases in the palm and noses out like claws, into three chambers at once. Each grip takes a little longer than one round; the block fills in three (3, 3, 2), well under half the time.' });
     plat.offset = {}; for (const k of STAT_KEYS) plat.offset[k] = -Object.values(plat.defaults).reduce((a, pid) => a + ((PARTS[pid] && PARTS[pid].st[k]) || 0), 0);
     addFits(plat); }
   // what an attachments box offers for a weapon: parts that go straight onto it as it's built (a slot it has now, not
@@ -1734,11 +1741,13 @@ const G_Gunsmith = (() => {
     else if (vel) add(`Velocity ${pct(vel)}`, vel > 0);
     if (s.rpm) add(`Rate ${pct(s.rpm)}`, s.rpm > 0);
     if (s.spin) add(`Spin-up ${pct(s.spin)}`, s.spin < 0);
-    if (s.reload) add(`Reload ${pct(s.reload)}`, s.reload < 0);
+    const hw = p.mount === 'hsload' && p.set && p.set.perLoad ? G.WEAPONS.hailstorm : null; // (the Wolverine grip: slower a grip, but fewer grips: what it does to filling the block from empty, G.fullReload)
+    if (hw) { const k = G.fullReload(Object.assign({}, hw, { reload: hw.reload * (1 + (s.reload || 0) / 100), perLoad: p.set.perLoad })) / G.fullReload(hw) - 1; add(`Full reload ${pct(k * 100)}`, k < 0); out.push(`<span>${(hw.reload * (1 + (s.reload || 0) / 100)).toFixed(2)} s a grip</span>`); }
+    else if (s.reload) add(`Reload ${pct(s.reload)}`, s.reload < 0);
     if (p.slot === 'handguard' && p.model && p.model.hg && p.hgScale) out.push(`<span>${(p.model.hg.len! * 39.37).toFixed(1)}"</span>`); // (its length: it fits a barrel that leaves it that much)
     if (s.weight) add(`${s.weight > 0 ? '+' : ''}${s.weight.toFixed(2)} kg`, s.weight < 0);
     if (p.becomes) out.push(`<span class="g">Becomes the ${G.U.esc(G.WEAPONS[p.becomes].name)} (${(G.CALIBERS as Record<string, CaliberDef>)[G.calOf(G.WEAPONS[p.becomes])].name})</span>`);
-    if (p.set && p.set.perLoad) out.push(`<span>${p.set.perLoad} shells a push</span>`);
+    if (p.set && p.set.perLoad) out.push(p.mount === 'hsload' ? `<span class="g">${p.set.perLoad} rounds a grip</span>` : `<span>${p.set.perLoad} shells a push</span>`); // (the Hailstorm's Wolverine grip: rounds, between the fingers)
     if (p.set && p.set.cap) out.push(`<span>${p.set.cap} rds</span>`);
     if (p.set && p.set.levels) out.push(`<span>${p.set.levels[0]}–${p.set.levels[p.set.levels.length - 1]}×</span>`);
     else if (p.set && p.set.magnif) out.push(`<span>${p.set.magnif}×</span>`);
