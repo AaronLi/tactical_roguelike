@@ -477,9 +477,13 @@ const G_Server = {
     }
     return out;
   },
-  rollCase() {
-    const odds = this.caseOdds(this.level, Math.random() < 0.75 ? 'p' : 's');
-    let x = Math.random() * odds.reduce((a: number, [, wt]: [any, number]) => a + wt, 0), w = odds[0][0];
+  // The weapon case's gun, magazines and rounds: drawn from the level's seed (salted, so it isn't the map's own draws), so a seed
+  // gives the same case every time it's played. G.Server.rollCase(seed, level) in the console says what a seed's case holds.
+  rollCase(seed?: number, level?: number) {
+    if (seed == null) seed = this.seed; if (level == null) level = this.level;
+    const r = G.U.rng((seed ^ 0x5ca5e) >>> 0);
+    const odds = this.caseOdds(level, r() < 0.75 ? 'p' : 's');
+    let x = r() * odds.reduce((a: number, [, wt]: [any, number]) => a + wt, 0), w = odds[0][0];
     for (const [cand, wt] of odds) { x -= wt; if (x <= 0) { w = cand; break; } }
     // loaded, with two full spare magazines (or that many rounds; a full box, for a gun that only holds a round or two), all of one type: mostly ball, now and then
     // something better
@@ -487,12 +491,12 @@ const G_Server = {
     // lower with the AR-9 kit in it, an AK with the RPK's, fitted and working (its barrel and all), magazines and
     // rounds to match.
     const kits = G.Gunsmith.kitsFor(w.id).filter((k) => G.obtainable(G.WEAPONS[G.Gunsmith.PARTS[k].becomes]));
-    if (kits.length && Math.random() < 0.35) w = G.WEAPONS[G.Gunsmith.PARTS[kits[Math.floor(Math.random() * kits.length)]].becomes] || w;
+    if (kits.length && r() < 0.35) w = G.WEAPONS[G.Gunsmith.PARTS[kits[Math.floor(r() * kits.length)]].becomes] || w;
     if (w.barrels) { // a gun of several barrels (its round types are different lengths of round, G.roundOf): loaded with one, a spare block of the other, and a spare of the first: both turn up
-      const keys = Object.keys(w.barrels.rounds), rl = keys[Math.floor(Math.random() * keys.length)], other = keys.filter((k) => k !== rl)[0], cap = (k: string) => w.barrels.n * w.barrels.rounds[k].per;
-      return { code: G.Gunsmith.defaultCode(w.id), mag: cap(rl), reserve: cap(rl), rl, am: G.rollAmmo(w.barrels.rounds[rl].cal), alt: other ? { rl: other, n: cap(other), am: G.rollAmmo(w.barrels.rounds[other].cal) } : undefined };
+      const keys = Object.keys(w.barrels.rounds), rl = keys[Math.floor(r() * keys.length)], other = keys.filter((k) => k !== rl)[0], cap = (k: string) => w.barrels.n * w.barrels.rounds[k].per;
+      return { code: G.Gunsmith.defaultCode(w.id), mag: cap(rl), reserve: cap(rl), rl, am: G.rollAmmo(w.barrels.rounds[rl].cal, r), alt: other ? { rl: other, n: cap(other), am: G.rollAmmo(w.barrels.rounds[other].cal, r) } : undefined };
     }
-    return { code: G.Gunsmith.defaultCode(w.id), mag: w.mag, reserve: w.mag > 2 ? w.mag * 2 : G.Gear.boxCap(G.calOf(w)), am: G.rollAmmo(G.calOf(w)) };
+    return { code: G.Gunsmith.defaultCode(w.id), mag: w.mag, reserve: w.mag > 2 ? w.mag * 2 : G.Gear.boxCap(G.calOf(w)), am: G.rollAmmo(G.calOf(w), r) };
   },
   // Something lying in the world (G.Loot), and how it's sent
   lootAdd(x: number, y: number, z: number, item: any, yaw: number, fit?: number) {
