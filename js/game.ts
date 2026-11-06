@@ -869,7 +869,7 @@ const G_Game = {
     if (G.Highlights) G.Highlights.kill(m);
     if (m.inc) { // (down already: counted then, js/server.ts incapacitate)
       const def = (G.ENEMIES as Record<string, any>)[m.ty];
-      if (m.bo) G.HUD.feed(`<span class="dim">${def ? def.name : 'Suspect'} bled out</span>`);
+      if (m.bo || m.cz) G.HUD.feed(`<span class="dim">${def ? def.name : 'Suspect'} ${m.cz === 'burns' ? 'died of burns' : m.cz === 'blast' ? 'died of blast lung' : 'bled out'}</span>`);
       return;
     }
     this.credit(m);
