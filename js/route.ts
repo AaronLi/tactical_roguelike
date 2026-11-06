@@ -113,7 +113,7 @@ const G_Route = (() => {
       const [x, y] = pos(n), th = G.THEMES[n.th], opt = st.opts.includes(n.id), here = n.id === last;
       const cls = `rn${opt ? ' opt' : ''}${visited.has(n.id) ? ' done' : ''}${here ? ' here' : ''}${n.boss ? ' boss' : ''}${st.mine === n.id ? ' mine' : ''}`;
       const rad = n.boss ? 30 : 21;
-      dots += `<g class="${cls}" data-node="${n.id}" transform="translate(${x},${y})"><title>${esc(th.name)}${n.boss ? ' (boss)' : ''}${n.stronghold ? ` - STRONGHOLD: no civilians, about half as many suspects again, +¢${strongholdPay((route.act - 1) * COLS + n.c + 1)} for clearing it` : ''}${n.night ? ' - NIGHT: the lights are out but for the emergency lights; suspects can hardly see you in the dark, unless your weapon light gives you away' : ''}</title>`;
+      dots += `<g class="${cls}" data-node="${n.id}" transform="translate(${x},${y})" aria-label="${esc(th.name)}${n.boss ? ' (boss)' : ''}${n.stronghold ? ', stronghold' : ''}${n.night ? ', night' : ''}">`; // (what it is, on hover: tip)
       dots += `<circle r="${rad}" style="--fill:${th.wall};--edge:${th.floor}"/>`;
       dots += n.boss ? `<path d="M-9 6H9 M-9 3L-10-7-4-2 0-9 4-2 10-7 9 3Z" class="ri" transform="scale(1.4)"/>`
         : `<path d="${ICON[th.name] || 'M-5-5H5V5H-5Z'}" class="ri" transform="scale(1.55)"/>`;
@@ -131,7 +131,19 @@ const G_Route = (() => {
     for (let c = 0; c < COLS; c++) cols += `<text x="${PADX + c * STEP}" y="18" class="rc">${c === COLS - 1 ? 'BOSS' : 'LEVEL ' + ((route.act - 1) * COLS + c + 1)}</text>`;
     return `<svg viewBox="0 0 ${W} ${H + 10}" class="route-svg">${cols}${lines}${dots}</svg>`;
   }
-  return { COLS, strongholdPay, gen, options, colOf, actOf, isBoss, svg };
+  // The card shown over a node while the pointer's on it (js/game.ts routeTip): the place, the level, and what's different about it
+  // (a stronghold, a night level, the boss), each with the badge it wears on the map; and whether you can go there from here.
+  function tip(route: RMap, id: number, st: RState) {
+    const n = route.nodes.get(id); if (!n) return '';
+    const esc = G.U.esc, th = G.THEMES[n.th], lvl = (route.act - 1) * COLS + n.c + 1, rows: string[] = [];
+    if (n.boss) rows.push(`<div class="tt-row boss"><i class="tt-badge"><svg viewBox="-12 -12 24 24"><path d="M-9 6H9 M-9 3L-10-7-4-2 0-9 4-2 10-7 9 3Z"/></svg></i><div><b>The Kingpin</b>The act's last level: the boss is in here</div></div>`);
+    if (n.stronghold) rows.push(`<div class="tt-row sh"><i class="tt-badge"><svg viewBox="-9 -9 18 18"><circle r="8"/><path d="M0-4.5V1 M0 3.6V3.7"/></svg></i><div><b>Stronghold</b>No civilians, about half as many suspects again. <em>+¢${strongholdPay(lvl)}</em> for clearing it</div></div>`);
+    if (n.night) rows.push(`<div class="tt-row nt"><i class="tt-badge"><svg viewBox="-9 -9 18 18"><circle r="8"/><path d="M1.6-4.6A5 5 0 1 0 1.6 4.6 4 4 0 1 1 1.6-4.6Z"/></svg></i><div><b>Night</b>The lights are out but for the emergency lights. Suspects can hardly see you in the dark, unless your weapon light gives you away</div></div>`);
+    if (!rows.length) rows.push('<div class="tt-plain">An ordinary level: civilians about, the lights on</div>');
+    const last = st.path[st.path.length - 1], foot = id === last ? 'You are here' : st.path.includes(id) ? 'Cleared' : st.opts.includes(id) ? (st.mine === id ? 'Your vote' : 'Click to vote for it') : '';
+    return `<div class="tt-head"><span>${esc(n.boss ? 'The Kingpin' : th.name)}</span><small>${n.boss ? esc(th.name) + ' &middot; ' : ''}Level ${lvl}</small></div>${rows.join('')}${foot ? `<div class="tt-foot">${foot}</div>` : ''}`;
+  }
+  return { COLS, strongholdPay, gen, options, colOf, actOf, isBoss, svg, tip };
 })();
 G.Route = G_Route;
 

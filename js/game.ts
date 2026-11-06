@@ -222,6 +222,22 @@ const G_Game = {
   },
   bindMenu() {
     this.bindLook();
+    // hovering a node on the route map: its card (js/route.ts tip), beside the pointer, kept on screen
+    const tipEl = document.createElement('div'); tipEl.id = 'routeTip'; tipEl.className = 'route-tip hidden'; document.body.appendChild(tipEl);
+    let tipOn: number | null = null;
+    this.$('routeMap').addEventListener('pointermove', ((e: PointerEvent) => {
+      const g = (e.target as HTMLElement).closest<HTMLElement>('[data-node]');
+      if (!g || !this.routeMap || !this.routeSt) { tipEl.classList.add('hidden'); tipOn = null; return; }
+      const id = +g.dataset.node!;
+      if (id !== tipOn) { tipOn = id; tipEl.innerHTML = G.Route.tip(this.routeMap, id, this.routeTipSt()); }
+      tipEl.classList.remove('hidden');
+      const w = tipEl.offsetWidth, h = tipEl.offsetHeight, W = window.innerWidth, H = window.innerHeight;
+      let x = e.clientX + 18, y = e.clientY + 18;
+      if (x + w > W - 8) x = e.clientX - w - 18;
+      if (y + h > H - 8) y = e.clientY - h - 18;
+      tipEl.style.left = Math.max(8, x) + 'px'; tipEl.style.top = Math.max(8, y) + 'px';
+    }) as EventListener);
+    this.$('routeMap').addEventListener('pointerleave', () => { tipEl.classList.add('hidden'); tipOn = null; });
     this.$('routeMap').addEventListener('click', ((e: GmEvt) => { const g = e.target.closest<HTMLElement>('[data-node]'); if (g) this.pickRoute(+g.dataset.node!); }) as EventListener);
     const name = this.$<HTMLInputElement>('nameInput');
     name.value = this.myName;
@@ -1283,6 +1299,11 @@ const G_Game = {
       }) as EventListener);
     }
   },
+  // the route's state as the map draws it (js/route.ts svg, tip)
+  routeTipSt() {
+    const st = this.routeSt!, rm = this.routeMap!;
+    return { path: st.path, opts: G.Route.options(rm, st.path[st.path.length - 1]), votes: st.votes, mine: st.votes[G.Net.myId!] };
+  },
   renderRoute() {
     const rm = this.routeMap, st = this.routeSt;
     if (!rm || !st) return;
@@ -1291,6 +1312,7 @@ const G_Game = {
     const mine = st.votes[G.Net.myId!];
     const box = this.$('routeMap'), first = !box.firstChild;
     box.innerHTML = G.Route.svg(rm, { path: st.path, opts, votes: st.votes, colors, mine });
+    const tip = document.getElementById('routeTip'); if (tip) tip.classList.add('hidden'); // (the map redrawn: its card goes until the pointer moves)
     // the map is wider than the screen: bring where you are (and what's next) into view, and let the wheel scroll it
     const at = box.querySelector('.rn.here') || box.querySelector('.rn.opt');
     if (at && (first || !box.dataset.col || +box.dataset.col !== st.path.length)) {

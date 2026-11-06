@@ -867,3 +867,18 @@ i.c.heavy { background: #a02828; } i.c.light { background: #7a3a30; } i.c.frac {
 @media (max-width: 760px) { #menu .menu-box { width: 100%; padding: 28px 24px; } #menu .menu-box::before { -webkit-mask-image: none; mask-image: none; } }
 .route-svg .rnt circle { fill: #1a2240; stroke: #c8d4ff; stroke-width: 1.5; }
 .route-svg .rnt path { fill: #f2e8b8; stroke: none; }
+/* the route map's card for the node under the pointer (js/route.ts tip) */
+.route-tip { position: fixed; z-index: 60; pointer-events: none; width: 300px; background: rgba(12, 15, 18, 0.96); border: 1px solid var(--line); border-top: 2px solid var(--accent); border-radius: 3px; padding: 10px 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.55); font-size: 13px; line-height: 1.35; color: #d6dde2; }
+.route-tip .tt-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.route-tip .tt-head span { font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; font-size: 14px; color: #fff; }
+.route-tip .tt-head small { color: #8a949c; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap; }
+.route-tip .tt-row { display: flex; gap: 9px; align-items: flex-start; padding: 6px 0; border-top: 1px solid rgba(255,255,255,0.07); }
+.route-tip .tt-row b { display: block; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 1px; }
+.route-tip .tt-row em { font-style: normal; color: #ffd24a; font-weight: 700; }
+.route-tip .tt-badge { flex: none; width: 20px; height: 20px; margin-top: 1px; }
+.route-tip .tt-badge svg { width: 100%; height: 100%; overflow: visible; }
+.route-tip .sh b { color: #ff6a5e; } .route-tip .sh circle { fill: #d2342b; stroke: #fff; stroke-width: 1.5; } .route-tip .sh path { fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; }
+.route-tip .nt b { color: #c8d4ff; } .route-tip .nt circle { fill: #1a2240; stroke: #c8d4ff; stroke-width: 1.5; } .route-tip .nt path { fill: #f2e8b8; }
+.route-tip .boss b { color: #ffd24a; } .route-tip .boss path { fill: #ffd24a; stroke: #ffd24a; stroke-width: 1; stroke-linejoin: round; }
+.route-tip .tt-plain { color: #9aa4ac; padding: 6px 0; border-top: 1px solid rgba(255,255,255,0.07); }
+.route-tip .tt-foot { margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.07); color: #9fb0bc; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; }
