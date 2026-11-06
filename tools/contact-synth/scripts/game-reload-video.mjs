@@ -129,6 +129,13 @@ await page.evaluate(async () => {
   window.__clock.on();
 });
 console.log(`in the level, the ${C.title} drawn`);
+// Whether this gun locks open on an empty magazine is the game's call (G.boltHold): follow what it does, so the
+// captions and the sound after a run-dry reload match the animation (a bolt catch hit, or the handle racked).
+const holds = await page.evaluate(() => G.boltHold(G.Me.cur().def));
+if (!holds && C.after === 'release') {
+  console.log(`  (the game doesn't hold the ${C.title} open: it racks it after a run-dry reload)`);
+  Object.assign(C, { after: 'rack', afterCap: 'Magazine change, then the handle racked (the game holds it closed)', rackEmpty: C.charge_ });
+}
 // --still <frames>: step that many frames, save one picture, stop (to check the framing)
 if (opt('still', null) !== null) {
   for (let i = 0; i < +opt('still'); i++) await page.evaluate(() => window.__step());
@@ -212,6 +219,7 @@ place(C.magIn[0], C.magIn[1], at('insert_magazine', 0), null, -2);
 place(C.magOutEmpty[0], C.magOutEmpty[1], at('magazine out', 1), null, -2);
 place(C.magIn[0], C.magIn[1], at('insert_magazine', 1), null, -2);
 if (C.after === 'release') place(C.release[0], C.release[1], at('drop_slide'));
+// (the game has the final say: if it racked when we expected the catch, or the reverse, the log shows which)
 else worked(C.rackEmpty, at('rack_slide', 1));
 let pk = 0; for (const v of mix) pk = Math.max(pk, Math.abs(v));
 for (let i = 0; i < mix.length; i++) mix[i] *= 0.89 / pk;
