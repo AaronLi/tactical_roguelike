@@ -93,9 +93,10 @@ Other scenes, in `src/scenes/firearms.ts`:
 - `ar15-bolt-release`, `ar15-bolt-release-empty-mag`, `ar15-bolt-release-no-mag`: the bolt catch pressed with the bolt locked back. With an empty magazine, the press is firmer (the follower pushes up on the catch) and the bolt rides over the follower on the way home.
 
 - `ar15-mag-in`, `ar15-mag-in-empty`: a loaded or empty magazine inserted.
-  - It enters the mag well and slides up the lower receiver's aluminium well, and the spring-loaded mag catch rides along its side.
-  - The catch snaps into the magazine's slot and the magazine bottoms in the well. With a loaded magazine, the top round presses against the bolt carrier.
-- `ar15-mag-out`, `ar15-mag-out-empty`: the mag release button pressed until the catch pivots out. The magazine drops off the catch and slides out of the well, and the button springs back. A loaded magazine is heavier and damped by its rounds; an empty one rings.
+  - The hand accelerates it up the lower receiver's aluminium well, knocking the walls, while the spring-loaded mag catch rides along its side.
+  - The catch clicks into the hole in the magazine's side, the magazine hits its stop, and it settles back onto the catch. With a loaded magazine, the top round presses against the bolt carrier.
+- `ar15-mag-out`, `ar15-mag-out-empty`: the finger presses the mag release button and draws the catch out (nearly silent). The magazine falls from rest out of the well, speeding up, and touches nothing once it's clear; then the button springs back.
+- `ar15-load-rack-unload`: the full cycle, made with `chainScenes`: a loaded magazine in, the charging handle racked and released (chambering a round), and the magazine out, with the hand's travel between them and a level balance between the parts.
 
 The forward run is simulated from the reciprocating mass, the spring force and each magazine state's drag. Loaded takes 24.7 ms to the bolt face, empty 24.0 ms and no magazine 23.7 ms.
 

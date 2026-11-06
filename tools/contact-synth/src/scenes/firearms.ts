@@ -20,7 +20,7 @@
  * not a gun.
  */
 
-import type { Scene, SceneElement } from '../scene.js';
+import { chainScenes, type Scene, type SceneElement } from '../scene.js';
 import type { BodyParams, FrictionParams, ParamPatch, SnapParams } from '../params.js';
 import { mat } from '../presets.js';
 
@@ -869,9 +869,22 @@ export const AR15_MAG_IN_EMPTY = makeArMagIn('empty');
 export const AR15_MAG_OUT = makeArMagOut('loaded');
 export const AR15_MAG_OUT_EMPTY = makeArMagOut('empty');
 
+/**
+ * A full cycle: a loaded magazine goes in, the charging handle is racked and released (chambering
+ * the top round), then the magazine comes back out. The gaps are the hand moving between the
+ * magazine and the charging handle (~0.7 s) and back to the mag release (~0.8 s).
+ */
+export const AR15_LOAD_RACK_UNLOAD = chainScenes('ar15-load-rack-unload', 'AR-15: mag in, rack and release, mag out', [
+  // Balance: the bolt slamming home is the loudest thing; the magazine seating is ~10 dB under it,
+  // the magazine dropping out and its button ~14 dB under.
+  { label: 'mag-in', at: 0, scene: AR15_MAG_IN, gainDb: 2 },
+  { label: 'charge', at: 0.85, scene: AR15_CHARGE },
+  { label: 'mag-out', at: 2.05, scene: AR15_MAG_OUT, gainDb: 6 },
+]);
+
 export const FIREARM_SCENES: Scene[] = [
   PUMP_SHOTGUN,
   AR15_CHARGE, AR15_CHARGE_EMPTY, AR15_CHARGE_NO_MAG,
   AR15_BOLT_RELEASE, AR15_BOLT_RELEASE_EMPTY, AR15_BOLT_RELEASE_NO_MAG,
-  AR15_MAG_IN, AR15_MAG_IN_EMPTY, AR15_MAG_OUT, AR15_MAG_OUT_EMPTY,
+  AR15_MAG_IN, AR15_MAG_IN_EMPTY, AR15_MAG_OUT, AR15_MAG_OUT_EMPTY, AR15_LOAD_RACK_UNLOAD,
 ];

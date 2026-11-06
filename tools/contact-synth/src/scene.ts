@@ -92,6 +92,36 @@ export interface RenderedScene {
   mix: Float32Array;
 }
 
+/**
+ * Several scenes played one after another as one scene (e.g. a full reload: mag in, charge, mag
+ * out). Each part's elements move to its start time, its tracks are kept (named `<label>:<track>`),
+ * and its housing goes onto its own contact elements, since the parts may happen in different
+ * enclosures (the lower's mag well vs the whole receiver). Room and room size come from the first.
+ *
+ * Each element is rendered normalised and placed by its gainDb, so levels are only calibrated
+ * within a scene; `gainDb` per part sets the balance between scenes (e.g. a magazine going in
+ * against the bolt slamming home).
+ */
+export function chainScenes(id: string, title: string, parts: { label: string; at: number; scene: Scene; gainDb?: number }[]): Scene {
+  const tracks: SceneTrack[] = [];
+  for (const { label, at, scene, gainDb = 0 } of parts) {
+    for (const tr of scene.tracks) {
+      tracks.push({
+        name: `${label}:${tr.name}`,
+        description: tr.description,
+        elements: tr.elements.map((el) => {
+          let sound = el.sound;
+          if (sound.kind === 'contact' && scene.housing) {
+            sound = { ...sound, patch: { ...sound.patch, housing: { ...scene.housing, ...sound.patch.housing } } };
+          }
+          return { ...el, at: el.at + at, gainDb: el.gainDb + gainDb, sound };
+        }),
+      });
+    }
+  }
+  return { id, title, room: parts[0].scene.room, roomSize: parts[0].scene.roomSize, tracks };
+}
+
 function renderAir(a: AirSound, sr: number, seed: number): Float32Array {
   const len = Math.ceil(((a.attackMs + a.decayMs * 7) / 1000 + 0.02) * sr);
   const out = new Float32Array(len);
