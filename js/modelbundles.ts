@@ -1,5 +1,5 @@
 // The baked models, bundled (docs/models.md "Bundles"). The baker (tools/bundle_models.mjs, the last step of `npm run bake:models`) packs the
-// ~2,500 small files of assets/models into ONE container file, assets/models/bundles/models.rtb (~3.3 MB gzipped); the game fetches it once at boot
+// ~2,500 small files of assets/models (the guns' packs, the props, the hangar's scene) into ONE container file, assets/models/bundles/models.rtb (~3.3 MB gzipped); the game fetches it once at boot
 // (the very first thing the page does: this is the first script in index.html), keeps it in memory and slices the files out of it, so there are no
 // model requests after that and nothing waits on a fetch later. Nothing is parsed at boot: a glTF is parsed when a model is first shown (js/glb.ts).
 // There is no fallback to the loose files: a path that belongs to the bundle comes from it or fails.
@@ -35,10 +35,11 @@ const G_Bundles = (() => {
 
   /** `assets/models/parts/m4/index.json` or `parts/m4/index.json` -> the path inside the bundle (relative to assets/models/). */
   const rel = (path: string) => (path.startsWith(ROOT) ? path.slice(ROOT.length) : path);
-  /** 'models' if the path is in the bundle (props/**, parts/<id>/**), null for what is not bundled: whole-gun files and the bake's reports (parts/index.json, coverage.json...). */
+  /** 'models' if the path is in the bundle (props/**, scenes/*.glb, parts/<id>/**), null for what is not bundled: whole-gun files, the scenes' data (for the tools and the Bevy port) and the bake's reports (parts/index.json, coverage.json...). */
   function bundleOf(path: string): string | null {
     const p = rel(path);
     if (p.startsWith('props/')) return NAME;
+    if (p.startsWith('scenes/')) return p.endsWith('.glb') ? NAME : null; // (the hangar: tools/bake_hangar.mjs)
     if (!p.startsWith('parts/')) return null;
     return p.indexOf('/', 6) > 6 ? NAME : null;
   }

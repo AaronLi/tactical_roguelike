@@ -26,7 +26,8 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run build
-      # The guns: the game loads them only as baked glTF (assets/models, git-ignored), so the site bakes them here.
+      # The guns and the hangar's scene: the game loads them only as baked glTF (assets/models, git-ignored), so the site bakes them here
+      # (the hangar's in the runner's own headless Chrome: tools/bake_hangar.mjs).
       # Cached on everything a bake reads (the recipes and the baker, the parts data, the authored models): a push that
       # changes none of it reuses the last bake.
       - name: Baked models (cache)
@@ -34,7 +35,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: assets/models
-          key: models-${{ hashFiles('tools/**', 'js/parts.ts', 'js/data.ts', 'js/glb.ts', 'js/modelbundles.ts', 'js/gunmaterials.ts', 'models/**', 'package-lock.json') }}
+          key: models-${{ hashFiles('tools/**', 'js/parts.ts', 'js/data.ts', 'js/glb.ts', 'js/modelbundles.ts', 'js/gunmaterials.ts', 'js/hangar.ts', 'js/range.ts', 'js/course.ts', 'js/level.ts', 'js/highlights.ts', 'js/furnmesh.ts', 'models/**', 'package-lock.json') }}
       - name: Bake the models
         if: steps.models.outputs.cache-hit != 'true'
         run: npm run bake:models -- -j 4
@@ -42,8 +43,8 @@ jobs:
       - name: The site
         run: |
           mkdir -p _site
-          # the game loads the models only from assets/models/bundles (js/modelbundles.ts): the loose packs, props and whole-gun files are for the tools and tests, not shipped
-          rsync -a --exclude node_modules --exclude _site --exclude .git --exclude .github --exclude /assets/models/guns --exclude /assets/models/parts --exclude /assets/models/props ./ _site/
+          # the game loads the models only from assets/models/bundles (js/modelbundles.ts): the loose packs, props, scenes and whole-gun files are for the tools and tests, not shipped
+          rsync -a --exclude node_modules --exclude _site --exclude .git --exclude .github --exclude /assets/models/guns --exclude /assets/models/parts --exclude /assets/models/props --exclude /assets/models/scenes ./ _site/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

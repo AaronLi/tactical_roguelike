@@ -2269,17 +2269,17 @@ const G_Level = {
 
   // each window: the wall below and above the opening, a frame, the pane (map.winMeshes[id], hidden when it
   // breaks), and for an outside window the view behind the glass
-  buildWindows(map: LvMap, root: THREE.Object3D, wallMat: THREE.Material) {
+  buildWindows(map: LvMap, root: THREE.Object3D, wallMat: THREE.Material, fix: (o: THREE.Object3D) => void = (o) => root.add(o)) {
     const TS = this.TS, h = TS / 2;
     map.winMeshes = [];
     // roller doors, rolled up: the wall over the opening, the shutter's drum under it and a guide down each side
     const steel = new THREE.MeshStandardMaterial({ color: 0x5d6368, roughness: 0.5, metalness: 0.6 });
     for (const [x0, x1, z] of map.rollers || []) {
       const w = x1 - x0, cx = (x0 + x1) / 2, top = 3.0;
-      const lin = new THREE.Mesh(new THREE.BoxGeometry(w, this.WALL_H - top, TS), wallMat); lin.position.set(cx, (top + this.WALL_H) / 2, z); lin.layers.enable(1); root.add(lin);
-      const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, w, 16), steel); drum.rotation.z = Math.PI / 2; drum.position.set(cx, top - 0.2, z); root.add(drum);
-      const lip = new THREE.Mesh(new THREE.BoxGeometry(w, 0.08, 0.1), steel); lip.position.set(cx, top - 0.44, z); root.add(lip); // the shutter's bottom bar
-      for (const x of [x0 + 0.05, x1 - 0.05]) { const g = new THREE.Mesh(new THREE.BoxGeometry(0.1, top, 0.16), steel); g.position.set(x, top / 2, z); root.add(g); }
+      const lin = new THREE.Mesh(new THREE.BoxGeometry(w, this.WALL_H - top, TS), wallMat); lin.position.set(cx, (top + this.WALL_H) / 2, z); lin.layers.enable(1); fix(lin);
+      const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, w, 16), steel); drum.rotation.z = Math.PI / 2; drum.position.set(cx, top - 0.2, z); fix(drum);
+      const lip = new THREE.Mesh(new THREE.BoxGeometry(w, 0.08, 0.1), steel); lip.position.set(cx, top - 0.44, z); fix(lip); // the shutter's bottom bar
+      for (const x of [x0 + 0.05, x1 - 0.05]) { const g = new THREE.Mesh(new THREE.BoxGeometry(0.1, top, 0.16), steel); g.position.set(x, top / 2, z); fix(g); }
     }
     if (!map.windows || !map.windows.length) return;
     const frameMat = new THREE.MeshStandardMaterial({ color: map.theme.home >= 1 ? 0xe8e4da : 0x3a3e42, roughness: 0.6 });
@@ -3099,6 +3099,12 @@ const G_Level = {
     if (map.floors) return this.buildStack(map);
     const TS = this.TS, th = map.theme, root = new THREE.Group(), pool = !opts || opts.pool !== false;
     const { W, H, t } = map, SK = map.skirt || 0, va = map.voidAbove, gr = map.grate;
+    // The hangar's fixed shell (its floor, ceiling, roof, lamps' fittings and roller doors) is baked with the rest of it
+    // (js/hangar.ts, tools/bake_hangar.mjs): left out here once that's loaded. The bake builds it (opts.hubFixed), each
+    // piece marked hubFixed. What stays: the walls (a round takes cubes out of them: js/damage.ts), the windows (they break),
+    // the furniture (js/furnspec.ts), the lamps' light (the light grid).
+    const hubFixed = !!map.hub && !!opts && !!opts.hubFixed, skipFixed = !!map.hub && !hubFixed && !!(G.Hangar && G.Hangar.baked());
+    const fix = (o: THREE.Object3D, parent: THREE.Object3D = root) => { if (skipFixed) return; if (hubFixed) o.userData.hubFixed = true; parent.add(o); };
     // floor + ceiling (upstairs, the floor only where there is one: not over a drop, and steel grating where it's a catwalk)
     const ftex = this._tex(th.rock ? 'rock' : 'floor', th.floor); ftex.repeat.set(W / this.K, H / this.K);
     const fmat = new THREE.MeshStandardMaterial({ map: ftex, roughness: 0.92 });
@@ -3106,7 +3112,7 @@ const G_Level = {
       const floor = new THREE.Mesh(new THREE.PlaneGeometry(W * TS, H * TS), fmat);
       floor.rotation.x = -Math.PI / 2; floor.position.set((W * TS) / 2, 0, (H * TS) / 2);
       floor.layers.enable(1); // layer 1: what hides the evidence glow (walls, floors, doors)
-      root.add(floor);
+      fix(floor);
     } else {
       const cells: number[] = [], tr = map.terrain, hills: number[] = [];
       const raised = (i: number) => { const k = ((i / W) | 0) * tr.VW + (i % W); return Math.abs(tr.v[k]) > 1e-3 || Math.abs(tr.v[k + 1]) > 1e-3 || Math.abs(tr.v[k + tr.VW]) > 1e-3 || Math.abs(tr.v[k + tr.VW + 1]) > 1e-3; }; // (off level at 0: up or down)
@@ -3173,7 +3179,7 @@ const G_Level = {
       const g = new THREE.PlaneGeometry(TS, TS); g.rotateX(-Math.PI / 2);
       const top = new THREE.InstancedMesh(g, new THREE.MeshBasicMaterial({ color: 0x1e1f21 }), tops.length), tm = new THREE.Matrix4();
       tops.forEach((i, n) => { tm.makeTranslation(((i % W) + 0.5) * TS, this.builtY(map, i) + this.WALL_H + 0.02, (Math.floor(i / W) + 0.5) * TS); top.setMatrixAt(n, tm); });
-      root.add(top);
+      fix(top);
     }
     const ceil = new THREE.InstancedMesh(ceilGeo, new THREE.MeshStandardMaterial({ map: ctex, roughness: 1 }), roofed.length);
     const cm = new THREE.Matrix4();
@@ -3184,7 +3190,7 @@ const G_Level = {
     const ceilTint = G.Homes.ceilings(map);
     if (ceilTint) { const plain = new THREE.Color(1, 1, 1); roofed.forEach((i, n) => ceil.setColorAt(n, ceilTint.get(i) || plain)); }
     ceil.layers.enable(1);
-    root.add(ceil);
+    fix(ceil);
 
     // walls: only tiles that border floor are visible
     const walls = [];
@@ -3265,7 +3271,7 @@ const G_Level = {
       root.add(seg);
     }
     G.FurnMesh.build(map, root, this._tex('crate', th.crate));
-    this.buildWindows(map, root, wm.material);
+    this.buildWindows(map, root, wm.material, fix);
 
     // ceiling lamps (emissive panels) + a limited number of real point lights
     const lampGeo = new THREE.SphereGeometry(0.32, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2);
@@ -3291,24 +3297,24 @@ const G_Level = {
         return;
       }
       if (l.porch) { // a lantern on the wall over a back door
-        const box = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.26, 0.14), porchBox); box.position.set(l.x, (l.gy || 0) + l.y!, l.z + l.porch! * 0.07); root.add(box);
-        const glow = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.18, 0.1), lit ? porchMat : offMat); glow.position.set(l.x, (l.gy || 0) + l.y!, l.z + l.porch! * 0.1); root.add(glow);
+        const box = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.26, 0.14), porchBox); box.position.set(l.x, (l.gy || 0) + l.y!, l.z + l.porch! * 0.07); fix(box);
+        const glow = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.18, 0.1), lit ? porchMat : offMat); glow.position.set(l.x, (l.gy || 0) + l.y!, l.z + l.porch! * 0.1); fix(glow);
         return;
       }
       if (l.kind === 'panel') { // a shop's flat ceiling panel
-        const pn = new THREE.Mesh(panelGeo, lit ? panelMat : offMat); pn.position.set(l.x, (l.gy || 0) + this.WALL_H - 0.02, l.z); root.add(pn);
+        const pn = new THREE.Mesh(panelGeo, lit ? panelMat : offMat); pn.position.set(l.x, (l.gy || 0) + this.WALL_H - 0.02, l.z); fix(pn);
         return;
       }
       if (l.kind === 'highbay') { // a hall's: a dome on a rod down from the roof (the floor above's ceiling)
         const roof = this.FLOOR_H + this.WALL_H, rod = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, roof - l.y!), bayMat);
-        rod.position.set(l.x, (roof + l.y!) / 2, l.z); root.add(rod);
-        const dome = new THREE.Mesh(bayGeo, bayMat); dome.position.set(l.x, l.y! - 0.1, l.z); root.add(dome);
-        const glow = new THREE.Mesh(bayLens, lit ? lampMat : offMat); glow.position.set(l.x, l.y! - 0.26, l.z); root.add(glow);
+        rod.position.set(l.x, (roof + l.y!) / 2, l.z); fix(rod);
+        const dome = new THREE.Mesh(bayGeo, bayMat); dome.position.set(l.x, l.y! - 0.1, l.z); fix(dome);
+        const glow = new THREE.Mesh(bayLens, lit ? lampMat : offMat); glow.position.set(l.x, l.y! - 0.26, l.z); fix(glow);
         return;
       }
       const lamp = new THREE.Mesh(lampGeo, lit ? lampMat : offMat);
       lamp.position.set(l.x, (l.gy || 0) + this.WALL_H, l.z);
-      root.add(lamp);
+      fix(lamp);
     });
     map.lightPool = [];
     if (pool) G.LightGrid.build(map);

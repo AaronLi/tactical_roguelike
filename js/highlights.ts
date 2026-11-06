@@ -590,7 +590,8 @@ const G_Highlights = (() => {
   // and a small one in the helicopter, hung from the cabin roof and tipped down to the bench, to watch while the squad's getting in: muted
   // ([eyes' height, how far off they are], the roof it hangs from; js/hangar.ts helicopter)
   const cabinTv = (H: { x: number; z: number }) => [H.x - 0.05, 2.02, H.z - 0.55, 0, 0.72, { eye: [1.55, 1.4], roof: 2.45 }];
-  function mount(root: THREE.Object3D, helpers: { addTarget?: (t: HangarTarget) => HangarTarget } | null) {
+  // (the hangar's are its baked scene's anchors a_tv_<i>: these, written there by its bake, js/hangar.ts fixtures)
+  function mount(root: THREE.Object3D, helpers: { addTarget?: (t: HangarTarget) => HangarTarget; at?: (kind: string, i?: number) => THREE.Object3D } | null) {
     unmount();
     if (!P.level) return;
     
@@ -604,7 +605,8 @@ const G_Highlights = (() => {
           c *= 0.93 + 0.07 * sin(vUv.y * 900.0 + time * 3.0); vec2 d = vUv - 0.5; c *= 1.0 - dot(d, d) * 0.6; gl_FragColor = linearToOutputTexel(vec4(c * 1.08, 1.0)); }` });
     P.mat = mat;
     const dark = new T.MeshStandardMaterial({ color: 0x0c0d0f, roughness: 0.4, metalness: 0.3 }), steel = new T.MeshStandardMaterial({ color: 0x3a3e44, roughness: 0.5, metalness: 0.6 });
-    for (const [x, y, z, ry, w, cab] of TVS.concat([cabinTv(G.Hangar.HELI)])) {
+    const at = helpers && helpers.at, tvs = at ? TVS.map((_, i) => { const a = at('tv', i); return [a.position.x, a.position.y, a.position.z, (a.userData.ry as number) || 0, a.userData.w as number]; }) : TVS;
+    for (const [x, y, z, ry, w, cab] of tvs.concat([cabinTv(G.Hangar.HELI)])) {
       // tipped forward to face the eyes (1.6 m up) of someone standing about one and a third of its widths out, where it's
       // best watched: hinged at its bottom edge against the wall, its top held out by a strut
       const h = w * 9 / 16, tilt = cab ? Math.atan2(y - cab.eye[0], cab.eye[1]) : Math.atan2(y - 1.6, w * 1.33), g = new T.Group(), out = (h + 0.1) * Math.sin(tilt), top = y - h / 2 - 0.05 + (h + 0.1) * Math.cos(tilt);
@@ -3388,7 +3390,7 @@ const G_Highlights = (() => {
   }
 
   // (step and draw: the broadcast moved on and drawn by hand, for checking a replay without standing at a TV)
-  return { tourMoves: GT_MOVES, tourPath: gearPath, tick, shot, roundPath, glass, crack, door, laser, hitBy, kill, suspectDown, saved, incap, arrest, nade, boom, fragPaths, flash, take, drop, mount, unmount, update, step, draw, warm, gearFor, reset, exportPack, renderPack, cancelRender, exportHere, muxHere, toJSON, fromJSON, R, P };
+  return { TVS, tourMoves: GT_MOVES, tourPath: gearPath, tick, shot, roundPath, glass, crack, door, laser, hitBy, kill, suspectDown, saved, incap, arrest, nade, boom, fragPaths, flash, take, drop, mount, unmount, update, step, draw, warm, gearFor, reset, exportPack, renderPack, cancelRender, exportHere, muxHere, toJSON, fromJSON, R, P };
 })();
 G.Highlights = G_Highlights;
 interface GameModules { Highlights: typeof G_Highlights; }

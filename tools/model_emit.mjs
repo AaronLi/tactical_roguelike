@@ -30,6 +30,7 @@ export const quantizePositions = () => (doc) => {
   for (const mesh of root.listMeshes()) {
     const prims = mesh.listPrimitives().filter((p) => p.getAttribute('POSITION') && p.getAttribute('POSITION').getComponentType() === 5126);
     if (!prims.length) continue;
+    if (root.listNodes().some((nd) => nd.getMesh() === mesh && nd.getExtension('EXT_mesh_gpu_instancing'))) continue; // (instanced (the hangar's: tools/bake_hangar.mjs): the node's transform comes after the instances', so a box's can't go there; float32 positions)
     const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity], el = [0, 0, 0];
     for (const p of prims) { const a = p.getAttribute('POSITION'); for (let i = 0; i < a.getCount(); i++) { a.getElement(i, el); for (let k = 0; k < 3; k++) { if (el[k] < min[k]) min[k] = el[k]; if (el[k] > max[k]) max[k] = el[k]; } } }
     const um = (x) => Math.round(x * 1e6) / 1e6, o = [0, 1, 2].map((k) => um((min[k] + max[k]) / 2));

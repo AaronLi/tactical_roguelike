@@ -6,14 +6,20 @@
 // screen while you stand at that lane) shows the target with every hit on it, the last one picked out. The guns work here: you can load, fire and
 // reload as you like, and every round you use is given back when you walk out (the magazines, boxes and chambers as they
 // were when you came in). Nobody else is hurt by it: friendly fire is off in the hangar.
-// What the hangar hands the range to build with (js/hangar.ts: its box, its materials, its signs, its use targets).
+// What's fixed (the markings, the signs, the boards, the backstops, the lanes' consoles, the targets' posts and frames) is
+// baked with the hangar (fixtures: tools/bake_hangar.mjs, docs/hangar-data.md); what changes (the consoles' screens and
+// buttons, the targets, the course's stage, board and screens) is added on its anchors as the hangar is entered (build).
+// What the hangar hands the range to build with (js/hangar.ts: its box, its materials, its signs; its use targets and the
+// baked scene's anchors (build), or a way to place one (fixtures)).
 type RangeSolid = ReturnType<typeof G_World.add>;
 interface RangeHelpers {
   box: (parent: THREE.Object3D, x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, mat: THREE.Material) => unknown;
   M: (c: number, o?: THREE.MeshStandardMaterialParameters) => THREE.Material;
   canvasTex: (w: number, h: number, draw: (g: CanvasRenderingContext2D, w: number, h: number) => void) => THREE.CanvasTexture;
   signMat: (lines: string[], w: number, h: number, bg: string, fg: string, sub?: string) => THREE.Material;
-  addTarget: (t: HangarTarget) => HangarTarget;
+  addTarget?: (t: HangarTarget) => HangarTarget;
+  at?: (kind: string, i?: number) => THREE.Object3D;
+  anchor?: (r: THREE.Object3D, kind: string, i: number | null, x: number, y: number, z: number, ry?: number, extra?: Record<string, unknown>) => THREE.Object3D;
 }
 interface RangeSpec { x0: number; x1: number; lanes: number[]; len: number; marks: number[]; big?: number[]; steel?: number[]; }
 interface RifleSpec extends RangeSpec { big: number[]; steel: number[]; }
@@ -42,7 +48,7 @@ interface RangeSnap {
 }
 interface RangeState {
   root: THREE.Object3D | null; tg: RangeTarget[]; lanes: RangeLane[]; inside: boolean; snap: RangeSnap | null; ring: unknown[];
-  laneList?: RangeLane[] | null; hangar?: HangarState;
+  laneList?: RangeLane[] | null; hangar?: HangarState; live?: THREE.Object3D[];
 }
 const G_Range = (() => {
   const T = THREE;
@@ -100,8 +106,9 @@ const G_Range = (() => {
   let H: RangeHelpers = null!; // (build() gives it)
 
   // ---------------------------------------------------------------- the scene
-  function build(root: THREE.Object3D, hangarS: HangarState, helpers: RangeHelpers) {
-    H = helpers; S.root = root; S.tg = []; S.hangar = hangarS; S.lanes = []; S.laneList = null;
+  // the fixed part (bake time: js/hangar.ts fixtures); the course's in a group of its own
+  function fixtures(root: THREE.Object3D, courseRoot: THREE.Object3D, helpers: RangeHelpers) {
+    H = helpers;
     const white = basic(0xeceae4), yellow = basic(0xe8c030);
     // the yard's own sign, over the garage door inside the hall
     sign(root, ['SHOOTING RANGE', 'IPSC course · pistol · rifle · everything you fire here comes back'], 5.2, 0.85, 7, 3.5, 2.03, 0);
@@ -138,31 +145,47 @@ const G_Range = (() => {
     // the back of each range: the backstop, a bank of sand against the wall
     H.box(root, PIS.x0, 0, FL - PIS.len - 0.001, PIS.x1, 1.8, FL - PIS.len - 0.9, M(0x8a7a58, { roughness: 1 }));
     H.box(root, RIF.x0, 0, FL - RIF.len - 2 - 0.001, RIF.x1, 2.6, FL - RIF.len - 3.4, M(0x8a7a58, { roughness: 1 }));
-    // lanes: a console at the line and the targets down it
-    lanes().forEach((L) => { L.hits = 0; L.last = '—'; laneConsole(root, L); S.lanes.push(L); });
-    targets(root);
+    // lanes: a console at the line, and the targets' posts down it
+    lanes().forEach((L, k) => laneFixed(root, L, k));
+    targets(root, true);
+    G.Course.fixtures(courseRoot, helpers); // the IPSC course, on the left
+  }
+  // what changes: the lanes' screens and buttons, the targets, the course (as the hangar's entered)
+  function build(root: THREE.Object3D, hangarS: HangarState, helpers: RangeHelpers) {
+    H = helpers; S.root = root; S.tg = []; S.hangar = hangarS; S.lanes = []; S.laneList = null; S.live = [];
+    lanes().forEach((L, k) => { L.hits = 0; L.last = '—'; laneConsole(root, L, k); S.lanes.push(L); });
+    targets(root, false);
     G.Course.build(root, S.hangar, H); // the IPSC course, on the left
   }
 
   // a console at the left of each lane: its hits, and F on its screen clears the targets. A rifle lane's has a row of
-  // buttons along its front edge too (aim at one, F): where its IPSC target's carrier takes it.
-  function laneConsole(root: THREE.Object3D, L: RangeLane) {
-    const x = L.cx - 0.35, z = FL + 0.15, ipsc = L.range === 'rifle';
+  // buttons along its front edge too (aim at one, F): where its IPSC target's carrier takes it. Its box and the buttons'
+  // labels are fixed (laneFixed); its screen and buttons light up (laneConsole, on its anchor: a_lane_<k>, at the lane's
+  // middle on the console's line)
+  function laneFixed(root: THREE.Object3D, L: RangeLane, k: number) {
+    const z = FL + 0.15, ipsc = L.range === 'rifle';
     H.box(root, L.cx - 0.55, 0, z - 0.3, L.cx - 0.15, 1.0, z + 0.3, M(0x2c3036));
+    H.anchor!(root, 'lane', k, L.cx, 0, z, 0, { range: L.range, n: L.n });
+    if (ipsc) IPSC.dists.forEach((d, i) => {
+      const bx = L.cx - 0.535 + (i % 3) * 0.13, bz = z + 0.14 + Math.floor(i / 3) * 0.08;
+      const lab = new T.Mesh(new T.PlaneGeometry(0.1, 0.05), label(d + ' m', '#e8f4ff')); lab.rotation.x = -Math.PI / 2; lab.position.set(bx + 0.055, 1.026, bz + 0.03); root.add(lab);
+    });
+  }
+  function laneConsole(root: THREE.Object3D, L: RangeLane, k: number) {
+    const a = H.at!('lane', k).position, cx = a.x, z = a.z, x = cx - 0.35, ipsc = L.range === 'rifle';
     const scr = new T.Mesh(new T.PlaneGeometry(0.62, ipsc ? 0.42 : 0.32), new T.MeshBasicMaterial({ map: null }));
     scr.position.set(x, ipsc ? 1.3 : 1.2, z - 0.04); scr.rotation.x = -0.45; root.add(scr);
     L.scr = scr; paintLane(L);
-    H.addTarget({ id: 'lane' + L.range + L.n, kind: 'pos', box: ipsc ? [L.cx - 0.66, 1.08, z - 0.22, L.cx - 0.04, 1.5, z + 0.1] : [L.cx - 0.6, 0.6, z - 0.35, L.cx - 0.1, 1.5, z + 0.35], label: `lane ${L.n}'s targets`, run: () => reset(L), runText: `reset lane ${L.n}'s targets` });
+    H.addTarget!({ id: 'lane' + L.range + L.n, kind: 'pos', box: ipsc ? [cx - 0.66, 1.08, z - 0.22, cx - 0.04, 1.5, z + 0.1] : [cx - 0.6, 0.6, z - 0.35, cx - 0.1, 1.5, z + 0.35], label: `lane ${L.n}'s targets`, run: () => reset(L), runText: `reset lane ${L.n}'s targets` });
     if (!ipsc) return;
-    // the distance buttons: two rows of three on the console's top, nearest the yard
+    // the distance buttons: two rows of three on the console's top, nearest the yard (lit for where the target is: place)
     L.btns = [];
     IPSC.dists.forEach((d, i) => {
-      const bx = L.cx - 0.535 + (i % 3) * 0.13, bz = z + 0.14 + Math.floor(i / 3) * 0.08;
+      const bx = cx - 0.535 + (i % 3) * 0.13, bz = z + 0.14 + Math.floor(i / 3) * 0.08;
       const mat = new T.MeshStandardMaterial({ color: 0x3a4a56, roughness: 0.5, emissive: 0x000000 });
-      const b = new T.Mesh(new T.BoxGeometry(0.11, 0.025, 0.06), mat); b.position.set(bx + 0.055, 1.012, bz + 0.03); root.add(b);
-      const lab = new T.Mesh(new T.PlaneGeometry(0.1, 0.05), label(d + ' m', '#e8f4ff')); lab.rotation.x = -Math.PI / 2; lab.position.set(bx + 0.055, 1.026, bz + 0.03); root.add(lab);
+      const b = new T.Mesh(new T.BoxGeometry(0.11, 0.025, 0.06), mat); b.position.set(bx + 0.055, 1.012, bz + 0.03); root.add(b); S.live!.push(b);
       L.btns.push({ d, mat });
-      H.addTarget({ id: `ipsc${L.n}-${d}`, kind: 'pos', box: [bx, 0.99, bz, bx + 0.11, 1.04, bz + 0.06], label: `${d} m`, run: () => sendIpsc(L, d), runText: `send lane ${L.n}'s IPSC target to ${d} m` });
+      H.addTarget!({ id: `ipsc${L.n}-${d}`, kind: 'pos', box: [bx, 0.99, bz, bx + 0.11, 1.04, bz + 0.06], label: `${d} m`, run: () => sendIpsc(L, d), runText: `send lane ${L.n}'s IPSC target to ${d} m` });
     });
   }
   function paintLane(L: RangeLane) {
@@ -248,9 +271,10 @@ const G_Range = (() => {
   }
 
   // ---------------------------------------------------------------- targets
-  function steel(root: THREE.Object3D, L: RangeLane, d: number, off: number, size: number) {
-    const x = L.cx + off, z = FL - d, top = 1.5 + size, tg = { kind: 'steel', d, lane: L, hits: 0, size, x, z, swing: 0, vel: 0, flash: 0 } as SteelTarget;
-    H.box(root, x - 0.03, 0, z - 0.12, x + 0.03, top, z - 0.06, M(0x3b3f44)); // (its post)
+  // (fx: its post (fixed), and an anchor a_steel_<k> where the plate hangs from it; else the plate, hung there)
+  function steel(root: THREE.Object3D, L: RangeLane, d: number, off: number, size: number, fx: boolean, k: number) {
+    if (fx) { const x = L.cx + off, z = FL - d, top = 1.5 + size; H.box(root, x - 0.03, 0, z - 0.12, x + 0.03, top, z - 0.06, M(0x3b3f44)); H.anchor!(root, 'steel', k, x, top, z, 0, { d, size, lane: L.range + L.n }); return null; } // (its post)
+    const a = H.at!('steel', k).position, x = a.x, z = a.z, top = a.y, tg = { kind: 'steel', d, lane: L, hits: 0, size, x, z, swing: 0, vel: 0, flash: 0 } as SteelTarget;
     const pivot = new T.Group(); pivot.position.set(x, top, z); root.add(pivot);
     tg.mat = new T.MeshStandardMaterial({ color: 0xb0452c, roughness: 0.55, metalness: 0.5, emissive: 0x000000 });
     const plate = new T.Mesh(new T.BoxGeometry(size, size, 0.04), tg.mat); plate.position.set(0, -size / 2 - 0.05, 0.0); pivot.add(plate);
@@ -259,10 +283,17 @@ const G_Range = (() => {
     const sol = G.World.add(S.hangar!.map.world, G.World.box(x - size / 2, top - size - 0.05, z - 0.03 + RZ, x + size / 2, top - 0.05, z + 0.03 + RZ, { kind: 'target', move: false, target: tg }));
     tg.solid = sol; S.tg.push(tg); return tg;
   }
-  function paper(root: THREE.Object3D, L: RangeLane, d: number) {
-    const w = 0.5, h = 0.8, y = 1.35, x = L.cx, z = FL - d, tg = { kind: 'paper', d, lane: L, hits: 0, w, h, x, y, z } as PaperTarget;
-    H.box(root, x - 0.04, 0, z - 0.1, x + 0.04, y - h / 2, z - 0.05, M(0x6a5030));
-    H.box(root, x - w / 2 - 0.03, y - h / 2 - 0.03, z - 0.045, x + w / 2 + 0.03, y + h / 2 + 0.03, z - 0.03, M(0x6a5030));
+  // (fx: its post and frame (fixed), and an anchor a_paper_<k> at its foot; else the paper in the frame)
+  function paper(root: THREE.Object3D, L: RangeLane, d: number, fx: boolean, k: number) {
+    const w = 0.5, h = 0.8, y = 1.35;
+    if (fx) {
+      const x = L.cx, z = FL - d;
+      H.box(root, x - 0.04, 0, z - 0.1, x + 0.04, y - h / 2, z - 0.05, M(0x6a5030));
+      H.box(root, x - w / 2 - 0.03, y - h / 2 - 0.03, z - 0.045, x + w / 2 + 0.03, y + h / 2 + 0.03, z - 0.03, M(0x6a5030));
+      H.anchor!(root, 'paper', k, x, 0, z, 0, { d, lane: L.range + L.n });
+      return null;
+    }
+    const a = H.at!('paper', k).position, x = a.x, z = a.z, tg = { kind: 'paper', d, lane: L, hits: 0, w, h, x, y, z } as PaperTarget;
     tg.tex = tex(256, 410, (g, W, Hh) => {
       g.fillStyle = '#e8e4d4'; g.fillRect(0, 0, W, Hh);
       g.strokeStyle = '#3a3a34'; g.lineWidth = 3;
@@ -274,20 +305,21 @@ const G_Range = (() => {
     const sol = G.World.add(S.hangar!.map.world, G.World.box(x - w / 2, y - h / 2, z - 0.04 + RZ, x + w / 2, y + h / 2, z - 0.02 + RZ, { kind: 'target', move: false, target: tg }));
     tg.solid = sol; S.tg.push(tg); return tg;
   }
-  function targets(root: THREE.Object3D) {
+  function targets(root: THREE.Object3D, fx: boolean) {
+    let ks = 0, kp = 0;
     // pistol: paper at 5, 7 and 10 m (one to a lane), steel at 12 and 15 m either side of the lane's middle
     PIS.lanes.forEach((cx, i) => {
       const L = lanes().find((q) => q.range === 'pistol' && q.n === i + 1)!;
-      paper(root, L, [5, 7, 10][i]);
-      steel(root, L, 12, -0.7, 0.25); steel(root, L, 15, 0.7, 0.3);
+      paper(root, L, [5, 7, 10][i], fx, kp++);
+      steel(root, L, 12, -0.7, 0.25, fx, ks++); steel(root, L, 15, 0.7, 0.3, fx, ks++);
     });
     // rifle: a plate at each 25 m in every lane, set across the lane so none stands in front of another, and larger the farther it is
     const sizes = [0.3, 0.42, 0.55, 0.7];
     // (off to either side of the lane: its middle is the IPSC target's line)
     RIF.lanes.forEach((cx, j) => {
       const L = lanes().find((q) => q.range === 'rifle' && q.n === j + 1)!;
-      RIF.steel.forEach((d, k) => steel(root, L, d, (k + j) % 2 ? 0.8 : -0.8, sizes[k]));
-      ipscTarget(root, L);
+      RIF.steel.forEach((d, k) => steel(root, L, d, (k + j) % 2 ? 0.8 : -0.8, sizes[k], fx, ks++));
+      if (!fx) ipscTarget(root, L);
     });
   }
 
@@ -411,7 +443,7 @@ const G_Range = (() => {
   function leave() {
     if (S.snap && G.Me && G.Me.kit) { try { restore(G.Me, S.snap); } catch (e) { /* the kit changed under it */ } }
     if (S.hangar && S.hangar.map) for (const t of S.tg) G.World.remove(S.hangar!.map.world, t.solid!);
-    S.snap = null; S.inside = false; S.root = null; S.tg = []; S.lanes = []; S.laneList = null;
+    S.snap = null; S.inside = false; S.root = null; S.tg = []; S.lanes = []; S.laneList = null; S.live = [];
     if (spot) { spot.remove(); spot = null; spotKey = ''; }
     G.Course.leave();
   }
@@ -422,7 +454,7 @@ const G_Range = (() => {
     if (t.kind === 'course') return t.q.kind === 'steel' ? t.q.hinge : 'paper';
     return t.kind === 'steel' ? t.pivot : 'paper';
   }
-  return { decorate, build, update, leave, hit, markOn, on, reset, drawIpsc, zoneAt, S, FL, PIS, RIF };
+  return { decorate, fixtures, build, update, leave, hit, markOn, on, reset, drawIpsc, zoneAt, S, FL, PIS, RIF };
 })();
 G.Range = G_Range;
 interface GameModules { Range: typeof G_Range; }

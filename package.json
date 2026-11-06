@@ -10,6 +10,7 @@
     "typecheck:strict": "tsc -p . --noEmit --strict",
     "bake:models": "tsc -p . && tsc -p tsconfig.tools.json && node tools/bake_models.mjs",
     "bake:props": "tsc -p . && tsc -p tsconfig.tools.json && node tools/bake_props.mjs && node tools/bundle_models.mjs",
+    "bake:hangar": "tsc -p . && tsc -p tsconfig.tools.json && node tools/bake_hangar.mjs && node tools/bundle_models.mjs",
     "bundle:models": "tsc -p . && node tools/bundle_models.mjs",
     "check:models": "tsc -p . && tsc -p tsconfig.tools.json && node tools/check_models.mjs",
     "test:models": "tsc -p . && tsc -p tsconfig.tools.json && node tools/check_models.mjs --selftest && node tools/check_models.test.mjs && node tools/check_authored_parts.test.mjs && node tools/check_authored_checks.test.mjs && node tools/check_tempest_rounds.test.mjs && node tools/bundle_models.mjs --check && node tools/check_authored_magcheck.test.mjs && node tools/bundle_models.test.mjs && node tools/check_authored_golden.mjs && node tools/check_furniture_golden.mjs && node tools/check_model_cases.mjs --quiet",
