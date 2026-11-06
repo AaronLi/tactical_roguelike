@@ -42,7 +42,7 @@ const G_ServerHost = {
       case 'join': this.remotes.add(String(c.id)); break;
       case 'leave': if (this.remotes.delete(String(c.id)) && this.on) G.Server.onLeave(String(c.id)); break;
       case 'stickers': if (Array.isArray(c.names)) G.Stickers.names = c.names.filter((n: unknown) => typeof n === 'string'); break;
-      case 'digest': { const parts: Record<string, string> = {}; this.ctl!.postMessage({ k: 'digest', q: c.q, d: G.Server.map ? this.digest(G.Server.map, parts) : null, parts, seed: G.Server.seed, level: G.Server.level, th: G.Server.theme, night: G.Server.night }); break; }
+      case 'digest': { const parts: Record<string, string> = {}, m = G.Server.map; this.ctl!.postMessage({ k: 'digest', q: c.q, d: m ? this.digest(m, parts) : null, parts, json: c.json && m && m.desc ? JSON.stringify(m.desc) : null, seed: G.Server.seed, level: G.Server.level, th: G.Server.theme, night: G.Server.night }); break; }
       case 'stat': this.ctl!.postMessage({ k: 'stat', q: c.q, clock: G.Server.clock || 0, ticks: this.ticks, phase: G.Server.phase, level: G.Server.level, enemies: G.Server.enemies.size, players: G.Server.players.size }); break;
     }
   },
@@ -94,32 +94,15 @@ const G_ServerHost = {
   },
 
   // ---------------------------------------------------------------- is it the same place?
-  // A hash of what a level is made of (its tiles, doors, windows, rooms, spots and solids): the host's simulation builds the level
-  // from its seed and every screen builds it again, so these must agree (G.ServerLink.digest compares them). The solids are those
-  // it was built with (born: how many; a screen adds its own after, the helicopter on the pad: js/landing.ts).
-  // (parts: each piece's own hash too, to find which differs)
-  built: new WeakMap<object, number>(),
-  born(map: LvMap) { if (map && map.world) this.built.set(map, map.world.solids.length); },
+  // The level the simulation built from its seed (its description: js/leveldesc.ts) and every screen built again from it must
+  // be the same object (G.ServerLink.digest compares them): each part's fingerprint, and the whole of it as JSON (json: true).
+  // (What a screen adds after, the helicopter on the pad, js/landing.ts, goes in its world, not in the description.)
+  born(_map: LvMap) {},
   digest(map: LvMap, parts?: Record<string, string>) {
-    let h = 2166136261, p = 2166136261;
-    const num = (v: number) => { const x = Math.round((+v || 0) * 1000); for (const s of [x & 0xffff, x >>> 16]) { h ^= s; h = Math.imul(h, 16777619); p ^= s; p = Math.imul(p, 16777619); } };
-    const part = (k: string, f: () => void) => { p = 2166136261; f(); if (parts) parts[k] = (p >>> 0).toString(36); };
-    const arr = (a: ArrayLike<number> | null | undefined) => { if (!a) { num(-1); return; } num(a.length); for (let i = 0; i < a.length; i++) num(a[i]); };
-    const pts = (a: any[] | null | undefined, keys: string[]) => { if (!a) { num(-1); return; } num(a.length); for (const q of a) for (const k of keys) num(Array.isArray(q) ? q[+k] : q && q[k]); };
-    const one = (m: LvMap, f: number) => {
-      part(f + ':tiles', () => { num(m.W); num(m.H); arr(m.t); arr(m.out); });
-      part(f + ':doors', () => pts(m.doors, ['x', 'z', 'w', 'fy', 'open']));
-      part(f + ':windows', () => pts(m.windows, ['x', 'z', 'fy']));
-      part(f + ':rooms', () => pts(m.rooms, ['x', 'z', 'w', 'h', 'fl']));
-      part(f + ':spots', () => { pts(m.enemySpots, ['0', '1', '2']); pts(m.cover, ['x', 'z']); });
-      part(f + ':lights', () => pts(m.lights, ['x', 'z']));
-    };
-    one(map, 0);
-    (map.floors || []).forEach((f, i) => { if (f !== map) one(f, i); });
-    part('places', () => { num(map.NF || 1); num(map.spawn ? map.spawn.x : 0); num(map.spawn ? map.spawn.z : 0); num(map.extract ? map.extract.x : 0); num(map.extract ? map.extract.z : 0); });
-    const S0 = map.world ? map.world.solids : [], S = S0.slice(0, this.built.has(map) ? this.built.get(map) : S0.length);
-    part('solids', () => { num(S.length); for (const s of S) if (s) { arr(s.min); arr(s.max); } });
-    return (h >>> 0).toString(36);
+    if (!map || !map.desc) return null;
+    const fp = G.LevelDesc.fingerprint(map.desc);
+    if (parts) Object.assign(parts, fp.parts);
+    return fp.hash;
   },
 };
 G.ServerHost = G_ServerHost;
