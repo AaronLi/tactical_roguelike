@@ -305,9 +305,31 @@ const G_LightGrid = (() => {
     for (const k of ['lgLight', 'lgDir', 'lgPaint'] as const) if (U[k].value !== blank) { U[k].value.dispose(); U[k].value = blank; }
     G0 = null; built = false;
   }
+  // The light at a point (x, y, z in metres), as a surface there would take it facing every way at once: the four tiles
+  // round it blended as the texture's filtering does (only the open ones), from the layer of the floor it's on. Into out
+  // (linear RGB); black with no grid. Spread: averaged over a square that wide round it too (a body's width: standing in
+  // a doorway, the rooms either side). (For what has no place in the grid: the gun in your hands, js/render.ts eyeLight.)
+  function at(x: number, y: number, z: number, out: THREE.Color, spread = 0) {
+    out.setRGB(0, 0, 0);
+    if (!G0) return out;
+    const TS = U.lgGrid.value.z, { W, H, NF, N, cur } = G0, s = spread / 2;
+    const f = Math.max(0, Math.min(NF - 1, Math.floor((y - U.lgSize.value.w) / U.lgFloorH.value)));
+    let r = 0, g = 0, b = 0, w = 0;
+    for (let q = 0; q < (s > 0 ? 4 : 1); q++) {
+      const u = (x + (s > 0 ? ((q & 1) ? s : -s) : 0)) / TS - 0.5, v = Math.max(0, Math.min(H - 1, (z + (s > 0 ? ((q >> 1) ? s : -s) : 0)) / TS - 0.5));
+      const x0 = Math.floor(u), z0 = Math.floor(v), fx = u - x0, fz = v - z0;
+      for (let k = 0; k < 4; k++) {
+        const tx = Math.max(0, Math.min(W - 1, x0 + (k & 1))), tz = Math.max(0, Math.min(H - 1, z0 + (k >> 1)));
+        const o = (f * N + tz * W + tx) * K, ow = Math.max(0, Math.min(1, cur[o + 7])) * ((k & 1) ? fx : 1 - fx) * ((k >> 1) ? fz : 1 - fz);
+        r += Math.max(0, cur[o]) * ow; g += Math.max(0, cur[o + 1]) * ow; b += Math.max(0, cur[o + 2]) * ow; w += ow;
+      }
+    }
+    if (w > 0.02) out.setRGB(r / w, g / w, b / w);
+    return out;
+  }
   // on while the level's drawn (G.R.render), off for anything else drawn with the same materials
   const on = (v: boolean) => { U.lgGrid.value.w = v && built ? 1 : 0; };
-  return { build, dispose, on, setDoor: (id: number, k: number) => { if (built) setDoor(id, k); }, flush, U, opts, get built() { return built; }, get layers() { return G0 && G0.layers; } };
+  return { build, dispose, on, at, setDoor: (id: number, k: number) => { if (built) setDoor(id, k); }, flush, U, opts, get built() { return built; }, get layers() { return G0 && G0.layers; } };
 })();
 G.LightGrid = G_LightGrid;
 interface GameModules { LightGrid: typeof G_LightGrid; }

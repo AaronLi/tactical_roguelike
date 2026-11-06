@@ -25,7 +25,9 @@ const G_R = {
   vmHolder: undefined as unknown as THREE.Group,
   vmRoot: undefined as unknown as THREE.Group,
   vmMuzzle: undefined as unknown as THREE.PointLight,
-  vmLights: [] as [THREE.Light, number][], // (the gun in your hands' own light, and how bright it is by day)
+  vmLights: [] as [THREE.Light, number][], // (the gun in your hands' own light, and how bright it is in a lit room)
+  vmPts: [] as THREE.PointLight[], vmSpots: [] as THREE.SpotLight[], // (the dynamic lights' stand-ins for it: eyeLight)
+  vmDark: false, // (no light of its own: the level's light at the eye is all it gets, eyeLight)
   levelRoot: undefined as unknown as THREE.Group,
   dynRoot: undefined as unknown as THREE.Group,
   flashTex: undefined as unknown as THREE.CanvasTexture,
@@ -147,6 +149,10 @@ const G_R = {
     this.vmMuzzle = new THREE.PointLight(0xffb060, 0, 3, 2);
     this.vmMuzzle.position.set(0.2, -0.1, -0.8);
     this.vmHolder.add(this.vmMuzzle);
+    // the level's own dynamic lights, as they fall on the gun in your hands (a muzzle flash, a flashbang, a fireball, a
+    // weapon light pointed your way): a few stand-ins in the gun's scene, set each frame from the nearest (eyeLight)
+    this.vmPts = [0, 1, 2].map(() => { const l = new THREE.PointLight(0xffffff, 0, 1, 2); this.vmScene.add(l); return l; });
+    this.vmSpots = [0, 1].map(() => { const s = new THREE.SpotLight(0xffffff, 0, 1, 0.3, 0.6, 1.6); s.target = new THREE.Object3D(); this.vmScene.add(s, s.target); return s; });
 
     this.levelRoot = new THREE.Group();
     this.scene.add(this.levelRoot);
@@ -213,10 +219,82 @@ const G_R = {
     // Most of that fill's in the light grid now (js/lightgrid.ts: the sky on what's open to it, the lamps' light bounced
     // round the rooms): what's left of it flat everywhere is a little, so nowhere's black (all of it in the hangar,
     // daylit)
-    this.hemi.color.setHex(th.hemi || th.light, THREE.LinearSRGBColorSpace); this.hemi.intensity = (th.hemiI || 0.26) ** 2 * (th.hub ? 1 : G.LightGrid.opts.fill);
-    // a night level (js/level.ts nightify): the gun in your hands lit about as dimly as the dark round it (its own light a
-    // quarter of the day's: the light grid and your weapon light do the rest)
-    for (const [l, k] of this.vmLights) l.intensity = k * (map.night ? 0.25 : 1);
+    // On a night level (js/level.ts nightify) there's none of that: with the power off, a room with no window is black but
+    // for what the emergency lights, the moon through a doorway, a weapon light or a flash actually reach.
+    this.hemi.color.setHex(th.hemi || th.light, THREE.LinearSRGBColorSpace); this.hemi.intensity = map.night ? 0 : (th.hemiI || 0.26) ** 2 * (th.hub ? 1 : G.LightGrid.opts.fill);
+    // the gun in your hands: lit by what's lit where you stand (eyeLight), on a level with its lamps in the light grid
+    this.vmDark = !th.hub && G.LightGrid.built;
+    for (const [l, k] of this.vmLights) l.intensity = k;
+  },
+  // The light where you stand, for the gun in your hands (drawn in a scene of its own, js/render.ts render: so the level's
+  // lights never reach it). Its own studio light (vmLights, and the environment its metal reflects) stands for a lit
+  // room's (it lights the gun several times as brightly as the light grid does a wall there): it's turned down by how
+  // much light there is at the eye, all of it in a lit room (EYE_FULL: so a day level's lit rooms look as they did;
+  // outdoors under a day level's evening sky, about half, a corridor between its lamps two thirds; by an exit sign, a
+  // third; moonlight a tenth), none in the dark. That light, E:
+  //   the light grid's at the eye (the lamps, the sky through what's open to it, their light bounced round: as the walls
+  //   there take it) + the flat fill (this.hemi)
+  //   + each dynamic light's bounce: a weapon light's off what it shines on (stronger the closer that is: a wall at arm's
+  //   length lights up the gun, a long corridor hardly), a flash's or a fireball's off the room round it, where you can
+  //   see it.
+  // The dynamic lights themselves, where you can see them from the eye (a flash, a fireball, someone's light pointed
+  // at you) also light the gun directly: the nearest few copied into its scene each frame (vmPts, vmSpots).
+  // Its own light takes the colour of the light at the eye: on a night level wholly (under an exit sign, green), by day
+  // only as much as it's turned down (a day level's lit rooms look as they did).
+  // (EYE_BOUNCE: how much of a flash's light where you are comes back to you off the room round it; SPOT_BOUNCE: of a
+  // weapon light's, off the patch it lights: the patch's share of the light it reflects (half) that reaches a point a
+  // metre off, its size at a metre (the beam's width) over a metre squared; so as the inverse square of how far off it is)
+  EYE_FULL: 0.15, EYE_BOUNCE: 0.25, SPOT_BOUNCE: 0.045,
+  _eye: new THREE.Color(), _eyeC: new THREE.Color(), _eyeT: new THREE.Color(), _eyeV: new THREE.Vector3(), _eyeD: new THREE.Vector3(), _vmSky: new THREE.Color(0xdde6f0), _vmGround: new THREE.Color(0x2a2622),
+  eyeLight(): number {
+    const map = G.Game && G.Game.map, cam = this.camera, E = this._eye, C = this._eyeC, p = cam.position, L = G.Level;
+    for (const l of this.vmPts) l.intensity = 0;
+    for (const s of this.vmSpots) s.intensity = 0;
+    if (!this.vmDark || !map) return 1;
+    G.LightGrid.at(p.x, p.y, p.z, E, 0.7);
+    E.r += this.hemi.color.r * this.hemi.intensity; E.g += this.hemi.color.g * this.hemi.intensity; E.b += this.hemi.color.b * this.hemi.intensity;
+    const fall = (d: number, r: number, decay: number) => (r > 0 ? Math.pow(Math.max(0, 1 - d / r), decay) : 1 / (1 + d * d)); // (three.js' own, with a reach)
+    const seen = (q: THREE.Vector3) => L.los(map, q.x, q.y, q.z, p.x, p.y, p.z);
+    // points: the muzzle flashes and flashbangs (not your own: the gun's own flash, vmMuzzle, has that), the fireballs
+    const pts: [THREE.PointLight, number][] = [];
+    for (const l of [...this.muzzleLights, ...this.blastLights]) {
+      if (!(l.intensity > 0)) continue;
+      const d = l.position.distanceTo(p);
+      if ((this.muzzleLights.includes(l) && d < 1.2) || d >= l.distance || !seen(l.position)) continue;
+      const a = l.intensity * fall(d, l.distance, l.decay);
+      C.copy(l.color).multiplyScalar(a * this.EYE_BOUNCE); E.add(C);
+      pts.push([l, a]);
+    }
+    pts.sort((a, b) => b[1] - a[1]);
+    this.vmPts.forEach((v, i) => { const s = pts[i] && pts[i][0]; if (!s) return; v.position.copy(s.position); v.color.copy(s.color); v.intensity = s.intensity; v.distance = s.distance; v.decay = s.decay; });
+    // weapon lights: their bounce off what they light (as far as the beam goes before it hits something), and pointed
+    // at you, their beam
+    const sps: [THREE.SpotLight, number][] = [];
+    for (const s of this.spots) {
+      if (!(s.intensity > 0)) continue;
+      const dir = this._eyeD.subVectors(s.target.position, s.position).normalize();
+      const hit = L.raycast(map, s.position.x, s.position.y, s.position.z, dir.x, dir.y, dir.z, s.distance), hp = this._eyeV.copy(s.position).addScaledVector(dir, Math.max(0, hit.t - 0.08));
+      const dh = hp.distanceTo(p);
+      if (dh < s.distance && (dh < 0.3 || seen(hp))) {
+        const a = s.intensity * fall(hit.t, s.distance, s.decay) * this.SPOT_BOUNCE / Math.max(0.5, hit.t) ** 2 * fall(dh, s.distance, s.decay);
+        C.copy(s.color).multiplyScalar(a); E.add(C);
+      }
+      const d = s.position.distanceTo(p), toEye = this._eyeV.subVectors(p, s.position).normalize();
+      if (d > 0.6 && d < s.distance && toEye.dot(dir) > Math.cos(s.angle) && seen(s.position)) sps.push([s, s.intensity * fall(d, s.distance, s.decay)]);
+    }
+    sps.sort((a, b) => b[1] - a[1]);
+    this.vmSpots.forEach((v, i) => { const s = sps[i] && sps[i][0]; if (!s) return; v.position.copy(s.position); v.target.position.copy(s.target.position); v.target.updateMatrixWorld(); v.color.copy(s.color); v.intensity = s.intensity; v.distance = s.distance; v.decay = s.decay; v.angle = s.angle; v.penumbra = s.penumbra; });
+    const lum = (E.r + E.g + E.b) / 3, k = Math.min(1, lum / this.EYE_FULL);
+    // (its colour: toward the light's own, the dimmer it is; the light's as a tint, its brightest channel 1)
+    const m = Math.max(E.r, E.g, E.b);
+    const [vhl] = this.vmLights[0] as [THREE.HemisphereLight, number];
+    vhl.color.copy(this._vmSky); vhl.groundColor.copy(this._vmGround);
+    const tint = map.night ? 1 : 1 - k; // (by day, a lit room's lamps leave it as it was)
+    if (m > 1e-6 && tint > 0) {
+      C.setRGB(E.r / m, E.g / m, E.b / m);
+      vhl.color.lerp(this._eyeT.copy(this._vmSky).multiply(C), tint); vhl.groundColor.lerp(this._eyeT.copy(this._vmGround).multiply(C), tint);
+    }
+    return k;
   },
   // The level's meshes, taken out of the scene without being thrown away (js/highlights.ts replays the level in them on
   // the hangar's TVs, and disposes of them when it's done)
@@ -1174,7 +1252,12 @@ const G_R = {
     }
     r.clearDepth();
     r.clearStencil(); // reflex sight windows mark the stencil for their reticles
+    // the gun's own light, as much as there is where you stand (eyeLight): its lights and what its metal reflects
+    const ek = this.eyeLight(), envd: [THREE.MeshStandardMaterial, number][] = [];
+    for (const [l, k] of this.vmLights) l.intensity = k * ek;
+    if (ek < 1) this.vmRoot.traverse((o: any) => { const ms = o.isMesh ? (Array.isArray(o.material) ? o.material : [o.material]) : []; for (const mt of ms) if (mt.isMeshStandardMaterial && !mt.envMap) { envd.push([mt, mt.envMapIntensity]); mt.envMapIntensity *= ek; } });
     r.render(this.vmScene, this.camera);
+    for (let i = envd.length - 1; i >= 0; i--) envd[i][0].envMapIntensity = envd[i][1]; // (materials the gunsmith's and the icons' pictures share)
     G.LightGrid.on(false);
     r.info.autoReset = true;
   },
