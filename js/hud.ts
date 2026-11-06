@@ -350,7 +350,7 @@ const G_HUD = {
     // a grenade in your hand: what it is, how many, and the throw (right click changes it)
     if (Me.held) {
       const h = Me.held;
-      this.set('weapName', `${Me.quickName(h.kind)} <small title="Right click changes it">${Me.THROWS[h.str][0].toUpperCase()} THROW</small>${h.cock ? ' <em>pin out: let go to throw</em>' : ''}`);
+      this.set('weapName', `${Me.quickName(h.kind)} <small title="Right click changes it">${Me.THROWS[h.str][0].toUpperCase()} THROW</small>${h.cook != null ? ` <em>COOKING ${Math.max(0, h.cook).toFixed(1)} s: let go to throw</em>` : h.cock ? ' <em>pin out: let go to throw, R to cook it</em>' : ''}`);
       this.set('ammoMag', ''); this.set('ammoRes', ` <small>${Me.quickCount(h.kind)} left</small>`);
       this.set('weapAlt', `LMB hold, release to throw · RMB ${Me.THROWS.map((t, i) => (i === h.str ? `<b>${t[0]}</b>` : t[0])).join(' / ')}`);
     }

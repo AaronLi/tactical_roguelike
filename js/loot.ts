@@ -40,7 +40,7 @@ const G_Loot = (() => {
     if (t > reach) return Infinity;
     return G.Level.raycast(G.Game.map!, o.x, o.y, o.z, d.x, d.y, d.z, t, { move: true }).t < t - 0.02 ? Infinity : t;
   }
-  const COL = { mag: 0x2a2c2e, ammo: 0xb0915e, med: 0xd8d2c4, frag: 0x4a5a32, carrier: 0x3a4148, plate: 0x4a4d52, helmet: 0x33393f, belt: 0x3b3528, pack: 0x4a4a38, pouch: 0x404636, ifak: 0x7a2420, part: 0x2c3136 };
+  const COL = { mag: 0x2a2c2e, ammo: 0xb0915e, med: 0xd8d2c4, frag: 0x4a5a32, tb: 0x4c5634, carrier: 0x3a4148, plate: 0x4a4d52, helmet: 0x33393f, belt: 0x3b3528, pack: 0x4a4a38, pouch: 0x404636, ifak: 0x7a2420, part: 0x2c3136 };
   // A gun lies on its side (fit: shrunk to that length if it's longer, to lie in the weapon case), a magazine on
   // its flat as it would fall; anything else is a small box the size of its footprint (10 cm a cell), its icon on top.
   function meshFor(packed: any, fit?: number) {

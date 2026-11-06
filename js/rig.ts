@@ -845,7 +845,7 @@ const G_Rig = (() => {
     // the grenade itself, in their right hand until it's thrown
     if (p.hold || rig.handNade) {
       if (!rig.handNade) {
-        rig.handNade = { frag: new T.Mesh(new T.SphereGeometry(0.04, 10, 8), new T.MeshLambertMaterial({ color: 0x3a4a2a })), flash: new T.Mesh(new T.CylinderGeometry(0.027, 0.027, 0.1, 10), new T.MeshLambertMaterial({ color: 0x7d8388 })) };
+        rig.handNade = { frag: new T.Mesh(new T.SphereGeometry(0.04, 10, 8), new T.MeshLambertMaterial({ color: 0x3a4a2a })), flash: new T.Mesh(new T.CylinderGeometry(0.027, 0.027, 0.1, 10), new T.MeshLambertMaterial({ color: 0x7d8388 })), tb: G.Views ? G.Views.tbMesh(0.033, 0.115) : new T.Mesh(new T.CylinderGeometry(0.033, 0.033, 0.115, 10), new T.MeshLambertMaterial({ color: 0x4c5634 })) }; // (the video's worker has no js/views.ts)
         for (const m of Object.values(rig.handNade)) { m.position.set(0, -FARM - 0.07, -0.03); rig.armR.lo.add(m); }
       }
       for (const [k, m] of Object.entries(rig.handNade)) m.visible = !!p.hold && p.hold.kind === k && !handThrow && !posed;

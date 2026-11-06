@@ -244,6 +244,7 @@ const G_R = {
     while (this.levelRoot.children.length) { const c = this.levelRoot.children[0]; dispose(c); this.levelRoot.remove(c); }
     this.decals.forEach((d: THREE.Object3D) => (d.visible = false));
     this.fragMarks.count = 0; this.fragN = 0; this.scorches.forEach((m) => (m.visible = false));
+    for (const r of this.fires) r.t = 1e9; this.fireStep(0); // (a thermobaric's fireball still burning: gone with the level)
     if (this.bloodMarks) { this.bloodMarks.forEach((d: THREE.Object3D) => (d.visible = false)); this.pools.forEach((d: THREE.Object3D) => { d.visible = false; d.userData.owner = null; }); }
   },
   // ------------------------------------------------------------ blood on the environment
@@ -457,6 +458,13 @@ const G_R = {
       const m = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), new THREE.MeshBasicMaterial({ color: 0xff8830, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
       m.visible = false; m.userData.life = 0;
       this.scene.add(m); this.blasts.push(m);
+    }
+    // a thermobaric's fireball and smoke (fireball), one of each drawn always, too small to see: their shaders are built with the
+    // level's, not on the frame the first one goes off (a hitch, on some machines a long one, just when it's least wanted)
+    for (const add of [true, false]) {
+      const w = new THREE.InstancedMesh(this._fireGeo || (this._fireGeo = new THREE.PlaneGeometry(2, 2)), new THREE.MeshBasicMaterial({ map: this.fireTex(), transparent: true, depthWrite: false, blending: add ? THREE.AdditiveBlending : THREE.NormalBlending }), 1);
+      w.setMatrixAt(0, new THREE.Matrix4().makeScale(1e-4, 1e-4, 1e-4)); w.setColorAt(0, new THREE.Color(0, 0, 0)); w.frustumCulled = false;
+      this.scene.add(w);
     }
 
     // laser sights for marksmen
@@ -838,6 +846,96 @@ const G_R = {
     this.particles(p, 40, 0xffa040, 9, 0.6, 4, 1);
     this.particles(p, 30, 0x444038, 3, 1.4, -0.5, 1);
   },
+  // A thermobaric's fireball (js/player.ts tbModel): flame in every cell of floor its cloud reached, lit in the order it reached
+  // them (out from where it went off, round the furniture and through the open doorways) at the speed a burning cloud's front
+  // goes, and stacked two deep from the floor to the ceiling, so the room fills with it; white-yellow as it lights, orange as it
+  // rolls and swells, dull red, gone in about a second and a half. Then the soot: a dark layer of smoke under the ceiling that
+  // thins over a few seconds, and scorches on the floor. One of the two blast lights, bright and orange, in the middle of it.
+  // Two InstancedMeshes a burst (a few hundred soft round puffs, each turned to face the camera), each instance written once a frame
+  // while it lasts.
+  // a soft round puff: white in the middle, fading out to nothing at the edge (tinted per puff)
+  fireTex() {
+    if (this._fireTex) return this._fireTex;
+    const c = document.createElement('canvas'); c.width = c.height = 64;
+    const g = c.getContext('2d') as CanvasRenderingContext2D, gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.35, 'rgba(255,255,255,0.75)'); gr.addColorStop(0.7, 'rgba(255,255,255,0.25)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+    return (this._fireTex = new THREE.CanvasTexture(c));
+  },
+  fires: [] as any[], _fireGeo: null as THREE.PlaneGeometry | null, _fireTex: null as THREE.Texture | null,
+  FIRE: { LAYERS: 2, FRONT: 24, LIFE: 1.35, SMOKE: 6 },
+  fireball(M: any) {
+    const T = THREE, L = G.Level, TS = L.TS, F = this.FIRE, map = M.map as LvMap, W = map.W, n = M.cloud;
+    if (!n) return;
+    const geo = this._fireGeo || (this._fireGeo = new T.PlaneGeometry(2, 2)), rnd = G.U.rng(((M.p.x * 7919 + M.p.z * 104729) | 0) >>> 0 || 1);
+    const N = n * F.LAYERS, tex = this.fireTex(), flame = new T.InstancedMesh(geo, new T.MeshBasicMaterial({ map: tex, transparent: true, blending: T.AdditiveBlending, depthWrite: false }), N);
+    const smoke = new T.InstancedMesh(geo, new T.MeshBasicMaterial({ map: tex, color: 0xffffff, transparent: true, opacity: 0.75, depthWrite: false }), n);
+    flame.frustumCulled = smoke.frustumCulled = false; flame.renderOrder = 3; smoke.renderOrder = 2;
+    flame.instanceMatrix.setUsage(T.DynamicDrawUsage); smoke.instanceMatrix.setUsage(T.DynamicDrawUsage);
+    const at = new Float32Array(N * 6), sm = new Float32Array(n * 5), gys = new Float32Array(n);
+    let floor = Infinity, sx = 0, sz = 0;
+    for (let i = 0; i < n; i++) { const c = M.fill.order[i]; gys[i] = L.groundAt(map, ((c % W) + 0.5) * TS, (((c / W) | 0) + 0.5) * TS, 0.01, M.p.y + 0.3); floor = Math.min(floor, gys[i]); }
+    const ceil = floor + L.WALL_H;
+    for (let i = 0; i < n; i++) {
+      const c = M.fill.order[i], cx = ((c % W) + 0.5) * TS, cz = (((c / W) | 0) + 0.5) * TS, t0 = 0.08 + M.fill.d[i] / F.FRONT;
+      sx += cx; sz += cz;
+      for (let k = 0; k < F.LAYERS; k++) {
+        const j = (i * F.LAYERS + k) * 6, lo = gys[i] + 0.25, hi = ceil - 0.5, y = lo + (hi - lo) * (k + 0.2 + 0.6 * rnd()) / F.LAYERS;
+        at[j] = cx + (rnd() - 0.5) * TS * 0.6; at[j + 1] = y; at[j + 2] = cz + (rnd() - 0.5) * TS * 0.6; at[j + 3] = t0 + 0.05 * k + 0.04 * rnd(); at[j + 4] = 0.55 + 0.3 * rnd(); at[j + 5] = rnd();
+      }
+      const q = i * 5; sm[q] = cx + (rnd() - 0.5) * 0.3; sm[q + 1] = ceil - 0.5 - 0.6 * rnd(); sm[q + 2] = cz + (rnd() - 0.5) * 0.3; sm[q + 3] = t0 + 0.5 + 0.3 * rnd(); sm[q + 4] = i % 2 ? 0 : 0.8 + 0.5 * rnd(); // (a puff every other cell: smoke enough, half the drawing)
+      smoke.setColorAt(i, new T.Color().setScalar(0.07 + 0.08 * rnd()));
+    }
+    flame.setColorAt(0, new T.Color(0, 0, 0)); (flame.instanceColor as THREE.InstancedBufferAttribute).setUsage(T.DynamicDrawUsage);
+    this.scene.add(smoke, flame);
+    const l = this.blastLights.reduce((a: THREE.PointLight, b: THREE.PointLight) => (b.intensity < a.intensity ? b : a));
+    l.position.set(sx / n, floor + 1.8, sz / n); l.color.setHex(0xff7a30); l.distance = 10 + 2 * M.rc; l.intensity = 0;
+    const rec = { t: 0, n, N, at, sm, flame, smoke, light: l };
+    l.userData.by = rec;
+    this.fires.push(rec);
+    // soot on the floor where it burned, and the embers it throws
+    for (let k = 0; k < Math.min(6, 1 + (n / 18 | 0)); k++) { const i = Math.floor(rnd() * n), c = M.fill.order[i]; this.scorch(((c % W) + 0.5) * TS, gys[i], (((c / W) | 0) + 0.5) * TS, 1.3 + rnd(), 0.75, rnd() * 6.283); }
+    for (let k = 0; k < 6; k++) { const i = Math.floor(rnd() * n), c = M.fill.order[i]; this.particles(new T.Vector3(((c % W) + 0.5) * TS, floor + 1.2, (((c / W) | 0) + 0.5) * TS), 8, 0xffa040, 4, 0.9, 3, 1); }
+  },
+  fireStep(dt: number) {
+    if (!this.fires.length) return;
+    const F = this.FIRE, m = new THREE.Matrix4(), q = new THREE.Quaternion(), roll = new THREE.Quaternion(), z = new THREE.Vector3(0, 0, 1), cq = this.camera.quaternion, v = new THREE.Vector3(), s = new THREE.Vector3(), c = new THREE.Color();
+    for (const r of [...this.fires]) {
+      r.t += dt;
+      const t = r.t, at = r.at;
+      for (let i = 0; i < r.N; i++) {
+        const j = i * 6, a = t - at[j + 3];
+        let k = 0, sc = 0;
+        if (a > 0 && a < F.LIFE) {
+          const u = a / F.LIFE;
+          sc = at[j + 4] * (a < 0.1 ? 0.4 + 6 * a : 1 + 0.5 * u); // (bursting into being, then swelling as it rolls)
+          k = a < 0.12 ? 1 : 1 - (u - 0.09) / 0.91;
+          // white-yellow, orange, a dull red, out
+          if (u < 0.1) c.setRGB(1, 0.85, 0.55); else if (u < 0.5) c.setRGB(1, 0.5 - 0.25 * (u - 0.1) / 0.4, 0.1); else c.setRGB(0.85 - 0.4 * (u - 0.5) / 0.5, 0.16, 0.03);
+          c.multiplyScalar(Math.max(0, k) * 0.34 * (0.7 + 0.6 * at[j + 5])); // (dim each: they're many deep, and add up)
+        } else c.setRGB(0, 0, 0);
+        q.copy(cq).multiply(roll.setFromAxisAngle(z, at[j + 5] * 6.283 + t * (at[j + 5] - 0.5))); // (facing the camera, turned, turning)
+        m.compose(v.set(at[j], at[j + 1] + Math.max(0, a) * 0.35, at[j + 2]), q, s.setScalar(Math.max(0.0001, sc)));
+        r.flame.setMatrixAt(i, m); r.flame.setColorAt(i, c);
+      }
+      r.flame.instanceMatrix.needsUpdate = true; if (r.flame.instanceColor) r.flame.instanceColor.needsUpdate = true;
+      for (let i = 0; i < r.n; i++) {
+        const j = i * 5, a = t - r.sm[j + 3], sc = a > 0 && r.sm[j + 4] ? r.sm[j + 4] * Math.min(1.4, 0.4 + a * 0.8) : 0.0001;
+        m.compose(v.set(r.sm[j], r.sm[j + 1] + Math.min(0.4, Math.max(0, a) * 0.1), r.sm[j + 2]), q.copy(cq).multiply(roll.setFromAxisAngle(z, j)), s.setScalar(sc * 1.4));
+        r.smoke.setMatrixAt(i, m);
+      }
+      r.smoke.instanceMatrix.needsUpdate = true;
+      (r.smoke.material as THREE.MeshBasicMaterial).opacity = 0.75 * G.U.clamp(1 - (t - 2) / (F.SMOKE - 2), 0, 1);
+      const l = r.light;
+      if (l.userData.by === r) l.intensity = t < 0.15 ? 14 * t / 0.15 : t < 0.55 ? 14 : Math.max(0, 14 * (1 - (t - 0.55) / 0.9));
+      if (t > F.SMOKE + 0.2) {
+        this.scene.remove(r.flame, r.smoke);
+        (r.flame.material as THREE.Material).dispose(); (r.smoke.material as THREE.Material).dispose(); r.flame.dispose(); r.smoke.dispose();
+        if (l.userData.by === r) { l.userData.by = null; l.intensity = 0; l.color.setHex(0xff8040); l.distance = 18; }
+        this.fires.splice(this.fires.indexOf(r), 1);
+      }
+    }
+  },
   // The throw you're lining up: a dotted arc to where it goes off (G.Views.predictNade), and a ring there. Drawn
   // the frames it's called; cocked (pin out), brighter.
   throwArc(pts: THREE.Vector3[], cocked: boolean) {
@@ -887,6 +985,7 @@ const G_R = {
     }
     for (const l of this.muzzleLights) if (l.intensity > 0) { l.userData.t -= dt; if (l.userData.t <= 0) l.intensity = 0; }
     if (this.vmMuzzle.intensity > 0) this.vmMuzzle.intensity = Math.max(0, this.vmMuzzle.intensity - dt * 40);
+    this.fireStep(dt);
     for (const b of this.blasts) if (b.visible) {
       b.userData.life -= dt;
       const k = 1 - b.userData.life / b.userData.max;

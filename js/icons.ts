@@ -200,6 +200,15 @@ const G_Icons = (() => {
     g.strokeStyle = '#8a8f94'; g.lineWidth = 3; g.beginPath(); g.moveTo(W * 0.56, H * 0.22); g.lineTo(W * 0.72, H * 0.52); g.stroke();
     g.beginPath(); g.arc(W * 0.36, H * 0.22, W * 0.07, 0, 7); g.stroke();
   }
+  // a thermobaric grenade: a fatter olive can with an orange band round it, its fuze, spoon and pin on top
+  function drawTB(g: CanvasRenderingContext2D, W: number, H: number) {
+    rr(g, W * 0.26, H * 0.3, W * 0.48, H * 0.6, 5); g.fillStyle = '#4c5634'; g.fill(); shade(g, W * 0.26, H * 0.3, W * 0.48, H * 0.6);
+    g.fillStyle = '#c8641e'; g.fillRect(W * 0.26, H * 0.5, W * 0.48, H * 0.09); // (the band: an enhanced-blast fill)
+    g.fillStyle = '#e8e2c8'; g.font = `bold ${Math.round(H * 0.11)}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('TB', W * 0.5, H * 0.73);
+    g.fillStyle = '#8a8f94'; g.fillRect(W * 0.42, H * 0.18, W * 0.16, H * 0.13);
+    g.strokeStyle = '#8a8f94'; g.lineWidth = 3; g.beginPath(); g.moveTo(W * 0.56, H * 0.22); g.lineTo(W * 0.74, H * 0.52); g.stroke();
+    g.beginPath(); g.arc(W * 0.36, H * 0.22, W * 0.07, 0, 7); g.stroke();
+  }
   const GEAR_COL = (d: GearDef) => (d.brand && /Sable|Paragon/.test(d.brand) ? '#5a5240' : /Kestrel|Vantage/.test(d.brand || '') ? '#4d5639' : '#2e3236');
   function drawCarrier(g: CanvasRenderingContext2D, W: number, H: number, d: GearDef) {
     const col = d.id === 'c.lite' ? '#5c5a50' : d.id === 'c.ghost' ? '#3a3d40' : GEAR_COL(d);
@@ -413,6 +422,7 @@ const G_Icons = (() => {
     else if (it.k === 'med') drawMedItem(g, W, H, it.mt);
     else if (it.k === 'frag') drawFrag(g, W, H);
     else if (it.k === 'flash') drawFlash(g, W, H);
+    else if (it.k === 'tb') drawTB(g, W, H);
     else if (it.k === 'carrier') drawCarrier(g, W, H, d!);
     else if (it.k === 'plate') drawPlate(g, W, H, d!);
     else if (it.k === 'helmet') { drawHelmet(g, W, H, d!); if (it.face) drawFace(g, W, H, G.Gear.defOf(it.face) as GearDef, true); }

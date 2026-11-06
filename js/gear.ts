@@ -18,7 +18,7 @@ type GTbl = Record<string, any>; // a data table indexed by key (js/data.ts CALI
 type GDef = Record<string, any>; // a gun's definition (js/data.ts WEAPONS) or a gear definition (GearDef)
 // what the quartermaster's gear is (the kinds of item that go on you), and every kind of item there is
 type GearKind = 'carrier' | 'plate' | 'helmet' | 'face' | 'shoulder' | 'groin' | 'legs' | 'belt' | 'pack' | 'ifak';
-type ItemKind = 'gun' | 'mag' | 'ammo' | 'med' | 'frag' | 'flash' | 'part' | 'pouch' | 'tube' | GearKind; // ('tube': a shotgun's magazine tube, drawn as an icon only)
+type ItemKind = 'gun' | 'mag' | 'ammo' | 'med' | 'frag' | 'flash' | 'tb' | 'part' | 'pouch' | 'tube' | GearKind; // ('tube': a shotgun's magazine tube, drawn as an icon only)
 // a piece of gear's definition (LIST, DEFS): the fields that only some kinds have are optional
 interface GearDef {
   id: string; kind: GearKind; brand: string; name: string; tier: number; price: number; speed: number; desc: string;
@@ -304,6 +304,7 @@ const G_Gear = (() => {
   function medCount(me: GMe) { let n = 0; each(body(me), (it: GItem) => { if (it.k === 'med') n += it.n || 1; }); return n; }
   const fragItem = () => item({ k: 'frag' });
   const flashItem = () => item({ k: 'flash' }); // a flashbang: blinds and deafens, hurts nobody
+  const tbItem = () => item({ k: 'tb' }); // a thermobaric grenade: a fireball that fills the room (js/player.ts TB)
 
   // ---------------------------------------------------------------- grids
   let gid = 1;
@@ -673,6 +674,7 @@ const G_Gear = (() => {
     if (it.k === 'med') return (G.Med.ITEMS[it.mt] || G.Med.ITEMS.bandage).name; // (a stack's count is on its tile: n/most)
     if (it.k === 'frag') return 'Frag grenade';
     if (it.k === 'flash') return 'Flashbang';
+    if (it.k === 'tb') return 'Thermobaric grenade';
     if (it.k === 'gun') return it.w.def.name;
     if (it.k === 'pouch') return POUCHES[it.pid].name;
     if (it.k === 'part') return (G.Gunsmith.PARTS[it.pid] || {}).name || it.pid;
@@ -685,6 +687,7 @@ const G_Gear = (() => {
     if (it.k === 'med') return (G.Med.ITEMS[it.mt] || G.Med.ITEMS.bandage).price * (it.n || 1);
     if (it.k === 'frag') return 200;
     if (it.k === 'flash') return 150;
+    if (it.k === 'tb') return 450;
     if (it.k === 'gun') return Math.floor(G.WEAPONS[it.w.def.id].price * 0.5); // sold for half: what a trade-in gets
     if (it.k === 'pouch') return POUCHES[it.pid].price;
     if (it.k === 'part') { const p = G.Gunsmith.PARTS[it.pid]; return !p ? 0 : p.price || G.Gunsmith.sellPrice(p) * 2; } // (a gun's own part has no price: it's worth what it sells for)
@@ -698,7 +701,7 @@ const G_Gear = (() => {
     return base > 0 ? Math.max(1, Math.floor(base * c * c)) : 0;
   }
   return {
-    LIST, DEFS, POUCHES, MOUNTS, mountOn, mountFree, headLoad, mixed, pack, unpack, mergeBox, mergeMed, medStack, medCount, absorb, combine, setLoad, loadIn, magShape, magName, magVid, BRANDS: B, ammoFor, ammoItem, gearItem, gunItem, pouchItem, mounted, molles, pickMag, dumpGrid, dumpMag, partItem, partSize, flashItem, stow, inField, roomFor, unloadMag, unloadGun, fillMag, fillFrom, fillGun, partCount, stashProxy, gunSize, guns, packGuns, medItem, fragItem, grid, size, isGear, fits, put, findSpot, place, removeFrom,
+    LIST, DEFS, POUCHES, MOUNTS, mountOn, mountFree, headLoad, mixed, pack, unpack, mergeBox, mergeMed, medStack, medCount, absorb, combine, setLoad, loadIn, magShape, magName, magVid, BRANDS: B, ammoFor, ammoItem, gearItem, gunItem, pouchItem, mounted, molles, pickMag, dumpGrid, dumpMag, partItem, partSize, flashItem, tbItem, stow, inField, roomFor, unloadMag, unloadGun, fillMag, fillFrom, fillGun, partCount, stashProxy, gunSize, guns, packGuns, medItem, fragItem, grid, size, isGear, fits, put, findSpot, place, removeFrom,
     newKit, starter, body, all, each, feeds, rounds, count, take, swapMag, exchange, takeRounds, chamberIn, spares, refitMags, boxItem, boxCap, loadMag, loadAll, loadTargets, loadNeed, roundPrice,
     defOf, cond, piece, speed, label, price, sale,
   };

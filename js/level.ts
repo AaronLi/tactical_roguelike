@@ -1627,6 +1627,55 @@ const G_Level = {
     return G.U.clamp(Math.floor((y + 0.6) / this.FLOOR_H) + (map.base || 0), 0, map.NF - 1);
   },
   floorMap(map: LvMap, f: number) { return map.floors ? map.floors[f] : map; },
+  // The space a blast fills, on the floor it went off on: cell by cell out from the one it's in, nearest (along the floor)
+  // first, the way gas spreads. Walls stop it; a shut door stops it, an open doorway lets it through into the next room
+  // (furniture doesn't: the air goes round it). It stops when it's taken `cap` cells, or there's nowhere left to go (the
+  // room, and whatever's open onto it, is full). out: how many of them are open to the sky; vents: how many times it
+  // met a way out of the building (a broken window, the sky's edge). The same on every machine: it is worked out from the
+  // map and its doors alone. Returns the cells in the order it reached them (order, the cell index on that floor) and how
+  // far along the floor each is from where it went off (d, metres).
+  blastFill(map: LvMap, x: number, y: number, z: number, cap: number) {
+    const TS = this.TS, W = map.W, H = map.H, f = this.floorAt(map, x, y, z), fm = this.floorMap(map, f), t = fm.t, out = fm.out || map.out;
+    const doorAt: Map<number, LvDoor> = (fm as any).doorAt || map.doorAt || new Map();
+    const order = new Int32Array(cap), d = new Float32Array(cap), seen = new Uint8Array(W * H), broken = new Set<number>();
+    for (const w of map.windows || []) if (w.broken && (w.fl || 0) === f) for (const c of w.cells) broken.add(c);
+    let sx = G.U.clamp(Math.floor(x / TS), 0, W - 1), sz = G.U.clamp(Math.floor(z / TS), 0, H - 1);
+    // (gone off against a wall, or over a cell the grid calls solid: the nearest open cell next to it)
+    if (t[sz * W + sx] === 1) { // (the one whose middle is nearest the point: the side of the wall it's on)
+      let bx = sx, bz = sz, bd = Infinity;
+      for (const [ox, oz] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]) { const nx = sx + ox, nz = sz + oz, dd = Math.hypot((nx + 0.5) * TS - x, (nz + 0.5) * TS - z); if (nx >= 0 && nz >= 0 && nx < W && nz < H && t[nz * W + nx] !== 1 && dd < bd) { bd = dd; bx = nx; bz = nz; } }
+      sx = bx; sz = bz;
+    }
+    let n = 0, outN = 0, vents = 0;
+    const s0 = sz * W + sx;
+    if (t[s0] === 1) return { f, order, d, n: 0, out: 0, vents: 0, cx: x, cz: z };
+    // (nearest first: cells in buckets by distance, a tenth of a metre each; diagonal steps too, so it spreads round, not as a
+    // diamond, though never across a corner)
+    const best = new Float32Array(W * H).fill(Infinity), Q: number[][] = [], open = (j: number) => { const v = t[j]; if (v === 1) return false; if (v === 3) { const dd = doorAt.get(j); if (dd && !dd.open && !dd.fallen) return false; } return true; };
+    const push = (j: number, dj: number) => { if (dj >= best[j]) return; best[j] = dj; const b = Math.round(dj * 10); (Q[b] || (Q[b] = [])).push(j); };
+    push(s0, Math.hypot((sx + 0.5) * TS - x, (sz + 0.5) * TS - z));
+    for (let b = 0; b < Q.length && n < cap; b++) {
+      const q = Q[b]; if (!q) continue;
+      for (let k = 0; k < q.length && n < cap; k++) {
+        const i = q[k];
+        if (seen[i]) continue;
+        seen[i] = 1; order[n] = i; d[n++] = best[i];
+        if (out[i]) outN++;
+        const tx = i % W, tz = (i / W) | 0, di = best[i];
+        for (const [ox, oz] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]]) {
+          const nx = tx + ox, nz = tz + oz;
+          if (nx < 0 || nz < 0 || nx >= W || nz >= H) { if (!ox || !oz) vents++; continue; }
+          const j = nz * W + nx;
+          if (seen[j]) continue;
+          if (t[j] === 1) { if (broken.has(j) && !ox !== !oz) { seen[j] = 1; vents++; } continue; }
+          if (!open(j)) continue;
+          if (ox && oz && (!open(tz * W + nx) || !open(nz * W + tx))) continue; // (not across a corner)
+          push(j, di + (ox && oz ? TS * Math.SQRT2 : TS));
+        }
+      }
+    }
+    return { f, order, d, n, out: outN, vents, cx: x, cz: z };
+  },
   // a flow source for something at (x, y, z): its cell, and (in a building of several floors) its floor
   src(map: LvMap, x: number, y: number, z: number) { return [Math.floor(x / this.TS), Math.floor(z / this.TS), this.floorAt(map, x, y || 0, z)]; },
 

@@ -781,6 +781,7 @@ const G_Hangar = (() => {
         if (s.id.startsWith('med.')) out.push({ k: 'svc', key: s.id, item: Gr.medItem(s.id.slice(4)), name: s.name, price: s.price, sold: false });
         else if (s.id === 'flash') out.push({ k: 'svc', key: s.id, item: Gr.flashItem(), name: s.name, price: s.price, sold: false });
         else if (s.id === 'nade') out.push({ k: 'svc', key: s.id, item: Gr.fragItem(), name: s.name, price: s.price, sold: false });
+        else if (s.id === 'tb') out.push({ k: 'svc', key: s.id, item: Gr.tbItem(), name: s.name, price: s.price, sold: false });
       }
     }
     return out;
