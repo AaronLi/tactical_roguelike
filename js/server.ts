@@ -518,7 +518,8 @@ const G_Server = {
     w.mag = Math.min(got.mag - (ch ? 1 : 0), G.Me.magSize(w));
     if (w.tube) w.tube = Array(w.mag).fill(w.ammo);
     w.chamber = ch ? w.ammo : null;
-    const cos = Math.cos(c.yaw), sin = Math.sin(c.yaw), FOAM = 0.032;
+    // (on the foam: the case's own floor, which on ground that rolls is the ground under it, as js/level.ts draws it, not the map's zero)
+    const cos = Math.cos(c.yaw), sin = Math.sin(c.yaw), FOAM = (this.map!.terrain ? c.fy || 0 : 0) + 0.032;
     const put = (it: any, lx: number, lz: number, turn: number, fit?: number) => this.lootMsg(this.lootAdd(c.x + lx * cos + lz * sin, FOAM, c.z - lx * sin + lz * cos, Gr.pack(it), c.yaw + turn, fit));
     G.Net.broadcast({ t: 'loot', a: [put(Gr.gunItem(w), 0, -0.03, -Math.PI / 2, 1.28), ...Gr.spares(def, got.reserve, w.ammo, w.rl).concat(got.alt ? [Gr.ammoItem(def, got.alt.n, G.ammoOk(G.roundOf(def, got.alt.rl)!.cal, got.alt.am), undefined, got.alt.rl)] : []).map((it, i) => put(it, 0.55 - i * 0.2, 0.13, 0))] });
   },

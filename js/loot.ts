@@ -47,20 +47,20 @@ const G_Loot = (() => {
     if (packed.k === 'gun' && packed.w) {
       const code = G.Gunsmith.encode(packed.w.id, packed.w.build), gun = G.GunModels.world(code, packed.w.sk), wrap = new T.Group(), tmp = new T.Group();
       G.GunRig.setLoaded(gun, G.loaded(packed.w) > 0); // (a crossbow lying there with its bolt on the rail or not)
-      // (its place: lying on its side, shrunk to fit its case, its underside on the floor; done again when a gun that was still loading has come in: js/gunmodels.ts)
+      const g = new T.Group();
+      g.add(wrap);
+      // (its place: lying on its side, shrunk to fit its case, its underside on the floor; done again when a gun that was still loading has come in: js/gunmodels.ts.
+      // It's measured on its own, in tmp, away from where it lies (and only once it has meshes to measure), then put back in g: else the gun that came in is never drawn)
       const lay = () => {
-        if (fit) { gun.scale.setScalar(1); const b0 = new T.Box3().setFromObject(gun); gun.scale.setScalar(Math.min(1, fit / (b0.max.z - b0.min.z))); }
-        gun.rotation.z = Math.PI / 2;
-        wrap.position.set(0, 0, 0);
-        wrap.add(gun); tmp.add(wrap); tmp.updateMatrixWorld(true);
-        const b = new T.Box3().setFromObject(wrap);
+        tmp.add(gun); gun.rotation.z = 0;
+        if (fit) { gun.scale.setScalar(1); tmp.updateMatrixWorld(true); const b0 = new T.Box3().setFromObject(gun); gun.scale.setScalar(Math.min(1, fit / (b0.max.z - b0.min.z))); }
+        gun.rotation.z = Math.PI / 2; tmp.updateMatrixWorld(true);
+        const b = new T.Box3().setFromObject(gun);
         wrap.position.set(-(b.min.x + b.max.x) / 2, -b.min.y, -(b.min.z + b.max.z) / 2);
-        tmp.remove(wrap);
+        wrap.add(gun);
       };
-      const loading = !!gun.userData.pending;
-      lay();
-      if (loading) G.GunModels.whenReady(gun, (ok) => { if (ok) lay(); });
-      const g = new T.Group(); g.add(wrap);
+      if (gun.userData.pending) { wrap.add(gun); g.userData.gun = gun; G.GunModels.whenReady(gun, (ok) => { if (ok) lay(); }); } // (add() takes its box again then)
+      else lay();
       return g;
     }
     const it = G.Gear.unpack(packed), mdef = it.k === 'mag' && G.WEAPONS[it.wid];
@@ -85,6 +85,8 @@ const G_Loot = (() => {
     mesh.position.set(x, y + 0.002, z); mesh.rotation.y = yaw != null ? yaw : Math.random() * Math.PI * 2;
     G.R.dynRoot.add(mesh);
     list.set(id, { id, x, y, z, item: packed, mesh, box: boxOf(mesh) });
+    // a gun still loading has no shape yet to aim at: its box once it's in (else it couldn't be picked up)
+    if (mesh.userData.gun) G.GunModels.whenReady(mesh.userData.gun, () => { const l = list.get(id); if (l && l.mesh === mesh) l.box = boxOf(mesh); });
   }
   function remove(id: number) {
     const l = list.get(id);
