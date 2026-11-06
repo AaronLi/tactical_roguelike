@@ -2661,7 +2661,7 @@ const G_Server = {
     const r2 = (x: number) => Math.round(x * 100) / 100;
     this.hear(p.x, p.z, 20, p.y || 0);
     this.blastDaze([p.x, p.y, p.z], 'frag'); // (their own, too, if they're close to it)
-    G.Net.broadcast({ t: 'boom', id: 'enemy', p: [p.x, p.y, p.z].map(r2), r: G.Me.BLAST.r, d: Math.round(G.Me.BLAST.dmg * this.dmgMult), en: 1, fr: 1, s: (Math.random() * 4294967296) >>> 0 });
+    G.Net.broadcast({ t: 'boom', id: 'enemy', p: [p.x, p.y, p.z].map(r2), r: Math.round(G.Me.blastR(this.map, new THREE.Vector3(p.x, p.y, p.z)) * 100) / 100, d: Math.round(G.Me.BLAST.dmg * this.dmgMult), en: 1, fr: 1, s: (Math.random() * 4294967296) >>> 0 });
   },
 
   // blind: firing at where the target was last seen, not at them

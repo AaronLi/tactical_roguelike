@@ -1054,10 +1054,12 @@ const G_Views = {
         if ((n.kind === 'flash' || n.kind === 'tb') && !n.own) { G.R.dynRoot.remove(n.mesh); this.nades.splice(this.nades.indexOf(n), 1); continue; } // (someone else's: its bang comes from the host)
         G.R.dynRoot.remove(n.mesh);
         this.nades.splice(this.nades.indexOf(n), 1);
+        // (a frag or a thermobaric goes off where it is: at its own middle, NADE_R off whatever it's lying on, so its downward chips meet
+        // that floor a hand's breadth out and its blast is a surface burst's: js/player.ts blastR. A flashbang's flash a little above it.)
         if (n.own && n.kind === 'flash') G.Me.flashBang(p.clone().add(new THREE.Vector3(0, 0.1, 0)));
-        else if (n.own && n.kind === 'tb') G.Me.thermobaric(p.clone().add(new THREE.Vector3(0, 0.25, 0)));
-        else if (n.own) G.Me.explode(p.clone().add(new THREE.Vector3(0, 0.25, 0)), G.Me.BLAST.r, G.Me.BLAST.dmg, true); // (just off the floor it's on, any floor)
-        else if (n.enemy && G.Net.isHost) G.Server.enemyBoom(p.clone().add(new THREE.Vector3(0, 0.25, 0)));
+        else if (n.own && n.kind === 'tb') G.Me.thermobaric(p.clone());
+        else if (n.own) G.Me.explode(p.clone(), G.Me.blastR(map, p), G.Me.BLAST.dmg, true);
+        else if (n.enemy && G.Net.isHost) G.Server.enemyBoom(p.clone());
       }
     }
 

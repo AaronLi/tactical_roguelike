@@ -1783,7 +1783,16 @@ const G_Me = {
   // a time budget a frame (FRAG.BUDGET_MS, at least FRAG.MIN_PER_FRAME chips): a few frames at most. A chip that has
   // flown is flown at once (at a kilometre a second the air time is nothing). A body takes at most FRAG.CAP of them
   // through the full wound sums (the rest pass it by) so a crowd of chips on one man costs no more than that.
-  BLAST: { r: 4, dmg: 90 }, // (the burst's own push of air, close in: the chips are the rest)
+  BLAST: { r: 4, dmg: 90, SURFACE: 1.22 }, // (the burst's own push of air, close in: the chips are the rest)
+  // A burst lying on something hard (a floor, a table: within 15 cm of it) pushes its whole blast into the half above it: the surface
+  // reflects the downward half back up, so close in it acts like about 1.8 times the charge, which carries a blast about 1.22 times as
+  // far (as the cube root of the charge). In the air it's the plain BLAST.r. (The chips are the same either way: the floor stops or
+  // turns the downward ones itself, js/ballistics.ts glances.)
+  blastR(map: LvMap | null, p: THREE.Vector3) {
+    if (!map) return this.BLAST.r;
+    const g = G.Level.groundAt(map, p.x, p.z, 0.01, p.y + 0.05);
+    return g != null && p.y - g < 0.15 ? this.BLAST.r * this.BLAST.SURFACE : this.BLAST.r;
+  },
   FRAG: { N: 1200, V0: 1350, VMIN: 70, RANGE: 70, CAP: 28, BUDGET_MS: 3, MIN_PER_FRAME: 40, M_MED: 0.0004, CD: 1.2, FLAKE: 4, SHOW: 26, PUFFS: 14, BLOOD: 24 },
   fragQ: null as null | any[],
   fragLogs: [] as any[],
