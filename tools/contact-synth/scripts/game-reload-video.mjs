@@ -3,7 +3,7 @@
 // moment: the charging handle at the rear and the bolt home, the old magazine out of the well, the
 // new one seated, the bolt catch hit.
 //
-// The game runs in headless Chromium on a stepped clock (exactly 1/60 s per frame, whatever the
+// The game runs in headless Chromium on a stepped clock (exactly one frame's time per frame, whatever the
 // rendering speed), so every frame and every logged moment lines up with the sound.
 //
 // Usage: (from the repo root) HOST=127.0.0.1 node serve.js &
@@ -21,7 +21,8 @@ const args = process.argv.slice(2);
 const out = args[0];
 const opt = (k, d) => { const i = args.indexOf('--' + k); return i >= 0 ? args[i + 1] : d; };
 const URL = opt('url', 'http://127.0.0.1:8080/');
-const FPS = 60, W = 1280, H = 720;
+// 30 fps at 960x540: headless WebGL (SwiftShader) takes seconds a frame, so this keeps a run to ~45 min.
+const FPS = +opt('fps', '30'), W = 960, H = 540;
 if (!out) { console.error('usage: game-reload-video.mjs <out.mp4>'); process.exit(1); }
 
 // ---------- the game, on a stepped clock ----------
@@ -40,6 +41,7 @@ await page.addInitScript(() => {
   Date.now = () => (fake ? dateBase + off : realDate());
   window.requestAnimationFrame = (cb) => { if (fake) { q.push(cb); return 1; } return realRaf(cb); };
 });
+await page.addInitScript((f) => { window.__fps = f; }, FPS);
 await page.goto(URL);
 await page.waitForFunction(() => window.G && G.Game && G.Me, null, { timeout: 60000 });
 
@@ -50,6 +52,7 @@ await page.evaluate(async () => {
   G.Game.solo(); await sleep(0.8);
   G.Server.startRun();
   await until(() => G.Game.phase === 'route' && G.Game.routeMap);
+  G.Me.sidearmChosen = true; // (the route waits on the sidearm choice)
   const g0 = G.Game; g0.pickRoute(G.Route.options(g0.routeMap, g0.routeSt.path[g0.routeSt.path.length - 1])[0]);
   await until(() => G.Game.phase === 'level' && G.Me.kit);
   await sleep(1.0);
@@ -82,8 +85,9 @@ await page.evaluate(async () => {
   const sample = G.Audio.sample.bind(G.Audio);
   G.Audio.sample = (name, ...r) => { window.__log.push({ ev: name, t: window.__clock.t() }); return sample(name, ...r); };
   window.__prevM = -1;
+  const FPS = window.__fps;
   window.__step = () => {
-    window.__clock.step(1000 / 60);
+    window.__clock.step(1000 / FPS);
     // how far through the magazine change (js/vmanim.js magClip): out of the well at 0.1, entering it at 0.74
     if (m.reloading && m.reloadTotal) {
       const k = (1 - m.reloadT / m.reloadTotal) * (m.reloadSeat || 1);
@@ -107,7 +111,7 @@ async function frame() {
   const st = await page.evaluate(() => window.__step());
   await write(await page.screenshot({ type: 'jpeg', quality: 92 }));
   frames++;
-  if (frames % 60 === 0) process.stdout.write(`\r${(frames / FPS).toFixed(1)} s`);
+  if (frames % FPS === 0) console.log(`${(frames / FPS).toFixed(0)} s recorded`);
   return st;
 }
 const hold = async (s) => { for (let i = 0; i < Math.round(s * FPS); i++) await frame(); };
