@@ -31,7 +31,7 @@ const G_VMAnim = (() => {
   type Rig = GunRig; // (one gun in the hands: its holder, its parts, its anchors, its magazine's check data: js/gunrig.ts)
   interface MagState { mode: VmMagMode; at?: number; d?: number; k?: number; q?: THREE.Quaternion }
   // one frame of a clip: the gun's offset and what each part and hand is doing (null: left alone)
-  interface Pose { gun: number[]; L: V3 | null; R: V3 | null; mag: MagState; ch: number; handle: number | null; open: number | null; slide: number | null; cyl: number; brk: number; cover: number; pump: number | null; lever: number | null; hinge: number | null; lock: number; bolt: number[] | null; prop: { kind: VmPropKind; rx?: number; dx?: number; by?: V3; n?: number; seat?: number; up?: number; at?: V3[]; home?: V3 } | null; chk?: number; dropCase?: boolean; fed?: number; pulled?: boolean }
+  interface Pose { gun: number[]; L: V3 | null; R: V3 | null; mag: MagState; ch: number; catch?: number | null; handle: number | null; open: number | null; slide: number | null; cyl: number; brk: number; cover: number; pump: number | null; lever: number | null; hinge: number | null; lock: number; bolt: number[] | null; prop: { kind: VmPropKind; rx?: number; dx?: number; by?: V3; n?: number; seat?: number; up?: number; at?: V3[]; home?: V3 } | null; chk?: number; dropCase?: boolean; fed?: number; pulled?: boolean }
   interface Arm { g: THREE.Group; sleeve: THREE.Mesh; glove: THREE.Group; fist?: THREE.Group }
   interface ChvHeads { heads: THREE.Group[]; shot: boolean; cyl?: boolean }
   interface ChvPort { g: THREE.Group; round: THREE.Group; face: THREE.Mesh; shot: boolean; real: boolean; bolt: THREE.Mesh | null; win: number; f: number }
@@ -263,11 +263,14 @@ const G_VMAnim = (() => {
   }
   // Sending the action home from where it locked open: the left thumb on the slide stop (a pistol) or the palm
   // on the bolt catch over the magazine well (a rifle); the slide (or bolt) slams forward and the gun jumps.
+  const CATCH_LOCK = 0.14, CATCH_HAND = [-0.012, 0.012, -0.03]; // (the bolt catch's turn about its pin with the bolt held open, radians; where the hand rests on it, from the pin: forward, up, right)
   function release(c: number, h: Rig, kind: VmAction, pose: Pose, from: V3 | null) {
     const A = h.A;
-    const at = kind === 'pistol' ? off(A.G, 0.035, 0.045, -0.02) : off(A.W || A.WB || A.S, 0.01, 0.045, -0.03);
+    // (a rifle with a bolt catch of its own, part_catch: the hand takes the catch's upper paddle, where the model has it; any other, over the well)
+    const at = kind === 'pistol' ? off(A.G, 0.035, 0.045, -0.02) : A.catchHome ? off(A.catchHome, CATCH_HAND[0], CATCH_HAND[1], CATCH_HAND[2]) : off(A.W || A.WB || A.S, 0.01, 0.045, -0.03);
     pose.L = path(c, [[0, from || A.S], [0.28, at], [0.4, off(at, 0, -0.008)], [0.68, A.S], [1, A.S]]);
     const k = 1 - S(0.34, 0.4, c);
+    pose.catch = 1 - S(0.31, 0.37, c); // (the paddle pressed in just ahead of the bolt: it drops, the carrier runs home)
     if (kind === 'pistol') pose.slide = k;
     pose.open = k * actTravel(h, kind);
     const j = c > 0.36 && c < 0.56 ? Math.sin(Math.PI * (c - 0.36) / 0.2) : 0;
@@ -709,6 +712,10 @@ const G_VMAnim = (() => {
       }
       // handles and slides
       if (an.ch && A.chHome) an.ch.position.copy(A.chHome).z += (pose ? pose.ch : 0) * CH;
+      if (an.catch && A.catchHome) { // the bolt catch: up (its upper arm tipped back) with the bolt held open on an empty magazine, and through a reload from empty until the thumb sends the bolt home
+        const held = pose && pose.catch != null ? pose.catch : (pl as unknown as { reloading: boolean; reloadAct: string | null }).reloading && (pl as unknown as { reloadAct: string | null }).reloadAct === 'release' ? 1 : !G.loaded(w) && G.boltHold(a.def) ? 1 : 0;
+        an.catch.position.copy(A.catchHome); an.catch.rotation.x = held * CATCH_LOCK;
+      }
       if (an.handle && A.handleHome) {
         // at rest: home, or (an open bolt with a round to fire) back; a riding handle jumps with each shot: a closed
         // bolt's back and home, an open bolt's slams home to fire and comes back to be caught
