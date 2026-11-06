@@ -448,7 +448,7 @@ const G_HUD = {
       const bl = Math.round(Me.body.blood);
       this.set('downTitle', Me.out ? 'UNCONSCIOUS' : 'YOU ARE DOWN');
       this.set('bleed', `${Me.bleed == null ? 'Stable' : `Bleeding out: ${Math.ceil(Me.bleed)}s`} · blood ${bl}%`);
-      this.set('downHint', Me.out ? `Out cold. A teammate's blood bags bring you round (over ${G.Med.UNCON}% blood); stop the bleeding first, or it carries on.`
+      this.set('downHint', Me.out ? `Out cold. A teammate's blood bags bring you round (over ${G.Med.UNCON}% blood); stop the bleeding first, or it carries on.<br>${Me.giveUp > 0 ? `Giving up... <b>${Math.ceil(Me.GIVE_UP - Me.giveUp)}</b>` : 'Hold <b>G</b> to give up'}`
         : `Your sidearm still works. A teammate can get you up with a revive${bl <= G.Med.DOWNABLE ? `, but under ${G.Med.DOWNABLE + 1}% blood the next hit puts you down again: blood bags help` : ''}.`);
     }
     this.el.deadMsg.classList.toggle('hidden', !Me.dead);

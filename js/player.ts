@@ -590,6 +590,9 @@ const G_Me = {
     if (fate === 'out' && !this.out) this.goDown(true);
     else if (this.out && fate !== 'out') { this.out = false; G.HUD.toast('', 'You come round: a teammate can get you up', 2.4); }
     this.bleed = this.down ? G.Med.bleedOut(this.body) : null; // (seconds left, or null: stable)
+    // unconscious, you can give up: hold G (GIVE_UP s) and you're killed in action at once, spectating, rather than waiting it out
+    this.giveUp = this.out && this.keys.KeyG && !G.Game.chatOpen ? (this.giveUp || 0) + dt : 0;
+    if (this.giveUp >= this.GIVE_UP) { this.giveUp = 0; return this.die('Gave up, unconscious and bleeding'); }
 
     this.move(dt, map);
     // the gun in your hands is the one in view (moved out of its slot in the Tab screen, rebuilt, swapped, a sticker put on: whatever changed it)
@@ -2662,6 +2665,8 @@ const G_Me = {
     if (b.parts.thorax.lung) return 'Bled out from a chest wound (a punctured lung)';
     return 'Bled out: nobody stopped it in time';
   },
+  GIVE_UP: 2,
+  giveUp: 0,
   die(how?: any) {
     G.Views.spawnSelfBody(); // (before anything else changes: as you were, then down)
     this.down = false; this.out = false;
