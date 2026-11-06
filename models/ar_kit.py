@@ -438,8 +438,8 @@ def mag_stanag(top):
     R = lambda pts: RL(pts, 866, 232, top)
     HWm = 11.4 * mm
     back = [(792, 250), (792, 320), (787, 350), (786, 363), (790, 395), (800, 445), (810, 481), (820, 516), (832, 548)]
-    front = [(937, 284), (946, 310), (946, 400), (960, 459), (975, 506)]   # (inside the well its front stays behind the well's front wall: x 937, 1 mm clear)
-    mg = K.tmp(prism(R([(795, 232), (937, 232), (937, 284), (946, 310), (946, 400), (960, 459), (975, 506), (975, 515), (960, 522), (940, 524), (900, 536), (860, 548),
+    front = [(937, 284), (937, 400), (951, 459), (966, 506)]   # (its front 1 mm behind the well's front wall, x 937, and the same depth on down below the well: no step out)
+    mg = K.tmp(prism(R([(795, 232), (937, 232), (937, 284), (937, 400), (951, 459), (966, 506), (966, 515), (951, 522), (932, 525), (900, 536), (860, 548),
                         (838, 553), (832, 548), (820, 516), (810, 481), (800, 445), (790, 395), (786, 363), (787, 350), (792, 320), (792, 250)]), 'x', -HWm, HWm))   # (its back 1 mm clear of the well's back wall, x 792, down through the well)
     cut(mg, prism(R([(800, 226), (936, 226), (936, 246), (800, 246)]), 'x', -HWm + 1.0 * mm, HWm - 1.0 * mm))      # (open at the top: the follower's well)
 
@@ -473,7 +473,7 @@ def mag_stanag(top):
             for p0, p1 in zip(line, line[1:]):
                 o = K.tmp(prism(R([(p0[0] - 5, p0[1]), (p0[0] + 5, p0[1]), (p1[0] + 5, p1[1] + 1), (p1[0] - 5, p1[1] + 1)]), 'x', *xs(sd * 11.2 * mm, sd * 12.0 * mm)))
                 bevel(o, 0.3 * mm, 1); smooth(o); K.adopt(o, 'mag', 'park', pm)
-    o = K.tmp(prism(R([(836, 546), (978, 508), (980, 518), (838, 558)]), 'x', -12.6 * mm, 12.6 * mm)); bevel(o, 0.8 * mm, 1); smooth(o); K.adopt(o, 'mag', 'polymer', pm)
+    o = K.tmp(prism(R([(836, 546), (969, 508), (971, 518), (838, 558)]), 'x', -12.6 * mm, 12.6 * mm)); bevel(o, 0.8 * mm, 1); smooth(o); K.adopt(o, 'mag', 'polymer', pm)
     # the feed lips: each wall's top turned in over the rounds
     for sd in (-1, 1):
         o = K.tmp(prism(R([(800, 229), (900, 229), (900, 234), (800, 234)]), 'x', *xs(sd * (HWm - 0.2 * mm), sd * (HWm - 3.0 * mm))))
