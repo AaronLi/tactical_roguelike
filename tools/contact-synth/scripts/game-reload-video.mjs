@@ -16,7 +16,7 @@ import { writeFileSync, mkdtempSync, rmSync, renameSync } from 'node:fs';
 import { speakerMaster } from './speaker-master.mjs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { SCENES, renderScene, encodeWav } from '../dist/index.js';
+import { SCENES, renderScene, encodeWav, arChargeScene, chargeScene } from '../dist/index.js';
 import { T0 } from '../dist/excitation.js';
 
 const args = process.argv.slice(2);
@@ -40,6 +40,9 @@ const GUNS = {
     charge_: ['g19-rack', 'slide stops at the rear', 'slide slams home'], magOut: ['g19-mag-out', 'catch lets go of the magazine'], magOutEmpty: ['g19-mag-out-empty', 'catch lets go of the magazine'],
     magIn: ['g19-mag-in', 'catch clicks into the magazine'], release: ['g19-slide-release', 'slide slams home'] },
 };
+// The charge sound is rebuilt with the animation's own timing (js/vmanim.ts rack: the hand draws the action
+// back from 30% to 52% of it and lets go at once, home at 60%), keeping each gun's real stroke.
+const CHARGE_BUILD = { m4: (t) => arChargeScene('loaded', t), ak: (t) => chargeScene('ak', 'loaded', t), mp5: (t) => chargeScene('mp5', 'loaded', t), g19: (t) => chargeScene('g19', 'loaded', t) };
 const C = GUNS[GUN];
 if (!C) { console.error('--gun: one of ' + Object.keys(GUNS).join(', ')); process.exit(1); }
 // 30 fps at 960x540: headless WebGL (SwiftShader) takes seconds a frame, so this keeps a run to ~45 min.
@@ -107,8 +110,12 @@ await page.evaluate(async () => {
   G.Audio.sample = (name, ...r) => { window.__log.push({ ev: name, t: window.__clock.t() }); return sample(name, ...r); };
   window.__prevM = -1;
   const FPS = window.__fps;
+  let lastAct = null;
   window.__step = () => {
     window.__clock.step(1000 / FPS);
+    // an action being worked: its length, to time the charge sound to the animation
+    if (m.act && m.act !== lastAct) window.__log.push({ ev: 'action', t: window.__clock.t(), dur: m.act.dur, kind: m.act.kind });
+    lastAct = m.act;
     // how far through the magazine change (js/vmanim.js magClip): out of the well at 0.1, entering it at 0.74
     if (m.reloading && m.reloadTotal) {
       const k = (1 - m.reloadT / m.reloadTotal) * (m.reloadSeat || 1);
@@ -170,7 +177,7 @@ const mix = new Float32Array(Math.ceil((total + 1) * sr));
 const scene = (id) => SCENES.find((s) => s.id === id);
 /** Place a rendered stem (or the whole mix) so that element `what` of the scene lands at time `at`. */
 function place(id, what, at, tracks = null, gainDb = 0) {
-  const sc = scene(id);
+  const sc = typeof id === 'string' ? scene(id) : id;
   const els = sc.tracks.flatMap((t) => t.elements);
   const el = els.find((e) => e.what === what);
   if (!el) throw new Error(`${id}: no "${what}"`);
@@ -190,9 +197,12 @@ const at = (ev, n = 0) => { const l = log.filter((e) => e.ev === ev); if (!l[n])
 // rear, its run home with the slam on the bolt home (the first one logged after it).
 const homeAfter = (t) => log.find((e) => e.ev === 'bolt home' && e.t >= t - 1e-6).t;
 function worked([id, rear, slam], back) {
-  const sc = scene(id);
-  place(id, rear, back, sc.tracks.filter((t) => t.name !== 'release-forward').map((t) => t.name));
-  place(id, slam, homeAfter(back), ['release-forward']);
+  // the action logged just before the handle reached the rear: its length sets the pull
+  const act = log.filter((e) => e.ev === 'action' && e.t <= back + 1e-6).pop();
+  const sc = act ? CHARGE_BUILD[GUN]({ pull: 0.22 * act.dur, hold: 0 }) : scene(id);
+  if (act) console.log(`  ${sc.id}: pull ${(0.22 * act.dur * 1000).toFixed(0)} ms (the animation's), no hold`);
+  place(sc, rear, back, sc.tracks.filter((t) => t.name !== 'release-forward').map((t) => t.name));
+  place(sc, slam, homeAfter(back), ['release-forward']);
 }
 worked(C.charge_, at('rack_slide', 0));
 // the partial reload: the loaded magazine out, a fresh one in

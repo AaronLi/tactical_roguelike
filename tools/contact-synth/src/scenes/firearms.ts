@@ -530,16 +530,16 @@ const CH_BACK = 0.0;
 // so position along the stroke is x(t) = STROKE/2 · (1 − cos(π t / T)). Each part comes in
 // and out at its own point of travel, at the speed the stroke has there.
 const PULL_MM = STROKE_MM;
-const PULL_T = 0.26; // an aggressive yank
+let PULL_T = 0.26; // an aggressive yank (see arChargeScene for another timing)
 // The hand snatches the handle and is still moving fast when it hits the rear stop: position
 // x(u) = S·(1 − cos(Kπu)) / (1 − cos(Kπ)), K = 0.75, peaks in speed at 2/3 of the stroke and
 // arrives at ~70% of that.
 const PULL_K = 0.75;
 // Hits driven by the hand's speed soften on a slower pull (impact speed ∝ hand speed; level ∝ √
 // is a gentler, more natural-sounding scaling than linear). Spring-driven snaps don't change.
-const HAND = Math.sqrt(0.16 / PULL_T);
-const CH_END = CH_BACK + PULL_T;
-const LET_GO = CH_END + 0.08; // let go ~80 ms after the handle bottoms out
+let HAND = Math.sqrt(0.16 / PULL_T);
+let CH_END = CH_BACK + PULL_T;
+let LET_GO = CH_END + 0.08; // let go ~80 ms after the handle bottoms out
 const tAt = (mm: number): number =>
   CH_BACK + (PULL_T * Math.acos(1 - (Math.min(mm, PULL_MM) / PULL_MM) * (1 - Math.cos(PULL_K * Math.PI)))) / (PULL_K * Math.PI);
 
@@ -607,6 +607,21 @@ function caughtOnCatch(t: number): SceneElement[] {
     rub('operator pushes the charging handle home', t + 0.25, -22, { force: 2, duration: 0.1, speed: 0.8, profile: 'swell', roughness: 2, grain: 0.15, contactWidth: 0.12 }, arChargingHandle, arUpper),
     snap('charging handle latch catches', t + 0.37, -6, { strength: 0.7, preload: 0, seat: 0.4, seatDelay: 2 }, arChLatch, arUpper),
   ];
+}
+
+/**
+ * The AR charged with the hand's own timing (e.g. an animation's): how long the pull to the rear takes and how
+ * long the hand holds it there. The scene is built with those, then the defaults are put back.
+ */
+export function arChargeScene(mag: MagState, timing: { pull?: number; hold?: number }): Scene {
+  const saved = [PULL_T, HAND, CH_END, LET_GO];
+  PULL_T = timing.pull ?? 0.26; HAND = Math.sqrt(0.16 / PULL_T); CH_END = CH_BACK + PULL_T; LET_GO = CH_END + (timing.hold ?? 0.08);
+  try {
+    const sc = makeArCharge(mag);
+    return { ...sc, id: sc.id + '-timed' };
+  } finally {
+    [PULL_T, HAND, CH_END, LET_GO] = saved;
+  }
 }
 
 function makeArCharge(mag: MagState): Scene {

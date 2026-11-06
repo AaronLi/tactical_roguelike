@@ -56,6 +56,8 @@ export interface ContactSound {
 export interface SceneElement {
   /** Label for the cue sheet. */
   what: string;
+  /** Outside the scene's enclosure (a handle, a catch the thumb works): heard directly. */
+  outside?: boolean;
   /** When the gesture starts, s. */
   at: number;
   gainDb: number;
@@ -73,6 +75,8 @@ export interface Scene {
   title: string;
   /** Enclosure applied to every contact element (unless the element sets its own). */
   housing?: ParamPatch['housing'];
+  /** The action is heard through this shell (its receiver or slide): every contact element not marked `outside`. */
+  enclosure?: { cutoff: number; leak: number };
   room: number;
   roomSize: number;
   tracks: SceneTrack[];
@@ -113,6 +117,9 @@ export function chainScenes(id: string, title: string, parts: { label: string; a
           let sound = el.sound;
           if (sound.kind === 'contact' && scene.housing) {
             sound = { ...sound, patch: { ...sound.patch, housing: { ...scene.housing, ...sound.patch.housing } } };
+          }
+          if (sound.kind === 'contact' && scene.enclosure && !el.outside && !sound.patch.out?.enclosure) {
+            sound = { ...sound, patch: { ...sound.patch, out: { ...sound.patch.out, enclosure: scene.enclosure } } };
           }
           return { ...el, at: el.at + at, gainDb: el.gainDb + gainDb, sound };
         }),
@@ -195,12 +202,13 @@ function renderTube(tu: TubeSound, sr: number, seed: number): Float32Array {
   return out;
 }
 
-function renderElement(el: SceneElement, sr: number, seed: number, housing?: ParamPatch['housing']): { offset: number; samples: Float32Array } {
+function renderElement(el: SceneElement, sr: number, seed: number, housing?: ParamPatch['housing'], enclosure?: Scene['enclosure']): { offset: number; samples: Float32Array } {
   if (el.sound.kind === 'air') return { offset: el.at, samples: renderAir(el.sound, sr, seed) };
   if (el.sound.kind === 'tube') return { offset: el.at, samples: renderTube(el.sound, sr, seed) };
   const patch = housing ? { ...el.sound.patch, housing: { ...housing, ...el.sound.patch.housing } } : el.sound.patch;
   const p = withPatch(patch);
   p.out.room = 0;
+  if (enclosure && !el.outside && !el.sound.patch.out?.enclosure) p.out.enclosure = enclosure;
   if (!el.sound.patch.out?.seed) p.out.seed = seed;
   const r = render(p, sr);
   // render() starts T0 before the gesture.
@@ -211,7 +219,7 @@ export function renderScene(scene: Scene, sr = 48000, seed = 1): RenderedScene {
   const raw: { track: SceneTrack; start: number; samples: Float32Array }[] = [];
   let k = 0;
   for (const track of scene.tracks.filter((tr) => tr.elements.length > 0)) {
-    const parts = track.elements.map((el) => ({ el, ...renderElement(el, sr, seed * 1000 + ++k, scene.housing) }));
+    const parts = track.elements.map((el) => ({ el, ...renderElement(el, sr, seed * 1000 + ++k, scene.housing, scene.enclosure) }));
     const start = Math.min(...parts.map((p) => p.offset));
     const end = Math.max(...parts.map((p) => p.offset + p.samples.length / sr));
     const tail = scene.room > 0 ? 0.25 + 0.5 * scene.roomSize : 0;

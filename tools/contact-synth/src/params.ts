@@ -166,8 +166,23 @@ export interface Cavity {
   level?: number;
 }
 
+/**
+ * Heard through a shell: the contact happens inside a closed metal part (a receiver, a slide) and
+ * what reaches the ear comes through its walls, which pass the low end and stop the highs (a wall's
+ * transmission loss climbs ~6-12 dB an octave above its first modes), plus a little straight out
+ * through its openings (an ejection port, a magazine well).
+ */
+export interface Enclosure {
+  /** Where the walls start to cut, Hz (12 dB an octave above it). */
+  cutoff: number;
+  /** 0..1 how much comes straight out through the openings, unfiltered. */
+  leak: number;
+}
+
 export interface OutputParams {
   room: number;
+  /** Heard through a shell (see Enclosure); absent = in the open. */
+  enclosure?: Enclosure;
   roomSize: number;
   /** Maximum length, s (trailing silence is trimmed). */
   length: number;

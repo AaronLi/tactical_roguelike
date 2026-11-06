@@ -17,7 +17,7 @@ import { buildExcitation, edgeTau, eventPulse, makeContact, T0, type ContactEven
 import { renderBody } from './bank.js';
 import { runCoil, runFlex, wobbleTrack } from './elastic.js';
 import { applyRoom } from './room.js';
-import { clamp, dbToGain, highpassInPlace, makeRng, mixInto, peak } from './dsp.js';
+import { clamp, dbToGain, highpassInPlace, makeRng, mixInto, peak, enclose } from './dsp.js';
 
 export interface BodyInfo {
   f1: number;
@@ -220,6 +220,7 @@ export function render(p: Params, sampleRate = 48000): RenderResult {
   if (p.housing && p.housing.amount > 0) renderHousing(p, events, ex.cont, contactSound, mix, ref, sr, N);
 
   highpassInPlace(mix, 20, sr);
+  if (p.out.enclosure) enclose(mix, p.out.enclosure.cutoff, p.out.enclosure.leak, sr);
   let out = applyRoom(mix, p.out.room, p.out.roomSize, sr);
 
   // Normalise and trim trailing silence.

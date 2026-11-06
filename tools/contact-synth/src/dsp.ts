@@ -68,6 +68,21 @@ export function highpassInPlace(x: Float32Array, fc: number, sr: number): void {
   }
 }
 
+/**
+ * Through a shell's walls: two-pole low-pass at `fc` (12 dB an octave), plus `leak` of the original
+ * straight through (openings). The low end is kept at its level; the highs drop toward `leak`.
+ */
+export function enclose(x: Float32Array, fc: number, leak: number, sr: number): void {
+  const a = 1 - Math.exp((-2 * Math.PI * clamp(fc, 50, sr * 0.45)) / sr);
+  const k = clamp(leak, 0, 1);
+  let l1 = 0, l2 = 0;
+  for (let i = 0; i < x.length; i++) {
+    l1 += a * (x[i] - l1);
+    l2 += a * (l1 - l2);
+    x[i] = (1 - k) * l2 + k * x[i];
+  }
+}
+
 /** out += src * g */
 export function mixInto(out: Float32Array, src: Float32Array, g: number): void {
   if (g === 0) return;

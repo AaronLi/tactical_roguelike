@@ -22,6 +22,26 @@ import { mat } from '../presets.js';
 import { hit, rub, snap, steelBar, steelBlock, springWire, arCase, arFollower, SHEET_RATTLE, type Body } from './firearms.js';
 
 type Fill = 'loaded' | 'empty';
+/** How long the hand takes to pull the action to the rear, and how long it holds it there before letting go, s. */
+export interface ChargeTiming { pull?: number; hold?: number }
+
+/*
+ * Heard through the shell. The action works inside a closed metal part, so what reaches the ear comes through its
+ * walls (they pass the low end and stop the highs) plus a little straight out of its openings. The parts that are
+ * the shell itself, or sit outside it (the AK's top cover, the MP5's cocking tube, the Glock's slide on the frame),
+ * are heard directly.
+ *   KV-47: thin stamped walls, a big open ejection port and magazine well: cuts from ~2.2 kHz, the most leak.
+ *   MP5: a closed steel tube with a small port: cuts lower, ~1.8 kHz, little leak.
+ *   G19: the slide closes over the barrel and the frame round the rest, its rails inside both: ~2 kHz, the
+ *   port barely open.
+ */
+const AK_SHELL = { cutoff: 2200, leak: 0.18 };
+const MP5_SHELL = { cutoff: 1800, leak: 0.12 };
+const G19_SHELL = { cutoff: 2000, leak: 0.1 };
+
+/** The parts that are the shell or sit outside it: heard directly, not through the walls. */
+const OUTSIDE = /top cover|receiver rings|cocking handle|handle (stops|hits|spring)|thumb presses/; // (a Glock's slide runs on rails inside it and the frame: those are heard through it)
+function outsideShell(els: SceneElement[]): void { for (const e of els) if (OUTSIDE.test(e.what)) e.outside = true; }
 
 /** Hand pull from rest over `d` m in `T` s (a smooth yank): the time at which it has gone `x`. */
 function pullAt(x: number, d: number, T: number): number {
@@ -63,9 +83,9 @@ const AK_COVER_RATTLE = { flex: { amount: 0.5, freq: 120, decay: 0.06, rattle: 0
 const AK_STROKE = 0.1, AK_M = 0.45, AK_F = 40; // carrier travel, mass, mean spring force
 
 /** The AK charged: the handle on the carrier yanked to the rear and let go; it chambers a round from a loaded magazine (or not). */
-function makeAkCharge(fill: Fill | 'none'): Scene {
-  const T = 0.17, back = (x: number) => pullAt(x, AK_STROKE, T);
-  const LET_GO = T + 0.06;
+function makeAkCharge(fill: Fill | 'none', timing: ChargeTiming = {}): Scene {
+  const T = timing.pull ?? 0.17, back = (x: number) => pullAt(x, AK_STROKE, T);
+  const LET_GO = T + (timing.hold ?? 0.06);
   const fwd = (xFromRear: number) => LET_GO + runAt(xFromRear, AK_M, AK_F).t;
   const vHome = runAt(AK_STROKE, AK_M, AK_F).v; // ~4.2 m/s
   const TL = fwd(AK_STROKE); // carrier reaches the bolt locking
@@ -105,11 +125,12 @@ function makeAkCharge(fill: Fill | 'none'): Scene {
     hit('receiver rings', TL + 0.005, -6, 1.2, akReceiver, akTrunnion, { radius: 6, click: 0.2, sharp: 0.7 }),
   );
   if (fill !== 'none') els.push(hit('magazine body rings', TL + 0.006, fill === 'empty' ? -10 : -14, 0.8, akMag(fill === 'empty' ? 'empty' : 'loaded'), akReceiver, { radius: 3, click: 0.2, sharp: 0.6 }));
+  outsideShell(els);
   const pull = (e: SceneElement) => e.at < LET_GO - 0.001;
   return {
-    id: 'kv47-charge' + (fill === 'loaded' ? '' : fill === 'empty' ? '-empty-mag' : '-no-mag'),
+    id: 'kv47-charge' + (fill === 'loaded' ? '' : fill === 'empty' ? '-empty-mag' : '-no-mag') + (timing.pull ? '-timed' : ''),
     title: `KV-47 (AKM): charging handle racked and let go${fill === 'loaded' ? ', chambering a round' : fill === 'empty' ? ' (empty magazine)' : ' (no magazine)'}`,
-    room: 0.04, roomSize: 0.35, housing: AK_HOUSING,
+    room: 0.04, roomSize: 0.35, housing: AK_HOUSING, enclosure: AK_SHELL,
     tracks: [
       { name: 'pull-back', description: 'Handle yanked back: the bolt turns out, the carrier runs back, the hammer cocks, the carrier hits the rear trunnion.', elements: els.filter(pull) },
       { name: 'release-forward', description: 'Let go: the spring drives the carrier home, stripping and chambering a round, and the bolt turns in.', elements: els.filter((e) => !pull(e)) },
@@ -178,9 +199,9 @@ const TUBE_AIR = { housing: { amount: 0.6, cavity: 0.8, cavityWidth: 1.6, ...mat
 const MP5_STROKE = 0.075, MP5_M = 0.36, MP5_F = 45;
 
 /** The MP5 charged: the cocking handle pulled back in its tube and let go; the bolt runs home and the rollers cam out. */
-function makeMp5Charge(fill: Fill | 'none'): Scene {
-  const T = 0.15, back = (x: number) => pullAt(x, MP5_STROKE, T);
-  const LET_GO = T + 0.06;
+function makeMp5Charge(fill: Fill | 'none', timing: ChargeTiming = {}): Scene {
+  const T = timing.pull ?? 0.15, back = (x: number) => pullAt(x, MP5_STROKE, T);
+  const LET_GO = T + (timing.hold ?? 0.06);
   const fwd = (x: number) => LET_GO + runAt(x, MP5_M, MP5_F).t;
   const vHome = runAt(MP5_STROKE, MP5_M, MP5_F).v;
   const TL = fwd(MP5_STROKE);
@@ -215,11 +236,12 @@ function makeMp5Charge(fill: Fill | 'none'): Scene {
     hit('receiver rings', TL + 0.003, -9, 1.0, mp5Receiver, mp5Trunnion, { radius: 6, click: 0.2, sharp: 0.7 }),
   );
   if (fill !== 'none') els.push(hit('magazine body rings', TL + 0.004, fill === 'empty' ? -11 : -16, 0.7, mp5Mag(fill === 'empty' ? 'empty' : 'loaded'), mp5Receiver, { radius: 3, click: 0.2, sharp: 0.6 }));
+  outsideShell(els);
   const pull = (e: SceneElement) => e.at < LET_GO - 0.001;
   return {
-    id: 'mp5-charge' + (fill === 'loaded' ? '' : fill === 'empty' ? '-empty-mag' : '-no-mag'),
+    id: 'mp5-charge' + (fill === 'loaded' ? '' : fill === 'empty' ? '-empty-mag' : '-no-mag') + (timing.pull ? '-timed' : ''),
     title: `MP5: cocking handle pulled back and let go${fill === 'loaded' ? ', chambering a round' : fill === 'empty' ? ' (empty magazine)' : ' (no magazine)'}`,
-    room: 0.04, roomSize: 0.35, housing: MP5_HOUSING,
+    room: 0.04, roomSize: 0.35, housing: MP5_HOUSING, enclosure: MP5_SHELL,
     tracks: [
       { name: 'pull-back', description: 'Handle back in its tube: the rollers cam in, the bolt runs back, the hammer cocks.', elements: els.filter(pull) },
       { name: 'release-forward', description: 'Let go: the bolt runs home and its rollers snap out into the trunnion; the handle springs home in its tube.', elements: els.filter((e) => !pull(e)) },
@@ -288,7 +310,7 @@ function g19Forward(t0: number, chamber: boolean): SceneElement[] {
   }
   els.push(
     // the barrel's lug rides up the locking block and its hood locks into the ejection port
-    rub('barrel cams up onto the locking block', TL - 0.002, -9, { force: 12, duration: 0.002, speed: 1.2, profile: 'steady', roughness: 6, grain: 0.1, contactWidth: 0.02 }, g19Barrel, g19LockBlock),
+    rub('barrel cams up onto the locking block', TL - 0.003, -9, { force: 12, duration: 0.003, speed: 1.2, profile: 'steady', roughness: 6, grain: 0.1, contactWidth: 0.02 }, g19Barrel, g19LockBlock),
     hit('barrel hood locks into the slide', TL, -2, vHome * 0.8, g19Barrel, g19Slide, { radius: 3, click: 0.85, sharp: 0.85 }),
     hit('slide slams home', TL + 0.0005, 0, vHome, g19Slide, g19Rail, { radius: 4, click: 0.85, sharp: 0.85 }),
     hit('frame takes the blow', TL + 0.001, -8, 1.2, g19Frame, g19Rail, { radius: 6, click: 0.3, sharp: 0.5 }),
@@ -298,8 +320,8 @@ function g19Forward(t0: number, chamber: boolean): SceneElement[] {
 }
 
 /** The Glock racked: the slide pulled back overhand and let go, chambering a round (or not). */
-function makeG19Rack(fill: Fill | 'none'): Scene {
-  const T = 0.11, back = (x: number) => pullAt(x, G19_STROKE, T), LET_GO = T + 0.045;
+function makeG19Rack(fill: Fill | 'none', timing: ChargeTiming = {}): Scene {
+  const T = timing.pull ?? 0.11, back = (x: number) => pullAt(x, G19_STROKE, T), LET_GO = T + (timing.hold ?? 0.045);
   const els: SceneElement[] = [
     rub('slide drawn back on its rails', back(0.0005), -10, { force: 6, duration: T - back(0.0005), speed: 0.5, profile: 'swell', roughness: 2, grain: 0.2, periodicity: 0, contactWidth: 0.05 }, g19SlideSliding, g19Rail),
     hit('barrel drops off the locking block', back(0.003), -9, 0.6, g19Barrel, g19LockBlock, { radius: 2, click: 0.7, sharp: 0.8 }),
@@ -308,11 +330,12 @@ function makeG19Rack(fill: Fill | 'none'): Scene {
     hit('slide stops at the rear', T, -6, 0.9, g19Slide, g19Frame, { radius: 3, click: 0.6, sharp: 0.7 }),
     ...g19Forward(LET_GO, fill === 'loaded'),
   ];
+  outsideShell(els);
   const pull = (e: SceneElement) => e.at < LET_GO - 0.001;
   return {
-    id: 'g19-rack' + (fill === 'loaded' ? '' : fill === 'empty' ? '-empty-mag' : '-no-mag'),
+    id: 'g19-rack' + (fill === 'loaded' ? '' : fill === 'empty' ? '-empty-mag' : '-no-mag') + (timing.pull ? '-timed' : ''),
     title: `G19: slide racked and let go${fill === 'loaded' ? ', chambering a round' : ''}`,
-    room: 0.04, roomSize: 0.35, housing: G19_HOUSING,
+    room: 0.04, roomSize: 0.35, housing: G19_HOUSING, enclosure: G19_SHELL,
     tracks: [
       { name: 'pull-back', description: 'Slide drawn back: the barrel drops to unlock, the striker catches, the slide stops at the rear.', elements: els.filter(pull) },
       { name: 'release-forward', description: 'Let go: the slide runs home, strips and chambers a round, and the barrel locks up into it.', elements: els.filter((e) => !pull(e)) },
@@ -326,9 +349,10 @@ function makeG19SlideRelease(): Scene {
     snap('thumb presses the slide stop down', 0, -8, { strength: 0.6, preload: 40, creak: 0.05, seat: 0.2, seatDelay: 1 }, g19SlideStop, g19Slide),
     ...g19Forward(0.041, true),
   ];
+  outsideShell(els);
   return {
     id: 'g19-slide-release', title: 'G19: slide stop pressed, the slide runs home and chambers a round',
-    room: 0.04, roomSize: 0.35, housing: G19_HOUSING,
+    room: 0.04, roomSize: 0.35, housing: G19_HOUSING, enclosure: G19_SHELL,
     tracks: [{ name: 'slide-release', description: 'Slide stop pressed down; the slide runs home, chambering a round.', elements: els }],
   };
 }
@@ -363,3 +387,8 @@ export const MORE_GUN_SCENES: Scene[] = [
   makeG19Rack('loaded'), makeG19Rack('empty'), makeG19Rack('none'), makeG19SlideRelease(),
   makeG19Mag('out', 'loaded'), makeG19Mag('out', 'empty'), makeG19Mag('in', 'loaded'), makeG19Mag('in', 'empty'),
 ];
+
+/** A charge (the action pulled to the rear and let go) with the hand's own timing, e.g. to match an animation. */
+export function chargeScene(gun: 'ak' | 'mp5' | 'g19', fill: Fill | 'none', timing: ChargeTiming): Scene {
+  return gun === 'ak' ? makeAkCharge(fill, timing) : gun === 'mp5' ? makeMp5Charge(fill, timing) : makeG19Rack(fill, timing);
+}
