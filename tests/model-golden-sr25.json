@@ -537,6 +537,11 @@
    "geometry": "f450152a69c5db7b",
    "info": "b6868775d01b8165"
   },
+  "barrel=br.7.62x51.20,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.10,mag=sr25.mag,muzzle=mz.r762.a2,optic=op.th.0,stock=stk.tube.0": {
+   "label": "optic=op.th.0",
+   "geometry": "6c5342212c318b52",
+   "info": "dbbff18da7d4ed4b"
+  },
   "barrel=br.7.62x51.20,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.10,mag=sr25.mag,muzzle=mz.r762.a2,stock=stk.tube.0": {
    "label": "optic=(none)",
    "geometry": "f935270174852cb1",
@@ -1146,6 +1151,11 @@
    "label": "optic=hailstorm.optic from loaded A",
    "geometry": "e3b93a09be800878",
    "info": "fa75531132250403"
+  },
+  "barrel=br.7.62x51.20,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.10,mag=sr25.mag,muzzle=mz.r762.a2,optic=op.th.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
+   "label": "optic=op.th.0 from loaded A",
+   "geometry": "9449211e3278676b",
+   "info": "da631e653c5a8779"
   },
   "barrel=br.7.62x51.20,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.10,mag=sr25.mag,muzzle=mz.r762.a2,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=(none) from loaded A",

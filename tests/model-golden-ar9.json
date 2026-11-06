@@ -322,6 +322,11 @@
    "geometry": "214c6cf5efea1d2d",
    "info": "c5b2475188e33146"
   },
+  "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=hg.ar.3,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.th.0,stock=stk.tube.0": {
+   "label": "optic=op.th.0",
+   "geometry": "c3e494e354e9dd5d",
+   "info": "0fb4ed99c44561cd"
+  },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=hg.ar.3,mag=glock.mag.33,muzzle=mz.r9.a2,stock=stk.tube.0": {
    "label": "optic=(none)",
    "geometry": "8b4b879c2f67e5c9",

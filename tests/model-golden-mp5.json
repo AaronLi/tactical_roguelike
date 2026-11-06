@@ -317,6 +317,11 @@
    "geometry": "6324ba4c5c804cb1",
    "info": "bc0e242295e1e764"
   },
+  "barrel=br.9x19.8.9,grip=oem.gr.ar.4,handguard=oem.hg.smg.3,mag=mp5.mag.30,muzzle=mz.r9.tri,optic=op.th.0,receiver=rcv.mp5,stock=stk.smg.1": {
+   "label": "optic=op.th.0",
+   "geometry": "c06a1ed528109914",
+   "info": "272e1c405da05ad0"
+  },
   "barrel=br.9x19.8.9,grip=oem.gr.ar.4,handguard=oem.hg.smg.3,mag=mp5.mag.30,muzzle=mz.r9.tri,receiver=rcv.mp5,stock=stk.smg.1": {
    "label": "optic=(none)",
    "geometry": "b17a10feef7eaef1",
