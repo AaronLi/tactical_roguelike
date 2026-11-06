@@ -330,6 +330,69 @@ def handguard_quad(f0, f1, hk=False):
         o = K.obj(cyl(3.6 * mm, *xs(s * (HB_X + 5.6 * mm), s * (HB_X + 6.4 * mm)), 'x', (f1 - 6 * mm, HC - 2 * mm), 14), 'handguard', 'steel'); smooth(o)
     return HB_B
 
+def handguard_mlok(f0, f1, mat=None, sc=1.0):
+    """A free-floated M-LOK handguard (after the Midwest Industries / Aero Precision pattern in the Crane comparison sheet,
+    KeyMod_and_M-LOK_handguards.png on Commons): an eight-sided aluminium tube flush with the receiver's rail, a Picatinny rail its full
+    length on top, a row of small round lightening holes along each upper bevel, M-LOK slots (32 x 7 mm on a 40 mm pitch) down each side,
+    each lower bevel (staggered half a pitch) and the bottom; at the rear a clamp (a ring bored to the barrel nut, split underneath, two screws across a lug below the nut) and a QD sling
+    socket each side; the front edge chamfered."""
+    mat = mat or RCV
+    T, B, W, C = HB_T, -19.0 * mm * sc, 19.0 * mm * sc, 8.0 * mm * sc   # top (the receiver's rail base), bottom, half width, the bevels' size
+    def octo(t, b, w, c):
+        return [(-w + c, t), (w - c, t), (w, t - c), (w, b + c), (w - c, b), (-w + c, b), (-w, b + c), (-w, t - c)]
+    hg = K.tmp(prism(octo(T, B, W, C), 'y', f0, f1))
+    cut(hg, prism(octo(T - 2.6 * mm, B + 2.6 * mm, W - 2.6 * mm, C - 1.0 * mm), 'y', f0 - 0.01, f1 + 0.01))   # (hollow: 2.6 mm walls)
+    def face_cut(a, b, f, ln, wd, r=None, depth=6 * mm):
+        """A slot ln long, wd across, through the face from section point a to b, centred along it, its centre at forward f."""
+        ax, az = a; bx, bz = b
+        tx, tz = bx - ax, bz - az; n_ = math.hypot(tx, tz); tx, tz = tx / n_, tz / n_
+        nx, nz = tz, -tx                                                      # (the face's outward normal, the octagon wound anticlockwise)
+        if nx * (ax + bx) + nz * (az + bz - (T + B)) < 0: nx, nz = -nx, -nz
+        if nx * tz - nz * tx < 0: tx, tz = -tx, -tz                           # (keep the frame right-handed)
+        cx, cz = (ax + bx) / 2, (az + bz) / 2
+        g = prism(rounded(f, 0.0, ln / 2, wd / 2, (r or wd / 2) * 0.98, 4), 'x', -depth, depth)
+        g.transform(Matrix(((nx, 0, tx, cx), (0, 1, 0, 0), (nz, 0, tz, cz), (0, 0, 0, 1))))
+        return g
+    P = octo(T, B, W, C)
+    faces = {'ubR': (P[1], P[2]), 'sR': (P[2], P[3]), 'lbR': (P[3], P[4]), 'bot': (P[4], P[5]), 'lbL': (P[5], P[6]), 'sL': (P[6], P[7]), 'ubL': (P[7], P[0])}
+    CL = 0.030                                                                # (the clamp: the rear 30 mm, no slots)
+    n = int((f1 - f0 - CL - 0.010 + 0.008) / 0.040)
+    for k in range(n):
+        f = f0 + CL + 0.016 + k * 0.040
+        for nm in ('sR', 'sL', 'bot'): cut(hg, face_cut(*faces[nm], f, 32 * mm, 7 * mm))
+        if f + 0.020 + 0.016 < f1 - 0.010:
+            for nm in ('lbR', 'lbL'): cut(hg, face_cut(*faces[nm], f + 0.020, 32 * mm, 7 * mm))
+    k, f = 0, f0 + CL + 0.004                                                 # the round holes along the upper bevels, every 20 mm
+    while f < f1 - 0.010:
+        for nm in ('ubR', 'ubL'): cut(hg, face_cut(*faces[nm], f, 4.4 * mm, 4.4 * mm))
+        f += 0.020
+    # the clamp: the rear 18 mm (over the barrel nut, r 16.5 at the bore) a solid ring bored to the nut, split along the bottom, the
+    # split's two jaws a lug under the tube; two socket-head screws across the lug, below the nut, pull the split shut on it
+    CJ, NR = 0.018, NUT_R + 0.2 * mm                                                 # (the clamp's length; its bore, the nut's radius and a hair)
+    SPL = box(-0.8 * mm, 0.8 * mm, f0 - 0.01, f0 + CJ + 4 * mm, B - 0.01, -NR + 1.0 * mm)
+    cut(hg, SPL.copy())
+    bevel(hg, 0.5 * mm, 1, 30); smooth(hg); K.adopt(hg, 'handguard', mat)
+    ring = K.tmp(prism(octo(T - 2.6 * mm, B + 2.6 * mm, W - 2.6 * mm, C - 1.0 * mm), 'y', f0, f0 + CJ))
+    cut(ring, cyl(NR, f0 - 0.01, f0 + CJ + 0.01, 'y', (0, 0), 40), SPL.copy())
+    smooth(ring); K.adopt(ring, 'handguard', mat)
+    LZ0, LZ1, LX = B - 6.0 * mm, B + 0.5 * mm, 7.5 * mm                       # (the lug: its bottom, top (inside the tube's wall), half width)
+    SZ, SFQ = B - 2.8 * mm, (0.0045, 0.0130)                                 # (the screws: height, positions back to front over the nut)
+    lug = K.tmp(prism([(-LX, LZ1), (LX, LZ1), (LX, LZ0 + 1.5 * mm), (LX - 1.5 * mm, LZ0), (-LX + 1.5 * mm, LZ0), (-LX, LZ0 + 1.5 * mm)], 'y', f0, f0 + CJ))
+    cut(lug, *[SPL] + [cyl(1.6 * mm, -LX - 0.01, LX + 0.01, 'x', (f0 + q, SZ), 12) for q in SFQ]
+             + [cyl(2.9 * mm, LX - 2.6 * mm, LX + 0.01, 'x', (f0 + q, SZ), 18) for q in SFQ])      # (bores; the heads' counterbores, right)
+    bevel(lug, 0.5 * mm, 1, 30); smooth(lug); K.adopt(lug, 'handguard', mat)
+    for q in SFQ:                                                              # the screws: socket heads sunk in the right jaw, the threaded
+        o = K.tmp(cyl(2.6 * mm, LX - 2.6 * mm, LX - 0.3 * mm, 'x', (f0 + q, SZ), 18))   # ends flush in the left
+        hx = prism([(f0 + q + 1.25 * mm * math.cos(math.pi / 3 * j), SZ + 1.25 * mm * math.sin(math.pi / 3 * j)) for j in range(6)], 'x', LX - 1.5 * mm, LX)
+        cut(o, hx); bevel(o, 0.3 * mm, 1); smooth(o); K.adopt(o, 'handguard', 'steel')
+        o = K.obj(cyl(1.6 * mm, -LX - 0.05 * mm, -LX + 1.0 * mm, 'x', (f0 + q, SZ), 12), 'handguard', 'steel'); smooth(o)
+    for s in (-1, 1):                                                          # the QD sockets: a boss on each side face, its cup
+        o = K.tmp(cyl(6.5 * mm, *xs(s * (W - 0.5 * mm), s * (W + 1.6 * mm)), 'x', (f0 + 0.016, (T - C + B + C) / 2 + 2 * mm), 24))
+        cut(o, cyl(3.6 * mm, *xs(s * (W - 1.0 * mm), s * (W + 2.0 * mm)), 'x', (f0 + 0.016, (T - C + B + C) / 2 + 2 * mm), 20))
+        bevel(o, 0.4 * mm, 1); smooth(o); K.adopt(o, 'handguard', mat)
+    picatinny(K, f0, f1 - 1.5 * mm, T, 'handguard', mat)
+    return B
+
 def handguard_carbine(f0, f1):
     """The M4's two-piece carbine handguard: the delta ring and its slip ring round the barrel nut at the rear, the round ribbed body
     tapering a little to the front cap against the front sight base, split along each side, a row of oval vents along each upper
@@ -525,6 +588,45 @@ def round_lathe(h, x, z, case, oal, rim, body, neck, bul, pm, chk):
                      (h + oal, bul * 0.15), (h + oal, 0.0005)], 14, (x, 0, z)), 'mag', 'brass', pm); smooth(b)
     if chk: c['chk'] = {'role': 'top', 'i': 0}; b['chk'] = {'role': 'top', 'i': 1}
 
+def mag_762(top):
+    """The SR-25's 20-round 7.62 magazine: straight through the well (1 mm clear of its walls), curving a little forward below it, open at
+    the top between its feed lips with the top two 7.62 x 51 rounds in it (the top one the check's), two pressed ribs down each side, a
+    floorplate, five witness holes down its back."""
+    pm = K.part('mag', (0, top[0], top[1])); HWm = 12.3 * mm; pm['check'] = {'w': round(2 * HWm, 4)}
+    b0, f0_ = F(792) - top[0], F(937) - top[0]                            # (its back and front inside the well, from its top)
+    dB, dF = U(318) - top[1], U(266) - top[1]                              # (the well's mouth at the back and the front)
+    L, cv = C.get('mag_len', 0.158), 0.012                                                   # (its length below its top; how far forward its bottom comes)
+    def cx(z): return 0.0 if z > dB else cv * ((dB - z) / (dB + L)) ** 1.6
+    zs = [0.0, dB] + [dB + (-L - dB) * k / 6 for k in range(1, 7)]
+    back = [(b0 + cx(z), z) for z in zs]
+    front = [(f0_ + cx(z), z) for z in [0.0, dF - 2 * mm] + zs[1:]]    # (the same depth all the way down: no step out below the well)
+    front[1] = (f0_, dF - 2 * mm)
+    out = [(back[0][0] + top[0], top[1])] + [(f + top[0], z + top[1]) for f, z in front] + [(f + top[0], z + top[1]) for f, z in back[::-1]][:-1]
+    mg = K.tmp(prism(out, 'x', -HWm, HWm))
+    cut(mg, prism([(b0 + top[0] + 1.4 * mm, top[1] - 4.5 * mm), (f0_ + top[0] - 1.4 * mm, top[1] - 4.5 * mm), (f0_ + top[0] - 1.4 * mm, top[1] + 0.01),
+                   (b0 + top[0] + 1.4 * mm, top[1] + 0.01)], 'x', -HWm + 1.0 * mm, HWm - 1.0 * mm))      # (open at the top)
+    def face(t):
+        z = -6 * mm + t * (-L + 0.030 + 6 * mm); dz = 0.004
+        return (top[0] + b0 + cx(z), top[1] + z), (cx(z - dz) - cx(z + dz), -2 * dz)
+    wins = mag_holes(mg, pm, face, 5, HWm)
+    bevel(mg, 1.0 * mm, 1, 30); smooth(mg); K.adopt(mg, 'mag', 'park', pm)
+    mag_hole_glass(wins, pm)
+    for fr in (0.3, 0.68):   # the pressed ribs down each side, below the well
+        pts = [(top[0] + b0 + (f0_ - b0) * fr + cx(z), top[1] + z) for z in (dB - 4 * mm, -L + 0.012)]
+        for sd in (-1, 1):
+            o = K.tmp(prism([(pts[0][0] - 2.5 * mm, pts[0][1]), (pts[0][0] + 2.5 * mm, pts[0][1]), (pts[1][0] + 2.5 * mm, pts[1][1]), (pts[1][0] - 2.5 * mm, pts[1][1])],
+                            'x', *xs(sd * (HWm - 0.2 * mm), sd * (HWm + 0.6 * mm)))); bevel(o, 0.3 * mm, 1); smooth(o); K.adopt(o, 'mag', 'park', pm)
+    zb = top[1] - L; fb0, fb1 = top[0] + b0 + cv - 2 * mm, top[0] + f0_ + 1.2 * mm + cv + 2.5 * mm   # the floorplate
+    o = K.tmp(prism([(fb0, zb + 2 * mm), (fb1, zb + 2 * mm), (fb1, zb - 3.5 * mm), (fb0, zb - 3.5 * mm)], 'x', -HWm - 0.8 * mm, HWm + 0.8 * mm))
+    bevel(o, 1.0 * mm, 2, 30); smooth(o); K.adopt(o, 'mag', 'polymer', pm)
+    for sd in (-1, 1):       # the feed lips
+        o = K.tmp(box(*xs(sd * (HWm - 0.2 * mm), sd * (HWm - 3.4 * mm)), top[0] + b0 + 1 * mm, top[0] + b0 + 0.048, top[1] - 2.0 * mm, top[1] + 0.6 * mm))
+        bevel(o, 0.4 * mm, 1); smooth(o); K.adopt(o, 'mag', 'park', pm)
+    h = top[0] + b0 + 1.2 * mm     # (7.62 x 51: the case 51 mm, the round 71 mm; its head against the back wall)
+    round_lathe(h, 2.9 * mm, top[1] - 3.2 * mm, 0.051, 0.0705, 6.0 * mm, 5.9 * mm, 4.4 * mm, 3.9 * mm, pm, True)
+    round_lathe(h, -2.9 * mm, top[1] - 8.4 * mm, 0.051, 0.0705, 6.0 * mm, 5.9 * mm, 4.4 * mm, 3.9 * mm, pm, False)
+    return pm
+
 def mag_glock(top, L=0.244, rake=None):
     """A Glock 9 mm magazine (the 33-round stick, 244 mm), its top at `top`: a polymer body with its front corners well rounded, open at
     the top between its feed lips with the top two 9 x 19 rounds in it (the top one the check's), the floorplate's lip, five witness
@@ -568,7 +670,7 @@ HG0 = UP_F1 + 0.6 * mm                                    # (the rail's rear but
 HG1 = HG0 + C.get('hg_len', 0.2395)   # (the 9.5" RIS II: it ends 0.240 m ahead of the upper's front, inside the game's 15 mm of room before the muzzle)
 HGK = C.get('hg', 'quad')
 HGB = {'quad': lambda: handguard_quad(HG0, HG1), 'hk': lambda: handguard_quad(HG0, HG1, hk=True),
-       'carbine': lambda: handguard_carbine(HG0, HG1)}[HGK]()   # (its bottom)
+       'mlok': lambda: handguard_mlok(HG0, HG1, sc=RY), 'carbine': lambda: handguard_carbine(HG0, HG1)}[HGK]()   # (its bottom)
 MZ0 = UP_F1 + C.get('barrel', 0.2557)                      # the factory barrel's end (a muzzle device screws on here)
 BR = C.get('bore_r', 9.5 * mm)
 FRONT = C.get('front', 'flip')
@@ -593,7 +695,7 @@ if MK == 'glock':
     mag_glock(MTOP, rake=GRK if C.get('lower', 'ar15') == 'glock' else None)
 else:
     MTOP = la['mag']
-    mag_stanag(MTOP)
+    {'stanag': mag_stanag, '762': mag_762}[MK](MTOP)
 
 # ===================================================================================== info and anchors
 info = {
