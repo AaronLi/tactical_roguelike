@@ -638,7 +638,10 @@ const G_Server = {
       }
     };
     draw(def ? GS.attachOptions(def.id, def.build) : []);
-    draw(GS.LIST.filter((p: Loose) => !p.factory && !p.variant && !p.retired && !p.alt && !p.becomes && (p.tier || 1) <= 2 && !out.includes(p.id) && ['muzzle', 'fg', 'tac', 'optic', 'magnifier', 'stock'].includes(p.slot)));
+    // (the rest, to carry, are never what would fit the gun as it left the factory but doesn't as it's built: a pistol in a carbine
+    // chassis isn't offered its own slide's red dots or its frame light, which look meant for it and don't go on it)
+    const near = new Set<string>(def ? GS.attachOptions(def.id, GS.defaultBuild(def.id)).map((p: Loose) => p.id) : []);
+    draw(GS.LIST.filter((p: Loose) => !p.factory && !p.variant && !p.retired && !p.alt && !p.becomes && (p.tier || 1) <= 2 && !out.includes(p.id) && !near.has(p.id) && ['muzzle', 'fg', 'tac', 'optic', 'magnifier', 'stock'].includes(p.slot)));
     return out;
   },
   // [open, { player id: [their three part ids, the one they took (or null)] }] or null when the level has no box
