@@ -357,7 +357,7 @@ const G_HUD = {
     // ammo (a weapon in your hands)
     if (!Me.held) {
     const modes = def.modes || [def.mode], fm = Me.fireMode ? Me.fireMode(w) : modes[0];
-    this.set('weapName', `<span style="color:${G.TIER_COLORS[def.tier]}">${def.name}</span> <small${modes.length > 1 ? ' title="X switches"' : ''}>${G.MODE_NAME[fm] || ''}</small>${w.sup ? ' <small>SUPP</small>' : ''}${def.missing && def.missing.length ? ' <em class="broken">WON\'T FIRE</em>' : ''}${Me.reloading ? ` <em>${({ pouch: 'dump reload (pouch)', floor: 'dump reload' } as Record<string, string>)[Me.reloadMode] || 'reloading'}</em>` : ''}`);
+    this.set('weapName', `<span style="color:${G.TIER_COLORS[def.tier]}">${def.name}</span> <small${modes.length > 1 ? ' title="X switches"' : ''}>${G.MODE_NAME[fm] || ''}</small>${w.sup ? ' <small>SUPP</small>' : ''}${def.missing && def.missing.length ? ' <em class="broken">WON\'T FIRE</em>' : ''}${Me.reloading ? ` <em>${({ pouch: 'dump reload (pouch)', floor: 'dump reload' } as Record<string, string>)[Me.reloadMode] || (G.fblock(def) && (def.perLoad || 1) > 1 ? 'reloading · Wolverine grip' : 'reloading')}</em>` : ''}`);
     // No counts, no gauges: check the magazine (hold R) or the chamber (hold I) to know what's in it
     const hasCh = G.chambered(def), Gr = G.Gear, af = Gr.ammoFor(def), top = w.tube && w.tube.length ? w.tube[w.tube.length - 1] : w.ammo;
     this.set('ammoMag', af.kind === 'mag' && w.noMag ? '<span class="nomag">NO MAG</span>' : '');

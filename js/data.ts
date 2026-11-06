@@ -176,7 +176,7 @@ const G_WEAPON_LIST: WeaponDef[] = [
   // the block drops), and one pull fires every barrel that has a round in it (js/player.ts shoot). The barrels are bored to meet at volleyZ metres (each round leaves from its own
   // barrel on its own path), and each strays a little on its own (volleySpread: degrees): a fist of small holes up close that opens out with range. A curiosity: tier 2, and cheap.
   W({ id: 'hailstorm', slot: 'p', cls: 'SG', tier: 2, price: 900, name: 'Hailstorm .22', volley: 8, volleyZ: 10, volleySpread: 0.28, rpm: 300, mode: 'semi', mag: 8, reserve: 96, reload: 0.42, shell: true, spread: 3.4, ads: 0.035, range: 16, falloff: 0.55, speed: 0.98,
-    desc: 'Eight .22 LR barrels in one block behind a falling-block breech. Drop the lever, thumb a round into each chamber, and one pull sends every one of them: a fist of small holes up close, a scatter further out. Slow to fill, quick to empty.' }),
+    desc: 'Eight .22 LR barrels in one block behind a falling-block breech. Drop the lever, thumb a round into each chamber, and one pull sends every one of them: a fist of small holes up close, a scatter further out. Slow to fill (three at a time with the Wolverine grip), quick to empty.' }),
 ];
 G.WEAPON_LIST = G_WEAPON_LIST;
 const G_WEAPONS: Record<string, any> = {}; // (any, not WeaponDef: icons.ts, gunsmith.ts and parts.ts index it as (G.WEAPONS[x] || {}).field)
@@ -318,8 +318,9 @@ G.fblock = G_fblock;
 // how loud a volley is, as a share of a full one (every barrel): n rounds of def.volley at once (each round's blast adds to the others': the energy, not the pressure)
 const G_volleyVol = (def: Record<string, any>, n: number) => Math.sqrt(Math.max(1, n) / (def.volley || 1));
 G.volleyVol = G_volleyVol;
-// a whole reload from empty, as the stat cards show it (a revolver loaded by hand; a tube's stays its figure a shell)
-const G_fullReload = (d: Record<string, any>) => ((G.revolver(d) || G.fblock(d)) && d.shell ? G.REV.open + d.reload * d.mag + G.REV.close : d.reload);
+// a whole reload from empty, as the stat cards show it (a revolver loaded by hand; a tube's stays its figure a shell). A falling block loaded several at a
+// step (the Hailstorm's Wolverine grip, perLoad: three) takes a step per handful: 3 + 3 + 2 for eight.
+const G_fullReload = (d: Record<string, any>) => ((G.revolver(d) || G.fblock(d)) && d.shell ? G.REV.open + d.reload * Math.ceil(d.mag / Math.max(1, d.perLoad || 1)) + G.REV.close : d.reload);
 G.fullReload = G_fullReload;
 // Bolt hold-open: the action locks back on the last round, so a reload from empty is a magazine change and a
 // thumb on the bolt catch (or the slide stop), not a full rack. Every pistol with a slide, the AR-15 family and the

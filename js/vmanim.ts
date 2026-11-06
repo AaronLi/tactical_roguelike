@@ -16,7 +16,7 @@ type VmHold = VmAction | 'revolver' | 'break';
 /** What the magazine is doing in a pose. */
 type VmMagMode = 'in' | 'hand' | 'drop' | 'gone' | 'peek' | 'rise' | 'chk';
 /** Something the left hand carries. */
-type VmPropKind = 'shell' | 'case' | 'loader' | 'clip' | 'bolt';
+type VmPropKind = 'shell' | 'case' | 'loader' | 'clip' | 'bolt' | 'claw';
 /** Where a gun's round shows when it is checked: at the back of the cylinder, the open breech, the ejection port, the top or right of the receiver. */
 type VmChamberSide = 'cyl' | 'breech' | 'face' | 'port' | 'top' | 'right';
 const G_VMAnim = (() => {
@@ -31,8 +31,8 @@ const G_VMAnim = (() => {
   type Rig = GunRig; // (one gun in the hands: its holder, its parts, its anchors, its magazine's check data: js/gunrig.ts)
   interface MagState { mode: VmMagMode; at?: number; d?: number; k?: number; q?: THREE.Quaternion }
   // one frame of a clip: the gun's offset and what each part and hand is doing (null: left alone)
-  interface Pose { gun: number[]; L: V3 | null; R: V3 | null; mag: MagState; ch: number; handle: number | null; open: number | null; slide: number | null; cyl: number; brk: number; cover: number; pump: number | null; lever: number | null; hinge: number | null; bolt: number[] | null; prop: { kind: VmPropKind; rx?: number; dx?: number; by?: V3 } | null; chk?: number; dropCase?: boolean; fed?: number; pulled?: boolean }
-  interface Arm { g: THREE.Group; sleeve: THREE.Mesh; glove: THREE.Group }
+  interface Pose { gun: number[]; L: V3 | null; R: V3 | null; mag: MagState; ch: number; handle: number | null; open: number | null; slide: number | null; cyl: number; brk: number; cover: number; pump: number | null; lever: number | null; hinge: number | null; bolt: number[] | null; prop: { kind: VmPropKind; rx?: number; dx?: number; by?: V3; n?: number; seat?: number; up?: number; at?: V3[]; home?: V3 } | null; chk?: number; dropCase?: boolean; fed?: number; pulled?: boolean }
+  interface Arm { g: THREE.Group; sleeve: THREE.Mesh; glove: THREE.Group; fist?: THREE.Group }
   interface ChvHeads { heads: THREE.Group[]; shot: boolean; cyl?: boolean }
   interface ChvPort { g: THREE.Group; round: THREE.Group; face: THREE.Mesh; shot: boolean; real: boolean; bolt: THREE.Mesh | null; win: number; f: number }
   // the arms and props of a viewmodel (its userData.vma)
@@ -47,7 +47,7 @@ const G_VMAnim = (() => {
   const FACE = new T.Vector3(-0.07, -0.15, -0.45);
 
   // ------------------------------------------------------------------ setup
-  function makeArm(M: Mats) {
+  function makeArm(M: Mats): Arm {
     const g = new T.Group();
     const sleeve = new T.Mesh(new T.CylinderGeometry(0.03, 0.036, 1, 10), M.fabric());
     const glove = new T.Group();
@@ -56,6 +56,17 @@ const G_VMAnim = (() => {
     g.add(sleeve, glove);
     return { g, sleeve, glove };
   }
+  // The Wolverine grip (js/parts.ts hsl.0): the loading hand a loose fist, a round held in each of the three gaps between its four fingers, bases toward the
+  // palm and noses out past the knuckles like claws. CLAW_X: across the glove, the gaps; CLAW_AT: a round's middle, up and along the glove (its -z the fingers' way).
+  const CLAW_N = 3, CLAW_X = [-0.0105, 0, 0.0105], CLAW_Y = -0.008, CLAW_Z = -0.069;
+  // the fist held up between the pouch and the gun, the knuckles to the eye and the rounds standing up out of them, leaning away a little (the viewmodel's frame: x right, y up, z back)
+  const CLAW_UP = (() => { const Z = new T.Vector3(-0.12, -0.8, 0.45).normalize(), X = new T.Vector3(1, 0, 0), Y = new T.Vector3().crossVectors(Z, X).normalize(); X.crossVectors(Y, Z).normalize(); return new T.Quaternion().setFromRotationMatrix(new T.Matrix4().makeBasis(X, Y, Z)); })();
+  function makeFist(M: Mats) { // four knuckles curled in, shown in place of the flat fingers while the hand holds the rounds
+    const g = new T.Group();
+    for (let i = 0; i < 4; i++) { const f = new T.Mesh(new T.BoxGeometry(0.0098, 0.028, 0.026), M.glove()); f.position.set(-0.01575 + i * 0.0105, -0.008, -0.044); g.add(f); }
+    g.visible = false;
+    return g;
+  }
   function prop(kind: VmPropKind, M: Mats, def?: Def) { // things carried in the hand: a shell (or a round: its real size), a fired case, a speed loader, a stripper clip, a bolt
     // (a cartridge, or a shotshell, or the crossbow's bolt, from the baked props: assets/models/props, js/gunmodels.ts; centred on the hand's hold, the nose forward)
     let g = new T.Group();
@@ -63,6 +74,7 @@ const G_VMAnim = (() => {
     else if (kind === 'loader') { const plat = G.Gunsmith.PLATFORMS[def!.id], n = (plat && plat.spec.chambers) || 6, r = new T.Mesh(new T.CylinderGeometry(0.02, 0.02, 0.012, 14), M.black()); r.rotation.x = Math.PI / 2; g.add(r); for (let i = 0; i < n; i++) { const a = (i / n) * Math.PI * 2; const c = new T.Mesh(new T.CylinderGeometry(0.0045, 0.0045, 0.035, 8), M.brass()); c.rotation.x = Math.PI / 2; c.position.set(Math.cos(a) * 0.012, Math.sin(a) * 0.012, -0.02); g.add(c); } }
     else if (kind === 'clip') { const c = new T.Mesh(new T.BoxGeometry(0.014, 0.03, 0.06), M.brass()); g.add(c); }
     else if (kind === 'bolt') g = G.GunModels.quarrel(true).group; // (the crossbow's own bolt: nock, shaft, vanes and head)
+    else if (kind === 'claw' && def) for (let i = 0; i < CLAW_N; i++) g.add(G.GunModels.roundProp(def as { id: string }, 'shell')); // (the Wolverine grip: a round in each gap between the fingers, placed one by one in apply)
     g.visible = false;
     return g;
   }
@@ -96,7 +108,8 @@ const G_VMAnim = (() => {
     if (hs[0].info.hinge) { k.reload = 'hinge'; if (!def.manual) k.action = null; } // (a model with a reload sequence (info.hinge): its moving parts are driven by that and by nothing else, see hingeClip)
     const R = makeArm(M), L = makeArm(M);
     root.add(R.g, L.g);
-    const props = { shell: prop('shell', M, def), case: prop('case', M, def), loader: prop('loader', M, def), clip: prop('clip', M), bolt: prop('bolt', M) };
+    const props: Record<string, THREE.Group> = { shell: prop('shell', M, def), case: prop('case', M, def), loader: prop('loader', M, def), clip: prop('clip', M), bolt: prop('bolt', M) };
+    if (k.reload === 'block') { props.claw = prop('claw', M, def); L.fist = makeFist(M); L.glove.add(L.fist); } // (a falling block: a Wolverine grip may load it, def.perLoad)
     for (const p of Object.values(props)) hs[0].holder.add(p);
     u.vma = { def, k, hs, R, L, props, drop: null, chv: chamberView(hs[0], def, M), fw: 0 };
   }
@@ -420,10 +433,25 @@ const G_VMAnim = (() => {
     pose.brk = 1; tilt(1);
     const B = A.block, w = pl.cur();
     if (!B || !B.at.length) { pose.L = path(rt, [[0, A.P], [0.5, A.S], [1, A.P]]); return pose; }
+    if ((w.def.perLoad || 1) > 1) return clawRound(rt, h, pl, pose);
     const c = B.at[Math.min(B.at.length - 1, w.mag || 0)], home = new T.Vector3(c.x, c.y + 0.012, c.z - B.oal / 2 + 0.001 + 0.03), out = off(home, -0.035, 0.022); // (the hand where the round's base is at the chamber's mouth, all but its rim in; and behind and above it)
     pose.L = path(rt, [[0, A.P], [0.28, A.P], [0.56, out], [0.72, home], [0.8, home], [1, A.P]]);
     if (rt > 0.24 && rt < 0.74) pose.prop = { kind: 'shell' };
     if (rt >= 0.72) pose.fed = (w.mag || 0) + 1;
+    return pose;
+  }
+  // The Wolverine grip (def.perLoad, js/player.ts loadCount: pl.loadN rounds this grip, three or fewer): the hand comes up from the pouch with the rounds between
+  // its fingers, claws out, holds them up a moment in view, then over the next empty chambers from behind; as it comes down to them the rounds line up each on its
+  // own bore (pose.prop.seat: from the fingers' spacing to the chambers'), and one push seats them all. (rt: through this grip; the block already down.)
+  function clawRound(rt: number, h: Rig, pl: Pl, pose: Pose) {
+    const A = h.A, B = A.block!, w = pl.cur(), m = w.mag || 0, n = Math.max(1, Math.min(CLAW_N, pl.loadN || 1, B.at.length - m));
+    const at: V3[] = [], C = new T.Vector3();
+    for (let i = 0; i < n; i++) { const c = B.at[Math.min(B.at.length - 1, m + i)]; at.push(new T.Vector3(c.x, c.y, c.z - B.oal / 2 + 0.001)); C.add(c); } // (each round's middle, seated: its rim at the chamber's mouth)
+    C.divideScalar(n);
+    const home = new T.Vector3(C.x, C.y + 0.012, C.z - B.oal / 2 + 0.001 + 0.03), out = off(home, -0.04, 0.026), show = A.F.clone().lerp(out, 0.12); // (the hand over the chambers' middle; behind and above; up in view between)
+    pose.L = path(rt, [[0, A.P], [0.16, A.P], [0.4, show], [0.52, show], [0.68, out], [0.8, home], [0.86, home], [1, A.P]]);
+    if (rt > 0.12 && rt < 0.82) pose.prop = { kind: 'claw', n, seat: S(0.54, 0.7, rt), up: S(0.18, 0.38, rt) * (1 - S(0.5, 0.64, rt)), at, home }; // (up: the fist turned to show them)
+    if (rt >= 0.8) pose.fed = m + n;
     return pose;
   }
   function breakClip(t: number, h: Rig, n: number, pl: Pl) {
@@ -729,8 +757,10 @@ const G_VMAnim = (() => {
         }
         // something in the left hand
         if (pose && pose.dropCase && pl.handCase && !pl.handOut) { pl.handOut = true; G.Casings.loose(a.def, h.holder.localToWorld(a.props.case.position.clone()), h.holder, pl.handCase); } // (a real case now, falling from where the hand had it)
+        if (a.L.fist) { const fist = !!(pose && pose.prop && pose.prop.kind === 'claw'); a.L.fist.visible = fist; a.L.glove.children[1].visible = !fist; if (fist && pose!.prop!.up) a.L.glove.quaternion.slerp(CLAW_UP, pose!.prop!.up); } // (the Wolverine grip's fist, in place of the flat fingers; turned up to show the rounds)
         for (const [kind, obj] of Object.entries(a.props)) {
           obj.visible = !!(pose && pose.prop && pose.prop.kind === kind);
+          if (kind === 'claw') { if (obj.visible) clawPose(obj, pose!.prop!, a.L.glove, h.holder, Lt); continue; }
           const rx = (obj.visible && pose!.prop!.rx) || 0; // (tipped up with a derringer's barrels, held by its base)
           obj.rotation.x = rx;
           if (obj.visible) obj.position.copy(Lt).add(new T.Vector3(0.0, -0.012, -0.03).applyAxisAngle(_X, rx)).add(_v2.set(pose!.prop!.dx || 0, 0, 0)); // (dx: held to the side of the hand)
@@ -741,6 +771,23 @@ const G_VMAnim = (() => {
           }
         }
       }
+    });
+  }
+  // the Wolverine grip's rounds: each where it sits between the fingers (in the glove's frame, nose along the fingers), turned and moved as the hand comes over
+  // the chambers (seat) to where it goes in, along its own bore, riding the hand till it's seated (at: holder space, the hand at home)
+  const _gm = new T.Matrix4(), _hm = new T.Matrix4(), _gq = new T.Quaternion(), _cq = new T.Quaternion(), _rp = new T.Vector3();
+  function clawPose(g: THREE.Object3D, pr: NonNullable<Pose['prop']>, glove: THREE.Object3D, holder: THREE.Object3D, Lt: V3) {
+    g.position.set(0, 0, 0); g.rotation.set(0, 0, 0);
+    _gm.compose(glove.position, glove.quaternion, _v2.set(1, 1, 1)); _hm.copy(holder.matrix).invert(); // (the glove's frame is the viewmodel's, as the holder's parent)
+    _cq.copy(holder.quaternion).invert(); _gq.copy(_cq).multiply(glove.quaternion); // (the glove's turn in the holder's frame)
+    const n = pr.n || 1, k = pr.seat || 0;
+    g.children.forEach((r, i) => {
+      r.visible = i < n;
+      if (!r.visible) return;
+      _rp.set(CLAW_X[i], CLAW_Y, CLAW_Z).applyMatrix4(_gm).applyMatrix4(_hm); // (between the fingers: fewer than three, from the index finger's side)
+      const seated = pr.at![i].clone().sub(pr.home!).add(Lt); // (on its bore, as far from it as the hand is from its home)
+      r.position.copy(_rp).lerp(seated, k);
+      r.quaternion.copy(_gq).slerp(_cq.identity(), k);
     });
   }
   // what a magazine shows: the top round (its tip coloured for the load) if there is one, witness holes showing brass

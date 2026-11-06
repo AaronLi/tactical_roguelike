@@ -363,7 +363,17 @@ const G_Icons = (() => {
         g.beginPath(); g.moveTo(x0, H * 0.08); g.lineTo(x0 + mw, H * 0.08); g.quadraticCurveTo(x0 + mw + W * 0.06, H * 0.5, x0 + mw + W * 0.12, H * 0.92); g.lineTo(x0 + W * 0.12, H * 0.92); g.quadraticCurveTo(x0 + W * 0.06, H * 0.5, x0, H * 0.08); g.closePath(); fill(); shade(g, x0, H * 0.08, mw, H * 0.84);
         break;
       }
-      default: { // charging handle, loader, capacitor, motor: a labelled block
+      default: if (p.mount === 'hsload') { // the Wolverine grip (js/parts.ts): three .22s nose-up between four knuckles, as the hand holds them
+        for (let i = 0; i < 3; i++) {
+          const x = W * (0.32 + i * 0.18), a = (i - 1) * 0.16;
+          g.save(); g.translate(x, H * 0.62); g.rotate(a);
+          g.fillStyle = '#c89a44'; g.fillRect(-W * 0.035, -H * 0.42, W * 0.07, H * 0.34); // (the case)
+          g.fillStyle = '#9a6a3a'; g.beginPath(); g.moveTo(-W * 0.035, -H * 0.42); g.quadraticCurveTo(0, -H * 0.62, W * 0.035, -H * 0.42); g.fill(); // (the bullet)
+          g.restore();
+        }
+        for (let i = 0; i < 4; i++) { rr(g, W * (0.19 + i * 0.18), H * 0.6, W * 0.12, H * 0.3, W * 0.05); fill('#3a3430'); } // (the knuckles)
+        break;
+      } else { // charging handle, loader, capacitor, motor: a labelled block
         rr(g, W * 0.15, H * 0.25, W * 0.7, H * 0.5, 5); fill();
         g.fillStyle = 'rgba(255,255,255,0.6)'; g.font = `bold ${Math.round(Math.min(W, H) * 0.24)}px Consolas, monospace`; g.textAlign = 'center';
         g.fillText(p.slot.slice(0, 3).toUpperCase(), W / 2, H * 0.58);
