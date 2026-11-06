@@ -1777,14 +1777,14 @@ const G_Me = {
   // its own (js/ballistics.ts: a ragged flake of mild steel that mass, tumbling: fragOne): it slows in the air by its own drag, goes into
   // whoever is in its way through their armour and body (through), through walls and cover by what they are made of
   // (crossSolid), or stops in them. So how many reach someone is how much of the sphere they fill (a body at 3 m
-  // fills about 1/200th of it), and the lethal radius, a few metres, is where that is enough to wound a few times
+  // fills about 1/200th of it: seven or eight chips), and the lethal radius, about five metres, is where that is enough to wound a few times
   // over; further out they go on thinning (and slowing) as a hazard; walls and a table in the way stop most.
   // Spread over frames: the work is a ray per chip (a wall and a body test), so a burst is queued and worked off by
   // a time budget a frame (FRAG.BUDGET_MS, at least FRAG.MIN_PER_FRAME chips): a few frames at most. A chip that has
   // flown is flown at once (at a kilometre a second the air time is nothing). A body takes at most FRAG.CAP of them
   // through the full wound sums (the rest pass it by) so a crowd of chips on one man costs no more than that.
-  BLAST: { r: 3.2, dmg: 70 }, // (the burst's own push of air, close in: the chips are the rest)
-  FRAG: { N: 800, V0: 1350, VMIN: 70, RANGE: 70, CAP: 28, BUDGET_MS: 2.5, MIN_PER_FRAME: 40, M_MED: 0.0004, CD: 1.2, FLAKE: 4, SHOW: 26, PUFFS: 14, BLOOD: 24 },
+  BLAST: { r: 4, dmg: 90 }, // (the burst's own push of air, close in: the chips are the rest)
+  FRAG: { N: 1500, V0: 1350, VMIN: 70, RANGE: 70, CAP: 28, BUDGET_MS: 3, MIN_PER_FRAME: 40, M_MED: 0.0004, CD: 1.2, FLAKE: 4, SHOW: 26, PUFFS: 14, BLOOD: 24 },
   fragQ: null as null | any[],
   fragLogs: [] as any[],
   // p: where it went off. enemy: a suspect's (id): it is you it is meant for, and no one else it hurts here. seed: the
