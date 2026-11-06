@@ -55,7 +55,7 @@ const G_R = {
   points: undefined as unknown as THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial>,
   decals: undefined as unknown as RMark[],
   decalIdx: undefined as unknown as number,
-  FRAG_MARKS: 3000, fragMarks: undefined as unknown as THREE.InstancedMesh, fragN: 0, fragDirty: false, scorches: [] as THREE.Mesh[], scorchIdx: 0,
+  FRAG_MARKS: 3000, fragMarks: undefined as unknown as THREE.InstancedMesh, fragN: 0, fragDirty: false, scorches: [] as THREE.Mesh[], scorchIdx: 0, craters: [] as THREE.Mesh[], craterIdx: 0,
   bloodMats: undefined as unknown as RBloodMats,
   bloodMarks: undefined as unknown as RMark[],
   bloodIdx: undefined as unknown as number,
@@ -328,7 +328,7 @@ const G_R = {
     };
     while (this.levelRoot.children.length) { const c = this.levelRoot.children[0]; dispose(c); this.levelRoot.remove(c); }
     this.decals.forEach((d: THREE.Object3D) => (d.visible = false));
-    this.fragMarks.count = 0; this.fragN = 0; this.scorches.forEach((m) => (m.visible = false));
+    this.fragMarks.count = 0; this.fragN = 0; this.scorches.forEach((m) => (m.visible = false)); this.craters.forEach((m) => (m.visible = false));
     for (const r of this.fires) r.t = 1e9; this.fireStep(0); // (a thermobaric's fireball still burning: gone with the level)
     if (this.bloodMarks) { this.bloodMarks.forEach((d: THREE.Object3D) => (d.visible = false)); this.pools.forEach((d: THREE.Object3D) => { d.visible = false; d.userData.owner = null; }); }
   },
@@ -513,6 +513,15 @@ const G_R = {
         m.rotation.x = -Math.PI / 2; m.visible = false; this.scene.add(m); this.scorches.push(m);
       }
       this.scorchIdx = 0;
+      // and the crater a frag leaves on the floor it went off on (crater): a few looks, lit (its pale rim and dust would glow in
+      // the dark unlit), over the scorch
+      const looks = [3301, 4409, 5527].map((sd) => this.craterTexture(sd));
+      this.craters = [];
+      for (let i = 0; i < 12; i++) {
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshLambertMaterial({ map: looks[i % looks.length], transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3 }));
+        m.rotation.x = -Math.PI / 2; m.renderOrder = 1; m.visible = false; this.scene.add(m); this.craters.push(m);
+      }
+      this.craterIdx = 0;
     }
 
     // Blood where it lands: droplets (a drop with a few satellites) and smears on the floor or a tabletop,
@@ -925,6 +934,50 @@ const G_R = {
     }
     for (let i = 0; i < 40; i++) { const a = rnd() * 6.283, r = S * (0.2 + 0.25 * rnd()); g.fillStyle = `rgba(35,33,30,${0.08 + 0.15 * rnd()})`; g.beginPath(); g.arc(Math.cos(a) * r, Math.sin(a) * r, 1 + rnd() * 4, 0, 6.283); g.fill(); } // (flecks of it)
     return new THREE.CanvasTexture(c);
+  },
+  // A frag grenade's crater, seen from above (one look of three, seed: its dice): a shallow pit blown into the surface, dark and
+  // ragged, a pale rim of what was pulverised, and round it the ground its downward chips tore up, pocked thick near the pit and
+  // thinning out. It stands in for those chips' own pocks there (js/player.ts fragOne leaves none inside it), which in a heap
+  // read as a sieve, not as a hole. The texture's edge is the patch it covers (crater: d across).
+  craterTexture(seed: number) {
+    const S = 256, c = document.createElement('canvas'); c.width = c.height = S;
+    const g = c.getContext('2d') as CanvasRenderingContext2D, rnd = G.U.rng(seed), H = S / 2, PIT = H * 0.3;
+    g.translate(H, H);
+    // the torn-up ground: dust and grit, fading out to the edge
+    const dust = g.createRadialGradient(0, 0, PIT, 0, 0, H * 0.98);
+    dust.addColorStop(0, 'rgba(70,66,60,0.55)'); dust.addColorStop(0.45, 'rgba(95,90,82,0.28)'); dust.addColorStop(1, 'rgba(110,105,96,0)');
+    g.fillStyle = dust; g.beginPath(); g.arc(0, 0, H * 0.98, 0, 6.283); g.fill();
+    // gouges running out from the pit, where chips skipped along the surface
+    g.lineCap = 'round';
+    for (let i = 0; i < 46; i++) {
+      const a = rnd() * 6.283, r0 = PIT * (0.9 + 0.2 * rnd()), r1 = r0 + H * (0.1 + 0.45 * rnd() * rnd());
+      g.strokeStyle = `rgba(${18 + rnd() * 20 | 0},${17 + rnd() * 18 | 0},${15 + rnd() * 16 | 0},${0.25 + 0.4 * rnd()})`; g.lineWidth = 1 + rnd() * 2.5;
+      g.beginPath(); g.moveTo(Math.cos(a) * r0, Math.sin(a) * r0); g.lineTo(Math.cos(a) * r1, Math.sin(a) * r1); g.stroke();
+    }
+    // the chips' pocks, thick by the pit and fewer outwards, each a dark hole with a pale chipped edge
+    for (let i = 0; i < 420; i++) {
+      const a = rnd() * 6.283, r = PIT + (H * 0.95 - PIT) * Math.pow(rnd(), 1.8), s = 0.6 + 1.6 * rnd() * (1 - 0.5 * (r - PIT) / H);
+      const x = Math.cos(a) * r, y = Math.sin(a) * r;
+      g.fillStyle = `rgba(190,184,172,${0.25 + 0.25 * rnd()})`; g.beginPath(); g.arc(x, y, s * 1.7, 0, 6.283); g.fill();
+      g.fillStyle = `rgba(14,13,12,${0.65 + 0.3 * rnd()})`; g.beginPath(); g.arc(x, y, s, 0, 6.283); g.fill();
+    }
+    // the rim: what the blast smashed, pale and broken
+    const rim: number[] = []; for (let i = 0; i < 40; i++) rim.push(PIT * (0.85 + 0.35 * rnd()));
+    const ring = (k: number) => { g.beginPath(); for (let i = 0; i <= 40; i++) { const a = (i / 40) * 6.283, r = rim[i % 40] * k; i ? g.lineTo(Math.cos(a) * r, Math.sin(a) * r) : g.moveTo(Math.cos(a) * r, Math.sin(a) * r); } g.closePath(); };
+    ring(1.22); g.fillStyle = 'rgba(176,170,158,0.7)'; g.fill();
+    // the pit: dark, deeper looking where the light from above doesn't reach (its far wall lit, the near one in shadow)
+    ring(1);
+    const pit = g.createRadialGradient(PIT * 0.25, PIT * 0.25, PIT * 0.1, 0, 0, PIT * 1.15);
+    pit.addColorStop(0, 'rgba(8,7,6,0.97)'); pit.addColorStop(0.6, 'rgba(22,20,18,0.95)'); pit.addColorStop(1, 'rgba(70,66,60,0.9)');
+    g.fillStyle = pit; g.fill();
+    for (let i = 0; i < 26; i++) { const a = rnd() * 6.283, r = PIT * 0.8 * Math.sqrt(rnd()); g.fillStyle = `rgba(${90 + rnd() * 60 | 0},${86 + rnd() * 56 | 0},${80 + rnd() * 50 | 0},${0.3 + 0.4 * rnd()})`; g.beginPath(); g.arc(Math.cos(a) * r, Math.sin(a) * r, 0.8 + 2 * rnd(), 0, 6.283); g.fill(); } // (rubble in it)
+    const t = new THREE.CanvasTexture(c); t.anisotropy = 4;
+    return t;
+  },
+  // a frag's crater (craterTexture) on the surface it went off over (y: its height), d across, turned rot. Pooled: the oldest reused.
+  crater(x: number, y: number, z: number, d: number, rot: number) {
+    const m = this.craters[this.craterIdx]; this.craterIdx = (this.craterIdx + 1) % this.craters.length;
+    m.position.set(x, y + 0.016 + 0.0004 * this.craterIdx, z); m.rotation.z = rot; m.scale.set(d, d, 1); m.visible = true;
   },
   // A scorch on the surface a grenade went off over (y: that surface's height): d across, k how strong (a grenade that
   // went off in the air leaves a faint one), rot: its turn. Pooled: the oldest is reused.
