@@ -11,9 +11,7 @@ type BloodKind = 'drop' | 'spatter' | 'pool';
 interface RBloodMats { [kind: string]: THREE.MeshStandardMaterial; drop: THREE.MeshStandardMaterial; spatter: THREE.MeshStandardMaterial; pool: THREE.MeshStandardMaterial; }
 type RMark = THREE.Mesh<THREE.BufferGeometry, THREE.Material>; // a pooled decal or blood mark
 type RWound = (THREE.Mesh<THREE.BufferGeometry, THREE.Material> | THREE.Line<THREE.BufferGeometry, THREE.Material>) & { onRig?: any }; // a track kept on a body
-interface RWarm { t0: number; tWait: number; waitMs?: number; ext: any; done: (() => void) | null; tasks: (() => void)[]; stage: number; frames: number; undo: (() => void)[]; progs: any[]; mats: Set<THREE.Material> } // (js/render.ts warmup)
-// what a program just asked for answers while the driver's still building it (warmStep): no inputs, nothing to set
-const PH_UNIFORMS = { seq: [], map: {} };
+interface RWarm { t0: number; tWait: number; waitMs?: number; done: (() => void) | null; tasks: (() => void)[]; stage: number; frames: number; undo: (() => void)[]; had: Set<any>; ask?: any[] } // (js/render.ts warmup)
 interface RArc { dots: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial>; ring: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>; N: number; f?: number; }
 const G_R = {
   // (set in init / _initFx before anything uses them: they hold undefined till then, as before)
@@ -107,7 +105,8 @@ const G_R = {
   nvScene: undefined as THREE.Scene | undefined,
   depthOnly: undefined as THREE.MeshBasicMaterial | undefined,
   init() {
-    const r = (this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' }));
+    const r = (this.renderer = new THREE.WebGLRenderer({ antialias: true, stencil: true, powerPreference: 'high-performance', reversedDepthBuffer: true }));
+    this.reverseDepth(r);
     r.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     r.setSize(window.innerWidth, window.innerHeight);
     r.domElement.id = 'c';
@@ -129,7 +128,7 @@ const G_R = {
     this.scene.add(this.camera);
 
     // Dim by design: rooms are lit by their ceiling lamps, corridors are left in the gloom
-    this.hemi = new THREE.HemisphereLight(0xb0c0d0, 0x302820, 0.26);
+    this.hemi = new THREE.HemisphereLight(0xb0c0d0, 0x302820, Math.PI * 0.26);
     this.scene.add(this.hemi);
     this.ambient = new THREE.AmbientLight(0xffffff, 0);
     this.scene.add(this.ambient);
@@ -150,9 +149,9 @@ const G_R = {
     this.vmScene.add(this.vmHolder);
     this.vmRoot = new THREE.Group();
     this.vmHolder.add(this.vmRoot);
-    const vhl = new THREE.HemisphereLight(0xdde6f0, 0x2a2622, 0.55); this.vmScene.add(vhl);
-    const vdl = new THREE.DirectionalLight(0xffffff, 0.3); vdl.position.set(1, 2, 1); this.vmScene.add(vdl);
-    this.vmLights = [[vhl, 0.55], [vdl, 0.3]];
+    const vhl = new THREE.HemisphereLight(0xdde6f0, 0x2a2622, Math.PI * 0.55); this.vmScene.add(vhl);
+    const vdl = new THREE.DirectionalLight(0xffffff, Math.PI * 0.3); vdl.position.set(1, 2, 1); this.vmScene.add(vdl);
+    this.vmLights = [[vhl, Math.PI * 0.55], [vdl, Math.PI * 0.3]];
     this.vmScene.environment = this._envMap(r);
     this.vmMuzzle = new THREE.PointLight(0xffb060, 0, 3, 2);
     this.vmMuzzle.position.set(0.2, -0.1, -0.8);
@@ -169,6 +168,29 @@ const G_R = {
 
     this._initFx();
     window.addEventListener('resize', () => this.resize());
+  },
+  // A reversed depth buffer (EXT_clip_control: the near plane at depth 1, the far plane at 0, cleared to 0 and tested
+  // greater-than; three does that, the shadow maps' comparisons included, when it's asked for and the browser has it, and
+  // falls back to the usual one when it hasn't). Its point is a floating-point depth buffer: there the float's own
+  // precision, finest near 0, sits at the far end, where the projection leaves least, so distant surfaces close together
+  // (a roof's edge on a wall 300 m off through a scope) no longer fight. The screen's own depth buffer is 24-bit fixed
+  // point (a canvas can't have another), where it changes little either way; the scope's picture, magnified, is where
+  // distant surfaces come close enough to see fight, and it gets a 32-bit float one (viewRT). (Night vision's and the
+  // fisheye's frames, the screen's size, keep 24 bits: a float one with its stencil there cost the GPU more and showed nothing.)
+  //   - three turns a polygon offset's factor round for a reversed buffer but not its units (r186), so a decal held
+  //     off its wall by units (the stickers, the range's lane numbers) went behind it: both are turned here.
+  //   - a point projected through a camera that's been drawn with it is behind the eye with z < 0 (it was z > 1): behind().
+  reverseDepth(r: THREE.WebGLRenderer) {
+    if (!r.capabilities.reversedDepthBuffer) return;
+    const st = r.state as any, po = st.setPolygonOffset;
+    st.setPolygonOffset = function (on: boolean, factor: number, units: number) { return po.call(this, on, factor, st.buffers.depth.getReversed() ? -units : units); };
+  },
+  behind(v: THREE.Vector3, cam: THREE.Camera) { return (cam as any).reversedDepth ? v.z < 0 : v.z > 1; },
+  // the scope picture's target (opts: the WebGLRenderTarget's): with a reversed depth buffer, its
+  // depth 32-bit float (see above); the depth isn't read after, so it's not resolved out of the multisampled buffer
+  viewRT(w: number, h: number, opts: THREE.RenderTargetOptions) {
+    const rev = this.renderer && this.renderer.capabilities.reversedDepthBuffer;
+    return new THREE.WebGLRenderTarget(w, h, rev ? Object.assign({}, opts, { depthTexture: new THREE.DepthTexture(w, h, THREE.FloatType), resolveDepthBuffer: false, resolveStencilBuffer: false }) : opts);
   },
   // the roll-off (the shoulder of Khronos' PBR Neutral, on linear light): a channel's peak over the knee (0.76) eased
   // toward 1, the colour scaled with it, and toward white by how much was taken off (desaturation 0.15). (Not its toe:
@@ -229,7 +251,7 @@ const G_R = {
     // daylit)
     // On a night level (js/level.ts nightify) there's none of that: with the power off, a room with no window is black but
     // for what the emergency lights, the moon through a doorway, a weapon light or a flash actually reach.
-    this.hemi.color.setHex(th.hemi || th.light, THREE.LinearSRGBColorSpace); this.hemi.intensity = map.night ? 0 : (th.hemiI || 0.26) ** 2 * (th.hub ? 1 : G.LightGrid.opts.fill);
+    this.hemi.color.setHex(th.hemi || th.light, THREE.LinearSRGBColorSpace); this.hemi.intensity = map.night ? 0 : Math.PI * (th.hemiI || 0.26) ** 2 * (th.hub ? 1 : G.LightGrid.opts.fill);
     // the gun in your hands: lit by what's lit where you stand (eyeLight), on a level with its lamps in the light grid
     this.vmDark = !th.hub && G.LightGrid.built;
     for (const [l, k] of this.vmLights) l.intensity = k;
@@ -260,7 +282,8 @@ const G_R = {
     for (const s of this.vmSpots) s.intensity = 0;
     if (!this.vmDark || !map) return 1;
     G.LightGrid.at(p.x, p.y, p.z, E, 0.7);
-    E.r += this.hemi.color.r * this.hemi.intensity; E.g += this.hemi.color.g * this.hemi.intensity; E.b += this.hemi.color.b * this.hemi.intensity;
+    const hk = this.hemi.intensity / Math.PI; // (the lights' figures in r149's units, as the light grid's are: js/util.ts)
+    E.r += this.hemi.color.r * hk; E.g += this.hemi.color.g * hk; E.b += this.hemi.color.b * hk;
     const fall = (d: number, r: number, decay: number) => (r > 0 ? Math.pow(Math.max(0, 1 - d / r), decay) : 1 / (1 + d * d)); // (three.js' own, with a reach)
     const seen = (q: THREE.Vector3) => L.los(map, q.x, q.y, q.z, p.x, p.y, p.z);
     // points: the muzzle flashes and flashbangs (not your own: the gun's own flash, vmMuzzle, has that), the fireballs
@@ -269,7 +292,7 @@ const G_R = {
       if (!(l.intensity > 0)) continue;
       const d = l.position.distanceTo(p);
       if ((this.muzzleLights.includes(l) && d < 1.2) || d >= l.distance || !seen(l.position)) continue;
-      const a = l.intensity * fall(d, l.distance, l.decay);
+      const a = l.intensity / Math.PI * fall(d, l.distance, l.decay);
       C.copy(l.color).multiplyScalar(a * this.EYE_BOUNCE); E.add(C);
       pts.push([l, a]);
     }
@@ -284,7 +307,7 @@ const G_R = {
       const hit = L.raycast(map, s.position.x, s.position.y, s.position.z, dir.x, dir.y, dir.z, s.distance), hp = this._eyeV.copy(s.position).addScaledVector(dir, Math.max(0, hit.t - 0.08));
       const dh = hp.distanceTo(p);
       if (dh < s.distance && (dh < 0.3 || seen(hp))) {
-        const a = s.intensity * fall(hit.t, s.distance, s.decay) * this.SPOT_BOUNCE / Math.max(0.5, hit.t) ** 2 * fall(dh, s.distance, s.decay);
+        const a = s.intensity / Math.PI * fall(hit.t, s.distance, s.decay) * this.SPOT_BOUNCE / Math.max(0.5, hit.t) ** 2 * fall(dh, s.distance, s.decay);
         C.copy(s.color).multiplyScalar(a); E.add(C);
       }
       const d = s.position.distanceTo(p), toEye = this._eyeV.subVectors(p, s.position).normalize();
@@ -323,6 +346,7 @@ const G_R = {
     for (const m of [...(this.decals || []), ...(this.bloodMarks || [])]) if (m.parent && m.parent !== this.scene) this.scene.add(m);
     const dispose = (o: THREE.Object3D) => {
       o.traverse((c: any) => {
+        if (c.isBatchedMesh && c._matricesTexture) c.dispose(); // (its geometry, and the textures of its instances' matrices)
         if (c.geometry) c.geometry.dispose();
         if (c.material && !c.userData.keepMat) (Array.isArray(c.material) ? c.material : [c.material]).forEach((m: THREE.Material & { map?: THREE.Texture | null }) => { if (m.map) m.map.dispose(); m.dispose(); }); // (keepMat: shared, js/scars.ts's)
       });
@@ -585,8 +609,11 @@ const G_R = {
     for (let i = 0; i < 6; i++) {
       const s = new THREE.SpotLight(0xfff1dc, 0, 34, 0.3, 0.6, 1.6);
       s.target = new THREE.Object3D();
-      s.castShadow = true; s.shadow.autoUpdate = false; s.shadow.camera.near = 0.1;
-      s.shadow.map = new THREE.WebGLRenderTarget(512, 512, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
+      // (its map, 512 square, is made by three the first time it's drawn: drawn the first time the scene is, so every light has
+      // one from the start. three r186 lights what it's drawing from a light with no map yet with a stand-in it doesn't set up
+      // for comparing (fixed in r187): the draw fails and the whole level goes unlit, the GL saying "Mismatch between texture
+      // format and sampler type")
+      s.castShadow = true; s.shadow.autoUpdate = false; s.shadow.needsUpdate = true; s.shadow.camera.near = 0.1;
       this.scene.add(s, s.target); this.spots.push(s);
     }
     // what you see of someone else's light: its beam in the air, and the lamp itself
@@ -600,11 +627,14 @@ const G_R = {
     lg.fillStyle = lgr; lg.fillRect(0, 0, 32, 32);
     const laserDotTex = new THREE.CanvasTexture(lc);
     for (let i = 0; i < 6; i++) {
+      // (the light's shadow map is a depth texture three compares against, sampled as one: lit or not, the edge smoothed over a
+      // texel. It's made the first time it's drawn, so the beam picks it up as it's drawn.)
       const sh = this.spots[i].shadow, cone = new THREE.Mesh(cg, new THREE.ShaderMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
-        uniforms: { shMap: { value: sh.map.texture }, shMat: { value: sh.matrix } },
+        uniforms: { shMap: { value: null as THREE.Texture | null }, shMat: { value: sh.matrix } },
         // (brightest down the middle of it, nothing at its edges: no hard line round a beam in the air; it stops where its light does)
         vertexShader: 'uniform mat4 shMat; varying vec3 vC, vN, vV; varying vec4 vS; void main() { vC = color; vN = normalMatrix * normal; vec4 q = modelViewMatrix * vec4(position, 1.0); vV = -q.xyz; vS = shMat * modelMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * q; }',
-        fragmentShader: '#include <packing>\nuniform sampler2D shMap; varying vec3 vC, vN, vV; varying vec4 vS; void main() { vec3 s = vS.xyz / vS.w; if (s.z > unpackRGBAToDepth(texture2D(shMap, s.xy))) discard; float a = abs(dot(normalize(vN), normalize(vV))); gl_FragColor = vec4(vC * a * a * a * 0.11, 1.0); }' }));
+        fragmentShader: 'uniform sampler2DShadow shMap; varying vec3 vC, vN, vV; varying vec4 vS; void main() { vec3 s = vS.xyz / vS.w; if (texture(shMap, s) < 0.5) discard; float a = abs(dot(normalize(vN), normalize(vV))); gl_FragColor = vec4(vC * a * a * a * 0.11, 1.0); }' }));
+      cone.onBeforeRender = () => { cone.material.uniforms.shMap.value = sh.map ? sh.map.depthTexture : null; };
       const lamp = new THREE.Sprite(new THREE.SpriteMaterial({ map: laserDotTex, color: 0xfff4e0, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
       cone.visible = lamp.visible = false; cone.frustumCulled = false; this.scene.add(cone, lamp); this.cones.push({ cone, lamp });
     }
@@ -624,7 +654,7 @@ const G_R = {
   // your own, on a night level: its beam in the air in front of you, without the lamp)
   tacLight(pos: THREE.Vector3, dir: THREE.Vector3, k = 1, seen = false, haze = false) {
     const s = this.spots[this.spotUsed++]; if (!s) return;
-    s.position.copy(pos); s.target.position.copy(pos).add(dir); s.intensity = 0.9 * k; s.distance = 24 + 10 * k; s.shadow.needsUpdate = true;
+    s.position.copy(pos); s.target.position.copy(pos).add(dir); s.intensity = Math.PI * 0.9 * k; s.distance = 24 + 10 * k; s.shadow.needsUpdate = true;
     const C = (seen || haze) && this.cones[this.coneUsed++];
     if (!C) return;
     const len = 9 * k, r = len * Math.tan(0.3), at = _tv.subVectors(this.camera.position, pos).normalize().dot(dir); // (at: how nearly it's pointing at you)
@@ -816,8 +846,8 @@ const G_R = {
   PART_LIT: 0.35, PART_MIN: 0.03, _partC: new THREE.Color(),
   partLight(p: THREE.Vector3) {
     if (!this.vmDark || !G.LightGrid) return 1;
-    const E = G.LightGrid.at(p.x, p.y, p.z, this._partC, 0.4), h = this.hemi;
-    const l = 0.2126 * (E.r + h.color.r * h.intensity) + 0.7152 * (E.g + h.color.g * h.intensity) + 0.0722 * (E.b + h.color.b * h.intensity);
+    const E = G.LightGrid.at(p.x, p.y, p.z, this._partC, 0.4), h = this.hemi, hk = h.intensity / Math.PI; // (the fill in r149's units, as the grid's: eyeLight)
+    const l = 0.2126 * (E.r + h.color.r * hk) + 0.7152 * (E.g + h.color.g * hk) + 0.0722 * (E.b + h.color.b * hk);
     return G.U.clamp(l / this.PART_LIT, this.PART_MIN, 1);
   },
   // (glow: what gives off its own light, sparks, fire, embers, a flash: not dimmed by the dark)
@@ -998,7 +1028,7 @@ const G_R = {
     m.position.copy(p); m.visible = true;
     m.userData.life = m.userData.max = 0.45; m.userData.r = radius;
     const l = this.blastLights.reduce((a: THREE.PointLight, b: THREE.PointLight) => (b.intensity < a.intensity ? b : a));
-    l.position.copy(p); l.intensity = 6; l.userData.by = m;
+    l.position.copy(p); l.intensity = Math.PI * 6; l.userData.by = m;
     this.particles(p, 40, 0xffa040, 9, 0.6, 4, 1, null, false, true);
     this.particles(p, 30, 0x444038, 3, 1.4, -0.5, 1);
   },
@@ -1084,7 +1114,7 @@ const G_R = {
       r.smoke.instanceMatrix.needsUpdate = true;
       (r.smoke.material as THREE.MeshBasicMaterial).opacity = 0.75 * G.U.clamp(1 - (t - 2) / (F.SMOKE - 2), 0, 1);
       const l = r.light;
-      if (l.userData.by === r) l.intensity = t < 0.15 ? 14 * t / 0.15 : t < 0.55 ? 14 : Math.max(0, 14 * (1 - (t - 0.55) / 0.9));
+      if (l.userData.by === r) l.intensity = Math.PI * (t < 0.15 ? 14 * t / 0.15 : t < 0.55 ? 14 : Math.max(0, 14 * (1 - (t - 0.55) / 0.9)));
       if (t > F.SMOKE + 0.2) {
         this.scene.remove(r.flame, r.smoke);
         (r.flame.material as THREE.Material).dispose(); (r.smoke.material as THREE.Material).dispose(); r.flame.dispose(); r.smoke.dispose();
@@ -1118,12 +1148,12 @@ const G_R = {
   // a flashbang going off: a blinding point of light and a burst of sparks
   flashAt(p: THREE.Vector3) {
     const l = this.muzzleLights[this.mlIdx = ((this.mlIdx || 0) + 1) % this.muzzleLights.length];
-    if (l) { l.position.copy(p); l.color.setHex(0xffffff); l.intensity = 40; l.distance = 26; l.userData.t = 0.12; }
+    if (l) { l.position.copy(p); l.color.setHex(0xffffff); l.intensity = Math.PI * 40; l.distance = 26; l.userData.t = 0.12; }
     this.particles(p, 30, 0xfff6d8, 5, 0.35, 2, 1.6, null, false, true);
   },
   muzzleFlashAt(p: THREE.Vector3, color = 0xffb060) {
     const l = this.muzzleLights[this.muzzleIdx]; this.muzzleIdx = (this.muzzleIdx + 1) % this.muzzleLights.length;
-    l.position.copy(p); l.color.setHex(color); l.intensity = 2.5; l.userData.t = 0.05;
+    l.position.copy(p); l.color.setHex(color); l.intensity = Math.PI * 2.5; l.userData.t = 0.05;
   },
   beginLasers() { this.laserUsed = 0; },
   laser(a: THREE.Vector3, b: THREE.Vector3) {
@@ -1141,7 +1171,7 @@ const G_R = {
       if (m.userData.life <= 0) m.visible = false; else m.material.opacity = 0.9 * (m.userData.life / m.userData.max);
     }
     for (const l of this.muzzleLights) if (l.intensity > 0) { l.userData.t -= dt; if (l.userData.t <= 0) l.intensity = 0; }
-    if (this.vmMuzzle.intensity > 0) this.vmMuzzle.intensity = Math.max(0, this.vmMuzzle.intensity - dt * 40);
+    if (this.vmMuzzle.intensity > 0) this.vmMuzzle.intensity = Math.max(0, this.vmMuzzle.intensity - Math.PI * dt * 40);
     if (this.nvOver > 0) this.nvOver = Math.max(0, this.nvOver - dt * (this.nvOver > 0.6 ? 0.5 : 1.1)); // (the tubes come back from a flash: slowly at first)
     this.fireStep(dt);
     for (const b of this.blasts) if (b.visible) {
@@ -1150,7 +1180,7 @@ const G_R = {
       b.scale.setScalar(0.3 + k * b.userData.r);
       b.material.opacity = (1 - k) * 0.8;
       const l = this.blastLights.find((x: THREE.PointLight) => x.userData.by === b);
-      if (l) l.intensity = b.userData.life > 0 ? (1 - k) * 6 : 0;
+      if (l) l.intensity = b.userData.life > 0 ? Math.PI * (1 - k) * 6 : 0;
       if (b.userData.life <= 0) { b.visible = false; if (l) l.userData.by = null; }
     }
     for (const m of this.pools || []) {
@@ -1264,7 +1294,7 @@ const G_R = {
           vec4 c0 = texture2D(map, vUv);
           float inside = smoothstep(1.0, 0.988, e), rim = smoothstep(1.0, 1.07, e);
           vec3 plain = c0.rgb * rest * rim;
-          if (inside <= 0.0) { gl_FragColor = LinearTosRGB(vec4(bpTone(plain), 1.0)); return; }
+          if (inside <= 0.0) { gl_FragColor = sRGBTransferOETF(vec4(bpTone(plain), 1.0)); return; }
           vec2 uv = ctr + (vUv - ctr) * (1.0 - 0.035 * e * e); // (pincushioned toward the edge)
           vec2 hq = texture2D(heatMap, uv).rg; float dist = hq.g > 0.0 ? 1.0 / hq.g - 1.0 : 1e4; // (distance: 1 / (1 + d))
           float blur = smoothstep(0.45, 1.0, e) * 2.2 + clamp(1.35 / max(dist, 0.05) - 0.12, 0.0, 2.6) + (dist < 0.07 ? 3.4 : 0.0); // (under 7 cm: a magnified scope's lens, NV_LENS_D, nothing else that near: past use)
@@ -1297,7 +1327,7 @@ const G_R = {
           // the phosphor's afterglow: the last frame lingering (its output, as it was shown)
           vec3 pv = pow(texture2D(prev, vUv).rgb, vec3(2.2));
           col = max(col, pv * persist * 0.85) * (1.0 - 0.18 * persist) + pv * 0.18 * persist;
-          gl_FragColor = LinearTosRGB(vec4(bpTone(mix(plain, col, inside)), 1.0)); // (into a target: encoded here, copied to the screen as it is)
+          gl_FragColor = sRGBTransferOETF(vec4(bpTone(mix(plain, col, inside)), 1.0)); // (into a target: encoded here, copied to the screen as it is)
         }` });
   },
   // The heat (r) and distance (g: 1 / (1 + d), 0 far off) picture (for night vision's focus and thermal channel, and a
@@ -1312,7 +1342,12 @@ const G_R = {
   // the floor's own), a slow mottle over it, so a thermal picture has walls and floors to it)
   _heatMat(heat: number, d: number | null, opts: THREE.ShaderMaterialParameters = {}) {
     return new THREE.ShaderMaterial(Object.assign({ toneMapped: false, fog: false,
-      vertexShader: `varying float vD; varying vec3 vW; varying float vN; void main() { vec4 p = vec4(position, 1.0); vec3 n = normal;
+      vertexShader: `#include <batching_pars_vertex>
+        varying float vD; varying vec3 vW; varying float vN; void main() { vec4 p = vec4(position, 1.0); vec3 n = normal;
+        #include <batching_vertex>
+        #ifdef USE_BATCHING
+        p = batchingMatrix * p; n = mat3(batchingMatrix) * n;
+        #endif
         #ifdef USE_INSTANCING
         p = instanceMatrix * p; n = mat3(instanceMatrix) * n;
         #endif
@@ -1418,7 +1453,7 @@ const G_R = {
   },
   // ------------------------------------------------------------ picture-in-picture scopes
   pipTexture() {
-    if (!this.pipRT) this.pipRT = new THREE.WebGLRenderTarget(512, 512, { samples: 4 });
+    if (!this.pipRT) this.pipRT = this.viewRT(512, 512, { samples: 4 });
     return this.pipRT.texture;
   },
   // Render the world from the scope's ocular lens along its axis. The view is the lens's angular size (seen
@@ -1479,13 +1514,13 @@ const G_R = {
   //     and in the hangar the TVs' sets (js/highlights.ts warm)
   //   - then a few real frames with nothing culled, for what only drawing builds: the weapon lights' shadow maps (their
   //     depth shaders, one for each kind of thing that casts) and the evidence outlines' passes.
-  // The programs go to the graphics driver all at once and it builds them side by side (KHR_parallel_shader_compile:
-  // asked for, then waited on frame by frame, so the veil keeps moving: warmStep), and they're kept for good (pinned), so
+  // The programs go to the graphics driver all at once and it builds them side by side (three's compile asks for them and
+  // looks at none till it's first used; each program's isReady() asks KHR_parallel_shader_compile without waiting, as
+  // compileAsync does: waited on frame by frame, so the veil keeps moving: warmStep), and they're kept for good (pinned), so
   // the next level, or the hangar, finds most of them built. The light counts every program is built for never change:
   // every dynamic light is one of a fixed pool, always in the scene, dark when it's not in use (muzzleLights, blastLights,
   // spots; vmMuzzle, vmPts, vmSpots in the gun's scene).
   _kit: null as null | { world: THREE.Group; vm: THREE.Group; vmClip: THREE.Group },
-  _empty: undefined as THREE.Scene | undefined,
   _warm: null as null | RWarm,
   _pinned: new Set<any>(),
   warmStats: null as null | { programs: number; ms: number; waitMs: number; frames: number },
@@ -1558,8 +1593,7 @@ const G_R = {
     const r = this.renderer;
     if (!r || !this.scene || !this.camera) { if (done) done(); return; }
     if (this._warm) this._warmEnd(); // (one still going: put the scene back as it was first)
-    const gl = r.getContext(), ext = gl.getExtension('KHR_parallel_shader_compile');
-    const W: RWarm = (this._warm = { t0: performance.now(), tWait: 0, ext, done: done || null, tasks: [], stage: 0, frames: 0, undo: [], progs: [], mats: new Set() });
+    const W: RWarm = (this._warm = { t0: performance.now(), tWait: 0, done: done || null, tasks: [], stage: 0, frames: 0, undo: [], had: new Set(r.info.programs || []) });
     const extras: THREE.Object3D[] = [];
     const put = (m: THREE.Object3D | null | undefined) => { if (m) { m.position.set(0, -50, 0); this.dynRoot.add(m); extras.push(m); } };
     try {
@@ -1585,39 +1619,57 @@ const G_R = {
     });
     // each place things are drawn, one compile a task: (scene, camera, what it's drawn into, the layer a pass draws and the
     // material it draws everything in, if it's such a pass)
-    // (three.js compiles for the clipping planes the last thing drawn had: a stock in your hands has one. Drawing nothing
-    // sets them to the renderer's own, none, or here one, for the stocks)
-    const empty = this._empty || (this._empty = new THREE.Scene()), clipAt = (n: number) => { r.clippingPlanes = n ? [new THREE.Plane()] : []; r.render(empty, this.camera); r.clippingPlanes = []; };
     // (away: another scene the world's samples are drawn in, the TVs' sets: they go there for it)
-    const compile = (scene: THREE.Scene, cam: THREE.Camera, target: THREE.WebGLRenderTarget | null, layer?: number, over?: THREE.Material, clip = 0, away = false) => W.tasks.push(() => {
-      if (away) scene.add(kit.world);
-      clipAt(clip);
-      const swapped: [any, THREE.Material][] = [];
-      scene.traverse((o: any) => { const m = o.material; if (m) for (const x of Array.isArray(m) ? m : [m]) W.mats.add(x); });
-      if (over) W.mats.add(over);
-      if (layer != null) {
-        kit.world.traverse((o) => o.layers.enable(layer));
-        cam.layers.set(layer);
-        if (over) scene.traverse((o: any) => { if (o.material && o.layers.test(cam.layers)) { swapped.push([o, o.material]); o.material = over; } });
+    // (a plain place is compiled a piece at a time, each with the whole scene's lights and fog (compile's target scene), so no
+    // frame takes more than a few dozen programs: the scene's children, a big one's children, and theirs. A piece holds no
+    // light: compile counts a piece's lights on top of its target scene's, and would build for the wrong number)
+    const lit = (o: THREE.Object3D) => { let f = false; o.traverse((x) => { if ((x as THREE.Light).isLight) f = true; }); return f; };
+    const compile = (scene: THREE.Scene, cam: THREE.Camera, target: THREE.WebGLRenderTarget | null, layer?: number, over?: THREE.Material, away = false) => {
+      if (layer == null && !away) {
+        const bare = new Set<THREE.Object3D>(); // (compiled without its children, which are pieces of their own)
+        const split = (o: THREE.Object3D, d: number): THREE.Object3D[] => {
+          if ((o as THREE.Light).isLight) return [];
+          if (!lit(o) && (o.children.length <= 8 || d >= 3)) return [o];
+          bare.add(o); return [o, ...o.children.flatMap((c) => split(c, d + 1))];
+        };
+        const pieces = scene.children.flatMap((c) => split(c, 0));
+        for (const c of pieces) W.tasks.push(() => {
+          const kids = bare.has(c) ? c.children.splice(0) : null;
+          try { r.setRenderTarget(target); r.compile(c, cam, scene); } catch (e) { console.warn('warmup', e); }
+          if (kids) c.children.push(...kids);
+          r.setRenderTarget(null);
+        });
+        return;
       }
-      try { r.setRenderTarget(target); r.compile(scene, cam); } catch (e) { console.warn('warmup', e); }
-      r.setRenderTarget(null);
-      for (const [o, m] of swapped) o.material = m;
-      if (layer != null) { cam.layers.set(0); kit.world.traverse((o) => o.layers.disable(layer)); }
-      if (away) this.dynRoot.add(kit.world);
-      if (clip) clipAt(0);
-    });
+      W.tasks.push(() => {
+        if (away) scene.add(kit.world);
+        const swapped: [any, THREE.Material][] = [];
+        if (layer != null) {
+          kit.world.traverse((o) => o.layers.enable(layer));
+          cam.layers.set(layer);
+          if (over) scene.traverse((o: any) => { if (o.material && o.layers.test(cam.layers)) { swapped.push([o, o.material]); o.material = over; } });
+        }
+        // (into a target: three builds what's drawn into one for it, from the target that's set. compile, not compileAsync: that
+        // asks after the programs straight away, and on ANGLE the question waits for the driver to have translated every shader
+        // just handed over, a 0.2-0.6 s stall a task; the asking's done below, a frame at a time, once they're all handed over)
+        try { r.setRenderTarget(target); r.compile(scene, cam); } catch (e) { console.warn('warmup', e); }
+        r.setRenderTarget(null);
+        for (const [o, m] of swapped) o.material = m;
+        if (layer != null) { cam.layers.set(0); kit.world.traverse((o) => o.layers.disable(layer)); }
+        if (away) this.dynRoot.add(kit.world);
+      });
+    };
     compile(this.scene, this.camera, null);
     compile(this.vmScene, this.camera, null);
     // (the stocks: in a scene of their own with the same lights as the gun's, so only they are built cut)
     const vmClip = new THREE.Scene(); vmClip.environment = this.vmScene.environment; vmClip.add(kit.vmClip);
     this.vmScene.traverse((l: any) => { if (l.isLight) vmClip.add(l.isSpotLight ? new THREE.SpotLight() : l.isPointLight ? new THREE.PointLight() : l.isDirectionalLight ? new THREE.DirectionalLight() : l.isHemisphereLight ? new THREE.HemisphereLight() : new THREE.AmbientLight()); });
-    compile(vmClip, this.camera, null, undefined, undefined, 1);
+    compile(vmClip, this.camera, null);
     // (anything drawn into a texture is a different shader from the same thing on the screen: the scope's picture, for all
     // of the scene's materials, whatever gun you've got now, since you can pick one up; the fisheye's is the same)
     compile(this.scene, this.camera, this.pipRT!);
     compile(this.fishScene!, this.fishCam!, null);
-    if (G.Highlights && G.Highlights.warm) G.Highlights.warm((scene, cam, target, layer, over) => compile(scene, cam, target, layer, over, 0, true));
+    if (G.Highlights && G.Highlights.warm) G.Highlights.warm((scene, cam, target, layer, over) => compile(scene, cam, target, layer, over, true));
     G.Game.veilSay('Compiling shaders');
   },
   // A frame of the warmup (from the game's loop): true while it's going, and nothing should be drawn. The compiles, as many
@@ -1625,33 +1677,26 @@ const G_R = {
   warmStep() {
     const W = this._warm;
     if (!W) return false;
-    const r = this.renderer, gl = r.getContext(), progs = (r.info.programs || []) as any[];
+    const r = this.renderer;
     W.frames++;
     if (W.stage === 0) {
-      // Three.js asks the driver how a program went (whether it linked, where its inputs are) as soon as it's made, which
-      // waits for it to be built: one after another. With the driver building them side by side, those questions wait
-      // till they're all done (below): till then a new program answers with nothing (PH_UNIFORMS), and nothing's drawn.
-      const t = performance.now(), had = Object.prototype.hasOwnProperty.call(progs, 'push'), push = progs.push;
-      if (W.ext) {
-        r.debug.checkShaderErrors = false;
-        progs.push = function (this: any[], ...ps: any[]) { for (const p of ps) { W.progs.push(p); p._getUniforms = p.getUniforms; p.getUniforms = () => PH_UNIFORMS; } return push.apply(this, ps); };
-      }
-      try { while (W.tasks.length && performance.now() - t < 12) W.tasks.shift()!(); }
-      finally { r.debug.checkShaderErrors = true; if (had) progs.push = push; else delete (progs as any).push; }
+      const t = performance.now();
+      while (W.tasks.length && performance.now() - t < 12) W.tasks.shift()!();
       if (!W.tasks.length) { W.stage = 1; W.tWait = performance.now(); }
       return true;
     }
     if (W.stage === 1) {
-      const left = W.progs.filter((p) => !gl.getProgramParameter(p.program, W.ext.COMPLETION_STATUS_KHR)).length;
-      if (left && performance.now() - W.tWait < 20000) { G.Game.veilSay(`Compiling shaders ${W.progs.length - left} / ${W.progs.length}`); return true; }
-      // (built: the questions asked now that they're quick, and every material compiled made to look its program up again
-      // the next time it's drawn, with its real inputs)
-      for (const p of W.progs) {
-        p.getUniforms = p._getUniforms; delete p._getUniforms;
-        if (!gl.getProgramParameter(p.program, gl.LINK_STATUS)) console.error('THREE.WebGLProgram: shader error', p.name, gl.getProgramInfoLog(p.program));
-        else { p.getUniforms(); p.getAttributes(); }
-      }
-      if (W.progs.length) for (const m of W.mats) { const mp = r.properties.get(m) as any; mp.currentProgram = null; mp.__version = undefined; }
+      // (every program built since it began, a material's for the scope's picture or the TVs' as well as its last one, which
+      // is all compileAsync would wait for: so the first frame that draws one doesn't stand and wait)
+      const progs = ((r.info.programs || []) as any[]).filter((p) => !W.had.has(p)), left = progs.filter((p) => !p.isReady()).length;
+      if (left && performance.now() - W.tWait < 20000) { G.Game.veilSay(`Compiling shaders ${progs.length - left} / ${progs.length}`); return true; }
+      // (built: then what three asks of a program the first time it's used, whether it linked and where its inputs are, a
+      // few dozen calls that each wait on the driver: asked here, 50 ms of them a frame, not in the first frame that
+      // looks through a scope)
+      const t = performance.now();
+      W.ask = W.ask || progs;
+      while (W.ask.length && performance.now() - t < 50) { const p = W.ask.pop(); p.getUniforms(); p.getAttributes(); }
+      if (W.ask.length) return true;
       W.stage = 2;
       W.waitMs = performance.now() - W.tWait;
       return true;
@@ -1669,10 +1714,6 @@ const G_R = {
     if (!W) return;
     this._warm = null;
     for (const f of W.undo) f();
-    // (cut short, a new level started under it: what was asked of the driver put right first)
-    const cut = W.progs.filter((p) => p._getUniforms);
-    for (const p of cut) { p.getUniforms = p._getUniforms; delete p._getUniforms; }
-    if (cut.length) for (const m of W.mats) { const mp = r.properties.get(m) as any; mp.currentProgram = null; mp.__version = undefined; }
     // (kept for good: three.js lets a program go when the last material using it does, and the next level would build it again)
     let n = 0;
     for (const p of (r.info.programs || []) as any[]) if (!this._pinned.has(p)) { this._pinned.add(p); p.usedTimes++; n++; }
@@ -1767,12 +1808,12 @@ const G_R = {
     r.clearDepth();
     r.clearStencil(); // reflex sight windows mark the stencil for their reticles
     // the gun's own light, as much as there is where you stand (eyeLight): its lights and what its metal reflects
-    const ek = this.eyeLight(), envd: [THREE.MeshStandardMaterial, number][] = [];
+    // (what its metal reflects: three takes the scene's figure for a material lit by the scene's environment, not the material's own)
+    const ek = this.eyeLight();
     for (const [l, k] of this.vmLights) l.intensity = k * ek;
-    if (ek < 1) this.vmRoot.traverse((o: any) => { const ms = o.isMesh ? (Array.isArray(o.material) ? o.material : [o.material]) : []; for (const mt of ms) if (mt.isMeshStandardMaterial && !mt.envMap) { envd.push([mt, mt.envMapIntensity]); mt.envMapIntensity *= ek; } });
+    this.vmScene.environmentIntensity = ek;
     if (nv) this.nvRT!.texture.generateMipmaps = true;
     r.render(this.vmScene, this.camera);
-    for (let i = envd.length - 1; i >= 0; i--) envd[i][0].envMapIntensity = envd[i][1]; // (materials the gunsmith's and the icons' pictures share)
     if (nv) { LU.lgNv.value.w = 0; this._heatPass(this.camera, this.nvHeat!, true); this._nvComposite(); }
     G.LightGrid.on(false);
     r.info.autoReset = true;

@@ -328,7 +328,7 @@ const G_Viewmodel = (() => {
     if (reticle === 'thermal') return thermalLens(g, o, def);
     const mat = new T.ShaderMaterial({
       uniforms: { map: { value: G.R.pipTexture() }, live: { value: 0 }, eye: { value: new T.Vector2() }, ret: { value: PIP_RETICLE[reticle] || 0 }, illum: { value: new T.Color(PIP_ILLUM[reticle] || 0) }, rmap: { value: reticle === 'bdc' ? bdcTex(def) : reticle === 'range' ? rangeTex(rangeHolds(def, { def, clicks: 0, ammo: G.ballFor(G.calOf(def)) }).holds) : null }, pmil: { value: 1 }, calc: { value: def.calc || 0 }, dmap: { value: null }, poi: { value: new T.Vector3() } },
-      vertexShader: PIP_VS, fragmentShader: PIP_FS, extensions: { derivatives: true }, toneMapped: false, // (it rolls off the picture itself: bpTone)
+      vertexShader: PIP_VS, fragmentShader: PIP_FS, toneMapped: false, // (it rolls off the picture itself: bpTone)
     });
     const disk = new T.Mesh(new T.CircleGeometry(o.r, 48), mat);
     const parent = typeof o.parent === 'string' ? g.getObjectByName(o.parent) : o.parent;

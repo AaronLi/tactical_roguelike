@@ -572,7 +572,7 @@ const G_Highlights = (() => {
     P.clips = R.clips.slice().sort((a, b) => a.t - b.t); P.stats = new Map(R.stats); P.actors = new Map(R.actors); P.levelN = R.level; P.theme = R.theme;
     P.fired = new Map(R.fired); P.kgun = new Map(R.kgun); P.glass = R.glass.slice();
   }
-  function disposeNodes(nodes: THREE.Object3D[]) { for (const n of nodes || []) n.traverse((c: any) => { if (c.geometry) c.geometry.dispose(); if (c.material) (Array.isArray(c.material) ? c.material : [c.material]).forEach((m: any) => { if (m.map) m.map.dispose(); m.dispose(); }); }); }
+  function disposeNodes(nodes: THREE.Object3D[]) { for (const n of nodes || []) n.traverse((c: any) => { if (c.isBatchedMesh && c._matricesTexture) c.dispose(); if (c.geometry) c.geometry.dispose(); if (c.material) (Array.isArray(c.material) ? c.material : [c.material]).forEach((m: any) => { if (m.map) m.map.dispose(); m.dispose(); }); }); }
   function drop() {
     if (P.level) { disposeNodes(P.level.children.slice()); P.level = null; }
     P.map = null as unknown as LvMap; P.clips = []; clearRigs();
@@ -636,8 +636,8 @@ const G_Highlights = (() => {
   function stage() {
     P.scene = new T.Scene(); P.scene.background = new T.Color(0x1a2028);
     P.scene.add(P.level!);
-    P.scene.add(new T.HemisphereLight(0xe8f0ff, 0x4a4038, 1.05));
-    const dl = new T.DirectionalLight(0xffffff, 0.55); dl.position.set(0.4, 1, 0.3); P.scene.add(dl);
+    P.scene.add(new T.HemisphereLight(0xe8f0ff, 0x4a4038, Math.PI * 1.05));
+    const dl = new T.DirectionalLight(0xffffff, Math.PI * 0.55); dl.position.set(0.4, 1, 0.3); P.scene.add(dl);
     P.cam = new T.PerspectiveCamera(60, 16 / 9, 0.05, 200);
     P.scene.add(P.fxRoot = new T.Group());
     P.debris = G.Scars.debris(P.scene, (x: number, z: number, y: number) => floorAt(x, z, y));
@@ -887,7 +887,7 @@ const G_Highlights = (() => {
       if (s.kind === 'ad' && s.store && typeof s.store.left === 'number') { const n = s.store.left; s.store.left = () => n; }
       P.prog.push(s);
     }
-    const cv = new OffscreenCanvas(W, H), R2 = new T.WebGLRenderer({ canvas: cv, antialias: false, preserveDrawingBuffer: false });
+    const cv = new OffscreenCanvas(W, H), R2 = new T.WebGLRenderer({ canvas: cv, antialias: false, stencil: true, preserveDrawingBuffer: false });
     G.R.renderer = R2;
     P.rt = new T.WebGLRenderTarget(W, H, { samples: 2 });
     P.cv = new OffscreenCanvas(W, H) as unknown as HTMLCanvasElement; P.g = P.cv.getContext('2d')!;
@@ -2068,16 +2068,16 @@ const G_Highlights = (() => {
   function buildXray() {
     P.xs = new T.Scene(); P.xs.background = new T.Color(0x03101c);
     const grid = new T.GridHelper(6, 24, 0x1d6a8a, 0x0c3044); P.xs.add(grid);
-    P.xs.add(new T.HemisphereLight(0xcfe8ff, 0x10202a, 1.2));
+    P.xs.add(new T.HemisphereLight(0xcfe8ff, 0x10202a, Math.PI * 1.2));
     P.xcam = new T.PerspectiveCamera(36, 16 / 9, 0.05, 50);
   }
   // the gear room's stand: a turntable under studio lights, the gun on it (its model shared: js/gunmodels.ts world)
   function gearScene() {
     if (!P.gs) {
       P.gs = new T.Scene(); P.gs.background = new T.Color(0x0b1220);
-      P.gs.add(new T.HemisphereLight(0xdfe8ff, 0x1a1410, 1.1));
-      const key = new T.DirectionalLight(0xffffff, 1.0); key.position.set(1, 2, 1.5); P.gs.add(key);
-      const rim = new T.DirectionalLight(0xff9a40, 0.7); rim.position.set(-2, 1, -1.5); P.gs.add(rim);
+      P.gs.add(new T.HemisphereLight(0xdfe8ff, 0x1a1410, Math.PI * 1.1));
+      const key = new T.DirectionalLight(0xffffff, Math.PI * 1.0); key.position.set(1, 2, 1.5); P.gs.add(key);
+      const rim = new T.DirectionalLight(0xff9a40, Math.PI * 0.7); rim.position.set(-2, 1, -1.5); P.gs.add(rim);
       const disc = new T.Mesh(new T.CylinderGeometry(0.75, 0.8, 0.06, 40), new T.MeshStandardMaterial({ color: 0x1a2230, roughness: 0.4, metalness: 0.6 })); disc.position.y = -0.3; P.gs.add(disc);
       const ring = new T.Mesh(new T.TorusGeometry(0.78, 0.012, 8, 60), new T.MeshBasicMaterial({ color: 0xffb21a })); ring.rotation.x = Math.PI / 2; ring.position.y = -0.27; P.gs.add(ring);
       P.gpiv = new T.Group(); P.gs.add(P.gpiv);
@@ -2410,8 +2410,8 @@ const G_Highlights = (() => {
   }
   function acStage() {
     const sc = new T.Scene(); sc.background = new T.Color(0x03101c);
-    sc.add(new T.HemisphereLight(0xdfeeff, 0x182430, 1.5));
-    const key = new T.DirectionalLight(0xffffff, 1.1); key.position.set(1, 2, 3); sc.add(key);
+    sc.add(new T.HemisphereLight(0xdfeeff, 0x182430, Math.PI * 1.5));
+    const key = new T.DirectionalLight(0xffffff, Math.PI * 1.1); key.position.set(1, 2, 3); sc.add(key);
     const grid = new T.GridHelper(24, 96, 0x1d6a8a, 0x0c3044); grid.position.y = -0.62; sc.add(grid);
     // the round: a jacketed slug, its nose along +x
     const prof = [[0, 0.5], [0.13, 0.42], [0.27, 0.27], [0.4, 0.05], [0.5, -0.2], [0.5, -0.5], [0, -0.5]].map(([x, y]) => new T.Vector2(x, y));
@@ -3156,7 +3156,7 @@ const G_Highlights = (() => {
     fl.events.forEach((e, i: number) => {
       if (e.k === 'x' || e.x > x + 0.01 || !e.name) return;
       v.copy(e.p).project(P.cam);
-      if (v.z > 1) return;
+      if (G.R.behind(v, P.cam)) return;
       const out = fl.events.slice(i + 1).find((q) => q.k === 'x'), vIn = fl.pts[e.i].v, vOut = e.k === 'r' ? (fl.pts[e.i + 1] || fl.pts[e.i]).v : out ? fl.pts[out.i].v : vIn;
       const px = G.U.clamp((v.x + 1) / 2 * W, 150, W - 150), py = G.U.clamp((1 - v.y) / 2 * H - 44, 130, H - 130), ice = e.k === 'r';
       const inc = ice ? Math.round(Math.asin(Math.min(1, Math.abs(fl.dirAt(Math.max(0, e.x - 0.05)).dot(new T.Vector3(...e.n))))) * 180 / Math.PI) : 0;

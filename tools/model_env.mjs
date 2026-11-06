@@ -2,6 +2,7 @@
 // The gun recipes are bake-time code (tools/models/*.ts, tsconfig.tools.json -> dist/tools/tools/models): this file is what loads them, next to the game's data.
 import fs from 'fs'; import vm from 'vm'; import path from 'path'; import { fileURLToPath } from 'url';
 import * as THREE_NS from 'three';
+import { useExtrudeR149 } from './extrude_r149.mjs';
 import { loadAuthoredInto } from './bake_authored.mjs';
 import { loadAuthoredPartsInto } from './authored_parts.mjs';
 
@@ -24,6 +25,7 @@ export function loadModels() {
 /** The game's data and gun-building files, on the node build of three (ONE copy: the game's and the exporter's). */
 export function loadGame(withModels = false, extra = {}) {
   const THREE = { ...THREE_NS };
+  useExtrudeR149(THREE); // (the recipes' extrusions as three r149 made them: tools/extrude_r149.mjs)
   const ctx2d = new Proxy({}, { get: (t, k) => (k in t ? t[k] : () => ({ addColorStop() {} })), set: (t, k, v) => { t[k] = v; return true; } });
   const document = { createElement: () => ({ width: 64, height: 64, getContext: () => ctx2d, style: {} }) };
   const ctx = { console, Math, JSON, Set, Map, WeakMap, Object, Array, Number, String, Boolean, Uint8Array, Int8Array, Int16Array, Int32Array, Uint16Array, Uint32Array, Float32Array, Float64Array, Infinity, NaN, isFinite, parseInt, parseFloat, Error, Symbol, Date, Proxy, Reflect, THREE, document, performance };
@@ -41,7 +43,7 @@ export function loadGame(withModels = false, extra = {}) {
 
 /**
  * The game as loadGame() gives it, plus js/glb.js running the way it does in the browser with ?bakedGuns: a G.GLB made of three's own GLTFLoader (on the
- * files under assets/models, with the meshopt decoder) and a fetch that reads those files. For tests that assemble guns from the packs (check_models_assembly.mjs).
+ * files under assets/models, with the meshopt decoder, and the game's own dequantize after it) and a fetch that reads those files. For tests that assemble guns from the packs (check_models_assembly.mjs).
  */
 export async function loadGameWithModels() {
   const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
@@ -56,7 +58,7 @@ export async function loadGameWithModels() {
   });
   G.GLB = {
     ready: Promise.resolve(true),
-    load: (url) => { if (!cache.has(url)) cache.set(url, G.Bundles.getFile(url).then((ab) => new Promise((res, rej) => loader.parse(ab, '', (g) => res(g.scene), rej)))); return cache.get(url); },
+    load: (url) => { if (!cache.has(url)) cache.set(url, G.Bundles.getFile(url).then((ab) => new Promise((res, rej) => loader.parse(ab, '', (g) => res(G.Models.dequantize(g.scene)), rej)))); return cache.get(url); },
   };
   return G;
 }

@@ -858,7 +858,7 @@ const G_Damage = (() => {
     const gr = c.createRadialGradient(hx, hy, 2, hx, hy, 30); gr.addColorStop(0, 'rgba(255,255,255,0.95)'); gr.addColorStop(0.6, 'rgba(240,248,252,0.6)'); gr.addColorStop(1, 'rgba(240,248,252,0)');
     c.fillStyle = gr; c.beginPath(); c.arc(hx, hy, 30, 0, 7); c.fill();
     c.globalCompositeOperation = 'destination-out'; c.beginPath(); c.arc(hx, hy, 5, 0, 7); c.fill();
-    const tex = new T.CanvasTexture(cv); if (T.sRGBEncoding) tex.encoding = T.sRGBEncoding;
+    const tex = new T.CanvasTexture(cv);
     const m = new T.Mesh(new T.PlaneGeometry(A, H), new T.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, side: T.DoubleSide }));
     m.position.set((b.min.x + b.max.x) / 2, (b.min.y + b.max.y) / 2, (b.min.z + b.max.z) / 2); if (side) m.rotation.y = Math.PI / 2;
     m.renderOrder = 3; pane.add(m); pane.userData.crack = m;

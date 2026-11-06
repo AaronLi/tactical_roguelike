@@ -12,9 +12,9 @@ const G_MenuShow = (() => {
 
   function stage() {
     const scene = new T.Scene(); scene.background = new T.Color(0x000000); // (black: the gun alone, lit, nothing under it)
-    scene.add(new T.HemisphereLight(0xdfe8ff, 0x1a1410, 1.1));
-    const key = new T.DirectionalLight(0xffffff, 1.0); key.position.set(1, 2, 1.5); scene.add(key);
-    const rim = new T.DirectionalLight(0xff9a40, 0.7); rim.position.set(-2, 1, -1.5); scene.add(rim);
+    scene.add(new T.HemisphereLight(0xdfe8ff, 0x1a1410, Math.PI * 1.1));
+    const key = new T.DirectionalLight(0xffffff, Math.PI * 1.0); key.position.set(1, 2, 1.5); scene.add(key);
+    const rim = new T.DirectionalLight(0xff9a40, Math.PI * 0.7); rim.position.set(-2, 1, -1.5); scene.add(rim);
     const pivot = new T.Group(); scene.add(pivot);
     const cam = new T.PerspectiveCamera(30, 16 / 9, 0.02, 50); scene.add(cam);
     // the fade: a black card just in front of the lens

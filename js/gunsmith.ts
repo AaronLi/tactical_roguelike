@@ -30,10 +30,10 @@ const G_GunsmithUI = (() => {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     scene = new T.Scene();
     scene.environment = G.R._envMap(renderer);
-    scene.add(new T.HemisphereLight(0xe8eef5, 0x2a2622, 1.0));
-    const key = new T.DirectionalLight(0xffffff, 1.3); key.position.set(1, 2, 1.5); scene.add(key);
-    const fill = new T.DirectionalLight(0xffffff, 0.6); fill.position.set(-1, 0.6, 1.5); scene.add(fill);
-    const rim = new T.DirectionalLight(0x9fc0ff, 0.5); rim.position.set(-1.5, 0.5, -1); scene.add(rim);
+    scene.add(new T.HemisphereLight(0xe8eef5, 0x2a2622, Math.PI * 1.0));
+    const key = new T.DirectionalLight(0xffffff, Math.PI * 1.3); key.position.set(1, 2, 1.5); scene.add(key);
+    const fill = new T.DirectionalLight(0xffffff, Math.PI * 0.6); fill.position.set(-1, 0.6, 1.5); scene.add(fill);
+    const rim = new T.DirectionalLight(0x9fc0ff, Math.PI * 0.5); rim.position.set(-1.5, 0.5, -1); scene.add(rim);
     camera = new T.PerspectiveCamera(30, 1, 0.01, 20);
     let drag: { x: number, y: number, moved: number } | null = null;
     canvas.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY, moved: 0 }; canvas.setPointerCapture(e.pointerId); view.auto = false; });

@@ -204,7 +204,7 @@ says the same), but not whose: the shooter's name isn't shown.
   and blasts are still real lights.
   - **Colour is handled physically** (`js/util.ts`): every colour written down (a hex, a canvas, a loaded picture)
     is sRGB, decoded to linear before it's lit, lit in linear (light adds up as light does), and encoded back to sRGB
-    on the way to the screen (three's colour management, `outputEncoding` sRGB on every renderer). Before, three's
+    on the way to the screen (three's colour management, `outputColorSpace` sRGB on every renderer). Before, three's
     legacy mode lit the sRGB numbers as they were: a saturated colour under a bright lamp went fluorescent, and the
     falloff into shadow was a cliff. Lamp colours are tints of white picked by eye, so they're taken as written
     (decoded, a warm white's blue drops by a third and every room goes amber); the hemisphere fill is squared, so

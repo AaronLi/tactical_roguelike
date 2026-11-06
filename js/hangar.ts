@@ -310,6 +310,27 @@ const G_Hangar = (() => {
     zones(); workshop(); outfitters(); store(); stash(); nightjar(); lounge(); helicopter(); if (G.Range) G.Range.build(S.root, S, { box, M, signMat, canvasTex, addTarget }); outline();
     if (G.Highlights) G.Highlights.mount(S.root, { addTarget }); // (the TVs, showing the level just played, F to record it: js/highlights.ts)
     refresh(true);
+    batch();
+  }
+  // The hall's fixtures (the floor's markings, the benches, counters, shelves, the stash's cage, the rails, the bear and
+  // the canoe, the range's lines and posts...) drawn a BatchedMesh a material, as a level's are (js/level.ts batchStatic):
+  // about half the hangar's draw calls. Not anything that's kept hold of to be moved or changed later, nor what's under it:
+  // what's on show and turning, its sign, the vending machines' slots, the pouch shelf, the helicopter (its rotors), the
+  // people, the range's plates, carriers and screens, the course's stage, the TVs.
+  //   (G.Level.batchStatic leaves alone anything with a material of its own, as a sign's or a screen's is.)
+  function batch() {
+    const keep = new Set<THREE.Object3D>(), hold = (o: unknown, d = 0) => {
+      if (!o || typeof o !== 'object' || d > 2) return;
+      if ((o as THREE.Object3D).isObject3D) { keep.add(o as THREE.Object3D); return; }
+      for (const v of Array.isArray(o) ? o : Object.values(o)) if (v && typeof v === 'object') hold(v, d + 1);
+    };
+    for (const t of S.targets) hold(t);
+    hold(S.rigs.map((r) => r.rig.root)); hold(S.vend); hold(S.heli); hold(S.pouchSlots); hold(S.hl);
+    if (G.Range) { hold(G.Range.S.tg); hold(G.Range.S.lanes); }
+    if (G.Course) { const C = G.Course.S; hold([C.grp, C.tg, C.board, C.screens]); }
+    if (G.Highlights && (G.Highlights as any).P) hold((G.Highlights as any).P.tvs);
+    keep.delete(S.root);
+    G.Level.batchStatic(S.root, keep);
   }
   function leave() {
     if (G.Range) G.Range.leave();
