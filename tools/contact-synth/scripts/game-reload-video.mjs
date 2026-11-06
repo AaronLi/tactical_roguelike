@@ -60,12 +60,10 @@ await page.evaluate(async () => {
   const g = G.Game; let lk = true; Object.defineProperty(g, 'locked', { get: () => lk, set: () => {}, configurable: true });
   for (const el of ['pause', 'clickToPlay']) { const e = g.$(el); if (e) e.classList.add('hidden'); }
   G.Game.setMuted(true);
-  const m = G.Me, map = G.Game.map, wd = map.world;
-  const ray = (x, z, yaw, y) => G.World.raycast(wd, x, y, z, -Math.sin(yaw), 0, -Math.cos(yaw), 60).t;
-  const spots = [[m.pos.x, m.pos.z], ...(map.enemySpots || []).filter((p) => !p[2])];
-  let best = -1, at = null;
-  for (const [x, z] of spots) for (let i = 0; i < 32; i++) { const yaw = (i / 32) * Math.PI * 2, t = Math.min(ray(x, z, yaw, 1.6), ray(x, z, yaw, 0.9)); if (t > best) { best = t; at = [x, z, yaw]; } }
-  m.pos.x = at[0]; m.pos.z = at[1]; m.yaw = at[2]; m.pitch = -0.02; if (m.vel) m.vel.set(0, 0, 0);
+  // Stay in the spawn room, where it's lit; the game's level-start banner and objectives off (they fade on
+  // real time, which the stepped clock doesn't run).
+  const m = G.Me; m.pitch = -0.05; if (m.vel) m.vel.set(0, 0, 0);
+  const css = document.createElement('style'); css.textContent = '#toast,#levelInfo,#objective{display:none!important}'; document.head.appendChild(css);
   // The MK18: the AR-15 carbine with the short barrel fitted.
   const build = Object.assign({}, G.Gunsmith.compile('m4').build, { barrel: 'm4.br.short' });
   m.weapons.p = m.makeWeapon('m4', build); m.slot = null; m.swap('p');
@@ -76,7 +74,7 @@ await page.evaluate(async () => {
   // captions
   const cap = document.createElement('div');
   cap.id = 'cap';
-  cap.style.cssText = 'position:fixed;left:50%;top:7%;transform:translateX(-50%);z-index:50;text-align:center;font:600 24px system-ui,sans-serif;color:#fff;text-shadow:0 2px 6px #000;pointer-events:none';
+  cap.style.cssText = 'position:fixed;left:50%;top:5%;transform:translateX(-50%);z-index:50;text-align:center;font:600 24px system-ui,sans-serif;color:#fff;text-shadow:0 2px 6px #000;pointer-events:none';
   document.body.appendChild(cap);
   window.__caption = (a, b) => { cap.innerHTML = `${a}<div style="font-size:17px;font-weight:500;opacity:.85;margin-top:4px">${b}</div>`; };
   // the moments, logged on the stepped clock
@@ -101,6 +99,14 @@ await page.evaluate(async () => {
   window.__clock.on();
 });
 console.log('in the level, the MK18 drawn');
+// --still <frames>: step that many frames, save one picture, stop (to check the framing)
+if (opt('still', null) !== null) {
+  for (let i = 0; i < +opt('still'); i++) await page.evaluate(() => window.__step());
+  await page.screenshot({ path: out, type: 'jpeg', quality: 90 });
+  await browser.close();
+  console.log('wrote', out);
+  process.exit(0);
+}
 
 // ---------- the sequence, frame by frame ----------
 const ff = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-c:v', 'mjpeg', '-r', String(FPS), '-i', '-', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '20', '-preset', 'medium', join(mkdtempSync(join(tmpdir(), 'gv-')), 'v.mp4')], { stdio: ['pipe', 'inherit', 'inherit'] });
