@@ -738,7 +738,7 @@ function makeArMagIn(fill) {
         // and through the lower it's mounted in. It engages as the slot reaches it, just before the
         // magazine stops on the well: a crisp tick first, then the softer bottoming, then the magazine
         // settles back onto the catch. (Landing after the bottoming, it was swallowed by it.)
-        snap('mag catch snaps into the magazine', 0.101, -6, { strength: 0.6, preload: 0, seat: 0, seatDelay: 1 }, arMagCatch, body, { coil: { level: 0.15, length: 1.5, dispersion: 0.3, decay: 0.025, brightness: 7000 }, ...SHEET_EDGE }),
+        snap('mag catch snaps into the magazine', 0.101, -2, { strength: 0.75, preload: 0, seat: 0, seatDelay: 1 }, arMagCatch, body, { coil: { level: 0.15, length: 1.5, dispersion: 0.3, decay: 0.025, brightness: 7000 }, ...SHEET_EDGE }),
         hit('magazine bottoms in the well', 0.109, -10, 0.7 * v, panel, arMagWell, { scatter: 0.6, radius: 2, click: 0.6 }, SHEET_RATTLE),
         hit('magazine settles back onto the catch', 0.124, -15, 0.3, body, arMagCatch, { scatter: 0.3, radius: 2, click: 0.5 }),
         hit('magazine body rings', 0.1095, fill === 'loaded' ? -17 : -12, 0.6, body, arMagWell, { scatter: 0.3, radius: 3, click: 0.1, sharp: 0.7 }, own),
