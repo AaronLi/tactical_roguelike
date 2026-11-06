@@ -407,6 +407,71 @@ def magazine(parent_slot='mag'):
     rnd(-2.6 * mm, MAG_Y - 11.5 * mm, False)
     return pm
 
+# ===================================================================================== CLAW MOUNT (the gun's optic mount: slot optic, extras.mount)
+# The receiver has no rail: a Picatinny sight goes on a claw-mount rail, the pattern of B&T's low-profile MP5 mount (BT-21241: 138 mm long,
+# 40 mm across its clamps, 23.5 mm tall at most, 98 g; viewed, not downloaded, on its makers' and dealers' pages, with HK's own STANAG claw
+# mount on an MP5 for the claws and the locking lever): an aluminium deck the length of it with the rail along its top, lightened by a groove
+# down each side, and at each end a clamp block straddling the receiver's top, its claws hooked into the pair of recesses pressed there (four
+# recesses a side: receiver() above). The right jaw is the block's own, held by two cap screws; the left one is a separate jaw closed by a
+# throw lever lying along the side (the rear lever pointing forward, the front one back). It is the gun's OPTIC MOUNT (docs/models.md
+# "Authored models": slot optic with extras.mount): drawn whenever a rail sight is fitted, never with the drum and post alone; the sight stands
+# on its rail top at the platform's optF (mount_optic_rail .. mount_optic_rail_end).
+CLAW_REC = (F(600), F(640), F(780), F(820))          # the recesses (receiver(): their fore-and-aft centres)
+CM_LEN = 138 * mm
+CM0 = (CLAW_REC[0] + CLAW_REC[3]) / 2 - CM_LEN / 2  # the mount's rear and front, centred over the recesses
+CM1 = CM0 + CM_LEN
+CM_BLK = 36 * mm                                     # a clamp block's length (each covers one pair of recesses)
+CM_RT = TOP + 17.5 * mm                              # the rail's top: where the sight's foot stands (21.7 mm over the claws' tips)
+CM_DECK = CM_RT - 5.6 * mm                           # the deck's top, under the rail (blender_kit picatinny: 5.6 mm tall)
+CM_CLAW = TOP - 4.2 * mm                             # the claws' tips, under the recesses
+def claw_mount():
+    def mount(o): o['mount'] = True; return o
+    # the deck: its underside arched clear of the receiver's rounded top, its sides chamfered up to the rail
+    deck = [(-15.0 * mm, TOP - 1.0 * mm), (-12.5 * mm, TOP - 1.0 * mm), (-9.5 * mm, TOP + 0.8 * mm), (9.5 * mm, TOP + 0.8 * mm), (12.5 * mm, TOP - 1.0 * mm),
+            (15.0 * mm, TOP - 1.0 * mm), (15.0 * mm, CM_DECK - 2.0 * mm), (13.0 * mm, CM_DECK), (-13.0 * mm, CM_DECK), (-15.0 * mm, CM_DECK - 2.0 * mm)]
+    dk = K.tmp(prism(ccw(deck), 'y', CM0, CM1))
+    for s in (-1, 1):   # the lightening groove down each side, between the blocks
+        cut(dk, box(*xs(s * 13.6 * mm, s * 16 * mm), CM0 + CM_BLK + 5 * mm, CM1 - CM_BLK - 5 * mm, TOP + 3.0 * mm, TOP + 7.5 * mm))
+    bevel(dk, 0.7 * mm, 2, 35); smooth(dk); mount(K.adopt(dk, 'optic', 'black'))
+    # the rail along the top, the full length
+    mount(picatinny(K, CM0 + 1.5 * mm, CM1 - 1.5 * mm, CM_DECK, 'optic', 'black'))
+    for b0 in (CM0, CM1 - CM_BLK):
+        b1 = b0 + CM_BLK
+        rec = [f for f in CLAW_REC if b0 < f < b1]
+        # the block: right jaw and bridge in one, down to the claws on the right; on the left only down to the jaw's top (the jaw is separate)
+        blk = [(-17.0 * mm, TOP + 1.2 * mm), (-15.2 * mm, TOP + 1.2 * mm), (-15.2 * mm, TOP - 1.0 * mm), (-12.5 * mm, TOP - 1.0 * mm), (-9.5 * mm, TOP + 0.8 * mm),
+               (9.5 * mm, TOP + 0.8 * mm), (12.5 * mm, TOP - 1.0 * mm), (15.2 * mm, TOP - 1.0 * mm), (15.2 * mm, CM_CLAW), (20.0 * mm, CM_CLAW),
+               (20.0 * mm, CM_DECK - 3.5 * mm), (16.5 * mm, CM_DECK), (-16.5 * mm, CM_DECK), (-20.0 * mm, CM_DECK - 3.5 * mm), (-20.0 * mm, TOP + 4.5 * mm), (-17.0 * mm, TOP + 4.5 * mm)]
+        bk = K.tmp(prism(ccw(blk), 'y', b0, b1))
+        bevel(bk, 0.8 * mm, 2, 35); smooth(bk); mount(K.adopt(bk, 'optic', 'black'))
+        # the left jaw: a plate from under the block's left side down to the claws, a step in its top where the block overhangs it
+        jw = K.tmp(prism(ccw([(-20.0 * mm, CM_CLAW), (-15.2 * mm, CM_CLAW), (-15.2 * mm, TOP + 0.8 * mm), (-17.4 * mm, TOP + 0.8 * mm), (-17.4 * mm, TOP + 4.1 * mm), (-20.0 * mm, TOP + 4.1 * mm)]),
+                         'y', b0 + 1.5 * mm, b1 - 1.5 * mm))
+        bevel(jw, 0.6 * mm, 2, 35); smooth(jw); mount(K.adopt(jw, 'optic', 'gunmetal'))
+        # the claws: a finger off each jaw's inside into each recess (receiver(): x 12.6 to 14.4 mm, 1.4 to 3.6 mm under the top)
+        for f in rec:
+            for s in (-1, 1):
+                o = K.tmp(box(*xs(s * 12.9 * mm, s * 15.6 * mm), f - 2.1 * mm, f + 2.1 * mm, TOP - 3.4 * mm, TOP - 1.6 * mm)); bevel(o, 0.4 * mm, 1); smooth(o)
+                mount(K.adopt(o, 'optic', 'black' if s > 0 else 'gunmetal'))
+        # the right jaw's two cap screws (hex sockets), on its outside face
+        for f in (b0 + 9 * mm, b1 - 9 * mm):
+            o = K.tmp(cyl(2.8 * mm, 20.0 * mm - 0.2 * mm, 21.4 * mm, 'x', (f, TOP + 2.0 * mm), 18))
+            cut(o, cyl(1.3 * mm, 20.6 * mm, 21.6 * mm, 'x', (f, TOP + 2.0 * mm), 6)); smooth(o); mount(K.adopt(o, 'optic', 'steel'))
+        # the deck's screws into the block, on the shoulders beside the rail
+        for s in (-1, 1):
+            o = K.tmp(cyl(1.9 * mm, CM_DECK - 0.3 * mm, CM_DECK + 0.9 * mm, 'z', (s * 13.6 * mm, (b0 + b1) / 2), 14))
+            cut(o, cyl(0.9 * mm, CM_DECK + 0.3 * mm, CM_DECK + 1.0 * mm, 'z', (s * 13.6 * mm, (b0 + b1) / 2), 6)); smooth(o); mount(K.adopt(o, 'optic', 'steel'))
+        # the throw lever on the left jaw: its pivot boss at the block's middle, the arm lying along the side toward the mount's middle,
+        # a finger tab turned out at its tip
+        fc, zc, d = (b0 + b1) / 2, TOP + 0.5 * mm, 1 if b0 == CM0 else -1
+        o = K.obj(cyl(4.2 * mm, -22.4 * mm, -19.8 * mm, 'x', (fc, zc), 20), 'optic', 'black'); smooth(o); mount(o)
+        o = K.obj(cyl(1.6 * mm, -22.9 * mm, -22.2 * mm, 'x', (fc, zc), 12), 'optic', 'steel'); smooth(o); mount(o)
+        tip = fc + d * 30 * mm
+        arm = K.tmp(rprism([(fc, zc - 3.6 * mm), (tip, zc - 1.6 * mm), (tip + d * 3.0 * mm, zc + 0.4 * mm), (tip, zc + 2.6 * mm), (fc, zc + 3.6 * mm)] if d > 0 else
+                           [(fc, zc + 3.6 * mm), (tip, zc + 2.6 * mm), (tip + d * 3.0 * mm, zc + 0.4 * mm), (tip, zc - 1.6 * mm), (fc, zc - 3.6 * mm)], -22.2 * mm, -20.2 * mm))
+        bevel(arm, 0.6 * mm, 2, 35); smooth(arm); mount(K.adopt(arm, 'optic', 'black'))
+        o = K.tmp(box(-24.6 * mm, -20.6 * mm, *xs(tip - d * 4.0 * mm, tip + d * 1.5 * mm), zc - 1.4 * mm, zc + 2.4 * mm)); bevel(o, 0.7 * mm, 2, 35); smooth(o); mount(K.adopt(o, 'optic', 'black'))
+
 # ===================================================================================== ASSEMBLY
 receiver()
 housing()
@@ -423,6 +488,7 @@ if SD:
 else:
     mp5_front()
     END, MOUNT_MUZZLE, MOUNT_BARREL, POST = MUZ, FSH1, FSH1 - 8 * mm, POST_F
+claw_mount()                                 # (last: the meshes before it keep their names)
 
 # ===================================================================================== info and anchors
 info = {
@@ -439,6 +505,7 @@ info = {
 }
 anchors = {
     'mount_optic': [round(F(512), 4), round(TOP, 4), 0], 'mount_optic_end': [round(F(798), 4), round(TOP, 4), 0],   # (the claw mount's span on the receiver's top)
+    'mount_optic_rail': [round(CM0, 4), round(CM_RT, 4), 0], 'mount_optic_rail_end': [round(CM1, 4), round(CM_RT, 4), 0],    # (the claw mount's rail: where a sight stands)
     'mount_handguard': [round(HG0, 4), 0, 0], 'mount_handguard_end': [round(FSH0, 4), 0, 0],
     'mount_barrel': [round(MOUNT_BARREL, 4), 0, 0], 'mount_muzzle': [round(MOUNT_MUZZLE, 4), 0, 0],
     'mount_stock': [0, -0.002, 0], 'mount_grip': [round(F(601), 4), round(U(248), 4), 0],

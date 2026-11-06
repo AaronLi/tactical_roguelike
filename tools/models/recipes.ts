@@ -1031,11 +1031,17 @@ const G_GunRecipes = (() => {
       if (o.siderails) for (const x of [-1, 1]) sideRail(k, L * 0.58, L * 0.38, -0.004, x * (Wd / 2 + 0.0035)); // (a short rail each side of the front: an MP7's)
       if (o.optic && !(['irons', 'notch', 'bead', 'none'] as (string | undefined)[]).includes(o.optic)) { rcvTop = top; top = k.under('optic', () => S.rail(k, L * 0.15, L * 0.7, top, rm)); } // (the optic's rail: it is there only with one)
     } else if (rcv === 'authored') {
-      // A gun made in Blender: the receiver is the model's own. With an optic (or a riser, A.sights.rail), a rail along the model's optic mount
+      // A gun made in Blender: the receiver is the model's own. With an optic (or a riser, A.sights.rail), a rail along the model's optic mount, or
+      // the model's own adapter (A.rig.mount: the MP5's claw mount, its meshes extras.mount), the sight on its rail
       authored(k, A!, (e) => e.slot === 'base' && !e.part);
       if (A!.hinge) authored(k, A!, (e) => e.slot === 'base' && !!e.part); // (a gun with a reload sequence has its moving parts as nodes: the latch is the receiver's)
       top = A!.rig.top;
-      if (o.optic && (!ownIrons || A!.sights.rail.includes(o.optic))) { rcvTop = top; if (!A!.sights.railed) top = k.under('optic', () => S.rail(k, A!.rig.rail[0], A!.rig.rail[1] - A!.rig.rail[0], top, rm)); } // (railed: the model's receiver top is the rail)
+      if (o.optic && (!ownIrons || A!.sights.rail.includes(o.optic))) {
+        rcvTop = top;
+        const mt = A!.rig.mount;
+        if (mt) top = k.under('optic', () => k.at('mount', () => { authored(k, A!, (e) => !!e.mount); return mt.top; })); // (a mount piece, optic@mount, like the rail it replaces)
+        else if (!A!.sights.railed) top = k.under('optic', () => S.rail(k, A!.rig.rail[0], A!.rig.rail[1] - A!.rig.rail[0], top, rm)); // (railed: the model's receiver top is the rail)
+      }
     } else if (rcv === 'round') {
       if (tr) { tracedParts(k, tr, VT, 'base', mats); top = VT([0, tr.topY])[1]; } // (the 870's: traced)
       else {
@@ -1607,7 +1613,7 @@ const G_GunRecipes = (() => {
     if (onBarrels) k.into(brk, L, hy);
     let sight: Sight;
     if (ownIrons) { // (its own aperture, the front post's on the barrel; a riser on the rail over the aperture, the irons still used)
-      authored(k, A!, (e) => e.slot === 'optic'); sight = { sy: A!.info.sy, fSight: A!.info.fSight, relief: A!.info.relief };
+      authored(k, A!, (e) => e.slot === 'optic' && !e.mount); sight = { sy: A!.info.sy, fSight: A!.info.fSight, relief: A!.info.relief };
       if (o.optic && A!.sights.rail.includes(o.optic)) k.at('mount', () => k.box(0.024, o.riser || 0.022, 0.034, M.black(), ofs - 0.017, top + (o.riser || 0.022) / 2));
     }
     else if (rcv === 'aug') {

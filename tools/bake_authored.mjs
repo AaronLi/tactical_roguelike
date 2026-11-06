@@ -106,6 +106,7 @@ function readScene(buf, rootName, label) {
         // model (js/gunrig.ts magCheck: a hole's rotation is the face's tilt there): its geometry in its node's own frame too (local), and that node's place and
         // rotation in the gun's (xf: p [x, y, z], q [x, y, z, w], three's axes)
         if (ex.chk) { e.chk = ex.chk; e.local = { pos: Float32Array.from(P), nrm: Nm ? Float32Array.from(Nm) : nrm.slice() }; e.xf = xfOf(W); }
+        if (ex.mount === true) e.mount = true; // (a piece of the gun's own optic mount: drawn under a rail sight, never with the irons)
         if (ex.role === 'tube') e.legacyTube = true; // (an older export: see below)
         meshes.push(e);
       }
@@ -135,7 +136,7 @@ export function toAuthoredGun(src) {
   return {
     src: `models/${src.id}/${src.id}.glb`, info, meshes: src.meshes, parts: src.parts || {}, hinge: src.hinge || null, sights: { builtin: src.cfg.sights.builtin.slice(), rail: src.cfg.sights.rail.slice(), meshless: !!src.cfg.sights.meshless, railed: !!src.cfg.sights.railed }, pistol, anchors: a, variants,
     rig: pistol ? { top: y('mount_optic'), rail: [f('mount_optic'), f('mount_optic_end')], hgF: 0, hgEnd: 0, end: info.muzzles[0][0], barrel: f('mount_barrel'), stockY: y('mount_stock'), gripY: y('mount_grip'), mag: [a.mount_mag[0], a.mount_mag[1]] }
-      : { top: a.mount_optic[1], rail: [f('mount_optic'), f('mount_optic_end')], hgF: f('mount_handguard'), hgEnd: f('mount_handguard_end'), end: f('mount_muzzle'), barrel: f('mount_barrel'), stockY: a.mount_stock[1], gripY: a.mount_grip[1], mag: [a.mount_mag[0], a.mount_mag[1]] },
+      : { top: a.mount_optic[1], rail: [f('mount_optic'), f('mount_optic_end')], mount: a.mount_optic_rail ? { top: a.mount_optic_rail[1], rail: [f('mount_optic_rail'), f('mount_optic_rail_end')] } : null, hgF: f('mount_handguard'), hgEnd: f('mount_handguard_end'), end: f('mount_muzzle'), barrel: f('mount_barrel'), stockY: a.mount_stock[1], gripY: a.mount_grip[1], mag: [a.mount_mag[0], a.mount_mag[1]] },
   };
 }
 /** Fills G.Authored (the vm's, tools/models/authored.ts) from every authored source. Call after the recipes are loaded. */
@@ -166,6 +167,7 @@ export function checkAuthored(Models, id, G = null) {
     const a = readAuthored(id), A = toAuthoredGun(a), spec = G.Gunsmith.modelSpec({ id, build: G.Gunsmith.defaultBuild(id) });
     if (spec.rcv !== 'authored' || spec.authored !== id) E(`js/parts.ts: the platform ${id} is an authored gun: its spec needs rcv: 'authored', authored: '${id}' (it says rcv ${spec.rcv}, authored ${spec.authored})`);
     if (!A.pistol && (spec.L == null || !near(spec.L, A.rig.hgF))) E(`js/parts.ts: ${id}'s spec L is ${spec.L}, the model's mount_handguard is ${A.rig.hgF}: the same point (where a handguard starts)`);
+    if (!A.pistol && A.rig.mount && !(spec.optF != null && spec.optF > A.rig.mount.rail[0] && spec.optF < A.rig.mount.rail[1])) E(`js/parts.ts: ${id}'s spec optF is ${spec.optF}: a sight stands at optF on the model's own optic mount, whose rail (mount_optic_rail .. mount_optic_rail_end) runs ${A.rig.mount.rail[0]} to ${A.rig.mount.rail[1]}`);
     const room = A.rig.hgEnd - A.rig.hgF - 0.003;
     if (!A.pistol && (spec.hgMax == null || Math.abs(spec.hgMax - room) > 1e-4)) E(`js/parts.ts: ${id}'s spec hgMax is ${spec.hgMax}, the model's mount_handguard_end - mount_handguard - 3 mm is ${room.toFixed(4)}: the longest handguard it takes (fit is data)`);
     if (A.pistol) { // the pistol anchor set (GUN_MODEL_CONTRACT.authored.pistol): each thing the platform fits has its anchor

@@ -95,6 +95,14 @@ expectA('authored: json-text extras are read (Blender)', (() => { const g = aGun
 { const g = aGun(); g.roots[0].extras.anchors.mount_optic = [0.01, 0.023]; expectA('authored: an anchor of the wrong shape', g, /anchors\.mount_optic: expected 3 numbers/); }
 { const g = aGun(); g.roots[0].extras.anchors.mount_handguard = [0.6, 0, 0]; expectA('authored: anchors out of order', g, /mount_handguard \(0\.6\) must be behind mount_handguard_end/); }
 { const g = aGun(); g.roots[0].extras.anchors.mount_mag = [0.3, -0.04, 0]; expectA('authored: mount_mag must be info.magAt', g, /mount_mag .* is not info\.magAt/); }
+// the gun's own optic mount (an MP5's claw mount): meshes of slot optic with extras.mount, and its rail
+const OM = (extra = {}) => mesh('optic_9', 'optic', 'black', { mount: true, ...extra }), RAIL = { mount_optic_rail: [0.02, 0.04, 0], mount_optic_rail_end: [0.16, 0.04, 0] };
+{ const g = aGun({}, [B(), mesh('barrel_2', 'barrel', 'black'), OM()]); Object.assign(g.roots[0].extras.anchors, RAIL); expectA('authored: an optic mount with its rail is valid', g, null); }
+expectA('authored: an optic mount needs its rail', aGun({}, [B(), mesh('barrel_2', 'barrel', 'black'), OM()]), /has an optic mount .* but not its rail/);
+{ const g = aGun(); Object.assign(g.roots[0].extras.anchors, RAIL); expectA('authored: a mount rail with no mount', g, /the model has none \(no mesh with extras\.mount\)/); }
+{ const g = aGun({}, [B(), mesh('barrel_2', 'barrel', 'black'), OM({ slot: 'base' })]); g.roots[0].children[2].name = 'base_9'; Object.assign(g.roots[0].extras.anchors, RAIL); expectA('authored: an optic mount is slot optic', g, /is slot optic, not "base"/); }
+{ const g = aGun({}, [B(), mesh('barrel_2', 'barrel', 'black'), OM()]); Object.assign(g.roots[0].extras.anchors, RAIL, { mount_optic_rail_end: [0.16, 0.041, 0] }); expectA('authored: an optic mount rail is level', g, /mount_optic_rail and mount_optic_rail_end differ in height/); }
+{ const g = aGun({}, [B(), mesh('barrel_2', 'barrel', 'black'), OM()]); Object.assign(g.roots[0].extras.anchors, { mount_optic_rail: [0.02, 0.02, 0], mount_optic_rail_end: [0.16, 0.02, 0] }); expectA('authored: an optic mount rail is over the receiver', g, /must be above the receiver's top/); }
 expectA('authored: a factory slot with no meshes', aGun(), /the platform's default build fits a handguard, but the model has no mesh in slot "handguard"/, { factory: ['barrel', 'handguard'] });
 expectA('authored: info is still the contract', aGun({ info: { speling: 1 } }), /info\.speling: unknown field/);
 { const r = M.validateAuthoredConfig({ source: 'authored', sights: { builtin: ['irons'], rail: ['riser'] } }); if (r.some((e) => /not in sights\.builtin/.test(e))) console.log('ok   authored: model.json rail kinds must be builtin'); else { bad++; console.error('FAIL model.json rail check: ' + r); } }
