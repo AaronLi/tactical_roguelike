@@ -65,6 +65,21 @@ const G_Hangar = (() => {
 
   const S: HangarState = { root: null as unknown as THREE.Group, map: null as unknown as LvMap, targets: [], items: [], stands: [], rigs: [], crane: null, heli: null, vend: [], hover: null, hold: 0, hl: null, t: 0, vexQuip: 0, key: '', rosterKey: undefined, partStands: undefined, precStands: undefined, pouchSlots: undefined };
 
+  // The rockwork (fibreglass boulders stacked along the front wall, the bear's boulder, the pond's rim): each rock an
+  // icosphere, placed, turned and stretched (its matrix, in the hall's coordinates), and its colour. From a seed of its own,
+  // so what's drawn (outfitters) and the solids (decorate: rays meet each rock as drawn, js/world.ts hullOf) are the same.
+  let ROCKS: { m: number[]; c: number }[] | null = null, ROCK_G: THREE.BufferGeometry | null = null;
+  const rockG = () => ROCK_G || (ROCK_G = new THREE.IcosahedronGeometry(1, 1));
+  function rockwork() {
+    if (ROCKS) return ROCKS;
+    const T = THREE, O = OUT, rnd = G.U.rng(0x70c4e5), cols = [0x9a8468, 0x8a7a66, 0xa89276, 0x7a7064, 0xb09a7c], at: number[][] = [], m4 = new T.Matrix4(), e = new T.Euler();
+    for (let x = O.x0 + 0.3; x < O.x1; x += 0.9) for (let k = 0; k < 3; k++) at.push([x + (rnd() - 0.5) * 0.5, 0.35 + k * 0.85 + rnd() * 0.2, O.rocks + 0.55 + (rnd() - 0.5) * 0.3, 0.75 - k * 0.12 + rnd() * 0.25]);
+    for (let i = 0; i < 9; i++) { const a = rnd() * 6.28, d = rnd() * 0.7; at.push([O.bear[0] + Math.cos(a) * d, 0.2 + rnd() * 0.15, O.bear[1] + Math.sin(a) * d, 0.55 + rnd() * 0.25]); } // (the bear's boulder)
+    for (let x = O.pond[0]; x <= O.pond[2]; x += 0.6) at.push([x, 0.15, O.pond[1] + 0.15, 0.32 + rnd() * 0.12]); // (the pond's rim)
+    for (let z = O.pond[1]; z <= O.rocks; z += 0.6) for (const x of [O.pond[0], O.pond[2]]) at.push([x, 0.15, z, 0.32 + rnd() * 0.12]);
+    return (ROCKS = at.map(([x, y, z, s]) => ({ m: m4.compose(new T.Vector3(x, y, z), new T.Quaternion().setFromEuler(e.set(rnd() * 3, rnd() * 3, rnd() * 3)), new T.Vector3(s * (0.9 + rnd() * 0.4), s * (0.7 + rnd() * 0.3), s * (0.8 + rnd() * 0.3))).toArray(), c: cols[Math.floor(rnd() * cols.length)] })));
+  }
+
   // ------------------------------------------------------------------------ the solids (every machine's map has them)
   function decorate(map: LvMap) {
     const w = map.world, add = (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, o?: Record<string, unknown>) => G.World.add(w, G.World.box(x0, y0, z0 + RZ, x1, y1, z1 + RZ, Object.assign({ kind: 'prop' }, o || {})));
@@ -74,9 +89,19 @@ const G_Hangar = (() => {
     // the precision showcase: its stumps (and the air their pieces turn in), the rockwork, the pond, the bear on its boulder,
     // the pines, the log rails (gaps to walk in by: off the hall, and from the workshop)
     for (const z of OUT.rows) for (const x of OUT.xs) add(x - 0.44, 0, z - 0.44, x + 0.44, 1.5, z + 0.44);
-    add(OUT.x0, 0, OUT.rocks, OUT.x1, 2.8, OUT.z1);
-    add(OUT.pond[0], 0, OUT.pond[1], OUT.pond[2], 0.5, OUT.pond[3]);
-    add(OUT.bear[0] - 1.0, 0, OUT.bear[1] - 1.0, OUT.bear[0] + 1.0, 2.8, OUT.bear[1] + 1.0);
+    // (the rockwork: each rock as it's drawn for rays, and boxes fitted to it (20 cm columns) that stop you and that you don't climb; behind them
+    // the wall, and the pond: you can't walk into it, and a round meets its water)
+    const tri = (rockG().attributes.position as THREE.BufferAttribute).array, m4 = new THREE.Matrix4(), v = new THREE.Vector3();
+    for (const k of rockwork()) {
+      m4.fromArray(k.m);
+      const t: number[] = []; for (let i = 0; i < tri.length; i += 3) { v.set(tri[i], tri[i + 1], tri[i + 2]).applyMatrix4(m4); t.push(v.x, v.y, v.z + RZ); }
+      const h = G.World.hullOf(t, [[0, -1, 0, 0]], { kind: 'prop', move: false });
+      G.World.add(w, h);
+      for (const b of G.World.fitBoxes(h, 0, 0.2)) G.World.add(w, G.World.box(b[0], b[1], b[2], b[3], b[4], b[5], { kind: 'prop', ray: false, nostep: true }));
+    }
+    add(OUT.x0, 0, OUT.rocks + 0.6, OUT.x1, 2.8, OUT.z1, { ray: false }); // (behind the rocks, between them and the wall)
+    add(OUT.pond[0], 0, OUT.pond[1], OUT.pond[2], 0.5, OUT.pond[3], { ray: false }); add(OUT.pond[0], 0, OUT.pond[1], OUT.pond[2], 0.32, OUT.pond[3], { move: false });
+    add(OUT.bear[0] - 0.5, 0.4, OUT.bear[1] - 0.5, OUT.bear[0] + 0.5, 2.85, OUT.bear[1] + 0.5); // (the bear, up on its boulder: the boulder's its rocks)
     for (const [x, z] of OUT.pines) add(x - 0.35, 0, z - 0.35, x + 0.35, 3.2, z + 0.35);
     add(OUT.back, 0, OUT.z0 - 0.1, OUT.x1, 0.95, OUT.z0 + 0.1);
     add(OUT.x1 - 0.1, 0, OUT.z0, OUT.x1 + 0.1, 0.95, OUT.door[0]); add(OUT.x1 - 0.1, 0, OUT.door[1], OUT.x1 + 0.1, 0.95, OUT.rocks);
@@ -397,13 +422,8 @@ const G_Hangar = (() => {
     };
     rail(O.back, O.z0, O.x1, O.z0); rail(O.x1, O.z0, O.x1, O.door[0]); rail(O.x1, O.door[1], O.x1, O.rocks);
     // the rockwork along the front wall: fibreglass boulders stacked to above head height, sandstone and grey, a pine each end
-    const rockG = new T.IcosahedronGeometry(1, 1), cols = [0x9a8468, 0x8a7a66, 0xa89276, 0x7a7064, 0xb09a7c], rocks = [];
-    for (let x = O.x0 + 0.3; x < O.x1; x += 0.9) for (let k = 0; k < 3; k++) rocks.push([x + (rnd() - 0.5) * 0.5, 0.35 + k * 0.85 + rnd() * 0.2, O.rocks + 0.55 + (rnd() - 0.5) * 0.3, 0.75 - k * 0.12 + rnd() * 0.25]);
-    for (let i = 0; i < 9; i++) { const a = rnd() * 6.28, d = rnd() * 0.7; rocks.push([O.bear[0] + Math.cos(a) * d, 0.2 + rnd() * 0.15, O.bear[1] + Math.sin(a) * d, 0.55 + rnd() * 0.25]); } // (the bear's boulder)
-    for (let x = O.pond[0]; x <= O.pond[2]; x += 0.6) rocks.push([x, 0.15, O.pond[1] + 0.15, 0.32 + rnd() * 0.12]); // (the pond's rim)
-    for (let z = O.pond[1]; z <= O.rocks; z += 0.6) for (const x of [O.pond[0], O.pond[2]]) rocks.push([x, 0.15, z, 0.32 + rnd() * 0.12]);
-    const rk = new T.InstancedMesh(rockG, new T.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, flatShading: true }), rocks.length), m4 = new T.Matrix4(), q = new T.Quaternion(), e = new T.Euler(), col = new T.Color();
-    rocks.forEach(([x, y, z, s], i) => { m4.compose(new T.Vector3(x, y, z), q.setFromEuler(e.set(rnd() * 3, rnd() * 3, rnd() * 3)), new T.Vector3(s * (0.9 + rnd() * 0.4), s * (0.7 + rnd() * 0.3), s * (0.8 + rnd() * 0.3))); rk.setMatrixAt(i, m4); rk.setColorAt(i, col.setHex(cols[Math.floor(rnd() * cols.length)])); });
+    const rocks = rockwork(), rk = new T.InstancedMesh(rockG(), new T.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, flatShading: true }), rocks.length), m4 = new T.Matrix4(), col = new T.Color();
+    rocks.forEach((k, i) => { rk.setMatrixAt(i, m4.fromArray(k.m)); rk.setColorAt(i, col.setHex(k.c)); });
     r.add(rk);
     // the waterfall down the rocks into the pond, the pond, a lily pad or two
     const fx = (O.pond[0] + O.pond[2]) / 2 + 0.4;
