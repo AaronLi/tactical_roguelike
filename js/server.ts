@@ -1411,7 +1411,7 @@ const G_Server = {
   // officers do: js/medical.ts)
   BLEED_K: 0.5,
   // A thermobaric's injuries (e.tb: its burns and its blast, each a share of a life, js/player.ts tbDose), each a kind of harm of its own
-  // that goes on after the fireball, as a bleed does, and that cuffing them doesn't stop and nothing clots:
+  // that goes on after the fireball, as a bleed does, nothing clots, and only zip-tying them stops (they're out of harm's way then):
   //   burns: burn shock, the fluid the burned skin weeps away, faster the more of them is burned (BURN_K a second, of a person, for
   //     each share of a life the burns did)
   //   blast lung: the air sacs torn by the pressure, filling: less and less air, faster the harder the blast (LUNG_K likewise)
@@ -1421,13 +1421,13 @@ const G_Server = {
   TB_HARM: { BURN_K: 0.004, LUNG_K: 0.004 },
   tbRate(e: Enemy) { if (!e.tb) return 0; const H = this.TB_HARM, person = e.maxHp * (100 / e.def.hp); return (e.tb.burn * H.BURN_K + e.tb.blast * H.LUNG_K) * person; },
   injuryTick(e: Enemy, dt: number) {
+    if (e.state === 'cuffed') { e.bleedH = e.bleedL = 0; e.wnd = undefined; return false; } // (zip-tied: out of harm's way, applyHit)
     const tr = this.tbRate(e);
     if (tr > 0 && e.hp > 0) {
       e.hp -= tr * dt;
       if (!e.def.civ && e.morale != null) e.morale = Math.max(0, e.morale - dt * 0.6 * tr / e.maxHp);
       if (e.hp <= 0) { e.hp = 0.01; this.applyHit({ e: e.id, d: 1, bo: 1, cz: e.tb!.burn * this.TB_HARM.BURN_K >= e.tb!.blast * this.TB_HARM.LUNG_K ? 'burns' : 'blast' }, e.lastHit); return true; }
     }
-    if (e.state === 'cuffed') { e.bleedH = e.bleedL = 0; e.wnd = undefined; return false; }
     if (e.bleedL) { e.clotT = (e.clotT || 0) + dt; if (e.clotT > 30) { e.bleedL = 0; e.clotT = 0; } }
     const b = ((e.bleedH || 0) + (e.bleedL || 0)) * this.BLEED_K;
     if (!b) return false;
@@ -1498,6 +1498,7 @@ const G_Server = {
     if (this.phase !== 'level') return;
     const e = this.enemies.get(m.e);
     if (!e) return;
+    if (e.state === 'cuffed') return; // zip-tied: nothing hurts them any more (no round, chip, blast or fire, and no wound goes on: injuryTick)
     // the wounds, for injuries: the part, what the round did there (js/ballistics.ts effects), the side, the organs
     if (Array.isArray(m.w)) for (const w of m.w.slice(0, 12)) if (Array.isArray(w)) this.injure(e, String(w[0]), String(w[1] || ''), w[2], String(w[3] || ''));
     // wounds are a share of a standard person's life (tougher types have proportionally more), so lethality
