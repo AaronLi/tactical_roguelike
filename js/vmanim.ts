@@ -283,7 +283,7 @@ const G_VMAnim = (() => {
   const slapState = (t: number) => ({
     back: S(SLAP.grab, SLAP.pull, t) * (1 - S(SLAP.slap - 0.005, SLAP.home, t)),
     lock: S(SLAP.pull, SLAP.lock, t) * (1 - S(SLAP.slap - 0.02, SLAP.slap + 0.005, t)),
-    hand: S(0, SLAP.grab, t) * (1 - S(SLAP.lock, SLAP.mag0 + 0.06, t)) + S(SLAP.mag1 - 0.04, SLAP.mag1 + 0.03, t) * (1 - S(SLAP.home, SLAP.rest, t)), // (how much of the hand is on the handle)
+    hand: S(0, SLAP.grab, t) * (1 - S(SLAP.lock, SLAP.mag0 + 0.06, t)) + S(SLAP.mag1 - 0.055, SLAP.mag1 + 0.02, t) * (1 - S(SLAP.home, SLAP.rest, t)), // (how much of the hand is on the handle: straight there from the seated magazine, slapM)
   });
   const isSlap = (def: Def) => { const i = G.Models.infoOf(def); return !!(i && i.handle && i.handle.lock > 0 && !def.akimbo && kinds(def).reload === 'mag'); };
   // the grab point on the handle when it is back (0..1 of its slot) and turned up (0..1 of its lock): the point turned about the tube's axis (its x is 0, its height info.handle.y)
@@ -291,8 +291,16 @@ const G_VMAnim = (() => {
     const A = h.A, c = h.info.handle!.y, dx = A.H!.x, dy = A.H!.y - c, a = -h.lock * lock;
     return new T.Vector3(dx * Math.cos(a) - dy * Math.sin(a), dy * Math.cos(a) + dx * Math.sin(a) + c, A.H!.z + h.travel * back);
   }
+  // the magazine change runs to the moment the new one's pushed home (SEAT: its own clip's fraction there, by how the old one's
+  // stowed), just before the hand leaves for the handle; what's left of it (the gun levelled, the hand back to the handguard)
+  // plays after the slap, so the hand goes straight from the magazine to the handle with no rest on the handguard between
+  const slapSeat = (how: string) => (how === 'retain' || how === 'pouch' ? 0.78 : 0.7);
+  const slapM = (t: number, how: string) => {
+    const seat = slapSeat(how), end = SLAP.mag1 - 0.05;
+    return t < end ? seat * G.U.clamp((t - SLAP.mag0) / (end - SLAP.mag0), 0, 1) : seat + (1 - seat) * S(SLAP.slap, SLAP.rest, t);
+  };
   function slapClip(t: number, h: Rig, how: string) {
-    const A = h.A, st = slapState(t), m = G.U.clamp((t - SLAP.mag0) / (SLAP.mag1 - SLAP.mag0), 0, 1);
+    const A = h.A, st = slapState(t), m = slapM(t, how);
     const pose = magClip(m, h, false, how); // (the magazine change alone, between the lock and the slap; its tilt and its hand)
     pose.handle = st.back; pose.lock = st.lock; pose.open = h.travel * st.back; // (the bolt: off the chamber while the handle is back)
     // the left hand: on the handle, wherever it is, while it works it; on the magazine in between
@@ -921,7 +929,7 @@ const G_VMAnim = (() => {
     arm.glove.quaternion.copy(_q).multiply(RX);
   }
 
-  return { prepare, sample, apply, kinds, canMagCheck, actEvents, INSPECT_HOLD, SLAP, slapState, isSlap };
+  return { prepare, sample, apply, kinds, canMagCheck, actEvents, INSPECT_HOLD, SLAP, slapState, slapM, isSlap };
 })();
 G.VMAnim = G_VMAnim;
 
