@@ -572,7 +572,7 @@ const G_Highlights = (() => {
     P.clips = R.clips.slice().sort((a, b) => a.t - b.t); P.stats = new Map(R.stats); P.actors = new Map(R.actors); P.levelN = R.level; P.theme = R.theme;
     P.fired = new Map(R.fired); P.kgun = new Map(R.kgun); P.glass = R.glass.slice();
   }
-  function disposeNodes(nodes: THREE.Object3D[]) { for (const n of nodes || []) n.traverse((c: any) => { if (c.geometry) c.geometry.dispose(); if (c.material) (Array.isArray(c.material) ? c.material : [c.material]).forEach((m: any) => { if (m.map) m.map.dispose(); m.dispose(); }); }); }
+  function disposeNodes(nodes: THREE.Object3D[]) { for (const n of nodes || []) n.traverse((c: any) => { if (c.isBatchedMesh && c._matricesTexture) c.dispose(); if (c.geometry) c.geometry.dispose(); if (c.material) (Array.isArray(c.material) ? c.material : [c.material]).forEach((m: any) => { if (m.map) m.map.dispose(); m.dispose(); }); }); }
   function drop() {
     if (P.level) { disposeNodes(P.level.children.slice()); P.level = null; }
     P.map = null as unknown as LvMap; P.clips = []; clearRigs();

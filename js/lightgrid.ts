@@ -51,6 +51,9 @@ const G_LightGrid = (() => {
   const VS_HEAD = 'varying vec3 vLgP;\nvarying vec3 vLgN;\n';
   const VS_BODY = `
     { vec4 lgp = vec4(transformed, 1.0); vec3 lgn = objectNormal;
+      #ifdef USE_BATCHING
+      lgp = batchingMatrix * lgp; lgn = mat3(batchingMatrix) * lgn;
+      #endif
       #ifdef USE_INSTANCING
       lgp = instanceMatrix * lgp; lgn = mat3(instanceMatrix) * lgn;
       #endif

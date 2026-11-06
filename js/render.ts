@@ -322,6 +322,7 @@ const G_R = {
     for (const m of [...(this.decals || []), ...(this.bloodMarks || [])]) if (m.parent && m.parent !== this.scene) this.scene.add(m);
     const dispose = (o: THREE.Object3D) => {
       o.traverse((c: any) => {
+        if (c.isBatchedMesh && c._matricesTexture) c.dispose(); // (its geometry, and the textures of its instances' matrices)
         if (c.geometry) c.geometry.dispose();
         if (c.material && !c.userData.keepMat) (Array.isArray(c.material) ? c.material : [c.material]).forEach((m: THREE.Material & { map?: THREE.Texture | null }) => { if (m.map) m.map.dispose(); m.dispose(); }); // (keepMat: shared, js/scars.ts's)
       });
@@ -1252,7 +1253,12 @@ const G_R = {
   // the floor's own), a slow mottle over it, so a thermal picture has walls and floors to it)
   _heatMat(heat: number, d: number | null, opts: THREE.ShaderMaterialParameters = {}) {
     return new THREE.ShaderMaterial(Object.assign({ toneMapped: false, fog: false,
-      vertexShader: `varying float vD; varying vec3 vW; varying float vN; void main() { vec4 p = vec4(position, 1.0); vec3 n = normal;
+      vertexShader: `#include <batching_pars_vertex>
+        varying float vD; varying vec3 vW; varying float vN; void main() { vec4 p = vec4(position, 1.0); vec3 n = normal;
+        #include <batching_vertex>
+        #ifdef USE_BATCHING
+        p = batchingMatrix * p; n = mat3(batchingMatrix) * n;
+        #endif
         #ifdef USE_INSTANCING
         p = instanceMatrix * p; n = mat3(instanceMatrix) * n;
         #endif
