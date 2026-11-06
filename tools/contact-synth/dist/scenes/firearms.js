@@ -207,6 +207,28 @@ const LOWER_HOUSING = {
 // side (~2.5 mm pitch): it clicks over them whenever the carrier moves past.
 const arFaPawl = steelBar(1.5, 3);
 const gasKey = steelBar(3, 6);
+/**
+ * The charging handle is only loosely coupled to the carrier: its slot fits over the gas key with
+ * ~1 mm of play, and it sits in its channel in the upper with a little side play too. When it
+ * stops at either end of travel the carrier and gas key carry on a hair and it knocks back and
+ * forth in that play a few times, each bounce lighter and sooner (restitution ~0.7), before it
+ * settles. Out of the hand it rings a little more than when gripped.
+ */
+const chLoose = { ...arChargingHandle, damping: 0.5 };
+function handleRattle(t0, v0, gainDb, bounces, firstGap = 0.004) {
+    const els = [];
+    let t = t0, gap = firstGap, v = v0;
+    for (let i = 0; i < bounces; i++) {
+        t += gap;
+        // Alternate: the handle's slot knocks the gas key, then the handle knocks its channel.
+        els.push(i % 2 === 0
+            ? hit('charging handle rattles on the gas key', t, gainDb - i * 2.5, v, chLoose, gasKey, { scatter: 0.5, radius: 1.5, click: 0.7, sharp: 0.8 })
+            : hit('charging handle rattles in its channel', t, gainDb - 2 - i * 2.5, v, chLoose, arUpper, { scatter: 0.6, radius: 2, click: 0.6, sharp: 0.7 }));
+        gap *= 0.7;
+        v *= 0.7;
+    }
+    return els;
+}
 // What finally stops the carrier: the barrel extension, barrel and receiver. A thick steel
 // tube (~40 cm, ~6 mm wall) in the handguard: the low, heavy body of the slam.
 // Barrel (~16 mm steel rod, 40 cm) with the extension and upper: bends at ~500 Hz and up.
@@ -472,6 +494,8 @@ function arForward(t, withChargingHandle, mag = 'loaded') {
         // Let go, the charging handle rides home with the carrier and slams into its own front stop.
         els.push(hit('charging handle slams into its front stop', post(0.0581), 0, V(3.8), arChargingHandle, arUpper, { scatter: 0.4, radius: 3, click: 0.7 }));
         els.push(snap('charging handle latch catches', post(0.06), -9, { strength: 0.7, preload: 0, seat: 0.4, seatDelay: 2 }, arChLatch, arUpper));
+        // Free of the hand, it rattles in its play on the gas key and in its channel as it settles.
+        els.push(...handleRattle(post(0.0581), V(1.4), -1, 5, 0.008));
     }
     if (mag === 'loaded')
         return els;
@@ -647,6 +671,8 @@ function makeArCharge(mag) {
                 description: 'Full travel (3.7" ≈ 94 mm): the charging handle bottoms out; the bolt shifts inside the carrier.',
                 elements: [
                     hit('handle bottoms out', CH_END, -3, 2.0 * HAND, arChargingHandle, arUpper, { scatter: 0.4, radius: 3 }),
+                    // Still in the hand, so only a short, damped rattle as the carrier's gas key knocks in the slot.
+                    ...handleRattle(CH_END, 0.7 * HAND, -6, 3, 0.006),
                     hit('bolt shifts in the carrier', CH_END + 0.003, -14, 0.5 * HAND, arBolt, arCarrier, { scatter: 0.4, radius: 2 }),
                 ],
             },
