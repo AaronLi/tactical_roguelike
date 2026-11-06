@@ -807,6 +807,8 @@ function makeArMagIn(fill) {
         ],
     };
 }
+/** Time for the hand to pull the magazine clear of the well, s. */
+const MAG_PULL_T = 0.055;
 function makeArMagOut(fill) {
     const body = magShell(fill);
     const panel = magPanel(fill);
@@ -818,22 +820,22 @@ function makeArMagOut(fill) {
         // slowly out of the magazine's slot (a barely-there rub). The first real sound is the drop.
         snap('mag release button pressed in', 0, -26, { strength: 0.2, preload: 60, creak: 0.05, seat: 0.1, seatDelay: 1.5 }, arMagRelease, arLower),
         rub('mag catch pivots out of the magazine', 0.05, -34, { force: 3, duration: 0.012, speed: 0.05, profile: 'decelerate', roughness: 3, grain: 0.2, contactWidth: 0.03 }, arMagCatch, body),
-        // Free of the catch, the magazine starts from rest (a loaded one gets a small push from the
-        // stack pressing on the carrier): only a light shift off the catch, then it slides out of the well.
-        hit('magazine drops off the catch', 0.064, fill === 'loaded' ? -13 : -17, 0.25, panel, arMagWell, { scatter: 0.6, radius: 2, click: 0.6 }, withMagAir(SHEET_RATTLE, fill)),
-        // It falls under gravity alone: ~8 cm of well from rest takes sqrt(2 x 0.08 / 9.8) = 128 ms,
-        // leaving at ~1.25 m/s. The air column in the well grows as it drops (~1.2 cm -> ~8 cm,
-        // speeding up): its resonance falls. As the top clears the well, air rushes in: a small, low
-        // suction whump. From there it touches nothing.
-        { what: 'air column in the mag well grows', at: 0.065, gainDb: -13, sound: { kind: 'tube', fromCm: 1.2, toCm: 8, durationMs: 128, motion: 'accelerate', q: 2.5 } },
-        { what: 'air rushes in as the magazine clears', at: 0.193, gainDb: -20, sound: { kind: 'air', freq: 700, q: 0.7, attackMs: 0.5, decayMs: 7, pop: { freq: 140, ms: 6, level: 1.2 } } },
-        rub('magazine slides down out of the mag well', 0.065, -11, { force: 2, duration: 0.128, speed: 1.2, profile: 'accelerate', ...WORN_SLIDE }, panel, arMagWell, withMagAir(SHEET_BUZZ, fill)),
-        hit('magazine body rings as it drops', 0.0645, fill === 'loaded' ? -16 : -9, 0.6, body, arMagWell, { scatter: 0.3, radius: 3, click: 0.1, sharp: 0.7 }, own),
-        // Loose in the well as it drops: the shell clatters off the billet walls, the knocks spread
-        // evenly along the travel, so they come faster and harder as it falls, and stop once it's out.
-        ...[0.06, 0.18, 0.31, 0.45, 0.6, 0.76].map((x, i) => hit('magazine clatters against the well', 0.065 + 0.128 * Math.sqrt(x), -16 + i * 1.4, (0.15 + i * 0.04) * v, panel, arMagWell, WORN_KNOCK, withMagAir(SHEET_EDGE, fill))),
+        // The other hand already grips the magazine and pulls it the moment the catch lets go: it
+        // leaves the well in ~55 ms instead of falling for 128 ms (~8 cm at ~53 m/s^2, ~5 g, leaving
+        // at ~2.9 m/s). Gripped, the shell is damped and rings less than a free-falling one.
+        hit('magazine drops off the catch', 0.064, fill === 'loaded' ? -13 : -16, 0.35, panel, arMagWell, { scatter: 0.6, radius: 2, click: 0.6 }, withMagAir(SHEET_RATTLE, fill)),
+        // The air column in the well grows as it's pulled (~1.2 cm -> ~8 cm, speeding up): its
+        // resonance falls. As the top clears the well, air rushes in behind it: a quick, low suction
+        // whump, stronger for the faster exit. From there it touches nothing.
+        { what: 'air column in the mag well grows', at: 0.065, gainDb: -17, sound: { kind: 'tube', fromCm: 1.2, toCm: 8, durationMs: MAG_PULL_T * 1000, motion: 'accelerate', q: 2.5 } },
+        { what: 'air rushes in as the magazine clears', at: 0.065 + MAG_PULL_T, gainDb: -16, sound: { kind: 'air', freq: 700, q: 0.7, attackMs: 0.4, decayMs: 6, pop: { freq: 150, ms: 5, level: 1.4 } } },
+        rub('magazine slides down out of the mag well', 0.065, -14, { force: 3, duration: MAG_PULL_T, speed: 2.9, profile: 'accelerate', ...WORN_SLIDE }, panel, arMagWell, withMagAir(SHEET_BUZZ, fill)),
+        hit('magazine body rings as it drops', 0.0645, fill === 'loaded' ? -19 : -13, 0.6, { ...body, damping: Math.min(1, (body.damping ?? 0) + 0.25) }, arMagWell, { scatter: 0.3, radius: 3, click: 0.1, sharp: 0.7 }, own),
+        // Loose in the well as it's pulled: the shell knocks the billet walls, the knocks spread evenly
+        // along the travel, so they come faster and harder as it speeds up, and stop once it's out.
+        ...[0.08, 0.27, 0.5, 0.75].map((x, i) => hit('magazine clatters against the well', 0.065 + MAG_PULL_T * Math.sqrt(x), -15 + i * 1.5, (0.2 + i * 0.08) * v, panel, arMagWell, WORN_KNOCK, withMagAir(SHEET_EDGE, fill))),
         // The thumb lets go: the button and catch spring back out.
-        snap('mag release button springs back', 0.22, -10, { strength: 0.5, preload: 0, seat: 0.3, seatDelay: 1.5 }, arMagRelease, arLower, { coil: { level: 0.25, length: 2, dispersion: 0.35, decay: 0.05, brightness: 5000 } }),
+        snap('mag release button springs back', 0.16, -10, { strength: 0.5, preload: 0, seat: 0.3, seatDelay: 1.5 }, arMagRelease, arLower, { coil: { level: 0.25, length: 2, dispersion: 0.35, decay: 0.05, brightness: 5000 } }),
     ];
     if (fill === 'loaded') {
         els.push(hit('rounds shift in the falling magazine', 0.0655, -16, 0.4, arCase, arNextRound, { scatter: 0.3, radius: 3, click: 0.5 }, IN_LOADED_MAG));
