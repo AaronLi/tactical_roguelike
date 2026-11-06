@@ -5,7 +5,8 @@
 //   los / see: whether a can see b (and how well, through intact glass)
 //   resolve: a standing cylinder pushed out of whatever it walked into (stepping up onto anything low enough)
 //   groundAt / ceilingAt: the surface under someone's feet, and over their head
-// A solid is an axis-aligned box for now ({ min: [x, y, z], max: [x, y, z] }), with what it is (kind: 'wall',
+// A solid is an axis-aligned box ({ min: [x, y, z], max: [x, y, z] }), or a convex shape inside its box (hull: the planes
+// round it, a rock's: hullOf) that rays meet as it is, with what it is (kind: 'wall',
 // 'floor', 'ceil', 'door', 'leaf', 'glass', 'prop', 'step', ...) and how it behaves: move (it stops people),
 // ray (it stops rays), plus anything its owner needs (door, glass id, prop). Doors and windows are dynamic:
 // their solids change as they open, close and break.
@@ -60,6 +61,95 @@ const G_World = (() => {
   // a solid's new shape (a door swinging, say)
   function reshape(w: WorldT, s: Solid, min: number[], max: number[]) { unlink(w, s); s.min = min; s.max = max; insert(w, s); }
   const box = (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, o?: any) => Object.assign({ min: [x0, y0, z0], max: [x1, y1, z1] }, o || {});
+
+  // A convex solid (a rock): its faces' planes, [nx, ny, nz, d] (inside where n.p <= d), from its triangles (flat
+  // [x, y, z] corners, nine to a face, as a mesh draws them) and any planes more (cut: a floor it's cut off at). Its box is round
+  // its corners, inside the cuts. Rays, sight and a round's way through it are the shape's own (hullHit); what stops people is
+  // boxes (its owner's: fitBoxes fits them to it).
+  function hullOf(tris: ArrayLike<number>, cut: number[][] = [], o?: any): Solid {
+    const P: number[][] = [], n = tris.length / 3;
+    let cx = 0, cy = 0, cz = 0;
+    for (let i = 0; i < tris.length; i += 3) { cx += tris[i]; cy += tris[i + 1]; cz += tris[i + 2]; }
+    cx /= n; cy /= n; cz /= n;
+    for (let i = 0; i + 8 < tris.length; i += 9) {
+      const ax = tris[i], ay = tris[i + 1], az = tris[i + 2], ux = tris[i + 3] - ax, uy = tris[i + 4] - ay, uz = tris[i + 5] - az, vx = tris[i + 6] - ax, vy = tris[i + 7] - ay, vz = tris[i + 8] - az;
+      let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+      const l = Math.hypot(nx, ny, nz);
+      if (l < 1e-12) continue;
+      nx /= l; ny /= l; nz /= l;
+      if (nx * (ax - cx) + ny * (ay - cy) + nz * (az - cz) < 0) { nx = -nx; ny = -ny; nz = -nz; } // (outward)
+      P.push([nx, ny, nz, nx * ax + ny * ay + nz * az]);
+    }
+    P.push(...cut);
+    const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
+    for (let i = 0; i < tris.length; i += 3) for (let a = 0; a < 3; a++) { min[a] = Math.min(min[a], tris[i + a]); max[a] = Math.max(max[a], tris[i + a]); }
+    for (const q of cut) for (let a = 0; a < 3; a++) if (Math.abs(Math.abs(q[a]) - 1) < 1e-9) { if (q[a] > 0) max[a] = Math.min(max[a], q[3]); else min[a] = Math.max(min[a], -q[3]); } // (cut along an axis: its box too)
+    return Object.assign({ min, max, hull: P }, o || {});
+  }
+  // a ray against a convex solid's planes: where it goes in (and that face's normal) and comes out (and that one's), or null
+  function hullHit(o: number[], d: number[], P: number[][]) {
+    let t0 = -Infinity, t1 = Infinity, n0: number[] | null = null, n1: number[] | null = null;
+    for (const q of P) {
+      const dn = q[0] * d[0] + q[1] * d[1] + q[2] * d[2], dist = q[3] - (q[0] * o[0] + q[1] * o[1] + q[2] * o[2]);
+      if (Math.abs(dn) < 1e-12) { if (dist < 0) return null; continue; }
+      const t = dist / dn;
+      if (dn < 0) { if (t > t0) { t0 = t; n0 = q; } } else if (t < t1) { t1 = t; n1 = q; }
+      if (t0 > t1) return null;
+    }
+    if (t1 < 0 || !Number.isFinite(t1)) return null;
+    return { t: Math.max(0, t0), n: n0 ? [n0[0], n0[1], n0[2]] : [0, 1, 0], out: t1, nOut: n1 ? [n1[0], n1[1], n1[2]] : [0, 1, 0] }; // (starting inside it: as slab has it)
+  }
+  // Boxes filling a convex solid h (hullOf's), for people to bump into: [x0, y0, z0, x1, y1, z1] each, from the floor (y0) up.
+  // In slabs, the first up to about a step over the floor and the rest about 20 cm each; in each, a column of cells (cell
+  // metres on a side) counts if the shape is anywhere between the slab's bottom and top straight up through the cell's middle
+  // (so the boxes are within half a cell of the shape's side, at its widest in the slab). Runs of cells along x are merged, and
+  // the same run in the row after, and the same box in the slab over it. (A rock's: js/furniture.ts boulder, js/hangar.ts.)
+  function fitBoxes(h: Solid, y0 = h.min[1], cell = 0.1) {
+    const P = h.hull!, top = h.max[1], nx = Math.max(1, Math.ceil((h.max[0] - h.min[0]) / cell)), nz = Math.max(1, Math.ceil((h.max[2] - h.min[2]) / cell));
+    const x0 = (h.min[0] + h.max[0] - nx * cell) / 2, z0 = (h.min[2] + h.max[2] - nz * cell) / 2;
+    const base = Math.min(top, y0 + 0.36), up = top - base > 0.08 ? Math.max(1, Math.round((top - base) / 0.2)) : 0, edges = [y0, up ? base : top];
+    for (let i = 1; i <= up; i++) edges.push(base + (top - base) * i / up);
+    // where the shape is up a column: from where it goes in to where it comes out
+    const span = new Float64Array(nx * nz * 2);
+    for (let iz = 0; iz < nz; iz++) for (let ix = 0; ix < nx; ix++) {
+      const x = x0 + (ix + 0.5) * cell, z = z0 + (iz + 0.5) * cell;
+      let lo = -Infinity, hi = Infinity;
+      for (const q of P) {
+        const k = q[3] - q[0] * x - q[2] * z;
+        if (Math.abs(q[1]) < 1e-9) { if (k < 0) hi = -Infinity; } else if (q[1] > 0) hi = Math.min(hi, k / q[1]); else lo = Math.max(lo, k / q[1]);
+      }
+      span[(iz * nx + ix) * 2] = lo; span[(iz * nx + ix) * 2 + 1] = hi;
+    }
+    const there = (ix: number, iz: number, a: number, b: number) => { const i = (iz * nx + ix) * 2; return span[i] < span[i + 1] && span[i] < b && span[i + 1] > a; };
+    const out: number[][] = [], open = new Map<string, number[]>(); // (open: the boxes still growing upward, by their footprint)
+    for (let iy = 0; iy + 1 < edges.length; iy++) {
+      const here = new Set<string>(), rects: number[][] = [];
+      let rows: number[][] = [];
+      for (let iz = 0; iz < nz; iz++) { // a row of runs along x, merged with the same run in the row before it
+        const next: number[][] = [];
+        for (let ix = 0, run = -1; ix <= nx; ix++) {
+          const on = ix < nx && there(ix, iz, edges[iy], edges[iy + 1]);
+          if (on && run < 0) run = ix;
+          if (!on && run >= 0) { const prev = rows.find((q) => q[0] === run && q[1] === ix && q[3] === iz); if (prev) { prev[3] = iz + 1; next.push(prev); } else { const q = [run, ix, iz, iz + 1]; rects.push(q); next.push(q); } run = -1; }
+        }
+        rows = next;
+      }
+      for (const q of rects) {
+        const key = q.join(','), grown = open.get(key);
+        here.add(key);
+        if (grown) grown[4] = edges[iy + 1]; else { const bx = [x0 + q[0] * cell, edges[iy], z0 + q[2] * cell, x0 + q[1] * cell, edges[iy + 1], z0 + q[3] * cell]; out.push(bx); open.set(key, bx); }
+      }
+      for (const key of [...open.keys()]) if (!here.has(key)) open.delete(key);
+    }
+    return out;
+  }
+  // whether solid s takes up any of the box [min, max] (a convex one: unless the box is all outside one of its faces)
+  function touches(s: Solid, min: number[], max: number[]) {
+    if (!(s.max[0] > min[0] && s.min[0] < max[0] && s.max[1] > min[1] && s.min[1] < max[1] && s.max[2] > min[2] && s.min[2] < max[2])) return false;
+    if (!s.hull) return true;
+    for (const q of s.hull) if ((q[0] > 0 ? min[0] : max[0]) * q[0] + (q[1] > 0 ? min[1] : max[1]) * q[1] + (q[2] > 0 ? min[2] : max[2]) * q[2] > q[3]) return false;
+    return true;
+  }
 
   // ray vs box: the entry distance and the face's normal, or null
   function slab(o: number[], d: number[], s: Solid) {
@@ -127,7 +217,7 @@ const G_World = (() => {
         mark[id] = stamp;
         const s = w.solids[id];
         if (!s || !(mv ? s.move : s.ray || (bars && s.bars)) || (skip && skip(s))) continue;
-        const h = slab(o, d, s);
+        const h = s.hull ? (slab(o, d, s) && hullHit(o, d, s.hull)) : slab(o, d, s);
         if (!h || h.t > maxT) continue;
         if (s.bars && !mv && (!barHit(o, d, h, s) || h.t > maxT)) continue;
         // (shot through: down a hole in it there's nothing to meet, and a blind hole's met at its floor: js/damage.ts)
@@ -168,6 +258,7 @@ const G_World = (() => {
   const family = (s: Solid) => (s.kind === 'wall' || s.kind === 'lintel' ? 'w' : s.kind === 'floor' || s.kind === 'ceil' || s.kind === 'step' ? 'f' : null);
   function span(w: WorldT, s: Solid, o: { x: number, y: number, z: number }, d: { x: number, y: number, z: number }) {
     const O = [o.x, o.y, o.z], D = [d.x, d.y, d.z], fam = family(s), seen = new Set<Solid>([s]);
+    if (s.hull) { const h = hullHit(O, D, s.hull); if (h) return { t: h.out, n: h.nOut }; } // (a convex solid: out through its far face)
     const exit = (q: Solid) => { let t = Infinity, ax = 0; for (let a = 0; a < 3; a++) { if (Math.abs(D[a]) < 1e-9) continue; const tt = ((D[a] > 0 ? q.max[a] : q.min[a]) - O[a]) / D[a]; if (tt < t) { t = tt; ax = a; } } return { t, ax }; };
     let e = exit(s);
     for (let i = 0; fam && i < 16; i++) {
@@ -226,12 +317,15 @@ const G_World = (() => {
   // Someone standing at p (their feet), r round and h tall, pushed out of everything solid they overlap. What
   // they could step up onto (its top within `step` of their feet) doesn't stop them: groundAt lifts them onto it.
   // smooth: they walk stairs as slopes (rampAt): the steps of a flight they're on or walking onto don't stop them.
-  const STEP = 0.32, HEIGHT = 1.8;
+  // nostep: a solid that's never stepped up onto, however low its top (a rock's boxes: you'd climb it like stairs), only stood
+  // on once you're up on it (its top within NOSTEP of your feet)
+  const STEP = 0.32, HEIGHT = 1.8, NOSTEP = 0.02;
   function resolve(w: WorldT, p: { x: number, y: number, z: number }, r: number, h = HEIGHT, step = STEP, smooth = false) {
     const pass = smooth ? rampsFor(w, p, r, step) : null;
     for (let iter = 0; iter < 2; iter++) {
-      query(w, [p.x - r, p.y + step, p.z - r], [p.x + r, p.y + h, p.z + r], (s: Solid) => {
+      query(w, [p.x - r, p.y + Math.min(step, NOSTEP), p.z - r], [p.x + r, p.y + h, p.z + r], (s: Solid) => {
         if (!s.move || (pass && s.stair && pass.has(s.stair))) return;
+        if (s.max[1] <= p.y + (s.nostep ? NOSTEP : step)) return; // (low enough to step up onto; a rock's never is: only what you're stood on)
         const qx = G.U.clamp(p.x, s.min[0], s.max[0]), qz = G.U.clamp(p.z, s.min[2], s.max[2]);
         const ddx = p.x - qx, ddz = p.z - qz, d = Math.hypot(ddx, ddz);
         if (d >= r) return;
@@ -264,7 +358,7 @@ const G_World = (() => {
   function groundAt(w: WorldT, x: number, z: number, r: number, y: number, step = STEP, smooth = false) {
     let g = -Infinity;
     const k = r * 0.6;
-    query(w, [x - k, y - 50, z - k], [x + k, y + step, z + k], (s) => { if (s.move && !(smooth && s.stair) && s.max[1] <= y + step + 1e-6 && s.max[1] > g) g = s.max[1]; });
+    query(w, [x - k, y - 50, z - k], [x + k, y + step, z + k], (s) => { if (s.move && !(smooth && s.stair) && s.max[1] <= y + (s.nostep ? NOSTEP : step) + 1e-6 && s.max[1] > g) g = s.max[1]; });
     if (w.terrain) { const th = terrainUnder(w.terrain, x, z); if (th > g) g = th; } // (walked on as it lies: its blocks are for rays. There's nothing under it: anyone who's got under it is back up on it, not falling through it to the gorge's floor)
     if (smooth) for (const st of w.ramps || []) {
       const q = rampAt(st, x, z);
@@ -354,6 +448,8 @@ const G_World = (() => {
     for (const b of [[-E, 0, -E, 0, WH, H * TS + E], [W * TS, 0, -E, W * TS + E, WH, H * TS + E], [0, 0, -E, W * TS, WH, 0], [0, 0, H * TS, W * TS, WH, H * TS + E]]) { b[1] = Y - SK - (map.chasm || 0); b[4] += Y; add(w, box(...(b as [number, number, number, number, number, number]), { kind: 'wall', edge: true, ray: !map.chasm })); }
     // furniture and fences: each piece's boxes (a piece hangs on every tile it covers: once each)
     const fromB = (b: any, q: any, gy = b.gy || 0) => box(b.cx - b.hx, Y + gy + b.y0, b.cz - b.hz, b.cx + b.hx, Y + gy + b.h, b.cz + b.hz, q); // (gy: a piece on rolling ground)
+    // a piece's convex shape (its triangles: x and z where it stands, y up from its foot) stood at y0, and cut off there (the ground)
+    const hullAt = (tris: number[], y0: number, q: any) => { const v = tris.slice(); for (let i = 1; i < v.length; i += 3) v[i] += y0; return hullOf(v, [[0, -1, 0, -y0]], q); };
     // (each box once, with the piece it's part of: a cell two pieces share, or one piece's boxes overlap, holds them all
     // again, js/level.ts layProp)
     const seen = new Set<LvProp>(), seenB = new Set<LvBox>();
@@ -363,8 +459,10 @@ const G_World = (() => {
       for (const b of p.boxes) {
         if (seenB.has(b)) continue;
         seenB.add(b);
-        if (b.ray) { add(w, fromB(b, { kind: 'prop', prop: p, ray: false })); for (const q of b.ray) add(w, fromB(q, Object.assign({ kind: 'prop', prop: p, move: false }, q.m ? { mat: (G.Materials.PARTS as Record<string, any>)[q.m] } : null), b.gy || 0)); }
-        else add(w, fromB(b, { kind: 'prop', prop: p }));
+        // (open pieces: their ray boxes; a rock: its own shapes for rays, and for people boxes fitted inside them, b.walk)
+        const walk = b.walk ? { ray: false, nostep: true } : null;
+        if (b.ray) { add(w, fromB(b, Object.assign({ kind: 'prop', prop: p, ray: false }, walk))); for (const q of b.ray) add(w, q.hull ? hullAt(q.hull, Y + (b.gy || 0), { kind: 'prop', prop: p, move: false }) : fromB(q, Object.assign({ kind: 'prop', prop: p, move: false }, q.m ? { mat: (G.Materials.PARTS as Record<string, any>)[q.m] } : null), b.gy || 0)); }
+        else add(w, fromB(b, Object.assign({ kind: 'prop', prop: p }, walk)));
       }
     }
     // furniture tiles without a piece: a crate, or a fence post
@@ -435,7 +533,7 @@ const G_World = (() => {
     }
   }
 
-  return { CELL, STEP, HEIGHT, GLASS_SEE, create, add, remove, reshape, box, raycast, span, los, see, query, resolve, groundAt, terrainAt, terrainUnder, rampAt, ceilingAt, fromTileMap, stairs, door, windowSolids };
+  return { CELL, STEP, HEIGHT, GLASS_SEE, create, add, remove, reshape, box, hullOf, fitBoxes, touches, raycast, span, los, see, query, resolve, groundAt, terrainAt, terrainUnder, rampAt, ceilingAt, fromTileMap, stairs, door, windowSolids };
 })();
 G.World = G_World;
 

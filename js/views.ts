@@ -575,7 +575,7 @@ const G_Views = {
   NADE_R: 0.05, NADE_G: 14,
   nadeStep(n: VwNadeMotion, dt: number, map: LvMap | null) {
     const R = this.NADE_R, w = map && map.world, p = n.pos, v = n.vel;
-    const hits = (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number) => { if (!w) return y0 < 0; let h = false; G.World.query(w, [x0, y0, z0], [x1, y1, z1], (s) => { if (s.move || s.ray) h = true; }); return h; };
+    const hits = (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number) => { if (!w) return y0 < 0; let h = false; G.World.query(w, [x0, y0, z0], [x1, y1, z1], (s) => { if ((s.move || s.ray) && !(s.nostep && !s.ray) && (!s.hull || G.World.touches(s, [x0, y0, z0], [x1, y1, z1]))) h = true; }); return h; }; // (a rock: its own shape, not the boxes that stop people)
     const side = (x: number, y: number, z: number) => hits(x - R, y - R + 0.03, z - R, x + R, y + R, z + R); // (clear of the floor it's on)
     const below = (x: number, y: number, z: number) => hits(x - R + 0.01, y - R, z - R + 0.01, x + R - 0.01, y + R - 0.02, z + R - 0.01);
     const N = Math.max(1, Math.ceil(dt / (1 / 120))), h = dt / N;

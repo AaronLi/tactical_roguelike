@@ -30,11 +30,11 @@ const G_Furniture = (() => {
   // A room as the level lays it out (x, z, w, h in tiles) plus whatever else the layout hangs on it.
   interface Room { x: number; z: number; w: number; h: number; type: RoomType; [key: string]: any }
   // A piece's recipe in R: footprint, collision boxes, optional ray boxes and build()
-  interface PieceRec { w: number; d: number; boxes: any; ray?: (v: number) => any[]; [key: string]: any }
+  interface PieceRec { w: number; d: number; boxes: any; ray?: (v: number) => any[]; hulls?: (v: number) => number[][]; [key: string]: any }
   interface Spot { x: number; z: number; dirs: number[][]; used?: boolean }
   interface Rect { x0: number; x1: number; z0: number; z1: number }
   interface Fest { strings: any[]; stage: Rect | null; gate: Rect | null; lamps: number[][]; bays: number[][]; plaza: Rect | null; lot: Rect | null }
-  interface WBox { cx: number; cz: number; hx: number; hz: number; y0: number; h: number; m: any; ray?: WBox[] }
+  interface WBox { cx: number; cz: number; hx: number; hz: number; y0: number; h: number; m: any; ray?: WBox[]; walk?: boolean; hull?: number[] }
   interface PieceStyle { c: number; stripe?: number; [key: string]: any }
   const R: Record<string, any> = {};
   const FABRIC = [0x56677a, 0x7a4e3a, 0x4f6b4a, 0x8a7a5a, 0x6a3f4f, 0x3f4f6a, 0x9a8f7c, 0x7d3434, 0x46545c];
@@ -973,13 +973,15 @@ const G_Furniture = (() => {
   // (js/level.ts layCrest: the outcrops are its walls; what stands about on them is here)
   const GRANITE = [0xb08478, 0xa47a6e, 0xba8e80, 0x9a7468, 0xc49a8a];
   // A granite boulder, waist high: cover. A lump and a smaller one leaning on it, a third at its foot, lichen here and there.
-  // Its shape comes from the piece's own seed (v), the same for the meshes and the collision boxes (boulderLumps): each lump
-  // is an icosahedron turned about y, and what stops a round or you is a handful of boxes filling it out (lumpBoxes: its
-  // volume in 20 cm cells, runs of cells merged into boxes), so a round passes where there's no rock and meets it where there is.
+  // Its shape comes from the piece's own seed (v), the same for the meshes and the collision (boulderLumps): each lump is an
+  // icosahedron turned about y. What rounds and eyes meet is the lumps themselves, as drawn (hulls: js/world.ts hullOf, cut off
+  // at the ground); what stops you is boxes fitted to them (lumpBoxes: 10 cm columns, in slabs from the floor up), that you
+  // never step up onto (js/world.ts nostep: you'd climb the rock like stairs).
   const ICO_T = (1 + Math.sqrt(5)) / 2;
   const ICO_V = ([[-1, ICO_T, 0], [1, ICO_T, 0], [-1, -ICO_T, 0], [1, -ICO_T, 0], [0, -1, ICO_T], [0, 1, ICO_T], [0, -1, -ICO_T], [0, 1, -ICO_T], [ICO_T, 0, -1], [ICO_T, 0, 1], [-ICO_T, 0, -1], [-ICO_T, 0, 1]] as number[][]).map((p) => { const l = Math.hypot(p[0], p[1], p[2]); return p.map((c) => c / l); });
-  // its 20 faces' unit normals (a point is inside when it's within 0.7947 of the radius along every one)
-  const ICO_N = [[0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11], [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8], [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9], [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1]].map(([i, j, k]) => { const n = [0, 1, 2].map((c) => ICO_V[i][c] + ICO_V[j][c] + ICO_V[k][c]), l = Math.hypot(n[0], n[1], n[2]); return n.map((c) => c / l); });
+  // its 20 faces (as three's IcosahedronGeometry has them, which is what k.ico draws), and their unit normals
+  const ICO_F = [[0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11], [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8], [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9], [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1]];
+  const ICO_N = ICO_F.map(([i, j, k]) => { const n = [0, 1, 2].map((c) => ICO_V[i][c] + ICO_V[j][c] + ICO_V[k][c]), l = Math.hypot(n[0], n[1], n[2]); return n.map((c) => c / l); });
   interface Lump { r: number; x: number; y: number; z: number; ry: number }
   const boulderLumps = (v: number): Lump[] => {
     const r = G.U.rng(Math.floor(v * 4294967295)), s = r() < 0.5 ? -1 : 1;
@@ -989,44 +991,34 @@ const G_Furniture = (() => {
       { r: 0.3, x: (r() - 0.5) * 0.8, y: 0.12, z: 0.4, ry: r() * 6 },
     ];
   };
+  // a lump's corners in the piece's frame (turned ry about y as k.ico turns it: x' = x cos + z sin, z' = z cos - x sin)
+  const lumpAt = (l: Lump, p: number[]) => { const c = Math.cos(l.ry), sn = Math.sin(l.ry); return [l.x + (p[0] * c + p[2] * sn) * l.r, l.y + p[1] * l.r, l.z + (p[2] * c - p[0] * sn) * l.r]; };
+  // its triangles, nine numbers to a face, as it's drawn
+  const lumpTris = (l: Lump) => ICO_F.flatMap((f) => f.flatMap((i) => lumpAt(l, ICO_V[i])));
   // the boxes filling a lump, [x, z, w, d, top, bottom] (from the floor up: the part below it is under the ground)
-  const lumpBoxes = (l: Lump) => {
-    const CELL = 0.2, c = Math.cos(l.ry), sn = Math.sin(l.ry), R0 = l.r * 0.7947 + 0.03; // (a cell counts if its middle is inside, or just outside)
-    const top = l.y + l.r * 0.9511, nx = Math.ceil(l.r * 2 / CELL), x0 = l.x - nx * CELL / 2, z0 = l.z - nx * CELL / 2;
-    // the slabs' edges: the first one taller than a step (js/world.ts STEP, 0.32: you can't walk up onto it, nor up the rock like stairs), the rest about a cell each
-    const base = Math.min(top, 0.36), up = top - base > 0.08 ? Math.max(1, Math.round((top - base) / CELL)) : 0, edges = [0, up ? base : top];
-    for (let i = 1; i <= up; i++) edges.push(base + (top - base) * i / up);
-    const inside = (x: number, y: number, z: number) => { // (in the lump's own frame: undo the turn)
-      const px = (x - l.x) * c - (z - l.z) * sn, py = y - l.y, pz = (x - l.x) * sn + (z - l.z) * c;
-      for (const n of ICO_N) if (px * n[0] + py * n[1] + pz * n[2] > R0) return false;
-      return true;
-    };
-    const out: number[][] = [], open = new Map<string, number[]>(); // (open: the boxes still growing upward, by their footprint)
-    for (let iy = 0; iy + 1 < edges.length; iy++) {
-      const y = iy ? (edges[iy] + edges[iy + 1]) / 2 : Math.min(Math.max(l.y, 0), edges[1]), here = new Set<string>(), rects: number[][] = [], rows: (number[] | null)[] = [];
-      for (let iz = 0; iz < nx; iz++) { // a row of runs along x, merged with the same run in the row before it
-        const next: (number[] | null)[] = [];
-        for (let ix = 0, run = -1; ix <= nx; ix++) {
-          const on = ix < nx && inside(x0 + (ix + 0.5) * CELL, y, z0 + (iz + 0.5) * CELL);
-          if (on && run < 0) run = ix;
-          if (!on && run >= 0) { const prev = rows.find((q) => q && q[0] === run && q[1] === ix && q[3] === iz); if (prev) { prev[3] = iz + 1; next.push(prev); } else { const q = [run, ix, iz, iz + 1]; rects.push(q); next.push(q); } run = -1; }
-        }
-        rows.length = 0; rows.push(...next);
-      }
-      for (const q of rects) {
-        const key = q.join(','), grown = open.get(key);
-        here.add(key);
-        if (grown) grown[4] = edges[iy + 1]; else { const bx = [(x0 + (q[0] + q[1]) * CELL / 2), (z0 + (q[2] + q[3]) * CELL / 2), (q[1] - q[0]) * CELL, (q[3] - q[2]) * CELL, edges[iy + 1], edges[iy]]; out.push(bx); open.set(key, bx); }
-      }
-      for (const key of [...open.keys()]) if (!here.has(key)) open.delete(key);
+  const lumpBoxes = (l: Lump) => G.World.fitBoxes(G.World.hullOf(lumpTris(l)), 0).map(([x0, y0, z0, x1, y1, z1]) => [(x0 + x1) / 2, (z0 + z1) / 2, x1 - x0, z1 - z0, y1, y0]);
+  // the lichen: three crusts on the big lump's upper faces, each a little icosahedron sunk most of the way into it (a skin of it
+  // shows), from the piece's seed as the lumps are, so rounds meet them too
+  const UP_F = ICO_F.filter((_, i) => ICO_N[i][1] > 0.3);
+  const boulderLichen = (v: number): Lump[] => {
+    const r = G.U.rng((Math.floor(v * 4294967295) ^ 0x1c4e7) >>> 0), L0 = boulderLumps(v)[0], out: Lump[] = [];
+    for (let i = 0; i < 3; i++) {
+      const s = 0.08 + r() * 0.06, f = UP_F[Math.floor(r() * UP_F.length)].map((j) => lumpAt(L0, ICO_V[j]));
+      let a = r(), b = r(); if (a + b > 1) { a = 1 - a; b = 1 - b; }
+      const p = [0, 1, 2].map((c) => f[0][c] + (f[1][c] - f[0][c]) * a + (f[2][c] - f[0][c]) * b), m = [0, 1, 2].map((c) => (f[0][c] + f[1][c] + f[2][c]) / 3 - [L0.x, L0.y, L0.z][c]), ml = Math.hypot(m[0], m[1], m[2]);
+      out.push({ r: s, x: p[0] - m[0] / ml * s * 0.72, y: p[1] - m[1] / ml * s * 0.72, z: p[2] - m[2] / ml * s * 0.72, ry: r() * 6 });
     }
     return out;
   };
-  R.boulder = { w: 1.9, d: 1.5, cover: 1, boxes: (v: number) => boulderLumps(v).flatMap(lumpBoxes), build(k: Kit, v: number) {
+  // (a piece's boxes are asked for more than once as it's laid: each boulder's fitted, and its shapes worked out, once)
+  const fitted = new Map<number, { boxes: number[][]; hulls: number[][] }>();
+  const boulderFit = (v: number) => { let f = fitted.get(v); if (!f) { if (fitted.size > 4096) fitted.clear(); fitted.set(v, (f = { boxes: boulderLumps(v).flatMap(lumpBoxes), hulls: boulderLumps(v).concat(boulderLichen(v)).map(lumpTris) })); } return f; };
+  const boulderBoxes = (v: number) => boulderFit(v).boxes.map((q) => q.slice());
+  R.boulder = { w: 1.9, d: 1.5, cover: 1, lumps: (v: number) => boulderLumps(v).concat(boulderLichen(v)), boxes: boulderBoxes, hulls: (v: number) => boulderFit(v).hulls, build(k: Kit, v: number) {
     const g = k.mat(k.pick(GRANITE), 0.95, 0, { flatShading: true }), g2 = k.mat(k.tint(g.color.getHex(), 0.88), 0.95, 0, { flatShading: true });
     boulderLumps(v).forEach((l, i) => k.ico(i ? g2 : g, l.r, l.x, l.y, l.z, l.ry));
     const lichen = k.mat(k.pick([0x8a9a6a, 0xb4b080, 0x6a7a5a]), 1, 0, { flatShading: true });
-    for (let i = 0; i < 3; i++) k.ico(lichen, 0.08 + k.rnd() * 0.06, (k.rnd() - 0.5) * 0.9, 0.7 + k.rnd() * 0.3, (k.rnd() - 0.5) * 0.6);
+    for (const l of boulderLichen(v)) k.ico(lichen, l.r, l.x, l.y, l.z, l.ry);
   } };
   // A one-seed juniper, a dense bush about head high, blue-green: you can hide in it, not stop a round with it.
   R.juniper = { w: 1.6, d: 1.4, cover: 1, boxes: [[0, 0, 1.4, 1.2, 1.5]], build(k: Kit) {
@@ -1258,6 +1250,12 @@ const G_Furniture = (() => {
     const out = at(typeof rec.boxes === 'function' ? rec.boxes(v) : rec.boxes).sort((a, b) => b.h - a.h);
     // open pieces (shelving): you walk into the whole footprint, but rounds and eyes meet only what's solid
     if (rec.ray) out[0].ray = at(rec.ray(v));
+    // a rock: rounds and eyes meet its own convex shapes (each a list of triangles, turned and placed as its meshes are: hull,
+    // y still from its foot), and its boxes only stop people (walk: js/world.ts fromTileMap)
+    if (rec.hulls) {
+      for (const b of out) b.walk = true;
+      out[0].ray = rec.hulls(v).map((t) => ({ cx: x, cz: z, hx: 0, hz: 0, y0: 0, h: 0, m: null, hull: t.map((n, i) => i % 3 === 0 ? x + n * c + t[i + 2] * s : i % 3 === 2 ? z - t[i - 2] * s + n * c : n) }));
+    }
     return out;
   }
   // quarter-turns that put the back (-z) of a piece against the wall in direction (dx, dz)

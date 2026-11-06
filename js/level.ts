@@ -3,7 +3,7 @@
   case?: any; abox?: any; sbox?: any; winAt?: any; leafAt: Map<number, any>; unitAt?: Int8Array | null; doorAt?: any; doorMeshes?: any; fy: number; fl?: number; spawn: any; spawnRoom: LvRoom; exitRoom: LvRoom; extract?: any;
   grate?: any; railSteel?: boolean; fest?: any; base?: number; NF: number; minY?: number; rails: any[]; lz?: any; lzSpots?: number[][]; terrain?: any; skirt: number; entries?: number[][]; caseView?: any; cabViews?: any; aboxView?: any; sboxView?: any;
   above?: LvMap | null; voidAbove?: ArrayLike<number> | null; units?: number; navG?: any; lightT?: number; underground?: boolean; rollers?: number[][]; hub?: boolean; glassRuns?: any; fences: LvFence[]; doorVer?: number; cracked?: any; dmg?: any;
-  wallMesh?: any; wallIdx?: Map<number, number>; wallBase?: Float32Array; homes?: any; civSpots?: { x: number; z: number; yaw: number }[] | null; night?: boolean; lux?: LvLux } interface LvLight { x: number; z: number; y?: number; gy?: number; kind?: LvLightKind; color?: number; i?: number; d?: number; up?: number; porch?: number; fl?: number; glow?: number; off?: boolean; sign?: { x: number; z: number; ax: LvAxis } } interface LvLux { W: number; H: number; NF: number; v: Float32Array } interface LvWin { solids?: any[]; id: number; cells: number[]; nx: number; nz: number; ext: boolean; broken: boolean; x: number; z: number; len: number; armor?: boolean; cooler?: boolean; sill?: number; top?: number; door?: LvDoor; cracked?: any; fy?: number; rail?: any; fl?: number } interface LvCab { x: number; z: number; yaw: number; fy?: number } interface LvRoom { cars?: any; type: RoomType; x: number; z: number; w: number; h: number; cx: number; cz: number; dress?: LvDress | null; unit?: number; lid?: any; door?: any; out?: boolean; loft?: boolean; lamp?: any; cover?: any[][]; carved?: boolean; front?: any; tall?: any; house?: any; fl?: number; flush?: boolean } interface LvLz { x: number; z: number; f?: number; lamps?: number[][]; y?: number } type LvFence = [number, number, string, string?]; type LvRng = () => number; type LvObj = THREE.Object3D & Record<string, any>; interface LvBox { m?: any; cx: number; cz: number; hx: number; hz: number; y0: number; h: number; ray?: LvBox[]; gy?: number } interface LvDoor { id: number; i: number; tx: number; tz: number; x: number; z: number; axis: LvAxis; open: boolean; mirror: boolean; kind: any; cells?: number[]; w?: number; leaf?: LvBox; solids?: any[]; holes: any; gone: any; fallen?: boolean; rest?: any; pane?: any; fy?: number; fl?: number } interface LvProp { style?: Record<string, any>; name: string; x: number; z: number; q: number; v: number; boxes: LvBox[]; gy?: number; gone?: any; wd?: any; own?: boolean; block?: number } // a room's purpose (what furniture.ts fits it out as; homes.ts re-types a room to a resident's)
+  wallMesh?: any; wallIdx?: Map<number, number>; wallBase?: Float32Array; homes?: any; civSpots?: { x: number; z: number; yaw: number }[] | null; night?: boolean; lux?: LvLux } interface LvLight { x: number; z: number; y?: number; gy?: number; kind?: LvLightKind; color?: number; i?: number; d?: number; up?: number; porch?: number; fl?: number; glow?: number; off?: boolean; sign?: { x: number; z: number; ax: LvAxis } } interface LvLux { W: number; H: number; NF: number; v: Float32Array } interface LvWin { solids?: any[]; id: number; cells: number[]; nx: number; nz: number; ext: boolean; broken: boolean; x: number; z: number; len: number; armor?: boolean; cooler?: boolean; sill?: number; top?: number; door?: LvDoor; cracked?: any; fy?: number; rail?: any; fl?: number } interface LvCab { x: number; z: number; yaw: number; fy?: number } interface LvRoom { cars?: any; type: RoomType; x: number; z: number; w: number; h: number; cx: number; cz: number; dress?: LvDress | null; unit?: number; lid?: any; door?: any; out?: boolean; loft?: boolean; lamp?: any; cover?: any[][]; carved?: boolean; front?: any; tall?: any; house?: any; fl?: number; flush?: boolean } interface LvLz { x: number; z: number; f?: number; lamps?: number[][]; y?: number } type LvFence = [number, number, string, string?]; type LvRng = () => number; type LvObj = THREE.Object3D & Record<string, any>; interface LvBox { m?: any; cx: number; cz: number; hx: number; hz: number; y0: number; h: number; ray?: LvBox[]; gy?: number; walk?: boolean; hull?: number[] } interface LvDoor { id: number; i: number; tx: number; tz: number; x: number; z: number; axis: LvAxis; open: boolean; mirror: boolean; kind: any; cells?: number[]; w?: number; leaf?: LvBox; solids?: any[]; holes: any; gone: any; fallen?: boolean; rest?: any; pane?: any; fy?: number; fl?: number } interface LvProp { style?: Record<string, any>; name: string; x: number; z: number; q: number; v: number; boxes: LvBox[]; gy?: number; gone?: any; wd?: any; own?: boolean; block?: number } // a room's purpose (what furniture.ts fits it out as; homes.ts re-types a room to a resident's)
 type RoomType = 'living' | 'kitchen' | 'dining' | 'bedroom' | 'office' | 'storage' | 'breakroom' | 'yard' | 'hall' | 'hangar' | 'lz' | 'street' | 'road' | 'lot' | 'corridor' | 'bathroom' | 'alley' | 'stage' | 'washroom' | 'plaza' | 'cafe' | 'store' | 'mart' | 'bar' | 'melt' | 'control' | 'mcc' | 'locker' | 'kitchenette' | 'lobby' | 'observe' | 'boss' | 'meeting' | 'trail' | 'garden' | 'giftshop' | 'storeroom' | 'stockroom' | 'freezer' | 'cashier' | 'dock' | 'lawn' | 'landing' | 'range' | 'seating' | 'roof' | 'picnic' | 'parking' | 'pad' | 'gate' | 'cubicle' | 'court' | 'aisle' | 'overlook' | 'catwalk' | 'ridge' | 'saddle' | 'greenhouse' | 'antennas' | 'carpark' | 'mill' | 'loading' | 'restroom' | 'terrace' | 'viewing';
 type LvAxis = 'x' | 'z'; // (which way a door, stair or fence runs)
 type LvDoorKind = 'stair' | 'fire' | 'vault'; // (a door that isn't the plain wooden one)
@@ -416,7 +416,7 @@ const G_Level = {
   // A piece on the fine grid: hung on every cell it covers, those it stands on blocked (bv: 2 or 4; 0: it blocks nothing).
   layProp(m: Pick<LvMap, 'W' | 'H' | 't' | 'props' | 'propList'>, p: LvProp, bv: number) {
     const { W, H, t, props } = m, cs = this.TS, blocks = !!bv;
-    const hang = (i: number) => { const q = props.get(i); props.set(i, q ? { name: q.name, boxes: q.boxes.concat(p.boxes).sort((a: LvBox, b: LvBox) => b.h - a.h) } as LvProp : p); };
+    const hang = (i: number) => { const q = props.get(i); if (q && (q === p || q.boxes.includes(p.boxes[0]))) return; props.set(i, q ? { name: q.name, boxes: q.boxes.concat(p.boxes).sort((a: LvBox, b: LvBox) => b.h - a.h) } as LvProp : p); }; // (once a cell: each of its boxes over it would hang it again)
     m.propList.push(p);
     let any = false;
     for (const b of p.boxes) {
@@ -1031,8 +1031,39 @@ const G_Level = {
   // of it (the ceilings stop at the walls' middle lines), the parapet round its edge; and the guard rail inside its front
   // glass (crest.guard: it stops you walking out where the glass is shot out; only its handrail stops a round, as a
   // railing's: G.Level.stack)
+  // The outcrops' rough tops (an icosahedron over each one's wall, sometimes a smaller one on that) and a lump or two at their
+  // feet: each one's matrix (placed, turned, stretched) and its shade (p). From the seed alone, so the meshes (buildCrest) and
+  // what rays meet (crestSolids: each its own convex shape, js/world.ts hullOf) are the same rocks.
+  crestCaps(map: LvMap): { m: number[]; p: number }[] {
+    const cr = map.crest;
+    if (cr.caps) return cr.caps;
+    const T = THREE, TS = this.TS, CS = this.CTS, W = map.W, rnd = G.U.rng((map.seed ^ 0xca95e7) >>> 0), m4 = new T.Matrix4(), out: { m: number[]; p: number }[] = [];
+    const open = (x: number, z: number) => x >= 0 && z >= 0 && x < cr.W && z < cr.H && cr.kind[z * cr.W + x] !== 1 && cr.kind[z * cr.W + x] !== 2;
+    for (let i = 0; i < cr.W * cr.H; i++) {
+      if (cr.kind[i] !== 1) continue;
+      const x = i % cr.W, z = (i / cr.W) | 0, X = (x + 0.5) * CS, Z = (z + 0.5) * CS, gy = this.builtY(map, Math.floor(Z / TS) * W + Math.floor(X / TS)); // (on the ground the outcrop stands on)
+      const put = (px: number, py: number, pz: number, sx: number, sy: number, sz: number) => {
+        m4.compose(new T.Vector3(px, py, pz), new T.Quaternion().setFromEuler(new T.Euler(rnd() * 3, rnd() * 3, rnd() * 3)), new T.Vector3(sx, sy, sz));
+        out.push({ m: m4.toArray(), p: 0.9 + rnd() * 0.15 });
+      };
+      put(X + (rnd() - 0.5) * 0.6, gy + this.WALL_H - 0.1 + rnd() * 0.3, Z + (rnd() - 0.5) * 0.6, 1.05 + rnd() * 0.25, 0.5 + rnd() * 0.7, 1.05 + rnd() * 0.25);
+      if (rnd() < 0.4) put(X + (rnd() - 0.5) * 0.8, gy + this.WALL_H + 0.3 + rnd() * 0.4, Z + (rnd() - 0.5) * 0.8, 0.6, 0.5 + rnd() * 0.4, 0.6);
+      const side = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => open(x + dx, z + dz));
+      if (side.length && rnd() < 0.7) { const [dx, dz] = side[Math.floor(rnd() * side.length)]; put(X + dx * 0.5, this.groundHeight(map, X + dx * 0.5, Z + dz * 0.5) + 0.15, Z + dz * 0.5, 0.6, 0.45 + rnd() * 0.3, 0.6); }
+    }
+    return (cr.caps = out);
+  },
   crestSolids(map: LvMap) {
     const w = map.world, WH = this.WALL_H, P = this.PARAPET, gd = map.crest.guard;
+    // the outcrops' tops and the lumps at their feet, as drawn: rays meet them (you never get up there, and the lumps are at the
+    // walls' feet: what stops you is the walls)
+    const ico = new THREE.IcosahedronGeometry(1, 0), tri = (ico.attributes.position as THREE.BufferAttribute).array as Float32Array, m4 = new THREE.Matrix4(), v = new THREE.Vector3();
+    for (const c of this.crestCaps(map)) {
+      m4.fromArray(c.m);
+      const t: number[] = []; for (let i = 0; i < tri.length; i += 3) { v.set(tri[i], tri[i + 1], tri[i + 2]).applyMatrix4(m4); t.push(v.x, v.y, v.z); }
+      G.World.add(w, G.World.hullOf(t, [], { kind: 'prop', move: false, mat: G.Materials.PROPS.boulder }));
+    }
+    ico.dispose();
     if (gd) {
       const [x0, x1, z] = gd, y = this.crestFall(map.crest, (x0 + x1) / 2), H = this.GUARD_H;
       G.World.add(w, G.World.box(x0, y, z - 0.03, x1, y + H, z + 0.03, { kind: 'rail', ray: false }));
@@ -2617,23 +2648,10 @@ const G_Level = {
     const conc = new T.MeshStandardMaterial({ color: 0xb4ab9e, roughness: 0.9 });
     const station = new T.Mesh(new T.BoxGeometry(9, 9, 13), conc); station.position.set(-6, -6.2, 52); root.add(station);
     const band = new T.Mesh(new T.BoxGeometry(9.1, 1.6, 13.1), new T.MeshStandardMaterial({ color: 0x1c2228, roughness: 0.2, metalness: 0.5 })); band.position.set(-6, -3.4, 52); root.add(band);
-    // ---- the outcrops' tops, rough (and a lump or two at their feet): granite like their walls, lit as they are
-    const rockTiles = []; for (let i = 0; i < cr.W * cr.H; i++) if (cr.kind[i] === 1) rockTiles.push(i);
-    const caps = new T.InstancedMesh(new T.IcosahedronGeometry(1, 0), new T.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, flatShading: true }), rockTiles.length * 3);
-    let nc = 0;
-    const open = (x: number, z: number) => x >= 0 && z >= 0 && x < cr.W && z < cr.H && cr.kind[z * cr.W + x] !== 1 && cr.kind[z * cr.W + x] !== 2;
-    for (const i of rockTiles) {
-      const x = i % cr.W, z = (i / cr.W) | 0, X = (x + 0.5) * CS, Z = (z + 0.5) * CS, gy = this.builtY(map, Math.floor(Z / TS) * W + Math.floor(X / TS)); // (on the ground the outcrop stands on)
-      const put = (px: number, py: number, pz: number, sx: number, sy: number, sz: number) => {
-        m4.compose(at.set(px, py, pz), new T.Quaternion().setFromEuler(new T.Euler(rnd() * 3, rnd() * 3, rnd() * 3)), sc.set(sx, sy, sz)); caps.setMatrixAt(nc, m4);
-        const p = 0.9 + rnd() * 0.15; col.setRGB(0.69 * p, 0.5 * p, 0.45 * p).convertSRGBToLinear(); caps.setColorAt(nc++, col);
-      };
-      put(X + (rnd() - 0.5) * 0.6, gy + this.WALL_H - 0.1 + rnd() * 0.3, Z + (rnd() - 0.5) * 0.6, 1.05 + rnd() * 0.25, 0.5 + rnd() * 0.7, 1.05 + rnd() * 0.25);
-      if (rnd() < 0.4) put(X + (rnd() - 0.5) * 0.8, gy + this.WALL_H + 0.3 + rnd() * 0.4, Z + (rnd() - 0.5) * 0.8, 0.6, 0.5 + rnd() * 0.4, 0.6);
-      const side = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => open(x + dx, z + dz));
-      if (side.length && rnd() < 0.7) { const [dx, dz] = side[Math.floor(rnd() * side.length)]; put(X + dx * 0.5, this.groundHeight(map, X + dx * 0.5, Z + dz * 0.5) + 0.15, Z + dz * 0.5, 0.6, 0.45 + rnd() * 0.3, 0.6); }
-    }
-    caps.count = nc; caps.layers.enable(1); root.add(caps);
+    // ---- the outcrops' tops, rough (and a lump or two at their feet): granite like their walls, lit as they are (crestCaps)
+    const capList = this.crestCaps(map), caps = new T.InstancedMesh(new T.IcosahedronGeometry(1, 0), new T.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, flatShading: true }), Math.max(1, capList.length));
+    capList.forEach((c, n) => { m4.fromArray(c.m); caps.setMatrixAt(n, m4); col.setRGB(0.69 * c.p, 0.5 * c.p, 0.45 * c.p).convertSRGBToLinear(); caps.setColorAt(n, col); });
+    caps.count = capList.length; caps.layers.enable(1); root.add(caps);
     // ---- the ziplines: a steel pole each end on the rim, an arm out over the wall to the cable, a stay back to a footing; the
     // cable sagging between; at the start, the trolley and its grab bar waiting (js/player.ts rides them)
     const steel = new T.MeshStandardMaterial({ color: 0x4a4e52, roughness: 0.5, metalness: 0.6 }), cableM = new T.MeshStandardMaterial({ color: 0x26282a, roughness: 0.4, metalness: 0.7 }), yel = new T.MeshStandardMaterial({ color: 0xe0b020, roughness: 0.5 });
