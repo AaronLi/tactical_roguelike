@@ -1919,7 +1919,7 @@ const G_R = {
     if (nv) this._nvDist(); // (the distance, from the level's depth before anything clears it)
     // Evidence outlines (layer 2): drawn over everything except walls, floors and doors. Rebuild the depth
     // buffer from just those (layer 1, depth only), then draw the outlines against it (they use the stencil).
-    if (this.hasGlow) {
+    if (this.hasGlow && !nv) { // (not through night vision: the outline's a game marker, not light, and under the goggles' gain it glowed)
       const sc = this.scene, bg = sc.background, cam = this.camera;
       if (!this.depthOnly) this.depthOnly = new THREE.MeshBasicMaterial({ colorWrite: false });
       sc.background = null; // a colour background would clear the frame
