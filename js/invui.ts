@@ -518,7 +518,7 @@ const G_InvUI = (() => {
     if (md) Object.keys(G.Med.ITEMS).forEach((mt, i) => { if (md[i] > 0 && !G.Med.cantTreat(b, part, mt) && (!only || (G.Med.ITEMS as Rec)[mt].fixes === only)) opts.push({ mt, theirs: true, n: md[i] }); });
     const wrong = only === 'blood' ? (b.blood < 90 ? [`${Math.round(b.blood)}%`] : []) : G.Med.describe(b.parts[part]), several = opts.some((o) => o.theirs) && opts.some((o) => !o.theirs);
     menu = document.createElement('div');
-    menu.className = 'inv-menu med-menu';
+    menu.className = 'inv-menu med-menu ui';
     menu.innerHTML = `<b>${only === 'blood' ? 'Blood' : (G.Med.NAME as Rec)[part]}${wrong.length ? ` <small>${wrong.join(', ')}</small>` : ''}</b>`
       + (opts.length ? opts.map((o) => {
         // with more than one owner's gear on offer, each says whose it is: their emblem and name
@@ -950,7 +950,7 @@ const G_InvUI = (() => {
     if (!field && price > 0 && !hasContents(src.it) && !lastGun(me, src) && !cantDetach(src)) acts.push(['sell', `Sell for ¢${G.U.fmt(price)}`]);
     if (!acts.length) return;
     menu = document.createElement('div');
-    menu.className = 'inv-menu';
+    menu.className = 'inv-menu ui';
     menu.innerHTML = `<b>${G.U.esc(Gr.defOf(src.it) ? Gr.defOf(src.it)!.name : Gr.label(src.it))}</b>` + acts.map(([a, n, arg]) => `<button data-act="${a}"${arg != null ? ` data-arg="${arg}"` : ''}>${n}</button>`).join('');
     Object.assign(menu.style, { left: Math.min(e.clientX, innerWidth - 180) + 'px', top: Math.min(e.clientY, innerHeight - 30 - acts.length * 26) + 'px' });
     menu.addEventListener('click', (ev) => {

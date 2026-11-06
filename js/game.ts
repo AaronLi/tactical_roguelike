@@ -223,7 +223,7 @@ const G_Game = {
   bindMenu() {
     this.bindLook();
     // hovering a node on the route map: its card (js/route.ts tip), beside the pointer, kept on screen
-    const tipEl = document.createElement('div'); tipEl.id = 'routeTip'; tipEl.className = 'route-tip hidden'; document.body.appendChild(tipEl);
+    const tipEl = document.createElement('div'); tipEl.id = 'routeTip'; tipEl.className = 'route-tip ui hidden'; document.body.appendChild(tipEl);
     let tipOn: number | null = null;
     this.$('routeMap').addEventListener('pointermove', ((e: PointerEvent) => {
       const g = (e.target as HTMLElement).closest<HTMLElement>('[data-node]');
