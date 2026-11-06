@@ -104,5 +104,7 @@ Other scenes, in `src/scenes/firearms.ts`:
   - `magDropScene({ rounds, way, surface: 'asphalt', box: 0.5, toss, start })` builds others: an asphalt surface (softer, lossier, rougher) and a low walled box it can bounce off.
   - `node scripts/drop-video.mjs <rounds> <way> <out.mp4> [--surface asphalt] [--box 0.5] [--toss 0.45 --start -0.1]` renders the simulation as a video (a small software renderer, encoded with ffmpeg) with its synthesized sound: real time, then a 4× slow-motion replay; rings mark where each louder contact lands.
 
+- From measurements (`src/scenes/from-spec.ts`): fill in a `GunSpec` (action mass, stroke, spring, lock-up, receiver, barrel, cartridge, magazine) and `gunScenes(spec)` builds a first attempt at every sound of the gun: `<id>-charge` (loaded, `-empty-mag`, `-no-mag`), `<id>-release`, `<id>-mag-in`/`-mag-out` (and `-empty`), and `<id>-mag-drop-*`. `sr25-*` is built from measurements alone; `spec-ar15-*`, `spec-kv47-*`, `spec-mp5-*` and `spec-g19-*` are the hand-tuned guns restated as measurements, for comparison (`scripts/analyze/compare.mjs`). See SOUND_DESIGN.md, part 3.
+
 The forward run is simulated from the reciprocating mass, the spring force and each magazine state's drag. Loaded takes 24.7 ms to the bolt face, empty 24.0 ms and no magazine 23.7 ms.
 

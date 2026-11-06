@@ -185,3 +185,100 @@ Use published figures when you can. Look up loss factors and damping ratios for 
 for built-up joints (assemblies lose far more than the solid material does). Look up spring rates,
 masses, strokes and dimensions. When a sound needs a value that isn't published, choose one, say so,
 and prefer calibrating it against a recording.
+
+---
+
+## Part 3: From measurements
+
+Every gun tuned by hand so far followed the same rules from the same kinds of numbers.
+`src/scenes/from-spec.ts` turns those rules into code. You fill in a `GunSpec` with
+measurements, and `gunScenes(spec)` builds a first attempt at every sound:
+
+- the charge with a loaded magazine, an empty one and none;
+- the hold-open release, if the gun has one;
+- the magazine in and out, loaded and empty;
+- the 16 simulated magazine drops.
+
+The `sr25` spec is built from measurements alone. The `spec-ar15`, `spec-kv47`, `spec-mp5` and
+`spec-g19` specs restate the hand-tuned guns as measurements only, so the rules can be checked
+against the hand tuning.
+
+### What to measure, and what each number drives
+
+| Measurement | Where to get it | What it drives |
+|---|---|---|
+| Reciprocating mass (carrier + bolt, or slide + barrel; add the buffer) | Parts weights, armorer's manuals | Run-home time `t = √(2 x m / F)`, the speed of every hit on the way home (their level and brightness), and the carrier and bolt bars' thickness (mass = ρ L t²) |
+| Stroke | Manual, or bolt travel measured from the port | Pull timing, run-home time, the spring's coil length (its pitch) |
+| Return spring force at home and fully back | Spring rate × compression; published spring weights | Run-home time and speed |
+| Carrier and bolt (or slide and barrel) length | Parts drawings | The bars' pitch (longer is lower) |
+| Lock-up kind (rotating, rollers, tilting) | How it works | The last few ms: a bolt that turns into its lugs, rollers that snap out, or a barrel that cams up into the slide |
+| Lube (greased, oiled, dry) | How it's kept | The rubs' surface texture. Dry gets gritty stick-slip on the hammer |
+| Hold-open; hammer or striker; hammer spring wire | Manual | Whether there is a release scene; the hammer's ride-down, wind-up and cock on the pull |
+| Handle kind (on the carrier, separate, the slide), material, length | Manual | A separate handle stops at the end of its travel, then either springs home in its tube (MP5) or claps into its front stop with a latch clack (AR) |
+| Receiver build (billet, stamped, polymer), wall, inside length × width × height | Drawings, calipers | The shell body (aluminium shell, ringing steel plate, lossy polymer) and the air space that rings (its cavity from the inside dimensions) |
+| Ports (open, closed, slide); loose top cover | Look at it | How muffled it is: open billet is heard straight; the others go through the walls (a low-pass with a straight-through leak). A loose cover buzzes on every slam |
+| Buffer tube: length, bore, buffer weight | AR pattern guns | The spring sings in the tube's air column; the buffer's weights lag on the pull and slam forward a beat after lock-up |
+| Barrel length and diameter; overall length; frame material; separate lower | Spec sheet | The low end of the slam home: the barrel rings, the whole gun flexes as one body, and a pinned lower rings on its own |
+| Cartridge overall and case length, mass | Cartridge drawing | Where the bolt clears the rim on the pull and strips the round on the run home; the round's ring |
+| Magazine: capacity, length × width × thickness, material, wall, rib pitch, empty mass, spring force and rate | Calipers, scale, spring gauge | The magazine body's ring (ribbed folded steel, aluminium, polymer), its drop simulation (mass, centre of mass, contents on the spring), the follower rattle |
+| Magazine insert (straight, rock-in), catch (button, paddle), free drop, well, fit | Look at it | The mag-in and mag-out order of events. A loose fit knocks the walls on the way up, and the air in the well shrinks |
+
+The rules that don't change from gun to gun:
+
+- **Timing.** The pull is a smooth hand yank over the stroke. The default is `0.13 + 0.4 × stroke`
+  s; match it to the reload animation with `chargeFromSpec(g, fill, { pull, hold })`. The run home
+  is the spring driving the mass.
+- **Order.** The cartridge length sets where the round is stripped. The lock-up kind sets the
+  last few milliseconds.
+- **Held parts don't ring.** A carrier that lands is held home, so it is a damped bar. Only free
+  parts get modes.
+- **Through the walls, not into the ear.** Only parts on the outside are marked `outside`: the
+  handle, the top cover, the receiver ring and the thumb on the catch. They skip the enclosure.
+
+### How close a first attempt gets
+
+`node scripts/analyze/compare.mjs <hand-tuned> <spec> ...` compares two scenes on their dry render. It reports:
+
+- their lengths;
+- when the loudest moment comes;
+- the spectral centroid and the share of energy above 3 kHz;
+- the RMS difference of their third-octave spectra. `BANDS=1` prints each band.
+
+As a guide, under about 3 dB is close, 3–6 dB is noticeably different, and over 6 dB is a different sound.
+
+| Scene | Spectral difference |
+|---|---|
+| KV-47 charge | 3.0 dB |
+| MP5 charge | 2.4 dB |
+| AR-15 release | 4.0 dB |
+| AR-15 charge | 4.6 dB |
+| G19 rack | 4.9 dB |
+| G19 slide release | 5.6 dB |
+| KV-47, MP5 and G19 mag in | 3.2–3.8 dB |
+| AR-15 mag in | 5.9 dB |
+
+What the hand tuning added beyond the rules is detail of one particular gun:
+
+- the AR's staged lug turn, its gas key and its hammer and trigger jolting on their pins;
+- the G19's trigger bar and its particular striker;
+- the AR magazine's settle back onto its catch.
+
+The first attempt has the right events in the right order at the right times. It doesn't have
+those details.
+
+### Tuning a first attempt
+
+Listen to the charge first. It exercises most of the numbers. Then:
+
+1. **Timing wrong:** check the mass and the spring forces before changing any gain. Then match
+   `pull` to the animation.
+2. **Too bright or too dull overall:** check `ports` and `build`. These decide how much is heard
+   through the walls.
+3. **Slam has no weight:** check the `gun` block. A short barrel or a polymer frame is meant to be
+   light.
+4. **A part rings on:** it's a held part modelled as free. Find it with `ping.mjs`.
+5. **Scratchy rubs:** set `lube` one step wetter.
+6. **Magazine sounds like the wrong material:** check its material, wall and `ribPitchCm`. Ribs
+   stiffen a sheet and stop it ringing like a plain plate.
+7. When a gun needs more than these rules give, copy its generated scene into a hand-tuned file
+   and add the missing parts there, as `more-guns.ts` does.

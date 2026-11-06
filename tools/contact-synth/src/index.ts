@@ -11,4 +11,5 @@ export {
   AR15_CHARGE, AR15_CHARGE_EMPTY, AR15_CHARGE_NO_MAG, AR15_BOLT_RELEASE, AR15_BOLT_RELEASE_EMPTY, AR15_BOLT_RELEASE_NO_MAG,
   AR15_MAG_IN, AR15_MAG_IN_EMPTY, AR15_MAG_OUT, AR15_MAG_OUT_EMPTY, AR15_LOAD_RACK_UNLOAD, AR15_MAG_IN_OUT, AR15_MAG_DROPS, MORE_MAG_DROPS, MAG_TYPES, magDrops, type MagType, arChargeScene, magDropScene, magDropSpec, type MagDropOptions,
   MORE_GUN_SCENES, chargeScene, type ChargeTiming,
+  GUN_SPECS, gunScenes, derive, magTypeOf, chargeFromSpec, releaseFromSpec, magFromSpec, SPEC_SCENES, type GunSpec,
 } from './scenes/index.js';
