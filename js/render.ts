@@ -11,6 +11,9 @@ type BloodKind = 'drop' | 'spatter' | 'pool';
 interface RBloodMats { [kind: string]: THREE.MeshStandardMaterial; drop: THREE.MeshStandardMaterial; spatter: THREE.MeshStandardMaterial; pool: THREE.MeshStandardMaterial; }
 type RMark = THREE.Mesh<THREE.BufferGeometry, THREE.Material>; // a pooled decal or blood mark
 type RWound = (THREE.Mesh<THREE.BufferGeometry, THREE.Material> | THREE.Line<THREE.BufferGeometry, THREE.Material>) & { onRig?: any }; // a track kept on a body
+interface RWarm { t0: number; tWait: number; waitMs?: number; ext: any; done: (() => void) | null; tasks: (() => void)[]; stage: number; frames: number; undo: (() => void)[]; progs: any[]; mats: Set<THREE.Material> } // (js/render.ts warmup)
+// what a program just asked for answers while the driver's still building it (warmStep): no inputs, nothing to set
+const PH_UNIFORMS = { seq: [], map: {} };
 interface RArc { dots: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial>; ring: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>; N: number; f?: number; }
 const G_R = {
   // (set in init / _initFx before anything uses them: they hold undefined till then, as before)
@@ -324,6 +327,11 @@ const G_R = {
     this.fragMarks.count = 0; this.fragN = 0; this.scorches.forEach((m) => (m.visible = false));
     for (const r of this.fires) r.t = 1e9; this.fireStep(0); // (a thermobaric's fireball still burning: gone with the level)
     if (this.bloodMarks) { this.bloodMarks.forEach((d: THREE.Object3D) => (d.visible = false)); this.pools.forEach((d: THREE.Object3D) => { d.visible = false; d.userData.owner = null; }); }
+  },
+  // the chips and dust a round throws out of what it hits (js/scars.ts): made once, the first time something's hit or the
+  // shaders are compiled (warmup)
+  debrisFx() {
+    return this.debris || (this.debris = G.Scars.debris(this.scene, (x, z, y) => { const map = G.Game.map; return map ? G.Level.groundAt(map, x, z, 0.01, y) : 0; }));
   },
   // ------------------------------------------------------------ blood on the environment
   // the surface under (x, z) at or below height y: the floor, or the top of a piece of furniture
@@ -829,7 +837,7 @@ const G_R = {
     // the damage it did, and what it threw out of it (js/scars.ts), by what it hit and how; marks are from the pool, so a reused
     // one has to come off the door it was on
     const q = Object.assign({ fx, k: 'e', n }, o, { n });
-    (this.debris || (this.debris = G.Scars.debris(this.scene, (x, z, y) => { const map = G.Game.map; return map ? G.Level.groundAt(map, x, z, 0.01, y) : 0; }))).burst(p, q);
+    this.debrisFx().burst(p, q);
     if (!n || q.cut) return; // (what's been cut has its marks with the cut: js/damage.ts)
     for (const c of G.Scars.plan(q)) {
       const d = this.decals[this.decalIdx]; this.decalIdx = (this.decalIdx + 1) % this.decals.length;
@@ -1161,32 +1169,235 @@ const G_R = {
     const far = Math.max(cam.far, SCOPE_FAR), f = fog && fog.far < 1e4 ? fog.far : 0;
     return { k: f ? Math.min(mag, Math.max(1, far / f)) : 1, far };
   },
-  // Shaders are compiled the first time something is drawn, which is a stall (a big one on some GPUs): the
-  // first shot (casing, tracer, bullet hole, blood), the first explosion, the first suspect to come into
-  // view... So once a level's built and populated, everything gets compiled up front: every hidden thing
-  // (the pooled effects, the viewmodel's flash) shown for a moment, and samples of what's made on first use
-  // (cases, a dropped magazine and box, a loot box, a wall spatter) put in for a moment.
-  warmup() {
-    if (!this.renderer || !this.scene || !this.camera) return 0;
-    const t0 = performance.now(), extras: THREE.Object3D[] = [];
-    const put = (m: THREE.Object3D) => { if (m) { m.position.set(0, -50, 0); this.dynRoot.add(m); extras.push(m); } };
+  // ------------------------------------------------------------ shaders, built ahead (under the loading screen)
+  // three.js builds a shader program the first time it draws a kind of surface in a kind of place: a material's type with
+  // its maps, its sides, instanced or not, and the place's lights, fog and what it's drawn into (the screen, the scope's
+  // picture, a shadow map, the hangar's TVs). Building one stalls the page 0.1 to 0.2 s here (longer on some machines): the
+  // first chip off a wall, the first gun picked up, the first look through a scope, the first suspect down... But nothing in
+  // a level is truly random: whatever can turn up is one of a known set (the catalogue's gun materials, the bodies and their
+  // kit, the effects' pools). So once a level's built and populated, all of it is built up front, under the veil:
+  //   - the scene as it stands, every hidden thing (the pooled effects, the viewmodel's flash) shown for a moment, with
+  //     samples of what's made later (warmKit: every catalogue material and a sticker, every kind of body in every piece of
+  //     kit with a gun, a scope's lens, a reflex sight's reticle, the outlines; and, made for the level and not kept, cases,
+  //     a dropped magazine and box, a loot box, a wall spatter, a hole's lining)
+  //   - in every place it's drawn: the screen, the gun in your hands' own scene, the scope's picture, the fisheye's pass,
+  //     and in the hangar the TVs' sets (js/highlights.ts warm)
+  //   - then a few real frames with nothing culled, for what only drawing builds: the weapon lights' shadow maps (their
+  //     depth shaders, one for each kind of thing that casts) and the evidence outlines' passes.
+  // The programs go to the graphics driver all at once and it builds them side by side (KHR_parallel_shader_compile:
+  // asked for, then waited on frame by frame, so the veil keeps moving: warmStep), and they're kept for good (pinned), so
+  // the next level, or the hangar, finds most of them built. The light counts every program is built for never change:
+  // every dynamic light is one of a fixed pool, always in the scene, dark when it's not in use (muzzleLights, blastLights,
+  // spots; vmMuzzle, vmPts, vmSpots in the gun's scene).
+  _kit: null as null | { world: THREE.Group; vm: THREE.Group; vmClip: THREE.Group },
+  _empty: undefined as THREE.Scene | undefined,
+  _warm: null as null | RWarm,
+  _pinned: new Set<any>(),
+  warmStats: null as null | { programs: number; ms: number; waitMs: number; frames: number },
+  warmKit() {
+    if (this._kit) return this._kit;
+    const T = THREE, geo = new T.BoxGeometry(0.02, 0.02, 0.02), world = new T.Group(), vm = new T.Group(), vmClip = new T.Group();
+    const M = G.GunMaterials.M as Record<string, () => THREE.Material>, tex = this.flashTexture();
+    // every gun's surfaces: the catalogue's materials (a baked gun only names them: js/gunmaterials.ts), and a sticker on one
+    // (js/stickers.ts), in the world and in your hands
+    const sticker = new T.MeshStandardMaterial({ map: tex, transparent: true, alphaTest: 0.03, depthWrite: false, roughness: 0.45, metalness: 0, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
+    for (const g of [world, vm]) { for (const k of Object.keys(M)) g.add(new T.Mesh(geo, M[k]())); g.add(new T.Mesh(geo, sticker)); }
+    // (and a stock in your hands, cut off where it would be in your eye: its materials' own copies, with a clipping plane: clearStockNearEye)
+    const plane = new T.Plane(new T.Vector3(0, 0, -1), 0);
+    for (const k of Object.keys(M)) { const c = M[k]().clone(); c.clippingPlanes = [plane]; vmClip.add(new T.Mesh(geo, c)); }
+    // the gun in your hands' own pieces (js/viewmodel.ts): a reflex sight's window and reticle, a scope's lens, a muzzle
+    // flash, a display surface, a fire-mode dial's marker
+    try {
+      const V = G.Viewmodel, g = new T.Group();
+      V.reflex(g, { f: 0.1, y: 0, w: 0.02, h: 0.02, kind: 'dot' });
+      V.pipLens(g, { f: 0.1, y: 0, r: 0.02 }, { reticle: 'cross' });
+      g.add(V.flash(0xffc070));
+      const d = new T.Mesh(new T.PlaneGeometry(0.02, 0.01), M.black()); d.name = 'display_warm'; d.userData.display = { width: 8, height: 4 }; g.add(d); V.surfaces(g);
+      g.add(new T.Mesh(geo, new T.MeshBasicMaterial({ color: 0xffd36a })));
+      vm.add(g);
+    } catch (e) { console.warn('warm kit', e); }
+    // every kind of body: officers in every piece of kit and every look (their patches, their callsigns on their backs),
+    // with a gun; every kind of suspect, a few of each (what they wear is picked by their seed), in the armour they come
+    // in; civilians
+    try {
+      const R = G.Rig, byKind: Record<string, string[]> = {};
+      for (const d of Object.values(G.Gear.DEFS) as any[]) (byKind[d.kind] || (byKind[d.kind] = [])).push(d.id);
+      const looks = R.LOOKS as Record<string, string[]>, of = (k: string, i: number) => { const a = byKind[k] || []; return a.length ? a[i % a.length] : 0; };
+      const n = Math.max(...['helmet', 'face', 'carrier', 'plate', 'shoulder', 'groin', 'belt', 'legs', 'pack'].map((k) => (byKind[k] || []).length), ...Object.values(looks).map((v) => v.length));
+      const animals = G.Callsigns.LIST as { id: string }[];
+      for (let i = 0; i < n; i++) {
+        const look: Record<string, string> = {};
+        for (const [k, v] of Object.entries(looks)) look[k] = v[i % v.length];
+        const rig = G.Views.newPlayerRig({ color: [0x4080ff, 0xff5040, 0x40d060, 0xffc030][i % 4], animal: animals[i % animals.length].id, name: 'Warm', look }, 'warm' + i);
+        rig.setKit({ helmet: of('helmet', i), face: of('face', i), carrier: of('carrier', i), plate: of('plate', i) ? 1 : 0, sh: of('shoulder', i), gr: of('groin', i), cp: 4, belt: of('belt', i), lg: of('legs', i), bp: 2, pack: of('pack', i), ifak: of('ifak', i) });
+        rig.setGun('m4');
+        rig.root.removeFromParent(); rig.root.visible = true; world.add(rig.root);
+      }
+      const vests = ['soft2', 'soft', 'steel', 'ceramic', 'assault', ''], helms = ['ach', 'riflehelm', 'visor', ''];
+      Object.values(G.ENEMIES as Record<string, any>).forEach((def, j) => {
+        for (let s = 0; s < 3; s++) {
+          const rig = R.create({ style: def.style, scale: def.scale, boss: !!def.boss, leader: !!def.leader, seed: j * 7919 + s * 131 + 13, dressed: true });
+          if (!def.civ) rig.setKit(R.armourKit(vests[(j + s) % vests.length], helms[(j + s) % helms.length], def.style === 'armored', s % 2, []));
+          if (def.wpn) rig.setGun(def.wpn);
+          world.add(rig.root);
+        }
+      });
+    } catch (e) { console.warn('warm kit', e); }
+    // what's drawn over the evidence and what F would take (js/views.ts outlineMats: layer 2), and a few plain kinds the
+    // replays' and the reports' sets use (ghosts, rings, guides, sprites, particles)
+    try {
+      for (const blue of [false, true]) { const o = G.Views.outlineMats(blue); for (const m of [o.silhouette, ...o.bands]) { const x = new T.Mesh(geo, m); x.layers.set(2); world.add(x); } }
+    } catch (e) { console.warn('warm kit', e); }
+    const pts = new T.BufferGeometry(); pts.setAttribute('position', new T.Float32BufferAttribute([0, 0, 0, 0.01, 0, 0], 3)); pts.setAttribute('color', new T.Float32BufferAttribute([1, 1, 1, 1, 1, 1], 3));
+    // (and the marks a round leaves, as the replays put them back: js/scars.ts, js/damage.ts)
+    for (const m of [new T.MeshStandardMaterial({ vertexColors: true, side: T.DoubleSide }), new T.MeshLambertMaterial({ vertexColors: true, side: T.DoubleSide }), new T.MeshLambertMaterial({ map: tex, transparent: true, depthWrite: false }), new T.MeshStandardMaterial({ map: tex, transparent: true, depthWrite: false })]) world.add(new T.Mesh(geo, m));
+    for (const m of [new T.MeshBasicMaterial({ transparent: true, blending: T.AdditiveBlending, depthWrite: false }), new T.MeshBasicMaterial({ transparent: true, side: T.DoubleSide }), new T.MeshBasicMaterial({ map: tex, transparent: true }), new T.MeshBasicMaterial({ map: tex, transparent: true, side: T.BackSide })]) world.add(new T.Mesh(geo, m));
+    world.add(new T.Sprite(new T.SpriteMaterial({ map: tex, transparent: true, depthWrite: false })));
+    world.add(new T.Points(pts, new T.PointsMaterial({ map: tex, transparent: true, depthWrite: false })), new T.Points(pts, new T.PointsMaterial({ vertexColors: true, transparent: true, depthWrite: false })));
+    world.add(new T.Line(pts, new T.LineBasicMaterial({ transparent: true })), new T.LineSegments(pts, new T.LineBasicMaterial({ vertexColors: true })));
+    return (this._kit = { world, vm, vmClip });
+  },
+  // Starts building the shaders (above); done() once they're all built and the level can be shown (js/views.ts applySnap).
+  // The work is done a frame at a time by warmStep, from the game's loop.
+  warmup(done?: () => void) {
+    const r = this.renderer;
+    if (!r || !this.scene || !this.camera) { if (done) done(); return; }
+    if (this._warm) this._warmEnd(); // (one still going: put the scene back as it was first)
+    const gl = r.getContext(), ext = gl.getExtension('KHR_parallel_shader_compile');
+    const W: RWarm = (this._warm = { t0: performance.now(), tWait: 0, ext, done: done || null, tasks: [], stage: 0, frames: 0, undo: [], progs: [], mats: new Set() });
+    const extras: THREE.Object3D[] = [];
+    const put = (m: THREE.Object3D | null | undefined) => { if (m) { m.position.set(0, -50, 0); this.dynRoot.add(m); extras.push(m); } };
     try {
       if (G.Casings.warm) for (const m of G.Casings.warm()) put(m);
       if (G.Loot.meshFor) { put(G.Loot.meshFor(G.Gear.pack(G.Gear.medItem('bandage')))); }
       put(new THREE.Mesh(new THREE.PlaneGeometry(1, 1), this.bloodMats.spatter));
       if (G.Game.map) for (const m of G.Damage.warm(G.Game.map as unknown as Parameters<typeof G.Damage.warm>[0])) put(m);
+      this.debrisFx(); this.fishSetup(); this.pipTexture();
+      if (!this._arc) this.throwArc([], false); // (a throw's arc: its dots and the ring where it lands)
+      r.localClippingEnabled = true; // (as it is once there's a gun in your hands: clearStockNearEye)
     } catch (e) { console.warn('warmup', e); }
-    const hidden: THREE.Object3D[] = [];
-    for (const sc of [this.scene, this.vmScene]) sc.traverse((o: THREE.Object3D) => { if (!o.visible) { o.visible = true; hidden.push(o); } });
-    try {
-      this.renderer.compile(this.scene, this.camera); this.renderer.compile(this.vmScene, this.camera);
-      // (and the scope's picture: anything drawn into a texture is a different shader from the same thing on the screen, for
-      // all of the scene's materials, whatever gun you've got now: you can pick one up)
-      this.pipTexture(); this.renderer.setRenderTarget(this.pipRT!); this.renderer.compile(this.scene, this.camera); this.renderer.setRenderTarget(null);
-    } catch (e) { console.warn('warmup', e); }
-    for (const o of hidden) o.visible = false;
-    for (const m of extras) { m.removeFromParent(); m.traverse((o: any) => { if (o.geometry) o.geometry.dispose(); }); }
-    return performance.now() - t0;
+    const kit = this.warmKit();
+    kit.world.position.set(0, -50, 0); this.dynRoot.add(kit.world);
+    kit.vm.position.set(0, 0, -0.6); this.vmHolder.add(kit.vm);
+    // everything shown, and nothing culled (the real frames at the end draw all of it, into the shadow maps too)
+    const hidden: THREE.Object3D[] = [], culled: THREE.Object3D[] = [];
+    for (const sc of [this.scene, this.vmScene]) sc.traverse((o: THREE.Object3D) => { if (!o.visible) { o.visible = true; hidden.push(o); } if (o.frustumCulled) { o.frustumCulled = false; culled.push(o); } });
+    W.undo.push(() => {
+      for (const o of hidden) o.visible = false;
+      for (const o of culled) o.frustumCulled = true;
+      kit.world.removeFromParent(); kit.vm.removeFromParent();
+      for (const m of extras) { m.removeFromParent(); m.traverse((o: any) => { if (o.geometry) o.geometry.dispose(); }); }
+    });
+    // each place things are drawn, one compile a task: (scene, camera, what it's drawn into, the layer a pass draws and the
+    // material it draws everything in, if it's such a pass)
+    // (three.js compiles for the clipping planes the last thing drawn had: a stock in your hands has one. Drawing nothing
+    // sets them to the renderer's own, none, or here one, for the stocks)
+    const empty = this._empty || (this._empty = new THREE.Scene()), clipAt = (n: number) => { r.clippingPlanes = n ? [new THREE.Plane()] : []; r.render(empty, this.camera); r.clippingPlanes = []; };
+    // (away: another scene the world's samples are drawn in, the TVs' sets: they go there for it)
+    const compile = (scene: THREE.Scene, cam: THREE.Camera, target: THREE.WebGLRenderTarget | null, layer?: number, over?: THREE.Material, clip = 0, away = false) => W.tasks.push(() => {
+      if (away) scene.add(kit.world);
+      clipAt(clip);
+      const swapped: [any, THREE.Material][] = [];
+      scene.traverse((o: any) => { const m = o.material; if (m) for (const x of Array.isArray(m) ? m : [m]) W.mats.add(x); });
+      if (over) W.mats.add(over);
+      if (layer != null) {
+        kit.world.traverse((o) => o.layers.enable(layer));
+        cam.layers.set(layer);
+        if (over) scene.traverse((o: any) => { if (o.material && o.layers.test(cam.layers)) { swapped.push([o, o.material]); o.material = over; } });
+      }
+      try { r.setRenderTarget(target); r.compile(scene, cam); } catch (e) { console.warn('warmup', e); }
+      r.setRenderTarget(null);
+      for (const [o, m] of swapped) o.material = m;
+      if (layer != null) { cam.layers.set(0); kit.world.traverse((o) => o.layers.disable(layer)); }
+      if (away) this.dynRoot.add(kit.world);
+      if (clip) clipAt(0);
+    });
+    compile(this.scene, this.camera, null);
+    compile(this.vmScene, this.camera, null);
+    // (the stocks: in a scene of their own with the same lights as the gun's, so only they are built cut)
+    const vmClip = new THREE.Scene(); vmClip.environment = this.vmScene.environment; vmClip.add(kit.vmClip);
+    this.vmScene.traverse((l: any) => { if (l.isLight) vmClip.add(l.isSpotLight ? new THREE.SpotLight() : l.isPointLight ? new THREE.PointLight() : l.isDirectionalLight ? new THREE.DirectionalLight() : l.isHemisphereLight ? new THREE.HemisphereLight() : new THREE.AmbientLight()); });
+    compile(vmClip, this.camera, null, undefined, undefined, 1);
+    // (anything drawn into a texture is a different shader from the same thing on the screen: the scope's picture, for all
+    // of the scene's materials, whatever gun you've got now, since you can pick one up; the fisheye's is the same)
+    compile(this.scene, this.camera, this.pipRT!);
+    compile(this.fishScene!, this.fishCam!, null);
+    if (G.Highlights && G.Highlights.warm) G.Highlights.warm((scene, cam, target, layer, over) => compile(scene, cam, target, layer, over, 0, true));
+    G.Game.veilSay('Compiling shaders');
+  },
+  // A frame of the warmup (from the game's loop): true while it's going, and nothing should be drawn. The compiles, as many
+  // as fit in a frame; then waiting for the driver to finish them; then the real frames, and the scene put back.
+  warmStep() {
+    const W = this._warm;
+    if (!W) return false;
+    const r = this.renderer, gl = r.getContext(), progs = (r.info.programs || []) as any[];
+    W.frames++;
+    if (W.stage === 0) {
+      // Three.js asks the driver how a program went (whether it linked, where its inputs are) as soon as it's made, which
+      // waits for it to be built: one after another. With the driver building them side by side, those questions wait
+      // till they're all done (below): till then a new program answers with nothing (PH_UNIFORMS), and nothing's drawn.
+      const t = performance.now(), had = Object.prototype.hasOwnProperty.call(progs, 'push'), push = progs.push;
+      if (W.ext) {
+        r.debug.checkShaderErrors = false;
+        progs.push = function (this: any[], ...ps: any[]) { for (const p of ps) { W.progs.push(p); p._getUniforms = p.getUniforms; p.getUniforms = () => PH_UNIFORMS; } return push.apply(this, ps); };
+      }
+      try { while (W.tasks.length && performance.now() - t < 12) W.tasks.shift()!(); }
+      finally { r.debug.checkShaderErrors = true; if (had) progs.push = push; else delete (progs as any).push; }
+      if (!W.tasks.length) { W.stage = 1; W.tWait = performance.now(); }
+      return true;
+    }
+    if (W.stage === 1) {
+      const left = W.progs.filter((p) => !gl.getProgramParameter(p.program, W.ext.COMPLETION_STATUS_KHR)).length;
+      if (left && performance.now() - W.tWait < 20000) { G.Game.veilSay(`Compiling shaders ${W.progs.length - left} / ${W.progs.length}`); return true; }
+      // (built: the questions asked now that they're quick, and every material compiled made to look its program up again
+      // the next time it's drawn, with its real inputs)
+      for (const p of W.progs) {
+        p.getUniforms = p._getUniforms; delete p._getUniforms;
+        if (!gl.getProgramParameter(p.program, gl.LINK_STATUS)) console.error('THREE.WebGLProgram: shader error', p.name, gl.getProgramInfoLog(p.program));
+        else { p.getUniforms(); p.getAttributes(); }
+      }
+      if (W.progs.length) for (const m of W.mats) { const mp = r.properties.get(m) as any; mp.currentProgram = null; mp.__version = undefined; }
+      W.stage = 2;
+      W.waitMs = performance.now() - W.tWait;
+      return true;
+    }
+    // the real frames: a weapon light's shadow map drawn (nothing culled: every kind of thing that casts), with the
+    // outlines' passes and without (the depth shaders are built for the light counts the scene's last pass left)
+    const glow = this.hasGlow, s0 = this.spots[0];
+    try { for (const g of [true, false, false]) { s0.shadow.needsUpdate = true; this.hasGlow = g; this.render(); } } catch (e) { console.warn('warmup', e); }
+    this.hasGlow = glow; s0.shadow.needsUpdate = false;
+    this._warmEnd();
+    return true;
+  },
+  _warmEnd() {
+    const W = this._warm, r = this.renderer;
+    if (!W) return;
+    this._warm = null;
+    for (const f of W.undo) f();
+    // (cut short, a new level started under it: what was asked of the driver put right first)
+    const cut = W.progs.filter((p) => p._getUniforms);
+    for (const p of cut) { p.getUniforms = p._getUniforms; delete p._getUniforms; }
+    if (cut.length) for (const m of W.mats) { const mp = r.properties.get(m) as any; mp.currentProgram = null; mp.__version = undefined; }
+    // (kept for good: three.js lets a program go when the last material using it does, and the next level would build it again)
+    let n = 0;
+    for (const p of (r.info.programs || []) as any[]) if (!this._pinned.has(p)) { this._pinned.add(p); p.usedTimes++; n++; }
+    this.warmStats = { programs: n, ms: performance.now() - W.t0, waitMs: W.waitMs || 0, frames: W.frames };
+    if (W.done) W.done();
+  },
+  // the fisheye's pass (the death camera): the picture through a barrel distortion, onto the screen (made once: the first
+  // time it's needed, or the shaders are compiled)
+  fishSetup() {
+    if (!this.fishQuad) {
+      const mat = new THREE.ShaderMaterial({ depthTest: false, depthWrite: false,
+        uniforms: { map: { value: null }, k: { value: 0 }, ax: { value: 1 } },
+        vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+        // barrel: the edges squeezed in, the middle a little larger; the corners stay the corners
+        fragmentShader: this.TONE + ' uniform sampler2D map; uniform float k; uniform float ax; varying vec2 vUv; void main() { vec2 p = (vUv - 0.5) * 2.0; p.x *= ax; float r2 = dot(p, p), R2 = ax * ax + 1.0; vec2 q = p * (1.0 + k * r2) / (1.0 + k * R2); q.x /= ax; vec4 c = texture2D(map, q * 0.5 + 0.5); gl_FragColor = linearToOutputTexel(vec4(bpTone(c.rgb), c.a)); }', toneMapped: false });
+      this.fishQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat); this.fishQuad.frustumCulled = false;
+      this.fishScene = new THREE.Scene(); this.fishScene.add(this.fishQuad);
+      this.fishCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    }
+    return this.fishQuad;
   },
   render() {
     const r = this.renderer;
@@ -1235,17 +1446,7 @@ const G_R = {
     }
     if (fish) {
       r.setRenderTarget(null);
-      if (!this.fishQuad) {
-        const mat = new THREE.ShaderMaterial({ depthTest: false, depthWrite: false,
-          uniforms: { map: { value: null }, k: { value: 0 }, ax: { value: 1 } },
-          vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
-          // barrel: the edges squeezed in, the middle a little larger; the corners stay the corners
-          fragmentShader: this.TONE + ' uniform sampler2D map; uniform float k; uniform float ax; varying vec2 vUv; void main() { vec2 p = (vUv - 0.5) * 2.0; p.x *= ax; float r2 = dot(p, p), R2 = ax * ax + 1.0; vec2 q = p * (1.0 + k * r2) / (1.0 + k * R2); q.x /= ax; vec4 c = texture2D(map, q * 0.5 + 0.5); gl_FragColor = linearToOutputTexel(vec4(bpTone(c.rgb), c.a)); }', toneMapped: false });
-        this.fishQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat); this.fishQuad.frustumCulled = false;
-        this.fishScene = new THREE.Scene(); this.fishScene.add(this.fishQuad);
-        this.fishCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-      }
-      const u = this.fishQuad.material.uniforms;
+      const u = this.fishSetup().material.uniforms;
       u.map.value = this.fishRT!.texture; u.k.value = 0.3 * this.fk!; u.ax.value = this.fishRT!.width / this.fishRT!.height;
       r.clear();
       r.render(this.fishScene!, this.fishCam!);

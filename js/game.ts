@@ -1475,7 +1475,7 @@ const G_Game = {
     }
     G.R.update(dt);
     G.HUD.update(dt);
-    if (this.phase === 'menu' && G.MenuShow && G.MenuShow.live) G.MenuShow.render(G.R.renderer); else G.R.render();
+    if (this.phase === 'menu' && G.MenuShow && G.MenuShow.live) G.MenuShow.render(G.R.renderer); else if (!G.R.warmStep()) G.R.render(); // (the shaders being built under the veil: nothing drawn till they are, js/render.ts warmup)
     // the veil lifts once the new place has drawn veilN SMOOTH frames in a row (the first ones after a build upload textures and collect garbage: lifting
     // on those makes the wipe stutter off), or after 90 frames whatever they took (a slow machine still gets in)
     if (this.veilN > 0) {
