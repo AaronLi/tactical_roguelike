@@ -43,7 +43,7 @@ interface Enemy {
   id: number; type: EnemyKind; def: EnemyDef; x: number; y: number; z: number; yaw: number; hp: number; maxHp: number;
   alert: boolean; spot: number; tgt: string | null; tgtD: number; canSee: boolean; percT: number; cool: number; burstLeft: number; aiming: boolean; aimT: number;
   strafe: number; strafeT: number; idleT: number; idleYaw: number; pendingAlert: number; lostT: number; lastHit: string | null;
-  cover: EnemyCover | null; inCover: boolean; peek: boolean; peekT: number; coverT: number; coverStuck: number; crouch: boolean; nadeT: number;
+  cover: EnemyCover | null; inCover: boolean; peek: boolean; peekT: number; coverT: number; coverStuck: number; crouch: boolean; nadeT: number; nadeN?: number; pushing?: boolean; pushWait?: number;
   lastSeen: { x: number; y: number; z: number } | null; morale: number; broken: boolean; noise: { x: number; z: number } | null; holding: boolean; bold: boolean;
   mag: number; magMax: number; reloadT: number; bleedH: number; bleedL: number; wnd?: number[]; clotT: number; legs: number; arms: number; lung: boolean;
   drawn: boolean; drawT: number; surprisedT: number; suspicious: boolean; calmT: number; state: EnemyState; armed: boolean; shouts: number; complyCd: number;
@@ -1885,13 +1885,12 @@ const G_Server = {
           }
         }
       }
-      // flush a target that's ducked behind cover we can't shoot through
-      if (st.cr && d > 5 && d < 20 && !L.los(map, e.x, (e.y || 0) + 1.35 * s, e.z, st.p[0], st.p[1] + 0.75, st.p[2])) this.tryNade(e, st.p[0], st.p[2]);
     } else {
       e.aiming = false; e.peekDone = true; e.leanOut = 0;
       // just lost sight of them (round a door, behind its leaf): about half keep firing for a moment at where
       // they were, blind. Rounds rarely land, and only if you're still there and in the open.
       if (e.lostT === 0) {
+        e.pushing = false; e.pushWait = 0; // (lost sight again: a new push, if they make one)
         e.blind = !def.aimTime && Math.random() < 0.5;
         if (e.order && e.lastSeen && (e.sawAt || -99) > e.order.at && this.clock - e.order.rt > 4) this.retarget(e, e.lastSeen); // (the search starts again from where they were seen)
       }
@@ -1900,19 +1899,22 @@ const G_Server = {
         e.cool -= dt;
         if (e.cool <= 0) { this.fire(e, p as LivePlayer, true); e.cool = U.rf(0.15, 0.4); }
       } else e.cool = Math.max(e.cool, 0.6);
-      // lost sight: lob a grenade where they were last seen
-      if (e.lastSeen && e.lostT > 2 && e.lostT < 12 && !e.proof) { // (not at someone behind bulletproof glass: it'd come back at them)
-        const ld = Math.hypot(e.lastSeen.x - e.x, e.lastSeen.z - e.z);
-        if (ld > 5 && ld < 20) this.tryNade(e, e.lastSeen.x, e.lastSeen.z);
-      }
       const leash = Math.hypot(e.x - e.home.x, e.z - e.home.z) < 12;
       if (e.order) {
         // under a leader's order (callIn): to the spot by its own way in, and then searching outward from it
         const os = this.orderStep(e, dt);
         if (os) { mx = os.mx; mz = os.mz; sp = os.sp; e.holding = false; } else e.holding = true;
       } else if (this.brave(e) && e.lastSeen && e.lostT < 12 && leash && Math.hypot(e.lastSeen.x - e.x, e.lastSeen.z - e.z) > 2) {
-        e.cover = null; e.inCover = false; e.holding = false;
-        huntStep(); sp = 0.6; // advance cautiously toward where police were last seen
+        // a push on where police were last seen. A grenade goes first, if they have one and it's far enough off to be safe (5-20 m;
+        // not at someone behind bulletproof glass: it'd come back at them): thrown as the push starts, once a push, and they hold
+        // where they are till it's gone off, then go in behind it
+        if (!e.pushing) {
+          e.pushing = true;
+          const ld = Math.hypot(e.lastSeen.x - e.x, e.lastSeen.z - e.z);
+          if (ld > 5 && ld < 20 && !e.proof && this.tryNade(e, e.lastSeen.x, e.lastSeen.z)) e.pushWait = 3.0;
+        }
+        if ((e.pushWait || 0) > 0) { e.pushWait! -= dt; e.holding = true; }
+        else { e.cover = null; e.inCover = false; e.holding = false; huntStep(); sp = 0.6; } // advance cautiously toward where police were last seen
       } else {
         // dig in: stay put (in cover if they have it), crouched, watching the way the threat came from
         e.holding = true;
@@ -2452,16 +2454,19 @@ const G_Server = {
     return L.los(map, x, y + 1.1, z, px, y + 1.1, pz) && L.los(map, x, ey, z, px, ey, pz) && L.los(map, x, ey, z, ox, ey, oz);
   },
 
+  // A suspect's grenade (an Enforcer's, the Kingpin's), thrown at the start of a push (above): two each at most a level, half a minute
+  // or so apart, and no more than one in the level every ten seconds. Whether one was thrown.
   tryNade(e: Enemy, tx: number, tz: number) {
-    if (!e.def.nades || e.nadeT > 0 || this.nadeT > 0 || this.level < 2) return;
-    e.nadeT = 14 + Math.random() * 8;
-    this.nadeT = 5;
+    if (!e.def.nades || e.nadeT > 0 || this.nadeT > 0 || this.level < 2 || (e.nadeN || 0) >= 2) return false;
+    e.nadeT = 30 + Math.random() * 15; e.nadeN = (e.nadeN || 0) + 1;
+    this.nadeT = 10;
     const s = e.def.scale, p = [e.x, (e.y || 0) + 1.6 * s, e.z];
     const dx = tx - e.x, dz = tz - e.z, d = Math.hypot(dx, dz);
     const T = G.U.clamp(d / 11, 0.6, 1.5), g = 18;
     const v = [dx / T, (0.3 - p[1] + 0.5 * g * T * T) / T, dz / T];
     const r2 = (x: number) => Math.round(x * 100) / 100;
     G.Net.broadcast({ t: 'nade', id: 'enemy', e: e.id, p: p.map(r2), v: v.map(r2), fuse: 2.6, en: 1 });
+    return true;
   },
   // ---------------------------------------------------------------- flashbangs
   // A flashbang is a flash and a bang, and each does its own work. Anyone with the blast in sight (or half in sight: a
