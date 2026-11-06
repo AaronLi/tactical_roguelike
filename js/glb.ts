@@ -1312,9 +1312,9 @@ interface BakedIndex { version: number; three: string; src: string; guns: Record
   //  LOADING AT RUN TIME: the classic GLTFLoader, the boot's indexes, the preloads, what is ready (js/gunmodels.ts is the facade over these)
   // ===================================================================================================================
 
-  // three's GLTFLoader and the meshopt decoder as a classic script (assets/vendor/gltf-classic.js, built by tools/build_gltf_classic.mjs from the r149
-  // examples, on the page's own global THREE): a global GLTFClassic, so the page and the highlights' export worker load glTF the same way, no importmap
-  const GL = (globalThis as any).GLTFClassic;
+  // three's own GLTFLoader and meshopt decoder, from the same three as the global THREE (js/threeboot.ts: a global ThreeAddons, on the page and in the
+  // highlights' export worker alike)
+  const GL = (globalThis as any).ThreeAddons;
   if (GL && !G.GLB) {
     const loader = new GL.GLTFLoader().setMeshoptDecoder(GL.MeshoptDecoder), cache = new Map<string, Promise<any>>();
     G.GLB = {
@@ -1356,6 +1356,6 @@ interface BakedIndex { version: number; three: string; src: string; guns: Record
   };
 })();
 G.Models = G_Models;
-/** G.GLB: the glTF loader (made from assets/vendor/gltf-classic.js in js/glb.ts; tools replace it with their own). */
+/** G.GLB: the glTF loader (made from three's GLTFLoader in js/glb.ts; tools replace it with their own). */
 interface GlbModuleApi { ready: Promise<boolean>; load(url: string): Promise<any> }
 interface GameModules { Models: typeof G_Models; GLB?: GlbModuleApi }

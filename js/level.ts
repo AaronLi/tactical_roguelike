@@ -3130,7 +3130,7 @@ const G_Level = {
     wm.layers.enable(1);
     root.add(wm);
     const paintWalls = map.rooms.some((rm) => rm.dress);
-    if (paintWalls) wm.material.defines.LG_PAINT = 1; // (a resident's wallpaper: js/homes.ts paint)
+    if (paintWalls) wm.material.defines!.LG_PAINT = 1; // (a resident's wallpaper: js/homes.ts paint)
     // (which of them's which tile, and how they stood: a round takes cubes out of it, js/damage.ts)
     map.wallMesh = wm; map.wallIdx = new Map(walls.map(([x, z], i) => [z * W + x, i])); map.wallBase = (wm.instanceMatrix.array as Float32Array).slice();
 
@@ -3232,7 +3232,7 @@ const G_Level = {
     const metal = th.name === 'Bunker' || th.name === 'Research Lab' || th.name === 'Cold Storage' || th.name === 'Foundry' || th.name === 'Warehouse'; // (as js/materials.ts builds them)
     const leafMat = new THREE.MeshStandardMaterial({ color: metal ? 0x5d666e : 0x6e4a2c, roughness: metal ? 0.5 : 0.75, metalness: metal ? 0.5 : 0 });
     const lintelMat = new THREE.MeshStandardMaterial({ map: wtex, roughness: 0.85 });
-    if (paintWalls) lintelMat.defines.LG_PAINT = 1;
+    if (paintWalls) lintelMat.defines!.LG_PAINT = 1;
     const fireMat = new THREE.MeshStandardMaterial({ color: 0x5d666e, roughness: 0.5, metalness: 0.5 });
     const knobMat = new THREE.MeshStandardMaterial({ color: 0xb8a060, roughness: 0.3, metalness: 0.9 });
     const vaultMat = new THREE.MeshStandardMaterial({ color: 0x7a8288, roughness: 0.35, metalness: 0.85 });

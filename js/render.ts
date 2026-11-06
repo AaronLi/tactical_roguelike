@@ -576,8 +576,11 @@ const G_R = {
     for (let i = 0; i < 6; i++) {
       const s = new THREE.SpotLight(0xfff1dc, 0, 34, 0.3, 0.6, 1.6);
       s.target = new THREE.Object3D();
-      s.castShadow = true; s.shadow.autoUpdate = false; s.shadow.camera.near = 0.1;
-      s.shadow.map = new THREE.WebGLRenderTarget(512, 512, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
+      // (its map, 512 square, is made by three the first time it's drawn: drawn the first time the scene is, so every light has
+      // one from the start. three r186 lights what it's drawing from a light with no map yet with a stand-in it doesn't set up
+      // for comparing (fixed in r187): the draw fails and the whole level goes unlit, the GL saying "Mismatch between texture
+      // format and sampler type")
+      s.castShadow = true; s.shadow.autoUpdate = false; s.shadow.needsUpdate = true; s.shadow.camera.near = 0.1;
       this.scene.add(s, s.target); this.spots.push(s);
     }
     // what you see of someone else's light: its beam in the air, and the lamp itself
@@ -591,11 +594,14 @@ const G_R = {
     lg.fillStyle = lgr; lg.fillRect(0, 0, 32, 32);
     const laserDotTex = new THREE.CanvasTexture(lc);
     for (let i = 0; i < 6; i++) {
+      // (the light's shadow map is a depth texture three compares against, sampled as one: lit or not, the edge smoothed over a
+      // texel. It's made the first time it's drawn, so the beam picks it up as it's drawn.)
       const sh = this.spots[i].shadow, cone = new THREE.Mesh(cg, new THREE.ShaderMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
-        uniforms: { shMap: { value: sh.map.texture }, shMat: { value: sh.matrix } },
+        uniforms: { shMap: { value: null as THREE.Texture | null }, shMat: { value: sh.matrix } },
         // (brightest down the middle of it, nothing at its edges: no hard line round a beam in the air; it stops where its light does)
         vertexShader: 'uniform mat4 shMat; varying vec3 vC, vN, vV; varying vec4 vS; void main() { vC = color; vN = normalMatrix * normal; vec4 q = modelViewMatrix * vec4(position, 1.0); vV = -q.xyz; vS = shMat * modelMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * q; }',
-        fragmentShader: '#include <packing>\nuniform sampler2D shMap; varying vec3 vC, vN, vV; varying vec4 vS; void main() { vec3 s = vS.xyz / vS.w; if (s.z > unpackRGBAToDepth(texture2D(shMap, s.xy))) discard; float a = abs(dot(normalize(vN), normalize(vV))); gl_FragColor = vec4(vC * a * a * a * 0.11, 1.0); }' }));
+        fragmentShader: 'uniform sampler2DShadow shMap; varying vec3 vC, vN, vV; varying vec4 vS; void main() { vec3 s = vS.xyz / vS.w; if (texture(shMap, s) < 0.5) discard; float a = abs(dot(normalize(vN), normalize(vV))); gl_FragColor = vec4(vC * a * a * a * 0.11, 1.0); }' }));
+      cone.onBeforeRender = () => { cone.material.uniforms.shMap.value = sh.map ? sh.map.depthTexture : null; };
       const lamp = new THREE.Sprite(new THREE.SpriteMaterial({ map: laserDotTex, color: 0xfff4e0, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
       cone.visible = lamp.visible = false; cone.frustumCulled = false; this.scene.add(cone, lamp); this.cones.push({ cone, lamp });
     }
@@ -1199,7 +1205,7 @@ const G_R = {
           vec4 c0 = texture2D(map, vUv);
           float inside = smoothstep(1.0, 0.988, e), rim = smoothstep(1.0, 1.07, e);
           vec3 plain = c0.rgb * rest * rim;
-          if (inside <= 0.0) { gl_FragColor = LinearTosRGB(vec4(bpTone(plain), 1.0)); return; }
+          if (inside <= 0.0) { gl_FragColor = sRGBTransferOETF(vec4(bpTone(plain), 1.0)); return; }
           vec2 uv = ctr + (vUv - ctr) * (1.0 - 0.035 * e * e); // (pincushioned toward the edge)
           vec2 hq = texture2D(heatMap, uv).rg; float dist = hq.g > 0.0 ? 1.0 / hq.g - 1.0 : 1e4; // (distance: 1 / (1 + d))
           float blur = smoothstep(0.45, 1.0, e) * 2.2 + clamp(1.35 / max(dist, 0.05) - 0.12, 0.0, 2.6);
@@ -1232,7 +1238,7 @@ const G_R = {
           // the phosphor's afterglow: the last frame lingering (its output, as it was shown)
           vec3 pv = pow(texture2D(prev, vUv).rgb, vec3(2.2));
           col = max(col, pv * persist * 0.85) * (1.0 - 0.18 * persist) + pv * 0.18 * persist;
-          gl_FragColor = LinearTosRGB(vec4(bpTone(mix(plain, col, inside)), 1.0)); // (into a target: encoded here, copied to the screen as it is)
+          gl_FragColor = sRGBTransferOETF(vec4(bpTone(mix(plain, col, inside)), 1.0)); // (into a target: encoded here, copied to the screen as it is)
         }` });
   },
   // The heat (r) and distance (g: 1 / (1 + d), 0 far off) picture (for night vision's focus and thermal channel, and a

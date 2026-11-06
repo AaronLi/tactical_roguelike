@@ -7,17 +7,14 @@ self.G = self.G || ({} as GameNamespace); // (the page, or the highlights' expor
 // way to the screen. (three's legacy mode lit the sRGB numbers as they were: a saturated colour went fluorescent
 // under a bright lamp, and the falloff into shadow was a cliff.) So: colours convert as they're set, canvas and
 // loaded textures are marked sRGB (decoded as they're sampled; the light grid's and render targets' data stay
-// linear), and every renderer writes sRGB.
+// linear), and every renderer writes sRGB. (three does the first and the last itself, ColorManagement and the
+// renderer's outputColorSpace; a texture it can't know is a picture, so the canvases and loaded ones are marked here.)
 if (window.THREE) {
   const THREE = window.THREE;
-  THREE.ColorManagement.legacyMode = false;
   const CT: any = THREE.CanvasTexture;
-  (THREE as any).CanvasTexture = class extends CT { constructor(...a: any[]) { super(...a); this.encoding = THREE.sRGBEncoding; } };
+  (THREE as any).CanvasTexture = class extends CT { constructor(...a: any[]) { super(...a); this.colorSpace = THREE.SRGBColorSpace; } };
   const load = THREE.TextureLoader.prototype.load;
-  THREE.TextureLoader.prototype.load = function (this: any, ...a: any[]) { const t = (load as any).apply(this, a); t.encoding = THREE.sRGBEncoding; return t; };
-  const WR: any = THREE.WebGLRenderer;
-  (THREE as any).WebGLRenderer = function (...a: any[]) { const r = new WR(...a); r.outputEncoding = THREE.sRGBEncoding; return r; };
-  THREE.WebGLRenderer.prototype = WR.prototype;
+  THREE.TextureLoader.prototype.load = function (this: any, ...a: any[]) { const t = (load as any).apply(this, a); t.colorSpace = THREE.SRGBColorSpace; return t; };
 }
 
 const G_U = {

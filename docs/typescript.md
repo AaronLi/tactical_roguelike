@@ -24,8 +24,10 @@ before. `js/types/globals.d.ts` declares what all of them share:
 - `G` (the `GameNamespace` interface) and `Peer` (PeerJS, from the CDN, untyped);
 - browser extras the standard library doesn't know (`webkitAudioContext`, `performance.memory`).
 
-`THREE` (value and types) comes from `@types/three` 0.149.0, the game's r149, as the global `THREE` namespace;
-`js/types/three-extra.d.ts` adds the two colour-space constants those types leave out.
+`THREE` (value and types) comes from `@types/three` 0.186.0, for the game's three r186.1, as the global `THREE`
+namespace (`js/types/three-global.d.ts`: the types no longer declare it themselves). On the page it's put there by the
+one module, `js/threeboot.ts` (three's ES module build and its glTF loader, from jsDelivr, pinned), which runs before
+the game's scripts: they're all `defer`, and deferred and module scripts run in the order they're written.
 
 Each file declares what it puts on `G` (interfaces merge across scripts):
 
@@ -39,7 +41,7 @@ interface GameModules { Level: typeof G_Level; }
 error, and every call from one file into another is checked against the callee's real signature. Fields a module
 gains at runtime go in a `NameFields` interface next to it (`typeof G_Me & MeFields`).
 
-Adding a file: create `js/<name>.ts`, add `<script src="dist/js/<name>.js">` to `index.html` in the right order,
+Adding a file: create `js/<name>.ts`, add `<script defer src="dist/js/<name>.js">` to `index.html` in the right order,
 and to `js/exportworker.ts`'s list if the highlights' replay needs it.
 
 ## Status

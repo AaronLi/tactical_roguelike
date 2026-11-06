@@ -100,7 +100,7 @@ const G_LightGrid = (() => {
       reflectedLight.directDiffuse += diffuseColor.rgb * lgNv.w * nvc * nvf * nvf * clamp(dot(normalize(vLgN), nvd / nvr), 0.0, 1.0) / (1.0 + nvr * nvr) * (0.15 + 0.85 * smoothstep(0.5, 1.8, nvr)); // (the gun in your hands below the head-mounted lamp, mostly out of its beam)
     }
     #include <lights_fragment_end>`;
-  function patch(shader: THREE.Shader) {
+  function patch(shader: THREE.WebGLProgramParametersWithUniforms) {
     if (!shader.fragmentShader.includes('#include <lights_fragment_end>') || !shader.vertexShader.includes('#include <worldpos_vertex>')) return;
     Object.assign(shader.uniforms, U);
     shader.vertexShader = VS_HEAD + shader.vertexShader.replace('#include <worldpos_vertex>', '#include <worldpos_vertex>' + VS_BODY);
