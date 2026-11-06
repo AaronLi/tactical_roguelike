@@ -1410,7 +1410,23 @@ const G_Server = {
   // bleeding, every tick; true when it killed them. (BLEED_K: everyone bleeds at this share of the wounds' rates, as
   // officers do: js/medical.ts)
   BLEED_K: 0.5,
+  // A thermobaric's injuries (e.tb: its burns and its blast, each a share of a life, js/player.ts tbDose), each a kind of harm of its own
+  // that goes on after the fireball, as a bleed does, and that cuffing them doesn't stop and nothing clots:
+  //   burns: burn shock, the fluid the burned skin weeps away, faster the more of them is burned (BURN_K a second, of a person, for
+  //     each share of a life the burns did)
+  //   blast lung: the air sacs torn by the pressure, filling: less and less air, faster the harder the blast (LUNG_K likewise)
+  // So anyone caught in the fireball itself and still alive (its burns alone near half a life) goes in under a minute; at its edge
+  // the harm's slow enough to outlast a level. A death of it is the thrower's (a civilian's counted as killed), of burns or the
+  // blast, whichever drained more (cz).
+  TB_HARM: { BURN_K: 0.004, LUNG_K: 0.004 },
+  tbRate(e: Enemy) { if (!e.tb) return 0; const H = this.TB_HARM, person = e.maxHp * (100 / e.def.hp); return (e.tb.burn * H.BURN_K + e.tb.blast * H.LUNG_K) * person; },
   injuryTick(e: Enemy, dt: number) {
+    const tr = this.tbRate(e);
+    if (tr > 0 && e.hp > 0) {
+      e.hp -= tr * dt;
+      if (!e.def.civ && e.morale != null) e.morale = Math.max(0, e.morale - dt * 0.6 * tr / e.maxHp);
+      if (e.hp <= 0) { e.hp = 0.01; this.applyHit({ e: e.id, d: 1, bo: 1, cz: e.tb!.burn * this.TB_HARM.BURN_K >= e.tb!.blast * this.TB_HARM.LUNG_K ? 'burns' : 'blast' }, e.lastHit); return true; }
+    }
     if (e.state === 'cuffed') { e.bleedH = e.bleedL = 0; e.wnd = undefined; return false; }
     if (e.bleedL) { e.clotT = (e.clotT || 0) + dt; if (e.clotT > 30) { e.bleedL = 0; e.clotT = 0; } }
     const b = ((e.bleedH || 0) + (e.bleedL || 0)) * this.BLEED_K;
@@ -1491,7 +1507,7 @@ const G_Server = {
     if (!(d > 0)) return;
     e.hp -= d;
     if (!m.bo) { e.lastHit = from; e.lastHitAt = this.clock || 0; e.lastH = !!m.h; e.lastAp = !!m.ap; e.hitState = e.state; e.hitUnaware = !e.alert || (e.surprisedT || 0) > 0; e.hitYield = this.wouldYield(e);
-      if (Array.isArray(m.tb) && m.tb.length === 2 && m.tb.every(Number.isFinite)) { const t = e.tb || (e.tb = { burn: 0, blast: 0, n: 0 }); t.burn += G.U.clamp(m.tb[0], 0, 2); t.blast += G.U.clamp(m.tb[1], 0, 2); t.n++; } // (a thermobaric's burns and blast, for F9: js/hud.ts)
+      if (Array.isArray(m.tb) && m.tb.length === 2 && m.tb.every(Number.isFinite)) { const t = e.tb || (e.tb = { burn: 0, blast: 0, n: 0 }); t.burn += G.U.clamp(m.tb[0], 0, 2); t.blast += G.U.clamp(m.tb[1], 0, 2); t.n++; } // (a thermobaric's burns and blast: injuries of their own, injuryTick; and for F9, js/hud.ts)
       e.lastGr = Number.isFinite(m.gr) ? m.gr : 0; e.lastFb = e.flashT! > 0 ? e.flashId || 0 : 0; } // bleeding out is judged by what they were doing when shot (and for the highlights: a frag grenade's, gr its seed; blind from a flashbang, which)
     // Shock: being hit wrecks your aim for a moment (most of it, for a hard hit), throws off the shot you were
     // about to take, and starts your aim over from the body. It fades over a couple of seconds.
@@ -1543,6 +1559,7 @@ const G_Server = {
       if (e.lastAp && !hl.bo) hl.ap = 1; // (the round that did it went through their armour)
       if (!hl.bo && e.lastGr) hl.gr = e.lastGr; // (a frag grenade did it: which)
       if (!hl.bo && e.lastFb) hl.fb = e.lastFb; // (blind from a flashbang when it was done: which)
+      if (m.cz === 'burns' || m.cz === 'blast') { hl.cz = m.cz; if (e.lastGr) hl.gr = e.lastGr; } // (died of a thermobaric's burns or blast lung: injuryTick; the grenade's)
       G.Net.broadcast(Object.assign({ t: 'kill', e: e.id, by: from, cr, h: !!m.h, ty: e.type, why, inc: inc ? 1 : 0, wd: e.wnd && e.wnd.length ? e.wnd : undefined }, hl));
       this.checkClear();
     }
