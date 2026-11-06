@@ -882,9 +882,15 @@ export const AR15_LOAD_RACK_UNLOAD = chainScenes('ar15-load-rack-unload', 'AR-15
   { label: 'mag-out', at: 2.05, scene: AR15_MAG_OUT, gainDb: 6 },
 ]);
 
+/** Just the magazine: a loaded magazine in, a short pause, and back out. */
+export const AR15_MAG_IN_OUT = chainScenes('ar15-mag-in-out', 'AR-15: mag in, mag out', [
+  { label: 'mag-in', at: 0, scene: AR15_MAG_IN },
+  { label: 'mag-out', at: 0.9, scene: AR15_MAG_OUT, gainDb: 4 },
+]);
+
 export const FIREARM_SCENES: Scene[] = [
   PUMP_SHOTGUN,
   AR15_CHARGE, AR15_CHARGE_EMPTY, AR15_CHARGE_NO_MAG,
   AR15_BOLT_RELEASE, AR15_BOLT_RELEASE_EMPTY, AR15_BOLT_RELEASE_NO_MAG,
-  AR15_MAG_IN, AR15_MAG_IN_EMPTY, AR15_MAG_OUT, AR15_MAG_OUT_EMPTY, AR15_LOAD_RACK_UNLOAD,
+  AR15_MAG_IN, AR15_MAG_IN_EMPTY, AR15_MAG_OUT, AR15_MAG_OUT_EMPTY, AR15_LOAD_RACK_UNLOAD, AR15_MAG_IN_OUT,
 ];

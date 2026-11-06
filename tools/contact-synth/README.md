@@ -97,6 +97,7 @@ Other scenes, in `src/scenes/firearms.ts`:
   - The catch clicks into the hole in the magazine's side, the magazine hits its stop, and it settles back onto the catch. With a loaded magazine, the top round presses against the bolt carrier.
 - `ar15-mag-out`, `ar15-mag-out-empty`: the finger presses the mag release button and draws the catch out (nearly silent). The magazine falls from rest out of the well, speeding up, and touches nothing once it's clear; then the button springs back.
 - `ar15-load-rack-unload`: the full cycle, made with `chainScenes`: a loaded magazine in, the charging handle racked and released (chambering a round), and the magazine out, with the hand's travel between them and a level balance between the parts.
+- `ar15-mag-in-out`: just the magazine: a loaded magazine in, a short pause, and back out.
 
 The forward run is simulated from the reciprocating mass, the spring force and each magazine state's drag. Loaded takes 24.7 ms to the bolt face, empty 24.0 ms and no magazine 23.7 ms.
 
