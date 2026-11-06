@@ -939,33 +939,65 @@ const SURFACE = {
 // USGI magazines have a stamped steel floorplate.
 const magFloorplate = { ...mat('steel'), shape: 'plate', size: 7, thickness: 1, modes: 1, irregularity: 0.5, damping: 0.5, level: 0 };
 const magFeedLips = { ...mat('aluminum'), shape: 'plate', size: 4, thickness: 0.9, modes: 0, irregularity: 0.8, damping: 0.5, level: 0 };
-function dropParts(n) {
-    const f = n / 30;
-    const shell = { ...mat('aluminum'), shape: 'plate', size: 18, thickness: 0.9, modes: Math.round(5 - 3 * f), irregularity: 0.85, damping: 0.25 + 0.45 * f, level: 0 };
-    const edge = { ...shell, size: 6, modes: 0, damping: Math.min(0.9, shell.damping + 0.25) };
-    const airLen = Math.max(1.5, 16 * (1 - f));
+const MAG_POLYMER = { ...mat('nylon'), material: 'custom', stiffness: 2.4, loss: 0.05 };
+export const MAG_TYPES = {
+    // USGI 30-round: 0.9 mm aluminium, ~18 x 6 x 2.2 cm, 0.11 kg + a 10 g follower; 5.56 rounds of ~12 g, ~5 mm each.
+    ar15: { id: 'ar15', name: 'AR-15 (USGI 30-round)', capacity: 30, dims: [0.18, 0.06, 0.022], shellMass: 0.11, followerMass: 0.01, roundMass: 0.012, stackPerRound: 0.005,
+        springPreload: 10, springRate: 130, wall: mat('aluminum'), wallMm: 0.9, wallModes: 5, wallDamping: 0.25, bounce: 1, edgeHardness: 1,
+        floorplate: magFloorplate, lips: magFeedLips, round: arCase, follower: arFollower, spring: arMagSpring },
+    // AKM steel 30-round: stamped ~1 mm steel, ribbed, ~23.5 x 7.5 x 3 cm, ~0.32 kg; 7.62x39 rounds ~16 g, ~6.5 mm
+    // each along its curve; a stiffer spring for the heavier stack; steel floorplate and thick steel lips.
+    kv47: { id: 'kv47', name: 'KV-47 (AKM steel 30-round)', capacity: 30, dims: [0.235, 0.075, 0.03], shellMass: 0.3, followerMass: 0.02, roundMass: 0.0163, stackPerRound: 0.0065,
+        springPreload: 14, springRate: 150, wall: mat('steel'), wallMm: 1, wallModes: 4, wallDamping: 0.3, bounce: 1, edgeHardness: 1,
+        floorplate: { ...mat('steel'), shape: 'plate', size: 8, thickness: 1.2, modes: 1, irregularity: 0.5, damping: 0.5, level: 0 },
+        lips: { ...mat('steel'), shape: 'plate', size: 5, thickness: 1.2, modes: 0, irregularity: 0.7, damping: 0.5, level: 0 },
+        round: { ...arCase, size: 5.6, thickness: 7 }, follower: { ...arFollower, ...mat('steel'), modes: 1 }, spring: springWire(10, 1.3) },
+    // MP5 steel 30-round (curved): ~0.8 mm steel, ~20 x 5.5 x 2.5 cm, ~0.12 kg; 9 mm rounds ~8 g, ~4.7 mm each.
+    mp5: { id: 'mp5', name: 'MP5 (steel 30-round)', capacity: 30, dims: [0.2, 0.055, 0.025], shellMass: 0.12, followerMass: 0.01, roundMass: 0.008, stackPerRound: 0.0047,
+        springPreload: 9, springRate: 110, wall: mat('steel'), wallMm: 0.8, wallModes: 4, wallDamping: 0.3, bounce: 1, edgeHardness: 1,
+        floorplate: { ...mat('steel'), shape: 'plate', size: 6, thickness: 1, modes: 1, irregularity: 0.5, damping: 0.5, level: 0 },
+        lips: { ...mat('steel'), shape: 'plate', size: 3.5, thickness: 0.8, modes: 0, irregularity: 0.7, damping: 0.5, level: 0 },
+        round: { ...arCase, size: 2.9, thickness: 9 }, follower: arFollower, spring: springWire(8, 1) },
+    // G19 15-round: polymer over a steel liner, ~12.5 x 3.4 x 2.6 cm, ~0.07 kg; 9 mm rounds, ~6.5 mm each; a stiff
+    // short spring; a polymer floorplate; the feed lips are the steel liner's. Polymer bounces less and doesn't ring.
+    g19: { id: 'g19', name: 'G19 (15-round)', capacity: 15, dims: [0.125, 0.034, 0.026], shellMass: 0.062, followerMass: 0.006, roundMass: 0.008, stackPerRound: 0.0065,
+        springPreload: 9, springRate: 220, wall: MAG_POLYMER, wallMm: 2, wallModes: 0, wallDamping: 0.55, bounce: 0.75, edgeHardness: 0.25,
+        floorplate: { ...MAG_POLYMER, shape: 'plate', size: 3.5, thickness: 3, modes: 0, irregularity: 0.5, damping: 0.65, level: 0 },
+        lips: { ...mat('steel'), shape: 'plate', size: 3, thickness: 0.5, modes: 0, irregularity: 0.7, damping: 0.5, level: 0 },
+        round: { ...arCase, size: 2.9, thickness: 9 }, follower: { ...arFollower, ...MAG_POLYMER, modes: 0 }, spring: springWire(6, 1) },
+};
+function dropParts(M, n) {
+    const f = n / M.capacity;
+    const L = M.dims[0] * 100;
+    const shell = { ...M.wall, shape: 'plate', size: L, thickness: M.wallMm, modes: Math.round(M.wallModes * (1 - 0.6 * f)), irregularity: 0.85, damping: M.wallDamping + 0.45 * f, level: 0 };
+    const edge = { ...shell, size: M.dims[1] * 100, modes: 0, damping: Math.min(0.9, shell.damping + 0.25) };
+    // The hollow below the stack (the stack sits at the top, against the lips).
+    const airLen = Math.max(1.5, (L - 2) * (1 - f));
     const housing = {
-        ...MAG_HOUSING, amount: 0.7 - 0.35 * f, cavity: 0.85 * Math.pow(1 - f, 1.5) + 0.02, damping: 0.35 + 0.4 * f,
-        cavities: [{ length: airLen, width: 5.8, depth: 2, q: 22 - 14 * f, level: 1 }],
+        ...MAG_HOUSING, ...M.wall, shape: 'plate', size: L, thickness: M.wallMm, modes: Math.min(2, M.wallModes),
+        amount: (0.7 - 0.35 * f) * (M.wallModes ? 1 : 0.7), cavity: (0.85 * Math.pow(1 - f, 1.5) + 0.02) * (M.wallModes ? 1 : 0.6), damping: M.wallDamping + 0.1 + 0.4 * f,
+        cavities: [{ length: airLen, width: M.dims[1] * 100 - 0.2, depth: M.dims[2] * 100 - 0.2, q: (22 - 14 * f) * (M.wallModes ? 1 : 0.4), level: 1 }],
     };
-    // The stack: ~5 mm of magazine per round (double column), a brass and lead block.
-    const stack = { ...mat('brass'), shape: 'block', size: Math.max(1.5, n * 0.5), thickness: 10, modes: 0, irregularity: 0.7, damping: 0.85, level: 0 };
+    // The stack: a brass and lead block, its length the rounds' share of the magazine.
+    const stack = { ...mat('brass'), shape: 'block', size: Math.max(1.5, n * M.stackPerRound * 100), thickness: M.dims[2] * 450, modes: 0, irregularity: 0.7, damping: 0.85, level: 0 };
     // The whole magazine as it lands, its walls loaded by the rounds.
-    const load = (0.12 + 0.012 * n) / 0.12;
+    const empty = M.shellMass + M.followerMass;
+    const load = (empty + M.roundMass * n) / empty;
     const loaded = { ...shell, density: (shell.density ?? 2700) * load };
     return { f, shell, edge, housing, stack, loaded, inMag: { housing } };
 }
 /** The magazine and its contents as a rigid body for the simulation. */
 export function magDropSpec(o) {
-    const n = o.rounds, f = n / 30, L = 0.18;
+    const M = MAG_TYPES[o.mag ?? 'ar15'];
+    const n = o.rounds, f = n / M.capacity, [L, Wd] = M.dims;
     const sf = SURFACE[o.surface ?? 'concrete'];
-    const rng = makeRng(1000 + (o.seed ?? 1) * 97 + n * 7 + ['bottom', 'top', 'sideways', 'forwards'].indexOf(o.way) * 13);
+    const salt = M.id === 'ar15' ? 0 : [...M.id].reduce((a, c) => a + c.charCodeAt(0), 0);
+    const rng = makeRng(1000 + (o.seed ?? 1) * 97 + n * 7 + ['bottom', 'top', 'sideways', 'forwards'].indexOf(o.way) * 13 + salt);
     const j = (x) => x * (rng() * 2 - 1);
-    const stackLen = Math.max(0.01, n * 0.005);
-    // USGI spring: ~10 N on an empty follower, rising ~130 N/m as it's compressed by the stack.
+    const stackLen = Math.max(0.01, n * M.stackPerRound);
     const contents = {
-        mass: 0.01 + 0.012 * n, x: L / 2 - stackLen / 2, length: stackLen, springRate: 130, preload: 10 + 130 * n * 0.005,
-        travel: Math.max(0.002, 0.16 * (1 - f) * 0.7), damping: 0.5 + 3 * f,
+        mass: M.followerMass + M.roundMass * n, x: L / 2 - stackLen / 2, length: stackLen, springRate: M.springRate, preload: M.springPreload + M.springRate * stackLen,
+        travel: Math.max(0.002, (L - 0.02) * (1 - f) * 0.7), damping: 0.5 + 3 * f,
     };
     const h = o.height ?? 1.2;
     let q, spin, half;
@@ -982,41 +1014,69 @@ export function magDropSpec(o) {
     else if (o.way === 'sideways') {
         q = quatMul(axisAngle([0, 0, 1], j(0.4)), axisAngle([1, 0, 0], j(1)));
         spin = [12 + j(3), j(0.6), j(0.6)];
-        half = 0.035;
+        half = Wd * 0.6;
     }
     else {
         q = quatMul(axisAngle([0, 0, 1], j(0.4)), axisAngle([0, 1, 0], -0.3 + j(0.3)));
-        spin = [j(0.6), 9 + j(2), j(0.6)];
-        half = 0.06;
+        spin = [j(0.6), 9 * (0.18 / L) ** 0.5 + j(2), j(0.6)];
+        half = L / 3;
     }
-    const surfaceSpec = { restitution: sf.restitution * (1 - 0.4 * f), friction: sf.friction, stiffness: sf.stiffness };
+    const surfaceSpec = { restitution: sf.restitution * M.bounce * (1 - 0.4 * f), friction: sf.friction, stiffness: sf.stiffness };
     return {
-        dims: [L, 0.06, 0.022], mass: 0.11, contents, surfaces: boxSurfaces(surfaceSpec, o.box || undefined, 0.18),
+        dims: M.dims, mass: M.shellMass, contents, surfaces: boxSurfaces(surfaceSpec, o.box || undefined, 0.18),
         position: [(o.start ?? 0) + j(0.05), j(0.05), h + half], orientation: q, velocity: [(o.toss ?? 0.15) + j(0.05), j(0.08), 0], spin,
         duration: 3, dt: 1e-5, traceRate: 240,
     };
 }
-/** The sound of a simulated drop: one hit per contact, one rub per slide, plus the contents. */
-export function magDropScene(o, sim = simulateBoxDrop(magDropSpec(o))) {
+/**
+ * The sound of a simulated drop: one hit per contact, one rub per slide, plus the contents. Without a simulation
+ * given, the drop is simulated the first time the scene's tracks are read (64 of them would otherwise take
+ * seconds to load).
+ */
+export function magDropScene(o, sim) {
+    const full = () => buildMagDropScene(o, sim ?? simulateBoxDrop(magDropSpec(o)));
+    if (sim)
+        return full();
+    const head = dropHead(o);
+    let built = null;
+    return { ...head, get tracks() { built ??= full(); return built.tracks; } };
+}
+/** A drop's id, title and room, without simulating it. */
+function dropHead(o) {
+    const M = MAG_TYPES[o.mag ?? 'ar15'], n = o.rounds;
+    const third = Math.round(M.capacity / 3);
+    const fillName = n === 0 ? 'empty' : n === M.capacity ? 'full' : n <= third ? 'third' : 'two-thirds';
+    const fillTitle = n === 0 ? 'empty' : n === M.capacity ? `full (${n} rounds)` : `${n <= third ? '1/3' : '2/3'} full (${n} rounds)`;
+    const wayTitle = { bottom: 'lands on its floorplate', top: 'lands on its feed lips', sideways: 'tumbling sideways', forwards: 'tumbling end over end' }[o.way];
+    const surf = o.surface ?? 'concrete';
+    return {
+        id: `${M.id}-mag-drop-${o.box ? surf + '-box-' : surf === 'concrete' ? '' : surf + '-'}${o.way}-${fillName}`,
+        title: `${M.name} magazine dropped on ${surf}${o.box ? ' in a walled box' : ''}, ${fillTitle}, ${wayTitle} (simulated)`,
+        room: o.box ? 0.08 : 0.12,
+        roomSize: 0.45,
+    };
+}
+function buildMagDropScene(o, sim) {
+    const M = MAG_TYPES[o.mag ?? 'ar15'];
     const n = o.rounds;
-    const { f, shell, edge, stack, loaded, inMag } = dropParts(n);
+    const { f, shell, edge, stack, loaded, inMag } = dropParts(M, n);
     const sf = SURFACE[o.surface ?? 'concrete'];
-    const mTot = 0.12 + 0.012 * n;
-    const e = sf.restitution * (1 - 0.4 * f);
+    const mTot = M.shellMass + M.followerMass + M.roundMass * n;
+    const e = sf.restitution * M.bounce * (1 - 0.4 * f);
     // Levels: every element renders normalised, so each gets its level from its impulse, relative to
     // the magazine landing square at full speed.
     const Jref = mTot * DROP_V * (1 + e);
     const db = (J) => 20 * Math.log10(Math.max(1e-6, J) / Jref);
-    const lips = n === 0 ? magFeedLips : { ...magFeedLips, damping: 0.6 };
+    const lips = n === 0 ? M.lips : { ...M.lips, damping: 0.6 };
     const els = [];
-    const opt = (radius, sharp = 0.85) => ({ scatter: 0, radius, click: 0.8 - 0.45 * f, sharp: sharp - 0.25 * f });
+    const opt = (radius, sharp = 0.85) => ({ scatter: 0, radius, click: (0.8 - 0.45 * f) * (0.6 + 0.4 * M.edgeHardness), sharp: (sharp - 0.25 * f) * M.edgeHardness });
     const where = (s) => (s === 'floor' ? '' : ` (${s})`);
     // How loose the magazine is: empty is all play; the stack holds the walls still as it fills.
-    const loose = f < 0.5 ? { shellBuzz: { amount: 0.4 * (1 - 2 * f), freq: 140, decay: 0.035, rattle: 0.65 * (1 - 2 * f), wobble: 0, tone: 0 } } : null;
+    const loose = f < 0.5 && M.wallModes ? { shellBuzz: { amount: 0.4 * (1 - 2 * f), freq: 140, decay: 0.035, rattle: 0.65 * (1 - 2 * f), wobble: 0, tone: 0 } } : null;
     const PART = {
-        'bottom-end': { what: 'floorplate lands flat', layer: magFloorplate, radius: 6, trim: 0 },
-        'bottom-end-edge': { what: 'edge of the floorplate lands', layer: magFloorplate, radius: 2, trim: 0 },
-        'bottom-corner': { what: 'floorplate corner lands', layer: magFloorplate, radius: 1.2, sharp: 0.9, trim: 0 },
+        'bottom-end': { what: 'floorplate lands flat', layer: M.floorplate, radius: 6, trim: 0 },
+        'bottom-end-edge': { what: 'edge of the floorplate lands', layer: M.floorplate, radius: 2, trim: 0 },
+        'bottom-corner': { what: 'floorplate corner lands', layer: M.floorplate, radius: 1.2, sharp: 0.9, trim: 0 },
         'top-end': { what: 'feed lips land', layer: lips, radius: 2, sharp: 0.95, trim: 0, round: true },
         'top-end-edge': { what: 'edge of the feed lips lands', layer: lips, radius: 1.5, sharp: 0.95, trim: 0, round: true },
         'top-corner': { what: 'top corner lands', layer: lips, radius: 1, sharp: 0.9, trim: 0 },
@@ -1032,13 +1092,13 @@ export function magDropScene(o, sim = simulateBoxDrop(magDropSpec(o))) {
         const v = Math.max(0.05, ct.speed);
         const o2 = opt(p.radius, p.sharp);
         const what = p.what + where(ct.surface);
-        // A lightly loaded magazine's thin shell isn't held still from inside: it buzzes against the
+        // A lightly loaded magazine's thin metal shell isn't held still from inside: it buzzes against the
         // follower, the spring and the floorplate's tabs for a moment after each blow.
         els.push(hit(what, ct.t, g, v, loaded, sf.body, o2, loose ? { ...inMag, flex: loose.shellBuzz } : inMag));
         if (p.layer && g > -35)
-            els.push(hit(`${what} (the ${p.layer === magFloorplate ? 'floorplate' : p.layer === edge ? 'edge' : 'feed lips'} rings)`, ct.t, g - 7 - 5 * f, v, p.layer, sf.body, o2, inMag));
+            els.push(hit(`${what} (the ${p.layer === M.floorplate ? 'floorplate' : p.layer === edge ? 'edge' : 'feed lips'} rings)`, ct.t, g - 7 - 5 * f, v, p.layer, sf.body, o2, inMag));
         if (p.round && n > 0 && g > -35)
-            els.push(hit('top round strikes' + where(ct.surface), ct.t + 0.0003, g - 8, v * 0.8, arCase, sf.body, { scatter: 0, radius: 1.5, click: 0.6, sharp: 0.7 }, inMag));
+            els.push(hit('top round strikes' + where(ct.surface), ct.t + 0.0003, g - 8, v * 0.8, M.round, sf.body, { scatter: 0, radius: 1.5, click: 0.6, sharp: 0.7 }, inMag));
         // Loose things inside ticking against the walls: an empty follower, a light stack's cases.
         if (n === 0 ? g > -32 : g > -22) {
             if (n === 0) {
@@ -1046,36 +1106,36 @@ export function magDropScene(o, sim = simulateBoxDrop(magDropSpec(o))) {
                 // off its seat it rattles from wall to wall, each knock lighter and sooner, for ~30 ms.
                 let dt = 0.004, kv = 0.35;
                 for (let i = 0; i < 6; i++) {
-                    els.push(hit('follower rattles in the shell', ct.t + dt, g - 9 - i * 2.2, v * kv, arFollower, i % 2 ? edge : shell, { scatter: 0, radius: 1.5, click: 0.6, sharp: 0.65 }, inMag));
+                    els.push(hit('follower rattles in the shell', ct.t + dt, g - 9 - i * 2.2, v * kv, M.follower, i % 2 ? edge : shell, { scatter: 0, radius: 1.5, click: 0.6, sharp: 0.65 * M.edgeHardness }, inMag));
                     dt += 0.0065 * Math.pow(0.82, i);
                     kv *= 0.78;
                 }
                 // The long, barely compressed spring: its coils slap the walls and buzz.
-                els.push(hit('spring coils buzz against the walls', ct.t + 0.001, g - 11, v * 0.4, arMagSpring, shell, { scatter: 0, radius: 1, click: 0.3, sharp: 0.5 }, { ...inMag, flex: { amount: 0.6, freq: 85, decay: 0.07, rattle: 0.85, wobble: 0, tone: 0 }, coil: { level: 0.35, length: 12, dispersion: 0.5, decay: 0.12, brightness: 3500 } }));
+                els.push(hit('spring coils buzz against the walls', ct.t + 0.001, g - 11, v * 0.4, M.spring, shell, { scatter: 0, radius: 1, click: 0.3, sharp: 0.5 }, { ...inMag, flex: { amount: 0.6, freq: 85, decay: 0.07, rattle: 0.85, wobble: 0, tone: 0 }, coil: { level: 0.35, length: 12 * M.dims[0] / 0.18, dispersion: 0.5, decay: 0.12, brightness: 3500 } }));
             }
             else {
                 const ticks = Math.round(4 * (1 - f));
                 for (let i = 0; i < ticks; i++)
-                    els.push(hit('cases tick against each other', ct.t + 0.005 + i * 0.0045 + (i % 2) * 0.0012, g - 13 - i * 2, v * (0.25 - i * 0.04), arCase, i % 2 ? shell : arCase, { scatter: 0, radius: 1.5, click: 0.5, sharp: 0.55 }, inMag));
+                    els.push(hit('cases tick against each other', ct.t + 0.005 + i * 0.0045 + (i % 2) * 0.0012, g - 13 - i * 2, v * (0.25 - i * 0.04), M.round, i % 2 ? shell : M.round, { scatter: 0, radius: 1.5, click: 0.5, sharp: 0.55 }, inMag));
             }
         }
     }
     // The contents on the spring.
-    const mC = 0.01 + 0.012 * n;
+    const mC = M.followerMass + M.roundMass * n;
     for (const k of sim.knocks) {
         const g = db(mC * k.speed * 1.5) + 3;
         if (g < -42)
             continue;
         if (k.end === 'top')
-            els.push(hit(n === 0 ? 'follower slams back into the feed lips' : 'stack slams back into the feed lips', k.t, g, k.speed, n === 0 ? arFollower : stack, n === 0 ? lips : loaded, { scatter: 0, radius: 2, click: 0.6, sharp: n === 0 ? 0.7 : 0.5 }, inMag));
+            els.push(hit(n === 0 ? 'follower slams back into the feed lips' : 'stack slams back into the feed lips', k.t, g, k.speed, n === 0 ? M.follower : stack, n === 0 ? lips : loaded, { scatter: 0, radius: 2, click: 0.6, sharp: n === 0 ? 0.7 : 0.5 }, inMag));
         else
-            els.push(hit('spring goes solid under the stack', k.t, g, k.speed, stack, magFloorplate, { scatter: 0, radius: 3, click: 0.4, sharp: 0.4 }, inMag));
+            els.push(hit('spring goes solid under the stack', k.t, g, k.speed, stack, M.floorplate, { scatter: 0, radius: 3, click: 0.4, sharp: 0.4 }, inMag));
     }
     for (const l of sim.launches) {
         const g = db(mC * l.speed) - 2;
         if (g < -40)
             continue;
-        els.push(hit(n === 0 ? 'empty spring boings' : 'spring takes up the stack', l.t, g, l.speed, arMagSpring, shell, { scatter: 0, radius: 1, click: 0.05, sharp: 0.35 }, { coil: { level: 0.55 * (1 - f) + 0.05, length: 6 + 6 * (1 - f), dispersion: 0.5, decay: 0.08 + 0.12 * (1 - f), brightness: 4000 }, ...inMag }));
+        els.push(hit(n === 0 ? 'empty spring boings' : 'spring takes up the stack', l.t, g, l.speed, M.spring, shell, { scatter: 0, radius: 1, click: 0.05, sharp: 0.35 }, { coil: { level: 0.55 * (1 - f) + 0.05, length: (6 + 6 * (1 - f)) * M.dims[0] / 0.18, dispersion: 0.5, decay: 0.08 + 0.12 * (1 - f), brightness: 4000 }, ...inMag }));
     }
     for (const sl of sim.slides) {
         if (sl.speed < 0.08)
@@ -1083,17 +1143,10 @@ export function magDropScene(o, sim = simulateBoxDrop(magDropSpec(o))) {
         const body = sl.part === 'broad-side' ? loaded : edge;
         els.push(rub('slides' + where(sl.surface), sl.t, -12 + 20 * Math.log10(Math.min(1.5, sl.speed)), { force: Math.min(10, Math.max(0.5, sl.force)), duration: sl.duration, speed: sl.speed, profile: 'decelerate', ...sf.texture }, body, sf.body, inMag));
     }
-    const fillName = n === 0 ? 'empty' : n === 30 ? 'full' : n === 10 ? 'third' : 'two-thirds';
-    const fillTitle = n === 0 ? 'empty' : n === 30 ? 'full (30 rounds)' : n === 10 ? '1/3 full (10 rounds)' : '2/3 full (20 rounds)';
-    const wayTitle = { bottom: 'lands on its floorplate', top: 'lands on its feed lips', sideways: 'tumbling sideways', forwards: 'tumbling end over end' }[o.way];
-    const surf = o.surface ?? 'concrete';
     const inside = (el) => /follower|spring|stack|cases tick/.test(el.what);
     const slideEl = (el) => /^slides/.test(el.what);
     return {
-        id: `ar15-mag-drop-${o.box ? surf + '-box-' : surf === 'concrete' ? '' : surf + '-'}${o.way}-${fillName}`,
-        title: `AR-15 magazine dropped on ${surf}${o.box ? ' in a walled box' : ''}, ${fillTitle}, ${wayTitle} (simulated)`,
-        room: o.box ? 0.08 : 0.12,
-        roomSize: 0.45,
+        ...dropHead(o),
         tracks: [
             { name: 'contacts', description: 'Every simulated contact with the floor (and walls).', elements: els.filter((el) => !inside(el) && !slideEl(el)) },
             { name: 'inside', description: 'The follower, spring and rounds reacting inside it.', elements: els.filter(inside) },
@@ -1101,12 +1154,19 @@ export function magDropScene(o, sim = simulateBoxDrop(magDropSpec(o))) {
         ],
     };
 }
-export const AR15_MAG_DROPS = ['bottom', 'top', 'sideways', 'forwards'].flatMap((way) => [0, 10, 20, 30].map((rounds) => magDropScene({ rounds, way })));
+/** The four drops x four fills for a magazine type (empty, a third, two thirds, full). */
+export function magDrops(mag) {
+    const M = MAG_TYPES[mag];
+    const fills = [0, Math.round(M.capacity / 3), Math.round((2 * M.capacity) / 3), M.capacity];
+    return ['bottom', 'top', 'sideways', 'forwards'].flatMap((way) => fills.map((rounds) => magDropScene({ mag, rounds, way })));
+}
+export const AR15_MAG_DROPS = magDrops('ar15');
+export const MORE_MAG_DROPS = [...magDrops('kv47'), ...magDrops('mp5'), ...magDrops('g19')];
 export const FIREARM_SCENES = [
     PUMP_SHOTGUN,
     AR15_CHARGE, AR15_CHARGE_EMPTY, AR15_CHARGE_NO_MAG,
     AR15_BOLT_RELEASE, AR15_BOLT_RELEASE_EMPTY, AR15_BOLT_RELEASE_NO_MAG,
     AR15_MAG_IN, AR15_MAG_IN_EMPTY, AR15_MAG_OUT, AR15_MAG_OUT_EMPTY, AR15_LOAD_RACK_UNLOAD, AR15_MAG_IN_OUT,
-    ...AR15_MAG_DROPS,
+    ...AR15_MAG_DROPS, ...MORE_MAG_DROPS,
 ];
 //# sourceMappingURL=firearms.js.map

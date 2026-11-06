@@ -8,5 +8,5 @@ export { MORE_GUN_SCENES, chargeScene, type ChargeTiming } from './more-guns.js'
 export { RECON_CS6, RECON_CS6_DRY } from './recon-cs6.js';
 export {
   PUMP_SHOTGUN, AR15_CHARGE, AR15_CHARGE_EMPTY, AR15_CHARGE_NO_MAG, AR15_BOLT_RELEASE, AR15_BOLT_RELEASE_EMPTY, AR15_BOLT_RELEASE_NO_MAG,
-  AR15_MAG_IN, AR15_MAG_IN_EMPTY, AR15_MAG_OUT, AR15_MAG_OUT_EMPTY, AR15_LOAD_RACK_UNLOAD, AR15_MAG_IN_OUT, AR15_MAG_DROPS, arChargeScene, magDropScene, magDropSpec, type MagDropOptions,
+  AR15_MAG_IN, AR15_MAG_IN_EMPTY, AR15_MAG_OUT, AR15_MAG_OUT_EMPTY, AR15_LOAD_RACK_UNLOAD, AR15_MAG_IN_OUT, AR15_MAG_DROPS, MORE_MAG_DROPS, MAG_TYPES, magDrops, type MagType, arChargeScene, magDropScene, magDropSpec, type MagDropOptions,
 } from './firearms.js';
