@@ -5,7 +5,9 @@
 //     gunsmith's parts for sale;
 //   the store (middle): Vex at his counter (his till opens the whole stock), the kit for sale on pedestals,
 //     a shelf of pouches, and two vending machines (ammunition; medical gear and grenades);
-//   the warehouse (east, at the back): a robotic crane over the stash, and a console that opens your stash and loadout;
+//   the stash (east, at the back, by the walkway to the lounge): your crates in a cage, and a console that opens your stash and loadout;
+//   Nightjar Optronics (east, at the back, where the warehouse was): a special-operations outfitter behind a glass front,
+//     night vision in glass cases (G.Shop.offers.nvg), a counter with their rep behind it;
 //   the lounge (east, at the front, by the hangar door): sofas in front of a big screen showing the highlights of the
 //     level just played (js/highlights.ts);
 //   the helipad (out the front): hold F on the helicopter to climb in and ready up; hold F again to get out.
@@ -16,23 +18,21 @@
 // one thing for sale or to use (see addTarget); the fields vary with its kind
 interface HangarTarget {
   id: string; kind: HangarKind; box: number[]; what?: HangarWhat; key?: string | null; sold?: boolean; reach?: number; // (reach: further, a TV on the wall)
-  label?: string; title?: string; tab?: string; who?: string; mine?: boolean; run?: () => void; runText?: string; crane?: boolean; // (a use target: 'pos')
+  label?: string; title?: string; tab?: string; who?: string; mine?: boolean; run?: () => void; runText?: string; // (a use target: 'pos')
   disp?: THREE.Group; sign?: THREE.Mesh<any, any>; spin?: THREE.Object3D | null; signTop?: number; slot?: THREE.Group; idx?: number; // (a thing on show)
   vendOf?: HangarMachine; name?: string; price?: number; item?: GItem; // (one in a vending machine)
 }
 type HangarKind = 'pos' | 'buy' | 'heli';
 type HangarWhat = 'gear' | 'part' | 'pouch' | 'ammo' | 'svc';
-type HangarCraneState = 'idle' | 'toStack' | 'down' | 'lift' | 'toBay' | 'set' | 'rise' | 'return';
 interface HangarRig { rig: Rig; x: number; z: number; yaw: number; vex?: boolean; y?: number; }
 interface HangarVend { id: string; title: string; x: number; z: number; cols: number; rows: number; tab: string; }
 interface HangarMachine { v: HangarVend; group: THREE.Group; key: string; slots: unknown[]; }
-interface HangarCrane { bridge: THREE.Object3D; trolley: THREE.Object3D; grab: THREE.Object3D; cable: THREE.Object3D; carried: THREE.Object3D; cx: number; cz: number; gy: number; state: HangarCraneState; t: number; queue: number; }
 interface HangarShip { group: THREE.Group; rotors: THREE.Group[]; tail: THREE.Group; glow: THREE.MeshBasicMaterial; thrust: THREE.MeshBasicMaterial; }
 interface HangarHeli extends HangarShip { rotor: THREE.Group; speed: number; spin: number; }
 interface HangarState {
-  root: THREE.Group; map: LvMap; targets: HangarTarget[]; items: HangarTarget[]; stands: HangarTarget[]; rigs: HangarRig[]; crane: HangarCrane | null; heli: HangarHeli | null; vend: HangarMachine[];
+  root: THREE.Group; map: LvMap; targets: HangarTarget[]; items: HangarTarget[]; stands: HangarTarget[]; rigs: HangarRig[]; heli: HangarHeli | null; vend: HangarMachine[];
   hover: HangarTarget | null; hold: number; hl: THREE.Object3D | null; t: number; vexQuip: number; key: string;
-  rosterKey: string | undefined; partStands: HangarTarget[] | undefined; precStands: HangarTarget[] | undefined; pouchSlots: THREE.Group[] | undefined;
+  rosterKey: string | undefined; partStands: HangarTarget[] | undefined; precStands: HangarTarget[] | undefined; njStands?: HangarTarget[]; njPart?: HangarTarget | null; pouchSlots: THREE.Group[] | undefined;
 }
 
 const G_Hangar = (() => {
@@ -50,9 +50,13 @@ const G_Hangar = (() => {
   const ZERO = { x0: 6.3, x1: 8.1, z0: 13.1, z1: 14.9, h: 0.9 }; // the zeroing table, in the middle of the workshop floor
   const PARTS = { x0: 12.9, z: 3.5, step: 1.15, n: 7, top: 0.9 }; // the gunsmith's parts, on pedestals along the north wall (east of the range's garage door)
   const VEND: HangarVend[] = [{ id: 'ammo', title: 'AMMUNITION', x: 35.0, z: 10.0, cols: 2, rows: 3, tab: 'svc' }, { id: 'supply', title: 'FIELD SUPPLIES', x: 35.0, z: 12.2, cols: 3, rows: 3, tab: 'svc' }];
-  const CONSOLE = { x0: 38.2, x1: 39.1, z0: 7.6, z1: 10.4 };
-  const STACK = { x: 44.5, z: 6.4 }, BAY_Z = 11.2; // (the stash, and the loadout pallet in front of it)
-  const WARE = { z0: 3, z1: 13 }; // the warehouse's reach (the crane's rails, the racking)
+  const CONSOLE = { x0: 36.7, x1: 37.5, z0: 2.5, z1: 4.9 }; // the stash console, beside its cage, turned to the store
+  const STACK = { x: 38.9, z: 3.4 }; // (the stash's cage, against the back wall)
+  // Nightjar Optronics: the back of the east side (the warehouse's floor, x 40 to the east wall, the back wall to the lounge's),
+  // behind a glass front with its doors (door: z from, to) onto the walkway by the stash. Its cases, [x, z, which way the
+  // card faces (1: south)], in two rows either side of the aisle from the door to the counter at the far end; top: the
+  // cases' tops; rep: where their rep stands, behind the counter
+  const NJ = { x0: 40, x1: 50, z0: 2, z1: 14, door: [6.4, 9.0], cases: [[42.4, 4.4, 1], [45.2, 4.4, 1], [42.4, 11.2, -1], [45.2, 11.2, -1]] as [number, number, number][], top: 0.95, counter: { x0: 47.2, x1: 48.0, z0: 5.2, z1: 10.6, h: 1.0 }, rep: [48.75, 7.6] };
   // the lounge: the front of the east side, walled off from the warehouse (a gap by the store to walk through), a big
   // screen on the east wall (js/highlights.ts TVS) and two rows of sofas facing it
   const LOUNGE = { x0: 36, x1: 50, z0: 14.2, z1: 26, wall: 38, sofas: [{ x: 43.4, z0: 17.6, z1: 22.4 }, { x: 40.4, z0: 17.2, z1: 22.8 }], table: [45.0, 19.3, 46.0, 20.7, 0.42], bar: [37.0, 23.4, 38.0, 25.8, 1.0] };
@@ -63,7 +67,7 @@ const G_Hangar = (() => {
   const OUT = { x0: 5.4, x1: 16.6, z0: 16.4, z1: 26, rows: [18.6, 21.6], xs: [7.6, 10.9, 14.2], top: 0.9, size: 0.9, rocks: 24.9, pond: [10.0, 23.0, 14.8, 25.4], bear: [7.0, 24.0], pines: [[15.9, 25.0], [6.1, 17.2]], door: [19.0, 21.2], back: 8.4 };
   const REACH = 3.2, HELI_REACH = 4.2, HOLD = 1.1;
 
-  const S: HangarState = { root: null as unknown as THREE.Group, map: null as unknown as LvMap, targets: [], items: [], stands: [], rigs: [], crane: null, heli: null, vend: [], hover: null, hold: 0, hl: null, t: 0, vexQuip: 0, key: '', rosterKey: undefined, partStands: undefined, precStands: undefined, pouchSlots: undefined };
+  const S: HangarState = { root: null as unknown as THREE.Group, map: null as unknown as LvMap, targets: [], items: [], stands: [], rigs: [], heli: null, vend: [], hover: null, hold: 0, hl: null, t: 0, vexQuip: 0, key: '', rosterKey: undefined, partStands: undefined, precStands: undefined, pouchSlots: undefined };
 
   // The rockwork (fibreglass boulders stacked along the front wall, the bear's boulder, the pond's rim): each rock an
   // icosphere, placed, turned and stretched (its matrix, in the hall's coordinates), and its colour. From a seed of its own,
@@ -113,9 +117,13 @@ const G_Hangar = (() => {
     add(POUCH.x0, 0, POUCH.z0 - 0.2, POUCH.x1, 1.9, POUCH.z0 + POUCH.n * POUCH.step);
     for (const v of VEND) add(v.x, 0, v.z - 0.55, v.x + 1.1, 1.95, v.z + 0.55);
     add(CONSOLE.x0, 0, CONSOLE.z0, CONSOLE.x1, 1.2, CONSOLE.z1);
-    add(STACK.x - 1.2, 0, STACK.z - 1.2, STACK.x + 1.2, 1.7, STACK.z + 1.2);
-    for (const x of [38.2, 49.6]) for (const z of [WARE.z0 + 0.3, WARE.z1 - 0.3]) add(x - 0.2, 0, z - 0.2, x + 0.2, 3.5, z + 0.2); // (the crane's rail posts)
-    add(49.0, 0, WARE.z0, 50, 2.4, WARE.z1); // (racking against the east wall)
+    add(STACK.x - 1.05, 0, STACK.z - 1.05, STACK.x + 1.05, 1.8, STACK.z + 1.05);
+    // Nightjar's: the glass front either side of its doors, the cases (and the air their pieces turn in), the counter, the
+    // shelves behind it
+    add(NJ.x0 - 0.06, 0, NJ.z0, NJ.x0 + 0.06, 3.0, NJ.door[0]); add(NJ.x0 - 0.06, 0, NJ.door[1], NJ.x0 + 0.06, 3.0, NJ.z1);
+    for (const [x, z] of NJ.cases) add(x - 0.72, 0, z - 0.52, x + 0.72, NJ.top + 0.85, z + 0.52);
+    add(NJ.counter.x0 - 0.06, 0, NJ.counter.z0 - 0.05, NJ.counter.x1 + 0.04, NJ.counter.h, NJ.counter.z1 + 0.05);
+    add(NJ.x1 - 0.67, 0, NJ.counter.z0 - 0.3, NJ.x1, 2.7, NJ.counter.z1 + 0.3);
     // the lounge: its wall, the sofas (seat and back), the coffee table, the snack bar
     const L = LOUNGE;
     add(L.wall, 0, L.z0 - 0.2, L.x1, 2.8, L.z0);
@@ -199,7 +207,7 @@ const G_Hangar = (() => {
   function addTarget(t: HangarTarget) { t.box = [t.box[0], t.box[1], t.box[2] + RZ, t.box[3], t.box[4], t.box[5] + RZ]; S.targets.push(t); return t; } // (boxes are said in the hall's coordinates, kept in the world's)
   const gearOf = (id: string) => G.Gear.DEFS[id];
   // what a piece of gear fits on that isn't part of the sale (a plate goes in a carrier, a face guard on a helmet)
-  const needs = (d: GearDef) => (d.kind === 'plate' || d.kind === 'shoulder' || d.kind === 'groin' ? 'carrier not included' : d.kind === 'face' ? 'helmet not included' : d.kind === 'legs' ? 'belt not included' : null);
+  const needs = (d: GearDef) => (d.kind === 'plate' || d.kind === 'shoulder' || d.kind === 'groin' ? 'carrier not included' : d.kind === 'face' || d.kind === 'nvg' ? 'helmet not included' : d.kind === 'legs' ? 'belt not included' : null);
   // The piece on show, on its own. The same models the squad wears (js/rig.ts setKit makes them in the frames of a body):
   // built on a body that's thrown away, each part lifted out by what it is (helmet, face guard, carrier, belt, pack) and
   // set down where it hung. A plate isn't part of a carrier's model: it's drawn here, to stand beside it.
@@ -299,7 +307,7 @@ const G_Hangar = (() => {
     S.map = map; S.root = new T.Group(); S.targets = []; S.items = []; S.stands = []; S.rigs = []; S.vend = []; S.t = 0; S.hold = 0; S.vexQuip = 3; S.key = ''; S.rosterKey = rosterKey();
     S.root.position.z = RZ;
     G.R.levelRoot.add(S.root);
-    zones(); workshop(); outfitters(); store(); warehouse(); lounge(); helicopter(); if (G.Range) G.Range.build(S.root, S, { box, M, signMat, canvasTex, addTarget }); outline();
+    zones(); workshop(); outfitters(); store(); stash(); nightjar(); lounge(); helicopter(); if (G.Range) G.Range.build(S.root, S, { box, M, signMat, canvasTex, addTarget }); outline();
     if (G.Highlights) G.Highlights.mount(S.root, { addTarget }); // (the TVs, showing the level just played, F to record it: js/highlights.ts)
     refresh(true);
   }
@@ -307,7 +315,7 @@ const G_Hangar = (() => {
     if (G.Range) G.Range.leave();
     if (G.Highlights) G.Highlights.unmount();
     if (S.root && S.root.parent) S.root.parent.remove(S.root);
-    S.root = null as unknown as THREE.Group; S.map = null as unknown as LvMap; S.targets = []; S.items = []; S.rigs = []; S.crane = null; S.heli = null; S.hover = null;
+    S.root = null as unknown as THREE.Group; S.map = null as unknown as LvMap; S.targets = []; S.items = []; S.rigs = []; S.heli = null; S.hover = null; S.njStands = []; S.njPart = null;
   }
   const rosterKey = () => Object.keys(G.Game.roster || {}).sort().join(',');
 
@@ -325,7 +333,6 @@ const G_Hangar = (() => {
     };
     hang('WORKSHOP', 'a bench for each of you', 9, 7.5, '#ffb43a');
     hang('STORE', 'look at it, press F', 26, 8.2, '#58b8ff');
-    hang('WAREHOUSE', 'stash and loadout', 44, 2.6, '#ff7a4a');
     hang('LOUNGE', 'the highlights, on the big screen', 43, 14.6, '#ff7ac8');
     // light fittings over the hall (the real lights are in the map: these are what they hang from)
     for (const L of S.map.lights || []) { if (L.porch || L.kind) continue; box(r, L.x - 0.45, 3.82, L.z - RZ - 0.12, L.x + 0.45, 3.96, L.z - RZ + 0.12, new T.MeshBasicMaterial({ color: 0xfff6e0 })); }
@@ -562,15 +569,9 @@ const G_Hangar = (() => {
     addTarget({ id: 'vend-' + v.id, kind: 'pos', box: [v.x - 0.5, 1.55, v.z - 0.55, v.x + 0.3, 2.0, v.z + 0.55], label: v.title.toLowerCase() + ' machine', tab: v.tab, title: v.title.toLowerCase() });
   }
 
-  // ---- the warehouse: the crane over the stash, a console, racking
-  function warehouse() {
+  // ---- the stash, by the way into Nightjar's: crates in a cage against the back wall, and a console that opens your stash and loadout
+  function stash() {
     const r = S.root;
-    // racking and stock against the east wall
-    for (const [z0, z1] of [[WARE.z0, WARE.z1]]) {
-      for (const y of [0.35, 1.05, 1.75]) box(r, 49.0, y, z0, 50, y + 0.05, z1, M(0x4a6a8a));
-      for (let z = z0; z <= z1; z += 2) box(r, 49.0, 0, z - 0.03, 49.05, 2.4, z + 0.03, M(0xd8602a));
-      for (let k = 0; k * 1.25 + 1.2 <= z1 - z0; k++) for (const y of [0.4, 1.1, 1.8]) box(r, 49.1, y, z0 + 0.3 + k * 1.25, 49.9, y + 0.5, z0 + 1.2 + k * 1.25, M([0x8a6a3a, 0x6f8a52, 0x7c8a96, 0x8a6a3a][(k + (y > 1 ? 1 : 0)) % 4], { roughness: 0.9 }));
-    }
     // the console: two screens on a desk-high pedestal, turned to the store
     box(r, CONSOLE.x0, 0, CONSOLE.z0, CONSOLE.x1, 0.95, CONSOLE.z1, M(0x363b41));
     box(r, CONSOLE.x0 - 0.02, 0.95, CONSOLE.z0 - 0.05, CONSOLE.x1, 1.0, CONSOLE.z1 + 0.05, M(0x1c1f22));
@@ -579,30 +580,142 @@ const G_Hangar = (() => {
       box(r, CONSOLE.x0 + 0.05, 1.0, z - 0.4, CONSOLE.x0 + 0.13, 1.5, z + 0.4, M(0x16181a));
       const s = new T.Mesh(new T.PlaneGeometry(0.76, 0.46), screenMat(a, [b, 'F: open'], 256, 152, '#ff9a5a')); s.rotation.y = -Math.PI / 2; s.position.set(CONSOLE.x0 + 0.045, 1.25, z); r.add(s);
     }
-    addTarget({ id: 'console', kind: 'pos', box: [CONSOLE.x0 - 0.1, 0.9, CONSOLE.z0, CONSOLE.x1, 1.6, CONSOLE.z1], label: 'the warehouse console', tab: 'kit', title: 'your stash and loadout', crane: true });
-    // the stash: crates stacked in a cage the crane works over
+    addTarget({ id: 'console', kind: 'pos', box: [CONSOLE.x0 - 0.1, 0.9, CONSOLE.z0, CONSOLE.x1, 1.6, CONSOLE.z1], label: 'the stash console', tab: 'kit', title: 'your stash and loadout' });
+    // the stash itself: crates two high in a cage
     const stack = new T.Group(); stack.position.set(STACK.x, 0, STACK.z); r.add(stack);
     const crateCols = [0x8a6a3a, 0x6f8a52, 0x5a6a7a, 0x9a5a3a];
-    for (let i = 0; i < 4; i++) for (let k = 0; k < 2; k++) box(stack, (i % 2 ? 0.02 : -1.12), k * 0.8, (i < 2 ? -1.12 : 0.02), (i % 2 ? 1.12 : -0.02), k * 0.8 + 0.78, (i < 2 ? -0.02 : 1.12), M(crateCols[(i + k) % 4], { roughness: 0.9 }));
-    for (const [dx, dz] of [[-1.3, -1.3], [1.3, -1.3], [-1.3, 1.3], [1.3, 1.3]]) box(stack, dx - 0.04, 0, dz - 0.04, dx + 0.04, 1.75, dz + 0.04, M(0xf0c030)); // the cage's corner posts
-    const sg = new T.Mesh(new T.PlaneGeometry(1.8, 0.4), signMat(['STASH', 'the crane keeps it'], 384, 96, '#101418', '#ff9a5a', '#cfd6dc')); sg.position.set(STACK.x, 2.05, STACK.z - 1.36); r.add(sg);
-    // the loadout bay: a pallet where the crane sets down what you've asked for
-    box(r, STACK.x - 1.2, 0, BAY_Z - 1.0, STACK.x + 1.2, 0.14, BAY_Z + 1.0, M(0x9a7a4a));
-    // the crane: a bridge between two rails, a trolley on the bridge, a hoist with a grab
-    const rail = M(0xf0c030), steel = M(0x6e7479, { metalness: 0.6 });
-    box(r, 38.0, 3.5, WARE.z0 - 0.1, 38.4, 3.7, WARE.z1 + 0.1, rail); box(r, 49.4, 3.5, WARE.z0 - 0.1, 49.8, 3.7, WARE.z1 + 0.1, rail);
-    for (const x of [38.2, 49.6]) for (const z of [WARE.z0 + 0.3, WARE.z1 - 0.3]) box(r, x - 0.12, 0, z - 0.12, x + 0.12, 3.5, z + 0.12, steel); // (the rails' posts)
-    const bridge = new T.Group(); r.add(bridge);
-    box(bridge, -5.8, 3.62, -0.25, 5.8, 3.88, 0.25, rail);
-    box(bridge, -5.9, 3.5, -0.4, -5.7, 3.9, 0.4, steel); box(bridge, 5.7, 3.5, -0.4, 5.9, 3.9, 0.4, steel);
-    const trolley = new T.Group(); bridge.add(trolley);
-    box(trolley, -0.4, 3.35, -0.45, 0.4, 3.62, 0.45, steel);
-    const cable = new T.Mesh(new T.BoxGeometry(0.04, 1, 0.04), M(0x202326)); cable.geometry.translate(0, -0.5, 0); cable.position.y = 3.35; trolley.add(cable);
-    const grab = new T.Group(); trolley.add(grab);
-    box(grab, -0.35, 0.0, -0.35, 0.35, 0.2, 0.35, M(0xd8602a));
-    for (const sd of [-1, 1]) { box(grab, sd * 0.4 - 0.03, -0.42, -0.3, sd * 0.4 + 0.03, 0.0, 0.3, steel); box(grab, sd * 0.32, -0.44, -0.3, sd * 0.4, -0.38, 0.3, steel); }
-    const carried = new T.Mesh(new T.BoxGeometry(0.76, 0.78, 0.76), M(0x8a6a3a, { roughness: 0.9 })); carried.position.y = -0.43 - 0.39; carried.visible = false; grab.add(carried);
-    S.crane = { bridge, trolley, grab, cable, carried, cx: STACK.x, cz: STACK.z, gy: 2.9, state: 'idle', t: 0, queue: 0 };
+    for (let i = 0; i < 4; i++) for (let k = 0; k < 2; k++) box(stack, (i % 2 ? 0.02 : -0.86), k * 0.8, (i < 2 ? -0.86 : 0.02), (i % 2 ? 0.86 : -0.02), k * 0.8 + 0.78, (i < 2 ? -0.02 : 0.86), M(crateCols[(i + k) % 4], { roughness: 0.9 }));
+    for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) box(stack, dx - 0.04, 0, dz - 0.04, dx + 0.04, 1.75, dz + 0.04, M(0xf0c030)); // the cage's corner posts
+    for (const y of [0.05, 1.7]) for (const [x0, z0, x1, z1] of [[-1, -1, 1, -0.96], [-1, 0.96, 1, 1], [-1, -1, -0.96, 1], [0.96, -1, 1, 1]]) box(stack, x0, y, z0, x1, y + 0.05, z1, M(0xf0c030)); // and its rails
+    const sg = new T.Mesh(new T.PlaneGeometry(1.6, 0.4), signMat(['STASH', 'your lockers'], 384, 96, '#101418', '#ff9a5a', '#cfd6dc')); sg.position.set(STACK.x, 2.05, STACK.z + 1.05); r.add(sg);
+  }
+
+  // ---- Nightjar Optronics (NJ): a special-operations outfitter in what was the warehouse, selling night vision. A dark,
+  // clean room behind a glass front (its doors open onto the walkway by the stash): a polished black floor edged in light,
+  // the brand on the back wall over two rows of glass cases (one for each set they make, the set turning inside on a
+  // mannequin's head, its card on the case's face to the aisle), a counter at the far end with their rep behind it (a
+  // panoramic set flipped up on the helmet), shelves of boxed stock, a keypad at the door and a camera dome over it.
+  // What's in stock this visit is the shop's (G.Shop.offers.nvg); a set not in this visit (or not yet: lv) says so on its card.
+  function nightjar() {
+    const r = S.root, N = NJ, cx = (N.x0 + N.x1) / 2, cz = (N.z0 + N.z1) / 2;
+    const black = M(0x121416, { roughness: 0.45, metalness: 0.3 }), panel = M(0x1b1f23, { roughness: 0.6, metalness: 0.2 }), steel = M(0x3a4046, { roughness: 0.35, metalness: 0.7 });
+    const led = new T.MeshBasicMaterial({ color: 0x7dffb0 }), white = new T.MeshBasicMaterial({ color: 0xe8f4ff });
+    const glass = new T.MeshStandardMaterial({ color: 0x9ab8c8, transparent: true, opacity: 0.16, roughness: 0.05, metalness: 0.4, depthWrite: false });
+    // the floor: polished black tiles, a strip of light round the walls
+    const tiles = canvasTex(512, 512, (g, w, h) => { g.fillStyle = '#121518'; g.fillRect(0, 0, w, h); g.strokeStyle = '#262b30'; g.lineWidth = 3; for (let i = 0; i <= 4; i++) { g.beginPath(); g.moveTo(i * w / 4, 0); g.lineTo(i * w / 4, h); g.stroke(); g.beginPath(); g.moveTo(0, i * h / 4); g.lineTo(w, i * h / 4); g.stroke(); } });
+    tiles.wrapS = tiles.wrapT = T.RepeatWrapping; tiles.repeat.set((N.x1 - N.x0) / 4.8, (N.z1 - N.z0) / 4.8);
+    const fl = new T.Mesh(new T.PlaneGeometry(N.x1 - N.x0, N.z1 - N.z0), new T.MeshStandardMaterial({ map: tiles, roughness: 0.18, metalness: 0.35 })); fl.rotation.x = -Math.PI / 2; fl.position.set(cx, 0.015, cz); r.add(fl);
+    for (const [x0, z0, x1, z1] of [[N.x0 + 0.1, N.z0 + 0.05, N.x1 - 0.05, N.z0 + 0.09], [N.x0 + 0.1, N.z1 - 0.29, N.x1 - 0.05, N.z1 - 0.25], [N.x1 - 0.31, N.z0, N.x1 - 0.27, N.z1 - 0.25]]) box(r, x0, 0.016, z0, x1, 0.03, z1, led);
+    // the walls inside: dark panels over the hangar's own, a black frieze along the top
+    box(r, N.x0 + 0.1, 0, N.z0, N.x1, 3.4, N.z0 + 0.04, panel);
+    box(r, N.x1 - 0.26, 0, N.z0, N.x1 - 0.22, 3.4, N.z1 - 0.2, panel); // (clear of the hall's windows)
+    box(r, N.x0 + 0.1, 0, N.z1 - 0.25, N.x1, 3.4, N.z1 - 0.2, panel); // (over the lounge wall's window strip too)
+    for (const z of [N.z0 + 0.04]) for (let x = N.x0 + 0.9; x < N.x1 - 0.5; x += 1.2) box(r, x - 0.012, 0.03, z, x + 0.012, 3.4, z + 0.02, M(0x262b30));
+    // the glass front: panes in black mullions either side of the door, a fascia over it all with the name, the doors slid open
+    const front = (z0: number, z1: number) => {
+      const n = Math.max(1, Math.round((z1 - z0) / 1.3)), w = (z1 - z0) / n;
+      for (let i = 0; i < n; i++) { const p = new T.Mesh(new T.PlaneGeometry(w - 0.06, 2.85), glass); p.rotation.y = Math.PI / 2; p.position.set(N.x0, 1.47, z0 + (i + 0.5) * w); r.add(p); }
+      for (let i = 0; i <= n; i++) box(r, N.x0 - 0.04, 0, z0 + i * w - 0.03, N.x0 + 0.04, 2.9, z0 + i * w + 0.03, black);
+      box(r, N.x0 - 0.04, 0, z0, N.x0 + 0.04, 0.06, z1, black);
+    };
+    front(N.z0, N.door[0]); front(N.door[1], N.z1);
+    for (const [z0, z1] of [[N.door[0] - 1.15, N.door[0] - 0.05], [N.door[1] + 0.05, N.door[1] + 1.15]]) { const p = new T.Mesh(new T.PlaneGeometry(z1 - z0, 2.6), glass); p.rotation.y = Math.PI / 2; p.position.set(N.x0 + 0.1, 1.33, (z0 + z1) / 2); r.add(p); box(r, N.x0 + 0.07, 2.6, z0, N.x0 + 0.13, 2.66, z1, steel); } // (the doors, slid back behind the panes)
+    box(r, N.x0 - 0.08, 2.9, N.z0, N.x0 + 0.08, 3.5, N.z1, black); // the fascia
+    const logo = (g: CanvasRenderingContext2D, x: number, y: number, s: number, col: string) => { // (the mark: a nightjar's swept wings across a ring, an eye in the middle)
+      g.strokeStyle = col; g.fillStyle = col; g.lineWidth = s * 0.07;
+      g.beginPath(); g.arc(x, y, s * 0.42, 0, Math.PI * 2); g.stroke();
+      g.beginPath(); g.moveTo(x - s * 0.62, y - s * 0.02); g.quadraticCurveTo(x - s * 0.25, y - s * 0.3, x, y - s * 0.06); g.quadraticCurveTo(x + s * 0.25, y - s * 0.3, x + s * 0.62, y - s * 0.02); g.quadraticCurveTo(x + s * 0.25, y - s * 0.14, x, y + s * 0.08); g.quadraticCurveTo(x - s * 0.25, y - s * 0.14, x - s * 0.62, y - s * 0.02); g.fill();
+      g.beginPath(); g.arc(x, y + s * 0.18, s * 0.07, 0, Math.PI * 2); g.fill();
+    };
+    const brand = (w: number, h: number, sub: string) => canvasTex(w, h, (g) => {
+      g.fillStyle = '#0b0d0f'; g.fillRect(0, 0, w, h);
+      logo(g, h * 0.55, h * 0.5, h * 0.8, '#8dffbe');
+      g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillStyle = '#e8f4ff'; g.font = `600 ${Math.round(h * 0.42)}px sans-serif`;
+      const t = 'N I G H T J A R'; g.fillText(t, h * 1.15, h * 0.4);
+      g.fillStyle = '#8dffbe'; g.font = `${Math.round(h * 0.15)}px sans-serif`; g.fillText(sub, h * 1.18, h * 0.76);
+    });
+    const fasc = new T.Mesh(new T.PlaneGeometry(5.6, 0.56), new T.MeshBasicMaterial({ map: brand(1280, 128, 'OPTRONICS  ·  NIGHT VISION FOR SPECIAL OPERATIONS') })); fasc.rotation.y = -Math.PI / 2; fasc.position.set(N.x0 - 0.085, 3.2, (N.door[0] + N.door[1]) / 2); r.add(fasc);
+    // the keypad by the door and the camera dome over it
+    box(r, N.x0 - 0.07, 1.3, N.door[0] - 0.32, N.x0 - 0.04, 1.48, N.door[0] - 0.2, black); box(r, N.x0 - 0.075, 1.44, N.door[0] - 0.3, N.x0 - 0.07, 1.46, N.door[0] - 0.22, led);
+    const dome = new T.Mesh(new T.SphereGeometry(0.11, 14, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), M(0x0a0b0c, { roughness: 0.1, metalness: 0.5 })); dome.position.set(N.x0 + 0.4, 3.4, (N.door[0] + N.door[1]) / 2); r.add(dome);
+    box(r, N.x0 + 0.3, 3.4, dome.position.z - 0.1, N.x0 + 0.5, 3.44, dome.position.z + 0.1, black);
+    // the brand on the back wall, lit, and a line under it
+    const bw = new T.Mesh(new T.PlaneGeometry(6.0, 1.2), new T.MeshBasicMaterial({ map: brand(1280, 256, 'OPTRONICS  ·  SEE FIRST') })); bw.position.set(cx - 0.4, 2.55, N.z0 + 0.05); r.add(bw);
+    box(r, cx - 3.4, 1.82, N.z0 + 0.04, cx + 2.6, 1.84, N.z0 + 0.06, led);
+    // the cases: a black cabinet, a glass box on it lit from the top, a plinth inside for the piece to turn on, its card on the
+    // face to the aisle
+    S.njStands = [];
+    N.cases.forEach(([x, z, face], i) => {
+      const H = N.top, gx = 0.62, gz = 0.44;
+      box(r, x - 0.7, 0, z - 0.5, x + 0.7, H - 0.04, z + 0.5, black);
+      box(r, x - 0.72, H - 0.04, z - 0.52, x + 0.72, H, z + 0.52, steel);
+      box(r, x - 0.68, 0.02, z - 0.48, x + 0.68, 0.035, z + 0.48, led); // (a light under its foot)
+      for (const [w, d, px, pz, ry] of [[2 * gx, 0.8, x, z - gz, 0], [2 * gx, 0.8, x, z + gz, Math.PI], [2 * gz, 0.8, x - gx, z, -Math.PI / 2], [2 * gz, 0.8, x + gx, z, Math.PI / 2]] as number[][]) { const p = new T.Mesh(new T.PlaneGeometry(w, d), glass); p.position.set(px, H + 0.4, pz); p.rotation.y = ry; r.add(p); }
+      box(r, x - gx, H + 0.8, z - gz, x + gx, H + 0.84, z + gz, black); box(r, x - gx + 0.06, H + 0.79, z - 0.02, x + gx - 0.06, H + 0.8, z + 0.02, white);
+      box(r, x - 0.12, H, z - 0.12, x + 0.12, H + 0.1, z + 0.12, M(0x0c0d0e, { roughness: 0.3 }));
+      const sign = new T.Mesh(new T.PlaneGeometry(1.2, 0.5), new T.MeshBasicMaterial({ color: 0x000000 })); sign.position.set(x, 0.5, z + face * 0.502); if (face < 0) sign.rotation.y = Math.PI; r.add(sign);
+      const disp = new T.Group(); disp.position.set(x, 0, z); r.add(disp);
+      const tg = addTarget({ id: 'nj' + i, kind: 'buy', box: [x - 0.7, 0.1, z - 0.5, x + 0.7, H + 0.85, z + 0.5], what: 'gear', key: null, sign, disp, spin: null, idx: i });
+      S.njStands!.push(tg); S.items.push(tg);
+    });
+    // the counter, a terminal on it (it opens the whole stock), shelves of boxed sets behind, and their rep
+    const C = N.counter;
+    box(r, C.x0, 0, C.z0, C.x1, C.h - 0.05, C.z1, black);
+    box(r, C.x0 - 0.06, C.h - 0.05, C.z0 - 0.05, C.x1 + 0.04, C.h, C.z1 + 0.05, steel);
+    box(r, C.x0 - 0.01, 0.1, C.z0 + 0.1, C.x0, 0.14, C.z1 - 0.1, led);
+    const tcz = (C.z0 + C.z1) / 2 - 1.2;
+    box(r, C.x0 + 0.25, C.h, tcz - 0.18, C.x0 + 0.33, C.h + 0.32, tcz + 0.18, black);
+    const term = new T.Mesh(new T.PlaneGeometry(0.34, 0.26), screenMat('NIGHTJAR', ['F: the stock', 'night vision'], 256, 180, '#8dffbe')); term.rotation.y = -Math.PI / 2; term.position.set(C.x0 + 0.245, C.h + 0.17, tcz); r.add(term);
+    // on the counter's near end, under a glass cover: the thermal riflescope, when they have it (refresh: S.njPart)
+    { const pz = C.z1 - 0.55, px = (C.x0 + C.x1) / 2, H = C.h;
+      for (const [w, d, ox, oz, ry] of [[0.56, 0.36, 0, -0.2, 0], [0.56, 0.36, 0, 0.2, Math.PI], [0.4, 0.36, -0.28, 0, -Math.PI / 2], [0.4, 0.36, 0.28, 0, Math.PI / 2]] as number[][]) { const p = new T.Mesh(new T.PlaneGeometry(w, d), glass); p.position.set(px + ox, H + 0.18, pz + oz); p.rotation.y = ry; r.add(p); }
+      box(r, px - 0.28, H + 0.36, pz - 0.2, px + 0.28, H + 0.38, pz + 0.2, black);
+      const sign = new T.Mesh(new T.PlaneGeometry(0.8, 0.4), new T.MeshBasicMaterial({ color: 0x000000 })); sign.rotation.y = -Math.PI / 2; sign.position.set(C.x0 - 0.065, 0.5, pz); r.add(sign);
+      const disp = new T.Group(); disp.position.set(px, 0, pz); r.add(disp);
+      S.njPart = addTarget({ id: 'njpart', kind: 'buy', box: [C.x0 - 0.1, 0.1, pz - 0.3, C.x1, H + 0.4, pz + 0.3], what: 'part', key: null, sign, disp, spin: null, signTop: H });
+      S.items.push(S.njPart); }
+    addTarget({ id: 'njtill', kind: 'pos', box: [C.x0 - 0.1, C.h - 0.1, tcz - 0.3, C.x1, C.h + 0.45, tcz + 0.3], label: 'the Nightjar terminal', tab: 'stock', title: 'Nightjar: night vision (and the rest of the stock)' });
+    for (const y of [0.6, 1.2, 1.8, 2.4]) {
+      box(r, N.x1 - 0.67, y, C.z0 - 0.3, N.x1 - 0.26, y + 0.03, C.z1 + 0.3, steel);
+      for (let z = C.z0 - 0.2; z < C.z1 + 0.2; z += 0.42) { box(r, N.x1 - 0.62, y + 0.03, z, N.x1 - 0.32, y + 0.25, z + 0.34, M(0x16191c, { roughness: 0.5 })); box(r, N.x1 - 0.621, y + 0.11, z + 0.05, N.x1 - 0.62, y + 0.13, z + 0.29, led); }
+    }
+    const rep = G.Rig.create({ style: 'tactical', bare: true, look: { top: 'combat', topC: 0x16181a, pants: 'combat', pantsC: 0x1c1e20, eyes: 'none', gloves: 'tactical' }, seed: 31, scale: 1 });
+    rep.setKit({ helmet: 'h.rifle', nv: 'n.pano', nd: 0, carrier: 'c.slick', plate: 1, cp: 1, belt: 'b.duty', bp: 1 });
+    rep.root.position.set(N.rep[0], 0, N.rep[1]); r.add(rep.root); S.rigs.push({ rig: rep, x: N.rep[0], z: N.rep[1], yaw: Math.PI / 2 });
+    // a poster by the door: what it looks like through them
+    const post = new T.Mesh(new T.PlaneGeometry(1.1, 1.5), new T.MeshBasicMaterial({ map: canvasTex(220, 300, (g, w, h) => {
+      const gr = g.createRadialGradient(w / 2, h * 0.45, 10, w / 2, h * 0.45, w * 0.6); gr.addColorStop(0, '#5aff9a'); gr.addColorStop(0.7, '#0e4a24'); gr.addColorStop(1, '#020604');
+      g.fillStyle = '#020604'; g.fillRect(0, 0, w, h); g.fillStyle = gr; g.beginPath(); g.arc(w / 2, h * 0.45, w * 0.44, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#062a12'; g.beginPath(); g.ellipse(w * 0.56, h * 0.36, w * 0.06, w * 0.07, 0, 0, 7); g.fill(); g.fillRect(w * 0.5, h * 0.42, w * 0.12, h * 0.2); // (someone in a doorway)
+      g.fillStyle = '#e8f4ff'; g.font = 'bold 26px sans-serif'; g.textAlign = 'center'; g.fillText('SEE FIRST.', w / 2, h * 0.86); g.fillStyle = '#8dffbe'; g.font = '13px sans-serif'; g.fillText('NIGHTJAR OPTRONICS', w / 2, h * 0.93);
+    }) }));
+    post.position.set(N.x0 + 1.6, 1.7, N.z1 - 0.19); post.rotation.y = Math.PI; r.add(post);
+  }
+  // A set of night vision on show: on a mannequin's head (matte black) in a high-cut helmet, flipped down, as js/rig.ts
+  // setKit makes it on a body (that body thrown away, the head and what's on it lifted out)
+  function nvPiece(id: string) {
+    const root = new T.Group(), rig = G.Rig.create({ style: 'tactical', bare: true, mannequin: true, look: { top: 'tshirt', topC: 0x202326, pants: 'jeans', pantsC: 0x202326, eyes: 'none', gloves: 'none' }, seed: 5 });
+    rig.setKit({ helmet: 'h.fast', nv: id, nd: 1 }); rig.root.updateMatrixWorld(true);
+    const g = new T.Group(), keep = ['helmet', 'nvg'];
+    for (const m of rig.kitParts) {
+      if (!keep.includes(m.userData.part)) continue;
+      const c = m.clone(true); m.updateWorldMatrix(true, false); m.matrixWorld.decompose(c.position, c.quaternion, c.scale); g.add(c);
+    }
+    const head = new T.Mesh(new T.SphereGeometry(0.1, 18, 12), M(0x1a1c1f, { roughness: 0.85 })); head.scale.set(0.92, 1.18, 1.02);
+    rig.head.updateWorldMatrix(true, false); head.position.set(0, 0.12, 0).applyMatrix4(rig.head.matrixWorld); g.add(head);
+    const neck = new T.Mesh(new T.CylinderGeometry(0.05, 0.06, 0.12, 12), M(0x1a1c1f, { roughness: 0.85 })); neck.position.set(0, 0.01, 0.01).applyMatrix4(rig.head.matrixWorld); g.add(neck);
+    const bb = new T.Box3().setFromObject(g), ctr = bb.getCenter(new T.Vector3());
+    g.position.set(-ctr.x, -bb.min.y, -ctr.z);
+    const pivot = new T.Group(); pivot.add(g); pivot.scale.setScalar(1.75); pivot.position.y = NJ.top + 0.1; pivot.rotation.y = Math.PI;
+    root.add(pivot);
+    return { root, spin: pivot };
+  }
+  // its card: the name, the price, what it is, and that the helmet's not in it (or why it's not on sale)
+  function njSign(id: string, sold: boolean, out: string | null) {
+    const d = gearOf(id), L = [d.name, out ? out : sold ? 'SOLD' : money(G.Shop.gearPrice(id))];
+    if (!out && !sold) { L.push(G.Shop.nvField(d)); L.push('!helmet not included'); }
+    else if (out) L.push(G.Shop.nvField(d));
+    return L;
   }
 
   // ---- the lounge: carpet, a wall to the warehouse, two rows of sofas facing the big screen, a coffee table, a snack bar
@@ -744,7 +857,7 @@ const G_Hangar = (() => {
     const Sh = G.Shop, O = Sh.offers!;
     if (S.rosterKey !== rosterKey()) { enter(S.map); return; } // (someone joined or left: the benches are theirs)
     // only when something's changed (each change draws new signs)
-    const parts0 = [...(Sh.partStock || [])].sort((a, b) => +Sh.wished(b as string) - +Sh.wished(a as string)), prec0 = [...(Sh.precStock || [])], key = JSON.stringify([O.gear, parts0, prec0, Sh.stock, parts0.concat(prec0).filter((i) => Sh.wished(i as string))]);
+    const parts0 = [...(Sh.partStock || [])].sort((a, b) => +Sh.wished(b as string) - +Sh.wished(a as string)), prec0 = [...(Sh.precStock || [])], key = JSON.stringify([O.gear, O.nvg, O.njParts, parts0, prec0, Sh.stock, parts0.concat(prec0).filter((i) => Sh.wished(i as string))]);
     if (!force && key === S.key) { vending(false); return; }
     S.key = key;
     // the pedestals: the five pieces of gear
@@ -760,6 +873,31 @@ const G_Hangar = (() => {
       tg.sign!.scale.set(1, SH / 0.5, 1);
       tg.sign!.position.y = 0.1 + (STAND.top - 0.14) / 2;
     });
+    // Nightjar's cases: one for each set they make, in stock this visit or not (and not yet, at this level: lv)
+    const nvAll = G.Gear.LIST.filter((d) => d.kind === 'nvg');
+    (S.njStands || []).forEach((tg: HangarTarget, i: number) => {
+      const d = nvAll[i], stocked = !!d && (O.nvg || []).includes(d.id);
+      tg.key = stocked ? d.id : null;
+      tg.sold = !stocked || !Sh.inStock('gear:' + d.id);
+      clear(tg.disp!); tg.spin = null;
+      if (d && (!tg.sold || !stocked)) { const sh = nvPiece(d.id); tg.disp!.add(sh.root); tg.spin = sh.spin; } // (one not in this visit's still on show: it's their window)
+      const out = !d ? null : stocked ? null : (Sh.level || 0) < (d.lv || 0) || d.tier > Math.min(4, 1 + Math.ceil((Sh.level || 0) / 2)) ? `from level ${Math.max(d.lv || 0, 2 * d.tier - 3)}` : 'NOT IN THIS VISIT';
+      const lines = d ? njSign(d.id, tg.sold, out) : ['—'], SH = Math.min(0.62, 0.24 + 0.1 * lines.length);
+      if (tg.sign!.material.map) tg.sign!.material.map.dispose(); tg.sign!.material.dispose();
+      tg.sign!.material = signMat(lines, 600, Math.round(600 * SH / 1.2), '#0a0d0f', out ? '#7a8a90' : tg.sold ? '#ff6a5a' : '#8dffbe', '#ffffff');
+      tg.sign!.scale.set(1, SH / 0.5, 1);
+      tg.sign!.position.y = 0.06 + (NJ.top - 0.1) / 2;
+    });
+    // and the thermal sight on their counter
+    if (S.njPart) {
+      const tg = S.njPart, id = (O.njParts || [])[0], p = id && G.Gunsmith.PARTS[id], left = p ? Sh.count('part:' + id) : 0;
+      tg.key = id || null; tg.sold = !p || !left;
+      clear(tg.disp!); tg.spin = null;
+      if (p && left) { const sh = partPiece(id, 0.36, NJ.counter.h); tg.disp!.add(sh.root); tg.spin = sh.spin; }
+      const all = G.Gunsmith.LIST.find((q) => q.seller === 'nj'), lines = p ? (left ? [p.name, money(p.price), 'digital thermal · 2-4-8×'] : [p.name, 'SOLD']) : all ? [all.name, `from level ${2 * all.tier - 3}`] : ['—'];
+      if (tg.sign!.material.map) tg.sign!.material.map.dispose(); tg.sign!.material.dispose();
+      tg.sign!.material = signMat(lines, 512, 256, '#0a0d0f', p && left ? '#8dffbe' : p ? '#ff6a5a' : '#7a8a90', '#ffffff');
+    }
     // the parts pedestals, and the precision showcase's stumps
     const onShow = (S.partStands || []).map((tg: HangarTarget, i: number) => [tg, parts0[i]]).concat((S.precStands || []).map((tg: HangarTarget, i: number) => [tg, prec0[i]])) as [HangarTarget, string][];
     onShow.forEach(([tg, id]: [HangarTarget, string]) => {
@@ -838,6 +976,8 @@ const G_Hangar = (() => {
     // the kit on show, turning
     for (const tg of S.stands) if (tg.spin) tg.spin.rotation.y += dt * 0.5;
     for (const tg of (S.partStands || []).concat(S.precStands || [])) if (tg.spin) tg.spin.rotation.y += dt * 0.6;
+    for (const tg of S.njStands || []) if (tg.spin) tg.spin.rotation.y += dt * 0.4;
+    if (S.njPart && S.njPart.spin) S.njPart.spin.rotation.y += dt * 0.5;
     // Vex, standing about
     for (const o of S.rigs) {
       const idle = o.vex ? { yaw: o.yaw + Math.sin(S.t * 0.35) * 0.18 } : { yaw: o.yaw };
@@ -853,33 +993,11 @@ const G_Hangar = (() => {
       const k = ids.length ? ready / ids.length : 0; H.glow.color.setRGB(0.9 - 0.8 * k, 0.15 + 0.75 * k, 0.1 + 0.2 * k); H.thrust.opacity = 0.08 + 0.4 * Math.min(1, H.spin / 38); // (status strips: red to green as the squad gets in)
       H.rotor.rotation.x = Math.sin(S.t * 0.7) * 0.004 * (1 + H.spin * 0.05);
     }
-    craneStep(dt);
     if (G.Range) G.Range.update(dt);
     if (G.Highlights) G.Highlights.update(dt);
     // a word from Vex now and then, when you're in the store
     if (me.pos && me.pos.x > 16 && me.pos.x < 36 && me.pos.z - RZ < 26 && me.pos.z - RZ > 0 && (S.vexQuip -= dt) <= 0) { S.vexQuip = 40 + Math.random() * 30; if (!G.Game.shopOpen && Math.hypot(me.pos.x - VEX.x, me.pos.z - RZ - VEX.z) < 9) G.HUD.toast('VEX', G.VENDOR_QUIPS.hello[Math.floor(Math.random() * G.VENDOR_QUIPS.hello.length)], 2.4); }
   }
-  // the crane: drifts about the stash; when sent, picks a crate off the stack and sets it on the loadout pallet (and back)
-  function craneStep(dt: number) {
-    const c = S.crane;
-    if (!c) return;
-    const go = (tx: number, tz: number, sp: number) => { const dx = tx - c.cx, dz = tz - c.cz, d = Math.hypot(dx, dz); if (d < 0.02) return true; const k = Math.min(d, sp * dt); c.cx += dx / d * k; c.cz += dz / d * k; return false; };
-    const hoist = (to: number, sp: number) => { const d = to - c.gy; c.gy += Math.sign(d) * Math.min(Math.abs(d), sp * dt); return Math.abs(to - c.gy) < 0.01; };
-    c.t += dt;
-    if (c.state === 'idle') {
-      if (c.queue > 0) { c.queue--; c.state = 'toStack'; }
-      else { go(STACK.x + Math.sin(c.t * 0.21) * 3.2, (WARE.z0 + WARE.z1) / 2 + Math.sin(c.t * 0.15 + 1) * 3.5, 0.6); hoist(2.9, 0.5); }
-    } else if (c.state === 'toStack') { if (go(STACK.x, STACK.z, 3.2) && hoist(2.9, 1.5)) c.state = 'down'; }
-    else if (c.state === 'down') { if (hoist(2.45, 1.2)) { c.state = 'lift'; c.carried.visible = true; } }          // (onto the top crate)
-    else if (c.state === 'lift') { if (hoist(2.95, 1.2)) c.state = 'toBay'; }
-    else if (c.state === 'toBay') { if (go(STACK.x, BAY_Z, 3.2)) c.state = 'set'; }
-    else if (c.state === 'set') { if (hoist(1.45, 1.2)) { c.carried.visible = false; c.state = 'rise'; } }          // (down to the pallet, let go)
-    else if (c.state === 'rise') { if (hoist(2.9, 1.5)) c.state = 'return'; }
-    else if (c.state === 'return') { if (go(STACK.x, STACK.z, 3.2)) c.state = 'idle'; }
-    c.bridge.position.set(43.9, 0, c.cz); c.trolley.position.x = c.cx - 43.9;
-    c.grab.position.y = c.gy; c.cable.scale.y = Math.max(0.05, 3.35 - (c.gy + 0.2));
-  }
-
   // ------------------------------------------------------------------------ looking and pressing F
   const _o = new T.Vector3(), _d = new T.Vector3();
   function slab(b: number[], o: THREE.Vector3, d: THREE.Vector3) {
@@ -932,7 +1050,6 @@ const G_Hangar = (() => {
     refresh();
   }
   function open(t: HangarTarget) {
-    if (t.crane && S.crane) S.crane.queue = Math.min(2, S.crane.queue + 1);
     G.Game.openShop(t.tab, t.title);
   }
   // seated: which seat is mine (the same on every machine: by position in the sorted roster)

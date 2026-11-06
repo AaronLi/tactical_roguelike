@@ -32,6 +32,9 @@ const G_LightGrid = (() => {
     lgSize: { value: new T.Vector4(1, 1, 1, 0) }, // W, H (cells), floors, where the lowest floor's layer starts (y)
     lgFloorH: { value: 4.3 },
     lgPaint: { value: blank }, // (residents' wall colours, a cell of the floor plan each: js/homes.ts paint)
+    // night vision's IR illuminator (js/render.ts), only on a frame drawn for the goggles with it switched on: lgNv where it
+    // is (the eye: x, y, z) and how bright (w, 0 off), lgNvD which way it points (x, y, z) and the cosine of its cone's half-angle (w)
+    lgNv: { value: new T.Vector4(0, 0, 0, 0) }, lgNvD: { value: new T.Vector4(0, 0, -1, 0.9) },
   };
   let built = false;
   // bounce: how much of what a surface reflects comes back into the room (on top of its colour: the theme's walls',
@@ -52,7 +55,7 @@ const G_LightGrid = (() => {
       lgp = instanceMatrix * lgp; lgn = mat3(instanceMatrix) * lgn;
       #endif
       lgp = modelMatrix * lgp; vLgP = lgp.xyz; vLgN = normalize(mat3(modelMatrix) * lgn); }`;
-  const FS_HEAD = `varying vec3 vLgP;\nvarying vec3 vLgN;\nuniform sampler2D lgLight;\nuniform sampler2D lgDir;\nuniform vec4 lgGrid;\nuniform vec4 lgSize;\nuniform float lgFloorH;\nuniform sampler2D lgPaint;\n`;
+  const FS_HEAD = `varying vec3 vLgP;\nvarying vec3 vLgN;\nuniform sampler2D lgLight;\nuniform sampler2D lgDir;\nuniform vec4 lgGrid;\nuniform vec4 lgSize;\nuniform float lgFloorH;\nuniform sampler2D lgPaint;\nuniform vec4 lgNv;\nuniform vec4 lgNvD;\n`;
   // A wall's colour by the room it faces (a material with LG_PAINT: only a level with a resident's room). A wall cell is one
   // box with a room on each side, so the box can't be tinted: each face takes it from the floor plan, just off the face on
   // its own side, as it does the light, so the room next door keeps its own, and so do a wall's faces once they've been
@@ -88,6 +91,13 @@ const G_LightGrid = (() => {
         float lgturn = clamp(0.5 + 0.5 * dot(lgn, lgdir), 0.0, 1.0);
         reflectedLight.directDiffuse += diffuseColor.rgb * (lgL.rgb / lgL.a) * lgturn;
       }
+    }
+    // (night vision's IR illuminator: a cone from the eye, soft-edged, out to about 18 m, on what faces it; what's behind a
+    // wall isn't seen from the eye anyway, so no shadow's needed)
+    if (lgNv.w > 0.0) {
+      vec3 nvd = lgNv.xyz - vLgP; float nvr = max(length(nvd), 0.05), nvf = max(0.0, 1.0 - nvr / 18.0);
+      float nvc = smoothstep(lgNvD.w, mix(lgNvD.w, 1.0, 0.5), dot(-nvd / nvr, lgNvD.xyz));
+      reflectedLight.directDiffuse += diffuseColor.rgb * lgNv.w * nvc * nvf * nvf * clamp(dot(normalize(vLgN), nvd / nvr), 0.0, 1.0) / (1.0 + nvr * nvr) * (0.15 + 0.85 * smoothstep(0.5, 1.8, nvr)); // (the gun in your hands below the head-mounted lamp, mostly out of its beam)
     }
     #include <lights_fragment_end>`;
   function patch(shader: THREE.Shader) {

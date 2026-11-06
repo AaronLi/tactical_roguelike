@@ -180,6 +180,14 @@ const G_Audio = {
   alarm() { for (let i = 0; i < 3; i++) this.tone(880, 0.18, 'square', 0.1, 660, i * 0.25); },
   extract() { this.tone(523, 0.2, 'triangle', 0.2); this.tone(659, 0.2, 'triangle', 0.2, null, 0.15); this.tone(784, 0.4, 'triangle', 0.2, null, 0.3); },
   laser() { this.tone(2400, 0.06, 'sine', 0.05); },
+  // night vision flipped: the mount's detent clacking (down, then the tubes' faint whine as they power up; up, they're off)
+  nvFlip(down: boolean) {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    this._noise(t, 0.035, down ? 2200 : 2800, 2, 0.18, 'bandpass'); this.tone(down ? 420 : 520, 0.04, 'square', 0.05, null, 0.01);
+    this._noise(t + 0.24, 0.03, 3200, 3, 0.16, 'bandpass'); this.tone(900, 0.03, 'square', 0.05, null, 0.25);
+    if (down) this.tone(9800, 0.55, 'sine', 0.012, 12600, 0.28);
+  },
   pin() { this.tone(2600, 0.05, 'square', 0.08); },
   chat() { this.tone(1500, 0.05, 'sine', 0.08); },
   // crossbow: string slap + a dull thump, deliberately quiet

@@ -10,7 +10,8 @@
 //   with visor        an Altyn-style assault helmet: a deep rounded shell down over the ears and nape, a brow cut
 //                     away for the armoured visor that hinges on bolts at each side
 // and the face pieces hung on a helmet's rails (a mandible round the jaw; a polycarbonate or laminated face shield),
-// and a suspect's baseball cap. Every shell is a dome whose lower edge follows a profile round the head (band),
+// night vision on the shroud (a mount, an arm down to the bridge and its tubes in front of the eyes, swung up over the
+// brow when it's off: nvg), and a suspect's baseball cap. Every shell is a dome whose lower edge follows a profile round the head (band),
 // so the brow, the ear cut-outs and the nape are each where they are on the real helmet.
 const G_Headgear = (() => {
   const T = THREE, PI = Math.PI;
@@ -133,6 +134,42 @@ const G_Headgear = (() => {
     put(new T.Mesh(band(vr + 0.002, -1.22, 1.22, PI * 0.36, PI * 0.4, 0.012, { cols: 18, rows: 1 }), mat(0x1c1e20))); // its top edge, the hinge bar
     for (const s of [-1, 1]) { const p = at(M.r + 0.012, s * 1.4, PI * 0.42), m = new T.Mesh(new T.BoxGeometry(0.014, 0.03, 0.05), mat(0x1c1e20)); m.position.copy(p); m.rotation.y = s * 0.3; put(m); }
   }
+  // Night vision on the helmet's shroud ('n.mono', 'n.bino', 'n.pano', 'n.fuse'): the shroud's mount stays put; what hangs
+  // from it (the arm, the bridge and the tubes, an eyecup at the back of each and its objective lens in front) is in a
+  // pivot at the hinge, drawn down in front of the eyes. Its rotation.x swings it: 0 down, NV_UP up over the brow, tubes
+  // pointing up. A panoramic's outer pair are canted out; a fused set has the thermal core on top of the bridge; the
+  // quads' battery pack rides at the back of the helmet as a counterweight. The eyecups glow faintly with the phosphor
+  // when they're on (glow: its material, to light or not). Returns { pivot, glow }.
+  const NV_UP = 1.95, glowMats: Record<string, THREE.MeshBasicMaterial> = {};
+  function nvg(id: string, helmetId: string, mat: Mat, put: Put) {
+    const M = MODELS[helmetId] || MODELS.generic, d = G.Gear && G.Gear.DEFS[id], v = d && d.nv, n = v ? v.tubes.length : 2;
+    const hinge = at(M.r + 0.018, 0, PI * 0.36), dark = 0x1a1c1e, body = 0x2c3034, rubber = 0x101112;
+    const mount = new T.Mesh(new T.BoxGeometry(0.036, 0.03, 0.022), mat(dark)); mount.position.copy(hinge); mount.rotation.x = -0.4; put(mount);
+    const pivot = new T.Group(); pivot.position.copy(hinge); put(pivot);
+    const add = (m: THREE.Mesh, x: number, y: number, z: number) => { m.position.set(x, y, z); pivot.add(m); return m; };
+    // (in the pivot's frame: the eyes are about 6 cm below the hinge, the eyepieces just in front of them)
+    const eyeY = 0.136 - hinge.y, eyeZ = -0.13 - hinge.z;
+    const arm = add(new T.Mesh(new T.BoxGeometry(0.022, Math.abs(eyeY) + 0.01, 0.014), mat(body)), 0, eyeY / 2 + 0.008, -0.012); arm.rotation.x = -0.12;
+    const bw = n === 1 ? 0.03 : n === 2 ? 0.084 : 0.142;
+    add(new T.Mesh(new T.BoxGeometry(bw, 0.026, 0.05), mat(body)), n === 1 ? -0.016 : 0, eyeY + 0.02, eyeZ - 0.035); // the bridge
+    const key = (v ? (v.phos[0] > 0.6 ? 'w' : 'g') : 'g'), glow = glowMats[key] || (glowMats[key] = new T.MeshBasicMaterial({ color: key === 'w' ? 0x9fb8ff : 0x3aff7a }));
+    const tube = (x: number, cant: number, r: number, len: number) => {
+      const g = new T.Group(); g.position.set(x, eyeY, eyeZ); g.rotation.y = cant; pivot.add(g);
+      const cyl = (rr: number, l: number, c: number, z: number, glowing?: boolean) => { const m = new T.Mesh(new T.CylinderGeometry(rr, rr, l, 14), glowing ? glow : mat(c)); m.rotation.x = PI / 2; m.position.z = z; g.add(m); return m; };
+      cyl(r, len, body, -len / 2 - 0.006);
+      cyl(r * 1.12, 0.012, rubber, -0.004); // the eyecup
+      cyl(r * 1.08, 0.014, dark, -len - 0.008); // the objective's ring
+      cyl(r * 0.8, 0.002, 0x05080a, -len - 0.016); // its lens
+      return cyl(r * 0.62, 0.0015, 0, 0.0035, true); // the eyepiece, lit
+    };
+    const lit: THREE.Mesh[] = [];
+    if (n === 1) lit.push(tube(-0.032, 0, 0.016, 0.1)); // (over the right eye: -x is the wearer's right)
+    else if (n === 2) for (const s of [-1, 1]) lit.push(tube(s * 0.032, 0, 0.017, 0.105));
+    else for (const [x, c] of [[-0.058, 0.36], [-0.022, 0], [0.022, 0], [0.058, -0.36]]) lit.push(tube(x, c, 0.0135, 0.088));
+    if (v && v.thermal) { add(new T.Mesh(new T.BoxGeometry(0.044, 0.026, 0.05), mat(0x3a3428)), 0, eyeY + 0.042, eyeZ - 0.05); add(new T.Mesh(new T.CylinderGeometry(0.011, 0.011, 0.004, 12), mat(0x2a1a08)), 0, eyeY + 0.042, eyeZ - 0.077).rotation.x = PI / 2; } // the thermal core and its window
+    if (n === 4) { const p = at(M.r + 0.02, PI, PI * 0.52), b = new T.Mesh(new T.BoxGeometry(0.07, 0.04, 0.026), mat(0x24272a)); b.position.copy(p); b.rotation.x = 0.35; put(b); } // the battery pack, at the back
+    return { pivot, lit };
+  }
   // a baseball cap: a six-panel crown and a curved peak
   function cap(mat: Mat, put: Put, col: number) {
     const cr = band(0.106, -PI, PI, 0, PI * 0.5, 0.003, { c: [0, 0.158, 0.004], sc: [1, 0.85, 1.08], cols: 30, rows: 8 });
@@ -142,7 +179,7 @@ const G_Headgear = (() => {
     const peak = new T.Mesh(new T.RingGeometry(0.1, 0.19, 18, 1, PI / 2 - PI * 0.26, PI * 0.52), mat(col, { side: T.DoubleSide }));
     peak.rotation.x = -PI / 2 - 0.2; peak.position.set(0, 0.16, 0.0); peak.scale.set(0.85, 1, 1); put(peak);
   }
-  return { band, helmet, face, cap, MODELS, CUT };
+  return { band, helmet, face, nvg, NV_UP, cap, MODELS, CUT };
 })();
 G.Headgear = G_Headgear;
 interface GameModules { Headgear: typeof G_Headgear; }

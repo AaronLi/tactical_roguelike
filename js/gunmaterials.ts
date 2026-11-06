@@ -49,6 +49,7 @@ const M = {
   glass: () => std('glass', 0x204050, 0.05, 0.6, { transparent: true, opacity: 0.25, depthWrite: false }),
   tubeDS: () => std('tubeDS', 0x1d1f22, 0.45, 0.5, { side: T.DoubleSide }),
   lens: () => std('lens', 0x3a6a8a, 0.05, 0.8),
+  germanium: () => std('germanium', 0x2c2836, 0.08, 0.95, { emissive: 0x0c0614 }), // a thermal sight's objective: dark grey, a purple sheen
   // reflex sight glass: the front element carries the dot's reflective coating (a faint blue-violet tint)
   // (barely there: you look straight through a 1x sight's glass; only the faintest tint and sheen)
   reflexLens: () => std('reflexLens', 0x8a94d8, 0.04, 0.6, { transparent: true, opacity: 0.05, depthWrite: false }),

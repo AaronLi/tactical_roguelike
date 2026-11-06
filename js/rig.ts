@@ -38,6 +38,8 @@ interface Rig { // a character's skeleton and its meshes (what create makes, and
   // (what the animation keeps from frame to frame)
   powered?: boolean; limp?: boolean; zipped?: boolean; zipKit?: THREE.Object3D; zipT?: number; zipYaw?: number | null; zipSw?: ZipSwing; proneW?: number; proneS?: number; effPh?: number; effT?: number; braceW?: number; gunAimW?: number; gunKick?: number;
   gunBase?: { p: THREE.Vector3; q: THREE.Quaternion; s: THREE.Vector3 }; gunBaseOf?: THREE.Object3D; gunSupport?: THREE.Vector3 | null; bipodK?: number; hitDir?: THREE.Vector3; xbLoaded?: any;
+  cold?: boolean; // (no warmth for a thermal channel: a mannequin)
+  nvPivot?: THREE.Object3D | null; nvLit?: THREE.Mesh[]; nvK?: number; nvWant?: number; // (night vision on the helmet: what swings, its lit eyepieces, how far down it is and is going: setKit, update)
   blindW?: number; radioW?: number; dazeW?: number; blindT?: number; atakW?: number; atak?: THREE.Group; atakAlways?: boolean; handNade?: any; throwHand?: boolean; throwStr?: any; dropped?: { g: THREE.Object3D; vy: number; spin: number; floor?: number; [field: string]: any } | null;
   [bone: string]: any; // (a bone looked up by name: js/ballistics.ts boneOf, the hitbox readouts of js/hud.ts and js/highlights.ts; and what js/hud.ts keeps on a rig)
 }
@@ -139,12 +141,22 @@ const G_Rig = (() => {
       return m;
     });
   }
+  // Warm bodies, for a thermal channel (js/render.ts _heatPass): the body's and the kit's meshes on the heat layer too, drawn
+  // warm there (not what's carried in the hands: a gun's as cold as the room). Every body there is: live (a mannequin's cold).
+  const live = new Set<Rig>();
+  function heatMark(o: THREE.Object3D, skip?: THREE.Object3D | null) {
+    if (o === skip) return;
+    if ((o as THREE.Mesh).isMesh) o.layers.enable(3); // (js/render.ts HEAT_LAYER: the video's worker has no G.R)
+    for (const c of o.children) heatMark(c, skip);
+  }
   function setKit(rig: Rig, k: any) {
-    const key = JSON.stringify(k || {}) + (rig.callsign ? '|' + rig.callsign.id + '|' + rig.callsign.name : '');
+    rig.nvWant = k && k.nd ? 1 : 0; // (night vision flipped down or up: animated in update, not a new model)
+    const key = JSON.stringify(Object.assign({}, k || {}, { nd: 0 })) + (rig.callsign ? '|' + rig.callsign.id + '|' + rig.callsign.name : '');
     if (rig.kitKey === key) return;
     rig.kitKey = key; rig.kit = k;
     for (const m of rig.kitParts as THREE.Mesh[]) { if (m.parent) m.parent.remove(m); if (m.geometry) m.geometry.dispose(); }
     rig.kitParts = [];
+    rig.nvPivot = null; rig.nvLit = [];
     backPatch(rig, k);
     if (!k) return;
     const D = (id: any) => (id && G.Gear && G.Gear.DEFS[id]) || null;
@@ -163,6 +175,15 @@ const G_Rig = (() => {
     const fd = D(k.face);
     part = 'face';
     if (fd && hd) G.Headgear.face(fd.id, hd.id, KM, putHd);
+    // night vision on its shroud: down in front of the eyes or swung up (nvK: as far as it's got, kept through a rebuild)
+    const nd = D(k.nv);
+    part = 'nvg';
+    if (nd && hd) {
+      const nv = G.Headgear.nvg(nd.id, hd.id, KM, putHd);
+      rig.nvPivot = nv.pivot; rig.nvLit = nv.lit;
+      if (rig.nvK == null) rig.nvK = rig.nvWant;
+      nvPose(rig);
+    }
     // the carrier: a soft vest, a slick plate carrier, a chest rig, or a full carrier with its pouches
     const cd = D(k.carrier), cc = KIT_COL(cd);
     part = 'carrier';
@@ -231,6 +252,14 @@ const G_Rig = (() => {
       box(C, w, h, d, KIT_COL(pd), 0, y, back);
       box(C, w * 0.8, h * 0.3, 0.04, 0x23251f, 0, y - h * 0.2, back + d / 2 + 0.02); // a pocket
     }
+    for (const m of rig.kitParts) heatMark(m);
+  }
+  // the night vision as far down as it's got (nvK 1: down, the eyepieces lit once it's there)
+  function nvPose(rig: Rig) {
+    if (!rig.nvPivot) return;
+    const k = rig.nvK || 0, e = k * k * (3 - 2 * k);
+    rig.nvPivot.rotation.x = (1 - e) * G.Headgear.NV_UP;
+    for (const m of rig.nvLit || []) m.visible = k > 0.97;
   }
   // A suspect's armour (G.ARMORS ids) as the gear an officer would wear: the same models for the same kit
   function armourKit(vest: string, helmet: string, armored: boolean, face?: any, ex?: any) {
@@ -485,6 +514,8 @@ const G_Rig = (() => {
     rig.setCallsign = (id: string, name: string) => { rig.callsign = id ? { id, name: name || '' } : null; setKit(rig, rig.kit); setSeat(rig); };
     setKit(rig, null); // (the back patch, before any kit)
     setSeat(rig);
+    heatMark(rig.root, rig.gun); // (warm: js/render.ts _heatPass)
+    rig.cold = !!o.mannequin; live.add(rig);
     // put the weapon away (true) or bring it to the hands (false)
     // anim: the hand carries it there (slingSwap) rather than it jumping; and it isn't taken back up while the ATAK's still out
     // (the phone's folded away first: rig.slingWant waits for it)
@@ -537,6 +568,7 @@ const G_Rig = (() => {
       if (rig.dropped && rig.dropped.g.parent) rig.dropped.g.parent.remove(rig.dropped.g);
       if (rig.dbg) rig.dbg.forEach((m: THREE.Object3D) => m.parent && m.parent.remove(m));
       for (const o of [rig.root, rig.dropped && rig.dropped.g]) if (o) o.traverse((c: any) => { if (c.geometry) c.geometry.dispose(); });
+      live.delete(rig);
     };
     return rig;
   }
@@ -640,6 +672,8 @@ const G_Rig = (() => {
     if (p.zip) { if (rig.zipYaw == null) rig.zipYaw = p.yaw; if (Math.hypot(rig.vel.x, rig.vel.z) > 1.5) rig.zipYaw = Math.atan2(-rig.vel.x, -rig.vel.z); } else rig.zipYaw = null;
     root.rotation.y = p.climb ? p.climb.yaw : p.zip ? rig.zipYaw : p.yaw; // (on a ladder: facing it, wherever they're looking)
     if (rig.powered && rig.state !== 'dead' && !rig.limp) gunHome(rig); // (before the hands reach for it)
+    // night vision flipping down or up (a third of a second, as the wearer's own: js/player.ts nvFlip)
+    if (rig.nvPivot && rig.nvK !== rig.nvWant) { const w = rig.nvWant || 0; rig.nvK = (rig.nvK || 0) + Math.sign(w - (rig.nvK || 0)) * Math.min(Math.abs(w - (rig.nvK || 0)), dt / 0.32); nvPose(rig); }
     root.updateMatrixWorld(true);
     // a crossbow: its bolt's on the rail while it's loaded (a reload lays it there at 0.72, cocking the string at 0.3)
     if (rig.gun && rig.gun.userData.xb) {
@@ -1763,7 +1797,7 @@ const G_Rig = (() => {
   // where someone lying (dead, or down for good) is: their ragdoll's hips, wherever it came to rest
   function bodyAt(rig: Rig) { return (rig.hips || rig.root).getWorldPosition(new THREE.Vector3()); }
   return {
-    create, zipSwing, raycast, rayCapsule, OFFICER_LOOK, LOOKS, cleanLook, armourKit, zipPoint, bodyAt,
+    create, live, zipSwing, raycast, rayCapsule, OFFICER_LOOK, LOOKS, cleanLook, armourKit, zipPoint, bodyAt,
     get debug() { return debug; },
     toggleDebug() { debug = !debug; return debug; },
   };

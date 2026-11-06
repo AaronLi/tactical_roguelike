@@ -249,12 +249,12 @@ const G_InvUI = (() => {
     if (w && G.R.vm && G.R.vm.userData.key !== G.R.vmKey(w.def, w.stickers)) G.R.setViewmodel(w.def);
   }
   let opened: number[] = []; // uids of the open containers, newest first
-  const COLORS: Record<string, string> = { mag: '#3d4a33', ammo: '#4a4130', med: '#5a2a2a', frag: '#3a4237', flash: '#3d4247', tb: '#3e4430', carrier: '#2f3a44', plate: '#3c3f46', helmet: '#33393f', face: '#30363c', belt: '#3b3528', pack: '#3a3a2c', gun: '#262b30', pouch: '#353a2e', part: '#2c3136' };
+  const COLORS: Record<string, string> = { mag: '#3d4a33', ammo: '#4a4130', med: '#5a2a2a', frag: '#3a4237', flash: '#3d4247', tb: '#3e4430', carrier: '#2f3a44', plate: '#3c3f46', helmet: '#33393f', face: '#30363c', nvg: '#2a3034', belt: '#3b3528', pack: '#3a3a2c', gun: '#262b30', pouch: '#353a2e', part: '#2c3136' };
   const GS = () => G.Gunsmith;
-  const SLOTS = [['wp', 'Primary weapon'], ['ws', 'Sidearm'], ['helmet', 'Helmet'], ['face', 'Face shield / mandible'], ['carrier', 'Body armour / rig'], ['plate', 'Plate'], ['shoulder', 'Shoulders'], ['groin', 'Pelvis'], ['belt', 'Belt'], ['legs', 'Legs'], ['ifak', 'IFAK'], ['pack', 'Backpack']];
-  const GEAR_SLOTS = ['helmet', 'face', 'carrier', 'plate', 'shoulder', 'groin', 'belt', 'legs', 'ifak', 'pack'];
+  const SLOTS = [['wp', 'Primary weapon'], ['ws', 'Sidearm'], ['helmet', 'Helmet'], ['face', 'Face shield / mandible'], ['nvg', 'Night vision'], ['carrier', 'Body armour / rig'], ['plate', 'Plate'], ['shoulder', 'Shoulders'], ['groin', 'Pelvis'], ['belt', 'Belt'], ['legs', 'Legs'], ['ifak', 'IFAK'], ['pack', 'Backpack']];
+  const GEAR_SLOTS = ['helmet', 'face', 'nvg', 'carrier', 'plate', 'shoulder', 'groin', 'belt', 'legs', 'ifak', 'pack'];
   // an empty mount's slot, and which gear it's missing: what it says when it can't be used
-  const NO_MOUNT: Record<string, string> = { face: 'no mount on this helmet', plate: 'no plate pocket', shoulder: 'no shoulder mounts', groin: 'no pelvis mount', legs: 'no leg hangers' };
+  const NO_MOUNT: Record<string, string> = { face: 'no mount on this helmet', nvg: 'no shroud on this helmet', plate: 'no plate pocket', shoulder: 'no shoulder mounts', groin: 'no pelvis mount', legs: 'no leg hangers' };
   const WSLOT: Record<string, string> = { wp: 'p', ws: 's' };
   const ACCEPT: Record<string, string> = { mag: 'magazines', ammo: 'ammo', frag: 'grenade', flash: 'grenade', tb: 'grenade', med: 'medkit' };
 
@@ -351,7 +351,12 @@ const G_InvUI = (() => {
   const lastGun = (me: Me, src: Src) => WSLOT[src.slot!] && Object.keys(me.weapons).length <= 1;
   // can an item go in that equipment slot?
   function slotOK(me: Me, s: string, it: Item) {
-    if ((GG().MOUNTS as Rec)[s]) return it.k === s && !!GG().mountOn(me, s);
+    if ((GG().MOUNTS as Rec)[s]) { // (and nothing in the way: night vision's eyepieces and a full face shield can't both be on)
+      if (it.k !== s || !GG().mountOn(me, s)) return false;
+      const c = GG().clash(GG().mountOn(me, s), s, it);
+      if (c) G.HUD.toast('', `The ${G.U.esc(GG().label(c))} is in the way: take it off first`, 1.8);
+      return !c;
+    }
     if (WSLOT[s]) return it.k === 'gun' && it.w.def.slot === WSLOT[s];
     return it.k === s;
   }
@@ -555,7 +560,7 @@ const G_InvUI = (() => {
     return `<div class="hl-status ${G.Med.bleeding(me.body) ? 'bad' : ''}">${status}</div>${bodyHTML(me.body)}
       <p class="inv-hint">Click a part to treat it with what you carry, or drag a medical item onto it (it takes a few seconds). Click the blood bar for a blood bag.</p>
       ${squadHTML(me)}
-      ${piece('Helmet', me.kit.helmet)}${me.kit.helmet && me.kit.helmet.face ? piece('Face', me.kit.helmet.face) : ''}${piece('Armour', me.kit.carrier)}${me.kit.carrier ? piece('Plate', me.kit.carrier.plate) + piece('Shoulders', me.kit.carrier.shoulder) + piece('Pelvis', me.kit.carrier.groin) : ''}${me.kit.belt ? piece('Legs', me.kit.belt.legs) : ''}`;
+      ${piece('Helmet', me.kit.helmet)}${me.kit.helmet && me.kit.helmet.face ? piece('Face', me.kit.helmet.face) : ''}${me.kit.helmet && me.kit.helmet.nvg ? piece('Night vision', me.kit.helmet.nvg) : ''}${piece('Armour', me.kit.carrier)}${me.kit.carrier ? piece('Plate', me.kit.carrier.plate) + piece('Shoulders', me.kit.carrier.shoulder) + piece('Pelvis', me.kit.carrier.groin) : ''}${me.kit.belt ? piece('Legs', me.kit.belt.legs) : ''}`;
   }
   function stats(me: Me) {
     // each zone: the hardest to stop of the reference rounds what's there stops head-on, new (js/ballistics.ts rating)

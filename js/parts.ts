@@ -37,6 +37,7 @@ interface Part { // a part as the catalog holds it
   authored?: { height: string }; /* (a part modelled in Blender: models/parts, docs/models.md) */
   len?: number; /* (a shared long-gun barrel: its length in inches, what fits is each gun's factory length's 0.6x-1.6x) */
   profile?: string; /* (a shared barrel's profile: BARREL_PROFILES, absent = standard) */
+  seller?: string; /* (sold only at one counter: 'nj' Nightjar's (js/shop.ts offers.njParts), never on the gunsmith's pedestals or Timberline's stumps) */
 }
 interface MagFam {
   name: string; brand: string; clear?: string; std: number; straightShort?: boolean; model: Record<string, any>; desc: string;
@@ -385,7 +386,7 @@ const G_Gunsmith = (() => {
   // magnified sights are looked through (scope overlay with the sight's own reticle)
   // Magnified sights show a picture-in-picture view at their magnification (variable scopes sit at a working
   // power). zoom stays the aim-sensitivity multiplier.
-  const RETICLE: Record<string, string> = { scope: 'cross', acog: 'chevron', prism: 'chevron', lpvo: 'lpvo', augscope: 'ring' };
+  const RETICLE: Record<string, string> = { scope: 'cross', acog: 'chevron', prism: 'chevron', lpvo: 'lpvo', augscope: 'ring', thermal: 'thermal' };
   const scopeMag = (model: any, zoom: number) => model.px || ({ prism: 2, acog: 4, lpvo: 4, augscope: 1.5 } as Record<string, number>)[model.optic] || Math.min(8, Math.max(3, Math.round(1.6 / zoom)));
   // every variable-power optic is first focal plane: the range-finding marks grow with the picture, true at any power (a fixed-power scope has one power: its marks are true at it)
   // (a ballistic computer scope, model.calc: its own plain reticle, a range readout and a point-of-impact marker drawn in the picture: js/viewmodel.ts)
@@ -1668,7 +1669,7 @@ const G_Gunsmith = (() => {
   function rollStock(level: number, seed: number, n = 7) {
     const r = G.U.rng((seed ^ 0x6a5d) >>> 0), maxTier = Math.min(3, 1 + Math.floor(level / 2)), out = new Set();
     // (lights and lasers are few among hundreds of muzzles, stocks and grips: they're weighted up to turn up most visits)
-    const pool = LIST.filter((p) => !p.factory && !p.variant && !p.retired && !p.alt && !plainGrip(p) && p.tier <= maxTier && p.id !== 'fg.4') // (the bipod's the showcase's: rollPrecision)
+    const pool = LIST.filter((p) => !p.factory && !p.variant && !p.retired && !p.alt && !p.seller && !plainGrip(p) && p.tier <= maxTier && p.id !== 'fg.4') // (the bipod's the showcase's: rollPrecision)
       .map((p) => ({ p, w: Math.pow(fitsPart(p).length, 0.8) * (p.slot === 'tac' ? 9 : 1) * Math.max(0.04, Math.pow(1 - stockShare(p), 3)) }));
     while (out.size < n && pool.length) {
       let roll = r() * pool.reduce((a, x) => a + x.w, 0), i = 0;
@@ -1682,7 +1683,7 @@ const G_Gunsmith = (() => {
   // the bipod, and match barrels for the long guns (the marksman and sniper rifles first): six, three scopes, the bipod and two barrels.
   function rollPrecision(level: number, seed: number, n = 6) {
     const r = G.U.rng((seed ^ 0x5c09e) >>> 0), maxTier = Math.min(3, 2 + Math.floor(level / 2)), his = rollStock(level, seed);
-    const ok = (p: Part) => !p.factory && !p.retired && !p.alt && !his.has(p.id) && (p.tier || 1) <= maxTier;
+    const ok = (p: Part) => !p.factory && !p.retired && !p.alt && !p.seller && !his.has(p.id) && (p.tier || 1) <= maxTier;
     const take = (list: Part[], k: number) => G.U.shuffle(r, list.filter(ok)).slice(0, k).map((p) => p.id);
     const magnified = LIST.filter((p) => p.slot === 'optic' && p.model && (['scope', 'lpvo', 'acog'] as (string | undefined)[]).includes(p.model.optic));
     const scopes = take(magnified.filter((p) => !p.oem), 3); // (the named glass first; the plain rifle scopes the guns ship with if it's short)
@@ -1722,6 +1723,13 @@ const G_Gunsmith = (() => {
       desc: 'Not a thing on the gun: a way of holding the rounds. Three .22s between the fingers of your loading hand, one in each gap, bases in the palm and noses out like claws, into three chambers at once. Each grip takes a little longer than one round; the block fills in three (3, 3, 2), well under half the time.' });
     plat.offset = {}; for (const k of STAT_KEYS) plat.offset[k] = -Object.values(plat.defaults).reduce((a, pid) => a + ((PARTS[pid] && PARTS[pid].st[k]) || 0), 0);
     addFits(plat); }
+  // Nightjar's digital thermal riflescope (sold at their counter in the hangar: js/hangar.ts NJ, js/shop.ts njParts), made after
+  // everything else for the same reason. A sensor and a screen, not glass: its picture (js/viewmodel.ts, js/render.ts
+  // thermalMaterial) is heat, at the sensor's resolution, zoomed digitally, so it works in the dark, through smoke and with night
+  // vision down (an eyepiece screen: no focus to fight). Its model: tools/models/recipes.ts thermal.
+  add({ id: 'op.th.0', slot: 'optic', mount: 'op:pic', brand: 'Nightjar Optronics', name: 'Nightjar TS-35 thermal riflescope', price: 9800, tier: 4, seller: 'nj', st: { ergo: -9, acc: -10, weight: 0.32 },
+    set: sightSet({ optic: 'thermal', px: 2, levels: [2, 4, 8] }, 0.45), model: { optic: 'thermal', px: 2, levels: [2, 4, 8] },
+    desc: 'A digital thermal sight: heat, not light. Anyone warm shows white on a dark picture in total darkness and through smoke (not through glass or walls). 2-4-8× digital zoom (scroll while aiming: the picture coarsens as it zooms, a 384×288 sensor), T cycles white-hot, black-hot and ironbow. Its eyepiece is a screen, so it works with night vision down.' });
   // what an attachments box offers for a weapon: parts that go straight onto it as it's built (a slot it has now, not
   // what's already in it), not factory parts, magazines, or anything that makes it another gun
   const ATTACH_SLOTS = new Set(['slide', 'barrel', 'muzzle', 'handguard', 'railmount', 'pump', 'fg', 'tac', 'tacL', 'optic', 'riserdot', 'magnifier', 'charging', 'grip', 'stock', 'buttstock', 'loader']);

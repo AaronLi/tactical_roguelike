@@ -159,7 +159,7 @@ const CONTRACT_CORE = {
       plum: { doc: 'Plum bakelite (an AK-74 grip).' }, woodRed: { doc: 'Red-brown wood.' }, brass: { doc: 'Brass.' }, rubber: { doc: 'Black rubber.' },
       stipple: { doc: 'Stippled polymer grip.', bump: 'stp' }, chequer: { doc: 'Chequered metal or polymer.', bump: 'chq' }, chequerWood: { doc: 'Chequered wood.', bump: 'chq' },
       rust: { doc: 'Rusted metal.' }, tape: { doc: 'Wrapped tape.' }, clear: { doc: 'Translucent plastic (a see-through magazine).' }, glass: { doc: 'Dark glass.' },
-      tubeDS: { doc: 'Double-sided black (a tube you see inside).' }, lens: { doc: 'Blue-coated lens.' }, reflexLens: { doc: 'Reflex sight glass.' }, clearLens: { doc: 'Clear lens.' },
+      tubeDS: { doc: 'Double-sided black (a tube you see inside).' }, lens: { doc: 'Blue-coated lens.' }, germanium: { doc: 'A thermal sight\'s germanium objective: dark grey, a purple sheen.' }, reflexLens: { doc: 'Reflex sight glass.' }, clearLens: { doc: 'Clear lens.' },
       dot: { doc: 'Red emissive dot.' }, amber: { doc: 'Amber emissive.' }, glow: { doc: 'Cyan emissive.' }, sightPaint: { doc: 'White sight paint.' }, tritium: { doc: 'Green night-sight glow.' },
       redInsert: { doc: 'Red revolver ramp insert.' }, string: { doc: 'String / cord.' }, fabric: { doc: 'Fabric.' }, glove: { doc: 'Glove leather.' },
     } as Record<string, MaterialSpec>,

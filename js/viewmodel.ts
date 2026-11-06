@@ -64,7 +64,7 @@ const G_Viewmodel = (() => {
       gl_Position = projectionMatrix * mv;
     }`;
   const RETICLE_FRAG = `
-    uniform float dotMOA; uniform float ringMOA; uniform float ticks; uniform float holo; uniform float t;
+    uniform float dotMOA; uniform float ringMOA; uniform float ticks; uniform float holo; uniform float t; uniform float nvDim;
     uniform vec3 col; uniform vec3 core; uniform float pxPerTan; varying vec2 vP;
     float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
     void main() {
@@ -93,7 +93,7 @@ const G_Viewmodel = (() => {
       }
       vec3 c = mix(col, core, hot);
       // premultiplied: the lit parts cover what's behind them (a red dot shows on a bright sky too), the glow only adds
-      gl_FragColor = vec4(c * ${LIT.toFixed(2)} * clamp(a, 0.0, 1.0), clamp(occ, 0.0, 1.0) * 0.9);
+      gl_FragColor = vec4(c * ${LIT.toFixed(2)} * nvDim * clamp(a, 0.0, 1.0), clamp(occ, 0.0, 1.0) * 0.9);
     }`;
   function reflex(g: THREE.Object3D, o: VmReflex) {
     const mask = new T.Mesh(o.round ? new T.CircleGeometry(o.w / 2, 28) : new T.PlaneGeometry(o.w, o.h), new T.MeshBasicMaterial({
@@ -104,7 +104,7 @@ const G_Viewmodel = (() => {
     mask.renderOrder = 20;
     g.add(mask);
     const k = RETICLES[o.kind] || RETICLES.dot;
-    const u = { pxPerTan: { value: 1000 }, spanPx: { value: 48 }, dotMOA: { value: k.dot }, ringMOA: { value: k.ring }, ticks: { value: k.ticks }, holo: { value: o.kind === 'holo' ? 1 : 0 }, t: { value: 0 }, col: { value: new T.Vector3(...k.col) }, core: { value: new T.Vector3(...k.core) } };
+    const u = { pxPerTan: { value: 1000 }, spanPx: { value: 48 }, dotMOA: { value: k.dot }, ringMOA: { value: k.ring }, ticks: { value: k.ticks }, holo: { value: o.kind === 'holo' ? 1 : 0 }, t: { value: 0 }, nvDim: { value: 1 }, col: { value: new T.Vector3(...k.col) }, core: { value: new T.Vector3(...k.core) } };
     const mat = new T.ShaderMaterial({
       uniforms: u, vertexShader: RETICLE_VERT, fragmentShader: RETICLE_FRAG, transparent: true, blending: T.CustomBlending, blendEquation: T.AddEquation, blendSrc: T.OneFactor, blendDst: T.OneMinusSrcAlphaFactor, depthTest: false, depthWrite: false, toneMapped: false,
       stencilWrite: true, stencilRef: 1, stencilFunc: T.EqualStencilFunc, stencilFail: T.KeepStencilOp, stencilZFail: T.KeepStencilOp, stencilZPass: T.KeepStencilOp,
@@ -117,6 +117,7 @@ const G_Viewmodel = (() => {
     ret.onBeforeRender = (r: THREE.WebGLRenderer, _s: THREE.Scene, cam: THREE.Camera) => {
       const ppt = (r.getDrawingBufferSize(new T.Vector2()).y / 2) * (cam as THREE.PerspectiveCamera).projectionMatrix.elements[5];
       u.pxPerTan.value = ppt; u.t.value = performance.now() / 1000;
+      u.nvDim.value = G.R.nv && G.R.nv.k > 0.5 ? G.R.NV_DIM : 1; // (night vision down: its NV setting, a dot dim enough not to bloom the tubes)
       u.spanPx.value = Math.max(k.ring * MOA * ppt * 1.3 + 16, 48);
     };
     g.add(ret);
@@ -324,6 +325,7 @@ const G_Viewmodel = (() => {
     }`;
   function pipLens(g: THREE.Object3D, o: VmPip, def: any) {
     const reticle = def.reticle || 'cross';
+    if (reticle === 'thermal') return thermalLens(g, o, def);
     const mat = new T.ShaderMaterial({
       uniforms: { map: { value: G.R.pipTexture() }, live: { value: 0 }, eye: { value: new T.Vector2() }, ret: { value: PIP_RETICLE[reticle] || 0 }, illum: { value: new T.Color(PIP_ILLUM[reticle] || 0) }, rmap: { value: reticle === 'bdc' ? bdcTex(def) : reticle === 'range' ? rangeTex(rangeHolds(def, { def, clicks: 0, ammo: G.ballFor(G.calOf(def)) }).holds) : null }, pmil: { value: 1 }, calc: { value: def.calc || 0 }, dmap: { value: null }, poi: { value: new T.Vector3() } },
       vertexShader: PIP_VS, fragmentShader: PIP_FS, extensions: { derivatives: true }, toneMapped: false, // (it rolls off the picture itself: bpTone)
@@ -366,6 +368,33 @@ const G_Viewmodel = (() => {
     return { disk, r: o.r, mat, mag: def.magnif || 4, fp: def.fp as string | undefined, fpMag: (def.fpMag || def.magnif || 4) as number, sync };
   }
 
+
+  // A digital thermal sight's eyepiece (op.th.0): a screen, not a lens. js/render.ts _renderPip draws its sensor's picture
+  // (heat: _heatPass, from the sight along its axis at its widest), and this shows it (G.R.thermalMaterial): zoomed in digitally
+  // to the power it's set to (the sensor's pixels growing as it does), in the palette picked (w.thPal: T or the comms wheel),
+  // with its reticle and a readout of the power, the palette and the battery painted on a canvas over it.
+  const TH_PAL = ['WH', 'BH', 'IRON'];
+  function thermalLens(g: THREE.Object3D, o: VmPip, def: any) {
+    const cv = document.createElement('canvas'); cv.width = cv.height = 256;
+    const osd = new T.CanvasTexture(cv), mat = G.R.thermalMaterial(osd), cx = cv.getContext('2d')!;
+    const disk = new T.Mesh(new T.CircleGeometry(o.r, 48), mat);
+    disk.position.set(0, o.y, -o.f); g.add(disk);
+    const L = def.magLevels || [def.magnif || 2], pip = { disk, r: o.r, mat, mag: L[0], mag0: L[0], fp: undefined as string | undefined, fpMag: L[0], thermal: true, heatRT: null as THREE.WebGLRenderTarget | null, sync: (w: any) => {} };
+    let shown = '';
+    pip.sync = (w: any) => {
+      const pal = (w && w.thPal) || 0, k = `${pip.mag}|${pal}`;
+      mat.uniforms.pal.value = pal; mat.uniforms.zoom.value = pip.mag / pip.mag0;
+      if (k === shown) return;
+      shown = k;
+      cx.clearRect(0, 0, 256, 256); cx.font = 'bold 19px monospace'; cx.fillStyle = 'rgba(230,240,255,0.92)'; cx.textBaseline = 'top';
+      cx.textAlign = 'left'; cx.fillText(`${pip.mag.toFixed(1)}×`, 52, 44);
+      cx.textAlign = 'right'; cx.fillText(TH_PAL[pal], 204, 44);
+      cx.strokeStyle = 'rgba(230,240,255,0.92)'; cx.lineWidth = 2; cx.strokeRect(160, 200, 30, 13); cx.fillRect(190, 204, 3, 5); for (let i = 0; i < 3; i++) cx.fillRect(163 + i * 9, 203, 7, 7); // (the battery, three bars of four)
+      cx.textAlign = 'left'; cx.font = '13px monospace'; cx.fillText('NJ TS-35', 66, 201);
+      osd.needsUpdate = true;
+    };
+    return pip;
+  }
 
   // ---------------------------------------------------------------- display surfaces
   // A mesh named display_<name> (extras.display { width, height }, with UVs) is a surface the game paints at runtime: it gets a

@@ -249,6 +249,23 @@ const G_Icons = (() => {
     g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(W * 0.22, H * 0.5, W * 0.14, H * 0.1); // rail / ear cut
     if (d.prot && d.prot.some((p) => p.at === 'face')) { g.fillStyle = 'rgba(120,150,170,0.55)'; g.beginPath(); g.moveTo(W * 0.6, H * 0.4); g.lineTo(W * 0.92, H * 0.42); g.lineTo(W * 0.88, H * 0.92); g.lineTo(W * 0.62, H * 0.86); g.closePath(); g.fill(); }
   }
+  // night vision: the mount and its arm, the tubes side by side (one, two, or four, the outer two canted out) with their
+  // eyepieces and objective lenses (a thermal core's window in the middle of a fused set); on: drawn onto a helmet's icon,
+  // small, at its brow
+  function drawNvg(g: CanvasRenderingContext2D, W: number, H: number, d: GearDef, on?: boolean) {
+    const v = d.nv!, n = v.tubes.length, ox = on ? W * 0.5 : 0, oy = on ? H * 0.38 : 0, s = on ? 0.48 : 1, X = (q: number) => ox + q * W * s, Y = (q: number) => oy + q * H * s;
+    const tall = H > W * 1.4; // (a monocular stands upright in its cell)
+    g.fillStyle = '#26292c'; rr(g, X(0.38), Y(0.04), W * 0.24 * s, H * (tall ? 0.16 : 0.24) * s, 3); g.fill(); // the mount
+    const bw = Math.min(0.2, 0.84 / Math.max(2, n)), y0 = tall ? 0.24 : 0.32, th = tall ? 0.7 : 0.56;
+    g.fillStyle = '#1c1e20'; rr(g, X(0.5 - (bw * n) / 2 - 0.03), Y(y0), W * (bw * n + 0.06) * s, H * th * 0.45 * s, 4); g.fill(); // the bridge / housing
+    for (let i = 0; i < n; i++) {
+      const cx = 0.5 + (i - (n - 1) / 2) * bw, r = bw * 0.46, out = n === 4 && (i === 0 || i === 3);
+      g.fillStyle = out ? '#2e3236' : '#33383c'; rr(g, X(cx - r), Y(y0 + 0.02), W * r * 2 * s, H * th * s, 4); g.fill(); shade(g, X(cx - r), Y(y0 + 0.02), W * r * 2 * s, H * th * s);
+      g.fillStyle = '#0b0d0e'; g.beginPath(); g.ellipse(X(cx), Y(y0 + th * 0.88), W * r * 0.8 * s, H * r * 0.5 * s * (tall ? 0.6 : 1), 0, 0, 7); g.fill(); // the objective
+      g.fillStyle = v.phos[0] > 0.6 ? 'rgba(170,190,255,0.35)' : 'rgba(90,255,140,0.3)'; g.beginPath(); g.ellipse(X(cx - r * 0.25), Y(y0 + th * 0.84), W * r * 0.25 * s, H * r * 0.16 * s, 0, 0, 7); g.fill(); // its glint
+    }
+    if (v.thermal) { g.fillStyle = '#5a4a2a'; rr(g, X(0.44), Y(y0 + th * 0.48), W * 0.12 * s, H * 0.16 * s, 2); g.fill(); g.fillStyle = '#c87a2a'; g.fillRect(X(0.47), Y(y0 + th * 0.52), W * 0.06 * s, H * 0.08 * s); } // the thermal window
+  }
   // a face shield (a tinted polycarbonate shield with its mounting arms) or a mandible (a curved guard
   // round the jaw); on: drawn onto a helmet's icon
   function drawFace(g: CanvasRenderingContext2D, W: number, H: number, d: GearDef, on?: boolean) {
@@ -435,7 +452,8 @@ const G_Icons = (() => {
     else if (it.k === 'tb') drawTB(g, W, H);
     else if (it.k === 'carrier') drawCarrier(g, W, H, d!);
     else if (it.k === 'plate') drawPlate(g, W, H, d!);
-    else if (it.k === 'helmet') { drawHelmet(g, W, H, d!); if (it.face) drawFace(g, W, H, G.Gear.defOf(it.face) as GearDef, true); }
+    else if (it.k === 'helmet') { drawHelmet(g, W, H, d!); if (it.face) drawFace(g, W, H, G.Gear.defOf(it.face) as GearDef, true); if (it.nvg) drawNvg(g, W, H, G.Gear.defOf(it.nvg) as GearDef, true); }
+    else if (it.k === 'nvg') drawNvg(g, W, H, d!);
     else if (it.k === 'face') drawFace(g, W, H, d!);
     else if (it.k === 'shoulder' || it.k === 'groin' || it.k === 'legs') drawAddon(g, W, H, d!);
     else if (it.k === 'belt') drawBelt(g, W, H, d!);
@@ -454,7 +472,7 @@ const G_Icons = (() => {
   function of(it: GItem, w: number, h: number, rot?: boolean) {
     // (a magazine or tube is drawn as full as it is: that's part of the key, to a round on small ones)
     const fill = it.k === 'mag' || (it.k as string) === 'tube' ? (it.cap ? Math.round(G.U.clamp(it.n / it.cap, 0, 1) * Math.min(it.cap, 40)) : it.n > 0 ? 1 : 0) + '/' + (it.cap || 0) : it.k === 'ammo' ? Math.ceil(fillOf(it) * 20) : it.n > 0 ? 1 : 0;
-    const key = [it.k, it.k === 'gun' ? it.w.def.code + (it.w.noMag ? 'n' : '') : it.wid || it.key || it.gid || it.pid || it.mt || '', it.vid || '', it.am || '', fill, w, h, rot ? 1 : 0, it.face ? it.face.gid : ''].join('|');
+    const key = [it.k, it.k === 'gun' ? it.w.def.code + (it.w.noMag ? 'n' : '') : it.wid || it.key || it.gid || it.pid || it.mt || '', it.vid || '', it.am || '', fill, w, h, rot ? 1 : 0, it.face ? it.face.gid : '', it.nvg ? it.nvg.gid : ''].join('|');
     let url = cache.get(key);
     if (url) return url;
     gunWaits = false;
