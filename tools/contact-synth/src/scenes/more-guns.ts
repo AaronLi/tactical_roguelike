@@ -98,6 +98,14 @@ function makeAkCharge(fill: Fill | 'none', timing: ChargeTiming = {}): Scene {
     hit('carrier meets the hammer', back(0.025), -12, 0.9, akCarrier, akHammer, { radius: 2, click: 0.6, sharp: 0.8 }),
     rub('carrier pushes the hammer down', back(0.026), -15, { force: 8, duration: back(0.07) - back(0.026), speed: 0.9, profile: 'steady', roughness: 3, grain: 0.2, contactWidth: 0.05 }, akCarrierSliding, akHammer),
     snap('hammer cocks onto the trigger hook', back(0.072), -8, { strength: 0.7, preload: 0, seat: 0.3, seatDelay: 2 }, akHammer, steelBar(3, 5)),
+    // going back, the bolt's underside rides over the top round (pressed up against it by the magazine spring)
+    // until its face clears the rim, ~75 mm back (a 56 mm cartridge); then the round pops up into the lips
+    ...(fill === 'loaded' ? [
+      rub('bolt rides over the top round', back(0.004), -14, { force: 5, duration: back(0.075) - back(0.004), speed: 0.9, profile: 'swell', roughness: 3, grain: 0.2, contactWidth: 0.05 }, akBolt, akRound),
+      hit('top round pops up into the feed lips', back(0.076), -10, 1.0, akRound, akMag('loaded'), { radius: 2, click: 0.6, sharp: 0.7 }),
+    ] : fill === 'empty' ? [
+      rub('bolt rides over the empty follower', back(0.004), -16, { force: 4, duration: back(0.075) - back(0.004), speed: 0.9, profile: 'swell', roughness: 3, grain: 0.3, contactWidth: 0.08 }, akBolt, arFollower),
+    ] : []),
     hit('carrier slams into the rear trunnion', T, -2, 1.6, akCarrier, akRearTrunnion, { radius: 4, click: 0.8, sharp: 0.85 }, AK_COVER_RATTLE),
     hit('receiver rings', T + 0.0005, -10, 0.9, akReceiver, akCarrier, { radius: 6, click: 0.2, sharp: 0.7 }),
     // let go: the spring drives it home with nothing to slow it but the round it strips
@@ -213,6 +221,13 @@ function makeMp5Charge(fill: Fill | 'none', timing: ChargeTiming = {}): Scene {
     rub('bolt runs back in the receiver', back(0.005), -10, { force: 5, duration: T - back(0.005), speed: 1, profile: 'swell', roughness: 4, grain: 0.3, periodicity: 0, contactWidth: 0.08 }, mp5BoltSliding, mp5Receiver),
     rub('recoil spring compresses', back(0.008), -15, { force: 5, duration: T - back(0.008), speed: 1, profile: 'swell', roughness: 4, grain: 0.3, contactWidth: 0.05 }, mp5Spring, mp5Receiver, { coil: { level: 0.3, length: 12, dispersion: 0.5, decay: 0.12, brightness: 3500 } }),
     snap('hammer cocks', back(0.05), -11, { strength: 0.6, preload: 0, seat: 0.3, seatDelay: 2 }, steelBar(4, 7), steelBar(3, 5)),
+    // the bolt rides over the top round until its face clears the rim, ~42 mm back (a 29 mm 9 mm cartridge)
+    ...(fill === 'loaded' ? [
+      rub('bolt rides over the top round', back(0.003), -14, { force: 4, duration: back(0.042) - back(0.003), speed: 0.8, profile: 'swell', roughness: 3, grain: 0.2, contactWidth: 0.05 }, mp5BoltSliding, mp5Round),
+      hit('top round pops up into the feed lips', back(0.043), -11, 0.9, mp5Round, mp5Mag('loaded'), { radius: 1.5, click: 0.6, sharp: 0.7 }),
+    ] : fill === 'empty' ? [
+      rub('bolt rides over the empty follower', back(0.003), -16, { force: 3, duration: back(0.042) - back(0.003), speed: 0.8, profile: 'swell', roughness: 3, grain: 0.3, contactWidth: 0.08 }, mp5BoltSliding, arFollower),
+    ] : []),
     hit('handle stops at the end of its slot', T, -4, 1.3, mp5Handle, mp5Tube, { radius: 2, click: 0.8, sharp: 0.85 }, TUBE_AIR),
     // let go: the bolt flies home; the handle, not tied to it, is sent home by its own spring in the tube
     rub('bolt flies home', LET_GO, -8, { force: 5, duration: TL - LET_GO, speed: vHome, profile: 'accelerate', roughness: 4, grain: 0.3, periodicity: 0, contactWidth: 0.08 }, mp5BoltSliding, mp5Receiver),
@@ -223,8 +238,11 @@ function makeMp5Charge(fill: Fill | 'none', timing: ChargeTiming = {}): Scene {
     const strip = fwd(0.03);
     els.push(
       hit('bolt face strips the top round', strip, -5, vHome * 0.6, mp5Bolt, mp5Round, { radius: 1.5, click: 0.6, sharp: 0.7 }),
+      rub('round dragged out of the feed lips', strip + 0.0004, -11, { force: 5, duration: 0.004, speed: vHome * 0.7, profile: 'steady', roughness: 6, grain: 0.3, contactWidth: 0.05 }, mp5Round, mp5Mag('loaded')),
+      hit('bullet nose glances off the feed ramp', strip + 0.004, -13, 1.3, mp5Round, mp5Trunnion, { radius: 1.5, click: 0.6, sharp: 0.8 }),
       hit('next round snaps up into the lips', strip + 0.006, -12, 1.0, mp5Round, mp5Mag('loaded'), { radius: 1.5, click: 0.6, sharp: 0.7 }),
-      rub('round slides into the chamber', strip + 0.004, -11, { force: 3, duration: TL - strip - 0.006, speed: vHome * 0.8, profile: 'steady', roughness: 4, grain: 0.2, contactWidth: 0.05 }, mp5Round, steelBar(8, 10)),
+      rub('round slides into the chamber', strip + 0.005, -11, { force: 3, duration: TL - strip - 0.007, speed: vHome * 0.8, profile: 'steady', roughness: 4, grain: 0.2, contactWidth: 0.05 }, mp5Round, steelBar(8, 10)),
+      hit('case seats in the chamber', TL - 0.002, -8, vHome * 0.5, mp5Round, steelBar(8, 10), { radius: 2.5, click: 0.7, sharp: 0.7 }),
       snap('extractor snaps over the rim', TL - 0.001, -9, { strength: 0.7, preload: 0, seat: 0.3, seatDelay: 1 }, steelBar(2, 3), mp5Round),
     );
   }
@@ -279,7 +297,11 @@ function makeMp5Mag(dir: 'in' | 'out', fill: Fill): Scene {
 const g19Slide: Body = { ...mat('steel'), shape: 'bar', size: 17, thickness: 14, modes: 0, irregularity: 0.6, damping: 0.78, level: 0 };
 const g19SlideSliding: Body = { ...g19Slide, modes: 0, damping: 0.8 };
 const g19Barrel = steelBar(10, 12, 0.55);
-const g19Frame: Body = { ...mat('nylon'), shape: 'shell', size: 16, thickness: 3, modes: 0, irregularity: 0.7, damping: 0.6, level: 0 };
+// The frame: a resilient polymer that flexes in the hand, not a hard, glassy plastic. Softer than plain nylon in
+// the way it meets things (a blunt contact, no edge crack) and far lossier (it deadens a knock at once), and the
+// hollow of the grip, open at the bottom and filled by the magazine, barely sounds as a box.
+const GLOCK_POLYMER = { ...mat('nylon'), material: 'custom', stiffness: 1.6, loss: 0.09 };
+const g19Frame: Body = { ...GLOCK_POLYMER, shape: 'shell', size: 16, thickness: 3, modes: 0, irregularity: 0.7, damping: 0.82, level: 0 };
 const g19Rail = steelBar(1.5, 3, 0.6);
 const g19LockBlock = steelBlock(2, 8);
 const g19Spring = onRod(springWire(8, 1));
@@ -288,7 +310,7 @@ const g19Mag = (f: Fill): Body => ({ ...mat('nylon'), shape: 'shell', size: 12, 
 const g19MagLiner = (f: Fill): Body => ({ ...mat('steel'), shape: 'plate', size: 11, thickness: 0.4, modes: f === 'empty' ? 3 : 1, irregularity: 0.7, damping: f === 'empty' ? 0.45 : 0.7, level: 0 });
 const g19MagCatch: Body = { ...mat('nylon'), shape: 'block', size: 1.5, thickness: 5, modes: 0, irregularity: 0.5, damping: 0.5, level: 0 };
 const g19Round: Body = { ...arCase, size: 2.9, thickness: 9 };
-const G19_HOUSING: Scene['housing'] = { amount: 0.55, cavity: 0.35, ...mat('nylon'), shape: 'shell', size: 16, thickness: 3, modes: 0, irregularity: 0.7, damping: 0.6, cavities: [{ length: 10, width: 2.4, depth: 3, q: 7, level: 1 }] };
+const G19_HOUSING: Scene['housing'] = { amount: 0.45, cavity: 0.2, ...GLOCK_POLYMER, shape: 'shell', size: 16, thickness: 3, modes: 0, irregularity: 0.7, damping: 0.82, cavities: [{ length: 10, width: 2.4, depth: 3, q: 4, level: 1 }] };
 const G19_STROKE = 0.032, G19_M = 0.24, G19_F = 55;
 
 /** The slide run home on its spring from the rear, chambering (or not), and locking up. */
@@ -304,8 +326,11 @@ function g19Forward(t0: number, chamber: boolean): SceneElement[] {
     const strip = fwd(0.012);
     els.push(
       hit('breech face strips the top round', strip, -5, vHome * 0.6, g19Slide, g19Round, { radius: 1.5, click: 0.6, sharp: 0.7 }),
+      rub('round dragged out of the feed lips', strip + 0.0003, -12, { force: 4, duration: 0.003, speed: vHome * 0.7, profile: 'steady', roughness: 6, grain: 0.3, contactWidth: 0.05 }, g19Round, g19MagLiner('loaded')),
       hit('bullet glances up the feed ramp', strip + 0.003, -11, 1.4, g19Round, g19Barrel, { radius: 1.5, click: 0.6, sharp: 0.8 }),
       hit('next round snaps up into the lips', strip + 0.004, -14, 0.8, g19Round, g19MagLiner('loaded'), { radius: 1.5, click: 0.5, sharp: 0.6 }),
+      rub('round slides into the chamber', strip + 0.0035, -12, { force: 3, duration: Math.max(0.003, TL - strip - 0.0055), speed: vHome * 0.8, profile: 'steady', roughness: 4, grain: 0.2, contactWidth: 0.05 }, g19Round, g19Barrel),
+      hit('case seats in the chamber', TL - 0.0015, -9, vHome * 0.5, g19Round, g19Barrel, { radius: 2.5, click: 0.7, sharp: 0.7 }),
     );
   }
   els.push(
@@ -313,7 +338,7 @@ function g19Forward(t0: number, chamber: boolean): SceneElement[] {
     rub('barrel cams up onto the locking block', TL - 0.003, -9, { force: 12, duration: 0.003, speed: 1.2, profile: 'steady', roughness: 6, grain: 0.1, contactWidth: 0.02 }, g19Barrel, g19LockBlock),
     hit('barrel hood locks into the slide', TL, -2, vHome * 0.8, g19Barrel, g19Slide, { radius: 3, click: 0.85, sharp: 0.85 }),
     hit('slide slams home', TL + 0.0005, 0, vHome, g19Slide, g19Rail, { radius: 4, click: 0.85, sharp: 0.85 }),
-    hit('frame takes the blow', TL + 0.001, -8, 1.2, g19Frame, g19Rail, { radius: 6, click: 0.3, sharp: 0.5 }),
+    hit('frame takes the blow', TL + 0.001, -8, 1.2, g19Frame, g19Rail, { radius: 8, click: 0.15, sharp: 0.2 }),
   );
   if (chamber) els.push(snap('extractor snaps over the rim', TL - 0.001, -10, { strength: 0.6, preload: 0, seat: 0.3, seatDelay: 1 }, steelBar(2, 3), g19Round));
   return els;
@@ -326,8 +351,15 @@ function makeG19Rack(fill: Fill | 'none', timing: ChargeTiming = {}): Scene {
     rub('slide drawn back on its rails', back(0.0005), -10, { force: 6, duration: T - back(0.0005), speed: 0.5, profile: 'swell', roughness: 2, grain: 0.2, periodicity: 0, contactWidth: 0.05 }, g19SlideSliding, g19Rail),
     hit('barrel drops off the locking block', back(0.003), -9, 0.6, g19Barrel, g19LockBlock, { radius: 2, click: 0.7, sharp: 0.8 }),
     snap('striker catches on the trigger bar', back(0.006), -11, { strength: 0.5, preload: 0, seat: 0.2, seatDelay: 1 }, steelBar(3, 4), steelBar(2, 2)),
+    // the slide's breech face rides over the top round until it clears the rim, ~30 mm back; then the round pops up
+    ...(fill === 'loaded' ? [
+      rub('slide rides over the top round', back(0.002), -15, { force: 3, duration: back(0.029) - back(0.002), speed: 0.4, profile: 'swell', roughness: 3, grain: 0.2, contactWidth: 0.05 }, g19SlideSliding, g19Round),
+      hit('top round pops up into the feed lips', back(0.0295), -13, 0.7, g19Round, g19MagLiner('loaded'), { radius: 1.5, click: 0.5, sharp: 0.6 }),
+    ] : fill === 'empty' ? [
+      rub('slide rides over the empty follower', back(0.002), -17, { force: 2, duration: back(0.029) - back(0.002), speed: 0.4, profile: 'swell', roughness: 3, grain: 0.3, contactWidth: 0.08 }, g19SlideSliding, { ...arFollower, ...GLOCK_POLYMER, shape: 'bar', size: 3, thickness: 3, modes: 0, damping: 0.8 }),
+    ] : []),
     rub('recoil spring compresses', back(0.002), -17, { force: 3, duration: T - back(0.002), speed: 0.5, profile: 'swell', roughness: 3, grain: 0.3, contactWidth: 0.05 }, g19Spring, g19Frame, { coil: { level: 0.3, length: 5, dispersion: 0.5, decay: 0.08, brightness: 5000 } }),
-    hit('slide stops at the rear', T, -6, 0.9, g19Slide, g19Frame, { radius: 3, click: 0.6, sharp: 0.7 }),
+    hit('slide stops at the rear', T, -6, 0.9, g19Slide, g19Frame, { radius: 5, click: 0.35, sharp: 0.3 }),
     ...g19Forward(LET_GO, fill === 'loaded'),
   ];
   outsideShell(els);
