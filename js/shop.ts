@@ -466,10 +466,17 @@ const G_Shop = {
     document.getElementById('shopTabs')!.innerHTML = tabs.map(([k, n]) => `<button class="tab${this.tab === k ? ' on' : ''}" data-tab="${k}">${n}</button>`).join('');
     let html = '';
     const O = this.offers;
-    if (this.tab === 'stock') html = O.ammo.map((o: ShopAmmo) => this.ammoCard(o)).join('') + O.gear.map((id: string) => this.gearCard(G.Gear.DEFS[id])).join('') +
-      [...(this.partStock || [])].sort((a, b) => +this.wished(b as string) - +this.wished(a as string)).map((id) => this.partCard(G.Gunsmith.PARTS[id as string])).join('') +
-      ((O.nvg || []).length || (O.njParts || []).length ? `<h3 class="shop-sub">Nightjar Optronics · night vision and thermal</h3>` + (O.nvg || []).map((id: string) => this.gearCard(G.Gear.DEFS[id])).join('') + (O.njParts || []).map((id: string) => this.partCard(G.Gunsmith.PARTS[id])).join('') : '') +
-      `<h3 class="shop-sub">Pouches and magazines</h3>` + O.pouches.map((o: { id: string }) => this.pouchCard(o.id)).join('') + O.mags.map((o: { id: string }) => this.magCard(o.id)).join('');
+    if (this.tab === 'stock') {
+      // what's for sale, by who sells it (Vex's own; Nightjar's; the pouches and magazines), and anything sold out gathered at the
+      // end under its own label: [stock key, card] each
+      const card = (k: string, h: string): [string, string] => [k, h], sold: string[] = [];
+      const group = (title: string, cards: [string, string][]) => { const live = cards.filter(([k, h]) => !this.stock || this.inStock(k) || (sold.push(h), false)); /* (before the host's count is in: all as listed) */ return live.length ? `<h3 class="shop-sub">${title}</h3>` + live.map((c) => c[1]).join('') : ''; };
+      html = group('Vex&#39;s', [...O.ammo.map((o: ShopAmmo) => card('ammo:' + o.cal, this.ammoCard(o))), ...O.gear.map((id: string) => card('gear:' + id, this.gearCard(G.Gear.DEFS[id]))),
+        ...[...(this.partStock || [])].sort((a, b) => +this.wished(b as string) - +this.wished(a as string)).map((id) => card('part:' + id, this.partCard(G.Gunsmith.PARTS[id as string])))]) +
+        group('Nightjar Optronics · night vision and thermal', [...(O.nvg || []).map((id: string) => card('gear:' + id, this.gearCard(G.Gear.DEFS[id]))), ...(O.njParts || []).map((id: string) => card('part:' + id, this.partCard(G.Gunsmith.PARTS[id])))]) +
+        group('Pouches and magazines', [...O.pouches.map((o: { id: string }) => card('pouch:' + o.id, this.pouchCard(o.id))), ...O.mags.map((o: { id: string }) => card('mag:' + o.id, this.magCard(o.id)))]);
+      if (sold.length) html += `<h3 class="shop-sub">Out of stock</h3>` + sold.join('');
+    }
     else if (this.tab === 'svc') html = this.services().map((s: ShopService) => `<div class="card">
         <div class="ch"><span class="cn">${s.name}</span></div>${s.sel || ''}<div class="cd">${s.desc}</div>
         <div class="cfoot"><span></span><button class="btn small buy" data-k="svc" data-id="${s.id}" ${s.disabled || Me.credits < s.price ? 'disabled' : ''}>${s.disabled ? '—' : '¢' + G.U.fmt(s.price)}</button></div></div>`).join('');

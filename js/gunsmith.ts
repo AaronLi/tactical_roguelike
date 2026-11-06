@@ -443,10 +443,15 @@ const G_GunsmithUI = (() => {
       const parts = GS.compatible(cur.mount).filter((p: Part) => GS.fitsLen(p, def.id, build) && (!p.factory || p.plat === def.id || (Me.stash || {})[p.id] || build[cur.slot] === p.id) && !(p.not || []).includes(def.id) && (!plainOut(p) || own(p)));
       const rank = (p: Part) => (build[cur.slot] === p.id ? 0 : (Me.stash || {})[p.id] ? 1 : atShowcase(p) && !needed(p) ? 3 : forSale(p) ? 2 : 4);
       parts.sort((a: Part, b: Part) => rank(a) - rank(b) || +G.Shop.wished(b.id) - +G.Shop.wished(a.id) || (a.len != null && b.len != null ? a.len - b.len : 0) || a.price - b.price); // (barrels: by length)
-      let head = false;
+      let head = -1;
       for (const p of parts) {
         const r = rank(p), n = (Me.stash || {})[p.id] || 0, factoryHere = p.factory && p.plat === def.id;
-        if (r === 3 && !head) { head = true; list += '<div class="gs-sub">At Timberline Outfitters <small>(by the hangar door)</small></div>'; }
+        if (r !== head) { // (a label over each group that's for sale or not: Vex's, Timberline's, and what's out of stock)
+          if (r === 2) list += '<div class="gs-sub">At Vex&#39;s <small>(his counter and pedestals)</small></div>';
+          else if (r === 3) list += '<div class="gs-sub">At Timberline Outfitters <small>(by the hangar door)</small></div>';
+          else if (r === 4) list += '<div class="gs-sub">Out of stock</div>';
+          head = r;
+        }
         let action;
         if (r === 0 && !(skinned && skins.length > 1)) action = cur.req ? '<span class="tag">Fitted</span>' : `<button class="btn small" data-gremove="${cur.slot}">Remove</button>`;
         else if (r === 0) action = `<select class="gs-skin" data-gskin ${G.Shop.ready ? 'disabled' : ''}>${skins.map((q: any) => `<option value="${q.id}"${q === p ? ' selected' : ''}>${G.U.esc(q.skinName || q.name)}</option>`).join('')}</select>`;
