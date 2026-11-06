@@ -263,7 +263,7 @@ const G_Viewmodel = (() => {
     for (const x of [204, 216, 228]) c.fillRect(x, y0 + 22, 5, 28);
     c.fillRect(204, y0 + 22, 29, 5);
   }
-  // the point of impact, where the next round strikes at a range, is a lit cell of a coarse grid (a cell is this many mils: the marker snaps from cell to cell)
+  // the point of impact, where the next round strikes at a range, is one cell lit red on a coarse grid of faint grey cells (a cell is this many mils: the marker snaps from cell to cell)
   const POI_CELL = 0.5, POI_FAR = 560;
   const PIP_VS = 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
   const PIP_FS = G.R.TONE + `
@@ -309,12 +309,12 @@ const G_Viewmodel = (() => {
         vec2 u = (p - vec2(0.08, -0.62)) / vec2(0.54, 0.14);
         if (u.x > 0.0 && u.y > 0.0 && u.x < 1.0 && u.y < 1.0) { float a = texture2D(dmap, u).a; col = mix(col, vec3(0.01, 0.03, 0.02), 0.72); col += vec3(0.25, 1.0, 0.3) * a * 1.3; }
       }
-      if (calc > 1 && poi.z > 0.5) { // the point of impact: a lit cell of a coarse LCD grid (cells of ${POI_CELL} mil), with the cells about it faintly showing
+      if (calc > 1) { // the point of impact: a coarse LCD grid (cells of ${POI_CELL} mil) over the whole picture, every cell a faint translucent grey, and the one cell the round will strike lit red
         vec2 q = p / pmil / ${POI_CELL.toFixed(2)} + 0.5, c = floor(q), f = fract(q), dd = abs(c - poi.xy);
         vec2 aa = fwidth(q) * 0.75, e = smoothstep(vec2(0.09), vec2(0.09) + aa, f) * (1.0 - smoothstep(vec2(0.91) - aa, vec2(0.91), f));
-        float cell = e.x * e.y, lit = step(dd.x, 0.5) * step(dd.y, 0.5), near = step(dd.x, 2.5) * step(dd.y, 2.5);
-        col = mix(col, vec3(0.02, 0.025, 0.02), near * cell * 0.5);
-        col += vec3(1.0, 0.7, 0.18) * cell * (lit * 1.5 + near * 0.12);
+        float cell = e.x * e.y, lit = poi.z > 0.5 ? step(dd.x, 0.5) * step(dd.y, 0.5) : 0.0;
+        col = mix(col, vec3(0.5), cell * 0.07 * (1.0 - lit));
+        col = mix(col, vec3(1.0, 0.08, 0.05) * 1.6, cell * lit * 0.85);
       }
       col *= (1.0 - smoothstep(0.7, 1.0, length(p - eye))) * smoothstep(1.0, 0.9, r);
       vec3 glass = vec3(0.025, 0.04, 0.055) + vec3(0.1, 0.12, 0.18) * pow(max(0.0, 1.0 - length(p - vec2(-0.35, 0.4))), 3.0);
