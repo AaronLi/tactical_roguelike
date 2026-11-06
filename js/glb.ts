@@ -76,7 +76,7 @@ interface GunModelInfo {
   sy: number; fSight: number; relief: number; muzzles: Vec3[]; grip: Vec3; support: Vec3; anim: Record<string, string>;
   magAt?: Vec2 | null; handle?: HandleInfo | null; port?: Vec3 | null; chamberAt?: ChamberAt | null;
   breech?: { at: Vec2; pitch: number; long: string | null } | null; ch?: Vec3 | null; bolt?: Vec3 | null; boltTravel?: number | null; cheek?: number | null; recoilBarrel?: number | null;
-  pistol?: boolean | null; slide?: Vec3 | null; cylAt?: Vec3 | null; load?: { at: Vec2[]; pitch: number } | null; cup?: Vec3 | null; block?: { drop: number; lever: number } | null; magTop?: boolean | null;
+  pistol?: boolean | null; slide?: Vec3 | null; cylAt?: Vec3 | null; load?: { at: Vec2[]; pitch: number } | null; cup?: Vec3 | null; block?: { drop: number; lever: number } | null; magTop?: boolean | null; magRake?: number | null;
   quarrelMats?: Record<string, unknown> | null; mounts?: Record<string, Vec3> | null;
   // first-person extras (js/viewmodel.ts), written by whoever makes the model:
   reflex?: { f: number; y: number; w: number; h: number; round?: boolean | null; kind: string } | null;
@@ -211,6 +211,7 @@ const INFO_FIELDS: { [K in keyof GunModelInfo]-?: Field } = {
   cup: vec3('Where the left hand cups the frame (a derringer), [forward, up, right] metres.', true),
   block: F('A falling-block breech (the Hailstorm): part_brk is the block, which slides straight down `drop` metres to bare the chambers, and part_lever its lever, which swings down `lever` radians (about x, at its pivot) as it does.', { t: 'obj', props: { drop: num('How far the block drops, metres.'), lever: num('How far the lever swings, radians.') } }, true),
   magTop: F('True when the hand takes the magazine from its top instead of its base.', { t: 'bool' }, true),
+  magRake: num('A raked magazine well (a Glock-pattern one, its bottom back like a pistol grip\'s): how far the magazine\'s axis is turned back from straight down, radians. A reload draws it out and seats it along that axis, and a non-factory magazine is drawn at that angle. Absent or 0: straight down.', true, { min: 0, max: 0.6 }),
   quarrelMats: F('A crossbow\'s bolt materials as three.js Material JSON (free-form; viewmodel only).', { t: 'map', of: { t: 'free' } }, true),
   mounts: F('Mount points where a swappable part sits, `mount_<slot>` -> [forward, up, right] metres of the part\'s origin (e.g. mount_muzzle: where a muzzle device screws on). Normally assembled from the parts\' anchors (see GUN_MODEL_CONTRACT.anchors); a whole-gun bake may list them directly.', { t: 'map', of: { t: 'vec', n: 3 } }, true),
   // first-person extras (js/viewmodel.ts applies them; the third person ignores them)

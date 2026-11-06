@@ -697,6 +697,20 @@
       ],
       "description": "True when the hand takes the magazine from its top instead of its base."
     },
+    "magRake": {
+      "oneOf": [
+        {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.6,
+          "description": "A raked magazine well (a Glock-pattern one, its bottom back like a pistol grip's): how far the magazine's axis is turned back from straight down, radians. A reload draws it out and seats it along that axis, and a non-factory magazine is drawn at that angle. Absent or 0: straight down."
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "A raked magazine well (a Glock-pattern one, its bottom back like a pistol grip's): how far the magazine's axis is turned back from straight down, radians. A reload draws it out and seats it along that axis, and a non-factory magazine is drawn at that angle. Absent or 0: straight down."
+    },
     "quarrelMats": {
       "oneOf": [
         {

@@ -19,7 +19,7 @@ type MagKind = 'curved' | 'straight' | 'pistol' | 'drum' | 'ammobox' | 'internal
 /** The size of a round, for the cartridges a clear magazine shows. */
 interface RoundDims { head: number; cs: number; bl: number; bd: number; shell?: boolean; pistol?: boolean; cap?: number }
 /** A magazine's model (M: how a material is named: a name in the catalog, a material once built). */
-interface MagSpec<M = THREE.Material | null> { t?: MagKind; f: number; y: number; len?: number; d?: number; c?: number; w?: number; st?: number; ribs?: number; rake?: number; r?: number; dw?: number; scale?: number; m?: M; well?: M; rnd?: RoundDims | null }
+interface MagSpec<M = THREE.Material | null> { t?: MagKind; f: number; y: number; len?: number; d?: number; c?: number; w?: number; st?: number; ribs?: number; rake?: number; r?: number; dw?: number; scale?: number; m?: M; well?: M; rnd?: RoundDims | null; bare?: boolean /* (in a well of the gun's own: a pistol magazine without an adapter block) */ }
 /** A handguard's model. */
 interface HgSpec<M = THREE.Material | null> { t: HandguardKind; len: number; m?: M; rails?: boolean; slots?: string; under?: boolean; aksu?: boolean; bl?: number; ext?: number }
 /** Where a gun's charging handle is, and how it moves. */
