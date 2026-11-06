@@ -60,7 +60,7 @@ interface Enemy {
   firedAt?: number; sawAt?: number; engagedAt?: number; allyT?: number; allyN?: number; proof?: boolean; seeVis?: number; blind?: boolean; onWait?: number;
   order?: Order | null; radioT?: number; callAt?: number; callTgt?: { x: number; y: number; z: number } | null; callLog?: string[]; calls?: number; noLead?: number;
   coverFlow?: ReturnType<typeof G.Level.flow> | null; coverCheckT?: number; emboldened?: boolean; fl?: number;
-  visK?: number; guess?: { x: number; y: number; z: number; until: number } | null; // (night: how well they see who they're on, lightK; where they think you are)
+  visK?: number; noiseAt?: number; nsAt?: number; guess?: { x: number; y: number; z: number; until: number } | null; // (night: how well they see who they're on, lightK; when they last heard something; when their own search last started; where they think you are)
 }
 // A leader's order to a suspect (js/server.ts dispatch): get to the spot the police were last known at, by this way in (entry: a door, or a
 // point round it), and then search outward. role: 'push' goes in, 'hold' covers the way in from a little way off and goes in later; phase:
@@ -70,6 +70,7 @@ interface Order {
   by: number; role: 'push' | 'hold'; phase: 'approach' | 'hold' | 'enter' | 'search'; x: number; y: number; z: number; entry: OrderSpot; tflow: ReturnType<typeof G.Level.flow>;
   at: number; until: number; holdUntil: number; rest: number; leg: 'cover' | 'run'; legT: number; cv: EnemyCover | null; cvFlow: ReturnType<typeof G.Level.flow> | null;
   sp: { x: number; z: number; flow: ReturnType<typeof G.Level.flow> } | null; ring: number; done: [number, number][]; look: number; delay: number; rt: number;
+  own?: boolean; lookYaw?: number; // (own: a search of their own in the dark, no leader's: nightSearch)
 }
 interface DoorPeekSpot { d: LvDoor; x: number; y: number; z: number; px: number; pz: number; lean: number; yaw: number; fl: number; phase: string; t: number; n: number; flow?: ReturnType<typeof G.Level.flow> }
 
@@ -945,7 +946,10 @@ const G_Server = {
     for (const e of this.enemies.values()) {
       if (this.heardAt(field, e.x, e.z, e.y) > radius) continue;
       if (e.def.civ) { this.panic(e, { x, z }); continue; }
-      if (e.state === 'normal') { e.noise = { x, z }; this.noted(e, x, y, z); }
+      if (e.state === 'normal') { e.noise = { x, z }; e.noiseAt = this.clock; this.noted(e, x, y, z); }
+      // (searching in the dark on their own: a new noise somewhere else is where they look now)
+      const o = e.order;
+      if (o && o.own && e.state === 'normal' && this.clock - o.rt > this.NIGHT.RT_GAP && Math.hypot(x - o.x, z - o.z) > this.NIGHT.RETARGET) { this.retarget(e, { x, y, z }); o.ring = 0; o.until = Math.max(o.until, this.clock + this.NIGHT.SEARCH_T * 0.5); }
       if (e.def.leader && e.state === 'normal' && !e.down) this.callIn(e, x, y, z, 'heard a noise');
       if (!e.alert && e.state === 'normal') e.pendingAlert = e.pendingAlert >= 0 ? e.pendingAlert : 0.2 + Math.random() * 0.5;
     }
@@ -1249,7 +1253,12 @@ const G_Server = {
   // own light or laser, a flash, or close by); and where they aim is a guess, GUESS * (1 - k)² metres off (none at k = 1),
   // a new guess every GUESS_T seconds. Picking you up again after losing you: ACQ seconds more before the first shot at
   // k = 0 (a marksman's aim time AIMT times longer).
-  NIGHT: { REACH0: 3, CLOSE: 4, ALERT: 1.4, LASER: 0.04, AIM: 0.3, GUESS: 1.2, GUESS_T: 1.1, ACQ: 1.0, AIMT: 1 },
+  // Search (nightSearch, orderStep): having lost you (or only heard you), after HOLD seconds (HOLD_B for those who'd push on
+  // anyway) they go and look for themselves, as a leader's order would send them: to where you were seen or heard, then
+  // spot to spot outward from it, at CREEP of their walk, stopping a while at each (REST seconds, more by chance) to listen and
+  // look round, till SEARCH_T seconds have gone or they've looked as far as RING metres out from it. A new noise sends it
+  // there (RETARGET metres off, at most every RT_GAP seconds).
+  NIGHT: { REACH0: 3, CLOSE: 4, ALERT: 1.4, LASER: 0.04, AIM: 0.3, GUESS: 1.2, GUESS_T: 1.1, ACQ: 1.0, AIMT: 1, HOLD: 2.5, HOLD_B: 0.8, CREEP: 0.5, REST: 2.2, SEARCH_T: 60, RING: 21, RETARGET: 3, RT_GAP: 2 },
   // The light where an officer stands: the level's (G.Level.luxAt), and a muzzle flash for a moment after they fire.
   // Kept for the tick: every suspect looking their way asks.
   officerLux(p: LivePlayer) {
@@ -1942,6 +1951,7 @@ const G_Server = {
         if (e.cool <= 0) { this.fire(e, p as LivePlayer, true); e.cool = U.rf(0.15, 0.4); }
       } else e.cool = Math.max(e.cool, 0.6);
       const leash = Math.hypot(e.x - e.home.x, e.z - e.home.z) < 12;
+      if (this.night && !e.order) this.nightSearch(e); // (in the dark they go and look for themselves)
       if (e.order) {
         // under a leader's order (callIn): to the spot by its own way in, and then searching outward from it
         const os = this.orderStep(e, dt);
@@ -2187,14 +2197,36 @@ const G_Server = {
   retarget(e: Enemy, at: { x: number; y: number; z: number }) {
     const o = e.order!;
     o.x = at.x; o.y = at.y; o.z = at.z; o.tflow = this.flowTo(at.x, at.y, at.z);
-    o.phase = 'enter'; o.role = 'push'; o.ring = 6; o.done = []; o.sp = null; o.cv = null; o.legT = 0; o.rest = 0; o.rt = this.clock; o.until = Math.max(o.until, this.clock + 45);
+    o.phase = 'enter'; o.role = 'push'; o.ring = o.own ? 0 : 6; o.done = []; o.sp = null; o.cv = null; o.legT = 0; o.rest = 0; o.rt = this.clock; o.until = Math.max(o.until, this.clock + 45);
+  },
+  // A night level: an alert suspect who's lost sight of the police (or only heard them) doesn't sit and wait for them to walk into
+  // view, it goes and looks, carefully: an order of its own (by itself, own) to where they were last seen or heard, searched as a
+  // leader's would be (orderStep: to the spot, then spot to spot outward from it, the nearest first), at a creep, stopping to listen.
+  // Not a lookout (it holds), a guard, the Kingpin or one lurking; not again on what it's already searched (nsAt), only on something
+  // new seen or heard. NIGHT says how long they wait first and how long they keep at it.
+  nightSearch(e: Enemy) {
+    const N = this.NIGHT, c = this.clock;
+    if (e.def.civ || e.def.boss || e.def.aimTime || e.guard || e.lurk || e.state !== 'normal' || e.broken) return;
+    const ns = e.nsAt == null ? -99 : e.nsAt;
+    const seen = e.lastSeen && (e.sawAt == null ? -99 : e.sawAt) > ns ? e.lastSeen : null, heard = !seen && e.noise && (e.noiseAt == null ? -99 : e.noiseAt) > ns ? e.noise : null;
+    const at = seen || heard;
+    if (!at || e.lostT < (this.brave(e) ? N.HOLD_B : N.HOLD) + (e.id % 5) * 0.3) return; // (not all of them at once)
+    e.nsAt = c;
+    const y = seen ? seen.y : e.y || 0, tflow = this.flowTo(at.x, y, at.z);
+    if (this.flowDist(tflow, e.x, e.y || 0, e.z) < 0) return; // (no way there)
+    // (one who'd have pushed on with a grenade first still throws it, as a push does)
+    const ld = Math.hypot(at.x - e.x, at.z - e.z);
+    if (seen && this.brave(e) && ld > 5 && ld < 20 && !e.proof) this.tryNade(e, at.x, at.z);
+    e.order = { by: e.id, own: true, role: 'push', phase: 'enter', x: at.x, y, z: at.z, entry: { x: at.x, y, z: at.z, flow: tflow, kind: 'point', n: 0 }, tflow, at: c, until: c + N.SEARCH_T, holdUntil: 0,
+      rest: 0.4 + Math.random() * 0.6, leg: 'run', legT: 0, cv: null, cvFlow: null, sp: null, ring: 0, done: [], look: 0, delay: 0, rt: c };
+    e.cover = null; e.inCover = false; e.peek = false; e.leanOut = 0; e.pushing = false;
   },
   // Called every tick: orders from a leader who's no longer able to give them (killed, down, arrested, given up) lapse. The suspects who
   // had them are back on their own behaviour, and shaken: nerve down (a few will break and run), and a shout will do better with them.
   leaderCheck() {
     let gone: Set<number> | null = null;
     for (const e of this.enemies.values()) {
-      if (!e.order) continue;
+      if (!e.order || e.order.own) continue; // (a search of their own isn't anyone's plan)
       const l = this.enemies.get(e.order.by);
       if (!l || l.down || l.collapsed || l.state === 'surrender' || l.state === 'cuffed') (gone || (gone = new Set())).add(e.order.by);
     }
@@ -2234,14 +2266,22 @@ const G_Server = {
     if (o.phase === 'search') {
       if (!o.sp) {
         o.sp = this.searchSpot(e, o);
-        if (!o.sp) { o.ring += 7; if (o.ring > 70) this.endOrder(e); o.rest = 0.5; return null; }
+        if (!o.sp) { o.ring += 7; if (o.ring > (o.own ? this.NIGHT.RING : 70)) this.endOrder(e); o.rest = 0.5; return null; }
       }
-      if (Math.hypot(o.sp.x - e.x, o.sp.z - e.z) < 1.6) { o.done.push([o.sp.x, o.sp.z]); o.sp = null; o.rest = 1.2 + rnd() * 1.2; e.yaw += (rnd() - 0.5) * 2; return null; } // (a look round it)
+      if (Math.hypot(o.sp.x - e.x, o.sp.z - e.z) < 1.6) { o.done.push([o.sp.x, o.sp.z]); o.sp = null; o.rest = o.own ? this.NIGHT.REST + rnd() * 2 : 1.2 + rnd() * 1.2; e.yaw += (rnd() - 0.5) * 2; return null; } // (a look round it; in the dark, a longer one, listening)
     }
     if (o.phase === 'search' && o.sp) { goal = o.sp.flow; gx = o.sp.x; gz = o.sp.z; }
     else if (o.phase === 'approach') { goal = o.entry.flow; gx = o.entry.x; gz = o.entry.z; }
     else { goal = o.tflow; gx = o.x; gz = o.z; }
-    if (o.rest > 0) { o.rest -= dt; return null; }
+    if (o.rest > 0) {
+      o.rest -= dt;
+      // (searching in the dark: stopped, listening, and looking round where there's room to look: the doorways, the room's corners)
+      if (o.own) {
+        if ((o.look -= dt) <= 0) { o.look = 0.8 + rnd() * 0.9; o.lookYaw = this.openYaw(e, e.yaw + (rnd() - 0.5) * 3.2, 3.2); }
+        if (o.lookYaw != null) e.yaw += G.U.angDiff(e.yaw, o.lookYaw) * Math.min(1, dt * 3);
+      }
+      return null;
+    }
     // a new bound
     if (!o.cv && o.legT <= 0) {
       const cv = this.nextCover(e, goal);
@@ -2262,12 +2302,12 @@ const G_Server = {
       const st = cd > 1.6 && o.cvFlow ? L.flowStep(this.map!, o.cvFlow, e.x, e.z, e.y) : null;
       if (st) { tx = st.x; tz = st.z; } else { tx = o.cv.x; tz = o.cv.z; }
     } else {
-      if (o.legT <= 0) { o.rest = 0.8 + rnd() * 0.9; return null; }
+      if (o.legT <= 0) { o.rest = o.own ? 1.4 + rnd() * 1.4 : 0.8 + rnd() * 0.9; return null; } // (in the dark: a few steps, then a stop to listen)
       const st = L.flowStep(this.map!, goal, e.x, e.z, e.y);
       if (st) { tx = st.x; tz = st.z; }
     }
     const dx = tx - e.x, dz = tz - e.z, d = Math.hypot(dx, dz) || 1;
-    return { mx: dx / d, mz: dz / d, sp: 0.9 };
+    return { mx: dx / d, mz: dz / d, sp: o.own ? this.NIGHT.CREEP : 0.9 };
   },
   // The cover spot a bound away that gets them most of the way on: 3 to 10 m off, at least 2.5 m closer to where they're going, no one else's
   nextCover(e: Enemy, goal: Int16Array) {
