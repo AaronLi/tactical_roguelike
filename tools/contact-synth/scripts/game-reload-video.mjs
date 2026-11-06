@@ -36,7 +36,7 @@ const GUNS = {
   mp5: { title: 'MP5', charge: 'Cocking handle pulled back and let go: chambers a round', after: 'rack', afterCap: 'Magazine change, then the cocking handle',
     charge_: ['mp5-charge', 'handle stops at the end of its slot', 'rollers snap out into the trunnion'], rackEmpty: ['mp5-charge', 'handle stops at the end of its slot', 'rollers snap out into the trunnion'],
     magOut: ['mp5-mag-out', 'catch lets go of the magazine'], magOutEmpty: ['mp5-mag-out-empty', 'catch lets go of the magazine'], magIn: ['mp5-mag-in', 'catch clicks into the magazine'] },
-  g19: { title: 'G19', charge: 'Slide racked and let go: chambers a round', after: 'release', afterCap: 'Magazine change, then the slide stop hit',
+  g19: { title: 'G19', rearCue: 'drop_slide', charge: 'Slide racked and let go: chambers a round', after: 'release', afterCap: 'Magazine change, then the slide stop hit',
     charge_: ['g19-rack', 'slide stops at the rear', 'slide slams home'], magOut: ['g19-mag-out', 'catch lets go of the magazine'], magOutEmpty: ['g19-mag-out-empty', 'catch lets go of the magazine'],
     magIn: ['g19-mag-in', 'catch clicks into the magazine'], release: ['g19-slide-release', 'slide slams home'] },
 };
@@ -224,16 +224,19 @@ function worked([id, rear, slam], back) {
   place(sc, rear, back, sc.tracks.filter((t) => t.name !== 'release-forward').map((t) => t.name));
   place(sc, slam, homeAfter(back), ['release-forward']);
 }
-worked(C.charge_, at('rack_slide', 0));
+// (a pistol's slide at the rear is cued 'drop_slide' by the game, a rifle's handle 'rack_slide'; a release's home
+// is 'drop_slide' too, so for a pistol it's the next one after the charge's)
+const rearCue = C.rearCue || 'rack_slide';
+worked(C.charge_, at(rearCue, 0));
 // the partial reload: the loaded magazine out, a fresh one in
 place(C.magOut[0], C.magOut[1], at('magazine out', 0), null, -2);
 place(C.magIn[0], C.magIn[1], at('insert_magazine', 0), null, -2);
 // run dry: the empty one out, a fresh one in, then the action
 place(C.magOutEmpty[0], C.magOutEmpty[1], at('magazine out', 1), null, -2);
 place(C.magIn[0], C.magIn[1], at('insert_magazine', 1), null, -2);
-if (C.after === 'release') place(C.release[0], C.release[1], at('drop_slide'));
+if (C.after === 'release') place(C.release[0], C.release[1], at('drop_slide', rearCue === 'drop_slide' ? 1 : 0));
 // (the game has the final say: if it racked when we expected the catch, or the reverse, the log shows which)
-else worked(C.rackEmpty, at('rack_slide', 1));
+else worked(C.rackEmpty, at(rearCue, 1));
 let pk = 0; for (const v of mix) pk = Math.max(pk, Math.abs(v));
 for (let i = 0; i < mix.length; i++) mix[i] *= 0.89 / pk;
 const tmp = mkdtempSync(join(tmpdir(), 'ga-'));
