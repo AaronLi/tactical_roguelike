@@ -2218,7 +2218,15 @@ On top of the baked room reverb, echoes are **ray-traced through the level** for
 - **No stall on first use:** shaders are compiled the first time something's drawn, which caused a spike on
   the first shot of a session (the casing, tracer, bullet hole and blood all drawn for the first time) and
   again for the first explosion or the first suspect to come into view. Once each level is built and
-  populated, everything is compiled up front (`G.R.warmup`, during loading).
+  populated, everything is compiled up front (`G.R.warmup`, during loading): the level as it stands, and a
+  sample of everything that can turn up later (`G.R.warmKit`: every catalogue gun material and a sticker,
+  every kind of body in every piece of kit, a scope's lens and a reflex sight's reticle, the outlines), in
+  every place it's drawn (the screen, the gun in your hands, the scope's picture, the fisheye, the hangar's
+  TVs), then a few frames drawn with nothing culled (the weapon lights' shadow maps, the outlines' passes).
+  The driver builds the programs side by side (`KHR_parallel_shader_compile`, waited on frame by frame, so
+  the wipe keeps moving), and they're kept, so the next level finds most of them built. The scene's light
+  counts never change (every dynamic light is one of a fixed pool, dark when unused), so nothing is
+  recompiled when a light comes on.
 - **Loading goes behind a wipe** (`G.Game.veil`, `G.Server.overBlack`): the picture stands still while a level or the
   hangar is built and compiled, so the host sends a black panel with slanted edges down every screen first (covered
   in 0.35 s), builds it there, and the panel pulls away off the bottom (0.65 s) once warmup's done and three frames

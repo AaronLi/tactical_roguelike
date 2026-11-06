@@ -2072,7 +2072,7 @@ const G_Highlights = (() => {
     P.xcam = new T.PerspectiveCamera(36, 16 / 9, 0.05, 50);
   }
   // the gear room's stand: a turntable under studio lights, the gun on it (its model shared: js/gunmodels.ts world)
-  function gearStage(s: Seg) {
+  function gearScene() {
     if (!P.gs) {
       P.gs = new T.Scene(); P.gs.background = new T.Color(0x0b1220);
       P.gs.add(new T.HemisphereLight(0xdfe8ff, 0x1a1410, 1.1));
@@ -2083,6 +2083,9 @@ const G_Highlights = (() => {
       P.gpiv = new T.Group(); P.gs.add(P.gpiv);
       P.gcam = new T.PerspectiveCamera(30, 16 / 9, 0.02, 50);
     }
+  }
+  function gearStage(s: Seg) {
+    gearScene();
     while (P.gpiv.children.length) P.gpiv.remove(P.gpiv.children[0]);
     P.gt = null; // (the last stage's tour: gearTourSet)
     let g = null; try { g = G.GunModels.world(s.code, (((P.actors.get(s.k) || {}) as Actor).skins || {})[s.code]); } catch (e) { /* no model */ }
@@ -2665,10 +2668,23 @@ const G_Highlights = (() => {
     if (step(dt)) return;
     // the picture, twenty times a second while someone can see it
     P.frameT -= dt;
-    if (!seen || P.frameT > 0) return;
+    if (!seen || P.frameT > 0 || G.R._warm) return; // (not while the shaders are being built under the veil: js/render.ts warmup)
     P.frameT = 0.05;
     draw();
   }
+  // The sets the TVs show, for js/render.ts warmup to build their shaders under the hangar's veil: each drawn into the TVs'
+  // picture (P.rt) by its own camera, and the pass that shows a round's target through the walls (layer 5, in thruMat)
+  function warm(compile: (scene: THREE.Scene, cam: THREE.Camera, target: THREE.WebGLRenderTarget | null, layer?: number, over?: THREE.Material) => void) {
+    if (!P.ready || !P.rt || !P.scene) return;
+    gearScene();
+    if (!P.ac) acStage();
+    compile(P.scene, P.cam, P.rt);
+    compile(P.scene, P.cam, P.rt, 5, thruMat());
+    compile(P.gs, P.gcam, P.rt);
+    compile(P.xs, P.xcam, P.rt);
+    compile(P.ac.scene, P.ac.cam, P.rt);
+  }
+  const thruMat = () => P.thruMat || (P.thruMat = new T.MeshBasicMaterial({ color: 0xff5030, transparent: true, opacity: 0.42, fog: false }));
   // the broadcast moving on by dt: the clip acting, its moments, the next segment when it's done (true when it moved on)
   function step(dt: number) {
     P.time += dt; P.st += dt;
@@ -2695,7 +2711,7 @@ const G_Highlights = (() => {
       // (a round on its way to someone behind a wall: them, a solid glow over everything, until it gets there)
       if (s.thru && s.tau < momentT(s.clip)!) {
         const bg = P.scene.background, ac = R2.autoClear;
-        P.scene.background = null; P.scene.overrideMaterial = P.thruMat || (P.thruMat = new T.MeshBasicMaterial({ color: 0xff5030, transparent: true, opacity: 0.42, fog: false }));
+        P.scene.background = null; P.scene.overrideMaterial = thruMat();
         P.cam.layers.set(5); R2.autoClear = false; R2.clearDepth(); R2.render(P.scene, P.cam);
         P.cam.layers.set(0); R2.autoClear = ac; P.scene.overrideMaterial = null; P.scene.background = bg;
       }
@@ -3372,7 +3388,7 @@ const G_Highlights = (() => {
   }
 
   // (step and draw: the broadcast moved on and drawn by hand, for checking a replay without standing at a TV)
-  return { tourMoves: GT_MOVES, tourPath: gearPath, tick, shot, roundPath, glass, crack, door, laser, hitBy, kill, suspectDown, saved, incap, arrest, nade, boom, fragPaths, flash, take, drop, mount, unmount, update, step, draw, gearFor, reset, exportPack, renderPack, cancelRender, exportHere, muxHere, toJSON, fromJSON, R, P };
+  return { tourMoves: GT_MOVES, tourPath: gearPath, tick, shot, roundPath, glass, crack, door, laser, hitBy, kill, suspectDown, saved, incap, arrest, nade, boom, fragPaths, flash, take, drop, mount, unmount, update, step, draw, warm, gearFor, reset, exportPack, renderPack, cancelRender, exportHere, muxHere, toJSON, fromJSON, R, P };
 })();
 G.Highlights = G_Highlights;
 interface GameModules { Highlights: typeof G_Highlights; }
