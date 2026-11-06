@@ -602,7 +602,10 @@ const G_Rig = (() => {
     // (rays from in front straight back at the chest across where the plate goes: it rests on the frontmost thing any of them meets)
     const meshes: THREE.Object3D[] = [], mt = rig.atak && rig.atak.userData.mount;
     rig.chest.traverse((o: THREE.Object3D) => { if ((o as THREE.Mesh).isMesh && o.visible) meshes.push(o); });
-    const skip = new Set<THREE.Object3D>(); if (mt) mt.traverse((o: THREE.Object3D) => skip.add(o));
+    // (not the phone itself, and not what's held out in front of the chest or hung off it: the arms, the gun in the hands or slung,
+    // a grenade in the hand. Only what's worn on the chest: the shirt, a vest, a carrier and its plate and pouches)
+    const skip = new Set<THREE.Object3D>();
+    for (const r of [mt, rig.armL && rig.armL.sh, rig.armR && rig.armR.sh, rig.gunMount, rig.slingMount, rig.hipMount, rig.gun, rig.neck]) if (r) r.traverse((o: THREE.Object3D) => skip.add(o));
     const list = meshes.filter((o) => !skip.has(o)), rc = new T.Raycaster(), o = new T.Vector3(), d = new T.Vector3();
     let z = Infinity;
     for (const x of [-hw, -hw / 2, 0, hw / 2, hw]) for (const y of [y0, (y0 + y1) / 2, y1]) {
