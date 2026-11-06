@@ -729,16 +729,17 @@ function makeArMagIn(fill) {
         { what: 'air column in the mag well shrinks', at: 0.002, gainDb: -13, sound: { kind: 'tube', fromCm: 8, toCm: 1.2, durationMs: 105, motion: 'linear', q: 2.5 } },
         { what: 'air squeezed out as it seats', at: 0.107, gainDb: -26, sound: { kind: 'air', freq: 3200, q: 1.4, attackMs: 0.3, decayMs: 4 } },
         rub('magazine slides up the mag well', 0.002, -11, { force: 2.5, duration: 0.105, speed: 0.45, profile: 'steady', roughness: 14, grain: 0.4, periodicity: 0.1, contactWidth: 0.04 }, panel, arMagWell, SHEET_BUZZ),
-        // The mag's side pushes the spring-loaded catch aside; it rides along until the slot.
-        rub('mag catch rides along the magazine side', 0.06, -12, { force: 6, duration: 0.04, speed: 0.4, profile: 'steady', roughness: 4, grain: 0.2, contactWidth: 0.03 }, arMagCatch, body, { coil: { level: 0.25, length: 2, dispersion: 0.35, decay: 0.05, brightness: 5000 } }),
+        // The mag's side pushes the spring-loaded catch aside; it rides along the side panel until the hole.
+        rub('mag catch rides along the magazine side', 0.06, -12, { force: 6, duration: 0.04, speed: 0.4, profile: 'steady', roughness: 4, grain: 0.2, contactWidth: 0.03 }, arMagCatch, panel, { coil: { level: 0.25, length: 2, dispersion: 0.35, decay: 0.05, brightness: 5000 } }),
         // Play in the well: the magazine wobbles and knocks lightly against the walls on the way up.
         // Loose and worn: the sheet-metal shell clatters against the billet walls on the way up.
         ...[0.014, 0.027, 0.034, 0.051, 0.066, 0.071, 0.084, 0.092].map((at, i) => hit('magazine clatters against the well', at, -10 - (i % 3) * 3, (0.35 - i * 0.02) * v, panel, arMagWell, { scatter: 0.8, radius: 1, click: 0.85, sharp: 1 }, SHEET_EDGE)),
-        // The catch: a small, hard steel part snapping into the slot under its spring, heard directly
-        // and through the lower it's mounted in. It engages as the slot reaches it, just before the
-        // magazine stops on the well: a crisp tick first, then the softer bottoming, then the magazine
-        // settles back onto the catch. (Landing after the bottoming, it was swallowed by it.)
-        snap('mag catch snaps into the magazine', 0.101, -2, { strength: 0.75, preload: 0, seat: 0, seatDelay: 1 }, arMagCatch, body, { coil: { level: 0.15, length: 1.5, dispersion: 0.3, decay: 0.025, brightness: 7000 }, ...SHEET_EDGE }),
+        // The catch: spring-loaded, it has been riding along the magazine's side. When the hole in the
+        // side panel lines up, its spring throws it sideways into the hole and its shoulder strikes the
+        // sheet metal round the hole: hard steel on a thin aluminium panel, a sharp tinny click, with a
+        // trace of its spring. The magazine then stops at the top of its travel and settles back down
+        // onto the catch.
+        hit('mag catch clicks into the hole in the magazine', 0.101, 0, 1.4, arMagCatch, panel, { scatter: 0.1, radius: 0.6, click: 0.9, sharp: 1 }, { coil: { level: 0.15, length: 1.5, dispersion: 0.3, decay: 0.025, brightness: 7000 }, ...SHEET_EDGE }),
         hit('magazine bottoms in the well', 0.109, -10, 0.7 * v, panel, arMagWell, { scatter: 0.6, radius: 2, click: 0.6 }, SHEET_RATTLE),
         hit('magazine settles back onto the catch', 0.124, -15, 0.3, body, arMagCatch, { scatter: 0.3, radius: 2, click: 0.5 }),
         hit('magazine body rings', 0.1095, fill === 'loaded' ? -17 : -12, 0.6, body, arMagWell, { scatter: 0.3, radius: 3, click: 0.1, sharp: 0.7 }, own),
@@ -757,7 +758,7 @@ function makeArMagIn(fill) {
         housing: LOWER_HOUSING,
         tracks: [
             { name: 'insert', description: 'Magazine enters and slides up the mag well; the catch rides along its side.', elements: els.filter((e) => /enters|slides up|rides along|top round presses|column|knocks|clatters/.test(e.what)) },
-            { name: 'catch-locks', description: 'The mag catch snaps into the magazine; it bottoms in the well.', elements: els.filter((e) => /snaps into|bottoms|body rings$|stack gives|squeezed|settles back/.test(e.what)) },
+            { name: 'catch-locks', description: 'The mag catch clicks into the hole in the magazine; it bottoms in the well.', elements: els.filter((e) => /clicks into|bottoms|body rings$|stack gives|squeezed|settles back/.test(e.what)) },
         ],
     };
 }
