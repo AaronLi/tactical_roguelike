@@ -487,8 +487,8 @@ const G_Server = {
     for (const [cand, wt] of odds) { x -= wt; if (x <= 0) { w = cand; break; } }
     // loaded, with two full spare magazines (or that many rounds; a full box, for a gun that only holds a round or two), all of one type: mostly ball, now and then
     // something better
-    // A gun that takes other receiver groups (js/parts.ts RCV) now and then turns up built on one of them: an M4
-    // lower with the AR-9 kit in it, an AK with the RPK's, fitted and working (its barrel and all), magazines and
+    // A gun that takes other receiver groups (js/parts.ts RCV) now and then turns up built on one of them: an AUG
+    // with the 9mm kit in it, an AK with the RPK's, fitted and working (its barrel and all), magazines and
     // rounds to match.
     const kits = G.Gunsmith.kitsFor(w.id).filter((k) => G.obtainable(G.WEAPONS[G.Gunsmith.PARTS[k].becomes]));
     if (kits.length && r() < 0.35) w = G.WEAPONS[G.Gunsmith.PARTS[kits[Math.floor(r() * kits.length)]].becomes] || w;

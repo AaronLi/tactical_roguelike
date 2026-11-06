@@ -69,13 +69,10 @@ const G_Gunsmith = (() => {
       caps: [[5, false, 80, { reload: -12, ergo: 3, weight: -0.15 }, 1], [8, false, 70, {}, 1], [12, false, 260, { reload: 10, ergo: -3, weight: 0.3 }, 2], [20, true, 620, { reload: 40, ergo: -9, weight: 1.1 }, 3]] },
   };
   // Receivers: guns that are the same core (a lower, a frame, an action) with a different kit in it. The core
-  // takes any of its group's kits (a 'receiver' part), and the kit decides which gun it is: fit the AR-9 kit to
-  // an M4 and you have an AR-9; the parts that fit the new gun stay on it. Each gun's own kit is its default.
+  // takes any of its group's kits (a 'receiver' part), and the kit decides which gun it is: fit the 9mm kit to
+  // an AUG and you have an AUG 9mm; the parts that fit the new gun stay on it. Each gun's own kit is its default.
   //   kits: { gun: [brand, name, price, tier, description] }
   const RCV: Record<string, { name: string; kits: Record<string, RcvKit> }> = {
-    ar15: { name: 'AR-15 lower receiver', kits: {
-      m4: ['kestrel', 'Mk18 5.56 upper receiver group', 520, 1, 'Upper, bolt, gas system and barrel for 5.56: an Mk18 again.'],
-      ar9: ['redline', 'AR-9 9mm conversion kit', 640, 2, 'A blowback 9mm upper and a magazine-well block for Glock magazines. Turns an Mk18 into a 9mm carbine.'] } },
     ak: { name: 'AK receiver and trunnion', kits: {
       ak: ['north', 'AKM 7.62×39 barrel and bolt group', 560, 1, 'Front trunnion, bolt and barrel for 7.62×39: a KV-47.'],
       ak74: ['north', 'AK-74 5.45×39 conversion group', 620, 2, 'Trunnion, bolt and barrel for 5.45×39: an AK-74M, on AK-74 magazines.'],
@@ -95,6 +92,17 @@ const G_Gunsmith = (() => {
   };
   const RCV_OF: Record<string, string> = {};
   for (const [grp, r] of Object.entries(RCV)) for (const id of Object.keys(r.kits)) RCV_OF[id] = grp;
+  // (retired groups: the AR-15's. The AR-9 is a gun of its own now, a dedicated 9 mm lower with a Glock magazine's well, so
+  // no kit turns an Mk18 into one or back, and neither has a receiver slot. Their kits are still made, retired, where they
+  // always were (a part's id in a code is its place in the list, so the parts after them keep theirs): a saved build or a
+  // replay code with either decodes without it, the gun it names on its own factory receiver (decode skips a retired part))
+  const RCV_RETIRED: Record<string, { name: string; kits: Record<string, RcvKit> }> = {
+    ar15: { name: 'AR-15 lower receiver', kits: {
+      m4: ['kestrel', 'Mk18 5.56 upper receiver group', 520, 1, 'Upper, bolt, gas system and barrel for 5.56: an Mk18 again.'],
+      ar9: ['redline', 'AR-9 9mm conversion kit', 640, 2, 'A blowback 9mm upper and a magazine-well block for Glock magazines. Turns an Mk18 into a 9mm carbine.'] } },
+  };
+  const RETIRED_OF: Record<string, string> = {};
+  for (const [grp, r] of Object.entries(RCV_RETIRED)) for (const id of Object.keys(r.kits)) RETIRED_OF[id] = grp;
   // machine pistols (and the Glocks) take a stock; tube shotguns a side saddle or a speed loader. Neither
   // comes fitted.
   const PSTOCK = new Set(['p9', 'g18', 'g19', 'auto9']), SGLOAD = new Set(['pump', 'ksg', 'slug', 'benelli']);
@@ -466,7 +474,7 @@ const G_Gunsmith = (() => {
     if (IFACE[mount]) return IFACE[mount];
     const [kind, rest] = mount.split(':');
     if (kind === 'mz') return `${THREAD[rest] || rest} muzzle thread`;
-    if (kind === 'rcv') return RCV[rest] ? RCV[rest].name : mount;
+    if (kind === 'rcv') return RCV[rest] ? RCV[rest].name : RCV_RETIRED[rest] ? RCV_RETIRED[rest].name : mount;
     if ((kind === 'br' || kind === 'pbr') && (G.CALIBERS as Record<string, any>)[rest]) return `${(G.CALIBERS as Record<string, any>)[rest].name} ${kind === 'br' ? 'rifle barrel' : 'pistol barrel'}`;
     const w = G.WEAPONS[rest];
     const what = { br: 'barrel extension', pbr: 'barrel', mag: 'magazine well', sl: 'slide rails', tube: 'magazine tube', motor: 'drive housing', cap: 'capacitor bay', limbs: 'limb pockets' }[kind] || kind;
@@ -713,6 +721,9 @@ const G_Gunsmith = (() => {
       const mount = 'rcv:' + rg, [b, n, price, tier, desc] = RCV[rg].kits[id];
       slot('receiver', mount, true);
       plat.defaults.receiver = (PARTS[`rcv.${id}`] || add({ id: `rcv.${id}`, slot: 'receiver', mount, brand: BR[b], name: n, price, tier, desc, becomes: id, model: {} })).id;
+    } else if (RETIRED_OF[id] && !PARTS[`rcv.${id}`]) { // (a retired group's kit: made, so the ids after it stay, but no slot takes it and nothing offers it)
+      const g = RETIRED_OF[id], [b, n, price, tier, desc] = RCV_RETIRED[g].kits[id];
+      add({ id: `rcv.${id}`, slot: 'receiver', mount: 'rcv:' + g, brand: BR[b], name: n, price, tier, desc, model: {}, retired: true });
     }
     if (s.motor) {
       slot('motor', 'motor:' + id, true);
