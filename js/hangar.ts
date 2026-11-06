@@ -57,10 +57,10 @@ const G_Hangar = (() => {
   // screen on the east wall (js/highlights.ts TVS) and two rows of sofas facing it
   const LOUNGE = { x0: 36, x1: 50, z0: 14.2, z1: 26, wall: 38, sofas: [{ x: 43.4, z0: 17.6, z1: 22.4 }, { x: 40.4, z0: 17.2, z1: 22.8 }], table: [45.0, 19.3, 46.0, 20.7, 0.42], bar: [37.0, 23.4, 38.0, 25.8, 1.0] };
   // the precision showcase: the front of the workshop side, by the hangar door, done up as a hunting superstore (Timberline
-  // Outfitters): a plank floor inside log rails (a way in off the hall, and one from the workshop), eight tree stumps with the
+  // Outfitters): a plank floor inside log rails (a way in off the hall, and one from the workshop), six tree stumps (two rows of three) with the
   // scopes, the bipod and the match barrels for sale turning on them (G.Gunsmith.rollPrecision), fibreglass rockwork along the
   // front wall with a waterfall into a pond, a stuffed grizzly reared up on a boulder, pines, a canoe hung from the roof
-  const OUT = { x0: 5.4, x1: 16.6, z0: 16.4, z1: 26, rows: [18.6, 21.6], xs: [7.6, 9.8, 12.0, 14.2], top: 0.9, size: 0.9, rocks: 24.9, pond: [10.0, 23.0, 14.8, 25.4], bear: [7.0, 24.0], pines: [[15.9, 25.0], [6.1, 17.2]], door: [19.0, 21.2], back: 8.4 };
+  const OUT = { x0: 5.4, x1: 16.6, z0: 16.4, z1: 26, rows: [18.6, 21.6], xs: [7.6, 10.9, 14.2], top: 0.9, size: 0.9, rocks: 24.9, pond: [10.0, 23.0, 14.8, 25.4], bear: [7.0, 24.0], pines: [[15.9, 25.0], [6.1, 17.2]], door: [19.0, 21.2], back: 8.4 };
   const REACH = 3.2, HELI_REACH = 4.2, HOLD = 1.1;
 
   const S: HangarState = { root: null as unknown as THREE.Group, map: null as unknown as LvMap, targets: [], items: [], stands: [], rigs: [], crane: null, heli: null, vend: [], hover: null, hold: 0, hl: null, t: 0, vexQuip: 0, key: '', rosterKey: undefined, partStands: undefined, precStands: undefined, pouchSlots: undefined };

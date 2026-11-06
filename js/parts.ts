@@ -1662,8 +1662,8 @@ const G_Gunsmith = (() => {
   }
   // The precision showcase's stock this visit (js/hangar.ts: the hunting-store corner at the front of the workshop), the same for
   // the whole squad and none of what's on the gunsmith's pedestals: rifle scopes (the magnified ones, a tier deeper than his),
-  // the bipod, and match barrels for the long guns (the marksman and sniper rifles first).
-  function rollPrecision(level: number, seed: number, n = 8) {
+  // the bipod, and match barrels for the long guns (the marksman and sniper rifles first): six, three scopes, the bipod and two barrels.
+  function rollPrecision(level: number, seed: number, n = 6) {
     const r = G.U.rng((seed ^ 0x5c09e) >>> 0), maxTier = Math.min(3, 2 + Math.floor(level / 2)), his = rollStock(level, seed);
     const ok = (p: Part) => !p.factory && !p.retired && !p.alt && !his.has(p.id) && (p.tier || 1) <= maxTier;
     const take = (list: Part[], k: number) => G.U.shuffle(r, list.filter(ok)).slice(0, k).map((p) => p.id);
@@ -1672,8 +1672,8 @@ const G_Gunsmith = (() => {
     if (scopes.length < 3) scopes.push(...take(magnified.filter((p) => p.oem), 3 - scopes.length));
     // (a barrel longer than a gun of those classes comes with: a long one of a shared set, or its match barrel)
     const long = (cls: any) => LIST.filter((p) => p.slot === 'barrel' && (p.len != null ? fitsPart(p).some((id) => cls.includes(G.WEAPONS[id].cls) && p.len! > G.GUN_SPECS[id].barrel * 1.05) : p.id.endsWith('.br.long') && G.WEAPONS[p.plat!] && cls.includes(G.WEAPONS[p.plat!].cls)));
-    const barrels = take(long(['SNP', 'DMR']), 4);
-    if (barrels.length < 4) barrels.push(...take(long(['BR', 'AR', 'LMG']), 4 - barrels.length));
+    const barrels = take(long(['SNP', 'DMR']), 2);
+    if (barrels.length < 2) barrels.push(...take(long(['BR', 'AR', 'LMG']), 2 - barrels.length));
     return [...scopes, ...(ok(PARTS['fg.4']) ? ['fg.4'] : []), ...barrels].slice(0, n);
   }
   // Take the aftermarket parts off a weapon (traded in or replaced) and put them in a stash.
