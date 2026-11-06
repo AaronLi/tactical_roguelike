@@ -238,7 +238,7 @@ const G_Scars = (() => {
       if (L.dust != null) {
         const u = puffs[puffI], m = u.obj; puffI = (puffI + 1) % puffs.length;
         u.t = 0; u.life = 1.6 + Math.random() * 1.2; u.k = 0.22 * k * (o.k === 'x' ? 1.5 : 1); u.v.copy(out).multiplyScalar(0.7 * k);
-        m.position.copy(p).addScaledVector(n0, 0.03); m.material.color.setHex(L.dust); m.material.opacity = 0.7; m.scale.setScalar(u.k); m.visible = true;
+        m.position.copy(p).addScaledVector(n0, 0.03); m.material.color.setHex(L.dust).multiplyScalar(G.R.partLight ? G.R.partLight(p) : 1); m.material.opacity = 0.7; // (unlit: as lit as where it is, js/render.ts partLight) m.scale.setScalar(u.k); m.visible = true;
       }
     }
     function update(dt: number) {

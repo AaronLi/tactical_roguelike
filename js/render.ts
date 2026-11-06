@@ -815,8 +815,20 @@ const G_R = {
     m.material.color.setHex(color); m.material.opacity = op;
     m.userData.f = this.frameNo; m.visible = true;
   },
-  particles(p: THREE.Vector3, n: number, color: number, speed: number, life: number, grav = 9, spread = 1, dir?: ArrayLike<number> | null, blood?: boolean) {
+  // How lit a point is, for what's drawn unlit (the particles, the blood's drops: points, not lit by three.js): the light grid
+  // there with the sky's fill, as a share of an ordinary lit room's (PART_LIT), so dust and blood are dark in a dark room
+  // (bright under night vision's gain otherwise) and as they were in the light. 1 where there's no grid (the menus' scenes).
+  PART_LIT: 0.35, PART_MIN: 0.03, _partC: new THREE.Color(),
+  partLight(p: THREE.Vector3) {
+    if (!this.vmDark || !G.LightGrid) return 1;
+    const E = G.LightGrid.at(p.x, p.y, p.z, this._partC, 0.4), h = this.hemi, hk = h.intensity / Math.PI; // (the fill in r149's units, as the grid's: eyeLight)
+    const l = 0.2126 * (E.r + h.color.r * hk) + 0.7152 * (E.g + h.color.g * hk) + 0.0722 * (E.b + h.color.b * hk);
+    return G.U.clamp(l / this.PART_LIT, this.PART_MIN, 1);
+  },
+  // (glow: what gives off its own light, sparks, fire, embers, a flash: not dimmed by the dark)
+  particles(p: THREE.Vector3, n: number, color: number, speed: number, life: number, grav = 9, spread = 1, dir?: ArrayLike<number> | null, blood?: boolean, glow = false) {
     const col = new THREE.Color(color);
+    if (!glow) col.multiplyScalar(this.partLight(p));
     for (let k = 0; k < n; k++) {
       const i = this.pIdx; this.pIdx = (this.pIdx + 1) % this.PN;
       this.pBlood[i] = blood ? 1 : 0;
@@ -837,7 +849,7 @@ const G_R = {
     this.sPos[i * 3] = p.x; this.sPos[i * 3 + 1] = p.y; this.sPos[i * 3 + 2] = p.z;
     this.sVel[i * 3] = vx; this.sVel[i * 3 + 1] = vy; this.sVel[i * 3 + 2] = vz;
     this.sLife[i] = 1.3;
-    const c = _bjc.setHex(color), v = 0.8 + Math.random() * 0.2;
+    const c = _bjc.setHex(color), v = (0.8 + Math.random() * 0.2) * this.partLight(p);
     this.sBase[i * 3] = c.r * v; this.sBase[i * 3 + 1] = c.g * v; this.sBase[i * 3 + 2] = c.b * v;
   },
   // what a round throws up, by what it hit (js/materials.ts fx): sparks [colour, how many, speed, life, gravity], and the puff of it
@@ -850,7 +862,7 @@ const G_R = {
     if (kind === 'blood') { this.particles(p, 8, 0x8a0a0a, 2.5, 1.2, 9, 0.8, n, true); return; } // (each leaves a drop where it lands)
     if (kind === 'armor') { this.particles(p, 6, 0x9fd8ff, 3, 0.25, 6, 1); return; }
     const fxs = (this.IMPACT as Record<string, any>)[fx!] || this.IMPACT.stone;
-    if (fxs.s) this.particles(p, fxs.s[1], fxs.s[0], fxs.s[2], fxs.s[3], fxs.s[4], 0.8, n);
+    if (fxs.s) this.particles(p, fxs.s[1], fxs.s[0], fxs.s[2], fxs.s[3], fxs.s[4], 0.8, n, false, true); // (sparks: hot, their own light)
     if (fxs.d && !o) this.particles(p, fxs.d[1], fxs.d[0], fxs.d[2], 0.6, 1, 0.6, n); // (the rest of what's thrown out: js/scars.ts)
     if (kind !== 'wall' || (o && o.m === '')) return; // (o.m '': nothing there to damage)
     // the damage it did, and what it threw out of it (js/scars.ts), by what it hit and how; marks are from the pool, so a reused
@@ -992,7 +1004,7 @@ const G_R = {
     m.userData.life = m.userData.max = 0.45; m.userData.r = radius;
     const l = this.blastLights.reduce((a: THREE.PointLight, b: THREE.PointLight) => (b.intensity < a.intensity ? b : a));
     l.position.copy(p); l.intensity = Math.PI * 6; l.userData.by = m;
-    this.particles(p, 40, 0xffa040, 9, 0.6, 4, 1);
+    this.particles(p, 40, 0xffa040, 9, 0.6, 4, 1, null, false, true);
     this.particles(p, 30, 0x444038, 3, 1.4, -0.5, 1);
   },
   // A thermobaric's fireball (js/player.ts tbModel): flame in every cell of floor its cloud reached, lit in the order it reached
@@ -1045,7 +1057,7 @@ const G_R = {
     this.fires.push(rec);
     // soot on the floor where it burned, and the embers it throws
     for (let k = 0; k < Math.min(6, 1 + (n / 18 | 0)); k++) { const i = Math.floor(rnd() * n), c = M.fill.order[i]; this.scorch(((c % W) + 0.5) * TS, gys[i], (((c / W) | 0) + 0.5) * TS, 1.3 + rnd(), 0.75, rnd() * 6.283); }
-    for (let k = 0; k < 6; k++) { const i = Math.floor(rnd() * n), c = M.fill.order[i]; this.particles(new T.Vector3(((c % W) + 0.5) * TS, floor + 1.2, (((c / W) | 0) + 0.5) * TS), 8, 0xffa040, 4, 0.9, 3, 1); }
+    for (let k = 0; k < 6; k++) { const i = Math.floor(rnd() * n), c = M.fill.order[i]; this.particles(new T.Vector3(((c % W) + 0.5) * TS, floor + 1.2, (((c / W) | 0) + 0.5) * TS), 8, 0xffa040, 4, 0.9, 3, 1, null, false, true); }
   },
   fireStep(dt: number) {
     if (!this.fires.length) return;
@@ -1112,7 +1124,7 @@ const G_R = {
   flashAt(p: THREE.Vector3) {
     const l = this.muzzleLights[this.mlIdx = ((this.mlIdx || 0) + 1) % this.muzzleLights.length];
     if (l) { l.position.copy(p); l.color.setHex(0xffffff); l.intensity = Math.PI * 40; l.distance = 26; l.userData.t = 0.12; }
-    this.particles(p, 30, 0xfff6d8, 5, 0.35, 2, 1.6);
+    this.particles(p, 30, 0xfff6d8, 5, 0.35, 2, 1.6, null, false, true);
   },
   muzzleFlashAt(p: THREE.Vector3, color = 0xffb060) {
     const l = this.muzzleLights[this.muzzleIdx]; this.muzzleIdx = (this.muzzleIdx + 1) % this.muzzleLights.length;
