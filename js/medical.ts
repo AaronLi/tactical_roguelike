@@ -32,7 +32,7 @@
 //   blood bag (40% blood back: on yourself, or on a teammate; an unconscious one comes round with it).
 // Bandages and painkiller doses stack 4 to a slot, tourniquets and gauze 3; the rest are one each.
 // A gut wound can't be fixed in the field. Everything heals at the quartermaster's.
-interface MedPart { hp: number; max: number; light: boolean; heavy: boolean; massive: boolean; frac: boolean; tq: boolean; lung: boolean; gut: boolean; spine: boolean; org: Record<string, number>; clot?: number | null; }
+interface MedPart { hp: number; max: number; light: boolean; heavy: boolean; massive: boolean; frac: boolean; tq: boolean; lung: boolean; gut: boolean; spine: boolean; org: Record<string, number>; clot?: number | null; ln?: number; } // (ln: how many small wounds the part's light bleeding is from: each bleeds)
 interface MedBody { parts: Record<string, MedPart>; blood: number; pk: number; }
 // the yes/no injuries a part can have (MedPart), in the order they're packed into the saved flags
 type MedFlag = 'light' | 'heavy' | 'frac' | 'tq' | 'lung' | 'gut' | 'massive' | 'spine';
@@ -131,12 +131,13 @@ const G_Med = (() => {
     if (b.blood <= UNCON) return 'out';
     return hit || paralysed(b) ? 'down' : null;
   }
-  // a light bleed starting (or a fresh one on top): it clots by itself in 30-60 s
-  function bleed(p: MedPart) { p.light = true; p.clot = 30 + Math.random() * 30; }
+  // a light bleed starting, or another small wound on top of one: they add up (a peppering of fragments, each oozing), and clot
+  // together by themselves in 30-60 s from the last; one bandage closes them all
+  function bleed(p: MedPart) { p.light = true; p.ln = (p.ln || 0) + 1; p.clot = 30 + Math.random() * 30; }
   // blood lost per second (down: slower, see DOWN_K)
   function drainOf(b: MedBody, down: boolean) {
     let d = 0;
-    for (const p of Object.values(b.parts)) d += (p.light ? DRAIN.light : 0) + (p.heavy ? DRAIN.heavy : 0) + (p.massive ? DRAIN.massive : 0) + (p.gut ? DRAIN.gut : 0);
+    for (const p of Object.values(b.parts)) d += (p.light ? DRAIN.light * Math.max(1, p.ln || 1) : 0) + (p.heavy ? DRAIN.heavy : 0) + (p.massive ? DRAIN.massive : 0) + (p.gut ? DRAIN.gut : 0);
     d *= BLEED_K;
     return down ? d * DOWN_K : d;
   }
@@ -145,7 +146,7 @@ const G_Med = (() => {
   // bleeding, light bleeds clotting (not once you're down), painkillers wearing off. Returns 'out' / 'dead' when the
   // blood runs very low / out (low blood alone doesn't put you down: the next hit does).
   function tick(b: MedBody, dt: number, down: boolean) {
-    if (!down) for (const p of Object.values(b.parts)) if (p.light && (p.clot = (p.clot == null ? 45 : p.clot) - dt) <= 0) { p.light = false; p.clot = null; }
+    if (!down) for (const p of Object.values(b.parts)) if (p.light && (p.clot = (p.clot == null ? 45 : p.clot) - dt) <= 0) { p.light = false; p.ln = 0; p.clot = null; }
     b.blood = Math.max(0, b.blood - drainOf(b, down) * dt);
     b.pk = Math.max(0, b.pk - dt);
     return fateOf(b, false);
@@ -195,8 +196,8 @@ const G_Med = (() => {
     const I = ITEMS[mt], p = b.parts[part];
     if (I.fixes === 'pain') b.pk = PK;
     else if (I.fixes === 'blood') b.blood = Math.min(100, b.blood + BAG);
-    else if (I.fixes === 'light') p.light = false;
-    else if (I.fixes === 'heavy') { if (p.heavy) { p.heavy = false; if (mt === 'tourniquet') p.tq = true; } else p.light = false; } // (gauze on a light bleed: as a bandage)
+    else if (I.fixes === 'light') { p.light = false; p.ln = 0; }
+    else if (I.fixes === 'heavy') { if (p.heavy) { p.heavy = false; if (mt === 'tourniquet') p.tq = true; } else { p.light = false; p.ln = 0; } } // (gauze on a light bleed: as a bandage)
     else if (I.fixes === 'frac') p.frac = false;
     else if (I.fixes === 'lung') p.lung = false;
     return true;
@@ -236,7 +237,7 @@ const G_Med = (() => {
     if (p.hp <= 0) out.push('destroyed');
     if (p.massive) out.push('internal bleeding');
     if (p.heavy) out.push('heavy bleeding');
-    if (p.light) out.push('bleeding');
+    if (p.light) out.push((p.ln || 1) > 1 ? `bleeding from ${p.ln} wounds` : 'bleeding');
     if (p.frac) out.push('fracture');
     if (p.lung) out.push('punctured lung');
     if (p.gut) out.push('gut wound');

@@ -488,7 +488,7 @@ const G_InvUI = (() => {
   function bodyHTML(b: MedBody) {
     const part = (k: string) => {
       const p = b.parts[k], f = Math.max(0, p.hp / p.max), col = p.hp <= 0 ? '#5a2020' : f > 0.6 ? '#4f7a44' : f > 0.3 ? '#8a7030' : '#8a3a30';
-      const chips = [p.heavy ? '<i class="c heavy">BLEED++</i>' : '', p.light ? '<i class="c light">BLEED</i>' : '', p.frac ? '<i class="c frac">FRACTURE</i>' : '',
+      const chips = [p.heavy ? '<i class="c heavy">BLEED++</i>' : '', p.light ? `<i class="c light">BLEED${(p.ln || 1) > 1 ? ' ×' + p.ln : ''}</i>` : '', p.frac ? '<i class="c frac">FRACTURE</i>' : '',
         p.lung ? '<i class="c organ">LUNG</i>' : '', p.gut ? '<i class="c organ">GUT</i>' : '', p.tq ? '<i class="c tq">TQ</i>' : ''].join('');
       return `<div class="bp bp-${k}${p.heavy || p.light ? ' bleeding' : ''}${ptPart === k ? ' sel' : ''}" data-body="${k}" title="${G.U.esc((G.Med.NAME as Rec)[k])}: ${Math.ceil(Math.max(0, p.hp))}/${p.max}${G.Med.describe(p).length ? ' · ' + G.Med.describe(p).join(', ') : ''}">
         <b>${(G.Med.NAME as Rec)[k]}</b><div class="bp-bar"><i style="width:${Math.round(f * 100)}%;background:${col}"></i></div><small>${Math.ceil(Math.max(0, p.hp))}/${p.max}</small><div class="bp-chips">${chips}</div></div>`;

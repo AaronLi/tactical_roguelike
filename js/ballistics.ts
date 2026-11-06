@@ -748,7 +748,7 @@ const G_Ballistics = (() => {
       if ((id === 'liver' || id === 'spleen' || O.pair === 'kidney') && d >= O.hp) eff.add('massive'); // (torn apart: bleeds out in seconds)
       if (id === 'brain' && d < 0.3) { eff.delete('dead'); eff.add('out'); } // (a graze: knocked out, not killed)
     }
-    if (h.crush >= 15) eff.add('heavy'); else if (h.crush >= 1.5) eff.add('light');
+    if (h.crush >= 15) eff.add('heavy'); else if (h.crush >= 0.25) eff.add('light'); // (any wound that breaks the skin and crushes a little tissue oozes: a fragment's too)
     const dmg = Math.min(h.E + h.blunt, PART_J[h.seg] || Infinity) * DMG_PER_J;
     return { part: h.part, side: h.side, seg: h.seg, dmg, effects: [...eff], organs, blunt: h.blunt, armour: h.armour };
   }

@@ -38,7 +38,7 @@ interface Rig { // a character's skeleton and its meshes (what create makes, and
   // (what the animation keeps from frame to frame)
   powered?: boolean; limp?: boolean; zipped?: boolean; zipKit?: THREE.Object3D; zipT?: number; zipYaw?: number | null; zipSw?: ZipSwing; proneW?: number; proneS?: number; effPh?: number; effT?: number; braceW?: number; gunAimW?: number; gunKick?: number;
   gunBase?: { p: THREE.Vector3; q: THREE.Quaternion; s: THREE.Vector3 }; gunBaseOf?: THREE.Object3D; gunSupport?: THREE.Vector3 | null; bipodK?: number; hitDir?: THREE.Vector3; xbLoaded?: any;
-  blindW?: number; radioW?: number; dazeW?: number; blindT?: number; atakW?: number; atak?: THREE.Group; handNade?: any; throwHand?: boolean; throwStr?: any; dropped?: { g: THREE.Object3D; vy: number; spin: number; floor?: number; [field: string]: any } | null;
+  blindW?: number; radioW?: number; dazeW?: number; blindT?: number; atakW?: number; atak?: THREE.Group; atakAlways?: boolean; handNade?: any; throwHand?: boolean; throwStr?: any; dropped?: { g: THREE.Object3D; vy: number; spin: number; floor?: number; [field: string]: any } | null;
   [bone: string]: any; // (a bone looked up by name: js/ballistics.ts boneOf, the hitbox readouts of js/hud.ts and js/highlights.ts; and what js/hud.ts keeps on a rig)
 }
 const G_Rig = (() => {
@@ -410,7 +410,7 @@ const G_Rig = (() => {
     const hipMount = joint(hips, 0.2, 0.02, -0.02); hipMount.rotation.set(-Math.PI / 2, 0, 0);
 
     const rig = {
-      hairMesh, look, pantsM: bottom, seat: null, kitParts: [], kitKey: null, kit: null, callsign: o.animal ? { id: o.animal, name: o.callName || '' } : null,
+      hairMesh, look, pantsM: bottom, seat: null, kitParts: [], kitKey: null, kit: null, callsign: o.animal ? { id: o.animal, name: o.callName || '' } : null, atakAlways: !!o.animal,
       root, body, hips, spine, chest, neck, head, armL, armR, legL, legR, gunMount, slingMount, hipMount, slung: false, mats, scale: s, style,
       gun: null, gunInfo: null, gunKey: null,
       phase: rnd() * 10, vel: new T.Vector3(), lastPos: null,
@@ -887,15 +887,19 @@ const G_Rig = (() => {
     // (the phone comes out once the hands are free: the weapon slung first, if there is one)
     const atakOk = !rig.swap && (!rig.gun || rig.slung);
     rig.atakW = (rig.atakW || 0) + ((p.atak && atakOk && !posed && !p.act && p.state === 'alive' ? 1 : 0) - (rig.atakW || 0)) * Math.min(1, dt * 5);
-    if (rig.atakW > 0.01) {
+    // An officer's ATAK is always on their chest, folded flat (screen in) when it isn't being looked at (rig.atakAlways: a rig with a
+    // callsign). Seated on the front of what's worn (chestFront), again whenever the kit changes.
+    if (rig.atakAlways || rig.atakW > 0.01) {
       if (!rig.atak) rig.atak = makeAtak(rig);
-      const k = U.smooth(0, 1, rig.atakW), hg = rig.atak, ph = hg.userData.phone as THREE.Object3D, H = hg.userData.H as number, W = hg.userData.W as number;
-      const mt = hg.userData.mount as THREE.Object3D;
-      if (!mt.visible) { // (coming out: seated on the front of what's worn now, the kit may have changed since)
+      const mt = rig.atak.userData.mount as THREE.Object3D;
+      if (!mt.visible || mt.userData.kit !== rig.kitKey) {
         rig.chest.updateMatrixWorld(true);
-        mt.position.z = chestFront(rig, mt.position.y - 0.04, mt.position.y + 0.1, W / 2) - 0.01; // (the plate's back on it)
-        mt.visible = true;
+        mt.position.z = chestFront(rig, mt.position.y - 0.04, mt.position.y + 0.1, (rig.atak.userData.W as number) / 2) - 0.01; // (the plate's back on it)
+        mt.userData.kit = rig.kitKey; mt.visible = true;
       }
+    }
+    if (rig.atakW > 0.01) {
+      const k = U.smooth(0, 1, rig.atakW), hg = rig.atak!, ph = hg.userData.phone as THREE.Object3D, H = hg.userData.H as number, W = hg.userData.W as number;
       hg.rotation.x = ATAK_OPEN * U.smooth(0.15, 0.85, k); // (the hand reaches it first, then folds it out)
       rig.neck.rotation.x -= 0.55 * k; // head down to the screen
       const gl = hg.userData.glow as THREE.Mesh; if (gl) (gl.material as THREE.MeshBasicMaterial).opacity = (0.22 + 0.06 * Math.sin(performance.now() / 400)) * U.smooth(0.5, 1, k);
@@ -908,7 +912,10 @@ const G_Rig = (() => {
       // landscape, held by its two ends like a phone (the left pulls it down; the right comes in a beat later, its thumb tapping)
       hand(rig.armL, ph.localToWorld(new T.Vector3(-W / 2 - 0.04, H * 0.45, -0.025)), rig.chest.localToWorld(new T.Vector3(-0.62, -0.25, -0.1)), k);
       hand(rig.armR, ph.localToWorld(new T.Vector3(W / 2 + 0.04, H * 0.45, -0.025 + tap)), rig.chest.localToWorld(new T.Vector3(0.62, -0.25, -0.1)), U.smooth(0.3, 1, k));
-    } else if (rig.atak) (rig.atak.userData.mount as THREE.Object3D).visible = false;
+    } else if (rig.atak) {
+      if (rig.atakAlways) { rig.atak.rotation.x = 0; const gl = rig.atak.userData.glow as THREE.Mesh; if (gl) (gl.material as THREE.MeshBasicMaterial).opacity = 0; } // (folded away on the chest)
+      else (rig.atak.userData.mount as THREE.Object3D).visible = false;
+    }
     // blinded (p.blind 1): a hand pressed over the eyes, the forearm across the face; with a weapon the other hand keeps it hanging
     // low, with none both hands go to the eyes
     if (bw > 0.01) {
