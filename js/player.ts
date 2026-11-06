@@ -1339,7 +1339,8 @@ const G_Me = {
   // What a slap reload (js/vmanim.ts slapClip) sounds like as it goes, at k through it: the handle drawn back, its click into the notch, the old magazine out (and, dumped on
   // the floor, falling), the new one in, then the slap that frees the bolt: a sharp crack over the bolt going home.
   slapSounds(w: GWeapon, k: number) {
-    const S = G.VMAnim.SLAP, km = G.U.clamp((k - S.mag0) / (S.mag1 - S.mag0), 0, 1), def = w.def, keep = this.reloadMode === 'retain' || this.reloadMode === 'pouch';
+    const S = G.VMAnim.SLAP, km = G.VMAnim.slapM(k, this.reloadMode), def = w.def, // (how far the magazine change is: js/vmanim.ts slapM)
+      keep = this.reloadMode === 'retain' || this.reloadMode === 'pouch';
     if (this.reloadEv === 0 && k > (S.grab + S.pull) / 2) { this.reloadEv = 1; G.Audio.sample('rack_slide', 0.7, 1.2); }
     if (this.reloadEv === 1 && k > S.lock) { this.reloadEv = 2; G.Audio.click(); }
     if (this.reloadEv === 2 && km > 0.1) { this.reloadEv = 3; if (!G.Audio.sample('pull_magazine')) G.Audio.reload(); }
@@ -1456,7 +1457,7 @@ const G_Me = {
       else if (!G.GunAudio.play(multi && !vol ? G.shotSoundKey(def, eff, round) : G.Gunsmith.roundSoundKey(def, round), null, undefined, vol ? G.volleyVol(w.def, nv) : multi ? Math.pow(G.shotK(w.def, eff), 2) : 1)) G.Audio.shot(w.sup ? G.SUPPRESSOR.snd : def.snd); // (the report of the round fired, not just the gun's)
       if (!w.sup && def.cls !== 'BOW' && !(vol && n > 0)) { // (a volley: one flash, the barrels' together)
         this.flashT = 0.05;
-        G.R.vmMuzzle.intensity = 3;
+        G.R.vmMuzzle.intensity = Math.PI * 3;
         G.R.muzzleFlashAt(muzzle, def.tracer || 0xffb060);
       }
       if (!multi && !w.def.caseless && !w.def.manual) G.Casings.fired(def, true, null, null, round); // the spent case, out of the port (a bolt gun's when the bolt's worked; a caseless round has none)

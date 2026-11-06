@@ -67,7 +67,7 @@ const G_Stickers = (() => {
     const p = pic(name);
     if (!p.tex) {
       // (an ImageBitmap isn't turned over on upload: its top row is v = 0, as the decals' UVs have it)
-      p.tex = new THREE.Texture(p.bm || undefined); p.tex.flipY = false; p.tex.encoding = THREE.sRGBEncoding; p.tex.anisotropy = 4;
+      p.tex = new THREE.Texture(p.bm || undefined); p.tex.flipY = false; p.tex.colorSpace = THREE.SRGBColorSpace; p.tex.anisotropy = 4;
       if (p.bm) p.tex.needsUpdate = true;
     }
     const k = ghost ? 'ghost' : 'mat';
