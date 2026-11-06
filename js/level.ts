@@ -2946,6 +2946,8 @@ const G_Level = {
   // map: a few dozen draw calls where there were hundreds. Left as they are: what moves or changes (the doors, the
   // weapon case, the cabinets, the panes that break), anything see-through (drawn in order), and anything with a
   // material of its own making.
+  // (Tried as BatchedMeshes, batchStatic below, a material each over the whole map with the pieces culled one by one: 5% fewer
+  // draw calls on a level, and a little more of the CPU's time in a frame, culling the pieces in every view. Kept as it is.)
   mergeStatic(root: THREE.Object3D, map: LvMap, CH = 24) {
     const T = THREE, keep = new Set();
     for (const m of [map, ...(map.floors || [])]) {
@@ -3007,6 +3009,89 @@ const G_Level = {
     root.traverse((o: LvObj) => { if (o.geometry) used.add(o.geometry); });
     for (const o of merged) if (!used.has(o.geometry)) o.geometry.dispose();
     for (const b of bins.values()) for (const e of b.list) e.g.dispose();
+    return merged.size;
+  },
+  // The hangar's fixtures drawn as BatchedMeshes (js/hangar.ts batch), one a material, each piece an instance with its own
+  // matrix, each kind of geometry in it once, the pieces culled one by one in every view: every plain, opaque mesh under root but what's in
+  // keep (and under it), binned by its material (the material itself, so a material changed later still changes all of
+  // them), its layers, its attributes, whether it casts a shadow and is culled. A material only one mesh has is left as it
+  // is (nothing to save).
+  batchStatic(root: THREE.Object3D, keep: Set<THREE.Object3D>) {
+    const T = THREE;
+    const plain = (mt: Record<string, any>) => (mt.isMeshStandardMaterial || mt.isMeshBasicMaterial || mt.isMeshLambertMaterial || mt.isMeshPhongMaterial) && !mt.transparent
+      && (!mt.hasOwnProperty('onBeforeCompile'));
+    root.updateMatrixWorld(true);
+    interface BEntry { g: THREE.BufferGeometry; o: LvObj; M: THREE.Matrix4 }
+    interface Bin { mt: THREE.Material; mask: number; cast: boolean; culled: boolean; keepMat: boolean; multi: boolean; list: BEntry[] }
+    const inv = new T.Matrix4().copy(root.matrixWorld).invert(), bins = new Map<string, Bin>(), took: LvObj[] = [];
+    const ids = new Map<unknown, number>(), idOf = (mt: unknown) => { if (!ids.has(mt)) ids.set(mt, ids.size); return ids.get(mt); }; // (by the material itself, not its uuid)
+    // a mesh of several materials (a stair's step: tread and risers): each material's part a geometry of its own, made once
+    // for each geometry and part
+    const parts = new Map<THREE.BufferGeometry, Map<number, THREE.BufferGeometry>>(), made: THREE.BufferGeometry[] = [];
+    const partOf = (g: THREE.BufferGeometry, p: { start: number; count: number }) => {
+      let by = parts.get(g); if (!by) parts.set(g, (by = new Map()));
+      let s = by.get(p.start);
+      if (!s) {
+        s = new T.BufferGeometry();
+        if (g.index) { for (const [n, a] of Object.entries(g.attributes)) s.setAttribute(n, a); s.setIndex(new T.BufferAttribute((g.index.array as Uint32Array).slice(p.start, Math.min(g.index.count, p.start + p.count)), 1)); }
+        else { const end = Math.min(g.attributes.position.count, p.start + p.count); for (const [n, a] of Object.entries(g.attributes)) { const sz = a.itemSize; s.setAttribute(n, new T.BufferAttribute((a.array as Float32Array).slice(p.start * sz, end * sz), sz, a.normalized)); } }
+        by.set(p.start, s); made.push(s);
+      }
+      return s;
+    };
+    const walk = (o: LvObj) => {
+      if (keep.has(o) || !o.visible) return;
+      for (const ch of [...o.children]) walk(ch);
+      if (!o.isMesh || o.isInstancedMesh || o.isBatchedMesh || o.isSkinnedMesh || o.children.length || o.renderOrder || o.morphTargetInfluences || o.hasOwnProperty('onBeforeRender')) return;
+      const g = o.geometry, mats = Array.isArray(o.material) ? o.material : [o.material];
+      if (!g.attributes.position || !mats.every(plain) || Object.values(g.attributes).some((a: any) => !(a.array instanceof Float32Array) || a.isInterleavedBufferAttribute)) return;
+      const M = new T.Matrix4().multiplyMatrices(inv, o.matrixWorld);
+      if (M.determinant() <= 0) return; // (mirrored: its faces would turn inside out, and an instance can't turn them back)
+      const names = Object.keys(g.attributes).sort().map((n) => n + ':' + g.attributes[n].itemSize + (g.attributes[n].normalized ? 'n' : '')).join(',');
+      const multi = Array.isArray(o.material) && g.groups.length > 0, ps = multi ? g.groups : [{ start: 0, count: Infinity, materialIndex: 0 }];
+      for (const p of ps) {
+        const mt = mats[p.materialIndex!] || mats[0], pg = multi ? partOf(g, p) : g;
+        const key = idOf(mt) + '|' + o.layers.mask + '|' + names + '|' + (pg.index ? 'i' : 'n') + '|' + (o.castShadow ? 1 : 0) + (o.frustumCulled ? 1 : 0);
+        let b = bins.get(key);
+        if (!b) bins.set(key, (b = { mt, mask: o.layers.mask, cast: o.castShadow, culled: o.frustumCulled, keepMat: false, multi: false, list: [] }));
+        b.list.push({ g: pg, o, M });
+        if (multi) b.multi = true; // (built however few: the mesh's other parts go into theirs)
+        if (o.userData.keepMat) b.keepMat = true;
+      }
+      took.push(o);
+    };
+    walk(root as LvObj);
+    const merged = new Set<LvObj>(), failed = new Set<LvObj>(), inst: [THREE.BatchedMesh, number, LvObj][] = [];
+    for (const b of bins.values()) {
+      if (b.list.length < 2 && !b.multi) continue; // (the only one with its material: nothing to save)
+      const geos = new Map<THREE.BufferGeometry, number>();
+      let nv = 0, ni = 0;
+      for (const e of b.list) if (!geos.has(e.g)) { geos.set(e.g, -1); nv += e.g.attributes.position.count; ni += e.g.index ? e.g.index.count : 0; }
+      const bm = new T.BatchedMesh(b.list.length, nv, ni, b.mt);
+      for (const e of b.list) {
+        try {
+          let gid = geos.get(e.g)!;
+          if (gid < 0) { gid = bm.addGeometry(e.g); geos.set(e.g, gid); }
+          const id = bm.addInstance(gid); bm.setMatrixAt(id, e.M);
+          inst.push([bm, id, e.o]); merged.add(e.o);
+        } catch (err) { failed.add(e.o); console.warn('batchStatic', err); }
+      }
+      bm.sortObjects = false; // (opaque, in any order, as the baked meshes were: not sorted again in every view)
+      bm.perObjectFrustumCulled = bm.frustumCulled = b.culled;
+      bm.castShadow = b.cast; bm.layers.mask = b.mask; bm.matrixAutoUpdate = false; bm.name = 'batch';
+      if (b.keepMat) bm.userData.keepMat = true; // (its material shared, not thrown away with the level: js/render.ts clearLevel)
+      bm.computeBoundingBox(); bm.computeBoundingSphere();
+      root.add(bm);
+    }
+    // a mesh that couldn't all go in stays as it is, and out of the batches it went into
+    for (const [bm, id, o] of inst) if (failed.has(o)) bm.deleteInstance(id);
+    for (const o of failed) merged.delete(o);
+    // what went in: out of the scene (and its geometry thrown away, unless something left still uses it)
+    for (const o of took) if (merged.has(o)) o.removeFromParent();
+    const used = new Set();
+    root.traverse((o: LvObj) => { if (o.geometry) used.add(o.geometry); });
+    for (const o of merged) if (!used.has(o.geometry)) o.geometry.dispose();
+    for (const g of made) g.dispose();
     return merged.size;
   },
   buildMesh(map: LvMap, opts?: Record<string, any>) {

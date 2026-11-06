@@ -277,7 +277,7 @@ const G_ShotLog = (() => {
     const list = [...mine].reverse().flatMap((r, i) => r.labels.filter((l) => !l.key || l.key === fk || sel).map((l) => ({ l, rank: l.pri * 2 - i }))).concat([...fills].reverse().flatMap((f, i) => f.labels.map((l) => ({ l, rank: l.pri * 2 - i })))).sort((a, b) => b.rank - a.rank), seen = new Set<string>();
     for (const { l } of list) {
       v.copy(l.p).project(cam);
-      if (v.z > 1 || Math.abs(v.x) > 1 || Math.abs(v.y) > 1 || l.p.distanceTo(cam.position) > RANGE) continue;
+      if (G.R.behind(v, cam) || Math.abs(v.x) > 1 || Math.abs(v.y) > 1 || l.p.distanceTo(cam.position) > RANGE) continue;
       const x = (v.x + 1) / 2 * W, y = (1 - v.y) / 2 * H, id = l.t + '@' + Math.round(x / 6) + ',' + Math.round(y / 6);
       if (seen.has(id)) continue; // (the same thing, from the same spot: rounds fired from where you stood)
       seen.add(id);
