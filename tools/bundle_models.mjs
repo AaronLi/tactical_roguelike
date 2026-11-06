@@ -1,4 +1,4 @@
-// Bundles the baked models for the game (docs/models.md "Bundles"): reads the finished tree assets/models/{parts,props} and writes
+// Bundles the baked models for the game (docs/models.md "Bundles"): reads the finished tree assets/models/{parts,props,scenes} and writes
 // assets/models/bundles/models.rtb (ONE container: every pack, platform index and prop) + bundles/index.json (for the tools) + bundles/manifest.json ({ v, hash, size }: what the game fetches to learn whether its local copy is current).
 // The last step of `npm run bake:models`; independent of how the tree was baked (it only reads files), deterministic (same files -> same bytes).
 //   node tools/bundle_models.mjs           write the bundles
