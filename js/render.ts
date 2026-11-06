@@ -1199,9 +1199,12 @@ const G_R = {
   // the road, an exit sign, a lamp left on), and makes none: a sealed room with the power off stays black, but for the
   // goggles' own IR illuminator if it's switched on (js/lightgrid.ts lgNv: a cone of light from the head that only this
   // frame, drawn for the tubes, has in it; others with goggles see its source glaring at them: js/player.ts nvStep).
-  // The frame (the level and the gun in your hands) is drawn into a half-float texture (nvRT, its mipmaps made as it's
-  // resolved: blurs at every scale for free), and a picture of distance and heat at half the size (_heatPass:
-  // everything plain, drawn once more), and one pass (nvMaterial) puts it on the screen as the tubes show it:
+  // The frame (the level and the gun in your hands) is drawn into a half-float texture (nvRT, its mipmaps made once it's
+  // all in: blurs at every scale for free; no multisampling: the tubes' own softness and speckle hide the steps, and a
+  // multisampled half-float target's resolve, its depth and stencil with it, cost more than the rest of the goggles put
+  // together), a picture of distance at half the size (_nvDist: from the level's depth as it's drawn, then the gun in
+  // your hands' focus marks over it), a few tiny passes (_nvComposite: the gain, eased, in a 1x1 target; the halos, at a
+  // sixteenth of the size), and one pass (nvMaterial) puts it on the screen as the tubes show it:
   //   - the tubes' fields: each a circle (spec.tubes: so many degrees off straight ahead, so many across, measured in the
   //     view's own unzoomed width, so aiming in magnifies the picture and not the eyepieces), the picture inside their
   //     union, a dark rim round each (the eyepiece's edge), and round them the plain view as far as the housing leaves it
@@ -1209,38 +1212,92 @@ const G_R = {
   //     into place from above, and the picture comes up once they're there;
   //   - the photocathode: no colour, only how bright (weighted to the red end: it's into the near infrared), shown in the
   //     phosphor's colour (spec.phos: green P43 on the cheaper tubes, white P45 on the panoramics), saturating softly (x / (1 + x));
-  //   - automatic gain: the frame's average light (its last mipmap) brought up to a set level, as far as the tube can go
+  //   - automatic gain: the frame's average light (a small mipmap, read at sixteen points) brought up to a set level, as far as the tube can go
   //     (spec.gain) and never below GAIN_MIN: a lamp in view, a weapon light's patch, a muzzle flash turn it down and the
-  //     rest goes dark round them; a lit room or daylight washes out (a night tool);
-  //   - halos: what's over-bright spreads into a glow with a soft ring round it (a blurred mipmap's bright part, read on two
-  //     rings round the pixel); a flash or a fireball whites it out (nvOver);
+  //     rest goes dark round them; a lit room or daylight washes out (a night tool). Not at once: as a tube's automatic
+  //     brightness control does, it cuts back fast on a bright light (protection: GAIN_FALL, most of the way in a tenth
+  //     to a fifth of a second) and comes back slowly (GAIN_RISE, most of the way in under a second): a muzzle flash
+  //     blooms for a frame or two and the room dims round it, then creeps back up (nvGainMaterial, kept frame to frame in nvGain);
+  //   - halos: what's over-bright spreads into a glow with a soft ring round it (a blurred mipmap's bright part, read where
+  //     it is and on a ring round it, worked out at a sixteenth of the size: nvHalo); a flash or a fireball whites it out (nvOver);
   //   - scintillation: speckle drawn afresh every frame, more the higher the gain (the darker it is) and the fainter the spot,
-  //     and the odd bright sparkle in the dark; the fibre-optic plate's faint honeycomb, fixed to the tube;
+  //     and the odd bright sparkle in the dark; the fibre-optic plate's honeycomb, fixed to the tube, very faint;
   //   - the optics: soft toward each tube's edge (a blurrier mipmap), a little pincushioned and dimmer there; focused at
-  //     about 25 m to infinity, so what's close is soft (the distance from the heat picture): a wall at arm's length, and
+  //     about 25 m to infinity, so what's close is soft (the distance picture, nvDist): a wall at arm's length, and
   //     the gun in your hands a little (a reflex sight's window is sharp: its dot's at infinity; a magnified scope, prism or
   //     magnifier's lens is soft, its picture unusable through the goggles, as it is in life; a 1x one is fine);
   //   - persistence: the phosphor's afterglow, the last frame's picture lingering a moment (ping-pong targets nvOut): a
   //     smear on fast turns, trails behind bright lights;
-  //   - a fused thermal channel (spec.thermal): heat, not light (_heatPass: the warm bodies, the fresh muzzle flashes and
+  //   - a fused thermal channel (spec.thermal): heat, not light (_heatPass, at half the size and every other frame, as a
+  //     sensor's slower picture: the warm bodies, the fresh muzzle flashes and
   //     fireballs, everything else cold; smoke and haze aren't drawn in it, so it sees through them; glass is, as
   //     opaque, cold, so it doesn't see through windows; walls stop it), run through edge detection and laid over the
   //     intensified picture as amber outlines, stronger the hotter against what's behind: a warm body in a black room
   //     or in smoke is a crisp outline where the picture has nothing.
   // What the suspects see is the host's business and the same as ever: night vision only helps you see.
-  GAIN_MIN: 14, NV_TARGET: 0.1, NV_DIM: 0.1, NV_VM_D: 1.1, NV_LENS_D: 0.04, HEAT_LAYER: 3,
+  GAIN_MIN: 14, NV_TARGET: 0.1, NV_DIM: 0.1, NV_VM_D: 1.1, NV_LENS_D: 0.04, HEAT_LAYER: 3, GAIN_FALL: 0.05, GAIN_RISE: 0.3,
+  // (the frame drawn at 0.8 of the screen's size each way, the picture made at the full size from it: the tubes' own
+  // softness hides it, and it's two thirds of the pixels; its blurs a mip level as wide on the screen as they'd be at
+  // the full size, by the bias log2(NV_SCALE))
+  NV_SCALE: 0.8,
   _nvTubes: [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()],
+  NV_VS: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+  NV_CATH: 'float cath(vec3 c) { return dot(c, vec3(0.42, 0.45, 0.13)); }',
+  // the gain (r), eased toward the frame's own (its average light: sixteen reads of an eighth-size-or-so mipmap, a true
+  // average where the last, 1x1 one of a frame that isn't a power of two in size is a few pixels'; brought to target), in log steps: down
+  // fast, up slowly (GAIN_FALL, GAIN_RISE: time constants, s); reset straight to it when the goggles come down
+  nvGainMaterial() {
+    return new THREE.ShaderMaterial({ depthTest: false, depthWrite: false, toneMapped: false,
+      uniforms: { map: { value: null }, prev: { value: null }, lod: { value: 10 }, gMax: { value: 300 }, gMin: { value: this.GAIN_MIN }, target: { value: this.NV_TARGET }, dt: { value: 0.016 }, reset: { value: 1 }, fall: { value: this.GAIN_FALL }, rise: { value: this.GAIN_RISE } },
+      vertexShader: this.NV_VS,
+      fragmentShader: this.NV_CATH + `
+        uniform sampler2D map, prev; uniform float lod, gMax, gMin, target, dt, reset, fall, rise;
+        void main() {
+          float avg = 0.0; for (int i = 0; i < 16; i++) avg += cath(textureLod(map, (vec2(float(i - (i / 4) * 4), float(i / 4)) + 0.5) / 4.0, lod).rgb);
+          avg = max(avg / 16.0, 1e-6); float want = clamp(target / avg, gMin, gMax);
+          float g = texture2D(prev, vec2(0.5)).r;
+          if (reset < 0.5 && g > 0.0) g = exp(mix(log(g), log(want), 1.0 - exp(-dt / (want < g ? fall : rise)))); else g = want;
+          gl_FragColor = vec4(g, 0.0, 0.0, 1.0);
+        }` });
+  },
+  // the halos (see above), at a sixteenth of the size: the blurred frame's over-bright part where it is, and on a ring
+  // round it (the soft edge), at the gain the picture's shown at
+  nvHaloMaterial() {
+    return new THREE.ShaderMaterial({ depthTest: false, depthWrite: false, toneMapped: false,
+      uniforms: { map: { value: null }, gainMap: { value: null }, px: { value: new THREE.Vector2(1e-3, 1e-3) }, lodBias: { value: 0 } },
+      vertexShader: this.NV_VS,
+      fragmentShader: this.NV_CATH + `
+        uniform sampler2D map, gainMap; uniform vec2 px; uniform float lodBias; varying vec2 vUv;
+        void main() {
+          float gain = texture2D(gainMap, vec2(0.5)).r;
+          float hc = max(0.0, cath(textureLod(map, vUv, 4.5 + lodBias).rgb) * gain - 1.2), h = 0.0;
+          for (int j = 0; j < 6; j++) { float an = float(j) * 1.0472 + 0.26; h += max(0.0, cath(textureLod(map, vUv + vec2(cos(an), sin(an)) * px * 34.0, 5.5 + lodBias).rgb) * gain - 1.5); }
+          gl_FragColor = vec4(hc * 0.3 + h / 6.0 * 0.25, 0.0, 0.0, 1.0);
+        }` });
+  },
+  // the distance picture (g: 1 / (1 + d), 0 far off, as the heat pass's) from the level's depth as it was drawn (nvRT's
+  // depth texture: before the gun in your hands is drawn over it, with the depth cleared)
+  nvDistMaterial() {
+    return new THREE.ShaderMaterial({ depthTest: false, depthWrite: false, toneMapped: false,
+      uniforms: { depth: { value: null }, tanC: { value: new THREE.Vector2(1, 1) }, near: { value: 0.03 }, far: { value: 280 } },
+      vertexShader: this.NV_VS,
+      fragmentShader: `uniform sampler2D depth; uniform vec2 tanC; uniform float near, far; varying vec2 vUv;
+        void main() {
+          float d = texture2D(depth, vUv).r;
+          float z = near * far / (far - d * (far - near)), dist = z * length(vec3((vUv * 2.0 - 1.0) * tanC, 1.0));
+          gl_FragColor = vec4(0.0, d < 1.0 ? 1.0 / (1.0 + dist) : 0.0, 0.0, 1.0);
+        }` });
+  },
   nvMaterial() {
     return new THREE.ShaderMaterial({ depthTest: false, depthWrite: false, toneMapped: false,
-      uniforms: { map: { value: null }, heatMap: { value: null }, prev: { value: null }, lod: { value: 10 }, tanB: { value: new THREE.Vector2(1, 1) }, tubes: { value: this._nvTubes }, nt: { value: 1 },
-        phos: { value: new THREE.Vector3(0.3, 1, 0.45) }, gMax: { value: 300 }, gMin: { value: this.GAIN_MIN }, target: { value: this.NV_TARGET }, k: { value: 1 }, over: { value: 0 }, frame: { value: 0 },
-        grain: { value: 1 }, rest: { value: 0.2 }, thermal: { value: 0 }, px: { value: new THREE.Vector2(1e-3, 1e-3) }, hpx: { value: new THREE.Vector2(3e-3, 3e-3) }, res: { value: new THREE.Vector2(1, 1) }, persist: { value: 0.5 } },
-      vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
-      fragmentShader: this.TONE + `
-        uniform sampler2D map, heatMap, prev; uniform float lod; uniform vec2 tanB; uniform vec3 tubes[4]; uniform int nt; uniform vec3 phos;
-        uniform float gMax, gMin, target, k, over, frame, grain, rest, thermal, persist; uniform vec2 px, hpx, res; varying vec2 vUv;
+      uniforms: { map: { value: null }, distMap: { value: null }, heatMap: { value: null }, gainMap: { value: null }, haloMap: { value: null }, prev: { value: null }, tanB: { value: new THREE.Vector2(1, 1) }, tubes: { value: this._nvTubes }, nt: { value: 1 },
+        phos: { value: new THREE.Vector3(0.3, 1, 0.45) }, gMax: { value: 300 }, gMin: { value: this.GAIN_MIN }, k: { value: 1 }, over: { value: 0 }, frame: { value: 0 },
+        grain: { value: 1 }, rest: { value: 0.2 }, thermal: { value: 0 }, hpx: { value: new THREE.Vector2(3e-3, 3e-3) }, res: { value: new THREE.Vector2(1, 1) }, persist: { value: 0.5 }, lodBias: { value: 0 } },
+      vertexShader: this.NV_VS,
+      fragmentShader: this.TONE + this.NV_CATH + `
+        uniform sampler2D map, distMap, heatMap, gainMap, haloMap, prev; uniform vec2 tanB; uniform vec3 tubes[4]; uniform int nt; uniform vec3 phos;
+        uniform float gMax, gMin, k, over, frame, grain, rest, thermal, persist, lodBias; uniform vec2 hpx, res; varying vec2 vUv;
         float hash(vec2 p) { vec3 q = fract(vec3(p.xyx) * 0.1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
-        float cath(vec3 c) { return dot(c, vec3(0.42, 0.45, 0.13)); }
         float heat(vec2 uv) { return texture2D(heatMap, uv).r; }
         void main() {
           vec3 ray = normalize(vec3((vUv * 2.0 - 1.0) * tanB, -1.0));
@@ -1249,20 +1306,15 @@ const G_R = {
           for (int i = 0; i < 4; i++) { if (i >= nt) break; vec3 t = tubes[i]; float ax = radians(t.x), ay = radians(t.y) + lift;
             vec3 dir = vec3(sin(ax) * cos(ay), sin(ay), -cos(ax) * cos(ay)); float q = acos(clamp(dot(ray, dir), -1.0, 1.0)) / radians(t.z);
             if (q < e) { e = q; ctr = (dir.xy / max(-dir.z, 0.05)) / tanB * 0.5 + 0.5; } }
-          vec4 c0 = texture2D(map, vUv);
           float inside = smoothstep(1.0, 0.988, e), rim = smoothstep(1.0, 1.07, e);
-          vec3 plain = c0.rgb * rest * rim;
+          vec3 plain = textureLod(map, vUv, 0.0).rgb * rest * rim;
           if (inside <= 0.0) { gl_FragColor = LinearTosRGB(vec4(bpTone(plain), 1.0)); return; }
           vec2 uv = ctr + (vUv - ctr) * (1.0 - 0.035 * e * e); // (pincushioned toward the edge)
-          vec2 hq = texture2D(heatMap, uv).rg; float dist = hq.g > 0.0 ? 1.0 / hq.g - 1.0 : 1e4; // (distance: 1 / (1 + d))
+          float dq = texture2D(distMap, uv).g, dist = dq > 0.0 ? 1.0 / dq - 1.0 : 1e4; // (distance: 1 / (1 + d))
           float blur = smoothstep(0.45, 1.0, e) * 2.2 + clamp(1.35 / max(dist, 0.05) - 0.12, 0.0, 2.6) + (dist < 0.07 ? 3.4 : 0.0); // (under 7 cm: a magnified scope's lens, NV_LENS_D, nothing else that near: past use)
-          float avg = max(cath(textureLod(map, vec2(0.5), lod).rgb), 1e-6), gain = clamp(target / avg, gMin, gMax);
-          float L = cath(textureLod(map, uv, blur).rgb) * gain;
-          // halos: the blurred frame's over-bright part where it is, and on two rings round it (the soft ringing edge)
-          float hc = max(0.0, cath(textureLod(map, uv, 4.5).rgb) * gain - 1.2), h1 = 0.0, h2 = 0.0;
-          for (int j = 0; j < 12; j++) { float an = float(j) * 0.5236 + 0.26; vec2 o = vec2(cos(an), sin(an));
-            h1 += max(0.0, cath(textureLod(map, uv + o * px * 24.0, 5.0).rgb) * gain - 1.5); h2 += max(0.0, cath(textureLod(map, uv + o * px * 44.0, 5.5).rgb) * gain - 1.5); }
-          float ve = L + hc * 0.35 + h1 / 12.0 * 0.22 + h2 / 12.0 * 0.12, v = ve / (1.0 + ve); // (saturating softly: a bright screen or lamp keeps some of its detail)
+          float gain = texture2D(gainMap, vec2(0.5)).r;
+          float L = cath(textureLod(map, uv, max(blur + lodBias, 0.0)).rgb) * gain;
+          float ve = L + texture2D(haloMap, uv).r, v = ve / (1.0 + ve); // (the halos: nvHaloMaterial; saturating softly: a bright screen or lamp keeps some of its detail)
           // scintillation: fresh every frame, more the darker it is and the fainter the spot; sparkles in the dark
           float dk = clamp(log(gain / gMin) / log(max(gMax / gMin, 1.01)), 0.0, 1.0);
           vec2 cell = floor(vUv * res / 1.5), fo = vec2(frame * 37.0, frame * 71.0);
@@ -1271,7 +1323,7 @@ const G_R = {
           if (hash(cell + fo + 1029.0) > 1.0 - 0.0035 * dk * grain) v += 0.55;
           // the fibre-optic plate's honeycomb, fixed to the tube
           vec2 hp = (vUv - ctr) * res / 5.0; vec2 hr = vec2(1.0, 1.732), ha = mod(hp, hr) - hr * 0.5, hb = mod(hp - hr * 0.5, hr) - hr * 0.5;
-          float hx = min(dot(ha, ha), dot(hb, hb)); v *= 1.0 - 0.06 * smoothstep(0.16, 0.25, hx);
+          float hx = min(dot(ha, ha), dot(hb, hb)); v *= 1.0 - 0.035 * smoothstep(0.16, 0.25, hx);
           vec3 col = phos * max(v, 0.0);
           // the thermal channel: its edges, by how sharply the heat changes (a body against the cooler room behind it)
           if (thermal > 0.5) {
@@ -1298,16 +1350,21 @@ const G_R = {
   heatFx: null as null | { scene: THREE.Scene; spots: THREE.Mesh[] },
   // (heat < 0: the room's own temperature, as the cold things are: a little warmer facing up (the warm air under the ceiling,
   // the floor's own), a slow mottle over it, so a thermal picture has walls and floors to it)
+  // (one program for all of them, instanced or not: the heat and a fixed distance are uniforms, dq < 0 the real distance)
   _heatMat(heat: number, d: number | null, opts: THREE.ShaderMaterialParameters = {}) {
     return new THREE.ShaderMaterial(Object.assign({ toneMapped: false, fog: false,
+      uniforms: { heat: { value: heat }, dq: { value: d == null ? -1 : d === Infinity ? 0 : 1 / (1 + d) } },
       vertexShader: `varying float vD; varying vec3 vW; varying float vN; void main() { vec4 p = vec4(position, 1.0); vec3 n = normal;
         #ifdef USE_INSTANCING
         p = instanceMatrix * p; n = mat3(instanceMatrix) * n;
         #endif
         vec4 wp = modelMatrix * p; vW = wp.xyz; vN = normalize(mat3(modelMatrix) * n).y; vD = distance(wp.xyz, cameraPosition); gl_Position = projectionMatrix * viewMatrix * wp; }`,
-      fragmentShader: `varying float vD; varying vec3 vW; varying float vN; void main() {
-        float h = ${heat < 0 ? '0.16 + 0.04 * vN + 0.02 * sin(vW.x * 1.7 + vW.y * 0.9) * sin(vW.z * 1.3 - vW.y * 0.7)' : heat.toFixed(3)};
-        gl_FragColor = vec4(h, ${d == null ? '1.0 / (1.0 + vD)' : d === Infinity ? '0.0' : (1 / (1 + d)).toFixed(4)}, 0.0, 1.0); }` }, opts));
+      fragmentShader: `uniform float heat, dq; varying float vD; varying vec3 vW; varying float vN; void main() {
+        float h = heat < 0.0 ? 0.16 + 0.04 * vN + 0.02 * sin(vW.x * 1.7 + vW.y * 0.9) * sin(vW.z * 1.3 - vW.y * 0.7) : heat;
+        gl_FragColor = vec4(h, dq < 0.0 ? 1.0 / (1.0 + vD) : dq, 0.0, 1.0); }` }, opts));
+  },
+  _heatMats() {
+    return this.heatMats || (this.heatMats = { cold: this._heatMat(-1, null), near: this._heatMat(-1, this.NV_VM_D), lens: this._heatMat(-1, this.NV_LENS_D), far: this._heatMat(-1, Infinity, { depthTest: false, depthWrite: false, side: THREE.DoubleSide }), warm: Array.from({ length: 11 }, (_, i) => this._heatMat(i / 10, null)) });
   },
   // A thermal sight's screen (js/viewmodel.ts thermalLens): the sensor's picture (map: _heatPass's heat, its pixels kept square,
   // nearest), the middle of it zoomed (digital zoom: coarser as it goes), levelled from the room's temperature to a body's, in a
@@ -1332,76 +1389,142 @@ const G_R = {
           gl_FragColor = vec4(c * live * dim, 1.0); // (a screen: its own levels, as they are; dimmed for night vision)
         }` });
   },
+  // (what the heat picture leaves out: a glow, a particle, a beam, a see-through thing that isn't glass; worked out with
+  // no arrays made, every frame: a material can turn transparent as it fades)
+  _heatHid: [] as THREE.Object3D[], _heatSw: [] as (THREE.Mesh | THREE.Material | THREE.Material[])[], _heatCc: new THREE.Color(),
+  _heatSkips(o: any) {
+    if (o.isPoints || o.isLine || o.isSprite) return true;
+    const m = o.material;
+    if (!m) return false;
+    if (Array.isArray(m)) { for (const x of m) if (this._heatSkipM(x)) return true; return false; }
+    return this._heatSkipM(m);
+  },
+  _heatSkipM(m: THREE.Material) { return (m.transparent && !(m as any).isMeshStandardMaterial) || m.blending === THREE.AdditiveBlending || m.colorWrite === false; },
   _heatPass(cam: THREE.Camera, rt: THREE.WebGLRenderTarget, vm: boolean) {
-    const r = this.renderer, sc = this.scene, bg = sc.background, hid: THREE.Object3D[] = [];
-    const H = this.heatMats || (this.heatMats = { cold: this._heatMat(-1, null), near: this._heatMat(-1, this.NV_VM_D), lens: this._heatMat(-1, this.NV_LENS_D), far: this._heatMat(-1, Infinity, { depthTest: false, depthWrite: false, side: THREE.DoubleSide }), warm: Array.from({ length: 11 }, (_, i) => this._heatMat(i / 10, null)) });
-    const cc = r.getClearColor(new THREE.Color()), ca = r.getClearAlpha();
+    const r = this.renderer, sc = this.scene, bg = sc.background, hid = this._heatHid, sw = this._heatSw;
+    const H = this._heatMats();
+    const cc = r.getClearColor(this._heatCc), ca = r.getClearAlpha();
     r.setRenderTarget(rt); r.setClearColor(0x000000, 1); r.clear();
     sc.background = null;
-    sc.traverseVisible((o: any) => {
-      const ms = o.material ? ([] as any[]).concat(o.material) : [];
-      if (o.isPoints || o.isLine || o.isSprite || ms.some((m) => (m.transparent && !m.isMeshStandardMaterial) || m.blending === THREE.AdditiveBlending || m.colorWrite === false)) hid.push(o);
-    });
+    hid.length = 0;
+    sc.traverseVisible((o: any) => { if (this._heatSkips(o)) hid.push(o); });
     for (const o of hid) o.visible = false;
     sc.overrideMaterial = H.cold; r.render(sc, cam); sc.overrideMaterial = null;
     // the warm: each body's meshes on the heat layer drawn in its warmth (a living body 1, a dead one cooling to the room's over minutes)
-    const swapped: [THREE.Mesh, THREE.Material | THREE.Material[]][] = [];
+    sw.length = 0;
+    const HL = this.HEAT_LAYER;
     for (const rig of G.Rig.live) {
       if (rig.cold || !rig.root.visible) continue;
       const w = rig.state === 'dead' ? Math.max(0.35, 1 - (rig.deadT || 0) / 420) : 1, mat = H.warm[Math.round(w * 10)];
-      rig.root.traverse((o: any) => { if (o.isMesh && o.layers.isEnabled(this.HEAT_LAYER)) { swapped.push([o, o.material]); o.material = mat; } });
+      rig.root.traverse((o: any) => { if (o.isMesh && o.layers.isEnabled(HL)) { sw.push(o, o.material); o.material = mat; } });
     }
     const L0 = cam.layers.mask;
-    cam.layers.set(this.HEAT_LAYER); r.render(sc, cam); cam.layers.mask = L0;
-    for (const [o, m] of swapped) o.material = m;
+    cam.layers.set(HL); r.render(sc, cam); cam.layers.mask = L0;
+    for (let i = 0; i < sw.length; i += 2) (sw[i] as THREE.Mesh).material = sw[i + 1] as THREE.Material;
     for (const o of hid) o.visible = true;
+    hid.length = 0; sw.length = 0;
     sc.background = bg;
     // the hot spots: a muzzle flash's (the gas, the muzzle a moment), a fireball's
     if (!this.heatFx) { const s = new THREE.Scene(), spots = Array.from({ length: 6 }, () => { const m = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 8), this._heatMat(1, null)); s.add(m); return m; }); this.heatFx = { scene: s, spots }; }
+    const spots = this.heatFx.spots;
     let n = 0;
-    for (const l of [...this.muzzleLights, ...this.blastLights]) { if (!(l.intensity > 0) || n >= this.heatFx.spots.length) continue; const m = this.heatFx.spots[n++]; m.visible = true; m.position.copy(l.position); m.scale.setScalar(this.blastLights.includes(l) ? 0.6 + l.intensity * 0.25 : 0.1); }
-    for (let i = n; i < this.heatFx.spots.length; i++) this.heatFx.spots[i].visible = false;
+    for (const L of [this.muzzleLights, this.blastLights]) for (const l of L) { if (!(l.intensity > 0) || n >= spots.length) continue; const m = spots[n++]; m.visible = true; m.position.copy(l.position); m.scale.setScalar(L === this.blastLights ? 0.6 + l.intensity * 0.25 : 0.1); }
+    for (let i = n; i < spots.length; i++) spots[i].visible = false;
     if (n) r.render(this.heatFx.scene, cam);
-    if (vm) {
-      r.clearDepth();
-      const pip = this.vm && this.vm.userData.pip, vsw: [THREE.Mesh, THREE.Material | THREE.Material[]][] = [], vh: THREE.Object3D[] = [];
-      this.vmRoot.traverseVisible((o: any) => {
-        if (!o.isMesh) { if (o.isSprite || o.isPoints || o.isLine) vh.push(o); return; }
-        const m = o.material;
-        if (pip && o === pip.disk) { vsw.push([o, m]); o.material = pip.mag <= 1.05 || pip.thermal ? H.far : H.lens; return; } // (a 1x scope, and a thermal sight's screen, in focus; magnified glass far out of it: its picture's a smear through the goggles, NV_LENS_D)
-        if (m.colorWrite === false && m.stencilWrite) { vsw.push([o, m]); o.material = H.far; return; } // (a reflex sight's window)
-        if (m.stencilWrite || m.transparent || m.blending === THREE.AdditiveBlending) { vh.push(o); return; } // (its reticle, a flash, glass)
-        vsw.push([o, m]); o.material = H.near;
-      });
-      for (const o of vh) o.visible = false;
-      r.render(this.vmScene, cam);
-      for (const o of vh) o.visible = true;
-      for (const [o, m] of vsw) o.material = m;
-    }
+    if (vm) this._heatVm(cam);
     r.setClearColor(cc, ca);
   },
-  // the night vision's picture (see above), into the next of the two out targets, then onto the screen
-  nvOut: null as null | THREE.WebGLRenderTarget[], nvFrame: 0, nvHeat: undefined as THREE.WebGLRenderTarget | undefined, nvCopy: undefined as THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial> | undefined,
-  _nvComposite() {
-    const r = this.renderer, nv = this.nv!, sp = nv.spec, rt = this.nvRT!, W = rt.width, Hh = rt.height;
-    if (!this.nvQuad) { this.nvQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.nvMaterial()); this.nvQuad.frustumCulled = false; this.nvScene = new THREE.Scene(); this.nvScene.add(this.nvQuad); if (!this.fishCam) this.fishCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1); }
-    if (!this.nvOut || this.nvOut[0].width !== W || this.nvOut[0].height !== Hh) {
-      if (this.nvOut) for (const t of this.nvOut) t.dispose();
-      this.nvOut = [0, 1].map(() => new THREE.WebGLRenderTarget(W, Hh, { depthBuffer: false }));
+  // the gun in your hands into the heat or distance picture (over what's there, the depth cleared): near, at the room's
+  // temperature; a reflex sight's window far (its dot's at infinity), a 1x scope's lens and a thermal sight's screen
+  // likewise; a magnified scope's lens nearer than anything real (NV_LENS_D: blurred past use)
+  _heatVm(cam: THREE.Camera) {
+    const r = this.renderer, H = this._heatMats(), sw = this._heatSw, vh = this._heatHid;
+    r.clearDepth();
+    const pip = this.vm && this.vm.userData.pip;
+    sw.length = 0; vh.length = 0;
+    this.vmRoot.traverseVisible((o: any) => {
+      if (!o.isMesh) { if (o.isSprite || o.isPoints || o.isLine) vh.push(o); return; }
+      const m = o.material;
+      if (pip && o === pip.disk) { sw.push(o, m); o.material = pip.mag <= 1.05 || pip.thermal ? H.far : H.lens; return; } // (a 1x scope, and a thermal sight's screen, in focus; magnified glass far out of it: its picture's a smear through the goggles, NV_LENS_D)
+      if (m.colorWrite === false && m.stencilWrite) { sw.push(o, m); o.material = H.far; return; } // (a reflex sight's window)
+      if (m.stencilWrite || m.transparent || m.blending === THREE.AdditiveBlending) { vh.push(o); return; } // (its reticle, a flash, glass)
+      sw.push(o, m); o.material = H.near;
+    });
+    for (const o of vh) o.visible = false;
+    r.render(this.vmScene, cam);
+    for (const o of vh) o.visible = true;
+    for (let i = 0; i < sw.length; i += 2) (sw[i] as THREE.Mesh).material = sw[i + 1] as THREE.Material;
+    sw.length = 0; vh.length = 0;
+  },
+  // the night vision's targets and passes, made once (and again at a new size): nvRT the frame (with its depth, for the
+  // distance), nvDist the distance at half the size, nvHeat the thermal channel's heat (half, the fused set only), nvGain
+  // the gain (1x1, two: last frame's read, this frame's written), nvHalo the halos (a sixteenth), nvOut the picture shown
+  // (two: last frame's for the afterglow)
+  nvDist: undefined as THREE.WebGLRenderTarget | undefined, nvHalo: undefined as THREE.WebGLRenderTarget | undefined, nvGain: null as null | THREE.WebGLRenderTarget[],
+  nvMats: null as null | { comp: THREE.ShaderMaterial; gain: THREE.ShaderMaterial; halo: THREE.ShaderMaterial; dist: THREE.ShaderMaterial; copy: THREE.ShaderMaterial },
+  nvHeatAt: -1, _nvT: 0,
+  nvSetup() {
+    if (!this.nvMats) {
+      this.nvMats = { comp: this.nvMaterial(), gain: this.nvGainMaterial(), halo: this.nvHaloMaterial(), dist: this.nvDistMaterial(),
+        copy: new THREE.ShaderMaterial({ depthTest: false, depthWrite: false, toneMapped: false, uniforms: { map: { value: null } }, vertexShader: this.NV_VS, fragmentShader: 'uniform sampler2D map; varying vec2 vUv; void main() { gl_FragColor = texture2D(map, vUv); }' }) };
+      this.nvQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.nvMats.comp); this.nvQuad.frustumCulled = false;
+      this.nvScene = new THREE.Scene(); this.nvScene.add(this.nvQuad);
+      if (!this.fishCam) this.fishCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
     }
-    const out = this.nvOut[this.nvFrame & 1], prev = this.nvOut[(this.nvFrame + 1) & 1];
-    const u = this.nvQuad.material.uniforms, tv = Math.tan(THREE.MathUtils.degToRad(nv.fov) / 2), asp = W / Hh;
-    u.map.value = rt.texture; u.heatMap.value = this.nvHeat!.texture; u.prev.value = prev.texture; u.lod.value = Math.ceil(Math.log2(Math.max(W, Hh)));
-    u.tanB.value.set(tv * asp, tv); u.px.value.set(1 / W, 1 / Hh); u.hpx.value.set(1 / this.nvHeat!.width, 1 / this.nvHeat!.height); u.res.value.set(W, Hh);
-    sp.tubes.forEach((t, i) => this._nvTubes[i].set(t[0], t[1], t[2])); u.nt.value = sp.tubes.length;
+    return this.nvMats;
+  },
+  _nvTargets(w: number, h: number) {
+    if (this.nvOut && this.nvOut[0].width === w && this.nvOut[0].height === h && this.nvRT!.width === Math.round(w * this.NV_SCALE)) return;
+    for (const t of [this.nvRT, this.nvDist, this.nvHeat, this.nvHalo, ...(this.nvGain || []), ...(this.nvOut || [])]) if (t) t.dispose();
+    const HF = THREE.HalfFloatType, sw = Math.max(16, Math.round(w * this.NV_SCALE)), sh = Math.max(16, Math.round(h * this.NV_SCALE)), hw = Math.ceil(sw / 2), hh = Math.ceil(sh / 2);
+    const dt = new THREE.DepthTexture(sw, sh, THREE.UnsignedInt248Type); dt.format = THREE.DepthStencilFormat;
+    this.nvRT = new THREE.WebGLRenderTarget(sw, sh, { stencilBuffer: true, depthTexture: dt, type: HF, minFilter: THREE.LinearMipmapLinearFilter, generateMipmaps: false }); // (half float: the faint light of a dark room kept, to be amplified)
+    this.nvDist = new THREE.WebGLRenderTarget(hw, hh, { type: HF });
+    this.nvHeat = new THREE.WebGLRenderTarget(hw, hh, { type: HF });
+    this.nvHalo = new THREE.WebGLRenderTarget(Math.ceil(w / 16), Math.ceil(h / 16), { type: HF, depthBuffer: false });
+    this.nvGain = [0, 1].map(() => new THREE.WebGLRenderTarget(1, 1, { type: HF, depthBuffer: false, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter }));
+    this.nvOut = [0, 1].map(() => new THREE.WebGLRenderTarget(w, h, { depthBuffer: false }));
+    this.nvFrame = 0; this.nvHeatAt = -1;
+  },
+  _nvPass(mat: THREE.ShaderMaterial, rt: THREE.WebGLRenderTarget | null) {
+    this.nvQuad!.material = mat;
+    this.renderer.setRenderTarget(rt); this.renderer.render(this.nvScene!, this.fishCam!);
+  },
+  // the distance picture (see above): the level's, from its depth, then the gun in your hands' focus marks over it; drawn
+  // between the level and the gun (whose drawing clears the depth), and back into the frame after
+  _nvDist() {
+    const M = this.nvSetup(), cam = this.camera, u = M.dist.uniforms, P = cam.projectionMatrix.elements;
+    u.depth.value = this.nvRT!.depthTexture; u.near.value = cam.near; u.far.value = cam.far; u.tanC.value.set(1 / P[0], 1 / P[5]);
+    this._nvPass(M.dist, this.nvDist!);
+    this._heatVm(cam);
+    this.renderer.setRenderTarget(this.nvRT!);
+  },
+  // the night vision's picture (see above), into the next of the two out targets, then onto the screen
+  nvOut: null as null | THREE.WebGLRenderTarget[], nvFrame: 0, nvHeat: undefined as THREE.WebGLRenderTarget | undefined,
+  _nvComposite() {
+    const nv = this.nv!, sp = nv.spec, rt = this.nvRT!, W = this.nvOut![0].width, Hh = this.nvOut![0].height, M = this.nvSetup(), bias = Math.log2(rt.width / W); // (W x Hh: the screen's size; rt the frame's, smaller)
+    const now = performance.now(), dt = this.nvFrame ? Math.min(0.25, (now - this._nvT) / 1000) : 0; this._nvT = now;
+    // the thermal channel's heat: every other frame (a sensor's slower picture; the scope's thermal sight takes the others)
+    if (sp.thermal && (this.nvHeatAt < 0 || this.frameNo & 1)) { this._heatPass(this.camera, this.nvHeat!, true); this.nvHeatAt = this.frameNo; }
+    // the gain, eased
+    const gIn = this.nvGain![(this.nvFrame + 1) & 1], gOut = this.nvGain![this.nvFrame & 1], g = M.gain.uniforms;
+    g.map.value = rt.texture; g.prev.value = gIn.texture; g.lod.value = Math.max(0, Math.floor(Math.log2(Math.max(rt.width, rt.height))) - 3); g.gMax.value = sp.gain; g.dt.value = dt; g.reset.value = this.nvFrame ? 0 : 1; // (lod: each read a texel of about an eighth of the frame)
+    this._nvPass(M.gain, gOut);
+    // the halos
+    const h = M.halo.uniforms; h.map.value = rt.texture; h.gainMap.value = gOut.texture; h.px.value.set(1 / W, 1 / Hh); h.lodBias.value = bias;
+    this._nvPass(M.halo, this.nvHalo!);
+    // the picture
+    const out = this.nvOut![this.nvFrame & 1], prev = this.nvOut![(this.nvFrame + 1) & 1];
+    const u = M.comp.uniforms, tv = Math.tan(THREE.MathUtils.degToRad(nv.fov) / 2), asp = W / Hh;
+    u.map.value = rt.texture; u.distMap.value = this.nvDist!.texture; u.heatMap.value = this.nvHeat!.texture; u.gainMap.value = gOut.texture; u.haloMap.value = this.nvHalo!.texture; u.prev.value = prev.texture;
+    u.tanB.value.set(tv * asp, tv); u.hpx.value.set(1 / this.nvHeat!.width, 1 / this.nvHeat!.height); u.res.value.set(W, Hh); u.lodBias.value = bias;
+    for (let i = 0; i < sp.tubes.length; i++) { const t = sp.tubes[i]; this._nvTubes[i].set(t[0], t[1], t[2]); } u.nt.value = sp.tubes.length;
     u.phos.value.set(sp.phos[0], sp.phos[1], sp.phos[2]); u.gMax.value = sp.gain; u.grain.value = sp.grain; u.rest.value = sp.rest; u.thermal.value = sp.thermal ? 1 : 0;
     u.k.value = nv.k; u.over.value = this.nvOver; u.frame.value = this.nvFrame % 997; u.persist.value = this.nvFrame > 1 ? (sp.persist || 0.5) : 0;
-    r.setRenderTarget(out); r.clear(); r.render(this.nvScene!, this.fishCam!);
-    if (!this.nvCopy) { this.nvCopy = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({ depthTest: false, depthWrite: false, toneMapped: false, uniforms: { map: { value: null } }, vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }', fragmentShader: 'uniform sampler2D map; varying vec2 vUv; void main() { gl_FragColor = texture2D(map, vUv); }' })); this.nvCopy.frustumCulled = false; }
-    this.nvCopy.material.uniforms.map.value = out.texture;
-    this.nvQuad.visible = false; this.nvScene!.add(this.nvCopy);
-    r.setRenderTarget(null); r.clear(); r.render(this.nvScene!, this.fishCam!);
-    this.nvScene!.remove(this.nvCopy); this.nvQuad.visible = true;
+    this._nvPass(M.comp, out);
+    M.copy.uniforms.map.value = out.texture;
+    this._nvPass(M.copy, null);
+    this.nvQuad!.material = M.comp;
     this.nvFrame++;
   },
   // ------------------------------------------------------------ picture-in-picture scopes
@@ -1577,21 +1700,21 @@ const G_R = {
     // sets them to the renderer's own, none, or here one, for the stocks)
     const empty = this._empty || (this._empty = new THREE.Scene()), clipAt = (n: number) => { r.clippingPlanes = n ? [new THREE.Plane()] : []; r.render(empty, this.camera); r.clippingPlanes = []; };
     // (away: another scene the world's samples are drawn in, the TVs' sets: they go there for it)
-    const compile = (scene: THREE.Scene, cam: THREE.Camera, target: THREE.WebGLRenderTarget | null, layer?: number, over?: THREE.Material, clip = 0, away = false) => W.tasks.push(() => {
+    const compile = (scene: THREE.Scene, cam: THREE.Camera, target: THREE.WebGLRenderTarget | null, layer?: number, over?: THREE.Material, clip = 0, away = false, only?: (o: any) => boolean) => W.tasks.push(() => {
       if (away) scene.add(kit.world);
       clipAt(clip);
       const swapped: [any, THREE.Material][] = [];
       scene.traverse((o: any) => { const m = o.material; if (m) for (const x of Array.isArray(m) ? m : [m]) W.mats.add(x); });
       if (over) W.mats.add(over);
       if (layer != null) {
-        kit.world.traverse((o) => o.layers.enable(layer));
+        if (layer) kit.world.traverse((o) => o.layers.enable(layer));
         cam.layers.set(layer);
-        if (over) scene.traverse((o: any) => { if (o.material && o.layers.test(cam.layers)) { swapped.push([o, o.material]); o.material = over; } });
+        if (over) scene.traverse((o: any) => { if (o.material && o.layers.test(cam.layers) && (!only || only(o))) { swapped.push([o, o.material]); o.material = over; } });
       }
       try { r.setRenderTarget(target); r.compile(scene, cam); } catch (e) { console.warn('warmup', e); }
       r.setRenderTarget(null);
       for (const [o, m] of swapped) o.material = m;
-      if (layer != null) { cam.layers.set(0); kit.world.traverse((o) => o.layers.disable(layer)); }
+      if (layer != null) { cam.layers.set(0); if (layer) kit.world.traverse((o) => o.layers.disable(layer)); }
       if (away) this.dynRoot.add(kit.world);
       if (clip) clipAt(0);
     });
@@ -1605,6 +1728,18 @@ const G_R = {
     // of the scene's materials, whatever gun you've got now, since you can pick one up; the fisheye's is the same)
     compile(this.scene, this.camera, this.pipRT!);
     compile(this.fishScene!, this.fishCam!, null);
+    // (night vision's: the gun in your hands drawn into its frame; the heat and distance pictures' one material over the
+    // level, the bodies, the gun in your hands (and the reflex window's, two-sided); its own passes, into a target and the
+    // last onto the screen. Into any target: they're built for one as for another)
+    const H = this._heatMats(), M = this.nvSetup(), nvT = this.pipRT!, heatOnly = (o: any) => !this._heatSkips(o);
+    const nvq = new THREE.Scene(), quad = this.nvQuad!.geometry;
+    for (const m of [M.comp, M.gain, M.halo, M.dist, M.copy, H.cold]) { const q = new THREE.Mesh(quad, m); q.frustumCulled = false; nvq.add(q); }
+    compile(this.vmScene, this.camera, nvT); compile(vmClip, this.camera, nvT, undefined, undefined, 1);
+    compile(this.scene, this.camera, nvT, 0, H.cold, 0, false, heatOnly);
+    compile(this.scene, this.camera, nvT, this.HEAT_LAYER, H.warm[10], 0, false, heatOnly);
+    compile(this.vmScene, this.camera, nvT, 0, H.near, 0, false, heatOnly);
+    compile(this.vmScene, this.camera, nvT, 0, H.far, 0, false, heatOnly);
+    compile(nvq, this.fishCam!, nvT); compile(nvq, this.fishCam!, null);
     if (G.Highlights && G.Highlights.warm) G.Highlights.warm((scene, cam, target, layer, over) => compile(scene, cam, target, layer, over, 0, true));
     G.Game.veilSay('Compiling shaders');
   },
@@ -1705,15 +1840,9 @@ const G_R = {
       const cp = this.camera.position, fw = this._eyeD.set(0, 0, -1).applyQuaternion(this.camera.quaternion);
       LU.lgNv.value.set(cp.x, cp.y, cp.z, nv.ir ? nv.spec.ir * THREE.MathUtils.smoothstep(nv.k, 0.75, 1) : 0); LU.lgNvD.value.set(fw.x, fw.y, fw.z, Math.cos(0.5));
       const sz = r.getDrawingBufferSize(this._fsz || (this._fsz = new THREE.Vector2()));
-      if (!this.nvRT || this.nvRT.width !== sz.x || this.nvRT.height !== sz.y) {
-        if (this.nvRT) this.nvRT.dispose();
-        if (this.nvHeat) this.nvHeat.dispose();
-        this.nvRT = new THREE.WebGLRenderTarget(sz.x, sz.y, { samples: 4, stencilBuffer: true, type: THREE.HalfFloatType, minFilter: THREE.LinearMipmapLinearFilter, generateMipmaps: true }); // (half float: the faint light of a dark room kept, to be amplified)
-        this.nvHeat = new THREE.WebGLRenderTarget(Math.ceil(sz.x / 2), Math.ceil(sz.y / 2), { type: THREE.HalfFloatType });
-        this.nvFrame = 0;
-      }
-      this.nvRT.texture.generateMipmaps = false; // (made once, after the last of the frame's drawn into it)
-    } else this.nvFrame = 0;
+      this._nvTargets(sz.x, sz.y);
+      this.nvRT!.texture.generateMipmaps = false; // (made once, after the last of the frame's drawn into it)
+    } else { this.nvFrame = 0; this.nvHeatAt = -1; }
     // the scope picture: only rendered while you're bringing the gun up or looking through it
     const pip = this.vm && this.vm.visible && this.vm.userData.pip, live = this.pipLive || 0;
     if (pip) {
@@ -1734,6 +1863,7 @@ const G_R = {
     if (nv) r.setRenderTarget(this.nvRT!);
     r.clear();
     r.render(this.scene, this.camera);
+    if (nv) this._nvDist(); // (the distance, from the level's depth before anything clears it)
     // Evidence outlines (layer 2): drawn over everything except walls, floors and doors. Rebuild the depth
     // buffer from just those (layer 1, depth only), then draw the outlines against it (they use the stencil).
     if (this.hasGlow) {
@@ -1761,7 +1891,7 @@ const G_R = {
     if (nv) this.nvRT!.texture.generateMipmaps = true;
     r.render(this.vmScene, this.camera);
     for (let i = envd.length - 1; i >= 0; i--) envd[i][0].envMapIntensity = envd[i][1]; // (materials the gunsmith's and the icons' pictures share)
-    if (nv) { LU.lgNv.value.w = 0; this._heatPass(this.camera, this.nvHeat!, true); this._nvComposite(); }
+    if (nv) { LU.lgNv.value.w = 0; this._nvComposite(); }
     G.LightGrid.on(false);
     r.info.autoReset = true;
   },
