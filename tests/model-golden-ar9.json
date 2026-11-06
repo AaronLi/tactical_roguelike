@@ -414,7 +414,7 @@
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=hg.ar.3,mag=glock.mag.50,muzzle=mz.r9.a2,optic=op.pic.0,receiver=rcv.ar9,stock=stk.tube.0": {
    "label": "mag=glock.mag.50",
-   "geometry": "ca1063339e4c0d1a",
+   "geometry": "28812f99811f5e56",
    "info": "890e9517680210d7"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=hg.ar.3,mag=glock.mag.17c,muzzle=mz.r9.a2,optic=op.pic.0,receiver=rcv.ar9,stock=stk.tube.0": {
