@@ -7,6 +7,7 @@ What the game's sound does in a place, and the knobs for tuning it. Three files:
 | `js/acoustics.ts` | The level's acoustic map: zones and portals, built once a level. `listen()` and `hear()`. |
 | `js/ambience.ts` | Each place's background sound, synthesized live, heard through the map. |
 | `js/gunaudio.ts` | Gunshots (rendered by `js/gunshot-synth.ts`), heard through the map, with traced wall echoes. |
+| `js/footsteps.ts` | Footsteps (baked by the contact synth), heard through the map like gunshots. |
 
 ## The acoustic map (`js/acoustics.ts`)
 
@@ -72,6 +73,30 @@ wall echoes (`echoTaps`: rays from the gun, two bounces, any bounce that can see
 and echoes up to 1.5 s count (the slap back off far buildings and cliffs); over the Sandia Crest's gorge the rays cross
 the open air to its far face (0.3–1.3 s). A shot's louder and brighter down its line of fire (`directivity`: +3 dB
 ahead, −4 dB and dull behind), judged at where it leaves for you: the callers pass the aim point.
+
+## Footsteps (`js/footsteps.ts`)
+
+Every step anyone takes is a clip from the contact synth's footstep model (`tools/contact-synth/src/scenes/footsteps.ts`
+on `claude/great-wozniak-4nmx0u`, baked by its `scripts/footstep-bank.mjs` into `assets/audio/footsteps/`): the sole
+(boots, sneakers, dress shoes), the floor under the foot, the gait (creep, crouch, walk, run), four takes of each, and
+the kit's rattle (light, heavy) laid over the step apart. The clips carry their level: a carpet step is 12 dB under
+concrete, a run 8 dB over a walk, a creep 14 dB under. `manifest.json` gives each clip's anchor (where the foot
+strikes); a step starts there.
+
+- **When:** another's step lands when their rig puts a foot down (`js/rig.ts`: the gait's phase, where the foot's
+  lift runs out), so it's in time with what you see; yours every half stride you walk (`self`, the rig's stride).
+  Not on a ladder or a zipline, prone, down or dead, or standing still.
+- **Who:** you and the other officers in boots with heavy kit; the armoured in boots with heavy kit; suspects in boots
+  or sneakers (half and half, by who they are), light kit when armed; civilians in sneakers or dress shoes (`feetOf`).
+- **Gait:** crouched; creeping when steadied or under 1 m/s; running with the weapon lowered or over 2.5 m/s; walking
+  otherwise (`gaitOf`).
+- **Floor:** `G.Casings.surface` (a room's floor, a home's, out of doors) mapped to the synth's (`FLOOR`): concrete,
+  pave and flagstones, tile, vinyl, hardwood and parquet (and a home's bare floor), carpet, dirt and soil, grass.
+  The synth also has gravel, dry leaves and a steel deck, for floors the game doesn't mark yet.
+- **Heard:** by `hear()` (as loud and as dull as the way to you lets it, from the opening it comes in by), falling
+  6 dB per doubling of distance past 1.5 m, not played past 30 m, and sent into the walker's room's measured response
+  (`G.GunAudio.roomVerb`) at half the level. Yours from under you, at `SELF` (0.45). `GAIN` (2) is the overall trim.
+  At most 24 at once.
 
 ## Tuning
 

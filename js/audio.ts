@@ -31,6 +31,7 @@ const G_Audio = {
     const d = this.noise.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
     // recorded reload foley; fails quietly (e.g. when opened from file://) and the synthesized clicks are used instead
+    if (G.Footsteps) G.Footsteps.init(); // (the synthesized footsteps: js/footsteps.ts)
     for (const n of this.SAMPLES) {
       fetch('assets/audio/' + n + '.ogg').then((r) => r.arrayBuffer()).then((b) => this.ctx.decodeAudioData(b))
         .then((buf) => { this.samples[n] = buf; }).catch(() => {});

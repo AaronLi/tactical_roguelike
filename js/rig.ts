@@ -714,7 +714,11 @@ const G_Rig = (() => {
 
     // gait: one full cycle = two steps; longer strides when running
     const stride = U.lerp(1.1, 1.8, U.clamp(speed / 6, 0, 1)) * (1 - rig.crouchW * 0.35);
+    const ph0 = rig.phase;
     rig.phase += (speed * dt / stride) * Math.PI * 2;
+    // a foot comes down where its lift (below) runs out: the left at phase π/2, the right at 3π/2 (js/footsteps.ts)
+    if (p.feet && moving > 0.6 && !p.zip && !p.climb && p.state !== 'down' && rig.proneS < 0.3 && !posed && G.Footsteps
+      && Math.floor((rig.phase - Math.PI / 2) / Math.PI) > Math.floor((ph0 - Math.PI / 2) / Math.PI)) G.Footsteps.rigStep(rig, p, speed * s);
     const bob = Math.abs(Math.sin(rig.phase)) * 0.035 * moving;
 
     // body: hips height, lean, downed pose

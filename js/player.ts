@@ -604,6 +604,7 @@ const G_Me = {
     if (this.giveUp >= this.GIVE_UP) { this.giveUp = 0; return this.die('Gave up, unconscious and bleeding'); }
 
     this.move(dt, map);
+    G.Footsteps.self(dt); // (your own footsteps: js/footsteps.ts)
     // the gun in your hands is the one in view (moved out of its slot in the Tab screen, rebuilt, swapped, a sticker put on: whatever changed it)
     const cw = this.cur();
     if (cw ? !G.R.vm || G.R.vm.userData.key !== G.R.vmKey(cw.def, cw.stickers) : G.R.vm) G.R.setViewmodel(cw ? cw.def : null);
