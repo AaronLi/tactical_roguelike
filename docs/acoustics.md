@@ -76,7 +76,7 @@ ahead, −4 dB and dull behind), judged at where it leaves for you: the callers 
 
 ## Handling sounds (`js/handling.ts`, `js/audio.ts` `route`)
 
-The guns' handling sounds are the contact synth's (`tools/contact-synth`), baked dry by `npm run build` (`tools/bake_audio.mjs`: git-ignored, like the models; only when the synth has changed) into
+The guns' handling sounds are the contact synth's (`tools/contact-synth`), baked dry by `npm run build` (`tools/bake_audio.mjs`: git-ignored, like the models; only when the synth has changed; both banks then packed into one gzipped bundle the game downloads once and keeps, `assets/audio/bundles/audio.rtb`, read through `G.AudioBundle` as the models are through `G.Bundles`) into
 `assets/audio/handling/<family>/` with a manifest of each clip's anchor (the moment the game's cue lines up with). A gun's
 family is how its action and magazine work (AR-15, KV-47, MP5, G19, SR-25, blowback SMG, bullpup; a manual action's bolt
 or pump; rounds by hand; and from `scenes/no-family.ts` a revolver's cylinder, a break-action's hinge, a belt-fed's feed

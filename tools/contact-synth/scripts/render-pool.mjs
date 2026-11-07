@@ -6,8 +6,8 @@
 // Float32Array (transferred, not copied). n: how many at once (default: the cores less one, at most 16).
 import { Worker, isMainThread, parentPort } from 'node:worker_threads';
 import { execFile } from 'node:child_process';
-import { writeFileSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { writeFileSync, rmSync, mkdirSync, renameSync } from 'node:fs';
+import { join, dirname } from 'node:path';
 import { tmpdir, cpus } from 'node:os';
 import { renderScene, encodeWav } from '../dist/index.js';
 
@@ -62,7 +62,9 @@ export async function encodeAll(clips, n = defaultJobs(), quality = 5) {
       const c = clips[i], tmp = join(tmpdir(), `bank-${process.pid}-${i}.wav`);
       writeFileSync(tmp, Buffer.from(encodeWav(c.data, c.sr)));
       await new Promise((res, rej) => execFile('ffmpeg', ['-loglevel', 'error', '-y', '-i', tmp, '-c:a', 'libvorbis', '-q:a', String(quality), c.path], (e) => (e ? rej(e) : res())));
-      rmSync(tmp, { force: true });
+      // (BANK_WAV_DIR: keep each clip's uncompressed WAV there too, as <its path below the bank>.wav: for comparing encodings)
+      if (process.env.BANK_WAV_DIR) { const rel = c.path.split(String.fromCharCode(92)).join('/').split('/').slice(-2).join('/').replace(/\.ogg$/, '.wav'), dst = join(process.env.BANK_WAV_DIR, rel); mkdirSync(dirname(dst), { recursive: true }); renameSync(tmp, dst); }
+      else rmSync(tmp, { force: true });
     }
   };
   await Promise.all(Array.from({ length: Math.min(n, clips.length) }, one));

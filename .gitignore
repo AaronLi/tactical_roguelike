@@ -9,6 +9,7 @@ assets/models/
 # the synthesized audio banks: baked by npm run build (tools/bake_audio.mjs), like the models
 assets/audio/handling/
 assets/audio/footsteps/
+assets/audio/bundles/
 scratch/
 
 # Blender backups

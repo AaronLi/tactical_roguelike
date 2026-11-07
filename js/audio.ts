@@ -42,6 +42,15 @@ const G_Audio = {
     return this._load;
   },
 
+  // A file of the synthesized audio (path below assets/audio/: 'handling/ar15/rack-45.ogg', 'footsteps/manifest.json'): from the
+  // audio bundle (js/modelbundles.ts G.AudioBundle: one download, kept in the local store), or, if it didn't load, the loose file.
+  bankFile(path: string): Promise<ArrayBuffer> {
+    const loose = () => fetch('assets/audio/' + path).then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); });
+    const B = G.AudioBundle;
+    if (!B || B.state().phase === 'failed') return loose();
+    return B.getFile('assets/audio/' + path).catch(loose);
+  },
+  bankJson(path: string): Promise<any> { return this.bankFile(path).then((b) => JSON.parse(new TextDecoder().decode(b))); },
   // The master's way out: a compressor (all of it, under -14 dB) into the speakers, and a tap after it for the watchdog.
   _comp: null as DynamicsCompressorNode | null,
   _tap: null as AnalyserNode | null,

@@ -8,7 +8,6 @@
 // sample): every call here returns false when it has nothing, for the caller's fallback.
 interface HandEntry { gain: number; clips: Record<string, { anchor: number; len: number }> }
 const G_Handling = (() => {
-  const DIR = 'assets/audio/handling/';
   let manifest: { families: Record<string, HandEntry> } | null = null, asked = false;
   const bufs = new Map<string, AudioBuffer>(), loading = new Set<string>();
   // Each gun's family: how its action and its magazine work (the contact synth's specs: an AR-15's charging handle and
@@ -44,13 +43,13 @@ const G_Handling = (() => {
     if (!manifest) {
       if (asked) return;
       asked = true;
-      fetch(DIR + 'manifest.json').then((r) => r.json()).then((m) => { manifest = m; want(f); }).catch(() => {});
+      G.Audio.bankJson('handling/manifest.json').then((m) => { manifest = m; want(f); }).catch(() => {}); // (from the audio bundle: G.Audio.bankFile)
       return;
     }
     if (loading.has(f) || !manifest.families[f]) return;
     loading.add(f);
     for (const n of Object.keys(manifest.families[f].clips)) {
-      fetch(DIR + f + '/' + n + '.ogg').then((r) => r.arrayBuffer()).then((b) => ctx.decodeAudioData(b))
+      G.Audio.bankFile('handling/' + f + '/' + n + '.ogg').then((b) => ctx.decodeAudioData(b))
         .then((buf) => { bufs.set(f + '/' + n, buf); }).catch(() => {});
     }
   }

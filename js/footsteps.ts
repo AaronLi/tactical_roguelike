@@ -36,7 +36,7 @@ const G_Footsteps = {
     if (this.started || !G.Audio.ctx) return;
     this.started = true;
     const ctx = G.Audio.ctx;
-    fetch(this.BASE + 'manifest.json').then((r) => r.json()).then((m) => {
+    G.Audio.bankJson('footsteps/manifest.json').then((m) => { // (from the audio bundle: G.Audio.bankFile)
       this.man = m;
       // boots first (everyone on your side wears them), then the rest, a few at a time so the level's loading isn't held up
       const names = [...Object.entries(m.soles as Record<string, Record<string, unknown>>).flatMap(([s, c]) => Object.keys(c).map((n) => s + '/' + n)), ...Object.keys(m.kit).map((n) => 'kit/' + n)];
@@ -44,7 +44,7 @@ const G_Footsteps = {
       const next = (): void => {
         const n = names[i++];
         if (!n) return;
-        fetch(this.BASE + n + '.ogg').then((r) => r.arrayBuffer()).then((b) => ctx.decodeAudioData(b)).then((buf) => { this.bufs[n] = buf; }).catch(() => {}).then(next);
+        G.Audio.bankFile('footsteps/' + n + '.ogg').then((b) => ctx.decodeAudioData(b)).then((buf) => { this.bufs[n] = buf; }).catch(() => {}).then(next);
       };
       for (let k = 0; k < 6; k++) next();
     }).catch(() => { this.started = false; });

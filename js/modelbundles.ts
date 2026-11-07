@@ -20,11 +20,17 @@
 
 (globalThis as any).G = (globalThis as any).G || {}; // (the page, the export worker, the tools: on the page this file runs before util.js)
 
-const G_Bundles = (() => {
-  const DIR = 'assets/models/bundles/', ROOT = 'assets/models/', EXT = '.rtb', MAGIC = 'RTB1', NAME = 'models';
-  /** The format of the files in the bundle, in the manifest (v) and on the stored copy: 2 = meshopt with float32 positions, 3 = int16 positions the loader undoes (js/glb.ts dequantize). A copy of another format is never used. */
-  const FORMAT = 3;
-  const R = { base: '' }; // (where the page's folder is from here: '' on the page, '../../' in the export worker: G.Models.setRoot)
+// The same machinery serves more than one bundle (makeBundle): the models (G.Bundles, as above) and the synthesized audio
+// (G.AudioBundle: assets/audio/bundles/audio.rtb, the handling and footstep banks, packed by tools/bake_audio.mjs). Each has its own
+// manifest, its own copy in the local store and its own download; the audio's waits for the models' to finish (it isn't needed
+// till a level, and mustn't hold up the boot).
+const EXT = '.rtb', MAGIC = 'RTB1';
+const R_BUNDLES = { base: '' }; // (where the page's folder is from here: '' on the page, '../../' in the export worker: G.Models.setRoot)
+const KNOWN_BUNDLES = new Set<string>(); // (the store's records of any other name are stale: sweep)
+interface BundleCfg { name: string; dir: string; root: string; format: number; flag: string; bundleOf: (rel: string) => boolean }
+function makeBundle(cfg: BundleCfg) {
+  const DIR = cfg.dir, ROOT = cfg.root, NAME = cfg.name, FORMAT = cfg.format, R = R_BUNDLES;
+  KNOWN_BUNDLES.add(NAME);
 
   interface Bundle { bytes: number; wire: number; files: Map<string, [number, number]>; buf: ArrayBuffer; from: 'net' | 'store' }
   interface State { phase: 'idle' | 'loading' | 'ready' | 'failed'; loaded: number; total: number; from: 'net' | 'store' | null; error?: string }
@@ -35,19 +41,14 @@ const G_Bundles = (() => {
 
   /** `assets/models/parts/m4/index.json` or `parts/m4/index.json` -> the path inside the bundle (relative to assets/models/). */
   const rel = (path: string) => (path.startsWith(ROOT) ? path.slice(ROOT.length) : path);
-  /** 'models' if the path is in the bundle (props/**, parts/<id>/**), null for what is not bundled: whole-gun files and the bake's reports (parts/index.json, coverage.json...). */
-  function bundleOf(path: string): string | null {
-    const p = rel(path);
-    if (p.startsWith('props/')) return NAME;
-    if (!p.startsWith('parts/')) return null;
-    return p.indexOf('/', 6) > 6 ? NAME : null;
-  }
+  /** The bundle's name if the path is in it (cfg.bundleOf), null if not. */
+  function bundleOf(path: string): string | null { return cfg.bundleOf(rel(path)) ? NAME : null; }
   const fileOf = () => R.base + DIR + NAME + EXT;
 
   /** Container bytes (already gunzipped) -> its table of contents. Throws on a malformed one. */
   function parse(buf: ArrayBuffer): { files: Map<string, [number, number]> } {
     const u8 = new Uint8Array(buf);
-    if (u8.length < 8 || String.fromCharCode(u8[0], u8[1], u8[2], u8[3]) !== MAGIC) throw new Error('not a model bundle');
+    if (u8.length < 8 || String.fromCharCode(u8[0], u8[1], u8[2], u8[3]) !== MAGIC) throw new Error('not a ' + NAME + ' bundle');
     const tocLen = new DataView(buf).getUint32(4, true), toc = JSON.parse(new TextDecoder().decode(u8.subarray(8, 8 + tocLen)));
     const base = 8 + tocLen + ((4 - ((8 + tocLen) % 4)) % 4), files = new Map<string, [number, number]>();
     for (const [p, off, len] of toc.files as [string, number, number][]) {
@@ -93,7 +94,7 @@ const G_Bundles = (() => {
   const storePut = (rec: Rec) => idbDo<any>('readwrite', (s) => s.put(rec, NAME));
   const storeDrop = () => idbDo<any>('readwrite', (s) => s.delete(NAME));
   /** Records of the old per-platform bundles (anything that is not the one bundle) are dropped. */
-  function sweep() { idbDo<string[]>('readonly', (s) => s.getAllKeys()).then((keys) => { for (const k of keys || []) if (k !== NAME) { log('drop stale', k); idbDo<any>('readwrite', (s) => s.delete(k)); } }); }
+  function sweep() { idbDo<string[]>('readonly', (s) => s.getAllKeys()).then((keys) => { for (const k of keys || []) if (!KNOWN_BUNDLES.has(k)) { log('drop stale', k); idbDo<any>('readwrite', (s) => s.delete(k)); } }); }
   /** Ask the browser not to evict the store (no prompt in the browsers that have it; ignored where it does not exist), and under ?checkModels log the quota. */
   function persist() {
     try {
@@ -137,7 +138,7 @@ const G_Bundles = (() => {
   }
   // localStorage remembers which hash the store holds (it can be read synchronously, IndexedDB cannot): no memory of one means a first visit, and its download is started
   // at once (below), without waiting for the manifest or for the main thread to be free.
-  const FLAG = 'rt-models-stored';
+  const FLAG = cfg.flag;
   const flagGet = (): string | null => { try { return localStorage.getItem(FLAG); } catch { return null; } };
   const flagSet = (h: string | null) => { try { if (h) localStorage.setItem(FLAG, h); else localStorage.removeItem(FLAG); } catch { /* */ } };
   let early: Promise<Response> | null = null;
@@ -188,10 +189,10 @@ const G_Bundles = (() => {
   function getFile(path: string): Promise<ArrayBuffer> {
     if (!bundleOf(path)) return Promise.reject(new Error('not in a bundle: ' + path));
     const p = rel(path);
-    if (st.phase === 'failed' && !running) return Promise.reject(new Error('the model bundle did not load')); // (not retried per file: start() retries it)
+    if (st.phase === 'failed' && !running) return Promise.reject(new Error('the ' + NAME + ' bundle did not load')); // (not retried per file: start() retries it)
     return start().then((ok) => {
-      if (!ok || !done) throw new Error('the model bundle did not load');
-      const e = done.files.get(p); if (!e) throw new Error(`${p} is not in the model bundle`);
+      if (!ok || !done) throw new Error('the ' + NAME + ' bundle did not load');
+      const e = done.files.get(p); if (!e) throw new Error(`${p} is not in the ${NAME} bundle`);
       return done.buf.slice(e[0], e[1]);
     });
   }
@@ -201,16 +202,38 @@ const G_Bundles = (() => {
     NAME, EXT, DIR, MAGIC, FORMAT, bundleOf, parse, start, getFile, getJson,
     state: (): State => ({ ...st }), onChange: (fn: (s: State) => void) => { listeners.push(fn); },
     loaded: () => !!done,
-    setRoot: (base: string) => { R.base = base; },
+    setRoot: (base: string) => { R.base = base; }, // (shared: every bundle's)
     stats: () => (done ? [{ name: NAME, files: done.files.size, bytes: done.bytes, wire: done.wire, from: done.from }] : []),
   };
-  // On the page the download is the first thing that happens: this script is the first one in index.html, before three.js and the rest.
-  if (typeof document !== 'undefined' && typeof fetch === 'function') {
-    if (!flagGet()) early = fetch(fileOf(), { cache: 'no-cache' }); // (a first visit: the download begins now)
-    if (early) early.catch(() => { /* (loadOnce falls back to the by-hash fetch) */ });
-    start();
-  }
-  return api;
-})();
+  return Object.assign(api, {
+    /** begin at once, a first visit's download before the manifest's even asked (the models: the first thing the page does) */
+    boot() {
+      if (!flagGet()) early = fetch(fileOf(), { cache: 'no-cache' }); // (a first visit: the download begins now)
+      if (early) early.catch(() => { /* (loadOnce falls back to the by-hash fetch) */ });
+      start();
+    },
+  });
+}
+// The models: props/** and parts/<id>/** (not the whole-gun files nor the bake's reports: parts/index.json, coverage.json...).
+// FORMAT 3: the files' format, in the manifest (v) and on the stored copy: 2 = meshopt with float32 positions, 3 = int16 positions the loader
+// undoes (js/glb.ts dequantize). A copy of another format is never used.
+const G_Bundles = makeBundle({
+  name: 'models', dir: 'assets/models/bundles/', root: 'assets/models/', format: 3, flag: 'rt-models-stored',
+  bundleOf: (p) => p.startsWith('props/') || (p.startsWith('parts/') && p.indexOf('/', 6) > 6),
+});
+// The synthesized audio: the guns' handling bank and the footsteps (each folder's manifest.json and its clips), Ogg Vorbis, the
+// container gzipped (it halves it: every clip carries the same Vorbis setup header). FORMAT 1.
+const G_AudioBundle = makeBundle({
+  name: 'audio', dir: 'assets/audio/bundles/', root: 'assets/audio/', format: 1, flag: 'rt-audio-stored',
+  bundleOf: (p) => p.startsWith('handling/') || p.startsWith('footsteps/'),
+});
+// On the page the models' download is the first thing that happens (this script is the first one in index.html, before three.js and the
+// rest); the audio's once the models are in (or have given up).
+if (typeof document !== 'undefined' && typeof fetch === 'function') {
+  G_Bundles.boot();
+  const audioNext = (s: { phase: string }) => { if ((s.phase === 'ready' || s.phase === 'failed') && G_AudioBundle.state().phase === 'idle') G_AudioBundle.boot(); };
+  G_Bundles.onChange(audioNext); audioNext(G_Bundles.state());
+}
 G.Bundles = G_Bundles;
-interface GameModules { Bundles: typeof G_Bundles }
+G.AudioBundle = G_AudioBundle;
+interface GameModules { Bundles: typeof G_Bundles; AudioBundle: typeof G_AudioBundle }
