@@ -2,7 +2,8 @@
 // Stickers: pictures you stick on your guns, for good.
 //
 // WHICH: whatever pictures are in assets/stickers/ (its index.json, a list of their file names, if it has one; else
-// the folder's listing, which serve.js and most static servers give). Found in levels (a small sticker box in about
+// the folder's listing, which serve.js and most static servers give). They're baked by `npm run build` from the originals in
+// assets/original_stickers (tools/bake_stickers.mjs: a quarter size, WebP), and the index with them. Found in levels (a small sticker box in about
 // one in ten: js/level.ts, the host's pick of what's in it: js/server.ts), kept for the run (G.Me.stk: owned / give /
 // use), each stuck on one gun used up.
 //
@@ -36,7 +37,10 @@ const G_Stickers = (() => {
       .catch(() => []).then((a: any) => (S.names = names(Array.isArray(a) ? a : []) as string[]));
     return loading;
   }
-  const url = (name: string) => S.base + DIR + encodeURIComponent(name);
+  // a sticker's file: its name, or, for a name from before the stickers were baked as WebP (tools/bake_stickers.mjs: 'clown.png' in an
+  // older save, replay or teammate's gun), the .webp the index has in its place
+  const file = (name: string) => { const w = name.replace(/\.(png|jpe?g|gif|avif)$/i, '.webp'); return S.names.includes(name) || !S.names.includes(w) ? name : w; };
+  const url = (name: string) => S.base + DIR + encodeURIComponent(file(name));
 
   // ---------------------------------------------------------------- your collection (name -> how many)
   const owned = () => (G.Me.stk || (G.Me.stk = {}));
@@ -51,7 +55,8 @@ const G_Stickers = (() => {
     if (!p) {
       p = { bm: null, w: 1, h: 1, bad: false, tex: null, mat: null, ghost: null } as Pic;
       pics.set(name, p);
-      p.ready = ok(name) ? fetch(url(name)).then((r) => (r.ok ? r.blob() : Promise.reject(new Error(String(r.status))))).then((b) => createImageBitmap(b)).then((bm) => set(p!, bm)).catch(() => { p!.bad = true; return p!; })
+      // (fetched after the index: which file a name is, file())
+      p.ready = ok(name) ? load().then(() => fetch(url(name))).then((r) => (r.ok ? r.blob() : Promise.reject(new Error(String(r.status))))).then((b) => createImageBitmap(b)).then((bm) => set(p!, bm)).catch(() => { p!.bad = true; return p!; })
         : Promise.resolve((p.bad = true, p));
     }
     return p;

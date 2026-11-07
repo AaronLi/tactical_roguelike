@@ -10,6 +10,8 @@ assets/models/
 assets/audio/handling/
 assets/audio/footsteps/
 assets/audio/bundles/
+# the stickers: baked by npm run build from assets/original_stickers (tools/bake_stickers.mjs)
+assets/stickers/
 scratch/
 
 # Blender backups
