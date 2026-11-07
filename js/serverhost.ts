@@ -3,12 +3,12 @@
 // in both places it can run (docs/threads.md): the server's own thread (js/serverworker.ts loads it there) or, as a fallback,
 // the page's (js/serverlink.ts starts it there when a worker can't be had, or with ?serverthread=0). Either way it's reached
 // only through two MessagePorts, so it can't tell which:
-//   ctl, the page's control port (for as long as this thread runs): {k:'init', id, solo, cli} a session starts (cli: the host's
-//     own player's port), {k:'stop'} it's over, {k:'in', from, m} a message from a remote player (relayed off the page's PeerJS
+//   ctl, the page's control port (for as long as this thread runs): {k:'init', id, solo, cli, rec} a session starts (cli: the host's
+//     own player's port; rec: record the levels, js/recorder.ts), {k:'stop'} it's over, {k:'in', from, m} a message from a remote player (relayed off the page's PeerJS
 //     connection), {k:'join' | 'leave', id} a remote player's connection opened or dropped, {k:'stickers', names} the stickers
 //     there are (js/stickers.ts load, on the page), {k:'digest'} / {k:'stat'} questions (for tests and desync hunting).
 //     Back on it: {k:'ready'} once, {k:'on'} a session's started, {k:'bc', m, x} for every remote player but x, {k:'to', id, m}
-//     for one of them, the answers, and {k:'prof'} each second (how long the ticks took).
+//     for one of them, {k:'rec', name, data} a level's recording, the answers, and {k:'prof'} each second (how long the ticks took).
 //   cli, the host's own player's port (a new one each session): the same messages any player's game sends and gets over the
 //     network, both ways.
 // It ticks on its own timer, TICK_MS apart (as fast as the frames used to come), dt the time since the last (at most 0.1 s),
@@ -31,14 +31,15 @@ const G_ServerHost = {
     ctl.onmessage = (e: MessageEvent) => this.control(e.data);
     SvNet.broadcast = (m, x) => this.broadcast(m, x);
     SvNet.sendTo = (id, m) => this.sendTo(id, m);
+    G.Recorder.out = (name, data) => this.ctl!.postMessage({ k: 'rec', name, data }); // (a level's recording: js/recorder.ts)
     ctl.postMessage({ k: 'ready' });
   },
   control(c: any) {
     if (!c || typeof c !== 'object') return;
     switch (c.k) {
-      case 'init': this.start(c.id, c.cli); break;
+      case 'init': G.Recorder.on = !!c.rec; this.start(c.id, c.cli); break;
       case 'stop': this.stop(); break;
-      case 'in': if (this.on && c.m && typeof c.m === 'object') G.Server.handle(c.m, String(c.from)); break;
+      case 'in': if (this.on && c.m && typeof c.m === 'object') { G.Recorder.msg(G.Server, c.m, String(c.from)); G.Server.handle(c.m, String(c.from)); } break;
       case 'join': this.remotes.add(String(c.id)); break;
       case 'leave': if (this.remotes.delete(String(c.id)) && this.on) G.Server.onLeave(String(c.id)); break;
       case 'stickers': if (Array.isArray(c.names)) G.Stickers.names = c.names.filter((n: unknown) => typeof n === 'string'); break;
@@ -51,7 +52,7 @@ const G_ServerHost = {
     this.stop();
     this.id = SvNet.myId = id;
     this.cli = cli;
-    cli.onmessage = (e: MessageEvent) => { if (this.on && e.data && typeof e.data === 'object') G.Server.handle(e.data, this.id!); };
+    cli.onmessage = (e: MessageEvent) => { if (this.on && e.data && typeof e.data === 'object') { G.Recorder.msg(G.Server, e.data, this.id!); G.Server.handle(e.data, this.id!); } };
     G.Server.reset();
     this.on = true;
     this.last = performance.now();
@@ -59,6 +60,7 @@ const G_ServerHost = {
     this.ctl!.postMessage({ k: 'on', id });
   },
   stop() {
+    G.Recorder.end('stop');
     clearInterval(this.timer);
     if (this.cli) { this.cli.onmessage = null; this.cli.close(); }
     this.cli = null; this.on = false; this.remotes.clear();
@@ -69,6 +71,7 @@ const G_ServerHost = {
     const now = performance.now(), dt = Math.min((now - this.last) / 1000, 0.1);
     this.last = now;
     G.Server.update(dt);
+    G.Recorder.tick(G.Server, dt);
     const P = this.prof, took = performance.now() - now;
     this.ticks++; P.n++; P.ms += took; if (took > P.max) P.max = took;
     if (now - P.at > 1000) { if (P.at) this.ctl!.postMessage({ k: 'prof', n: P.n, ms: P.ms, max: P.max }); P.n = 0; P.ms = 0; P.max = 0; P.at = now; }

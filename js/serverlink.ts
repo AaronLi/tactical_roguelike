@@ -21,6 +21,24 @@ const G_ServerLink = {
   qn: 0,
   warned: new Set<string>(),
 
+  // recording the levels (js/recorder.ts, docs/recording.md): ?rec in the URL, or localStorage.rec = '1'
+  recording() {
+    try { if (new URLSearchParams(location.search).has('rec')) return true; } catch (e) { /* no URL */ }
+    try { return localStorage.getItem('rec') === '1'; } catch (e) { return false; }
+  },
+  // A level's recording, saved: to the game's own server (serve.js writes it to recordings/), or, served from somewhere that
+  // can't take it, downloaded as a file.
+  async save(name: string, data: any) {
+    const json = JSON.stringify(data), file = String(name).replace(/[^\w.-]/g, '_') + '.json';
+    try {
+      const r = await fetch('rec?name=' + encodeURIComponent(name), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: json });
+      if (r.ok) { console.log(`[rec] saved recordings/${file} (${(json.length / 1048576).toFixed(1)} MB)`); return; }
+      console.warn('[rec] the server would not take it (' + r.status + '): downloading it instead');
+    } catch (e) { console.warn('[rec] could not reach the server: downloading it instead', e); }
+    const a = document.createElement('a'), url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+    a.href = url; a.download = file; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  },
   wanted() { try { return new URLSearchParams(location.search).get('serverthread') !== '0'; } catch (e) { return true; } },
   // The simulation's thread, started (once a page: its scripts take a moment to load, so it's started with the page, before
   // anyone hosts). Resolves once it's up.
@@ -65,6 +83,7 @@ const G_ServerLink = {
         case 'ready': this.up = true; for (const [m, tr] of this.pend.splice(0)) port.postMessage(m, tr); onReady(); break;
         case 'bc': G.Net.relay(c.m, c.x); break;
         case 'to': G.Net.relayTo(c.id, c.m); break;
+        case 'rec': this.save(c.name, c.data); break;
         case 'prof': this.prof = { n: c.n, ms: c.ms, max: c.max }; break;
         case 'digest': case 'stat': { const f = this.asks.get(c.q); if (f) { this.asks.delete(c.q); f(c); } break; }
       }
@@ -81,7 +100,7 @@ const G_ServerLink = {
     const ch = new MessageChannel(), port = ch.port1;
     this.cli = port;
     port.onmessage = (e: MessageEvent) => { if (this.cli === port && e.data && typeof e.data === 'object') G.Net.onClient(e.data); };
-    this.post({ k: 'init', id, cli: ch.port2 }, [ch.port2]);
+    this.post({ k: 'init', id, cli: ch.port2, rec: this.recording() }, [ch.port2]);
     if (this.names) this.post({ k: 'stickers', names: this.names });
   },
   stop() {

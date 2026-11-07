@@ -10,7 +10,7 @@
 (self as any).document = { createElement: (t: string) => (t === 'canvas' ? new OffscreenCanvas(1, 1) : { style: {} }), body: { prepend() {}, append() {}, appendChild() {} }, addEventListener() {} };
 // (the scripts, in the page's order: index.html)
 const SERVER_SCRIPTS = ['util', 'data', 'callsigns', 'arsenal', 'parts', 'gear', 'medical', 'sim', 'materials', 'ballistics', 'level', 'world', 'furniture', 'homes', 'residents',
-  'scars', 'damage', 'stickers', 'route', 'shop', 'server', 'serverhost'];
+  'scars', 'damage', 'stickers', 'route', 'shop', 'recorder', 'server', 'serverhost'];
 const svBooted = import('./threeboot.js').then(() => {
   importScripts(...SERVER_SCRIPTS.map((f) => f + '.js'));
 });
