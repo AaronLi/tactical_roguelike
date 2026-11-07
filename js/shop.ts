@@ -510,6 +510,7 @@ const G_Shop = {
     else if (this.tab === 'zero') { G.GunsmithUI.hide(); G.InvUI.hide(); G.ZeroUI.show(items); }
     else { G.GunsmithUI.hide(); G.InvUI.hide(); items.innerHTML = html; if (this.tab === 'route') this.routeWire(items); }
     items.classList.toggle('locked', this.ready);
+    items.classList.toggle('route-view', this.tab === 'route'); // (the map fills the pane: css)
 
     const kitName = (it: GItem | null | undefined) => (it ? G.U.esc(G.Gear.defOf(it)!.name) : '—');
     const wline = (w: GWeapon) => `<div class="lo"><span style="color:${G.TIER_COLORS[w.def.tier]}">${w.def.name}${w.def.modified ? ' <small>CUSTOM</small>' : ''}${w.sup ? ' <small>SUPP</small>' : ''}</span><small>${w.mag}${w.chamber ? '+1' : ''}/${Me.magSize(w)}</small></div>`; // (between levels: the count)
