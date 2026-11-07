@@ -10,7 +10,7 @@
 // The placed buffer is then positioned in 3D (HRTF panner, distance gain, air absorption,
 // wall occlusion), so moving around never re-renders anything. Until a room render is ready
 // the dry render plays; until that exists, the old procedural shot (G.Audio.shot) plays.
-type AcousticEnv = 'hall' | 'room' | 'concrete' | 'warehouse'; // a room's kind, from its shape (acousticsAt): the synth's own presets of that name
+type AcousticEnv = 'hall' | 'room' | 'concrete' | 'warehouse' | 'field' | 'urban' | 'canyon'; // a place's kind, from its shape (acousticsAt): the synth's own presets of that name (the last three out of doors)
 interface RoomAcoustics { env: AcousticEnv; rt60: number; envReflect: number; envMix: number }
 interface RoomSig { env: SynthEnv; envSize: number; envReflect: number; envMix: number } // a room, rounded off (what a render is cached by)
 interface EchoPt { x: number; y: number; z: number }
@@ -50,11 +50,15 @@ const G_GunAudio = {
     const memo = map._acoustics.get(key);
     if (memo) return memo;
     const cx = (tx + 0.5) * L.TS, cz = (tz + 0.5) * L.TS;
-    const RAYS = 24, FAR = 80, OPEN_M = 26, clamp = G.U.clamp;
-    const dist: number[] = [];
+    // The room's shape from rays round the shooter: 48 of them, each the further of two (at 1.5 m and at 2.6 m, over most
+    // furniture), passing what stands in the room (shelves, counters, machines don't make it smaller) and the map's edge
+    // walls (past them is open air). Its size is the zone's own (js/acoustics.ts: the whole room's floor, not what's in
+    // sight of where you stand: up against a wall the rays fan out short and grazing, and the room read as a cupboard).
+    const RAYS = 48, FAR = 80, OPEN_M = 26, clamp = G.U.clamp;
+    const dist: number[] = [], opts = this.PROBE;
     for (let i = 0; i < RAYS; i++) {
-      const a = (i / RAYS) * Math.PI * 2;
-      dist.push(L.raycast(map, cx, fy + 1.5, cz, Math.cos(a), 0, Math.sin(a), FAR).t);
+      const a = (i / RAYS) * Math.PI * 2, c = Math.cos(a), s = Math.sin(a);
+      dist.push(Math.max(L.raycast(map, cx, fy + 1.5, cz, c, 0, s, FAR, opts).t, L.raycast(map, cx, fy + 2.6, cz, c, 0, s, FAR, opts).t));
     }
     const dA = (Math.PI * 2) / RAYS;
     let area = 0, perim = 0;
@@ -63,15 +67,19 @@ const G_GunAudio = {
       area += 0.5 * d0 * d1 * Math.sin(dA);
       perim += Math.sqrt(Math.max(0, d0 * d0 + d1 * d1 - 2 * d0 * d1 * Math.cos(dA)));
     }
-    let longM = 0, shortM = Infinity;
-    for (let i = 0; i < RAYS / 2; i++) {
-      const span = dist[i] + dist[i + RAYS / 2];
-      longM = Math.max(longM, span); shortM = Math.min(shortM, span);
-    }
+    // (its long and short: the lines through you across it, the 85th and 15th percentiles of their lengths, not the
+    // longest and shortest: in a corner one ray clipping a door frame made a room a corridor)
+    const spans: number[] = [];
+    for (let i = 0; i < RAYS / 2; i++) spans.push(dist[i] + dist[i + RAYS / 2]);
+    spans.sort((p, q) => p - q);
+    const longM = spans[Math.floor(spans.length * 0.85)], shortM = spans[Math.floor(spans.length * 0.15)];
     const openFrac = dist.filter((d) => d > OPEN_M).length / RAYS;
-    const aspect = longM / Math.max(shortM, 0.5);
+    let aspect = longM / Math.max(shortM, 0.5), narrow = shortM;
+    const Ac = G.Acoustics, zi = Ac ? Ac.zoneAt(map, cx, fy + 1.5, cz) : -1, zone = zi >= 0 ? Ac.of(map).zones[zi] : null;
+    // (indoors, the room's own size and shape, its whole floor's, wherever in it you stand: the rays only say how open it is)
+    if (zone && !zone.out) { area = zone.area; aspect = zone.longM / Math.max(zone.shortM, 0.5); narrow = zone.shortM; }
     let env: AcousticEnv;
-    if (aspect >= 2.4 && shortM <= 6) env = 'hall';
+    if (aspect >= 2.4 && narrow <= 6) env = 'hall';
     else if (area <= 250) env = 'room';
     else if (area <= 800) env = 'concrete';
     else env = 'warehouse';
@@ -80,8 +88,17 @@ const G_GunAudio = {
     const envMix = clamp(0.2 - 0.14 * openFrac, 0.05, 0.2);
     const V = area * this.CEIL_M, S = 2 * area + perim * this.CEIL_M;
     const alpha = clamp(0.55 - 0.5 * envReflect, 0.18, 0.6);
-    const rt60 = clamp((0.161 * V) / Math.max(S * alpha, 1e-3), 0.1, 1.6);
-    const out = { env, rt60, envReflect, envMix };
+    let rt60 = clamp((0.161 * V) / Math.max(S * alpha, 1e-3), 0.1, 1.6), refl = envReflect, mix = envMix;
+    // With the level's acoustics (js/acoustics.ts): out of doors, an outdoor preset (the Sandia Crest's a canyon; buildings
+    // near round you, a street; otherwise open ground), never an enclosed room's tail; indoors, the zone's own reverberation
+    // (its real height, two storeys or a hangar's hall, and what its surfaces are), not a 4 m room's guess.
+    if (zone && zone.out) {
+      const near = dist.filter((d) => d < 30).length / RAYS;
+      env = map.chasm || map.crest ? 'canyon' : near > 0.3 ? 'urban' : 'field';
+      rt60 = window.GunshotSynth.ENVIRONMENTS[env].rt60;
+      refl = clamp(0.15 + 0.3 * near, 0.1, 0.45); mix = clamp(0.06 + 0.12 * near, 0.05, 0.2);
+    } else if (zone) rt60 = clamp(zone.rt60, 0.15, 3);
+    const out = { env, rt60, envReflect: refl, envMix: mix };
     map._acoustics.set(key, out);
     return out;
   },
@@ -157,6 +174,7 @@ const G_GunAudio = {
     if (!this.available()) return;
     ids = [...new Set(ids)].filter((id) => this.spec(id));
     ids.forEach((id) => this.buildDry(id));
+    if (G.Acoustics) { if (map) G.Acoustics.prewarm(map); return; } // (the rooms are measured, not rendered per room kind)
     const sigs = new Map<string, RoomSig>();
     const step = Math.max(1, Math.round(4 / G.Level.TS)); // a sample every ~4 m
     for (const fm of map!.floors || [map!]) for (let tz = 1; tz < map!.H - 1; tz += step) for (let tx = 1; tx < map!.W - 1; tx += step) {
@@ -174,6 +192,10 @@ const G_GunAudio = {
   // (speed of sound), distance + wall absorption + how mirror-like the bounce is set the level, and the
   // echo is played from that wall. Closed doors block rays, so opening one changes what you hear.
   SOUND: 343,
+  /** a ray's options: the map's edge walls passed through (past them is open air: nothing comes back off them) */
+  PAST_EDGE: { skip: (s: { edge?: boolean }) => !!s.edge } as LvRayOpts,
+  /** sizing up a room: the edge walls passed, and what stands in it (furniture, shelving, machines: a 'prop') too */
+  PROBE: { skip: (s: { edge?: boolean; kind?: string }) => !!s.edge || s.kind === 'prop' } as LvRayOpts,
   ECHO_RAYS: 48,
   echoCache: new Map<string, { map: AcMap; taps: EchoTap[] }>(),
   debugEchoes: (() => { try { return new URLSearchParams(location.search).has('echoes'); } catch (e) { return false; } })(),
@@ -191,7 +213,7 @@ const G_GunAudio = {
     const add = (pos: EchoPt, path: number, amp: number, order: number, hops: EchoPt[]) => {
       const delay = (path - direct) / this.SOUND;
       // < 20 ms fuses with the direct sound (the room reverb already covers it); > 0.6 s is negligible here
-      if (delay < 0.02 || delay > 0.6 || amp < 0.008) return;
+      if (delay < 0.02 || delay > LATE || amp < (outside ? 0.0015 : 0.008)) return; // (out of doors a cliff or a building's front is a big, flat reflector: its slap back carries)
       const b = Math.round(delay / 0.012);
       const cur = bins.get(b);
       if (!cur) bins.set(b, { delay, amp, pos, order, hops });
@@ -200,30 +222,67 @@ const G_GunAudio = {
         cur.amp = Math.hypot(cur.amp, amp); // arrivals in the same bin add incoherently
       }
     };
-    for (let i = 0; i < K; i++) {
-      const a = ((i + 0.5) / K) * Math.PI * 2;
-      let dx = Math.cos(a), dz = Math.sin(a), ox = src.x, oz = src.z, travelled = 0, energy = 1;
+    // (out of doors: a long way to the next wall, a building across the lot or the cliff over the gorge, so the rays go
+    // further and the late arrivals count: the slap back off them, half a second and more after the shot)
+    const outside = !!(G.Acoustics && (() => { const zi = G.Acoustics.zoneAt(map, src.x, src.y, src.z); return zi >= 0 && G.Acoustics.of(map).zones[zi].out; })());
+    const FAR = outside ? 200 : 60, LATE = outside ? 1.5 : 0.6;
+    // The rays, in 3D: a level ring, and indoors a ring tilted 35 degrees up and one straight up (the ceiling and the tops
+    // of the walls: in a hall two storeys high or the hangar the slap off the roof comes 30-70 ms after the shot; in an
+    // ordinary room it fuses with it). Each bounces off whatever it meets (wall, ceiling, floor) up to twice; the map's
+    // edge walls it passes (open air past them). Out of doors there's only sky up there.
+    const dirs: [number, number, number, number][] = []; // [x, y, z, weight]
+    for (let i = 0; i < K; i++) { const a = ((i + 0.5) / K) * Math.PI * 2; dirs.push([Math.cos(a), 0, Math.sin(a), 1]); }
+    if (!outside) {
+      const e = 0.6, K2 = K >> 1;
+      for (let i = 0; i < K2; i++) { const a = ((i + 0.5) / K2) * Math.PI * 2; dirs.push([Math.cos(a) * Math.cos(e), Math.sin(e), Math.sin(a) * Math.cos(e), 0.7]); }
+      dirs.push([0, 1, 0, 1]);
+    }
+    for (const [d0x, d0y, d0z, wgt] of dirs) {
+      let dx = d0x, dy = d0y, dz = d0z, ox = src.x, oy = y, oz = src.z, travelled = 0, energy = wgt;
       const hops: EchoPt[] = [{ x: src.x, y, z: src.z }];
       for (let order = 1; order <= 2; order++) {
-        const h = L.raycast(map, ox, y, oz, dx, 0, dz, 60);
-        if (!h.n || h.n[1] !== 0) break;
-        const nx = h.n[0], nz = h.n[2];
-        const px = ox + dx * h.t + nx * 0.05, pz = oz + dz * h.t + nz * 0.05;
+        const h = L.raycast(map, ox, oy, oz, dx, dy, dz, FAR, this.PAST_EDGE);
+        if (!h.n || h.t >= FAR - 1e-3) break;
+        const nx = h.n[0], ny = h.n[1], nz = h.n[2];
+        const px = ox + dx * h.t + nx * 0.05, py = oy + dy * h.t + ny * 0.05, pz = oz + dz * h.t + nz * 0.05;
         travelled += h.t;
         energy *= refl;
-        const dot = dx * nx + dz * nz, rx = dx - 2 * dot * nx, rz = dz - 2 * dot * nz;
-        hops.push({ x: px, y, z: pz });
-        const tlx = lis.x - px, tly = ly - y, tlz = lis.z - pz, tl = Math.hypot(tlx, tly, tlz);
-        if (tl > 0.3 && L.los(map, px, y, pz, lis.x, ly, lis.z)) {
-          const spec = Math.max(0, (rx * tlx + rz * tlz) / tl); // 1 = mirror bounce straight at the listener
+        const dot = dx * nx + dy * ny + dz * nz, rx = dx - 2 * dot * nx, ry = dy - 2 * dot * ny, rz = dz - 2 * dot * nz;
+        hops.push({ x: px, y: py, z: pz });
+        const tlx = lis.x - px, tly = ly - py, tlz = lis.z - pz, tl = Math.hypot(tlx, tly, tlz);
+        if (tl > 0.3 && L.los(map, px, py, pz, lis.x, ly, lis.z)) {
+          const spec = Math.max(0, (rx * tlx + ry * tly + rz * tlz) / tl); // 1 = mirror bounce straight at the listener
           const path = travelled + tl;
           const amp = energy * rayNorm * (0.2 + 0.8 * Math.pow(spec, 8)) * Math.pow(2 / Math.max(path, 2), 0.6);
-          add({ x: px, y, z: pz }, path, amp, order, hops.slice());
+          add({ x: px, y: py, z: pz }, path, amp, order, hops.slice());
         }
-        ox = px; oz = pz; dx = rx; dz = rz;
+        ox = px; oy = py; oz = pz; dx = rx; dy = ry; dz = rz;
       }
     }
-    const taps = [...bins.values()].sort((p, q) => q.amp - p.amp).slice(0, 6);
+    // A gorge (the Sandia Crest's): a shot fired over it comes back off its far face. Its rim's a low wall, so a level ray
+    // crosses the open air above it (t 5) to the far side unhindered; where it meets ground again beyond, that's the
+    // face's top, the cliff going 45 m down under it: a big, rough reflector, its echo the one you hear a long time after.
+    if (outside && map.chasm) {
+      const t5 = G.Level.floorMap(map, 0).t, ts = L.TS;
+      for (let i = 0; i < K; i++) {
+        const a = ((i + 0.5) / K) * Math.PI * 2, dx = Math.cos(a), dz = Math.sin(a);
+        let over = false;
+        for (let s = 1; s < 260; s += ts) {
+          const px = src.x + dx * s, pz = src.z + dz * s, tx = Math.floor(px / ts), tz = Math.floor(pz / ts);
+          if (tx < 0 || tz < 0 || tx >= map.W || tz >= map.H) break;
+          const v = t5[tz * map.W + tx];
+          if (v === 5) { over = true; continue; }
+          if (!over) continue;
+          const tl = Math.hypot(lis.x - px, ly - y, lis.z - pz), path = s + tl;
+          const amp = 0.6 * rayNorm * 0.45 * Math.pow(2 / Math.max(path, 2), 0.6) * Math.min(1, map.chasm / 20); // (the face's height: the more of it, the more comes back)
+          add({ x: px, y: y - map.chasm / 2, z: pz }, path, amp, 1, [{ x: src.x, y, z: src.z }, { x: px, y, z: pz }]);
+          break;
+        }
+      }
+    }
+    // the strongest six (out of doors, two of them the strongest late ones, past 150 ms: the slap back off far walls)
+    const all = [...bins.values()].sort((p, q) => q.amp - p.amp), late = outside ? all.filter((t) => t.delay > 0.15).slice(0, 2) : [];
+    const taps = [...late, ...all.filter((t) => !late.includes(t))].slice(0, 6).sort((p, q) => q.amp - p.amp);
     if (this.echoCache.size > 400) this.echoCache.clear();
     this.echoCache.set(key, { map, taps });
     return taps;
@@ -237,7 +296,56 @@ const G_GunAudio = {
     }
   },
 
+  // ------------------------------------------------------------ the rooms' reverberation, measured
+  // A convolver per measured room (its traced response, js/acoustics.ts), every shot in that room sent into it at its own
+  // level; its output heard the way that room reaches you now (from the opening it comes in by, as loud and as dull as the
+  // way there lets it be; your own room's all round you). Kept for the level (a new one's measured afresh).
+  // Its output two ways: wide (the response's own stereo, straight to both ears: a room's tail comes from all round) and
+  // placed (a mono share through a panner at the opening it comes in by). A panner collapses a stereo signal to the side
+  // it's on, so only the placed share goes through one: in your own room all of it's wide; from another room most of it
+  // still is (once it's through the door it fills yours), a third of its energy from the doorway.
+  verbs: new Map<AcTrace, { cv: ConvolverNode; lp: BiquadFilterNode; wide: GainNode; dg: GainNode; pan: PannerNode; g: GainNode; map: AcMap }>(),
+  verbOf(ctx: AudioContext, map: AcMap, tr: AcTrace) {
+    for (const [k, v] of this.verbs) if (v.map !== map) { v.g.disconnect(); this.verbs.delete(k); } // (last level's)
+    let v = this.verbs.get(tr);
+    if (!v) {
+      const cv = ctx.createConvolver(), lp = ctx.createBiquadFilter(), wide = ctx.createGain(), dg = ctx.createGain(), pan = ctx.createPanner(), g = ctx.createGain();
+      cv.normalize = false; cv.buffer = G.Acoustics.impulse(ctx, tr); lp.type = 'lowpass';
+      pan.panningModel = 'equalpower'; pan.rolloffFactor = 0; dg.gain.value = 0;
+      cv.connect(lp); lp.connect(wide); wide.connect(g); lp.connect(dg); dg.connect(pan); pan.connect(g); g.connect(G.Audio.master);
+      v = { cv, lp, wide, dg, pan, g, map }; this.verbs.set(tr, v);
+    }
+    return v;
+  },
+  /** the shooter's room's response, set for how it reaches you now: returns its nodes (the shot's sent into .cv) */
+  roomVerb(ctx: AudioContext, map: AcMap, src: EchoPt, heard: { k: number; lp: number; at: EchoPt; same: boolean } | null) {
+    const tr = G.Acoustics.roomAt(map, src.x, src.y, src.z);
+    if (!tr) return null;
+    const v = this.verbOf(ctx, map, tr), t = ctx.currentTime, same = !heard || heard.same, PLACED = 0.33;
+    v.g.gain.setTargetAtTime(same ? 1 : heard!.k, t, 0.02); v.lp.frequency.setTargetAtTime(same ? 20000 : heard!.lp, t, 0.02);
+    v.wide.gain.setTargetAtTime(same ? 1 : Math.sqrt(1 - PLACED), t, 0.02); v.dg.gain.setTargetAtTime(same ? 0 : Math.sqrt(PLACED), t, 0.02);
+    if (!same) { const at = heard!.at; v.pan.positionX.setValueAtTime(at.x, t); v.pan.positionY.setValueAtTime(at.y, t); v.pan.positionZ.setValueAtTime(at.z, t); }
+    return v;
+  },
+  /** your own room's response, all round you: what a sound coming in from another room fills it with */
+  listenerVerb(ctx: AudioContext, map: AcMap) {
+    const cam = G.R.camera.position, tr = G.Acoustics.roomAt(map, cam.x, cam.y, cam.z);
+    if (!tr) return null;
+    const v = this.verbOf(ctx, map, tr), t = ctx.currentTime;
+    v.g.gain.setTargetAtTime(1, t, 0.02); v.lp.frequency.setTargetAtTime(20000, t, 0.02); v.wide.gain.setTargetAtTime(1, t, 0.02); v.dg.gain.setTargetAtTime(0, t, 0.02);
+    return v;
+  },
   // ------------------------------------------------------------ playback
+  // A gun's report is loudest down the line it's fired along: the blast leaves the muzzle forward, and behind the gun
+  // it's the shooter's body and the gun in the way. About +3 dB straight ahead, -4 dB straight behind, and the highs
+  // going first round the back (the crack's ahead of the blast). heard: where the sound leaves for you (the shooter, or
+  // the opening it reaches you by: what matters is which way that is from the muzzle).
+  directivity(pos: EchoPt, aim: EchoPt, toward: EchoPt) {
+    const ax = aim.x - pos.x, ay = aim.y - pos.y, az = aim.z - pos.z, al = Math.hypot(ax, ay, az) || 1;
+    const lx = toward.x - pos.x, ly = toward.y - pos.y, lz = toward.z - pos.z, ll = Math.hypot(lx, ly, lz) || 1;
+    const c = (ax * lx + ay * ly + az * lz) / (al * ll), f = (1 + c) / 2; // (1 ahead, 0.5 side, 0 behind)
+    return { k: Math.pow(10, (-4 + 7 * f) / 20), lp: 6000 + 14000 * f };
+  },
   // a suppressed gun's first shot after a pause (by shooter: two of them with the same gun are two cans)
   firstRound(id: string, who: string, now: number) {
     if (this.spec(id).muzzleDevice !== 'suppressor') return 1;
@@ -248,33 +356,49 @@ const G_GunAudio = {
   },
   // pos = world position of the muzzle, or null for the local player's own gun. who: the shooter (for a can's first-round pop).
   // Returns false when no synth buffer exists yet so the caller can play a fallback.
-  play(id: string, pos: THREE.Vector3 | null, who?: string, vol = 1) { // (vol: this shot's own level: a gun of several barrels, each as loud as its effective length makes it, js/data.ts G.shotDef)
+  play(id: string, pos: THREE.Vector3 | null, who?: string, vol = 1, aim?: EchoPt | null) { // (vol: this shot's own level: a gun of several barrels, each as loud as its effective length makes it, js/data.ts G.shotDef)
     const A = G.Audio, ctx = A.ctx, map = G.Game.map;
     if (!ctx || !map || !this.spec(id) || !this.available()) return false;
     const cam = G.R.camera.position;
     const src = pos || cam;
-    const sig = this.roomSig(map, src.x, src.z, this.floorY(map, src));
-    let buf = this.bufs.get(id + '|' + this.sigKey(sig));
-    if (!buf) {
-      buf = this.dry.get(id);
-      if (!buf) this.buildDry(id, true);
-      this.build(id, sig, true);
-      if (!buf) return false;
+    // With the level's acoustics the report's dry (the gun and the round, a metre off), and its room is the room's own,
+    // measured (js/acoustics.ts roomAt: its traced response, convolved below). Without, the synth's render for a room of
+    // this one's kind (roomSig: a preset, picked by its shape).
+    const measured = !!G.Acoustics;
+    let buf: AudioBuffer | undefined;
+    if (measured) { buf = this.dry.get(id); if (!buf) { this.buildDry(id, true); return false; } }
+    else {
+      const sig = this.roomSig(map, src.x, src.z, this.floorY(map, src));
+      buf = this.bufs.get(id + '|' + this.sigKey(sig));
+      if (!buf) {
+        buf = this.dry.get(id);
+        if (!buf) this.buildDry(id, true);
+        this.build(id, sig, true);
+        if (!buf) return false;
+      }
     }
 
     const base = this.GAIN * vol * this.firstRound(id, who || (pos ? 'x' : 'me'), ctx.currentTime);
     let gain = base, occluded = false, d = 0, panPos = pos as EchoPt, portal: EchoTap | null = null; // (panPos is only read inside `if (pos)`)
+    let heard: { k: number; lp: number; at: EchoPt; same: boolean } | null = null;
     const taps = this.echoTaps(map, src, cam);
     if (this.debugEchoes) this.drawEchoes(taps, cam);
     if (pos) {
       d = cam.distanceTo(pos);
       gain *= G.U.clamp(Math.pow(2 / Math.max(d, 2), 0.6), 0.05, 1);
-      occluded = !G.Level.los(map, cam.x, cam.y, cam.z, pos.x, pos.y, pos.z);
-      // Heard round a corner: if an echo path exists, the shot seems to come from that opening and is
-      // much less muffled than sound going through a wall.
-      if (occluded) portal = taps.reduce<EchoTap | null>((b, t) => (!b || t.amp > b.amp ? t : b), null);
-      if (portal) panPos = portal.pos;
-      if (occluded) gain *= portal ? 0.75 : 0.55;
+      // How it gets to you (js/acoustics.ts): in your own zone, straight (dulled a little behind shelves and pillars);
+      // from another, by the strongest way through the openings: as loud and as bright as the doors and windows on it
+      // let it be, and from the one it comes in by. (No acoustics: line of sight, and round a corner by its echoes.)
+      if (G.Acoustics) {
+        heard = G.Acoustics.hear(map, pos, cam);
+        gain *= heard.k; panPos = heard.at; occluded = !heard.same || heard.k < 1;
+        if (aim) { const dv = this.directivity(pos, aim, heard.at); gain *= dv.k; heard.lp = Math.min(heard.lp, dv.lp); }
+      } else {
+        occluded = !G.Level.los(map, cam.x, cam.y, cam.z, pos.x, pos.y, pos.z);
+        if (occluded) portal = taps.reduce<EchoTap | null>((b, t) => (!b || t.amp > b.amp ? t : b), null);
+        if (portal) panPos = portal.pos;
+        if (occluded) gain *= portal ? 0.75 : 0.55;
+      }
       if (this.voices >= this.MAX_VOICES && gain < 0.3) return true; // drop distant shots under load
     }
 
@@ -287,7 +411,7 @@ const G_GunAudio = {
       // air absorption (halves every ~35 m, as in the synth's listener model) + muffling through walls
       const lp = ctx.createBiquadFilter();
       lp.type = 'lowpass';
-      lp.frequency.value = Math.min(G.U.clamp(18000 * Math.pow(0.5, d / 35), 1200, 19000), occluded ? (portal ? 2500 : 900) : 20000);
+      lp.frequency.value = Math.min(G.U.clamp(18000 * Math.pow(0.5, d / 35), 1200, 19000), heard ? heard.lp : occluded ? (portal ? 2500 : 900) : 20000);
       const pan = ctx.createPanner();
       pan.panningModel = 'HRTF';
       pan.distanceModel = 'inverse';
@@ -297,6 +421,21 @@ const G_GunAudio = {
       s.connect(lp).connect(pan).connect(g);
     } else s.connect(g);
     g.connect(A.master);
+    // and into the room you're in (js/ambience.ts's reverb for your zone): a shot from another room comes in and fills
+    // yours; one in your own room already carries its room in its render, so only a little
+    // its room: the shooter's room's measured response (the report's reverberation, at its measured level against the
+    // report itself), heard by the way the shooter's room reaches you (in your own room, all round you)
+    const rv = measured ? this.roomVerb(ctx, map, src, heard) : null;
+    if (rv) { const sg = ctx.createGain(); sg.gain.value = base; s.connect(sg); sg.connect(rv.cv); } // (at the report's own level: the response carries the room's)
+    // and a shot from another room, come in, fills the room you're in: your room's own response to it, all round you, at
+    // the level it reaches you at (the same room's response, when that's whose it was, is already the shooter's above)
+    if (measured && heard && !heard.same) {
+      const lv = this.listenerVerb(ctx, map);
+      if (lv && lv !== rv) { const sg = ctx.createGain(); sg.gain.value = gain; g.connect(sg); sg.connect(lv.cv); }
+    } else if (!measured) {
+      const room = G.Ambience && G.Ambience.reverbIn();
+      if (room && heard && !heard.same) { const sg = ctx.createGain(); sg.gain.value = gain * 0.8; g.connect(sg); sg.connect(room); }
+    }
     this.voices++;
     s.onended = () => { this.voices--; };
     s.start();

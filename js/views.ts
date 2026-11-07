@@ -519,7 +519,7 @@ const G_Views = {
     if (G.Highlights) G.Highlights.shot('e' + m.e, f, to, wdef.code || m.w, undefined!, undefined!, m.sid);
     this.visRound(f, to, wdef, tr ? 'tracer' : G.ballFor(G.calOf(wdef)), () => {});
     G.Casings.fired(wdef, false, f, to);
-    if (!G.GunAudio.play(wdef.id, f, 'e' + m.e)) G.Audio.shot((G.CLASS_SND as Record<string, any>)[wdef.cls] || G.CLASS_SND.AR, me.distanceTo(f));
+    if (!G.GunAudio.play(wdef.id, f, 'e' + m.e, 1, to)) G.Audio.shot((G.CLASS_SND as Record<string, any>)[wdef.cls] || G.CLASS_SND.AR, me.distanceTo(f));
     G.Audio.flyby(f, to, wdef, G.ballFor(G.calOf(wdef)));
     this.pings.push({ x: m.f[0], z: m.f[2], t: 2.5 });
     const ev = this.enemies.get(m.e);
@@ -557,7 +557,7 @@ const G_Views = {
     const d = G.R.camera.position.distanceTo(f);
     if (def.cls === 'RAIL') G.Audio.rail(d);
     else if (def.cls === 'BOW') G.Audio.bow(d);
-    else if (!G.GunAudio.play(m.bm && def.barrels ? G.shotSoundKey(G.roundSpec(def, m.rl), m.bm, am) : G.Gunsmith.roundSoundKey(def, am), f, 'p' + m.id, m.bm && def.barrels ? Math.pow(G.shotK(def, m.bm), 2) : def.volley ? G.volleyVol(def, m.vn || def.volley) : 1)) G.Audio.shot(m.sil ? G.SUPPRESSOR.snd : def.snd, d);
+    else if (!G.GunAudio.play(m.bm && def.barrels ? G.shotSoundKey(G.roundSpec(def, m.rl), m.bm, am) : G.Gunsmith.roundSoundKey(def, am), f, 'p' + m.id, m.bm && def.barrels ? Math.pow(G.shotK(def, m.bm), 2) : def.volley ? G.volleyVol(def, m.vn || def.volley) : 1, to)) G.Audio.shot(m.sil ? G.SUPPRESSOR.snd : def.snd, d);
   },
 
   // ---------------------------------------------------------------- other people's rounds

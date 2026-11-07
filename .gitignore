@@ -8,3 +8,6 @@ scratch/
 
 # Blender backups
 *.blend1
+
+# walkthrough videos (tools/walkthrough.js): rendered locally, not kept in the repo
+videos/

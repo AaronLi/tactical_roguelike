@@ -1456,6 +1456,7 @@ const G_Game = {
     const now = performance.now();
     const raw = now - this.last, dt = Math.min(raw / 1000, 0.05);
     this.last = now;
+    G.Ambience.update(dt, this.phase === 'level' ? this.map : null, G.R.camera); // the place's own sound (js/ambience.ts), for where you are in it
     if (this.phase === 'level') {
       if (G.Net.isHost && !this.hub) G.Views.boresOut(); // (the suspects' guns as they were last drawn, to the simulation: before anything moves this frame)
       if (this.invOpen) G.InvUI.update(dt);

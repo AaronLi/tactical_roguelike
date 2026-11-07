@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ambience Audition</title>
+<!-- Every place's ambience (js/ambience.ts), to listen to without a level: pick a place, slide between indoors and
+     outdoors, fire any of its events by hand. Served by the dev server: npm run dev, then /ambience.html -->
+<style>
+  :root { --bg: #111417; --panel: #1b2025; --line: #2c333a; --text: #d8dde2; --dim: #8a949e; --hot: #f0a63a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, sans-serif; }
+  main { max-width: 980px; margin: 0 auto; padding: 20px 16px 40px; }
+  h1 { font-size: 20px; margin: 0 0 4px; letter-spacing: 0.04em; }
+  p.sub { color: var(--dim); margin: 0 0 18px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0; }
+  button { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; font: inherit; cursor: pointer; }
+  button:hover { border-color: var(--dim); }
+  button.on { border-color: var(--hot); color: var(--hot); }
+  #start { background: var(--hot); color: #111; border: 0; font-weight: 600; padding: 10px 18px; }
+  label { color: var(--dim); display: flex; gap: 8px; align-items: center; }
+  input[type=range] { width: 220px; accent-color: var(--hot); }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; margin: 14px 0; }
+  section h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--dim); margin: 0 0 8px; }
+  .ev button { font-size: 13px; padding: 5px 10px; }
+  .ev small { color: var(--dim); margin-left: 4px; }
+  canvas { width: 100%; height: 120px; display: block; background: #0b0d0f; border-radius: 6px; }
+  #meter { font-variant-numeric: tabular-nums; color: var(--dim); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Ambience audition</h1>
+  <p class="sub">Each place's background sound, synthesized live (js/ambience.ts). Indoors you hear the inside layers and the outside ones through the walls; outdoors, the other way about.</p>
+  <div class="row"><button id="start">Start audio</button><button id="stop">Stop</button></div>
+  <section><h2>Place</h2><div class="row" id="places"></div>
+    <div class="row">
+      <label><input type="checkbox" id="night"> Night</label>
+      <label>Indoors <input type="range" id="out" min="0" max="1" step="0.01" value="0"> Outdoors</label>
+      <label>Volume <input type="range" id="vol" min="0" max="1.5" step="0.01" value="0.8"></label>
+    </div>
+  </section>
+  <section><h2>This place's events (fire one now)</h2><div class="row ev" id="events"></div></section>
+  <section><h2>Every event</h2><div class="row ev" id="all"></div></section>
+  <section><h2>Output</h2><canvas id="spec" width="960" height="120"></canvas><div id="meter">—</div></section>
+</main>
+<script>self.G = {};</script>
+<script src="dist/js/audio.js"></script>
+<script src="dist/js/ambience.js"></script>
+<script>
+(() => {
+  const A = G.Audio, M = G.Ambience, $ = (id) => document.getElementById(id);
+  let place = null, an = null;
+  const opts = () => ({ night: $('night').checked, hub: place === 'Hangar' });
+  function ensure() {
+    if (!A.ctx) {
+      A.init();
+      an = A.ctx.createAnalyser(); an.fftSize = 4096; A.master.connect(an);
+      M.setVolume(+$('vol').value);
+      draw();
+    } else if (A.ctx.state === 'suspended') A.ctx.resume();
+  }
+  function play(name) {
+    ensure(); place = name;
+    const s = M.play(name, opts());
+    M.setOutdoors(+$('out').value);
+    for (const b of $('places').children) b.classList.toggle('on', b.textContent === name);
+    $('events').innerHTML = '';
+    for (const e of (s ? s.events : [])) {
+      const b = document.createElement('button');
+      b.innerHTML = `${e.name}<small>${e.bus} · ${e.rate}/min</small>`;
+      b.onclick = () => { const g = A.ctx.createGain(); g.gain.value = e.vol; g.connect(e.bus === 'in' ? s.inBus : s.outBus); e.play(A.ctx, g, A.ctx.currentTime + 0.05, Math.random()); };
+      $('events').appendChild(b);
+    }
+  }
+  for (const name of Object.keys(M.RECIPES)) { const b = document.createElement('button'); b.textContent = name; b.onclick = () => play(name); $('places').appendChild(b); }
+  for (const name of Object.keys(M.E)) {
+    const b = document.createElement('button'); b.textContent = name;
+    b.onclick = () => { ensure(); const g = A.ctx.createGain(); g.gain.value = 1; g.connect(A.master); M.E[name](A.ctx, g, A.ctx.currentTime + 0.05, Math.random()); };
+    $('all').appendChild(b);
+  }
+  $('start').onclick = () => { ensure(); if (!place) play('Apartment'); };
+  $('stop').onclick = () => { if (A.ctx) M.play(null); place = null; for (const b of $('places').children) b.classList.remove('on'); $('events').innerHTML = ''; };
+  $('night').onchange = () => { if (place) play(place); };
+  $('out').oninput = () => M.setOutdoors(+$('out').value);
+  $('vol').oninput = () => M.setVolume(+$('vol').value);
+  function draw() {
+    const cv = $('spec'), g = cv.getContext('2d'), f = new Float32Array(an.frequencyBinCount), w = new Float32Array(an.fftSize);
+    const css = getComputedStyle(document.documentElement), hot = css.getPropertyValue('--hot').trim();
+    (function frame() {
+      requestAnimationFrame(frame);
+      an.getFloatFrequencyData(f); an.getFloatTimeDomainData(w);
+      g.clearRect(0, 0, cv.width, cv.height); g.strokeStyle = hot; g.beginPath();
+      const nyq = A.ctx.sampleRate / 2;
+      for (let x = 0; x < cv.width; x++) {
+        const hz = 20 * Math.pow(nyq / 20, x / cv.width), i = Math.min(f.length - 1, Math.round(hz / nyq * f.length));
+        const y = cv.height * (1 - (Math.max(-110, f[i]) + 110) / 90);
+        x ? g.lineTo(x, y) : g.moveTo(x, y);
+      }
+      g.stroke();
+      let s = 0, pk = 0; for (const v of w) { s += v * v; pk = Math.max(pk, Math.abs(v)); }
+      $('meter').textContent = `RMS ${(20 * Math.log10(Math.sqrt(s / w.length) + 1e-9)).toFixed(1)} dBFS · peak ${(20 * Math.log10(pk + 1e-9)).toFixed(1)} dBFS · 20 Hz – ${(nyq / 1000).toFixed(0)} kHz, log`;
+    })();
+  }
+})();
+</script>
+</body>
+</html>
