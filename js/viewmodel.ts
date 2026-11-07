@@ -332,7 +332,13 @@ const G_Viewmodel = (() => {
     });
     const disk = new T.Mesh(new T.CircleGeometry(o.r, 48), mat);
     const parent = typeof o.parent === 'string' ? g.getObjectByName(o.parent) : o.parent;
-    if (parent) { disk.position.copy(Array.isArray(o.pos) ? new T.Vector3(o.pos[0], o.pos[1], o.pos[2]) : o.pos!); parent.add(disk); } // (a magnifier's lens swings with it)
+    if (parent) { // (a magnifier's lens swings with it: put on its part, where it is in the gun at rest)
+      if (Array.isArray(o.pos)) { // ([f, y, x] in the gun's frame, as the bake writes it: tools/models/recipes.ts info.pip.pos; into the part's own frame, the magnifier in line)
+        g.updateMatrixWorld(true);
+        disk.position.copy(parent.worldToLocal(g.localToWorld(new T.Vector3(o.pos[2] || 0, o.pos[1], -o.pos[0]))));
+      } else disk.position.copy(o.pos!);
+      parent.add(disk);
+    }
     else { disk.position.set(0, o.y, -o.f); g.add(disk); }
     let sig = '';
     // a ballistic computer (def.calc: 1 a rangefinder's readout only, 2 with the point-of-impact marker): a few times a second it asks range() how far it is to what's under the crosshair, paints it and, from the
