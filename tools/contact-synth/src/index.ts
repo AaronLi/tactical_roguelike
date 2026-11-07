@@ -12,4 +12,5 @@ export {
   AR15_MAG_IN, AR15_MAG_IN_EMPTY, AR15_MAG_OUT, AR15_MAG_OUT_EMPTY, AR15_LOAD_RACK_UNLOAD, AR15_MAG_IN_OUT, AR15_MAG_DROPS, MORE_MAG_DROPS, MAG_TYPES, magDrops, type MagType, arChargeScene, magDropScene, magDropSpec, type MagDropOptions,
   MORE_GUN_SCENES, chargeScene, type ChargeTiming,
   GUN_SPECS, gunScenes, derive, magTypeOf, chargeFromSpec, releaseFromSpec, magFromSpec, boltActionScene, roundInScene, SPEC_SCENES, type GunSpec,
+  SOLES, FLOORS, GAITS, STRIKE, deriveStep, stepScene, walkScene, kitElements, FOOTSTEP_SCENES, type SoleSpec, type FloorSpec, type GaitSpec, type StepSpec, type KitId,
 } from './scenes/index.js';

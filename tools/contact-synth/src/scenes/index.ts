@@ -3,8 +3,10 @@ import { RECON_SCENES } from './recon-cs6.js';
 import { FIREARM_SCENES } from './firearms.js';
 import { MORE_GUN_SCENES } from './more-guns.js';
 import { SPEC_SCENES } from './from-spec.js';
+import { FOOTSTEP_SCENES } from './footsteps.js';
 
-export const SCENES: Scene[] = [...RECON_SCENES, ...FIREARM_SCENES, ...MORE_GUN_SCENES, ...SPEC_SCENES];
+export const SCENES: Scene[] = [...RECON_SCENES, ...FIREARM_SCENES, ...MORE_GUN_SCENES, ...SPEC_SCENES, ...FOOTSTEP_SCENES];
+export { SOLES, FLOORS, GAITS, STRIKE, deriveStep, stepScene, walkScene, kitElements, FOOTSTEP_SCENES, type SoleSpec, type FloorSpec, type GaitSpec, type StepSpec, type KitId } from './footsteps.js';
 export { GUN_SPECS, gunScenes, derive, magTypeOf, chargeFromSpec, releaseFromSpec, magFromSpec, boltActionScene, roundInScene, SPEC_SCENES, type GunSpec } from './from-spec.js';
 export { MORE_GUN_SCENES, chargeScene, type ChargeTiming } from './more-guns.js';
 export { RECON_CS6, RECON_CS6_DRY } from './recon-cs6.js';
