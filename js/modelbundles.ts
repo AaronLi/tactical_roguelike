@@ -1,5 +1,5 @@
 // The baked models, bundled (docs/models.md "Bundles"). The baker (tools/bundle_models.mjs, the last step of `npm run bake:models`) packs the
-// ~2,500 small files of assets/models into ONE container file, assets/models/bundles/models.rtb (~3.3 MB gzipped); the game fetches it once at boot
+// ~2,500 small files of assets/models (the guns' packs, the props, the hangar's scene) into ONE container file, assets/models/bundles/models.rtb (~3.3 MB gzipped); the game fetches it once at boot
 // (the very first thing the page does: this is the first script in index.html), keeps it in memory and slices the files out of it, so there are no
 // model requests after that and nothing waits on a fetch later. Nothing is parsed at boot: a glTF is parsed when a model is first shown (js/glb.ts).
 // There is no fallback to the loose files: a path that belongs to the bundle comes from it or fails.
@@ -9,7 +9,7 @@
 //   G.Bundles.onChange(fn)          fn(state) on every progress step and phase change
 //   G.Bundles.getFile(path)         Promise<ArrayBuffer>: the file's bytes (waits for the bundle; starts it if nothing has)
 //   G.Bundles.getJson(path)         Promise<any | null>: the file parsed (null if the bundle or the file is missing)
-//   G.Bundles.bundleOf(path)        'models' if the path is in the bundle, null if not (guns/*.glb, the bake reports)
+//   G.Bundles.bundleOf(path)        'models' if the path is in the bundle, null if not (guns/*.glb, the scenes' data, the bake reports)
 //
 // Returning visitors: bundles/manifest.json ({ v: 3, hash, size }, fetched with no-cache at boot, ~100 bytes) says which bundle is current; the one hash is
 // compared with the stored copy (IndexedDB), which is used with no request if it matches and is of this format (FORMAT: 3 since the packs' positions are int16); otherwise models.rtb?h=<hash> is fetched and replaces it.
@@ -214,12 +214,13 @@ function makeBundle(cfg: BundleCfg) {
     },
   });
 }
-// The models: props/** and parts/<id>/** (not the whole-gun files nor the bake's reports: parts/index.json, coverage.json...).
+// The models: props/**, scenes/*.glb (the hangar: tools/bake_hangar.mjs) and parts/<id>/** (not the whole-gun files, the scenes'
+// data (for the tools and the Bevy port) nor the bake's reports: parts/index.json, coverage.json...).
 // FORMAT 3: the files' format, in the manifest (v) and on the stored copy: 2 = meshopt with float32 positions, 3 = int16 positions the loader
 // undoes (js/glb.ts dequantize). A copy of another format is never used.
 const G_Bundles = makeBundle({
   name: 'models', dir: 'assets/models/bundles/', root: 'assets/models/', format: 3, flag: 'rt-models-stored',
-  bundleOf: (p) => p.startsWith('props/') || (p.startsWith('parts/') && p.indexOf('/', 6) > 6),
+  bundleOf: (p) => p.startsWith('props/') || (p.startsWith('scenes/') && p.endsWith('.glb')) || (p.startsWith('parts/') && p.indexOf('/', 6) > 6),
 });
 // The synthesized audio: the guns' handling bank and the footsteps (each folder's manifest.json and its clips), Ogg Vorbis, the
 // container gzipped (it halves it: every clip carries the same Vorbis setup header). FORMAT 1.

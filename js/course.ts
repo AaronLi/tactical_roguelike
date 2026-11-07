@@ -29,7 +29,7 @@ interface CourseRun {
 interface CoursePanel { mesh: THREE.Mesh<any, any>; c: HTMLCanvasElement; tx: THREE.CanvasTexture; }
 interface CourseState {
   root: THREE.Object3D; grp: THREE.Group; H: RangeHelpers; world: Parameters<typeof G_World.add>[0]; RZ: number; seed: number; tg: CourseTarget[]; solids: RangeSolid[]; run: CourseRun | null; last: unknown;
-  board: CoursePanel | null; screens: CoursePanel[]; cams: THREE.PerspectiveCamera[]; rts: THREE.WebGLRenderTarget[]; on: boolean; frame: number; boxes?: { x: number; z: number }[];
+  board: CoursePanel | null; screens: CoursePanel[]; cams: THREE.PerspectiveCamera[]; rts: THREE.WebGLRenderTarget[]; on: boolean; frame: number; boxes?: { x: number; z: number }[]; live?: THREE.Object3D[];
 }
 const G_Course = (() => {
   const T = THREE;
@@ -53,32 +53,50 @@ const G_Course = (() => {
   }
 
   // ---------------------------------------------------------------- building
-  function build(root: THREE.Object3D, hangar: HangarState, H: RangeHelpers) {
-    S.root = root; S.H = H; S.world = hangar.map.world; S.RZ = G.HANGAR_ROWS * 2;
+  // What's fixed (the backstop, the buttons' posts, buttons and labels, the frames of the board and the screens) is baked
+  // with the hangar (fixtures: js/hangar.ts, docs/hangar-data.md), with an anchor for each of the rest: a_course_btn_<i>
+  // (START, NEW: what F on it does), a_course_board, a_course_screen_<i> (the middle of each, on the wall). What changes is
+  // added there as the hangar is entered (build): the board's picture, the screens, the stage.
+  const POSTS: [number, number, number, string][] = [[11.2, BOXES[0], 0x2a7a3a, 'START'], [11.6, -3.2, 0x3a5a8a, 'NEW']]; // the buttons: START in the first box (on a post to its right), REGENERATE in the yard beside the entrance
+  const PANELS: [number, number, number, number][] = [[16.5, 3.2, 1.8, 2.4], [12.4, 1.9, 1.07, 2.5], [20.6, 1.9, 1.07, 2.5]]; // the board and the two screens, on the hall's north wall over the yard (east of the garage door), facing the course: [x, w, h, y]
+  function fixtures(root: THREE.Object3D, H: RangeHelpers) {
     const M = (c: number, o?: THREE.MeshStandardMaterialParameters) => new T.MeshStandardMaterial(Object.assign({ color: c, roughness: 0.85, metalness: 0.05 }, o || {}));
-    // the backstop, its sign, the course's name over the entrance
+    // the backstop
     H.box(root, A.x0, 0, A.z1 + 0.9, A.x1, 2.4, A.z1 - 0.001, M(0x8a7a58, { roughness: 1 }));
-    // the buttons: START in the first box (on a post to its right), REGENERATE in the yard beside the entrance
-    post(root, 11.2, BOXES[0], 0x2a7a3a, 'START', () => start(), 'start a run (standby, then the beep)');
-    post(root, 11.6, -3.2, 0x3a5a8a, 'NEW', () => regenerate(), 'lay a new stage (nobody may be in the course)');
-    // the board and the two screens, on the hall's north wall over the yard (east of the garage door), facing the course
-    S.board = panel(root, 16.5, 3.2, 1.8, 2.4);
-    S.screens = [panel(root, 12.4, 1.9, 1.07, 2.5, true), panel(root, 20.6, 1.9, 1.07, 2.5, true)];
+    // the buttons: a post with a big button on top, its label over it
+    POSTS.forEach(([x, z, col, text], i) => {
+      H.box(root, x - 0.06, 0, z - 0.06, x + 0.06, 1.0, z + 0.06, new T.MeshStandardMaterial({ color: 0x3b3f44, roughness: 0.7 }));
+      const b = new T.Mesh(new T.CylinderGeometry(0.09, 0.09, 0.05, 16), new T.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.35 }));
+      b.position.set(x, 1.03, z); root.add(b);
+      const lab = canvasPlane(256, 64, 0.32, 0.08, (g, w, h) => { g.fillStyle = '#101418'; g.fillRect(0, 0, w, h); g.fillStyle = '#f4f4f0'; g.font = 'bold 40px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, w / 2, h / 2 + 2); });
+      lab.mesh.position.set(x, 1.18, z + 0.001); root.add(lab.mesh);
+      H.anchor!(root, 'course_btn', i, x, 0, z, 0, { text });
+    });
+    // the frames of the board and the screens (a board or screen on the hall's north wall, its yard side, z 0, facing north
+    // over the yard: w x h, its middle at x, y)
+    PANELS.forEach(([x, w, h, y], i) => {
+      S.H = H; frame(root, x, w, h, y);
+      if (i) H.anchor!(root, 'course_screen', i - 1, x, y, -0.08, Math.PI, { w, h }); else H.anchor!(root, 'course_board', null, x, y, -0.08, Math.PI, { w, h });
+    });
+  }
+  function build(root: THREE.Object3D, hangar: HangarState, H: RangeHelpers) {
+    S.root = root; S.H = H; S.world = hangar.map.world; S.RZ = G.HANGAR_ROWS * 2; S.live = [];
+    // the buttons: START in the first box, REGENERATE in the yard beside the entrance
+    post(0, () => start(), 'start a run (standby, then the beep)');
+    post(1, () => regenerate(), 'lay a new stage (nobody may be in the course)');
+    // the board and the two screens
+    S.board = panel(root, H.at!('course_board'));
+    S.screens = [panel(root, H.at!('course_screen', 0), true), panel(root, H.at!('course_screen', 1), true)];
     for (let i = 0; i < 2; i++) { S.rts[i] = new T.WebGLRenderTarget(384, 216); S.cams[i] = new T.PerspectiveCamera(60, 16 / 9, 0.1, 120); }
     for (const sc of S.screens) sc.mesh.material.color.setHex(0x000000);
     S.seed = S.seed || 1 + Math.floor((hangar.map.seed || 7) * 7919) % 100000;
     lay(S.seed);
     paintBoard();
   }
-  // a post with a big button on top, F to press it
-  function post(root: THREE.Object3D, x: number, z: number, col: number, text: string, run: () => unknown, runText: string) {
-    const H = S.H;
-    H.box(root, x - 0.06, 0, z - 0.06, x + 0.06, 1.0, z + 0.06, new T.MeshStandardMaterial({ color: 0x3b3f44, roughness: 0.7 }));
-    const b = new T.Mesh(new T.CylinderGeometry(0.09, 0.09, 0.05, 16), new T.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.35 }));
-    b.position.set(x, 1.03, z); root.add(b);
-    const lab = canvasPlane(256, 64, 0.32, 0.08, (g, w, h) => { g.fillStyle = '#101418'; g.fillRect(0, 0, w, h); g.fillStyle = '#f4f4f0'; g.font = 'bold 40px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, w / 2, h / 2 + 2); });
-    lab.mesh.position.set(x, 1.18, z + 0.001); root.add(lab.mesh);
-    H.addTarget({ id: 'course-' + text, kind: 'pos', box: [x - 0.15, 0.95, z - 0.15, x + 0.15, 1.12, z + 0.15], label: text, run, runText });
+  // a button: F to press it (the post, button and label are baked: its anchor's at the foot of the post)
+  function post(i: number, run: () => unknown, runText: string) {
+    const a = S.H.at!('course_btn', i), x = a.position.x, z = a.position.z, text = a.userData.text as string;
+    S.H.addTarget!({ id: 'course-' + text, kind: 'pos', box: [x - 0.15, 0.95, z - 0.15, x + 0.15, 1.12, z + 0.15], label: text, run, runText });
   }
   function canvasPlane(cw: number, ch: number, w: number, h: number, draw: (g: CanvasRenderingContext2D, w: number, h: number) => void) {
     const c = document.createElement('canvas'); c.width = cw; c.height = ch; draw(c.getContext('2d')!, cw, ch);
@@ -86,13 +104,17 @@ const G_Course = (() => {
     const mesh = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshBasicMaterial({ map: tx, side: T.DoubleSide }));
     return { mesh, c, tx };
   }
-  // a board or screen on the hall's north wall (its yard side, z 0), facing north over the yard: w x h, its middle at x, y
-  function panel(root: THREE.Object3D, x: number, w: number, h: number, y: number, screen?: boolean): CoursePanel {
+  // a board's or screen's frame on the hall's north wall (its yard side, z 0), w x h, its middle at x, y
+  function frame(root: THREE.Object3D, x: number, w: number, h: number, y: number) {
     const z = -0.08;
     S.H.box(root, x - w / 2 - 0.06, y - h / 2 - 0.06, z + 0.01, x + w / 2 + 0.06, y + h / 2 + 0.06, 0.0, new T.MeshStandardMaterial({ color: 0x2c3036, roughness: 0.7 }));
+  }
+  // the board or screen itself, in its frame (on its anchor, facing north over the yard)
+  function panel(root: THREE.Object3D, a: THREE.Object3D, screen?: boolean): CoursePanel {
+    const w = a.userData.w as number, h = a.userData.h as number;
     const mesh = screen ? new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshBasicMaterial({ color: 0x000000 })) : null;
     const p = (screen ? { mesh } : canvasPlane(1024, 576, w, h, () => {})) as CoursePanel;
-    p.mesh.position.set(x, y, z); p.mesh.rotation.y = Math.PI; root.add(p.mesh); return p;
+    p.mesh.position.copy(a.position); p.mesh.rotation.y = Math.PI; root.add(p.mesh); return p;
   }
 
   // ---------------------------------------------------------------- the stage, from its seed
@@ -355,7 +377,7 @@ const G_Course = (() => {
     for (const rt of S.rts) if (rt) rt.dispose();
     Object.assign(S, { root: null, grp: null, seed: 0, tg: [], solids: [], run: null, board: null, screens: [], cams: [], rts: [], on: false });
   }
-  return { build, update, leave, hit, shot, remoteRun, setCourse, regenerate, start, inside, anyoneIn, score, A, S };
+  return { fixtures, build, update, leave, hit, shot, remoteRun, setCourse, regenerate, start, inside, anyoneIn, score, A, S };
 })();
 G.Course = G_Course;
 interface GameModules { Course: typeof G_Course; }

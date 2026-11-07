@@ -95,6 +95,7 @@ const G_Game = {
     G.ServerLink.boot(); // (the host's simulation's thread, loading now so it's there when you host: js/serverlink.ts)
     G.Stickers.load().then((names) => G.ServerLink.stickers(names)); // (which stickers there are: js/stickers.ts; the sticker box hands out one of them)
     G.GunModels.boot(); // (every platform's model index and the props; the packs themselves as they are needed: js/gunmodels.ts)
+    G.Hangar.load(); // (the hangar's baked scene, parsed as soon as the bundle's in: js/hangar.ts; what enters the game waits for it, needModels)
     this.settings = { sens: G.U.store.get('sens', 1), fov: G.U.store.get('fov', 80), vol: G.U.store.get('vol', 0.6), loadKit: G.U.store.get('loadKit', 1) }; // (loadKit: the hangar's Load Magazines tops up the equipped guns' and the kit's magazines only (1), or everything (0))
     this.myName = G.U.store.get('name', 'Operator' + Math.floor(Math.random() * 90 + 10));
     G.U.store.set('name', this.myName); // (kept: the same name after a refresh, so the squad knows who's back)
@@ -446,8 +447,8 @@ const G_Game = {
     retry.onclick = () => { G.Bundles.start(); upd(G.Bundles.state()); };
   },
   /** Runs fn now if the models are in; otherwise when they arrive (the menu says so meanwhile). */
-  needModels(fn: () => void) {
-    const s = G.Bundles.state();
+  needModels(fn0: () => void) {
+    const s = G.Bundles.state(), fn = () => { G.Hangar.load().then(() => fn0()); }; // (and the hangar's scene parsed: a few hundred ms after the bundle; js/hangar.ts)
     if (s.phase === 'ready') { fn(); return; }
     this.waitingModels = fn; this.msg('menuMsg', 'Waiting for the models to finish downloading...');
     if (s.phase === 'failed' || s.phase === 'idle') G.Bundles.start();

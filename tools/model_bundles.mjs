@@ -1,4 +1,4 @@
-// The model bundle (docs/models.md "Bundles"): packing the baked tree assets/models/{parts,props} into the ONE container file the game loads
+// The model bundle (docs/models.md "Bundles"): packing the baked tree assets/models/{parts,props,scenes} into the ONE container file the game loads
 // (assets/models/bundles/models.rtb), reading it back, and checking it. The container format, and which paths are bundled, are the game's own
 // (js/modelbundles.ts, loaded here from dist/js): this file only writes what that reader reads, so the two cannot drift apart unnoticed.
 // Pure functions over a models folder: tools/bundle_models.mjs is the command, tools/bundle_models.test.mjs the negative tests.
@@ -17,11 +17,11 @@ export function loadBundles() {
 }
 
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
-/** Every file under parts/ and props/ of the models folder that belongs in the bundle, as paths relative to it ('/'-separated), in byte order. */
+/** Every file under parts/, props/ and scenes/ of the models folder that belongs in the bundle, as paths relative to it ('/'-separated), in byte order. */
 export function listLoose(models, B) {
   const out = [];
   const walk = (dir, rel) => { for (const d of fs.readdirSync(dir, { withFileTypes: true })) { const r = rel + d.name; if (d.isDirectory()) walk(path.join(dir, d.name), r + '/'); else if (B.bundleOf(r)) out.push(r); } };
-  for (const top of ['parts', 'props']) if (fs.existsSync(path.join(models, top))) walk(path.join(models, top), top + '/');
+  for (const top of ['parts', 'props', 'scenes']) if (fs.existsSync(path.join(models, top))) walk(path.join(models, top), top + '/');
   return out.sort(cmp);
 }
 
@@ -97,6 +97,9 @@ export function check(models, B) {
   const pi = files.get('props/index.json');
   if (!pi) errs.push('props/index.json is not in the bundle');
   else { const px = JSON.parse(pi.toString('utf8')); named.add('props/index.json'); resolve('props/' + px.quarrel.file, 'props/index.json quarrel'); for (const [k, e] of Object.entries(px.keys)) resolve('props/' + e.file, `props/index.json ${k}`); }
+  // the scenes (the hangar: tools/bake_hangar.mjs): scenes/index.json (beside the bundle, not in it) names each scene's glTF
+  const sf = path.join(models, 'scenes/index.json');
+  if (fs.existsSync(sf)) { let sx = null; try { sx = JSON.parse(fs.readFileSync(sf, 'utf8')); } catch { errs.push('scenes/index.json is not JSON'); } if (sx) for (const [k, e] of Object.entries(sx.scenes || {})) if (e.file) resolve('scenes/' + e.file, `scenes/index.json ${k}`); }
   for (const p of files.keys()) if (!named.has(p) && !p.endsWith('/index.json')) errs.push(`orphan: ${p} in bundle ${B.NAME} is named by no index`);
   return errs;
 }
