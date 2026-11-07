@@ -25,14 +25,16 @@ to the simulation the way a remote player's does, with the same messages; it rea
 | `js/serverlink.ts` | page | `G.ServerLink`: starts the worker as the page loads, opens a session when you host (`start`) and closes it (`stop`), sends your game's messages to it (`toServer`), relays the remote players' both ways. |
 | `js/sim.ts` | both | `G.Sim`: pure reckonings both sides need (a grenade's flight, a round's arc, a blast's reach and a thermobaric's dose, a weapon as built, an officer's look cleaned, the cabinet and locker grids, the veil's time). They used to live in files that draw; those hand on to it. |
 
-The worker loads `util, data, callsigns, arsenal, parts, gear, medical, sim, materials, ballistics, level, world,
-furnspec, furniture, homes, residents, scars, damage, stickers, route, shop, server, serverhost` (`SERVER_SCRIPTS` in
+The worker loads `util, data, callsigns, arsenal, parts, gear, medical, sim, materials, ballistics, level, leveldesc, world,
+furnspec, furniture, homes, residents, scars, damage, stickers, route, shop, recorder, server, serverhost` (`SERVER_SCRIPTS` in
 `js/serverworker.ts`): the data, the rules of guns, gear and medicine, the level as it's generated, collided with and seen
-through, the shop's stock reckoning. Nothing that draws or plays loads there (no renderer, rigs, views, viewmodel, HUD,
+through, the shop's stock reckoning, the recorder. Nothing that draws or plays loads there (no renderer, rigs, views, viewmodel, HUD,
 icons, sound, PeerJS); the furniture's solids come from its pieces (`js/furniture.ts solids`), and what the pieces look
-like (`js/furnspec.ts`, [furniture-data.md](furniture-data.md)) is only described where it's drawn. three.js does, for its maths: level generation cuts the Sandia Crest's rocks from three's
-icosahedron, and holes, blasts and arcs are worked in its vectors; loading the same three as the page keeps the level the
-simulation builds identical to the one every screen builds from the seed.
+like (`js/furnspec.ts`, [furniture-data.md](furniture-data.md)) is only described where it's drawn. three.js still loads, because a
+few of those files reach for it as they load (js/util.ts, js/damage.ts) and the simulation works holes, blasts and arcs in its
+vectors; generating a level doesn't touch it. The level is its description (docs/level-data.md: js/leveldesc.ts), the same
+object here and on every screen, and the world the simulation collides with is built from that description's solids alone
+(G.World.fromDesc).
 
 ## Ports and messages
 
@@ -81,8 +83,9 @@ for that.
 
 ## Checking it
 
-- `await G.ServerLink.digest()` (in the console, hosting): the simulation's level against yours, `same` and the parts that
-  differ. Both are built from the seed; the helicopter's solids, which your screen adds after, aren't counted.
+- `await G.ServerLink.digest()` (in the console, hosting): the simulation's level description against yours (docs/level-data.md):
+  `same` (the whole of them equal as JSON) and the parts whose fingerprints differ. What your screen adds after (the
+  helicopter's solids) is in its world, not in the description.
 - `await G.ServerLink.stat()`: the simulation's clock, ticks, phase, level, how many suspects and players it has.
 - The profiler's file (`js/profiler.ts`) has `context.serverThread`: where it runs and its last second of ticks. With the
   simulation in its worker, the page's `host:` lines are empty (it isn't on the page).

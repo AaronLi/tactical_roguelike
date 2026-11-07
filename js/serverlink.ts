@@ -127,15 +127,17 @@ const G_ServerLink = {
   stickers(names: string[]) { this.names = names.slice(); this.post({ k: 'stickers', names: this.names }); },
 
   // ---------------------------------------------------------------- questions (tests, and hunting a desync)
-  ask(k: 'digest' | 'stat'): Promise<any> {
+  ask(k: 'digest' | 'stat', o?: Record<string, unknown>): Promise<any> {
     const q = ++this.qn;
-    return new Promise((res) => { this.asks.set(q, res); this.post({ k, q }); });
+    return new Promise((res) => { this.asks.set(q, res); this.post(Object.assign({ k, q }, o || {})); });
   },
   // the simulation's level against the one on this screen: built from the same seed, they must be the same place
+  // (same: the two descriptions are equal, the whole of them as JSON; differ: the parts whose fingerprints differ)
   async digest() {
-    const s = await this.ask('digest'), m = G.Game.map, parts: Record<string, string> = {};
+    const s = await this.ask('digest', { json: true }), m = G.Game.map, parts: Record<string, string> = {};
     const mine = m && !m.hub ? G.ServerHost.digest(m, parts) : null, differ = Object.keys(parts).filter((k) => !s.parts || s.parts[k] !== parts[k]);
-    return { server: s.d, client: mine, same: !!s.d && s.d === mine, differ, seed: s.seed, level: s.level, th: s.th, night: s.night };
+    const same = !!s.json && !!m && !!m.desc && s.json === JSON.stringify(m.desc);
+    return { server: s.d, client: mine, same, bytes: s.json ? s.json.length : 0, differ, seed: s.seed, level: s.level, th: s.th, night: s.night };
   },
   stat() { return this.ask('stat'); },
 };

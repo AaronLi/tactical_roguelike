@@ -235,7 +235,7 @@ const G_R = {
   },
   setLevel(map: LvMap) {
     this.clearLevel();
-    this.levelRoot.add(G.Level.buildMesh(map));
+    this.levelRoot.add(G.LevelView.build(map));
     // what stops a weapon light: the level, bar what you can see through (glass, a grating)
     const solid = (mt: THREE.Material) => !mt.transparent && !mt.alphaTest;
     this.levelRoot.traverse((o: any) => { if (o.isMesh) o.castShadow = Array.isArray(o.material) ? o.material.every(solid) : solid(o.material); });

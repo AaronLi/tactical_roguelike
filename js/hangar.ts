@@ -311,7 +311,7 @@ const G_Hangar = (() => {
   // workshop's benches, Timberline's rockwork, stumps and the rest of its corner, Vex's counter, pedestals, shelves and
   // machine, the stash's console and cage, Nightjar's glass front, cases and counter, the lounge, the helipad, the range's
   // fixed structure, and the shell's own fixtures (the floor, the ceiling, the roof, the lamps' fittings, the roller doors:
-  // js/level.ts buildMesh, hubFixed). tools/bake_hangar.mjs runs fixtures() below in a page and writes the scene to
+  // js/leveldesc.ts hf, js/levelview.ts build hubFixed). tools/bake_hangar.mjs runs fixtures() below in a page and writes the scene to
   // assets/models/scenes/hangar.glb (in the model bundle); the game parses it once (load) and draws a copy of it on each
   // visit (enter), adding what changes (live: the stock, the signs that say what it is, the people, the helicopter, the
   // screens with names on them, the range's targets and screens, the TVs) on its anchors: empties named a_<kind>_<i>, their
@@ -325,7 +325,7 @@ const G_Hangar = (() => {
     return (loadP = G.Models.loadFile(FILE).then((scene: THREE.Object3D) => { BAKED = prep(scene); loadMs = performance.now() - t0; S.loadMs = Math.round(loadMs); return true; },
       (e: any) => { console.error('[hangar] ' + FILE + ': ' + (e && e.message || e)); loadP = null; return false; }));
   }
-  // a quantised attribute (normals, UVs: tools/model_emit.mjs compression) as float32 (what G.Level.batchStatic batches)
+  // a quantised attribute (normals, UVs: tools/model_emit.mjs compression) as float32 (what G.LevelView.batchStatic batches)
   function floatAttr(a: THREE.BufferAttribute | THREE.InterleavedBufferAttribute) {
     const n = a.count, s = a.itemSize, f = new Float32Array(n * s);
     for (let i = 0; i < n; i++) { f[i * s] = a.getX(i); if (s > 1) f[i * s + 1] = a.getY(i); if (s > 2) f[i * s + 2] = a.getZ(i); if (s > 3) f[i * s + 3] = a.getW(i); }
@@ -400,10 +400,10 @@ const G_Hangar = (() => {
   }
   // The hall's fixtures and what's added to them (the floor's markings, the benches, counters, shelves, the stash's cage,
   // the rails, the bear and the canoe, the range's lines and posts...) drawn a BatchedMesh a material, as a level's are
-  // (js/level.ts batchStatic): about half the hangar's draw calls. Not anything that's kept hold of to be moved or changed
+  // (js/levelview.ts batchStatic): about half the hangar's draw calls. Not anything that's kept hold of to be moved or changed
   // later, nor what's under it: what's on show and turning, its sign, the vending machines' slots, the pouch shelf, the
   // helicopter (its rotors), the people, the range's plates, carriers and screens, the course's stage, the TVs.
-  //   (G.Level.batchStatic leaves alone anything with a material of its own, as a sign's or a screen's is.)
+  //   (G.LevelView.batchStatic leaves alone anything with a material of its own, as a sign's or a screen's is.)
   function batch() {
     const keep = new Set<THREE.Object3D>(), hold = (o: unknown, d = 0) => {
       if (!o || typeof o !== 'object' || d > 2) return;
@@ -416,7 +416,7 @@ const G_Hangar = (() => {
     if (G.Course) { const C = G.Course.S; hold([C.grp, C.tg, C.board, C.screens, C.live]); }
     if (G.Highlights && (G.Highlights as any).P) hold((G.Highlights as any).P.tvs);
     keep.delete(S.root);
-    G.Level.batchStatic(S.root, keep);
+    G.LevelView.batchStatic(S.root, keep);
   }
   function leave() {
     if (G.Range) G.Range.leave();

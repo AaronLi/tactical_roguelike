@@ -460,7 +460,7 @@ const G_FurnSpec = (() => {
       }
     };
     // A resident's room (js/homes.ts, rm.dress): its floor, its trim round the walls, what hangs on them. Its walls and
-    // ceiling are G.Level.buildMesh's; its furniture went by with the rest.
+    // ceiling are js/leveldesc.ts floorNodes'; its furniture went by with the rest.
     const dressRoom = (rm: any) => {
       const dr = rm.dress, f = dr.floor;
       D.cur = srng((map.seed ^ Math.imul(rm.z * W + rm.x + 1, 0x9e3779b1)) >>> 0);

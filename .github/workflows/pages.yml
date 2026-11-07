@@ -46,7 +46,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: assets/models
-          key: models-${{ hashFiles('tools/**', 'js/parts.ts', 'js/data.ts', 'js/glb.ts', 'js/modelbundles.ts', 'js/gunmaterials.ts', 'js/hangar.ts', 'js/range.ts', 'js/course.ts', 'js/level.ts', 'js/highlights.ts', 'js/furnspec.ts', 'js/furnmesh.ts', 'models/**', 'package-lock.json') }}
+          key: models-${{ hashFiles('tools/**', 'js/parts.ts', 'js/data.ts', 'js/glb.ts', 'js/modelbundles.ts', 'js/gunmaterials.ts', 'js/hangar.ts', 'js/range.ts', 'js/course.ts', 'js/level.ts', 'js/leveldesc.ts', 'js/levelview.ts', 'js/highlights.ts', 'js/furnspec.ts', 'js/furnmesh.ts', 'models/**', 'package-lock.json') }}
       - name: Bake the models
         if: steps.models.outputs.cache-hit != 'true'
         run: npm run bake:models -- -j 4

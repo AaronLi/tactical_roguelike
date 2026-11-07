@@ -1,5 +1,5 @@
 // Bakes the hangar's fixed parts (docs/hangar-data.md) to glTF, from the game's own code: the hangar's builder (js/hangar.ts fixtures, js/range.ts and
-// js/course.ts fixtures) and the shell's fixed pieces (js/level.ts buildMesh, hubFixed), run in a headless Chromium (Edge or Chrome) on the game's page,
+// js/course.ts fixtures) and the shell's fixed pieces (the level description's hf nodes, js/levelview.ts build hubFixed), run in a headless Chromium (Edge or Chrome) on the game's page,
 // so the signs' canvases are drawn by a browser, exported there with three's GLTFExporter, then compressed here as the packs are (tools/model_emit.mjs).
 //   assets/models/scenes/hangar.glb    the scene: one root node `hangar` (translation z = RZ, the hall's coordinates under it), a group for each part of the
 //                                      hall (zones, workshop, outfitters, store, stash, nightjar, lounge, helipad, range, course, shell), their meshes, and the
@@ -75,7 +75,7 @@ async function inPage(threeVer) {
   const drawn = (seed, level) => {
     const map = G.Level.generateHub(seed, level), root = G.Hangar.fixtures(map), shell = new T.Group();
     shell.name = 'shell'; shell.position.z = -RZ; root.add(shell);
-    const lv = G.Level.buildMesh(map, { pool: false, hubFixed: true }); // (the shell's fixed pieces, marked: js/level.ts buildMesh)
+    const lv = G.LevelView.build(map, { pool: false, hubFixed: true }); // (the shell's fixed pieces, marked: js/leveldesc.ts hf, js/levelview.ts build)
     for (const o of [...lv.children]) if (o.userData.hubFixed) { delete o.userData.hubFixed; shell.add(o); }
     const lights = new T.Group(); lights.name = 'lights'; shell.add(lights);
     (map.lights || []).forEach((l, i) => { const e = new T.Object3D(); e.name = 'light_' + i; e.position.set(l.x, (l.gy || 0) + (l.y != null ? l.y : WALL_H), l.z); e.userData = { light: JSON.parse(JSON.stringify(l)) }; lights.add(e); });

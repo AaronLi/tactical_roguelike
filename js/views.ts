@@ -746,7 +746,7 @@ const G_Views = {
         const c = G.R.camera, f = new THREE.Vector3(0, 0, -1).applyQuaternion(c.quaternion), h = G.Level.raycast(G.Game.map, c.position.x, c.position.y, c.position.z, f.x, f.y, f.z, 120);
         focus = c.position.clone().addScaledVector(f, h.t);
       }
-      G.Level.updateLights(G.Game.map, G.R.camera.position, false, focus);
+      G.LevelView.updateLights(G.Game.map, G.R.camera.position, false, focus);
     }
     // officers bleeding: you, and your teammates from what their bodies report
     if (G.Game.phase === 'level' && G.Me.body && G.Me.pos) {

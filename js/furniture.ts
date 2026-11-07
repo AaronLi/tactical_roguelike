@@ -759,7 +759,7 @@ const G_Furniture = (() => {
     k.cyl(stone, 0.12, 0.16, 0.5, 0, 1.9, 0, 10);
   } };
   // ---------------------------------------------------------------- a foundry (js/level.ts layFoundry)
-  // fx: what a piece throws off (G.Level.buildFx: 'sparks' and 'jet' along dir, 'embers' off a molten surface r across,
+  // fx: what a piece throws off (js/levelview.ts fx: 'sparks' and 'jet' along dir, 'embers' off a molten surface r across,
   // 'smoke', 'steam'), glow: the light it gives (a lamp of its own); both in its own frame, from the floor up.
   const MOLTEN: MatArgs = [0xffc060, 0.4, 0, { emissive: 0xff7010, emissiveIntensity: 2.6 }], DULL: MatArgs = [0x7a3010, 0.6, 0, { emissive: 0xb02a06, emissiveIntensity: 1.1 }];
   // An electric arc furnace (across 2 x 2 tiles): a squat steel shell on its tilting rockers, its water-cooled panels'
@@ -1191,7 +1191,7 @@ const G_Furniture = (() => {
     corridor: { floor: 'carpet', bare: 1 }, landing: { floor: 'tile', bare: 1 },
     bathroom: { floor: 'tile', bare: 1, noArt: 1 }, // (only ever carved out of a resident's room: js/homes.ts)
     alley: { floor: 'pave', bare: 1, out: 1 }, // the passage between two houses
-    // a festival (laid out on its own: plan()); the field's lawn is laid in G.Level.buildFestival
+    // a festival (laid out on its own: plan()); the field's lawn is laid in js/leveldesc.ts festival
     stage: { floor: null, out: 1 }, seating: { floor: null, out: 1 }, court: { floor: null, out: 1 }, picnic: { floor: null, out: 1 }, gate: { floor: null, out: 1 },
     washroom: { must: 'sinks', wall: ['sinks'], center: [], small: ['bin'], floor: 'tile' }, cubicle: { floor: 'tile', bare: 1 },
     plaza: { floor: null, out: 1 }, parking: { floor: null, out: 1 }, aisle: { floor: null, bare: 1, out: 1 },

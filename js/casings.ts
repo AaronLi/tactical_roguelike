@@ -181,7 +181,7 @@ const G_Casings = (() => {
       // festival's lawn, the mountain's granite), indoors the level's own floor (a home's boards); then each room's floor
       // (out of doors too: a road's paving, a lawn's grass, the Crest's dirt tracks; js/furniture.ts ROOMS, `sound` where
       // a case or a foot hears it differently from what's drawn), a festival's slabs over its lawn (the square's paving, the
-      // gate's, the car park's asphalt, the toilet block's tiles: G.Level.buildFestival), and a resident's room its own
+      // gate's, the car park's asphalt, the toilet block's tiles: js/leveldesc.ts festival), and a resident's room its own
       const WH = map.W * map.H, NF = map.NF || 1, TS = L.TS, ROOMS = G.Furniture.ROOMS as Record<string, any>;
       const ground = map.fest ? 'grass' : map.theme.rock ? 'gravel' : 'concrete', inside = map.theme.home >= 1 ? 'hard' : 'concrete';
       map.surf = new Array(WH * NF);
