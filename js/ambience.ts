@@ -660,7 +660,8 @@ const G_Ambience = (() => {
     // a festival at night: the crowd, the stage's beat (from the stage itself: a spot), cheers; inside the tents and booths, it all muffled
     Festival(s, o, map) {
       s.loop('out', L.wind(0.03, 0.5, 0.02));
-      s.loop('out', L.crickets(0.012, 4, 2.4));
+      // (no crickets for now: four of them at evenly staggered starts tile the whole chirp cycle, a steady 30 Hz buzz with no
+      // gaps, not a field of crickets; back once L.crickets gives each its own start and rate)
       s.bed('in', { noise: 'brown', vol: 0.04, lp: 200 });
       const stage = map && map.rooms.find((r) => r.type === 'stage');
       if (stage) s.spot('the stage', (stage.cx), 2, (stage.cz), 90, L.music(124, 0.3), 1);
