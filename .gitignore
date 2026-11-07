@@ -11,3 +11,6 @@ scratch/
 
 # walkthrough videos (tools/walkthrough.js): rendered locally, not kept in the repo
 videos/
+
+# officers' play, recorded on the host (?rec: js/recorder.ts, docs/recording.md)
+recordings/
