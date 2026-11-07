@@ -84,7 +84,7 @@ input[type=checkbox] { accent-color: var(--ui-text); }
   background: rgba(14, 17, 20, 0.78); border: 1px solid var(--ui-line-lo); border-radius: var(--ui-r); padding: calc(6px * var(--ik, 1)) calc(14px * var(--ik, 1)); box-sizing: border-box; } /* (framed as the shop's cards are) */
 .shop-route .route-svg { height: min(56vh, 500px); width: auto; display: block; }
 /* on the Route tab the pane's a column: the line on what's next, then the map's frame taking the rest of its height, the map as tall as that */
-#shopItems.route-view { display: flex; flex-direction: column; overflow: hidden; }
+#shopItems.route-view { display: flex; flex-direction: column; overflow: hidden; flex: 1 1 auto; min-height: 0; } /* (all the column's height below the tabs, as a long Stock tab reaches) */
 #shopItems.route-view .shop-route-head { flex: 0 0 auto; }
 #shopItems.route-view .shop-route { flex: 1 1 auto; min-height: 0; display: flex; }
 #shopItems.route-view .shop-route .route-svg { height: 100%; margin: 0; flex: 0 0 auto; }
