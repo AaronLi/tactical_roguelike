@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contact Synth</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <h1>Contact Synth</h1>
+    <p>Metal &amp; plastic contact sounds from a physical description: gesture, bodies and springiness.</p>
+  </div>
+  <div class="bar">
+    <select id="preset" aria-label="Preset"></select>
+    <button id="play" class="primary" title="Play (Space)">▶ Play</button>
+    <button id="vary" title="Same settings, new seed: different contact spots, bounces and texture">Vary</button>
+    <button id="random" title="Random bodies and gesture">Randomize</button>
+    <button id="download" title="Download WAV">WAV</button>
+    <button id="copy" title="Copy parameters as JSON (the URL also holds them)">Copy JSON</button>
+    <label class="toggle"><input type="checkbox" id="autoplay" checked> Auto-play</label>
+  </div>
+</header>
+
+<section class="stage">
+  <div class="viz-wrap">
+    <canvas id="viz" title="Click to play"></canvas>
+    <div id="playhead"></div>
+  </div>
+  <div class="meta">
+    <div id="info"></div>
+    <div id="status" class="dim"></div>
+  </div>
+</section>
+
+<details class="howto">
+  <summary>How sounds are described</summary>
+  <div class="howto-body">
+    <p>Every sound is the same recipe, so any combination of the sliders is a valid sound:</p>
+    <ol>
+      <li><b>Gesture</b>: how the two bodies touch over time. An <i>impact</i> is a momentum kick with bounces.
+        <i>Friction</i> reads a surface texture (roughness, grain, periodicity) at the sliding speed, plus stick-slip for squeaks.
+        A <i>snap</i> loads (creaks), releases (click) and lands on its stop (seat). Use any or all of them at once.</li>
+      <li><b>Contact</b>: Hertzian contact time from both materials' stiffness, the mass and the curvature. Metal on metal is a ~30 µs spike (bright),
+        plastic ~300 µs (duller), rubber milliseconds (a thud).</li>
+      <li><b>Bodies</b>: each is a material (stiffness, density, internal loss) plus a geometry (shape, size, thickness) and how it's held.
+        This gives its modes: pitch ∝ thickness / size², ring time ∝ 1 / (loss × frequency).</li>
+      <li><b>Springiness</b>: a <i>flex</i> swing (rulers, sheets, latch arms) that can rattle or bend the pitch, and a <i>coil</i> waveguide whose
+        dispersion turns every click into a "zing" that echoes along the spring.</li>
+    </ol>
+    <p class="dim">Hover any control for what it does. Double-click a value to type it. The URL holds the full patch, so you can bookmark or share a sound.</p>
+  </div>
+</details>
+
+<div class="toolbar-row"><button id="collapse" class="link">Collapse / expand all sections</button></div>
+<main id="controls"></main>
+
+<script type="module" src="dist/main.js"></script>
+</body>
+</html>

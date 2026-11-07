@@ -780,7 +780,7 @@ const G_Damage = (() => {
     piv.userData.fallen = true;
     const u = piv.userData; u.centre = tr.centre;
     st(map).falls.push({ piv, tr, t: snap ? 1e3 : 0, Y: d.fy || 0, d, thud: false });
-    if (!snap && G.Audio && G.Audio.sampleAt) G.Audio.sampleAt('door_close', new T.Vector3(d.x, 1.1, d.z), 0.5, 0.7);
+    if (!snap && G.Audio && G.Audio.sampleAt) G.Audio.sampleAt('door_close', new T.Vector3(d.x, (d.fy || 0) + 1.1, d.z), 0.5, 0.7); // (on its own floor)
   }
   function update(map: DmgMap, dt: number) {
     const D = map && map.dmg;

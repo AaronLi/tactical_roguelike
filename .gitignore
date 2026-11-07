@@ -1,9 +1,14 @@
 node_modules/
 dist/
+# (the contact synth's compiled JS is committed: its page runs without a build step)
+!tools/contact-synth/dist/
 .DS_Store
 Thumbs.db
 *.log
 assets/models/
+# the synthesized audio banks: baked by npm run build (tools/bake_audio.mjs), like the models
+assets/audio/handling/
+assets/audio/footsteps/
 scratch/
 
 # Blender backups

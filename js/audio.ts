@@ -14,54 +14,191 @@ const G_Audio = {
     // the highlights' studio audience (js/highlights.ts; recordings credited in the README)
     'crowd_bed', 'crowd_cheer', 'crowd_cheer_big', 'crowd_roar', 'crowd_laugh', 'crowd_laugh_long', 'crowd_ooh', 'crowd_wow', 'crowd_awww'],
   lastShot: 0,
+  // The handling sounds' trim (a magazine, the action, a door: the recorded foley here and the synthesized bank,
+  // js/handling.ts): 3 dB under where they were set, nearer the ambience, further under the shots.
+  HANDLING: 0.7,
+  /** your own gun's handling (in your hands: sample, and js/handling.ts at you): back at the level it was set at
+   *  (1 / HANDLING), where the others' are 3 dB under it */
+  HANDLING_OWN: 1 / 0.7,
+  // ---------------------------------------------------------------- keeping up
+  // Is the audio thread keeping up? Its clock (ctx.currentTime) runs at real time while it renders in time; when there's
+  // more live sound than it can render (a belt dumped: shots, their echoes, every case's bounce), it falls behind, the
+  // sound skips, and given long enough some browsers stop it. load(): 0 keeping up .. 1 well behind, from how far the
+  // clock lagged over the last half second or so; the least of what's playing (distant cases, echoes, others' steps)
+  // is shed while it's behind (casing, js/gunaudio.ts play, js/footsteps.ts step).
+  _lw: 0, _lc: 0, _load: 0,
+  load() {
+    const c = this.ctx;
+    if (!c || c.state !== 'running') return 0;
+    const now = performance.now() / 1000, ct = c.currentTime;
+    if (!this._lw) { this._lw = now; this._lc = ct; return this._load; }
+    const dw = now - this._lw;
+    if (dw >= 0.25) {
+      const rate = (ct - this._lc) / dw; // (1: in time)
+      this._load = rate < 0.97 ? G.U.clamp((1 - rate) * 4, 0, 1) : this._load * 0.6; // (eases off once it's caught up)
+      if (dw > 2) this._load = 0; // (the page was in the background: not the audio's doing)
+      this._lw = now; this._lc = ct;
+    }
+    return this._load;
+  },
+
+  // The master's way out: a compressor (all of it, under -14 dB) into the speakers, and a tap after it for the watchdog.
+  _comp: null as DynamicsCompressorNode | null,
+  _tap: null as AnalyserNode | null,
+  _tapBuf: null as Float32Array<ArrayBuffer> | null,
+  _hush: null as GainNode | null,
+  /** the whole game's level after the compressor (+6 dB: the volume setting can come down that much), into a limiter
+   *  that keeps it from clipping */
+  OUTPUT: 2,
+  _up: null as GainNode | null,
+  _outChain() {
+    const c = this.ctx;
+    if (this._comp) { try { this.master.disconnect(this._comp); this._comp.disconnect(); } catch { /* (gone already) */ } }
+    if (!this._hush) {
+      // the compressor -> the make-up gain -> the hush -> a limiter (fast, hard: nothing over -1 dBFS) -> the speakers
+      const up = c.createGain(); up.gain.value = this.OUTPUT;
+      const lim = c.createDynamicsCompressor();
+      lim.threshold.value = -1; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.001; lim.release.value = 0.08;
+      this._hush = c.createGain(); this._hush.gain.value = this._hushed ? 0 : 1;
+      up.connect(this._hush); this._hush.connect(lim); lim.connect(c.destination);
+      this._up = up;
+    }
+    const comp = c.createDynamicsCompressor();
+    comp.threshold.value = -14; comp.ratio.value = 6;
+    comp.connect(this._up!);
+    this.master.connect(comp);
+    const tap = c.createAnalyser(); tap.fftSize = 1024; comp.connect(tap);
+    this._comp = comp; this._tap = tap; this._tapBuf = new Float32Array(tap.fftSize);
+  },
+  // Everything hushed while the loading screen's up (js/game.ts veil): the level being built under it, the hangar's
+  // hall and ambience starting, the shaders compiling in stutters, all unheard; out in a moment, back in over ~1 s as
+  // it lifts. After the compressor, so the volume and the mute (master) are untouched.
+  _hushed: false,
+  hush(on: boolean) {
+    this._hushed = on;
+    const h = this._hush, c = this.ctx;
+    if (!h || !c) return;
+    const t = c.currentTime;
+    h.gain.cancelScheduledValues(t); h.gain.setValueAtTime(h.gain.value, t);
+    h.gain.setTargetAtTime(on ? 0 : 1, t, on ? 0.03 : 0.3);
+  },
+  // A watchdog on the sound coming out, twice a second (init). Sound that blanks out and stays out has a few causes, each
+  // put right here and said in the console ('[audio] ...') with what was playing:
+  //   a NaN (an unstable filter, a bad level) reaching the compressor: its state goes NaN and it gives silence for good,
+  //     long after what made it has stopped; the compressor's rebuilt;
+  //   the context suspended or interrupted (the device changed, the OS took it): resumed;
+  //   its clock stopped though it says it's running: said (a reload's the cure);
+  //   the audio thread falling behind real time (more live sound than it can render: load()): said, with how far.
+  _wd: { t: 0, ct: 0, behindSaid: 0, stallSaid: 0 },
+  watch() {
+    const c = this.ctx;
+    if (!c) return;
+    const now = performance.now() / 1000, w = this._wd, live = () => `(gunshot voices ${G.GunAudio ? G.GunAudio.voices : '?'}, cases ${this._caseVoices}, steps ${G.Footsteps ? G.Footsteps.voices : '?'})`;
+    if (c.state !== 'running') {
+      console.warn(`[audio] the context is ${c.state}: resuming ${live()}`);
+      c.resume().catch(() => {});
+      w.t = 0; return;
+    }
+    if (this._tap && this._tapBuf) {
+      this._tap.getFloatTimeDomainData(this._tapBuf);
+      let bad = 0; for (let i = 0; i < this._tapBuf.length; i++) if (!Number.isFinite(this._tapBuf[i])) bad++;
+      if (bad) { console.warn(`[audio] NaN in the output (${bad} samples): the compressor rebuilt ${live()}`); this._outChain(); }
+    }
+    if (w.t && now - w.t < 2) { // (a gap of seconds: the page was in the background, not the audio's doing)
+      const rate = (c.currentTime - w.ct) / (now - w.t);
+      if (rate < 0.02 && now - w.stallSaid > 10) { w.stallSaid = now; console.warn(`[audio] the audio clock has stopped though the context is running ${live()}`); }
+      else if (rate < 0.9 && now - w.behindSaid > 5) { w.behindSaid = now; console.warn(`[audio] the audio thread is behind: rendering at ${Math.round(rate * 100)}% of real time ${live()}`); }
+    }
+    w.t = now; w.ct = c.currentTime;
+  },
 
   init() {
     if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
     this.ctx = new AC();
-    const comp = this.ctx.createDynamicsCompressor();
-    comp.threshold.value = -14; comp.ratio.value = 6;
-    comp.connect(this.ctx.destination);
     this.master = this.ctx.createGain();
     this.master.gain.value = this.muted ? 0 : this.vol;
-    this.master.connect(comp);
+    this._outChain();
+    setInterval(() => this.watch(), 500);
     const len = this.ctx.sampleRate * 1.5;
     this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
     const d = this.noise.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
     // recorded reload foley; fails quietly (e.g. when opened from file://) and the synthesized clicks are used instead
+    if (G.Footsteps) G.Footsteps.init(); // (the synthesized footsteps: js/footsteps.ts)
     for (const n of this.SAMPLES) {
       fetch('assets/audio/' + n + '.ogg').then((r) => r.arrayBuffer()).then((b) => this.ctx.decodeAudioData(b))
         .then((buf) => { this.samples[n] = buf; }).catch(() => {});
     }
   },
+  // A recorded handling sound in your own hands (a magazine, the action, a door you kick): at you, and in the room
+  // you're in (route).
   sample(name: string, vol = 0.7, rate = 1, dist = 0) {
     const buf = this.ctx && this.samples[name];
     if (!buf) return false;
-    vol /= 1 + dist * 0.12;
-    const s = this.ctx.createBufferSource(), g = this.ctx.createGain();
+    vol *= this.HANDLING * (dist ? 1 : this.HANDLING_OWN) / (1 + dist * 0.12); // (at you: your own hands)
+    const s = this.ctx.createBufferSource();
     s.buffer = buf; s.playbackRate.value = rate * (0.96 + Math.random() * 0.08);
-    g.gain.value = vol;
-    s.connect(g); g.connect(this.master); s.start();
+    this.route(s, null, vol, vol * this.NEAR_HANDS);
+    s.start();
     return true;
   },
-  // A recorded sound from a place in the world: panned in 3D (HRTF, against the listener that follows the
-  // camera), quieter with distance, and muffled when there's a wall between you and it. pos: a Vector3.
+  // A recorded sound from a place in the world: panned in 3D (HRTF, against the listener that follows the camera),
+  // quieter with distance, heard the way it reaches you and in its room (route). pos: a Vector3.
   sampleAt(name: string, pos: THREE.Vector3, vol = 0.7, rate = 1) {
     const buf = this.ctx && this.samples[name], cam = G.R && G.R.camera;
     if (!buf) return false;
     if (!pos || !cam) return this.sample(name, vol, rate, 0);
-    const c = this.ctx, d = cam.position.distanceTo(pos), map = G.Game && G.Game.map;
-    const blocked = map && !G.Level.los(map, cam.position.x, cam.position.y, cam.position.z, pos.x, pos.y, pos.z);
-    const s = c.createBufferSource(), g = c.createGain(), lp = c.createBiquadFilter(), pan = c.createPanner();
+    vol *= this.HANDLING;
+    const s = this.ctx.createBufferSource();
     s.buffer = buf; s.playbackRate.value = rate * (0.96 + Math.random() * 0.08);
-    g.gain.value = vol / (1 + d * 0.12) * (blocked ? 0.55 : 1);
-    lp.type = 'lowpass'; lp.frequency.value = blocked ? 1100 : 18000;
-    pan.panningModel = 'HRTF'; pan.distanceModel = 'inverse'; pan.rolloffFactor = 0; // (loudness comes from the gain)
-    if (pan.positionX) { pan.positionX.value = pos.x; pan.positionY.value = pos.y; pan.positionZ.value = pos.z; } else pan.setPosition(pos.x, pos.y, pos.z);
-    s.connect(lp).connect(pan).connect(g); g.connect(this.master); s.start();
+    this.route(s, pos, vol / (1 + cam.position.distanceTo(pos) * 0.12), vol * this.NEAR_PLACED);
+    s.start();
     return true;
+  },
+  // How far from the thing making it a handling sound's level is set for, m: your own gun's ~0.4 m from your ears, a
+  // sound placed in the world is levelled as from ~0.5 m. The rooms' measured responses (js/acoustics.ts) are against
+  // the direct sound at 1 m, so a sound's share into its room is its level times that distance (a close sound's direct
+  // stands that much further above the room than a gunshot's does).
+  NEAR_HANDS: 0.4,
+  NEAR_PLACED: 0.5,
+  // A sound's way to your ears, through the level's acoustics (js/gunaudio.ts play does the same for the reports):
+  // src: the sound, gain: its level as it reaches you before the walls (its distance in it), send: its level at the
+  // source scaled to 1 m (what goes into its room's response). pos null: at you (your own hands), straight to your
+  // ears, and your room's response round you. Else from the way it reaches you (js/acoustics.ts hear: as loud and as
+  // dull as the openings on it let it be, from the one it comes in by), its own room's response heard the same way, and
+  // a sound from another room filling yours. Without the acoustics (or out of a level), muffled behind a wall and dry.
+  route(src: AudioNode, pos: { x: number; y: number; z: number } | null, gain: number, send: number) {
+    const c = this.ctx, map = G.Game && G.Game.map, cam = G.R && G.R.camera && G.R.camera.position, GA = G.GunAudio;
+    const g = c.createGain(); g.connect(this.master);
+    const ac = !!(G.Acoustics && GA && map && cam && G.Game.phase === 'level');
+    const into = (from: AudioNode, k: number, v: { cv: ConvolverNode } | null) => {
+      if (!v || k <= 0) return;
+      const sg = c.createGain(); sg.gain.value = k; from.connect(sg); sg.connect(v.cv);
+    };
+    if (!pos || !cam) {
+      g.gain.value = gain; src.connect(g);
+      if (ac) into(src, send, GA.listenerVerb(c, map));
+      return;
+    }
+    const lp = c.createBiquadFilter(), pan = c.createPanner();
+    lp.type = 'lowpass'; pan.panningModel = 'HRTF'; pan.distanceModel = 'inverse'; pan.rolloffFactor = 0; // (loudness comes from the gain)
+    let at = pos;
+    if (ac) {
+      const h = G.Acoustics.hear(map, pos, cam);
+      gain *= h.k; lp.frequency.value = h.same ? 20000 : h.lp; at = h.at;
+      const rv = GA.roomVerb(c, map, pos, h);
+      into(src, send, rv);
+      if (!h.same) { const lv = GA.listenerVerb(c, map); if (lv !== rv) into(g, 1, lv); }
+    } else {
+      const blocked = map && !G.Level.los(map, cam.x, cam.y, cam.z, pos.x, pos.y, pos.z);
+      if (blocked) gain *= 0.55;
+      lp.frequency.value = blocked ? 1100 : 18000;
+    }
+    if (pan.positionX) { pan.positionX.value = at.x; pan.positionY.value = at.y; pan.positionZ.value = at.z; } else pan.setPosition(at.x, at.y, at.z);
+    g.gain.value = gain;
+    src.connect(lp); lp.connect(pan); pan.connect(g);
   },
   setVolume(v: number) { this.vol = v; if (this.master) this.master.gain.value = this.muted ? 0 : v; },
   setMuted(m: boolean) { this.muted = m; this.setVolume(this.vol); },
@@ -358,54 +495,85 @@ const G_Audio = {
     else if (fx) mat = fx === 'metal' || fx === 'glass' ? 'metal' : fx === 'wood' ? 'wood' : fx === 'soft' || fx === 'soil' || fx === 'water' ? 'soft' : 'wall'; // (what it really hit: js/materials.ts)
     else if (G.Game && G.Game.map) {
       const map = G.Game.map, L = G.Level, tx = Math.floor(p.x / L.TS), tz = Math.floor(p.z / L.TS), fm = L.floorMap(map, L.floorAt(map, p.x, p.y, p.z)!), tile = L.tile(fm, tx, tz);
-      if (p.y - (fm.fy || 0) < 0.06) { const s = G.Casings.surface(map, p.x, p.z, fm.fy || 0); mat = s === 'grass' || s === 'carpet' ? 'soft' : s === 'wood' ? 'wood' : 'wall'; } // (on the floor of whichever floor it's on)
+      if (p.y - (fm.fy || 0) < 0.06) { const s = G.Casings.surface(map, p.x, p.z, fm.fy || 0); mat = G.Audio.SOFT[s] ? 'soft' : s === 'wood' ? 'wood' : 'wall'; } // (on the floor of whichever floor it's on)
       else if (tile === 3) mat = 'wood'; // a door
       else if (tile === 2 || tile === 4) mat = 'wood'; // furniture, fences
     }
     this.impact(mat, e.d, e.pan);
   },
-  // pos: where it landed (a Vector3): placed there in 3D (HRTF against the listener that follows the camera: left and
-  // right, in front and behind, above and below), muffled if there's a wall between you and it. Without it, just a pan.
-  casing(dist: number, mat: CaseMat, len: number, surf: string, speed: number, pan = 0, pos: THREE.Vector3 | null = null) {
-    if (!this.ctx) return;
-    const c = this.ctx, t = c.currentTime, soft = surf === 'carpet' || surf === 'grass';
-    const a = this._att(dist) * Math.min(1, speed / 2.2) * (soft ? 0.3 : 1);
-    if (a < 0.004) return;
-    let out: AudioNode;
-    const cam = pos && G.R && G.R.camera;
-    if (cam) {
-      const map = G.Game && G.Game.map, blocked = map && !G.Level.los(map, cam.position.x, cam.position.y, cam.position.z, pos.x, pos.y + 0.03, pos.z);
-      const pn = c.createPanner(), lp = c.createBiquadFilter(), g = c.createGain();
-      pn.panningModel = 'HRTF'; pn.distanceModel = 'inverse'; pn.rolloffFactor = 0; // (loudness comes from the gain)
-      if (pn.positionX) { pn.positionX.value = pos.x; pn.positionY.value = pos.y; pn.positionZ.value = pos.z; } else pn.setPosition(pos.x, pos.y, pos.z);
-      lp.type = 'lowpass'; lp.frequency.value = blocked ? 1400 : 20000; g.gain.value = blocked ? 0.6 : 1;
-      out = c.createGain(); out.connect(lp); lp.connect(pn); pn.connect(g); g.connect(this.master);
-    } else {
-      out = c.createStereoPanner ? c.createStereoPanner() : c.createGain();
-      if ((out as StereoPannerNode).pan) (out as StereoPannerNode).pan.value = pan * 0.8;
-      out.connect(this.master);
-    }
-    const strike = (f: number, q: number, g: number, dur: number) => {
-      const src = c.createBufferSource(); src.buffer = this.noise;
-      const flt = c.createBiquadFilter(); flt.type = 'bandpass'; flt.frequency.value = f; flt.Q.value = q;
-      const gn = c.createGain(); gn.gain.setValueAtTime(g, t); gn.gain.exponentialRampToValueAtTime(0.0005, t + dur);
-      src.connect(flt); flt.connect(gn); gn.connect(out); src.start(t, Math.random() * 0.5); src.stop(t + dur + 0.02);
+  // A case's ring, made once (per material, length, floor and take) and played as a clip: its modes as decaying sines
+  // and its contact as a burst of band-passed noise, as the live synthesis built them node by node (a bounce was ~15
+  // nodes; a belt dumped made a hundred oscillators a second). At unit level: the bounce's level is the clip's gain.
+  _caseBufs: new Map<string, AudioBuffer>(),
+  _caseVoices: 0,
+  CASE_VOICES: 10,
+  /** the cases' level trim (3 dB down on where they were set: under the shots) */
+  CASE_GAIN: 0.7,
+  _caseBuf(mat: CaseMat, len: number, surf: string, soft: boolean) {
+    const fl = soft ? 'soft' : surf === 'wood' ? 'wood' : surf === 'carpet' ? 'carpet' : 'hard', take = Math.floor(Math.random() * 3);
+    const key = mat + '|' + Math.round(len) + '|' + fl + '|' + take;
+    let b = this._caseBufs.get(key);
+    if (b) return b;
+    const sr = this.ctx.sampleRate, rng = (() => { let x = (take + 1) * 2654435761 >>> 0; return () => ((x = (x * 1664525 + 1013904223) >>> 0) / 4294967296); })();
+    // a strike: white noise through a band-pass (RBJ biquad), decaying exponentially to -64 dB over dur
+    const strike = (d: Float32Array, f: number, q: number, g: number, dur: number) => {
+      const w = 2 * Math.PI * Math.min(f, sr * 0.45) / sr, al = Math.sin(w) / (2 * q), a0 = 1 + al;
+      const b0 = al / a0, b2 = -al / a0, a1 = -2 * Math.cos(w) / a0, a2 = (1 - al) / a0;
+      let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+      const n = Math.min(d.length, Math.ceil((dur + 0.02) * sr)), k = Math.log(0.0005 / 1) / (dur * sr);
+      for (let i = 0; i < n; i++) {
+        const x = rng() * 2 - 1, y = b0 * x + b2 * x2 - a1 * y1 - a2 * y2;
+        x2 = x1; x1 = x; y2 = y1; y1 = y;
+        d[i] += y * g * Math.exp(k * i);
+      }
     };
     if (mat === 'plastic') {
-      strike(soft ? 420 : 820, 1.6, 0.16 * a, soft ? 0.03 : 0.06);
-      if (!soft) strike(3200, 4, 0.03 * a, 0.03);
-      return;
+      b = this.ctx.createBuffer(1, Math.ceil(0.1 * sr), sr);
+      const d = b.getChannelData(0);
+      strike(d, soft ? 420 : 820, 1.6, 0.16, soft ? 0.03 : 0.06);
+      if (!soft) strike(d, 3200, 4, 0.03, 0.03);
+    } else {
+      const f0 = 4200 * Math.pow(19 / len, 0.6) * (mat === 'steel' ? 0.88 : mat === 'aluminum' ? 1.15 : 1) * (0.97 + 0.06 * rng());
+      const ring = (soft ? 0.025 : fl === 'wood' ? 0.1 : fl === 'carpet' ? 0.03 : 0.3) * (mat === 'steel' ? 0.55 : mat === 'aluminum' ? 0.45 : 1) * Math.pow(len / 45, 0.35);
+      b = this.ctx.createBuffer(1, Math.ceil((ring + 0.05) * sr), sr);
+      const d = b.getChannelData(0), g0 = 0.075;
+      for (const [m, k] of [[1, 1], [2.71, 0.45], [5.15, 0.22], [8.9, 0.1]]) {
+        if (f0 * m > 16000) continue;
+        // (each mode falls to 0.0005 over ring/√m, as the live version's exponential ramp did)
+        const n = Math.min(d.length, Math.ceil((ring / Math.sqrt(m)) * sr)), dec = Math.log(0.0005 / (g0 * k)) / n, w = 2 * Math.PI * f0 * m / sr, ph = rng() * 6.283;
+        for (let i = 0; i < n; i++) d[i] += Math.sin(w * i + ph) * g0 * k * Math.exp(dec * i);
+      }
+      strike(d, soft ? 1400 : 5500, 0.9, g0 * 0.9, 0.012); // the contact itself
     }
-    const f0 = 4200 * Math.pow(19 / len, 0.6) * (mat === 'steel' ? 0.88 : mat === 'aluminum' ? 1.15 : 1) * (0.96 + Math.random() * 0.08);
-    const ring = (soft ? 0.025 : surf === 'wood' ? 0.1 : surf === 'carpet' ? 0.03 : 0.3) * (mat === 'steel' ? 0.55 : mat === 'aluminum' ? 0.45 : 1) * Math.pow(len / 45, 0.35);
-    const g0 = 0.075 * a;
-    for (const [m, k] of [[1, 1], [2.71, 0.45], [5.15, 0.22], [8.9, 0.1]]) {
-      if (f0 * m > 16000) continue;
-      const o = c.createOscillator(); o.frequency.value = f0 * m;
-      const gn = c.createGain(); gn.gain.setValueAtTime(g0 * k, t); gn.gain.exponentialRampToValueAtTime(0.0005, t + ring / Math.sqrt(m));
-      o.connect(gn); gn.connect(out); o.start(t); o.stop(t + ring + 0.05);
+    this._caseBufs.set(key, b);
+    return b;
+  },
+  /** the floors (js/casings.ts surface()) a case lands dead on: no ring, a thud */
+  SOFT: { carpet: 1, grass: 1, dirt: 1, soil: 1, leaves: 1, gravel: 1 } as Record<string, number>,
+  // A spent case hitting something (js/casings.ts): its ring (_caseBuf), as loud as the bounce, placed where it landed in
+  // 3D (HRTF against the listener that follows the camera), heard the way it reaches you and in its room (route); without
+  // pos, just a pan. At most CASE_VOICES ring at once; while the audio's behind (load), only the near ones.
+  casing(dist: number, mat: CaseMat, len: number, surf: string, speed: number, pan = 0, pos: THREE.Vector3 | null = null) {
+    if (!this.ctx) return;
+    const c = this.ctx, soft = !!this.SOFT[surf];
+    const a = this.CASE_GAIN * this._att(dist) * Math.min(1, speed / 2.2) * (soft ? 0.3 : 1);
+    if (a < 0.004 || this._caseVoices >= this.CASE_VOICES) return;
+    if (this.load() > 0.15 && dist > 3) return; // (behind: the far ones go first)
+    const src = c.createBufferSource();
+    src.buffer = this._caseBuf(mat, len, surf, soft); src.playbackRate.value = 0.97 + Math.random() * 0.06;
+    const cam = pos && G.R && G.R.camera;
+    if (cam) {
+      // (its strikes are levelled for the distance already, _att: its room's share is the level at the case, at 1 m)
+      const g = c.createGain(); g.gain.value = a; src.connect(g);
+      this.route(g, { x: pos!.x, y: pos!.y + 0.03, z: pos!.z }, 1, this.NEAR_PLACED / this._att(dist));
+    } else {
+      const out = c.createStereoPanner ? c.createStereoPanner() : c.createGain(), g = c.createGain();
+      if ((out as StereoPannerNode).pan) (out as StereoPannerNode).pan.value = pan * 0.8;
+      g.gain.value = a; src.connect(g); g.connect(out); out.connect(this.master);
     }
-    strike(soft ? 1400 : 5500, 0.9, g0 * 0.9, 0.012); // the contact itself
+    this._caseVoices++;
+    src.onended = () => { this._caseVoices--; };
+    src.start();
   },
   grab(dist = 0) { const a = this._att(dist), t = this.ctx.currentTime; this._noise(t, 0.14, 900, 0.8, 0.22 * a, 'bandpass'); this._noise(t + 0.02, 0.08, 2600, 1.2, 0.08 * a, 'bandpass'); },
   // a body pushed onto the floor: the weight landing, then clothes and kit settling

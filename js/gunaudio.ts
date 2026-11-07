@@ -21,7 +21,7 @@ const G_GunAudio = {
   REF: { lisBearing: 105, lisDist: 1.2 },
   MIC: { micSim: true, micGain: 1.0, micHardness: 1.0, micAgc: 0.08 },
   CASING: 0, // spent cases are simulated and heard where they land (js/casings.ts), not baked into the shot
-  GAIN: 0.55,          // level trim for synth buffers vs. the other effects
+  GAIN: 0.87,          // level trim for synth buffers vs. the other effects (4 dB up on 0.55: the shots well over the ambience, the steps and the cases)
   // A suppressor's level drop is in its render (GunshotSynth.suppression: a compact can on a .308 takes off far less
   // than a long can on a 9 mm). First-round pop: a can that's gone quiet for a while fills back up with air, and the
   // oxygen burns with the next shot's gas: that shot is a few dB louder than the string that follows.
@@ -443,7 +443,8 @@ const G_GunAudio = {
     // the echoes: the dry report (no baked reverb) replayed from each reflecting wall after its delay,
     // darker with every bounce. Under heavy fire only the two strongest are kept.
     const echoBuf = this.dry.get(id) || buf, now = ctx.currentTime;
-    const n = Math.min(taps.length, this.voices > this.MAX_VOICES * 0.6 ? 2 : taps.length); // (there may be fewer than two)
+    // (under heavy fire only the two strongest; while the audio thread's behind, one, then none: G.Audio.load)
+    const ld = A.load(), n = Math.min(taps.length, ld > 0.5 ? 0 : ld > 0.15 ? 1 : this.voices > this.MAX_VOICES * 0.6 ? 2 : taps.length); // (there may be fewer than two)
     for (let i = 0; i < n; i++) {
       const tp = taps[i];
       const es = ctx.createBufferSource();

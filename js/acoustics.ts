@@ -64,11 +64,14 @@ const G_Acoustics = (() => {
   const BARE_THEMES = new Set(['Foundry', 'Warehouse', 'Cold Storage', 'Bunker', 'Hangar']);
   const TILE_ALPHA = 0.55, TILE_ALPHA_LOW = 0.35;
   const LOW_CONTENT = 0.6; // (what stands in a room takes 0.6 as much of the lows)
-  const HARD: RoomType[] = ['melt', 'mill', 'loading', 'dock', 'hangar', 'mcc', 'catwalk', 'boss', 'hall'];
+  const HARD: RoomType[] = ['melt', 'mill', 'loading', 'dock', 'mcc', 'catwalk', 'boss', 'hall'];
   // (a stockroom's shelves of cardboard boxes, a walk-in freezer's racks of product: nearly a furnished room's, 0.6)
   const STOCKED: RoomType[] = ['storage', 'storeroom', 'stockroom', 'freezer'];
   const DEFAULT_CONTENT = 0.4;
-  const CONTENT = new Map<RoomType, number>([...SOFT.map((t) => [t, 0.8] as [RoomType, number]), ...MID.map((t) => [t, 0.5] as [RoomType, number]), ...HARD.map((t) => [t, 0.25] as [RoomType, number]), ...STOCKED.map((t) => [t, 0.6] as [RoomType, number])]);
+  const CONTENT = new Map<RoomType, number>([...SOFT.map((t) => [t, 0.8] as [RoomType, number]), ...MID.map((t) => [t, 0.5] as [RoomType, number]), ...HARD.map((t) => [t, 0.25] as [RoomType, number]), ...STOCKED.map((t) => [t, 0.6] as [RoomType, number]),
+    // (the hangar's hall: 14 m up, but full: the shop's stalls and racks, the gunsmith's benches, lockers, crates, the
+    // aircraft and their covers, what's hung from the roof: more per m² of floor than a furnished room's, it stands so high)
+    ['hangar', 1.4]]);
   // (and the air's own: 4mV, m about 0.003 a metre at 2 kHz: in a big hall, as much as its walls)
   const AIR_M = 0.003, AIR_M_LOW = 0.0003; // (the air takes the highs, hardly the lows)
   /** how hard the place's surfaces are (the theme's reflect) -> their absorption, α: for floor in no room */

@@ -144,6 +144,7 @@ const G_Game = {
     if (!on && was) this.veilSay(null); // (done: the line turns away as it goes)
     el.classList.toggle('now', !!instant);
     el.classList.toggle('on', !!on);
+    G.Audio.hush(!!on); // (no sound while it's up: js/audio.ts hush)
     el.classList.toggle('out', !on && was && !instant);
     if (on) { this.$('veilStatus').textContent = ''; this.veilSay('Building the map'); }
     else if (el.classList.contains('out')) this.veilT = setTimeout(() => el.classList.remove('out'), this.VEIL_OUT + 50); // (back above the screen for next time)
@@ -755,7 +756,7 @@ const G_Game = {
           const piv = this.map!.doorMeshes && this.map!.doorMeshes[m.i];
           if (piv) piv.userData.rate = d.open ? 2.6 : 5; // pushed open gently, pulled shut a bit quicker
         }
-        if (!m.k) G.Audio.sampleAt(d.open ? 'door_open' : 'door_close', new THREE.Vector3(d.x, 1.1, d.z), 0.6, 1); // from the door
+        if (!m.k) G.Audio.sampleAt(d.open ? 'door_open' : 'door_close', new THREE.Vector3(d.x, (d.fy || 0) + 1.1, d.z), 0.6, 1); // from the door (at its handle, on its own floor)
         break;
       }
       case 'order': if (m.id !== G.Net.myId) G.Audio.order(this.playerPos(m.id)!); break;
@@ -1374,6 +1375,7 @@ const G_Game = {
     // the guns the level will show, fetched now: the squad's kits, the level's enemy weapon pool (every pack of each platform), the weapon case's gun and the loot (as it lands)
     const caseGun = typeof wc === 'string' ? G.Gunsmith.fromCode(wc) : null; // (the host says what's in the case: 'wc')
     G.GunModels.preload([...Object.values(G.Me.weapons).map((w) => w.def), ...teamDefs, ...(caseGun ? [caseGun] : [])], this.enemyGuns(level), false); // (the models are all in memory: this only schedules their parsing)
+    G.Handling.prewarm([...Object.values(G.Me.weapons).map((w) => w.def), ...this.enemyGuns(level).map((id) => G.WEAPONS[id])]); // (the guns' handling sounds: js/handling.ts)
     G.GunAudio.prewarm([...Object.values(G.Me.weapons).flatMap((w) => [w.def.soundKey, G.Gunsmith.roundSoundKey(w.def, w.chamber || w.ammo), ...(w.def.barrels ? Object.keys(w.def.barrels.rounds).flatMap((k) => G.barrelMm(w.def, k).map((mm: number) => G.shotSoundKey(G.roundSpec(w.def, k), mm, w.ammo))) : [])]), ...this.enemyGuns(level), ...team], this.map);
     // everyone in a seat of their own in the helicopter, on the pad (the same on every machine: by the sorted roster)
     const i = Math.max(0, Object.keys(this.roster).sort().indexOf(G.Net.myId!));

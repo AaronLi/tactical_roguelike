@@ -7,7 +7,7 @@ interface VwPlayer { id: string; name: string; color: number; animal: string; lo
 // A suspect or civilian: the rig, where the host says it is (tgt) and where it's drawn (pos, eased towards it). The rest
 // (flags from the snapshot, timers for the reload, the prone shift...) are set as they happen.
 interface VwEnemy {
-  id: number; type: string; def: any; rig: Rig; tac: number; pos: THREE.Vector3; tgt: THREE.Vector3; yaw: number; tgtYaw: number; hp: number; alive: boolean; deadT: number; lean: number;
+  id: number; type: string; def: any; rig: Rig; feet?: FsFeet; tac: number; pos: THREE.Vector3; tgt: THREE.Vector3; yaw: number; tgtYaw: number; hp: number; alive: boolean; deadT: number; lean: number;
   // set as it goes: from the snapshots (bleed, limp, reloading, down: its flags), by the kill and the cuffing, and by the frame's own bookkeeping
   scode?: number; radio?: boolean; str?: number; bleed?: boolean; limp?: boolean; reloading?: boolean; down?: boolean; surp?: boolean; doorOn?: boolean; doorT?: number; arrested?: boolean; bodySecured?: boolean;
   pooled?: boolean; wnd?: number[] | null; wacc?: number[]; ph?: number; wpool?: boolean; leanS?: number; dripT?: number; proneKey?: string; proneShift?: THREE.Vector3 | null; recPitch?: number; recTk?: number;
@@ -478,11 +478,13 @@ const G_Views = {
     const A = G.Audio, dur = Math.min(5, +m.dur || 2) * 1000;
     if (!(m.n > 0)) { ev.reloadAt = performance.now(); ev.reloadDur = dur; } // (a magazine change: their hands show it, js/rig.ts)
     // from their hands, wherever they are when each part of it happens (heard from that side, muffled through walls)
-    const at = () => new THREE.Vector3(ev.pos.x, 1.15 * (ev.crouch ? 0.7 : 1) * ev.def.scale, ev.pos.z);
-    if (m.n > 0) { for (let i = 0; i < Math.min(8, m.n); i++) setTimeout(() => { if (ev.alive && ev.reloading !== false) A.sampleAt('insert_magazine', at(), 0.45, 1.6) || A.shell(); }, i * dur + dur * 0.7); return; }
-    A.sampleAt('pull_magazine', at(), 0.6, 1);
-    setTimeout(() => { if (ev.alive) A.sampleAt('insert_magazine', at(), 0.6, 1); }, dur * 0.6);
-    setTimeout(() => { if (ev.alive) A.sampleAt('rack_slide', at(), 0.5, 1); }, dur * 0.88);
+    const at = () => new THREE.Vector3(ev.pos.x, ev.pos.y + 1.15 * (ev.crouch ? 0.7 : 1) * ev.def.scale, ev.pos.z); // (above their feet, on whatever floor they're on)
+    // (their gun's own sounds, js/handling.ts, where it has them; else the recordings)
+    const H = G.Handling, wd = G.WEAPONS[ev.def.wpn];
+    if (m.n > 0) { for (let i = 0; i < Math.min(8, m.n); i++) setTimeout(() => { if (ev.alive && ev.reloading !== false) (wd && H.roundIn(wd, { vol: 0.45, pos: at() })) || A.sampleAt('insert_magazine', at(), 0.45, 1.6) || A.shell(); }, i * dur + dur * 0.7); return; }
+    H.play(wd, 'mag-out', { land: H.LAND.magOut, vol: 0.6, pos: at() }) || A.sampleAt('pull_magazine', at(), 0.6, 1);
+    setTimeout(() => { if (ev.alive) H.play(wd, 'mag-in', { land: H.LAND.magIn, vol: 0.6, pos: at() }) || A.sampleAt('insert_magazine', at(), 0.6, 1); }, dur * 0.6);
+    setTimeout(() => { if (ev.alive) (wd && H.play(wd, H.rackClip(wd, 0.45), { land: H.LAND.rack, vol: 0.5, pos: at() })) || A.sampleAt('rack_slide', at(), 0.5, 1); }, dur * 0.88);
   },
   // The host's: each suspect's gun as it was last drawn here, where their bodies are simulated (js/rig.ts powerStep), for the
   // simulation to know whether it's on its target before they fire (js/server.ts onTarget): [id, muzzle x, y, z, bore x, y, z, ...]
@@ -825,7 +827,7 @@ const G_Views = {
       const aimAt = tgt && ev.armed === 2 && ev.alert && !ev.surp && !ev.reloading && !pose && !ev.down ? new THREE.Vector3(tgt.x, tgt.y + 1.2, tgt.z) : null;
       const rlP = ev.reloadAt && ev.reloading ? (performance.now() - ev.reloadAt) / ev.reloadDur : -1; // (how far into a magazine change)
       ev.aimP = aimed ? aimAt : null; // (who they're on: where their light and laser go)
-      ev.rig.update(dt, { pos: at, yaw: ev.yaw, pitch, crouch: ev.crouch || (ev.str != null && ev.str < 0.4), rise: 3.5, alert: !!ev.alert && ev.armed === 2 && !ev.surp && !ev.reloading, lean: ev.leanS, pose, radio: ev.radio && ev.alive && !ev.down, blind: ev.alive && !ev.down && ev.scode !== 1 && ev.scode !== 2 && !ev.arrested ? ev.fc || 0 : 0, tk, act, str: near ? (ev.str == null ? 1 : ev.str) : null, aimAt,
+      ev.rig.update(dt, { feet: ev.alive && !ev.down ? (ev.feet ||= G.Footsteps.feetOf(ev.def, ev.id, ev.armed === 2, ev.rig.shoe)) : undefined, pos: at, yaw: ev.yaw, pitch, crouch: ev.crouch || (ev.str != null && ev.str < 0.4), rise: 3.5, alert: !!ev.alert && ev.armed === 2 && !ev.surp && !ev.reloading, lean: ev.leanS, pose, radio: ev.radio && ev.alive && !ev.down, blind: ev.alive && !ev.down && ev.scode !== 1 && ev.scode !== 2 && !ev.arrested ? ev.fc || 0 : 0, tk, act, str: near ? (ev.str == null ? 1 : ev.str) : null, aimAt,
         reload: rlP >= 0 && rlP < 1 ? rlP : -1 });
       // past the fog (it's the background's colour out there: nothing to see) they aren't drawn, each one's forty-odd
       // pieces a draw call. The body, not the root: the root's what a shot checks for (js/player.ts), and it still hits.
@@ -873,11 +875,11 @@ const G_Views = {
       // their restraining / bagging sounds, as they reach each step
       if (act && pv.lastAct === st.act) G.Audio.foley(act.kind, pv.lastAp || 0, act.t, pv.pos.distanceTo(G.R.camera.position));
       pv.lastAct = st.act; pv.lastAp = act ? act.t : 0;
-      if (st.ra != null && st.ra >= 0 && !(pv.lastRa >= 0) && !st.sw) { const rdef = G.Gunsmith.fromCode(st.w); G.Audio.sampleAt('rack_slide', pv.pos.clone().setY(pv.pos.y + 1.3), 0.7, rdef && rdef.manual ? G.Me.MANUAL_PITCH : 1); } // (their bolt / pump / lever worked: heard from where they stand)
+      if (st.ra != null && st.ra >= 0 && !(pv.lastRa >= 0) && !st.sw) { const rdef = G.Gunsmith.fromCode(st.w), rp = pv.pos.clone().setY(pv.pos.y + 1.3); (rdef && G.Handling.play(rdef, G.Handling.rackClip(rdef, rdef.manual ? G.Me.MANUAL_T : 0.45), { land: G.Handling.LAND.rack, vol: 0.7, pos: rp })) || G.Audio.sampleAt('rack_slide', rp, 0.7, rdef && rdef.manual ? G.Me.MANUAL_PITCH : 1); } // (their bolt / pump / lever worked: heard from where they stand)
       pv.lastRa = st.ra == null ? -1 : st.ra;
       const kneel = (st.act === 'z' && (st.ap || 0) > 0.3) || st.act === 'b';
       const hold = st.hk ? { kind: st.hk === 2 ? 'flash' : st.hk === 3 ? 'tb' : 'frag', cock: !!st.hc, str: st.hs == null ? 2 : st.hs } : null; // (a grenade in their hand)
-      pv.rig.update(dt, { pos: pv.pos, yaw: pv.yaw, pitch: pv.pitch, crouch: (!!st.cr || kneel) && !st.dn, prone: !!st.pr, bipod: !!st.bp, climb: st.cl ? G.Level.ladderAt(G.Game.map, pv.pos.x, pv.pos.z) : null, zip: !!st.zp, aim: !!st.ad, alert: !st.lr && !st.sw, atak: !!st.mn, lean: st.ln || 0, state: st.dn ? 'down' : 'alive', act,
+      pv.rig.update(dt, { feet: st.dn || st.dd ? undefined : { sole: 'boot', kit: 'heavy', careful: !!st.sd, low: !!st.lr }, pos: pv.pos, yaw: pv.yaw, pitch: pv.pitch, crouch: (!!st.cr || kneel) && !st.dn, prone: !!st.pr, bipod: !!st.bp, climb: st.cl ? G.Level.ladderAt(G.Game.map, pv.pos.x, pv.pos.z) : null, zip: !!st.zp, aim: !!st.ad, alert: !st.lr && !st.sw, atak: !!st.mn, lean: st.ln || 0, state: st.dn ? 'down' : 'alive', act,
         hold, rack: st.ra == null ? -1 : st.ra, reload: st.rl == null ? -1 : st.rl, loaded: st.ld == null ? null : !!st.ld, nomag: !!st.nm, inspect: st.in == null ? -1 : st.in, magChk: st.mc == null ? -1 : st.mc });
       if (pv.tag) pv.tag.position.y = st.dn ? 0.8 : st.cr ? 1.7 : 2.15;
     }

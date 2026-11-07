@@ -7,6 +7,7 @@ What the game's sound does in a place, and the knobs for tuning it. Three files:
 | `js/acoustics.ts` | The level's acoustic map: zones and portals, built once a level. `listen()` and `hear()`. |
 | `js/ambience.ts` | Each place's background sound, synthesized live, heard through the map. |
 | `js/gunaudio.ts` | Gunshots (rendered by `js/gunshot-synth.ts`), heard through the map, with traced wall echoes. |
+| `js/footsteps.ts` | Footsteps (baked by the contact synth), heard through the map like gunshots. |
 
 ## The acoustic map (`js/acoustics.ts`)
 
@@ -72,6 +73,54 @@ wall echoes (`echoTaps`: rays from the gun, two bounces, any bounce that can see
 and echoes up to 1.5 s count (the slap back off far buildings and cliffs); over the Sandia Crest's gorge the rays cross
 the open air to its far face (0.3–1.3 s). A shot's louder and brighter down its line of fire (`directivity`: +3 dB
 ahead, −4 dB and dull behind), judged at where it leaves for you: the callers pass the aim point.
+
+## Handling sounds (`js/handling.ts`, `js/audio.ts` `route`)
+
+The guns' handling sounds are the contact synth's (`tools/contact-synth`), baked dry by `npm run build` (`tools/bake_audio.mjs`: git-ignored, like the models; only when the synth has changed) into
+`assets/audio/handling/<family>/` with a manifest of each clip's anchor (the moment the game's cue lines up with). A gun's
+family is how its action and magazine work (AR-15, KV-47, MP5, G19, SR-25, blowback SMG, bullpup; a manual action's bolt
+or pump; rounds by hand; and from `scenes/no-family.ts` a revolver's cylinder, a break-action's hinge, a belt-fed's feed
+cover and belt, an M1's clip); a gun with none (the crossbow) keeps the recorded foley. A revolver, break-action or
+belt-fed reload plays its parts on its animation's own moments (`Handling.cues`: the crane on its stop, the rounds
+seating, the latch; the cover up, the box off and on, the cover slammed) instead of a magazine out and in. A rack or release starts its clip early by its anchor
+so the rear stop or the slam lands on the animation's; the reload's cues keep the timing tuned with the recordings.
+
+Everything handled (the bank, the recorded foley, doors, spent cases, dropped magazines) goes through `route`, the same
+way to your ears as a gunshot's: your own hands straight to you with your room's measured response round you; anything
+placed from where `hear()` says it reaches you, its own room's response heard the same way, and a sound from another room
+filling yours. The send into a room is the sound's level scaled to 1 m (the responses are measured against the direct
+sound at 1 m): your own gun's ~0.4 m off, so its room sits ~8 dB further down than a shot's from a metre. A dropped
+magazine plays that gun's simulated drop (by how full it was, landing a random way) from its first contact on a hard
+floor, and its later bounces are in that; on carpet or grass it's the case pings, soft.
+
+## Footsteps (`js/footsteps.ts`)
+
+Every step anyone takes is a clip from the contact synth's footstep model (`tools/contact-synth/src/scenes/footsteps.ts`
+baked by its `scripts/footstep-bank.mjs` into `assets/audio/footsteps/` when `npm run build` runs `tools/bake_audio.mjs`): the sole
+(boots, sneakers, dress shoes), the floor under the foot, the gait (creep, crouch, walk, run), four takes of each, and
+the kit's rattle (light, heavy) laid over the step apart. The clips carry their level: a carpet step is 12 dB under
+concrete, a run 8 dB over a walk, a creep 14 dB under. `manifest.json` gives each clip's anchor (where the foot
+strikes); a step starts there.
+
+- **When:** another's step lands when their rig puts a foot down (`js/rig.ts`: the gait's phase, where the foot's
+  lift runs out), so it's in time with what you see; yours each time your view's bob comes down (`self`). Everyone walks at a
+  real cadence for their speed (`cadence`: ~2.1 steps a second at the game's 1.9 m/s walk, ~2.65 running), the legs, the
+  bob and the steps alike.
+  Not on a ladder or a zipline, prone, down or dead, or standing still.
+- **Who:** each a walker baked apart (`footstep-bank.mjs` BAKE: a sole and a weight): you and the other officers, and
+  the armoured, in boots with armour and heavy kit (~105 kg); suspects in boots (~80 kg), light kit when armed; civilians
+  in the shoes their model wears (`js/rig.ts` shoe: white trainers as sneakers, brown as leather dress shoes with a hard
+  heel, black as everyday rubber-soled shoes; ~70-75 kg) (`feetOf`). A heavier walker's step is heavier and louder.
+- **Gait:** crouched; creeping when steadied or under 1 m/s; running with the weapon lowered or over 2.5 m/s; walking
+  otherwise (`gaitOf`).
+- **Floor:** `G.Casings.surface` (a room's floor, a home's, out of doors) mapped to the synth's (`FLOOR`): concrete,
+  pave and flagstones, tile, vinyl, hardwood and parquet (and a home's bare floor), carpet, dirt and soil, grass.
+  The synth also has gravel, dry leaves and a steel deck, for floors the game doesn't mark yet.
+- **Heard:** by `hear()` (as loud and as dull as the way to you lets it, from the opening it comes in by), falling
+  6 dB per doubling of distance past 1.5 m, not played past 30 m, and sent into the walker's room's measured response
+  (`G.GunAudio.roomVerb`) at half the level. Yours from under you, at `SELF` (0.45), and into the room you're in
+  (`listenerVerb`) as your own gun's handling is. `GAIN` (2) is the overall trim.
+  At most 24 at once.
 
 ## Tuning
 

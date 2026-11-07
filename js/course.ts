@@ -341,7 +341,11 @@ const G_Course = (() => {
       c1.position.set(7, 3.2, A.z1 + 1.6 + RZ); c1.lookAt(p.x, (p.y || 0) + 1.0, p.z);
       const prevT = r.getRenderTarget();
       G.LightGrid.on(true);
+      // (the screens out of their own pictures: a screen in view while its target's drawn would read the texture being written:
+      // WebGL's 'feedback loop formed between Framebuffer and active Texture', and the draw dropped)
+      for (const sc of S.screens) sc.mesh.visible = false;
       for (let i = 0; i < 2; i++) { r.setRenderTarget(S.rts[i]); r.clear(); r.render(G.R.scene, S.cams[i]); }
+      for (const sc of S.screens) sc.mesh.visible = true;
       G.LightGrid.on(false);
       r.setRenderTarget(prevT);
     }

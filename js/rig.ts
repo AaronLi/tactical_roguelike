@@ -27,7 +27,7 @@ type RigState = 'alive' | 'down' | 'dead';
 interface Rig { // a character's skeleton and its meshes (what create makes, and what update, the hit and the zip tie add as they go)
   hairMesh: THREE.Mesh | null; look: Record<string, any>; pantsM: THREE.Material; seat: THREE.Mesh[] | null; kitParts: THREE.Object3D[]; kitKey: string | null; kit: Record<string, any> | null;
   callsign: { id: string; name: string } | null; root: THREE.Object3D; body: THREE.Object3D; hips: THREE.Object3D; spine: THREE.Object3D; chest: THREE.Object3D; neck: THREE.Object3D; head: THREE.Object3D;
-  armL: RigArm; armR: RigArm; legL: RigLeg; legR: RigLeg; gunMount: THREE.Object3D; slingMount: THREE.Object3D; hipMount: THREE.Object3D; slung: boolean; mats: any[]; scale: number; style: string;
+  armL: RigArm; armR: RigArm; legL: RigLeg; legR: RigLeg; gunMount: THREE.Object3D; slingMount: THREE.Object3D; hipMount: THREE.Object3D; slung: boolean; mats: any[]; scale: number; style: string; shoe: FsSole | null;
   gun: THREE.Object3D | null; gunInfo: Record<string, any> | null; gunKey: string | null; phase: number; vel: THREE.Vector3; lastPos: THREE.Vector3 | null;
   crouchW: number; aimW: number; lean: number; kick: number; flinch: THREE.Vector3; throwT: number; state: string; deadT: number; fallX: number; fallZ: number; downW: number;
   hb: any[] | null; dbg: THREE.Mesh[] | null; rd: Ragdoll;
@@ -297,7 +297,10 @@ const G_Rig = (() => {
     if (!o.dressed && o.vest && !vestM) vestM = L(o.vest === 'soft2' ? 0x5c5a50 : o.vest === 'soft' ? 0x34373b : 0x3b4232);
     if (!o.dressed && o.helmet && !helmetM) { helmetM = L(0x2a2d30); hairM = null; }
     const gloveM = ({ tactical: L(0x1c1d1f), leather: L(0x5e3e24), fingerless: L(0x1c1d1f) } as Record<string, THREE.MeshLambertMaterial>)[look.gloves] || null;
-    const bootM = style === 'civ' ? L(pick([0xeeeeee, 0x3a2a1a, 0x222222])) : L(0x1e1f21);
+    // (a civilian's shoes: white trainers, brown leather dress shoes, black everyday shoes; heard so too: js/footsteps.ts feetOf)
+    const shoeC: number | null = style === 'civ' ? pick([0xeeeeee, 0x3a2a1a, 0x222222]) : null;
+    const shoe: FsSole | null = shoeC == null ? null : shoeC === 0xeeeeee ? 'sneaker' : shoeC === 0x3a2a1a ? 'dress' : 'shoe';
+    const bootM = L(shoeC ?? 0x1e1f21);
     const dark = L(0x141414);
     const mats = [top, bottom, skin];
     const tieMat = L(0xe6e6e0); // white zip tie, easy to spot on a body
@@ -433,7 +436,7 @@ const G_Rig = (() => {
 
     const rig = {
       hairMesh, look, pantsM: bottom, seat: null, kitParts: [], kitKey: null, kit: null, callsign: o.animal ? { id: o.animal, name: o.callName || '' } : null, atakAlways: !!o.animal,
-      root, body, hips, spine, chest, neck, head, armL, armR, legL, legR, gunMount, slingMount, hipMount, slung: false, mats, scale: s, style,
+      root, body, hips, spine, chest, neck, head, armL, armR, legL, legR, gunMount, slingMount, hipMount, slung: false, mats, scale: s, style, shoe,
       gun: null, gunInfo: null, gunKey: null,
       phase: rnd() * 10, vel: new T.Vector3(), lastPos: null,
       crouchW: 0, aimW: 0, lean: 0, kick: 0, flinch: new T.Vector3(), throwT: -1,
@@ -712,9 +715,13 @@ const G_Rig = (() => {
     rig.flinch.z = Math.max(0, rig.flinch.z - dt * 5);
     if (rig.throwT >= 0) { rig.throwT += dt; if (rig.throwT > 0.9) rig.throwT = -1; }
 
-    // gait: one full cycle = two steps; longer strides when running
-    const stride = U.lerp(1.1, 1.8, U.clamp(speed / 6, 0, 1)) * (1 - rig.crouchW * 0.35);
+    // gait: one full cycle = two steps, at a walker's cadence for the speed (js/footsteps.ts: longer and quicker strides as it rises)
+    const stride = G.Footsteps ? G.Footsteps.stride(speed * s, rig.crouchW) / s : U.lerp(1.1, 1.8, U.clamp(speed / 6, 0, 1)) * (1 - rig.crouchW * 0.35);
+    const ph0 = rig.phase;
     rig.phase += (speed * dt / stride) * Math.PI * 2;
+    // a foot comes down where its lift (below) runs out: the left at phase π/2, the right at 3π/2 (js/footsteps.ts)
+    if (p.feet && moving > 0.6 && !p.zip && !p.climb && p.state !== 'down' && rig.proneS < 0.3 && !posed && G.Footsteps
+      && Math.floor((rig.phase - Math.PI / 2) / Math.PI) > Math.floor((ph0 - Math.PI / 2) / Math.PI)) G.Footsteps.rigStep(rig, p, speed * s);
     const bob = Math.abs(Math.sin(rig.phase)) * 0.035 * moving;
 
     // body: hips height, lean, downed pose

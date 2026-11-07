@@ -33,10 +33,12 @@ function saveRec(req, res) {
 const server = http.createServer((req, res) => {
   const url = decodeURIComponent(req.url.split('?')[0]);
   if (url === '/rec') { if (req.method === 'POST') return saveRec(req, res); res.writeHead(405); return res.end(); }
-  const file = path.normalize(path.join(root, url === '/' ? 'index.html' : url));
+  let file = path.normalize(path.join(root, url === '/' ? 'index.html' : url));
   if (!file.startsWith(root)) { res.writeHead(403); return res.end(); }
-  // a folder: a listing of its files (how the game finds what's in assets/stickers/, js/stickers.ts)
-  if (url !== '/' && url.endsWith('/')) {
+  // a folder: its index.html if it has one (a tool's page, e.g. tools/contact-synth/), else a listing of its files
+  // (how the game finds what's in assets/stickers/, js/stickers.ts)
+  if (url !== '/' && url.endsWith('/') && fs.existsSync(path.join(file, 'index.html'))) file = path.join(file, 'index.html');
+  else if (url !== '/' && url.endsWith('/')) {
     return fs.readdir(file, { withFileTypes: true }, (err, list) => {
       if (err) { res.writeHead(404); return res.end('Not found'); }
       const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));

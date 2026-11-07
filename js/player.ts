@@ -31,7 +31,7 @@ interface PAction {
   target?: number; living?: boolean; civBody?: boolean; approach?: PXZ | null; spot?: PXZ | null; face?: PXZ; stuck?: number; start?: THREE.Vector3; pull?: PPull | null; qFloor?: THREE.Quaternion;
 }
 // the action worked by hand (rack / release), the magazine pulled to look at, the chamber check, the comms wheel, a viewer, a zipline, a ladder
-interface PAct { kind: PActKind; seat: number | null; t: number; dur: number; back: number; home: number; b?: boolean; h?: boolean }
+interface PAct { kind: PActKind; seat: number | null; t: number; dur: number; back: number; home: number; b?: boolean; h?: boolean; s?: boolean } // (s: its sound's started: js/handling.ts, ahead of the stop it lines up with)
 interface PMagChk { k: number; back: number; yaw: number; pitch: number; rel?: boolean; seated?: boolean }
 interface PRChk { k: number; rel: boolean }
 interface PWheelItem { id: string; label: string; sub: string; off?: boolean; act: () => void }
@@ -89,7 +89,7 @@ const G_Me = {
   // the weapon in hand
   slot: undefined as unknown as string,
   reloading: undefined as unknown as boolean, reloadT: undefined as unknown as number, reloadTotal: undefined as unknown as number, reloadMode: undefined as unknown as PReloadMode,
-  reloadSeat: undefined as unknown as number, reloadPackK: undefined as unknown as number, reloadN: undefined as unknown as number, reloadEv: undefined as unknown as number, loadN: undefined as unknown as number,
+  reloadSeat: undefined as unknown as number, reloadPackK: undefined as unknown as number, reloadN: undefined as unknown as number, reloadEv: undefined as unknown as number, hCues: null as { at: number; name: string; done: boolean }[] | null, loadN: undefined as unknown as number,
   reloadEmpty: undefined as unknown as boolean, reloadAct: undefined as unknown as PActKind | null, slap: undefined as unknown as boolean,
   byHand: undefined as unknown as boolean, revOpen: undefined as unknown as boolean, revClose: undefined as unknown as boolean,
   magDropped: undefined as any, dumpDest: undefined as unknown as GGrid | null, dumped: undefined as unknown as GItem | null,
@@ -604,6 +604,7 @@ const G_Me = {
     if (this.giveUp >= this.GIVE_UP) { this.giveUp = 0; return this.die('Gave up, unconscious and bleeding'); }
 
     this.move(dt, map);
+    G.Footsteps.self(dt); // (your own footsteps: js/footsteps.ts)
     // the gun in your hands is the one in view (moved out of its slot in the Tab screen, rebuilt, swapped, a sticker put on: whatever changed it)
     const cw = this.cur();
     if (cw ? !G.R.vm || G.R.vm.userData.key !== G.R.vmKey(cw.def, cw.stickers) : G.R.vm) G.R.setViewmodel(cw ? cw.def : null);
@@ -705,7 +706,7 @@ const G_Me = {
     this.vel.x += (wx * speed - this.vel.x) * Math.min(1, accel * dt);
     this.vel.z += (wz * speed - this.vel.z) * Math.min(1, accel * dt);
     this.vel.y -= 20 * dt;
-    const prevY = this.pos.y, STEP = G.World.STEP, was = this.onGround;
+    const prevY = this.pos.y, STEP = G.World.STEP, was = this.onGround, x0 = this.pos.x, z0 = this.pos.z;
     this.pos.x += this.vel.x * dt;
     this.pos.z += this.vel.z * dt;
     G.Level.resolve(map, this.pos, 0.35, prevY, STEP, true); // (anything a step high or less: walked up onto, not into; stairs as slopes)
@@ -728,8 +729,10 @@ const G_Me = {
     this.eyeH += (eyeTarget - this.eyeH) * Math.min(1, dt * 12);
     const ceil = map.world ? G.World.ceilingAt(map.world, this.pos.x, this.pos.z, 0.2, this.pos.y + 1.0) : G.Level.WALL_H; // (the ceiling over you, wherever you are: none outdoors)
     if (this.pos.y + this.eyeH > ceil - 0.15) { this.pos.y = ceil - 0.15 - this.eyeH; this.vel.y = Math.min(0, this.vel.y); }
-    this.hspeed = Math.hypot(this.vel.x, this.vel.z);
-    if (this.onGround && this.hspeed > 0.5) this.bobT += dt * this.hspeed * 1.8;
+    // how fast you're really going: what the walls let you move, not what your legs are pushing for (into a wall: nothing,
+    // so no stride, no bob, no steps; along one, the slide). The push itself stays in vel (a cracked pane shouldered, above).
+    this.hspeed = dt > 0 ? Math.min(Math.hypot(this.vel.x, this.vel.z), Math.hypot(this.pos.x - x0, this.pos.z - z0) / dt) : 0;
+    if (this.onGround && this.hspeed > 0.5) this.bobT += dt * Math.PI * G.Footsteps.cadence(this.hspeed, this.crouch ? 1 : 0); // (a dip of the view each step, on the steps' cadence: js/footsteps.ts)
   },
   // A coin-op viewer (the Sandia Crest's overlook: crest.scopes, js/furniture.ts): press F at one to put your eyes to it, a
   // MAG-power view out over the gorge, turned no further than YAW either side of where it points, UP and DOWN; the weapon away.
@@ -1117,7 +1120,9 @@ const G_Me = {
     this.handCase = info && info.breech && w.spent && w.spent.length ? w.spent[0] : null; this.handOut = false;
     if (!this.handCase) G.Casings.emptied(w.def, w.def.volley ? (w.spent || []).length : mag - w.mag, w.spent); // a revolver or break-action: the empties fall out (each hull its load's colour; a volley gun's: what it fired, however many were in it)
     this.ejected = w.spent; this.ejecting = (w.spent || []).length; this.ejectT = this.handCase ? this.reloadTotal * 0.3 : 0.25; w.spent = []; // (still in it till they do: js/vmanim.ts)
-    if (!this.slap && (this.loose(w.def) || !G.Audio.sample('pull_magazine'))) G.Audio.reload(); // (a slap reload's own sounds come as it goes: slapSounds)
+    this.hCues = !this.slap && !this.loose(w.def) ? G.Handling.cues(w.def) : null; // (a cylinder, a hinge, a feed cover: on the animation's own moments, below)
+    if (this.revOpen) G.Handling.open(w.def);
+    if (!this.slap && !this.hCues && !this.loose(w.def)) G.Handling.play(w.def, w.mag > 0 ? 'mag-out' : 'mag-out-empty', { land: G.Handling.LAND.magOut }) || G.Audio.sample('pull_magazine'); // (a slap reload's own sounds come as it goes: slapSounds; a round-by-round one's with each round (and a cylinder's or a block's opening); else the gun's own, js/handling.ts, else the recording)
   },
   reloadTime(def: WeaponDef) { return this.byHand && def.handReload ? def.handReload : def.reload; },
   // how many rounds the next step of a loose reload puts in: one, or with a loader several (a tube's push, the Hailstorm's Wolverine grip: three), fewer when
@@ -1133,7 +1138,7 @@ const G_Me = {
   loose(def: WeaponDef) { return def.shell || (!!this.byHand && G.revolver(def)); },
   // a revolver loaded a round at a time: it stays open till it's shut, which takes a moment (a falling block likewise: the block stays down till it's shut, js/data.ts G.fblock)
   revHand(def: WeaponDef) { return (G.revolver(def) || G.fblock(def)) && this.loose(def); },
-  revShut() { this.revClose = true; this.reloadT = this.reloadTotal = G.REV.close; },
+  revShut(def: WeaponDef) { this.revClose = true; this.reloadT = this.reloadTotal = G.REV.close; G.Handling.shut(def); },
   ACT_T: { release: 0.4, rack: 0.6 },
   // how far through its motions a magazine change goes before the action, from empty: it stops as the magazine
   // seats and the hand goes straight on to the catch or the handle (no trip back to the handguard first)
@@ -1201,8 +1206,8 @@ const G_Me = {
     // holding R: the magazine check (js/vmanim.ts magCheckClip). Out, look, and back in when you let go (or do anything else).
     if (this.rHeldAt && performance.now() - this.rHeldAt > 260) {
       this.rHeldAt = 0;
-      if (!this.reloading && !w.noMag && G.VMAnim.canMagCheck(G.R.vm)) { this.magChk = { k: 0, back: 0, yaw: 0, pitch: 0 }; this.inspectT = 0; G.Audio.click(); }
-      else if (!this.reloading && !this.act) { this.rChk = { k: 0, rel: false }; this.inspectT = 0; this.inspYaw = this.inspPitch = 0; G.Audio.click(); }
+      if (!this.reloading && !w.noMag && G.VMAnim.canMagCheck(G.R.vm)) { this.magChk = { k: 0, back: 0, yaw: 0, pitch: 0 }; this.inspectT = 0; G.Handling.play(w.def, w.mag > 0 ? 'mag-out' : 'mag-out-empty', { land: 0, vol: 0.35 }) || G.Audio.sample('pull_magazine', 0.35, 1.2); } // (the catch pressed and the magazine drawn: its own sound, quieter than a change)
+      else if (!this.reloading && !this.act) { this.rChk = { k: 0, rel: false }; this.inspectT = 0; this.inspYaw = this.inspPitch = 0; G.Handling.play(w.def, 'pull', { land: G.Handling.LAND.rack, vol: 0.35 }); } // (the action eased back to see the round: the pull alone, quietly; nothing where the gun has none)
     }
     // held R on a gun with no magazine to pull: into the chamber check (0.45 s), held while R is (the mouse turns the
     // gun, as a held inspect's), and back out when you let go or do anything else (0.35 s)
@@ -1220,7 +1225,7 @@ const G_Me = {
       else {
         if (!mc.back) mc.back = Math.max(0.001, 1 - mc.k);
         mc.back += dt / 0.5;
-        if (mc.back >= 0.78 && !mc.seated) { mc.seated = true; G.Audio.sample('insert_magazine', 0.35, 1.2) || G.Audio.click(); }
+        if (mc.back >= 0.78 && !mc.seated) { mc.seated = true; G.Handling.play(def, 'mag-in', { land: G.Handling.LAND.magIn, vol: 0.35 }) || G.Audio.sample('insert_magazine', 0.35, 1.2) || G.Audio.click(); }
         if (mc.back >= 1) this.magChk = null;
       }
       this.fireCd = Math.max(this.fireCd, 0.12); // (no magazine in it)
@@ -1232,8 +1237,15 @@ const G_Me = {
       ac.t += dt / ac.dur;
       this.fireCd = Math.max(this.fireCd, (1 - ac.t) * ac.dur);
       const pistol = def.cls === 'PST' || def.cls === 'MP';
-      if (!ac.b && ac.t >= ac.back) { ac.b = true; if (w.spentCh) this.ejectSpent(w, 0); if (ac.kind === 'rack') G.Audio.sample(pistol && !def.manual ? 'drop_slide' : 'rack_slide', 0.8, def.manual ? this.MANUAL_PITCH : 1); }
-      if (!ac.h && ac.t >= ac.home) { ac.h = true; this.feed(w); if (ac.kind === 'release') G.Audio.sample('drop_slide', 0.9, pistol ? 1 : 0.85); }
+      // its sound (js/handling.ts: the gun's own), started ahead of the stop it lines up with by as much as leads up to
+      // it in the clip: a rack's rear stop, a release's slam home. Else the recording, at the stop.
+      if (!ac.s) {
+        const rack = ac.kind === 'rack', nm = rack ? G.Handling.rackClip(def, ac.dur) : G.Handling.lead(def, 'release') != null ? 'release' : 'home';
+        const stop = rack ? ac.back : ac.home, ld = G.Handling.lead(def, nm);
+        if (ld != null && ac.t >= stop - ld / ac.dur) { ac.s = true; G.Handling.play(def, nm, { land: Math.max(0, (stop - ac.t) * ac.dur), vol: rack ? 0.8 : 0.9 }); }
+      }
+      if (!ac.b && ac.t >= ac.back) { ac.b = true; if (w.spentCh) this.ejectSpent(w, 0); if (ac.kind === 'rack' && !ac.s) { ac.s = true; G.Audio.sample(pistol && !def.manual ? 'drop_slide' : 'rack_slide', 0.8, def.manual ? this.MANUAL_PITCH : 1); } }
+      if (!ac.h && ac.t >= ac.home) { ac.h = true; this.feed(w); if (ac.kind === 'release' && !ac.s) { ac.s = true; G.Audio.sample('drop_slide', 0.9, pistol ? 1 : 0.85); } }
       if (ac.t >= 1) this.act = null;
     }
     if (this.ejecting && (this.ejectT -= dt) <= 0) this.ejecting = 0;
@@ -1244,8 +1256,13 @@ const G_Me = {
         // the old magazine leaves your hand onto the floor (as the viewmodel lets go of it)
         if (this.slap) this.slapSounds(w, k);
         const km = k * (this.reloadSeat || 1); // (through the magazine change's motions)
-        if (this.slap) { /* (its own: slapSounds) */ } else if (this.reloadMode === 'floor' && !this.magDropped && !w.noMag && km > (def.barrels ? 0.47 : pistol ? 0.06 : 0.2)) this.magDropped = G.Casings.dropMag(def) || true;
-        if (this.slap) { /* (its own: slapSounds) */ } else if (this.reloadEv === 0 && km > (def.barrels ? 0.8 : this.reloadMode === 'retain' || this.reloadMode === 'pouch' ? 0.76 : 0.68)) { this.reloadEv = 1; G.Audio.sample('insert_magazine'); }
+        if (this.slap) { /* (its own: slapSounds) */ } else if (this.reloadMode === 'floor' && !this.magDropped && !w.noMag && km > (def.barrels ? 0.47 : pistol ? 0.06 : 0.2)) this.magDropped = G.Casings.dropMag(def, w.mag / Math.max(1, def.mag)) || true;
+        if (this.hCues) { // (each part as far ahead of its moment as its clip leads it: secs to go = (at - km) of the change's motions)
+          const R = this.reloadTotal / (this.reloadSeat || 1);
+          for (const c of this.hCues) { const ld = c.done ? null : G.Handling.lead(def, c.name); if (ld != null && (c.at - km) * R <= ld) { c.done = true; G.Handling.play(def, c.name, { land: Math.max(0, (c.at - km) * R) }); } }
+          this.reloadEv = 1;
+        }
+        if (this.slap) { /* (its own: slapSounds) */ } else if (this.reloadEv === 0 && km > (def.barrels ? 0.8 : this.reloadMode === 'retain' || this.reloadMode === 'pouch' ? 0.76 : 0.68)) { this.reloadEv = 1; G.Handling.play(def, 'mag-in', { land: G.Handling.LAND.magIn }) || G.Audio.sample('insert_magazine'); }
       }
       if (this.reloadT <= 0) {
         if (this.revClose) { this.revClose = false; this.reloading = false; } // (shut: ready)
@@ -1253,9 +1270,9 @@ const G_Me = {
           // one shell, or with a speed loader several at a push
           this.revOpen = false;
           const got = w.mag < mag ? G.Gear.takeRounds(this, def, Math.min(def.perLoad || 1, mag - w.mag), w.ammo) : [];
-          if (got.length) { G.Gear.chamberIn(w, got); G.Audio.sample('insert_magazine', 0.5, 1.6) || G.Audio.shell(); }
+          if (got.length) { G.Gear.chamberIn(w, got); G.Handling.roundIn(def, { vol: 0.5 }) || G.Audio.sample('insert_magazine', 0.5, 1.6) || G.Audio.shell(); }
           if (w.mag < mag && w.reserve > 0) { this.reloadT = this.reloadTime(def); this.reloadTotal = this.reloadT; this.loadN = this.loadCount(w, mag); }
-          else if (this.revHand(def)) this.revShut();
+          else if (this.revHand(def)) this.revShut(def);
           else { this.reloading = false; if (this.reloadEmpty) this.rack(w); else this.feed(w); }
         } else {
           // a fresh magazine in (the old one goes back in its pouch), or loose rounds into a break-action
@@ -1263,7 +1280,7 @@ const G_Me = {
             this.dumped = null;
             const went = G.Gear.dumpMag(this, w, mag, this.dumpDest as GGrid);
             // the magazine on the floor is that one (it can be picked up again)
-            if (went === 'floor') { const c = this.magDropped && this.magDropped !== true ? this.magDropped : G.Casings.dropMag(def); if (c && this.dumped) c.item = this.dumped; }
+            if (went === 'floor') { const c = this.magDropped && this.magDropped !== true ? this.magDropped : G.Casings.dropMag(def, w.mag / Math.max(1, def.mag)); if (c && this.dumped) c.item = this.dumped; }
           } else if (G.Gear.ammoFor(def).kind === 'mag') G.Gear.swapMag(this, w, mag);
           else G.Gear.chamberIn(w, G.Gear.takeRounds(this, def, mag - w.mag, w.ammo));
           this.reloading = false; // (a gun of several barrels: the new block's own counts are in G.Gear loadIn, or spread evenly: js/data.ts G.barrelsOf)
@@ -1312,7 +1329,7 @@ const G_Me = {
       return;
     }
     if (this.reloading) {
-      if (this.revHand(def)) { if (!this.revClose) { this.revShut(); this.pressBuf = G.REV.close + 0.05; } return; } // (the cylinder shut first, on what's in it: the shot goes as it does)
+      if (this.revHand(def)) { if (!this.revClose) { this.revShut(def); this.pressBuf = G.REV.close + 0.05; } return; } // (the cylinder shut first, on what's in it: the shot goes as it does)
       if (this.loose(def)) this.reloading = false; else return;
     }
     const bolt = ch && !!def.manual, round = w.chamber;
@@ -1344,12 +1361,12 @@ const G_Me = {
   slapSounds(w: GWeapon, k: number) {
     const S = G.VMAnim.SLAP, km = G.VMAnim.slapM(k, this.reloadMode), def = w.def, // (how far the magazine change is: js/vmanim.ts slapM)
       keep = this.reloadMode === 'retain' || this.reloadMode === 'pouch';
-    if (this.reloadEv === 0 && k > (S.grab + S.pull) / 2) { this.reloadEv = 1; G.Audio.sample('rack_slide', 0.7, 1.2); }
-    if (this.reloadEv === 1 && k > S.lock) { this.reloadEv = 2; G.Audio.click(); }
-    if (this.reloadEv === 2 && km > 0.1) { this.reloadEv = 3; if (!G.Audio.sample('pull_magazine')) G.Audio.reload(); }
-    if (this.reloadMode === 'floor' && !this.magDropped && !w.noMag && km > 0.2) this.magDropped = G.Casings.dropMag(def) || true;
-    if (this.reloadEv === 3 && km > (keep ? 0.76 : 0.68)) { this.reloadEv = 4; G.Audio.sample('insert_magazine'); }
-    if (this.reloadEv === 4 && k > S.slap) { this.reloadEv = 5; G.Audio.sample('drop_bolt', 1, 1.3); G.Audio.sample('drop_slide', 0.7, 1.4); }
+    if (this.reloadEv === 0 && k > (S.grab + S.pull) / 2) { this.reloadEv = 1; G.Handling.play(def, 'pull', { land: G.Handling.LAND.rack }) || G.Audio.sample('rack_slide', 0.7, 1.2); }
+    if (this.reloadEv === 1 && k > S.lock) { this.reloadEv = 2; } // (the handle turned up into its notch: the pull's sound carries it)
+    if (this.reloadEv === 2 && km > 0.1) { this.reloadEv = 3; G.Handling.play(def, w.mag > 0 ? 'mag-out' : 'mag-out-empty', { land: G.Handling.LAND.magOut }) || G.Audio.sample('pull_magazine'); }
+    if (this.reloadMode === 'floor' && !this.magDropped && !w.noMag && km > 0.2) this.magDropped = G.Casings.dropMag(def, w.mag / Math.max(1, def.mag)) || true;
+    if (this.reloadEv === 3 && km > (keep ? 0.76 : 0.68)) { this.reloadEv = 4; G.Handling.play(def, 'mag-in', { land: G.Handling.LAND.magIn }) || G.Audio.sample('insert_magazine'); }
+    if (this.reloadEv === 4 && k > S.slap) { this.reloadEv = 5; G.Audio.sample('drop_bolt', 1, 1.3); G.Handling.play(def, 'home', { land: G.Handling.LAND.home }) || G.Audio.sample('drop_slide', 0.7, 1.4); } // (the hand's slap, and the bolt going home)
   },
   // the next round from the magazine (or tube) into an empty chamber
   feed(w: GWeapon) {

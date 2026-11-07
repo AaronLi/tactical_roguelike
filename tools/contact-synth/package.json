@@ -1,0 +1,16 @@
+{
+  "name": "contact-synth",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Physically-informed Web Audio synthesizer for metal and plastic contact sounds",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p .",
+    "watch": "tsc -p . --watch",
+    "check": "node test/render-all.mjs",
+    "scene": "node scripts/render-scene.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.2"
+  }
+}

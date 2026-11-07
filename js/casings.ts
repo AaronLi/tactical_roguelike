@@ -21,7 +21,7 @@ const G_Casings = (() => {
   type CaseGun = Record<string, any>; // a gun, as far as a case is concerned (its id)
   interface CaseKind { mat: CaseMat; len: number; r: number; h?: number }
   // one thing falling: a spent case (slots in the instanced meshes, am: its load) or a dropped magazine (mesh, item: what it carries, box: its pick-up box)
-  interface Spent { k: CaseKind; p: THREE.Vector3; v: THREE.Vector3; q: THREE.Quaternion; w: THREE.Vector3; rest: boolean; age: number; slots?: number[]; am?: string; mesh?: THREE.Mesh; item?: any; box?: any }
+  interface Spent { k: CaseKind; p: THREE.Vector3; v: THREE.Vector3; q: THREE.Quaternion; w: THREE.Vector3; rest: boolean; age: number; slots?: number[]; am?: string; mesh?: THREE.Mesh; item?: any; box?: any; drop?: { def: WeaponDef; fill: number } | null; quiet?: boolean }
   // a case or some cases due out of a gun, in t seconds
   interface Pending { t: number; def: WeaponDef; local: boolean; from?: THREE.Vector3 | null; to?: THREE.Vector3 | null; am?: string | string[]; drop?: boolean; n?: number }
   let metal: THREE.InstancedMesh = null!, hull: THREE.InstancedMesh = null!, live: Spent[] = [], queue: Pending[] = [], free: number[] = [], sounds = 0;
@@ -135,7 +135,8 @@ const G_Casings = (() => {
     if (!boxMat) boxMat = new T.MeshStandardMaterial({ color: 0xb0915e, roughness: 0.9 });
     return { mesh: new T.Mesh(new T.BoxGeometry(x, y, z), item && item.k === 'ammo' ? boxMat : magMat), r: x / 2 };
   }
-  function dropMag(def: WeaponDef) {
+  // (fill: how full it was, 0..1: its fall's sound, js/handling.ts drop)
+  function dropMag(def: WeaponDef, fill = 0) {
     const vm = G.R.vm, a = vm && vm.userData.vma, h = vm && vm.userData.holders && vm.userData.holders[0];
     if (!h || !G.R.dynRoot) return undefined;
     const { mesh, r } = magMesh(def, null);
@@ -145,7 +146,7 @@ const G_Casings = (() => {
     h.holder.getWorldQuaternion(q);
     const v = G.Me.vel ? V().set(G.Me.vel.x, 0, G.Me.vel.z) : V();
     v.y -= 0.6;
-    const c: Spent = { mesh, p, q, v, w: new T.Vector3((Math.random() - 0.5) * 6, (Math.random() - 0.5) * 4, (Math.random() - 0.5) * 6), rest: false, age: 0, k: { mat: 'steel', len: 120, r } };
+    const c: Spent = { mesh, p, q, v, w: new T.Vector3((Math.random() - 0.5) * 6, (Math.random() - 0.5) * 4, (Math.random() - 0.5) * 6), rest: false, age: 0, k: { mat: 'steel', len: 120, r }, drop: { def, fill } };
     G.R.dynRoot.add(mesh);
     mags.push(c);
     // too many lying about: the oldest one that nobody can pick up goes
@@ -176,23 +177,56 @@ const G_Casings = (() => {
     const L = G.Level, f = map.floors ? L.floorAt(map, x, y, z)! : 0, fy = map.floors ? map.floors[f].fy : 0; // (which floor it's on)
     if (y - fy > 0.05) return 'wood'; // something's top: a table, a crate, a sofa (or a step)
     if (!map.surf) {
-      // what each tile's floor is, from its room (each floor its own)
-      const WH = map.W * map.H;
-      map.surf = new Array(WH * (map.NF || 1)).fill(map.theme.home >= 1 ? 'hard' : 'concrete');
-      for (const rm of map.rooms) {
-        const fl = rm.out ? ((G.Furniture.ROOMS as Record<string, any>)[rm.type] || {}).sound || 'grass' : rm.dress ? rm.dress.floor.sound || rm.dress.floor.kind : ((G.Furniture.ROOMS as Record<string, any>)[rm.type] || {}).floor; // (a resident's room has its own: js/homes.ts)
-        if (!fl) continue;
-        for (let tz = rm.z; tz < rm.z + rm.h; tz++) for (let tx = rm.x; tx < rm.x + rm.w; tx++) map.surf[(rm.fl || 0) * WH + tz * map.W + tx] = fl;
+      // what each tile's floor is, as it's drawn (each floor its own): the open ground what the level lays outside (a
+      // festival's lawn, the mountain's granite), indoors the level's own floor (a home's boards); then each room's floor
+      // (out of doors too: a road's paving, a lawn's grass, the Crest's dirt tracks; js/furniture.ts ROOMS, `sound` where
+      // a case or a foot hears it differently from what's drawn), a festival's slabs over its lawn (the square's paving, the
+      // gate's, the car park's asphalt, the toilet block's tiles: G.Level.buildFestival), and a resident's room its own
+      const WH = map.W * map.H, NF = map.NF || 1, TS = L.TS, ROOMS = G.Furniture.ROOMS as Record<string, any>;
+      const ground = map.fest ? 'grass' : map.theme.rock ? 'gravel' : 'concrete', inside = map.theme.home >= 1 ? 'hard' : 'concrete';
+      map.surf = new Array(WH * NF);
+      const sky = new Uint8Array(WH * NF);
+      for (let f = 0; f < NF; f++) { const o = (map.floors ? map.floors[f] : map).out; for (let i = 0; i < WH; i++) { sky[f * WH + i] = o && o[i] ? 1 : 0; map.surf[f * WH + i] = o && o[i] ? null : inside; } }
+      const lay = (rm: any, fl: string) => { for (let tz = rm.z; tz < rm.z + rm.h; tz++) for (let tx = rm.x; tx < rm.x + rm.w; tx++) map.surf[(rm.fl || 0) * WH + tz * map.W + tx] = fl; };
+      for (const rm of map.rooms) if (rm.out) { const sp = ROOMS[rm.type] || {}, fl = sp.sound || sp.floor; if (fl) lay(rm, fl); }
+      // the seams between the outdoor rooms (a kerb, a fence line, the strip round a house): the ground beside them, a
+      // couple of tiles out (not at a festival: its lawn is laid wall to wall under everything); anywhere further out of
+      // doors, the level's open ground
+      for (let step = 0; step < (map.fest ? 0 : 2); step++) {
+        const was = map.surf.slice();
+        for (let i = 0; i < was.length; i++) if (was[i] === null) {
+          const x = i % map.W, z = ((i % WH) / map.W) | 0;
+          const by = (j: number) => sky[j] ? was[j] : null, n = (x > 0 && by(i - 1)) || (x < map.W - 1 && by(i + 1)) || (z > 0 && by(i - map.W)) || (z < map.H - 1 && by(i + map.W));
+          if (n) map.surf[i] = n;
+        }
       }
+      for (let i = 0; i < map.surf.length; i++) if (map.surf[i] === null) map.surf[i] = ground;
+      const fest = map.fest;
+      if (fest) {
+        const slab = (r: any, fl: string) => { if (!r) return; for (let tz = Math.max(0, Math.floor(r.z0 / TS)); tz < Math.min(map.H, Math.ceil(r.z1 / TS)); tz++) for (let tx = Math.max(0, Math.floor(r.x0 / TS)); tx < Math.min(map.W, Math.ceil(r.x1 / TS)); tx++) map.surf[tz * map.W + tx] = fl; };
+        slab(fest.gate, 'pave');
+        if (fest.plaza) slab({ x0: fest.plaza.x0 - TS, x1: fest.plaza.x1, z0: fest.plaza.z0 - TS, z1: fest.plaza.z1 + TS * 2 }, 'pave');
+        if (fest.lot) slab({ x0: fest.lot.x0 - TS, x1: fest.lot.x1 + TS, z0: fest.lot.z0 - TS / 2, z1: fest.lot.z1 + TS }, 'concrete'); // (asphalt)
+        const wc = map.rooms.filter((rm: any) => rm.type === 'washroom' || rm.type === 'cubicle');
+        if (wc.length) slab({ x0: (Math.min(...wc.map((rm: any) => rm.x)) - 1) * TS, x1: (Math.max(...wc.map((rm: any) => rm.x + rm.w)) + 1) * TS, z0: (Math.min(...wc.map((rm: any) => rm.z)) - 1) * TS, z1: (Math.max(...wc.map((rm: any) => rm.z + rm.h)) + 1) * TS }, 'tile');
+      }
+      for (const rm of map.rooms) if (!rm.out) { const fl = rm.dress ? rm.dress.floor.sound || rm.dress.floor.kind : (ROOMS[rm.type] || {}).floor; if (fl) lay(rm, fl); } // (a resident's room has its own: js/homes.ts)
     }
     const tx = Math.floor(x / L.TS), tz = Math.floor(z / L.TS);
     return map.surf[f * map.W * map.H + tz * map.W + tx] || 'concrete';
   }
   function impact(c: Spent, speed: number, map: any) {
-    if (speed < 0.35 || sounds > 5) return;
+    if (c.quiet || speed < 0.35 || sounds > 5) return;
     const cam = G.R.camera, d = c.p.distanceTo(cam.position);
     if (d > 26) return;
     sounds++;
+    // a magazine of yours on a hard floor: its own fall (js/handling.ts: that gun's magazine simulated landing, every
+    // contact of it from this first one), where it lands; then the rest of its bounces are in that
+    if (c.drop) {
+      const dr = c.drop, surf = surface(map, c.p.x, c.p.z, c.p.y - c.k.r);
+      c.drop = null;
+      if (!G.Audio.SOFT[surf] && G.Handling.drop(dr.def, dr.fill, c.p)) { c.quiet = true; return; }
+    }
     // left or right of you
     const rel = V().subVectors(c.p, cam.position).normalize(), right = V().setFromMatrixColumn(cam.matrixWorld, 0);
     G.Audio.casing(d, c.k.mat, c.k.len, surface(map, c.p.x, c.p.z, c.p.y - c.k.r), speed, G.U.clamp(rel.dot(right), -1, 1), c.p);

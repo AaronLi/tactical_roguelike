@@ -955,7 +955,7 @@ const G_Ambience = (() => {
 
   // ---- in the game ----
   let wasAboard = false;
-  let bus: GainNode | null = null, cur: AmbScene | null = null, curMap: LvMap | null | undefined, outT = 0, spotT = 0, vol = 0.2625; // (vol: the ambience under the master volume: 0.7 at first, a quarter off, then half of that)
+  let bus: GainNode | null = null, cur: AmbScene | null = null, curMap: LvMap | null | undefined, outT = 0, spotT = 0, vol = 0.21; // (vol: the ambience under the master volume: 0.7 at first, a quarter off, then half of that, then 2 dB more under the shots)
   /** bring spots in range on (and the far ones off), heard by the way they reach you */
   function updateSpots(s: AmbScene, p: THREE.Vector3) {
     const c = s.c, t = c.currentTime, MAX = 6; // (the nearest few at most: a foundry's full of fires)
