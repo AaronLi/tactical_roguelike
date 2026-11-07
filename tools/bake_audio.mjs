@@ -3,7 +3,7 @@
 // Run by `npm run build`; `npm run bake:audio` alone. The synth is compiled first, then a bank is baked again only when
 // what it's baked from has changed: a hash of the synth's sources, its bank scripts and its package.json, kept in the
 // bank as .inputs (--force bakes regardless). Banks render on worker threads: -j N (default the cores less one).
-// Needs ffmpeg on the PATH (the clips are Ogg Vorbis).
+// The clips are Ogg Vorbis, encoded in-process (libvorbis as WebAssembly: wasm-media-encoders, a dev dependency): no ffmpeg needed.
 // Then both banks are packed into ONE bundle, as the models are (tools/model_bundles.mjs's container): assets/audio/bundles/audio.rtb,
 // gzipped (it halves it: every clip carries the same Vorbis setup header), and bundles/manifest.json ({ v, hash, size }: what the
 // game fetches to learn whether its stored copy is current: js/modelbundles.ts G.AudioBundle). Packed again whenever a bank's baked
@@ -23,7 +23,6 @@ const BANKS = [
   { name: 'footsteps', script: 'scripts/footstep-bank.mjs', out: 'assets/audio/footsteps' },
 ];
 
-try { execFileSync('ffmpeg', ['-version'], { stdio: 'ignore' }); } catch { console.error('bake:audio needs ffmpeg on the PATH'); process.exit(1); }
 // the synth's compiled JS (its page runs from it, and the banks import it)
 execFileSync(process.execPath, [join(root, 'node_modules/typescript/bin/tsc'), '-p', synth], { stdio: 'inherit' });
 

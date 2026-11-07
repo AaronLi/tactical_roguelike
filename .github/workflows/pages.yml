@@ -26,10 +26,8 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       # The synthesized audio (assets/audio/handling, assets/audio/footsteps, git-ignored): npm run build bakes them
-      # (tools/bake_audio.mjs) with ffmpeg, again only when the contact synth they're baked from has changed, and packs
+      # (tools/bake_audio.mjs; Ogg Vorbis by a WebAssembly encoder, no ffmpeg), again only when the contact synth they're baked from has changed, and packs
       # them into the one bundle the game loads (assets/audio/bundles/audio.rtb). Cached on it.
-      - name: ffmpeg
-        run: command -v ffmpeg || (sudo apt-get update && sudo apt-get install -y ffmpeg)
       - name: Baked audio (cache)
         uses: actions/cache@v4
         with:
@@ -37,7 +35,7 @@ jobs:
             assets/audio/handling
             assets/audio/footsteps
             assets/audio/bundles
-          key: audio-${{ hashFiles('tools/contact-synth/src/**', 'tools/contact-synth/scripts/**', 'tools/contact-synth/package.json', 'tools/bake_audio.mjs') }}
+          key: audio-${{ hashFiles('tools/contact-synth/src/**', 'tools/contact-synth/scripts/**', 'tools/contact-synth/package.json', 'tools/bake_audio.mjs', 'package-lock.json') }}
       - run: npm run build -- -j 4
       # The guns: the game loads them only as baked glTF (assets/models, git-ignored), so the site bakes them here.
       # Cached on everything a bake reads (the recipes and the baker, the parts data, the authored models): a push that
