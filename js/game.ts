@@ -221,16 +221,19 @@ const G_Game = {
     M.fabric().color.setHex(L.top === 'tshirt' ? SKIN : L.topC);
     M.glove().color.setHex(({ tactical: 0x1b1c1e, leather: 0x5e3e24, fingerless: 0x1b1c1e } as Record<string, number>)[L.gloves] || SKIN);
   },
+  routeHover: (() => {}) as (el: HTMLElement, view?: boolean) => void, // (a route map's hover cards on an element: bindMenu)
   bindMenu() {
     this.bindLook();
     // hovering a node on the route map: its card (js/route.ts tip), beside the pointer, kept on screen
     const tipEl = document.createElement('div'); tipEl.id = 'routeTip'; tipEl.className = 'route-tip ui hidden'; document.body.appendChild(tipEl);
     let tipOn: number | null = null;
-    this.$('routeMap').addEventListener('pointermove', ((e: PointerEvent) => {
+    // (on the route screen's map, and on the hangar's Tab menu's view of it: js/shop.ts routeHtml)
+    this.routeHover = (el: HTMLElement, view = false) => {
+    el.addEventListener('pointermove', ((e: PointerEvent) => {
       const g = (e.target as HTMLElement).closest<HTMLElement>('[data-node]');
       if (!g || !this.routeMap || !this.routeSt) { tipEl.classList.add('hidden'); tipOn = null; return; }
       const id = +g.dataset.node!;
-      if (id !== tipOn) { tipOn = id; tipEl.innerHTML = G.Route.tip(this.routeMap, id, this.routeTipSt()); }
+      if (id !== tipOn) { tipOn = id; tipEl.innerHTML = G.Route.tip(this.routeMap, id, Object.assign(this.routeTipSt(), { view })); }
       tipEl.classList.remove('hidden');
       const w = tipEl.offsetWidth, h = tipEl.offsetHeight, W = window.innerWidth, H = window.innerHeight;
       let x = e.clientX + 18, y = e.clientY + 18;
@@ -238,7 +241,9 @@ const G_Game = {
       if (y + h > H - 8) y = e.clientY - h - 18;
       tipEl.style.left = Math.max(8, x) + 'px'; tipEl.style.top = Math.max(8, y) + 'px';
     }) as EventListener);
-    this.$('routeMap').addEventListener('pointerleave', () => { tipEl.classList.add('hidden'); tipOn = null; });
+    el.addEventListener('pointerleave', () => { tipEl.classList.add('hidden'); tipOn = null; });
+    };
+    this.routeHover(this.$('routeMap'));
     this.$('routeMap').addEventListener('click', ((e: GmEvt) => { const g = e.target.closest<HTMLElement>('[data-node]'); if (g) this.pickRoute(+g.dataset.node!); }) as EventListener);
     const name = this.$<HTMLInputElement>('nameInput');
     name.value = this.myName;

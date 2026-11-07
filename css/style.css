@@ -77,6 +77,15 @@ input[type=checkbox] { accent-color: var(--ui-text); }
 .route-title { font: 300 24px var(--ui-font); letter-spacing: 8px; text-transform: uppercase; }
 .route-title span { font: 300 14px var(--ui-font); color: var(--ui-dim); letter-spacing: 1px; text-transform: none; }
 #routeMap { overflow-x: auto; overflow-y: hidden; max-width: 100%; scrollbar-color: rgba(255,255,255,0.25) transparent; }
+/* the hangar's Tab menu's view of the route (js/shop.ts routeHtml): the same map, scrolling sideways, a line on what's next above it */
+.shop-route-head { grid-column: 1 / -1; margin: 2px 0 8px; line-height: 1.5; }
+.shop-route-head b { letter-spacing: 1px; }
+.shop-route { grid-column: 1 / -1; overflow-x: auto; overflow-y: hidden; max-width: 100%; scrollbar-color: rgba(255,255,255,0.25) transparent; }
+.shop-route .route-svg { height: min(58vh, 520px); width: auto; display: block; }
+.shop-route .rn { cursor: default; }
+.shop-route-empty { grid-column: 1 / -1; padding: 24px 4px; }
+.tab.tab-icon { display: inline-flex; align-items: center; justify-content: center; padding-left: 12px; padding-right: 12px; }
+.tab .tab-ico { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linejoin: round; stroke-linecap: round; display: block; }
 .route-svg { height: min(62vh, calc(620px * var(--ik, 1))); width: auto; max-width: none; display: block; margin: 8px 0; font-family: var(--ui-font); }
 .route-svg .rc { fill: var(--ui-dim); font-size: 11px; letter-spacing: 0.2em; text-anchor: middle; font-weight: 500; }
 .route-svg .rl { stroke: rgba(255,255,255,0.18); stroke-width: 1.5; stroke-dasharray: 4 5; }

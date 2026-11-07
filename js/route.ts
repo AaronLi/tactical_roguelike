@@ -8,7 +8,7 @@ const G_Route = (() => {
   // which column a level is in, and which act; the last level of each act is the boss
   interface RNode { id: number; c: number; r: number; th: number; next: number[]; prev: number[]; boss: boolean; stronghold: boolean; night: boolean }
   interface RMap { seed: number; act: number; cols: RNode[][]; nodes: Map<number, RNode> }
-  interface RState { path: number[]; opts: number[]; votes?: Record<string, number>; colors?: Record<string, number>; mine?: number }
+  interface RState { path: number[]; opts: number[]; votes?: Record<string, number>; colors?: Record<string, number>; mine?: number; view?: boolean } // (view: only looking, the hangar's Route tab: no voting)
   const STRONGHOLD = 1 / 12; // the share of the levels that can be (past FROM) that are strongholds
   const NIGHT = 0.12; // and of those that can be, the share that are night levels (the lights out: js/level.ts nightify): about one in ten
   const FROM = 4; // neither before this level: the first three are always ordinary ones
@@ -142,7 +142,7 @@ const G_Route = (() => {
     if (n.stronghold) rows.push(`<div class="tt-row sh"><i class="tt-badge"><svg viewBox="-9 -9 18 18"><circle r="8"/><path d="M0-4.5V1 M0 3.6V3.7"/></svg></i><div><b>Stronghold</b>No civilians, about half as many suspects again. <em>+¢${strongholdPay(lvl)}</em> for clearing it</div></div>`);
     if (n.night) rows.push(`<div class="tt-row nt"><i class="tt-badge"><svg viewBox="-9 -9 18 18"><circle r="8"/><path d="M1.6-4.6A5 5 0 1 0 1.6 4.6 4 4 0 1 1 1.6-4.6Z"/></svg></i><div><b>Night</b>The lights are out but for the emergency lights. Suspects can hardly see you in the dark, unless your weapon light gives you away</div></div>`);
     if (!rows.length) rows.push('<div class="tt-plain">An ordinary level: civilians about, the lights on</div>');
-    const last = st.path[st.path.length - 1], foot = id === last ? 'You are here' : st.path.includes(id) ? 'Cleared' : st.opts.includes(id) ? (st.mine === id ? 'Your vote' : 'Click to vote for it') : '';
+    const last = st.path[st.path.length - 1], foot = id === last ? 'You are here' : st.path.includes(id) ? 'Cleared' : st.opts.includes(id) ? (st.view ? 'One of the next levels' : st.mine === id ? 'Your vote' : 'Click to vote for it') : '';
     return `<div class="tt-head"><span>${esc(n.boss ? 'The Kingpin' : th.name)}</span><small>${n.boss ? esc(th.name) + ' &middot; ' : ''}Level ${lvl}</small></div>${rows.join('')}${foot ? `<div class="tt-foot">${foot}</div>` : ''}`;
   }
   return { COLS, strongholdPay, gen, options, colOf, actOf, isBoss, svg, tip };

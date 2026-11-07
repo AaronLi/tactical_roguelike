@@ -452,6 +452,27 @@ const G_Shop = {
     </div>`;
   },
 
+  // The Route tab: the act's map as the route screen draws it (js/route.ts svg), to look at between levels: where the squad's
+  // been, the levels it can go to next, every node's card on hover (strongholds, night, the boss). Picking is the route
+  // screen's, once you've boarded the helicopter.
+  routeHtml() {
+    const g = G.Game, rm = g.routeMap, st = g.routeSt;
+    if (!rm || !st) return '<div class="shop-route-empty dim">No route yet: it is drawn when the run starts.</div>';
+    const at = st.path[st.path.length - 1], opts = G.Route.options(rm, at), colors: Record<string, number> = {};
+    for (const [id, p] of Object.entries(g.roster || {})) colors[id] = (p as any).color;
+    const next = opts.map((o) => rm.nodes.get(o)!).filter(Boolean);
+    const line = next.length === 1 && next[0].boss ? 'Next: <b class="red">the Kingpin</b>' : `Next: one of ${next.length} — ${next.map((n) => G.U.esc(G.THEMES[n.th].name) + (n.stronghold ? ' <b class="red">!</b>' : '') + (n.night ? ' ☾' : '')).join(' · ')}`;
+    return `<div class="shop-route-head"><b>Act ${rm.act}</b> <span class="dim">level ${this.level + 1} next</span><div>${line}</div><small class="dim">Hover a level for its card. You pick on the route map once you've boarded the helicopter.</small></div>
+      <div class="shop-route">${G.Route.svg(rm, { path: st.path, opts, votes: {}, colors, mine: undefined })}</div>`;
+  },
+  routeWire(items: HTMLElement) {
+    const box = items.querySelector<HTMLElement>('.shop-route');
+    if (!box) return;
+    G.Game.routeHover(box, true);
+    box.addEventListener('wheel', (e: WheelEvent) => { if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { box.scrollLeft += e.deltaY; e.preventDefault(); } }, { passive: false });
+    const here = box.querySelector('.rn.here') || box.querySelector('.rn.opt');
+    if (here) { const r = here.getBoundingClientRect(), b = box.getBoundingClientRect(); box.scrollLeft += r.left + r.width / 2 - (b.left + b.width * 0.35); }
+  },
   render() {
     if (G.InvUI.scaleUI) G.InvUI.scaleUI(); // (the shop's sizes scale with the window too: --ik)
     if (!this.offers) return;
@@ -462,8 +483,10 @@ const G_Shop = {
       (rp.civKilled ? ` · <b class="red">${rp.civKilled} civilian casualties</b>` : '') + (rp.unauth ? ` · <b class="red">${rp.unauth} unauthorised kills</b>` : '') +
       (!rp.civKilled && !rp.unauth ? ' · <b class="go">clean op +¢200</b>' : '') + (rp.stronghold ? ` · <b class="go">stronghold cleared +¢${G.Route.strongholdPay(this.level)}</b>` : '') + (rp.allRescued ? ` · <b class="go">every civilian rescued +¢${150 + 50 * this.level}</b>` : '') + '</div>' : '';
     document.getElementById('shopTitle')!.innerHTML = `Level ${this.level} cleared <span>— next up: level ${this.level + 1}${G.Route.isBoss(this.level + 1) ? ' <b class="red">(BOSS)</b>' : ''}</span>${rep}`;
-    const tabs = [['stock', 'Stock'], ['kit', 'Kit'], ['gunsmith', 'Gunsmith'], ['zero', 'Zeroing'], ['svc', 'Supplies']];
-    document.getElementById('shopTabs')!.innerHTML = tabs.map(([k, n]) => `<button class="tab${this.tab === k ? ' on' : ''}" data-tab="${k}">${n}</button>`).join('');
+    // (the route map's tab first, as an icon: a folded map)
+    const MAP_ICON = '<svg class="tab-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5 9 4l6 2.5L21 4v13.5L15 20l-6-2.5L3 20Z M9 4v13.5 M15 6.5V20"/></svg>';
+    const tabs = [['route', MAP_ICON, 'Route map'], ['stock', 'Stock'], ['kit', 'Kit'], ['gunsmith', 'Gunsmith'], ['zero', 'Zeroing'], ['svc', 'Supplies']];
+    document.getElementById('shopTabs')!.innerHTML = tabs.map(([k, n, t]) => `<button class="tab${k === 'route' ? ' tab-icon' : ''}${this.tab === k ? ' on' : ''}" data-tab="${k}"${t ? ` title="${t}" aria-label="${t}"` : ''}>${n}</button>`).join('');
     let html = '';
     const O = this.offers;
     if (this.tab === 'stock') {
@@ -477,6 +500,7 @@ const G_Shop = {
         group('Pouches and magazines', [...O.pouches.map((o: { id: string }) => card('pouch:' + o.id, this.pouchCard(o.id))), ...O.mags.map((o: { id: string }) => card('mag:' + o.id, this.magCard(o.id)))]);
       if (sold.length) html += `<h3 class="shop-sub">Out of stock</h3>` + sold.join('');
     }
+    else if (this.tab === 'route') html = this.routeHtml();
     else if (this.tab === 'svc') html = this.services().map((s: ShopService) => `<div class="card">
         <div class="ch"><span class="cn">${s.name}</span></div>${s.sel || ''}<div class="cd">${s.desc}</div>
         <div class="cfoot"><span></span><button class="btn small buy" data-k="svc" data-id="${s.id}" ${s.disabled || Me.credits < s.price ? 'disabled' : ''}>${s.disabled ? '—' : '¢' + G.U.fmt(s.price)}</button></div></div>`).join('');
@@ -484,7 +508,7 @@ const G_Shop = {
     if (this.tab === 'gunsmith') { G.InvUI.hide(); G.GunsmithUI.show(items); }
     else if (this.tab === 'kit') { G.GunsmithUI.hide(); G.InvUI.show(items); }
     else if (this.tab === 'zero') { G.GunsmithUI.hide(); G.InvUI.hide(); G.ZeroUI.show(items); }
-    else { G.GunsmithUI.hide(); G.InvUI.hide(); items.innerHTML = html; }
+    else { G.GunsmithUI.hide(); G.InvUI.hide(); items.innerHTML = html; if (this.tab === 'route') this.routeWire(items); }
     items.classList.toggle('locked', this.ready);
 
     const kitName = (it: GItem | null | undefined) => (it ? G.U.esc(G.Gear.defOf(it)!.name) : '—');
