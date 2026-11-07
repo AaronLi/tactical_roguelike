@@ -80,8 +80,9 @@ input[type=checkbox] { accent-color: var(--ui-text); }
 /* the hangar's Tab menu's view of the route (js/shop.ts routeHtml): the same map, scrolling sideways, a line on what's next above it */
 .shop-route-head { grid-column: 1 / -1; margin: 2px 0 8px; line-height: 1.5; }
 .shop-route-head b { letter-spacing: 1px; }
-.shop-route { grid-column: 1 / -1; overflow-x: auto; overflow-y: hidden; max-width: 100%; scrollbar-color: rgba(255,255,255,0.25) transparent; }
-.shop-route .route-svg { height: min(58vh, 520px); width: auto; display: block; }
+.shop-route { grid-column: 1 / -1; overflow-x: auto; overflow-y: hidden; max-width: 100%; scrollbar-color: rgba(255,255,255,0.25) transparent;
+  background: rgba(14, 17, 20, 0.78); border: 1px solid var(--ui-line-lo); border-radius: var(--ui-r); padding: calc(6px * var(--ik, 1)) calc(14px * var(--ik, 1)); box-sizing: border-box; } /* (framed as the shop's cards are) */
+.shop-route .route-svg { height: min(56vh, 500px); width: auto; display: block; }
 .shop-route .rn { cursor: default; }
 .shop-route-empty { grid-column: 1 / -1; padding: 24px 4px; }
 .tab.tab-icon { display: inline-flex; align-items: center; justify-content: center; padding-left: 12px; padding-right: 12px; }
