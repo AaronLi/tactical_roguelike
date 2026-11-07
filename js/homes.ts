@@ -1,21 +1,8 @@
 'use strict';
-// The builder kit js/furniture.ts hands to a piece's build() (the same as its Kit), a piece's style, and a floor spec.
-type HomeMat = THREE.MeshStandardMaterial;
-interface HomeKit {
-  rnd(): number; pick<T>(a: T[]): T; tint(hex: number, f: number): number;
-  mat(hex: number, rough?: number, metal?: number, extra?: Record<string, any>): HomeMat;
-  box(m: HomeMat, w: number, h: number, d: number, x: number, y: number, z: number, ry?: number, rx?: number): void;
-  cyl(m: HomeMat, rt: number, rb: number, h: number, x: number, y: number, z: number, seg?: number, rx?: number): void;
-  cylX(m: HomeMat, rt: number, rb: number, h: number, x: number, y: number, z: number, seg?: number): void;
-  sph(m: HomeMat, r: number, x: number, y: number, z: number): void;
-  ico(m: HomeMat, r: number, x: number, y: number, z: number): void;
-  side(m: HomeMat, pts: number[][], w: number, x?: number, b?: number): void;
-  leaf(): HomeMat; screen(): HomeMat; shade(): HomeMat; crate(): HomeMat;
-  pack(kind: string, shade?: number): HomeMat; label(): number;
-  boxL(m: HomeMat, lb: number, w: number, h: number, d: number, x: number, y: number, z: number, ry?: number, rx?: number): void;
-  cylL(m: HomeMat, lb: number, rt: number, rb: number, h: number, x: number, y: number, z: number, seg?: number): void;
-  tableLamp(x: number, y: number, z: number): void; plantSmall(x: number, y: number, z: number): void; fruit(x: number, y: number, z: number): void;
-}
+// The kit js/furniture.ts hands to a piece's build() (js/furnspec.ts FdKit: it records what the piece is made of), its
+// materials, a piece's style, and a floor spec.
+type HomeMat = FdMat;
+type HomeKit = FdKit;
 type HomeStyle = Record<string, any>; // (a piece's style: whatever its build reads)
 interface HomeFloor { kind: string; color: string; grout?: string; sound?: string }
 // A resident's data: see the notes below.
@@ -44,7 +31,7 @@ interface HomeHung { name: string; x: number; z: number; q: number; v: number; s
 //   be. What doesn't fit is swapped for what's next on its list, or left out. A room that isn't there (a bathroom) is cut
 //   from a corner of one that is. The rest of the home is painted and floored to match, its furniture left in it.
 //   rm.dress holds what's left to draw: the wall, ceiling, trim and floor colours and what hangs on the walls. Walls:
-//   js/lightgrid.ts (from paint()); ceilings: js/level.ts buildMesh; floor, trim, hung things: js/furniture.ts dressRoom.
+//   js/lightgrid.ts (from paint()); ceilings: js/level.ts buildMesh; floor, trim, hung things: js/furnspec.ts describe (dressRoom).
 // All of it's on its own random streams and comes after everything else, so a home that gets a resident changes nothing
 // outside itself.
 //
@@ -53,7 +40,7 @@ interface HomeHung { name: string; x: number; z: number; q: number; v: number; s
 //   rate: the chance, each eligible home, of it being theirs (at most once a level)
 //   rest: { wall, ceil, trim, floor }: any room of the home they've no list for: painted and floored, its furniture left
 //   rooms: by room type: { wall, ceil, trim (hex strings), paper (the walls striped, as wallpaper),
-//     floor: { kind (a texture of js/furniture.ts textures), color, grout (its second colour), sound (what it sounds like,
+//     floor: { kind (a texture of js/furnspec.ts painters), color, grout (its second colour), sound (what it sounds like,
 //       js/casings.ts surface, if not its kind) }, spare, carve, tight, items }
 //     spare: the home needn't have a room of this type: one it can spare becomes it (no walls move)
 //     carve: { from: the room types to take it out of, first that'll do; size: [short, long], in cells }: a small room that

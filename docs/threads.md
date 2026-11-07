@@ -26,10 +26,11 @@ to the simulation the way a remote player's does, with the same messages; it rea
 | `js/sim.ts` | both | `G.Sim`: pure reckonings both sides need (a grenade's flight, a round's arc, a blast's reach and a thermobaric's dose, a weapon as built, an officer's look cleaned, the cabinet and locker grids, the veil's time). They used to live in files that draw; those hand on to it. |
 
 The worker loads `util, data, callsigns, arsenal, parts, gear, medical, sim, materials, ballistics, level, world,
-furniture, homes, residents, scars, damage, stickers, route, shop, server, serverhost` (`SERVER_SCRIPTS` in
+furnspec, furniture, homes, residents, scars, damage, stickers, route, shop, server, serverhost` (`SERVER_SCRIPTS` in
 `js/serverworker.ts`): the data, the rules of guns, gear and medicine, the level as it's generated, collided with and seen
 through, the shop's stock reckoning. Nothing that draws or plays loads there (no renderer, rigs, views, viewmodel, HUD,
-icons, sound, PeerJS). three.js does, for its maths: level generation cuts the Sandia Crest's rocks from three's
+icons, sound, PeerJS); the furniture's solids come from its pieces (`js/furniture.ts solids`), and what the pieces look
+like (`js/furnspec.ts`, [furniture-data.md](furniture-data.md)) is only described where it's drawn. three.js does, for its maths: level generation cuts the Sandia Crest's rocks from three's
 icosahedron, and holes, blasts and arcs are worked in its vectors; loading the same three as the page keeps the level the
 simulation builds identical to the one every screen builds from the seed.
 

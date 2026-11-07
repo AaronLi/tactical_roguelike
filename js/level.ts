@@ -2288,7 +2288,7 @@ const G_Level = {
     const frameMat = new THREE.MeshStandardMaterial({ color: map.theme.home >= 1 ? 0xe8e4da : 0x3a3e42, roughness: 0.6 });
     // tinted, a little reflective, seen from both sides: it has to read as glass, not a hole
     const glassMat = new THREE.MeshStandardMaterial({ color: 0x7e98a8, transparent: true, opacity: 0.38, roughness: 0.08, metalness: 0.55, depthWrite: false, side: THREE.DoubleSide, envMapIntensity: 1.2 });
-    const view = map.windows.some((w) => w.ext) ? G.Furniture.outsideMaterial(G.U.rng((map.seed ^ 0x77) >>> 0), map.theme.layout === 'apartments' ? 18 : 0) : null;
+    const view = map.windows.some((w) => w.ext) ? G.FurnMesh.outsideMaterial(G.U.rng((map.seed ^ 0x77) >>> 0), map.theme.layout === 'apartments' ? 18 : 0) : null;
     // bulletproof glass with steel wire in it: the grid drawn into the pane (and a grey steel frame round it)
     let wiredMat: THREE.MeshStandardMaterial | null = null, coolerMat: THREE.MeshStandardMaterial | null = null;
     if (map.windows.some((w) => w.armor)) {
@@ -2732,7 +2732,7 @@ const G_Level = {
     // (a night level's festival is the small hours, everyone gone home and the power off: the bulbs, lanterns, street lamps, stage
     // lamps and its sign are dead glass and paint, lit only by the moon, no glows or beams; nightify has their lights off)
     const dark = !!map.night, deadGlass = (hex: number) => new T.MeshStandardMaterial({ color: new T.Color(hex).multiplyScalar(0.35), roughness: 0.25, metalness: 0.1 });
-    const tx = G.Furniture.textures(rnd);
+    const tx = G.FurnMesh.textures(rnd);
     // the lawn (worn in the lanes), paving at the gate
     const grass = tx.grass(); grass.repeat.set(map.W / 3, map.H / 3);
     const lawn = new T.Mesh(new T.PlaneGeometry(Wm, Hm), new T.MeshStandardMaterial({ map: grass, roughness: 1 }));
@@ -3272,7 +3272,7 @@ const G_Level = {
       }
       root.add(seg);
     }
-    G.Furniture.build(map, root, this._tex('crate', th.crate));
+    G.FurnMesh.build(map, root, this._tex('crate', th.crate));
     this.buildWindows(map, root, wm.material);
 
     // ceiling lamps (emissive panels) + a limited number of real point lights
