@@ -529,7 +529,7 @@ const G_Server = {
   // The level's weapon case: a weapon in its standard build, fully loaded, picked by rarity. Each tier has a
   // share (CASE_RARITY), split evenly between that tier's weapons so a tier with many weapons isn't more
   // likely; deeper levels shift the odds toward rarer tiers, and legendaries only turn up from level 3.
-  // Nine in ten are long guns, and mostly ones worth building on from the start (the second tier the likeliest at the first level,
+  // All long guns (the sidearms are earned on the sidearm web, js/arsenal.ts), and mostly ones worth building on from the start (the second tier the likeliest at the first level,
   // the first tier a quarter or so of them, and fading). (Tier 0, the starter pistol, turns up too, rarely.)
   CASE_RARITY: { 0: 5, 1: 25, 2: 45, 3: 15, 4: 3 } as Record<string, number>,
   caseOdds(level: number, slot: string) {
@@ -547,7 +547,7 @@ const G_Server = {
   rollCase(seed?: number, level?: number) {
     if (seed == null) seed = this.seed; if (level == null) level = this.level;
     const r = G.U.rng((seed ^ 0x5ca5e) >>> 0);
-    const odds = this.caseOdds(level, r() < 0.9 ? 'p' : 's');
+    r(); const odds = this.caseOdds(level, 'p'); // (long guns only: the sidearms are earned on the sidearm web, js/arsenal.ts. The draw that picked the slot is still made, so a seed's later draws stay put)
     let x = r() * odds.reduce((a: number, [, wt]: [any, number]) => a + wt, 0), w = odds[0][0];
     for (const [cand, wt] of odds) { x -= wt; if (x <= 0) { w = cand; break; } }
     // loaded, with two full spare magazines (or that many rounds; a full box, for a gun that only holds a round or two), all of one type: mostly ball, now and then

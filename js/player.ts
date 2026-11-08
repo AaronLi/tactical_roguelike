@@ -137,10 +137,10 @@ const G_Me = {
     this.stash = G.Gear.stashProxy(this); // weapon parts owned but not fitted: items, read as { partId: count }
     this.stats = { kills: 0, dmg: 0, hs: 0, downs: 0, revives: 0 } as PStats;
   },
-  // the sidearm you start a run with (js/arsenal.ts), loaded with tracers, and two spare loads of them in the small
+  // the sidearm you start a run with (js/arsenal.ts), loaded with tracers (or its own load: Arsenal.startAm, the USP's +P), and two spare loads of them in the small
   // pockets (in place of the last one's)
   setSidearm(id: string, build?: PBuild) {
-    const w = this.makeWeapon(id, build), am = G.ammoOk(G.calOf(w.def), 'tracer');
+    const w = this.makeWeapon(id, build), am = G.Arsenal.has(id) ? G.Arsenal.startAm(id) : G.ammoOk(G.calOf(w.def), 'tracer');
     w.ammo = am; w.tube = w.tube.map(() => am); if (w.chamber) w.chamber = am;
     this.weapons.s = w; this.slot = 's';
     for (const g of [this.pockets[2], this.pockets[3]]) {
