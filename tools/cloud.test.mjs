@@ -299,5 +299,88 @@ await test('an anonymous session an earlier version made is let go of; its progr
   const c = await careerRow(D, E.G.Cloud.user.id), prog = (await D.admin('select * from public.progress where user_id = $1', [E.G.Cloud.user.id]))[0];
   assert.equal(c.kills, 1); assert.deepEqual(prog.arsenal.got, ['ppk']);
 });
+// ---------------------------------------------------------------- the move of a guest save, step by step, and the in-flight additions
+await test('career_add is idempotent by its id: a repeated id adds nothing, a new one does', async () => {
+  const u = await D.user('idem@example.com'), id = crypto.randomUUID();
+  const add = (d) => D.as(u, 'select kills, runs from public.career_add($1::jsonb)', [JSON.stringify(d)]);
+  assert.equal((await add({ id, add: { kills: 4, runs: 1 } }))[0].kills, 4);
+  assert.equal((await add({ id, add: { kills: 4, runs: 1 } }))[0].kills, 4, 'the same id again: nothing added');
+  assert.equal((await add({ id: crypto.randomUUID(), add: { kills: 1 } }))[0].kills, 5);
+  assert.equal((await add({ add: { kills: 1 } }))[0].kills, 6, 'no id: added, as before');
+  await assert.rejects(add({ id: 'not-a-uuid', add: { kills: 1 } }), /bad career delta id/);
+  const other = await D.user('idem2@example.com');
+  assert.equal((await D.as(other, 'select kills from public.career_add($1::jsonb)', [JSON.stringify({ id, add: { kills: 2 } })]))[0].kills, 2, 'an id is per user');
+});
+const stM = storage();
+let M, uidM;
+const kill = (w) => { w.navigator.onLine = false; }; // (a closed tab: its retries stop)
+async function signInOnly(w, email) {
+  await w.G.Cloud.signInEmail(email);
+  const mail = [...server.mail].reverse().find((m) => m.to === email && m.type === 'email' && !m.used);
+  await w.G.Cloud.verifyCode(mail.token);
+}
+const reopen = () => { const w = browser(server, stM); w.G.Cloud.tune({ batch: 3 }); w.G.Cloud.boot(); return w; };
+await test('a move interrupted after the profile, after the career request (its reply lost) and mid-runs, then finished after a reload: exact totals, no duplicate runs, the guest save gone', async () => {
+  server.faults = []; server.offline = false;
+  M = browser(server, stM); M.G.Cloud.tune({ batch: 3 }); M.G.Cloud.boot();
+  M.G.U.store.set('arsenal', { got: ['ppk'], n: { ppk: { sur: 4 } }, pro: {}, on: {} }); M.G.U.store.set('fov', 101);
+  const C = M.G.Career;
+  for (let i = 0; i < 7; i++) { C.runStart(); C.levelStart(i + 1, 0, false, false); C.ev('kill', 50); C.runEnd('left'); }
+  assert.equal(C.stats().kills, 7); assert.equal(C.runs().length, 7);
+  // 1. the progress row's write fails (after the profile went)
+  server.faults = [{ what: 'upsert progress', when: 'before', n: 1 }];
+  await signInOnly(M, 'mover@example.com'); uidM = M.G.Cloud.user.id;
+  await until(() => M.G.Cloud.state === 'offline', 8000);
+  assert.equal(M.G.Cloud.meta().mig, uidM); assert.equal(M.G.Cloud.meta().owner, null);
+  assert.equal(JSON.parse(stM.getItem('bp_arsenal')).got[0], 'ppk'); assert.equal(C.stats().kills, 7, 'the guest save as it was');
+  assert.equal((await D.admin('select count(*) n from public.profiles where user_id = $1', [uidM]))[0].n, 1);
+  assert.equal((await D.admin('select count(*) n from public.progress where user_id = $1', [uidM]))[0].n, 0);
+  assert.ok(!(await careerRow(D, uidM)), 'no career yet');
+  // 2. after a reload: the career request reaches the server, its reply is lost
+  kill(M); server.faults = [{ what: 'rpc career_add', when: 'after', n: 1 }];
+  M = reopen(); await until(() => M.G.Cloud.user && M.G.Cloud.state === 'offline', 8000);
+  assert.equal((await careerRow(D, uidM)).kills, 7, 'applied on the server');
+  assert.equal(M.G.Cloud.fly().length, 1, 'and kept here, in flight'); assert.equal(M.G.Career.stats().kills, 7);
+  // played on, still a guest save: one more kill
+  M.G.Career.ev('kill', 50);
+  // 3. after a reload: the addition re-sent (skipped: applied), the rest of the kill added, the runs' second batch fails
+  kill(M); server.faults = [{ what: 'upsert runs', when: 'before', n: 1, skip: 1 }];
+  M = reopen(); await until(() => M.G.Cloud.user && M.G.Cloud.state === 'offline', 8000);
+  assert.equal((await careerRow(D, uidM)).kills, 8, 'the re-sent addition not counted twice, the new kill once');
+  assert.equal(M.G.Cloud.fly().length, 0);
+  assert.equal(+(await D.admin('select count(*) n from public.runs where user_id = $1', [uidM]))[0].n, 3, 'one batch of three');
+  assert.equal(M.G.Cloud.meta().owner, null); assert.equal(JSON.parse(stM.getItem('bp_arsenal')).got[0], 'ppk');
+  // 4. after a reload: the rest, then the guest save wiped and the account's copy in its place
+  kill(M); server.faults = [];
+  M = reopen(); await until(() => M.G.Cloud.user && M.G.Cloud.state === 'ok' && M.G.Cloud.meta().owner === uidM, 10000);
+  const c = await careerRow(D, uidM), runs = await D.admin('select id from public.runs where user_id = $1', [uidM]), prog = (await D.admin('select * from public.progress where user_id = $1', [uidM]))[0];
+  assert.equal(c.kills, 8); assert.equal(c.runs, 7);
+  assert.equal(runs.length, 7); assert.equal(new Set(runs.map((r) => r.id)).size, 7);
+  assert.equal(M.G.Cloud.meta().mig, null); assert.equal(JSON.stringify(M.G.Cloud.meta().migSent), '{}'); assert.equal(M.G.Cloud.fly().length, 0);
+  assert.deepEqual(JSON.parse(stM.getItem('bp_arsenal')), prog.arsenal, 'the account\'s copy');
+  assert.equal(M.G.Career.stats().kills, 8); assert.ok(M.G.Career.runs().every((r) => runs.some((q) => q.id === r.id)));
+  assert.equal(JSON.parse(stM.getItem('bp_fov')), 101, 'preferences stay');
+  // and a reload adds nothing more
+  kill(M); M = reopen(); await until(() => M.G.Cloud.user && M.G.Cloud.state === 'ok', 8000); await sleep(300);
+  assert.equal((await careerRow(D, uidM)).kills, 8);
+});
+await test('signed in, an addition whose reply was lost is re-sent after a reload and counted once', async () => {
+  M.G.Career.ev('kill', 50);
+  server.faults = [{ what: 'rpc career_add', when: 'after', n: 1 }];
+  await M.G.Cloud.flush();
+  assert.equal((await careerRow(D, uidM)).kills, 9); assert.equal(M.G.Cloud.fly().length, 1);
+  kill(M); server.faults = [];
+  M = reopen(); await until(() => M.G.Cloud.user && M.G.Cloud.state === 'ok' && M.G.Cloud.fly().length === 0, 8000);
+  assert.equal((await careerRow(D, uidM)).kills, 9); assert.equal(M.G.Career.stats().kills, 9);
+});
+await test('after a move, signing out leaves an empty guest save, and a second email gets nothing of the first guest\'s', async () => {
+  await M.G.Cloud.signOut();
+  assert.equal(stM.getItem('bp_arsenal'), null); assert.equal(M.G.Career.stats().kills, 0); assert.equal(M.G.Career.runs().length, 0);
+  await signIn(M, 'second@example.com');
+  const u2 = M.G.Cloud.user.id, c = await careerRow(D, u2), prog = (await D.admin('select * from public.progress where user_id = $1', [u2]))[0];
+  assert.ok(!c || c.kills === 0); assert.deepEqual(prog ? prog.arsenal.got : [], []);
+  assert.equal(+(await D.admin('select count(*) n from public.runs where user_id = $1', [u2]))[0].n, 0);
+  assert.equal((await careerRow(D, uidM)).kills, 9, 'the first account untouched');
+});
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

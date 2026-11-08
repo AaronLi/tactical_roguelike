@@ -30,7 +30,7 @@ was: no request to Supabase, and the Account box in the main menu says cloud sav
 5. **Enable pg_cron** (for the guest cleanup): **Database > Extensions**, search *pg_cron*, enable it. (Optional: without it the
    cleanup isn't scheduled, and the migration says so with a notice; enable it later and run the second migration again.)
 6. **Run the migrations**, in order: either paste each file of `supabase/migrations/` (`20261107000000_progress.sql`, then
-   `20261108000000_guest_cleanup.sql`) into **SQL Editor** and run it, or with the Supabase CLI: `supabase link --project-ref <ref>`
+   `20261108000000_guest_cleanup.sql`, then `20261109000000_career_idempotent.sql`) into **SQL Editor** and run it, or with the Supabase CLI: `supabase link --project-ref <ref>`
    then `supabase db push`.
 7. **Paste the URL and the anon key** into `js/cloudconfig.ts` (from **Project Settings > API**: "Project URL" and the `anon` `public`
    key; newer projects call it the "publishable" key, which works the same). **Never** the `service_role` / secret key: it bypasses
@@ -52,7 +52,7 @@ and **Table Editor** shows your rows. `?cloud=0` in the URL turns cloud saves of
   into the account (below). From then on it syncs.
 - **Sign out**: the account's progress (sidearm tree, wishlist, career, runs) leaves this browser; your preferences (callsign, look,
   settings) stay. Signing back in brings it back. Signed out, you play and save locally again, and that merges in when you sign in.
-- **Offline**: signed in, cloud writes queue (`bp_cloudq`; the runs carry their own "sent" mark) and go up when the network is back
+- **Offline**: signed in, cloud writes queue (`bp_cloudq`, and career additions in flight in `bp_cloudfly`; the runs carry their own "sent" mark) and go up when the network is back
   (the browser's `online` event, and retries backing off from 5 s to a minute).
 - **Debounced**: a change goes up 4 s after the last one. Writes are small; a level makes a handful of requests.
 - The Account box shows *offline* or *sync failed* (with the reason) beside the account, and a status line inside.
@@ -115,9 +115,34 @@ What's in the browser has an *owner* (`bp_cloudmeta`: the account it was last sy
 | This browser's copy | Mode | What happens |
 | --- | --- | --- |
 | Of this account | same | Pull, merge (below), push. The career gets only what's queued since the last sync. |
-| Of no account (never signed in, or signed out), or of an anonymous user | adopt | Everything here merges *into* the account, the career added in whole, every local run copied in. Signing out clears the account's progress from this copy and the owner with it, so signing in again adds only what was played since: the career is never counted twice. |
+| Of no account (never signed in, or signed out), or of an anonymous user | adopt (*the move*) | Everything here moves *into* the account (below). Signing out clears the account's progress from this copy and the owner with it, so signing in again adds only what was played since: the career is never counted twice. |
 | Of another email account | replace | The account's progress replaces this copy (the other account's is safe in its own rows); preferences still merge by time. |
 
+### The move: a guest save into an account
+
+The first sign-in on a device whose progress is no account's yet moves that guest save into the account, as a transfer:
+
+1. the preferences and progress merged with the account's (rules below) and written (the profile and progress rows);
+2. the guest's career added to the account's, as one addition with an id (below);
+3. every run of the guest's sent (in batches of 50).
+
+Only once the server has confirmed all three is the **guest save wiped**: this device's own sidearm tree, wishlist, career and run
+history go, and the account's copy, read back from the server, takes their place (owned by the account). The device's preferences
+(settings, callsign order, look) were merged into the account and stay as they are. Until then nothing is wiped: the device stays
+marked as moving (`bp_cloudmeta`'s `mig`, and `migSent`, how much of the guest's career the account has confirmed), the Account box
+says *Moving your progress to your account… will retry*, and the move is taken up again where it stopped, after a reload too, with
+backoff. A guest who plays on meanwhile adds to the same guest save, and the next attempt carries the rest (only what `migSent`
+doesn't cover is added). Signing out mid-move leaves the guest save as it is.
+
+After the move, signing out leaves an empty guest save (a fresh sidearm tree, no career), and the old guest save can never merge into
+a second account: there's nothing of it left on the device.
+
+### Career additions in flight
+
+A career addition (the move's, or one queued while signed in) is written to `bp_cloudfly` with an id the client made *before* it's
+sent, and only forgotten once the reply confirms it; whatever's still there when the page loads (a tab closed mid-request, a reply
+lost) is sent again with the same id. `career_add` remembers the ids it has applied (`career_applied`, 90 days, per user) and skips an
+id it has seen, returning the row as it is: an addition is counted exactly once.
 Per item:
 
 - **Sidearm unlocks** (`got`): the union. **Tallies** (`n`): per gun and stat, the higher. **Pro builds earned**: earned on either
@@ -167,7 +192,10 @@ The preference clock is each device's own.
   into the new account, a reload restoring the session without counting anything twice, the offline queue, two accounts kept apart
   through the API, signing in on a second browser and the merge, the first browser picking the merge up, signing out, playing and
   signing in again (and again) with the career counted once, an anonymous session from the earlier version let go of with its
-  progress kept, the TURN settings kept out of the row (and stripped from one that had them), the callsign list's migration.
+  progress kept, the TURN settings kept out of the row (and stripped from one that had them), the callsign list's migration, a move
+  interrupted after the profile, after the career request (its reply lost) and between batches of runs and finished after reloads with
+  exact totals and no duplicate runs, an addition re-sent after a lost reply counted once, `career_add` skipping a repeated id, and
+  signing out after a move leaving an empty guest save that a second email gets nothing of.
 
 Not covered until a real project exists: supabase-js itself from the CDN (its session storage, token refresh, the magic link's
 redirect back with the session in the URL), the emails Supabase sends and their templates, the Auth settings above, real network

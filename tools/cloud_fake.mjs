@@ -4,7 +4,7 @@
 // sent emails) is shared by every client made from it, as one project is by every browser; each client keeps its session in its own
 // storage, as a browser does. `server.offline = true` makes every call fail as fetch does with no network.
 export function fakeServer(D) {
-  const server = { D, offline: false, mail: [], calls: [] };
+  const server = { D, offline: false, mail: [], calls: [], faults: [] };
   const netErr = () => ({ message: 'TypeError: Failed to fetch', status: 0, name: 'AuthRetryableFetchError' });
   const isoRow = (r) => { if (!r) return r; const o = {}; for (const [k, v] of Object.entries(r)) o[k] = v instanceof Date ? v.toISOString() : typeof v === 'bigint' ? Number(v) : v; return o; };
   const userOf = async (id) => { const [u] = await D.admin('select id, email, is_anonymous from auth.users where id = $1', [id]); return u ? { id: u.id, email: u.email || undefined, is_anonymous: u.is_anonymous, aud: 'authenticated' } : null; };
@@ -17,7 +17,16 @@ export function fakeServer(D) {
     const keep = () => { if (!storage) return; if (session) storage.setItem(SKEY, JSON.stringify(session)); else storage.removeItem(SKEY); };
     const emit = (ev) => { for (const f of subs) f(ev, session); };
     const setSession = (user, ev) => { session = user ? { access_token: 'fake.' + user.id, user } : null; keep(); emit(ev); };
-    const call = async (what, fn) => { server.calls.push(what); if (server.offline) return { data: null, error: netErr() }; try { return { data: await fn(), error: null }; } catch (e) { return { data: null, error: { message: e.message, code: e.code } }; } };
+    // (server.faults: [{ what, when: 'before' | 'after', n }]: the call's network fails before it reaches the server, or after it's been
+    // done there and before the reply comes back, n times)
+    const call = async (what, fn) => {
+      server.calls.push(what);
+      if (server.offline) return { data: null, error: netErr() };
+      let f = server.faults.find((x) => x.what === what && x.n > 0);
+      if (f && f.skip > 0) { f.skip--; f = null; } // (skip: let that many through first)
+      if (f && f.when === 'before') { f.n--; return { data: null, error: netErr() }; }
+      try { const data = await fn(); if (f) { f.n--; return { data: null, error: netErr() }; } return { data, error: null }; } catch (e) { if (process.env.FAKE_DEBUG) console.log('[fake] ' + what + ' as ' + uid() + ': ' + e.message, new Error().stack.split('\n').slice(2, 9).join(' | ')); return { data: null, error: { message: e.message, code: e.code } }; }
+    };
     const uid = () => (session ? session.user.id : null);
 
     const auth = {
