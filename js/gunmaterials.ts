@@ -59,13 +59,21 @@ const M = {
   glow: () => std('glow', 0x40d8ff, 0.4, 0, { emissive: 0x30c8ff, emissiveIntensity: 2 }),
   sightPaint: () => std('sightPaint', 0xf4f2ea, 0.6, 0, { emissive: 0x2a2a28 }), // white dots and outlines
   tritium: () => std('tritium', 0x7dff8a, 0.5, 0, { emissive: 0x3dff5a, emissiveIntensity: 2.2 }), // night sights
+  fibre: () => std('fibre', 0x2fe05a, 0.35, 0, { emissive: 0x1fb040, emissiveIntensity: 0.9 }), // a fibre-optic sight insert: green, bright with the light it gathers (less than tritium's glow)
   redInsert: () => std('redInsert', 0xd8261c, 0.5, 0, { emissive: 0x5a0a06 }), // revolver ramp insert
   string: () => std('string', 0xd8d0b8, 0.9, 0),
   fabric: () => std('fabric', 0x2f352b, 0.95, 0),
   glove: () => std('glove', 0x1b1c1e, 0.9, 0),
 };
-// a shotgun's front bead: bright brass with a little glow, so it reads against a dark room
-return { M, std, relief };
+// ALIAS: an anonymous one-off colour (the contract's `m_<rrggbb>`) a model uses that the game draws as a catalogue material. The authored
+// models' meshes are drawn by name (byName: the catalogue's, else an alias's, else black), so an anonymous colour with no alias is black.
+//   m_2fe05a: the 2011's front sight fibre (models/p2011: a green rod across the post's top) -> fibre
+const ALIAS: Record<string, string> = { m_2fe05a: 'fibre' };
+const byName = (name: string | null | undefined): THREE.Material => {
+  const all = M as Record<string, () => THREE.Material>, f = name ? all[name] || all[ALIAS[name]] : null;
+  return f ? f() : M.black();
+};
+return { M, std, relief, byName, ALIAS };
 })();
 G.GunMaterials = G_GunMaterials;
 interface GameModules { GunMaterials: typeof G_GunMaterials; }

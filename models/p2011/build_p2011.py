@@ -96,22 +96,55 @@ K.adopt(cp, 'optic', 'black', pslide)
 for dx in (-4.5 * mm, 4.5 * mm):
     o = K.obj(cyl(1.6 * mm, s_top - OPT_D + 0.3 * mm, s_top - OPT_D + 0.6 * mm, 'z', (dx, OPT_F0 + 0.010), 12), 'optic', 'steel', pslide); smooth(o)
 # the rear sight: standing at the cut's front edge, a square notch, ramped at its front
+# ---- the irons: RED-DOT (suppressor) HEIGHT, on the slide (part_slide, slot slide), so they stay with a dot fitted and serve as its backup.
+# A modest co-witness with the game's pistol dots (op.pso: their window 16 mm tall, centred 16 mm over the cut's floor): the sight picture
+# (the front fibre's centre level with the rear notch's top edges) 1.5 mm into the window from its bottom, the irons just showing in it.
+CUT_FLOOR = s_top - OPT_D
+WIN_LO = CUT_FLOOR + 0.016 - 0.008                                   # (the dots' window's bottom over the bore)
+SY_IRONS = WIN_LO + 0.0015                                           # (a modest co-witness: the fibre's centre 1.5 mm into the window from its bottom)
+NOTCH = SY_IRONS - 0.0025                                            # (the rear notch's floor: 2.5 mm deep, its top edges level with the fibre's centre)
+RS_F0, RS_F1 = F(406), F(438)                                        # (the rear sight, ahead of the optic cut, as the reference's)
 rb = K.tmp(prism(PL([(362, 230), (454, 230), (454, 221), (366, 221)]), 'x', -TOPW - 1.5 * mm, TOPW + 1.5 * mm)); bevel(rb, 0.8 * mm, 2); smooth(rb)
-K.adopt(rb, 'optic', 'black', pslide)                                                                                      # the rear sight's base, ahead of the cut
-rs = K.tmp(prism(PL([(406, 222), (438, 222), (436, 196), (428, 181), (410, 181)]), 'x', -8.5 * mm, 8.5 * mm))
-cut(rs, box(-1.9 * mm, 1.9 * mm, -0.02, 0.2, U(200), 0.04))   # (the notch: its floor 0.7 mm under the post's top, 3.8 mm wide)
+K.adopt(rb, 'slide', 'black', pslide)                                                                                      # the rear sight's base, ahead of the cut
+rs_top = SY_IRONS                                                    # (the notch's top edges: the sight picture's line)
+rs = K.tmp(prism([(RS_F0, U(222)), (RS_F1, U(222)), (RS_F1 - 0.5 * mm, rs_top - 3 * mm), (RS_F1 - 2.5 * mm, rs_top), (RS_F0 + 0.5 * mm, rs_top)], 'x', -8.5 * mm, 8.5 * mm))
+cut(rs, box(-1.9 * mm, 1.9 * mm, -0.02, 0.2, NOTCH, 0.06))            # (the notch: 3.8 mm wide)
+for k in range(5):                                                   # (its back face serrated against glare)
+    zz = U(222) + 3 * mm + k * 1.6 * mm
+    if zz + 0.7 * mm < NOTCH: cut(rs, box(-0.02, 0.02, RS_F0 - 0.001, RS_F0 + 0.5 * mm, zz, zz + 0.7 * mm))
 bevel(rs, 0.4 * mm, 2); smooth(rs)
-K.adopt(rs, 'optic', 'black', pslide)
-# the front sight: a tall post, its fibre across the top
-fs = K.tmp(prism(PL([(908, 222), (955, 222), (952, 199), (914, 197)]), 'x', -1.4 * mm, 1.4 * mm)); bevel(fs, 0.4 * mm, 1); smooth(fs)   # (2.8 mm wide)
+K.adopt(rs, 'slide', 'black', pslide)
+# the front sight: a tall post (2.8 mm wide) up to just under the sight line, a fibre rod across its top (its end facing the shooter: the dot
+# the eye puts in the notch), held in a shallow saddle
+FIB_R = 0.8 * mm
+POST_TOP = SY_IRONS - FIB_R                                          # (the post's body; the fibre's CENTRE is the sight line)
+fs = K.tmp(prism([(F(910), U(222)), (F(955), U(222)), (F(952), POST_TOP + 0.4 * mm), (F(948), POST_TOP + 0.4 * mm), (F(948), POST_TOP), (F(916), POST_TOP), (F(916), POST_TOP + 0.4 * mm), (F(912), POST_TOP + 0.4 * mm)], 'x', -1.4 * mm, 1.4 * mm))
+bevel(fs, 0.3 * mm, 1); smooth(fs)
 K.adopt(fs, 'slide', 'black', pslide)
-o = K.obj(cyl(0.9 * mm, F(916), F(950), 'y', (0, U(201)), 10), 'slide', 'sightPaint', pslide)
+o = K.obj(cyl(FIB_R, F(916), F(948), 'y', (0, POST_TOP + FIB_R), 12), 'slide', 'm_2fe05a', pslide); smooth(o)                  # (the fibre: green)
 
 # ---- BARREL: the crown, the body inside; the hood showing in the port ----
-o = K.obj(lathe([(F(600), 6.9 * mm), (s_end + 0.0006, 6.9 * mm), (s_end + 0.0006, 4.6 * mm), (s_end - 0.0015, 4.6 * mm)], 28), 'barrel', 'black'); smooth(o)
-o = K.obj(cyl(4.6 * mm, s_end - 0.004, s_end + 0.0007, 'y', (0, 0), 20), 'barrel', 'gunmetal')
-o = K.obj(box(-6.0 * mm, 6.0 * mm, F(452), F(592), -3 * mm, s_top - 1.4 * mm), 'barrel', 'steel'); bevel(o, 0.5 * mm, 2); smooth(o)
-MUZ = s_end + 0.0006
+THR_SH, THR_L, THR_R = 3.0 * mm, 12.0 * mm, 6.35 * mm          # the threaded barrel: its shoulder past the nose, the 1/2x28 thread's length, its radius
+def barrel(Kx, threaded=False):
+    # the crown flush with the slide's mouth; threaded: the barrel runs on past the nose to a shoulder, then the 1/2x28 thread (28 a
+    # inch: a groove every 0.9 mm, drawn as rings), its end chamfered round the bore. Returns (the muzzle, the thread's end or None)
+    if not threaded:
+        o = Kx.obj(lathe([(F(600), 6.9 * mm), (s_end + 0.0006, 6.9 * mm), (s_end + 0.0006, 4.6 * mm), (s_end - 0.0015, 4.6 * mm)], 28), 'barrel', 'black'); smooth(o)
+        end, thr = s_end + 0.0006, None
+    else:
+        sh = s_end + THR_SH; end = sh + THR_L
+        prof = [(F(600), 6.9 * mm), (sh, 6.9 * mm), (sh, THR_R)]
+        f = sh + 0.6 * mm
+        while f + 0.9 * mm < end - 0.8 * mm:
+            prof += [(f, THR_R), (f + 0.45 * mm, THR_R - 0.45 * mm), (f + 0.9 * mm, THR_R)]
+            f += 0.9 * mm
+        prof += [(end - 0.6 * mm, THR_R), (end, THR_R - 0.6 * mm), (end, 4.6 * mm), (end - 0.0015, 4.6 * mm)]
+        o = Kx.obj(lathe(prof, 28), 'barrel', 'black'); smooth(o, 50)
+        thr = end
+    o = Kx.obj(cyl(4.6 * mm, end - 0.004, end + 0.0001, 'y', (0, 0), 20), 'barrel', 'gunmetal')
+    o = Kx.obj(box(-6.0 * mm, 6.0 * mm, F(452), F(592), -3 * mm, s_top - 1.4 * mm), 'barrel', 'steel'); bevel(o, 0.5 * mm, 2); smooth(o)
+    return end, thr
+MUZ, _ = barrel(K)
 
 # ---- FRAME (base) ----
 FW = 11.0 * mm
@@ -193,9 +226,9 @@ def magazine(Kx):
 magazine(K)
 
 # ---- the gun's info and the authored-pistol anchors ----
-SY = U(197)                                                   # the sight line: the front post's top (the contract: the post's tip is at sy), just over the notch's floor
+SY = SY_IRONS                                                 # the sight line: the front fibre's centre, level with the rear notch's top edges
 info = {
-    'sy': round(SY, 4), 'fSight': round(F(420), 4), 'relief': 0.36, 'pistol': True,
+    'sy': round(SY, 4), 'fSight': round((RS_F0 + RS_F1) / 2, 4), 'relief': 0.36, 'pistol': True,
     'muzzles': [[round(MUZ, 4), 0, 0]],
     'grip': [round(F(260), 4), round(U(620), 4), 0], 'support': [round(F(280), 4), round(U(690), 4), -0.022],
     'anim': {'slide': 'part_slide', 'mag': 'part_mag'},
@@ -214,9 +247,20 @@ anchors = {
 }
 root['gun'] = ID; root['info_json'] = json.dumps(info); root['anchors_json'] = json.dumps(anchors)
 
+# ---- VARIANTS: the threaded barrel (its own collection and file, the same frame) ----
+VARS = []
+c_, r_, Kt = kit_variant(ID, 'barrel_threaded', 'barrel', {})
+MUZ_T, THR_END = barrel(Kt, True)
+r_['variant_json'] = json.dumps({'gun': ID, 'slot': 'barrel', 'of': 'factory', 'info': {'muzzles': [[round(MUZ_T, 4), 0, 0]]},
+                                 'anchors': {'mount_muzzle': [round(THR_END, 4), 0, 0]},
+                                 'thread': {'size': '1/2x28', 'shoulder': round(s_end + THR_SH, 4), 'end': round(THR_END, 4), 'r': round(THR_R, 5)},
+                                 'note': 'a threaded barrel: 15 mm past the slide nose, a shoulder and a 12 mm 1/2x28 thread for a muzzle device'})
+VARS.append(('barrel_threaded', c_))
+vglb = {n: (export_glb(c, os.path.join(HERE, n + '.glb')) if EXPORT else None, tris_of(c.all_objects)) for n, c in VARS}
+
 meshes = [o for o in coll.all_objects if o.type == 'MESH']
 bb = [[min((o.matrix_world @ v.co)[a] for o in meshes for v in o.data.vertices) for a in range(3)],
       [max((o.matrix_world @ v.co)[a] for o in meshes for v in o.data.vertices) for a in range(3)]]
 result = {'meshes': len(meshes), 'tris': tris_of(meshes), 'bounds_mm': [[round(x * 1000, 1) for x in b] for b in bb], 'info': info,
-          'glb': save_and_export(coll, root, HERE, ID, EXPORT)}
+          'glb': save_and_export(coll, root, HERE, ID, EXPORT, also=tuple(c for _, c in VARS)), 'variants': vglb, 'thread_end': round(THR_END, 4)}
 print('RESULT', json.dumps(result))

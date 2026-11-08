@@ -1939,7 +1939,7 @@ const G_GunRecipes = (() => {
   function authored(k: Kit, A: AuthoredGun, which: (e: AuthoredMesh) => boolean, bend?: (e: AuthoredMesh, g: THREE.BufferGeometry) => THREE.BufferGeometry) {
     for (const e of A.meshes) {
       if (!which(e)) continue;
-      const g = bend ? bend(e, geoOf(e)) : geoOf(e), mat = e.display ? Object.assign(M.black().clone(), { name: 'black' }) : ((M as any)[e.mat] || M.black)(); // (a display surface: the game paints it, whatever material the file names)
+      const g = bend ? bend(e, geoOf(e)) : geoOf(e), mat = e.display ? Object.assign(M.black().clone(), { name: 'black' }) : G.GunMaterials.byName(e.mat); // (a display surface: the game paints it, whatever material the file names)
       let m: THREE.Mesh;
       if (A.hinge && e.part) { const at = A.parts[e.part].at; k.into(partNode(k, A, e.part), -at[2], at[1]); m = placeAuthored(k, e, g, mat); k.into(null); }
       else m = placeAuthored(k, e, g, mat);
@@ -1950,13 +1950,13 @@ const G_GunRecipes = (() => {
   function authoredVariant(k: Kit, A: AuthoredGun, v: AuthoredVariant) {
     const host = A.hinge ? A.meshes.find((q) => q.slot === v.slot && q.part) : null;
     if (host) { const at = A.parts[host.part!].at; k.into(partNode(k, A, host.part!), -at[2], at[1]); }
-    for (const e of v.meshes) placeAuthored(k, e, geoOf(e), ((M as any)[e.mat] || M.black)());
+    for (const e of v.meshes) placeAuthored(k, e, geoOf(e), G.GunMaterials.byName(e.mat));
     if (host) k.into(null);
   }
   // an authored gun's own bipod (part_bipod, GUN_MODEL_CONTRACT.bipod: the RPK's): its node at its pivot, each leg a group at the leg's pivot inside it with
   // userData.leg (its deploy rotation), as bipodLeg makes them; the meshes where they were made
   function authoredBipod(k: Kit, A: AuthoredGun): THREE.Object3D {
-    const pt = A.parts.bipod, [bx, by, bz] = pt.at, bp = k.part(-bz, by), mat = (e: AuthoredMesh) => ((M as any)[e.mat] || M.black)();
+    const pt = A.parts.bipod, [bx, by, bz] = pt.at, bp = k.part(-bz, by), mat = (e: AuthoredMesh) => G.GunMaterials.byName(e.mat);
     bp.position.x = bx;
     const draw = (node: THREE.Object3D, at: number[], leg: number | null) => {
       k.into(node, -at[2], at[1]);
@@ -2141,13 +2141,14 @@ const G_GunRecipes = (() => {
   // A PISTOL modelled in Blender (o.rcv 'authored', models/<id>/<id>.glb: docs/models.md "Authored pistols"). Its frame, slide, grip, barrel (an integral suppressor with its
   // front sight on it) and magazine are the model's own; the parts it takes that are not (a pistol dot, a light) are seated on the model's pistol anchors as pistol()
   // seats them: the dot in the slide's optic cut (mount_optic, riding the slide), the light under the frame (mount_tac). Its variant barrel / magazine (o.avBarrel /
-  // o.avMag: a file beside the model) replace the factory one whole. Nothing is scaled.
+  // o.avMag: a file beside the model) replace the factory one whole. A THREADED variant barrel (its anchors.mount_muzzle, the thread's end) takes a muzzle device (o.muzzle /
+  // o.apMuzzle, the shared pistol devices), seated there on the bore axis as pistol() seats one on its thread's end, the muzzle moving on to the device's front. Nothing is scaled.
   function authoredPistol(k: Kit, o: RecipeSpec) {
     const A = G.Authored[o.authored!], a = A.anchors, anim: any = {};
     const ownIrons = !o.optic || o.optic === 'notch' || A.sights.builtin.includes(o.optic);
     // (a variant barrel: its meshes replace the factory barrel's; it may carry a pistol optic cut of its own, info.mounts.mount_optic, which the dot is seated in)
     const vb = o.avBarrel ? A.variants[o.avBarrel] : null, mountOptic: number[] = (vb && vb.info && vb.info.mounts && vb.info.mounts.mount_optic) || a.mount_optic;
-    const draw = (list: AuthoredMesh[]) => { for (const e of list) placeAuthored(k, e, geoOf(e), ((M as any)[e.mat] || M.black)()); }; // (a magazine-check mesh at its own node's place and tilt)
+    const draw = (list: AuthoredMesh[]) => { for (const e of list) placeAuthored(k, e, geoOf(e), G.GunMaterials.byName(e.mat)); }; // (a magazine-check mesh at its own node's place and tilt)
     // (an animated part: its pivot and the meshes that pass `which`; the pivot is where the model put the part_ node)
     const partOf = (list: AuthoredMesh[], key: string, which: (e: AuthoredMesh) => boolean = () => true) => {
       const first = list.find((e) => e.part === key); if (!first) return null;
@@ -2185,11 +2186,15 @@ const G_GunRecipes = (() => {
     anim.mag = partOf(vm ? vm.meshes : A.meshes, 'mag');
     k.tag('barrel');
     draw(vb ? vb.meshes : A.meshes.filter((e) => e.slot === 'barrel'));
+    // a muzzle device on a threaded barrel's thread (the variant's mount_muzzle: its end), as pistol() seats one (its bore radius: the thread's, at least 6.5 mm)
+    const mmz = vb && vb.anchors && vb.anchors.mount_muzzle;
+    let devLen = 0;
+    if (mmz && (o.muzzle || o.apMuzzle)) { k.tag('muzzle'); devLen = muzzleDev(k, o, mmz[0], Math.max(0.0065, (vb!.thread && vb!.thread.r) || 0), mmz[1]); }
     // A light or laser under the frame, at the model's mount_tac (the underside of the frame, where a pistol's rail is)
     k.tag('tac');
     if (o.tac && a.mount_tac) tactical(k, o.tac, a.mount_tac[0], a.mount_tac[1] - 0.0115, -0.01);
     k.tag('base');
-    const info: any = { sy: sight.sy, fSight: sight.fSight, relief: sight.relief || A.info.relief, muzzles: (vb && vb.info ? vb.info.muzzles : A.info.muzzles).map((m: number[]) => m.slice()), anim, magAt: A.info.magAt.slice(), pistol: true };
+    const info: any = { sy: sight.sy, fSight: sight.fSight, relief: sight.relief || A.info.relief, muzzles: devLen ? [[mmz![0] + devLen, mmz![1], mmz![2]]] : (vb && vb.info ? vb.info.muzzles : A.info.muzzles).map((m: number[]) => m.slice()), anim, magAt: A.info.magAt.slice(), pistol: true };
     for (const f of ['grip', 'support', 'slide', 'chamberAt', 'port', 'bolt', 'ch', 'cheek']) if (A.info[f]) info[f] = JSON.parse(JSON.stringify(A.info[f]));
     if (A.info.anim && A.info.anim.bolt) { const bt = A.info.boltTravel != null ? A.info.boltTravel : o.boltTravel; if (bt != null) info.boltTravel = bt; } // (how far a hand-worked bolt comes back: the model's, else the platform's)
     return info;

@@ -16,7 +16,7 @@ interface AuthoredRig {
   mount?: { top: number; rail: [number, number] } | null;
 }
 /** A per-gun variant part (models/<id>/<name>.glb, GUN_MODEL_CONTRACT.authored.variants): the meshes that replace the factory barrel (info.muzzles: where it ends), muzzle device (info.muzzles) or magazine (cap rounds), in the gun's frame. */
-interface AuthoredVariant { slot: 'barrel' | 'mag' | 'muzzle'; of: string; info: Record<string, any> | null; cap: number | null; note: string; meshes: AuthoredMesh[]; check: Record<string, any> | null /* (a magazine's check data, its part_mag's extras.check) */ }
+interface AuthoredVariant { slot: 'barrel' | 'mag' | 'muzzle'; of: string; info: Record<string, any> | null; anchors?: { mount_muzzle?: number[] } | null /* a threaded barrel's: where a muzzle device is seated (the thread's end) */; thread?: { size: string; shoulder: number; end: number; r: number } | null; cap: number | null; note: string; meshes: AuthoredMesh[]; check: Record<string, any> | null /* (a magazine's check data, its part_mag's extras.check) */ }
 /**
  * One authored gun: the frame the other parts are seated on (rig), which optic kinds are its own sights (sights), the factory build's info and the meshes.
  * pistol: a pistol (info.pistol): the rig is made from the pistol anchor set, and the raw anchors (mount_slide, mount_optic, mount_tac...) are in `anchors`; variants: its per-gun parts by file name.

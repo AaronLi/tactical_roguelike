@@ -180,6 +180,17 @@ expectV('variant: an unknown field', vDesc({ ...VB(), extra: 1 }), /variant\.ext
 expectV('variant: a mesh of another slot', vDesc(VB(), 'x_barrel_short', [mesh('grip_1', 'grip', 'black')]), /extras\.slot is "grip", expected "barrel"/);
 expectV('variant: the root is named <gun>_<name>', vDesc(VB(), 'barrel_short'), /expected "x_barrel_short"/);
 expectV('variant: no meshes', vDesc(VB(), 'x_barrel_short', []), /no meshes/);
+// a threaded barrel variant: anchors.mount_muzzle (the thread's end) and thread go together
+const VT = () => ({ ...VB(), info: { muzzles: [[0.1939, 0, 0]] }, anchors: { mount_muzzle: [0.1939, 0, 0] }, thread: { size: '1/2x28', shoulder: 0.1819, end: 0.1939, r: 0.00635 } });
+expectV('variant: a threaded barrel variant is valid', vDesc(VT()), null);
+expectV('variant: a thread without its mount_muzzle', vDesc({ ...VT(), anchors: undefined }), /thread needs variant\.anchors\.mount_muzzle/);
+expectV('variant: a mount_muzzle without its thread', vDesc({ ...VT(), thread: undefined }), /needs variant\.thread/);
+expectV('variant: a mount_muzzle that is not the thread\'s end', vDesc({ ...VT(), anchors: { mount_muzzle: [0.19, 0, 0] } }), /is not variant\.thread\.end/);
+expectV('variant: a thread ending behind its shoulder', vDesc({ ...VT(), thread: { size: '1/2x28', shoulder: 0.2, end: 0.1939, r: 0.00635 } }), /is not forward of its shoulder/);
+expectV('variant: a thread with an unknown field', vDesc({ ...VT(), thread: { ...VT().thread, pitch: 0.9 } }), /variant\.thread\.pitch: not a field/);
+expectV('variant: another anchor', vDesc({ ...VT(), anchors: { mount_muzzle: [0.1939, 0, 0], mount_optic: [0.1, 0.02, 0] } }), /variant\.anchors\.mount_optic: not an anchor/);
+expectV('variant: a threaded magazine', vDesc({ ...VT(), slot: 'mag', cap: 20 }, 'x_barrel_short', [part('mag', [mesh('mag_1', 'mag', 'black')])]), /only a barrel variant has variant\.anchors/);
+expectV('variant: a threaded barrel whose muzzle is not its end', vDesc({ ...VT(), info: { muzzles: [[0.17, 0, 0]] } }), /is not at the thread's end/);
 // the info as leaves, and the planner
 const canon = (v) => JSON.stringify(v, (k, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.keys(x).sort().map((q) => [q, x[q]])) : x));
 const leavesBack = (v) => canon(M.infoFromLeaves(M.infoLeaves(v)));

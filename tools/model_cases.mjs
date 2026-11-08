@@ -147,7 +147,9 @@ export function generate(G, id) {
   } }
   // authored variants (models/<id>/<name>.glb: a per-gun barrel or magazine): each fitted alone, with the loaded build, and all of them together
   { const vs = Object.values(PARTS).filter((p) => p.plat === id && p.model && (p.model.avBarrel || p.model.avMag) && !p.retired);
-    for (const p of vs) { add(`authored variant (${p.id})`, { ...def, [p.slot]: p.id }); add(`authored variant, loaded (${p.id})`, { ...loaded, [p.slot]: p.id }); }
+    for (const p of vs) { add(`authored variant (${p.id})`, { ...def, [p.slot]: p.id }); add(`authored variant, loaded (${p.id})`, { ...loaded, [p.slot]: p.id });
+      // (an authored pistol's threaded variant barrel opens the muzzle slot: each device on it, the default build's and the loaded one's)
+      if (p.provides && p.provides.muzzle && (G.WEAPONS[id] || {}).cls === 'PST') for (const base of [def, loaded]) { const b = { ...base, [p.slot]: p.id }, ms = slotOf(b, 'muzzle'); if (ms) for (const m of options(ms, b)) add(`authored variant with a muzzle device (${p.id}, ${m.id})`, { ...b, muzzle: m.id }); } }
     if (vs.length > 1) add('authored variants together', vs.reduce((b, p) => ({ ...b, [p.slot]: p.id }), { ...loaded })); }
   // specials
   const brs = slotOf(def, 'barrel');

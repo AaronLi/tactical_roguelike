@@ -10686,6 +10686,10 @@
    "build": { "barrel": "p2011.barrel", "mag": "p2011.mag", "optic": "p2011.optic", "tac": "ptac.3" }
   },
   { "platform": "p2011",
+   "why": "opens slots: p2011.br.threaded in barrel (muzzle) + authored variant with a muzzle device (p2011.br.threaded, mz.rp.comp)",
+   "build": { "barrel": "p2011.br.threaded", "mag": "p2011.mag", "muzzle": "mz.rp.comp", "optic": "p2011.optic" }
+  },
+  { "platform": "p2011",
    "why": "lowest optic (p9.optic)",
    "build": { "barrel": "p2011.barrel", "mag": "p2011.mag", "optic": "p9.optic", "tac": "ptac.0" }
   },
@@ -10712,6 +10716,34 @@
   { "platform": "p2011",
    "why": "authored optic (op.pso.5)",
    "build": { "barrel": "p2011.barrel", "mag": "p2011.mag", "optic": "op.pso.5" }
+  },
+  { "platform": "p2011",
+   "why": "authored variant (p2011.br.threaded)",
+   "build": { "barrel": "p2011.br.threaded", "mag": "p2011.mag", "optic": "p2011.optic" }
+  },
+  { "platform": "p2011",
+   "why": "authored variant, loaded (p2011.br.threaded)",
+   "build": { "barrel": "p2011.br.threaded", "mag": "p2011.mag", "optic": "p2011.optic", "tac": "ptac.0" }
+  },
+  { "platform": "p2011",
+   "why": "authored variant with a muzzle device (p2011.br.threaded, mz.rp.can)",
+   "build": { "barrel": "p2011.br.threaded", "mag": "p2011.mag", "muzzle": "mz.rp.can", "optic": "p2011.optic" }
+  },
+  { "platform": "p2011",
+   "why": "authored variant with a muzzle device (p2011.br.threaded, mz.rp.long)",
+   "build": { "barrel": "p2011.br.threaded", "mag": "p2011.mag", "muzzle": "mz.rp.long", "optic": "p2011.optic" }
+  },
+  { "platform": "p2011",
+   "why": "authored variant with a muzzle device (p2011.br.threaded, mz.rp.comp)",
+   "build": { "barrel": "p2011.br.threaded", "mag": "p2011.mag", "muzzle": "mz.rp.comp", "optic": "p2011.optic", "tac": "ptac.0" }
+  },
+  { "platform": "p2011",
+   "why": "authored variant with a muzzle device (p2011.br.threaded, mz.rp.can)",
+   "build": { "barrel": "p2011.br.threaded", "mag": "p2011.mag", "muzzle": "mz.rp.can", "optic": "p2011.optic", "tac": "ptac.0" }
+  },
+  { "platform": "p2011",
+   "why": "authored variant with a muzzle device (p2011.br.threaded, mz.rp.long)",
+   "build": { "barrel": "p2011.br.threaded", "mag": "p2011.mag", "muzzle": "mz.rp.long", "optic": "p2011.optic", "tac": "ptac.0" }
   }
  ]
 }
