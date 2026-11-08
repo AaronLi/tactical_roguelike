@@ -299,7 +299,7 @@ const G_GunAudio = {
         if (tl > 0.3 && L.los(map, px, py, pz, lis.x, ly, lis.z)) {
           const spec = Math.max(0, (rx * tlx + ry * tly + rz * tlz) / tl); // 1 = mirror bounce straight at the listener
           const path = travelled + tl;
-          const amp = energy * rayNorm * (0.2 + 0.8 * Math.pow(spec, 8)) * Math.pow(2 / Math.max(path, 2), 0.6);
+          const amp = energy * rayNorm * (0.2 + 0.8 * Math.pow(spec, 8)) * G.Audio.far(path); // (its whole path's falloff: G.Audio.far)
           add({ x: px, y: py, z: pz }, path, amp, order, hops.slice());
         }
         ox = px; oy = py; oz = pz; dx = rx; dy = ry; dz = rz;
@@ -364,11 +364,15 @@ const G_GunAudio = {
     return v;
   },
   /** the shooter's room's response, set for how it reaches you now: returns its nodes (the shot's sent into .cv) */
-  roomVerb(ctx: AudioContext, map: AcMap, src: EchoPt, heard: { k: number; lp: number; at: EchoPt; same: boolean } | null) {
+  // far: the source's distance falloff (G.Audio.far). Indoors a room's reverberation fills it, as loud wherever you stand in
+  // it; out of doors there's no room, only what reflects off what's near the source, and that falls off with the distance
+  // as the sound itself does.
+  roomVerb(ctx: AudioContext, map: AcMap, src: EchoPt, heard: { k: number; lp: number; at: EchoPt; same: boolean } | null, far = 1) {
     const tr = G.Acoustics.roomAt(map, src.x, src.y, src.z);
     if (!tr) return null;
+    const z = G.Acoustics.of(map).zones[tr.zone], fk = z && z.out ? far : 1;
     const v = this.verbOf(ctx, map, tr), t = ctx.currentTime, same = !heard || heard.same, PLACED = 0.33;
-    v.g.gain.setTargetAtTime(same ? 1 : heard!.k, t, 0.02); v.lp.frequency.setTargetAtTime(same ? 20000 : heard!.lp, t, 0.02);
+    v.g.gain.setTargetAtTime((same ? 1 : heard!.k) * fk, t, 0.02); v.lp.frequency.setTargetAtTime(same ? 20000 : heard!.lp, t, 0.02);
     v.wide.gain.setTargetAtTime(same ? 1 : Math.sqrt(1 - PLACED), t, 0.02); v.dg.gain.setTargetAtTime(same ? 0 : Math.sqrt(PLACED), t, 0.02);
     if (!same) { const at = heard!.at; v.pan.positionX.setValueAtTime(at.x, t); v.pan.positionY.setValueAtTime(at.y, t); v.pan.positionZ.setValueAtTime(at.z, t); }
     return v;
@@ -431,7 +435,7 @@ const G_GunAudio = {
     if (this.debugEchoes) this.drawEchoes(taps, cam);
     if (pos) {
       d = cam.distanceTo(pos);
-      gain *= G.U.clamp(Math.pow(2 / Math.max(d, 2), 0.6), 0.05, 1);
+      gain *= A.far(d); // (G.Audio.far: gently near, as sound does in the open past 15 m, no floor)
       // How it gets to you (js/acoustics.ts): in your own zone, straight (dulled a little behind shelves and pillars);
       // from another, by the strongest way through the openings: as loud and as bright as the doors and windows on it
       // let it be, and from the one it comes in by. (No acoustics: line of sight, and round a corner by its echoes.)
@@ -471,7 +475,7 @@ const G_GunAudio = {
     // yours; one in your own room already carries its room in its render, so only a little
     // its room: the shooter's room's measured response (the report's reverberation, at its measured level against the
     // report itself), heard by the way the shooter's room reaches you (in your own room, all round you)
-    const rv = measured ? this.roomVerb(ctx, map, src, heard) : null;
+    const rv = measured ? this.roomVerb(ctx, map, src, heard, pos ? A.far(d) : 1) : null;
     if (rv) { const sg = ctx.createGain(); sg.gain.value = base; s.connect(sg); sg.connect(rv.cv); } // (at the report's own level: the response carries the room's)
     // and a shot from another room, come in, fills the room you're in: your room's own response to it, all round you, at
     // the level it reaches you at (the same room's response, when that's whose it was, is already the shooter's above)

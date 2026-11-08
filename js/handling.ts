@@ -77,7 +77,7 @@ const G_Handling = (() => {
     const s = ctx.createBufferSource(); s.buffer = c.buf;
     s.playbackRate.value = 0.98 + Math.random() * 0.04; // (no two quite alike)
     const v = (o.vol != null ? o.vol : 0.7) * c.gain * A.HANDLING, cam = G.R && G.R.camera; // (A.HANDLING: the handling sounds' trim)
-    if (o.pos && cam) A.route(s, o.pos, v / (1 + cam.position.distanceTo(o.pos as THREE.Vector3) * 0.12), v * A.NEAR_PLACED);
+    if (o.pos && cam) A.route(s, o.pos, v * A.far(cam.position.distanceTo(o.pos as THREE.Vector3)), v * A.NEAR_PLACED);
     else A.route(s, null, v * A.HANDLING_OWN, v * A.HANDLING_OWN * A.NEAR_HANDS); // (your own: A.HANDLING_OWN up)
     if (when >= now) s.start(when); else s.start(now, Math.min(now - when, c.buf.duration));
     return true;

@@ -162,9 +162,19 @@ const G_Audio = {
     vol *= this.HANDLING;
     const s = this.ctx.createBufferSource();
     s.buffer = buf; s.playbackRate.value = rate * (0.96 + Math.random() * 0.08);
-    this.route(s, pos, vol / (1 + cam.position.distanceTo(pos) * 0.12), vol * this.NEAR_PLACED);
+    this.route(s, pos, vol * this.far(cam.position.distanceTo(pos)), vol * this.NEAR_PLACED);
     s.start();
     return true;
+  },
+  // How a sound falls off with distance d (m), against its level at 2 m: gently near (^0.6, as the game's always had it: a
+  // fight across a room keeps its punch), then from FAR_KNEE (15 m) as sound really does in the open, 6 dB a doubling, with
+  // no floor (a shot 250 m off is ~35 dB under one at 2 m; was a floor at -26 dB, everything past ~300 m as loud as that).
+  // The shots (js/gunaudio.ts), their echoes, the out-of-doors reverb round them, doors and everything placed (route callers).
+  FAR_KNEE: 15,
+  far(d: number) {
+    if (!(d > 2)) return 1;
+    const K = this.FAR_KNEE;
+    return d <= K ? Math.pow(2 / d, 0.6) : Math.pow(2 / K, 0.6) * (K / d);
   },
   // How far from the thing making it a handling sound's level is set for, m: your own gun's ~0.4 m from your ears, a
   // sound placed in the world is levelled as from ~0.5 m. The rooms' measured responses (js/acoustics.ts) are against
@@ -197,7 +207,7 @@ const G_Audio = {
     if (ac) {
       const h = G.Acoustics.hear(map, pos, cam);
       gain *= h.k; lp.frequency.value = h.same ? 20000 : h.lp; at = h.at;
-      const rv = GA.roomVerb(c, map, pos, h);
+      const rv = GA.roomVerb(c, map, pos, h, this.far(Math.hypot(pos.x - cam.x, pos.y - cam.y, pos.z - cam.z)));
       into(src, send, rv);
       if (!h.same) { const lv = GA.listenerVerb(c, map); if (lv !== rv) into(g, 1, lv); }
     } else {

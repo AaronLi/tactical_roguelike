@@ -74,6 +74,11 @@ and echoes up to 1.5 s count (the slap back off far buildings and cliffs); over 
 the open air to its far face (0.3–1.3 s). A shot's louder and brighter down its line of fire (`directivity`: +3 dB
 ahead, −4 dB and dull behind), judged at where it leaves for you: the callers pass the aim point.
 
+**Distance** (`G.Audio.far`): a shot, its echoes and everything placed fall off gently near (^0.6 against 2 m: a fight
+across a room keeps its punch) and from 15 m as sound does in the open, 6 dB a doubling, with no floor (250 m: ~35 dB
+under 2 m). Out of doors the reverberation round the source (what reflects off what's near it) falls off the same way;
+indoors a room's fills it, as loud anywhere in it.
+
 ## Handling sounds (`js/handling.ts`, `js/audio.ts` `route`)
 
 The guns' handling sounds are the contact synth's (`tools/contact-synth`), baked dry by `npm run build` (`tools/bake_audio.mjs`: git-ignored, like the models; only when the synth has changed; both banks then packed into one gzipped bundle the game downloads once and keeps, `assets/audio/bundles/audio.rtb`, read through `G.AudioBundle` as the models are through `G.Bundles`) into
