@@ -151,6 +151,13 @@ expectA('a rifle still needs its handguard anchors', aGun({}, undefined, { ancho
   expectA('multi: a hinge frame names a part', mgun({}, { hinge: { sequence: [{ part: 'carry', move: [0, 0.1, 0], frame: 'part_brk' }] } }), /sequence\[0\]\.frame: "part_brk" is not a part_ node/);
   expectA('multi: a step does something', mgun({}, { hinge: { sequence: [{ part: 'carry' }] } }), /turns \(axis \+ rotate_deg\) or slides \(move\)/);
   expectA('multi: a rotation needs an axis', mgun({}, { hinge: { sequence: [{ part: 'carry', rotate_deg: 40 }] } }), /axis: x, y or z/);
+  expectA('multi: a step\'s feel (share, ease, over, back, hand) is read', mgun({}, { hinge: { sequence: [{ part: 'carry', axis: 'x', rotate_deg: 90, share: 0.5, ease: 'spring', over: 0.06, back: { share: 1.2, ease: 'magnet' }, hand: { part: 'part_carry', at: [0.06, 0, 0] } }] } }), null);
+  expectA('multi: an ease is one the game plays', mgun({}, { hinge: { sequence: [{ part: 'carry', axis: 'x', rotate_deg: 90, ease: 'bouncy' }] } }), /ease: "bouncy" is not one of smooth, linear/);
+  expectA('multi: a way back\'s ease too', mgun({}, { hinge: { sequence: [{ part: 'carry', axis: 'x', rotate_deg: 90, back: { ease: 'snap' } }] } }), /back\.ease: "snap" is not one of/);
+  expectA('multi: a share is positive', mgun({}, { hinge: { sequence: [{ part: 'carry', axis: 'x', rotate_deg: 90, share: 0 }] } }), /share: 0 is out of range/);
+  expectA('multi: a hand holds a part', mgun({}, { hinge: { sequence: [{ part: 'carry', axis: 'x', rotate_deg: 90, hand: { part: 'part_brk', at: [0, 0, 0] } }] } }), /sequence\[0\]\.hand\.part: "part_brk" is not a part_ node/);
+  expectA('multi: a hand needs its point', mgun({}, { hinge: { sequence: [{ part: 'carry', axis: 'x', rotate_deg: 90, hand: { part: 'part_carry' } }] } }), /hand\.at: missing/);
+  expectA('multi: an overshoot is a spring\'s', mgun({}, { hinge: { sequence: [{ part: 'carry', axis: 'x', rotate_deg: 90, ease: 'smooth', over: 0.1 }] } }), /over: an overshoot is for ease "spring"/);
   expectA('multi: nested parts are fine (a barrel block inside a forend)', mgun({ anim: { brk: 'part_brk', mag: 'part_mag', carry: 'part_carry' } }, {}, [B(), part('brk', [part('mag', [mesh('mag_3', 'mag'), part('carry', [mesh('mag_4', 'mag')])])])]), null);
   expectA('multi: carry is a part key', mgun({ anim: { mag: 'part_mag', carry: 'part_carry' } }), null);
 }

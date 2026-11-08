@@ -580,13 +580,27 @@ for t in range(0, 101):                                                    # the
     for f0, u0 in TOPS:
         f, u = _rot(f0, u0, OPEN, UNSEAT); f += up[0] * t * 0.001; u += up[1] * t * 0.001
         if inrail(f): RAIL_CLEAR = min(RAIL_CLEAR, RAIL_B - u)
+# how each step feels (js/vmanim.ts hingeClip; the fields: docs/models.md "Multi-barrel guns", GUN_MODEL_CONTRACT.multi): share of the time (relative), ease out and back, and
+# the support hand's hold, a point of a part_ node in its own frame [forward, up, right] that the hand follows. The left thumb flicks the latches up; the hand takes the bail
+# and flips it; on the forend's underside (where it rests, a little forward) as the spring shoots the front forward, then a firm pull down breaks it open against the detent;
+# the bail again to slide the block back and lift it out. Back in: the block set down, slid home, the forend heaved up (heavy), the front drawn home by its magnets (a soft
+# stop), the bail folded, the latches pressed down.
+H_LEVER = {'part': 'part_lever', 'at': [0.02, -0.02, -0.05]}                # (the latches' tab, from the left)
+H_BAIL = {'part': 'part_carry', 'at': [0.064, 0, 0]}                        # (the bail's bar: CH_L, 6 mm on)
+H_FOREND = {'part': 'part_brk', 'at': [0.150, -0.033, 0]}                   # (under the forend, just ahead of the support hand's rest)
 root['hinge_json'] = json.dumps({'sequence': [
-    {'part': 'part_lever', 'axis': 'x', 'at': [LP[0], LP[1], 0], 'rotate_deg': 40, 'note': 'the latches lift off the cradle pin: the block is free of the dock'},
-    {'part': 'part_carry', 'axis': 'x', 'at': [CH_F, HU, 0], 'rotate_deg': 90, 'frame': 'part_mag', 'note': 'the carry handle flips up'},
-    {'part': 'part_pump', 'move': [SLIDE, 0, 0], 'note': 'the muzzle device runs forward on its guide rods, drawing the barrel block out from under the rail'},
-    {'part': 'part_brk', 'axis': 'x', 'at': [HINGE[0], HINGE[1], 0], 'rotate_deg': -OPEN, 'note': 'the forend drops on the fixed hinge'},
-    {'part': 'part_mag', 'move': [-UNSEAT, 0, 0], 'frame': 'part_brk', 'note': 'the block slides back off the muzzle device\'s seats'},
-    {'part': 'part_mag', 'move': [0, 0.10, 0], 'frame': 'part_brk', 'note': 'and lifts straight up out of the cradle'}]})
+    {'part': 'part_lever', 'axis': 'x', 'at': [LP[0], LP[1], 0], 'rotate_deg': 40, 'note': 'the latches lift off the cradle pin: the block is free of the dock',
+     'share': 0.45, 'ease': 'out', 'back': {'share': 0.35}, 'hand': H_LEVER},
+    {'part': 'part_carry', 'axis': 'x', 'at': [CH_F, HU, 0], 'rotate_deg': 90, 'frame': 'part_mag', 'note': 'the carry handle flips up',
+     'share': 0.5, 'back': {'share': 0.4}, 'hand': H_BAIL},
+    {'part': 'part_pump', 'move': [SLIDE, 0, 0], 'note': 'the muzzle device runs forward on its guide rods, drawing the barrel block out from under the rail',
+     'share': 0.55, 'ease': 'spring', 'over': 0.06, 'back': {'share': 1.0, 'ease': 'magnet'}, 'hand': H_FOREND},
+    {'part': 'part_brk', 'axis': 'x', 'at': [HINGE[0], HINGE[1], 0], 'rotate_deg': -OPEN, 'note': 'the forend drops on the fixed hinge',
+     'share': 1.3, 'ease': 'detent', 'back': {'share': 1.4, 'ease': 'heavy'}, 'hand': H_FOREND},
+    {'part': 'part_mag', 'move': [-UNSEAT, 0, 0], 'frame': 'part_brk', 'note': 'the block slides back off the muzzle device\'s seats',
+     'share': 0.35, 'hand': H_BAIL},
+    {'part': 'part_mag', 'move': [0, 0.10, 0], 'frame': 'part_brk', 'note': 'and lifts straight up out of the cradle',
+     'share': 0.9, 'back': {'share': 0.8}, 'hand': H_BAIL}]})
 
 # ---- MUZZLE DEVICE VARIANTS: their own collections and files, the same rear interface and frame ----
 VARS = []
