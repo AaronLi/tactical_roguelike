@@ -5,7 +5,7 @@
 # It sets CFG and runs the shared AK builder (models/ak_kit.py), which writes rpk.glb, rpk.blend and model.json.
 import os
 HERE = globals().get('GUN_DIR') or os.path.dirname(os.path.abspath(__file__))
-CFG = {'variant': 'rpk'}
+CFG = {'variant': 'rpk', 'barrels': [16, 16.3, 20]}   # (the other barrels: variants beside the gun, barrel_<len>.glb)
 g = {'GUN_DIR': HERE, 'CFG': CFG}
 exec(open(os.path.join(os.path.dirname(HERE), 'ak_kit.py'), encoding='utf-8').read(), g)
 result = g['result']

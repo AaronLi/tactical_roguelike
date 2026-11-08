@@ -37,13 +37,13 @@ root['gun'] = ID
 # ----------------------------------------------------------------------------------------------------- the variant's figures (mm)
 V = {
     'akm':  dict(rcv='blued', furn='woodRed', grip='woodRed', panel='chequerWood', mag='park', mag_kind='762', mag_n=30,
-                 stock='wood', butt=-246.0, gas='45', muzzle='slant', barrel_end=620.0, fsb=(572.0, 606.0), barrel_r=(10.5, 8.6, 7.6),
+                 stock='wood', butt=-246.0, inches=16.3, gas='45', muzzle='slant', barrel_end=620.0, fsb=(572.0, 606.0), barrel_r=(10.5, 8.6, 7.6),
                  hg='wood', cover_ribs=True),
     'ak74': dict(rcv='black', furn='polymer', grip='polymer', panel='polymer', mag='plum', mag_kind='545', mag_n=30,
-                 stock='fold', butt=-259.0, gas='90', muzzle='brake', barrel_end=620.0, fsb=(572.0, 606.0), barrel_r=(10.5, 8.6, 7.6),
+                 stock='fold', butt=-259.0, inches=16.3, gas='90', muzzle='brake', barrel_end=620.0, fsb=(572.0, 606.0), barrel_r=(10.5, 8.6, 7.6),
                  hg='poly', cover_ribs=True),
     'rpk':  dict(rcv='blued', furn='woodRed', grip='woodRed', panel='chequerWood', mag='park', mag_kind='762', mag_n=40,
-                 stock='club', butt=-237.0, gas='45', muzzle='cap', barrel_end=800.0, fsb=(762.0, 786.0), barrel_r=(12.0, 11.0, 10.5),
+                 stock='club', butt=-237.0, inches=23.2, gas='45', muzzle='cap', barrel_end=800.0, fsb=(762.0, 786.0), barrel_r=(12.0, 11.0, 10.5),
                  hg='wood', cover_ribs=True, bipod=True),
 }[VAR]
 RCV, FURN = V['rcv'], V['furn']
@@ -101,18 +101,37 @@ def receiver():
     bevel(o, 0.8 * mm, 1); smooth(o); K.adopt(o, 'base', RCV)
     o = K.obj(cyl(2.6 * mm, -7.5 * mm, 7.5 * mm, 'x', (147 * mm, -41 * mm), 12), 'base', 'steel'); smooth(o)
 
+CV_BOT = 5.0                 # the cover's skirts: down outside the receiver's walls to here (4 mm below their top): no daylight under it
+def cover_shape(d, bot, f1, f0=None):
+    """The dust cover's solid shape grown by d (mm; negative: inside it): its side profile (the rear end stepped down round the spring
+    guide's button) across its section (square-bottomed, rounded over the top), from its rear (CV0 - d, or f0) to f1, down to bot.
+    A closed mesh (for a boolean): returned as a working object."""
+    f0 = CV0 - d if f0 is None else f0
+    o = K.tmp(prism(P([(f0, bot), (f0, 22 + 0.4 * d), (CV0 + 6 - 0.4 * d, 31 + d), (CV0 + 16, CVT + d), (f1, CVT + d), (f1, bot)]), 'x', -0.03, 0.03))
+    w, top, lo = HW + 0.8 + d, CVT + d, bot - 20.0
+    boolean(o, prism(rounded(0, (top + lo) / 2 * mm, w * mm, (top - lo) / 2 * mm, (8 + d) * mm, 5), 'y', f0 * mm - 0.01, f1 * mm + 0.01), 'INTERSECT')
+    return o
+
+def mesh_of(o):
+    """A working object's mesh, the object gone (a cutter for cut())."""
+    me = o.data; bpy.data.objects.remove(o, do_unlink=True); return me
+
+def port_skirt_cut(o, x0):
+    """The right skirt cut back to the walls' top over the ejection port and the handle's travel (the handle runs there)."""
+    cut(o, box((HW - 0.3) * mm, (x0 + 1) * mm, 136 * mm, (CV1 + 2) * mm, (CV_BOT - 1) * mm, (RTOP + 0.2) * mm))
+
 def dust_cover():
-    """The dust cover: a pressed steel lid over the receiver's top, rounded across, its rear end stepped down round the recoil spring
-    guide's button (which stands through it), its pressed transverse stiffening ribs; the button."""
-    cv = K.tmp(prism(P([(CV0, RTOP - 0.5), (CV0, 22), (CV0 + 6, 31), (CV0 + 16, CVT), (CV1, CVT), (CV1, RTOP - 0.5)]), 'x', -CHW * mm, CHW * mm))
-    boolean(cv, prism(rounded(0, (RTOP + CVT) / 2 * mm, CHW * mm, (CVT - RTOP + 1) / 2 * mm, 8 * mm, 5), 'y', CV0 * mm - 0.01, CV1 * mm + 0.01), 'INTERSECT')
-    cut(cv, prism(rounded(0, (RTOP + CVT) / 2 * mm - 1.2 * mm, (CHW - 0.8) * mm, (CVT - RTOP + 1) / 2 * mm, 7.2 * mm, 5), 'y', (CV0 + 3) * mm, (CV1 + 1) * mm))   # (a pressed lid: hollow)
-    bevel(cv, 0.6 * mm, 1, 30); smooth(cv); K.adopt(cv, 'base', RCV)
+    """The dust cover: a pressed steel lid over the receiver's top, rounded across, its skirts down outside the receiver's walls, closed at
+    its rear (stepped down round the recoil spring guide's button, which stands through it) and its front; its pressed transverse
+    stiffening ribs; the button."""
+    cv = cover_shape(0.0, CV_BOT, CV1)
+    cut(cv, mesh_of(cover_shape(-0.8, CV_BOT - 10, CV1 - 1.5)))       # (a pressed lid: hollow, 0.8 mm, open only underneath)
+    port_skirt_cut(cv, HW + 0.8)
+    bevel(cv, 0.4 * mm, 1, 30); smooth(cv); K.adopt(cv, 'base', RCV)
     if V['cover_ribs']:
         for f in (40, 62, 84, 106, 128):   # the ribs: low ridges across its top, down to the shoulders
-            rb = K.tmp(prism(rounded(0, (RTOP + CVT) / 2 * mm + 0.4 * mm, (CHW + 0.6) * mm, (CVT - RTOP + 1) / 2 * mm + 0.6 * mm, 8.6 * mm, 5), 'y', (f - 1.6) * mm, (f + 1.6) * mm))
-            cut(rb, box(-0.03, 0.03, (f - 3) * mm, (f + 3) * mm, -0.02, (RTOP + 12) * mm))
-            bevel(rb, 0.5 * mm, 1, 30); smooth(rb); K.adopt(rb, 'base', RCV)
+            rb = cover_shape(0.4, RTOP + 12, f + 1.6, f0=f - 1.6)          # (0.4 mm proud: inside the railed cover, which is 0.5)
+            bevel(rb, 0.3 * mm, 1, 30); smooth(rb); K.adopt(rb, 'base', RCV)
     o = K.obj(lathe([(6 * mm, 4.6 * mm), (CV0 * mm + 1 * mm, 4.6 * mm), (CV0 * mm + 1 * mm, 3.4 * mm)], 18, (0, 0, 16 * mm)), 'base', 'steel'); smooth(o)
     o = K.obj(lathe([(4.5 * mm, 0.0003), (4.5 * mm, 3.2 * mm), (6.5 * mm, 4.6 * mm)], 18, (0, 0, 16 * mm)), 'base', 'steel'); smooth(o)
 
@@ -145,17 +164,7 @@ def rear_leaf():
     if rpk:   # the RPK's windage drum on the leaf's left, by the notch
         o = K.obj(cyl(4.0 * mm, -14 * mm, -9.0 * mm, 'x', ((NOTCH_F + 6) * mm, (SY - 5) * mm), 16), 'optic', RCV); smooth(o)
 
-# ----------------------------------------------------------------------------------------------------- GAS TUBE, HANDGUARDS
-def gas_tube():
-    """The gas tube from the rear sight block to the gas block (base: it stays with any handguard): its rear ferrule in the block, its front
-    vent holes, the front ferrule over the upper handguard."""
-    gt = K.tmp(lathe([(310 * mm, TUBE_R * mm), (GAS0 * mm + 6 * mm, TUBE_R * mm), (GAS0 * mm + 6 * mm, 0.0003)], 24, (0, 0, TUBE_U * mm)))
-    for f in (440, 452, 464):   # (the vents along each side near its front)
-        cut(gt, cyl(1.9 * mm, -0.02, 0.02, 'x', (f * mm, TUBE_U * mm), 10))
-    smooth(gt); K.adopt(gt, 'base', RCV)
-    for f0, f1 in ((318, 325), (428, 433)):
-        o = K.obj(lathe([(f0 * mm, (TUBE_R + 1.5) * mm), (f1 * mm, (TUBE_R + 1.5) * mm)], 24, (0, 0, TUBE_U * mm)), 'base', RCV); smooth(o)
-
+# ----------------------------------------------------------------------------------------------------- HANDGUARDS
 def handguards(a=None, b=None, m=None, poly=None):
     """The handguards (slot handguard): the upper one round the gas tube (half round over a flat underside) and the lower one under the
     barrel, deep at its heel against the receiver, its sides grooved for the fingers; the retainer band at their front (b to b + 7). AKM /
@@ -267,19 +276,22 @@ def handguard_quad_ak(L):
     sp = lambda f0, f1: [round((f0 - RF) * mm, 4), round((f1 - RF) * mm, 4)]
     return {'top': sp(r0, r1), 'bottom': sp(r0 + 10, r1), 'left': sp(r0 + 12, r1), 'right': sp(r0 + 12, r1)}
 
-# ----------------------------------------------------------------------------------------------------- BARREL, GAS BLOCK, FRONT SIGHT
-def barrel():
-    """The barrel (base from the trunnion to inside the front sight base: it stays with any barrel; slot barrel the factory barrel's end
-    ahead of it with the muzzle thread, to mount_muzzle), the cleaning rod under it."""
-    r0, r1, r2 = V['barrel_r']
-    o = K.obj(lathe([(250 * mm, r0 * mm), ((RF + 30) * mm, r0 * mm), ((RF + 60) * mm, r1 * mm), (GAS1 * mm, r1 * mm), ((GAS1 + 8) * mm, r2 * mm), ((FS1 - 6) * mm, r2 * mm)], 24), 'base', 'park' if RCV == 'blued' else RCV); smooth(o)
-    o = K.obj(lathe([((FS1 - 8) * mm, r2 * mm), (FS1 * mm, r2 * mm), (FS1 * mm, 7.0 * mm), (BE * mm, 7.0 * mm), (BE * mm, 3.0 * mm), ((BE - 3) * mm, 2.8 * mm)], 20), 'barrel', 'park' if RCV == 'blued' else RCV); smooth(o)
-    o = K.obj(lathe([((HG_LO[1] + 2) * mm, 3.0 * mm), ((FS1 - 3) * mm, 3.0 * mm), ((FS1 - 1) * mm, 3.6 * mm), (FS1 * mm, 3.6 * mm)], 12, (0, 0, -15.5 * mm)), 'base', 'steel'); smooth(o)
-
-def gas_block():
+# ----------------------------------------------------------------------------------------------------- THE BARREL AND WHAT RIDES ON IT
+# The barrel carries its gas block, the gas tube, the front sight base with the post, the cleaning rod, the muzzle thread (and on the RPK
+# the bipod's collar): slot barrel, so another barrel brings its own. The factory barrel is the model's; each other length is a variant
+# beside it (models/<id>/barrel_<len>.glb, variant_json slot barrel: js/parts.ts <id>.br.<name>, avBarrel), drawn whole in its place.
+# The receiver keeps only the barrel's shank in the trunnion and under the handguard (base, to BASE_END: every length reaches it).
+# The gas system: on 16" and longer the gas port is where the AKM's is (a fixed distance from the chamber), so the gas block, the tube
+# and the handguard room are the factory's whatever the length, and only the front sight base moves (14 mm behind the barrel's end).
+# On 12.5" and shorter there is no room for both: the gas block and front sight are ONE block (the AK-104/105's), its gas port as far
+# back as the handguard allows, the tube shortened to it; the handguard room is then that block's rear (each variant's note gives it).
+BASE_END = 410.0             # the barrel's base part ends here (under the handguard): ahead of it each barrel is its own
+SHORT_IN = 12.5              # barrels this long and shorter take the combined gas block and front sight
+BP_DROP = -41.0              # the RPK bipod's legs: folded back at this height, under the lower handguard
+def gas_block(a, b, slot):
     """The gas block: the AKM's (and RPK's) with its front sloped back at 45 degrees over the gas port, the AK-74's square-fronted; the
     gas cylinder's seat round the tube's front, the bayonet lug under it."""
-    a, b = GAS0, GAS1
+    m = 'park' if RCV == 'blued' else RCV
     if V['gas'] == '45':
         prof = [(a, -11), (b, -11), (b, 4), (b - 22, TUBE_U + 9.5), (a, TUBE_U + 9.5)]
     else:
@@ -288,34 +300,86 @@ def gas_block():
     sec = prism(circles_hull([(0, 0), (0, TUBE_U * mm)], 10.5 * mm, 28), 'y', a * mm - 0.01, b * mm + 0.01)
     boolean(gb, sec, 'INTERSECT')
     cut(gb, cyl(V['barrel_r'][1] * mm, a * mm - 0.01, b * mm + 0.01, 'y', (0, 0), 24))
-    bevel(gb, 0.8 * mm, 1, 30); smooth(gb); K.adopt(gb, 'base', 'park' if RCV == 'blued' else RCV)
+    bevel(gb, 0.8 * mm, 1, 30); smooth(gb); K.adopt(gb, slot, m)
     o = K.tmp(prism(P([(b - 24, -10), (b - 2, -10), (b - 2, -19.5), (b - 20, -19.5)]), 'x', -4.2 * mm, 4.2 * mm))        # the bayonet lug
     cut(o, cyl(3.2 * mm, -0.01, 0.01, 'x', ((b - 11) * mm, -15.5 * mm), 12))
     boolean(o, cyl(5.0 * mm, (b - 24) * mm, (b - 2) * mm, 'y', (0, -15.5 * mm), 16), 'UNION'); cut(o, cyl(3.1 * mm, (b - 25) * mm, (b - 1) * mm, 'y', (0, -15.5 * mm), 12))
-    bevel(o, 0.5 * mm, 1); smooth(o); K.adopt(o, 'base', 'park' if RCV == 'blued' else RCV)
-    o = K.obj(cyl(1.6 * mm, -11 * mm, 11 * mm, 'x', ((a + 8) * mm, (TUBE_U - 2) * mm), 10), 'base', 'steel'); smooth(o)   # (the tube's pin)
+    bevel(o, 0.5 * mm, 1); smooth(o); K.adopt(o, slot, m)
+    o = K.obj(cyl(1.6 * mm, -11 * mm, 11 * mm, 'x', ((a + 8) * mm, (TUBE_U - 2) * mm), 10), slot, 'steel'); smooth(o)   # (the tube's pin)
 
-def front_sight():
-    """The front sight base pinned to the barrel's front: its collar, the tower to the hood (a ring open at the top, round the post), the
-    round post on its windage drum with its tip on the sight line, the cleaning rod's lug under it."""
-    a, b, pf = FS0, FS1, POST_F
-    br = V['barrel_r'][2]
+def combo_block(a, b, pf, br, slot):
+    """The short barrels' gas block and front sight in one (the AK-104/105's): the gas block's body round the barrel and the tube's front,
+    the hood and post standing straight on its top, the post's tip on the sight line."""
+    m = 'park' if RCV == 'blued' else RCV
+    gb = K.tmp(prism(P([(a, -11), (b, -11), (b, 2), (b - 6, TUBE_U + 9.5), (a, TUBE_U + 9.5)]), 'x', -10.5 * mm, 10.5 * mm))
+    boolean(gb, prism(circles_hull([(0, 0), (0, TUBE_U * mm)], 10.5 * mm, 28), 'y', a * mm - 0.01, b * mm + 0.01), 'INTERSECT')
+    cut(gb, cyl(br * mm, a * mm - 0.01, b * mm + 0.01, 'y', (0, 0), 24))
+    bevel(gb, 0.8 * mm, 1, 30); smooth(gb); K.adopt(gb, slot, m)
+    o = K.obj(cyl(1.6 * mm, -11 * mm, 11 * mm, 'x', ((a + 8) * mm, (TUBE_U - 2) * mm), 10), slot, 'steel'); smooth(o)
+    sight_head(pf, slot)
+
+def sight_head(pf, slot):
+    """The hood (a ring open at the top) round the post, the post on its windage drum with its tip on the sight line."""
+    HR, HC = 10.5, SY - 3.0
+    hd = K.tmp(cyl(HR * mm, (pf - 6.5) * mm, (pf + 6.5) * mm, 'y', (0, HC * mm), 28))
+    cut(hd, cyl((HR - 1.8) * mm, (pf - 7) * mm, (pf + 7) * mm, 'y', (0, HC * mm), 28))
+    cut(hd, box(-4.5 * mm, 4.5 * mm, (pf - 7) * mm, (pf + 7) * mm, (HC + 4) * mm, (HC + 12) * mm))   # (open at the top)
+    cut(hd, box(-0.03, 0.03, (pf - 7) * mm, (pf + 7) * mm, (SY - 20) * mm, (SY - 12.6) * mm))         # (its foot sits on the tower)
+    bevel(hd, 0.4 * mm, 1, 30); smooth(hd); K.adopt(hd, slot, RCV)
+    o = K.obj(cyl(3.2 * mm, -6.8 * mm, 6.8 * mm, 'x', (pf * mm, (SY - 11) * mm), 16), slot, 'steel'); smooth(o)        # the post's windage drum
+    o = K.obj(cyl(1.0 * mm, (SY - 11) * mm, SY * mm, 'z', (0, pf * mm), 12), slot, RCV); smooth(o)                     # the post
+
+def front_sight(a, b, pf, br, slot):
+    """The front sight base pinned to the barrel's front: its collar, the tower to the hood, the cleaning rod's lug under it; the head."""
+    m = 'park' if RCV == 'blued' else RCV
     fb = K.tmp(lathe([(a * mm, (br + 3.6) * mm), (b * mm, (br + 3.6) * mm)], 28))
     boolean(fb, prism(P([(a + 4, 0), (b - 3, 0), (pf + 6, SY - 13), (pf - 6, SY - 13)]), 'x', -7.0 * mm, 7.0 * mm), 'UNION')
     boolean(fb, prism(P([(a + 3, -br - 2), (b - 2, -br - 2), (b - 2, -20), (a + 6, -20)]), 'x', -5.0 * mm, 5.0 * mm), 'UNION')    # (the rod's lug)
     cut(fb, cyl(br * mm, a * mm - 0.01, b * mm + 0.01, 'y', (0, 0), 28))
     cut(fb, cyl(3.4 * mm, (a - 1) * mm, (b + 1) * mm, 'y', (0, -15.5 * mm), 12))
-    bevel(fb, 0.6 * mm, 1, 30); smooth(fb); K.adopt(fb, 'base', 'park' if RCV == 'blued' else RCV)
-    HR, HC = 10.5, SY - 3.0                                       # the hood: its outer radius and centre
-    hd = K.tmp(cyl(HR * mm, (pf - 6.5) * mm, (pf + 6.5) * mm, 'y', (0, HC * mm), 28))
-    cut(hd, cyl((HR - 1.8) * mm, (pf - 7) * mm, (pf + 7) * mm, 'y', (0, HC * mm), 28))
-    cut(hd, box(-4.5 * mm, 4.5 * mm, (pf - 7) * mm, (pf + 7) * mm, (HC + 4) * mm, (HC + 12) * mm))   # (open at the top)
-    cut(hd, box(-0.03, 0.03, (pf - 7) * mm, (pf + 7) * mm, (SY - 20) * mm, (SY - 12.6) * mm))         # (its foot sits on the tower)
-    bevel(hd, 0.4 * mm, 1, 30); smooth(hd); K.adopt(hd, 'base', RCV)
-    o = K.obj(cyl(3.2 * mm, -6.8 * mm, 6.8 * mm, 'x', (pf * mm, (SY - 11) * mm), 16), 'base', 'steel'); smooth(o)        # the post's windage drum
-    o = K.obj(cyl(1.0 * mm, (SY - 11) * mm, SY * mm, 'z', (0, pf * mm), 12), 'base', RCV); smooth(o)                     # the post
+    bevel(fb, 0.6 * mm, 1, 30); smooth(fb); K.adopt(fb, slot, m)
+    sight_head(pf, slot)
     for q in (a + 7, b - 7):   # the taper pins
-        o = K.obj(cyl(1.4 * mm, -(br + 3.8) * mm, (br + 3.8) * mm, 'x', (q * mm, (br + 1.0) * mm), 10), 'base', 'steel'); smooth(o)
+        o = K.obj(cyl(1.4 * mm, -(br + 3.8) * mm, (br + 3.8) * mm, 'x', (q * mm, (br + 1.0) * mm), 10), slot, 'steel'); smooth(o)
+
+def barrel_base():
+    """The barrel's shank: in the trunnion and on under the handguard to BASE_END (base: the same on every barrel)."""
+    r0, r1, r2 = V['barrel_r']
+    o = K.obj(lathe([(250 * mm, r0 * mm), ((RF + 30) * mm, r0 * mm), ((RF + 60) * mm, r1 * mm), (BASE_END * mm, r1 * mm)], 24), 'base', 'park' if RCV == 'blued' else RCV); smooth(o)
+
+def barrel_assembly(E, inches, slot='barrel'):
+    """The barrel from BASE_END to its end E (the thread's end: mount_muzzle) and what rides on it. Returns its figures."""
+    r0, r1, r2 = V['barrel_r']
+    m = 'park' if RCV == 'blued' else RCV
+    short = inches <= SHORT_IN + 1e-6
+    fs1 = E - 14.0                                               # (the sight base's front: the thread ahead of it, as the factory's)
+    if short:
+        c0 = min(438.0, E - 14.0 - 42.0); c1 = c0 + 40.0          # (the combined block: right ahead of the factory handguard, or as far forward as the barrel lets it)
+        gas_front, pf, hg_end = c0, c0 + 25.0, c0
+        br = r1
+        o = K.obj(lathe([((BASE_END - 1) * mm, r1 * mm), (fs1 * mm, r1 * mm), (fs1 * mm, 7.0 * mm), (E * mm, 7.0 * mm), (E * mm, 3.0 * mm), ((E - 3) * mm, 2.8 * mm)], 24), slot, m); smooth(o)
+        combo_block(c0, c1, pf, br, slot)
+    else:
+        gas_front, hg_end = GAS0, GAS0
+        fs0 = fs1 - 34.0; pf = (fs0 + fs1) / 2 + 1.0; br = r2
+        o = K.obj(lathe([((BASE_END - 1) * mm, r1 * mm), (GAS1 * mm, r1 * mm), ((GAS1 + 8) * mm, r2 * mm), (fs1 * mm, r2 * mm), (fs1 * mm, 7.0 * mm), (E * mm, 7.0 * mm),
+                         (E * mm, 3.0 * mm), ((E - 3) * mm, 2.8 * mm)], 24), slot, m); smooth(o)
+        gas_block(GAS0, GAS1, slot)
+        front_sight(fs0, fs1, pf, br, slot)
+        o = K.obj(lathe([((HG_LO[1] + 2) * mm, 3.0 * mm), ((fs1 - 3) * mm, 3.0 * mm), ((fs1 - 1) * mm, 3.6 * mm), (fs1 * mm, 3.6 * mm)], 12, (0, 0, -15.5 * mm)), slot, 'steel'); smooth(o)
+        if V.get('bipod'):   # the RPK bipod's collar behind the sight base, its bracket down to the legs' hinges under the handguard's line
+            bp = fs0 - 16.0
+            o = K.obj(lathe([((bp - 9) * mm, br * mm), ((bp - 9) * mm, (br + 3.2) * mm), ((bp + 9) * mm, (br + 3.2) * mm), ((bp + 9) * mm, br * mm)], 28), slot, RCV); smooth(o)
+            o = K.tmp(box(-6 * mm, 6 * mm, (bp - 8) * mm, (bp + 8) * mm, (BP_DROP + 2) * mm, -(br + 1) * mm)); bevel(o, 0.6 * mm, 1); smooth(o); K.adopt(o, slot, RCV)
+            o = K.tmp(box(-15 * mm, 15 * mm, (bp - 9) * mm, (bp + 9) * mm, (BP_DROP - 5) * mm, (BP_DROP + 5) * mm)); bevel(o, 0.6 * mm, 1); smooth(o); K.adopt(o, slot, RCV)
+    # the gas tube: from the rear sight block to the gas block, its vents near its front, its ferrules (the upper handguard between them)
+    gt = K.tmp(lathe([(310 * mm, TUBE_R * mm), ((gas_front + 6) * mm, TUBE_R * mm), ((gas_front + 6) * mm, 0.0003)], 24, (0, 0, TUBE_U * mm)))
+    for f in (gas_front - 48, gas_front - 36, gas_front - 24):
+        if f > HG_UP[1] + 8: cut(gt, cyl(1.9 * mm, -0.02, 0.02, 'x', (f * mm, TUBE_U * mm), 10))
+    smooth(gt); K.adopt(gt, slot, RCV)
+    for f0, f1 in ((318, 325), (min(428, gas_front - 5), min(433, gas_front))):
+        o = K.obj(lathe([(f0 * mm, (TUBE_R + 1.5) * mm), (f1 * mm, (TUBE_R + 1.5) * mm)], 24, (0, 0, TUBE_U * mm)), slot, RCV); smooth(o)
+    return {'E': E, 'post': pf, 'fs1': fs1, 'short': short, 'hg_end': hg_end, 'bipod_f': (fs1 - 34.0 - 16.0) if (V.get('bipod') and not short) else None}
 
 # ----------------------------------------------------------------------------------------------------- MUZZLE DEVICES (factory: muzzle)
 def muzzle():
@@ -517,41 +581,36 @@ RC_T = CVT + 0.5              # the railed cover's top (the rail's base)
 RC_RT = RC_T + 5.6            # the rail's top
 def railed_cover():
     def mount(o): o['mount'] = True; return o
-    cw = CHW + 0.5
-    cv = K.tmp(prism(P([(CV0 - 0.5, RTOP - 0.5), (CV0 - 0.5, 22.5), (CV0 + 5.5, 31.5), (CV0 + 16, RC_T), (CV1 + 0.5, RC_T), (CV1 + 0.5, RTOP - 0.5)]), 'x', -cw * mm, cw * mm))
-    boolean(cv, prism(rounded(0, (RTOP + RC_T) / 2 * mm, cw * mm, (RC_T - RTOP + 1) / 2 * mm, 8.3 * mm, 5), 'y', CV0 * mm - 0.01, CV1 * mm + 0.01), 'INTERSECT')
-    cut(cv, prism(rounded(0, (RTOP + CVT) / 2 * mm, (CHW + 0.05) * mm, (CVT - RTOP + 1) / 2 * mm + 0.05 * mm, 8 * mm, 5), 'y', (CV0 + 2.5) * mm, (CV1 + 1) * mm))   # (over the issue cover)
-    bevel(cv, 0.5 * mm, 1, 30); smooth(cv); mount(K.adopt(cv, 'optic', RCV))
+    cv = cover_shape(0.5, CV_BOT, CV1 + 0.5)                          # (the issue cover's shape 0.5 mm larger, closed at both ends)
+    cut(cv, mesh_of(cover_shape(0.02, CV_BOT - 10, CV1 + 0.02)))      # (hollow: the issue cover inside it)
+    port_skirt_cut(cv, HW + 1.3)
+    bevel(cv, 0.3 * mm, 1, 30); smooth(cv); mount(K.adopt(cv, 'optic', RCV))
     mount(picatinny(K, RC0 * mm, RC1 * mm, RC_T * mm, 'optic', 'black'))
     for f in (RC0 + 8, RC1 - 8):    # the rail's screws into the lid, beside it
         for s_ in (-1, 1):
             o = K.obj(cyl(1.6 * mm, (RC_T - 0.5) * mm, (RC_T + 0.6) * mm, 'z', (s_ * 12.4 * mm, f * mm), 10), 'optic', 'steel'); smooth(o); mount(o)
 
 # ----------------------------------------------------------------------------------------------------- BIPOD (the RPK's: part_bipod)
-BP_F = FS0 - 16.0            # the bipod's collar, behind the front sight base
-def bipod():
-    """The RPK's bipod: a collar clamped round the barrel behind the front sight base (base), and its two legs hinged under it either side,
-    drawn folded back along the barrel (part_bipod's legs, group_ nodes with extras.leg: deployed each turns down 90 degrees about its
-    hinge and splays out). Each leg: a tube, its knuckle, the pointed foot plate."""
-    br = V['barrel_r'][2]
-    co = K.tmp(lathe([((BP_F - 9) * mm, (br + 3.2) * mm), ((BP_F + 9) * mm, (br + 3.2) * mm)], 28))
-    boolean(co, box(-15 * mm, 15 * mm, (BP_F - 9) * mm, (BP_F + 9) * mm, -(br + 8) * mm, -4 * mm), 'UNION')
-    cut(co, cyl(br * mm, (BP_F - 10) * mm, (BP_F + 10) * mm, 'y', (0, 0), 28))
-    bevel(co, 0.6 * mm, 1, 30); smooth(co); K.adopt(co, 'base', RCV)
-    pb = K.part('bipod', (11.5 * mm, BP_F * mm, -(br + 5) * mm))
+def bipod(hinge_f):
+    """The RPK's bipod legs (part_bipod; the collar they hinge on is the barrel's, barrel_assembly): two legs hinged under the collar either
+    side, drawn folded back under the barrel below the handguard's line (group_ nodes with extras.leg: deployed each turns down 90 degrees
+    about its hinge and splays out). Each leg: a tube, its knuckle, the pointed foot plate. Its hinges stand 64 mm behind mount_muzzle: with
+    another barrel the game moves part_bipod by that barrel's end against the factory one (the collar comes with the barrel)."""
+    BP_F, hz = hinge_f, BP_DROP
+    pb = K.part('bipod', (11.5 * mm, BP_F * mm, hz * mm))
     LL = 300.0
     for i, s in enumerate((1, -1)):
-        hx, hz = s * 11.5, -(br + 5)
+        hx = s * 11.5
         g = bpy.data.objects.new('group_%d' % (i + 1), None); coll.objects.link(g); g.parent = pb
         bpy.context.view_layer.update()
         g.matrix_parent_inverse = pb.matrix_world.inverted(); g.location = (hx * mm, BP_F * mm, hz * mm)
         g['leg'] = {'deploy': [round(math.pi / 2, 4), round(s * 0.26, 4), 0.0]}
         bpy.context.view_layer.update()
         o = K.obj(cyl(4.2 * mm, (hx - 4) * mm, (hx + 4) * mm, 'x', (BP_F * mm, hz * mm), 16), 'base', RCV, g); smooth(o)           # the knuckle
-        o = K.obj(lathe([((BP_F - LL + 30) * mm, 3.6 * mm), ((BP_F - 4) * mm, 3.6 * mm)], 14, ((hx + s * 0.5) * mm, 0, (hz - 1) * mm)), 'base', RCV, g); smooth(o)
-        o = K.obj(lathe([((BP_F - LL + 30) * mm, 3.0 * mm), ((BP_F - LL + 4) * mm, 3.0 * mm), ((BP_F - LL) * mm, 1.0 * mm)], 12, ((hx + s * 0.5) * mm, 0, (hz - 1) * mm)), 'base', 'steel', g); smooth(o)
-        ft = K.tmp(prism(P([(BP_F - LL + 22, hz + 2), (BP_F - LL + 46, hz + 2), (BP_F - LL + 52, hz - 2), (BP_F - LL + 46, hz - 5), (BP_F - LL + 22, hz - 5)]),
-                         'x', *xs((hx + s * 2) * mm, (hx + s * 9) * mm)))
+        o = K.obj(lathe([((BP_F - LL + 30) * mm, 3.6 * mm), ((BP_F - 4) * mm, 3.6 * mm)], 14, ((hx - s * 2.5) * mm, 0, hz * mm)), 'base', RCV, g); smooth(o)
+        o = K.obj(lathe([((BP_F - LL + 30) * mm, 3.0 * mm), ((BP_F - LL + 4) * mm, 3.0 * mm), ((BP_F - LL) * mm, 1.0 * mm)], 12, ((hx - s * 2.5) * mm, 0, hz * mm)), 'base', 'steel', g); smooth(o)
+        ft = K.tmp(prism(P([(BP_F - LL + 22, hz + 3), (BP_F - LL + 46, hz + 3), (BP_F - LL + 52, hz - 1), (BP_F - LL + 46, hz - 4), (BP_F - LL + 22, hz - 4)]),
+                         'x', *xs((hx - s * 1.0) * mm, (hx + s * 5) * mm)))
         bevel(ft, 0.6 * mm, 1); smooth(ft); K.adopt(ft, 'base', RCV, g)
     return pb
 
@@ -560,17 +619,15 @@ receiver()
 dust_cover()
 rear_sight_block()
 rear_leaf()
-gas_tube()
 handguards()
-barrel()
-gas_block()
-front_sight()
+barrel_base()
+FB = barrel_assembly(BE, V['inches'])
 MUZ = muzzle()
 grip()
 stock()
 MK = magazine()
 ph = handle()
-if V.get('bipod'): bipod()
+if V.get('bipod'): bipod(FB['bipod_f'])
 railed_cover()               # (last: the meshes before it keep their names)
 for o in list(coll.all_objects):
     if o.name.startswith('tmp') or o.name.startswith('cutter'): bpy.data.objects.remove(o, do_unlink=True)
@@ -597,7 +654,7 @@ anchors = {
     'mount_optic': [round(CV0 * mm, 4), round(CVT * mm, 4), 0], 'mount_optic_end': [round(CV1 * mm, 4), round(CVT * mm, 4), 0],
     'mount_optic_rail': [round(RC0 * mm, 4), round(RC_RT * mm, 4), 0], 'mount_optic_rail_end': [round(RC1 * mm, 4), round(RC_RT * mm, 4), 0],
     'mount_handguard': [round(RF * mm, 4), 0, 0], 'mount_handguard_end': [round(HG_END * mm, 4), 0, 0],
-    'mount_barrel': [round((FS1 - 8) * mm, 4), 0, 0], 'mount_muzzle': [round(BE * mm, 4), 0, 0],
+    'mount_barrel': [round(GAS1 * mm, 4), 0, 0], 'mount_muzzle': [round(BE * mm, 4), 0, 0],
     'mount_stock': [0, -0.002, 0], 'mount_grip': [round(GRIP_TOP[0] * mm, 4), round(GRIP_TOP[1] * mm, 4), 0],
     'mount_mag': [round(MK['F'] * mm, 4), round(MK['Y'] * mm, 4), 0],
 }
@@ -608,7 +665,40 @@ bb = [[min((o.matrix_world @ v.co)[a] for o in meshes for v in o.data.vertices) 
 if EXPORT:
     with open(os.path.join(HERE, 'model.json'), 'w', encoding='utf-8') as fh:
         fh.write(json.dumps({'source': 'authored', 'sights': {'builtin': ['notch'], 'rail': []}}, indent=2) + '\n')
-result = {'id': ID, 'meshes': len(meshes), 'tris': tris_of(meshes), 'bounds_mm': [[round(x * 1000, 1) for x in v] for v in bb],
-          'glb': save_and_export(coll, root, HERE, ID, EXPORT), 'info': info, 'anchors': anchors,
+# ---- the other barrel lengths: variants beside the model (models/<id>/barrel_<len>.glb; js/parts.ts <id>.br.<len>, avBarrel). Each is its
+# barrel from BASE_END to its end, the gas tube, the gas block and front sight (or the combined block), the rod, the RPK's bipod collar:
+# its end the factory end moved by the length's difference (the shared barrels' rule), so the muzzle device seats as on the factory one.
+also, figures = [], {}
+def fig(d, inches):
+    return {'inches': inches, 'mount_muzzle': round(d['E'] * mm, 4), 'post_f': round(d['post'] * mm, 4), 'post_tip': round(SY * mm, 4),
+            'hg_room': round((d['hg_end'] - RF - 3.0) * mm, 4), 'mount_handguard_end': round(d['hg_end'] * mm, 4), 'gas': 'combined block' if d['short'] else 'factory gas block',
+            'muzzle_device_front': round((d['E'] + MUZ - BE) * mm, 4), 'bipod_hinge_f': round(d['bipod_f'] * mm, 4) if d['bipod_f'] else None}
+figures['factory'] = fig(FB, V['inches'])
+for inches in C.get('barrels', []):
+    name = 'barrel_' + ('%g' % inches).replace('.', '_')
+    E = BE + (inches - V['inches']) * 25.4
+    vc, vr, KV = kit_variant(ID, name, 'barrel', {})
+    K_main = K; K = KV
+    d = barrel_assembly(E, inches)
+    K = K_main
+    for o in list(vc.all_objects):
+        if o.name.startswith('tmp') or o.name.startswith('cutter'): bpy.data.objects.remove(o, do_unlink=True)
+    figures[name] = fig(d, inches)
+    note = '%g" barrel: %s; the handguard room to %.1f mm (hgMax %.4f)%s' % (inches, figures[name]['gas'], d['hg_end'], figures[name]['hg_room'],
+            ('; the bipod hinges %.1f mm behind mount_muzzle (move part_bipod with the barrel end)' % (d['E'] - d['bipod_f'])) if d['bipod_f'] else '')
+    vr['variant_json'] = json.dumps({'gun': ID, 'slot': 'barrel', 'of': 'factory', 'info': {'muzzles': [[round(E * mm, 4), 0, 0]]}, 'note': note})
+    also.append(vc)
+    if EXPORT: export_glb(vc, os.path.join(HERE, name + '.glb'))
+def open_edges(objs):
+    """The meshes with non-manifold edges (open, or more than two faces on an edge): name -> count."""
+    import bmesh as _bm
+    out = {}
+    for o in objs:
+        b = _bm.new(); b.from_mesh(o.data); n = sum(1 for e in b.edges if not e.is_manifold); b.free()
+        if n: out[o.name] = n
+    return out
+OPEN = open_edges([o for c in (coll, *also) for o in c.all_objects if o.type == 'MESH'])
+result = {'id': ID, 'meshes': len(meshes), 'tris': tris_of(meshes), 'open_meshes': OPEN, 'bounds_mm': [[round(x * 1000, 1) for x in v] for v in bb],
+          'glb': save_and_export(coll, root, HERE, ID, EXPORT, also=tuple(also)), 'info': info, 'anchors': anchors, 'barrels': figures,
           'magFit': {'len': MK['LEN'], 'c': MK['C'], 'd0': MK['D0'], 'd1': MK['D1'], 'w': MK['W']}}
 print('RESULT', json.dumps(result))

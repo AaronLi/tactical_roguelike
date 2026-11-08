@@ -147,171 +147,199 @@
   },
   { "platform": "ak",
    "why": "default + loaded + loaded-last",
-   "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "ak.optic", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "ak.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "ak.optic", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
   },
   { "platform": "ak",
    "why": "bare",
-   "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "receiver": "rcv.ak" }
+   "build": { "barrel": "ak.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "receiver": "rcv.ak" }
   },
   { "platform": "ak",
-   "why": "shortest barrel (br.7.62x39.16.3) x longest handguard that fits (oem.hg.ak.7) + authored handguard (oem.hg.ak.7)",
-   "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.7", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "ak.optic", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+   "why": "shortest barrel (ak.br.10_5) x longest handguard that fits (hg.ak.short.mlok)",
+   "build": { "barrel": "ak.br.10_5", "grip": "oem.gr.ak.3", "handguard": "hg.ak.short.mlok", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "ak.optic", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
   },
   { "platform": "ak",
-   "why": "longest barrel (br.7.62x39.23.2.heavy) x shortest handguard (oem.hg.ak.8)",
-   "build": { "barrel": "br.7.62x39.23.2.heavy", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.8", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "ak.optic", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+   "why": "longest barrel (ak.br.23_2) x shortest handguard (oem.hg.ak.8)",
+   "build": { "barrel": "ak.br.23_2", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.8", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "ak.optic", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+  },
+  { "platform": "ak",
+   "why": "opens slots: ak.br.12_5 in barrel (fg, tac, tacL)",
+   "build": { "barrel": "ak.br.12_5", "fg": "fg.0", "grip": "oem.gr.ak.3", "handguard": "hg.ak.1", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "ak.optic", "receiver": "rcv.ak", "stock": "oem.stk.ak.4", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "ak",
    "why": "opens slots: hg.ak.1 in handguard (fg, tac, tacL)",
-   "build": { "barrel": "br.7.62x39.16.3", "fg": "fg.0", "grip": "oem.gr.ak.3", "handguard": "hg.ak.1", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "ak.optic", "receiver": "rcv.ak", "stock": "oem.stk.ak.4", "tac": "tac.0", "tacL": "tac.0" }
+   "build": { "barrel": "ak.barrel", "fg": "fg.0", "grip": "oem.gr.ak.3", "handguard": "hg.ak.1", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "ak.optic", "receiver": "rcv.ak", "stock": "oem.stk.ak.4", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "ak",
    "why": "opens slots: hg.ak.2 in handguard (fg, tac, tacL)",
-   "build": { "barrel": "br.7.62x39.16.3", "fg": "fg.0", "grip": "oem.gr.ak.3", "handguard": "hg.ak.2", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "ak.optic", "receiver": "rcv.ak", "stock": "oem.stk.ak.4", "tac": "tac.0", "tacL": "tac.0" }
+   "build": { "barrel": "ak.barrel", "fg": "fg.0", "grip": "oem.gr.ak.3", "handguard": "hg.ak.2", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "ak.optic", "receiver": "rcv.ak", "stock": "oem.stk.ak.4", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "ak",
    "why": "opens slots: oem.hg.ak.9 in handguard (fg, tac, tacL)",
-   "build": { "barrel": "br.7.62x39.16.3", "fg": "fg.0", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.9", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "ak.optic", "receiver": "rcv.ak", "stock": "oem.stk.ak.4", "tac": "tac.0", "tacL": "tac.0" }
+   "build": { "barrel": "ak.barrel", "fg": "fg.0", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.9", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "ak.optic", "receiver": "rcv.ak", "stock": "oem.stk.ak.4", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "ak",
    "why": "opens slots: hg.ak.short.rail in handguard (fg, tac, tacL)",
-   "build": { "barrel": "br.7.62x39.16.3", "fg": "fg.0", "grip": "oem.gr.ak.3", "handguard": "hg.ak.short.rail", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "ak.optic", "receiver": "rcv.ak", "stock": "oem.stk.ak.4", "tac": "tac.0", "tacL": "tac.0" }
+   "build": { "barrel": "ak.barrel", "fg": "fg.0", "grip": "oem.gr.ak.3", "handguard": "hg.ak.short.rail", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "ak.optic", "receiver": "rcv.ak", "stock": "oem.stk.ak.4", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "ak",
    "why": "opens slots: hg.ak.short.mlok in handguard (fg, tac, tacL)",
-   "build": { "barrel": "br.7.62x39.16.3", "fg": "fg.0", "grip": "oem.gr.ak.3", "handguard": "hg.ak.short.mlok", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "ak.optic", "receiver": "rcv.ak", "stock": "oem.stk.ak.4", "tac": "tac.0", "tacL": "tac.0" }
+   "build": { "barrel": "ak.barrel", "fg": "fg.0", "grip": "oem.gr.ak.3", "handguard": "hg.ak.short.mlok", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "ak.optic", "receiver": "rcv.ak", "stock": "oem.stk.ak.4", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "ak",
    "why": "opens slots: op.pic.12 in optic (riserdot) + replaced optic (op.pso.1) on the riser",
-   "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "op.pic.12", "receiver": "rcv.ak", "riserdot": "op.pso.1", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "ak.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "op.pic.12", "receiver": "rcv.ak", "riserdot": "op.pso.1", "stock": "oem.stk.ak.4" }
   },
   { "platform": "ak",
    "why": "opens slots: stk.ak.3 in stock (buttstock)",
-   "build": { "barrel": "br.7.62x39.16.3", "buttstock": "stk.tube.0", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "ak.optic", "receiver": "rcv.ak", "stock": "stk.ak.3" }
+   "build": { "barrel": "ak.barrel", "buttstock": "stk.tube.0", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "ak.optic", "receiver": "rcv.ak", "stock": "stk.ak.3" }
   },
   { "platform": "ak",
    "why": "lowest optic (op.pic.0)",
-   "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "op.pic.0", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "ak.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "op.pic.0", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
   },
   { "platform": "ak",
    "why": "tallest optic (oem.op.pic.23)",
-   "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "oem.op.pic.23", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "ak.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "oem.op.pic.23", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
   },
   { "platform": "ak",
    "why": "magnifier on the lowest optic that takes one (op.auth.falcon) + magnifier behind the authored optic (op.auth.falcon)",
-   "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.slant", "optic": "op.auth.falcon", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "ak.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.slant", "optic": "op.auth.falcon", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
   },
   { "platform": "ak",
    "why": "magnifier on the tallest optic that takes one (op.pic.4) + magnifier behind the authored optic (op.pic.4)",
-   "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.slant", "optic": "op.pic.4", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "ak.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.slant", "optic": "op.pic.4", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
   },
   { "platform": "ak",
    "why": "authored optic (op.pic.1)",
-   "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "op.pic.1", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "ak.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "op.pic.1", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
   },
   { "platform": "ak",
    "why": "magnifier behind the authored optic (op.pic.1)",
-   "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.slant", "optic": "op.pic.1", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "ak.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.slant", "optic": "op.pic.1", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
   },
   { "platform": "ak",
    "why": "authored optic (op.pic.2)",
-   "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "op.pic.2", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "ak.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "op.pic.2", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
   },
   { "platform": "ak",
    "why": "magnifier behind the authored optic (op.pic.2)",
-   "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.slant", "optic": "op.pic.2", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "ak.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.slant", "optic": "op.pic.2", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
   },
   { "platform": "ak",
    "why": "authored optic (op.pic.3)",
-   "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "op.pic.3", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "ak.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "op.pic.3", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
   },
   { "platform": "ak",
    "why": "magnifier behind the authored optic (op.pic.3)",
-   "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.slant", "optic": "op.pic.3", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "ak.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.slant", "optic": "op.pic.3", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
   },
   { "platform": "ak",
    "why": "authored optic (op.pic.4)",
-   "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "op.pic.4", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "ak.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "op.pic.4", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
   },
   { "platform": "ak",
    "why": "authored optic (op.pic.5)",
-   "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "op.pic.5", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "ak.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "op.pic.5", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
   },
   { "platform": "ak",
    "why": "authored optic (op.pic.10)",
-   "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "op.pic.10", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "ak.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "op.pic.10", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
   },
   { "platform": "ak",
    "why": "magnifier behind the authored optic (op.pic.10)",
-   "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.slant", "optic": "op.pic.10", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "ak.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.slant", "optic": "op.pic.10", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
   },
   { "platform": "ak",
    "why": "authored optic (op.pic.11)",
-   "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "op.pic.11", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "ak.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "op.pic.11", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
   },
   { "platform": "ak",
    "why": "magnifier behind the authored optic (op.pic.11)",
-   "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.slant", "optic": "op.pic.11", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "ak.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.slant", "optic": "op.pic.11", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
   },
   { "platform": "ak",
    "why": "authored optic (op.pic.13)",
-   "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "op.pic.13", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "ak.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "op.pic.13", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
   },
   { "platform": "ak",
    "why": "magnifier behind the authored optic (op.pic.13)",
-   "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.slant", "optic": "op.pic.13", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "ak.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.slant", "optic": "op.pic.13", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
   },
   { "platform": "ak",
    "why": "authored optic (op.pic.14)",
-   "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "op.pic.14", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "ak.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "op.pic.14", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
   },
   { "platform": "ak",
    "why": "authored optic (op.pic.15)",
-   "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "op.pic.15", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "ak.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "op.pic.15", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
   },
   { "platform": "ak",
    "why": "authored optic (op.pic.16)",
-   "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "op.pic.16", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "ak.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "op.pic.16", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
   },
   { "platform": "ak",
    "why": "authored optic (op.auth.falcon)",
-   "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "op.auth.falcon", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "ak.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "op.auth.falcon", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
   },
   { "platform": "ak",
    "why": "authored magnifier (mgn.1) behind op.pic.1",
-   "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "magnifier": "mgn.1", "muzzle": "mz.rak.slant", "optic": "op.pic.1", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "ak.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "magnifier": "mgn.1", "muzzle": "mz.rak.slant", "optic": "op.pic.1", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
   },
   { "platform": "ak",
    "why": "authored magnifier (mgn.2) behind op.pic.1",
-   "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "magnifier": "mgn.2", "muzzle": "mz.rak.slant", "optic": "op.pic.1", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "ak.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "magnifier": "mgn.2", "muzzle": "mz.rak.slant", "optic": "op.pic.1", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
   },
   { "platform": "ak",
    "why": "authored stock (stk.ak.0)",
-   "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "ak.optic", "receiver": "rcv.ak", "stock": "stk.ak.0" }
+   "build": { "barrel": "ak.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "ak.optic", "receiver": "rcv.ak", "stock": "stk.ak.0" }
   },
   { "platform": "ak",
    "why": "authored stock (stk.ak.1)",
-   "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "ak.optic", "receiver": "rcv.ak", "stock": "stk.ak.1" }
+   "build": { "barrel": "ak.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "ak.optic", "receiver": "rcv.ak", "stock": "stk.ak.1" }
   },
   { "platform": "ak",
    "why": "authored handguard (hg.ak.1)",
-   "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.1", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "ak.optic", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "ak.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.1", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "ak.optic", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
   },
   { "platform": "ak",
    "why": "authored handguard (hg.ak.2)",
-   "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.2", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "ak.optic", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "ak.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.2", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "ak.optic", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
   },
   { "platform": "ak",
    "why": "authored handguard (oem.hg.ak.6)",
-   "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.6", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "ak.optic", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "ak.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.6", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "ak.optic", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+  },
+  { "platform": "ak",
+   "why": "authored handguard (oem.hg.ak.7)",
+   "build": { "barrel": "ak.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.7", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "ak.optic", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
   },
   { "platform": "ak",
    "why": "authored handguard (oem.hg.ak.9)",
-   "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.9", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "ak.optic", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "ak.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.9", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "ak.optic", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+  },
+  { "platform": "ak",
+   "why": "authored variant (ak.br.10_5) + authored variant, loaded (ak.br.10_5)",
+   "build": { "barrel": "ak.br.10_5", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.8", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "ak.optic", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+  },
+  { "platform": "ak",
+   "why": "authored variant (ak.br.12_5) + authored variant, loaded (ak.br.12_5)",
+   "build": { "barrel": "ak.br.12_5", "grip": "oem.gr.ak.3", "handguard": "hg.ak.1", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "ak.optic", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+  },
+  { "platform": "ak",
+   "why": "authored variant (ak.br.16) + authored variant, loaded (ak.br.16)",
+   "build": { "barrel": "ak.br.16", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "ak.optic", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+  },
+  { "platform": "ak",
+   "why": "authored variant (ak.br.20) + authored variant, loaded (ak.br.20)",
+   "build": { "barrel": "ak.br.20", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "ak.optic", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+  },
+  { "platform": "ak",
+   "why": "authored variant (ak.br.23_2) + authored variant, loaded (ak.br.23_2) + authored variants together",
+   "build": { "barrel": "ak.br.23_2", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.slant", "optic": "ak.optic", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
   },
   { "platform": "ak",
    "why": "suppressor on the muzzle (mz.rak.can)",
-   "build": { "barrel": "br.7.62x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.can", "optic": "ak.optic", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "ak.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.30", "muzzle": "mz.rak.can", "optic": "ak.optic", "receiver": "rcv.ak", "stock": "oem.stk.ak.4" }
   },
   { "platform": "f2",
    "why": "default",
@@ -5643,171 +5671,195 @@
   },
   { "platform": "ak74",
    "why": "default + loaded + loaded-last",
-   "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "ak74.optic", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+   "build": { "barrel": "ak74.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "ak74.optic", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
   },
   { "platform": "ak74",
    "why": "bare",
-   "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "receiver": "rcv.ak74" }
+   "build": { "barrel": "ak74.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "receiver": "rcv.ak74" }
   },
   { "platform": "ak74",
-   "why": "shortest barrel (br.5.6x39.16.3) x longest handguard that fits (oem.hg.ak.7) + authored handguard (oem.hg.ak.7)",
-   "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.7", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "ak74.optic", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+   "why": "shortest barrel (ak74.br.10_5) x longest handguard that fits (hg.ak.short.mlok)",
+   "build": { "barrel": "ak74.br.10_5", "grip": "oem.gr.ak.3", "handguard": "hg.ak.short.mlok", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "ak74.optic", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
   },
   { "platform": "ak74",
-   "why": "longest barrel (br.5.6x39.20.heavy) x shortest handguard (oem.hg.ak.8)",
-   "build": { "barrel": "br.5.6x39.20.heavy", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.8", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "ak74.optic", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+   "why": "longest barrel (ak74.br.20) x shortest handguard (oem.hg.ak.8)",
+   "build": { "barrel": "ak74.br.20", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.8", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "ak74.optic", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+  },
+  { "platform": "ak74",
+   "why": "opens slots: ak74.br.12_5 in barrel (fg, tac, tacL)",
+   "build": { "barrel": "ak74.br.12_5", "fg": "fg.0", "grip": "oem.gr.ak.3", "handguard": "hg.ak.1", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "ak74.optic", "receiver": "rcv.ak74", "stock": "stk.ak.1", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "ak74",
    "why": "opens slots: hg.ak.1 in handguard (fg, tac, tacL)",
-   "build": { "barrel": "br.5.6x39.16.3", "fg": "fg.0", "grip": "oem.gr.ak.3", "handguard": "hg.ak.1", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "ak74.optic", "receiver": "rcv.ak74", "stock": "stk.ak.1", "tac": "tac.0", "tacL": "tac.0" }
+   "build": { "barrel": "ak74.barrel", "fg": "fg.0", "grip": "oem.gr.ak.3", "handguard": "hg.ak.1", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "ak74.optic", "receiver": "rcv.ak74", "stock": "stk.ak.1", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "ak74",
    "why": "opens slots: hg.ak.2 in handguard (fg, tac, tacL)",
-   "build": { "barrel": "br.5.6x39.16.3", "fg": "fg.0", "grip": "oem.gr.ak.3", "handguard": "hg.ak.2", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "ak74.optic", "receiver": "rcv.ak74", "stock": "stk.ak.1", "tac": "tac.0", "tacL": "tac.0" }
+   "build": { "barrel": "ak74.barrel", "fg": "fg.0", "grip": "oem.gr.ak.3", "handguard": "hg.ak.2", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "ak74.optic", "receiver": "rcv.ak74", "stock": "stk.ak.1", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "ak74",
    "why": "opens slots: oem.hg.ak.9 in handguard (fg, tac, tacL)",
-   "build": { "barrel": "br.5.6x39.16.3", "fg": "fg.0", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.9", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "ak74.optic", "receiver": "rcv.ak74", "stock": "stk.ak.1", "tac": "tac.0", "tacL": "tac.0" }
+   "build": { "barrel": "ak74.barrel", "fg": "fg.0", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.9", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "ak74.optic", "receiver": "rcv.ak74", "stock": "stk.ak.1", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "ak74",
    "why": "opens slots: hg.ak.short.rail in handguard (fg, tac, tacL)",
-   "build": { "barrel": "br.5.6x39.16.3", "fg": "fg.0", "grip": "oem.gr.ak.3", "handguard": "hg.ak.short.rail", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "ak74.optic", "receiver": "rcv.ak74", "stock": "stk.ak.1", "tac": "tac.0", "tacL": "tac.0" }
+   "build": { "barrel": "ak74.barrel", "fg": "fg.0", "grip": "oem.gr.ak.3", "handguard": "hg.ak.short.rail", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "ak74.optic", "receiver": "rcv.ak74", "stock": "stk.ak.1", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "ak74",
    "why": "opens slots: hg.ak.short.mlok in handguard (fg, tac, tacL)",
-   "build": { "barrel": "br.5.6x39.16.3", "fg": "fg.0", "grip": "oem.gr.ak.3", "handguard": "hg.ak.short.mlok", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "ak74.optic", "receiver": "rcv.ak74", "stock": "stk.ak.1", "tac": "tac.0", "tacL": "tac.0" }
+   "build": { "barrel": "ak74.barrel", "fg": "fg.0", "grip": "oem.gr.ak.3", "handguard": "hg.ak.short.mlok", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "ak74.optic", "receiver": "rcv.ak74", "stock": "stk.ak.1", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "ak74",
    "why": "opens slots: op.pic.12 in optic (riserdot) + replaced optic (op.pso.1) on the riser",
-   "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.12", "receiver": "rcv.ak74", "riserdot": "op.pso.1", "stock": "stk.ak.1" }
+   "build": { "barrel": "ak74.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.12", "receiver": "rcv.ak74", "riserdot": "op.pso.1", "stock": "stk.ak.1" }
   },
   { "platform": "ak74",
    "why": "opens slots: stk.ak.3 in stock (buttstock)",
-   "build": { "barrel": "br.5.6x39.16.3", "buttstock": "stk.tube.0", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "ak74.optic", "receiver": "rcv.ak74", "stock": "stk.ak.3" }
+   "build": { "barrel": "ak74.barrel", "buttstock": "stk.tube.0", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "ak74.optic", "receiver": "rcv.ak74", "stock": "stk.ak.3" }
   },
   { "platform": "ak74",
    "why": "lowest optic (op.pic.0)",
-   "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.0", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+   "build": { "barrel": "ak74.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.0", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
   },
   { "platform": "ak74",
    "why": "tallest optic (oem.op.pic.23)",
-   "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "oem.op.pic.23", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+   "build": { "barrel": "ak74.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "oem.op.pic.23", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
   },
   { "platform": "ak74",
    "why": "magnifier on the lowest optic that takes one (op.auth.falcon) + magnifier behind the authored optic (op.auth.falcon)",
-   "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.brake", "optic": "op.auth.falcon", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+   "build": { "barrel": "ak74.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.brake", "optic": "op.auth.falcon", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
   },
   { "platform": "ak74",
    "why": "magnifier on the tallest optic that takes one (op.pic.4) + magnifier behind the authored optic (op.pic.4)",
-   "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.brake", "optic": "op.pic.4", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+   "build": { "barrel": "ak74.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.brake", "optic": "op.pic.4", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
   },
   { "platform": "ak74",
    "why": "authored optic (op.pic.1)",
-   "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.1", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+   "build": { "barrel": "ak74.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.1", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
   },
   { "platform": "ak74",
    "why": "magnifier behind the authored optic (op.pic.1)",
-   "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.brake", "optic": "op.pic.1", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+   "build": { "barrel": "ak74.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.brake", "optic": "op.pic.1", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
   },
   { "platform": "ak74",
    "why": "authored optic (op.pic.2)",
-   "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.2", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+   "build": { "barrel": "ak74.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.2", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
   },
   { "platform": "ak74",
    "why": "magnifier behind the authored optic (op.pic.2)",
-   "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.brake", "optic": "op.pic.2", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+   "build": { "barrel": "ak74.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.brake", "optic": "op.pic.2", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
   },
   { "platform": "ak74",
    "why": "authored optic (op.pic.3)",
-   "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.3", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+   "build": { "barrel": "ak74.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.3", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
   },
   { "platform": "ak74",
    "why": "magnifier behind the authored optic (op.pic.3)",
-   "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.brake", "optic": "op.pic.3", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+   "build": { "barrel": "ak74.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.brake", "optic": "op.pic.3", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
   },
   { "platform": "ak74",
    "why": "authored optic (op.pic.4)",
-   "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.4", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+   "build": { "barrel": "ak74.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.4", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
   },
   { "platform": "ak74",
    "why": "authored optic (op.pic.5)",
-   "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.5", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+   "build": { "barrel": "ak74.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.5", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
   },
   { "platform": "ak74",
    "why": "authored optic (op.pic.10)",
-   "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.10", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+   "build": { "barrel": "ak74.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.10", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
   },
   { "platform": "ak74",
    "why": "magnifier behind the authored optic (op.pic.10)",
-   "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.brake", "optic": "op.pic.10", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+   "build": { "barrel": "ak74.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.brake", "optic": "op.pic.10", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
   },
   { "platform": "ak74",
    "why": "authored optic (op.pic.11)",
-   "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.11", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+   "build": { "barrel": "ak74.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.11", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
   },
   { "platform": "ak74",
    "why": "magnifier behind the authored optic (op.pic.11)",
-   "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.brake", "optic": "op.pic.11", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+   "build": { "barrel": "ak74.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.brake", "optic": "op.pic.11", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
   },
   { "platform": "ak74",
    "why": "authored optic (op.pic.13)",
-   "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.13", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+   "build": { "barrel": "ak74.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.13", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
   },
   { "platform": "ak74",
    "why": "magnifier behind the authored optic (op.pic.13)",
-   "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.brake", "optic": "op.pic.13", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+   "build": { "barrel": "ak74.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "magnifier": "mgn.0", "muzzle": "mz.rak.brake", "optic": "op.pic.13", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
   },
   { "platform": "ak74",
    "why": "authored optic (op.pic.14)",
-   "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.14", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+   "build": { "barrel": "ak74.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.14", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
   },
   { "platform": "ak74",
    "why": "authored optic (op.pic.15)",
-   "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.15", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+   "build": { "barrel": "ak74.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.15", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
   },
   { "platform": "ak74",
    "why": "authored optic (op.pic.16)",
-   "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.16", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+   "build": { "barrel": "ak74.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "op.pic.16", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
   },
   { "platform": "ak74",
    "why": "authored optic (op.auth.falcon)",
-   "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "op.auth.falcon", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+   "build": { "barrel": "ak74.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "op.auth.falcon", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
   },
   { "platform": "ak74",
    "why": "authored magnifier (mgn.1) behind op.pic.1",
-   "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "magnifier": "mgn.1", "muzzle": "mz.rak.brake", "optic": "op.pic.1", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+   "build": { "barrel": "ak74.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "magnifier": "mgn.1", "muzzle": "mz.rak.brake", "optic": "op.pic.1", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
   },
   { "platform": "ak74",
    "why": "authored magnifier (mgn.2) behind op.pic.1",
-   "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "magnifier": "mgn.2", "muzzle": "mz.rak.brake", "optic": "op.pic.1", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+   "build": { "barrel": "ak74.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "magnifier": "mgn.2", "muzzle": "mz.rak.brake", "optic": "op.pic.1", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
   },
   { "platform": "ak74",
    "why": "authored stock (stk.ak.0)",
-   "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "ak74.optic", "receiver": "rcv.ak74", "stock": "stk.ak.0" }
+   "build": { "barrel": "ak74.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "ak74.optic", "receiver": "rcv.ak74", "stock": "stk.ak.0" }
   },
   { "platform": "ak74",
    "why": "authored stock (oem.stk.ak.4)",
-   "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "ak74.optic", "receiver": "rcv.ak74", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "ak74.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "ak74.optic", "receiver": "rcv.ak74", "stock": "oem.stk.ak.4" }
   },
   { "platform": "ak74",
    "why": "authored handguard (hg.ak.1)",
-   "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.1", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "ak74.optic", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+   "build": { "barrel": "ak74.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.1", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "ak74.optic", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
   },
   { "platform": "ak74",
    "why": "authored handguard (hg.ak.2)",
-   "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.2", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "ak74.optic", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+   "build": { "barrel": "ak74.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.2", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "ak74.optic", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
   },
   { "platform": "ak74",
    "why": "authored handguard (oem.hg.ak.6)",
-   "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.6", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "ak74.optic", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+   "build": { "barrel": "ak74.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.6", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "ak74.optic", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+  },
+  { "platform": "ak74",
+   "why": "authored handguard (oem.hg.ak.7)",
+   "build": { "barrel": "ak74.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.7", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "ak74.optic", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
   },
   { "platform": "ak74",
    "why": "authored handguard (oem.hg.ak.9)",
-   "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.9", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "ak74.optic", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+   "build": { "barrel": "ak74.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.9", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "ak74.optic", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+  },
+  { "platform": "ak74",
+   "why": "authored variant (ak74.br.10_5) + authored variant, loaded (ak74.br.10_5)",
+   "build": { "barrel": "ak74.br.10_5", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.8", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "ak74.optic", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+  },
+  { "platform": "ak74",
+   "why": "authored variant (ak74.br.12_5) + authored variant, loaded (ak74.br.12_5)",
+   "build": { "barrel": "ak74.br.12_5", "grip": "oem.gr.ak.3", "handguard": "hg.ak.1", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "ak74.optic", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+  },
+  { "platform": "ak74",
+   "why": "authored variant (ak74.br.15_9) + authored variant, loaded (ak74.br.15_9)",
+   "build": { "barrel": "ak74.br.15_9", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "ak74.optic", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+  },
+  { "platform": "ak74",
+   "why": "authored variant (ak74.br.20) + authored variant, loaded (ak74.br.20) + authored variants together",
+   "build": { "barrel": "ak74.br.20", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "ak74.optic", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
   },
   { "platform": "ak74",
    "why": "suppressor on the muzzle (mz.rak.can)",
-   "build": { "barrel": "br.5.6x39.16.3", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "muzzle": "mz.rak.can", "optic": "ak74.optic", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
+   "build": { "barrel": "ak74.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.0", "mag": "ak74.mag.30", "muzzle": "mz.rak.can", "optic": "ak74.optic", "receiver": "rcv.ak74", "stock": "stk.ak.1" }
   },
   { "platform": "aks74u",
    "why": "default + loaded + loaded-last",
@@ -5955,175 +6007,187 @@
   },
   { "platform": "rpk",
    "why": "default + loaded + loaded-last",
-   "build": { "barrel": "br.7.62x39.23.2.tapered", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "rpk.optic", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "rpk.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "rpk.optic", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
   },
   { "platform": "rpk",
    "why": "bare",
-   "build": { "barrel": "br.7.62x39.23.2.tapered", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "receiver": "rcv.rpk" }
+   "build": { "barrel": "rpk.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "receiver": "rcv.rpk" }
   },
   { "platform": "rpk",
-   "why": "shortest barrel (br.7.62x39.23.2) x longest handguard that fits (oem.hg.ak.7)",
-   "build": { "barrel": "br.7.62x39.23.2", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.7", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "rpk.optic", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+   "why": "shortest barrel (rpk.br.16) x longest handguard that fits (oem.hg.ak.7)",
+   "build": { "barrel": "rpk.br.16", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.7", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "rpk.optic", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
   },
   { "platform": "rpk",
-   "why": "longest barrel (br.7.62x39.23.2.heavy) x shortest handguard (oem.hg.ak.8)",
-   "build": { "barrel": "br.7.62x39.23.2.heavy", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.8", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "rpk.optic", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+   "why": "longest barrel (rpk.barrel) x shortest handguard (oem.hg.ak.8)",
+   "build": { "barrel": "rpk.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.8", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "rpk.optic", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
   },
   { "platform": "rpk",
    "why": "opens slots: hg.ak.1 in handguard (fg, tac, tacL)",
-   "build": { "barrel": "br.7.62x39.23.2.tapered", "fg": "fg.0", "grip": "oem.gr.ak.3", "handguard": "hg.ak.1", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "rpk.optic", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4", "tac": "tac.0", "tacL": "tac.0" }
+   "build": { "barrel": "rpk.barrel", "fg": "fg.0", "grip": "oem.gr.ak.3", "handguard": "hg.ak.1", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "rpk.optic", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "rpk",
    "why": "opens slots: hg.ak.2 in handguard (fg, tac, tacL)",
-   "build": { "barrel": "br.7.62x39.23.2.tapered", "fg": "fg.0", "grip": "oem.gr.ak.3", "handguard": "hg.ak.2", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "rpk.optic", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4", "tac": "tac.0", "tacL": "tac.0" }
+   "build": { "barrel": "rpk.barrel", "fg": "fg.0", "grip": "oem.gr.ak.3", "handguard": "hg.ak.2", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "rpk.optic", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "rpk",
    "why": "opens slots: oem.hg.ak.9 in handguard (fg, tac, tacL)",
-   "build": { "barrel": "br.7.62x39.23.2.tapered", "fg": "fg.0", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.9", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "rpk.optic", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4", "tac": "tac.0", "tacL": "tac.0" }
+   "build": { "barrel": "rpk.barrel", "fg": "fg.0", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.9", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "rpk.optic", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "rpk",
    "why": "opens slots: hg.ak.short.rail in handguard (fg, tac, tacL)",
-   "build": { "barrel": "br.7.62x39.23.2.tapered", "fg": "fg.0", "grip": "oem.gr.ak.3", "handguard": "hg.ak.short.rail", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "rpk.optic", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4", "tac": "tac.0", "tacL": "tac.0" }
+   "build": { "barrel": "rpk.barrel", "fg": "fg.0", "grip": "oem.gr.ak.3", "handguard": "hg.ak.short.rail", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "rpk.optic", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "rpk",
    "why": "opens slots: hg.ak.short.mlok in handguard (fg, tac, tacL)",
-   "build": { "barrel": "br.7.62x39.23.2.tapered", "fg": "fg.0", "grip": "oem.gr.ak.3", "handguard": "hg.ak.short.mlok", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "rpk.optic", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4", "tac": "tac.0", "tacL": "tac.0" }
+   "build": { "barrel": "rpk.barrel", "fg": "fg.0", "grip": "oem.gr.ak.3", "handguard": "hg.ak.short.mlok", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "rpk.optic", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "rpk",
    "why": "opens slots: op.pic.12 in optic (riserdot) + replaced optic (op.pso.1) on the riser",
-   "build": { "barrel": "br.7.62x39.23.2.tapered", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "op.pic.12", "receiver": "rcv.rpk", "riserdot": "op.pso.1", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "rpk.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "op.pic.12", "receiver": "rcv.rpk", "riserdot": "op.pso.1", "stock": "oem.stk.ak.4" }
   },
   { "platform": "rpk",
    "why": "opens slots: stk.ak.3 in stock (buttstock)",
-   "build": { "barrel": "br.7.62x39.23.2.tapered", "buttstock": "stk.tube.0", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "rpk.optic", "receiver": "rcv.rpk", "stock": "stk.ak.3" }
+   "build": { "barrel": "rpk.barrel", "buttstock": "stk.tube.0", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "rpk.optic", "receiver": "rcv.rpk", "stock": "stk.ak.3" }
   },
   { "platform": "rpk",
    "why": "lowest optic (op.pic.0)",
-   "build": { "barrel": "br.7.62x39.23.2.tapered", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "op.pic.0", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "rpk.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "op.pic.0", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
   },
   { "platform": "rpk",
    "why": "tallest optic (oem.op.pic.23)",
-   "build": { "barrel": "br.7.62x39.23.2.tapered", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "oem.op.pic.23", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "rpk.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "oem.op.pic.23", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
   },
   { "platform": "rpk",
    "why": "magnifier on the lowest optic that takes one (op.auth.falcon) + magnifier behind the authored optic (op.auth.falcon)",
-   "build": { "barrel": "br.7.62x39.23.2.tapered", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "magnifier": "mgn.0", "muzzle": "mz.rak.cap", "optic": "op.auth.falcon", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "rpk.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "magnifier": "mgn.0", "muzzle": "mz.rak.cap", "optic": "op.auth.falcon", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
   },
   { "platform": "rpk",
    "why": "magnifier on the tallest optic that takes one (op.pic.4) + magnifier behind the authored optic (op.pic.4)",
-   "build": { "barrel": "br.7.62x39.23.2.tapered", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "magnifier": "mgn.0", "muzzle": "mz.rak.cap", "optic": "op.pic.4", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "rpk.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "magnifier": "mgn.0", "muzzle": "mz.rak.cap", "optic": "op.pic.4", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
   },
   { "platform": "rpk",
    "why": "authored optic (op.pic.1)",
-   "build": { "barrel": "br.7.62x39.23.2.tapered", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "op.pic.1", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "rpk.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "op.pic.1", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
   },
   { "platform": "rpk",
    "why": "magnifier behind the authored optic (op.pic.1)",
-   "build": { "barrel": "br.7.62x39.23.2.tapered", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "magnifier": "mgn.0", "muzzle": "mz.rak.cap", "optic": "op.pic.1", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "rpk.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "magnifier": "mgn.0", "muzzle": "mz.rak.cap", "optic": "op.pic.1", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
   },
   { "platform": "rpk",
    "why": "authored optic (op.pic.2)",
-   "build": { "barrel": "br.7.62x39.23.2.tapered", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "op.pic.2", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "rpk.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "op.pic.2", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
   },
   { "platform": "rpk",
    "why": "magnifier behind the authored optic (op.pic.2)",
-   "build": { "barrel": "br.7.62x39.23.2.tapered", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "magnifier": "mgn.0", "muzzle": "mz.rak.cap", "optic": "op.pic.2", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "rpk.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "magnifier": "mgn.0", "muzzle": "mz.rak.cap", "optic": "op.pic.2", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
   },
   { "platform": "rpk",
    "why": "authored optic (op.pic.3)",
-   "build": { "barrel": "br.7.62x39.23.2.tapered", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "op.pic.3", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "rpk.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "op.pic.3", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
   },
   { "platform": "rpk",
    "why": "magnifier behind the authored optic (op.pic.3)",
-   "build": { "barrel": "br.7.62x39.23.2.tapered", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "magnifier": "mgn.0", "muzzle": "mz.rak.cap", "optic": "op.pic.3", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "rpk.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "magnifier": "mgn.0", "muzzle": "mz.rak.cap", "optic": "op.pic.3", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
   },
   { "platform": "rpk",
    "why": "authored optic (op.pic.4)",
-   "build": { "barrel": "br.7.62x39.23.2.tapered", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "op.pic.4", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "rpk.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "op.pic.4", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
   },
   { "platform": "rpk",
    "why": "authored optic (op.pic.5)",
-   "build": { "barrel": "br.7.62x39.23.2.tapered", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "op.pic.5", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "rpk.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "op.pic.5", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
   },
   { "platform": "rpk",
    "why": "authored optic (op.pic.10)",
-   "build": { "barrel": "br.7.62x39.23.2.tapered", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "op.pic.10", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "rpk.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "op.pic.10", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
   },
   { "platform": "rpk",
    "why": "magnifier behind the authored optic (op.pic.10)",
-   "build": { "barrel": "br.7.62x39.23.2.tapered", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "magnifier": "mgn.0", "muzzle": "mz.rak.cap", "optic": "op.pic.10", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "rpk.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "magnifier": "mgn.0", "muzzle": "mz.rak.cap", "optic": "op.pic.10", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
   },
   { "platform": "rpk",
    "why": "authored optic (op.pic.11)",
-   "build": { "barrel": "br.7.62x39.23.2.tapered", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "op.pic.11", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "rpk.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "op.pic.11", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
   },
   { "platform": "rpk",
    "why": "magnifier behind the authored optic (op.pic.11)",
-   "build": { "barrel": "br.7.62x39.23.2.tapered", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "magnifier": "mgn.0", "muzzle": "mz.rak.cap", "optic": "op.pic.11", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "rpk.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "magnifier": "mgn.0", "muzzle": "mz.rak.cap", "optic": "op.pic.11", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
   },
   { "platform": "rpk",
    "why": "authored optic (op.pic.13)",
-   "build": { "barrel": "br.7.62x39.23.2.tapered", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "op.pic.13", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "rpk.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "op.pic.13", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
   },
   { "platform": "rpk",
    "why": "magnifier behind the authored optic (op.pic.13)",
-   "build": { "barrel": "br.7.62x39.23.2.tapered", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "magnifier": "mgn.0", "muzzle": "mz.rak.cap", "optic": "op.pic.13", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "rpk.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "magnifier": "mgn.0", "muzzle": "mz.rak.cap", "optic": "op.pic.13", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
   },
   { "platform": "rpk",
    "why": "authored optic (op.pic.14)",
-   "build": { "barrel": "br.7.62x39.23.2.tapered", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "op.pic.14", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "rpk.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "op.pic.14", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
   },
   { "platform": "rpk",
    "why": "authored optic (op.pic.15)",
-   "build": { "barrel": "br.7.62x39.23.2.tapered", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "op.pic.15", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "rpk.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "op.pic.15", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
   },
   { "platform": "rpk",
    "why": "authored optic (op.pic.16)",
-   "build": { "barrel": "br.7.62x39.23.2.tapered", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "op.pic.16", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "rpk.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "op.pic.16", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
   },
   { "platform": "rpk",
    "why": "authored optic (op.auth.falcon)",
-   "build": { "barrel": "br.7.62x39.23.2.tapered", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "op.auth.falcon", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "rpk.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "op.auth.falcon", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
   },
   { "platform": "rpk",
    "why": "authored magnifier (mgn.1) behind op.pic.1",
-   "build": { "barrel": "br.7.62x39.23.2.tapered", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "magnifier": "mgn.1", "muzzle": "mz.rak.cap", "optic": "op.pic.1", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "rpk.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "magnifier": "mgn.1", "muzzle": "mz.rak.cap", "optic": "op.pic.1", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
   },
   { "platform": "rpk",
    "why": "authored magnifier (mgn.2) behind op.pic.1",
-   "build": { "barrel": "br.7.62x39.23.2.tapered", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "magnifier": "mgn.2", "muzzle": "mz.rak.cap", "optic": "op.pic.1", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "rpk.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "magnifier": "mgn.2", "muzzle": "mz.rak.cap", "optic": "op.pic.1", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
   },
   { "platform": "rpk",
    "why": "authored stock (stk.ak.0)",
-   "build": { "barrel": "br.7.62x39.23.2.tapered", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "rpk.optic", "receiver": "rcv.rpk", "stock": "stk.ak.0" }
+   "build": { "barrel": "rpk.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "rpk.optic", "receiver": "rcv.rpk", "stock": "stk.ak.0" }
   },
   { "platform": "rpk",
    "why": "authored stock (stk.ak.1)",
-   "build": { "barrel": "br.7.62x39.23.2.tapered", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "rpk.optic", "receiver": "rcv.rpk", "stock": "stk.ak.1" }
+   "build": { "barrel": "rpk.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "rpk.optic", "receiver": "rcv.rpk", "stock": "stk.ak.1" }
   },
   { "platform": "rpk",
    "why": "authored handguard (hg.ak.1)",
-   "build": { "barrel": "br.7.62x39.23.2.tapered", "grip": "oem.gr.ak.3", "handguard": "hg.ak.1", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "rpk.optic", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "rpk.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.1", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "rpk.optic", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
   },
   { "platform": "rpk",
    "why": "authored handguard (hg.ak.2)",
-   "build": { "barrel": "br.7.62x39.23.2.tapered", "grip": "oem.gr.ak.3", "handguard": "hg.ak.2", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "rpk.optic", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "rpk.barrel", "grip": "oem.gr.ak.3", "handguard": "hg.ak.2", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "rpk.optic", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
   },
   { "platform": "rpk",
    "why": "authored handguard (oem.hg.ak.6)",
-   "build": { "barrel": "br.7.62x39.23.2.tapered", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.6", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "rpk.optic", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "rpk.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.6", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "rpk.optic", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
   },
   { "platform": "rpk",
    "why": "authored handguard (oem.hg.ak.7)",
-   "build": { "barrel": "br.7.62x39.23.2.tapered", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.7", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "rpk.optic", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "rpk.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.7", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "rpk.optic", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
   },
   { "platform": "rpk",
    "why": "authored handguard (oem.hg.ak.9)",
-   "build": { "barrel": "br.7.62x39.23.2.tapered", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.9", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "rpk.optic", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "rpk.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.9", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "rpk.optic", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+  },
+  { "platform": "rpk",
+   "why": "authored variant (rpk.br.16) + authored variant, loaded (rpk.br.16)",
+   "build": { "barrel": "rpk.br.16", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "rpk.optic", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+  },
+  { "platform": "rpk",
+   "why": "authored variant (rpk.br.16_3) + authored variant, loaded (rpk.br.16_3)",
+   "build": { "barrel": "rpk.br.16_3", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "rpk.optic", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+  },
+  { "platform": "rpk",
+   "why": "authored variant (rpk.br.20) + authored variant, loaded (rpk.br.20) + authored variants together",
+   "build": { "barrel": "rpk.br.20", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.cap", "optic": "rpk.optic", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
   },
   { "platform": "rpk",
    "why": "suppressor on the muzzle (mz.rak.can)",
-   "build": { "barrel": "br.7.62x39.23.2.tapered", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.can", "optic": "rpk.optic", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
+   "build": { "barrel": "rpk.barrel", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.5", "mag": "akm.mag.40", "muzzle": "mz.rak.can", "optic": "rpk.optic", "receiver": "rcv.rpk", "stock": "oem.stk.ak.4" }
   },
   { "platform": "scarl",
    "why": "default",
