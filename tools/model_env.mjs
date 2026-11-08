@@ -23,7 +23,7 @@ export function loadModels() {
 }
 
 /** The game's data and gun-building files, on the node build of three (ONE copy: the game's and the exporter's). */
-export function loadGame(withModels = false, extra = {}) {
+export function loadGame(withModels = false, extra = {}, { dist = DIST, recipes = DIST_RECIPES } = {}) { // (dist: another build of the game's js, an older one to compare with: tools/check_models_parity.mjs)
   const THREE = { ...THREE_NS };
   useExtrudeR149(THREE); // (the recipes' extrusions as three r149 made them: tools/extrude_r149.mjs)
   const ctx2d = new Proxy({}, { get: (t, k) => (k in t ? t[k] : () => ({ addColorStop() {} })), set: (t, k, v) => { t[k] = v; return true; } });
@@ -31,13 +31,13 @@ export function loadGame(withModels = false, extra = {}) {
   const ctx = { console, Math, JSON, Set, Map, WeakMap, Object, Array, Number, String, Boolean, Uint8Array, Int8Array, Int16Array, Int32Array, Uint16Array, Uint32Array, Float32Array, Float64Array, Infinity, NaN, isFinite, parseInt, parseFloat, Error, Symbol, Date, Proxy, Reflect, THREE, document, performance };
   Object.assign(ctx, extra); ctx.window = ctx; ctx.self = ctx; ctx.G = { R: { flashTexture: () => null, _envMap: () => null } };
   vm.createContext(ctx);
-  for (const f of ['util', 'data', 'callsigns', 'arsenal', 'parts', 'gear', 'medical', 'materials', 'stickers', 'gunmaterials']) vm.runInContext(readDist(f), ctx, { filename: f + '.js' });
-  for (const f of ['guntraces', 'authored', 'authoredparts', 'recipes']) vm.runInContext(readDist(f, DIST_RECIPES), ctx, { filename: f + '.js' }); // (the recipes: G.GunRecipes, the bake's only; the game's runtime has none)
+  for (const f of ['util', 'data', 'callsigns', 'arsenal', 'parts', 'gear', 'medical', 'materials', 'stickers', 'gunmaterials']) vm.runInContext(readDist(f, dist), ctx, { filename: f + '.js' });
+  for (const f of ['guntraces', 'authored', 'authoredparts', 'recipes']) vm.runInContext(readDist(f, recipes), ctx, { filename: f + '.js' }); // (the recipes: G.GunRecipes, the bake's only; the game's runtime has none)
   loadAuthoredPartsInto(ctx.G); // (the sights etc. modelled in Blender: models/parts/<slot>/<id>/, tools/authored_parts.mjs)
   loadAuthoredInto(ctx.G); // (the guns modelled in Blender: models/<id>/, tools/bake_authored.mjs)
-  vm.runInContext(readDist('gunrig'), ctx, { filename: 'gunrig.js' });
+  vm.runInContext(readDist('gunrig', dist), ctx, { filename: 'gunrig.js' });
   ctx.G.GunModels = ctx.G.GunRecipes; // (the baker's name for them: .display(def), .M, .build; the game's G.GunModels is the facade over the baked files, js/gunmodels.ts, not loaded here)
-  if (withModels) { vm.runInContext(readDist('modelbundles'), ctx, { filename: 'modelbundles.js' }); vm.runInContext(readDist("glb"), ctx, { filename: "glb.js" }); }
+  if (withModels) { vm.runInContext(readDist('modelbundles', dist), ctx, { filename: 'modelbundles.js' }); vm.runInContext(readDist('glb', dist), ctx, { filename: "glb.js" }); }
   return ctx.G;
 }
 
@@ -45,17 +45,17 @@ export function loadGame(withModels = false, extra = {}) {
  * The game as loadGame() gives it, plus js/glb.js running the way it does in the browser with ?bakedGuns: a G.GLB made of three's own GLTFLoader (on the
  * files under assets/models, with the meshopt decoder, and the game's own dequantize after it) and a fetch that reads those files. For tests that assemble guns from the packs (check_models_assembly.mjs).
  */
-export async function loadGameWithModels() {
+export async function loadGameWithModels({ dist = DIST, root = ROOT } = {}) { // (root: the folder whose assets/models it reads)
   const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
   const { MeshoptDecoder } = await import('three/examples/jsm/libs/meshopt_decoder.module.js');
   await MeshoptDecoder.ready;
   const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder), cache = new Map();
   // The files the game reads: the bundles (assets/models/bundles, js/modelbundles.ts through a fetch that serves the bundle files), so the tests assemble from what the game loads.
-  const file = (url) => path.join(ROOT, url.replace(/\?.*$/, '')); // (the bundle URLs carry ?h=<hash>)
+  const file = (url) => path.join(root, url.replace(/\?.*$/, '')); // (the bundle URLs carry ?h=<hash>)
   const G = loadGame(true, {
     location: { search: '' }, URLSearchParams, TextDecoder, addEventListener() {}, DecompressionStream, Response, Blob,
     fetch: async (url) => { const f = file(url); if (!fs.existsSync(f) || /guns\/index\.json$/.test(url)) return { ok: false, status: 404 }; const b = fs.readFileSync(f); return { ok: true, status: 200, arrayBuffer: async () => b.buffer.slice(b.byteOffset, b.byteOffset + b.length), json: async () => JSON.parse(b.toString('utf8')) }; },
-  });
+  }, { dist });
   G.GLB = {
     ready: Promise.resolve(true),
     load: (url) => { if (!cache.has(url)) cache.set(url, G.Bundles.getFile(url).then((ab) => new Promise((res, rej) => loader.parse(ab, '', (g) => res(G.Models.dequantize(g.scene)), rej)))); return cache.get(url); },

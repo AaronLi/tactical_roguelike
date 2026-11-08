@@ -69,7 +69,7 @@ for (const id of plats) {
   if (!M.platformLoaded(id)) { problems.push(`${id}: no packs (run npm run bake:models)`); continue; }
   // (the game computes bounds on the loaded packs as it renders them: an assembled copy must not inherit them)
   const ixf = JSON.parse(fs.readFileSync(path.join(ROOT, 'assets/models/parts', id, 'index.json'), 'utf8'));
-  for (const t of Object.values(ixf.tags)) for (const e of t.packs) if (e.file) (await G.GLB.load('assets/models/parts/' + (e.file.startsWith('_shared/') ? '' : id + '/') + e.file)).traverse((o) => { if (o.isMesh) { o.geometry.computeBoundingBox(); o.geometry.computeBoundingSphere(); } });
+  for (const t of Object.values(ixf.tags)) for (const e of Object.values(t.pieces)) if (e.file) (await G.GLB.load('assets/models/parts/' + (e.file.startsWith('_shared/') ? '' : id + '/') + e.file)).traverse((o) => { if (o.isMesh) { o.geometry.computeBoundingBox(); o.geometry.computeBoundingSphere(); } });
   const line = { cases: {}, regress: {} };
   for (const [which, list] of [['cases', mine], ['regress', regs]]) for (const c of list) {
     const key = keyOf(c.build), r = run(id, which, c.build, c.why); line[which][r.kind] = (line[which][r.kind] || 0) + 1;
