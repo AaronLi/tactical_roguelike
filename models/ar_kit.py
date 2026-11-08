@@ -357,7 +357,7 @@ def handguard_mlok(f0, f1, mat=None, sc=1.0):
     # and the lower bevels each about a third of its height): taller than wide, a narrow top flat under the rail, steep upper bevels down to
     # short side flats, long lower bevels in to a narrow bottom flat; nearly round in the hand
     T, B, W = HB_T, -19.0 * mm * sc, 19.0 * mm * sc                    # top (the receiver's rail base), bottom, half width
-    C = (8.0 * mm * sc, 15.0 * mm * sc, 10.0 * mm * sc, 15.0 * mm * sc)  # the bevels: upper (across, down), lower (across, up)
+    C = (10.0 * mm * sc, 15.0 * mm * sc, 10.0 * mm * sc, 15.0 * mm * sc)  # the bevels: upper (across, down), lower (across, up): the top flat as narrow as the bottom (18 mm, the rail's foot)
     CI = tuple(c - 1.1 * mm for c in C)                                  # (the bore's, 2.6 mm in)
     def octo(t, b, w, c):
         ux, uz, lx, lz = c
@@ -395,7 +395,7 @@ def handguard_mlok(f0, f1, mat=None, sc=1.0):
     cut(hg, SPL.copy())
     bevel(hg, 0.5 * mm, 1, 30); smooth(hg); K.adopt(hg, 'handguard', mat)
     ring = K.tmp(prism(octo(T - 2.6 * mm, B + 2.6 * mm, W - 2.6 * mm, CI), 'y', f0, f0 + CJ))
-    cut(ring, cyl(NR, f0 - 0.01, f0 + CJ + 0.01, 'y', (0, 0), 40), SPL.copy())
+    cut(ring, cyl(NR, f0 - 0.01, f0 + CJ + 0.01, 'y', (0, 0), 40), SPL.copy(), box(-W, W, f0 - 0.01, f0 + CJ + 0.01, 0.0, T))   # (a collar under the nut only: over it the top keeps the tube's own wall, as thin as the bottom)
     smooth(ring); K.adopt(ring, 'handguard', mat)
     LZ0, LZ1, LX = B - 6.0 * mm, B + 0.5 * mm, 7.5 * mm                       # (the lug: its bottom, top (inside the tube's wall), half width)
     SZ, SFQ = B - 2.8 * mm, (0.0045, 0.0130)                                 # (the screws: height, positions back to front over the nut)
