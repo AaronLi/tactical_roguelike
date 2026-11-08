@@ -225,14 +225,18 @@ const G_Cloud = (() => {
       const cv: Record<string, any> = Object.assign({}, row ? row.settings : {}); for (const k of PROFILE) if (row && row[k] != null) cv[k] = row[k];
       // (a row an older version wrote: its one animal (the column) and second choice (settings.animal2), as the list's first entries)
       const oldAnimals = !!row && !Array.isArray(cv.animals) && (typeof row.animal === 'string' || typeof cv.animal2 === 'string');
-      if (oldAnimals) { cv.animals = [row.animal, cv.animal2].filter((a, i, l) => typeof a === 'string' && a && l.indexOf(a) === i).slice(0, 3); cmt.animals = Math.max(cmt.animal || 0, cmt.animal2 || 0); }
-      if (Array.isArray(local.animals) && Array.isArray(cv.animals) && cv.animals.length < local.animals.length && (cmt.animals || 0) >= (m.mt.animals || 0)) // (the account's older, shorter list: topped up from here's, in order)
-        for (const a of local.animals) if (cv.animals.length < 3 && !cv.animals.includes(a)) cv.animals.push(a);
+      if (oldAnimals) { cv.animals = [row.animal, cv.animal2].filter((a, i, l) => typeof a === 'string' && a && l.indexOf(a) === i); cmt.animals = Math.max(cmt.animal || 0, cmt.animal2 || 0); }
+      // (a shorter list, an older one or a top three: the missing animals appended in their usual order, and written up whole)
+      const ids: string[] = G.Callsigns ? G.Callsigns.LIST.map((a) => a.id) : Array.isArray(local.animals) ? local.animals : [];
+      const whole = (l: unknown) => { if (!Array.isArray(l)) return l; const o = l.filter((a, i) => typeof a === 'string' && l.indexOf(a) === i && (!G.Callsigns || G.Callsigns.valid(a))); for (const id of ids) if (!o.includes(id)) o.push(id); return o; };
+      const shortCloud = Array.isArray(cv.animals) && JSON.stringify(whole(cv.animals)) !== JSON.stringify(cv.animals);
+      if (shortCloud) cv.animals = whole(cv.animals);
+      if (Array.isArray(local.animals)) local.animals = whole(local.animals);
       const r = mergePrefs(PREFS, local, m.mt, cv, cmt);
       for (const k of r.toLocal) { S.put(k, r.vals[k]); m.mt[k] = r.mt[k]; }
       // (a row holding what's no longer synced, a TURN password an older version wrote, is written again without it)
       const stale = !!row && Object.keys(row.settings || {}).some((k) => !SETTINGS.includes(k));
-      changed = r.toLocal; up = r.toCloud || !row || stale || oldAnimals;
+      changed = r.toLocal; up = r.toCloud || !row || stale || oldAnimals || shortCloud;
       const settings: Record<string, any> = {}; for (const k of SETTINGS) if (r.vals[k] !== undefined) settings[k] = r.vals[k];
       const first = Array.isArray(r.vals.animals) ? r.vals.animals[0] : null; // (the animal column: the 1st, for anything reading it)
       Object.assign(out, { name: r.vals.name != null ? String(r.vals.name).slice(0, 32) : null, animal: typeof first === 'string' ? first.slice(0, 32) : null, look: r.vals.look || null, settings, mt: r.mt });

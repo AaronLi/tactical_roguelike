@@ -44,6 +44,7 @@ function browser(server, store, { cfg = { url: 'http://fake.supabase', key: 'ano
   G.Route = { isBoss: (n) => n % 10 === 0 };
   G.Net = { solo: true, isHost: true, peer: null };
   G.Arsenal = { reload() {} };
+  { const LIST = ['snake', 'seal', 'frog', 'cat', 'raccoon', 'hyrax'].map((id) => ({ id })); G.Callsigns = { LIST, valid: (a) => LIST.some((x) => x.id === a) }; }
   win.fire = (ev) => (listeners[ev] || []).forEach((f) => f());
   win.G = G;
   return win;
@@ -192,17 +193,28 @@ await test('the TURN relay\'s settings stay in the browser, and one an older ver
   assert.equal(prof.settings.turn, undefined, 'dropped'); assert.equal(prof.mt.turn, undefined);
   assert.equal(JSON.parse(stA.getItem('bp_turn')).pass, 'secret', 'the local one untouched, the row\'s never merged in');
 });
-await test('callsign preferences: an older row\'s animal and second choice become the list, and the row is written again as one', async () => {
+await test('callsign preference: an older row\'s animal and second choice, or a top three, become the whole ranked list, written again whole', async () => {
+  const ALL = ['snake', 'seal', 'frog', 'cat', 'raccoon', 'hyrax'];
   await D.admin(`update public.profiles set animal = 'cat', settings = (settings - 'animals') || '{"animal2":"frog"}'::jsonb, mt = (mt - 'animals') || '{"animal":1000}'::jsonb where user_id = $1`, [uidA]);
   await A.G.Cloud.sync();
-  assert.deepEqual(JSON.parse(stA.getItem('bp_animals')), ['cat', 'frog']);
+  const want = ['cat', 'frog', 'snake', 'seal', 'raccoon', 'hyrax'];
+  assert.deepEqual(JSON.parse(stA.getItem('bp_animals')), want);
   let prof = (await D.admin('select * from public.profiles where user_id = $1', [uidA]))[0];
-  assert.deepEqual(prof.settings.animals, ['cat', 'frog']); assert.equal(prof.settings.animal2, undefined); assert.equal(prof.animal, 'cat'); assert.equal(prof.mt.animal, undefined);
-  // a new pick here: up, the column the 1st
-  A.G.U.store.set('animals', ['seal', 'cat', 'frog']); A.G.Cloud.flush();
+  assert.deepEqual(prof.settings.animals, want); assert.equal(prof.settings.animal2, undefined); assert.equal(prof.animal, 'cat'); assert.equal(prof.mt.animal, undefined);
+  // a top three (the version before): the rest appended in their usual order
+  await D.admin(`update public.profiles set settings = settings || '{"animals":["hyrax","seal","cat"]}'::jsonb, mt = mt || '{"animals":99999999999990}'::jsonb where user_id = $1`, [uidA]);
+  await A.G.Cloud.sync();
+  const want3 = ['hyrax', 'seal', 'cat', 'snake', 'frog', 'raccoon'];
+  assert.deepEqual(JSON.parse(stA.getItem('bp_animals')), want3);
+  prof = (await D.admin('select * from public.profiles where user_id = $1', [uidA]))[0];
+  assert.deepEqual(prof.settings.animals, want3); assert.equal(prof.animal, 'hyrax');
+  await D.admin(`update public.profiles set mt = mt || '{"animals":1000}'::jsonb where user_id = $1`, [uidA]);
+  // a new order here: up whole, the column the 1st
+  const mine = ['seal', 'cat', 'frog', 'hyrax', 'snake', 'raccoon'];
+  A.G.U.store.set('animals', mine); A.G.Cloud.flush();
   await until(async () => (await D.admin('select animal from public.profiles where user_id = $1', [uidA]))[0].animal === 'seal', 15000);
   prof = (await D.admin('select * from public.profiles where user_id = $1', [uidA]))[0];
-  assert.deepEqual(prof.settings.animals, ['seal', 'cat', 'frog']);
+  assert.deepEqual(prof.settings.animals, mine); assert.equal(ALL.every((a) => mine.includes(a)), true);
 });
 const stB = storage();
 let B;

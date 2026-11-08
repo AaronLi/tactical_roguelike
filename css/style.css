@@ -971,15 +971,13 @@ i.c.heavy { background: #a02828; } i.c.light { background: #7a3a30; } i.c.frac {
 .acct-alt small { margin-right: auto; }
 .acct-status, .acct-msg { margin-top: 8px; font: 300 12px var(--ui-font); color: var(--ui-dim); }
 .career-row { margin-top: 10px; }
-/* your animals, ranked by dragging (the first three count: badged, the rest dimmed past a divider), and a word when the host gave you another */
+/* your animals, all ranked by dragging (each badged with its rank), and a word when the host gave you another */
 .rank-row { gap: 6px; align-items: center; }
 .rank-chip { position: relative; touch-action: none; cursor: grab; user-select: none; }
-.rank-chip.on { border-color: var(--ui-line); background: var(--ui-fill-hi); }
-.rank-chip.off { opacity: 0.55; }
-.rank-chip.off:hover, .rank-chip.off:focus-visible { opacity: 0.85; }
+.rank-chip.on { border-color: transparent; background: var(--ui-fill); }
+.rank-chip.first { border-color: var(--ui-line); background: var(--ui-fill-hi); }
 .rank-chip:focus-visible { outline: 1px solid var(--ui-line-hi); outline-offset: 1px; }
 .rank-chip .rk { position: absolute; top: -6px; left: -5px; width: 15px; height: 15px; border-radius: 50%; background: var(--ui-text); color: var(--ui-ink); font: 600 10px/15px var(--ui-font); font-style: normal; text-align: center; }
-.rank-cut { width: 1px; align-self: stretch; min-height: 26px; background: var(--ui-line-hi); margin: 0 4px; }
 .rank-row.ranking .rank-chip { cursor: grabbing; }
 .rank-chip.dragging { opacity: 0.2; }
 .rank-chip.ins-before { box-shadow: -5px 0 0 -2px var(--ui-text); }

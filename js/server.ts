@@ -153,11 +153,11 @@ const G_Server = {
     switch (m.t) {
       case 'hello': {
         const name = String(m.name || 'Operator').slice(0, 16);
-        // their animal (one of each to a squad): their preferences in order (prefs: up to three known animals, no repeats; a client
-        // before them sends only animal), else the first one free
+        // their animal (one of each to a squad): the highest-ranked free one of their preference (prefs: known animals, no repeats, at most
+        // as many as there are; a client before them sends only animal), else the first one free
         const CS = G.Callsigns, taken = new Set([...this.players.values()].filter((q) => q.id !== from).map((q) => q.animal));
         const prefs: string[] = [];
-        for (const a of Array.isArray(m.prefs) ? m.prefs.slice(0, 3) : [m.animal]) if (typeof a === 'string' && CS.valid(a) && !prefs.includes(a)) prefs.push(a);
+        for (const a of Array.isArray(m.prefs) ? m.prefs.slice(0, CS.LIST.length) : [m.animal]) if (typeof a === 'string' && CS.valid(a) && !prefs.includes(a)) prefs.push(a);
         let animal: string | null = prefs.find((a) => !taken.has(a)) || null;
         if (!animal) animal = (CS.LIST.find((a) => !taken.has(a.id)) || CS.of(prefs[0] || CS.LIST[0].id)).id;
         const color = CS.of(animal).color;

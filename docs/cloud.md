@@ -56,12 +56,14 @@ and **Table Editor** shows your rows. `?cloud=0` in the URL turns cloud saves of
 - **Other players** see a small **GUEST** mark beside your name in the lobby, the hangar's roster and the Tab scoreboard while you
   play as a guest (the optional `anon: 1` on `hello`, and the `acct` message when it changes mid-session; js/server.ts). A player
   with cloud saves off isn't marked. Names are display names only (not unique); the account's identity is its user id.
-- **Callsign preferences**: your top three animals, ranked (*Callsign preferences* in the main menu: every animal in one row, in your
-  order, dragged to rank (mouse or touch), moved with the arrow keys / Home / End, or clicked to put it 1st; the first three count), kept as one list (`animals`) and synced like the rest of your look. `hello` sends them as
-  `prefs: [a, b, c]` (and `animal`, the first, for an older host); the host checks them (known animals, at most three, no repeats) and
-  gives you the first of them that's free, else the first one free, one of each to a squad. The menu and the lobby say when you got
-  your 2nd or 3rd, or none of the three. An older version's single `animal` and its `animal2` second choice become the list's first
-  entries, in the browser and in a profile row (which the next write rewrites as the list). The list lives in `settings` (jsonb), so it needed no migration.
+- **Callsign preference**: every animal, ranked (*Callsign preference* in the main menu: one row in your order, each with its rank;
+  dragged to rank with the mouse or a finger, moved with the arrow keys / Home / End, or clicked to put it 1st), kept as one list
+  (`animals`, all of them) and synced like the rest of your look. `hello` sends it as `prefs` (and `animal`, the 1st, for an older
+  host); the host checks it (known animals, no repeats, at most as many as there are) and gives you the highest-ranked one that's
+  free (one of each to a squad), else the first one free (only for an older client, or a short list). The menu and the lobby say
+  which choice you got when it wasn't your 1st. An older version's single `animal` and its `animal2` second choice, or a top-three
+  list, become the list's first entries, the rest appended in their usual order, in the browser and in a profile row (which the
+  next write rewrites whole). The list lives in `settings` (jsonb), so it needed no migration.
 
 ## The data
 
@@ -71,7 +73,7 @@ role (no session) has no grants at all.
 
 | Table | Columns | Limits |
 | --- | --- | --- |
-| `profiles` | `name`, `animal` (the 1st preference, kept for anything reading it), `look` (jsonb), `settings` (jsonb: `animals` (the ranked list) `sens fov vol loadKit muted quick`; never the TURN relay's), `mt` (jsonb: when each was last changed), `updated_at` | name/animal ≤ 32 chars, look ≤ 4 KB, settings ≤ 8 KB |
+| `profiles` | `name`, `animal` (the 1st of the ranking, kept for anything reading it), `look` (jsonb), `settings` (jsonb: `animals` (every animal, ranked) `sens fov vol loadKit muted quick`; never the TURN relay's), `mt` (jsonb: when each was last changed), `updated_at` | name/animal ≤ 32 chars, look ≤ 4 KB, settings ≤ 8 KB |
 | `progress` | `arsenal` (jsonb: `{ got, n, pro, on }`, js/arsenal.ts), `wishlist` (jsonb array), `mt`, `updated_at` | arsenal ≤ 32 KB, wishlist ≤ 500 items / 32 KB |
 | `career` | `runs runs_done deepest acts levels kills incaps headshots arrests rescued civ_killed unauth deaths downs revives evidence credits`, `best_level`, `best_credits` (jsonb run summaries) | non-negative, capped; written only through `career_add` |
 | `runs` | PK `(user_id, id)`; `id` (client uuid), `started_at`, `ended_at`, `solo`, `host`, `squad`, `joined_at`, `outcome` (`playing wiped left abandoned`), `deepest`, `credits`, `kills`, `arrests`, `levels` (jsonb), `updated_at` | ≤ 200 levels / 64 KB; squad 1-16; the newest 1000 runs a player are kept |
@@ -113,7 +115,7 @@ Per item:
 
 - **Sidearm unlocks** (`got`): the union. **Tallies** (`n`): per gun and stat, the higher. **Pro builds earned**: earned on either
   side is earned. **Start in pro mode** (`on`): the side whose arsenal changed last.
-- **Preferences** (name, the callsign list (as a whole), look, each setting, and the wishlist): per key, the one changed later (`mt`, the
+- **Preferences** (name, the callsign ranking (as a whole), look, each setting, and the wishlist): per key, the one changed later (`mt`, the
   changing device's clock). A tie, or a value nobody chose (the made-up `OperatorNN` name, written with `mt` 0), goes to the account;
   a key only one side has comes from that side. (The wishlist is a preference rather than a union, so un-starring sticks.)
 - **Career counters**: added (the account's + this browser's unsent additions). **deepest**: the higher. **Best runs**: the better.
