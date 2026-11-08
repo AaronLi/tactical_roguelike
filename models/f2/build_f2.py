@@ -174,8 +174,16 @@ bevel(o, 1.0 * mm, 2, 30); smooth(o); K.adopt(o, 'base', 'black', ph)
 # ===================================================================================== the barrel (barrel: the F2's own, the grenade spigot's
 # rings along it) and the flash hider (muzzle: the A2 pattern, the game's r556 birdcage)
 MZ0 = L + 0.068
-o = K.obj(lathe([(L - 0.008, 10.5 * mm), (L + 0.022, 10.5 * mm), (L + 0.024, 6.8 * mm)], 24), 'barrel', 'black'); smooth(o)   # (its back 8 mm into the forend's face)
-o = K.obj(lathe([(L, 6.8 * mm), (MZ0, 6.8 * mm)], 20), 'barrel', 'park'); smooth(o)
+# the collar (the bushing the barrel leaves the nose through): the receiver's (slot base), so it stays put whatever barrel is fitted; seated
+# 32 mm deep so it meets the sloping nose face all round; its bore clears the thickest shared barrel (the heavy profile: 12 mm radius)
+COLLAR_R, COLLAR_BORE = 14.5 * mm, 12.3 * mm
+cl = K.tmp(lathe([(L - 0.032, COLLAR_R), (L + 0.020, COLLAR_R), (L + 0.022, COLLAR_R - 1.5 * mm)], 32))
+cut(cl, cyl(COLLAR_BORE, L - 0.04, L + 0.03, 'y', (0, 0), 32))
+bevel(cl, 0.5 * mm, 2, 30); smooth(cl); K.adopt(cl, 'base', 'black')
+# the barrel: from just ahead of the chamber, through the body and the collar, to the muzzle device's seat (the shared tubes run the same
+# way: no gap can show at any angle)
+o = K.obj(lathe([(F(940), 6.8 * mm), (MZ0, 6.8 * mm)], 20), 'barrel', 'park'); smooth(o)
+o = K.obj(lathe([(L + 0.004, 9.0 * mm), (L + 0.020, 9.0 * mm), (L + 0.023, 6.8 * mm)], 24), 'barrel', 'black'); smooth(o)   # (the barrel's own shoulder, in the collar's mouth)
 for i in range(9):
     f = L + 0.026 + (MZ0 - 0.008 - L - 0.026) * i / 8
     o = K.obj(lathe([(f, 6.8 * mm), (f + 0.4 * mm, 7.6 * mm), (f + 1.2 * mm, 7.6 * mm), (f + 1.6 * mm, 6.8 * mm)], 20), 'barrel', 'black'); smooth(o)
