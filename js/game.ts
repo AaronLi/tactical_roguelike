@@ -48,7 +48,7 @@ const G_Game = {
   settings: undefined as unknown as Record<GmSetting, number>, // (init)
   myName: undefined as unknown as string, // (init: your callsign's name, its animal and colour, and what you wear)
   myAnimal: undefined as unknown as string,
-  prefAnimal: undefined as unknown as string,
+  prefAnimals: [] as string[], // (your callsign preferences, 1st to 3rd: init)
   myColor: undefined as unknown as number,
   myLook: undefined as unknown as ReturnType<typeof G.Rig.cleanLook>,
   last: undefined as unknown as number, // (init: the clock of the last frame)
@@ -100,11 +100,10 @@ const G_Game = {
     this.settings = { sens: G.U.store.get('sens', 1), fov: G.U.store.get('fov', 80), vol: G.U.store.get('vol', 0.6), loadKit: G.U.store.get('loadKit', 1) }; // (loadKit: the hangar's Load Magazines tops up the equipped guns' and the kit's magazines only (1), or everything (0))
     this.myName = G.U.store.get('name', 'Operator' + Math.floor(Math.random() * 90 + 10));
     G.U.store.set('name', this.myName, true); // (kept: the same name after a refresh, so the squad knows who's back. auto: a made-up one doesn't outweigh an account's, js/cloud.ts)
-    // your callsign: an animal (its emblem and colour mark you out to the squad; js/callsigns.ts). prefAnimal is your preference, the one
-    // you ask the host for (and the one you'd rather have next if it's taken, animal2); myAnimal the one you have this session
-    this.prefAnimal = G.U.store.get('animal', null);
-    if (!G.Callsigns.valid(this.prefAnimal)) this.prefAnimal = G.Callsigns.LIST[Math.floor(Math.random() * G.Callsigns.LIST.length)].id;
-    this.myAnimal = this.prefAnimal;
+    // your callsign: an animal (its emblem and colour mark you out to the squad; js/callsigns.ts). prefAnimals are your preferences, 1st
+    // to 3rd, asked of the host in that order (one of each to a squad); myAnimal is the one you have this session
+    this.prefAnimals = this.animalPrefs(true);
+    this.myAnimal = this.prefAnimals[0];
     this.myColor = G.Callsigns.of(this.myAnimal).color;
     this.myLook = G.Rig.cleanLook(G.U.store.get('look', null)); // top, pants, eyewear, gloves (the menu)
     G.R.init();
@@ -220,10 +219,9 @@ const G_Game = {
     lp.sc.add(lp.rig.root);
   },
   // your callsign (picked in the menu, or the host's pick for you when yours was taken)
-  // (keep: your pick in the menu, your preference from now on, kept and synced; otherwise the host's pick for this session)
-  setAnimal(id: string, keep?: boolean) {
+  // (in the menu, your 1st preference; in a game, the host's pick for this session)
+  setAnimal(id: string) {
     if (!G.Callsigns.valid(id)) return;
-    if (keep && id !== this.prefAnimal) { this.prefAnimal = id; G.U.store.set('animal', id); }
     if (id !== this.myAnimal) {
       this.myAnimal = id; this.myColor = G.Callsigns.of(id).color;
       if (this._lp && this._lp.rig) this.lookPreview(); // (the officer in the menu, in the new patches)
@@ -233,8 +231,9 @@ const G_Game = {
   // the note under the menu's animals (and in the lobby): the host gave you another one this session, yours being taken
   animalNote() {
     const el = document.getElementById('animalNote');
-    const other = this.phase !== 'menu' && this.myAnimal !== this.prefAnimal;
-    const txt = other ? `The host gave you the ${G.Callsigns.of(this.myAnimal).name} this session: the ${G.Callsigns.of(this.prefAnimal).name} was taken.` : '';
+    const P = this.prefAnimals, rank = P.indexOf(this.myAnimal), N = (id: string) => G.Callsigns.of(id).name;
+    const txt = this.phase === 'menu' || rank === 0 ? '' : rank > 0 ? `The ${N(P[0])} was taken: you're the ${N(this.myAnimal)} this session, your ${['1st', '2nd', '3rd'][rank]} choice.`
+      : `Your three were taken: the host gave you the ${N(this.myAnimal)} this session.`;
     if (el) el.textContent = txt;
     const lb = document.getElementById('lobbyAnimal'); if (lb) lb.textContent = txt;
   },
@@ -255,18 +254,28 @@ const G_Game = {
     }
     if (has('muted') && !new URLSearchParams(location.search).has('mute')) { const m = !!S.get('muted', false); G.Audio.setMuted(m); this.$<HTMLInputElement>('mute').checked = m; }
     if (has('name')) { const n = String(S.get('name', this.myName) || '').trim().slice(0, 16); if (n) { this.myName = n; this.$<HTMLInputElement>('nameInput').value = n; if (this._lp && this._lp.rig) this._lp.rig.setCallsign(this.myAnimal, n); } }
-    if (has('animal')) { const a = S.get('animal', null); if (G.Callsigns.valid(a)) { this.prefAnimal = a; if (this.phase === 'menu') this.setAnimal(a); this.markAnimals(); } }
-    if (has('animal2')) this.animal2Options();
+    if (has('animals')) { this.prefAnimals = this.animalPrefs(false); if (this.phase === 'menu') this.setAnimal(this.prefAnimals[0]); this.animalPicks(); }
     if (has('look')) { this.myLook = G.Rig.cleanLook(S.get('look', null)); this.bindLookBox(); }
     if (has('turn')) { const t = S.get('turn', {}) || {}; this.$<HTMLInputElement>('turnUrl').value = t.url || ''; this.$<HTMLInputElement>('turnUser').value = t.user || ''; this.$<HTMLInputElement>('turnPass').value = t.pass || ''; }
   },
-  // the menu's animals, the preferred one lit
-  markAnimals() { this.$('colorRow').querySelectorAll<HTMLElement>('.sw').forEach((x) => x.classList.toggle('on', x.dataset.a === this.prefAnimal)); },
-  // your second choice, if your first is taken (asked of the host in your hello: js/server.ts)
-  animal2Options() {
-    const sel = this.$<HTMLSelectElement>('animal2'); if (!sel) return;
-    const v = G.U.store.get('animal2', '');
-    sel.innerHTML = `<option value="">The first one free</option>` + G.Callsigns.LIST.map((a) => `<option value="${a.id}"${a.id === v ? ' selected' : ''}>${G.U.esc(a.name)}</option>`).join('');
+  // Your callsign preferences, as kept ('animals': three animals, no repeats), made whole: from the single 'animal' (and the 'animal2'
+  // second choice) an older version kept, then topped up at random. init: what's made up is kept (not a choice: it doesn't outweigh an
+  // account's), the old keys dropped.
+  animalPrefs(init: boolean): string[] {
+    const S = G.U.store, CS = G.Callsigns, kept = S.get('animals', null);
+    const src: unknown[] = Array.isArray(kept) ? kept : [S.get('animal', null), S.get('animal2', null)];
+    const out: string[] = [];
+    for (const a of src) if (typeof a === 'string' && CS.valid(a) && !out.includes(a) && out.length < 3) out.push(a);
+    const pool = CS.LIST.map((a) => a.id).filter((id) => !out.includes(id));
+    while (out.length < Math.min(3, CS.LIST.length)) out.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+    if (init && JSON.stringify(out) !== JSON.stringify(kept)) { S.put('animals', out); S.put('animal', undefined); S.put('animal2', undefined); }
+    return out;
+  },
+  // the menu's three pickers: 1st, 2nd, 3rd, each the animals not picked in the others
+  animalPicks() {
+    const P = this.prefAnimals, box = this.$('colorRow');
+    box.innerHTML = P.map((pick, r) => `<div class="pick-row"><span class="pick-n">${['1st', '2nd', '3rd'][r]}</span><div class="color-row">${G.Callsigns.LIST.filter((a) => a.id === pick || !P.includes(a.id))
+      .map((a) => `<button class="sw animal${a.id === pick ? ' on' : ''}" data-r="${r}" data-a="${a.id}" title="${a.name}">${G.Callsigns.html(a.id)}<span style="color:${G.U.hex(a.color)}">${a.name}</span></button>`).join('')}</div></div>`).join('');
   },
   // your own arms in first person: sleeves in your top's colour (bare forearms in a T-shirt), your gloves
   applyLook() {
@@ -304,16 +313,18 @@ const G_Game = {
     name.value = this.myName;
     name.addEventListener('input', () => { this.myName = name.value.trim().slice(0, 16) || 'Operator'; G.U.store.set('name', this.myName); if (this._lp && this._lp.rig) this._lp.rig.setCallsign(this.myAnimal, this.myName); });
     const row = this.$('colorRow');
-    this.animal2Options();
-    this.$('animal2').addEventListener('change', () => G.U.store.set('animal2', this.$<HTMLSelectElement>('animal2').value)); // ('': none, the host's first free)
     // your career (js/career.ts), from the menu
     this.$('btnCareer').onclick = () => { this.$('careerBody').innerHTML = G.Career.html(); this.screen('career'); };
     this.$('btnCareerBack').onclick = () => this.screen('menu');
-    row.innerHTML = G.Callsigns.LIST.map((a) => `<button class="sw animal${a.id === this.prefAnimal ? ' on' : ''}" data-a="${a.id}" title="${a.name}">${G.Callsigns.html(a.id)}<span style="color:${G.U.hex(a.color)}">${a.name}</span></button>`).join('');
+    this.animalPicks();
     row.addEventListener('click', ((e: GmEvt) => {
       const b = e.target.closest<HTMLElement>('.sw'); if (!b) return;
-      this.setAnimal(b.dataset.a!, true);
-      row.querySelectorAll('.sw').forEach((x: Element) => x.classList.toggle('on', x === b));
+      const r = +b.dataset.r!, a = b.dataset.a!;
+      if (!G.Callsigns.valid(a) || this.prefAnimals[r] === a || this.prefAnimals.includes(a)) return;
+      this.prefAnimals = this.prefAnimals.slice(); this.prefAnimals[r] = a;
+      G.U.store.set('animals', this.prefAnimals); // (kept and synced: js/cloud.ts)
+      if (r === 0) this.setAnimal(a);
+      this.animalPicks();
     }) as EventListener);
 
     const bindRange = (ids: string[], key: GmSetting, fmt: (v: number) => string, apply?: (v: number) => void) => {
@@ -594,9 +605,9 @@ const G_Game = {
     if (G.Net.isHost && !G.Net.solo) G.Net.startBeacon(); // (findable from the same network)
     G.Me.newRun();
     this.runStarted = false;
-    // (your preferred animal, and your second choice; anon: you're a cloud saves guest, for the GUEST mark: js/server.ts hello)
-    const a2 = G.U.store.get('animal2', '');
-    G.Net.toHost({ t: 'hello', name: this.myName, animal: this.prefAnimal, ...(G.Callsigns.valid(a2) ? { animal2: a2 } : {}), look: this.myLook, ...(G.Cloud.guest() ? { anon: 1 } : {}) });
+    // (anon: you're a cloud saves guest, for the GUEST mark: js/server.ts hello)
+    // (prefs: your three, in order, tried by the host; animal, the first, for a host before them)
+    G.Net.toHost({ t: 'hello', name: this.myName, animal: this.prefAnimals[0], prefs: this.prefAnimals.slice(0, 3), look: this.myLook, ...(G.Cloud.guest() ? { anon: 1 } : {}) });
   },
   toMenu(reason?: string) {
     if (G.Career.run) G.Career.runEnd('left'); // (a run you walked out of, or lost the host in)
@@ -608,7 +619,7 @@ const G_Game = {
     G.R.setViewmodel(null);
     this.map = null;
     this.phase = 'menu';
-    this.setAnimal(this.prefAnimal); // (back to yours: the host's pick was for that session)
+    this.setAnimal(this.prefAnimals[0]); // (back to yours: the host's pick was for that session)
     if (document.pointerLockElement) document.exitPointerLock();
     this.veil(false, true);
     this.screen('menu');

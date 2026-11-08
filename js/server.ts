@@ -153,11 +153,13 @@ const G_Server = {
     switch (m.t) {
       case 'hello': {
         const name = String(m.name || 'Operator').slice(0, 16);
-        // their animal (one of each to a squad: if theirs is taken, their second choice (animal2, optional), else the first one free)
+        // their animal (one of each to a squad): their preferences in order (prefs: up to three known animals, no repeats; a client
+        // before them sends only animal), else the first one free
         const CS = G.Callsigns, taken = new Set([...this.players.values()].filter((q) => q.id !== from).map((q) => q.animal));
-        let animal = CS.valid(m.animal) ? m.animal : null;
-        if ((!animal || taken.has(animal)) && CS.valid(m.animal2) && !taken.has(m.animal2)) animal = m.animal2;
-        if (!animal || taken.has(animal)) animal = (CS.LIST.find((a) => !taken.has(a.id)) || CS.of(animal)).id;
+        const prefs: string[] = [];
+        for (const a of Array.isArray(m.prefs) ? m.prefs.slice(0, 3) : [m.animal]) if (typeof a === 'string' && CS.valid(a) && !prefs.includes(a)) prefs.push(a);
+        let animal: string | null = prefs.find((a) => !taken.has(a)) || null;
+        if (!animal) animal = (CS.LIST.find((a) => !taken.has(a.id)) || CS.of(prefs[0] || CS.LIST[0].id)).id;
         const color = CS.of(animal).color;
         // anon: signed in to the cloud saves as a guest (js/cloud.ts; optional: an older client sends nothing, and shows nothing)
         this.players.set(from, { id: from, name, color, animal, look: G.Sim.cleanLook(m.look), ready: false, st: null, anon: m.anon === 1 ? 1 : 0 });

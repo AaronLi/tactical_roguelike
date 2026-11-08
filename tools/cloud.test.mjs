@@ -31,7 +31,7 @@ function browser(server, store, { cfg = { url: 'http://fake.supabase', key: 'ano
     navigator: { onLine: true },
     document: { readyState: 'complete', getElementById: () => null, querySelector: () => null },
     addEventListener: (ev, f) => { (listeners[ev] = listeners[ev] || []).push(f); },
-    __bpCloudConfig: cfg,
+    __bpCloudConfig: cfg || { url: '', key: '' }, // (null: no project, whatever js/cloudconfig.ts holds)
     __bpCloudClient: server ? (url, key, opts) => server.client(url, key, opts, store) : undefined,
     confirm: () => true,
   };
@@ -191,6 +191,18 @@ await test('the TURN relay\'s settings stay in the browser, and one an older ver
   prof = (await D.admin('select * from public.profiles where user_id = $1', [uidA]))[0];
   assert.equal(prof.settings.turn, undefined, 'dropped'); assert.equal(prof.mt.turn, undefined);
   assert.equal(JSON.parse(stA.getItem('bp_turn')).pass, 'secret', 'the local one untouched, the row\'s never merged in');
+});
+await test('callsign preferences: an older row\'s animal and second choice become the list, and the row is written again as one', async () => {
+  await D.admin(`update public.profiles set animal = 'cat', settings = (settings - 'animals') || '{"animal2":"frog"}'::jsonb, mt = (mt - 'animals') || '{"animal":1000}'::jsonb where user_id = $1`, [uidA]);
+  await A.G.Cloud.sync();
+  assert.deepEqual(JSON.parse(stA.getItem('bp_animals')), ['cat', 'frog']);
+  let prof = (await D.admin('select * from public.profiles where user_id = $1', [uidA]))[0];
+  assert.deepEqual(prof.settings.animals, ['cat', 'frog']); assert.equal(prof.settings.animal2, undefined); assert.equal(prof.animal, 'cat'); assert.equal(prof.mt.animal, undefined);
+  // a new pick here: up, the column the 1st
+  A.G.U.store.set('animals', ['seal', 'cat', 'frog']); A.G.Cloud.flush();
+  await until(async () => (await D.admin('select animal from public.profiles where user_id = $1', [uidA]))[0].animal === 'seal', 15000);
+  prof = (await D.admin('select * from public.profiles where user_id = $1', [uidA]))[0];
+  assert.deepEqual(prof.settings.animals, ['seal', 'cat', 'frog']);
 });
 const stB = storage();
 let B;

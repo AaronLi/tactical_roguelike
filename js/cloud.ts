@@ -17,7 +17,7 @@ interface CloudQueue { add: Record<string, number>; max: Record<string, number>;
 const G_Cloud = (() => {
   const V = 1; // (the data's shape: schema_version in every row. The client's version is in load's import, and js/types/supabase-cdn.d.ts)
   // what's synced, by where it goes (never the TURN relay's settings, 'turn': a connection's credentials stay in this browser): the profile row's columns, its settings (jsonb), and the progress row
-  const PROFILE = ['name', 'animal', 'look'], SETTINGS = ['animal2', 'sens', 'fov', 'vol', 'loadKit', 'muted', 'quick'], PROGRESS = ['arsenal', 'wishlist'];
+  const PROFILE = ['name', 'look'], SETTINGS = ['animals', 'sens', 'fov', 'vol', 'loadKit', 'muted', 'quick'], PROGRESS = ['arsenal', 'wishlist'];
   const PREFS = [...PROFILE, ...SETTINGS], SYNCED = new Set([...PREFS, ...PROGRESS]);
   const DEBOUNCE = 4000, RETRY0 = 5000, RETRY_MAX = 60000;
   const q = new URLSearchParams(location.search);
@@ -28,7 +28,8 @@ const G_Cloud = (() => {
   // ------------------------------------------------------------- config
   function config() {
     const o = (window as any).__bpCloudConfig, C = G.CloudConfig;
-    return { url: String((o && o.url) || (C && C.SUPABASE_URL) || '').trim(), key: String((o && o.key) || (C && C.SUPABASE_ANON_KEY) || '').trim() };
+    const src = o && typeof o === 'object' ? { u: o.url, k: o.key } : { u: C && C.SUPABASE_URL, k: C && C.SUPABASE_ANON_KEY }; // (a test's stand-in project, wholly, if it set one)
+    return { url: String(src.u || '').trim(), key: String(src.k || '').trim() };
   }
   const switchedOff = () => q.get('cloud') === '0';
   const configured = () => { const c = config(); return !!(c.url && c.key); };
@@ -222,13 +223,19 @@ const G_Cloud = (() => {
     if (table === 'profiles') {
       for (const k of PREFS) { const v = S.get(k, undefined); if (v !== undefined) local[k] = v; }
       const cv: Record<string, any> = Object.assign({}, row ? row.settings : {}); for (const k of PROFILE) if (row && row[k] != null) cv[k] = row[k];
+      // (a row an older version wrote: its one animal (the column) and second choice (settings.animal2), as the list's first entries)
+      const oldAnimals = !!row && !Array.isArray(cv.animals) && (typeof row.animal === 'string' || typeof cv.animal2 === 'string');
+      if (oldAnimals) { cv.animals = [row.animal, cv.animal2].filter((a, i, l) => typeof a === 'string' && a && l.indexOf(a) === i).slice(0, 3); cmt.animals = Math.max(cmt.animal || 0, cmt.animal2 || 0); }
+      if (Array.isArray(local.animals) && Array.isArray(cv.animals) && cv.animals.length < local.animals.length && (cmt.animals || 0) >= (m.mt.animals || 0)) // (the account's older, shorter list: topped up from here's, in order)
+        for (const a of local.animals) if (cv.animals.length < 3 && !cv.animals.includes(a)) cv.animals.push(a);
       const r = mergePrefs(PREFS, local, m.mt, cv, cmt);
       for (const k of r.toLocal) { S.put(k, r.vals[k]); m.mt[k] = r.mt[k]; }
       // (a row holding what's no longer synced, a TURN password an older version wrote, is written again without it)
       const stale = !!row && Object.keys(row.settings || {}).some((k) => !SETTINGS.includes(k));
-      changed = r.toLocal; up = r.toCloud || !row || stale;
+      changed = r.toLocal; up = r.toCloud || !row || stale || oldAnimals;
       const settings: Record<string, any> = {}; for (const k of SETTINGS) if (r.vals[k] !== undefined) settings[k] = r.vals[k];
-      Object.assign(out, { name: r.vals.name != null ? String(r.vals.name).slice(0, 32) : null, animal: r.vals.animal != null ? String(r.vals.animal).slice(0, 32) : null, look: r.vals.look || null, settings, mt: r.mt });
+      const first = Array.isArray(r.vals.animals) ? r.vals.animals[0] : null; // (the animal column: the 1st, for anything reading it)
+      Object.assign(out, { name: r.vals.name != null ? String(r.vals.name).slice(0, 32) : null, animal: typeof first === 'string' ? first.slice(0, 32) : null, look: r.vals.look || null, settings, mt: r.mt });
     } else {
       const la = S.get('arsenal', null), lw = S.get('wishlist', undefined), ca = row ? row.arsenal : null;
       const arsenal = mode === 'replace' ? (ca && ca.got ? ca : { got: [], n: {}, pro: {}, on: {} }) : mergeArsenal(la, ca, (cmt.arsenal || 0) > (m.mt.arsenal || 0));
@@ -422,6 +429,7 @@ const G_Cloud = (() => {
   // ------------------------------------------------------------- starting
   function boot() {
     S.onSet = onSet;
+    { const m = meta(); if (m.mt.animal != null || m.mt.animal2 != null) { m.mt.animals = Math.max(m.mt.animals || 0, m.mt.animal || 0, m.mt.animal2 || 0); delete m.mt.animal; delete m.mt.animal2; keepMeta(); } } // (an older version's one animal and second choice: now the list, js/game.ts animalPrefs)
     G.Career.init();
     bindUI(); render();
     if (!on()) { state = 'off'; render(); return; }

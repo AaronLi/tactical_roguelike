@@ -971,9 +971,10 @@ i.c.heavy { background: #a02828; } i.c.light { background: #7a3a30; } i.c.frac {
 .acct-alt small { margin-right: auto; }
 .acct-status, .acct-msg { margin-top: 8px; font: 300 12px var(--ui-font); color: var(--ui-dim); }
 .career-row { margin-top: 10px; }
-/* your animal's a preference: a second choice, and a word when the host gave you another */
-.animal2-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; font: 300 12px var(--ui-font); color: var(--ui-dim); }
-.animal2-row select { width: auto; flex: 0 1 220px; padding: 5px 8px; font-size: 13px; }
+/* your animals are preferences, 1st to 3rd (each row the ones not picked in the others), and a word when the host gave you another */
+.pick-row { display: flex; align-items: center; gap: 10px; }
+.pick-row + .pick-row { margin-top: 6px; }
+.pick-n { flex: 0 0 26px; font: 500 10px var(--ui-font); letter-spacing: 1.5px; text-transform: uppercase; color: var(--ui-dim); }
 .animal-note { font: 300 12px var(--ui-font); color: var(--ui-dim); margin-top: 6px; min-height: 0; }
 .animal-note:empty { display: none; }
 /* a guest (signed in to the cloud saves anonymously), beside their name in the lobby, the hangar's roster and the scoreboard */

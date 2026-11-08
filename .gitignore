@@ -22,3 +22,6 @@ videos/
 
 # officers' play, recorded on the host (?rec: js/recorder.ts, docs/recording.md)
 recordings/
+
+# the Supabase CLI's local state (supabase link)
+supabase/.temp/
