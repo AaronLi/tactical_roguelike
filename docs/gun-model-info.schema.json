@@ -882,6 +882,20 @@
       ],
       "description": "A scope's ocular lens (js/viewmodel.ts): the game draws the world through the scope on a disc there (picture-in-picture) with the reticle over it. f, y: its centre, [forward, up] metres; r: its radius. parent + pos: a lens that swings on a hinge (a magnifier's): the NAME of the node it hangs on and its place in that node, [x, y, z] metres in the node's own frame."
     },
+    "magnOut": {
+      "oneOf": [
+        {
+          "type": "number",
+          "minimum": -3.2,
+          "maximum": 3.2,
+          "description": "A flip magnifier (part_magn): the angle it swings to when flipped out, radians, as the game turns the node: about its own z axis (three.js, the axis along the tube pointing back at the eye; negative is clockwise as the shooter sees it, out to the right). From an authored magnifier's model.json magnifier.flip.out_deg. Absent: -2.8 (the procedural magnifier's)."
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "A flip magnifier (part_magn): the angle it swings to when flipped out, radians, as the game turns the node: about its own z axis (three.js, the axis along the tube pointing back at the eye; negative is clockwise as the shooter sees it, out to the right). From an authored magnifier's model.json magnifier.flip.out_deg. Absent: -2.8 (the procedural magnifier's)."
+    },
     "barrels": {
       "oneOf": [
         {

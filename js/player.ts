@@ -2916,7 +2916,7 @@ const G_Me = {
     if (u.displays && u.displays.ammo && w.def.barrels) G.Viewmodel.paintAmmo(u.displays.ammo, G.barrelsOf(w)!, G.perOf(w)); // (the rounds left in each barrel)
     if (an.cyl) an.cyl.rotation.z += (this.cylShots * (Math.PI * 2) / u.info.chamberAt.n - an.cyl.rotation.z) * Math.min(1, dt * 18);
     if (an.spin) an.spin.rotation.z += dt * this.spin * 55;
-    if (an.magn) an.magn.rotation.z += ((sg.scoped ? 0 : -2.8) - an.magn.rotation.z) * Math.min(1, dt * 14); // a magnifier flips in or out
+    if (an.magn) an.magn.rotation.z += ((sg.scoped ? 0 : u.info.magnOut != null ? u.info.magnOut : -2.8) - an.magn.rotation.z) * Math.min(1, dt * 14); // a magnifier flips in or out (to the angle its model gives: info.magnOut, an authored one's)
     G.VMAnim.apply(this, vm, cyc); // hands and the parts they work
     this.animateLimbs(cam);
   },

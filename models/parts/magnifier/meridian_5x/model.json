@@ -1,0 +1,45 @@
+{
+  "source": "authored",
+  "kind": "part",
+  "slot": "magnifier",
+  "frame": "magnifier-mount",
+  "anchors": {
+    "pip": [
+      -0.115,
+      0,
+      0
+    ],
+    "hinge": [
+      -0.042,
+      -0.02,
+      0.024
+    ],
+    "foot": [
+      -0.059,
+      -0.034,
+      0
+    ],
+    "foot_end": [
+      -0.025,
+      -0.034,
+      0
+    ]
+  },
+  "magnifier": {
+    "px": 5,
+    "len": 0.09,
+    "relief": 0.075,
+    "pip": {
+      "f": -0.115,
+      "r": 0.0139
+    },
+    "flip": {
+      "part": "part_magn",
+      "axis": "y",
+      "out_deg": -160
+    }
+  },
+  "replaces": [
+    "Meridian 5\u00d7 flip magnifier"
+  ]
+}

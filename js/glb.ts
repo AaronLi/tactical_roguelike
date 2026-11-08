@@ -81,6 +81,7 @@ interface GunModelInfo {
   // first-person extras (js/viewmodel.ts), written by whoever makes the model:
   reflex?: { f: number; y: number; w: number; h: number; round?: boolean | null; kind: string } | null;
   pip?: { f: number; y: number; r: number; parent?: string | null; pos?: Vec3 | null } | null;
+  magnOut?: number | null;
   // a gun with several barrels (GUN_MODEL_CONTRACT.multi)
   barrels?: { n: number; free_bore_mm?: number | null; stack_mm?: number | null; rounds: Record<string, { round_mm?: number[] | null; rounds_each: number; effective_mm: number[] }>; default: string } | null;
   barrelGroups?: Record<string, number[]> | null;
@@ -219,6 +220,7 @@ const INFO_FIELDS: { [K in keyof GunModelInfo]-?: Field } = {
   // first-person extras (js/viewmodel.ts applies them; the third person ignores them)
   reflex: F('A reflex or holographic sight\'s window (js/viewmodel.ts): the game draws a collimated reticle behind it, masked to it. f, y: the window\'s centre, [forward, up] metres; w, h: its size, metres (round: a disc of diameter w); kind: the reticle drawn: dot, dotG, dotP (a small precision dot), cdot or holo.', { t: 'obj', props: { f: num('Forward position of the window, metres.'), y: num('Height of the window, metres.'), w: num('Width, metres.', false, { min: 0 }), h: num('Height, metres.', false, { min: 0 }), round: F('True: a disc of diameter w.', { t: 'bool' }, true), kind: F('The reticle: dot, dotG (green dot), cdot (circle-dot) or holo (a ring).', { t: 'str', enum: ['dot', 'dotG', 'cdot', 'holo'] }) } }, true),
   pip: F('A scope\'s ocular lens (js/viewmodel.ts): the game draws the world through the scope on a disc there (picture-in-picture) with the reticle over it. f, y: its centre, [forward, up] metres; r: its radius. parent + pos: a lens that swings on a hinge (a magnifier\'s): the NAME of the node it hangs on and its place in that node, [x, y, z] metres in the node\'s own frame.', { t: 'obj', props: { f: num('Forward position of the lens, metres.'), y: num('Height of the lens centre, metres.'), r: num('Lens radius, metres.', false, { min: 0 }), parent: F('Node name the lens hangs on.', { t: 'str' }, true), pos: F('Place in the parent, [x, y, z] metres in its own frame.', { t: 'vec', n: 3 }, true) } }, true),
+  magnOut: num('A flip magnifier (part_magn): the angle it swings to when flipped out, radians, as the game turns the node: about its own z axis (three.js, the axis along the tube pointing back at the eye; negative is clockwise as the shooter sees it, out to the right). From an authored magnifier\'s model.json magnifier.flip.out_deg. Absent: -2.8 (the procedural magnifier\'s).', true, { min: -3.2, max: 3.2 }),
   // a gun with several barrels (a barrel block: the Tempest)
   barrels: F('A gun with several barrels, each holding a stack of rounds fired nose to tail: n barrels (info.muzzles has one entry each, in the same order). The ROUND LENGTH loaded decides how many rounds a barrel holds, so the model lists the round types it takes in `rounds`, keyed by name (standard, rifle...): each has rounds_each (the rounds a barrel holds of that type), effective_mm (the length the bullet has run down the bore for the 1st, 2nd... last round of a barrel: rounds_each entries, longest last: the more rounds are gone, the longer the run) and round_mm [diameter, length] of one round (informational). `default` names the type a gun starts with. stack_mm is the length of a barrel\'s stack (the same for every type: a longer round, fewer of them) and free_bore_mm the part of the bore a fresh barrel has before its first round (both informational). The game takes the speed of a shot from the effective length (GUN_MODEL_CONTRACT.multi).', { t: 'obj', props: { n: num('How many barrels.', false, { min: 2 }), free_bore_mm: num('The bore a fresh barrel has before its first round, millimetres.', true), stack_mm: num('The length of a barrel\'s stack of rounds, millimetres (the same for every round type).', true), rounds: F('The round types the block takes, by name: each { round_mm, rounds_each, effective_mm }.', { t: 'map', of: { t: 'obj', props: { round_mm: F('One round: [diameter, length], millimetres.', { t: 'list', of: { t: 'num' } }, true), rounds_each: num('Rounds a full barrel holds of this type.', false, { min: 1 }), effective_mm: F('The effective barrel length for each round of a barrel in turn, millimetres: shortest first.', { t: 'list', of: { t: 'num' }, min: 1 }) } } }), default: F('The round type a gun starts with (a key of rounds).', { t: 'str' }) } }, true),
   barrelGroups: F('Named groups of barrels (indices into info.muzzles): the game fires the "top" or "bottom" group for a three-barrel pull and "all" for every barrel.', { t: 'map', of: { t: 'list', of: { t: 'num' } } }, true),
@@ -344,6 +346,14 @@ const GUN_MODEL_CONTRACT = { ...CONTRACT_CORE, displays: {
     grip: 'frame "grip-mount": the ORIGIN at the grip\'s front top, where it meets the receiver\'s underside (the gun\'s mount_grip); the grip hangs below and behind it (up to 30 mm above the origin, inside the receiver; at least 50 mm below; nothing more than 20 mm ahead). anchor grip (where the palm sits). part { mount (the grip interface: ar) }. Finish material: polymer.',
     muzzle: 'frame "muzzle-mount": the ORIGIN on the bore axis at the barrel\'s end, where the thread ends (the gun\'s mount_muzzle); the device reaches forward from it (at most 10 mm back over the thread, at least 10 mm forward), centred on the bore. anchor muzzles: [[forward, up, right], ...] where the bullet leaves it, at the device\'s front (within 5 mm). part { thread (the thread family, e.g. r556), kind (the device kind, e.g. flash) }. No finish.',
     handguard: 'frame "handguard-mount": the ORIGIN on the bore axis at the handguard\'s rear, against the receiver\'s front face (the gun\'s mount_handguard); the handguard runs forward from 0 to part.len (both ends within 3 mm), centred on the bore. anchor support (where the support hand holds it, between its ends). part { t (the handguard kind: rail), len (metres), rails? { top, bottom, left, right: [from, to] forward of the origin } }. Finish material: black.',
+  },
+  magnifier: {
+    what: 'A FLIP MAGNIFIER behind a reflex sight (models/parts/magnifier/<id>/), replace-only: model.json { "source": "authored", "kind": "part", "slot": "magnifier", "frame": "magnifier-mount", "anchors": { pip, hinge, foot, foot_end }, "magnifier": { px, len, relief, pip: { f, r }, flip: { part, axis, out_deg } }, "replaces": [entry names] }. It replaces the procedural magnifier (tools/models/recipes.ts S.magnifier) for the entries it names; a magnifier with no authored model keeps the procedural one.',
+    frame: 'frame "magnifier-mount": the ORIGIN is the red dot\'s eye point, the gun\'s mount_magnifier = [the sight\'s fSight, its sy, 0]: the sight line runs along forward at up 0, right 0. The tube runs back from forward -0.025 (a 25 mm gap behind the sight) to -0.025 - len; the rail clamp is at the tube\'s FRONT, forward -0.059 to -0.025, its foot 34 mm under the sight line (a red dot\'s height over its rail), so it needs only 34 mm of rail behind the sight. The recipe seats the origin at mount_magnifier with no rotation and no scaling.',
+    nodes: 'The root (named after the part, extras.anchors_json = model.json\'s anchors) holds the fixed meshes (the clamp: "magnifier_<n>") and ONE node part_magn (extras.part "magn"), the swinging tube: its translation is on the hinge\'s axis (anchors.hinge), its meshes ("magnifier_<n>") under it. Nothing else is a node.',
+    anchors: 'pip: the tube\'s rear lens (the picture-in-picture disc\'s centre; at forward magnifier.pip.f, up 0, right 0); hinge: a point on the hinge\'s axis, the part_magn node\'s place; foot and foot_end: the clamp\'s foot, its rear and front ends on the rail top (tools/check_magnifier_rails.mjs reads the span).',
+    magnifier: 'px: the power (the catalogue\'s set.magnifier decides the zoom; the bake checks they agree); len: the tube\'s length, metres (the catalogue entry\'s model.magnifier.len to 1.5 mm); relief: the eye relief behind the tube\'s rear while aiming through it, metres (info.relief; info.fSight is the tube\'s rear, origin + pip.f); pip { f, r }: the rear lens, forward of the origin (-0.025 - len, within 1 mm) and its radius (info.pip, hung on part_magn so it swings with the tube); flip { part: "part_magn", axis: "y" (the tube\'s own forward axis, Blender Y: the only one), out_deg: the angle it swings to when flipped out, degrees as the game turns the node: about the axis pointing BACK at the eye, negative clockwise as the shooter sees it (S.magnifier\'s about -160, out to the right for a hinge on the right) } (info.magnOut, radians).',
+    rules: 'Materials: black, steel, rubber, glass (catalogue names). The clamp is centred over the rail, the tube on the sight line; swung out by out_deg about the hinge, the tube clears the sight line to the side of the hinge (checked). No glass may be on the eye side of the pip disc (checkPipClear, as an optic\'s).',
   },
   example: { name: 'falcon', extras: {}, child: { name: 'optic_1', extras: { slot: 'optic' }, material: 'black' }, model_json: { source: 'authored', kind: 'part', slot: 'optic', frame: 'rail-top', optic: { sy: 0.0285, fSight: -0.026, relief: 0.09, reflex: { f: 0.0135, y: 0.0285, w: 0.026, h: 0.026, kind: 'dot' }, magnifier: true, height: 'low' } } },
 } };
@@ -802,9 +812,51 @@ const AUTHORED_PART_SLOTS: Record<string, { frame: string; mounts?: string[]; an
   grip: { frame: 'grip-mount', anchors: ['grip'], finish: 'polymer', part: { mount: 'str' } },
   muzzle: { frame: 'muzzle-mount', anchors: ['muzzles'], finish: null, part: { thread: 'str', kind: 'str' } },
   handguard: { frame: 'handguard-mount', anchors: ['support'], finish: 'black', part: { t: 'str', len: 'num', rails: 'rails?' } },
+  magnifier: { frame: 'magnifier-mount', anchors: ['pip', 'hinge', 'foot', 'foot_end'], finish: null, part: {} }, // (its data is model.json "magnifier", not "part": GUN_MODEL_CONTRACT.authoredParts.magnifier)
 };
 const RETICLES = ['dot', 'dotG', 'dotP', 'cdot', 'holo'], SCOPE_RETICLES = ['cross', 'chevron', 'lpvo', 'ring'];
 const isPt = (v: any) => Array.isArray(v) && v.length === 3 && v.every(isNum);
+/** model.json of an authored FLIP MAGNIFIER (GUN_MODEL_CONTRACT.authoredParts.magnifier): its anchors, its "magnifier" data (power, tube, relief, pip lens, flip) and what it replaces. */
+function validateMagnifierConfig(cfg: any, spec: NonNullable<typeof AUTHORED_PART_SLOTS[string]>, E: (m: string) => void) {
+  for (const k of Object.keys(cfg)) if (!['source', 'kind', 'slot', 'frame', 'anchors', 'magnifier', 'replaces'].includes(k)) E(`unknown field "${k}"${k === 'part' ? ' (a magnifier\'s data is "magnifier")' : ''}`);
+  const a = cfg.anchors, m = cfg.magnifier, rep = cfg.replaces;
+  if (!isObj(a)) E(`"anchors" is missing: { ${spec.anchors!.join(', ')} } as [forward, up, right] metres from the origin (the red dot's eye point)`);
+  else {
+    for (const k of spec.anchors!) if (a[k] === undefined) E(`anchors.${k} is missing (a magnifier has ${spec.anchors!.join(', ')})`); else if (!isPt(a[k])) E(`anchors.${k}: expected [forward, up, right] (finite numbers, metres), got ${JSON.stringify(a[k])}`);
+    for (const k of Object.keys(a)) if (!spec.anchors!.includes(k)) E(`anchors.${k}: not an anchor of a magnifier (${spec.anchors!.join(', ')})`);
+  }
+  if (!isObj(m)) E('"magnifier" is missing: { px, len, relief, pip: { f, r }, flip: { part, axis, out_deg } }');
+  else {
+    if (!isNum(m.px) || m.px < 1.2 || m.px > 10) E(`magnifier.px: the power, 1.2 to 10, got ${JSON.stringify(m.px)}`);
+    if (!isNum(m.len) || m.len < 0.03 || m.len > 0.15) E(`magnifier.len: the tube's length, 0.03 to 0.15 m, got ${JSON.stringify(m.len)}`);
+    if (!isNum(m.relief) || m.relief < 0.03 || m.relief > 0.4) E(`magnifier.relief: the eye relief, 0.03 to 0.4 m, got ${JSON.stringify(m.relief)}`);
+    const q = m.pip;
+    if (!isObj(q) || !isNum(q.f) || !isNum(q.r)) E(`magnifier.pip: expected { f, r } (the tube's rear lens: forward of the origin, radius; metres), got ${JSON.stringify(q)}`);
+    else {
+      if (q.r < 0.004 || q.r > 0.03) E(`magnifier.pip.r: ${q.r} m is not a magnifier's lens`);
+      if (isNum(m.len) && Math.abs(q.f - (-0.025 - m.len)) > 0.001) E(`magnifier.pip.f (${q.f}) is not the tube's rear (-0.025 - len = ${(-0.025 - m.len).toFixed(4)}): the tube runs back from 25 mm behind the sight`);
+      if (isPt(a && a.pip) && (Math.abs(a.pip[0] - q.f) > 1e-4 || Math.abs(a.pip[1]) > 1e-4 || Math.abs(a.pip[2]) > 1e-4)) E(`anchors.pip [${a.pip}] is not [magnifier.pip.f, 0, 0]: the lens is on the sight line`);
+      for (const k of Object.keys(q)) if (!['f', 'r'].includes(k)) E(`magnifier.pip: unknown field "${k}"`);
+    }
+    const fl = m.flip;
+    if (!isObj(fl)) E('magnifier.flip: expected { part: "part_magn", axis: "y", out_deg }');
+    else {
+      if (fl.part !== 'part_magn') E(`magnifier.flip.part: ${JSON.stringify(fl.part)}, expected "part_magn" (the node the game swings)`);
+      if (fl.axis !== 'y') E(`magnifier.flip.axis: ${JSON.stringify(fl.axis)}, expected "y" (the tube's own forward axis, through anchors.hinge: the only one the game turns it about)`);
+      if (!isNum(fl.out_deg) || Math.abs(fl.out_deg) < 60 || Math.abs(fl.out_deg) > 180) E(`magnifier.flip.out_deg: the angle it swings out to, 60 to 180 degrees either way, got ${JSON.stringify(fl.out_deg)}`);
+      for (const k of Object.keys(fl)) if (!['part', 'axis', 'out_deg'].includes(k)) E(`magnifier.flip: unknown field "${k}"`);
+    }
+    if (isPt(a && a.foot) && isPt(a && a.foot_end)) {
+      if (!(a.foot[0] < a.foot_end[0])) E(`anchors.foot (${a.foot[0]}) must be behind anchors.foot_end (${a.foot_end[0]}): the clamp's rear and front`);
+      if (Math.abs(a.foot[1] - a.foot_end[1]) > 1e-4) E('anchors.foot and foot_end are not at the same height: both on the rail top');
+      if (a.foot_end[0] > -0.01) E(`anchors.foot_end (${a.foot_end[0]}) reaches under the sight: the clamp is behind it (at most -0.01)`);
+      if (a.foot[1] > -0.02 || a.foot[1] < -0.06) E(`anchors.foot is ${a.foot[1]} m under the sight line: a red dot's height over its rail is about 0.034`);
+    }
+    for (const k of Object.keys(m)) if (!['px', 'len', 'relief', 'pip', 'flip'].includes(k)) E(`magnifier: unknown field "${k}"`);
+  }
+  if (!Array.isArray(rep) || !rep.length || !rep.every((n: any) => typeof n === 'string' && n.trim())) E('"replaces": expected a non-empty list of catalogue entry names (a magnifier is always replace-only: e.g. "Strix FTS 3× flip magnifier")');
+  else if (new Set(rep).size !== rep.length) E('"replaces": an entry is named twice');
+}
 /** model.json of a piece of authored FURNITURE (a stock, grip, muzzle device, handguard): its anchors, its own data ("part") and what it replaces (names or matches). */
 function validateFurnitureConfig(cfg: any, spec: NonNullable<typeof AUTHORED_PART_SLOTS[string]>, E: (m: string) => void) {
   for (const k of Object.keys(cfg)) if (!['source', 'kind', 'slot', 'frame', 'anchors', 'part', 'replaces', 'gun'].includes(k)) E(`unknown field "${k}"${k === 'optic' ? ' (a ' + cfg.slot + ' has no sight data)' : ''}`);
@@ -851,9 +903,9 @@ function validateAuthoredPartConfig(cfg: any, id?: string): string[] {
   if (!(cfg.slot in AUTHORED_PART_SLOTS)) E(`"slot" is ${JSON.stringify(cfg.slot)}, expected one of ${Object.keys(AUTHORED_PART_SLOTS).join(', ')}`);
   if (id !== undefined && !/^[a-z][a-z0-9_]*$/.test(id)) E(`the folder name "${id}" must be lower-case letters, digits and underscores (it makes the part id op.auth.${id})`);
   const fs0 = AUTHORED_PART_SLOTS[cfg.slot];
-  if (fs0 && cfg.slot !== 'optic') { // furniture: its own frame, anchors and data
-    if (cfg.frame !== fs0.frame) E(`"frame" is ${JSON.stringify(cfg.frame)}, expected "${fs0.frame}" (the origin is the gun's mount_${cfg.slot}: GUN_MODEL_CONTRACT.authoredParts.furniture)`);
-    validateFurnitureConfig(cfg, fs0, E);
+  if (fs0 && cfg.slot !== 'optic') { // furniture (and a magnifier): its own frame, anchors and data
+    if (cfg.frame !== fs0.frame) E(`"frame" is ${JSON.stringify(cfg.frame)}, expected "${fs0.frame}" (the origin is the gun's mount_${cfg.slot}: GUN_MODEL_CONTRACT.authoredParts.${cfg.slot === 'magnifier' ? 'magnifier' : 'furniture'})`);
+    if (cfg.slot === 'magnifier') validateMagnifierConfig(cfg, fs0, E); else validateFurnitureConfig(cfg, fs0, E);
     return out;
   }
   if (cfg.frame !== 'rail-top') E(`"frame" is ${JSON.stringify(cfg.frame)}, expected "rail-top" (the origin is the top of the rail at the optic's mount point)`);
@@ -969,10 +1021,21 @@ function validateAuthoredPart(model: ModelDesc, id: string, slot = 'optic'): Mod
   const root = model.roots[0];
   if (root.name !== id) E(`the root node is named "${root.name}", expected "${id}" (the folder name)`);
   if (root.extras[NAMES.extras.info] !== undefined || root.extras[NAMES.extras.anchors] !== undefined) E('an authored part has no extras.info or extras.anchors on its root (its sight data is in model.json)');
-  let meshes = 0; const names = new Set<string>();
+  let meshes = 0, swing = 0; const names = new Set<string>();
+  // (a magnifier: its fixed meshes under the root and ONE part_magn node, the swinging tube, its meshes under it: GUN_MODEL_CONTRACT.authoredParts.magnifier)
+  const MAGN = NAMES.partPrefix + PARTS.magn, kids: { c: ModelNode; inSwing: boolean }[] = [];
   for (const c of root.children) {
+    if (slot === 'magnifier' && c.name === MAGN && !c.mesh) {
+      if (names.has(c.name)) E(`two nodes are named "${c.name}"`); names.add(c.name);
+      swing++; if (c.extras[NAMES.extras.part] !== undefined && c.extras[NAMES.extras.part] !== PARTS.magn) E(`node "${MAGN}": extras.part is ${JSON.stringify(c.extras[NAMES.extras.part])}, expected "${PARTS.magn}"`);
+      if (!c.children.length) E(`node "${MAGN}" has no meshes: the swinging tube is its children`);
+      for (const cc of c.children) kids.push({ c: cc, inSwing: true });
+    } else kids.push({ c, inSwing: false });
+  }
+  if (slot === 'magnifier' && swing !== 1) E(`a magnifier has one ${MAGN} node under its root (the tube that flips aside), this one has ${swing}`);
+  for (const { c, inSwing } of kids) {
     if (names.has(c.name)) E(`two nodes are named "${c.name}"`); names.add(c.name);
-    if (!c.mesh) { E(`node "${c.name}": an authored part is flat meshes under the root (no ${NAMES.partPrefix}/${NAMES.groupPrefix} nodes)`); continue; }
+    if (!c.mesh) { E(`node "${c.name}": an authored part is flat meshes under the root (no ${NAMES.partPrefix}/${NAMES.groupPrefix} nodes${slot === 'magnifier' ? ' but its one ' + MAGN : ''})${inSwing ? ' (under ' + MAGN + ')' : ''}`); continue; }
     const display = c.name.startsWith(NAMES.displayPrefix);
     if (c.extras[NAMES.extras.slot] !== slot) E(`mesh "${c.name}": extras.slot is ${JSON.stringify(c.extras[NAMES.extras.slot])}, expected "${slot}"`);
     if (display) {
@@ -1119,7 +1182,7 @@ function contractMarkdown(): string {
   for (const [k, v] of Object.entries(C.authored.optional)) L.push(`| \`${k}\` (optional) | ${esc(v as string)} |`);
   L.push('', `- opticMount: ${C.authored.opticMount}`, `- pistol: ${C.authored.pistol}`, `- variants: ${C.authored.variants}`, `- seat: ${C.authored.seat}`, `- mesh: ${C.authored.mesh}`, ...C.authored.rules.map((r) => `- ${r}`), '- example: \`' + JSON.stringify(C.authored.example) + '\`');
   const AP = C.authoredParts;
-  L.push('', '**Authored parts** (a shared attachment modelled in Blender: sights, prisms, scopes, and furniture: stocks, grips, muzzle devices, handguards):', '', `- what: ${AP.what}`, `- frame: ${AP.frame}`, `- model: ${AP.model}`, `- config: ${AP.config}`, ...Object.entries(AP.optic).map(([k, v]) => `- optic.${k}: ${v}`), `- part: ${AP.part}`, ...AP.rules.map((r) => `- ${r}`), ...Object.entries(AP.furniture).map(([k, v]) => `- furniture ${k}: ${v}`), '- example: \`' + JSON.stringify(AP.example) + '\`');
+  L.push('', '**Authored parts** (a shared attachment modelled in Blender: sights, prisms, scopes; furniture: stocks, grips, muzzle devices, handguards; and flip magnifiers):', '', `- what: ${AP.what}`, `- frame: ${AP.frame}`, `- model: ${AP.model}`, `- config: ${AP.config}`, ...Object.entries(AP.optic).map(([k, v]) => `- optic.${k}: ${v}`), `- part: ${AP.part}`, ...AP.rules.map((r) => `- ${r}`), ...Object.entries(AP.furniture).map(([k, v]) => `- furniture ${k}: ${v}`), ...Object.entries(AP.magnifier).map(([k, v]) => `- magnifier ${k}: ${v}`),'- example: \`' + JSON.stringify(AP.example) + '\`');
   L.push('', '**Magazine check** (`part_mag.extras.check`, meshes\' `extras.chk`):', '', `- what: ${C.magCheck.what}`, `- part: ${C.magCheck.part}`, `- meshes: ${C.magCheck.meshes}`, '- example: `' + JSON.stringify(C.magCheck.example) + '`');
   L.push('', '**Multi-barrel guns and reload sequences** (`info.barrels`, `info.hinge`):', '', `- what: ${C.multi.what}`, `- speed: ${C.multi.speed}`, `- display: ${C.multi.display}`, `- dial: ${C.multi.dial}`, `- hinge: ${C.multi.hinge}`, '- example: `' + JSON.stringify(C.multi.example) + '`');
   L.push('', '**Bipods** (`part_bipod`, its legs\' `extras.leg`):', '', `- what: ${C.bipod.what}`, `- pose: ${C.bipod.pose}`, `- drive: ${C.bipod.drive}`, `- packs: ${C.bipod.packs}`, '- example: `' + JSON.stringify(C.bipod.example) + '`');

@@ -862,7 +862,7 @@ const G_Gunsmith = (() => {
   P('crossbow', 'crossbow', {}, { limbs: true, stock: ['precision', 'sniper'], optic: ['pic', { optic: 'reddot' }] });
 
   // anything without a platform entry (shouldn't happen) gets a bare one
-  const LATE = new Set(['qbz95', 'qbz192', 'mcx']), LAST = new Set(['hailstorm']); // (LAST: made after everything else, below the ballistic computers)
+  const LATE = new Set(['qbz95', 'qbz192', 'mcx']), LAST = new Set(['hailstorm', 'p2011']); // (LAST: made after everything else, below the ballistic computers)
   const AUTHORED_PISTOLS = new Set(['welrod', 'maxim9', 'tempest']); // (and the Tempest, a rifle) // (made after the authored parts: AUTHORED_PISTOLS below) // (their platforms are made at the end: a part's id in a code is its place in the list)
   for (const def of G.WEAPON_LIST) if (!PLATFORMS[def.id] && !LATE.has(def.id) && !LAST.has(def.id) && !AUTHORED_PISTOLS.has(def.id)) P(def.id, 'rifle', {}, {});
   // Calibration: the weapon's tuned stats are what its default build shoots like, so each platform carries
@@ -1188,7 +1188,8 @@ const G_Gunsmith = (() => {
   }
   // The key an authored piece of furniture's model rides on in a part's model (and so in the spec): the recipe draws the model there instead of its own
   // (tools/models/recipes.ts; the parts replaced are set at the end of the catalogue). One per slot, as the spec merges every slot's patch into one object.
-  const AP_KEY: Record<string, 'apStock' | 'apGrip' | 'apMuzzle' | 'apHg'> = { stock: 'apStock', grip: 'apGrip', muzzle: 'apMuzzle', handguard: 'apHg' };
+  // (a flip magnifier likewise: apMagn, S.magnifier draws the authored one from models/parts/magnifier/<id>/ instead of its own)
+  const AP_KEY: Record<string, 'apStock' | 'apGrip' | 'apMuzzle' | 'apHg' | 'apMagn'> = { stock: 'apStock', grip: 'apGrip', muzzle: 'apMuzzle', handguard: 'apHg', magnifier: 'apMagn' };
   // The model spec for a build: the platform's receiver spec with every installed part's patch applied.
   function modelSpec(def: any) {
     const plat = PLATFORMS[def.id];
@@ -1535,6 +1536,9 @@ const G_Gunsmith = (() => {
     {"apart":"handguard/vantage_vx13_fde","names":["Vantage VX-13 M-LOK (FDE)"],"len":0.32},
     {"apart":"handguard/vantage_vx15","names":["Vantage VX-15 M-LOK 15\""],"len":0.36},
     {"apart":"handguard/vantage_vx5","names":["Vantage VX-5 M-LOK 5\""],"len":0.12},
+    {"apart":"magnifier/brightline_2x","names":["Brightline 2× micro magnifier"],"len":0.06,"px":2},
+    {"apart":"magnifier/meridian_5x","names":["Meridian 5× flip magnifier"],"len":0.09,"px":5},
+    {"apart":"magnifier/strix_fts3","names":["Strix FTS 3× flip magnifier"],"len":0.075,"px":3},
     {"apart":"muzzle/ironvale_a2_556","names":["Ironvale A2 5.56 birdcage"]},
     {"apart":"optic/brightline_pip","names":["Brightline Pip red dot"]},
     {"apart":"optic/ember","names":["Halcyon Ember pistol dot"]},
@@ -1571,16 +1575,17 @@ const G_Gunsmith = (() => {
   // figures are the game's, PROPOSED here (the user confirms them): the stats of what it is (a shorter can: handier and louder; a longer magazine: more rounds,
   // slower to swap). The Welrod is worked by a bolt (def.manual: js/player.ts, the model's part_bolt: js/vmanim.ts), the Maxim 9 by its slide.
   const LATE_AUTHORED: (() => void)[] = []; // (variants added after the last authored pistol: a part's id in a code is its place in the list)
-  const authoredPistol = (v: { barrel: Record<string, any>; mag: Record<string, any> }) => (h: any) => {
+  const authoredPistol = (v: { barrel: Record<string, any>; mag: Record<string, any>; factory?: { name: string; set: Record<string, any> } }) => (h: any) => {
     const { slot, factory, own, plat, def, gs, brandA, brandB } = h, id = def.id as string;
     // the barrel: the integral suppressor with its front sight (no thread: nothing screws on), and its shortened one
     // (suppression is the variant's DATA: b.set overrides the suppressed defaults, e.g. { sup: false, device: 'none', can: null } for an unsuppressed barrel; b.optic: the barrel
     // carries a pistol optic cut and opens the optic slot, the dot seated at the variant's info.mounts.mount_optic; b.late: added after the other authored pistols, so their ids don't move)
-    { const mount = 'br:' + id, cap0 = { barrelIn: gs.barrel, sup: true, device: 'suppressor' };
+    // (v.factory: a pistol whose own barrel is a plain one, the 2011's: its name and set in place of the integral suppressor's; b.same: a barrel drawn as the factory one, no file of its own)
+    { const mount = 'br:' + id, cap0 = v.factory ? Object.assign({ barrelIn: gs.barrel }, v.factory.set) : { barrelIn: gs.barrel, sup: true, device: 'suppressor' };
       slot('barrel', mount, true);
-      factory('barrel', mount, { name: `${def.name} integral suppressor`, model: {}, set: Object.assign({ can: 'integral' }, cap0) });
+      factory('barrel', mount, v.factory ? { name: v.factory.name, model: {}, set: cap0 } : { name: `${def.name} integral suppressor`, model: {}, set: Object.assign({ can: 'integral' }, cap0) });
       for (const [name, b] of Object.entries(v.barrel)) {
-        const add1 = () => own(Object.assign({ id: `${id}.br.${name}`, slot: 'barrel', mount, brand: b.brand === 'B' ? brandB : brandA, name: b.name, price: b.price, tier: b.tier, model: { avBarrel: 'barrel_' + name }, st: b.st, set: Object.assign({ can: b.can }, cap0, b.set), desc: b.desc }, b.optic ? { provides: { optic: 'op:pso' } } : null));
+        const add1 = () => own(Object.assign({ id: `${id}.br.${name}`, slot: 'barrel', mount, brand: b.brand === 'B' ? brandB : brandA, name: b.name, price: b.price, tier: b.tier, model: b.same ? {} : { avBarrel: 'barrel_' + name }, st: b.st, set: Object.assign({ can: b.can }, cap0, b.set), desc: b.desc }, b.optic ? { provides: { optic: 'op:pso' } } : null));
         if (b.late) LATE_AUTHORED.push(add1); else add1();
       } }
     // the magazine: the one it comes with (the model's part_mag) and a longer one
@@ -1648,7 +1653,10 @@ const G_Gunsmith = (() => {
         if (!ps.length) throw new Error(`models/parts/${r.apart}/model.json replaces ${JSON.stringify(n)}, which ${typeof n === 'string' ? 'is not in the catalogue' : 'matches no entry'}`);
         for (const p of ps) {
           if (!p.model || p.slot !== slot) throw new Error(`models/parts/${r.apart}/model.json replaces "${p.name}", which is not a ${slot}`);
-          if (r.len != null && !r.gun && !(p.model.hg && Math.abs((p.model.hg.len || 0) - r.len) <= 0.0015)) throw new Error(`models/parts/${r.apart}/model.json replaces "${p.name}", ${p.model.hg ? p.model.hg.len : '?'} m long; the model is ${r.len} m`);
+          if (slot === 'handguard' && r.len != null && !r.gun && !(p.model.hg && Math.abs((p.model.hg.len || 0) - r.len) <= 0.0015)) throw new Error(`models/parts/${r.apart}/model.json replaces "${p.name}", ${p.model.hg ? p.model.hg.len : '?'} m long; the model is ${r.len} m`);
+          if (slot === 'magnifier') { const mg = (p.model as any).magnifier || {}; // (a magnifier's entries are the model's tube and power: the catalogue's len and set.magnifier)
+            if (!(Math.abs((mg.len || 0) - r.len) <= 0.0015)) throw new Error(`models/parts/${r.apart}/model.json replaces "${p.name}", its tube ${mg.len} m long; the model's is ${r.len} m`);
+            if (p.set.magnifier !== r.px) throw new Error(`models/parts/${r.apart}/model.json replaces "${p.name}", a ${p.set.magnifier}× magnifier; the model says ${r.px}×`); }
           if (r.gun) { const m = p.model as any; m[key + 'By'] = Object.assign(m[key + 'By'] || {}, { [r.gun]: r.apart }); continue; } // (one gun's own model for a shared entry: modelSpec picks it by the gun)
           (p.model as any)[key] = r.apart;
         }
@@ -1739,6 +1747,21 @@ const G_Gunsmith = (() => {
   add({ id: 'op.th.0', slot: 'optic', mount: 'op:pic', brand: 'Nightjar Optronics', name: 'Nightjar TS-35 thermal riflescope', price: 9800, tier: 4, seller: 'nj', st: { ergo: -9, acc: -10, weight: 0.32 },
     set: sightSet({ optic: 'thermal', px: 2, levels: [2, 4, 8] }, 0.45), model: { optic: 'thermal', px: 2, levels: [2, 4, 8] },
     desc: 'A digital thermal sight: heat, not light. Anyone warm shows white on a dark picture in total darkness and through smoke (not through glass or walls). 2-4-8× digital zoom (scroll while aiming: the picture coarsens as it zooms, a 384×288 sensor), T cycles white-hot, black-hot and ironbow. Its eyepiece is a screen, so it works with night vision down.' });
+  // The 2011 (models/p2011, docs/models.md "Authored pistols"), made after everything else for the same reason: a pistol modelled in Blender, its frame, slide (an optic
+  // cut under a cover plate, its own irons), bull barrel, grip module and magazine the model's own. A pistol dot in the cut, a light or laser on the dust cover's rail (mount_tac).
+  // Its barrel is a plain one (no thread: nothing screws on; a threaded barrel needs a file of its own beside the model), and the one other barrel it takes is a match
+  // barrel drawn as the factory one (a drop-in bushingless barrel looks the same): tighter, so the redundancy rule holds (one barrel of each figure). No magazine variant yet.
+  // (mag = the model's mount_mag, len0 = its mount_barrel's forward: the baker checks them against the model, so a re-exported model re-derives them)
+  P('p2011', 'pistol', { rcv: 'authored', authored: 'p2011', mag: { f: 0.0264, y: -0.004 }, len0: 0.1789 }, { optic: ['pso', { optic: 'notch' }], ptac: true, authoredPistol: authoredPistol({
+    factory: { name: '2011 4.4" bull barrel', set: { sup: false, device: 'none', can: null } },
+    barrel: { match: { same: true, brand: 'B', name: '2011 4.4" match bull barrel', price: 300, tier: 2, st: { acc: -15, weight: 0.02 }, desc: 'Hand-fitted to the slide, no bushing: tighter groups. It looks like the barrel it replaces.' } },
+    mag: {} }) });
+  { const plat = PLATFORMS.p2011; plat.offset = {}; for (const k of STAT_KEYS) plat.offset[k] = -Object.values(plat.defaults).reduce((a, pid) => a + ((PARTS[pid] && PARTS[pid].st[k]) || 0), 0);
+    PARTS['op.pso.0'].not = (PARTS['op.pso.0'].not || []).concat(['p2011']); // (the tritium night sights: the 2011 has its own irons, and a dot goes in the cut)
+    // (an authored pistol's factory irons are its model's own, on the shared pistol-optic mount: each goes on its own gun only, the 2011's and the Maxim 9's)
+    PARTS['p2011.optic'].not = Object.keys(PLATFORMS).filter((g) => g !== 'p2011');
+    PARTS['maxim9.optic'].not = (PARTS['maxim9.optic'].not || []).concat(['p2011']);
+    addFits(plat); }
   // what an attachments box offers for a weapon: parts that go straight onto it as it's built (a slot it has now, not
   // what's already in it), not factory parts, magazines, or anything that makes it another gun
   const ATTACH_SLOTS = new Set(['slide', 'barrel', 'muzzle', 'handguard', 'railmount', 'pump', 'fg', 'tac', 'tacL', 'optic', 'riserdot', 'magnifier', 'charging', 'grip', 'stock', 'buttstock', 'loader']);

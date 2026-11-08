@@ -110,7 +110,8 @@ function offAxis(ax, th, az) {
  *  - The line E -> just under the tip must reach the post (nothing else crosses it), and a cone of LIMITS.coneDeg round E -> tip (beside and over the tip)
  *    must be clear from 30 mm past the rear sight to the front sight's assembly (25 mm behind the post).
  *  - The rear sight: rays from E fanned out round the line (16 directions, each out to the first angle that is stopped, 8 degrees at most): what stops them
- *    within the nearer 70 % of the sight radius (a pistol's notch is over half way at arm's length) is the rear sight. If it closes over the top it is an
+ *    within the nearer 70 % of the sight radius (80 % on a pistol: its notch is over half way at arm's length, and a rear sight ahead of an optic cut, the 2011's, is
+ *    three quarters of the way from the eye to the post at the pistols' relief) is the rear sight. If it closes over the top it is an
  *    APERTURE: its radius (the mean of the 16) must be at least LIMITS.apertureDeg. If it is open on top it is a NOTCH: the clear angle to either side must be
  *    LIMITS.notchClear times the post's half-width at least. Nothing in the rear part: a bead or front-only sight (only the post and the line are checked).
  * The irons are found by geometry, not by mesh names: a front sight on the barrel slot (the pistols') or on the base counts the same as slot optic meshes.
@@ -145,7 +146,7 @@ export function checkIrons(M, E, W) {
   const lineHit = h0 && eye[0] + d0[0] * h0.t < runStart - 0.001 ? h0 : null;
   if (lineHit) E(`${at}: the sight line from the eye to the front post's tip (forward ${mm(fc)} mm) is crossed by ${lineHit.m.name} ${mm(lineHit.t)} mm from the eye (forward ${mm(eye[0] + d0[0] * lineHit.t)} mm): the post cannot be seen`);
   // the rear sight: how far round the line rays stay clear, in 16 directions (stopped by something in the rear part of the sight radius)
-  const dT = norm(sub(P, eye)), front = dP - 0.025, rearMax = dP * 0.7, MAXA = 8 * Math.PI / 180, STEP = 0.1 * Math.PI / 180;
+  const dT = norm(sub(P, eye)), front = dP - 0.025, rearMax = dP * (pistol ? 0.8 : 0.7), MAXA = 8 * Math.PI / 180, STEP = 0.1 * Math.PI / 180;
   const clear = (az) => { // the first angle out from the line where a ray is stopped, and what stops it (rays from the line out: the inside of a ring stops them first)
     const blocked = (th) => first(S, eye, offAxis(dT, th, az), rearMax);
     let a = 0, b = null; for (let th = STEP / 2; th <= MAXA; th += STEP) { if (blocked(th)) { b = th; break; } a = th; }

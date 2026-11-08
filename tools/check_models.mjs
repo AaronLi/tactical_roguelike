@@ -63,7 +63,7 @@ if (args.includes('--write')) {
   for (const k of authoredPartKeys()) { const n = checkAuthoredPartFile(`models/parts/${k}`, k); if (n) bad++; }
   for (const k of authoredPartKeys()) {
     if (isReplaceOnly(k)) {
-      const ak = { optic: 'apart', stock: 'apStock', grip: 'apGrip', muzzle: 'apMuzzle', handguard: 'apHg' }[k.split('/')[0]]; // (the model key the part rides on: js/parts.ts AP_KEY)
+      const ak = { optic: 'apart', stock: 'apStock', grip: 'apGrip', muzzle: 'apMuzzle', handguard: 'apHg', magnifier: 'apMagn' }[k.split('/')[0]]; // (the model key the part rides on: js/parts.ts AP_KEY)
       for (const r of replacements().filter((r) => r.apart === k)) for (const nm of r.names) {
         if (typeof nm !== 'string') { if (!Object.values(G.Gunsmith.PARTS).some((q) => q.model && (q.model[ak] === k || (q.model[ak + 'By'] && Object.values(q.model[ak + 'By']).includes(k))))) fail(`${k}: the match ${JSON.stringify(nm)} gave no entry the model`); continue; }
         const pt = Object.values(G.Gunsmith.PARTS).find((q) => q.name === nm); if (!pt) fail(`${k}: replaces "${nm}", which is not in the catalogue`); else if (!pt.model || (pt.model[ak] !== k && !(pt.model[ak + 'By'] && Object.values(pt.model[ak + 'By']).includes(k)))) fail(`${k}: "${nm}" does not use the model after the replace`);
