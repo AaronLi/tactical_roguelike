@@ -15,6 +15,22 @@ const G_GunRecipes = (() => {
   const Mk = M as Record<string, () => THREE.MeshStandardMaterial>; // (a material looked up by name)
   type Tracer = (p: number[]) => number[]; // a traced reference photo's pixel -> [forward, up] in gun space
   type Trace = GunTrace; // one of tools/models/guntraces.ts's tables of traced outlines
+  // FEET (for tools/check_magnifier_rails.mjs only; nothing is drawn by it): with a log set (feetLog), each rail records its span and top, and each
+  // reflex sight and magnifier the span of its foot along the rail and the top it stands on, [forward from, forward to] in the gun's frame
+  type Foot = { kind: 'rail' | 'sight' | 'magnifier'; f0: number; f1: number; top: number; what?: string };
+  let feetLog: Foot[] | null = null;
+  const foot = (kind: Foot['kind'], f0: number, f1: number, top: number, what?: string) => { if (feetLog) feetLog.push({ kind, f0, f1, top, what }); };
+  // an authored optic's foot along the rail, in its own frame: the forward span of its vertices on the rail top (y under 4 mm)
+  const apFoot = new Map<string, number[]>();
+  function authoredFoot(key: string) {
+    let r = apFoot.get(key);
+    if (!r) {
+      r = [Infinity, -Infinity];
+      for (const e of G.AuthoredParts.get(key).meshes) for (let i = 0; i < e.pos.length; i += 3) if (e.pos[i + 1] < 0.004) { r[0] = Math.min(r[0], -e.pos[i + 2]); r[1] = Math.max(r[1], -e.pos[i + 2]); }
+      apFoot.set(key, r);
+    }
+    return r;
+  }
   type Anim = Record<string, any>; // a recipe's animated parts, by name
   type Sight = { sy: number; fSight: number; relief: number };
 
@@ -151,12 +167,13 @@ const G_GunRecipes = (() => {
         for (let i = 0; i < n; i++) k.box(0.023, 0.004, 0.0052, m, f0 + 0.003 + i * 0.0105, y + 0.009);
       };
       if (k.slot === 'optic') k.at('mount', build); else build();
+      foot('rail', f0, f0 + len, y + 0.011);
       return y + 0.011;
     },
     // Reflex sights record their window in k.reflex; the viewmodel puts a collimated reticle behind it.
     reddot(k: Kit, f: number, top: number, o: RecipeSpec = {}) { // a tube on a QD riser (30 mm by default): turrets, brightness dial
       const R = o.dotR || 0.02, len = o.dotLen || 0.056, f0 = f - len / 2, sy = top + 0.014 + R;
-      k.box(0.03, 0.01, 0.05, M.black(), f - 0.025, top + 0.005);
+      k.box(0.03, 0.01, 0.05, M.black(), f - 0.025, top + 0.005); foot('sight', f - 0.025, f + 0.025, top, 'reddot');
       k.box(0.02, sy - top - 0.012, 0.03, M.black(), f - 0.015, (sy + top) / 2 - 0.006);
       k.box(0.006, 0.008, 0.022, M.black(), f - 0.011, top + 0.007, 0.018);
       k.cyl(R, len, M.tubeDS(), f0, sy, 0, R, 24, true);
@@ -173,7 +190,7 @@ const G_GunRecipes = (() => {
     holo(k: Kit, f: number, top: number) { // box-hooded holographic sight, battery and electronics in the base
       const sy = top + 0.033, wW = 0.033, wH = 0.027, f0 = f - 0.034, f1 = f + 0.03;
       const yb = top + 0.012, yt = sy + wH / 2 + 0.003, hl = f1 - f0 - 0.012;
-      k.box(0.04, 0.012, f1 - f0, M.black(), f0, top + 0.006);
+      k.box(0.04, 0.012, f1 - f0, M.black(), f0, top + 0.006); foot('sight', f0, f1, top, 'holo');
       k.box(0.036, 0.008, 0.03, M.black(), f0, top + 0.015);
       for (const x of [-1, 1]) k.box(0.004, yt - yb, hl, M.black(), f0 + 0.012, (yt + yb) / 2, x * (wW / 2 + 0.002));
       k.box(wW + 0.008, 0.004, hl, M.black(), f0 + 0.012, yt + 0.002);
@@ -349,6 +366,7 @@ const G_GunRecipes = (() => {
     // An open reflex sight (pistol size, on the slide; o.riser lifts it to rifle height on a rail), or an enclosed
     // one (o.closed: a hood all round, glass at both ends)
     minidot(k: Kit, f: number, top: number, o: RecipeSpec = {}) {
+      foot('sight', f - (o.riser ? 0.017 : 0.016), f + (o.riser ? 0.017 : 0.016), top, 'minidot'); // (on a riser: the riser's foot)
       if (o.riser) { const rh = o.riser; k.at('mount', () => k.box(0.024, rh, 0.034, M.black(), f - 0.017, top + rh / 2)); top += rh; } // (a riser dot: a mount piece, the dot above it is the same dot as ever)
       const sy = top + 0.016;
       k.box(0.024, 0.008, 0.032, M.black(), f - 0.016, top + 0.004);
@@ -371,6 +389,7 @@ const G_GunRecipes = (() => {
     magnifier(k: Kit, sight: { sy: number; fSight: number }, m: any, anim: Anim) {
       const sy = sight.sy, top = sy - 0.034, len = m.len || 0.075, R = 0.0165, fFront = sight.fSight - 0.025, fRear = fFront - len, fc = fRear + len * 0.5;
       const fm = fFront - 0.017; // (the foot's and the hinge's middle, 34 mm long, ending at the tube's front)
+      foot('magnifier', fm - 0.017, fm + 0.017, top, 'magnifier ' + len);
       k.anchor('optic', 'mount_magnifier', [sight.fSight, sy, 0]);
       const hx = 0.024, hy = top + 0.014;
       k.box(0.03, 0.012, 0.034, M.black(), fm - 0.017, top + 0.006);
@@ -932,6 +951,7 @@ const G_GunRecipes = (() => {
   const isDot = (o: RecipeSpec) => o.optic === 'minidot' || o.optic === 'authored';
   const pistolDot = (k: Kit, o: RecipeSpec, f: number, top: number) => (o.optic === 'authored' ? authoredOptic(k, o, f, top) : S.minidot(k, f, top, o));
   function authoredOptic(k: Kit, o: RecipeSpec, f: number, top: number) {
+    if (feetLog) { const af = authoredFoot(o.apart!); foot('sight', o.riser ? f - 0.017 : f + af[0], o.riser ? f + 0.017 : f + af[1], top, o.apart); } // (on a riser: the riser's foot)
     if (o.riser) { const rh = o.riser; k.at('mount', () => k.box(0.024, rh, 0.034, M.black(), f - 0.017, top + rh / 2)); top += rh; }
     return G.AuthoredParts.place(k, o.apart!, f, top, !!o.riser);
   }
@@ -1088,7 +1108,8 @@ const G_GunRecipes = (() => {
       if (o.optic && (!ownIrons || A!.sights.rail.includes(o.optic))) {
         rcvTop = top;
         const mt = A!.rig.mount;
-        if (mt) top = k.under('optic', () => k.at('mount', () => { authored(k, A!, (e) => !!e.mount); return mt.top; })); // (a mount piece, optic@mount, like the rail it replaces)
+        if (mt) { top = k.under('optic', () => k.at('mount', () => { authored(k, A!, (e) => !!e.mount); return mt.top; })); foot('rail', mt.rail[0], mt.rail[1], mt.top, 'mount'); } // (a mount piece, optic@mount, like the rail it replaces)
+        else if (A!.sights.railed) foot('rail', A!.rig.rail[0], A!.rig.rail[1], top, 'receiver');
         else if (!A!.sights.railed) top = k.under('optic', () => S.rail(k, A!.rig.rail[0], A!.rig.rail[1] - A!.rig.rail[0], top, rm)); // (railed: the model's receiver top is the rail)
       }
     } else if (rcv === 'round') {
@@ -2702,7 +2723,10 @@ const G_GunRecipes = (() => {
   // (skin: the gun's stickers, js/stickers.ts.) Nothing of this runs in the game: it loads baked glTF (js/gunmodels.ts).
   function display(def: any, skin?: any) { const k = kit(); const info = build(k, def); if (skin && skin.length) G.Stickers.decorate(k.g, skin); return { group: k.g, info }; }
 
-  return { M, build, display, roundDims, roundShape, quarrel };
+  // the gun's rails and the feet of its reflex sight and magnifier (tools/check_magnifier_rails.mjs): display() with a log
+  function feet(def: any) { const log: Foot[] = []; feetLog = log; try { const r = display(def); return { ...r, feet: log }; } finally { feetLog = null; } }
+
+  return { M, build, display, feet, roundDims, roundShape, quarrel };
 })();
 G.GunRecipes = G_GunRecipes;
 interface GameModules { GunRecipes: typeof G_GunRecipes; }
