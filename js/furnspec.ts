@@ -7,8 +7,8 @@
 //                js/furnmesh.ts turns them into meshes on the page.
 // What goes where, how big, what's on the shelves and what a festival's dressed with stays in code, seeded as ever (the
 // pieces' recipes: js/furniture.ts R, js/homes.ts, js/residents.ts; the plan: js/furniture.ts plan, js/homes.ts fill): only
-// what each piece is made of is data. Looks draw on one random stream through the level, in the order they always have,
-// so a level described is the level that was built.
+// what each piece is made of is data. Looks draw on random streams seeded by what they're the looks of (a piece by its own
+// v, a room by the level's seed and where the room is: describe), so nothing looks as it does for what came before it.
 // A texture, by what paints it (k) and with what (a: its colours), from the random stream's state (s) where its painting
 // starts; rep, rot: its repeat over a face and its turn. 'crate' is the level's crate texture (js/level.ts _tex), 'pack'
 // the stock's label atlas (packPaint).
@@ -306,13 +306,12 @@ const G_FurnSpec = (() => {
   const planeUV = (f: (u: number, v: number) => number[]) => PLANE_UV.flatMap(([u, v]) => f(u, v));
 
   // The recorder: the kit every piece's build() is handed (js/furniture.ts R), and what it's recorded so far. Its looks
-  // draw on cur (rnd0 unless a piece or a room has a stream of its own); while sink is set, what's described goes nowhere
-  // (it still draws on the stream: a resident's room as it would have been, js/homes.ts).
+  // draw on cur (rnd0 until a piece or a room is given a stream of its own: describe).
   function recorder(rnd0: FdRng) {
     const cache = new Map<string, FdMat>(), texIds = new Map<FdTex, number>();
     const texId = (t: FdTex) => { if (!texIds.has(t)) texIds.set(t, texIds.size); return texIds.get(t)!; };
     const D = {
-      rnd0, cur: rnd0, sink: false, groups: [] as FdGroup[], group: null as FdGroup | null, frame: { at: [0, 0, 0] } as { at: number[]; q?: number; meta?: Record<string, any> },
+      rnd0, cur: rnd0, groups: [] as FdGroup[], group: null as FdGroup | null, frame: { at: [0, 0, 0] } as { at: number[]; q?: number; meta?: Record<string, any> },
       rnd: () => D.cur(),
       // A colour's material: one per colour and finish (the finish: everything but the colour, what's drawn as one mesh)
       mat(hex: number, rough = 0.8, metal = 0, extra?: Record<string, any>): FdMat {
@@ -324,7 +323,6 @@ const G_FurnSpec = (() => {
       // what follows is in this frame (at, turned q quarter-turns about y), and of this piece or room (meta)
       begin(at: number[], q?: number, meta?: Record<string, any>) { D.frame = { at, q, meta }; D.group = null; },
       push(p: FdPrim) {
-        if (D.sink) return;
         if (!D.group) {
           const f = D.frame, g: FdGroup = { at: f.at } as FdGroup;
           if (f.q != null) g.q = f.q;
@@ -399,16 +397,20 @@ const G_FurnSpec = (() => {
   function describe(map: any, opts: { solids?: boolean } = {}): FdLevel {
     const L = G.Level, F = G.Furniture, R = F.R, TS = L.TS, { W, t } = map;
     const D = recorder(srng((map.seed ^ 0x5eed1e) >>> 0)), k = D.k, mat = D.mat, rnd = D.rnd, pick = k.pick;
-    // (the one stream everything's looks draw on, in turn, so a room that's built differently would change every room
-    // after it. A resident's room: what it would have been is still described, into nothing (sink), and what's really
-    // there draws on a stream of its own. Every other room comes out the same, Harold's or no.)
+    // (every piece's looks draw on a stream of its own, seeded by its v and where it stands (in centimetres: fence panels
+    // and the like share a few v's between them, js/level.ts refine), and every room's on one of its own, seeded by the
+    // level's seed and where the room is: so nothing looks as it does for what was described before it, and a room a
+    // resident's moved into, or a piece taken out, changes nothing else. docs/furniture-data.md.)
+    const cm = (a: number) => Math.floor(a * 100 + 0.5) | 0;
+    const pieceRng = (p: { v: number; x: number; z: number }) => srng((Math.floor((p.v || 0) * 4294967295) ^ Math.imul(cm(p.x), 0x9e3779b1) ^ Math.imul(cm(p.z), 0x85ebca6b)) >>> 0);
+    const roomRng = (rm: any, salt: number) => srng((map.seed ^ salt ^ Math.imul(((rm.fl || 0) * map.H + rm.z) * W + rm.x + 1, 0x9e3779b1) ^ Math.imul(rm.w * 65536 + rm.h, 0x85ebca6b)) >>> 0);
     for (const p of map.propList || new Set(map.props.values())) {
       // (gy: on rolling ground, a rock or a tree where it lies: G.Level.crestGround)
-      D.sink = !!p.gone; D.cur = p.own ? srng(Math.floor(p.v * 4294967295)) : D.rnd0; // (p.gone, p.own: js/homes.ts)
+      D.cur = pieceRng(p);
       D.begin([p.x, p.gy || 0, p.z], p.q, { piece: p.name, v: p.v, style: p.style, solids: opts.solids ? F.solids(R[p.name], p.v) : undefined });
       R[p.name].build(k, p.v, p.style);
     }
-    D.sink = false; D.cur = D.rnd0;
+    D.cur = D.rnd0; // (the pictures' six paintings: the level's own stream, all of it theirs)
     D.begin([0, 0, 0]);
     const plane = (m: FdMat, w: number, h: number, x: number, y: number, z: number, ry?: number, rx?: number, uv?: number[]) => { const p: FdPrim = { t: 'plane', m, s: [w, h], p: [x, y, z], r: rot(ry, rx) }; if (uv) p.uv = uv; D.push(p); };
 
@@ -419,15 +421,15 @@ const G_FurnSpec = (() => {
     const arts = [0, 1, 2, 3, 4, 5].map(() => mat(0xffffff, 0.7, 0, { map: tx.art() }));
     const board = mat(map.theme.home >= 1 ? 0xe8e4da : 0x2a2826, 0.6);
     const frameMats = [mat(0x1c1c1e, 0.5), mat(0xb8a060, 0.35, 0.7), mat(0x6b4428, 0.6), mat(0xe8e4da, 0.6)];
-    outsidePaint(D.rnd, nullMk); // (a window's view, as rooms had once: windows are js/level.ts buildWindows' now, but every room after it draws on the stream where it left it)
-    // a wall face wide enough to hang something on: this cell and its neighbours either side along the wall
-    // all face the same wall, and nothing's been hung there yet
+    // a wall face wide enough to hang something on: this cell and its neighbours either side along the wall are the
+    // room's, all face the same wall, and nothing's been hung there yet (the room's own cells only: what one room hangs
+    // never keeps another from hanging something, so no room's walls depend on the rooms before it)
     const hung = new Set();
-    const wide = (x: number, z: number, dx: number, dz: number) => {
+    const wide = (rm: any, x: number, z: number, dx: number, dz: number) => {
       const ax = dz ? 1 : 0, az = dx ? 1 : 0;
       for (const s of [-1, 0, 1]) {
         const xx = x + ax * s, zz = z + az * s;
-        if (t[zz * W + xx] !== 0 || L.tile(map, xx + dx, zz + dz) !== 1 || hung.has(zz * W + xx)) return false;
+        if (!inRoom(rm, xx, zz) || t[zz * W + xx] !== 0 || L.tile(map, xx + dx, zz + dz) !== 1 || hung.has(zz * W + xx)) return false;
         if (map.winAt && [-1, 0, 1].some((k) => map.winAt.has((zz + dz + az * k) * W + xx + dx + ax * k))) return false; // (not over a window)
       }
       for (const s of [-1, 0, 1]) hung.add((z + az * s) * W + x + ax * s);
@@ -463,7 +465,7 @@ const G_FurnSpec = (() => {
     // ceiling are js/leveldesc.ts floorNodes'; its furniture went by with the rest.
     const dressRoom = (rm: any) => {
       const dr = rm.dress, f = dr.floor;
-      D.cur = srng((map.seed ^ Math.imul(rm.z * W + rm.x + 1, 0x9e3779b1)) >>> 0);
+      D.cur = roomRng(rm, 0x40e5);
       const tex = tx[f.kind === 'laminate' ? 'wood' : f.kind](f.color, f.grout || '#7a7670');
       tex.rep = [rm.w, rm.h];
       const fm = mat(0xffffff, f.kind === 'tile' ? 0.45 : 0.85, 0, { map: tex }), mine = new Set(dr.cells);
@@ -479,18 +481,19 @@ const G_FurnSpec = (() => {
         }
       }
       for (const h of dr.hung) {
+        D.cur = pieceRng(h);
         D.begin([h.x, 0, h.z], h.q, { piece: h.name, v: h.v, style: h.style });
         R[h.name].build(k, h.v, h.style);
       }
-      D.begin([0, 0, 0]); D.cur = D.rnd0;
+      D.begin([0, 0, 0]);
     };
     map.rooms.forEach((rm: any, ri: number) => {
-      if (rm.carved) { dressRoom(rm); return; } // (a room that wouldn't have been: nothing to go through)
-      if (rm.dress) { G.Homes.swap(map, rm); D.sink = true; } // (the room as it would have been, for the stream's sake)
-      const spec = (F.ROOMS as Record<string, any>)[rm.type] || {};
       // (a room indoors on rolling ground: all of it at the ground it's built on, level there; outdoors its floor's laid
       // over the ground as it lies: layFloor)
       D.begin(map.terrain && !(rm.out && rm.flush) ? [0, L.groundHeight(map, (rm.x + rm.w / 2) * TS, (rm.z + rm.h / 2) * TS), 0] : [0, 0, 0], undefined, { room: ri });
+      if (rm.dress) { dressRoom(rm); return; } // (a resident's room, a carved one too: its own floor, trim and what's hung, js/homes.ts)
+      D.cur = roomRng(rm, 0x5eed1e);
+      const spec = (F.ROOMS as Record<string, any>)[rm.type] || {};
       const x0 = rm.x * TS, z0 = rm.z * TS, w = rm.w * TS, d = rm.h * TS;
       if (spec.floor) {
         let tex;
@@ -525,7 +528,7 @@ const G_FurnSpec = (() => {
           const p = map.props.get(z * W + x), tall = p && p.boxes[0].h > 1.0 && !(R[p.name] && R[p.name].small);
           if (tall) continue;
           const v = rnd() * 3;
-          if (v > 0.65 || !wide(x, z, dx, dz)) continue;
+          if (v > 0.65 || !wide(rm, x, z, dx, dz)) continue;
           if (pics < 3 && v < 0.5 && rm.type !== 'washroom' && rm.type !== 'cubicle' && !spec.noArt) { // (no art in a toilet block)
             pics++;
             const fw = 0.5 + rnd() * 0.5, fh = fw * 0.75, y = p ? 1.7 : 1.55;
@@ -540,7 +543,6 @@ const G_FurnSpec = (() => {
           }
         }
       }
-      if (rm.dress) { G.Homes.swap(map, rm); D.sink = false; dressRoom(rm); }
     });
     return D.done();
   }

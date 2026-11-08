@@ -110,7 +110,7 @@ const G_LevelDesc = (() => {
       spawn: pt(map.spawn), extract: map.extract ? { x: map.extract.x, z: map.extract.z, r: map.extract.r } : null, lz: map.lz ? { x: map.lz.x, y: map.lz.y, z: map.lz.z, f: map.lz.f } : null,
       entries: fms.map((m) => m.entries || []), enemySpots: map.enemySpots, lzSpots: map.lzSpots || [],
       cover: map.cover.map((c) => [c.x, c.z, c.cx, c.cz, c.y || 0, c.fl || 0]), wallSpots: map.wallSpots.map((c) => [c.x, c.z, c.y || 0, c.fl || 0]),
-      props: propList(map).map((p) => Object.assign({ fl: (p as any)._fl, name: p.name }, p.x != null ? { x: p.x, z: p.z, q: p.q, v: p.v, gy: p.gy || 0 } : {}, p.style ? { style: p.style } : {}, p.gone ? { gone: 1 } : {}, p.own ? { own: 1 } : {})),
+      props: propList(map).map((p) => Object.assign({ fl: (p as any)._fl, name: p.name }, p.x != null ? { x: p.x, z: p.z, q: p.q, v: p.v, gy: p.gy || 0 } : {}, p.style ? { style: p.style } : {}, p.own ? { own: 1 } : {})),
       boxes: { case: map.case ? box(map.case) : null, abox: map.abox ? box(map.abox) : null, sbox: map.sbox ? box(map.sbox) : null, cabinets: (map.cabinets || []).map(box) },
       crest: map.crest ? { CX0: map.crest.CX0, CX1: map.crest.CX1, SZ: map.crest.SZ, site: map.crest.site, fog: map.theme.fog, roofs: map.crest.roofs, ladders: map.crest.ladders, lines: map.crest.lines.map((l: any) => ({ a: l.a, b: l.b, sag: l.sag, on: l.on, off: l.off, gy: l.gy })), guard: map.crest.guard || null } : null,
       fx: (map.fx || []).map((f) => Object.assign({}, f)),
