@@ -47,6 +47,8 @@ const G_Arsenal = (() => {
       pro: { name: 'Quiet Room', stat: 'one', n: 30, what: 'one-round kills', parts: { barrel: 'maxim9.br.short', optic: 'op.pso.2', tac: 'ptac.1' } } },
     { id: 'm1911', from: 'ppk', path: 'modern', ring: 2, stat: 'hs', n: 15, what: 'headshot kills', how: 'Put it where it counts.',
       pro: { name: 'Old Faithful', stat: 'hs', n: 30, what: 'headshot kills', parts: { barrel: 'pbr.11.43x23.match', optic: 'op.pso.0', grip: 'gr.pistol.1' } } },
+    { id: 'p2011', from: 'm1911', path: 'modern', ring: 3, a: 168, r: 880, stat: 'tap', n: 15, what: 'double-tap kills', how: 'Two hits inside half a second: a competition pair.',
+      pro: { name: 'Open Class', stat: 'hsfar', n: 25, what: 'headshot kills past 10 m', parts: { optic: 'op.pso.5', tac: 'ptac.2' } } },
     { id: 'usp', from: 'm1911', path: 'modern', ring: 3, am: 'tracer_p', stat: 'hsfar', n: 15, what: 'headshot kills past 10 m', how: 'A headshot, from further off than a pistol wants to be.',
       pro: { name: 'Whisper', stat: 'sur', n: 30, what: 'kills on unaware suspects', parts: { barrel: 'pbr.11.43x23.thr', muzzle: 'mz.rp.can', tac: 'ptac.3' } } },
     { id: 'fiveseven', from: 'usp', path: 'modern', ring: 4, stat: 'far', n: 15, what: 'kills past 20 m', how: "A pistol, at a rifle's distance.",

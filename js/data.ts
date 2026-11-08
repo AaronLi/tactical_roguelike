@@ -164,6 +164,10 @@ const G_WEAPON_LIST: WeaponDef[] = [
   // The authored pistols (models/maxim9, models/welrod). Figures modelled on the P9 / G19 / USP (9x19) and the PPK (.32 ACP): see the notes at GS and GUN_KG below.
   W({ id: 'welrod', slot: 's', cls: 'PST', tier: 1, price: 700, name: 'Welrod Mk II', rpm: 80, mode: 'semi', manual: true, mag: 8, reserve: 48, reload: 1.5, spread: 1.6, ads: 0.075, range: 16, speed: 0.97, integral: true, desc: 'The wartime assassin\'s pistol: .32 ACP, an integral suppressor and a bolt you work by hand after every shot. Slow, silent, and it does not miss much.' }),
   W({ id: 'maxim9', slot: 's', cls: 'PST', tier: 2, price: 1200, name: 'Maxim 9', rpm: 450, mode: 'semi', mag: 17, reserve: 102, reload: 1.5, spread: 2.0, ads: 0.075, range: 20, speed: 0.95, integral: true, desc: 'A 9mm pistol with its suppressor built in: seventeen rounds, a long sight radius and a report you barely hear. Its front block comes off for a shorter, louder, handier gun.' }),
+  // (the 2011, models/p2011: a double-stack 9x19 on the 1911's pattern, tier 2 beside the Five-seveN and the Maxim 9. Against the G19 (2.2 spread, 15 rounds) and the USP .45 (1.8): the
+  // tightest semi-auto sidearm (1.6, the Welrod's), the 1911's quick sight picture (ads 0.06667) and the USP's reach (22); a flat trigger for a quicker pair (rpm 480 over the G19's 450);
+  // the magazine well's funnel keeps the G19's 1.4 s reload; a heavy steel frame (GUN_KG 0.95) keeps the muzzle down and moves a touch slower (speed 0.98, the Maxim 9 0.95))
+  W({ id: 'p2011', slot: 's', cls: 'PST', tier: 2, price: 1100, name: '2011', rpm: 480, mode: 'semi', mag: 17, reserve: 102, reload: 1.4, spread: 1.6, ads: 0.06667, range: 22, speed: 0.98, desc: 'A double-stack 9 mm built on the 1911\'s bones, born on the competition circuit: a flat trigger, a heavy steel frame that keeps the muzzle down, and a magazine well you can find blind.' }),
   W({ id: 'thor', slot: 's', cls: 'PST', tier: 4, price: 4500, name: 'Thor .50', rpm: 40, mode: 'semi', mag: 1, reserve: 10, reload: 3.2, spread: 3, ads: 0.03, range: 60, pen: 3, desc: 'One round of .50 BMG, in a pistol, because someone asked if it could be done. It can. Hold on.' }),
   // The Tempest (models/tempest, TASK 18): a stacked-round rifle, six barrels of telescoped rounds (def.barrels: js/player.ts shoot, docs/models.md "Multi-barrel guns"). Found only in weapon cases
   // (caseOnly: no shop, no kit). The figures are the user's starting values (to tune): burst specialist, class AR; tier 4 because that is how the cases rank a legendary.
@@ -436,6 +440,8 @@ const G_GUN_SPECS: Record<string, any> = { // (any, not GunSpec, for the same re
   welrod:   GS(4.0, 7.65, 'suppressor', 22000, 0.20, 71, 0.05, 0.10, 'recoil', 'brass', 17),
   // (the Maxim 9: the MP5SD's integral-can 9x19 load (35000 psi, 147 gr, 19 mm case, loudness 0.55) in the P9's slide (boltMass 0.45); barrel 4.38 in, the published figure)
   maxim9:   GS(4.38, 9.00, 'suppressor', 35000, 0.35, 147, 0.45, 0.55, 'recoil', 'brass', 19),
+  // (the 2011: 9x19 at the G19's pressure and charge with the 124 gr load a competition gun runs (the MP5's), a 4.4 in (112 mm) bull barrel; its steel slide is heavier than the G19's (boltMass 0.45, the P9's))
+  p2011:    GS(4.4, 9.00, 'none', 35000, 0.35, 124, 0.45, 0.60, 'recoil', 'brass', 19),
   // (the Tempest: 10 mm caseless, a 20 in (508 mm) barrel at its fullest: the figures for a barrel are the effective lengths, G.barrelMm(def); an electric ignition has no bolt to hear.
   // Two lengths of round fit its bores, the block holding whichever it was loaded with (def.barrels.rounds): the standard 10 x 31, 8 g (123 grains), about 5.56 / 7.62x39 in energy,
   // and the rifle 10 x 53, 9.8 g (151 grains), about .30-06's. The loads of each: CALIBERS)
@@ -742,7 +748,7 @@ const G_GUN_KG: Record<string, number> = { // each gun as it comes (kg)
   pump: 3.6, dbl: 3.2, saiga: 3.6, aa12: 4.8, ksg: 3.6, slug: 3.6, benelli: 3.8, vepr: 4.0, m249: 7.5, pkm: 7.5, m60: 10.5,
   rpk: 4.8, shredder: 16, r700: 4.1, barrett: 14, gm6: 11.5, mosin: 4.0, awm: 6.5, m32: 5.3, rail: 7.5, crossbow: 3.5,
   tempest: 4.6, p9: 0.75, g19: 0.7, m1911: 1.1, usp: 0.75, fiveseven: 0.75, thor: 5.4, b92: 0.97, ppk: 0.59, auto9: 1.1, deagle: 2.0, rev: 1.1, hc500: 2.0, akimbo: 0.95, derringer: 0.4,
-  welrod: 1.0, maxim9: 1.2, // (estimates: a little over a kilo for the Welrod with its tube, about 1.2 kg for the Maxim 9 with its suppressor; the P9 is 0.75)
+  welrod: 1.0, maxim9: 1.2, p2011: 0.95, // (estimates: a little over a kilo for the Welrod with its tube, about 1.2 kg for the Maxim 9 with its suppressor; the 2011, a steel frame under a polymer grip, about 0.95; the P9 is 0.75)
   g18: 0.9, skorp: 1.3, mp7: 1.9, mac10: 2.8, tx22: 0.6, sawn: 2.0, judge: 0.85, pocketgl: 1.8,
   hailstorm: 3.1, // (an estimate: the eight-bore block is most of it, about 1.3 kg of steel)
 };

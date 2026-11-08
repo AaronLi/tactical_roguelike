@@ -10440,6 +10440,50 @@
   { "platform": "hailstorm",
    "why": "authored magnifier (mgn.2) behind op.pic.1",
    "build": { "barrel": "hailstorm.barrel", "magnifier": "mgn.2", "optic": "op.pic.1", "stock": "oem.stk.classic.4" }
+  },
+  { "platform": "p2011",
+   "why": "default",
+   "build": { "barrel": "p2011.barrel", "mag": "p2011.mag", "optic": "p2011.optic" }
+  },
+  { "platform": "p2011",
+   "why": "bare",
+   "build": { "barrel": "p2011.barrel", "mag": "p2011.mag" }
+  },
+  { "platform": "p2011",
+   "why": "loaded",
+   "build": { "barrel": "p2011.barrel", "mag": "p2011.mag", "optic": "p2011.optic", "tac": "ptac.0" }
+  },
+  { "platform": "p2011",
+   "why": "loaded-last",
+   "build": { "barrel": "p2011.barrel", "mag": "p2011.mag", "optic": "p2011.optic", "tac": "ptac.3" }
+  },
+  { "platform": "p2011",
+   "why": "lowest optic (p9.optic)",
+   "build": { "barrel": "p2011.barrel", "mag": "p2011.mag", "optic": "p9.optic", "tac": "ptac.0" }
+  },
+  { "platform": "p2011",
+   "why": "tallest optic (op.pso.5)",
+   "build": { "barrel": "p2011.barrel", "mag": "p2011.mag", "optic": "op.pso.5", "tac": "ptac.0" }
+  },
+  { "platform": "p2011",
+   "why": "authored optic (op.pso.1)",
+   "build": { "barrel": "p2011.barrel", "mag": "p2011.mag", "optic": "op.pso.1" }
+  },
+  { "platform": "p2011",
+   "why": "authored optic (op.pso.2)",
+   "build": { "barrel": "p2011.barrel", "mag": "p2011.mag", "optic": "op.pso.2" }
+  },
+  { "platform": "p2011",
+   "why": "authored optic (op.pso.3)",
+   "build": { "barrel": "p2011.barrel", "mag": "p2011.mag", "optic": "op.pso.3" }
+  },
+  { "platform": "p2011",
+   "why": "authored optic (op.pso.4)",
+   "build": { "barrel": "p2011.barrel", "mag": "p2011.mag", "optic": "op.pso.4" }
+  },
+  { "platform": "p2011",
+   "why": "authored optic (op.pso.5)",
+   "build": { "barrel": "p2011.barrel", "mag": "p2011.mag", "optic": "op.pso.5" }
   }
  ]
 }
