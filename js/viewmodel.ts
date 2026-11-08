@@ -10,6 +10,8 @@
 //   G.Viewmodel.pipLens(group, o, def)  a scope's picture-in-picture lens (o: info.pip)
 //   G.Viewmodel.flash(color)            a muzzle flash sprite
 //   G.Viewmodel.surfaces(group)         the model's display_<name> meshes, each given a CanvasTexture to paint: { name: { mesh, canvas, ctx, tex, width, height } }
+//   G.Viewmodel.paintAmmo(s, left, per) a multi-barrel gun's display_ammo: the rounds left in each barrel
+//   G.Viewmodel.paintRange(s, text)     a rail ballistic computer's display_range: its seven-segment readout (rangeText(metres) makes the text)
 //   G.Viewmodel.worldProto(group, info) the third-person model of a gun: its meshes merged one per material, the magazine, a
 //                                       crossbow's bolt and strings and a bipod's legs pulled out on their own (cache it)
 //   G.Viewmodel.worldInstance(proto)    a group of it, sharing the proto's geometry
@@ -247,9 +249,11 @@ const G_Viewmodel = (() => {
   // The ballistic computer's readout (display_ cells of a seven-segment LCD, lit over faint unlit ones) is painted on a canvas the lens shows low on its right: the range in
   // metres to whatever is under the crosshair, "----" for nothing (sky, or past 1500 m). White on clear: the shader tints it.
   const LCD_W = 256, LCD_H = 64, LCD_SEG: Record<string, string> = { 0: 'abcdef', 1: 'bc', 2: 'abdeg', 3: 'abcdg', 4: 'bcfg', 5: 'acdfg', 6: 'acdefg', 7: 'abc', 8: 'abcdefg', 9: 'abcdfg', '-': 'g' };
-  function paintLcd(c: CanvasRenderingContext2D, text: string) {
-    c.clearRect(0, 0, LCD_W, LCD_H);
-    const w = 34, h = 50, t = 7, y0 = 7;
+  // (lit / unlit: the cells' colours; bg, a panel's colour under them instead of clear; H, the panel's height in the same units, LCD_W across: a taller panel, taller
+  // digits, up to twice the scope's, centred)
+  function paintLcd(c: CanvasRenderingContext2D, text: string, lit = '#fff', unlit = 'rgba(255,255,255,0.1)', bg?: string, H = LCD_H) {
+    if (bg) { c.fillStyle = bg; c.fillRect(0, 0, LCD_W, H); } else c.clearRect(0, 0, LCD_W, H);
+    const w = 34, h = Math.min(H - 14, 100), t = 7, y0 = (H - h) / 2;
     const hbar = (x: number, y: number, l: number) => { c.moveTo(x, y + t / 2); c.lineTo(x + t / 2, y); c.lineTo(x + l - t / 2, y); c.lineTo(x + l, y + t / 2); c.lineTo(x + l - t / 2, y + t); c.lineTo(x + t / 2, y + t); c.closePath(); };
     const vbar = (x: number, y: number, l: number) => { c.moveTo(x + t / 2, y); c.lineTo(x + t, y + t / 2); c.lineTo(x + t, y + l - t / 2); c.lineTo(x + t / 2, y + l); c.lineTo(x, y + l - t / 2); c.lineTo(x, y + t / 2); c.closePath(); };
     for (let i = 0; i < 4; i++) {
@@ -258,13 +262,15 @@ const G_Viewmodel = (() => {
         c.beginPath();
         if (s === 'a') hbar(x + 2, y0, w - 4); else if (s === 'g') hbar(x + 2, y0 + h / 2 - t / 2, w - 4); else if (s === 'd') hbar(x + 2, y0 + h - t, w - 4);
         else if (s === 'f') vbar(x, y0 + 2, h / 2 - 2); else if (s === 'b') vbar(x + w - t, y0 + 2, h / 2 - 2); else if (s === 'e') vbar(x, y0 + h / 2, h / 2 - 2); else vbar(x + w - t, y0 + h / 2, h / 2 - 2);
-        c.fillStyle = on.includes(s) ? '#fff' : 'rgba(255,255,255,0.1)'; c.fill();
+        c.fillStyle = on.includes(s) ? lit : unlit; c.fill();
       }
     }
-    c.fillStyle = '#fff'; // (the unit: a small "m" of bars, like the digits)
-    for (const x of [204, 216, 228]) c.fillRect(x, y0 + 22, 5, 28);
-    c.fillRect(204, y0 + 22, 29, 5);
+    c.fillStyle = lit; // (the unit: a small "m" of bars, like the digits)
+    for (const x of [204, 216, 228]) c.fillRect(x, y0 + h * 0.44, 5, h * 0.56);
+    c.fillRect(204, y0 + h * 0.44, 29, 5);
   }
+  // the text a range readout shows for a range in metres (null: nothing in reach)
+  const rangeText = (r: number | null) => (r == null ? '----' : String(Math.min(9999, Math.round(r))).padStart(4, ' '));
   // the point of impact, where the next round strikes at a range, is one cell lit red on a coarse grid of faint grey cells (a cell is this many mils: the marker snaps from cell to cell)
   const POI_CELL = 0.5, POI_FAR = 560;
   const PIP_VS = 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
@@ -352,7 +358,7 @@ const G_Viewmodel = (() => {
       const now = performance.now();
       if (now - lcdT < 200) return;
       lcdT = now;
-      const r = range(), text = r == null ? '----' : String(Math.min(9999, Math.round(r))).padStart(4, ' ');
+      const r = range(), text = rangeText(r);
       if (text !== lcdText) { lcdText = text; paintLcd(lcd!, text); lcdTex.needsUpdate = true; }
       const poi = mat.uniforms.poi.value;
       if (def.calc < 2 || r == null || r < 1) { poi.z = 0; return; }
@@ -436,6 +442,18 @@ const G_Viewmodel = (() => {
     s.tex.needsUpdate = true;
   }
 
+  // A rail ballistic computer's own readout (display_range, on the module's back: tools/models/recipes.ts tactical 'bcomp'): the scope's seven-segment LCD, green on
+  // the dark glass, across the surface's canvas (a squarer glass than the scope's panel: taller digits). text: four characters, as calcStep makes them ('----' for no
+  // reading). Repaints only when it changed.
+  function paintRange(s: VmSurface, text: string) {
+    if ((s as any).sig === text) return;
+    (s as any).sig = text;
+    const c = s.ctx, k = s.width / LCD_W;
+    c.setTransform(k, 0, 0, k, 0, 0);
+    paintLcd(c, text, '#8dffa8', 'rgba(141,255,168,0.09)', '#06110b', s.height / k);
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    s.tex.needsUpdate = true;
+  }
   // ---------------------------------------------------------------- the first-person gun
   // models: one per gun in the hands (two for an akimbo pair), each already built and decorated
   function assemble(def: any, models: VmModel[]) {
@@ -628,7 +646,7 @@ const G_Viewmodel = (() => {
     return g;
   }
 
-  return { assemble, reflex, pipLens, flash, surfaces, paintAmmo, worldProto, worldInstance, merge };
+  return { assemble, reflex, pipLens, flash, surfaces, paintAmmo, paintRange, rangeText, worldProto, worldInstance, merge };
 })();
 G.Viewmodel = G_Viewmodel;
 interface GameModules { Viewmodel: typeof G_Viewmodel; }

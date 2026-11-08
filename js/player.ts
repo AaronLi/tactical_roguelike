@@ -418,9 +418,23 @@ const G_Me = {
   // How far it is to what's under the crosshair of the scope you're looking through (a ballistic computer's readout: js/viewmodel.ts), along the scope's own axis: the level or a suspect, whichever's nearer;
   // null for nothing in reach (sky, or past 1500 m) or while you're not looking through it
   scopeRange(): number | null {
-    const sc = G.R.scopeCam, map = G.Game.map;
-    if (!sc || !map || (G.R.pipLive || 0) < 0.5) return null;
-    const MAX = 1500, o = sc.position, f = new THREE.Vector3(0, 0, -1).applyQuaternion(sc.quaternion);
+    const sc = G.R.scopeCam;
+    if (!sc || (G.R.pipLive || 0) < 0.5) return null;
+    return this.rangeAlong(sc);
+  },
+  // What a rail ballistic computer's laser reads (the readout on its back, display_range: js/viewmodel.ts paintRange): through a scope, along the scope's axis (scopeRange);
+  // otherwise along the view's centre line, what's under the crosshair. null for nothing in reach.
+  aimRange(): number | null {
+    const sc = G.R.scopeCam;
+    return sc && (G.R.pipLive || 0) >= 0.5 ? this.rangeAlong(sc) : this.rangeAlong(G.R.camera);
+  },
+  // How far it is from a camera along its centre line to the level or a suspect, whichever's nearer; null for nothing within 1500 m (the sky)
+  rangeAlong(cam: THREE.Object3D): number | null {
+    const map = G.Game.map;
+    if (!cam || !map) return null;
+    const MAX = 1500, o = new THREE.Vector3(), q = new THREE.Quaternion();
+    cam.getWorldPosition(o); cam.getWorldQuaternion(q);
+    const f = new THREE.Vector3(0, 0, -1).applyQuaternion(q);
     let t = G.Level.raycast(map, o.x, o.y, o.z, f.x, f.y, f.z, MAX).t;
     const rc = new THREE.Raycaster(o.clone(), f.clone(), 0, t);
     for (const ev of G.Views.enemies.values()) {
@@ -2914,6 +2928,14 @@ const G_Me = {
     }
     if (an.pump && !u.info.hinge) an.pump.position.z = cyc * 0.085; // (a gun with a reload sequence moves it only there)
     if (u.displays && u.displays.ammo && w.def.barrels) G.Viewmodel.paintAmmo(u.displays.ammo, G.barrelsOf(w)!, G.perOf(w)); // (the rounds left in each barrel)
+    if (u.displays && (u.displays.range || u.displays.range_l)) { // (a rail ballistic computer's readout on its back: the laser's range, five times a second, repainted when it changes)
+      const now = performance.now();
+      if (now - (u.rangeAt || 0) >= 200) {
+        u.rangeAt = now;
+        const text = G.Viewmodel.rangeText(this.aimRange());
+        for (const k of ['range', 'range_l']) if (u.displays[k]) G.Viewmodel.paintRange(u.displays[k], text);
+      }
+    }
     if (an.cyl) an.cyl.rotation.z += (this.cylShots * (Math.PI * 2) / u.info.chamberAt.n - an.cyl.rotation.z) * Math.min(1, dt * 18);
     if (an.spin) an.spin.rotation.z += dt * this.spin * 55;
     if (an.magn) an.magn.rotation.z += ((sg.scoped ? 0 : u.info.magnOut != null ? u.info.magnOut : -2.8) - an.magn.rotation.z) * Math.min(1, dt * 14); // a magnifier flips in or out (to the angle its model gives: info.magnOut, an authored one's)

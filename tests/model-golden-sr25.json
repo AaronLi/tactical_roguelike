@@ -284,7 +284,7 @@
   },
   "barrel=br.7.62x51.20,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.10,mag=sr25.mag,muzzle=mz.r762.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.bc.0": {
    "label": "tac=tac.bc.0",
-   "geometry": "42cca7a62aadb045",
+   "geometry": "58238f7a1256c613",
    "info": "5f881cd0a1658bd4"
   },
   "barrel=br.7.62x51.20,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.10,mag=sr25.mag,muzzle=mz.r762.a2,optic=op.pic.0,stock=stk.tube.0,tacL=tac.0": {
@@ -314,7 +314,7 @@
   },
   "barrel=br.7.62x51.20,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.10,mag=sr25.mag,muzzle=mz.r762.a2,optic=op.pic.0,stock=stk.tube.0,tacL=tac.bc.0": {
    "label": "tacL=tac.bc.0",
-   "geometry": "ca8ec80f7f036212",
+   "geometry": "ba4c260d2dc1041a",
    "info": "5f881cd0a1658bd4"
   },
   "barrel=br.7.62x51.20,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.10,mag=sr25.mag,muzzle=mz.r762.a2,optic=op.pic.1,stock=stk.tube.0": {
@@ -894,7 +894,7 @@
   },
   "barrel=br.7.62x51.20,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.10,mag=sr25.mag,muzzle=mz.r762.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.bc.0,tacL=tac.0": {
    "label": "tac=tac.bc.0 from loaded A",
-   "geometry": "c15bbe258eeccb04",
+   "geometry": "413c2f8671d48239",
    "info": "37ad7fa23ebbf30e"
   },
   "barrel=br.7.62x51.20,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.10,mag=sr25.mag,muzzle=mz.r762.a2,optic=op.pic.0,stock=stk.tube.0,tacL=tac.0": {
@@ -924,7 +924,7 @@
   },
   "barrel=br.7.62x51.20,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.10,mag=sr25.mag,muzzle=mz.r762.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.bc.0": {
    "label": "tacL=tac.bc.0 from loaded A",
-   "geometry": "ca3c7f59b8d5ee7d",
+   "geometry": "2b41de85ad0f9f7c",
    "info": "37ad7fa23ebbf30e"
   },
   "barrel=br.7.62x51.20,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.10,mag=sr25.mag,muzzle=mz.r762.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0": {
