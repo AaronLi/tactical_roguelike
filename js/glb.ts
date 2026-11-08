@@ -808,8 +808,9 @@ function validateFurnitureConfig(cfg: any, spec: NonNullable<typeof AUTHORED_PAR
       if (t.startsWith('str') && (typeof v !== 'string' || !v.trim())) E(`part.${k}: expected a non-empty string, got ${JSON.stringify(v)}`);
       if (t === 'num' && (!isNum(v) || v <= 0 || v > 1)) E(`part.${k}: expected a length in metres (0 to 1), got ${JSON.stringify(v)}`);
       if (t === 'rails?') {
-        if (!isObj(v)) { E('part.rails: expected { top?, bottom?, left?, right?: [from, to] }'); continue; }
+        if (!isObj(v)) { E('part.rails: expected { top?, bottom?, left?, right?: [from, to], kind? }'); continue; }
         for (const [s, r] of Object.entries(v)) {
+          if (s === 'kind') { if (r !== 'picatinny' && r !== 'mlok') E(`part.rails.kind: "picatinny" or "mlok" (what the side and bottom rails are: the top is always Picatinny), got ${JSON.stringify(r)}`); continue; }
           if (!['top', 'bottom', 'left', 'right'].includes(s)) E(`part.rails.${s}: not a side (top, bottom, left, right)`);
           else if (!(Array.isArray(r) && r.length === 2 && r.every(isNum) && r[0] < r[1])) E(`part.rails.${s}: expected [from, to] metres forward of the origin, from < to, got ${JSON.stringify(r)}`);
           else if (isNum(p.len) && (r[0] < -0.003 || r[1] > p.len + 0.003)) E(`part.rails.${s}: [${r}] runs off the handguard (0 to part.len ${p.len})`);

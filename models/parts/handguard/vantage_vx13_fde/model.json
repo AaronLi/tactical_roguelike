@@ -1,0 +1,39 @@
+{
+  "source": "authored",
+  "kind": "part",
+  "slot": "handguard",
+  "frame": "handguard-mount",
+  "anchors": {
+    "support": [
+      0.19,
+      -0.025,
+      0
+    ]
+  },
+  "part": {
+    "t": "mlok",
+    "len": 0.32,
+    "rails": {
+      "top": [
+        0,
+        0.3185
+      ],
+      "left": [
+        0.03,
+        0.31
+      ],
+      "right": [
+        0.03,
+        0.31
+      ],
+      "bottom": [
+        0.03,
+        0.31
+      ],
+      "kind": "mlok"
+    }
+  },
+  "replaces": [
+    "Vantage VX-13 M-LOK (FDE)"
+  ]
+}
