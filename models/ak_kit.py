@@ -101,18 +101,37 @@ def receiver():
     bevel(o, 0.8 * mm, 1); smooth(o); K.adopt(o, 'base', RCV)
     o = K.obj(cyl(2.6 * mm, -7.5 * mm, 7.5 * mm, 'x', (147 * mm, -41 * mm), 12), 'base', 'steel'); smooth(o)
 
+CV_BOT = 5.0                 # the cover's skirts: down outside the receiver's walls to here (4 mm below their top): no daylight under it
+def cover_shape(d, bot, f1, f0=None):
+    """The dust cover's solid shape grown by d (mm; negative: inside it): its side profile (the rear end stepped down round the spring
+    guide's button) across its section (square-bottomed, rounded over the top), from its rear (CV0 - d, or f0) to f1, down to bot.
+    A closed mesh (for a boolean): returned as a working object."""
+    f0 = CV0 - d if f0 is None else f0
+    o = K.tmp(prism(P([(f0, bot), (f0, 22 + 0.4 * d), (CV0 + 6 - 0.4 * d, 31 + d), (CV0 + 16, CVT + d), (f1, CVT + d), (f1, bot)]), 'x', -0.03, 0.03))
+    w, top, lo = HW + 0.8 + d, CVT + d, bot - 20.0
+    boolean(o, prism(rounded(0, (top + lo) / 2 * mm, w * mm, (top - lo) / 2 * mm, (8 + d) * mm, 5), 'y', f0 * mm - 0.01, f1 * mm + 0.01), 'INTERSECT')
+    return o
+
+def mesh_of(o):
+    """A working object's mesh, the object gone (a cutter for cut())."""
+    me = o.data; bpy.data.objects.remove(o, do_unlink=True); return me
+
+def port_skirt_cut(o, x0):
+    """The right skirt cut back to the walls' top over the ejection port and the handle's travel (the handle runs there)."""
+    cut(o, box((HW - 0.3) * mm, (x0 + 1) * mm, 136 * mm, (CV1 + 2) * mm, (CV_BOT - 1) * mm, (RTOP + 0.2) * mm))
+
 def dust_cover():
-    """The dust cover: a pressed steel lid over the receiver's top, rounded across, its rear end stepped down round the recoil spring
-    guide's button (which stands through it), its pressed transverse stiffening ribs; the button."""
-    cv = K.tmp(prism(P([(CV0, RTOP - 0.5), (CV0, 22), (CV0 + 6, 31), (CV0 + 16, CVT), (CV1, CVT), (CV1, RTOP - 0.5)]), 'x', -CHW * mm, CHW * mm))
-    boolean(cv, prism(rounded(0, (RTOP + CVT) / 2 * mm, CHW * mm, (CVT - RTOP + 1) / 2 * mm, 8 * mm, 5), 'y', CV0 * mm - 0.01, CV1 * mm + 0.01), 'INTERSECT')
-    cut(cv, prism(rounded(0, (RTOP + CVT) / 2 * mm - 1.2 * mm, (CHW - 0.8) * mm, (CVT - RTOP + 1) / 2 * mm, 7.2 * mm, 5), 'y', (CV0 + 3) * mm, (CV1 + 1) * mm))   # (a pressed lid: hollow)
-    bevel(cv, 0.6 * mm, 1, 30); smooth(cv); K.adopt(cv, 'base', RCV)
+    """The dust cover: a pressed steel lid over the receiver's top, rounded across, its skirts down outside the receiver's walls, closed at
+    its rear (stepped down round the recoil spring guide's button, which stands through it) and its front; its pressed transverse
+    stiffening ribs; the button."""
+    cv = cover_shape(0.0, CV_BOT, CV1)
+    cut(cv, mesh_of(cover_shape(-0.8, CV_BOT - 10, CV1 - 1.5)))       # (a pressed lid: hollow, 0.8 mm, open only underneath)
+    port_skirt_cut(cv, HW + 0.8)
+    bevel(cv, 0.4 * mm, 1, 30); smooth(cv); K.adopt(cv, 'base', RCV)
     if V['cover_ribs']:
         for f in (40, 62, 84, 106, 128):   # the ribs: low ridges across its top, down to the shoulders
-            rb = K.tmp(prism(rounded(0, (RTOP + CVT) / 2 * mm + 0.4 * mm, (CHW + 0.6) * mm, (CVT - RTOP + 1) / 2 * mm + 0.6 * mm, 8.6 * mm, 5), 'y', (f - 1.6) * mm, (f + 1.6) * mm))
-            cut(rb, box(-0.03, 0.03, (f - 3) * mm, (f + 3) * mm, -0.02, (RTOP + 12) * mm))
-            bevel(rb, 0.5 * mm, 1, 30); smooth(rb); K.adopt(rb, 'base', RCV)
+            rb = cover_shape(0.4, RTOP + 12, f + 1.6, f0=f - 1.6)          # (0.4 mm proud: inside the railed cover, which is 0.5)
+            bevel(rb, 0.3 * mm, 1, 30); smooth(rb); K.adopt(rb, 'base', RCV)
     o = K.obj(lathe([(6 * mm, 4.6 * mm), (CV0 * mm + 1 * mm, 4.6 * mm), (CV0 * mm + 1 * mm, 3.4 * mm)], 18, (0, 0, 16 * mm)), 'base', 'steel'); smooth(o)
     o = K.obj(lathe([(4.5 * mm, 0.0003), (4.5 * mm, 3.2 * mm), (6.5 * mm, 4.6 * mm)], 18, (0, 0, 16 * mm)), 'base', 'steel'); smooth(o)
 
@@ -350,11 +369,9 @@ def barrel_assembly(E, inches, slot='barrel'):
         o = K.obj(lathe([((HG_LO[1] + 2) * mm, 3.0 * mm), ((fs1 - 3) * mm, 3.0 * mm), ((fs1 - 1) * mm, 3.6 * mm), (fs1 * mm, 3.6 * mm)], 12, (0, 0, -15.5 * mm)), slot, 'steel'); smooth(o)
         if V.get('bipod'):   # the RPK bipod's collar behind the sight base, its bracket down to the legs' hinges under the handguard's line
             bp = fs0 - 16.0
-            co = K.tmp(lathe([((bp - 9) * mm, (br + 3.2) * mm), ((bp + 9) * mm, (br + 3.2) * mm)], 28))
-            boolean(co, box(-6 * mm, 6 * mm, (bp - 9) * mm, (bp + 9) * mm, (BP_DROP + 2) * mm, -4 * mm), 'UNION')
-            boolean(co, box(-15 * mm, 15 * mm, (bp - 9) * mm, (bp + 9) * mm, (BP_DROP - 5) * mm, (BP_DROP + 5) * mm), 'UNION')
-            cut(co, cyl(br * mm, (bp - 10) * mm, (bp + 10) * mm, 'y', (0, 0), 28))
-            bevel(co, 0.6 * mm, 1, 30); smooth(co); K.adopt(co, slot, RCV)
+            o = K.obj(lathe([((bp - 9) * mm, br * mm), ((bp - 9) * mm, (br + 3.2) * mm), ((bp + 9) * mm, (br + 3.2) * mm), ((bp + 9) * mm, br * mm)], 28), slot, RCV); smooth(o)
+            o = K.tmp(box(-6 * mm, 6 * mm, (bp - 8) * mm, (bp + 8) * mm, (BP_DROP + 2) * mm, -(br + 1) * mm)); bevel(o, 0.6 * mm, 1); smooth(o); K.adopt(o, slot, RCV)
+            o = K.tmp(box(-15 * mm, 15 * mm, (bp - 9) * mm, (bp + 9) * mm, (BP_DROP - 5) * mm, (BP_DROP + 5) * mm)); bevel(o, 0.6 * mm, 1); smooth(o); K.adopt(o, slot, RCV)
     # the gas tube: from the rear sight block to the gas block, its vents near its front, its ferrules (the upper handguard between them)
     gt = K.tmp(lathe([(310 * mm, TUBE_R * mm), ((gas_front + 6) * mm, TUBE_R * mm), ((gas_front + 6) * mm, 0.0003)], 24, (0, 0, TUBE_U * mm)))
     for f in (gas_front - 48, gas_front - 36, gas_front - 24):
@@ -564,11 +581,10 @@ RC_T = CVT + 0.5              # the railed cover's top (the rail's base)
 RC_RT = RC_T + 5.6            # the rail's top
 def railed_cover():
     def mount(o): o['mount'] = True; return o
-    cw = CHW + 0.5
-    cv = K.tmp(prism(P([(CV0 - 0.5, RTOP - 0.5), (CV0 - 0.5, 22.5), (CV0 + 5.5, 31.5), (CV0 + 16, RC_T), (CV1 + 0.5, RC_T), (CV1 + 0.5, RTOP - 0.5)]), 'x', -cw * mm, cw * mm))
-    boolean(cv, prism(rounded(0, (RTOP + RC_T) / 2 * mm, cw * mm, (RC_T - RTOP + 1) / 2 * mm, 8.3 * mm, 5), 'y', CV0 * mm - 0.01, CV1 * mm + 0.01), 'INTERSECT')
-    cut(cv, prism(rounded(0, (RTOP + CVT) / 2 * mm, (CHW + 0.05) * mm, (CVT - RTOP + 1) / 2 * mm + 0.05 * mm, 8 * mm, 5), 'y', (CV0 + 2.5) * mm, (CV1 + 1) * mm))   # (over the issue cover)
-    bevel(cv, 0.5 * mm, 1, 30); smooth(cv); mount(K.adopt(cv, 'optic', RCV))
+    cv = cover_shape(0.5, CV_BOT, CV1 + 0.5)                          # (the issue cover's shape 0.5 mm larger, closed at both ends)
+    cut(cv, mesh_of(cover_shape(0.02, CV_BOT - 10, CV1 + 0.02)))      # (hollow: the issue cover inside it)
+    port_skirt_cut(cv, HW + 1.3)
+    bevel(cv, 0.3 * mm, 1, 30); smooth(cv); mount(K.adopt(cv, 'optic', RCV))
     mount(picatinny(K, RC0 * mm, RC1 * mm, RC_T * mm, 'optic', 'black'))
     for f in (RC0 + 8, RC1 - 8):    # the rail's screws into the lid, beside it
         for s_ in (-1, 1):
@@ -673,7 +689,16 @@ for inches in C.get('barrels', []):
     vr['variant_json'] = json.dumps({'gun': ID, 'slot': 'barrel', 'of': 'factory', 'info': {'muzzles': [[round(E * mm, 4), 0, 0]]}, 'note': note})
     also.append(vc)
     if EXPORT: export_glb(vc, os.path.join(HERE, name + '.glb'))
-result = {'id': ID, 'meshes': len(meshes), 'tris': tris_of(meshes), 'bounds_mm': [[round(x * 1000, 1) for x in v] for v in bb],
+def open_edges(objs):
+    """The meshes with non-manifold edges (open, or more than two faces on an edge): name -> count."""
+    import bmesh as _bm
+    out = {}
+    for o in objs:
+        b = _bm.new(); b.from_mesh(o.data); n = sum(1 for e in b.edges if not e.is_manifold); b.free()
+        if n: out[o.name] = n
+    return out
+OPEN = open_edges([o for c in (coll, *also) for o in c.all_objects if o.type == 'MESH'])
+result = {'id': ID, 'meshes': len(meshes), 'tris': tris_of(meshes), 'open_meshes': OPEN, 'bounds_mm': [[round(x * 1000, 1) for x in v] for v in bb],
           'glb': save_and_export(coll, root, HERE, ID, EXPORT, also=tuple(also)), 'info': info, 'anchors': anchors, 'barrels': figures,
           'magFit': {'len': MK['LEN'], 'c': MK['C'], 'd0': MK['D0'], 'd1': MK['D1'], 'w': MK['W']}}
 print('RESULT', json.dumps(result))
