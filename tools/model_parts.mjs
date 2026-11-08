@@ -303,6 +303,9 @@ export function fitOffsets(obs, slots, k, tol, { conds: fixedConds = null, ref =
   const optional = slots.filter((s) => obs.some((o) => o.b[s]) && obs.some((o) => !o.b[s]));
   for (const c of optional) { const M2 = solveModel(obs, slots, k, [c], ref), r2 = residOf(M2, obs); if (r2 <= tol) return { model: M2, resid: r2 }; if (r2 < r) { M = M2; r = r2; } }
   if (!cap) { residOf(M, obs); return { model: M, resid: r }; }
+  // a pair first (the min or max of two parts' values: the plainer rule), then a cap
+  const Mp = fitPair(obs, slots, k, tol, ref, M);
+  if (Mp) return { model: Mp, resid: residOf(Mp, obs) };
   // a cap: on one axis, one slot's offsets (`of`) give way to another part's limit (min or max) where it is lower (higher)
   for (let axis = 0; axis < k; axis++) for (const by of slots) for (const of of slots) {
     if (of === by) continue;
@@ -325,8 +328,6 @@ export function fitOffsets(obs, slots, k, tol, { conds: fixedConds = null, ref =
       if (r3 <= tol) return { model: M3, resid: r3 };
     }
   }
-  const Mp = fitPair(obs, slots, k, tol, ref, M);
-  if (Mp) return { model: Mp, resid: residOf(Mp, obs) };
   residOf(M, obs); return { model: M, resid: r };
 }
 
@@ -406,7 +407,9 @@ export function learnPlatform(C) {
         let found = null;
         for (const key of [...keys].sort()) {
           const ok = multi.every((q) => { const m = new Map(); return best.obs.filter((o) => o.pq === q).every((o) => { const l = labelOf(o.b[s] || '', key); if (m.has(l) && m.get(l) !== o.vi) return false; m.set(l, o.vi); return true; }); });
-          if (ok && (!found || new Set(parts.map((p) => labelOf(p, key))).size < found.n)) found = { key, n: new Set(parts.map((p) => labelOf(p, key))).size };
+          // (the property fewest parts have a value of their own for (a barrel's sight rise, not its radius), then the fewest labels)
+          const own = parts.filter((p) => p && partProps(C, s, p)[key] !== undefined).length, nl = new Set(parts.map((p) => labelOf(p, key))).size;
+          if (ok && (!found || own < found.own || (own === found.own && nl < found.n))) found = { key, n: nl, own };
         }
         if (found) { vary = { by: s, key: found.key, labelOf: (p) => labelOf(p, found.key) }; break; }
       }
