@@ -91,8 +91,11 @@ pad), `cover` `[x, z, coverX, coverZ, y, floor]`, `wallSpots` `[x, z, y, floor]`
 out, unit }` (cells).
 
 `props`: every piece of furniture, once, in a fixed order (each floor's placed pieces, then what the cells hold besides):
-`{ fl, name, x, z, q (quarter turns), v (its variation, 0..1), gy (the ground under it), style }`. The shapes are
-`js/furniture.ts`' (R[name]: its boxes, and the meshes it builds). `boxes`: the weapon case, the attachments box, the
+`{ fl, name, x, z, q (quarter turns), v (its variation, 0..1), gy (the ground under it), style, own (1: a resident's) }`.
+The furniture a resident's rooms were cleared of (`js/homes.ts clear`) isn't listed at all: it's out of the level, and a
+solid's `pr` indexes the list as it is. The shapes are `js/furniture.ts`' (R[name]: its boxes, and the meshes it builds);
+each piece's and room's looks draw on a stream seeded by the piece or the room alone (docs/furniture-data.md, "The looks'
+random streams"). `boxes`: the weapon case, the attachments box, the
 sticker box, the first aid cabinets: `{ x, z, yaw, fy }`. `crest`: the Sandia Crest's roofs, ladders, ziplines, guard rail and
 the figures its surroundings are made from. `fx`: what a foundry's machinery throws off (emitters: kind, place, direction).
 

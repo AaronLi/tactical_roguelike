@@ -9,7 +9,7 @@
     "th": 0,
     "night": false
    },
-   "hash": "093f9c4d",
+   "hash": "1c7b170c",
    "parts": {
     "floors": "27131e4b",
     "terrain": "77074ba4",
@@ -21,15 +21,15 @@
     "lamps": "7a647749",
     "light": "87a28dde",
     "spots": "ee4d6cad",
-    "props": "a9b832ae",
+    "props": "1fd1b901",
     "boxes": "9b7c8ad8",
     "crest": "77074ba4",
     "fx": "741638a5",
-    "solids": "5a08cf61",
+    "solids": "7464d98f",
     "mats": "e1b6bf4d",
     "tex": "c18283f1",
     "nodes": "acee717b",
-    "all": "093f9c4d"
+    "all": "1c7b170c"
    },
    "count": {
     "floors": 3,
@@ -39,7 +39,7 @@
     "stairs": 4,
     "rails": 66,
     "lamps": 96,
-    "props": 354,
+    "props": 340,
     "fx": 0,
     "solids": 1422,
     "mats": 90,
@@ -47,7 +47,7 @@
     "nodes": 1787
    },
    "proc": {},
-   "bytes": 1361879
+   "bytes": 1360413
   },
   "Apartment night": {
    "args": {
@@ -57,7 +57,7 @@
     "th": 0,
     "night": true
    },
-   "hash": "a3e5dd76",
+   "hash": "d00b05f7",
    "parts": {
     "floors": "27131e4b",
     "terrain": "77074ba4",
@@ -69,15 +69,15 @@
     "lamps": "b7b82355",
     "light": "45bb4eb9",
     "spots": "ee4d6cad",
-    "props": "a9b832ae",
+    "props": "1fd1b901",
     "boxes": "9b7c8ad8",
     "crest": "77074ba4",
     "fx": "741638a5",
-    "solids": "5a08cf61",
+    "solids": "7464d98f",
     "mats": "ed3a98d9",
     "tex": "c18283f1",
     "nodes": "7f183317",
-    "all": "a3e5dd76"
+    "all": "d00b05f7"
    },
    "count": {
     "floors": 3,
@@ -87,7 +87,7 @@
     "stairs": 4,
     "rails": 66,
     "lamps": 25,
-    "props": 354,
+    "props": 340,
     "fx": 0,
     "solids": 1422,
     "mats": 94,
@@ -95,7 +95,7 @@
     "nodes": 1812
    },
    "proc": {},
-   "bytes": 1359562
+   "bytes": 1358096
   },
   "Warehouse day": {
    "args": {
@@ -995,7 +995,7 @@
     "th": 0,
     "night": false
    },
-   "hash": "b2d8c3cd",
+   "hash": "e4038f22",
    "parts": {
     "floors": "cda93496",
     "terrain": "77074ba4",
@@ -1007,15 +1007,15 @@
     "lamps": "1c1cd21a",
     "light": "87a28dde",
     "spots": "7329e448",
-    "props": "dc552ca1",
+    "props": "659a44cd",
     "boxes": "aa452309",
     "crest": "77074ba4",
     "fx": "741638a5",
-    "solids": "cae64717",
+    "solids": "e25f6948",
     "mats": "11bdb599",
     "tex": "8cfa2ada",
     "nodes": "92c5018d",
-    "all": "b2d8c3cd"
+    "all": "e4038f22"
    },
    "count": {
     "floors": 3,
@@ -1025,7 +1025,7 @@
     "stairs": 4,
     "rails": 66,
     "lamps": 114,
-    "props": 429,
+    "props": 419,
     "fx": 0,
     "solids": 1682,
     "mats": 80,
@@ -1033,7 +1033,7 @@
     "nodes": 2039
    },
    "proc": {},
-   "bytes": 1572639
+   "bytes": 1571653
   },
   "Suburbs (basement, upstairs) L5 night": {
    "args": {

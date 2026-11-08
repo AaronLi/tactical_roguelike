@@ -8,7 +8,7 @@ turns it into meshes, and the Rust/Bevy port builds from the same description. T
 | --- | --- | --- |
 | `js/furnspec.ts` | page, server thread, tools | `G.FurnSpec`: the recording kit, `describe(map)` (a level, floor by floor), `piece(name, v, style)` (one piece), `fingerprint()`, the texture painters. |
 | `js/furniture.ts` | page, server thread, tools | `G.Furniture`: the pieces (`R`: footprint, solids, `build(k, v, style)`), `plan()` (what goes where), `solids()` and `worldBoxes()` (collision). |
-| `js/homes.ts`, `js/residents.ts` | page, server thread, tools | The residents' pieces (more of `R`) and how a home is done over (`fill`, `swap`). |
+| `js/homes.ts`, `js/residents.ts` | page, server thread, tools | The residents' pieces (more of `R`) and how a home is done over (`fill`). |
 | `js/furnmesh.ts` | page (and the highlights' export worker) | `G.FurnMesh`: draws a description (`realise`), the textures painted on canvases, the window view's shader. |
 
 What stays in code, seeded as it was: which pieces go where and how they're turned (`plan`, `G.Homes.fill`), their
@@ -36,7 +36,9 @@ then moved to `at`; without it, it is only moved. A piece's frame: its footprint
 the wall at -z, its front at +z, from the floor up.
 
 - `piece`, `v`, `style`: a piece (`G.Furniture.R[piece]`), its own seed (0..1) and style (a resident's colours, a
-  container's paint). Pieces come in `map.propList` order, then each resident's hung pieces after their room.
+  container's paint). Pieces come in `map.propList` order, then each resident's hung pieces after their room. The
+  furniture a resident's rooms were cleared of isn't in `map.propList` (nor in the level description's `props`): it's gone
+  from the level, not hidden.
 - `room`: the index in `map.rooms` of the room whose floor, rug, skirting and pictures these are.
 - `solids`: with `{ solids: true }` (the golden test), the piece's solids (below).
 
@@ -98,13 +100,26 @@ In the piece's frame, what the simulation collides with (`js/furniture.ts worldB
 
 The server's thread loads the same pieces and makes the same solids from them: it never describes or draws the looks.
 
-## The looks' random stream
+## The looks' random streams
 
-A level's looks draw on one stream, `srng((map.seed ^ 0x5eed1e) >>> 0)`, piece after piece and room after room, in the
-order above. A piece of a resident's (`own`) draws on its own (`srng(floor(v · 4294967295))`), and so does a resident's
-room (`srng((seed ^ imul(z · W + x + 1, 0x9e3779b1)) >>> 0)`); a piece that's gone, and a resident's room as it would
-have been, still draw on the stream, into nothing. So the Bevy port, to describe a level itself, runs the same recipes
-on the same stream; to draw one, it can take a description as it is.
+Every piece and every room draws its looks on a stream of its own (mulberry32, `G.FurnSpec.srng(seed)`), so nothing looks
+as it does for what was described before it: a room a resident moves into, or a piece taken out, changes nothing else.
+In 32-bit integer arithmetic (`imul`: the low 32 bits of the product; `^` on the 32 bits; the seed taken as unsigned):
+
+- **A piece** (each of `map.propList`, and each piece a resident hangs, `rm.dress.hung`):
+  `srng(floor(v · 4294967295) ^ imul(cm(x), 0x9e3779b1) ^ imul(cm(z), 0x85ebca6b))`, where `v` is the piece's own value
+  (0..1), `x`, `z` where it stands (metres, the floor's frame) and `cm(a) = floor(a · 100 + 0.5)` (an int32). Where it
+  stands is in it because some pieces share a few `v`s (a fence's panels have one of 17: `js/level.ts refine`).
+- **A room** (`map.rooms[i]` of a floor map `W` x `H` cells: its floor `fl` (0 if unset), its rectangle `x, z, w, h` in
+  cells): `srng(seed ^ salt ^ imul((fl · H + z) · W + x + 1, 0x9e3779b1) ^ imul(w · 65536 + h, 0x85ebca6b))`, with
+  `seed` the level's (`map.seed`) and `salt` `0x5eed1e` for a room's own dressing (its floor, rug, skirting, pictures and
+  clock) or `0x40e5` for a resident's room (`rm.dress`, a carved room too: its floor and trim; what it hangs are pieces,
+  above). A resident's room has only its resident's dressing.
+- **The pictures' six paintings** (`art`, painted once a floor, before the rooms): `srng(seed ^ 0x5eed1e)`, nothing else.
+
+A picture or a clock hangs only where three of the room's own cells in a row face a wall, none of them hung on yet, so
+what one room hangs never depends on another. So the Bevy port, to describe a level itself, runs the same recipes on
+these streams, in any order; to draw one, it can take a description as it is.
 
 ## The golden test
 
