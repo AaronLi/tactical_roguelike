@@ -1,4 +1,4 @@
-// Writes the packs of tools/model_packs.mjs as glTF binaries (assets/models/parts/<platform>/<tag>/<file>.glb) and the platform's index.json.
+// Writes the per-part pieces of tools/bake_parts.mjs as glTF binaries (assets/models/parts/<platform>/<tag>/<file>.glb).
 // A pack is rebuilt from its capture build (the recipe's own display model), keeping only the meshes tagged with its slot, moved to the
 // platform's reference frame (the capture's offsets undone) and exported exactly as the whole guns are (tools/bake_models.mjs): the game's
 // materials by catalogue name, UVs only where a bump map or display needs them, welded, quantised (positions to int16 in each mesh's box: quantizePositions),

@@ -1,5 +1,5 @@
 // How one tag's geometry differs between two builds: the same, a rigid move, or a different shape.
-// Used by the baker's coupling detection (tools/model_packs.mjs). Positions are world-space (tools/model_sweep.mjs meshesOf), metres, in glTF axes
+// Used by the tests' comparisons (tools/model_compare.mjs). Positions are world-space (tools/model_sweep.mjs meshesOf), metres, in glTF axes
 // (x right, y up, z = -forward); displacements are reported as [forward, up, right] = [-dz, dy, dx], the contract's order.
 
 export const TOL = 2e-6;        // metres: float noise of the recipe's own arithmetic ("the same", "a rigid move")
