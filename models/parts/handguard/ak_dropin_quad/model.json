@@ -1,0 +1,34 @@
+{
+  "source": "authored",
+  "kind": "part",
+  "slot": "handguard",
+  "frame": "handguard-mount",
+  "anchors": {
+    "support": [
+      0.099,
+      -0.026,
+      0
+    ]
+  },
+  "part": {
+    "t": "rail",
+    "len": 0.158,
+    "rails": {
+      "bottom": [
+        0.057,
+        0.147
+      ],
+      "left": [
+        0.057,
+        0.147
+      ],
+      "right": [
+        0.057,
+        0.147
+      ]
+    }
+  },
+  "replaces": [
+    "Ironvale AK quad rail"
+  ]
+}

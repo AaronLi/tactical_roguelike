@@ -1,0 +1,25 @@
+{
+  "source": "authored",
+  "kind": "part",
+  "slot": "stock",
+  "frame": "stock-mount",
+  "anchors": {
+    "butt": [
+      -0.257,
+      -0.052,
+      0
+    ],
+    "cheek": [
+      -0.15,
+      -0.004,
+      0
+    ]
+  },
+  "part": {
+    "mount": "ak",
+    "position": "unfolded (the AK-74M side-folder, 259 mm)"
+  },
+  "replaces": [
+    "Kodiak AK-74M side-folding stock (Polymer)"
+  ]
+}

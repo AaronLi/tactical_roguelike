@@ -86,8 +86,11 @@ function readScene(buf, rootName, label) {
   if (roots.length !== 1 || j.nodes[roots[0]].name !== rootName) throw new Error(`${label}: one root node named "${rootName}"`);
   const rn = j.nodes[roots[0]], rx = rn.extras || {}, info = jsonExtra(rx, 'info'), anchors = jsonExtra(rx, 'anchors'), meshes = [];
   const parts = {};
-  const walk = (ni, parentW, part) => {
+  const walk = (ni, parentW, part, leg = null) => {
     const n = j.nodes[ni], W = mul(parentW, local(n)), ex = n.extras || {};
+    // a bipod's leg (a group_ child of part_bipod with extras.leg, GUN_MODEL_CONTRACT.bipod): its pivot in the gun's frame and its deploy rotation, on the part (parts.bipod.legs);
+    // the meshes in it carry its index (e.leg)
+    if (part && !(n.name || '').startsWith('part_') && n.mesh == null && ex.leg && Array.isArray(ex.leg.deploy)) { const p = parts[part.key]; p.legs = p.legs || []; leg = p.legs.length; p.legs.push({ at: [W[12], W[13], W[14]].map((c) => +c.toFixed(5)), deploy: ex.leg.deploy.slice() }); }
     if ((n.name || '').startsWith('part_')) { const key = ex.part || n.name.slice(5); part = { key, at: [W[12], W[13], W[14]], chain: (part ? part.chain : []).concat(key) }; parts[key] = { at: part.at.map((c) => +c.toFixed(5)), parent: part.chain.length > 1 ? part.chain[part.chain.length - 2] : null, ...(ex.check ? { check: ex.check } : {}) }; } // (check: a magazine's check data, { w }: docs/models.md "Magazine check")
     if (n.mesh != null) {
       for (const prim of j.meshes[n.mesh].primitives) {
@@ -104,7 +107,7 @@ function readScene(buf, rootName, label) {
         // its UVs, when the model has them: a display surface's (the canvas across it), or a bump-mapped material's (the 2011's grip: box-projected in metres, so the
         // stipple relief tiles over it). The emitters keep them only where something uses them (tools/bake_worker.mjs, tools/model_emit.mjs needUv).
         { const U = prim.attributes.TEXCOORD_0 != null ? readAccessor(g, prim.attributes.TEXCOORD_0) : null; if (U) e.uv = Float32Array.from(U); }
-        if (part) { e.part = part.key; e.at = part.at.map((c) => +c.toFixed(5)); e.chain = part.chain.slice(); }
+        if (part) { e.part = part.key; e.at = part.at.map((c) => +c.toFixed(5)); e.chain = part.chain.slice(); if (leg != null) e.leg = leg; }
         // a magazine-check mesh (extras.chk: the top round, a witness hole...) stays a mesh of its own with its node's transform, as the game reads them off the
         // model (js/gunrig.ts magCheck: a hole's rotation is the face's tilt there): its geometry in its node's own frame too (local), and that node's place and
         // rotation in the gun's (xf: p [x, y, z], q [x, y, z, w], three's axes)
@@ -114,7 +117,7 @@ function readScene(buf, rootName, label) {
         meshes.push(e);
       }
     }
-    for (const c of n.children || []) walk(c, W, part);
+    for (const c of n.children || []) walk(c, W, part, leg);
   };
   const I = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
   for (const c of rn.children || []) walk(c, mul(I, local(rn)), null);

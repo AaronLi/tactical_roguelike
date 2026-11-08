@@ -469,9 +469,10 @@ const G_GunRecipes = (() => {
     k.box(0.004, 0.02, 0.005, M.black(), gf + 0.04, -0.048);
   }
   // Stocks: the first-person model has them too (it is the same geometry as display()). ap: the fitted stock is an authored model (models/parts/stock/<id>/,
-  // o.apStock): its origin goes where the buffer tube meets the receiver, (0, -0.002) here, and the tube under it is the gun's (drawn as the 'm4' case's).
+  // o.apStock): its origin goes where the buffer tube meets the receiver, (0, -0.002) here, and the tube under it is the gun's (drawn as the 'm4' case's): an
+  // AR stock's (part.mount 'tube'); a stock on its own trunnion (an AK's, mount 'ak') has no tube
   function stock(k: Kit, type: string, m: THREE.Material, _wrist?: boolean, ap?: string | null): void {
-    if (ap) { k.cyl(0.0155, 0.2, M.black(), -0.2, -0.002); G.AuthoredParts.furniture(k, ap, 0, -0.002, m); return; }
+    if (ap) { if ((G.AuthoredParts.get(ap).part || {}).mount === 'tube') k.cyl(0.0155, 0.2, M.black(), -0.2, -0.002); G.AuthoredParts.furniture(k, ap, 0, -0.002, m); return; }
     const pad = (f: number, y: number, h: number) => k.box(0.044, h, 0.012, M.rubber(), f - 0.012, y);
     switch (type) {
       case 'tubeonly': // a buffer tube adapter with nothing on it
@@ -1117,6 +1118,7 @@ const G_GunRecipes = (() => {
       authored(k, A!, (e) => e.slot === 'base' && !e.part);
       if (A!.hinge) authored(k, A!, (e) => e.slot === 'base' && !!e.part); // (a gun with a reload sequence has its moving parts as nodes: the latch is the receiver's)
       if (A!.info.anim && A!.info.anim.catch && !A!.hinge) anim.catch = authoredPart(k, A!, 'catch'); // (the bolt catch, part_catch: the receiver's own, a node that turns with the bolt held open)
+      if (A!.info.anim && A!.info.anim.bipod && A!.parts.bipod && !A!.hinge) anim.bipod = authoredBipod(k, A!); // (the model's own bipod, its legs swung down by the game: the RPK's)
       top = A!.rig.top;
       if (o.optic && (!ownIrons || A!.sights.rail.includes(o.optic))) {
         rcvTop = top;
@@ -1678,7 +1680,14 @@ const G_GunRecipes = (() => {
     }
     else if (o.fg && A && A.anchors.mount_fg) { k.tag('fg'); fgF = A.anchors.mount_fg[0]; k.moved(0, A.anchors.mount_fg[1] + 0.022, () => foregrip(k, o.fg!, fgF!, fm, anim)); } // (a rail under the model's own forend: the foregrip hangs from it)
     else if (o.fg && !hgLen && o.fgAt != null) { k.tag('fg'); fgF = o.fgAt; foregrip(k, o.fg, fgF, fm, anim); } // (a rail under the receiver itself: the SCAR's)
-    else if (o.fg && hgLen) { k.tag('fg'); fgF = rcv === 'vector' && o.hg && o.hg.t === 'vector' ? L - 0.05 : hgF + Math.min(hgLen * 0.35, 0.09, hgLen - 0.04); foregrip(k, o.fg, fgF, fm, anim); } // (the Vector's: on the rail under the front of the upper) // (near the rail's back: the support arm bent, the gun out in front)
+    else if (o.fg && hgLen) {
+      k.tag('fg'); fgF = rcv === 'vector' && o.hg && o.hg.t === 'vector' ? L - 0.05 : hgF + Math.min(hgLen * 0.35, 0.09, hgLen - 0.04);
+      // (an authored handguard whose bottom rail, part.rails.bottom, does not reach under that seat, a drop-in's under a short gas tube: the foregrip goes on
+      // that rail, as near its back as its clamp, 12 mm behind the seat to 16 mm ahead, stays on it)
+      const ap = o.apHg ? G.AuthoredParts.get(o.apHg) : null, bot = ap && ap.part && ap.part.rails && ap.part.rails.bottom as number[] | undefined;
+      if (bot && (fgF - 0.012 < hgF + bot[0] - 1e-9 || fgF + 0.016 > hgF + bot[1] + 1e-9)) fgF = hgF + Math.min(Math.max(fgF - hgF, bot[0] + 0.012), bot[1] - 0.016);
+      foregrip(k, o.fg, fgF, fm, anim);
+    } // (the Vector's: on the rail under the front of the upper) // (near the rail's back: the support arm bent, the gun out in front)
     // a clamp-on rail mount: a collar round the barrel (or the can), in front of any jacket, a short rail on one side or both
     let tacAt = A && A.anchors.mount_tac ? { f: A.anchors.mount_tac[0], y: A.anchors.mount_tac[1], x: Math.abs(A.anchors.mount_tac[2]) } : o.tacAt ? Object.assign({}, o.tacAt) : rcv === 'vector' && o.hg && o.hg.t === 'vector' ? { f: L - 0.012, y: vecTrace([0, 132])[1], x: 0.027 } // (on the short rails each side of the front)
       : hgLen && !o.pump ? { f: hgF + hgLen - 0.01, y: 0, x: 0.024 } : o.siderails ? (rcv === 'box' ? { f: L - 0.012, y: -0.004, x: (o.W || 0.045) / 2 + 0.0075 } : { f: L - 0.02, y: -0.006, x: 0.029 }) : null;
@@ -1928,6 +1937,25 @@ const G_GunRecipes = (() => {
     if (host) { const at = A.parts[host.part!].at; k.into(partNode(k, A, host.part!), -at[2], at[1]); }
     for (const e of v.meshes) placeAuthored(k, e, geoOf(e), ((M as any)[e.mat] || M.black)());
     if (host) k.into(null);
+  }
+  // an authored gun's own bipod (part_bipod, GUN_MODEL_CONTRACT.bipod: the RPK's): its node at its pivot, each leg a group at the leg's pivot inside it with
+  // userData.leg (its deploy rotation), as bipodLeg makes them; the meshes where they were made
+  function authoredBipod(k: Kit, A: AuthoredGun): THREE.Object3D {
+    const pt = A.parts.bipod, [bx, by, bz] = pt.at, bp = k.part(-bz, by), mat = (e: AuthoredMesh) => ((M as any)[e.mat] || M.black)();
+    bp.position.x = bx;
+    const draw = (node: THREE.Object3D, at: number[], leg: number | null) => {
+      k.into(node, -at[2], at[1]);
+      for (const e of A.meshes) if (e.part === 'bipod' && (e.leg ?? null) === leg) placeAuthored(k, e, geoOf(e), mat(e)).position.x -= at[0];
+      k.into(null);
+    };
+    draw(bp, pt.at, null);
+    (pt.legs || []).forEach((l, i) => {
+      const p = k.part(-l.at[2], l.at[1]);
+      bp.add(p); p.position.set(l.at[0] - bx, l.at[1] - by, l.at[2] - bz);
+      draw(p, l.at, i);
+      p.userData.leg = { deploy: l.deploy.slice() };
+    });
+    return bp;
   }
   // an authored animated part (part_<key>): its pivot and its meshes
   function authoredPart(k: Kit, A: AuthoredGun, key: string) {

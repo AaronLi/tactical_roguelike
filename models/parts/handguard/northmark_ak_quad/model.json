@@ -1,0 +1,38 @@
+{
+  "source": "authored",
+  "kind": "part",
+  "slot": "handguard",
+  "frame": "handguard-mount",
+  "anchors": {
+    "support": [
+      0.122,
+      -0.026,
+      0
+    ]
+  },
+  "part": {
+    "t": "rail",
+    "len": 0.204,
+    "rails": {
+      "top": [
+        0.0025,
+        0.195
+      ],
+      "bottom": [
+        0.0125,
+        0.195
+      ],
+      "left": [
+        0.0145,
+        0.195
+      ],
+      "right": [
+        0.0145,
+        0.195
+      ]
+    }
+  },
+  "replaces": [
+    "Northmark 8.0\" quad rail handguard"
+  ]
+}

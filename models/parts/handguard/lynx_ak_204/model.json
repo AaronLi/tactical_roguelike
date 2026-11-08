@@ -1,0 +1,20 @@
+{
+  "source": "authored",
+  "kind": "part",
+  "slot": "handguard",
+  "frame": "handguard-mount",
+  "anchors": {
+    "support": [
+      0.122,
+      -0.026,
+      0
+    ]
+  },
+  "part": {
+    "t": "wood",
+    "len": 0.204
+  },
+  "replaces": [
+    "Lynx 8.0\" handguard"
+  ]
+}
