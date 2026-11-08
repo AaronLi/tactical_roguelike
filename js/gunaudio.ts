@@ -175,6 +175,30 @@ const G_GunAudio = {
     }
     return out;
   },
+  // How long a buffer played at gain g stays above STOP_FLOOR (into G.Audio.master; its compressor and OUTPUT bring that
+  // to about -80 dBFS at most): from the buffer's decay, the loudest of what's left after each 256-sample block (kept per
+  // buffer). A quiet echo or a far shot is stopped there instead of playing out what nobody hears, its nodes and its
+  // MAX_VOICES slot freed sooner.
+  STOP_FLOOR: 3e-5,
+  _decay: new WeakMap<AudioBuffer, Float32Array>(),
+  audibleFor(buf: AudioBuffer, g: number) {
+    let dec = this._decay.get(buf);
+    if (!dec) {
+      const B = 256, nb = Math.ceil(buf.length / B), chs: Float32Array[] = [];
+      for (let c = 0; c < buf.numberOfChannels; c++) chs.push(buf.getChannelData(c));
+      dec = new Float32Array(nb);
+      let m = 0;
+      for (let k = nb - 1; k >= 0; k--) {
+        for (const d of chs) for (let i = k * B, e = Math.min(d.length, i + B); i < e; i++) { const v = d[i] < 0 ? -d[i] : d[i]; if (v > m) m = v; }
+        dec[k] = m;
+      }
+      this._decay.set(buf, dec);
+    }
+    const lv = this.STOP_FLOOR / Math.max(g, 1e-9);
+    let lo = 0, hi = dec.length; // (the first block from which all that's left is under the floor: dec only falls)
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (dec[mid] < lv) hi = mid; else lo = mid + 1; }
+    return Math.min(buf.duration, (lo * 256) / buf.sampleRate + 0.005);
+  },
   buildDry(id: string, urgent?: boolean) {
     if (this.dry.has(id)) return;
     const dryPlace: RoomSig = { env: 'none', envSize: 0, envReflect: 0, envMix: 0 };
@@ -461,6 +485,8 @@ const G_GunAudio = {
     this.voices++;
     s.onended = () => { this.voices--; };
     s.start();
+    // (stopped once even its loudest path, the room's send at the report's own level, is under the floor)
+    s.stop(ctx.currentTime + this.audibleFor(buf, rv ? Math.max(gain, base) : gain) / s.playbackRate.value);
 
     // the echoes: the dry report (no baked reverb) replayed from each reflecting wall after its delay,
     // darker with every bounce. Under heavy fire only the two strongest are kept.
@@ -486,6 +512,7 @@ const G_GunAudio = {
       this.voices++;
       es.onended = () => { this.voices--; };
       es.start(now + tp.delay);
+      es.stop(now + tp.delay + this.audibleFor(echoBuf, base * tp.amp) / es.playbackRate.value);
     }
     return true;
   },
