@@ -39,9 +39,9 @@ var G_AuthoredParts = {
     return g;
   },
   meshes(k: any, p: AuthoredPartSrc, f: number, y: number, finish?: THREE.Material | null) {
-    const A = G_AuthoredParts, M = G.GunMaterials.M as Record<string, () => THREE.Material>;
+    const A = G_AuthoredParts;
     for (const e of p.meshes) {
-      const mesh = k.place(A.geoOf(e), finish && p.finish && e.mat === p.finish ? finish : (M[e.mat] || M.black)(), 0, y, f);
+      const mesh = k.place(A.geoOf(e), finish && p.finish && e.mat === p.finish ? finish : G.GunMaterials.byName(e.mat), 0, y, f);
       if (e.display) { mesh.userData.display = e.display; mesh.name = e.name; }
     }
   },
@@ -51,11 +51,11 @@ var G_AuthoredParts = {
    * (anchors.hinge), which the caller makes the animated part (anim.magn). Returns the hinge, its place [f, y, x] in the gun's frame, and the part.
    */
   magnifier(k: any, key: string, f: number, y: number) {
-    const A = G_AuthoredParts, p = A.get(key), M = G.GunMaterials.M as Record<string, () => THREE.Material>, h = (p.anchors && p.anchors.hinge) || [0, 0, 0];
+    const A = G_AuthoredParts, p = A.get(key), h = (p.anchors && p.anchors.hinge) || [0, 0, 0];
     if (!p.magnifier) throw new Error(`authored part ${key} is not a magnifier (model.json has no "magnifier")`);
-    for (const e of p.meshes) if (!e.part) k.place(A.geoOf(e), (M[e.mat] || M.black)(), 0, y, f);
+    for (const e of p.meshes) if (!e.part) k.place(A.geoOf(e), G.GunMaterials.byName(e.mat), 0, y, f);
     const hinge = k.hang(new THREE.Group(), h[2], y + h[1], f + h[0]);
-    for (const e of p.meshes) if (e.part) { const mesh = new THREE.Mesh(A.geoOf(e), (M[e.mat] || M.black)()); mesh.position.set(-h[2], -h[1], h[0]); mesh.userData.slot = k.slot; hinge.add(mesh); }
+    for (const e of p.meshes) if (e.part) { const mesh = new THREE.Mesh(A.geoOf(e), G.GunMaterials.byName(e.mat)); mesh.position.set(-h[2], -h[1], h[0]); mesh.userData.slot = k.slot; hinge.add(mesh); }
     return { hinge, at: [f + h[0], y + h[1], h[2]], p };
   },
   get(key: string) { const p = G_AuthoredParts.store[key]; if (!p) throw new Error(`authored part ${key} is not loaded (models/parts/${key}/)`); return p; },

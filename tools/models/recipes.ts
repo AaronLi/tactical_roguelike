@@ -1924,7 +1924,7 @@ const G_GunRecipes = (() => {
   function authored(k: Kit, A: AuthoredGun, which: (e: AuthoredMesh) => boolean, bend?: (e: AuthoredMesh, g: THREE.BufferGeometry) => THREE.BufferGeometry) {
     for (const e of A.meshes) {
       if (!which(e)) continue;
-      const g = bend ? bend(e, geoOf(e)) : geoOf(e), mat = e.display ? Object.assign(M.black().clone(), { name: 'black' }) : ((M as any)[e.mat] || M.black)(); // (a display surface: the game paints it, whatever material the file names)
+      const g = bend ? bend(e, geoOf(e)) : geoOf(e), mat = e.display ? Object.assign(M.black().clone(), { name: 'black' }) : G.GunMaterials.byName(e.mat); // (a display surface: the game paints it, whatever material the file names)
       let m: THREE.Mesh;
       if (A.hinge && e.part) { const at = A.parts[e.part].at; k.into(partNode(k, A, e.part), -at[2], at[1]); m = placeAuthored(k, e, g, mat); k.into(null); }
       else m = placeAuthored(k, e, g, mat);
@@ -1935,13 +1935,13 @@ const G_GunRecipes = (() => {
   function authoredVariant(k: Kit, A: AuthoredGun, v: AuthoredVariant) {
     const host = A.hinge ? A.meshes.find((q) => q.slot === v.slot && q.part) : null;
     if (host) { const at = A.parts[host.part!].at; k.into(partNode(k, A, host.part!), -at[2], at[1]); }
-    for (const e of v.meshes) placeAuthored(k, e, geoOf(e), ((M as any)[e.mat] || M.black)());
+    for (const e of v.meshes) placeAuthored(k, e, geoOf(e), G.GunMaterials.byName(e.mat));
     if (host) k.into(null);
   }
   // an authored gun's own bipod (part_bipod, GUN_MODEL_CONTRACT.bipod: the RPK's): its node at its pivot, each leg a group at the leg's pivot inside it with
   // userData.leg (its deploy rotation), as bipodLeg makes them; the meshes where they were made
   function authoredBipod(k: Kit, A: AuthoredGun): THREE.Object3D {
-    const pt = A.parts.bipod, [bx, by, bz] = pt.at, bp = k.part(-bz, by), mat = (e: AuthoredMesh) => ((M as any)[e.mat] || M.black)();
+    const pt = A.parts.bipod, [bx, by, bz] = pt.at, bp = k.part(-bz, by), mat = (e: AuthoredMesh) => G.GunMaterials.byName(e.mat);
     bp.position.x = bx;
     const draw = (node: THREE.Object3D, at: number[], leg: number | null) => {
       k.into(node, -at[2], at[1]);
@@ -2133,7 +2133,7 @@ const G_GunRecipes = (() => {
     const ownIrons = !o.optic || o.optic === 'notch' || A.sights.builtin.includes(o.optic);
     // (a variant barrel: its meshes replace the factory barrel's; it may carry a pistol optic cut of its own, info.mounts.mount_optic, which the dot is seated in)
     const vb = o.avBarrel ? A.variants[o.avBarrel] : null, mountOptic: number[] = (vb && vb.info && vb.info.mounts && vb.info.mounts.mount_optic) || a.mount_optic;
-    const draw = (list: AuthoredMesh[]) => { for (const e of list) placeAuthored(k, e, geoOf(e), ((M as any)[e.mat] || M.black)()); }; // (a magazine-check mesh at its own node's place and tilt)
+    const draw = (list: AuthoredMesh[]) => { for (const e of list) placeAuthored(k, e, geoOf(e), G.GunMaterials.byName(e.mat)); }; // (a magazine-check mesh at its own node's place and tilt)
     // (an animated part: its pivot and the meshes that pass `which`; the pivot is where the model put the part_ node)
     const partOf = (list: AuthoredMesh[], key: string, which: (e: AuthoredMesh) => boolean = () => true) => {
       const first = list.find((e) => e.part === key); if (!first) return null;
