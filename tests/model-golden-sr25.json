@@ -179,13 +179,13 @@
   },
   "barrel=br.7.62x51.20,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=hg.ar.0,mag=sr25.mag,muzzle=mz.r762.a2,optic=op.pic.0,stock=stk.tube.0": {
    "label": "handguard=hg.ar.0",
-   "geometry": "cd65230a83e7f54a",
-   "info": "b384af410fdf805a"
+   "geometry": "1f8f489fe347c70f",
+   "info": "5f3dc8fe4ebbe6de"
   },
   "barrel=br.7.62x51.20,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=hg.ar.1,mag=sr25.mag,muzzle=mz.r762.a2,optic=op.pic.0,stock=stk.tube.0": {
    "label": "handguard=hg.ar.1",
-   "geometry": "8866907b41b0ef26",
-   "info": "5f881cd0a1658bd4"
+   "geometry": "9a32c1be9b885414",
+   "info": "0b6d9115badbe69f"
   },
   "barrel=br.7.62x51.20,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=hg.ar.2,mag=sr25.mag,muzzle=mz.r762.a2,optic=op.pic.0,stock=stk.tube.0": {
    "label": "handguard=hg.ar.2",
@@ -199,8 +199,8 @@
   },
   "barrel=br.7.62x51.20,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=hg.ar.4,mag=sr25.mag,muzzle=mz.r762.a2,optic=op.pic.0,stock=stk.tube.0": {
    "label": "handguard=hg.ar.4",
-   "geometry": "7200db1ad05b3d6c",
-   "info": "5f881cd0a1658bd4"
+   "geometry": "5f62556e03302bf7",
+   "info": "83bc86267fd803bb"
   },
   "barrel=br.7.62x51.20,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.5,mag=sr25.mag,muzzle=mz.r762.a2,optic=op.pic.0,stock=stk.tube.0": {
    "label": "handguard=oem.hg.ar.5",
@@ -799,12 +799,12 @@
   },
   "barrel=br.7.62x51.20,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=hg.ar.0,mag=sr25.mag,muzzle=mz.r762.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "handguard=hg.ar.0 from loaded A",
-   "geometry": "90d57039b72ba939",
+   "geometry": "a19aacee4d364221",
    "info": "37ad7fa23ebbf30e"
   },
   "barrel=br.7.62x51.20,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=hg.ar.1,mag=sr25.mag,muzzle=mz.r762.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "handguard=hg.ar.1 from loaded A",
-   "geometry": "3dac1c34966be666",
+   "geometry": "4d5f50bf206ab11c",
    "info": "37ad7fa23ebbf30e"
   },
   "barrel=br.7.62x51.20,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=hg.ar.2,mag=sr25.mag,muzzle=mz.r762.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
@@ -814,7 +814,7 @@
   },
   "barrel=br.7.62x51.20,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=hg.ar.4,mag=sr25.mag,muzzle=mz.r762.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "handguard=hg.ar.4 from loaded A",
-   "geometry": "81a669ef91572481",
+   "geometry": "cef00ae7268eb1d5",
    "info": "37ad7fa23ebbf30e"
   },
   "barrel=br.7.62x51.20,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.5,mag=sr25.mag,muzzle=mz.r762.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
