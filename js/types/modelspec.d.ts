@@ -38,11 +38,11 @@ interface RecipeSpec<M = THREE.Material | null> {
   bolt?: number; lever?: boolean; cock?: Partial<CockHandle>; ch?: string; pump?: { f: number; len: number; m?: M; [field: string]: any }; tube?: number; tubeY?: number; saddle?: string | Record<string, any>;
   // the furniture
   grip?: number; gripT?: string; stock?: StockKind; hg?: HgSpec<M>; hgGap?: number; hgMax?: number; fg?: ForegripKind; fgAt?: number; vfg?: number; vfgM?: M; bipod?: number; slots?: string; under?: boolean;
-  tac?: string; tacL?: string; tacAt?: { f: number; y: number; x: number }; railmount?: string | Record<string, any>; railExt?: number;
+  tac?: string; tacL?: string; tacAt?: { f: number; y: number; x: number }; railmount?: string | Record<string, any>; railExt?: number; optRail?: [number, number] /* (a box receiver's optic rail, [rear, front] from the receiver's back, when not 15% to 85% of L) */;
   // the barrel and what's on it
   barrel?: BarrelSpec; rib?: boolean /* (its barrels carry a rib along the top, whatever sight is fitted) */; mbr?: number /* (the barrel radius a muzzle device is drawn for: the gun's, whatever profile its barrel has) */; blen?: number; barrels?: number[]; integral?: { len: number; r: number } | null; muzzle?: MuzzleKind; thread?: boolean; match?: boolean; can?: { from: number; r: number }; comp?: boolean; recoilBarrel?: number; bIn?: number;
   // the sights
-  optic?: OpticKind; apart?: string; optF?: number; optCut?: boolean | number; ironsAt?: number[]; sightRise?: number; magnifier?: number | Record<string, any>; riser?: number; ret?: ReticleKind; dotR?: number; dotLen?: number; px?: number; scopeLen?: number; scopeObj?: number; calc?: boolean; closed?: boolean;
+  optic?: OpticKind; apart?: string; optF?: number; optFMag?: number /* (the sight's place with a magnifier behind it, when not optF: the MP5's claw mount, its short rail) */; optCut?: boolean | number; ironsAt?: number[]; sightRise?: number; magnifier?: number | Record<string, any>; riser?: number; ret?: ReticleKind; dotR?: number; dotLen?: number; px?: number; scopeLen?: number; scopeObj?: number; calc?: boolean; closed?: boolean;
   // the magazine and where things sit
   mag?: MagSpec<M>; magFit?: { len: number; c: number; d: number }; support?: number; chY?: number; chF?: number; slotOf?: Record<string, string>;
   // the odd ones

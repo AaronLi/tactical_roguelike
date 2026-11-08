@@ -15,6 +15,22 @@ const G_GunRecipes = (() => {
   const Mk = M as Record<string, () => THREE.MeshStandardMaterial>; // (a material looked up by name)
   type Tracer = (p: number[]) => number[]; // a traced reference photo's pixel -> [forward, up] in gun space
   type Trace = GunTrace; // one of tools/models/guntraces.ts's tables of traced outlines
+  // FEET (for tools/check_magnifier_rails.mjs only; nothing is drawn by it): with a log set (feetLog), each rail records its span and top, and each
+  // reflex sight and magnifier the span of its foot along the rail and the top it stands on, [forward from, forward to] in the gun's frame
+  type Foot = { kind: 'rail' | 'sight' | 'magnifier'; f0: number; f1: number; top: number; what?: string };
+  let feetLog: Foot[] | null = null;
+  const foot = (kind: Foot['kind'], f0: number, f1: number, top: number, what?: string) => { if (feetLog) feetLog.push({ kind, f0, f1, top, what }); };
+  // an authored optic's foot along the rail, in its own frame: the forward span of its vertices on the rail top (y under 4 mm)
+  const apFoot = new Map<string, number[]>();
+  function authoredFoot(key: string) {
+    let r = apFoot.get(key);
+    if (!r) {
+      r = [Infinity, -Infinity];
+      for (const e of G.AuthoredParts.get(key).meshes) for (let i = 0; i < e.pos.length; i += 3) if (e.pos[i + 1] < 0.004) { r[0] = Math.min(r[0], -e.pos[i + 2]); r[1] = Math.max(r[1], -e.pos[i + 2]); }
+      apFoot.set(key, r);
+    }
+    return r;
+  }
   type Anim = Record<string, any>; // a recipe's animated parts, by name
   type Sight = { sy: number; fSight: number; relief: number };
 
@@ -151,12 +167,13 @@ const G_GunRecipes = (() => {
         for (let i = 0; i < n; i++) k.box(0.023, 0.004, 0.0052, m, f0 + 0.003 + i * 0.0105, y + 0.009);
       };
       if (k.slot === 'optic') k.at('mount', build); else build();
+      foot('rail', f0, f0 + len, y + 0.011);
       return y + 0.011;
     },
     // Reflex sights record their window in k.reflex; the viewmodel puts a collimated reticle behind it.
     reddot(k: Kit, f: number, top: number, o: RecipeSpec = {}) { // a tube on a QD riser (30 mm by default): turrets, brightness dial
       const R = o.dotR || 0.02, len = o.dotLen || 0.056, f0 = f - len / 2, sy = top + 0.014 + R;
-      k.box(0.03, 0.01, 0.05, M.black(), f - 0.025, top + 0.005);
+      k.box(0.03, 0.01, 0.05, M.black(), f - 0.025, top + 0.005); foot('sight', f - 0.025, f + 0.025, top, 'reddot');
       k.box(0.02, sy - top - 0.012, 0.03, M.black(), f - 0.015, (sy + top) / 2 - 0.006);
       k.box(0.006, 0.008, 0.022, M.black(), f - 0.011, top + 0.007, 0.018);
       k.cyl(R, len, M.tubeDS(), f0, sy, 0, R, 24, true);
@@ -173,7 +190,7 @@ const G_GunRecipes = (() => {
     holo(k: Kit, f: number, top: number) { // box-hooded holographic sight, battery and electronics in the base
       const sy = top + 0.033, wW = 0.033, wH = 0.027, f0 = f - 0.034, f1 = f + 0.03;
       const yb = top + 0.012, yt = sy + wH / 2 + 0.003, hl = f1 - f0 - 0.012;
-      k.box(0.04, 0.012, f1 - f0, M.black(), f0, top + 0.006);
+      k.box(0.04, 0.012, f1 - f0, M.black(), f0, top + 0.006); foot('sight', f0, f1, top, 'holo');
       k.box(0.036, 0.008, 0.03, M.black(), f0, top + 0.015);
       for (const x of [-1, 1]) k.box(0.004, yt - yb, hl, M.black(), f0 + 0.012, (yt + yb) / 2, x * (wW / 2 + 0.002));
       k.box(wW + 0.008, 0.004, hl, M.black(), f0 + 0.012, yt + 0.002);
@@ -349,6 +366,7 @@ const G_GunRecipes = (() => {
     // An open reflex sight (pistol size, on the slide; o.riser lifts it to rifle height on a rail), or an enclosed
     // one (o.closed: a hood all round, glass at both ends)
     minidot(k: Kit, f: number, top: number, o: RecipeSpec = {}) {
+      foot('sight', f - (o.riser ? 0.017 : 0.016), f + (o.riser ? 0.017 : 0.016), top, 'minidot'); // (on a riser: the riser's foot)
       if (o.riser) { const rh = o.riser; k.at('mount', () => k.box(0.024, rh, 0.034, M.black(), f - 0.017, top + rh / 2)); top += rh; } // (a riser dot: a mount piece, the dot above it is the same dot as ever)
       const sy = top + 0.016;
       k.box(0.024, 0.008, 0.032, M.black(), f - 0.016, top + 0.004);
@@ -365,20 +383,24 @@ const G_GunRecipes = (() => {
     // magnifies the dot; swung out and down beside the receiver (about -160°) you look past it. Its rear lens is the picture-in-picture lens.
     // Built from the optic's mount_magnifier anchor alone, [its fSight, its sy]: the tube on the sight line, the foot and hinge below it
     // by fixed amounts (the foot's base 34 mm under it, a red dot's height over its rail; on a lower sight the foot sinks into the rail),
-    // so the magnifier's shape is its own and the optic only moves it.
+    // so the magnifier's shape is its own and the optic only moves it. The foot, the hinge block and the flip arm are at the tube's FRONT end,
+    // right behind the sight (fSight - 59 mm .. fSight - 25 mm, whatever the tube's length): the tube reaches back over the rail from there,
+    // and swings out about a forward axis at its front. So the foot needs only 34 mm of rail behind the sight (the MP5's short claw-mount rail).
     magnifier(k: Kit, sight: { sy: number; fSight: number }, m: any, anim: Anim) {
-      const sy = sight.sy, top = sy - 0.034, len = m.len || 0.085, R = 0.0165, fRear = sight.fSight - 0.025 - len, fc = fRear + len * 0.5;
+      const sy = sight.sy, top = sy - 0.034, len = m.len || 0.075, R = 0.0165, fFront = sight.fSight - 0.025, fRear = fFront - len, fc = fRear + len * 0.5;
+      const fm = fFront - 0.017; // (the foot's and the hinge's middle, 34 mm long, ending at the tube's front)
+      foot('magnifier', fm - 0.017, fm + 0.017, top, 'magnifier ' + len);
       k.anchor('optic', 'mount_magnifier', [sight.fSight, sy, 0]);
       const hx = 0.024, hy = top + 0.014;
-      k.box(0.03, 0.012, 0.034, M.black(), fc - 0.017, top + 0.006);
-      k.box(0.008, 0.014, 0.03, M.black(), fc - 0.015, hy, hx);
-      const hinge = k.hang(new T.Group(), hx, hy, fc);
-      const add = (geo: THREE.BufferGeometry, mat: THREE.Material, x: number, y: number, f: number) => { const mesh = new T.Mesh(geo, mat); mesh.position.set(x - hx, y - hy, -(f - fc)); mesh.userData.slot = k.slot; hinge.add(mesh); return mesh; };
+      k.box(0.03, 0.012, 0.034, M.black(), fm - 0.017, top + 0.006);
+      k.box(0.008, 0.014, 0.034, M.black(), fm - 0.017, hy, hx);
+      const hinge = k.hang(new T.Group(), hx, hy, fm);
+      const add = (geo: THREE.BufferGeometry, mat: THREE.Material, x: number, y: number, f: number) => { const mesh = new T.Mesh(geo, mat); mesh.position.set(x - hx, y - hy, -(f - fm)); mesh.userData.slot = k.slot; hinge.add(mesh); return mesh; };
       const tube = new T.CylinderGeometry(R, R * 1.08, len, 24, 1, true); tube.rotateX(Math.PI / 2); add(tube, M.tubeDS(), 0, sy, fc);
-      for (const ff of [fRear, fRear + len]) { const ring = new T.TorusGeometry(R, 0.0025, 6, 24); add(ring, M.black(), 0, sy, ff); }
-      add(new T.BoxGeometry(0.02, sy - hy - R + 0.004, 0.026), M.black(), hx * 0.45, (sy - R + hy) / 2, fc);
-      const front = new T.CircleGeometry(R * 0.95, 24); add(front, M.lens(), 0, sy, fRear + len - 0.002);
-      k.pip = { f: fRear - 0.001, y: sy, r: R - 0.0015, parent: hinge, pos: new T.Vector3(-hx, sy - hy, -(fRear - 0.001 - fc)) };
+      for (const ff of [fRear, fFront]) { const ring = new T.TorusGeometry(R, 0.0025, 6, 24); add(ring, M.black(), 0, sy, ff); }
+      add(new T.BoxGeometry(0.02, sy - hy - R + 0.004, 0.026), M.black(), hx * 0.45, (sy - R + hy) / 2, fm);
+      const front = new T.CircleGeometry(R * 0.95, 24); add(front, M.lens(), 0, sy, fFront - 0.002);
+      k.pip = { f: fRear - 0.001, y: sy, r: R - 0.0015, parent: hinge, pos: new T.Vector3(-hx, sy - hy, -(fRear - 0.001 - fm)) };
       anim.magn = hinge;
       return { sy, fSight: fRear, relief: 0.075 };
     },
@@ -929,6 +951,7 @@ const G_GunRecipes = (() => {
   const isDot = (o: RecipeSpec) => o.optic === 'minidot' || o.optic === 'authored';
   const pistolDot = (k: Kit, o: RecipeSpec, f: number, top: number) => (o.optic === 'authored' ? authoredOptic(k, o, f, top) : S.minidot(k, f, top, o));
   function authoredOptic(k: Kit, o: RecipeSpec, f: number, top: number) {
+    if (feetLog) { const af = authoredFoot(o.apart!); foot('sight', o.riser ? f - 0.017 : f + af[0], o.riser ? f + 0.017 : f + af[1], top, o.apart); } // (on a riser: the riser's foot)
     if (o.riser) { const rh = o.riser; k.at('mount', () => k.box(0.024, rh, 0.034, M.black(), f - 0.017, top + rh / 2)); top += rh; }
     return G.AuthoredParts.place(k, o.apart!, f, top, !!o.riser);
   }
@@ -1074,7 +1097,7 @@ const G_GunRecipes = (() => {
       if (tr) { tracedParts(k, tr, VT, 'base', mats); top = VT([0, tr.topY])[1]; }
       else { k.prof([[0, -H * 0.55], [0, H * 0.45], [L, H * 0.45], [L, -H * 0.55]], Wd, rm); top = H * 0.45; }
       if (o.siderails) for (const x of [-1, 1]) sideRail(k, L * 0.58, L * 0.38, -0.004, x * (Wd / 2 + 0.0035)); // (a short rail each side of the front: an MP7's)
-      if (o.optic && !(['irons', 'notch', 'bead', 'none'] as (string | undefined)[]).includes(o.optic)) { rcvTop = top; top = k.under('optic', () => S.rail(k, L * 0.15, L * 0.7, top, rm)); } // (the optic's rail: it is there only with one)
+      if (o.optic && !(['irons', 'notch', 'bead', 'none'] as (string | undefined)[]).includes(o.optic)) { rcvTop = top; top = k.under('optic', () => S.rail(k, o.optRail ? o.optRail[0] : L * 0.15, o.optRail ? o.optRail[1] - o.optRail[0] : L * 0.7, top, rm)); } // (the optic's rail: it is there only with one)
     } else if (rcv === 'authored') {
       // A gun made in Blender: the receiver is the model's own. With an optic (or a riser, A.sights.rail), a rail along the model's optic mount, or
       // the model's own adapter (A.rig.mount: the MP5's claw mount, its meshes extras.mount), the sight on its rail
@@ -1085,7 +1108,8 @@ const G_GunRecipes = (() => {
       if (o.optic && (!ownIrons || A!.sights.rail.includes(o.optic))) {
         rcvTop = top;
         const mt = A!.rig.mount;
-        if (mt) top = k.under('optic', () => k.at('mount', () => { authored(k, A!, (e) => !!e.mount); return mt.top; })); // (a mount piece, optic@mount, like the rail it replaces)
+        if (mt) { top = k.under('optic', () => k.at('mount', () => { authored(k, A!, (e) => !!e.mount); return mt.top; })); foot('rail', mt.rail[0], mt.rail[1], mt.top, 'mount'); } // (a mount piece, optic@mount, like the rail it replaces)
+        else if (A!.sights.railed) foot('rail', A!.rig.rail[0], A!.rig.rail[1], top, 'receiver');
         else if (!A!.sights.railed) top = k.under('optic', () => S.rail(k, A!.rig.rail[0], A!.rig.rail[1] - A!.rig.rail[0], top, rm)); // (railed: the model's receiver top is the rail)
       }
     } else if (rcv === 'round') {
@@ -1662,8 +1686,8 @@ const G_GunRecipes = (() => {
 
     // sights
     k.tag('optic');
-    // (with a magnifier behind it on a sleeve carried forward, the sight goes forward along that rail to leave it room)
-    const ofs = tr && tr.sleeve && o.hgGap && o.magnifier ? magOfs(o, VT([tr.sleeve.railBack, 0])[0], hgF - 0.012 - VT([tr.sleeve.railBack, 0])[0], 0) : o.optF != null ? o.optF : bull ? L * 0.65 : L * 0.5;
+    // (with a magnifier behind it on a sleeve carried forward, the sight goes forward along that rail to leave it room; on a short rail of the gun's own, optFMag: the MP5's claw mount)
+    const ofs = tr && tr.sleeve && o.hgGap && o.magnifier ? magOfs(o, VT([tr.sleeve.railBack, 0])[0], hgF - 0.012 - VT([tr.sleeve.railBack, 0])[0], 0) : o.magnifier && o.optFMag != null ? o.optFMag : o.optF != null ? o.optF : bull ? L * 0.65 : L * 0.5;
     // (a break-action's bead and rib are on its barrels, so they tip open with them)
     const onBarrels = brk && ((o.optic || 'irons') === 'bead' || tr);
     if (onBarrels) k.into(brk, L, hy);
@@ -2400,7 +2424,7 @@ const G_GunRecipes = (() => {
     k.tag('optic');
     let sight: Sight;
     if (!o.optic || o.optic === 'bead') sight = sightOf(k, { ...o, optic: 'bead' }, top, L, bl, outer, front, L * 0.5, true, 0);
-    else { const rt = S.rail(k, 0.008, L - BLK - 0.012, top, M.black()); sight = magIn(k, sightOf(k, o, rt, L, bl, outer, front, magOfs(o, 0.008, L - BLK - 0.012, (L - BLK) * 0.5), true, 0), rt, o, anim); }
+    else { const rt = S.rail(k, 0.004, 0.137, top, M.black()); sight = magIn(k, sightOf(k, o, rt, L, bl, outer, front, magOfs(o, 0.004, 0.137, (L - BLK) * 0.5) + (o.magnifier ? 0.003 : 0), true, 0), rt, o, anim); }
     k.tag('stock');
     if (o.stock) stock(k, o.stock, o.sm || M.wood(), true, o.apStock);
     k.tag('base');
@@ -2483,8 +2507,8 @@ const G_GunRecipes = (() => {
     k.tag('stock');
     stock(k, o.stock || 'wire', o.sm || M.blued(), false, o.apStock);
     k.tag('optic');
-    const rt = o.optic && o.optic !== 'notch' && S.rail(k, 0.05, 0.12, 0.024, M.black());
-    const sight = rt ? magIn(k, sightOf(k, o, rt, bl, bl, 0.024, bl, magOfs(o, 0.05, 0.12, 0.1), true, 0), rt, o, anim) : S.notch(k, 0.05, bl - 0.03, 0.042, 0.024, 0, true);
+    const rt = o.optic && o.optic !== 'notch' && S.rail(k, 0.033, 0.137, 0.024, M.black());
+    const sight = rt ? magIn(k, sightOf(k, o, rt, bl, bl, 0.024, bl, magOfs(o, 0.033, 0.137, 0.1) + (o.magnifier ? 0.003 : 0), true, 0), rt, o, anim) : S.notch(k, 0.05, bl - 0.03, 0.042, 0.024, 0, true);
     k.tag('base');
     return { sy: sight.sy, fSight: sight.fSight, relief: sight.relief || 0.3, muzzles: [[bl, 0, 0]], grip: [0.035, -0.075, 0], support: [0.2, -0.03, 0], anim, port: [0.0, 0.0, 0] };
   }
@@ -2643,7 +2667,7 @@ const G_GunRecipes = (() => {
     k.prof(pts([[170, 262], [170, 136], [186, 122], [470, 118], [496, 136], [530, 212], [530, 290], [462, 290], [456, 214], [430, 190], [252, 190], [250, 262]]), 0.044, B, 0,
       [pts([[420, 150], [482, 148], [486, 168], [422, 170]])]);
     for (const x of [-0.0232, 0.0232]) sideRail(k, F(410), F(250) - F(410), Y(161), x);
-    const top = S.rail(k, F(445), F(200) - F(445), Y(119), B);
+    const top = S.rail(k, F(470), F(187) - F(470), Y(119), B);
     k.tag('tac'); tactical(k, o.tac, F(232), Y(161), 0.0245);
     k.tag('tacL'); tactical(k, o.tacL, F(232), Y(161), -0.0245, -1);
     // the magazine: clear, lying along the top from the housing's front post to the stock, the rounds across it
@@ -2663,7 +2687,7 @@ const G_GunRecipes = (() => {
     k.tag('optic');
     // (irons at the two ends of the housing's rail; anything else in the middle of it)
     const anim = { mag: magP, handle: hp };
-    const sight = (['irons', 'notch', undefined] as (string | undefined)[]).includes(o.optic) ? S.irons(k, F(440), F(210), top + 0.034, top, top, o.irons || 'ar') : magIn(k, sightOf(k, o, top, F(167), bl, 0.0085, front, magOfs(o, F(445), F(200) - F(445), F(325))), top, o, anim);
+    const sight = (['irons', 'notch', undefined] as (string | undefined)[]).includes(o.optic) ? S.irons(k, F(440), F(210), top + 0.034, top, top, o.irons || 'ar') : magIn(k, sightOf(k, o, top, F(167), bl, 0.0085, front, magOfs(o, F(470), F(187) - F(470), F(325)) + (o.magnifier ? 0.003 : 0)), top, o, anim);
     k.tag('base');
     return { sy: sight.sy, fSight: sight.fSight, relief: sight.relief, muzzles: [[front, 0, 0]], grip: [F(468), Y(425), 0], support: [F(300), Y(445), 0], anim, handle,
       magAt: [m0 + 0.08, my], magTop: true, chamberAt: { side: 'right', f: F(780), y: Y(275), x: 0.028 } };
@@ -2699,7 +2723,10 @@ const G_GunRecipes = (() => {
   // (skin: the gun's stickers, js/stickers.ts.) Nothing of this runs in the game: it loads baked glTF (js/gunmodels.ts).
   function display(def: any, skin?: any) { const k = kit(); const info = build(k, def); if (skin && skin.length) G.Stickers.decorate(k.g, skin); return { group: k.g, info }; }
 
-  return { M, build, display, roundDims, roundShape, quarrel };
+  // the gun's rails and the feet of its reflex sight and magnifier (tools/check_magnifier_rails.mjs): display() with a log
+  function feet(def: any) { const log: Foot[] = []; feetLog = log; try { const r = display(def); return { ...r, feet: log }; } finally { feetLog = null; } }
+
+  return { M, build, display, feet, roundDims, roundShape, quarrel };
 })();
 G.GunRecipes = G_GunRecipes;
 interface GameModules { GunRecipes: typeof G_GunRecipes; }
