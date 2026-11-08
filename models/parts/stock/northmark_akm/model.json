@@ -1,0 +1,26 @@
+{
+  "source": "authored",
+  "kind": "part",
+  "slot": "stock",
+  "frame": "stock-mount",
+  "anchors": {
+    "butt": [
+      -0.244,
+      -0.052,
+      0
+    ],
+    "cheek": [
+      -0.15,
+      -0.004,
+      0
+    ]
+  },
+  "part": {
+    "mount": "ak",
+    "position": "fixed (the AKM laminate, 246 mm)"
+  },
+  "replaces": [
+    "Northmark stock",
+    "Northmark stock (Laminate)"
+  ]
+}
