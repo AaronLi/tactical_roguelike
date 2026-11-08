@@ -3,8 +3,6 @@
   "hailstorm": { "maxMm": 63.4, "why": "the magnifier's foot 39-63 mm behind its 72 mm rail, and the long dots' own feet 4-8 mm off its rear" },
   "skorp": { "maxMm": 47, "why": "the magnifier's foot 23-47 mm behind the rail's rear" },
   "mp7": { "maxMm": 42, "why": "the magnifier's foot 18-42 mm behind the rail's rear" },
-  "m4": { "maxMm": 41.6, "why": "the magnifier's foot 18-42 mm behind the flat-top's rear (the sight at mid-rail)" },
-  "ar9": { "maxMm": 41.6, "why": "the magnifier's foot 18-42 mm behind the flat-top's rear (the sight at mid-rail)" },
   "uzi": { "maxMm": 33, "why": "the magnifier's foot 9-33 mm behind the rail's rear" },
   "qbz95": { "maxMm": 25.7, "why": "the magnifier's foot up to 26 mm behind the handle rail's rear" },
   "p90": { "maxMm": 19.3, "why": "the magnifier's foot 8-19 mm behind the rail's rear" },
