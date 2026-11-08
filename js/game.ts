@@ -1385,7 +1385,7 @@ const G_Game = {
     const others = Object.keys(roster).filter((pid) => pid !== G.Net.myId), waiting = others.filter((pid) => !arms[pid]).length;
     const pic = (id: string) => { const it = G.Gear.gunItem(G.Me.makeWeapon(id, A.proOn(id) ? A.build(id) : undefined)), [cw, ch] = G.Gear.size(it); const url = G.Icons.of(it, cw, ch, false); return G.Icons.pending() ? '' : url; };
     // the web: a ring for each step out, spokes between, and the paths on it
-    const W = 1200, spokes = [...Array(6)].map((_, i) => ((-90 + i * 60) * Math.PI) / 180), spot = (a: number, r: number) => [Math.cos(a) * r, Math.sin(a) * r], rings = A.RINGS.slice(1);
+    const W = 1500, spokes = [...Array(6)].map((_, i) => ((-90 + i * 60) * Math.PI) / 180), spot = (a: number, r: number) => [Math.cos(a) * r, Math.sin(a) * r], rings = A.RINGS.slice(1);
     const web = rings.map((r) => `<polygon points="${spokes.map((a) => spot(a, r).map((v) => v.toFixed(1)).join()).join(' ')}"/>`).join('') + spokes.map((a) => { const [x, y] = spot(a, rings[rings.length - 1]); return `<line x1="0" y1="0" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"/>`; }).join('');
     const strands = A.NODES.filter((q) => q.from).map((q) => {
       const [x0, y0] = A.at(A.BY.get(q.from!)!), [x1, y1] = A.at(q), got = A.open(q.id), f = got ? 1 : A.open(q.from!) ? A.left(q) / q.n! : 0;
@@ -1395,7 +1395,8 @@ const G_Game = {
       const [x, y] = A.at(q), st = A.open(q.id) ? 'got' : A.open(q.from!) ? 'next' : 'far', tip = st === 'next' ? `<small>${A.left(q)}/${q.n} ${G.U.esc(q.what!)}</small>` : st === 'far' ? '<small>Locked</small>' : A.proGot(q.id) ? `<small>${A.proOn(q.id) ? 'Pro: ' : 'Pro earned: '}${G.U.esc(q.pro!.name)}</small>` : '';
       return `<button class="web-node ${st}${this.armLook === q.id ? ' look' : ''}${this.armSel === q.id ? ' sel' : ''}" data-arm="${q.id}" style="left:${x.toFixed(1)}px;top:${y.toFixed(1)}px">${((src) => src ? `<img src="${src}" alt="" draggable="false">` : '<span class="icon-wait"><span class="spin"></span></span>')(pic(q.id))}<b>${G.U.esc(A.name(q.id))}</b>${tip}</button>`;
     }).join('');
-    const paths = Object.entries(A.PATHS).map(([k, p]) => { const [x, y] = A.along(k, A.RINGS[p.len] + 165); return `<span class="web-path" style="left:${x.toFixed(1)}px;top:${y.toFixed(1)}px">${p.name}</span>`; }).join('');
+    // each path's name in a box over the middle of its first strand (the first ring is wide enough apart for them to sit clear of the nodes)
+    const paths = Object.entries(A.PATHS).map(([k, p]) => { const [x, y] = A.along(k, A.RINGS[1] / 2); return `<span class="web-path" style="left:${x.toFixed(1)}px;top:${y.toFixed(1)}px">${p.name}</span>`; }).join('');
     // what you're looking at: the gun, and what it takes
     const id = this.armLook, q = A.BY.get(id)!, d = G.WEAPONS[id], cal = G.CALIBERS[G.calOf(d)], got = A.open(id), modes = (d.modes || [d.mode]).map((m: string) => G.MODE_NAME[m]).join(' / ');
     const nextOn = A.NODES.filter((c) => c.from === id && !A.open(c.id)).map((c) => `<li><b>${G.U.esc(A.name(c.id))}</b> <span>${A.left(c)}/${c.n}</span> ${G.U.esc(c.what!)}<small>${G.U.esc(c.how!)}</small></li>`).join('');

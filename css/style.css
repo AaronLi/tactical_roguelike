@@ -827,7 +827,7 @@ i.c.heavy { background: #a02828; } i.c.light { background: #7a3a30; } i.c.frac {
 .web-lines polygon, .web-lines line { fill: none; stroke: rgba(255,255,255,0.07); stroke-width: 1.5; }
 .web-world .strand { stroke: rgba(255,255,255,0.16); stroke-width: 4; stroke-linecap: round; }
 .web-world .strand.on { stroke: var(--ui-text); stroke-width: 5; }
-.web-path { position: absolute; transform: translate(-50%, -50%); font: 500 13px var(--ui-font); letter-spacing: 6px; text-transform: uppercase; color: var(--ui-dim); white-space: nowrap; pointer-events: none; }
+.web-path { position: absolute; transform: translate(-50%, -50%); padding: 6px 12px; background: rgba(20, 24, 28, 0.92); border: 1px solid var(--ui-line); border-radius: var(--ui-r); font: 500 12px var(--ui-font); letter-spacing: 3px; text-transform: uppercase; color: var(--ui-dim); white-space: nowrap; pointer-events: none; }
 .web-node { position: absolute; transform: translate(-50%, -50%); width: 176px; padding: 10px 8px; display: flex; flex-direction: column; align-items: center; gap: 4px; background: rgba(20, 24, 28, 0.92); border: 1px solid var(--ui-line); border-radius: var(--ui-r); color: var(--ui-text); font-family: var(--ui-font); cursor: pointer; }
 .web-node img { height: 72px; max-width: 100%; object-fit: contain; pointer-events: none; }
 /* a gun picture still loading (js/icons.ts pending) */
