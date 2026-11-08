@@ -1,11 +1,11 @@
-// Bakes the game's procedural guns into glTF binaries (.glb), so the browser can load a model instead of building it.
+// Bakes the game's procedural guns into glTF binaries (.glb): every part's pieces, which the game assembles into any build (and, with --guns, whole default guns for the tools).
 //   npm run bake:models              (tsc, then this)         node tools/bake_models.mjs [id ...]   (just those guns)
 //   node tools/bake_models.mjs --check                        lists the bakes that are stale against the current code
-//   node tools/bake_models.mjs --guns | --parts [id ...]      only the whole default guns / only the per-part packs (default: both)
+//   node tools/bake_models.mjs --guns [--parts] [id ...]     also (or only) the whole default guns, assets/models/guns/ (for the tools: the game loads none; default: the pieces only)
 //   -j N | --jobs N (or MODEL_BAKE_JOBS=N)   worker threads (default min(cores - 1, 8); -j 1: one process). The output is byte-identical for any N.
 //   --verbose (every platform detail line, gltf-transform log lines)   --no-props (skip the props bake that a full run ends with: tools/bake_props.mjs)   --no-hangar (skip the hangar's scene: tools/bake_hangar.mjs, which needs a Chromium)   --no-bundle (skip the bundling that runs last: tools/bundle_models.mjs)
 //
-// WHAT IT DOES. Loads the compiled game (dist/js) in a vm with the node build of three r149, builds every platform's
+// WHAT IT DOES (--guns). Loads the compiled game (dist/js) in a vm with the node build of three r149, builds every platform's
 // DEFAULT build with G.GunRecipes.display(G.Gunsmith.compile(id, defaultBuild(id))), exports it with three's GLTFExporter,
 // then shrinks it with gltf-transform (dedup, weld, prune, quantize, meshopt: never join/flatten, the parts stay separate
 // nodes). Output (all git-ignored, regenerate with the script):
@@ -23,13 +23,13 @@
 // AUTHORED MODELS (made in Blender: models/<id>/<id>.glb + model.json { source: 'authored' }) are baked from that file, with no recipe of their own:
 // tools/bake_authored.mjs checks the source against the contract and the platform's spec (a missing anchor or slot fails the bake here, naming it), reads it
 // into G.Authored, and the generic seating of the other parts on its mount anchors (tools/models/recipes.ts rifle(), rcv 'authored') makes every build, so
-// the whole gun, the packs and their checks treat it like any other. docs/models.md "Authored models".
+// the whole gun, the pieces and their checks treat it like any other. docs/models.md "Authored models".
 //
-// PER-PART PACKS (milestone 2; tools/bake_parts.mjs, model_packs.mjs, model_emit.mjs, docs/models.md): next to guns/,
-//   assets/models/parts/<platform>/index.json            the platform index: which slots shape which (JOINT packs), the anchors (offsets
-//                                                        parts give other slots), the info model, the pack list per slot
-//   assets/models/parts/<platform>/<slot>/<file>.glb     one pack: one slot's meshes for a combination of parts, in the gun's frame
-// guns/<id>.glb stays the fast path for default builds; js/glb.ts assemble(def) builds any build from the packs.
+// PER-PART PIECES (tools/bake_parts.mjs, model_parts.mjs, model_emit.mjs, docs/models.md "Per-part bake"): next to guns/,
+//   assets/models/parts/<platform>/index.json            the platform index: who draws each tag (its pieces, one per part), the offsets parts give
+//                                                        the others, the few rules beyond the sum (variants, conditions, caps, stretches), the info rules
+//   assets/models/parts/<platform>/<tag>/<file>.glb      one piece: one part's meshes of one tag (no combinations of parts)
+// js/glb.ts assemble(def) builds any build from the pieces by those rules; guns/<id>.glb (the default build, whole) is for the tools only.
 import fs from 'fs'; import path from 'path'; import os from 'os'; import crypto from 'crypto'; import { spawnSync } from 'child_process';
 import { ROOT } from './model_env.mjs';
 import * as THREE_NS from 'three';
@@ -51,7 +51,7 @@ for (let i = 0; i < argv.length; i++) {
   else only.push(a);
 }
 const check = flags.has('--check'), verbose = flags.has('--verbose'), noProps = flags.has('--no-props');
-const doGuns = !flags.has('--parts') || flags.has('--guns'), doParts = !flags.has('--guns') || flags.has('--parts');
+const doGuns = flags.has('--guns'), doParts = !flags.has('--guns') || flags.has('--parts'); // (the whole default guns only when asked: the game assembles every build from the pieces, the default one too)
 const jobs = Math.max(1, Math.floor(+(jobsArg || process.env.MODEL_BAKE_JOBS || Math.min((os.availableParallelism ? os.availableParallelism() : os.cpus().length) - 1, 8))) || 1);
 
 // ---- progress: [k/N] <what> <secs>s · elapsed · ETA (from the running mean)
@@ -80,7 +80,7 @@ for (const k of authoredPartKeys()) { // (the authored parts: sights etc. made i
 const platIds = Object.keys(GS.PLATFORMS || {}).filter((id) => G.WEAPONS[id]);
 const ids2 = only.length ? only : platIds.length ? platIds : G.WEAPON_LIST.map((w) => w.id);
 const pool = await makePool(jobs, { env, verbose });
-fs.mkdirSync(OUT, { recursive: true });
+if (doGuns) fs.mkdirSync(OUT, { recursive: true }); else if (!only.length && !check && doParts) fs.rmSync(OUT, { recursive: true, force: true }); // (a whole bake without them leaves none behind)
 console.log(`baking ${ids2.length} ${only.length ? 'platforms (' + ids2.join(' ') + ')' : 'platforms'} on ${jobs} ${jobs === 1 ? 'process' : 'worker threads'}${check ? ' (check)' : ''}`);
 
 // ---- how long each platform took last time (slowest first keeps the workers busy to the end); kept outside the repo, per checkout
@@ -129,9 +129,8 @@ if (doParts) {
     order: slowestFirst(ids2), partial: only.length > 0, log: console.log, phase,
     onPlatform: (p) => {
       times[p.id] = p.secs;
-      for (const l of p.logs.slice(0, -1)) console.log(l); // (a collapse that kept full keys, ...)
-      prog(p.id, p.secs, `${p.builds} builds ${p.cover} cover ${p.rounds} rounds ${p.reps.length} shapes`);
-      if (verbose) console.log(p.logs[p.logs.length - 1]);
+      prog(p.id, p.secs, `${p.builds} builds (${p.sampled} sampled) ${p.pieces.length} pieces ${p.reps.length} shapes`);
+      if (verbose) for (const l of p.logs) console.log(l);
     },
     onWrite: (total, k) => { // (about every tenth)
       if (!wprog) wprog = { t0: now(), total }; const step = Math.max(1, Math.ceil(total / 10));
@@ -143,13 +142,15 @@ if (doParts) {
     const old2 = fs.existsSync(PARTS_DIR + 'index.json') ? JSON.parse(fs.readFileSync(PARTS_DIR + 'index.json', 'utf8')).platforms : {};
     const plats = { ...(only.length ? old2 : {}), ...r.summary };
     const vals = Object.values(plats), sum = (k) => vals.reduce((a, x) => a + (x[k] || 0), 0);
-    const totals = { platforms: vals.length, packs: sum('entries'), files: sum('files'), bytes: sum('bytes'), gz: sum('gz'), sharedFiles: r.shared.files, sharedBytes: r.shared.bytes, sharedGz: r.shared.gz, index: sum('index'), indexGz: sum('indexGz'), builds: sum('builds'), coverBuilds: sum('coverBuilds') };
-    fs.writeFileSync(PARTS_DIR + 'index.json', JSON.stringify({ version: 2, src, platforms: plats, totals }, null, 1));
-    // what each platform's coverage was made of (the joint packs and info tables, with their combination counts): for docs/models.md and review
-    fs.writeFileSync(PARTS_DIR + 'coverage.json', JSON.stringify(Object.fromEntries(r.states.map((st) => [st.id, { builds: st.builds, coverBuilds: st.cover, rounds: st.rounds, combinations: st.stats, joint: st.joint, info: st.infoDeps }])), null, 1));
-    fs.writeFileSync(PARTS_DIR + 'couplings.json', JSON.stringify(r.couplings, null, 1)); // (slot pairs where one slot's part reshapes another's geometry: tools/model_policy.mjs)
+    const totals = { platforms: vals.length, pieces: sum('pieces'), anchors: sum('anchors'), files: sum('files'), bytes: sum('bytes'), gz: sum('gz'), sharedFiles: r.shared.files, sharedBytes: r.shared.bytes, sharedGz: r.shared.gz, index: sum('index'), indexGz: sum('indexGz'), builds: sum('builds'), sampled: sum('sampled') };
+    fs.writeFileSync(PARTS_DIR + 'index.json', JSON.stringify({ version: 3, src, platforms: plats, totals }, null, 1));
+    // the rules each platform's pieces follow beyond the plain sum (variants, condition slots, caps, pairs, stretches, thresholds, info maxima): for docs/models.md and review
+    fs.writeFileSync(PARTS_DIR + 'rules.json', JSON.stringify(Object.fromEntries(r.states.map((st) => [st.id, {
+      tags: Object.fromEntries(Object.entries(st.ix.tags).filter(([, T]) => T.vary || T.cond || T.stretch || T.show || T.cap || T.pair).map(([t, T]) => [t, Object.fromEntries(['from', 'vary', 'cond', 'stretch', 'show', 'cap', 'pair'].filter((k) => T[k] !== undefined).map((k) => [k, T[k]]))])),
+      info: Object.fromEntries(Object.entries(st.ix.info).filter(([, R]) => R.max || R.vary).map(([l, R]) => [l, { from: R.from, ...(R.vary ? { vary: R.vary } : {}), ...(R.max ? { max: R.max.by } : {}) }])),
+    }]).filter(([, x]) => Object.keys(x.tags).length || Object.keys(x.info).length)), null, 1));
     const gzAll = totals.gz + totals.sharedGz;
-    console.log(`\nbaked packs for ${vals.length} platforms: ${totals.packs} index entries; ${totals.files} platform files (${totals.bytes} B, ${totals.gz} B gzipped) + ${totals.sharedFiles} shared files (${totals.sharedBytes} B, ${totals.sharedGz} B gzipped) = ${gzAll} B gzipped (+ indexes ${totals.index} B, ${totals.indexGz} gzipped); ${totals.builds} builds (of which ${totals.coverBuilds} made to cover every combination) assemble from them`);
+    console.log(`\nbaked pieces for ${vals.length} platforms: ${totals.pieces} pieces, ${totals.anchors} offsets; ${totals.files} platform files (${totals.bytes} B, ${totals.gz} B gzipped) + ${totals.sharedFiles} shared files (${totals.sharedBytes} B, ${totals.sharedGz} B gzipped) = ${gzAll} B gzipped (+ indexes ${totals.index} B, ${totals.indexGz} gzipped); learnt from ${totals.builds} builds, ${totals.sampled} more sampled: every one assembles from them as the recipe builds it`);
     if (!only.length) { try { fs.writeFileSync(timesFile, JSON.stringify(times)); } catch (e) { /* the cache is a convenience */ } }
   }
 }

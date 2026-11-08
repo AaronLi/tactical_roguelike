@@ -91,7 +91,7 @@ export function check(models, B) {
   for (const p of files.keys()) {
     if (p.startsWith('parts/') && p.endsWith('/index.json')) {
       const id = p.split('/')[1]; let px; try { px = JSON.parse(files.get(p).toString('utf8')); } catch { errs.push(`${p} is not JSON`); continue; }
-      for (const t of Object.values(px.tags || {})) for (const e of t.packs || []) if (e.file) resolve('parts/' + (e.file.startsWith('_shared/') ? '' : id + '/') + e.file, `${p} (${e.file})`);
+      for (const t of Object.values(px.tags || {})) for (const e of Object.values(t.pieces || {})) if (e && e.file) resolve('parts/' + (e.file.startsWith('_shared/') ? '' : id + '/') + e.file, `${p} (${e.file})`);
     }
   }
   const pi = files.get('props/index.json');

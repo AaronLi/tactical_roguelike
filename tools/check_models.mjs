@@ -81,7 +81,7 @@ if (args.includes('--write')) {
     for (const e of r.errors) { bad++; console.error(`parts/${id}/index.json: ERROR ${e}`); }
     if (ix.platform !== id) fail(`parts/${id}/index.json is for platform ${ix.platform}`);
     const files = new Set(), fp = (f) => (f.startsWith('_shared/') ? path.join(pdir, f) : path.join(pdir, id, f));
-    for (const [tag, ti] of Object.entries(ix.tags || {})) for (const e of ti.packs || []) if (e.file) {
+    for (const [tag, ti] of Object.entries(ix.tags || {})) for (const e of Object.values(ti.pieces || {})) if (e && e.file) {
       if (!fs.existsSync(fp(e.file))) { fail(`parts/${id}: ${e.file} is in the index but missing`); continue; }
       if (!files.has(e.file) && !(e.file.startsWith('_shared/') && sharedSeen.has(e.file))) { files.add(e.file); sharedSeen.add(e.file); nf++; const rep = Models.validatePack(Models.describeGltfJson(Models.glbJson(fs.readFileSync(fp(e.file)))), tag); for (const m of rep.errors) { bad++; console.error(`parts/${id}/${e.file}: ERROR ${m}`); } }
     }

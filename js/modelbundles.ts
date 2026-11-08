@@ -215,7 +215,7 @@ function makeBundle(cfg: BundleCfg) {
   });
 }
 // The models: props/**, scenes/*.glb (the hangar: tools/bake_hangar.mjs) and parts/<id>/** (not the whole-gun files, the scenes'
-// data (for the tools and the Bevy port) nor the bake's reports: parts/index.json, coverage.json...).
+// data (for the tools and the Bevy port) nor the bake's reports: parts/index.json, rules.json...).
 // FORMAT 3: the files' format, in the manifest (v) and on the stored copy: 2 = meshopt with float32 positions, 3 = int16 positions the loader
 // undoes (js/glb.ts dequantize). A copy of another format is never used.
 const G_Bundles = makeBundle({

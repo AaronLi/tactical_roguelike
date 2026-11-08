@@ -7,75 +7,52 @@
   "properties": {
     "version": {
       "type": "number",
-      "description": "Index format version (2)."
+      "description": "Index format version (3)."
     },
     "platform": {
       "type": "string",
-      "description": "The platform (gun id) the packs are for."
+      "description": "The platform (gun id) the pieces are for."
     },
     "src": {
       "type": "string",
-      "description": "Hash of the recipe sources the packs came from (stale-pack detection)."
+      "description": "Hash of the recipe sources the pieces came from (stale-pack detection)."
     },
     "slots": {
       "type": "array",
       "items": {
         "type": "string"
       },
-      "description": "Every build slot seen in the platform's builds: the ones `anchors` is keyed by."
+      "description": "Every build slot seen in the platform's builds."
     },
     "tags": {
       "type": "object",
       "additionalProperties": {
         "type": "object",
         "properties": {
-          "dep": {
+          "from": {
             "type": "array",
             "items": {
               "type": "string"
             },
-            "description": "The build slots whose parts shape this tag: a pack's `key` lists a part for each, in this order."
+            "description": "The provider list: the first of these build slots that is filled draws the tag (its part's piece; none: the tag is absent); empty: the platform draws it."
           },
-          "packs": {
-            "type": "array",
-            "items": {
+          "pieces": {
+            "type": "object",
+            "additionalProperties": {
               "type": "object",
               "properties": {
-                "key": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  },
-                  "description": "A part id per `dep` slot (\"\" = the slot is empty; \"*\" = any part)."
-                },
                 "file": {
-                  "oneOf": [
-                    {
-                      "type": "string",
-                      "description": "The pack's file under the platform folder (or `_shared/<slot>/<file>.glb` under the parts folder: stored once for every platform); null when the tag is empty for this key."
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "description": "The pack's file under the platform folder (or `_shared/<slot>/<file>.glb` under the parts folder: stored once for every platform); null when the tag is empty for this key."
+                  "type": "string",
+                  "description": "The piece's file under the platform folder (or `_shared/<tag>/<file>.glb` under the parts folder: stored once for every platform)."
                 },
                 "at": {
-                  "oneOf": [
-                    {
-                      "type": "array",
-                      "items": {
-                        "type": "number"
-                      },
-                      "minItems": 3,
-                      "maxItems": 3,
-                      "description": "A shared pack: the move [forward, up, right] metres that places its stored geometry on this platform."
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "description": "A shared pack: the move [forward, up, right] metres that places its stored geometry on this platform."
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "minItems": 3,
+                  "maxItems": 3,
+                  "description": "The move [forward, up, right] metres from the file's geometry to where the piece sits when no part offsets it."
                 },
                 "nodes": {
                   "oneOf": [
@@ -84,25 +61,61 @@
                       "items": {
                         "type": "string"
                       },
-                      "description": "The part_ nodes the pack has meshes in (info.anim keys, before the meshes are loaded)."
+                      "description": "The part_ nodes the piece has meshes in."
                     },
                     {
                       "type": "null"
                     }
                   ],
-                  "description": "The part_ nodes the pack has meshes in (info.anim keys, before the meshes are loaded)."
+                  "description": "The part_ nodes the piece has meshes in."
+                },
+                "rear": {
+                  "oneOf": [
+                    {
+                      "type": "number",
+                      "description": "A stretched piece: the forward position (in the file) of the end it is stretched from."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A stretched piece: the forward position (in the file) of the end it is stretched from."
+                },
+                "len": {
+                  "oneOf": [
+                    {
+                      "type": "number",
+                      "description": "A stretched piece: its length in the file, metres (signed)."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A stretched piece: its length in the file, metres (signed)."
+                },
+                "len0": {
+                  "oneOf": [
+                    {
+                      "type": "number",
+                      "description": "A stretched piece: its length when no part changes it, metres (signed)."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "A stretched piece: its length when no part changes it, metres (signed)."
                 },
                 "tris": {
                   "oneOf": [
                     {
                       "type": "number",
-                      "description": "Triangles in the pack."
+                      "description": "Triangles in the piece."
                     },
                     {
                       "type": "null"
                     }
                   ],
-                  "description": "Triangles in the pack."
+                  "description": "Triangles in the piece."
                 },
                 "bytes": {
                   "oneOf": [
@@ -118,90 +131,202 @@
                 }
               },
               "required": [
-                "key"
+                "file",
+                "at"
               ],
               "additionalProperties": false
             },
-            "description": "The packs: the most specific matching key is used."
+            "description": "The pieces: \"<slot>=<part>\" (or \"\" for the platform's own), with \"#<label>\" for a variant."
+          },
+          "vary": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "by": {
+                    "type": "string",
+                    "description": "The deciding slot."
+                  },
+                  "key": {
+                    "type": "string",
+                    "description": "The spec key whose value decides."
+                  }
+                },
+                "required": [
+                  "by",
+                  "key"
+                ],
+                "additionalProperties": false,
+                "description": "Variants: the piece key gets \"#<label>\", the label being values[\"<by>=<part>\"][key] (or values[\"\"][key]; \"none\" when the slot is empty)."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Variants: the piece key gets \"#<label>\", the label being values[\"<by>=<part>\"][key] (or values[\"\"][key]; \"none\" when the slot is empty)."
+          },
+          "cond": {
+            "oneOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Condition slots: an offset `mount_<tag>?<slot>` applies only while that slot is filled."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Condition slots: an offset `mount_<tag>?<slot>` applies only while that slot is filled."
+          },
+          "stretch": {
+            "oneOf": [
+              {
+                "type": "boolean",
+                "description": "The piece is stretched along the bore: its length is len0 plus the parts' `len_<tag>` offsets."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The piece is stretched along the bore: its length is len0 plus the parts' `len_<tag>` offsets."
+          },
+          "show": {
+            "oneOf": [
+              {
+                "description": "The tag shows only while values[a] - values[b] > gt (two parts' spec values)."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The tag shows only while values[a] - values[b] > gt (two parts' spec values)."
+          },
+          "cap": {
+            "oneOf": [
+              {
+                "description": "On one axis the `of` slots' offsets give way to the `by` part's `cap_<tag>` (min or max)."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "On one axis the `of` slots' offsets give way to the `by` part's `cap_<tag>` (min or max)."
+          },
+          "pair": {
+            "oneOf": [
+              {
+                "description": "On one axis the offset is the min (or max) of two parts' `pair_<tag>` values (instead of the sum)."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "On one axis the offset is the min (or max) of two parts' `pair_<tag>` values (instead of the sum)."
           }
         },
         "required": [
-          "dep",
-          "packs"
+          "from",
+          "pieces"
         ],
         "additionalProperties": false
       },
-      "description": "Per mesh slot (tag): which build slots shape it and its packs."
+      "description": "Per tag (a mesh slot, or slot@anchor for a piece another part places): who draws it and its pieces."
     },
     "anchors": {
       "type": "object",
       "additionalProperties": {
         "type": "object",
+        "additionalProperties": {}
+      },
+      "description": "What each part gives: \"<slot>=<partId>\" -> { mount_<tag>: [f, u, r] offset, mount_<tag>?<slot>: offset while that slot is filled, len_<tag>: length, cap_<tag> / pair_<tag>: value }."
+    },
+    "values": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
         "additionalProperties": {
-          "type": "array",
-          "items": {
-            "type": "number"
-          },
-          "minItems": 3,
-          "maxItems": 3
+          "type": "string"
         }
       },
-      "description": "Offsets parts give other slots: \"<buildSlot>=<partId>\" -> { mount_<tag>: [forward, up, right] } (metres, added up over the build)."
+      "description": "The spec values variants and thresholds go by: \"<slot>=<partId>\" (or \"\" for the platform's own) -> { key: JSON text }."
     },
     "info": {
-      "type": "array",
-      "items": {
+      "type": "object",
+      "additionalProperties": {
         "type": "object",
         "properties": {
-          "dep": {
+          "from": {
             "type": "array",
             "items": {
               "type": "string"
             },
-            "description": "The build slots whose parts the table's leaves depend on: a row's `key` lists a part for each, in this order."
+            "description": "The provider list: the first filled slot whose part is not in skip provides the leaf (else the platform)."
           },
-          "leaves": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "description": "The info leaf paths (a/b/0: segments joined by \"/\", array indices as numbers) the rows give."
-          },
-          "rows": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "key": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  },
-                  "description": "A part id per `dep` slot (\"\" = the slot is empty; \"*\" = any part)."
+          "skip": {
+            "oneOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
                 },
-                "v": {
-                  "type": "array",
-                  "items": {},
-                  "description": "The value of each leaf, in the order of `leaves` ({ \"del\": 1 }: the leaf is absent)."
-                }
+                "description": "Parts (\"<slot>=<part>\") that do not provide it: the next one down does."
               },
-              "required": [
-                "key",
-                "v"
-              ],
-              "additionalProperties": false
-            },
-            "description": "One row per combination of parts: the most specific matching key is used."
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Parts (\"<slot>=<part>\") that do not provide it: the next one down does."
+          },
+          "own": {
+            "type": "object",
+            "additionalProperties": {},
+            "description": "Each provider's own value (\"\" the platform's; { \"del\": 1 }: the leaf is absent)."
+          },
+          "vary": {
+            "oneOf": [
+              {
+                "description": "The provider key gets \"#<label>\" as a tag's vary does."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The provider key gets \"#<label>\" as a tag's vary does."
+          },
+          "off": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": {},
+                "description": "Per provider slot: the other parts' offsets for the leaf, summed (x: \"<slot>=<part>\" -> number; y: condition slot -> those, while it is filled)."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Per provider slot: the other parts' offsets for the leaf, summed (x: \"<slot>=<part>\" -> number; y: condition slot -> those, while it is filled)."
+          },
+          "max": {
+            "oneOf": [
+              {
+                "description": "The leaf is the larger of the value and v[the part in `by`]."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The leaf is the larger of the value and v[the part in `by`]."
           }
         },
         "required": [
-          "dep",
-          "leaves",
-          "rows"
+          "from",
+          "own"
         ],
         "additionalProperties": false
       },
-      "description": "The `info` leaves as tables: each leaf is a function of the parts in some slots, and leaves with the same slots are one table."
+      "description": "The `info` leaves (a/b/0 paths): who provides each and how it moves."
     },
     "totals": {
       "oneOf": [
@@ -222,6 +347,7 @@
     "slots",
     "tags",
     "anchors",
+    "values",
     "info"
   ],
   "additionalProperties": false

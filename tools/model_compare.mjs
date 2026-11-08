@@ -1,7 +1,7 @@
 // Comparing a gun assembled from the packs with the recipe's own (tools/check_models_assembly.mjs, tools/check_model_cases.mjs), and the golden fingerprint of a gun.
 import crypto from 'crypto';
 import { meshesOf } from './model_sweep.mjs';
-import { cleanInfo } from './model_packs.mjs';
+import { cleanInfo } from './model_parts.mjs';
 import { matchTriangles } from './model_diff.mjs';
 
 const R4 = (x) => Math.round(x * 1e4);

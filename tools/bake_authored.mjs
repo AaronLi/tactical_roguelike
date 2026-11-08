@@ -13,7 +13,7 @@
 //                                      mount anchors as the frame the shared parts are seated on (rig), the sights rules, the factory info. The
 //                                      generic seating (rcv 'authored' in tools/models/recipes.ts rifle()) builds the whole gun from that, and the
 //                                      per-part packs, the platform index (anchors, info tables) and the sharing of the other guns' parts then come
-//                                      from the one pipeline every platform goes through (tools/model_packs.mjs, model_emit.mjs, bake_parts.mjs)
+//                                      from the one pipeline every platform goes through (tools/model_parts.mjs, model_emit.mjs, bake_parts.mjs)
 //   authoredSrc()                      the sources' text, for the bake's staleness hash
 // The .glb is read here with a small synchronous reader (positions, normals, indices, node transforms, extras): the recipes are synchronous.
 import fs from 'fs'; import path from 'path'; import { fileURLToPath } from 'url';

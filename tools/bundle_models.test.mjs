@@ -7,7 +7,7 @@ const B = loadBundles(); let failed = 0, ran = 0;
 const ok = (name, cond, extra = '') => { ran++; if (!cond) { failed++; console.error('FAIL ' + name + (extra ? ': ' + extra : '')); } };
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'rtb-'));
 const put = (root, rel, data) => { const f = path.join(root, rel); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, data); };
-const index = (packs) => JSON.stringify({ version: 2, tags: { barrel: { dep: ['barrel'], packs: packs.map((file) => ({ key: ['*'], file })) } } });
+const index = (files) => JSON.stringify({ version: 3, tags: { barrel: { from: ['barrel'], pieces: Object.fromEntries(files.map((file, i) => ['barrel=p' + i, { file, at: [0, 0, 0] }])) } } });
 function tree() {
   const r = tmp();
   put(r, 'parts/aa/index.json', index(['barrel/a.glb', 'barrel/c.glb', '_shared/optic/s.glb', '_shared/optic/t.glb'])); put(r, 'parts/aa/barrel/a.glb', Buffer.from('glb-a')); put(r, 'parts/aa/barrel/c.glb', Buffer.from('glb-c'));

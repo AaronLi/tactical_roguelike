@@ -63,9 +63,22 @@ expectPack('owner must be a boolean', packRoot([pnode('group_barrel_1', [bm()], 
 expectPack('anchors do not belong in a pack', packRoot([pnode('group_barrel_1', [bm()], { anchors: {} })]), /a pack carries no extras\.anchors/);
 expectPack('unknown material', packRoot([bm('barrel_1', 'barrel', 'foo')]), /material 'foo' is not in the catalogue/);
 // the platform index
-const ix = () => ({ version: M.PARTS_INDEX_VERSION, platform: 'x', src: 'abc', slots: ['barrel', 'handguard'], tags: { barrel: { dep: ['barrel'], packs: [{ key: ['b1'], file: 'barrel/b1.glb' }, { key: ['b2'], file: '_shared/barrel/ab.glb', at: [0.1, 0, 0], nodes: ['part_barrel'] }] }, handguard: { dep: ['barrel', 'handguard'], packs: [{ key: ['*', 'h1'], file: null }] } },
-  anchors: { 'barrel=b2': { mount_muzzle: [0.05, 0, 0] } },
-  info: [{ dep: ['barrel'], leaves: ['sy', 'muzzles/0/0'], rows: [{ key: ['b1'], v: [0.07, 0.5] }, { key: ['b2'], v: [0.071, 0.55] }] }, { dep: ['barrel', 'handguard'], leaves: ['support/0', 'gone'], rows: [{ key: ['*', 'h1'], v: [0.2, { del: 1 }] }, { key: ['b2', 'h1'], v: [0.25, 3] }] }] });
+const ix = () => ({ version: M.PARTS_INDEX_VERSION, platform: 'x', src: 'abc', slots: ['barrel', 'grip', 'handguard', 'magnifier', 'optic'],
+  tags: {
+    barrel: { from: ['barrel'], pieces: { 'barrel=b1': { file: 'barrel/b1.glb', at: [0, 0, 0] }, 'barrel=b2': { file: '_shared/barrel/ab.glb', at: [0.1, 0, 0], nodes: ['part_barrel'] } } },
+    handguard: { from: ['handguard'], pieces: { 'handguard=h1': { file: 'handguard/h1.glb', at: [0, 0, 0] } }, show: { a: ['barrel', 'barrel.len'], b: ['handguard', 'hg.len'], gt: 0.05 } },
+    optic: { from: ['optic'], pieces: { 'optic=o1': { file: 'optic/o1.glb', at: [0, 0.02, 0] } }, cond: ['magnifier'] },
+    'optic@rib': { from: ['optic'], pieces: { 'optic=o1#"r"': { file: 'optic-on-rib/o1.glb', at: [0, 0, 0], rear: 0.1, len: 0.2, len0: 0.2 } }, stretch: true, vary: { by: 'barrel', key: 'rib' } },
+    tac: { from: ['handguard'], pieces: { 'handguard=h1': { file: 'tac/h1.glb', at: [0, 0, 0] } }, pair: { axis: 0, h: 'handguard', by: 'barrel', op: 'min' } },
+  },
+  anchors: { 'barrel=b2': { mount_handguard: [0.05, 0, 0], 'mount_optic?magnifier': [0.01, 0, 0], len_optic: 1, 'len_optic@rib': 0.1, pair_tac: 0.3 }, 'handguard=h1': { pair_tac: 0.2 }, 'barrel=b1': { pair_tac: 0.1 } },
+  values: { '': { rib: '"r"', 'barrel.len': '0.3' }, 'barrel=b2': { 'barrel.len': '0.4' }, 'handguard=h1': { 'hg.len': '0.3' } },
+  info: {
+    sy: { from: ['optic'], own: { '': 0.06, 'optic=o1': 0.07 } },
+    'muzzles/0/0': { from: ['barrel'], own: { 'barrel=b1': 0.5, 'barrel=b2': 0.55 }, max: { by: 'grip', v: { g9: 0.6 } } },
+    'support/0': { from: ['handguard'], own: { '': 0.1, 'handguard=h1': 0.2 }, off: { handguard: { x: { 'barrel=b2': 0.05 } } } },
+    gone: { from: ['barrel'], own: { 'barrel=b1': { del: 1 }, 'barrel=b2': 3 } },
+  } });
 const expectIx = (label, mut, re) => {
   const o = ix(); mut(o); const r = M.validatePartsIndex(o), all = r.errors.join('\n'), ok = re === null ? r.errors.length === 0 : re.test(all);
   if (!ok) { bad++; console.error(`FAIL index ${label}: expected ${re}, got:\n  ${all || '(nothing)'}`); } else console.log('ok   index ' + label);
@@ -73,13 +86,13 @@ const expectIx = (label, mut, re) => {
 expectIx('a valid index', () => {}, null);
 expectIx('a missing field', (o) => { delete o.anchors; }, /index\.anchors: missing/);
 expectIx('an unknown field', (o) => { o.extra = 1; }, /index\.extra: unknown field/);
-expectIx('a key that does not line up with dep', (o) => { o.tags.barrel.packs[0].key = ['b1', 'h1']; }, /key has 2 parts for 1 dep slots/);
-expectIx('a tag that is not a slot', (o) => { o.tags.nowhere = { dep: [], packs: [] }; }, /index\.tags\.nowhere: not a slot/);
-expectIx('a stretch (there is none: a part is modelled at its own size)', (o) => { o.tags.handguard.packs[0].stretch = { from: 0.1, to: 0.3, gain: 1 }; }, /stretch: unknown field/);
-expectIx('an anchor with two numbers', (o) => { o.anchors['barrel=b2'].mount_muzzle = [1, 2]; }, /expected 3 numbers/);
-expectIx('an info row with too few values', (o) => { o.info[0].rows[0].v.pop(); }, /rows\[0\]\.v has 1 values for 2 leaves/);
-expectIx('an info row key that does not line up', (o) => { o.info[0].rows[0].key = ['b1', 'h1']; }, /rows\[0\]\.key has 2 parts for 1 dep slots/);
-expectIx('the old reference builds are gone', (o) => { o.bases = []; }, /index\.bases: unknown field/);
+expectIx('a piece of a slot not in its provider list', (o) => { o.tags.barrel.pieces['grip=g1'] = { file: 'barrel/g1.glb', at: [0, 0, 0] }; }, /grip is not in its from/);
+expectIx('a provider slot the index has not', (o) => { o.tags.barrel.from = ['nowhere']; }, /"nowhere" is not one of the index's slots/);
+expectIx('a tag that is not a slot', (o) => { o.tags.nowhere = { from: [], pieces: {} }; }, /index\.tags\.nowhere: not a slot/);
+expectIx('a piece without its move', (o) => { delete o.tags.barrel.pieces['barrel=b1'].at; }, /at: missing/);
+expectIx('the old packs are gone', (o) => { o.tags.barrel.packs = []; }, /packs: unknown field/);
+expectIx('the old info tables are gone', (o) => { o.info = [{ dep: [], leaves: [], rows: [] }]; }, /index\.info/);
+expectIx('an older index', (o) => { o.version = 2; }, /index\.version is 2/);
 // authored sources (a gun modelled in Blender: M.validateAuthored, GUN_MODEL_CONTRACT.authored)
 const ANCH = () => ({ mount_optic: [0.01, 0.023, 0], mount_optic_end: [0.18, 0.023, 0], mount_handguard: [0.3, 0, 0], mount_handguard_end: [0.53, 0, 0], mount_barrel: [0.6, 0, 0], mount_muzzle: [0.73, 0, 0], mount_stock: [0, -0.018, 0], mount_grip: [0.066, -0.045, 0], mount_mag: [0.22, -0.043, 0] });
 const aGun = (over = {}, kids = [B(), mesh('barrel_2', 'barrel', 'black')], rootOver = {}) => ({ roots: [{ name: 'x', extras: { gun: 'x', info: { ...info(), magAt: [0.22, -0.043], anim: { mag: 'part_mag' }, ...over.info }, anchors: ANCH(), ...rootOver }, mesh: false, uv: false, materials: [], children: [...kids, part('mag', [mesh('mag_3', 'mag')])] }] });
@@ -166,12 +179,18 @@ const leavesBack = (v) => canon(M.infoFromLeaves(M.infoLeaves(v)));
 for (const v of [{ sy: 0.07, muzzles: [[0.5, 0, 0], [0.5, 0, 0.01]], chamberAt: { side: 'top', f: 0.1, y: 0.02, x: 0, w: 0.01 }, handle: null, pistol: true, load: { at: [[0.1, 0.2]], pitch: 0.4 }, anim: {}, empty: [] }]) {
   if (leavesBack(v) === canon(v)) console.log('ok   info leaves round trip'); else { bad++; console.error('FAIL info leaves round trip: ' + leavesBack(v)); }
 }
-const plan = M.planBuild(ix(), { barrel: 'b2', handguard: 'h1' });
-const near = M.planBuild(ix(), { barrel: 'b1', handguard: 'h9' });
-const plan2 = M.planBuild(ix(), { barrel: 'b1', handguard: 'h1' });
-// exact covers: the most specific row / pack, the shared pack's move, the anchors' mounts, the absent leaf, the part nodes
-if (plan.approx === null && plan.info.sy === 0.071 && plan.info.muzzles[0][0] === 0.55 && plan.info.support[0] === 0.25 && plan.info.gone === 3 && plan.tags[0].at[0] === 0.1 && plan.info.mounts.mount_muzzle[0] === 0.05 && plan.info.anim.barrel === 'part_barrel'
-  && plan2.approx === null && plan2.info.support[0] === 0.2 && !('gone' in plan2.info) && plan2.tags.length === 2 && plan2.tags[1].entry === null) console.log('ok   planBuild picks packs and the most specific info rows, shared packs, mounts'); else { bad++; console.error('FAIL planBuild: ' + JSON.stringify(plan)); }
-// a combination nothing covers is still planned (the nearest pack and row) and says what was not covered exactly
-if (near.approx && near.tags.length === 2 && near.info.sy === 0.07) console.log('ok   planBuild falls back to the nearest and reports what no pack covers'); else { bad++; console.error('FAIL planBuild approx: ' + JSON.stringify(near)); }
+const plan = M.planBuild(ix(), { barrel: 'b2', handguard: 'h1', optic: 'o1', magnifier: 'm1' });
+const plan2 = M.planBuild(ix(), { barrel: 'b1', handguard: 'h1', grip: 'g9' });
+const tg = (p, t) => p.tags.find((x) => x.tag === t);
+// the pieces by provider, the offsets summed (the provider's own slot gives none), the condition offset, the stretch, the pair, the threshold, the info rules
+if (plan.approx === null && tg(plan, 'barrel').at[0] === 0.1 && tg(plan, 'handguard').rigid[0] === 0.05 && tg(plan, 'optic').rigid[0] === 0.01 && tg(plan, 'optic').at[1] === 0.02
+  && Math.abs(tg(plan, 'optic@rib').scale - 1.5) < 1e-12 && tg(plan, 'optic@rib').rear === 0.1 && tg(plan, 'tac').rigid[0] === 0.2
+  && plan.info.sy === 0.07 && plan.info.muzzles[0][0] === 0.55 && plan.info.support[0] === 0.25 && plan.info.gone === 3 && plan.info.anim.barrel === 'part_barrel' && plan.info.mounts.mount_handguard[0] === 0.05)
+  console.log('ok   planBuild: pieces by provider, offsets, conditions, stretch, pair, info'); else { bad++; console.error('FAIL planBuild: ' + JSON.stringify(plan)); }
+// a threshold hides a piece; a max of one part's value; an absent leaf; the platform's own value with no provider
+if (plan2.approx === null && !tg(plan2, 'handguard') && tg(plan2, 'tac').rigid[0] === 0.1 && plan2.info.muzzles[0][0] === 0.6 && !('gone' in plan2.info) && plan2.info.sy === 0.06 && plan2.info.support[0] === 0.2)
+  console.log('ok   planBuild: thresholds, maxima, absent leaves, the platform\'s own'); else { bad++; console.error('FAIL planBuild 2: ' + JSON.stringify(plan2)); }
+// a part the index has no value for is reported (a bake bug), not guessed
+const near = M.planBuild(ix(), { barrel: 'b9', handguard: 'h1' });
+if (near.approx) console.log('ok   planBuild reports what the index does not cover'); else { bad++; console.error('FAIL planBuild approx: ' + JSON.stringify(near)); }
 process.exit(bad ? 1 : 0);

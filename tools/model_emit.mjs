@@ -1,4 +1,4 @@
-// Writes the packs of tools/model_packs.mjs as glTF binaries (assets/models/parts/<platform>/<tag>/<file>.glb) and the platform's index.json.
+// Writes the per-part pieces of tools/bake_parts.mjs as glTF binaries (assets/models/parts/<platform>/<tag>/<file>.glb).
 // A pack is rebuilt from its capture build (the recipe's own display model), keeping only the meshes tagged with its slot, moved to the
 // platform's reference frame (the capture's offsets undone) and exported exactly as the whole guns are (tools/bake_models.mjs): the game's
 // materials by catalogue name, UVs only where a bump map or display needs them, welded, quantised (positions to int16 in each mesh's box: quantizePositions),
@@ -112,10 +112,14 @@ export async function makeEmitter({ G, GM, Models, logger }) {
   /**
    * Builds the THREE scene of one pack from its capture: { root, hash, tris }. `off` = { rigid [f,u,r] } the capture carries (undone here).
    */
+  const shown = { id: null, map: new Map() };
   function buildPack({ id, tag, entry, name }) {
     const cap = entry.capture, off = entry.off;
-    const { group, info } = GM.display(defOf(G, id, cap.build));
-    G.GunRig.describe(group); // (the magazine check's references as data on the nodes, as a whole-gun bake writes them)
+    // (one display a capture build: the pieces of a platform taken from one build share it)
+    const ck = id + '|' + JSON.stringify(Object.entries(cap.build).sort()); if (shown.id !== id) { shown.id = id; shown.map.clear(); }
+    let hit = shown.map.get(ck); const fresh = !!hit; if (!hit) { hit = GM.display(defOf(G, id, cap.build)); shown.map.set(ck, hit); }
+    const { group, info } = hit;
+    if (!fresh) G.GunRig.describe(group); // (the magazine check's references as data on the nodes, as a whole-gun bake writes them)
     const fr = fragments(group, info, tag);
     const [rf, ru, rr] = off.rigid, shift = new T.Vector3(rr, ru, -rf);
     const un = (v) => v.sub(shift); // a point of the capture's frame back to the pack's
