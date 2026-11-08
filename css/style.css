@@ -971,10 +971,22 @@ i.c.heavy { background: #a02828; } i.c.light { background: #7a3a30; } i.c.frac {
 .acct-alt small { margin-right: auto; }
 .acct-status, .acct-msg { margin-top: 8px; font: 300 12px var(--ui-font); color: var(--ui-dim); }
 .career-row { margin-top: 10px; }
-/* your animals are preferences, 1st to 3rd (each row the ones not picked in the others), and a word when the host gave you another */
-.pick-row { display: flex; align-items: center; gap: 10px; }
-.pick-row + .pick-row { margin-top: 6px; }
-.pick-n { flex: 0 0 26px; font: 500 10px var(--ui-font); letter-spacing: 1.5px; text-transform: uppercase; color: var(--ui-dim); }
+/* your animals, ranked by dragging (the first three count: badged, the rest dimmed past a divider), and a word when the host gave you another */
+.rank-row { gap: 6px; align-items: center; }
+.rank-chip { position: relative; touch-action: none; cursor: grab; user-select: none; }
+.rank-chip.on { border-color: var(--ui-line); background: var(--ui-fill-hi); }
+.rank-chip.off { opacity: 0.55; }
+.rank-chip.off:hover, .rank-chip.off:focus-visible { opacity: 0.85; }
+.rank-chip:focus-visible { outline: 1px solid var(--ui-line-hi); outline-offset: 1px; }
+.rank-chip .rk { position: absolute; top: -6px; left: -5px; width: 15px; height: 15px; border-radius: 50%; background: var(--ui-text); color: var(--ui-ink); font: 600 10px/15px var(--ui-font); font-style: normal; text-align: center; }
+.rank-cut { width: 1px; align-self: stretch; min-height: 26px; background: var(--ui-line-hi); margin: 0 4px; }
+.rank-row.ranking .rank-chip { cursor: grabbing; }
+.rank-chip.dragging { opacity: 0.2; }
+.rank-chip.ins-before { box-shadow: -5px 0 0 -2px var(--ui-text); }
+.rank-chip.ins-after { box-shadow: 5px 0 0 -2px var(--ui-text); }
+.sw.animal.rank-ghost { position: fixed; z-index: 100; pointer-events: none; margin: 0; opacity: 1; background: var(--ui-panel-solid); border: 1px solid var(--ui-line-hi); box-shadow: 0 6px 18px rgba(0,0,0,0.5); cursor: grabbing; font-family: var(--ui-font); transform: translateY(-10px) rotate(-2deg); }
+.sw.animal.rank-ghost img.anim { filter: none; opacity: 1; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .animal-note { font: 300 12px var(--ui-font); color: var(--ui-dim); margin-top: 6px; min-height: 0; }
 .animal-note:empty { display: none; }
 /* a guest (signed in to the cloud saves anonymously), beside their name in the lobby, the hangar's roster and the scoreboard */

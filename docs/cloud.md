@@ -56,8 +56,8 @@ and **Table Editor** shows your rows. `?cloud=0` in the URL turns cloud saves of
 - **Other players** see a small **GUEST** mark beside your name in the lobby, the hangar's roster and the Tab scoreboard while you
   play as a guest (the optional `anon: 1` on `hello`, and the `acct` message when it changes mid-session; js/server.ts). A player
   with cloud saves off isn't marked. Names are display names only (not unique); the account's identity is its user id.
-- **Callsign preferences**: your top three animals, ranked (*Callsign preferences* in the main menu: 1st, 2nd, 3rd, each row the
-  animals not picked in the others), kept as one list (`animals`) and synced like the rest of your look. `hello` sends them as
+- **Callsign preferences**: your top three animals, ranked (*Callsign preferences* in the main menu: every animal in one row, in your
+  order, dragged to rank (mouse or touch), moved with the arrow keys / Home / End, or clicked to put it 1st; the first three count), kept as one list (`animals`) and synced like the rest of your look. `hello` sends them as
   `prefs: [a, b, c]` (and `animal`, the first, for an older host); the host checks them (known animals, at most three, no repeats) and
   gives you the first of them that's free, else the first one free, one of each to a squad. The menu and the lobby say when you got
   your 2nd or 3rd, or none of the three. An older version's single `animal` and its `animal2` second choice become the list's first

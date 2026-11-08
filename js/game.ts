@@ -271,11 +271,97 @@ const G_Game = {
     if (init && JSON.stringify(out) !== JSON.stringify(kept)) { S.put('animals', out); S.put('animal', undefined); S.put('animal2', undefined); }
     return out;
   },
-  // the menu's three pickers: 1st, 2nd, 3rd, each the animals not picked in the others
+  // The menu's callsign list: every animal in one row, in your order, the first three your preferences (badged 1 to 3; the rest dimmed
+  // past a divider). Ranked by dragging (bindAnimalRank), by the keyboard, or a click that puts one first. (animalOrder: the whole
+  // order as you left it this visit; only the first three are kept and synced.)
+  animalOrder: [] as string[],
   animalPicks() {
-    const P = this.prefAnimals, box = this.$('colorRow');
-    box.innerHTML = P.map((pick, r) => `<div class="pick-row"><span class="pick-n">${['1st', '2nd', '3rd'][r]}</span><div class="color-row">${G.Callsigns.LIST.filter((a) => a.id === pick || !P.includes(a.id))
-      .map((a) => `<button class="sw animal${a.id === pick ? ' on' : ''}" data-r="${r}" data-a="${a.id}" title="${a.name}">${G.Callsigns.html(a.id)}<span style="color:${G.U.hex(a.color)}">${a.name}</span></button>`).join('')}</div></div>`).join('');
+    const P = this.prefAnimals, ids = G.Callsigns.LIST.map((a) => a.id);
+    const rest = this.animalOrder.filter((id) => ids.includes(id) && !P.includes(id));
+    for (const id of ids) if (!P.includes(id) && !rest.includes(id)) rest.push(id);
+    this.animalOrder = [...P, ...rest];
+    const ORD = ['1st', '2nd', '3rd'];
+    this.$('colorRow').innerHTML = this.animalOrder.map((id, i) => {
+      const a = G.Callsigns.of(id), on = i < 3;
+      return `${i === 3 ? '<span class="rank-cut" aria-hidden="true"></span>' : ''}<button class="sw animal rank-chip${on ? ' on' : ' off'}" data-a="${id}" data-i="${i}" role="listitem"
+        aria-label="${G.U.esc(a.name)}: ${on ? ORD[i] + ' choice' : 'not counted, ' + (i + 1) + 'th'}" title="${G.U.esc(a.name)}: drag to rank, click for 1st, arrow keys to move">${on ? `<i class="rk">${i + 1}</i>` : ''}${G.Callsigns.html(id)}<span style="color:${G.U.hex(a.color)}">${G.U.esc(a.name)}</span></button>`;
+    }).join('');
+  },
+  // a new order: the first three your preferences (kept and synced as 'animals': js/cloud.ts), the 1st your animal in the menu; said aloud
+  // for a screen reader (where the one moved landed), and focus kept on it
+  rankAnimals(order: string[], moved?: string, focus = false) {
+    this.animalOrder = order;
+    const top = order.slice(0, 3);
+    if (JSON.stringify(top) !== JSON.stringify(this.prefAnimals)) {
+      this.prefAnimals = top;
+      G.U.store.set('animals', top);
+      if (this.phase === 'menu') this.setAnimal(top[0]);
+    }
+    this.animalPicks();
+    if (!moved) return;
+    const i = order.indexOf(moved), live = document.getElementById('animalLive');
+    if (live) live.textContent = `${G.Callsigns.of(moved).name}: ${i < 3 ? ['1st', '2nd', '3rd'][i] + ' choice' : 'not counted (' + (i + 1) + 'th)'}`;
+    if (focus) { const b = this.$('colorRow').querySelector<HTMLElement>(`[data-a="${moved}"]`); if (b) b.focus(); }
+  },
+  // Dragging (pointer events: mouse and touch alike): a ghost of the chip follows the pointer, a marker shows where it lands; a press
+  // that doesn't move puts the chip first. Left / Right (Alt or not) move the focused chip a place, Home / End to the front or back.
+  bindAnimalRank(row: HTMLElement) {
+    let d: { id: string; pid: number; x0: number; y0: number; drag: boolean; ghost: HTMLElement | null; at: number; dx: number; dy: number } | null = null;
+    const chips = () => [...row.querySelectorAll<HTMLElement>('.rank-chip')];
+    // where it would land: before the first other chip the pointer is ahead of (reading order, rows wrapping), else at the end
+    const landing = (x: number, y: number) => {
+      const others = chips().filter((c) => c.dataset.a !== d!.id);
+      for (let k = 0; k < others.length; k++) { const r = others[k].getBoundingClientRect(); if (y < r.top || (y <= r.bottom && x < r.left + r.width / 2)) return k; }
+      return others.length;
+    };
+    const mark = (k: number) => {
+      const others = chips().filter((c) => c.dataset.a !== d!.id);
+      others.forEach((c, j) => { c.classList.toggle('ins-before', j === k); c.classList.toggle('ins-after', k === others.length && j === others.length - 1); });
+    };
+    const end = (drop: boolean) => {
+      if (!d) return;
+      const cur = d; d = null;
+      if (cur.ghost) cur.ghost.remove();
+      row.classList.remove('ranking');
+      if (!cur.drag) { if (drop) { const o = this.animalOrder.filter((id) => id !== cur.id); this.rankAnimals([cur.id, ...o], cur.id); G.Audio.click && G.Audio.click(); } return; }
+      if (!drop) { this.animalPicks(); return; }
+      const o = this.animalOrder.filter((id) => id !== cur.id); o.splice(cur.at, 0, cur.id);
+      this.rankAnimals(o, cur.id);
+    };
+    row.addEventListener('pointerdown', (e: PointerEvent) => {
+      const b = (e.target as HTMLElement).closest<HTMLElement>('.rank-chip');
+      if (!b || e.button !== 0 || d) return;
+      const r = b.getBoundingClientRect();
+      d = { id: b.dataset.a!, pid: e.pointerId, x0: e.clientX, y0: e.clientY, drag: false, ghost: null, at: 0, dx: e.clientX - r.left, dy: e.clientY - r.top };
+      try { row.setPointerCapture(e.pointerId); } catch (err) { /* (a synthetic pointer) */ }
+      e.preventDefault();
+    });
+    row.addEventListener('pointermove', (e: PointerEvent) => {
+      if (!d || e.pointerId !== d.pid) return;
+      if (!d.drag) {
+        if (Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < 6) return;
+        const b = row.querySelector<HTMLElement>(`[data-a="${d.id}"]`); if (!b) return;
+        d.drag = true; row.classList.add('ranking'); b.classList.add('dragging');
+        const g = b.cloneNode(true) as HTMLElement; g.classList.add('rank-ghost', 'on'); g.classList.remove('dragging', 'off'); g.removeAttribute('data-a');
+        g.style.width = b.offsetWidth + 'px'; document.body.appendChild(g); d.ghost = g;
+      }
+      d.ghost!.style.left = e.clientX - d.dx + 'px'; d.ghost!.style.top = e.clientY - d.dy + 'px';
+      d.at = landing(e.clientX, e.clientY); mark(d.at);
+    });
+    row.addEventListener('pointerup', (e: PointerEvent) => { if (d && e.pointerId === d.pid) end(true); });
+    row.addEventListener('pointercancel', () => end(false));
+    row.addEventListener('lostpointercapture', () => { if (d && d.drag) end(true); });
+    row.addEventListener('click', (e) => { if ((e as MouseEvent).detail === 0) { const b = (e.target as HTMLElement).closest<HTMLElement>('.rank-chip'); if (b) { const o = this.animalOrder.filter((id) => id !== b.dataset.a); this.rankAnimals([b.dataset.a!, ...o], b.dataset.a, true); } } }); // (Enter or Space on a chip: to 1st)
+    row.addEventListener('keydown', (e: KeyboardEvent) => {
+      const b = (e.target as HTMLElement).closest<HTMLElement>('.rank-chip'); if (!b) return;
+      const id = b.dataset.a!, o = this.animalOrder.slice(), i = o.indexOf(id);
+      const to = e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? i - 1 : e.key === 'ArrowRight' || e.key === 'ArrowDown' ? i + 1 : e.key === 'Home' ? 0 : e.key === 'End' ? o.length - 1 : -2;
+      if (to === -2) return;
+      e.preventDefault();
+      if (to < 0 || to >= o.length || to === i) return;
+      o.splice(i, 1); o.splice(to, 0, id);
+      this.rankAnimals(o, id, true);
+    });
   },
   // your own arms in first person: sleeves in your top's colour (bare forearms in a T-shirt), your gloves
   applyLook() {
@@ -317,15 +403,7 @@ const G_Game = {
     this.$('btnCareer').onclick = () => { this.$('careerBody').innerHTML = G.Career.html(); this.screen('career'); };
     this.$('btnCareerBack').onclick = () => this.screen('menu');
     this.animalPicks();
-    row.addEventListener('click', ((e: GmEvt) => {
-      const b = e.target.closest<HTMLElement>('.sw'); if (!b) return;
-      const r = +b.dataset.r!, a = b.dataset.a!;
-      if (!G.Callsigns.valid(a) || this.prefAnimals[r] === a || this.prefAnimals.includes(a)) return;
-      this.prefAnimals = this.prefAnimals.slice(); this.prefAnimals[r] = a;
-      G.U.store.set('animals', this.prefAnimals); // (kept and synced: js/cloud.ts)
-      if (r === 0) this.setAnimal(a);
-      this.animalPicks();
-    }) as EventListener);
+    this.bindAnimalRank(row);
 
     const bindRange = (ids: string[], key: GmSetting, fmt: (v: number) => string, apply?: (v: number) => void) => {
       ids.forEach((id) => {
