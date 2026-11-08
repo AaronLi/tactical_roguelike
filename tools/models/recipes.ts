@@ -1879,7 +1879,7 @@ const G_GunRecipes = (() => {
       const src = e.local || e; // (a magazine-check mesh: in its own node's frame, placed with that node's transform: placeAuthored)
       g.setAttribute('position', new T.BufferAttribute(src.pos, 3)); g.setAttribute('normal', new T.BufferAttribute(src.nrm, 3));
       g.setIndex(new T.BufferAttribute(e.idx, 1));
-      if (e.uv) g.setAttribute('uv', new T.BufferAttribute(e.uv, 2)); // (a display surface's)
+      if (e.uv) g.setAttribute('uv', new T.BufferAttribute(e.uv, 2)); // (a display surface's, or a bump-mapped material's: the 2011's stippled grip)
       g.computeBoundingSphere(); g.computeBoundingBox();
       authoredGeo.set(e, g);
     }
