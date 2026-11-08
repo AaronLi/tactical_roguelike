@@ -25,7 +25,7 @@ const G_Casings = (() => {
   // a case or some cases due out of a gun, in t seconds
   interface Pending { t: number; def: WeaponDef; local: boolean; from?: THREE.Vector3 | null; to?: THREE.Vector3 | null; am?: string | string[]; drop?: boolean; n?: number }
   let metal: THREE.InstancedMesh = null!, hull: THREE.InstancedMesh = null!, live: Spent[] = [], queue: Pending[] = [], free: number[] = [], sounds = 0;
-  const tmpM = new T.Matrix4(), tmpS = new T.Vector3(), tmpQ = new T.Quaternion(), hide = new T.Matrix4().makeScale(0, 0, 0);
+  const tmpM = new T.Matrix4(), tmpS = new T.Vector3(), tmpQ = new T.Quaternion(), prevP = new T.Vector3(), hide = new T.Matrix4().makeScale(0, 0, 0);
   const col = new T.Color();
 
   function meshes() {
@@ -142,7 +142,9 @@ const G_Casings = (() => {
     const { mesh, r } = magMesh(def, null);
     h.holder.updateMatrixWorld(true);
     const home = a && a.hs[0] && a.hs[0].A.magHome ? a.hs[0].A.magHome.clone() : V().set(0, -0.06, -0.12);
-    const p = h.holder.localToWorld(home), q = new T.Quaternion();
+    const p = h.holder.localToWorld(home), q = new T.Quaternion(), cam = G.R.camera.position, map = G.Game.map;
+    // (up against a wall the gun, and the magazine in it, can be half through it: then it falls from where you stand, not from the far side)
+    if (map && !G.Level.los(map, cam.x, cam.y, cam.z, p.x, p.y, p.z)) { p.x = cam.x; p.z = cam.z; }
     h.holder.getWorldQuaternion(q);
     const v = G.Me.vel ? V().set(G.Me.vel.x, 0, G.Me.vel.z) : V();
     v.y -= 0.6;
@@ -233,6 +235,7 @@ const G_Casings = (() => {
   }
   function step(c: Spent, h: number, map: any) {
     const L = G.Level;
+    prevP.copy(c.p); // (where it was: a wall pushes it back to that side, never on through to the far one)
     c.v.y -= GRAV * h;
     c.p.addScaledVector(c.v, h);
     const wl = c.w.length();
@@ -243,8 +246,12 @@ const G_Casings = (() => {
       const px = hx + c.k.r - Math.abs(c.p.x - cx), pz = hz + c.k.r - Math.abs(c.p.z - cz);
       if (px <= 0 || pz <= 0) return;
       const vn = px < pz ? c.v.x : c.v.z;
-      if (px < pz) { c.p.x += Math.sign(c.p.x - cx || 1) * px; c.v.x *= -0.3; c.v.z *= 0.7; }
-      else { c.p.z += Math.sign(c.p.z - cz || 1) * pz; c.v.z *= -0.3; c.v.x *= 0.7; }
+      // (out the side it came in by: by the least overlap it went out the far side of a wall it had got half way through,
+      // and at the map's edge that was out of the world)
+      // (and when it was already in the wall, out toward the middle of the level)
+      const was = Math.abs(prevP.x - cx) < hx + c.k.r && Math.abs(prevP.z - cz) < hz + c.k.r, mx = map.W * L.TS / 2, mz = map.H * L.TS / 2;
+      if (px < pz) { const sx = Math.sign((was ? mx : prevP.x) - cx || 1); c.p.x = cx + sx * (hx + c.k.r); c.v.x *= -0.3; c.v.z *= 0.7; }
+      else { const sz = Math.sign((was ? mz : prevP.z) - cz || 1); c.p.z = cz + sz * (hz + c.k.r); c.v.z *= -0.3; c.v.x *= 0.7; }
       c.w.multiplyScalar(0.7);
       impact(c, Math.abs(vn) * 0.7, map);
     };
@@ -274,6 +281,10 @@ const G_Casings = (() => {
         if (vn < 0.6 && Math.hypot(c.v.x, c.v.z) < 0.3) settle(c, g);
       }
     }
+    // (never out of the level: kept inside its plan, the last word if anything gets through a wall)
+    const X1 = map.W * L.TS - c.k.r, Z1 = map.H * L.TS - c.k.r;
+    if (c.p.x < c.k.r || c.p.x > X1) { c.p.x = Math.min(X1, Math.max(c.k.r, c.p.x)); c.v.x *= -0.3; }
+    if (c.p.z < c.k.r || c.p.z > Z1) { c.p.z = Math.min(Z1, Math.max(c.k.r, c.p.z)); c.v.z *= -0.3; }
     const floor = (G.Game.map && G.Game.map.minY) || 0;
     if (c.p.y < floor - 1) settle(c, floor); // (a basement's floor is below the ground)
   }
