@@ -37,6 +37,7 @@ interface Part { // a part as the catalog holds it
   authored?: { height: string }; /* (a part modelled in Blender: models/parts, docs/models.md) */
   len?: number; /* (a shared long-gun barrel: its length in inches, what fits is each gun's factory length's 0.6x-1.6x) */
   profile?: string; /* (a shared barrel's profile: BARREL_PROFILES, absent = standard) */
+  ownBarrel?: boolean; /* (a gun's own barrel with a length (the modelled AKs'): its figures by its length as a shared one's, its model its own (model), not the shared tube (lenModel)) */
   seller?: string; /* (sold only at one counter: 'nj' Nightjar's (js/shop.ts offers.njParts), never on the gunsmith's pedestals or Timberline's stumps) */
 }
 interface MagFam {
@@ -133,8 +134,8 @@ const G_Gunsmith = (() => {
   const fitsSlot = (s: Slot, p: Part, id: string, build?: Record<string, string> | false) => !!(s && p) && (s.mount === p.mount || (p.alsoMounts || []).includes(s.mount)) && (s.slot === p.slot || ALIAS[kindOf(s.slot)] === p.slot) && !(id && p.not && p.not.includes(id)) && fitsLen(p, id, build); // (p.not: guns on that mount it still doesn't go on)
   // A shared long-gun barrel (a cartridge's: br:<cartridge>) fits a gun whose factory barrel it's within 0.6x-1.6x the length of
   // (the MCX down to 0.45x: its Rattler barrel)
-  const LEN_MIN_IN: Record<string, number> = { fal: 17, ak: 16.3, ak74: 16.3, rpk: 23.2 }; // (the FAL's gas block and tube stand on the barrel to 15 mm behind this: a barrel ending before them is not offered;
-  // the modelled AKs' gas block and front sight base are the receiver's, fixed where the factory barrel has them, the base's front 14 mm behind its end: nothing shorter)
+  const LEN_MIN_IN: Record<string, number> = { fal: 17 }; // (the FAL's gas block and tube stand on the barrel to 15 mm behind this: a barrel ending before them is not offered.
+  // The modelled AKs need none: each of their barrels carries its own gas block and front sight, js/parts.ts AK_BARRELS)
   const LEN_LO: Record<string, number> = { mcx: 0.45, aks74u: 0.65 }; // (the AKS-74U: no handguard is short enough for less)
   // A handguard is the length it is, and fits where its barrel leaves it that much: its own length, the gap behind it (hgGap: the Thor's
   // sleeve) and 15 mm before the muzzle's end, within the barrel's visible length (what's outside the receiver, or an integral can's).
@@ -1205,7 +1206,7 @@ const G_Gunsmith = (() => {
     // (in slot order, by the slot each is in: what's on an adapter goes over the adapter)
     const fitted = Object.entries(def.build || defaultBuild(def.id)).filter(([, p]) => PARTS[p])
       .sort((a, b) => slotRank(a[0]) - slotRank(b[0]));
-    for (const [sl, pid] of fitted) for (let [k, v] of Object.entries(Object.assign(AP_KEY[PARTS[pid].slot] ? { [AP_KEY[PARTS[pid].slot]]: null } : {}, PARTS[pid].len != null ? lenModel(def.id, PARTS[pid]) : PARTS[pid].model || {}))) { // (a stock, grip, muzzle or handguard says whether it is an authored model, so one on an adapter is the one drawn)
+    for (const [sl, pid] of fitted) for (let [k, v] of Object.entries(Object.assign(AP_KEY[PARTS[pid].slot] ? { [AP_KEY[PARTS[pid].slot]]: null } : {}, PARTS[pid].len != null && !PARTS[pid].ownBarrel ? lenModel(def.id, PARTS[pid]) : PARTS[pid].model || {}))) { // (a stock, grip, muzzle or handguard says whether it is an authored model, so one on an adapter is the one drawn)
       if (k === 'tac' && sl === 'tacL') k = 'tacL'; // (the left rail's)
       if (k === 'apHgBy') { if (v[def.id]) spec.apHg = v[def.id]; continue; } // (a handguard entry shared between guns that has a model of its own on this one: models/parts/handguard, model.json "gun")
       if (k === 'pumpPatch') { spec.pump = Object.assign({}, spec.pump || {}, v); continue; }
@@ -1778,6 +1779,32 @@ const G_Gunsmith = (() => {
     PARTS['p2011.optic'].not = Object.keys(PLATFORMS).filter((g) => g !== 'p2011');
     PARTS['maxim9.optic'].not = (PARTS['maxim9.optic'].not || []).concat(['p2011']);
     addFits(plat); }
+  // The modelled AKs' barrels (models/ak, ak74, rpk: models/ak_kit.py), made after everything else for the same reason. Each barrel carries its gas block, gas tube, front
+  // sight base and post, cleaning rod and thread (and the RPK's, its bipod's collar): the receiver keeps only the shank. So these guns take no shared barrel (a tube
+  // without any of that), only their own lengths, each modelled beside the gun (models/<id>/barrel_<len>.glb, the recipe draws it whole: avBarrel) with a length's
+  // figures as a shared barrel of that length would have them (len: partSt, barrelOf). The catalogue's light, tapered and heavy profiles are not offered on them:
+  // nothing models those contours, and showing a heavy barrel as the plain one would be a lie (the modelling session can add profile variants later). hgMax: the
+  // handguard room a variant leaves (12.5" and shorter have the combined gas block and front sight right ahead of the handguard: the model's note gives it).
+  { const AK_BARRELS: Record<string, { brand: string; lens: [number, number?][] }> = {
+      ak: { brand: 'north', lens: [[10.5, 0.1367], [12.5, 0.158], [16], [20], [23.2]] },
+      ak74: { brand: 'valkyr', lens: [[10.5, 0.1367], [12.5, 0.158], [15.9], [20]] },
+      rpk: { brand: 'sable', lens: [[16], [16.3], [20]] },
+    };
+    for (const [id, A] of Object.entries(AK_BARRELS)) {
+      const plat = PLATFORMS[id], def = G.WEAPONS[id], f = G.GUN_SPECS[id].barrel as number, sl = plat.slots.find((s: Slot) => s.slot === 'barrel')!, was = PARTS[plat.defaults.barrel];
+      const mount = 'br:' + id, B = plat.barrelModel || {}, show = (len: number) => Math.round((B.len + (len - f) * 0.0254) * 1e5) / 1e5, cn = (G.CALIBERS as Record<string, any>)[G.calOf(def)].name;
+      for (const ids of FITS.values()) { const i = ids.indexOf(id); if (i >= 0) ids.splice(i, 1); } // (its old mounts: the shared barrels no longer fit it)
+      sl.mount = mount;
+      add({ id: `${id}.barrel`, slot: 'barrel', mount, plat: id, brand: 'Factory', factory: true, name: `${def.name} ${f.toFixed(1)}" barrel`, desc: 'Factory part.', price: 0, len: f, profile: plat.barrelProfile, ownBarrel: true, set: { barrelIn: f }, provides: was.provides, model: { barrel: { len: B.len } } });
+      plat.defaults.barrel = `${id}.barrel`;
+      for (const [len, room] of A.lens) {
+        const key = String(len).replace('.', '_');
+        add({ id: `${id}.br.${key}`, slot: 'barrel', mount, plat: id, brand: BR[A.brand], name: `${BR[A.brand].split(' ')[0]} ${len.toFixed(1)}" ${cn} barrel`, price: Math.round((200 + len * 14) / 10) * 10, tier: len > f ? 2 : 1, len, profile: plat.barrelProfile, ownBarrel: true,
+          set: { barrelIn: len }, provides: was.provides, model: Object.assign({ avBarrel: 'barrel_' + key, barrel: { len: show(len) } }, room != null ? { hgMax: room } : {}),
+          desc: `${len.toFixed(1)}" barrel for the ${def.name}, its gas block, front sight and cleaning rod on it${room != null ? ' (the gas block and front sight in one, right ahead of a shorter handguard)' : ''}: a shorter barrel is handier and quicker to bring up, a longer one has more velocity and accuracy.` });
+      }
+      addFits(plat);
+    } }
   // what an attachments box offers for a weapon: parts that go straight onto it as it's built (a slot it has now, not
   // what's already in it), not factory parts, magazines, or anything that makes it another gun
   const ATTACH_SLOTS = new Set(['slide', 'barrel', 'muzzle', 'handguard', 'railmount', 'pump', 'fg', 'tac', 'tacL', 'optic', 'riserdot', 'magnifier', 'charging', 'grip', 'stock', 'buttstock', 'loader']);

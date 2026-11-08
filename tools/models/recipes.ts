@@ -1118,7 +1118,12 @@ const G_GunRecipes = (() => {
       authored(k, A!, (e) => e.slot === 'base' && !e.part);
       if (A!.hinge) authored(k, A!, (e) => e.slot === 'base' && !!e.part); // (a gun with a reload sequence has its moving parts as nodes: the latch is the receiver's)
       if (A!.info.anim && A!.info.anim.catch && !A!.hinge) anim.catch = authoredPart(k, A!, 'catch'); // (the bolt catch, part_catch: the receiver's own, a node that turns with the bolt held open)
-      if (A!.info.anim && A!.info.anim.bipod && A!.parts.bipod && !A!.hinge) anim.bipod = authoredBipod(k, A!); // (the model's own bipod, its legs swung down by the game: the RPK's)
+      if (A!.info.anim && A!.info.anim.bipod && A!.parts.bipod && !A!.hinge) { // (the model's own bipod, its legs swung down by the game: the RPK's)
+        // (its legs hinge on the collar, which is the barrel's: with another barrel (a variant, drawn whole) the legs go forward or back with that barrel's end. They are
+        // the barrel's slot too, so each barrel's piece carries them where its collar is; the node stays on the root, as a variant can't hold a part_ node)
+        const vb = o.avBarrel ? A!.variants[o.avBarrel] : null, dF = vb && vb.info && vb.info.muzzles ? vb.info.muzzles[0][0] - A!.rig.end : 0;
+        k.tag('barrel'); anim.bipod = authoredBipod(k, A!); anim.bipod.position.z -= dF; k.tag('base');
+      }
       top = A!.rig.top;
       if (o.optic && (!ownIrons || A!.sights.rail.includes(o.optic))) {
         rcvTop = top;
