@@ -348,8 +348,9 @@ const G_Viewmodel = (() => {
     else { disk.position.set(0, o.y, -o.f); g.add(disk); }
     let sig = '';
     // a ballistic computer (def.calc: 1 a rangefinder's readout only, 2 with the point-of-impact marker): a few times a second it asks range() how far it is to what's under the crosshair, paints it and, from the
-    // flight of the round that fires next (the holdover marks' own sums), puts the marker where that round arrives at that range (below the crosshair, in mils)
-    let lcd: CanvasRenderingContext2D | null = null, lcdTex: any = null, lcdT = 0, lcdText = '', pathK = '', path: { h: number }[] = [];
+    // flight of the round that fires next (the holdover marks' own sums), puts the marker where that round arrives at that range (below the crosshair, in mils;
+    // and to the side the wind carries it)
+    let lcd: CanvasRenderingContext2D | null = null, lcdTex: any = null, lcdT = 0, lcdText = '', pathK = '', path: { h: number; lag: number }[] = [];
     if (def.calc) {
       const cv = document.createElement('canvas'); cv.width = LCD_W; cv.height = LCD_H; lcd = cv.getContext('2d');
       lcdTex = new T.CanvasTexture(cv); mat.uniforms.dmap.value = lcdTex; paintLcd(lcd!, '----'); lcdText = '----';
@@ -366,7 +367,15 @@ const G_Viewmodel = (() => {
       if (k !== pathK) { pathK = k; path = G.flight(cdef, am, G.boreTip({ def: cdef, clicks: w.clicks || 0 }), POI_FAR); }
       const q = path[Math.round(r)]; // (past the round's reach there is no impact to show)
       if (!q) { poi.z = 0; return; }
-      poi.set(0, Math.round(((q.h / r) * 1000) / POI_CELL), 1);
+      // and off sideways with the wind (js/wind.ts: the level's, as the host last said, where the round will be at that
+      // range): the crosswind across the line of sight times the round's lag time there (G.flight's lag; js/sim.ts windStep)
+      let side = 0;
+      if (G.Wind && G.Wind.mean && q.lag) {
+        const cam = G.R.scopeCam || G.R.camera, f = cam.getWorldDirection(new T.Vector3()), at = cam.getWorldPosition(new T.Vector3()).addScaledVector(f, r);
+        const wv = G.Wind.at(G.Game.map, at), rl = Math.hypot(f.x, f.z);
+        if (wv && rl > 1e-3) side = ((wv.x * -f.z + wv.z * f.x) / rl) * q.lag; // (metres to the right: the wind's part along the right of the line, -f.z, f.x)
+      }
+      poi.set(Math.round(((side / r) * 1000) / POI_CELL), Math.round(((q.h / r) * 1000) / POI_CELL), 1);
     };
     // the range-finding reticle's holdover marks follow the weapon in the hands: called each frame with it; they are rebuilt when its round or its zero changes
     const sync = (w: any, range?: () => number | null) => {

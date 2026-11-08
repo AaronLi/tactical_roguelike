@@ -22,7 +22,7 @@ type GmScreen = 'menu' | 'lobby' | 'shop' | 'route' | 'gameover' | 'pause' | 'ca
 // the sliders in the menu, and the keys they keep in storage
 type GmSetting = 'sens' | 'fov' | 'vol' | 'loadKit';
 // what the host tells the clients (js/server.ts), by t: onMsg dispatches on it
-type GmMsgKind = 'eround' | 'eInfo' | 'welcome' | 'roster' | 'arms' | 'rvotes' | 'newrun' | 'veil' | 'phase' | 'snap' | 'rfx' | 'bstk' | 'hole' | 'dpart' | 'dfall' | 'rpath' | 'npath' | 'skin' | 'loot' | 'lootRm' | 'glass' | 'crack' | 'lootGot' | 'team' | 'cab' | 'sbox' | 'abox' | 'wcase' | 'eshot' | 'shot' | 'nade' | 'boom' | 'course' | 'crun' | 'flash' | 'kill' | 'incap' | 'edown' | 'saved' | 'stock' | 'took' | 'ereload' | 'clear' | 'treat' | 'applying' | 'revive' | 'chat' | 'ping' | 'ffhit' | 'left' | 'door' | 'order' | 'shout' | 'radio' | 'evid' | 'evtake' | 'evsec' | 'cuffed' | 'refund';
+type GmMsgKind = 'wind' | 'eround' | 'eInfo' | 'welcome' | 'roster' | 'arms' | 'rvotes' | 'newrun' | 'veil' | 'phase' | 'snap' | 'rfx' | 'bstk' | 'hole' | 'dpart' | 'dfall' | 'rpath' | 'npath' | 'skin' | 'loot' | 'lootRm' | 'glass' | 'crack' | 'lootGot' | 'team' | 'cab' | 'sbox' | 'abox' | 'wcase' | 'eshot' | 'shot' | 'nade' | 'boom' | 'course' | 'crun' | 'flash' | 'kill' | 'incap' | 'edown' | 'saved' | 'stock' | 'took' | 'ereload' | 'clear' | 'treat' | 'applying' | 'revive' | 'chat' | 'ping' | 'ffhit' | 'left' | 'door' | 'order' | 'shout' | 'radio' | 'evid' | 'evtake' | 'evsec' | 'cuffed' | 'refund';
 // the map as js/damage.ts takes it (its own cut-down shape of a level's)
 type GmDmgMap = Parameters<typeof G.Damage.apply>[0];
 // the turning figure of you in the menu (lookPreview)
@@ -788,6 +788,7 @@ const G_Game = {
         else if (m.phase === 'lobby') this.enterLobby();
         break;
       case 'snap': if (this.phase === 'level') G.Views.applySnap(m); break;
+      case 'wind': if (this.phase === 'level') G.Wind.msg(m.w); break; // (the level's wind, every half second: js/server.ts windTick, js/wind.ts)
       case 'rfx': if (this.phase === 'level') G.Views.roundFx(m.a); break;
       case 'bstk': if (this.phase === 'level') G.Bolts.fromNet(m); break;
       case 'hole': if (this.phase === 'level') for (const h of m.a || []) G.Damage.apply(this.map as unknown as GmDmgMap, h); break;
@@ -1633,6 +1634,7 @@ const G_Game = {
       if (G.Highlights && !this.hub) G.Highlights.tick(dt); // (recording the level, for the hangar's TVs)
       if (this.hub) { G.Hangar.update(dt); G.Hangar.mark(); }
       G.Views.update(dt);
+      G.Wind.update(dt); // (the flags)
       if (!this.hub) G.Landing.update(dt); // (after everyone's posed: in the air it moves the camera, and hides who's riding with you)
       if (G.Me.dead) G.Me.spectate(dt); // (after the rigs are posed: the helmet camera's on a head as it is this frame)
       G.GunAudio.updateListener(G.R.camera); // (after that: dead, you hear from where the camera is, not where you fell)

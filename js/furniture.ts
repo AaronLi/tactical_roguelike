@@ -1103,6 +1103,16 @@ const G_Furniture = (() => {
     for (const y of [0.3, 1.2]) k.box(wire, 0.68, 0.02, 0.02, 0, y, 0.06);
     for (let i = 0; i < 7; i++) { const h = 1.35 + k.rnd() * 0.35; k.cyl(k.mat(k.pick([0x8a7058, 0x7a6048, 0x9a8068, 0x6e5640]), 0.95), 0.035, 0.045, h, -0.29 + i * 0.097, h / 2, (k.rnd() - 0.5) * 0.03, 6); }
   } };
+  // A flagpole: a concrete footing, a steel pole FLAG.pole high (over a roof's parapet), a ball on top, the halyard's cleat.
+  // The flag itself isn't furniture: it's cloth the wind blows (js/wind.ts draws it, hoisted at the top of the pole, FLAG.w
+  // by FLAG.h, its top edge FLAG.top under the ball), so it isn't in the description; the pole is (docs/level-data.md "Wind").
+  R.flagpole = { small: 1, flag: { pole: 7.2, top: 0.12, w: 1.5, h: 1.0 }, boxes: [[0, 0, 0.5, 0.5, 0.3], [0, 0, 0.12, 0.12, 7.2]], build(k: Kit) {
+    const conc = k.mat(0xa8a39a, 0.9), steel = k.mat(0xd4d6d8, 0.3, 0.7), gold = k.mat(0xc8a040, 0.35, 0.8);
+    k.cyl(conc, 0.24, 0.27, 0.3, 0, 0.15, 0, 12);
+    k.cyl(steel, 0.035, 0.06, 7.2, 0, 3.9, 0, 10);
+    k.sph(gold, 0.08, 0, 7.55, 0);
+    k.box(steel, 0.03, 0.14, 0.04, 0, 1.4, 0.07);
+  } };
   // A mast on the antenna farm: its equipment hut at the foot (what stops you), a steel lattice tower up out of it, dishes and
   // panels on it, red beacons up its length.
   R.mast = { w: 1.9, d: 1.9, cover: 1, boxes: [[0, 0, 1.8, 1.8, 2.5]], build(k: Kit, v: number) {
@@ -1520,6 +1530,25 @@ const G_Furniture = (() => {
           for (const x of [rm.x + 1, rm.x + 3]) for (let z = rm.z + 1; z < rm.z + rm.h - 1; z++) if (z !== rm.cz) one('potbench', x, z, 1, true);
           small('ristra', rm.x + rm.w - 1, rm.z);
         },
+        // Flags to judge the wind by (js/wind.ts): a flagpole by a wall of each building (the Crest House, the viewing site,
+        // the greenhouse across the gorge: kind 2 and 3, js/level.ts layCrest), well apart, and one out at the parking lot
+        // and one on the antenna farm. From a stream of their own (rf), after everything else is placed, so the rest is as it was.
+        flags() {
+          const rf = U.rng(((seed0 ^ 0xf1a6) >>> 0) || 1), at: number[][] = [], gap = 14, LZW = G.Level.LZ_W;
+          const ok = (x: number, z: number) => x > 0 && z > 0 && x < W - 1 && z < map.H - 1 && free(x, z) && !!map.out[z * W + x] && !byDoor(x, z) && !map.props.has(z * W + x) && at.every(([a, b]) => Math.hypot(a - x, b - z) >= gap);
+          const pole = (x: number, z: number, dx = 0, dz = 0) => { put('flagpole', x, z, C(x) + dx * 0.55, C(z) + dz * 0.55, 0, rf()); at.push([x, z]); };
+          const cand: number[][] = [];
+          for (let z = 1; z < map.H - 1; z++) for (let x = 1; x < W - 1; x++) for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            const j = (z + dz) * W + x + dx;
+            if (t[j] === 1 && (cr.kind[j] === 2 || cr.kind[j] === 3)) { cand.push([x, z, dx, dz]); break; }
+          }
+          U.shuffle(rf, cand);
+          for (const [x, z, dx, dz] of cand) if (at.length < 3 && ok(x, z)) pole(x, z, dx, dz);
+          for (const type of ['lz', 'antennas']) {
+            const rm = rooms.find((q: Room) => q.type === type);
+            for (let a = 0; rm && a < 60; a++) { const x = rm.x + Math.floor(rf() * rm.w), z = rm.z + Math.floor(rf() * rm.h); if (ok(x, z) && lone(x, z) && !(type === 'lz' && x < 3 + LZW + 2 && z >= 37)) { pole(x, z); break; } } // (clear of the helicopter's pad: js/level.ts layCrest _pad, at tile 3, 39)
+          }
+        },
         antennas(rm: Room) {
           for (const [x0, z0] of [[rm.x + 3, rm.z + 3], [rm.x + 11, rm.z + 6], [rm.x + 17, rm.z + 2]]) for (let a = 0; a < 8; a++) {
             const x = x0 + U.ri(r, -1, 1), z = z0 + U.ri(r, -1, 1);
@@ -1666,6 +1695,7 @@ const G_Furniture = (() => {
         put(U.pick(r, spec.small), e.x, e.z, center(e.x) + dx * 0.68 + dz * side * 0.62, center(e.z) + dz * 0.68 + dx * side * 0.62, facing(dx, dz), r(), [[dx, dz]]);
       }
     }
+    if (cst) cst.flags(); // (the Sandia Crest's flags: last, from their own stream)
   }
   return { plan, R, ROOMS, solids, worldBoxes, facing };
 })();

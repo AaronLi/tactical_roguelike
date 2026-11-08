@@ -539,7 +539,7 @@ const G_THEMES: ThemeDef[] = [
   { name: 'Apartment', layout: 'apartments', residents: 1, winRate: 0.3, foes: 2, crowd: 2, big: 2, home: 1, reflect: 0.3, floor: '#4a443d', wall: '#b8ab95', crate: '#8a6a3a', fog: 0x0e0c0a, light: 0xffd8a8, ceil: '#cfc8ba' },
   { name: 'Warehouse', layout: 'warehouse', noFog: true, home: 0, reflect: 0.3, floor: '#57504a', wall: '#7c6e5b', crate: '#8a6a3a', fog: 0x16130f, light: 0xffd49a, ceil: '#2a2622' },
   { name: 'Bunker', entry: 'vault', home: 0.45, reflect: 0.4, floor: '#3a4042', wall: '#5a6160', crate: '#4d5a3c', fog: 0x0b0f11, light: 0xa8c8ff, ceil: '#1d2224' },
-  { name: 'Suburbs', layout: 'houses', foes: 1.8, crowd: 1.6, big: 2, home: 1, reflect: 0.28, floor: '#5a4a3a', wall: '#9fae98', crate: '#8a6a3a', fog: 0x111723, light: 0xffe0b0, ceil: '#d6d2c4' },
+  { name: 'Suburbs', layout: 'houses', wind: 1.2, foes: 1.8, crowd: 1.6, big: 2, home: 1, reflect: 0.28, floor: '#5a4a3a', wall: '#9fae98', crate: '#8a6a3a', fog: 0x111723, light: 0xffe0b0, ceil: '#d6d2c4' },
   { name: 'Research Lab', home: 0.4, reflect: 0.36, floor: '#8d9399', wall: '#b9bec4', crate: '#5d6b7a', fog: 0x12161a, light: 0xe6f2ff, ceil: '#3a3f44' },
   { name: 'Foundry', layout: 'foundry', home: 0, reflect: 0.3, floor: '#3e3832', wall: '#6e645a', crate: '#6a5a4a', fog: 0x1a0e08, light: 0xffd2a4, ceil: '#2a221c' },
   { name: 'Cold Storage', home: 0.35, reflect: 0.4, floor: '#4f5d68', wall: '#7f97a8', crate: '#5f6f7a', fog: 0x0a1218, light: 0x9fe0ff, ceil: '#26323a' },
@@ -547,12 +547,14 @@ const G_THEMES: ThemeDef[] = [
   // the first deployment of a run (js/route.ts: never anywhere else): a small corner store, its weapon case, attachments
   // box and first aid cabinet always in its stockroom to get you started
   { name: 'Convenience Store', layout: 'mart', starter: true, foes: 0.8, crowd: 1.5, home: 0, reflect: 0.35, floor: '#cfd3cd', wall: '#e6e2d6', crate: '#8a6a3a', fog: 0x0d0f12, light: 0xf2f6ff, ceil: '#e8e8e2' },
-  { name: 'Festival', layout: 'festival', fence: 'hoarding', from: 2, home: 0, reflect: 0.2, floor: '#26331f', wall: '#5b7480', crate: '#8a6a3a', fog: 0x060912, light: 0xffe2c0, ceil: '#d8dcde', fogNear: 30, fogFar: 150, hemi: 0x5a6a96, hemiI: 0.55, crowd: 2, foes: 1.5, night: 35 },
+  { name: 'Festival', layout: 'festival', fence: 'hoarding', from: 2, home: 0, reflect: 0.2, floor: '#26331f', wall: '#5b7480', crate: '#8a6a3a', fog: 0x060912, light: 0xffe2c0, ceil: '#d8dcde', fogNear: 30, fogFar: 150, hemi: 0x5a6a96, hemiI: 0.55, crowd: 2, foes: 1.5, night: 35, wind: 1.5 },
+  // wind: the mean wind speed out in the open (m/s; none if not given: indoors there's none anyway), js/sim.ts windAt and
+  // docs/level-data.md "Wind": a breeze over the suburbs' gardens and the festival's field, a strong one on the Sandia Crest's summits.
   // the top of the Sandia Mountains over Albuquerque at sundown, outdoors: two summits of pink granite with a gorge between,
   // long sight lines across it (a sniper's level: the garden 500 m from the overlook), the city's lights coming on far below. rock: the walls are outcrops
   // (js/level.ts buildMesh); far: how far the camera sees (the view off the mountain); lookouts: more marksmen among them;
   // from: the first level it can come up at on the route map (js/route.ts): not till after the third
-  { name: 'Sandia Crest', layout: 'crest', from: 4, rock: 1, fence: 'cliffwall', home: 0, reflect: 0.1, floor: '#8c7660', wall: '#e2d6cc', crate: '#8a6a3a', fog: 0xd99a7c, light: 0xffe4c0, ceil: '#d6cfc4', fogNear: 340, fogFar: 1100, far: 1600, hemi: 0xffd6b8, hemiI: 0.85, cloud: 0xb98c8a, crowd: 0.8, foes: 1.4, big: 1.5, lookouts: 2.5 },
+  { name: 'Sandia Crest', layout: 'crest', from: 4, rock: 1, fence: 'cliffwall', home: 0, reflect: 0.1, floor: '#8c7660', wall: '#e2d6cc', crate: '#8a6a3a', fog: 0xd99a7c, light: 0xffe4c0, ceil: '#d6cfc4', fogNear: 340, fogFar: 1100, far: 1600, hemi: 0xffd6b8, hemiI: 0.85, cloud: 0xb98c8a, crowd: 0.8, foes: 1.4, big: 1.5, lookouts: 2.5, wind: 6.5 },
 ];
 G.THEMES = G_THEMES;
 
@@ -812,7 +814,9 @@ const G_sightH = (def: Record<string, any>): number => ({ PST: 0.02, MP: 0.025, 
 G.sightH = G_sightH;
 // What a round does once it leaves (js/player.ts fly, stepRound: the same sums): from sightH under the line of sight,
 // the bore tipped up `slope` (rise over run), out to maxD metres. Samples a metre apart: h (metres above the line of
-// sight; level ground, the line of sight level), v (m/s), t (s). Stops where a round's spent (ROUND_LIFE).
+// sight; level ground, the line of sight level), v (m/s), t (s), lag (s: t less the time it'd take with no drag, the
+// lag time: a crosswind of w m/s carries the round w * lag metres sideways by then, js/sim.ts windAt). Stops where a
+// round's spent (ROUND_LIFE).
 const G_ROUND_LIFE = { t: 4, dist: 700, v: 30 }; // (in the air past any of these, it's gone: past the far side of the Sandia Crest's gorge, 500 m off)
 G.ROUND_LIFE = G_ROUND_LIFE;
 const G_ballistics = (def: Record<string, any>, am?: string | null) => { const rail = def.cls === 'RAIL'; return { v0: rail ? 3000 : Math.max(40, G.roundSpeed(def, am) || 400), drag: rail ? 1e9 : G.dragOf(def, am), g: rail ? 0 : G.GRAVITY, sh: G.sightH(def) }; };
@@ -820,10 +824,10 @@ G.ballistics = G_ballistics;
 const G_flight = (def: Record<string, any>, am: string | null | undefined, slope: number, maxD = 500) => {
   const { v0, drag, g, sh } = G.ballistics(def, am), L = G.ROUND_LIFE, dt = 1 / 120, n = Math.hypot(1, slope);
   let x = 0, y = -sh, vx = v0 / n, vy = v0 * slope / n, t = 0, dist = 0;
-  const out = [{ d: 0, h: y, v: v0, t: 0 }];
+  const out = [{ d: 0, h: y, v: v0, t: 0, lag: 0 }];
   while (x < maxD && t < L.t && dist < L.dist && Math.hypot(vx, vy) >= L.v) {
     const x1 = x + vx * dt, y1 = y + vy * dt - 0.5 * g * dt * dt, len = Math.hypot(x1 - x, y1 - y), k = Math.exp(-len / drag);
-    for (let d = out.length; d <= x1 && d <= maxD; d++) { const u = (d - x) / (x1 - x); out.push({ d, h: y + (y1 - y) * u, v: Math.hypot(vx, vy) * k, t: t + dt * u }); }
+    for (let d = out.length; d <= x1 && d <= maxD; d++) { const u = (d - x) / (x1 - x), tt = t + dt * u; out.push({ d, h: y + (y1 - y) * u, v: Math.hypot(vx, vy) * k, t: tt, lag: tt - d * n / v0 }); }
     vx *= k; vy = vy * k - g * dt; x = x1; y = y1; t += dt; dist += len;
   }
   return out;

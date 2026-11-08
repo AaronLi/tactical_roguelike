@@ -1578,7 +1578,7 @@ const G_Me = {
   },
   // where a round would end up if nobody's in the way: its arc, stepped against the walls only (what the squad
   // is told, to draw it going there)
-  predictEnd(p0: THREE.Vector3, v0: THREE.Vector3, drag: number, grav: number) { return G.Sim.predictEnd(p0, v0, drag, grav, G.Game.map!); }, // (js/sim.ts, on the level you are in)
+  predictEnd(p0: THREE.Vector3, v0: THREE.Vector3, drag: number, grav: number) { return G.Sim.predictEnd(p0, v0, drag, grav, G.Game.map!, grav ? G.Wind.vec() : null); }, // (js/sim.ts, on the level you are in, in its wind)
   // every round in flight, one frame on (and the friendly fire they did, sent)
   stepRounds(dt: number) {
     const rs = this.rounds;
@@ -1608,6 +1608,7 @@ const G_Me = {
     const end = this.roundSegment(b, b.p, dir, len);
     const k = Math.exp(-len / b.drag);
     b.v.multiplyScalar(k); b.v.y -= b.grav * dt;
+    if (G.Wind.mean && b.grav) { const w = G.Wind.at(G.Game.map, b.p); if (w) G.Sim.windStep(b.v, k, w); } // (out in the open, the wind carries it: js/sim.ts windStep; the wind's the host's, js/wind.ts)
     b.t += dt;
     const head = end ? end.p : b.turned ? b.at : p1, way = b.turned ? b.v.clone().normalize() : dir;
     if (b.trail && !(end && end.body)) G.R.trailAdd(b.trail, head, !!end, end ? end.v! : b.v.length()); // (stopped in someone: its track through them ends the trail)
