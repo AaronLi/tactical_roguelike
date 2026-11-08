@@ -21,6 +21,12 @@ EXPORT = os.environ.get('GUN_EXPORT', '1') == '1'
 mm = 0.001
 S = 0.3554 * mm
 def F(x): return (x - 204) * S
+def wnorm(o, deg=30):
+    # shade by angle, then weight each vertex's normal by its faces' areas (the sharp edges kept): the big flat sides stay flat instead
+    # of fanning the rounded edges' slope across their long triangles (the forend's wedge, the smear round the scallops)
+    smooth(o, deg)
+    md = o.modifiers.new('wn', 'WEIGHTED_NORMAL'); md.mode = 'FACE_AREA'; md.keep_sharp = True; md.weight = 100
+    _apply(o, md); return o
 def U(y): return (931 - y) * S
 def PL(pts): return [(F(x), U(y)) for x, y in pts]
 
@@ -68,7 +74,7 @@ boolean(sh, prism([(-20 * mm, U(1300)), (20 * mm, U(1300)), (20 * mm, U(880)), (
 cut(sh, box(-12.4 * mm, 12.4 * mm, MAG_TOP[0] + MB - 1.0 * mm, MAG_TOP[0] + MF + 1.0 * mm, U(1250), MAG_TOP[1] + 2 * mm))
 # the ejection port (right): a recess its cover sits in, the bolt showing
 cut(sh, box(17.5 * mm, 21 * mm, F(657), F(946), U(979), U(933)))
-bevel(sh, 3.0 * mm, 2, 30); smooth(sh); K.adopt(sh, 'base', SH)
+bevel(sh, 3.0 * mm, 2, 30); wnorm(sh); K.adopt(sh, 'base', SH)
 o = K.tmp(box(17.0 * mm, 19.5 * mm, F(665), F(938), U(972), U(940))); bevel(o, 0.6 * mm, 1); smooth(o); K.adopt(o, 'base', 'steel')     # (the bolt)
 o = K.tmp(box(16.5 * mm, 18.0 * mm, F(940), F(946), U(979), U(933))); smooth(o); K.adopt(o, 'base', 'black')                             # (the port's front lip)
 # the butt pad, a little proud of the shell all round its back
@@ -102,7 +108,7 @@ for xa, xb in ((1486, 1539), (1569, 1623), (1669, 1716), (1757, 1805), (1853, 18
     xm, w_ = (xa + xb) / 2, xb - xa
     for sx in (-1, 1):
         cut(rc, prism(PL([[xa, 1020], [xa + w_ * 0.12, 1000], [xa + w_ * 0.3, 988], [xm, 984], [xb - w_ * 0.3, 988], [xb - w_ * 0.12, 1000], [xb, 1020]]), 'x', *xs(sx * 21 * mm, sx * 30 * mm)))
-bevel(rc, 3.0 * mm, 2, 30); smooth(rc); K.adopt(rc, 'base', SH)
+bevel(rc, 3.0 * mm, 2, 30); wnorm(rc); K.adopt(rc, 'base', SH)
 # the Valorise rails on the handguard's flanks (the light's and the laser's), and the grenade sight's rod along the right with its ear
 L = 0.637                                                    # (the handguard's front face: where the barrel comes out)
 for s_, ax in ((1, 'right'), (-1, 'left')):
@@ -126,7 +132,7 @@ cut(hd, box(-CW, CW, F(1050), F(2010), FL, U(HT) + 0.01))                      #
 for a_, b_ in ((1050, 1172), (1872, 2010)): cut(hd, box(-CW, CW, F(a_), F(b_), U(790), U(760)))   # (deeper where the sights stand)
 RA, RB = F(1190), F(1720)                                    # (the rail's span)
 cut(hd, box(-0.03, 0.03, RA - 6 * mm, RB + 6 * mm, FL + 2.0 * mm, U(HT) + 0.01))   # (the panels cut down beside it to 2 mm over its foot)
-bevel(hd, 1.0 * mm, 1, 30); smooth(hd); K.adopt(hd, 'base', SH)
+bevel(hd, 1.0 * mm, 1, 30); wnorm(hd); K.adopt(hd, 'base', SH)
 RAIL_U = FL
 picatinny(K, RA, RB, RAIL_U, 'base', 'black')
 RAIL_TOP = RAIL_U + 5.6 * mm
@@ -150,7 +156,7 @@ o = K.obj(box(-0.75 * mm, 0.75 * mm, FS - 0.8 * mm, FS + 0.8 * mm, SY - 12.5 * m
 # ===================================================================================== the grip (the F2's own: raked, finger grooves down its front)
 GRIP = DR([(918, 412), (1002, 415), (1003, 455), (995, 470), (980, 480), (978, 495), (993, 510), (985, 518), (967, 522), (966, 537), (980, 543), (970, 552), (948, 560),
            (947, 573), (957, 593), (953, 596), (893, 581), (882, 567), (880, 533), (897, 487), (918, 437)])[::-1]   # (from the F1 drawing)
-gp = K.tmp(prism(PL(GRIP), 'x', -15 * mm, 15 * mm)); bevel(gp, 4.5 * mm, 3, 30); smooth(gp); K.adopt(gp, 'grip', SH)
+gp = K.tmp(prism(PL(GRIP), 'x', -15 * mm, 15 * mm)); bevel(gp, 4.5 * mm, 3, 30); wnorm(gp, 35); K.adopt(gp, 'grip', SH)
 # the F1's trigger guard (after the drawing): a thin wire loop round the trigger only, from the grip's front to the receiver ahead of it
 CL = PL(DR([(1000, 428), (1006, 455), (1013, 473), (1030, 485), (1075, 489), (1098, 482), (1108, 460), (1103, 428)]))
 o = K.tmp(prism(strip(CL, 2.6 * mm), 'x', -1.6 * mm, 1.6 * mm)); bevel(o, 0.5 * mm, 1, 30); smooth(o); K.adopt(o, 'base', 'black')
@@ -168,7 +174,7 @@ bevel(o, 1.0 * mm, 2, 30); smooth(o); K.adopt(o, 'base', 'black', ph)
 # ===================================================================================== the barrel (barrel: the F2's own, the grenade spigot's
 # rings along it) and the flash hider (muzzle: the A2 pattern, the game's r556 birdcage)
 MZ0 = L + 0.068
-o = K.obj(lathe([(L, 10.5 * mm), (L + 0.022, 10.5 * mm), (L + 0.024, 6.8 * mm)], 24), 'barrel', 'black'); smooth(o)
+o = K.obj(lathe([(L - 0.008, 10.5 * mm), (L + 0.022, 10.5 * mm), (L + 0.024, 6.8 * mm)], 24), 'barrel', 'black'); smooth(o)   # (its back 8 mm into the forend's face)
 o = K.obj(lathe([(L, 6.8 * mm), (MZ0, 6.8 * mm)], 20), 'barrel', 'park'); smooth(o)
 for i in range(9):
     f = L + 0.026 + (MZ0 - 0.008 - L - 0.026) * i / 8
