@@ -348,16 +348,22 @@ def handguard_quad(f0, f1, hk=False):
 
 def handguard_mlok(f0, f1, mat=None, sc=1.0):
     """A free-floated M-LOK handguard (after the Midwest Industries / Aero Precision pattern in the Crane comparison sheet,
-    KeyMod_and_M-LOK_handguards.png on Commons): an eight-sided aluminium tube flush with the receiver's rail, a Picatinny rail its full
+    KeyMod_and_M-LOK_handguards.png on Commons): an eight-sided aluminium tube flush with the receiver's rail (a slim, nearly round section), a Picatinny rail its full
     length on top, a row of small round lightening holes along each upper bevel, M-LOK slots (32 x 7 mm on a 40 mm pitch) down each side,
     each lower bevel (staggered half a pitch) and the bottom; at the rear a clamp (a ring bored to the barrel nut, split underneath, two screws across a lug below the nut) and a QD sling
     socket each side; the front edge chamfered."""
     mat = mat or RCV
-    T, B, W, C = HB_T, -19.0 * mm * sc, 19.0 * mm * sc, 8.0 * mm * sc   # top (the receiver's rail base), bottom, half width, the bevels' size
+    # its section, after the commercial slim M-LOK tubes (Aero's ATLAS S-ONE and Enhanced Gen 2 side-on: the upper bevels, the side flats
+    # and the lower bevels each about a third of its height): taller than wide, a narrow top flat under the rail, steep upper bevels down to
+    # short side flats, long lower bevels in to a narrow bottom flat; nearly round in the hand
+    T, B, W = HB_T, -19.0 * mm * sc, 19.0 * mm * sc                    # top (the receiver's rail base), bottom, half width
+    C = (8.0 * mm * sc, 15.0 * mm * sc, 10.0 * mm * sc, 15.0 * mm * sc)  # the bevels: upper (across, down), lower (across, up)
+    CI = tuple(c - 1.1 * mm for c in C)                                  # (the bore's, 2.6 mm in)
     def octo(t, b, w, c):
-        return [(-w + c, t), (w - c, t), (w, t - c), (w, b + c), (w - c, b), (-w + c, b), (-w, b + c), (-w, t - c)]
+        ux, uz, lx, lz = c
+        return [(-w + ux, t), (w - ux, t), (w, t - uz), (w, b + lz), (w - lx, b), (-w + lx, b), (-w, b + lz), (-w, t - uz)]
     hg = K.tmp(prism(octo(T, B, W, C), 'y', f0, f1))
-    cut(hg, prism(octo(T - 2.6 * mm, B + 2.6 * mm, W - 2.6 * mm, C - 1.0 * mm), 'y', f0 - 0.01, f1 + 0.01))   # (hollow: 2.6 mm walls)
+    cut(hg, prism(octo(T - 2.6 * mm, B + 2.6 * mm, W - 2.6 * mm, CI), 'y', f0 - 0.01, f1 + 0.01))   # (hollow: 2.6 mm walls)
     def face_cut(a, b, f, ln, wd, r=None, depth=6 * mm):
         """A slot ln long, wd across, through the face from section point a to b, centred along it, its centre at forward f."""
         ax, az = a; bx, bz = b
@@ -388,7 +394,7 @@ def handguard_mlok(f0, f1, mat=None, sc=1.0):
     SPL = box(-0.8 * mm, 0.8 * mm, f0 - 0.01, f0 + CJ + 4 * mm, B - 0.01, -NR + 1.0 * mm)
     cut(hg, SPL.copy())
     bevel(hg, 0.5 * mm, 1, 30); smooth(hg); K.adopt(hg, 'handguard', mat)
-    ring = K.tmp(prism(octo(T - 2.6 * mm, B + 2.6 * mm, W - 2.6 * mm, C - 1.0 * mm), 'y', f0, f0 + CJ))
+    ring = K.tmp(prism(octo(T - 2.6 * mm, B + 2.6 * mm, W - 2.6 * mm, CI), 'y', f0, f0 + CJ))
     cut(ring, cyl(NR, f0 - 0.01, f0 + CJ + 0.01, 'y', (0, 0), 40), SPL.copy())
     smooth(ring); K.adopt(ring, 'handguard', mat)
     LZ0, LZ1, LX = B - 6.0 * mm, B + 0.5 * mm, 7.5 * mm                       # (the lug: its bottom, top (inside the tube's wall), half width)
@@ -403,8 +409,8 @@ def handguard_mlok(f0, f1, mat=None, sc=1.0):
         cut(o, hx); bevel(o, 0.3 * mm, 1); smooth(o); K.adopt(o, 'handguard', 'steel')
         o = K.obj(cyl(1.6 * mm, -LX - 0.05 * mm, -LX + 1.0 * mm, 'x', (f0 + q, SZ), 12), 'handguard', 'steel'); smooth(o)
     for s in (-1, 1):                                                          # the QD sockets: a boss on each side face, its cup
-        o = K.tmp(cyl(6.5 * mm, *xs(s * (W - 0.5 * mm), s * (W + 1.6 * mm)), 'x', (f0 + 0.016, (T - C + B + C) / 2 + 2 * mm), 24))
-        cut(o, cyl(3.6 * mm, *xs(s * (W - 1.0 * mm), s * (W + 2.0 * mm)), 'x', (f0 + 0.016, (T - C + B + C) / 2 + 2 * mm), 20))
+        o = K.tmp(cyl(6.5 * mm, *xs(s * (W - 0.5 * mm), s * (W + 1.6 * mm)), 'x', (f0 + 0.016, (T - C[1] + B + C[3]) / 2), 24))
+        cut(o, cyl(3.6 * mm, *xs(s * (W - 1.0 * mm), s * (W + 2.0 * mm)), 'x', (f0 + 0.016, (T - C[1] + B + C[3]) / 2), 20))
         bevel(o, 0.4 * mm, 1); smooth(o); K.adopt(o, 'handguard', mat)
     picatinny(K, f0, f1 - 1.5 * mm, T, 'handguard', mat)
     return B
