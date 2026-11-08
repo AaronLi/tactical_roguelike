@@ -1691,7 +1691,13 @@ const G_GunRecipes = (() => {
       // that rail, as near its back as its clamp, 12 mm behind the seat to 16 mm ahead, stays on it)
       const ap = o.apHg ? G.AuthoredParts.get(o.apHg) : null, bot = ap && ap.part && ap.part.rails && ap.part.rails.bottom as number[] | undefined;
       if (bot && (fgF - 0.012 < hgF + bot[0] - 1e-9 || fgF + 0.016 > hgF + bot[1] + 1e-9)) fgF = hgF + Math.min(Math.max(fgF - hgF, bot[0] + 0.012), bot[1] - 0.016);
-      foregrip(k, o.fg, fgF, fm, anim);
+      // (its colour: the gun's furniture colour, unless that is wood, which a foregrip never is: on a railed handguard of a wood-furnished gun it takes the
+      // handguard's own finish if it has one, else plain polymer black (a wood AK's drop-in rail doesn't carry a red laminate grip). Where the handguard isn't
+      // railed (a wood one), the furniture's, as before. (Not the handguard's finish on every gun: an FDE grip on an FDE rail of a black AR would make the
+      // foregrip a piece per handguard finish, and the Thor's support hand is then more than the per-part bake can explain)
+      const hgT = o.hg && o.hg.t, onRail = hgT === 'rail' || hgT === 'mlok' || hgT === 'vector' || hgT === 'sig' || hgT === 'qbz' || !!(o.hg && o.hg.rails);
+      const woodFm = fm === M.wood() || fm === M.woodRed() || fm === M.woodDark() || fm === M.chequerWood();
+      foregrip(k, o.fg, fgF, onRail && woodFm ? o.hg!.m || M.polymer() : fm, anim);
     } // (the Vector's: on the rail under the front of the upper) // (near the rail's back: the support arm bent, the gun out in front)
     // a clamp-on rail mount: a collar round the barrel (or the can), in front of any jacket, a short rail on one side or both
     let tacAt = A && A.anchors.mount_tac ? { f: A.anchors.mount_tac[0], y: A.anchors.mount_tac[1], x: Math.abs(A.anchors.mount_tac[2]) } : o.tacAt ? Object.assign({}, o.tacAt) : rcv === 'vector' && o.hg && o.hg.t === 'vector' ? { f: L - 0.012, y: vecTrace([0, 132])[1], x: 0.027 } // (on the short rails each side of the front)
