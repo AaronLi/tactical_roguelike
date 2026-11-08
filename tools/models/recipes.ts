@@ -2126,7 +2126,8 @@ const G_GunRecipes = (() => {
   // A PISTOL modelled in Blender (o.rcv 'authored', models/<id>/<id>.glb: docs/models.md "Authored pistols"). Its frame, slide, grip, barrel (an integral suppressor with its
   // front sight on it) and magazine are the model's own; the parts it takes that are not (a pistol dot, a light) are seated on the model's pistol anchors as pistol()
   // seats them: the dot in the slide's optic cut (mount_optic, riding the slide), the light under the frame (mount_tac). Its variant barrel / magazine (o.avBarrel /
-  // o.avMag: a file beside the model) replace the factory one whole. Nothing is scaled.
+  // o.avMag: a file beside the model) replace the factory one whole. A THREADED variant barrel (its anchors.mount_muzzle, the thread's end) takes a muzzle device (o.muzzle /
+  // o.apMuzzle, the shared pistol devices), seated there on the bore axis as pistol() seats one on its thread's end, the muzzle moving on to the device's front. Nothing is scaled.
   function authoredPistol(k: Kit, o: RecipeSpec) {
     const A = G.Authored[o.authored!], a = A.anchors, anim: any = {};
     const ownIrons = !o.optic || o.optic === 'notch' || A.sights.builtin.includes(o.optic);
@@ -2170,11 +2171,15 @@ const G_GunRecipes = (() => {
     anim.mag = partOf(vm ? vm.meshes : A.meshes, 'mag');
     k.tag('barrel');
     draw(vb ? vb.meshes : A.meshes.filter((e) => e.slot === 'barrel'));
+    // a muzzle device on a threaded barrel's thread (the variant's mount_muzzle: its end), as pistol() seats one (its bore radius: the thread's, at least 6.5 mm)
+    const mmz = vb && vb.anchors && vb.anchors.mount_muzzle;
+    let devLen = 0;
+    if (mmz && (o.muzzle || o.apMuzzle)) { k.tag('muzzle'); devLen = muzzleDev(k, o, mmz[0], Math.max(0.0065, (vb!.thread && vb!.thread.r) || 0), mmz[1]); }
     // A light or laser under the frame, at the model's mount_tac (the underside of the frame, where a pistol's rail is)
     k.tag('tac');
     if (o.tac && a.mount_tac) tactical(k, o.tac, a.mount_tac[0], a.mount_tac[1] - 0.0115, -0.01);
     k.tag('base');
-    const info: any = { sy: sight.sy, fSight: sight.fSight, relief: sight.relief || A.info.relief, muzzles: (vb && vb.info ? vb.info.muzzles : A.info.muzzles).map((m: number[]) => m.slice()), anim, magAt: A.info.magAt.slice(), pistol: true };
+    const info: any = { sy: sight.sy, fSight: sight.fSight, relief: sight.relief || A.info.relief, muzzles: devLen ? [[mmz![0] + devLen, mmz![1], mmz![2]]] : (vb && vb.info ? vb.info.muzzles : A.info.muzzles).map((m: number[]) => m.slice()), anim, magAt: A.info.magAt.slice(), pistol: true };
     for (const f of ['grip', 'support', 'slide', 'chamberAt', 'port', 'bolt', 'ch', 'cheek']) if (A.info[f]) info[f] = JSON.parse(JSON.stringify(A.info[f]));
     if (A.info.anim && A.info.anim.bolt) { const bt = A.info.boltTravel != null ? A.info.boltTravel : o.boltTravel; if (bt != null) info.boltTravel = bt; } // (how far a hand-worked bolt comes back: the model's, else the platform's)
     return info;

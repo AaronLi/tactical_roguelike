@@ -1591,18 +1591,24 @@ const G_Gunsmith = (() => {
   // figures are the game's, PROPOSED here (the user confirms them): the stats of what it is (a shorter can: handier and louder; a longer magazine: more rounds,
   // slower to swap). The Welrod is worked by a bolt (def.manual: js/player.ts, the model's part_bolt: js/vmanim.ts), the Maxim 9 by its slide.
   const LATE_AUTHORED: (() => void)[] = []; // (variants added after the last authored pistol: a part's id in a code is its place in the list)
+  const LAST_AUTHORED: (() => void)[] = []; // (b.last: a variant of a LAST pistol's, added after its platform's own parts: the 2011's threaded barrel)
   const authoredPistol = (v: { barrel: Record<string, any>; mag: Record<string, any>; factory?: { name: string; set: Record<string, any> } }) => (h: any) => {
     const { slot, factory, own, plat, def, gs, brandA, brandB } = h, id = def.id as string;
     // the barrel: the integral suppressor with its front sight (no thread: nothing screws on), and its shortened one
     // (suppression is the variant's DATA: b.set overrides the suppressed defaults, e.g. { sup: false, device: 'none', can: null } for an unsuppressed barrel; b.optic: the barrel
     // carries a pistol optic cut and opens the optic slot, the dot seated at the variant's info.mounts.mount_optic; b.late: added after the other authored pistols, so their ids don't move)
     // (v.factory: a pistol whose own barrel is a plain one, the 2011's: its name and set in place of the integral suppressor's; b.same: a barrel drawn as the factory one, no file of its own)
+    // (b.thread: the variant file carries a thread (variant_json anchors.mount_muzzle, thread): the part PROVIDES the muzzle slot, on that thread family's mount (mz:rp, the
+    // pistol devices the shared threaded pistol barrels take), so the slot exists only while that barrel is fitted; the device is seated at the variant's mount_muzzle, the
+    // thread's end, as on a recipe pistol's threaded barrel. b.name may be a function of the part's brand. b.last: added after the platform's own parts, LAST_AUTHORED)
     { const mount = 'br:' + id, cap0 = v.factory ? Object.assign({ barrelIn: gs.barrel }, v.factory.set) : { barrelIn: gs.barrel, sup: true, device: 'suppressor' };
       slot('barrel', mount, true);
       factory('barrel', mount, v.factory ? { name: v.factory.name, model: {}, set: cap0 } : { name: `${def.name} integral suppressor`, model: {}, set: Object.assign({ can: 'integral' }, cap0) });
       for (const [name, b] of Object.entries(v.barrel)) {
-        const add1 = () => own(Object.assign({ id: `${id}.br.${name}`, slot: 'barrel', mount, brand: b.brand === 'B' ? brandB : brandA, name: b.name, price: b.price, tier: b.tier, model: b.same ? {} : { avBarrel: 'barrel_' + name }, st: b.st, set: Object.assign({ can: b.can }, cap0, b.set), desc: b.desc }, b.optic ? { provides: { optic: 'op:pso' } } : null));
-        if (b.late) LATE_AUTHORED.push(add1); else add1();
+        const brand = b.brand === 'B' ? brandB : brandA;
+        const add1 = () => own(Object.assign({ id: `${id}.br.${name}`, slot: 'barrel', mount, brand, name: typeof b.name === 'function' ? b.name(brand) : b.name, price: b.price, tier: b.tier, model: b.same ? {} : { avBarrel: 'barrel_' + name }, st: b.st, set: Object.assign({ can: b.can }, cap0, b.set), desc: b.desc },
+          b.optic || b.thread ? { provides: Object.assign({}, b.optic ? { optic: 'op:pso' } : null, b.thread ? { muzzle: 'mz:' + b.thread } : null) } : null));
+        if (b.last) LAST_AUTHORED.push(add1); else if (b.late) LATE_AUTHORED.push(add1); else add1();
       } }
     // the magazine: the one it comes with (the model's part_mag) and a longer one
     { const mount = 'mag:' + id, cap = def.mag as number;
@@ -1765,13 +1771,18 @@ const G_Gunsmith = (() => {
     desc: 'A digital thermal sight: heat, not light. Anyone warm shows white on a dark picture in total darkness and through smoke (not through glass or walls). 2-4-8× digital zoom (scroll while aiming: the picture coarsens as it zooms, a 384×288 sensor), T cycles white-hot, black-hot and ironbow. Its eyepiece is a screen, so it works with night vision down.' });
   // The 2011 (models/p2011, docs/models.md "Authored pistols"), made after everything else for the same reason: a pistol modelled in Blender, its frame, slide (an optic
   // cut under a cover plate, its own irons), bull barrel, grip module and magazine the model's own. A pistol dot in the cut, a light or laser on the dust cover's rail (mount_tac).
-  // Its barrel is a plain one (no thread: nothing screws on; a threaded barrel needs a file of its own beside the model), and the one other barrel it takes is a match
-  // barrel drawn as the factory one (a drop-in bushingless barrel looks the same): tighter, so the redundancy rule holds (one barrel of each figure). No magazine variant yet.
+  // Its barrel is a plain one (no thread: nothing screws on), and it takes two others: a match barrel drawn as the factory one (a drop-in bushingless barrel looks the
+  // same): tighter; and a threaded one (models/p2011/barrel_threaded.glb: 15 mm on past the slide's nose, a shoulder and a 12 mm ½-28 thread) that opens a muzzle slot for
+  // the pistol devices (mz:rp: the comp and the cans), half an inch longer, so a little faster, and heavier. One barrel of each figure (the redundancy rule). No magazine
+  // variant yet. (The threaded one is made last of all, LAST_AUTHORED: after the 2011's magazine, so no id moves.)
   // (mag = the model's mount_mag, len0 = its mount_barrel's forward: the baker checks them against the model, so a re-exported model re-derives them)
   P('p2011', 'pistol', { rcv: 'authored', authored: 'p2011', mag: { f: 0.0264, y: -0.004 }, len0: 0.1789 }, { optic: ['pso', { optic: 'notch' }], ptac: true, authoredPistol: authoredPistol({
     factory: { name: '2011 4.4" bull barrel', set: { sup: false, device: 'none', can: null } },
-    barrel: { match: { same: true, brand: 'B', name: '2011 4.4" match bull barrel', price: 300, tier: 2, st: { acc: -15, weight: 0.02 }, desc: 'Hand-fitted to the slide, no bushing: tighter groups. It looks like the barrel it replaces.' } },
+    barrel: { match: { same: true, brand: 'B', name: '2011 4.4" match bull barrel', price: 300, tier: 2, st: { acc: -15, weight: 0.02 }, desc: 'Hand-fitted to the slide, no bushing: tighter groups. It looks like the barrel it replaces.' },
+      threaded: { last: true, thread: 'rp', name: (br: string) => `${br.split(' ')[0]} 2011 threaded barrel (½×28)`, price: 220, tier: 1, st: { weight: 0.03 }, set: { barrelIn: 5.0 },
+        desc: 'The bull barrel run on 15 mm past the slide to a shoulder and a ½-28 thread: takes a pistol compensator or suppressor. A little more velocity, a little more weight up front.' } },
     mag: {} }) });
+  for (const add1 of LAST_AUTHORED) add1();
   { const plat = PLATFORMS.p2011; plat.offset = {}; for (const k of STAT_KEYS) plat.offset[k] = -Object.values(plat.defaults).reduce((a, pid) => a + ((PARTS[pid] && PARTS[pid].st[k]) || 0), 0);
     PARTS['op.pso.0'].not = (PARTS['op.pso.0'].not || []).concat(['p2011']); // (the tritium night sights: the 2011 has its own irons, and a dot goes in the cut)
     // (an authored pistol's factory irons are its model's own, on the shared pistol-optic mount: each goes on its own gun only, the 2011's and the Maxim 9's)
