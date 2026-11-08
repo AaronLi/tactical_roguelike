@@ -37,15 +37,27 @@ def build(pid, name, px, L, R, RB, style):
     o = K.obj(cyl(3.2 * mm, 15 * mm, 16.6 * mm, 'x', ((F0 + F1) / 2, TOP + 4 * mm), 6), 'magnifier', 'steel'); smooth(o)
     lv = K.tmp(prism([(F0 + 3 * mm, TOP + 2 * mm), (F1 - 3 * mm, TOP + 2 * mm), (F1 - 1 * mm, TOP + 9 * mm), (F0 + 6 * mm, TOP + 10 * mm)], 'x', -18.5 * mm, -15 * mm))
     bevel(lv, 0.6 * mm, 1); smooth(lv); K.adopt(lv, 'magnifier', 'black')
-    o = K.obj(cyl(4.2 * mm, F0 + 2 * mm, F1 - 2 * mm, 'y', (HX, HZ), 16), 'magnifier', 'black'); smooth(o)              # (the knuckle)
+    o = K.obj(cyl(4.2 * mm, F0 + 12.5 * mm, F1 - 12.5 * mm, 'y', (HX, HZ), 20), 'magnifier', 'black'); smooth(o)        # (the fixed knuckle: the middle third)
+    o = K.obj(cyl(1.4 * mm, F0 + 1.5 * mm, F1 - 1.5 * mm, 'y', (HX, HZ), 10), 'magnifier', 'steel'); smooth(o)          # (the hinge pin through all three)
     o = K.tmp(box(14 * mm, HX, F0 + 2 * mm, F1 - 2 * mm, TOP + 6 * mm, HZ)); bevel(o, 0.6 * mm, 1); smooth(o); K.adopt(o, 'magnifier', 'black')
     # ---- the swinging part (part_magn), its node on the hinge's axis: the arm from the knuckle up to the ring round the tube's front, the tube
     pm = K.part('magn', (HX, (F0 + F1) / 2, HZ))
-    ring = K.tmp(cyl(R + 3.0 * mm, F0 + 2 * mm, F1 - 1 * mm, 'y', (0, 0), 32))
-    boolean(ring, box(-R - 3 * mm, HX + 4 * mm, F0 + 2 * mm, F1 - 1 * mm, HZ - 4 * mm, -R + 2 * mm), 'UNION')            # (its arm to the hinge)
-    cut(ring, cyl(R - 0.2 * mm, F0, F1 + 0.01, 'y', (0, 0), 32))
-    bevel(ring, 0.6 * mm, 1, 30); smooth(ring); K.adopt(ring, 'magnifier', 'black', pm)
-    o = K.obj(cyl(2.0 * mm, HZ - 2 * mm, -R + 1 * mm, 'z', (-R - 1.0 * mm, (F0 + F1) / 2), 8), 'magnifier', 'steel', pm); smooth(o)   # (the clamp screw's head, left)
+    # the flip mount's ring: a machined loop round the tube's front (3 mm wall), a web running from its lower right out to the hinge, and the
+    # two moving knuckles on the web's end, either side of the fixed one; a relief groove round the loop's middle
+    Ro = R + 3.0 * mm
+    ring = K.tmp(cyl(Ro, F0 + 2 * mm, F1 - 1 * mm, 'y', (0, 0), 48))
+    ca, sa = math.cos(math.radians(-25)), math.sin(math.radians(-25)); cb, sb = math.cos(math.radians(-70)), math.sin(math.radians(-70))
+    web = [(Ro * ca * 0.9, Ro * sa * 0.9), (HX + 1.5 * mm, HZ + 3.6 * mm), (HX + 0.5 * mm, HZ - 4.0 * mm), (Ro * cb * 0.9, Ro * sb * 0.9)]
+    for f0_, f1_ in ((F0 + 2 * mm, F0 + 12 * mm), (F1 - 12 * mm, F1 - 1 * mm)):     # (the web only where the moving knuckles are)
+        boolean(ring, prism(web, 'y', f0_, f1_), 'UNION')
+        boolean(ring, cyl(4.2 * mm, f0_, f1_, 'y', (HX, HZ), 20), 'UNION')
+    cut(ring, cyl(R - 0.2 * mm, F0, F1 + 0.01, 'y', (0, 0), 48))
+    gr = cyl(Ro + 1 * mm, F0 + 14 * mm, F1 - 13 * mm, 'y', (0, 0), 48); gk = bpy.data.objects.new('gk', gr); coll.objects.link(gk)
+    boolean(gk, cyl(Ro - 0.8 * mm, F0, F1, 'y', (0, 0), 48), 'DIFFERENCE'); g2 = gk.data.copy(); bpy.data.objects.remove(gk, do_unlink=True)
+    cut(ring, g2)                                                                                              # (the relief groove: an annulus)
+    bevel(ring, 0.5 * mm, 1, 30); smooth(ring); K.adopt(ring, 'magnifier', 'black', pm)
+    bs = K.tmp(box(-Ro - 2.2 * mm, -Ro + 1.5 * mm, (F0 + F1) / 2 - 5 * mm, (F0 + F1) / 2 + 5 * mm, -5 * mm, 5 * mm)); bevel(bs, 0.6 * mm, 1); smooth(bs); K.adopt(bs, 'magnifier', 'black', pm)   # (the loop's pinch boss, left)
+    o = K.obj(cyl(2.0 * mm, -Ro - 3.0 * mm, -Ro - 2.0 * mm, 'x', ((F0 + F1) / 2, 0), 12), 'magnifier', 'steel', pm); smooth(o)   # (its screw head)
     # the tube: the body, the objective's bell at the front, the diopter ring (knurled) near the rear, the eyepiece and its rubber eyecup
     prof = [(fR + 12 * mm, R), (F1 - (8 * mm if RB else 0), R)]
     if RB: prof += [(F1 - 6 * mm, RB), (F1, RB)]
