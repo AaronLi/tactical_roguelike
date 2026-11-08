@@ -367,13 +367,15 @@ const G_Viewmodel = (() => {
       if (k !== pathK) { pathK = k; path = G.flight(cdef, am, G.boreTip({ def: cdef, clicks: w.clicks || 0 }), POI_FAR); }
       const q = path[Math.round(r)]; // (past the round's reach there is no impact to show)
       if (!q) { poi.z = 0; return; }
-      // and off sideways with the wind (js/wind.ts: the level's, as the host last said, where the round will be at that
-      // range): the crosswind across the line of sight times the round's lag time there (G.flight's lag; js/sim.ts windStep)
+      // and off sideways with the wind (js/wind.ts: the level's, as the host last said): the crosswind across the line of sight
+      // times the round's lag time at that range (G.flight's lag; js/sim.ts windStep), by how much of the way there is out in
+      // it (eight points along the line: from a room out through a window, only the part outside; into a room, none of it)
       let side = 0;
       if (G.Wind && G.Wind.mean && q.lag) {
-        const cam = G.R.scopeCam || G.R.camera, f = cam.getWorldDirection(new T.Vector3()), at = cam.getWorldPosition(new T.Vector3()).addScaledVector(f, r);
-        const wv = G.Wind.at(G.Game.map, at), rl = Math.hypot(f.x, f.z);
-        if (wv && rl > 1e-3) side = ((wv.x * -f.z + wv.z * f.x) / rl) * q.lag; // (metres to the right: the wind's part along the right of the line, -f.z, f.x)
+        const cam = G.R.scopeCam || G.R.camera, f = cam.getWorldDirection(new T.Vector3()), o = cam.getWorldPosition(new T.Vector3()), wv = G.Wind.vec(), rl = Math.hypot(f.x, f.z), map = G.Game.map;
+        let out = 0;
+        for (let i = 0; i < 8; i++) { const s = r * (i + 0.5) / 8; if (G.Sim.windy(map, o.x + f.x * s, o.y + f.y * s, o.z + f.z * s)) out++; }
+        if (out && rl > 1e-3) side = ((wv.x * -f.z + wv.z * f.x) / rl) * q.lag * out / 8; // (metres to the right: the wind's part along the right of the line, -f.z, f.x)
       }
       poi.set(Math.round(((side / r) * 1000) / POI_CELL), Math.round(((q.h / r) * 1000) / POI_CELL), 1);
     };
