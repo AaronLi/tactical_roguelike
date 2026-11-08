@@ -1662,8 +1662,8 @@ const G_GunRecipes = (() => {
 
     // sights
     k.tag('optic');
-    // (with a magnifier behind it on a sleeve carried forward, the sight goes forward along that rail to leave it room)
-    const ofs = tr && tr.sleeve && o.hgGap && o.magnifier ? magOfs(o, VT([tr.sleeve.railBack, 0])[0], hgF - 0.012 - VT([tr.sleeve.railBack, 0])[0], 0) : o.optF != null ? o.optF : bull ? L * 0.65 : L * 0.5;
+    // (with a magnifier behind it on a sleeve carried forward, the sight goes forward along that rail to leave it room; on a short rail of the gun's own, optFMag: the MP5's claw mount)
+    const ofs = tr && tr.sleeve && o.hgGap && o.magnifier ? magOfs(o, VT([tr.sleeve.railBack, 0])[0], hgF - 0.012 - VT([tr.sleeve.railBack, 0])[0], 0) : o.magnifier && o.optFMag != null ? o.optFMag : o.optF != null ? o.optF : bull ? L * 0.65 : L * 0.5;
     // (a break-action's bead and rib are on its barrels, so they tip open with them)
     const onBarrels = brk && ((o.optic || 'irons') === 'bead' || tr);
     if (onBarrels) k.into(brk, L, hy);
