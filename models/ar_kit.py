@@ -393,7 +393,7 @@ def handguard_mlok(f0, f1, mat=None, sc=1.0):
     CJ, NR = 0.018, NUT_R + 0.2 * mm                                                 # (the clamp's length; its bore, the nut's radius and a hair)
     SPL = box(-0.8 * mm, 0.8 * mm, f0 - 0.01, f0 + CJ + 4 * mm, B - 0.01, -NR + 1.0 * mm)
     cut(hg, SPL.copy())
-    bevel(hg, 0.5 * mm, 1, 30); smooth(hg); K.adopt(hg, 'handguard', mat)
+    bevel(hg, 0.5 * mm, 1, 30); smooth(hg, 1); K.adopt(hg, 'handguard', mat)   # (flat-shaded: every edge sharp, so the long sliver triangles of its flat faces can't smear normals from the holes' chamfers)
     ring = K.tmp(prism(octo(T - 2.6 * mm, B + 2.6 * mm, W - 2.6 * mm, CI), 'y', f0, f0 + CJ))
     cut(ring, cyl(NR, f0 - 0.01, f0 + CJ + 0.01, 'y', (0, 0), 40), SPL.copy(), box(-W, W, f0 - 0.01, f0 + CJ + 0.01, 0.0, T))   # (a collar under the nut only: over it the top keeps the tube's own wall, as thin as the bottom)
     smooth(ring); K.adopt(ring, 'handguard', mat)
