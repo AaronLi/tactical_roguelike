@@ -159,7 +159,7 @@
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.bc.0": {
    "label": "tac=tac.bc.0",
-   "geometry": "817426c3fa61b859",
+   "geometry": "891ebe1ba39c986d",
    "info": "adca3668369f1fec"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tacL=tac.0": {
@@ -189,7 +189,7 @@
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tacL=tac.bc.0": {
    "label": "tacL=tac.bc.0",
-   "geometry": "ba9d18f2a3f0384d",
+   "geometry": "96d09622be10a3a0",
    "info": "adca3668369f1fec"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.1,stock=stk.tube.0": {
@@ -639,7 +639,7 @@
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.bc.0,tacL=tac.0": {
    "label": "tac=tac.bc.0 from loaded A",
-   "geometry": "466833314ef9a2ca",
+   "geometry": "adb218efb0f42331",
    "info": "0515539cc636217a"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tacL=tac.0": {
@@ -669,7 +669,7 @@
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.bc.0": {
    "label": "tacL=tac.bc.0 from loaded A",
-   "geometry": "1ca7d25ec38c19a1",
+   "geometry": "b3b08702a5ca21d3",
    "info": "0515539cc636217a"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0": {

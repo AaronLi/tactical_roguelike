@@ -174,7 +174,7 @@
   },
   "barrel=br.5.56x45.10.3,charging=oem.ch.ar.3,grip=gr.ar.0,handguard=oem.hg.ar.5,mag=stanag.mag.30,muzzle=mz.r556.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.bc.0": {
    "label": "tac=tac.bc.0",
-   "geometry": "1e10558077b78ac7",
+   "geometry": "9d589d293166e99f",
    "info": "e5f9af213b30594e"
   },
   "barrel=br.5.56x45.10.3,charging=oem.ch.ar.3,grip=gr.ar.0,handguard=oem.hg.ar.5,mag=stanag.mag.30,muzzle=mz.r556.a2,optic=op.pic.0,stock=stk.tube.0,tacL=tac.0": {
@@ -204,7 +204,7 @@
   },
   "barrel=br.5.56x45.10.3,charging=oem.ch.ar.3,grip=gr.ar.0,handguard=oem.hg.ar.5,mag=stanag.mag.30,muzzle=mz.r556.a2,optic=op.pic.0,stock=stk.tube.0,tacL=tac.bc.0": {
    "label": "tacL=tac.bc.0",
-   "geometry": "0ccdac7cc71fdbea",
+   "geometry": "d693cc89f3583732",
    "info": "e5f9af213b30594e"
   },
   "barrel=br.5.56x45.10.3,charging=oem.ch.ar.3,grip=gr.ar.0,handguard=oem.hg.ar.5,mag=stanag.mag.30,muzzle=mz.r556.a2,optic=op.pic.1,stock=stk.tube.0": {
@@ -669,7 +669,7 @@
   },
   "barrel=br.5.56x45.10.3,charging=oem.ch.ar.3,fg=fg.0,grip=gr.ar.0,handguard=oem.hg.ar.5,mag=stanag.mag.30,muzzle=mz.r556.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.bc.0,tacL=tac.0": {
    "label": "tac=tac.bc.0 from loaded A",
-   "geometry": "13609bc0a9c1c055",
+   "geometry": "ec99175a61f3c952",
    "info": "0eedae84e7bdc038"
   },
   "barrel=br.5.56x45.10.3,charging=oem.ch.ar.3,fg=fg.0,grip=gr.ar.0,handguard=oem.hg.ar.5,mag=stanag.mag.30,muzzle=mz.r556.a2,optic=op.pic.0,stock=stk.tube.0,tacL=tac.0": {
@@ -699,7 +699,7 @@
   },
   "barrel=br.5.56x45.10.3,charging=oem.ch.ar.3,fg=fg.0,grip=gr.ar.0,handguard=oem.hg.ar.5,mag=stanag.mag.30,muzzle=mz.r556.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.bc.0": {
    "label": "tacL=tac.bc.0 from loaded A",
-   "geometry": "403c47f637126584",
+   "geometry": "65e53e162dfc79f7",
    "info": "0eedae84e7bdc038"
   },
   "barrel=br.5.56x45.10.3,charging=oem.ch.ar.3,fg=fg.0,grip=gr.ar.0,handguard=oem.hg.ar.5,mag=stanag.mag.30,muzzle=mz.r556.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0": {

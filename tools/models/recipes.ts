@@ -11,6 +11,8 @@ const G_GunRecipes = (() => {
   const T = THREE;
   const M = G.GunMaterials.M;
   const BEAD = new T.MeshStandardMaterial({ color: 0xf2dc96, emissive: 0x5a4210, roughness: 0.3, metalness: 0.6 });
+  // a display surface's own material (kit.display): a dark LCD's glass, what it looks like wherever the game doesn't paint it (the hangar, the gunsmith, third person)
+  const LCD = new T.MeshStandardMaterial({ name: 'display', color: 0x0b1712, roughness: 0.25, metalness: 0.1 });
 
   const Mk = M as Record<string, () => THREE.MeshStandardMaterial>; // (a material looked up by name)
   type Tracer = (p: number[]) => number[]; // a traced reference photo's pixel -> [forward, up] in gun space
@@ -92,6 +94,15 @@ const G_GunRecipes = (() => {
         const geo = new T.ExtrudeGeometry(s, { depth: thick, bevelEnabled: false, curveSegments: 24 });
         geo.translate(0, 0, -thick / 2);
         return put(geo, m, x, y, f0 + thick / 2);
+      },
+      // a display surface (docs/models.md "Display surfaces"): a w x h plane facing the shooter (back, +z) centred at (f, y, x), tipped up by `tilt` radians (its face
+      // turned toward the sky), named display_<name>, with UVs (u to the shooter's right, v up the face) and userData.display = { width, height }, the canvas the game
+      // paints on it (js/viewmodel.ts surfaces); it survives the bake as it is
+      display(name: string, w: number, h: number, px: number[], f: number, y = 0, x = 0, tilt = 0) {
+        const geo = new T.PlaneGeometry(w, h); if (tilt) geo.rotateX(-tilt);
+        const mesh = put(geo, LCD, x, y, f);
+        mesh.name = 'display_' + name; mesh.userData.display = { width: px[0], height: px[1] };
+        return mesh;
       },
       // a flat plate facing down the bore, outline [[x, y], ...] as you'd see it from behind the gun
       plate(pts: number[][], thick: number, m: THREE.Material, f0: number) {
@@ -908,9 +919,13 @@ const G_GunRecipes = (() => {
       if (t === 'pcombo') k.cyl(0.0035, 0.004, M.dot(), f, y - r - 0.004, cx);
       return;
     }
-    if (t === 'bcomp') { // a ballistic computer: a long box on the rail, a rangefinder's two windows and the laser in front, a green display on its outer side
+    if (t === 'bcomp') { // a ballistic computer: a long box on the rail, a rangefinder's two windows and the laser in front, a green status strip on its outer side, and on its
+      // back (toward the shooter) the range readout: display_range (display_range_l on the left rail), painted by js/player.ts with the metres to what's under the crosshair.
+      // The readout stands on a block raised on the back of the box: over the handguard's side rail, which hides the lower back of the module from behind the gun.
       const hw = 0.0125, bx = x + side * hw;
       k.box(2 * hw, 0.03, 0.09, M.black(), f - 0.09, y, bx);
+      k.box(2 * hw, 0.03, 0.03, M.black(), f - 0.092, y + 0.011, bx);
+      k.display(side < 0 ? 'range_l' : 'range', 0.023, 0.0162, [256, 180], f - 0.0925, y + 0.0145, bx);
       k.box(0.02, 0.006, 0.05, M.black(), f - 0.07, y + 0.017, bx);
       k.box(0.0016, 0.012, 0.03, M.glow(), f - 0.06, y + 0.002, bx + side * (hw + 0.0006));
       for (const dx of [-0.007, 0.007]) k.cyl(0.0052, 0.004, M.lens(), f, y + 0.004, bx + dx);
