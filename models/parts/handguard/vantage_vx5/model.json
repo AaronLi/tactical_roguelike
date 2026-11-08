@@ -1,0 +1,39 @@
+{
+  "source": "authored",
+  "kind": "part",
+  "slot": "handguard",
+  "frame": "handguard-mount",
+  "anchors": {
+    "support": [
+      0.09,
+      -0.025,
+      0
+    ]
+  },
+  "part": {
+    "t": "mlok",
+    "len": 0.12,
+    "rails": {
+      "top": [
+        0,
+        0.1185
+      ],
+      "left": [
+        0.03,
+        0.11
+      ],
+      "right": [
+        0.03,
+        0.11
+      ],
+      "bottom": [
+        0.03,
+        0.11
+      ],
+      "kind": "mlok"
+    }
+  },
+  "replaces": [
+    "Vantage VX-5 M-LOK 5\""
+  ]
+}

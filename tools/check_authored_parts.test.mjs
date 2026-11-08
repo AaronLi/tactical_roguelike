@@ -95,6 +95,8 @@ fconf('handguard/quad_rail_240', 'the factory rail is valid', () => {}, null);
 fconf('handguard/quad_rail_240', 'a length in millimetres', (c) => { c.part.len = 239.5; }, /part\.len: expected a length in metres/);
 fconf('handguard/quad_rail_240', 'a rail off the end', (c) => { c.part.rails.top = [0, 0.3]; }, /part\.rails\.top: \[0,0\.3\] runs off the handguard/);
 fconf('handguard/quad_rail_240', 'a rail that is not a side', (c) => { c.part.rails.under = [0, 0.1]; }, /part\.rails\.under: not a side/);
+fconf('handguard/quad_rail_240', 'the side rails kind', (c) => { c.part.rails.kind = 'mlok'; }, null);
+fconf('handguard/quad_rail_240', 'a side rail kind that is not one', (c) => { c.part.rails.kind = 'keymod'; }, /part\.rails\.kind: "picatinny" or "mlok"/);
 { const S = M.authoredPartSlots; run('the finish materials agree (js/glb.ts and tools/authored_parts.mjs)', Object.keys(S).filter((s) => s !== 'optic' && (S[s].finish || null) !== (FINISH[s] || null)).map((s) => s + ': ' + S[s].finish + ' vs ' + FINISH[s]), null); }
 const FB = (k) => { const b = boundsOf(readAuthoredPart(k).meshes); return { min: b.min.slice(), max: b.max.slice() }; };
 const FG = (k, label, mut, re, cmut) => { const b = FB(k), c = fcfg(k); mut(b); if (cmut) cmut(c); run(`${k.split('/')[0]} geometry: ${label}`, checkFurniture(k.split('/')[0], c, b), re); };
